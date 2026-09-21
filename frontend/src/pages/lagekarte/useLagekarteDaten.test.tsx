@@ -294,3 +294,53 @@ describe('useLagekarteDaten fehlerhafteQuellen', () => {
     await waitFor(() => expect(result.current.fehlerhafteQuellen).toEqual(['Gesicherter Stand']));
   });
 });
+
+/**
+ * `markerLaden` (Nacharbeit 22.09.2026): die Startansicht der Karte entscheidet erst über das
+ * VOLLSTÄNDIGE Markerbild. `ladt` hängt nur an Einsatz und Config und wäre dafür zu früh.
+ */
+describe('useLagekarteDaten markerLaden', () => {
+  it('bleibt wahr, solange eine Marker-Quelle lädt — auch wenn `ladt` schon fertig ist', async () => {
+    let freigeben: () => void = () => {};
+    const gesperrt = new Promise<void>((r) => {
+      freigeben = r;
+    });
+    server.use(
+      http.get('/api/einsaetze/5', () =>
+        HttpResponse.json({ id: 5, bezeichnung: 'T', status: 'aktiv' }),
+      ),
+      http.get('/api/karte/config', () =>
+        HttpResponse.json({
+          online_styles: [],
+          offline_verfuegbar: false,
+          offline_tiles_url: null,
+          offline_attribution: null,
+          offline_regionen: [],
+          karten_bau_verfuegbar: false,
+        }),
+      ),
+      http.get('/api/einsaetze/5/einheiten', async () => {
+        await gesperrt;
+        return HttpResponse.json([]);
+      }),
+      ...[
+        '/api/einsaetze/5/uhs',
+        '/api/einsaetze/5/schaeden',
+        '/api/einsaetze/5/fahrzeuge',
+        '/api/einsaetze/5/abschnitte',
+        '/api/einsaetze/5/zonen',
+        '/api/einsaetze/5/freie-zeichen',
+        '/api/einsaetze/5/gefahrengebiete',
+        '/api/einsaetze/5/lage/meldungen',
+        '/api/einsaetze/5/karte/fuehrungskraefte',
+      ].map((pfad) => http.get(pfad, () => HttpResponse.json([]))),
+    );
+    const { result } = renderHook(() => useLagekarteDaten({ einsatzId: 5, zeigeZonen: true }), {
+      wrapper: wrapper(),
+    });
+    await waitFor(() => expect(result.current.ladt).toBe(false));
+    expect(result.current.markerLaden).toBe(true);
+    freigeben();
+    await waitFor(() => expect(result.current.markerLaden).toBe(false));
+  });
+});

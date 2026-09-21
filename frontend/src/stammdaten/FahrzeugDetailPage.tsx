@@ -15,7 +15,6 @@ import { Link, Navigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import AdminPage from '../components/AdminPage';
 import { monoStil } from '../components/instrument';
-import SektionHeader from '../components/SektionHeader';
 import { SeitenFehler, SeitenLeer, SeitenSkeleton } from '../components/SeitenZustand';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import StaerkeEingabe from '../anzeige/StaerkeEingabe';
@@ -36,6 +35,7 @@ import type { Fahrzeug, Staerke } from '../api/types';
 import { flaeche } from '../theme/tokens';
 import { fahrzeugListePfad } from './stammdatenDetail';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
+import Formularpaneel from '../pages/einstellungen/Formularpaneel';
 
 interface FormWerte {
   funkrufname: string;
@@ -155,6 +155,7 @@ export default function FahrzeugDetailPage() {
         ]}
       />
       <AdminPage
+        breite={flaeche.seiteSchmal}
         titel={<span style={monoStil(14, 500)}>{fahrzeug.funkrufname}</span>}
         beschreibung="Vollständige Stammdaten. Die Schnellerfassung in der Liste trägt nur die vier Felder, ohne die ein Fahrzeug nicht auffindbar ist."
         hinweis={
@@ -202,93 +203,99 @@ export default function FahrzeugDetailPage() {
           initialValues={zuFormWerten(fahrzeug)}
           onFinish={(werte) => speichern.mutate(werte)}
         >
-          <SektionHeader titel="Identität" dataUpdatedAt={fahrzeugeQuery.dataUpdatedAt} />
-          <Row gutter={token.margin}>
-            <Col xs={24} lg={12}>
-              <Form.Item
-                label="Funkrufname"
-                name="funkrufname"
-                rules={[
-                  { required: true, whitespace: true, message: 'Funkrufname darf nicht leer sein' },
-                ]}
-              >
-                <Input />
-              </Form.Item>
-            </Col>
-            <Col xs={24} lg={12}>
-              <Form.Item label="Fahrzeugtyp" name="fahrzeugtyp">
-                <AutoComplete
-                  options={vorschlaege.fahrzeugtyp.map((t) => ({ value: t }))}
-                  allowClear
-                  placeholder="z. B. LF 20, RTW"
-                  showSearch={{
-                    filterOption: (input, option) =>
-                      (option?.value ?? '').toLowerCase().includes(input.toLowerCase()),
-                  }}
-                />
-              </Form.Item>
-            </Col>
-            <Col xs={24} lg={12}>
-              <Form.Item label="Trägerorganisation" name="traegerorganisation">
-                <AutoComplete
-                  options={vorschlaege.traegerorganisation.map((t) => ({ value: t }))}
-                  allowClear
-                  placeholder="z. B. Feuerwehr Musterstadt"
-                  showSearch={{
-                    filterOption: (input, option) =>
-                      (option?.value ?? '').toLowerCase().includes(input.toLowerCase()),
-                  }}
-                />
-              </Form.Item>
-            </Col>
-            <Col xs={24} lg={12}>
-              <Form.Item label="Kennzeichen" name="kennzeichen">
-                <Input />
-              </Form.Item>
-            </Col>
-            <Col xs={24} lg={12}>
-              <Form.Item label="OPTA" name="opta">
-                <Input />
-              </Form.Item>
-            </Col>
-            <Col xs={24} lg={12}>
-              <Form.Item label="Standort" name="standort">
-                <AutoComplete
-                  options={vorschlaege.standort.map((t) => ({ value: t }))}
-                  allowClear
-                  placeholder="z. B. Wache Mitte"
-                  showSearch={{
-                    filterOption: (input, option) =>
-                      (option?.value ?? '').toLowerCase().includes(input.toLowerCase()),
-                  }}
-                />
-              </Form.Item>
-            </Col>
-          </Row>
+          <Formularpaneel titel="Identität" dataUpdatedAt={fahrzeugeQuery.dataUpdatedAt}>
+            <Row gutter={token.margin}>
+              <Col xs={24} lg={12}>
+                <Form.Item
+                  label="Funkrufname"
+                  name="funkrufname"
+                  rules={[
+                    {
+                      required: true,
+                      whitespace: true,
+                      message: 'Funkrufname darf nicht leer sein',
+                    },
+                  ]}
+                >
+                  <Input />
+                </Form.Item>
+              </Col>
+              <Col xs={24} lg={12}>
+                <Form.Item label="Fahrzeugtyp" name="fahrzeugtyp">
+                  <AutoComplete
+                    options={vorschlaege.fahrzeugtyp.map((t) => ({ value: t }))}
+                    allowClear
+                    placeholder="z. B. LF 20, RTW"
+                    showSearch={{
+                      filterOption: (input, option) =>
+                        (option?.value ?? '').toLowerCase().includes(input.toLowerCase()),
+                    }}
+                  />
+                </Form.Item>
+              </Col>
+              <Col xs={24} lg={12}>
+                <Form.Item label="Trägerorganisation" name="traegerorganisation">
+                  <AutoComplete
+                    options={vorschlaege.traegerorganisation.map((t) => ({ value: t }))}
+                    allowClear
+                    placeholder="z. B. Feuerwehr Musterstadt"
+                    showSearch={{
+                      filterOption: (input, option) =>
+                        (option?.value ?? '').toLowerCase().includes(input.toLowerCase()),
+                    }}
+                  />
+                </Form.Item>
+              </Col>
+              <Col xs={24} lg={12}>
+                <Form.Item label="Kennzeichen" name="kennzeichen">
+                  <Input />
+                </Form.Item>
+              </Col>
+              <Col xs={24} lg={12}>
+                <Form.Item label="OPTA" name="opta">
+                  <Input />
+                </Form.Item>
+              </Col>
+              <Col xs={24} lg={12}>
+                <Form.Item label="Standort" name="standort">
+                  <AutoComplete
+                    options={vorschlaege.standort.map((t) => ({ value: t }))}
+                    allowClear
+                    placeholder="z. B. Wache Mitte"
+                    showSearch={{
+                      filterOption: (input, option) =>
+                        (option?.value ?? '').toLowerCase().includes(input.toLowerCase()),
+                    }}
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+          </Formularpaneel>
 
-          <SektionHeader titel="Funk & Sonderrechte" />
-          <Row gutter={token.margin}>
-            <Col xs={24} lg={12}>
-              <Form.Item label="FMS-ISSI" name="fms_issi">
-                <Input />
-              </Form.Item>
-            </Col>
-            <Col xs={24} lg={12}>
-              <Form.Item label="Sonder-/Wegerecht" name="sondersignal" valuePropName="checked">
-                <Switch />
-              </Form.Item>
-            </Col>
-          </Row>
+          <Formularpaneel titel="Funk & Sonderrechte">
+            <Row gutter={token.margin}>
+              <Col xs={24} lg={12}>
+                <Form.Item label="FMS-ISSI" name="fms_issi">
+                  <Input />
+                </Form.Item>
+              </Col>
+              <Col xs={24} lg={12}>
+                <Form.Item label="Sonder-/Wegerecht" name="sondersignal" valuePropName="checked">
+                  <Switch />
+                </Form.Item>
+              </Col>
+            </Row>
+          </Formularpaneel>
 
-          <SektionHeader titel="Kapazität" />
-          <Row gutter={token.margin}>
-            <Col xs={24} lg={12}>
-              <Form.Item label="Tragenkapazität" name="tragenkapazitaet">
-                <InputNumber min={0} style={{ width: '100%', maxWidth: 160 }} />
-              </Form.Item>
-            </Col>
-            <Col xs={24} lg={12}>
-              {/*
+          <Formularpaneel titel="Kapazität">
+            <Row gutter={token.margin}>
+              <Col xs={24} lg={12}>
+                <Form.Item label="Tragenkapazität" name="tragenkapazitaet">
+                  <InputNumber min={0} style={{ width: '100%', maxWidth: 160 }} />
+                </Form.Item>
+              </Col>
+              <Col xs={24} lg={12}>
+                {/*
                 EIN `Form.Item` für das ganze F/UF/M-Trio — nicht drei.
                 `src/routes/fahrzeug.rs:267` prüft die Stärke gegen den EFFEKTIVZUSTAND
                 (`staerke_roh`, Mehrspalten-CHECK „alle drei oder keiner"). Eine Maske, die
@@ -296,16 +303,18 @@ export default function FahrzeugDetailPage() {
                 Kombination erzeugen, die der CHECK ablehnt — deshalb ein Formular, ein
                 Absenden, alle drei Werte.
               */}
-              <Form.Item label="Soll-Stärke (alle drei oder keiner)" name="staerke">
-                <StaerkeEingabe />
-              </Form.Item>
-            </Col>
-          </Row>
+                <Form.Item label="Soll-Stärke (alle drei oder keiner)" name="staerke">
+                  <StaerkeEingabe />
+                </Form.Item>
+              </Col>
+            </Row>
+          </Formularpaneel>
 
-          <SektionHeader titel="Bemerkung" />
-          <Form.Item label="Bemerkung" name="bemerkung">
-            <Input.TextArea rows={3} />
-          </Form.Item>
+          <Formularpaneel titel="Freitext">
+            <Form.Item label="Bemerkung" name="bemerkung">
+              <Input.TextArea rows={3} />
+            </Form.Item>
+          </Formularpaneel>
 
           {/* Sticky am unteren Rand und IM `<form>`: nur dort trägt der Knopf
               `htmlType="submit"`, und Enter sendet über die eingebaute Formularübermittlung

@@ -1,7 +1,14 @@
 import { Button } from 'antd';
 import type { CSSProperties } from 'react';
 import type { Person } from '../api/types';
-import { Paneel, PaneelZeile, monoStil, useRollen } from '../components/instrument';
+import {
+  Aufgliederung,
+  Paneel,
+  PaneelZeile,
+  monoStil,
+  useRollen,
+  type Segment,
+} from '../components/instrument';
 import { sichtung } from '../theme/statusFarben';
 import { sichtungsfarben } from '../theme/tokens';
 import { SK_WORT } from './personMeta';
@@ -26,11 +33,11 @@ import {
  * `sichtung[k].farbe` wie `SichtungsTag`; „unverletzt" und „ohne Sichtung" haben keine
  * Fachfarbe und stehen als leeres Feld bzw. neutrale Spur.
  *
- * DER BALKEN IST EIN LOKALER NACHBAU von `Aufgliederung` (gemeldet): deren Segmente sind
- * nackte Flächen, und das schwarze Feld für „tot" verschwände auf dem Nachtgrund. Hier
- * trägt jedes Segment dieselbe Umrandung wie das Farbfeld des `SichtungsTag` — dieselbe
- * Begründung wie dort (Gelb auf hellem, Schwarz auf dunklem Grund). Zugänglich ist er als
- * EIN Bild mit ausgeschriebenem Wortlaut; die Liste darunter ist der zweite Kanal.
+ * DER BALKEN IST DER BAUSTEIN `Aufgliederung` mit Umrandung je Segment (seit 22.09.2026;
+ * vorher ein lokaler Nachbau): das schwarze Feld für „tot" verschwände sonst auf dem
+ * Nachtgrund, Gelb auf hellem — dieselbe Begründung wie am Farbfeld des `SichtungsTag`.
+ * Zugänglich ist er als EIN Bild mit ausgeschriebenem Wortlaut über ALLE Kategorien, auch
+ * die leeren; die Liste darunter ist der zweite Kanal.
  */
 
 interface Props {
@@ -79,10 +86,14 @@ export default function BetroffenenSeitenleiste({
   const bild = sichtungsbild(alle);
   const verbleib = verbleibZaehlung(alle, uhsName);
   const offen = offeneFelder(alle);
-  const belegt = SICHTUNGSBILD_REIHE.filter((k) => bild.je[k] > 0);
-  const bildText = `Betroffene nach Sichtung: ${SICHTUNGSBILD_REIHE.map(
-    (k) => `${kuerzel(k) === '—' ? 'ohne Sichtung' : kuerzel(k)} ${bild.je[k]}`,
-  ).join(', ')}`;
+  // Alle Kategorien, auch die leeren: der zugängliche Name zählt sie vollständig auf, die
+  // Fläche zeichnet der Baustein ohnehin nur für positive Werte.
+  const segmente: Segment[] = SICHTUNGSBILD_REIHE.map((k) => ({
+    label: k === 'ohne' ? 'ohne Sichtung' : kuerzel(k),
+    wert: bild.je[k],
+    farbe: farbe(k) ?? rollen.flaeche3,
+    umrandung: token.colorTextTertiary,
+  }));
 
   const zeile: CSSProperties = {
     display: 'flex',
@@ -108,31 +119,12 @@ export default function BetroffenenSeitenleiste({
             </span>
             <span style={{ fontSize: 11, color: rollen.schwach }}>erfasst</span>
           </div>
-          <div
-            role="img"
-            aria-label={bildText}
-            data-lfh="sichtungsbalken"
-            style={{
-              display: 'flex',
-              gap: 2,
-              height: 8,
-              background: belegt.length === 0 ? rollen.flaeche3 : undefined,
-            }}
-          >
-            {belegt.map((k) => (
-              <span
-                key={k}
-                style={{
-                  flexGrow: bild.je[k],
-                  flexShrink: 1,
-                  flexBasis: 0,
-                  background: farbe(k) ?? rollen.flaeche3,
-                  outline: `1px solid ${token.colorTextTertiary}`,
-                  outlineOffset: -1,
-                }}
-              />
-            ))}
-          </div>
+          <Aufgliederung
+            segmente={segmente}
+            titel="Betroffene nach Sichtung"
+            hoehe={8}
+            legende={false}
+          />
           <ul
             aria-label="Sichtungskategorien"
             style={{

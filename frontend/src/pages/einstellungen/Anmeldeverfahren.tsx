@@ -6,6 +6,8 @@ import AdminPage from '../../components/AdminPage';
 import { SeitenHinweise } from '../../components/SpeicherHinweis';
 import { useAuth } from '../../auth/AuthContext';
 import { globalKeys } from '../../api/queryKeys';
+import { flaeche } from '../../theme/tokens';
+import { Paneel } from '../../components/instrument';
 
 /**
  * Trefflächenboden für die Beschriftungszeile — REIN und exportiert, damit die Zusicherung
@@ -86,6 +88,7 @@ export default function Anmeldeverfahren() {
   return (
     <AdminPage
       titel="Anmeldeverfahren"
+      breite={flaeche.seiteSchmal}
       beschreibung="Verfügbare Login-Wege an- und abschalten. Nur beim Serverstart konfigurierte Verfahren erscheinen hier. Änderungen werden sofort gespeichert."
       hinweis={
         <SeitenHinweise
@@ -96,78 +99,84 @@ export default function Anmeldeverfahren() {
         />
       }
     >
-      {providerQuery.isLoading ? (
-        <Spin />
-      ) : providerQuery.isError ? (
-        <Alert type="error" title="Anmeldeverfahren nicht ladbar" showIcon />
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 360 }}>
-          {provider.map((p) => {
-            const istPasswort = p.id === 'passwort';
-            // Die drei Sperrquellen getrennt statt vermischt: nur zwei davon sind dauerhaft
-            // und verdienen einen Text. `isPending` ist vorübergehend und bekommt keinen —
-            // ein Grund, der nach 200 ms wieder verschwindet, ist Rauschen.
-            const bedienbar = istAdmin && !istPasswort;
-            const gesperrt = !bedienbar || schaltenMutation.isPending;
-            const sperrGrund = !istAdmin
-              ? 'nur Admins'
-              : istPasswort
-                ? 'nicht deaktivierbar'
-                : null;
-            const langGrund = !istAdmin
-              ? 'Nur Benutzer mit der Systemrolle „Admin" dürfen Anmeldeverfahren umschalten'
-              : 'Garantierter Admin-Login-Weg — nicht deaktivierbar';
-            const feldId = `anmeldeverfahren-${p.id}`;
-            // Nur die abgelehnte Zeile wird markiert (H14). `variables` trägt die Zeile,
-            // an der die Mutation zuletzt gescheitert ist.
-            const hatFehler = schaltenMutation.isError && schaltenMutation.variables?.id === p.id;
-            return (
-              <div
-                key={p.id}
-                data-provider-zeile={p.id}
-                data-fehler={hatFehler ? 'true' : undefined}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 12,
-                  borderInlineStart: hatFehler ? `3px solid ${token.colorError}` : undefined,
-                }}
-              >
-                {/* Ein `<label htmlFor>` NUR an der bedienbaren Zeile — sonst ein `<span>`
+      <Paneel
+        titel="Login-Wege"
+        meta={providerQuery.isSuccess ? provider.length : undefined}
+        koerperPolster
+      >
+        {providerQuery.isLoading ? (
+          <Spin />
+        ) : providerQuery.isError ? (
+          <Alert type="error" title="Anmeldeverfahren nicht ladbar" showIcon />
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 360 }}>
+            {provider.map((p) => {
+              const istPasswort = p.id === 'passwort';
+              // Die drei Sperrquellen getrennt statt vermischt: nur zwei davon sind dauerhaft
+              // und verdienen einen Text. `isPending` ist vorübergehend und bekommt keinen —
+              // ein Grund, der nach 200 ms wieder verschwindet, ist Rauschen.
+              const bedienbar = istAdmin && !istPasswort;
+              const gesperrt = !bedienbar || schaltenMutation.isPending;
+              const sperrGrund = !istAdmin
+                ? 'nur Admins'
+                : istPasswort
+                  ? 'nicht deaktivierbar'
+                  : null;
+              const langGrund = !istAdmin
+                ? 'Nur Benutzer mit der Systemrolle „Admin" dürfen Anmeldeverfahren umschalten'
+                : 'Garantierter Admin-Login-Weg — nicht deaktivierbar';
+              const feldId = `anmeldeverfahren-${p.id}`;
+              // Nur die abgelehnte Zeile wird markiert (H14). `variables` trägt die Zeile,
+              // an der die Mutation zuletzt gescheitert ist.
+              const hatFehler = schaltenMutation.isError && schaltenMutation.variables?.id === p.id;
+              return (
+                <div
+                  key={p.id}
+                  data-provider-zeile={p.id}
+                  data-fehler={hatFehler ? 'true' : undefined}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    borderInlineStart: hatFehler ? `3px solid ${token.colorError}` : undefined,
+                  }}
+                >
+                  {/* Ein `<label htmlFor>` NUR an der bedienbaren Zeile — sonst ein `<span>`
                     ohne Zeigerform. Das `aria-label` am Switch bleibt und schlägt das Label
                     (gemessen), die Bestandsnamen ändern sich also nicht. Wer es später als
                     „doppelt" entfernt, bekommt STILL einen anderen Accessible Name. */}
-                {bedienbar ? (
-                  <label
-                    htmlFor={feldId}
-                    style={{ ...zeilenzielStil(token), flex: 1, cursor: 'pointer' }}
-                  >
-                    {p.anzeigename}
-                  </label>
-                ) : (
-                  <span style={{ ...zeilenzielStil(token), flex: 1 }}>{p.anzeigename}</span>
-                )}
-                {sperrGrund && (
-                  // Kurzwort sichtbar, lange Begründung im Tooltip darüber — und der Tooltip
-                  // hängt an einem NICHT gesperrten Element, braucht also keinen Wrapper.
-                  <Tooltip title={langGrund}>
-                    <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
-                      {sperrGrund}
-                    </Typography.Text>
-                  </Tooltip>
-                )}
-                <Switch
-                  id={feldId}
-                  aria-label={`Anmeldeverfahren: ${p.anzeigename}`}
-                  checked={p.aktiviert}
-                  disabled={gesperrt}
-                  onChange={(aktiviert) => schaltenMutation.mutate({ id: p.id, aktiviert })}
-                />
-              </div>
-            );
-          })}
-        </div>
-      )}
+                  {bedienbar ? (
+                    <label
+                      htmlFor={feldId}
+                      style={{ ...zeilenzielStil(token), flex: 1, cursor: 'pointer' }}
+                    >
+                      {p.anzeigename}
+                    </label>
+                  ) : (
+                    <span style={{ ...zeilenzielStil(token), flex: 1 }}>{p.anzeigename}</span>
+                  )}
+                  {sperrGrund && (
+                    // Kurzwort sichtbar, lange Begründung im Tooltip darüber — und der Tooltip
+                    // hängt an einem NICHT gesperrten Element, braucht also keinen Wrapper.
+                    <Tooltip title={langGrund}>
+                      <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
+                        {sperrGrund}
+                      </Typography.Text>
+                    </Tooltip>
+                  )}
+                  <Switch
+                    id={feldId}
+                    aria-label={`Anmeldeverfahren: ${p.anzeigename}`}
+                    checked={p.aktiviert}
+                    disabled={gesperrt}
+                    onChange={(aktiviert) => schaltenMutation.mutate({ id: p.id, aktiviert })}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Paneel>
     </AdminPage>
   );
 }

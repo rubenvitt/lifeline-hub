@@ -11,6 +11,7 @@ export {
   paneelStil,
   paneelKopfStil,
   paneelZeileStil,
+  type PaneelUeberschrift,
 } from './Paneel';
 export {
   Kennzahl,
@@ -18,6 +19,7 @@ export {
   kennzahlStil,
   kennzahlenbandStil,
   zahlFarbe,
+  punktFarbe,
   KANTE,
   LADE_ZEICHEN,
   FEHLER_ZEICHEN,
@@ -33,6 +35,7 @@ export {
   Balken,
   aufgliederungText,
   sichtbareSegmente,
+  segmentFlaecheStil,
   anteil,
   type Segment,
 } from './Aufgliederung';
@@ -60,3 +63,13 @@ export {
 export { default as Sammelbanner, type SammelbannerProps } from './Sammelbanner';
 export { default as Schnellerfassungszeile, schnellerfassungStil } from './Schnellerfassungszeile';
 export { istDunkel, rollenwerte, useRollen, schriftStil, monoStil } from './rollenwerte';
+export { default as Datenraster, Datenfeld } from './Datenraster';
+export { DATENRASTER_MINDESTBREITE, datenrasterStil, datenfeldStil } from './datenrasterStil';
+export {
+  default as PaneelZustand,
+  PaneelLink,
+  PANEEL_FEHLER_TITEL,
+  PANEEL_FEHLER_TEXT,
+  PANEEL_NEULADEN,
+  type PaneelDatenzustand,
+} from './PaneelZustand';

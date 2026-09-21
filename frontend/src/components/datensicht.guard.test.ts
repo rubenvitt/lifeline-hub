@@ -203,8 +203,9 @@ const KARTEN_EIGENBAU: string[] = [];
 const NUR_KARTE: string[] = [
   '/src/auftraege/BefehlListe.tsx',
   '/src/pages/LageberichtePage.tsx',
-  // Zwölfte Konsumentin seit LFH-348 · C13: ein Lageobjekt wird gelesen, nicht verglichen.
-  '/src/pages/LagemeldungenPage.tsx',
+  // Die Lagemeldungen standen hier von LFH-348 · C13 bis zum Neuentwurf (22.09.2026).
+  // Seitdem sind sie eine Zeitachse außerhalb der Datensicht (`lagemeldungen/zeitachse.ts`,
+  // Begründung im Dateikopf von `pages/LagemeldungenPage.tsx`) — dieselbe Bewegung wie das ETB.
 ];
 
 /**
@@ -278,9 +279,8 @@ const KONSUMENTEN = [
   '/src/pages/FahrzeugePage.tsx',
   '/src/pages/KraefteuebersichtPage.tsx',
   '/src/pages/LageberichtePage.tsx',
-  // Zwölfte seit LFH-348 · C13: die Lagemeldungen lagen auf einer nackten `Liste` ohne
-  // Zeit, Sortierung, Gruppen und Rückweg (Befund M85).
-  '/src/pages/LagemeldungenPage.tsx',
+  // Die Lagemeldungen waren von LFH-348 · C13 bis zum Neuentwurf (22.09.2026) die zwölfte
+  // Konsumentin; seitdem sind sie wie das ETB eine Zeitachse und kein Konsument mehr.
   '/src/pages/MaterialPage.tsx',
   '/src/pages/PersonalPage.tsx',
   '/src/pages/PersonenPage.tsx',
@@ -817,20 +817,21 @@ const AUSNAHMEN = {
 };
 
 describe('Datensicht-Guard (LFH-330 · B2)', () => {
-  it('kein Konsument setzt einen eigenen Umbruch (tabelleAb) — das ETB war der einzige', () => {
+  it('das Primitiv kennt keinen eigenen Umbruchpunkt mehr (tabelleAb) — auto bricht bei md', () => {
     /*
      * LFH-464 hatte der ETB-Chronologie als EINZIGER Konsumentin `tabelleAb="xl"` erlaubt
      * (gemessener 1024-px-Engpass). Seit dem Neuentwurf (S4) ist das Tagebuch auf allen
-     * Breiten eine Zeitachse und keine Datensicht mehr; damit setzt niemand mehr einen
-     * eigenen Umbruch, und der Default `md` gilt überall. Ein neuer Eintrag hier braucht
-     * wieder eine Browsermessung wie LFH-464, nicht bloß den Verweis darauf.
+     * Breiten eine Zeitachse und keine Datensicht mehr; am 22.09.2026 fiel die Prop deshalb
+     * ganz. Ein Konsument, der sie setzt, bricht jetzt im Typcheck — die Aussage hier hält
+     * die DEKLARATION fern: wer sie zurückholt, braucht wieder eine Browsermessung wie
+     * LFH-464, nicht bloß den Verweis darauf.
      */
-    const mitUmbruch = KONSUMENTEN.filter((pfad) =>
-      /\btabelleAb\s*=/.test(ohneKommentare(dateien[pfad] ?? '')),
-    );
-    expect(mitUmbruch).toEqual([]);
-    // Und die Zeitachse ist wirklich keine Datensicht mehr — sonst wäre die Liste oben
-    // bloß um sie verkürzt worden.
+    const primitiv = ohneKommentare(dateien[PRIMITIV] ?? '');
+    expect(primitiv, 'Datensicht.tsx gelesen').toContain('export default function Datensicht');
+    expect(primitiv).not.toMatch(/\btabelleAb\b/);
+    // Der Auto-Zweig steht fest auf md — LITERAL, damit ein stiller Wechsel rot wird.
+    expect(primitiv).toMatch(/form === 'auto' && abBreite\('md'\)/);
+    // Und die Zeitachse ist wirklich keine Datensicht mehr.
     expect(konsumentenVon(dateien)).not.toContain('/src/etb/EtbZeitachse.tsx');
   });
 
@@ -849,10 +850,10 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
     // einträgt, begründet wie über der Liste beschrieben — sonst wächst die Ausnahme über
     // das Band und der Kartenplan wäre nur noch ein Vorschlag.
     expect(KARTEN_EIGENBAU).toHaveLength(0);
-    // Drei Kartenmodule (Befehle, Lageberichte, seit LFH-348 · C13 die Lagemeldungen), eine
-    // Vergleichsfläche. Wer einträgt, ohne umzubauen, fällt am Anwesenheits-Gegentest oben
-    // auf; wer umbaut, ohne einzutragen, an der Formprüfung.
-    expect(NUR_KARTE).toHaveLength(3);
+    // Zwei Kartenmodule (Befehle, Lageberichte — die Lagemeldungen sind seit dem Neuentwurf
+    // eine Zeitachse), eine Vergleichsfläche. Wer einträgt, ohne umzubauen, fällt am
+    // Anwesenheits-Gegentest oben auf; wer umbaut, ohne einzutragen, an der Formprüfung.
+    expect(NUR_KARTE).toHaveLength(2);
     expect(NUR_TABELLE).toHaveLength(1);
     // Die vierte ist keine Ausnahme, sondern eine PFLICHT — und sie ist ausdrücklich
     // dateibezogen. Ein zweiter Eintrag braucht dieselbe Herleitung wie das Meldebild
@@ -872,7 +873,7 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
     expect(dateien[PRIMITIV]).toContain('KatalogTabelle');
   });
 
-  it('der Scan sieht genau die zehn geplanten Konsumenten', () => {
+  it('der Scan sieht genau die geplanten Konsumenten (Neuentwurf: zehn)', () => {
     /**
      * Die Gleichheit prüft BEIDE Richtungen: eine Datei, die still aus dem Primitiv
      * herausfällt, verschwindet aus dem Scan und bleibt in {@link KONSUMENTEN} stehen; eine

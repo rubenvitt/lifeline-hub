@@ -565,6 +565,37 @@ describe('Sidebar Fehler-Slots', () => {
     expect(onPlatzierenStart).toHaveBeenCalledWith({ typ: 'uhs', id: 42 });
   });
 
+  it('„Nicht verortet": Zeilenaktionen sind sekundär — keine Reihe gefüllter Primärknöpfe', () => {
+    const onPlatzierenStart = vi.fn();
+    const onAbschnittZeichnenStart = vi.fn();
+    renderMitProviders(
+      <Sidebar
+        {...basisProps}
+        darfSchreiben
+        nichtVerortet={[
+          { typ: 'uhs', id: 1, label: 'UHS Nord' },
+          { typ: 'schaden', id: 2, label: 'S-004' },
+          { typ: 'abschnitt', id: 3, label: 'EA Süd' },
+        ]}
+        onPlatzierenStart={onPlatzierenStart}
+        onAbschnittZeichnenStart={onAbschnittZeichnenStart}
+      />,
+    );
+    const platzieren = screen.getAllByRole('button', { name: 'Platzieren' });
+    const zeichnen = screen.getByRole('button', { name: 'Fläche zeichnen' });
+    // Positivkontrolle: die Knöpfe stehen und wirken — sonst wäre die Abwesenheit unten
+    // auch dann grün, wenn die Zeilen gar nicht mehr gerendert würden.
+    expect(platzieren).toHaveLength(2);
+    fireEvent.click(platzieren[1]);
+    expect(onPlatzierenStart).toHaveBeenCalledWith({ typ: 'schaden', id: 2 });
+    fireEvent.click(zeichnen);
+    expect(onAbschnittZeichnenStart).toHaveBeenCalledWith(3);
+    for (const knopf of [...platzieren, zeichnen]) {
+      expect(knopf).not.toHaveClass('ant-btn-primary');
+      expect(knopf).toHaveClass('ant-btn-default');
+    }
+  });
+
   it('„Bild-Hintergründe": Fehler-Slot, der Upload bleibt bedienbar', () => {
     renderMitProviders(
       <Sidebar

@@ -19,6 +19,7 @@ import PersonalFormModal from './PersonalFormModal';
 import { globalKeys } from '../api/queryKeys';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 import { personalDetailPfad } from './stammdatenDetail';
+import { StatusChip } from '../components/instrument';
 
 export default function PersonalTab() {
   const { benutzer } = useAuth();
@@ -118,9 +119,9 @@ export default function PersonalTab() {
       onFilter: (wert, p) => p.dienststatus === wert,
       render: (_, p) =>
         p.dienststatus === 'in_dienst' ? (
-          <Tag color="green">in Dienst</Tag>
+          <StatusChip ton="normal" wort="in Dienst" />
         ) : (
-          <Tag>außer Dienst</Tag>
+          <StatusChip ton="neutral" wort="außer Dienst" />
         ),
     },
     ...(istAdmin

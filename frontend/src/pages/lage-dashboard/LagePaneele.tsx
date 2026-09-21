@@ -21,14 +21,13 @@ import PaneelZustand, { PaneelLink } from './PaneelZustand';
 import { WARNSTUFE_RANG, type GefahrenZeile, type SichtungsZeile } from './lageVerdichtung';
 import { warnstufeTon, type Datenzustand } from './lagebild';
 import { bannerText, stromQuelle, stromZeit } from './meldungsstrom';
+import { MATRIX_KLASSE } from './matrixGeometrie';
+import './gefahrenmatrix.css';
 
 /** Im Fugenraster trägt das Raster die Linien — ein eigener Paneelrahmen verdoppelte sie. */
 const IM_RASTER: CSSProperties = { border: 'none', minHeight: 0 };
 
 const LEGENDE = ['niedrig', 'mittel', 'hoch', 'akut'] as const;
-
-/** Name · 4-Stufen-Balken · Stufenwort — dieselben Spalten für Zeilen und Legende. */
-const MATRIX_SPALTEN = 'minmax(72px, 112px) minmax(0, 1fr) 56px';
 
 export function GefahrenmatrixPaneel({
   zustand,
@@ -70,7 +69,10 @@ export function GefahrenmatrixPaneel({
         onLeerAktion={onGefahren}
         onNeuladen={onNeuladen}
       >
-        <div style={{ padding: token.padding, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div
+          className={MATRIX_KLASSE.wurzel}
+          style={{ padding: token.padding, display: 'flex', flexDirection: 'column', gap: 10 }}
+        >
           <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 10 }}>
             {zeilen.map((z) => {
               const farbe = warnstufeBalkenFarbe(z.stufe, token);
@@ -81,26 +83,33 @@ export function GefahrenmatrixPaneel({
                   key={z.typ}
                   data-lfh="gefahrenzeile"
                   data-stufe={z.stufe}
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: MATRIX_SPALTEN,
-                    alignItems: 'center',
-                    gap: token.paddingSM,
-                  }}
+                  className={MATRIX_KLASSE.zeile}
+                  style={{ gap: token.paddingSM }}
                 >
-                  <span style={{ fontSize: 12, color: rollen.text2, overflowWrap: 'anywhere' }}>
+                  {/* Silbentrennung statt Bruch an beliebiger Stelle: „Erkrankung/Verletzung"
+                      bräche sonst als „…/Verl|etzung" (`lang="de"` steht in index.html). */}
+                  <span
+                    style={{
+                      fontSize: 12,
+                      color: rollen.text2,
+                      hyphens: 'auto',
+                      overflowWrap: 'break-word',
+                    }}
+                  >
                     {z.label}
                   </span>
                   {/* Dekoration neben dem Wort — der zweite Kanal ist das Stufenwort rechts. */}
-                  <span aria-hidden="true" style={{ display: 'flex', gap: 2, height: 14 }}>
+                  <span
+                    aria-hidden="true"
+                    data-lfh="gefahrenbalken"
+                    className={MATRIX_KLASSE.stufen}
+                    style={{ height: 14 }}
+                  >
                     {LEGENDE.map((_, i) => (
                       <span
                         key={i}
                         data-voll={i < rang ? 'ja' : 'nein'}
-                        style={{
-                          flex: 1,
-                          background: i < rang && farbe ? farbe : rollen.flaeche3,
-                        }}
+                        style={{ background: i < rang && farbe ? farbe : rollen.flaeche3 }}
                       />
                     ))}
                   </span>
@@ -122,30 +131,33 @@ export function GefahrenmatrixPaneel({
               );
             })}
           </ul>
+          {/* Legende in DERSELBEN Geometrie wie die Balken (`matrixGeometrie.ts`): jedes
+              Wort steht mittig unter seinem Segment. */}
           <div
             aria-hidden="true"
+            data-lfh="gefahrenlegende"
+            className={`${MATRIX_KLASSE.zeile} ${MATRIX_KLASSE.legende}`}
             style={{
-              display: 'grid',
-              gridTemplateColumns: MATRIX_SPALTEN,
               gap: token.paddingSM,
               paddingTop: 6,
               borderTop: `1px solid ${rollen.linie}`,
             }}
           >
-            <span />
+            <span className={MATRIX_KLASSE.fueller} />
             <span
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
-                ...monoStil(10),
-                color: rollen.schwach,
-              }}
+              className={MATRIX_KLASSE.stufen}
+              style={{ ...monoStil(10), color: rollen.schwach }}
             >
               {LEGENDE.map((l) => (
-                <span key={l}>{l}</span>
+                <span
+                  key={l}
+                  style={{ textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden' }}
+                >
+                  {l}
+                </span>
               ))}
             </span>
-            <span />
+            <span className={MATRIX_KLASSE.fueller} />
           </div>
         </div>
       </PaneelZustand>

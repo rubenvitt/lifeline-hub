@@ -27,7 +27,7 @@ import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
  *
  * EINE Spaltendefinition je Modul, zwei Darstellungsformen. Die Formwahl liegt an
  * `form`, nicht am Zufall: `'tabelle'` immer Tabelle, `'karte'` immer Karte,
- * `'auto'` Tabelle ab `tabelleAb` (Default `md`) und Karte darunter. Der Tabellenzweig rendert nicht selbst,
+ * `'auto'` Tabelle ab `md` und Karte darunter. Der Tabellenzweig rendert nicht selbst,
  * sondern durch `KatalogTabelle` — es bleibt bei EINER Scroll-/Sticky-/Fixier-Wahrheit
  * im Repo, und diese Datei setzt kein Bildlauf-Prop.
  *
@@ -108,7 +108,9 @@ import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
 
 // ── Formachse ────────────────────────────────────────────────────────────────────────
 /**
- * `'auto'` Tabelle ab `tabelleAb` (Default `md`), Karte darunter — begründungspflichtig.
+ * `'auto'` Tabelle ab `md`, Karte darunter — begründungspflichtig. Einen eigenen
+ *            Umbruchpunkt je Konsument gibt es nicht mehr (`tabelleAb` fiel am 22.09.2026 mit
+ *            seiner einzigen Nutzerin, der ETB-Chronologie).
  * `'tabelle'` immer Tabelle. Für Vergleichsflächen (Meldebild), die Kriterium 14
  *            ausdrücklich nicht in Karten auflösen dürfen.
  * `'karte'` immer Karte. Für Module, die heute schon kartenbasiert gelesen werden
@@ -345,8 +347,6 @@ export interface DatensichtProps<T extends object, K extends string> {
   karte: Kartenplan<T, NoInfer<K>>;
   /** Default `'auto'`. */
   form?: Darstellungsform;
-  /** Auto-Umbruch zur Tabelle; Default md. Abweichungen brauchen Browserbelege (LFH-464). */
-  tabelleAb?: AbBreitePunkt;
   ladend?: boolean;
   /** Tabelle: `locale.emptyText`; Karte: `Liste emptyText`. KEIN neuer Leerzustands-Knoten. */
   leerText?: ReactNode;
@@ -801,7 +801,6 @@ export default function Datensicht<T extends object, const K extends string>(
     zeilenSchluessel,
     karte,
     form = 'auto',
-    tabelleAb = 'md',
     ladend,
     leerText,
     standardSortierung = null,
@@ -919,7 +918,7 @@ export default function Datensicht<T extends object, const K extends string>(
   // ── Formwahl ──────────────────────────────────────────────────────────────────────
   // Steht HIER und nicht erst bei der Werkzeugzeile, weil die Ebenen-Registrierung
   // gleich darunter sie liest: der Spaltenschalter existiert nur im Tabellenzweig.
-  const alsTabelle = form === 'tabelle' || (form === 'auto' && abBreite(tabelleAb));
+  const alsTabelle = form === 'tabelle' || (form === 'auto' && abBreite('md'));
 
   const [spaltenOffen, setSpaltenOffen] = useState(false);
 

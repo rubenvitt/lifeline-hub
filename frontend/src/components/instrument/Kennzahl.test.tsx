@@ -1,8 +1,15 @@
 import { screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { renderMitProviders } from '../../test/utils';
-import { dichten, farbenHell } from '../../theme/tokens';
-import { Kennzahl, Kennzahlenband, kennzahlStil, kennzahlenbandStil, zahlFarbe } from './Kennzahl';
+import { dichten, farbenDunkel, farbenHell } from '../../theme/tokens';
+import {
+  Kennzahl,
+  Kennzahlenband,
+  kennzahlStil,
+  kennzahlenbandStil,
+  punktFarbe,
+  zahlFarbe,
+} from './Kennzahl';
 
 const tokenFuer = (stufe: keyof typeof dichten) => ({
   controlHeight: dichten[stufe].zeilenhoehe,
@@ -129,5 +136,39 @@ describe('Kennzahlenband', () => {
     expect(screen.getByRole('img', { name: 'Sichtung: SK I 2' })).toBeInTheDocument();
     rerender(<Kennzahl titel="A" wert={2} aufgliederung={seg} zustand="laden" />);
     expect(screen.queryByRole('img')).toBeNull();
+  });
+});
+
+describe('Kennzahl — Statuspunkt vor der Augenbraue (S6)', () => {
+  it('setzt den Punkt nur auf Wunsch, als Dekoration vor dem Stufenwort', () => {
+    const { container, rerender } = renderMitProviders(<Kennzahl titel="S4" wert={17} />);
+    expect(container.querySelector('[data-lfh="kennzahl-punkt"]')).toBeNull();
+    rerender(<Kennzahl titel="S4" wert={17} punkt="bedien" />);
+    const punkt = container.querySelector<HTMLElement>('[data-lfh="kennzahl-punkt"]')!;
+    expect(punkt).toHaveAttribute('aria-hidden', 'true');
+    expect(punkt).toHaveAttribute('data-ton', 'bedien');
+    // VOR der Augenbraue, im selben Zeilenkopf.
+    expect(punkt.nextElementSibling).toHaveTextContent('S4');
+  });
+
+  it('färbt nur im Zustand daten — laden/fehler stehen neutral am selben Platz', () => {
+    const { container, rerender } = renderMitProviders(
+      <Kennzahl titel="S6" wert={2} punkt="alarm" zustand="fehler" />,
+    );
+    expect(container.querySelector('[data-lfh="kennzahl-punkt"]')).toHaveAttribute(
+      'data-ton',
+      'neutral',
+    );
+    rerender(<Kennzahl titel="S6" wert={2} punkt="alarm" />);
+    expect(container.querySelector('[data-lfh="kennzahl-punkt"]')).toHaveAttribute(
+      'data-ton',
+      'alarm',
+    );
+  });
+
+  it('nimmt die Kantenfarbe der Statusfläche — dieselbe Rolle wie der Rand der StatusZelle', () => {
+    expect(punktFarbe(farbenDunkel, 'alarm', 'daten', true)).toBe(farbenDunkel.alarm);
+    expect(punktFarbe(farbenHell, 'normal', 'daten', false)).toBe(farbenHell.normal);
+    expect(punktFarbe(farbenHell, 'alarm', 'laden', false)).toBe(farbenHell.schwach);
   });
 });

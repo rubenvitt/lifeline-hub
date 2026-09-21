@@ -1,8 +1,14 @@
 import { Alert, App, Button, Form, Typography } from 'antd';
 import AdminPage from '../components/AdminPage';
-import { Augenbraue, Paneel, monoStil, useRollen } from '../components/instrument';
-import { farbenHell } from '../theme/tokens';
-import Datenraster, { Datenfeld } from './datenraster/Datenraster';
+import {
+  Augenbraue,
+  Datenfeld,
+  Datenraster,
+  Paneel,
+  monoStil,
+  useRollen,
+} from '../components/instrument';
+import { farbenHell, flaeche } from '../theme/tokens';
 import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { startRegistration } from '@simplewebauthn/browser';
@@ -172,7 +178,8 @@ export default function ProfilPage() {
   const totpAktiv = benutzer?.totp_aktiviert ?? false;
 
   return (
-    <AdminPage titel="Profil">
+    // Reine Formularseite: ausdrücklich schmal, unabhängig von der Vorgabe des Primitivs.
+    <AdminPage titel="Profil" breite={flaeche.seiteSchmal}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: token.margin }}>
         <Paneel titel="Konto">
           {/* Die Organisation steht nicht am Benutzer, sie kommt aus einem eigenen Abruf.

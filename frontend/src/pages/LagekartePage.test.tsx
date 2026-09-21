@@ -23,6 +23,9 @@ vi.mock('./lagekarte/Kartenflaeche', () => ({
     <div data-testid="kartenflaeche-stub">
       <div data-testid="attribution">{props.attribution ?? ''}</div>
       <div data-testid="bilder-count">{(props.bilder ?? []).length}</div>
+      <div data-testid="startansicht">
+        {props.startAnsicht === undefined ? 'offen' : JSON.stringify(props.startAnsicht)}
+      </div>
       <button onClick={() => props.onKarteKlick?.({ lng: 8.6, lat: 50.1 })}>karte-klick</button>
       {(props.markers ?? []).map((m) => (
         <button key={m.schluessel} onClick={() => props.onMarkerKlick?.(m.schluessel)}>
@@ -512,6 +515,21 @@ describe('LagekartePage', () => {
     // zugänglichen Namens, also gezielt diesen Knopf treffen, nicht irgendeine „1".
     expect(await screen.findByRole('button', { name: 'Nicht verortet 1' })).toBeInTheDocument();
     expect(await screen.findByText(/BHP 50/)).toBeInTheDocument();
+  });
+
+  it('startet auf dem Einsatzort statt auf der Deutschland-Übersicht', async () => {
+    basisHandler();
+    renderSeite();
+    // EINSATZ trägt einsatzort 50.0/8.5; der verortete Schaden liegt woanders und darf den
+    // Ausschnitt NICHT bestimmen (sonst wäre es ein Rahmen, kein Punkt).
+    await waitFor(() =>
+      expect(JSON.parse(screen.getByTestId('startansicht').textContent ?? 'null')).toEqual({
+        art: 'punkt',
+        lng: 8.5,
+        lat: 50.0,
+        zoom: 14,
+      }),
+    );
   });
 
   it('öffnet selbst KEINE SSE-Verbindung (der Live-Stream ist ins EinsatzLayout gehoben)', async () => {

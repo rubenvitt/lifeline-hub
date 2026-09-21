@@ -1,7 +1,11 @@
 import { Typography, theme } from 'antd';
 import type { ReactNode } from 'react';
-import { flaeche } from '../theme/tokens';
-import { seitenkopfStil, seitentitelStil } from './EinsatzSeite';
+import {
+  seitenBreiteMax,
+  seitenkopfStil,
+  seitentitelStil,
+  type SeitenBreite,
+} from './EinsatzSeite';
 import { useModusFarben } from './rahmenStil';
 
 interface AdminPageProps {
@@ -18,8 +22,14 @@ interface AdminPageProps {
   aktionen?: ReactNode;
   /** Optionaler Hinweis unter dem Header (z. B. ein read-only-Alert). */
   hinweis?: ReactNode;
-  /** Container-Breite in px. Default `flaeche.seiteSchmal`. */
-  breite?: number;
+  /**
+   * Breite der Spalte — dieselbe Achse wie an `EinsatzSeite` (`'voll'`/`'schmal'`/px).
+   * Vorgabe bleibt hier `'schmal'`: die Verwaltungsseiten sind Formularseiten neben einer
+   * Seitenleiste, und ihre Sektionen werden eigens umgebaut. Anders als bei `EinsatzSeite`
+   * (Vorgabe `'voll'`, Neuentwurf 22.09.2026) ist die Umstellung hier keine Rahmenfrage,
+   * sondern je Sektion zu entscheiden.
+   */
+  breite?: SeitenBreite;
   children: ReactNode;
 }
 
@@ -38,13 +48,13 @@ export default function AdminPage({
   beschreibung,
   aktionen,
   hinweis,
-  breite = flaeche.seiteSchmal,
+  breite = 'schmal',
   children,
 }: AdminPageProps) {
   const { token } = theme.useToken();
   const farben = useModusFarben();
   return (
-    <div style={{ maxWidth: breite }}>
+    <div style={{ maxWidth: seitenBreiteMax(breite) }}>
       <div data-lfh="seitenkopf" style={seitenkopfStil(token, farben, false)}>
         <Typography.Title level={4} style={{ ...seitentitelStil(farben), minWidth: 0 }}>
           {titel}

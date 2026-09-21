@@ -22,6 +22,13 @@ describe('Paneel', () => {
     expect(screen.getByRole('heading', { level: 3, name: 'Nächste Marken' })).toBeVisible();
   });
 
+  it.each([5, 6] as const)('trägt auch tiefe Gliederung (h%i) — die Optik bleibt dieselbe', (n) => {
+    renderMitProviders(<Paneel titel="Tief" ueberschrift={`h${n}`} />);
+    const kopf = screen.getByRole('heading', { level: n, name: 'Tief' });
+    expect(kopf).toHaveClass('lfh-augenbraue');
+    expect(screen.getByRole('region', { name: 'Tief' })).toBeInTheDocument();
+  });
+
   it('rendert Aktion und Fuß nur, wenn sie übergeben werden', () => {
     const { rerender } = renderMitProviders(<Paneel titel="A" />);
     expect(screen.queryByRole('button')).toBeNull();

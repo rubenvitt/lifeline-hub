@@ -427,9 +427,13 @@ export const abstand: Abstandsraster = dichten.kompakt.abstand;
  * einer Ladefläche.
  */
 export const flaeche = {
-  /** Lesebreite einer Formularseite (heute `AdminPage`-Default). */
+  /** Lesebreite einer reinen Formularseite (`AdminPage`-Default, `EinsatzSeite breite="schmal"`). */
   seiteSchmal: 900,
-  /** Lesebreite einer Listenseite (heute `EinsaetzePage`). */
+  /**
+   * Frühere Lesebreite der Listenseiten. Seit dem Neuentwurf (22.09.2026) füllt
+   * `EinsatzSeite` per Vorgabe die ganze Breite; der Wert lebt nur noch, bis die
+   * Bestandsaufrufer ihr `breite={flaeche.seiteBreit}` beim eigenen Umbau streichen.
+   */
   seiteBreit: 960,
   /** Abstand über einem Lade-/Fehlerzustand, damit er nicht am Kopf klebt. */
   zustandOben: 80,

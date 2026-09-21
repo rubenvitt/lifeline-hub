@@ -340,9 +340,11 @@ test('die Fahrzeug-Detailseite ist per Deeplink erreichbar und ihre Speicherleis
   await page.goto(`/admin/stammdaten/fahrzeuge/${fahrzeug.id}`);
 
   await expect(page.getByRole('heading', { name: fahrzeug.funkrufname })).toBeVisible();
-  // Die vier Sektionen. Über die Überschriften-Rolle, nicht über `getByText`:
-  // „Bemerkung" steht zweimal auf der Seite — als Sektionstitel UND als Feldbeschriftung.
-  for (const titel of ['Identität', 'Funk & Sonderrechte', 'Kapazität', 'Bemerkung']) {
+  // Die vier Sektionen (seit dem Neuentwurf Paneele mit Augenbrauen-Kopf, h3). Über die
+  // Überschriften-Rolle, nicht über `getByText`. Das vierte Paneel heißt „Freitext": als
+  // „Bemerkung" benannte es sein Paneel (`aria-labelledby`) gleich wie das Feld darin, und
+  // `getByLabelText('Bemerkung')` träfe zwei Knoten.
+  for (const titel of ['Identität', 'Funk & Sonderrechte', 'Kapazität', 'Freitext']) {
     await expect(page.getByRole('heading', { name: titel, exact: true })).toBeVisible();
   }
 

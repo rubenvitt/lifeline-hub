@@ -138,14 +138,14 @@ describe('App-Routing', () => {
     expect(router.state.location.state).toMatchObject({ von: ziel });
   });
 
-  it('lädt die per React.lazy eingebundene Kräfteübersicht im Data Router', async () => {
+  it('lädt das per React.lazy eingebundene Meldebild (Kräfteübersicht) im Data Router', async () => {
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json(admin)),
       http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
     );
     renderApp('/einsaetze/7/kraefteuebersicht');
-    expect(await screen.findByRole('heading', { name: /Kräfteübersicht/ })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /Meldebild/ })).toBeInTheDocument();
   });
 
   it('leitet ohne Anmeldung zu /login um', async () => {

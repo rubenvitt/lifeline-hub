@@ -4,6 +4,7 @@ import type { Farbrollen, Schriftstufenname } from '../../theme/tokens';
 import Augenbraue from './Augenbraue';
 import { Aufgliederung, type Segment } from './Aufgliederung';
 import { monoStil, schriftStil, useRollen } from './rollenwerte';
+import { statusFlaeche, type StatusTon } from './statusFlaeche';
 // Grund und Hover/Fokus der Zelle stehen als Klasse `.lfh-kennzahl` in der Gestaltungssprache:
 // ein Inline-Grund schlüge jede `:hover`-Regel.
 import '../../theme/sprache.css';
@@ -29,9 +30,18 @@ import '../../theme/sprache.css';
  * ── TON UND ZWEITER KANAL ──────────────────────────────────────────────────────────
  *
  * `achtung`/`alarm` färben die Zahl UND setzen eine abgestufte Innenkante (3 bzw. 6 px,
- * `inset`-Schatten, null Layout) — dieselbe Regel wie `.lfh-kz--alarm`/`--achtung` in
- * `theme/sprache.css`: die beiden bewerteten Stufen unterscheiden sich auch ohne Farbe,
- * und die Zeile springt beim Statuswechsel nicht (keine stufenabhängige Schriftgröße).
+ * `inset`-Schatten, null Layout): die beiden bewerteten Stufen unterscheiden sich auch
+ * ohne Farbe, und die Zeile springt beim Statuswechsel nicht (keine stufenabhängige
+ * Schriftgröße).
+ *
+ * ── STATUSPUNKT (Neuentwurf S6, Statusstufen-Kacheln) ──────────────────────────────
+ *
+ * `punkt` setzt ein 8-px-Quadrat in der Tonfarbe VOR die Augenbraue — die Kachel benennt
+ * damit eine STUFE (S1 … S6), nicht eine Bewertung der Zahl; deshalb ist er von `ton`
+ * getrennt. Er ist Dekoration (`aria-hidden`): der zweite Kanal ist die Augenbraue mit dem
+ * Stufenwort. Wie `ton` gilt er nur im Zustand `daten` — bei `laden`/`fehler` steht er
+ * neutral an seinem Platz, damit die Zeile nicht springt und kein Ton eine unbekannte Lage
+ * behauptet.
  *
  * ── KLICKBAR ────────────────────────────────────────────────────────────────────────
  *
@@ -71,6 +81,20 @@ export function zahlFarbe(
 }
 
 /**
+ * Farbe des Statuspunkts — die KANTE der Statusfläche (`statusFlaeche`), also dieselbe
+ * Rollenfarbe, die `StatusZelle`/`StatusChip` als Rand tragen. Außerhalb von `daten` neutral.
+ * Rein.
+ */
+export function punktFarbe(
+  rollen: Parameters<typeof statusFlaeche>[0],
+  ton: StatusTon,
+  zustand: KennzahlZustand,
+  dunkel: boolean,
+): string {
+  return statusFlaeche(rollen, zustand === 'daten' ? ton : 'neutral', dunkel).kante;
+}
+
+/**
  * Stil der Zelle — rein und exportiert (Muster `bedienzielStil`), damit Boden und Kante
  * ohne Render prüfbar sind. `minHeight` steht IMMER da, nicht nur klickbar: ein Band mit
  * gemischten Zellen soll nicht in der Höhe springen, wenn eine davon ein Ziel bekommt.
@@ -107,6 +131,8 @@ export interface KennzahlProps {
   groesse?: KennzahlGroesse;
   ton?: KennzahlTon;
   zustand?: KennzahlZustand;
+  /** Statuspunkt vor der Augenbraue (S6-Statusstufen) — siehe Dateikopf. */
+  punkt?: StatusTon;
   /** Aufgliederungsbalken unter der Zahl. */
   aufgliederung?: { segmente: readonly Segment[]; titel?: string; legende?: ReactNode | false };
   /** Macht die Zelle zum Link auf diese Route (gebaut über `routing/deeplinks.ts`). */
@@ -124,12 +150,13 @@ export function Kennzahl({
   groesse = 'mittel',
   ton = 'neutral',
   zustand = 'daten',
+  punkt,
   aufgliederung,
   ziel,
   zielBeschriftung,
   style,
 }: KennzahlProps) {
-  const { token, rollen } = useRollen();
+  const { token, rollen, dunkel } = useRollen();
   const zahl =
     zustand === 'laden' ? (
       <b aria-busy="true" style={{ font: 'inherit' }}>
@@ -147,7 +174,24 @@ export function Kennzahl({
 
   const inhalt = (
     <>
-      <Augenbraue>{titel}</Augenbraue>
+      {punkt != null ? (
+        <span style={{ display: 'flex', alignItems: 'center', gap: token.marginXS }}>
+          <span
+            aria-hidden="true"
+            data-lfh="kennzahl-punkt"
+            data-ton={zustand === 'daten' ? punkt : 'neutral'}
+            style={{
+              width: 8,
+              height: 8,
+              flex: '0 0 8px',
+              background: punktFarbe(rollen, punkt, zustand, dunkel),
+            }}
+          />
+          <Augenbraue>{titel}</Augenbraue>
+        </span>
+      ) : (
+        <Augenbraue>{titel}</Augenbraue>
+      )}
       <span style={{ display: 'flex', alignItems: 'baseline', gap: token.marginXS }}>
         <span
           data-lfh="kennzahl-wert"

@@ -9,9 +9,10 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
  * hoch die Berührungsziele wirklich sind. Dass die Weiche existiert, pinnt
  * `src/components/Datensicht.test.tsx`; hier geht es um die gemessene Wirkung.
  *
- * Der Default-Umbruch bleibt `md` (768 px). Seit LFH-464 kann eine vermessene Fläche
- * `tabelleAb` setzen; das ETB nutzt `xl`. Hier wird am unveränderten Personal-Konsumenten
- * zusätzlich 767/768 und 1199/1200 geprüft, damit die ETB-Ausnahme nicht global wird.
+ * Der Umbruch ist `md` (768 px), für alle Konsumenten. Den eigenen Umbruchpunkt aus LFH-464
+ * (`tabelleAb`, vom ETB mit `xl` genutzt) gibt es seit dem Neuentwurf nicht mehr (22.09.2026).
+ * Hier wird am Personal-Konsumenten zusätzlich 767/768 und 1199/1200 geprüft: die Weiche
+ * steht bei 768, und bei 1199 bleibt die Tabelle — keine ETB-Schwelle wird global.
  *
  * AN- UND ABWESENHEIT, je mit Gegenprobe auf der anderen Breite. `.ant-table` allein trennt
  * die Zweige nicht: eine Seite, die aus einem beliebigen anderen Grund keine Tabelle rendert

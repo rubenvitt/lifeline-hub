@@ -37,7 +37,8 @@ import '../theme/sprache.css';
  * **Suche — opt-in, nicht opt-out.** Ohne `suche`-Prop existiert weder Feld noch
  * Werkzeugzeile. Default-AN wäre in drei gemessenen Fällen Schaden statt Nutzen:
  * `pages/SchaedenPage.tsx` hat bereits ein eigenes `Input.Search` mit ANDERER Semantik
- * (Ort/Beschreibung), `etb/EtbTabelle.tsx` sucht serverweit über ein 100-Zeilen-Fenster,
+ * (Ort/Beschreibung), das ETB (heute die Zeitachse `etb/EtbZeitachse.tsx`) sucht
+ * serverweit über seine eigene Filterleiste,
  * und `Datensicht` nutzt dieses Primitiv intern und brächte sein eigenes Feld daneben.
  *
  * Die Suche liest die Rohdaten über {@link zellenWert}, also nur Spalten mit auflösbarem

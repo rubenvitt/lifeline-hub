@@ -148,7 +148,8 @@ const MIT_NACHBARSCHAFT = [
  * bewertete Nachbarschaft ist noch da" verlangt einen echten Fund), einer in
  * {@link OHNE_NACHBARSCHAFT} behauptete das Gegenteil des Wahren. Die Zusicherung
  * steht deshalb als Kommentar in der Karte selbst — dieselbe Auflösung wie bei
- * `etb/EtbTabelle.tsx` in LFH-342/C7: die Regel gilt, nicht der Scanner.
+ * der früheren `etb/EtbTabelle.tsx` in LFH-342/C7 (seit dem Neuentwurf durch
+ * `etb/EtbZeitachse.tsx` ersetzt): die Regel gilt, nicht der Scanner.
  */
 const BEWERTET_OHNE_SCANNER_DECKUNG = ['nachforderungen/NachforderungKarte.tsx'];
 

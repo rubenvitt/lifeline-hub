@@ -7,6 +7,7 @@ import {
   Aufgliederung,
   aufgliederungText,
   Balken,
+  segmentFlaecheStil,
   sichtbareSegmente,
 } from './Aufgliederung';
 
@@ -43,6 +44,23 @@ describe('Aufgliederung', () => {
   it('eine leere Menge behält ihre Spur — kein verschwundener Balken', () => {
     renderMitProviders(<Aufgliederung segmente={[]} legende={false} />);
     expect(screen.getByRole('img')).toHaveStyle({ background: farbenHell.flaeche3 });
+  });
+
+  it('umrandet ein Segment nur auf Wunsch — ohne Layoutwirkung', () => {
+    // „tot" ist schwarz und verschwände auf dem Nachtgrund; die Umrandung trägt es sichtbar.
+    const tot = { label: 'tot', wert: 2, farbe: 'rgb(0, 0, 0)', umrandung: 'rgb(9, 9, 9)' };
+    expect(segmentFlaecheStil(tot)).toMatchObject({
+      outline: '1px solid rgb(9, 9, 9)',
+      outlineOffset: -1,
+      flexGrow: 2,
+    });
+    // Gegenprobe: ohne Angabe KEINE Umrandung — die übrigen Aufrufer bleiben unverändert.
+    expect(segmentFlaecheStil(SEGMENTE[0])).not.toHaveProperty('outline');
+
+    renderMitProviders(<Aufgliederung segmente={[SEGMENTE[0], tot]} legende={false} />);
+    const teile = [...screen.getByRole('img').children] as HTMLElement[];
+    expect(teile[0].style.outline).toBe('');
+    expect(teile[1].style.outline).toBe('1px solid rgb(9, 9, 9)');
   });
 
   it('der Text ohne Titel ist die reine Aufzählung', () => {

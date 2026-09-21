@@ -226,7 +226,8 @@ export const verfuegbarkeit: Record<Verfuegbarkeit, StatusDarstellung> = {
  * für die Kante aufgehoben — nicht über eine neue {@link Statusrolle}, sondern über eine
  * eigene Palette: ein Eintragstyp ist eine KATEGORIE, keine Dringlichkeit, und gehört
  * deshalb nicht auf die Statusachse. Die Rollen unten bleiben stehen, solange das
- * Etikett noch Konsumenten hat (`EtbTabelle`); die Karte selbst bleibt im Vertrag.
+ * Etikett noch Konsumenten hat — die ETB-Zeitachse (`etb/EtbZeitachse.tsx`, Nachfolgerin
+ * der früheren `EtbTabelle`) liest heute nur `label`; die Karte selbst bleibt im Vertrag.
  */
 export const etbTyp: Record<EtbTyp, StatusDarstellung> = {
   meldung: { rolle: 'bedien', label: 'Meldung' },
@@ -457,12 +458,12 @@ export const odlStufe: Record<OdlStufe, StatusDarstellung> = {
  * eine Umbenennung im Vertrag bricht die Konsumenten im Typcheck, statt still
  * auseinanderzulaufen.
  *
- * Warum nicht alle sechs Rollen? Weil `LageDashboardPage` den Wert in einen
- * KLASSENNAMEN einsetzt (`lfh-plakette--${stufe}`, `lfh-kz--${stufe}`) und
- * `theme/sprache.css` genau für diese drei eine Regel hat. `Statusrolle` dort
- * einzusetzen erlaubte ein `lfh-plakette--marke` — ein Klassenname ohne CSS, still
- * ungestylt, und jsdom rechnet kein Layout, würde den Ausfall also in keinem Test
- * zeigen. Die Verengung ist damit das Ehrlichere, nicht das Bequemere.
+ * Warum nicht alle sechs Rollen? Ursprünglich, weil das Lage-Dashboard den Wert in einen
+ * KLASSENNAMEN einsetzte (`lfh-plakette--${stufe}`) und `theme/sprache.css` genau für
+ * diese drei eine Regel hatte. Diese Klassen sind mit dem Neuentwurf entfallen (22.09.2026);
+ * die Verengung bleibt trotzdem richtig: die Karte {@link dringlichkeit} trägt Wort UND
+ * Form je Stufe, und eine vierte Stufe bräuchte ein viertes Formzeichen, das es nicht gibt.
+ * Die Verengung ist damit das Ehrlichere, nicht das Bequemere.
  */
 export type Dringlichkeit = Extract<Statusrolle, 'alarm' | 'achtung' | 'normal'>;
 

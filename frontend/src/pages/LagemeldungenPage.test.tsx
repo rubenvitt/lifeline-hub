@@ -48,15 +48,6 @@ function renderPage() {
   );
 }
 
-/** Ein antd-`Select`-Eintrag: erst den Auslöser öffnen, dann den echten Options-Knoten klicken. */
-async function waehleOption(label: string) {
-  const option = (await screen.findAllByText(label)).find((el) =>
-    el.closest('.ant-select-item-option'),
-  );
-  expect(option).toBeTruthy();
-  await userEvent.click(option!);
-}
-
 describe('LagemeldungenPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -66,9 +57,14 @@ describe('LagemeldungenPage', () => {
   it('zeigt Lageobjekte mit nachvollziehbarer Herkunft', async () => {
     renderPage();
     expect(await screen.findByText('Brücke gesperrt')).toBeInTheDocument();
-    // Der Wortlaut ist byte-gleich geblieben; nur trägt „Meldung #5" jetzt einen Anker.
+    // Zeitachse (Neuentwurf): Herkunft im Meta der Zeile, der Absender als Verfasser rechts.
     const sicht = screen.getByRole('region', { name: 'Lagemeldungen' });
-    expect(sicht).toHaveTextContent('Herkunft: Meldung #5 von Florian Nord 1');
+    const zeile = sicht.querySelector('li[data-lfh-eintrag="zeitachse"]') as HTMLElement;
+    expect(zeile).toHaveTextContent('aus Meldung #5');
+    expect(zeile).toHaveTextContent('Florian Nord 1');
+    // Typkante + Typwort des ETB-Typs „Lage" — kein Etikett, keine zweite Farbe.
+    expect(zeile).toHaveAttribute('data-typ', 'lage');
+    expect(within(zeile).getByText('Lage')).toBeInTheDocument();
     expect(screen.getByLabelText(/^Datenstand \d{2}:\d{2}$/)).toBeInTheDocument();
   });
 
@@ -77,14 +73,14 @@ describe('LagemeldungenPage', () => {
    * `routing/deeplinks.ts` — kein Inline-Template-Literal (LFH-25); der Grep auf
    * `einsaetze/${` in der Seite ist Teil des Akzeptanzkriteriums.
    */
-  it('verlinkt die Quellmeldung über meldungenPfad und zeigt die Zeit taktisch', async () => {
+  it('verlinkt die Quellmeldung über meldungenPfad und zeigt die Uhrzeit unter dem Tageskopf', async () => {
     renderPage();
     const link = await screen.findByRole('link', { name: 'Meldung #5' });
     expect(link).toHaveAttribute('href', '/einsaetze/1/meldungen?meldung=3');
-    // `format="kurz"`: nicht heute → `DDHHmm` in Ortszeit, kein roher Wirestring.
-    expect(
-      screen.getByText(alsOrtszeit('2026-06-12 09:00:00')!.format('DDHHmm')),
-    ).toBeInTheDocument();
+    // In der Tagesgruppe genügt `HH:mm` in Ortszeit — der Tag steht im Kopf darüber.
+    const ort = alsOrtszeit('2026-06-12 09:00:00')!;
+    expect(screen.getByText(ort.format('HH:mm'))).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: ort.format('DD.MM.YYYY') })).toBeInTheDocument();
     expect(screen.queryByText('2026-06-12 09:00:00')).toBeNull();
   });
 
@@ -112,10 +108,35 @@ describe('LagemeldungenPage', () => {
     ]);
     renderPage();
     await screen.findByText('Ohne Ort');
-    await userEvent.click(screen.getByRole('combobox', { name: 'Ort' }));
-    await waehleOption('Mit Koordinaten');
+    const ort = screen.getByRole('radiogroup', { name: 'Ort' });
+    await userEvent.click(within(ort).getByRole('radio', { name: 'Mit Koordinaten' }));
     expect(screen.queryByText('Ohne Ort')).toBeNull();
     expect(screen.getByText('Mit Ort')).toBeInTheDocument();
+    expect(within(ort).getByRole('radio', { name: 'Mit Koordinaten' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+  });
+
+  it('sucht über Text und Absender und bietet bei leerem Treffer das Zurücksetzen an', async () => {
+    listeLageMeldungen.mockResolvedValue([
+      lage({ id: 1, text: 'Brücke gesperrt' }),
+      lage({ id: 2, text: 'Deich hält', meldung_absender: 'Pegel Süd' }),
+    ]);
+    renderPage();
+    await screen.findByText('Deich hält');
+    const suche = screen.getByRole('searchbox', { name: 'Suche in Lagemeldungen' });
+    await userEvent.type(suche, 'pegel');
+    expect(screen.queryByText('Brücke gesperrt')).toBeNull();
+    expect(screen.getByText('Deich hält')).toBeInTheDocument();
+    await userEvent.clear(suche);
+    await userEvent.type(suche, 'gibt es nicht');
+    // Weggefiltert ist nicht leer: eigener Wortlaut und eine Aktion hinaus.
+    expect(screen.getByText('Keine Lagemeldung passt zum Filter')).toBeInTheDocument();
+    expect(screen.queryByText('Noch keine lagerelevanten Meldungen übergeben')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
+    expect(screen.getByText('Brücke gesperrt')).toBeInTheDocument();
+    expect(suche).toHaveValue('');
   });
 
   it('filtert über das Zeitfenster', async () => {
@@ -127,15 +148,18 @@ describe('LagemeldungenPage', () => {
     listeLageMeldungen.mockResolvedValue([
       lage({ id: 1, text: 'Frisch', erstellt_at: vorMinuten(10) }),
       lage({ id: 2, text: 'Vorhin', erstellt_at: vorMinuten(180) }),
-      lage({ id: 3, text: 'Gestern', erstellt_at: vorMinuten(60 * 30) }),
+      lage({ id: 3, text: 'Vortag', erstellt_at: vorMinuten(60 * 30) }),
     ]);
     renderPage();
-    await screen.findByText('Gestern');
-    await userEvent.click(screen.getByRole('combobox', { name: 'Zeit' }));
-    await waehleOption('Letzte Stunde');
+    await screen.findByText('Vortag');
+    await userEvent.click(
+      within(screen.getByRole('radiogroup', { name: 'Zeitfenster' })).getByRole('radio', {
+        name: 'Letzte Stunde',
+      }),
+    );
     expect(screen.getByText('Frisch')).toBeInTheDocument();
     expect(screen.queryByText('Vorhin')).toBeNull();
-    expect(screen.queryByText('Gestern')).toBeNull();
+    expect(screen.queryByText('Vortag')).toBeNull();
   });
 
   /**
@@ -153,5 +177,15 @@ describe('LagemeldungenPage', () => {
       await screen.findByText('Noch keine lagerelevanten Meldungen übergeben'),
     ).toBeInTheDocument();
     expect(container.querySelector('.ant-empty')).toBeNull();
+    // Ohne Menge keine Filterleiste: sie filterte nichts.
+    expect(screen.queryByRole('search', { name: 'Lagemeldungen filtern' })).toBeNull();
+  });
+
+  it('Fehler ist nicht leer: Fehlermeldung mit Wiederholen, kein Leerzustand', async () => {
+    listeLageMeldungen.mockRejectedValue(new Error('500'));
+    renderPage();
+    expect(await screen.findByText('Lageobjekte konnten nicht geladen werden')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Erneut laden' })).toBeInTheDocument();
+    expect(screen.queryByText('Noch keine lagerelevanten Meldungen übergeben')).toBeNull();
   });
 });

@@ -27,6 +27,24 @@ export interface Segment {
   wert: number;
   /** Aufgelöste Farbe (Rolle/Fachfarbe des aktiven Modus). */
   farbe: string;
+  /**
+   * Optionale Umrandung des Segments (aufgelöste Farbe). Für Fachfarben, die auf einem Grund
+   * verschwinden: das schwarze „tot" auf dem Nachtgrund, Gelb (SK II) auf hellem — dieselbe
+   * Begründung wie am Farbfeld des `SichtungsTag`. Als `outline` mit Versatz −1 px gezeichnet,
+   * also OHNE Layoutwirkung: der Anteil des Segments bleibt exakt sein Wert.
+   */
+  umrandung?: string;
+}
+
+/** Stil eines Segments — rein und exportiert, damit die Umrandung ohne Render prüfbar ist. */
+export function segmentFlaecheStil(s: Segment): CSSProperties {
+  return {
+    flexGrow: s.wert,
+    flexShrink: 1,
+    flexBasis: 0,
+    background: s.farbe,
+    ...(s.umrandung != null ? { outline: `1px solid ${s.umrandung}`, outlineOffset: -1 } : {}),
+  };
 }
 
 /** Wortlaut für `aria-label`: „Titel: A 1, B 2". Rein — ohne Render prüfbar. */
@@ -72,10 +90,7 @@ export function Aufgliederung({ segmente, titel, hoehe = 5, legende, style }: Au
         }}
       >
         {sichtbar.map((s) => (
-          <span
-            key={s.label}
-            style={{ flexGrow: s.wert, flexShrink: 1, flexBasis: 0, background: s.farbe }}
-          />
+          <span key={s.label} data-segment={s.label} style={segmentFlaecheStil(s)} />
         ))}
       </div>
       {legendenInhalt != null && (

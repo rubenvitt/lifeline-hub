@@ -440,6 +440,15 @@ test('Statusband des Meldebilds bricht um statt waagerecht zu scrollen', async (
   const anzahl = await zellen.count();
   expect(anzahl, 'mindestens eine Fahrzeug- und eine Personalzelle').toBeGreaterThanOrEqual(2);
   for (let i = 0; i < anzahl; i += 1) await expect(zellen.nth(i)).toBeInViewport();
+  // Fugenraster (Nacharbeit 22.09.2026): bei 1024 px drei Spalten (6 ab xl, 3 ab md, 2
+  // darunter), beide Gruppen in derselben Geometrie. Die Spuren teilen sich die Breite zu
+  // gleichen Teilen — ein Band, das nur einen Teil der Breite nutzte (Auto-Fit mit wenigen
+  // Zellen), hätte hier eine andere Spurzahl.
+  const spuren = await band
+    .locator('[data-lfh="kennzahlenband"]')
+    .evaluateAll((els) => els.map((el) => getComputedStyle(el).gridTemplateColumns.split(' ')));
+  expect(spuren.map((s) => s.length)).toEqual([3, 3]);
+  expect(spuren[1], 'Personal in derselben Spaltengeometrie wie Fahrzeuge').toEqual(spuren[0]);
   // Und das Meta im Seitenkopf nennt Einheiten und Stärke in BOS-Schreibweise.
   await expect(
     page.locator('[data-lfh="seitenkopf"]').getByText(/Einheiten? · Stärke \d+\/\d+\/\d+\/\/\d+/),

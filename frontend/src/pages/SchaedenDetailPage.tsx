@@ -14,8 +14,7 @@ import {
   Typography,
 } from 'antd';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { monoStil } from '../components/instrument';
-import Datenraster, { Datenfeld } from './datenraster/Datenraster';
+import { Datenfeld, Datenraster, monoStil } from '../components/instrument';
 import { Select } from '../components/Select';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { useState } from 'react';

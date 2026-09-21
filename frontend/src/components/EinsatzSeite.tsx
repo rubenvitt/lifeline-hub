@@ -151,11 +151,34 @@ interface EinsatzSeiteProps {
   hinweis?: ReactNode;
   /** Letzter erfolgreicher Listenabruf (`query.dataUpdatedAt`). */
   dataUpdatedAt?: number;
-  /** Container-Breite in px — `flaeche.seiteSchmal` (Default) oder `flaeche.seiteBreit`. */
-  breite?: number;
+  /**
+   * Breite des Inhalts unter der Kopfleiste. Vorgabe `'voll'`: der Neuentwurf ist eine
+   * Instrumententafel über die ganze Inhaltsbreite (22.09.2026). `'schmal'` begrenzt auf die
+   * Lesebreite einer reinen Formularseite (`flaeche.seiteSchmal`) — das ist die begründete
+   * Ausnahme und wird deshalb AUSDRÜCKLICH gesetzt, nie geerbt.
+   *
+   * Eine Zahl (px) bleibt zulässig, damit die Bestandsaufrufer mit `flaeche.seiteBreit` bis
+   * zu ihrem eigenen Umbau typecheck-grün bleiben; sie begrenzt wie früher. Für Neues ist sie
+   * nicht gedacht — wer eine Seite anfasst, streicht die Zahl oder setzt `'schmal'`.
+   */
+  breite?: SeitenBreite;
   /** Arbeitsfläche bis zum Fensterende; children folgen darunter im Dokumentfluss. */
   fensterInhalt?: { inhalt: ReactNode; mindestHoehe?: number };
   children: ReactNode;
+}
+
+/** Breite des Seiteninhalts — siehe `EinsatzSeiteProps.breite`. */
+export type SeitenBreite = 'voll' | 'schmal' | number;
+
+/**
+ * Löst `breite` in ein `maxWidth` auf — rein und exportiert. `'voll'` ergibt KEINE Grenze
+ * (`undefined`, nicht `'100%'`): ein `maxWidth` von 100 % ist wirkungslos und stünde nur im
+ * Weg, wenn ein Aufrufer per `style` nachsteuert.
+ */
+export function seitenBreiteMax(breite: SeitenBreite): number | undefined {
+  if (breite === 'voll') return undefined;
+  if (breite === 'schmal') return flaeche.seiteSchmal;
+  return breite;
 }
 
 /**
@@ -174,15 +197,13 @@ function primaeraktionen(wurzel: HTMLElement): number {
  * dem Muster von `AdminPage`. Abstände und Farben kommen aus `theme.useToken()`
  * bzw. `theme/tokens.ts` — keine Pixel von Hand.
  *
- * **Signatur:** der Akzentstrich (36 × 3 px, `--lfh-marke` mit Glühen) steht über
- * dem Titel. Er ist Signatur-Element 1 der Gestaltungssprache (LFH-352/A0) und der
- * Grund, warum die rohen `Typography.Title` der Modulseiten hierher wandern.
+ * **Neuentwurf (21./22.09.2026):** der Seitenkopf ist eine 44-px-Leiste mit Titel 14/600,
+ * Mono-Meta und Aktionen; der frühere A0-Akzentstrich über dem Titel ist entfallen. Der
+ * Inhalt füllt per Vorgabe die ganze Breite (`breite`), eine Lesebreite ist Ausnahme.
  *
- * **Abweichung von der A0-Referenzseite (Spec §3.1):** A0 hat auf dem
- * Lage-Dashboard die Seitenüberschrift entfernt, weil dort das Instrumentenband die
- * Identität trägt. Modul-Arbeitsseiten haben kein Instrumentenband und brauchen die
- * Ortsangabe — `EinsatzSeite` behält deshalb den `titel`-Slot und wird **nicht** auf
- * das Lage-Dashboard angewandt.
+ * **Überschriftenebene:** der Titel ist (noch) ein `h4`, die Paneele darunter sind `h2`. Die
+ * Hierarchie steht damit verkehrt herum; der Umzug auf `h1` (Satz bleibt 14/600) ist
+ * geplant, braucht aber den gleichzeitigen Nachzug der Testdateien, die `level: 4` pinnen.
  *
  * **Sektionen INNERHALB einer Seite** bekommen weiterhin `SektionHeader` (level 5);
  * dieses Primitiv ersetzt ihn nicht, sondern steht eine Ebene darüber.
@@ -196,7 +217,7 @@ export default function EinsatzSeite({
   neueZeile,
   hinweis,
   dataUpdatedAt,
-  breite = flaeche.seiteSchmal,
+  breite = 'voll',
   fensterInhalt,
   children,
 }: EinsatzSeiteProps) {
@@ -246,7 +267,7 @@ export default function EinsatzSeite({
     }
   });
 
-  const koerperStil: CSSProperties = { maxWidth: breite };
+  const koerperStil: CSSProperties = { maxWidth: seitenBreiteMax(breite) };
 
   const kopf = (
     <>
@@ -310,9 +331,9 @@ export default function EinsatzSeite({
   );
 
   // Die WURZEL ist vollbreit (sonst reichte die Kopfleiste nur so weit wie die Lesebreite);
-  // die Lesebreite `breite` gilt für den Inhalt darunter. Linksbündig statt zentriert: der
-  // Entwurf verankert Seiten an der Navigation, nicht in der Fenstermitte — ein zentrierter
-  // Inhalt unter einem linksbündigen Titel stünde versetzt.
+  // eine ausdrücklich gesetzte Lesebreite `breite` gilt nur dem Inhalt darunter. Linksbündig
+  // statt zentriert: der Entwurf verankert Seiten an der Navigation, nicht in der
+  // Fenstermitte — ein zentrierter Inhalt unter einem linksbündigen Titel stünde versetzt.
   return (
     <div ref={seitenWurzel}>
       {fensterInhalt != null ? (

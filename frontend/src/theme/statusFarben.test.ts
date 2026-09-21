@@ -272,9 +272,9 @@ describe('einsatzStatus (LFH-345 · C10 Befund M14, LFH-358)', () => {
 
 describe('dringlichkeit (LFH-395, hierher mit LFH-358)', () => {
   it('bleibt über die drei stufbaren Rollen geschlüsselt, nicht über alle sechs', () => {
-    // Die Verengung ist die Zusicherung: `LageDashboardPage` setzt den Schlüssel in einen
-    // KLASSENNAMEN (`lfh-plakette--${stufe}`), und `theme/sprache.css` hat genau für diese
-    // drei eine Regel. Ein vierter Schlüssel wäre still ungestylt.
+    // Die Verengung ist die Zusicherung: je Stufe ein Wort UND ein Formzeichen (dreieck,
+    // balken, kreis). Die früheren Klassen `lfh-plakette--${stufe}` sind mit dem Neuentwurf
+    // entfallen; ein vierter Schlüssel bräuchte weiterhin eine vierte Form.
     expect(Object.keys(sf.dringlichkeit).sort()).toEqual(['achtung', 'alarm', 'normal']);
   });
 

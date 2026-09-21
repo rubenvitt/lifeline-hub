@@ -68,6 +68,7 @@ import { eckenInitialPixel, type Punkt } from './bildGeometrie';
 import { erzeugeBildHandles, type BildHandles } from './bildHandles';
 import type { Ecken } from '../../api/kartenbilder';
 import type { FachebeneQuelle } from '../../api/fachebenen';
+import { PUNKT_ZOOM, type StartAnsicht } from './startAnsicht';
 
 // Worker-URL setzen, bevor die erste Map entsteht — diese Datei ist die einzige Stelle im Repo,
 // die eine Map erzeugt. Der Guard davor ist keine Paranoia, sondern deckt eine gemessene Bruchlinie
@@ -137,6 +138,14 @@ export interface KartenflaecheProps {
   onMarkerKlick?: (schluessel: string) => void;
   /** Beim Setzen sanft hinfliegen. */
   flyToZiel?: { lng: number; lat: number } | null;
+  /**
+   * Startansicht aus den Einsatzdaten (`startAnsicht.ts`). `undefined` heißt „noch nicht
+   * entschieden" (Daten laden), `null` „nichts verortet, Übersicht behalten". Sie greift
+   * GENAU EINMAL je Karte: danach gehört der Ausschnitt der Bedienung — ein Live-Update, das
+   * einen neuen Marker bringt, darf den Ausschnitt nicht wegziehen. Ein früherer `flyToZiel`
+   * (Deeplink) verbraucht sie ebenfalls.
+   */
+  startAnsicht?: StartAnsicht | null;
   /** Style-Ladefehler (online nicht erreichbar) → Page stuft ab. */
   onStyleFehler?: () => void;
   /** Config-autoritative Pflicht-Attribution des aktiven Online-Views (null = keine). */
@@ -236,6 +245,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     onPlatzierGeometrie,
     onZeigerLage,
     massstabZiel,
+    startAnsicht,
   },
   ref,
 ) {
@@ -572,11 +582,38 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     };
   }, [massstabZiel]);
 
+  // Startansicht einmalig anwenden. Steht VOR dem fly-to-Effekt: kommen beide in derselben
+  // Runde (Deeplink `?gefahrengebiet=`), läuft das fly-to danach und gewinnt.
+  // „Verbraucht" hängt an der KARTENINSTANZ, nicht an einem Boolean: unter StrictMode (Vite-
+  // Dev, e2e) läuft der Erzeugungs-Effekt zweimal, die erste Karte wird entfernt — ein
+  // Boolean-Ref überlebte das und ließe die zweite, sichtbare Karte auf der Übersicht stehen
+  // (so im Browser gemessen).
+  const startAufKarteRef = useRef<maplibregl.Map | null>(null);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || startAnsicht === undefined || startAufKarteRef.current === map) return;
+    startAufKarteRef.current = map;
+    if (startAnsicht === null) return;
+    if (startAnsicht.art === 'punkt') {
+      map.jumpTo({ center: [startAnsicht.lng, startAnsicht.lat], zoom: startAnsicht.zoom });
+    } else {
+      map.fitBounds(
+        [
+          [startAnsicht.west, startAnsicht.sued],
+          [startAnsicht.ost, startAnsicht.nord],
+        ],
+        { padding: 60, maxZoom: PUNKT_ZOOM, duration: 0 },
+      );
+    }
+  }, [startAnsicht]);
+
   // fly-to bei Auswahl.
   useEffect(() => {
     const map = mapRef.current;
-    if (map && flyToZiel)
+    if (map && flyToZiel) {
+      startAufKarteRef.current = map;
       map.flyTo({ center: [flyToZiel.lng, flyToZiel.lat] as LngLatLike, zoom: 15 });
+    }
   }, [flyToZiel]);
 
   // Abschnittsflächen-Daten in die Source spielen (und für setStyle-Re-Anlage merken).

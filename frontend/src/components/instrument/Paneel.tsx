@@ -12,8 +12,10 @@ import { monoStil, useRollen } from './rollenwerte';
  * keine eigene Polsterung — Zeilen bringen sie mit (Trenner `flaeche3`, siehe
  * {@link paneelZeileStil}); wer Fließinhalt hineinlegt, setzt `koerperPolster`.
  *
- * Die Überschrift ist SEMANTISCH (`ueberschrift="h2"`/`"h3"`), die Augenbraue nur ihre
- * Optik; das `<section>` wird über sie benannt (`aria-labelledby`). Ein Paneel ohne
+ * Die Überschrift ist SEMANTISCH (`ueberschrift="h2"` … `"h6"`), die Augenbraue nur ihre
+ * Optik; das `<section>` wird über sie benannt (`aria-labelledby`). Die Ebene folgt der
+ * Gliederung der Seite, nicht der Optik: ein Paneel in einem Paneel ist eine Ebene tiefer,
+ * sieht aber gleich aus. Ein Paneel ohne
  * Überschrift gibt es nicht — ein unbenannter Block ist genau die Fläche, die der
  * Entwurf durch die Augenbraue abschafft.
  *
@@ -63,11 +65,14 @@ export function paneelZeileStil(
   };
 }
 
+/** Die zulässigen Überschriftenebenen eines Paneels — `h1` gehört dem Seitentitel. */
+export type PaneelUeberschrift = 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
+
 interface PaneelProps {
   /** Wortlaut der Augenbraue — Pflicht, siehe Dateikopf. */
   titel: ReactNode;
   /** Überschriftenebene; Vorgabe `h2`. */
-  ueberschrift?: 'h2' | 'h3' | 'h4';
+  ueberschrift?: PaneelUeberschrift;
   /** Mono-Meta rechts im Kopf („4 Abschnitte · 31 Einheiten"). */
   meta?: ReactNode;
   /** Aktion rechts im Kopf (Link/Knopf) — steht nach dem Meta. */

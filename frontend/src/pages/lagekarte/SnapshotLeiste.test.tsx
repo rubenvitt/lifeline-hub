@@ -18,7 +18,8 @@ vi.mock('../../api/lageSnapshot', () => ({
   ladeLageSnapshot: (...a: unknown[]) => ladeLageSnapshot(...a),
 }));
 
-import { SnapshotLeiste, ANZEIGE_MS } from './SnapshotLeiste';
+import { SnapshotLeiste, ANZEIGE_MS, standLeisteStil, startEingeklappt } from './SnapshotLeiste';
+import { setzeViewportBreite } from '../../test/viewport';
 
 type Snap = Record<string, unknown>;
 function snapshot(over: Snap = {}): Snap {
@@ -56,6 +57,11 @@ function renderLeiste(liste: Snap[], props: Record<string, unknown>) {
     { wrapper: Wrapper },
   );
 }
+
+// Die Leiste startet ohne gemerkte Wahl erst ab `xl` ausgeklappt (Nacharbeit 22.09.2026);
+// die Bestandstests prüfen die ausgeklappte Leiste und laufen deshalb bei 1440 px. Die
+// Breitenregel selbst prüfen die eigenen Tests unten.
+beforeEach(() => setzeViewportBreite(1440));
 
 describe('SnapshotLeiste', () => {
   beforeEach(() => {
@@ -258,5 +264,43 @@ describe('SnapshotLeiste — Platz im KartenFuss (LFH-355)', () => {
     expect(knopf.style.zIndex).toBe('');
     expect(knopf.style.alignSelf).toBe('flex-start');
     expect(knopf.style.pointerEvents).toBe('auto');
+  });
+
+  it('die Stände teilen sich die Zeile und rollen, statt eine zweite Zeile aufzumachen', () => {
+    const { container } = renderLeiste(
+      [snapshot(), snapshot({ id: 2, bezeichnung: 'Stand B', stand_at: '2026-07-24 09:00:00' })],
+      { darfSichern: true },
+    );
+    const reihe = container.querySelector('[data-lfh="zeitachse-staende"]') as HTMLElement;
+    // Positivkontrolle: die Reihe trägt die Stände wirklich.
+    expect(reihe.querySelectorAll('button').length).toBe(2);
+    expect(reihe.style.minWidth).toBe('0px');
+    expect(reihe.style.overflowX).toBe('auto');
+    expect(standLeisteStil.flex).toBe('1 1 160px');
+  });
+
+  it('Startzustand: gemerkte Wahl gewinnt, ohne Wahl eingeklappt nur auf dem Handschirm', () => {
+    expect(startEingeklappt(null, true)).toBe(true);
+    expect(startEingeklappt(null, false)).toBe(false);
+    expect(startEingeklappt(false, true)).toBe(false);
+    expect(startEingeklappt(true, false)).toBe(true);
+  });
+
+  it.each([390, 1024])('bei %i px ohne gemerkte Wahl steht nur der Einblenden-Knopf', (breite) => {
+    setzeViewportBreite(breite);
+    renderLeiste([snapshot()], { darfSichern: true });
+    expect(screen.getByRole('button', { name: 'Zeitachse einblenden' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Stand sichern/ })).toBeNull();
+  });
+
+  it('ab xl ohne gemerkte Wahl ausgeklappt; eine gemerkte Wahl schlägt die Breite', () => {
+    setzeViewportBreite(1440);
+    const { unmount } = renderLeiste([snapshot()], { darfSichern: true });
+    expect(screen.getByRole('button', { name: /Stand sichern/ })).toBeInTheDocument();
+    unmount();
+    localStorage.setItem('lfh:lagekarte:zeitachse-eingeklappt', '0');
+    setzeViewportBreite(390);
+    renderLeiste([snapshot()], { darfSichern: true });
+    expect(screen.getByRole('button', { name: /Stand sichern/ })).toBeInTheDocument();
   });
 });

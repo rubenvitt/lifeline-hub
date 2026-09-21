@@ -1,6 +1,6 @@
-import { App, Button, Popconfirm, Space, Tag, type TableColumnsType } from 'antd';
+import { App, Button, Popconfirm, Space, type TableColumnsType } from 'antd';
 import AdminPage from '../components/AdminPage';
-import { StatusChip } from '../components/instrument';
+import { StatusChip, monoStil } from '../components/instrument';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle from '../components/KatalogTabelle';
 import { SeitenFehler } from '../components/SeitenZustand';
@@ -57,7 +57,9 @@ export default function SprechgruppenTab() {
         { text: 'DMO', value: 'DMO' },
       ],
       onFilter: (wert, sg) => sg.betriebsart === wert,
-      render: (ba: string) => <Tag color={ba === 'TMO' ? 'blue' : 'orange'}>{ba}</Tag>,
+      // Eine Betriebsart ist eine KENNUNG, kein Zustand — Mono statt einer Etikettfarbe, die
+      // TMO und DMO Bedeutungen andichtete (blau = Bedienung, orange = Achtung).
+      render: (ba: string) => <span style={monoStil(12, 500)}>{ba}</span>,
     },
     {
       title: 'Hinweis',

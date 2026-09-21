@@ -34,6 +34,7 @@ import { SnapshotLeiste } from './lagekarte/SnapshotLeiste';
 import { KartenFuss, bandStil } from './lagekarte/KartenFuss';
 import KartenUeberlagerung, { GrundlageLeiste } from './lagekarte/KartenUeberlagerung';
 import { erzeugeZeigerQuelle } from './lagekarte/mausPosition';
+import { startAnsicht } from './lagekarte/startAnsicht';
 import {
   grundlageAufloesen,
   grundlageOptionen,
@@ -132,6 +133,7 @@ export default function LagekartePage() {
   // getrennten localStorage-Quellen ab.
   const {
     ansichten,
+    aktiveAnsicht,
     aktiveAnsichtId,
     ansichtenFehler,
     ansichtenFehlerUrsache,
@@ -164,6 +166,7 @@ export default function LagekartePage() {
     einsatz,
     darfSchreiben,
     ladt,
+    markerLaden,
     gebiete,
     fehlerhafteQuellen,
     neuLaden,
@@ -383,6 +386,15 @@ export default function LagekartePage() {
   } = useKartenbilder({ einsatzId, kartenRef, bildPlatzierenId, aktiveAnsichtId, quelle, fehler });
 
   const sichtbareMarker = alleVerortet.filter((m) => layer[m.typ]);
+  // Startausschnitt aus den Daten (Ansichtszentrum → Einsatzort → Objekte); die Karte wendet
+  // ihn genau einmal an. Über ALLE verorteten Objekte, nicht nur die sichtbaren Ebenen: eine
+  // ausgeblendete Ebene ändert nicht, wo der Einsatz liegt.
+  // `undefined`, solange eine Marker-Quelle noch lädt: die Karte entscheidet erst über das
+  // vollständige Bild.
+  const start = useMemo(
+    () => (markerLaden ? undefined : startAnsicht(alleVerortet, aktiveAnsicht)),
+    [markerLaden, alleVerortet, aktiveAnsicht],
+  );
   const aktiverMarker = alleVerortet.find((m) => m.schluessel === auswahl) ?? null;
   // Freies taktisches Zeichen zur Marker-Auswahl (LFH-170): der Inspector editiert den ROHEN
   // Record, nicht die gestrippte Marker-tz (sonst verlöre der Editor gestrippte Overlays).
@@ -596,6 +608,7 @@ export default function LagekartePage() {
           if (!exklusiverModusAktiv) onMarkerWaehlen(schluessel);
         }}
         flyToZiel={flyToZiel}
+        startAnsicht={start}
         onStyleFehler={onStyleFehler}
         flaechen={
           layer.abschnitt

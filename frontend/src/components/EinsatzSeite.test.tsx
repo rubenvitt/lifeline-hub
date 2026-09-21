@@ -13,7 +13,7 @@ import {
 import type { TastaturAktionen } from '../command-palette/typen';
 import { renderMitProviders } from '../test/utils';
 import { flaeche } from '../theme/tokens';
-import EinsatzSeite, { seitenkopfStil } from './EinsatzSeite';
+import EinsatzSeite, { seitenBreiteMax, seitenkopfStil } from './EinsatzSeite';
 
 /**
  * Attrappe für die Palettenbefehle (LFH-391 · B5). Nötig, weil `src/test/setup.ts` MSW mit
@@ -42,7 +42,6 @@ vi.mock('../command-palette/useBefehle', () => ({
 }));
 
 const hier = dirname(fileURLToPath(import.meta.url));
-const spracheCss = readFileSync(join(hier, '..', 'theme', 'sprache.css'), 'utf-8');
 const seiteCss = readFileSync(join(hier, 'EinsatzSeite.css'), 'utf-8');
 
 afterEach(() => {
@@ -70,9 +69,8 @@ describe('EinsatzSeite', () => {
     expect(screen.getByRole('button', { name: 'Anlegen' })).toBeInTheDocument();
     expect(screen.getByText('Nur lesend')).toBeInTheDocument();
     expect(screen.getByText('Seiteninhalt')).toBeInTheDocument();
-    // Neuentwurf (21.09.2026): die Seitenkopfleiste trägt die Seite — der A0-Akzentstrich
-    // über dem Titel ist entfallen, Titel und Aktionen stehen in EINER Leiste.
-    expect(container.querySelector('.lfh-marke__strich')).toBeNull();
+    // Neuentwurf (21.09.2026): die Seitenkopfleiste trägt die Seite — Titel und Aktionen
+    // stehen in EINER Leiste, ein Titelblock darüber existiert nicht mehr.
     const leiste = container.querySelector<HTMLElement>('[data-lfh="seitenkopf"]')!;
     expect(leiste).toContainElement(heading);
     expect(leiste).toContainElement(screen.getByRole('button', { name: 'Anlegen' }));
@@ -108,25 +106,42 @@ describe('EinsatzSeite', () => {
     expect(seitenkopfStil(token, { linie: '#LINIE' }, false).marginInline).toBeUndefined();
   });
 
-  it('hält die Inhaltsbreite auf `flaeche.seiteSchmal` und lässt sie überschreiben', () => {
-    // Seit dem Neuentwurf ist die WURZEL vollbreit (die Kopfleiste zieht bis an den Rand);
-    // die Lesebreite trägt der Inhaltsbereich darunter.
-    const wurzel = (c: HTMLElement) => c.querySelector<HTMLElement>('[data-lfh="seiten-inhalt"]')!;
+  it('füllt ohne Angabe die volle Inhaltsbreite; schmal nur ausdrücklich', () => {
+    // Neuentwurf (22.09.2026): eine Instrumententafel über die ganze Breite ist die Vorgabe.
+    // Die WURZEL ist ohnehin vollbreit (die Kopfleiste zieht bis an den Rand); die Grenze,
+    // falls gesetzt, trägt der Inhaltsbereich darunter. Die Pixel stehen als LITERALE da —
+    // aus `flaeche` zurückgelesen prüfte der Test den Token gegen sich selbst.
+    const inhalt = (c: HTMLElement) => c.querySelector<HTMLElement>('[data-lfh="seiten-inhalt"]')!;
 
-    const { container, unmount } = renderMitProviders(
-      <EinsatzSeite titel="Schmal">
+    const voll = renderMitProviders(
+      <EinsatzSeite titel="Voll">
         <div>x</div>
       </EinsatzSeite>,
     );
-    expect(wurzel(container).style.maxWidth).toBe(`${flaeche.seiteSchmal}px`);
-    unmount();
+    expect(inhalt(voll.container).style.maxWidth).toBe('');
+    voll.unmount();
 
-    const breit = renderMitProviders(
-      <EinsatzSeite titel="Breit" breite={flaeche.seiteBreit}>
+    const schmal = renderMitProviders(
+      <EinsatzSeite titel="Schmal" breite="schmal">
         <div>x</div>
       </EinsatzSeite>,
     );
-    expect(wurzel(breit.container).style.maxWidth).toBe(`${flaeche.seiteBreit}px`);
+    expect(inhalt(schmal.container).style.maxWidth).toBe('900px');
+    schmal.unmount();
+
+    // Bestandsaufrufer mit einer Zahl behalten ihre Grenze, bis sie selbst umgebaut werden.
+    const zahl = renderMitProviders(
+      <EinsatzSeite titel="Zahl" breite={flaeche.seiteBreit}>
+        <div>x</div>
+      </EinsatzSeite>,
+    );
+    expect(inhalt(zahl.container).style.maxWidth).toBe('960px');
+  });
+
+  it('löst die Breite rein auf — voll ist keine Grenze, nicht 100 %', () => {
+    expect(seitenBreiteMax('voll')).toBeUndefined();
+    expect(seitenBreiteMax('schmal')).toBe(900);
+    expect(seitenBreiteMax(640)).toBe(640);
   });
 
   it('zeigt den Query-Datenstand im Seitenkopf', () => {
@@ -137,28 +152,6 @@ describe('EinsatzSeite', () => {
       </EinsatzSeite>,
     );
     expect(screen.getByText('Stand 14:07')).toBeInTheDocument();
-  });
-
-  /**
-   * SEIT DEM NEUENTWURF benutzt `EinsatzSeite` den Strich nicht mehr — einziger Konsument ist
-   * das Lage-Dashboard (`pages/lage-dashboard/LageDashboardPage.tsx`). Der Pin bleibt hier,
-   * bis er dorthin umzieht; er bewacht `sprache.css`, nicht dieses Primitiv.
-   *
-   * Der Akzentstrich lebt als CSS-Klasse, und `vite.config.ts` setzt für Vitest
-   * `css: false` — die Klassen-Assertion oben belegt also NUR das Attribut, keine
-   * Wirkung. Dieser Guard (Muster: `theme/rollen.guard.test.ts`) pinnt deshalb die
-   * Geometrie in der Quelle. Er macht zugleich die bewusste Kopplung laut: die
-   * Klasse ist BEM-Kind von `.lfh-marke`; wer sie dort umbaut, bricht hier einen
-   * Test statt still ein Primitiv.
-   */
-  it('der Akzentstrich in sprache.css trägt 36 × 3 px aus den Markenrollen', () => {
-    const regel = spracheCss.match(/\.lfh-marke__strich\s*\{([^}]*)\}/);
-    expect(regel).not.toBeNull();
-    const block = regel![1];
-    expect(block).toMatch(/width:\s*36px/);
-    expect(block).toMatch(/height:\s*3px/);
-    expect(block).toMatch(/background:\s*var\(--lfh-marke\)/);
-    expect(block).toMatch(/box-shadow:\s*var\(--lfh-marke-glut\)/);
   });
 
   /**

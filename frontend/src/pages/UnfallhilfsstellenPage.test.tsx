@@ -278,6 +278,21 @@ describe('UnfallhilfsstellenPage', () => {
     renderPage();
     expect(await screen.findByText('Noch keine Unfallhilfsstellen erfasst')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
+    // Leerzustand mit Weg hinaus (Neuentwurf): die Anlage öffnet denselben Drawer wie „Neu".
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Erste Unfallhilfsstelle anlegen' }),
+    );
+    expect(await screen.findByLabelText('Bezeichnung')).toBeInTheDocument();
+  });
+
+  it('bietet ohne Schreibrecht im Leerzustand keine Anlage an', async () => {
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAntwort('beobachter'))),
+      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
+    );
+    renderPage();
+    expect(await screen.findByText('Noch keine Unfallhilfsstellen erfasst')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Erste Unfallhilfsstelle anlegen' })).toBeNull();
   });
 
   it('fokussiert Bezeichnung und legt per Enter aus diesem Feld an', async () => {

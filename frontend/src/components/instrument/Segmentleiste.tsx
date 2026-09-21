@@ -1,4 +1,5 @@
-import { useRef, type CSSProperties, type KeyboardEvent } from 'react';
+import { Tooltip } from 'antd';
+import { useId, useRef, type CSSProperties, type KeyboardEvent } from 'react';
 import { useRollen } from './rollenwerte';
 import '../../theme/sprache.css';
 
@@ -23,6 +24,13 @@ import '../../theme/sprache.css';
  * aus LFH-365 — `minHeight: token.controlHeight` plus Polsterung aus der Staffel
  * ({@link segmentStil}). Der Entwurf zeichnet 26–30 px; das ist Skizze, die Staffel
  * 30 / 48 / 72 gilt (umsetzung.md § Form & Typografie).
+ *
+ * GESPERRT (22.09.2026): ein Segment mit `gesperrt` bleibt SICHTBAR und nennt seinen Grund —
+ * als Tooltip fürs Auge und als Beschreibung (`aria-describedby`) für Vorlesende. Es ist
+ * `aria-disabled`, nicht `disabled`: ein natives `disabled` nähme es aus dem Fokus und dem
+ * Baum der Hilfstechnik, und der Grund wäre nicht mehr erreichbar. Klick und Pfeiltasten
+ * wählen es nicht; die Pfeile springen darüber hinweg. „Ausgegraut" allein wäre eine
+ * Ein-Kanal-Aussage (WCAG 1.4.1, CLAUDE.md M16) — der Grund ist der zweite Kanal.
  */
 
 export interface SegmentOption<W extends string | number> {
@@ -33,6 +41,12 @@ export interface SegmentOption<W extends string | number> {
   punkt?: string;
   /** Nur `tablist`: Id der Fläche, die dieses Segment zeigt. */
   steuert?: string;
+  /**
+   * Sperrt das Segment und nennt den GRUND („Keine Offline-Karte hinterlegt"). Ohne Grund
+   * gibt es keine Sperre — ein stumm gesperrtes Segment ist von „kaputt" nicht zu
+   * unterscheiden.
+   */
+  gesperrt?: string;
 }
 
 /** Geometrie eines Segments — rein und exportiert (Muster `bedienzielStil`). */
@@ -51,20 +65,39 @@ export function segmentStil(token: {
   };
 }
 
-/** Der Index nach einer Pfeil-/Pos1-/Ende-Taste, oder `null`, wenn die Taste nicht wandert. */
-export function naechsterIndex(taste: string, aktuell: number, anzahl: number): number | null {
+/**
+ * Der Index nach einer Pfeil-/Pos1-/Ende-Taste, oder `null`, wenn die Taste nicht wandert.
+ *
+ * `gesperrt(i)` überspringt Segmente: Pfeile laufen zum nächsten freien (zyklisch), Pos1/Ende
+ * zum ersten/letzten freien. Ist keines frei außer dem aktuellen, bleibt es beim aktuellen;
+ * ist gar keines frei, wandert nichts (`null`).
+ */
+export function naechsterIndex(
+  taste: string,
+  aktuell: number,
+  anzahl: number,
+  gesperrt: (index: number) => boolean = () => false,
+): number | null {
   if (anzahl === 0) return null;
+  const frei = (i: number) => !gesperrt(i);
+  const suche = (start: number, schritt: 1 | -1): number | null => {
+    for (let n = 0; n < anzahl; n += 1) {
+      const i = (((start + schritt * n) % anzahl) + anzahl) % anzahl;
+      if (frei(i)) return i;
+    }
+    return null;
+  };
   switch (taste) {
     case 'ArrowRight':
     case 'ArrowDown':
-      return (aktuell + 1) % anzahl;
+      return suche(aktuell + 1, 1);
     case 'ArrowLeft':
     case 'ArrowUp':
-      return (aktuell - 1 + anzahl) % anzahl;
+      return suche(aktuell - 1, -1);
     case 'Home':
-      return 0;
+      return suche(0, 1);
     case 'End':
-      return anzahl - 1;
+      return suche(anzahl - 1, -1);
     default:
       return null;
   }
@@ -89,6 +122,7 @@ export default function Segmentleiste<W extends string | number>({
   style,
 }: SegmentleisteProps<W>) {
   const { token } = useRollen();
+  const grundId = useId();
   const knoepfe = useRef<(HTMLButtonElement | null)[]>([]);
   const aktivIndex = Math.max(
     0,
@@ -97,7 +131,7 @@ export default function Segmentleiste<W extends string | number>({
   const alsTab = rolle === 'tablist';
 
   const taste = (e: KeyboardEvent<HTMLButtonElement>, index: number) => {
-    const ziel = naechsterIndex(e.key, index, optionen.length);
+    const ziel = naechsterIndex(e.key, index, optionen.length, (i) => !!optionen[i].gesperrt);
     if (ziel == null) return;
     e.preventDefault();
     onWechsel(optionen[ziel].wert);
@@ -114,7 +148,9 @@ export default function Segmentleiste<W extends string | number>({
     >
       {optionen.map((o, i) => {
         const aktiv = i === aktivIndex;
-        return (
+        const gesperrt = o.gesperrt != null && o.gesperrt !== '';
+        const beschreibungId = gesperrt ? `${grundId}-${i}` : undefined;
+        const knopf = (
           <button
             key={String(o.wert)}
             ref={(el) => {
@@ -125,9 +161,14 @@ export default function Segmentleiste<W extends string | number>({
             aria-checked={alsTab ? undefined : aktiv}
             aria-selected={alsTab ? aktiv : undefined}
             aria-controls={alsTab ? o.steuert : undefined}
+            aria-disabled={gesperrt || undefined}
+            aria-describedby={beschreibungId}
+            data-gesperrt={gesperrt || undefined}
             tabIndex={aktiv ? 0 : -1}
             className={aktiv ? 'lfh-segment lfh-segment--aktiv' : 'lfh-segment'}
-            onClick={() => onWechsel(o.wert)}
+            onClick={() => {
+              if (!gesperrt) onWechsel(o.wert);
+            }}
             onKeyDown={(e) => taste(e, i)}
             style={segmentStil(token)}
           >
@@ -139,7 +180,20 @@ export default function Segmentleiste<W extends string | number>({
               />
             )}
             {o.label}
+            {gesperrt && (
+              // Der Grund als Beschreibung — sichtbar trägt ihn der Tooltip.
+              <span id={beschreibungId} hidden>
+                {o.gesperrt}
+              </span>
+            )}
           </button>
+        );
+        return gesperrt ? (
+          <Tooltip key={String(o.wert)} title={o.gesperrt}>
+            {knopf}
+          </Tooltip>
+        ) : (
+          knopf
         );
       })}
     </div>

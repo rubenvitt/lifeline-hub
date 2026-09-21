@@ -1,15 +1,15 @@
 import type { CSSProperties, ReactNode } from 'react';
-import Augenbraue from '../../components/instrument/Augenbraue';
-import { monoStil, useRollen } from '../../components/instrument/rollenwerte';
+import Augenbraue from './Augenbraue';
+import { monoStil, useRollen } from './rollenwerte';
 import { datenfeldStil, datenrasterStil } from './datenrasterStil';
 
 /**
  * Datenraster — die Detail-Optik des Neuentwurfs statt antds `Descriptions`: je Feld eine
  * Augenbraue über dem Wert, 2–4 Spalten im Fugenraster, Kennungen/Zahlen/Zeiten in Mono.
  *
- * LOKALE ERGÄNZUNG: `components/instrument/**` kennt keinen Datenraster-Baustein, und die
- * Bausteine werden parallel benutzt — er liegt deshalb hier und ist im Bericht gemeldet.
- * Gehört er später in `instrument/`, zieht er ohne Schnittstellenänderung um.
+ * Seit 22.09.2026 ein Baustein in `components/instrument/` (vorher lokal unter
+ * `pages/datenraster/`, als die Bausteine parallel in Arbeit waren). Umgezogen ohne
+ * Schnittstellenänderung.
  *
  * SEMANTIK: ein `<dl>`; jedes Feld ist ein `<div>` mit `<dt>` (Augenbraue) und `<dd>`.
  * Das ist die zulässige Gruppierung nach HTML — Vorleser hören Begriff und Wert als Paar.

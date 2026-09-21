@@ -63,6 +63,37 @@ export function kopfZelleStil(
   };
 }
 
+/**
+ * Flex-Angaben der wachsenden Kopfgruppen im Einsatz-Workspace — rein und exportiert.
+ *
+ * Der Einsatzname ist die Identität der Seite, das Suchfeld nur ein Auslöser. Ab `lg`
+ * teilten sich beide den Überschuss früher zu gleichen Teilen (`1 1 240px` / `1 1 280px`);
+ * gemessen bei 1440 px blieben dem Namen 92 px, und „Übung Hochwasser Neckartal" endete nach
+ * „Übung Hoch…", während das Suchfeld 451 px breit war. Dabei deckte die Namensbasis von
+ * 240 px nicht einmal den festen Teil der Gruppe (Marke 60 · Wortmarke · Nummer · Abstände,
+ * gemessen ≈ 270 px in `kompakt`) — der Name lebte allein vom Überschuss.
+ *
+ * Jetzt (ab `lg`): die Namensgruppe startet mit 340 px (fester Teil plus gut 70 px Name)
+ * und wächst dreimal so stark wie die Suche; die Suche startet bei 180 px und SCHRUMPFT
+ * zuerst. Ihre Obergrenze von 520 px hält weiter `CommandPaletteTrigger`
+ * (`SUCHFELD_MAX_BREITE`). Gemessen: 1440 px → Name ungekürzt.
+ *
+ * Die BASEN entscheiden zugleich den Umbruch (`flexWrap` am Kopf): die rechte Zellgruppe
+ * wandert in eine zweite Zeile, sobald Namensbasis + Suchbasis + rechte Gruppe die Breite
+ * übersteigen. Die Summe der Basen ist mit 340 + 180 = 520 px BEWUSST dieselbe wie vorher
+ * (240 + 280): der Umbruch setzt also nicht früher ein als bisher (≈ 1100 px in `kompakt`),
+ * das Führungs-Tablet verliert keine Zeile. Die Summe nur zu verkleinern, ginge nicht:
+ * mit 240 + 160 blieb bei 992 px alles einzeilig und der Name stand gemessen auf 0 px.
+ *
+ * UNTER `lg` gilt {@link KOPF_NAME_FLEX_SCHMAL}, die bestehende Verdichtung: dort gibt es
+ * keine Suchzelle, und eine 400-px-Basis bräche auf dem Tablet die Kopfzeile unnötig um.
+ * `minWidth: 0` bleibt an allen Aufrufstellen Pflicht — ohne sie kürzt ein Flex-Kind nicht,
+ * sondern läuft über (Gate 1).
+ */
+export const KOPF_NAME_FLEX = '3 1 340px';
+export const KOPF_NAME_FLEX_SCHMAL = '1 1 240px';
+export const KOPF_SUCHE_FLEX = '1 1 180px';
+
 /** Markenzelle: 14-px-Quadrat in `marke`, in Rail-Breite. Reine Dekoration. */
 export function Markenzelle() {
   return (

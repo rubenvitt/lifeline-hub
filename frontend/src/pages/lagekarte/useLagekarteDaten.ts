@@ -386,6 +386,20 @@ export function useLagekarteDaten({
     // Ladegate spiegelt die aktive Quelle: im Snapshot-Modus die Dokument-Query (eine disabled
     // Live-Query meldet isLoading=false → sonst „fertig geladen" bei leerem Dokument, Marker-Pop-in).
     ladt: istSnapshot ? snapQuery.isLoading : einsatzQuery.isLoading || configQuery.isLoading,
+    // Stehen ALLE Quellen der Marker fest (geladen oder gescheitert)? `ladt` hängt nur an
+    // Einsatz und Config — die Startansicht der Karte (`startAnsicht.ts`) braucht aber das
+    // vollständige Bild, sonst entschiede sie über eine halb geladene Markermenge.
+    markerLaden: istSnapshot
+      ? snapQuery.isLoading
+      : einsatzQuery.isLoading ||
+        uhsQuery.isLoading ||
+        schaedenQuery.isLoading ||
+        einheitenQuery.isLoading ||
+        fahrzeugeQuery.isLoading ||
+        abschnitteQuery.isLoading ||
+        freieZeichenQuery.isLoading ||
+        lageMeldungenQuery.isLoading ||
+        fkQuery.isLoading,
     // Namen der Lagebild-Quellen, deren Abruf scheiterte (LFH-331 · B3) — leer = vollständig.
     // Die Kürzung für die Anzeige liegt bewusst NICHT hier: sie ist Darstellung, und ein Hook,
     // der schon kürzt, nähme der Seite die Wahl (und dem Test die Zählbarkeit).

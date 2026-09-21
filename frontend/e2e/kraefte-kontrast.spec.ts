@@ -272,11 +272,12 @@ for (const modus of ['light', 'dark']) {
 // (1) DAS STATUSBAND DES MELDEBILDS (Neuentwurf S6, 21.09.2026). Bis dahin standen hier die
 //     Kopf-Statuszahlen der Kräfteübersicht als Rollenfarbe auf KARTENGRUND — und verfehlten
 //     im Hellmodus die 7 : 1 in allen Werten (LFH-538, Messwerte 11.09.2026: 6,78–6,94). Das
-//     Band legt die Statusrolle nun als getönte FLÄCHE hinter Code, Zahl und Wort, und deren
-//     Text ist genau das Paar, das `components/instrument/statusFlaeche.ts` gerechnet hat
-//     (Tag: normal 7,87 · achtung/alarm tragen `text` 16,06 / 15,06; Nacht: 10,44 · 11,18 ·
-//     6,89). Deshalb wird hier in BEIDEN Modi der Zielwert HART zugesichert — für diese
-//     Fläche ist LFH-538 mit dem Umbau eingelöst.
+//     Band stellt seine Zellen seit der Nacharbeit vom 22.09.2026 auf die NEUTRALE Fläche
+//     (`flaeche`) und trägt den Ton nur im 8-px-Quadrat und in der Zahl; die Textfarben
+//     stehen in `kraefte/statusbandStil.ts` (Tag: normalText 9,18 · achtung/alarm tragen
+//     `text` 18,47, Wort `gedaempft` 8,42; Nacht: 10,92 · 11,75 · 6,77, Wort 7,27). Deshalb
+//     wird hier in BEIDEN Modi der Zielwert HART zugesichert — für diese Fläche ist LFH-538
+//     mit dem Umbau eingelöst.
 //
 // (2) DIE VERDICHTUNGSZEILE der Kräfte-Modulseiten auf SEITENGRUND: unverändert Rolle auf
 //     Text, im Hellmodus weiter unter 7 (LFH-538 offen) — dort steht die absolute
@@ -343,7 +344,8 @@ for (const modus of ['light', 'dark'] as const) {
       expect.soft(werte.textKontrast, kontext).toBeGreaterThanOrEqual(schranke);
     }
 
-    // (1) STATUSBAND — Zahl und Wort je Ton, auf der getönten Fläche.
+    // (1) STATUSBAND — Zahl und Wort je Ton, auf der neutralen Zellfläche (Nacharbeit
+    // 22.09.2026: der Ton steht nur noch im Quadrat und in der Zahl, `statusbandStil.ts`).
     await page.goto(`/einsaetze/${einsatzId}/kraefteuebersicht`);
     await expect(page.locator('html')).toHaveAttribute('data-theme', modus);
     await expect(page.getByRole('region', { name: 'Meldebild' })).toHaveCount(1);

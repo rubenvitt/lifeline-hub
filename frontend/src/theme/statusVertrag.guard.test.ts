@@ -106,7 +106,7 @@
  *     Ausdruck nennt dann weder das eine noch das andere, und was hier steht, ist wahr:
  *     der Scanner sieht Zeichen, keine Auswertung. Das ist keine Lücke IM Scanner,
  *     sondern die Fähigkeit, die er nicht hat — sie käme mit dem Syntaxbaum, nicht mit
- *     einem weiteren Sonderfall. Im Bestand kommt beides an keiner der 132
+ *     einem weiteren Sonderfall. Im Bestand kam beides an keiner der 132 (12.09.2026)
  *     `<Tag color=`-Stellen vor (gemessen: kein `color={<bezeichner>}` ausserhalb der
  *     Tests).
  *   • **Ein Regex-Literal in einer Nachbar-Prop** desselben Tags: {@link tagEnde} kennt
@@ -1928,7 +1928,7 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
     expect(presets.filter((p) => WIRE_WERTE.has(p))).toEqual([]);
   });
 
-  it('sieht den echten Baum — die 132 Tag-Stellen des Bestands', () => {
+  it('sieht den echten Baum — die Tag-Stellen des Bestands (Neuentwurf: 70)', () => {
     const dateien = lieseQuellen(SRC);
     const stellen = Object.entries(dateien)
       .filter(([p]) => ausserhalbDesVertrags(p))
@@ -1938,9 +1938,12 @@ describe('Statusfarb-Vertrag: kein `<Tag color=` über einem Vertrags-Enum (LFH-
             .join('\n')
             .match(/<Tag(?=[\s/>])/g) ?? [],
       );
-    // Gemessen am 12.09.2026: 132 `<Tag`-Stellen neben dem Vertrag und außerhalb der Tests
-    // (Kommentarinhalt abgezogen, roh sind es 134). Die untere Schranke ist der Selbsttest
-    // gegen einen Schnitt, der nichts mehr findet und deshalb trivial grün wäre.
-    expect(stellen.length).toBeGreaterThanOrEqual(100);
+    // Gemessen mit genau diesem Schnitt: 132 `<Tag`-Stellen am 12.09.2026, 70 am 22.09.2026
+    // (Neuentwurf „Instrumententafel" — Status als `StatusChip`/`StatusZelle` statt antd-Tag).
+    // Die untere Schranke ist der Selbsttest gegen einen Schnitt, der nichts mehr findet und
+    // deshalb trivial grün wäre. Sie liegt mit Absicht deutlich unter dem Messwert: der
+    // Neuentwurf baut weitere Tag-Stellen ab, die Zahl kann nur fallen. Wer sie unter 50
+    // drückt, misst neu und senkt die Schranke — ein Schnitt, der NICHTS findet, bleibt rot.
+    expect(stellen.length).toBeGreaterThanOrEqual(50);
   });
 });

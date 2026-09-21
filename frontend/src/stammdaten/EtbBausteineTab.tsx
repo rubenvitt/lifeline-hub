@@ -1,4 +1,4 @@
-import { App, Button, Popconfirm, Space, Tag, Typography, theme } from 'antd';
+import { App, Button, Popconfirm, Space, Typography, theme } from 'antd';
 import AdminPage from '../components/AdminPage';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
@@ -9,7 +9,8 @@ import { useAuth } from '../auth/AuthContext';
 import { ApiError } from '../api/client';
 import { deaktiviereBaustein, listeBausteine } from '../api/etbBaustein';
 import type { EtbBaustein } from '../api/types';
-import { etbTyp } from '../theme/statusFarben';
+import { monoStil } from '../components/instrument';
+import { etbTyp, etbTypFarbe } from '../theme/statusFarben';
 import EtbBausteinFormModal from './EtbBausteinFormModal';
 import { globalKeys } from '../api/queryKeys';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
@@ -100,9 +101,34 @@ export default function EtbBausteineTab() {
         value: t,
       })),
       onFilter: (wert, b) => b.typ === wert,
-      render: (t: EtbBaustein['typ']) => <Tag>{etbTyp[t].label}</Tag>,
+      // Typ als KANTE + TYPWORT wie auf der ETB-Zeitachse (Neuentwurf, Entscheidung 2), nicht
+      // als Etikett: derselbe Typ sieht im Katalog aus wie im Tagebuch, das er befüllt.
+      render: (t: EtbBaustein['typ']) => {
+        const farbe = etbTypFarbe(t, token);
+        return (
+          <span
+            data-typ={t}
+            style={{
+              ...monoStil(11, 500),
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
+              color: farbe.wort,
+              borderInlineStart: `2px solid ${farbe.kante}`,
+              paddingInlineStart: token.paddingXS,
+            }}
+          >
+            {etbTyp[t].label}
+          </span>
+        );
+      },
     },
-    { title: 'Sortierung', dataIndex: 'sortier', key: 'sortier' },
+    {
+      title: 'Sortierung',
+      dataIndex: 'sortier',
+      key: 'sortier',
+      // Zahlen in Mono (Neuentwurf) — die Spalte wird zeilenweise verglichen.
+      render: (n: number) => <span style={monoStil(12)}>{n}</span>,
+    },
     ...(istAdmin
       ? ([
           {

@@ -44,7 +44,6 @@ import {
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { formatUhrzeit, formatUhrzeitMitTag } from '../../anzeige/format';
 import { etbTyp } from '../../theme/statusFarben';
-import { flaeche } from '../../theme/tokens';
 import { useViewport } from '../../components/useViewport';
 import {
   abschnittNamen,
@@ -328,7 +327,6 @@ export default function UeberblickPage() {
           ]}
         />
       }
-      breite={flaeche.seiteBreit}
       dataUpdatedAt={einsatzQ.dataUpdatedAt}
       aktionen={
         <>

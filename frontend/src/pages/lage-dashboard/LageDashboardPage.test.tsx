@@ -474,6 +474,28 @@ describe('LageDashboardPage — Gefahrenmatrix', () => {
     // Das Stufenwort ist der zweite Kanal — es steht in jeder Zeile.
     expect(zeilen[1]).toHaveTextContent('akut');
     expect(within(box).getByText('2 Gebiete')).toBeInTheDocument();
+
+    // Legende bündig unter den Segmenten: dieselbe Zeilenklasse UND dasselbe Vier-Stufen-
+    // Raster wie die Balken (die Geometrie steht in `gefahrenmatrix.css`, geprüft in
+    // `matrixGeometrie.test.ts`; jsdom rechnet weder Layout noch Container-Abfragen).
+    const legende = box.querySelector<HTMLElement>('[data-lfh="gefahrenlegende"]')!;
+    const balken = zeilen[1].querySelector<HTMLElement>('[data-lfh="gefahrenbalken"]')!;
+    expect(zeilen[1]).toHaveClass('lfh-matrixzeile');
+    expect(legende).toHaveClass('lfh-matrixzeile');
+    expect(legende.style.gap).toBe(zeilen[1].style.gap);
+    expect(legende.closest('.lfh-gefahrenmatrix')).toBe(zeilen[1].closest('.lfh-gefahrenmatrix'));
+    const legendenRaster = legende.querySelector<HTMLElement>('.lfh-stufenraster')!;
+    expect(balken).toHaveClass('lfh-stufenraster');
+    // Kein Inline-Raster: es schlüge die Container-Abfrage der Klasse.
+    expect(balken.style.gridTemplateColumns).toBe('');
+    expect(legendenRaster.style.gridTemplateColumns).toBe('');
+    expect(Array.from(legendenRaster.children).map((c) => c.textContent)).toEqual([
+      'niedrig',
+      'mittel',
+      'hoch',
+      'akut',
+    ]);
+    expect(balken.children).toHaveLength(4);
   });
 
   it('trennt „keine" (bewertet) von „unbewertet" (Lücke)', async () => {

@@ -546,10 +546,13 @@ export default function Sidebar(props: SidebarProps) {
               renderItem={(o) => {
                 const aktiv = platzierungZiel?.typ === o.typ && platzierungZiel?.id === o.id;
                 let action: React.ReactNode = null;
+                // Zeilenaktionen sind SEKUNDÄR (umrandet): n Zeilen mit je einem gefüllten
+                // Knopf wären n Primäraktionen nebeneinander — „genau eine Primäraktion" gilt
+                // auch in der Leiste. Gefüllt bleibt nur, was einen laufenden Modus abschließt.
                 if (darfSchreiben) {
                   if (o.typ === 'abschnitt') {
                     action = (
-                      <Button type="primary" onClick={() => props.onAbschnittZeichnenStart(o.id)}>
+                      <Button onClick={() => props.onAbschnittZeichnenStart(o.id)}>
                         Fläche zeichnen
                       </Button>
                     );
@@ -559,10 +562,7 @@ export default function Sidebar(props: SidebarProps) {
                     // o.typ ist hier auf die Punkt-Typen verengt (abschnitt oben behandelt).
                     const punktTyp = o.typ;
                     action = (
-                      <Button
-                        type="primary"
-                        onClick={() => props.onPlatzierenStart({ typ: punktTyp, id: o.id })}
-                      >
+                      <Button onClick={() => props.onPlatzierenStart({ typ: punktTyp, id: o.id })}>
                         Platzieren
                       </Button>
                     );

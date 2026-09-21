@@ -12,7 +12,12 @@ import UhsAnlegenDrawer from './uhs/UhsAnlegenDrawer';
 import type { Uhs, UhsStatus, UhsTyp } from '../api/types';
 import EinsatzSeite from '../components/EinsatzSeite';
 import StatusTag from '../components/StatusTag';
-import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
+import {
+  SeitenFehler,
+  SeitenLeer,
+  SeitenSkeleton,
+  SeitenStandVeraltet,
+} from '../components/SeitenZustand';
 import { uhsStatus, uhsTyp } from '../theme/statusFarben';
 import KatalogTabelle from '../components/KatalogTabelle';
 
@@ -130,6 +135,17 @@ export default function UnfallhilfsstellenPage() {
           text="Unfallhilfsstellen konnten nicht geladen werden"
           ursache={uhsQuery.error}
           onWiederholen={() => void uhsQuery.refetch()}
+        />
+      ) : uhsQuery.isSuccess && alle.length === 0 ? (
+        // Leerzustand MIT Weg hinaus (Neuentwurf, LFH-331 · B3): dieselbe Anlage wie im Kopf,
+        // mit demselben Rechte-Riegel. Ohne Schreibrecht bleibt es bei der Aussage.
+        <SeitenLeer
+          titel="Noch keine Unfallhilfsstellen erfasst"
+          aktion={
+            schreibgeschuetzt
+              ? undefined
+              : { label: 'Erste Unfallhilfsstelle anlegen', onClick: () => setAnlegen(true) }
+          }
         />
       ) : (
         <>

@@ -16,8 +16,14 @@ import type { BrStatus, Einheit, EinsatzFahrzeug } from '../../api/types';
 import KraefteOhneBrSidebar from './KraefteOhneBrSidebar';
 import EinsatzSeite from '../../components/EinsatzSeite';
 import SektionHeader from '../../components/SektionHeader';
-import { Kennzahl, Kennzahlenband, monoStil, useRollen } from '../../components/instrument';
-import Datenraster, { Datenfeld } from '../datenraster/Datenraster';
+import {
+  Datenfeld,
+  Datenraster,
+  Kennzahl,
+  Kennzahlenband,
+  monoStil,
+  useRollen,
+} from '../../components/instrument';
 import StatusTag from '../../components/StatusTag';
 import { useViewport } from '../../components/useViewport';
 import { brStatus } from '../../theme/statusFarben';

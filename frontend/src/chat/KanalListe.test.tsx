@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../test/utils';
 import KanalListe, { sortiereKanaele } from './KanalListe';
@@ -67,10 +67,10 @@ describe('KanalListe', () => {
         onKanalAnlegen={vi.fn()}
       />,
     );
-    expect(screen.queryByRole('button', { name: 'Kanal' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Kanal anlegen' })).not.toBeInTheDocument();
   });
 
-  it('zeigt Ungelesen-Punkt und letzte Nachrichtenzeit', () => {
+  it('zeigt die Zahl der Ungelesenen (Zahl + Wort) und die letzte Nachrichtenzeit', () => {
     const letzte = new Date().toISOString().slice(0, 10) + ' 10:42:00';
     const { container } = renderMitProviders(
       <KanalListe
@@ -81,7 +81,10 @@ describe('KanalListe', () => {
         onKanalAnlegen={vi.fn()}
       />,
     );
-    expect(container.querySelector('.ant-badge-dot')).not.toBeNull();
+    // Zweiter Kanal: die Zahl mit dem Wort, nicht bloß ein Farbpunkt.
+    expect(container.querySelector('[data-lfh="kanal-ungelesen"]')).toHaveTextContent(
+      '2 ungelesen',
+    );
     expect(screen.getByTitle('Letzte Nachricht')).not.toHaveTextContent('');
   });
 
@@ -101,5 +104,39 @@ describe('KanalListe', () => {
       }),
     ]);
     expect(sortiert.map((k) => k.name)).toEqual(['Ungelesen', 'Gelesen']);
+  });
+
+  it('markiert den aktiven Kanal mit aria-current', () => {
+    renderMitProviders(
+      <KanalListe
+        kanaele={[kanal(), kanal({ id: 2, name: 'S2/S3' })]}
+        aktiverKanalId={2}
+        onWechsel={vi.fn()}
+        darfSchreiben={false}
+        onKanalAnlegen={vi.fn()}
+      />,
+    );
+    const zeilen = Array.from(document.querySelectorAll('[data-lfh="kanal-zeile"]'));
+    expect(zeilen.map((z) => z.getAttribute('aria-current'))).toEqual([null, 'true']);
+  });
+
+  it('legt einen Kanal per Enter im Namensfeld an (Erfassungs-Hülle)', async () => {
+    const user = userEvent.setup();
+    const onKanalAnlegen = vi.fn();
+    renderMitProviders(
+      <KanalListe
+        kanaele={[]}
+        aktiverKanalId={null}
+        onWechsel={vi.fn()}
+        darfSchreiben
+        onKanalAnlegen={onKanalAnlegen}
+      />,
+    );
+    // Leerzustand nennt den Weg; die Anlage öffnet aus dem Kopf.
+    expect(screen.getByText(/Noch keine Kanäle/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Kanal anlegen' }));
+    const name = await screen.findByLabelText('Name');
+    await user.type(name, '  Abschnitt Nord  {Enter}');
+    await waitFor(() => expect(onKanalAnlegen).toHaveBeenCalledWith('Abschnitt Nord', undefined));
   });
 });

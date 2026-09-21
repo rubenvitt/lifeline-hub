@@ -1,7 +1,7 @@
 import { App } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router';
-import SektionHeader from '../../components/SektionHeader';
+import Formularpaneel from './Formularpaneel';
 import { SeitenFehler, SeitenSkeleton } from '../../components/SeitenZustand';
 import { SeitenHinweise } from '../../components/SpeicherHinweis';
 import ModulEinstellungsListe from './ModulEinstellungsListe';
@@ -99,45 +99,46 @@ export default function EinsatzModule() {
         rechteFehlt={daten.istAktiv && !darfModuleVerwalten}
         rechteText="Nur die Einsatzleitung oder ein System-Admin darf die Modul-Sichtbarkeit dieses Einsatzes ändern — die Werte stehen hier zum Nachlesen."
       />
-      <SektionHeader
+      <Formularpaneel
         titel="Modul-Sichtbarkeit & Berechtigungen"
         beschreibung="Module für diesen Einsatz ausblenden oder auf eine Rolle beschränken. Einsatzdaten und Einstellungen lassen sich nicht ausblenden. Änderungen werden sofort gespeichert."
-      />
-      <ModulEinstellungsListe
-        rollenSpalte="Benötigte Rolle"
-        rolleVon={(key) => overrides[key]?.benoetigte_rolle ?? ''}
-        aufRolle={(modulKey, val) =>
-          overrideMutation.mutate({
-            modulKey,
-            update: {
-              // Die Sichtbarkeit MUSS mitfahren: der PUT ist Vollersatz — ohne den
-              // Bestandswert nullt eine reine Rollen-Änderung das Ausblenden.
-              sichtbar: sichtbarVon(modulKey),
-              benoetigte_rolle: (val || null) as ModulOverrideUpdate['benoetigte_rolle'],
-            },
-          })
-        }
-        sichtbarSpalte={{
-          titel: 'Sichtbar',
-          sichtbarVon,
-          aufSichtbar: (modulKey, checked) =>
+      >
+        <ModulEinstellungsListe
+          rollenSpalte="Benötigte Rolle"
+          rolleVon={(key) => overrides[key]?.benoetigte_rolle ?? ''}
+          aufRolle={(modulKey, val) =>
             overrideMutation.mutate({
               modulKey,
               update: {
-                sichtbar: checked,
-                // LFH-120: Backend typisiert benoetigte_rolle als freien Option<String>
-                // (generiert `string | null`); FE verengt auf die gültigen Rollen-Codes.
-                benoetigte_rolle: (overrides[modulKey]?.benoetigte_rolle ??
-                  null) as ModulOverrideUpdate['benoetigte_rolle'],
+                // Die Sichtbarkeit MUSS mitfahren: der PUT ist Vollersatz — ohne den
+                // Bestandswert nullt eine reine Rollen-Änderung das Ausblenden.
+                sichtbar: sichtbarVon(modulKey),
+                benoetigte_rolle: (val || null) as ModulOverrideUpdate['benoetigte_rolle'],
               },
-            }),
-        }}
-        darfVerwalten={darfModuleVerwalten}
-        // Nur die schreibende Zeile ist gesperrt (H15), nur die gescheiterte markiert (H14).
-        laeuftKey={overrideMutation.isPending ? overrideMutation.variables.modulKey : null}
-        fehlerKey={overrideMutation.isError ? overrideMutation.variables.modulKey : null}
-        hinweisVon={(key) => orgRollenHinweis(orgModulDefaults[key])}
-      />
+            })
+          }
+          sichtbarSpalte={{
+            titel: 'Sichtbar',
+            sichtbarVon,
+            aufSichtbar: (modulKey, checked) =>
+              overrideMutation.mutate({
+                modulKey,
+                update: {
+                  sichtbar: checked,
+                  // LFH-120: Backend typisiert benoetigte_rolle als freien Option<String>
+                  // (generiert `string | null`); FE verengt auf die gültigen Rollen-Codes.
+                  benoetigte_rolle: (overrides[modulKey]?.benoetigte_rolle ??
+                    null) as ModulOverrideUpdate['benoetigte_rolle'],
+                },
+              }),
+          }}
+          darfVerwalten={darfModuleVerwalten}
+          // Nur die schreibende Zeile ist gesperrt (H15), nur die gescheiterte markiert (H14).
+          laeuftKey={overrideMutation.isPending ? overrideMutation.variables.modulKey : null}
+          fehlerKey={overrideMutation.isError ? overrideMutation.variables.modulKey : null}
+          hinweisVon={(key) => orgRollenHinweis(orgModulDefaults[key])}
+        />
+      </Formularpaneel>
     </>
   );
 }

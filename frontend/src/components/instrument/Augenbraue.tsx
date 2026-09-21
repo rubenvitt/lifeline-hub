@@ -8,7 +8,7 @@ import { schriftStil, useRollen } from './rollenwerte';
  * Tabellenspalten und Feldgruppen.
  *
  * Standard ist ein `<span>` (Satz, kein Gliederungspunkt). Wo die Augenbraue eine
- * Sektion BENENNT — Paneelkopf, Kennzahl —, macht `als="h2"`/`"h3"` sie zur Überschrift,
+ * Sektion BENENNT — Paneelkopf, Kennzahl —, macht `als="h2"` … `"h6"` sie zur Überschrift,
  * ohne dass die Optik sich ändert: die Gliederung gehört in den Baum, nicht ins Aussehen.
  *
  * Die Versalien sind CSS (`text-transform`), der Text im DOM bleibt, wie er übergeben
@@ -23,7 +23,7 @@ export function augenbraueStil(rollen: Pick<Farbrollen, 'schwach'>): CSSProperti
   };
 }
 
-export type AugenbraueElement = 'span' | 'div' | 'h2' | 'h3' | 'h4' | 'h5' | 'dt';
+export type AugenbraueElement = 'span' | 'div' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'dt';
 
 interface AugenbraueProps {
   children: ReactNode;

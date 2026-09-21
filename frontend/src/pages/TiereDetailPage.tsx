@@ -14,9 +14,8 @@ import {
   Typography,
 } from 'antd';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { Paneel, StatusChip, monoStil } from '../components/instrument';
+import { Datenfeld, Datenraster, Paneel, StatusChip, monoStil } from '../components/instrument';
 import { TIER_STATUS } from './tiere/tierHelfer';
-import Datenraster, { Datenfeld } from './datenraster/Datenraster';
 import { Select } from '../components/Select';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { useState } from 'react';

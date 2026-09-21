@@ -9,7 +9,8 @@ import { entferneMitglied, ladeMitglieder, setzeMitglied } from '../api/einsaetz
 import { listeBenutzer } from '../api/benutzer';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import KatalogTabelle from '../components/KatalogTabelle';
-import SektionHeader from '../components/SektionHeader';
+import Datenstand from '../components/Datenstand';
+import { Paneel, useRollen } from '../components/instrument';
 import { ErfassungsModal } from '../components/Erfassung';
 
 const ROLLEN: { value: EinsatzRolle; label: string }[] = [
@@ -88,6 +89,7 @@ export default function MitgliederAbschnitt({
 }: Props) {
   const qc = useQueryClient();
   const { message } = App.useApp();
+  const { token } = useRollen();
   const [neuerBenutzer, setNeuerBenutzer] = useState<number | undefined>();
   const [neueRolle, setNeueRolle] = useState<EinsatzRolle>('fuehrungspersonal');
   const [stelleZiel, setStelleZiel] = useState<StellenZiel | null>(null);
@@ -205,10 +207,22 @@ export default function MitgliederAbschnitt({
   ];
 
   return (
-    <section style={{ marginTop: 32 }}>
-      <SektionHeader titel="Zugriff" dataUpdatedAt={mitgliederQuery.dataUpdatedAt} />
+    // Ein Paneel mit Augenbraue statt einer Sektionsüberschrift (Neuentwurf): Zählung und
+    // Datenstand stehen im Kopf rechts, die Hinzufügen-Zeile ist die erste Paneelzeile.
+    <Paneel
+      titel="Zugriff"
+      meta={
+        mitgliederQuery.isSuccess ? (
+          <>
+            {mitglieder.length} Mitglieder{' '}
+            <Datenstand dataUpdatedAt={mitgliederQuery.dataUpdatedAt} />
+          </>
+        ) : undefined
+      }
+      style={{ marginTop: token.marginLG }}
+    >
       {darfVerwalten && (
-        <Space style={{ marginBottom: 16 }} wrap>
+        <Space style={{ padding: token.padding }} wrap>
           <Select
             placeholder="Benutzer …"
             style={{ width: 200 }}
@@ -262,6 +276,6 @@ export default function MitgliederAbschnitt({
             fehler={stelleSetzen.error}
           />
         )}
-    </section>
+    </Paneel>
   );
 }

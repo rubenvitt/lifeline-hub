@@ -1,4 +1,4 @@
-import { App, Button, Form, Space, Typography } from 'antd';
+import { App, Button, Form, theme } from 'antd';
 import AdminPage from '../components/AdminPage';
 import { Select } from '../components/Select';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
@@ -8,6 +8,9 @@ import { useAuth } from '../auth/AuthContext';
 import { ladeOrganisation, setzeOrgDefault } from '../api/organisation';
 import { globalKeys } from '../api/queryKeys';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
+import Formularpaneel from '../pages/einstellungen/Formularpaneel';
+import { speicherLeisteStil } from '../pages/einstellungen/einsatzEinstellungenForm';
+import { flaeche } from '../theme/tokens';
 
 interface FormWerte {
   tz_organisation: string;
@@ -36,6 +39,7 @@ export default function OrganisationTab() {
   const qc = useQueryClient();
   const { message } = App.useApp();
   const [form] = Form.useForm<FormWerte>();
+  const { token } = theme.useToken();
 
   const orgQuery = useQuery({ queryKey: globalKeys.organisation(), queryFn: ladeOrganisation });
 
@@ -67,6 +71,7 @@ export default function OrganisationTab() {
        `<form>` und könnte nichts übermitteln (Erfassungs-Norm B4/LFH-332). */
     <AdminPage
       titel="Organisation"
+      breite={flaeche.seiteSchmal}
       hinweis={
         <SeitenHinweise
           fehler={speichern.error}
@@ -75,37 +80,38 @@ export default function OrganisationTab() {
         />
       }
     >
-      <Space orientation="vertical" size="middle" style={{ width: '100%', maxWidth: 480 }}>
-        <Typography.Paragraph type="secondary">
-          Standard-Organisation für taktische Zeichen; pro Objekt überschreibbar.
-        </Typography.Paragraph>
-        {/* `disabled` am Formular sperrt die Felder, `disabled` am Knopf den Absendeweg —
-            der Knopf VERSCHWINDET nicht (M16). */}
-        <Form<FormWerte>
-          form={form}
-          layout="vertical"
-          disabled={!istAdmin}
-          onFinish={(w) => speichern.mutate(w)}
+      {/* `disabled` am Formular sperrt die Felder, `disabled` am Knopf den Absendeweg —
+          der Knopf VERSCHWINDET nicht (M16). Neuentwurf: Feldgruppe als Paneel, der Knopf in
+          der sticky Leiste IM `<form>` wie auf den Einstellungsseiten. */}
+      <Form<FormWerte>
+        form={form}
+        layout="vertical"
+        disabled={!istAdmin}
+        onFinish={(w) => speichern.mutate(w)}
+      >
+        <Formularpaneel
+          titel="Taktische Zeichen"
+          beschreibung="Standard-Organisation für taktische Zeichen; pro Objekt überschreibbar."
         >
-          <Form.Item label="DV-102-Organisation" name="tz_organisation">
+          <Form.Item label="DV-102-Organisation" name="tz_organisation" style={{ maxWidth: 480 }}>
             <Select
               options={ORG_OPTIONEN}
               placeholder="Organisation wählen"
               loading={orgQuery.isLoading}
             />
           </Form.Item>
-          <Form.Item>
-            <Button
-              type="primary"
-              htmlType="submit"
-              disabled={!istAdmin}
-              loading={speichern.isPending}
-            >
-              Speichern
-            </Button>
-          </Form.Item>
-        </Form>
-      </Space>
+        </Formularpaneel>
+        <div style={speicherLeisteStil(token)}>
+          <Button
+            type="primary"
+            htmlType="submit"
+            disabled={!istAdmin}
+            loading={speichern.isPending}
+          >
+            Speichern
+          </Button>
+        </div>
+      </Form>
     </AdminPage>
   );
 }

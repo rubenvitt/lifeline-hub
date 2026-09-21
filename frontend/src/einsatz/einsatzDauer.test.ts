@@ -14,8 +14,15 @@ describe('einsatzDauer', () => {
     expect(einsatzDauer('2026-09-21 14:22:00', null, JETZT)).toBe('00:00 h');
   });
 
-  it('lässt die Stunden über 24 weiterlaufen', () => {
-    expect(einsatzDauer('2026-09-20 07:17:00', null, JETZT)).toBe('31:05 h');
+  it('setzt ab 24 Stunden die vollen Tage vor die Uhrzeitform', () => {
+    expect(einsatzDauer('2026-09-20 07:17:00', null, JETZT)).toBe('1 d 07:05 h');
+    // 62:20 h — die Form, die der Neuentwurf ablöst.
+    expect(einsatzDauer('2026-09-19 00:02:00', null, JETZT)).toBe('2 d 14:20 h');
+  });
+
+  it('bleibt knapp unter 24 Stunden in der Stundenform und wechselt genau bei 24', () => {
+    expect(einsatzDauer('2026-09-20 14:23:00', null, JETZT)).toBe('23:59 h');
+    expect(einsatzDauer('2026-09-20 14:22:00', null, JETZT)).toBe('1 d 00:00 h');
   });
 
   it('steht bei einem abgeschlossenen Einsatz auf der Dauer bis zum Ende', () => {

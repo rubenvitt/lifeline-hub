@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { dichten, farbenDunkel } from '../theme/tokens';
 import { funktionAusSachgebieten } from './BenutzerMenu';
 import {
+  KOPF_NAME_FLEX,
+  KOPF_NAME_FLEX_SCHMAL,
+  KOPF_SUCHE_FLEX,
   SYNC_DARSTELLUNG,
   formatiereUhr,
   kopfZelleStil,
@@ -83,5 +86,40 @@ describe('funktionAusSachgebieten — Funktion im Kopf', () => {
   it('erfindet ohne Sachgebiet keine Funktion', () => {
     expect(funktionAusSachgebieten([])).toBeNull();
     expect(funktionAusSachgebieten(undefined)).toBeNull();
+  });
+});
+
+describe('Kopfgruppen — der Einsatzname vor dem Suchfeld (22.09.2026)', () => {
+  // `flex`-Kurzform zerlegt: Wachstum, Schrumpfung, Basis in px.
+  const teile = (flex: string) => {
+    const [grow, shrink, basis] = flex.split(' ');
+    return { grow: Number(grow), shrink: Number(shrink), basis: Number.parseInt(basis, 10) };
+  };
+
+  it('lässt ab lg die Namensgruppe stärker wachsen als die Suche', () => {
+    const name = teile(KOPF_NAME_FLEX);
+    const suche = teile(KOPF_SUCHE_FLEX);
+    // Vorher je 1 — bei 1440 px blieben dem Namen gemessen 92 px, der Suche 451 px.
+    expect(name.grow).toBeGreaterThan(suche.grow);
+    // Beide dürfen schrumpfen, sonst läuft die Kopfzeile über statt umzubrechen (Gate 1).
+    expect(name.shrink).toBeGreaterThan(0);
+    expect(suche.shrink).toBeGreaterThan(0);
+  });
+
+  it('gibt der Namensgruppe eine Basis über ihrem festen Teil (≈ 270 px in kompakt)', () => {
+    // LITERALE: mit 240 px deckte die Basis nicht einmal Marke, Wortmarke und Nummer.
+    expect(teile(KOPF_NAME_FLEX).basis).toBe(340);
+    expect(teile(KOPF_SUCHE_FLEX).basis).toBe(180);
+  });
+
+  it('bricht nicht früher um als vorher — die Summe der Basen bleibt 520 px', () => {
+    // Vorher 240 + 280. Eine größere Summe kostete das Führungs-Tablet (1024–1280 px) eine
+    // zweite Kopfzeile; eine kleinere hielte bei 992 px alles einzeilig und drückte den
+    // Namen auf 0 px (gemessen).
+    expect(teile(KOPF_NAME_FLEX).basis + teile(KOPF_SUCHE_FLEX).basis).toBe(520);
+  });
+
+  it('lässt die Verdichtung unter lg unverändert', () => {
+    expect(KOPF_NAME_FLEX_SCHMAL).toBe('1 1 240px');
   });
 });

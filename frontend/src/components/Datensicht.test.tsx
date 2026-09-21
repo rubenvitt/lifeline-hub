@@ -697,29 +697,23 @@ const tabellen = (c: HTMLElement) => c.querySelectorAll('.ant-table');
 const karten = (c: HTMLElement) => c.querySelectorAll('[data-lfh="datensicht-karte"]');
 
 describe('Datensicht · Formachse', () => {
-  it.each([768, 991, 992, 1024, 1199, 1200, 1280, 1366])(
-    'LFH-464: optionaler xl-Umbruch bei %i px, Default bleibt md',
+  it.each([390, 767, 768, 1024, 1200, 1366])(
+    'auto bricht bei md um — %i px (kein eigener Umbruchpunkt mehr, tabelleAb ist entfallen)',
     (breite) => {
       setzeViewportBreite(breite);
-      const optional = rendere({ tabelleAb: 'xl' });
-      expect(tabellen(optional.container)).toHaveLength(breite >= 1200 ? 1 : 0);
-      expect(karten(optional.container)).toHaveLength(breite >= 1200 ? 0 : 3);
-      optional.unmount();
-      const standard = rendere();
-      expect(tabellen(standard.container)).toHaveLength(1);
-      expect(karten(standard.container)).toHaveLength(0);
+      const { container } = rendere();
+      // md = 768 px (antd). LITERAL, nicht aus dem Grid zurückgelesen.
+      expect(tabellen(container)).toHaveLength(breite >= 768 ? 1 : 0);
+      expect(karten(container)).toHaveLength(breite >= 768 ? 0 : 3);
     },
   );
 
-  it.each(['tabelle', 'karte'] as const)(
-    'LFH-464: feste Form %s gewinnt gegen den optionalen Umbruch',
-    (form) => {
-      setzeViewportBreite(form === 'tabelle' ? 390 : 1600);
-      const { container } = rendere({ form, tabelleAb: 'xl' });
-      expect(tabellen(container)).toHaveLength(form === 'tabelle' ? 1 : 0);
-      expect(karten(container)).toHaveLength(form === 'karte' ? 3 : 0);
-    },
-  );
+  it.each(['tabelle', 'karte'] as const)('feste Form %s gewinnt gegen die Breite', (form) => {
+    setzeViewportBreite(form === 'tabelle' ? 390 : 1600);
+    const { container } = rendere({ form });
+    expect(tabellen(container)).toHaveLength(form === 'tabelle' ? 1 : 0);
+    expect(karten(container)).toHaveLength(form === 'karte' ? 3 : 0);
+  });
 
   it('bei 1024 px genau EIN Zweig: Tabelle, keine Karte', () => {
     /**

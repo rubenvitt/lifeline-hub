@@ -2,13 +2,13 @@ import { App, AutoComplete, Button, Form, theme } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router';
 import { Select } from '../../components/Select';
-import SektionHeader from '../../components/SektionHeader';
 import { SeitenFehler, SeitenSkeleton } from '../../components/SeitenZustand';
 import { SeitenHinweise } from '../../components/SpeicherHinweis';
 import { speichereEinstellungen } from '../../api/einsaetze';
 import { einsatzKeys } from '../../api/queryKeys';
 import { modulRegistry } from '../../einsatz/modulRegistry';
 import { RECHTE_TEXT, useEinstellungenDaten } from '../EinsatzEinstellungenPage';
+import Formularpaneel from './Formularpaneel';
 import {
   EINHEITEN_OPTIONEN,
   KOORDINATEN_OPTIONEN,
@@ -95,64 +95,66 @@ export default function EinsatzAllgemein() {
         onFinish={(werte) => speichern.mutate(werte)}
         disabled={!daten.darfBearbeiten}
       >
-        <SektionHeader titel="Einstieg" />
-        <Form.Item
-          label="Standard-Modul (Einstieg)"
-          name="standard_modul"
-          tooltip="Modul, das beim Öffnen des Einsatzes angezeigt wird. Leer = Standard (Lage-Dashboard bzw. ETB)."
-        >
-          <Select
-            allowClear
-            placeholder="Standard (Lage-Dashboard bzw. ETB)"
-            options={standardModulOptionen}
-          />
-        </Form.Item>
+        <Formularpaneel titel="Einstieg">
+          <Form.Item
+            label="Standard-Modul (Einstieg)"
+            name="standard_modul"
+            tooltip="Modul, das beim Öffnen des Einsatzes angezeigt wird. Leer = Standard (Lage-Dashboard bzw. ETB)."
+          >
+            <Select
+              allowClear
+              placeholder="Standard (Lage-Dashboard bzw. ETB)"
+              options={standardModulOptionen}
+            />
+          </Form.Item>
+        </Formularpaneel>
 
-        <SektionHeader
+        <Formularpaneel
           titel="Anzeige-Konventionen"
           beschreibung="Gemeinsame Darstellung für diesen Einsatz (Lagebild). Leer = Standard."
-        />
-        <Form.Item
-          label="Zeitzone"
-          name="zeitzone"
-          tooltip="IANA-Zeitzone (z. B. Europe/Berlin). Leer = lokale Zeit des Geräts."
-          extra={orgHinweisWert(orgDefaults?.zeitzone)}
         >
-          <AutoComplete
-            allowClear
-            options={ZEITZONEN_OPTIONEN}
-            placeholder="Europe/Berlin (Standard)"
-            showSearch={{
-              filterOption: (eingabe, option) =>
-                (option?.value ?? '').toLowerCase().includes(eingabe.toLowerCase()),
-            }}
-          />
-        </Form.Item>
-        <Form.Item
-          label="Zeitformat"
-          name="zeitformat"
-          extra={orgHinweisSelect(orgDefaults?.zeitformat, ZEITFORMAT_OPTIONEN)}
-        >
-          <Select allowClear placeholder="24 Stunden (Standard)" options={ZEITFORMAT_OPTIONEN} />
-        </Form.Item>
-        <Form.Item
-          label="Einheiten"
-          name="einheiten"
-          extra={orgHinweisSelect(orgDefaults?.einheiten, EINHEITEN_OPTIONEN)}
-        >
-          <Select allowClear placeholder="Metrisch (Standard)" options={EINHEITEN_OPTIONEN} />
-        </Form.Item>
-        <Form.Item
-          label="Koordinatenformat"
-          name="koordinatenformat"
-          extra={orgHinweisSelect(orgDefaults?.koordinatenformat, KOORDINATEN_OPTIONEN)}
-        >
-          <Select
-            allowClear
-            placeholder="WGS84 dezimal (Standard)"
-            options={KOORDINATEN_OPTIONEN}
-          />
-        </Form.Item>
+          <Form.Item
+            label="Zeitzone"
+            name="zeitzone"
+            tooltip="IANA-Zeitzone (z. B. Europe/Berlin). Leer = lokale Zeit des Geräts."
+            extra={orgHinweisWert(orgDefaults?.zeitzone)}
+          >
+            <AutoComplete
+              allowClear
+              options={ZEITZONEN_OPTIONEN}
+              placeholder="Europe/Berlin (Standard)"
+              showSearch={{
+                filterOption: (eingabe, option) =>
+                  (option?.value ?? '').toLowerCase().includes(eingabe.toLowerCase()),
+              }}
+            />
+          </Form.Item>
+          <Form.Item
+            label="Zeitformat"
+            name="zeitformat"
+            extra={orgHinweisSelect(orgDefaults?.zeitformat, ZEITFORMAT_OPTIONEN)}
+          >
+            <Select allowClear placeholder="24 Stunden (Standard)" options={ZEITFORMAT_OPTIONEN} />
+          </Form.Item>
+          <Form.Item
+            label="Einheiten"
+            name="einheiten"
+            extra={orgHinweisSelect(orgDefaults?.einheiten, EINHEITEN_OPTIONEN)}
+          >
+            <Select allowClear placeholder="Metrisch (Standard)" options={EINHEITEN_OPTIONEN} />
+          </Form.Item>
+          <Form.Item
+            label="Koordinatenformat"
+            name="koordinatenformat"
+            extra={orgHinweisSelect(orgDefaults?.koordinatenformat, KOORDINATEN_OPTIONEN)}
+          >
+            <Select
+              allowClear
+              placeholder="WGS84 dezimal (Standard)"
+              options={KOORDINATEN_OPTIONEN}
+            />
+          </Form.Item>
+        </Formularpaneel>
 
         <div style={speicherLeisteStil(token)}>
           <Button type="primary" htmlType="submit" loading={speichern.isPending}>

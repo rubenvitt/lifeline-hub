@@ -72,7 +72,6 @@ type SpaltenKey = 'funkrufname' | 'typ';
 function rendere(
   spalten: readonly DatensichtSpalte<Fahrzeug, SpaltenKey>[],
   form: 'tabelle' | 'karte' | 'auto',
-  tabelleAb: 'md' | 'xl' = 'md',
 ): ReactElement {
   const karte: Kartenplan<Fahrzeug, SpaltenKey> = {
     art: 'plan',
@@ -87,7 +86,6 @@ function rendere(
         zeilenSchluessel="id"
         karte={karte}
         form={form}
-        tabelleAb={tabelleAb}
         suche={{ platzhalter: 'Funkrufname' }}
       />
     </CommandPaletteProvider>
@@ -198,14 +196,14 @@ describe('Datensicht · Spaltenmenü über einen Zweigwechsel', () => {
    * weg, wenn `hatWaehlbareSpalten` falsch wird (Wechsel der Spaltengarnitur).
    */
   it.each([
-    { tabelleAb: 'md', breit: 1024, schmal: 390 },
-    { tabelleAb: 'xl', breit: 1280, schmal: 1199 },
+    { breit: 1024, schmal: 390 },
+    { breit: 768, schmal: 767 },
   ] as const)(
-    'bleibt beim Wechsel über $tabelleAb geschlossen',
-    async ({ tabelleAb, breit, schmal }) => {
+    'bleibt beim Wechsel über md geschlossen ($breit → $schmal px)',
+    async ({ breit, schmal }) => {
       const u = userEvent.setup();
       setzeViewportBreite(breit);
-      renderBasis(rendere(ZWEI_SPALTEN, 'auto', tabelleAb));
+      renderBasis(rendere(ZWEI_SPALTEN, 'auto'));
 
       await u.click(screen.getByRole('button', { name: 'Spalten — Fahrzeuge' }));
       await waitFor(() => expect(offenesSpaltenMenue()).not.toBeNull());

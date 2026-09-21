@@ -26,6 +26,9 @@ import BenutzerMenu, { funktionAusSachgebieten } from '../components/BenutzerMen
 import CommandPaletteTrigger from '../components/CommandPaletteTrigger';
 import {
   KOPF_HOEHE,
+  KOPF_NAME_FLEX,
+  KOPF_NAME_FLEX_SCHMAL,
+  KOPF_SUCHE_FLEX,
   KopfRechts,
   Markenzelle,
   SyncAnzeige,
@@ -309,8 +312,16 @@ export default function EinsatzLayout() {
       <Header style={KOPF_STIL}>
         {/* LINKE GRUPPE: Marke (bzw. Griff unter `lg`), Wortmarke, Einsatzkennung. Sie
             bleibt zusammen; bei Platzmangel bricht die rechte Gruppe um, statt den
-            Einsatznamen auf null zu drücken. */}
-        <div style={{ display: 'flex', alignItems: 'stretch', flex: '1 1 240px', minWidth: 0 }}>
+            Einsatznamen auf null zu drücken. Sie wächst stärker als die Suche
+            (`KOPF_NAME_FLEX`), damit der Name erst kürzt, wenn es wirklich eng ist. */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'stretch',
+            flex: breit ? KOPF_NAME_FLEX : KOPF_NAME_FLEX_SCHMAL,
+            minWidth: 0,
+          }}
+        >
           {breit ? (
             <Markenzelle />
           ) : (
@@ -373,7 +384,7 @@ export default function EinsatzLayout() {
           <div
             data-lfh="kopf-suche"
             style={{
-              flex: '1 1 280px',
+              flex: KOPF_SUCHE_FLEX,
               minWidth: 0,
               display: 'flex',
               alignItems: 'center',
