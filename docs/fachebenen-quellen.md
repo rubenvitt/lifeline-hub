@@ -23,7 +23,7 @@ Die Pflicht-Attribution aktiver, nicht-offline Fachebenen wird in der Karten-Att
 | **Strahlung / ODL (BfS)** (`odl`) | `https://www.imis.bfs.de/ogc/opendata/ows` (WFS 1.1.0, `opendata:odlinfo_odl_1h_latest`, `outputFormat=application/json`) | GeoJSON-Punkte direkt (~1 676 ortsfeste Sonden, EPSG:4326, Gamma-ODL-Stundenwert in µSv/h) → auf die gelesenen Felder normalisiert, mit Bewertungsstufe | **GeoNutzV bzw. Datenlizenz Deutschland – Namensnennung – 2.0 (dl-de/by-2-0)**, auch kommerziell; Auflage laut BfS-Nutzungsbedingungen: Daten „in sachlicher Art und Weise darzustellen". Kein Schlüssel, keine dokumentierte Abrufgrenze. | `Bundesamt für Strahlenschutz (BfS), dl-de/by-2-0` | 600 s (Quelle im Stundentakt) | leer + ausgegraut |
 | **Autobahn-Lage / BAB** (`autobahn`) | `https://verkehr.autobahn.de/o/autobahn/` (Streckenliste) + je Strecke `…/services/{webcam,roadworks,closure}` | JSON → GeoJSON-**Punkte** (111 Strecken × 3 Dienste, im Backend aggregiert) | **Kein Lizenzvermerk in API oder OpenAPI-Spec.** Gängige Einordnung (bundesAPI): Datenlizenz Deutschland – Namensnennung – 2.0 (dl-de/by-2-0), also auch kommerziell und verändert nutzbar bei Quellennennung. Kein Schlüssel, keine Registrierung. Siehe Lizenz-Vorbehalt unten. | `Autobahn GmbH des Bundes` | 600 s (Erstbefüllung im Hintergrund, s. u.) | leer + ausgegraut |
 | **Luftqualität / UBA** (`luftqualitaet`) | `https://luftdaten.umweltbundesamt.de/api/air-data/v2/stations/json` + `…/airquality/json` (Acht-Stunden-Fenster, beide mit `lang=de&index=id`) | Zeilen-Arrays mit Spaltenliste in `indices` → GeoJSON-**Punkte** (~390 Messstationen mit Index) | **Lizenz-Vorbehalt, s. u.** — gängige Einordnung: Datenlizenz Deutschland – Namensnennung – 2.0 (dl-de/by-2-0). Kein Schlüssel, keine Registrierung. Inoffizielle API (bund.dev), keine Stabilitätszusage. | `Umweltbundesamt` | 900 s (Stundenwerte mit ~2 h Verzug) | leer + ausgegraut |
-| **KRITIS / sensible Objekte** (`kritis`) | `https://overpass-api.de/api/interpreter` (Overpass QL, `nwr … out center`) | OSM-JSON → GeoJSON-Punkte (Zentroide), viewport-`bbox`-getrieben | **ODbL** (OpenStreetMap), Attribution **zwingend**. | `© OpenStreetMap-Beitragende (ODbL)` | 24 h (`KRITIS_TTL`, KRITIS-Objekte ändern sich kaum; hier stand bis LFH-79 fälschlich 3600 s) | leer + ausgegraut |
+| **KRITIS / sensible Objekte** (`kritis`) | `https://overpass-api.de/api/interpreter` (Overpass QL, `nwr … out center`) | OSM-JSON → GeoJSON-Punkte (Zentroide), viewport-`bbox`-getrieben | **ODbL** (OpenStreetMap), Attribution **zwingend**. | `© OpenStreetMap-Beitragende (ODbL)` | 86400 s = 1 Tag (KRITIS-Objekte sind quasi statisch, entlastet Overpass) | leer + ausgegraut |
 
 ## Hinweise zur Anbindung
 
@@ -32,7 +32,12 @@ Die Pflicht-Attribution aktiver, nicht-offline Fachebenen wird in der Karten-Att
   toleriert einzelne fehlschlagende Geometrie-Abrufe (geloggt, übrige Warnungen bleiben).
 - **KRITIS** ist die einzige `bbox`-abhängige Ebene: Das Frontend meldet den Karten-Viewport
   (Parameter `bbox=west,sued,ost,nord`) nach Kartenbewegung (debounced); der Aggregator cacht
-  pro gerundeter bbox. Fehlender/ungültiger `bbox` → HTTP 400.
+  pro gerundeter bbox. Fehlender/ungültiger `bbox` → HTTP 400. Jeder dieser bbox-Einträge
+  hält **einen Tag** (`karte::quellen::KRITIS_TTL` = 24 × 3600 s) — deutlich länger als bei
+  jeder anderen Ebene, weil Krankenhäuser, Schulen und Umspannwerke quasi statisch sind und
+  ein kurzer Takt bei jedem Kartenschwenk eine neue bbox gegen Overpass laufen ließe. Dazu
+  kommt ein eigenes Abruf-Timeout von 30 s (`KRITIS_TIMEOUT`), weil die Overpass-Abfrage
+  intern mit `[timeout:25]` läuft und damit über dem globalen 8-s-Client-Timeout liegt.
 - **LHP (`hochwasser`)** ist die zweite zweistufige Quelle — anders als NINA holt Stufe 1
   aber keine Daten, sondern einen **Sitzungs-Token**: die Webservices des Portals antworten
   nur mit einem gültigen, serverseitig ausgegebenen `ki`. Gemessen am 20.09.2026: ohne
