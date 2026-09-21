@@ -8,6 +8,7 @@ pub mod download;
 pub mod katalog;
 pub mod mbtiles;
 pub mod normalisierung;
+pub mod odl_grundpegel;
 pub mod proxy;
 pub mod quellen;
 pub mod registry;

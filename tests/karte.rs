@@ -599,6 +599,10 @@ async fn fachebenen_odl_wird_bedient() {
         }),
     );
     lifeline_hub::karte::cache::setze(&cache_pool, "odl", &gesetzt).await;
+    // Frischer, LEERER Grundpegel (LFH-598): ohne ihn stiesse die Route den Hintergrund-Abruf
+    // der BfS-Zeitreihe an — ein Test ohne Netzbezug soll keinen ausgehenden Aufruf starten.
+    let leer = lifeline_hub::karte::odl_grundpegel::GrundpegelKarte::new();
+    lifeline_hub::karte::cache::setze_wert(&cache_pool, "odl:grundpegel", &leer).await;
 
     let res = anfrage(&app, "GET", "/api/karte/fachebenen/odl", None, None).await;
     assert_eq!(res.status(), StatusCode::OK);
@@ -607,6 +611,72 @@ async fn fachebenen_odl_wird_bedient() {
     assert_eq!(v["status"], "ok");
     let f = &v["features"]["features"][0];
     assert_eq!(f["properties"]["stufe"], "stark_erhoeht");
+    // Ohne Grundpegel: absolute Stufe, Grundlage benannt, die Standort-Felder FEHLEN.
+    assert_eq!(f["properties"]["bewertung"], "absolut");
+    assert!(!f["properties"].as_object().unwrap().contains_key("faktor"));
+}
+
+/// LFH-598: liegt unter `odl:grundpegel` ein Pegel für die Kennung, bewertet die Route bei
+/// Auslieferung relativ — auch wenn der `odl`-Eintrag noch die absolute Stufe trägt. Dieselbe
+/// Sonde (0,19 µSv/h) steht absolut auf `normal` und relativ zu 0,06 auf `stark_erhoeht`:
+/// genau der Fall, den die absoluten Bänder übersehen.
+#[tokio::test]
+async fn fachebenen_odl_bewertet_gegen_den_grundpegel() {
+    use lifeline_hub::karte::odl_grundpegel::{Grundpegel, GrundpegelKarte};
+    use lifeline_hub::karte::typen::FachebeneAntwort;
+    let karten_dir = lifeline_hub::db::test_karten_dir();
+    let app = build_router(AppState {
+        pool: pool().await,
+        live: LiveHub::new(),
+        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
+        download_client: lifeline_hub::karte::download::download_client(),
+        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
+        karten_service_url: None,
+        karten_service_token: None,
+        karten_dir: karten_dir.clone(),
+    });
+    let cache_pool = lifeline_hub::cache_db::cache_pool(&karten_dir)
+        .await
+        .unwrap();
+    let sonde = |kennung: &str| {
+        serde_json::json!({
+            "type": "Feature",
+            "geometry": { "type": "Point", "coordinates": [12.87, 50.79] },
+            "properties": { "titel": kennung, "kennung": kennung, "wert": 0.19,
+                            "einheit": "µSv/h", "stufe": "normal" }
+        })
+    };
+    let gesetzt = FachebeneAntwort::ok(
+        "odl",
+        "Testattribution",
+        None,
+        serde_json::json!({ "type": "FeatureCollection",
+                            "features": [sonde("DEZ0001"), sonde("DEZ9999")] }),
+    );
+    lifeline_hub::karte::cache::setze(&cache_pool, "odl", &gesetzt).await;
+    let karte = GrundpegelKarte::from([(
+        "DEZ0001".to_string(),
+        Grundpegel {
+            pegel: 0.06,
+            n: 27,
+            stand: "2026-09-21T12:00:00Z".into(),
+        },
+    )]);
+    lifeline_hub::karte::cache::setze_wert(&cache_pool, "odl:grundpegel", &karte).await;
+
+    let res = anfrage(&app, "GET", "/api/karte/fachebenen/odl", None, None).await;
+    assert_eq!(res.status(), StatusCode::OK);
+    let v = json(res).await;
+    let mit = &v["features"]["features"][0]["properties"];
+    assert_eq!(mit["stufe"], "stark_erhoeht");
+    assert_eq!(mit["bewertung"], "standort");
+    assert_eq!(mit["grundpegel"], 0.06);
+    assert_eq!(mit["faktor"], 3.17);
+    assert_eq!(mit["grundpegel_stand"], "2026-09-21T12:00:00Z");
+    // Eine Sonde ohne Eintrag im Grundpegel bleibt bei ihrer absoluten Stufe.
+    let ohne = &v["features"]["features"][1]["properties"];
+    assert_eq!(ohne["stufe"], "normal");
+    assert_eq!(ohne["bewertung"], "absolut");
 }
 
 // ===== Admin-CRUD: Online-Quellen =====
