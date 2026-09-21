@@ -12,7 +12,10 @@ export function sorgeFuerFachebeneLayer(
 ) {
   const src = fachebeneSourceId(def.key);
   if (!map.getSource(src)) {
-    map.addSource(src, { type: 'geojson', data: daten as never });
+    // `generateId`: die Feature-ID ist der Index im `features`-Array. Sie entscheidet beim Klick
+    // zwischen überlappenden Flächen mit gleichen Properties (LFH-282, `geometrieZumKlickFeature`).
+    // Die Wire-Features tragen keine eigene ID.
+    map.addSource(src, { type: 'geojson', data: daten as never, generateId: true });
   }
   if (def.geometrieTyp === 'polygon') {
     if (!map.getLayer(`fachebene-${def.key}-fill`)) {
