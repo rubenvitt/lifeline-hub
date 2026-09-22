@@ -476,13 +476,13 @@ test('Tastaturweg: Dialog öffnen, Datei wählen, Kategorie, Enter legt ab', asy
   ]);
   await expect(dateiKnopf, 'zurück am ersten Ziel').toBeFocused();
 
-  // Leertaste auf dem Knopf öffnet den Dateidialog des Browsers — der Weg ohne Maus zur Datei.
-  // NICHT Enter: rc-upload hängt an seiner Hülle einen eigenen Enter-Handler (`onKeyDown`),
-  // und der native Knopf löst bei Enter zusätzlich `click` aus — zwei `input.click()` in einer
-  // Geste, von denen Chromium nur einen bedient (gemessen: der Wähler kam nicht jedes Mal).
+  // Enter auf dem Knopf öffnet den Dateidialog des Browsers — der Weg ohne Maus zur Datei.
+  // Enter und nicht die Leertaste, weil es der Weg ist, den man nimmt. Gemessen (Sonde mit
+  // Zähler auf `HTMLInputElement.prototype.click`, 12 Läufe): genau EIN `input.click()` und
+  // EIN Dateiwähler je Tastendruck, für Enter wie für die Leertaste.
   const [waehler] = await Promise.all([
     page.waitForEvent('filechooser'),
-    page.keyboard.press('Space'),
+    page.keyboard.press('Enter'),
   ]);
   await waehler.setFiles({ name: 'Einsatzbefehl 3.pdf', mimeType: 'application/pdf', buffer: PDF });
   await expect(dialog.getByLabel('Titel')).toHaveValue('Einsatzbefehl 3');
