@@ -149,8 +149,15 @@ export default function EinsatzDefaults() {
 
         <Formularpaneel
           titel="Verhalten & Automatik"
-          beschreibung="Nummernkreis-Präfixe und Default-Fristen für neue Einsätze. Präfixe sind reine Anzeige. Leer = kein Default (hartkodierter Fallback)."
+          beschreibung="Nummernkreis-Präfixe und Default-Fristen für neue Einsätze. Das Präfix der Einsatznummer wird beim Anlegen fest in die Nummer übernommen; die übrigen Präfixe sind reine Anzeige. Leer = kein Default (hartkodierter Fallback)."
         >
+          <Form.Item
+            label="Präfix Einsatznummer"
+            name="einsatz_nummer_praefix"
+            tooltip="Steht vor Jahr und laufender Nummer (z. B. E-2026-0001). Gilt nur für neu angelegte Einsätze — bestehende Nummern ändern sich nicht. Leer = E-. Max. 8 Zeichen."
+          >
+            <Input maxLength={8} placeholder="E-" style={{ width: '100%', maxWidth: 200 }} />
+          </Form.Item>
           <Form.Item
             label="Präfix ETB"
             name="etb_nummer_praefix"

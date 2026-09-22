@@ -27,6 +27,7 @@ const VOLL = {
   etb_nummer_praefix: 'EB-',
   meldung_nummer_praefix: 'M-',
   auftrag_nummer_praefix: 'A-',
+  einsatz_nummer_praefix: 'WF-',
   meldung_bestaetigung_frist_min: 30,
   auftrag_quittierung_frist_min: 45,
   rueckmeldung_frist_min: 25,
@@ -79,6 +80,8 @@ describe('AnzeigeEinstellungen', () => {
         etb_nummer_praefix: 'EB-',
         meldung_nummer_praefix: 'M-',
         auftrag_nummer_praefix: 'A-',
+        // LFH-617: ein Anzeige-Save darf das Einsatznummer-Präfix nicht nullen.
+        einsatz_nummer_praefix: 'WF-',
         meldung_bestaetigung_frist_min: 30,
         auftrag_quittierung_frist_min: 45,
         rueckmeldung_frist_min: 25,

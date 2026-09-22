@@ -72,6 +72,8 @@ export interface OrgEinstellungenUpdate {
   etb_nummer_praefix: string | null;
   meldung_nummer_praefix: string | null;
   auftrag_nummer_praefix: string | null;
+  /** Präfix der Einsatznummer (LFH-617) — beim Anlegen in die Nummer eingefroren. */
+  einsatz_nummer_praefix: string | null;
   meldung_bestaetigung_frist_min: number | null;
   auftrag_quittierung_frist_min: number | null;
   rueckmeldung_frist_min: number | null;
