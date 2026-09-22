@@ -58,7 +58,7 @@ Lauf vom 22.09.2026 (Backend-Binary aus eigenem `CARGO_TARGET_DIR`, Stand dieses
 - **3 · A:** Die Kennzahl liest nur, es gibt keine Aktion.
 - **3 · B/C:** Die Rückmeldung unter 100 ms ist belegt: Während eines PUT sind die
   Zeilenmenüs gesperrt, „Hinzufügen“ bzw. der Inspector-Knopf zeigen den Ladezustand
-  [T1, T4]. Die Kommandoreaktion ≤ 2 s trägt das Backend seit `2d94f92f`: PUT und POST warten
+  [T1, T4]. Die Kommandoreaktion ≤ 2 s trägt das Backend seit `d98d8d09`: PUT und POST warten
   nie auf PEGELONLINE, sie antworten aus dem Cache und stoßen fehlende Messungen im
   Hintergrund an [B1]; die Anzeige holt die fehlende Messung einmal nach ~10 s nach (O2,
   eingelöst).
@@ -171,7 +171,7 @@ Lauf vom 22.09.2026 (Backend-Binary aus eigenem `CARGO_TARGET_DIR`, Stand dieses
 
 **Backend:**
 
-- **[B1]** Commit `2d94f92f` (`src/pegel/abruf.rs`, `Modus::NurCache`): schreibende Routen
+- **[B1]** Commit `d98d8d09` (`src/pegel/abruf.rs`, `Modus::NurCache`): schreibende Routen
   warten nie auf die Quelle; Beleg ist der Test `nur_cache_wartet_nie_und_stoesst_an` in
   `src/pegel/abruf.rs`.
 
@@ -189,7 +189,7 @@ Lauf vom 22.09.2026 (Backend-Binary aus eigenem `CARGO_TARGET_DIR`, Stand dieses
   Seiten, nicht von LFH-606 verursacht. Der Pegel-Anteil liegt im Rauschen der Messung. Die
   Ursache (welche Abfrage die Verschiebung auslöst) ist nicht untersucht.
 - **O2 · Neu festgelegte Station zeigt bis zu 5 min „Stand unbekannt“ — eingelöst.** Seit
-  `2d94f92f` antworten PUT und POST für eine noch nicht gecachte Station ohne Messung. Das
+  `d98d8d09` antworten PUT und POST für eine noch nicht gecachte Station ohne Messung. Das
   Frontend fragt jetzt **einmal** nach ~10 s nach, wenn einem Eintrag die Messung fehlt
   (`PEGEL_NACHFRAGE_MS`), nach Schreiben wie beim ersten Laden. Fehlt sie danach weiter, gilt
   wieder der 5-min-Takt. Träger ist `refetchInterval` als Funktion der Daten
