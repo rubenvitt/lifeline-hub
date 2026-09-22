@@ -38,6 +38,10 @@ function setup(me: Record<string, unknown>) {
 }
 
 describe('AppLayout (globale Topbar)', () => {
+  // Der Name steht seit 22.09.2026 erst ab `xl` im Benutzer-Trigger; die Tests hier lesen
+  // ihn als Ladeanker und prüfen die Fükw-Kopfzeile.
+  beforeEach(() => setzeViewportBreite(1366));
+
   it('Admin: Verwaltung ist Link, Profil/Abmelden im Benutzermenü (Benutzer wohnt in der Sidebar)', async () => {
     setup(admin);
     await waitFor(() => expect(screen.getByText('Chef')).toBeInTheDocument());
@@ -119,8 +123,9 @@ describe('AppLayout (globale Topbar)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Benutzermenü' }));
 
     const menu = await screen.findByRole('menu');
-    expect(within(menu).getByRole('menuitem', { name: /System ✓/ })).toBeInTheDocument();
-    expect(within(menu).getByRole('menuitem', { name: /^Dunkel$/ })).toBeInTheDocument();
+    // Vorgabe seit dem Neuentwurf (21.09.2026): Nachtbetrieb trägt das Häkchen.
+    expect(within(menu).getByRole('menuitem', { name: /Dunkel ✓/ })).toBeInTheDocument();
+    expect(within(menu).getByRole('menuitem', { name: /^System$/ })).toBeInTheDocument();
     expect(within(menu).getByRole('menuitem', { name: /Kompakt ✓/ })).toBeInTheDocument();
     expect(within(menu).getByRole('menuitem', { name: /^Handschuh$/ })).toBeInTheDocument();
   });

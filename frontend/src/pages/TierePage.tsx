@@ -1,4 +1,5 @@
-import { Alert, App, Breadcrumb, Button, Form, Input, Space, Tabs, Tag, Typography } from 'antd';
+import { Alert, App, Breadcrumb, Button, Form, Input, Space, Tag, Typography } from 'antd';
+import { Augenbraue, Segmentleiste, StatusChip } from '../components/instrument';
 import { Select } from '../components/Select';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -20,7 +21,6 @@ import Datensicht, {
   type Kartenplan,
 } from '../components/Datensicht';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { flaeche } from '../theme/tokens';
 import { ErfassungsModal } from '../components/Erfassung';
 import {
   liesErfassungsSitzungswert,
@@ -29,16 +29,12 @@ import {
 import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { tiereDetailPfad } from '../routing/deeplinks';
-import { filterTiere, type TiereSicht } from './tiere/tierHelfer';
-import type { Spezies, Tier, TierStatus } from '../api/types';
+import { TIER_STATUS, filterTiere, type TiereSicht } from './tiere/tierHelfer';
+import type { Spezies, Tier } from '../api/types';
 import StatusTag from '../components/StatusTag';
 import { einsatzStatus } from '../theme/statusFarben';
 
-const STATUS_META: Record<TierStatus, { label: string; color: string }> = {
-  aktiv: { label: 'aktiv', color: 'green' },
-  vermisst: { label: 'vermisst', color: 'orange' },
-  abgeschlossen: { label: 'abgeschlossen', color: 'default' },
-};
+const STATUS_META = TIER_STATUS;
 
 const SPEZIES_META: Record<Spezies, string> = {
   hund: 'Hund',
@@ -105,7 +101,9 @@ const tierSpalten = spaltenFuer<Tier>()([
     title: 'Status',
     key: 'status',
     width: 130,
-    render: (_, t) => <Tag color={STATUS_META[t.status].color}>{STATUS_META[t.status].label}</Tag>,
+    render: (_, t) => (
+      <StatusChip ton={STATUS_META[t.status].ton} wort={STATUS_META[t.status].label} />
+    ),
   },
   { title: 'Spezies', key: 'spezies', width: 120, render: (_, t) => SPEZIES_META[t.spezies] },
   {
@@ -164,8 +162,11 @@ type TierSpaltenKey = (typeof tierSpalten)[number]['key'];
 /**
  * Kartenplan der Tierliste. KEIN `status`-Slot: `TierStatus` steht nicht im
  * A2-Statusfarbvertrag (`theme/statusFarben.ts` führt diese Seite ausdrücklich als bewusst
- * draußen), und ihn hineinzuziehen wäre der von A2 verbotene Bestands-Sweep. Der Status
- * steht deshalb als Sekundärfeld — mit Etikett, also mit zweitem Kanal.
+ * draußen), und der Slot nimmt eine `StatusDarstellung` aus diesem Vertrag. Seit dem
+ * Neuentwurf trägt die Spalte eine getönte Statusfläche (`TIER_STATUS` in
+ * `tiere/tierHelfer.ts`, Ton + Wort); in der Karte steht der Status weiter als
+ * Sekundärfeld — mit Wort, also mit zweitem Kanal. Ihn in den Vertrag zu heben bleibt eine
+ * eigene Entscheidung am Vertrag und seinem Guard.
  */
 const tierKarte = (einsatzId: number): Kartenplan<Tier, TierSpaltenKey> => ({
   art: 'plan',
@@ -352,8 +353,8 @@ export default function TierePage() {
 
   return (
     <EinsatzSeite
-      breite={flaeche.seiteBreit}
       dataUpdatedAt={tiereQuery.dataUpdatedAt}
+      meta={tiereQuery.isSuccess ? `${tiereQuery.data.length} Tiere` : undefined}
       titel={
         <Space>
           Tiere
@@ -391,14 +392,17 @@ export default function TierePage() {
         )
       }
     >
-      <Tabs
-        activeKey={sicht}
-        onChange={(k) => setSichtFuer(einsatzId, k as Sicht)}
-        items={SICHTEN.map((s) => ({ key: s.key, label: s.label }))}
-      />
-
-      <Space wrap style={{ marginBottom: 12 }}>
-        <Typography.Text type="secondary">Spezies:</Typography.Text>
+      {/* Sicht und Spezies als EINE Filterzeile (Neuentwurf: Segmentleiste statt antds
+          Reitern). Eine Wahl unter mehreren, die die Liste darunter filtert — deshalb
+          `radiogroup`, nicht `tablist`: es gibt kein eigenes Feld je Segment. */}
+      <Space wrap size="middle" align="center" style={{ marginBottom: 12 }}>
+        <Segmentleiste
+          beschriftung="Tiere nach Status filtern"
+          wert={sicht}
+          onWechsel={(k) => setSichtFuer(einsatzId, k)}
+          optionen={SICHTEN.map((s) => ({ wert: s.key, label: s.label }))}
+        />
+        <Augenbraue>Spezies</Augenbraue>
         {/* `aria-label`, weil die `Typography.Text` daneben kein `<label>` ist (kein `htmlFor`,
             keine Umschließung): ohne ihn hat das Feld keinen zugänglichen Namen und ist nur
             solange eindeutig auffindbar, wie es die einzige Combobox der Seite ist. */}

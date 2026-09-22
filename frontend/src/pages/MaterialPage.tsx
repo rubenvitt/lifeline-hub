@@ -10,13 +10,12 @@ import {
   Popconfirm,
   Space,
   Tag,
-  Typography,
 } from 'antd';
+import EinsatzSeite from '../components/EinsatzSeite';
 import { Select } from '../components/Select';
 import { BemerkungZelle } from '../components/BemerkungZelle';
 import { ErfassungsModal } from '../components/Erfassung';
 import Datensicht, { spaltenFuer } from '../components/Datensicht';
-import Datenstand from '../components/Datenstand';
 import {
   nichtGefundenInhalt,
   SeitenFehler,
@@ -405,46 +404,39 @@ export default function MaterialPage() {
   ]);
 
   return (
-    <div>
-      <Breadcrumb
-        style={{ marginBottom: 12 }}
-        items={[
-          { title: <Link to="/einsaetze">Einsätze</Link> },
-          { title: einsatz.bezeichnung },
-          { title: 'Material' },
-        ]}
-      />
-      {/**
-       * DER SEITENKOPF MUSS UMBRECHEN (LFH-339 · C4, gemessen).
-       *
-       * Beide `Space`-Reihen trugen kein `wrap`, und die Disponier-Leiste bringt ein
-       * `Select` mit `minWidth: 260` plus Mengenfeld plus zwei Knöpfe mit. Auf 390 px
-       * lief die Seite dadurch bis 717 px breit — 327 px Überlauf, gemessen im
-       * e2e-Diagnoselauf mit der innersten sprengenden Knotenmenge.
-       *
-       * Warum das die Nachbarseiten NICHT trifft: `FahrzeugePage` und `PersonalPage`
-       * tragen ihren Kopf über `components/EinsatzSeite.tsx`, das den Umbruch selbst
-       * mitbringt; diese Seite baut ihn von Hand. Sie ebenfalls auf `EinsatzSeite` zu
-       * ziehen wäre die gründlichere Antwort und gehört zum Seitenkopf-Bündel (C5) —
-       * hier wird der Überlauf behoben, nicht die Bauform vereinheitlicht.
-       *
-       * `align="start"`, damit die umgebrochene Aktionszeile nicht an der Titelzeile
-       * klebt, und `minWidth: 0` am Titelblock: ein Flex-Kind hat per Vorgabe
-       * `min-width: auto` und schrumpft sonst nicht unter seinen Inhalt.
-       */}
-      <Space
-        wrap
-        align="start"
-        style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }}
-      >
-        <Space wrap style={{ minWidth: 0 }}>
-          <Typography.Title level={3} style={{ margin: 0 }}>
-            Material
-          </Typography.Title>
+    <EinsatzSeite
+      breadcrumb={
+        <Breadcrumb
+          items={[
+            { title: <Link to="/einsaetze">Einsätze</Link> },
+            { title: einsatz.bezeichnung },
+            { title: 'Material' },
+          ]}
+        />
+      }
+      titel={
+        <Space>
+          Material
           <StatusTag darstellung={einsatzStatus[einsatz.status]} />
-          <Datenstand dataUpdatedAt={emQuery.dataUpdatedAt} />
         </Space>
-        {darfSchreiben && (
+      }
+      meta={emQuery.isSuccess ? `${ems.length} Positionen` : undefined}
+      dataUpdatedAt={emQuery.dataUpdatedAt}
+      hinweis={
+        !darfSchreiben &&
+        einsatz.status !== 'aktiv' && (
+          <Alert type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
+        )
+      }
+      /**
+       * DER SEITENKOPF MUSS UMBRECHEN (LFH-339 · C4, gemessen): die Disponier-Leiste bringt
+       * ein `Select` mit `minWidth: 260` plus Mengenfeld plus zwei Knöpfe mit; auf 390 px
+       * lief die Seite vorher bis 717 px. Seit dem Neuentwurf trägt `EinsatzSeite` den Kopf
+       * und bringt den Umbruch selbst mit; `wrap` + `maxWidth` am Block bleiben, weil der
+       * Umbruch allein den Block nur unter den Titel verschiebt.
+       */
+      aktionen={
+        darfSchreiben && (
           <Space wrap style={{ minWidth: 0 }}>
             <Select
               // `minWidth` bleibt als Lesbarkeitsboden, `maxWidth` verhindert das Sprengen:
@@ -477,18 +469,9 @@ export default function MaterialPage() {
             </Button>
             <Button onClick={() => setAdhocOffen(true)}>Ad-hoc-Material</Button>
           </Space>
-        )}
-      </Space>
-
-      {!darfSchreiben && einsatz.status !== 'aktiv' && (
-        <Alert
-          style={{ marginBottom: 12 }}
-          type="info"
-          showIcon
-          title="Einsatz ist abgeschlossen — nur Ansicht."
-        />
-      )}
-
+        )
+      }
+    >
       {/* DER STATUS STEHT SEIT LFH-339 · C4 IM `karte.status`-SLOT, nicht mehr als
           Sekundärfeld — hier stand vorher die gegenteilige Regel, und sie ist überholt.
 
@@ -629,6 +612,6 @@ export default function MaterialPage() {
           ]}
         />
       </ErfassungsModal>
-    </div>
+    </EinsatzSeite>
   );
 }

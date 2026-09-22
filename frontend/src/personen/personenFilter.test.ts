@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Person } from '../api/types';
-import { filterPersonen, gefundenePersonen } from './personenFilter';
+import { filterPersonen, gefundenePersonen, sichtFuerNeuePerson } from './personenFilter';
 
 /**
  * Die Filterkette der Personenliste als reine Funktionen (Muster
@@ -51,24 +51,52 @@ const patient: Person = {
 const alle = [basis, vermisst, betroffen, verstorben, betroffenStorniert, patient];
 const nummern = (p: readonly Person[]) => p.map((x) => x.registrier_nr);
 
+const SICHT = { ansicht: 'zeilen', filter: 'alle', nurLuecken: false } as const;
+
 describe('filterPersonen', () => {
   it('„alle" filtert nichts weg und behält die Lieferreihenfolge', () => {
-    expect(filterPersonen(alle, 'alle')).toEqual(alle);
+    expect(filterPersonen(alle, SICHT)).toEqual(alle);
   });
 
-  it('„patienten" filtert NICHT — die SK-Achse liegt in der Gruppierung, nicht hier', () => {
-    // Bewusst: der Patienten-Reiter zeigt eine gruppierte Sicht über `istPatient`, und die
-    // Trennung der beiden Achsen wäre verwischt, wenn dieser Helfer sie beide bediente.
-    expect(filterPersonen(alle, 'patienten')).toEqual(alle);
+  it('filtert nach Sichtung NICHT — das Raster gruppiert, es filtert nicht', () => {
+    expect(filterPersonen(alle, { ...SICHT, ansicht: 'raster' })).toEqual(alle);
   });
 
-  it('filtert jede Status-Sicht auf genau ihren Status', () => {
-    expect(nummern(filterPersonen(alle, 'vermisst'))).toEqual([2]);
-    expect(nummern(filterPersonen(alle, 'erfasst'))).toEqual([1]);
-    expect(nummern(filterPersonen(alle, 'verstorben'))).toEqual([4]);
-    // betroffen: der Stornierte und der Patient tragen denselben Status — die Status-Sicht
+  it('filtert jeden Statusfilter auf genau seinen Status', () => {
+    expect(nummern(filterPersonen(alle, { ...SICHT, filter: 'vermisst' }))).toEqual([2]);
+    expect(nummern(filterPersonen(alle, { ...SICHT, filter: 'erfasst' }))).toEqual([1]);
+    expect(nummern(filterPersonen(alle, { ...SICHT, filter: 'verstorben' }))).toEqual([4]);
+    // betroffen: der Stornierte und der Patient tragen denselben Status — der Statusfilter
     // blendet KEINEN von beiden aus (das tut nur `gefundenePersonen`).
-    expect(nummern(filterPersonen(alle, 'betroffen'))).toEqual([3, 5, 6]);
+    expect(nummern(filterPersonen(alle, { ...SICHT, filter: 'betroffen' }))).toEqual([3, 5, 6]);
+  });
+
+  it('„Nur Lücken" zeigt genau die Datensätze mit offenem Feld — und wirkt MIT dem Filter', () => {
+    const offen = { ...betroffen, id: 20, registrier_nr: 20, aktueller_verbleib: null };
+    const vermisstOhneAlles = { ...vermisst, antreff_ort: null, aktueller_verbleib: null };
+    const menge = [{ ...basis, aktueller_verbleib: 'entlassen' }, offen, vermisstOhneAlles];
+    expect(nummern(filterPersonen(menge, { ...SICHT, nurLuecken: true }))).toEqual([20]);
+    expect(filterPersonen(menge, { ...SICHT, filter: 'erfasst', nurLuecken: true })).toEqual([]);
+  });
+});
+
+describe('sichtFuerNeuePerson', () => {
+  it('lässt eine passende Sicht unangetastet (dieselbe Referenz)', () => {
+    const sicht = { ...SICHT, filter: 'betroffen' } as const;
+    expect(sichtFuerNeuePerson(sicht, betroffen)).toBe(sicht);
+  });
+
+  it('nimmt einen verbergenden Statusfilter auf „Alle" zurück, die Ansicht bleibt', () => {
+    expect(
+      sichtFuerNeuePerson({ ansicht: 'raster', filter: 'vermisst', nurLuecken: false }, patient),
+    ).toEqual({ ansicht: 'raster', filter: 'alle', nurLuecken: false });
+  });
+
+  it('nimmt „Nur Lücken" nur zurück, wenn die neue Person keine Lücke hat', () => {
+    const mitLuecke = { ...betroffen, aktueller_verbleib: null };
+    const ohneLuecke = { ...betroffen, aktueller_verbleib: 'entlassen' };
+    expect(sichtFuerNeuePerson({ ...SICHT, nurLuecken: true }, mitLuecke).nurLuecken).toBe(true);
+    expect(sichtFuerNeuePerson({ ...SICHT, nurLuecken: true }, ohneLuecke).nurLuecken).toBe(false);
   });
 });
 

@@ -1,7 +1,6 @@
 import {
   App,
   Button,
-  Card,
   Dropdown,
   Form,
   Input,
@@ -60,6 +59,7 @@ import { einsatzKeys } from '../../api/queryKeys';
 import PersonDetailDrawer from '../../personen/PersonDetailDrawer';
 import { ErfassungsModal } from '../../components/Erfassung';
 import StatusTag from '../../components/StatusTag';
+import { Augenbraue, Paneel, StatusChip, monoStil, useRollen } from '../../components/instrument';
 import { rollenFarbe, verfuegbarkeit as verfuegbarkeitVertrag } from '../../theme/statusFarben';
 import { useViewport } from '../../components/useViewport';
 
@@ -117,12 +117,12 @@ export function aktionsabstand(token: { marginSM: number; controlHeightSM: numbe
   return Math.max(0, Math.min(token.marginSM, jeLuecke));
 }
 
-// BEFUND zum kleinen `size`-Prop (LFH-328/A1 Festlegung 4, Gate 4) — hier bleiben SECHS
-// stehen, in zwei Gruppen, und die zweite ist kein Ermessen, sondern eine gemessene
+// BEFUND zum kleinen `size`-Prop (LFH-328/A1 Festlegung 4, Gate 4) — hier standen SECHS,
+// in zwei Gruppen, und die zweite ist kein Ermessen, sondern eine gemessene
 // Kollision:
 //
-//   * Die zwei `Card` in `PersonenSpalte`/`TransportSpalte` sind ein reiner
-//     Polsterungsfall und treffen keine Treffläche — bleiben.
+//   * Die zwei `Card` in `PersonenSpalte`/`TransportSpalte` waren ein reiner
+//     Polsterungsfall ohne Treffläche; seit dem Neuentwurf sind sie `Paneel`e ohne `size`.
 //   * Die vier Aktions-Buttons in `PlatzKarte` (Transport, Zurückweisen, „als frei",
 //     Platzaktionen) lassen sich NICHT auf die volle Zeilenhöhe der Dichte-Staffel heben,
 //     ohne die Karte zu sprengen. Die Rechnung: Innenraum = 116 − 12 (padding) − 4 (border)
@@ -287,6 +287,7 @@ function PlatzKarte({
     data: { kind: 'platz', platzId: platz.id, uhsId: platz.uhs_id },
   });
   const { token } = theme.useToken();
+  const { rollen } = useRollen();
   const setRef = (n: HTMLDivElement | null) => {
     setDragRef(n);
     setDropRef(n);
@@ -334,13 +335,12 @@ function PlatzKarte({
     // Belegte Plätze: Hintergrund + „belegt"-Tag. „frei" und „belegt" schließen sich aus
     // (s. u. tag-Logik); andere Verfügbarkeiten (defekt/gesperrt/…) bleiben daneben sichtbar.
     // Theme-Tokens statt fixer Hex-Werte, damit die Karten im Dark Mode mitziehen.
-    background: isOver
-      ? token.colorPrimaryBg
-      : belegtVon
-        ? token.colorInfoBg
-        : token.colorBgContainer,
+    // Neuentwurf: Flächen aus den Rollen (`bedienFlaeche` für die aktive Belegung, `flaeche`
+    // sonst), Radius 0. NUR Farbe und Form der Ecke — Höhe, Rand und Polsterung bleiben an
+    // die Konstanten oben gebunden (SCHRITT_X/SCHRITT_Y, Dateikopf).
+    background: isOver ? token.colorPrimaryBg : belegtVon ? rollen.bedienFlaeche : rollen.flaeche,
     padding: PLATZ_KARTE_POLSTER,
-    borderRadius: 4,
+    borderRadius: 0,
     transform: transform ? `translate(${transform.x}px, ${transform.y}px)` : undefined,
   };
   // Verfügbarkeits-Optionen immer; „Platz löschen" ist eine Layout-/Setup-Aktion und
@@ -447,7 +447,7 @@ function PlatzKarte({
       {/* Status-Tags: eine Zeile, kein Umbruch (feste Höhe). */}
       <div style={{ height: 24, overflow: 'hidden', whiteSpace: 'nowrap' }}>
         {zeigeVerfTag && <StatusTag darstellung={verfuegbarkeitVertrag[platz.verfuegbarkeit]} />}
-        {belegtVon && <Tag color="blue">belegt</Tag>}
+        {belegtVon && <StatusChip ton="bedien" wort="belegt" />}
       </div>
       {/* Belegung: feste Höhe reserviert, auch wenn leer → Karte bleibt gleich groß.
           Belegte Person ist ziehbar (→ Wartebereich links oder Transport rechts); im
@@ -592,10 +592,11 @@ function PersonenSpalte({
   });
   const { token } = theme.useToken();
   return (
-    <Card
-      title={titel}
-      size="small"
-      styles={{ body: { padding: 8 } }}
+    <Paneel
+      titel={titel}
+      ueberschrift="h3"
+      meta={personen.length}
+      koerperPolster
       style={{ background: droppableId && drop.isOver ? token.colorPrimaryBg : undefined }}
     >
       <div ref={droppableId ? drop.setNodeRef : undefined} style={{ minHeight: 48 }}>
@@ -637,7 +638,7 @@ function PersonenSpalte({
         ))}
         {personen.length === 0 && <Typography.Text type="secondary">{leerText}</Typography.Text>}
       </div>
-    </Card>
+    </Paneel>
   );
 }
 
@@ -668,22 +669,25 @@ function TransportSpalte({
   });
   const { token } = theme.useToken();
   return (
-    <Card
-      title="Auf Transport gebracht"
-      size="small"
-      styles={{ body: { padding: 8 } }}
+    <Paneel
+      titel="Auf Transport gebracht"
+      ueberschrift="h3"
+      meta={personen.length}
+      koerperPolster
       style={{ background: !gesperrt && drop.isOver ? token.colorPrimaryBg : undefined }}
     >
       <div ref={gesperrt ? undefined : drop.setNodeRef} style={{ minHeight: 48 }}>
         {personen.map((p) => (
           <div key={p.id} style={{ marginBottom: 6 }}>
-            <Tag
-              color="orange"
-              style={{ margin: 0, cursor: 'pointer' }}
+            {/* Ein echter Knopf statt eines klickbaren `Tag`: der war ein `<span onClick>` ohne
+                Rolle und ohne Tastaturweg. `type="link"` erbt die Steuerhöhe der Staffel. */}
+            <Button
+              type="link"
+              style={{ ...monoStil(12), paddingInline: 0 }}
               onClick={() => onOeffnen(p.id)}
             >
               {personLabel(p)}
-            </Tag>
+            </Button>
             {p.aktueller_verbleib && (
               <div>
                 <Typography.Text type="secondary" style={{ fontSize: 12 }}>
@@ -695,7 +699,7 @@ function TransportSpalte({
         ))}
         {personen.length === 0 && <Typography.Text type="secondary">keine</Typography.Text>}
       </div>
-    </Card>
+    </Paneel>
   );
 }
 
@@ -716,7 +720,7 @@ export default function Grundriss({
 }) {
   const qc = useQueryClient();
   const { message } = App.useApp();
-  const { token } = theme.useToken();
+  const { rollen } = useRollen();
   // Sensors: PointerSensor mit 5px-Aktivierungsdistanz (sonst klickt jeder Click den Drag aus),
   // KeyboardSensor für Tests/Accessibility.
   const sensors = useSensors(
@@ -1071,7 +1075,7 @@ export default function Grundriss({
           gap: 8,
         }}
       >
-        <Typography.Text strong>Unfallhilfsstelle</Typography.Text>
+        <Augenbraue als="h3">Unfallhilfsstelle</Augenbraue>
         {!schreibgeschuetzt &&
           (uhs.status === 'geplant' ? (
             <NeuerPlatzKnopf einsatzId={einsatzId} uhsId={uhs.id} primaer onSuccess={invalidate} />
@@ -1094,9 +1098,9 @@ export default function Grundriss({
           flex: 1,
           minHeight: 0,
           overflow: 'auto',
-          border: `1px dashed ${token.colorBorder}`,
-          background: token.colorBgLayout,
-          borderRadius: 4,
+          border: `1px dashed ${rollen.linieStark}`,
+          background: rollen.grund,
+          borderRadius: 0,
         }}
       >
         <div style={{ position: 'relative', width: flaecheBreite, height: flaecheHoehe }}>

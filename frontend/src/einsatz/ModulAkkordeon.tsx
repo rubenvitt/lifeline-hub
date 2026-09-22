@@ -1,5 +1,6 @@
 import { theme } from 'antd';
-import { abstand, form } from '../theme/tokens';
+import { form } from '../theme/tokens';
+import { useModusFarben } from '../components/rahmenStil';
 import { ModulListe } from './ModulPanel';
 import {
   moduleNachKategorie,
@@ -58,11 +59,9 @@ export default function ModulAkkordeon({
   zaehler,
 }: Props) {
   const { token } = theme.useToken();
+  const farben = useModusFarben();
   return (
-    <nav
-      aria-label="Einsatz-Navigation"
-      style={{ display: 'flex', flexDirection: 'column', gap: abstand.xs }}
-    >
+    <nav aria-label="Einsatz-Navigation" style={{ display: 'flex', flexDirection: 'column' }}>
       {kategorien.map((k) => {
         const offen = k.key === offeneKategorie;
         const Icon = k.icon;
@@ -72,28 +71,35 @@ export default function ModulAkkordeon({
               type="button"
               aria-expanded={offen}
               onClick={() => onKategorieKlick(k.key)}
+              // Optisch an die Rail angeglichen (Neuentwurf): aufgeklappt `flaeche3` mit
+              // heller Schrift und der 2-px-Ortsmarke in `marke`, zu gedämpft. Die Marke ist
+              // Ort, nicht Bedienung — die Fläche bleibt neutral („Rot bedient nichts").
+              // `Math.max(48, controlHeight)`: 48 ist der A1-Boden des Berührungsfalls, in
+              // `handschuh` wächst die Kopfzeile auf 72 mit (Befund LFH-537 für diese Stelle).
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: abstand.md,
+                gap: token.marginSM,
                 width: '100%',
-                minHeight: TREFFLAECHE,
-                padding: `0 ${abstand.sm}px`,
+                minHeight: Math.max(TREFFLAECHE, token.controlHeight),
+                padding: `0 ${token.padding}px`,
                 border: 'none',
                 borderRadius: form.radiusSteuer,
                 textAlign: 'left',
                 cursor: 'pointer',
-                // Bedienung, nicht Marke: der aufgeklappte Zustand ist ein
-                // Navigationszustand („Rot bedient nichts", LFH-315/A0).
-                background: offen ? token.colorPrimaryBg : 'transparent',
-                color: offen ? token.colorPrimary : 'inherit',
+                fontWeight: offen ? 600 : 400,
+                background: offen ? farben.flaeche3 : 'transparent',
+                boxShadow: offen ? `inset 2px 0 0 ${farben.marke}` : 'none',
+                color: offen ? farben.text : farben.gedaempft,
               }}
             >
-              <Icon size={24} />
+              <span aria-hidden="true" style={{ display: 'inline-flex', flexShrink: 0 }}>
+                <Icon size={20} />
+              </span>
               <span>{k.label}</span>
             </button>
             {offen && (
-              <div style={{ paddingLeft: abstand.md }}>
+              <div style={{ background: farben.paneel }}>
                 <ModulListe
                   module={moduleNachKategorie(k.key)}
                   benutzer={benutzer}

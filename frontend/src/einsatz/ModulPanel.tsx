@@ -1,14 +1,23 @@
 import type { CSSProperties } from 'react';
-import { Badge, theme, Typography } from 'antd';
+import { theme } from 'antd';
 import { ExportOutlined, LockOutlined, ToolOutlined } from '@ant-design/icons';
 import { istModulGesperrt, istModulSichtbar, type ModulEintrag } from './modulRegistry';
-import { form } from '../theme/tokens';
-import type { BenutzerAnzeige, ModulOverrides } from '../api/types';
+import { form, schrift, type Farbrollen } from '../theme/tokens';
+import type { BenutzerAnzeige, EinsatzAnzeige, ModulOverrides } from '../api/types';
 import type { ModulZaehlerMap } from './useModulZaehler';
+import { useMinutenTakt } from '../components/Kopfleiste';
+import { augenbraueStil, useModusFarben } from '../components/rahmenStil';
+import { einsatzDauer } from './einsatzDauer';
+import { fussFokusabstandStil, useFussFokusabstand } from './fussFokusabstand';
 
-/** Breite des Aktivbalkens. Markermaß, keine Dichte-Angabe — dieselbe Kategorie wie
- *  die 48 in `IconRail.tsx:43-44`. */
-const AKTIVBALKEN = 3;
+/** Breite des Modulpanels (Neuentwurf, `shell.dc.html`). Layoutmaß, keine Dichte-Angabe. */
+export const PANEL_BREITE = 208;
+
+/** Höhe des Panelkopfs mit der Augenbraue (Entwurf: 42 px). Layoutmaß. */
+const PANEL_KOPF = 42;
+
+/** Aktive Modulmarke: 2 × 16 px in `bedien` (Entwurf). Markermaß, keine Dichte-Angabe. */
+const MARKE = { breite: 2, hoehe: 16 } as const;
 
 interface ListeProps {
   module: ModulEintrag[];
@@ -23,8 +32,7 @@ interface ListeProps {
    * Die Zeilenhöhe kommt seit LFH-370 · B5j aus `controlHeight` (30 / 48 / 72), also aus
    * der Staffel; ohne diesen Prop bleibt es dabei. Der Navigations-Drawer ist der
    * Berührungsfall und setzt hier zusätzlich das A1-Maß: das ist eine Trefffläche, keine
-   * Dichte-Angabe (dieselbe Begründung wortgleich in `ModulAkkordeon.tsx:39-43` und
-   * `IconRail.tsx:43-44`).
+   * Dichte-Angabe.
    *
    * Deshalb `Math.max` und NICHT `??`: mit `??` deckelte die Drawer-Trefffläche 48 die
    * Handschuh-Stufe auf 48 statt 72 — die Prop drehte die Staffel dort zurück, statt sie
@@ -35,6 +43,12 @@ interface ListeProps {
   zaehler?: ModulZaehlerMap;
 }
 
+/** Die Farbrollen, die eine Modulzeile liest — als Ausschnitt, damit der Test sie setzen kann. */
+export type ModulZeilenFarben = Pick<
+  Farbrollen,
+  'flaeche2' | 'text' | 'text2' | 'gedaempft' | 'schwach' | 'bedien'
+>;
+
 /**
  * Zeilenstil eines Modulknopfes — REIN und exportiert, damit die Zusicherung über die
  * Dichtestufen prüfbar ist, OHNE zu rendern.
@@ -42,16 +56,17 @@ interface ListeProps {
  * `test/utils.tsx:31` montiert ein nacktes `ConfigProvider` ohne unser Theme: `useToken()`
  * liefert dort den antd-Seed (`controlHeight: 32`), also KEINE der Stufen 30/48/72. Ein
  * gerenderter Wert belegte antd-Vorgaben statt der Staffel — und jsdom rechnet ohnehin kein
- * Layout. Präzedenz: `pages/lagekarte/Sidebar.tsx:239` (`bedienzielStil`) mit
- * `Sidebar.test.tsx:591-637`.
+ * Layout. Präzedenz: `pages/lagekarte/Sidebar.tsx` (`bedienzielStil`).
  *
  * ZWEI Angaben, nicht eine (Konvention aus LFH-365): `minHeight` aus `controlHeight` PLUS
- * die mitziehende Polsterung. Die Polsterung allein trägt den Boden nicht, `minHeight`
- * allein klebt den Text im Handschuh-Betrieb an die Kante.
+ * die mitziehende Polsterung. Die 34 px des Entwurfs sind Skizze; der Boden ist die Staffel.
  *
- * Aufgelöste Tokens, nie `var(--lfh-*)` — die Arbeitsteilung steht in `theme/rollen.css`
- * („ZWEI QUELLEN, EINE WAHRHEIT"): handgeschriebenes CSS liest die Custom Properties,
- * TSX liest `theme.useToken()`.
+ * NEUENTWURF (21.09.2026): aktiv trägt die Zeile `flaeche2` und `text`, inaktiv
+ * `gedaempft` — keine blaue Fläche mehr. Die Bedienfarbe steckt allein in der 2 × 16-px-Marke
+ * ({@link modulMarkeStil}); sie ist der ZWEITE Kanal neben der Fläche (WCAG 1.4.1), und
+ * `aria-current` der dritte.
+ *
+ * Aufgelöste Tokens, nie `var(--lfh-*)` — die Arbeitsteilung steht in `theme/rollen.css`.
  */
 export function modulZeilenStil(
   token: {
@@ -59,10 +74,9 @@ export function modulZeilenStil(
     padding: number;
     paddingSM: number;
     marginSM: number;
-    colorPrimary: string;
-    colorPrimaryBg: string;
     colorTextDisabled: string;
   },
+  farben: ModulZeilenFarben,
   zustand: { aktiv: boolean; gesperrt: boolean; mindestTrefflaeche?: number },
 ): CSSProperties {
   return {
@@ -72,37 +86,45 @@ export function modulZeilenStil(
     padding: `${token.paddingSM}px ${token.padding}px`,
     minHeight: Math.max(zustand.mindestTrefflaeche ?? 0, token.controlHeight),
     border: 'none',
-    // Der Balken ist der ZWEITE Kanal neben der Fläche (WCAG 1.4.1), nicht ihr Ersatz —
-    // deshalb steht `background` unten weiterhin. Inaktiv bleibt er `transparent` statt
-    // zu entfallen: sonst springt die Zeile beim Aktivieren um 3 px zur Seite.
-    borderLeft: `${AKTIVBALKEN}px solid ${zustand.aktiv ? token.colorPrimary : 'transparent'}`,
     borderRadius: form.radiusSteuer,
     textAlign: 'left',
     width: '100%',
+    fontSize: 13,
     cursor: zustand.gesperrt ? 'not-allowed' : 'pointer',
-    background: zustand.aktiv ? token.colorPrimaryBg : 'transparent',
+    background: zustand.aktiv ? farben.flaeche2 : 'transparent',
     color: zustand.gesperrt
       ? token.colorTextDisabled
       : zustand.aktiv
-        ? token.colorPrimary
-        : 'inherit',
+        ? farben.text
+        : farben.gedaempft,
+  };
+}
+
+/**
+ * Die aktive Marke links in der Zeile. Inaktiv bleibt sie als transparenter Platzhalter
+ * stehen — sonst spränge das Etikett beim Aktivieren um die Markenbreite.
+ */
+export function modulMarkeStil(farben: Pick<Farbrollen, 'bedien'>, aktiv: boolean): CSSProperties {
+  return {
+    width: MARKE.breite,
+    height: MARKE.hoehe,
+    flexShrink: 0,
+    background: aktiv ? farben.bedien : 'transparent',
   };
 }
 
 /**
  * Stil der Knopfspalte. Rein und exportiert aus demselben Grund wie {@link modulZeilenStil}.
  *
- * Träger ist `token.marginXS` und NICHT der Modul-Export `abstand` aus `theme/tokens.ts:171`:
- * der ist die eingefrorene KOMPAKTE Stufe (immer 3) und zieht mit der Dichte nicht mit.
- * `ModulAkkordeon.tsx:59` und `IconRail.tsx:28` benutzen ihn — das ist Bestand aus der Zeit
- * vor der Dichteachse, keine Präzedenz für sie.
+ * Die Zeilen stehen ohne Zwischenraum (Entwurf) — die Liste trägt nur oben und unten Luft,
+ * aus `token.marginXS` und damit mit der Dichte.
  */
-export function modulListenStil(token: { marginXS: number; marginSM: number }): CSSProperties {
+export function modulListenStil(token: { marginXS: number }): CSSProperties {
   return {
     display: 'flex',
     flexDirection: 'column',
-    gap: token.marginXS,
-    marginTop: token.marginSM,
+    gap: 0,
+    paddingBlock: token.marginXS * 2,
   };
 }
 
@@ -117,6 +139,8 @@ export function modulListenStil(token: { marginXS: number; marginSM: number }): 
  */
 interface Props extends ListeProps {
   titel: string;
+  /** Der Einsatz für den Fuß „Einsatzdauer". Fehlt er (lädt noch), entfällt der Fuß. */
+  einsatz?: Pick<EinsatzAnzeige, 'begonnen_at' | 'abgeschlossen_at'> | null;
 }
 
 /**
@@ -139,6 +163,7 @@ export function ModulListe({
   zaehler,
 }: ListeProps) {
   const { token } = theme.useToken();
+  const farben = useModusFarben();
   // Ausgeblendete Module nicht rendern (nicht-ausblendbare bleiben immer sichtbar).
   // Beide Aufrufer — das Panel und das `ModulAkkordeon` — reichen die Kategorieliste
   // roh aus `moduleNachKategorie` herein; der Filter gehört deshalb hierher.
@@ -148,7 +173,6 @@ export function ModulListe({
       {sichtbareModule.map((m) => {
         const gesperrt = istModulGesperrt(m, benutzer, overrides);
         const aktiv = m.key === aktiverModulKey;
-        const Icon = m.icon;
         const modulZaehler = m.zaehlerQuelle ? zaehler?.[m.zaehlerQuelle] : undefined;
         const zaehlerSichtbar = modulZaehler !== undefined && modulZaehler.wert > 0;
         return (
@@ -157,45 +181,46 @@ export function ModulListe({
             type="button"
             disabled={gesperrt}
             title={gesperrt ? 'Keine Berechtigung' : undefined}
-            // Der aktive Zustand war bisher NUR optisch (Fläche + Schriftfarbe) und für
-            // Screenreader unsichtbar. Muster: `IconRail.tsx:40`, dort von
-            // `IconRail.test.tsx:30-35` gepinnt.
+            // Der aktive Zustand war bis LFH-370 NUR optisch und für Screenreader unsichtbar.
             aria-current={aktiv ? 'true' : undefined}
             aria-label={zaehlerSichtbar ? `${m.label}, ${modulZaehler.beschreibung}` : undefined}
             onClick={() => !gesperrt && onModulKlick(m)}
-            style={modulZeilenStil(token, { aktiv, gesperrt, mindestTrefflaeche })}
+            // Fokusabstand zum klebenden Einsatzdauer-Fuß (WCAG 2.4.11, `fussFokusabstand.ts`)
+            // neben, nicht in `modulZeilenStil`: der ist die Dichte-Zusicherung.
+            style={{
+              ...modulZeilenStil(token, farben, { aktiv, gesperrt, mindestTrefflaeche }),
+              ...fussFokusabstandStil,
+            }}
           >
-            {/* `flexShrink: 0`, weil die Ikone sonst statt des Etiketts nachgibt: gemessen
-                schrumpft sie bei „Gefahren-/Absperrzonen" im 220-px-Panel auf 4,1 px. */}
-            <Icon size={18} style={{ flexShrink: 0 }} />
-            <span style={{ minWidth: 0 }}>{m.label}</span>
+            {/* KEINE Modulikone mehr (Neuentwurf): die Zeile trägt Marke · Etikett · Zähler.
+                Die Ikonen bleiben in der Kommandopalette, wo sie zwischen Modulen, Aktionen
+                und Datensätzen unterscheiden. */}
+            <span aria-hidden="true" style={modulMarkeStil(farben, aktiv)} />
+            <span style={{ minWidth: 0, flex: 1 }}>{m.label}</span>
+            {/* Zähler als Mono-Zahl rechts statt Badge-Pille (Entwurf). Neutral: er zählt
+                offene Vorgänge, er alarmiert nicht — die Alarmierung trägt die
+                Alarmzentrale. Die Bedeutung steht im zugänglichen Namen des Knopfes. */}
             {zaehlerSichtbar && (
               <span
                 aria-hidden="true"
+                data-lfh="modul-zaehler"
                 title={modulZaehler.beschreibung}
-                style={{ display: 'inline-flex', flexShrink: 0, marginLeft: 'auto' }}
+                style={{
+                  flexShrink: 0,
+                  fontFamily: schrift.zahl,
+                  fontSize: 11,
+                  fontVariantNumeric: 'tabular-nums',
+                  color: aktiv ? farben.text2 : farben.schwach,
+                }}
               >
-                <Badge
-                  count={modulZaehler.wert}
-                  overflowCount={999}
-                  styles={{
-                    indicator: {
-                      backgroundColor: token.colorText,
-                      color: token.colorBgContainer,
-                      boxShadow: 'none',
-                    },
-                  }}
-                />
+                {modulZaehler.wert > 999 ? '999+' : modulZaehler.wert}
               </span>
             )}
             {/* Dekoration neben dem Label. `aria-hidden` an der HÜLLE ist Pflicht, nicht
                 Kosmetik: ein `@ant-design/icons`-Knoten bringt `role="img"` mit eigenem
                 ENGLISCHEM `aria-label` mit („tool"/„lock") und landete sonst im Accessible
-                Name des Knopfes — dieselbe Falle, die vorher die Emojis stellten.
-                Ikone statt Emoji seit der Regel „Ein Emoji ist keine Ikone" (30.07.2026):
-                Zeichnung, Farbe und Breite eines Emojis kommen aus der Systemschrift statt
-                aus dem Entwurf. Kein `size`-Prop — antd-Ikonen kennen keins, ihr SVG ist
-                1em und erbt damit die Schriftgröße der Stufe. */}
+                Name des Knopfes. Ikone statt Emoji seit der Regel „Ein Emoji ist keine
+                Ikone" (30.07.2026). */}
             {m.status === 'wip' && (
               <span title="In Arbeit" aria-hidden style={{ display: 'inline-flex', flexShrink: 0 }}>
                 <ToolOutlined />
@@ -205,29 +230,15 @@ export function ModulListe({
               <span
                 title="Öffnet in der Lagekarte"
                 aria-hidden
-                style={{
-                  display: 'inline-flex',
-                  flexShrink: 0,
-                  marginLeft: zaehlerSichtbar ? 0 : 'auto',
-                }}
+                style={{ display: 'inline-flex', flexShrink: 0 }}
               >
                 <ExportOutlined />
               </span>
             )}
             {/* Ebenfalls Dekoration, und bewusst OHNE `title`: die Sperre trägt der Knopf
-                selbst über `disabled` und `title="Keine Berechtigung"`. Ein zweiter Titel
-                am inneren Span verdrängte beim Zeigen den des Knopfes (der innerste
-                gewinnt) und zerlegte ein Bedienelement in zwei Tooltip-Zonen mit
-                verschiedenem Wortlaut, um dieselbe Sache zu sagen. */}
+                selbst über `disabled` und `title="Keine Berechtigung"`. */}
             {gesperrt && (
-              <span
-                aria-hidden
-                style={{
-                  display: 'inline-flex',
-                  flexShrink: 0,
-                  marginLeft: zaehlerSichtbar ? 0 : 'auto',
-                }}
-              >
+              <span aria-hidden style={{ display: 'inline-flex', flexShrink: 0 }}>
                 <LockOutlined />
               </span>
             )}
@@ -238,27 +249,83 @@ export function ModulListe({
   );
 }
 
-/** Liste der Module einer Kategorie im inline-Rahmen (Ebene 2). */
-export default function ModulPanel({ titel, ...liste }: Props) {
+/**
+ * Liste der Module einer Kategorie im inline-Rahmen (Ebene 2), 208 px auf `paneel`.
+ *
+ * Kopf 42 px mit Augenbraue und Haarlinie; Fuß „Einsatzdauer" in Mono 18, live je Minute
+ * (bei abgeschlossenem Einsatz bis `abgeschlossen_at`). Der Fuß entfällt, solange der
+ * Einsatz nicht geladen ist oder keinen lesbaren Beginn hat — erfunden wird nichts.
+ */
+export default function ModulPanel({ titel, einsatz, ...liste }: Props) {
   const { token } = theme.useToken();
-  const ueberschrift: CSSProperties = {
-    fontSize: 12,
-    textTransform: 'uppercase',
-  };
+  const farben = useModusFarben();
+  const jetzt = useMinutenTakt();
+  const dauer = einsatz ? einsatzDauer(einsatz.begonnen_at, einsatz.abgeschlossen_at, jetzt) : null;
+  const linie = `1px solid ${farben.linie}`;
+  const { wurzelRef, fussRef } = useFussFokusabstand();
   return (
     <div
+      ref={wurzelRef}
       // Testanker für den e2e-Trefflächennachweis (AK2). Der inline-Rahmen hat als einziger
       // der drei Navigationsträger keine Landmark — die IconRail trägt `<nav
       // aria-label="Kategorien">`, das Akkordeon `<nav aria-label="Einsatz-Navigation">`.
       // Eine zweite Landmark hier machte `getByRole('navigation')` ohne Namen mehrdeutig,
       // deshalb ein Datenmerkmal. Präzedenz: `data-lfh="datensicht-karte"` in Datensicht.tsx.
       data-lfh="modul-panel"
-      style={{ width: 220, padding: 12, borderRight: `1px solid ${token.colorBorderSecondary}` }}
+      style={{
+        width: PANEL_BREITE,
+        flex: `0 0 ${PANEL_BREITE}px`,
+        display: 'flex',
+        flexDirection: 'column',
+        background: farben.paneel,
+        borderInlineEnd: linie,
+        boxSizing: 'border-box',
+      }}
     >
-      <Typography.Text type="secondary" style={ueberschrift}>
-        {titel}
-      </Typography.Text>
+      <div
+        style={{
+          minHeight: PANEL_KOPF,
+          display: 'flex',
+          alignItems: 'center',
+          paddingInline: token.padding,
+          borderBottom: linie,
+        }}
+      >
+        <span style={augenbraueStil(farben.schwach)}>{titel}</span>
+      </div>
       <ModulListe {...liste} />
+      {dauer && (
+        // `sticky; bottom: 0` aus demselben Grund wie der Rail-Fuß (`IconRail.tsx`): die Seite
+        // scrollt im Dokument, der Fuß hängt so am Fensterrand statt am Seitenende.
+        <div
+          ref={fussRef}
+          data-lfh="modul-panel-fuss"
+          style={{
+            marginTop: 'auto',
+            position: 'sticky',
+            bottom: 0,
+            background: farben.paneel,
+            borderTop: linie,
+            padding: `${token.paddingSM}px ${token.padding}px`,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 6,
+          }}
+        >
+          <span style={augenbraueStil(farben.schwach)}>Einsatzdauer</span>
+          <span
+            style={{
+              fontFamily: schrift.zahl,
+              fontSize: 18,
+              fontWeight: 500,
+              fontVariantNumeric: 'tabular-nums',
+              color: farben.text,
+            }}
+          >
+            {dauer}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

@@ -45,9 +45,16 @@ test('ETB-Deeplink ?eintrag= hebt den adressierten Eintrag im Browser hervor', a
   await page.getByPlaceholder('Inhalt …').fill(inhalt);
   await page.getByRole('button', { name: 'Erfassen', exact: true }).click();
 
-  const zeile = page.locator('tr', { hasText: inhalt });
+  /*
+   * Seit dem Neuentwurf (21.09.2026) ist das Tagebuch auf jeder Breite eine Zeitachse, kein
+   * `<tr>` mehr (`etb/EtbZeitachse.tsx`, e2e `etb-chronologie`). Die Zeile trägt dieselbe
+   * Marke wie ein Kartenzweig der Datensicht (`data-lfh="datensicht-karte"`, daran findet
+   * `scrolleZurZeile` sie) und ihren Schlüssel in `data-zeile` statt `data-row-key`.
+   */
+  const sicht = page.getByRole('region', { name: 'Einsatztagebuch' });
+  const zeile = sicht.getByTestId('etb-ereigniszeile').filter({ hasText: inhalt });
   await expect(zeile).toBeVisible();
-  const zeilenSchluessel = await zeile.getAttribute('data-row-key');
+  const zeilenSchluessel = await zeile.getAttribute('data-zeile');
   expect(zeilenSchluessel).toBeTruthy();
   /*
    * Der Zeilenschlüssel trägt seit LFH-342 · C7 das Sortenpräfix (`eintrag-<id>`) — die
@@ -58,9 +65,12 @@ test('ETB-Deeplink ?eintrag= hebt den adressierten Eintrag im Browser hervor', a
   const eintragId = zeilenSchluessel!.replace(/^eintrag-/, '');
   expect(eintragId).toMatch(/^\d+$/);
 
-  // Deeplink auf den Eintrag → Highlight-Klasse muss am <tr> erscheinen.
+  // Ohne Deeplink ist die Zeile NICHT hervorgehoben — sonst belegte die Aussage unten nichts.
+  await expect(zeile).not.toHaveClass(/zeile-hervorgehoben/);
+
+  // Deeplink auf den Eintrag → Highlight-Klasse muss an genau dieser Zeile erscheinen.
   await page.goto(`/einsaetze/${eid}/etb?eintrag=${eintragId}`);
-  await expect(page.locator(`tr[data-row-key="${zeilenSchluessel}"]`)).toHaveClass(
-    /zeile-hervorgehoben/,
-  );
+  const ziel = page.locator(`[data-testid="etb-ereigniszeile"][data-zeile="${zeilenSchluessel}"]`);
+  await expect(ziel).toHaveClass(/zeile-hervorgehoben/);
+  await expect(ziel).toBeInViewport();
 });

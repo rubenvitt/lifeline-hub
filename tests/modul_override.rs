@@ -427,7 +427,9 @@ const MODUL_GET_PFADE: &[(&str, &str)] = &[
 
 /// Module ohne eigene daten-besitzende Backend-Routen (reine Aggregation/Sicht):
 /// kein Guard-Pfad möglich, daher legitim NICHT in MODUL_GET_PFADE.
-const OHNE_EIGENE_ROUTEN: &[&str] = &["stab", "lage-dashboard", "kraefteuebersicht"];
+/// `ueberblick` (Neuentwurf 22.09.2026) verdichtet nur Einsatz-, Abschnitts-, Auftrags-,
+/// ETB- und Erinnerungsdaten anderer Module.
+const OHNE_EIGENE_ROUTEN: &[&str] = &["stab", "lage-dashboard", "kraefteuebersicht", "ueberblick"];
 /// ETB ist das exemplarisch zuerst gegatete Modul mit eigenem dedizierten Guard-Test.
 const SEPARAT_GETESTET: &[&str] = &["etb"];
 

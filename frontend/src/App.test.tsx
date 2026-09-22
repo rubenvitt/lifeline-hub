@@ -138,14 +138,14 @@ describe('App-Routing', () => {
     expect(router.state.location.state).toMatchObject({ von: ziel });
   });
 
-  it('lädt die per React.lazy eingebundene Kräfteübersicht im Data Router', async () => {
+  it('lädt das per React.lazy eingebundene Meldebild (Kräfteübersicht) im Data Router', async () => {
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json(admin)),
       http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
     );
     renderApp('/einsaetze/7/kraefteuebersicht');
-    expect(await screen.findByRole('heading', { name: /Kräfteübersicht/ })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /Meldebild/ })).toBeInTheDocument();
   });
 
   it('leitet ohne Anmeldung zu /login um', async () => {
@@ -156,35 +156,24 @@ describe('App-Routing', () => {
     expect(await screen.findByRole('button', { name: 'Anmelden' })).toBeInTheDocument();
   });
 
-  it('Default-Route /einsaetze/:id landet im Lage-Dashboard', async () => {
+  it('Default-Route /einsaetze/:id landet im Führungsüberblick (Neuentwurf)', async () => {
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json(admin)),
       http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
     );
-    renderApp('/einsaetze/7');
-    // Das Dashboard trägt die Bezeichnung seit LFH-352 im Instrumentenband, nicht
-    // mehr als Seitenüberschrift — die Überschriften-Ebene gehört jetzt den
-    // Kachelköpfen. Geprüft wird deshalb das Band selbst.
-    await waitFor(() =>
-      expect(
-        screen.getAllByText('Hochwasser Nord').some((e) => e.classList.contains('lfh-band__titel')),
-      ).toBe(true),
-    );
-    // Panel öffnet sich auf dem Redirect-Pfad zur Kategorie des Ziel-Moduls (Lage).
+    const { router } = renderApp('/einsaetze/7');
+    await waitFor(() => expect(router.state.location.pathname).toBe('/einsaetze/7/ueberblick'));
+    expect(await screen.findByRole('heading', { name: 'Überblick' })).toBeInTheDocument();
+    // Panel öffnet sich auf dem Redirect-Pfad zur Kategorie des Ziel-Moduls (Führung).
     //
-    // AUF DAS PANEL GESCOPT (LFH-337 · Fix-Welle): seit die Kategorie-Rail ihre Etiketten
-    // als sichtbaren Text trägt statt nur im `aria-label`, steht „Lage" zweimal im Baum —
-    // einmal als Rail-Knopf, einmal als Panel-Überschrift. Eine ungescopte Abfrage bricht
-    // daran mit „Found multiple elements". Der Anker ist das Datenmerkmal des Panels
-    // (`ModulPanel.tsx:240`), nicht die Rail: geprüft werden soll, dass das PANEL auf der
-    // Lage-Kategorie steht — eine Rail-gescopte Abfrage sagte nur, dass es den Knopf gibt,
-    // und wäre auf jeder beliebigen Route grün. Gleiche Bauform wie
-    // `einsatz/EinsatzLayout.test.tsx:566-570`.
+    // AUF DAS PANEL GESCOPT (LFH-337 · Fix-Welle): „Führung" steht zweimal im Baum —
+    // einmal als Rail-Etikett, einmal als Panel-Augenbraue. Der Anker ist das Datenmerkmal
+    // des Panels, nicht die Rail: eine Rail-gescopte Abfrage wäre auf jeder Route grün.
     await waitFor(() => {
       const panel = document.querySelector<HTMLElement>('[data-lfh="modul-panel"]');
       expect(panel).not.toBeNull();
-      expect(within(panel!).getByText('Lage')).toBeInTheDocument();
+      expect(within(panel!).getByText('Führung')).toBeInTheDocument();
     });
   });
 

@@ -8,20 +8,27 @@ Alle Familien stehen unter der **SIL Open Font License 1.1**. Der Lizenztext lie
 unter `lizenzen/` und muss bei jeder Weitergabe der Schriftdateien mitgehen — das verlangt die
 OFL ausdrücklich; eine nackte `.woff2` im Repo erfüllt die Bedingung nicht.
 
-| Rolle                                        | Familie        | Dateien                          | Herkunft         | Lizenz                            |
-| -------------------------------------------- | -------------- | -------------------------------- | ---------------- | --------------------------------- |
-| **Text** — Fließtext, Formulare, Listen      | Archivo        | `archivo-{400,500,700}.woff2`    | Omnibus-Type     | `lizenzen/OFL-Archivo.txt`        |
-| **Display** — Köpfe, Sektionsmarken          | Archivo Narrow | `archivo-narrow-600.woff2`       | Omnibus-Type     | `lizenzen/OFL-Archivo-Narrow.txt` |
-| **Zahl** — Stärke, DTG, Koordinaten, Nummern | JetBrains Mono | `jetbrains-mono-{400,600}.woff2` | JetBrains s.r.o. | `lizenzen/OFL-JetBrains-Mono.txt` |
+| Rolle                                        | Familie        | Dateien                              | Herkunft         | Lizenz                            |
+| -------------------------------------------- | -------------- | ------------------------------------ | ---------------- | --------------------------------- |
+| **Text** — Fließtext, Formulare, Listen      | Archivo        | `archivo-{400,500,600,700}.woff2`    | Omnibus-Type     | `lizenzen/OFL-Archivo.txt`        |
+| **Display** — Köpfe, Sektionsmarken          | Archivo Narrow | `archivo-narrow-600.woff2`           | Omnibus-Type     | `lizenzen/OFL-Archivo-Narrow.txt` |
+| **Zahl** — Stärke, DTG, Koordinaten, Nummern | JetBrains Mono | `jetbrains-mono-{400,500,600}.woff2` | JetBrains s.r.o. | `lizenzen/OFL-JetBrains-Mono.txt` |
 
 Bezogen über den Fontsource-Spiegel (`cdn.jsdelivr.net/fontsource/fonts/…`) im `latin`-Subset
-(U+0000–00FF — deutsche Diakritika und `ß` vollständig). Lizenztexte aus dem
+(U+0000–00FF — deutsche Diakritika und `ß` vollständig). **Archivo 600** und **JetBrains Mono 500**
+kamen mit dem Neuentwurf „Instrumententafel" (21.09.2026) dazu — aus den npm-Paketen
+`@fontsource/archivo@5.3.0` bzw. `@fontsource/jetbrains-mono@5.3.0` (`files/*-latin-{600,500}-normal.woff2`,
+per `npm pack` entpackt, **nicht** als Projektabhängigkeit). Gegenprobe auf dieselbe Quelle:
+die Bestandsdateien `archivo-500.woff2` und `jetbrains-mono-600.woff2` sind byte-gleich mit den
+entsprechenden Dateien dieser Paketversionen. Lizenztexte aus dem
 Google-Fonts-Repository (`github.com/google/fonts/ofl/<familie>/OFL.txt`).
 
 ## Budget
 
-**96,6 KB in 6 Schnitten** — der Deckel aus LFH-352 liegt bei 200 KB. Nachprüfbar mit
-`du -ch frontend/src/assets/fonts/*.woff2`.
+**131,4 KB in 8 Schnitten** (134 584 Byte Dateigröße, gemessen 21.09.2026) — der Deckel aus
+LFH-352 liegt bei 200 KB. Nachprüfbar mit
+`ls -l frontend/src/assets/fonts/*.woff2 | awk '{s+=$5} END {print s}'` — **nicht** mit `du`, das
+Blockgrößen zählt (gemessen 148K für dieselben Dateien).
 
 Die Kandidaten der Variantenrunde (IBM Plex, Atkinson Hyperlegible) sind mit der Entscheidung
 entfernt worden. **Feineres Subsetting** — nur die tatsächlich benutzten Zeichen statt des
@@ -39,5 +46,6 @@ Die Kriterien aus LFH-352 sind an einem gerenderten Specimen geprüft, nicht aus
 - **Unverwechselbare Zeichen.** `1 l I`, `0 O`, `5 S`, `8 B` sind in JetBrains Mono über
   Strichstärke, Punkt in der Null und unterschiedliche Höhen sicher getrennt.
 - **Vollständige deutsche Diakritika und `ß`.**
-- **Mehrere Schnitte inkl. eines echten Halbfetten** für Kennzahlen (Archivo 500/700).
+- **Mehrere Schnitte inkl. eines echten Halbfetten** für Kennzahlen (Archivo 500/600/700,
+  JetBrains Mono 500 für Datenwerte).
 - **Freie Lizenz** (SIL OFL 1.1).

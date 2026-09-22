@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { theme } from 'antd';
 import { describe, expect, it, vi } from 'vitest';
 import { renderMitProviders } from '../test/utils';
-import { dichten, farbenDunkel } from '../theme/tokens';
+import { dichten, farbenDunkel, rahmenFarben } from '../theme/tokens';
 import IconRail, { railZielStil } from './IconRail';
 import { kategorien } from './modulRegistry';
 
@@ -33,35 +33,46 @@ describe('IconRail', () => {
     expect(screen.getByRole('button', { name: 'Führung' })).not.toHaveAttribute('aria-current');
   });
 
-  // Der Kern von LFH-328/A2: die aktive Fläche trug das Marken-Rot als Hex-Kopie. „Rot bedient
-  // nichts" (LFH-315/A0) — sie gehört auf die Bedienfarbe. Der Gate-5-Hexscan kann das NICHT
-  // prüfen: er sieht nur, dass kein Literal mehr dasteht, nicht welche Rolle gewählt wurde.
-  it('färbt den aktiven Zustand mit der Bedienfarbe — nicht mit der Alarmfarbe', () => {
+  // Neuentwurf „Instrumententafel" (21.09.2026), Entscheidung 2 des Auftraggebers: die aktive
+  // Kategorie trägt eine 2-px-Marke in `marke` (Rot = Marke) auf NEUTRALER Fläche. Das dreht
+  // die A2-Aussage „aktiv = blaue Bedienfläche" bewusst um — aber nicht „Rot bedient nichts":
+  // die Fläche bleibt neutral, rot ist allein die schmale Ortsmarke. Beides wird hier gepinnt,
+  // weil der Gate-5-Hexscan nur sieht, DASS kein Literal dasteht, nicht welche Rolle gewählt wurde.
+  it('markiert die aktive Kategorie mit der roten Marke auf neutraler Fläche (Neuentwurf)', () => {
     renderMitProviders(
       <>
         <TokenSonde />
         <IconRail kategorien={kategorien} aktiveKategorie="lage" onKategorieKlick={() => {}} />
       </>,
     );
-    const sonde = screen.getByTestId('token');
-    const bedien = sonde.getAttribute('data-bedien')!;
-    const alarm = sonde.getAttribute('data-alarm')!;
-    expect(bedien).not.toBe(alarm);
-
+    const alarm = screen.getByTestId('token').getAttribute('data-alarm')!;
     const aktiv = screen.getByRole('button', { name: 'Lage' });
-    // Geprüft wird die ROLLE, nicht der Modus-Wert: die Rail ist in beiden Modi eine
-    // dunkle Fläche und trägt deshalb `farbenDunkel.bedien` (8,67:1) statt des hellen
-    // Bedien-Tokens, das auf dunklem Grund nur 2,93:1 erreicht und WCAG 1.4.11 (3:1 für
-    // Zustandsanzeige) verfehlt. Entscheidend bleibt: Bedienfarbe, nicht Alarmfarbe.
-    expect(aktiv).toHaveStyle({ backgroundColor: farbenDunkel.bedien });
-    expect(aktiv).not.toHaveStyle({ backgroundColor: alarm });
-    expect(farbenDunkel.bedien).not.toBe(alarm);
+    // Die Marke ist die Markenrolle, nicht die Alarmrolle — und nicht die Bedienfarbe.
+    expect(aktiv.style.boxShadow).toContain('2px 0 0');
+    expect(rahmenFarben.marke).toBe(farbenDunkel.marke);
+    expect(rahmenFarben.marke).not.toBe(alarm);
+    // Die FLÄCHE ist neutral (`flaeche3`), keine rote und keine blaue Vollfläche mehr.
+    expect(aktiv).toHaveStyle({ backgroundColor: rahmenFarben.aktiv });
+    expect(aktiv).not.toHaveStyle({ backgroundColor: farbenDunkel.bedien });
+    expect(aktiv).not.toHaveStyle({ backgroundColor: farbenDunkel.marke });
 
-    // Die inaktive Fläche trägt die Bedienfarbe NICHT — sonst wäre der Vergleich oben trivial.
-    // (`transparent` ist als Erwartung untauglich: jsdom rechnet es auf `rgba(0, 0, 0, 0)` um.)
-    expect(screen.getByRole('button', { name: 'Führung' })).not.toHaveStyle({
-      backgroundColor: bedien,
-    });
+    // Gegenprobe: die inaktive Kategorie trägt weder Marke noch Fläche — sonst wäre die
+    // Aussage oben trivial.
+    const inaktiv = screen.getByRole('button', { name: 'Führung' });
+    expect(inaktiv.style.boxShadow).toBe('none');
+    expect(inaktiv).not.toHaveStyle({ backgroundColor: rahmenFarben.aktiv });
+  });
+
+  it('setzt „Einstellungen" abgesetzt an den Fuß — sechs Ziele bleiben in EINER Landmarke', () => {
+    renderMitProviders(
+      <IconRail kategorien={kategorien} aktiveKategorie={null} onKategorieKlick={() => {}} />,
+    );
+    const nav = screen.getByRole('navigation', { name: 'Kategorien' });
+    expect(nav.querySelectorAll('button')).toHaveLength(6);
+    const fuss = nav.querySelector('[data-lfh="rail-fuss"]')!;
+    expect(fuss).not.toBeNull();
+    expect(fuss.querySelectorAll('button')).toHaveLength(1);
+    expect(fuss.querySelector('button')).toHaveAttribute('aria-label', 'Einstellungen');
   });
 
   it('meldet Klick mit dem Kategorie-Key', async () => {
@@ -73,26 +84,20 @@ describe('IconRail', () => {
     expect(onKlick).toHaveBeenCalledWith('erfassung');
   });
 
-  it('zeigt jede Kategoriebezeichnung als sichtbaren Text — ohne Hover', () => {
+  it('zeigt jedes Kurzetikett als sichtbaren Text — ohne Hover', () => {
     renderMitProviders(
       <IconRail kategorien={kategorien} aktiveKategorie={null} onKategorieKlick={() => {}} />,
     );
     // `getByText`, NICHT `getByRole(name:)`: der Name kam schon vorher aus `aria-label`
     // und wäre auch bei rein bebilderten Knöpfen grün. Die Aussage von Befund H8 ist,
-    // dass der Text SICHTBAR im Baum steht — auf dem Führungs-Tablet gibt es kein Hover.
-    //
-    // Dieser Test trägt die GANZE Aussage „nicht mehr nur im Tooltip" allein, ohne
-    // Interaktion: kein `userEvent.hover`, kein Fokus. Ein früherer Gegentest wollte
-    // zusätzlich `.ant-tooltip` im Baum verneinen — das ist eine Attrappe, keine
-    // zweite Zusicherung: antd mountet Tooltip-Inhalt erst bei `open` (ohne Hover nie
-    // im Baum, mit oder ohne diese Änderung) und rendert ihn bei offenem Zustand
-    // ohnehin per Portal an `document.body`, außerhalb des RTL-`container`. Ein
-    // `querySelector('.ant-tooltip')` wäre vor UND nach dem Umbau `null` gewesen. Wer
-    // die Tooltip-Abwesenheit zusätzlich belegen will, braucht einen Timeout-Test auf
-    // ein Portal, das nie kommt — das ist kein Beweis. Diese `getByText`-Schleife
-    // dagegen wäre rot, fände sie den Text nur im (ungeöffneten) Tooltip.
+    // dass ein Text SICHTBAR im Baum steht — auf dem Führungs-Tablet gibt es kein Hover.
+    // Seit dem Neuentwurf ist es das Kurzetikett (9 px Versalien in 60 px Rail); der volle
+    // Name bleibt `aria-label` und `title`.
     for (const k of kategorien) {
-      expect(screen.getByText(k.label)).toBeVisible();
+      expect(screen.getByText(k.kurz)).toBeVisible();
+      if (k.kurz !== k.label) {
+        expect(screen.getByRole('button', { name: k.label })).toHaveAttribute('title', k.label);
+      }
     }
   });
 });
@@ -108,17 +113,15 @@ describe('IconRail', () => {
 describe('IconRail · Dichte', () => {
   const tokenFuer = (s: keyof typeof dichten) => ({
     controlHeight: dichten[s].zeilenhoehe,
-    padding: dichten[s].abstand.md,
-    paddingSM: dichten[s].abstand.sm,
-    fontSizeSM: 12,
+    paddingXS: dichten[s].abstand.xs,
   });
   const hoehe = (s: keyof typeof dichten) => railZielStil(tokenFuer(s), { aktiv: false }).minHeight;
 
-  it('hält den A1-Boden von 48 px in JEDER Stufe', () => {
-    // Der Kern des Pakets: `Math.max`, nicht `??`. Mit `??` stände in der kompakten
-    // Stufe 30 — unter dem A1-Boden, den die Rail seit LFH-329 trägt.
-    expect(hoehe('kompakt')).toBe(48);
-    expect(hoehe('komfortabel')).toBe(48);
+  it('hält die Entwurfshöhe 62 als Boden — über dem A1-Boden von 48 px', () => {
+    // `Math.max`, nicht `??`: mit `??` stände in der kompakten Stufe 30 — unter dem
+    // A1-Boden, den die Rail seit LFH-329 trägt.
+    expect(hoehe('kompakt')).toBe(62);
+    expect(hoehe('komfortabel')).toBe(62);
     expect(hoehe('handschuh')).toBe(72);
   });
 
@@ -127,13 +130,10 @@ describe('IconRail · Dichte', () => {
   });
 
   it('trägt ZWEI Angaben, nicht eine (LFH-365)', () => {
-    // Die Polsterung allein trägt den Boden nicht, `minHeight` allein klebt den Text
-    // im Handschuh-Betrieb an die Kante. `toBeTruthy()` allein würde nur Anwesenheit
-    // belegen, nicht Korrektheit — deshalb der konkrete Wert als LITERAL: `paddingSM`
-    // der Stufe (16) senkrecht, `padding` der Stufe (26) waagerecht auf 8 gedeckelt
-    // (`Math.min(token.padding, 8)` in `railZielStil`).
+    // Konkreter Wert als LITERAL: `paddingXS` der Stufe (7) senkrecht, waagerecht 2 px —
+    // die 60-px-Rail hat für eine mitwachsende Seitenpolsterung keinen Platz.
     const stil = railZielStil(tokenFuer('handschuh'), { aktiv: false });
     expect(stil.minHeight).toBe(72);
-    expect(stil.padding).toBe('16px 8px');
+    expect(stil.padding).toBe('7px 2px');
   });
 });

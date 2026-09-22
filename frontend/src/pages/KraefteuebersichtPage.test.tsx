@@ -5,7 +5,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, within, fireEvent, waitFor } from '@testing-library/react';
 import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
-import KraefteuebersichtPage, { aktiveFilterChips, LEERER_FILTER } from './KraefteuebersichtPage';
+import KraefteuebersichtPage, {
+  aktiveFilterChips,
+  LEERER_FILTER,
+  meldebildMeta,
+} from './KraefteuebersichtPage';
 import { Routes, Route } from 'react-router';
 import { ladeEinsatz } from '../api/einsaetze';
 import { listeEinheiten } from '../api/einheiten';
@@ -13,8 +17,11 @@ import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
 import { listeEinsatzMaterial } from '../api/einsatzMaterial';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
+import { listeAuftraege } from '../api/auftraege';
+import { ApiError } from '../api/client';
+import { listeFahrzeugStatus } from '../api/fahrzeugStatus';
 import { legeLageberichtAn, aktualisiereLagebericht } from '../api/lageberichte';
-import type { EinsatzAnzeige } from '../api/types';
+import type { Auftrag, EinsatzAnzeige, FahrzeugStatus } from '../api/types';
 
 vi.mock('../api/einsaetze', () => ({ ladeEinsatz: vi.fn() }));
 vi.mock('../api/einheiten', () => ({ listeEinheiten: vi.fn() }));
@@ -22,14 +29,14 @@ vi.mock('../api/einsatzPersonal', () => ({ listeEinsatzPersonal: vi.fn() }));
 vi.mock('../api/einsatzFahrzeuge', () => ({ listeEinsatzFahrzeuge: vi.fn() }));
 vi.mock('../api/einsatzMaterial', () => ({ listeEinsatzMaterial: vi.fn() }));
 vi.mock('../api/einsatzabschnitte', () => ({ listeAbschnitte: vi.fn() }));
-// Der frühere `vi.mock('../live/useEinsatzLiveStream')` ist entfallen: die Seite importiert
-// den Hook nicht (0 Treffer). Die Aussage dahinter — diese Fläche hat KEINEN eigenen
-// Stream, sie hängt an den sechs Queries oben — steht jetzt am Zufluss-Kommentar der Seite.
+vi.mock('../api/auftraege', () => ({ listeAuftraege: vi.fn() }));
+vi.mock('../api/fahrzeugStatus', () => ({ listeFahrzeugStatus: vi.fn() }));
 vi.mock('../api/lageberichte', () => ({
   legeLageberichtAn: vi.fn(() => Promise.resolve({ id: 99 })),
   aktualisiereLagebericht: vi.fn(() => Promise.resolve({})),
 }));
-vi.mock('react-router', async (orig) => ({ ...(await orig()), useNavigate: () => vi.fn() }));
+const { navigiere } = vi.hoisted(() => ({ navigiere: vi.fn() }));
+vi.mock('react-router', async (orig) => ({ ...(await orig()), useNavigate: () => navigiere }));
 
 // Nur die im Page genutzten Felder; Rest via Cast (Test-Fixture, kein echter Server-DTO).
 const EINSATZ = {
@@ -131,10 +138,34 @@ const FAHRZEUG_F1 = {
   soll_besatzung: null,
 };
 
+/** Katalog wie im Seed (`migrations/0008`): das Label trägt die FMS-Ziffer selbst. */
+const KATALOG = [
+  { id: 102, label: '2 – Frei auf Wache', kategorie: 'verfuegbar', fms_anker: 2, sortier: 20 },
+  { id: 104, label: '4 – Am Einsatzort', kategorie: 'gebunden', fms_anker: 4, sortier: 40 },
+  {
+    id: 106,
+    label: '6 – Nicht einsatzbereit',
+    kategorie: 'nicht_verfuegbar',
+    fms_anker: 6,
+    sortier: 60,
+  },
+] as FahrzeugStatus[];
+
+const AUFTRAG_A3 = {
+  id: 3,
+  lfd_nr: 3,
+  auftrag_text: 'Deichsicherung km 3,8 – 4,6',
+  bearbeitungsstatus: 'offen',
+  erteilt_at: '2026-09-21T08:00:00',
+  ist_ueberfaellig: false,
+  empfaenger: [{ id: 31, einheit_id: 20 }],
+} as unknown as Auftrag;
+
 let drucke: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   drucke = vi.fn();
+  navigiere.mockReset();
   vi.stubGlobal('print', drucke);
   vi.mocked(ladeEinsatz).mockResolvedValue(EINSATZ);
   vi.mocked(listeEinheiten).mockResolvedValue([]);
@@ -142,15 +173,13 @@ beforeEach(() => {
   vi.mocked(listeEinsatzFahrzeuge).mockResolvedValue([]);
   vi.mocked(listeEinsatzMaterial).mockResolvedValue([]);
   vi.mocked(listeAbschnitte).mockResolvedValue([]);
+  vi.mocked(listeAuftraege).mockResolvedValue([]);
+  vi.mocked(listeFahrzeugStatus).mockResolvedValue(KATALOG);
 });
 
 /**
- * Auf `renderMitProviders` gehoben (vorher rohes `render` mit selbstgebauten Providern,
- * OHNE `ConfigProvider`). Ohne ihn ist jede Aussage über einen Zweig oder über die
- * Dichte-/Höhenachse von `Datensicht` unerreichbar, weil `theme.useToken()` dann auf
- * antd-Defaults statt auf die Anwendungskonfiguration fällt. Die eigene
- * `AuthProvider`-Schachtel entfällt — `renderMitProviders` bringt sie mit, zweimal
- * verschachtelt lädt sie zweimal.
+ * Über `renderMitProviders`: ohne `ConfigProvider` fiele `theme.useToken()` auf
+ * antd-Vorgaben, und jede Aussage über Zweig oder Dichte von `Datensicht` wäre unerreichbar.
  */
 function setup() {
   return renderMitProviders(
@@ -161,84 +190,319 @@ function setup() {
   );
 }
 
-/** Fixture mit Abschnitt → Einheit → Fahrzeug, also allen drei Zeilenarten. */
-function mitBaum() {
+/** Abschnitt → Einheit (20) → Fahrzeug (30, S4 „Am Einsatzort"). */
+function mitEinheit() {
   vi.mocked(listeAbschnitte).mockResolvedValue([ABSCHNITT_A1]);
   vi.mocked(listeEinheiten).mockResolvedValue([EINHEIT_E10]);
-  vi.mocked(listeEinsatzFahrzeuge).mockResolvedValue([FAHRZEUG_F1]);
+  vi.mocked(listeEinsatzFahrzeuge).mockResolvedValue([
+    { ...FAHRZEUG_F1, status_id: 104, status_kategorie: 'gebunden' },
+  ]);
 }
 
-describe('KraefteuebersichtPage', () => {
-  it('zeigt einen Druck-Button', async () => {
-    setup();
-    expect(await screen.findByRole('button', { name: /Drucken/i })).toBeInTheDocument();
-  });
+/** Der Seitenkopf — das Meta steht zusätzlich im (am Schirm verborgenen) Druckkopf. */
+async function seitenkopf() {
+  return within(
+    await waitFor(() => {
+      const k = document.querySelector('[data-lfh="seitenkopf"]') as HTMLElement | null;
+      expect(k).not.toBeNull();
+      return k!;
+    }),
+  );
+}
 
-  it('zeigt Titel und die Gesamt-Personalstärke im Kopf', async () => {
+const zeile = (container: HTMLElement, schluessel: string) =>
+  container.querySelector(`[data-row-key="${schluessel}"]`) as HTMLElement | null;
+
+describe('KraefteuebersichtPage — Seitenkopf', () => {
+  it('trägt den Titel „Meldebild" und die Stärke in BOS-Schreibweise als Mono-Meta', async () => {
+    mitEinheit();
     vi.mocked(listeEinsatzPersonal).mockResolvedValue([PERSON_P1]);
     setup();
-    expect(await screen.findByRole('heading', { name: 'Kräfteübersicht' })).toBeInTheDocument();
-    const statCard = screen.getByText('Gesamtstärke (F/UF/M//Ges)').closest('.ant-statistic')!;
-    expect(await within(statCard as HTMLElement).findByText('0/0/1//1')).toBeInTheDocument();
-  });
-
-  it('rendert Abschnitt, Einheit und Einzelmittel als aufklappbare Zeilen', async () => {
-    mitBaum();
-    const { container } = setup();
-    /**
-     * Seit LFH-338 · C3 startet das Blatt AUFGEKLAPPT (H7) — alle drei Zeilenarten stehen
-     * ohne Zutun da. Der frühere Weg über `.ant-table-row-expand-icon-collapsed` fand nach
-     * dem Umbau nichts mehr; die Aussage („alle drei Ebenen erreichbar") bleibt dieselbe,
-     * nur die Reihenfolge dreht sich: erst sichtbar, dann zuklappbar.
-     */
-    expect(await screen.findByText('Abschnitt Nord')).toBeInTheDocument();
-    expect(screen.getByText('1. Zug')).toBeInTheDocument();
-    expect(screen.getByText('FW 1/44-1')).toBeInTheDocument();
-
-    // Und sie bleiben aufklappBAR: das Symbol steht da und trägt jetzt den Auf-Zustand.
-    expect(container.querySelector('.ant-table-row-expand-icon-expanded')).not.toBeNull();
-  });
-
-  it('zeigt Fahrzeug-Verfügbarkeits-Achse im Kopf', async () => {
-    vi.mocked(listeEinsatzFahrzeuge).mockResolvedValue([FAHRZEUG_F1]);
-    setup();
-    /**
-     * Seit LFH-338 · C3 steht die Verteilung als EINE Zeile unter der Fahrzeug-Kachel statt
-     * als drei gleichrangige `Statistic` daneben (Befund H6: bis zu 12 Kacheln in einer
-     * nicht umbrechenden Reihe). Die Aussage bleibt dieselbe — die Zahl der freien
-     * Fahrzeuge ist im Kopf ablesbar —, nur ihre Form ist kompakter.
-     *
-     * Der Wortlaut trägt weiterhin die Bedeutung: Farbe allein reicht nicht
-     * (Prüflisten-Kriterium 6), deshalb wird auf „1 frei" geprüft und nicht auf eine Farbe.
-     */
-    expect(await screen.findByText('1 frei')).toBeInTheDocument();
-    expect(screen.getByText('0 gebunden')).toBeInTheDocument();
-    expect(screen.getByText('0 n. einsatzbereit')).toBeInTheDocument();
-  });
-
-  it('zeigt Filterleiste mit Trägerorganisation-Select', async () => {
-    setup();
-    // Filter bar renders after einsatzQuery resolves past the Spin early-return
-    expect(await screen.findByText('Trägerorganisation')).toBeInTheDocument();
-  });
-
-  it('zeigt "In Lagebericht übernehmen" nur für Führungspersonal im aktiven Einsatz', async () => {
-    // EINSATZ hat status:'aktiv' und meine_rolle:'einsatzleitung' → Button sichtbar
-    setup();
+    expect(await screen.findByRole('heading', { name: 'Meldebild' })).toBeInTheDocument();
     expect(
-      await screen.findByRole('button', { name: /In Lagebericht übernehmen/i }),
+      await (await seitenkopf()).findByText('1 Einheit · Stärke 0/0/1//1'),
     ).toBeInTheDocument();
   });
 
-  it('versteckt "In Lagebericht übernehmen" für Beobachter', async () => {
+  it('„Einheit" ist die eine Primäraktion und führt auf die Einheiten-Seite', async () => {
+    setup();
+    const kopf = await waitFor(() => {
+      const k = document.querySelector('[data-lfh="seitenkopf-aktionen"]') as HTMLElement;
+      expect(k).not.toBeNull();
+      return k;
+    });
+    const knopf = within(kopf).getByRole('button', { name: /Einheit/ });
+    // Genau eine Primäraktion im Kopf (LFH-340 · C5).
+    expect(kopf.querySelectorAll('.ant-btn-primary')).toHaveLength(1);
+    expect(knopf).toHaveClass('ant-btn-primary');
+    fireEvent.click(knopf);
+    expect(navigiere).toHaveBeenCalledWith('/einsaetze/1/einheiten');
+    // Der Abschnitt-Filter sitzt sekundär daneben.
+    expect(within(kopf).getByRole('combobox', { name: 'Abschnitt filtern' })).toBeInTheDocument();
+  });
+
+  it('ohne Schreibrecht KEIN „Einheit"-Knopf und keine Lagebericht-Übernahme', async () => {
     vi.mocked(ladeEinsatz).mockResolvedValue({
       ...EINSATZ,
       meine_rolle: 'beobachter',
     } as EinsatzAnzeige);
     setup();
-    // Wait for page to render past Spin
     await screen.findByRole('button', { name: /Drucken/i });
+    expect(screen.queryByRole('button', { name: /^Einheit/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /In Lagebericht übernehmen/i })).toBeNull();
+  });
+});
+
+describe('meldebildMeta', () => {
+  it('nennt ungefiltert Einheitenzahl und Gesamtstärke', () => {
+    expect(
+      meldebildMeta({
+        einheiten: 7,
+        einheitenGesamt: 7,
+        staerke: '2/3/10//15',
+        staerkeGesamt: '2/3/10//15',
+        gefiltert: false,
+      }),
+    ).toBe('7 Einheiten · Stärke 2/3/10//15');
+  });
+
+  it('nennt gefiltert den Ausschnitt UND den Bezugswert (H3)', () => {
+    expect(
+      meldebildMeta({
+        einheiten: 3,
+        einheitenGesamt: 7,
+        staerke: '1/0/5//6',
+        staerkeGesamt: '2/3/10//15',
+        gefiltert: true,
+      }),
+    ).toBe('3 von 7 Einheiten · Stärke 1/0/5//6 von 2/3/10//15');
+  });
+});
+
+describe('KraefteuebersichtPage — Statusband', () => {
+  it('zählt Fahrzeuge je FMS-Status mit Code, Zahl und Wort', async () => {
+    mitEinheit();
+    const { container } = setup();
+    const zelle = await waitFor(() => {
+      const z = container.querySelector(
+        '[aria-label="Fahrzeuge je Status"] [data-lfh="kennzahl"]',
+      ) as HTMLElement;
+      expect(z).not.toBeNull();
+      return z;
+    });
+    expect(zelle).toHaveTextContent('S4');
+    expect(zelle).toHaveTextContent('1');
+    expect(zelle).toHaveTextContent('Am Einsatzort');
+    // Ton aus der Kategorie (gebunden → achtung), nicht aus dem Anker.
+    expect(zelle).toHaveAttribute('data-ton', 'achtung');
+  });
+
+  it('führt die Personalverteilung als eigene Zellen', async () => {
+    vi.mocked(listeEinsatzPersonal).mockResolvedValue([PERSON_P1]);
+    setup();
+    const gruppe = await screen.findByRole('region', { name: 'Personal je Status' });
+    expect(within(gruppe).getByText('gebunden')).toBeInTheDocument();
+  });
+
+  it('zeigt „keine Rückmeldung" NICHT — dafür gibt es keine Daten (LFH-610)', async () => {
+    mitEinheit();
+    setup();
+    await screen.findByText('Am Einsatzort');
+    expect(screen.queryByText(/keine Rückmeldung/i)).toBeNull();
+  });
+
+  it('meldet einen gescheiterten Abruf als „Stand unbekannt", nicht als Null', async () => {
+    vi.mocked(listeEinsatzFahrzeuge).mockRejectedValue(new Error('kaputt'));
+    setup();
+    expect((await screen.findAllByText('Stand unbekannt')).length).toBeGreaterThan(0);
+  });
+});
+
+describe('KraefteuebersichtPage — Raster', () => {
+  it('eine Zeile je Einheit mit Abschnitt, Stärke und Funkrufname; Mittel sind zugeklappt', async () => {
+    mitEinheit();
+    vi.mocked(listeEinheiten).mockResolvedValue([
+      {
+        ...EINHEIT_E10,
+        fahrzeug_mitglieder: [{ ef_id: 30, funkrufname: 'FW 1/44-1', fahrzeugtyp: 'HLF 20' }],
+      },
+    ]);
+    const { container } = setup();
+    await screen.findByText('1. Zug');
+    const e = zeile(container, 'eh-20')!;
+    expect(within(e).getByText('Abschnitt Nord')).toBeInTheDocument();
+    expect(within(e).getByText('0/0/0//0')).toBeInTheDocument();
+    // Genau ein Fahrzeug → eindeutiger Rufname der Einheit.
+    expect(within(e).getByText('FW 1/44-1')).toBeInTheDocument();
+    // Die Mittelzeile ist Detail: zugeklappt.
+    expect(zeile(container, 'ef-30')).toBeNull();
+    // Der Abschnitt ist Spalte, keine Baumebene mehr.
+    expect(zeile(container, 'ab-10')).toBeNull();
+  });
+
+  it('klappt die Mittel per Zeilenklick auf und zeigt den FMS-Chip', async () => {
+    mitEinheit();
+    const { container } = setup();
+    fireEvent.click(await screen.findByText('1. Zug'));
+    const mittel = await waitFor(() => {
+      const m = zeile(container, 'ef-30');
+      expect(m).not.toBeNull();
+      return m!;
+    });
+    const chip = mittel.querySelector('[data-lfh="status-chip"]') as HTMLElement;
+    expect(chip).toHaveTextContent('S4');
+    expect(chip).toHaveTextContent('Am Einsatzort');
+  });
+
+  it('die Einheitenzeile trägt die verdichtete Verteilung bereit / gebunden / Ausfall — auch die 0', async () => {
+    mitEinheit();
+    const { container } = setup();
+    await screen.findByText('1. Zug');
+    const gruppe = within(zeile(container, 'eh-20')!).getByRole('group', {
+      name: 'Fahrzeuge und Personal',
+    });
+    expect(within(gruppe).getByTitle('bereit')).toHaveTextContent('0');
+    expect(within(gruppe).getByTitle('gebunden')).toHaveTextContent('1');
+    expect(within(gruppe).getByTitle('Ausfall')).toHaveTextContent('0');
+    // Eine 0 bekommt keinen Ton.
+    expect(within(gruppe).getByTitle('Ausfall')).toHaveAttribute('data-ton', 'neutral');
+  });
+
+  it('tönt eine Einheit mit Ausfall als Problemzeile — mit der Ausfall-Zahl als zweitem Kanal', async () => {
+    vi.mocked(listeEinheiten).mockResolvedValue([
+      EINHEIT_E10,
+      { ...EINHEIT_E10, id: 21, name: '2. Zug' },
+    ]);
+    vi.mocked(listeEinsatzFahrzeuge).mockResolvedValue([
+      { ...FAHRZEUG_F1, einheit_id: 21, status_id: 106, status_kategorie: 'nicht_verfuegbar' },
+    ]);
+    const { container } = setup();
+    await screen.findByText('2. Zug');
+    const problem = zeile(container, 'eh-21')!;
+    expect(problem).toHaveClass('meldebild-problemzeile');
+    expect(within(problem).getByTitle('Ausfall')).toHaveTextContent('1');
+    expect(within(problem).getByTitle('Ausfall')).toHaveAttribute('data-ton', 'alarm');
+    expect(zeile(container, 'eh-20')).not.toHaveClass('meldebild-problemzeile');
+  });
+
+  it('zeigt den jüngsten offenen Auftrag der Einheit als Deeplink', async () => {
+    mitEinheit();
+    vi.mocked(listeAuftraege).mockResolvedValue([AUFTRAG_A3]);
+    const { container } = setup();
+    const link = await within(
+      await waitFor(() => {
+        const z = zeile(container, 'eh-20');
+        expect(z).not.toBeNull();
+        return z!;
+      }),
+    ).findByRole('link', { name: /Deichsicherung/ });
+    expect(link).toHaveTextContent('Nr. 3 · Deichsicherung km 3,8 – 4,6');
+    expect(link).toHaveAttribute('href', '/einsaetze/1/auftraege?auftrag=3');
+  });
+
+  it('ein gescheiterter Auftragsabruf nimmt nicht die Tabelle, die Zelle sagt „?"', async () => {
+    mitEinheit();
+    vi.mocked(listeAuftraege).mockRejectedValue(new Error('403'));
+    const { container } = setup();
+    await screen.findByText('1. Zug');
+    await waitFor(() =>
+      expect(
+        within(zeile(container, 'eh-20')!).getByTitle('Aufträge nicht abrufbar'),
+      ).toBeInTheDocument(),
+    );
+  });
+
+  it('eine Rolle ohne Auftragsrecht (403) sieht „—", nicht die Störungsmarke', async () => {
+    mitEinheit();
+    vi.mocked(listeAuftraege).mockRejectedValue(new ApiError(403, 'verboten'));
+    const { container } = setup();
+    await screen.findByText('1. Zug');
+    const e = await waitFor(() => {
+      const z = zeile(container, 'eh-20')!;
+      expect(within(z).getByTitle('Aufträge für diese Rolle nicht einsehbar')).toBeInTheDocument();
+      return z;
+    });
+    expect(within(e).queryByTitle('Aufträge nicht abrufbar')).toBeNull();
+  });
+
+  it('der Abschnitt bleibt auch schmal sichtbar — er ist die Gliederung (kein abBreite)', async () => {
+    setzeViewportBreite(390);
+    mitEinheit();
+    const { container } = setup();
+    await screen.findByText('1. Zug');
+    expect(within(zeile(container, 'eh-20')!).getByText('Abschnitt Nord')).toBeInTheDocument();
+  });
+
+  it('sammelt Kräfte ohne Einheit in „Ohne Einheit" — keine Kraft verschwindet', async () => {
+    vi.mocked(listeEinsatzPersonal).mockResolvedValue([PERSON_P1]);
+    const { container } = setup();
+    await screen.findByText('Ohne Einheit');
+    fireEvent.click(screen.getByText('Ohne Einheit'));
+    await waitFor(() => expect(zeile(container, 'ep-1')).not.toBeNull());
+  });
+
+  it('Leerzustand mit Aktion', async () => {
+    setup();
+    expect(await screen.findByRole('link', { name: 'Einheit bilden' })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/einheiten',
+    );
+  });
+
+  it('bleibt AUCH bei 390 px eine Tabelle (Kriterium 14)', async () => {
+    setzeViewportBreite(390);
+    mitEinheit();
+    const { container } = setup();
+    await screen.findByText('1. Zug');
+    expect(container.querySelector('.ant-table')).not.toBeNull();
+    expect(container.querySelector('[data-lfh="datensicht-karte"]')).toBeNull();
+  });
+
+  it('die Problemtönung liegt als Regel an der Zelle und liest die Rolle', () => {
+    const hier = dirname(fileURLToPath(import.meta.url));
+    const css = readFileSync(join(hier, 'kraefteuebersichtPrint.css'), 'utf-8');
+    const schirm = css.slice(0, css.indexOf('@media print'));
+    expect(schirm).toMatch(
+      /tr\.meldebild-problemzeile\s*>\s*td\s*\{[^}]*background-color:\s*var\(--lfh-problem-zeile\)/,
+    );
+  });
+});
+
+describe('KraefteuebersichtPage — Aufklappen', () => {
+  it('„Mit Mitteln" klappt alle auf, „Nur Einheiten" wieder zu', async () => {
+    mitEinheit();
+    setup();
+    await screen.findByText('1. Zug');
+    fireEvent.click(screen.getByText('Mit Mitteln'));
+    expect(await screen.findByText('HLF 20')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Nur Einheiten'));
+    await waitFor(() => expect(screen.queryByText('HLF 20')).toBeNull());
+    expect(screen.getByText('1. Zug')).toBeInTheDocument();
+  });
+
+  it('klappt nach dem Zuklappen EINER Zeile über „Mit Mitteln" wieder vollständig auf', async () => {
+    mitEinheit();
+    vi.mocked(listeEinsatzPersonal).mockResolvedValue([PERSON_P1]);
+    setup();
+    await screen.findByText('1. Zug');
+    fireEvent.click(screen.getByText('Mit Mitteln'));
+    await screen.findByText('HLF 20');
+
+    fireEvent.click(screen.getByText('1. Zug'));
+    await waitFor(() => expect(screen.queryByText('HLF 20')).toBeNull());
+    // „Ohne Einheit" steht noch offen — die Liste ist also nicht leer, aber unvollständig.
+    expect(screen.getByText('P1')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Mit Mitteln'));
+    expect(await screen.findByText('HLF 20')).toBeInTheDocument();
+  });
+});
+
+describe('KraefteuebersichtPage — Werkzeugzeile', () => {
+  it('trägt Trägerorganisation-Filter und Druck', async () => {
+    setup();
+    expect(await screen.findByText('Trägerorganisation')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Drucken/i })).toBeInTheDocument();
   });
 
   it('ruft legeLageberichtAn und aktualisiereLagebericht beim Klick auf Übernahme-Button auf', async () => {
@@ -262,88 +526,16 @@ describe('KraefteuebersichtPage', () => {
     );
   });
 
-  // ── Teil 2: die Ampelzeile als zwei eigene Spalten ──────────────────────────────
-
-  it('zeigt Personal und Fahrzeuge als eigene Spalten mit Textkopf', async () => {
-    /**
-     * Vorher: eine 220-px-Statusspalte mit bis zu acht `Tag` und zwei Emoji als einziger
-     * Achsenunterscheidung. „Personal"/„Fahrzeuge" existierten nur als `Statistic title`
-     * im Kennzahlenkopf, und antd rendert die in einem `div` OHNE Rolle — diese Abfrage
-     * kann also nicht aus der falschen Richtung grün werden.
-     */
-    mitBaum();
-    setup();
-    await screen.findByText('Abschnitt Nord');
-    expect(screen.getByRole('columnheader', { name: 'Personal' })).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: 'Fahrzeuge' })).toBeInTheDocument();
-  });
-
-  it('die Zählgruppen einer Abschnittszeile sind über ihr Etikett erreichbar und tragen Kurztexte', async () => {
-    /**
-     * `within(zeile)` ist PFLICHT, nicht Kosmetik: die Fixture hat mit Abschnitt UND
-     * Einheit zwei Zeilen mit Zählgruppen, und nur weil `expandedRowKeys` leer startet,
-     * existiert zufällig genau ein Knoten. Ungescopet würde diese Abfrage beim ersten
-     * zweiten Abschnitt oder beim ersten Aufklapp-Klick mit einer
-     * Mehrfachtreffer-Verletzung werfen — grün aus dem falschen Grund.
-     */
-    mitBaum();
-    const { container } = setup();
-    await screen.findByText('Abschnitt Nord');
-    const zeile = container.querySelector('[data-row-key="ab-10"]') as HTMLElement;
-    expect(zeile).not.toBeNull();
-
-    const personal = within(zeile).getByLabelText('Personal');
-    // Der Kurztext IST der zweite Kanal (Kriterium 6): die Farbe färbt nur die Zahl.
-    expect(personal).toHaveTextContent('frei');
-    expect(personal).toHaveTextContent('n.v.');
-
-    const fahrzeuge = within(zeile).getByLabelText('Fahrzeuge');
-    // Ein verfügbares Fahrzeug im Abschnitt, über die Einheit kumuliert.
-    expect(within(fahrzeuge).getByTitle('verfügbar')).toHaveTextContent('1');
-    // Und die 0 steht MIT da — sonst fluchten zwei Zeilen nicht übereinander.
-    expect(within(fahrzeuge).getByTitle('gebunden')).toHaveTextContent('0');
-  });
-
-  it('die Statusspalte trägt nur noch den Einzelstatus der Mittel', async () => {
-    mitBaum();
-    const { container } = setup();
-    // Seit LFH-338 · C3 steht die Mittelzeile ohne Durchklappen da (H7): das Blatt startet
-    // aufgeklappt. Die beiden früheren Klicks auf die Aufklapp-Symbole sind entfallen.
-    await screen.findByText('FW 1/44-1');
-
-    const mittel = container.querySelector('[data-row-key="ef-30"]') as HTMLElement;
-    expect(within(mittel).getByText('verfügbar')).toBeInTheDocument();
-    // Und umgekehrt: die Aggregatzeilen tragen ihre Zahlen NICHT mehr in der Statusspalte,
-    // sondern in den zwei eigenen Spalten — dort steht kein Kurztext.
-    const abschnitt = container.querySelector('[data-row-key="ab-10"]') as HTMLElement;
-    const statusZelle = abschnitt.querySelectorAll('td')[5];
-    expect(statusZelle.textContent).toBe('');
-  });
-
   it('die Statusfilter-Optionen kommen aus der einen Statusachse — ohne den vierten Eimer', async () => {
-    /**
-     * Die drei Optionen standen hier als Literale und waren die dritte Kopie derselben
-     * Labels. Sie kommen jetzt aus `KATEGORIE_WERTE`.
-     *
-     * Der vierte Eimer („ohne Status") bleibt draußen, und das ist eine Entscheidung:
-     * `FilterWerte.kategorie` ist `StatusKategorie | null`, und `filtereKraefte` vergleicht
-     * `kat === f.kategorie` — ein Filterwert `'ohne'` träfe also NIE eine Zeile und wäre
-     * eine tote Option. Gruppieren nach vier Eimern (Fahrzeuge/Personal) und Filtern nach
-     * drei ist hier kein Widerspruch, sondern die Grenze der Datenschicht.
-     */
     const { container } = setup();
     await screen.findByText('Trägerorganisation');
-    // Auf die Filter-Card scopen: „Status" ist auch ein Spaltenkopf, ungescopet ist die
-    // Abfrage mehrdeutig. Und NICHT über die Position im DOM — ein zusätzliches Feld in
-    // der Leiste würde einen Positionsindex lautlos verschieben.
-    const karte = container.querySelector('.kraefte-no-print.ant-card') as HTMLElement;
-    expect(karte, 'Filter-Card nicht gefunden').not.toBeNull();
-    const statusFilter = [...karte.querySelectorAll('.ant-select')].find((s) =>
+    // Auf die Werkzeugzeile scopen: „Status" ist auch ein Spaltenkopf.
+    const leiste = container.querySelector('[data-lfh="meldebild-werkzeuge"]') as HTMLElement;
+    expect(leiste, 'Werkzeugzeile nicht gefunden').not.toBeNull();
+    const statusFilter = [...leiste.querySelectorAll('.ant-select')].find((s) =>
       s.textContent?.includes('Status'),
     );
     expect(statusFilter, 'Status-Select nicht gefunden').not.toBeUndefined();
-    // antd 6 nennt die Klickfläche `.ant-select-content` (v5: `.ant-select-selector`) und
-    // den Platzhalter `.ant-select-placeholder` — nachgemessen, nicht aus dem Gedächtnis.
     fireEvent.mouseDown(statusFilter!.querySelector('.ant-select-content')!);
     const optionen = await waitFor(() => {
       const treffer = document.querySelectorAll('.ant-select-item-option-content');
@@ -352,85 +544,39 @@ describe('KraefteuebersichtPage', () => {
     });
     expect(optionen).toEqual(['verfügbar', 'gebunden', 'nicht verfügbar']);
   });
+});
 
-  // ── Teil 3: das Meldebild auf dem Primitiv ──────────────────────────────────────
-
-  it('der Meldebild-Baum bleibt AUCH bei 390 px eine Tabelle', async () => {
-    /**
-     * Prüflisten-Kriterium 14: „keine Auflösung in Karten, wo verglichen wird". Die
-     * Bedien-Leitlinie führt genau diese Seite als kanonisches „wird verglichen: ja",
-     * deshalb `form="tabelle"` und kein Kartenzweig. Ohne diese Zusicherung wäre ein
-     * `form="auto"` hier unauffällig — die Breit-Ansicht sähe identisch aus.
-     */
-    setzeViewportBreite(390);
-    mitBaum();
-    const { container } = setup();
-    await screen.findByText('Abschnitt Nord');
-    expect(container.querySelector('.ant-table')).not.toBeNull();
-    // Gegenprobe zur Formwahl: kein Kartenzweig daneben (genau EIN Zweig im Baum).
-    expect(container.querySelector('[data-lfh="datensicht-karte"]')).toBeNull();
-  });
-
-  it('Drucken klappt alle Knoten auf und druckt genau einmal', async () => {
-    /**
-     * Der Aufklappzustand liegt beim AUFRUFER, nicht im Primitiv — genau deswegen: hier
-     * setzt ihn ein anderes Seitenmerkmal (`handleDrucken`), und gedruckt wird erst im
-     * Folgeeffekt. Ein Primitiv mit internem Aufklappzustand hätte diesen Pfad lautlos
-     * stillgelegt: kein Fehler, kein roter Test, nur ein Ausdruck mit kollabierten Zeilen.
-     */
-    mitBaum();
+describe('KraefteuebersichtPage — Druck', () => {
+  it('Drucken klappt alle Mittel auf und druckt genau einmal', async () => {
+    // Das Raster startet zugeklappt — „Drucken klappt auf" ist hier also nicht trivial.
+    mitEinheit();
     setup();
-    // Seit LFH-338 · C3 startet das Blatt aufgeklappt (H7). Für DIESE Zusicherung wird
-    // deshalb erst von Hand zugeklappt — sonst wäre „Drucken klappt auf" trivial erfüllt
-    // und der Pfad, um den es geht, ungeprüft.
-    await screen.findByText('FW 1/44-1');
-    fireEvent.click(screen.getByText('Nur Abschnitte'));
-    await waitFor(() => expect(screen.queryByText('1. Zug')).toBeNull());
+    await screen.findByText('1. Zug');
+    expect(screen.queryByText('HLF 20')).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: /Drucken/i }));
 
-    expect(await screen.findByText('1. Zug')).toBeInTheDocument();
-    expect(screen.getByText('FW 1/44-1')).toBeInTheDocument();
+    expect(await screen.findByText('HLF 20')).toBeInTheDocument();
     await waitFor(() => expect(drucke).toHaveBeenCalledTimes(1));
   });
 
   it('„Drucken" bleibt AUSSERHALB der Werkzeugzeile des Primitivs', async () => {
-    /**
-     * Abweichung von der API-Spec §6, begründet: `kraefteuebersichtPrint.css` arbeitet über
-     * `body * { visibility: hidden }` plus `.kraefte-no-print { display: none }`. Ein Knoten
-     * INNERHALB von `Datensicht` ist damit nicht markierbar — `DatensichtProps` nimmt kein
-     * `className`. In `werkzeuge` läge der Druckknopf also im Ausdruck.
-     */
-    mitBaum();
+    // `.kraefte-no-print` ist innerhalb von `Datensicht` nicht setzbar (kein `className`).
+    mitEinheit();
     const { container } = setup();
-    await screen.findByText('Abschnitt Nord');
+    await screen.findByText('1. Zug');
     const werkzeuge = container.querySelector('[data-lfh="datensicht-werkzeuge"]') as HTMLElement;
     expect(werkzeuge).not.toBeNull();
     expect(within(werkzeuge).queryByRole('button', { name: /Drucken/i })).toBeNull();
-    // Was dort steht, ist der Spaltenschalter — und nur er.
     expect(within(werkzeuge).getByRole('button', { name: /Spalten/ })).toBeInTheDocument();
-    expect(werkzeuge.childElementCount).toBe(1);
   });
 
   it('der Druck neutralisiert Bildlaufcontainer, Sticky-Kopf, fixierte Spalte und Werkzeugzeile', () => {
-    /**
-     * jsdom rechnet kein Layout und `@media print` schon gar nicht — diese Zusicherung ist
-     * bewusst eine TEXT-Prüfung der Regeldatei, kein Layoutbeweis. Sie steht hier, weil der
-     * Umbau auf `KatalogTabelle` einen `overflow: auto`-Container, einen Sticky-Holder und
-     * `position: sticky` an Spalte 0 einführt, die das alte Blatt (nur `visibility`) nicht
-     * kennt: der Ausdruck wäre rechts abgeschnitten, und JEDER Vitest bliebe grün.
-     * Der Layoutbeweis gehört nach `frontend/e2e/` (Bildlaufmaß unter `emulateMedia`).
-     */
+    // jsdom rechnet kein `@media print` — bewusst eine TEXT-Prüfung der Regeldatei, als
+    // reguläre Ausdrücke (Quote-Stil ist Formatierung, keine Aussage; Lehre aus LFH-354).
     const hier = dirname(fileURLToPath(import.meta.url));
     const css = readFileSync(join(hier, 'kraefteuebersichtPrint.css'), 'utf-8');
     const druckblock = css.slice(css.indexOf('@media print'));
-    // DIE MARKEN SIND REGULÄRE AUSDRÜCKE, NICHT ZEICHENKETTEN — Lehre aus LFH-354, kein
-    // Stil. Der Attributselektor stand hier als `[data-lfh="datensicht-werkzeuge"]` mit
-    // doppelten Anführungszeichen; der einmalige Prettier-Sweep hat die Regeldatei auf
-    // einfache umgestellt (`singleQuote` aus .prettierrc gilt bei Prettier AUCH für CSS),
-    // und dieser Test wurde rot, ohne dass eine Druckregel gefehlt hätte. In CSS sind beide
-    // Schreibweisen identisch — ein Test, der sie unterscheidet, prüft die Formatierung der
-    // Datei statt ihrer Aussage und meldet einen Mangel, den es nicht gibt.
     for (const marke of [
       /\.ant-table-body\b/,
       /\.ant-table-sticky-holder\b/,
@@ -441,85 +587,92 @@ describe('KraefteuebersichtPage', () => {
     }
     expect(druckblock).toMatch(/overflow:\s*visible\s*!important/);
   });
+
+  it('trägt Einsatzbezeichnung, taktischen Zeitstand, Ersteller und die Meta-Zeile', async () => {
+    mitEinheit();
+    setup();
+    const kopf = await screen.findByTestId('kraefte-druckkopf');
+    expect(within(kopf).getByText(/Meldebild — Testeinsatz/)).toBeInTheDocument();
+    expect(within(kopf).getByText(/Stand: \d{6}[A-ZÄÖÜ]{3}\d{4}/)).toBeInTheDocument();
+    expect(within(kopf).getByText(/Erstellt von:/)).toBeInTheDocument();
+    expect(await within(kopf).findByText(/Einheit · Stärke/)).toBeInTheDocument();
+  });
+
+  it('nennt die Auswahl im Druckkopf, sobald gefiltert wird — und sonst nicht', async () => {
+    mitEinheit();
+    setup();
+    const kopf = await screen.findByTestId('kraefte-druckkopf');
+    expect(within(kopf).queryByText(/^Auswahl:/)).toBeNull();
+
+    await waehleAbschnitt('Abschnitt Nord');
+
+    expect(await within(kopf).findByText('Auswahl: Abschnitt: Abschnitt Nord')).toBeInTheDocument();
+  });
+
+  it('verbirgt den Druckkopf am Schirm und wiederholt im Druck die Spaltenköpfe', () => {
+    const hier = dirname(fileURLToPath(import.meta.url));
+    const css = readFileSync(join(hier, 'kraefteuebersichtPrint.css'), 'utf-8');
+    const druckblock = css.slice(css.indexOf('@media print'));
+    const schirmblock = css.slice(0, css.indexOf('@media print'));
+    expect(schirmblock).toMatch(/\.kraefte-nur-print\s*\{[^}]*display:\s*none/);
+    expect(druckblock).toMatch(/\.kraefte-nur-print\s*\{[^}]*display:\s*block/);
+    expect(druckblock).toMatch(/thead\s*\{[^}]*display:\s*table-header-group/);
+    expect(druckblock).toMatch(/tr\s*\{[^}]*break-inside:\s*avoid/);
+  });
 });
 
 /**
- * ── FILTERWAHRHEIT IM KOPF (LFH-338 · C3, Befund H3) ────────────────────────────
+ * ── FILTERWAHRHEIT (LFH-338 · C3, Befund H3) ────────────────────────────────────
  *
- * Die Kopfzahlen wurden schon immer aus den GEFILTERTEN Daten gerechnet, die Kachel war
- * aber unverändert mit „Gesamtstärke" beschriftet. Wer im Fükw kurz weggeht, zurückkommt
- * und abliest, meldete damit die Teilstärke eines Abschnitts als Gesamtstärke des
- * Einsatzes — eine Falschmeldung an die übergeordnete Führungsstelle.
- *
- * Die Selects werden über `getAllByRole('combobox')` mit Index gegriffen (Bestandsmuster
- * aus `SchaedenPage.test.tsx:158`): die vier Filterfelder tragen nur Platzhalter, keine
- * Beschriftungen — ein `name`-Matcher hätte hier nichts zu greifen.
+ * Wer kurz weggeht und dann abliest, darf die Teilstärke eines Abschnitts nicht für die
+ * Gesamtstärke halten. Der Abschnitt-Filter sitzt seit dem Neuentwurf im Seitenkopf und
+ * trägt einen zugänglichen Namen.
  */
 async function waehleAbschnitt(name: string) {
-  const felder = screen.getAllByRole('combobox');
-  fireEvent.mouseDown(felder[0]); // 0 = Abschnitt, 1 = Trägerorganisation, 2 = Status
+  fireEvent.mouseDown(await screen.findByRole('combobox', { name: 'Abschnitt filtern' }));
   fireEvent.click(await screen.findByTitle(name));
 }
 
 describe('KraefteuebersichtPage — Filterwahrheit', () => {
-  it('nennt den Kopf ungefiltert „Gesamtstärke" und mit Filter nicht mehr so', async () => {
-    mitBaum();
+  it('das Meta nennt mit Filter den Ausschnitt und die ungefilterte Stärke als Bezugswert', async () => {
+    mitEinheit();
+    vi.mocked(listeEinsatzPersonal).mockResolvedValue([PERSON_P1]); // 0/0/1//1, ohne Einheit
     setup();
-    expect(await screen.findByText(/Gesamtstärke/)).toBeInTheDocument();
+    expect(
+      await (await seitenkopf()).findByText('1 Einheit · Stärke 0/0/1//1'),
+    ).toBeInTheDocument();
 
     await waehleAbschnitt('Abschnitt Nord');
 
-    await waitFor(() => expect(screen.queryByText(/Gesamtstärke/)).toBeNull());
-    expect(screen.getByText(/Stärke \(gefiltert/)).toBeInTheDocument();
+    // Gefiltert bleibt keine Person übrig — der Bezugswert steht trotzdem da.
+    expect(
+      await (await seitenkopf()).findByText('1 von 1 Einheit · Stärke 0/0/0//0 von 0/0/1//1'),
+    ).toBeInTheDocument();
   });
 
   it('zeigt „X von Y Kräften" und setzt mit einem Klick alle Filter zurück', async () => {
-    // P1 hängt an KEINER Einheit, F1 an Einheit 20 (Abschnitt Nord). Der Abschnittsfilter
-    // trennt die beiden also — sonst wäre „X von Y" mit X = Y trivial erfüllt.
-    vi.mocked(listeAbschnitte).mockResolvedValue([ABSCHNITT_A1]);
-    vi.mocked(listeEinheiten).mockResolvedValue([EINHEIT_E10]);
-    vi.mocked(listeEinsatzFahrzeuge).mockResolvedValue([FAHRZEUG_F1]);
+    // P1 hängt an KEINER Einheit, F1 an Einheit 20 (Abschnitt Nord).
+    mitEinheit();
     vi.mocked(listeEinsatzPersonal).mockResolvedValue([PERSON_P1]);
     setup();
 
     expect(await screen.findByText('2 von 2 Kräften')).toBeInTheDocument();
-
     await waehleAbschnitt('Abschnitt Nord');
     expect(await screen.findByText('1 von 2 Kräften')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
     expect(await screen.findByText('2 von 2 Kräften')).toBeInTheDocument();
-    // Und der Titel ist wieder der ungefilterte — das Zurücksetzen wirkt auf den ganzen Kopf.
-    expect(screen.getByText(/Gesamtstärke/)).toBeInTheDocument();
-  });
-
-  it('führt die ungefilterte Gesamtstärke als Bezugswert weiter, sobald gefiltert wird', async () => {
-    vi.mocked(listeAbschnitte).mockResolvedValue([ABSCHNITT_A1]);
-    vi.mocked(listeEinheiten).mockResolvedValue([EINHEIT_E10]);
-    vi.mocked(listeEinsatzPersonal).mockResolvedValue([PERSON_P1]); // 0/0/1//1, ohne Einheit
-    setup();
-    await screen.findByText(/Gesamtstärke/);
-
-    await waehleAbschnitt('Abschnitt Nord');
-
-    // Gefiltert bleibt niemand übrig — der Bezugswert steht trotzdem da. Genau das ist der
-    // Punkt: eine leere gefilterte Menge darf die Gesamtstärke nicht verschwinden lassen.
-    expect(await screen.findByText(/ungefiltert 0\/0\/1\/\/1/)).toBeInTheDocument();
+    expect((await seitenkopf()).getByText('1 Einheit · Stärke 0/0/1//1')).toBeInTheDocument();
   });
 
   it('zeigt den gesetzten Filter als schließbare Marke, die genau ihn zurücknimmt', async () => {
-    vi.mocked(listeAbschnitte).mockResolvedValue([ABSCHNITT_A1]);
-    vi.mocked(listeEinheiten).mockResolvedValue([EINHEIT_E10]);
-    vi.mocked(listeEinsatzFahrzeuge).mockResolvedValue([FAHRZEUG_F1]);
+    mitEinheit();
     vi.mocked(listeEinsatzPersonal).mockResolvedValue([PERSON_P1]);
     setup();
     await screen.findByText('2 von 2 Kräften');
 
     await waehleAbschnitt('Abschnitt Nord');
     const marke = await screen.findByText('Abschnitt: Abschnitt Nord');
-    expect(marke).toBeInTheDocument();
-
-    // Das Schließkreuz der Marke, nicht der Zurücksetzen-Knopf.
     fireEvent.click(marke.closest('.ant-tag')!.querySelector('.ant-tag-close-icon')!);
     expect(await screen.findByText('2 von 2 Kräften')).toBeInTheDocument();
     expect(screen.queryByText('Abschnitt: Abschnitt Nord')).toBeNull();
@@ -553,220 +706,15 @@ describe('aktiveFilterChips', () => {
   });
 
   it('wertet eine Suche aus lauter Leerzeichen NICHT als gesetzten Filter', () => {
-    // `filtereKraefte` trimmt ebenfalls (`f.suche.trim()`); eine Marke für einen Filter, der
-    // nichts filtert, behauptete eine Einschränkung, die es nicht gibt.
     expect(aktiveFilterChips({ ...LEERER_FILTER, suche: '   ' }, name)).toEqual([]);
   });
 });
 
-/**
- * ── DAS GEDRUCKTE MELDEBLATT (LFH-338 · C3, Befund H4) ──────────────────────────
- *
- * Der Ausdruck ging bis dahin ohne Einsatzbezug, ohne Zeitstand und ohne Angabe der Auswahl
- * an die übergeordnete Führungsstelle: die Bezeichnung stand ausschließlich in der
- * Breadcrumb, und die trägt `.kraefte-no-print`.
- *
- * Der Knoten wird über `data-testid` gegriffen, nicht über seine Sichtbarkeit: jsdom wertet
- * kein CSS aus, ein `toBeVisible()` könnte Schirm- und Druckzweig hier gar nicht
- * unterscheiden. Dass er am Schirm verborgen ist, prüft die CSS-Textzusicherung unten.
- */
-describe('KraefteuebersichtPage — Druckkopf', () => {
-  it('trägt Einsatzbezeichnung, taktischen Zeitstand und Ersteller', async () => {
-    mitBaum();
-    setup();
-    const kopf = await screen.findByTestId('kraefte-druckkopf');
-    expect(within(kopf).getByText(/Testeinsatz/)).toBeInTheDocument();
-    // Taktische DTG: DDHHmm + dreibuchstabiges Monatskürzel + Jahr, z. B. 111430AUG2026.
-    expect(within(kopf).getByText(/Stand: \d{6}[A-ZÄÖÜ]{3}\d{4}/)).toBeInTheDocument();
-    expect(within(kopf).getByText(/Erstellt von:/)).toBeInTheDocument();
-  });
-
-  it('nennt die Auswahl im Druckkopf, sobald gefiltert wird — und sonst nicht', async () => {
-    mitBaum();
-    setup();
-    const kopf = await screen.findByTestId('kraefte-druckkopf');
-    expect(within(kopf).queryByText(/^Auswahl:/)).toBeNull();
-
-    await waehleAbschnitt('Abschnitt Nord');
-
-    expect(await within(kopf).findByText('Auswahl: Abschnitt: Abschnitt Nord')).toBeInTheDocument();
-  });
-
-  it('verbirgt den Druckkopf am Schirm und wiederholt im Druck die Spaltenköpfe', () => {
-    const hier = dirname(fileURLToPath(import.meta.url));
-    const css = readFileSync(join(hier, 'kraefteuebersichtPrint.css'), 'utf-8');
-    const druckblock = css.slice(css.indexOf('@media print'));
-    const schirmblock = css.slice(0, css.indexOf('@media print'));
-
-    // Am Schirm weg — und zwar AUSSERHALB des Druckblocks, sonst wäre er überall sichtbar.
-    expect(schirmblock).toMatch(/\.kraefte-nur-print\s*\{[^}]*display:\s*none/);
-    expect(druckblock).toMatch(/\.kraefte-nur-print\s*\{[^}]*display:\s*block/);
-
-    // Mehrseitige Bäume: Kopfzeile je Blatt, keine Zeile über den Blattrand.
-    expect(druckblock).toMatch(/thead\s*\{[^}]*display:\s*table-header-group/);
-    expect(druckblock).toMatch(/tr\s*\{[^}]*break-inside:\s*avoid/);
-  });
-});
-
-/**
- * ── DER MONITORING-KOPF (LFH-338 · C3, Befund H6) ───────────────────────────────
- *
- * Bis dahin lagen bis zu 12 Kennzahlen in einem `Space` mit `flexWrap: 'nowrap'` hinter
- * einem Card-internen `overflowX: 'auto'`. Auf ~950 px nutzbarer Breite (13"-Fükw-Schirm)
- * lag die komplette Materialachse unsichtbar rechts — ohne jede optische Andeutung.
- *
- * jsdom rechnet kein Layout: der eigentliche Beweis („scrollt nicht waagerecht") steht in
- * `frontend/e2e/meldebild-tabelle.spec.ts`. Hier wird die STRUKTUR geprüft, aus der er
- * folgt, plus das Verschwinden der beiden Konstrukte im Quelltext — das ist wörtlich das
- * Akzeptanzkriterium des Tickets.
- */
-describe('KraefteuebersichtPage — Kopf bricht um', () => {
-  it('setzt den Kopf in ein Raster statt in eine nicht umbrechende Reihe', async () => {
-    mitBaum();
-    const { container } = setup();
-    await screen.findByText(/Gesamtstärke/);
-    expect(container.querySelector('.ant-row')).not.toBeNull();
-  });
-
-  it('zeigt alle drei Achsen — Personal, Fahrzeuge, Material', async () => {
-    mitBaum();
-    setup();
-    expect(await screen.findByText(/Gesamtstärke/)).toBeInTheDocument();
-    expect(screen.getByText('Fahrzeuge', { selector: '.ant-statistic-title' })).toBeInTheDocument();
-    expect(screen.getByText(/Material \(Pos\.\)/)).toBeInTheDocument();
-  });
-
-  it('trägt weder flexWrap: nowrap noch einen Card-internen Horizontalscroll', () => {
+describe('KraefteuebersichtPage — Quelltext', () => {
+  it('trägt weder flexWrap: nowrap noch einen internen Horizontalscroll (Befund H6)', () => {
     const hier = dirname(fileURLToPath(import.meta.url));
     const quelle = readFileSync(join(hier, 'KraefteuebersichtPage.tsx'), 'utf-8');
     expect(quelle).not.toMatch(/flexWrap:\s*'nowrap'/);
     expect(quelle).not.toMatch(/overflowX:\s*'auto'/);
   });
-});
-
-/**
- * ── DAS BLATT STARTET AUFGEKLAPPT (LFH-338 · C3, Befund H7) ─────────────────────
- *
- * Das Meldebild ist die Verdichtung, aus der gemeldet wird — und es öffnete vollständig
- * ZUgeklappt. Wer die Stärke eines Abschnitts ablesen wollte, klickte sich erst durch n
- * Ebenen, jedes Mal auf ein rund 16 px breites Symbol.
- */
-describe('KraefteuebersichtPage — Aufklappen', () => {
-  it('startet aufgeklappt, sobald der erste Baum geladen ist', async () => {
-    mitBaum();
-    setup();
-    // Abschnitt → Einheit → Fahrzeug: die TIEFSTE Zeile steht ohne einen einzigen Klick da.
-    expect(await screen.findByText('FW 1/44-1')).toBeInTheDocument();
-  });
-
-  it('klappt über „Nur Abschnitte" auf die oberste Ebene zurück und wieder auf', async () => {
-    mitBaum();
-    setup();
-    await screen.findByText('FW 1/44-1');
-
-    fireEvent.click(screen.getByText('Nur Abschnitte'));
-    await waitFor(() => expect(screen.queryByText('FW 1/44-1')).toBeNull());
-    // Die oberste Ebene bleibt — „zu" heißt nicht „leer".
-    expect(screen.getByText('Abschnitt Nord')).toBeInTheDocument();
-
-    fireEvent.click(screen.getByText('Alles aufklappen'));
-    expect(await screen.findByText('FW 1/44-1')).toBeInTheDocument();
-  });
-
-  it('klappt eine Zeile per Klick auf die Zeile zu, nicht nur am Symbol', async () => {
-    mitBaum();
-    setup();
-    await screen.findByText('FW 1/44-1');
-
-    // Auf den Text der Abschnittszeile, nicht auf das Aufklapp-Symbol.
-    fireEvent.click(screen.getByText('Abschnitt Nord'));
-    await waitFor(() => expect(screen.queryByText('FW 1/44-1')).toBeNull());
-  });
-
-  it('klappt eine vom Benutzer zugeklappte Zeile NICHT bei jedem Datenzufluss wieder auf', async () => {
-    mitBaum();
-    setup();
-    await screen.findByText('FW 1/44-1');
-    fireEvent.click(screen.getByText('Abschnitt Nord'));
-    await waitFor(() => expect(screen.queryByText('FW 1/44-1')).toBeNull());
-
-    /**
-     * Das automatische Aufklappen darf GENAU EINMAL greifen. Ohne Riegel klappte jeder
-     * Neuaufbau des Baums die Handarbeit der Einsatzkraft wieder auf — und der passiert
-     * dauernd: `bild` hängt an sechs Queries UND am Filter, jeder Tastendruck im Suchfeld
-     * baut ihn neu.
-     *
-     * Als Auslöser dient deshalb genau das: ein Suchbegriff, der die Fahrzeugzeile
-     * ausdrücklich BEHÄLT ('FW' trifft ihren Funkrufnamen). Bliebe sie danach weg, weil sie
-     * herausgefiltert wurde, bewiese der Test nichts über das Aufklappen. Der Druck-Knopf
-     * taugt als Auslöser NICHT — der klappt absichtlich alles auf.
-     */
-    fireEvent.change(screen.getByPlaceholderText('Suche...'), { target: { value: 'FW' } });
-
-    await new Promise((r) => setTimeout(r, 50));
-    expect(screen.queryByText('FW 1/44-1')).toBeNull();
-    // Gegenprobe: die Zeile ist zugeklappt, nicht weggefiltert — ihr Elternteil steht da.
-    expect(screen.getByText('Abschnitt Nord')).toBeInTheDocument();
-  });
-});
-
-/**
- * ── DER EINMAL-RIEGEL DARF NICHT ZU FRÜH ZUSCHNAPPEN (Review zu LFH-338) ────────
- *
- * `bild.baum` entsteht aus SECHS unabhängigen Queries, und `baueKraeftebild` legt eine
- * Abschnittszeile UNBEDINGT an (`kraeftebild.ts:627-643`, kein Kinder-Riegel). „Erster
- * nicht leerer Baum" ist damit nicht dasselbe wie „erster vollständiger Baum": kommen die
- * Abschnitte zuerst, klappt der Effekt genau die Abschnittsebene auf, verbraucht seine
- * Marke — und alles, was danach eintrifft, bleibt zu.
- *
- * Das ist kein Rennen, sondern ein alltäglicher Weg: `einsatzKeys.abschnitte` wird von acht
- * weiteren Flächen geladen (Lage-Dashboard, ETB, Meldungen, Chat, Lagekarte, …). Wer von
- * dort herüberwechselt, hat die Abschnitte im Zwischenspeicher — sie stehen im ERSTEN
- * Render, die anderen fünf Queries sind noch offen.
- *
- * Das Akzeptanzkriterium („expandedKeys ist nach dem ersten geladenen Baum nicht leer")
- * bliebe dabei grün: die Abschnitts-Schlüssel stehen ja drin. Genau deshalb prüft dieser
- * Test die TIEFSTE Zeile.
- */
-it('klappt auch auf, wenn die Abschnitte VOR den übrigen Listen da sind', async () => {
-  const spaet =
-    <T,>(wert: T) =>
-    () =>
-      new Promise<T>((aufloesen) => setTimeout(() => aufloesen(wert), 30));
-
-  vi.mocked(listeAbschnitte).mockResolvedValue([ABSCHNITT_A1]); // sofort (im Cache)
-  vi.mocked(listeEinheiten).mockImplementation(spaet([EINHEIT_E10])); // trifft später ein
-  vi.mocked(listeEinsatzFahrzeuge).mockImplementation(spaet([FAHRZEUG_F1]));
-  setup();
-
-  // Die Abschnittszeile steht früh — der Baum ist also „nicht leer", bevor er vollständig ist.
-  await screen.findByText('Abschnitt Nord');
-  // …und die tiefste Zeile muss trotzdem aufgeklappt erscheinen.
-  expect(await screen.findByText('FW 1/44-1')).toBeInTheDocument();
-});
-
-/**
- * ── „ALLES AUFKLAPPEN" DARF NICHT VERSTUMMEN (Review zu LFH-338) ────────────────
- *
- * Der Umschalterwert wird aus `expandedKeys` abgeleitet — richtig, ein zweiter Zustand
- * daneben liefe auseinander. Aber die Ableitung „length > 0" ist zu grob: klappt jemand
- * EINE von mehreren Zeilen zu, bleibt die Liste nicht leer, der Umschalter steht weiter auf
- * „alles", und ein Klick darauf schaltet ein bereits gesetztes Radio — das feuert kein
- * `change`. Der Knopf sähe aus wie eine Bedienung und wäre keine; der einzige Weg zurück
- * wäre der Umweg über „Nur Abschnitte".
- *
- * Zugleich behauptete die Beschriftung einen Zustand, der nicht vorliegt.
- */
-it('klappt nach dem Zuklappen EINER Zeile über „Alles aufklappen" wieder vollständig auf', async () => {
-  mitBaum();
-  setup();
-  await screen.findByText('FW 1/44-1');
-
-  // Eine einzelne Zeile zuklappen (Zeilenklick) — nicht alle.
-  fireEvent.click(screen.getByText('1. Zug'));
-  await waitFor(() => expect(screen.queryByText('FW 1/44-1')).toBeNull());
-  expect(screen.getByText('Abschnitt Nord')).toBeInTheDocument();
-
-  fireEvent.click(screen.getByText('Alles aufklappen'));
-  expect(await screen.findByText('FW 1/44-1')).toBeInTheDocument();
 });

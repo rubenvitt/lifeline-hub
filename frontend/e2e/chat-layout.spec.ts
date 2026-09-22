@@ -72,7 +72,7 @@ test('Chat: die Eingabe bleibt bei langem Strom sichtbar — auch nach dem Absen
   expect(await ueberstand(page)).toBeLessThanOrEqual(0);
 });
 
-test('Chat: unter md trägt eine Segmented-Leiste die Kanäle, nicht die Seitenspalte', async ({
+test('Chat: unter md trägt eine Segmentleiste die Kanäle, nicht die Seitenspalte', async ({
   page,
 }) => {
   await anmelden(page);
@@ -99,7 +99,9 @@ test('Aufträge: auf 390 px scrollt der Body nicht waagerecht', async ({ page })
 
   await page.setViewportSize(SCHMAL);
   await page.goto(`/einsaetze/${einsatzId}/auftraege`);
-  await expect(page.getByRole('heading', { name: 'Aufträge' })).toBeVisible();
+  // Reiterkopf `Bereichskopf` (h3, Augenbraue in CSS-Versalien); `level` trennt ihn vom h1-Seitentitel
+  // „Aufträge/Befehle" — ohne `exact`, damit die Groß-/Kleinschreibung des Namens egal ist.
+  await expect(page.getByRole('heading', { level: 3, name: 'Aufträge' })).toBeVisible();
   expect(await ueberstand(page)).toBeLessThanOrEqual(0);
 
   // Das Erfassungsformular ist der Teil, den C8 umgebaut hat (vier sichtbare

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { App, Button, Input, Slider, Space, theme, Tooltip } from 'antd';
 import {
   CameraOutlined,
@@ -13,6 +13,7 @@ import { ladeLageSnapshot } from '../../api/lageSnapshot';
 import { formatZeitKurz } from '../../anzeige/format';
 import { useLageSnapshots } from './useLageSnapshots';
 import { bandStil } from './KartenFuss';
+import { useViewport } from '../../components/useViewport';
 
 /** Feste Anzeigedauer je Stand im Replay (D/LFH-322). */
 export const ANZEIGE_MS = 2500;
@@ -23,12 +24,27 @@ export const ANZEIGE_MS = 2500;
 // — dort würde sie geteilt und jede Klapp-Aktion machte die Ansicht schmutzig.
 const SPEICHER_SCHLUESSEL = 'lfh:lagekarte:zeitachse-eingeklappt';
 
-function gespeichertEingeklappt(): boolean {
+/** Gemerkte Wahl: `true`/`false`, oder `null`, wenn nie gewählt wurde. */
+function gespeichertEingeklappt(): boolean | null {
   try {
-    return localStorage.getItem(SPEICHER_SCHLUESSEL) === '1';
+    const wert = localStorage.getItem(SPEICHER_SCHLUESSEL);
+    return wert === '1' ? true : wert === '0' ? false : null;
   } catch {
-    return false;
+    return null;
   }
+}
+
+/**
+ * Startzustand der Leiste (Nacharbeit 22.09.2026). Eine gemerkte Wahl gewinnt IMMER (sonst
+ * drehte sich die Leiste beim Neuladen selbst zurück — dieselbe Regel wie bei der Dichte in
+ * `useViewport`). Ohne Wahl startet sie eingeklappt, wo die Karte eng ist — unter `xl`
+ * (1200 px). Gemessen ausgeklappt: 222 von 623 px Kartenhöhe bei 375 px Breite, 168 px in drei
+ * Zeilen bei 1024 px (dort teilen sich Modulpanel, Karte und Leiste die Breite, die Karte ist
+ * rund 440 px schmal); bei 1440 px eine Zeile. Die Leiste ist ein Werkzeug auf Abruf (LFH-353),
+ * kein Dauerelement. Rein und exportiert, damit die Vorrangregel ohne Rendern prüfbar ist.
+ */
+export function startEingeklappt(gemerkt: boolean | null, kartenEng: boolean): boolean {
+  return gemerkt ?? kartenEng;
 }
 
 function merkeEingeklappt(wert: boolean): void {
@@ -38,6 +54,23 @@ function merkeEingeklappt(wert: boolean): void {
     /* localStorage nicht verfügbar → nicht persistierbar, kein harter Fehler */
   }
 }
+
+/**
+ * Die Reihe der gesicherten Stände. Sie teilt sich die Zeile mit Sichern und Zeitleiste
+ * (Nacharbeit Neuentwurf, 22.09.2026): ohne `flex`-Basis und `minWidth: 0` nahm sie als
+ * Flex-Kind ihre volle Inhaltsbreite an, brach in eine ZWEITE Zeile um und machte die über
+ * der Karte liegende Leiste doppelt so hoch — gemessen bei 1440 × 900 rund 100 statt 50 px.
+ * Jetzt schrumpft sie auf den Rest der Zeile und rollt waagerecht; erst unter 160 px Rest
+ * bricht sie um. Rein und exportiert, damit die Zusicherung ohne Layout prüfbar ist.
+ */
+export const standLeisteStil: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 6,
+  flex: '1 1 160px',
+  minWidth: 0,
+  overflowX: 'auto',
+};
 
 interface SnapshotLeisteProps {
   einsatzId: number;
@@ -92,7 +125,12 @@ export function SnapshotLeiste({
   const { snapshots, sichern, sichertGerade } = useLageSnapshots(einsatzId);
   const [bezeichnung, setBezeichnung] = useState('');
   const [spielt, setSpielt] = useState(false);
-  const [eingeklappt, setEingeklappt] = useState(gespeichertEingeklappt);
+  const { abBreite } = useViewport();
+  // Abgeleitet statt einmalig gesetzt: die Breitenstufe steht im ersten Render noch nicht
+  // fest (antds Breakpoint-Beobachter meldet sich erst nach dem Einhängen), ein
+  // `useState`-Startwert läse sie also immer als „breit".
+  const [wahl, setWahl] = useState<boolean | null>(gespeichertEingeklappt);
+  const eingeklappt = startEingeklappt(wahl, !abBreite('xl'));
 
   // Chronologisch (alt → neu) für die Zeitleiste; das Backend liefert neueste zuerst.
   const chrono = useMemo(
@@ -153,7 +191,7 @@ export function SnapshotLeiste({
   };
 
   const klappeUm = (zu: boolean) => {
-    setEingeklappt(zu);
+    setWahl(zu);
     merkeEingeklappt(zu);
     // Einklappen stoppt eine laufende Wiedergabe: ein Replay, das die Karte weiterschaltet,
     // während die Pause-Taste nicht sichtbar ist, wäre eine Falle. Der Historien-Modus selbst
@@ -265,7 +303,7 @@ export function SnapshotLeiste({
       )}
 
       {chrono.length > 0 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflowX: 'auto' }}>
+        <div data-lfh="zeitachse-staende" style={standLeisteStil}>
           {chrono.map((s) => (
             <Tooltip key={s.id} title={s.notiz ?? undefined}>
               <Button

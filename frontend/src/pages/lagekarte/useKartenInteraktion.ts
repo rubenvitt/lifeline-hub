@@ -385,7 +385,7 @@ export function useKartenInteraktion({
         // (`lage_zone/repo.rs:anlegen_tx` → `gebiet_anlegen`). Ohne die zweite Invalidierung
         // trägt die frische Zone eine `gefahrengebiet_id`, die die veraltete Gebiets-Liste
         // nicht kennt — der Nachschlag geht ins Leere und die Karte beschriftet sie
-        // „Warnstufe: unbekannt", bis ein fremder Refetch kommt. Der SSE-Fan-out räumt beides
+        // „Stufe unbekannt", bis ein fremder Refetch kommt. Der SSE-Fan-out räumt beides
         // ab (`lage_zone` → zonen + gefahrengebiete); die Lücke trägt also nur, solange der
         // Live-Strom hängt — genau dann, wenn niemand sie sich erklären kann.
         return Promise.all([

@@ -10,17 +10,17 @@ import {
   setzeOrgModulEinstellung,
 } from '../../api/orgEinstellungen';
 import AdminPage from '../../components/AdminPage';
-import SektionHeader from '../../components/SektionHeader';
 import { SeitenHinweise, SpeicherFehler } from '../../components/SpeicherHinweis';
 import { useAuth } from '../../auth/AuthContext';
 import { globalKeys } from '../../api/queryKeys';
-import { speicherLeisteStil } from './einsatzEinstellungenForm';
+import { speicherLeisteStil } from '../../components/speicherLeiste';
 import {
   type FormWerteEinsatz,
   initialEinsatz,
   normalisiereEinsatz,
   zuUpdate,
 } from './orgEinstellungenForm';
+import { Formularpaneel } from '../../components/instrument';
 
 /**
  * Admin-Sektion `/admin/einstellungen/einsatz` — Aufbewahrung, Nummernkreise, Fristen,
@@ -104,6 +104,7 @@ export default function EinsatzDefaults() {
   return (
     <AdminPage
       titel="Einsatz-Defaults"
+      breite="schmal"
       beschreibung="Org-weite Defaults für neue Einsätze. Einsatzspezifische Einstellungen überschreiben diese Werte."
       hinweis={
         // NUR der Formular-Fehler. Die Modul-Liste speichert je Zeile sofort und trägt ihre
@@ -126,84 +127,84 @@ export default function EinsatzDefaults() {
         onValuesChange={() => setHatFassung(true)}
         disabled={!istAdmin}
       >
-        <SektionHeader
+        <Formularpaneel
           titel="Aufbewahrung"
           beschreibung="Default-Aufbewahrungs-Dauer für neue Einsätze. Leer = keine automatische Frist."
-        />
-
-        <Form.Item
-          label="Aufbewahrungs-Dauer (Tage)"
-          name="retention_dauer_tage"
-          tooltip="1 bis 3650 Tage. Leer = keine automatische Aufbewahrungsfrist."
         >
-          <InputNumber
-            min={1}
-            max={3650}
-            style={{ width: '100%', maxWidth: 200 }}
-            placeholder="keine"
-          />
-        </Form.Item>
+          <Form.Item
+            label="Aufbewahrungs-Dauer (Tage)"
+            name="retention_dauer_tage"
+            tooltip="1 bis 3650 Tage. Leer = keine automatische Aufbewahrungsfrist."
+          >
+            <InputNumber
+              min={1}
+              max={3650}
+              style={{ width: '100%', maxWidth: 200 }}
+              placeholder="keine"
+            />
+          </Form.Item>
+        </Formularpaneel>
 
-        <SektionHeader
+        <Formularpaneel
           titel="Verhalten & Automatik"
           beschreibung="Nummernkreis-Präfixe und Default-Fristen für neue Einsätze. Präfixe sind reine Anzeige. Leer = kein Default (hartkodierter Fallback)."
-        />
+        >
+          <Form.Item
+            label="Präfix ETB"
+            name="etb_nummer_praefix"
+            tooltip="Wird der laufenden ETB-Nummer vorangestellt (z. B. EB-). Max. 8 Zeichen."
+          >
+            <Input maxLength={8} placeholder="z. B. EB-" style={{ width: '100%', maxWidth: 200 }} />
+          </Form.Item>
+          <Form.Item
+            label="Präfix Meldungen"
+            name="meldung_nummer_praefix"
+            tooltip="Wird der laufenden Meldungs-Nummer vorangestellt. Max. 8 Zeichen."
+          >
+            <Input maxLength={8} placeholder="z. B. M-" style={{ width: '100%', maxWidth: 200 }} />
+          </Form.Item>
+          <Form.Item
+            label="Präfix Aufträge"
+            name="auftrag_nummer_praefix"
+            tooltip="Wird der laufenden Auftrags-Nummer vorangestellt. Max. 8 Zeichen."
+          >
+            <Input maxLength={8} placeholder="z. B. A-" style={{ width: '100%', maxWidth: 200 }} />
+          </Form.Item>
 
-        <Form.Item
-          label="Präfix ETB"
-          name="etb_nummer_praefix"
-          tooltip="Wird der laufenden ETB-Nummer vorangestellt (z. B. EB-). Max. 8 Zeichen."
-        >
-          <Input maxLength={8} placeholder="z. B. EB-" style={{ width: '100%', maxWidth: 200 }} />
-        </Form.Item>
-        <Form.Item
-          label="Präfix Meldungen"
-          name="meldung_nummer_praefix"
-          tooltip="Wird der laufenden Meldungs-Nummer vorangestellt. Max. 8 Zeichen."
-        >
-          <Input maxLength={8} placeholder="z. B. M-" style={{ width: '100%', maxWidth: 200 }} />
-        </Form.Item>
-        <Form.Item
-          label="Präfix Aufträge"
-          name="auftrag_nummer_praefix"
-          tooltip="Wird der laufenden Auftrags-Nummer vorangestellt. Max. 8 Zeichen."
-        >
-          <Input maxLength={8} placeholder="z. B. A-" style={{ width: '100%', maxWidth: 200 }} />
-        </Form.Item>
+          <Form.Item
+            label="Default-Bestätigungsfrist Meldungen (Minuten)"
+            name="meldung_bestaetigung_frist_min"
+            tooltip="Frist für die Bestätigung pflichtiger Meldungen. Leer = kein Default."
+          >
+            <InputNumber
+              min={1}
+              max={10080}
+              style={{ width: '100%', maxWidth: 200 }}
+              placeholder="kein Default"
+            />
+          </Form.Item>
+          <Form.Item
+            label="Default-Quittierungsfrist Aufträge (Minuten)"
+            name="auftrag_quittierung_frist_min"
+            tooltip="Frist für unquittierte Aufträge ohne explizite Frist. Leer = kein Default."
+          >
+            <InputNumber
+              min={1}
+              max={10080}
+              style={{ width: '100%', maxWidth: 200 }}
+              placeholder="kein Default"
+            />
+          </Form.Item>
 
-        <Form.Item
-          label="Default-Bestätigungsfrist Meldungen (Minuten)"
-          name="meldung_bestaetigung_frist_min"
-          tooltip="Frist für die Bestätigung pflichtiger Meldungen. Leer = kein Default."
-        >
-          <InputNumber
-            min={1}
-            max={10080}
-            style={{ width: '100%', maxWidth: 200 }}
-            placeholder="kein Default"
-          />
-        </Form.Item>
-        <Form.Item
-          label="Default-Quittierungsfrist Aufträge (Minuten)"
-          name="auftrag_quittierung_frist_min"
-          tooltip="Frist für unquittierte Aufträge ohne explizite Frist. Leer = kein Default."
-        >
-          <InputNumber
-            min={1}
-            max={10080}
-            style={{ width: '100%', maxWidth: 200 }}
-            placeholder="kein Default"
-          />
-        </Form.Item>
-
-        <Form.Item
-          label="Automatische ETB-Einträge"
-          name="auto_etb_eintraege"
-          valuePropName="checked"
-          tooltip="Meldungen und Aufträge erzeugen automatisch einen verknüpften ETB-Eintrag."
-        >
-          <Switch />
-        </Form.Item>
+          <Form.Item
+            label="Automatische ETB-Einträge"
+            name="auto_etb_eintraege"
+            valuePropName="checked"
+            tooltip="Meldungen und Aufträge erzeugen automatisch einen verknüpften ETB-Eintrag."
+          >
+            <Switch />
+          </Form.Item>
+        </Formularpaneel>
 
         {/* Der Knopf VERSCHWINDET ohne Recht nicht (LFH-345 · C10, M16) — er steht gesperrt
             da, und der Grund steht als `RechteHinweis` im Kopf. Ein fehlender Knopf ist von
@@ -222,35 +223,36 @@ export default function EinsatzDefaults() {
 
       {/* ── Modul-Rollen-Default (Sofort-Speichern, kein Form-Feld) ──────── */}
       <div style={{ marginTop: token.marginXL }}>
-        <SektionHeader
+        <Formularpaneel
           titel="Modul-Rollen-Default"
           beschreibung="Org-weiter Default für die benötigte Rolle je Modul. Kann pro Einsatz überschrieben werden. Änderungen werden sofort gespeichert."
-        />
-      </div>
-      {/* Die Ablehnung der Liste steht BEI der Liste, nicht im Seitenkopf: der Kopf trägt den
+        >
+          {/* Die Ablehnung der Liste steht BEI der Liste, nicht im Seitenkopf: der Kopf trägt den
           Formular-Fehler, und zwei Vorgänge in einem Kasten sagen nicht mehr, welcher gemeint
           ist. Zusammen mit der Zeilenmarke (`fehlerKey`) ergibt das beide Kanäle am selben
           Ort — Text und Rand zeigen auf dieselbe Zeile. */}
-      <div style={{ marginBottom: token.marginSM }}>
-        <SpeicherFehler fehler={modulMutation.error} />
-      </div>
+          <div style={{ marginBottom: token.marginSM }}>
+            <SpeicherFehler fehler={modulMutation.error} />
+          </div>
 
-      <ModulEinstellungsListe
-        rollenSpalte="Benötigte Rolle (Default)"
-        rolleVon={(key) => orgModul[key] ?? ''}
-        aufRolle={(modulKey, val) =>
-          modulMutation.mutate({
-            modulKey,
-            rolle: (val || null) as 'admin' | 'fuehrungskraft' | null,
-          })
-        }
-        darfVerwalten={istAdmin}
-        // Nur die schreibende Zeile ist gesperrt (H15) und nur die gescheiterte markiert
-        // (H14). `variables` traegt die Zeile, die react-query gerade bearbeitet — bzw. die
-        // zuletzt gescheiterte, solange `error` steht.
-        laeuftKey={modulMutation.isPending ? modulMutation.variables.modulKey : null}
-        fehlerKey={modulMutation.isError ? modulMutation.variables.modulKey : null}
-      />
+          <ModulEinstellungsListe
+            rollenSpalte="Benötigte Rolle (Default)"
+            rolleVon={(key) => orgModul[key] ?? ''}
+            aufRolle={(modulKey, val) =>
+              modulMutation.mutate({
+                modulKey,
+                rolle: (val || null) as 'admin' | 'fuehrungskraft' | null,
+              })
+            }
+            darfVerwalten={istAdmin}
+            // Nur die schreibende Zeile ist gesperrt (H15) und nur die gescheiterte markiert
+            // (H14). `variables` traegt die Zeile, die react-query gerade bearbeitet — bzw. die
+            // zuletzt gescheiterte, solange `error` steht.
+            laeuftKey={modulMutation.isPending ? modulMutation.variables.modulKey : null}
+            fehlerKey={modulMutation.isError ? modulMutation.variables.modulKey : null}
+          />
+        </Formularpaneel>
+      </div>
     </AdminPage>
   );
 }

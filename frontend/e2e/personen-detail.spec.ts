@@ -39,7 +39,8 @@ test('Personen: Liste navigiert zur Detail-Vollseite mit zwei Spalten', async ({
 
   // Direkt ins Personen-Modul.
   await page.goto(`/einsaetze/${einsatzId}/personen`);
-  await expect(page.getByRole('heading', { name: /Personen/ })).toBeVisible();
+  // Der Seitentitel heißt seit dem Neuentwurf (S7) „Betroffene"; die Route bleibt `personen`.
+  await expect(page.getByRole('heading', { name: 'Betroffene', exact: true })).toBeVisible();
 
   // Person per Schnellerfassung anlegen (Modal: okText „Erfassen").
   await page.getByRole('button', { name: 'Schnellerfassung' }).click();
@@ -72,5 +73,5 @@ test('Personen: Liste navigiert zur Detail-Vollseite mit zwei Spalten', async ({
   // LFH-340 · C5 entfallen: er stand als siebte gleichrangige Aktion neben dem Breadcrumb,
   // der denselben Weg trägt.
   await page.getByRole('link', { name: 'Personen', exact: true }).click();
-  await expect(page.getByRole('heading', { name: /Personen/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Betroffene', exact: true })).toBeVisible();
 });

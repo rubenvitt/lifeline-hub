@@ -1,8 +1,9 @@
-import { Descriptions, Space, theme } from 'antd';
+import { Space, theme } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
+import { Datenfeld, Datenraster, monoStil } from '../components/instrument';
 import type { Stab } from '../api/types';
 import StatusTag from '../components/StatusTag';
 import { etbPfad } from '../routing/deeplinks';
@@ -31,8 +32,9 @@ function useJetzt(taktMs: number): Dayjs {
  * nur der Wortlaut im `StatusTag`, die Tabelle wird nicht neu aufgebaut. Der Termin kommt aus
  * `StabAnzeige`, nicht aus dem Einsatzkopf — der steht im NICHT_LIVE-Fach (Spec Entsch. 11).
  *
- * `column={1}` fest wie auf allen Detail-Vollseiten des Bestands; `size="small"` ist an einer
- * nicht-interaktiven Fläche ein Abstandsmaß, keine Treffläche.
+ * Neuentwurf: `Datenraster` statt antds `Descriptions` — je Feld eine Augenbraue über dem
+ * Wert, Nummern, Zeiten und die Anzahl in Mono. „Letzte" zieht über die volle Breite, weil sie
+ * Nummer, Zeit, Entschluss und Link in einer Zeile trägt.
  */
 export default function LagebesprechungStand({
   einsatzId,
@@ -47,18 +49,27 @@ export default function LagebesprechungStand({
   const letzte = stab.letzte_lagebesprechung;
 
   return (
-    <Descriptions column={1} size="small" bordered>
-      <Descriptions.Item label="Nächste">
+    <Datenraster spalten={3} beschriftung="Stand der Lagebesprechung">
+      <Datenfeld label="Nächste">
         <Space wrap>
-          {termin && <ZeitAnzeige wert={termin} />}
+          {termin && (
+            <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+              <ZeitAnzeige wert={termin} />
+            </span>
+          )}
           <StatusTag darstellung={lagebesprechungZustand(termin, jetzt)} />
         </Space>
-      </Descriptions.Item>
-      <Descriptions.Item label="Letzte">
+      </Datenfeld>
+      <Datenfeld label="Anzahl" mono>
+        {stab.anzahl_lagebesprechungen}
+      </Datenfeld>
+      <Datenfeld label="Letzte" breit>
         {letzte ? (
           <Space wrap>
-            <span>Nr. {letzte.lfd_nr}</span>
-            <ZeitAnzeige wert={letzte.abgehalten_at} />
+            <span style={monoStil(13)}>Nr. {letzte.lfd_nr}</span>
+            <span style={monoStil(13)}>
+              <ZeitAnzeige wert={letzte.abgehalten_at} />
+            </span>
             <span title={letzte.entschluss}>{kuerzeEntschluss(letzte.entschluss)}</span>
             {/* Handgebautes Bedienziel: ein `<a>` erbt keine Steuerhöhe (LFH-396). */}
             <Link
@@ -72,8 +83,7 @@ export default function LagebesprechungStand({
         ) : (
           'noch keine'
         )}
-      </Descriptions.Item>
-      <Descriptions.Item label="Anzahl">{stab.anzahl_lagebesprechungen}</Descriptions.Item>
-    </Descriptions>
+      </Datenfeld>
+    </Datenraster>
   );
 }

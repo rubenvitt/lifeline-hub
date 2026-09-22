@@ -1,9 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
-import { Alert, App } from 'antd';
+import { Alert, App, Button, Typography } from 'antd';
 import { ApiError } from '../api/client';
 import { SeitenSkeleton } from '../components/SeitenZustand';
+import FensterRahmen from '../components/FensterRahmen';
+import { seitenkopfStil, seitenMetaStil, seitentitelStil } from '../components/EinsatzSeite';
+import { useModusFarben } from '../components/rahmenStil';
+import { useViewport } from '../components/useViewport';
+import { useRollen } from '../components/instrument';
 import { ladeKarteConfig } from '../api/karte';
 import { globalKeys } from '../api/queryKeys';
 import { gefahrenPfad, parsePlatzierenAuftrag, parseRouteId } from '../routing/deeplinks';
@@ -26,7 +31,16 @@ import FachebenenInspector from './lagekarte/FachebenenInspector';
 import ZeichnenSteuerung from './lagekarte/ZeichnenSteuerung';
 import { HistorienBanner } from './lagekarte/HistorienBanner';
 import { SnapshotLeiste } from './lagekarte/SnapshotLeiste';
-import { KartenFuss } from './lagekarte/KartenFuss';
+import { KartenFuss, bandStil } from './lagekarte/KartenFuss';
+import KartenUeberlagerung, { GrundlageLeiste } from './lagekarte/KartenUeberlagerung';
+import { erzeugeZeigerQuelle } from './lagekarte/mausPosition';
+import { startAnsicht } from './lagekarte/startAnsicht';
+import {
+  grundlageAufloesen,
+  grundlageOptionen,
+  grundlageWert,
+  verortetAnzahl,
+} from './lagekarte/leistenDaten';
 import { useLageSnapshots } from './lagekarte/useLageSnapshots';
 import type { Standquelle } from './lagekarte/snapshotDaten';
 
@@ -49,6 +63,20 @@ export function quellenMeldung(quellen: string[]): string {
   return `Lagebild unvollständig: ${kopf} und ${rest === 1 ? 'eine' : rest} weitere`;
 }
 
+/** Breite der rechten Kartenleiste ab `lg` (Neuentwurf S5). */
+export const LEISTE_BREITE = 300;
+
+/**
+ * Meta im Seitenkopf: wie viele Objekte auf der Karte stehen, wie viele noch nicht. Im
+ * Fehlerfall „—" statt einer Zahl — dieselbe Regel wie an den Ebenen-Zählern.
+ */
+export function kopfMeta(verortet: number, nichtVerortet: number, fehler: boolean): string {
+  if (fehler) return '— verortet';
+  return nichtVerortet > 0
+    ? `${verortet} verortet · ${nichtVerortet} nicht verortet`
+    : `${verortet} verortet`;
+}
+
 export default function LagekartePage() {
   const { id } = useParams();
   const einsatzId = Number(id);
@@ -61,6 +89,26 @@ export default function LagekartePage() {
   // Abschnitt-/Zone-Zeichnen abschließen).
   const kartenRef = useRef<KartenHandle>(null);
   const [zeichnenBereit, setZeichnenBereit] = useState(false);
+
+  // Neuentwurf S5: Rahmen, Überlagerungen, rechte Leiste.
+  const { token } = useRollen();
+  const farben = useModusFarben();
+  const { abBreite, istSchmal } = useViewport();
+  const breit = abBreite('lg');
+  // Unter `lg` liegt die Leiste UNTER der Karte und lässt sich ausblenden (die Karte bekommt
+  // dann die ganze Höhe). Ab `lg` steht sie immer rechts daneben. Ohne eigene Wahl ist sie
+  // auf dem Handschirm (< `md`) zu — dort trüge die Karte neben ihr keine 300 px mehr —, auf
+  // dem Tablet offen. `null` = noch keine Wahl; die Vorgabe folgt dann der Breite, auch wenn
+  // die erst nach dem ersten Rendern bekannt ist.
+  const [leisteWahl, setLeisteWahl] = useState<boolean | null>(null);
+  const leisteOffen = leisteWahl ?? !istSchmal;
+  // Zeigerkoordinate: die Karte meldet, nur die Anzeige rendert mit (siehe `mausPosition.ts`).
+  const zeigerQuelle = useMemo(() => erzeugeZeigerQuelle(), []);
+  // Band des Kartenfusses, in das die MapLibre-Maßstabsleiste gehängt wird. State statt Ref,
+  // damit `Kartenflaeche` den Effekt fährt, sobald das Band im Baum steht.
+  const [massstabZiel, setMassstabZiel] = useState<HTMLDivElement | null>(null);
+  // Zeichnen-Knopf über der Karte → Paneel „Zeichnen" der Leiste öffnen (Zähler, s. Sidebar).
+  const [zeichnenAnfrage, setZeichnenAnfrage] = useState(0);
 
   // Karten-Config vorziehen — dieselbe globale Query wie in useLagekarteDaten (react-query
   // dedupliziert), aber hier zuerst, weil useKartenAnsicht sie für die config-validierte
@@ -85,10 +133,12 @@ export default function LagekartePage() {
   // getrennten localStorage-Quellen ab.
   const {
     ansichten,
+    aktiveAnsicht,
     aktiveAnsichtId,
     ansichtenFehler,
     ansichtenFehlerUrsache,
     ansichtenNeuLaden,
+    ansichtenLaden,
     neueAnsicht,
     umbenennen,
     setzeStandard,
@@ -117,6 +167,7 @@ export default function LagekartePage() {
     einsatz,
     darfSchreiben,
     ladt,
+    markerLaden,
     gebiete,
     fehlerhafteQuellen,
     neuLaden,
@@ -127,6 +178,7 @@ export default function LagekartePage() {
     nichtVerortetAlle,
     zonen,
     freieZeichen,
+    rohdaten,
   } = useLagekarteDaten({ einsatzId, zeigeZonen: layer.zone, aktiveAnsichtId, quelle });
 
   const {
@@ -337,6 +389,17 @@ export default function LagekartePage() {
   } = useKartenbilder({ einsatzId, kartenRef, bildPlatzierenId, aktiveAnsichtId, quelle, fehler });
 
   const sichtbareMarker = alleVerortet.filter((m) => layer[m.typ]);
+  // Startausschnitt aus den Daten (Ansichtszentrum → Einsatzort → Objekte); die Karte wendet
+  // ihn genau einmal an. Über ALLE verorteten Objekte, nicht nur die sichtbaren Ebenen: eine
+  // ausgeblendete Ebene ändert nicht, wo der Einsatz liegt.
+  // `undefined`, solange eine Marker-Quelle ODER die Ansichtsliste noch lädt: die Karte
+  // entscheidet erst über das vollständige Bild — die Ansicht steht in der Reihenfolge ganz
+  // vorn, und die Karte wendet den Start nur einmal an.
+  const startOffen = markerLaden || ansichtenLaden;
+  const start = useMemo(
+    () => (startOffen ? undefined : startAnsicht(alleVerortet, aktiveAnsicht)),
+    [startOffen, alleVerortet, aktiveAnsicht],
+  );
   const aktiverMarker = alleVerortet.find((m) => m.schluessel === auswahl) ?? null;
   // Freies taktisches Zeichen zur Marker-Auswahl (LFH-170): der Inspector editiert den ROHEN
   // Record, nicht die gestrippte Marker-tz (sonst verlöre der Editor gestrippte Overlays).
@@ -417,273 +480,427 @@ export default function LagekartePage() {
     return <SeitenSkeleton />;
   }
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 120px)' }}>
-      {/* Warn-Overlay (AK6, LFH-331 · B3): eine Karte ohne Objekt sieht aus wie eine Lage ohne
-          Objekt — der Ausfall einer Domänen-Quelle ist der einzige Fehler dieser Seite, der
-          sich als gültiger Zustand tarnt. Deshalb steht er dauerhaft und namentlich da.
+  const onlineStyles = config?.online_styles ?? [];
+  const quellenFehler = fehlerhafteQuellen.length > 0;
 
-          Form nach `live/LiveStatusBanner`: `banner`-Alert, kein `closable`, KEIN Knopf. Ein
-          Wiederhol-Knopf wäre hier zudem irreführend — er könnte nur EINE der elf Quellen
-          meinen; nachladen tut die Seite ohnehin über den Live-Stream des EinsatzLayouts.
-
-          Er liegt IM Fluss über der ganzen Seite, nicht schwebend über der Karte: der
-          `HistorienBanner` unten belegt bereits `position: absolute; top: 12` in der
-          Kartenspalte, und zwei schwebende Meldungen landen im Historien-Modus mit
-          gescheitertem Dokument übereinander. */}
-      {fehlerhafteQuellen.length > 0 && (
-        <div data-testid="lagebild-unvollstaendig">
-          <Alert
-            type="error"
-            showIcon
-            banner
-            title={quellenMeldung(fehlerhafteQuellen)}
-            /* Zwei Sätze, weil die Lage zweierlei ist: im Live-Betrieb fehlen EINZELNE
-               Quellen und der Rest der Karte stimmt. Scheitert dagegen das Snapshot-
-               Dokument, gibt es keinen Ersatz — die Live-Queries sind im Historien-Modus
-               abgeschaltet, alle Rohlisten bleiben leer. „unvollständig, nicht leer" wäre
-               dort die Unwahrheit, und zwar die gefährliche Richtung. */
-            description={
-              snapshotParam != null
-                ? 'Der gesicherte Stand konnte nicht abgerufen werden — die Karte ist leer, nicht aktuell.'
-                : 'Objekte dieser Quellen fehlen auf der Karte. Der Stand ist unvollständig, nicht leer.'
-            }
+  // „Ausgewählt": die Inspectors, die vorher über der Karte schwebten, stehen jetzt in der
+  // rechten Leiste. Mehrere gleichzeitig (Marker UND Zone) bleiben möglich, wie bisher.
+  const auswahlInhalt =
+    (aktiverMarker && aktiverMarker.typ !== 'freies_zeichen') ||
+    ausgewaehltesZeichen ||
+    fachebeneAuswahl ||
+    ausgewaehlteZone ? (
+      <>
+        {aktiverMarker && aktiverMarker.typ !== 'freies_zeichen' && (
+          <Inspector
+            einsatzId={einsatzId}
+            marker={aktiverMarker}
+            darfSchreiben={!!darfSchreiben}
+            onSchliessen={() => setAuswahl(null)}
+            onVerortungLoeschen={loescheVerortung}
+            onSymbolAendern={aendereSymbol}
+            roh={rohdaten}
           />
+        )}
+        {ausgewaehltesZeichen && (
+          <FreiesZeichenInspector
+            key={ausgewaehltesZeichen.id}
+            zeichen={ausgewaehltesZeichen}
+            darfSchreiben={!!darfSchreiben}
+            onSchliessen={() => setAuswahl(null)}
+            onAendern={(spec) => zeichenAendern(ausgewaehltesZeichen.id, spec)}
+            onLoeschen={() => zeichenLoeschen(ausgewaehltesZeichen.id)}
+            ansichten={ansichten ?? []}
+            onVerschieben={(ansichtId) => zeichenVerschieben(ausgewaehltesZeichen.id, ansichtId)}
+          />
+        )}
+        {fachebeneAuswahl && (
+          <FachebenenInspector
+            quelle={fachebeneAuswahl.quelle}
+            properties={fachebeneAuswahl.properties}
+            geometrie={fachebeneAuswahl.geometrie}
+            onSchliessen={() => setFachebeneAuswahl(null)}
+          />
+        )}
+        {ausgewaehlteZone && (
+          <ZonenInspector
+            zone={ausgewaehlteZone}
+            gebiete={gebiete}
+            darfSchreiben={!!darfSchreiben}
+            onSchliessen={() => setZoneAuswahl(null)}
+            onAendern={(patch) => zoneAendern(ausgewaehlteZone.id, patch)}
+            onMatrixOeffnen={(gid) => navigate(gefahrenPfad(einsatzId, { gefahrengebiet: gid }))}
+            onLoeschen={() => zoneLoeschen(ausgewaehlteZone.id)}
+            ansichten={ansichten ?? []}
+          />
+        )}
+      </>
+    ) : null;
+
+  // Unter `lg`: eine Auswahl holt die ausgeblendete Leiste zurück — sonst wählte man auf der
+  // Karte ein Objekt und sähe nichts davon. Abgeleitet, nicht per Effekt: wird die Auswahl
+  // geschlossen, gilt wieder die eigene Wahl.
+  const leisteSichtbar = breit || leisteOffen || auswahlInhalt != null;
+
+  // Die Kartengrundlage: ab `md` als Segmentleiste über der Karte (Neuentwurf S5). Auf dem
+  // Handschirm bräche die Leiste mit mehreren Online-Stilen in vier Zeilen um und läge über
+  // Knopfblock und Karte — dort steht sie im Paneel „Kartengrundlage" der Leiste.
+  const grundlageWahl = (
+    <GrundlageLeiste
+      einzeilig={!istSchmal}
+      optionen={grundlageOptionen(onlineStyles, !!config?.offline_verfuegbar)}
+      wert={grundlageWert(basemap, onlineStilName, onlineStyles)}
+      onWechsel={(w) => {
+        const { basemap: modus, stilName } = grundlageAufloesen(w);
+        if (stilName) setOnlineStilName(stilName);
+        setBasemap(modus);
+      }}
+    />
+  );
+
+  const kopf = (
+    <div data-lfh="seitenkopf" style={{ ...seitenkopfStil(token, farben, true), marginBottom: 0 }}>
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          columnGap: token.marginXS * 3,
+          rowGap: 2,
+          minWidth: 0,
+        }}
+      >
+        <Typography.Title level={1} style={seitentitelStil(farben)}>
+          Lagekarte
+        </Typography.Title>
+        <span data-lfh="seitenkopf-meta" style={seitenMetaStil(farben)}>
+          {kopfMeta(verortetAnzahl(alleVerortet), nichtVerortetAlle.length, quellenFehler)}
+        </span>
+      </div>
+      {!breit && (
+        <div data-lfh="seitenkopf-aktionen">
+          <Button
+            aria-expanded={leisteSichtbar}
+            aria-controls="lagekarte-leiste"
+            onClick={() => setLeisteWahl(!leisteSichtbar)}
+            disabled={auswahlInhalt != null}
+            title={
+              auswahlInhalt != null ? 'Auswahl schließen, um die Leiste auszublenden' : undefined
+            }
+          >
+            {leisteSichtbar ? 'Leiste ausblenden' : 'Leiste einblenden'}
+          </Button>
         </div>
       )}
-      <div style={{ display: 'flex', flex: 1, minHeight: 0, position: 'relative' }}>
-        <Sidebar
-          einsatzId={einsatzId}
-          nichtVerortet={nichtVerortetAlle}
-          verortet={alleVerortet}
-          darfSchreiben={!!darfSchreiben}
-          platzierungZiel={platzierungZiel}
-          onPlatzierenStart={onPlatzierenStart}
-          onPlatzierenAbbrechen={onPlatzierenAbbrechen}
-          onAbschnittZeichnenStart={onAbschnittZeichnenStart}
-          onZoneZeichnenStart={onZoneZeichnenStart}
-          zeichenPlatzieren={zeichenPlatzieren}
-          onZeichenPlatzierenStart={onZeichenPlatzierenStart}
-          onZeichenPlatzierenAbbrechen={onZeichenPlatzierenAbbrechen}
-          zeichenSerie={zeichenSerie}
-          onZeichenSerieWechsel={setZeichenSerie}
-          zeichenSerieAnzahl={zeichenSerieAnzahl}
-          onZeichenPlatzierenFertig={onZeichenPlatzierenFertig}
-          onKoordinateEingeben={onKoordinateEingeben}
-          einsatzortVerortet={verortet.some((m) => m.typ === 'einsatzort')}
-          onEinsatzortPlatzieren={onEinsatzortPlatzieren}
-          layer={layer}
-          onLayerToggle={(k, an) => setLayer((l) => ({ ...l, [k]: an }))}
-          basemap={basemap}
-          onBasemapWechsel={setBasemap}
-          onMarkerWaehlen={onMarkerWaehlen}
-          onlineVerfuegbar={(config?.online_styles.length ?? 0) > 0}
-          offlineVerfuegbar={!!config?.offline_verfuegbar}
-          onlineStyles={config?.online_styles ?? []}
-          onlineStilName={onlineStilName}
-          onOnlineStilWechsel={setOnlineStilName}
-          kartenTheme={kartenTheme}
-          onKartenThemeWechsel={setKartenTheme}
-          ansichtDirty={dirty}
-          ansichtSpeichert={speichertGerade}
-          onAnsichtSpeichern={onAnsichtSpeichern}
-          fachebenenSichtbar={fachebenenSichtbar}
-          fachebenenStatus={fachebenenStatus}
-          onFachebeneToggle={onFachebeneToggle}
-          zoomZuKlein={zoomZuKlein}
-          fachebenenLaedt={fachebenenLaedt}
-          bilder={bilder}
-          onBildUpload={onBildUpload}
-          onBildToggle={onBildToggle}
-          onBildOpazitaet={onBildOpazitaet}
-          onBildPlatzieren={onBildPlatzieren}
-          onBildPlatzierenFertig={onBildPlatzierenFertig}
-          onBildLoeschen={onBildLoeschen}
-          onBildVerschieben={onBildVerschieben}
-          onBildZentrieren={onBildZentrieren}
-          onBildUmbenennen={onBildUmbenennen}
-          onBildMittelpunkt={onBildMittelpunkt}
-          bildPlatzierenId={bildPlatzierenId}
-          bildPlatzierZentrum={bildPlatzierZentrum}
-          ansichten={ansichten ?? []}
-          aktiveAnsichtId={aktiveAnsichtId}
-          onAnsichtWaehlen={waehleAnsicht}
-          onAnsichtNeu={onAnsichtNeu}
-          onAnsichtUmbenennen={onAnsichtUmbenennen}
-          onAnsichtStandard={onAnsichtStandard}
-          onAnsichtLoeschen={onAnsichtLoeschen}
-          ansichtBusy={ansichtBusy}
-          /* Drei Sektionen, drei Ursachen (LFH-331 · B3). Der Slot an „Nicht verortet" hängt
-             an denselben elf Lagebild-Quellen wie das Overlay oben; er wiederholt deren Namen
-             nicht, sondern trägt den erneuten Abruf — die eine Handlung, die das Overlay
-             bewusst nicht anbietet, weil es für elf Quellen zugleich spricht. */
-          sektionFehler={{
-            nichtVerortet: fehlerhafteQuellen.length
-              ? { text: 'Objektlisten konnten nicht geladen werden', onWiederholen: neuLaden }
-              : undefined,
-            bilder: bilderFehler
-              ? {
-                  text: 'Bild-Hintergründe konnten nicht geladen werden',
-                  ursache: bilderFehlerUrsache,
-                  onWiederholen: bilderNeuLaden,
-                }
-              : undefined,
-            ansichten: ansichtenFehler
-              ? {
-                  text: 'Kartenansichten konnten nicht geladen werden',
-                  ursache: ansichtenFehlerUrsache,
-                  onWiederholen: ansichtenNeuLaden,
-                }
-              : undefined,
+    </div>
+  );
+
+  const karte = (
+    <div
+      data-lfh="kartenspalte"
+      style={{ flex: 1, minWidth: 0, minHeight: 0, position: 'relative' }}
+    >
+      <Kartenflaeche
+        ref={kartenRef}
+        style={style}
+        attribution={attribution}
+        markers={sichtbareMarker}
+        onKarteKlick={onKarteKlick}
+        // LFH-208: Map-Marker-Klick während eines exklusiven Modus (Platzieren/Zeichnen/…)
+        // öffnet kein Panel. Nur der Map-Pfad ist gegatet — die Leisten-Selektion
+        // (onMarkerWaehlen direkt an die Leiste) bleibt frei.
+        onMarkerKlick={(schluessel) => {
+          if (!exklusiverModusAktiv) onMarkerWaehlen(schluessel);
+        }}
+        flyToZiel={flyToZiel}
+        startAnsicht={start}
+        onStyleFehler={onStyleFehler}
+        flaechen={
+          layer.abschnitt
+            ? flaechen.map((f) => ({ id: f.id, label: f.label, polygon: f.polygon }))
+            : []
+        }
+        zeichnen={zeichneAbschnittId != null}
+        onFlaecheGezeichnet={onFlaecheGezeichnet}
+        onFlaecheKlick={onFlaecheKlick}
+        zonen={zonenFeatures}
+        zoneZeichnen={zoneEntwurf ? zoneEntwurf.modus : null}
+        zoneZeichnenNonce={zoneZeichnenNonce}
+        onZoneKlick={onZoneKlick}
+        onZoneGezeichnet={onZoneGezeichnet}
+        onZeichnenBereitAenderung={setZeichnenBereit}
+        fachebenen={aktiveFachebenen}
+        // Der Ausschnitt hängt an JEDER sichtbaren bbox-Ebene, nicht mehr an KRITIS
+        // allein (LFH-81) — sonst bliebe „Energie an, KRITIS aus" dauerhaft leer.
+        onBboxAenderung={
+          braucheViewportBbox(fachebenenSichtbar)
+            ? (b) => setViewportBbox(rasterBbox(b))
+            : undefined
+        }
+        onZoomAenderung={setKartenZoom}
+        onFachebeneKlick={onFachebeneKlick}
+        bilder={bildOverlays}
+        platzierBild={aktivesPlatzierBild}
+        onPlatzierGeometrie={onPlatzierGeometrie}
+        onZeigerLage={zeigerQuelle.melde}
+        massstabZiel={massstabZiel}
+      />
+      <KartenUeberlagerung
+        grundlage={istSchmal ? null : grundlageWahl}
+        zeigerQuelle={zeigerQuelle}
+        onZoomRein={() => kartenRef.current?.zoomRein()}
+        onZoomRaus={() => kartenRef.current?.zoomRaus()}
+        onNorden={() => kartenRef.current?.nachNorden()}
+        onZeichnen={
+          darfSchreiben
+            ? () => {
+                setLeisteWahl(true);
+                setZeichnenAnfrage((n) => n + 1);
+              }
+            : undefined
+        }
+      />
+      {/* Gemeinsamer unterer Rand (LFH-355): Zeichnen-Steuerung, Maßstab und Zeitachse als
+          Flow-Bänder in einer Spalte — zwei Elemente im Fluss können sich nicht überlagern.
+          Die Begründung steht in `lagekarte/KartenFuss.tsx`. */}
+      <KartenFuss>
+        <ZeichnenSteuerung
+          aktiv={zoneEntwurf != null || zoneBestaetigung != null || zeichneAbschnittId != null}
+          titel={
+            zeichneAbschnittId != null
+              ? 'Abschnitt'
+              : `${ZONE_TYPEN.find((t) => t.typ === (zoneBestaetigung?.typ ?? zoneEntwurf?.typ))?.label ?? 'Zone'} · ${
+                  (zoneBestaetigung?.modus ?? zoneEntwurf?.modus) === 'linie' ? 'Linie' : 'Fläche'
+                }`
+          }
+          phase={zoneBestaetigung != null ? 'bestaetigen' : 'zeichnen'}
+          speichernLaeuft={zoneSpeichern}
+          abschliessenMoeglich={zeichnenBereit}
+          onAbschliessen={() => {
+            const abgeschlossen =
+              zeichneAbschnittId != null
+                ? kartenRef.current?.abschnittAbschliessen()
+                : kartenRef.current?.zoneAbschliessen();
+            if (!abgeschlossen) {
+              message.warning(
+                zeichneAbschnittId == null && zoneEntwurf?.modus === 'linie'
+                  ? 'Mindestens 2 verschiedene Punkte für eine Linie'
+                  : 'Mindestens 3 verschiedene Punkte für eine Fläche',
+              );
+            }
+          }}
+          onAbbrechen={onZeichnenAbbrechen}
+          onSpeichern={bestaetigungSpeichern}
+          onVerwerfen={bestaetigungVerwerfen}
+          // Serienmodus nur für Zonen (LFH-332/M76) — eine Abschnittsfläche gehört zu genau
+          // einem Abschnitt, für sie gibt es keine Folge.
+          serie={zeichneAbschnittId != null ? undefined : zoneSerie}
+          onSerieWechsel={zeichneAbschnittId != null ? undefined : setZoneSerie}
+          serieAnzahl={zeichneAbschnittId != null ? undefined : zoneSerieAnzahl}
+          onFertig={zeichneAbschnittId != null ? undefined : onZoneZeichnenFertig}
+        />
+        {/* Maßstab (metrisch): MapLibres `ScaleControl`, von `Kartenflaeche` über seine
+            `IControl`-Schnittstelle in dieses Band gehängt — nicht in MapLibres eigene Ecke,
+            die absolut über dem Fuß läge. */}
+        <div
+          ref={setMassstabZiel}
+          className="lfh-massstab"
+          data-lfh="massstab"
+          // Rein visuell: die Zahl darin schreibt MapLibre bei jeder Bewegung neu, und ein
+          // Vorleser hätte mit „500 m" ohne Bezug nichts gewonnen.
+          aria-hidden="true"
+          style={{
+            ...bandStil('links'),
+            display: 'flex',
+            padding: `${token.paddingXXS}px ${token.paddingXS}px`,
+            background: farben.kopf,
+            border: `1px solid ${farben.linieStark}`,
           }}
         />
-        <div style={{ flex: 1, position: 'relative' }}>
-          <Kartenflaeche
-            ref={kartenRef}
-            style={style}
-            attribution={attribution}
-            markers={sichtbareMarker}
-            onKarteKlick={onKarteKlick}
-            // LFH-208: Map-Marker-Klick während eines exklusiven Modus (Platzieren/Zeichnen/…)
-            // öffnet kein Panel. Nur der Map-Pfad ist gegatet — die Sidebar-Selektion (onMarkerWaehlen
-            // direkt an die Sidebar, s. o.) bleibt frei.
-            onMarkerKlick={(schluessel) => {
-              if (!exklusiverModusAktiv) onMarkerWaehlen(schluessel);
-            }}
-            flyToZiel={flyToZiel}
-            onStyleFehler={onStyleFehler}
-            flaechen={
-              layer.abschnitt
-                ? flaechen.map((f) => ({ id: f.id, label: f.label, polygon: f.polygon }))
-                : []
+        <SnapshotLeiste
+          einsatzId={einsatzId}
+          darfSichern={!!darfSchreiben}
+          aktiverSnapshotId={snapshotParam}
+          onWaehle={waehleSnapshot}
+          fehler={fehler}
+        />
+      </KartenFuss>
+    </div>
+  );
+
+  const leiste = (
+    <aside
+      id="lagekarte-leiste"
+      aria-label="Kartenleiste"
+      style={
+        breit
+          ? {
+              width: LEISTE_BREITE,
+              flex: `0 0 ${LEISTE_BREITE}px`,
+              minHeight: 0,
+              borderInlineStart: `1px solid ${farben.linie}`,
             }
-            zeichnen={zeichneAbschnittId != null}
-            onFlaecheGezeichnet={onFlaecheGezeichnet}
-            onFlaecheKlick={onFlaecheKlick}
-            zonen={zonenFeatures}
-            zoneZeichnen={zoneEntwurf ? zoneEntwurf.modus : null}
-            zoneZeichnenNonce={zoneZeichnenNonce}
-            onZoneKlick={onZoneKlick}
-            onZoneGezeichnet={onZoneGezeichnet}
-            onZeichnenBereitAenderung={setZeichnenBereit}
-            fachebenen={aktiveFachebenen}
-            // Der Ausschnitt hängt an JEDER sichtbaren bbox-Ebene, nicht mehr an KRITIS
-            // allein (LFH-81) — sonst bliebe „Energie an, KRITIS aus" dauerhaft leer.
-            onBboxAenderung={
-              braucheViewportBbox(fachebenenSichtbar)
-                ? (b) => setViewportBbox(rasterBbox(b))
-                : undefined
+          : {
+              // Unter `lg`: unterer Bereich. Höchstens die halbe Fläche — die Karte bleibt
+              // die Hauptsache und auf 390 px bedienbar; die Leiste scrollt in sich.
+              flex: '0 0 45%',
+              minHeight: 0,
+              borderBlockStart: `1px solid ${farben.linie}`,
             }
-            onZoomAenderung={setKartenZoom}
-            onFachebeneKlick={onFachebeneKlick}
-            bilder={bildOverlays}
-            platzierBild={aktivesPlatzierBild}
-            onPlatzierGeometrie={onPlatzierGeometrie}
-          />
-          {aktiverMarker && aktiverMarker.typ !== 'freies_zeichen' && (
-            <Inspector
-              einsatzId={einsatzId}
-              marker={aktiverMarker}
-              darfSchreiben={!!darfSchreiben}
-              onSchliessen={() => setAuswahl(null)}
-              onVerortungLoeschen={loescheVerortung}
-              onSymbolAendern={aendereSymbol}
-            />
-          )}
-          {ausgewaehltesZeichen && (
-            <FreiesZeichenInspector
-              key={ausgewaehltesZeichen.id}
-              zeichen={ausgewaehltesZeichen}
-              darfSchreiben={!!darfSchreiben}
-              onSchliessen={() => setAuswahl(null)}
-              onAendern={(spec) => zeichenAendern(ausgewaehltesZeichen.id, spec)}
-              onLoeschen={() => zeichenLoeschen(ausgewaehltesZeichen.id)}
-              ansichten={ansichten ?? []}
-              onVerschieben={(ansichtId) => zeichenVerschieben(ausgewaehltesZeichen.id, ansichtId)}
-            />
-          )}
-          {fachebeneAuswahl && (
-            <FachebenenInspector
-              quelle={fachebeneAuswahl.quelle}
-              properties={fachebeneAuswahl.properties}
-              geometrie={fachebeneAuswahl.geometrie}
-              onSchliessen={() => setFachebeneAuswahl(null)}
-            />
-          )}
-          {ausgewaehlteZone && (
-            <ZonenInspector
-              zone={ausgewaehlteZone}
-              gebiete={gebiete}
-              darfSchreiben={!!darfSchreiben}
-              onSchliessen={() => setZoneAuswahl(null)}
-              onAendern={(patch) => zoneAendern(ausgewaehlteZone.id, patch)}
-              onMatrixOeffnen={(gid) => navigate(gefahrenPfad(einsatzId, { gefahrengebiet: gid }))}
-              onLoeschen={() => zoneLoeschen(ausgewaehlteZone.id)}
-              ansichten={ansichten ?? []}
-            />
-          )}
-          {snapshotParam != null && (
-            <HistorienBanner
-              standAt={aktiverSnapshot?.stand_at}
-              bezeichnung={aktiverSnapshot?.bezeichnung}
-              onZurueckAktuell={() => waehleSnapshot(null)}
-            />
-          )}
-          {/* Gemeinsamer unterer Rand (LFH-355): Zeichnen-Steuerung ÜBER der Zeitachse,
-              beide als Flow-Bänder in einer Spalte. Vorher lagen sie absolut auf demselben
-              zIndex und die später gerenderte Leiste verdeckte die Steuerung vollständig —
-              „Abschließen"/„Abbrechen" waren im Default-Zustand nicht bedienbar. Die
-              Begründung, warum es ein Rahmen und kein höherer zIndex ist, steht in
-              `lagekarte/KartenFuss.tsx`. */}
-          <KartenFuss>
-            <ZeichnenSteuerung
-              aktiv={zoneEntwurf != null || zoneBestaetigung != null || zeichneAbschnittId != null}
-              titel={
-                zeichneAbschnittId != null
-                  ? 'Abschnitt'
-                  : `${ZONE_TYPEN.find((t) => t.typ === (zoneBestaetigung?.typ ?? zoneEntwurf?.typ))?.label ?? 'Zone'} · ${
-                      (zoneBestaetigung?.modus ?? zoneEntwurf?.modus) === 'linie'
-                        ? 'Linie'
-                        : 'Fläche'
-                    }`
+      }
+    >
+      <Sidebar
+        einsatzId={einsatzId}
+        nichtVerortet={nichtVerortetAlle}
+        verortet={alleVerortet}
+        darfSchreiben={!!darfSchreiben}
+        platzierungZiel={platzierungZiel}
+        onPlatzierenStart={onPlatzierenStart}
+        onPlatzierenAbbrechen={onPlatzierenAbbrechen}
+        onAbschnittZeichnenStart={onAbschnittZeichnenStart}
+        onZoneZeichnenStart={onZoneZeichnenStart}
+        zeichenPlatzieren={zeichenPlatzieren}
+        onZeichenPlatzierenStart={onZeichenPlatzierenStart}
+        onZeichenPlatzierenAbbrechen={onZeichenPlatzierenAbbrechen}
+        zeichenSerie={zeichenSerie}
+        onZeichenSerieWechsel={setZeichenSerie}
+        zeichenSerieAnzahl={zeichenSerieAnzahl}
+        onZeichenPlatzierenFertig={onZeichenPlatzierenFertig}
+        onKoordinateEingeben={onKoordinateEingeben}
+        einsatzortVerortet={verortet.some((m) => m.typ === 'einsatzort')}
+        onEinsatzortPlatzieren={onEinsatzortPlatzieren}
+        layer={layer}
+        onLayerToggle={(k, an) => setLayer((l) => ({ ...l, [k]: an }))}
+        zonenAnzahl={zonen.length}
+        basemap={basemap}
+        grundlageWahl={istSchmal ? grundlageWahl : undefined}
+        onMarkerWaehlen={onMarkerWaehlen}
+        onlineVerfuegbar={onlineStyles.length > 0}
+        offlineVerfuegbar={!!config?.offline_verfuegbar}
+        kartenTheme={kartenTheme}
+        onKartenThemeWechsel={setKartenTheme}
+        ansichtDirty={dirty}
+        ansichtSpeichert={speichertGerade}
+        onAnsichtSpeichern={onAnsichtSpeichern}
+        fachebenenSichtbar={fachebenenSichtbar}
+        fachebenenStatus={fachebenenStatus}
+        onFachebeneToggle={onFachebeneToggle}
+        zoomZuKlein={zoomZuKlein}
+        fachebenenLaedt={fachebenenLaedt}
+        bilder={bilder}
+        onBildUpload={onBildUpload}
+        onBildToggle={onBildToggle}
+        onBildOpazitaet={onBildOpazitaet}
+        onBildPlatzieren={onBildPlatzieren}
+        onBildPlatzierenFertig={onBildPlatzierenFertig}
+        onBildLoeschen={onBildLoeschen}
+        onBildVerschieben={onBildVerschieben}
+        onBildZentrieren={onBildZentrieren}
+        onBildUmbenennen={onBildUmbenennen}
+        onBildMittelpunkt={onBildMittelpunkt}
+        bildPlatzierenId={bildPlatzierenId}
+        bildPlatzierZentrum={bildPlatzierZentrum}
+        ansichten={ansichten ?? []}
+        aktiveAnsichtId={aktiveAnsichtId}
+        onAnsichtWaehlen={waehleAnsicht}
+        onAnsichtNeu={onAnsichtNeu}
+        onAnsichtUmbenennen={onAnsichtUmbenennen}
+        onAnsichtStandard={onAnsichtStandard}
+        onAnsichtLoeschen={onAnsichtLoeschen}
+        ansichtBusy={ansichtBusy}
+        auswahl={auswahlInhalt}
+        zeichnenAnfrage={zeichnenAnfrage}
+        /* Drei Sektionen, drei Ursachen (LFH-331 · B3). Der Slot an „Nicht verortet" hängt
+           an denselben elf Lagebild-Quellen wie das Overlay oben; er wiederholt deren Namen
+           nicht, sondern trägt den erneuten Abruf — die eine Handlung, die das Overlay
+           bewusst nicht anbietet, weil es für elf Quellen zugleich spricht. */
+        sektionFehler={{
+          nichtVerortet: quellenFehler
+            ? { text: 'Objektlisten konnten nicht geladen werden', onWiederholen: neuLaden }
+            : undefined,
+          bilder: bilderFehler
+            ? {
+                text: 'Bild-Hintergründe konnten nicht geladen werden',
+                ursache: bilderFehlerUrsache,
+                onWiederholen: bilderNeuLaden,
               }
-              phase={zoneBestaetigung != null ? 'bestaetigen' : 'zeichnen'}
-              speichernLaeuft={zoneSpeichern}
-              abschliessenMoeglich={zeichnenBereit}
-              onAbschliessen={() => {
-                const abgeschlossen =
-                  zeichneAbschnittId != null
-                    ? kartenRef.current?.abschnittAbschliessen()
-                    : kartenRef.current?.zoneAbschliessen();
-                if (!abgeschlossen) {
-                  message.warning(
-                    zeichneAbschnittId == null && zoneEntwurf?.modus === 'linie'
-                      ? 'Mindestens 2 verschiedene Punkte für eine Linie'
-                      : 'Mindestens 3 verschiedene Punkte für eine Fläche',
-                  );
-                }
-              }}
-              onAbbrechen={onZeichnenAbbrechen}
-              onSpeichern={bestaetigungSpeichern}
-              onVerwerfen={bestaetigungVerwerfen}
-              // Serienmodus nur für Zonen (LFH-332/M76) — eine Abschnittsfläche gehört zu genau
-              // einem Abschnitt, für sie gibt es keine Folge. Ohne onSerieWechsel rendert die
-              // Steuerung im Abschnitt-Fall unverändert.
-              serie={zeichneAbschnittId != null ? undefined : zoneSerie}
-              onSerieWechsel={zeichneAbschnittId != null ? undefined : setZoneSerie}
-              serieAnzahl={zeichneAbschnittId != null ? undefined : zoneSerieAnzahl}
-              onFertig={zeichneAbschnittId != null ? undefined : onZoneZeichnenFertig}
+            : undefined,
+          ansichten: ansichtenFehler
+            ? {
+                text: 'Kartenansichten konnten nicht geladen werden',
+                ursache: ansichtenFehlerUrsache,
+                onWiederholen: ansichtenNeuLaden,
+              }
+            : undefined,
+        }}
+      />
+    </aside>
+  );
+
+  return (
+    // Der Höhenrahmen des Projekts (LFH-459, `FensterRahmen`): die Arbeitsfläche endet am
+    // Fensterrand, gemessen in `dvh` — nicht mehr das frühere `calc(100vh - 120px)` mit einer
+    // geratenen Kopfhöhe. Nicht über `EinsatzSeite.fensterInhalt`: die Karte baut ihren Kopf
+    // selbst (Ansichtswahl im Kopf, keine Seitenebene für „Neue Zeile"), und Karte plus
+    // 300-px-Leiste brauchen die ganze Inhaltsfläche. Kopf und Titel folgen den exportierten
+    // Stilen von `EinsatzSeite`.
+    <FensterRahmen kopf={kopf} mindestHoehe={360}>
+      <div
+        data-lfh="lagekarte-flaeche"
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          // Bis an die Ränder des Inhaltsbereichs, wie die Kopfleiste darüber: die Karte
+          // führt (Neuentwurf S5), eine Rinne um sie wäre toter Rand.
+          height: 'calc(100% + var(--lfh-seiten-polsterung))',
+          marginInline: 'calc(-1 * var(--lfh-seiten-polsterung))',
+          minHeight: 0,
+        }}
+      >
+        {/* Warn-Overlay (AK6, LFH-331 · B3): eine Karte ohne Objekt sieht aus wie eine Lage
+            ohne Objekt — der Ausfall einer Domänen-Quelle ist der einzige Fehler dieser
+            Seite, der sich als gültiger Zustand tarnt. Deshalb steht er dauerhaft und
+            namentlich da: `banner`-Alert, kein `closable`, KEIN Knopf (ein Wiederhol-Knopf
+            könnte nur EINE der elf Quellen meinen). Im Fluss über der Fläche, nicht
+            schwebend: oben auf der Karte liegen die Überlagerungen. */}
+        {quellenFehler && (
+          <div data-testid="lagebild-unvollstaendig">
+            <Alert
+              type="error"
+              showIcon
+              banner
+              title={quellenMeldung(fehlerhafteQuellen)}
+              /* Zwei Sätze, weil die Lage zweierlei ist: im Live-Betrieb fehlen EINZELNE
+                 Quellen und der Rest der Karte stimmt. Scheitert dagegen das Snapshot-
+                 Dokument, gibt es keinen Ersatz — „unvollständig, nicht leer" wäre dort die
+                 Unwahrheit, und zwar die gefährliche Richtung. */
+              description={
+                snapshotParam != null
+                  ? 'Der gesicherte Stand konnte nicht abgerufen werden — die Karte ist leer, nicht aktuell.'
+                  : 'Objekte dieser Quellen fehlen auf der Karte. Der Stand ist unvollständig, nicht leer.'
+              }
             />
-            <SnapshotLeiste
-              einsatzId={einsatzId}
-              darfSichern={!!darfSchreiben}
-              aktiverSnapshotId={snapshotParam}
-              onWaehle={waehleSnapshot}
-              fehler={fehler}
-            />
-          </KartenFuss>
+          </div>
+        )}
+        {snapshotParam != null && (
+          <HistorienBanner
+            standAt={aktiverSnapshot?.stand_at}
+            bezeichnung={aktiverSnapshot?.bezeichnung}
+            onZurueckAktuell={() => waehleSnapshot(null)}
+          />
+        )}
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: breit ? 'row' : 'column',
+            flex: 1,
+            minHeight: 0,
+          }}
+        >
+          {karte}
+          {leisteSichtbar && leiste}
         </div>
       </div>
-    </div>
+    </FensterRahmen>
   );
 }

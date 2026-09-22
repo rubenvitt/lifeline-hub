@@ -1,4 +1,5 @@
-import type { ThemeConfig } from 'antd';
+import { theme as antdTheme, type ThemeConfig } from 'antd';
+import type { MappingAlgorithm } from 'antd';
 
 /** LFH-455: fachliche Sichtungskennzeichnung, bewusst unabhängig von A0-Statusrollen.
  * Die festen Farbfelder behalten auch nachts ihren Farbton (insbesondere schwarz).
@@ -21,6 +22,12 @@ export const sichtungsfarben = {
  * aus C (Radius 0, Umrissrahmen, Kartenraster, DV-102-Dreiecke, Archivo).
  * Begründung und Messwerte: `docs/superpowers/specs/2026-07-25-gestaltungssprache.md`.
  *
+ * NEUENTWURF „INSTRUMENTENTAFEL" (21.09.2026): neutralere, tiefere Nachtpalette,
+ * Nachtbetrieb als Vorgabe, neue Rollen für Rahmen, Paneele, deckende Statusflächen,
+ * ETB-Typfarben und Warnstufen-Balken, dazu eine Schriftskala. Verbindliche Grundlage:
+ * `docs/design/2026-09-21-neuentwurf/umsetzung.md`; Abweichungen stehen mit Messwert an
+ * den Werten (`farbenDunkel`).
+ *
  * DIESE DATEI IST DIE TS-SEITE DER WAHRHEIT. Die CSS-Seite steht in `rollen.css`
  * als statische Custom Properties — nötig, weil handgeschriebenes CSS die
  * antd-Tokens nicht lesen kann, solange `cssVar` aus ist (Weiche vertagt nach
@@ -31,12 +38,18 @@ export const sichtungsfarben = {
  */
 
 /** Farbrollen eines Modus. Namen sind Rollen, nicht Farben — `bedien` bleibt
- *  `bedien`, auch wenn der Wert eines Tages nicht mehr blau ist. */
+ *  `bedien`, auch wenn der Wert eines Tages nicht mehr blau ist.
+ *
+ *  Die Rollen ab `kopf` kamen mit dem Neuentwurf „Instrumententafel" (21.09.2026,
+ *  `docs/design/2026-09-21-neuentwurf/umsetzung.md`) dazu. Jede existiert in BEIDEN
+ *  Modi — was nur nachts gebraucht würde, wäre keine Rolle, sondern eine Ausnahme. */
 export interface Farbrollen {
   grund: string;
   flaeche: string;
   flaeche2: string;
   linie: string;
+  /** Kräftigere Haarlinie: Paneelkanten, Umrandung sekundärer Knöpfe. Seit dem
+   *  Neuentwurf DEKORATIV — der Rahmen eines Steuerelements ist {@link Farbrollen.steuerRahmen}. */
   linieStark: string;
   rasterLinie: string;
   text: string;
@@ -56,18 +69,65 @@ export interface Farbrollen {
   /** Zweite Intensität von `achtung` — Gegenstück zu {@link Farbrollen.alarmFuellungStark}. */
   achtungFuellungStark: string;
   normalFuellung: string;
+
+  // ── Neuentwurf „Instrumententafel" (21.09.2026) ──────────────────────────────
+  /** Kopfbänder IM INHALT: Tabellenkopf, Erfassungsleiste. Die Kommandoleiste und
+   *  die Rail lesen dagegen {@link rahmenFarben} — sie bleiben in beiden Modi dunkel. */
+  kopf: string;
+  /** Modulpanel, Seitenleisten, Kachel-Paneele — eine Stufe über `grund`. */
+  paneel: string;
+  /** Dritte Flächenstufe: aktive Zeile, leere Balkenspur, Zeilentrenner im Paneel. */
+  flaeche3: string;
+  /** Lauftext in Listen — zwischen `text` und `gedaempft`. */
+  text2: string;
+  /** Rahmen eines STEUERELEMENTS (antds `colorBorder`, Eingabefelder). Eigene Rolle,
+   *  weil `linieStark` des Entwurfs WCAG 1.4.11 (≥ 3 : 1) nicht trägt — Messwerte am Wert. */
+  steuerRahmen: string;
+  /** Bedienfarbe unter dem Zeiger (antds `colorPrimaryHover`). */
+  bedienHover: string;
+  /** Text in Bedienfarbe AUF einer getönten Bedienfläche (`bedienFlaeche`, Sammelbanner). */
+  bedienText: string;
+  /** Vordergrund AUF einer satt gefüllten Bedien- oder Alarmfläche (Primär-/Gefahrknopf). */
+  aufBedien: string;
+  /** Text in Normalfarbe — nachts heller als die Füllfarbe `normal`, damit Zahl und Wort lesbar bleiben. */
+  normalText: string;
+  /** Deckende Statusflächen: „Ampel als Fläche, Zahl bleibt lesbar" (Statuszelle/-Chip). */
+  normalFlaeche: string;
+  achtungFlaeche: string;
+  alarmFlaeche: string;
+  bedienFlaeche: string;
+  /** Sammelbanner („12 neue Meldungen"): Grund und Kante. */
+  bannerGrund: string;
+  bannerLinie: string;
+  /** Zeilentönungen der Zeitachse: Berichtigung, Lücke, Problem. */
+  berichtigungZeile: string;
+  lueckeZeile: string;
+  problemZeile: string;
 }
 
+/**
+ * Tagmodus — aus der Nachtpalette ABGELEITET (Entscheidung 1 des Auftraggebers),
+ * neutral-kühle Grautöne statt des früheren Blaugrau. Die Status- und Bedienrollen
+ * (`alarm`/`achtung`/`normal`/`bedien`/`marke`) und die Füllungen behalten ihre
+ * gemessenen LFH-352-Werte; neu gestimmt sind die Flächen- und Textstufen.
+ *
+ * Kontrast (WCAG-Formel, gerechnet 21.09.2026; `grund` · `flaeche`):
+ * text 15,46 · 18,47 — text2 11,00 · 13,13 — gedaempft 7,05 · 8,42 — schwach 5,33 · 6,37
+ * (vorher text 15,18, gedaempft 6,33, schwach 4,88 auf dem alten Grund); steuerRahmen 3,30 · 3,95
+ * (vorher `linieStark` 3,07 auf Weiß); Weiß auf bedien 6,59, auf bedienHover 5,62.
+ * normalText auf normalFlaeche 7,87, achtung/achtungFlaeche 6,02, alarm/alarmFlaeche 5,52,
+ * bedienText auf bedienFlaeche 7,11.
+ */
 export const farbenHell: Farbrollen = {
-  grund: '#e7ebf0',
+  grund: '#e9ebee',
   flaeche: '#ffffff',
-  flaeche2: '#f2f5f8',
-  linie: '#d3dae2',
-  linieStark: '#8c949e',
+  flaeche2: '#f5f6f8',
+  linie: '#d4d8dd',
+  linieStark: '#b9bfc6',
   rasterLinie: 'rgba(26, 95, 160, 0.07)',
-  text: '#10161e',
-  gedaempft: '#4a5563',
-  schwach: '#5a6675',
+  text: '#111418',
+  gedaempft: '#474e57',
+  schwach: '#58606a',
   bedien: '#1a5fa0',
   alarm: '#b02318',
   achtung: '#7a5200',
@@ -79,29 +139,194 @@ export const farbenHell: Farbrollen = {
   achtungFuellung: 'rgba(122, 82, 0, 0.08)',
   achtungFuellungStark: 'rgba(122, 82, 0, 0.2)',
   normalFuellung: 'rgba(28, 102, 64, 0.07)',
+  kopf: '#eef0f2',
+  paneel: '#f4f5f7',
+  flaeche3: '#e1e4e8',
+  text2: '#2b3138',
+  steuerRahmen: '#79818a',
+  bedienHover: '#236aad',
+  bedienText: '#164f86',
+  aufBedien: '#ffffff',
+  normalText: '#155234',
+  normalFlaeche: '#e3f1e8',
+  achtungFlaeche: '#f7efd5',
+  alarmFlaeche: '#f9e3e3',
+  bedienFlaeche: '#e4edf7',
+  bannerGrund: '#e6eef8',
+  bannerLinie: '#9dbbe0',
+  berichtigungZeile: '#fbeaea',
+  lueckeZeile: '#faf3da',
+  problemZeile: '#f8eded',
 };
 
+/**
+ * Nachtbetrieb — die Werte aus den Inline-Styles des Neuentwurfs (Tabelle in
+ * `umsetzung.md`). Seit dem 21.09.2026 die VORGABE (`ThemeModeProvider`).
+ *
+ * Kontrast (WCAG-Formel, gerechnet 21.09.2026; `grund` · `flaeche` · `flaeche2`):
+ * text 16,65 · 15,70 · 15,02 — text2 12,30 · 11,60 · 11,10 — gedaempft 7,71 · 7,27 · 6,96
+ * — bedien 6,19 · 5,84 · 5,58 — alarm 7,18 · 6,77 · 6,48 — achtung 12,45 · 11,75 · 11,24
+ * — normal 8,79 · 8,29 · 7,94 — aufBedien auf bedien 6,19, auf alarm 7,18.
+ * Statusflächen: normalText/normalFlaeche 10,44, achtung/achtungFlaeche 11,18,
+ * alarm/alarmFlaeche 6,89, bedienText/bedienFlaeche 9,65.
+ *
+ * ZWEI BEWUSSTE ABWEICHUNGEN VOM ENTWURF, beide gemessen:
+ *
+ * - `schwach` steht auf `#7d858e` statt `#5f676f`. Der Entwurfswert liegt bei 3,47 : 1 auf
+ *   `grund` und 3,13 : 1 auf `flaeche2` — für eine 10-px-Augenbraue zu wenig (WCAG 1.4.3),
+ *   und die Rolle trägt über antds `colorTextTertiary`/`colorTextDescription` auch echten
+ *   Text (`Typography type="secondary"`, Formularhilfen, `KraefteuebersichtPage`, der
+ *   gesperrte Verwaltungs-Link im Kopf). `#7d858e`: 5,33 auf `grund`, 5,03 auf `flaeche`,
+ *   4,81 auf `flaeche2`, 4,72 auf `flaeche3`, 5,17 auf `rahmenFarben.grund` — mindestens
+ *   der bisherige Stand (alter Wert 4,92 auf der alten `flaeche`). Die Hierarchie zu
+ *   `gedaempft` (7,71) bleibt sichtbar.
+ * - `steuerRahmen` (`#626a73`) trägt antds `colorBorder`, NICHT `linieStark` (`#2e343a`).
+ *   Der Entwurfswert erreicht als Rahmen 1,49 : 1 auf `flaeche` — ein Eingabefeld wäre
+ *   dann nur über seinen Grund zu erkennen. `#626a73`: 3,43 auf `flaeche`, 3,28 auf
+ *   `flaeche2`, 3,21 auf `flaeche3` (WCAG 1.4.11 ≥ 3 : 1; vorher 3,04). `linieStark` bleibt
+ *   als dekorative Linie auf dem Entwurfswert.
+ *
+ * DAZU EINE BENANNTE VERSCHLECHTERUNG, die der Entwurf so will: `marke` ist nachts jetzt
+ * `#a8071a` (vorher `#e04552`) — 2,57 : 1 auf `grund`, 2,42 auf `flaeche`. Als Logo-Quadrat,
+ * Rail-Marke und Akzentstrich trägt das (Dekoration, kein Text). Als TEXTFARBE nicht:
+ * `components/Markdown.css` färbt Links mit `--lfh-marke` — nachts damit unter 3 : 1 und
+ * obendrein rot auf einem Bedienziel. Nachzug außerhalb der Theme-Dateien.
+ */
 export const farbenDunkel: Farbrollen = {
-  grund: '#0b0e13',
-  flaeche: '#161c25',
-  flaeche2: '#1d242f',
-  linie: '#262f3b',
-  linieStark: '#606874',
-  rasterLinie: 'rgba(111, 180, 236, 0.055)',
-  text: '#dee5ec',
-  gedaempft: '#9aa7b6',
-  schwach: '#7d8b9b',
-  bedien: '#6fb4ec',
-  alarm: '#ff7a7f',
-  achtung: '#f5b942',
-  normal: '#5cc48d',
-  marke: '#e04552',
-  markeGlut: '0 0 12px 0 rgba(224, 69, 82, 0.55)',
-  alarmFuellung: 'rgba(255, 122, 127, 0.1)',
-  alarmFuellungStark: 'rgba(255, 122, 127, 0.24)',
-  achtungFuellung: 'rgba(245, 185, 66, 0.1)',
-  achtungFuellungStark: 'rgba(245, 185, 66, 0.24)',
-  normalFuellung: 'rgba(92, 196, 141, 0.1)',
+  grund: '#08090b',
+  flaeche: '#0f1215',
+  flaeche2: '#14171b',
+  linie: '#22262b',
+  linieStark: '#2e343a',
+  rasterLinie: 'rgba(77, 148, 214, 0.055)',
+  text: '#e8ebee',
+  gedaempft: '#9aa2ab',
+  schwach: '#7d858e',
+  bedien: '#4d94d6',
+  alarm: '#ff6b6b',
+  achtung: '#e8cc3a',
+  normal: '#52c41a',
+  marke: '#a8071a',
+  markeGlut: '0 0 12px 0 rgba(168, 7, 26, 0.55)',
+  alarmFuellung: 'rgba(255, 107, 107, 0.1)',
+  alarmFuellungStark: 'rgba(255, 107, 107, 0.24)',
+  achtungFuellung: 'rgba(232, 204, 58, 0.1)',
+  achtungFuellungStark: 'rgba(232, 204, 58, 0.24)',
+  normalFuellung: 'rgba(82, 196, 26, 0.1)',
+  kopf: '#0c0e11',
+  paneel: '#0a0c0e',
+  flaeche3: '#16191d',
+  text2: '#c6ccd2',
+  steuerRahmen: '#626a73',
+  bedienHover: '#7db3e8',
+  bedienText: '#8ec2f0',
+  aufBedien: '#08090b',
+  normalText: '#7ddc4a',
+  normalFlaeche: '#0d1a0a',
+  achtungFlaeche: '#1c1705',
+  alarmFlaeche: '#1c0a0d',
+  bedienFlaeche: '#0d1620',
+  bannerGrund: '#0d1520',
+  bannerLinie: '#1d3a5c',
+  berichtigungZeile: '#160d0f',
+  lueckeZeile: '#161305',
+  problemZeile: '#130f0f',
+};
+
+/**
+ * Der RAHMEN — Kommandoleiste (52 px) und Rail (60 px) — bleibt in BEIDEN Modi dunkel
+ * („chrome stays dark", Neuentwurf). Deshalb eine modusunabhängige Palette statt
+ * weiterer `Farbrollen`: stünde sie dort, müsste der Nachtblock sie wertgleich doppeln,
+ * und genau diese stille Redundanz verbietet `rollen.guard.test.ts`.
+ *
+ * Die Werte ZEIGEN auf die Nachtpalette statt sie zu kopieren — eine Änderung dort zieht
+ * hier mit. Präzedenz: `IconRail.tsx`/`AppLayout.tsx` lesen schon heute `farbenDunkel`
+ * direkt, und `--lfh-kopf-vordergrund` steht aus demselben Grund nur unter `:root`.
+ * Rot ist hier ausschließlich `marke` (2-px-Marke der aktiven Rail-Kategorie).
+ */
+export const rahmenFarben = {
+  grund: farbenDunkel.kopf,
+  /** Aktive Rail-Kategorie. */
+  aktiv: farbenDunkel.flaeche3,
+  /** Suchfeld in der Kommandoleiste. */
+  feld: farbenDunkel.flaeche2,
+  linie: farbenDunkel.linie,
+  text: farbenDunkel.text,
+  gedaempft: farbenDunkel.gedaempft,
+  schwach: farbenDunkel.schwach,
+  marke: farbenDunkel.marke,
+} as const;
+
+/**
+ * ETB-Typfarben (Entscheidung 2 des Auftraggebers): Meldung blau, Anordnung orange,
+ * Entscheidung violett, Lage cyan, Berichtigung rot, System neutral — als farbige
+ * KANTE (2 px) plus TYPWORT in Typfarbe, nicht als Etikett.
+ *
+ * Zwei Werte je Typ, weil eine Kante und ein Wort verschiedene Böden haben: die Kante
+ * ist Dekoration neben dem Typwort (zweiter Kanal), das Wort ist Text. Nachts trägt die
+ * Kante den Entwurfswert; das Wort ist aufgehellt, wo der Entwurfston als Text zu schwach
+ * wäre (auf `flaeche2`: Meldung 4,38 → 6,61, Anordnung 5,06 → 6,69, Entscheidung
+ * 2,59 → 5,90, Berichtigung 3,23 → 6,48). Im Tagmodus sind die Wörter ≥ 7 : 1 auf Weiß und
+ * ≥ 5,9 auf `grund`; die Kanten ≥ 3 : 1 auf `grund`. Nachts liegt die Entscheidungskante
+ * bei 2,87 : 1 auf `grund` — Entwurfswert, das Typwort daneben trägt die Aussage.
+ *
+ * `system` ist neutral und zeigt auf die Textstufen — kein eigener Farbton.
+ * Gleiche Hexwerte wie andere Paletten (Meldung = `sichtungsfarben.blau`, Berichtigung =
+ * Warnstufe hoch) sind Zufall des Entwurfs, keine Kopplung.
+ */
+export type EtbTypTon =
+  'meldung' | 'anordnung' | 'entscheidung' | 'lage' | 'berichtigung' | 'system';
+
+export interface EtbTypFarbe {
+  /** Die 2-px-Typkante. */
+  kante: string;
+  /** Das Typwort (Mono, Versalien). */
+  wort: string;
+}
+
+export const etbTypFarbenDunkel: Record<EtbTypTon, EtbTypFarbe> = {
+  meldung: { kante: '#1677ff', wort: '#5c9dff' },
+  anordnung: { kante: '#d46b08', wort: '#e8852a' },
+  entscheidung: { kante: '#722ed1', wort: '#a57ff0' },
+  lage: { kante: '#13c2c2', wort: '#13c2c2' },
+  berichtigung: { kante: '#cf1322', wort: farbenDunkel.alarm },
+  system: { kante: farbenDunkel.schwach, wort: farbenDunkel.gedaempft },
+};
+
+export const etbTypFarbenHell: Record<EtbTypTon, EtbTypFarbe> = {
+  meldung: { kante: '#1677ff', wort: '#0a47a6' },
+  anordnung: { kante: '#b35600', wort: '#8a3f00' },
+  entscheidung: { kante: '#722ed1', wort: '#5b1fae' },
+  lage: { kante: '#0e8c90', wort: '#006266' },
+  berichtigung: { kante: '#cf1322', wort: '#a8071a' },
+  system: { kante: farbenHell.schwach, wort: farbenHell.gedaempft },
+};
+
+/**
+ * Warnstufen-Balken der Gefahrenmatrix (Neuentwurf S3). Eine BALKENFARBE, keine Fläche —
+ * die Flächen-Lesart bleibt {@link Farbrollen.alarmFuellung} & Co. (LFH-368). `keine` hat
+ * keinen Balken. Der zweite Kanal ist Pflicht und liegt beim Konsumenten (Wort/Kürzel).
+ *
+ * Nachts die Entwurfswerte. `akut` (#a8071a, = `marke`) liegt dort bei 2,57 : 1 auf
+ * `grund` und damit UNTER `hoch` (3,58) — das ist der Entwurf (Marke = akut), der Balken
+ * ist Dekoration neben Wort/Kürzel, kein alleiniger Informationsträger. Im Tagmodus sind
+ * `niedrig`/`mittel` abgedunkelt (3,20 bzw. 4,14 auf `grund`), damit der Balken auf
+ * hellem Grund nicht verschwindet.
+ */
+export type WarnstufeBalken = 'niedrig' | 'mittel' | 'hoch' | 'akut';
+
+export const warnstufeFarbenDunkel: Record<WarnstufeBalken, string> = {
+  niedrig: '#d4b106',
+  mittel: '#d46b08',
+  hoch: '#cf1322',
+  akut: '#a8071a',
+};
+
+export const warnstufeFarbenHell: Record<WarnstufeBalken, string> = {
+  niedrig: '#9e7f00',
+  mittel: '#b35600',
+  hoch: '#cf1322',
+  akut: '#a8071a',
 };
 
 /** Abstandsraster einer Dichtestufe. Komponenten importieren diese Werte, statt
@@ -202,10 +427,12 @@ export const abstand: Abstandsraster = dichten.kompakt.abstand;
  * einer Ladefläche.
  */
 export const flaeche = {
-  /** Lesebreite einer Formularseite (heute `AdminPage`-Default). */
+  /**
+   * Lesebreite einer reinen Formular-/Editorseite (`breite="schmal"` an `EinsatzSeite` und
+   * `AdminPage`). Die frühere Listenbreite `seiteBreit` (960) ist mit dem Neuentwurf
+   * entfallen: Listen, Übersichten und Zeitachsen füllen die ganze Inhaltsbreite.
+   */
   seiteSchmal: 900,
-  /** Lesebreite einer Listenseite (heute `EinsaetzePage`). */
-  seiteBreit: 960,
   /** Abstand über einem Lade-/Fehlerzustand, damit er nicht am Kopf klebt. */
   zustandOben: 80,
   /** Mindestbreite einer Kachel im Kartenraster. */
@@ -276,6 +503,104 @@ export const schrift = {
   zahl: "'LFH JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace",
 } as const;
 
+/** Die Schriftfamilie einer Stufe — ein Schlüssel in {@link schrift}, kein Familienname. */
+export type Schriftfamilie = keyof typeof schrift;
+
+export interface Schriftstufe {
+  /** px */
+  groesse: number;
+  gewicht: 400 | 500 | 600 | 700;
+  familie: Schriftfamilie;
+  /** `letter-spacing` als CSS-Wert. Nur wo der Entwurf ihn setzt. */
+  sperrung?: string;
+  /** Versalien (`text-transform: uppercase`). */
+  versal?: boolean;
+}
+
+/**
+ * Schriftskala des Neuentwurfs („Kontrastsprung statt Abstufung", `umsetzung.md`
+ * § Form & Typografie; Einzelwerte aus den Inline-Styles von `neuentwurf.dc.html` und
+ * `shell.dc.html`).
+ *
+ * Sie ergänzt die Dichte-Achse, sie ersetzt sie nicht: antds Grundschrift (`fontSize`)
+ * bleibt `dichten[…].schriftgroesse` (13,5 / 15 / 15) — die Skala benennt die STUFEN
+ * darüber und daneben, die handgebaute Bausteine setzen. Zahlen, Zeiten, Funkrufnamen,
+ * Koordinaten und Nummern laufen immer in `zahl` (Mono, `tabular-nums`).
+ *
+ * CSS-Seite: `--lfh-typo-<stufe>-{groesse,gewicht,sperrung}` in `rollen.css`,
+ * deckungsgleich gehalten von `rollen.guard.test.ts`. Die Familie steht dort nicht noch
+ * einmal — sie ist `--lfh-schrift-<familie>`.
+ */
+export const schriftskala = {
+  /** Große Überschrift (Einstiegsflächen). */
+  ueberschrift: { groesse: 30, gewicht: 600, familie: 'text', sperrung: '-0.02em' },
+  /** Seitenkopf: Titel 14/600. */
+  seitentitel: { groesse: 14, gewicht: 600, familie: 'text' },
+  /** Lauftext-Grundmaß des Entwurfs. */
+  text: { groesse: 14, gewicht: 400, familie: 'text' },
+  /** Dichter Lauftext in Listen und Paneelen. */
+  textKlein: { groesse: 12, gewicht: 400, familie: 'text' },
+  /** Augenbraue: 10 px, 600, Versalien, Sperrung .14em, Farbe `schwach`. */
+  augenbraue: { groesse: 10, gewicht: 600, familie: 'text', sperrung: '0.14em', versal: true },
+  /** Etikett unter der Rail-Ikone: 9 px Versalien. */
+  railEtikett: { groesse: 9, gewicht: 500, familie: 'text', sperrung: '0.06em', versal: true },
+  /** Mono-Meta: Zeiten, Nummern, Zähler neben Text. */
+  meta: { groesse: 11, gewicht: 400, familie: 'zahl' },
+  /** Datenwert in Paneelzeilen und Kennzahlenbändern. */
+  datenwertKlein: { groesse: 22, gewicht: 500, familie: 'zahl', sperrung: '-0.02em' },
+  /** Datenwert einer Kennzahl-Kachel. */
+  datenwert: { groesse: 32, gewicht: 500, familie: 'zahl', sperrung: '-0.02em' },
+  /** Führende Kennzahl („Zahl führt"). */
+  datenwertGross: { groesse: 40, gewicht: 500, familie: 'zahl', sperrung: '-0.02em' },
+} as const satisfies Record<string, Schriftstufe>;
+
+export type Schriftstufenname = keyof typeof schriftskala;
+
+/**
+ * Der antd-Algorithmus eines Modus.
+ *
+ * Nachts läuft zuerst antds `darkAlgorithm` — er leitet die abgeleiteten Töne (Hover-,
+ * Aktiv-, Füll- und Randstufen) für dunklen Grund ab — und danach {@link seedTreu}. Der
+ * Grund, gemessen am 21.09.2026: `darkAlgorithm` rechnet die SEED-Farben selbst um, und
+ * die sind über `token` nicht zu überschreiben (antd löscht Seed-Schlüssel aus dem
+ * Override, `theme/util/alias.js`). Aus `bedien` #4d94d6 wurde `colorPrimary` #4481b9,
+ * aus `alarm` #ff6b6b #dc5e5e, aus `normal` #52c41a #49aa19 — die antd-Fläche trug damit
+ * eine andere Farbe als `rollen.css` daneben, und der Primärknopf verfehlte den
+ * Entwurfswert (#4d94d6, Text #08090b). {@link seedTreu} setzt die fünf Signalfarben auf
+ * den Seed zurück; alles andere bleibt die Ableitung des Dunkel-Algorithmus.
+ */
+export function antdAlgorithmus(dunkel: boolean): MappingAlgorithm | MappingAlgorithm[] {
+  return dunkel ? [antdTheme.darkAlgorithm, seedTreu] : antdTheme.defaultAlgorithm;
+}
+
+/** Zweite Stufe des Nacht-Algorithmus: die Signalfarben tragen genau ihren Rollenwert. */
+export const seedTreu: MappingAlgorithm = (seed, abgeleitet) => ({
+  ...(abgeleitet ?? antdTheme.darkAlgorithm(seed)),
+  colorPrimary: seed.colorPrimary,
+  colorInfo: seed.colorInfo,
+  colorError: seed.colorError,
+  colorWarning: seed.colorWarning,
+  colorSuccess: seed.colorSuccess,
+});
+
+/**
+ * Komponenten-Tokens, die aus den Rollen folgen.
+ *
+ * `aufBedien` gehört an den KNOPF, nicht an antds `colorTextLightSolid`: dieser globale
+ * Token färbt auch Tooltip (auf `colorBgSpotlight`), Avatar, Badge, Bildvorschau-Maske,
+ * die Layout-Kopfzeile und rund fünfzehn weitere Stellen (gezählt in
+ * `antd/es/…/style`). #08090b dort wäre nachts dunkel auf dunkel. Am Knopf: #08090b auf
+ * `bedien` 6,19 : 1, auf `alarm` 7,18 : 1; Weiß auf `bedien` hätte nur 3,22.
+ */
+export function antdKomponenten(farben: Farbrollen): NonNullable<ThemeConfig['components']> {
+  return {
+    Button: {
+      primaryColor: farben.aufBedien,
+      dangerColor: farben.aufBedien,
+    },
+  };
+}
+
 /**
  * Leitet die antd-Tokens aus den Rollen ab — eine Richtung, keine zweite Liste.
  * Was antd nicht kennt (Marke, Kartenraster, Versal-Sperrung), lebt allein in
@@ -285,6 +610,7 @@ export function antdToken(farben: Farbrollen, dichte: Dichte = 'kompakt'): Theme
   const stufe = dichten[dichte];
   return {
     colorPrimary: farben.bedien,
+    colorPrimaryHover: farben.bedienHover,
     colorError: farben.alarm,
     colorWarning: farben.achtung,
     colorSuccess: farben.normal,
@@ -298,7 +624,8 @@ export function antdToken(farben: Farbrollen, dichte: Dichte = 'kompakt'): Theme
     colorTextSecondary: farben.gedaempft,
     colorTextTertiary: farben.schwach,
 
-    colorBorder: farben.linieStark,
+    // Der Rahmen eines Steuerelements, nicht die dekorative Linie (Messwerte bei `farbenDunkel`).
+    colorBorder: farben.steuerRahmen,
     colorBorderSecondary: farben.linie,
 
     borderRadius: form.radiusFlaeche,
@@ -307,6 +634,9 @@ export function antdToken(farben: Farbrollen, dichte: Dichte = 'kompakt'): Theme
 
     fontFamily: schrift.text,
     fontFamilyCode: schrift.zahl,
+    // Halbfett ist 600, seit Archivo 600 lokal ausgeliefert wird (Neuentwurf) — vorher
+    // fiel antds `strong` auf den nächsten verfügbaren Schnitt.
+    fontWeightStrong: 600,
     fontSize: stufe.schriftgroesse,
 
     // Dichte aus der gewählten Stufe. `controlHeight` trägt sie für alle

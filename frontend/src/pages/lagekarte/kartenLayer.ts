@@ -7,6 +7,7 @@ import type { FachebeneDef } from './fachebenen';
 import type { FeatureCollection } from '../../api/fachebenen';
 import { synchronisiereBildLayer, type BildOverlay } from './bildLayer';
 import { reAnlegenMarker, type MarkerFeatureCollection } from './markerLayer';
+import { farbenDunkel, type Farbrollen } from '../../theme/tokens';
 
 export type { BildOverlay };
 
@@ -29,6 +30,91 @@ export interface ZoneFeature {
   geometrie: GeoJsonGeometry;
   label: string | null;
   stil: ZoneStil;
+  /** Gefahrenzone: Umriss gestrichelt (Neuentwurf S5). Nur Darstellung, keine Geometrie. */
+  gestrichelt?: boolean;
+  /** Farben der Beschriftungsplakette aus den Rollen des aktiven Modus. Ohne Angabe: Nacht. */
+  plakette?: ZonenPlakette;
+}
+
+/**
+ * Beschriftung einer Zone im Entwurfsstil (Neuentwurf S5): dunkle Plakette mit Rahmen
+ * `linieStark`, Text in `text`. Die Werte sind AUFGELÖSTE Rollen — MapLibre-`paint` kennt
+ * weder `var(--lfh-*)` noch antd-Token, deshalb reicht `useLagekarteDaten` sie durch, wie
+ * es den Token für die Zonenfarben schon tut.
+ */
+export interface ZonenPlakette {
+  text: string;
+  grund: string;
+  rahmen: string;
+}
+
+/** Plakette aus einem Rollensatz — rein, damit die Rollenwahl ohne Karte prüfbar ist. */
+export function zonenPlakette(rollen: Pick<Farbrollen, 'text' | 'paneel' | 'linieStark'>) {
+  return { text: rollen.text, grund: rollen.paneel, rahmen: rollen.linieStark };
+}
+
+/** Präfix der Plakettenbilder; `styleimagemissing` in `Kartenflaeche.tsx` erkennt es daran. */
+export const PLAKETTE_PRAEFIX = 'plakette|';
+
+/** Bild-Id einer Plakette: die Farben stehen IN der Id, damit der Handler sie nach einem
+ *  `setStyle` (der alle Bilder wegwischt) ohne weiteren Zustand neu zeichnen kann. */
+export function plakettenBildId(p: Pick<ZonenPlakette, 'grund' | 'rahmen'>): string {
+  return `${PLAKETTE_PRAEFIX}${p.grund}|${p.rahmen}`;
+}
+
+/** `#rrggbb` → [r, g, b]; alles andere → null (dann gibt es keine Plakette, nur Text). */
+function hexZuRgb(hex: string): [number, number, number] | null {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return null;
+  const n = Number.parseInt(m[1], 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+/** Kantenlänge des Plakettenbilds; 1 px Rahmen, der Rest dehnbar (9-Slice). */
+const PLAKETTE_KANTE = 8;
+
+/**
+ * Das Plakettenbild als Pixeldaten für `map.addImage` — ein 9-Slice aus 1 px Rahmen und
+ * dehnbarem Innenraum, das `icon-text-fit` um den Text legt. Rein und exportiert: die
+ * Karte selbst läuft in jsdom nicht, die Pixel schon. `null` für eine fremde oder
+ * unlesbare Id — der Aufrufer legt dann kein Bild an, und die Beschriftung steht ohne
+ * Plakette da, statt dass ein Fehler aus dem MapLibre-Callback fliegt.
+ */
+export function plakettenBild(id: string): {
+  width: number;
+  height: number;
+  data: Uint8Array;
+  stretchX: [number, number][];
+  stretchY: [number, number][];
+  content: [number, number, number, number];
+} | null {
+  if (!id.startsWith(PLAKETTE_PRAEFIX)) return null;
+  const [grundHex, rahmenHex] = id.slice(PLAKETTE_PRAEFIX.length).split('|');
+  const grund = hexZuRgb(grundHex ?? '');
+  const rahmen = hexZuRgb(rahmenHex ?? '');
+  if (!grund || !rahmen) return null;
+  const k = PLAKETTE_KANTE;
+  const data = new Uint8Array(k * k * 4);
+  for (let y = 0; y < k; y++) {
+    for (let x = 0; x < k; x++) {
+      const rand = x === 0 || y === 0 || x === k - 1 || y === k - 1;
+      const [r, g, b] = rand ? rahmen : grund;
+      const i = (y * k + x) * 4;
+      data[i] = r;
+      data[i + 1] = g;
+      data[i + 2] = b;
+      // Der Grund deckt nicht ganz (Entwurf: `rgba(12,14,17,.92)`), der Rahmen schon.
+      data[i + 3] = rand ? 255 : 235;
+    }
+  }
+  return {
+    width: k,
+    height: k,
+    data,
+    stretchX: [[1, k - 1]],
+    stretchY: [[1, k - 1]],
+    content: [1, 1, k - 1, k - 1],
+  };
 }
 
 export type FlaechenFeatureCollection = {
@@ -53,6 +139,9 @@ export type ZonenFeatureCollection = {
       fillOpacity: number;
       lineColor: string;
       lineWidth: number;
+      gestrichelt: boolean;
+      textFarbe: string;
+      plakette: string;
     };
     geometry: GeoJsonGeometry;
   }>;
@@ -75,19 +164,25 @@ export function baueFlaechenFc(
 export function baueZonenFc(zonen: ZoneFeature[] | undefined): ZonenFeatureCollection {
   return {
     type: 'FeatureCollection',
-    features: (zonen ?? []).map((z) => ({
-      type: 'Feature',
-      id: z.id,
-      properties: {
+    features: (zonen ?? []).map((z) => {
+      const plakette = z.plakette ?? zonenPlakette(farbenDunkel);
+      return {
+        type: 'Feature' as const,
         id: z.id,
-        label: z.label ?? '',
-        fillColor: z.stil.fillColor,
-        fillOpacity: z.stil.fillOpacity,
-        lineColor: z.stil.lineColor,
-        lineWidth: z.stil.lineWidth,
-      },
-      geometry: z.geometrie,
-    })),
+        properties: {
+          id: z.id,
+          label: z.label ?? '',
+          fillColor: z.stil.fillColor,
+          fillOpacity: z.stil.fillOpacity,
+          lineColor: z.stil.lineColor,
+          lineWidth: z.stil.lineWidth,
+          gestrichelt: z.gestrichelt ?? false,
+          textFarbe: plakette.text,
+          plakette: plakettenBildId(plakette),
+        },
+        geometry: z.geometrie,
+      };
+    }),
   };
 }
 
@@ -128,21 +223,54 @@ export function sorgeFuerZonenLayer(map: MapLibreMap, daten: ZonenFeatureCollect
       paint: { 'fill-color': ['get', 'fillColor'], 'fill-opacity': ['get', 'fillOpacity'] },
     });
   }
+  // Durchgezogen und gestrichelt als ZWEI gefilterte Layer statt eines datengetriebenen
+  // `line-dasharray`: Arrays lassen sich nicht aus Feature-Properties lesen, und ein Layer,
+  // den MapLibre bei der Validierung ablehnt, fehlt STILL — die Zonen stünden ohne Umriss da.
+  // Der Klick-Handler hängt an `zonen-line`: gestrichelt sind nur Gefahrengebiete, und die
+  // sind Flächen, die über `zonen-fill` angeklickt werden.
   if (!map.getLayer('zonen-line')) {
     map.addLayer({
       id: 'zonen-line',
       type: 'line',
       source: 'zonen',
+      filter: ['!=', ['get', 'gestrichelt'], true],
       paint: { 'line-color': ['get', 'lineColor'], 'line-width': ['get', 'lineWidth'] },
     });
   }
+  if (!map.getLayer('zonen-line-gestrichelt')) {
+    map.addLayer({
+      id: 'zonen-line-gestrichelt',
+      type: 'line',
+      source: 'zonen',
+      filter: ['==', ['get', 'gestrichelt'], true],
+      paint: {
+        'line-color': ['get', 'lineColor'],
+        'line-width': ['get', 'lineWidth'],
+        'line-dasharray': [3, 2],
+      },
+    });
+  }
+  // Beschriftung im Entwurfsstil: Plakette (9-Slice-Bild, `icon-text-fit`) statt Halo,
+  // Versalien per `text-transform` — der Text selbst bleibt, wie `zonenBeschriftung` ihn
+  // baut. Die Schrift bleibt die Vorgabe des Styles: eine Mono-Familie, die der
+  // Glyphen-Server nicht führt, liesse die Beschriftung ganz verschwinden.
   if (!map.getLayer('zonen-label')) {
     map.addLayer({
       id: 'zonen-label',
       type: 'symbol',
       source: 'zonen',
-      layout: { 'text-field': ['get', 'label'], 'text-size': 12, 'symbol-placement': 'point' },
-      paint: { 'text-color': '#1f1f1f', 'text-halo-color': '#fff', 'text-halo-width': 1.5 },
+      filter: ['!=', ['get', 'label'], ''],
+      layout: {
+        'text-field': ['get', 'label'],
+        'text-size': 10,
+        'text-transform': 'uppercase',
+        'text-letter-spacing': 0.06,
+        'symbol-placement': 'point',
+        'icon-image': ['get', 'plakette'],
+        'icon-text-fit': 'both',
+        'icon-text-fit-padding': [3, 6, 3, 6],
+      },
+      paint: { 'text-color': ['get', 'textFarbe'] },
     });
   }
 }

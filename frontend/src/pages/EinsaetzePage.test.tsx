@@ -586,6 +586,45 @@ describe('Einsatzkarte — Lagebild statt vier Felder (LFH-336 · M4/M5)', () =>
     await nutzer.keyboard('{Enter}');
     expect(await screen.findByText('EINSATZ-DETAIL')).toBeInTheDocument();
   });
+
+  // Neuentwurf „Instrumententafel": die Kachel ist keine antd-Card mehr, sondern eine
+  // Fläche mit Status-Punkt und Mono-Zeile. Geprüft wird, was sie TRÄGT, nicht die Optik.
+  it('zeigt die Einsatznummer in Mono, wenn es eine gibt — und erfindet sonst keine', async () => {
+    mockEinsaetze([
+      e({ id: 1, bezeichnung: 'Mit Nummer', einsatznummer_intern: 'E-2026-014' }),
+      e({ id: 2, bezeichnung: 'Ohne Nummer', einsatznummer_intern: null, leitstellen_nr: null }),
+    ]);
+    const { container } = render();
+    await screen.findByText('Mit Nummer');
+    const nummern = container.querySelectorAll<HTMLElement>('[data-lfh="einsatznummer"]');
+    expect(nummern).toHaveLength(1);
+    expect(nummern[0]).toHaveTextContent('E-2026-014');
+    expect(nummern[0].closest('span[style*="JetBrains"]')).not.toBeNull();
+  });
+
+  it('der Status-Punkt ist Dekoration, das Wort trägt die Aussage', async () => {
+    mockEinsaetze([e({})]);
+    const { container } = render();
+    await screen.findByText('Hochwasser Musterstadt');
+    const punkt = container.querySelector('[data-lfh="status-punkt"]');
+    expect(punkt).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByText('Aktiv')).toBeInTheDocument();
+  });
+
+  it('abgeschlossene Kacheln sind gedämpft über die Klasse, nicht über Deckkraft', async () => {
+    mockEinsaetze([e({ id: 9, bezeichnung: 'Vorbei', status: 'abgeschlossen' })]);
+    const { container } = render();
+    await screen.findByText('Vorbei');
+    const kachel = container.querySelector<HTMLElement>('[data-lfh="einsatzkachel"]')!;
+    expect(kachel).toHaveClass('lfh-einsatzkachel--abgeschlossen');
+    expect(kachel.style.opacity).toBe('');
+  });
+
+  it('der Seitenkopf nennt beide Mengen in Mono-Meta', async () => {
+    mockEinsaetze([e({ id: 1 }), e({ id: 2, bezeichnung: 'Alt', status: 'abgeschlossen' })]);
+    render();
+    expect(await screen.findByText('1 aktiv · 1 abgeschlossen')).toBeInTheDocument();
+  });
 });
 
 /**

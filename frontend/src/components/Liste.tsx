@@ -3,6 +3,7 @@ import { createContext, useContext } from 'react';
 import type { CSSProperties, Key, ReactNode } from 'react';
 import { KlickbareZeile } from './Klickbar';
 import { SeitenLeer } from './SeitenZustand';
+import { useRollen } from './instrument/rollenwerte';
 
 /**
  * Schlanker, nicht-deprecated Ersatz für antd `<List>` (LFH-167).
@@ -24,6 +25,12 @@ import { SeitenLeer } from './SeitenZustand';
  * `paddingContentVerticalSM`/`paddingXS` ← `sizeXS`. Unter dem antd-Standardtheme sind die
  * Werte damit unverändert (16/24/12/8), unter `kompakt` fallen sie auf 11/18/7/3 und ziehen
  * bei einer Dichteumschaltung (B5) mit. Gepinnt in `Liste.test.tsx`.
+ *
+ * **Optik des Neuentwurfs „Instrumententafel" (21.09.2026).** Karten ohne Schatten und
+ * ohne Rundung; die umrandete Liste steht auf `flaeche` mit Rahmen `linie` (die dekorative
+ * Haarlinie, nicht antds Steuerrahmen `colorBorder`), die Zeilen trennt `flaeche3` — der
+ * Paneel-Trenner des Entwurfs (`#16191d`). Die Rollen kommen über
+ * `instrument/rollenwerte.ts` aus der Palette des aktiven Modus; antd kennt `flaeche3` nicht.
  */
 
 const { useToken } = theme;
@@ -64,13 +71,14 @@ export function Liste<T>({
   style,
   className,
 }: ListeProps<T>) {
-  const { token } = useToken();
+  const { token, rollen } = useRollen();
 
   const containerStyle: CSSProperties = {
     ...(bordered
       ? {
-          border: `1px solid ${token.colorBorder}`,
-          borderRadius: token.borderRadiusLG,
+          border: `1px solid ${rollen.linie}`,
+          borderRadius: 0,
+          background: rollen.flaeche,
         }
       : {}),
     ...style,
@@ -115,7 +123,7 @@ export function Liste<T>({
         {dataSource.map((item, index) => (
           <li
             key={rowKey(item, index)}
-            style={index > 0 ? { borderBlockStart: `1px solid ${token.colorSplit}` } : undefined}
+            style={index > 0 ? { borderBlockStart: `1px solid ${rollen.flaeche3}` } : undefined}
           >
             {renderItem(item, index)}
           </li>
@@ -130,7 +138,7 @@ export function Liste<T>({
           <div
             style={{
               padding: `${token.paddingSM}px ${headerPaddingInline}px`,
-              borderBlockEnd: `1px solid ${token.colorSplit}`,
+              borderBlockEnd: `1px solid ${rollen.linie}`,
             }}
           >
             {header}
@@ -169,7 +177,7 @@ export function ListenEintrag({
   style,
   className,
 }: ListenEintragProps) {
-  const { token } = useToken();
+  const { token, rollen } = useRollen();
   const { size, bordered } = useContext(ListeContext);
 
   const paddingBlock = size === 'small' ? token.paddingXS : token.paddingSM;
@@ -217,7 +225,7 @@ export function ListenEintrag({
                   ? {
                       marginInlineStart: token.marginSM,
                       paddingInlineStart: token.marginSM,
-                      borderInlineStart: `1px solid ${token.colorSplit}`,
+                      borderInlineStart: `1px solid ${rollen.linie}`,
                       lineHeight: 1,
                       color: token.colorTextDescription,
                     }

@@ -1,4 +1,4 @@
-import { Alert, App, Button, Card, Flex, Segmented, Typography } from 'antd';
+import { Alert, App, Button } from 'antd';
 import { Select } from '../components/Select';
 import { CloseOutlined, PlusOutlined, UpOutlined } from '@ant-design/icons';
 import { useEffect, useState } from 'react';
@@ -30,7 +30,8 @@ import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import AuftragListe from './AuftragListe';
 import AuftragFormular from './AuftragFormular';
 import VollzugMeldenModal from './VollzugMeldenModal';
-import Datenstand from '../components/Datenstand';
+import Bereichskopf from '../kommunikation/Bereichskopf';
+import { Augenbraue, Paneel, Segmentleiste, useRollen } from '../components/instrument';
 
 /** Offene Aufträge: nach Prio (sofort→dringend→normal), dann Frist (früheste zuerst). */
 function vergleicheOffen(a: Auftrag, b: Auftrag): number {
@@ -49,6 +50,7 @@ export default function AuftraegeListe({
   const { message } = App.useApp();
   const qc = useQueryClient();
   const { benutzer } = useAuth();
+  const { token } = useRollen();
 
   const abschnitteQuery = useQuery({
     queryKey: einsatzKeys.abschnitte(einsatzId),
@@ -106,7 +108,7 @@ export default function AuftraegeListe({
   // LFH-343/C8: kein `setFormOffen(false)` mehr. Das Inline-Formular bleibt nach
   // dem Erteilen offen, damit der nächste Auftrag ohne Aufklappen weitergeht;
   // Zuklappen ist ausdrückliche Nutzeraktion (Kopf-Umschalter oder Kreuz an der
-  // Card). Der conditional Render der Card würde das Formular sonst unmounten —
+  // Paneel). Der conditional Render des Paneels würde das Formular sonst unmounten —
   // samt Serienzähler und Wertübernahme. Muster: `pages/MeldungenPage.tsx`.
   const anlegenMutation = useMutation({
     mutationFn: (d: NeuerAuftrag) => legeAuftragAn(einsatzId, d),
@@ -284,36 +286,29 @@ export default function AuftraegeListe({
 
   return (
     <>
-      <Flex justify="space-between" align="center" gap={16} wrap style={{ marginBottom: 16 }}>
-        <div>
-          <Typography.Title level={3} style={{ margin: 0 }}>
-            Aufträge
-          </Typography.Title>
-          <Typography.Text type="secondary">
-            {offene.length} offen · {abgeschlossene.length} abgeschlossen
-          </Typography.Text>
-          <div>
-            <Datenstand dataUpdatedAt={auftraegeQuery.dataUpdatedAt} />
-          </div>
-        </div>
-        {darfSchreiben && (
-          <Button
-            type="primary"
-            size="large"
-            icon={formOffen ? <UpOutlined /> : <PlusOutlined />}
-            onClick={() => setFormOffen((o) => !o)}
-          >
-            {formOffen ? 'Formular schließen' : 'Auftrag erteilen'}
-          </Button>
-        )}
-      </Flex>
+      <Bereichskopf
+        titel="Aufträge"
+        meta={`${offene.length} offen · ${abgeschlossene.length} abgeschlossen`}
+        dataUpdatedAt={auftraegeQuery.dataUpdatedAt}
+        aktion={
+          darfSchreiben && (
+            <Button
+              type="primary"
+              icon={formOffen ? <UpOutlined /> : <PlusOutlined />}
+              onClick={() => setFormOffen((o) => !o)}
+            >
+              {formOffen ? 'Formular schließen' : 'Auftrag erteilen'}
+            </Button>
+          )
+        }
+      />
 
       {darfSchreiben && formOffen && (
-        <Card
-          size="small"
-          title="Neuer Auftrag/Befehl"
-          style={{ marginBottom: 16 }}
-          extra={
+        <Paneel
+          titel="Neuer Auftrag/Befehl"
+          koerperPolster
+          style={{ marginBottom: token.margin }}
+          aktion={
             <Button
               type="text"
               icon={<CloseOutlined />}
@@ -334,14 +329,14 @@ export default function AuftraegeListe({
             // leeren, wenn der Auftrag wirklich angekommen ist.
             onAnlegen={(d) => anlegenMutation.mutateAsync(d)}
           />
-        </Card>
+        </Paneel>
       )}
 
       {auftraegeQuery.isError && (
         <Alert
           type="error"
           showIcon
-          style={{ marginBottom: 12 }}
+          style={{ marginBottom: token.marginSM }}
           title="Aufträge konnten nicht geladen werden"
         />
       )}
@@ -349,26 +344,28 @@ export default function AuftraegeListe({
         style={{
           display: 'flex',
           flexWrap: 'wrap',
-          gap: 12,
-          marginBottom: 16,
+          gap: token.marginSM,
+          marginBottom: token.margin,
           alignItems: 'center',
         }}
       >
-        <Segmented
-          value={ansicht}
-          onChange={(v) => setAnsicht(v as 'offen' | 'abgeschlossen')}
-          options={[
-            { value: 'offen', label: `Offen (${offene.length})` },
-            { value: 'abgeschlossen', label: `Abgeschlossen (${abgeschlossene.length})` },
+        <Segmentleiste
+          beschriftung="Ansicht"
+          wert={ansicht}
+          onWechsel={setAnsicht}
+          optionen={[
+            { wert: 'offen', label: `Offen (${offene.length})` },
+            { wert: 'abgeschlossen', label: `Abgeschlossen (${abgeschlossene.length})` },
           ]}
         />
-        <Segmented
-          value={richtungFilter ?? 'alle'}
-          onChange={(v) => setRichtungFilter(v === 'alle' ? undefined : String(v))}
-          options={[
-            { value: 'alle', label: 'Alle Richtungen' },
-            { value: 'intern', label: 'Intern' },
-            { value: 'extern', label: 'Extern' },
+        <Segmentleiste
+          beschriftung="Richtung"
+          wert={richtungFilter ?? 'alle'}
+          onWechsel={(v) => setRichtungFilter(v === 'alle' ? undefined : v)}
+          optionen={[
+            { wert: 'alle', label: 'Alle Richtungen' },
+            { wert: 'intern', label: 'Intern' },
+            { wert: 'extern', label: 'Extern' },
           ]}
         />
         <Select
@@ -385,10 +382,10 @@ export default function AuftraegeListe({
           <AuftragListe auftraege={[]} ansicht="offen" {...listenProps} />
         ) : (
           offeneGruppen.map(({ gruppe, auftraege }) => (
-            <div key={gruppe} style={{ marginBottom: 16 }}>
-              <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>
+            <div key={gruppe} style={{ marginBottom: token.margin }}>
+              <Augenbraue als="h4" style={{ display: 'block', marginBottom: token.marginXS }}>
                 {GRUPPE_LABEL[gruppe]} ({auftraege.length})
-              </Typography.Text>
+              </Augenbraue>
               <AuftragListe auftraege={auftraege} ansicht="offen" {...listenProps} />
             </div>
           ))

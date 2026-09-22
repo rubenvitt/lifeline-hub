@@ -1,13 +1,13 @@
 /**
- * Datenmodell des Lage-Dashboards (LFH-352 · A0).
+ * Datenmodell des Lage-Dashboards (LFH-352 · A0, neu gedacht mit dem Neuentwurf S3).
  *
- * Verdichtet die 15 Queries der Seite auf ein flaches, darstellungsneutrales
- * Lagebild. Die Trennung ist Absicht: die Seite entscheidet über Form, diese
- * Datei über Bedeutung — welche Zahl alarmiert, welcher Wortlaut zu ihr gehört.
+ * Verdichtet die Queries der Seite auf ein flaches, darstellungsneutrales Lagebild. Die
+ * Trennung ist Absicht: die Seite entscheidet über Form, diese Datei über Bedeutung —
+ * welche Zahl alarmiert, welcher Wortlaut zu ihr gehört.
  *
- * Entstanden als Datenschicht der Variantenrunde; sie hat den Vergleich der
- * Entwürfe ehrlich gehalten (gleiche Zahlen, verschiedene Gestaltung) und ist
- * mit der Entscheidung in die Referenzseite übergegangen.
+ * Gefahrenmatrix, Sichtungsbild und Meldungsstrom haben eigene Ableitungen
+ * (`lageVerdichtung.ts`, `meldungsstrom.ts`): sie hängen an eigenen Abfragen mit eigenem
+ * Datenzustand und gehören nicht in ein Lagebild, das erst mit dem Einsatz entsteht.
  */
 import type {
   Auftrag,
@@ -19,264 +19,156 @@ import type {
   Einsatzabschnitt,
   Gefahrengebiet,
   LageberichtAnzeige,
-  LageZone,
+  LageberichtStatus,
   Meldung,
   Person,
   Schaden,
-  Tier,
   Uhs,
   Warnstufe,
 } from '../../api/types';
 import {
   DEFAULT_KONVENTIONEN,
-  formatUhrzeit,
   formatUhrzeitMitTag,
+  inZone,
   type AnzeigeKonventionen,
 } from '../../anzeige/format';
 import { baueKraeftebild, staerkeText } from '../../kraefte/kraeftebild';
-import { warnstufeKennzahl, type Dringlichkeit, type Statusrolle } from '../../theme/statusFarben';
+import { LAGEBERICHT_STATUS } from '../../kommunikation/phase';
+import { warnstufeKennzahl } from '../../theme/statusFarben';
+import type { KennzahlTon } from '../../components/instrument';
 import {
   neuesterLagebericht,
   verdichteGefahrengebiete,
   verdichtePersonen,
   verdichteSchaeden,
-  verdichteTiere,
   verdichteUhs,
+  type SkVerteilung,
 } from './lageVerdichtung';
 
-/** Die vier Datenzustände, die eine Gestaltungssprache tragen muss.
- *  `fehler` und `leer` sind bewusst getrennt — der Sweep-Befund lautet
- *  „Fehler sieht aus wie leer" (LFH-326), und genau das soll jede Variante lösen. */
+/** Die Datenzustände, die eine Gestaltungssprache tragen muss. `fehler` und `leer` sind
+ *  bewusst getrennt — der Sweep-Befund lautet „Fehler sieht aus wie leer" (LFH-326). */
 export type Datenzustand = 'daten' | 'laden' | 'fehler' | 'leer';
 
-/** Rolle → Dringlichkeit. `Record` über die VOLLE `Statusrolle`, damit eine siebte
- *  Rolle im Vertrag hier den Build bricht statt still auf `normal` zu fallen. Die drei
- *  übrigen A0-Rollen tragen keine Dringlichkeit: `neutral` ist die bewusste
- *  Nichtmeldung, `bedien` und `marke` sind Bedienung bzw. Herkunft — im Lagebild also
- *  allesamt „kein Alarmbeitrag". */
-const ROLLE_ALS_DRINGLICHKEIT: Record<Statusrolle, Dringlichkeit> = {
-  alarm: 'alarm',
-  achtung: 'achtung',
-  normal: 'normal',
-  neutral: 'normal',
-  bedien: 'normal',
-  marke: 'normal',
-};
+/**
+ * Die sechs Kennzahl-Etiketten, in fester Reihenfolge (Neuentwurf S3).
+ *
+ * EINE Quelle für beide Reihen: die Plätze, die die Seite vor dem ersten Einsatz-Abruf
+ * stellt (Prüfliste Kriterium 12, CLS ≤ 0,1), und die Kennzahlen aus {@link baueLagebild}.
+ * `LageDashboardPage.test.tsx` pinnt beide gegen handgeschriebene Literale.
+ *
+ * Die Reihenfolge wird NICHT nach Dringlichkeit sortiert: Prüfliste Kriterium 9 verlangt
+ * dieselbe Größe an derselben Stelle, in jedem Zustand — wer eine Lage funkt, greift nach
+ * der Zahl an ihrem Platz. Die Anzahl ist sechs, weil sie sich 6 → 3 → 2 Spalten ohne Rest
+ * teilt. „Pegel" und „Evakuiert" aus dem Entwurf fehlen: dafür gibt es keine Datenquelle
+ * (LFH-606, LFH-607), und eine erfundene Kennzahl wäre schlimmer als eine fehlende.
+ */
+export const KENNZAHL_ETIKETTEN = [
+  'Betroffene',
+  'Kräfte',
+  'Vermisste',
+  'Höchste Warnstufe',
+  'Schäden offen',
+  'Einsatzdauer',
+] as const;
 
-/** Eine Meldung als Kurzlisten-Zeile des Dashboards (LFH-336 · Befund H5). */
-export interface Meldungszeile {
-  id: number;
-  lfdNr: number;
-  zeit: string;
-  absender: string;
-  text: string;
-  stufe: Dringlichkeit;
-}
-
-/** Ein Auftrag als Kurzlisten-Zeile des Dashboards (LFH-336 · Befund H5). */
-export interface Auftragszeile {
-  id: number;
-  lfdNr: number | null;
-  /** Ortszeit der Frist (`14:30`) oder `null`, wenn keine gesetzt ist. */
-  frist: string | null;
-  text: string;
-  stufe: Dringlichkeit;
-}
-
-/** Wie viele Zeilen eine Kurzliste trägt.
- *  Drei, weil die Kachel darunter noch Kopfzahl und Fußnote hält — eine vierte
- *  Zeile drückt die Kachelreihe auf dem 13"-Fükw-Schirm in den Umbruch. */
-const KURZLISTE_MAX = 3;
+export type KennzahlEtikett = (typeof KENNZAHL_ETIKETTEN)[number];
 
 export interface Kennzahl {
-  etikett: string;
+  etikett: KennzahlEtikett;
   wert: string;
-  zusatz: string;
-  /** Wortlaut statt nackter Zahl, wo die Zahl allein irreführt (Sweep M30). */
-  stufe?: Dringlichkeit;
+  einheit?: string;
+  notiz: string;
+  ton: KennzahlTon;
+  /** Modul-Route für `einsatzModulPfad` (die Seite baut den Pfad über `routing/deeplinks`). */
   route: string;
 }
 
-export interface Lagebild {
-  bezeichnung: string;
-  stichwort: string | null;
-  org: string | null;
-  status: string;
-  kennzahlen: Kennzahl[];
-  sichtung: { etikett: string; wert: number; stufe: Dringlichkeit }[];
-  betroffeneGesamt: number;
-  vermisst: number;
-  staerke: string;
-  einheiten: number;
-  abschnitte: number;
-  fahrzeugeGebunden: number;
-  fahrzeugeGesamt: number;
-  uhsAktiv: number;
-  uhsGesamt: number;
-  schaedenOffen: number;
-  schaedenGesamt: number;
-  tiereAktiv: number;
-  zonen: number;
-  bericht: {
-    titel: string;
-    status: string;
-    stand: string;
-    von: string;
-    auszug: string | null;
-  } | null;
-  meldungszeilen: Meldungszeile[];
-  auftragszeilen: Auftragszeile[];
+/** Der Führungsstand unter den drei Paneelen: was vorher eigene Kacheln hatte. */
+export interface Fuehrungsstand {
   auftraegeOffen: number;
   auftraegeUeberfaellig: number;
   meldungenOffen: number;
   meldungenNeu: number;
   meldungenUeberfaellig: number;
+  uhsAktiv: number;
+  uhsGeplant: number;
+  bericht: {
+    id: number;
+    titel: string;
+    statusLabel: string;
+    /** `zeitstand` als Wirestring — formatiert wird in der Seite (Zone am Provider). */
+    stand: string;
+    status: LageberichtStatus;
+  } | null;
+}
+
+export interface Lagebild {
+  kennzahlen: Kennzahl[];
+  /** Für das Sichtungsbild: die Verteilung aus derselben Verdichtung wie die Kennzahlen. */
+  sk: SkVerteilung;
+  betroffeneGesamt: number;
+  hoechsteWarnstufe: Warnstufe;
+  fuehrung: Fuehrungsstand;
+}
+
+/** Warnstufe → Ton der Kennzahl, aus {@link warnstufeKennzahl} (nicht `warnstufeKarte`:
+ *  „keine" ist hier „kein Alarmbeitrag", nicht „vorsichtshalber Gefahr"). Rein. */
+export function warnstufeTon(w: Warnstufe): KennzahlTon {
+  const rolle = warnstufeKennzahl[w].rolle;
+  return rolle === 'alarm' ? 'alarm' : rolle === 'achtung' ? 'achtung' : 'neutral';
 }
 
 /**
- * Warnstufe → Dringlichkeit der Kennzahl. Ableitung aus dem Statusfarb-Vertrag, keine
- * zweite Liste (LFH-328/A2) — sonst käme neben `warnstufeKarte` und `warnstufeKennzahl`
- * noch eine Lesart desselben Enums dazu.
- *
- * Es GIBT eine dritte — die FLÄCHE der Gefahrenmatrix —, und sie liegt seit LFH-368
- * nicht mehr draußen: `theme/statusFarben.ts:warnstufeFlaeche` bildet die Stufen auf
- * die Füllungsrollen ab, `flaechenFarbe` löst sie je Modus auf. Alle drei Lesarten
- * stehen damit im selben Vertrag; welche gilt, entscheidet die Darstellungssorte
- * (Kennzahl · Objektsignatur · Fläche), nicht der Aufrufort.
- *
- * Gelesen wird ausdrücklich {@link warnstufeKennzahl} und NICHT `warnstufeKarte`: die
- * Karte zeigt ein OBJEKT (dieses eine Gebiet ist unbewertet ⇒ vorsichtshalber Gefahr,
- * `keine` → `alarm`), das Dashboard eine KENNZAHL (nichts gemeldet ⇒ kein
- * Alarmbeitrag, `keine` → `normal`). Wer hier auf `warnstufeKarte` umstellt, färbt
- * einen Einsatz ohne jedes Gefahrengebiet rot.
+ * Ein Wirestring (UTC ohne Zonenkennung, `YYYY-MM-DD HH:MM:SS`) als Epoche. `NaN` bei
+ * Unbrauchbarem. Rein — kein dayjs-Plugin nötig, weil nur die Differenz gebraucht wird.
  */
-function warnstufeStufe(w: Warnstufe): Dringlichkeit {
-  return ROLLE_ALS_DRINGLICHKEIT[warnstufeKennzahl[w].rolle];
-}
-
-/** Tag + Ortszeit als DTG-Kurzform (`261432`), wie im Funkverkehr gesprochen.
- *  Bewusst aus den LOKALEN Feldern des Date gebaut, nicht aus `toISOString()` —
- *  das läge in UTC und würde im Sommer eine Stunde danebenliegen. */
-export function dtgKurz(d: Date): string {
-  const zz = (n: number) => String(n).padStart(2, '0');
-  return `${zz(d.getDate())}${zz(d.getHours())}${zz(d.getMinutes())}`;
-}
-
-/** DTG des Aufrufzeitpunkts. Eigene Funktion, damit Tests sie stellen können —
- *  ein Instrumentenband mit stehengebliebener Uhr wäre im Einsatz ein Fehler,
- *  und ein Test, der `new Date()` nicht kontrollieren kann, ist flaky. */
-export function dtgJetzt(): string {
-  return dtgKurz(new Date());
+export function wireAlsEpoche(wire: string): number {
+  return Date.parse(`${wire.trim().replace(' ', 'T')}Z`);
 }
 
 /**
- * Die jüngsten OFFENEN Meldungen als Kurzliste.
- *
- * Sortiert nach EREIGNISZEIT, nicht nach Eingangszeit: im Meldebild zählt,
- * wann es passiert ist, nicht wann es jemand eingetippt hat.
- *
- * Gefiltert auf `ist_offen`, weil die Kopfzahl der Kachel offene Meldungen zählt.
- * Eine Liste, die erledigte mitzeigt, widerspräche der Zahl über ihr.
+ * Einsatzdauer als `H:MM` (Stunden laufen über 24 hinaus weiter: „26:05"), gerechnet vom
+ * Beginn bis `jetzt` bzw. bis zum Abschluss. Ein Beginn in der Zukunft oder ein
+ * unlesbarer Wert ergibt `—:——`, keine negative Dauer. Rein.
  */
-export function meldungszeilen(
-  meldungen: Meldung[],
+export function einsatzdauer(beginn: string, jetzt: number, ende?: string | null): string {
+  const von = wireAlsEpoche(beginn);
+  const bis = ende ? wireAlsEpoche(ende) : jetzt;
+  if (!Number.isFinite(von) || !Number.isFinite(bis) || bis < von) return '—:——';
+  const minuten = Math.floor((bis - von) / 60_000);
+  return `${Math.floor(minuten / 60)}:${String(minuten % 60).padStart(2, '0')}`;
+}
+
+/** „Lagebild 21.09. 14:22" — der Zeitpunkt in der Anzeigezone. Rein. */
+export function lagebildZeit(
+  jetzt: number,
   konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
-): Meldungszeile[] {
-  return [...meldungen]
-    .filter((m) => m.ist_offen)
-    .sort((a, b) => (a.ereigniszeit < b.ereigniszeit ? 1 : -1))
-    .slice(0, KURZLISTE_MAX)
-    .map((m) => ({
-      id: m.id,
-      lfdNr: m.lfd_nr,
-      zeit: formatUhrzeit(m.ereigniszeit, konv),
-      absender: m.absender,
-      text: m.inhalt,
-      stufe: m.ist_ueberfaellig ? 'alarm' : m.status === 'neu' ? 'achtung' : 'normal',
-    }));
+): string {
+  return inZone(new Date(jetzt).toISOString(), konv).format('DD.MM. HH:mm');
 }
 
 /**
- * Die fristnächsten OFFENEN Aufträge als Kurzliste.
- *
- * Ein Auftrag ohne Frist sortiert ans ENDE, nicht an den Anfang. Ein leerer
- * String verglichen sich lexikographisch vor jedes Datum — der fristlose Auftrag
- * verdrängte dann den überfälligen aus der Dreierliste. Unbestimmt ist nicht
- * dringend.
- *
- * Die Statusmenge ist dieselbe wie bei `auftraegeOffen` weiter unten: alles außer
- * `vollzogen` und `abgenommen`.
- *
- * `frist` nutzt `formatUhrzeitMitTag`, NICHT `formatUhrzeit` — eine reine
- * `HH:mm` ist optisch nicht von „in 20 Minuten" zu „morgen früh" zu unterscheiden,
- * und eine Frist ist der Fall, nach dem jemand handelt (LFH-336, Fix-Runde 1 zu
- * Task 3). `meldungszeilen` oben bleibt bewusst bei `formatUhrzeit`: eine Meldung zeigt
- * Vergangenes und steht als „die drei jüngsten" ohnehin im Jetzt, keine Deadline.
+ * Alter des Datenstands als Mono-Meta („Stand vor 40 s"). `0`/ungültig heißt „noch nichts
+ * abgerufen". Über einer Stunde steht die Uhrzeit — „vor 184 min" liest niemand. Rein.
  */
-export function auftragszeilen(
-  auftraege: Auftrag[],
+export function standText(
+  datenstand: number,
+  jetzt: number,
   konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
-): Auftragszeile[] {
-  const offen = auftraege.filter(
-    (a) => a.bearbeitungsstatus !== 'vollzogen' && a.bearbeitungsstatus !== 'abgenommen',
-  );
-  return [...offen]
-    .sort((a, b) => {
-      if (!a.frist_at && !b.frist_at) return 0;
-      if (!a.frist_at) return 1;
-      if (!b.frist_at) return -1;
-      return a.frist_at < b.frist_at ? -1 : 1;
-    })
-    .slice(0, KURZLISTE_MAX)
-    .map((a) => ({
-      id: a.id,
-      lfdNr: a.lfd_nr ?? null,
-      frist: a.frist_at ? formatUhrzeitMitTag(a.frist_at, konv) : null,
-      text: a.auftrag_text,
-      stufe: a.ist_ueberfaellig ? 'alarm' : 'normal',
-    }));
-}
-
-/**
- * Welcher Abschnitt eines Lageberichts DIE LAGE trägt — je Vorlage ein anderer.
- *
- * Es gibt keinen Abschnitt namens „lage" (gemessen gegen `src/lagebericht/mod.rs`,
- * gespiegelt in `lageberichte/vorlagen.ts`). Deshalb eine Vorrangliste über alle
- * drei Vorlagen statt einer Fallunterscheidung — die Schlüssel sind eindeutig,
- * eine Vorlage kann keine zwei davon tragen.
- */
-const LAGE_ABSCHNITTE = ['gefahren_schadenlage', 'beurteilung_schadenlage', 'text'] as const;
-
-/** Wie viel Lagetext die Kachel trägt. 240 Zeichen sind rund drei Zeilen auf
- *  Kachelbreite — mehr sprengt das Raster, weniger sagt nichts. */
-const AUSZUG_MAX = 240;
-
-/**
- * Der Lageabschnitt eines Berichts, gekürzt — oder `null`, wenn er nichts hergibt.
- *
- * Fällt auf den ersten nicht-leeren Abschnitt zurück: ein leerer Vorrangabschnitt
- * darf die Kachel nicht verstummen lassen, obwohl der Bericht Inhalt hat.
- */
-export function lageauszug(bericht: LageberichtAnzeige | null): string | null {
-  if (!bericht) return null;
-  const gefuellt = (s: string | undefined) => (s ?? '').trim().length > 0;
-  const vorrang = LAGE_ABSCHNITTE.map((k) =>
-    bericht.abschnitte.find((a) => a.schluessel === k),
-  ).find((a) => gefuellt(a?.text));
-  const gewaehlt = vorrang ?? bericht.abschnitte.find((a) => gefuellt(a.text));
-  if (!gewaehlt) return null;
-  const text = gewaehlt.text.trim();
-  return text.length > AUSZUG_MAX ? `${text.slice(0, AUSZUG_MAX)}…` : text;
+): string {
+  if (!Number.isFinite(datenstand) || datenstand <= 0) return 'Stand wird abgerufen';
+  const sekunden = Math.max(0, Math.round((jetzt - datenstand) / 1000));
+  if (sekunden < 60) return `Stand vor ${sekunden} s`;
+  if (sekunden < 3600) return `Stand vor ${Math.floor(sekunden / 60)} min`;
+  return `Stand ${inZone(new Date(datenstand).toISOString(), konv).format('HH:mm')}`;
 }
 
 export interface Rohdaten {
   einsatz: EinsatzAnzeige;
   personen: Person[];
-  tiere: Tier[];
   uhs: Uhs[];
   schaeden: Schaden[];
   gefahren: Gefahrengebiet[];
-  zonen: LageZone[];
   lageberichte: LageberichtAnzeige[];
   einheiten: Einheit[];
   personal: EinsatzPersonal[];
@@ -287,7 +179,11 @@ export interface Rohdaten {
   meldungen: Meldung[];
 }
 
-export function baueLagebild(r: Rohdaten): Lagebild {
+export function baueLagebild(
+  r: Rohdaten,
+  jetzt: number,
+  konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
+): Lagebild {
   const kraefte = baueKraeftebild(
     r.abschnitte,
     r.einheiten,
@@ -298,148 +194,89 @@ export function baueLagebild(r: Rohdaten): Lagebild {
   const betroffene = verdichtePersonen(r.personen);
   const uhs = verdichteUhs(r.uhs);
   const schaeden = verdichteSchaeden(r.schaeden);
-  const tiere = verdichteTiere(r.tiere);
   const gefahren = verdichteGefahrengebiete(r.gefahren);
   const bericht = neuesterLagebericht(r.lageberichte);
+  const abgeschlossen = r.einsatz.abgeschlossen_at ?? null;
 
-  const auftraegeOffen = r.auftraege.filter(
-    (a) => a.bearbeitungsstatus !== 'vollzogen' && a.bearbeitungsstatus !== 'abgenommen',
-  ).length;
-  const auftraegeUeberfaellig = r.auftraege.filter((a) => a.ist_ueberfaellig).length;
-  const meldungenOffen = r.meldungen.filter((m) => m.ist_offen).length;
-  const meldungenNeu = r.meldungen.filter((m) => m.status === 'neu').length;
-  const meldungenUeberfaellig = r.meldungen.filter((m) => m.ist_ueberfaellig).length;
+  // Die Reihenfolge ist die von KENNZAHL_ETIKETTEN; ein Etikett, das es dort nicht gibt,
+  // bricht über den Typ `KennzahlEtikett` den Build.
+  const kennzahlen: Kennzahl[] = [
+    {
+      etikett: 'Betroffene',
+      wert: String(betroffene.gesamt),
+      notiz: `${betroffene.patienten} Patienten`,
+      ton: 'neutral',
+      route: 'personen',
+    },
+    {
+      // Die Gesamtstärke führt; F/UF/M//Σ steht in der Notiz, damit die BOS-Schreibweise
+      // nicht verloren geht, die vorher das Band und die Kräfte-Kachel trugen.
+      etikett: 'Kräfte',
+      wert: String(kraefte.staerke.gesamt),
+      notiz: `${r.einheiten.length} Einheiten · ${staerkeText(kraefte.staerke)}`,
+      ton: 'neutral',
+      route: 'kraefteuebersicht',
+    },
+    {
+      etikett: 'Vermisste',
+      wert: String(betroffene.vermisst),
+      notiz: betroffene.vermisst > 0 ? 'als vermisst erfasst' : 'keine offenen Fälle',
+      ton: betroffene.vermisst > 0 ? 'alarm' : 'neutral',
+      route: 'personen',
+    },
+    {
+      etikett: 'Höchste Warnstufe',
+      wert: warnstufeKennzahl[gefahren.hoechste].label,
+      notiz: `${gefahren.anzahlAktiv} Gefahrengebiete aktiv`,
+      ton: warnstufeTon(gefahren.hoechste),
+      route: 'gefahren',
+    },
+    {
+      etikett: 'Schäden offen',
+      wert: String(schaeden.offen),
+      notiz: `von ${schaeden.gesamt} gemeldet`,
+      ton: schaeden.offen > 0 ? 'achtung' : 'neutral',
+      route: 'schaeden',
+    },
+    {
+      etikett: 'Einsatzdauer',
+      wert: einsatzdauer(r.einsatz.begonnen_at, jetzt, abgeschlossen),
+      einheit: 'h',
+      notiz: abgeschlossen
+        ? `beendet ${formatUhrzeitMitTag(abgeschlossen, konv)}`
+        : `seit ${formatUhrzeitMitTag(r.einsatz.begonnen_at, konv)}`,
+      ton: 'neutral',
+      route: 'einsatzdaten',
+    },
+  ];
 
   return {
-    bezeichnung: r.einsatz.bezeichnung,
-    stichwort: r.einsatz.stichwort ?? null,
-    org: r.einsatz.org_name ?? null,
-    status: r.einsatz.status,
-    // SECHS Kennzahlen, feste Reihenfolge (LFH-329 · B1).
-    //
-    // Die Anzahl ist eine Entscheidung, keine Zufälligkeit: am Handschirm stehen
-    // sie in 2 Spalten, sechs ergeben also genau 3 Zeilen. Eine siebte — der
-    // Kandidat waren die überfälligen Aufträge — machte daraus 4 Zeilen. Die
-    // überfälligen Aufträge tragen deshalb weiterhin die Alarm-Plakette IHRER
-    // Kachel; der Punkt ist erfüllt, nur an anderer Stelle.
-    //
-    // Die Reihenfolge wird NICHT nach Dringlichkeit sortiert. Prüfliste
-    // Kriterium 9 verlangt dieselbe Größe an derselben Stelle, in jedem Zustand —
-    // wer eine Lage funkt, greift nach der Zahl an ihrem Platz. Zweitens hängt an
-    // dieser Liste eine zweite in `LageDashboardPage.tsx` (Kennzahl ↔ Datenzustand),
-    // die stumm aus dem Takt liefe; beide pinnt `LageDashboardPage.test.tsx`.
-    kennzahlen: [
-      {
-        etikett: 'Kräfte F/UF/M//Σ',
-        wert: staerkeText(kraefte.staerke),
-        zusatz: `${kraefte.anzahlPersonal} Personen · ${r.einheiten.length} Einheiten`,
-        route: 'kraefteuebersicht',
-      },
-      {
-        etikett: 'Patienten SK I–IV',
-        wert: String(betroffene.patienten),
-        zusatz: `von ${betroffene.gesamt} erfasst`,
-        stufe: betroffene.sk.sk1 > 0 ? 'alarm' : betroffene.patienten > 0 ? 'achtung' : 'normal',
-        route: 'personen',
-      },
-      {
-        etikett: 'Vermisst',
-        wert: String(betroffene.vermisst),
-        zusatz: betroffene.vermisst > 0 ? 'Suche läuft' : 'keine offenen Fälle',
-        stufe: betroffene.vermisst > 0 ? 'alarm' : 'normal',
-        route: 'personen',
-      },
-      {
-        etikett: 'Höchste Warnstufe',
-        wert: warnstufeKennzahl[gefahren.hoechste].label,
-        zusatz: `${gefahren.anzahlAktiv} Gefahrengebiete aktiv`,
-        stufe: warnstufeStufe(gefahren.hoechste),
-        route: 'gefahren',
-      },
-      {
-        etikett: 'Schäden offen',
-        wert: String(schaeden.offen),
-        zusatz: `von ${schaeden.gesamt} gemeldet`,
-        stufe: schaeden.offen > 0 ? 'achtung' : 'normal',
-        route: 'schaeden',
-      },
-      {
-        etikett: 'UHS aktiv',
-        wert: String(uhs.aktiv),
-        zusatz: `${uhs.geplant} geplant · ${uhs.aufgeloest} aufgelöst`,
-        route: 'unfallhilfsstellen',
-      },
-    ],
-    sichtung: [
-      { etikett: 'SK I', wert: betroffene.sk.sk1, stufe: 'alarm' },
-      { etikett: 'SK II', wert: betroffene.sk.sk2, stufe: 'achtung' },
-      { etikett: 'SK III', wert: betroffene.sk.sk3, stufe: 'normal' },
-      { etikett: 'SK IV', wert: betroffene.sk.sk4, stufe: 'normal' },
-    ],
+    kennzahlen,
+    sk: betroffene.sk,
     betroffeneGesamt: betroffene.gesamt,
-    vermisst: betroffene.vermisst,
-    staerke: staerkeText(kraefte.staerke),
-    einheiten: r.einheiten.length,
-    abschnitte: r.abschnitte.length,
-    fahrzeugeGebunden: kraefte.fahrzeugStatus.gebunden,
-    fahrzeugeGesamt: kraefte.anzahlFahrzeuge,
-    uhsAktiv: uhs.aktiv,
-    uhsGesamt: uhs.gesamt,
-    schaedenOffen: schaeden.offen,
-    schaedenGesamt: schaeden.gesamt,
-    tiereAktiv: tiere.aktiv,
-    zonen: r.zonen.length,
-    bericht: bericht
-      ? {
-          titel: bericht.titel,
-          status: bericht.status,
-          stand: bericht.zeitstand,
-          von: bericht.ersteller_name,
-          auszug: lageauszug(bericht),
-        }
-      : null,
-    meldungszeilen: meldungszeilen(r.meldungen),
-    auftragszeilen: auftragszeilen(r.auftraege),
-    auftraegeOffen,
-    auftraegeUeberfaellig,
-    meldungenOffen,
-    meldungenNeu,
-    meldungenUeberfaellig,
-  };
-}
-
-/** Leeres Lagebild — frisch angelegter Einsatz, noch nichts erfasst.
- *  Bewusst NICHT identisch mit dem Fehlerfall (siehe `Datenzustand`). */
-export function leeresLagebild(basis: Lagebild): Lagebild {
-  return {
-    ...basis,
-    kennzahlen: basis.kennzahlen.map((k) => ({
-      ...k,
-      wert: '0',
-      zusatz: 'noch nichts erfasst',
-      stufe: 'normal',
-    })),
-    sichtung: basis.sichtung.map((s) => ({ ...s, wert: 0 })),
-    betroffeneGesamt: 0,
-    vermisst: 0,
-    staerke: '0/0/0//0',
-    einheiten: 0,
-    abschnitte: 0,
-    fahrzeugeGebunden: 0,
-    fahrzeugeGesamt: 0,
-    uhsAktiv: 0,
-    uhsGesamt: 0,
-    schaedenOffen: 0,
-    schaedenGesamt: 0,
-    tiereAktiv: 0,
-    zonen: 0,
-    bericht: null,
-    meldungszeilen: [],
-    auftragszeilen: [],
-    auftraegeOffen: 0,
-    auftraegeUeberfaellig: 0,
-    meldungenOffen: 0,
-    meldungenNeu: 0,
-    meldungenUeberfaellig: 0,
+    hoechsteWarnstufe: gefahren.hoechste,
+    fuehrung: {
+      // Dieselbe Statusmenge wie vorher die Aufträge-Kachel: alles außer vollzogen/abgenommen.
+      auftraegeOffen: r.auftraege.filter(
+        (a) => a.bearbeitungsstatus !== 'vollzogen' && a.bearbeitungsstatus !== 'abgenommen',
+      ).length,
+      // Unabhängig vom Filter darüber (src/auftrag/repo.rs): ein vollzogener Auftrag mit
+      // unquittiertem Empfänger und abgelaufener Frist ist trotzdem überfällig.
+      auftraegeUeberfaellig: r.auftraege.filter((a) => a.ist_ueberfaellig).length,
+      meldungenOffen: r.meldungen.filter((m) => m.ist_offen).length,
+      meldungenNeu: r.meldungen.filter((m) => m.status === 'neu').length,
+      meldungenUeberfaellig: r.meldungen.filter((m) => m.ist_ueberfaellig).length,
+      uhsAktiv: uhs.aktiv,
+      uhsGeplant: uhs.geplant,
+      bericht: bericht
+        ? {
+            id: bericht.id,
+            titel: bericht.titel,
+            status: bericht.status,
+            statusLabel: LAGEBERICHT_STATUS[bericht.status].label,
+            stand: bericht.zeitstand,
+          }
+        : null,
+    },
   };
 }

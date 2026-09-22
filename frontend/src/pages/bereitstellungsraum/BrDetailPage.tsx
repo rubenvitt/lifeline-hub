@@ -1,15 +1,4 @@
-import {
-  Alert,
-  App,
-  Breadcrumb,
-  Button,
-  Descriptions,
-  Popconfirm,
-  Space,
-  Spin,
-  Tag,
-  Typography,
-} from 'antd';
+import { Alert, App, Breadcrumb, Button, Popconfirm, Space, Spin, Tag } from 'antd';
 import { Liste, ListenEintrag } from '../../components/Liste';
 import { Link, Navigate, useParams } from 'react-router';
 import { useEffect } from 'react';
@@ -27,10 +16,18 @@ import type { BrStatus, Einheit, EinsatzFahrzeug } from '../../api/types';
 import KraefteOhneBrSidebar from './KraefteOhneBrSidebar';
 import EinsatzSeite from '../../components/EinsatzSeite';
 import SektionHeader from '../../components/SektionHeader';
+import {
+  Datenfeld,
+  Datenraster,
+  Kennzahl,
+  Kennzahlenband,
+  monoStil,
+  useRollen,
+} from '../../components/instrument';
 import StatusTag from '../../components/StatusTag';
 import { useViewport } from '../../components/useViewport';
 import { brStatus } from '../../theme/statusFarben';
-import { abstand, flaeche } from '../../theme/tokens';
+import { abstand } from '../../theme/tokens';
 import BrSwitcher from './BrSwitcher';
 import { merkeLetztenBr } from './brAuswahl';
 import StaerkeAnzeige from '../../anzeige/StaerkeAnzeige';
@@ -40,6 +37,7 @@ export default function BrDetailPage() {
   const { id, brId: brIdParam } = useParams();
   const einsatzId = Number(id);
   const { benutzer } = useAuth();
+  const { rollen } = useRollen();
   const brId = Number(brIdParam);
   const idGueltig = parseRouteId(brIdParam) != null;
   const listenPfad = bereitstellungsraeumeListePfad(einsatzId);
@@ -172,7 +170,6 @@ export default function BrDetailPage() {
 
   return (
     <EinsatzSeite
-      breite={flaeche.seiteBreit}
       titel={
         <Space>
           <BrSwitcher einsatzId={einsatzId} aktuellerBr={br} />
@@ -195,6 +192,7 @@ export default function BrDetailPage() {
             <Popconfirm
               title="BR auflösen?"
               description="Nur möglich, wenn keine Kraft mehr belegt ist."
+              okButtonProps={{ danger: true }}
               onConfirm={() => statusMut.mutate('aufgeloest')}
             >
               <Button danger loading={statusMut.isPending}>
@@ -211,7 +209,11 @@ export default function BrDetailPage() {
               >
                 In Betrieb nehmen
               </Button>
-              <Popconfirm title="BR stornieren?" onConfirm={() => stornoMut.mutate()}>
+              <Popconfirm
+                title="BR stornieren?"
+                okButtonProps={{ danger: true }}
+                onConfirm={() => stornoMut.mutate()}
+              >
                 <Button danger loading={stornoMut.isPending}>
                   Stornieren
                 </Button>
@@ -221,14 +223,10 @@ export default function BrDetailPage() {
         </Space>
       }
     >
-      <Descriptions column={2} style={{ marginBottom: abstand.lg }}>
-        <Descriptions.Item label="Standort" span={2}>
-          {br.standort ?? '—'}
-        </Descriptions.Item>
-        <Descriptions.Item label="Notiz" span={2}>
-          {br.notiz ?? '—'}
-        </Descriptions.Item>
-      </Descriptions>
+      <Datenraster spalten={2} beschriftung="Raumdaten" style={{ marginBottom: abstand.lg }}>
+        <Datenfeld label="Standort">{br.standort ?? '—'}</Datenfeld>
+        <Datenfeld label="Notiz">{br.notiz ?? '—'}</Datenfeld>
+      </Datenraster>
 
       {/* Unter `md` stapeln statt der 240-px-Sidebar neben dem Hauptbereich (LFH-341 · H40) —
           dieselbe Form wie Gefahrengebietsliste und Gliederungsbaum. Ohne diese Weiche würde
@@ -245,18 +243,29 @@ export default function BrDetailPage() {
       >
         {/* Hauptbereich: bereitgestellte Kräfte */}
         <div style={{ flex: 1 }}>
+          {/* Zahl führt (Neuentwurf S1): Stärke und Fahrzeugzahl als Kennzahlen. Bei
+              unvollständiger Einheitenliste steht „—" mit dem Grund als Notiz — eine zu
+              kleine Summe sähe sonst vollständig aus (Final-Review Befund A). */}
           <div data-testid="br-summe" style={{ marginBottom: abstand.md }}>
-            <Typography.Text strong>
-              Bereitgestellt: {unvollstaendig ? '—' : <StaerkeAnzeige wert={summe} />} ·{' '}
-              {fahrzeugZahl} {fahrzeugZahl === 1 ? 'Fahrzeug' : 'Fahrzeuge'}
-            </Typography.Text>
-            {unvollstaendig && (
-              <div>
-                <Typography.Text type="warning">
-                  (Stärke unvollständig — Einheitenliste nicht geladen)
-                </Typography.Text>
-              </div>
-            )}
+            <Kennzahlenband beschriftung="Bereitgestellte Kräfte">
+              <Kennzahl
+                titel="Bereitgestellt"
+                groesse="klein"
+                wert={unvollstaendig ? '—' : <StaerkeAnzeige wert={summe} />}
+                einheit={unvollstaendig ? undefined : 'F/UF/M//Σ'}
+                ton={unvollstaendig ? 'achtung' : 'neutral'}
+                notiz={
+                  unvollstaendig
+                    ? '(Stärke unvollständig — Einheitenliste nicht geladen)'
+                    : undefined
+                }
+              />
+              <Kennzahl
+                titel={fahrzeugZahl === 1 ? 'Fahrzeug' : 'Fahrzeuge'}
+                groesse="klein"
+                wert={fahrzeugZahl}
+              />
+            </Kennzahlenband>
           </div>
           <SektionHeader titel="Bereitgestellte Einheiten" />
           <Liste
@@ -283,9 +292,9 @@ export default function BrDetailPage() {
                 <Space wrap>
                   <span>{e.name}</span>
                   {einheitVon.get(e.id)?.typ_label && <Tag>{einheitVon.get(e.id)!.typ_label}</Tag>}
-                  <Tag color="blue">
+                  <span style={{ ...monoStil(12), color: rollen.gedaempft }}>
                     <StaerkeAnzeige wert={einheitVon.get(e.id)?.ist_kumuliert ?? null} />
-                  </Tag>
+                  </span>
                 </Space>
               </ListenEintrag>
             )}
@@ -313,7 +322,7 @@ export default function BrDetailPage() {
                 }
               >
                 <Space wrap>
-                  <span>{f.funkrufname}</span>
+                  <span style={monoStil(13)}>{f.funkrufname}</span>
                   {fahrzeugVon.get(f.id)?.fahrzeugtyp && (
                     <Tag>{fahrzeugVon.get(f.id)!.fahrzeugtyp}</Tag>
                   )}

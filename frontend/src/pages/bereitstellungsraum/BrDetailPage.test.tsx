@@ -387,7 +387,8 @@ describe('BrDetailPage — Typ, Stärke, Summenzeile (LFH-347 · M58a)', () => {
     renderBrDetail();
 
     const summe = await screen.findByTestId('br-summe');
-    expect(summe).toHaveTextContent('Bereitgestellt: 1/4/20//25 · 1 Fahrzeug');
+    expect(summe).toHaveTextContent(/Bereitgestellt\s*1\/4\/20\/\/25/);
+    expect(summe).toHaveTextContent(/Fahrzeug\s*1$/);
     expect(screen.getByText('Zug')).toBeInTheDocument();
     expect(screen.getByText('1/3/18//22')).toBeInTheDocument();
     expect(screen.getByText('LF 20')).toBeInTheDocument();
@@ -422,7 +423,7 @@ describe('BrDetailPage — unvollständige Stärke bei fehlenden Einheiten (Fina
     renderBrDetail();
 
     const summe = await screen.findByTestId('br-summe');
-    expect(summe).toHaveTextContent('Bereitgestellt: —');
+    expect(summe).toHaveTextContent(/Bereitgestellt\s*—/);
     expect(summe).not.toHaveTextContent('//');
     expect(
       screen.getByText('(Stärke unvollständig — Einheitenliste nicht geladen)'),
@@ -445,7 +446,7 @@ describe('BrDetailPage — unvollständige Stärke bei fehlenden Einheiten (Fina
 
     expect(await screen.findByText('Zug 1')).toBeInTheDocument();
     const summe = screen.getByTestId('br-summe');
-    expect(summe).toHaveTextContent('Bereitgestellt: —');
+    expect(summe).toHaveTextContent(/Bereitgestellt\s*—/);
     expect(
       screen.getByText('(Stärke unvollständig — Einheitenliste nicht geladen)'),
     ).toBeInTheDocument();

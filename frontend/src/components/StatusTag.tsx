@@ -1,5 +1,7 @@
-import { Tag, theme } from 'antd';
+import { Tag } from 'antd';
 import { rollenFarbe, type StatusDarstellung } from '../theme/statusFarben';
+import { useRollen } from './instrument/rollenwerte';
+import { statusFlaeche, tonVonRolle } from './instrument/statusFlaeche';
 
 /** Formzeichen als DRITTER Kanal (DV 102 / A0-Formensprache). Für Screenreader
  *  ausgeblendet — die Bedeutung trägt bereits `label`, sonst läse er sie doppelt. */
@@ -26,10 +28,49 @@ interface StatusTagProps {
    * getrimmtes Nichts ist keine Farbe.
    */
   farbe?: string | null;
+  /**
+   * `flaeche` (getönte Fläche, getönter Text, Rand in Rollenfarbe) oder `rand` (Rolle am
+   * Rand, Wortlaut in `colorText`, kein Grund). Ohne Angabe: `flaeche` für jede Rolle mit
+   * Statusfläche, `rand` für `marke` und IMMER `rand`, sobald eine Mandantenfarbe gesetzt
+   * ist — siehe Dateikopf.
+   */
+  darstellungsart?: 'flaeche' | 'rand';
+}
+
+/** Die wirksame Darstellungsart — rein, damit die Regel ohne Render prüfbar ist. */
+export function wirksameDarstellungsart(
+  darstellung: StatusDarstellung,
+  mandantenfarbe: string | null | undefined,
+  gewuenscht?: 'flaeche' | 'rand',
+): 'flaeche' | 'rand' {
+  if (mandantenfarbe?.trim()) return 'rand';
+  if (tonVonRolle(darstellung.rolle) == null) return 'rand';
+  return gewuenscht ?? 'flaeche';
 }
 
 /**
  * Einheitliche Statusanzeige über dem Statusfarb-Vertrag (LFH-328 · A2).
+ *
+ * ── NEUENTWURF „INSTRUMENTENTAFEL" (21.09.2026): DIE FLÄCHE IST DIE VORGABE ─────────
+ *
+ * Entscheidung 2 des Auftraggebers hebt „Statusfarbe nie als Textfläche" für
+ * ROLLENfarben auf: der Status steht als getönte Fläche mit getöntem Text da („Ampel als
+ * Fläche, Zahl bleibt lesbar"). Die Werte und ihre Kontrastrechnung liegen an EINER
+ * Stelle, `components/instrument/statusFlaeche.ts` — dieselbe Übersetzung tragen
+ * `StatusChip` und `StatusZelle`. Die Böden aus Kriterium 5 (`e2e/*kontrast*.spec.ts`:
+ * Tag ≥ 7, Nacht ≥ 5) halten in jeder Rolle; wo der getönte Text im Tagmodus darunter
+ * fiele (`achtung` 6,02, `alarm` 5,52), nimmt die Beschriftung `text` (16,06 / 15,06),
+ * die Fläche behält ihren Ton. Der 1-px-Rand bleibt in der Rollenfarbe stehen, weil
+ * `kraefte-kontrast.spec.ts` ihn als tragende Kante misst (≥ 3 : 1 gegen den Grund).
+ *
+ * DIE RAND-FORM BLEIBT für zwei Fälle, und das ist Vertrag, nicht Übergang:
+ *  · **Mandantenfarbe gesetzt** (`farbe`): die Zeile kommt aus einem Katalog mit
+ *    ungeprüftem Freitext (`status_farbe`). Eine Fläche neben einem frei gewählten Punkt
+ *    wäre die Kombination, deren Kontrast niemand zusichern kann.
+ *  · **Rolle `marke`**: Signatur, kein Zustand — es gibt keine Markenfläche.
+ * Wer die Rand-Form ausdrücklich will, setzt `darstellungsart="rand"`.
+ *
+ * ── DIE RAND-FORM (LFH-446), unverändert: ───────────────────────────────────────────
  *
  * Nimmt eine {@link StatusDarstellung} statt Farbe + Text getrennt — damit ist der
  * zweite Kanal (WCAG 1.4.1) nicht Disziplin, sondern Typ: einen Tag ohne Text kann
@@ -46,15 +87,28 @@ interface StatusTagProps {
  * Keine Klein-Variante am Steuerelement (A1 Gate 4) — die Höhe kommt aus der
  * Dichte-Staffel am `ConfigProvider`.
  */
-export default function StatusTag({ darstellung, title, farbe: ueberschrieben }: StatusTagProps) {
-  const { token } = theme.useToken();
-  const farbe = rollenFarbe(darstellung.rolle, token);
+export default function StatusTag({
+  darstellung,
+  title,
+  farbe: ueberschrieben,
+  darstellungsart,
+}: StatusTagProps) {
+  const { token, rollen, dunkel } = useRollen();
   const mandantenfarbe = ueberschrieben?.trim();
+  const art = wirksameDarstellungsart(darstellung, mandantenfarbe, darstellungsart);
+  const ton = tonVonRolle(darstellung.rolle);
+  const flaeche = art === 'flaeche' && ton != null ? statusFlaeche(rollen, ton, dunkel) : null;
+  const farbe = flaeche ? flaeche.kante : rollenFarbe(darstellung.rolle, token);
   return (
     <Tag
       title={title}
       data-rolle={darstellung.rolle}
-      style={{ color: token.colorText, borderColor: farbe, background: 'transparent' }}
+      data-darstellung={art}
+      style={
+        flaeche
+          ? { color: flaeche.text, borderColor: flaeche.kante, background: flaeche.grund }
+          : { color: token.colorText, borderColor: farbe, background: 'transparent' }
+      }
     >
       {darstellung.form && (
         <span aria-hidden="true" style={{ color: farbe, marginInlineEnd: token.marginXXS }}>
@@ -71,7 +125,7 @@ export default function StatusTag({ darstellung, title, farbe: ueberschrieben }:
             display: 'inline-block',
             width: '0.5em',
             height: '0.5em',
-            borderRadius: '50%',
+            borderRadius: 0,
             backgroundColor: mandantenfarbe,
             marginInlineEnd: token.marginXXS,
           }}

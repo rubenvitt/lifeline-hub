@@ -209,7 +209,32 @@ describe('Bediendichte — die drei Austritte (LFH-329 · B1)', () => {
     // Setzer. Ein versehentlich geteilter Speicherschlüssel oder ein Setzer, der
     // beide Felder schreibt, fiele hier auf.
     zeigeSonde();
-    expect(document.documentElement.dataset.theme).toBe('light');
+    // Ohne gespeicherte Wahl gilt seit dem Neuentwurf (21.09.2026) der Nachtbetrieb —
+    // die Aussage hier ist, dass die Dichte-Achse daran nichts dreht und nichts speichert.
+    expect(document.documentElement.dataset.theme).toBe('dark');
     expect(localStorage.getItem('lifeline-hub.theme')).toBeNull();
+  });
+});
+
+describe('Nachtbetrieb als Vorgabe (Neuentwurf „Instrumententafel", 21.09.2026)', () => {
+  it('startet ohne gespeicherte Wahl dunkel — unabhängig von der OS-Einstellung', () => {
+    // `matchMedia` meldet in der Testumgebung kein dunkles System; vorher (Vorgabe
+    // `system`) landete dieser Fall deshalb hell. Genau das dreht die Entscheidung um.
+    expect(window.matchMedia('(prefers-color-scheme: dark)').matches).toBe(false);
+    zeigeSonde();
+    expect(document.documentElement.dataset.theme).toBe('dark');
+    expect(document.documentElement.style.colorScheme).toBe('dark');
+  });
+
+  it('eine gespeicherte Wahl gewinnt weiterhin — auch „System"', () => {
+    localStorage.setItem('lifeline-hub.theme', 'system');
+    zeigeSonde();
+    expect(document.documentElement.dataset.theme).toBe('light');
+  });
+
+  it('ein unbekannter Speicherwert fällt auf die Vorgabe, nicht auf Hell', () => {
+    localStorage.setItem('lifeline-hub.theme', 'kaputt');
+    zeigeSonde();
+    expect(document.documentElement.dataset.theme).toBe('dark');
   });
 });

@@ -1,0 +1,47 @@
+/* Gefahrenmatrix des Lage-Dashboards (Neuentwurf S3) — die Spaltengeometrie für Zeilen UND
+   Legende an EINER Stelle (Nacharbeit 22.09.2026). Hier und nicht inline, weil sie von der
+   Breite des PANEELS abhängt, nicht vom Viewport: bei 1024 px ist das Paneel ~230 px schmal,
+   bei 1440 px ~360, gestapelt auf dem Handschirm ~350 (jeweils mit Polsterung). Das kann nur eine Container-Abfrage.
+
+   Breit: Name · Balken · Stufenwort. Die Balkenspalte hat einen Boden von 184 px, damit jedes
+   der vier Segmente das längste Stufenwort der Legende trägt: (184 − 3 × 2) / 4 = 44,5 px
+   gegen „niedrig" in Mono 10 (≈ 42 px bei 0,6 em).
+
+   Schmal (Paneel unter 332 px; breit braucht 64 + 184 + 52 + zwei Lücken `paddingSM`, das
+   sind 7 / 11 / 16 px je Dichtestufe, also höchstens 332 px): Name und Stufenwort in der ersten Zeile, der Balken darunter über die volle
+   Breite — so behält jedes Segment seine Breite, statt dass die Zeile aus dem Paneel läuft.
+   Die Legende folgt derselben Regel: ihr Raster steht in der Balkenspalte. */
+
+.lfh-gefahrenmatrix {
+  container-type: inline-size;
+}
+
+.lfh-matrixzeile {
+  display: grid;
+  grid-template-columns: minmax(64px, 112px) minmax(184px, 1fr) 52px;
+  align-items: center;
+}
+
+.lfh-stufenraster {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 2px;
+}
+
+@container (max-width: 331.98px) {
+  .lfh-matrixzeile {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .lfh-matrixzeile > .lfh-stufenraster {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .lfh-matrixlegende > .lfh-matrixfueller {
+    display: none;
+  }
+  /* Die Legende hat keine Namenszeile — ihr Raster steht in Zeile 1, aber ebenso über die
+     volle Breite wie die Balken darüber. */
+  .lfh-matrixlegende > .lfh-stufenraster {
+    grid-row: auto;
+  }
+}

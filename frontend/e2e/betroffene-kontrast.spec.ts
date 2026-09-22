@@ -149,7 +149,12 @@ for (const modus of ['light', 'dark'] as const) {
       ['schaeden', schaeden],
     ] as const) {
       await page.goto(`${basis}/${modul}`);
-      await page.getByRole('tab', { name: 'Alle', exact: true }).click();
+      // Schäden filtern seit dem Neuentwurf über eine Segmentleiste (`radio`), Personen ggf.
+      // noch über Reiter — der Griff nimmt beide Rollen.
+      await page
+        .getByRole('tab', { name: 'Alle', exact: true })
+        .or(page.getByRole('radio', { name: 'Alle', exact: true }))
+        .click();
       await expect(page.locator('.ant-table-row')).toHaveCount(saetze.length);
       for (const { id, label } of saetze) {
         const tag = page

@@ -32,6 +32,7 @@ import EinsatzabschnittePage from './pages/EinsatzabschnittePage';
 import GefahrenPage from './pages/gefahren/GefahrenPage';
 import PersonenPage from './pages/PersonenPage';
 import LageDashboardPage from './pages/lage-dashboard/LageDashboardPage';
+import UeberblickPage from './pages/fuehrung/UeberblickPage';
 import TierePage from './pages/TierePage';
 import TiereDetailPage from './pages/TiereDetailPage';
 import SchaedenPage from './pages/SchaedenPage';
@@ -76,6 +77,7 @@ const KraefteuebersichtPage = lazy(() => import('./pages/KraefteuebersichtPage')
  * unter dem key stehen, sonst greift der Stub-Fallback.
  */
 const MODUL_ELEMENTE: Record<string, ReactElement> = {
+  ueberblick: <UeberblickPage />,
   'lage-dashboard': <LageDashboardPage />,
   etb: <EtbPage />,
   chat: <ChatPage />,

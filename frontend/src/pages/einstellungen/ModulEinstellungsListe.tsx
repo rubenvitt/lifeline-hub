@@ -264,7 +264,7 @@ export default function ModulEinstellungsListe({
           )}
           {gruppen.map((g) => (
             <div key={g.kategorie.key}>
-              <SektionHeader titel={g.kategorie.label} />
+              <SektionHeader titel={g.kategorie.label} ueberschrift="h3" />
               <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginXXS }}>
                 {g.module.map(zeile)}
               </div>

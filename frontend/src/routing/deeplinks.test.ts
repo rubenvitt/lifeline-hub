@@ -36,6 +36,7 @@ import {
   erinnerungenPfad,
   kraefteuebersichtPfad,
   parseRouteId,
+  ueberblickPfad,
 } from './deeplinks';
 
 const E = 5; // einsatzId
@@ -115,6 +116,10 @@ describe('deeplinks — Listen-Routes (NaN-Redirect-Ziele)', () => {
    */
   it('kraefteuebersichtPfad', () => {
     expect(kraefteuebersichtPfad(E)).toBe('/einsaetze/5/kraefteuebersicht');
+  });
+
+  it('ueberblickPfad — Startseite des Einsatzes (Neuentwurf)', () => {
+    expect(ueberblickPfad(E)).toBe('/einsaetze/5/ueberblick');
   });
 });
 

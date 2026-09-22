@@ -1,0 +1,15 @@
+/* Lückentönung der Betroffenen-Zeilen (Neuentwurf S7, `lueckeZeile`). Zweiter Kanal ist
+   das Wort „… offen" in der Personenzelle (`personen/personenSpalten.tsx`) — die Tönung
+   allein wäre ein Ein-Kanal-Signal (WCAG 1.4.1).
+
+   ZWEI SELEKTOREN wie bei `.zeile-hervorgehoben` (`index.css`): unter `md` rendert
+   `Datensicht` Karten ohne `td`-Kinder, und im Tabellenzweig färbt antd die ZELLEN — ein
+   Hintergrund am `tr` bliebe verdeckt. Nur `background-color`, kein Verlauf und keine
+   Deckkraft: `e2e/betroffene-kontrast.spec.ts` rechnet die Farbpaare unter dieser Tönung
+   und lehnt jede andere Komposition ab. */
+/* Spezifität über antds Zellregel (`.ant-table-wrapper .ant-table-tbody > tr > td`, dort
+   (0,2,2) hinter `:where(…)`) — sonst hinge die Tönung an der Einfügereihenfolge. */
+.ant-table-wrapper .ant-table-tbody > tr.zeile-luecke > td,
+[data-lfh='datensicht-karte'].zeile-luecke {
+  background-color: var(--lfh-luecke-zeile);
+}

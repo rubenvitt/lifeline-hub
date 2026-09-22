@@ -283,11 +283,11 @@ describe('LageberichtDetailPage', () => {
     await userEvent.type(auftragFeld, '## Schwerpunkt\n- Punkt A');
     // Vorgabe: KEINE Vorschau neben dem Text (H62 — der Split kostete die halbe
     // Schreibbreite und war für 2108 px Scrollstrecke mitverantwortlich).
-    expect(screen.queryByRole('heading', { name: 'Schwerpunkt', level: 2 })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Schwerpunkt', level: 5 })).toBeNull();
     // Der Umschalter ist eine Einstellung in eigener Zeile, keine Aktion in der Knopfreihe.
     await userEvent.click(screen.getByRole('checkbox', { name: 'Vorschau neben dem Text' }));
     expect(
-      await screen.findByRole('heading', { name: 'Schwerpunkt', level: 2 }),
+      await screen.findByRole('heading', { name: 'Schwerpunkt', level: 5 }),
     ).toBeInTheDocument();
     // Listeneintrag muss als listitem erscheinen
     expect(screen.getByText('Punkt A')).toBeInTheDocument();
@@ -305,7 +305,7 @@ describe('LageberichtDetailPage', () => {
     const abschnitt = auftragFeld.closest('.ant-collapse-item') as HTMLElement;
     await userEvent.click(within(abschnitt).getByRole('button', { name: /Vorschau/ }));
     expect(
-      await screen.findByRole('heading', { name: 'Schwerpunkt', level: 2 }),
+      await screen.findByRole('heading', { name: 'Schwerpunkt', level: 5 }),
     ).toBeInTheDocument();
   });
 
@@ -361,9 +361,10 @@ describe('LageberichtDetailPage', () => {
         { schluessel: 'zusammenfassung', text: '' },
       ],
     });
-    // Markdown-Überschrift (h2) muss als Heading gerendert sein, nicht als Rohtext "## Schwerpunkt"
+    // Markdown-Überschrift (`##`, um drei Ebenen gerückt → h5, `Markdown.tsx`) muss als Heading
+    // gerendert sein, nicht als Rohtext "## Schwerpunkt"
     expect(
-      await screen.findByRole('heading', { name: 'Schwerpunkt', level: 2 }),
+      await screen.findByRole('heading', { name: 'Schwerpunkt', level: 5 }),
     ).toBeInTheDocument();
     // Listeneintrag muss als listitem erscheinen, nicht als Rohtext "- Punkt A"
     expect(screen.getByText('Punkt A')).toBeInTheDocument();
@@ -929,8 +930,10 @@ describe('LageberichtePage', () => {
 
   it('trägt Überschrift und Kennzahlenzeile', async () => {
     setup(KETTE);
+    // Seitenkopf des Neuentwurfs (`EinsatzSeite`): der Titel ist die h4 der Kopfleiste,
+    // die Mengen stehen als Mono-Meta daneben — kein eigener Titelblock mehr.
     expect(
-      await screen.findByRole('heading', { name: 'Lageberichte', level: 3 }),
+      await screen.findByRole('heading', { name: 'Lageberichte', level: 1 }),
     ).toBeInTheDocument();
     expect(await screen.findByText(/3 Berichte in 2 Ketten · 1 im Entwurf/)).toBeInTheDocument();
   });

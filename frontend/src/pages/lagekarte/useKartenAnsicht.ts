@@ -264,6 +264,11 @@ export function useKartenAnsicht({ einsatzId, config, aktiveAnsichtId }: KartenA
     ansichtenFehler: ansichtenQuery.isError,
     ansichtenFehlerUrsache: ansichtenQuery.error,
     ansichtenNeuLaden: () => void ansichtenQuery.refetch(),
+    // Steht die Ansichtsliste noch aus? Die Startansicht der Karte (`startAnsicht.ts`) hängt
+    // an der aktiven Ansicht und wird genau einmal verbraucht — ohne dieses Signal entschied
+    // sie bei langsamer Abfrage ohne Ansicht, und deren Zentrum kam nie mehr zum Zug.
+    // Gescheitert zählt als entschieden (`isLoading` fällt), die Karte startet dann ohne.
+    ansichtenLaden: ansichtenQuery.isLoading,
     aktiveAnsicht,
     // Aktive Ansicht-id — für Objekt-Filterung (client-seitig) und das Stempeln neuer Objekte.
     aktiveAnsichtId: aktiveAnsicht?.id,

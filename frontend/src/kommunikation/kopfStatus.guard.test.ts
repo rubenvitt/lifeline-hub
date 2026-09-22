@@ -75,7 +75,7 @@ const KOEPFE = [
  * VOR den Etiketten, fällt das laut auf (der `<Tag>`-Nachweis unten wird rot); steht es
  * DAHINTER, bliebe ein `<Tag color=…>` im abgeschnittenen Rest unsichtbar. Ein
  * Klammerzähler wäre die Antwort darauf — heute ist der Fall hypothetisch, der Kopf
- * trägt genau drei Etiketten und kein zweites `Space`.
+ * trägt genau drei Angaben (Status, Vorlage, Fassung) und kein zweites `Space`.
  */
 function etikettengruppe(inhalt: string, datei: string): string {
   const auf = inhalt.indexOf('<Space size={6} wrap');
@@ -97,7 +97,12 @@ describe('Seitenkopf-Status der Kommunikationsmodule (LFH-493)', () => {
     // Der Schnitt hat wirklich die Gruppe erwischt — sonst prüfte die Zeile darüber
     // eine leere Zeichenkette gegen eine Abwesenheit und wäre immer grün. Zugleich die
     // Gegenprobe gegen das bloße Entfernen der Etikettengruppe.
-    expect(gruppe, `${datei}: der Schnitt enthält die Etiketten`).toContain('<Tag>');
+    //
+    // Seit dem Neuentwurf („Instrumententafel", 21.09.2026) steht die Gruppe als Mono-Meta
+    // im Seitenkopf (`EinsatzSeite meta`): Vorlage und Fassung sind schlichter Satz, keine
+    // `<Tag>` mehr. Der Anker ist deshalb die Fassungsangabe `v{….version}`, die in beiden
+    // Köpfen neben dem Statusetikett steht.
+    expect(gruppe, `${datei}: der Schnitt enthält die Etiketten`).toMatch(/v\{\w+\.version\}/);
   });
 
   it.each(KOEPFE)('%s schreibt den Wortlaut nicht ab, sondern liest ihn', (datei, zugriff) => {

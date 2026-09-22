@@ -1,4 +1,5 @@
-import { Space, Tag, theme } from 'antd';
+import { Space, theme } from 'antd';
+import { monoStil } from '../../components/instrument';
 import { PhoneOutlined, UserOutlined } from '@ant-design/icons';
 import type { Einsatzabschnitt, Staerke } from '../../api/types';
 import StaerkeAnzeige from '../../anzeige/StaerkeAnzeige';
@@ -40,15 +41,20 @@ export default function AbschnittKnoten({ abschnitt, staerke, anzahlEinheiten }:
           display: 'inline-block',
           width: token.fontSizeSM,
           height: token.fontSizeSM,
-          borderRadius: '50%',
+          // Radius 0 auch für den Punkt (Neuentwurf „Instrumententafel": Formensprache).
+          borderRadius: 0,
           backgroundColor: rollenFarbe(besetzt ? 'normal' : 'achtung', token),
         }}
       />
       <span>{abschnitt.name}</span>
-      <Tag color="blue">
+      {/* Stärke und Einheitenzahl sind Zahlen → Mono (Neuentwurf), kein farbiges Etikett:
+          Blau ist die Bedienrolle und benennt hier nichts. */}
+      <span style={{ ...monoStil(12), color: token.colorText }}>
         <StaerkeAnzeige wert={staerke} />
-      </Tag>
-      <span style={{ color: token.colorTextSecondary }}>{anzahlEinheiten} Einh.</span>
+      </span>
+      <span style={{ ...monoStil(12), color: token.colorTextSecondary }}>
+        {anzahlEinheiten} Einh.
+      </span>
       {abschnitt.leiter_name && (
         <span style={{ color: token.colorTextSecondary }}>
           <span aria-hidden="true">

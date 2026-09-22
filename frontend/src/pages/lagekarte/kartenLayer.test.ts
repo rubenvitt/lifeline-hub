@@ -3,9 +3,14 @@ import {
   baueFlaechenFc,
   baueZonenFc,
   planeReAnlegenNachStyle,
+  plakettenBild,
+  plakettenBildId,
   reAnlegenAlles,
+  sorgeFuerZonenLayer,
+  zonenPlakette,
   type ZoneFeature,
 } from './kartenLayer';
+import { farbenDunkel, farbenHell } from '../../theme/tokens';
 import { FACHEBENEN } from './fachebenen';
 import { MARKER_CLUSTER_QUELLE } from './markerLayer';
 
@@ -270,5 +275,71 @@ describe('planeReAnlegenNachStyle — Marker', () => {
     geladen = true;
     map.feuere('render');
     expect(map.getSource(MARKER_CLUSTER_QUELLE)).toBeTruthy();
+  });
+});
+
+/**
+ * Neuentwurf S5: Zonenbeschriftung als Plakette (dunkler Grund, Rahmen `linieStark`,
+ * Versalien) und Gefahrenzonen gestrichelt. Nur Darstellung — keine neue Geometrie.
+ */
+describe('Zonen im Entwurfsstil', () => {
+  it('trägt Strichelung und Plakettenfarben als Feature-Properties', () => {
+    const fc = baueZonenFc([
+      { ...ZONE, gestrichelt: true, plakette: zonenPlakette(farbenHell) },
+      { ...ZONE, id: 2 },
+    ]);
+    const [gefahr, andere] = fc.features.map((f) => f.properties);
+    expect(gefahr.gestrichelt).toBe(true);
+    expect(gefahr.textFarbe).toBe(farbenHell.text);
+    expect(gefahr.plakette).toBe(
+      plakettenBildId({ grund: farbenHell.paneel, rahmen: farbenHell.linieStark }),
+    );
+    // Ohne Angabe: durchgezogen, Nachtfarben (Vorgabe des Neuentwurfs).
+    expect(andere.gestrichelt).toBe(false);
+    expect(andere.textFarbe).toBe(farbenDunkel.text);
+  });
+
+  it('legt durchgezogene und gestrichelte Linien als zwei gefilterte Layer an', () => {
+    const { map } = fakeMap(() => true);
+    sorgeFuerZonenLayer(map, baueZonenFc([ZONE]));
+    const specs = map.addLayer.mock.calls.map((c: [{ id: string }]) => c[0]) as Array<{
+      id: string;
+      filter?: unknown;
+      paint?: Record<string, unknown>;
+      layout?: Record<string, unknown>;
+    }>;
+    const durch = specs.find((l) => l.id === 'zonen-line')!;
+    const strich = specs.find((l) => l.id === 'zonen-line-gestrichelt')!;
+    expect(durch.filter).toEqual(['!=', ['get', 'gestrichelt'], true]);
+    expect(strich.filter).toEqual(['==', ['get', 'gestrichelt'], true]);
+    // Ein konstantes Array, KEIN datengetriebener Ausdruck (Arrays aus Properties lehnt
+    // MapLibre ab — der Layer fehlte dann still).
+    expect(strich.paint?.['line-dasharray']).toEqual([3, 2]);
+    expect(durch.paint?.['line-dasharray']).toBeUndefined();
+    const label = specs.find((l) => l.id === 'zonen-label')!;
+    expect(label.layout?.['text-transform']).toBe('uppercase');
+    expect(label.layout?.['icon-image']).toEqual(['get', 'plakette']);
+    expect(label.layout?.['icon-text-fit']).toBe('both');
+  });
+});
+
+describe('plakettenBild', () => {
+  const id = plakettenBildId({ grund: '#0a0c0e', rahmen: '#2e343a' });
+
+  it('zeichnet 1 px Rahmen in der Rahmenfarbe und den Grund innen', () => {
+    const bild = plakettenBild(id)!;
+    expect(bild.width).toBe(8);
+    const px = (x: number, y: number) =>
+      Array.from(bild.data.slice((y * 8 + x) * 4, (y * 8 + x) * 4 + 4));
+    expect(px(0, 0)).toEqual([0x2e, 0x34, 0x3a, 255]);
+    expect(px(3, 3).slice(0, 3)).toEqual([0x0a, 0x0c, 0x0e]);
+    // Der dehnbare Bereich spart den Rahmen aus — sonst würde er beim Strecken breiter.
+    expect(bild.stretchX).toEqual([[1, 7]]);
+    expect(bild.content).toEqual([1, 1, 7, 7]);
+  });
+
+  it('liefert für fremde oder unlesbare Ids nichts, statt zu werfen', () => {
+    expect(plakettenBild('tz|irgendwas')).toBeNull();
+    expect(plakettenBild('plakette|rot|blau')).toBeNull();
   });
 });

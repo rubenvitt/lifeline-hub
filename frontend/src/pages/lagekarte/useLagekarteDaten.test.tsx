@@ -159,9 +159,9 @@ describe('useLagekarteDaten Standquelle', () => {
     // Die Zone im Dokument hat keinen eigenen Namen (`label: null`) — übrig bleibt die Stufe.
     // Erwartung als LITERAL, nicht über `zonenBeschriftung`: sonst stünden beide Seiten auf
     // derselben Quelle und eine verbogene Beschriftung bliebe grün.
-    expect(result.current.zonenFeatures[0].label).toBe('Warnstufe: mittel');
+    expect(result.current.zonenFeatures[0].label).toBe('mittel');
     // Gegenprobe gegen die Nachbarin auf DERSELBEN Farbe — sie muss am Text auseinandergehen.
-    expect(result.current.zonenFeatures[0].label).not.toBe('Warnstufe: niedrig');
+    expect(result.current.zonenFeatures[0].label).not.toBe('niedrig');
   });
 
   // Codex-Review zu LFH-357 (P1): das Ladegate der Karte (`ladt`) hängt an `einsatz`/`config`,
@@ -176,7 +176,7 @@ describe('useLagekarteDaten Standquelle', () => {
       { wrapper: wrapper() },
     );
     await waitFor(() => expect(result.current.zonenFeatures.length).toBe(1));
-    expect(result.current.zonenFeatures[0].label).toBe('Warnstufe: unbekannt');
+    expect(result.current.zonenFeatures[0].label).toBe('Stufe unbekannt');
     // Die zweite Hälfte der Zusicherung: der vorsichtshalber rote Fallback ist NICHT
     // mitgewandert. Ohne sie beliesse ein Fix, der die Fläche entfärbt, den Test grün.
     const { result: tk } = renderHook(() => theme.useToken(), { wrapper: wrapper() });
@@ -292,5 +292,55 @@ describe('useLagekarteDaten fehlerhafteQuellen', () => {
       { wrapper: wrapper() },
     );
     await waitFor(() => expect(result.current.fehlerhafteQuellen).toEqual(['Gesicherter Stand']));
+  });
+});
+
+/**
+ * `markerLaden` (Nacharbeit 22.09.2026): die Startansicht der Karte entscheidet erst über das
+ * VOLLSTÄNDIGE Markerbild. `ladt` hängt nur an Einsatz und Config und wäre dafür zu früh.
+ */
+describe('useLagekarteDaten markerLaden', () => {
+  it('bleibt wahr, solange eine Marker-Quelle lädt — auch wenn `ladt` schon fertig ist', async () => {
+    let freigeben: () => void = () => {};
+    const gesperrt = new Promise<void>((r) => {
+      freigeben = r;
+    });
+    server.use(
+      http.get('/api/einsaetze/5', () =>
+        HttpResponse.json({ id: 5, bezeichnung: 'T', status: 'aktiv' }),
+      ),
+      http.get('/api/karte/config', () =>
+        HttpResponse.json({
+          online_styles: [],
+          offline_verfuegbar: false,
+          offline_tiles_url: null,
+          offline_attribution: null,
+          offline_regionen: [],
+          karten_bau_verfuegbar: false,
+        }),
+      ),
+      http.get('/api/einsaetze/5/einheiten', async () => {
+        await gesperrt;
+        return HttpResponse.json([]);
+      }),
+      ...[
+        '/api/einsaetze/5/uhs',
+        '/api/einsaetze/5/schaeden',
+        '/api/einsaetze/5/fahrzeuge',
+        '/api/einsaetze/5/abschnitte',
+        '/api/einsaetze/5/zonen',
+        '/api/einsaetze/5/freie-zeichen',
+        '/api/einsaetze/5/gefahrengebiete',
+        '/api/einsaetze/5/lage/meldungen',
+        '/api/einsaetze/5/karte/fuehrungskraefte',
+      ].map((pfad) => http.get(pfad, () => HttpResponse.json([]))),
+    );
+    const { result } = renderHook(() => useLagekarteDaten({ einsatzId: 5, zeigeZonen: true }), {
+      wrapper: wrapper(),
+    });
+    await waitFor(() => expect(result.current.ladt).toBe(false));
+    expect(result.current.markerLaden).toBe(true);
+    freigeben();
+    await waitFor(() => expect(result.current.markerLaden).toBe(false));
   });
 });

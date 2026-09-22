@@ -176,22 +176,25 @@ const BEZEICHNER = /[A-Za-z_$][\w$]*/g;
  * über den Plan-Modus, weil `Liste` mit ihren Trennlinien bereits die Struktur von
  * `personen/PersonVerlauf.tsx` liefert.
  *
- * ── DER ERSTE EINTRAG, UND WARUM DER PLAN-MODUS IHN NICHT TRÄGT (LFH-342 · C7) ──
+ * ── WIEDER LEER, UND WARUM (Neuentwurf S4, 21.09.2026) ─────────────────────────
  *
- * Die ETB-Chronologie braucht **fünf** Kopffelder (Nr. · Zeit · Typ · Von→An · Erfasser),
- * einen Markdown-Block über die **volle Breite** und **drei** Zeilenaktionen. Der
- * Plan-Modus bietet Titel + Status + höchstens DREI Sekundärfelder + genau EINE
- * Primäraktion — im Plan-Modus fielen Berichtigen, Wiedervorlage und Auftrag unter `md`
- * also ersatzlos weg, und der Meldungstext stünde als Etikett/Wert-Paar neben den
- * anderen Feldern statt darunter. An einem beweissichernden Tagebuch ist beides kein
- * hinnehmbarer Verlust; genau H59/H64 war der Anlass des Umbaus.
+ * Der erste und einzige Eintrag war von LFH-342 · C7 bis zum Neuentwurf die
+ * ETB-Chronologie (`etb/EtbTabelle.tsx`): fünf Kopffelder, ein Markdown-Block über die
+ * volle Breite und drei Zeilenaktionen passten nicht in den Plan-Modus (Titel + Status +
+ * drei Sekundärfelder + eine Primäraktion). Mit dem Neuentwurf ist das Tagebuch auf ALLEN
+ * Breiten eine Zeitachse (Entscheidung 3 des Auftraggebers) und läuft gar nicht mehr über
+ * `Datensicht` — es wird gelesen, nicht verglichen, und hat weder Sortierung noch
+ * Spaltenfilter noch Spaltenauswahl. `etb/EtbZeitachse.tsx` baut die Einträge aus dem
+ * Instrument-Baustein `Zeitachseneintrag`; damit ist die Ausnahme erloschen, nicht
+ * verlagert.
  *
- * Was der Eigenbau dafür SELBST tragen muss, steht im Dateikopf von `etb/EtbTabelle.tsx`:
- * `data-lfh="datensicht-karte"` (sonst findet `scrolleZurZeile` die Karte nicht) und die
- * Zeilenklasse (sonst gilt sie nur im Tabellenzweig). Das Primitiv legt beim Eigenbau
- * keinen Wrapper darum — wer den zweiten Eintrag hier hinzufügt, prüft beides mit.
+ * Die Lehre für einen künftigen Eintrag bleibt stehen: das Primitiv legt beim Eigenbau
+ * keinen Wrapper um `karte.render(...)`. Der Eigenbau trägt `data-lfh="datensicht-karte"`
+ * (sonst findet `scrolleZurZeile` die Karte nicht) und die Zeilenklasse (sonst gilt sie nur
+ * im Tabellenzweig) selbst — die Zeitachse tut das weiterhin, obwohl sie keine Datensicht
+ * mehr ist, weil der Deeplink `?eintrag=` über genau diese Marke springt.
  */
-const KARTEN_EIGENBAU: string[] = ['/src/etb/EtbTabelle.tsx'];
+const KARTEN_EIGENBAU: string[] = [];
 
 /**
  * Dateien, die `form="karte"` tragen MÜSSEN — Module, die heute schon kartenbasiert gelesen
@@ -200,8 +203,9 @@ const KARTEN_EIGENBAU: string[] = ['/src/etb/EtbTabelle.tsx'];
 const NUR_KARTE: string[] = [
   '/src/auftraege/BefehlListe.tsx',
   '/src/pages/LageberichtePage.tsx',
-  // Zwölfte Konsumentin seit LFH-348 · C13: ein Lageobjekt wird gelesen, nicht verglichen.
-  '/src/pages/LagemeldungenPage.tsx',
+  // Die Lagemeldungen standen hier von LFH-348 · C13 bis zum Neuentwurf (22.09.2026).
+  // Seitdem sind sie eine Zeitachse außerhalb der Datensicht (`lagemeldungen/zeitachse.ts`,
+  // Begründung im Dateikopf von `pages/LagemeldungenPage.tsx`) — dieselbe Bewegung wie das ETB.
 ];
 
 /**
@@ -268,17 +272,15 @@ const REITERSCHLUESSEL_OFFEN: string[] = [];
  */
 const KONSUMENTEN = [
   '/src/auftraege/BefehlListe.tsx',
-  // Elfte seit LFH-342 · C7: die ETB-Chronologie lief als neunzehnte Konsumentin direkt
-  // auf `KatalogTabelle` und war damit auf jedem Schirm eine Tabelle mit sieben Spalten.
-  // Sie ist damit — wie `SchaedenPage` in C5 — nach OBEN aus dem Katalogtabellen-Inventar
-  // herausgefallen; der Restposten LFH-330 · AP8 ist eingelöst.
-  '/src/etb/EtbTabelle.tsx',
+  // Die ETB-Chronologie (`etb/EtbTabelle.tsx`) war von LFH-342 · C7 bis zum Neuentwurf
+  // (S4, 21.09.2026) die elfte Konsumentin. Seitdem ist das Tagebuch auf allen Breiten eine
+  // Zeitachse (`etb/EtbZeitachse.tsx`) und kein Konsument mehr — begründet an
+  // KARTEN_EIGENBAU oben.
   '/src/pages/FahrzeugePage.tsx',
   '/src/pages/KraefteuebersichtPage.tsx',
   '/src/pages/LageberichtePage.tsx',
-  // Zwölfte seit LFH-348 · C13: die Lagemeldungen lagen auf einer nackten `Liste` ohne
-  // Zeit, Sortierung, Gruppen und Rückweg (Befund M85).
-  '/src/pages/LagemeldungenPage.tsx',
+  // Die Lagemeldungen waren von LFH-348 · C13 bis zum Neuentwurf (22.09.2026) die zwölfte
+  // Konsumentin; seitdem sind sie wie das ETB eine Zeitachse und kein Konsument mehr.
   '/src/pages/MaterialPage.tsx',
   '/src/pages/PersonalPage.tsx',
   '/src/pages/PersonenPage.tsx',
@@ -815,12 +817,22 @@ const AUSNAHMEN = {
 };
 
 describe('Datensicht-Guard (LFH-330 · B2)', () => {
-  it('LFH-464: ausschließlich das vermessene ETB setzt einen eigenen Umbruch', () => {
-    const mitUmbruch = KONSUMENTEN.filter((pfad) =>
-      /\btabelleAb\s*=/.test(ohneKommentare(dateien[pfad])),
-    );
-    expect(mitUmbruch).toEqual(['/src/etb/EtbTabelle.tsx']);
-    expect(ohneKommentare(dateien['/src/etb/EtbTabelle.tsx'])).toContain('tabelleAb="xl"');
+  it('das Primitiv kennt keinen eigenen Umbruchpunkt mehr (tabelleAb) — auto bricht bei md', () => {
+    /*
+     * LFH-464 hatte der ETB-Chronologie als EINZIGER Konsumentin `tabelleAb="xl"` erlaubt
+     * (gemessener 1024-px-Engpass). Seit dem Neuentwurf (S4) ist das Tagebuch auf allen
+     * Breiten eine Zeitachse und keine Datensicht mehr; am 22.09.2026 fiel die Prop deshalb
+     * ganz. Ein Konsument, der sie setzt, bricht jetzt im Typcheck — die Aussage hier hält
+     * die DEKLARATION fern: wer sie zurückholt, braucht wieder eine Browsermessung wie
+     * LFH-464, nicht bloß den Verweis darauf.
+     */
+    const primitiv = ohneKommentare(dateien[PRIMITIV] ?? '');
+    expect(primitiv, 'Datensicht.tsx gelesen').toContain('export default function Datensicht');
+    expect(primitiv).not.toMatch(/\btabelleAb\b/);
+    // Der Auto-Zweig steht fest auf md — LITERAL, damit ein stiller Wechsel rot wird.
+    expect(primitiv).toMatch(/form === 'auto' && abBreite\('md'\)/);
+    // Und die Zeitachse ist wirklich keine Datensicht mehr.
+    expect(konsumentenVon(dateien)).not.toContain('/src/etb/EtbZeitachse.tsx');
   });
 
   it('das Primitiv und alle abgeleiteten Konsumenten halten den Vertrag', () => {
@@ -833,16 +845,15 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
   });
 
   it('die fünf gepflegten Listen stehen auf dem entschiedenen Stand', () => {
-    // GENAU EINER seit LFH-342 · C7, und die Begründung steht über der Liste: die
-    // ETB-Ereigniszeile passt strukturell nicht in den Plan-Modus (fünf Kopffelder,
-    // Volltextblock, drei Aktionen gegen Titel + Status + drei Felder + eine Aktion).
-    // Wer den zweiten einträgt, begründet ebenso — sonst wächst die Ausnahme über das
-    // Band auf fünf und der Kartenplan wäre nur noch ein Vorschlag.
-    expect(KARTEN_EIGENBAU).toHaveLength(1);
-    // Drei Kartenmodule (Befehle, Lageberichte, seit LFH-348 · C13 die Lagemeldungen), eine
-    // Vergleichsfläche. Wer einträgt, ohne umzubauen, fällt am Anwesenheits-Gegentest oben
-    // auf; wer umbaut, ohne einzutragen, an der Formprüfung.
-    expect(NUR_KARTE).toHaveLength(3);
+    // WIEDER LEER seit dem Neuentwurf (S4): die ETB-Chronologie, der einzige Eintrag seit
+    // LFH-342 · C7, ist eine Zeitachse außerhalb der Datensicht geworden. Wer einen neuen
+    // einträgt, begründet wie über der Liste beschrieben — sonst wächst die Ausnahme über
+    // das Band und der Kartenplan wäre nur noch ein Vorschlag.
+    expect(KARTEN_EIGENBAU).toHaveLength(0);
+    // Zwei Kartenmodule (Befehle, Lageberichte — die Lagemeldungen sind seit dem Neuentwurf
+    // eine Zeitachse), eine Vergleichsfläche. Wer einträgt, ohne umzubauen, fällt am
+    // Anwesenheits-Gegentest oben auf; wer umbaut, ohne einzutragen, an der Formprüfung.
+    expect(NUR_KARTE).toHaveLength(2);
     expect(NUR_TABELLE).toHaveLength(1);
     // Die vierte ist keine Ausnahme, sondern eine PFLICHT — und sie ist ausdrücklich
     // dateibezogen. Ein zweiter Eintrag braucht dieselbe Herleitung wie das Meldebild
@@ -862,7 +873,7 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
     expect(dateien[PRIMITIV]).toContain('KatalogTabelle');
   });
 
-  it('der Scan sieht genau die zehn geplanten Konsumenten', () => {
+  it('der Scan sieht genau die geplanten Konsumenten (Neuentwurf: zehn)', () => {
     /**
      * Die Gleichheit prüft BEIDE Richtungen: eine Datei, die still aus dem Primitiv
      * herausfällt, verschwindet aus dem Scan und bleibt in {@link KONSUMENTEN} stehen; eine

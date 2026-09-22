@@ -434,7 +434,7 @@ describe('EinsatzabschnittePage', () => {
   it('bietet im leeren Baum genau eine Primäraktion, und die öffnet einen Entwurf', async () => {
     server.use(...handlers('einsatzleitung', 'aktiv', []));
     renderPage();
-    const karte = (await screen.findByText('Noch keine Abschnitte')).closest('.ant-card');
+    const karte = (await screen.findByText('Noch keine Abschnitte')).closest('[data-lfh="paneel"]');
     expect(karte, 'der Leerzustand muss in der Gliederungs-Karte stehen').not.toBeNull();
     const knoepfe = within(karte as HTMLElement).getAllByRole('button');
     expect(knoepfe).toHaveLength(1);
@@ -578,7 +578,9 @@ describe('EinsatzabschnittePage', () => {
   it('fordert bei fehlender Auswahl zur Wahl auf — ohne Aktion', async () => {
     server.use(...handlers());
     renderPage();
-    const karte = (await screen.findByText('Wähle einen Abschnitt im Baum')).closest('.ant-card');
+    const karte = (await screen.findByText('Wähle einen Abschnitt im Baum')).closest(
+      '[data-lfh="paneel"]',
+    );
     expect(karte).not.toBeNull();
     expect(within(karte as HTMLElement).queryAllByRole('button')).toHaveLength(0);
   });

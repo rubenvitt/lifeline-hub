@@ -1,4 +1,17 @@
-import type { Spezies, Tier } from '../../api/types';
+import type { Spezies, Tier, TierStatus } from '../../api/types';
+import type { StatusTon } from '../../components/instrument';
+
+/**
+ * Tierstatus als Wort + Ton der Statusfläche (Neuentwurf: „Status als getönte Fläche").
+ * Die EINE Zuordnung für Liste und Detailseite — vorher stand dieselbe Map zweimal, mit
+ * antd-Tag-Farbnamen. `vermisst` ist `achtung` wie beim Personenstatus (CLAUDE.md, LFH-455),
+ * `abgeschlossen` neutral. Das Wort ist Pflicht: der Ton ist nie der einzige Kanal.
+ */
+export const TIER_STATUS: Record<TierStatus, { label: string; ton: StatusTon }> = {
+  aktiv: { label: 'aktiv', ton: 'normal' },
+  vermisst: { label: 'vermisst', ton: 'achtung' },
+  abgeschlossen: { label: 'abgeschlossen', ton: 'neutral' },
+};
 
 /**
  * Filterkette der Tierliste als reine Funktion (LFH-330 · B2, Muster

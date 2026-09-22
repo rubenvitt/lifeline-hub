@@ -1,0 +1,65 @@
+/* Einsatzkachel der Einsatzliste (Neuentwurf „Instrumententafel"): Fläche statt antd-Card,
+   Radius 0, Haarlinie. Hover/Fokus stehen hier, weil `:hover`/`:focus-within` inline nicht
+   erreichbar sind; Farben ausschließlich über die Rollen aus `theme/rollen.css`. */
+.lfh-einsatzkachel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--lfh-flaeche);
+  border: 1px solid var(--lfh-linie);
+  border-radius: 0;
+  cursor: pointer;
+  transition:
+    background var(--lfh-uebergang),
+    border-color var(--lfh-uebergang);
+}
+
+.lfh-einsatzkachel:hover {
+  background: var(--lfh-flaeche-2);
+  border-color: var(--lfh-linie-stark);
+}
+
+.lfh-einsatzkachel:focus-within {
+  outline: 2px solid var(--lfh-bedien);
+  outline-offset: -2px;
+}
+
+/* Abgeschlossen: gedämpft über die Textrolle, NICHT über `opacity` — Deckkraft senkte den
+   Kontrast aller Kinder unter die Böden aus Kriterium 5. */
+.lfh-einsatzkachel--abgeschlossen {
+  background: var(--lfh-paneel);
+}
+
+.lfh-einsatzkachel__kopf {
+  display: flex;
+  align-items: center;
+  gap: var(--lfh-luft-2);
+  min-width: 0;
+  padding: 0 var(--lfh-luft-3);
+  border-bottom: 1px solid var(--lfh-flaeche-3);
+}
+
+.lfh-einsatzkachel__link {
+  color: var(--lfh-text);
+  font-family: var(--lfh-schrift-text);
+  font-size: var(--lfh-typo-seitentitel-groesse);
+  font-weight: var(--lfh-typo-seitentitel-gewicht);
+}
+
+.lfh-einsatzkachel--abgeschlossen .lfh-einsatzkachel__link {
+  color: var(--lfh-text-2);
+}
+
+.lfh-einsatzkachel__link:hover,
+.lfh-einsatzkachel__link:focus-visible {
+  color: var(--lfh-bedien-hover);
+}
+
+.lfh-einsatzkachel__leib {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lfh-luft-1);
+  padding: var(--lfh-luft-2) var(--lfh-luft-3);
+  color: var(--lfh-gedaempft);
+  font-size: 12px;
+}

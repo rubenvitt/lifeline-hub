@@ -74,6 +74,9 @@ beforeEach(async () => {
   vi.stubGlobal('BroadcastChannel', FakeBroadcastChannel);
   Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
   Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
+  // Die Seite lädt die Unfallhilfsstellen für `@UHS` und die Verbleib-Spalte; ohne eigene
+  // Angabe eines Tests gibt es keine.
+  server.use(http.get('/api/einsaetze/:einsatzId/uhs', () => HttpResponse.json([])));
   await queueLeerenFuerTests();
 });
 afterEach(() => {
@@ -220,12 +223,18 @@ function OfflineSyncTest({ benutzerId }: { benutzerId: number }) {
 }
 
 describe('PersonenPage', () => {
-  it('zeigt Personen der Sicht „Neu" mit Registriernummer und Status', async () => {
+  it('zeigt in der Vorgabe ALLE Personen; der Filter „Neu" zeigt nur erfasste', async () => {
+    // Vorgabe „Alle" statt des früheren „Neu": eine über die Zeile MIT Sichtung erfasste
+    // Person hebt der Server auf `betroffen` — unter „Neu" verschwände sie beim Erfassen.
     render(einsatzAktiv, [person, unbekannt]);
     expect(await screen.findByText('R-001')).toBeInTheDocument();
+    expect(screen.getByText('R-002')).toBeInTheDocument();
     expect(screen.getByText('Mustermann, Max')).toBeInTheDocument();
-    // unbekannt (vermisst) ist in der Default-Sicht „Neu" (erfasst) NICHT sichtbar:
-    expect(screen.queryByText('R-002')).not.toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Alle', selected: true })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Neu' }));
+    await vi.waitFor(() => expect(screen.queryByText('R-002')).not.toBeInTheDocument());
+    expect(screen.getByText('R-001')).toBeInTheDocument();
   });
 
   it('filtert per Tab auf Vermisst und zeigt „unbekannt"', async () => {
@@ -291,25 +300,30 @@ describe('PersonenPage', () => {
   /**
    * LFH-340 · C5. Der Kopf kam aus einem handgebauten Block (Breadcrumb, `Title level={3}`,
    * Status-Tag, `Datenstand`, Schreibrecht-Alert) — also genau aus dem Slotsatz, den
-   * `EinsatzSeite` seit LFH-328 · A2 trägt. Die zweite Zeile ist die tragende: „level 4 da"
+   * `EinsatzSeite` seit LFH-328 · A2 trägt. Die zweite Zeile ist die tragende: „level 1 da"
    * allein wäre auch grün, wenn der Handbau daneben stehen bliebe.
    */
-  it('trägt den gemeinsamen Modulkopf statt einer handgebauten Titelzeile', async () => {
-    render(einsatzAktiv, []);
-    expect(await screen.findByRole('heading', { level: 4, name: /Personen/ })).toBeInTheDocument();
+  it('trägt den Seitenkopf „Betroffene" mit Mono-Meta „n erfasst"', async () => {
+    render(einsatzAktiv, [person, unbekannt]);
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Betroffene' }),
+    ).toBeInTheDocument();
+    expect(await screen.findByText('2 erfasst')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { level: 3 })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Einsätze' })).toBeInTheDocument();
   });
 
-  it('Einsatzleitung sieht die Anlege-Buttons', async () => {
+  it('Einsatzleitung sieht die Erfassungszeile und die Masken-Wege', async () => {
     render(einsatzAktiv, []);
-    await screen.findByRole('heading', { name: /Personen/ });
+    await screen.findByRole('heading', { name: /Betroffene/ });
+    expect(screen.getByRole('textbox', { name: 'Kurzeingabe Person' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Person erfassen' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Schnellerfassung' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Vermisst melden' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Betroffene/n erfassen' })).toBeInTheDocument();
   });
 
-  it('bestätigt die Registriernummer, wechselt in die Zielsicht und hebt die neue Person hervor', async () => {
+  it('bestätigt die Registriernummer, macht die neue Person sichtbar und hebt sie hervor', async () => {
     const vermisst = {
       ...person,
       id: 47,
@@ -326,6 +340,9 @@ describe('PersonenPage', () => {
       }),
     );
     render(einsatzAktiv, []);
+    // Ein Filter, der die neue Person VERBIRGT: er muss auf „Alle" zurückfallen, sonst stünde
+    // die Hervorhebung an einer Zeile, die gar nicht angezeigt wird.
+    await userEvent.click(await screen.findByRole('tab', { name: 'Neu' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Vermisst melden' }));
     // Der Name liegt seit LFH-340 · C5 unter „Weitere Angaben" — für diesen Fall genügt der
     // Antreffort, die Maske hat ohnehin keine Pflichtfelder.
@@ -333,7 +350,7 @@ describe('PersonenPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
 
     expect(await screen.findByText('Erfasst als R-047')).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Vermisst', selected: true })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Alle', selected: true })).toBeInTheDocument();
     const kennung = await screen.findByText('R-047');
     expect(kennung.closest('tr')).toHaveClass('zeile-hervorgehoben');
   });
@@ -361,7 +378,9 @@ describe('PersonenPage', () => {
     );
     render(einsatzAktiv, []);
     await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
-    const skZwei = within(screen.getByRole('radiogroup')).getAllByRole('radio')[1];
+    const skZwei = within(
+      screen.getByRole('radiogroup', { name: 'Sichtungskategorie' }),
+    ).getAllByRole('radio')[1];
     await userEvent.click(skZwei.closest('label')!);
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
 
@@ -522,7 +541,7 @@ describe('PersonenPage', () => {
     await vi.waitFor(() => expect(screen.queryByText('Erfasst als R-077')).not.toBeInTheDocument());
     expect(screen.getByText('Person B')).toBeInTheDocument();
     expect(screen.queryByText('Person A')).not.toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Neu' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'Alle' })).toHaveAttribute('aria-selected', 'true');
     expect(container.querySelector('[data-row-key="77"]')).not.toHaveClass('zeile-hervorgehoben');
     expect(screen.getByRole('dialog')).toHaveTextContent('Schnellerfassung');
   });
@@ -560,7 +579,7 @@ describe('PersonenPage', () => {
     });
 
     expect(await screen.findByText('Erfasst als R-048')).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Vermisst', selected: true })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Alle', selected: true })).toBeInTheDocument();
     expect((await screen.findByText('R-048')).closest('tr')).toHaveClass('zeile-hervorgehoben');
   });
 
@@ -604,7 +623,7 @@ describe('PersonenPage', () => {
 
     const zweiteSeite = render(einsatzAktiv, [vermisst]);
     expect(await screen.findByText('Erfasst als R-049')).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Vermisst', selected: true })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Alle', selected: true })).toBeInTheDocument();
     expect((await screen.findByText('R-049')).closest('tr')).toHaveClass('zeile-hervorgehoben');
     // Render allein ist kein globaler Ack: ein anderer sichtbarer Tab muss das
     // Receipt nach seinem datenarmen Signal noch aus IDB lesen können.
@@ -618,9 +637,9 @@ describe('PersonenPage', () => {
     zweiteSeite.unmount();
 
     render(einsatzAktiv, [vermisst]);
-    await screen.findByRole('heading', { name: /Personen/ });
+    await screen.findByRole('heading', { name: /Betroffene/ });
     expect(screen.queryByText('Erfasst als R-049')).not.toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Neu', selected: true })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Alle', selected: true })).toBeInTheDocument();
   });
 
   it('sendet tabübergreifend ausschließlich den Receipt-Scope ohne Personendaten', () => {
@@ -661,7 +680,7 @@ describe('PersonenPage', () => {
       name: 'Aus anderem Tab',
     };
     render(einsatzAktiv, []);
-    await screen.findByRole('heading', { name: /Personen/ });
+    await screen.findByRole('heading', { name: /Betroffene/ });
     await schreibaktionEinreihen(nutzer.id, 1, {
       art: 'person',
       daten: { name: 'Aus anderem Tab', status: 'vermisst', client_id: 'cross-tab-50' },
@@ -694,7 +713,7 @@ describe('PersonenPage', () => {
       });
     });
     expect(await screen.findByText('Erfasst als R-050')).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Vermisst', selected: true })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Alle', selected: true })).toBeInTheDocument();
     expect((await screen.findByText('R-050')).closest('tr')).toHaveClass('zeile-hervorgehoben');
 
     // Wiederholtes Signal und konkurrierender Re-Read bleiben idempotent; erst
@@ -737,7 +756,7 @@ describe('PersonenPage', () => {
 
     render(einsatzAktiv, []);
     expect(await screen.findByText('Erfasst als R-051')).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Betroffen', selected: true })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Alle', selected: true })).toBeInTheDocument();
     expect(quittungSchliessenButton()).not.toBeInTheDocument();
     expect(await personErfassungsQuittungenLaden(nutzer.id, 1)).toHaveLength(1);
 
@@ -814,13 +833,13 @@ describe('PersonenPage', () => {
 
     expect(screen.queryByText('Erfasst als R-078')).not.toBeInTheDocument();
     expect(screen.queryByText('Offline A')).not.toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Neu' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'Alle' })).toHaveAttribute('aria-selected', 'true');
     expect(container.querySelector('[data-row-key="78"]')).not.toHaveClass('zeile-hervorgehoben');
 
     await userEvent.click(screen.getByRole('button', { name: 'Zu Einsatz A' }));
     expect(await screen.findByText('Offline A')).toBeInTheDocument();
     expect(screen.getByText('Erfasst als R-078')).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Vermisst' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'Alle' })).toHaveAttribute('aria-selected', 'true');
     expect(container.querySelector('[data-row-key="78"]')).toHaveClass('zeile-hervorgehoben');
   });
 
@@ -828,6 +847,8 @@ describe('PersonenPage', () => {
     render(einsatzBeobachter, [person]);
     await screen.findByText('R-001');
     expect(screen.queryByRole('button', { name: 'Schnellerfassung' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Kurzeingabe Person' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Person erfassen' })).not.toBeInTheDocument();
   });
 
   it('leitet den Alt-Deep-Link ?person=<id> auf die Detailseite um', async () => {
@@ -837,7 +858,7 @@ describe('PersonenPage', () => {
     expect(await screen.findByRole('heading', { name: /Person R-001/ })).toBeInTheDocument();
   });
 
-  it('zeigt SK-Badge und Lagebild-Zählungen', async () => {
+  it('zeigt die Sichtung als BBK-Etikett und zählt das Sichtungsbild der Seitenleiste', async () => {
     const gesichtet = {
       ...person,
       id: 12,
@@ -847,16 +868,96 @@ describe('PersonenPage', () => {
       aktuelle_sichtung_at: '2026-05-27 09:30:00',
     };
     render(einsatzAktiv, [person, unbekannt, gesichtet]);
-    // Liste-Sicht „Alle" wählen, dann nach SK-Tag suchen
     await screen.findByText('R-001');
-    await userEvent.click(screen.getByRole('tab', { name: 'Alle' }));
-    expect(await screen.findByText('SK II')).toBeInTheDocument();
-    // Lagebild: „SK II: 1", „ungesichtet: 2" (person + unbekannt)
-    expect(screen.getByText(/SK II:\s*1/)).toBeInTheDocument();
-    expect(screen.getByText(/ungesichtet:\s*2/)).toBeInTheDocument();
+    // Das Etikett in der Zeile ist der `SichtungsTag` (BBK-Farbfeld), nicht eine Designfarbe.
+    const zeile = (await screen.findByText('R-003')).closest('tr')!;
+    expect(zeile.querySelector('[data-sichtung="sk2"]')).toHaveTextContent('SK II');
+
+    const bild = screen.getByRole('region', { name: 'Sichtungsbild' });
+    expect(bild.querySelector('[data-lfh="summe"]')).toHaveTextContent('3');
+    const reihe = (k: string) => bild.querySelector(`[data-sichtung-zeile="${k}"]`)!;
+    expect(reihe('sk2')).toHaveTextContent(/SK II.*schwer.*1$/);
+    expect(reihe('ohne')).toHaveTextContent(/ohne Sichtung.*2$/);
+    expect(reihe('sk1')).toHaveTextContent(/0$/);
+    expect(within(bild).getByRole('img')).toHaveAccessibleName(
+      'Betroffene nach Sichtung: SK I 0, SK II 1, SK III 0, SK IV 0, tot 0, unverletzt 0, ohne Sichtung 2',
+    );
   });
 
-  it('Patienten-Tab gruppiert SK I–IV + tot in Abschnitte, ohne unverletzt/ungesichtet', async () => {
+  it('zählt Verbleib und offene Felder nur über angetroffene Personen', async () => {
+    const mitVerbleib = {
+      ...person,
+      id: 21,
+      registrier_nr: 21,
+      status: 'betroffen' as const,
+      aktueller_verbleib: 'Transport → KH Nord',
+    };
+    const inUhs = {
+      ...person,
+      id: 22,
+      registrier_nr: 22,
+      status: 'betroffen' as const,
+      aktuelle_uhs_id: 7,
+      antreff_ort: null,
+    };
+    server.use(
+      http.get('/api/einsaetze/:einsatzId/uhs', () =>
+        HttpResponse.json([
+          { id: 7, einsatz_id: 1, bezeichnung: 'Weserstadion', typ: 'uhs', status: 'aktiv' },
+        ]),
+      ),
+    );
+    // `person` (erfasst, ohne Verbleib) ist offen; `unbekannt` (vermisst) zählt NICHT.
+    render(einsatzAktiv, [person, unbekannt, mitVerbleib, inUhs]);
+    await screen.findByText('R-001');
+
+    const verbleib = screen.getByRole('region', { name: 'Verbleib' });
+    await vi.waitFor(() =>
+      expect(verbleib.querySelector('[data-verbleib="uhs:7"]')).toHaveTextContent('Weserstadion1'),
+    );
+    expect(verbleib.querySelector('[data-verbleib="transport"]')).toHaveTextContent('Transport1');
+    expect(verbleib.querySelector('[data-verbleib="offen"]')).toHaveTextContent('offen1');
+
+    const offen = screen.getByRole('region', { name: 'Offene Felder' });
+    expect(offen.querySelector('[data-lfh="offene-felder"]')).toHaveTextContent(
+      /^1 ohne Verbleib, 1 ohne Fundort — 2 Datensätze\./,
+    );
+    // Die Verbleib-Zelle nennt die UHS beim Namen.
+    expect((await screen.findByText('R-022')).closest('tr')).toHaveTextContent('UHS Weserstadion');
+  });
+
+  it('tönt Lückenzeilen und schreibt das Wort dazu; „Nur Lücken zeigen" filtert darauf', async () => {
+    const vollstaendig = {
+      ...person,
+      id: 23,
+      registrier_nr: 23,
+      status: 'betroffen' as const,
+      aktueller_verbleib: 'entlassen',
+    };
+    render(einsatzAktiv, [person, vollstaendig, unbekannt]);
+    const offen = (await screen.findByText('R-001')).closest('tr')!;
+    expect(offen).toHaveClass('zeile-luecke');
+    // Zweiter Kanal: das Wort in der Personenzelle, nicht nur die Tönung.
+    expect(offen).toHaveTextContent('Verbleib offen');
+    const voll = screen.getByText('R-023').closest('tr')!;
+    expect(voll).not.toHaveClass('zeile-luecke');
+    // Regex statt Teilstring: „betroffen" enthält „offen".
+    expect(voll).not.toHaveTextContent(/(Verbleib|Fundort) offen/);
+    // Vermisst ist KEINE Lücke — sie hat naturgemäß weder Fundort noch Verbleib.
+    expect(screen.getByText('R-002').closest('tr')).not.toHaveClass('zeile-luecke');
+
+    const knopf = screen.getByRole('button', { name: 'Nur Lücken zeigen' });
+    expect(knopf).toHaveAttribute('aria-pressed', 'false');
+    await userEvent.click(knopf);
+    expect(knopf).toHaveAttribute('aria-pressed', 'true');
+    await vi.waitFor(() => expect(regFolge()).toEqual(['R-001']));
+
+    // Gegenhälfte: aus wieder an → alle drei zurück.
+    await userEvent.click(knopf);
+    await vi.waitFor(() => expect(regFolge()).toHaveLength(3));
+  });
+
+  it('Sichtungsraster gruppiert ALLE Personen nach Sichtung, samt unverletzt und ohne Sichtung', async () => {
     const sk2 = {
       ...person,
       id: 12,
@@ -882,64 +983,30 @@ describe('PersonenPage', () => {
       aktuelle_sichtung_at: '2026-05-27 09:50:00',
     };
     render(einsatzAktiv, [person, sk2, totVerstorben, unverletzt]);
-    await screen.findByText('R-001'); // ungesichtete Person im „Neu"-Tab
-    await userEvent.click(screen.getByRole('tab', { name: 'Patienten' }));
-    // SK-II-Abschnitt + tot-Abschnitt: beide Patienten sichtbar:
-    expect(await screen.findByText('R-003')).toBeInTheDocument();
-    expect(screen.getByText('R-004')).toBeInTheDocument();
-    // Zwei belegte Gruppen mit je einem Patienten. Die Gruppenachse erscheint im
-    // Tabellenzweig als Zählerstreifen der Werkzeugzeile („SK II · 1"), NICHT als
-    // Zwischenkopfzeile — synthetische Gruppenzeilen sind bei unbedingt fixierter Spalte 0
-    // ungeprüft (API-Entscheidung §9.8).
+    await screen.findByText('R-001');
+    const ansicht = screen.getByRole('radiogroup', { name: 'Ansicht' });
+    expect(within(ansicht).getByRole('radio', { name: 'Zeilen' })).toBeChecked();
+    // „Karte" gibt es nicht — an der Person gibt es keine Koordinate (LFH-613).
+    expect(within(ansicht).queryByRole('radio', { name: 'Karte' })).not.toBeInTheDocument();
+
+    await userEvent.click(within(ansicht).getByRole('radio', { name: 'Sichtungsraster' }));
+    expect(
+      await screen.findByRole('region', { name: 'Betroffene nach Sichtungskategorie' }),
+    ).toBeInTheDocument();
+    // Die Gruppenachse erscheint im Tabellenzweig als Zählerstreifen der Werkzeugzeile —
+    // KEINE synthetischen Zwischenzeilen (API-Entscheidung §9.8).
     expect(screen.getByText('SK II · 1')).toBeInTheDocument();
     expect(screen.getByText('tot · 1')).toBeInTheDocument();
-    // unverletzt (R-005) und ungesichtet (R-001) sind KEINE Patienten:
-    expect(screen.queryByText('R-005')).not.toBeInTheDocument();
-    expect(screen.queryByText('R-001')).not.toBeInTheDocument();
-    // Achsen-Überlappung: verstorben+tot erscheint AUCH im Verstorben-Tab:
+    expect(screen.getByText('unverletzt · 1')).toBeInTheDocument();
+    expect(screen.getByText('ohne Sichtung · 1')).toBeInTheDocument();
+    // Dringlichkeit zuerst: SK II vor tot vor unverletzt vor ohne Sichtung.
+    await vi.waitFor(() => expect(regFolge()).toEqual(['R-003', 'R-004', 'R-005', 'R-001']));
+    // Der Statusfilter gilt auch im Raster.
     await userEvent.click(screen.getByRole('tab', { name: 'Verstorben' }));
-    expect(await screen.findByText('R-004')).toBeInTheDocument();
+    await vi.waitFor(() => expect(regFolge()).toEqual(['R-004']));
   });
 
-  it('Patienten-Tab zeigt einen Leer-Hinweis, wenn niemand gesichtet ist', async () => {
-    render(einsatzAktiv, [person, unbekannt]); // beide ungesichtet
-    await screen.findByText('R-001');
-    await userEvent.click(screen.getByRole('tab', { name: 'Patienten' }));
-    expect(await screen.findByText(/Keine Patienten/)).toBeInTheDocument();
-  });
-
-  it('Lagebild-Streifen zeigt „Patienten: N" (SK I–IV + tot)', async () => {
-    const sk2 = {
-      ...person,
-      id: 12,
-      registrier_nr: 3,
-      status: 'betroffen' as const,
-      aktuelle_sichtung: 'sk2' as const,
-      aktuelle_sichtung_at: '2026-05-27 09:30:00',
-    };
-    const tot = {
-      ...person,
-      id: 13,
-      registrier_nr: 4,
-      status: 'verstorben' as const,
-      aktuelle_sichtung: 'tot' as const,
-      aktuelle_sichtung_at: '2026-05-27 09:40:00',
-    };
-    const unverletzt = {
-      ...person,
-      id: 14,
-      registrier_nr: 5,
-      status: 'betroffen' as const,
-      aktuelle_sichtung: 'unverletzt' as const,
-      aktuelle_sichtung_at: '2026-05-27 09:50:00',
-    };
-    render(einsatzAktiv, [person, sk2, tot, unverletzt]);
-    await screen.findByText('R-001');
-    // Patienten = sk2 + tot = 2 (unverletzt + ungesichtet zählen nicht):
-    expect(await screen.findByText(/Patienten:\s*2/)).toBeInTheDocument();
-  });
-
-  it('öffnet via ?neu=1 die Schnellerfassung', async () => {
+  it('öffnet via ?neu=1 die Schnellerfassung (die Maske, nicht die Zeile)', async () => {
     render(einsatzAktiv, [], '/einsaetze/1/personen?neu=1');
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toBeInTheDocument();
@@ -949,7 +1016,7 @@ describe('PersonenPage', () => {
   it('öffnet via ?neu=1 die Schnellerfassung NICHT für Beobachter', async () => {
     render(einsatzBeobachter, [], '/einsaetze/1/personen?neu=1');
     // Seite lädt durch (Tabelle ist leer, kein Spinner mehr)
-    await screen.findByRole('heading', { name: /Personen/ });
+    await screen.findByRole('heading', { name: /Betroffene/ });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
@@ -964,12 +1031,13 @@ describe('PersonenPage', () => {
     ];
     render(einsatzAktiv, drei);
     await screen.findByText('R-001');
-    await userEvent.click(screen.getByRole('tab', { name: 'Alle' }));
     await vi.waitFor(() => expect(regFolge()).toHaveLength(3));
-    expect(regFolge()).toEqual(['R-001', 'R-002', 'R-003']);
+    // Jüngste Registrierung oben (Entwurf S7): die zuletzt Erfasste steht dort, wo die
+    // Erfassungszeile ist.
+    expect(regFolge()).toEqual(['R-003', 'R-002', 'R-001']);
   });
 
-  it('zeigt „seit" und ordnet Patienten derselben SK ältester-zuerst', async () => {
+  it('zeigt die Zeit und ordnet im Raster dieselbe SK ältester-zuerst', async () => {
     /**
      * FALLE, gemessen: alle Bestandsfixtures sind aus `person` gespreizt und teilen
      * `erfasst_at: '2026-05-27 09:00:00'`. Eine Zeitsortier-Behauptung über gleiche
@@ -993,16 +1061,13 @@ describe('PersonenPage', () => {
       aktuelle_sichtung_at: '2026-05-27 09:10:00',
     };
     render(einsatzAktiv, [spaet, frueh]);
-    // Auf den REITER warten, nicht auf eine Zeile: beide Personen sind `betroffen` und
-    // damit im Vorgabe-Reiter „Neu" unsichtbar.
-    await userEvent.click(await screen.findByRole('tab', { name: 'Patienten' }));
+    await userEvent.click(await screen.findByRole('radio', { name: 'Sichtungsraster' }));
     await vi.waitFor(() => expect(regFolge()).toHaveLength(2));
     // Die Spalte existiert überhaupt …
-    expect(screen.getByRole('columnheader', { name: /seit/ })).toBeInTheDocument();
-    // … und trägt eine taktische DTG (Muster, kein Fixwert — Lokalzeit des Testrechners) …
-    const dtg = screen
-      .getAllByText(/^\d{6}(JAN|FEB|MÄR|APR|MAI|JUN|JUL|AUG|SEP|OKT|NOV|DEZ)2026$/)
-      .map((e) => e.textContent);
+    expect(screen.getByRole('columnheader', { name: /Zeit/ })).toBeInTheDocument();
+    // … und trägt eine taktische DTG `DDHHmm` (Muster, kein Fixwert — Lokalzeit des
+    // Testrechners) …
+    const dtg = screen.getAllByText(/^\d{6}$/).map((e) => e.textContent);
     expect(dtg).toHaveLength(2);
     // … mit ZWEI VERSCHIEDENEN Werten: beide Fixtures teilen `erfasst_at` und `geaendert_at`,
     // also blieb ein `render` auf einem dieser Felder grün, solange nur das Format geprüft
@@ -1030,8 +1095,7 @@ describe('PersonenPage', () => {
       aktuelle_sichtung_at: '2026-05-27 09:40:00',
     };
     render(einsatzAktiv, [sk2, tot]);
-    // Reiter statt Zeile abwarten: beide Personen sind im Vorgabe-Reiter „Neu" unsichtbar.
-    await userEvent.click(await screen.findByRole('tab', { name: 'Patienten' }));
+    await userEvent.click(await screen.findByRole('radio', { name: 'Sichtungsraster' }));
     expect(await screen.findByText('SK II · 1')).toBeInTheDocument();
     expect(screen.getByText('tot · 1')).toBeInTheDocument();
     /**
@@ -1044,9 +1108,10 @@ describe('PersonenPage', () => {
     expect(screen.queryByText(/^SK I · /)).not.toBeInTheDocument();
     expect(screen.queryByText(/^SK III · /)).not.toBeInTheDocument();
     expect(screen.queryByText(/^SK IV · /)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^ohne Sichtung · /)).not.toBeInTheDocument();
   });
 
-  it('trägt „seit" in den Kartenzweig und ersetzt dort die Abgleich-Zelle durch einen Dialog', async () => {
+  it('trägt die Zeit in den Kartenzweig und ersetzt dort die Abgleich-Zelle durch einen Dialog', async () => {
     /**
      * Zwei Aussagen in einem Fall, weil sie denselben Zweig brauchen:
      *
@@ -1067,10 +1132,8 @@ describe('PersonenPage', () => {
     // Genau EIN Zweig im Baum.
     expect(schmal.container.querySelector('.ant-table')).toBeNull();
     // Etikett UND Wert — das Etikett ist der zweite Kanal der Karte.
-    expect(screen.getByText('seit')).toBeInTheDocument();
-    expect(
-      screen.getByText(/^\d{6}(JAN|FEB|MÄR|APR|MAI|JUN|JUL|AUG|SEP|OKT|NOV|DEZ)2026$/),
-    ).toBeInTheDocument();
+    expect(screen.getByText('Zeit')).toBeInTheDocument();
+    expect(screen.getByText(/^\d{6}$/)).toBeInTheDocument();
     // Das Tastaturziel der Zeile ist der Titel-Link, nicht die Kartenfläche.
     expect(screen.getByRole('link', { name: 'R-002' })).toHaveAttribute(
       'href',
@@ -1093,7 +1156,6 @@ describe('PersonenPage', () => {
 
   it('rendert genau einen Datensatz-Link pro Personenzeile', async () => {
     render(einsatzAktiv, [person, unbekannt]);
-    await userEvent.click(await screen.findByRole('tab', { name: 'Alle' }));
 
     const links = await screen.findAllByRole('link', { name: /^R-00[12]$/ });
     expect(links).toHaveLength(2);
@@ -1132,7 +1194,9 @@ describe('PersonenPage', () => {
     expect(await screen.findByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
     expect(screen.getByText('Personen konnten nicht geladen werden')).toBeInTheDocument();
     expect(screen.queryByText('Keine Personen in dieser Sicht')).not.toBeInTheDocument();
-    expect(screen.queryByText('Keine Patienten in diesem Einsatz.')).not.toBeInTheDocument();
+    // Die Seitenleiste zählt aus derselben Menge — über dem Fehler meldete sie „0 erfasst",
+    // eine Zahl, die niemand erhoben hat.
+    expect(screen.queryByRole('region', { name: 'Sichtungsbild' })).not.toBeInTheDocument();
   });
 
   it('zeigt bei leerer Menge die Leertexte und KEINEN Fehler', async () => {
@@ -1141,8 +1205,8 @@ describe('PersonenPage', () => {
     expect(await screen.findByText('Keine Personen in dieser Sicht')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('tab', { name: 'Patienten' }));
-    expect(await screen.findByText('Keine Patienten in diesem Einsatz.')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('radio', { name: 'Sichtungsraster' }));
+    expect(await screen.findByText('Keine Personen in dieser Sicht')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
   });
 
@@ -1173,5 +1237,191 @@ describe('PersonenPage', () => {
     // Die Zeilen aus dem Zwischenspeicher bleiben stehen — der Fehler verdrängt sie NICHT.
     expect(screen.getByText('R-001')).toBeInTheDocument();
     expect(screen.queryByText('Personen konnten nicht geladen werden')).not.toBeInTheDocument();
+  });
+
+  describe('Erfassungszeile /person', () => {
+    const feld = () => screen.getByRole('textbox', { name: 'Kurzeingabe Person' });
+
+    it('erfasst in Serie: EIN POST mit Sichtung und client_id, Feld leer, Fokus bleibt, Quittung aus der Antwort', async () => {
+      const koerper: Record<string, unknown>[] = [];
+      const antworten = [
+        {
+          ...person,
+          id: 60,
+          registrier_nr: 60,
+          status: 'betroffen',
+          name: 'Kowalski',
+          vorname: 'Anna',
+          geschlecht: 'weiblich',
+          alter_geschaetzt: 34,
+          aktuelle_sichtung: 'sk3',
+          antreff_ort: null,
+        },
+        {
+          ...person,
+          id: 61,
+          registrier_nr: 61,
+          status: 'betroffen',
+          name: 'Hoffmann',
+          vorname: null,
+          aktuelle_sichtung: 'sk2',
+          antreff_ort: null,
+        },
+      ];
+      server.use(
+        http.post('/api/einsaetze/1/personen', async ({ request }) => {
+          koerper.push((await request.json()) as Record<string, unknown>);
+          return HttpResponse.json(antworten[koerper.length - 1], { status: 201 });
+        }),
+      );
+      render(einsatzAktiv, []);
+      await userEvent.type(
+        await screen.findByRole('textbox', { name: 'Kurzeingabe Person' }),
+        'Kowalski, Anna w 34 sk3',
+      );
+      // Erkannte Teile stehen als Marken darunter — die Sichtung als BBK-`SichtungsTag`.
+      const erkannt = document.querySelector('[data-lfh="erkannt"]')!;
+      expect(erkannt).toHaveTextContent('Kowalski, Anna');
+      expect(erkannt.querySelector('[data-sichtung="sk3"]')).toHaveTextContent('SK III');
+
+      await userEvent.keyboard('{Enter}');
+      await vi.waitFor(() => expect(feld()).toHaveValue(''));
+      expect(koerper[0]).toMatchObject({
+        name: 'Kowalski',
+        vorname: 'Anna',
+        geschlecht: 'weiblich',
+        alter_geschaetzt: 34,
+        sichtung: 'sk3',
+        status: 'erfasst',
+        client_id: expect.any(String),
+      });
+      expect(koerper[0]).not.toHaveProperty('uhs_id');
+      await vi.waitFor(() => expect(feld()).toHaveFocus());
+      const zuletzt = document.querySelector('[data-lfh="zuletzt"]')!;
+      expect(zuletzt).toHaveTextContent(/^Zuletzt: \d{4} R-060 Kowalski, Anna · SK III$/);
+      // Die Zeile quittiert an sich selbst — kein Alert je Person, der weggeklickt werden müsste.
+      expect(screen.queryByText(/Erfasst als R-060/)).not.toBeInTheDocument();
+      // … und die neue Zeile steht hervorgehoben in der Liste.
+      expect((await screen.findByText('R-060')).closest('tr')).toHaveClass('zeile-hervorgehoben');
+
+      // Zweiter Datensatz, direkt weiter — per Knopf statt Enter, derselbe Weg.
+      await userEvent.type(feld(), 'Hoffmann SK II');
+      await userEvent.click(screen.getByRole('button', { name: 'Person erfassen' }));
+      await vi.waitFor(() => expect(koerper).toHaveLength(2));
+      expect(koerper[1]).toMatchObject({ name: 'Hoffmann', sichtung: 'sk2' });
+      expect(koerper[1].client_id).not.toBe(koerper[0].client_id);
+      await vi.waitFor(() =>
+        expect(document.querySelector('[data-lfh="zuletzt"]')).toHaveTextContent(
+          /R-061 Hoffmann · SK II$/,
+        ),
+      );
+    });
+
+    it('löst „@" auf eine UHS auf und schickt uhs_id im SELBEN POST', async () => {
+      let koerper: Record<string, unknown> | undefined;
+      server.use(
+        http.get('/api/einsaetze/:einsatzId/uhs', () =>
+          HttpResponse.json([
+            { id: 7, einsatz_id: 1, bezeichnung: 'Weserstadion', typ: 'uhs', status: 'aktiv' },
+          ]),
+        ),
+        http.post('/api/einsaetze/1/personen', async ({ request }) => {
+          koerper = (await request.json()) as Record<string, unknown>;
+          return HttpResponse.json(
+            { ...person, id: 62, registrier_nr: 62, aktuelle_uhs_id: 7 },
+            { status: 201 },
+          );
+        }),
+      );
+      render(einsatzAktiv, []);
+      await userEvent.type(
+        await screen.findByRole('textbox', { name: 'Kurzeingabe Person' }),
+        'Bauer sk3 @weser',
+      );
+      await vi.waitFor(() =>
+        expect(document.querySelector('[data-lfh="erkannt"]')).toHaveTextContent(
+          '→ UHS Weserstadion',
+        ),
+      );
+      await userEvent.keyboard('{Enter}');
+      await vi.waitFor(() =>
+        expect(koerper).toMatchObject({ name: 'Bauer', sichtung: 'sk3', uhs_id: 7 }),
+      );
+    });
+
+    it('sendet bei unerkanntem Kürzel NICHT und sagt warum; der Wortlaut bleibt stehen', async () => {
+      const post = vi.fn();
+      server.use(
+        http.post('/api/einsaetze/1/personen', () => {
+          post();
+          return HttpResponse.json(person, { status: 201 });
+        }),
+      );
+      render(einsatzAktiv, []);
+      await userEvent.type(
+        await screen.findByRole('textbox', { name: 'Kurzeingabe Person' }),
+        'Meier #52.1/9.3 sk3',
+      );
+      await userEvent.keyboard('{Enter}');
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        /Nicht erfasst: .*eine Koordinate an der Person gibt es nicht/,
+      );
+      expect(post).not.toHaveBeenCalled();
+      expect(feld()).toHaveValue('Meier #52.1/9.3 sk3');
+    });
+
+    it('tut bei leerer Eingabe nichts — kein POST, keine Meldung', async () => {
+      const post = vi.fn();
+      server.use(http.post('/api/einsaetze/1/personen', () => (post(), HttpResponse.json(person))));
+      render(einsatzAktiv, []);
+      await userEvent.type(
+        await screen.findByRole('textbox', { name: 'Kurzeingabe Person' }),
+        '   {Enter}',
+      );
+      expect(post).not.toHaveBeenCalled();
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+
+    it('zeigt 422 mit dem Wortlaut des Servers an der Zeile und behält die Eingabe', async () => {
+      server.use(
+        http.post('/api/einsaetze/1/personen', () =>
+          HttpResponse.json({ error: 'Sichtung passt nicht zum Status' }, { status: 422 }),
+        ),
+      );
+      render(einsatzAktiv, []);
+      await userEvent.type(
+        await screen.findByRole('textbox', { name: 'Kurzeingabe Person' }),
+        'Meier sk1{Enter}',
+      );
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Nicht erfasst: Sichtung passt nicht zum Status',
+      );
+      expect(feld()).toHaveValue('Meier sk1');
+      // Weitertippen räumt die Meldung.
+      await userEvent.type(feld(), 'x');
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+
+    it('merkt offline vor (client_id, Sichtung in der vorgemerkten Anlage) und leert das Feld', async () => {
+      Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
+      render(einsatzAktiv, []);
+      await userEvent.type(
+        await screen.findByRole('textbox', { name: 'Kurzeingabe Person' }),
+        'Neumann, Ilse w 84 sk2{Enter}',
+      );
+      await vi.waitFor(() => expect(feld()).toHaveValue(''));
+      expect(document.querySelector('[data-lfh="zuletzt"]')).toHaveTextContent(
+        'Zuletzt: offline vorgemerkt · Neumann, Ilse · SK II',
+      );
+      expect(await screen.findByText(/Offline vorgemerkt/)).toBeInTheDocument();
+      const [vorgemerkt] = await schreibaktionenLaden(nutzer.id, 1);
+      if (vorgemerkt.aktion.art !== 'person') throw new Error('Personenaktion erwartet');
+      expect(vorgemerkt.aktion.daten).toMatchObject({
+        name: 'Neumann',
+        vorname: 'Ilse',
+        sichtung: 'sk2',
+        client_id: expect.any(String),
+      });
+    });
   });
 });

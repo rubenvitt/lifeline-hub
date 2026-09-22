@@ -68,8 +68,52 @@ function lieseQuellen(verzeichnis: string, praefix = '/src'): Record<string, str
 
 const dateien = lieseQuellen(SRC);
 
-/** Die zehn A0-Rollenwerte aus `farbenHell`/`farbenDunkel` (Gate 5 aus A1, wortgleich). */
-const ROLLENWERT = /#(b02318|ff7a7f|f5b942|5cc48d|1c6640|7a5200|1a5fa0|6fb4ec|a8071a|e04552)/i;
+/**
+ * Die Status-, Bedien- und Markenwerte aus `farbenHell`/`farbenDunkel` (Gate 5 aus A1).
+ *
+ * Stand Neuentwurf „Instrumententafel" (21.09.2026): Tag `b02318 7a5200 1c6640 1a5fa0
+ * a8071a`, Nacht `ff6b6b e8cc3a 52c41a 4d94d6` (`marke` ist in beiden Modi `a8071a`),
+ * dazu die drei neuen, unverwechselbaren Textstufen der Nacht `7ddc4a` (normalText),
+ * `8ec2f0` (bedienText) und `7db3e8` (bedienHover). Die abgelösten Nachtwerte
+ * (`ff7a7f f5b942 5cc48d 6fb4ec e04552`) sind entfallen: ein Gate auf Werte, die keine
+ * Rolle mehr trägt, schützt nichts.
+ *
+ * NICHT aufgenommen sind die ETB-Typ- und Warnstufen-Kanten (`1677ff d46b08 722ed1
+ * 13c2c2 cf1322 d4b106`): es sind antd-Presets, und der Bestand nutzt sie gemessen an
+ * neun Stellen in `pages/lagekarte/` als KARTENFARBEN (Zonen, Handles, Fachebenen) —
+ * modusunabhängige Kartensignaturen, keine Kopien einer UI-Rolle. Der Scan meldete
+ * dort Fehlalarme statt Funde.
+ */
+const ROLLENWERT =
+  /#(b02318|7a5200|1c6640|1a5fa0|a8071a|ff6b6b|e8cc3a|52c41a|4d94d6|7ddc4a|8ec2f0|7db3e8)/i;
+
+/**
+ * Benannte Ausnahmen: Datei + Wert, jeweils mit Grund. Keine Zeilennummer — die bräche
+ * bei jeder Einrückung. Wer hier einträgt, schreibt den Grund dazu; ein Eintrag, der
+ * nichts mehr trifft, färbt den Guard rot (unten geprüft), damit die Liste nicht verrottet.
+ */
+const AUSNAHMEN: readonly { pfad: string; wert: string; grund: string }[] = [
+  {
+    pfad: '/src/pages/lagekarte/taktischesZeichen.ts',
+    wert: '52c41a',
+    grund:
+      '`AUSMASS_FARBE.gering` — Kartenfarbe des Schadenszeichens (DV 102), eine Reihe mit den ' +
+      'antd-Presets #faad14/#fa8c16/#f5222d daneben. Der Wert ist antds green-6 und fiel ' +
+      'mit dem Neuentwurf zufällig mit `farbenDunkel.normal` zusammen; die Zeichenfarbe ' +
+      'ist modusunabhängig und darf der Rolle NICHT folgen. Eine Umstellung auf eine ' +
+      'eigene Kartenpalette ist ein Nachzug außerhalb des Fundament-Schritts.',
+  },
+];
+
+function istAusnahme(pfad: string, zeile: string): boolean {
+  const treffer = [...zeile.matchAll(new RegExp(ROLLENWERT.source, 'gi'))].map((m) =>
+    m[1].toLowerCase(),
+  );
+  return (
+    treffer.length > 0 &&
+    treffer.every((wert) => AUSNAHMEN.some((a) => a.pfad === pfad && a.wert === wert))
+  );
+}
 
 /**
  * Blendet Kommentarinhalt aus und behält die Zeilenzahl bei (Index = Zeile − 1).
@@ -116,7 +160,7 @@ describe('Gate-5-Guard (LFH-328): kein A0-Farbwert außerhalb src/theme/', () =>
       if (/\.test\.[jt]sx?$/.test(pfad)) continue; // Tests pinnen Werte bewusst
       if (/\.generated\.[jt]sx?$/.test(pfad)) continue; // Codegen
       ohneKommentare(inhalt).forEach((zeile, i) => {
-        if (ROLLENWERT.test(zeile)) {
+        if (ROLLENWERT.test(zeile) && !istAusnahme(pfad, zeile)) {
           verstoesse.push(`${pfad}:${i + 1}  ${zeile.trim()}`);
         }
       });
@@ -127,6 +171,18 @@ describe('Gate-5-Guard (LFH-328): kein A0-Farbwert außerhalb src/theme/', () =>
         `theme.useToken() bzw. rollenFarbe(rolle, token), in CSS über var(--lfh-*) ` +
         `aus rollen.css:\n${verstoesse.join('\n')}`,
     ).toEqual([]);
+  });
+
+  it('jede benannte Ausnahme trifft noch etwas — sonst gehört sie gestrichen', () => {
+    for (const a of AUSNAHMEN) {
+      const inhalt = dateien[a.pfad];
+      expect(inhalt, `${a.pfad} existiert nicht mehr`).toBeDefined();
+      const trifft = ohneKommentare(inhalt ?? '').some((z) =>
+        new RegExp(`#${a.wert}`, 'i').test(z),
+      );
+      expect(trifft, `Ausnahme ${a.pfad} #${a.wert} ist tot`).toBe(true);
+      expect(a.grund.trim()).not.toBe('');
+    }
   });
 
   it('sieht die CSS-Dateien wirklich — sonst ist das halbe Gate eine Attrappe', () => {

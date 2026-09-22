@@ -244,9 +244,9 @@ describe('KatalogTabelle', () => {
  * Suche, Blätterung und die durchgereichten antd-Haken (LFH-330 · B2).
  *
  * Die Suche ist **opt-in**: `pages/SchaedenPage.tsx` trägt bereits ein eigenes
- * `Input.Search` mit anderer Semantik (Ort/Beschreibung), `etb/EtbTabelle.tsx` sucht
- * serverweit über ein 100-Zeilen-Fenster, und `Datensicht` bringt im Tabellenzweig sein
- * eigenes Feld mit. Default-AN erzeugte in allen drei Fällen ein zweites Suchfeld.
+ * `Input.Search` mit anderer Semantik (Ort/Beschreibung), das ETB (heute die Zeitachse
+ * `etb/EtbZeitachse.tsx`) sucht serverweit über seine eigene Filterleiste, und `Datensicht`
+ * bringt im Tabellenzweig sein eigenes Feld mit. Default-AN erzeugte in allen drei Fällen ein zweites Suchfeld.
  */
 describe('KatalogTabelle · Suche', () => {
   const ZWEI: Zeile[] = [

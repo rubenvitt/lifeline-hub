@@ -1,8 +1,15 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { ConfigProvider, theme as antdTheme } from 'antd';
+import { ConfigProvider } from 'antd';
 import deDE from 'antd/locale/de_DE';
-import { antdToken, farbenDunkel, farbenHell, type Dichte } from './tokens';
+import {
+  antdAlgorithmus,
+  antdKomponenten,
+  antdToken,
+  farbenDunkel,
+  farbenHell,
+  type Dichte,
+} from './tokens';
 import { zeigerIstGrob } from '../components/useViewport';
 
 /** Vom Nutzer wählbarer Modus. `system` folgt der OS-Einstellung. */
@@ -42,9 +49,17 @@ function istThemeModus(wert: string | null): wert is ThemeModus {
   return wert === 'system' || wert === 'light' || wert === 'dark';
 }
 
+/**
+ * Modus ohne gespeicherte Wahl: NACHTBETRIEB (Neuentwurf „Instrumententafel",
+ * Entscheidung 1 des Auftraggebers, 21.09.2026). Vorher `system`. „System" bleibt als
+ * Wahl erhalten — es ist nur nicht mehr der Ausgangszustand. Gespiegelt im
+ * Bootstrap-Skript von `index.html`; wer eines ändert, ändert beide.
+ */
+const MODUS_DEFAULT: ThemeModus = 'dark';
+
 function gespeicherterModus(): ThemeModus {
   const wert = localStorage.getItem(SPEICHER_SCHLUESSEL);
-  return istThemeModus(wert) ? wert : 'system';
+  return istThemeModus(wert) ? wert : MODUS_DEFAULT;
 }
 
 function istDichte(wert: string | null): wert is Dichte {
@@ -148,7 +163,10 @@ export function ThemeModeProvider({ children }: { children: ReactNode }) {
           // A1 Gate 3 zurück und die Staffel griffe an jedem Element vorbei, das
           // eine Bibliothek intern klein nennt.
           token: antdToken(effektiv === 'dark' ? farbenDunkel : farbenHell, dichte),
-          algorithm: effektiv === 'dark' ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
+          // Nachts hält `antdAlgorithmus` die Signalfarben auf ihrem Rollenwert — ohne
+          // die zweite Stufe rechnete `darkAlgorithm` sie um (#4d94d6 → #4481b9).
+          algorithm: antdAlgorithmus(effektiv === 'dark'),
+          components: antdKomponenten(effektiv === 'dark' ? farbenDunkel : farbenHell),
         }}
       >
         {children}
@@ -159,15 +177,17 @@ export function ThemeModeProvider({ children }: { children: ReactNode }) {
 
 /**
  * Liefert den aktuellen Theme-Modus. Außerhalb des Providers (z. B. in
- * isolierten Tests) wird ein neutraler `system`-Default zurückgegeben, statt
- * zu werfen — so brauchen Komponententests keinen Theme-Wrapper.
+ * isolierten Tests) wird die Vorgabe zurückgegeben, statt zu werfen — so brauchen
+ * Komponententests keinen Theme-Wrapper. Die Vorgabe ist seit dem Neuentwurf der
+ * Nachtbetrieb, also auch hier `dark`; ein Fallback, der einen anderen Modus meldet
+ * als den, mit dem die App startet, wäre eine zweite Wahrheit.
  */
 export function useThemeMode(): ThemeModeWert {
   const wert = useContext(ThemeModeContext);
   if (wert) return wert;
   return {
-    modus: 'system',
-    effektiv: 'light',
+    modus: MODUS_DEFAULT,
+    effektiv: 'dark',
     setModus: () => {},
     dichte: DICHTE_DEFAULT,
     setDichte: () => {},

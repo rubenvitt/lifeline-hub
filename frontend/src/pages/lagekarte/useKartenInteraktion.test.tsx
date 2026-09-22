@@ -535,7 +535,7 @@ describe('useKartenInteraktion — Serienmodus Zone (LFH-332)', () => {
   // eine neue Gefahrengebiet-Gruppe an (`lage_zone/repo.rs:anlegen_tx` → `gebiet_anlegen`).
   // Invalidiert der Klick nur die Zonen, trägt die frische Zone eine `gefahrengebiet_id`, die
   // in der veralteten Gebiets-Liste fehlt — der Nachschlag geht ins Leere und die Karte
-  // beschriftet sie „Warnstufe: unbekannt", bis irgendein fremder Refetch kommt. Der
+  // beschriftet sie „Stufe unbekannt", bis irgendein fremder Refetch kommt. Der
   // SSE-Fan-out räumt beides ab (`lage_zone` → zonen + gefahrengebiete); genau deshalb fällt
   // es nur auf, wenn der Live-Strom hängt. Die Änder- und Lösch-Pfade desselben Hooks
   // invalidieren längst beides — hier fehlte die Symmetrie.

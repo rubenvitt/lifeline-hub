@@ -254,7 +254,7 @@ describe('Schnellerfassung', () => {
     expect(screen.getByText(hinweis)).toBeVisible();
     expect(screen.getByPlaceholderText(/Inhalt/)).toHaveAttribute(
       'placeholder',
-      'Inhalt … ( / für Felder & Bausteine )',
+      'Inhalt … ( / für Typ, Felder & Bausteine · @ für Einheit )',
     );
   });
 
@@ -421,7 +421,7 @@ describe('Schnellerfassung', () => {
   it('Berichtigungsmodus sendet typ=berichtigung + berichtigt_eintrag_id', async () => {
     const p = props({ berichtigungZu: original() });
     renderMitProviders(<Schnellerfassung {...p} />);
-    expect(screen.getByText(/Berichtigung zu #5/)).toBeInTheDocument();
+    expect(screen.getByText(/Berichtigung zu Nr\. 5/)).toBeInTheDocument();
     await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Korrektur{Enter}');
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
     expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
@@ -483,9 +483,10 @@ describe('Schnellerfassung', () => {
     expect(
       screen.queryByRole('button', { name: /strukturierten Lagebericht/i }),
     ).not.toBeInTheDocument();
-    // Typ auf 'Lage' umstellen
-    await userEvent.click(screen.getByRole('combobox'));
-    await userEvent.click(await screen.findByText('Lage'));
+    // Typ auf 'Lage' umstellen — über den Präfix, der den Typ als Befehl zeigt.
+    await userEvent.click(screen.getByRole('button', { name: 'Eintragstyp /meldung ändern' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Lage' }));
+    expect(screen.getByRole('button', { name: 'Eintragstyp /lage ändern' })).toBeInTheDocument();
     expect(
       await screen.findByRole('button', { name: /strukturierten Lagebericht/i }),
     ).toBeInTheDocument();
@@ -519,7 +520,7 @@ describe('Schnellerfassung – Wertübernahme', () => {
       onWerteBehaltenChange: vi.fn(),
     });
     renderMitProviders(<Schnellerfassung {...p} />);
-    expect(screen.getByText(/Berichtigung zu #5/)).toBeInTheDocument();
+    expect(screen.getByText(/Berichtigung zu Nr\. 5/)).toBeInTheDocument();
     expect(screen.queryByRole('checkbox', { name: 'Werte behalten' })).toBeNull();
   });
 
@@ -608,5 +609,108 @@ describe('Schnellerfassung – Entwurf-Anbindung', () => {
       onWerteChange.mock.calls.length - 1
     ][0] as EntwurfWerte;
     expect(letzter.inhalt).toBe('Hi');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Neuentwurf S4: Typ per `/` am Zeilenanfang, `@` für Von/An, Hinweiszeile
+// ---------------------------------------------------------------------------
+
+describe('Schnellerfassung – Befehlszeile (Neuentwurf S4)', () => {
+  it('zeigt den gewählten Typ als Befehl im Präfix der Zeile', () => {
+    renderMitProviders(<Schnellerfassung {...props()} />);
+    const praefix = document.querySelector('[data-lfh="schnellerfassung-praefix"]')!;
+    expect(praefix).toHaveTextContent('/meldung');
+  });
+
+  it('im Berichtigungsmodus steht /berichtigung fest im Präfix, ohne Typwähler', () => {
+    renderMitProviders(<Schnellerfassung {...props({ berichtigungZu: original() })} />);
+    const praefix = document.querySelector('[data-lfh="schnellerfassung-praefix"]')!;
+    expect(praefix).toHaveTextContent('/berichtigung');
+    expect(screen.queryByRole('button', { name: /Eintragstyp/ })).toBeNull();
+  });
+
+  it('/ am Zeilenanfang bietet die Typen an und setzt den gewählten Typ', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, '/anord');
+    const menue = await screen.findByTestId('slash-menu');
+    expect(menue).toHaveTextContent('Typ');
+    await userEvent.keyboard('{Enter}');
+    await waitFor(() => expect(screen.queryByTestId('slash-menu')).toBeNull());
+    // Der Befehlstext ist aus dem Feld verschwunden, der Typ steht im Präfix.
+    expect(feld).toHaveValue('');
+    expect(screen.getByRole('button', { name: 'Eintragstyp /anordnung ändern' })).toBeVisible();
+    await userEvent.type(feld, 'Verbau halten{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
+      typ: 'anordnung',
+      inhalt: 'Verbau halten',
+    });
+  });
+
+  it('/ mitten im Satz bietet KEINE Typen an — nur Felder', async () => {
+    renderMitProviders(<Schnellerfassung {...props()} />);
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Lage /');
+    const menue = await screen.findByTestId('slash-menu');
+    expect(menue).toHaveTextContent('Felder');
+    expect(menue).not.toHaveTextContent('/anordnung');
+  });
+
+  it('ein ausgetippter Befehl mit Leerzeichen setzt den Typ ohne Menü', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, '/lage Pegel steigt');
+    expect(feld).toHaveValue('Pegel steigt');
+    expect(screen.getByRole('button', { name: 'Eintragstyp /lage ändern' })).toBeVisible();
+  });
+
+  it('@ füllt bei einer Meldung den Absender aus den Funkrufnamen', async () => {
+    server.use(
+      http.get('/api/einsaetze/7/fahrzeuge', () =>
+        HttpResponse.json([{ id: 1, funkrufname: 'Florian 1', opta: null }]),
+      ),
+    );
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, 'Lage ruhig @flo');
+    await userEvent.click(await screen.findByText('Von: Florian 1'));
+    expect(await screen.findByText('Von: Florian 1', { selector: '*' })).toBeInTheDocument();
+    // Der Auslösetext ist weg, der Satz davor bleibt.
+    expect(feld).toHaveValue('Lage ruhig ');
+    await userEvent.type(feld, '{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
+      von: 'Florian 1',
+    });
+  });
+
+  it('@ füllt bei einer Anordnung den Empfänger — Freitext bleibt möglich', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, '/anordnung Sandsäcke @EA-Süd');
+    // Kein Funkrufname passt: der getippte Text steht als Freitext-Eintrag da.
+    await userEvent.keyboard('{Enter}');
+    await waitFor(() => expect(screen.queryByTestId('slash-menu')).toBeNull());
+    await userEvent.type(feld, '{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
+      typ: 'anordnung',
+      an: 'EA-Süd',
+    });
+  });
+
+  it('nennt die Typbefehle, @ und den Nachtrag-Weg in der Hinweiszeile', () => {
+    renderMitProviders(<Schnellerfassung {...props()} />);
+    const zeile = document.querySelector('[data-lfh="schnellerfassung"]')!;
+    expect(zeile).toHaveTextContent('/meldung /anordnung /entscheidung /lage');
+    expect(zeile).toHaveTextContent('@ Einheit');
+    expect(zeile).toHaveTextContent('/zeit ⧖ Nachtrag');
+    // Kein „# Koordinate": dafür gibt es keinen Weg in den Eintrag.
+    expect(zeile).not.toHaveTextContent('Koordinate');
   });
 });

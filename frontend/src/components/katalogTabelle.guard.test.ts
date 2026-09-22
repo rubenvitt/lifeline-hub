@@ -88,9 +88,10 @@ const SRC = (() => {
  * `etb/EtbTabelle.tsx` war die neunzehnte Konsumentin und ist seit LFH-342 · C7 **nach
  * oben** herausgefallen — dieselbe Bewegung wie bei `pages/SchaedenPage.tsx` in C5: sie
  * bindet `KatalogTabelle` nicht mehr selbst ein, sondern läuft über `Datensicht` (das
- * seinerseits durch das Primitiv rendert). Ihr Guard-Ort ist damit
- * `datensicht.guard.test.ts`, wo sie zugleich der erste und einzige Eintrag in
- * `KARTEN_EIGENBAU` ist. Der Restposten LFH-330 · AP8 ist eingelöst und nicht mehr offen.
+ * seinerseits durch das Primitiv rendert). Mit dem Neuentwurf (21.09.2026) ist sie ganz
+ * entfallen: das Tagebuch ist die Zeitachse `etb/EtbZeitachse.tsx` und läuft weder über
+ * `Datensicht` noch über dieses Primitiv. Der Restposten LFH-330 · AP8 ist eingelöst und
+ * nicht mehr offen.
  */
 const KATALOGE = [
   'stammdaten/QualifikationenTab.tsx',

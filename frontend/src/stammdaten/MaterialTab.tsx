@@ -1,5 +1,6 @@
-import { App, Button, Popconfirm, Space, Tag, type TableColumnsType } from 'antd';
+import { App, Button, Popconfirm, Space, type TableColumnsType } from 'antd';
 import AdminPage from '../components/AdminPage';
+import { StatusChip, monoStil } from '../components/instrument';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle from '../components/KatalogTabelle';
 import { SeitenFehler } from '../components/SeitenZustand';
@@ -58,7 +59,7 @@ export default function MaterialTab() {
       title: 'Bestandsnummer',
       dataIndex: 'bestandsnummer',
       key: 'bestandsnummer',
-      render: (t) => t ?? '—',
+      render: (t) => (t ? <span style={monoStil(13)}>{t}</span> : '—'),
     },
     { title: 'Träger', dataIndex: 'traegerorganisation', key: 'traeger', render: (t) => t ?? '—' },
     {
@@ -84,9 +85,9 @@ export default function MaterialTab() {
       onFilter: (wert, m) => m.dienststatus === String(wert),
       render: (_, m) =>
         m.dienststatus === 'in_dienst' ? (
-          <Tag color="green">in Dienst</Tag>
+          <StatusChip ton="normal" wort="in Dienst" />
         ) : (
-          <Tag>außer Dienst</Tag>
+          <StatusChip ton="neutral" wort="außer Dienst" />
         ),
     },
     ...(istAdmin

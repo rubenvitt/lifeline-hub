@@ -80,7 +80,7 @@ describe('GefahrenPage', () => {
     zeile.focus();
     await user.keyboard('{Enter}');
 
-    expect(await screen.findByRole('heading', { level: 5 })).toHaveTextContent('Süd');
+    expect(await screen.findByRole('heading', { level: 3 })).toHaveTextContent('Süd');
   });
 
   it('weist Gebietsliste und Matrix mit dem älteren erfolgreichen Stand aus', async () => {
@@ -100,7 +100,7 @@ describe('GefahrenPage', () => {
       { route: '/einsaetze/1/gefahren', client },
     );
 
-    await screen.findByRole('list');
+    await screen.findByRole('region', { name: 'Gefahrengebiete' });
     expect(
       await screen.findByLabelText(`Datenstand ${formatiereDatenstand(matrixStand)}`),
     ).toBeInTheDocument();
@@ -245,7 +245,7 @@ describe('GefahrenPage', () => {
       { route: '/einsaetze/1/gefahren?gefahrengebiet=8', client },
     );
     // FINALE Auswahl: der editierbare Titel (h5) zeigt NUR das gewählte Gebiet.
-    const titel = await screen.findByRole('heading', { level: 5 });
+    const titel = await screen.findByRole('heading', { level: 3 });
     expect(titel).toHaveTextContent('Süd'); // NICHT 'Nord' (= Default aufs erste Gebiet)
   });
 
@@ -274,7 +274,7 @@ describe('GefahrenPage', () => {
       await screen.findByRole('button', { name: 'Bewertung Brand × Menschen: keine' }),
     );
     // Der Eintrag wird über das OFFENE Menü gegriffen — antd lässt die Portale
-    // geschlossener Dropdowns im Baum stehen (Muster aus `etb/EtbTabelle.test.tsx`).
+    // geschlossener Dropdowns im Baum stehen (Muster aus `etb/EtbZeitachse.test.tsx`).
     const menue = document.querySelector<HTMLElement>(
       '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
     );
@@ -330,7 +330,9 @@ describe('GefahrenPage', () => {
     server.use(...handlers());
     setzeViewportBreite(800); // < lg (992)
     renderPage();
-    const rahmen = (await screen.findByRole('list')).closest('[data-gefahren-rahmen]')!;
+    const rahmen = (await screen.findByRole('region', { name: 'Gefahrengebiete' })).closest(
+      '[data-gefahren-rahmen]',
+    )!;
     expect(rahmen).toHaveStyle({ flexDirection: 'column' });
   });
 
@@ -338,7 +340,9 @@ describe('GefahrenPage', () => {
     server.use(...handlers());
     setzeViewportBreite(1280);
     renderPage();
-    const rahmen = (await screen.findByRole('list')).closest('[data-gefahren-rahmen]')!;
+    const rahmen = (await screen.findByRole('region', { name: 'Gefahrengebiete' })).closest(
+      '[data-gefahren-rahmen]',
+    )!;
     expect(rahmen).toHaveStyle({ flexDirection: 'row' });
   });
 

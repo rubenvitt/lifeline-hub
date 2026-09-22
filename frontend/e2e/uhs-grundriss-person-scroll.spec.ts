@@ -76,10 +76,11 @@ async function setupBelegterPlatz(page: Page): Promise<string> {
   return personName;
 }
 
-/** Drop-Target zu einem Spalten-Titel: der Karten-Body (dort sitzt die Droppable —
- *  NICHT der Header, sonst verfehlt der Drop die Drop-Zone). */
+/** Drop-Target zu einem Spalten-Titel: der Paneel-Körper (dort sitzt die Droppable —
+ *  NICHT der Kopf, sonst verfehlt der Drop die Drop-Zone). Seit dem Neuentwurf sind die
+ *  Seitenspalten `Paneel`e statt antd-`Card`s: Kopf ist das erste, Körper das zweite Kind. */
 function dropZone(page: Page, titel: string): Locator {
-  return page.locator('.ant-card', { hasText: titel }).locator('.ant-card-body');
+  return page.locator('[data-lfh="paneel"]', { hasText: titel }).locator(':scope > div').nth(1);
 }
 
 // Neu: eine belegte Person ist ziehbar → in den Transport-Bereich rechts ziehen öffnet

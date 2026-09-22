@@ -45,6 +45,13 @@ import { rollenFarbe, type StatusDarstellung } from '../theme/statusFarben';
  *
  * ── DIE FARBE STEHT NEBEN DEM TEXT, NIE DAHINTER (Z2b) ─────────────────────────────────
  *
+ * FORTGESCHRIEBEN MIT DEM NEUENTWURF (21.09.2026, Entscheidung 2): für ROLLENfarben ist die
+ * getönte Fläche jetzt die Vorgabe — das AUSLÖSER-Etikett ist ein `StatusTag` und trägt sie
+ * (Werte und Kontrastrechnung in `instrument/statusFlaeche.ts`). Unverändert gilt der
+ * zweite Grund unten: eine MANDANTENFARBE bleibt Punkt, nie Fläche, und die Menüzeilen
+ * bleiben ungefärbt. Der erste Grund (antds Vollflächen-`color`) bleibt richtig — die Fläche
+ * kommt aus den Rollen, nicht aus antds Farbberechnung. Der Punkt ist quadratisch (Radius 0).
+ *
  * Zwei belegte Gründe, warum „Statusfarbe als Fläche" aus dem Elternticket eine
  * begründete Entscheidung zurückdrehen würde:
  *
@@ -186,7 +193,7 @@ export default function StatusWahl<W extends string | number>({
               display: 'inline-block',
               width: '0.5em',
               height: '0.5em',
-              borderRadius: '50%',
+              borderRadius: 0,
               backgroundColor: o.farbe?.trim()
                 ? o.farbe.trim()
                 : rollenFarbe(o.darstellung.rolle, token),

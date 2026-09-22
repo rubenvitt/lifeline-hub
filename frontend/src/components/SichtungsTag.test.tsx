@@ -20,13 +20,14 @@ describe('SichtungsTag', () => {
       );
       const tag = screen.getByText('tot');
       expect(tag).toHaveStyle({
-        color: modus === 'dark' ? '#dee5ec' : '#10161e',
+        // Literale der Textrolle je Modus (Neuentwurf, 21.09.2026).
+        color: modus === 'dark' ? '#e8ebee' : '#111418',
         background: 'transparent',
       });
       const farbfeld = tag.querySelector('[aria-hidden="true"]');
       expect(farbfeld).toHaveStyle({
         background: '#000000',
-        borderColor: modus === 'dark' ? '#dee5ec' : '#10161e',
+        borderColor: modus === 'dark' ? '#e8ebee' : '#111418',
       });
       expect(tag.className).not.toMatch(/ant-tag-(black|default)/);
     },

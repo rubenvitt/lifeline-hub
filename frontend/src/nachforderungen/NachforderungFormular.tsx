@@ -1,4 +1,5 @@
-import { Card, Col, Form, Input, InputNumber, Row } from 'antd';
+import { Col, Form, Input, InputNumber, Row } from 'antd';
+import { Paneel } from '../components/instrument';
 import { Select } from '../components/Select';
 import { ErfassungsFormular } from '../components/Erfassung';
 import type { AdressatKategorie, NachforderungPrioritaet, NeueNachforderung } from '../api/types';
@@ -46,7 +47,7 @@ export default function NachforderungFormular({
    * Fehlschlag sieht (LFH-332/B4).
    */
   onAnlegen: (d: NeueNachforderung) => Promise<unknown>;
-  /** Umschließende Card mit Titel rendern. `false` für Inline-Einbettung, wo der
+  /** Umschließendes Paneel mit Titel rendern. `false` für Inline-Einbettung, wo der
    *  Container den Titel schon liefert (vermeidet doppelte Überschrift, LFH-112). */
   card?: boolean;
 }) {
@@ -144,8 +145,8 @@ export default function NachforderungFormular({
 
   if (!card) return formular;
   return (
-    <Card size="small" title="Nachforderung absetzen">
+    <Paneel titel="Nachforderung absetzen" koerperPolster>
       {formular}
-    </Card>
+    </Paneel>
   );
 }

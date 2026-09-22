@@ -1,10 +1,13 @@
-import { Button, Card, Flex, Space, Tag, Tooltip, Typography, theme } from 'antd';
+import { Button, Flex, Space, Tooltip, Typography } from 'antd';
 import { ClockCircleOutlined } from '@ant-design/icons';
 import type { ReactNode } from 'react';
 import { Link, useParams } from 'react-router';
 import type { Erinnerung } from '../api/types';
 import { auftraegePfad, etbPfad, meldungenPfad, parseRouteId } from '../routing/deeplinks';
 import { ERINNERUNG_STATUS, StatusBadge, QuittungIndikator, formatZeit } from '../kommunikation';
+import KommKarte from '../kommunikation/KommKarte';
+import { StatusChip, monoStil } from '../components/instrument';
+import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 
 const { Text } = Typography;
 
@@ -34,17 +37,14 @@ function BezugLink({ e, einsatzId }: { e: Erinnerung; einsatzId: string | undefi
   const text = `↗ ${bezug?.wort ?? e.bezug_typ} #${e.bezug_id}`;
   const eid = parseRouteId(einsatzId);
   if (!bezug || eid == null) {
-    // Unbekannter Bezugstyp oder fehlende/ungültige Einsatz-id → reines Tag ohne Link.
-    return (
-      <Tag color="cyan" style={{ margin: 0 }}>
-        {text}
-      </Tag>
-    );
+    // Unbekannter Bezugstyp oder fehlende/ungültige Einsatz-id → Verweistext ohne Link.
+    return <span style={monoStil(11)}>{text}</span>;
   }
+  // Verweis als Link mit ↗-Zeichen (Neuentwurf: Deeplink-Glyphe), kein farbiges Etikett.
   return (
-    <Tag color="cyan" style={{ margin: 0 }}>
-      <Link to={bezug.pfad(eid, e.bezug_id)}>{text}</Link>
-    </Tag>
+    <Link to={bezug.pfad(eid, e.bezug_id)} style={monoStil(11)}>
+      {text}
+    </Link>
   );
 }
 
@@ -59,7 +59,7 @@ export interface ErinnerungKarteProps {
 
 /**
  * Erinnerungs-Karte (LFH-112): Karten-Look analog AuftragKarte, ohne Prio. Fällig-/Überfällig-
- * Hervorhebung ist dark-safe über Theme-Tokens (colorErrorBg/colorError) statt hartkodiertem Rosa.
+ * Hervorhebung über den Kartenrand-Vertrag von `KommKarte` (Alarmrand + Alarmfläche).
  * Quittiert-vs-Erledigt bleibt fachlich getrennt (Tooltips + getrennte Aktionen, LFH-106).
  */
 export default function ErinnerungKarte({
@@ -69,7 +69,6 @@ export default function ErinnerungKarte({
   onErledigen,
   onQuittieren,
 }: ErinnerungKarteProps) {
-  const { token } = theme.useToken();
   const { id: einsatzId } = useParams();
   const status = ERINNERUNG_STATUS[e.status] ?? ERINNERUNG_STATUS.offen;
   const istAbg = ansicht === 'abgeschlossen';
@@ -98,14 +97,11 @@ export default function ErinnerungKarte({
       : [];
 
   return (
-    <Card
-      size="small"
-      style={{
-        marginBottom: 10,
-        borderInlineStart: `3px solid ${faellig ? token.colorError : 'transparent'}`,
-        background: faellig ? token.colorErrorBg : undefined,
-      }}
-      styles={{ body: { padding: '12px 16px' } }}
+    // Zeitachsen-Optik (Neuentwurf): die Fälligkeit führt links in Mono. Der linke Rand ist
+    // der Kartenrand-Vertrag aus C8/H47 — eine fällige Erinnerung trägt den Alarmrand.
+    <KommKarte
+      alarm={faellig}
+      zeit={e.faellig_at ? <ZeitAnzeige wert={e.faellig_at} format="uhrzeit" /> : undefined}
     >
       <Flex justify="space-between" align="center" style={{ marginBottom: 6 }} gap={8} wrap>
         <Space size={6} wrap>
@@ -113,28 +109,23 @@ export default function ErinnerungKarte({
             {e.titel}
           </Text>
           {istAbg && <StatusBadge phase={status.phase} label={status.label} />}
-          {faellig && (
-            <Tag color="red" style={{ margin: 0 }}>
-              fällig
-            </Tag>
+          {faellig && <StatusChip ton="alarm" wort="fällig" />}
+          {e.intervall_minuten && (
+            <StatusChip ton="neutral" wort={`alle ${e.intervall_minuten} Min`} />
           )}
-          {e.intervall_minuten && <Tag style={{ margin: 0 }}>alle {e.intervall_minuten} Min</Tag>}
-          {e.quelle === 'auto_frist' && (
-            <Tag color="orange" style={{ margin: 0 }}>
-              automatisch
-            </Tag>
-          )}
-          {e.vollzug_status === 'vollzogen' && (
-            <Tag color="success" style={{ margin: 0 }}>
-              Vollzogen
-            </Tag>
-          )}
+          {e.quelle === 'auto_frist' && <StatusChip ton="achtung" wort="automatisch" />}
+          {e.vollzug_status === 'vollzogen' && <StatusChip ton="normal" wort="Vollzogen" />}
           <BezugLink e={e} einsatzId={einsatzId} />
         </Space>
         <Space size={10} wrap>
           {e.faellig_at && (
             <Text type={faellig ? 'danger' : 'secondary'} style={{ fontSize: 12 }}>
-              {faellig && <ClockCircleOutlined />} fällig: {formatZeit(e.faellig_at)}
+              {faellig && (
+                <span aria-hidden="true">
+                  <ClockCircleOutlined />
+                </span>
+              )}{' '}
+              fällig: {formatZeit(e.faellig_at)}
             </Text>
           )}
         </Space>
@@ -171,6 +162,6 @@ export default function ErinnerungKarte({
           {aktionen}
         </Flex>
       )}
-    </Card>
+    </KommKarte>
   );
 }

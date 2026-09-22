@@ -2,7 +2,6 @@ import { App, AutoComplete, Breadcrumb, Button, Col, Form, Input, Row, theme } f
 import { Link, Navigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import AdminPage from '../components/AdminPage';
-import SektionHeader from '../components/SektionHeader';
 import { Select } from '../components/Select';
 import { SeitenFehler, SeitenLeer, SeitenSkeleton } from '../components/SeitenZustand';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
@@ -18,13 +17,13 @@ import { listeQualifikationen } from '../api/qualifikationen';
 import { listeBenutzer } from '../api/benutzer';
 import { globalKeys } from '../api/queryKeys';
 // Wiederverwendet statt nachgebaut — siehe Kopf von `FahrzeugDetailPage`.
-import { speicherLeisteStil } from '../pages/einstellungen/einsatzEinstellungenForm';
+import { speicherLeisteStil } from '../components/speicherLeiste';
 import { leerZuNull } from '../api/patchTriState';
 import { parseRouteId } from '../routing/deeplinks';
 import type { Personal, StaerkePosition } from '../api/types';
-import { flaeche } from '../theme/tokens';
 import { personalListePfad } from './stammdatenDetail';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
+import { Formularpaneel } from '../components/instrument';
 
 interface FormWerte {
   name: string;
@@ -124,12 +123,13 @@ export default function PersonalDetailPage() {
   }));
 
   return (
-    <div style={{ maxWidth: flaeche.seiteSchmal, margin: '0 auto' }}>
+    <div>
       <Breadcrumb
         style={{ marginBottom: token.marginSM }}
         items={[{ title: <Link to={personalListePfad()}>Personal</Link> }, { title: person.name }]}
       />
       <AdminPage
+        breite="schmal"
         titel={person.name}
         beschreibung="Vollständige Stammdaten. Die Schnellerfassung in der Liste trägt nur die vier Felder, ohne die eine Person nicht auffindbar ist."
         hinweis={
@@ -172,74 +172,84 @@ export default function PersonalDetailPage() {
           initialValues={zuFormWerten(person)}
           onFinish={(werte) => speichern.mutate(werte)}
         >
-          <SektionHeader titel="Identität" dataUpdatedAt={personalQuery.dataUpdatedAt} />
-          <Row gutter={token.margin}>
-            <Col xs={24} lg={12}>
-              <Form.Item
-                label="Name"
-                name="name"
-                rules={[{ required: true, whitespace: true, message: 'Name darf nicht leer sein' }]}
-              >
-                <Input />
-              </Form.Item>
-            </Col>
-            <Col xs={24} lg={12}>
-              <Form.Item label="Personalnummer" name="personalnummer">
-                <Input />
-              </Form.Item>
-            </Col>
-            <Col xs={24} lg={12}>
-              <Form.Item label="Trägerorganisation" name="traegerorganisation">
-                <AutoComplete
-                  options={vorschlaege.traegerorganisation.map((t) => ({ value: t }))}
-                  allowClear
-                  placeholder="z. B. DRK Musterstadt"
-                  showSearch={{
-                    filterOption: (input, option) =>
-                      (option?.value ?? '').toLowerCase().includes(input.toLowerCase()),
-                  }}
-                />
-              </Form.Item>
-            </Col>
-          </Row>
+          <Formularpaneel titel="Identität" dataUpdatedAt={personalQuery.dataUpdatedAt}>
+            <Row gutter={token.margin}>
+              <Col xs={24} lg={12}>
+                <Form.Item
+                  label="Name"
+                  name="name"
+                  rules={[
+                    { required: true, whitespace: true, message: 'Name darf nicht leer sein' },
+                  ]}
+                >
+                  <Input />
+                </Form.Item>
+              </Col>
+              <Col xs={24} lg={12}>
+                <Form.Item label="Personalnummer" name="personalnummer">
+                  <Input />
+                </Form.Item>
+              </Col>
+              <Col xs={24} lg={12}>
+                <Form.Item label="Trägerorganisation" name="traegerorganisation">
+                  <AutoComplete
+                    options={vorschlaege.traegerorganisation.map((t) => ({ value: t }))}
+                    allowClear
+                    placeholder="z. B. DRK Musterstadt"
+                    showSearch={{
+                      filterOption: (input, option) =>
+                        (option?.value ?? '').toLowerCase().includes(input.toLowerCase()),
+                    }}
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+          </Formularpaneel>
 
-          <SektionHeader titel="Erreichbarkeit & Konto" />
-          <Row gutter={token.margin}>
-            <Col xs={24} lg={12}>
-              <Form.Item label="Telefon" name="telefon">
-                <Input />
-              </Form.Item>
-            </Col>
-            <Col xs={24} lg={12}>
-              <Form.Item label="Benutzer-Konto (optional)" name="benutzer_id">
-                <Select allowClear options={benutzerOptionen} placeholder="kein Konto verknüpft" />
-              </Form.Item>
-            </Col>
-          </Row>
+          <Formularpaneel titel="Erreichbarkeit & Konto">
+            <Row gutter={token.margin}>
+              <Col xs={24} lg={12}>
+                <Form.Item label="Telefon" name="telefon">
+                  <Input />
+                </Form.Item>
+              </Col>
+              <Col xs={24} lg={12}>
+                <Form.Item label="Benutzer-Konto (optional)" name="benutzer_id">
+                  <Select
+                    allowClear
+                    options={benutzerOptionen}
+                    placeholder="kein Konto verknüpft"
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+          </Formularpaneel>
 
-          <SektionHeader titel="Einsatzrolle" />
-          <Row gutter={token.margin}>
-            <Col xs={24} lg={12}>
-              <Form.Item label="Stärke-Position" name="staerke_position">
-                <Select allowClear placeholder="optional" options={POSITION_OPTIONEN} />
-              </Form.Item>
-            </Col>
-            <Col xs={24} lg={12}>
-              <Form.Item label="Qualifikationen" name="qualifikation_ids">
-                <Select
-                  mode="multiple"
-                  allowClear
-                  options={qualOptionen}
-                  placeholder="Qualifikationen wählen"
-                />
-              </Form.Item>
-            </Col>
-          </Row>
+          <Formularpaneel titel="Einsatzrolle">
+            <Row gutter={token.margin}>
+              <Col xs={24} lg={12}>
+                <Form.Item label="Stärke-Position" name="staerke_position">
+                  <Select allowClear placeholder="optional" options={POSITION_OPTIONEN} />
+                </Form.Item>
+              </Col>
+              <Col xs={24} lg={12}>
+                <Form.Item label="Qualifikationen" name="qualifikation_ids">
+                  <Select
+                    mode="multiple"
+                    allowClear
+                    options={qualOptionen}
+                    placeholder="Qualifikationen wählen"
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+          </Formularpaneel>
 
-          <SektionHeader titel="Bemerkung" />
-          <Form.Item label="Bemerkung" name="bemerkung">
-            <Input.TextArea rows={3} />
-          </Form.Item>
+          <Formularpaneel titel="Freitext">
+            <Form.Item label="Bemerkung" name="bemerkung">
+              <Input.TextArea rows={3} />
+            </Form.Item>
+          </Formularpaneel>
 
           <div style={speicherLeisteStil(token)}>
             <Button type="primary" htmlType="submit" loading={speichern.isPending}>

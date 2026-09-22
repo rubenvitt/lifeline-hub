@@ -1,7 +1,6 @@
 import { App, Button, Form, InputNumber, theme } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router';
-import SektionHeader from '../../components/SektionHeader';
 import { SeitenFehler, SeitenSkeleton } from '../../components/SeitenZustand';
 import { SeitenHinweise } from '../../components/SpeicherHinweis';
 import { speichereEinstellungen } from '../../api/einsaetze';
@@ -11,10 +10,11 @@ import {
   initialAufbewahrung,
   normalisiereAufbewahrung,
   orgHinweisWert,
-  speicherLeisteStil,
   zuUpdate,
   type FormWerteAufbewahrung,
 } from './einsatzEinstellungenForm';
+import { speicherLeisteStil } from '../../components/speicherLeiste';
+import { Formularpaneel } from '../../components/instrument';
 
 /**
  * Sektion `…/einstellungen/aufbewahrung` (LFH-345 · C10) — die Aufbewahrungs-Dauer.
@@ -73,23 +73,24 @@ export default function EinsatzAufbewahrung() {
         onFinish={(werte) => speichern.mutate(werte)}
         disabled={!daten.darfBearbeiten}
       >
-        <SektionHeader
+        <Formularpaneel
           titel="Aufbewahrung & Archiv"
           beschreibung="Aufbewahrungs-Dauer in Tagen für diesen Einsatz. Die Frist greift erst beim Abschluss (sie wird daraus als Zeitpunkt berechnet) und wirkt nie auf den laufenden Einsatz. Nach Fristablauf wird der Einsatz zunächst gesperrt und später unwiderruflich von Personendaten bereinigt (ETB und Statistik bleiben erhalten). Leer = keine automatische Frist. Eine spätere Verkürzung einer bereits gesetzten Frist ist gesondert (manuelle Frist) bestätigungspflichtig."
-        />
-        <Form.Item
-          label="Aufbewahrungs-Dauer (Tage)"
-          name="retention_dauer_tage"
-          tooltip="1 bis 3650 Tage. Leer = keine automatische Aufbewahrungsfrist."
-          extra={orgHinweisWert(daten.einstellungen.org_defaults?.retention_dauer_tage, 'Tage')}
         >
-          <InputNumber
-            min={1}
-            max={3650}
-            style={{ width: '100%', maxWidth: 200 }}
-            placeholder="keine"
-          />
-        </Form.Item>
+          <Form.Item
+            label="Aufbewahrungs-Dauer (Tage)"
+            name="retention_dauer_tage"
+            tooltip="1 bis 3650 Tage. Leer = keine automatische Aufbewahrungsfrist."
+            extra={orgHinweisWert(daten.einstellungen.org_defaults?.retention_dauer_tage, 'Tage')}
+          >
+            <InputNumber
+              min={1}
+              max={3650}
+              style={{ width: '100%', maxWidth: 200 }}
+              placeholder="keine"
+            />
+          </Form.Item>
+        </Formularpaneel>
 
         <div style={speicherLeisteStil(token)}>
           <Button type="primary" htmlType="submit" loading={speichern.isPending}>

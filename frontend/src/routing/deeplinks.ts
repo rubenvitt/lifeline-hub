@@ -124,7 +124,17 @@ export function lageberichtePfad(einsatzId: number): string {
 }
 
 /**
- * Aggregierende Kräfteübersicht (Meldebild) eines Einsatzes.
+ * Führungsüberblick eines Einsatzes — seit dem Neuentwurf (21.09.2026) die Startseite, auf
+ * die `/einsaetze/:id` umleitet (`redirectZiel` in `einsatz/modulRegistry.ts`).
+ */
+export function ueberblickPfad(einsatzId: number): string {
+  return einsatzModulPfad(einsatzId, 'ueberblick');
+}
+
+/**
+ * Aggregierende Kräfteübersicht (Meldebild) eines Einsatzes. Seit dem Neuentwurf heißt das
+ * Modul in der Navigation „Meldebild" und steht unter Kräfte & Mittel; der Routenschlüssel
+ * bleibt, damit bestehende Deeplinks tragen.
  *
  * Der Routenschlüssel ist der aus `einsatz/modulRegistry.ts` und `App.tsx` — die Seite gab
  * es längst, sie war nur von keiner der vier Kräfte-Modulseiten aus erreichbar

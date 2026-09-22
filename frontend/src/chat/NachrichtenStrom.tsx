@@ -15,6 +15,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { BezugTyp, ChatNachricht } from '../api/types';
 import { formatZeit, formatZeitKurz } from '../kommunikation';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
+import { StatusChip, monoStil } from '../components/instrument';
 import type { BezugKurzinfo } from './bezug';
 
 /**
@@ -63,6 +64,15 @@ interface Props {
    *  zurück, auch wenn gerade weiter oben gelesen wurde — siehe Effekt unten. */
   eigeneSendungen?: number;
 }
+
+/**
+ * Lesebreite einer Nachricht (22.09.2026). Seit der Seitenrahmen die volle Inhaltsbreite
+ * nimmt, liefen lange Nachrichten auf dem Fükw-Schirm über 200 Zeichen je Zeile — jenseits
+ * jeder Lesbarkeit (übliche Obergrenze 60–80 Zeichen). Begrenzt wird der TEXT, nicht die
+ * Seite: die Kanalspalte daneben und der Scroll-Container des Stroms (Höhenkette H51,
+ * Stick-to-bottom) bleiben unberührt, und die Aktion bleibt am Zeilenende.
+ */
+const NACHRICHT_LESEBREITE = '72ch';
 
 export default function NachrichtenStrom({
   nachrichten,
@@ -269,20 +279,23 @@ export default function NachrichtenStrom({
                   <Space size="small">
                     <Typography.Text strong>{n.autor_name}</Typography.Text>
                     <Tooltip title={formatZeit(n.erstellt_at)}>
-                      <Typography.Text
-                        type="secondary"
-                        style={{ fontWeight: 'normal', fontSize: 12 }}
-                      >
+                      <Typography.Text type="secondary" style={monoStil(12)}>
                         {formatZeitKurz(n.erstellt_at)}
                       </Typography.Text>
                     </Tooltip>
                     {n.bearbeitet_at && (
                       <Tooltip title={`bearbeitet am ${formatZeit(n.bearbeitet_at)}`}>
-                        <Tag>bearbeitet</Tag>
+                        <span style={{ display: 'inline-flex' }}>
+                          <StatusChip ton="neutral" wort="bearbeitet" />
+                        </span>
                       </Tooltip>
                     )}
-                    {heraufgestuft && <Tag color="blue">heraufgestuft zu ETB</Tag>}
-                    {heraufgestuftZuAuftrag && <Tag color="geekblue">heraufgestuft zu Auftrag</Tag>}
+                    {/* Heraufstufung ist eine aktive Beziehung zu einem anderen Datensatz →
+                        Ton `bedien` (Neuentwurf „Status als getönte Fläche"). */}
+                    {heraufgestuft && <StatusChip ton="bedien" wort="heraufgestuft zu ETB" />}
+                    {heraufgestuftZuAuftrag && (
+                      <StatusChip ton="bedien" wort="heraufgestuft zu Auftrag" />
+                    )}
                     {!geloescht &&
                       hatBezug &&
                       bezugLabel &&
@@ -332,7 +345,12 @@ export default function NachrichtenStrom({
                       Nachricht gelöscht
                     </Typography.Text>
                   ) : (
-                    <Space orientation="vertical" size={4} style={{ width: '100%' }}>
+                    <Space
+                      orientation="vertical"
+                      size={4}
+                      data-lfh="chat-nachricht-text"
+                      style={{ width: '100%', maxWidth: NACHRICHT_LESEBREITE }}
+                    >
                       {n.inhalt && <Typography.Text>{n.inhalt}</Typography.Text>}
                       {n.anhaenge.map((a) => (
                         <Typography.Link

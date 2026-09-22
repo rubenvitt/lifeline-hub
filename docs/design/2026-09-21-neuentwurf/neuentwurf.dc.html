@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<link rel="stylesheet" href="_ds/lifeline-hub-design-system-ac89f959-9945-47a5-bb8b-25b1c32d4848/tokens/colors.css">
+<link rel="stylesheet" href="_ds/lifeline-hub-design-system-ac89f959-9945-47a5-bb8b-25b1c32d4848/tokens/typography.css">
+<link rel="stylesheet" href="_ds/lifeline-hub-design-system-ac89f959-9945-47a5-bb8b-25b1c32d4848/tokens/spacing.css">
+<link rel="stylesheet" href="_ds/lifeline-hub-design-system-ac89f959-9945-47a5-bb8b-25b1c32d4848/tokens/elevation.css">
+<link rel="stylesheet" href="_ds/lifeline-hub-design-system-ac89f959-9945-47a5-bb8b-25b1c32d4848/tokens/motion.css">
+<script src="_ds/lifeline-hub-design-system-ac89f959-9945-47a5-bb8b-25b1c32d4848/_ds_bundle.js"></script>
+<style>
+  body { margin:0; background:#050608; }
+  a { color:#4d94d6; text-decoration:none; }
+  a:hover { color:#7db3e8; }
+</style>
+</helmet>
+
+<div style="display:flex; flex-direction:column; gap:64px; padding:56px; background:#050608; font-family:Archivo, system-ui, sans-serif; color:#e8ebee">
+
+  <div style="display:flex; flex-direction:column; gap:14px; max-width:980px">
+    <div style="font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:.16em; text-transform:uppercase; color:#a8071a">Neuentwurf · Turn 1</div>
+    <div style="font-size:40px; font-weight:600; letter-spacing:-.02em; line-height:1.1">Lifeline Hub als Instrumententafel</div>
+    <div style="font-size:16px; line-height:1.6; color:#9aa2ab; text-wrap:pretty">Sieben Bildschirme und eine geschärfte Systemkarte. Die Gestaltungssprache wird dunkel, scharfkantig und kartografisch: Nachtbetrieb als Grundzustand, Zahlen in Mono, Rot ausschließlich als Alarm, Blau für alles Bedienbare. Formulare treten zurück hinter Kacheln, Zeitachsen und Zeilen, die sich an der Stelle bearbeiten lassen, an der sie stehen. Auffindbarkeit übernimmt eine Sprungpalette auf <span style="font-family:'JetBrains Mono', monospace; color:#c6ccd2">⌘K</span>.</div>
+  </div>
+
+  <section id="1a" style="display:flex; flex-direction:column; gap:14px">
+    <div style="display:flex; align-items:baseline; gap:12px">
+      <div style="font-family:'JetBrains Mono', monospace; font-size:11px; padding:3px 7px; background:#16191d; border:1px solid #2e343a; color:#9aa2ab">S1</div>
+      <div style="font-size:20px; font-weight:600">Systemkarte</div>
+      <div style="font-size:14px; color:#5f676f">Was sich am Design System ändert</div>
+    </div>
+
+    <div style="width:1440px; background:#0a0c0e; border:1px solid #22262b; padding:32px; display:flex; flex-direction:column; gap:28px">
+
+      <div style="display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:1px; background:#22262b">
+        <div style="background:#0f1215; padding:20px; display:flex; flex-direction:column; gap:14px">
+          <div style="font-size:10px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:#5f676f">Signalordnung</div>
+          <div style="display:flex; flex-direction:column; gap:9px">
+            <div style="display:flex; align-items:center; gap:10px"><div style="width:26px; height:26px; background:#a8071a"></div><div style="font-size:12px; line-height:1.35"><span style="color:#e8ebee">Alarm &amp; Marke</span><br><span style="font-family:'JetBrains Mono', monospace; color:#5f676f">#a8071a</span></div></div>
+            <div style="display:flex; align-items:center; gap:10px"><div style="width:26px; height:26px; background:#4d94d6"></div><div style="font-size:12px; line-height:1.35"><span style="color:#e8ebee">Bedienung</span><br><span style="font-family:'JetBrains Mono', monospace; color:#5f676f">#4d94d6</span></div></div>
+            <div style="display:flex; align-items:center; gap:10px"><div style="width:26px; height:26px; background:#52c41a"></div><div style="font-size:12px; line-height:1.35"><span style="color:#e8ebee">Einsatzbereit</span><br><span style="font-family:'JetBrains Mono', monospace; color:#5f676f">#52c41a</span></div></div>
+            <div style="display:flex; align-items:center; gap:10px"><div style="width:26px; height:26px; background:#0f1215; border:1px solid #2e343a"></div><div style="font-size:12px; line-height:1.35"><span style="color:#e8ebee">Fläche</span><br><span style="font-family:'JetBrains Mono', monospace; color:#5f676f">#08090b → #16191d</span></div></div>
+          </div>
+          <div style="font-size:12px; line-height:1.5; color:#9aa2ab; border-top:1px solid #22262b; padding-top:12px">Rot bedient nichts. Primäre Schaltflächen werden blau, Rot bleibt Gefahr, Berichtigung und Marke.</div>
+        </div>
+
+        <div style="background:#0f1215; padding:20px; display:flex; flex-direction:column; gap:14px">
+          <div style="font-size:10px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:#5f676f">Typografie</div>
+          <div style="display:flex; flex-direction:column; gap:10px">
+            <div style="font-size:30px; font-weight:600; letter-spacing:-.02em; line-height:1">Archivo 600</div>
+            <div style="font-size:14px; color:#c6ccd2; line-height:1.5">Archivo 400 · Lauftext und Bedienung, 14 px Grundmaß</div>
+            <div style="font-family:'JetBrains Mono', monospace; font-size:22px; font-weight:500; letter-spacing:.02em; color:#e8ebee">1 / 2 / 9 / 12</div>
+            <div style="font-family:'JetBrains Mono', monospace; font-size:12px; color:#9aa2ab">JetBrains Mono · Zahlen, Zeiten, Funkrufnamen, Koordinaten</div>
+          </div>
+          <div style="font-size:12px; line-height:1.5; color:#9aa2ab; border-top:1px solid #22262b; padding-top:12px">Kontrastsprung statt Abstufung: Überschrift 30, Datenwert 22, Text 14, Augenbraue 10 in Kapitälchenlage.</div>
+        </div>
+
+        <div style="background:#0f1215; padding:20px; display:flex; flex-direction:column; gap:14px">
+          <div style="font-size:10px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:#5f676f">Raster &amp; Dichte</div>
+          <div style="display:flex; flex-direction:column; gap:8px">
+            <div style="display:flex; align-items:center; gap:10px"><div style="width:52px; font-family:'JetBrains Mono', monospace; font-size:11px; color:#5f676f">kompakt</div><div style="flex:1; height:22px; background:#14171b; border:1px solid #2e343a"></div></div>
+            <div style="display:flex; align-items:center; gap:10px"><div style="width:52px; font-family:'JetBrains Mono', monospace; font-size:11px; color:#5f676f">normal</div><div style="flex:1; height:30px; background:#14171b; border:1px solid #2e343a"></div></div>
+            <div style="display:flex; align-items:center; gap:10px"><div style="width:52px; font-family:'JetBrains Mono', monospace; font-size:11px; color:#5f676f">handschuh</div><div style="flex:1; height:46px; background:#14171b; border:1px solid #4d94d6"></div></div>
+          </div>
+          <div style="font-size:12px; line-height:1.5; color:#9aa2ab; border-top:1px solid #22262b; padding-top:12px">Radius 0 durchgehend. Trennung über Haarlinien auf 1440er Schirm und Führungstablet gleich, nur die Zeilenhöhe wechselt.</div>
+        </div>
+
+        <div style="background:#0f1215; padding:20px; display:flex; flex-direction:column; gap:14px">
+          <div style="font-size:10px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:#5f676f">Layoutmuster</div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px">
+            <div style="display:flex; flex-direction:column; gap:5px"><div style="height:52px; border:1px solid #2e343a; display:flex; flex-direction:column"><div style="height:8px; background:#22262b"></div><div style="flex:1; display:grid; grid-template-columns:repeat(3,1fr); gap:2px; padding:3px"><div style="background:#16191d"></div><div style="background:#16191d"></div><div style="background:#16191d"></div></div></div><div style="font-size:10px; color:#5f676f">Kennzahlen</div></div>
+            <div style="display:flex; flex-direction:column; gap:5px"><div style="height:52px; border:1px solid #2e343a; display:flex"><div style="width:3px; background:#4d94d6; margin:4px 0 4px 6px"></div><div style="flex:1; display:flex; flex-direction:column; gap:3px; padding:5px"><div style="height:6px; background:#16191d"></div><div style="height:6px; background:#16191d"></div><div style="height:6px; background:#16191d"></div></div></div><div style="font-size:10px; color:#5f676f">Zeitachse</div></div>
+            <div style="display:flex; flex-direction:column; gap:5px"><div style="height:52px; border:1px solid #2e343a; display:flex"><div style="flex:1; background:#0b0d10"></div><div style="width:26px; border-left:1px solid #2e343a; background:#14171b"></div></div><div style="font-size:10px; color:#5f676f">Karte + Leiste</div></div>
+            <div style="display:flex; flex-direction:column; gap:5px"><div style="height:52px; border:1px solid #2e343a; display:grid; grid-template-columns:repeat(4,1fr); grid-template-rows:repeat(3,1fr); gap:1px; padding:3px"><div style="background:#16191d"></div><div style="background:#16191d"></div><div style="background:#52c41a"></div><div style="background:#16191d"></div><div style="background:#16191d"></div><div style="background:#d4b106"></div><div style="background:#16191d"></div><div style="background:#16191d"></div><div style="background:#16191d"></div><div style="background:#16191d"></div><div style="background:#16191d"></div><div style="background:#a8071a"></div></div><div style="font-size:10px; color:#5f676f">Statusraster</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:14px">
+        <div style="font-size:10px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:#5f676f">Neue Bausteine</div>
+        <div style="display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:16px">
+
+          <div style="background:#0f1215; border:1px solid #22262b; padding:16px; display:flex; flex-direction:column; gap:10px">
+            <div style="display:flex; align-items:center; justify-content:space-between"><div style="font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#5f676f">Betroffene</div><i class="ti ti-arrow-up-right" style="font-size:14px; color:#4d94d6"></i></div>
+            <div style="font-family:'JetBrains Mono', monospace; font-size:38px; font-weight:500; line-height:1; letter-spacing:-.02em">248</div>
+            <div style="display:flex; gap:2px; height:5px"><div style="flex:12; background:#a8071a"></div><div style="flex:31; background:#d46b08"></div><div style="flex:96; background:#d4b106"></div><div style="flex:109; background:#3a4149"></div></div>
+            <div style="font-family:'JetBrains Mono', monospace; font-size:11px; color:#9aa2ab">SK I 12 · II 31 · III 96 · IV 109</div>
+            <div style="font-size:11px; color:#5f676f; border-top:1px solid #22262b; padding-top:8px">Kachel — Zahl führt, Aufgliederung folgt</div>
+          </div>
+
+          <div style="background:#0f1215; border:1px solid #22262b; padding:16px; display:flex; flex-direction:column; gap:10px">
+            <div style="font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#5f676f">Zeitachsen-Eintrag</div>
+            <div style="display:flex; gap:10px">
+              <div style="font-family:'JetBrains Mono', monospace; font-size:12px; color:#9aa2ab; padding-top:1px">14:06</div>
+              <div style="width:2px; background:#d46b08"></div>
+              <div style="flex:1; display:flex; flex-direction:column; gap:4px">
+                <div style="font-family:'JetBrains Mono', monospace; font-size:10px; letter-spacing:.1em; color:#d46b08">ANORDNUNG</div>
+                <div style="font-size:12px; line-height:1.45; color:#c6ccd2">Abschnitt Nord verlegt zwei Trupps zur Deichkrone km 4,2.</div>
+                <div style="font-family:'JetBrains Mono', monospace; font-size:10px; color:#5f676f">ELW 1 · Funk</div>
+              </div>
+            </div>
+            <div style="font-size:11px; color:#5f676f; border-top:1px solid #22262b; padding-top:8px">Typ als farbige Kante, nicht als Etikett</div>
+          </div>
+
+          <div style="background:#0f1215; border:1px solid #22262b; padding:16px; display:flex; flex-direction:column; gap:10px">
+            <div style="font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#5f676f">Statuszelle</div>
+            <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:#22262b">
+              <div style="background:#0d1a0a; height:34px; display:flex; align-items:center; justify-content:center; font-family:'JetBrains Mono', monospace; font-size:13px; color:#7ddc4a">2</div>
+              <div style="background:#1c1705; height:34px; display:flex; align-items:center; justify-content:center; font-family:'JetBrains Mono', monospace; font-size:13px; color:#e8cc3a">4</div>
+              <div style="background:#1c0a0d; height:34px; display:flex; align-items:center; justify-content:center; font-family:'JetBrains Mono', monospace; font-size:13px; color:#ff6b6b">3</div>
+            </div>
+            <div style="font-family:'JetBrains Mono', monospace; font-size:11px; color:#9aa2ab">bereit · gebunden · Ausfall</div>
+            <div style="font-size:11px; color:#5f676f; border-top:1px solid #22262b; padding-top:8px">Ampel als Fläche, Zahl bleibt lesbar</div>
+          </div>
+
+          <div style="background:#0f1215; border:1px solid #22262b; padding:16px; display:flex; flex-direction:column; gap:10px">
+            <div style="font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#5f676f">Schnellerfassung</div>
+            <div style="display:flex; align-items:center; gap:8px; height:34px; padding:0 10px; background:#14171b; border:1px solid #4d94d6">
+              <div style="font-family:'JetBrains Mono', monospace; font-size:13px; color:#4d94d6">/</div>
+              <div style="font-family:'JetBrains Mono', monospace; font-size:13px; color:#e8ebee">meldung</div>
+              <div style="width:1px; height:16px; background:#4d94d6"></div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:4px">
+              <div style="font-family:'JetBrains Mono', monospace; font-size:11px; color:#9aa2ab">/meldung · /anordnung · /lage</div>
+              <div style="font-family:'JetBrains Mono', monospace; font-size:11px; color:#9aa2ab">/person · /einheit · /gefahr</div>
+            </div>
+            <div style="font-size:11px; color:#5f676f; border-top:1px solid #22262b; padding-top:8px">Eine Zeile ersetzt sechs Formulare</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="1b" style="display:flex; flex-direction:column; gap:14px">
+    <div style="display:flex; align-items:baseline; gap:12px">
+      <div style="font-family:'JetBrains Mono', monospace; font-size:11px; padding:3px 7px; background:#16191d; border:1px solid #2e343a; color:#9aa2ab">S2</div>
+      <div style="font-size:20px; font-weight:600">Einsatz-Workspace</div>
+      <div style="font-size:14px; color:#5f676f">Rail, Modulpanel, Kopf — mit offener Sprungpalette</div>
+    </div>
+    <div style="width:1440px; height:900px; border:1px solid #22262b; position:relative; overflow:hidden">
+      <dc-import name="Shell" aktiv="fuehrung" panel-titel="Führung" module="{{ modulFuehrung }}" hint-size="100%,100%" style="width:100%; height:100%">
+        <div style="flex:1; display:flex; flex-direction:column; background:#08090b; overflow:hidden">
+          <div style="height:44px; flex:0 0 44px; display:flex; align-items:center; justify-content:space-between; padding:0 24px; border-bottom:1px solid #22262b">
+            <div style="display:flex; align-items:center; gap:9px; font-size:12px; color:#5f676f">
+              <span>Einsätze</span><i class="ti ti-chevron-right" style="font-size:13px"></i><span>Hochwasser Weserlauf</span><i class="ti ti-chevron-right" style="font-size:13px"></i><span style="color:#c6ccd2">Überblick</span>
+            </div>
+            <div style="display:flex; gap:8px">
+              <div style="height:28px; display:flex; align-items:center; gap:7px; padding:0 12px; border:1px solid #2e343a; font-size:12px; color:#c6ccd2"><i class="ti ti-file-text" style="font-size:14px"></i>Lagebericht</div>
+              <div style="height:28px; display:flex; align-items:center; gap:7px; padding:0 12px; background:#4d94d6; font-size:12px; font-weight:500; color:#08090b"><i class="ti ti-plus" style="font-size:14px"></i>Eintrag</div>
+            </div>
+          </div>
+
+          <div style="flex:1; display:flex; flex-direction:column; gap:20px; padding:24px; overflow:hidden">
+            <div style="display:grid; grid-template-columns:repeat(5,1fr); gap:1px; background:#22262b; border:1px solid #22262b">
+              <sc-for list="{{ kennzahlen }}" as="k" hint-placeholder-count="5">
+                <div style="background:#0f1215; padding:16px 18px; display:flex; flex-direction:column; gap:8px">
+                  <div style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#5f676f">{{ k.titel }}</div>
+                  <div style="display:flex; align-items:baseline; gap:8px">
+                    <div style="font-family:'JetBrains Mono', monospace; font-size:32px; font-weight:500; line-height:1; letter-spacing:-.02em; color: {{ k.farbe }}">{{ k.wert }}</div>
+                    <div style="font-family:'JetBrains Mono', monospace; font-size:12px; color:#5f676f">{{ k.einheit }}</div>
+                  </div>
+                  <div style="font-size:11px; color:#9aa2ab">{{ k.notiz }}</div>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="flex:1; display:grid; grid-template-columns:minmax(0,1.35fr) minmax(0,1fr); grid-template-rows:auto minmax(0,1fr); gap:20px; min-height:0">
+              <div style="display:flex; flex-direction:column; border:1px solid #22262b; background:#0a0c0e">
+                <div style="height:38px; flex:0 0 38px; display:flex; align-items:center; justify-content:space-between; padding:0 16px; border-bottom:1px solid #22262b">
+                  <div style="font-size:10px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:#5f676f">Einsatzabschnitte</div>
+                  <div style="font-family:'JetBrains Mono', monospace; font-size:11px; color:#5f676f">4 Abschnitte · 31 Einheiten</div>
+                </div>
+                <sc-for list="{{ abschnitte }}" as="a" hint-placeholder-count="4">
+                  <div style="display:flex; align-items:stretch; gap:14px; padding:16px; border-bottom:1px solid #16191d">
+                    <div style="width:3px; background: {{ a.farbe }}"></div>
+                    <div style="width:158px; display:flex; flex-direction:column; gap:4px">
+                      <div style="font-size:14px; font-weight:500">{{ a.name }}</div>
+                      <div style="font-family:'JetBrains Mono', monospace; font-size:11px; color:#5f676f">{{ a.leitung }}</div>
+                      <div style="font-family:'JetBrains Mono', monospace; font-size:11px; color:#9aa2ab">{{ a.einheiten }} Einheiten</div>
+                    </div>
+                    <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:7px">
+                      <div style="font-size:12px; line-height:1.45; color:#9aa2ab; text-wrap:pretty">{{ a.auftrag }}</div>
+                      <div style="display:flex; align-items:center; gap:9px">
+                        <div style="flex:1; height:4px; background:#16191d; display:flex"><div style="background: {{ a.farbe }}; width: {{ a.fortschritt }}"></div></div>
+                        <div style="font-family:'JetBrains Mono', monospace; font-size:11px; color:#5f676f">{{ a.fortschritt }}</div>
+                      </div>
+                      <div style="display:flex; align-items:center; gap:10px; padding-top:1px">
+                        <div style="font-family:'JetBrains Mono', monospace; font-size:10px; color:#5f676f">{{ a.rueck }}</div>
+                        <div style="font-size:11px; color:#5f676f; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ a.letzte }}</div>
+                      </div>
+                    </div>
+                    <div style="width:132px; display:flex; flex-direction:column; gap:7px; align-items:flex-end">
+                      <div style="font-family:'JetBrains Mono', monospace; font-size:15px">{{ a.staerke }}</div>
+                      <div style="font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:#5f676f">F/UF/M/Ges</div>
+                      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:#22262b; width:100%">
+                        <div style="background:#0d1a0a; height:24px; display:flex; align-items:center; justify-content:center; font-family:'JetBrains Mono', monospace; font-size:12px; color:#7ddc4a">{{ a.bereit }}</div>
+                        <div style="background:#0d1620; height:24px; display:flex; align-items:center; justify-content:center; font-family:'JetBrains Mono', monospace; font-size:12px; color:#8ec2f0">{{ a.gebunden }}</div>
+                        <div style="background: {{ a.ausfallBg }}; height:24px; display:flex; align-items:center; justify-content:center; font-family:'JetBrains Mono', monospace; font-size:12px; color: {{ a.ausfallFarbe }}">{{ a.ausfall }}</div>
+                      </div>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+
+              <div style="display:flex; flex-direction:column; border:1px solid #22262b; background:#0a0c0e">
+                <div style="height:38px; flex:0 0 38px; display:flex; align-items:center; justify-content:space-between; padding:0 16px; border-bottom:1px solid #22262b">
+                  <div style="font-size:10px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:#5f676f">Offene Anordnungen</div>
+                  <div style="font-family:'JetBrains Mono', monospace; font-size:11px; color:#e8cc3a">3 überfällig</div>
+                </div>
+                <sc-for list="{{ anordnungen }}" as="o" hint-placeholder-count="5">
+                  <div style="display:flex; gap:12px; padding:14px 16px; border-bottom:1px solid #16191d">
+                    <div style="font-family:'JetBrains Mono', monospace; font-size:11px; color: {{ o.zeitFarbe }}; width:40px">{{ o.zeit }}</div>
+                    <div style="flex:1; display:flex; flex-direction:column; gap:4px">
+                      <div style="font-size:12px; line-height:1.45; color:#c6ccd2; text-wrap:pretty">{{ o.text }}</div>
+                      <div style="font-family:'JetBrains Mono', monospace; font-size:10px; color:#5f676f">{{ o.an }} · Frist {{ o.frist }}</div>
+                    </div>
+                    <div style="font-family:'JetBrains Mono', monospace; font-size:10px; letter-spacing:.06em; color: {{ o.zeitFarbe }}">{{ o.status }}</div>
+                  </div>
+                </sc-for>
+              </div>
+
+              <div style="grid-column:1 / -1; display:flex; border:1px solid #22262b; background:#0a0c0e; min-height:0">
+                <div style="flex:1; min-width:0; display:flex; flex-direction:column">
+                  <div style="height:38px; flex:0 0 38px; display:flex; align-items:center; justify-content:space-between; padding:0 16px; border-bottom:1px solid #22262b">
+                    <div style="font-size:10px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:#5f676f">Entscheidungen der letzten Stunde</div>
+                    <div style="font-family:'JetBrains Mono', monospace; font-size:11px; color:#5f676f">ETB ↗</div>
+                  </div>
+                  <div style="flex:1; display:flex; flex-direction:column; min-height:0; overflow:hidden">
+                    <sc-for list="{{ entscheidungen }}" as="e" hint-placeholder-count="4">
+                      <div style="display:flex; gap:14px; padding:13px 16px; border-bottom:1px solid #16191d">
+                        <div style="font-family:'JetBrains Mono', monospace; font-size:12px; color:#9aa2ab; width:40px">{{ e.zeit }}</div>
+                        <div style="width:2px; background:#722ed1"></div>
+                        <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:3px">
+                          <div style="font-size:13px; line-height:1.45; color:#dfe4e9; text-wrap:pretty">{{ e.text }}</div>
+                          <div style="font-family:'JetBrains Mono', monospace; font-size:10px; color:#5f676f">{{ e.meta }}</div>
+                        </div>
+                        <div style="font-family:'JetBrains Mono', monospace; font-size:10px; letter-spacing:.06em; color: {{ e.folgeFarbe }}">{{ e.folge }}</div>
+                      </div>
+                    </sc-for>
+                  </div>
+                </div>
+                <div style="width:280px; flex:0 0 280px; border-left:1px solid #22262b; display:flex; flex-direction:column">
+                  <div style="height:38px; flex:0 0 38px; display:flex; align-items:center; padding:0 16px; border-bottom:1px solid #22262b; font-size:10px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:#5f676f">Nächste Marken</div>
+                  <div style="padding:14px 16px; display:flex; flex-direction:column; gap:12px">
+                    <sc-for list="{{ marken }}" as="m" hint-placeholder-count="4">
+                      <div style="display:flex; align-items:baseline; gap:11px">
+                        <div style="font-family:'JetBrains Mono', monospace; font-size:13px; color: {{ m.farbe }}; width:44px">{{ m.zeit }}</div>
+                        <div style="flex:1; font-size:12px; line-height:1.4; color:#9aa2ab; text-wrap:pretty">{{ m.text }}</div>
+                      </div>
+                    </sc-for>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </dc-import>
+
+      <div style="position:absolute; inset:0; background:rgba(5,6,8,.72); display:flex; align-items:flex-start; justify-content:center; padding-top:120px">
+        <div style="width:640px; background:#101317; border:1px solid #4d94d6; box-shadow:0 24px 64px rgba(0,0,0,.6); display:flex; flex-direction:column">
+          <div style="display:flex; align-items:center; gap:12px; height:52px; padding:0 16px; border-bottom:1px solid #22262b">
+            <i class="ti ti-search" style="font-size:18px; color:#4d94d6"></i>
+            <div style="flex:1; font-size:16px; color:#e8ebee">deich</div>
+            <div style="font-family:'JetBrains Mono', monospace; font-size:11px; color:#5f676f">ESC</div>
+          </div>
+          <div style="padding:8px 0">
+            <div style="padding:8px 16px 6px; font-size:10px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:#5f676f">Sprungmarken</div>
+            <sc-for list="{{ palette }}" as="p" hint-placeholder-count="5">
+              <div style="display:flex; align-items:center; gap:12px; height:38px; padding:0 16px; background: {{ p.bg }}">
+                <i class="{{ p.icon }}" style="font-size:16px; color: {{ p.iconFarbe }}"></i>
+                <div style="flex:1; font-size:13px; color:#e8ebee">{{ p.label }}</div>
+                <div style="font-size:11px; color:#5f676f">{{ p.kontext }}</div>
+                <div style="font-family:'JetBrains Mono', monospace; font-size:10px; color:#5f676f">{{ p.taste }}</div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display:flex; gap:18px; padding:10px 16px; border-top:1px solid #22262b; font-family:'JetBrains Mono', monospace; font-size:10px; color:#5f676f">
+            <div>↵ öffnen</div><div>⇧↵ im Panel</div><div>/ Befehl</div><div>@ Einheit</div><div># Koordinate</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="1c" style="display:flex; flex-direction:column; gap:14px">
+    <div style="display:flex; align-items:baseline; gap:12px">
+      <div style="font-family:'JetBrains Mono', monospace; font-size:11px; padding:3px 7px; background:#16191d; border:1px solid #2e343a; color:#9aa2ab">S3</div>
+      <div style="font-size:20px; font-weight:600">Lage-Dashboard</div>
+      <div style="font-size:14px; color:#5f676f">Die ganze Lage auf einem Schirm</div>
+    </div>
+    <div style="width:1440px; height:900px; border:1px solid #22262b; overflow:hidden">
+      <dc-import name="Shell" aktiv="lage" panel-titel="Lage" module="{{ modulLage }}" hint-size="100%,100%" style="width:100%; height:100%">
+        <div style="flex:1; display:flex; flex-direction:column; background:#08090b; overflow:hidden">
+          <div style="height:44px; flex:0 0 44px; display:flex; align-items:center; justify-content:space-between; padding:0 24px; border-bottom:1px solid #22262b">
+            <div style="font-size:14px; font-weight:600">Lagebild 21.09. 14:22</div>
+            <div style="display:flex; align-items:center; gap:16px; font-family:'JetBrains Mono', monospace; font-size:11px; color:#5f676f">
+              <div>Stand vor 40 s</div>
+              <div style="display:flex; align-items:center; gap:6px; color:#e8cc3a"><i class="ti ti-alert-triangle" style="font-size:14px"></i>Warnstufe hoch</div>
+            </div>
+          </div>
+
+          <div style="flex:1; display:flex; flex-direction:column; gap:1px; background:#22262b; overflow:hidden">
+            <div style="display:grid; grid-template-columns:repeat(6,1fr); gap:1px; background:#22262b">
+              <sc-for list="{{ dashKennzahlen }}" as="k" hint-placeholder-count="6">
+                <div style="background:#0f1215; padding:18px 20px; display:flex; flex-direction:column; gap:8px">
+                  <div style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#5f676f">{{ k.titel }}</div>
+                  <div style="font-family:'JetBrains Mono', monospace; font-size:34px; font-weight:500; line-height:1; letter-spacing:-.02em; color: {{ k.farbe }}">{{ k.wert }}</div>
+                  <div style="font-size:11px; color:#9aa2ab">{{ k.notiz }}</div>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="flex:1; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.1fr); gap:1px; background:#22262b; min-height:0">
+
+              <div style="background:#0a0c0e; display:flex; flex-direction:column; min-height:0">
+                <div style="height:36px; flex:0 0 36px; display:flex; align-items:center; padding:0 18px; border-bottom:1px solid #22262b; font-size:10px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:#5f676f">Gefahrenmatrix</div>
+                <div style="padding:16px 18px; display:flex; flex-direction:column; gap:10px">
+                  <sc-for list="{{ gefahren }}" as="g" hint-placeholder-count="6">
+                    <div style="display:flex; align-items:center; gap:12px">
+                      <div style="width:106px; font-size:12px; color:#c6ccd2">{{ g.name }}</div>
+                      <div style="flex:1; display:flex; gap:2px; height:14px">
+                        <div style="flex:1; background: {{ g.s1 }}"></div>
+                        <div style="flex:1; background: {{ g.s2 }}"></div>
+                        <div style="flex:1; background: {{ g.s3 }}"></div>
+                        <div style="flex:1; background: {{ g.s4 }}"></div>
+                      </div>
+                      <div style="width:56px; text-align:right; font-family:'JetBrains Mono', monospace; font-size:11px; color: {{ g.textFarbe }}">{{ g.stufe }}</div>
+                    </div>
+                  </sc-for>
+                  <div style="display:flex; justify-content:space-between; padding-top:6px; border-top:1px solid #22262b; font-family:'JetBrains Mono', monospace; font-size:10px; color:#5f676f">
+                    <div>niedrig</div><div>mittel</div><div>hoch</div><div>akut</div>
+                  </div>
+                </div>
+              </div>
+
+              <div style="background:#0a0c0e; display:flex; flex-direction:column; min-height:0">
+                <div style="height:36px; flex:0 0 36px; display:flex; align-items:center; padding:0 18px; border-bottom:1px solid #22262b; font-size:10px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:#5f676f">Sichtung</div>
+                <div style="padding:16px 18px; display:flex; flex-direction:column; gap:14px">
+                  <sc-for list="{{ sichtung }}" as="s" hint-placeholder-count="4">
+                    <div style="display:flex; flex-direction:column; gap:6px">
+                      <div style="display:flex; align-items:baseline; justify-content:space-between">
+                        <div style="font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:.06em; color: {{ s.farbe }}">{{ s.kat }}</div>
+                        <div style="font-size:11px; color:#5f676f">{{ s.label }}</div>
+                        <div style="font-family:'JetBrains Mono', monospace; font-size:20px; font-weight:500; color:#e8ebee">{{ s.wert }}</div>
+                      </div>
+                      <div style="height:6px; background:#16191d; display:flex"><div style="background: {{ s.farbe }}; width: {{ s.breite }}"></div></div>
+                    </div>
+                  </sc-for>
+                  <div style="margin-top:2px; padding-top:12px; border-top:1px solid #22262b; display:flex; justify-content:space-between">
+                    <div style="font-size:11px; color:#5f676f">Transportiert / offen</div>
+                    <div style="font-family:'JetBrains Mono', monospace; font-size:12px; color:#c6ccd2">104 / 144</div>
+                  </div>
+                </div>
+              </div>
+
+              <div style="background:#0a0c0e; display:flex; flex-direction:column; min-height:0">
+                <div style="height:36px; flex:0 0 36px; display:flex; align-items:center; justify-content:space-between; padding:0 18px; border-bottom:1px solid #22262b">
+                  <div style="font-size:10px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:#5f676f">Meldungsstrom</div>
+                  <div style="font-family:'JetBrains Mono', monospace; font-size:10px; color:#4d94d6">live</div>
+                </div>
+                <sc-for list="{{ strom }}" as="m" hint-placeholder-count="7">
+                  <div style="display:flex; gap:10px; padding:11px 18px; border-bottom:1px solid #16191d">
+                    <div style="font-family:'JetBrains Mono', monospace; font-size:11px; color:#5f676f; width:36px">{{ m.zeit }}</div>
+                    <div style="width:2px; background: {{ m.farbe }}"></div>
+                    <div style="flex:1; display:flex; flex-direction:column; gap:3px">
+                      <div style="font-size:12px; line-height:1.4; color:#c6ccd2">{{ m.text }}</div>
+                      <div style="font-family:'JetBrains Mono', monospace; font-size:10px; color:#5f676f">{{ m.quelle }}</div>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+        </div>
+      </dc-import>
+    </div>
+  </section>
+
+  <section id="1d" style="display:flex; flex-direction:column; gap:14px">
+    <div style="display:flex; align-items:baseline; gap:12px">
+      <div style="font-family:'JetBrains Mono', monospace; font-size:11px; padding:3px 7px; background:#16191d; border:1px solid #2e343a; color:#9aa2ab">S4</div>
+      <div style="font-size:20px; font-weight:600">Einsatztagebuch</div>
+      <div style="font-size:14px; color:#5f676f">Zeitachse statt Liste, Sichtungsmarke, Schnellerfassung</div>
+    </div>
+    <div style="width:1440px; height:900px; border:1px solid #22262b; overflow:hidden">
+      <dc-import name="Shell" aktiv="erfassung" panel-titel="Erfassung" module="{{ modulEtb }}" hint-size="100%,100%" style="width:100%; height:100%">
+        <div style="flex:1; display:flex; min-height:0; background:#08090b">
+          <div style="flex:1; display:flex; flex-direction:column; min-width:0">
+            <div style="height:44px; flex:0 0 44px; display:flex; align-items:center; justify-content:space-between; padding:0 24px; border-bottom:1px solid #22262b">
+              <div style="display:flex; align-items:center; gap:14px">
+                <div style="font-size:14px; font-weight:600">Einsatztagebuch</div>
+                <div style="font-family:'JetBrains Mono', monospace; font-size:11px; color:#5f676f">412 Einträge</div>
+              </div>
+              <div style="display:flex; gap:1px; background:#2e343a; border:1px solid #2e343a">
+                <sc-for list="{{ etbFilter }}" as="f" hint-placeholder-count="6">
+                  <div style="height:26px; display:flex; align-items:center; gap:6px; padding:0 11px; background: {{ f.bg }}; font-size:11px; color: {{ f.farbe }}">
+                    <div style="width:6px; height:6px; background: {{ f.punkt }}"></div>{{ f.label }}
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+
+            <div style="flex:1; overflow:hidden; display:flex; flex-direction:column">
+              <div style="display:flex; align-items:center; gap:12px; padding:9px 24px; background:#0d1520; border-bottom:1px solid #1d3a5c">
+                <i class="ti ti-arrow-down" style="font-size:14px; color:#4d94d6"></i>
+                <div style="font-size:12px; color:#8ec2f0">14 neue Einträge seit Ihrer letzten Sichtung um 13:04</div>
+                <div style="flex:1"></div>
+                <div style="font-family:'JetBrains Mono', monospace; font-size:11px; color:#4d94d6">alle als gesichtet markieren</div>
+              </div>
+
+              <sc-for list="{{ etb }}" as="e" hint-placeholder-count="8">
+                <div style="display:flex; gap:0; border-bottom:1px solid #14171b; background: {{ e.rowBg }}">
+                  <div style="width:96px; flex:0 0 96px; padding:13px 0 13px 24px; display:flex; flex-direction:column; gap:2px">
+                    <div style="font-family:'JetBrains Mono', monospace; font-size:13px; font-weight:500; color:#e8ebee">{{ e.zeit }}</div>
+                    <div style="font-family:'JetBrains Mono', monospace; font-size:10px; color:#5f676f">{{ e.nr }}</div>
+                  </div>
+                  <div style="width:2px; flex:0 0 2px; background: {{ e.farbe }}; margin:10px 0"></div>
+                  <div style="flex:1; min-width:0; padding:13px 16px; display:flex; flex-direction:column; gap:5px">
+                    <div style="display:flex; align-items:center; gap:10px">
+                      <div style="font-family:'JetBrains Mono', monospace; font-size:10px; font-weight:500; letter-spacing:.1em; color: {{ e.farbe }}">{{ e.typ }}</div>
+                      <div style="font-family:'JetBrains Mono', monospace; font-size:10px; color:#5f676f">{{ e.meta }}</div>
+                    </div>
+                    <div style="font-size:13px; line-height:1.5; color:#dfe4e9; text-wrap:pretty">{{ e.text }}</div>
+                    <div style="font-size:11px; line-height:1.5; color: {{ e.hinweisFarbe }}">{{ e.hinweis }}</div>
+                  </div>
+                  <div style="width:130px; flex:0 0 130px; padding:13px 24px 13px 0; display:flex; flex-direction:column; align-items:flex-end; gap:5px">
+                    <div style="font-family:'JetBrains Mono', monospace; font-size:11px; color:#9aa2ab">{{ e.verfasser }}</div>
+                    <div style="font-family:'JetBrains Mono', monospace; font-size:10px; color:#5f676f">{{ e.weg }}</div>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="flex:0 0 auto; border-top:1px solid #2e343a; background:#0c0e11; padding:14px 24px; display:flex; flex-direction:column; gap:10px">
+              <div style="display:flex; align-items:center; gap:10px; height:40px; padding:0 12px; background:#14171b; border:1px solid #4d94d6">
+                <div style="font-family:'JetBrains Mono', monospace; font-size:14px; color:#4d94d6">/anordnung</div>
+                <div style="font-size:14px; color:#e8ebee">@ELW-1 Abschnitt Süd hält Sandsackverbau km 6,1</div>
+                <div style="width:1px; height:18px; background:#4d94d6"></div>
+                <div style="flex:1"></div>
+                <div style="font-family:'JetBrains Mono', monospace; font-size:11px; color:#5f676f">↵ eintragen</div>
+              </div>
+              <div style="display:flex; align-items:center; gap:18px; font-family:'JetBrains Mono', monospace; font-size:11px; color:#5f676f">
+                <div style="color:#9aa2ab">/meldung</div><div style="color:#9aa2ab">/anordnung</div><div style="color:#9aa2ab">/entscheidung</div><div style="color:#9aa2ab">/lage</div>
+                <div style="flex:1"></div>
+                <div>@ Einheit · # Koordinate · ⧖ Nachtrag</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="width:260px; flex:0 0 260px; border-left:1px solid #22262b; background:#0a0c0e; display:flex; flex-direction:column">
+            <div style="height:44px; flex:0 0 44px; display:flex; align-items:center; padding:0 18px; border-bottom:1px solid #22262b; font-size:10px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:#5f676f">Tagesbilanz</div>
+            <div style="padding:18px; display:flex; flex-direction:column; gap:18px">
+              <sc-for list="{{ etbBilanz }}" as="b" hint-placeholder-count="5">
+                <div style="display:flex; flex-direction:column; gap:5px">
+                  <div style="display:flex; align-items:baseline; justify-content:space-between">
+                    <div style="font-size:11px; color:#9aa2ab">{{ b.label }}</div>
+                    <div style="font-family:'JetBrains Mono', monospace; font-size:18px; font-weight:500; color:#e8ebee">{{ b.wert }}</div>
+                  </div>
+                  <div style="height:4px; background:#16191d; display:flex"><div style="background: {{ b.farbe }}; width: {{ b.breite }}"></div></div>
+                </div>
+              </sc-for>
+              <div style="border-top:1px solid #22262b; padding-top:14px; display:flex; flex-direction:column; gap:8px">
+                <div style="font-size:10px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:#5f676f">Berichtigungen</div>
+                <div style="display:flex; align-items:flex-start; gap:9px">
+                  <div style="width:2px; height:32px; background:#cf1322"></div>
+                  <div style="font-size:11px; line-height:1.5; color:#9aa2ab">Nr. 388 berichtigt um 13:47 — Grundeintrag bleibt einsehbar.</div>
+                </div>
+              </div>
+              <div style="border-top:1px solid #22262b; padding-top:14px; display:flex; flex-direction:column; gap:8px">
+                <div style="font-size:10px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:#5f676f">Puffer</div>
+                <div style="display:flex; align-items:center; gap:9px">
+                  <i class="ti ti-check" style="font-size:15px; color:#52c41a"></i>
+                  <div style="font-size:11px; color:#9aa2ab">Alle Einträge übertragen</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </dc-import>
+    </div>
+  </section>
+
+  <section id="1e" style="display:flex; flex-direction:column; gap:14px">
+    <div style="display:flex; align-items:baseline; gap:12px">
+      <div style="font-family:'JetBrains Mono', monospace; font-size:11px; padding:3px 7px; background:#16191d; border:1px solid #2e343a; color:#9aa2ab">S5</div>
+      <div style="font-size:20px; font-weight:600">Lagekarte</div>
+      <div style="font-size:14px; color:#5f676f">Karte führt, Daten folgen</div>
+    </div>
+    <div style="width:1440px; height:900px; border:1px solid #22262b; overflow:hidden">
+      <dc-import name="Shell" aktiv="lage" panel-titel="Lage" module="{{ modulKarte }}" hint-size="100%,100%" style="width:100%; height:100%">
+        <div style="flex:1; display:flex; min-height:0; background:#08090b">
+          <div style="flex:1; position:relative; min-width:0; background-color:#0b0d10; background-image:repeating-radial-gradient(circle at 38% 44%, rgba(207,19,34,0) 0 88px, rgba(207,19,34,.20) 88px 89px), repeating-linear-gradient(0deg, rgba(255,255,255,.035) 0 1px, transparent 1px 56px), repeating-linear-gradient(90deg, rgba(255,255,255,.035) 0 1px, transparent 1px 56px)">
+            <div style="position:absolute; top:14px; left:16px; display:flex; flex-direction:column; gap:8px">
+              <div style="display:flex; gap:1px; background:#2e343a; border:1px solid #2e343a">
+                <div style="height:30px; display:flex; align-items:center; padding:0 12px; background:#14171b; font-size:12px; color:#e8ebee">Lage</div>
+                <div style="height:30px; display:flex; align-items:center; padding:0 12px; background:#0f1215; font-size:12px; color:#9aa2ab">Gelände</div>
+                <div style="height:30px; display:flex; align-items:center; padding:0 12px; background:#0f1215; font-size:12px; color:#9aa2ab">Satellit</div>
+              </div>
+              <div style="display:flex; align-items:center; gap:8px; height:28px; padding:0 10px; background:rgba(12,14,17,.9); border:1px solid #2e343a; font-family:'JetBrains Mono', monospace; font-size:11px; color:#9aa2ab">
+                <i class="ti ti-crosshair" style="font-size:14px; color:#4d94d6"></i>52.2634 N · 9.1287 O
+              </div>
+            </div>
+
+            <div style="position:absolute; top:14px; right:16px; display:flex; flex-direction:column; gap:1px; background:#2e343a; border:1px solid #2e343a">
+              <div style="width:32px; height:32px; display:flex; align-items:center; justify-content:center; background:#0f1215"><i class="ti ti-plus" style="font-size:16px; color:#9aa2ab"></i></div>
+              <div style="width:32px; height:32px; display:flex; align-items:center; justify-content:center; background:#0f1215"><i class="ti ti-minus" style="font-size:16px; color:#9aa2ab"></i></div>
+              <div style="width:32px; height:32px; display:flex; align-items:center; justify-content:center; background:#0f1215"><i class="ti ti-ruler-measure" style="font-size:16px; color:#4d94d6"></i></div>
+              <div style="width:32px; height:32px; display:flex; align-items:center; justify-content:center; background:#0f1215"><i class="ti ti-pencil" style="font-size:16px; color:#9aa2ab"></i></div>
+            </div>
+
+            <sc-for list="{{ marker }}" as="m" hint-placeholder-count="6">
+              <div style="position:absolute; left: {{ m.x }}; top: {{ m.y }}; display:flex; align-items:center; gap:7px">
+                <div style="width:30px; height:30px; border:1px solid {{ m.farbe }}; background:rgba(12,14,17,.92); display:flex; align-items:center; justify-content:center; font-family:'JetBrains Mono', monospace; font-size:9px; letter-spacing:.04em; color: {{ m.farbe }}">TZ</div>
+                <div style="padding:2px 6px; background:rgba(12,14,17,.92); border:1px solid #2e343a; font-family:'JetBrains Mono', monospace; font-size:10px; color:#c6ccd2">{{ m.label }}</div>
+              </div>
+            </sc-for>
+
+            <div style="position:absolute; left:22%; top:56%; width:280px; height:150px; border:1px dashed rgba(207,19,34,.6); background:rgba(207,19,34,.08)">
+              <div style="position:absolute; top:-9px; left:8px; padding:1px 6px; background:#0b0d10; font-family:'JetBrains Mono', monospace; font-size:10px; letter-spacing:.06em; color:#ff6b6b">ÜBERFLUTUNG · AKUT</div>
+            </div>
+
+            <div style="position:absolute; bottom:14px; left:16px; display:flex; align-items:center; gap:10px; padding:6px 10px; background:rgba(12,14,17,.9); border:1px solid #2e343a">
+              <div style="width:56px; height:3px; background:#9aa2ab"></div>
+              <div style="font-family:'JetBrains Mono', monospace; font-size:10px; color:#9aa2ab">500 m</div>
+              <div style="width:1px; height:14px; background:#2e343a"></div>
+              <div style="font-family:'JetBrains Mono', monospace; font-size:10px; color:#5f676f">PMTiles · Kartenplatzhalter</div>
+            </div>
+          </div>
+
+          <div style="width:300px; flex:0 0 300px; border-left:1px solid #22262b; background:#0a0c0e; display:flex; flex-direction:column">
+            <div style="height:44px; flex:0 0 44px; display:flex; align-items:center; justify-content:space-between; padding:0 18px; border-bottom:1px solid #22262b">
+              <div style="font-size:10px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:#5f676f">Ebenen</div>
+              <i class="ti ti-layers-intersect" style="font-size:16px; color:#5f676f"></i>
+            </div>
+            <sc-for list="{{ ebenen }}" as="e" hint-placeholder-count="5">
+              <div style="display:flex; align-items:center; gap:11px; padding:10px 18px; border-bottom:1px solid #16191d">
+                <div style="width:14px; height:14px; border:1px solid {{ e.rahmen }}; background: {{ e.fuellung }}"></div>
+                <div style="flex:1; font-size:12px; color: {{ e.textFarbe }}">{{ e.name }}</div>
+                <div style="font-family:'JetBrains Mono', monospace; font-size:11px; color:#5f676f">{{ e.anzahl }}</div>
+              </div>
+            </sc-for>
+
+            <div style="height:44px; flex:0 0 44px; display:flex; align-items:center; padding:0 18px; border-top:1px solid #22262b; border-bottom:1px solid #22262b; font-size:10px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:#5f676f">Ausgewählt</div>
+            <div style="padding:18px; display:flex; flex-direction:column; gap:14px; border-bottom:1px solid #22262b">
+              <div style="display:flex; align-items:center; gap:11px">
+                <div style="width:38px; height:38px; border:1px solid #4d94d6; display:flex; align-items:center; justify-content:center; font-family:'JetBrains Mono', monospace; font-size:9px; color:#4d94d6">TZ</div>
+                <div style="display:flex; flex-direction:column; gap:3px">
+                  <div style="font-size:14px; font-weight:500">Deichwache Nord</div>
+                  <div style="font-family:'JetBrains Mono', monospace; font-size:11px; color:#9aa2ab">FL HM 12/44 · Zug</div>
+                </div>
+              </div>
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px">
+                <div style="display:flex; flex-direction:column; gap:3px"><div style="font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:#5f676f">Stärke</div><div style="font-family:'JetBrains Mono', monospace; font-size:15px">1 / 2 / 9 / 12</div></div>
+                <div style="display:flex; flex-direction:column; gap:3px"><div style="font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:#5f676f">Status</div><div style="font-family:'JetBrains Mono', monospace; font-size:15px; color:#7ddc4a">4 · gebunden</div></div>
+                <div style="display:flex; flex-direction:column; gap:3px"><div style="font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:#5f676f">Seit</div><div style="font-family:'JetBrains Mono', monospace; font-size:15px">09:12</div></div>
+                <div style="display:flex; flex-direction:column; gap:3px"><div style="font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:#5f676f">Abschnitt</div><div style="font-family:'JetBrains Mono', monospace; font-size:15px">Nord</div></div>
+              </div>
+              <div style="display:flex; gap:8px">
+                <div style="flex:1; height:30px; display:flex; align-items:center; justify-content:center; gap:7px; background:#4d94d6; font-size:12px; font-weight:500; color:#08090b"><i class="ti ti-message" style="font-size:14px"></i>Anordnung</div>
+                <div style="flex:1; height:30px; display:flex; align-items:center; justify-content:center; gap:7px; border:1px solid #2e343a; font-size:12px; color:#c6ccd2">ETB ↗</div>
+              </div>
+            </div>
+            <div style="padding:18px; display:flex; flex-direction:column; gap:10px">
+              <div style="font-size:10px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:#5f676f">Letzte Meldung</div>
+              <div style="font-size:12px; line-height:1.5; color:#c6ccd2">Sickerstelle an km 4,2 unverändert, Sandsackverbau hält. Nachschub für 3 h gesichert.</div>
+              <div style="font-family:'JetBrains Mono', monospace; font-size:10px; color:#5f676f">14:11 · Funk</div>
+            </div>
+          </div>
+        </div>
+      </dc-import>
+    </div>
+  </section>
+
+  <section id="1f" style="display:flex; flex-direction:column; gap:14px">
+    <div style="display:flex; align-items:baseline; gap:12px">
+      <div style="font-family:'JetBrains Mono', monospace; font-size:11px; padding:3px 7px; background:#16191d; border:1px solid #2e343a; color:#9aa2ab">S6</div>
+      <div style="font-size:20px; font-weight:600">Meldebild Kräfte</div>
+      <div style="font-size:14px; color:#5f676f">Statusraster über alle Einheiten</div>
+    </div>
+    <div style="width:1440px; height:900px; border:1px solid #22262b; overflow:hidden">
+      <dc-import name="Shell" aktiv="kraefte" panel-titel="Kräfte &amp; Mittel" module="{{ modulKraefte }}" hint-size="100%,100%" style="width:100%; height:100%">
+        <div style="flex:1; display:flex; flex-direction:column; min-height:0; background:#08090b">
+          <div style="height:44px; flex:0 0 44px; display:flex; align-items:center; justify-content:space-between; padding:0 24px; border-bottom:1px solid #22262b">
+            <div style="display:flex; align-items:center; gap:14px">
+              <div style="font-size:14px; font-weight:600">Meldebild</div>
+              <div style="font-family:'JetBrains Mono', monospace; font-size:11px; color:#5f676f">31 Einheiten · Stärke 24 / 47 / 186 / 257</div>
+            </div>
+            <div style="display:flex; align-items:center; gap:10px">
+              <div style="height:28px; display:flex; align-items:center; gap:7px; padding:0 12px; border:1px solid #2e343a; font-size:12px; color:#c6ccd2"><i class="ti ti-filter" style="font-size:14px"></i>Abschnitt</div>
+              <div style="height:28px; display:flex; align-items:center; gap:7px; padding:0 12px; background:#4d94d6; font-size:12px; font-weight:500; color:#08090b"><i class="ti ti-plus" style="font-size:14px"></i>Einheit</div>
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:repeat(6,1fr); gap:1px; background:#22262b; border-bottom:1px solid #22262b">
+            <sc-for list="{{ statusStufen }}" as="s" hint-placeholder-count="6">
+              <div style="background:#0f1215; padding:14px 18px; display:flex; flex-direction:column; gap:6px">
+                <div style="display:flex; align-items:center; gap:8px">
+                  <div style="width:8px; height:8px; background: {{ s.farbe }}"></div>
+                  <div style="font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:.06em; color:#9aa2ab">{{ s.code }}</div>
+                </div>
+                <div style="font-family:'JetBrains Mono', monospace; font-size:26px; font-weight:500; line-height:1; color: {{ s.farbe }}">{{ s.wert }}</div>
+                <div style="font-size:11px; color:#9aa2ab">{{ s.label }}</div>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="flex:1; overflow:hidden; display:flex; flex-direction:column">
+            <div style="display:flex; align-items:center; height:34px; flex:0 0 34px; padding:0 24px; border-bottom:1px solid #22262b; background:#0c0e11; font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#5f676f">
+              <div style="width:196px">Einheit</div>
+              <div style="width:132px">Funkrufname</div>
+              <div style="width:124px">Abschnitt</div>
+              <div style="width:120px">Stärke</div>
+              <div style="width:104px">Status</div>
+              <div style="width:78px">Seit</div>
+              <div style="flex:1">Auftrag</div>
+              <div style="width:96px; text-align:right">Rückmeldung</div>
+            </div>
+            <sc-for list="{{ einheiten }}" as="u" hint-placeholder-count="11">
+              <div style="display:flex; align-items:center; padding:0 24px; height:48px; border-bottom:1px solid #14171b; background: {{ u.rowBg }}">
+                <div style="width:196px; display:flex; align-items:center; gap:10px">
+                  <div style="width:26px; height:26px; border:1px solid #2e343a; display:flex; align-items:center; justify-content:center; font-family:'JetBrains Mono', monospace; font-size:8px; color:#5f676f">TZ</div>
+                  <div style="font-size:13px; color:#e8ebee">{{ u.name }}</div>
+                </div>
+                <div style="width:132px; font-family:'JetBrains Mono', monospace; font-size:12px; color:#9aa2ab">{{ u.funk }}</div>
+                <div style="width:124px; font-size:12px; color:#9aa2ab">{{ u.abschnitt }}</div>
+                <div style="width:120px; font-family:'JetBrains Mono', monospace; font-size:12px; color:#c6ccd2">{{ u.staerke }}</div>
+                <div style="width:104px">
+                  <div style="display:inline-flex; align-items:center; gap:7px; height:22px; padding:0 8px; background: {{ u.statusBg }}">
+                    <div style="font-family:'JetBrains Mono', monospace; font-size:11px; font-weight:500; color: {{ u.statusFarbe }}">{{ u.statusCode }}</div>
+                    <div style="font-size:11px; color: {{ u.statusFarbe }}">{{ u.status }}</div>
+                  </div>
+                </div>
+                <div style="width:78px; font-family:'JetBrains Mono', monospace; font-size:12px; color:#9aa2ab">{{ u.seit }}</div>
+                <div style="flex:1; min-width:0; font-size:12px; color:#9aa2ab; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ u.auftrag }}</div>
+                <div style="width:96px; text-align:right; font-family:'JetBrains Mono', monospace; font-size:11px; color: {{ u.rueckFarbe }}">{{ u.rueck }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </dc-import>
+    </div>
+  </section>
+
+  <section id="1g" style="display:flex; flex-direction:column; gap:14px">
+    <div style="display:flex; align-items:baseline; gap:12px">
+      <div style="font-family:'JetBrains Mono', monospace; font-size:11px; padding:3px 7px; background:#16191d; border:1px solid #2e343a; color:#9aa2ab">S7</div>
+      <div style="font-size:20px; font-weight:600">Erfassung Betroffene</div>
+      <div style="font-size:14px; color:#5f676f">Das Formular wird zur Zeile</div>
+    </div>
+    <div style="width:1440px; height:900px; border:1px solid #22262b; overflow:hidden">
+      <dc-import name="Shell" aktiv="erfassung" panel-titel="Erfassung" module="{{ modulErfassung }}" hint-size="100%,100%" style="width:100%; height:100%">
+        <div style="flex:1; display:flex; min-height:0; background:#08090b">
+          <div style="flex:1; display:flex; flex-direction:column; min-width:0">
+            <div style="height:44px; flex:0 0 44px; display:flex; align-items:center; justify-content:space-between; padding:0 24px; border-bottom:1px solid #22262b">
+              <div style="display:flex; align-items:center; gap:14px">
+                <div style="font-size:14px; font-weight:600">Betroffene</div>
+                <div style="font-family:'JetBrains Mono', monospace; font-size:11px; color:#5f676f">248 erfasst · UHS Weserstadion</div>
+              </div>
+              <div style="display:flex; gap:1px; background:#2e343a; border:1px solid #2e343a">
+                <div style="height:26px; display:flex; align-items:center; padding:0 11px; background:#14171b; font-size:11px; color:#e8ebee">Zeilen</div>
+                <div style="height:26px; display:flex; align-items:center; padding:0 11px; background:#0f1215; font-size:11px; color:#9aa2ab">Sichtungsraster</div>
+                <div style="height:26px; display:flex; align-items:center; padding:0 11px; background:#0f1215; font-size:11px; color:#9aa2ab">Karte</div>
+              </div>
+            </div>
+
+            <div style="padding:14px 24px; border-bottom:1px solid #2e343a; background:#0c0e11; display:flex; flex-direction:column; gap:10px">
+              <div style="display:flex; align-items:center; gap:0; height:42px; background:#14171b; border:1px solid #4d94d6">
+                <div style="display:flex; align-items:center; gap:8px; padding:0 12px; height:100%; border-right:1px solid #22262b">
+                  <div style="font-family:'JetBrains Mono', monospace; font-size:14px; color:#4d94d6">/person</div>
+                </div>
+                <div style="display:flex; align-items:center; gap:14px; padding:0 14px; flex:1">
+                  <div style="font-size:14px; color:#e8ebee">Kowalski, Anna</div>
+                  <div style="font-family:'JetBrains Mono', monospace; font-size:13px; color:#9aa2ab">w 34</div>
+                  <div style="display:flex; align-items:center; gap:6px; padding:2px 8px; background:#1c1705"><div style="width:6px; height:6px; background:#e8cc3a"></div><div style="font-family:'JetBrains Mono', monospace; font-size:12px; color:#e8cc3a">SK III</div></div>
+                  <div style="font-family:'JetBrains Mono', monospace; font-size:13px; color:#9aa2ab">#52.2691/9.1342</div>
+                  <div style="width:1px; height:18px; background:#4d94d6"></div>
+                </div>
+                <div style="padding:0 14px; font-family:'JetBrains Mono', monospace; font-size:11px; color:#5f676f">↵ erfassen &amp; nächste</div>
+              </div>
+              <div style="display:flex; align-items:center; gap:20px; font-family:'JetBrains Mono', monospace; font-size:11px; color:#5f676f">
+                <div>Kürzel: <span style="color:#9aa2ab">sk1–sk4</span></div>
+                <div><span style="color:#9aa2ab">m/w/d + Alter</span></div>
+                <div><span style="color:#9aa2ab">#Koordinate</span></div>
+                <div><span style="color:#9aa2ab">@Einheit</span></div>
+                <div style="flex:1"></div>
+                <div>Zuletzt: 14:19 Hoffmann, T. · SK II</div>
+              </div>
+            </div>
+
+            <div style="flex:1; overflow:hidden; display:flex; flex-direction:column">
+              <div style="display:flex; align-items:center; height:32px; flex:0 0 32px; padding:0 24px; border-bottom:1px solid #22262b; background:#0c0e11; font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#5f676f">
+                <div style="width:52px">Nr.</div>
+                <div style="width:208px">Person</div>
+                <div style="width:82px">Sichtung</div>
+                <div style="width:118px">Zustand</div>
+                <div style="width:160px">Fundort</div>
+                <div style="width:132px">Verbleib</div>
+                <div style="flex:1">Vermerk</div>
+                <div style="width:62px; text-align:right">Zeit</div>
+              </div>
+              <sc-for list="{{ personen }}" as="p" hint-placeholder-count="10">
+                <div style="display:flex; align-items:center; height:44px; padding:0 24px; border-bottom:1px solid #14171b; background: {{ p.rowBg }}">
+                  <div style="width:52px; font-family:'JetBrains Mono', monospace; font-size:11px; color:#5f676f">{{ p.nr }}</div>
+                  <div style="width:208px; display:flex; align-items:baseline; gap:9px">
+                    <div style="font-size:13px; color:#e8ebee">{{ p.name }}</div>
+                    <div style="font-family:'JetBrains Mono', monospace; font-size:11px; color:#5f676f">{{ p.alter }}</div>
+                  </div>
+                  <div style="width:82px">
+                    <div style="display:inline-flex; align-items:center; gap:6px; padding:2px 7px; background: {{ p.skBg }}">
+                      <div style="width:6px; height:6px; background: {{ p.skFarbe }}"></div>
+                      <div style="font-family:'JetBrains Mono', monospace; font-size:11px; color: {{ p.skFarbe }}">{{ p.sk }}</div>
+                    </div>
+                  </div>
+                  <div style="width:118px; font-size:12px; color:#c6ccd2">{{ p.zustand }}</div>
+                  <div style="width:160px; font-family:'JetBrains Mono', monospace; font-size:11px; color:#9aa2ab">{{ p.fundort }}</div>
+                  <div style="width:132px; font-size:12px; color: {{ p.verbleibFarbe }}">{{ p.verbleib }}</div>
+                  <div style="flex:1; min-width:0; font-size:12px; color:#9aa2ab; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ p.vermerk }}</div>
+                  <div style="width:62px; text-align:right; font-family:'JetBrains Mono', monospace; font-size:11px; color:#9aa2ab">{{ p.zeit }}</div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="width:268px; flex:0 0 268px; border-left:1px solid #22262b; background:#0a0c0e; display:flex; flex-direction:column">
+            <div style="height:44px; flex:0 0 44px; display:flex; align-items:center; padding:0 18px; border-bottom:1px solid #22262b; font-size:10px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:#5f676f">Sichtungsbild</div>
+            <div style="padding:18px; display:flex; flex-direction:column; gap:16px; border-bottom:1px solid #22262b">
+              <div style="display:flex; align-items:baseline; gap:10px">
+                <div style="font-family:'JetBrains Mono', monospace; font-size:40px; font-weight:500; line-height:1; letter-spacing:-.02em">248</div>
+                <div style="font-size:11px; color:#5f676f">erfasst</div>
+              </div>
+              <div style="display:flex; gap:2px; height:8px"><div style="flex:12; background:#a8071a"></div><div style="flex:31; background:#d46b08"></div><div style="flex:96; background:#d4b106"></div><div style="flex:109; background:#3a4149"></div></div>
+              <sc-for list="{{ skBilanz }}" as="s" hint-placeholder-count="4">
+                <div style="display:flex; align-items:center; gap:10px">
+                  <div style="width:8px; height:8px; background: {{ s.farbe }}"></div>
+                  <div style="font-family:'JetBrains Mono', monospace; font-size:12px; color:#c6ccd2; width:44px">{{ s.kat }}</div>
+                  <div style="flex:1; font-size:11px; color:#5f676f">{{ s.label }}</div>
+                  <div style="font-family:'JetBrains Mono', monospace; font-size:15px; color:#e8ebee">{{ s.wert }}</div>
+                </div>
+              </sc-for>
+            </div>
+            <div style="padding:18px; display:flex; flex-direction:column; gap:12px; border-bottom:1px solid #22262b">
+              <div style="font-size:10px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:#5f676f">Verbleib</div>
+              <sc-for list="{{ verbleib }}" as="v" hint-placeholder-count="4">
+                <div style="display:flex; align-items:baseline; justify-content:space-between">
+                  <div style="font-size:12px; color:#9aa2ab">{{ v.label }}</div>
+                  <div style="font-family:'JetBrains Mono', monospace; font-size:14px; color:#e8ebee">{{ v.wert }}</div>
+                </div>
+              </sc-for>
+            </div>
+            <div style="padding:18px; display:flex; flex-direction:column; gap:10px">
+              <div style="font-size:10px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:#5f676f">Offene Felder</div>
+              <div style="font-size:12px; line-height:1.5; color:#9aa2ab">14 Datensätze ohne Verbleib, 6 ohne Fundort. Zeilen sind gelb markiert und direkt ergänzbar.</div>
+              <div style="height:30px; display:flex; align-items:center; justify-content:center; border:1px solid #2e343a; font-size:12px; color:#c6ccd2">Nur Lücken zeigen</div>
+            </div>
+          </div>
+        </div>
+      </dc-import>
+    </div>
+  </section>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1560,&quot;height&quot;:1000}}">
+class Component extends DCLogic {
+  renderVals() {
+    const G = '#52c41a', GELB = '#d4b106', OR = '#d46b08', RT = '#a8071a', BL = '#4d94d6', GR = '#3a4149';
+
+    const mod = (arr, aktivLabel) => arr.map(([label, zahl]) => ({ label, zahl, aktiv: label === aktivLabel }));
+
+    return {
+      modulFuehrung: mod([['Überblick', ''], ['Einsatzabschnitte', '4'], ['Aufträge', '12'], ['Entscheidungen', '7'], ['Stabsbesetzung', '9'], ['Dokumente', '23']], 'Überblick'),
+      modulLage: mod([['Lage-Dashboard', ''], ['Lagekarte', ''], ['Lageberichte', '6'], ['Gefahrenmatrix', '9'], ['Wetter & Pegel', ''], ['Prognose', '']], 'Lage-Dashboard'),
+      modulKarte: mod([['Lage-Dashboard', ''], ['Lagekarte', ''], ['Lageberichte', '6'], ['Gefahrenmatrix', '9'], ['Wetter & Pegel', ''], ['Prognose', '']], 'Lagekarte'),
+      modulEtb: mod([['Einsatztagebuch', '412'], ['Betroffene', '248'], ['Patienten', '144'], ['Tiere', '11'], ['Schäden', '37'], ['Vermisste', '9']], 'Einsatztagebuch'),
+      modulErfassung: mod([['Einsatztagebuch', '412'], ['Betroffene', '248'], ['Patienten', '144'], ['Tiere', '11'], ['Schäden', '37'], ['Vermisste', '9']], 'Betroffene'),
+      modulKraefte: mod([['Meldebild', '31'], ['Einheiten', '31'], ['Fahrzeuge', '44'], ['Material', ''], ['Verpflegung', ''], ['Ablösung', '2']], 'Meldebild'),
+
+      kennzahlen: [
+        { titel: 'Betroffene', wert: '248', einheit: 'Pers.', notiz: '+18 in 60 min', farbe: '#e8ebee' },
+        { titel: 'Kräfte im Einsatz', wert: '257', einheit: 'Ges.', notiz: '24 / 47 / 186 / 257', farbe: '#e8ebee' },
+        { titel: 'Warnstufe', wert: 'hoch', einheit: '', notiz: 'Pegel 6,84 m steigend', farbe: '#e8cc3a' },
+        { titel: 'Offene Aufträge', wert: '12', einheit: 'davon 3 ü.', notiz: '3 über Frist', farbe: '#ff6b6b' },
+        { titel: 'Einsatzabschnitte', wert: '4', einheit: '', notiz: 'Nord, Süd, UHS, Logistik', farbe: '#e8ebee' }
+      ],
+      abschnitte: [
+        { name: 'Abschnitt Nord', leitung: 'EA-N · Vitt', einheiten: '9', auftrag: 'Deichsicherung km 3,8 – 5,4, Sandsackverbau und Pumpenbetrieb an zwei Sickerstellen.', staerke: '8 / 14 / 62 / 84', fortschritt: '72%', farbe: G, rueck: '14:11', letzte: 'Verbau hält', bereit: '2', gebunden: '6', ausfall: '1', ausfallBg: '#1c0a0d', ausfallFarbe: '#ff6b6b' },
+        { name: 'Abschnitt Süd', leitung: 'EA-S · Brand', einheiten: '8', auftrag: 'Evakuierung Wohngebiet Uferstraße, Verlegung zur Verstärkung km 6,1.', staerke: '6 / 12 / 51 / 69', fortschritt: '48%', farbe: GELB, rueck: '14:14', letzte: 'Verlegung läuft', bereit: '1', gebunden: '7', ausfall: '0', ausfallBg: '#16191d', ausfallFarbe: '#5f676f' },
+        { name: 'UHS Weserstadion', leitung: 'UHS · Dr. Kehl', einheiten: '7', auftrag: 'Sichtung, Behandlung und Transportorganisation, Notunterkunft im Oberrang.', staerke: '5 / 11 / 44 / 60', fortschritt: '61%', farbe: BL, rueck: '14:18', letzte: '18 Betroffene übernommen', bereit: '0', gebunden: '7', ausfall: '0', ausfallBg: '#16191d', ausfallFarbe: '#5f676f' },
+        { name: 'Logistik', leitung: 'LOG · Meyer', einheiten: '7', auftrag: 'Nachschub Sandsäcke ab Lager Ost, Verpflegung 250 EP je Schicht, Kraftstoff.', staerke: '5 / 10 / 29 / 44', fortschritt: '85%', farbe: G, rueck: '14:02', letzte: 'Nachschub für 3 h', bereit: '3', gebunden: '4', ausfall: '0', ausfallBg: '#16191d', ausfallFarbe: '#5f676f' }
+      ],
+      anordnungen: [
+        { zeit: '11:40', text: 'Zwei Trupps zur Deichkrone km 4,2 verlegen', an: 'an EA-Nord', frist: '12:30', status: 'überfällig', zeitFarbe: '#ff6b6b' },
+        { zeit: '12:05', text: 'Pegelmeldung Weser stündlich an Stab', an: 'an S2 Lage', frist: '13:00', status: 'überfällig', zeitFarbe: '#ff6b6b' },
+        { zeit: '12:55', text: 'Notunterkunft Turnhalle Ost aktivieren', an: 'an Betreuungsdienst', frist: '14:00', status: 'überfällig', zeitFarbe: '#ff6b6b' },
+        { zeit: '13:30', text: 'Transportkapazität für 40 Patienten anfordern', an: 'an UHS', frist: '15:00', status: 'läuft', zeitFarbe: '#9aa2ab' },
+        { zeit: '14:10', text: 'Drohnenaufklärung Uferstraße Süd', an: 'an Fachberater', frist: '15:30', status: 'läuft', zeitFarbe: '#9aa2ab' }
+      ],
+      entscheidungen: [
+        { zeit: '14:18', text: 'Turnhalle Ost wird als zweite Notunterkunft aktiviert. Betreuungsdienst übernimmt Einrichtung und Belegung.', meta: 'Brandt · EL · Nr. 411', folge: '1 Auftrag', folgeFarbe: '#4d94d6' },
+        { zeit: '13:52', text: 'Evakuierungsgrenze wird auf Uferstraße 42 bis 58 ausgeweitet, Prognose 7,10 m zugrunde gelegt.', meta: 'Brandt · EL · Nr. 404', folge: '3 Aufträge', folgeFarbe: '#4d94d6' },
+        { zeit: '13:20', text: 'Drohnenaufklärung wird bis zum Abflauen des Windes ausgesetzt, Aufklärung erfolgt bodengebunden.', meta: 'Vitt · S3 · Nr. 399', folge: 'erledigt', folgeFarbe: '#9aa2ab' },
+        { zeit: '12:44', text: 'Ablösung der Deichwache Nord auf 6-Stunden-Rhythmus verkürzt, zwei Einheiten nachgefordert.', meta: 'Brandt · EL · Nr. 391', folge: '2 Aufträge', folgeFarbe: '#4d94d6' }
+      ],
+      marken: [
+        { zeit: '15:00', text: 'Lagebericht an Kreisstab fällig', farbe: '#e8cc3a' },
+        { zeit: '15:30', text: 'Ablösung Deichwache Nord, 2 Einheiten', farbe: '#e8ebee' },
+        { zeit: '16:00', text: 'Stabsbesprechung, Prognose 7,10 m', farbe: '#e8ebee' },
+        { zeit: '18:00', text: 'Erwarteter Höchststand Pegel Weser', farbe: '#ff6b6b' }
+      ],
+      palette: [
+        { icon: 'ti ti-map-2', label: 'Lagekarte · Deichabschnitt Nord', kontext: 'Lage', taste: '↵', bg: '#16191d', iconFarbe: BL },
+        { icon: 'ti ti-truck', label: 'Deichwache Nord · FL HM 12/44', kontext: 'Einheit', taste: '', bg: 'transparent', iconFarbe: '#5f676f' },
+        { icon: 'ti ti-clipboard-text', label: 'ETB · Einträge zu „Deich"', kontext: '31 Treffer', taste: '', bg: 'transparent', iconFarbe: '#5f676f' },
+        { icon: 'ti ti-alert-triangle', label: 'Gefahrenmatrix · Deichbruch', kontext: 'Warnstufe hoch', taste: '', bg: 'transparent', iconFarbe: '#5f676f' },
+        { icon: 'ti ti-file-text', label: 'Lagebericht 14:00 · Deichlage', kontext: 'Dokument', taste: '', bg: 'transparent', iconFarbe: '#5f676f' }
+      ],
+
+      dashKennzahlen: [
+        { titel: 'Pegel Weser', wert: '6,84', notiz: 'm · +9 cm/h', farbe: '#e8cc3a' },
+        { titel: 'Betroffene', wert: '248', notiz: '144 Patienten', farbe: '#e8ebee' },
+        { titel: 'Evakuiert', wert: '1 320', notiz: 'von 1 850 geplant', farbe: '#e8ebee' },
+        { titel: 'Kräfte', wert: '257', notiz: '31 Einheiten', farbe: '#e8ebee' },
+        { titel: 'Vermisste', wert: '9', notiz: '3 seit über 4 h', farbe: '#ff6b6b' },
+        { titel: 'Einsatzdauer', wert: '6:41', notiz: 'seit 07:41', farbe: '#e8ebee' }
+      ],
+      gefahren: (() => {
+        const rows = [
+          ['Deichbruch', 4], ['Überflutung', 4], ['Stromausfall', 3],
+          ['Trinkwasser', 2], ['Gefahrstoff', 1], ['Verkehr', 3]
+        ];
+        const stufen = ['niedrig', 'mittel', 'hoch', 'akut'];
+        const farben = [GELB, OR, '#cf1322', RT];
+        return rows.map(([name, n]) => {
+          const cell = i => (i < n ? farben[n - 1] : '#16191d');
+          return {
+            name, stufe: stufen[n - 1],
+            textFarbe: n >= 3 ? '#ff6b6b' : n === 2 ? '#e8a13a' : '#9aa2ab',
+            s1: cell(0), s2: cell(1), s3: cell(2), s4: cell(3)
+          };
+        });
+      })(),
+      sichtung: [
+        { kat: 'SK I', label: 'akut vital bedroht', wert: '12', breite: '11%', farbe: RT },
+        { kat: 'SK II', label: 'schwer verletzt', wert: '31', breite: '28%', farbe: OR },
+        { kat: 'SK III', label: 'leicht verletzt', wert: '96', breite: '88%', farbe: GELB },
+        { kat: 'SK IV', label: 'ohne Überlebenschance', wert: '5', breite: '5%', farbe: GR }
+      ],
+      strom: [
+        { zeit: '14:21', text: 'Sickerstelle km 4,2 unverändert, Verbau hält', quelle: 'Deichwache Nord · Funk', farbe: '#1677ff' },
+        { zeit: '14:18', text: 'Entscheidung: Turnhalle Ost als zweite Notunterkunft', quelle: 'Einsatzleitung', farbe: '#722ed1' },
+        { zeit: '14:11', text: 'Anordnung: Sandsackverbau km 6,1 halten', quelle: 'an EA-Süd · Funk', farbe: OR },
+        { zeit: '14:04', text: 'Lage: Pegel 6,84 m, Prognose 7,10 m bis 18:00', quelle: 'S2 Lage', farbe: '#13c2c2' },
+        { zeit: '13:58', text: '18 weitere Betroffene an UHS übergeben', quelle: 'UHS Weserstadion', farbe: '#1677ff' },
+        { zeit: '13:47', text: 'Berichtigung zu Nr. 388 — Uhrzeit korrigiert', quelle: 'Vitt · S2', farbe: '#cf1322' },
+        { zeit: '13:40', text: 'Stromausfall Uferstraße 12–40, Notstrom läuft', quelle: 'Fachberater EVU · Telefon', farbe: '#1677ff' }
+      ],
+
+      etbFilter: [
+        { label: 'Alle', punkt: '#5f676f', bg: '#14171b', farbe: '#e8ebee' },
+        { label: 'Meldung', punkt: '#1677ff', bg: '#0f1215', farbe: '#9aa2ab' },
+        { label: 'Anordnung', punkt: OR, bg: '#0f1215', farbe: '#9aa2ab' },
+        { label: 'Entscheidung', punkt: '#722ed1', bg: '#0f1215', farbe: '#9aa2ab' },
+        { label: 'Lage', punkt: '#13c2c2', bg: '#0f1215', farbe: '#9aa2ab' },
+        { label: 'Berichtigung', punkt: '#cf1322', bg: '#0f1215', farbe: '#9aa2ab' }
+      ],
+      etb: [
+        { zeit: '14:21', nr: 'Nr. 412', typ: 'MELDUNG', farbe: '#1677ff', meta: 'Abschnitt Nord', text: 'Sickerstelle an Deich km 4,2 unverändert. Sandsackverbau hält, Nachschub für drei Stunden gesichert.', hinweis: '', hinweisFarbe: '#5f676f', verfasser: 'Deichwache N', weg: 'Funk', rowBg: 'transparent' },
+        { zeit: '14:18', nr: 'Nr. 411', typ: 'ENTSCHEIDUNG', farbe: '#722ed1', meta: 'Einsatzleitung', text: 'Turnhalle Ost wird als zweite Notunterkunft aktiviert. Betreuungsdienst übernimmt Einrichtung und Belegung.', hinweis: 'Folgeauftrag an Betreuungsdienst erzeugt ↗', hinweisFarbe: '#4d94d6', verfasser: 'Brandt · EL', weg: 'Persönlich', rowBg: 'transparent' },
+        { zeit: '14:11', nr: 'Nr. 410', typ: 'ANORDNUNG', farbe: OR, meta: 'an EA-Süd', text: 'Sandsackverbau km 6,1 halten. Zwei Trupps zur Verstärkung verlegen, Rückmeldung bis 14:45.', hinweis: '', hinweisFarbe: '#5f676f', verfasser: 'Vitt · S3', weg: 'Funk', rowBg: 'transparent' },
+        { zeit: '14:04', nr: 'Nr. 409', typ: 'LAGE', farbe: '#13c2c2', meta: 'S2 Lage', text: 'Pegel Weser 6,84 m, Anstieg 9 cm/h. Prognose 7,10 m bis 18:00. Warnstufe bleibt hoch.', hinweis: '', hinweisFarbe: '#5f676f', verfasser: 'Vitt · S2', weg: 'System', rowBg: 'transparent' },
+        { zeit: '13:58', nr: 'Nr. 408', typ: 'MELDUNG', farbe: '#1677ff', meta: 'UHS Weserstadion', text: '18 weitere Betroffene übernommen. Sichtung abgeschlossen: 2 × SK II, 16 × SK III.', hinweis: '', hinweisFarbe: '#5f676f', verfasser: 'Dr. Kehl', weg: 'Telefon', rowBg: 'transparent' },
+        { zeit: '13:47', nr: 'Nr. 407', typ: 'BERICHTIGUNG', farbe: '#cf1322', meta: 'berichtigt Nr. 388', text: 'Eingangszeit der Meldung Nr. 388 war 12:52, nicht 13:52. Grundeintrag bleibt unverändert einsehbar.', hinweis: 'Grundeintrag Nr. 388 anzeigen ↗', hinweisFarbe: '#ff6b6b', verfasser: 'Vitt · S2', weg: 'System', rowBg: '#160d0f' },
+        { zeit: '13:40', nr: 'Nr. 406', typ: 'MELDUNG', farbe: '#1677ff', meta: 'Fachberater EVU', text: 'Stromausfall Uferstraße 12 bis 40. Notstromaggregat der Netzbetreiber läuft seit 13:36.', hinweis: '', hinweisFarbe: '#5f676f', verfasser: 'Ludwig', weg: 'Telefon', rowBg: 'transparent' },
+        { zeit: '13:22', nr: 'Nr. 405', typ: 'MELDUNG', farbe: '#1677ff', meta: 'Abschnitt Süd', text: 'Evakuierung Uferstraße abgeschlossen, 212 Personen verbracht. Drei Wohnungen verschlossen, Halterermittlung läuft.', hinweis: '⧖ nachgetragen um 13:31', hinweisFarbe: '#9aa2ab', verfasser: 'Brand · EA-S', weg: 'Funk', rowBg: 'transparent' }
+      ],
+      etbBilanz: [
+        { label: 'Meldungen', wert: '218', breite: '82%', farbe: '#1677ff' },
+        { label: 'Anordnungen', wert: '96', breite: '46%', farbe: OR },
+        { label: 'Entscheidungen', wert: '31', breite: '18%', farbe: '#722ed1' },
+        { label: 'Lagemeldungen', wert: '62', breite: '30%', farbe: '#13c2c2' },
+        { label: 'Berichtigungen', wert: '5', breite: '6%', farbe: '#cf1322' }
+      ],
+
+      marker: [
+        { x: '34%', y: '26%', label: 'Deichwache N', farbe: G },
+        { x: '58%', y: '34%', label: 'ELW 1', farbe: BL },
+        { x: '46%', y: '52%', label: 'UHS Weserstadion', farbe: BL },
+        { x: '68%', y: '62%', label: 'Abschnitt Süd', farbe: GELB },
+        { x: '22%', y: '44%', label: 'Sickerstelle km 4,2', farbe: '#ff6b6b' },
+        { x: '76%', y: '22%', label: 'Logistik', farbe: G }
+      ],
+      ebenen: [
+        { name: 'Einheiten', anzahl: '31', fuellung: BL, rahmen: BL, textFarbe: '#e8ebee' },
+        { name: 'Gefahrenbereiche', anzahl: '6', fuellung: 'rgba(207,19,34,.5)', rahmen: '#cf1322', textFarbe: '#e8ebee' },
+        { name: 'Einsatzabschnitte', anzahl: '4', fuellung: 'rgba(82,196,26,.5)', rahmen: G, textFarbe: '#e8ebee' },
+        { name: 'Pegel & Wasserstand', anzahl: '12', fuellung: 'transparent', rahmen: '#3a4149', textFarbe: '#5f676f' },
+        { name: 'Drohnenaufnahmen', anzahl: '3', fuellung: 'transparent', rahmen: '#3a4149', textFarbe: '#5f676f' }
+      ],
+
+      statusStufen: [
+        { code: 'S1', label: 'frei auf Funk', wert: '2', farbe: G },
+        { code: 'S2', label: 'frei auf Wache', wert: '4', farbe: G },
+        { code: 'S3', label: 'auf Anfahrt', wert: '5', farbe: GELB },
+        { code: 'S4', label: 'am Einsatzort', wert: '17', farbe: BL },
+        { code: 'S6', label: 'nicht einsatzbereit', wert: '2', farbe: '#ff6b6b' },
+        { code: '—', label: 'keine Rückmeldung', wert: '1', farbe: '#ff6b6b' }
+      ],
+      einheiten: (() => {
+        const st = {
+          4: { bg: '#0d1620', farbe: '#8ec2f0', text: 'Einsatzort' },
+          3: { bg: '#1c1705', farbe: '#e8cc3a', text: 'Anfahrt' },
+          2: { bg: '#0d1a0a', farbe: '#7ddc4a', text: 'Wache' },
+          6: { bg: '#1c0a0d', farbe: '#ff6b6b', text: 'Ausfall' }
+        };
+        const rows = [
+          ['Deichwache Nord', 'FL HM 12/44', 'Nord', '1 / 2 / 9 / 12', 4, '09:12', 'Deichsicherung km 3,8 – 4,6', '14:11', 0],
+          ['THW FGr W Hameln', 'HEIL 81/12', 'Nord', '1 / 3 / 14 / 18', 4, '09:40', 'Sandsackverbau km 4,2, Pumpenbetrieb', '14:06', 0],
+          ['LZ Weserstadt 1', 'FL HM 01/10', 'Süd', '1 / 2 / 11 / 14', 4, '08:22', 'Evakuierung Uferstraße 12 – 40', '13:52', 0],
+          ['LZ Weserstadt 2', 'FL HM 01/20', 'Süd', '1 / 2 / 10 / 13', 3, '14:02', 'Verlegung zu km 6,1', '14:14', 0],
+          ['RD OrgL Hameln', 'RD HM 10/01', 'UHS', '1 / 1 / 0 / 2', 4, '08:05', 'Organisatorische Leitung UHS', '14:18', 0],
+          ['SEG Sanität HM', 'KAT HM 19/83', 'UHS', '2 / 4 / 22 / 28', 4, '08:50', 'Sichtung und Behandlung UHS', '14:09', 0],
+          ['SEG Betreuung HM', 'KAT HM 19/91', 'UHS', '2 / 3 / 18 / 23', 4, '09:05', 'Notunterkunft Weserstadion', '13:44', 0],
+          ['Verpflegungstrupp', 'KAT HM 19/65', 'Logistik', '1 / 2 / 8 / 11', 4, '10:10', 'Verpflegung 250 EP je Schicht', '13:30', 0],
+          ['GW Logistik', 'FL HM 05/59', 'Logistik', '1 / 1 / 5 / 7', 3, '13:48', 'Nachschub Sandsäcke ab Lager Ost', '14:02', 0],
+          ['Drohnentrupp', 'FL HM 12/98', 'Nord', '0 / 2 / 2 / 4', 6, '13:15', 'Aufklärung ausgesetzt — Windgrenze', '13:15', 1],
+          ['Fachberater EVU', 'EVU HM 01', 'Süd', '1 / 0 / 0 / 1', 4, '11:20', 'Netzabschaltung Uferstraße begleiten', '—', 2]
+        ];
+        return rows.map(r => {
+          const s = st[r[4]];
+          return {
+            name: r[0], funk: r[1], abschnitt: r[2], staerke: r[3],
+            statusCode: 'S' + r[4], status: s.text, statusBg: s.bg, statusFarbe: s.farbe,
+            seit: r[5], auftrag: r[6], rueck: r[7],
+            rueckFarbe: r[8] === 2 ? '#ff6b6b' : r[8] === 1 ? '#e8cc3a' : '#9aa2ab',
+            rowBg: r[8] ? '#130f0f' : 'transparent'
+          };
+        });
+      })(),
+
+      personen: (() => {
+        const sk = {
+          1: { f: '#ff6b6b', bg: '#1c0a0d', t: 'SK I' },
+          2: { f: '#e8a13a', bg: '#1c1305', t: 'SK II' },
+          3: { f: '#e8cc3a', bg: '#1c1705', t: 'SK III' },
+          4: { f: '#9aa2ab', bg: '#16191d', t: 'SK IV' }
+        };
+        const rows = [
+          ['248', 'Kowalski, Anna', 'w 34', 3, 'gehfähig, unterkühlt', 'Uferstraße 22', 'UHS Weserstadion', '', '14:19', 0],
+          ['247', 'Hoffmann, Tobias', 'm 61', 2, 'Beinfraktur', 'Uferstraße 18', 'Transport KH Nord', 'RTW HM 83/01', '14:14', 0],
+          ['246', 'unbekannt', 'm ~50', 1, 'bewusstlos, intubiert', 'Deich km 4,4', 'Transport KH Zentral', 'NEF HM 82/01 · Voranmeldung', '14:08', 0],
+          ['245', 'Bauer, Lena', 'w 8', 3, 'unverletzt, Begleitkind', 'Uferstraße 18', 'UHS Weserstadion', 'Angehörige zu Nr. 247', '14:08', 0],
+          ['244', 'Peters, Karin', 'w 79', 2, 'Hypothermie, verwirrt', 'Uferstraße 26', 'Transport KH Nord', '', '14:01', 0],
+          ['243', 'unbekannt', 'w ~30', 3, 'Schnittwunde Hand', 'Weserpromenade', '—', 'Verbleib offen', '13:57', 1],
+          ['242', 'Seidel, Markus', 'm 45', 3, 'gehfähig', 'Uferstraße 30', 'Notunterkunft Ost', '', '13:52', 0],
+          ['241', 'Neumann, Ilse', 'w 84', 2, 'Kreislauf instabil', 'Pflegeheim Süd', 'Transport KH Zentral', 'Pflegeverlegung, 12 weitere folgen', '13:48', 0],
+          ['240', 'unbekannt', 'm ~65', 4, 'ohne Überlebenschance', 'Deich km 4,1', 'UHS · Betreuung', 'Angehörigenermittlung läuft', '13:41', 0],
+          ['239', 'Fischer, Jonas', 'm 12', 3, 'unverletzt', 'Uferstraße 34', '—', 'Fundort ungenau, Verbleib offen', '13:36', 1]
+        ];
+        return rows.map(r => {
+          const s = sk[r[3]];
+          return {
+            nr: r[0], name: r[1], alter: r[2], sk: s.t, skFarbe: s.f, skBg: s.bg,
+            zustand: r[4], fundort: r[5],
+            verbleib: r[6], verbleibFarbe: r[6] === '—' ? '#e8cc3a' : '#c6ccd2',
+            vermerk: r[7], zeit: r[8],
+            rowBg: r[9] ? '#161305' : 'transparent'
+          };
+        });
+      })(),
+      skBilanz: [
+        { kat: 'SK I', label: 'akut', wert: '12', farbe: RT },
+        { kat: 'SK II', label: 'schwer', wert: '31', farbe: OR },
+        { kat: 'SK III', label: 'leicht', wert: '96', farbe: GELB },
+        { kat: 'SK IV', label: 'palliativ', wert: '5', farbe: GR }
+      ],
+      verbleib: [
+        { label: 'UHS Weserstadion', wert: '84' },
+        { label: 'Transport Krankenhaus', wert: '61' },
+        { label: 'Notunterkunft', wert: '89' },
+        { label: 'Offen', wert: '14' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

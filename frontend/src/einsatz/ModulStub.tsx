@@ -6,7 +6,7 @@ import { ladeEinstellungen } from '../api/einsaetze';
 import { einsatzKeys } from '../api/queryKeys';
 import { einsatzModulPfad, parseRouteId } from '../routing/deeplinks';
 
-/** Beschriftung des Rückweg-Knopfes aus der Registry — „Dashboard öffnen" statt eines
+/** Beschriftung des Rückweg-Knopfes aus der Registry — „Überblick öffnen" statt eines
  *  nichtssagenden „Zurück". Fällt die Route aus der Registry heraus, bleibt der
  *  generische Text (der Pfad selbst ist von `aufloeseStandardModul` gedeckt). */
 function rueckwegLabel(zielRoute: string): string {

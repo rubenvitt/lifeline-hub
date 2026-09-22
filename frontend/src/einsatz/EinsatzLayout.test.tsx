@@ -9,9 +9,9 @@ import { setzeViewportBreite } from '../test/viewport';
 import { bedienzieleNachRolle, radiosImKopf, zaehleBedienziele } from '../test/kopfzeile';
 import { AuthProvider } from '../auth/AuthContext';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
-import EinsatzLayout, { kopfAbstaende } from './EinsatzLayout';
+import EinsatzLayout, { einsatzKennung } from './EinsatzLayout';
 import { leseZuletztModule, merkeModulBesuch } from './zuletztModule';
-import { dichten } from '../theme/tokens';
+import { farbenDunkel } from '../theme/tokens';
 
 vi.mock('./useModulZaehler', () => ({ useModulZaehler: () => ({}) }));
 
@@ -318,11 +318,16 @@ describe('EinsatzLayout', () => {
    * Aufschlüsselung steht daneben, weil eine nackte Zahl beim Fehlschlag nicht
    * sagt, welche Sorte Ziel dazugekommen ist. Herleitung: `test/kopfzeile.ts`.
    */
-  it('AK1 — die Kopfzeile trägt nur noch 5 Bedienziele (vorher 11)', async () => {
+  it('AK1 — die Kopfzeile trägt 5 Knöpfe und die Wortmarke (vorher 11 Ziele)', async () => {
+    // Neuentwurf (21.09.2026): die Wortmarke `lifeline-hub` ist ab `lg` ein Link zur
+    // Einsatzliste — ein Bedienziel mehr als LFH-392 zählte, keine Umschalter zurück.
     setup();
     await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
-    expect(bedienzieleNachRolle()).toEqual({ button: 5, radio: 0, link: 0 });
-    expect(zaehleBedienziele()).toBe(5);
+    expect(bedienzieleNachRolle()).toEqual({ button: 5, radio: 0, link: 1 });
+    expect(zaehleBedienziele()).toBe(6);
+    expect(
+      within(screen.getByRole('banner')).getByRole('link', { name: 'lifeline-hub' }),
+    ).toHaveAttribute('href', '/einsaetze');
   });
 
   /**
@@ -337,41 +342,44 @@ describe('EinsatzLayout', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Benutzermenü' }));
 
     const menu = await screen.findByRole('menu');
-    expect(within(menu).getByRole('menuitem', { name: /System ✓/ })).toBeInTheDocument();
-    expect(within(menu).getByRole('menuitem', { name: /^Dunkel$/ })).toBeInTheDocument();
+    // Vorgabe seit dem Neuentwurf (21.09.2026): Nachtbetrieb trägt das Häkchen.
+    expect(within(menu).getByRole('menuitem', { name: /Dunkel ✓/ })).toBeInTheDocument();
+    expect(within(menu).getByRole('menuitem', { name: /^System$/ })).toBeInTheDocument();
     expect(within(menu).getByRole('menuitem', { name: /Kompakt ✓/ })).toBeInTheDocument();
     expect(within(menu).getByRole('menuitem', { name: /^Handschuh$/ })).toBeInTheDocument();
   });
 
   /**
-   * Die Alarmzentrale ist von den Aktionen ABGESETZT (LFH-392).
-   *
-   * WAS HIER NICHT PRÜFBAR IST: dass die Trennung im Browser auch zu SEHEN ist.
-   * `vite.config.ts` fährt Vitest mit `css: false`, und jsdom rechnet kein
-   * Layout — ein Pixelabstand wäre hier eine erfundene Zahl. Belegbar ist die
-   * DOM-Semantik: es gibt genau einen Trenner, die Alarm-Knöpfe stehen davor,
-   * die Aktionen dahinter. Das Sichtbare belegen die Bilder am Ticket.
-   * Der Test läuft auf der Vitest-Vorgabebreite (1024, also ab `lg`); die
-   * Null unter `lg` steht im Schmal-Block unten — beide zusammen sind das Paar.
-   *
-   * `compareDocumentPosition` statt `children.indexOf`: antds `Space` wickelt
-   * JEDES Kind in ein eigenes `.ant-space-item`, die Knöpfe sind also Enkel und
-   * kein `indexOf` fände sie (gemessen).
+   * Die Alarmzentrale ist von den Aktionen ABGESETZT (LFH-392) — seit dem Neuentwurf über
+   * eine EIGENE Zelle der Kommandoleiste mit Haarlinie statt über einen Trenner im
+   * Knopfrhythmus. Belegbar in jsdom ist die DOM-Semantik: die Alarm-Knöpfe stehen in der
+   * Alarmzelle, Suche und Benutzermenü NICHT. Die sichtbare Linie belegt der Browser
+   * (`e2e/kopfzeile-schmal.spec.ts`).
    */
-  it('setzt die Alarmzentrale mit einem Trenner von den Aktionen ab', async () => {
+  it('setzt die Alarmzentrale in eine eigene Zelle, abgesetzt von den Aktionen', async () => {
     setup();
     await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
 
     const kopf = screen.getByRole('banner');
-    const trenner = within(kopf).getAllByRole('separator');
-    expect(trenner).toHaveLength(1);
+    const zelle = kopf.querySelector<HTMLElement>('[data-lfh="kopf-alarm"]')!;
+    expect(zelle).not.toBeNull();
+    expect(zelle).toContainElement(within(kopf).getByRole('button', { name: /Alarmton/ }));
+    expect(zelle).not.toContainElement(within(kopf).getByRole('button', { name: 'Suchen' }));
+    expect(zelle).not.toContainElement(within(kopf).getByRole('button', { name: 'Benutzermenü' }));
+    // Kein Trenner-Element mehr — die Zelle trägt die Linie.
+    expect(within(kopf).queryAllByRole('separator')).toHaveLength(0);
+  });
 
-    const ton = within(kopf).getByRole('button', { name: /Alarmton/ });
-    const suchen = within(kopf).getByRole('button', { name: 'Suchen' });
-    expect(trenner[0].compareDocumentPosition(ton) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
-    expect(
-      trenner[0].compareDocumentPosition(suchen) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
+  it('zeigt Statuspunkt, Einsatzname und — nur wenn vorhanden — die Einsatznummer', async () => {
+    setup();
+    const kopf = await screen.findByRole('banner');
+    await waitFor(() =>
+      expect(within(kopf).getByRole('img', { name: 'Einsatzstatus: Aktiv' })).toBeInTheDocument(),
+    );
+    // Der Fixture-Einsatz hat weder interne noch Leitstellennummer — dann steht KEINE da,
+    // statt der Datenbank-`id` (Neuentwurf, Entscheidung 4: nichts erfinden).
+    expect(kopf.querySelector('[data-lfh="kopf-einsatznummer"]')).toBeNull();
+    expect(within(kopf).getByRole('button', { name: /Hochwasser Nord/ })).toBeInTheDocument();
   });
 
   it('rendert den sichtbaren Such-Trigger im Einsatz-Workspace', async () => {
@@ -523,15 +531,16 @@ describe('EinsatzLayout', () => {
       expect(screen.queryByRole('button', { name: 'Alarmton durch Klick entsperren' })).toBeNull();
     });
 
-    it('trägt unter lg KEINEN Trenner — das 390-px-Budget hält ihn nicht (gemessen)', async () => {
-      // Die Gegenprobe zum Trenner-Test ab lg. Er ist ein eigenes `Space`-Kind
-      // und kostet einen vollen `middle`-Abstand mit; auf 390 px lief der
-      // UHS-Grundriss damit um 20 px waagerecht über
-      // (`e2e/uhs-grundriss-touch.spec.ts`). Die Null ist widerlegbar: dieselbe
-      // Abfrage findet ab lg genau einen Trenner (Test oben).
+    it('zeigt unter lg die Suche als Ikone und keine Wortmarke', async () => {
+      // Gegenprobe zum Suchfeld ab lg: auf 390 px trägt die Leiste kein 520-px-Feld, und
+      // die Wortmarke weicht dem Griff der Navigation.
       setup();
       await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
-      expect(within(screen.getByRole('banner')).queryAllByRole('separator')).toHaveLength(0);
+      const kopf = screen.getByRole('banner');
+      expect(within(kopf).queryByRole('link', { name: 'lifeline-hub' })).toBeNull();
+      expect(within(kopf).getByRole('button', { name: 'Suchen' })).not.toHaveTextContent(
+        'Modul, Einheit',
+      );
     });
 
     it('hält Hamburger und Schließen-Knopf auf der A1-Trefffläche', async () => {
@@ -546,7 +555,8 @@ describe('EinsatzLayout', () => {
       expect(suche).toHaveAttribute('aria-label', 'Suchen');
       expect(suche.style.width).toBe('48px');
       expect(suche.style.height).toBe('48px');
-      expect(suche.style.color).toBe('var(--lfh-kopf-vordergrund)');
+      // Farbe aus der Nachtrolle des Rahmens — nicht aus dem Modus-Token (Kopf ist modusfest).
+      expect(suche).toHaveStyle({ color: farbenDunkel.text });
 
       await userEvent.click(hamburger);
       // Der Drawer bringt seinen Schließen-Knopf selbst mit; dessen Trefffläche
@@ -560,33 +570,14 @@ describe('EinsatzLayout', () => {
   });
 });
 
-describe('EinsatzLayout · Breitenbudget der Kopfzeile (LFH-511)', () => {
-  // Die Stufen als HANDGESCHRIEBENE Zahlen daneben: `dichten` liefert sie zwar,
-  // aber die Behauptung „11/18/26" ist Teil des Befunds und soll brechen, wenn
-  // jemand die Staffel verschiebt, ohne diese Rechnung neu zu machen.
-  const STUFEN = [
-    ['kompakt', 11],
-    ['komfortabel', 18],
-    ['handschuh', 26],
-  ] as const;
-
-  it('die Staffel liefert genau die gemessenen Reihen-Abstände', () => {
-    for (const [stufe, erwartet] of STUFEN) {
-      expect(dichten[stufe].abstand.md, `${stufe}: abstand.md`).toBe(erwartet);
-    }
-  });
-
-  // LFH-460: Das alte Rechenmodell mit fest 265 px Reihenkindern und 48 px
-  // Hamburger ist mit wachsenden Zielen ungültig. Breite und Erreichbarkeit
-  // belegt jetzt die Browsermatrix in gate1-ueberlauf.spec.ts.
-
-  it('am breiten Schirm bleibt der Abstand die Dichte-Staffel — der Deckel ist schmal-only', () => {
-    // Ein Deckel, der überall gilt, nähme der Dichteachse ihre Wirkung dort, wo
-    // sie nichts kostet. Geprüft wird die Ungleichheit über die Stufen.
-    const breit = STUFEN.map(([, p]) => kopfAbstaende(p, false).reihe);
-    expect(breit).toEqual([11, 18, 26]);
-    const schmal = STUFEN.map(([, p]) => kopfAbstaende(p, true).reihe);
-    expect(new Set(schmal).size, 'schmal ist der Abstand gedeckelt und damit konstant').toBe(1);
+describe('EinsatzLayout · Einsatzkennung im Kopf (Neuentwurf)', () => {
+  it('nimmt die interne Nummer, sonst die Leitstellennummer, sonst keine', () => {
+    expect(einsatzKennung({ einsatznummer_intern: 'E-2026-0431', leitstellen_nr: '4711' })).toBe(
+      'E-2026-0431',
+    );
+    expect(einsatzKennung({ einsatznummer_intern: '  ', leitstellen_nr: '4711' })).toBe('4711');
+    expect(einsatzKennung({ einsatznummer_intern: null, leitstellen_nr: null })).toBeNull();
+    expect(einsatzKennung(undefined)).toBeNull();
   });
 });
 

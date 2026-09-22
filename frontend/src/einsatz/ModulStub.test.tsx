@@ -90,14 +90,14 @@ describe('ModulStub', () => {
    * `modulRegistry.test.ts` — dort nimmt die Funktion den Register als Argument, samt
    * Gegenprobe auf ein fertiges Modul.
    */
-  it('fällt bei nicht auflösbarem Standardmodul auf das Lage-Dashboard zurück (LFH-328)', async () => {
+  it('fällt bei nicht auflösbarem Standardmodul auf den Überblick zurück (LFH-328, Neuentwurf)', async () => {
     server.use(
       http.get('/api/einsaetze/7/einstellungen', () =>
         HttpResponse.json({ einsatz_id: 7, standard_modul: 'wip-probe' }),
       ),
     );
     rendern();
-    await userEvent.click(await screen.findByRole('button', { name: 'Dashboard öffnen' }));
-    expect(screen.getByTestId('pfad')).toHaveTextContent('/einsaetze/7/lage-dashboard');
+    await userEvent.click(await screen.findByRole('button', { name: 'Überblick öffnen' }));
+    expect(screen.getByTestId('pfad')).toHaveTextContent('/einsaetze/7/ueberblick');
   });
 });

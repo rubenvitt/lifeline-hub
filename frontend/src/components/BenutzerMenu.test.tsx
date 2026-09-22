@@ -74,7 +74,11 @@ afterEach(() => {
   delete document.documentElement.dataset.theme;
 });
 
-describe('BenutzerMenu — ab lg', () => {
+describe('BenutzerMenu — ab xl', () => {
+  // Seit 22.09.2026 steht der Name erst ab `xl` (1200 px) im Trigger; der Vorgabe-Viewport
+  // des Stubs ist 1024 px (Führungs-Tablet) und damit darunter.
+  beforeEach(() => setzeViewportBreite(1366));
+
   it('der Trigger trägt den Anzeigenamen', async () => {
     zeige();
     // Am TRIGGER geprüft, nicht am Dokument: der Name steht auch in der
@@ -83,10 +87,43 @@ describe('BenutzerMenu — ab lg', () => {
     expect((await trigger()).textContent).toContain(ANZEIGENAME);
   });
 
+  it('der Trigger trägt die Funktion statt des Namens, wenn sie bekannt ist (Neuentwurf)', async () => {
+    server.use(http.get('/api/auth/me', () => HttpResponse.json(benutzer)));
+    renderMitProviders(
+      <ThemeModeProvider>
+        <BenutzerMenu funktion="S2 Lage" />
+      </ThemeModeProvider>,
+    );
+    const knopf = await trigger();
+    expect(knopf.textContent).toContain('S2 Lage');
+    expect(knopf.textContent).toContain(INITIALEN);
+    expect(knopf.textContent).not.toContain(ANZEIGENAME);
+    // Der zugängliche Name bleibt — daran hängen die Layout-Suiten.
+    expect(knopf).toHaveAttribute('aria-label', 'Benutzermenü');
+  });
+
   it('zeigt die gebaute Frontend-Version sichtbar im Dropdown', async () => {
     zeige();
     await oeffne();
     expect(await screen.findByText(/^Version \d+\.\d+\.\d+/)).toBeInTheDocument();
+  });
+});
+
+describe('BenutzerMenu — Führungs-Tablet zwischen lg und xl', () => {
+  // 1024 px: die Kopfzeile soll einzeilig bleiben, Funktion und Pfeil kosteten bis zu 190 px.
+  beforeEach(() => setzeViewportBreite(1024));
+
+  it('der Trigger trägt nur die Initialen — die Funktion steht im zugänglichen Namen nicht', async () => {
+    server.use(http.get('/api/auth/me', () => HttpResponse.json(benutzer)));
+    renderMitProviders(
+      <ThemeModeProvider>
+        <BenutzerMenu funktion="S2 Lage" />
+      </ThemeModeProvider>,
+    );
+    const knopf = await trigger();
+    expect(knopf.textContent).toContain(INITIALEN);
+    expect(knopf.textContent).not.toContain('S2 Lage');
+    expect(knopf).toHaveAttribute('aria-label', 'Benutzermenü');
   });
 });
 
@@ -149,9 +186,11 @@ describe.each([
     await oeffne();
     // Das Häkchen ist der ZWEITE KANAL neben der Auswahlfarbe (WCAG 1.4.1) —
     // und zugleich das, was hier prüfbar ist: eine Klasse wäre es nicht.
-    expect(await screen.findByRole('menuitem', { name: /System ✓/ })).toBeInTheDocument();
+    // Ohne gespeicherte Wahl ist seit dem Neuentwurf (21.09.2026) der Nachtbetrieb
+    // aktiv; „System" bleibt wählbar, trägt aber nicht mehr das Häkchen.
+    expect(await screen.findByRole('menuitem', { name: /Dunkel ✓/ })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: /^Hell$/ })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: /^Dunkel$/ })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /^System$/ })).toBeInTheDocument();
   });
 
   it('die Bediendichte liegt daneben — alle drei Stufen', async () => {
@@ -173,8 +212,10 @@ describe.each([
     // dessen `onClick`-Zweig fehlt, ließe beide Tests oben grün.
     zeige();
     await oeffne();
-    await userEvent.click(screen.getByRole('menuitem', { name: /^Dunkel$/ }));
-    expect(document.documentElement.dataset.theme).toBe('dark');
+    // Gewählt wird der NICHT aktive Modus: seit der Vorgabe `dark` bewiese ein Klick
+    // auf „Dunkel" nichts mehr — das Merkmal stünde auch ohne `onClick`-Zweig dort.
+    await userEvent.click(screen.getByRole('menuitem', { name: /^Hell$/ }));
+    expect(document.documentElement.dataset.theme).toBe('light');
 
     await oeffne();
     await userEvent.click(screen.getByRole('menuitem', { name: /^Handschuh$/ }));
@@ -185,6 +226,6 @@ describe.each([
     // betrifft aber nicht die gelöschte Komponente, sondern den weiterlebenden
     // `ThemeModeProvider` (ein Context, ein `useMemo`, zwei Setter). Mit der
     // Testdatei wäre sie ersatzlos gefallen.
-    expect(document.documentElement.dataset.theme).toBe('dark');
+    expect(document.documentElement.dataset.theme).toBe('light');
   });
 });

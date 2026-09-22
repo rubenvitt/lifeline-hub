@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { listeEinsaetze } from '../api/einsaetze';
 import { globalKeys } from '../api/queryKeys';
 import { einsatzPfad } from '../routing/deeplinks';
+import { farbenDunkel } from '../theme/tokens';
 
 /**
  * Switcher im Einsatz-Header: aktive Einsätze + Rückwege.
@@ -46,10 +47,13 @@ export default function EinsatzSwitcher({ aktuellName }: { aktuellName: string }
       <Button
         type="text"
         title={aktuellName}
+        // Farbe aus der NACHTrolle, nicht `#fff` und nicht der Modus-Token: die
+        // Kommandoleiste ist in beiden Modi dunkel (Neuentwurf). 13/500 in `text2` wie im
+        // Entwurf — der Name steht neben der Einsatznummer, er muss sie nicht überschreien.
         style={{
-          color: '#fff',
-          fontWeight: 600,
-          fontSize: 16,
+          color: farbenDunkel.text2,
+          fontWeight: 500,
+          fontSize: 13,
           maxWidth: '100%',
           // Auch ein kurzer Name wie „A“ hält den Handschuh-Boden (LFH-460).
           minWidth: token.controlHeight,

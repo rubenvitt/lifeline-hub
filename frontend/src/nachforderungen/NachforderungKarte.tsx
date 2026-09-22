@@ -1,7 +1,9 @@
-import { Button, Card, Flex, Space, Typography, theme } from 'antd';
+import { Button, Flex, Space, Typography } from 'antd';
 import type { ReactNode } from 'react';
 import type { Nachforderung, NachforderungStatus } from '../api/types';
 import { NACHFORDERUNG_STATUS, PrioBadge, StatusBadge, formatZeit } from '../kommunikation';
+import KommKarte from '../kommunikation/KommKarte';
+import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 
 const { Text } = Typography;
 
@@ -41,7 +43,6 @@ export default function NachforderungKarte({
   onStatus,
   onAblehnen,
 }: NachforderungKarteProps) {
-  const { token } = theme.useToken();
   const status = NACHFORDERUNG_STATUS[n.status] ?? NACHFORDERUNG_STATUS.angefordert;
   const next = NAECHSTER[n.status];
   const istAbg = ansicht === 'abgeschlossen';
@@ -72,15 +73,9 @@ export default function NachforderungKarte({
       : [];
 
   return (
-    <Card
-      size="small"
-      style={{
-        marginBottom: 10,
-        borderInlineStart: `3px solid ${abgelehnt ? token.colorError : 'transparent'}`,
-        background: abgelehnt ? token.colorErrorBg : undefined,
-      }}
-      styles={{ body: { padding: '12px 16px' } }}
-    >
+    // Zeitachsen-Optik (Neuentwurf): die Anforderungszeit führt links in Mono. Der linke
+    // Rand ist der Kartenrand-Vertrag aus C8/H47 — abgelehnt trägt den Alarmrand.
+    <KommKarte alarm={abgelehnt} zeit={<ZeitAnzeige wert={n.angefordert_at} format="uhrzeit" />}>
       <Flex justify="space-between" align="center" style={{ marginBottom: 6 }} gap={8} wrap>
         <Space size={6} wrap>
           <PrioBadge prio={n.prioritaet} />
@@ -148,6 +143,6 @@ export default function NachforderungKarte({
           {aktionen}
         </Space>
       )}
-    </Card>
+    </KommKarte>
   );
 }

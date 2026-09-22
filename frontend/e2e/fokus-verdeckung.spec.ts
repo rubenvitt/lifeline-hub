@@ -519,3 +519,55 @@ test('Einheit Selbstbeweis: ein Fokusziel hinter der echten sticky Aktionsleiste
   await page.locator('#e2e-probenstart').focus();
   expect((await pruefeFokusVerdeckung(page, 1)).verdeckt).toEqual([]);
 });
+
+/**
+ * Der klebende Fuß des Modulpanels (Einsatzdauer, `sticky; bottom: 0`) verdeckt kein Ziel
+ * der Liste darüber — deterministisch statt über den Tabulatordurchlauf oben, der die Lage
+ * nur zufällig trifft: im vollen Lauf mit gewachsenem Datenbestand landete
+ * „Bereitstellungsräume" (72 px, `handschuh`) ganz hinter dem Fuß, einzeln lief derselbe
+ * Test grün. Hier wird die Seite je Schritt anders gescrollt und das Ziel frisch fokussiert.
+ * Gegenprobe beim Bau: ohne `fussFokusabstandStil` blieb es bei 0/20/40 px Ausgangslage
+ * unter dem Fuß (Unterkante 520 gegen Fußoberkante 438).
+ */
+test('Modulpanel: der klebende Einsatzdauer-Fuß verdeckt kein fokussiertes Modul (1366 × 520, handschuh)', async ({
+  page,
+}) => {
+  await anmelden(page);
+  await page.setViewportSize({ width: 1366, height: 520 });
+  const { pfad } = await einheitMitZuordnungen(page);
+  await page.evaluate(() => localStorage.setItem('lifeline-hub.dichte', 'handschuh'));
+  await page.goto(pfad);
+  await expect(page.locator('html')).toHaveAttribute('data-dichte', 'handschuh');
+  await detailBereit(page);
+  const panel = page.locator('[data-lfh="modul-panel"]');
+  const fuss = panel.locator('[data-lfh="modul-panel-fuss"]');
+  await expect(fuss).toHaveCSS('position', 'sticky');
+  const ziel = panel.getByRole('button', { name: /^Bereitstellungsräume/ });
+  await expect(ziel).toHaveCount(1);
+  const befunde: string[] = [];
+  let unterDemFussGestartet = 0;
+  for (let y = 0; y <= 200; y += 20) {
+    await page.evaluate((wert) => {
+      (document.activeElement as HTMLElement | null)?.blur();
+      window.scrollTo(0, wert);
+    }, y);
+    // Vorbedingung zählen: nur Lagen, in denen das Ziel VOR dem Fokus den Fuß berührt,
+    // prüfen überhaupt etwas.
+    const vorher = await ziel.evaluate(
+      (el, f) => el.getBoundingClientRect().bottom > f!.getBoundingClientRect().top,
+      await fuss.elementHandle(),
+    );
+    if (vorher) unterDemFussGestartet += 1;
+    await ziel.focus();
+    const m = await ziel.evaluate(
+      (el, f) => ({
+        unten: el.getBoundingClientRect().bottom,
+        fussOben: f!.getBoundingClientRect().top,
+      }),
+      await fuss.elementHandle(),
+    );
+    if (m.unten > m.fussOben + 1) befunde.push(`Ausgangslage ${y}px: ${JSON.stringify(m)}`);
+  }
+  expect(unterDemFussGestartet, 'mindestens eine Lage beginnt unter dem Fuß').toBeGreaterThan(0);
+  expect(befunde, befunde.join('\n')).toEqual([]);
+});

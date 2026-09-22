@@ -113,7 +113,7 @@ describe('adminNav — Seitenkopf trägt den Registry-Titel', () => {
       stammdatenHandler();
       renderMitProviders(element);
       // Der Kopf von `AdminPage` ist ein level-4-Heading (Dateikopf dort).
-      expect(await screen.findByRole('heading', { level: 4, name: label })).toBeInTheDocument();
+      expect(await screen.findByRole('heading', { level: 1, name: label })).toBeInTheDocument();
     },
   );
 

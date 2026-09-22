@@ -122,18 +122,26 @@ describe('AuftragKarte — Eingangszustand', () => {
     const { container } = renderMitProviders(
       <AuftragListe auftraege={[auftrag({ bearbeitungsstatus: 'offen' })]} einsatzId={7} />,
     );
-    expect(container.querySelector('.ant-card')).toHaveAttribute('data-unbearbeitet', 'true');
-    expect(screen.getByText('Offen').closest('.ant-tag')).toHaveClass('ant-tag-warning');
+    expect(container.querySelector('[data-lfh="komm-karte"]')).toHaveAttribute(
+      'data-unbearbeitet',
+      'true',
+    );
+    expect(screen.getByText('Offen').closest('[data-lfh="status-chip"]')).toHaveAttribute(
+      'data-ton',
+      'achtung',
+    );
   });
 
   it('lässt „In Bearbeitung" neutral', () => {
     const { container } = renderMitProviders(
       <AuftragListe auftraege={[auftrag({ bearbeitungsstatus: 'in_arbeit' })]} einsatzId={7} />,
     );
-    expect(container.querySelector('.ant-card')).not.toHaveAttribute('data-unbearbeitet');
-    expect(screen.getByText('In Bearbeitung').closest('.ant-tag')).not.toHaveClass(
-      'ant-tag-warning',
+    expect(container.querySelector('[data-lfh="komm-karte"]')).not.toHaveAttribute(
+      'data-unbearbeitet',
     );
+    expect(
+      screen.getByText('In Bearbeitung').closest('[data-lfh="status-chip"]'),
+    ).not.toHaveAttribute('data-ton', 'achtung');
   });
 
   it('lässt Überfällig den Rand gewinnen, behält aber das Etikett', () => {
@@ -143,9 +151,12 @@ describe('AuftragKarte — Eingangszustand', () => {
         einsatzId={7}
       />,
     );
-    const karte = container.querySelector('.ant-card')!;
+    const karte = container.querySelector('[data-lfh="komm-karte"]')!;
     expect(karte).toHaveAttribute('data-ueberfaellig', 'true');
     expect(karte).not.toHaveAttribute('data-unbearbeitet');
-    expect(screen.getByText('Offen').closest('.ant-tag')).toHaveClass('ant-tag-warning');
+    expect(screen.getByText('Offen').closest('[data-lfh="status-chip"]')).toHaveAttribute(
+      'data-ton',
+      'achtung',
+    );
   });
 });

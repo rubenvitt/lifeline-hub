@@ -69,30 +69,14 @@ describe('EtbFilterleiste', () => {
     }
   });
 
-  it('der Typfilter greift sofort, ohne auf die Entprellung zu warten', () => {
-    vi.useFakeTimers();
-    try {
-      const onChange = vi.fn<(w: EtbFilterWerte) => void>();
-      render(<EtbFilterleiste onChange={onChange} />);
-      // Antds Select öffnet auf `mousedown`, nicht auf `click` — der echte
-      // Options-Knoten wird danach geklickt (Hausmuster für antd-Auswahlfelder).
-      // Kein `findByTitle`: dessen `waitFor` hängt an echten Timern und liefe unter
-      // Fake-Timern in den Test-Timeout statt in eine Aussage (gemessen).
-      fireEvent.mouseDown(screen.getByRole('combobox'));
-      act(() => {
-        vi.advanceTimersByTime(50); // antds Öffnungsanimation, nicht unsere Frist
-      });
-      fireEvent.click(screen.getByTitle('Meldung'));
-      // Die Uhr steht seit dem Klick still: was jetzt gemeldet ist, wurde SOFORT
-      // gemeldet. Eine Auswahl ändert sich nicht zeichenweise, die Frist hätte hier
-      // nur Wartezeit ohne Nutzen erzeugt.
-      expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ typ: 'meldung' }));
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('eine laufende Suchfrist überschreibt den eben gewählten Typ nicht', () => {
+  /**
+   * Der Typ ist seit dem Neuentwurf (S4) NICHT mehr Teil dieser Leiste — er steht als
+   * Segmentleiste im Seitenkopf. Die Zusicherung „ein Nachläufer der Suchfrist
+   * überschreibt den gewählten Typ nicht" lebt deshalb an der Nahtstelle: die Leiste meldet
+   * nur IHRE Schlüssel, die Seite führt zusammen (`zeitachseModell.test.ts`,
+   * `filterZusammenfuehren`; `EtbPage.test.tsx`, „Segment und Suche …").
+   */
+  it('meldet nur ihre eigenen Schlüssel — nie einen Typ, auch wenn einer in der URL stand', () => {
     vi.useFakeTimers();
     try {
       const onChange = vi.fn<(w: EtbFilterWerte) => void>();
@@ -101,12 +85,26 @@ describe('EtbFilterleiste', () => {
       act(() => {
         vi.advanceTimersByTime(400);
       });
-      // Der Nachläufer trägt BEIDE Achsen. Baute er auf einem Stand ohne den Typ
-      // auf, fiele der Filter beim nächsten Tastendruck still zurück.
-      expect(onChange).toHaveBeenLastCalledWith({ typ: 'meldung', q: 'pum' });
+      const letzte = onChange.mock.calls[onChange.mock.calls.length - 1][0];
+      expect(letzte).toEqual({ q: 'pum' });
+      // Schärfer als `toEqual` (das `undefined` übergeht): der Schlüssel `typ` fehlt ganz.
+      expect(Object.keys(letzte)).not.toContain('typ');
+      // Und es gibt keinen Typwähler mehr in der Leiste.
+      expect(screen.queryByRole('combobox')).toBeNull();
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('meldet einen geleerten Suchbegriff als undefined, damit die Seite ihn entfernt', async () => {
+    const onChange = vi.fn<(w: EtbFilterWerte) => void>();
+    render(<EtbFilterleiste onChange={onChange} startWerte={{ q: 'x' }} />);
+    await userEvent.clear(screen.getByPlaceholderText('Volltextsuche'));
+    await waitFor(() => expect(onChange).toHaveBeenCalled());
+    const letzte = onChange.mock.calls[onChange.mock.calls.length - 1][0];
+    // Der Schlüssel MUSS drinstehen — fehlte er, behielte die Zusammenführung den alten Wert.
+    expect(Object.keys(letzte)).toContain('q');
+    expect(letzte.q).toBeUndefined();
   });
 
   /**
@@ -121,7 +119,6 @@ describe('EtbFilterleiste', () => {
       />,
     );
     expect(screen.getByPlaceholderText('Volltextsuche')).toHaveValue('brand');
-    expect(screen.getByTitle('Meldung')).toBeInTheDocument();
     // Der Zeitwert kommt als UTC-Wire-String und muss als ORTSZEIT im Feld stehen.
     // Ohne die Umkehr aus `filterZeit.ts` stünde hier der Wert um den Zonenversatz
     // verschoben — der Fehlermodus, wegen dem die Leiste bis LFH-342 nicht hydrierte.
@@ -130,8 +127,10 @@ describe('EtbFilterleiste', () => {
 
   it('mischt einen Anfangsstand mit einer späteren Änderung, statt ihn zu verwerfen', async () => {
     const onChange = vi.fn<(w: EtbFilterWerte) => void>();
-    render(<EtbFilterleiste onChange={onChange} startWerte={{ typ: 'meldung' }} />);
+    render(<EtbFilterleiste onChange={onChange} startWerte={{ von: '2026-08-21 06:00:00' }} />);
     await userEvent.type(screen.getByPlaceholderText('Volltextsuche'), 'x');
-    await waitFor(() => expect(onChange).toHaveBeenLastCalledWith({ typ: 'meldung', q: 'x' }));
+    await waitFor(() =>
+      expect(onChange).toHaveBeenLastCalledWith({ von: '2026-08-21 06:00:00', q: 'x' }),
+    );
   });
 });

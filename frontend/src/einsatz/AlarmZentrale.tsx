@@ -19,6 +19,20 @@ import {
 } from '../alarm/desktopAlarm';
 import { auftraegePfad, erinnerungenPfad, meldungenPfad } from '../routing/deeplinks';
 import { useViewport } from '../components/useViewport';
+import { farbenDunkel, rahmenFarben } from '../theme/tokens';
+
+/**
+ * Farbe eines Alarm-Knopfs in der Kommandoleiste (Neuentwurf „Instrumententafel").
+ *
+ * Rein und exportiert, damit die Zuordnung ohne Rendern prüfbar ist. Die Leiste ist in
+ * beiden Modi dunkel — die Werte kommen deshalb aus den NACHTrollen, nicht aus dem
+ * Modus-Token und nicht mehr aus `#fff`. Ein auffälliger Zustand („stumm", „blockiert")
+ * steht in `achtung`: er verzögert eine Alarmierung, er ist selbst keine. Der zweite Kanal
+ * ist das Wort im Knopf (WCAG 1.4.1) — die Farbe ergänzt, sie trägt nicht allein.
+ */
+export function alarmKnopfFarbe(auffaellig: boolean): string {
+  return auffaellig ? farbenDunkel.achtung : rahmenFarben.gedaempft;
+}
 
 type ErinnerungDetail = {
   erinnerung_id?: number;
@@ -375,7 +389,16 @@ export default function AlarmZentrale() {
   // `useViewport.guard.test.ts`). `istSchmal` ist `< md` (768 px) — bei 768 px
   // und darüber trägt die Kopfzeile beide Knöpfe mühelos, eng wird es erst auf
   // dem Handschirm.
-  const { istSchmal } = useViewport();
+  //
+  // ZWISCHEN `md` UND `xl` (Führungs-Tablet, 22.09.2026) bleiben es zwei Knöpfe mit je
+  // einem Tipper, aber der RUHEZUSTAND steht nur als Ikone: „Ton bereit" und „Desktop
+  // aus/erlaubt" kosteten dort zusammen gut 200 px und brachen die Kopfzeile bei 1024 px
+  // auf zwei Zeilen (52 → 104 px). Eine STÖRUNG — „Ton stumm/blockiert", „Desktop
+  // blockiert" — trägt ihr Wort weiter auf jeder Breite (LFH-392: das darf nicht nur über
+  // eine Ikone laufen); Wort und Warnfarbe hängen deshalb an derselben Bedingung. Der
+  // Ruhezustand bleibt über Ikonenform, `aria-label`/`aria-pressed` und den Tooltip lesbar.
+  const { istSchmal, abBreite } = useViewport();
+  const knapp = !abBreite('xl');
 
   const desktopAktivieren = () => {
     fordereDesktopPermission((p) => setPermission(p));
@@ -423,7 +446,7 @@ export default function AlarmZentrale() {
       <TbBellOff aria-hidden />
     ) : (
       <Badge dot status="error">
-        <TbBell aria-hidden style={{ color: '#fff' }} />
+        <TbBell aria-hidden style={{ color: rahmenFarben.gedaempft }} />
       </Badge>
     );
 
@@ -501,7 +524,11 @@ export default function AlarmZentrale() {
           // nicht, wozu der Knopf gehört.
           aria-label={`Alarmzentrale: ${sammelText}`}
           icon={zeigtTon ? tonIkone : desktopIkone}
-          style={{ color: '#fff', flexShrink: 0 }}
+          style={{
+            color: alarmKnopfFarbe(zeigtTon ? tonAuffaellig : desktop === 'browser-blockiert'),
+            fontSize: 12,
+            flexShrink: 0,
+          }}
         >
           {sammelText}
         </Button>
@@ -509,30 +536,38 @@ export default function AlarmZentrale() {
     );
   }
 
+  const desktopAuffaellig = desktop === 'browser-blockiert';
+  const tonAuffaelligBreit = gemutet || tonStatus !== 'bereit';
+  const desktopWort = knapp && !desktopAuffaellig ? null : desktopText;
+  const tonWort = knapp && !tonAuffaelligBreit ? null : tonText;
+
   return (
     <>
-      <Tooltip title={desktopHinweis}>
+      <Tooltip title={desktopWort ? desktopHinweis : `${desktopText} — ${desktopHinweis}`}>
         <Button
           type="text"
           aria-label={`Desktop-Benachrichtigungen: ${desktopText.replace('Desktop ', '')}`}
           aria-disabled={desktop !== 'aus'}
           onClick={desktop === 'aus' ? desktopAktivieren : undefined}
           icon={desktopIkone}
-          style={{ color: '#fff' }}
+          style={{ color: alarmKnopfFarbe(desktopAuffaellig), fontSize: 12 }}
         >
-          {desktopText}
+          {desktopWort}
         </Button>
       </Tooltip>
-      <Tooltip title={tonHinweis}>
+      <Tooltip title={tonWort ? tonHinweis : `${tonText} — ${tonHinweis}`}>
         <Button
           type="text"
           aria-label={tonHinweis}
           aria-pressed={gemutet}
           onClick={() => void tonUmschalten()}
-          style={{ color: '#fff' }}
+          style={{
+            color: alarmKnopfFarbe(tonAuffaelligBreit),
+            fontSize: 12,
+          }}
           icon={tonIkone}
         >
-          {tonText}
+          {tonWort}
         </Button>
       </Tooltip>
     </>

@@ -3,9 +3,16 @@ import { expect, test, type Page } from '@playwright/test';
 /**
  * Die ETB-Chronologie als Layoutmessung (LFH-342 · C7, Befunde H59/H64).
  *
+ * FORTGESCHRIEBEN DURCH DEN NEUENTWURF (S4, 21.09.2026): das Tagebuch ist auf ALLEN
+ * Breiten eine Zeitachse (`src/etb/EtbZeitachse.tsx`), die Tabelle ab `xl` (LFH-464), ihr
+ * Spaltenschalter und die fixierte Kennung sind entfallen. Die Befunde unten bleiben als
+ * Herleitung stehen; gemessen wird jetzt dieselbe Aussage — der Meldungstext hat Platz,
+ * nichts läuft über — an der Zeitachse. Die Pins der Struktur liegen in
+ * `src/etb/EtbZeitachse.test.tsx`.
+ *
  * WARUM HIER UND NICHT IN VITEST: jsdom rechnet kein Layout (`vite.config.ts` fährt
  * `css: false`) — alle Breiten sind dort 0, `boundingBox` gibt es nicht. Dass die
- * Breitenweiche und das Spaltenbudget existieren, pinnt `src/etb/EtbTabelle.test.tsx`;
+ * Zeitachse auf jeder Breite steht, pinnt `src/etb/EtbZeitachse.test.tsx`;
  * hier geht es um die gemessene Wirkung, und die beiden Akzeptanzkriterien des Tickets
  * sind genau solche Messungen.
  *
@@ -128,26 +135,41 @@ test.describe('LFH-463: Terminpflege und Wiedervorlage', () => {
   });
 });
 
-test.describe('LFH-464: ETB-Umbruch bei xl', () => {
+/**
+ * Die Zeitachse auf ALLEN Breiten (Neuentwurf S4, 21.09.2026) — ersetzt die Messung der
+ * `xl`-Schwelle aus LFH-464. Die Schwelle gibt es nicht mehr: das Tagebuch ist auf jedem
+ * Schirm eine Zeitachse, eine Tabelle steht nirgends. Gemessen wird, dass das stimmt (keine
+ * `.ant-table`, genau eine Ereigniszeile), dass nichts überläuft (Rumpf UND jeder
+ * Scrollcontainer der Sicht) und dass der Meldungstext Platz hat.
+ *
+ * DIE ANTEILSSCHWELLEN SIND SETZUNGEN, KEINE MESSWERTE [abgeleitet]: die Zeitachse stellt
+ * links Zeit/Nr. und rechts Verfasser/Weg/Aktion neben den Text. Bei 390 px im
+ * Handschuhbetrieb nimmt allein der Aktionsknopf 72 px; 30 % ist deshalb der Boden für
+ * schmale Schirme, ab 1200 px die Hälfte der Sicht (die C7-Zusicherung „der Meldungstext
+ * bekommt mindestens die halbe Fläche" in Zeitachsenform). Der erste Lauf hängt die
+ * Messwerte an; wer die Schwellen schärft, schärft sie gegen diese Anhänge.
+ */
+test.describe('Neuentwurf S4: Zeitachse auf allen Breiten', () => {
   test.use({ hasTouch: true });
   for (const dichte of ['kompakt', 'komfortabel', 'handschuh']) {
-    test(`misst beide Seiten der Schwelle und die Tabletbreiten (${dichte})`, async ({
+    test(`keine Tabelle, kein Überlauf, Platz für den Text (${dichte})`, async ({
       page,
     }, testInfo) => {
       await page.setViewportSize(FUEKW);
       await anmelden(page);
-      const einsatzId = await einsatzAnlegen(page, `E2E ETB xl ${dichte} ${Date.now()}`);
+      const einsatzId = await einsatzAnlegen(page, `E2E ETB Zeitachse ${dichte} ${Date.now()}`);
       await seedeEintrag(page, einsatzId);
       await page.evaluate((wert) => localStorage.setItem('lifeline-hub.dichte', wert), dichte);
       const messungen = [];
-      for (const breite of [767, 768, 991, 992, 1024, 1199, 1200, 1280, 1366]) {
+      for (const breite of [390, 767, 768, 1024, 1199, 1200, 1280, 1366, 1600]) {
         await page.setViewportSize({ width: breite, height: 900 });
         await page.goto(`/einsaetze/${einsatzId}/etb`);
         await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
         const sicht = page.getByRole('region', { name: 'Einsatztagebuch' });
         await expect(sicht.getByText(MELDUNG, { exact: true })).toHaveCount(1);
-        await expect(sicht.locator('.ant-table')).toHaveCount(breite >= 1200 ? 1 : 0);
-        await expect(sicht.getByTestId('etb-ereigniszeile')).toHaveCount(breite >= 1200 ? 0 : 1);
+        await expect(sicht.locator('.ant-table')).toHaveCount(0);
+        await expect(sicht.locator('table')).toHaveCount(0);
+        await expect(sicht.getByTestId('etb-ereigniszeile')).toHaveCount(1);
         const mass = await sicht.evaluate((element) => {
           const text = element.querySelector<HTMLElement>('.markdown')!;
           const container = [...element.querySelectorAll<HTMLElement>('*')].filter((knoten) =>
@@ -163,16 +185,16 @@ test.describe('LFH-464: ETB-Umbruch bei xl', () => {
             ),
           };
         });
-        expect(mass.bodyUeberlauf, `Seitenrumpf bei ${breite}/${dichte}`).toBeLessThanOrEqual(
-          SUBPIXEL,
+        const wo = `${breite}/${dichte}`;
+        expect(mass.bodyUeberlauf, `Seitenrumpf bei ${wo}`).toBeLessThanOrEqual(SUBPIXEL);
+        expect(mass.innererUeberlauf, `Innerer Überlauf bei ${wo}`).toBeLessThanOrEqual(SUBPIXEL);
+        expect(mass.text, `Textbreite bei ${wo}`).toBeGreaterThan(0);
+        expect(mass.text / mass.sicht, `Textanteil bei ${wo}`).toBeGreaterThanOrEqual(
+          breite >= 1200 ? MINDESTANTEIL : 0.3,
         );
-        if (breite < 1200) {
-          expect(mass.innererUeberlauf).toBeLessThanOrEqual(SUBPIXEL);
-          expect(mass.text / mass.sicht).toBeGreaterThan(0.85);
-        }
         messungen.push({ breite, dichte, ...mass });
       }
-      await testInfo.attach('layoutmessung.json', {
+      await testInfo.attach('zeitachse-messung.json', {
         body: JSON.stringify(messungen, null, 2),
         contentType: 'application/json',
       });
@@ -181,30 +203,16 @@ test.describe('LFH-464: ETB-Umbruch bei xl', () => {
 });
 
 /**
- * Der lange Meldungstext bricht im Tabellenzweig um (LFH-523).
+ * Der lange Meldungstext bricht um (LFH-523, fortgeschrieben auf die Zeitachse).
  *
- * DER BEFUND, gemessen auf `origin/main` 17aed41c: ein NORMAL UMBRECHBARER Text mit 209
- * Zeichen bleibt in der Tabelle einzeilig und verbreitert sie. Handschuhmodus, 1280 px
- * Viewport: 936 px Sicht, rund 1484 px Text, 1122 px innerer waagerechter Überlauf; bei
- * 1366 px noch 1036 px. Der Rumpf selbst scrollt dabei NICHT — der Überlauf steckt im
- * Scrollcontainer der Tabelle, und genau deshalb misst dieser Block beides getrennt.
- *
- * WARUM DER BODY-TEST DAS NICHT GEFANGEN HAT: `KatalogTabelle` scrollt in sich (das ist
- * Festlegung 1 des Primitivs und richtig). Ein Test, der nur `document.body.scrollWidth`
- * prüft, ist gegen diesen Befund blind — er war auf `origin/main` grün, während der Text
- * 1122 px weit aus der Sicht ragte.
- *
- * DIE ZWEITE HÄLFTE IST DIE POSITIVE: „kein Überlauf" allein wäre auch bei einer leeren,
- * kaputten oder weggeleiteten Seite wahr. Gemessen wird deshalb ZUSÄTZLICH, dass der Text
- * wirklich steht (Sichtfläche positiv, Textbreite positiv) und dass er MEHRZEILIG ist —
- * seine Höhe übersteigt die einer Zeile. Ohne diese Aussage bliebe der Test grün, wenn der
- * Text auf null Breite zusammenfiele.
- *
- * KURZ UND LANG IM PAAR: der kurze Text ist die Gegenprobe. Er darf durch die Deckelung
- * NICHT schmaler werden — an ihm hängt die C7-Zusicherung, und ein Deckel, der auch den
- * kurzen Fall zusammenzieht, hätte den Befund gegen die Zusicherung eingetauscht.
+ * Der Befund von LFH-523 lag im TABELLENZWEIG (ein umbrechbarer Text blieb einzeilig und
+ * trieb die Tabelle 1122 px über die Sicht). Den Zweig gibt es nicht mehr; die Aussage
+ * bleibt als Wächter stehen, weil sie die ist, die der Leser braucht: ein langer Text ist
+ * mehrzeilig, liegt in der Sicht, und nichts scrollt seitlich — weder der Rumpf noch ein
+ * Container darin. Die positive Hälfte (Sicht und Text messbar, Text mehrzeilig) bleibt,
+ * sonst wäre „kein Überlauf" auch bei einer leeren Seite wahr.
  */
-test.describe('LFH-523: langer Meldungstext im Tabellenzweig', () => {
+test.describe('LFH-523: langer Meldungstext in der Zeitachse', () => {
   test.use({ hasTouch: true });
 
   /** 209 Zeichen, ausschließlich normale Wortgrenzen — kein unteilbares Wort, keine URL. */
@@ -218,31 +226,22 @@ test.describe('LFH-523: langer Meldungstext im Tabellenzweig', () => {
       await page.setViewportSize(FUEKW);
       await anmelden(page);
       const einsatzId = await einsatzAnlegen(page, `E2E ETB Langtext ${dichte} ${Date.now()}`);
-      // Kurz UND lang in derselben Chronologie: die Tabellenbreite entsteht aus ALLEN
-      // Zeilen, ein langer Text neben kurzen ist der Befundfall.
       await seedeEintrag(page, einsatzId);
       await seedeEintrag(page, einsatzId, LANG);
       await page.evaluate((wert) => localStorage.setItem('lifeline-hub.dichte', wert), dichte);
 
       const messungen = [];
-      // Nur Breiten ab `xl`: darunter steht die Chronologie als Karten, und die hatten den
-      // Befund nie. 1200 px ist die schmalste Flaeche, auf der die Tabelle ueberhaupt steht.
-      for (const breite of [1200, 1280, 1366]) {
+      for (const breite of [390, 1024, 1200, 1366]) {
         await page.setViewportSize({ width: breite, height: 900 });
         await page.goto(`/einsaetze/${einsatzId}/etb`);
         await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
         const sicht = page.getByRole('region', { name: 'Einsatztagebuch' });
-        await expect(sicht.locator('.ant-table')).toHaveCount(1);
         await expect(sicht.getByText(LANG, { exact: true })).toHaveCount(1);
 
         const mass = await sicht.evaluate((element, langtext) => {
           const bloecke = [...element.querySelectorAll<HTMLElement>('.markdown')];
           const lang = bloecke.find((knoten) => knoten.textContent?.trim() === langtext)!;
           const kurz = bloecke.find((knoten) => knoten.textContent?.trim() !== langtext)!;
-          // JEDER Scrollcontainer der Sicht, nicht nur `.ant-table-body`: antd zieht Kopf
-          // und Koerper in zwei Elemente auseinander, und der Ueberlauf kann in beiden
-          // stecken. Ein auf eine Klasse verengter Griff ginge bei einem antd-Bump still
-          // ins Leere und der Test waere danach eine Attrappe.
           const container = [...element.querySelectorAll<HTMLElement>('*')].filter((knoten) =>
             ['auto', 'scroll'].includes(getComputedStyle(knoten).overflowX),
           );
@@ -253,46 +252,24 @@ test.describe('LFH-523: langer Meldungstext im Tabellenzweig', () => {
             langHoehe: lang.getBoundingClientRect().height,
             kurzBreite: kurz.getBoundingClientRect().width,
             zeilenhoehe,
-            container: container.length,
             bodyUeberlauf: document.body.scrollWidth - window.innerWidth,
             innererUeberlauf: Math.max(0, ...container.map((k) => k.scrollWidth - k.clientWidth)),
           };
         }, LANG);
 
         const wo = `${breite}/${dichte}`;
-        // (a) Die Sicht steht ueberhaupt — sonst belegen die Null-Aussagen unten nichts.
         expect(mass.sicht, `Sichtflaeche bei ${wo}`).toBeGreaterThan(0);
         expect(mass.langBreite, `Textbreite bei ${wo}`).toBeGreaterThan(0);
-        // Und es GIBT einen Scrollcontainer — sonst waere „kein innerer Ueberlauf" die
-        // triviale Aussage ueber eine Menge ohne Element.
-        expect(mass.container, `Scrollcontainer bei ${wo}`).toBeGreaterThan(0);
-
-        // (b) Der Rumpf wandert nicht — die Bestandsaussage, die den Befund NICHT fing.
         expect(mass.bodyUeberlauf, `Seitenrumpf bei ${wo}`).toBeLessThanOrEqual(SUBPIXEL);
-        // (c) Und der innere Ueberlauf, der ihn fing. Auf altem Stand gemessen: 974 px
-        // (kompakt) / 1134 px (komfortabel) / 1178 px (handschuh) bei 1200 px, und
-        // 1122 px bei 1280/handschuh im Ticket. DAS ist die Zeile, die den Befund traegt.
-        expect(mass.innererUeberlauf, `Innerer Tabellenueberlauf bei ${wo}`).toBeLessThanOrEqual(
-          SUBPIXEL,
-        );
-
-        // (d) Der Text steht INNERHALB der Sicht — die positive Form derselben Aussage.
+        expect(mass.innererUeberlauf, `Innerer Ueberlauf bei ${wo}`).toBeLessThanOrEqual(SUBPIXEL);
         expect(mass.langBreite, `Textbreite gegen Sicht bei ${wo}`).toBeLessThanOrEqual(
           mass.sicht + SUBPIXEL,
         );
-
-        // (e) Er ist MEHRZEILIG. Das ist die eigentliche Aussage des Tickets: lesbar ohne
-        // waagerechtes Abfahren EINER langen Zeile. Ohne sie waere ein auf null Breite
-        // zusammengefallener Text ebenfalls „ohne Ueberlauf".
         expect(mass.zeilenhoehe, `Zeilenhoehe bei ${wo}`).toBeGreaterThan(0);
         expect(
           mass.langHoehe,
           `Texthoehe bei ${wo} (einzeilig waere <= ${mass.zeilenhoehe})`,
         ).toBeGreaterThan(mass.zeilenhoehe * 1.5);
-
-        // (f) Gegenprobe: der KURZE Text ist vom Deckel unberuehrt. Er teilt sich die Spalte
-        // mit dem langen, bekommt also dieselbe Breite — zusammengezogen haette der Deckel
-        // den Befund gegen die C7-Zusicherung eingetauscht.
         expect(mass.kurzBreite, `Kurztextbreite bei ${wo}`).toBeGreaterThan(0);
 
         messungen.push({ breite, dichte, ...mass });
@@ -303,50 +280,6 @@ test.describe('LFH-523: langer Meldungstext im Tabellenzweig', () => {
       });
     });
   }
-
-  /**
-   * Die C7-Zusicherung UNTER Langtextlast (AK#4). Der Bestandstest unten saet nur den
-   * kurzen Text; dass der Deckel die Spalte auch dann nicht unter die Haelfte drueckt,
-   * wenn ein langer Text in derselben Tabelle steht, ist die Aussage, die LFH-523
-   * zusaetzlich schuldet. Die fixierte Kennung wird im selben Zug mitgeprueft.
-   *
-   * DIESER FALL IST EIN WAECHTER, KEIN BEFUNDFAENGER — gemessen: mit zurueckgedrehtem
-   * Produktionscode bleibt er GRUEN, weil der ungedeckelte Text die Spalte aufblaeht und
-   * die ≥50 % damit trivial erfuellt (derselbe Grund, aus dem der Bestandstest kurz saet).
-   * Rot wird auf altem Stand allein der Ueberlauf-Fall darueber, und zwar in allen drei
-   * Dichten: 974 / 1134 / 1178 px innerer Ueberlauf bei 1200 px. Wer diesen Waechter fuer
-   * den Beleg des Tickets haelt, verwechselt die beiden.
-   */
-  test('haelt bei 1366 px die halbe Contentbreite und die fixierte Kennung', async ({ page }) => {
-    await anmelden(page);
-    const einsatzId = await einsatzAnlegen(page, `E2E ETB Langtext C7 ${Date.now()}`);
-    await seedeEintrag(page, einsatzId);
-    await seedeEintrag(page, einsatzId, LANG);
-    await page.setViewportSize(FUEKW);
-    await page.goto(`/einsaetze/${einsatzId}/etb`);
-    const bereich = page.getByRole('region', { name: 'Einsatztagebuch' });
-    await expect(bereich.getByText(LANG, { exact: true })).toHaveCount(1);
-
-    // Der Spaltenschalter sagt weiterhin, dass die zwei Nebenspalten AUSGEBLENDET sind —
-    // ohne diese Zeile waere „Spalte weg" von „Spalte kaputt" nicht zu unterscheiden.
-    await expect(page.getByRole('button', { name: /2 ausgeblendet/ })).toHaveCount(1);
-
-    const spalte = await bereich.getByRole('columnheader', { name: 'Inhalt' }).boundingBox();
-    const flaeche = await bereich.boundingBox();
-    expect(spalte, 'Inhaltsspalte nicht messbar').not.toBeNull();
-    expect(flaeche, 'Sichtflaeche nicht messbar').not.toBeNull();
-    const anteil = spalte!.width / flaeche!.width;
-    expect(
-      anteil,
-      `Meldungstext bekommt ${Math.round(anteil * 100)} % der Contentbreite ` +
-        `(${Math.round(spalte!.width)}px von ${Math.round(flaeche!.width)}px), Soll >= 50 %`,
-    ).toBeGreaterThanOrEqual(MINDESTANTEIL);
-
-    // Die fixierte Kennung bleibt die erste Spalte und bleibt fixiert (Gate 2).
-    const fixiert = bereich.locator('th.ant-table-cell-fix-start');
-    await expect(fixiert).toHaveCount(1);
-    await expect(fixiert).toHaveText('Nr.');
-  });
 });
 
 // Login-/Anlege-Helfer aus `kernfluss.spec.ts` kopiert — es gibt (noch) kein geteiltes
@@ -377,7 +310,7 @@ async function seedeEintrag(page: Page, einsatzId: string, inhalt: string = MELD
   ).toBeTruthy();
 }
 
-test('bei 390 px scrollt der Seitenrumpf nicht seitlich, und die Chronologie steht als Ereigniszeilen', async ({
+test('bei 390 px scrollt der Seitenrumpf nicht seitlich, und die Chronologie steht als Zeitachse', async ({
   page,
 }) => {
   await anmelden(page);
@@ -394,7 +327,6 @@ test('bei 390 px scrollt der Seitenrumpf nicht seitlich, und die Chronologie ste
   // leeren, fehlgeschlagenen oder weggeleiteten Seite wahr.
   await expect(bereich.getByText(MELDUNG)).toHaveCount(1);
 
-  // AK#1, erste Hälfte: der Rumpf wandert nicht.
   const mass = await page.evaluate(() => ({
     scroll: document.body.scrollWidth,
     innen: window.innerWidth,
@@ -404,18 +336,18 @@ test('bei 390 px scrollt der Seitenrumpf nicht seitlich, und die Chronologie ste
     `Body scrollt seitlich: ${mass.scroll}px gegen ${mass.innen}px Fensterbreite`,
   ).toBeLessThanOrEqual(mass.innen + SUBPIXEL);
 
-  // Und die Form: Ereigniszeilen statt Tabelle. Ein Tabellenelement, das nur in sich
-  // scrollt, erfüllte die Zeile darüber ebenfalls — die Aussage des Tickets ist aber
-  // die Auflösung in Zeilen.
   await expect(bereich.locator('[data-testid="etb-ereigniszeile"]')).toHaveCount(1);
   await expect(bereich.locator('table')).toHaveCount(0);
+
+  // Die Schnellerfassung am Fuß bleibt erreichbar: sichtbar im Fenster, ohne Blättern.
+  await expect(page.getByPlaceholder('Inhalt …')).toBeInViewport();
 });
 
-test('bei 1366 px bekommt der Meldungstext mindestens die halbe Contentbreite', async ({
+test('bei 1366 px bekommt der Meldungstext mindestens die halbe Zeitachsenbreite', async ({
   page,
 }) => {
   await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E ETB Spaltenbudget ${Date.now()}`);
+  const einsatzId = await einsatzAnlegen(page, `E2E ETB Textbreite ${Date.now()}`);
   await seedeEintrag(page, einsatzId);
 
   await page.setViewportSize(FUEKW);
@@ -426,23 +358,20 @@ test('bei 1366 px bekommt der Meldungstext mindestens die halbe Contentbreite', 
   await expect(bereich).toHaveCount(1);
   await expect(bereich.getByText(MELDUNG)).toHaveCount(1);
 
-  // Die Nebenspalten, die den Text erdrückten, sind bei dieser Breite aus (`abBreite:
-  // 'xxl'`) — und der Spaltenschalter sagt es. Ohne diese Zeile wäre „Spalte weg" von
-  // „Spalte kaputt" nicht zu unterscheiden.
-  await expect(bereich.getByRole('columnheader', { name: 'Von → An' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: /2 ausgeblendet/ })).toHaveCount(1);
-
-  const inhalt = bereich.getByRole('columnheader', { name: 'Inhalt' });
-  await expect(inhalt).toHaveCount(1);
-  const spalte = await inhalt.boundingBox();
+  // Die Seitenleiste „Bilanz" steht ab `xl` rechts daneben — gemessen wird gegen die
+  // Zeitachse selbst, nicht gegen den Inhaltsbereich mit Leiste.
+  await expect(page.getByRole('complementary', { name: 'Bilanz des Tagebuchs' })).toBeVisible();
+  const text = await bereich.locator('.markdown').first().boundingBox();
   const flaeche = await bereich.boundingBox();
-  expect(spalte, 'Inhaltsspalte nicht messbar').not.toBeNull();
+  expect(text, 'Meldungstext nicht messbar').not.toBeNull();
   expect(flaeche, 'Sichtfläche nicht messbar').not.toBeNull();
 
-  const anteil = spalte!.width / flaeche!.width;
+  // Der Textblock ist so breit wie seine Spalte (Blockelement), also misst dies die
+  // Spalte, die der Text bekommt — nicht die Länge des kurzen Textes.
+  const anteil = text!.width / flaeche!.width;
   expect(
     anteil,
-    `Meldungstext bekommt ${Math.round(anteil * 100)} % der Contentbreite ` +
-      `(${Math.round(spalte!.width)}px von ${Math.round(flaeche!.width)}px), Soll ≥ 50 %`,
+    `Meldungstext bekommt ${Math.round(anteil * 100)} % der Zeitachse ` +
+      `(${Math.round(text!.width)}px von ${Math.round(flaeche!.width)}px), Soll ≥ 50 %`,
   ).toBeGreaterThanOrEqual(MINDESTANTEIL);
 });

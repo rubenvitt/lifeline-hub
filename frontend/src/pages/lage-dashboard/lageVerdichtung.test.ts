@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type {
+  GefahrBewertung,
   Gefahrengebiet,
   LageberichtAnzeige,
   Person,
@@ -14,6 +15,7 @@ import {
   verdichtePersonen,
 } from './lageVerdichtung';
 import { verdichteSchaeden, verdichteTiere, verdichteUhs } from './lageVerdichtung';
+import { sichtungsZeilen, verdichteGefahrenmatrix } from './lageVerdichtung';
 
 function person(p: Partial<Person>): Person {
   return {
@@ -254,5 +256,91 @@ describe('einfache Status-Zählungen', () => {
       abgeschlossen: 1,
       gesamt: 3,
     });
+  });
+});
+
+describe('verdichteGefahrenmatrix', () => {
+  const b = (
+    gefahrentyp: GefahrBewertung['gefahrentyp'],
+    warnstufe: Warnstufe,
+    gebiet = 1,
+  ): GefahrBewertung =>
+    ({
+      gefahrentyp,
+      warnstufe,
+      gefahrengebiet_id: gebiet,
+      schutzobjekt: 'menschen',
+    }) as GefahrBewertung;
+
+  it('leere Matrix → keine Zeilen, alle 13 Typen unbewertet', () => {
+    expect(verdichteGefahrenmatrix([])).toEqual({ zeilen: [], unbewertet: 13 });
+  });
+
+  it('nimmt je Typ die höchste Stufe über Gebiete und Schutzobjekte (ordinal, nicht lexikalisch)', () => {
+    const { zeilen } = verdichteGefahrenmatrix([
+      b('brand', 'hoch', 1),
+      b('brand', 'akut', 2),
+      b('brand', 'mittel', 2),
+      b('ertrinken', 'niedrig', 1),
+      b('ertrinken', 'mittel', 2),
+    ]);
+    expect(zeilen).toEqual([
+      { typ: 'brand', label: 'Brand', stufe: 'akut' },
+      { typ: 'ertrinken', label: 'Ertrinken', stufe: 'mittel' },
+    ]);
+  });
+
+  it('hält die Katalogreihenfolge, nicht die Eingangs- oder Stufenreihenfolge', () => {
+    const { zeilen } = verdichteGefahrenmatrix([
+      b('ertrinken', 'akut'),
+      b('atemgifte', 'niedrig'),
+      b('explosion', 'hoch'),
+    ]);
+    expect(zeilen.map((z) => z.typ)).toEqual(['atemgifte', 'explosion', 'ertrinken']);
+  });
+
+  it('„keine" ist eine bewertete Zeile, kein unbewerteter Typ', () => {
+    const v = verdichteGefahrenmatrix([b('brand', 'keine')]);
+    expect(v.zeilen).toEqual([{ typ: 'brand', label: 'Brand', stufe: 'keine' }]);
+    expect(v.unbewertet).toBe(12);
+  });
+});
+
+describe('sichtungsZeilen', () => {
+  const sk = (over: Partial<Record<string, number>> = {}) => ({
+    sk1: 0,
+    sk2: 0,
+    sk3: 0,
+    sk4: 0,
+    tot: 0,
+    unverletzt: 0,
+    ohne: 0,
+    ...over,
+  });
+
+  it('zeigt SK I–IV immer, auch mit null — eine Null ist ein Befund', () => {
+    expect(sichtungsZeilen(sk()).map((z) => [z.kategorie, z.wert, z.anteil])).toEqual([
+      ['sk1', 0, 0],
+      ['sk2', 0, 0],
+      ['sk3', 0, 0],
+      ['sk4', 0, 0],
+    ]);
+  });
+
+  it('nimmt tot und unverletzt nur dazu, wenn es sie gibt', () => {
+    expect(sichtungsZeilen(sk({ tot: 1 })).map((z) => z.kategorie)).toEqual([
+      'sk1',
+      'sk2',
+      'sk3',
+      'sk4',
+      'tot',
+    ]);
+    expect(sichtungsZeilen(sk({ unverletzt: 2 })).map((z) => z.kategorie)).toContain('unverletzt');
+  });
+
+  it('rechnet den Anteil an allen GESICHTETEN, nicht an allen Erfassten', () => {
+    const zeilen = sichtungsZeilen(sk({ sk1: 1, sk3: 2, unverletzt: 1, ohne: 10 }));
+    const anteil = Object.fromEntries(zeilen.map((z) => [z.kategorie, z.anteil]));
+    expect(anteil).toEqual({ sk1: 0.25, sk2: 0, sk3: 0.5, sk4: 0, unverletzt: 0.25 });
   });
 });

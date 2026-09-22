@@ -1,33 +1,42 @@
-import { Layout, Space, Tag, Typography, theme } from 'antd';
+import { Layout, Tag, Typography, theme } from 'antd';
 import type { CSSProperties } from 'react';
 import { Link, Outlet } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
 import { darfVerwaltung } from '../einsatz/schreibrecht';
-import { farbenDunkel } from '../theme/tokens';
+import { farbenDunkel, rahmenFarben } from '../theme/tokens';
 import BenutzerMenu from './BenutzerMenu';
 import CommandPaletteTrigger from './CommandPaletteTrigger';
+import {
+  KOPF_HOEHE,
+  KopfRechts,
+  Markenzelle,
+  SyncAnzeige,
+  Uhr,
+  Wortmarke,
+  kopfZelleStil,
+} from './Kopfleiste';
 import { useViewport } from './useViewport';
 
 const { Header, Content } = Layout;
 
 /**
- * Die Kopfzeile trägt ihre Polsterung selbst (LFH-329 · B1/M12).
- *
- * Ohne diesen Stil hinge sie am antd-Komponententoken, der sich aus der
- * Steuerhöhe ableitet und bei der kompakten Stufe rund 47 px je Seite beträgt —
- * auf einem 390-px-Schirm knapp ein Viertel der Breite, nur für Rand. Die Zahl
- * steht NICHT hier, sondern als Custom Property in `theme/rollen.css`: sie
- * hängt am Viewport, und eine Media-Regel greift beim ersten Paint, während
- * eine JS-Ableitung erst nach dem Mount stimmte.
+ * Die Kommandoleiste der Ebene-1-Shell — dieselbe Gestalt wie im Einsatz-Workspace
+ * (`einsatz/EinsatzLayout.tsx`, Neuentwurf „Instrumententafel"): 52 px auf dem dunklen
+ * Rahmengrund, Haarlinie unten, Zellen statt Abständen. Die Polsterung der Leiste selbst
+ * ist 0; die Kopf-Polsterung (`--lfh-kopf-polsterung`, LFH-329 · B1/M12) sitzt an der
+ * Suchzelle. Auf dem Handschirm bricht die rechte Zellgruppe als GANZES um (LFH-460).
  */
 const KOPF_STIL = {
   display: 'flex',
   flexWrap: 'wrap',
+  alignItems: 'stretch',
   height: 'auto',
   lineHeight: 'normal',
-  alignItems: 'center',
-  columnGap: 16,
-  paddingInline: 'var(--lfh-kopf-polsterung)',
+  minHeight: KOPF_HOEHE,
+  padding: 0,
+  background: rahmenFarben.grund,
+  borderBottom: `1px solid ${rahmenFarben.linie}`,
+  color: rahmenFarben.text,
 } as const;
 
 /**
@@ -62,6 +71,7 @@ function GlobalLink({
           // `farbenDunkel`, nicht der modusabhängige Token: die Kopfzeile trägt in BEIDEN
           // Modi denselben dunklen Grund (dieselbe Begründung wie `IconRail.tsx:20-21`).
           color: farbenDunkel.schwach,
+          fontSize: 12,
           cursor: 'not-allowed',
           display: 'inline-flex',
           alignItems: 'center',
@@ -111,57 +121,89 @@ function GlobalLink({
 
 export default function AppLayout() {
   const { benutzer } = useAuth();
-  // Dieselbe Schwelle wie im Einsatz-Workspace. Sie trägt seit LFH-392 nur noch
-  // EINE Frage: ob der Sperrgrund am Verwaltungs-Link als Tag danebensteht — die
-  // Umschalter hingen früher ebenfalls hier und sind jetzt breitenunabhängig im
-  // Benutzermenü. Die Frage stellt ausschließlich `useViewport`; eine zweite,
-  // handgeschriebene Breitenabfrage driftet still von antds Schwellen weg
+  // Dieselbe Schwelle wie im Einsatz-Workspace. Sie trägt drei Fragen: ob der Sperrgrund
+  // am Verwaltungs-Link als Tag danebensteht, ob die Suche als Feld oder als Ikone steht,
+  // und (ab `md`) ob die Uhr Platz hat. Die Frage stellt ausschließlich `useViewport`; eine
+  // zweite, handgeschriebene Breitenabfrage driftet still von antds Schwellen weg
   // (erzwungen von `useViewport.guard.test.ts`).
   const { abBreite } = useViewport();
   const breit = abBreite('lg');
+  const mittel = abBreite('md');
+  // Wie im Einsatz-Kopf: unter `xl` steht der Ruhezustand der SYNC-Anzeige nur als Ikone.
+  const weit = abBreite('xl');
   const { token } = theme.useToken();
+  // Unter `md` rücken die Zellen zusammen: mit der vollen Staffel-Polsterung (18 px je Seite
+  // in `komfortabel`) bräche die rechte Zellgruppe auf 390 px in eine dritte Zeile um.
+  const zellToken = mittel ? token : { padding: token.paddingXS };
+  // Der Verwaltungs-Link ist ein handgebautes Bedienziel: ZWEI Angaben (LFH-365). Farbe aus
+  // der Nachtrolle, weil die Leiste in beiden Modi dunkel ist (vorher `#fff`).
   const linkStil: CSSProperties = {
-    color: '#fff',
+    color: rahmenFarben.gedaempft,
+    fontSize: 12,
     display: 'inline-flex',
     alignItems: 'center',
     flexShrink: 0,
     minHeight: token.controlHeight,
-    padding: `${token.paddingSM}px ${token.padding}px`,
+    // Gate 3 misst Höhe UND Breite: ein 12-px-Wort allein fiele in `handschuh` unter 72.
+    minWidth: token.controlHeight,
+    justifyContent: 'center',
+    padding: `${token.paddingXS}px 0`,
   };
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      {/* LFH-460: Umbruch braucht eine mitwachsende Höhe UND normale Zeilenhöhe.
-          Sonst reserviert jedes Space-Kind antds gesamte Headerhöhe als Textzeile. */}
-      <Header
-        style={{
-          ...KOPF_STIL,
-          minHeight: token.controlHeight * 2,
-          rowGap: token.paddingXS,
-          paddingBlock: token.paddingXS,
-        }}
-      >
-        <Link to="/einsaetze" style={{ ...linkStil, fontWeight: 600, fontSize: 18 }}>
-          lifeline-hub
-        </Link>
-        <GlobalLink
-          to="/admin"
-          label="Verwaltung"
-          gesperrt={!darfVerwaltung(benutzer)}
-          grundSichtbar={breit}
-          linkStil={linkStil}
-        />
-        {/* Farbschema UND Bediendichte wohnen seit LFH-392 auf JEDER Breite im
-            Benutzermenü, nicht mehr ab `lg` zusätzlich hier. Sie sind
-            Einstellungen, keine Aktionen — und ein Element, das keine Aktion ist,
-            gehört nicht in eine Aktionsreihe (CLAUDE.md, Nachtrag 30.07.2026 zur
-            Erfassungs-Knopfreihe). Zwei Dreier-Segmentleisten trugen die zwei
-            Einstellungen mit SECHS Zielen breit aus, während dieselbe Wahl im
-            Menü darunter schon vollständig lag. */}
-        <Space wrap style={{ marginLeft: 'auto', maxWidth: '100%' }} size="middle">
-          <CommandPaletteTrigger />
-          <BenutzerMenu />
-        </Space>
+      <Header style={KOPF_STIL}>
+        {/* LINKE GRUPPE: Marke, Wortmarke (Link zur Einsatzliste), Verwaltung. */}
+        <div style={{ display: 'flex', alignItems: 'stretch', flex: '1 1 auto', minWidth: 0 }}>
+          <Markenzelle />
+          <div style={kopfZelleStil(zellToken)}>
+            <Wortmarke />
+            <span
+              aria-hidden="true"
+              style={{ width: 1, height: 18, flexShrink: 0, background: rahmenFarben.linie }}
+            />
+            <GlobalLink
+              to="/admin"
+              label="Verwaltung"
+              gesperrt={!darfVerwaltung(benutzer)}
+              grundSichtbar={breit}
+              linkStil={linkStil}
+            />
+          </div>
+        </div>
+        {/* SUCHZELLE ab `lg` — sie trägt die Kopf-Polsterung (`kopfpolsterung.guard.test.ts`).
+            Farbschema und Bediendichte wohnen seit LFH-392 im Benutzermenü, nicht hier:
+            Einstellungen gehören nicht in eine Aktionsreihe. */}
+        {breit && (
+          <div
+            data-lfh="kopf-suche"
+            style={{
+              flex: '1 1 280px',
+              minWidth: 0,
+              display: 'flex',
+              alignItems: 'center',
+              paddingInline: 'var(--lfh-kopf-polsterung)',
+            }}
+          >
+            <CommandPaletteTrigger />
+          </div>
+        )}
+        <KopfRechts>
+          {/* Außerhalb eines Einsatzes läuft kein Live-Strom — die SYNC-Zelle erscheint hier
+              nur bei Netzverlust oder offener Offline-Queue. */}
+          <SyncAnzeige liveErwartet={false} kompakt={!mittel} ruheOhneWort={!weit} />
+          {mittel && <Uhr />}
+          {!breit && (
+            <div style={kopfZelleStil(zellToken)}>
+              <CommandPaletteTrigger />
+            </div>
+          )}
+          <div
+            style={{ ...kopfZelleStil(zellToken, 'keiner'), paddingInlineStart: token.paddingXS }}
+          >
+            <BenutzerMenu />
+          </div>
+        </KopfRechts>
       </Header>
       <Content style={{ padding: 'var(--lfh-seiten-polsterung)' }}>
         <Outlet />

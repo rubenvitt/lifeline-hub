@@ -134,7 +134,7 @@ describe('Stammdaten — fehlende Berechtigung wird erklärt', () => {
       renderMitProviders(<Komp />);
       // Erst auf den gerenderten Seitenkopf warten — ein `queryBy` vor dem ersten Anstrich
       // wäre trivial `null` und belegte nichts.
-      expect(await screen.findByRole('heading', { level: 4, name })).toBeInTheDocument();
+      expect(await screen.findByRole('heading', { level: 1, name })).toBeInTheDocument();
       expect(screen.queryByText(STAMMDATEN_RECHTE_TEXT)).not.toBeInTheDocument();
       // Die Gegenaussage zur Sperre. Ohne sie bliebe eine fest verdrahtete `disabled`-Angabe
       // unentdeckt: elf `toBeDisabled` wären dann grün, und die Seite unbedienbar.

@@ -245,16 +245,13 @@ describe('CommandPalette · label-gleiche Zwillinge (LFH-391 · A3)', () => {
 
     await u.type(screen.getByRole('combobox'), 'lage');
 
-    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual([
-      'Lagekarte',
-      'Lagemeldungen',
-    ]);
+    expect(screen.getAllByRole('option').map(optionsText)).toEqual(['Lagekarte', 'Lagemeldungen']);
   });
 
   it('behält die Abkürzung „Zuletzt" bei LEERER Suche', () => {
     renderMitProviders(<CommandPalette befehle={zwillingsKorpus} schliesse={() => {}} />);
 
-    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual([
+    expect(screen.getAllByRole('option').map(optionsText)).toEqual([
       'Lagekarte',
       'Lagekarte',
       'Lagemeldungen',
@@ -276,7 +273,17 @@ const modusKorpus: Befehl[] = [
   { id: 'einstellung:dunkel', gruppe: 'einstellungen', label: 'Dunkel', ausfuehren: () => {} },
 ];
 
-const optionsTexte = () => screen.getAllByRole('option').map((o) => o.textContent);
+/**
+ * Der LESBARE Text einer Option — ohne `aria-hidden`-Beiwerk. Seit dem Neuentwurf trägt die
+ * aktive Zeile eine Enter-Marke und Moduloptionen einen Kontext; beides ist Darstellung,
+ * nicht der Name der Option.
+ */
+function optionsText(o: HTMLElement): string | null {
+  const kopie = o.cloneNode(true) as HTMLElement;
+  kopie.querySelectorAll('[aria-hidden="true"]').forEach((n) => n.remove());
+  return kopie.textContent;
+}
+const optionsTexte = () => screen.getAllByRole('option').map(optionsText);
 const modusZeile = () => document.querySelector('[data-lfh="palette-modus"]');
 
 describe('CommandPalette · Präfixmodus „>" (LFH-391 · A4)', () => {
@@ -338,10 +345,19 @@ describe('CommandPalette · Präfixmodus „>" (LFH-391 · A4)', () => {
  * Handschuhweg zu 42+ Befehlen, und dort sieht niemand die getippte Zeile als Syntax.
  */
 describe('CommandPalette · Modusanzeige (LFH-391 · A4)', () => {
-  it('zeigt bei leerem Feld die Legende mit dem Präfixzeichen als Marke', () => {
+  it('zeigt die Legende mit dem Präfixzeichen als Marke dauerhaft in der Fußzeile', () => {
     renderMitProviders(<CommandPalette befehle={modusKorpus} schliesse={() => {}} />);
 
-    expect(modusZeile()).toHaveTextContent('zeigt nur Aktionen');
+    // Neuentwurf (S2): die Legende „wie komme ich hinein" steht in der Fußzeile, die
+    // Modusanzeige oben nennt nur noch den AKTIVEN Modus — bei leerem Feld also keine.
+    const fuss = document.querySelector('[data-lfh="palette-fuss"]');
+    expect(fuss).toHaveTextContent('zeigt nur Aktionen');
+    expect(fuss).toHaveTextContent('sucht im Einsatztagebuch');
+    expect(fuss).toHaveTextContent('öffnen');
+    // Nur, was funktioniert: kein „Koordinate", kein „im Panel" aus dem Entwurf.
+    expect(fuss).not.toHaveTextContent('Koordinate');
+    expect(fuss).not.toHaveTextContent('Panel');
+    expect(modusZeile()).toBeNull();
     // Ein sichtbares Kürzel ist eine Marke, kein Satzzeichen im Fließtext (CLAUDE.md,
     // Nacharbeit zu LFH-335): ein nacktes '>' im Text hätte weder Rahmen noch Abstand.
     expect(screen.getByText('>', { selector: 'kbd' })).toBeInTheDocument();

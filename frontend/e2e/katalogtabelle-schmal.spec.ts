@@ -63,9 +63,27 @@ test('Katalogtabelle bei 390 px: scrollt in sich, drückt die Seite nicht breit,
   page,
 }) => {
   await anmelden(page);
-  // Benutzerliste: sechs Spalten und ohne jede Vorarbeit mindestens eine Datenzeile
-  // (der vom Harness angelegte Admin). Ein Anlegen-Dialog auf 390 px wäre zusätzliche
-  // Fehlerquelle ohne Erkenntnisgewinn.
+  // Benutzerliste: sechs Spalten. Die Zeilen legt der Spec SELBST per API an (kein
+  // Anlegen-Dialog auf 390 px — der wäre Fehlerquelle ohne Erkenntnisgewinn). Früher
+  // reichte die eine Zeile des Harness-Admins; seit dem Neuentwurf (22.09.2026) ist der
+  // Seitenkopf 44 px statt eines Titelblocks, die Seite also kürzer, und bei 400 px
+  // Schirmhöhe blieb GAR KEINE Bildlaufreserve mehr (gemessen: scrollY 0 statt 254).
+  // Im vollen Lauf fiel das nicht auf, weil andere Specs vorher Benutzer anlegen — allein
+  // (CI-Shard) war der Spec rot. Jetzt hängt die Vorbedingung nicht mehr an der Reihenfolge.
+  const LAUF = Date.now();
+  for (let i = 0; i < 8; i += 1) {
+    const antwort = await page.request.post('/api/benutzer', {
+      data: {
+        anzeigename: `E2E Katalog ${LAUF}-${i}`,
+        benutzername: `e2e-katalog-${LAUF}-${i}`,
+        passwort: 'e2e-katalog-pw-123',
+      },
+    });
+    expect(
+      antwort.ok(),
+      `Seeding Benutzer ${i}: ${antwort.status()} ${await antwort.text()}`,
+    ).toBeTruthy();
+  }
   await page.goto('/admin/benutzer');
   const zeile = page.locator('tr.ant-table-row').first();
   await expect(zeile).toBeVisible();

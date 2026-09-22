@@ -42,11 +42,12 @@ function zeige(daten: Stab) {
   return renderMitProviders(<LagebesprechungStand einsatzId={1} stab={daten} />);
 }
 /**
- * Zeile einer bordered `Descriptions` (horizontal): Label und Inhalt stehen in EINEM `<tr>`
- * (gelesen an antd 6.5.2, `es/descriptions/Row.js:132`). Liefert `closest('tr')` nach einem
- * antd-Sprung `null`, wirft `within` laut — dann über `.ant-descriptions-row` greifen.
+ * Feld des `Datenraster`s (Neuentwurf): Begriff (`<dt>`) und Wert (`<dd>`) stehen in EINER
+ * Feldhülle `data-lfh="datenfeld"`. Gegriffen wird die Hülle, damit die Aussagen „im Feld X
+ * steht Y" dieselben bleiben wie an der früheren `Descriptions`-Zeile.
  */
-const zeile = (label: string) => screen.getByText(label).closest('tr')!;
+const zeile = (label: string) =>
+  screen.getByText(label, { selector: 'dt' }).closest<HTMLElement>('[data-lfh="datenfeld"]')!;
 
 describe('LagebesprechungStand · Nächste', () => {
   it('zukünftig: „in 23 min", neutral', () => {
@@ -77,7 +78,7 @@ describe('LagebesprechungStand · Nächste', () => {
     // die Uhr beim Tick auf GENAU +30,000 s — ein Termin bei +23:30 läge dann auf exakt 23:00 und
     // zeigte weiter „in 23 min". Tragend ist das Fenster [+23:00, +23:30): vor dem Tick 23, danach 22.
     zeige(stab({ naechste_lagebesprechung_at: wireAb(23 * 60 + 15) }));
-    const tabelle = document.querySelector('.ant-descriptions');
+    const tabelle = document.querySelector('[data-lfh="datenraster"]');
     expect(screen.getByText('in 23 min')).toBeInTheDocument();
 
     // Gegenfall zum Takt: nach 29 s steht noch der alte Wert — ein kürzerer Takt zeigte „in 22 min".
@@ -87,7 +88,8 @@ describe('LagebesprechungStand · Nächste', () => {
     await act(() => vi.advanceTimersByTimeAsync(1_000));
     expect(screen.getByText('in 22 min')).toBeInTheDocument();
     // Kein Blinken: derselbe Knoten, nur der Wortlaut ändert sich.
-    expect(document.querySelector('.ant-descriptions')).toBe(tabelle);
+    expect(tabelle).not.toBeNull();
+    expect(document.querySelector('[data-lfh="datenraster"]')).toBe(tabelle);
     // Kein Toast. Dass die Queue zählbar ist, belegt `LagebesprechungModal.test.tsx`.
     expect(document.querySelectorAll('.ant-message')).toHaveLength(0);
   });

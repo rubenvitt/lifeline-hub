@@ -5,12 +5,17 @@ import type { Person } from '../api/types';
 import {
   SkTag,
   abgleichSpalten,
+  geschlechtAlter,
   nameText,
   personenKarte,
-  personenSpalten,
+  personenSpalten as spaltenFabrik,
   seitWert,
+  verbleibText,
   type PersonenSpaltenKey,
 } from './personenSpalten';
+
+const uhsNamen: Record<number, string> = { 7: 'Weserstadion' };
+const personenSpalten = spaltenFabrik((id) => uhsNamen[id]);
 
 /**
  * Register- und Helferprüfungen der Personenspalten (LFH-330 · B2, Bündel I).
@@ -108,15 +113,18 @@ describe('nameText', () => {
 /** Hilfsgriff aufs Register — `key` ist Pflichtfeld, also ist das eindeutig. */
 const spalte = (key: string) => personenSpalten.filter((s) => s.key === key);
 
-describe('personenSpalten — Registerform', () => {
-  it('trägt die seit-Spalte genau einmal', () => {
-    expect(spalte('seit')).toHaveLength(1);
-  });
-
-  it('legt seit VOR den Antreffort — die schmalste Spalte trägt die höchste Breitenschwelle', () => {
-    const keys = personenSpalten.map((s) => s.key);
-    expect(keys.indexOf('seit')).toBeGreaterThan(keys.indexOf('alter'));
-    expect(keys.indexOf('seit')).toBeLessThan(keys.indexOf('antreff_ort'));
+describe('personenSpalten — Registerform (Neuentwurf S7)', () => {
+  it('trägt die Spalten des Entwurfs, soweit es Daten gibt — ohne „Zustand" (LFH-613)', () => {
+    expect(personenSpalten.map((s) => s.key)).toEqual([
+      'reg',
+      'person',
+      'sk',
+      'status',
+      'fundort',
+      'verbleib',
+      'vermerk',
+      'seit',
+    ]);
   });
 
   it('sortiert seit über DIESELBE Regel, die die Zelle zeigt', () => {
@@ -127,28 +135,58 @@ describe('personenSpalten — Registerform', () => {
     }
   });
 
-  it('macht reg sortierbar und suchbar, in der ANZEIGE-Schreibweise', () => {
+  it('macht Nr. sortierbar und suchbar, in der ANZEIGE-Schreibweise, und setzt sie Mono', () => {
     const reg = spalte('reg')[0];
     // Sortiert wird über die ZAHL (sonst läge R-10 vor R-9), gesucht über den Text, den
     // jemand auch eintippt.
     expect(reg.sortWert!(basis)).toBe(1);
     expect(reg.suchText!(basis)).toBe('R-001');
     expect(reg.immerSichtbar).toBe(true);
+    expect(reg.zahl).toBe(true);
+    expect(spalte('seit')[0].zahl).toBe(true);
   });
 
   it('lässt den Namen zur Suche beitragen, ohne „unbekannt" als Namen zu führen', () => {
-    const name = spalte('name')[0];
-    expect(name.suchText!(basis)).toBe('Mustermann, Max');
-    expect(name.suchText!({ ...basis, name: null, vorname: null })).toBeFalsy();
+    const person = spalte('person')[0];
+    expect(person.suchText!(basis)).toBe('Mustermann, Max');
+    expect(person.suchText!({ ...basis, name: null, vorname: null })).toBeFalsy();
   });
 
-  it('staffelt die Nebenspalten über abBreite statt über antds Breiten-Prop', () => {
-    expect(spalte('geschlecht')[0].abBreite).toBe('lg');
-    expect(spalte('alter')[0].abBreite).toBe('lg');
-    expect(spalte('antreff_ort')[0].abBreite).toBe('xl');
-    // seit trägt KEINE Schwelle: eine Spalte, die unter 1200 px verschwindet, wäre in jeder
-    // jsdom-Prüfung abwesend, und jede Behauptung über sie wäre eine Attrappe.
+  it('staffelt die Nebenspalten über abBreite; Zeit und Verbleib tragen keine Schwelle', () => {
+    expect(spalte('fundort')[0].abBreite).toBe('lg');
+    expect(spalte('vermerk')[0].abBreite).toBe('xxl');
+    // Eine Spalte mit Schwelle wäre in jeder jsdom-Prüfung unter 1200 px abwesend.
     expect(spalte('seit')[0].abBreite).toBeUndefined();
+    expect(spalte('verbleib')[0].abBreite).toBeUndefined();
+  });
+
+  it('zeigt Person mit Geschlecht/Alter und schreibt eine Lücke als Wort aus', () => {
+    const render_ = spalte('person')[0].render!;
+    const { container, rerender } = render(<>{render_(undefined, basis, 0)}</>);
+    expect(container.textContent).toBe('Mustermann, Maxm ~40Verbleib offen');
+    rerender(<>{render_(undefined, { ...basis, aktueller_verbleib: 'entlassen' }, 0)}</>);
+    expect(container.textContent).toBe('Mustermann, Maxm ~40');
+    expect(container.querySelector('[data-lfh="luecke"]')).toBeNull();
+  });
+});
+
+describe('geschlechtAlter / verbleibText', () => {
+  it('schreibt Geschlecht und Alter in der Kurzform der Zeile', () => {
+    expect(geschlechtAlter(basis)).toBe('m ~40');
+    expect(geschlechtAlter({ ...basis, geschlecht: null, alter_geschaetzt: null })).toBeNull();
+    expect(geschlechtAlter({ ...basis, geburtsdatum: '1990-01-02' })).toBe('m 1990-01-02');
+  });
+
+  it('nennt Kurzform, sonst die UHS beim Namen, sonst nichts', () => {
+    const name = (id: number) => uhsNamen[id];
+    expect(
+      verbleibText({ aktueller_verbleib: 'Transport → KH Nord', aktuelle_uhs_id: 7 }, name),
+    ).toBe('Transport → KH Nord');
+    expect(verbleibText({ aktueller_verbleib: null, aktuelle_uhs_id: 7 }, name)).toBe(
+      'UHS Weserstadion',
+    );
+    expect(verbleibText({ aktueller_verbleib: null, aktuelle_uhs_id: 99 }, name)).toBe('UHS');
+    expect(verbleibText({ aktueller_verbleib: null, aktuelle_uhs_id: null }, name)).toBeNull();
   });
 });
 
@@ -178,13 +216,14 @@ describe('personenKarte', () => {
     expect(karte.titel.ziel!(basis)).toBe('/einsaetze/7/personen/10');
   });
 
-  it('führt seit als Sekundärfeld — sonst fehlt die Zeitachse im Kartenzweig', () => {
-    // Gemessen als Lücke: ohne diese Zeile blieb das Register grün, während `seit` aus dem
-    // Kartenplan verschwand — unter `md` wäre die Zeit dann unsichtbar, und die
-    // Spaltenprüfungen oben hätten davon nichts gesehen.
+  it('führt Person, Sichtung und Zeit als Sekundärfelder, den Status im Status-Slot', () => {
+    // `seit` gemessen als Lücke: ohne diese Zeile blieb das Register grün, während die Zeit
+    // aus dem Kartenplan verschwand. `person` trägt im Kartenzweig den Lückenvermerk — ohne
+    // sie hinge die Lückentönung dort ohne Wort.
     const karte = personenKarte(1);
     if (karte.art !== 'plan') throw new Error('personenKarte ist ein Plan, kein Eigenbau');
-    expect(karte.sekundaer).toEqual(['name', 'sk', 'seit']);
+    expect(karte.sekundaer).toEqual(['person', 'sk', 'seit']);
+    expect(karte.status!({ ...basis, status: 'vermisst' })).toMatchObject({ label: 'vermisst' });
   });
 
   it('lehnt einen Tippfehler im Sekundärslot schon am Typcheck ab', () => {

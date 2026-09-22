@@ -7,6 +7,7 @@ import { useAuth } from '../auth/AuthContext';
 import { einsatzKeys } from '../api/queryKeys';
 import AuftraegeListe from '../auftraege/AuftraegeListe';
 import BefehlListe from '../auftraege/BefehlListe';
+import EinsatzSeite from '../components/EinsatzSeite';
 
 export default function AuftraegePage() {
   const { id } = useParams();
@@ -32,15 +33,21 @@ export default function AuftraegePage() {
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
   return (
-    <div style={{ maxWidth: 1040, margin: '0 auto' }}>
-      <Breadcrumb
-        style={{ marginBottom: 12 }}
-        items={[
-          { title: <Link to="/einsaetze">Einsätze</Link> },
-          { title: einsatz.bezeichnung },
-          { title: 'Aufträge/Befehle' },
-        ]}
-      />
+    // Titel und Ortspfad trägt der Seitenkopf; Mengen, Datenstand und Anlegen-Aktion
+    // gehören dem jeweiligen Reiter (`Bereichskopf`) — die zwei Bereiche zählen Verschiedenes.
+    <EinsatzSeite
+      titel="Aufträge/Befehle"
+
+      breadcrumb={
+        <Breadcrumb
+          items={[
+            { title: <Link to="/einsaetze">Einsätze</Link> },
+            { title: einsatz.bezeichnung },
+            { title: 'Aufträge/Befehle' },
+          ]}
+        />
+      }
+    >
       <Tabs
         defaultActiveKey="auftraege"
         items={[
@@ -56,6 +63,6 @@ export default function AuftraegePage() {
           },
         ]}
       />
-    </div>
+    </EinsatzSeite>
   );
 }

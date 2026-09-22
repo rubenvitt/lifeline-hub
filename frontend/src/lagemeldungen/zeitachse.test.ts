@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
-import { imZeitfenster, tagesEtikett, tagesSchluessel } from './zeitachse';
+import {
+  LEERER_FILTER,
+  filterAktiv,
+  filtereLagemeldungen,
+  gruppiereNachTag,
+  imZeitfenster,
+  tagesEtikett,
+  tagesSchluessel,
+} from './zeitachse';
 
 dayjs.extend(utc);
 
@@ -46,5 +54,61 @@ describe('zeitachse', () => {
     const jetztBerlin = dayjs.utc('2026-06-13 10:00:00').tz('Europe/Berlin');
     expect(imZeitfenster('2026-06-12 22:30:00', 'heute', jetztBerlin, berlin)).toBe(true);
     expect(imZeitfenster('2026-06-12 21:30:00', 'heute', jetztBerlin, berlin)).toBe(false);
+  });
+
+  const eintrag = (erstellt_at: string, text: string, lat: number | null = null) => ({
+    text,
+    erstellt_at,
+    lat,
+    lon: lat,
+    meldung_lfd_nr: 5,
+    meldung_absender: 'Florian Nord 1',
+  });
+
+  it('gruppiert nach Tag der Anzeigezone, jüngster Tag und jüngster Eintrag zuerst', () => {
+    const berlin = { zeitzone: 'Europe/Berlin' };
+    const jetzt = dayjs.utc('2026-06-13 10:00:00').tz('Europe/Berlin');
+    // ABSICHTLICH aufsteigend geliefert (wie vom Server): nur so beweist die Umkehr etwas.
+    const gruppen = gruppiereNachTag(
+      [
+        eintrag('2026-06-12 08:00:00', 'Alt'),
+        // 22:30 UTC am 12. ist in Berlin der 13. — gehört unter „Heute", nicht „Gestern".
+        eintrag('2026-06-12 22:30:00', 'Nachts'),
+        eintrag('2026-06-13 07:00:00', 'Neu'),
+      ],
+      berlin,
+      jetzt,
+    );
+    expect(gruppen.map((g) => g.etikett)).toEqual(['Heute', 'Gestern']);
+    expect(gruppen[0].zeilen.map((z) => z.text)).toEqual(['Neu', 'Nachts']);
+    expect(gruppen[1].zeilen.map((z) => z.text)).toEqual(['Alt']);
+    expect(gruppiereNachTag([])).toEqual([]);
+  });
+
+  it('filtert nach Ort, Zeitfenster und Freitext — jede Achse für sich und zusammen', () => {
+    const jetzt = dayjs.utc('2026-06-13 10:00:00').local();
+    const menge = [
+      eintrag('2026-06-13 09:30:00', 'Brücke gesperrt', 50.1),
+      eintrag('2026-06-13 07:00:00', 'Pegel steigt'),
+      eintrag('2026-06-12 07:00:00', 'Deich hält', 50.2),
+    ];
+    const texte = (f: Partial<typeof LEERER_FILTER>) =>
+      filtereLagemeldungen(menge, { ...LEERER_FILTER, ...f }, undefined, jetzt).map((l) => l.text);
+    expect(texte({})).toEqual(['Brücke gesperrt', 'Pegel steigt', 'Deich hält']);
+    expect(texte({ ort: 'mit' })).toEqual(['Brücke gesperrt', 'Deich hält']);
+    expect(texte({ ort: 'ohne' })).toEqual(['Pegel steigt']);
+    expect(texte({ fenster: 'stunde' })).toEqual(['Brücke gesperrt']);
+    expect(texte({ fenster: 'vierStunden', ort: 'ohne' })).toEqual(['Pegel steigt']);
+    // Freitext trifft Text, Absender und Nummer, ohne Groß-/Kleinschreibung.
+    expect(texte({ suche: '  DEICH ' })).toEqual(['Deich hält']);
+    expect(texte({ suche: 'florian' })).toHaveLength(3);
+    expect(texte({ suche: 'nichts' })).toEqual([]);
+  });
+
+  it('unterscheidet ungefiltert von gefiltert (Leerzustand „weggefiltert")', () => {
+    expect(filterAktiv(LEERER_FILTER)).toBe(false);
+    expect(filterAktiv({ ...LEERER_FILTER, suche: '   ' })).toBe(false);
+    expect(filterAktiv({ ...LEERER_FILTER, ort: 'mit' })).toBe(true);
+    expect(filterAktiv({ ...LEERER_FILTER, fenster: 'heute' })).toBe(true);
   });
 });

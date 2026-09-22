@@ -1,131 +1,29 @@
 /* Gestaltungssprache „E · Lagekarte nachts" (LFH-352 · A0) — die Bausteine.
    ============================================================================
-   Referenzimplementierung der fünf Signatur-Elemente. Alles hier liest
-   ausschließlich `--lfh-*` aus `rollen.css` — kein Literalwert, keine zweite
-   Farbentscheidung. Wer eine Farbe hart einträgt, hebelt die Sprache aus.
-
-   Die Klassen sind bewusst allgemein gehalten (`lfh-kachel`, nicht
-   `lage-dashboard-kachel`): Band B hebt sie zu React-Primitiven, Band C
-   konsumiert sie. Bis dahin ist das Lage-Dashboard ihr einziger Konsument und
-   zugleich die Referenzseite, gegen die jeder C-Task geprüft wird.
+   Alles hier liest ausschließlich `--lfh-*` aus `rollen.css` — kein Literalwert,
+   keine zweite Farbentscheidung. Wer eine Farbe hart einträgt, hebelt die Sprache aus.
 
    NICHT ANTD: diese Bausteine kommen ohne antd-Komponenten aus. Nicht aus
    Prinzip, sondern weil antd seine eigene Formensprache mitbringt (Radien,
    Schatten, Polsterung) und sie genau da überschreiben würde, wo die Handschrift
    sitzt. Formulare, Tabellen und Overlays bleiben antd — mit den Tokens aus
    `tokens.ts`.
+
+   NEUENTWURF „INSTRUMENTENTAFEL" (21.09.2026, `docs/design/2026-09-21-neuentwurf/`):
+   Paneele auf `--lfh-paneel` mit Haarlinie `--lfh-linie`, Augenbrauen (10 px, 600,
+   Versalien, `--lfh-schwach`), Fugenraster (`gap: 1px` auf Linienfarbe), Zeilentrenner
+   `--lfh-flaeche-3`, Status als getönte Fläche. Die Bausteine dazu sind React-Komponenten
+   (`components/instrument/`); hier steht nur, was inline nicht geht.
+
+   AUFGERÄUMT am 22.09.2026: die A0-Klassen ohne Erzeuger im Quelltext sind entfallen —
+   Fläche mit Kartenraster samt Container-Staffel (`.lfh-flaeche`, 1100/700 px), Marke
+   und Akzentstrich, Formzeichen (`.lfh-zeichen--*`), Instrumentenband, Kachel-Innenteile,
+   Werteblöcke, Plaketten, Leer-/Fehler-Innenteile und der Blankknopf. Die vier letzten
+   Klassen ohne Erzeuger (`.lfh-kennzahlen`, `.lfh-kz`, `.lfh-zeile`, `.lfh-kachel__mehr`)
+   lebten nur noch als e2e-Selektor; seit `gate1-ueberlauf` und `gate3-trefflaeche` auf die
+   Anker des neuen Lage-Dashboards zeigen (`[data-lfh="kennzahl"]`, `[data-lfh="paneel-link"]`),
+   sind auch sie entfallen.
    ========================================================================== */
-
-/* ── Fläche mit Kartenraster ───────────────────────────────────────────────
-   Signatur: das Messtischblatt-Raster liegt IM GRUND, nie über dem Text. */
-.lfh-flaeche {
-  background: var(--lfh-grund);
-  color: var(--lfh-text);
-  font-family: var(--lfh-schrift-text);
-  font-size: var(--lfh-schriftgroesse);
-  line-height: 1.45;
-  background-image:
-    linear-gradient(var(--lfh-raster-linie) 1px, transparent 1px),
-    linear-gradient(90deg, var(--lfh-raster-linie) 1px, transparent 1px);
-  background-size: 28px 28px;
-
-  /* Container-Query-Wurzel: die Breakpoints richten sich nach der Fläche, die
-     der Inhalt wirklich hat — nicht nach dem Viewport. Sonst stimmt das Raster
-     nur am Designer-Monitor und nicht in einem schmalen Panel daneben. */
-  container-type: inline-size;
-  container-name: lfh;
-}
-
-.lfh-flaeche *,
-.lfh-flaeche *::before,
-.lfh-flaeche *::after {
-  box-sizing: border-box;
-}
-
-/* Fokus-Ring in der BEDIENFARBE, nie in Signalrot (LFH-315). */
-.lfh-flaeche :focus-visible {
-  outline: 2px solid var(--lfh-bedien);
-  outline-offset: 2px;
-}
-
-/* ── Signatur 1 · Der Akzentstrich als Marke ───────────────────────────────
-   36 × 3 px mit Glühen — unverändert aus der Anmeldeseite übernommen. */
-.lfh-marke {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.lfh-marke__strich {
-  display: block;
-  width: 36px;
-  height: 3px;
-  flex: 0 0 auto;
-  background: var(--lfh-marke);
-  border-radius: var(--lfh-radius-marke);
-  box-shadow: var(--lfh-marke-glut);
-}
-
-.lfh-marke__name {
-  font-family: var(--lfh-schrift-display);
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 2px;
-}
-
-/* ── Signatur 2 · Die Sektionsmarke und der Zeilenmarker (DV 102) ──────────
-   ZWEI ACHSEN, GETRENNT GEHALTEN (LFH-395, WCAG 1.4.1). Bis dahin hing die
-   Stufe AUSSCHLIESSLICH an `border-bottom-color`; Breite, Höhe und Umriss
-   waren über alle drei Stufen gleich. Wer rot-grün-blind ist oder den
-   Fükw-Schirm im Sonnenlicht liest, bekam die Dringlichkeit nicht.
-
-   Seither trägt die FORMKLASSE (`--dreieck` / `--kreis` / `--balken`) die
-   Geometrie und die STUFENKLASSE (`--alarm` / `--achtung` / `--normal`) allein
-   die Farbe. Die Brücke ist `currentColor`, und sie ist nicht Bequemlichkeit:
-   das Dreieck färbt über `border-bottom-color`, Kreis und Balken über
-   `background` — ohne sie bräuchte jede Stufe DREI Regeln, je eine pro Form.
-   Dieselbe Bauform wie in `components/Tastenkuerzel.tsx`.
-
-   Die Basis trägt bewusst KEINE Geometrie: ein Marker ohne Formklasse soll
-   verschwinden statt als Dreieck durchzurutschen. Festgehalten in
-   `LageDashboardPage.test.tsx` („jeder Marker der Seite trägt eine
-   Formklasse") — sonst wäre der Ausfall spurlos, jsdom rechnet kein Layout. */
-.lfh-zeichen {
-  flex: 0 0 auto;
-  color: var(--lfh-bedien);
-}
-
-/* Warndreieck. Die höchste Stufe behält den Umriss, den die Marke seit je hat. */
-.lfh-zeichen--dreieck {
-  width: 0;
-  height: 0;
-  border-left: 5px solid transparent;
-  border-right: 5px solid transparent;
-  border-bottom: 9px solid currentColor;
-}
-/* Punkt — die ruhige Form, für den Normalfall. */
-.lfh-zeichen--kreis {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: currentColor;
-}
-/* Balken — dazwischen, und im Umriss von beiden anderen unterscheidbar. */
-.lfh-zeichen--balken {
-  width: 10px;
-  height: 3px;
-  background: currentColor;
-}
-
-.lfh-zeichen--alarm {
-  color: var(--lfh-alarm);
-}
-.lfh-zeichen--achtung {
-  color: var(--lfh-achtung);
-}
-.lfh-zeichen--normal {
-  color: var(--lfh-normal);
-}
 
 /* ── Signatur 3 · Zahlen als Instrument ────────────────────────────────────
    `tabular-nums` überall, wo fachlich gezählt oder verglichen wird. Ziffern-
@@ -137,247 +35,22 @@
   letter-spacing: 0;
 }
 
-.lfh-zahl--gross {
-  font-size: 20px;
-  font-weight: 600;
-  line-height: 1.1;
-}
-
 .lfh-zahl--mittel {
   font-size: 17px;
-  font-weight: 600;
-}
-
-/** Stärke in BOS-Schreibweise (1/3/18//22) — das größte Element ihrer Kachel. */
-.lfh-staerke {
-  font-size: 25px;
-  font-weight: 600;
-  line-height: 1.05;
-  letter-spacing: 0.5px;
-}
-
-/* ── Signatur 4 · Das Instrumentenband ─────────────────────────────────────
-   Die Größen, die im Einsatz nie fehlen dürfen — schmal, immer sichtbar,
-   immer an derselben Stelle. */
-.lfh-band {
-  display: flex;
-  align-items: center;
-  gap: var(--lfh-luft-4);
-  padding: var(--lfh-luft-2) var(--lfh-luft-3);
-  background: var(--lfh-flaeche);
-  border-bottom: 1px solid var(--lfh-linie-stark);
-  flex-wrap: wrap;
-}
-
-.lfh-band__wert {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-
-.lfh-band__titel {
-  font-family: var(--lfh-schrift-display);
-  font-size: 14px;
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.lfh-band__verbindung {
-  display: flex;
-  align-items: center;
-  gap: var(--lfh-luft-2);
-  margin-left: auto;
-}
-
-.lfh-puls {
-  width: 8px;
-  height: 8px;
-  flex: 0 0 auto;
-  border-radius: var(--lfh-radius-marke);
-  background: var(--lfh-normal);
-}
-
-.lfh-puls--alarm {
-  background: var(--lfh-alarm);
+  font-weight: 500;
 }
 
 /* ── Signatur 5 · Gesperrte Versalien als Metadaten-Stimme ─────────────────
    Der Unterschied zwischen Formular und Werkzeug. */
+/* Seit dem Neuentwurf die AUGENBRAUE: 10 px, 600, Sperrung .14em, `schwach` — dieselbe
+   Stimme wie `components/instrument/Augenbraue.tsx` (TS-Seite `schriftskala.augenbraue`). */
 .lfh-etikett {
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: var(--lfh-versal-sperrung);
+  font-size: var(--lfh-typo-augenbraue-groesse);
+  font-weight: var(--lfh-typo-augenbraue-gewicht);
+  letter-spacing: var(--lfh-typo-augenbraue-sperrung);
   text-transform: uppercase;
-  color: var(--lfh-gedaempft);
-  white-space: nowrap;
-}
-
-.lfh-zusatz {
-  font-size: 11.5px;
   color: var(--lfh-schwach);
-}
-
-.lfh-fussnote {
-  margin: 0;
-  font-size: 11.5px;
-  color: var(--lfh-gedaempft);
-}
-
-/* ── Kennzahlenleiste ──────────────────────────────────────────────────────
-   Kennzahlen tragen WORTLAUT, nicht nur Zähler („hoch" statt „3"). */
-.lfh-kennzahlen {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 1px;
-  background: var(--lfh-linie);
-  border-bottom: 1px solid var(--lfh-linie-stark);
-}
-
-.lfh-kz {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--lfh-luft-1);
-  padding: var(--lfh-luft-3);
-  /* GEMESSEN eine Nulländerung: der Inhalt (Etikett + Zahl + Zusatz, zwei gaps,
-     Polster rundum) ergibt bereits 81,9 / 99,9 / 119,9 px — die 62 px banden in
-     KEINER Stufe. Sie fallen trotzdem, weil ein harter Pixelwert hier als
-     Zusicherung gelesen wird, die er nie war; als Boden für künftig kürzere
-     Inhalte trägt die Staffel ihn besser. */
-  min-height: var(--lfh-zeilenhoehe);
-  background: var(--lfh-flaeche);
-  border: 0;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition: background var(--lfh-uebergang);
-}
-
-.lfh-kz:hover {
-  background: var(--lfh-flaeche-2);
-}
-
-/* Zweiter Kanal: eine Kante trägt die Stufe mit, nicht nur die Ziffernfarbe.
-   Die Kante ist ABGESTUFT (6 px Alarm gegen 3 px Achtung), weil die beiden
-   Stufen sich sonst ausschließlich in der Farbe unterschieden — WCAG 1.4.1
-   verlangt den zweiten Kanal nicht nur gegenüber „unauffällig", sondern
-   zwischen den bewerteten Stufen selbst.
-
-   AUSDRÜCKLICH NICHT über die Schriftgröße (LFH-329 · B1, Prüfliste Kriterium 6):
-   eine stufenabhängige Größe ließe die Zeile bei jedem Statuswechsel in der Höhe
-   springen — Festlegung 6 der Bedien-Leitlinie deckelt CLS bei 0,1 (WCAG 3.2.5).
-   Ein `inset`-Schatten kostet dagegen null Layout.
-
-   Und NICHT über das Schriftgewicht: gemessen in Chromium an der Kennzahl
-   „Kräfte F/UF/M//Σ" — Vorschubbreite bei 400/500 = 96,33 px, bei 600/700/800 =
-   96,00 px. Über 600 hinaus gibt es keinen Schnitt (`schriften.css` liefert von
-   LFH JetBrains Mono nur 400 und 600), und der Browser setzt keinen künstlichen
-   Fettdruck darauf. Die Zahl steht bereits auf 600 — nach oben ist der Kanal
-   also nachweislich leer, nicht bloß vermutlich. */
-.lfh-kz--alarm {
-  box-shadow: inset 6px 0 0 0 var(--lfh-alarm);
-}
-.lfh-kz--alarm .lfh-zahl--gross {
-  color: var(--lfh-alarm);
-}
-.lfh-kz--achtung {
-  box-shadow: inset 3px 0 0 0 var(--lfh-achtung);
-}
-.lfh-kz--achtung .lfh-zahl--gross {
-  color: var(--lfh-achtung);
-}
-
-/* ── Kachelraster ──────────────────────────────────────────────────────────
-   Umrissrahmen statt Erhebung: die Kachel ist eine Kartensignatur, kein Blatt
-   Papier, das über der Fläche schwebt. */
-.lfh-raster {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  padding: 8px;
-}
-
-.lfh-kachel {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  background: var(--lfh-flaeche);
-  border: 1px solid var(--lfh-linie-stark);
-  border-radius: var(--lfh-radius-flaeche);
-}
-
-.lfh-kachel--breit {
-  grid-column: 1 / -1;
-}
-
-.lfh-kachel__kopf {
-  display: flex;
-  align-items: center;
-  gap: var(--lfh-luft-2);
-  padding: var(--lfh-luft-2) var(--lfh-luft-3);
-  border-bottom: 1px solid var(--lfh-linie);
-}
-
-.lfh-kachel__titel {
-  margin: 0;
-  font-family: var(--lfh-schrift-display);
-  font-size: 11.5px;
-  font-weight: 600;
-  letter-spacing: var(--lfh-versal-sperrung);
-  text-transform: uppercase;
-}
-
-/* Der „Öffnen"-Verweis im Kachelkopf ist ein Knopf (er navigiert), soll aber
-   wie Text aussehen — sonst konkurriert er mit der eigentlichen Aktion.
-
-   STEHT BEWUSST VOR `.lfh-kachel__mehr`. Beide haben eine Klasse, also gleiche
-   Spezifität, und `font: inherit` ist eine KURZFORM: sie setzt font-size und
-   font-weight mit zurück. Solange dieser Block danach stand, waren die Angaben
-   in `.lfh-kachel__mehr` tot — gemessen rendete der Verweis mit 13,5 / 15 px bei
-   Gewicht 400 statt der dort verlangten 11,5 / 600, also GRÖSSER und DÜNNER als
-   der Kacheltitel über ihm. Überlebt hatten nur letter-spacing, text-transform
-   und color; die stehen nicht in der Kurzform. Wer hier sortiert, liest das. */
-.lfh-knopf-blank {
-  border: 0;
-  background: none;
-  padding: 0;
-  font: inherit;
-  cursor: pointer;
-}
-
-.lfh-kachel__mehr {
-  margin-left: auto;
-  /* Der EINZIGE Navigationsausgang jeder Dashboard-Kachel — und bis LFH-370 der
-     einzige ohne jede Mindesthöhe (gemessen 19,6 / 21,8 / 21,8 px, also schon in
-     der kompakten Stufe unter dem Gate-1-Boden von 24 px).
-     `inline-flex` + `align-items` sind nicht Zierde: ohne sie sitzt das Etikett
-     bei 72 px Höhe oben statt mittig. Die Polsterung gibt der waagerechten Achse
-     eine Fläche, die sonst die blosse Textbreite wäre. */
-  display: inline-flex;
-  align-items: center;
-  min-height: var(--lfh-zeilenhoehe);
-  padding: 0 var(--lfh-luft-2);
-  /* 11,5 px wie der Kacheltitel, nicht die 10,5 der Bestandsabsicht: die hat wegen
-     des Kaskadenfehlers oben nie gewirkt, gerendert wurden 13,5 / 15 px. Auf 10,5
-     zu gehen wäre für den einzigen Ausgang der Kachel eine echte Verschlechterung
-     gegenüber dem heutigen Bild. */
-  font-size: 11.5px;
-  font-weight: 600;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  color: var(--lfh-bedien);
-}
-
-.lfh-kachel__leib {
-  display: flex;
-  flex-direction: column;
-  gap: var(--lfh-luft-2);
-  padding: var(--lfh-luft-3);
-  flex: 1;
+  white-space: nowrap;
 }
 
 /* ── Werteblöcke ───────────────────────────────────────────────────────────── */
@@ -394,7 +67,7 @@
   flex-direction: column;
   gap: 2px;
   padding: var(--lfh-luft-2);
-  background: var(--lfh-flaeche-2);
+  background: var(--lfh-flaeche);
 }
 
 .lfh-feld--alarm .lfh-zahl {
@@ -402,151 +75,6 @@
 }
 .lfh-feld--achtung .lfh-zahl {
   color: var(--lfh-achtung);
-}
-
-.lfh-werte {
-  display: flex;
-  gap: var(--lfh-luft-4);
-  margin: 0;
-  flex-wrap: wrap;
-}
-
-.lfh-werte--liste {
-  flex-direction: column;
-  gap: var(--lfh-luft-1);
-}
-
-.lfh-werte > div {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.lfh-werte--liste > div {
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: var(--lfh-luft-3);
-  padding: 3px 0;
-  border-bottom: 1px solid var(--lfh-linie);
-}
-
-.lfh-werte--liste > div:last-child {
-  border-bottom: 0;
-}
-
-.lfh-werte dd {
-  margin: 0;
-  font-weight: 600;
-}
-
-/* ── Plaketten — Farbe IMMER mit Text, nie allein ──────────────────────────── */
-.lfh-plakette {
-  display: inline-flex;
-  align-items: center;
-  padding: 1px 7px;
-  border: 1px solid;
-  border-radius: var(--lfh-radius-steuer);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.3px;
-  white-space: nowrap;
-}
-
-.lfh-plakette--alarm {
-  color: var(--lfh-alarm);
-  border-color: var(--lfh-alarm);
-  background: var(--lfh-alarm-fuellung);
-}
-.lfh-plakette--achtung {
-  color: var(--lfh-achtung);
-  border-color: var(--lfh-achtung);
-  background: var(--lfh-achtung-fuellung);
-}
-.lfh-plakette--normal {
-  color: var(--lfh-normal);
-  border-color: var(--lfh-normal);
-  background: var(--lfh-normal-fuellung);
-}
-
-/* ── Ereigniszeilen ────────────────────────────────────────────────────────── */
-.lfh-zeilen {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.lfh-zeile {
-  display: flex;
-  align-items: center;
-  gap: var(--lfh-luft-2);
-  min-height: var(--lfh-zeilenhoehe);
-  padding: var(--lfh-luft-1) 0;
-  border-top: 1px solid var(--lfh-linie);
-  font-size: 13px;
-}
-
-.lfh-zeilen > .lfh-zeile:first-child,
-.lfh-zeilen > li:first-child > .lfh-zeile {
-  border-top: 0;
-}
-
-.lfh-zeile time {
-  color: var(--lfh-gedaempft);
-  font-size: 12px;
-  flex: 0 0 auto;
-}
-
-.lfh-zeile__text {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.lfh-zeile__quelle {
-  flex: 0 0 auto;
-  color: var(--lfh-schwach);
-  font-size: 11.5px;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-
-/* Eine Kurzlisten-Zeile, die auf ihren Datensatz springt (LFH-336).
-   Trägt `.lfh-zeile` und damit deren Boden (`--lfh-zeilenhoehe`) und Polsterung —
-   die zwei Angaben, die LFH-365 einem Bedienziel abverlangt, kommen aus der
-   Basisklasse und werden hier NICHT wiederholt. */
-a.lfh-zeile {
-  color: inherit;
-  text-decoration: none;
-}
-
-a.lfh-zeile:hover,
-a.lfh-zeile:focus-visible {
-  background: var(--lfh-flaeche-2);
-}
-
-/* Die laufende Nummer ist ein Ordnungsmerkmal, kein Fließtext — Ziffernbreite
-   fest, damit die Textspalte über alle Zeilen an derselben Stelle beginnt. */
-.lfh-zeile__nr {
-  flex: 0 0 auto;
-  font-variant-numeric: tabular-nums;
-  color: var(--lfh-schwach);
-  font-size: 12px;
-}
-
-/* Der Lageauszug ist Fließtext, nicht Instrument: er darf umbrechen, aber nicht
-   die Kachel sprengen. */
-.lfh-auszug {
-  margin: var(--lfh-luft-1) 0 0;
-  color: var(--lfh-gedaempft);
-  font-size: 13px;
-  line-height: 1.45;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-  overflow: hidden;
 }
 
 /* ── Datenzustände: LADEN, FEHLER und LEER sehen verschieden aus ───────────
@@ -562,7 +90,7 @@ a.lfh-zeile:focus-visible {
 .lfh-skelett__balken {
   height: 12px;
   width: 100%;
-  background: var(--lfh-linie);
+  background: var(--lfh-flaeche-3);
   animation: lfh-puls 1.4s ease-in-out infinite;
 }
 
@@ -584,141 +112,116 @@ a.lfh-zeile:focus-visible {
   }
 }
 
+/* Fehler als getönte Fläche — dieselbe Rolle wie die Statusfläche der Bausteine
+   (`--lfh-alarm-flaeche`, deckend). Die Innenteile trägt `SeitenZustand` inline. */
 .lfh-fehler {
   display: flex;
   gap: var(--lfh-luft-3);
   padding: var(--lfh-luft-3);
   border: 1px solid var(--lfh-alarm);
-  background: var(--lfh-alarm-fuellung);
+  background: var(--lfh-alarm-flaeche);
 }
 
-.lfh-fehler__zeichen {
-  flex: 0 0 auto;
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  border: 2px solid var(--lfh-alarm);
-  color: var(--lfh-alarm);
-  font-family: var(--lfh-schrift-display);
-  font-weight: 700;
-  font-size: 15px;
+/* ══ Bausteine des Neuentwurfs (`components/instrument/`) ═══════════════════
+   Nur, was inline nicht geht: `:hover`, `:focus-visible` und Regeln in
+   antd-Innereien. Geometrie und Farben der Zustände, die ein Test prüfen soll,
+   stehen als Inline-Stil in den Bausteinen (Vitest fährt mit `css: false`). */
+
+/* Kennzahl im Fugenraster: Grund hier, damit `:hover` ihn überschreiben kann. */
+.lfh-kennzahl {
+  background: var(--lfh-flaeche);
+  transition: background var(--lfh-uebergang);
+}
+.lfh-kennzahl--ziel {
+  cursor: pointer;
+}
+.lfh-kennzahl--ziel:hover {
+  background: var(--lfh-flaeche-2);
+}
+.lfh-kennzahl--ziel:focus-visible {
+  outline: 2px solid var(--lfh-bedien);
+  outline-offset: -2px;
 }
 
-.lfh-fehler__titel {
-  display: block;
-  color: var(--lfh-alarm);
-  font-size: 13px;
+/* Segmentleiste — Fugenraster auf `linie-stark`; aktiv `flaeche-2` + Text. */
+.lfh-segmente {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 1px;
+  background: var(--lfh-linie-stark);
+  border: 1px solid var(--lfh-linie-stark);
 }
-
-.lfh-fehler__text {
-  margin: 2px 0 var(--lfh-luft-2);
-  font-size: 12px;
-  color: var(--lfh-gedaempft);
-}
-
-.lfh-leer {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--lfh-luft-2);
-  padding: var(--lfh-luft-3) 0;
-}
-
-.lfh-leer__text {
+.lfh-segment {
   margin: 0;
-  font-size: 13px;
+  border: 0;
+  border-radius: 0;
+  background: var(--lfh-flaeche);
   color: var(--lfh-gedaempft);
-}
-
-/* Jeder Leerzustand führt zu einer Aktion (Bestand: 1 von 46). */
-.lfh-knopf {
-  padding: var(--lfh-luft-2) var(--lfh-luft-3);
-  /* Der eigentliche Fund der Datei: die 32 px BANDEN, gemessen 32/32/32 px über
-     alle drei Stufen. Jetzt 30 / 48 / 72. Die kompakte Stufe schrumpft dabei um
-     2 px — das ist der Stufenwert selbst und liegt über dem Gate-3-Boden 24. */
-  min-height: var(--lfh-zeilenhoehe);
-  border: 1px solid var(--lfh-bedien);
-  border-radius: var(--lfh-radius-steuer);
-  background: transparent;
-  color: var(--lfh-bedien);
-  font-family: inherit;
+  font-family: var(--lfh-schrift-text);
   font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.4px;
+  line-height: 1.2;
   cursor: pointer;
   transition:
     background var(--lfh-uebergang),
     color var(--lfh-uebergang);
 }
-
-.lfh-knopf:hover {
-  background: var(--lfh-bedien);
-  color: var(--lfh-grund);
+.lfh-segment:hover {
+  color: var(--lfh-text);
+}
+.lfh-segment--aktiv {
+  background: var(--lfh-flaeche-2);
+  color: var(--lfh-text);
+}
+/* Gesperrt: sichtbar, fokussierbar (der Grund steht im Tooltip), aber ohne Hover-Aufhellung.
+   Die Farbe ist nicht der einzige Kanal — `Segmentleiste` nennt den Grund. */
+.lfh-segment[aria-disabled='true'],
+.lfh-segment[aria-disabled='true']:hover {
+  color: var(--lfh-schwach);
+  cursor: not-allowed;
+}
+/* Nach innen versetzt: im Fugenraster läge ein äußerer Ring unter dem Nachbarsegment. */
+.lfh-segment:focus-visible {
+  position: relative;
+  z-index: 1;
+  outline: 2px solid var(--lfh-bedien);
+  outline-offset: -2px;
 }
 
-/* Bewegung nur mit Bedeutung — und nie erzwungen. */
-@media (prefers-reduced-motion: reduce) {
-  .lfh-flaeche *,
-  .lfh-flaeche *::before,
-  .lfh-flaeche *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
+/* Schnellerfassungszeile: die ZEILE trägt Rahmen und Grund, das Feld darin nicht.
+   Drei Klassen tief, damit antds `:where()`-gekapselte Feldregeln (bis 0,2,0 samt
+   `:focus`) unterliegen, ohne `!important`. */
+.lfh-schnellerfassung .lfh-schnellerfassung__feld .ant-input,
+.lfh-schnellerfassung .lfh-schnellerfassung__feld .ant-input-affix-wrapper,
+.lfh-schnellerfassung .lfh-schnellerfassung__feld .ant-input:focus,
+.lfh-schnellerfassung .lfh-schnellerfassung__feld .ant-input-affix-wrapper:focus-within {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  color: var(--lfh-text);
+  font-size: 14px;
+}
+.lfh-schnellerfassung:focus-within {
+  outline: 1px solid var(--lfh-bedien);
+  outline-offset: 0;
 }
 
-/* ── Schmale Schirme ───────────────────────────────────────────────────────
-   Schwellen an den Einsatzkontexten: > 1100 px Fükw (13–15"), 700–1100 px
-   Führungs-Tablet, < 700 px mobil. Die Staffel selbst gehört A1 (LFH-327).
-
-   DIE ZAHLEN SIND CONTAINER-BREITEN, NICHT VIEWPORT-BREITEN. Gemessen wird
-   `.lfh-flaeche` (`container-type: inline-size`, oben in dieser Datei), also die
-   Fläche, die dem Inhalt nach Abzug von Navigationsrahmen und Seitenrinne bleibt.
-   Im Browser nachgemessen (LFH-329 · B1, Chromium, `e2e/lage-dashboard-schmal.spec.ts`):
-   Viewport 1366 → Container 1036 · 1024 → 694 · 390 → 366.
-
-   WARUM 1100 UND NICHT WENIGER: sechs Spalten brauchen mindestens ~1036 px
-   Container, sonst läuft das längste Etikett aus seinem Knopf. Gemessen mit
-   erzwungenen sechs Spalten: Container 950 → 14 px Überlauf, Container 1036 →
-   0 px. Eine Schwelle bei 1000 (so der ursprüngliche Entwurf) gäbe also genau
-   dem Band 1000–1036 sechs Spalten mit abgeschnittenen Etiketten — und
-   abgeschnittene Etiketten sind im Einsatz schlimmer als eine zweite Zeile.
-   1100 lässt die nötige Luft. Wer die Zahl senkt, misst vorher neu; der Pin in
-   `pages/lage-dashboard/LageDashboardPage.test.tsx` färbt eine stille Senkung rot. */
-@container lfh (max-width: 1100px) {
-  .lfh-kennzahlen {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-  .lfh-raster {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+/* Katalogtabelle / Datensicht (`components/KatalogTabelle.tsx`). Farben, Trenner und
+   Zellpolster kommen als antd-Komponententokens (`tabellenTokens`); hier steht nur die
+   Kopfzeilen-TYPOGRAFIE und die Mono-Spalte. `.ant-table-wrapper.lfh-katalog` hebt die
+   Spezifität über antds (0,2,2) — die Regel hinge sonst an der Einfügereihenfolge. */
+.ant-table-wrapper.lfh-katalog .ant-table-thead > tr > th {
+  font-family: var(--lfh-schrift-text);
+  font-size: var(--lfh-typo-augenbraue-groesse);
+  font-weight: var(--lfh-typo-augenbraue-gewicht);
+  /* .12em statt der .14em der Augenbraue: so steht es im Tabellenkopf des Entwurfs
+     (S6/S7); die engere Sperrung spart in schmalen Spalten eine Zeile. */
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  border-bottom-color: var(--lfh-linie);
 }
-
-@container lfh (max-width: 700px) {
-  .lfh-kennzahlen {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .lfh-raster {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  /* Abgeschnittene Etiketten sind im Einsatz schlimmer als eine zweite Zeile. */
-  .lfh-etikett {
-    white-space: normal;
-  }
-  /* Die Quelle rutscht unter den Text, statt ihm die Breite zu nehmen. */
-  .lfh-zeile {
-    flex-wrap: wrap;
-    row-gap: 0;
-  }
-  .lfh-zeile__text {
-    flex: 1 1 100%;
-    order: 3;
-    white-space: normal;
-  }
-  .lfh-zeile__quelle {
-    margin-left: auto;
-  }
+.ant-table-wrapper.lfh-katalog td.lfh-zahl-spalte {
+  font-family: var(--lfh-schrift-zahl);
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── Zählzeile in einer Tabellenzelle (LFH-330 · B2) ───────────────────────

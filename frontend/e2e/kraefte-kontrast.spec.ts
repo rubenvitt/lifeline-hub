@@ -260,152 +260,137 @@ for (const modus of ['light', 'dark']) {
   });
 }
 
-// ── Kräfteübersicht und Verdichtungszeile (LFH-515, Nachzug zu LFH-338 · C3, Kriterium 5) ──
-//
-// WAS DIE PRÜFLISTE OFFEN LIESS: sie belegte, dass alle Farben aus dem Vertrag kommen
-// (`rollenFarbe`/`statusKategorie`, 0 Farbliterale per Grep) — nicht, welchen Kontrast diese
-// Rollen auf ihrem tatsächlichen Grund erreichen. „Kommt aus dem Vertrag" ist keine Messung:
-// eine Rolle kann auf Kartengrund bestehen und auf Seitengrund durchfallen, und im
-// Nachtmodus gilt ein anderes Farbpaar. jsdom rechnet keine Farbmischung, deshalb hier.
+// ── Meldebild und Verdichtungszeile (LFH-515, Nachzug zu LFH-338 · C3, Kriterium 5) ──
 //
 // DERSELBE MESSKERN wie oben ({@link kontrastVon}) — komponierte Grundfläche über alle
 // Elternlagen, Alpha eingerechnet, Ablehnung statt Scheinpräzision bei Verläufen und
-// Gruppen-Opacity. Sein Selbstbeweis steht im ersten Test dieser Datei und gilt damit für
-// beide Flächenpaare. Eine zweite Kopie in einer eigenen Datei wäre ein Messkern, der an
-// zwei Orten verschieden rechnet — und machte beide Nachweise wertlos.
+// Gruppen-Opacity. Eine zweite Kopie in einer eigenen Datei wäre ein Messkern, der an zwei
+// Orten verschieden rechnet.
 //
-// ZWEI GRÜNDE, NICHT EINER — und genau darin liegt der Nachweis: die Kopf-Statuszahlen der
-// Kräfteübersicht stehen auf KARTENGRUND (`Card`), die drei derselben Rollen in der
-// Verdichtungszeile auf SEITENGRUND (`Space` ohne Karte). Beide zu messen ist der Punkt;
-// eine Messung auf nur einer Fläche behauptete die andere mit.
+// ZWEI FLÄCHEN, NICHT EINE:
 //
-// KEIN RANDKONTRAST hier, anders als beim Etikett oben: diese Zahlen sind nackter Text in
-// einer Zeile, kein umrandetes Feld. `randKontrast` gegen einen nicht vorhandenen Rahmen
-// wäre eine Zahl ohne Gegenstand.
+// (1) DAS STATUSBAND DES MELDEBILDS (Neuentwurf S6, 21.09.2026). Bis dahin standen hier die
+//     Kopf-Statuszahlen der Kräfteübersicht als Rollenfarbe auf KARTENGRUND — und verfehlten
+//     im Hellmodus die 7 : 1 in allen Werten (LFH-538, Messwerte 11.09.2026: 6,78–6,94). Das
+//     Band stellt seine Zellen seit der Nacharbeit vom 22.09.2026 auf die NEUTRALE Fläche
+//     (`flaeche`) und trägt den Ton nur im 8-px-Quadrat und in der Zahl; die Textfarben
+//     stehen in `kraefte/statusbandStil.ts` (Tag: normalText 9,18 · achtung/alarm tragen
+//     `text` 18,47, Wort `gedaempft` 8,42; Nacht: 10,92 · 11,75 · 6,77, Wort 7,27). Deshalb
+//     wird hier in BEIDEN Modi der Zielwert HART zugesichert — für diese Fläche ist LFH-538
+//     mit dem Umbau eingelöst.
 //
-// ── GEMESSEN (11.09.2026, erster Lauf) ──────────────────────────────────────────────
+// (2) DIE VERDICHTUNGSZEILE der Kräfte-Modulseiten auf SEITENGRUND: unverändert Rolle auf
+//     Text, im Hellmodus weiter unter 7 (LFH-538 offen) — dort steht die absolute
+//     Untergrenze, der Zielwert steht in jeder Meldung. `soft`, damit ein Lauf alle Werte
+//     meldet statt am ersten abzubrechen.
 //
-//   Textfarben: normal rgb(28,102,64) · achtung rgb(122,82,0) · alarm rgb(176,35,24)
-//
-//   hell,   Kopf auf rgb(255,255,255)   frei 6,94 · gebunden 6,92 · n. einsatzbereit 6,78
-//   hell,   Zeile auf rgb(231,235,240)  frei 5,80 · gebunden 5,78 · n. verf.         5,66
-//   dunkel, Kopf auf rgb(22,28,37)      frei 6,02 · gebunden 7,22 · n. einsatzbereit 5,20
-//   dunkel, Zeile auf rgb(11,14,19)     frei 6,80 · gebunden 8,16 · n. verf.         5,87
-//
-// DER BEFUND, und er ist der Grund, warum dieser Nachweis gefehlt hat: der **Nachtmodus
-// hält** seine Grenze (5 : 1) in allen sechs Werten, der **Hellmodus verfehlt** seine
-// (7 : 1) in allen sechs — auf reinem Kartenweiß im besten Fall mit 6,94, auf Seitengrund
-// mit 5,66. „Tag" in Kriterium 5 meint den TAG, nicht das antd-`Tag`: die Schwellen sind
-// hell ≥ 7 : 1 / Nacht ≥ 5 : 1 (so auch `betroffene-kontrast.spec.ts:86`).
-//
-// Der Fehlbetrag ist eine Eigenschaft der **Rollen-Tokens als Textfarbe**, nicht dieser
-// beiden Seiten — auf reinem Weiß bleiben alle drei Rollen unter 7. Genau deshalb legt
-// `StatusTag` (LFH-446) die Rolle auf den RAND und die Beschriftung in `token.colorText`:
-// dort wird die Grenze erreicht. Die Kopfzahlen und die Verdichtungszeile sind die beiden
-// Flächen, die die Rolle direkt auf den Text legen.
-//
-// HIER NICHT BEHOBEN, und das ist eine Entscheidung: jede Lösung hat Breitenwirkung —
-// entweder die Rollen-Tokens im Hellmodus abdunkeln (das trifft JEDEN `rollenFarbe`-
-// Konsumenten, auch Ränder und Punkte, wo 3 : 1 genügt) oder die zwei Flächen auf die
-// `StatusTag`-Bauform umstellen. Beides ist eine Gestaltungsentscheidung mit eigenem
-// Ticket (**LFH-538**), kein Nebenprodukt eines Messungs-Nachzugs — dieselbe Trennung, die
-// LFH-378/B5g für eine Bedienentscheidung im Härtungs-Ticket gezogen hat. Die Schranke
-// unten steht deshalb auf der absoluten Untergrenze und NENNT den verfehlten Zielwert in
-// jeder Meldung, statt ihn wegzulassen.
-//
-// WARUM NICHT EINFACH `expect.soft` AUF 7 DANEBEN: eine Zusicherung, die bei jedem Lauf
-// rot meldet, wird nach zwei Wochen überlesen — und `pnpm e2e` bräche ab Tag eins (AK:
-// „der Spec läuft in `pnpm e2e` mit und ist grün"). Der Befund gehört an eine Stelle, die
-// jemand liest: in dieses Ticket, in die Meldung jeder Messung und in die Prüfliste.
-//
-// MUTATIONSPROBE (Akzeptanzkriterium), am 11.09.2026 mit zwei temporären Kopien gefahren,
-// beide Male danach zurückgedreht und byte-gleich verglichen. Weil die zwei Modi auf
-// VERSCHIEDENEN Schranken stehen, braucht jeder seine eigene Probe — eine einzige hätte nur
-// einen der beiden Zweige belegt:
-//  - Textfarbe vor der Messung auf `rgb(200,200,200)` gesetzt: der HELL-Test rot in allen
-//    sechs Werten (1,67 auf Kartengrund, 1,40 auf Seitengrund), der Nacht-Test blieb
-//    zu Recht grün — auf dunklem Grund ist dieses Grau kontrastreich.
-//  - Textfarbe auf `rgb(60,66,75)` gesetzt: der NACHT-Test rot in allen sechs Werten
-//    (1,69 bzw. 1,91 : 1, „Ziel ≥ 5"), der Hell-Test zu Recht grün.
-//    Damit ist auch die harte Nachtschranke als wirksam belegt und nicht nur behauptet.
+// KEIN RANDKONTRAST: beides sind Textflächen ohne Rahmen; der Farbpunkt im Band ist Zierde
+// neben einem Code UND einem Wort, kein alleiniger Bedeutungsträger.
 
 /** Absolute Untergrenze aus Kriterium 5 („nie < 4,5 : 1"), als Literal. */
 const BODEN = 4.5;
-/**
- * Zielwert je Modus aus Kriterium 5 (hell ≥ 7 : 1, Nacht ≥ 5 : 1), als Literale.
- * `dark` wird HART zugesichert (der Bestand hält ihn), `light` steht heute nur in der
- * Meldung — siehe LFH-538 im Block darüber.
- */
+/** Zielwert je Modus aus Kriterium 5 (hell ≥ 7 : 1, Nacht ≥ 5 : 1), als Literale. */
 const ZIEL = { light: 7, dark: 5 } as const;
 
-/** Die drei Statusrollen, wie sie in Kopf und Zeile ausgeschrieben stehen. */
-const KOPF_ZAHLEN = [/^\d+ frei$/, /^\d+ gebunden$/, /^\d+ n\. einsatzbereit$/];
+/** Die drei Statusrollen, wie sie in der Verdichtungszeile ausgeschrieben stehen. */
 const ZEILEN_ZAHLEN = [/^\d+ frei$/, /^\d+ gebunden$/, /^\d+ n\. verf\.$/];
 
+/** Die drei Kategorien des Fahrzeugkatalogs und der Ton, den das Band ihnen gibt. */
+const BAND_TOENE = [
+  { kategorie: 'verfuegbar', ton: 'normal' },
+  { kategorie: 'gebunden', ton: 'achtung' },
+  { kategorie: 'nicht_verfuegbar', ton: 'alarm' },
+] as const;
+
 for (const modus of ['light', 'dark'] as const) {
-  test(`Kräfteübersicht: Kopf-Statuszahlen und Verdichtungszeile im Modus ${modus}`, async ({
-    page,
-  }) => {
+  test(`Meldebild: Statusband und Verdichtungszeile im Modus ${modus}`, async ({ page }) => {
     test.setTimeout(90_000);
     await anmelden(page);
     const einsatzId = await post(page, '/api/einsaetze', {
       bezeichnung: `E2E 515 Kontrast ${Date.now()}`,
     });
     const basis = `/api/einsaetze/${einsatzId}`;
-    // Ohne Daten rendert die Verdichtungszeile `null` (Datenriegel) — die Messung liefe auf
-    // einem Leerzustand. Die Fahrzeugachse des Kopfes steht dagegen auch bei lauter Nullen.
+    // Ohne Daten rendert die Verdichtungszeile `null` (Datenriegel) und das Band nur einen
+    // Leerzustand — die Messung liefe ins Nichts.
     await post(page, `${basis}/personal`, { adhoc: { name: 'Messkraft 515' } });
-    await post(page, `${basis}/fahrzeuge`, {
-      adhoc: { funkrufname: 'Florian Musterstadt 3/44-1' },
-    });
+
+    // Je Kategorie ein Fahrzeug mit einem Katalogstatus dieser Kategorie — sonst stünde im
+    // Band nur der Default-Status neuer Dispositionen, und zwei der drei Töne blieben
+    // ungemessen.
+    const katalogAntwort = await page.request.get('/api/fahrzeug-status');
+    expect(katalogAntwort.ok(), await katalogAntwort.text()).toBeTruthy();
+    const katalog = (await katalogAntwort.json()) as { id: number; kategorie: string }[];
+    for (const [i, { kategorie }] of BAND_TOENE.entries()) {
+      const status = katalog.find((k) => k.kategorie === kategorie);
+      expect(status, `Katalog ohne Status der Kategorie ${kategorie}`).toBeDefined();
+      const id = await post(page, `${basis}/fahrzeuge`, {
+        adhoc: { funkrufname: `Florian Musterstadt 3/44-${i + 1}` },
+      });
+      const r = await page.request.patch(`${basis}/fahrzeuge/${id}`, {
+        data: { status_id: status!.id },
+      });
+      expect(r.ok(), await r.text()).toBeTruthy();
+    }
 
     await page.evaluate((m) => localStorage.setItem('lifeline-hub.theme', m), modus);
 
     const messwerte: Record<string, unknown>[] = [];
 
-    /** Misst die benannten Zeilenstücke und prüft Boden und Zielwert. */
-    async function misst(flaeche: string, muster: RegExp[]) {
-      for (const m of muster) {
-        const ziel = page.getByRole('main').getByText(m);
-        // Genau ein Knoten: `getByText` trifft den kleinsten Container, und eine Menge
-        // stumm zu mitteln verschwiege den schlechtesten Wert.
-        await expect(ziel, `${flaeche} ${m}: genau ein Knoten`).toHaveCount(1);
-        // Kein Hovergrund aus einer vorangegangenen Bewegung in die Messung mischen.
-        await page.mouse.move(0, 0);
-        const werte = await kontrastVon(ziel);
-        const kontext = `${modus}, ${flaeche}, ${m}: Text ${werte.text} auf rgb(${werte.grund}) = ${werte.textKontrast.toFixed(2)} : 1 (Ziel ≥ ${ZIEL[modus]}, absolute Untergrenze ${BODEN})`;
-        messwerte.push({ modus, flaeche, muster: String(m), ...werte });
-        // Im NACHTMODUS wird der Zielwert hart zugesichert — der Bestand hält ihn, und
-        // eine Schranke unterhalb des Erreichten ließe eine Verschlechterung durch.
-        // Im HELLMODUS steht heute die absolute Untergrenze, weil der Zielwert
-        // bestandsseitig verfehlt wird (LFH-538, Messwerte im Block oben); der Zielwert
-        // steht trotzdem in jeder Meldung. `soft`, damit ein Lauf ALLE sechs Werte meldet
-        // statt am ersten abzubrechen — bei einer Palettenänderung will man die ganze
-        // Tabelle sehen, nicht eine Zeile davon.
-        expect
-          .soft(werte.textKontrast, kontext)
-          .toBeGreaterThanOrEqual(modus === 'dark' ? ZIEL.dark : BODEN);
-      }
+    async function pruefe(ziel: Locator, flaeche: string, beschreibung: string, schranke: number) {
+      await page.mouse.move(0, 0);
+      const werte = await kontrastVon(ziel);
+      const kontext = `${modus}, ${flaeche}, ${beschreibung}: Text ${werte.text} auf rgb(${werte.grund}) = ${werte.textKontrast.toFixed(2)} : 1 (Ziel ≥ ${ZIEL[modus]}, absolute Untergrenze ${BODEN})`;
+      messwerte.push({ modus, flaeche, beschreibung, ...werte });
+      expect.soft(werte.textKontrast, kontext).toBeGreaterThanOrEqual(schranke);
     }
 
-    // (1) KARTENGRUND — der Statuskopf der Kräfteübersicht.
+    // (1) STATUSBAND — Zahl und Wort je Ton, auf der neutralen Zellfläche (Nacharbeit
+    // 22.09.2026: der Ton steht nur noch im Quadrat und in der Zahl). Die Zellen sind seit
+    // dem Umbau `Kennzahl`-Bausteine: Marke `kennzahl` mit `data-ton`, Zahl `kennzahl-wert`,
+    // das Wort ist die Notiz (`kennzahl-notiz`).
     await page.goto(`/einsaetze/${einsatzId}/kraefteuebersicht`);
     await expect(page.locator('html')).toHaveAttribute('data-theme', modus);
     await expect(page.getByRole('region', { name: 'Meldebild' })).toHaveCount(1);
-    await misst('Kopf (Kartengrund)', KOPF_ZAHLEN);
+    const band = page.getByRole('region', { name: 'Fahrzeuge je Status' });
+    for (const { ton } of BAND_TOENE) {
+      // `.first()` ist hier KEINE Mittelung: mehrere Katalogstatus derselben Kategorie
+      // tragen dieselbe Fläche und dieselbe Textfarbe, das Paar ist also eines.
+      const zelle = band.locator(`[data-lfh="kennzahl"][data-ton="${ton}"]`).first();
+      await expect(zelle, `Bandzelle mit Ton ${ton}`).toHaveCount(1);
+      await pruefe(
+        zelle.locator('[data-lfh="kennzahl-wert"]'),
+        'Statusband',
+        `Zahl ${ton}`,
+        ZIEL[modus],
+      );
+      await pruefe(
+        zelle.locator('[data-lfh="kennzahl-notiz"]'),
+        'Statusband',
+        `Wort ${ton}`,
+        ZIEL[modus],
+      );
+    }
 
     // (2) SEITENGRUND — dieselben drei Rollen in der Verdichtungszeile.
     await page.goto(`/einsaetze/${einsatzId}/fahrzeuge`);
     await expect(page.locator('html')).toHaveAttribute('data-theme', modus);
-    await expect(page.getByRole('link', { name: 'Kräfteübersicht', exact: true })).toHaveCount(1);
-    await misst('Verdichtungszeile (Seitengrund)', ZEILEN_ZAHLEN);
+    await expect(page.getByRole('link', { name: 'Meldebild', exact: true })).toHaveCount(1);
+    for (const m of ZEILEN_ZAHLEN) {
+      const ziel = page.getByRole('main').getByText(m);
+      await expect(ziel, `Verdichtungszeile ${m}: genau ein Knoten`).toHaveCount(1);
+      await pruefe(
+        ziel,
+        'Verdichtungszeile (Seitengrund)',
+        String(m),
+        modus === 'dark' ? ZIEL.dark : BODEN,
+      );
+    }
 
-    // Die Gründe müssen sich unterscheiden — sonst hat (2) nur (1) wiederholt und der
-    // ganze Zweitnachweis wäre eine Abschrift.
+    // Die Gründe müssen sich unterscheiden — sonst hat (2) nur (1) wiederholt.
     const gruende = new Set(messwerte.map((w) => String(w.grund)));
     expect(
       gruende.size,
-      `Karten- und Seitengrund sind zwei Flächen: ${[...gruende]}`,
+      `Band- und Seitengrund sind verschiedene Flächen: ${[...gruende]}`,
     ).toBeGreaterThan(1);
 
     await test.info().attach('kontrastwerte.json', {

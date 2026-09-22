@@ -1,6 +1,7 @@
-import { App, Button, Popconfirm, Space, Tag, type TableColumnsType } from 'antd';
+import { App, Button, Popconfirm, Space, type TableColumnsType } from 'antd';
 import { Link } from 'react-router';
 import AdminPage from '../components/AdminPage';
+import { StatusChip, monoStil } from '../components/instrument';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle from '../components/KatalogTabelle';
 import { SeitenFehler } from '../components/SeitenZustand';
@@ -68,12 +69,25 @@ export default function FahrzeugeTab() {
        * betrifft ausschliesslich `Datensicht`, wo Zeilenklick und Link gleichzeitig feuern
        * könnten.
        */
-      render: (_, f) => <Link to={fahrzeugDetailPfad(f.id)}>{f.funkrufname}</Link>,
+      render: (_, f) => (
+        <Link to={fahrzeugDetailPfad(f.id)} style={monoStil(13)}>
+          {f.funkrufname}
+        </Link>
+      ),
     },
     { title: 'Typ', dataIndex: 'fahrzeugtyp', key: 'fahrzeugtyp', render: (t) => t ?? '—' },
     { title: 'Träger', dataIndex: 'traegerorganisation', key: 'traeger', render: (t) => t ?? '—' },
-    { title: 'Kennzeichen', dataIndex: 'kennzeichen', key: 'kennzeichen', render: (t) => t ?? '—' },
-    { title: 'Stärke', key: 'staerke', render: (_, f) => staerkeText(f) },
+    {
+      title: 'Kennzeichen',
+      dataIndex: 'kennzeichen',
+      key: 'kennzeichen',
+      render: (t) => (t ? <span style={monoStil(12)}>{t}</span> : '—'),
+    },
+    {
+      title: 'Stärke',
+      key: 'staerke',
+      render: (_, f) => <span style={monoStil(12)}>{staerkeText(f)}</span>,
+    },
     {
       title: 'Status',
       key: 'dienststatus',
@@ -99,9 +113,9 @@ export default function FahrzeugeTab() {
       onFilter: (wert, f) => f.dienststatus === String(wert),
       render: (_, f) =>
         f.dienststatus === 'in_dienst' ? (
-          <Tag color="green">in Dienst</Tag>
+          <StatusChip ton="normal" wort="in Dienst" />
         ) : (
-          <Tag>außer Dienst</Tag>
+          <StatusChip ton="neutral" wort="außer Dienst" />
         ),
     },
     ...(istAdmin

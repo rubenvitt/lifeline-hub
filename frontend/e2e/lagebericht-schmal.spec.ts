@@ -138,7 +138,13 @@ for (const pfad of ['lageberichte', 'lagemeldungen'] as const) {
     if (pfad === 'lagemeldungen') await lagemeldungAnlegen(page, einsatzId!);
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(`/einsaetze/${einsatzId}/${pfad}`);
-    await expect(page.getByRole('heading', { level: 3 })).toBeVisible();
+    // Seitenkopf des Neuentwurfs: der Titel ist das h1 der `EinsatzSeite`-Kopfleiste.
+    await expect(
+      page.getByRole('heading', {
+        level: 1,
+        name: pfad === 'lageberichte' ? 'Lageberichte' : 'Lagerelevante Meldungen',
+      }),
+    ).toBeVisible();
     // Der gesäte Datensatz als Anker: eine leere Seite hätte trivial keinen Überlauf.
     await expect(
       page.getByText(

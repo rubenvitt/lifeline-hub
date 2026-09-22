@@ -1,19 +1,10 @@
-import {
-  App,
-  Button,
-  Collapse,
-  Form,
-  Input,
-  Popconfirm,
-  Space,
-  Tag,
-  type TableColumnsType,
-} from 'antd';
+import { App, Button, Collapse, Form, Input, Popconfirm, Space, type TableColumnsType } from 'antd';
 import KatalogTabelle from '../components/KatalogTabelle';
 import { ErfassungsModal } from '../components/Erfassung';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { Select } from '../components/Select';
 import AdminPage from '../components/AdminPage';
+import { StatusChip, monoStil } from '../components/instrument';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Navigate } from 'react-router';
@@ -123,16 +114,21 @@ export default function BenutzerPage() {
       title: 'Benutzername',
       dataIndex: 'benutzername',
       key: 'benutzername',
-      render: (t) => `@${t}`,
+      // Kennung in Mono (Neuentwurf: Kennungen immer Mono).
+      render: (t) => <span style={monoStil(13)}>@{t}</span>,
     },
     {
       title: 'Rollen',
       key: 'rollen',
       render: (_, b) => (
-        <Space size={4}>
-          {b.system_rolle === 'admin' && <Tag color="gold">Admin</Tag>}
-          {b.org_rolle === 'fuehrungskraft' && <Tag color="blue">Führungskraft</Tag>}
-          {b.system_rolle !== 'admin' && b.org_rolle !== 'fuehrungskraft' && <Tag>Benutzer</Tag>}
+        // Rollen sind Zuordnungen, keine Zustände: neutrale Chips, das Wort trägt die Aussage.
+        // Gold/Blau des Bestands dichteten ihnen eine Statusbedeutung an (Blau = Bedienung).
+        <Space size={4} wrap>
+          {b.system_rolle === 'admin' && <StatusChip ton="neutral" wort="Admin" />}
+          {b.org_rolle === 'fuehrungskraft' && <StatusChip ton="neutral" wort="Führungskraft" />}
+          {b.system_rolle !== 'admin' && b.org_rolle !== 'fuehrungskraft' && (
+            <StatusChip ton="neutral" wort="Benutzer" />
+          )}
         </Space>
       ),
     },
@@ -147,7 +143,12 @@ export default function BenutzerPage() {
         { text: 'deaktiviert', value: false },
       ],
       onFilter: (wert, b) => b.aktiv === wert,
-      render: (_, b) => (b.aktiv ? <Tag color="green">aktiv</Tag> : <Tag>deaktiviert</Tag>),
+      render: (_, b) =>
+        b.aktiv ? (
+          <StatusChip ton="normal" wort="aktiv" />
+        ) : (
+          <StatusChip ton="neutral" wort="deaktiviert" />
+        ),
     },
     {
       title: 'Aktionen',

@@ -53,9 +53,11 @@ import type { EinsatzAnzeige } from '../src/api/types';
  *
  * ── WARUM `page.route` STATT SEEDING ─────────────────────────────────────────────────
  *
- * Ein Layout-Shift hängt an der ZAHL der Kacheln: das Raster ist bei 960 px Seitenbreite
- * (`flaeche.seiteBreit`) und 260 px Kachel-Mindestbreite (`flaeche.kachelMin`) drei
- * Spalten breit, drei Skelette füllen also genau eine Reihe. Die Suite legt in DERSELBEN
+ * Ein Layout-Shift hängt an der ZAHL der Kacheln: seit dem Neuentwurf (22.09.2026) füllt
+ * die Seite die ganze Inhaltsbreite (vorher gedeckelt auf 960 px, `flaeche.seiteBreit`,
+ * entfallen); bei 260 px Kachel-Mindestbreite (`flaeche.kachelMin`) ist das Raster am
+ * Fükw-Schirm (1366 px) im Browser gemessen VIER Spalten breit (vorher drei). Drei
+ * Skelette füllen weiterhin genau eine Reihe. Die Suite legt in DERSELBEN
  * Datenbank parallel Einsätze an (`gate3-trefflaeche.spec.ts` sät acht, `kernfluss` und
  * `command-palette` weitere) — mit echtem Seeding wäre die Kachelzahl und damit der
  * Messwert eine Funktion der Nachbarspecs. Interzipiert wird ausschließlich
@@ -536,7 +538,7 @@ test('Einsatzauswahl: der Ladewechsel Skelett → Karten hält den Kachelboden u
   // Die drei Skelettkacheln stehen unbedingt (`EinsaetzePage.tsx`, kein `&&` davor) — und
   // sie stehen STILL, solange das Tor zu ist. Ohne das fiel diese Messung unter Last aus
   // (siehe `ladeTor`).
-  const skelettHoehe = await kachelnHaltenBoden(page, '.ant-card', 'Skelett-Kachel', 3);
+  const skelettHoehe = await kachelnHaltenBoden(page, '.lfh-einsatzkachel', 'Skelett-Kachel', 3);
 
   // Das Suchfeld darf hier NICHT erscheinen — sonst misst dieser Test den Einschub aus
   // Test 2 mit und die beiden Aussagen wären nicht mehr trennbar.
@@ -544,7 +546,7 @@ test('Einsatzauswahl: der Ladewechsel Skelett → Karten hält den Kachelboden u
   oeffne();
   await kartenStehen(page, liste[0].bezeichnung);
   await expect(page.getByLabel('Einsätze durchsuchen')).toHaveCount(0);
-  const kartenHoehe = await kachelnHaltenBoden(page, '.ant-card', 'Einsatzkarte', 2);
+  const kartenHoehe = await kachelnHaltenBoden(page, '.lfh-einsatzkachel', 'Einsatzkarte', 2);
   // Der Knoten unter dem Raster muss wirklich stehen, sonst hat ein Shift dort keine Quelle.
   await expect(page.getByRole('link', { name: liste[2].bezeichnung, exact: true })).toHaveCount(1);
 
@@ -576,8 +578,9 @@ test('Einsatzauswahl: der Ladewechsel mit Suchfeld und drei Rasterreihen bleibt 
 
   // Genau `SUCHE_AB` aktive Einsätze. Damit ändert der Ladewechsel den Seitenaufbau an
   // ZWEI Stellen zugleich: das Suchfeld erscheint ÜBER dem Raster, und das Raster selbst
-  // wächst von einer Skelettreihe auf drei Kartenreihen (acht Karten plus Anlegen-Kachel
-  // bei drei Spalten). Beide schieben denselben Rasterknoten, die gemessenen 0.0204 lassen
+  // wächst von einer Skelettreihe auf drei Kartenreihen (acht Karten plus Anlegen-Kachel;
+  // bei vier Spalten seit der vollen Breite 4 + 4 + 1, gemessen wurden die 0.0204 noch bei
+  // drei Spalten). Beide schieben denselben Rasterknoten, die gemessenen 0.0204 lassen
   // sich also nicht auf eine der Ursachen aufteilen — siehe `LADEWECHSEL_DECKEL`.
   // Das ist ein ECHTER Shift und kein Nullwert: der Test belegt, dass er im Budget bleibt,
   // nicht dass es ihn nicht gibt.

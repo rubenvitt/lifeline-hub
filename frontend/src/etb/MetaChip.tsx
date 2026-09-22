@@ -163,8 +163,8 @@ export default function MetaChip({
       <Dropdown
         trigger={['click']}
         /*
-         * `autoFocus` aus demselben Grund wie an der Aktionsspalte in `EtbTabelle.tsx`
-         * und an `components/Datensicht.tsx:664-670`: ohne ihn bleibt der Fokus am
+         * `autoFocus` aus demselben Grund wie am Aktionsmenü der Zeile in `EtbZeitachse.tsx`
+         * und in `components/Datensicht.tsx`: ohne ihn bleibt der Fokus am
          * Auslöser und die Pfeiltasten heben im Menü nichts hervor. Anders als dort ist
          * die Wirkung hier gemessen — mit dem Prop trägt der erste Eintrag beim Öffnen
          * die Hervorhebung, ohne ihn keiner.

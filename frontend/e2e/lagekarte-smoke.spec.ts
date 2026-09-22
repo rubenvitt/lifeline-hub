@@ -48,6 +48,8 @@ interface MapHaken {
   getStyle(): { sources?: Record<string, unknown> } | undefined;
   isSourceLoaded(id: string): boolean;
   loaded(): boolean;
+  getZoom(): number;
+  getCenter(): { lng: number; lat: number };
 }
 
 async function anmelden(page: Page) {
@@ -125,9 +127,15 @@ test('Lagekarte: MapLibre startet, Controls leben, terra-draw greift', async ({ 
   await expect(canvas).toHaveCount(1);
   await expect(canvas).toBeVisible();
 
-  // NavigationControl lebt: beweist, dass die Map nicht nur konstruiert wurde, sondern
-  // ihr Control-/DOM-Gerüst aufgebaut hat.
-  await expect(page.locator('.maplibregl-ctrl-zoom-in')).toBeVisible();
+  // Das Control-Gerüst der Map lebt: beweist, dass sie nicht nur konstruiert wurde, sondern
+  // ihr Control-/DOM-Gerüst aufgebaut hat. Seit dem Neuentwurf (S5) gibt es kein
+  // `NavigationControl` mehr — Zoom/Nordung/Zeichnen sind eigene Knöpfe über der Karte. Das
+  // MapLibre-eigene Control, das bleibt, ist die `AttributionControl`; dazu die
+  // Maßstabsleiste, die MapLibre selbst in das Band des Kartenfußes schreibt (`ScaleControl`
+  // über `onAdd`) — sie trägt nur Text, wenn die Map ihr erstes `move` gerechnet hat.
+  await expect(page.locator('.maplibregl-ctrl-attrib')).toBeAttached();
+  await expect(page.locator('[data-lfh="massstab"] .maplibregl-ctrl-scale')).toHaveText(/\d/);
+  await expect(page.getByRole('button', { name: 'Hineinzoomen' })).toBeVisible();
 
   // Und jetzt das, was das DOM NICHT verrät: arbeitet die Karte überhaupt?
   // Alles oben — Canvas, `toHaveCount(1)`, Controls, weiter unten der Cursor — ist auch dann
@@ -217,11 +225,18 @@ test('Lagekarte: MapLibre startet, Controls leben, terra-draw greift', async ({ 
   await expect(page.getByRole('button', { name: 'Abschließen' })).toBeHidden();
 
   // Schmale Fläche (LFH-355, AK3). 1024 × 768 ist der Führungs-Tablet-Kontext der
-  // Bedien-Leitlinie und die schmalste Breite, auf der diese Seite überhaupt eine
-  // Zeichenfläche trägt: die Lagekarten-Sidebar ist fest 300 px breit und die
-  // ZeichnenSteuerung fordert `minWidth: 320` — bei 390 px bliebe für die Karte nichts
-  // übrig. Das ist eine eigene Frage (Sidebar-Responsivität), keine dieses Tickets.
+  // Bedien-Leitlinie; dort steht die 300-px-Leiste noch RECHTS neben der Karte (ab `lg`).
+  // Darunter rutscht sie seit dem Neuentwurf (S5) unter die Karte, und die
+  // ZeichnenSteuerung ist auf `min(320px, 100%)` gedeckelt — die Karte trägt dann die volle
+  // Breite. Die Zeichenwerkzeuge liegen im Paneel „Zeichnen" der Leiste (für Schreibende
+  // vorgabemäßig offen).
   await page.setViewportSize({ width: 1024, height: 768 });
+  // Unter `xl` startet die Zeitachse ohne gemerkte Wahl EINGEKLAPPT (Nacharbeit 22.09.2026,
+  // `startEingeklappt` in SnapshotLeiste.tsx) — ausgeklappt frass sie bei 1024 px drei
+  // Zeilen. Die Überdeckungsmessung braucht aber die ausgeklappte Leiste, sonst wäre sie
+  // still wertlos: also bewusst einblenden, wie es eine Einsatzkraft täte.
+  await page.getByRole('button', { name: 'Zeitachse einblenden' }).click();
+  await expect(page.getByRole('button', { name: 'Zeitachse ausblenden' })).toBeVisible();
   await page.getByRole('button', { name: 'Gefahrengebiet zeichnen' }).click();
   await expect(page.getByRole('button', { name: 'Abschließen' })).toBeVisible();
   await ohneUeberdeckung(page, 'Tablet 1024 px');
@@ -229,4 +244,84 @@ test('Lagekarte: MapLibre startet, Controls leben, terra-draw greift', async ({ 
   await expect(page.getByRole('button', { name: 'Abschließen' })).toBeHidden();
 
   expect(seitenFehler.map((f) => f.message)).toEqual([]);
+});
+
+/**
+ * Startansicht (Nacharbeit 22.09.2026, `lagekarte/startAnsicht.ts`): ein verorteter Einsatz
+ * öffnet auf seinem Einsatzort, nicht auf „Mitte Deutschland, Zoom 5". Hier und nicht in
+ * Vitest, weil die Anwendung an der echten Karteninstanz hängt — und weil der gemessene Fehler
+ * ein StrictMode-Fall war: der Start wurde auf der ersten, sofort wieder entfernten Karte
+ * „verbraucht", die sichtbare zweite blieb auf der Übersicht. e2e läuft unter Vite-Dev mit
+ * StrictMode AN und fängt genau das.
+ *
+ * Dazu der Kartenfuß: er liegt über der Karte und darf mit ausgeklappter Zeitachse und einem
+ * gesicherten Stand nicht über eine Zeile hinauswachsen (vorher brach die Stand-Reihe in eine
+ * zweite Zeile um).
+ */
+test('Lagekarte: startet auf dem Einsatzort; die Zeitachse deckt die Karte nicht zu', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await anmelden(page);
+  const eid = await einsatzAnlegenUndOeffnen(page);
+  const ort = { lat: 49.3519, lon: 9.1457 };
+  // Der Kopf-PATCH ist ein VOLLERSATZ (`KopfdatenUpdate`) — deshalb aus dem Bestand gebaut.
+  const e = (await (await page.request.get(`/api/einsaetze/${eid}`)).json()) as Record<
+    string,
+    unknown
+  >;
+  const antwort = await page.request.patch(`/api/einsaetze/${eid}`, {
+    data: {
+      bezeichnung: e.bezeichnung,
+      stichwort: e.stichwort ?? null,
+      einsatzart: e.einsatzart,
+      einsatznummer_intern: e.einsatznummer_intern ?? null,
+      leitstellen_nr: e.leitstellen_nr ?? null,
+      einsatzort: e.einsatzort ?? null,
+      einsatzort_lat: ort.lat,
+      einsatzort_lon: ort.lon,
+      meldende_stelle: e.meldende_stelle ?? null,
+      sachverhalt: e.sachverhalt ?? null,
+      anzahl_betroffene_initial: e.anzahl_betroffene_initial ?? null,
+      begonnen_at: e.begonnen_at,
+    },
+  });
+  expect(antwort.ok(), await antwort.text()).toBeTruthy();
+  const stand = await page.request.post(`/api/einsaetze/${eid}/lage-snapshots`, {
+    data: { bezeichnung: 'Stand vor Ort' },
+  });
+  expect(stand.ok(), await stand.text()).toBeTruthy();
+  await page.goto(`/einsaetze/${eid}/lagekarte`);
+  await expect(page.getByTestId('kartenflaeche').locator('canvas.maplibregl-canvas')).toHaveCount(
+    1,
+  );
+
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const map = (window as unknown as { __lfhKarte?: MapHaken }).__lfhKarte;
+          if (!map) return null;
+          const c = map.getCenter();
+          return { zoom: Math.round(map.getZoom()), lat: c.lat, lon: c.lng };
+        }),
+      { timeout: 15_000, message: 'Karte steht nicht auf dem Einsatzort' },
+    )
+    .toEqual({ zoom: 14, lat: expect.closeTo(ort.lat, 4), lon: expect.closeTo(ort.lon, 4) });
+
+  const zeitachse = page.locator('[data-lfh="zeitachse"]');
+  await expect(zeitachse.getByRole('button', { name: 'Stand vor Ort' })).toBeVisible();
+  const hoehe = (await zeitachse.boundingBox())!.height;
+  const zeile = (await page.getByRole('button', { name: 'Aktuell' }).boundingBox())!.height;
+  // Eine Zeile = höchstes Steuerelement plus die Polsterung des Bands (2 × 8 px) und Rand.
+  expect(hoehe, `Zeitachse ${hoehe}px hoch bei ${zeile}px Zeilenhöhe`).toBeLessThan(zeile * 2);
+
+  // Unter `xl` ist die Karte eng (1024 px: Modulpanel, Karte und Leiste nebeneinander) — dort
+  // startet die Zeitachse ohne gemerkte Wahl eingeklappt, statt drei Zeilen Karte zu decken.
+  // Oben wurde nicht geklappt, es gibt also keine gemerkte Wahl; zur Sicherheit geräumt.
+  await page.evaluate(() => localStorage.removeItem('lfh:lagekarte:zeitachse-eingeklappt'));
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Zeitachse einblenden' })).toBeVisible();
+  await expect(page.locator('[data-lfh="zeitachse"]')).toHaveCount(0);
 });

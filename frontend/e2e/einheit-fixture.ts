@@ -38,7 +38,7 @@ export async function einheitMitZuordnungen(page: Page) {
 export function zuordnungsKarte(page: Page, titel: string): Locator {
   return page
     .getByRole('main')
-    .locator('.ant-card')
+    .locator('[data-lfh="paneel"]')
     .filter({
       has: page.getByRole('heading', { name: titel, exact: true }),
     });

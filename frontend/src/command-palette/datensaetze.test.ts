@@ -103,7 +103,12 @@ function kontext(over: Partial<DatensatzKontext> = {}): DatensatzKontext {
 }
 
 const ids = (t: Treffer[]) => t.map((x) => x.befehl.id);
-const labels = (t: Treffer[]) => t.map((x) => x.befehl.label);
+/**
+ * „Kontext · Label" — die Zeile, wie sie gelesen wird. Seit dem Neuentwurf steht die
+ * Modulherkunft als `kontext` NEBEN dem Label statt als Präfix darin; der Helfer setzt beide
+ * wieder zusammen, damit die Aussagen unten die Herkunft weiter mitprüfen.
+ */
+const labels = (t: Treffer[]) => t.map((x) => `${x.befehl.kontext} · ${x.befehl.label}`);
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe('zahlAusSuche', () => {
@@ -801,8 +806,19 @@ describe('baueDatensatzTreffer — Deckel, Beschriftung, Leerfall', () => {
     expect(ids(t)[0]).toBe('datensatz:fahrzeuge:60');
   });
 
-  /** Die Modulherkunft kommt aus `modulRegistry.label`, nicht aus einer zweiten Namensliste. */
-  it('trägt die Modulherkunft im Label', () => {
+  /** Die Modulherkunft kommt aus `modulRegistry.label`, nicht aus einer zweiten Namensliste.
+   *  Seit dem Neuentwurf als KONTEXT neben dem Label — und als Schlagwort, damit die Suche
+   *  nach dem Modulnamen den Datensatz weiter findet. */
+  it('trägt die Modulherkunft als Kontext, nicht mehr im Label', () => {
+    const [p] = baueDatensatzTreffer(
+      kontext({ suche: '42', quellen: { personen: [person({ id: 7, registrier_nr: 42 })] } }),
+    );
+    expect(p.befehl.kontext).toBe('Personen');
+    expect(p.befehl.label.startsWith('Personen')).toBe(false);
+    expect(p.befehl.schlagworte).toContain('Personen');
+  });
+
+  it('setzt Kontext und Label zur gelesenen Zeile zusammen', () => {
     const quellen = {
       personen: [person({ id: 7, registrier_nr: 42, name: 'Müller' })],
       uhs: [uhs({ id: 8, bezeichnung: 'BHP Nord', typ: 'behandlungsplatz' })],

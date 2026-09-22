@@ -5,7 +5,7 @@ import type { IconType } from 'react-icons';
 import type { TableColumnsType } from 'antd';
 import type { GefahrBewertung, Gefahrentyp, Schutzobjekt, Warnstufe } from '../../api/types';
 import type { BewertungEingabe } from '../../api/gefahren';
-import { flaechenFarbe, warnstufeFlaeche } from '../../theme/statusFarben';
+import { flaechenFarbe, warnstufeBalkenFarbe, warnstufeFlaeche } from '../../theme/statusFarben';
 import { GEFAHRENTYPEN, SCHUTZOBJEKTE, WARNSTUFEN, kombinationGueltig } from './gefahrenSchema';
 import GefahrenZelleDetails from './GefahrenZelleDetails';
 
@@ -35,6 +35,11 @@ const SPALTENKOPF: Record<Schutzobjekt, { icon: IconType; kurz: string }> = {
 /** EINE Schreibweise für die Zell-Identität. Die Seite bildet den Schlüssel der
  *  laufenden Mutation mit derselben Funktion — zwei Schreibweisen und die Sperre
  *  greift stillschweigend nie. */
+/** Balken einer Matrixzelle — rein; ohne Warnstufe kein Balken. */
+export function zellBalkenStil(farbe: string | null): { boxShadow?: string } {
+  return farbe == null ? {} : { boxShadow: `inset 0 -3px 0 0 ${farbe}` };
+}
+
 export function zellSchluessel(typ: Gefahrentyp, objekt: Schutzobjekt): string {
   return `${typ}×${objekt}`;
 }
@@ -106,15 +111,22 @@ export default function GefahrenMatrix({
             </Space>
           </Tooltip>
         ),
-        onCell: (zeile: ZeilenDaten) => ({
-          style: {
-            backgroundColor: flaechenFarbe(
-              zelleVon(zeile.typ, obj.wert)?.warnstufe ?? 'keine',
-              token,
-            ),
-            textAlign: 'center' as const,
-          },
-        }),
+        onCell: (zeile: ZeilenDaten) => {
+          const stufe = zelleVon(zeile.typ, obj.wert)?.warnstufe ?? 'keine';
+          return {
+            'data-warnstufe': stufe,
+            style: {
+              backgroundColor: flaechenFarbe(stufe, token),
+              // Warnstufenbalken des Neuentwurfs (Gefahrenmatrix-Balken, umsetzung.md
+              // Palette „Warnstufe"): 3 px unten, als Innenschatten — null Layout, die
+              // Zeilenhöhe springt beim Umbewerten nicht. Der Balken trägt die Skala
+              // niedrig → akut in eigenen Tönen, die Fläche darunter die zwei Intensitäten
+              // aus dem Flächenvertrag; der zweite Kanal bleibt das Kürzel im Knopf.
+              ...zellBalkenStil(warnstufeBalkenFarbe(stufe, token)),
+              textAlign: 'center' as const,
+            },
+          };
+        },
         render: (_: unknown, zeile: ZeilenDaten) => {
           if (!kombinationGueltig(zeile.typ, obj.wert)) {
             // Zweiter Kanal für den gesperrten Zustand ist TEXT, nicht Blässe (WCAG 1.4.1):

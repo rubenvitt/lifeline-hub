@@ -1,4 +1,4 @@
-import { Alert, App, Breadcrumb, Button, Card, Flex, Segmented, Spin, Typography } from 'antd';
+import { Alert, App, Breadcrumb, Button, Spin } from 'antd';
 import { CloseOutlined, PlusOutlined, UpOutlined } from '@ant-design/icons';
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router';
@@ -27,7 +27,16 @@ import MeldungListe from '../meldungen/MeldungListe';
 import MeldungFormular from '../meldungen/MeldungFormular';
 import AuftragErteilenModal from '../meldungen/AuftragErteilenModal';
 import LagerelevantModal, { type LagerelevantDaten } from '../meldungen/LagerelevantModal';
-import Datenstand from '../components/Datenstand';
+import EinsatzSeite from '../components/EinsatzSeite';
+import {
+  Augenbraue,
+  Kennzahl,
+  Kennzahlenband,
+  Paneel,
+  Segmentleiste,
+  useRollen,
+} from '../components/instrument';
+import { meldungKennzahlen } from '../meldungen/meldungKennzahlen';
 
 /**
  * Sortierung der Meldungen: Prio (sofort→dringend→normal), dann eskaliert zuerst
@@ -58,6 +67,7 @@ export default function MeldungenPage() {
   const { benutzer } = useAuth();
   const { message } = App.useApp();
   const qc = useQueryClient();
+  const { token } = useRollen();
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -121,7 +131,7 @@ export default function MeldungenPage() {
   // LFH-332/B4: kein `setFormOffen(false)` mehr. Das Inline-Formular bleibt nach
   // dem Senden offen, damit die nächste Meldung ohne Aufklappen weitergeht;
   // Zuklappen ist ausdrückliche Nutzeraktion (Kopf-Umschalter oder Kreuz an der
-  // Card). Der conditional Render der Card (unten) würde das Formular sonst
+  // Paneel). Der conditional Render des Paneels (unten) würde das Formular sonst
   // unmounten — samt Serienzähler und Wertübernahme.
   const anlegenMutation = useMutation({
     mutationFn: (d: NeueMeldung) => {
@@ -285,46 +295,75 @@ export default function MeldungenPage() {
     einheiten: (einheitenQuery.data ?? []).map((e) => ({ id: e.id, name: e.name })),
   };
 
+  const kennzahlen = meldungKennzahlen(alleMeldungen);
+
   return (
-    <div style={{ maxWidth: 1040, margin: '0 auto' }}>
-      <Breadcrumb
-        style={{ marginBottom: 12 }}
-        items={[
-          { title: <Link to="/einsaetze">Einsätze</Link> },
-          { title: einsatz.bezeichnung },
-          { title: 'Meldungen (eingehend)' },
-        ]}
-      />
-      <Flex justify="space-between" align="center" gap={16} wrap style={{ marginBottom: 16 }}>
-        <div>
-          <Typography.Title level={3} style={{ margin: 0 }}>
-            Meldungen (eingehend)
-          </Typography.Title>
-          <Typography.Text type="secondary">
-            {offene.length} offen · {abgeschlossene.length} abgeschlossen
-          </Typography.Text>
-          <div>
-            <Datenstand dataUpdatedAt={meldungenQuery.dataUpdatedAt} />
-          </div>
-        </div>
-        {darfSchreiben && (
+    <EinsatzSeite
+      titel="Meldungen (eingehend)"
+
+      meta={`${offene.length} offen · ${abgeschlossene.length} abgeschlossen`}
+      dataUpdatedAt={meldungenQuery.dataUpdatedAt}
+      breadcrumb={
+        <Breadcrumb
+          items={[
+            { title: <Link to="/einsaetze">Einsätze</Link> },
+            { title: einsatz.bezeichnung },
+            { title: 'Meldungen (eingehend)' },
+          ]}
+        />
+      }
+      aktionen={
+        darfSchreiben && (
           <Button
             type="primary"
-            size="large"
             icon={formOffen ? <UpOutlined /> : <PlusOutlined />}
             onClick={() => setFormOffen((o) => !o)}
           >
             {formOffen ? 'Formular schließen' : 'Meldung erfassen'}
           </Button>
-        )}
-      </Flex>
+        )
+      }
+    >
+      {/* Kennzahlen der Triage (Neuentwurf „Zahl führt"): dieselben Mengen, aus denen die
+          Liste darunter gebaut ist — keine zweite Zählung, `meldungKennzahlen` ist rein. */}
+      <Kennzahlenband beschriftung="Meldungen in Zahlen" style={{ marginBottom: token.margin }}>
+        <Kennzahl
+          titel="Unbearbeitet"
+          groesse="klein"
+          wert={kennzahlen.unbearbeitet}
+          ton={kennzahlen.unbearbeitet > 0 ? 'achtung' : 'neutral'}
+          notiz="noch nicht gesichtet"
+          zustand={meldungenQuery.isLoading ? 'laden' : meldungenQuery.isError ? 'fehler' : 'daten'}
+        />
+        <Kennzahl
+          titel="In Arbeit"
+          groesse="klein"
+          wert={kennzahlen.inArbeit}
+          notiz="gesichtet oder in Bearbeitung"
+          zustand={meldungenQuery.isLoading ? 'laden' : meldungenQuery.isError ? 'fehler' : 'daten'}
+        />
+        <Kennzahl
+          titel="Alarmiert"
+          groesse="klein"
+          wert={kennzahlen.alarmiert}
+          ton={kennzahlen.alarmiert > 0 ? 'alarm' : 'neutral'}
+          notiz="Bestätigungsfrist verstrichen"
+          zustand={meldungenQuery.isLoading ? 'laden' : meldungenQuery.isError ? 'fehler' : 'daten'}
+        />
+        <Kennzahl
+          titel="Erledigt"
+          groesse="klein"
+          wert={kennzahlen.erledigt}
+          zustand={meldungenQuery.isLoading ? 'laden' : meldungenQuery.isError ? 'fehler' : 'daten'}
+        />
+      </Kennzahlenband>
 
       {darfSchreiben && formOffen && (
-        <Card
-          size="small"
-          title="Neue Meldung erfassen"
-          style={{ marginBottom: 16 }}
-          extra={
+        <Paneel
+          titel="Neue Meldung erfassen"
+          koerperPolster
+          style={{ marginBottom: token.margin }}
+          aktion={
             <Button
               type="text"
               icon={<CloseOutlined />}
@@ -341,14 +380,14 @@ export default function MeldungenPage() {
             // wirft weiterhin `onError` der Mutation.
             onAnlegen={(d) => anlegenMutation.mutateAsync(d)}
           />
-        </Card>
+        </Paneel>
       )}
 
       {meldungenQuery.isError && (
         <Alert
           type="error"
           showIcon
-          style={{ marginBottom: 12 }}
+          style={{ marginBottom: token.marginSM }}
           title="Meldungen konnten nicht geladen werden"
         />
       )}
@@ -356,26 +395,28 @@ export default function MeldungenPage() {
         style={{
           display: 'flex',
           flexWrap: 'wrap',
-          gap: 12,
-          marginBottom: 16,
+          gap: token.marginSM,
+          marginBottom: token.margin,
           alignItems: 'center',
         }}
       >
-        <Segmented
-          value={ansicht}
-          onChange={(v) => setAnsicht(v as 'offen' | 'abgeschlossen')}
-          options={[
-            { value: 'offen', label: `Offen (${offene.length})` },
-            { value: 'abgeschlossen', label: `Abgeschlossen (${abgeschlossene.length})` },
+        <Segmentleiste
+          beschriftung="Ansicht"
+          wert={ansicht}
+          onWechsel={setAnsicht}
+          optionen={[
+            { wert: 'offen', label: `Offen (${offene.length})` },
+            { wert: 'abgeschlossen', label: `Abgeschlossen (${abgeschlossene.length})` },
           ]}
         />
-        <Segmented
-          value={richtungFilter ?? 'alle'}
-          onChange={(v) => setRichtungFilter(v === 'alle' ? undefined : String(v))}
-          options={[
-            { value: 'alle', label: 'Alle Richtungen' },
-            { value: 'intern', label: 'Intern' },
-            { value: 'extern', label: 'Extern' },
+        <Segmentleiste
+          beschriftung="Richtung"
+          wert={richtungFilter ?? 'alle'}
+          onWechsel={(v) => setRichtungFilter(v === 'alle' ? undefined : v)}
+          optionen={[
+            { wert: 'alle', label: 'Alle Richtungen' },
+            { wert: 'intern', label: 'Intern' },
+            { wert: 'extern', label: 'Extern' },
           ]}
         />
       </div>
@@ -384,10 +425,10 @@ export default function MeldungenPage() {
           <MeldungListe meldungen={[]} ansicht="offen" {...listenProps} />
         ) : (
           offeneGruppen.map(({ titel, meldungen }) => (
-            <div key={titel} style={{ marginBottom: 16 }}>
-              <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>
+            <div key={titel} style={{ marginBottom: token.margin }}>
+              <Augenbraue als="h2" style={{ display: 'block', marginBottom: token.marginXS }}>
                 {titel}
-              </Typography.Text>
+              </Augenbraue>
               <MeldungListe meldungen={meldungen} ansicht="offen" {...listenProps} />
             </div>
           ))
@@ -419,6 +460,6 @@ export default function MeldungenPage() {
             : Promise.reject(new Error('Keine Quellmeldung'))
         }
       />
-    </div>
+    </EinsatzSeite>
   );
 }

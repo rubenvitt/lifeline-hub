@@ -1,8 +1,8 @@
-import { Alert, App, Breadcrumb, Button, Popconfirm, Space, Spin, Tabs } from 'antd';
+import { Alert, App, Breadcrumb, Button, Popconfirm, Space, Spin } from 'antd';
 import { UserAddOutlined } from '@ant-design/icons';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { ladeEinsatz } from '../../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { useAuth } from '../../auth/AuthContext';
@@ -17,8 +17,8 @@ import { einsatzKeys } from '../../api/queryKeys';
 import type { UhsStatus } from '../../api/types';
 import EinsatzSeite from '../../components/EinsatzSeite';
 import StatusTag from '../../components/StatusTag';
+import { Segmentleiste } from '../../components/instrument';
 import { uhsStatus, uhsTyp } from '../../theme/statusFarben';
-import { flaeche } from '../../theme/tokens';
 import UhsSwitcher from './UhsSwitcher';
 import { merkeLetzteUhs } from './uhsAuswahl';
 import Grundriss from './Grundriss';
@@ -29,6 +29,10 @@ export default function UhsDetailPage() {
   const { id, uhsId: uhsIdParam } = useParams();
   const einsatzId = Number(id);
   const navigate = useNavigate();
+  // Material/Bewegungen als Segmentleiste im Reiter-Modus (Neuentwurf: Radius 0, Fugenraster
+  // statt antds Unterstrich-Reitern). Nur das aktive Feld ist gebaut — wie vorher bei `Tabs`.
+  const [reiter, setReiter] = useState<'material' | 'bewegungen'>('material');
+  const reiterFeld = useId();
   const { benutzer } = useAuth();
   const uhsId = Number(uhsIdParam);
   const idGueltig = parseRouteId(uhsIdParam) != null;
@@ -101,19 +105,14 @@ export default function UhsDetailPage() {
   const uhs = detailQuery.data;
   const schreibgeschuetzt = !darfImEinsatzSchreiben(einsatz, benutzer);
 
-  const meta = [
-    // Der Typ ist eine Kategorie und trägt im Vertrag durchgängig `neutral` — hier zählt
-    // nur seine Beschriftung. Die liegt seit LFH-328/A2 im Vertrag (`theme/statusFarben.ts`,
-    // `uhsTyp`); `UnfallhilfsstellenPage` und `UhsAnlegenDrawer` lesen bereits von dort,
-    // diese Seite ist der dritte Konsument (LFH-341 · M54).
-    `Typ: ${uhsTyp[uhs.typ].label}`,
-    `Standort: ${uhs.standort ?? '—'}`,
-    ...(uhs.notiz ? [`Notiz: ${uhs.notiz}`] : []),
-  ].join('  ·  ');
+  // Typ und Standort sind Kopf-Meta (Neuentwurf: „Titel 14/600 + Mono-Meta"); der Typ ist
+  // eine Kategorie und trägt im Vertrag durchgängig `neutral` — hier zählt nur seine
+  // Beschriftung aus `uhsTyp` (LFH-328/A2, dritter Konsument seit LFH-341 · M54). Die
+  // Notiz ist Freitext und bleibt Beschreibungszeile unter dem Kopf.
+  const meta = [uhsTyp[uhs.typ].label, uhs.standort ?? 'ohne Standort'].join(' · ');
 
   return (
     <EinsatzSeite
-      breite={flaeche.seiteBreit}
       /* Der Titel trägt den Umschalter, nicht bloß den Namen: die UHS-Detailseite ist der
          Ort, an dem zwischen mehreren Hilfsstellen gewechselt wird (LFH-25). */
       titel={
@@ -122,7 +121,8 @@ export default function UhsDetailPage() {
           <StatusTag darstellung={uhsStatus[uhs.status]} />
         </Space>
       }
-      beschreibung={meta}
+      meta={meta}
+      beschreibung={uhs.notiz ? `Notiz: ${uhs.notiz}` : undefined}
       /* Betriebs-Feedback im Kopf (B6-Muster): die beiden Reiter tragen es seit B2, die
          Seite selbst nicht — ausgerechnet dort, wo der Grundriss live mitläuft. Das
          Primitiv rendert den Indikator; eine eigene `<Datenstand>`-Zeile daneben wäre die
@@ -196,23 +196,28 @@ export default function UhsDetailPage() {
     >
       {/* Der Seitenkopf teilt die echte Resthöhe mit dem Grundriss (LFH-459).
           Material/Bewegungen folgen weiterhin im Seitenfluss (LFH-149). */}
-      <Tabs
-        style={{ marginTop: 16 }}
-        items={[
-          {
-            key: 'material',
-            label: 'Material',
-            children: (
-              <MaterialTab einsatzId={einsatzId} uhs={uhs} schreibgeschuetzt={schreibgeschuetzt} />
-            ),
-          },
-          {
-            key: 'bewegungen',
-            label: 'Bewegungen',
-            children: <BewegungenTab uhs={uhs} dataUpdatedAt={detailQuery.dataUpdatedAt} />,
-          },
+      <Segmentleiste
+        rolle="tablist"
+        beschriftung="Material und Bewegungen"
+        wert={reiter}
+        onWechsel={setReiter}
+        optionen={[
+          { wert: 'material', label: 'Material', steuert: reiterFeld },
+          { wert: 'bewegungen', label: 'Bewegungen', steuert: reiterFeld },
         ]}
+        style={{ marginTop: 16, marginBottom: 12 }}
       />
+      <div
+        role="tabpanel"
+        id={reiterFeld}
+        aria-label={reiter === 'material' ? 'Material' : 'Bewegungen'}
+      >
+        {reiter === 'material' ? (
+          <MaterialTab einsatzId={einsatzId} uhs={uhs} schreibgeschuetzt={schreibgeschuetzt} />
+        ) : (
+          <BewegungenTab uhs={uhs} dataUpdatedAt={detailQuery.dataUpdatedAt} />
+        )}
+      </div>
     </EinsatzSeite>
   );
 }

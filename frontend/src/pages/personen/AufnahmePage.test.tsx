@@ -158,7 +158,7 @@ async function waehleSk(index: number) {
 describe('AufnahmePage', () => {
   it('trägt den Modulkopf und die Feldgruppe der Aufnahme', async () => {
     render();
-    expect(await screen.findByRole('heading', { level: 4, name: /Aufnahme/ })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: /Aufnahme/ })).toBeInTheDocument();
     expect(screen.getByRole('radiogroup')).toBeInTheDocument();
     // Der Breadcrumb trägt den Rückweg in die Liste — deshalb gibt es keinen Zurück-Knopf.
     expect(screen.getByRole('link', { name: 'Personen' })).toHaveAttribute(

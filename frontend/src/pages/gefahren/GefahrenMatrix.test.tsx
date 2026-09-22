@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { ConfigProvider } from 'antd';
 import { renderMitProviders } from '../../test/utils';
 import { antdToken, farbenHell, type Dichte } from '../../theme/tokens';
-import GefahrenMatrix, { type GefahrenMatrixProps } from './GefahrenMatrix';
+import GefahrenMatrix, { type GefahrenMatrixProps, zellBalkenStil } from './GefahrenMatrix';
 import type { GefahrBewertung } from '../../api/types';
 
 const zelle = (over: Partial<GefahrBewertung>): GefahrBewertung => ({
@@ -24,7 +24,7 @@ const zelle = (over: Partial<GefahrBewertung>): GefahrBewertung => ({
 /**
  * Der Eintrag wird IMMER über das geöffnete Menü gegriffen: antd lässt die Portale
  * geschlossener Dropdowns im Baum stehen, ein globales getByText träfe auch sie.
- * Muster aus `etb/EtbTabelle.test.tsx` (LFH-365 · B5e); in einer Matrix mit 58
+ * Muster aus `etb/EtbZeitachse.test.tsx` (vorher `EtbTabelle`, LFH-365 · B5e); in einer Matrix mit 58
  * Auslösern liegt je bereits geöffneter Zelle ein eigenes totes Portal herum.
  *
  * `:not(.ant-dropdown-hidden)` allein GENÜGT HIER NICHT — gemessen an genau dem Fall,
@@ -338,5 +338,24 @@ describe('GefahrenMatrix — die kurze Achse des Zell-Auslösers folgt der Dicht
     ['handschuh', 72],
   ] as const)('erreicht in %s den Trefflächenboden von %i px', (dichte, boden) => {
     expect(parseFloat(ausloeserBreite(dichte))).toBeGreaterThanOrEqual(boden);
+  });
+});
+
+describe('GefahrenMatrix — Warnstufenbalken (Neuentwurf)', () => {
+  it('zellBalkenStil: ohne Farbe kein Balken, sonst 3 px unten als Innenschatten', () => {
+    expect(zellBalkenStil(null)).toEqual({});
+    expect(zellBalkenStil('red')).toEqual({ boxShadow: 'inset 0 -3px 0 0 red' });
+  });
+
+  it('trägt den Balken an einer bewerteten Zelle und keinen an einer unbewerteten', () => {
+    const { container } = rendereMatrix({ matrix: [zelle({ warnstufe: 'hoch' })] });
+    const bewertet = container.querySelector<HTMLElement>('td[data-warnstufe="hoch"]');
+    expect(bewertet, 'die bewertete Zelle trägt ihre Stufe').not.toBeNull();
+    expect(bewertet!.style.boxShadow).toMatch(/^inset 0(px)? -3px 0(px)? 0(px)? /);
+    // Gegenprobe: ohne Warnstufe kein Balken — sonst wäre die erste Aussage auch mit
+    // einem unbedingten Schatten wahr.
+    const leer = container.querySelector<HTMLElement>('td[data-warnstufe="keine"]');
+    expect(leer).not.toBeNull();
+    expect(leer!.style.boxShadow).toBe('');
   });
 });

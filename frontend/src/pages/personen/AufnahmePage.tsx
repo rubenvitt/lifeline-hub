@@ -19,7 +19,6 @@ import { SK_META } from '../../personen/personMeta';
 import AufnahmeFelder, { type AufnahmeEingabe } from '../../personen/AufnahmeFelder';
 import { erfassePersonOfflineFaehig } from '../../offline/schreiben';
 import { parseRouteId, personenPfad, uhsDetailPfad } from '../../routing/deeplinks';
-import { flaeche } from '../../theme/tokens';
 import StatusTag from '../../components/StatusTag';
 import { einsatzStatus } from '../../theme/statusFarben';
 
@@ -154,7 +153,7 @@ export default function AufnahmePage() {
 
   return (
     <EinsatzSeite
-      breite={flaeche.seiteSchmal}
+      breite="schmal"
       titel={
         <Space>
           Aufnahme

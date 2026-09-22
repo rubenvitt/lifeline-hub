@@ -1,16 +1,4 @@
-import {
-  App,
-  Breadcrumb,
-  Button,
-  Flex,
-  Form,
-  Input,
-  Space,
-  Spin,
-  Tag,
-  Typography,
-  theme,
-} from 'antd';
+import { App, Breadcrumb, Button, Form, Input, Space, Spin, Typography, theme } from 'antd';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -34,6 +22,8 @@ import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { useViewport } from '../components/useViewport';
 import { AKTIONSLEISTE_AB, aktionsleisteStil } from '../befehle/aktionsleiste';
 import { BEFEHL_STATUS, StatusBadge } from '../kommunikation';
+import EinsatzSeite from '../components/EinsatzSeite';
+import { Paneel, monoStil } from '../components/instrument';
 import './befehlPrint.css';
 import './befehlAktionsleiste.css';
 
@@ -403,40 +393,23 @@ function BefehlDetail() {
         onAbbrechen={() => setFreigabeWerte(null)}
         onFreigeben={() => void freigabeAusfuehren()}
       />
-      <Breadcrumb
-        className="befehl-no-print"
-        style={{ marginBottom: 12 }}
-        items={[
-          { title: <Link to="/einsaetze">Einsätze</Link> },
-          { title: einsatz.bezeichnung },
-          { title: <Link to={auftraegePfad(einsatzId)}>Aufträge/Befehle</Link> },
-          { title: befehl.titel },
-        ]}
-      />
       {/*
-        Umbruchfähige Kopfzeile (LFH-343 · C8, Befund M73). Vorher trug sie ein
-        `<Space>` ohne `wrap`: auf schmalem Schirm schob der Titel die Aktionen aus
-        dem sichtbaren Bereich, und „Freigeben" — die einzige Aktion, die den
-        Entwurf abschliesst — war nicht mehr erreichbar. Muster sind die vier
-        Schwesterseiten (`MeldungenPage`, `ErinnerungenPage`, `NachforderungenPage`,
-        `AuftraegeListe`), die alle `<Flex justify="space-between" … wrap>` tragen.
+        Seitenkopf des Neuentwurfs (`EinsatzSeite`): Titel 14/600, rechts der Aktionsblock.
+        Er ersetzt die umbruchfähige Kopfzeile aus LFH-343 · C8 (Befund M73) — die Leiste
+        bricht selbst um (`flexWrap`), „Freigeben" bleibt also auf 390 px erreichbar.
+        Status, Vorlage und Fassung stehen als Meta neben dem Titel statt als Tag-Gruppe.
 
-        Die Tag-Gruppe rutscht UNTER den Titel: nebeneinander sind es fünf Elemente
-        in einer Zeile, und auf 390 px bleibt für den Titel dann nichts.
+        Der Kopf liegt INNERHALB von `.befehl-print-root`: die Aktionen müssen dort liegen
+        (`e2e/befehl-aktionsleiste.spec.ts` sucht sie im Druckbereich), und der Kopf selbst
+        wird im Druck über `befehlPrint.css` ausgeblendet — wie die alte Kopfzeile, die
+        `befehl-no-print` trug.
       */}
-      <Flex
-        className="befehl-no-print"
-        justify="space-between"
-        align="center"
-        gap={16}
-        wrap
-        style={{ marginBottom: 16 }}
-      >
-        <div>
-          <Typography.Title level={3} style={{ margin: 0 }}>
-            {befehl.titel}
-          </Typography.Title>
-          <Space size={6} wrap style={{ marginTop: 4 }}>
+      <EinsatzSeite
+        // Editor: reine Schreibfläche, ausdrücklich in Lesebreite.
+        breite="schmal"
+        titel={befehl.titel}
+        meta={
+          <Space size={6} wrap>
             {/* Derselbe Träger wie in der Liste (LFH-493): Fachlabel und Phasenfarbe
                 kommen aus der geteilten Achse, nicht aus zwei handgeschriebenen
                 Ternären. `istEntwurf` bleibt — es steuert die Knöpfe, nicht das Etikett. */}
@@ -444,83 +417,108 @@ function BefehlDetail() {
               phase={BEFEHL_STATUS[befehl.status].phase}
               label={BEFEHL_STATUS[befehl.status].label}
             />
-            <Tag>{v?.label ?? befehl.vorlage}</Tag>
-            <Tag>v{befehl.version}</Tag>
+            <span>{v?.label ?? befehl.vorlage}</span>
+            <span>v{befehl.version}</span>
           </Space>
-        </div>
-        {!verankert && aktionen}
-      </Flex>
-
-      {/*
+        }
+        breadcrumb={
+          <Breadcrumb
+            items={[
+              { title: <Link to="/einsaetze">Einsätze</Link> },
+              { title: einsatz.bezeichnung },
+              { title: <Link to={auftraegePfad(einsatzId)}>Aufträge/Befehle</Link> },
+              { title: befehl.titel },
+            ]}
+          />
+        }
+        aktionen={!verankert && aktionen}
+      >
+        {/*
         Der Grund eines gescheiterten Speicherns — nicht im `aktionen`-Block (LFH-494):
         der wandert je Breite zwischen Kopf und verankerter Leiste, der Alert soll aber in
         jeder Breite an derselben Stelle über dem Inhalt stehen. `befehl-no-print`, weil ein
         „Nicht gespeichert"-Banner im ausgedruckten Befehl eine Aussage mit Aussenwirkung
         wäre, die den Druck nicht betrifft.
       */}
-      {schutz.speicherFehler != null && (
-        <div className="befehl-no-print" style={{ marginBottom: token.marginSM }}>
-          <SpeicherFehler fehler={schutz.speicherFehler} />
-        </div>
-      )}
+        {schutz.speicherFehler != null && (
+          <div className="befehl-no-print" style={{ marginBottom: token.marginSM }}>
+            <SpeicherFehler fehler={schutz.speicherFehler} />
+          </div>
+        )}
 
-      {/* Taktische DTG in der Anzeigezone (LFH-350 · H60): `zeitstand` ist ein UTC-Wirestring
+        {/* Taktische DTG in der Anzeigezone (LFH-350 · H60): `zeitstand` ist ein UTC-Wirestring
           ohne Zonenkennung und stand roh ausgegeben um den Zonenversatz falsch. */}
-      <Typography.Paragraph type="secondary">
-        Zeitstand: <ZeitAnzeige wert={befehl.zeitstand} />
-      </Typography.Paragraph>
+        <Typography.Paragraph type="secondary" style={monoStil(12)}>
+          Zeitstand: <ZeitAnzeige wert={befehl.zeitstand} />
+        </Typography.Paragraph>
 
-      {istEntwurf && darfSchreiben ? (
-        <Form
-          form={form}
-          layout="vertical"
-          onValuesChange={schutz.markiereGeaendert}
-          // Der zweite Auslöser neben der Frist: ein verlassenes Feld ist der Moment,
-          // in dem ein Abschnitt fertig gedacht ist. `onBlur` steigt aus den Feldern
-          // auf, ein Handler am Formular genügt also für alle.
-          onBlur={schutz.autosaveJetzt}
-          onFinish={(werte) => speichernMutation.mutate(werte as Record<string, string>)}
+        <Paneel
+          titel={istEntwurf && darfSchreiben ? 'Entwurf' : 'Befehlstext'}
+          meta={`${v?.abschnitte.length ?? 0} Abschnitte`}
+          koerperPolster
         >
-          <Form.Item label="Titel" name="titel" rules={[{ required: true }]}>
-            <Input />
-          </Form.Item>
-          {v?.abschnitte.map((a) => (
-            <Form.Item key={a.schluessel} label={a.label} name={a.schluessel} extra={a.hilfetext}>
-              <MarkdownEditor layout="split" variante="dokument" autoSize={{ minRows: 8 }} />
-            </Form.Item>
-          ))}
-          {/* Einstiegsfokus in den ersten leeren Abschnitt (LFH-495). Als LETZTES Kind, damit
+          {istEntwurf && darfSchreiben ? (
+            <Form
+              form={form}
+              layout="vertical"
+              onValuesChange={schutz.markiereGeaendert}
+              // Der zweite Auslöser neben der Frist: ein verlassenes Feld ist der Moment,
+              // in dem ein Abschnitt fertig gedacht ist. `onBlur` steigt aus den Feldern
+              // auf, ein Handler am Formular genügt also für alle.
+              onBlur={schutz.autosaveJetzt}
+              onFinish={(werte) => speichernMutation.mutate(werte as Record<string, string>)}
+            >
+              <Form.Item label="Titel" name="titel" rules={[{ required: true }]}>
+                <Input />
+              </Form.Item>
+              {v?.abschnitte.map((a) => (
+                <Form.Item
+                  key={a.schluessel}
+                  label={a.label}
+                  name={a.schluessel}
+                  extra={a.hilfetext}
+                >
+                  <MarkdownEditor layout="split" variante="dokument" autoSize={{ minRows: 8 }} />
+                </Form.Item>
+              ))}
+              {/* Einstiegsfokus in den ersten leeren Abschnitt (LFH-495). Als LETZTES Kind, damit
               beim Mount-Effekt alle Felder im DOM stehen; Begründungen in `Einstiegsfokus`. */}
-          <Einstiegsfokus
-            form={form}
-            feld={einstiegsAbschnitt(
-              (v?.abschnitte ?? []).map((a) => a.schluessel),
-              (schluessel) => befehl.abschnitte.find((x) => x.schluessel === schluessel)?.text,
-            )}
-          />
-        </Form>
-      ) : (
-        <div className="befehl-druck">
-          {v?.abschnitte.map((a) => {
-            const text = befehl.abschnitte.find((x) => x.schluessel === a.schluessel)?.text ?? '';
-            return (
-              <section key={a.schluessel} style={{ marginBottom: 16 }}>
-                <Typography.Title level={5}>{a.label}</Typography.Title>
-                {text.trim() ? (
-                  <Markdown variante="dokument">{text}</Markdown>
-                ) : (
-                  <Typography.Paragraph>—</Typography.Paragraph>
+              <Einstiegsfokus
+                form={form}
+                feld={einstiegsAbschnitt(
+                  (v?.abschnitte ?? []).map((a) => a.schluessel),
+                  (schluessel) => befehl.abschnitte.find((x) => x.schluessel === schluessel)?.text,
                 )}
-              </section>
-            );
-          })}
-        </div>
-      )}
+              />
+            </Form>
+          ) : (
+            <div className="befehl-druck">
+              {v?.abschnitte.map((a) => {
+                const text =
+                  befehl.abschnitte.find((x) => x.schluessel === a.schluessel)?.text ?? '';
+                return (
+                  <section key={a.schluessel} style={{ marginBottom: 16 }}>
+                    {/* h3 unter dem Paneel (h2); Satz bleibt der von h5. */}
+                    <Typography.Title level={3} style={{ fontSize: token.fontSizeHeading5 }}>
+                      {a.label}
+                    </Typography.Title>
+                    {text.trim() ? (
+                      <Markdown variante="dokument">{text}</Markdown>
+                    ) : (
+                      <Typography.Paragraph>—</Typography.Paragraph>
+                    )}
+                  </section>
+                );
+              })}
+            </div>
+          )}
+        </Paneel>
 
-      {/* Die verankerte Leiste steht NACH dem Inhalt: `position: sticky; bottom: 0` klebt
+        {/* Die verankerte Leiste steht NACH dem Inhalt: `position: sticky; bottom: 0` klebt
           nur, solange der umgebende Block noch scrollt — und die Tabulaturreihenfolge
           führt so vom letzten Abschnittsfeld direkt auf „Freigeben". */}
-      {verankert && aktionen}
+        {verankert && aktionen}
+      </EinsatzSeite>
     </div>
   );
 }

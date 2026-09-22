@@ -76,3 +76,84 @@ export function imZeitfenster(
       return d.isSame(jetztInZone(konv, jetzt), 'day');
   }
 }
+
+/** Ortsfilter der Zeitachse: alle, nur verortete, nur unverortete Einträge. */
+export type Ortsfilter = 'alle' | 'mit' | 'ohne';
+
+/** Filterstand der Zeitachse — `'alle'` heißt „kein Filter auf dieser Achse". */
+export interface LageFilter {
+  fenster: Zeitfenster | 'alle';
+  ort: Ortsfilter;
+  /** Freitext über Meldungstext, Absender und Meldungsnummer; leer = kein Filter. */
+  suche: string;
+}
+
+export const LEERER_FILTER: LageFilter = { fenster: 'alle', ort: 'alle', suche: '' };
+
+/** Ist irgendein Filter gesetzt? Trennt „leer" von „weggefiltert" im Leerzustand. */
+export function filterAktiv(f: LageFilter): boolean {
+  return f.fenster !== 'alle' || f.ort !== 'alle' || f.suche.trim() !== '';
+}
+
+/** Die Felder, die ein Lageobjekt für Filter und Gruppen braucht (Teil von `LageMeldung`). */
+export interface LageEintragKern {
+  text: string;
+  erstellt_at: string;
+  lat?: number | null;
+  lon?: number | null;
+  meldung_lfd_nr: number;
+  meldung_absender: string;
+}
+
+/** Filtert die Menge — rein, Reihenfolge bleibt. */
+export function filtereLagemeldungen<T extends LageEintragKern>(
+  eintraege: readonly T[],
+  f: LageFilter,
+  konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
+  jetzt: Dayjs = dayjs(),
+): T[] {
+  const nadel = f.suche.trim().toLowerCase();
+  return eintraege.filter((l) => {
+    if (f.fenster !== 'alle' && !imZeitfenster(l.erstellt_at, f.fenster, jetzt, konv)) {
+      return false;
+    }
+    if (f.ort !== 'alle' && (l.lat != null && l.lon != null) !== (f.ort === 'mit')) return false;
+    if (nadel !== '') {
+      const heuhaufen = `${l.text} ${l.meldung_absender} ${l.meldung_lfd_nr}`.toLowerCase();
+      if (!heuhaufen.includes(nadel)) return false;
+    }
+    return true;
+  });
+}
+
+export interface Tagesgruppe<T> {
+  schluessel: string;
+  etikett: string;
+  zeilen: T[];
+}
+
+/**
+ * Tagesgruppen, jüngster Tag zuerst und innerhalb des Tages jüngster Eintrag zuerst — die
+ * Zeitachse wird von oben gelesen („was ist zuletzt passiert?"). Die Reihenfolge kommt aus
+ * den Daten, nicht aus der Serverliste: die liefert aufsteigend.
+ *
+ * Sortiert wird über den Wire-String: `YYYY-MM-DD HH:mm:ss` ist als Text chronologisch, und
+ * ein Umweg über `inZone` änderte an der Ordnung nichts (die Zone verschiebt alle gleich).
+ */
+export function gruppiereNachTag<T extends LageEintragKern>(
+  eintraege: readonly T[],
+  konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
+  jetzt: Dayjs = dayjs(),
+): Tagesgruppe<T>[] {
+  const sortiert = [...eintraege].sort((a, b) =>
+    a.erstellt_at < b.erstellt_at ? 1 : a.erstellt_at > b.erstellt_at ? -1 : 0,
+  );
+  const gruppen: Tagesgruppe<T>[] = [];
+  for (const l of sortiert) {
+    const schluessel = tagesSchluessel(l.erstellt_at, konv);
+    const letzte = gruppen[gruppen.length - 1];
+    if (letzte?.schluessel === schluessel) letzte.zeilen.push(l);
+    else gruppen.push({ schluessel, etikett: tagesEtikett(schluessel, konv, jetzt), zeilen: [l] });
+  }
+  return gruppen;
+}

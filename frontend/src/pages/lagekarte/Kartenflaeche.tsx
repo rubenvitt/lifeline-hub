@@ -47,6 +47,8 @@ import {
   planeReAnlegenNachStyle,
   sorgeFuerAbschnittLayer,
   sorgeFuerZonenLayer,
+  plakettenBild,
+  PLAKETTE_PRAEFIX,
   type FlaechenFeatureCollection,
   type ZonenFeatureCollection,
   type ZoneFeature,
@@ -67,6 +69,7 @@ import { erzeugeBildHandles, type BildHandles } from './bildHandles';
 import type { Ecken } from '../../api/kartenbilder';
 import { BBOX_MIN_ZOOM } from './fachebenen';
 import type { FachebeneQuelle } from '../../api/fachebenen';
+import { PUNKT_ZOOM, type StartAnsicht } from './startAnsicht';
 
 // Worker-URL setzen, bevor die erste Map entsteht — diese Datei ist die einzige Stelle im Repo,
 // die eine Map erzeugt. Der Guard davor ist keine Paranoia, sondern deckt eine gemessene Bruchlinie
@@ -136,6 +139,14 @@ export interface KartenflaecheProps {
   onMarkerKlick?: (schluessel: string) => void;
   /** Beim Setzen sanft hinfliegen. */
   flyToZiel?: { lng: number; lat: number } | null;
+  /**
+   * Startansicht aus den Einsatzdaten (`startAnsicht.ts`). `undefined` heißt „noch nicht
+   * entschieden" (Daten laden), `null` „nichts verortet, Übersicht behalten". Sie greift
+   * GENAU EINMAL je Karte: danach gehört der Ausschnitt der Bedienung — ein Live-Update, das
+   * einen neuen Marker bringt, darf den Ausschnitt nicht wegziehen. Ein früherer `flyToZiel`
+   * (Deeplink) verbraucht sie ebenfalls.
+   */
+  startAnsicht?: StartAnsicht | null;
   /** Style-Ladefehler (online nicht erreichbar) → Page stuft ab. */
   onStyleFehler?: () => void;
   /** Config-autoritative Pflicht-Attribution des aktiven Online-Views (null = keine). */
@@ -181,6 +192,15 @@ export interface KartenflaecheProps {
   platzierBild?: { id: number; ecken: Ecken } | null;
   /** Callback, wenn Platzier-Geometrie per Drag verändert wurde. */
   onPlatzierGeometrie?: (ecken: Ecken) => void;
+  /** Zeigerlage über der Karte (Koordinatenanzeige); `null`, sobald er die Karte verlässt. */
+  onZeigerLage?: (lage: { lat: number; lon: number } | null) => void;
+  /**
+   * Ziel-Element der Maßstabsleiste. MapLibres `ScaleControl` hängt sich sonst in seine
+   * eigene Ecke (`.maplibregl-ctrl-bottom-left`) — absolut über der Karte, genau dort, wo
+   * `KartenFuss` die Bänder im Fluss stapelt (LFH-355). Deshalb wird es über seine
+   * öffentliche `IControl`-Schnittstelle (`onAdd`/`onRemove`) in ein Band des Fußes gehängt.
+   */
+  massstabZiel?: HTMLElement | null;
 }
 
 /** Imperative Karten-API für die Page: Upload-Platzierung + Auf-Bild-Zentrieren. */
@@ -194,6 +214,11 @@ export interface KartenHandle {
   zoneAbschliessen(): boolean;
   /** Aktives Abschnitt-Zeichnen abschließen. No-op, wenn nicht aktiv. */
   abschnittAbschliessen(): boolean;
+  /** Eine Zoomstufe hinein/heraus — die Knöpfe der Überlagerung ersetzen `NavigationControl`. */
+  zoomRein(): void;
+  zoomRaus(): void;
+  /** Drehung und Neigung zurücksetzen (Nordung) — der Kompass des alten `NavigationControl`. */
+  nachNorden(): void;
 }
 
 const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kartenflaeche(
@@ -222,6 +247,9 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     bilder,
     platzierBild,
     onPlatzierGeometrie,
+    onZeigerLage,
+    massstabZiel,
+    startAnsicht,
   },
   ref,
 ) {
@@ -314,6 +342,15 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       abschnittAbschliessen() {
         return drawRef.current?.abschliessen() ?? false;
       },
+      zoomRein() {
+        mapRef.current?.zoomIn();
+      },
+      zoomRaus() {
+        mapRef.current?.zoomOut();
+      },
+      nachNorden() {
+        mapRef.current?.resetNorthPitch();
+      },
     }),
     [],
   );
@@ -349,7 +386,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       // absolutieren — Begründung und DEV-Mitschnitt oben an `transformiereKartenAnfrage`.
       transformRequest: transformiereKartenAnfrage,
     });
-    map.addControl(new maplibregl.NavigationControl(), 'top-right');
+    // KEIN `NavigationControl` mehr (Neuentwurf S5): Zoom, Nordung und Zeichnen stehen im
+    // Knopfblock der Überlagerung (`KartenUeberlagerung.tsx`) und rufen den Handle oben.
     // Fenster für die Basemap-Abstufung schließen, sobald der STYLE steht — NICHT erst bei
     // 'load'. 'load' wartet auf das Absetzen aller sichtbaren Kacheln (Map.loaded →
     // Style.loaded → TileManager.loaded), sein Fenster umfasst also den kompletten ersten
@@ -373,6 +411,15 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     const ladendeIcons = new Set<string>();
     map.on('styleimagemissing', (e) => {
       const id = e.id;
+      // Beschriftungsplakette der Zonen (9-Slice, Farben stehen in der Id). Nach `setStyle`
+      // sind alle Bilder weg; dieser Handler legt sie beim nächsten Bedarf wieder an.
+      if (id.startsWith(PLAKETTE_PRAEFIX)) {
+        const bild = plakettenBild(id);
+        if (!bild || map.hasImage(id)) return;
+        const { width, height, data, ...dehnung } = bild;
+        map.addImage(id, { width, height, data }, dehnung);
+        return;
+      }
       if (!id.startsWith('tz|')) return; // fremde IDs ignorieren
       if (map.hasImage(id) || ladendeIcons.has(id)) return;
       const tz = tzRegistryRef.current.get(id);
@@ -508,11 +555,69 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     };
   }, [onKarteKlick, onStyleFehler]);
 
+  // Zeigerlage melden (Koordinatenanzeige der Überlagerung). Über eine Ref, damit eine neue
+  // Callback-Identität die Handler nicht bei jedem Render ab- und anmeldet.
+  const onZeigerLageRef = useRef(onZeigerLage);
+  onZeigerLageRef.current = onZeigerLage;
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const bewegt = (e: maplibregl.MapMouseEvent) =>
+      onZeigerLageRef.current?.({ lat: e.lngLat.lat, lon: e.lngLat.lng });
+    const verlassen = () => onZeigerLageRef.current?.(null);
+    map.on('mousemove', bewegt);
+    map.on('mouseout', verlassen);
+    return () => {
+      map.off('mousemove', bewegt);
+      map.off('mouseout', verlassen);
+    };
+  }, []);
+
+  // Maßstabsleiste (metrisch) in das Band des Kartenfußes hängen — siehe `massstabZiel`.
+  // `onAdd` legt das Element im Kartencontainer an und abonniert `move`; `appendChild`
+  // VERSCHIEBT es in das Band. `onRemove` räumt Element und Abo wieder ab.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !massstabZiel) return;
+    const massstab = new maplibregl.ScaleControl({ maxWidth: 88, unit: 'metric' });
+    massstabZiel.appendChild(massstab.onAdd(map));
+    return () => {
+      massstab.onRemove();
+    };
+  }, [massstabZiel]);
+
+  // Startansicht einmalig anwenden. Steht VOR dem fly-to-Effekt: kommen beide in derselben
+  // Runde (Deeplink `?gefahrengebiet=`), läuft das fly-to danach und gewinnt.
+  // „Verbraucht" hängt an der KARTENINSTANZ, nicht an einem Boolean: unter StrictMode (Vite-
+  // Dev, e2e) läuft der Erzeugungs-Effekt zweimal, die erste Karte wird entfernt — ein
+  // Boolean-Ref überlebte das und ließe die zweite, sichtbare Karte auf der Übersicht stehen
+  // (so im Browser gemessen).
+  const startAufKarteRef = useRef<maplibregl.Map | null>(null);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || startAnsicht === undefined || startAufKarteRef.current === map) return;
+    startAufKarteRef.current = map;
+    if (startAnsicht === null) return;
+    if (startAnsicht.art === 'punkt') {
+      map.jumpTo({ center: [startAnsicht.lng, startAnsicht.lat], zoom: startAnsicht.zoom });
+    } else {
+      map.fitBounds(
+        [
+          [startAnsicht.west, startAnsicht.sued],
+          [startAnsicht.ost, startAnsicht.nord],
+        ],
+        { padding: 60, maxZoom: PUNKT_ZOOM, duration: 0 },
+      );
+    }
+  }, [startAnsicht]);
+
   // fly-to bei Auswahl.
   useEffect(() => {
     const map = mapRef.current;
-    if (map && flyToZiel)
+    if (map && flyToZiel) {
+      startAufKarteRef.current = map;
       map.flyTo({ center: [flyToZiel.lng, flyToZiel.lat] as LngLatLike, zoom: 15 });
+    }
   }, [flyToZiel]);
 
   // Abschnittsflächen-Daten in die Source spielen (und für setStyle-Re-Anlage merken).
@@ -572,9 +677,11 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     };
     map.on('click', 'zonen-fill', handler);
     map.on('click', 'zonen-line', handler);
+    map.on('click', 'zonen-line-gestrichelt', handler);
     return () => {
       map.off('click', 'zonen-fill', handler);
       map.off('click', 'zonen-line', handler);
+      map.off('click', 'zonen-line-gestrichelt', handler);
     };
   }, [onZoneKlick]);
 

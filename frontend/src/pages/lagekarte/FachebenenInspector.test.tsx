@@ -238,7 +238,8 @@ describe('FachebenenInspector', () => {
           onSchliessen={() => {}}
         />,
       );
-      const rand = (container.querySelector('.ant-card-head') as HTMLElement).style.borderLeftColor;
+      const rand = (container.querySelector('[data-lfh="auswahl-kachel"]') as HTMLElement).style
+        .borderColor;
       unmount();
       return rand;
     };

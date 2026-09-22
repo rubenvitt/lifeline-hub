@@ -1,0 +1,49 @@
+/* Lagekarte im Neuentwurf (S5 „Karte führt, Daten folgen").
+   Farben ausschliesslich über `var(--lfh-*)` aus `theme/rollen.css` — TSX liest dieselben
+   Rollen über `useRollen()` („ZWEI QUELLEN, EINE WAHRHEIT"). Hier steht nur, was inline nicht
+   erreichbar ist: Hover und Fokus, und die Optik der MapLibre-Maßstabsleiste. */
+
+/* Klappköpfe und Ebenen-Zeilen der rechten Leiste: Hover hebt den Grund, der Fokusring liegt
+   innen (in der Leiste stünde ein äusserer Ring unter dem Nachbarn). Der Ruhegrund steht HIER
+   und nicht inline — ein Inline-Grund schlüge jede `:hover`-Regel. */
+.lfh-klappkopf,
+.lfh-ebenenzeile {
+  background: transparent;
+}
+.lfh-kartenknopf {
+  background: var(--lfh-flaeche);
+}
+.lfh-klappkopf:hover,
+.lfh-ebenenzeile:hover,
+.lfh-kartenknopf:hover {
+  background: var(--lfh-flaeche-2);
+}
+.lfh-klappkopf:focus-visible,
+.lfh-ebenenzeile:focus-visible,
+.lfh-kartenknopf:focus-visible {
+  outline: 2px solid var(--lfh-bedien);
+  outline-offset: -2px;
+}
+.lfh-kartenknopf:disabled {
+  cursor: not-allowed;
+  color: var(--lfh-schwach);
+}
+
+/* Maßstabsleiste: MapLibres `ScaleControl` hängt im Band des Kartenfusses (siehe
+   `Kartenflaeche.tsx`, `massstabZiel`). Seine Vorgabe ist ein weisser Kasten mit dunklem
+   Rahmen — hier im Instrumentenstil: Mono 10, Linie unten und an den Enden in `gedaempft`,
+   ohne Fläche. Die BREITE setzt MapLibre bei jeder Bewegung inline; sie bleibt unangetastet. */
+.lfh-massstab .maplibregl-ctrl-scale {
+  margin: 0;
+  padding: 0 4px;
+  background: transparent;
+  border: 2px solid var(--lfh-gedaempft);
+  border-top: 0;
+  box-sizing: border-box;
+  color: var(--lfh-gedaempft);
+  font-family: var(--lfh-schrift-zahl);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  line-height: 14px;
+  white-space: nowrap;
+}

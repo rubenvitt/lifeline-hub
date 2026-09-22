@@ -1,9 +1,6 @@
 import { DatePicker, Input, Space } from 'antd';
-import { Select } from '../components/Select';
 import { useEffect, useRef, useState } from 'react';
 import type { EtbFilterWerte } from '../api/etb';
-import type { EtbTyp } from '../api/types';
-import { etbTyp } from '../theme/statusFarben';
 import { abstand } from '../theme/tokens';
 import { alsBackendZeit, alsOrtszeit } from './filterZeit';
 
@@ -35,10 +32,22 @@ import { alsBackendZeit, alsOrtszeit } from './filterZeit';
  * Entprellung in `EtbPage` verzögerte auch die Auswahl eines Typs — Wartezeit ohne Nutzen.
  * Der sichtbare Text hängt bewusst NICHT an der Frist; verzögert wird allein die Meldung
  * nach außen, sonst sähe die Bedienung aus wie ein hängendes Feld.
+ *
+ * **Der Typ gehört seit dem Neuentwurf (S4, 21.09.2026) NICHT mehr hierher**, sondern der
+ * Segmentleiste im Seitenkopf. Damit liefen zwei Filterquellen mit verschiedener Frist
+ * nebeneinander, und die Leiste meldet deshalb nur noch IHRE Schlüssel (`q`, `von`, `bis`)
+ * — nie den ganzen Filter aus ihrer Kopie. Meldete sie den ganzen, überschriebe ein
+ * Nachläufer der Suchfrist den eben gewählten Typ mit einem Stand, der ihn nicht kennt.
+ * Zusammengeführt wird in der Seite gegen den AKTUELLEN Filter
+ * (`zeitachseModell.ts`, `filterZusammenfuehren`).
  */
 
+/** Die Schlüssel, die diese Leiste führt. Ein geleerter Wert kommt als `undefined`. */
+export type LeistenFilter = Pick<EtbFilterWerte, 'q' | 'von' | 'bis'>;
+
 interface Props {
-  onChange: (werte: EtbFilterWerte) => void;
+  /** Stand der drei eigenen Schlüssel — vollständig, geleerte als `undefined`. */
+  onChange: (werte: LeistenFilter) => void;
   /**
    * Anfangsstand, üblicherweise aus der URL (`parseEtbFilter`). Wirkt einmalig beim
    * Aufbau — die Leiste ist danach die Quelle des sichtbaren Standes.
@@ -46,16 +55,15 @@ interface Props {
   startWerte?: EtbFilterWerte;
 }
 
-const TYP_OPTIONEN = (Object.keys(etbTyp) as EtbTyp[]).map((t) => ({
-  value: t,
-  label: etbTyp[t].label,
-}));
-
 /** Frist der Volltext-Entprellung. ~300 ms ist die Vorgabe aus dem Befund M80. */
 const ENTPRELLUNG_MS = 300;
 
 export default function EtbFilterleiste({ onChange, startWerte }: Props) {
-  const [werte, setWerte] = useState<EtbFilterWerte>(startWerte ?? {});
+  const [werte, setWerte] = useState<LeistenFilter>({
+    q: startWerte?.q,
+    von: startWerte?.von,
+    bis: startWerte?.bis,
+  });
   const frist = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Eine offene Frist beim Abbau löschen: die Leiste wird per `key` neu aufgesetzt
@@ -68,37 +76,31 @@ export default function EtbFilterleiste({ onChange, startWerte }: Props) {
     [],
   );
 
-  function aktualisiere(teil: Partial<EtbFilterWerte>, verzoegert = false) {
-    const neu = { ...werte, ...teil };
-    // Leere Strings/undefined entfernen, damit keine leeren Query-Parameter entstehen.
-    (Object.keys(neu) as (keyof EtbFilterWerte)[]).forEach((k) => {
-      if (neu[k] === undefined || neu[k] === '') delete neu[k];
+  function aktualisiere(teil: Partial<LeistenFilter>, verzoegert = false) {
+    // Leere Strings werden zu `undefined`: die Seite entfernt den Schlüssel dann, statt
+    // einen leeren Query-Parameter zu schreiben. Die Schlüssel bleiben dabei im Objekt —
+    // nur so erfährt die Seite, dass ein Wert GELEERT wurde.
+    const neu: LeistenFilter = { ...werte, ...teil };
+    (Object.keys(neu) as (keyof LeistenFilter)[]).forEach((k) => {
+      if (neu[k] === '') neu[k] = undefined;
     });
     setWerte(neu);
     // Auch der SOFORT-Weg löscht eine laufende Frist: sonst überschriebe ein
-    // Nachläufer aus dem Suchfeld gleich darauf den eben gewählten Typ mit einem
-    // Stand, der ihn noch nicht kennt.
+    // Nachläufer aus dem Suchfeld gleich darauf das eben gewählte Datum mit einem
+    // Stand, der es noch nicht kennt.
     if (frist.current) clearTimeout(frist.current);
     if (verzoegert) frist.current = setTimeout(() => onChange(neu), ENTPRELLUNG_MS);
     else onChange(neu);
   }
 
   return (
-    <Space wrap style={{ marginBottom: abstand.lg }}>
+    <Space wrap data-lfh="etb-filterleiste" style={{ marginBottom: abstand.lg }}>
       <Input.Search
         placeholder="Volltextsuche"
         allowClear
         defaultValue={startWerte?.q}
         style={{ width: 220 }}
         onChange={(e) => aktualisiere({ q: e.target.value }, true)}
-      />
-      <Select
-        placeholder="Typ"
-        allowClear
-        defaultValue={startWerte?.typ}
-        style={{ width: 150 }}
-        options={TYP_OPTIONEN}
-        onChange={(v?: EtbTyp) => aktualisiere({ typ: v })}
       />
       <DatePicker
         showTime

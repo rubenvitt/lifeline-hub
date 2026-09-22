@@ -1,4 +1,13 @@
-import { Alert, App, Button, Descriptions, Form, Typography } from 'antd';
+import { Alert, App, Button, Form, Typography } from 'antd';
+import AdminPage from '../components/AdminPage';
+import {
+  Augenbraue,
+  Datenfeld,
+  Datenraster,
+  Paneel,
+  monoStil,
+  useRollen,
+} from '../components/instrument';
 import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { startRegistration } from '@simplewebauthn/browser';
@@ -47,6 +56,7 @@ export default function ProfilPage() {
   // flüchtige Aktion ohne Folgezustand, die drei Alerts tragen Zustände. `App.useApp()`
   // hat im Repo breite Präzedenz, `<AntApp>` steht in main.tsx und in test/utils.tsx.
   const { message } = App.useApp();
+  const { token, rollen } = useRollen();
   const [provider, setProvider] = useState<AuthProvider[]>([]);
   // Die Organisation steht nicht an `BenutzerAnzeige` — sie kommt aus einem eigenen Abruf.
   // Nicht-blockierend und ohne Fehlerzweig: schlägt er fehl, zeigt die Kopfsektion „—",
@@ -166,168 +176,174 @@ export default function ProfilPage() {
 
   const totpAktiv = benutzer?.totp_aktiviert ?? false;
 
-  const kopfEintraege = [
-    { key: 'anzeigename', label: 'Anzeigename', children: benutzer?.anzeigename ?? '—' },
-    { key: 'benutzername', label: 'Benutzername', children: benutzer?.benutzername ?? '—' },
-    { key: 'rolle', label: 'Systemrolle', children: rollenText(benutzer) },
-    // Die Organisation steht nicht am Benutzer, sie kommt aus einem eigenen Abruf. Fällt
-    // der aus, bleibt „—" — die Kopfsektion ist deshalb nicht weniger brauchbar.
-    { key: 'org', label: 'Organisation', children: organisation?.name ?? '—' },
-  ];
-
   return (
-    <div>
-      <div style={{ maxWidth: 480, marginBottom: 32 }}>
-        <Typography.Title level={4} style={{ marginTop: 0 }}>
-          Profil
-        </Typography.Title>
-        {/* Ohne Klein-Angabe: an einer `Descriptions` wäre sie zwar kein Trefflächen-
-            Verstoß (`dichte.guard.test.ts` hält nicht-interaktive Flächen bewusst
-            draußen), das Kriterium dieses Tasks zählt aber dateiweit — und gebraucht
-            wird sie hier nicht. */}
-        <Descriptions column={1} bordered items={kopfEintraege} />
-      </div>
+    // Reine Formularseite: ausdrücklich schmal, unabhängig von der Vorgabe des Primitivs.
+    <AdminPage titel="Profil" breite="schmal">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: token.margin }}>
+        <Paneel titel="Konto">
+          {/* Die Organisation steht nicht am Benutzer, sie kommt aus einem eigenen Abruf.
+              Fällt der aus, bleibt „—" — die Kopfsektion ist deshalb nicht weniger
+              brauchbar. Benutzername in Mono: er ist eine Kennung, kein Name. */}
+          <Datenraster spalten={2} beschriftung="Kontodaten" style={{ border: 0 }}>
+            <Datenfeld label="Anzeigename">{benutzer?.anzeigename ?? '—'}</Datenfeld>
+            <Datenfeld label="Benutzername" mono>
+              {benutzer?.benutzername ?? '—'}
+            </Datenfeld>
+            <Datenfeld label="Systemrolle">{rollenText(benutzer)}</Datenfeld>
+            <Datenfeld label="Organisation">{organisation?.name ?? '—'}</Datenfeld>
+          </Datenraster>
+        </Paneel>
 
-      <Typography.Title level={4}>Sicherheit</Typography.Title>
-
-      {passkeySichtbar && (
-        <div style={{ maxWidth: 480, marginBottom: 32 }}>
-          <Typography.Title level={5} style={{ marginTop: 0 }}>
-            Passkey
-          </Typography.Title>
-          <Typography.Paragraph type="secondary">
-            Registriere einen Passkey für passwortlose Anmeldung auf diesem Gerät.
-          </Typography.Paragraph>
-          {fehler && <Alert type="error" title={fehler} showIcon style={{ marginBottom: 12 }} />}
-          {erfolg && (
-            <Alert
-              type="success"
-              title="Passkey registriert"
-              showIcon
-              style={{ marginBottom: 12 }}
-            />
-          )}
-          <Button onClick={passkeyRegistrieren} loading={laedt}>
-            Passkey registrieren
-          </Button>
-        </div>
-      )}
-
-      <div style={{ maxWidth: 480, marginBottom: 32 }}>
-        <Typography.Title level={5} style={{ marginTop: 0 }}>
-          Zwei-Faktor (TOTP)
-        </Typography.Title>
-
-        {recoveryCodes && (
-          <Alert
-            type="warning"
-            showIcon
-            style={{ marginBottom: 16 }}
-            // `title` statt des in antd 6 abgelösten `message` (LFH-345 · C10, N5).
-            title="Recovery-Codes jetzt sichern"
-            description={
-              <div>
-                <Typography.Paragraph style={{ marginBottom: 8 }}>
-                  Diese Codes werden nur einmal angezeigt und sind der einzige Ausweg bei
-                  Geräteverlust (Authenticator-App weg/gelöscht). Jeder Code ist genau einmal
-                  verwendbar.
+        <Paneel titel="Sicherheit" koerperPolster>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginLG }}>
+            {passkeySichtbar && (
+              <section style={{ maxWidth: 480 }}>
+                <Augenbraue als="h3" style={{ marginBottom: token.marginXS }}>
+                  Passkey
+                </Augenbraue>
+                <Typography.Paragraph type="secondary">
+                  Registriere einen Passkey für passwortlose Anmeldung auf diesem Gerät.
                 </Typography.Paragraph>
-                <pre
-                  style={{
-                    background: 'rgba(0,0,0,0.04)',
-                    padding: 12,
-                    borderRadius: 4,
-                    marginBottom: 8,
-                    whiteSpace: 'pre-wrap',
-                  }}
-                >
-                  {recoveryCodes.join('\n')}
-                </pre>
-                {/* `block` statt Klein-Angabe: das ist der einzige Ein-Klick-Weg zu Codes,
+                {fehler && (
+                  <Alert type="error" title={fehler} showIcon style={{ marginBottom: 12 }} />
+                )}
+                {erfolg && (
+                  <Alert
+                    type="success"
+                    title="Passkey registriert"
+                    showIcon
+                    style={{ marginBottom: 12 }}
+                  />
+                )}
+                <Button onClick={passkeyRegistrieren} loading={laedt}>
+                  Passkey registrieren
+                </Button>
+              </section>
+            )}
+
+            <section style={{ maxWidth: 480 }}>
+              <Augenbraue als="h3" style={{ marginBottom: token.marginXS }}>
+                Zwei-Faktor (TOTP)
+              </Augenbraue>
+
+              {recoveryCodes && (
+                <Alert
+                  type="warning"
+                  showIcon
+                  style={{ marginBottom: 16 }}
+                  // `title` statt des in antd 6 abgelösten `message` (LFH-345 · C10, N5).
+                  title="Recovery-Codes jetzt sichern"
+                  description={
+                    <div>
+                      <Typography.Paragraph style={{ marginBottom: 8 }}>
+                        Diese Codes werden nur einmal angezeigt und sind der einzige Ausweg bei
+                        Geräteverlust (Authenticator-App weg/gelöscht). Jeder Code ist genau einmal
+                        verwendbar.
+                      </Typography.Paragraph>
+                      <pre
+                        style={{
+                          background: rollen.flaeche2,
+                          padding: 12,
+                          borderRadius: 0,
+                          ...monoStil(13),
+                          marginBottom: 8,
+                          whiteSpace: 'pre-wrap',
+                        }}
+                      >
+                        {recoveryCodes.join('\n')}
+                      </pre>
+                      {/* `block` statt Klein-Angabe: das ist der einzige Ein-Klick-Weg zu Codes,
                     die nur einmal angezeigt werden. Ohne Zwischenablage KEIN toter Knopf,
                     sondern der ehrliche Hinweis auf das `<pre>` darüber — die Codes sind
                     markierbar, ein zweiter Mechanismus wäre überflüssig. Bewusst ohne
                     „Strg+C": das Führungs-Tablet hat keine Strg-Taste. */}
-                {kopierenMoeglich ? (
-                  <Button block onClick={recoveryCodesKopieren}>
-                    Codes kopieren
-                  </Button>
-                ) : (
-                  <Typography.Text type="secondary">
-                    Kopieren ist auf dieser Verbindung nicht möglich — die Codes oben lassen sich
-                    markieren und kopieren.
-                  </Typography.Text>
-                )}
-              </div>
-            }
-          />
-        )}
+                      {kopierenMoeglich ? (
+                        <Button block onClick={recoveryCodesKopieren}>
+                          Codes kopieren
+                        </Button>
+                      ) : (
+                        <Typography.Text type="secondary">
+                          Kopieren ist auf dieser Verbindung nicht möglich — die Codes oben lassen
+                          sich markieren und kopieren.
+                        </Typography.Text>
+                      )}
+                    </div>
+                  }
+                />
+              )}
 
-        {totpFehler && (
-          <Alert type="error" title={totpFehler} showIcon style={{ marginBottom: 12 }} />
-        )}
+              {totpFehler && (
+                <Alert type="error" title={totpFehler} showIcon style={{ marginBottom: 12 }} />
+              )}
 
-        {totpAktiv ? (
-          <>
-            <Alert type="success" title="2FA aktiv" showIcon style={{ marginBottom: 8 }} />
-            <Typography.Paragraph type="secondary">
-              Deaktivieren ist aktuell nur über einen Admin-Reset möglich (self-service Deaktivieren
-              ist bewusst nicht vorgesehen).
-            </Typography.Paragraph>
-          </>
-        ) : totpEnrollment ? (
-          <div>
-            <Typography.Paragraph type="secondary">
-              QR-Code mit deiner Authenticator-App scannen (oder das Secret manuell eintragen) und
-              den generierten Code bestätigen.
-            </Typography.Paragraph>
-            <div
-              style={{
-                background: '#fff',
-                padding: 12,
-                width: 'fit-content',
-                marginBottom: 12,
-              }}
-            >
-              <QRCodeSVG value={totpEnrollment.otpauthUrl} size={176} />
-            </div>
-            <Typography.Paragraph copyable={{ text: totpEnrollment.secretBase32 }}>
-              Secret (manuelle Eingabe): <code>{totpEnrollment.secretBase32}</code>
-            </Typography.Paragraph>
-            <Form
-              layout="vertical"
-              form={totpForm}
-              onFinish={totpBestaetigen}
-              disabled={totpLaedt}
-              requiredMark={false}
-            >
-              <Form.Item
-                label="Code aus deiner Authenticator-App"
-                name="code"
-                rules={[{ required: true, message: 'Bitte Code eingeben' }]}
-              >
-                {/* Dasselbe Primitiv wie auf der Anmeldeseite (LFH-345 · C10, M20). Hier
+              {totpAktiv ? (
+                <>
+                  <Alert type="success" title="2FA aktiv" showIcon style={{ marginBottom: 8 }} />
+                  <Typography.Paragraph type="secondary">
+                    Deaktivieren ist aktuell nur über einen Admin-Reset möglich (self-service
+                    Deaktivieren ist bewusst nicht vorgesehen).
+                  </Typography.Paragraph>
+                </>
+              ) : totpEnrollment ? (
+                <div>
+                  <Typography.Paragraph type="secondary">
+                    QR-Code mit deiner Authenticator-App scannen (oder das Secret manuell eintragen)
+                    und den generierten Code bestätigen.
+                  </Typography.Paragraph>
+                  <div
+                    style={{
+                      // Ein QR-Code braucht hellen Grund, auch im Nachtbetrieb — Scanner lesen
+                      // dunkle Module auf hellem Feld. Den hellen Grund samt Ruhezone
+                      // (4 Module, `marginSize`) trägt das SVG selbst (Vorgabe `bgColor` der
+                      // Bibliothek); die Hülle nimmt nur die Modus-Rolle und liest keine
+                      // Palette fest aus (vorher `farbenHell.flaeche`).
+                      background: rollen.flaeche,
+                      width: 'fit-content',
+                      marginBottom: token.marginSM,
+                    }}
+                  >
+                    <QRCodeSVG value={totpEnrollment.otpauthUrl} size={200} marginSize={4} />
+                  </div>
+                  <Typography.Paragraph copyable={{ text: totpEnrollment.secretBase32 }}>
+                    Secret (manuelle Eingabe): <code>{totpEnrollment.secretBase32}</code>
+                  </Typography.Paragraph>
+                  <Form
+                    layout="vertical"
+                    form={totpForm}
+                    onFinish={totpBestaetigen}
+                    disabled={totpLaedt}
+                    requiredMark={false}
+                  >
+                    <Form.Item
+                      label="Code aus deiner Authenticator-App"
+                      name="code"
+                      rules={[{ required: true, message: 'Bitte Code eingeben' }]}
+                    >
+                      {/* Dasselbe Primitiv wie auf der Anmeldeseite (LFH-345 · C10, M20). Hier
                     stand ein nacktes `<Input>` — ohne Ziffern-Tastatur, ohne Längengrenze,
                     ohne Ziffern-Optik. Ausgerechnet an der Stelle, an der 2FA eingerichtet
                     wird, war die schlechtere der beiden Bauformen. */}
-                <OtpEingabe autoFocus onVoll={() => totpForm.submit()} />
-              </Form.Item>
-              <Button type="primary" htmlType="submit" loading={totpLaedt}>
-                Bestätigen
-              </Button>
-            </Form>
+                      <OtpEingabe autoFocus onVoll={() => totpForm.submit()} />
+                    </Form.Item>
+                    <Button type="primary" htmlType="submit" loading={totpLaedt}>
+                      Bestätigen
+                    </Button>
+                  </Form>
+                </div>
+              ) : (
+                <>
+                  <Typography.Paragraph type="secondary">
+                    Sichere dein Konto mit einem zweiten Faktor aus einer Authenticator-App ab.
+                  </Typography.Paragraph>
+                  <Button onClick={totpEinrichtenStarten} loading={totpLaedt}>
+                    2FA einrichten
+                  </Button>
+                </>
+              )}
+            </section>
           </div>
-        ) : (
-          <>
-            <Typography.Paragraph type="secondary">
-              Sichere dein Konto mit einem zweiten Faktor aus einer Authenticator-App ab.
-            </Typography.Paragraph>
-            <Button onClick={totpEinrichtenStarten} loading={totpLaedt}>
-              2FA einrichten
-            </Button>
-          </>
-        )}
+        </Paneel>
       </div>
-    </div>
+    </AdminPage>
   );
 }

@@ -7,7 +7,7 @@ import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import type { KarteServerConfig } from '../api/karte';
 import type { KartenflaecheProps } from './lagekarte/Kartenflaeche';
-import LagekartePage, { quellenMeldung } from './LagekartePage';
+import LagekartePage, { kopfMeta, quellenMeldung } from './LagekartePage';
 
 // URL.createObjectURL / revokeObjectURL fehlen in jsdom → Stubs definieren bevor Tests laufen.
 // Direkt auf URL setzen (nicht via spyOn, da die Methoden in jsdom gar nicht existieren).
@@ -23,6 +23,9 @@ vi.mock('./lagekarte/Kartenflaeche', () => ({
     <div data-testid="kartenflaeche-stub">
       <div data-testid="attribution">{props.attribution ?? ''}</div>
       <div data-testid="bilder-count">{(props.bilder ?? []).length}</div>
+      <div data-testid="startansicht">
+        {props.startAnsicht === undefined ? 'offen' : JSON.stringify(props.startAnsicht)}
+      </div>
       {/* bbox-Pfad (LFH-81): ob die Seite überhaupt einen Ausschnitt hören will, und ein
           Auslöser, der einen Ausschnitt meldet wie die echte Karte nach `moveend`. */}
       <div data-testid="bbox-callback">{props.onBboxAenderung ? 'an' : 'aus'}</div>
@@ -394,7 +397,7 @@ describe('LagekartePage · Warn-Overlay bei fehlender Quelle (AK6)', () => {
   it('zeigt bei vollständig geladenem Lagebild KEIN Warn-Overlay', async () => {
     basisHandler();
     renderSeite();
-    expect(await screen.findByText('⚠ Nicht verortet')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /^Nicht verortet/ })).toBeInTheDocument();
     expect(screen.queryByTestId('lagebild-unvollstaendig')).not.toBeInTheDocument();
   });
 
@@ -476,7 +479,7 @@ describe('LagekartePage · Fehler-Slots der Sidebar', () => {
     expect(screen.queryByText('Alles verortet')).not.toBeInTheDocument();
     // Section-lokal, nicht seitenweit: der Sektionskopf steht weiterhin da. Geprüft wird
     // das Verhalten, nicht der DOM-Aufbau der Sidebar — kein Griff in die Card-Struktur.
-    expect(screen.getByText('⚠ Nicht verortet')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Nicht verortet/ })).toBeInTheDocument();
   });
 
   it('meldet die gescheiterte Bilder-Query in ihrer Sektion', async () => {
@@ -507,7 +510,7 @@ describe('LagekartePage · Fehler-Slots der Sidebar', () => {
   it('ohne Fehler trägt die Sidebar keinen der drei Slots', async () => {
     basisHandler();
     renderSeite();
-    expect(await screen.findByText('⚠ Nicht verortet')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /^Nicht verortet/ })).toBeInTheDocument();
     expect(screen.queryByText('Objektlisten konnten nicht geladen werden')).not.toBeInTheDocument();
     expect(
       screen.queryByText('Bild-Hintergründe konnten nicht geladen werden'),
@@ -519,15 +522,71 @@ describe('LagekartePage · Fehler-Slots der Sidebar', () => {
 });
 
 describe('LagekartePage', () => {
-  it('zeigt die Nicht-verortet-Liste mit Anzahl-Badge', async () => {
+  it('zeigt die Nicht-verortet-Liste mit Anzahl im Paneelkopf', async () => {
     basisHandler();
-    const { container } = renderSeite();
-    expect(await screen.findByText('⚠ Nicht verortet')).toBeInTheDocument();
+    renderSeite();
+    // Die Anzahl steht als Mono-Meta im Klappkopf (Neuentwurf S5) — sie ist Teil seines
+    // zugänglichen Namens, also gezielt diesen Knopf treffen, nicht irgendeine „1".
+    expect(await screen.findByRole('button', { name: 'Nicht verortet 1' })).toBeInTheDocument();
     expect(await screen.findByText(/BHP 50/)).toBeInTheDocument();
-    // Badge zeigt die Anzahl der nicht verorteten Objekte (1) — gezielt den
-    // Badge-Knoten treffen, nicht eine zufällige "(1)"-Zähltext-Stelle.
-    const badge = container.querySelector('.ant-badge-count');
-    expect(badge).toHaveTextContent('1');
+  });
+
+  it('startet auf dem Einsatzort statt auf der Deutschland-Übersicht', async () => {
+    basisHandler();
+    renderSeite();
+    // EINSATZ trägt einsatzort 50.0/8.5; der verortete Schaden liegt woanders und darf den
+    // Ausschnitt NICHT bestimmen (sonst wäre es ein Rahmen, kein Punkt).
+    await waitFor(() =>
+      expect(JSON.parse(screen.getByTestId('startansicht').textContent ?? 'null')).toEqual({
+        art: 'punkt',
+        lng: 8.5,
+        lat: 50.0,
+        zoom: 14,
+      }),
+    );
+  });
+
+  /*
+   * Review 22.09.2026: das Gate wartete nur auf die Marker-Quellen, nicht auf die
+   * Ansichten-Query. Kam die langsamer, entschied die Karte ohne Ansicht (Einsatzort) — und
+   * die Startansicht wird genau einmal verbraucht (`Kartenflaeche`), die gespeicherte
+   * Ansicht kam also nie mehr zum Zug.
+   */
+  it('wartet mit der Startansicht auf eine langsame Ansichten-Abfrage', async () => {
+    let freigeben: () => void = () => {};
+    const freigabe = new Promise<void>((r) => (freigeben = r));
+    basisHandler([
+      http.get('/api/einsaetze/1/karten-ansichten', async () => {
+        await freigabe;
+        return HttpResponse.json([
+          {
+            id: 1,
+            einsatz_id: 1,
+            name: 'Standard',
+            reihenfolge: 0,
+            ist_standard: true,
+            zentrum_lat: 49.4,
+            zentrum_lon: 8.7,
+            zoom: 12,
+            erstellt_at: '',
+            geaendert_at: '',
+          },
+        ]);
+      }),
+    ]);
+    renderSeite();
+    // Die Marker-Quellen sind da (die Liste steht) — die Ansichten noch nicht.
+    expect(await screen.findByRole('button', { name: 'Nicht verortet 1' })).toBeInTheDocument();
+    expect(screen.getByTestId('startansicht')).toHaveTextContent('offen');
+    freigeben();
+    await waitFor(() =>
+      expect(JSON.parse(screen.getByTestId('startansicht').textContent ?? 'null')).toEqual({
+        art: 'punkt',
+        lng: 8.7,
+        lat: 49.4,
+        zoom: 12,
+      }),
+    );
   });
 
   it('öffnet selbst KEINE SSE-Verbindung (der Live-Stream ist ins EinsatzLayout gehoben)', async () => {
@@ -536,7 +595,7 @@ describe('LagekartePage', () => {
     // darf deshalb keine eigene mehr öffnen — sonst wieder zwei Verbindungen je sichtbarer Seite.
     basisHandler();
     renderSeite();
-    expect(await screen.findByText('⚠ Nicht verortet')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /^Nicht verortet/ })).toBeInTheDocument();
     expect(eventSourceUrls).toHaveLength(0);
   });
 
@@ -581,7 +640,7 @@ describe('LagekartePage', () => {
     const user = userEvent.setup();
     renderSeite();
     await user.click(await screen.findByText('marker-schaden-9'));
-    const link = await screen.findByRole('link', { name: /Im Fach-Modul öffnen/ });
+    const link = await screen.findByRole('link', { name: /Im Fachmodul öffnen/ });
     expect(link).toHaveAttribute('href', '/einsaetze/1/schaeden/9');
   });
 
@@ -642,7 +701,7 @@ describe('LagekartePage', () => {
     await user.click(await screen.findByText('marker-freies_zeichen-42'));
     // FreiesZeichenInspector: Picker mit vorbelegtem Grundzeichen; KEIN „Im Fach-Modul öffnen".
     expect(await screen.findByText('Stelle, Einrichtung')).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /Im Fach-Modul öffnen/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Im Fachmodul öffnen/ })).not.toBeInTheDocument();
   });
 
   it('Marker-Klick während Platzieren öffnet keinen Inspector und lässt den Platzier-Modus intakt (LFH-208)', async () => {
@@ -659,7 +718,7 @@ describe('LagekartePage', () => {
     renderSeite();
     await user.click(await screen.findByRole('button', { name: 'Platzieren' }));
     await user.click(await screen.findByText('marker-schaden-9'));
-    expect(screen.queryByRole('link', { name: /Im Fach-Modul öffnen/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Im Fachmodul öffnen/ })).not.toBeInTheDocument();
     // Platzier-Modus intakt: der nächste Karten-Klick verortet weiterhin.
     await user.click(screen.getByText('karte-klick'));
     await waitFor(() => expect(patchBody).toEqual({ lat: 50.1, lon: 8.6 }));
@@ -696,15 +755,15 @@ describe('LagekartePage', () => {
     const user = userEvent.setup();
     renderSeite();
     // Default ist 'online' (online_style_url gesetzt) → Online gewählt, Blind NICHT.
+    // Die Kartengrundlage ist seit dem Neuentwurf (S5) eine Segmentleiste ÜBER der Karte;
+    // je Online-Stil ein Segment, benannt nach dem Stil (hier heißt er „Online").
     expect(await screen.findByText('marker-schaden-9')).toBeInTheDocument();
-    expect((screen.getByRole('radio', { name: 'Online' }) as HTMLInputElement).checked).toBe(true);
-    expect((screen.getByRole('radio', { name: 'Blind' }) as HTMLInputElement).checked).toBe(false);
-    // Auf Blind wechseln. antd Radio.Button rendert pointer-events:none auf dem
-    // <input> selbst → das umschließende <label>-Element klicken.
-    const blindLabel = screen.getByText('Blind').closest('label') ?? screen.getByText('Blind');
-    await user.click(blindLabel);
-    expect((screen.getByRole('radio', { name: 'Blind' }) as HTMLInputElement).checked).toBe(true);
-    expect((screen.getByRole('radio', { name: 'Online' }) as HTMLInputElement).checked).toBe(false);
+    const grundlage = screen.getByRole('radiogroup', { name: 'Kartengrundlage' });
+    expect(within(grundlage).getByRole('radio', { name: 'Online' })).toBeChecked();
+    expect(within(grundlage).getByRole('radio', { name: 'Blind' })).not.toBeChecked();
+    await user.click(within(grundlage).getByRole('radio', { name: 'Blind' }));
+    expect(within(grundlage).getByRole('radio', { name: 'Blind' })).toBeChecked();
+    expect(within(grundlage).getByRole('radio', { name: 'Online' })).not.toBeChecked();
     // Marker bleiben im Blind-Modus sichtbar (Spec-Garantie):
     expect(screen.getByText('marker-schaden-9')).toBeInTheDocument();
   });
@@ -726,29 +785,33 @@ describe('LagekartePage', () => {
     // Frisch hydratisiert = deckungsgleich mit der Ansicht → noch kein Speichern-Button.
     expect(screen.queryByRole('button', { name: 'In dieser Ansicht speichern' })).toBeNull();
     // Basemap auf Blind wechseln → der Zustand weicht von der gespeicherten Ansicht ab.
-    const blindLabel = screen.getByText('Blind').closest('label') ?? screen.getByText('Blind');
-    await user.click(blindLabel);
+    await user.click(screen.getByRole('radio', { name: 'Blind' }));
     expect(
       await screen.findByRole('button', { name: 'In dieser Ansicht speichern' }),
     ).toBeInTheDocument();
   });
 
-  it('Basemap-Umschalter: ohne Config sind Online/Offline disabled, Blind aktiv', async () => {
+  it('Basemap-Umschalter: ohne Config sind Online/Offline gesperrt, Blind aktiv', async () => {
     // Default-Config: leer → defaultModus = blind, kein Modus außer Blind verfügbar.
+    // Gesperrt statt ausgeblendet: dass es keine Online-/Offline-Karte gibt, ist eine
+    // Aussage über die Installation — der Grund steht am Segment.
     basisHandler();
     renderSeite();
     await screen.findByText('marker-schaden-9');
-    expect((screen.getByRole('radio', { name: 'Online' }) as HTMLInputElement).disabled).toBe(true);
-    expect((screen.getByRole('radio', { name: 'Offline' }) as HTMLInputElement).disabled).toBe(
-      true,
-    );
-    expect((screen.getByRole('radio', { name: 'Blind' }) as HTMLInputElement).disabled).toBe(false);
-    expect((screen.getByRole('radio', { name: 'Blind' }) as HTMLInputElement).checked).toBe(true);
+    const online = screen.getByRole('radio', { name: 'Online' });
+    expect(online).toBeDisabled();
+    expect(online).toHaveAttribute('title', 'Online-Karte nicht konfiguriert');
+    expect(screen.getByRole('radio', { name: 'Offline' })).toBeDisabled();
+    expect(screen.getByRole('radio', { name: 'Blind' })).toBeEnabled();
+    expect(screen.getByRole('radio', { name: 'Blind' })).toBeChecked();
   });
 
   it('Basemap-Umschalter: Blind-Modus zeigt erklärenden Hinweistext', async () => {
     basisHandler();
+    const user = userEvent.setup();
     renderSeite();
+    // Der Hinweis steht im Paneel „Kartengrundlage" der Leiste — zu Beginn zugeklappt.
+    await user.click(await screen.findByRole('button', { name: 'Kartengrundlage' }));
     expect(await screen.findByText(/Keine Basemap konfiguriert/i)).toBeInTheDocument();
   });
 
@@ -763,15 +826,13 @@ describe('LagekartePage', () => {
       offline_regionen: [],
       karten_bau_verfuegbar: false,
     });
+    const user = userEvent.setup();
     renderSeite();
     await screen.findByText('marker-schaden-9');
-    expect((screen.getByRole('radio', { name: 'Online' }) as HTMLInputElement).disabled).toBe(
-      false,
-    );
-    expect((screen.getByRole('radio', { name: 'Offline' }) as HTMLInputElement).disabled).toBe(
-      false,
-    );
-    // Default-Modus ist 'online' → kein Blind-Hinweis sichtbar.
+    expect(screen.getByRole('radio', { name: 'Online' })).toBeEnabled();
+    expect(screen.getByRole('radio', { name: 'Offline' })).toBeEnabled();
+    // Default-Modus ist 'online' → kein Blind-Hinweis, auch bei aufgeklapptem Paneel.
+    await user.click(screen.getByRole('button', { name: 'Kartengrundlage' }));
     expect(screen.queryByText(/Keine Basemap konfiguriert/i)).not.toBeInTheDocument();
   });
 
@@ -786,12 +847,10 @@ describe('LagekartePage', () => {
     });
     renderSeite();
     await screen.findByText('marker-schaden-9');
-    expect((screen.getByRole('radio', { name: 'Online' }) as HTMLInputElement).disabled).toBe(true);
-    expect((screen.getByRole('radio', { name: 'Offline' }) as HTMLInputElement).disabled).toBe(
-      false,
-    );
+    expect(screen.getByRole('radio', { name: 'Online' })).toBeDisabled();
+    expect(screen.getByRole('radio', { name: 'Offline' })).toBeEnabled();
     // defaultModus springt auf 'offline'
-    expect((screen.getByRole('radio', { name: 'Offline' }) as HTMLInputElement).checked).toBe(true);
+    expect(screen.getByRole('radio', { name: 'Offline' })).toBeChecked();
   });
 
   // --- L‑2: taktische Gliederung --------------------------------------------
@@ -877,7 +936,7 @@ describe('LagekartePage', () => {
     const user = userEvent.setup();
     renderSeite();
     await user.click(await screen.findByText('marker-einheit-1'));
-    const link = await screen.findByRole('link', { name: /Im Fach-Modul öffnen/ });
+    const link = await screen.findByRole('link', { name: /Im Fachmodul öffnen/ });
     // Deeplink mit Listen-Selektion der Einheit (LFH-25).
     expect(link).toHaveAttribute('href', '/einsaetze/1/einheiten?einheit=1');
   });
@@ -899,16 +958,13 @@ describe('LagekartePage', () => {
     await screen.findByText('marker-schaden-9');
     // Default-View ist der erste (Liberty) → dessen Attribution liegt an.
     expect(screen.getByTestId('attribution')).toHaveTextContent('© Liberty');
-    // Sub-Switcher (Online-Ansicht-Select) öffnen und TopPlus wählen. Seit B/LFH-320 trägt
-    // die Sidebar oben zusätzlich den Ansichts-Switcher (eigene Combobox) → per aria-label
-    // eindeutig abgrenzen. Option über `.ant-select-item-option` (der Text steht auch im
-    // ausgewählten Selektor).
-    await user.click(screen.getByRole('combobox', { name: 'Online-Ansicht' }));
-    const option = (await screen.findAllByText('TopPlus')).find((el) =>
-      el.closest('.ant-select-item-option'),
-    );
-    await user.click(option!);
+    // Seit dem Neuentwurf (S5) ist jeder Online-Stil ein eigenes Segment der Kartengrundlage
+    // (vorher ein Unter-Select „Online-Ansicht" hinter dem Online-Knopf).
+    const grundlage = screen.getByRole('radiogroup', { name: 'Kartengrundlage' });
+    expect(within(grundlage).getByRole('radio', { name: 'Liberty' })).toBeChecked();
+    await user.click(within(grundlage).getByRole('radio', { name: 'TopPlus' }));
     await waitFor(() => expect(screen.getByTestId('attribution')).toHaveTextContent('© BKG'));
+    expect(within(grundlage).getByRole('radio', { name: 'TopPlus' })).toBeChecked();
   });
 
   // --- L‑3: Gefahren- & Absperrzonen ----------------------------------------
@@ -1314,6 +1370,36 @@ function erstelleZonenPostSpy() {
   return { handler, count: () => anzahl, lastBody: () => letzterBody! };
 }
 
+/**
+ * Knopf über seinen sichtbaren Text statt `*ByRole` über die ganze Seite (22.09.2026).
+ *
+ * GEMESSEN, nicht vermutet: `getByRole('button', { name })` kostete auf der Lagekarte je Aufruf
+ * 2,4–2,6 s, allein und ohne Last — der Test „neuer Zeichenstart …" lief einzeln 6,1 s und in
+ * der vollen Suite über sein Zeitbudget. Die Zeit steckt NICHT in einer Render-Schleife und
+ * nicht in fehlenden Mocks: das CPU-Profil zeigt fast ausschließlich jsdoms
+ * `getComputedStyle` (`#resolveLonghand`, `getInheritedPropertyValue`, `var()`-Auflösung).
+ * Seit jsdom 30 löst `getComputedStyle` CSS-Variablen auf, und antd 6 trägt an jedem
+ * Bedienelement die Klasse `css-var-root` mit ihren Hunderten `--ant-*`-Variablen; die
+ * Rollenabfrage ruft das für JEDEN Knopf der Seite, um Namen und Sichtbarkeit zu bestimmen.
+ * Ein einzelner antd-Knopf in der Kartenleiste (Liste im Paneel im `aside`) kostete so bis
+ * zu 0,85 s — und die Leiste trägt Dutzende.
+ *
+ * `getByText` fragt keine berechneten Stile ab (3 ms statt 2,4 s). Die Rollenaussage geht
+ * dabei nicht verloren: der Treffer wird auf seinen `<button>` hochgereicht und muss einer
+ * sein.
+ */
+function knopfAus(text: HTMLElement): HTMLElement {
+  const knopf = text.closest('button');
+  expect(knopf, `„${text.textContent}" steht in keinem Knopf`).not.toBeNull();
+  return knopf as HTMLElement;
+}
+async function knopf(name: string): Promise<HTMLElement> {
+  return knopfAus(await screen.findByText(name));
+}
+function knopfSofort(name: string): HTMLElement {
+  return knopfAus(screen.getByText(name));
+}
+
 describe('LagekartePage · bbox-Pfad für bbox-abhängige Ebenen (LFH-81)', () => {
   it('KRITIS aus, Energie an → der Ausschnitt wird gemeldet und die Ebene damit abgefragt', async () => {
     const angefragt: (string | null)[] = [];
@@ -1334,6 +1420,9 @@ describe('LagekartePage · bbox-Pfad für bbox-abhängige Ebenen (LFH-81)', () =
     // dann die Meldung ganz.
     expect(await screen.findByTestId('bbox-callback')).toHaveTextContent('aus');
 
+    // Seit dem Neuentwurf (22.09.2026) startet das Fachebenen-Paneel der rechten Leiste
+    // eingeklappt — erst aufklappen, dann liegt der Schalter im Baum.
+    await user.click(await knopf('Fachebenen (extern)'));
     const schalter = (await screen.findByText('Energieanlagen'))
       .closest('.ant-space')
       ?.querySelector('button[role="switch"]');
@@ -1343,7 +1432,7 @@ describe('LagekartePage · bbox-Pfad für bbox-abhängige Ebenen (LFH-81)', () =
     // Die tragende Aussage: der Ausschnitt hängt nicht mehr an KRITIS. Mit der alten
     // Bedingung (`fachebenenSichtbar.kritis`) stünde hier weiter „aus".
     await waitFor(() => expect(screen.getByTestId('bbox-callback')).toHaveTextContent('an'));
-    await user.click(screen.getByRole('button', { name: 'bbox-melden' }));
+    await user.click(await knopf('bbox-melden'));
     // Gerastert wie bei KRITIS (0,05°-Gitter nach außen) — derselbe Schlüssel für
     // benachbarte Ausschnitte, frontend- wie backendseitig.
     await waitFor(() => expect(angefragt).toContain('7,51.5,7.15,51.6'));
@@ -1355,10 +1444,10 @@ describe('LFH-145: Zeichnen-Abschluss + Bestätigung', () => {
     basisHandler();
     const user = userEvent.setup();
     renderSeite();
-    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+    await user.click(await knopf('Gefahrengebiet zeichnen'));
     expect(await screen.findByText('Gefahrengebiet · Fläche')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Abschließen' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Abbrechen' })).toBeInTheDocument();
+    expect(knopfSofort('Abschließen')).toBeInTheDocument();
+    expect(knopfSofort('Abbrechen')).toBeInTheDocument();
   });
 
   it('nach Abschluss (Stub) → Phase „bestaetigen", noch NICHT persistiert', async () => {
@@ -1366,10 +1455,10 @@ describe('LFH-145: Zeichnen-Abschluss + Bestätigung', () => {
     basisHandler([spy.handler]);
     const user = userEvent.setup();
     renderSeite();
-    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+    await user.click(await knopf('Gefahrengebiet zeichnen'));
     await user.click(await screen.findByText('zone-fertig'));
-    expect(await screen.findByRole('button', { name: 'Speichern' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Verwerfen' })).toBeInTheDocument();
+    expect(await knopf('Speichern')).toBeInTheDocument();
+    expect(knopfSofort('Verwerfen')).toBeInTheDocument();
     expect(spy.count()).toBe(0);
   });
 
@@ -1378,9 +1467,9 @@ describe('LFH-145: Zeichnen-Abschluss + Bestätigung', () => {
     basisHandler([spy.handler]);
     const user = userEvent.setup();
     renderSeite();
-    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+    await user.click(await knopf('Gefahrengebiet zeichnen'));
     await user.click(await screen.findByText('zone-fertig'));
-    await user.click(await screen.findByRole('button', { name: 'Speichern' }));
+    await user.click(await knopf('Speichern'));
     await waitFor(() => expect(spy.count()).toBe(1));
     expect(spy.lastBody().typ).toBe('gefahrengebiet');
   });
@@ -1390,13 +1479,11 @@ describe('LFH-145: Zeichnen-Abschluss + Bestätigung', () => {
     basisHandler([spy.handler]);
     const user = userEvent.setup();
     renderSeite();
-    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+    await user.click(await knopf('Gefahrengebiet zeichnen'));
     await user.click(await screen.findByText('zone-fertig'));
-    await user.click(await screen.findByRole('button', { name: 'Verwerfen' }));
+    await user.click(await knopf('Verwerfen'));
     expect(spy.count()).toBe(0);
-    await waitFor(() =>
-      expect(screen.queryByRole('button', { name: 'Speichern' })).not.toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.queryByText('Speichern')).not.toBeInTheDocument());
   });
 
   it('Abbrechen in Phase zeichnen → kein POST, Overlay weg', async () => {
@@ -1404,8 +1491,8 @@ describe('LFH-145: Zeichnen-Abschluss + Bestätigung', () => {
     basisHandler([spy.handler]);
     const user = userEvent.setup();
     renderSeite();
-    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
-    await user.click(await screen.findByRole('button', { name: 'Abbrechen' }));
+    await user.click(await knopf('Gefahrengebiet zeichnen'));
+    await user.click(await knopf('Abbrechen'));
     expect(spy.count()).toBe(0);
     await waitFor(() =>
       expect(screen.queryByText('Gefahrengebiet · Fläche')).not.toBeInTheDocument(),
@@ -1420,15 +1507,77 @@ describe('LFH-145: Zeichnen-Abschluss + Bestätigung', () => {
     basisHandler([spy.handler]);
     const user = userEvent.setup();
     renderSeite();
-    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+    await user.click(await knopf('Gefahrengebiet zeichnen'));
     await user.click(await screen.findByText('zone-fertig'));
-    expect(await screen.findByRole('button', { name: 'Speichern' })).toBeInTheDocument();
+    expect(await knopf('Speichern')).toBeInTheDocument();
 
-    await user.click(await screen.findByRole('button', { name: 'Absperrgrenze zeichnen' }));
+    await user.click(await knopf('Absperrgrenze zeichnen'));
     // Zurück in Phase „zeichnen" für den NEUEN Entwurf, keine hängende Bestätigung mehr.
-    expect(screen.queryByRole('button', { name: 'Speichern' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Speichern')).not.toBeInTheDocument();
     expect(await screen.findByText('Absperrgrenze · Linie')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Abschließen' })).toBeInTheDocument();
+    expect(knopfSofort('Abschließen')).toBeInTheDocument();
     expect(spy.count()).toBe(0);
+  });
+});
+
+/** Neuentwurf S5: schlanker Seitenkopf, Karte führt, rechte Leiste trägt Ebenen + Auswahl. */
+describe('kopfMeta', () => {
+  it('nennt verortete und — wenn es sie gibt — nicht verortete Objekte', () => {
+    expect(kopfMeta(12, 0, false)).toBe('12 verortet');
+    expect(kopfMeta(12, 3, false)).toBe('12 verortet · 3 nicht verortet');
+  });
+
+  it('behauptet im Fehlerfall keine Zahl', () => {
+    expect(kopfMeta(0, 0, true)).toBe('— verortet');
+  });
+});
+
+describe('LagekartePage · Neuentwurf S5', () => {
+  it('trägt Titel und Mono-Meta im Seitenkopf', async () => {
+    basisHandler();
+    renderSeite();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Lagekarte' })).toBeInTheDocument();
+    // Schaden 9 ist verortet, UHS 5 (BHP 50) nicht.
+    const meta = document.querySelector('[data-lfh="seitenkopf-meta"]') as HTMLElement;
+    await waitFor(() => expect(meta).toHaveTextContent('verortet · 1 nicht verortet'));
+  });
+
+  it('Marker-Klick füllt das Paneel „Ausgewählt" der Leiste, nicht eine Karte über der Karte', async () => {
+    basisHandler();
+    const user = userEvent.setup();
+    renderSeite();
+    await user.click(await screen.findByText('marker-schaden-9'));
+    const paneel = screen.getByRole('region', { name: 'Ausgewählt' });
+    expect(
+      await within(paneel).findByRole('link', { name: /Im Fachmodul öffnen/ }),
+    ).toHaveAttribute('href', '/einsaetze/1/schaeden/9');
+    // Schließen führt zurück zum Hinweis.
+    await user.click(within(paneel).getByRole('button', { name: 'Schließen' }));
+    expect(paneel).toHaveTextContent(/Nichts gewählt/);
+  });
+
+  it('der Zeichnen-Knopf über der Karte öffnet die Zeichenwerkzeuge der Leiste', async () => {
+    localStorage.setItem('lfh:lagekarte:paneele', JSON.stringify({ zeichnen: false }));
+    basisHandler();
+    const user = userEvent.setup();
+    renderSeite();
+    await screen.findByText('marker-schaden-9');
+    expect(
+      screen.queryByRole('button', { name: 'Gefahrengebiet zeichnen' }),
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Zeichenwerkzeuge' }));
+    expect(
+      await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }),
+    ).toBeInTheDocument();
+  });
+
+  it('hängt die Maßstabsleiste als Band in den Kartenfuß, nicht frei über die Karte', async () => {
+    basisHandler();
+    renderSeite();
+    await screen.findByText('marker-schaden-9');
+    const band = document.querySelector('[data-lfh="massstab"]') as HTMLElement;
+    // Geschwister im Fluss des Fußes (LFH-355) — die Positionierung gehört dem Rahmen.
+    expect(band.parentElement?.dataset.lfh).toBe('karten-fuss');
+    expect(band.style.position).toBe('');
   });
 });
