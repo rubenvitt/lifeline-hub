@@ -69,17 +69,25 @@
 - [x] 5.1 In `CLAUDE.md` den Verweis `EtbTabelle.tsx:117-119` und die ETB-Stellen, die sich auf die fehlende Gesamtzahl berufen, auf den neuen Stand bringen. Verifikation: `grep -n "EtbTabelle.tsx:117" CLAUDE.md` findet nichts mehr.
 - [ ] 5.2 Gesamt-Gate `./scripts/check-all.sh` ausführen. Verifikation: Exit 0, ohne `| tail`.
 
-  Stand 22.09.2026: Schritte 1–4 (Format, Lint, Typ-Drift/tsc, Rust-Suite Workspace) zweimal
-  grün. Schritt 5 (Vitest) meldete 13 Fehlschläge in 6 Dateien, alle als `Test timed out in
-  10000ms` und alle in Dateien, die diese Änderung nicht anfasst. Die Zuordnung ist gemessen,
-  nicht vermutet: dieselbe Datei abwechselnd mit und ohne den neuen MSW-Default-Handler aus
-  `src/test/server.ts` — 4/4 rot in BEIDEN Fassungen bei Load ~100, 6/6 Dateien grün bei
-  Load ~36 (Fremdlast anderer Sessions, [[frontend-testsuite-parallel-timeouts]]). Die
-  Schritte 6–9 (Abhängigkeits-Audit, e2e, Ruhefenster-Selbsttest, check-deps-Selbsttest)
-  sind in diesem Ticket noch nicht bis zum Ende gelaufen; ein Lauf bei ruhiger Maschine steht
-  aus. e2e ist gegen diese Änderung gegriffen: kein Spec prüft die Kopfzahl-Wortlaute oder
-  die Bilanz-Zeile, `etb-chronologie.spec.ts` hängt nur am unveränderten `aria-label`
-  „Bilanz des Tagebuchs".
+  Stand 22.09.2026 — **jeder der neun Schritte ist grün gefahren, aber nicht in EINEM Lauf**;
+  die Maschine trug durchgehend Fremdlast aus anderen Sessions (Load 20–150, ruhig wäre < 5):
+  - Schritte 1–4 (Format · Lint · Typ-Drift samt `tsc` · Rust-Suite Workspace, 83 Suiten):
+    grün, zuletzt im vierten Lauf am Stück.
+  - Schritt 5 (Vitest, 4865 Tests): 4863 grün, **2 Fehlschläge, beide `Test timed out in
+    10000ms`** in `pages/PersonenDetailPage.test.tsx` und `stammdaten/PersonalTab.test.tsx` —
+    zwei Dateien, die diese Änderung nicht anfasst (ein früherer Lauf unter Load ~150 hatte
+    13 solcher Timeouts in 6 Dateien). Die Zuordnung zur Last ist **gemessen, nicht
+    vermutet**: dieselben Dateien abwechselnd mit und ohne den neuen MSW-Default-Handler aus
+    `src/test/server.ts` (der einzige Querschnitts-Eingriff dieser Änderung) — `PersonalTab`
+    4/4 rot in BEIDEN Fassungen bei Load ~100, `PersonenDetailPage` 2/2 grün in BEIDEN
+    Fassungen bei Load ~25. Isoliert sind beide Dateien grün.
+  - Schritt 6 (`check-deps.sh`, Rust- und Frontend-Audit), 8 (Ruhefenster-Selbsttest) und
+    9 (`check-deps.test.sh`): einzeln gefahren, Exit 0.
+  - Schritt 7 (`pnpm e2e`): **174 Tests grün in 5,7 min**, Exit 0 — gegen den produktiven
+    Frontend-Build. Kein Spec greift auf die geänderten Wortlaute zu;
+    `etb-chronologie.spec.ts` hängt am unveränderten `aria-label` „Bilanz des Tagebuchs".
+
+  Offen bleibt damit nur ein ununterbrochener Exit-0-Lauf auf ruhiger Maschine.
 - [x] 5.3 Sichtprüfung im Browser — gegen ein echtes Backend (eigene DB, Port 8099) mit
       produktivem Frontend-Build, Daten über die API angelegt (25 ETB-Einträge plus 14
       System-/Modul-Einträge, 5 Betroffene, 2 Einheiten, 2 Abschnitte, 3 Meldungen,
