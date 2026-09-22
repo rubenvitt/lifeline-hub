@@ -9,7 +9,7 @@ Prüfliste gilt nicht als fertig. Die Dokumentenablage ist ein neues Modul unter
 | Angabe | Wert |
 | --- | --- |
 | Route | `/einsaetze/:id/dokumente` (`frontend/src/pages/DokumentePage.tsx`) |
-| Stand | Commit `595a84fc` auf `claude/lfh-632-f2fa9d` (Basis `origin/alpha` `cbcec2f7`) |
+| Stand | Commit `ea2a47d0` auf `claude/lfh-632-f2fa9d` (Basis `origin/alpha` `cbcec2f7`) |
 | Zielkontext | Fükw (1280–1366 px, Tastatur + Maus, Nachtbetrieb als Vorgabe) als Primärkontext; Führungs-Tablet in `komfortabel`/`handschuh`; mobil 390 px nur lesend und ablegend, ohne Vergleichsansicht (Kartenform) |
 | Nicht enthalten | Vorschau (Bild/PDF), EXIF-/GPS-Bereinigung, Metadaten ändern, Offline-Ablage — nicht gebaut; wo ein Kriterium daran hängt, steht es als „offen" in der Zeile |
 
@@ -24,7 +24,7 @@ Gerechnetes und aus Quelltext/Grep Geschlossenes trägt **[abgeleitet]**. Eine A
 „erbt vom `ConfigProvider`" ist kein Beleg (LFH-396).
 
 **Zieltickets:** `LFH-397` besteht (Helligkeitsregler, app-weit), `LFH-643` besteht (globale
-Textstufe `schwach` am Tag). Die mit **F1…F5** bezeichneten Folgetickets sind vorgeschlagen und
+Textstufe `schwach` am Tag). Die mit **F1…F6** bezeichneten Folgetickets sind vorgeschlagen und
 werden vom Controller angelegt; die Liste steht am Ende unter „Offene Punkte".
 
 ---
@@ -40,10 +40,10 @@ Messwerte hängen als Anhang an den Tests.
 | e2e „legt ab, zählt, lädt herunter, filtert und entfernt — der ganze Weg im Browser" | Ansteuerung über die Modulzeile (`aria-current` danach gesetzt), kein Zähler bei 0, Fokus beim Öffnen auf „Datei wählen" (`toBeFocused` **und** `document.activeElement` = `BUTTON`, nicht der Datei-Input), Titel aus dem Dateinamen, Zeile im Viewport, Zähler 1 → 2 → 1, Download `Lageplan Nord.pdf`, Filter „Foto", Entfernen mit Rückfrage | `595a84fc` |
 | e2e „Formweiche und Querlauf: Tabelle bei 1280 px, Karte bei 390 px" | Tabelle bei 1280, Karten bei 390, `scrollWidth − clientWidth ≤ 0,5` bei beiden; Entfernen im Kartenzweig: Auslöser **nicht** rot, OK der Rückfrage rot, Zeile weg | `595a84fc` |
 | e2e „Dichte-Staffel: … › kompakt / komfortabel / handschuh" | Download-Anker, Entfernen (Zeile), Datei wählen, Kategorie, Titel, Abbrechen, Ablegen: **30 / 48 / 72** px (Select kompakt 29,5, Titel kompakt 30,1); Fuge zwischen den Entfernen-Knöpfen zweier Zeilen in `handschuh` ≥ 16 zugesichert, gemessen **15 / 23 / 33** px. Nur gemessen: Klappkopf „Bezug (optional)" **36 / 45 / 55** px, Fuge Abbrechen │ Ablegen **3 / 5 / 7** px | `595a84fc` |
-| e2e „Tastaturweg: Dialog öffnen, Datei wählen, Kategorie, Enter legt ab" | Tab-Reihe vorwärts `Datei wählen → Kategorie → Titel → Bezug (optional) → Abbrechen → Ablegen`, rückwärts gespiegelt; die rc-upload-Hülle ist **kein** eigener Tab-Stopp; Leertaste öffnet den Dateiwähler; nach der Wahl sind Dateiname und „Datei entfernen" Tab-Stopps; Kategorie per Tippen + Enter; Enter im Titel legt ab | `595a84fc` |
+| e2e „Tastaturweg: Dialog öffnen, Datei wählen, Kategorie, Enter legt ab" | Tab-Reihe vorwärts `Datei wählen → Kategorie → Titel → Bezug (optional) → Abbrechen → Ablegen`, rückwärts gespiegelt; die rc-upload-Hülle ist **kein** eigener Tab-Stopp; Enter öffnet den Dateiwähler (Sonde: genau ein `input.click()` je Tastendruck, 12 Läufe, Enter wie Leertaste); nach der Wahl sind Dateiname und „Datei entfernen" Tab-Stopps; Kategorie per Tippen + Enter; Enter im Titel legt ab | `595a84fc` |
 | e2e „Kontrast light / dark: Zellen, Dialog und Pflichtmeldung" | **Zugesichert (7 Tag / 5 Nacht):** Kategorie-Zelle, Verfasser · Zeit, Label „Datei", „Datei wählen", Klappkopf. **Gemessen, Boden 4,5:** Titel-Anker (Linkfarbe) **6,59 / 4,55**, Tabellenkopf **5,58 / 5,17**, Bezug „—" (Sekundärtext) **6,37 / 5,03**, Pflichtmeldung (`colorError`) **6,27 / 6,48** | `595a84fc` |
 | e2e „Fokus nie verdeckt: Tab-Durchlauf durch die Liste unter der stehenden Kopfzeile" | 1366 × 600, 20 Zeilen, halb gescrollt: **79** Stopps, **45** in der Tabelle, **25** fixierte Kandidaten, **0** verdeckt | `595a84fc` |
-| Mutationsproben (zurückgedreht) | Fokus-Callback entfernt → „Fokus liegt beim Öffnen auf „Datei wählen"" rot · `bestaetigungGefahr` entfernt → „das OK der Rückfrage ist rot" rot · `minHeight: 20` am Anker → komfortabel 23 < 48 und handschuh 23 < 72 rot | `595a84fc` |
+| Mutationsproben (zurückgedreht) | Fokus-Callback entfernt → „Fokus liegt beim Öffnen auf „Datei wählen"" rot · `bestaetigungGefahr` entfernt → „das OK der Rückfrage ist rot" rot · `minHeight: 20` am Anker → komfortabel 23 < 48 und handschuh 23 < 72 rot | `746810b9` (die geprüften Tests sind bis `ea2a47d0` unverändert) |
 | Sondierlauf (nicht eingecheckt), Seitenkopf und Werkzeugzeile | „Dokument ablegen" und das Suchfeld der Werkzeugzeile **30 / 48 / 72** px | `595a84fc` |
 | Grep über `pages/DokumentePage.tsx`, `dokumente/*.tsx` (ohne Tests) | `size=` **0** · Farbliterale (`#…`, `rgb(`, `color=`) **0** · `danger` **2** (Entfernen-Knopf der Tabelle, `okButtonProps` der Rückfrage) · `animation`/`keyframes`/`transition` **0** · `sticky`/`fixed` **0** · Toast-Aufrufe **2**, beide `message.success` im `onSuccess` einer eigenen Mutation | `595a84fc` [abgeleitet] |
 
@@ -97,7 +97,7 @@ Nummer `0106` (LFH-609, LFH-628, LFH-636); der Server startet damit nicht
 | 12 | **Kein Sprung unter dem Cursor** — CLS ≤ 0,1 (75. Perzentil, web.dev); neue Datensätze nur als opt-in-Sammelbanner (WCAG 3.2.5 / G76). | **offen** | **Trägt:** die Dateiwahl setzt den Titel nur, solange er leer oder automatisch gesetzt ist (`DokumentAblegenModal.test.tsx` „überschreibt einen schon getippten Titel NICHT", „ersetzt einen automatisch gesetzten Titel bei neuer Dateiwahl"); der Bezug klappt nur auf Nutzeraktion auf. **Offen:** die Optionen der Bezugswahl stammen aus drei Live-Keys (`einsatz-abschnitte`, `einsatz-einheiten`, `einsatz-etb`, `api/queryKeys.ts`). Kommt bei geöffneter Liste ein ETB-Eintrag dazu, steht er **oben** in seiner Gruppe (neueste zuerst) und schiebt die Einträge darunter weg; ein neuer Abschnitt schiebt die Gruppen „Einheiten" und „ETB-Einträge" — ohne Sammelbanner [abgeleitet, nicht gemessen]. Derselbe Befund wie Stab 3 · 12 | F4 |
 | 13 | **Fokus nie verdeckt** — 0 vollständig verdeckte Fokusziele beim Tab-Durchlauf hinter fixierten Köpfen, Fußleisten oder Drawern (WCAG 2.4.11 AA). | **erfüllt** | Tab-Reihe im Browser vollständig gemessen und im Dialog geschlossen (e2e „Tastaturweg …", vor- und rückwärts); Dialog und Hülle tragen keine fixierte Konstruktion (Grep `sticky`/`fixed` in `DokumentAblegenModal.tsx` und `Erfassung.tsx` = 0 [abgeleitet]) | — |
 | 14 | **Tabellenseite vollständig** — fixierte Kopfzeile, fixierte menschenlesbare Identifierspalte, umschaltbarer Spaltensatz mit Zähler ausgeblendeter Spalten, keine Auflösung in Karten, wo verglichen wird (NN/g Data Tables / Mobile Tables). | **nicht anwendbar** | Maske, keine Menge | — |
-| 15 | **Erfassungsmaske vollständig** — Defaults vorbelegt, sichtbar und einzeln überschreibbar (MIL 5.14.7.1/.3), „Speichern und nächsten anlegen" mit gehaltenem Kontext (5.14.7.4), Sammelliste mit Ändern/Entfernen je Zeile (DWP „Add another thing"), Labels über dem Feld (50 ms statt 500 ms Sakkade, Penzo), volle Tastaturbedienung (WCAG 2.1.1). | **offen** | **Trägt:** Hülle `ErfassungsModal`, Knopf im `<form>`, keine Modal-Fußzeile (`DokumentAblegenModal.test.tsx` „Struktur statt Tastendruck: Absende-Knopf im <form>, keine Modal-Fußzeile"); Feldbudget 3 sichtbar + Bezug eingeklappt im Baum („Feldbudget: drei sichtbare Felder, der Bezug zählt erst aufgeklappt"); Titel aus dem Dateinamen vorbelegt, sichtbar und überschreibbar (Tests in Nr. 12); Kategorie **bewusst ohne** Vorbelegung (ein als „Sonstiges" durchgerutschtes Foto findet der Filter nicht mehr, Dateikopf `DokumentAblegenModal.tsx`); zurückgesetzt auf jedem Weg hinaus, Datei eingeschlossen („schließt nach Erfolg und ist beim Wiederöffnen leer — Datei eingeschlossen"); Labels über dem Feld (`layout="vertical"` der Hülle); **volle Tastaturbedienung im Browser**: e2e „Tastaturweg: Dialog öffnen, Datei wählen, Kategorie, Enter legt ab" samt Fokus beim Öffnen (e2e „legt ab …"). **Bewusst nicht:** „Speichern und nächste" — jede Ablage braucht einen eigenen Dateiwähler-Durchgang. **Offen:** die Sammelliste (Tabelle 1) hat Entfernen, aber **kein Ändern** je Zeile — ein falsch gewählter Titel, eine falsche Kategorie oder ein vergessener Bezug lassen sich nur durch Entfernen und neues Ablegen korrigieren | F5 |
+| 15 | **Erfassungsmaske vollständig** — Defaults vorbelegt, sichtbar und einzeln überschreibbar (MIL 5.14.7.1/.3), „Speichern und nächsten anlegen" mit gehaltenem Kontext (5.14.7.4), Sammelliste mit Ändern/Entfernen je Zeile (DWP „Add another thing"), Labels über dem Feld (50 ms statt 500 ms Sakkade, Penzo), volle Tastaturbedienung (WCAG 2.1.1). | **offen** | **Trägt:** Hülle `ErfassungsModal`, Knopf im `<form>`, keine Modal-Fußzeile (`DokumentAblegenModal.test.tsx` „Struktur statt Tastendruck: Absende-Knopf im <form>, keine Modal-Fußzeile"); Feldbudget 3 sichtbar + Bezug eingeklappt im Baum („Feldbudget: drei sichtbare Felder, der Bezug zählt erst aufgeklappt"); Titel aus dem Dateinamen vorbelegt, sichtbar und überschreibbar (Tests in Nr. 12); Kategorie **bewusst ohne** Vorbelegung (ein als „Sonstiges" durchgerutschtes Foto findet der Filter nicht mehr, Dateikopf `DokumentAblegenModal.tsx`); zurückgesetzt auf jedem Weg hinaus, Datei eingeschlossen („schließt nach Erfolg und ist beim Wiederöffnen leer — Datei eingeschlossen"); Labels über dem Feld (`layout="vertical"` der Hülle); **volle Tastaturbedienung im Browser**: e2e „Tastaturweg: Dialog öffnen, Datei wählen, Kategorie, Enter legt ab" samt Fokus beim Öffnen (e2e „legt ab …"). **Bewusst nicht:** „Speichern und nächste" — jede Ablage braucht einen eigenen Dateiwähler-Durchgang. **Offen:** die Sammelliste (Tabelle 1) hat Entfernen, aber **kein Ändern** je Zeile — ein falsch gewählter Titel, eine falsche Kategorie oder ein vergessener Bezug lassen sich nur durch Entfernen und neues Ablegen korrigieren. Dazu ein Tab-Stopp ohne Aktion: nach der Dateiwahl ist der Dateiname in antds Upload-Liste ein `span role="button" tabindex="0"`, ohne `onPreview` bewirkt Enter darauf nichts (Sonde: Fokus bleibt, keine Navigation, kein neues Fenster; 3 Läufe) | F5, F6 |
 
 **Verdikt-Bilanz:** 7 erfüllt (davon 2 [abgeleitet]) · 6 offen · 2 nicht anwendbar.
 
@@ -125,6 +125,7 @@ Nummer `0106` (LFH-609, LFH-628, LFH-636); der Server startet damit nicht
 | 2 · 8 | Regler (app-weit) | LFH-397 |
 | 2 · 12 | Bezugswahl folgt drei Live-Keys; neue Einträge schieben die offene Optionsliste | F4 |
 | 2 · 15 | Kein „Ändern" je Zeile: Metadaten (Titel, Kategorie, Bezug) nachträglich ändern | F5 |
+| 2 · 15 | Dateiname in der Upload-Liste ist Tab-Stopp ohne Aktion | F6 |
 
 **Vorgeschlagene Folgetickets** (vom Controller anzulegen):
 
@@ -143,6 +144,10 @@ Nummer `0106` (LFH-609, LFH-628, LFH-636); der Server startet damit nicht
   jüngsten 100 Einträge" (serverseitige Suche).
 - **F5 — Metadaten eines abgelegten Dokuments nachträglich ändern** (Titel, Kategorie,
   Bezug; Kandidat aus dem Plan).
+- **F6 — Upload-Liste ohne leeren Tab-Stopp:** der Dateiname in antds Upload-Liste ist ohne
+  `onPreview` ein fokussierbares `role="button"` ohne Wirkung; entweder die Vorschau daran
+  hängen (Plan-Kandidat „Vorschau") oder den Eintrag aus der Tab-Reihe nehmen. Trifft jede
+  Upload-Maske der Anwendung.
 
 **Kandidaten aus dem Plan, die hier nicht zutreffen:** Vorschau (Bild/PDF-Quick-View) und
 EXIF-/GPS-Entfernung berühren keines der 15 Kriterien — der Download ist der vollständige
@@ -167,3 +172,7 @@ Suchtext enthält und deshalb schon vor der Wahl passte). Viermal parallel wiede
 
 **Mit dem eingecheckten Stand allein startet kein Backend:** der Befund liegt an
 `origin/alpha` (drei `0106`-Migrationen), nicht an diesem Modul; aufgelöst werden muss er dort.
+
+Nachgezogen in `ea2a47d0`: der Tastaturweg öffnet den Dateiwähler jetzt mit Enter statt mit der
+Leertaste (Sonde: kein Doppelauslösen); der Spec lief danach 9 / 9 grün, „Tastaturweg …" sechsmal
+parallel grün. Kein erneuter Gesamtlauf — geändert hat sich nur diese eine Taste im Spec.
