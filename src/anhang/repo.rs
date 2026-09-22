@@ -478,7 +478,15 @@ mod tests {
             chat_lebend: 1,
             dokument_gesamt: 0,
         };
+        // Dokument hat Vorrang: auch eine lebende Chat-Verknüpfung öffnet den generischen
+        // Download nicht (LFH-632).
+        let dokument_und_lebender_chat = LinkerStand {
+            chat_gesamt: 1,
+            chat_lebend: 1,
+            dokument_gesamt: 1,
+        };
         assert!(nur_tot.generischer_download_gesperrt());
         assert!(!einer_lebt.generischer_download_gesperrt());
+        assert!(dokument_und_lebender_chat.generischer_download_gesperrt());
     }
 }
