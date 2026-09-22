@@ -537,7 +537,7 @@ fn stab_besetzung_art_wire() {
 }
 
 /// LFH-632: Dokumentenablage. `DokumentKategorie` trägt die DB-CHECK-Werte aus
-/// `migrations/0107_einsatz_dokument.sql` — Drift endet sonst im Constraint-Sicherheitsnetz.
+/// `migrations/0114_einsatz_dokument.sql` — Drift endet sonst im Constraint-Sicherheitsnetz.
 #[test]
 fn dokument_kategorie_wire() {
     enum_wire_as_str!(lifeline_hub::dokument::DokumentKategorie {
