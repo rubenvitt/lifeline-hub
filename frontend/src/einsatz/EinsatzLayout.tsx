@@ -23,7 +23,7 @@ import ModulAkkordeon from './ModulAkkordeon';
 import { leseNavEingeklappt, schreibeNavEingeklappt } from './navPersistenz';
 import { merkeModulBesuch } from './zuletztModule';
 import AlarmZentrale from './AlarmZentrale';
-import BenutzerMenu, { funktionAusSachgebieten } from '../components/BenutzerMenu';
+import BenutzerMenu from '../components/BenutzerMenu';
 import CommandPaletteTrigger from '../components/CommandPaletteTrigger';
 import {
   KOPF_HOEHE,
@@ -428,7 +428,7 @@ export default function EinsatzLayout() {
           <div
             style={{ ...kopfZelleStil(zellToken, 'keiner'), paddingInlineStart: token.paddingXS }}
           >
-            <BenutzerMenu funktion={funktionAusSachgebieten(einsatz?.meine_sachgebiete)} />
+            <BenutzerMenu funktion={einsatz?.meine_funktion} />
           </div>
         </KopfRechts>
       </Header>

@@ -388,6 +388,37 @@ describe('EinsatzLayout', () => {
     expect(within(kopf).getByRole('button', { name: /Hochwasser Nord/ })).toBeInTheDocument();
   });
 
+  it('trägt die Funktion aus dem Backend im Benutzermenü, nicht aus den Sachgebieten (LFH-615)', async () => {
+    // Beide Felder widersprechen sich absichtlich: eine Frontend-Ableitung aus
+    // `meine_sachgebiete` ergäbe „S4 Versorgung". Maßgeblich ist allein `meine_funktion`.
+    // Ab `xl` trägt der Trigger die Funktion; darunter nur die Initialen (BenutzerMenu).
+    setzeViewportBreite(1440);
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
+      http.get('/api/einsaetze/7', () =>
+        HttpResponse.json({ ...einsatz, meine_sachgebiete: ['s4'], meine_funktion: 'S2/S3' }),
+      ),
+      http.get('/api/einsaetze/7/modul-overrides', () => HttpResponse.json({})),
+      http.get('/api/einsaetze/7/einstellungen', () => HttpResponse.json({})),
+    );
+    renderMitProviders(
+      <AuthProvider>
+        <CommandPaletteProvider>
+          <Routes>
+            <Route path="/einsaetze/:id" element={<EinsatzLayout />}>
+              <Route path="etb" element={<div>ETB-Inhalt</div>} />
+            </Route>
+          </Routes>
+        </CommandPaletteProvider>
+      </AuthProvider>,
+      { route: '/einsaetze/7/etb' },
+    );
+    const menu = await screen.findByRole('button', { name: 'Benutzermenü' });
+    await waitFor(() => expect(menu.textContent).toContain('S2/S3'));
+    expect(menu.textContent).not.toContain('Versorgung');
+  });
+
   it('rendert den sichtbaren Such-Trigger im Einsatz-Workspace', async () => {
     setup();
     await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());

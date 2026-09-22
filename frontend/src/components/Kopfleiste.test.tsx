@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { dichten, farbenDunkel } from '../theme/tokens';
-import { funktionAusSachgebieten } from './BenutzerMenu';
 import {
   KOPF_NAME_FLEX,
   KOPF_NAME_FLEX_SCHMAL,
@@ -75,18 +74,6 @@ describe('Kopfleiste · Stile', () => {
 
   it('formatiert die Uhr als HH:MM', () => {
     expect(formatiereUhr(new Date(2026, 8, 21, 7, 5).getTime())).toBe('07:05');
-  });
-});
-
-describe('funktionAusSachgebieten — Funktion im Kopf', () => {
-  it('nennt das erste besetzte Sachgebiet im Klartext, in S1–S6-Reihenfolge', () => {
-    expect(funktionAusSachgebieten(['s2'])).toBe('S2 Lage');
-    expect(funktionAusSachgebieten(['s4', 's2'])).toBe('S2 Lage');
-  });
-
-  it('erfindet ohne Sachgebiet keine Funktion', () => {
-    expect(funktionAusSachgebieten([])).toBeNull();
-    expect(funktionAusSachgebieten(undefined)).toBeNull();
   });
 });
 

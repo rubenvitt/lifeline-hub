@@ -233,6 +233,11 @@ pub struct EtbEintragAnzeige {
     pub veranlassung: Option<String>,
     pub erfasser_id: i64,
     pub erfasser_name: String,
+    /// Funktion des Erfassers beim Anlegen („S2", „S2/S3", „EL"; LFH-615) — Snapshot, keine
+    /// Ableitung beim Lesen. Fehlt, wenn keine Funktion ableitbar war oder der Eintrag älter
+    /// als die Spalte ist.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub erfasser_funktion: Option<String>,
     pub ereigniszeit: String,
     pub received_at: String,
     pub erfasst_lokal_at: Option<String>,

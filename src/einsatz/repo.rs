@@ -223,33 +223,44 @@ pub async fn liste_fuer(
                 jetzt,
             )
         })
-        .map(|r| EinsatzAnzeige {
-            id: r.id,
-            org_id: r.org_id,
-            org_name: r.org_name,
-            bezeichnung: r.bezeichnung,
-            stichwort: r.stichwort,
-            status: r.status,
-            begonnen_at: r.begonnen_at,
-            naechste_lagebesprechung_at: r.naechste_lagebesprechung_at,
-            abgeschlossen_at: r.abgeschlossen_at,
-            abgeschlossen_von: r.abgeschlossen_von,
-            einsatzart: r.einsatzart,
-            einsatznummer_intern: r.einsatznummer_intern,
-            angelegt_at: r.angelegt_at,
-            leitstellen_nr: r.leitstellen_nr,
-            einsatzort: r.einsatzort,
-            einsatzort_lat: r.einsatzort_lat,
-            einsatzort_lon: r.einsatzort_lon,
-            meldende_stelle: r.meldende_stelle,
-            sachverhalt: r.sachverhalt,
-            anzahl_betroffene_initial: r.anzahl_betroffene_initial,
-            retention_bis: r.retention_bis,
-            meine_rolle: r.meine_rolle,
-            meine_fuehrungsstelle: r.meine_fuehrungsstelle,
-            // `remove` statt `get`: jede Einsatz-id kommt genau einmal vor, der Eintrag wird
-            // also nicht mehr gebraucht — das spart das Klonen des Vec.
-            meine_sachgebiete: sachgebiete.remove(&r.id).unwrap_or_default(),
+        .map(|r| {
+            let meine_sachgebiete = sachgebiete.remove(&r.id).unwrap_or_default();
+            // Dieselbe reine Ableitung wie `Einsatz::anzeige` — aus Werten, die diese
+            // Funktion ohnehin schon geladen hat, also ohne dritte Abfrage.
+            let meine_funktion = super::funktion::ableiten(
+                &meine_sachgebiete,
+                r.meine_rolle.as_deref().and_then(EinsatzRolle::parse),
+            )
+            .map(|f| f.bezeichnung);
+            EinsatzAnzeige {
+                id: r.id,
+                org_id: r.org_id,
+                org_name: r.org_name,
+                bezeichnung: r.bezeichnung,
+                stichwort: r.stichwort,
+                status: r.status,
+                begonnen_at: r.begonnen_at,
+                naechste_lagebesprechung_at: r.naechste_lagebesprechung_at,
+                abgeschlossen_at: r.abgeschlossen_at,
+                abgeschlossen_von: r.abgeschlossen_von,
+                einsatzart: r.einsatzart,
+                einsatznummer_intern: r.einsatznummer_intern,
+                angelegt_at: r.angelegt_at,
+                leitstellen_nr: r.leitstellen_nr,
+                einsatzort: r.einsatzort,
+                einsatzort_lat: r.einsatzort_lat,
+                einsatzort_lon: r.einsatzort_lon,
+                meldende_stelle: r.meldende_stelle,
+                sachverhalt: r.sachverhalt,
+                anzahl_betroffene_initial: r.anzahl_betroffene_initial,
+                retention_bis: r.retention_bis,
+                meine_rolle: r.meine_rolle,
+                meine_fuehrungsstelle: r.meine_fuehrungsstelle,
+                // `remove` statt `get` (oben): jede Einsatz-id kommt genau einmal vor, der
+                // Eintrag wird also nicht mehr gebraucht — das spart das Klonen des Vec.
+                meine_sachgebiete,
+                meine_funktion,
+            }
         })
         .collect())
 }

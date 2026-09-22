@@ -214,7 +214,20 @@ export default function Zeitachseneintrag({
           }}
         >
           {verfasser != null && (
-            <span style={{ ...monoStil(11), color: rollen.gedaempft }}>{verfasser}</span>
+            // Gedeckelt (LFH-615): mit Funktion („Administrator ·\u00A0EL") wuchs die Spalte
+            // so weit, dass der Meldungstext bei 1200 px unter die halbe Sicht fiel. `ch` misst
+            // in der Mono-Schrift DIESES Elements; ein längerer Verfasser bricht um.
+            <span
+              data-lfh="verfasser"
+              style={{
+                ...monoStil(11),
+                color: rollen.gedaempft,
+                maxWidth: '15ch',
+                overflowWrap: 'anywhere',
+              }}
+            >
+              {verfasser}
+            </span>
           )}
           {weg != null && <span style={{ ...monoStil(10), color: rollen.schwach }}>{weg}</span>}
           {aktionen}

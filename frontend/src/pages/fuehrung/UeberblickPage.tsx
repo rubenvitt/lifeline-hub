@@ -20,6 +20,7 @@ import {
   type KennzahlZustand,
 } from '../../components/instrument';
 import { einsatzKeys } from '../../api/queryKeys';
+import { verfasserText } from '../../etb/verfasser';
 import { ladeEinsatz } from '../../api/einsaetze';
 import { listePersonen } from '../../api/einsatzPerson';
 import { listeEinsatzPersonal } from '../../api/einsatzPersonal';
@@ -644,7 +645,7 @@ export default function UeberblickPage() {
                         typwort={etbTyp.entscheidung.label}
                         zeit={uhrzeit(e.ereigniszeit)}
                         nr={`Nr. ${e.lfd_nr}`}
-                        meta={e.erfasser_name}
+                        meta={verfasserText(e)}
                         aktionen={
                           folgeWort ? (
                             <span

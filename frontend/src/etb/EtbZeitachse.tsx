@@ -30,6 +30,7 @@ import EtbBacklinkBadges from './EtbBacklinkBadges';
 import type { EtbZeile } from './etbZeile';
 import { MELDEWEG_OPTIONEN } from './schnellerfassungModell';
 import { istNachgetragen } from './typFarben';
+import { verfasserText } from './verfasser';
 import {
   berichtigungsindex,
   einfrieren,
@@ -365,7 +366,7 @@ export default function EtbZeitachse({
         meta={vonAn(e.von, e.an)}
         toenung={e.typ === 'berichtigung' ? 'berichtigung' : undefined}
         hinweis={eintragsHinweis(e)}
-        verfasser={e.erfasser_name}
+        verfasser={verfasserText(e)}
         weg={e.meldeweg ? MELDEWEG_LABEL[e.meldeweg] : undefined}
       >
         {/* Unter dem Stundenkopf (h2, s. u.) — `#` im Eintrag wird h3 (LFH-621). */}
