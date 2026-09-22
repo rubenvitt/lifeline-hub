@@ -23,6 +23,8 @@ describe('EINSATZ_KEYS', () => {
     // trifft still ein anderes Cache-Fach: kein Fehler, kein roter Test, kein auffälliger
     // Request. Der Byte-Pin ist die einzige Stelle, die das bemerkt.
     expect(EINSATZ_KEYS.stab).toBe('einsatz-stab');
+    // LFH-632: ebenfalls als Literal gepinnt.
+    expect(EINSATZ_KEYS.dokumente).toBe('einsatz-dokumente');
     // LFH-635: handgeschriebenes Literal, nicht über EINSATZ_KEYS.
     expect(EINSATZ_KEYS.abloesungen).toBe('einsatz-abloesungen');
   });
@@ -135,6 +137,7 @@ describe('einsatzKeys (Factory-Output)', () => {
     expect(einsatzKeys.nachforderungen(1)).toEqual(['einsatz-nachforderungen', 1]);
     expect(einsatzKeys.etb(1)).toEqual(['etb', 1]);
     expect(einsatzKeys.stab(1)).toEqual(['einsatz-stab', 1]);
+    expect(einsatzKeys.dokumente(1)).toEqual(['einsatz-dokumente', 1]);
     expect(einsatzKeys.pegel(1)).toEqual(['einsatz-pegel', 1]);
     expect(einsatzKeys.pegelVorhersage(1, 7)).toEqual(['einsatz-pegel', 1, 'vorhersage', 7]);
   });

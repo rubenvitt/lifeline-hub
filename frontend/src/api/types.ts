@@ -349,6 +349,10 @@ export type PegelPrognose = S['PegelPrognose'];
 export type PegelVorhersage = S['PegelVorhersage'];
 export type PegelVorhersageAntwort = S['PegelVorhersageAntwort'];
 
+// ============================== LFH-632 Dokumentenablage ==============================
+export type Dokument = S['DokumentAnzeige'];
+export type DokumentKategorie = S['DokumentKategorie'];
+
 // ============================== LFH-46 Stab (S1–S6) ==============================
 export type Stab = S['StabAnzeige'];
 export type Stabsfunktion = S['StabsfunktionAnzeige'];

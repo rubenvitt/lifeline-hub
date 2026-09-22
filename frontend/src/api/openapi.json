@@ -1456,6 +1456,116 @@
           "ausser_dienst"
         ]
       },
+      "DokumentAnzeige": {
+        "type": "object",
+        "description": "Öffentliche Darstellung eines Dokuments (ohne Bytes).",
+        "required": [
+          "id",
+          "einsatz_id",
+          "kategorie",
+          "titel",
+          "dateiname",
+          "mime",
+          "groesse",
+          "etb_eintrag_id",
+          "abgelegt_von_id",
+          "abgelegt_at"
+        ],
+        "properties": {
+          "abgelegt_at": {
+            "type": "string"
+          },
+          "abgelegt_von_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "abgelegt_von_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bezug_abschnitt_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "bezug_abschnitt_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bezug_einheit_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "bezug_einheit_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bezug_etb_eintrag_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "bezug_etb_lfd_nr": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "dateiname": {
+            "type": "string"
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "etb_eintrag_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "groesse": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "kategorie": {
+            "$ref": "#/components/schemas/DokumentKategorie"
+          },
+          "mime": {
+            "type": "string"
+          },
+          "titel": {
+            "type": "string"
+          }
+        }
+      },
+      "DokumentKategorie": {
+        "type": "string",
+        "description": "Kategorie eines abgelegten Dokuments. Wire == `as_str()`; `ALLE` ist zugleich die\nAnzeigereihenfolge (Vertrag, nicht Dekoration).",
+        "enum": [
+          "lagekarte_plan",
+          "befehl",
+          "formular",
+          "foto",
+          "sonstiges"
+        ]
+      },
       "EinheitAnzeige": {
         "type": "object",
         "description": "Aufgelöste Einheiten-Anzeige inkl. Typ/Abschnitt-Labels, Führer-Identität,\nMitgliedern und berechneter Stärke. `soll` ist optional (Override → Typ-Default →\n`None`); `ist`/`ist_kumuliert` sind immer gesetzt.",
@@ -4465,6 +4575,7 @@
           "etb",
           "befehl",
           "stab",
+          "dokument",
           "abloesung",
           "karten_ansicht",
           "lage_snapshot",

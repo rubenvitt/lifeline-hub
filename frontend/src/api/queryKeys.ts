@@ -52,6 +52,7 @@ export const EINSATZ_KEYS = {
   kartenAnsicht: 'einsatz-karten-ansicht',
   lageSnapshot: 'einsatz-lage-snapshot',
   stab: 'einsatz-stab',
+  dokumente: 'einsatz-dokumente',
   abloesungen: 'einsatz-abloesungen',
   // Nicht live über SSE getrieben (siehe NICHT_LIVE_KEYS + Guard-Test):
   einsatz: 'einsatz',
@@ -150,6 +151,9 @@ export const EINSATZ_STREAM_EVENTS = {
   // (['einsatz-stab', einsatzId, 'lagebesprechungen']) — kein eigener Singular-Key,
   // sonst entstünde die Silent-Gap-Falle der Detail-Keys oben.
   stab: [EINSATZ_KEYS.stab],
+  // Dokumentenablage live (LFH-632): Ablegen/Entfernen publiziert `dokument` → die Liste
+  // aller Betrachter aktualisiert sich. Der ETB-Nachweis kommt über das eigene `etb`-Ereignis.
+  dokument: [EINSATZ_KEYS.dokumente],
   // Ablösung live (LFH-635): Schichten und Rhythmus-Vorgaben hängen unter EINEM Prefix
   // (Sub-Keys 'liste'/'vorgaben'), damit ein Ereignis beide trifft. Trägt das Ereignis `art`,
   // stammt es vom Scheduler und alarmiert zusätzlich (Escape-Hatch im Live-Hook).
@@ -294,6 +298,9 @@ export const einsatzKeys = {
   /** Historie der Lagebesprechungen als Sub-Key unter DEMSELBEN Prefix (Spec 9.3). */
   stabLagebesprechungen: (einsatzId: number) =>
     [EINSATZ_KEYS.stab, einsatzId, 'lagebesprechungen'] as const,
+
+  // Dokumentenablage (LFH-632).
+  dokumente: (einsatzId: number) => [EINSATZ_KEYS.dokumente, einsatzId] as const,
 
   // Bereitstellungsraum
   br: (einsatzId: number) => [EINSATZ_KEYS.br, einsatzId] as const,

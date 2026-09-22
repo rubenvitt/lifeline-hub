@@ -4,11 +4,11 @@ use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
 use crate::error::AppError;
 use crate::extract::PfadParam;
 use axum::extract::{Multipart, State};
-use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
-use axum::response::{IntoResponse, Response};
+use axum::http::{HeaderMap, StatusCode};
+use axum::response::Response;
 use axum::Json;
 
-use super::support::{etag_von, if_none_match_matcht, ASSET_CACHE_CONTROL};
+use super::support::anhang_antwort;
 
 /// POST /api/einsaetze/{id}/anhaenge — generischer Datei-Upload (multipart).
 /// Schreibrecht + aktiver Einsatz. Jedes Datei-Feld wird einzeln validiert
@@ -95,41 +95,8 @@ pub async fn herunterladen(
         return Err(AppError::NotFound);
     }
 
-    // Cache-Kurzschluss (LFH-258): sha256-Meta OHNE BLOB laden; passt der If-None-Match-
-    // Header, antworten wir 304 und sparen den teuren Voll-BLOB-Read.
-    let (dateiname, mime, sha256) =
-        anhang::repo::meta_fuer_download(&state.pool, anhang_id).await?;
-    let etag = etag_von(&sha256);
-
-    let mut headers = HeaderMap::new();
-    headers.insert(
-        header::ETAG,
-        HeaderValue::from_str(&etag)
-            .map_err(|e| AppError::Internal(format!("Ungültiger ETag: {e}")))?,
-    );
-    headers.insert(
-        header::CACHE_CONTROL,
-        HeaderValue::from_static(ASSET_CACHE_CONTROL),
-    );
-
-    if if_none_match_matcht(&req_headers, &etag) {
-        return Ok((StatusCode::NOT_MODIFIED, headers).into_response());
-    }
-
-    headers.insert(
-        header::CONTENT_TYPE,
-        HeaderValue::from_str(&mime)
-            .unwrap_or(HeaderValue::from_static("application/octet-stream")),
-    );
-    // Content-Disposition mit ASCII-Fallback + RFC-5987 filename* (Umlaute etc.);
-    // geteilte Infrastruktur in `anhang::content_disposition` (LFH-238).
-    headers.insert(
-        header::CONTENT_DISPOSITION,
-        HeaderValue::from_str(&anhang::content_disposition(&dateiname))
-            .map_err(|e| AppError::Internal(format!("Ungültiger Header: {e}")))?,
-    );
-    let (_, _, daten) = anhang::repo::laden_bytes(&state.pool, anhang_id).await?;
-    Ok((headers, daten).into_response())
+    // Cache-Kurzschluss (LFH-258) + Header-Sequenz: geteilt mit dem Dokument-Download.
+    anhang_antwort(&state.pool, anhang_id, &req_headers).await
 }
 
 /// DELETE /api/einsaetze/{id}/anhaenge/{aid} — Anhang hart löschen (Freigabepfad, LFH-250).
