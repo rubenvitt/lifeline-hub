@@ -159,6 +159,7 @@ const etb = (lfd: number, over: Partial<EtbEintragAnzeige> = {}): EtbEintragAnze
   received_at: '2026-06-11 09:00:00',
   erfasser_id: 1,
   erfasser_name: 'Vitt',
+  folgeauftraege: [],
   ...over,
 });
 

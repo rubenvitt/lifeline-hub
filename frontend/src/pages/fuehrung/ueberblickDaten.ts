@@ -220,16 +220,6 @@ export function empfaengerText(a: Auftrag): string | null {
   return namen.length > 0 ? namen.join(', ') : null;
 }
 
-/** Zahl der Folgeaufträge je ETB-Eintrag (`Auftrag.quell_etb_eintrag_id`). */
-export function folgeauftraegeJeEintrag(auftraege: Auftrag[]): Map<number, number> {
-  const m = new Map<number, number>();
-  for (const a of auftraege) {
-    if (a.quell_etb_eintrag_id == null) continue;
-    m.set(a.quell_etb_eintrag_id, (m.get(a.quell_etb_eintrag_id) ?? 0) + 1);
-  }
-  return m;
-}
-
 export function folgeText(anzahl: number): string | null {
   if (anzahl <= 0) return null;
   return anzahl === 1 ? '1 Auftrag' : `${anzahl} Aufträge`;

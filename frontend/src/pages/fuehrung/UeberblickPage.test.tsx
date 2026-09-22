@@ -126,13 +126,11 @@ const volleDaten = {
     auftrag({
       id: 23,
       auftrag_text: 'Folge A',
-      quell_etb_eintrag_id: 411,
       bearbeitungsstatus: 'vollzogen',
     }),
     auftrag({
       id: 24,
       auftrag_text: 'Folge B',
-      quell_etb_eintrag_id: 411,
       bearbeitungsstatus: 'vollzogen',
     }),
   ],
@@ -149,6 +147,13 @@ const volleDaten = {
       inhalt: 'Turnhalle Ost wird Notunterkunft.',
       erfasser_id: 1,
       erfasser_name: 'Brandt',
+      // Die Zahl kommt aus dem ETB-Eintrag (LFH-636), nicht aus der Auftragsliste: die
+      // Aufträge 23/24 oben tragen bewusst KEINEN `quell_etb_eintrag_id`, sonst stimmten
+      // beide Quellen überein und der Test könnte die alte Ableitung nicht fangen.
+      folgeauftraege: [
+        { id: 23, lfd_nr: 3 },
+        { id: 24, lfd_nr: 4 },
+      ],
     },
   ],
   /** Maßgebliche Pegel (LFH-606) — im Grundbestand keiner festgelegt. */
@@ -536,10 +541,11 @@ describe('UeberblickPage', () => {
     expect(auftragsZahl).toHaveTextContent('?');
     // Die Betroffenenzahl hängt an ihrer eigenen Quelle und bleibt lesbar.
     expect(within(band()).getByRole('link', { name: /Betroffene/ })).toHaveTextContent('3');
-    // Folgeaufträge werden nicht still als „keine" gezeigt.
-    expect(
-      await screen.findByText('Aufträge nicht abrufbar — Folgeaufträge werden nicht gezählt.'),
-    ).toBeInTheDocument();
+    // Die Folgeaufträge hängen seit LFH-636 am ETB-Eintrag, nicht an der Auftragsliste:
+    // die Zahl bleibt stehen, und der frühere Ausfallhinweis ist weg.
+    const entscheidungen = await waitFor(() => paneel('Entscheidungen der letzten Stunde'));
+    expect(await within(entscheidungen).findByText('2 Aufträge')).toBeInTheDocument();
+    expect(screen.queryByText(/Folgeaufträge werden nicht gezählt/)).toBeNull();
   });
 
   it('Ladezustand: Kennzahlen und Paneele zeigen „wird abgerufen", keine Null', async () => {

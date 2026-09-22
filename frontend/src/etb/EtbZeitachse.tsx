@@ -36,6 +36,7 @@ import {
   type Einfrierstand,
   gruppiereNachStunde,
   teileZufluss,
+  hatVerknuepfung,
   verweisStil,
   zuflussText,
 } from './zeitachseModell';
@@ -277,9 +278,7 @@ export default function EtbZeitachse({
             <span aria-hidden="true"> ↗</span>
           </Link>
         )),
-        (e.befehl_id != null || e.lagebericht_id != null || e.auftrag_id != null) && (
-          <EtbBacklinkBadges key="rueck" eintrag={e} einsatzId={einsatzId} />
-        ),
+        hatVerknuepfung(e) && <EtbBacklinkBadges key="rueck" eintrag={e} einsatzId={einsatzId} />,
       ],
       token.marginXS,
     );
