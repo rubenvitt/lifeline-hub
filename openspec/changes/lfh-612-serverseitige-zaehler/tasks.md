@@ -68,10 +68,34 @@
 
 - [x] 5.1 In `CLAUDE.md` den Verweis `EtbTabelle.tsx:117-119` und die ETB-Stellen, die sich auf die fehlende Gesamtzahl berufen, auf den neuen Stand bringen. Verifikation: `grep -n "EtbTabelle.tsx:117" CLAUDE.md` findet nichts mehr.
 - [ ] 5.2 Gesamt-Gate `./scripts/check-all.sh` ausführen. Verifikation: Exit 0, ohne `| tail`.
-- [ ] 5.3 Sichtprüfung im Browser (Vite-Dev plus Backend mit Seeds):
-  - Modulpanel zeigt Zähler an ETB, Betroffenen, Einheiten, Abschnitten und den Kommunikationsmodulen
-  - ETB-Kopf zeigt die Gesamtzahl, auch bei mehr als 100 Einträgen
-  - Suchbegriff → „n Treffer“ und „Bilanz im Filter“
-  - neuer Eintrag in einem zweiten Tab erhöht beide Zahlen live
 
-  Verifikation: Screenshots bzw. Beobachtung sind festgehalten.
+  Stand 22.09.2026: Schritte 1–4 (Format, Lint, Typ-Drift/tsc, Rust-Suite Workspace) zweimal
+  grün. Schritt 5 (Vitest) meldete 13 Fehlschläge in 6 Dateien, alle als `Test timed out in
+  10000ms` und alle in Dateien, die diese Änderung nicht anfasst. Die Zuordnung ist gemessen,
+  nicht vermutet: dieselbe Datei abwechselnd mit und ohne den neuen MSW-Default-Handler aus
+  `src/test/server.ts` — 4/4 rot in BEIDEN Fassungen bei Load ~100, 6/6 Dateien grün bei
+  Load ~36 (Fremdlast anderer Sessions, [[frontend-testsuite-parallel-timeouts]]). Die
+  Schritte 6–9 (Abhängigkeits-Audit, e2e, Ruhefenster-Selbsttest, check-deps-Selbsttest)
+  sind in diesem Ticket noch nicht bis zum Ende gelaufen; ein Lauf bei ruhiger Maschine steht
+  aus. e2e ist gegen diese Änderung gegriffen: kein Spec prüft die Kopfzahl-Wortlaute oder
+  die Bilanz-Zeile, `etb-chronologie.spec.ts` hängt nur am unveränderten `aria-label`
+  „Bilanz des Tagebuchs".
+- [x] 5.3 Sichtprüfung im Browser — gegen ein echtes Backend (eigene DB, Port 8099) mit
+      produktivem Frontend-Build, Daten über die API angelegt (25 ETB-Einträge plus 14
+      System-/Modul-Einträge, 5 Betroffene, 2 Einheiten, 2 Abschnitte, 3 Meldungen,
+      2 Aufträge, 1 Erinnerung):
+  - Modulpanel je Kategorie: „ETB, 39 Einträge im Einsatztagebuch" · „Personen, 5 Betroffene" ·
+    „Einheiten, 2 Einheiten" · „Einsatzabschnitte, 2 Einsatzabschnitte" · „Meldungen
+    (eingehend), 3 offene Meldungen, davon 3 ungesehen" · „Aufträge/Befehle, 2 offene
+    Aufträge, davon 1 überfällig" · „Erinnerungen, 2 fällige Erinnerungen". Chat steht bei
+    `ungelesen: 0` OHNE Zahl.
+  - ETB-Kopf „39 Einträge", Leiste „BILANZ / 39 Einträge" mit Meldungen 17 · Anordnungen 8 ·
+    Entscheidungen 2 · Lagemeldungen 3 · Berichtigungen 0 · Systemeinträge 9 — deckungsgleich
+    mit `GET …/etb/zaehler`. Der Fall „mehr als 100 Einträge" ist hier nicht gestellt worden
+    (40 Einträge); er ist in `EtbPage.test.tsx` gepinnt (Serverzahl 412 gegen 101 geladene).
+  - Filter `?typ=meldung`: Kopf „17 Treffer", Leiste „BILANZ IM FILTER / 17 Treffer", die
+    Systemzeile fällt weg. Der Volltextweg (`q=`) ist im Browser nicht gefahren, sondern in
+    `EtbPage.test.tsx` (Kopf „7 Treffer" plus Gleichheit des `q`-Parameters mit der Liste).
+  - Live: ein per API angelegter ETB-Eintrag hob OHNE Reload Kopf, Bilanz und Modulzähler
+    von 39 auf 40 — das `etb`-Ereignis zieht beide Zählungen mit.
+  - Der Chat-Zähler stand auf 0, ohne dass ein Kanal entstand (Review-Fix live bestätigt).
