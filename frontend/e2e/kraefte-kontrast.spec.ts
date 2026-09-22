@@ -273,9 +273,10 @@ for (const modus of ['light', 'dark']) {
 //     Kopf-Statuszahlen der Kräfteübersicht als Rollenfarbe auf KARTENGRUND — und verfehlten
 //     im Hellmodus die 7 : 1 in allen Werten (LFH-538, Messwerte 11.09.2026: 6,78–6,94). Das
 //     Band stellt seine Zellen seit der Nacharbeit vom 22.09.2026 auf die NEUTRALE Fläche
-//     (`flaeche`) und trägt den Ton nur im 8-px-Quadrat und in der Zahl; die Textfarben
-//     stehen in `kraefte/statusbandStil.ts` (Tag: normalText 9,18 · achtung/alarm tragen
-//     `text` 18,47, Wort `gedaempft` 8,42; Nacht: 10,92 · 11,75 · 6,77, Wort 7,27). Deshalb
+//     (`flaeche`) und trägt den Ton nur im 8-px-Quadrat und in der Zahl; die Zahlfarbe
+//     steht in `components/instrument/Kennzahl.tsx` (`zahlFarbe`; Tag: normalText 9,18 ·
+//     achtungText 9,22 · alarmText 8,96 seit LFH-618, vorher wich der Tag auf `text` aus;
+//     Wort `gedaempft` 8,42; Nacht: 10,92 · 11,75 · 6,77, Wort 7,27). Deshalb
 //     wird hier in BEIDEN Modi der Zielwert HART zugesichert — für diese Fläche ist LFH-538
 //     mit dem Umbau eingelöst.
 //

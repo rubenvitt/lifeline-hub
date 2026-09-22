@@ -16,7 +16,8 @@
 .lfh-klappkopf:hover,
 .lfh-ebenenzeile:hover,
 .lfh-kartenknopf:hover {
-  background: var(--lfh-flaeche-2);
+  /* `flaeche-3`, nicht `flaeche-2`: die läge am Tag bei 1,01 : 1 auf `paneel` (LFH-618). */
+  background: var(--lfh-flaeche-3);
 }
 .lfh-klappkopf:focus-visible,
 .lfh-ebenenzeile:focus-visible,
