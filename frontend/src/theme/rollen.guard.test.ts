@@ -55,7 +55,10 @@ const css = readFileSync(join(hier, 'rollen.css'), 'utf-8');
  *  (gemessen: alle Nachtmodus-Prüfungen liefen gegen die Tagwerte und waren
  *  rot, obwohl beide Dateien stimmten). */
 function block(selektor: string): Record<string, string> {
-  const treffer = new RegExp(`^${selektor.replace(/[[\]]/g, '\\$&')}\\s*\\{`, 'm').exec(css);
+  // Vollständiges RegExp-Escaping (inkl. Backslash) — nur `[`/`]` zu escapen reicht für die
+  // heutigen Selektoren, wäre aber für jeden anderen Sonderzeichen-Selektor falsch (CodeQL).
+  const muster = selektor.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const treffer = new RegExp(`^${muster}\\s*\\{`, 'm').exec(css);
   if (!treffer) throw new Error(`Selektor ${selektor} fehlt in rollen.css`);
   const i = treffer.index;
   const auf = css.indexOf('{', i);
