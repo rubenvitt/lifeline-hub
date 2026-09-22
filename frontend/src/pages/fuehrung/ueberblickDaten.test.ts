@@ -433,4 +433,72 @@ describe('abschnittZeilen', () => {
     expect(nord.auftraege.map((a) => a.auftrag_text)).toEqual(['neu an Nord-Deich', 'alt an Nord']);
     expect(zeilen.find((z) => z.abschnittId == null)!.auftraege).toEqual([]);
   });
+  it('zählt die Auftragsbilanz über den Teilbaum, jeden Auftrag einmal (LFH-608)', () => {
+    const nord = zeilen.find((z) => z.abschnittId === 1)!;
+    // drei Aufträge an Nord/Nord-Deich, einer davon vollzogen
+    expect(nord.auftragsbilanz).toEqual({ erledigt: 1, gesamt: 3 });
+    expect(zeilen.find((z) => z.abschnittId === 2)!.auftragsbilanz).toEqual({
+      erledigt: 0,
+      gesamt: 1,
+    });
+    expect(zeilen.find((z) => z.abschnittId == null)!.auftragsbilanz).toEqual({
+      erledigt: 0,
+      gesamt: 0,
+    });
+  });
+});
+
+describe('abschnittZeilen — Lage je Abschnitt (LFH-608)', () => {
+  const roh = (abschnitte: Einsatzabschnitt[], auftraege: Auftrag[] = []) =>
+    abschnittZeilen({
+      abschnitte,
+      einheiten: [],
+      personal: [],
+      fahrzeuge: [],
+      material: [],
+      auftraege,
+    });
+
+  it('übernimmt Kürzel, Lagezustand, festen Auftrag und Fortschritt des Abschnitts', () => {
+    const [nord] = roh([
+      abschnitt(1, 'Nord', {
+        kurzbezeichnung: 'EA-N',
+        lagezustand: 'angespannt',
+        abschnittsauftrag: 'Deichsicherung km 3,8 – 5,4',
+        fortschritt: 72,
+      }),
+    ]);
+    expect(nord.kurzbezeichnung).toBe('EA-N');
+    expect(nord.lagezustand).toBe('angespannt');
+    expect(nord.abschnittsauftrag).toBe('Deichsicherung km 3,8 – 5,4');
+    expect(nord.fortschritt).toBe(72);
+  });
+
+  it('nicht gepflegt bleibt null — kein erfundenes „planmäßig" und keine 0 %', () => {
+    const [nord] = roh([abschnitt(1, 'Nord')]);
+    expect(nord.kurzbezeichnung).toBeNull();
+    expect(nord.lagezustand).toBeNull();
+    expect(nord.abschnittsauftrag).toBeNull();
+    expect(nord.fortschritt).toBeNull();
+    expect(nord.unterLage).toBeNull();
+  });
+
+  it('meldet einen SCHLECHTER beurteilten Unterabschnitt, sonst nichts', () => {
+    const zeilen = roh([
+      abschnitt(1, 'Nord', { lagezustand: 'planmaessig' }),
+      abschnitt(2, 'Nord-Deich', { ueber_abschnitt_id: 1, lagezustand: 'angespannt' }),
+      abschnitt(3, 'Nord-Deich-Spitze', { ueber_abschnitt_id: 2, lagezustand: 'kritisch' }),
+      abschnitt(4, 'Süd', { lagezustand: 'kritisch' }),
+      abschnitt(5, 'Süd-West', { ueber_abschnitt_id: 4, lagezustand: 'angespannt' }),
+      abschnitt(6, 'Ost'),
+      abschnitt(7, 'Ost-UA', { ueber_abschnitt_id: 6, lagezustand: 'planmaessig' }),
+    ]);
+    const nach = (id: number) => zeilen.find((z) => z.abschnittId === id)!;
+    // der schlechteste im ganzen Teilbaum, auch zwei Ebenen tief
+    expect(nach(1).unterLage).toBe('kritisch');
+    // ein besserer Unterabschnitt ist keine Meldung
+    expect(nach(4).unterLage).toBeNull();
+    // ohne eigene Beurteilung ist jede Beurteilung darunter eine Aussage
+    expect(nach(6).unterLage).toBe('planmaessig');
+  });
 });

@@ -17,6 +17,7 @@
 import dayjs, { type Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import type {
+  AbschnittLagezustand,
   Auftrag,
   Einheit,
   EinsatzFahrzeug,
@@ -253,7 +254,30 @@ export interface AbschnittZeile {
   einheitenStatus: EinheitenVerteilung;
   /** Offene Aufträge an diesen Abschnitt (oder einen Unterabschnitt), jüngste zuerst. */
   auftraege: Auftrag[];
+  /** Alle Aufträge an den Teilbaum, jeder einmal; erledigt = vollzogen oder abgenommen.
+   *  Eine ZÄHLUNG, keine Fortschrittsangabe — jeder Auftrag wiegt gleich, deshalb steht
+   *  sie neben der Einschätzung und nicht an ihrer Stelle (LFH-608). */
+  auftragsbilanz: { erledigt: number; gesamt: number };
+  /** Die folgenden vier gehören dem OBERSTEN Abschnitt selbst, nicht dem Teilbaum:
+   *  eine Beurteilung lässt sich nicht aufsummieren. `null` = nicht gepflegt (LFH-608). */
+  kurzbezeichnung: string | null;
+  lagezustand: AbschnittLagezustand | null;
+  abschnittsauftrag: string | null;
+  fortschritt: number | null;
+  /** Schlechtester Lagezustand eines Unterabschnitts, NUR wenn er schlechter ist als der
+   *  eigene. Die Kante bleibt die Beurteilung des Abschnitts selbst; die Seite setzt den
+   *  Unterabschnitt als eigenes Etikett mit Rollenrand daneben, damit ein kritischer
+   *  Unterabschnitt nicht hinter einer grünen Kante verschwindet. */
+  unterLage: AbschnittLagezustand | null;
 }
+
+/** Ordnung der Lagezustände; „nicht beurteilt" liegt unter allen. */
+const LAGE_RANG: Record<AbschnittLagezustand, number> = {
+  planmaessig: 1,
+  angespannt: 2,
+  kritisch: 3,
+};
+const lageRang = (l: AbschnittLagezustand | null | undefined) => (l ? LAGE_RANG[l] : 0);
 
 export interface AbschnittRohdaten {
   abschnitte: Einsatzabschnitt[];
@@ -335,6 +359,21 @@ export function abschnittZeilen(r: AbschnittRohdaten): AbschnittZeile[] {
     const abschnitt = id != null ? abschnittNachId.get(id) : undefined;
     const { einheiten, einheitIds, abschnittIds } = zaehleImTeilbaum(knoten);
     const teilbaum = new Set(abschnittIds);
+    const anTeilbaum =
+      teilbaum.size === 0
+        ? []
+        : r.auftraege.filter((a) =>
+            (a.empfaenger ?? []).some(
+              (e) => e.abschnitt_id != null && teilbaum.has(e.abschnitt_id),
+            ),
+          );
+    const eigeneLage = abschnitt?.lagezustand ?? null;
+    let unterLage: AbschnittLagezustand | null = null;
+    for (const uid of abschnittIds) {
+      if (uid === id) continue;
+      const l = abschnittNachId.get(uid)?.lagezustand ?? null;
+      if (lageRang(l) > lageRang(unterLage)) unterLage = l;
+    }
     return {
       key: knoten.key,
       abschnittId: knoten.key === OHNE_ABSCHNITT_KEY ? null : id,
@@ -345,14 +384,16 @@ export function abschnittZeilen(r: AbschnittRohdaten): AbschnittZeile[] {
       staerke: knoten.staerke,
       staerkeText: staerkeText(knoten.staerke),
       einheitenStatus: einheitenVerteilung(einheitIds.map((eid) => einheitNachId.get(eid))),
-      auftraege:
-        teilbaum.size === 0
-          ? []
-          : offen.filter((a) =>
-              (a.empfaenger ?? []).some(
-                (e) => e.abschnitt_id != null && teilbaum.has(e.abschnitt_id),
-              ),
-            ),
+      auftraege: offen.filter((a) => anTeilbaum.includes(a)),
+      auftragsbilanz: {
+        erledigt: anTeilbaum.filter((a) => !istOffen(a)).length,
+        gesamt: anTeilbaum.length,
+      },
+      kurzbezeichnung: abschnitt?.kurzbezeichnung ?? null,
+      lagezustand: eigeneLage,
+      abschnittsauftrag: abschnitt?.abschnittsauftrag ?? null,
+      fortschritt: abschnitt?.fortschritt ?? null,
+      unterLage: lageRang(unterLage) > lageRang(eigeneLage) ? unterLage : null,
     };
   });
 

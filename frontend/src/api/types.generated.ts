@@ -38,6 +38,13 @@ export interface components {
          */
         AbschlussGrund: "uebergabe_halter" | "uebergabe_tierarzt" | "uebergabe_tierheim" | "verstorben" | "freilauf" | "sonstiges";
         /**
+         * @description Lagezustand eines Abschnitts (LFH-608), Wire == `lagezustand`. Die Beurteilung trifft
+         *     die Führung; ohne Beurteilung bleibt das Feld leer — „nicht beurteilt" ist KEIN
+         *     planmäßig. Die Farbe liegt im Frontend-Vertrag (`theme/statusFarben.ts`).
+         * @enum {string}
+         */
+        AbschnittLagezustand: "planmaessig" | "angespannt" | "kritisch";
+        /**
          * @description Geteilte externe Adressat-Kategorie für Nachforderung (`adressat_kategorie`) und Auftrag
          *     (`extern_kategorie`) (Schema-Anker für die OpenAPI-Union, LFH-120).
          * @enum {string}
@@ -807,14 +814,27 @@ export interface components {
          *     `ueber_abschnitt_id` gebaut), inkl. aufgelöstem Leiter-Namen.
          */
         EinsatzabschnittAnzeige: {
+            /**
+             * @description Fester Abschnittsauftrag als Freitext (LFH-608) — nicht zu verwechseln mit den
+             *     einzelnen Aufträgen des Auftragsmoduls.
+             */
+            abschnittsauftrag?: string | null;
             bemerkung?: string | null;
             /** Format: int64 */
             einsatz_id: number;
             erreichbarkeit?: string | null;
             flaeche_geojson?: string | null;
+            /**
+             * Format: int64
+             * @description Eingeschätzter Fortschritt in Prozent, 0–100 (LFH-608); fehlt = nicht eingeschätzt.
+             */
+            fortschritt?: number | null;
             /** Format: int64 */
             id: number;
             kommunikationsmittel?: string | null;
+            /** @description Kurzbezeichnung/Rufname im Einsatz, z. B. „EA-N" (LFH-608); je Einsatz eindeutig. */
+            kurzbezeichnung?: string | null;
+            lagezustand?: null | components["schemas"]["AbschnittLagezustand"];
             /** Format: int64 */
             leiter_id?: number | null;
             /** @description Name der disponierten Leiter-Person (aufgelöst), falls gesetzt. */

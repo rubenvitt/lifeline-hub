@@ -333,6 +333,13 @@ fn serde_wire_gleich_as_str() {
         Abgelehnt,
     });
 
+    // einsatzabschnitt
+    enum_wire_as_str!(lifeline_hub::einsatzabschnitt::AbschnittLagezustand {
+        Planmaessig,
+        Angespannt,
+        Kritisch,
+    });
+
     // einsatz
     enum_wire_as_str!(lifeline_hub::einsatz::EinsatzRolle {
         Einsatzleitung,

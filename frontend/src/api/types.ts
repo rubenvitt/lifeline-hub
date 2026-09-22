@@ -174,6 +174,7 @@ export interface SprechgruppeEingabe {
 
 // ============================== Struktur (Abschnitte / Einheiten) ==============================
 export type Einsatzabschnitt = S['EinsatzabschnittAnzeige'];
+export type AbschnittLagezustand = S['AbschnittLagezustand'];
 export type EinheitMitgliedPerson = S['EinheitMitgliedPerson'];
 export type EinheitMitgliedFahrzeug = S['EinheitMitgliedFahrzeug'];
 export type Einheit = S['EinheitAnzeige'];
