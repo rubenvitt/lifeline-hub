@@ -27,7 +27,9 @@ import type {
   Erinnerung,
   EtbEintragAnzeige,
   Gefahrengebiet,
+  LetzteRueckmeldung,
   Person,
+  Rueckmeldungen,
   Warnstufe,
 } from '../../api/types';
 import type { KennzahlTon } from '../../components/instrument';
@@ -41,6 +43,7 @@ import {
   type StaerkeSumme,
 } from '../../kraefte/kraeftebild';
 import { verdichteGefahrengebiete } from '../lage-dashboard/lageVerdichtung';
+import { letzteImTeilbaum } from '../../meldungen/rueckmeldung';
 import { dauerText } from '../../stab/lagebesprechungZustand';
 import { warnstufeKennzahl, type Statusrolle } from '../../theme/statusFarben';
 
@@ -240,6 +243,15 @@ export interface AbschnittZeile {
   mittel: MittelVerteilung;
   /** Offene Aufträge an diesen Abschnitt (oder einen Unterabschnitt), jüngste zuerst. */
   auftraege: Auftrag[];
+  /**
+   * Stehen die Rückmeldungen fest (LFH-610)? `false` solange sie laden, bei 403 (kein
+   * Leserecht auf „Meldungen") und bei Fehler — dann zeigt die Zeile GAR NICHTS dazu, auch
+   * kein „—": ein Strich behauptete „keine Rückmeldung", und das weiß die Seite nicht.
+   */
+  rueckmeldungBekannt: boolean;
+  /** Jüngste Rückmeldung im Teilbaum (Abschnitte direkt UND Einheiten darin); `null`, wenn
+   *  keine vorliegt oder {@link rueckmeldungBekannt} `false` ist. */
+  letzteRueckmeldung: LetzteRueckmeldung | null;
 }
 
 export interface AbschnittRohdaten {
@@ -249,6 +261,8 @@ export interface AbschnittRohdaten {
   fahrzeuge: EinsatzFahrzeug[];
   material: EinsatzMaterial[];
   auftraege: Auftrag[];
+  /** `GET …/meldungen/rueckmeldungen`; `undefined`, solange nicht (oder nie) geladen. */
+  rueckmeldungen?: Rueckmeldungen;
 }
 
 function abschnittIdAusKey(key: string): number | null {
@@ -256,18 +270,33 @@ function abschnittIdAusKey(key: string): number | null {
   return m ? Number(m[1]) : null;
 }
 
-function zaehleImTeilbaum(zeile: MeldebildZeile): { einheiten: number; abschnittIds: number[] } {
+/** Einheit-id aus dem Meldebild-Schlüssel `eh-<id>`; die Sammelzeilen `eh-ohne-…` fallen
+ *  am Muster heraus, weil `ohne` keine Ziffernfolge ist. */
+function einheitIdAusKey(key: string): number | null {
+  const m = /^eh-(\d+)$/.exec(key);
+  return m ? Number(m[1]) : null;
+}
+
+function zaehleImTeilbaum(zeile: MeldebildZeile): {
+  einheiten: number;
+  abschnittIds: number[];
+  einheitIds: number[];
+} {
   let einheiten = 0;
   const abschnittIds: number[] = [];
+  const einheitIds: number[] = [];
   const id = abschnittIdAusKey(zeile.key);
   if (zeile.art === 'abschnitt' && id != null) abschnittIds.push(id);
   if (zeile.art === 'einheit' && !zeile.key.startsWith(OHNE_EINHEIT_KEY_PREFIX)) einheiten += 1;
+  const einheitId = zeile.art === 'einheit' ? einheitIdAusKey(zeile.key) : null;
+  if (einheitId != null) einheitIds.push(einheitId);
   for (const kind of zeile.children ?? []) {
     const k = zaehleImTeilbaum(kind);
     einheiten += k.einheiten;
     abschnittIds.push(...k.abschnittIds);
+    einheitIds.push(...k.einheitIds);
   }
-  return { einheiten, abschnittIds };
+  return { einheiten, abschnittIds, einheitIds };
 }
 
 /**
@@ -289,7 +318,7 @@ export function abschnittZeilen(r: AbschnittRohdaten): AbschnittZeile[] {
   const zeilen: AbschnittZeile[] = baum.map((knoten) => {
     const id = abschnittIdAusKey(knoten.key);
     const abschnitt = id != null ? abschnittNachId.get(id) : undefined;
-    const { einheiten, abschnittIds } = zaehleImTeilbaum(knoten);
+    const { einheiten, abschnittIds, einheitIds } = zaehleImTeilbaum(knoten);
     const teilbaum = new Set(abschnittIds);
     const p = knoten.personalVerteilung;
     const f = knoten.fahrzeugVerteilung;
@@ -318,6 +347,13 @@ export function abschnittZeilen(r: AbschnittRohdaten): AbschnittZeile[] {
                 (e) => e.abschnitt_id != null && teilbaum.has(e.abschnitt_id),
               ),
             ),
+      // Anders als bei den Aufträgen KEIN Kurzschluss auf leeren `teilbaum`: die Sammelzeile
+      // „Ohne Abschnitt" hat keine Abschnitt-ids, ihre Einheiten melden trotzdem zurück.
+      rueckmeldungBekannt: r.rueckmeldungen != null,
+      letzteRueckmeldung:
+        r.rueckmeldungen != null
+          ? letzteImTeilbaum(r.rueckmeldungen, teilbaum, new Set(einheitIds))
+          : null,
     };
   });
 

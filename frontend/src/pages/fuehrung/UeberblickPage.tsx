@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { Breadcrumb, Button } from 'antd';
@@ -31,6 +31,7 @@ import { ladeGefahrengebiete } from '../../api/gefahren';
 import { listeAuftraege } from '../../api/auftraege';
 import { listeErinnerungen } from '../../api/erinnerungen';
 import { listeEtb } from '../../api/etb';
+import { holeRueckmeldungen } from '../../api/meldungen';
 import {
   auftraegePfad,
   einheitenPfad,
@@ -82,8 +83,14 @@ import { MARKEN_BREITE, rasterStil, zeilenzielStil } from './ueberblickStil';
  *
  * BEWUSST WEGGELASSEN (keine erfundenen Daten, Entscheidung 4): Pegel-Notiz an der
  * Warnstufe (LFH-606), Lagezustand-Farbkante und Fortschritt je Abschnitt (LFH-608),
- * Einheitenstatus (LFH-609 — ersetzt durch die Verfügbarkeit der Mittel), letzte
- * Rückmeldung je Abschnitt (LFH-610).
+ * Einheitenstatus (LFH-609 — ersetzt durch die Verfügbarkeit der Mittel).
+ *
+ * LETZTE RÜCKMELDUNG JE ABSCHNITT (LFH-610): jüngste Meldung im Teilbaum, direkt an einen
+ * Abschnitt oder an eine seiner Einheiten gebunden. Die Quelle hängt am Leserecht auf
+ * „Meldungen" und läuft deshalb NICHT durch `zustandVon`: ein 403 ist für Rollen ohne das
+ * Modul der Normalfall und darf das Abschnittspaneel nicht auf „Stand unbekannt" stellen.
+ * Solange sie lädt oder scheitert, trägt die Zeile dazu schlicht nichts. Keine Fristfarbe:
+ * der Überblick zählt Rückmeldungen nicht aus, das tut das Meldebild (S6).
  */
 
 /** Der Entscheidungsabruf: nur Typ „Entscheidung", ein Deckel, der die letzte Stunde
@@ -233,6 +240,10 @@ export default function UeberblickPage() {
     queryKey: einsatzKeys.etbListe(einsatzId, ETB_ENTSCHEIDUNGEN),
     queryFn: () => listeEtb(einsatzId, ETB_ENTSCHEIDUNGEN),
   });
+  const rueckmeldungenQ = useQuery({
+    queryKey: einsatzKeys.meldungenRueckmeldungen(einsatzId),
+    queryFn: () => holeRueckmeldungen(einsatzId),
+  });
 
   const einsatz = einsatzQ.data;
   /*
@@ -251,6 +262,9 @@ export default function UeberblickPage() {
   const auftraege = auftraegeQ.data;
   const erinnerungen = erinnerungenQ.data;
   const etb = etbQ.data;
+  // Nur ein erfolgreicher Abruf zählt — ein stehengebliebener Stand nach einem Fehler
+  // (react-query behält `data`) wäre sonst eine stille Aussage über veraltete Daten.
+  const rueckmeldungen = rueckmeldungenQ.isError ? undefined : rueckmeldungenQ.data;
 
   const betroffene = useMemo(() => betroffeneKennzahl(personen ?? [], jetzt), [personen, jetzt]);
   const kraefte = useMemo(
@@ -269,8 +283,9 @@ export default function UeberblickPage() {
         fahrzeuge: fahrzeuge ?? [],
         material: material ?? [],
         auftraege: auftraege ?? [],
+        rueckmeldungen,
       }),
-    [abschnitte, einheiten, personal, fahrzeuge, material, auftraege],
+    [abschnitte, einheiten, personal, fahrzeuge, material, auftraege, rueckmeldungen],
   );
   const entscheidungen = useMemo(() => entscheidungenAuswahl(etb ?? [], jetzt), [etb, jetzt]);
   const folge = useMemo(() => folgeauftraegeJeEintrag(auftraege ?? []), [auftraege]);
@@ -475,6 +490,7 @@ export default function UeberblickPage() {
                   <li key={z.key}>
                     <AbschnittEintrag
                       zeile={z}
+                      zeit={frist}
                       ziel={
                         z.abschnittId != null
                           ? einsatzabschnittePfad(einsatzId, { abschnitt: z.abschnittId })
@@ -716,12 +732,36 @@ export default function UeberblickPage() {
   );
 }
 
-/** Eine Abschnittszeile: Name/Leiter/Einheiten · jüngster offener Auftrag · Stärke und
- *  Mittelverteilung. Die ganze Zeile ist der Link auf den Abschnitt. */
-function AbschnittEintrag({ zeile, ziel }: { zeile: AbschnittZeile; ziel: string }) {
+/** Visuell verborgen, für Vorleser da — dieselbe Clip-Bauform wie in `instrument/Status`. */
+const NUR_VORLESER: CSSProperties = {
+  position: 'absolute',
+  width: 1,
+  height: 1,
+  padding: 0,
+  margin: -1,
+  overflow: 'hidden',
+  clip: 'rect(0, 0, 0, 0)',
+  whiteSpace: 'nowrap',
+  border: 0,
+};
+
+/** Eine Abschnittszeile: Name/Leiter/Einheiten · jüngster offener Auftrag und letzte
+ *  Rückmeldung · Stärke und Mittelverteilung. Die ganze Zeile ist der Link auf den
+ *  Abschnitt. */
+function AbschnittEintrag({
+  zeile,
+  ziel,
+  zeit,
+}: {
+  zeile: AbschnittZeile;
+  ziel: string;
+  /** Tagesbewusste Uhrzeit — eine Rückmeldung von gestern ist nicht „14:11". */
+  zeit: (utc: string | null | undefined) => string;
+}) {
   const { token, rollen } = useRollen();
   const [juengster, ...weitere] = zeile.auftraege;
   const { mittel } = zeile;
+  const rueck = zeile.letzteRueckmeldung;
   return (
     <Link
       to={ziel}
@@ -746,14 +786,20 @@ function AbschnittEintrag({ zeile, ziel }: { zeile: AbschnittZeile; ziel: string
         style={{
           flex: '1 1 160px',
           minWidth: 0,
-          fontSize: 12,
-          lineHeight: 1.45,
-          color: rollen.gedaempft,
-          overflowWrap: 'anywhere',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 7,
         }}
       >
-        {juengster ? (
-          <>
+        {juengster && (
+          <span
+            style={{
+              fontSize: 12,
+              lineHeight: 1.45,
+              color: rollen.gedaempft,
+              overflowWrap: 'anywhere',
+            }}
+          >
             {juengster.auftrag_text}
             {weitere.length > 0 && (
               <span style={{ ...monoStil(10), color: rollen.schwach }}>
@@ -761,8 +807,42 @@ function AbschnittEintrag({ zeile, ziel }: { zeile: AbschnittZeile; ziel: string
                 · +{weitere.length} weitere offen
               </span>
             )}
-          </>
-        ) : null}
+          </span>
+        )}
+        {/* Nur wenn die Rückmeldungen feststehen (LFH-610) — sonst gar nichts, auch kein
+            Strich. Der verborgene Vorsatz gibt der Zeit im Linknamen ihre Bedeutung; ohne
+            ihn läse ein Vorleser eine nackte Uhrzeit neben dem Auftrag. */}
+        {zeile.rueckmeldungBekannt && (
+          <span
+            data-lfh="abschnitt-rueckmeldung"
+            style={{ display: 'flex', alignItems: 'baseline', gap: 10, minWidth: 0 }}
+          >
+            {rueck ? (
+              <>
+                <span style={{ ...monoStil(10), color: rollen.schwach, flex: '0 0 auto' }}>
+                  <span style={NUR_VORLESER}>Letzte Rückmeldung:</span> {zeit(rueck.ereigniszeit)}
+                </span>
+                {/* Leerzeichen zwischen den Flex-Kindern: unsichtbar, trennt aber im Linknamen
+                    Uhrzeit und Text („14:11 Verbau hält" statt „14:11Verbau hält"). */}{' '}
+                <span
+                  title={rueck.inhalt}
+                  style={{
+                    fontSize: 11,
+                    color: rollen.schwach,
+                    minWidth: 0,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {rueck.inhalt}
+                </span>
+              </>
+            ) : (
+              <span style={{ fontSize: 11, color: rollen.schwach }}>noch keine Rückmeldung</span>
+            )}
+          </span>
+        )}
       </span>
       <span
         style={{

@@ -22,6 +22,7 @@ import {
   LEERE_ROHDATEN,
   auswahlRaster,
   auswahlUnterzeile,
+  letzteMeldungBlock,
   type AuswahlRoh,
   type RasterFeld,
 } from './leistenDaten';
@@ -133,7 +134,7 @@ function RasterZelle({ feld }: { feld: RasterFeld }) {
  * Marker-Inspector im Paneel „Ausgewählt" der rechten Kartenleiste (Neuentwurf S5):
  * Symbol-Kachel mit dem taktischen Zeichen, Name, Mono-Unterzeile (Objektart · Typ),
  * Datenraster in zwei Spalten mit Augenbrauen — nur Felder mit Datenquelle, siehe
- * `auswahlRaster` —, Ort, und die Aktionen.
+ * `auswahlRaster` —, bei einer Einheit die letzte Meldung (LFH-610), Ort, und die Aktionen.
  */
 export default function Inspector({
   einsatzId,
@@ -155,6 +156,7 @@ export default function Inspector({
   const kennzahlen = marker.geometrie ? geoKennzahlen(marker.geometrie) : null;
   const bild = useMemo(() => tzBildUrl(marker.tz), [marker.tz]);
   const raster = auswahlRaster(marker, roh, formatZeitKurz);
+  const letzte = letzteMeldungBlock(marker, roh, formatZeitKurz);
 
   const symbolAuswahl = darfSchreiben && onSymbolAendern && TAKTISCHE_TYPEN.includes(marker.typ);
 
@@ -188,6 +190,23 @@ export default function Inspector({
             <RasterZelle key={f.label} feld={f} />
           ))}
         </dl>
+      )}
+      {/* Eigener Block NEBEN dem Raster, nicht darin: ein Meldungstext ist kein Feld mit
+          Augenbraue über einem Wert, und im zweispaltigen `dl` bräche er auf die halbe Breite. */}
+      {letzte && (
+        <section
+          data-lfh="auswahl-letzte-meldung"
+          aria-label="Letzte Meldung"
+          style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS }}
+        >
+          <Augenbraue>Letzte Meldung</Augenbraue>
+          <span
+            style={{ fontSize: 12, lineHeight: 1.5, color: rollen.text2, overflowWrap: 'anywhere' }}
+          >
+            {letzte.text}
+          </span>
+          <span style={{ ...monoStil(10), color: rollen.schwach }}>{letzte.meta}</span>
+        </section>
       )}
       {marker.typ === 'lagemeldung' && marker.lageMeldung && (
         <Typography.Paragraph style={{ margin: 0, fontSize: 12, color: rollen.text2 }}>

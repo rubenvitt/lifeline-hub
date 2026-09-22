@@ -207,6 +207,23 @@ describe('useLagekarteDaten Standquelle', () => {
  * strukturell wahr (kein Fehler → das Overlay ist gar nicht montiert), hier wird die
  * Zuordnung Query → Name und die Trennlinie Lagebild/Render-Kontext tatsächlich geprüft.
  */
+/** Eine Rückmeldung (LFH-610) — Form von `GET …/meldungen/rueckmeldungen`. */
+const RUECKMELDUNGEN = {
+  frist_min: 60,
+  einheiten: [
+    {
+      bezug_id: 1,
+      meldung_id: 3,
+      lfd_nr: 3,
+      ereigniszeit: '2026-09-21 12:11:00',
+      inhalt: 'Verbau hält',
+      meldeweg: 'funk',
+      faellig_at: '2026-09-21 13:11:00',
+    },
+  ],
+  abschnitte: [],
+};
+
 describe('useLagekarteDaten fehlerhafteQuellen', () => {
   it('nennt die gescheiterten Lagebild-Quellen — und KEINEN Render-Kontext', async () => {
     // Zwei Lagebild-Quellen scheitern (uhs, zonen) UND alle drei Render-Kontext-Quellen
@@ -222,6 +239,12 @@ describe('useLagekarteDaten fehlerhafteQuellen', () => {
       http.get('/api/organisation', () => new HttpResponse(null, { status: 500 })),
       http.get('/api/karte/config', () => new HttpResponse(null, { status: 500 })),
       http.get('/api/einsaetze/5/einstellungen', () => new HttpResponse(null, { status: 500 })),
+      // 403 auf die Rückmeldungen (LFH-610) ist für Rollen ohne „Meldungen" der Normalfall —
+      // er gehört ebenfalls NICHT in den Katalog.
+      http.get(
+        '/api/einsaetze/5/meldungen/rueckmeldungen',
+        () => new HttpResponse(null, { status: 403 }),
+      ),
       ...[
         '/api/einsaetze/5/schaeden',
         '/api/einsaetze/5/einheiten',
@@ -232,12 +255,17 @@ describe('useLagekarteDaten fehlerhafteQuellen', () => {
         '/api/einsaetze/5/lage/meldungen',
         '/api/einsaetze/5/karte/fuehrungskraefte',
       ].map((pfad) => http.get(pfad, () => HttpResponse.json([]))),
+      http.get('/api/einsaetze/5/meldungen/rueckmeldungen', () =>
+        HttpResponse.json(RUECKMELDUNGEN),
+      ),
     );
     const { result } = renderHook(() => useLagekarteDaten({ einsatzId: 5, zeigeZonen: true }), {
       wrapper: wrapper(),
     });
     await waitFor(() => expect(result.current.fehlerhafteQuellen).toHaveLength(2));
     expect(result.current.fehlerhafteQuellen).toEqual(['Unfallhilfsstellen', 'Zonen']);
+    // Und das Paneel bekommt keine Rückmeldungen — kein Block statt eines erfundenen.
+    expect(result.current.rohdaten.rueckmeldungen).toBeUndefined();
   });
 
   it('ist bei vollständigem Abruf leer', async () => {
@@ -273,12 +301,17 @@ describe('useLagekarteDaten fehlerhafteQuellen', () => {
         '/api/einsaetze/5/lage/meldungen',
         '/api/einsaetze/5/karte/fuehrungskraefte',
       ].map((pfad) => http.get(pfad, () => HttpResponse.json([]))),
+      http.get('/api/einsaetze/5/meldungen/rueckmeldungen', () =>
+        HttpResponse.json(RUECKMELDUNGEN),
+      ),
     );
     const { result } = renderHook(() => useLagekarteDaten({ einsatzId: 5, zeigeZonen: true }), {
       wrapper: wrapper(),
     });
     await waitFor(() => expect(result.current.ladt).toBe(false));
     expect(result.current.fehlerhafteQuellen).toEqual([]);
+    // Live: die Rückmeldungen reichen bis ins Paneel „Ausgewählt" durch (LFH-610).
+    await waitFor(() => expect(result.current.rohdaten.rueckmeldungen).toEqual(RUECKMELDUNGEN));
   });
 
   it('spiegelt im Historien-Modus die EINE aktive Quelle, nicht die elf abgeschalteten', async () => {
@@ -334,6 +367,9 @@ describe('useLagekarteDaten markerLaden', () => {
         '/api/einsaetze/5/lage/meldungen',
         '/api/einsaetze/5/karte/fuehrungskraefte',
       ].map((pfad) => http.get(pfad, () => HttpResponse.json([]))),
+      http.get('/api/einsaetze/5/meldungen/rueckmeldungen', () =>
+        HttpResponse.json(RUECKMELDUNGEN),
+      ),
     );
     const { result } = renderHook(() => useLagekarteDaten({ einsatzId: 5, zeigeZonen: true }), {
       wrapper: wrapper(),

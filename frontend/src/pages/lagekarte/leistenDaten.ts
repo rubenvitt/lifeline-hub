@@ -3,6 +3,7 @@ import type {
   Einsatzabschnitt,
   EinsatzFahrzeug,
   FuehrungskraftKarte,
+  Rueckmeldungen,
   Schaden,
   Staerke,
   Uhs,
@@ -17,6 +18,7 @@ import {
   uhsTyp,
   type Statusrolle,
 } from '../../theme/statusFarben';
+import { MELDEWEG_WORT, rueckmeldungJeEinheit } from '../../meldungen/rueckmeldung';
 import type { KarteMarker, MarkerTyp } from './marker';
 import type { BasemapModus } from './basemapStil';
 import type { LayerSichtbar } from './Sidebar';
@@ -116,6 +118,12 @@ export interface AuswahlRoh {
   uhs: readonly Uhs[];
   schaeden: readonly Schaden[];
   abschnitte: readonly Einsatzabschnitt[];
+  /**
+   * Letzte Rückmeldung je Einheit (LFH-610). Optional und bewusst ohne Leerwert: fehlt sie
+   * (lädt, 403 ohne Leserecht auf „Meldungen", Fehler, Historien-Modus), zeigt das Paneel
+   * den Block „Letzte Meldung" gar nicht — eine leere Menge hieße dagegen „nie gemeldet".
+   */
+  rueckmeldungen?: Rueckmeldungen;
 }
 
 export const LEERE_ROHDATEN: AuswahlRoh = {
@@ -188,7 +196,8 @@ export function auswahlUnterzeile(marker: KarteMarker, roh: AuswahlRoh): string 
  * Weggelassen, weil es sie nicht gibt (Auftrag „keine erfundenen Daten"): Status und „Seit"
  * einer EINHEIT (LFH-609 — das DTO trägt keinen Status), „Seit" eines Fahrzeugstatus (das DTO
  * führt `status_label`, aber keinen Zeitpunkt des Statuswechsels; `disponiert_at` ist der
- * Zeitpunkt der Disposition und steht unter diesem Namen da), „Letzte Meldung" (LFH-610).
+ * Zeitpunkt der Disposition und steht unter diesem Namen da). „Letzte Meldung" steht nicht
+ * im Raster, sondern als eigener Block darunter — {@link letzteMeldungBlock}.
  *
  * `zeit` formatiert einen UTC-Zeitstempel nach den Anzeigekonventionen des Einsatzes.
  */
@@ -272,6 +281,31 @@ export function auswahlRaster(
     default:
       return [];
   }
+}
+
+export interface LetzteMeldungBlock {
+  /** Wortlaut der Meldung. */
+  text: string;
+  /** Mono-Zeile „14:11 · Funk" — Zeit nach Anzeigekonvention · Meldeweg. */
+  meta: string;
+}
+
+/**
+ * Block „Letzte Meldung" einer ausgewählten EINHEIT (Neuentwurf S5, LFH-610): die jüngste an
+ * die Einheit gebundene Meldung, gleich welcher Meldungsart. `null` — und damit KEIN Block —,
+ * wenn der Marker keine Einheit ist, die Rückmeldungen nicht vorliegen oder die Einheit noch
+ * nie gemeldet hat. Ein Platzhalter wie „—" stünde im Paneel als Aussage, die für die ersten
+ * beiden Fälle nicht belegt ist; der dritte zeigt sich im Meldebild (S6), nicht hier.
+ */
+export function letzteMeldungBlock(
+  marker: Pick<KarteMarker, 'typ' | 'id'>,
+  roh: AuswahlRoh,
+  zeit: (utc: string | null | undefined) => string,
+): LetzteMeldungBlock | null {
+  if (marker.typ !== 'einheit' || !roh.rueckmeldungen) return null;
+  const r = rueckmeldungJeEinheit(roh.rueckmeldungen).get(marker.id);
+  if (!r) return null;
+  return { text: r.inhalt, meta: `${zeit(r.ereigniszeit)} · ${MELDEWEG_WORT[r.meldeweg]}` };
 }
 
 // ── Kartengrundlage ───────────────────────────────────────────────────────────────────
