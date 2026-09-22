@@ -13,6 +13,7 @@ import {
 import { farbenDunkel, farbenHell } from '../../theme/tokens';
 import { FACHEBENEN } from './fachebenen';
 import { MARKER_CLUSTER_QUELLE } from './markerLayer';
+import { blindStyle, offlineStyle } from './basemapStil';
 
 const leereFlaechen = baueFlaechenFc([]);
 const leereZonen = baueZonenFc([]);
@@ -32,7 +33,7 @@ const leereZonen = baueZonenFc([]);
  */
 
 /** Fake-Map mit Source-Registry; protokolliert addSource/addLayer und treibt render-Frames. */
-function fakeMap(istGeladen: () => boolean) {
+function fakeMap(istGeladen: () => boolean, stil?: unknown) {
   const sources = new Set<string>();
   const layers = new Set<string>();
   const handler: Record<string, Array<() => void>> = {};
@@ -54,6 +55,7 @@ function fakeMap(istGeladen: () => boolean) {
       layers.add(spec.id);
     }),
     moveLayer: vi.fn(),
+    getStyle: vi.fn(() => stil),
     feuere: (ev: string) => (handler[ev] ?? []).slice().forEach((h) => h()),
   };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -86,6 +88,7 @@ function fakeMapMitBild() {
       layers.delete(id);
     }),
     setPaintProperty: vi.fn(),
+    getStyle: vi.fn(() => undefined),
     _layers: layers,
   };
 }
@@ -320,6 +323,22 @@ describe('Zonen im Entwurfsstil', () => {
     expect(label.layout?.['text-transform']).toBe('uppercase');
     expect(label.layout?.['icon-image']).toEqual(['get', 'plakette']);
     expect(label.layout?.['icon-text-fit']).toBe('both');
+  });
+
+  // LFH-622: ohne `text-font` fordert MapLibre „Open Sans Regular,Arial Unicode MS Regular"
+  // an — die führt der eigene Glyphen-Server nicht, und die Plakette fehlte offline still.
+  it('fordert offline die eingebettete Mono-Schrift an, ohne Glyphen-Server keine', () => {
+    const labelLayout = (stil: unknown) => {
+      const { map } = fakeMap(() => true, stil);
+      sorgeFuerZonenLayer(map, baueZonenFc([ZONE]));
+      const specs = map.addLayer.mock.calls.map((c: [{ id: string }]) => c[0]) as Array<{
+        id: string;
+        layout?: Record<string, unknown>;
+      }>;
+      return specs.find((l) => l.id === 'zonen-label')!.layout!;
+    };
+    expect(labelLayout(offlineStyle('dark', []))['text-font']).toEqual(['JetBrains Mono Regular']);
+    expect(labelLayout(blindStyle('dark'))).not.toHaveProperty('text-font');
   });
 });
 

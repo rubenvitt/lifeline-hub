@@ -85,6 +85,9 @@ export function blindStyle(theme: KartenTheme): StyleSpecification {
  * gleiche Features doppelt — bei identischem Schema/Theme optisch unkritisch (spätere Option:
  * per-Region-bbox-Clip, LFH-188).
  */
+/** Glyphen-Vorlage des Offline-Stils: der eigene, eingebettete Server (`assets/karten/fonts/`). */
+export const OFFLINE_GLYPHS = '/api/karte/offline/fonts/{fontstack}/{range}.pbf';
+
 export function offlineStyle(theme: KartenTheme, regionen: OfflineRegion[]): StyleSpecification {
   const f = FARBEN[theme];
   const sources: Record<string, unknown> = {};
@@ -114,7 +117,7 @@ export function offlineStyle(theme: KartenTheme, regionen: OfflineRegion[]): Sty
   }
   return {
     version: 8,
-    glyphs: '/api/karte/offline/fonts/{fontstack}/{range}.pbf',
+    glyphs: OFFLINE_GLYPHS,
     sprite: '/api/karte/offline/sprites/basemap',
     sources,
     layers,

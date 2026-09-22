@@ -1,1 +1,3 @@
 Echte Offline-Style-Assets, erzeugt von `karten-build/gen-assets.sh` aus gepinnten Upstream-Releases (versatiles-fonts OFL-Glyphs „Noto Sans Regular", kuratierte Latein-Ranges; versatiles-style CC0-Sprite `basics` → `basemap`). Nicht händisch pflegen — bei Update das Skript neu laufen lassen.
+
+Dazu die Mono-Glyphs „JetBrains Mono Regular" (LFH-622, Beschriftungsplaketten der Lagekarte): kein Upstream-Release liefert eine Mono-Familie als SDF-PBF, deshalb baut dasselbe Skript sie aus der gepinnten OFL-TTF (JetBrains/JetBrainsMono v2.304) mit dem gepinnten `build_pbf_glyphs` 1.5.1. Die Lizenz liegt als `OFL.txt` im Fontstack-Ordner.

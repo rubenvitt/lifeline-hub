@@ -1,7 +1,8 @@
 //! Eingebettete Offline-Glyphs/Sprite (LFH-195/197). Die echten Assets erzeugt
 //! `karten-build/gen-assets.sh` aus gepinnten Upstream-Releases (versatiles-fonts: OFL-Glyphs
 //! „Noto Sans Regular", kuratierte Latein-Ranges; versatiles-style: CC0-Sprite `basics` →
-//! `basemap`); hier nur die Einbettung via rust-embed.
+//! `basemap`; JetBrains Mono: OFL-TTF, selbst zu SDF-Glyphs „JetBrains Mono Regular" gebaut für
+//! die Beschriftungsplaketten, LFH-622); hier nur die Einbettung via rust-embed.
 
 #[derive(rust_embed::Embed)]
 #[folder = "assets/karten/"]
@@ -84,6 +85,19 @@ mod tests {
             "0-255.pbf wirkt wie Placeholder ({} Bytes) — echte Glyphs via gen-assets.sh einspielen",
             f.data.len()
         );
+    }
+
+    // Die Mono-Glyphs der Beschriftungsplaketten (LFH-622). Fehlen sie, fordert der
+    // Offline-Stil einen Fontstack an, den der Server 404-t — und MapLibre lässt jede
+    // Plakette samt Text STILL weg. Alle vier Ranges, weil „·" (0-255) und „–" (8192-8447)
+    // in den Beschriftungen vorkommen.
+    #[test]
+    fn mono_glyphs_der_plaketten_sind_echt_eingebettet() {
+        for r in ["0-255", "256-511", "512-767", "8192-8447"] {
+            let f = KartenAssets::get(&format!("fonts/JetBrains Mono Regular/{r}.pbf"))
+                .unwrap_or_else(|| panic!("Mono-Range {r} fehlt — karten-build/gen-assets.sh"));
+            assert!(f.data.len() > 1000, "Mono-Range {r} wirkt wie Placeholder");
+        }
     }
 
     // Ebenso das CC0-Sprite: der 1×1-Placeholder (70 Bytes) ist zwar ein gültiges leeres Sprite,
