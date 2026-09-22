@@ -1590,7 +1590,7 @@ mod tests {
         );
     }
 
-    /// LFH-617: Bestandsnummern `JJJJ-NNN` (von 0104 in die Zahlenspalten übernommen) zählen
+    /// LFH-617: Bestandsnummern `JJJJ-NNN` (von 0115 in die Zahlenspalten übernommen) zählen
     /// mit — die Zählung setzt dahinter fort, ihr Text bleibt wörtlich. Ein Vorjahr zählt nicht.
     #[tokio::test]
     async fn anlegen_setzt_hinter_bestandsnummern_fort() {
@@ -1631,7 +1631,7 @@ mod tests {
     }
 
     /// LFH-617 (Review): ein früher VON HAND gesetzter Text, der zufällig dem neuen Muster
-    /// entspricht, trägt keine Zahlen (0104 übernimmt nur `JJJJ-NNN`) und zählt nicht mit.
+    /// entspricht, trägt keine Zahlen (0115 übernimmt nur `JJJJ-NNN`) und zählt nicht mit.
     /// Ohne Ausweichen entstünde derselbe Text erneut, der Text-Index aus 0005 schlüge an —
     /// und weil MAX(nummer_lfd) dann nie wächst, bei JEDEM weiteren Versuch: die Org könnte
     /// in diesem Jahr keinen Einsatz mehr anlegen. Die Vergabe überspringt belegte Texte.

@@ -2633,12 +2633,12 @@ mod tests {
         assert_eq!(neue_id, 3, "gelöschte ids werden nicht wiedervergeben");
     }
 
-    /// LFH-617: 0104 übernimmt nur Bestandsnummern im EXAKTEN Muster `JJJJ-NNN` in die
+    /// LFH-617: 0115 übernimmt nur Bestandsnummern im EXAKTEN Muster `JJJJ-NNN` in die
     /// Zahlenspalten. Läuft gegen die ECHTE Migration (include_str!) auf einem Minimal-Schema
     /// des Vorstands — ein `2026-01` neben `2026-001` ergäbe sonst dasselbe Zahlenpaar und
     /// spränge den neuen Unique-Index mitten in der Migration.
     #[tokio::test]
-    async fn migration_0104_uebernimmt_nur_exakte_bestandsnummern() {
+    async fn migration_0115_uebernimmt_nur_exakte_bestandsnummern() {
         let pool = SqlitePoolOptions::new()
             .max_connections(1)
             .connect_with(SqliteConnectOptions::new().filename(":memory:"))
@@ -2657,10 +2657,10 @@ mod tests {
         .await
         .unwrap();
 
-        sqlx::raw_sql(include_str!("../migrations/0104_einsatznummer_system.sql"))
+        sqlx::raw_sql(include_str!("../migrations/0115_einsatznummer_system.sql"))
             .execute(&pool)
             .await
-            .expect("0104 muss auf Bestand mit Handwerten durchlaufen");
+            .expect("0115 muss auf Bestand mit Handwerten durchlaufen");
 
         let zeilen: Vec<(i64, Option<String>, Option<i64>, Option<i64>)> = sqlx::query_as(
             "SELECT id, einsatznummer_intern, nummer_jahr, nummer_lfd FROM einsatz ORDER BY id",

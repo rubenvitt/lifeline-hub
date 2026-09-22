@@ -4,7 +4,7 @@ Arbeitsweise je Aufgabe: `superpowers:test-driven-development` (erst roter Test,
 
 ## 1. Datenbank
 
-- [x] 1.1 Prüfen, dass `0104` auf `origin/alpha` frei ist, dann `migrations/0104_einsatznummer_system.sql` anlegen (Spalten `einsatz.nummer_jahr`/`nummer_lfd`, Übernahme nur für exakt `JJJJ-NNN`, Unique-Index `(org_id, nummer_jahr, nummer_lfd)`, `org_einstellungen.einsatz_nummer_praefix`). Verifikation: Migrationstest in `src/db.rs` belegt Übernahme von `2026-001`, Nicht-Übernahme von `EN-4711` und `2026-01`, `NULL` bleibt `NULL`, und eine doppelte `(org, jahr, lfd)` wird abgewiesen.
+- [x] 1.1 Prüfen, dass die Nummer auf `origin/alpha` frei ist, dann `migrations/0115_einsatznummer_system.sql` anlegen (zuerst `0104`, dann `0107`, dann `0113`, dann `0114`; alle beim Rebase durch parallele Merges belegt) (Spalten `einsatz.nummer_jahr`/`nummer_lfd`, Übernahme nur für exakt `JJJJ-NNN`, Unique-Index `(org_id, nummer_jahr, nummer_lfd)`, `org_einstellungen.einsatz_nummer_praefix`). Verifikation: Migrationstest in `src/db.rs` belegt Übernahme von `2026-001`, Nicht-Übernahme von `EN-4711` und `2026-01`, `NULL` bleibt `NULL`, und eine doppelte `(org, jahr, lfd)` wird abgewiesen.
 - [x] 1.2 `src/einsatz/schwaerzung_registry.rs`: `nummer_jahr` und `nummer_lfd` als `retain(…, G_ZAEHLER)` eintragen. Verifikation: der Registry-Guard ist nach der Migration erst rot, dann grün.
 
 ## 2. Vergabe (Backend)

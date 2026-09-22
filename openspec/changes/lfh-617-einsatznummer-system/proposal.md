@@ -44,7 +44,7 @@ erzeugt, unveränderlich).
 
 ## Impact
 
-- **Datenbank:** neue Migration nach `0103`: `einsatz.nummer_jahr`, `einsatz.nummer_lfd` plus
+- **Datenbank:** neue Migration `0115`: `einsatz.nummer_jahr`, `einsatz.nummer_lfd` plus
   Unique-Index je (Org, Jahr, lfd. Nr.), Übernahme der Bestandsnummern und
   `org_einstellungen.einsatz_nummer_praefix`.
 - **Abhängigkeit:** `chrono-tz` (IANA-Zeitzonendatenbank, passt zum vorhandenen `chrono`).

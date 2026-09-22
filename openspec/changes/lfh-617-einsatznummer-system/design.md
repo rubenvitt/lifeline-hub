@@ -132,10 +132,10 @@ Zeitzonendatenbank macht das Binary etwas größer, das Single-Binary bleibt.
 
 ## Migration Plan
 
-Neue Migration `0104_einsatznummer_system.sql`: `ALTER TABLE einsatz ADD COLUMN nummer_jahr
+Neue Migration `0115_einsatznummer_system.sql`: `ALTER TABLE einsatz ADD COLUMN nummer_jahr
 INTEGER`, `… nummer_lfd INTEGER`, Übernahme (Entscheidung 3), `CREATE UNIQUE INDEX
 idx_einsatz_nummer_lfd ON einsatz(org_id, nummer_jahr, nummer_lfd)`, `ALTER TABLE
 org_einstellungen ADD COLUMN einsatz_nummer_praefix TEXT`. Nur additiv, kein Rebuild. Eine
 Rückabwicklung ist nicht vorgesehen, und die Spalten schaden einem älteren Binary nicht.
-Vor dem Anlegen prüfen, ob `0104` auf `origin/alpha` inzwischen belegt ist (Memory:
+Die zuerst geplante `0104` und danach `0107`, `0113` und `0114` waren beim Rebase jeweils schon belegt (parallele Merges auf `alpha`), daher `0115`. Vor dem Merge noch einmal prüfen, ob die Nummer auf `origin/alpha` inzwischen belegt ist (Memory:
 Migrations-Nummernkollision).
