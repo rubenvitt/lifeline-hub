@@ -1,3 +1,9 @@
+## [1.0.0-alpha.30](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.29...v1.0.0-alpha.30) (2026-09-22)
+
+### Features
+
+* **lagekarte:** Namensplaketten an den Markern, Mono-Glyphen offline (LFH-622) ([8a87b0c](https://github.com/rubenvitt/lifeline-hub/commit/8a87b0c3892ee6dcd2770a33261ca12fbecdf8a2))
+
 ## [1.0.0-alpha.29](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.28...v1.0.0-alpha.29) (2026-09-22)
 
 ### Features
