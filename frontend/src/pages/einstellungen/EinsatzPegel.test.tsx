@@ -53,7 +53,7 @@ const FEATURES = [
 ];
 
 /** Wire-Form von `GET /api/karte/fachebenen/pegelonline` (`FachebeneAntwort`). */
-const antwort = (status: 'ok' | 'offline', features: unknown[]) => ({
+const antwort = (status: 'ok' | 'offline' | 'leer', features: unknown[]) => ({
   quelle: 'pegelonline',
   status,
   attribution: 'WSV',
@@ -66,6 +66,8 @@ interface Aufbau {
   stationenStatus?: number;
   /** Das Backend antwortet 200, meldet die Quelle aber `offline` ohne Cache-Bestand. */
   stationenOffline?: boolean;
+  /** Das Backend antwortet 200 mit `leer` — erreichbar, aber ohne Station. */
+  stationenLeer?: boolean;
   pegelStatus?: number;
   putStatus?: number;
 }
@@ -85,7 +87,13 @@ function stelleBereit(a: Aufbau = {}) {
     http.get('/api/karte/fachebenen/pegelonline', () =>
       a.stationenStatus
         ? new HttpResponse(null, { status: a.stationenStatus })
-        : HttpResponse.json(a.stationenOffline ? antwort('offline', []) : antwort('ok', FEATURES)),
+        : HttpResponse.json(
+            a.stationenOffline
+              ? antwort('offline', [])
+              : a.stationenLeer
+                ? antwort('leer', [])
+                : antwort('ok', FEATURES),
+          ),
     ),
     http.put('/api/einsaetze/1/pegel', async ({ request }) => {
       const body = (await request.json()) as {
@@ -344,6 +352,15 @@ describe('EinsatzPegel', () => {
     expect(screen.getByRole('combobox', { name: 'Station wählen' })).toBeDisabled();
   });
 
+  it('Quelle leer: die Auswahl ist gesperrt und sagt warum, statt leer aufzuklappen', async () => {
+    stelleBereit({ stationenLeer: true });
+    rendern();
+    expect(
+      await screen.findByText('PEGELONLINE liefert gerade keine wählbare Station.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Station wählen' })).toBeDisabled();
+  });
+
   it('Quelle erreichbar: kein Hinweis — die Gegenaussage', async () => {
     stelleBereit();
     rendern();
@@ -352,6 +369,7 @@ describe('EinsatzPegel', () => {
       expect(screen.getByRole('combobox', { name: 'Station wählen' })).toBeEnabled(),
     );
     expect(screen.queryByText(/PEGELONLINE ist gerade nicht erreichbar/)).toBeNull();
+    expect(screen.queryByText(/keine wählbare Station/)).toBeNull();
   });
 
   it('ein abgelehnter PUT steht als Fehler an der Seite, die Liste bleibt beim Serverstand', async () => {

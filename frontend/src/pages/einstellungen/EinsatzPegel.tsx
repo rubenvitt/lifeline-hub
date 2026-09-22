@@ -185,10 +185,11 @@ export default function EinsatzPegel() {
   const laeuft = aendern.isPending;
   const voll = liste.length >= PEGEL_MAX;
   const festgelegt = new Set(liste.map((p) => p.station_uuid.toLowerCase()));
-  // Nicht erreichbar: der Abruf scheitert, oder das Backend meldet die Quelle `offline` und
-  // hat keinen Bestand aus dem Cache — mit Cache-Bestand bleibt die Auswahl nutzbar.
-  const stationenFehlen =
-    stationenQ.isError || (stationenQ.data?.status === 'offline' && stationen.length === 0);
+  // Keine Auswahl möglich: der Abruf scheitert, oder die Antwort trägt keine wählbare Station
+  // (Quelle `offline` ohne Cache-Bestand, `leer`, oder nur Punkte ohne uuid). Mit Bestand aus
+  // dem Cache bleibt die Auswahl nutzbar, auch wenn die Quelle gerade `offline` meldet.
+  const stationenFehlen = stationenQ.isError || (stationenQ.data != null && stationen.length === 0);
+  const quelleOffline = stationenQ.isError || stationenQ.data?.status === 'offline';
   const gewaehlt = stationen.find((s) => s.uuid === auswahl) ?? null;
 
   const setzen = (neu: PegelAnzeige[]) =>
@@ -361,8 +362,12 @@ export default function EinsatzPegel() {
             type="warning"
             showIcon
             style={{ marginBlockStart: token.marginSM }}
-            title="Die Stationsliste von PEGELONLINE ist gerade nicht erreichbar."
-            description="Neue Pegel lassen sich erst wieder hinzufügen, wenn sie antwortet. Die festgelegten Pegel bleiben bedienbar: umordnen und entfernen geht weiter."
+            title={
+              quelleOffline
+                ? 'Die Stationsliste von PEGELONLINE ist gerade nicht erreichbar.'
+                : 'PEGELONLINE liefert gerade keine wählbare Station.'
+            }
+            description="Neue Pegel lassen sich erst wieder hinzufügen, wenn die Liste zurück ist. Die festgelegten Pegel bleiben bedienbar: umordnen und entfernen geht weiter."
             action={<Button onClick={() => void stationenQ.refetch()}>Erneut abrufen</Button>}
           />
         )}
