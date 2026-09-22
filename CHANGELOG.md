@@ -1,3 +1,19 @@
+## [1.0.0-alpha.33](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.32...v1.0.0-alpha.33) (2026-09-22)
+
+### Features
+
+* **person:** Codegen und Frontend-Typen für die Lagedaten der Betroffenen ([37fc1c4](https://github.com/rubenvitt/lifeline-hub/commit/37fc1c4945b9b7ef0e85f253507f2ccd63f36c0d))
+* **personen:** Zustand, Koordinate, Verbleib-Zählung, Kartenansicht und Dashboard-Angaben ([7923f5b](https://github.com/rubenvitt/lifeline-hub/commit/7923f5b17d0e603f9539d6cc0d8f6a4101b0c7bb))
+* **person:** Migrationen und Schwärzung für die Lagedaten der Betroffenen ([379dcad](https://github.com/rubenvitt/lifeline-hub/commit/379dcad0bf13fbea6797fa3031cfe42242ee6ade))
+* **person:** Zustand, Fundort-Koordinate, Verbleib-Struktur und „vermisst seit“ in der API ([33ab0ee](https://github.com/rubenvitt/lifeline-hub/commit/33ab0ee7f9d0d5153697b2e012c16209183eb722))
+
+### Bug Fixes
+
+* **migrations:** LFH-613-Migrationen auf 0106/0107 umnummerieren ([436921c](https://github.com/rubenvitt/lifeline-hub/commit/436921c0ee063624cd4063dd887d4cd3e1c7542f))
+* **migrations:** LFH-613-Migrationen auf 0111/0112 umnummerieren ([46561d1](https://github.com/rubenvitt/lifeline-hub/commit/46561d1314829c456eee0366eb60804e65d4ef52))
+* **personen:** Fundort-Angaben nur an angetroffenen Personen, e2e für die Karte ([c79b113](https://github.com/rubenvitt/lifeline-hub/commit/c79b11396623830880af26585af9d2ca5e378fc8))
+* **personen:** Sichtung auf der Karte ohne Zoomschwelle lesbar, Kürzel-Hinweis #Koordinate ([9f5f6e1](https://github.com/rubenvitt/lifeline-hub/commit/9f5f6e1a4a12ab1487365b48e70dc3a9e6af004a)), closes [#Koordinate](https://github.com/rubenvitt/lifeline-hub/issues/Koordinate)
+
 ## [1.0.0-alpha.32](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.31...v1.0.0-alpha.32) (2026-09-22)
 
 ### Features
