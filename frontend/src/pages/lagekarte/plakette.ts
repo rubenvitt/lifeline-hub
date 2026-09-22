@@ -106,17 +106,20 @@ function schriftListe(wert: unknown): string[] | undefined {
 
 /**
  * Welche Schrift die Plaketten anfordern (LFH-622). Ein Fontstack, den der Glyphen-Server
- * des aktiven Stils nicht führt, lässt MapLibre Plakette UND Text STILL weglassen —
- * deshalb hängt die Wahl am Stil, nicht an einer Vorgabe:
+ * des aktiven Stils nicht führt, beantwortet er mit 404. MapLibre 6 zeichnet die Zeichen
+ * dann lokal in einer Systemschrift und warnt je Zeichen in der Konsole (im Browser
+ * gemessen: 38 Warnungen für acht kurze Namen). Die Plakette bleibt stehen, nur eben nicht
+ * in Mono, und die Konsole läuft voll. Deshalb hängt die Wahl am Stil, nicht an einer
+ * Vorgabe:
  *
  * - **offline** → Mono, denn der eigene Server liefert sie aus;
  * - **online** → die erste literale Schrift des Anbieter-Stils: die führt dessen Server
  *   sicher, eine Mono-Familie dort nicht;
  * - **ohne Glyphen-Server** (Blindkarte) → keine Angabe, MapLibre zeichnet lokal.
  *
- * `undefined` heißt „kein `text-font` setzen". Das ist offline ausdrücklich NICHT richtig:
- * MapLibres Vorgabe ist „Open Sans Regular,Arial Unicode MS Regular", und die führt der
- * eigene Server nicht — ohne diese Funktion standen die Zonenplaketten offline leer.
+ * `undefined` heißt „kein `text-font` setzen". Offline wäre das der eben beschriebene
+ * Rückfall: MapLibres Vorgabe ist „Open Sans Regular,Arial Unicode MS Regular", die der
+ * eigene Server nicht führt — so liefen die Zonenplaketten bis LFH-622.
  */
 export function plakettenSchrift(stil: StilAusschnitt | undefined): string[] | undefined {
   if (!stil?.glyphs) return undefined;

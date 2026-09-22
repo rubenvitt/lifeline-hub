@@ -326,7 +326,7 @@ describe('Zonen im Entwurfsstil', () => {
   });
 
   // LFH-622: ohne `text-font` fordert MapLibre „Open Sans Regular,Arial Unicode MS Regular"
-  // an — die führt der eigene Glyphen-Server nicht, und die Plakette fehlte offline still.
+  // an. Die führt der eigene Glyphen-Server nicht: 404, lokaler Rückfall, eine Warnung je Zeichen.
   it('fordert offline die eingebettete Mono-Schrift an, ohne Glyphen-Server keine', () => {
     const labelLayout = (stil: unknown) => {
       const { map } = fakeMap(() => true, stil);

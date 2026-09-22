@@ -4,9 +4,9 @@ import { blindStyle, offlineStyle } from './basemapStil';
 
 /**
  * LFH-622: Welche Schrift die Beschriftungsplaketten anfordern, hängt am Glyphen-Server des
- * aktiven Stils. Ein Fontstack, den der Server nicht führt, lässt MapLibre die Plakette samt
- * Text STILL weglassen — kein Fehlerbild, nur leere Karte. Deshalb Mono NUR offline, wo der
- * eigene Server sie ausliefert.
+ * aktiven Stils. Einen Fontstack, den der Server nicht führt, beantwortet er mit 404; MapLibre
+ * zeichnet dann lokal in einer Systemschrift und warnt je Zeichen. Deshalb Mono NUR offline,
+ * wo der eigene Server sie ausliefert.
  */
 describe('plakettenSchrift', () => {
   it('nimmt offline die eingebettete Mono-Schrift', () => {

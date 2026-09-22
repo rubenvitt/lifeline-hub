@@ -179,7 +179,8 @@ export function sorgeFuerZonenLayer(map: MapLibreMap, daten: ZonenFeatureCollect
   // Beschriftung im Entwurfsstil: Plakette (9-Slice-Bild, `icon-text-fit`) statt Halo,
   // Versalien per `text-transform` — der Text selbst bleibt, wie `zonenBeschriftung` ihn
   // baut. Die Schrift wählt `plakettenSchrift` je Glyphen-Server: Mono nur offline, wo der
-  // eigene Server sie führt — eine fremde Familie liesse die Beschriftung ganz verschwinden.
+  // eigene Server sie führt. Eine fremde Familie beantwortet der Server mit 404, und MapLibre
+  // zeichnet dann in einer lokalen Systemschrift.
   if (!map.getLayer('zonen-label')) {
     const schrift = plakettenSchrift(map.getStyle());
     map.addLayer({

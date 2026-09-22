@@ -88,9 +88,9 @@ mod tests {
     }
 
     // Die Mono-Glyphs der Beschriftungsplaketten (LFH-622). Fehlen sie, fordert der
-    // Offline-Stil einen Fontstack an, den der Server 404-t — und MapLibre lässt jede
-    // Plakette samt Text STILL weg. Alle vier Ranges, weil „·" (0-255) und „–" (8192-8447)
-    // in den Beschriftungen vorkommen.
+    // Offline-Stil einen Fontstack an, den der Server 404-t. MapLibre zeichnet dann lokal in
+    // einer Systemschrift statt Mono und warnt je Zeichen. Alle vier Ranges, weil „·" (0-255)
+    // und „–" (8192-8447) in den Beschriftungen vorkommen.
     #[test]
     fn mono_glyphs_der_plaketten_sind_echt_eingebettet() {
         for r in ["0-255", "256-511", "512-767", "8192-8447"] {
