@@ -402,7 +402,8 @@ test('Druckpfad des Meldebilds: die Neutralisierer WIRKEN, und keine Spalte ragt
  *
  * WARUM GESEEDET WIRD: ohne Kräfte zeigt das Band nur den Leerzustand. Gesät werden Personal
  * UND Einheiten mit je einem Fahrzeug, damit beide Gruppen stehen; die Einheiten tragen den
- * aus dem Default-Status neuer Dispositionen abgeleiteten Status (LFH-609).
+ * aus dem Default-Status neuer Dispositionen abgeleiteten Status (LFH-609). Weil keine von
+ * ihnen je zurückgemeldet hat, steht zusätzlich die Gruppe „keine Rückmeldung" (LFH-610).
  */
 test('Statusband des Meldebilds bricht um statt waagerecht zu scrollen', async ({ page }) => {
   await page.setViewportSize({ width: 1024, height: 768 });
@@ -458,8 +459,12 @@ test('Statusband des Meldebilds bricht um statt waagerecht zu scrollen', async (
   const spuren = await band
     .locator('[data-lfh="kennzahlenband"]')
     .evaluateAll((els) => els.map((el) => getComputedStyle(el).gridTemplateColumns.split(' ')));
-  expect(spuren.map((s) => s.length)).toEqual([3, 3]);
+  // Drei Gruppen: die gesäten Einheiten haben nie zurückgemeldet, also steht die Kachel
+  // „keine Rückmeldung" als eigene Gruppe daneben (LFH-610) — in derselben Geometrie.
+  await expect(band.getByRole('region', { name: 'Einheiten ohne Rückmeldung' })).toBeVisible();
+  expect(spuren.map((s) => s.length)).toEqual([3, 3, 3]);
   expect(spuren[1], 'Personal in derselben Spaltengeometrie wie Fahrzeuge').toEqual(spuren[0]);
+  expect(spuren[2], 'Rückmeldung in derselben Spaltengeometrie').toEqual(spuren[0]);
   // Und das Meta im Seitenkopf nennt Einheiten und Stärke in BOS-Schreibweise.
   await expect(
     page.locator('[data-lfh="seitenkopf"]').getByText(/Einheiten? · Stärke \d+\/\d+\/\d+\/\/\d+/),
