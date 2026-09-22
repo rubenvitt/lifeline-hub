@@ -32,6 +32,20 @@ function p(teil: Partial<Person>): Person {
 }
 
 describe('personenMarker', () => {
+  it('lässt nicht angetroffene Personen weg — eine Koordinate an einer vermissten ist kein Fundort', () => {
+    const personen = [
+      p({ id: 1, status: 'vermisst', antreff_lat: 50.1, antreff_lon: 8.6 }),
+      p({ id: 2, status: 'vermisst' }),
+      p({ id: 3, status: 'abgemeldet' }),
+      p({ id: 4, status: 'verstorben', antreff_lat: 50.2, antreff_lon: 8.7 }),
+    ];
+    const { marker, ohneKoordinate } = personenMarker(personen, token);
+    // Gegenaussage im selben Test: die verstorbene (angetroffene) Person bleibt drauf.
+    expect(marker.map((m) => m.id)).toEqual([4]);
+    // Vermisste und abgemeldete zählen auch nicht als „ohne Koordinate" (wie `lueckenVon`).
+    expect(ohneKoordinate).toBe(0);
+  });
+
   it('Spec-Szenario: fünf Personen, zwei mit Koordinate → zwei Marker, drei ohne', () => {
     const personen = [
       p({

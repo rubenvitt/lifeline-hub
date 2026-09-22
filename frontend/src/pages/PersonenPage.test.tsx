@@ -1554,11 +1554,11 @@ describe('PersonenPage — Sichtvorgabe aus der URL (LFH-620)', () => {
     );
     renderMitSuche('/einsaetze/1/personen?ansicht=karte');
     // Keine der beiden Personen trägt eine Koordinate, der Einsatz keinen Ort: Leerzustand,
-    // und die Lücke ist gezählt.
+    // und die Lücke ist gezählt — nur die ANGETROFFENE, die vermisste hat keinen Fundort.
     expect(await screen.findByText('Keine Person mit Koordinate')).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: 'Karte' })).toBeChecked();
     expect(
-      screen.getByText('2 Personen ohne Koordinate — nicht auf der Karte'),
+      screen.getByText('1 Person ohne Koordinate — nicht auf der Karte'),
     ).toBeInTheDocument();
     await vi.waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
   });
@@ -1631,7 +1631,8 @@ describe('PersonenPage — Kartenansicht (LFH-613)', () => {
   it('zeigt zwei Marker mit Registriernummer und Sichtung und nennt „3 ohne Koordinate“ (Spec-Szenario)', async () => {
     const personen = [
       person, // R-001, ohne Koordinate
-      { ...unbekannt }, // R-002, ohne Koordinate
+      { ...unbekannt }, // R-002, vermisst: kein Fundort, also auch keine Lücke
+      { ...person, id: 12, registrier_nr: 7 }, // R-007, ohne Koordinate
       { ...person, id: 15, registrier_nr: 3, antreff_lat: 52.1, antreff_lon: null }, // halbes Paar
       mitKoordinate(20, 4, { aktuelle_sichtung: 'sk2' }),
       mitKoordinate(21, 5),
@@ -1673,12 +1674,12 @@ describe('PersonenPage — Kartenansicht (LFH-613)', () => {
     renderKarte([
       person,
       mitKoordinate(20, 4, { status: 'betroffen' }),
-      mitKoordinate(21, 5, { status: 'vermisst' }),
+      mitKoordinate(21, 5, { status: 'verstorben' }),
     ]);
     await waehleKarte();
     await screen.findByTestId('kartenflaeche-stub');
     expect(screen.getAllByRole('button', { name: /^marker-person-/ })).toHaveLength(2);
-    await userEvent.click(screen.getByRole('tab', { name: 'Vermisst' }));
+    await userEvent.click(screen.getByRole('tab', { name: 'Verstorben' }));
     await vi.waitFor(() =>
       expect(screen.getAllByRole('button', { name: /^marker-person-/ })).toHaveLength(1),
     );

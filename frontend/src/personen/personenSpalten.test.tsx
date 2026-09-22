@@ -281,6 +281,12 @@ describe('Zustand-Spalte (LFH-613)', () => {
     expect(koerper[0]).toEqual({ zustand: 'gehfähig, unterkühlt' });
   });
 
+  it('bietet einer VERMISSTEN Person keinen Zustand an — auch mit Schreibrecht', () => {
+    renderMitProviders(<>{zelle(mitSchreibrecht, { ...basis, status: 'vermisst' })}</>);
+    expect(screen.queryByRole('button', { name: /Zustand zu R-001/ })).toBeNull();
+    expect(screen.getByText('—')).toBeInTheDocument();
+  });
+
   it('schickt nichts, wenn der Wert unverändert bleibt (Wertgleichheits-Riegel)', async () => {
     const patch = vi.fn();
     server.use(

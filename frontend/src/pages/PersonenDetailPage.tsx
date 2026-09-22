@@ -84,6 +84,7 @@ import {
   tiereDetailPfad,
 } from '../routing/deeplinks';
 import { koordinatenText } from '../personen/koordinate';
+import { istAngetroffen } from '../personen/personenBilanz';
 import { KoordinateFeld, VermisstSeitFeld } from '../personen/LagedatenFelder';
 import {
   bearbeitenWerteAus,
@@ -725,6 +726,7 @@ export default function PersonenDetailPage() {
   }
 
   function stammdatenSpalte(person: PersonDetail) {
+    const angetroffen = istAngetroffen(person);
     // Als `const` herausgezogen, damit TypeScript im Formularzweig auf „Sitzung offen"
     // verengt: `basis` ist dort nicht optional. Mit `editSitzung.sitzung?.basis` wäre der
     // unmögliche Fall still ein Schreiben OHNE Lock — also genau der blinde Overwrite,
@@ -773,13 +775,17 @@ export default function PersonenDetailPage() {
             <Form.Item label="Herkunft / Adresse" name="herkunft_adresse">
               <Input />
             </Form.Item>
-            <Form.Item label="Zustand" name="zustand">
-              <Input placeholder="z. B. gehfähig, unterkühlt" />
-            </Form.Item>
+            {/* Zustand und Koordinate beschreiben eine ANGETROFFENE Person — wie in der
+                Aufnahme (`AufnahmeFelder`) bekommt eine vermisste sie nicht angeboten. */}
+            {angetroffen && (
+              <Form.Item label="Zustand" name="zustand">
+                <Input placeholder="z. B. gehfähig, unterkühlt" />
+              </Form.Item>
+            )}
             <Form.Item label="Antreffort" name="antreff_ort">
               <Input />
             </Form.Item>
-            <KoordinateFeld />
+            {angetroffen && <KoordinateFeld />}
             {person.status === 'vermisst' && <VermisstSeitFeld />}
             <Form.Item label="Melder / Kontakt" name="melder_kontakt">
               <Input />
@@ -813,7 +819,7 @@ export default function PersonenDetailPage() {
                 <span data-lfh="koordinate" style={{ fontFamily: token.fontFamilyCode }}>
                   {koordinatenText(person) ?? '—'}
                 </span>
-                {darfSchreiben && !person.storniert_at && (
+                {darfSchreiben && !person.storniert_at && angetroffen && (
                   // Ein Link, kein Knopf: das Ziel ist eine Adresse (Platzier-Auftrag an die
                   // Lagekarte, LFH-340-Muster), in einem neuen Tab öffenbar. Die zwei
                   // Angaben des handgebauten Bedienziels (LFH-365) trägt `verortenLinkStil`.

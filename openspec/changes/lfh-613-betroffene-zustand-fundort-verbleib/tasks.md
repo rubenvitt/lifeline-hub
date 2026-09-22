@@ -35,7 +35,7 @@
 - [x] 5.1 `MarkerTyp` bekommt `person`, dazu `personen/personenKarte.ts` (`personenMarker`, Anzahl ohne Koordinate, Farbe aus der Sichtungsachse, Label `R-042 · SK II`). Verifikation: Unit-Test gegen das Spec-Szenario „Personen auf der Karte“ (2 Marker, 3 ohne Koordinate).
 - [x] 5.2 `personen/BetroffeneKarte.tsx` mit `Kartenflaeche` + `useBasemap`, per `React.lazy` in die Segmentleiste „Karte“ von `PersonenPage`, Leerzustand und Hinweis „n ohne Koordinate“. Verifikation: `PersonenPage.test.tsx` mit gemocktem `Kartenflaeche`. Die Ansicht ist wählbar, die Marker werden übergeben, und der Markerklick navigiert zur Detailseite. Der bisherige Test „Karte gibt es nicht“ ist umgeschrieben.
 - [x] 5.3 Platzier-Auftrag `person`: `PlatzierenZielTyp`/`PlatzierenPunktTyp` und ein `useKartenInteraktion`-Zweig rufen `aktualisierePerson` mit lat/lon. Verifikation: `deeplinks.test.ts` für den Roundtrip `person:<id>`, dazu der Test des Mutationszweigs.
-- [ ] 5.4 e2e `e2e/betroffene-karte.spec.ts`: eine Person mit Koordinate anlegen, Ansicht „Karte“, ein Marker ist über `window.__lfhKarte` vorhanden. Verifikation: `pnpm e2e` für diese Spec ist grün.
+- [x] 5.4 e2e `e2e/betroffene-karte.spec.ts`: eine Person mit Koordinate anlegen, Ansicht „Karte“, ein Marker ist über `window.__lfhKarte` vorhanden. Verifikation: `pnpm e2e` für diese Spec ist grün.
 
 ## 6. Lage-Dashboard
 

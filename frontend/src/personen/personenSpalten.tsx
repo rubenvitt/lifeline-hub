@@ -15,7 +15,13 @@ import type { Person } from '../api/types';
 import { STATUS_META } from './personMeta';
 import { GESCHLECHT_KURZ } from './personBefehl';
 import { koordinatenText } from './koordinate';
-import { lueckenText, lueckenVon, verbleibKlasse, verbleibLabel } from './personenBilanz';
+import {
+  istAngetroffen,
+  lueckenText,
+  lueckenVon,
+  verbleibKlasse,
+  verbleibLabel,
+} from './personenBilanz';
 
 /**
  * Das EINE Spaltenregister der Betroffenen-Listen (LFH-330 · B2; Neuentwurf S7) — reine
@@ -176,7 +182,9 @@ function ZustandSchreiben({ p, einsatzId }: { p: Person; einsatzId: number }) {
 
 function ZustandZelle({ p, bedienung }: { p: Person; bedienung?: ZustandBedienung }) {
   const { rollen } = useRollen();
-  if (!bedienung?.darfSchreiben) {
+  // Der Zustand beschreibt eine ANGETROFFENE Person — einer vermissten wird er nicht
+  // angeboten (dieselbe Regel wie in `AufnahmeFelder` und auf der Detailseite).
+  if (!bedienung?.darfSchreiben || !istAngetroffen(p)) {
     return p.zustand ? (
       <span style={{ fontSize: 12, color: rollen.text2 }}>{p.zustand}</span>
     ) : (
@@ -241,7 +249,9 @@ export function personenSpalten(
     {
       title: 'Zustand',
       key: 'zustand',
-      mindestBreite: 140,
+      // Feste Breite (Entwurf S7: 118 px, hier mit Platz für den Platzhalter-Knopf) — KEINE
+      // weitere Fließspalte neben Person und Vermerk (`fliessBreite` in `KatalogTabelle`).
+      width: 140,
       suchText: (p) => p.zustand,
       render: (_, p) => <ZustandZelle p={p} bedienung={zustand} />,
     },

@@ -147,8 +147,10 @@ mit der Zeit fortschreiben, ohne dass neue Daten eintreffen.
 
 ### Requirement: Kartenansicht der Betroffenen
 Die Betroffenen-Seite SHALL neben „Zeilen“ und „Sichtungsraster“ eine Ansicht „Karte“ bieten.
-Sie zeigt jede nicht stornierte Person mit Fundort-Koordinate als Marker auf der
-Einsatzkarte. Der Marker MUST die Sichtungskategorie über Farbe UND Beschriftung zeigen
+Sie zeigt jede nicht stornierte, angetroffene Person (Status erfasst, betroffen oder
+verstorben) mit Fundort-Koordinate als Marker auf der Einsatzkarte. Eine vermisste Person hat
+keinen Fundort: sie erscheint weder als Marker noch in der Zählung „ohne Koordinate“, und
+Zustand und Koordinate werden ihr in keiner Eingabe angeboten. Der Marker MUST die Sichtungskategorie über Farbe UND Beschriftung zeigen
 (zweiter Kanal, WCAG 1.4.1). Er MUST zur Detailseite der Person führen. Wie viele Personen
 ohne Koordinate nicht auf der Karte stehen, MUST sichtbar genannt werden.
 

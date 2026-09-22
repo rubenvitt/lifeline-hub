@@ -5,6 +5,7 @@ import { rollenFarbe, sichtung } from '../theme/statusFarben';
 import { sichtungsfarben } from '../theme/tokens';
 import type { KarteMarker } from '../pages/lagekarte/marker';
 import { SK_WORT } from './personMeta';
+import { istAngetroffen } from './personenBilanz';
 
 /**
  * Marker der Kartenansicht „Betroffene" (LFH-613, design D7) — rein, damit die Auswahl ohne
@@ -12,6 +13,10 @@ import { SK_WORT } from './personMeta';
  *
  * - Stornierte Personen fallen ganz heraus, auch aus der Zählung „ohne Koordinate": sie
  *   stehen in keiner Sicht der Seite, eine Lücke an ihnen wäre keine.
+ * - Nur ANGETROFFENE Personen (`istAngetroffen`) stehen auf der Karte und in der Zählung: die
+ *   Koordinate ist ein FUNDort, und eine vermisste Person hat keinen. Das gilt auch für eine
+ *   stehengebliebene Koordinate nach einem Wechsel zu „vermisst" — die Regel hängt an der
+ *   Anzeige, nicht an den Eingabewegen (Review LFH-613).
  * - Nur ein VOLLSTÄNDIGES Paar `antreff_lat`/`antreff_lon` ist eine Koordinate.
  * - Farbe aus der Sichtungsachse (`tokens.ts`, `sichtungsfarben`); ohne Sichtung und
  *   „unverletzt" (ohne Fachfarbe) neutral. Der zweite Kanal (WCAG 1.4.1) ist die
@@ -30,7 +35,7 @@ export function personenMarker(
   const neutral = rollenFarbe('neutral', token);
 
   for (const p of personen) {
-    if (p.storniert_at) continue;
+    if (p.storniert_at || !istAngetroffen(p)) continue;
     const lat = p.antreff_lat;
     const lon = p.antreff_lon;
     if (lat == null || lon == null) {

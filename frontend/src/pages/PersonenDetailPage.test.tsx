@@ -1386,6 +1386,18 @@ describe('PersonenDetailPage — Zustand, Koordinate, vermisst seit (LFH-613)', 
     expect(patch).not.toHaveBeenCalled();
   });
 
+  it('vermisst: kein Zustand, keine Koordinate, kein Verorten — ein Fundort gibt es nicht', async () => {
+    const vermisst = { ...detail, status: 'vermisst' } as PersonDetail;
+    render(einsatzAktiv, vermisst);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    expect(screen.queryByRole('link', { name: 'Auf Lagekarte verorten' })).toBeNull();
+    await ausMenue(/Bearbeiten/);
+    // Gegenaussage im selben Formular: „vermisst seit" ist da, die zwei Fundort-Felder nicht.
+    expect(screen.getByLabelText('vermisst seit')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Zustand')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Koordinate')).not.toBeInTheDocument();
+  });
+
   it('vermisst: zeigt „vermisst seit" und sendet es nur, wenn es geändert wurde', async () => {
     const vermisst = {
       ...detail,
