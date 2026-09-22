@@ -5,6 +5,7 @@ import {
   messEpoche,
   pegelKennzahl,
   pegelNotizKurz,
+  standZeit,
   trendRichtung,
   trendText,
   wasserstandMeter,
@@ -58,6 +59,25 @@ describe('Zeit mit Versatz (die Falle der Wirestring-Formatierer)', () => {
   });
 });
 
+describe('standZeit', () => {
+  it('am selben Tag wie „jetzt“ nur die Uhrzeit, gegen jetzt statt gegen die Maschinenuhr', () => {
+    expect(standZeit('2026-09-22T14:05:00+02:00', JETZT, BERLIN)).toBe('14:05');
+  });
+
+  it('ein Stand vom Vortag trägt das Tag-Präfix', () => {
+    expect(standZeit('2026-09-21T23:50:00+02:00', JETZT, BERLIN)).toBe('21. 23:50');
+  });
+
+  it('die Tagesgrenze liegt in der Anzeigezone, nicht in UTC', () => {
+    // 22.09. 00:10 Berlin ist 21.09. 22:10 UTC — in Berlin derselbe Tag wie JETZT.
+    expect(standZeit('2026-09-21T22:10:00Z', JETZT, BERLIN)).toBe('00:10');
+    // In New York ist JETZT (12:30 UTC) der 22., der Stand (18:10 am 21.) der Vortag.
+    expect(standZeit('2026-09-21T22:10:00Z', JETZT, { zeitzone: 'America/New_York' })).toBe(
+      '21. 18:10',
+    );
+  });
+});
+
 describe('wasserstandMeter', () => {
   it('rechnet cm in m mit zwei Nachkommastellen und deutschem Komma', () => {
     expect(wasserstandMeter(684)).toBe('6,84');
@@ -105,7 +125,7 @@ describe('pegelKennzahl', () => {
     const k = pegelKennzahl([pegel()], JETZT, BERLIN);
     expect(k).toMatchObject({ fall: 'messung', wert: '6,84', einheit: 'm', ton: 'neutral' });
     expect(k.veraltet).toBe(false);
-    expect(k.notiz).toMatch(/^WESER · steigend \+9 cm\/h · Stand (\d{2}\. )?14:05$/);
+    expect(k.notiz).toBe('WESER · steigend +9 cm/h · Stand 14:05');
   });
 
   it('ohne Gewässer steht der Stationsname', () => {
@@ -132,7 +152,16 @@ describe('pegelKennzahl', () => {
     });
     const k = pegelKennzahl([pegel()], grenze + 1000, BERLIN);
     expect(k).toMatchObject({ fall: 'messung', wert: '6,84', ton: 'achtung', veraltet: true });
-    expect(k.notiz).toMatch(/Stand (\d{2}\. )?14:05 · veraltet$/);
+    expect(k.notiz).toBe('WESER · steigend +9 cm/h · Stand 14:05 · veraltet');
+  });
+
+  it('ein Stand vom Vortag nennt den Tag in der Notiz', () => {
+    const k = pegelKennzahl(
+      [pegel({ messung: { ...pegel().messung!, zeitpunkt: '2026-09-21T23:50:00+02:00' } })],
+      JETZT,
+      BERLIN,
+    );
+    expect(k.notiz).toBe('WESER · steigend +9 cm/h · Stand 21. 23:50 · veraltet');
   });
 
   it('Ausfall: festgelegt, keine Messung → „—", „Stand unbekannt", achtung', () => {

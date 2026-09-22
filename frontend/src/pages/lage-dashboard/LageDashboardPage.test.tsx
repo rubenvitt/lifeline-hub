@@ -410,6 +410,23 @@ describe('LageDashboardPage — Kennzahlenband', () => {
     expect(kennzahl('Betroffene')).not.toHaveTextContent('Stand unbekannt');
   });
 
+  it('FEHLER SIEHT NICHT AUS WIE LEER: der Gefahren-Ausfall zeigt einen Fehler, nicht „keine Gefahr"', async () => {
+    // Der Bestandsfall aus LFH-331 · B3, seit LFH-606 ohne eigene Warnstufen-Kennzahl: die
+    // Warnstufe steht im Kopf-Hinweis und in der Gefahrenmatrix. Beide dürfen einen toten
+    // Abruf nicht als „keine Gefahr" ausgeben.
+    mockEndpunkte({ personen: [person('sk1')], gefahrenStatus: 500 });
+    render();
+    await kennzahlGeladen('Betroffene');
+    const box = paneel('Gefahrenmatrix');
+    expect(await within(box).findByText('Daten nicht abrufbar')).toBeInTheDocument();
+    expect(within(box).queryByText(/Noch keine/)).toBeNull();
+    // Kein Kopf-Hinweis aus einer erfundenen Stufe.
+    expect(document.querySelector('[data-lfh="warnstufe-hinweis"]')).toBeNull();
+    // Ein Teilfehler macht die übrigen Kennzahlen nicht unkenntlich.
+    expect(kennzahl('Betroffene')).toHaveTextContent('1');
+    expect(kennzahl('Betroffene')).not.toHaveTextContent('Stand unbekannt');
+  });
+
   it('Warnstufe „niedrig" bleibt still; „hoch" steht als Hinweis im Seitenkopf', async () => {
     // Entscheidung des Vertrags, hier festgenagelt: `niedrig` ist kein Alarmbeitrag
     // (EEMUA 191 / ISA-18.2). Ein stilles Umhängen auf `achtung` färbte app-weit um.

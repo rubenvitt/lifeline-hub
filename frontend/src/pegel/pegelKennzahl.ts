@@ -21,9 +21,9 @@
  *    bei |Trend| < 1 cm/h, „Trend unbekannt" ohne Trend. Das Backend rundet auf eine
  *    Nachkommastelle; Zehntel-Zentimeter je Stunde sind in einer Kennzahl Rauschen, und die
  *    Rundung auf ganze Zahlen passt zur Schwelle für „gleichbleibend".
- *  - **Datenstand** „Stand HH:MM" in der Anzeigezone über `formatUhrzeitMitTag` (am Vortag
- *    mit Tag davor). `zeitpunkt` ist RFC 3339 MIT Versatz — `inZone` liest ihn über
- *    `dayjs.utc`, das den Versatz auswertet; das Alter rechnet `Date.parse`, NICHT
+ *  - **Datenstand** „Stand HH:MM" in der Anzeigezone, an einem anderen Tag als `jetzt` mit
+ *    Tag davor („Stand 21. 23:50", {@link standZeit}). `zeitpunkt` ist RFC 3339 MIT Versatz —
+ *    `inZone` liest ihn über `dayjs.utc`, das den Versatz auswertet; das Alter rechnet `Date.parse`, NICHT
  *    `wireAlsEpoche` (die hängt ein `Z` an und liefert für einen Versatz `NaN`).
  *  - **Älter als 60 min → „veraltet"**: Wort in der Notiz plus Ton `achtung` (Kante als
  *    zweiter Kanal). Die Quelle misst im 15-min-Raster; eine Stunde ohne neue Messung heißt,
@@ -35,11 +35,7 @@
  *  - **Mehrere**: Zusatz „+n weitere".
  */
 import type { PegelAnzeige } from '../api/types';
-import {
-  DEFAULT_KONVENTIONEN,
-  formatUhrzeitMitTag,
-  type AnzeigeKonventionen,
-} from '../anzeige/format';
+import { DEFAULT_KONVENTIONEN, inZone, type AnzeigeKonventionen } from '../anzeige/format';
 
 /** Ab diesem Alter ist eine Messung „veraltet". */
 export const PEGEL_VERALTET_MS = 60 * 60_000;
@@ -83,6 +79,22 @@ export function trendText(t: number | null | undefined): string {
   if (richtung === 'gleichbleibend') return richtung;
   const betrag = Math.round(Math.abs(t as number));
   return `${richtung} ${richtung === 'steigend' ? '+' : MINUS}${betrag} cm/h`;
+}
+
+/**
+ * Uhrzeit des Datenstands in der Anzeigezone: `HH:mm` am selben Tag wie `jetzt`, sonst
+ * `DD. HH:mm`. Dasselbe Format wie `formatUhrzeitMitTag`, aber gegen `jetzt` statt gegen die
+ * Maschinenuhr — sonst hinge das Tag-Präfix einer reinen Funktion an der echten Uhr und wäre
+ * nicht pinnbar. Die Tagesgrenze liegt in derselben Zone wie die Formatierung. Rein.
+ */
+export function standZeit(
+  zeitpunkt: string,
+  jetzt: number,
+  konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
+): string {
+  const d = inZone(zeitpunkt, konv);
+  const heute = inZone(new Date(jetzt).toISOString(), konv);
+  return d.isSame(heute, 'day') ? d.format('HH:mm') : d.format('DD. HH:mm');
 }
 
 /** Messzeitpunkt (RFC 3339 mit Versatz) als Epoche; `NaN` bei Unlesbarem. Rein. */
@@ -146,7 +158,7 @@ export function pegelKennzahl(
       veraltet: false,
     };
   }
-  const stand = `Stand ${formatUhrzeitMitTag(m.zeitpunkt, konv)}`;
+  const stand = `Stand ${standZeit(m.zeitpunkt, jetzt, konv)}`;
   return {
     fall: 'messung',
     wert: m.meter,

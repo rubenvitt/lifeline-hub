@@ -827,6 +827,47 @@ describe('FachebenenInspector — Pegel festlegen (LFH-606)', () => {
     );
   });
 
+  it('ein abgelehnter POST (volle Liste, 422) steht als Fehler im Panel, ohne Erfolgsmeldung', async () => {
+    stelleBereit([eintrag('00000000-0000-4000-8000-000000000001', 0)]);
+    server.use(
+      http.post('/api/einsaetze/1/pegel', () =>
+        HttpResponse.json({ error: 'höchstens 5 Pegel je Einsatz' }, { status: 422 }),
+      ),
+    );
+    inspector();
+    const knopf = await screen.findByRole('button', { name: 'Als maßgeblichen Pegel festlegen' });
+    await waitFor(() => expect(knopf).toBeEnabled());
+    await userEvent.click(knopf);
+    expect(await screen.findByText('Nicht gespeichert')).toBeInTheDocument();
+    expect(screen.getByText('höchstens 5 Pegel je Einsatz')).toBeInTheDocument();
+    expect(screen.queryByText('Als maßgeblicher Pegel festgelegt')).toBeNull();
+  });
+
+  it('Fehler und Ladezustand gehören zur Station: ein anderer Punkt zeigt sie nicht', async () => {
+    stelleBereit([eintrag('00000000-0000-4000-8000-000000000001', 0)]);
+    server.use(
+      http.post('/api/einsaetze/1/pegel', () =>
+        HttpResponse.json({ error: 'abgelehnt' }, { status: 422 }),
+      ),
+    );
+    const { rerender } = inspector();
+    const knopf = await screen.findByRole('button', { name: 'Als maßgeblichen Pegel festlegen' });
+    await waitFor(() => expect(knopf).toBeEnabled());
+    await userEvent.click(knopf);
+    expect(await screen.findByText('Nicht gespeichert')).toBeInTheDocument();
+    // Derselbe Inspektor, ein anderer PEGELONLINE-Punkt (so wechselt die Lagekarte die Auswahl).
+    rerender(
+      <FachebenenInspector
+        quelle="pegelonline"
+        properties={{ ...station, titel: 'KASSEL', uuid: 'a1b2c3d4-0000-4000-8000-000000000003' }}
+        onSchliessen={() => {}}
+        pegelBezug={{ einsatzId: 1, darfSchreiben: true }}
+      />,
+    );
+    expect(await screen.findByText('KASSEL')).toBeInTheDocument();
+    expect(screen.queryByText('Nicht gespeichert')).toBeNull();
+  });
+
   it('unter fünf kein Grenzhinweis — die Gegenaussage', async () => {
     stelleBereit([eintrag('00000000-0000-4000-8000-000000000001', 0)]);
     inspector();

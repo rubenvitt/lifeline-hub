@@ -151,7 +151,7 @@ describe('baueLagebild', () => {
     } as PegelAnzeige;
     const k = baueLagebild(roh({ pegel: [p] }), JETZT, BERLIN).kennzahlen[0];
     expect(k).toMatchObject({ etikett: 'Pegel', wert: '6,84', einheit: 'm', ton: 'neutral' });
-    expect(k.notiz).toMatch(/^WESER · steigend \+9 cm\/h · Stand (\d{2}\. )?13:05$/);
+    expect(k.notiz).toBe('WESER · steigend +9 cm/h · Stand 13:05');
     expect(k.zielPfad).toBe('/einsaetze/1/einstellungen/pegel');
   });
 

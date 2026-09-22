@@ -5,7 +5,9 @@ import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
-import EinsatzPegel, { stationenAus, stationsLabel, verschiebe } from './EinsatzPegel';
+import { QueryClient } from '@tanstack/react-query';
+import { einsatzKeys } from '../../api/queryKeys';
+import EinsatzPegel, { stationenAus, stationsLabel, verschiebe, wendeAn } from './EinsatzPegel';
 
 /**
  * Sektion „Pegel" (LFH-606). Sofort-Speichern wie die Modul-Liste: jede Handlung ist ein
@@ -127,17 +129,29 @@ function stelleBereit(a: Aufbau = {}) {
       return HttpResponse.json(liste, { status: 201 });
     }),
   );
-  return aufrufe;
+  // `setzeListe` spielt eine Änderung von ANDERER Stelle nach (Karten-Schnellweg, zweiter
+  // Arbeitsplatz): der Server hat dann einen neuen Stand, der Cache der Seite noch nicht.
+  return Object.assign(aufrufe, {
+    setzeListe: (neu: unknown[]) => {
+      liste = neu;
+    },
+  });
 }
 
-function rendern() {
+function rendern(client?: QueryClient) {
   return renderMitProviders(
     <Routes>
       <Route path="/einsaetze/:id/einstellungen/pegel" element={<EinsatzPegel />} />
     </Routes>,
-    { route: '/einsaetze/1/einstellungen/pegel' },
+    { route: '/einsaetze/1/einstellungen/pegel', client },
   );
 }
+
+/** Eigener Client, damit ein Test den Cache von außen erneuern kann (kein `gcTime: 0`). */
+const eigenerClient = () =>
+  new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+
+const KASS = pegel(UUID_KASS, 'KASSEL', 'FULDA', 2);
 
 /** Die Zeilen der Liste (Titel samt Ordnungsnummer). */
 const zeilentitel = () =>
@@ -186,6 +200,17 @@ describe('EinsatzPegel — reine Helfer', () => {
     expect(stationsLabel({ name: 'X', gewaesser: null, km: null })).toBe('X');
   });
 
+  it('wendeAn benennt die Station über die uuid; fehlt sie, gibt es nichts zu senden', () => {
+    const l = ['a', 'b', 'c'].map((station_uuid) => ({ station_uuid }));
+    expect(wendeAn(l, { art: 'verschieben', uuid: 'B', richtung: -1 })).toEqual(
+      ['b', 'a', 'c'].map((station_uuid) => ({ station_uuid })),
+    );
+    expect(wendeAn(l, { art: 'entfernen', uuid: 'c' })).toEqual(
+      ['a', 'b'].map((station_uuid) => ({ station_uuid })),
+    );
+    expect(wendeAn(l, { art: 'entfernen', uuid: 'x' })).toBeNull();
+  });
+
   it('verschiebt um eine Stelle und bleibt an den Enden stehen', () => {
     expect(verschiebe(['a', 'b', 'c'], 0, 1)).toEqual(['b', 'a', 'c']);
     expect(verschiebe(['a', 'b', 'c'], 2, -1)).toEqual(['a', 'c', 'b']);
@@ -226,7 +251,7 @@ describe('EinsatzPegel', () => {
     await waitFor(() =>
       expect(zeilentitel()).toEqual(['1. HANN. MÜNDEN', '2. WAHNHAUSEN', '3. KASSEL']),
     );
-    expect(aufrufe).toEqual([
+    expect([...aufrufe]).toEqual([
       {
         methode: 'POST',
         body: { station_uuid: UUID_KASS, name: 'KASSEL', gewaesser: 'FULDA' },
@@ -241,7 +266,7 @@ describe('EinsatzPegel', () => {
     await waitFor(() => expect(zeilentitel()).toHaveLength(2));
     await zeilenaktion('HANN. MÜNDEN', /Nach unten/);
     await waitFor(() => expect(zeilentitel()).toEqual(['1. WAHNHAUSEN', '2. HANN. MÜNDEN']));
-    expect(aufrufe).toEqual([
+    expect([...aufrufe]).toEqual([
       {
         methode: 'PUT',
         body: {
@@ -285,7 +310,7 @@ describe('EinsatzPegel', () => {
     await waitFor(() => expect(zeilentitel()).toHaveLength(2));
     await zeilenaktion('WAHNHAUSEN', /Entfernen/);
     await waitFor(() => expect(zeilentitel()).toEqual(['1. HANN. MÜNDEN']));
-    expect(aufrufe).toEqual([
+    expect([...aufrufe]).toEqual([
       {
         methode: 'PUT',
         body: {
@@ -351,7 +376,7 @@ describe('EinsatzPegel', () => {
     expect(screen.getByRole('button', { name: 'Hinzufügen' })).toHaveFocus();
     await userEvent.keyboard('{Enter}');
     await waitFor(() => expect(zeilentitel()).toHaveLength(3));
-    expect(aufrufe).toEqual([
+    expect([...aufrufe]).toEqual([
       { methode: 'POST', body: { station_uuid: UUID_KASS, name: 'KASSEL', gewaesser: 'FULDA' } },
     ]);
   });
@@ -368,6 +393,92 @@ describe('EinsatzPegel', () => {
     expect(
       screen.getByText('Höchstens 5 maßgebliche Pegel — zum Hinzufügen zuerst einen entfernen.'),
     ).toBeInTheDocument();
+  });
+
+  it('wird die Liste bei GEWÄHLTER Station voll, sperrt „Hinzufügen“ trotzdem', async () => {
+    // Nicht trivial grün: ohne Auswahl wäre der Knopf schon über `!gewaehlt` gesperrt. Hier
+    // steht die Auswahl, und erst der fünfte Pegel von anderer Stelle sperrt.
+    const vier = [0, 1, 2, 3].map((i) =>
+      pegel(`00000000-0000-4000-8000-00000000000${i}`, `P${i}`, 'WESER', i),
+    );
+    const server = stelleBereit({ liste: vier });
+    const client = eigenerClient();
+    rendern(client);
+    await waitFor(() => expect(zeilentitel()).toHaveLength(4));
+    await waehleStation('KASSEL · FULDA · km 81,73');
+    expect(screen.getByRole('button', { name: 'Hinzufügen' })).toBeEnabled();
+    server.setzeListe([...vier, pegel(UUID_WAHN, 'WAHNHAUSEN', 'FULDA', 4)]);
+    await client.invalidateQueries({ queryKey: einsatzKeys.pegel(1) });
+    await waitFor(() => expect(zeilentitel()).toHaveLength(5));
+    expect(screen.getByRole('button', { name: 'Hinzufügen' })).toBeDisabled();
+  });
+
+  it('verliert man bei GEWÄHLTER Station das Schreibrecht, sperrt „Hinzufügen“', async () => {
+    const aufbau: Aufbau = {};
+    stelleBereit(aufbau);
+    const client = eigenerClient();
+    rendern(client);
+    await waitFor(() => expect(zeilentitel()).toHaveLength(2));
+    await waehleStation('KASSEL · FULDA · km 81,73');
+    expect(screen.getByRole('button', { name: 'Hinzufügen' })).toBeEnabled();
+    aufbau.rolle = 'beobachter';
+    await client.invalidateQueries({ queryKey: einsatzKeys.einsatz(1) });
+    expect(await screen.findByText(/Nur die Einsatzleitung, Führungspersonal/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Hinzufügen' })).toBeDisabled();
+  });
+
+  it('während eines laufenden PUT ist auch „Hinzufügen“ gesperrt — kein POST parallel', async () => {
+    const aufrufe = stelleBereit({ verzoegerung: 400 });
+    rendern();
+    await waitFor(() => expect(zeilentitel()).toHaveLength(2));
+    await waehleStation('KASSEL · FULDA · km 81,73');
+    // Vorbedingung: mit gewählter Station ist der Knopf bedienbar — sonst wäre die Sperre
+    // unten schon über `!gewaehlt` erfüllt und bewiese nichts.
+    expect(screen.getByRole('button', { name: 'Hinzufügen' })).toBeEnabled();
+    await zeilenaktion('HANN. MÜNDEN', /Nach unten/);
+    const knopf = screen.getByRole('button', { name: 'Hinzufügen' });
+    expect(knopf).toBeDisabled();
+    await userEvent.click(knopf);
+    await waitFor(() => expect(zeilentitel()).toEqual(['1. WAHNHAUSEN', '2. HANN. MÜNDEN']));
+    expect(aufrufe.map((x) => x.methode)).toEqual(['PUT']);
+    // Nach dem PUT ist die Auswahl weiter da und der Knopf wieder bedienbar.
+    expect(knopf).toBeEnabled();
+  });
+
+  it('Umordnen arbeitet auf dem FRISCHEN Serverstand: „B nach oben“ bei [A,B,C] schickt [B,A,C]', async () => {
+    // Cache [A,B], Server inzwischen [A,B,C] (C über die Karte festgelegt). Ein PUT aus dem
+    // Cache nähme C still wieder heraus.
+    const aufrufe = stelleBereit({ liste: [HMUE, WAHN] });
+    rendern();
+    await waitFor(() => expect(zeilentitel()).toHaveLength(2));
+    aufrufe.setzeListe([HMUE, WAHN, KASS]);
+    await zeilenaktion('WAHNHAUSEN', /Nach oben/);
+    await waitFor(() =>
+      expect(zeilentitel()).toEqual(['1. WAHNHAUSEN', '2. HANN. MÜNDEN', '3. KASSEL']),
+    );
+    expect([...aufrufe]).toEqual([
+      {
+        methode: 'PUT',
+        body: {
+          stationen: [
+            { station_uuid: UUID_WAHN, name: 'WAHNHAUSEN', gewaesser: 'FULDA' },
+            { station_uuid: UUID_HMUE, name: 'HANN. MÜNDEN', gewaesser: 'WESER' },
+            { station_uuid: UUID_KASS, name: 'KASSEL', gewaesser: 'FULDA' },
+          ],
+        },
+      },
+    ]);
+  });
+
+  it('ist die gemeinte Station inzwischen weg, wird nichts gesendet und die Liste erneuert', async () => {
+    const aufrufe = stelleBereit({ liste: [HMUE, WAHN] });
+    rendern();
+    await waitFor(() => expect(zeilentitel()).toHaveLength(2));
+    aufrufe.setzeListe([HMUE]);
+    await zeilenaktion('WAHNHAUSEN', /Entfernen/);
+    await waitFor(() => expect(zeilentitel()).toEqual(['1. HANN. MÜNDEN']));
+    expect([...aufrufe]).toEqual([]);
+    expect(await screen.findByText(/nicht mehr festgelegt/)).toBeInTheDocument();
   });
 
   it('unter fünf steht kein Grenzhinweis — die Gegenaussage', async () => {

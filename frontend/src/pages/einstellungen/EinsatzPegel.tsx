@@ -14,18 +14,23 @@ import { Select } from '../../components/Select';
 import { SeitenFehler, SeitenSkeleton } from '../../components/SeitenZustand';
 import { SeitenHinweise } from '../../components/SpeicherHinweis';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
-import { formatUhrzeitMitTag } from '../../anzeige/format';
 import { ladeFachebene } from '../../api/fachebenen';
 import {
   PEGEL_MAX,
   fuegePegelHinzu,
   pegelAbfrage,
+  pegelSchreibScope,
   setzePegel,
   type PegelEingabe,
 } from '../../api/pegel';
 import { einsatzKeys, globalKeys } from '../../api/queryKeys';
 import type { PegelAnzeige } from '../../api/types';
-import { PEGEL_STAND_UNBEKANNT, trendText, wasserstandMeter } from '../../pegel/pegelKennzahl';
+import {
+  PEGEL_STAND_UNBEKANNT,
+  standZeit,
+  trendText,
+  wasserstandMeter,
+} from '../../pegel/pegelKennzahl';
 import { RECHTE_TEXT, useEinstellungenDaten } from '../EinsatzEinstellungenPage';
 
 /** Eine wählbare PEGELONLINE-Station aus der Fachebene (`properties` der Features). */
@@ -79,8 +84,26 @@ export function verschiebe<T>(liste: readonly T[], index: number, richtung: -1 |
   return neu;
 }
 
-type Aenderung =
-  { art: 'hinzufuegen'; station: PegelEingabe } | { art: 'setzen'; stationen: PegelEingabe[] };
+/** Eine Listenoperation, benannt über die STATION, nicht über ihren Index im alten Stand. */
+export type PegelOperation =
+  { art: 'verschieben'; uuid: string; richtung: -1 | 1 } | { art: 'entfernen'; uuid: string };
+
+/**
+ * Wendet eine Operation auf eine (frisch geholte) Liste an. `null`, wenn die gemeinte Station
+ * dort nicht mehr steht — dann gibt es nichts zu senden. Rein.
+ */
+export function wendeAn<T extends { station_uuid: string }>(
+  liste: readonly T[],
+  op: PegelOperation,
+): T[] | null {
+  const index = liste.findIndex((p) => p.station_uuid.toLowerCase() === op.uuid.toLowerCase());
+  if (index < 0) return null;
+  return op.art === 'entfernen'
+    ? liste.filter((_, i) => i !== index)
+    : verschiebe(liste, index, op.richtung);
+}
+
+type Aenderung = { art: 'hinzufuegen'; station: PegelEingabe } | PegelOperation;
 
 /**
  * Sektion `…/einstellungen/pegel` (LFH-606) — die maßgeblichen Pegel des Einsatzes.
@@ -104,11 +127,13 @@ type Aenderung =
  * Der Preis ist ein Vollersatz-PUT je Pfeildruck; bei höchstens fünf Zeilen ist das kein
  * Preis. **Hinzufügen geht über POST** (hinten anfügen, idempotent), nicht über den PUT: es
  * braucht die eigene Liste nicht als Basis und überschreibt damit keine gleichzeitige
- * Änderung von anderer Stelle.
+ * Änderung von anderer Stelle. Umordnen und Entfernen holen die Liste vor dem PUT frisch und
+ * benennen die Station über ihre uuid (Review LFH-606): der Cache-Stand kann bis zu 5 min alt
+ * sein, ein Index daraus träfe nach einer Festlegung über die Karte die falsche Zeile.
  *
- * Während eine Änderung läuft, ist die GANZE Liste gesperrt — anders als die Modul-Liste
- * („eine Zeile sperrt sich selbst", C10/H15): dort schreibt jede Zeile ihren eigenen
- * Datensatz, hier schreibt jede Handlung die ganze Liste. Es gibt kein optimistisches
+ * Während eine Änderung läuft, ist die GANZE Liste gesperrt, „Hinzufügen“ eingeschlossen —
+ * anders als die Modul-Liste („eine Zeile sperrt sich selbst", C10/H15): dort schreibt jede
+ * Zeile ihren eigenen Datensatz, hier schreibt jede Handlung die ganze Liste. Es gibt kein optimistisches
  * Update: die Anzeige liest aus der Abfrage, eine gescheiterte Änderung ist also sichtbar
  * nicht geschehen, und der Grund steht als `SpeicherFehler` über der Liste.
  *
@@ -148,15 +173,33 @@ export default function EinsatzPegel() {
   });
 
   // KEIN `onError`-Toast (H14): der Fehler steht als Alert über der Liste.
+  //
+  // ALLE Schreibwege laufen durch EINE Mutation mit gemeinsamem `scope` (auch der
+  // Karten-Schnellweg nutzt ihn): TanStack reiht Mutationen desselben Scopes hintereinander.
+  // Parallel kämen POST und PUT in Ankunftsreihenfolge an, und ein PUT mit der Altliste nähme
+  // die gerade hinzugefügte Station wieder heraus.
+  //
+  // Umordnen und Entfernen bauen ihren Vollersatz-PUT NICHT aus dem Cache: der Key ist nicht
+  // live und wird nur alle 5 min erneuert, eine zwischenzeitliche Festlegung über die Karte
+  // fehlte dort — und der PUT entfernte sie still. Deshalb vor dem PUT frisch holen und die
+  // Operation über die `station_uuid` auf DIESE Liste anwenden. Steht die Station dort nicht
+  // mehr, wird nichts gesendet; die frische Liste steht dann im Cache.
   const aendern = useMutation({
-    mutationFn: (a: Aenderung) =>
-      a.art === 'hinzufuegen'
-        ? fuegePegelHinzu(einsatzId, a.station)
-        : setzePegel(einsatzId, a.stationen),
-    onSuccess: (liste, a) => {
+    scope: pegelSchreibScope(einsatzId),
+    mutationFn: async (a: Aenderung): Promise<{ liste: PegelAnzeige[]; gesendet: boolean }> => {
+      if (a.art === 'hinzufuegen') {
+        return { liste: await fuegePegelHinzu(einsatzId, a.station), gesendet: true };
+      }
+      const frisch = await qc.fetchQuery({ ...pegelAbfrage(einsatzId), staleTime: 0 });
+      const neu = wendeAn(frisch, a);
+      if (neu == null) return { liste: frisch, gesendet: false };
+      return { liste: await setzePegel(einsatzId, neu.map(alsWahl)), gesendet: true };
+    },
+    onSuccess: ({ liste, gesendet }, a) => {
       qc.setQueryData(einsatzKeys.pegel(einsatzId), liste);
       if (a.art === 'hinzufuegen') setAuswahl(null);
-      message.success('Pegel gespeichert');
+      if (gesendet) message.success('Pegel gespeichert');
+      else message.info('Diese Station ist nicht mehr festgelegt — die Liste ist aktualisiert.');
     },
   });
 
@@ -193,16 +236,13 @@ export default function EinsatzPegel() {
   const quelleOffline = stationenQ.isError || stationenQ.data?.status === 'offline';
   const gewaehlt = stationen.find((s) => s.uuid === auswahl) ?? null;
 
-  const setzen = (neu: PegelAnzeige[]) =>
-    aendern.mutate({ art: 'setzen', stationen: neu.map(alsWahl) });
-
   const messText = (p: PegelAnzeige): string => {
     const m = p.messung;
     if (!m) return PEGEL_STAND_UNBEKANNT;
     return [
       `${wasserstandMeter(m.wasserstand_cm)} m`,
       trendText(m.trend_cm_pro_h),
-      `Stand ${formatUhrzeitMitTag(m.zeitpunkt, konv)}`,
+      `Stand ${standZeit(m.zeitpunkt, Date.now(), konv)}`,
     ].join(' · ');
   };
 
@@ -257,10 +297,13 @@ export default function EinsatzPegel() {
                           ],
                           // Zuordnung am MENÜ, nicht je Eintrag (LFH-365).
                           onClick: ({ key }) => {
-                            if (key === 'hoch') setzen(verschiebe(liste, index, -1));
-                            else if (key === 'runter') setzen(verschiebe(liste, index, 1));
+                            const uuid = p.station_uuid;
+                            if (key === 'hoch')
+                              aendern.mutate({ art: 'verschieben', uuid, richtung: -1 });
+                            else if (key === 'runter')
+                              aendern.mutate({ art: 'verschieben', uuid, richtung: 1 });
                             else if (key === 'entfernen')
-                              setzen(liste.filter((_, i) => i !== index));
+                              aendern.mutate({ art: 'entfernen', uuid });
                           },
                         }}
                       >
@@ -342,7 +385,7 @@ export default function EinsatzPegel() {
           />
           <Button
             type="primary"
-            disabled={!darf || voll || !gewaehlt || festgelegt.has(gewaehlt.uuid)}
+            disabled={!darf || voll || laeuft || !gewaehlt || festgelegt.has(gewaehlt.uuid)}
             loading={laeuft && aendern.variables?.art === 'hinzufuegen'}
             onClick={() => {
               if (!gewaehlt) return;

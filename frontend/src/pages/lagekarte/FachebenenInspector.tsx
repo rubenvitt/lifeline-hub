@@ -3,7 +3,7 @@ import { App, Button, Descriptions, Tag, Typography, theme } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router';
 import { taktischeDtgVoll } from '../../anzeige/format';
-import { PEGEL_MAX, fuegePegelHinzu, pegelAbfrage } from '../../api/pegel';
+import { PEGEL_MAX, fuegePegelHinzu, pegelAbfrage, pegelSchreibScope } from '../../api/pegel';
 import { einsatzKeys } from '../../api/queryKeys';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
 import { einsatzEinstellungenPfad } from '../../routing/deeplinks';
@@ -199,6 +199,8 @@ function PegelFestlegen({
   const pegelQ = useQuery(pegelAbfrage(einsatzId));
   // KEIN `onError`-Toast (H14): der Fehler bleibt im Panel stehen.
   const festlegen = useMutation({
+    // Derselbe Scope wie die Einstellungssektion: Schreibwege auf die Liste laufen nacheinander.
+    scope: pegelSchreibScope(einsatzId),
     mutationFn: () => fuegePegelHinzu(einsatzId, { station_uuid: uuid, name, gewaesser }),
     onSuccess: (liste) => {
       qc.setQueryData(einsatzKeys.pegel(einsatzId), liste);
@@ -289,6 +291,9 @@ function PegelInhalt({
       </Descriptions>
       {pegelBezug && s(p.uuid) && (
         <PegelFestlegen
+          // `key` aus der Station: ein Klick auf einen anderen Punkt hängt einen FRISCHEN
+          // Block ein — sonst trüge Station B Fehler und Ladezustand der Mutation von A.
+          key={s(p.uuid)!.toLowerCase()}
           einsatzId={pegelBezug.einsatzId}
           darfSchreiben={pegelBezug.darfSchreiben}
           uuid={s(p.uuid)!.toLowerCase()}
