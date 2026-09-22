@@ -1,3 +1,13 @@
+## [1.0.0-alpha.28](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.27...v1.0.0-alpha.28) (2026-09-22)
+
+### Features
+
+* **markdown:** Überschriftenebene nennt der Einbauort (LFH-621) ([a37962c](https://github.com/rubenvitt/lifeline-hub/commit/a37962c97946745b4e096e3ad31ca6231552d105))
+
+### Bug Fixes
+
+* **chat:** aria-current an der Kanal-Schaltfläche statt am inneren Element (LFH-621) ([0c238e9](https://github.com/rubenvitt/lifeline-hub/commit/0c238e9ddff0c1354f9df321cd148187d1fb4596))
+
 ## [1.0.0-alpha.27](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.26...v1.0.0-alpha.27) (2026-09-22)
 
 ### Bug Fixes
