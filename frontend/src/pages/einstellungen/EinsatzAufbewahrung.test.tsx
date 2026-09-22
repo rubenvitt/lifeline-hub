@@ -48,6 +48,7 @@ const VOLL = {
   auftrag_nummer_start: 300,
   meldung_bestaetigung_frist_min: 30,
   auftrag_quittierung_frist_min: 45,
+  rueckmeldung_frist_min: 25,
   auto_etb_eintraege: 0,
   etb_nummer_eingefroren: false,
   meldung_nummer_eingefroren: false,
@@ -104,7 +105,7 @@ describe('EinsatzAufbewahrung', () => {
    * Deshalb der volle Objekt-Vergleich statt `objectContaining`: nur er sieht ein Feld, das
    * gar nicht erst im Payload steht.
    */
-  it('schickt beim Speichern den VOLLEN Payload — alle 18 Felder (Vollersatz-PUT)', async () => {
+  it('schickt beim Speichern den VOLLEN Payload — alle 19 Felder (Vollersatz-PUT)', async () => {
     rendern();
     fireEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
 
@@ -128,6 +129,7 @@ describe('EinsatzAufbewahrung', () => {
         auftrag_nummer_start: 300,
         meldung_bestaetigung_frist_min: 30,
         auftrag_quittierung_frist_min: 45,
+        rueckmeldung_frist_min: 25,
         auto_etb_eintraege: false,
         retention_dauer_tage: 365,
       }),

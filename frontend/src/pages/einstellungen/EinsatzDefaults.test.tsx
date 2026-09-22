@@ -36,6 +36,7 @@ const VOLL = {
   auftrag_nummer_praefix: 'A-',
   meldung_bestaetigung_frist_min: 30,
   auftrag_quittierung_frist_min: 45,
+  rueckmeldung_frist_min: 25,
   auto_etb_eintraege: 0,
   geocoder_url: 'https://geo.example',
   geaendert_at: null,
@@ -89,6 +90,7 @@ describe('EinsatzDefaults', () => {
         auftrag_nummer_praefix: 'A-',
         meldung_bestaetigung_frist_min: 30,
         auftrag_quittierung_frist_min: 45,
+        rueckmeldung_frist_min: 25,
         auto_etb_eintraege: false,
       }),
     );

@@ -39,16 +39,16 @@ describe('rueckmeldungZustand', () => {
 
   it('vor der Fälligkeit aktuell, ab der Fälligkeit überfällig', () => {
     // Entwurfsdaten S6 bei Frist 60: 13:30 unauffällig, 13:15 gelb.
-    expect(
-      rueckmeldungZustand(r(1, '2026-09-22 13:30:00', '2026-09-22 14:30:00'), JETZT),
-    ).toBe('aktuell');
-    expect(
-      rueckmeldungZustand(r(1, '2026-09-22 13:15:00', '2026-09-22 14:15:00'), JETZT),
-    ).toBe('ueberfaellig');
+    expect(rueckmeldungZustand(r(1, '2026-09-22 13:30:00', '2026-09-22 14:30:00'), JETZT)).toBe(
+      'aktuell',
+    );
+    expect(rueckmeldungZustand(r(1, '2026-09-22 13:15:00', '2026-09-22 14:15:00'), JETZT)).toBe(
+      'ueberfaellig',
+    );
     // Genau auf der Fälligkeit: überfällig (<=), wie ist_ueberfaellig im Backend.
-    expect(
-      rueckmeldungZustand(r(1, '2026-09-22 13:20:00', '2026-09-22 14:20:00'), JETZT),
-    ).toBe('ueberfaellig');
+    expect(rueckmeldungZustand(r(1, '2026-09-22 13:20:00', '2026-09-22 14:20:00'), JETZT)).toBe(
+      'ueberfaellig',
+    );
   });
 
   it('liest die Wire-Zeit als UTC, nicht als Ortszeit', () => {

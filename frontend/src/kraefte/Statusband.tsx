@@ -29,6 +29,15 @@ import { bandSpalten } from './statusbandStil';
  * `flaeche` aufgefüllt, sonst stünde dort der Fugengrund als Block.
  *
  * Zweiter Kanal: Code („S4") UND Wort („Am Einsatzort") stehen sichtbar neben der Zahl.
+ *
+ * ── „KEINE RÜCKMELDUNG" IST EINE EIGENE GRUPPE (LFH-610) ────────────────────────
+ *
+ * Der Entwurf setzt die Kachel ans Ende der FMS-Reihe. Sie zählt aber EINHEITEN, nicht
+ * Fahrzeuge — in der Gruppe „Fahrzeuge je Status" summierte sich das Band dann nicht mehr
+ * auf die Fahrzeugzahl, und ein Vorleser hörte eine Einheitenzahl als Fahrzeugstatus. Sie
+ * steht deshalb in einer eigenen Gruppe mit derselben Spaltengeometrie. Ob sie erscheint,
+ * entscheidet die Seite: nur bei lesbaren Daten und mindestens einer Einheit ohne
+ * Rückmeldung (`keineRueckmeldungZelle`).
  */
 
 function BandZelleAnsicht({ zelle }: { zelle: BandZelle }) {
@@ -67,9 +76,16 @@ export interface StatusbandProps {
   personal: readonly BandZelle[];
   /** Datenzustand beider Listen zusammen. */
   zustand: 'daten' | 'laden' | 'fehler';
+  /** Kachel „keine Rückmeldung" — `null`/fehlend, wenn es nichts zu melden gibt oder nichts lesbar ist. */
+  rueckmeldung?: BandZelle | null;
 }
 
-export default function Statusband({ fahrzeuge, personal, zustand }: StatusbandProps) {
+export default function Statusband({
+  fahrzeuge,
+  personal,
+  zustand,
+  rueckmeldung = null,
+}: StatusbandProps) {
   const { token } = useRollen();
   const { abBreite } = useViewport();
   const spalten = bandSpalten(abBreite);
@@ -81,7 +97,7 @@ export default function Statusband({ fahrzeuge, personal, zustand }: StatusbandP
       </Kennzahlenband>
     );
   }
-  if (fahrzeuge.length === 0 && personal.length === 0) {
+  if (fahrzeuge.length === 0 && personal.length === 0 && !rueckmeldung) {
     return (
       <Kennzahlenband beschriftung="Statusband">
         <Kennzahl titel="Fahrzeuge" wert={0} notiz="keine Kräfte disponiert" />
@@ -116,6 +132,17 @@ export default function Statusband({ fahrzeuge, personal, zustand }: StatusbandP
               <BandZelleAnsicht key={z.schluessel} zelle={z} />
             ))}
             <Auffuellung anzahl={personal.length} spalten={spalten} />
+          </Kennzahlenband>
+        </section>
+      )}
+      {rueckmeldung && (
+        <section aria-label="Einheiten ohne Rückmeldung" data-lfh="meldebild-rueckmeldung">
+          <Augenbraue als="h2" style={{ marginBlockEnd: token.marginXXS }}>
+            Rückmeldung
+          </Augenbraue>
+          <Kennzahlenband spalten={spalten}>
+            <BandZelleAnsicht zelle={rueckmeldung} />
+            <Auffuellung anzahl={1} spalten={spalten} />
           </Kennzahlenband>
         </section>
       )}

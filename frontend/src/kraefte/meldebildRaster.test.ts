@@ -7,13 +7,19 @@ import {
   fahrzeugStatus,
   fmsWort,
   istProblemZeile,
+  istRueckmeldungProblem,
+  keineRueckmeldungZelle,
   offeneAuftraegeJeEinheit,
+  rueckmeldungDerZeile,
   personalBand,
   OHNE_EINHEIT_SCHLUESSEL,
   type RasterEingabe,
   type RasterZeile,
 } from './meldebildRaster';
 import { verdichte, staerkeText } from './kraeftebild';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import { rueckmeldungJeEinheit } from '../meldungen/rueckmeldung';
 import type {
   Auftrag,
   Einheit,
@@ -22,7 +28,11 @@ import type {
   EinsatzPersonal,
   Einsatzabschnitt,
   FahrzeugStatus,
+  LetzteRueckmeldung,
+  Rueckmeldungen,
 } from '../api/types';
+
+dayjs.extend(utc);
 
 // ── Fixtures (nur die gelesenen Felder zählen; der Rest ist Typ-Pflicht) ──────────
 
@@ -407,5 +417,91 @@ describe('aufklappbareSchluessel', () => {
       eingabe({ einheiten: [eh(1, null), eh(2, null)], personal: [p(1, 2)] }),
     );
     expect(aufklappbareSchluessel(raster)).toEqual(['eh-2']);
+  });
+});
+
+// ── Rückmeldung (LFH-610) ─────────────────────────────────────────────────────
+
+describe('Rückmeldung je Rasterzeile', () => {
+  const JETZT = dayjs.utc('2026-09-22 12:00:00');
+  const rm = (bezug_id: number, faellig_at: string): LetzteRueckmeldung => ({
+    bezug_id,
+    meldung_id: bezug_id * 100,
+    lfd_nr: bezug_id,
+    ereigniszeit: '2026-09-22 11:00:00',
+    inhalt: 'Lage unverändert',
+    meldeweg: 'funk',
+    faellig_at,
+  });
+  /** E1 in der Frist, E2 überfällig, E3 nie zurückgemeldet. */
+  const DATEN: Rueckmeldungen = {
+    frist_min: 60,
+    einheiten: [rm(1, '2026-09-22 12:30:00'), rm(2, '2026-09-22 11:59:00')],
+    abschnitte: [],
+  };
+  const raster = baueMeldebildRaster(
+    eingabe({
+      einheiten: [eh(1, null), eh(2, null), eh(3, null)],
+      // Ein Fahrzeug ohne Einheit erzeugt die synthetische Zeile „Ohne Einheit".
+      fahrzeuge: [fz(9, 1, null), fz(10, null, null)],
+    }),
+  );
+  const zeile = (key: string) => raster.find((z) => z.key === key)!;
+  const je = rueckmeldungJeEinheit(DATEN);
+
+  it('unterscheidet in der Frist, überfällig und nie zurückgemeldet', () => {
+    expect(rueckmeldungDerZeile(zeile('eh-1'), je, JETZT)).toEqual({
+      zustand: 'aktuell',
+      letzte: DATEN.einheiten[0],
+    });
+    expect(rueckmeldungDerZeile(zeile('eh-2'), je, JETZT)?.zustand).toBe('ueberfaellig');
+    expect(rueckmeldungDerZeile(zeile('eh-3'), je, JETZT)).toEqual({
+      zustand: 'keine',
+      letzte: null,
+    });
+  });
+
+  it('schlägt mit der Uhr um, ohne neue Daten', () => {
+    const spaeter = dayjs.utc('2026-09-22 12:31:00');
+    expect(rueckmeldungDerZeile(zeile('eh-1'), je, spaeter)?.zustand).toBe('ueberfaellig');
+  });
+
+  it('„Ohne Einheit" und Mittelzeilen tragen keine Rückmeldung — auch nicht „keine"', () => {
+    expect(rueckmeldungDerZeile(zeile(OHNE_EINHEIT_SCHLUESSEL), je, JETZT)).toBeNull();
+    const mittel = zeile('eh-1').children![0];
+    expect(mittel.art).toBe('fahrzeug');
+    expect(rueckmeldungDerZeile(mittel, je, JETZT)).toBeNull();
+  });
+
+  it('tönt überfällig und nie, nicht aber in der Frist oder ohne Anzeige', () => {
+    const urteil = (key: string) =>
+      istRueckmeldungProblem(rueckmeldungDerZeile(zeile(key), je, JETZT));
+    expect(urteil('eh-1')).toBe(false);
+    expect(urteil('eh-2')).toBe(true);
+    expect(urteil('eh-3')).toBe(true);
+    expect(istRueckmeldungProblem(null)).toBe(false);
+  });
+
+  it('die Kachel zählt NUR nie zurückgemeldete Einheiten — überfällige nicht', () => {
+    expect(keineRueckmeldungZelle(raster, DATEN)).toEqual({
+      schluessel: 'rueckmeldung-keine',
+      code: '—',
+      wert: 1,
+      wort: 'keine Rückmeldung',
+      ton: 'alarm',
+    });
+  });
+
+  it('die synthetische Zeile „Ohne Einheit" zählt nicht mit', () => {
+    // Alle drei Einheiten haben zurückgemeldet — übrig bliebe nur „Ohne Einheit".
+    const alle: Rueckmeldungen = {
+      ...DATEN,
+      einheiten: [1, 2, 3].map((id) => rm(id, '2026-09-22 13:00:00')),
+    };
+    expect(keineRueckmeldungZelle(raster, alle)).toBeNull();
+  });
+
+  it('zählt über die übergebenen (gefilterten) Zeilen, nicht über den ganzen Einsatz', () => {
+    expect(keineRueckmeldungZelle([zeile('eh-1'), zeile('eh-2')], DATEN)).toBeNull();
   });
 });

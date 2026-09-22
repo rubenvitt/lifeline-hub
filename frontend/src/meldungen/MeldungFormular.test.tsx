@@ -2,7 +2,8 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { App as AntApp } from 'antd';
-import MeldungFormular from './MeldungFormular';
+import MeldungFormular, { vonZuBezug } from './MeldungFormular';
+import type { Einheit, Einsatzabschnitt } from '../api/types';
 
 /**
  * `onAnlegen` gibt seit LFH-332/B4 eine Zusage zurück — die Erfassungshülle
@@ -148,5 +149,82 @@ describe('MeldungFormular', () => {
     expect(screen.getByLabelText('Absender')).toHaveValue('RTW 2');
     // Ein Fehlschlag zählt nicht mit.
     expect(screen.queryByText(/Erfasst:/)).not.toBeInTheDocument();
+  });
+
+  describe('Absender an Einheit/Abschnitt binden (LFH-610)', () => {
+    const einheiten = [{ id: 7, name: '1. Zug' }] as Einheit[];
+    const abschnitte = [{ id: 3, name: 'Nord' }] as Einsatzabschnitt[];
+
+    function renderMitBezug(onAnlegen = anlegenMock()) {
+      render(
+        <AntApp>
+          <MeldungFormular
+            senden={false}
+            onAnlegen={onAnlegen}
+            einheiten={einheiten}
+            abschnitte={abschnitte}
+          />
+        </AntApp>,
+      );
+      return onAnlegen;
+    }
+
+    async function waehle(name: string) {
+      await userEvent.click(screen.getByRole('combobox', { name: 'Von Einheit / Abschnitt' }));
+      const eintrag = await screen.findByText(
+        (_, el) =>
+          typeof el?.className === 'string' &&
+          el.className.includes('ant-select-item-option-content') &&
+          el.textContent === name,
+      );
+      await userEvent.click(eintrag);
+    }
+
+    it('sendet die Einheit und belegt den Absender mit ihrem Namen vor', async () => {
+      const onAnlegen = renderMitBezug();
+      await waehle('1. Zug');
+      expect(screen.getByLabelText('Absender')).toHaveValue('1. Zug');
+      await userEvent.type(screen.getByLabelText('Inhalt / Wortlaut'), 'Lage ruhig');
+      await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+      await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
+      expect(onAnlegen.mock.calls[0][0]).toMatchObject({ einheit_id: 7, absender: '1. Zug' });
+      expect(onAnlegen.mock.calls[0][0]).not.toHaveProperty('abschnitt_id');
+    });
+
+    it('ohne Auswahl geht kein Bezug mit', async () => {
+      const onAnlegen = renderMitBezug();
+      await fuellePflichtfelder('RTW 2', 'Lage ruhig');
+      await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+      await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
+      expect(onAnlegen.mock.calls[0][0]).not.toHaveProperty('einheit_id');
+      expect(onAnlegen.mock.calls[0][0]).not.toHaveProperty('abschnitt_id');
+    });
+
+    it('bleibt bei „Werte behalten" über die Serie stehen', async () => {
+      const onAnlegen = renderMitBezug();
+      await waehle('Nord');
+      await userEvent.type(screen.getByLabelText('Inhalt / Wortlaut'), 'Erste');
+      await userEvent.click(screen.getByRole('checkbox', { name: 'Werte behalten' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
+      await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
+      await userEvent.type(screen.getByLabelText('Inhalt / Wortlaut'), 'Zweite');
+      await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
+      await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(2));
+      expect(onAnlegen.mock.calls[1][0]).toMatchObject({ abschnitt_id: 3, absender: 'Nord' });
+    });
+
+    it('ohne Einheiten und Abschnitte entfällt das Feld', () => {
+      renderFormular();
+      expect(
+        screen.queryByRole('combobox', { name: 'Von Einheit / Abschnitt' }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('vonZuBezug verwirft Unbrauchbares ganz', () => {
+      expect(vonZuBezug('einheit:7')).toEqual({ einheit_id: 7 });
+      expect(vonZuBezug('abschnitt:3')).toEqual({ abschnitt_id: 3 });
+      expect(vonZuBezug('einheit:x')).toEqual({});
+      expect(vonZuBezug(undefined)).toEqual({});
+    });
   });
 });

@@ -122,9 +122,10 @@ describe('Feldbreiten im Verwaltungsteil', () => {
     }
   });
 
-  it('die vierzehn umgestellten Felder tragen eine Obergrenze statt einer Festbreite', () => {
+  it('die vierzehn umgestellten Felder (plus Neuzugänge) tragen eine Obergrenze statt einer Festbreite', () => {
     const erwartet: Record<string, number> = {
-      'pages/einstellungen/EinsatzDefaults.tsx': 6,
+      // 6 umgestellte + die Rückmeldefrist (LFH-610), gleich in der fluiden Form gebaut.
+      'pages/einstellungen/EinsatzDefaults.tsx': 7,
       'stammdaten/QualifikationenTab.tsx': 1,
       'stammdaten/EtbBausteinFormModal.tsx': 1,
       'stammdaten/PersonalStatusTab.tsx': 1,
@@ -150,7 +151,8 @@ describe('Feldbreiten im Verwaltungsteil', () => {
     // Summiert wird das GEMESSENE, nicht die Erwartungsmap. Sonst verglich diese
     // Zeile eine hartkodierte Zahl mit einer hartkodierten Zahl und belegte über
     // den Quellbaum nichts — die vierzehn im Testnamen wäre nirgends erzwungen.
-    expect(Object.values(gemessen).reduce((a, b) => a + b, 0)).toBe(14);
+    // 14 umgestellte + 1 Neuzugang (Rückmeldefrist, LFH-610).
+    expect(Object.values(gemessen).reduce((a, b) => a + b, 0)).toBe(15);
   });
 
   it('der Scanner findet die verbotene Form wirklich (Selbstbeweis)', () => {

@@ -71,7 +71,9 @@ const UEBERNAHME: (keyof MeldungFormWerte & string)[] = [
 ];
 
 /** `einheit:<id>` / `abschnitt:<id>` → Bezugsfelder der Meldung. Unbekanntes → kein Bezug. */
-export function vonZuBezug(von: string | undefined): Pick<NeueMeldung, 'einheit_id' | 'abschnitt_id'> {
+export function vonZuBezug(
+  von: string | undefined,
+): Pick<NeueMeldung, 'einheit_id' | 'abschnitt_id'> {
   const m = /^(einheit|abschnitt):(\d+)$/.exec(von ?? '');
   if (!m) return {};
   const id = Number(m[2]);

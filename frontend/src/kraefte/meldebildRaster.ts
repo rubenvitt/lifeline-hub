@@ -6,8 +6,17 @@ import type {
   EinsatzPersonal,
   Einsatzabschnitt,
   FahrzeugStatus,
+  LetzteRueckmeldung,
+  Rueckmeldungen,
   StatusKategorie,
 } from '../api/types';
+import type { Dayjs } from 'dayjs';
+import {
+  RUECKMELDUNG_WORT,
+  ohneRueckmeldung,
+  rueckmeldungZustand,
+  type RueckmeldungZustand,
+} from '../meldungen/rueckmeldung';
 import { tonVonRolle, type StatusTon } from '../components/instrument/statusFlaeche';
 import { materialStatus, statusKategorie } from '../theme/statusFarben';
 import { verdichte, type StaerkeSumme, type Rohdaten } from './kraeftebild';
@@ -432,6 +441,69 @@ export interface BandZelle {
 /** Code einer Fahrzeugzelle ohne FMS-Anker — die Art statt einer erfundenen Ziffer. */
 const FAHRZEUG_KURZ = 'Fzg.';
 
+// ── Rückmeldung je Einheit (LFH-610) ──────────────────────────────────────────
+
+/** Rückmeldung einer Einheitenzeile: der Zustand und — falls vorhanden — die letzte Meldung. */
+export interface RueckmeldungAnzeige {
+  zustand: RueckmeldungZustand;
+  letzte: LetzteRueckmeldung | null;
+}
+
+/** Nur echte Einheiten tragen eine Rückmeldung — „Ohne Einheit" ist `art: 'einheit'`, hat aber keine id. */
+function istEchteEinheit(z: RasterZeile): z is RasterZeile & { einheitId: number } {
+  return z.art === 'einheit' && z.einheitId != null;
+}
+
+/**
+ * Rückmeldung einer Rasterzeile zum Zeitpunkt `jetzt` — `null` für jede Zeile, die keine
+ * echte Einheit ist (Mittel, „Ohne Einheit"). Bewusst NICHT in `baueMeldebildRaster`: der
+ * Zustand hängt an der Seitenuhr, und ein 30-s-Takt soll nicht den ganzen Baum neu bauen.
+ *
+ * `je` ist die Nachschlagetabelle aus `rueckmeldungJeEinheit` — und darf nur übergeben
+ * werden, wenn die Daten WIRKLICH da sind. Eine leere Tabelle heißt „niemand hat je
+ * zurückgemeldet"; wer sie beim Laden oder bei 403 übergibt, färbt jede Einheit rot.
+ */
+export function rueckmeldungDerZeile(
+  z: RasterZeile,
+  je: ReadonlyMap<number, LetzteRueckmeldung>,
+  jetzt: Dayjs,
+): RueckmeldungAnzeige | null {
+  if (!istEchteEinheit(z)) return null;
+  const letzte = je.get(z.einheitId) ?? null;
+  return { zustand: rueckmeldungZustand(letzte, jetzt), letzte };
+}
+
+/** Überfällig oder nie zurückgemeldet — die Zeile wird getönt wie eine Problemzeile. */
+export function istRueckmeldungProblem(r: RueckmeldungAnzeige | null | undefined): boolean {
+  return r != null && r.zustand !== 'aktuell';
+}
+
+/**
+ * Die Kachel „keine Rückmeldung" (Neuentwurf S6): Einheiten, von denen noch NIE eine
+ * Rückmeldung kam. Überfällige zählen NICHT mit (Entscheidung des Auftraggebers,
+ * 22.09.2026) — sie haben zurückgemeldet, nur zu lange her; das zeigt ihre Zeile.
+ *
+ * Gezählt über die GEFILTERTEN Rasterzeilen, wie die übrigen Bandzellen über die gefilterten
+ * Rohlisten: sonst stünde neben einem Abschnittsausschnitt eine Zahl über den ganzen Einsatz.
+ * Bei 0 entfällt die Kachel — die Bandzellen führen nur belegte Eimer, und eine rote Null
+ * meldete das Gegenteil dessen, was sie heißt.
+ */
+export function keineRueckmeldungZelle(
+  zeilen: readonly RasterZeile[],
+  daten: Rueckmeldungen,
+): BandZelle | null {
+  const ids = zeilen.filter(istEchteEinheit).map((z) => z.einheitId);
+  const anzahl = ohneRueckmeldung(ids, daten);
+  if (anzahl === 0) return null;
+  return {
+    schluessel: 'rueckmeldung-keine',
+    code: '—',
+    wert: anzahl,
+    wort: RUECKMELDUNG_WORT.keine,
+    ton: 'alarm',
+  };
+}
+
 /**
  * Fahrzeuge je Status des Katalogs — eine Zelle je Status mit mindestens einem Fahrzeug,
  * in `sortier`-Folge des Katalogs (Precedent: die Materialachse zeigte nur Werte > 0; der
@@ -439,9 +511,9 @@ const FAHRZEUG_KURZ = 'Fzg.';
  * das Band). Unbekannte `status_id` folgen nach dem Katalog, „ohne Status" steht hinten.
  *
  * „ohne Status" ist ECHTE Datenlage — ein disponiertes Fahrzeug, dem noch niemand einen
- * Status gegeben hat — und NICHT die Kachel „keine Rückmeldung" des Entwurfs: die
- * bräuchte einen Zeitpunkt der letzten Rückmeldung, den es nicht gibt (LFH-610).
- * Ohne diese Zelle summierte sich das Band nicht auf die Fahrzeugzahl.
+ * Status gegeben hat — und NICHT die Kachel „keine Rückmeldung" des Entwurfs: die zählt
+ * EINHEITEN ohne Rückmeldung (`keineRueckmeldungZelle`, LFH-610) und steht deshalb nicht in
+ * diesem Band, das sich auf die Fahrzeugzahl summieren muss. Ohne diese Zelle summierte sich das Band nicht auf die Fahrzeugzahl.
  */
 export function fahrzeugBand(
   fahrzeuge: readonly EinsatzFahrzeug[],
