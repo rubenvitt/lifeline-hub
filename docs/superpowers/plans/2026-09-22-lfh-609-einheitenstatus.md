@@ -32,7 +32,7 @@
 ### Task 1: `status_seit` am Fahrzeug
 
 **Dateien:**
-- Anlegen: `migrations/0104_status_seit.sql` (inklusive der Einheitenspalten aus Task 2, damit es EINE Migration ist)
+- Anlegen: `migrations/0105_status_seit.sql` (inklusive der Einheitenspalten aus Task 2, damit es EINE Migration ist)
 - Ändern: `src/fahrzeug/disposition_repo.rs` (SELECT, Row, `zu_anzeige`, beide INSERTs, `aktualisiere_tx`), `src/fahrzeug/mod.rs` (`EinsatzFahrzeugAnzeige.status_seit`), `src/einsatz/schwaerzung_registry.rs`
 - Test: `tests/einsatz_fahrzeug.rs`
 
