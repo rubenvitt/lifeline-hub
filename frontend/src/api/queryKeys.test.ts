@@ -38,6 +38,13 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
     ]);
   });
 
+  it('fahrzeug invalidiert auch die Einheiten — deren Status ist aus den Fahrzeugen abgeleitet (LFH-609)', () => {
+    expect(EINSATZ_STREAM_EVENTS.fahrzeug).toEqual([
+      EINSATZ_KEYS.fahrzeuge,
+      EINSATZ_KEYS.einheiten,
+    ]);
+  });
+
   it('bildet einheit auf den ×5-Fan-out in exakter Reihenfolge ab', () => {
     expect(EINSATZ_STREAM_EVENTS.einheit).toEqual([
       EINSATZ_KEYS.einheiten,

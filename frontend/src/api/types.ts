@@ -177,6 +177,9 @@ export type Einsatzabschnitt = S['EinsatzabschnittAnzeige'];
 export type EinheitMitgliedPerson = S['EinheitMitgliedPerson'];
 export type EinheitMitgliedFahrzeug = S['EinheitMitgliedFahrzeug'];
 export type Einheit = S['EinheitAnzeige'];
+export type EinheitStatus = S['EinheitStatus'];
+export type EinheitStatusQuelle = S['EinheitStatusQuelle'];
+export type StatusWert = S['StatusWert'];
 export type FuehrungskraftKarte = S['FuehrungskraftKarte'];
 export type OrganisationInfo = S['OrganisationAnzeige'];
 

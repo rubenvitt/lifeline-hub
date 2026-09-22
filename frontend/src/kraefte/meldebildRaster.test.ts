@@ -2,8 +2,9 @@ import { describe, it, expect } from 'vitest';
 import {
   aufklappbareSchluessel,
   baueMeldebildRaster,
+  einheitBand,
   einheitFunkrufname,
-  fahrzeugBand,
+  einheitStatusAnzeige,
   fahrzeugStatus,
   fmsWort,
   istProblemZeile,
@@ -17,6 +18,7 @@ import { verdichte, staerkeText } from './kraeftebild';
 import type {
   Auftrag,
   Einheit,
+  EinheitStatus,
   EinsatzFahrzeug,
   EinsatzMaterial,
   EinsatzPersonal,
@@ -320,30 +322,127 @@ describe('fahrzeugStatus', () => {
 
 // ── Statusband ───────────────────────────────────────────────────────────────
 
-describe('fahrzeugBand', () => {
-  it('zählt je Katalogstatus, in sortier-Folge, nur belegte Status', () => {
-    const band = fahrzeugBand(
-      [fz(1, null, 104), fz(2, null, 104), fz(3, null, 101), fz(4, null, 120), fz(5, null, 104)],
-      KATALOG,
+// ── Einheitenstatus (LFH-609) ─────────────────────────────────────────────────
+
+const wert = (k: FahrzeugStatus) => ({
+  status_id: k.id,
+  label: k.label,
+  kategorie: k.kategorie,
+  fms_anker: k.fms_anker ?? undefined,
+  sortier: k.sortier,
+});
+const [S2, S3, S4, S6, WERKSTATT] = KATALOG;
+const st = {
+  fahrzeuge: (k: FahrzeugStatus, seit = '2026-09-22 09:12:00'): EinheitStatus => ({
+    quelle: 'fahrzeuge',
+    status: wert(k),
+    kategorie: k.kategorie,
+    seit,
+    verteilung: [],
+  }),
+  hand: (k: FahrzeugStatus): EinheitStatus => ({
+    quelle: 'hand',
+    status: wert(k),
+    kategorie: k.kategorie,
+    seit: '2026-09-22 08:00:00',
+    verteilung: [],
+  }),
+  gemischt: (kategorie?: FahrzeugStatus['kategorie']): EinheitStatus => ({
+    quelle: 'gemischt',
+    kategorie,
+    verteilung: [{ status: wert(S3), anzahl: 1 }, { status: wert(S4), anzahl: 2 }, { anzahl: 1 }],
+  }),
+  ohne: (): EinheitStatus => ({ quelle: 'ohne', verteilung: [] }),
+};
+
+describe('einheitStatusAnzeige', () => {
+  it('abgeleitet und von Hand: Code, Wort ohne Ziffernpräfix, Ton aus der Kategorie', () => {
+    expect(einheitStatusAnzeige(st.fahrzeuge(S4))).toEqual({
+      ton: 'achtung',
+      code: 'S4',
+      wort: 'Am Einsatzort',
+      verteilung: null,
+    });
+    expect(einheitStatusAnzeige(st.hand(S2))).toMatchObject({ ton: 'normal', code: 'S2' });
+  });
+
+  it('gemischt erfindet keinen Status: Wort „gemischt", Verteilung als Text', () => {
+    const a = einheitStatusAnzeige(st.gemischt());
+    expect(a).toEqual({
+      ton: 'neutral',
+      code: null,
+      wort: 'gemischt',
+      verteilung: '1× S3 · 2× S4 · 1× ohne Status',
+    });
+    // Eine GEMEINSAME Kategorie trägt den Ton — S3 und S4 sind beide gebunden.
+    expect(einheitStatusAnzeige(st.gemischt('gebunden')).ton).toBe('achtung');
+  });
+
+  it('ohne Status: neutral und so benannt', () => {
+    expect(einheitStatusAnzeige(st.ohne())).toMatchObject({ ton: 'neutral', wort: 'ohne Status' });
+  });
+});
+
+describe('Raster trägt den Einheitenstatus', () => {
+  it('Einheitenzeile: Status, „Seit", Handstatus nur ohne Fahrzeug; Fahrzeugzeile: status_seit', () => {
+    const mitFzg = eh(1, null, null, {
+      status: st.fahrzeuge(S4),
+      fahrzeug_mitglieder: [{ ef_id: 1, funkrufname: 'F1' }],
+    } as Partial<Einheit>);
+    const ohneFzg = eh(2, null, null, { status: st.hand(S2) } as Partial<Einheit>);
+    const raster = baueMeldebildRaster(
+      eingabe({
+        einheiten: [mitFzg, ohneFzg],
+        fahrzeuge: [{ ...fz(1, 1, 104, 'gebunden'), status_seit: '2026-09-22 09:12:00' }],
+      }),
     );
-    expect(band.map((z) => [z.code, z.wert, z.wort, z.ton])).toEqual([
-      ['Fzg.', 1, 'Werkstatt', 'alarm'],
-      ['S2', 1, 'Frei auf Wache', 'normal'],
-      ['S4', 3, 'Am Einsatzort', 'achtung'],
+    const [z1, z2] = raster;
+    expect(z1.status).toMatchObject({ code: 'S4', wort: 'Am Einsatzort' });
+    expect(z1.seit).toBe('2026-09-22 09:12:00');
+    expect(z1.handStatus).toBe(false);
+    expect(z1.children?.[0].seit).toBe('2026-09-22 09:12:00');
+    expect(z2.handStatus).toBe(true);
+    expect(z2.einheitStatus?.quelle).toBe('hand');
+  });
+
+  it('der Status kommt vom Server, nicht aus den (gefilterten) Fahrzeuglisten', () => {
+    // Die Einheit trägt S4, die übergebene Fahrzeugliste ist leer (weggefiltert) —
+    // der Status darf dadurch nicht kippen.
+    const e = eh(1, null, null, {
+      status: st.fahrzeuge(S4),
+      fahrzeug_mitglieder: [{ ef_id: 1, funkrufname: 'F1' }],
+    } as Partial<Einheit>);
+    const [z] = baueMeldebildRaster(eingabe({ einheiten: [e] }));
+    expect(z.status).toMatchObject({ code: 'S4' });
+    expect(z.handStatus).toBe(false);
+  });
+});
+
+describe('einheitBand', () => {
+  it('zählt Einheiten je Status in Katalogfolge, Hand und Fahrzeug gleich, gemischt und ohne hinten', () => {
+    const band = einheitBand([
+      eh(1, null, null, { status: st.fahrzeuge(S4) } as Partial<Einheit>),
+      eh(2, null, null, { status: st.hand(S4) } as Partial<Einheit>),
+      eh(3, null, null, { status: st.hand(S2) } as Partial<Einheit>),
+      eh(4, null, null, { status: st.fahrzeuge(WERKSTATT) } as Partial<Einheit>),
+      eh(5, null, null, { status: st.gemischt('gebunden') } as Partial<Einheit>),
+      eh(6, null, null, { status: st.ohne() } as Partial<Einheit>),
+      eh(7, null, null, { status: st.fahrzeuge(S6) } as Partial<Einheit>),
     ]);
+    expect(band.map((z) => [z.code, z.wert, z.wort, z.ton])).toEqual([
+      ['Einh.', 1, 'Werkstatt', 'alarm'],
+      ['S2', 1, 'Frei auf Wache', 'normal'],
+      ['S4', 2, 'Am Einsatzort', 'achtung'],
+      ['S6', 1, 'Nicht einsatzbereit', 'alarm'],
+      ['Einh.', 1, 'gemischt', 'neutral'],
+      ['Einh.', 1, 'ohne Status', 'neutral'],
+    ]);
+    // Jede Einheit genau einmal — das Band summiert sich auf die Einheitenzahl.
+    expect(band.reduce((s, z) => s + z.wert, 0)).toBe(7);
   });
 
-  it('„ohne Status" steht hinten und summiert das Band auf die Fahrzeugzahl', () => {
-    const fahrzeuge = [fz(1, null, 104), fz(2, null, null), fz(3, null, 999, 'gebunden')];
-    const band = fahrzeugBand(fahrzeuge, KATALOG);
-    expect(band[band.length - 1]).toMatchObject({ wort: 'ohne Status', ton: 'neutral', wert: 1 });
-    // Ein Status, den der Katalog nicht (mehr) kennt, fällt nicht weg.
-    expect(band.map((z) => z.schluessel)).toContain('fzg-999');
-    expect(band.reduce((s, z) => s + z.wert, 0)).toBe(fahrzeuge.length);
-  });
-
-  it('keine Fahrzeuge — kein Band', () => {
-    expect(fahrzeugBand([], KATALOG)).toEqual([]);
+  it('keine Einheiten — kein Band', () => {
+    expect(einheitBand([])).toEqual([]);
   });
 });
 
@@ -418,6 +517,11 @@ describe('istProblemZeile', () => {
       }),
     );
     expect(raster.map(istProblemZeile)).toEqual([true, false, true]);
+    // Eine Einheit ohne Mittel mit Handstatus „nicht verfügbar" (LFH-609) ist ebenso eine.
+    const [hand] = baueMeldebildRaster(
+      eingabe({ einheiten: [eh(9, null, null, { status: st.hand(S6) } as Partial<Einheit>)] }),
+    );
+    expect(istProblemZeile(hand)).toBe(true);
     // Eine einzelne ausgefallene Mittelzeile tönt nicht — sie trägt ihren Status als Chip.
     expect(alleBlaetter(raster).some(istProblemZeile)).toBe(false);
   });

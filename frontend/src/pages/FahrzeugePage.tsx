@@ -334,6 +334,9 @@ export default function FahrzeugePage() {
       qc.setQueryData<EinsatzFahrzeug[]>(einsatzKeys.fahrzeuge(einsatzId), (alt) =>
         alt?.map((ef) => (ef.id === serverStand.id ? serverStand : ef)),
       );
+      // Der Einheitenstatus ist aus den Fahrzeugen abgeleitet (LFH-609) — nicht erst auf
+      // das Live-Ereignis warten, das ohne Stream (offline, Proxy) nie käme.
+      void qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
     },
     onError: (e, v, kontext) => {
       const vorher = kontext?.vorher;

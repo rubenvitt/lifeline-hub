@@ -12,7 +12,7 @@ import KraefteuebersichtPage, {
 } from './KraefteuebersichtPage';
 import { Routes, Route } from 'react-router';
 import { ladeEinsatz } from '../api/einsaetze';
-import { listeEinheiten } from '../api/einheiten';
+import { listeEinheiten, setzeEinheitStatus } from '../api/einheiten';
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
 import { listeEinsatzMaterial } from '../api/einsatzMaterial';
@@ -24,7 +24,7 @@ import { legeLageberichtAn, aktualisiereLagebericht } from '../api/lageberichte'
 import type { Auftrag, EinsatzAnzeige, FahrzeugStatus } from '../api/types';
 
 vi.mock('../api/einsaetze', () => ({ ladeEinsatz: vi.fn() }));
-vi.mock('../api/einheiten', () => ({ listeEinheiten: vi.fn() }));
+vi.mock('../api/einheiten', () => ({ listeEinheiten: vi.fn(), setzeEinheitStatus: vi.fn() }));
 vi.mock('../api/einsatzPersonal', () => ({ listeEinsatzPersonal: vi.fn() }));
 vi.mock('../api/einsatzFahrzeuge', () => ({ listeEinsatzFahrzeuge: vi.fn() }));
 vi.mock('../api/einsatzMaterial', () => ({ listeEinsatzMaterial: vi.fn() }));
@@ -110,6 +110,7 @@ const EINHEIT_E10 = {
   tz_organisation: null,
   aktueller_br_id: null,
   sprechgruppen: [],
+  status: { quelle: 'ohne' as const, verteilung: [] },
 };
 
 const FAHRZEUG_F1 = {
@@ -190,10 +191,31 @@ function setup() {
   );
 }
 
+/** Der Einheitenstatus, wie ihn der Server aus einem Fahrzeug in S4 ableitet (LFH-609). */
+const STATUS_S4 = {
+  quelle: 'fahrzeuge' as const,
+  status: {
+    status_id: 104,
+    label: '4 – Am Einsatzort',
+    kategorie: 'gebunden' as const,
+    fms_anker: 4,
+    sortier: 40,
+  },
+  kategorie: 'gebunden' as const,
+  seit: '2026-09-21 07:12:00',
+  verteilung: [],
+};
+
 /** Abschnitt → Einheit (20) → Fahrzeug (30, S4 „Am Einsatzort"). */
 function mitEinheit() {
   vi.mocked(listeAbschnitte).mockResolvedValue([ABSCHNITT_A1]);
-  vi.mocked(listeEinheiten).mockResolvedValue([EINHEIT_E10]);
+  vi.mocked(listeEinheiten).mockResolvedValue([
+    {
+      ...EINHEIT_E10,
+      status: STATUS_S4,
+      fahrzeug_mitglieder: [{ ef_id: 30, funkrufname: 'FW 1/44-1', fahrzeugtyp: 'HLF 20' }],
+    },
+  ]);
   vi.mocked(listeEinsatzFahrzeuge).mockResolvedValue([
     { ...FAHRZEUG_F1, status_id: 104, status_kategorie: 'gebunden' },
   ]);
@@ -280,12 +302,12 @@ describe('meldebildMeta', () => {
 });
 
 describe('KraefteuebersichtPage — Statusband', () => {
-  it('zählt Fahrzeuge je FMS-Status mit Code, Zahl und Wort', async () => {
+  it('zählt Einheiten je FMS-Status mit Code, Zahl und Wort (LFH-609)', async () => {
     mitEinheit();
     const { container } = setup();
     const zelle = await waitFor(() => {
       const z = container.querySelector(
-        '[aria-label="Fahrzeuge je Status"] [data-lfh="kennzahl"]',
+        '[aria-label="Einheiten je Status"] [data-lfh="kennzahl"]',
       ) as HTMLElement;
       expect(z).not.toBeNull();
       return z;
@@ -295,6 +317,20 @@ describe('KraefteuebersichtPage — Statusband', () => {
     expect(zelle).toHaveTextContent('Am Einsatzort');
     // Ton aus der Kategorie (gebunden → achtung), nicht aus dem Anker.
     expect(zelle).toHaveAttribute('data-ton', 'achtung');
+  });
+
+  it('sagt am Einheitenband, dass Suche/Träger/Status nur die Mittel filtern — und schweigt ohne', async () => {
+    mitEinheit();
+    const { container } = setup();
+    await screen.findByText('1. Zug');
+    const hinweis = () => container.querySelector('[data-lfh="statusband-hinweis"]');
+    expect(hinweis()).toBeNull();
+    fireEvent.change(screen.getByPlaceholderText('Suche...'), { target: { value: 'xyz' } });
+    await waitFor(() => expect(hinweis()).toHaveTextContent(/wirken auf die Mittel/));
+    // Das Band zählt weiter die Einheit — wie die Einheitenzeile darunter.
+    expect(
+      container.querySelector('[aria-label="Einheiten je Status"] [data-lfh="kennzahl"]'),
+    ).toHaveTextContent('1');
   });
 
   it('führt die Personalverteilung als eigene Zellen', async () => {
@@ -307,7 +343,7 @@ describe('KraefteuebersichtPage — Statusband', () => {
   it('zeigt „keine Rückmeldung" NICHT — dafür gibt es keine Daten (LFH-610)', async () => {
     mitEinheit();
     setup();
-    await screen.findByText('Am Einsatzort');
+    await screen.findAllByText('Am Einsatzort');
     expect(screen.queryByText(/keine Rückmeldung/i)).toBeNull();
   });
 
@@ -355,6 +391,8 @@ describe('KraefteuebersichtPage — Raster', () => {
   });
 
   it('die Einheitenzeile trägt die verdichtete Verteilung bereit / gebunden / Ausfall — auch die 0', async () => {
+    // Die Spalte „Mittel" steht ab `xl` (LFH-609), darunter im Spaltenschalter.
+    setzeViewportBreite(1440);
     mitEinheit();
     const { container } = setup();
     await screen.findByText('1. Zug');
@@ -369,6 +407,7 @@ describe('KraefteuebersichtPage — Raster', () => {
   });
 
   it('tönt eine Einheit mit Ausfall als Problemzeile — mit der Ausfall-Zahl als zweitem Kanal', async () => {
+    setzeViewportBreite(1440);
     vi.mocked(listeEinheiten).mockResolvedValue([
       EINHEIT_E10,
       { ...EINHEIT_E10, id: 21, name: '2. Zug' },
@@ -383,6 +422,37 @@ describe('KraefteuebersichtPage — Raster', () => {
     expect(within(problem).getByTitle('Ausfall')).toHaveTextContent('1');
     expect(within(problem).getByTitle('Ausfall')).toHaveAttribute('data-ton', 'alarm');
     expect(zeile(container, 'eh-20')).not.toHaveClass('meldebild-problemzeile');
+  });
+
+  it('die Einheitenzeile trägt Status-Chip und „Seit" (LFH-609)', async () => {
+    mitEinheit();
+    const { container } = setup();
+    await screen.findByText('1. Zug');
+    const e = zeile(container, 'eh-20')!;
+    const chip = e.querySelector('[data-lfh="status-chip"]') as HTMLElement;
+    expect(chip).toHaveTextContent('S4');
+    expect(chip).toHaveTextContent('Am Einsatzort');
+    // Mit Fahrzeug führen die Fahrzeuge — kein Handstatus-Auslöser.
+    expect(within(e).queryByRole('button', { name: /Status/ })).toBeNull();
+  });
+
+  it('eine Einheit OHNE Fahrzeug trägt mit Schreibrecht den Handstatus-Auslöser und setzt ihn', async () => {
+    vi.mocked(listeEinheiten).mockResolvedValue([{ ...EINHEIT_E10, name: 'Fachberater' }]);
+    vi.mocked(setzeEinheitStatus).mockResolvedValue({ ...EINHEIT_E10 });
+    const { container } = setup();
+    await screen.findByText('Fachberater');
+    const e = zeile(container, 'eh-20')!;
+    const ausloeser = await within(e).findByRole('button', { name: /Fachberater/ });
+    fireEvent.click(ausloeser);
+    const menue = await waitFor(() => {
+      const m = document.querySelector(
+        '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+      ) as HTMLElement | null;
+      expect(m).not.toBeNull();
+      return m!;
+    });
+    fireEvent.click(within(menue).getByText(/S2 · Frei auf Wache/));
+    await waitFor(() => expect(setzeEinheitStatus).toHaveBeenCalledWith(1, 20, 102));
   });
 
   it('zeigt den jüngsten offenen Auftrag der Einheit als Deeplink', async () => {

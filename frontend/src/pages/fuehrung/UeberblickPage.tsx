@@ -92,8 +92,8 @@ import { MARKEN_BREITE, rasterStil, zeilenzielStil } from './ueberblickStil';
  * unlesbar.
  *
  * BEWUSST WEGGELASSEN (keine erfundenen Daten, Entscheidung 4): Lagezustand-Farbkante und
- * Fortschritt je Abschnitt (LFH-608), Einheitenstatus (LFH-609 — ersetzt durch die
- * Verfügbarkeit der Mittel), letzte Rückmeldung je Abschnitt (LFH-610).
+ * Fortschritt je Abschnitt (LFH-608), letzte Rückmeldung je Abschnitt (LFH-610). Das
+ * Raster bereit · gebunden · Ausfall zählt seit LFH-609 die Einheiten nach ihrem Status.
  */
 
 /** Der Entscheidungsabruf: nur Typ „Entscheidung", ein Deckel, der die letzte Stunde
@@ -464,7 +464,7 @@ export default function UeberblickPage() {
             fuss={
               zAbschnitte === 'daten' && zeilen.length > 0 ? (
                 <span style={{ ...monoStil(10), color: rollen.schwach }}>
-                  Mittel (Fahrzeuge + Personal): bereit · gebunden · Ausfall
+                  Einheiten nach Status: bereit · gebunden · Ausfall
                   {auftraegeFehlen && ' — Aufträge nicht abrufbar, Auftragstexte fehlen'}
                 </span>
               ) : undefined
@@ -734,11 +734,11 @@ export default function UeberblickPage() {
 }
 
 /** Eine Abschnittszeile: Name/Leiter/Einheiten · jüngster offener Auftrag · Stärke und
- *  Mittelverteilung. Die ganze Zeile ist der Link auf den Abschnitt. */
+ *  Einheiten je Statuskategorie (LFH-609). Die ganze Zeile ist der Link auf den Abschnitt. */
 function AbschnittEintrag({ zeile, ziel }: { zeile: AbschnittZeile; ziel: string }) {
   const { token, rollen } = useRollen();
   const [juengster, ...weitere] = zeile.auftraege;
-  const { mittel } = zeile;
+  const verteilung = zeile.einheitenStatus;
   return (
     <Link
       to={ziel}
@@ -803,17 +803,19 @@ function AbschnittEintrag({ zeile, ziel }: { zeile: AbschnittZeile; ziel: string
             width: '100%',
           }}
         >
-          <StatusZelle ton="normal" hoehe={24} wert={mittel.bereit} wort="bereit" />
-          <StatusZelle ton="bedien" hoehe={24} wert={mittel.gebunden} wort="gebunden" />
+          <StatusZelle ton="normal" hoehe={24} wert={verteilung.bereit} wort="bereit" />
+          <StatusZelle ton="bedien" hoehe={24} wert={verteilung.gebunden} wort="gebunden" />
           <StatusZelle
-            ton={mittel.ausfall > 0 ? 'alarm' : 'neutral'}
+            ton={verteilung.ausfall > 0 ? 'alarm' : 'neutral'}
             hoehe={24}
-            wert={mittel.ausfall}
+            wert={verteilung.ausfall}
             wort="Ausfall"
           />
         </span>
-        {mittel.ohne > 0 && (
-          <span style={{ ...monoStil(10), color: rollen.schwach }}>+{mittel.ohne} ohne Status</span>
+        {verteilung.ohne > 0 && (
+          <span style={{ ...monoStil(10), color: rollen.schwach }}>
+            +{verteilung.ohne} ohne Status
+          </span>
         )}
       </span>
     </Link>

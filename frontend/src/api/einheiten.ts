@@ -80,3 +80,17 @@ export function ordneFahrzeugZu(einsatzId: number, eid: number, efId: number): P
 export function gibFahrzeugFrei(einsatzId: number, eid: number, efId: number): Promise<void> {
   return apiSend<void>(`/api/einsaetze/${einsatzId}/einheiten/${eid}/fahrzeug/${efId}`, 'DELETE');
 }
+
+/**
+ * Handstatus einer Einheit OHNE Fahrzeug setzen oder löschen (`null`, LFH-609). Mit
+ * Fahrzeugen führen diese den Status — der Server antwortet dann 422.
+ */
+export function setzeEinheitStatus(
+  einsatzId: number,
+  eid: number,
+  statusId: number | null,
+): Promise<Einheit> {
+  return apiSend<Einheit>(`/api/einsaetze/${einsatzId}/einheiten/${eid}/status`, 'PUT', {
+    status_id: statusId,
+  });
+}

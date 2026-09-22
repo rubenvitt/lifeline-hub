@@ -296,7 +296,7 @@ const ZIEL = { light: 7, dark: 5 } as const;
 /** Die drei Statusrollen, wie sie in der Verdichtungszeile ausgeschrieben stehen. */
 const ZEILEN_ZAHLEN = [/^\d+ frei$/, /^\d+ gebunden$/, /^\d+ n\. verf\.$/];
 
-/** Die drei Kategorien des Fahrzeugkatalogs und der Ton, den das Band ihnen gibt. */
+/** Die drei Kategorien des FMS-Katalogs und der Ton, den das Band ihnen gibt. */
 const BAND_TOENE = [
   { kategorie: 'verfuegbar', ton: 'normal' },
   { kategorie: 'gebunden', ton: 'achtung' },
@@ -317,7 +317,8 @@ for (const modus of ['light', 'dark'] as const) {
 
     // Je Kategorie ein Fahrzeug mit einem Katalogstatus dieser Kategorie — sonst stünde im
     // Band nur der Default-Status neuer Dispositionen, und zwei der drei Töne blieben
-    // ungemessen.
+    // ungemessen. Seit LFH-609 zählt das Band EINHEITEN, deren Status aus ihren Fahrzeugen
+    // abgeleitet ist: jedes Fahrzeug kommt deshalb in eine eigene Einheit.
     const katalogAntwort = await page.request.get('/api/fahrzeug-status');
     expect(katalogAntwort.ok(), await katalogAntwort.text()).toBeTruthy();
     const katalog = (await katalogAntwort.json()) as { id: number; kategorie: string }[];
@@ -331,6 +332,9 @@ for (const modus of ['light', 'dark'] as const) {
         data: { status_id: status!.id },
       });
       expect(r.ok(), await r.text()).toBeTruthy();
+      const einheit = await post(page, `${basis}/einheiten`, { name: `Messeinheit ${i + 1}` });
+      const z = await page.request.put(`${basis}/einheiten/${einheit}/fahrzeug/${id}`);
+      expect(z.ok(), await z.text()).toBeTruthy();
     }
 
     await page.evaluate((m) => localStorage.setItem('lifeline-hub.theme', m), modus);
@@ -352,7 +356,7 @@ for (const modus of ['light', 'dark'] as const) {
     await page.goto(`/einsaetze/${einsatzId}/kraefteuebersicht`);
     await expect(page.locator('html')).toHaveAttribute('data-theme', modus);
     await expect(page.getByRole('region', { name: 'Meldebild' })).toHaveCount(1);
-    const band = page.getByRole('region', { name: 'Fahrzeuge je Status' });
+    const band = page.getByRole('region', { name: 'Einheiten je Status' });
     for (const { ton } of BAND_TOENE) {
       // `.first()` ist hier KEINE Mittelung: mehrere Katalogstatus derselben Kategorie
       // tragen dieselbe Fläche und dieselbe Textfarbe, das Paar ist also eines.

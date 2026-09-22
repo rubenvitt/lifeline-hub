@@ -19,9 +19,9 @@ function rgb(hex: string): string {
 describe('Statusband', () => {
   it('jede Zelle ist eine Kennzahl auf der neutralen Fläche, der Ton im Quadrat und in der Marke', () => {
     const { container } = renderMitProviders(
-      <Statusband fahrzeuge={[zelle('s3', 'achtung', 5)]} personal={[]} zustand="daten" />,
+      <Statusband einheiten={[zelle('s3', 'achtung', 5)]} personal={[]} zustand="daten" />,
     );
-    const band = screen.getByRole('region', { name: 'Fahrzeuge je Status' });
+    const band = screen.getByRole('region', { name: 'Einheiten je Status' });
     const z = band.querySelector('[data-lfh="kennzahl"]') as HTMLElement;
     expect(z).toHaveAttribute('data-ton', 'achtung');
     expect(z).toHaveTextContent('S3');
@@ -41,7 +41,7 @@ describe('Statusband', () => {
   it('normal und bedien behalten ihre Tonfarbe auch tags', () => {
     renderMitProviders(
       <Statusband
-        fahrzeuge={[zelle('s2', 'normal', 4), zelle('s4', 'bedien', 2)]}
+        einheiten={[zelle('s2', 'normal', 4), zelle('s4', 'bedien', 2)]}
         personal={[]}
         zustand="daten"
       />,
@@ -64,7 +64,7 @@ describe('Statusband', () => {
       setzeViewportBreite(breite);
       renderMitProviders(
         <Statusband
-          fahrzeuge={[
+          einheiten={[
             zelle('s1', 'normal'),
             zelle('s2', 'normal'),
             zelle('s3', 'achtung'),
@@ -74,7 +74,7 @@ describe('Statusband', () => {
           zustand="daten"
         />,
       );
-      const fzg = screen.getByRole('region', { name: 'Fahrzeuge je Status' });
+      const fzg = screen.getByRole('region', { name: 'Einheiten je Status' });
       const pers = screen.getByRole('region', { name: 'Personal je Status' });
       const rasterF = fzg.querySelector('[data-lfh="kennzahlenband"]') as HTMLElement;
       const rasterP = pers.querySelector('[data-lfh="kennzahlenband"]') as HTMLElement;
@@ -91,7 +91,7 @@ describe('Statusband', () => {
     // Sechs Zellen füllen jede der drei Stufen (6, 3, 2) restlos.
     const sechs = ['a', 'b', 'c', 'd', 'e', 'f'].map((k) => zelle(k, 'normal'));
     const { container } = renderMitProviders(
-      <Statusband fahrzeuge={sechs} personal={[]} zustand="daten" />,
+      <Statusband einheiten={sechs} personal={[]} zustand="daten" />,
     );
     expect(container.querySelectorAll('[data-lfh="meldebild-bandluecke"]')).toHaveLength(0);
   });

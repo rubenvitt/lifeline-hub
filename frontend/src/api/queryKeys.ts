@@ -88,7 +88,9 @@ export type EinsatzKey = (typeof EINSATZ_KEYS)[keyof typeof EINSATZ_KEYS];
 export const EINSATZ_STREAM_EVENTS = {
   uhs: [EINSATZ_KEYS.uhs],
   schaden: [EINSATZ_KEYS.schaeden],
-  fahrzeug: [EINSATZ_KEYS.fahrzeuge],
+  // LFH-609: der Status einer Einheit ist aus ihren Fahrzeugen abgeleitet — ein
+  // Statuswechsel am Fahrzeug ändert die Einheitenliste mit.
+  fahrzeug: [EINSATZ_KEYS.fahrzeuge, EINSATZ_KEYS.einheiten],
   material: [EINSATZ_KEYS.material],
   tier: [EINSATZ_KEYS.tiere],
   lage_zone: [EINSATZ_KEYS.zonen, EINSATZ_KEYS.gefahrengebiete],

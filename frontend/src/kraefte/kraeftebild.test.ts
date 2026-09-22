@@ -61,6 +61,7 @@ const eh = (
   tz_organisation: null,
   aktueller_br_id: null,
   sprechgruppen: [],
+  status: { quelle: 'ohne', verteilung: [] },
 });
 const p = (
   id: number,
