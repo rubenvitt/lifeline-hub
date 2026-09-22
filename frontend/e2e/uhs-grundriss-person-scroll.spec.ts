@@ -453,3 +453,36 @@ test('UHS Grundriss: Person-Drop auf einen Platz löst die Belegung weiterhin au
   const body = JSON.parse(req.postData() ?? '{}') as { platz_id?: number | null };
   expect(typeof body.platz_id).toBe('number');
 });
+
+// LFH-621: die Personenmarke ersetzt den antd-Tag und behauptet dessen Höhe — dichteunabhängig,
+// weil die belegte Platzkarte an `SCHRITT_Y = 120` aus dem Backend hängt (Rechnung im Kopf von
+// `Grundriss.tsx`: der Streifen ist mit 24 px eingeplant). jsdom rechnet kein Layout, und die
+// Marke mischt Mono und Satzschrift in einer Zeile — deshalb hier gemessen, in zwei Stufen.
+test('UHS Grundriss: Personenmarke auf der Platzkarte behält ihre Höhe in jeder Dichtestufe', async ({
+  page,
+}) => {
+  const personName = await setupBelegterPlatz(page);
+  const karte = page.locator('[data-testid="platz-karte"]', { hasText: 'Bett 1' });
+  const marke = karte.locator('[data-lfh="personenkarte"]');
+
+  const messungen: { dichte: string; marke: number; karte: number }[] = [];
+  for (const dichte of ['kompakt', 'handschuh']) {
+    await page.evaluate((wert) => localStorage.setItem('lifeline-hub.dichte', wert), dichte);
+    await page.reload();
+    await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+    await expect(marke).toContainText(personName);
+    messungen.push({
+      dichte,
+      marke: (await marke.boundingBox())!.height,
+      karte: (await karte.boundingBox())!.height,
+    });
+  }
+
+  const [kompakt, handschuh] = messungen;
+  expect(kompakt.marke, 'die Marke passt in den eingeplanten 24-px-Streifen').toBeLessThanOrEqual(
+    24,
+  );
+  expect(handschuh.marke, 'die Marke wächst nicht mit der Dichte').toBe(kompakt.marke);
+  expect(handschuh.karte, 'die Platzkarte behält ihre Höhe').toBe(kompakt.karte);
+  expect(kompakt.karte).toBeLessThanOrEqual(120);
+});

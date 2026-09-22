@@ -112,7 +112,10 @@ describe('EtbZeitachse – der Eintrag', () => {
     });
     const gruppen = container.querySelectorAll('[role="group"]');
     expect(gruppen).toHaveLength(2);
-    expect(gruppen[0].getAttribute('aria-label')).toMatch(/^23\.05\. · \d{2} Uhr$/);
+    // Der Name kommt aus dem Kopf (`aria-labelledby`), nicht aus einem eigenen `aria-label` —
+    // sonst sagte der Vorleser die Stunde doppelt an (LFH-621).
+    expect(gruppen[0]).toHaveAccessibleName(/^23\.05\. · \d{2} Uhr$/);
+    expect(gruppen[0]).not.toHaveAttribute('aria-label');
     const texte = [...container.querySelectorAll('[data-zeile]')].map((z) => z.textContent);
     expect(texte[0]).toContain('drei');
     expect(texte[2]).toContain('eins');

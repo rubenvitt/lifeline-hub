@@ -1,6 +1,14 @@
 import { MoreOutlined } from '@ant-design/icons';
 import { Button, Dropdown, Space } from 'antd';
-import { useCallback, useMemo, useRef, useState, type FocusEvent, type ReactNode } from 'react';
+import {
+  useCallback,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type FocusEvent,
+  type ReactNode,
+} from 'react';
 import { Link } from 'react-router';
 import type { EtbEintragAnzeige, MeldeWeg } from '../api/types';
 import { HERVORGEHOBEN } from '../components/Datensicht';
@@ -144,6 +152,7 @@ export default function EtbZeitachse({
   const { token, rollen } = useRollen();
   const { konventionen } = useAnzeigeKonventionen();
   const wurzel = useRef<HTMLDivElement>(null);
+  const kopfIdBasis = useId();
   const [gefroren, setGefroren] = useState<Einfrierstand | null>(null);
   /*
    * Ein Sprung taut auf, und zwar IM RENDER (Zustandsangleich an eine Prop), nicht in
@@ -360,7 +369,7 @@ export default function EtbZeitachse({
         verfasser={e.erfasser_name}
         weg={e.meldeweg ? MELDEWEG_LABEL[e.meldeweg] : undefined}
       >
-        {/* Unter dem Tageskopf (h2, s. u.) — `#` im Eintrag wird h3 (LFH-621). */}
+        {/* Unter dem Stundenkopf (h2, s. u.) — `#` im Eintrag wird h3 (LFH-621). */}
         <Markdown variante="kompakt" unterEbene={2}>
           {e.inhalt}
         </Markdown>
@@ -377,8 +386,14 @@ export default function EtbZeitachse({
   if (sichtbar.length === 0) {
     inhalt = ladend ? <SeitenSkeleton /> : fehler ? null : leerText;
   } else {
-    inhalt = gruppen.map((g) => (
-      <div key={`${g.schluessel}-${g.zeilen[0].schluessel}`} role="group" aria-label={g.etikett}>
+    inhalt = gruppen.map((g, i) => (
+      <div
+        key={`${g.schluessel}-${g.zeilen[0].schluessel}`}
+        role="group"
+        // Benannt ÜBER den Kopf, nicht per eigenem `aria-label`: sonst sagte der Vorleser die
+        // Stunde doppelt an — einmal als Gruppe, einmal als Überschrift (LFH-621).
+        aria-labelledby={`${kopfIdBasis}-kopf-${i}`}
+      >
         <div
           style={{
             paddingBlock: token.paddingXS,
@@ -387,9 +402,11 @@ export default function EtbZeitachse({
             background: rollen.grund,
           }}
         >
-          {/* Der Tageskopf ist eine echte Überschrift (h2): er gliedert die Zeitachse, und
+          {/* Der Stundenkopf ist eine echte Überschrift (h2): er gliedert die Zeitachse, und
               die Überschriften IN den Einträgen hängen darunter (LFH-621). */}
-          <Augenbraue als="h2">{g.etikett}</Augenbraue>
+          <Augenbraue als="h2" id={`${kopfIdBasis}-kopf-${i}`}>
+            {g.etikett}
+          </Augenbraue>
         </div>
         <ol style={{ margin: 0, padding: 0 }}>{g.zeilen.map(zeile)}</ol>
       </div>

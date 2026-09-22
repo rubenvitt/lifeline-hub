@@ -207,7 +207,8 @@ function Personenkarte({ person, kompakt, testId }: PersonenkartenProps) {
       title={kompakt ? personLabel(person) : undefined}
     >
       <span style={monoStil(token.fontSizeSM)}>{nr}</span>
-      {` · ${person.name ?? 'unbekannt'}`}
+      {/* `||` wie in `personLabel`: ein leerer Name ist „unbekannt“, nicht „R-007 · “. */}
+      {` · ${person.name || 'unbekannt'}`}
     </span>
   );
 }

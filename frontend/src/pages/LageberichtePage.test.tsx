@@ -282,12 +282,13 @@ describe('LageberichtDetailPage', () => {
     const auftragFeld = await screen.findByLabelText('Auftrag');
     await userEvent.type(auftragFeld, '## Schwerpunkt\n- Punkt A');
     // Vorgabe: KEINE Vorschau neben dem Text (H62 — der Split kostete die halbe
-    // Schreibbreite und war für 2108 px Scrollstrecke mitverantwortlich).
-    expect(screen.queryByRole('heading', { name: 'Schwerpunkt', level: 5 })).toBeNull();
+    // Schreibbreite und war für 2108 px Scrollstrecke mitverantwortlich). Im Entwurf steht
+    // über dem Text nur der Seitentitel (`unterEbene` 1, LFH-621): `##` wird h3.
+    expect(screen.queryByRole('heading', { name: 'Schwerpunkt' })).toBeNull();
     // Der Umschalter ist eine Einstellung in eigener Zeile, keine Aktion in der Knopfreihe.
     await userEvent.click(screen.getByRole('checkbox', { name: 'Vorschau neben dem Text' }));
     expect(
-      await screen.findByRole('heading', { name: 'Schwerpunkt', level: 5 }),
+      await screen.findByRole('heading', { name: 'Schwerpunkt', level: 3 }),
     ).toBeInTheDocument();
     // Listeneintrag muss als listitem erscheinen
     expect(screen.getByText('Punkt A')).toBeInTheDocument();
@@ -305,7 +306,7 @@ describe('LageberichtDetailPage', () => {
     const abschnitt = auftragFeld.closest('.ant-collapse-item') as HTMLElement;
     await userEvent.click(within(abschnitt).getByRole('button', { name: /Vorschau/ }));
     expect(
-      await screen.findByRole('heading', { name: 'Schwerpunkt', level: 5 }),
+      await screen.findByRole('heading', { name: 'Schwerpunkt', level: 3 }),
     ).toBeInTheDocument();
   });
 
@@ -361,7 +362,7 @@ describe('LageberichtDetailPage', () => {
         { schluessel: 'zusammenfassung', text: '' },
       ],
     });
-    // Markdown-Überschrift (`##`, um drei Ebenen gerückt → h5, `Markdown.tsx`) muss als Heading
+    // Markdown-Überschrift (`##` unter dem Abschnittskopf h3 → h5, `unterEbene` 3) muss als Heading
     // gerendert sein, nicht als Rohtext "## Schwerpunkt"
     expect(
       await screen.findByRole('heading', { name: 'Schwerpunkt', level: 5 }),
