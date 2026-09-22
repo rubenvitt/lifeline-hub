@@ -323,13 +323,29 @@ function useOnline(): boolean {
  * der Store dauerhaft `idle`; dort erscheint die Zelle nur bei Netzverlust oder offener Queue.
  *
  * `kompakt` (unter `md`): nur Ikone, das Wort wandert in den zugänglichen Namen und `title`.
+ *
+ * `ruheOhneWort` (zwischen `md` und `xl`, Führungs-Tablet): nur der RUHEZUSTAND „SYNC" steht
+ * als Ikone — er ist der Normalfall und kostete bei 1024 px die Einzeiligkeit des Kopfes.
+ * Jede Störung (VERBINDE, QUEUE, GETRENNT, OFFLINE, PRÜFEN) behält ihr Wort: sie soll
+ * auffallen, und Farbe allein wäre ein Kanal (WCAG 1.4.1).
  */
+export function syncZeigtWort(
+  zustand: Exclude<SyncZustand, 'ruhe'>,
+  kompakt: boolean,
+  ruheOhneWort: boolean,
+): boolean {
+  if (kompakt) return false;
+  return !(ruheOhneWort && zustand === 'verbunden');
+}
+
 export function SyncAnzeige({
   liveErwartet,
   kompakt = false,
+  ruheOhneWort = false,
 }: {
   liveErwartet: boolean;
   kompakt?: boolean;
+  ruheOhneWort?: boolean;
 }) {
   const { token } = theme.useToken();
   const { benutzer } = useAuth();
@@ -357,7 +373,7 @@ export function SyncAnzeige({
       <span aria-hidden="true" style={{ display: 'inline-flex', color: d.farbe }}>
         <Icon size={16} />
       </span>
-      {!kompakt && (
+      {syncZeigtWort(zustand, kompakt, ruheOhneWort) && (
         <span
           aria-hidden="true"
           style={{

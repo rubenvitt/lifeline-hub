@@ -2,6 +2,7 @@ import type { CSSProperties, HTMLAttributes, ReactNode } from 'react';
 import type { EtbTyp } from '../../api/types';
 import { etbTypFarbe } from '../../theme/statusFarben';
 import type { EtbTypFarbe, Farbrollen } from '../../theme/tokens';
+import { useViewport } from '../useViewport';
 import { monoStil, useRollen } from './rollenwerte';
 
 /**
@@ -51,6 +52,19 @@ export function zeilenGrund(rollen: Farbrollen, toenung?: Zeilentoenung): string
   return toenung ? (rollen[TOENUNG[toenung]] as string) : 'transparent';
 }
 
+/**
+ * Waagerechte Rinne der drei Spalten — rein und exportiert (Muster `bedienzielStil`).
+ *
+ * Unter `md` die kleine Stufe (`paddingSM`), sonst `padding`. Grund, gemessen
+ * (e2e `etb-chronologie`, 390 px in `handschuh`): mit `padding` = 26 px kosteten allein die
+ * fünf Rinnen 130 px, dazu die Zeitspalte (56) und die 72-px-Aktion — dem Eintragstext
+ * blieben 29 % der Zeilenbreite, unter dem Boden von 30 %. Die Rinne ist Luft, keine
+ * Treffläche; die Bedienziele behalten ihre Staffelhöhe.
+ */
+export function zeitachsenRinne(token: { padding: number; paddingSM: number }, schmal: boolean) {
+  return schmal ? token.paddingSM : token.padding;
+}
+
 type Hueller = Omit<HTMLAttributes<HTMLElement>, 'children' | 'style'>;
 
 export interface ZeitachseneintragProps extends Hueller {
@@ -98,6 +112,8 @@ export default function Zeitachseneintrag({
   ...rest
 }: ZeitachseneintragProps) {
   const { token, rollen } = useRollen();
+  const { istSchmal } = useViewport();
+  const rinne = zeitachsenRinne(token, istSchmal);
   const farbe: EtbTypFarbe =
     farben ?? (typ ? etbTypFarbe(typ, token) : { kante: rollen.schwach, wort: rollen.gedaempft });
   const spalte = { paddingBlock: token.paddingSM } as const;
@@ -121,7 +137,7 @@ export default function Zeitachseneintrag({
           ...spalte,
           flex: '0 0 auto',
           minWidth: 56,
-          paddingInline: token.padding,
+          paddingInline: rinne,
           display: 'flex',
           flexDirection: 'column',
           gap: 2,
@@ -145,7 +161,7 @@ export default function Zeitachseneintrag({
           ...spalte,
           flex: '1 1 auto',
           minWidth: 0,
-          paddingInline: token.padding,
+          paddingInline: rinne,
           display: 'flex',
           flexDirection: 'column',
           gap: 5,
@@ -189,7 +205,7 @@ export default function Zeitachseneintrag({
             ...spalte,
             flex: '0 0 auto',
             maxWidth: '40%',
-            paddingInlineEnd: token.padding,
+            paddingInlineEnd: rinne,
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'flex-end',

@@ -6,6 +6,7 @@ import {
   KOPF_NAME_FLEX_SCHMAL,
   KOPF_SUCHE_FLEX,
   SYNC_DARSTELLUNG,
+  syncZeigtWort,
   formatiereUhr,
   kopfZelleStil,
   syncZustand,
@@ -121,5 +122,20 @@ describe('Kopfgruppen — der Einsatzname vor dem Suchfeld (22.09.2026)', () => 
 
   it('lässt die Verdichtung unter lg unverändert', () => {
     expect(KOPF_NAME_FLEX_SCHMAL).toBe('1 1 240px');
+  });
+});
+
+describe('syncZeigtWort — Wort nur, wo es trägt', () => {
+  it('unter md nie ein Wort (kompakt)', () => {
+    expect(syncZeigtWort('getrennt', true, false)).toBe(false);
+  });
+  it('auf dem Tablet: der Ruhezustand ohne Wort, jede Störung mit', () => {
+    expect(syncZeigtWort('verbunden', false, true)).toBe(false);
+    for (const z of ['verbinde', 'ausstehend', 'getrennt', 'offline', 'abgelehnt'] as const) {
+      expect(syncZeigtWort(z, false, true), z).toBe(true);
+    }
+  });
+  it('ab xl trägt auch der Ruhezustand sein Wort', () => {
+    expect(syncZeigtWort('verbunden', false, false)).toBe(true);
   });
 });

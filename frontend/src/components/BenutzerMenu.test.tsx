@@ -74,7 +74,11 @@ afterEach(() => {
   delete document.documentElement.dataset.theme;
 });
 
-describe('BenutzerMenu — ab lg', () => {
+describe('BenutzerMenu — ab xl', () => {
+  // Seit 22.09.2026 steht der Name erst ab `xl` (1200 px) im Trigger; der Vorgabe-Viewport
+  // des Stubs ist 1024 px (Führungs-Tablet) und damit darunter.
+  beforeEach(() => setzeViewportBreite(1366));
+
   it('der Trigger trägt den Anzeigenamen', async () => {
     zeige();
     // Am TRIGGER geprüft, nicht am Dokument: der Name steht auch in der
@@ -102,6 +106,24 @@ describe('BenutzerMenu — ab lg', () => {
     zeige();
     await oeffne();
     expect(await screen.findByText(/^Version \d+\.\d+\.\d+/)).toBeInTheDocument();
+  });
+});
+
+describe('BenutzerMenu — Führungs-Tablet zwischen lg und xl', () => {
+  // 1024 px: die Kopfzeile soll einzeilig bleiben, Funktion und Pfeil kosteten bis zu 190 px.
+  beforeEach(() => setzeViewportBreite(1024));
+
+  it('der Trigger trägt nur die Initialen — die Funktion steht im zugänglichen Namen nicht', async () => {
+    server.use(http.get('/api/auth/me', () => HttpResponse.json(benutzer)));
+    renderMitProviders(
+      <ThemeModeProvider>
+        <BenutzerMenu funktion="S2 Lage" />
+      </ThemeModeProvider>,
+    );
+    const knopf = await trigger();
+    expect(knopf.textContent).toContain(INITIALEN);
+    expect(knopf.textContent).not.toContain('S2 Lage');
+    expect(knopf).toHaveAttribute('aria-label', 'Benutzermenü');
   });
 });
 

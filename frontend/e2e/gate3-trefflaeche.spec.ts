@@ -994,7 +994,7 @@ test('Kräfteübersicht: Umschalter, Filterzeile und Suchfeld folgen der Dichte-
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
-test('Verdichtungszeile: der Kräfteübersicht-Link folgt der Dichte-Staffel 30 / 48 / 72 px', async ({
+test('Verdichtungszeile: der Meldebild-Link folgt der Dichte-Staffel 30 / 48 / 72 px', async ({
   page,
 }) => {
   test.setTimeout(90_000);
@@ -1029,8 +1029,10 @@ test('Verdichtungszeile: der Kräfteübersicht-Link folgt der Dichte-Staffel 30 
     await page.goto(`/einsaetze/${einsatzId}/fahrzeuge`);
     await stelleDichte(page, dichte);
 
-    const link = page.getByRole('link', { name: 'Kräfteübersicht', exact: true });
-    const hoehe = await haeltStufe(link, soll, `Kräfteübersicht-Link (${dichte})`);
+    // Seit dem Neuentwurf (21.09.2026) heißt die Zielseite „Meldebild" — der Linktext folgt
+    // dem Namen aus Modulpanel und Seitenkopf (`Verdichtungszeile.tsx`); die Route bleibt.
+    const link = page.getByRole('link', { name: 'Meldebild', exact: true });
+    const hoehe = await haeltStufe(link, soll, `Meldebild-Link (${dichte})`);
     // Er muss auch dorthin zeigen: ein Bedienziel der richtigen Größe am falschen Ziel
     // bestünde diese Messung ebenso.
     await expect(link).toHaveAttribute('href', `/einsaetze/${einsatzId}/kraefteuebersicht`);

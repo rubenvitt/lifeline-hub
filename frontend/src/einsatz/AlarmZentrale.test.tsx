@@ -1,6 +1,6 @@
 import { render, screen, waitFor, act, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App as AntApp } from 'antd';
 import { StrictMode, useState } from 'react';
 import { MemoryRouter, Routes, Route, useLocation, useNavigate } from 'react-router';
@@ -132,6 +132,10 @@ afterEach(() => {
 });
 
 describe('AlarmZentrale', () => {
+  // Die breite Bauform mit Wort auch im Ruhezustand gilt seit 22.09.2026 erst ab `xl`;
+  // der Vorgabe-Viewport des Stubs (1024 px) liegt darunter — siehe den Block „Tablet".
+  beforeEach(() => setzeViewportBreite(1366));
+
   it('zeigt einen Toast bei window-Event lfh:sofortmeldung', async () => {
     renderAlarm();
     act(() => {
@@ -468,5 +472,39 @@ describe('AlarmZentrale auf dem Handschirm (LFH-511)', () => {
       screen.getByRole('button', { name: 'Desktop-Benachrichtigungen: blockiert' }),
     ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Alarmzentrale:/ })).toBeNull();
+  });
+});
+
+/**
+ * FÜHRUNGS-TABLET zwischen `md` und `xl` (22.09.2026): zwei Knöpfe mit je einem Tipper wie
+ * breit, aber der RUHEZUSTAND steht nur als Ikone — sonst brach die Kopfzeile bei 1024 px
+ * auf zwei Zeilen. Eine STÖRUNG nennt ihr Wort weiter (LFH-392). Beide Hälften als Paar.
+ */
+describe('AlarmZentrale auf dem Führungs-Tablet (1024 px)', () => {
+  beforeEach(() => setzeViewportBreite(1024));
+
+  it('Ruhezustand: zwei Ziele, ohne Wort, Zustand im Namen bzw. Druckzustand', async () => {
+    stubAudioReady();
+    stubNotification('default');
+    renderAlarm();
+    const ton = await screen.findByRole('button', { name: 'Alarmton stummschalten' });
+    await waitFor(() => expect(ton).toHaveAttribute('aria-pressed', 'false'));
+    expect(ton).not.toHaveTextContent('Ton bereit');
+    const desktop = screen.getByRole('button', { name: 'Desktop-Benachrichtigungen: aus' });
+    expect(desktop).not.toHaveTextContent('Desktop aus');
+    expect(screen.queryByRole('button', { name: /^Alarmzentrale:/ })).toBeNull();
+  });
+
+  it('Störung: „Ton stumm" und „Desktop blockiert" behalten ihr Wort', async () => {
+    stubAudioReady();
+    stubNotification('denied');
+    renderAlarm();
+    expect(
+      screen.getByRole('button', { name: 'Desktop-Benachrichtigungen: blockiert' }),
+    ).toHaveTextContent('Desktop blockiert');
+    await userEvent.click(await screen.findByRole('button', { name: 'Alarmton stummschalten' }));
+    expect(screen.getByRole('button', { name: 'Alarmton einschalten' })).toHaveTextContent(
+      'Ton stumm',
+    );
   });
 });

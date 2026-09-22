@@ -65,6 +65,15 @@ interface Props {
   eigeneSendungen?: number;
 }
 
+/**
+ * Lesebreite einer Nachricht (22.09.2026). Seit der Seitenrahmen die volle Inhaltsbreite
+ * nimmt, liefen lange Nachrichten auf dem Fükw-Schirm über 200 Zeichen je Zeile — jenseits
+ * jeder Lesbarkeit (übliche Obergrenze 60–80 Zeichen). Begrenzt wird der TEXT, nicht die
+ * Seite: die Kanalspalte daneben und der Scroll-Container des Stroms (Höhenkette H51,
+ * Stick-to-bottom) bleiben unberührt, und die Aktion bleibt am Zeilenende.
+ */
+const NACHRICHT_LESEBREITE = '72ch';
+
 export default function NachrichtenStrom({
   nachrichten,
   eigeneBenutzerId,
@@ -336,7 +345,12 @@ export default function NachrichtenStrom({
                       Nachricht gelöscht
                     </Typography.Text>
                   ) : (
-                    <Space orientation="vertical" size={4} style={{ width: '100%' }}>
+                    <Space
+                      orientation="vertical"
+                      size={4}
+                      data-lfh="chat-nachricht-text"
+                      style={{ width: '100%', maxWidth: NACHRICHT_LESEBREITE }}
+                    >
                       {n.inhalt && <Typography.Text>{n.inhalt}</Typography.Text>}
                       {n.anhaenge.map((a) => (
                         <Typography.Link

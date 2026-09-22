@@ -160,6 +160,9 @@ export default function EinsatzLayout() {
   const { abBreite } = useViewport();
   const breit = abBreite('lg');
   const mittel = abBreite('md');
+  // Ab `xl` (1200 px) trägt der Kopf alle Wörter; darunter — Führungs-Tablet 1024–1199 —
+  // stehen Ruhezustände nur als Ikone, damit er einzeilig bleibt (gemessen 52 statt 104 px).
+  const weit = abBreite('xl');
   const { token } = theme.useToken();
   // Unter `md` rücken die Zellen zusammen: mit der vollen Staffel-Polsterung (18 px je Seite
   // in `komfortabel`) bräche die rechte Zellgruppe auf 390 px in eine dritte Zeile um.
@@ -404,7 +407,7 @@ export default function EinsatzLayout() {
           <div data-lfh="kopf-alarm" style={kopfZelleStil(zellToken)}>
             <AlarmZentrale />
           </div>
-          <SyncAnzeige liveErwartet kompakt={!mittel} />
+          <SyncAnzeige liveErwartet kompakt={!mittel} ruheOhneWort={!weit} />
           {mittel && <Uhr />}
           {!breit && (
             <div style={kopfZelleStil(zellToken)}>

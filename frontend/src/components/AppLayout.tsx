@@ -129,6 +129,8 @@ export default function AppLayout() {
   const { abBreite } = useViewport();
   const breit = abBreite('lg');
   const mittel = abBreite('md');
+  // Wie im Einsatz-Kopf: unter `xl` steht der Ruhezustand der SYNC-Anzeige nur als Ikone.
+  const weit = abBreite('xl');
   const { token } = theme.useToken();
   // Unter `md` rücken die Zellen zusammen: mit der vollen Staffel-Polsterung (18 px je Seite
   // in `komfortabel`) bräche die rechte Zellgruppe auf 390 px in eine dritte Zeile um.
@@ -189,7 +191,7 @@ export default function AppLayout() {
         <KopfRechts>
           {/* Außerhalb eines Einsatzes läuft kein Live-Strom — die SYNC-Zelle erscheint hier
               nur bei Netzverlust oder offener Offline-Queue. */}
-          <SyncAnzeige liveErwartet={false} kompakt={!mittel} />
+          <SyncAnzeige liveErwartet={false} kompakt={!mittel} ruheOhneWort={!weit} />
           {mittel && <Uhr />}
           {!breit && (
             <div style={kopfZelleStil(zellToken)}>

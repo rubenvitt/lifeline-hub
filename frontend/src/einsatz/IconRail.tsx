@@ -3,6 +3,7 @@ import { theme } from 'antd';
 import { RAIL_BREITE } from '../components/Kopfleiste';
 import { form, rahmenFarben, schrift, schriftskala } from '../theme/tokens';
 import type { Kategorie, KategorieKey } from './modulRegistry';
+import { fussFokusabstandStil, useFussFokusabstand } from './fussFokusabstand';
 
 interface Props {
   kategorien: Kategorie[];
@@ -93,6 +94,7 @@ const ETIKETT_STIL: CSSProperties = {
  */
 export default function IconRail({ kategorien, aktiveKategorie, onKategorieKlick }: Props) {
   const { token } = theme.useToken();
+  const { wurzelRef, fussRef } = useFussFokusabstand();
 
   const ziel = (k: Kategorie) => {
     const aktiv = k.key === aktiveKategorie;
@@ -105,7 +107,8 @@ export default function IconRail({ kategorien, aktiveKategorie, onKategorieKlick
         title={k.label === k.kurz ? undefined : k.label}
         aria-current={aktiv ? 'true' : undefined}
         onClick={() => onKategorieKlick(k.key)}
-        style={railZielStil(token, { aktiv })}
+        // Fokusabstand zum klebenden Fuß (WCAG 2.4.11) — neben, nicht in `railZielStil`.
+        style={{ ...railZielStil(token, { aktiv }), ...fussFokusabstandStil }}
       >
         {/* `flexShrink: 0`, weil sonst die Ikone statt des Etiketts nachgibt — dieselbe
             gemessene Falle wie in `ModulPanel`. Hülle mit `aria-hidden`: der Name steht am
@@ -125,6 +128,7 @@ export default function IconRail({ kategorien, aktiveKategorie, onKategorieKlick
 
   return (
     <nav
+      ref={wurzelRef}
       aria-label="Kategorien"
       style={{
         display: 'flex',
@@ -145,6 +149,7 @@ export default function IconRail({ kategorien, aktiveKategorie, onKategorieKlick
         // `marginTop: auto` ans Spaltenende. Der Grund ist nötig, weil darunter Ziele vorbei-
         // scrollen.
         <div
+          ref={fussRef}
           data-lfh="rail-fuss"
           style={{
             marginTop: 'auto',

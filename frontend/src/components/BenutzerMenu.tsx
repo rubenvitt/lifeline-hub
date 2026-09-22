@@ -71,11 +71,12 @@ function umschaltEintrag(
  * DIE INITIALEN STEHEN NEUTRAL (Neuentwurf „Instrumententafel", 21.09.2026): eine 24-px-
  * Kachel auf `flaeche3`, nicht mehr markenrot. Rot ist im Rahmen genau zweimal vergeben —
  * Logo-Quadrat und aktive Rail-Marke —, eine dritte rote Fläche daneben verwässerte beide.
- * Neben der Kachel steht ab `lg` die FUNKTION (`funktion`, z. B. „S2 Lage"), sonst der
+ * Neben der Kachel steht ab `xl` die FUNKTION (`funktion`, z. B. „S2 Lage"), sonst der
  * Anzeigename.
  *
  * ZWEI GESTALTEN, EINE SCHWELLE — die Schwelle gilt nur noch dem TRIGGER
- * (LFH-329 · B1/M12, eingeschränkt in LFH-392). Unterhalb von antds `lg`
+ * (LFH-329 · B1/M12, eingeschränkt in LFH-392; seit 22.09.2026 `xl` statt `lg`, damit
+ * der Kopf auf dem Führungs-Tablet einzeilig bleibt). Unterhalb von antds `xl`
  * schrumpft der Auslöser auf den Avatar (kein Name, kein Pfeil). Die zwei
  * Umschaltgruppen im Dropdown hängen dagegen an KEINER Breite mehr: seit
  * LFH-392 ist dies der einzige sichtbare Bedienweg für Darstellung und
@@ -99,7 +100,9 @@ export default function BenutzerMenu({ funktion }: { funktion?: string | null } 
   const { abBreite } = useViewport();
   const { modus, setModus } = useThemeMode();
   const { dichte, setDichte } = useDichte();
-  const breit = abBreite('lg');
+  // Funktion und Pfeil erst ab `xl`: auf dem Führungs-Tablet (1024–1199 px) kosteten sie
+  // bis zu 190 px und brachen die Kopfzeile auf zwei Zeilen (22.09.2026, gemessen 104 px).
+  const breit = abBreite('xl');
 
   if (!benutzer) return null;
 
@@ -244,7 +247,7 @@ export default function BenutzerMenu({ funktion }: { funktion?: string | null } 
         >
           {initialen(benutzer.anzeigename)}
         </span>
-        {/* Unter `lg` bleibt die Kachel allein stehen: Funktion und Pfeil kosten dort
+        {/* Unter `xl` bleibt die Kachel allein stehen: Funktion und Pfeil kosten dort
             bis zu 190 px der Kopfzeile, und der Name steht ohnehin in der Kopfgruppe des
             Dropdowns. Das `aria-label` am Knopf bleibt, damit der Trigger auch als reines
             Symbol benannt ist. Höhe und Mindestbreite folgen der Dichte; 40 px bleiben nur

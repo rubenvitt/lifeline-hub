@@ -51,13 +51,20 @@ test('Login → Einsatz → Eintrag live in zweitem Client', async ({ browser })
   await a.getByPlaceholder('Inhalt …').fill(inhalt);
   await a.getByRole('button', { name: 'Erfassen', exact: true }).click();
 
-  // A sieht den Eintrag in der ETB-Tabelle. role=cell ist eindeutig gegenüber Tab
-  // (role=tab) und Eingabefeld (role=textbox) — anders als ein generischer getByText,
-  // der transient das live spiegelnde Entwurf-Tab-Label träfe.
-  await expect(a.getByRole('cell', { name: inhalt })).toBeVisible();
+  // A sieht den Eintrag im Tagebuch. Seit dem Neuentwurf ist das eine Zeitachse ohne
+  // `role=cell`; eindeutig bleibt die Abfrage durch den Zuschnitt auf die Region
+  // „Einsatztagebuch" und die Ereigniszeile — Tab (role=tab) und Eingabefeld
+  // (role=textbox) liegen außerhalb, anders als bei einem seitenweiten getByText, der
+  // transient das live spiegelnde Entwurf-Tab-Label träfe.
+  const eintragBei = (p: Page) =>
+    p
+      .getByRole('region', { name: 'Einsatztagebuch' })
+      .getByTestId('etb-ereigniszeile')
+      .filter({ hasText: inhalt });
+  await expect(eintragBei(a)).toBeVisible();
 
   // B sieht den Eintrag ohne manuelles Neuladen (SSE-Live).
-  await expect(b.getByRole('cell', { name: inhalt })).toBeVisible();
+  await expect(eintragBei(b)).toBeVisible();
 
   await ctxA.close();
   await ctxB.close();

@@ -8,6 +8,7 @@ import type { ModulZaehlerMap } from './useModulZaehler';
 import { useMinutenTakt } from '../components/Kopfleiste';
 import { augenbraueStil, useModusFarben } from '../components/rahmenStil';
 import { einsatzDauer } from './einsatzDauer';
+import { fussFokusabstandStil, useFussFokusabstand } from './fussFokusabstand';
 
 /** Breite des Modulpanels (Neuentwurf, `shell.dc.html`). Layoutmaß, keine Dichte-Angabe. */
 export const PANEL_BREITE = 208;
@@ -184,7 +185,12 @@ export function ModulListe({
             aria-current={aktiv ? 'true' : undefined}
             aria-label={zaehlerSichtbar ? `${m.label}, ${modulZaehler.beschreibung}` : undefined}
             onClick={() => !gesperrt && onModulKlick(m)}
-            style={modulZeilenStil(token, farben, { aktiv, gesperrt, mindestTrefflaeche })}
+            // Fokusabstand zum klebenden Einsatzdauer-Fuß (WCAG 2.4.11, `fussFokusabstand.ts`)
+            // neben, nicht in `modulZeilenStil`: der ist die Dichte-Zusicherung.
+            style={{
+              ...modulZeilenStil(token, farben, { aktiv, gesperrt, mindestTrefflaeche }),
+              ...fussFokusabstandStil,
+            }}
           >
             {/* KEINE Modulikone mehr (Neuentwurf): die Zeile trägt Marke · Etikett · Zähler.
                 Die Ikonen bleiben in der Kommandopalette, wo sie zwischen Modulen, Aktionen
@@ -256,8 +262,10 @@ export default function ModulPanel({ titel, einsatz, ...liste }: Props) {
   const jetzt = useMinutenTakt();
   const dauer = einsatz ? einsatzDauer(einsatz.begonnen_at, einsatz.abgeschlossen_at, jetzt) : null;
   const linie = `1px solid ${farben.linie}`;
+  const { wurzelRef, fussRef } = useFussFokusabstand();
   return (
     <div
+      ref={wurzelRef}
       // Testanker für den e2e-Trefflächennachweis (AK2). Der inline-Rahmen hat als einziger
       // der drei Navigationsträger keine Landmark — die IconRail trägt `<nav
       // aria-label="Kategorien">`, das Akkordeon `<nav aria-label="Einsatz-Navigation">`.
@@ -290,6 +298,7 @@ export default function ModulPanel({ titel, einsatz, ...liste }: Props) {
         // `sticky; bottom: 0` aus demselben Grund wie der Rail-Fuß (`IconRail.tsx`): die Seite
         // scrollt im Dokument, der Fuß hängt so am Fensterrand statt am Seitenende.
         <div
+          ref={fussRef}
           data-lfh="modul-panel-fuss"
           style={{
             marginTop: 'auto',

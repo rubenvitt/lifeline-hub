@@ -143,7 +143,11 @@ for (const breite of [1366, 1024, 390]) {
     await expect(bewegungen).toBeInViewport();
     expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
     // Resize NACH Scroll: viewport-relatives top allein würde die Höhe aufblasen.
-    await page.setViewportSize({ width: breite, height: 844 });
+    // Bei 390 px soll der Resize den BODEN-Zweig erzwingen (Resthöhe < 380 px). Bis zum
+    // Neuentwurf reichte dafür 844 px Fensterhöhe; seit dem 44-px-Seitenkopf bleiben dort
+    // gemessen 449 px, der Boden wäre unerreicht und die Aussage unten leer. 600 px stellt
+    // die Vorbedingung wieder her — die Schwelle 380 bleibt, verschoben ist nur das Fenster.
+    await page.setViewportSize({ width: breite, height: breite === 390 ? 600 : 844 });
     const verkleinert = await fuelltArbeitsflaeche(page);
     if (breite === 390) {
       expect(verkleinert.fenster - verkleinert.polster - verkleinert.oben).toBeLessThan(380);

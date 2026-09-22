@@ -137,6 +137,24 @@ test.describe('LFH-460 Kopfzeilen und Bediendichte', () => {
             expect(messung.kopfHoehe, `${kontext}: höchstens zwei Zeilen`).toBeLessThanOrEqual(
               stufe === 'handschuh' ? 288 : stufe === 'komfortabel' ? 192 : 120,
             );
+            /*
+             * EINZEILIG AUF DEM FÜHRUNGS-TABLET (22.09.2026): bei 1024 px brach der Kopf vorher
+             * auf zwei Zeilen (52 → 104 px). Seitdem stehen dort Ruhezustände nur als Ikone
+             * (Alarmzentrale, SYNC) und der Benutzer-Trigger ohne Funktion. Geprüft in
+             * `kompakt`, weil das der einzige Fall ist, den diese Umgebung deterministisch
+             * trifft: headless meldet der Browser „Desktop blockiert" und der Strom steht
+             * oft noch auf „VERBINDE" — beides Störungen, die ihr Wort BEHALTEN (LFH-392).
+             * Mit diesem ungünstigsten Stand ist der Kopf in `kompakt` einzeilig; in
+             * `komfortabel`/`handschuh` darf eine Störung ihn umbrechen (gemessen mit den
+             * Störungswörtern: 104/144 px). Den RUHEZUSTAND in `handschuh` belegt
+             * `kopfzeile-schmal.spec.ts` („Führungs-Tablet 1024 px") — gemessen 52/52/72 px.
+             */
+            if (breite === 1024 && stufe === 'kompakt') {
+              expect(messung.kopfHoehe, `${kontext}: einzeilig (52 px)`).toBeLessThanOrEqual(52);
+              const oberste = Math.max(...messung.ziele.map((z) => z.y));
+              const unterste = Math.min(...messung.ziele.map((z) => z.unten));
+              expect(oberste, `${kontext}: alle Kopfziele in EINER Zeile`).toBeLessThan(unterste);
+            }
             if (stufe === 'handschuh') {
               await test.info().attach(`${route} Kopfzeile`, {
                 body: await page.screenshot(),
@@ -340,8 +358,8 @@ const BESTAND_OFFEN: readonly Freistellung[] = [];
  * Ein Datensatz je neu aufgenommenem Modul, mit absichtlich langen Werten.
  *
  * Die Ad-hoc-Kraft erscheint gleich in ZWEI der neuen Zeilen: auf der Personalseite als
- * eigene Zeile und im Meldebild der Kräfteübersicht über den Sammelknoten „Ohne Abschnitt"
- * (`kraefte/kraeftebild.ts:576-620`, `hasOhne` über `ohneEinheitPersonal`). Ein zweiter
+ * eigene Zeile und im Meldebild über die Sammelzeile „Ohne Einheit"
+ * (`kraefte/meldebildRaster.ts`, Mittel ohne `einheit_id`). Ein zweiter
  * Datensatz dafür wäre Aufwand ohne Aussage.
  *
  * Jede Antwort wird mit Status und Text zugesichert. Ein stillschweigend fehlgeschlagenes
@@ -538,15 +556,26 @@ test('Gate 1: keine tragende Route läuft auf 1366, 1024 oder 390 px waagerecht 
     },
     { pfad: '/admin/benutzer', anker: (p: Page) => p.locator('tr.ant-table-row').first() },
     {
+      // Zweite Verwaltungsroute neben `/admin/benutzer` (22.09.2026): in der Vorschau wurde
+      // hier bei 390 px ein Überlauf gemeldet (411 px). Diese Umgebung stellte ihn mit der
+      // alten Seitenleiste NICHT nach — die Zeile belegt also den neuen Stand (Expander
+      // unter `lg`, `AdminLayout.tsx`), nicht die Ursache. Anker ist der Seitentitel, nicht
+      // eine Tabellenzeile: die Fahrzeugliste kann leer sein.
+      pfad: '/admin/stammdaten/fahrzeuge',
+      anker: (p: Page) => p.getByRole('heading', { name: 'Fahrzeuge', level: 1 }),
+    },
+    {
       pfad: `/einsaetze/${einsatzId}/personal`,
       anker: (p: Page) => p.getByText('Kirchgassner-Wohlfahrt, Maximiliane'),
     },
     {
-      // DATENANKER, nicht der Kennzahlenkopf: „Gesamtstärke (F/UF/M//Ges)" steht auch
-      // über einer LEEREN Tabelle, die Zeile messte dann wieder einen Leerzustand.
-      // „Ohne Abschnitt" gibt es nur, wenn wirklich eine Kraft disponiert ist.
+      // DATENANKER, nicht der Kennzahlenkopf: der Seitenkopf steht auch über einer LEEREN
+      // Tabelle, die Zeile messte dann wieder einen Leerzustand. Seit dem Neuentwurf
+      // (21.09.2026, Meldebild als Statusraster) ist die Wurzel die Einheitenliste, und die
+      // Ad-hoc-Kraft landet in der Sammelzeile „Ohne Einheit" (`meldebildRaster.ts`) statt
+      // unter „Ohne Abschnitt". Sie gibt es nur, wenn wirklich eine Kraft disponiert ist.
       pfad: `/einsaetze/${einsatzId}/kraefteuebersicht`,
-      anker: (p: Page) => p.getByText('Ohne Abschnitt'),
+      anker: (p: Page) => p.getByText('Ohne Einheit', { exact: true }),
     },
     {
       pfad: `/einsaetze/${einsatzId}/auftraege`,

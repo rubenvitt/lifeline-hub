@@ -336,3 +336,51 @@ test('die Alarmzentrale steht ab lg sichtbar abgesetzt von den Aktionen', async 
   const suchenDrin = suchen.x < kasten.x + kasten.width && suchen.x + suchen.width > kasten.x;
   expect(suchenDrin, 'die Suche liegt NICHT in der Alarmzelle').toBe(false);
 });
+
+test('Führungs-Tablet 1024 px, handschuh: im Ruhezustand ist der Einsatz-Kopf EINE Zeile', async ({
+  page,
+}) => {
+  /**
+   * Die zweite Hälfte zur `kompakt`-Aussage in `gate1-ueberlauf.spec.ts` (22.09.2026). Dort
+   * misst der Kopf mit den Störungswörtern, die diese Umgebung liefert („Desktop blockiert",
+   * oft noch „VERBINDE"). Hier der RUHEZUSTAND, für den die Verdichtung gebaut ist:
+   * Benachrichtigungen erlaubt (headless gibt es die API nicht — sie wird für diesen Test
+   * nachgebildet), Strom verbunden, Ton bereit. Dann stehen die drei Zustände nur als Ikone,
+   * und auch die breiteste Stufe hält eine Zeile. Gemessen beim Bau: 52 / 52 / 72 px in
+   * kompakt / komfortabel / handschuh; geprüft wird die engste Stufe.
+   */
+  test.setTimeout(60_000);
+  await page.addInitScript(() => {
+    localStorage.setItem('lifeline-hub.dichte', 'handschuh');
+    class ErlaubteBenachrichtigung {
+      static permission = 'granted';
+      static requestPermission = async () => 'granted';
+    }
+    Object.defineProperty(window, 'Notification', {
+      value: ErlaubteBenachrichtigung,
+      configurable: true,
+    });
+  });
+  await page.setViewportSize({ width: 1024, height: 800 });
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(
+    page,
+    `LFH-460 Hochwasser Abschnitt Nordwest ${Date.now()}`,
+  );
+  await page.goto(`/einsaetze/${einsatzId}/etb`);
+  await expect(page.locator('html')).toHaveAttribute('data-dichte', 'handschuh');
+  await expect(page.locator('header [data-lfh="kopf-sync"]')).toHaveAttribute(
+    'data-zustand',
+    'verbunden',
+    { timeout: 30_000 },
+  );
+  const alarm = page.locator('header [data-lfh="kopf-alarm"]');
+  // Ruhezustand ohne Wort — aber benannt: beide Ziele stehen mit Zustand im Namen da.
+  await expect(alarm).toHaveText('');
+  await expect(
+    alarm.getByRole('button', { name: 'Desktop-Benachrichtigungen: erlaubt' }),
+  ).toBeVisible();
+  await expect(alarm.getByRole('button', { name: /Alarmton/ })).toBeVisible();
+  const hoehe = await page.locator('header').evaluate((h) => h.clientHeight);
+  expect(hoehe, 'eine Zeile in handschuh (72 px)').toBeLessThanOrEqual(72);
+});

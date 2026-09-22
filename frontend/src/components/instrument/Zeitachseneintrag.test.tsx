@@ -9,7 +9,7 @@ import {
   farbenDunkel,
   farbenHell,
 } from '../../theme/tokens';
-import Zeitachseneintrag, { hinweisFarbe, zeilenGrund } from './Zeitachseneintrag';
+import Zeitachseneintrag, { hinweisFarbe, zeilenGrund, zeitachsenRinne } from './Zeitachseneintrag';
 
 function kante(container: HTMLElement) {
   return container.querySelector<HTMLElement>('[data-lfh="typkante"]')!;
@@ -107,5 +107,16 @@ describe('Zeitachseneintrag', () => {
     expect(screen.getByText('Funk')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Aktionen zu Eintrag 1' })).toBeInTheDocument();
     expect(hinweisFarbe(farbenHell, 'schwach')).toBe(farbenHell.schwach);
+  });
+});
+
+describe('zeitachsenRinne', () => {
+  // Literale statt Rücklesen aus dem Token (CLAUDE.md): handschuh = 26 / 16.
+  const handschuh = { padding: 26, paddingSM: 16 };
+  it('unter md die kleine Rinne — der Text braucht die Breite', () => {
+    expect(zeitachsenRinne(handschuh, true)).toBe(16);
+  });
+  it('ab md die volle Rinne des Entwurfs', () => {
+    expect(zeitachsenRinne(handschuh, false)).toBe(26);
   });
 });

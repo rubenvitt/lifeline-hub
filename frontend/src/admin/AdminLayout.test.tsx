@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { Navigate, Route, Routes, useLocation } from 'react-router';
 import { server } from '../test/server';
+import { setzeViewportBreite } from '../test/viewport';
 import { renderMitProviders } from '../test/utils';
 import { AuthProvider } from '../auth/AuthContext';
 import AdminLayout from './AdminLayout';
@@ -181,5 +182,44 @@ describe('AdminLayout — Sidebar', () => {
     expect(screen.getByRole('menuitem', { name: 'Personal' })).not.toHaveClass(
       'ant-menu-item-selected',
     );
+  });
+});
+
+describe('AdminLayout — unter lg (Handschirm)', () => {
+  it('keine Seitenleiste: der Bereich steht zugeklappt über dem Inhalt und nennt die Sektion', async () => {
+    setzeViewportBreite(390);
+    setup(fuehrungskraft, '/admin/stammdaten/fahrzeuge');
+    await screen.findByText('PFAD:/admin/stammdaten/fahrzeuge');
+    expect(document.querySelector('.ant-layout-sider')).toBeNull();
+    const knopf = screen.getByRole('button', { name: /Verwaltung: Fahrzeuge/ });
+    expect(knopf).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('menuitem', { name: 'Fahrzeuge' })).not.toBeInTheDocument();
+  });
+
+  it('aufklappen, wählen → navigiert und klappt wieder zu', async () => {
+    setzeViewportBreite(390);
+    setup(fuehrungskraft, '/admin/stammdaten/fahrzeuge');
+    await screen.findByText('PFAD:/admin/stammdaten/fahrzeuge');
+    await userEvent.click(screen.getByRole('button', { name: /Verwaltung: Fahrzeuge/ }));
+    expect(screen.getByRole('button', { name: /Verwaltung: Fahrzeuge/ })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Offline-Karten' }));
+    expect(await screen.findByText('PFAD:/admin/karten/offline')).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Fahrzeuge' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Verwaltung: Offline-Karten/ })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+  });
+
+  it('ab lg steht die Seitenleiste ohne Expander (Gegenaussage)', async () => {
+    setzeViewportBreite(1024);
+    setup(fuehrungskraft, '/admin/stammdaten/fahrzeuge');
+    await screen.findByText('PFAD:/admin/stammdaten/fahrzeuge');
+    expect(document.querySelector('.ant-layout-sider')).not.toBeNull();
+    expect(screen.queryByRole('button', { name: /^Verwaltung/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Fahrzeuge' })).toBeInTheDocument();
   });
 });

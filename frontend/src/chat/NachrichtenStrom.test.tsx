@@ -42,6 +42,24 @@ describe('NachrichtenStrom', () => {
     expect(screen.getByText('Max')).toBeInTheDocument();
   });
 
+  it('begrenzt den Nachrichtentext auf Lesebreite, nicht den Strom', () => {
+    renderMitProviders(
+      <NachrichtenStrom
+        nachrichten={[nachricht({ inhalt: 'Lage '.repeat(80) })]}
+        eigeneBenutzerId={1}
+        darfSchreiben
+        onBearbeiten={vi.fn()}
+        onLoeschen={vi.fn()}
+        onHeraufstufen={vi.fn()}
+        onHeraufstufenAuftrag={vi.fn()}
+      />,
+    );
+    const text = document.querySelector<HTMLElement>('[data-lfh="chat-nachricht-text"]');
+    expect(text?.style.maxWidth).toBe('72ch');
+    // Der Scroll-Container (Höhenkette H51) bleibt unbegrenzt.
+    expect(screen.getByTestId('nachrichten-strom').style.maxWidth).toBe('');
+  });
+
   it('zeigt Tombstone für gelöschte Nachrichten ohne Aktionen', () => {
     renderMitProviders(
       <NachrichtenStrom
