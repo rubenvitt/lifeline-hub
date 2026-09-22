@@ -21,8 +21,8 @@ Arbeitsweise je Aufgabe: `superpowers:test-driven-development` (erst roter Test,
 
 ## 4. Org-Einstellung (Backend + Codegen)
 
-- [ ] 4.1 `einsatz_nummer_praefix` in `src/org/einstellungen.rs` (Struct, `leer`, `anzeige`, `anzeige_hinweis`, `laden_oder_default`, `speichern`) und in `routes/org_einstellungen.rs` (Update-DTO, `bereinige`, Präfix-Whitelist-Schleife) aufnehmen. Verifikation: Integrationstest PUT mit `WF-` → GET liefert `WF-`, PUT mit 9 Zeichen oder `E#` → 400.
-- [ ] 4.2 `scripts/check-typ-codegen.sh` laufen lassen und `openapi.json` + `types.generated.ts` mitcommitten. Verifikation: das Skript endet mit Exit 0 und ohne Drift.
+- [x] 4.1 `einsatz_nummer_praefix` in `src/org/einstellungen.rs` (Struct, `leer`, `anzeige`, `laden_oder_default`, `speichern`; bewusst NICHT in `anzeige_hinweis`, weil der nur Platzhalter für die Einsatz-Einstellungen trägt und es dort kein Einsatznummer-Präfix gibt) und in `routes/org_einstellungen.rs` (Update-DTO, `bereinige`, Präfix-Whitelist-Schleife) aufnehmen. Verifikation: Integrationstest PUT mit `WF-` → GET liefert `WF-`, PUT mit 9 Zeichen oder `E#` → 400.
+- [x] 4.2 `scripts/check-typ-codegen.sh` laufen lassen und `openapi.json` + `types.generated.ts` mitcommitten. Verifikation: das Skript endet mit Exit 0 und ohne Drift.
 
 ## 5. Frontend
 

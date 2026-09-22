@@ -2006,6 +2006,7 @@ export interface components {
             /** Format: int64 */
             auto_etb_eintraege?: number | null;
             einheiten?: null | components["schemas"]["EinheitenSystem"];
+            einsatz_nummer_praefix?: string | null;
             etb_nummer_praefix?: string | null;
             geaendert_at?: string | null;
             /** Format: int64 */

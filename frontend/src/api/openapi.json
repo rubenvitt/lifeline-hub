@@ -5430,6 +5430,12 @@
               }
             ]
           },
+          "einsatz_nummer_praefix": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "etb_nummer_praefix": {
             "type": [
               "string",
