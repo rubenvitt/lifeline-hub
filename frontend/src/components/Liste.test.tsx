@@ -88,6 +88,35 @@ describe('Liste', () => {
     expect(onKlick).toHaveBeenCalledTimes(1);
   });
 
+  // LFH-621: `aria-current` gehört an das Element mit der Rolle, nicht an ein inneres
+  // `div` — sonst sagt der Vorleser „Schaltfläche" ohne „aktuell". Beide Zweige: die
+  // Auswahlzeile (Klickbar-Primitiv) und die Anzeigezeile.
+  it('reicht aria-current an das Wurzelelement der Zeile durch', () => {
+    renderMitProviders(
+      <Liste
+        dataSource={['A', 'B']}
+        renderItem={(t) => (
+          <ListenEintrag onClick={vi.fn()} aria-current={t === 'B' ? 'true' : undefined}>
+            {t}
+          </ListenEintrag>
+        )}
+      />,
+    );
+    expect(screen.getByRole('button', { current: true })).toHaveAccessibleName('B');
+    expect(screen.getByRole('button', { name: 'A' })).not.toHaveAttribute('aria-current');
+
+    renderMitProviders(
+      <Liste
+        dataSource={['C']}
+        renderItem={(t) => <ListenEintrag aria-current="page">{t}</ListenEintrag>}
+      />,
+    );
+    expect(screen.getByText('C').closest('.listen-eintrag')).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+  });
+
   it('rendert Einträge als list/listitem (Screenreader-Semantik wie antds List)', () => {
     renderMitProviders(
       <Liste dataSource={['A', 'B']} renderItem={(t) => <ListenEintrag>{t}</ListenEintrag>} />,

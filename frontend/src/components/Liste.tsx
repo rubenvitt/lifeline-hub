@@ -1,6 +1,6 @@
 import { Spin, theme } from 'antd';
 import { createContext, useContext } from 'react';
-import type { CSSProperties, Key, ReactNode } from 'react';
+import type { AriaAttributes, CSSProperties, Key, ReactNode } from 'react';
 import { KlickbareZeile } from './Klickbar';
 import { SeitenLeer } from './SeitenZustand';
 import { useRollen } from './instrument/rollenwerte';
@@ -154,6 +154,12 @@ interface ListenEintragBasisProps {
   children?: ReactNode;
   style?: CSSProperties;
   className?: string;
+  /**
+   * Markiert die aktuelle Zeile (z. B. den offenen Chat-Kanal). Landet am WURZELelement —
+   * bei einer Auswahlzeile also an dem Knoten mit `role="button"`. An einem inneren
+   * Element sagt der Vorleser die Rolle ohne „aktuell" an (LFH-621).
+   */
+  'aria-current'?: AriaAttributes['aria-current'];
 }
 
 interface ListenEintragAuswahlProps extends ListenEintragBasisProps {
@@ -176,6 +182,7 @@ export function ListenEintrag({
   onClick,
   style,
   className,
+  'aria-current': ariaCurrent,
 }: ListenEintragProps) {
   const { token, rollen } = useRollen();
   const { size, bordered } = useContext(ListeContext);
@@ -185,6 +192,7 @@ export function ListenEintrag({
 
   const eintragProps = {
     className: ['listen-eintrag', className].filter(Boolean).join(' '),
+    'aria-current': ariaCurrent,
     style: {
       display: 'flex',
       alignItems: 'center',
