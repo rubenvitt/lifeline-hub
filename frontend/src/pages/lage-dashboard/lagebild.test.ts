@@ -193,6 +193,11 @@ describe('baueLagebild', () => {
 });
 
 describe('Vermisste seit über 4 h (LFH-613)', () => {
+  // Per Etikett, nicht per Index: das Band hat seine Reihenfolge schon einmal geändert
+  // (LFH-606 setzte den Pegel auf Platz 1), ein Index träfe dann still eine andere Kennzahl.
+  const vermisste = (bild: ReturnType<typeof baueLagebild>) =>
+    bild.kennzahlen.find((k) => k.etikett === 'Vermisste')!;
+
   // JETZT = 2026-06-11 12:00:00 UTC.
   const v = (vermisst_seit?: string, status: Person['status'] = 'vermisst') =>
     ({ status, vermisst_seit, aktuelle_sichtung: null }) as Person;
@@ -205,7 +210,7 @@ describe('Vermisste seit über 4 h (LFH-613)', () => {
     const personen = [v('2026-06-11 06:00:00'), v('2026-06-11 07:59:59'), v('2026-06-11 10:00:00')];
     expect(langeVermisst(personen, JETZT)).toBe(2);
     const bild = baueLagebild(roh({ personen }), JETZT);
-    expect(bild.kennzahlen[2]).toMatchObject({ wert: '3', notiz: '2 seit über 4 h', ton: 'alarm' });
+    expect(vermisste(bild)).toMatchObject({ wert: '3', notiz: '2 seit über 4 h', ton: 'alarm' });
   });
 
   it('zählt genau 4 h NICHT, eine Sekunde darüber schon', () => {
@@ -221,8 +226,8 @@ describe('Vermisste seit über 4 h (LFH-613)', () => {
 
   it('schreibt die Notiz mit der Zeit fort — dieselben Daten, später gefragt', () => {
     const personen = [v('2026-06-11 09:00:00')];
-    expect(baueLagebild(roh({ personen }), JETZT).kennzahlen[2].notiz).toBe('als vermisst erfasst');
-    expect(baueLagebild(roh({ personen }), JETZT + 60 * 60_000 + 1000).kennzahlen[2].notiz).toBe(
+    expect(vermisste(baueLagebild(roh({ personen }), JETZT)).notiz).toBe('als vermisst erfasst');
+    expect(vermisste(baueLagebild(roh({ personen }), JETZT + 60 * 60_000 + 1000)).notiz).toBe(
       '1 seit über 4 h',
     );
   });
