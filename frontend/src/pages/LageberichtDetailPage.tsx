@@ -155,8 +155,11 @@ function LageberichtDetail() {
       // Die Kopfzeile trägt den Namen sichtbar; das Etikett des Feldes bleibt für die
       // Zugänglichkeit (Label-Verknüpfung), steht aber nicht ein zweites Mal da.
       <Form.Item label={a.label} name={a.schluessel} labelCol={{ style: { display: 'none' } }}>
+        {/* Direkt unter dem Seitentitel (h1): die Akkordeon-Köpfe sind Schaltflächen, keine
+            Überschriften, und ein Paneel rahmt den Entwurf bewusst nicht (s. u.). */}
         <MarkdownEditor
           layout={vorschauNeben ? 'split' : 'toggle'}
+          unterEbene={1}
           variante="dokument"
           autoSize={{ minRows: 6 }}
         />
@@ -515,7 +518,9 @@ function LageberichtDetail() {
                       {a.label}
                     </Typography.Title>
                     {text.trim() ? (
-                      <Markdown variante="dokument">{text}</Markdown>
+                      <Markdown variante="dokument" unterEbene={3}>
+                        {text}
+                      </Markdown>
                     ) : (
                       <Typography.Paragraph>—</Typography.Paragraph>
                     )}

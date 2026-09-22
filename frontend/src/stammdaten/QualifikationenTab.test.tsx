@@ -54,6 +54,16 @@ describe('QualifikationenTab', () => {
     expect(screen.getByText('Gruppenführer')).toBeInTheDocument();
   });
 
+  // Neuentwurf (LFH-621): Zahlen stehen Mono mit `tabular-nums`, das Label nicht.
+  it('setzt die Sortierung in die Zahlenschrift, das Label nicht', async () => {
+    render(admin);
+    await screen.findByText('Sanitäter');
+    const zahl = screen.getByText('60');
+    expect(zahl.style.fontFamily).toContain('JetBrains Mono');
+    expect(zahl.style.fontVariantNumeric).toBe('tabular-nums');
+    expect(screen.getByText('Gruppenführer').style.fontFamily).toBe('');
+  });
+
   it('Admin sieht „Qualifikation anlegen"', async () => {
     render(admin);
     await screen.findByText('Sanitäter');

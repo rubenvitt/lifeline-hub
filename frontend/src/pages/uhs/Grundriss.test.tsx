@@ -102,7 +102,7 @@ describe('Grundriss – Belegt-Anzeige (LFH-18)', () => {
     const uhs = uhsDetail({ plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
     renderGrundriss(uhs, [p]);
     // Person-Tag bestätigt, dass die Belegung geladen ist …
-    expect(await screen.findByText(/R-007|R-7|· unbekannt/)).toBeInTheDocument();
+    expect(await screen.findByText(/R-007/)).toBeInTheDocument();
     // … und der Platz muss als belegt gekennzeichnet sein.
     expect(screen.getByText('belegt')).toBeInTheDocument();
     // Ein belegter „freier" Platz ist nicht mehr frei: der „frei"-Tag entfällt,
@@ -391,7 +391,7 @@ describe('Grundriss – Spalten-Fluss (LFH-58)', () => {
     const p = person({ id: 5, registrier_nr: 5, aktuelle_uhs_id: null });
     renderGrundriss(uhsDetail({}), [p]);
     expect(await screen.findByText('Noch nicht aufgenommen')).toBeInTheDocument();
-    expect(await screen.findByText(/R-005|· unbekannt/)).toBeInTheDocument();
+    expect(await screen.findByText(/R-005/)).toBeInTheDocument();
   });
 });
 
@@ -767,6 +767,24 @@ describe('Grundriss – Berührungsbedienung: kein Scroll-Riegel (LFH-367/B5g, A
   });
 });
 
+describe('Grundriss – Personenkarte im Neuentwurf (LFH-621)', () => {
+  // Kein antd-`Tag` mehr: die Karte ist eine Personenmarke in Paneel-Optik, die
+  // Registriernummer läuft Mono. Die e2e-Specs greifen sie über `data-lfh`, nicht über
+  // eine antd-Klasse — die Abwesenheit von `.ant-tag` ist deshalb Teil der Aussage.
+  it('rendert die Karte als Personenmarke mit Mono-Nummer, nicht als antd-Tag', async () => {
+    const p = person({ id: 7, registrier_nr: 7, name: 'Müller', aktuelle_uhs_id: null });
+    renderGrundriss(uhsDetail({}), [p]);
+    const nr = await screen.findByText('R-007');
+    const karte = nr.closest('[data-lfh="personenkarte"]') as HTMLElement | null;
+    expect(karte).not.toBeNull();
+    expect(karte).toHaveTextContent('R-007 · Müller');
+    expect(karte!.closest('.ant-tag')).toBeNull();
+    expect(karte!.querySelector('.ant-tag')).toBeNull();
+    expect(nr.style.fontFamily).toContain('JetBrains Mono');
+    expect(nr.style.fontVariantNumeric).toBe('tabular-nums');
+  });
+});
+
 describe('Grundriss – Patient-Detail-Drawer (Klick)', () => {
   function detail(p: Person): PersonDetail {
     return { ...p, sichtungen: [], notizen: [], verbleib: [], abgleiche: [] };
@@ -776,7 +794,7 @@ describe('Grundriss – Patient-Detail-Drawer (Klick)', () => {
     const p = person({ id: 7, registrier_nr: 7, aktuelle_uhs_id: null });
     server.use(http.get('/api/einsaetze/1/personen/7', () => HttpResponse.json(detail(p))));
     renderGrundriss(uhsDetail({}), [p]);
-    await userEvent.click(await screen.findByText(/R-007|· unbekannt/));
+    await userEvent.click(await screen.findByText(/R-007/));
     expect(await screen.findByText('Medizinischer Verlauf (neueste zuerst)')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Vollständig öffnen' })).toBeInTheDocument();
   });
@@ -786,7 +804,7 @@ describe('Grundriss – Patient-Detail-Drawer (Klick)', () => {
     const uhs = uhsDetail({ plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
     server.use(http.get('/api/einsaetze/1/personen/8', () => HttpResponse.json(detail(p))));
     renderGrundriss(uhs, [p]);
-    await userEvent.click(await screen.findByText(/R-008|· unbekannt/));
+    await userEvent.click(await screen.findByText(/R-008/));
     expect(await screen.findByText('Medizinischer Verlauf (neueste zuerst)')).toBeInTheDocument();
   });
 
@@ -794,7 +812,7 @@ describe('Grundriss – Patient-Detail-Drawer (Klick)', () => {
     const p = person({ id: 9, registrier_nr: 9, aktuelle_uhs_id: null });
     server.use(http.get('/api/einsaetze/1/personen/9', () => HttpResponse.json(detail(p))));
     renderGrundriss(uhsDetail({}), [p], true);
-    await userEvent.click(await screen.findByText(/R-009|· unbekannt/));
+    await userEvent.click(await screen.findByText(/R-009/));
     expect(await screen.findByText('Medizinischer Verlauf (neueste zuerst)')).toBeInTheDocument();
   });
 
@@ -806,7 +824,7 @@ describe('Grundriss – Patient-Detail-Drawer (Klick)', () => {
       ),
     );
     renderGrundriss(uhsDetail({}), [p]);
-    await userEvent.click(await screen.findByText(/R-011|· unbekannt/));
+    await userEvent.click(await screen.findByText(/R-011/));
     expect(await screen.findByText('Person konnte nicht geladen werden')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
   });

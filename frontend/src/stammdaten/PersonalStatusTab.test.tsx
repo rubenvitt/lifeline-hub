@@ -20,9 +20,16 @@ const nichtAdmin = { ...admin, system_rolle: 'keiner' };
 
 /**
  * Fachliche Reihenfolge (`sortier` 10 vor 20), die zugleich NICHT die alphabetische ist —
- * sonst sähe die Tabelle nach dem Sortierklick genauso aus wie davor.
+ * sonst sähe die Tabelle nach dem Sortierklick genauso aus wie davor. `farbe` ist
+ * ausdrücklich `string | null` typisiert, weil ein Test einen Farbcode einsetzt.
  */
-const status = [
+const status: {
+  id: number;
+  label: string;
+  kategorie: string;
+  farbe: string | null;
+  sortier: number;
+}[] = [
   { id: 1, label: 'dienstbereit', kategorie: 'verfuegbar', farbe: null, sortier: 10 },
   { id: 2, label: 'alarmiert', kategorie: 'gebunden', farbe: null, sortier: 20 },
 ];
@@ -61,6 +68,19 @@ describe('PersonalStatusTab', () => {
     render(admin);
     expect(await screen.findByText('dienstbereit')).toBeInTheDocument();
     expect(screen.getByText('gebunden')).toBeInTheDocument();
+  });
+
+  // Neuentwurf (LFH-621): Farbcode und Sortierung stehen Mono mit `tabular-nums`, das Label
+  // nicht. Die Kategorie ist bereits Fläche (`StatusTag`-Vorgabe, keine Mandantenfarbe).
+  it('setzt Farbcode und Sortierung in die Zahlenschrift, das Label nicht', async () => {
+    render(admin, [{ ...status[0], farbe: '#22aa55' }, status[1]]);
+    await screen.findByText('dienstbereit');
+    for (const wert of ['#22aa55', '20']) {
+      const knoten = screen.getByText(wert);
+      expect(knoten.style.fontFamily).toContain('JetBrains Mono');
+      expect(knoten.style.fontVariantNumeric).toBe('tabular-nums');
+    }
+    expect(screen.getByText('alarmiert').style.fontFamily).toBe('');
   });
 
   it('Admin sieht „Status anlegen", Nicht-Admin nicht', async () => {

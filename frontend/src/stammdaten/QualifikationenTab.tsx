@@ -9,6 +9,7 @@ import {
   type TableColumnsType,
 } from 'antd';
 import AdminPage from '../components/AdminPage';
+import { monoStil } from '../components/instrument';
 import { ErfassungsModal } from '../components/Erfassung';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle from '../components/KatalogTabelle';
@@ -106,7 +107,12 @@ export default function QualifikationenTab() {
        */
       sorter: (a, b) => a.label.localeCompare(b.label, 'de'),
     },
-    { title: 'Sortierung', dataIndex: 'sortier', key: 'sortier' },
+    {
+      title: 'Sortierung',
+      dataIndex: 'sortier',
+      key: 'sortier',
+      render: (n: number) => <span style={monoStil(12)}>{n}</span>,
+    },
     ...(istAdmin
       ? ([
           {

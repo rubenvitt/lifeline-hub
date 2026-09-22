@@ -405,8 +405,10 @@ export default function Schnellerfassung({
           }
           hinweiszeile={hinweiszeile}
         >
+          {/* Die Schnellerfassung steht ohne eigene Überschrift unter dem Seitentitel (h1). */}
           <MarkdownEditor
             ref={textRef}
+            unterEbene={1}
             layout="toggle"
             variante="kompakt"
             placeholder="Inhalt … ( / für Typ, Felder & Bausteine · @ für Einheit )"

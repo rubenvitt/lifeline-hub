@@ -422,7 +422,7 @@ describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
     // Personen-Query aufgelöst hat. Gemessen: mit `findByText('Wartebereich (Eingang)')`
     // als Anker lief dieser Test auch dann grün, wenn der Rechte-Riegel ganz entfernt war
     // (Mutationsprobe), weil zum Prüfzeitpunkt schlicht noch keine Zeile im Baum stand.
-    expect(await screen.findByText('R-006 · unbekannt')).toBeInTheDocument();
+    expect(await screen.findByText('R-006')).toBeInTheDocument();
     // … und trägt trotzdem keinen Auslöser. GAR NICHT gerendert, nicht deaktiviert.
     expect(
       screen.queryByRole('button', { name: /Verbleib \/ Entlassung erfassen/ }),

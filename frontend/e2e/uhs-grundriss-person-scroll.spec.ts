@@ -69,10 +69,13 @@ async function setupBelegterPlatz(page: Page): Promise<string> {
   // dann nichts, und beide Tests unten schlugen fehl, obwohl die Funktion
   // arbeitet — mit 1 s Wartezeit davor waren sie gemessen grün.
   //
-  // KEINE feste Wartezeit, sondern die Bedingung selbst: genau EIN Namens-Tag.
+  // KEINE feste Wartezeit, sondern die Bedingung selbst: genau EINE Personenmarke mit dem
+  // Namen (über `data-lfh`, nicht über eine antd-Klasse — LFH-621).
   // Ein `waitForTimeout` wäre auf einer langsameren Maschine wieder zu kurz und
   // hier meist zu lang.
-  await expect(page.locator('.ant-tag').filter({ hasText: personName })).toHaveCount(1);
+  await expect(
+    page.locator('[data-lfh="personenkarte"]').filter({ hasText: personName }),
+  ).toHaveCount(1);
   return personName;
 }
 
@@ -281,7 +284,7 @@ test('UHS Grundriss: Person-Drag sprengt nicht die Scroll-Region der linken Spal
   // Detail öffnen — der Grundriss wird direkt angezeigt (Personen-Spalten + Fläche).
   await page.getByRole('button', { name: uhsName }).click();
 
-  // Personenkarte in der linken Spalte finden (Tag mit Reg.-Nr. · Name).
+  // Personenkarte in der linken Spalte finden (Marke mit Reg.-Nr. · Name).
   const karte = page.getByText(personName).first();
   await expect(karte).toBeVisible();
 
@@ -449,4 +452,37 @@ test('UHS Grundriss: Person-Drop auf einen Platz löst die Belegung weiterhin au
   const req = await belegungPromise;
   const body = JSON.parse(req.postData() ?? '{}') as { platz_id?: number | null };
   expect(typeof body.platz_id).toBe('number');
+});
+
+// LFH-621: die Personenmarke ersetzt den antd-Tag und behauptet dessen Höhe — dichteunabhängig,
+// weil die belegte Platzkarte an `SCHRITT_Y = 120` aus dem Backend hängt (Rechnung im Kopf von
+// `Grundriss.tsx`: der Streifen ist mit 24 px eingeplant). jsdom rechnet kein Layout, und die
+// Marke mischt Mono und Satzschrift in einer Zeile — deshalb hier gemessen, in zwei Stufen.
+test('UHS Grundriss: Personenmarke auf der Platzkarte behält ihre Höhe in jeder Dichtestufe', async ({
+  page,
+}) => {
+  const personName = await setupBelegterPlatz(page);
+  const karte = page.locator('[data-testid="platz-karte"]', { hasText: 'Bett 1' });
+  const marke = karte.locator('[data-lfh="personenkarte"]');
+
+  const messungen: { dichte: string; marke: number; karte: number }[] = [];
+  for (const dichte of ['kompakt', 'handschuh']) {
+    await page.evaluate((wert) => localStorage.setItem('lifeline-hub.dichte', wert), dichte);
+    await page.reload();
+    await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+    await expect(marke).toContainText(personName);
+    messungen.push({
+      dichte,
+      marke: (await marke.boundingBox())!.height,
+      karte: (await karte.boundingBox())!.height,
+    });
+  }
+
+  const [kompakt, handschuh] = messungen;
+  expect(kompakt.marke, 'die Marke passt in den eingeplanten 24-px-Streifen').toBeLessThanOrEqual(
+    24,
+  );
+  expect(handschuh.marke, 'die Marke wächst nicht mit der Dichte').toBe(kompakt.marke);
+  expect(handschuh.karte, 'die Platzkarte behält ihre Höhe').toBe(kompakt.karte);
+  expect(kompakt.karte).toBeLessThanOrEqual(120);
 });

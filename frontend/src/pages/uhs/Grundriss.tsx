@@ -7,7 +7,6 @@ import {
   InputNumber,
   Space,
   Tabs,
-  Tag,
   Tooltip,
   Typography,
   theme,
@@ -157,37 +156,60 @@ interface PersonenkartenProps {
   person: Person | undefined;
   kompakt?: boolean;
   /**
-   * Test-Marke am gerenderten Tag. Nur das DragOverlay setzt sie (LFH-341 · C6): ohne
+   * Test-Marke an der gerenderten Personenmarke. Nur das DragOverlay setzt sie (LFH-341 · C6): ohne
    * eine Marke am schwebenden Knoten ist „der Drag läuft WIRKLICH" im Playwright nicht
    * behauptbar, und der Scroll-Nachweis fällt auf den billigen Scrolltest zurück, den B5g
-   * schon hat. Am Tag statt an einer zusätzlichen Hülle, damit der Overlay-Teilbaum
+   * schon hat. An der Marke statt an einer zusätzlichen Hülle, damit der Overlay-Teilbaum
    * unverändert bleibt.
    */
   testId?: string;
 }
 function Personenkarte({ person, kompakt, testId }: PersonenkartenProps) {
+  const { token, rollen } = useRollen();
   if (!person) return null;
-  // `kompakt` (auf der Platz-Karte): Label einzeilig mit Ellipsis kappen, damit die
-  // absolut positionierte, belegte Karte unabhängig von der Namenslänge eine stabile
-  // Höhe behält und nicht in die darunterliegende Karte hineinwächst (Layout-Bruch).
-  const style: React.CSSProperties = kompakt
-    ? {
-        margin: 2,
-        maxWidth: 124,
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap',
-      }
-    : { margin: 2 };
+  /*
+   * Personenmarke im Neuentwurf (LFH-621) statt antd-`Tag`: Radius 0, Haarlinie, Grund
+   * `flaeche2`, Registriernummer Mono. Die HÖHE ist die des alten Tags und bewusst
+   * dichteunabhängig (Zeilenhöhe aus `fontSizeSM` × `lineHeightSM` wie in antds Tag-Stil,
+   * plus 2 × 1 px Rahmen): die belegte Platzkarte hat 100 px Innenraum, und dieser Streifen
+   * ist mit 24 px eingeplant — die Karte darf nicht wachsen, weil `SCHRITT_Y = 120` im
+   * Backend sitzt (Rechnung im Kopf dieser Datei). Kein Bedienziel: Klick und Zug trägt die
+   * umgebende Hülle (`PersonenkarteDrag`), nicht die Marke.
+   *
+   * `data-lfh="personenkarte"` ist die Marke der e2e-Specs; sie griffen vorher über
+   * `.ant-tag` und hingen damit an der Bibliothek statt an der Aussage.
+   */
+  const nr = registrierAnzeige(person.registrier_nr);
+  const style: React.CSSProperties = {
+    display: 'inline-block',
+    maxWidth: kompakt ? 124 : '100%',
+    margin: 2,
+    paddingInline: token.paddingXS,
+    border: `1px solid ${rollen.linie}`,
+    borderRadius: 0,
+    background: rollen.flaeche2,
+    color: rollen.text2,
+    fontSize: token.fontSizeSM,
+    lineHeight: `${Math.round(token.fontSizeSM * token.lineHeightSM)}px`,
+    whiteSpace: 'nowrap',
+    // `kompakt` (auf der Platz-Karte): einzeilig mit Ellipsis kappen, damit die absolut
+    // positionierte, belegte Karte unabhängig von der Namenslänge eine stabile Höhe behält
+    // und nicht in die darunterliegende Karte hineinwächst (Layout-Bruch).
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    verticalAlign: 'top',
+  };
   return (
-    <Tag
-      color="default"
-      style={style}
+    <span
+      data-lfh="personenkarte"
       data-testid={testId}
+      style={style}
       title={kompakt ? personLabel(person) : undefined}
     >
-      {personLabel(person)}
-    </Tag>
+      <span style={monoStil(token.fontSizeSM)}>{nr}</span>
+      {/* `||` wie in `personLabel`: ein leerer Name ist „unbekannt“, nicht „R-007 · “. */}
+      {` · ${person.name || 'unbekannt'}`}
+    </span>
   );
 }
 

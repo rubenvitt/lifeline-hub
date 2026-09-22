@@ -143,6 +143,32 @@ describe('BefehlDetailPage', () => {
     expect(screen.getByText(/a\. Allgemeine Lage/)).toBeInTheDocument();
   });
 
+  // LFH-621: die Überschriftenebene nennt der Einbauort. Lesend steht der Text unter dem
+  // Abschnittskopf (h3) → `#` wird h4; im Entwurf unter dem Paneel „Entwurf" (h2) → h3.
+  it('setzt eine Markdown-Überschrift lesend unter den Abschnittskopf (h4)', async () => {
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue({
+      ...befehl('freigegeben'),
+      abschnitte: [{ schluessel: 'lage', text: '# Kopfzeile' }],
+    } as never);
+    renderAt(7);
+    expect(await screen.findByRole('heading', { name: 'Kopfzeile' })).toHaveProperty(
+      'tagName',
+      'H4',
+    );
+  });
+
+  it('setzt eine Markdown-Überschrift im Entwurf unter das Paneel (h3)', async () => {
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue({
+      ...befehl('entwurf'),
+      abschnitte: [{ schluessel: 'lage', text: '# Kopfzeile' }],
+    } as never);
+    renderAt(7);
+    expect(await screen.findByRole('heading', { name: 'Kopfzeile' })).toHaveProperty(
+      'tagName',
+      'H3',
+    );
+  });
+
   it('zeigt freigegeben read-only mit Fortschreiben', async () => {
     vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('freigegeben') as never);
     renderAt(7);

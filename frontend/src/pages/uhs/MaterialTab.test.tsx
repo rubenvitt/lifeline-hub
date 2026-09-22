@@ -271,6 +271,16 @@ describe('MaterialTab · „Lösen" ist umkehrbar (LFH-378, Trennlinie aus LFH-3
  * (`materialStatus`), derselben Quelle, aus der `MaterialPage` liest.
  */
 describe('MaterialTab · Statusspalte (LFH-341 · C6)', () => {
+  // Neuentwurf (LFH-621): die Menge ist eine Zahl und läuft Mono mit `tabular-nums`,
+  // die Bezeichnung bleibt Satzschrift.
+  it('setzt die Menge in die Zahlenschrift, die Bezeichnung nicht', async () => {
+    render([verortet]);
+    const menge = await screen.findByText('2');
+    expect(menge.style.fontFamily).toContain('JetBrains Mono');
+    expect(menge.style.fontVariantNumeric).toBe('tabular-nums');
+    expect(screen.getByText('Trage').style.fontFamily).toBe('');
+  });
+
   it('zeigt den Materialstatus als Etikett, nie den rohen Wire-Wert', async () => {
     render([{ ...verortet, status: 'desinfektion_noetig' as MaterialStatus }]);
 

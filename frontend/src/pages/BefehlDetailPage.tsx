@@ -478,7 +478,13 @@ function BefehlDetail() {
                   name={a.schluessel}
                   extra={a.hilfetext}
                 >
-                  <MarkdownEditor layout="split" variante="dokument" autoSize={{ minRows: 8 }} />
+                  {/* Unter dem Paneel „Entwurf" (h2); das Feldetikett ist keine Überschrift. */}
+                  <MarkdownEditor
+                    layout="split"
+                    unterEbene={2}
+                    variante="dokument"
+                    autoSize={{ minRows: 8 }}
+                  />
                 </Form.Item>
               ))}
               {/* Einstiegsfokus in den ersten leeren Abschnitt (LFH-495). Als LETZTES Kind, damit
@@ -503,7 +509,9 @@ function BefehlDetail() {
                       {a.label}
                     </Typography.Title>
                     {text.trim() ? (
-                      <Markdown variante="dokument">{text}</Markdown>
+                      <Markdown variante="dokument" unterEbene={3}>
+                        {text}
+                      </Markdown>
                     ) : (
                       <Typography.Paragraph>—</Typography.Paragraph>
                     )}

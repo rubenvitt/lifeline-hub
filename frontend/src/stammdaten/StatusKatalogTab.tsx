@@ -10,6 +10,7 @@ import {
   type TableColumnsType,
 } from 'antd';
 import AdminPage from '../components/AdminPage';
+import { monoStil } from '../components/instrument';
 import { ErfassungsModal } from '../components/Erfassung';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle from '../components/KatalogTabelle';
@@ -153,9 +154,27 @@ export default function StatusKatalogTab() {
       onFilter: (wert, s) => s.kategorie === String(wert),
       render: (k: StatusKategorie) => <StatusTag darstellung={statusKategorie[k]} />,
     },
-    { title: 'Farbe', dataIndex: 'farbe', key: 'farbe', render: (f) => f ?? '—' },
-    { title: 'FMS-Anker', dataIndex: 'fms_anker', key: 'fms_anker', render: (f) => f ?? '—' },
-    { title: 'Sortierung', dataIndex: 'sortier', key: 'sortier' },
+    {
+      title: 'Farbe',
+      dataIndex: 'farbe',
+      key: 'farbe',
+      // Der gepflegte Code als Wert (Mono), keine Farbfläche: `status_farbe` ist ungeprüfter
+      // Freitext, sein Kontrast ist nicht zugesichert (siehe `StatusTag`, Mandantenfarbe).
+      render: (f: string | null) => (f ? <span style={monoStil(12)}>{f}</span> : '—'),
+    },
+    {
+      title: 'FMS-Anker',
+      dataIndex: 'fms_anker',
+      key: 'fms_anker',
+      // `== null`, nicht Wahrheitswert: 0 ist ein gültiger Anker.
+      render: (f: number | null) => (f == null ? '—' : <span style={monoStil(12)}>{f}</span>),
+    },
+    {
+      title: 'Sortierung',
+      dataIndex: 'sortier',
+      key: 'sortier',
+      render: (n: number) => <span style={monoStil(12)}>{n}</span>,
+    },
     ...(istAdmin
       ? ([
           {

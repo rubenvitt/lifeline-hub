@@ -70,7 +70,9 @@ function props(over: Partial<React.ComponentProps<typeof Schnellerfassung>> = {}
 describe('TextAreaRef – Caret-Pfad', () => {
   it('resizableTextArea.textArea ist eine HTMLTextAreaElement-Instanz', () => {
     const ref = createRef<TextAreaRef>();
-    renderMitProviders(<MarkdownEditor layout="toggle" value="" onChange={() => {}} ref={ref} />);
+    renderMitProviders(
+      <MarkdownEditor unterEbene={3} layout="toggle" value="" onChange={() => {}} ref={ref} />,
+    );
     expect(ref.current?.resizableTextArea?.textArea).toBeInstanceOf(HTMLTextAreaElement);
   });
 
