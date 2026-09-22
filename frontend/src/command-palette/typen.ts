@@ -197,8 +197,8 @@ export const GRUPPEN_LABEL: Record<BefehlGruppe, string> = {
    */
   koordinate: 'Koordinate',
   /**
-   * Gefundene Datensätze aus den Modullisten (LFH-391 · C1). EINE Gruppe für alle neun
-   * Entitäten, die Modulherkunft steht im Label — neun Gruppen wären neun Überschriften
+   * Gefundene Datensätze aus den Modullisten (LFH-391 · C1). EINE Gruppe für alle zwölf
+   * Entitäten, die Modulherkunft steht im Label — zwölf Gruppen wären zwölf Überschriften
    * für im Schnitt ein bis zwei Zeilen, und bei AKTIVER Suche rendert die Palette seit A3
    * ohnehin flach.
    *
@@ -318,7 +318,7 @@ export const GRUPPE_NUR_ORDNUNG: Record<BefehlGruppe, boolean> = {
  * bekommen KEINEN Wortalias. Der Grund ist derselbe wie bei '>' und trägt hier sogar
  * weiter — ein getipptes „etb" ist ein SUCHBEGRIFF, es steht als Modullabel in der Liste;
  * es zugleich als Moduswechsel zu lesen machte die Eingabe mehrdeutig. Und unerreichbar
- * wird ohne Präfix nichts: der Vorgabemodus durchsucht alle zehn Quellen, die Präfixe
+ * wird ohne Präfix nichts: der Vorgabemodus durchsucht alle vierzehn Quellen, die Präfixe
  * kürzen nur.
  */
 export type PaletteModus = 'alles' | 'aktionen' | 'etb' | 'kraefte';
@@ -374,7 +374,7 @@ export const PALETTE_MODI: Record<PaletteModus, ModusBeschreibung> = {
   etb: {
     praefix: '#',
     gruppen: [],
-    quellen: ['etbNummer', 'etbText'],
+    quellen: ['etbNummer', 'etbText', 'etbAnzahl'],
     hinweis: 'Nur Einsatztagebuch',
     legende: 'sucht im Einsatztagebuch',
   },
@@ -405,7 +405,7 @@ export const PALETTE_MODI: Record<PaletteModus, ModusBeschreibung> = {
  * Nach unten begrenzt es der Zahlenzweig: die kürzeste gedruckte Kennung im System ist
  * zweistellig, mit N = 3 wäre „42 findet die Person 42" unerfüllbar. Nach oben begrenzt es
  * die Selektivität: ein einzelnes Zeichen ist keine Anfrage, es trifft in einer
- * MANV-Personenliste alles und kostet zehn Abrufe für null Aussage.
+ * MANV-Personenliste alles und kostet ein Dutzend Abrufe für null Aussage.
  *
  * HIER und nicht in `useDatensaetze.ts`, weil die Palette die Zahl selbst braucht: bei
  * einem einzelnen Zeichen im Datensatz-Modus ist die Liste per Konstruktion leer, und ein
@@ -422,14 +422,15 @@ export function modusZeigtDatensaetze(modus: PaletteModus): boolean {
 /**
  * Quelle → Modulschlüssel der LESEACHSE (`istModulFreigegeben`).
  *
- * NEUN MODULE, ZEHN QUELLEN: 'Kräfte' zerfällt in `fahrzeuge`, `personal` und `einheiten`,
- * die in der `modulRegistry` drei getrennte Einträge mit eigener Sichtbarkeits- und
- * Rollenschranke sind — ein Sammelbegriff wäre eine vierte, erfundene Achse. Die beiden
- * ETB-Zweige teilen sich denselben Schlüssel: ein Modul, zwei Abfragewege.
+ * ZWÖLF MODULE, VIERZEHN QUELLEN (seit LFH-619): 'Kräfte' zerfällt in `fahrzeuge`,
+ * `personal` und `einheiten`, die in der `modulRegistry` drei getrennte Einträge mit eigener
+ * Sichtbarkeits- und Rollenschranke sind — ein Sammelbegriff wäre eine vierte, erfundene
+ * Achse. Die drei ETB-Zweige (Nummer, Volltext, Zählung) teilen sich denselben Schlüssel: ein
+ * Modul, drei Abfragewege.
  *
  * HIER und nicht neben den Abrufen (C2 hatte sie dort), weil der REINE Kern sie ebenfalls
  * braucht: er darf `useDatensaetze.ts` nicht importieren, das zöge react-query und die
- * neun API-Clients in eine Datei, die ohne Netz prüfbar sein soll. Zwei Kopien wären zwei
+ * zwölf API-Clients in eine Datei, die ohne Netz prüfbar sein soll. Zwei Kopien wären zwei
  * Zuordnungen, die auseinanderlaufen, ohne dass ein Test es sieht — der Kern filterte dann
  * nach einem anderen Modul als der Abruf.
  */
@@ -444,4 +445,10 @@ export const QUELLE_MODUL = {
   einheiten: 'einheiten',
   etbNummer: 'etb',
   etbText: 'etb',
+  etbAnzahl: 'etb',
+  // LFH-619. `gefahrenzonen` ist der Registry-Schlüssel des Moduls „Gefahren" — die
+  // Gefahrengebiete wohnen dort, nicht unter einem eigenen Schlüssel.
+  lageberichte: 'lageberichte',
+  gefahrengebiete: 'gefahrenzonen',
+  abschnitte: 'einsatzabschnitte',
 } as const satisfies Record<DatensatzQuelle, string>;

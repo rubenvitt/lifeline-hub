@@ -13,6 +13,9 @@ import type {
   Auftrag,
   BenutzerAnzeige,
   Einheit,
+  Einsatzabschnitt,
+  Gefahrengebiet,
+  LageberichtAnzeige,
   EinsatzFahrzeug,
   EinsatzPersonal,
   EtbEintragAnzeige,
@@ -1024,5 +1027,174 @@ describe('sichtbareDatensaetze', () => {
       'datensatz:personen:7',
       'datensatz:etb:12',
     ]);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+/**
+ * LFH-619: drei weitere Quellen und der ETB-Sammeltreffer. Die Fixturen sind Teilobjekte wie
+ * oben — der Kern liest je Entität zwei bis drei Felder.
+ */
+const lagebericht = (o: Partial<LageberichtAnzeige>): LageberichtAnzeige =>
+  ({
+    id: 1,
+    einsatz_id: 5,
+    titel: 'Deichlage',
+    version: 1,
+    vorgaenger_id: null,
+    ...o,
+  }) as LageberichtAnzeige;
+const gebiet = (o: Partial<Gefahrengebiet>): Gefahrengebiet =>
+  ({ id: 1, einsatz_id: 5, label: 'Deichbruch Nord', zonen_ids: [], ...o }) as Gefahrengebiet;
+const abschnitt = (o: Partial<Einsatzabschnitt>): Einsatzabschnitt =>
+  ({ id: 1, einsatz_id: 5, name: 'Deich Süd', ...o }) as Einsatzabschnitt;
+
+describe('baueDatensatzTreffer — Lageberichte, Gefahrengebiete, Einsatzabschnitte (LFH-619)', () => {
+  it('findet alle drei im Vorgabemodus und springt auf ihre Adressen', () => {
+    const navigate = vi.fn();
+    const t = baueDatensatzTreffer(
+      kontext({
+        suche: 'deich',
+        navigate,
+        quellen: {
+          lageberichte: [lagebericht({ id: 7 })],
+          gefahrengebiete: [gebiet({ id: 3 })],
+          abschnitte: [abschnitt({ id: 4 })],
+        },
+      }),
+    );
+    expect(labels(t)).toEqual([
+      'Lageberichte · Deichlage',
+      'Gefahren · Deichbruch Nord',
+      'Einsatzabschnitte · Deich Süd',
+    ]);
+    for (const x of t) x.befehl.ausfuehren();
+    expect(navigate.mock.calls.map((c) => c[0])).toEqual([
+      '/einsaetze/5/lageberichte/7',
+      '/einsaetze/5/gefahren?gefahrengebiet=3',
+      '/einsaetze/5/einsatzabschnitte?abschnitt=4',
+    ]);
+  });
+
+  it('zeigt von einem fortgeschriebenen Lagebericht nur den jüngsten Stand', () => {
+    // Zwei Fassungen desselben Berichts wären zwei gleichnamige Zeilen, von denen eine auf
+    // einen überholten Stand springt — dieselbe Frage, die die Lageberichte-Liste über
+    // `kettenKoepfe` beantwortet (LFH-348 · N23).
+    const t = baueDatensatzTreffer(
+      kontext({
+        suche: 'deich',
+        quellen: {
+          lageberichte: [
+            lagebericht({ id: 1, version: 1 }),
+            lagebericht({ id: 2, version: 2, vorgaenger_id: 1 }),
+          ],
+        },
+      }),
+    );
+    expect(ids(t)).toEqual(['datensatz:lageberichte:2']);
+  });
+
+  it('ein Gefahrengebiet ohne Namen heisst wie auf der Gefahrenseite', () => {
+    const t = baueDatensatzTreffer(
+      kontext({
+        suche: 'gefahrengebiet',
+        quellen: { gefahrengebiete: [gebiet({ id: 9, label: null })] },
+      }),
+    );
+    expect(t.map((x) => x.befehl.label)).toEqual(['Gefahrengebiet #9']);
+  });
+
+  it('keine der drei gehört in „@" (Namen) oder „#" (Tagebuch)', () => {
+    const quellen = {
+      lageberichte: [lagebericht({})],
+      gefahrengebiete: [gebiet({})],
+      abschnitte: [abschnitt({})],
+    };
+    for (const modus of ['kraefte', 'etb'] as PaletteModus[]) {
+      expect(baueDatensatzTreffer(kontext({ suche: 'deich', modus, quellen })), modus).toEqual([]);
+    }
+  });
+
+  it('ein ausgeblendetes Modul liefert keine Treffer — je Modul, nicht alles oder nichts', () => {
+    const t = baueDatensatzTreffer(
+      kontext({
+        suche: 'deich',
+        overrides: {
+          gefahrenzonen: ueberschreibung({ modul_key: 'gefahrenzonen', sichtbar: false }),
+        },
+        quellen: { gefahrengebiete: [gebiet({})], abschnitte: [abschnitt({})] },
+      }),
+    );
+    expect(labels(t)).toEqual(['Einsatzabschnitte · Deich Süd']);
+  });
+});
+
+describe('baueDatensatzTreffer — ETB-Sammeltreffer (LFH-619)', () => {
+  it('eine Zeile mit der Trefferzahl, die auf die gefilterte ETB-Seite springt', () => {
+    const navigate = vi.fn();
+    const t = baueDatensatzTreffer(
+      kontext({ suche: 'deich', navigate, quellen: { etbAnzahl: { anzahl: 31 } } }),
+    );
+    expect(ids(t)).toEqual(['datensatz:etb:suche']);
+    expect(t[0].befehl.label).toBe('Alle Einträge zu „deich“');
+    expect(t[0].befehl.kontext).toBe('ETB · 31 Treffer');
+    t[0].befehl.ausfuehren();
+    expect(new URL(navigate.mock.calls[0][0], 'http://x').searchParams.get('q')).toBe('deich');
+    expect(new URL(navigate.mock.calls[0][0], 'http://x').pathname).toBe('/einsaetze/5/etb');
+  });
+
+  it('steht HINTER den einzelnen Einträgen — er ist der Weg zu allen, nicht der beste', () => {
+    const t = baueDatensatzTreffer(
+      kontext({
+        suche: 'deich',
+        quellen: { etbText: [etb({ id: 4, inhalt: 'Deich hält' })], etbAnzahl: { anzahl: 12 } },
+      }),
+    );
+    expect(ids(t)).toEqual(['datensatz:etb:4', 'datensatz:etb:suche']);
+  });
+
+  it('„1 Treffer" im Singular, keine Zeile bei null Treffern', () => {
+    const eins = baueDatensatzTreffer(
+      kontext({ suche: 'deich', quellen: { etbAnzahl: { anzahl: 1 } } }),
+    );
+    expect(eins[0].befehl.kontext).toBe('ETB · 1 Treffer');
+    expect(
+      baueDatensatzTreffer(kontext({ suche: 'deich', quellen: { etbAnzahl: { anzahl: 0 } } })),
+    ).toEqual([]);
+  });
+
+  it('im „#"-Modus ja, im „@"-Modus nein, bei einer Nummer nie', () => {
+    const quellen = { etbAnzahl: { anzahl: 5 } };
+    expect(ids(baueDatensatzTreffer(kontext({ suche: 'deich', modus: 'etb', quellen })))).toEqual([
+      'datensatz:etb:suche',
+    ]);
+    expect(baueDatensatzTreffer(kontext({ suche: 'deich', modus: 'kraefte', quellen }))).toEqual(
+      [],
+    );
+    // '42' fragt der ETB über den Cursor, nicht über den Volltext — „Einträge zu 42" wäre
+    // eine Suche nach der Zahl im Text, die niemand gestellt hat.
+    expect(baueDatensatzTreffer(kontext({ suche: '42', quellen }))).toEqual([]);
+  });
+
+  it('ohne ETB-Recht gibt es ihn nicht', () => {
+    const t = baueDatensatzTreffer(
+      kontext({
+        suche: 'deich',
+        overrides: { etb: ueberschreibung({ modul_key: 'etb', sichtbar: false }) },
+        quellen: { etbAnzahl: { anzahl: 5 } },
+      }),
+    );
+    expect(t).toEqual([]);
+  });
+
+  it('der Riegel an der Anzeige hält ihn wie jeden ETB-Treffer', () => {
+    // Nachläufer aus dem warmen Cache: '@deich' zeigt keine ETB-Zeilen, '??' keine
+    // Volltext-Zeile — auch nicht den Sammeltreffer.
+    const t = baueDatensatzTreffer(
+      kontext({ suche: 'deich', quellen: { etbAnzahl: { anzahl: 5 } } }),
+    );
+    expect(sichtbareDatensaetze(t, 'kraefte', 'deich')).toEqual([]);
+    expect(sichtbareDatensaetze(t, 'alles', '??')).toEqual([]);
+    expect(ids(sichtbareDatensaetze(t, 'etb', 'deich'))).toEqual(['datensatz:etb:suche']);
   });
 });
