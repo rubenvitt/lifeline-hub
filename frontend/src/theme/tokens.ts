@@ -91,6 +91,11 @@ export interface Farbrollen {
   aufBedien: string;
   /** Text in Normalfarbe — nachts heller als die Füllfarbe `normal`, damit Zahl und Wort lesbar bleiben. */
   normalText: string;
+  /** Text in Achtungsfarbe (Statuszahl, Hinweiswort). Am Tag dunkler als `achtung`, weil die
+   *  Füllfarbe als Text den Tagesboden 7 : 1 nicht trägt (LFH-618); nachts gleich `achtung`. */
+  achtungText: string;
+  /** Text in Alarmfarbe — Gegenstück zu {@link Farbrollen.achtungText}. */
+  alarmText: string;
   /** Deckende Statusflächen: „Ampel als Fläche, Zahl bleibt lesbar" (Statuszelle/-Chip). */
   normalFlaeche: string;
   achtungFlaeche: string;
@@ -115,8 +120,13 @@ export interface Farbrollen {
  * text 15,46 · 18,47 — text2 11,00 · 13,13 — gedaempft 7,05 · 8,42 — schwach 5,33 · 6,37
  * (vorher text 15,18, gedaempft 6,33, schwach 4,88 auf dem alten Grund); steuerRahmen 3,30 · 3,95
  * (vorher `linieStark` 3,07 auf Weiß); Weiß auf bedien 6,59, auf bedienHover 5,62.
- * normalText auf normalFlaeche 7,87, achtung/achtungFlaeche 6,02, alarm/alarmFlaeche 5,52,
- * bedienText auf bedienFlaeche 7,11.
+ * normalText auf normalFlaeche 7,87, bedienText auf bedienFlaeche 7,11.
+ *
+ * `achtung`/`alarm` tragen als TEXT den Tagesboden nicht (auf ihrer Fläche 6,02 bzw. 5,52,
+ * auf Weiß 6,92 bzw. 6,78). Dafür stehen seit LFH-618 `achtungText`/`alarmText`:
+ * achtungText 9,22 auf Weiß · 8,02 auf achtungFlaeche · 8,30 auf lueckeZeile · 7,72 auf grund;
+ * alarmText 8,96 auf Weiß · 7,31 auf alarmFlaeche · 7,82 auf problemZeile · 7,71 auf
+ * berichtigungZeile · 7,51 auf grund. Die Füllfarben bleiben für Kante, Punkt und Balken.
  */
 export const farbenHell: Farbrollen = {
   grund: '#e9ebee',
@@ -148,6 +158,8 @@ export const farbenHell: Farbrollen = {
   bedienText: '#164f86',
   aufBedien: '#ffffff',
   normalText: '#155234',
+  achtungText: '#604200',
+  alarmText: '#8f1c12',
   normalFlaeche: '#e3f1e8',
   achtungFlaeche: '#f7efd5',
   alarmFlaeche: '#f9e3e3',
@@ -222,6 +234,8 @@ export const farbenDunkel: Farbrollen = {
   bedienText: '#8ec2f0',
   aufBedien: '#08090b',
   normalText: '#7ddc4a',
+  achtungText: '#e8cc3a',
+  alarmText: '#ff6b6b',
   normalFlaeche: '#0d1a0a',
   achtungFlaeche: '#1c1705',
   alarmFlaeche: '#1c0a0d',
@@ -266,8 +280,12 @@ export const rahmenFarben = {
  * ist Dekoration neben dem Typwort (zweiter Kanal), das Wort ist Text. Nachts trägt die
  * Kante den Entwurfswert; das Wort ist aufgehellt, wo der Entwurfston als Text zu schwach
  * wäre (auf `flaeche2`: Meldung 4,38 → 6,61, Anordnung 5,06 → 6,69, Entscheidung
- * 2,59 → 5,90, Berichtigung 3,23 → 6,48). Im Tagmodus sind die Wörter ≥ 7 : 1 auf Weiß und
- * ≥ 5,9 auf `grund`; die Kanten ≥ 3 : 1 auf `grund`. Nachts liegt die Entscheidungskante
+ * 2,59 → 5,90, Berichtigung 3,23 → 6,48). Im Tagmodus sind die Wörter ≥ 7 : 1 auf `grund` —
+ * dort steht die Zeitachse, nicht auf Weiß. Bis LFH-618 waren sie nur gegen Weiß gerechnet,
+ * die Browsermessung (`e2e/hellmodus-kontrast.spec.ts`) fand Anordnung 6,30, Lage 5,98 und
+ * Berichtigung 6,49 auf `grund`. Jetzt: Meldung 7,13 · Anordnung 7,41 · Entscheidung 7,81 ·
+ * Lage 7,40 · Berichtigung (`alarmText`) 7,51, auf der Berichtigungszeile 7,71. Die Kanten
+ * sind ≥ 3 : 1 auf `grund`. Nachts liegt die Entscheidungskante
  * bei 2,87 : 1 auf `grund` — Entwurfswert, das Typwort daneben trägt die Aussage.
  *
  * `system` ist neutral und zeigt auf die Textstufen — kein eigener Farbton.
@@ -295,10 +313,10 @@ export const etbTypFarbenDunkel: Record<EtbTypTon, EtbTypFarbe> = {
 
 export const etbTypFarbenHell: Record<EtbTypTon, EtbTypFarbe> = {
   meldung: { kante: '#1677ff', wort: '#0a47a6' },
-  anordnung: { kante: '#b35600', wort: '#8a3f00' },
+  anordnung: { kante: '#b35600', wort: '#7a3700' },
   entscheidung: { kante: '#722ed1', wort: '#5b1fae' },
-  lage: { kante: '#0e8c90', wort: '#006266' },
-  berichtigung: { kante: '#cf1322', wort: '#a8071a' },
+  lage: { kante: '#0e8c90', wort: '#005357' },
+  berichtigung: { kante: '#cf1322', wort: farbenHell.alarmText },
   system: { kante: farbenHell.schwach, wort: farbenHell.gedaempft },
 };
 
@@ -623,6 +641,10 @@ export function antdToken(farben: Farbrollen, dichte: Dichte = 'kompakt'): Theme
     colorText: farben.text,
     colorTextSecondary: farben.gedaempft,
     colorTextTertiary: farben.schwach,
+    // Platzhalter trägt bei mehreren Filtern die EINZIGE Beschriftung („Status", „Typ",
+    // „Bearbeiter zuweisen"). antds Ableitung aus `colorTextQuaternary` lag bei 1,9 : 1 (Tag)
+    // bzw. 2,3 : 1 (Nacht); `schwach` hält 6,37 auf Weiß und 5,03 auf `flaeche` (LFH-618).
+    colorTextPlaceholder: farben.schwach,
 
     // Der Rahmen eines Steuerelements, nicht die dekorative Linie (Messwerte bei `farbenDunkel`).
     colorBorder: farben.steuerRahmen,

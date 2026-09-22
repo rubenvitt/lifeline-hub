@@ -19,6 +19,8 @@ pub struct EinheitDaten<'a> {
     pub soll_unterfuehrer: Option<i64>,
     pub soll_mannschaft: Option<i64>,
     pub bemerkung: Option<&'a str>,
+    /// LFH-614: eigener Rufname der Einheit (Freitext, z. B. „Florian HM 12/44").
+    pub funkrufname: Option<&'a str>,
     pub kommunikationsmittel: Option<&'a str>,
     pub erreichbarkeit: Option<&'a str>,
     pub sortier: i64,
@@ -37,6 +39,7 @@ struct Row {
     fuehrer_id: Option<i64>,
     fuehrer_name: Option<String>,
     bemerkung: Option<String>,
+    funkrufname: Option<String>,
     kommunikationsmittel: Option<String>,
     erreichbarkeit: Option<String>,
     sortier: i64,
@@ -183,7 +186,7 @@ pub fn leite_status_ab(
 const SELECT_AUFGELOEST: &str = "\
     SELECT e.id, e.einsatz_id, e.abschnitt_id, ab.name AS abschnitt_name, \
            e.ueber_einheit_id, e.typ_id, t.label AS typ_label, e.name, \
-           e.fuehrer_id, fp.snap_name AS fuehrer_name, e.bemerkung, \
+           e.fuehrer_id, fp.snap_name AS fuehrer_name, e.bemerkung, e.funkrufname, \
            e.kommunikationsmittel, e.erreichbarkeit, e.sortier, \
            e.lat, e.lon, e.tz_fachaufgabe, e.tz_organisation, \
            e.aktueller_br_id, \
@@ -330,6 +333,7 @@ async fn zu_anzeige_batch(
             fuehrer_id: row.fuehrer_id,
             fuehrer_name: row.fuehrer_name,
             bemerkung: row.bemerkung,
+            funkrufname: row.funkrufname,
             kommunikationsmittel: row.kommunikationsmittel,
             erreichbarkeit: row.erreichbarkeit,
             sortier: row.sortier,
@@ -484,9 +488,9 @@ pub async fn anlegen(
     let id = sqlx::query_scalar::<_, i64>(
         "INSERT INTO einsatz_einheit \
             (einsatz_id, abschnitt_id, ueber_einheit_id, typ_id, name, \
-             soll_fuehrer, soll_unterfuehrer, soll_mannschaft, bemerkung, \
+             soll_fuehrer, soll_unterfuehrer, soll_mannschaft, bemerkung, funkrufname, \
              kommunikationsmittel, erreichbarkeit, sortier, angelegt_von) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(einsatz_id)
     .bind(daten.abschnitt_id)
@@ -497,6 +501,7 @@ pub async fn anlegen(
     .bind(daten.soll_unterfuehrer)
     .bind(daten.soll_mannschaft)
     .bind(daten.bemerkung)
+    .bind(daten.funkrufname)
     .bind(daten.kommunikationsmittel)
     .bind(daten.erreichbarkeit)
     .bind(daten.sortier)
@@ -518,6 +523,7 @@ pub struct EinheitPatch<'a> {
     pub soll_unterfuehrer: Option<Option<i64>>,
     pub soll_mannschaft: Option<Option<i64>>,
     pub bemerkung: Option<Option<&'a str>>,
+    pub funkrufname: Option<Option<&'a str>>,
     pub kommunikationsmittel: Option<Option<&'a str>>,
     pub erreichbarkeit: Option<Option<&'a str>>,
     pub sortier: Option<i64>,
@@ -577,7 +583,7 @@ pub async fn soll_roh(
 /// falls die Einheit nicht zum Einsatz gehört.
 ///
 /// Flag/Wert-Paare mit **nummerierten** Parametern (LFH-266/F12, Vorlage `person/repo.rs`):
-/// nur gesendete Spalten werden angefasst. Die Nummerierung ist bei elf aufeinanderfolgenden
+/// nur gesendete Spalten werden angefasst. Die Nummerierung ist bei zwölf aufeinanderfolgenden
 /// Paaren keine Stilfrage — eine um eine Position verschobene Bind-Kette vertauschte
 /// gleichtypige Nachbarspalten (`kommunikationsmittel`↔`erreichbarkeit`,
 /// `abschnitt_id`↔`ueber_einheit_id`) STILL, ohne Compile- und ohne Laufzeitfehler.
@@ -602,8 +608,9 @@ pub async fn patche(
             bemerkung = CASE WHEN ?15 IS NULL THEN bemerkung ELSE ?16 END, \
             kommunikationsmittel = CASE WHEN ?17 IS NULL THEN kommunikationsmittel ELSE ?18 END, \
             erreichbarkeit = CASE WHEN ?19 IS NULL THEN erreichbarkeit ELSE ?20 END, \
-            sortier = CASE WHEN ?21 IS NULL THEN sortier ELSE ?22 END \
-         WHERE id = ?23 AND einsatz_id = ?24",
+            sortier = CASE WHEN ?21 IS NULL THEN sortier ELSE ?22 END, \
+            funkrufname = CASE WHEN ?23 IS NULL THEN funkrufname ELSE ?24 END \
+         WHERE id = ?25 AND einsatz_id = ?26",
     )
     .bind(patch.abschnitt_id.map(|_| 1_i64))
     .bind(patch.abschnitt_id.and_then(|v| v))
@@ -627,6 +634,8 @@ pub async fn patche(
     .bind(patch.erreichbarkeit.and_then(|v| v))
     .bind(patch.sortier.map(|_| 1_i64))
     .bind(patch.sortier)
+    .bind(patch.funkrufname.map(|_| 1_i64))
+    .bind(patch.funkrufname.and_then(|v| v))
     .bind(id)
     .bind(einsatz_id)
     .execute(pool)
@@ -1022,6 +1031,7 @@ mod tests {
             soll_unterfuehrer: u,
             soll_mannschaft: m,
             bemerkung: None,
+            funkrufname: None,
             kommunikationsmittel: None,
             erreichbarkeit: None,
             sortier: 0,
@@ -1332,6 +1342,7 @@ mod tests {
                 soll_unterfuehrer: Some(3),
                 soll_mannschaft: Some(18),
                 bemerkung: Some("Bem"),
+                funkrufname: Some("Florian HM 12/44"),
                 kommunikationsmittel: Some("digitalfunk"),
                 erreichbarkeit: Some("0170/1"),
                 sortier: 42,
@@ -1354,13 +1365,14 @@ mod tests {
         .unwrap();
         assert_eq!(nachher.name, "Umbenannt");
         assert_eq!(nachher.bemerkung.as_deref(), Some("Bem"));
+        assert_eq!(nachher.funkrufname.as_deref(), Some("Florian HM 12/44"));
         assert_eq!(nachher.kommunikationsmittel.as_deref(), Some("digitalfunk"));
         assert_eq!(nachher.erreichbarkeit.as_deref(), Some("0170/1"));
         assert_eq!(nachher.soll, Some(crate::staerke::Staerke::neu(1, 3, 18)));
         assert_eq!(nachher.sortier, 42);
     }
 
-    /// Bind-Reihenfolge der elf Flag/Wert-Paare: alle Spalten in EINEM Patch auf distinkte
+    /// Bind-Reihenfolge der zwölf Flag/Wert-Paare: alle Spalten in EINEM Patch auf distinkte
     /// Werte setzen und einzeln prüfen. Eine verschobene Kette vertauschte gleichtypige
     /// Nachbarspalten (`kommunikationsmittel`↔`erreichbarkeit`) still.
     #[tokio::test]
@@ -1399,6 +1411,7 @@ mod tests {
                 soll_unterfuehrer: Some(Some(5)),
                 soll_mannschaft: Some(Some(30)),
                 bemerkung: Some(Some("B")),
+                funkrufname: Some(Some("F")),
                 kommunikationsmittel: Some(Some("K")),
                 erreichbarkeit: Some(Some("E")),
                 sortier: Some(7),
@@ -1412,6 +1425,7 @@ mod tests {
         assert_eq!(nachher.typ_id, Some(typ));
         assert_eq!(nachher.soll, Some(crate::staerke::Staerke::neu(2, 5, 30)));
         assert_eq!(nachher.bemerkung.as_deref(), Some("B"));
+        assert_eq!(nachher.funkrufname.as_deref(), Some("F"));
         assert_eq!(nachher.kommunikationsmittel.as_deref(), Some("K"));
         assert_eq!(nachher.erreichbarkeit.as_deref(), Some("E"));
         assert_eq!(nachher.sortier, 7);

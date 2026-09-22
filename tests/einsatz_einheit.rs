@@ -941,8 +941,8 @@ async fn einheit_voll(app: &axum::Router, cookie: &str, einsatz: i64, sg: i64) -
         cookie,
         Some(&format!(
             r#"{{"name":"1. Zug","soll_fuehrer":1,"soll_unterfuehrer":3,"soll_mannschaft":18,
-                 "bemerkung":"Bem","kommunikationsmittel":"digitalfunk",
-                 "erreichbarkeit":"0170/12345","sortier":42,"sprechgruppe_ids":[{sg}]}}"#
+                 "bemerkung":"Bem","funkrufname":"Florian HM 12/44",
+                 "kommunikationsmittel":"digitalfunk","erreichbarkeit":"0170/12345","sortier":42,"sprechgruppe_ids":[{sg}]}}"#
         )),
     )
     .await;
@@ -978,6 +978,7 @@ async fn patch_fuehrer_laesst_kommunikationsmittel_erreichbarkeit_und_sprechgrup
     assert_eq!(json["kommunikationsmittel"], "digitalfunk");
     assert_eq!(json["erreichbarkeit"], "0170/12345");
     assert_eq!(json["bemerkung"], "Bem");
+    assert_eq!(json["funkrufname"], "Florian HM 12/44");
     assert_eq!(json["sortier"], 42);
     assert_eq!(json["soll"]["fuehrer"], 1);
     assert_eq!(json["soll"]["unterfuehrer"], 3);
@@ -1442,4 +1443,85 @@ async fn einheitenstatus_folgt_den_fahrzeugen_gemeinsam_oder_gemischt() {
         .map(|x| x["anzahl"].as_i64().unwrap())
         .collect();
     assert_eq!(anzahlen, vec![1, 1]);
+}
+
+// ---------- LFH-614: Funkrufname als Stammfeld der Einheit ----------
+
+/// Anlegen trimmt, PATCH ändert, `null` und Leerraum leeren. Der geleerte Wert fehlt im
+/// JSON (`skip_serializing_if`, Norm LFH-265) — geprüft per `contains_key`, weil
+/// `json["funkrufname"]` einen fehlenden Key nicht von `null` unterscheidet.
+#[tokio::test]
+async fn funkrufname_anlegen_aendern_und_leeren() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/einheiten"),
+        &admin,
+        Some(r#"{"name":"1. Zug","funkrufname":"  Florian HM 12/44  "}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+    assert_eq!(
+        json["funkrufname"], "Florian HM 12/44",
+        "wird getrimmt gespeichert"
+    );
+    let e = json["id"].as_i64().unwrap();
+    let pfad = format!("/api/einsaetze/{einsatz}/einheiten/{e}");
+
+    let (s, json) = anfrage(&app, "PATCH", &pfad, &admin, Some(r#"{"name":"Zug 1"}"#)).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(
+        json["funkrufname"], "Florian HM 12/44",
+        "ein Patch ohne den Key lässt den Rufnamen stehen"
+    );
+
+    let (_, json) = anfrage(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(r#"{"funkrufname":"Heros 3/1"}"#),
+    )
+    .await;
+    assert_eq!(json["funkrufname"], "Heros 3/1");
+
+    let (s, json) = anfrage(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(r#"{"funkrufname":null}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert!(!json.as_object().unwrap().contains_key("funkrufname"));
+
+    anfrage(&app, "PATCH", &pfad, &admin, Some(r#"{"funkrufname":"X"}"#)).await;
+    let (_, json) = anfrage(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(r#"{"funkrufname":"   "}"#),
+    )
+    .await;
+    assert!(
+        !json.as_object().unwrap().contains_key("funkrufname"),
+        "Leerraum ist der Leerwunsch, kein Leerstring in der Spalte"
+    );
+
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/einheiten"),
+        &admin,
+        Some(r#"{"name":"2. Zug"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+    assert!(!json.as_object().unwrap().contains_key("funkrufname"));
 }

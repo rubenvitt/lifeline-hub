@@ -66,9 +66,11 @@ import './kraefteuebersichtPrint.css';
  * Das Statusband zählt die Einheiten je Status wie der Entwurf. Die verdichtete
  * Verteilung der Mittel (bereit / gebunden / Ausfall) bleibt als eigene Spalte „Mittel".
  *
+ * Der Funkrufname der Einheit ist ihr gepflegter eigener (LFH-614); fehlt er, steht nur
+ * der eines EINZIGEN Fahrzeugs, sonst bleibt die Zelle leer.
+ *
  * WEGGELASSEN, weil ohne Datenquelle (Entscheidung 4, „keine erfundenen Daten"): die
- * Rückmeldung und die Kachel „keine Rückmeldung" (LFH-610), der Funkrufname der Einheit,
- * wo er nicht eindeutig aus genau einem Fahrzeug folgt (LFH-614).
+ * Rückmeldung und die Kachel „keine Rückmeldung" (LFH-610).
  */
 
 /**

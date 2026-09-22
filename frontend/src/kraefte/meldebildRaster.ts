@@ -244,17 +244,20 @@ export function offeneAuftraegeJeEinheit(auftraege: readonly Auftrag[]): Map<num
 // ── Funkrufname ───────────────────────────────────────────────────────────────
 
 /**
- * Der Funkrufname einer Einheit — NUR, wenn er eindeutig ist: genau ein Fahrzeug in der
- * Einheit. Bei null oder mehreren Fahrzeugen gibt es keinen Rufnamen der EINHEIT; ihn zu
- * raten (erstes Fahrzeug, Führungsfahrzeug) wäre eine erfundene Angabe. Ein eigener
- * Rufname je Einheit ist LFH-614.
+ * Der Funkrufname einer Einheit. Zuerst der gepflegte eigene Rufname (`Einheit.funkrufname`,
+ * LFH-614). Fehlt er, NUR der eindeutige: genau ein Fahrzeug in der Einheit. Bei null oder
+ * mehreren Fahrzeugen gibt es dann keinen Rufnamen der EINHEIT; ihn zu raten (erstes
+ * Fahrzeug, Führungsfahrzeug) wäre eine erfundene Angabe.
  *
  * Gelesen aus `Einheit.fahrzeug_mitglieder` (Serverstand), NICHT aus der gefilterten
  * Fahrzeugliste: sonst wechselte der Rufname einer Einheit mit dem Statusfilter.
  */
-export function eindeutigerFunkrufname(
-  fahrzeuge: readonly { funkrufname: string }[] | null | undefined,
-): string | null {
+export function einheitFunkrufname(einheit: {
+  funkrufname?: string | null;
+  fahrzeug_mitglieder?: readonly { funkrufname: string }[] | null;
+}): string | null {
+  if (einheit.funkrufname) return einheit.funkrufname;
+  const fahrzeuge = einheit.fahrzeug_mitglieder;
   if (!fahrzeuge) return null;
   return fahrzeuge.length === 1 ? fahrzeuge[0].funkrufname : null;
 }
@@ -423,7 +426,7 @@ export function baueMeldebildRaster(e: RasterEingabe): RasterZeile[] {
       einheitId: x.id,
       bezeichnung: x.name,
       zusatz: ueber ? `in ${ueber.name}` : (x.typ_label ?? null),
-      funkrufname: eindeutigerFunkrufname(x.fahrzeug_mitglieder),
+      funkrufname: einheitFunkrufname(x),
       abschnitt: aId != null ? (abschnittName.get(aId) ?? x.abschnitt_name ?? null) : null,
       staerke,
       verteilung,

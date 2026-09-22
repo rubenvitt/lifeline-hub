@@ -147,7 +147,8 @@ export type KatalogSpalte<T> = NonNullable<TableProps<T>['columns']>[number] & {
  * Kopfzeile auf `kopf` (nachts `#0c0e11`), Kopftext `schwach`, keine senkrechten Trenner im
  * Kopf; Zeilentrenner als Haarlinie — nachts `flaeche2` (Entwurf `#14171b`), am Tag
  * `flaeche3`: `flaeche2` läge dort bei 1,08 : 1 auf Weiß und wäre schlicht nicht da.
- * Hover dezent auf `flaeche2`. Die Zellpolsterung folgt der Dichte-Staffel (`paddingSM` /
+ * Hover auf `flaeche3` — aus demselben Grund: auf `flaeche2` war die Zeile am Tag nicht
+ * hervorgehoben (1,08 : 1), nachts trennt beide nur 1,02 : 1 (LFH-618). Die Zellpolsterung folgt der Dichte-Staffel (`paddingSM` /
  * `padding`), statt auf antds festen 16 px zu stehen — die Zeilenhöhe zieht damit mit.
  */
 export function tabellenTokens(
@@ -164,7 +165,7 @@ export function tabellenTokens(
     fixedHeaderSortActiveBg: rollen.kopf,
     headerBorderRadius: 0,
     borderColor: dunkel ? rollen.flaeche2 : rollen.flaeche3,
-    rowHoverBg: rollen.flaeche2,
+    rowHoverBg: rollen.flaeche3,
     cellPaddingBlock: token.paddingSM,
     cellPaddingInline: token.padding,
   };

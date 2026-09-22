@@ -111,6 +111,7 @@ interface KopfWerte {
   soll?: Staerke | null;
   bemerkung?: string;
   sprechgruppe_ids?: number[];
+  funkrufname?: string;
   kommunikationsmittel?: string;
   erreichbarkeit?: string;
 }
@@ -202,6 +203,7 @@ export default function EinheitDetailPage() {
         soll_mannschaft: werte.soll?.mannschaft ?? null,
         bemerkung: leerZuNull(werte.bemerkung),
         sprechgruppe_ids: werte.sprechgruppe_ids ?? [],
+        funkrufname: leerZuNull(werte.funkrufname),
         kommunikationsmittel: leerZuNull(werte.kommunikationsmittel),
         erreichbarkeit: leerZuNull(werte.erreichbarkeit),
       };
@@ -286,6 +288,7 @@ export default function EinheitDetailPage() {
         soll: aktuell.soll,
         bemerkung: aktuell.bemerkung ?? undefined,
         sprechgruppe_ids: aktuell.sprechgruppen?.map((s) => s.id) ?? [],
+        funkrufname: aktuell.funkrufname ?? undefined,
         kommunikationsmittel: aktuell.kommunikationsmittel ?? undefined,
         erreichbarkeit: aktuell.erreichbarkeit ?? undefined,
       });
@@ -488,6 +491,15 @@ export default function EinheitDetailPage() {
             </Form.Item>
 
             <SektionHeader titel="Funk / Kommunikation" ueberschrift="h3" />
+            {/* LFH-614: der Rufname der EINHEIT, nicht eines ihrer Fahrzeuge. Leer gelassen
+              zeigt das Meldebild höchstens den Rufnamen des einzigen Fahrzeugs. */}
+            <Form.Item
+              label="Funkrufname"
+              name="funkrufname"
+              extra="Leer lassen, wenn die Einheit keinen eigenen Rufnamen führt."
+            >
+              <Input placeholder="z. B. Florian HM 12/44" allowClear />
+            </Form.Item>
             <Form.Item label="Sprechgruppen" name="sprechgruppe_ids">
               <SprechgruppenPicker einsatzId={einsatzId} />
             </Form.Item>

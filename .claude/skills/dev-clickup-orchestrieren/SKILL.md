@@ -130,8 +130,9 @@ sequenziell — aber das nur, wenn der Schnitt sauber ist.
 
 ## Phase 5 — Abschluss & Status
 
-- Integration → `superpowers:finishing-a-development-branch`. Worktree/Branch dem Harness
-  überlassen (nicht manuell removen).
+- Integration → `superpowers:finishing-a-development-branch`, und zwar **ohne Menü mit der
+  stehenden Wahl „Push + PR gegen `alpha`"** (Festlegung des Users, 22.09.2026; Details in
+  `dev-clickup-ausfuehren`). Worktree/Branch dem Harness überlassen (nicht manuell removen).
 - Pro (Sub)Task Board-Status vorwärts: nach Merge `shipped`; ist nichts mehr offen → `done`.
   Parent erst auf `shipped`/`done`, wenn alle Subtasks es sind.
 - Commits/PR auf die jeweilige `custom_id` referenzieren.

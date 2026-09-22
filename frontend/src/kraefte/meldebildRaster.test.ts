@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   aufklappbareSchluessel,
   baueMeldebildRaster,
-  eindeutigerFunkrufname,
   einheitBand,
+  einheitFunkrufname,
   einheitStatusAnzeige,
   fahrzeugStatus,
   fmsWort,
@@ -225,7 +225,7 @@ describe('baueMeldebildRaster', () => {
     expect(raster[0].verteilung).toEqual({ bereit: 1, gebunden: 1, ausfall: 2, ohne: 1 });
   });
 
-  it('Funkrufname nur bei genau EINEM Fahrzeugmitglied der Einheit', () => {
+  it('ohne gepflegten Rufnamen: nur bei genau EINEM Fahrzeugmitglied der Einheit', () => {
     const raster = baueMeldebildRaster(
       eingabe({
         einheiten: [
@@ -243,7 +243,29 @@ describe('baueMeldebildRaster', () => {
       }),
     );
     expect(raster.map((z) => z.funkrufname)).toEqual(['FL HM 12/44', null, null]);
-    expect(eindeutigerFunkrufname(undefined)).toBeNull();
+    expect(einheitFunkrufname({})).toBeNull();
+  });
+
+  it('der gepflegte Rufname der Einheit (LFH-614) gewinnt über jede Ableitung', () => {
+    const raster = baueMeldebildRaster(
+      eingabe({
+        einheiten: [
+          eh(1, null, null, {
+            funkrufname: 'Heros 3/1',
+            fahrzeug_mitglieder: [{ ef_id: 1, funkrufname: 'FL HM 12/44' }],
+          } as never),
+          eh(2, null, null, {
+            funkrufname: 'Florian HM 1',
+            fahrzeug_mitglieder: [
+              { ef_id: 2, funkrufname: 'A' },
+              { ef_id: 3, funkrufname: 'B' },
+            ],
+          } as never),
+          eh(3, null, null, { funkrufname: 'Kater 7' } as never),
+        ],
+      }),
+    );
+    expect(raster.map((z) => z.funkrufname)).toEqual(['Heros 3/1', 'Florian HM 1', 'Kater 7']);
   });
 });
 

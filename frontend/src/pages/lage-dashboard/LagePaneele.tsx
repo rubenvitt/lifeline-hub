@@ -120,9 +120,9 @@ export function GefahrenmatrixPaneel({
                       textAlign: 'end',
                       color:
                         ton === 'alarm'
-                          ? rollen.alarm
+                          ? rollen.alarmText
                           : ton === 'achtung'
-                            ? rollen.achtung
+                            ? rollen.achtungText
                             : rollen.gedaempft,
                     }}
                   >
@@ -347,7 +347,11 @@ export function MeldungsstromPaneel({
   // „live" nur bei offener Leitung — bei totem Stream liefert der Cache brav alte Daten,
   // und ein stehengebliebenes „live" wäre genau die Falschaussage, gegen die LFH-336 antrat.
   const metaFarbe =
-    liveStatus === 'open' ? rollen.bedien : liveStatus === 'lost' ? rollen.alarm : rollen.schwach;
+    liveStatus === 'open'
+      ? rollen.bedien
+      : liveStatus === 'lost'
+        ? rollen.alarmText
+        : rollen.schwach;
   return (
     <Paneel
       titel="Meldungsstrom"

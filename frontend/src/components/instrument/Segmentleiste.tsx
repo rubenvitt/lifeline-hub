@@ -9,7 +9,7 @@ import '../../theme/sprache.css';
  * Gleitanimation die Formensprache (Radius 0, Fugenraster) an genau der Stelle brechen,
  * an der sie sitzt.
  *
- * FUGENRASTER: die Segmente stehen mit `gap: 1px` auf `linieStark`; aktiv `flaeche2` +
+ * FUGENRASTER: die Segmente stehen mit `gap: 1px` auf `linieStark`; aktiv `flaeche3` +
  * `text`, inaktiv `flaeche` + `gedaempft`, optional ein 6-px-Farbpunkt (quadratisch —
  * Radius 0 gilt auch für den Punkt). Die Farben und die Zustände Hover/Fokus liegen als
  * Klassen in `theme/sprache.css` (`.lfh-segmente`, `.lfh-segment`), weil `:hover` und

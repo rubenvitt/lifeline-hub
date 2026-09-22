@@ -11,6 +11,8 @@ export interface EinheitEingabe {
   soll_unterfuehrer?: number | null;
   soll_mannschaft?: number | null;
   bemerkung?: string | null;
+  /** LFH-614: eigener Funkrufname der Einheit (Freitext, `null` leert). */
+  funkrufname?: string | null;
   sortier?: number;
   /** LFH-109: IDs der zuzuordnenden Sprechgruppen aus dem Katalog. */
   sprechgruppe_ids?: number[];

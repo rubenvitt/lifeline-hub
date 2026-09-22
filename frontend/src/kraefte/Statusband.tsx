@@ -16,9 +16,9 @@ import { bandSpalten } from './statusbandStil';
  * Status-Töne führt (`normal` für „frei", `bedien` für „am Einsatzort"), ist jede Zelle eine
  * `Kennzahl`: Code als Augenbraue mit Statuspunkt (8-px-Quadrat in der Rollenfarbe, neutral
  * in `schwach`), Zahl Mono 22 (`klein`; der Eigenbau hatte 26, das kennt die Schriftskala
- * nicht), Wort als Notiz. Die Kontrastregel der Zahl — TAGS bei `achtung`/`alarm` in `text`,
- * weil die Tonfarbe den 7 : 1-Boden auf `flaeche` nicht trägt — liegt jetzt im Baustein
- * (`zahlFarbe`) und gilt damit für jede Kennzahl, nicht nur hier. Neu durch den Baustein:
+ * nicht), Wort als Notiz. Die Kontrastregel der Zahl — `achtung`/`alarm` über ihre
+ * Textrollen, weil die Füllfarbe den 7 : 1-Boden auf `flaeche` am Tag nicht trägt (LFH-618) —
+ * liegt im Baustein (`zahlFarbe`) und gilt damit für jede Kennzahl, nicht nur hier. Neu durch den Baustein:
  * `achtung`/`alarm` tragen seine abgestufte Innenkante (3/6 px) — ein zusätzlicher Kanal,
  * kein Verlust.
  *

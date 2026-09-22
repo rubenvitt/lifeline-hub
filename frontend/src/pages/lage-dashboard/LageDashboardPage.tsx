@@ -379,7 +379,7 @@ export default function LageDashboardPage() {
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 6,
-                color: warnTon === 'alarm' ? rollen.alarm : rollen.achtung,
+                color: warnTon === 'alarm' ? rollen.alarmText : rollen.achtungText,
               }}
             >
               <span aria-hidden="true" style={{ display: 'inline-flex' }}>
