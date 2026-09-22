@@ -634,3 +634,64 @@ test('Fokus nie verdeckt: Tab-Durchlauf durch die Liste unter der stehenden Kopf
     contentType: 'text/plain',
   });
 });
+
+// Kriterium 13 im Dialog: gemessen statt aus „kein sticky im Quelltext" geschlossen. Die Maske
+// des Modals und die Kopfleiste der Seite sind fixiert; der Durchlauf muss jedes Dialogziel
+// besuchen, sonst wäre „0 verdeckt" trivial wahr. Bei 390 px in `handschuh` ist der Dialog
+// höher als der Schirm und scrollt in seiner Hülle — genau dort könnte ein Ziel unter einer
+// fixierten Fläche landen.
+for (const viewport of [FUEKW, HANDSCHIRM]) {
+  for (const dichte of ['kompakt', 'handschuh'] as const) {
+    test(`Fokus nie verdeckt im Ablegen-Dialog bei ${viewport.width} px, ${dichte}`, async ({
+      page,
+    }, testInfo) => {
+      test.setTimeout(90_000);
+      await page.setViewportSize(viewport);
+      await anmelden(page);
+      const einsatzId = await einsatzAnlegen(page, `E2E Ablage Dialogfokus ${Date.now()}`);
+      await page.goto(`/einsaetze/${einsatzId}/dokumente`);
+      await stelleDichte(page, dichte);
+      await page.getByRole('button', { name: 'Dokument ablegen' }).click();
+      const dialog = ablegenDialog(page);
+      await expect(dialog.locator('button.ant-btn', { hasText: 'Datei wählen' })).toBeFocused();
+      await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+      // Datei gewählt und Bezug aufgeklappt: jedes Ziel, das der Dialog tragen kann, steht im Baum.
+      await dialog
+        .locator('input[type="file"]')
+        .setInputFiles({ name: 'Lageplan Nord.pdf', mimeType: 'application/pdf', buffer: PDF });
+      await dialog.getByText('Bezug (optional)').click();
+      await expect(dialog.getByRole('combobox', { name: 'Bezug' })).toBeVisible();
+
+      const ziele = {
+        datei: dialog.locator('button.ant-btn', { hasText: 'Datei wählen' }),
+        entfernen: dialog.getByRole('button', { name: 'Datei entfernen' }),
+        kategorie: dialog.getByRole('combobox', { name: 'Kategorie' }),
+        titel: dialog.getByLabel('Titel'),
+        klappkopf: dialog.locator('.ant-collapse-header'),
+        bezug: dialog.getByRole('combobox', { name: 'Bezug' }),
+        abbrechen: dialog.getByRole('button', { name: 'Abbrechen' }),
+        ablegen: dialog.getByRole('button', { name: 'Ablegen' }),
+      };
+      for (const [name, ziel] of Object.entries(ziele)) {
+        await ziel.evaluate((el, n) => el.setAttribute('data-e2e-fokus', n), name);
+      }
+      await ziele.datei.focus();
+
+      const befund = await pruefeFokusVerdeckung(page, 24);
+      expect(befund.besuchteZiele.sort(), 'jedes Dialogziel muss per Tab besucht werden').toEqual(
+        Object.keys(ziele).sort(),
+      );
+      expect(befund.fixierteKandidaten, 'Vorbedingung: es gibt fixierte Flächen').toBeGreaterThan(
+        0,
+      );
+      expect(befund.verdeckt, befund.verdeckt.join('\n')).toEqual([]);
+      const scrollt = await page
+        .locator('.ant-modal-wrap')
+        .evaluate((w) => w.scrollHeight > w.clientHeight);
+      await testInfo.attach('Fokus-Verdeckung Dialog', {
+        body: `${viewport.width}px ${dichte}: ${befund.stoppsGesamt} Stopps, ${befund.besuchteZiele.length} Dialogziele, ${befund.fixierteKandidaten} fixierte Kandidaten, ${befund.verdeckt.length} verdeckt, Dialog scrollt: ${scrollt}`,
+        contentType: 'text/plain',
+      });
+    });
+  }
+}
