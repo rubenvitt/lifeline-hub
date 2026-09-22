@@ -1238,8 +1238,19 @@ test('Ablösung: Kartenaktionen und Vorgabe-Knopf folgen der Dichte-Staffel 30 /
       soll,
       `Vorgabe-Knopf (${dichte})`,
     );
+    // Abstand zwischen Kartenaktion und Dreipunkt-Auslöser: im Handschuh-Betrieb ≥ 16 px
+    // (MIL-STD-1472F Fig. 24 [abgeleitet], Prüfliste Kriterium 2). Gemessen an der ersten Karte.
+    const links = (await vollziehen.first().boundingBox())!;
+    const rechts = (await menue.first().boundingBox())!;
+    const luecke = Math.round(rechts.x - (links.x + links.width));
+    if (dichte === 'handschuh') {
+      expect(
+        luecke,
+        `Abstand Kartenaktionen (handschuh, gemessen ${luecke}px)`,
+      ).toBeGreaterThanOrEqual(16);
+    }
     gemessen.push(
-      `${dichte} (Soll ≥ ${soll}): Vollziehen ${primaer}, Dreipunkt ${dreipunkt}, Vorgabe ${vorgabe}`,
+      `${dichte} (Soll ≥ ${soll}): Vollziehen ${primaer}, Dreipunkt ${dreipunkt}, Vorgabe ${vorgabe}, Abstand ${luecke}`,
     );
   }
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });

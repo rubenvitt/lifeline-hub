@@ -126,7 +126,9 @@ export default function AbloesungKarte({
           )}
         </Space>
         {darfSchreiben && laufend && (
-          <Flex justify="flex-end" gap={token.marginXS} style={{ marginTop: token.marginXS }}>
+          // `marginSM` = 7 / 11 / 16 px: im Handschuh-Betrieb der Abstand ≥ 16 px zwischen zwei
+          // Zielen (MIL-STD-1472F Fig. 24, Prüfliste Kriterium 2), gemessen in Gate 3.
+          <Flex justify="flex-end" gap={token.marginSM} style={{ marginTop: token.marginXS }}>
             {onVollziehen && (
               // Kein `type="primary"`: die EINE Primäraktion der Seite steht im Kopf
               // („Schicht beginnen", LFH-340 · C5); n blaue Kartenknöpfe gleichen Gewichts
