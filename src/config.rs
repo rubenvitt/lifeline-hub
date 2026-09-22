@@ -55,10 +55,22 @@ pub struct OnlineStyle {
     pub attribution: Option<String>,
 }
 
-/// Eingebaute, schlüsselfreie Default-Shortlist (alle ohne API-Key, MapLibre-GL-tauglich,
-/// behördlich/kommerziell nutzbar — Stand Recherche 30.05.2026). Dient als kuratierter
-/// Vorschlagskatalog (`GET /api/karte/online-quellen/katalog`) — NICHT als automatischer Seed;
-/// die DB-Registry startet leer (LFH-179: ENV-Kartenkonfig + Seeding entfernt).
+/// Eingebaute, schlüsselfreie Default-Shortlist (alle ohne API-Key, MapLibre-GL-tauglich).
+/// Dient als kuratierter Vorschlagskatalog (`GET /api/karte/online-quellen/katalog`) — NICHT
+/// als automatischer Seed; die DB-Registry startet leer (LFH-179: ENV-Kartenkonfig + Seeding
+/// entfernt). Die ersten fünf sind behördlich/kommerziell nutzbar (Stand Recherche 30.05.2026).
+///
+/// **Die eine Ausnahme ist „Satellit (Esri)"** (LFH-616, Umschalter „Satellit" aus dem
+/// Neuentwurf S5). Ein kostenloses, hochauflösendes Luftbild mit sauberer Lizenz für ganz
+/// Deutschland gibt es nicht: die Landes-DOP sind frei, aber je Bundesland verschieden (und
+/// teils nur als WMS-bbox, die der Proxy nicht kennt); Sentinel-2 cloudless (EOX) ist in der
+/// freien Fassung 2016 mit 10 m zu grob für eine Lagekarte. Esri World Imagery ist ohne
+/// Schlüssel abrufbar, laut Esri-Nutzungsbedingungen verlangt ein **Produktivbetrieb** aber
+/// ein ArcGIS-Konto — die Übernahme aus dem Katalog ist deshalb eine bewusste
+/// Betreiberentscheidung, kein stiller Vorgabewert. Übernommen läuft sie über den Proxy
+/// (`AusKatalogModal` setzt `proxy: true`); ein Schlüssel bliebe damit serverseitig.
+/// Offline ist Satellit begründet ausgenommen: Luftbildkacheln sind je Zoomstufe um
+/// Größenordnungen schwerer als Vektorkacheln, ein Offline-Paket wäre nicht lieferbar.
 pub fn default_online_styles() -> Vec<OnlineStyle> {
     vec![
         OnlineStyle {
@@ -90,6 +102,14 @@ pub fn default_online_styles() -> Vec<OnlineStyle> {
             url: "https://sgx.geodatenzentrum.de/wmts_topplus_open/tile/1.0.0/web/default/WEBMERCATOR/{z}/{y}/{x}.png".into(),
             typ: OnlineStyleTyp::Raster,
             attribution: Some("© GeoBasis-DE / BKG (2026), TopPlusOpen".into()),
+        },
+        OnlineStyle {
+            name: "Satellit (Esri)".into(),
+            url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}".into(),
+            typ: OnlineStyleTyp::Raster,
+            attribution: Some(
+                "Powered by Esri · Esri, Maxar, Earthstar Geographics, GIS User Community".into(),
+            ),
         },
     ]
 }
@@ -887,6 +907,24 @@ mod tests {
         );
     }
 
+    /// LFH-616: der Umschalter „Satellit" braucht eine Raster-Quelle im Katalog, und zwar in
+    /// einer Form, die der Proxy annimmt — nur `{z}`/`{x}`/`{y}`, kein WMS-bbox.
+    #[test]
+    fn katalog_bietet_satellit_als_proxy_taugliches_raster() {
+        let styles = default_online_styles();
+        let s = styles
+            .iter()
+            .find(|s| s.name.starts_with("Satellit"))
+            .expect("Satellit-Eintrag im Katalog");
+        assert_eq!(s.typ, OnlineStyleTyp::Raster);
+        assert!(s.url.starts_with("https://"));
+        assert!(
+            crate::karte::proxy::unbekannte_platzhalter(&s.url).is_empty(),
+            "nur Platzhalter, die der Proxy kennt"
+        );
+        assert!(s.attribution.as_deref().unwrap_or("").contains("Esri"));
+    }
+
     #[test]
     fn online_style_deserialisiert_mit_default_typ_vektor() {
         let s: OnlineStyle =
@@ -909,7 +947,7 @@ mod tests {
 
     /// LFH-265, Wire-Vertrag der Serialisierungsrichtung. EHRLICHE EINORDNUNG: an der heutigen
     /// API-Oberfläche ist `attribution: None` UNBEOBACHTBAR — `GET
-    /// /api/karte/online-quellen/katalog` liefert `default_online_styles()` (alle fünf mit
+    /// /api/karte/online-quellen/katalog` liefert `default_online_styles()` (alle mit
     /// `Some`), und der DB-Schreibpfad hinter `/api/karte/config` erzwingt Attribution als
     /// Pflicht (`routes/karte.rs`: „Attribution ist Pflicht (Lizenzauflage)"). Ein
     /// Endpunkt-Test ist damit unschreibbar; dieser Unit-Test ist der einzig mögliche Beleg.

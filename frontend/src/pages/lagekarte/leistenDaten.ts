@@ -333,10 +333,13 @@ export interface GrundlageOption {
 }
 
 /**
- * Die Segmente der Kartengrundlage — was es gibt, sonst nichts (kein „Satellit", LFH-616).
+ * Die Segmente der Kartengrundlage — was es gibt, sonst nichts.
  *
  * Je Online-Stil aus `config.online_styles` ein Segment (die Stilnamen sind die Wahl, die
  * vorher im Unter-Select stand); ist keiner konfiguriert, steht EIN gesperrtes „Online" da.
+ * „Lage / Gelände / Satellit" aus dem Entwurf S5 sind deshalb KEINE festen Rollen, sondern
+ * die Namen der übernommenen Quellen (LFH-616): der Katalog bietet „TopPlusOpen" als Gelände
+ * und „Satellit (Esri)" als Luftbild an, Offline hat kein Luftbild.
  * Offline ist gesperrt, wenn es nicht verfügbar ist. Gesperrt statt ausgeblendet: dass eine
  * Grundlage fehlt, ist eine Aussage über die Installation, die die Einsatzkraft braucht.
  */
