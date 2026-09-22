@@ -26,6 +26,19 @@ pub async fn liste_kanaele(
     .execute(pool)
     .await?;
 
+    kanaele_lesen(pool, einsatz_id, benutzer_id).await
+}
+
+/// Die Kanäle eines Einsatzes mit Ungelesen-Zahl für `benutzer_id` — rein lesend, OHNE den
+/// Standardkanal anzulegen (LFH-612). Der Modulzähler ruft sie bei jedem gezählten
+/// Live-Ereignis; ein INSERT dort nähme bei jedem Abruf die Schreibsperre der Datenbank, auch
+/// wenn es nichts einfügt. Fehlt der Standardkanal noch, gibt es auch nichts Ungelesenes.
+/// Eine Quelle für das Ungelesen-Prädikat: [`liste_kanaele`] liest über diese Funktion.
+pub async fn kanaele_lesen(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    benutzer_id: i64,
+) -> Result<Vec<ChatKanalAnzeige>, AppError> {
     sqlx::query_as::<_, ChatKanalAnzeige>(
         "SELECT k.id, k.einsatz_id, k.name, k.beschreibung, k.erstellt_von_id, \
                 k.erstellt_at, k.archiviert_at, MAX(n.erstellt_at) AS letzte_nachricht_at, \

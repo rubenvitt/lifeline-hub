@@ -79,13 +79,17 @@ describe('useModulZaehler (LFH-612)', () => {
   });
 
   it('zeigt ohne Antwort keine Zahl', async () => {
+    let beantwortet = false;
     server.use(
-      http.get('/api/einsaetze/7/modul-zaehler', () =>
-        HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
-      ),
+      http.get('/api/einsaetze/7/modul-zaehler', () => {
+        beantwortet = true;
+        return HttpResponse.json({ error: 'kaputt' }, { status: 500 });
+      }),
     );
     const { result } = renderHook(() => useModulZaehler({ einsatzId: 7, benutzer }), { wrapper });
-    await new Promise((r) => setTimeout(r, 50));
+    // Erst NACH der Antwort prüfen — vorher wäre `{}` auch ohne Fehlerpfad das Ergebnis.
+    await waitFor(() => expect(beantwortet).toBe(true));
+    await new Promise((r) => setTimeout(r, 20));
     expect(result.current).toEqual({});
   });
 });

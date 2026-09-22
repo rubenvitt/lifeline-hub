@@ -172,9 +172,10 @@ pub async fn berechne(
         });
     }
     if erlaubt.contains("chat") {
-        // Legt beim ersten Aufruf den Standardkanal an (idempotent) — derselbe Nebeneffekt,
-        // den vorher der Kanal-Abruf des Zählers im Browser auslöste.
-        let kanaele = crate::chat::repo::liste_kanaele(pool, einsatz_id, benutzer.id).await?;
+        // Rein lesend (ohne das Anlegen des Standardkanals, das `liste_kanaele` vorweg tut):
+        // dieser Abruf läuft bei jedem gezählten Live-Ereignis und darf keine Schreibsperre
+        // nehmen.
+        let kanaele = crate::chat::repo::kanaele_lesen(pool, einsatz_id, benutzer.id).await?;
         z.chat = Some(ChatZaehler {
             ungelesen: kanaele.iter().map(|k| k.ungelesen_anzahl).sum(),
         });

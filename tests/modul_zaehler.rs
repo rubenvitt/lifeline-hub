@@ -11,7 +11,9 @@ use axum::http::StatusCode;
 use serde_json::{json, Value};
 
 mod common;
-use common::{anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen, setup};
+use common::{
+    anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen, setup, setup_mit_pool,
+};
 
 fn uri(einsatz: i64) -> String {
     format!("/api/einsaetze/{einsatz}/modul-zaehler")
@@ -402,4 +404,23 @@ async fn nichtmitglied_ist_403_und_unbekannter_einsatz_404() {
     assert_eq!(status, StatusCode::FORBIDDEN);
     let (status, _) = anfrage(&app, "GET", &uri(9999), &admin, None).await;
     assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+/// Der Zähler läuft bei jedem gezählten Live-Ereignis. Er darf dabei nicht schreiben — das
+/// Anlegen des Standardkanals (in `liste_kanaele`) nähme sonst bei jedem Abruf die
+/// Schreibsperre der Datenbank. Ohne Kanal gibt es nichts Ungelesenes.
+#[tokio::test]
+async fn zaehlen_legt_keinen_chat_kanal_an() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+
+    let v = zaehler(&app, &admin, einsatz).await;
+    assert_eq!(v["chat"], json!({ "ungelesen": 0 }), "{v:?}");
+    let kanaele: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM chat_kanal WHERE einsatz_id = ?")
+        .bind(einsatz)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(kanaele, 0, "der Zähler hat einen Kanal angelegt");
 }
