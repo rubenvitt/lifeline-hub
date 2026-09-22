@@ -1601,14 +1601,13 @@ mod tests {
             neu.einsatznummer_intern.as_deref(),
             Some(format!("E-{jahr}-0004").as_str())
         );
-        let bestand: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM einsatz WHERE einsatznummer_intern IN (?, ?)",
-        )
-        .bind(format!("{jahr}-001"))
-        .bind(format!("{jahr}-003"))
-        .fetch_one(&pool)
-        .await
-        .unwrap();
+        let bestand: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM einsatz WHERE einsatznummer_intern IN (?, ?)")
+                .bind(format!("{jahr}-001"))
+                .bind(format!("{jahr}-003"))
+                .fetch_one(&pool)
+                .await
+                .unwrap();
         assert_eq!(bestand, 2, "Bestandstext bleibt wörtlich");
     }
 
@@ -1621,14 +1620,20 @@ mod tests {
         let jahr = crate::einsatz::nummer::jahr_in_zone(chrono::Utc::now(), None);
 
         let alt = test_anlegen(&pool, "Alt", None, leit).await.unwrap();
-        sqlx::query("INSERT INTO org_einstellungen (org_id, einsatz_nummer_praefix) VALUES (1, 'WF-')")
-            .execute(&pool)
-            .await
-            .unwrap();
+        sqlx::query(
+            "INSERT INTO org_einstellungen (org_id, einsatz_nummer_praefix) VALUES (1, 'WF-')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
         let neu = test_anlegen(&pool, "Neu", None, leit).await.unwrap();
 
         assert_eq!(
-            laden(&pool, alt.id).await.unwrap().einsatznummer_intern.as_deref(),
+            laden(&pool, alt.id)
+                .await
+                .unwrap()
+                .einsatznummer_intern
+                .as_deref(),
             Some(format!("E-{jahr}-0001").as_str()),
             "bestehende Nummer ändert sich nicht"
         );
@@ -1646,7 +1651,9 @@ mod tests {
         use chrono::TimeZone;
         let pool = crate::db::test_pool().await;
         let leit = benutzer_anlegen(&pool, "leit").await;
-        let silvester = chrono::Utc.with_ymd_and_hms(2026, 12, 31, 23, 30, 0).unwrap();
+        let silvester = chrono::Utc
+            .with_ymd_and_hms(2026, 12, 31, 23, 30, 0)
+            .unwrap();
         let daten = || NeuerEinsatzDaten {
             bezeichnung: "Neujahr",
             stichwort: None,
@@ -1721,7 +1728,10 @@ mod tests {
         // angelegt_at bleibt unverändert (Audit-Spur).
         assert_eq!(aktualisiert.angelegt_at, einsatz.angelegt_at);
         // Die Einsatznummer schreibt nur `anlegen` (LFH-617).
-        assert_eq!(aktualisiert.einsatznummer_intern, einsatz.einsatznummer_intern);
+        assert_eq!(
+            aktualisiert.einsatznummer_intern,
+            einsatz.einsatznummer_intern
+        );
     }
 
     /// Der Kern von LFH-306: ein Patch fasst nur die gesendeten Spalten an. Der

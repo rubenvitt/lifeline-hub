@@ -2683,10 +2683,12 @@ mod tests {
         );
 
         // Neue Präfix-Spalte existiert und ist leer.
-        sqlx::query("INSERT INTO org_einstellungen (org_id, einsatz_nummer_praefix) VALUES (1, 'WF-')")
-            .execute(&pool)
-            .await
-            .expect("einsatz_nummer_praefix muss existieren");
+        sqlx::query(
+            "INSERT INTO org_einstellungen (org_id, einsatz_nummer_praefix) VALUES (1, 'WF-')",
+        )
+        .execute(&pool)
+        .await
+        .expect("einsatz_nummer_praefix muss existieren");
 
         // Unique je (org, jahr, lfd): Dublette abgewiesen, mehrere NULL erlaubt.
         let dup = sqlx::query(
@@ -2695,7 +2697,10 @@ mod tests {
         )
         .execute(&pool)
         .await;
-        assert!(dup.is_err(), "doppelte (org, jahr, lfd) muss abgewiesen werden");
+        assert!(
+            dup.is_err(),
+            "doppelte (org, jahr, lfd) muss abgewiesen werden"
+        );
         sqlx::query("INSERT INTO einsatz (org_id) VALUES (1), (1)")
             .execute(&pool)
             .await

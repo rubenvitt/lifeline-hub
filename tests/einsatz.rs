@@ -592,7 +592,10 @@ async fn einsatz_detail(app: &axum::Router, cookie: &str, einsatz_id: i64) -> (S
         .unwrap();
     let status = resp.status();
     let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
-    (status, serde_json::from_slice(&bytes).unwrap_or(Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+    )
 }
 
 /// Liefert die Anzahl der Einsätze in der Liste des Cookie-Inhabers.

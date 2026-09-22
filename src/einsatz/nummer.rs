@@ -44,7 +44,9 @@ mod tests {
     use chrono::TimeZone;
 
     fn utc(s: &str) -> DateTime<Utc> {
-        Utc.from_utc_datetime(&chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S").unwrap())
+        Utc.from_utc_datetime(
+            &chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S").unwrap(),
+        )
     }
 
     #[test]
@@ -68,9 +70,18 @@ mod tests {
     #[test]
     fn neujahr_in_berlin_eine_stunde_vor_utc() {
         // Winterzeit: MEZ = UTC+1. 23:00 UTC ist schon 00:00 am 1. Januar.
-        assert_eq!(jahr_in_zone(utc("2026-12-31 22:59:59"), Some("Europe/Berlin")), 2026);
-        assert_eq!(jahr_in_zone(utc("2026-12-31 23:00:00"), Some("Europe/Berlin")), 2027);
-        assert_eq!(jahr_in_zone(utc("2026-12-31 23:30:00"), Some("Europe/Berlin")), 2027);
+        assert_eq!(
+            jahr_in_zone(utc("2026-12-31 22:59:59"), Some("Europe/Berlin")),
+            2026
+        );
+        assert_eq!(
+            jahr_in_zone(utc("2026-12-31 23:00:00"), Some("Europe/Berlin")),
+            2027
+        );
+        assert_eq!(
+            jahr_in_zone(utc("2026-12-31 23:30:00"), Some("Europe/Berlin")),
+            2027
+        );
     }
 
     #[test]
@@ -87,21 +98,39 @@ mod tests {
 
     #[test]
     fn unbekannte_zeitzone_gilt_berlin() {
-        assert_eq!(jahr_in_zone(utc("2026-12-31 23:00:00"), Some("Quatsch/Zone")), 2027);
-        assert_eq!(jahr_in_zone(utc("2026-12-31 22:59:59"), Some("Quatsch/Zone")), 2026);
+        assert_eq!(
+            jahr_in_zone(utc("2026-12-31 23:00:00"), Some("Quatsch/Zone")),
+            2027
+        );
+        assert_eq!(
+            jahr_in_zone(utc("2026-12-31 22:59:59"), Some("Quatsch/Zone")),
+            2026
+        );
     }
 
     #[test]
     fn sommerzeit_zone_suedhalbkugel() {
         // Sydney im Dezember: AEDT = UTC+11. 13:00 UTC ist schon Neujahr.
-        assert_eq!(jahr_in_zone(utc("2026-12-31 12:59:59"), Some("Australia/Sydney")), 2026);
-        assert_eq!(jahr_in_zone(utc("2026-12-31 13:00:00"), Some("Australia/Sydney")), 2027);
+        assert_eq!(
+            jahr_in_zone(utc("2026-12-31 12:59:59"), Some("Australia/Sydney")),
+            2026
+        );
+        assert_eq!(
+            jahr_in_zone(utc("2026-12-31 13:00:00"), Some("Australia/Sydney")),
+            2027
+        );
     }
 
     #[test]
     fn westliche_zone_haengt_nach() {
         // New York: EST = UTC-5. 03:00 UTC am 1.1. ist noch Silvester.
-        assert_eq!(jahr_in_zone(utc("2027-01-01 04:59:59"), Some("America/New_York")), 2026);
-        assert_eq!(jahr_in_zone(utc("2027-01-01 05:00:00"), Some("America/New_York")), 2027);
+        assert_eq!(
+            jahr_in_zone(utc("2027-01-01 04:59:59"), Some("America/New_York")),
+            2026
+        );
+        assert_eq!(
+            jahr_in_zone(utc("2027-01-01 05:00:00"), Some("America/New_York")),
+            2027
+        );
     }
 }

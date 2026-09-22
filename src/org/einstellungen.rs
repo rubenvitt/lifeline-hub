@@ -332,7 +332,11 @@ mod tests {
         assert_eq!(g.org_id, 1);
         assert_eq!(g.zeitzone.as_deref(), Some("Europe/Berlin"));
         assert_eq!(g.einsatz_nummer_praefix.as_deref(), Some("WF-"));
-        assert_eq!(g.auftrag_nummer_praefix.as_deref(), Some("A-"), "Nachbar nicht verrutscht");
+        assert_eq!(
+            g.auftrag_nummer_praefix.as_deref(),
+            Some("A-"),
+            "Nachbar nicht verrutscht"
+        );
         assert_eq!(g.zeitformat.as_deref(), Some("24h"));
         assert_eq!(g.einheiten.as_deref(), Some("metrisch"));
         assert_eq!(g.koordinatenformat.as_deref(), Some("mgrs"));

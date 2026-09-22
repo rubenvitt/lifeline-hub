@@ -437,7 +437,10 @@ async fn einsatz_nummer_praefix_persistiert_und_greift_beim_anlegen() {
     .await;
     assert_eq!(status, StatusCode::OK, "body={body}");
     let (_, get_body) = get_einstellungen(&app, Some(&admin_cookie)).await;
-    assert_eq!(get_body["einsatz_nummer_praefix"], "WF-", "getrimmt gespeichert");
+    assert_eq!(
+        get_body["einsatz_nummer_praefix"], "WF-",
+        "getrimmt gespeichert"
+    );
 
     let (status, einsatz) = anfrage(
         &app,
@@ -449,7 +452,10 @@ async fn einsatz_nummer_praefix_persistiert_und_greift_beim_anlegen() {
     .await;
     assert_eq!(status, StatusCode::CREATED, "body={einsatz}");
     let nr = einsatz["einsatznummer_intern"].as_str().unwrap();
-    assert!(nr.starts_with("WF-") && nr.ends_with("-0001"), "Nummer {nr}");
+    assert!(
+        nr.starts_with("WF-") && nr.ends_with("-0001"),
+        "Nummer {nr}"
+    );
 }
 
 /// Dieselbe Whitelist wie die übrigen Präfixe: zu lang oder unerlaubtes Zeichen → 400,
