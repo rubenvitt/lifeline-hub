@@ -276,6 +276,9 @@ const KONSUMENTEN = [
   // (S4, 21.09.2026) die elfte Konsumentin. Seitdem ist das Tagebuch auf allen Breiten eine
   // Zeitachse (`etb/EtbZeitachse.tsx`) und kein Konsument mehr — begründet an
   // KARTEN_EIGENBAU oben.
+  // LFH-632: die Dokumentenablage. Titel als nativer Download-Anker aus dem Spalten-`render`
+  // (kein `titel.ziel` — das wäre eine Client-Navigation), Begründung im Dateikopf.
+  '/src/pages/DokumentePage.tsx',
   '/src/pages/FahrzeugePage.tsx',
   '/src/pages/KraefteuebersichtPage.tsx',
   '/src/pages/LageberichtePage.tsx',
