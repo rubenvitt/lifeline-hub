@@ -462,6 +462,53 @@ async fn entfernen_ist_soft_delete() {
         .await
         .unwrap();
     assert_eq!(anhaenge, 1, "Soft-Delete lässt die Bytes stehen");
+
+    // Kein Bypass über die modul-lose generische Route: auch nach dem Soft-Delete bleibt der
+    // Anhang dort gesperrt (`LinkerStand` zählt gelöschte Dokumente mit, LFH-632 E1).
+    let aid: i64 = sqlx::query_scalar("SELECT anhang_id FROM einsatz_dokument WHERE id = ?")
+        .bind(did)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let (status, _) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/anhaenge/{aid}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn liste_zeigt_neueste_zuerst() {
+    let (app, admin, einsatz) = start().await;
+    let mut ids = Vec::new();
+    for titel in ["Erstes", "Zweites", "Drittes"] {
+        let (status, json) = ablegen(
+            &app,
+            einsatz,
+            &admin,
+            Some(PDF),
+            &[("titel", titel), ("kategorie", "sonstiges")],
+        )
+        .await;
+        assert_eq!(status, StatusCode::CREATED);
+        ids.push(json["id"].as_i64().unwrap());
+    }
+    let (_, liste) = anfrage(&app, "GET", &pfad(einsatz), &admin, None).await;
+    let reihenfolge: Vec<i64> = liste
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|d| d["id"].as_i64().unwrap())
+        .collect();
+    ids.reverse();
+    assert_eq!(
+        reihenfolge, ids,
+        "neueste zuerst (gleiche Sekunde → id DESC)"
+    );
 }
 
 // ---------- Rechte ----------
