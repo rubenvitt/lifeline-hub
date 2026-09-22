@@ -960,6 +960,73 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn schwaerzung_nullt_lagedaten_der_person_und_behaelt_die_kategorien() {
+        // LFH-613, Spec-Szenario „Geschwärzter Einsatz": Zustand (Gesundheitsdatum),
+        // Fundort-Koordinate und Verbleib-Ziel tragen Personenbezug und werden leer; Art und
+        // Status des Verbleibs sowie „vermisst seit" sind Kategorien bzw. Zeitstempel und
+        // bleiben für die statistische Aufbewahrung stehen.
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let einsatz = test_anlegen(&pool, "Lage", None, leit).await.unwrap();
+        abschliessen(&pool, einsatz.id, leit).await.unwrap();
+        sqlx::query("UPDATE einsatz SET geloescht_at = ? WHERE id = ?")
+            .bind("2026-01-01 00:00:00")
+            .bind(einsatz.id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_person (einsatz_id, registrier_nr, status, zustand, \
+                antreff_lat, antreff_lon, vermisst_seit, aktuelle_verbleib_art, \
+                aktuelles_verbleib_ziel, aktueller_verbleib_status, erfasst_von, geaendert_von) \
+             VALUES (?, 1, 'vermisst', 'gehfähig, unterkühlt', 52.2691, 9.1342, \
+                '2026-01-01 06:00:00', 'transport', 'KH Mitte', 'angemeldet', ?, ?)",
+        )
+        .bind(einsatz.id)
+        .bind(leit)
+        .bind(leit)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        assert!(schwaerze_einsatz(&pool, einsatz.id, "2026-02-01 00:00:00")
+            .await
+            .unwrap());
+
+        #[allow(clippy::type_complexity)]
+        let zeile: (
+            Option<String>,
+            Option<f64>,
+            Option<f64>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+        ) = sqlx::query_as(
+            "SELECT zustand, antreff_lat, antreff_lon, aktuelles_verbleib_ziel, \
+                    aktuelle_verbleib_art, aktueller_verbleib_status, vermisst_seit \
+             FROM einsatz_person WHERE einsatz_id = ?",
+        )
+        .bind(einsatz.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            zeile,
+            (
+                None,
+                None,
+                None,
+                None,
+                Some("transport".into()),
+                Some("angemeldet".into()),
+                Some("2026-01-01 06:00:00".into()),
+            ),
+            "Zustand, Koordinate und Ziel leer; Art, Status und vermisst_seit erhalten"
+        );
+    }
+
+    #[tokio::test]
     async fn schwaerzung_nullt_funk_erreichbarkeit_an_einheit_und_abschnitt() {
         // LFH-108: erreichbarkeit (mögliche Rufnummer der Führung) ist PII und MUSS an Einheit
         // UND Abschnitt genullt werden (Abschnitt-Lücke seit LFH-86 symmetrisch geschlossen).

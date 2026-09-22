@@ -210,6 +210,17 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("aktueller_verbleib", Strategie::NullSetzen),
             retain("aktuelle_uhs_id", G_FK),
             retain("aktueller_platz_id", G_FK),
+            // LFH-613: Zustand ist ein Gesundheitsdatum (Freitext), die Fundort-Koordinate ein
+            // Aufenthaltsort → beide PII. Das Verbleib-Ziel spiegelt person_verbleib.ziel
+            // (Klinikname/Adresse) und wird wie dort gescrubbt.
+            scrub("zustand", Strategie::NullSetzen),
+            scrub("antreff_lat", Strategie::NullSetzen),
+            scrub("antreff_lon", Strategie::NullSetzen),
+            retain("vermisst_seit", G_ZEIT),
+            // Art/Status spiegeln die CHECK-Enums von person_verbleib (dort ebenfalls retain).
+            retain("aktuelle_verbleib_art", G_TRIAGE),
+            scrub("aktuelles_verbleib_ziel", Strategie::NullSetzen),
+            retain("aktueller_verbleib_status", G_TRIAGE),
         ],
     },
     TabellenRegel {

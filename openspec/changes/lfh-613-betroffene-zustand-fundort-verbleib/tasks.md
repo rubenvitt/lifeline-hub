@@ -2,9 +2,9 @@
 
 ## 1. Datenmodell und Migrationen
 
-- [ ] 1.1 Migration `…_person_lagedaten.sql`: sieben Spalten an `einsatz_person` und Backfill der Verbleib-Cache-Spalten aus dem jüngsten `person_verbleib` (Tiebreak `id DESC`), dazu `vermisst_seit` für Vermisste aus `geaendert_at`. Verifikation: Migrationstest gegen eine DB mit zwei Ereignissen je Person, eines davon in derselben Sekunde, prüft Art, Ziel und Status des jüngsten.
-- [ ] 1.2 Migration `…_person_verbleib_notunterkunft.sql` (`-- no-transaction`, Leaf-Rebuild, CHECK mit `notunterkunft`). Verifikation: Test über `include_str!` gegen eine synthetische Alt-Schema-DB, Zeilen und `sqlite_sequence` bleiben erhalten, das Schema-Diff per `pragma_table_info`/`index_list` zeigt nur den CHECK, `foreign_key_check` ist leer.
-- [ ] 1.3 Schwärzungs-Registry: `zustand`, `antreff_lat`, `antreff_lon` und `aktuelles_verbleib_ziel` werden gescrubbt, `aktuelle_verbleib_art`/`aktueller_verbleib_status` behalten `G_TRIAGE`, `vermisst_seit` behält `G_ZEIT`. Verifikation: der Registry-Vollständigkeitsguard ist grün, und ein Schwärzungstest prüft das Spec-Szenario „Geschwärzter Einsatz“.
+- [x] 1.1 Migration `…_person_lagedaten.sql`: sieben Spalten an `einsatz_person` und Backfill der Verbleib-Cache-Spalten aus dem jüngsten `person_verbleib` (Tiebreak `id DESC`), dazu `vermisst_seit` für Vermisste aus `geaendert_at`. Verifikation: Migrationstest gegen eine DB mit zwei Ereignissen je Person, eines davon in derselben Sekunde, prüft Art, Ziel und Status des jüngsten.
+- [x] 1.2 Migration `…_person_verbleib_notunterkunft.sql` (`-- no-transaction`, Leaf-Rebuild, CHECK mit `notunterkunft`). Verifikation: Test über `include_str!` gegen eine synthetische Alt-Schema-DB, Zeilen und `sqlite_sequence` bleiben erhalten, das Schema-Diff per `pragma_table_info`/`index_list` zeigt nur den CHECK, `foreign_key_check` ist leer.
+- [x] 1.3 Schwärzungs-Registry: `zustand`, `antreff_lat`, `antreff_lon` und `aktuelles_verbleib_ziel` werden gescrubbt, `aktuelle_verbleib_art`/`aktueller_verbleib_status` behalten `G_TRIAGE`, `vermisst_seit` behält `G_ZEIT`. Verifikation: der Registry-Vollständigkeitsguard ist grün, und ein Schwärzungstest prüft das Spec-Szenario „Geschwärzter Einsatz“.
 
 ## 2. Backend-Domäne und Routen
 

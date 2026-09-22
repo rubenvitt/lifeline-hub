@@ -2284,4 +2284,325 @@ mod tests {
             .await
             .expect("mehrere NULL-lfd_nr müssen erlaubt bleiben (Altbestand)");
     }
+
+    // --- Migration 0104: Lagedaten an einsatz_person (LFH-613) ---
+    //
+    // test_pool() spielt 0104 auf einer LEEREN DB ein — der Backfill aus person_verbleib liefe
+    // dort über null Zeilen und ein falscher Tiebreak bliebe unsichtbar. Hier eine befüllte
+    // Alt-DB (einsatz_person im Minimalzuschnitt, person_verbleib aus der ECHTEN 0025) und die
+    // ECHTE 0104 per include_str!: zwei Ereignisse in derselben Sekunde entscheidet id DESC.
+    #[tokio::test]
+    async fn migration_0104_backfill_nimmt_juengstes_verbleib_ereignis() {
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(
+                SqliteConnectOptions::new()
+                    .filename(":memory:")
+                    .foreign_keys(false),
+            )
+            .await
+            .expect("In-Memory-Pool");
+        sqlx::query(
+            "CREATE TABLE einsatz_person ( \
+                id INTEGER PRIMARY KEY, status TEXT NOT NULL, geaendert_at TEXT NOT NULL)",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::raw_sql(include_str!("../migrations/0025_person_verbleib.sql"))
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_person (id, status, geaendert_at) VALUES \
+                (1, 'betroffen', '2026-09-22 08:00:00'), \
+                (2, 'vermisst',  '2026-09-22 07:30:00'), \
+                (3, 'betroffen', '2026-09-22 07:00:00')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        // Person 1: id 1 und 2 in derselben Sekunde (id 2 gewinnt), id 3 ist jünger angelegt,
+        // aber zeitlich älter — der Zeitpunkt ordnet vor der id.
+        sqlx::query(
+            "INSERT INTO person_verbleib \
+                (id, einsatz_id, person_id, art, ziel, status, zeitpunkt_at, erfasst_von) VALUES \
+                (1, 1, 1, 'vor_ort',    NULL,       NULL,              '2026-09-22 10:00:00', 1), \
+                (2, 1, 1, 'transport',  'KH Mitte', 'abtransportiert', '2026-09-22 10:00:00', 1), \
+                (3, 1, 1, 'entlassung', 'Zuhause',  NULL,              '2026-09-22 09:00:00', 1)",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        sqlx::raw_sql(include_str!("../migrations/0104_person_lagedaten.sql"))
+            .execute(&pool)
+            .await
+            .expect("0104 muss auf einer befüllten DB durchlaufen");
+
+        type Zeile = (
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+        );
+        let lese = |id: i64| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_as::<_, Zeile>(
+                    "SELECT aktuelle_verbleib_art, aktuelles_verbleib_ziel, \
+                            aktueller_verbleib_status, vermisst_seit \
+                     FROM einsatz_person WHERE id = ?",
+                )
+                .bind(id)
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+            }
+        };
+        assert_eq!(
+            lese(1).await,
+            (
+                Some("transport".into()),
+                Some("KH Mitte".into()),
+                Some("abtransportiert".into()),
+                None
+            ),
+            "jüngstes Ereignis nach zeitpunkt_at DESC, id DESC"
+        );
+        assert_eq!(
+            lese(2).await,
+            (None, None, None, Some("2026-09-22 07:30:00".into())),
+            "Vermisste bekommen vermisst_seit aus geaendert_at, ohne Ereignis bleibt der Cache leer"
+        );
+        assert_eq!(lese(3).await, (None, None, None, None));
+
+        let ereignisse: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM person_verbleib")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(ereignisse, 3, "kein Verbleib-Ereignis geht verloren");
+    }
+
+    /// Schema-Schnappschuss einer Tabelle: Spalten, FKs, Indizes samt Spalten.
+    async fn schema_von(pool: &SqlitePool, tabelle: &str) -> Vec<String> {
+        let mut aus = Vec::new();
+        for (sql, praefix) in [
+            (
+                "SELECT cid || '|' || name || '|' || type || '|' || \"notnull\" || '|' || \
+                        COALESCE(dflt_value, '∅') || '|' || pk \
+                 FROM pragma_table_info(?) ORDER BY cid",
+                "spalte",
+            ),
+            (
+                "SELECT \"table\" || '|' || \"from\" || '|' || \"to\" || '|' || on_delete \
+                 FROM pragma_foreign_key_list(?) ORDER BY id, seq",
+                "fk",
+            ),
+            (
+                "SELECT l.name || '|' || l.\"unique\" || '|' || l.origin || '|' || \
+                        (SELECT group_concat(i.name, ',') FROM pragma_index_info(l.name) i) \
+                 FROM pragma_index_list(?) l ORDER BY l.name",
+                "index",
+            ),
+        ] {
+            let zeilen: Vec<String> = sqlx::query_scalar(sqlx::AssertSqlSafe(sql))
+                .bind(tabelle)
+                .fetch_all(pool)
+                .await
+                .unwrap();
+            aus.extend(zeilen.into_iter().map(|z| format!("{praefix}:{z}")));
+        }
+        aus
+    }
+
+    /// DDL ohne Tabellennamen und mit zusammengefasstem Leerraum — für den Vergleich
+    /// „nur der CHECK hat sich geändert".
+    fn ddl_normalisiert(sql: &str) -> String {
+        let ohne_kopf = sql
+            .replacen("CREATE TABLE \"person_verbleib\"", "CREATE TABLE T", 1)
+            .replacen("CREATE TABLE person_verbleib_neu", "CREATE TABLE T", 1)
+            .replacen("CREATE TABLE person_verbleib", "CREATE TABLE T", 1);
+        ohne_kopf.split_whitespace().collect::<Vec<_>>().join(" ")
+    }
+
+    /// Alt-DB im 0025-Stand mit FK-Zwang (Prod-Parität) und minimalen Eltern-Tabellen, damit
+    /// `foreign_key_check` echte Aussagen trifft statt an fehlenden Tabellen zu scheitern.
+    async fn alt_db_person_verbleib() -> SqlitePool {
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(
+                SqliteConnectOptions::new()
+                    .filename(":memory:")
+                    .foreign_keys(true),
+            )
+            .await
+            .expect("In-Memory-Pool");
+        sqlx::raw_sql(
+            "CREATE TABLE einsatz (id INTEGER PRIMARY KEY); \
+             CREATE TABLE einsatz_person (id INTEGER PRIMARY KEY); \
+             CREATE TABLE benutzer (id INTEGER PRIMARY KEY); \
+             INSERT INTO einsatz (id) VALUES (1); \
+             INSERT INTO einsatz_person (id) VALUES (1), (2); \
+             INSERT INTO benutzer (id) VALUES (1);",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::raw_sql(include_str!("../migrations/0025_person_verbleib.sql"))
+            .execute(&pool)
+            .await
+            .unwrap();
+        pool
+    }
+
+    // --- Migration 0105: Leaf-Rebuild von person_verbleib mit 'notunterkunft' (LFH-613) ---
+    //
+    // Auf test_pool() wäre person_verbleib bei 0105 leer: ein vergessener Spaltenname im Copy
+    // oder eine verlorene Sequenz bliebe dort unsichtbar. Hier eine befüllte 0025-DB, deren
+    // höchste Zeile gelöscht ist (Sequenz > MAX(id)), und die ECHTE 0105 per include_str!.
+    #[tokio::test]
+    async fn migration_0105_person_verbleib_rebuild_erhaelt_zeilen_sequenz_und_schema() {
+        let pool = alt_db_person_verbleib().await;
+        sqlx::query(
+            "INSERT INTO person_verbleib \
+                (einsatz_id, person_id, art, transportmittel, ziel, status, notiz, zeitpunkt_at, erfasst_von) VALUES \
+                (1, 1, 'transport', 'RTW', 'KH Mitte', 'angemeldet', 'n1', '2026-09-22 10:00:00', 1), \
+                (1, 2, 'vor_ort', NULL, NULL, NULL, NULL, '2026-09-22 10:01:00', 1), \
+                (1, 2, 'entlassung', NULL, 'Zuhause', NULL, 'weg', '2026-09-22 10:02:00', 1)",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query("DELETE FROM person_verbleib WHERE id = 3")
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        let schema_vorher = schema_von(&pool, "person_verbleib").await;
+        let ddl_vorher: String = sqlx::query_scalar(
+            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'person_verbleib'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        type Zeile = (
+            i64,
+            i64,
+            i64,
+            String,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            String,
+            i64,
+        );
+        let alle = "SELECT id, einsatz_id, person_id, art, transportmittel, ziel, status, notiz, \
+                           zeitpunkt_at, erfasst_von FROM person_verbleib ORDER BY id";
+        let zeilen_vorher: Vec<Zeile> = sqlx::query_as(alle).fetch_all(&pool).await.unwrap();
+
+        let migration = include_str!("../migrations/0105_person_verbleib_notunterkunft.sql");
+        assert!(
+            migration.starts_with("-- no-transaction"),
+            "sqlx erkennt die Direktive nur am Dateianfang"
+        );
+        sqlx::raw_sql(migration)
+            .execute(&pool)
+            .await
+            .expect("0105 muss auf einer befüllten DB durchlaufen");
+
+        let zeilen_nachher: Vec<Zeile> = sqlx::query_as(alle).fetch_all(&pool).await.unwrap();
+        assert_eq!(
+            zeilen_nachher, zeilen_vorher,
+            "alle Zeilen verlustfrei kopiert"
+        );
+        assert_eq!(
+            schema_von(&pool, "person_verbleib").await,
+            schema_vorher,
+            "Spalten, FKs und Indizes unverändert"
+        );
+        let ddl_nachher: String = sqlx::query_scalar(
+            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'person_verbleib'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            ddl_normalisiert(&ddl_nachher).replacen(",'notunterkunft'", "", 1),
+            ddl_normalisiert(&ddl_vorher),
+            "die DDL unterscheidet sich ausschließlich im art-CHECK"
+        );
+        let reste: Vec<i64> = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM sqlite_master WHERE name = 'person_verbleib_neu' \
+             UNION ALL SELECT COUNT(*) FROM sqlite_sequence WHERE name = 'person_verbleib_neu'",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        let reste: i64 = reste.into_iter().sum();
+        assert_eq!(reste, 0, "keine Reste der Zwischentabelle");
+
+        // Die Sequenz überlebt: die gelöschte id 3 wird nicht wiedervergeben.
+        let neue_id: i64 = sqlx::query_scalar(
+            "INSERT INTO person_verbleib (einsatz_id, person_id, art, ziel, erfasst_von) \
+             VALUES (1, 1, 'notunterkunft', 'Turnhalle Ost', 1) RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("der neue CHECK nimmt 'notunterkunft'");
+        assert_eq!(neue_id, 4, "AUTOINCREMENT-Sequenz bleibt erhalten");
+        assert!(
+            sqlx::query(
+                "INSERT INTO person_verbleib (einsatz_id, person_id, art, erfasst_von) \
+                 VALUES (1, 1, 'teleportation', 1)",
+            )
+            .execute(&pool)
+            .await
+            .is_err(),
+            "der CHECK lehnt unbekannte Arten weiter ab"
+        );
+
+        let fk_verletzungen: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM pragma_foreign_key_check")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(fk_verletzungen, 0, "foreign_key_check ist leer");
+    }
+
+    // Randfall der Sequenz-Übernahme: sind ALLE Zeilen gelöscht, kopiert der Rebuild nichts
+    // und die neue Tabelle hätte gar keinen sqlite_sequence-Eintrag — ohne die Übernahme
+    // begänne die Nummerierung wieder bei 1.
+    #[tokio::test]
+    async fn migration_0105_erhaelt_sequenz_auch_bei_leerer_tabelle() {
+        let pool = alt_db_person_verbleib().await;
+        sqlx::query(
+            "INSERT INTO person_verbleib (einsatz_id, person_id, art, erfasst_von) \
+             VALUES (1, 1, 'vor_ort', 1), (1, 1, 'vor_ort', 1)",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query("DELETE FROM person_verbleib")
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        sqlx::raw_sql(include_str!(
+            "../migrations/0105_person_verbleib_notunterkunft.sql"
+        ))
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let neue_id: i64 = sqlx::query_scalar(
+            "INSERT INTO person_verbleib (einsatz_id, person_id, art, erfasst_von) \
+             VALUES (1, 1, 'notunterkunft', 1) RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(neue_id, 3, "gelöschte ids werden nicht wiedervergeben");
+    }
 }
