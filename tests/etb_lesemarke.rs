@@ -257,3 +257,29 @@ async fn marke_ueber_dem_hoechsten_eintrag_ist_422() {
     let (status, v) = setzen(&app, &erika, einsatz, hoechste + 1).await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{v:?}");
 }
+
+/// Das Paar zum Modul-Gate: vorher liest Erika ihre Marke, nach dem Ausblenden des
+/// ETB-Moduls weder lesend noch setzend — sonst verriete die Zahl fremde Einträge eines
+/// Moduls, das ihr entzogen ist.
+#[tokio::test]
+async fn ausgeblendetes_etb_modul_sperrt_lesemarke() {
+    let (app, admin, erika, einsatz) = aufbau().await;
+    let bis = meldung(&app, &admin, einsatz).await;
+    let (status, _) = anfrage(&app, "GET", &marke_uri(einsatz), &erika, None).await;
+    assert_eq!(status, StatusCode::OK, "vor dem Ausblenden lesbar");
+
+    let (status, json) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/modul-overrides/etb"),
+        &admin,
+        Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
+    )
+    .await;
+    assert!(status.is_success(), "Override setzen: {status} {json:?}");
+
+    let (status, _) = anfrage(&app, "GET", &marke_uri(einsatz), &erika, None).await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "Lesen gesperrt");
+    let (status, _) = setzen(&app, &erika, einsatz, bis).await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "Setzen gesperrt");
+}

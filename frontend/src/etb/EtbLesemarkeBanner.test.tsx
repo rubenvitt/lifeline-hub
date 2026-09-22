@@ -39,12 +39,15 @@ describe('EtbLesemarkeBanner', () => {
     server.use(
       http.post(URL, async ({ request }) => {
         gesendet = await request.json();
-        return HttpResponse.json({
+        const neu = {
           neue_anzahl: 0,
           hoechste_lfd_nr: 12,
           gesichtet_lfd_nr: 12,
           gesichtet_at: '2026-09-22 12:00:00',
-        });
+        };
+        // Der Server kennt ab jetzt den neuen Stand — auch für das Nachlesen danach.
+        stand(neu);
+        return HttpResponse.json(neu);
       }),
     );
     renderMitProviders(<EtbLesemarkeBanner einsatzId={7} />);
@@ -91,5 +94,50 @@ describe('EtbLesemarkeBanner', () => {
     // Der Fan-out des Live-Feeds invalidiert den ETB-PREFIX, nicht die Lesemarke selbst.
     await client.invalidateQueries({ queryKey: einsatzKeys.etb(7) });
     expect(await screen.findByText(/^2 neue Einträge seit/)).toBeTruthy();
+  });
+
+  it('ein vor dem Klick gestarteter Abruf holt das Banner nicht zurück', async () => {
+    const alt = {
+      neue_anzahl: 3,
+      hoechste_lfd_nr: 12,
+      gesichtet_lfd_nr: 9,
+      gesichtet_at: '2026-09-22 11:04:00',
+    };
+    const neu = { ...alt, neue_anzahl: 0, gesichtet_lfd_nr: 12 };
+    let serverStand: EtbLesemarke = alt;
+    let freigeben: (() => void) | null = null;
+    let haengend = false;
+    server.use(
+      http.get(URL, async () => {
+        // Der ERSTE Abruf nach `haengend` liest den alten Stand und bleibt hängen, bis der
+        // POST durch ist — genau das Fenster, in dem er den neuen Stand überschriebe.
+        if (haengend) {
+          haengend = false;
+          const gelesen = serverStand;
+          await new Promise<void>((r) => (freigeben = r));
+          return HttpResponse.json(gelesen);
+        }
+        return HttpResponse.json(serverStand);
+      }),
+      http.post(URL, () => {
+        serverStand = neu;
+        return HttpResponse.json(neu);
+      }),
+    );
+    const { client } = renderMitProviders(<EtbLesemarkeBanner einsatzId={7} />);
+    const knopf = await screen.findByRole('button', { name: 'alle als gesichtet markieren' });
+
+    haengend = true;
+    void client.invalidateQueries({ queryKey: einsatzKeys.etb(7) });
+    await waitFor(() => expect(freigeben).not.toBeNull());
+    await userEvent.click(knopf);
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'alle als gesichtet markieren' })).toBeNull(),
+    );
+
+    freigeben!();
+    // Dem veralteten Abruf Zeit geben, seinen alten Stand abzuliefern.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByRole('button', { name: 'alle als gesichtet markieren' })).toBeNull();
   });
 });

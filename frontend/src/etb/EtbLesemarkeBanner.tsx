@@ -45,9 +45,20 @@ export default function EtbLesemarkeBanner({ einsatzId }: { einsatzId: number })
   });
   const markieren = useMutation({
     mutationFn: (bisLfdNr: number) => setzeEtbLesemarke(einsatzId, bisLfdNr),
+    /*
+     * Ein Abruf, der VOR dem Markieren losging (etwa durch ein `etb`-Ereignis kurz vor dem
+     * Klick), läse die alte Marke und käme nach der Antwort an — `setQueryData` bricht ihn
+     * nicht ab, er überschriebe den neuen Stand, und das Banner stünde wieder da. Deshalb
+     * erst abbrechen, und nach dem Setzen frisch lesen: sonst fehlte der Eintrag, dessen
+     * Ereignis den abgebrochenen Abruf ausgelöst hatte, bis zum nächsten Ereignis.
+     * Gemessen: jede der beiden Angaben schließt das Fenster schon allein (das Nachlesen
+     * bricht einen laufenden Abruf ebenfalls ab); der Test wird erst rot, wenn beide fehlen.
+     */
+    onMutate: () => qc.cancelQueries({ queryKey: einsatzKeys.etbLesemarke(einsatzId) }),
     onSuccess: (neu) => qc.setQueryData(einsatzKeys.etbLesemarke(einsatzId), neu),
     onError: (e) =>
       message.error(e instanceof ApiError ? e.message : 'Markieren als gesichtet fehlgeschlagen'),
+    onSettled: () => qc.invalidateQueries({ queryKey: einsatzKeys.etbLesemarke(einsatzId) }),
   });
 
   const marke = query.data;
