@@ -190,8 +190,9 @@ where
 }
 
 /// Art eines Verbleib-Ereignisses. String = CHECK-Constraint in
-/// `migrations/0025_person_verbleib.sql`. `Verstorben` = Verbleib des Leichnams
-/// (NICHT der Admin-Status).
+/// `migrations/0025_person_verbleib.sql`, erweitert um `notunterkunft` in
+/// `migrations/0105_person_verbleib_notunterkunft.sql` (LFH-613). `Verstorben` = Verbleib des
+/// Leichnams (NICHT der Admin-Status).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum VerbleibArt {
@@ -199,6 +200,7 @@ pub enum VerbleibArt {
     Entlassung,
     VorOrt,
     Verstorben,
+    Notunterkunft,
 }
 
 impl VerbleibArt {
@@ -208,6 +210,7 @@ impl VerbleibArt {
             VerbleibArt::Entlassung => "entlassung",
             VerbleibArt::VorOrt => "vor_ort",
             VerbleibArt::Verstorben => "verstorben",
+            VerbleibArt::Notunterkunft => "notunterkunft",
         }
     }
 
@@ -217,6 +220,7 @@ impl VerbleibArt {
             "entlassung" => Some(VerbleibArt::Entlassung),
             "vor_ort" => Some(VerbleibArt::VorOrt),
             "verstorben" => Some(VerbleibArt::Verstorben),
+            "notunterkunft" => Some(VerbleibArt::Notunterkunft),
             _ => None,
         }
     }
@@ -231,6 +235,11 @@ impl VerbleibArt {
             VerbleibArt::Entlassung => "entlassen".to_string(),
             VerbleibArt::VorOrt => "vor Ort".to_string(),
             VerbleibArt::Verstorben => "verstorben".to_string(),
+            // Ohne Ziel wie beim Transport die bloße Art (LFH-613).
+            VerbleibArt::Notunterkunft => match ziel {
+                Some(z) => format!("Notunterkunft → {z}"),
+                None => "Notunterkunft".to_string(),
+            },
         }
     }
 
@@ -244,6 +253,11 @@ impl VerbleibArt {
             VerbleibArt::Entlassung => "entlassen".to_string(),
             VerbleibArt::VorOrt => "verbleibt vor Ort".to_string(),
             VerbleibArt::Verstorben => "Verbleib des Leichnams".to_string(),
+            // Ohne Ziel „in Notunterkunft" (LFH-613), analog zum Transport-Zweig.
+            VerbleibArt::Notunterkunft => match ziel {
+                Some(z) => format!("in Notunterkunft → {z}"),
+                None => "in Notunterkunft".to_string(),
+            },
         }
     }
 }
@@ -416,6 +430,28 @@ pub struct PersonAnzeige {
     // E‑3: UHS-Cache (NULL = nicht in einer UHS / nicht auf einem Platz).
     pub aktuelle_uhs_id: Option<i64>,
     pub aktueller_platz_id: Option<i64>,
+    // LFH-613: Lagedaten. Neue Option-Felder fehlen im JSON, wenn leer (Norm ab LFH-265) —
+    // die älteren Felder oben bleiben bewusst bei `null`, ihre Tests prüfen das.
+    /// Zustand in Kurzform (Freitext, z. B. „gehfähig, unterkühlt").
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub zustand: Option<String>,
+    /// Fundort-Koordinate (WGS84), immer gemeinsam mit `antreff_lon` gesetzt oder leer.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub antreff_lat: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub antreff_lon: Option<f64>,
+    /// Seit wann die Person vermisst wird (`YYYY-MM-DD HH:MM:SS`, UTC). Nur bei Status
+    /// `vermisst` bedeutsam; beim Verlassen des Status bleibt der Wert dokumentarisch stehen.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub vermisst_seit: Option<String>,
+    /// Strukturierter Cache des jüngsten Verbleib-Ereignisses (neben der Kurzform
+    /// `aktueller_verbleib`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub aktuelle_verbleib_art: Option<VerbleibArt>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub aktuelles_verbleib_ziel: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub aktueller_verbleib_status: Option<VerbleibStatus>,
 }
 
 #[cfg(test)]
@@ -498,10 +534,31 @@ mod tests {
 
     #[test]
     fn verbleib_art_roundtrip() {
-        for a in ["transport", "entlassung", "vor_ort", "verstorben"] {
+        for a in [
+            "transport",
+            "entlassung",
+            "vor_ort",
+            "verstorben",
+            "notunterkunft",
+        ] {
             assert_eq!(VerbleibArt::parse(a).unwrap().as_str(), a);
         }
         assert!(VerbleibArt::parse("teleportation").is_none());
+    }
+
+    #[test]
+    fn notunterkunft_kurzform_und_etb_sachverhalt() {
+        let n = VerbleibArt::Notunterkunft;
+        assert_eq!(
+            n.kurzform(Some("Turnhalle Ost")),
+            "Notunterkunft → Turnhalle Ost"
+        );
+        assert_eq!(n.kurzform(None), "Notunterkunft");
+        assert_eq!(
+            n.etb_sachverhalt(Some("Turnhalle Ost")),
+            "in Notunterkunft → Turnhalle Ost"
+        );
+        assert_eq!(n.etb_sachverhalt(None), "in Notunterkunft");
     }
 
     #[test]

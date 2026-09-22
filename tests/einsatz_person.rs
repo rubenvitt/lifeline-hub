@@ -1714,3 +1714,490 @@ async fn anlegen_mit_sichtung_schreibt_zwei_etb_zeilen_ohne_identitaet() {
         "der ETB bleibt pseudonym"
     );
 }
+
+// ---------- LFH-613: Zustand, Fundort-Koordinate, strukturierter Verbleib, vermisst seit ----------
+
+/// Anfrage an die Personenliste bzw. eine Person; liefert Status + JSON.
+async fn personen_post(
+    app: &axum::Router,
+    cookie: &str,
+    e: i64,
+    body: &str,
+) -> (StatusCode, Value) {
+    anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{e}/personen"),
+        cookie,
+        Some(body),
+    )
+    .await
+}
+
+async fn person_patch(
+    app: &axum::Router,
+    cookie: &str,
+    e: i64,
+    p: i64,
+    body: &str,
+) -> (StatusCode, Value) {
+    anfrage(
+        app,
+        "PATCH",
+        &format!("/api/einsaetze/{e}/personen/{p}"),
+        cookie,
+        Some(body),
+    )
+    .await
+}
+
+async fn person_detail(app: &axum::Router, cookie: &str, e: i64, p: i64) -> Value {
+    let (s, json) = anfrage(
+        app,
+        "GET",
+        &format!("/api/einsaetze/{e}/personen/{p}"),
+        cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    json
+}
+
+async fn personen_anzahl(app: &axum::Router, cookie: &str, e: i64) -> usize {
+    let (_, json) = anfrage(
+        app,
+        "GET",
+        &format!("/api/einsaetze/{e}/personen"),
+        cookie,
+        None,
+    )
+    .await;
+    json.as_array().unwrap().len()
+}
+
+/// Jetzt als Wire-Zeitstempel (UTC, `YYYY-MM-DD HH:MM:SS`). Lexikografisch vergleichbar.
+fn jetzt_wire(versatz_sek: i64) -> String {
+    (chrono::Utc::now() + chrono::Duration::seconds(versatz_sek))
+        .format("%Y-%m-%d %H:%M:%S")
+        .to_string()
+}
+
+#[tokio::test]
+async fn neue_leere_felder_fehlen_im_json_statt_null() {
+    // Norm ab LFH-265: neue Option-Felder mit skip_serializing_if. `== Value::Null` sähe einen
+    // fehlenden Key und ein `null` gleich — deshalb contains_key.
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(&app, &admin, e, r#"{"name":"Leer"}"#).await;
+    let detail = person_detail(&app, &admin, e, p).await;
+    let obj = detail.as_object().unwrap();
+    for feld in [
+        "zustand",
+        "antreff_lat",
+        "antreff_lon",
+        "vermisst_seit",
+        "aktuelle_verbleib_art",
+        "aktuelles_verbleib_ziel",
+        "aktueller_verbleib_status",
+    ] {
+        assert!(!obj.contains_key(feld), "{feld} fehlt, wenn leer");
+    }
+    // Gegenprobe: die Bestandsfelder bleiben beim expliziten null.
+    assert!(obj.contains_key("aktueller_verbleib"));
+}
+
+#[tokio::test]
+async fn zustand_beim_anlegen_wird_getrimmt_und_liste_liefert_ihn() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (s, json) = personen_post(&app, &admin, e, r#"{"zustand":"  Beinfraktur "}"#).await;
+    assert_eq!(s, StatusCode::CREATED);
+    assert_eq!(json["zustand"], "Beinfraktur");
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/personen"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(liste[0]["zustand"], "Beinfraktur");
+
+    // Ein nur aus Leerraum bestehender Zustand ist „kein Zustand".
+    let (_, json) = personen_post(&app, &admin, e, r#"{"zustand":"   "}"#).await;
+    assert!(!json.as_object().unwrap().contains_key("zustand"));
+}
+
+#[tokio::test]
+async fn zustand_leeren_per_patch_laesst_andere_felder_stehen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(
+        &app,
+        &admin,
+        e,
+        r#"{"name":"Muster","zustand":"unterkühlt"}"#,
+    )
+    .await;
+    let (s, json) = person_patch(&app, &admin, e, p, r#"{"zustand":"gehfähig"}"#).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(json["zustand"], "gehfähig");
+    let (s, json) = person_patch(&app, &admin, e, p, r#"{"zustand":null}"#).await;
+    assert_eq!(s, StatusCode::OK);
+    assert!(!json.as_object().unwrap().contains_key("zustand"));
+    assert_eq!(json["name"], "Muster");
+}
+
+#[tokio::test]
+async fn koordinate_beim_anlegen_und_halbe_oder_ungueltige_ist_422() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (s, json) = personen_post(
+        &app,
+        &admin,
+        e,
+        r#"{"antreff_lat":52.2691,"antreff_lon":9.1342}"#,
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+    assert_eq!(json["antreff_lat"], 52.2691);
+    assert_eq!(json["antreff_lon"], 9.1342);
+
+    for body in [
+        r#"{"antreff_lat":52.2691}"#,
+        r#"{"antreff_lon":9.1342}"#,
+        r#"{"antreff_lat":95,"antreff_lon":9}"#,
+        r#"{"antreff_lat":52,"antreff_lon":-181}"#,
+    ] {
+        let (s, _) = personen_post(&app, &admin, e, body).await;
+        assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
+    }
+    assert_eq!(
+        personen_anzahl(&app, &admin, e).await,
+        1,
+        "eine abgewiesene Anlage legt keine Person an"
+    );
+    // POST-Semantik: null heißt „nicht gesetzt", nicht halbe Koordinate.
+    let (s, _) = personen_post(
+        &app,
+        &admin,
+        e,
+        r#"{"antreff_lat":null,"antreff_lon":null}"#,
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+}
+
+#[tokio::test]
+async fn halbe_koordinate_im_patch_gegen_den_bestand_ist_422() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(
+        &app,
+        &admin,
+        e,
+        r#"{"antreff_lat":52.2691,"antreff_lon":9.1342}"#,
+    )
+    .await;
+    let (s, _) = person_patch(&app, &admin, e, p, r#"{"antreff_lon":null}"#).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+    let (s, _) = person_patch(&app, &admin, e, p, r#"{"antreff_lat":95}"#).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+    let detail = person_detail(&app, &admin, e, p).await;
+    assert_eq!(detail["antreff_lat"], 52.2691, "Koordinate unverändert");
+    assert_eq!(detail["antreff_lon"], 9.1342);
+
+    // Nur ein Wert neu, der andere aus dem Bestand → gültiges Paar.
+    let (s, json) = person_patch(&app, &admin, e, p, r#"{"antreff_lat":53.0}"#).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(json["antreff_lat"], 53.0);
+    assert_eq!(json["antreff_lon"], 9.1342);
+    // Gemeinsam leeren geht.
+    let (s, json) = person_patch(
+        &app,
+        &admin,
+        e,
+        p,
+        r#"{"antreff_lat":null,"antreff_lon":null}"#,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert!(!json.as_object().unwrap().contains_key("antreff_lat"));
+    assert!(!json.as_object().unwrap().contains_key("antreff_lon"));
+    // Und eine halbe Koordinate auf einer Person ohne Koordinate ist ebenfalls 422.
+    let (s, _) = person_patch(&app, &admin, e, p, r#"{"antreff_lat":52.0}"#).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[tokio::test]
+async fn verbleib_notunterkunft_setzt_struktur_kurzform_und_etb() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(&app, &admin, e, r#"{}"#).await;
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/personen/{p}/verbleib"),
+        &admin,
+        Some(r#"{"art":"notunterkunft","ziel":"Turnhalle Ost"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+    assert_eq!(json["art"], "notunterkunft");
+    let detail = person_detail(&app, &admin, e, p).await;
+    assert_eq!(detail["aktuelle_verbleib_art"], "notunterkunft");
+    assert_eq!(detail["aktuelles_verbleib_ziel"], "Turnhalle Ost");
+    assert_eq!(
+        detail["aktueller_verbleib"],
+        "Notunterkunft → Turnhalle Ost"
+    );
+    assert!(
+        !detail
+            .as_object()
+            .unwrap()
+            .contains_key("aktueller_verbleib_status"),
+        "ohne Status kein Status-Key"
+    );
+    let inhalte = system_etb_inhalte(&app, &admin, e).await;
+    assert!(inhalte
+        .iter()
+        .any(|i| i.contains("R-001") && i.contains("in Notunterkunft → Turnhalle Ost")));
+}
+
+#[tokio::test]
+async fn verbleib_transport_liefert_status_strukturiert() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(&app, &admin, e, r#"{}"#).await;
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/personen/{p}/verbleib"),
+        &admin,
+        Some(r#"{"art":"transport","ziel":"KH Mitte","status":"angemeldet"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+    let detail = person_detail(&app, &admin, e, p).await;
+    assert_eq!(detail["aktuelle_verbleib_art"], "transport");
+    assert_eq!(detail["aktuelles_verbleib_ziel"], "KH Mitte");
+    assert_eq!(detail["aktueller_verbleib_status"], "angemeldet");
+}
+
+#[tokio::test]
+async fn vermisst_seit_angabe_beim_anlegen_wird_uebernommen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (s, json) = personen_post(
+        &app,
+        &admin,
+        e,
+        r#"{"status":"vermisst","vermisst_seit":"2026-09-22 06:00:00"}"#,
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+    assert_eq!(json["vermisst_seit"], "2026-09-22 06:00:00");
+}
+
+#[tokio::test]
+async fn vermisst_seit_fehlt_dann_gilt_die_meldezeit() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let vorher = jetzt_wire(0);
+    let (s, json) = personen_post(&app, &admin, e, r#"{"status":"vermisst"}"#).await;
+    let nachher = jetzt_wire(0);
+    assert_eq!(s, StatusCode::CREATED);
+    let seit = json["vermisst_seit"]
+        .as_str()
+        .expect("vermisst_seit gesetzt");
+    assert!(
+        vorher.as_str() <= seit && seit <= nachher.as_str(),
+        "{vorher} <= {seit} <= {nachher}"
+    );
+    // Ohne Status vermisst wird nichts gesetzt.
+    let (_, json) = personen_post(&app, &admin, e, r#"{"status":"betroffen"}"#).await;
+    assert!(!json.as_object().unwrap().contains_key("vermisst_seit"));
+}
+
+#[tokio::test]
+async fn vermisst_seit_unbrauchbar_ist_400_ohne_vermisst_422() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let zukunft = jetzt_wire(3600);
+    let knapp = jetzt_wire(120);
+    for (body, erwartet) in [
+        (
+            format!(r#"{{"status":"vermisst","vermisst_seit":"{zukunft}"}}"#),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            r#"{"status":"vermisst","vermisst_seit":"22.09.2026 06:00"}"#.to_string(),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            r#"{"status":"vermisst","vermisst_seit":"2026-09-22T06:00:00Z"}"#.to_string(),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            r#"{"status":"betroffen","vermisst_seit":"2026-09-22 06:00:00"}"#.to_string(),
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+        (
+            r#"{"vermisst_seit":"2026-09-22 06:00:00"}"#.to_string(),
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+        // Feld isoliert vor dem Zusammenhang (LFH-267): kaputt UND falscher Status → 400.
+        (
+            r#"{"status":"betroffen","vermisst_seit":"gestern"}"#.to_string(),
+            StatusCode::BAD_REQUEST,
+        ),
+    ] {
+        let (s, _) = personen_post(&app, &admin, e, &body).await;
+        assert_eq!(s, erwartet, "{body}");
+    }
+    assert_eq!(personen_anzahl(&app, &admin, e).await, 0);
+
+    // Innerhalb der Uhrentoleranz (5 min) wird eine vorgehende Geräteuhr akzeptiert.
+    let (s, json) = personen_post(
+        &app,
+        &admin,
+        e,
+        &format!(r#"{{"status":"vermisst","vermisst_seit":"{knapp}"}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+    assert_eq!(json["vermisst_seit"], knapp.as_str());
+}
+
+#[tokio::test]
+async fn vermisst_seit_im_patch_nur_bei_vermisst_und_nicht_leerbar() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let v = person_anlegen(
+        &app,
+        &admin,
+        e,
+        r#"{"status":"vermisst","vermisst_seit":"2026-09-22 06:00:00"}"#,
+    )
+    .await;
+    let b = person_anlegen(&app, &admin, e, r#"{"status":"betroffen"}"#).await;
+
+    let (s, json) = person_patch(
+        &app,
+        &admin,
+        e,
+        v,
+        r#"{"vermisst_seit":"2026-09-22 05:30:00"}"#,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(json["vermisst_seit"], "2026-09-22 05:30:00");
+
+    let (s, _) = person_patch(&app, &admin, e, v, r#"{"vermisst_seit":null}"#).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "Leeren ist nicht vorgesehen");
+    let (s, _) = person_patch(&app, &admin, e, v, r#"{"vermisst_seit":""}"#).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "Leerstring ist ein Leerwunsch");
+    let zukunft = jetzt_wire(3600);
+    let (s, _) = person_patch(
+        &app,
+        &admin,
+        e,
+        v,
+        &format!(r#"{{"vermisst_seit":"{zukunft}"}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    assert_eq!(
+        person_detail(&app, &admin, e, v).await["vermisst_seit"],
+        "2026-09-22 05:30:00",
+        "der Zeitpunkt bleibt unverändert"
+    );
+
+    let (s, _) = person_patch(
+        &app,
+        &admin,
+        e,
+        b,
+        r#"{"vermisst_seit":"2026-09-22 05:30:00"}"#,
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[tokio::test]
+async fn wechsel_nach_vermisst_setzt_den_zeitpunkt_des_wechsels() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    // Angelegt als vermisst mit altem Zeitpunkt, dann gefunden (betroffen): der Wert bleibt
+    // dokumentarisch stehen.
+    let p = person_anlegen(
+        &app,
+        &admin,
+        e,
+        r#"{"status":"vermisst","vermisst_seit":"2026-01-01 00:00:00"}"#,
+    )
+    .await;
+    status_setzen(&app, &admin, e, p, "betroffen").await;
+    assert_eq!(
+        person_detail(&app, &admin, e, p).await["vermisst_seit"],
+        "2026-01-01 00:00:00",
+        "beim Verlassen von vermisst bleibt der Wert stehen"
+    );
+
+    // Erneut vermisst: der Zeitpunkt des Wechsels, nicht der alte und nicht der der Anlage.
+    let vorher = jetzt_wire(0);
+    status_setzen(&app, &admin, e, p, "vermisst").await;
+    let nachher = jetzt_wire(0);
+    let detail = person_detail(&app, &admin, e, p).await;
+    let seit = detail["vermisst_seit"].as_str().unwrap();
+    assert!(
+        vorher.as_str() <= seit && seit <= nachher.as_str(),
+        "{vorher} <= {seit} <= {nachher}"
+    );
+}
+
+#[tokio::test]
+async fn replay_derselben_client_id_aendert_koordinate_und_vermisst_seit_nicht() {
+    // Der zweite POST trägt ANDERE Werte: bliebe davon etwas hängen, hätte der Replay
+    // geschrieben. Erwartet: dieselbe Person mit den Werten des ersten Requests.
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (s1, erste) = personen_post(
+        &app,
+        &admin,
+        e,
+        r#"{"client_id":"lfh613-1","status":"vermisst","vermisst_seit":"2026-09-22 06:00:00",
+            "antreff_lat":52.2691,"antreff_lon":9.1342,"zustand":"unklar"}"#,
+    )
+    .await;
+    assert_eq!(s1, StatusCode::CREATED);
+    let (s2, zweite) = personen_post(
+        &app,
+        &admin,
+        e,
+        r#"{"client_id":"lfh613-1","status":"vermisst","vermisst_seit":"2026-09-22 07:00:00",
+            "antreff_lat":50.0,"antreff_lon":8.0,"zustand":"anders"}"#,
+    )
+    .await;
+    assert_eq!(s2, StatusCode::CREATED);
+    assert_eq!(zweite["id"], erste["id"]);
+    assert_eq!(zweite["vermisst_seit"], "2026-09-22 06:00:00");
+    assert_eq!(zweite["antreff_lat"], 52.2691);
+    assert_eq!(zweite["antreff_lon"], 9.1342);
+    assert_eq!(zweite["zustand"], "unklar");
+    assert_eq!(personen_anzahl(&app, &admin, e).await, 1);
+}

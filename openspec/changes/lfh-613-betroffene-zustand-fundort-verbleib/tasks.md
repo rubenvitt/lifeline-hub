@@ -8,12 +8,12 @@
 
 ## 2. Backend-Domäne und Routen
 
-- [ ] 2.1 `VerbleibArt::Notunterkunft` mit `as_str`/`parse`/`kurzform`/`etb_sachverhalt`, Nachtrag in `tests/enum_wire_kontrakt.rs`. Verifikation: Roundtrip-Unit-Test, und `cargo test --test enum_wire_kontrakt` ist grün.
-- [ ] 2.2 `PersonAnzeige` und `SELECT_ALLE` um die sieben Felder erweitern (`skip_serializing_if` für `Option`). Verifikation: der Detail- und Listentest liefert die Felder, und ein fehlender Key ist per `contains_key` geprüft.
-- [ ] 2.3 `verbleib_repo::erfassen` pflegt Art, Ziel und Status im Cache in derselben Transaktion. `notunterkunft` löst den UHS-Auto-Austritt aus. Verifikation: Integrationstests für die Spec-Szenarien „Verbleib Notunterkunft“, „Notunterkunft beendet den UHS-Aufenthalt“ und „Unbekannte Verbleib-Art“ (400).
-- [ ] 2.4 Anlege-POST: `zustand`, `antreff_lat/lon` (Paar- und Bereichsprüfung 422) und `vermisst_seit` (400/422 nach D4/D5) in `NeueDaten` und im INSERT. Verifikation: Integrationstests je Spec-Szenario, dazu ein Replay derselben `client_id`, bei dem `vermisst_seit` und die Koordinate unverändert bleiben und keine zweite Person entsteht.
-- [ ] 2.5 PATCH: `zustand`, `antreff_lat/lon` gegen den effektiven Zustand und `vermisst_seit` (nur bei vermisst, `null` ergibt 400) als Tri-State. Die Bindekette ist nummeriert. Verifikation: `aktualisiere_setzt_jede_spalte_an_ihren_platz` ist erweitert und grün, dazu Tests „Halbe Koordinate im PATCH gegen den Bestand“ und „Leeren ist nicht vorgesehen“.
-- [ ] 2.6 Der Statuswechsel nach `vermisst` setzt `vermisst_seit = now`. Verifikation: Integrationstest „Wechsel nach vermisst“, der Zeitpunkt liegt nach dem Wechsel und nicht bei der Anlage.
+- [x] 2.1 `VerbleibArt::Notunterkunft` mit `as_str`/`parse`/`kurzform`/`etb_sachverhalt`, Nachtrag in `tests/enum_wire_kontrakt.rs`. Verifikation: Roundtrip-Unit-Test, und `cargo test --test enum_wire_kontrakt` ist grün.
+- [x] 2.2 `PersonAnzeige` und `SELECT_ALLE` um die sieben Felder erweitern (`skip_serializing_if` für `Option`). Verifikation: der Detail- und Listentest liefert die Felder, und ein fehlender Key ist per `contains_key` geprüft.
+- [x] 2.3 `verbleib_repo::erfassen` pflegt Art, Ziel und Status im Cache in derselben Transaktion. `notunterkunft` löst den UHS-Auto-Austritt aus. Verifikation: Integrationstests für die Spec-Szenarien „Verbleib Notunterkunft“, „Notunterkunft beendet den UHS-Aufenthalt“ und „Unbekannte Verbleib-Art“ (400).
+- [x] 2.4 Anlege-POST: `zustand`, `antreff_lat/lon` (Paar- und Bereichsprüfung 422) und `vermisst_seit` (400/422 nach D4/D5) in `NeueDaten` und im INSERT. Verifikation: Integrationstests je Spec-Szenario, dazu ein Replay derselben `client_id`, bei dem `vermisst_seit` und die Koordinate unverändert bleiben und keine zweite Person entsteht.
+- [x] 2.5 PATCH: `zustand`, `antreff_lat/lon` gegen den effektiven Zustand und `vermisst_seit` (nur bei vermisst, `null` ergibt 400) als Tri-State. Die Bindekette ist nummeriert. Verifikation: `aktualisiere_setzt_jede_spalte_an_ihren_platz` ist erweitert und grün, dazu Tests „Halbe Koordinate im PATCH gegen den Bestand“ und „Leeren ist nicht vorgesehen“.
+- [x] 2.6 Der Statuswechsel nach `vermisst` setzt `vermisst_seit = now`. Verifikation: Integrationstest „Wechsel nach vermisst“, der Zeitpunkt liegt nach dem Wechsel und nicht bei der Anlage.
 - [ ] 2.7 Codegen mit `scripts/check-typ-codegen.sh`, danach `openapi.json`/`types.generated.ts` committen. Verifikation: das Skript endet mit Exit 0 ohne Diff.
 
 ## 3. Frontend-Grundlagen

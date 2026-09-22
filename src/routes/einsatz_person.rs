@@ -84,6 +84,61 @@ fn pruefe_geschlecht(g: Option<&str>) -> Result<(), AppError> {
     Ok(())
 }
 
+/// Toleranz für „vermisst seit" in der Zukunft (design.md D4): fängt eine vorgehende
+/// Geräteuhr ab. Ohne sie verwürfe die Offline-Queue eine Erfassung mit 400.
+const VERMISST_SEIT_TOLERANZ: chrono::Duration = chrono::Duration::minutes(5);
+
+/// Wire-Format aller Zeitstempel: UTC ohne Zonenkennung.
+const ZEIT_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
+
+fn jetzt_utc() -> chrono::NaiveDateTime {
+    chrono::Utc::now().naive_utc()
+}
+
+/// Prüft einen zu SETZENDEN „vermisst seit"-Wert isoliert (LFH-613, design.md D5): unparsebar
+/// oder mehr als fünf Minuten in der Zukunft → 400. Liefert die kanonische Schreibweise.
+///
+/// Das Feld wird bewusst VOR dem Zusammenhang (Status ≠ vermisst → 422) geprüft: ein
+/// unbrauchbarer Wert ist schon für sich unbrauchbar (LFH-267). Ein Body mit kaputtem
+/// Zeitpunkt UND falschem Status ist deshalb 400, nicht 422.
+fn pruefe_vermisst_seit(roh: &str, jetzt: chrono::NaiveDateTime) -> Result<String, AppError> {
+    let zeitpunkt =
+        chrono::NaiveDateTime::parse_from_str(roh.trim(), ZEIT_FORMAT).map_err(|_| {
+            AppError::Validation(
+                "vermisst_seit muss das Format JJJJ-MM-TT hh:mm:ss (UTC) haben".into(),
+            )
+        })?;
+    if zeitpunkt > jetzt + VERMISST_SEIT_TOLERANZ {
+        return Err(AppError::Validation(
+            "vermisst_seit darf nicht in der Zukunft liegen".into(),
+        ));
+    }
+    Ok(zeitpunkt.format(ZEIT_FORMAT).to_string())
+}
+
+/// Fundort-Koordinate als Paar im gültigen Wertebereich (LFH-613). Beim PATCH ist mit dem
+/// EFFEKTIVEN Zustand nach der Änderung aufzurufen, nicht mit dem Body allein — sonst ließe
+/// `{"antreff_lon": null}` gegen einen Bestand mit Koordinate eine halbe stehen. 422 wie
+/// `einsatz_uhs.rs` (Feld-Kombination bzw. Wertebereich).
+fn pruefe_koordinate(lat: Option<f64>, lon: Option<f64>) -> Result<(), AppError> {
+    if lat.is_some() != lon.is_some() {
+        return Err(AppError::UnprocessableEntity(
+            "antreff_lat und antreff_lon müssen gemeinsam gesetzt oder gemeinsam leer sein".into(),
+        ));
+    }
+    if lat.is_some_and(|la| !(-90.0..=90.0).contains(&la)) {
+        return Err(AppError::UnprocessableEntity(
+            "antreff_lat muss zwischen -90 und 90 liegen".into(),
+        ));
+    }
+    if lon.is_some_and(|lo| !(-180.0..=180.0).contains(&lo)) {
+        return Err(AppError::UnprocessableEntity(
+            "antreff_lon muss zwischen -180 und 180 liegen".into(),
+        ));
+    }
+    Ok(())
+}
+
 #[derive(Debug, Deserialize)]
 pub struct ListeParams {
     pub status: Option<String>,
@@ -143,6 +198,14 @@ pub struct AnlegenBody {
     /// Optionaler Eintritt in den UHS-Wartebereich in derselben Transaktion wie die
     /// Person-Anlage (LFH-458). Ein client_id-Replay erzeugt keine zweite Belegung.
     pub uhs_id: Option<i64>,
+    /// LFH-613: Zustand in Kurzform (Freitext, getrimmt; leer = kein Zustand).
+    pub zustand: Option<String>,
+    /// LFH-613: Fundort-Koordinate (WGS84), nur als Paar (sonst 422).
+    pub antreff_lat: Option<f64>,
+    pub antreff_lon: Option<f64>,
+    /// LFH-613: „vermisst seit" (`YYYY-MM-DD HH:MM:SS`, UTC). Nur mit `status: vermisst`
+    /// (sonst 422); fehlt er dort, setzt der Server den Zeitpunkt der Anlage.
+    pub vermisst_seit: Option<String>,
     /// Stabiler, client-generierter Idempotenzschlüssel für Offline-Queue und
     /// Timeout-Replay. Leer/fehlend behält das Verhalten älterer Clients.
     pub client_id: Option<String>,
@@ -242,6 +305,29 @@ pub async fn anlegen(
         ));
     }
 
+    // LFH-613: erst das Feld isoliert (400), dann der Zusammenhang mit dem Status (422).
+    let jetzt = jetzt_utc();
+    let vermisst_seit_angabe = match trimme(body.vermisst_seit) {
+        Some(roh) => Some(pruefe_vermisst_seit(&roh, jetzt)?),
+        None => None,
+    };
+    if vermisst_seit_angabe.is_some() && status_enum != PersonStatus::Vermisst {
+        return Err(AppError::UnprocessableEntity(
+            "vermisst_seit ist nur mit Status vermisst zulässig".into(),
+        ));
+    }
+    // Fehlt die Angabe bei einer Vermisstmeldung, gilt die Meldezeit. Sie steht im INSERT und
+    // ist damit Teil der Replay-idempotenten Anlage: ein client_id-Replay kommt nicht bis
+    // hierher (Lookup oben) bzw. schreibt in der Tx nichts neu (`war_neu`).
+    let vermisst_seit = match status_enum {
+        PersonStatus::Vermisst => {
+            Some(vermisst_seit_angabe.unwrap_or_else(|| jetzt.format(ZEIT_FORMAT).to_string()))
+        }
+        _ => None,
+    };
+    pruefe_koordinate(body.antreff_lat, body.antreff_lon)?;
+    let zustand = trimme(body.zustand);
+
     let name = trimme(body.name);
     let vorname = trimme(body.vorname);
     let geburtsdatum = trimme(body.geburtsdatum);
@@ -273,6 +359,10 @@ pub async fn anlegen(
                 antreff_ort: antreff.as_deref(),
                 melder_kontakt: melder.as_deref(),
                 notiz: notiz.as_deref(),
+                zustand: zustand.as_deref(),
+                antreff_lat: body.antreff_lat,
+                antreff_lon: body.antreff_lon,
+                vermisst_seit: vermisst_seit.as_deref(),
             },
         )
         .await?;
@@ -459,6 +549,30 @@ pub struct PatchBody {
         deserialize_with = "crate::routes::support::deserialize_optional_field"
     )]
     pub notiz: Option<Option<String>>,
+    /// LFH-613: Zustand (Tri-State; `null`/`""` leert).
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
+    pub zustand: Option<Option<String>>,
+    /// LFH-613: Fundort-Koordinate (Tri-State je Wert, Paarregel gegen den Effektivzustand).
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
+    pub antreff_lat: Option<Option<f64>>,
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
+    pub antreff_lon: Option<Option<f64>>,
+    /// LFH-613: „vermisst seit" korrigieren — nur bei Status vermisst (422), `null` ist 400:
+    /// Leeren nähme der Dashboard-Zählung die Grundlage (design.md D4).
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
+    pub vermisst_seit: Option<Option<String>>,
     /// Optimistisches Lock (LFH-241/F10): der beim Laden gelesene `geaendert_at`-Stand.
     /// Stimmt er nicht mehr → 409 statt stillem Overwrite. Fehlt er (Overwrite aus dem
     /// Konfliktdialog), wird bewusst blind geschrieben.
@@ -504,6 +618,34 @@ pub async fn aktualisieren(
     let antreff = trimme_tri(body.antreff_ort);
     let melder = trimme_tri(body.melder_kontakt);
     let notiz = trimme_tri(body.notiz);
+    let zustand = trimme_tri(body.zustand);
+
+    // LFH-613 „vermisst seit": zuerst das Feld isoliert (400 — leeren, unparsebar, Zukunft),
+    // danach der Zusammenhang mit dem Status (422, unten gegen den geladenen Bestand).
+    let vermisst_seit = match trimme_tri(body.vermisst_seit) {
+        None => None,
+        Some(None) => {
+            return Err(AppError::Validation(
+                "vermisst_seit kann nicht geleert werden".into(),
+            ))
+        }
+        Some(Some(roh)) => Some(pruefe_vermisst_seit(&roh, jetzt_utc())?),
+    };
+
+    // Paarregel und „nur bei vermisst" brauchen den Bestand. Wie in `einsatz_uhs.rs` gilt: der
+    // Effektivzustand wird vor dem UPDATE gelesen; ein konkurrierender Schreiber dazwischen
+    // fängt das optimistische Lock (`basis_geaendert_at`), wo der Client es mitschickt.
+    if body.antreff_lat.is_some() || body.antreff_lon.is_some() || vermisst_seit.is_some() {
+        let vorher = repo::laden(&state.pool, einsatz_id, person_id).await?;
+        let eff_lat = body.antreff_lat.unwrap_or(vorher.antreff_lat);
+        let eff_lon = body.antreff_lon.unwrap_or(vorher.antreff_lon);
+        pruefe_koordinate(eff_lat, eff_lon)?;
+        if vermisst_seit.is_some() && vorher.status != PersonStatus::Vermisst {
+            return Err(AppError::UnprocessableEntity(
+                "vermisst_seit ist nur bei einer vermissten Person änderbar".into(),
+            ));
+        }
+    }
 
     let person = repo::aktualisiere(
         &state.pool,
@@ -521,6 +663,10 @@ pub async fn aktualisieren(
             antreff_ort: antreff.as_ref().map(|o| o.as_deref()),
             melder_kontakt: melder.as_ref().map(|o| o.as_deref()),
             notiz: notiz.as_ref().map(|o| o.as_deref()),
+            zustand: zustand.as_ref().map(|o| o.as_deref()),
+            antreff_lat: body.antreff_lat,
+            antreff_lon: body.antreff_lon,
+            vermisst_seit: vermisst_seit.as_deref().map(Some),
         },
     )
     .await?;
@@ -887,8 +1033,12 @@ pub async fn verbleib(
     )
     .await?;
 
-    // E‑3: bei transport/entlassung → UHS-Auto-Austritt (eigene ETB-Spur).
-    if matches!(art, VerbleibArt::Transport | VerbleibArt::Entlassung) {
+    // E‑3: bei transport/entlassung/notunterkunft → UHS-Auto-Austritt (eigene ETB-Spur).
+    // Notunterkunft (LFH-613) verlässt die Unfallhilfsstelle ebenso wie ein Transport.
+    if matches!(
+        art,
+        VerbleibArt::Transport | VerbleibArt::Entlassung | VerbleibArt::Notunterkunft
+    ) {
         let anlass = format!("durch Verbleib {}", art.as_str());
         if let Some(effekt) =
             crate::uhs::auto_austritt(&state.pool, einsatz_id, person_id, &anlass, benutzer.id)
