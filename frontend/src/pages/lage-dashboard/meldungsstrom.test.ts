@@ -84,7 +84,7 @@ describe('stromQuelle', () => {
 
   it('ohne `von` trägt der Erfasser seinen Funktions-Snapshot (LFH-615)', () => {
     expect(stromQuelle(e(1, { erfasser_funktion: 'S2', meldeweg: 'funk' }))).toBe(
-      'Vitt · S2 · Funk',
+      'Vitt ·\u00A0S2 · Funk',
     );
     // Ein gesetztes `von` bleibt die Herkunft — die Funktion des Erfassers ist dann nicht die Quelle.
     expect(stromQuelle(e(1, { von: 'Deichwache Nord', erfasser_funktion: 'S2' }))).toBe(
