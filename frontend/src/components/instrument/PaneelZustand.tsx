@@ -68,7 +68,7 @@ export default function PaneelZustand({
         data-lfh="paneel-fehler"
         style={{ ...polster, display: 'flex', flexDirection: 'column', gap: token.marginXS }}
       >
-        <b style={{ color: rollen.alarm, fontSize: 13 }}>{PANEEL_FEHLER_TITEL}</b>
+        <b style={{ color: rollen.alarmText, fontSize: 13 }}>{PANEEL_FEHLER_TITEL}</b>
         <span style={{ color: rollen.gedaempft, fontSize: 12 }}>{PANEEL_FEHLER_TEXT}</span>
         <span>
           <Button onClick={onNeuladen}>{PANEEL_NEULADEN}</Button>

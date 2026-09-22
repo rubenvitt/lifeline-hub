@@ -13,7 +13,7 @@ const SELECT_AUFGELOEST: &str = "\
            ef.snap_funkrufname, ef.snap_kennzeichen, ef.snap_fahrzeugtyp, ef.snap_opta, \
            ef.snap_traegerorganisation, ef.bemerkung, \
            ef.lat, ef.lon, ef.tz_fachaufgabe, ef.tz_organisation, \
-           ef.aktueller_br_id, \
+           ef.aktueller_br_id, ef.status_seit, \
            ef.disponiert_at, ef.disponiert_von, \
            f.funkrufname AS live_funkrufname, f.kennzeichen AS live_kennzeichen, \
            f.fahrzeugtyp AS live_fahrzeugtyp, f.opta AS live_opta, \
@@ -43,6 +43,7 @@ struct Row {
     tz_fachaufgabe: Option<String>,
     tz_organisation: Option<String>,
     aktueller_br_id: Option<i64>,
+    status_seit: Option<String>,
     disponiert_at: String,
     disponiert_von: Option<i64>,
     live_funkrufname: Option<String>,
@@ -101,6 +102,7 @@ fn zu_anzeige(row: Row, einsatz_aktiv: bool) -> EinsatzFahrzeugAnzeige {
         status_label: row.status_label,
         status_kategorie: row.status_kategorie,
         status_farbe: row.status_farbe,
+        status_seit: row.status_seit,
         bemerkung: row.bemerkung,
         lat: row.lat,
         lon: row.lon,
@@ -227,9 +229,11 @@ pub async fn disponiere_stamm_tx(
 
     let ergebnis = sqlx::query_scalar::<_, i64>(
         "INSERT INTO einsatz_fahrzeug \
-            (einsatz_id, fahrzeug_id, status_id, snap_funkrufname, snap_kennzeichen, \
-             snap_fahrzeugtyp, snap_opta, snap_traegerorganisation, disponiert_von) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+            (einsatz_id, fahrzeug_id, status_id, status_seit, snap_funkrufname, \
+             snap_kennzeichen, snap_fahrzeugtyp, snap_opta, snap_traegerorganisation, \
+             disponiert_von) \
+         VALUES (?1, ?2, ?3, CASE WHEN ?3 IS NULL THEN NULL ELSE datetime('now') END, \
+                 ?4, ?5, ?6, ?7, ?8, ?9) RETURNING id",
     )
     .bind(einsatz_id)
     .bind(fahrzeug_id)
@@ -278,9 +282,11 @@ pub async fn disponiere_adhoc_tx(
         status_repo::erster_der_kategorie_tx(&mut *conn, org_id, KATEGORIE_GEBUNDEN).await?;
     let id = sqlx::query_scalar::<_, i64>(
         "INSERT INTO einsatz_fahrzeug \
-            (einsatz_id, fahrzeug_id, status_id, snap_funkrufname, snap_kennzeichen, \
-             snap_fahrzeugtyp, snap_opta, snap_traegerorganisation, disponiert_von) \
-         VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+            (einsatz_id, fahrzeug_id, status_id, status_seit, snap_funkrufname, \
+             snap_kennzeichen, snap_fahrzeugtyp, snap_opta, snap_traegerorganisation, \
+             disponiert_von) \
+         VALUES (?1, NULL, ?2, CASE WHEN ?2 IS NULL THEN NULL ELSE datetime('now') END, \
+                 ?3, ?4, ?5, ?6, ?7, ?8) RETURNING id",
     )
     .bind(einsatz_id)
     .bind(status_id)
@@ -309,7 +315,8 @@ pub async fn disponiere_adhoc(
 
 /// Aktualisiert Status und/oder Bemerkung einer Dispositionszeile auf einer offenen
 /// Connection/Transaktion (F06/LFH-244 Tier-A). `status_id` nutzt COALESCE (`None` =
-/// unverändert); `bemerkung` ist Drei-Zustands (wie `PositionPatch`): `None` = unverändert,
+/// unverändert); `status_seit` springt nur bei einem ECHTEN Wechsel (LFH-609) — derselbe
+/// Status erneut gesendet ist keiner, sonst läse „Seit“ den letzten Klick statt des Wechsels; `bemerkung` ist Drei-Zustands (wie `PositionPatch`): `None` = unverändert,
 /// `Some(None)` = explizit auf NULL, `Some(Some(x))` = setzen. Getrimmt/leer-kollabiert wird
 /// in der Route (F12-c/LFH-266), nicht hier.
 /// `NotFound`, falls die Zeile nicht zum Einsatz gehört.
@@ -322,9 +329,11 @@ pub async fn aktualisiere_tx(
 ) -> Result<(), AppError> {
     let resultat = sqlx::query(
         "UPDATE einsatz_fahrzeug \
-         SET status_id = COALESCE(?, status_id), \
-             bemerkung = CASE WHEN ? THEN ? ELSE bemerkung END \
-         WHERE id = ? AND einsatz_id = ?",
+         SET status_seit = CASE WHEN ?1 IS NOT NULL AND ?1 IS NOT status_id \
+                                THEN datetime('now') ELSE status_seit END, \
+             status_id = COALESCE(?1, status_id), \
+             bemerkung = CASE WHEN ?2 THEN ?3 ELSE bemerkung END \
+         WHERE id = ?4 AND einsatz_id = ?5",
     )
     .bind(status_id)
     .bind(bemerkung.is_some())

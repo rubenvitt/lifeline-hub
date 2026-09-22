@@ -668,6 +668,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
                 "Kommunikationsart-Schlüssel (digitalfunk/mobil/…), kein Personenbezug (LFH-108)",
             ),
             scrub("erreichbarkeit", Strategie::NullSetzen),
+            // LFH-614 (0105): Rufname der Einheit benennt ein operatives Objekt, keine
+            // Person — wie fahrzeug.funkrufname/snap_funkrufname.
+            retain("funkrufname", G_OP_LABEL),
             retain("sortier", G_KONFIG),
             retain("angelegt_at", G_ZEIT),
             retain("angelegt_von", G_FK),
@@ -676,6 +679,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("tz_fachaufgabe", G_ENUM),
             retain("tz_organisation", G_ENUM),
             retain("aktueller_br_id", G_FK),
+            retain("status_id", G_FK),
+            retain("status_seit", G_ZEIT),
         ],
     },
     TabellenRegel {
@@ -687,6 +692,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("einsatz_id", G_SCOPE),
             retain("fahrzeug_id", G_FK),
             retain("status_id", G_FK),
+            retain("status_seit", G_ZEIT),
             retain("snap_funkrufname", G_OP_SNAP),
             retain("snap_kennzeichen", G_OP_SNAP),
             retain("snap_fahrzeugtyp", G_OP_SNAP),
@@ -775,6 +781,29 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("etb_eintrag_id", G_FK),
             retain("erfasst_von_id", G_FK),
             retain("erfasst_at", G_ZEIT),
+        ],
+    },
+    // LFH-606: maßgebliche Pegel. Stationsname und Gewässer benennen eine Messstelle der
+    // WSV, keine Person — operatives Label. Kein Personenbezug außer dem Benutzer-FK.
+    TabellenRegel {
+        tabelle: "einsatz_pegel",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            retain("station_uuid", G_OP_LABEL),
+            retain("name", G_OP_LABEL),
+            retain("gewaesser", G_OP_LABEL),
+            retain("reihenfolge", G_ZAEHLER),
+            retain("gesetzt_von_id", G_FK),
+            retain("gesetzt_at", G_ZEIT),
+            // LFH-628: erwarteter Höchststand — ein Messwert mit Zeitpunkt, kein Personenbezug
+            // außer dem Benutzer-FK.
+            retain("prognose_cm", G_ZAEHLER),
+            retain("prognose_zeit", G_ZEIT),
+            retain("prognose_gesetzt_von_id", G_FK),
+            retain("prognose_gesetzt_at", G_ZEIT),
         ],
     },
     TabellenRegel {

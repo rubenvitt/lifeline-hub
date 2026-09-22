@@ -296,7 +296,7 @@ describe('ModulPanel · Dichte', () => {
     colorTextDisabled: '#GRAU',
   });
   const farben = {
-    flaeche2: '#FLAECHE2',
+    flaeche3: '#FLAECHE3',
     text: '#TEXT',
     text2: '#TEXT2',
     gedaempft: '#GEDAEMPFT',
@@ -341,9 +341,9 @@ describe('ModulPanel · Dichte', () => {
     expect(modulListenStil(tokenFuer('handschuh')).paddingBlock).toBe(14);
   });
 
-  it('aktiv: Fläche flaeche2 und Text, dazu die Marke in bedien (Neuentwurf)', () => {
+  it('aktiv: Fläche flaeche3 und Text, dazu die Marke in bedien (Neuentwurf, LFH-618)', () => {
     const aktiv = modulZeilenStil(tokenFuer('kompakt'), farben, { ...frei, aktiv: true });
-    expect(aktiv.background).toBe('#FLAECHE2');
+    expect(aktiv.background).toBe('#FLAECHE3');
     expect(aktiv.color).toBe('#TEXT');
     expect(modulMarkeStil(farben, true).background).toBe('#BEDIEN');
     // Inaktiv gedämpft, ohne Fläche — und die Marke bleibt als Platzhalter stehen, sonst

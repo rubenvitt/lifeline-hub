@@ -17,6 +17,7 @@ import {
   uhsTyp,
   type Statusrolle,
 } from '../../theme/statusFarben';
+import { einheitStatusAnzeige } from '../../kraefte/meldebildRaster';
 import type { KarteMarker, MarkerTyp } from './marker';
 import type { BasemapModus } from './basemapStil';
 import type { LayerSichtbar } from './Sidebar';
@@ -185,10 +186,10 @@ export function auswahlUnterzeile(marker: KarteMarker, roh: AuswahlRoh): string 
 /**
  * Das Datenraster des Paneels „Ausgewählt" — nur Felder, die eine Datenquelle haben.
  *
- * Weggelassen, weil es sie nicht gibt (Auftrag „keine erfundenen Daten"): Status und „Seit"
- * einer EINHEIT (LFH-609 — das DTO trägt keinen Status), „Seit" eines Fahrzeugstatus (das DTO
- * führt `status_label`, aber keinen Zeitpunkt des Statuswechsels; `disponiert_at` ist der
- * Zeitpunkt der Disposition und steht unter diesem Namen da), „Letzte Meldung" (LFH-610).
+ * Status und „Seit" einer EINHEIT und „Seit" eines Fahrzeugs kommen seit LFH-609 aus dem
+ * DTO: der Einheitenstatus ist aus den Fahrzeugen abgeleitet (gemeinsam oder „gemischt")
+ * oder von Hand gesetzt; ein unbekannter Zeitpunkt bleibt „—". Weggelassen, weil es sie
+ * nicht gibt (Auftrag „keine erfundenen Daten"): „Letzte Meldung" (LFH-610).
  *
  * `zeit` formatiert einen UTC-Zeitstempel nach den Anzeigekonventionen des Einsatzes.
  */
@@ -203,8 +204,17 @@ export function auswahlRaster(
     case 'einheit': {
       const e = roh.einheiten.find((x) => x.id === marker.id);
       if (!e) return [];
+      const st = einheitStatusAnzeige(e.status);
+      const statusText = st.code ? `${st.code} · ${st.wort}` : st.wort;
       return [
         { label: 'Stärke', wert: staerkeText(e.ist) },
+        {
+          label: 'Status',
+          wert: st.verteilung ? `${statusText} (${st.verteilung})` : statusText,
+          rolle: e.status.kategorie ? statusKategorie[e.status.kategorie]?.rolle : undefined,
+          mono: false,
+        },
+        { label: 'Seit', wert: e.status.seit ? zeit(e.status.seit) : '—' },
         { label: 'Abschnitt', wert: text(e.abschnitt_name), mono: false },
         { label: 'Führer', wert: text(e.fuehrer_name), mono: false },
       ];
@@ -221,6 +231,7 @@ export function auswahlRaster(
           rolle: f.status_kategorie ? statusKategorie[f.status_kategorie]?.rolle : undefined,
           mono: false,
         },
+        { label: 'Seit', wert: f.status_seit ? zeit(f.status_seit) : '—' },
         { label: 'Disponiert', wert: f.disponiert_at ? zeit(f.disponiert_at) : '—' },
         { label: 'Einheit', wert: text(einheit?.name), mono: false },
       ];

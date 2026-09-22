@@ -257,6 +257,22 @@ pub fn build_router(state: AppState) -> Router {
             "/api/einsaetze/{id}/auftraege/{aid}/abnehmen",
             post(routes::auftrag::abnehmen),
         )
+        // Maßgebliche Pegel (LFH-606): Kennzahl für Dashboard und Überblick, Gate `OhneModul`.
+        .route(
+            "/api/einsaetze/{id}/pegel",
+            get(routes::pegel::liste)
+                .put(routes::pegel::ersetzen)
+                .post(routes::pegel::anfuegen),
+        )
+        // Prognose am einzelnen Pegel (LFH-628): eigene Routen, nicht im Vollersatz-PUT.
+        .route(
+            "/api/einsaetze/{id}/pegel/{pegel_id}/prognose",
+            put(routes::pegel::prognose_setzen).delete(routes::pegel::prognose_loeschen),
+        )
+        .route(
+            "/api/einsaetze/{id}/pegel/{pegel_id}/vorhersage",
+            get(routes::pegel::vorhersage_lesen),
+        )
         // Stab (LFH-46): Führungsorganisation S1–S6. Flache Kette wie die Nachbarn.
         .route("/api/einsaetze/{id}/stab", get(routes::stab::laden))
         .route(
@@ -880,6 +896,10 @@ pub fn build_router(state: AppState) -> Router {
         .route(
             "/api/einsaetze/{id}/einheiten/{eid}/position",
             patch(routes::einsatz_einheit::position),
+        )
+        .route(
+            "/api/einsaetze/{id}/einheiten/{eid}/status",
+            put(routes::einsatz_einheit::status_setzen),
         )
         .route(
             "/api/einsaetze/{id}/einheiten/{eid}",

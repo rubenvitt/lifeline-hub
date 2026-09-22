@@ -95,7 +95,7 @@ export default function KanalListe({
                   minHeight: token.controlHeight,
                   padding: `${token.paddingXS}px ${token.padding}px`,
                   borderInlineStart: `2px solid ${aktiv ? rollen.bedien : 'transparent'}`,
-                  background: aktiv ? rollen.flaeche2 : undefined,
+                  background: aktiv ? rollen.flaeche3 : undefined,
                   fontWeight: aktiv ? 600 : 400,
                 }}
               >

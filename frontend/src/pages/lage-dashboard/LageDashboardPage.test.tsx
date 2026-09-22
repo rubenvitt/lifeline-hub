@@ -159,6 +159,7 @@ const etb = (lfd: number, over: Partial<EtbEintragAnzeige> = {}): EtbEintragAnze
   received_at: '2026-06-11 09:00:00',
   erfasser_id: 1,
   erfasser_name: 'Vitt',
+  folgeauftraege: [],
   ...over,
 });
 
@@ -221,6 +222,9 @@ interface Daten {
   gefahrenStatus?: number;
   personenStatus?: number;
   etbStatus?: number;
+  /** Maßgebliche Pegel (LFH-606) und ein erzwungener Fehlerstatus ihres Abrufs. */
+  pegel?: unknown[];
+  pegelStatus?: number;
   /** Der Einsatz-Abruf bleibt hängen — der einzige Zustand, in dem `baueLagebild`
    *  noch gar nichts liefert und das Kennzahlenband seine Plätze selbst stellen muss. */
   einsatzLaedt?: boolean;
@@ -257,6 +261,9 @@ function mockEndpunkte(d: Daten) {
     http.get('/api/einsaetze/1/etb', () =>
       d.etbStatus ? new HttpResponse(null, { status: d.etbStatus }) : json(d.etb),
     ),
+    http.get('/api/einsaetze/1/pegel', () =>
+      d.pegelStatus ? new HttpResponse(null, { status: d.pegelStatus }) : json(d.pegel),
+    ),
   );
 }
 
@@ -276,10 +283,10 @@ function render() {
 /** Das gepinnte Kennzahl-Set — handgeschrieben, NICHT aus `KENNZAHL_ETIKETTEN` gelesen:
  *  sonst prüfte der Pin die Konstante gegen sich selbst. */
 const KENNZAHL_SET = [
+  'Pegel',
   'Betroffene',
   'Kräfte',
   'Vermisste',
-  'Höchste Warnstufe',
   'Schäden offen',
   'Einsatzdauer',
 ];
@@ -325,7 +332,8 @@ describe('LageDashboardPage — Kennzahlenband', () => {
   it('trägt genau 6 Kennzahlen in fester Reihenfolge', async () => {
     // Der Reihenfolge-Pin bleibt (Prüfliste Kriterium 9: dieselbe Größe an derselben Stelle,
     // nie nach Dringlichkeit umsortiert) — neu belegt mit dem Set des Neuentwurfs S3.
-    // Pegel und Evakuiert fehlen bewusst (keine Datenquelle, LFH-606/607).
+    // Pegel auf Platz 1 statt „Höchste Warnstufe" (LFH-606); Evakuiert fehlt bewusst
+    // (keine Datenquelle, LFH-607).
     mockEndpunkte({ personen: [person('sk1')] });
     render();
     await kennzahlGeladen('Betroffene');
@@ -387,38 +395,170 @@ describe('LageDashboardPage — Kennzahlenband', () => {
     expect(dauer).toHaveTextContent(/seit /);
   });
 
-  it('FEHLER SIEHT NICHT AUS WIE LEER: der Gefahren-Ausfall zeigt „?", nicht „keine"', async () => {
-    mockEndpunkte({ personen: [person('sk1')], gefahrenStatus: 500 });
+  it('FEHLER SIEHT NICHT AUS WIE LEER: der Pegel-Abruf-Ausfall zeigt „?", nicht „kein Pegel"', async () => {
+    mockEndpunkte({ personen: [person('sk1')], pegelStatus: 500 });
     render();
-    await kennzahlGeladen('Höchste Warnstufe');
-    const warnstufe = kennzahl('Höchste Warnstufe');
-    expect(warnstufe).toHaveTextContent('?');
-    expect(warnstufe).toHaveTextContent('Stand unbekannt');
-    expect(warnstufe).not.toHaveTextContent('keine');
+    await kennzahlGeladen('Pegel');
+    const zelle = await waitFor(() => {
+      const z = kennzahl('Pegel');
+      expect(z).toHaveTextContent('?');
+      return z;
+    });
+    expect(zelle).toHaveTextContent('Stand unbekannt');
+    expect(zelle).not.toHaveTextContent('kein Pegel festgelegt');
     // Ein Teilfehler macht die übrigen Kennzahlen nicht unkenntlich.
     expect(kennzahl('Betroffene')).toHaveTextContent('1');
     expect(kennzahl('Betroffene')).not.toHaveTextContent('Stand unbekannt');
   });
 
-  it('Warnstufe „niedrig" hebt nicht ab; „hoch" trägt die Alarmkante und den Kopf-Hinweis', async () => {
+  it('FEHLER SIEHT NICHT AUS WIE LEER: der Gefahren-Ausfall zeigt einen Fehler, nicht „keine Gefahr"', async () => {
+    // Der Bestandsfall aus LFH-331 · B3, seit LFH-606 ohne eigene Warnstufen-Kennzahl: die
+    // Warnstufe steht im Kopf-Hinweis und in der Gefahrenmatrix. Beide dürfen einen toten
+    // Abruf nicht als „keine Gefahr" ausgeben.
+    mockEndpunkte({ personen: [person('sk1')], gefahrenStatus: 500 });
+    render();
+    await kennzahlGeladen('Betroffene');
+    const box = paneel('Gefahrenmatrix');
+    expect(await within(box).findByText('Daten nicht abrufbar')).toBeInTheDocument();
+    expect(within(box).queryByText(/Noch keine/)).toBeNull();
+    // Kein Kopf-Hinweis aus einer erfundenen Stufe.
+    expect(document.querySelector('[data-lfh="warnstufe-hinweis"]')).toBeNull();
+    // Ein Teilfehler macht die übrigen Kennzahlen nicht unkenntlich.
+    expect(kennzahl('Betroffene')).toHaveTextContent('1');
+    expect(kennzahl('Betroffene')).not.toHaveTextContent('Stand unbekannt');
+  });
+
+  it('Warnstufe „niedrig" bleibt still; „hoch" steht als Hinweis im Seitenkopf', async () => {
     // Entscheidung des Vertrags, hier festgenagelt: `niedrig` ist kein Alarmbeitrag
     // (EEMUA 191 / ISA-18.2). Ein stilles Umhängen auf `achtung` färbte app-weit um.
     expect(warnstufeKennzahl.niedrig.rolle).toBe('normal');
 
     mockEndpunkte({ gefahren: [gebiet(1, 'niedrig')] });
     const erster = render();
-    await kennzahlGeladen('Höchste Warnstufe');
-    expect(kennzahl('Höchste Warnstufe')).toHaveTextContent('niedrig');
-    expect(kante(kennzahl('Höchste Warnstufe'))).toBe(0);
+    // Wartesignal „Gebiete geladen": der Leerzustand der Matrix entsteht erst danach.
+    expect(
+      await within(paneel('Gefahrenmatrix')).findByText('Noch keine Gefahr bewertet.'),
+    ).toBeInTheDocument();
     expect(document.querySelector('[data-lfh="warnstufe-hinweis"]')).toBeNull();
     erster.unmount();
 
+    // Seit LFH-606 ist der Kopf-Hinweis der Ort der Warnstufe auf dieser Seite — das Band
+    // trägt sie nicht mehr.
     mockEndpunkte({ gefahren: [gebiet(1, 'hoch')] });
     render();
-    await kennzahlGeladen('Höchste Warnstufe');
-    expect(kante(kennzahl('Höchste Warnstufe'))).toBe(6);
-    const hinweis = document.querySelector('[data-lfh="warnstufe-hinweis"]');
+    const hinweis = await waitFor(() => {
+      const h = document.querySelector('[data-lfh="warnstufe-hinweis"]');
+      expect(h).not.toBeNull();
+      return h;
+    });
     expect(hinweis?.textContent).toBe('Warnstufe hoch');
+    expect(zellen().map((z) => z.textContent)).not.toContainEqual(
+      expect.stringContaining('Höchste Warnstufe'),
+    );
+  });
+
+  it('Pegel mit Messung: Meter, Einheit, Gewässer · Trend · Stand, Link zur Auswahl', async () => {
+    mockEndpunkte({
+      pegel: [
+        {
+          id: 1,
+          station_uuid: '47174d8f-1b8e-4599-8a59-b580dd55bc87',
+          name: 'HANN. MÜNDEN',
+          gewaesser: 'WESER',
+          reihenfolge: 0,
+          // Frisch zur echten Uhr: die Seite rechnet das Alter gegen `Date.now()`.
+          messung: {
+            wasserstand_cm: 684,
+            zeitpunkt: new Date(Date.now() - 10 * 60_000).toISOString(),
+            trend_cm_pro_h: 9.2,
+          },
+        },
+        {
+          id: 2,
+          station_uuid: '5f9c1b54-3c41-4d93-bb48-2b7c7c3f5a61',
+          name: 'WAHNHAUSEN',
+          gewaesser: 'FULDA',
+          reihenfolge: 1,
+        },
+      ],
+    });
+    render();
+    const zelle = await waitFor(() => {
+      const z = kennzahl('Pegel');
+      expect(z.querySelector('[data-lfh="kennzahl-wert"]')?.textContent).toBe('6,84');
+      return z;
+    });
+    expect(zelle).toHaveTextContent('m');
+    const notiz = zelle.querySelector('[data-lfh="kennzahl-notiz"]')?.textContent ?? '';
+    expect(notiz).toMatch(
+      /^WESER · steigend \+9 cm\/h · Stand (\d{2}\. )?\d{2}:\d{2} · \+1 weitere$/,
+    );
+    expect(notiz).not.toContain('veraltet');
+    expect(zelle.getAttribute('data-ton')).toBe('neutral');
+    expect(zelle).toHaveAttribute('href', '/einsaetze/1/einstellungen/pegel');
+  });
+
+  it('Pegel veraltet: das Wort in der Notiz und die Achtungskante', async () => {
+    mockEndpunkte({
+      pegel: [
+        {
+          id: 1,
+          station_uuid: '47174d8f-1b8e-4599-8a59-b580dd55bc87',
+          name: 'HANN. MÜNDEN',
+          gewaesser: 'WESER',
+          reihenfolge: 0,
+          messung: {
+            wasserstand_cm: 684,
+            zeitpunkt: new Date(Date.now() - 3 * 3_600_000).toISOString(),
+          },
+        },
+      ],
+    });
+    render();
+    const zelle = await waitFor(() => {
+      const z = kennzahl('Pegel');
+      expect(z).toHaveTextContent('veraltet');
+      return z;
+    });
+    expect(zelle).toHaveTextContent('Trend unbekannt');
+    expect(zelle.getAttribute('data-ton')).toBe('achtung');
+    expect(kante(zelle)).toBe(3);
+  });
+
+  it('Pegel-Ausfall: festgelegt, aber keine Messung → „—" und „Stand unbekannt"', async () => {
+    mockEndpunkte({
+      pegel: [
+        {
+          id: 1,
+          station_uuid: '47174d8f-1b8e-4599-8a59-b580dd55bc87',
+          name: 'HANN. MÜNDEN',
+          gewaesser: 'WESER',
+          reihenfolge: 0,
+        },
+      ],
+    });
+    render();
+    const zelle = await waitFor(() => {
+      const z = kennzahl('Pegel');
+      expect(z).toHaveTextContent('Stand unbekannt');
+      return z;
+    });
+    expect(zelle.querySelector('[data-lfh="kennzahl-wert"]')?.textContent).toBe('—');
+    expect(zelle).toHaveTextContent('WESER');
+    // Ein Ausfall ist kein Abruf-Fehler: kein „?".
+    expect(zelle).not.toHaveTextContent('?');
+  });
+
+  it('kein Pegel festgelegt: der Platz bleibt belegt und führt zur Auswahl', async () => {
+    mockEndpunkte({});
+    render();
+    const zelle = await waitFor(() => {
+      const z = kennzahl('Pegel');
+      expect(z).toHaveTextContent('kein Pegel festgelegt');
+      return z;
+    });
+    expect(zelle.querySelector('[data-lfh="kennzahl-wert"]')?.textContent).toBe('—');
+    expect(zelle).toHaveAttribute('href', '/einsaetze/1/einstellungen/pegel');
   });
 
   it('Deep-Link: Klick auf „Betroffene" führt ins Personen-Modul', async () => {

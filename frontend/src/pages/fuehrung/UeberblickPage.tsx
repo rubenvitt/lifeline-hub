@@ -31,11 +31,14 @@ import { ladeGefahrengebiete } from '../../api/gefahren';
 import { listeAuftraege } from '../../api/auftraege';
 import { listeErinnerungen } from '../../api/erinnerungen';
 import { listeEtb } from '../../api/etb';
+import { pegelAbfrage } from '../../api/pegel';
+import { PEGEL_STAND_UNBEKANNT, pegelNotizKurz } from '../../pegel/pegelKennzahl';
 import {
   auftraegePfad,
   einheitenPfad,
   einsaetzePfad,
   einsatzabschnittePfad,
+  einsatzEinstellungenPfad,
   erinnerungenPfad,
   etbPfad,
   gefahrenPfad,
@@ -57,11 +60,11 @@ import {
   empfaengerText,
   entscheidungenAuswahl,
   folgeText,
-  folgeauftraegeJeEintrag,
   kraefteKennzahl,
   naechsteMarken,
   offeneAuftraege,
   warnstufeKennzahlVon,
+  warnstufeNotiz,
   ueberblickRechteText,
   type AbschnittZeile,
   type Marke,
@@ -81,11 +84,25 @@ import { MARKEN_BREITE, rasterStil, zeilenzielStil } from './ueberblickStil';
  * (`EINSATZ_STREAM_EVENTS`). Die Reihenfolgen sind vollständig bestimmt (Tiebreak über
  * id), ein Refetch ordnet also nichts um, was sich nicht geändert hat.
  *
- * BEWUSST WEGGELASSEN (keine erfundenen Daten, Entscheidung 4): Pegel-Notiz an der
- * Warnstufe (LFH-606), Einheitenstatus (LFH-609 — ersetzt durch die Verfügbarkeit der
- * Mittel), letzte Rückmeldung je Abschnitt (LFH-610). Lagezustand, Kürzel, fester
- * Auftrag und Fortschritt je Abschnitt kommen seit LFH-608 aus dem Abschnitt selbst —
- * und bleiben weg, solange sie dort nicht gepflegt sind.
+ * PEGEL-NOTIZ AN DER WARNSTUFE (LFH-606, Entscheidung 4 des Auftraggebers vom 22.09.2026):
+ * seit es die maßgeblichen Pegel des Einsatzes gibt, trägt die Warnstufen-Kennzahl wieder
+ * „Pegel 6,84 m steigend" — aus derselben Ableitung wie das Lage-Dashboard
+ * (`pegel/pegelKennzahl.ts`). Ohne festgelegten Pegel keine Pegel-Notiz, bei Ausfall oder
+ * gescheitertem Abruf „Pegel: Stand unbekannt". Der Pegel-Abruf bestimmt NICHT den Zustand
+ * der Kennzahl: sie gehört der Warnstufe, ein toter Pegel-Abruf macht die Warnstufe nicht
+ * unlesbar.
+ *
+ * PEGEL-PROGNOSE ALS MARKE (LFH-628): ein offener erwarteter Höchststand steht unter den
+ * nächsten Marken („Erwarteter Höchststand Pegel Weser: 7,10 m") und führt zur
+ * Einstellungssektion, wo er gepflegt wird. Verstrichen fällt er heraus (`naechsteMarken`).
+ * Auch hier bestimmt der Pegel-Abruf NICHT den Zustand des Paneels: ein gescheiterter
+ * Abruf nimmt nur die Prognose-Marke weg, die Fristen der übrigen Quellen bleiben lesbar.
+ *
+ * BEWUSST WEGGELASSEN (keine erfundenen Daten, Entscheidung 4): letzte Rückmeldung je
+ * Abschnitt (LFH-610). Das Raster bereit · gebunden · Ausfall zählt seit LFH-609 die
+ * Einheiten nach ihrem Status; Lagezustand, Kürzel, fester Auftrag und Fortschritt je
+ * Abschnitt kommen seit LFH-608 aus dem Abschnitt selbst — und bleiben weg, solange sie
+ * dort nicht gepflegt sind.
  */
 
 /** Der Entscheidungsabruf: nur Typ „Entscheidung", ein Deckel, der die letzte Stunde
@@ -235,6 +252,7 @@ export default function UeberblickPage() {
     queryKey: einsatzKeys.etbListe(einsatzId, ETB_ENTSCHEIDUNGEN),
     queryFn: () => listeEtb(einsatzId, ETB_ENTSCHEIDUNGEN),
   });
+  const pegelQ = useQuery(pegelAbfrage(einsatzId));
 
   const einsatz = einsatzQ.data;
   /*
@@ -260,6 +278,16 @@ export default function UeberblickPage() {
     [personal, fahrzeuge, material],
   );
   const warnstufe = useMemo(() => warnstufeKennzahlVon(gefahren ?? []), [gefahren]);
+  const pegel = pegelQ.data;
+  const pegelNotiz = useMemo(
+    () =>
+      pegelQ.isError
+        ? `Pegel: ${PEGEL_STAND_UNBEKANNT}`
+        : pegel
+          ? pegelNotizKurz(pegel, jetzt.valueOf())
+          : null,
+    [pegelQ.isError, pegel, jetzt],
+  );
   const auftragszahl = useMemo(() => auftraegeKennzahl(auftraege ?? []), [auftraege]);
   const offene = useMemo(() => offeneAuftraege(auftraege ?? []), [auftraege]);
   const zeilen = useMemo(
@@ -275,7 +303,6 @@ export default function UeberblickPage() {
     [abschnitte, einheiten, personal, fahrzeuge, material, auftraege],
   );
   const entscheidungen = useMemo(() => entscheidungenAuswahl(etb ?? [], jetzt), [etb, jetzt]);
-  const folge = useMemo(() => folgeauftraegeJeEintrag(auftraege ?? []), [auftraege]);
   const marken = useMemo(
     () =>
       naechsteMarken(
@@ -283,8 +310,9 @@ export default function UeberblickPage() {
         erinnerungen ?? [],
         einsatz?.naechste_lagebesprechung_at,
         jetzt,
+        pegel ?? [],
       ),
-    [auftraege, erinnerungen, einsatz?.naechste_lagebesprechung_at, jetzt],
+    [auftraege, erinnerungen, einsatz?.naechste_lagebesprechung_at, jetzt, pegel],
   );
 
   const zBetroffene = zustandVon(personenQ);
@@ -306,15 +334,17 @@ export default function UeberblickPage() {
       ? auftraegePfad(einsatzId, { auftrag: m.id ?? undefined })
       : m.art === 'erinnerung'
         ? erinnerungenPfad(einsatzId)
-        : stabPfad(einsatzId);
+        : m.art === 'pegelprognose'
+          ? einsatzEinstellungenPfad(einsatzId, 'pegel')
+          : stabPfad(einsatzId);
   const markenFarbe = (m: Marke) =>
-    m.ton === 'alarm' ? rollen.alarm : m.ton === 'achtung' ? rollen.achtung : rollen.text;
+    m.ton === 'alarm' ? rollen.alarmText : m.ton === 'achtung' ? rollen.achtungText : rollen.text;
 
   const ueberfaelligMeta =
     zAuftraege === 'daten' ? (
       <span
         style={{
-          color: auftragszahl.ueberfaellig > 0 ? rollen.achtung : rollen.schwach,
+          color: auftragszahl.ueberfaellig > 0 ? rollen.achtungText : rollen.schwach,
         }}
       >
         {auftragszahl.ueberfaellig > 0
@@ -401,11 +431,7 @@ export default function UeberblickPage() {
             zustand={zWarnstufe}
             ton={warnstufe.ton}
             wert={warnstufe.wort}
-            notiz={
-              warnstufe.anzahlAktiv === 1
-                ? '1 Gefahrengebiet mit Warnstufe'
-                : `${warnstufe.anzahlAktiv} Gefahrengebiete mit Warnstufe`
-            }
+            notiz={warnstufeNotiz(warnstufe.anzahlAktiv, pegelNotiz)}
             ziel={gefahrenPfad(einsatzId)}
           />
           <Kennzahl
@@ -449,7 +475,7 @@ export default function UeberblickPage() {
             fuss={
               zAbschnitte === 'daten' && zeilen.length > 0 ? (
                 <span style={{ ...monoStil(10), color: rollen.schwach }}>
-                  Mittel (Fahrzeuge + Personal): bereit · gebunden · Ausfall
+                  Einheiten nach Status: bereit · gebunden · Ausfall
                   {auftraegeFehlen && ' — Aufträge nicht abrufbar, Auftragstexte fehlen'}
                 </span>
               ) : undefined
@@ -499,7 +525,7 @@ export default function UeberblickPage() {
             >
               <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
                 {offene.slice(0, AUFTRAEGE_MAX).map((a) => {
-                  const farbe = a.ist_ueberfaellig ? rollen.alarm : rollen.gedaempft;
+                  const farbe = a.ist_ueberfaellig ? rollen.alarmText : rollen.gedaempft;
                   return (
                     <li key={a.id}>
                       <Link
@@ -596,13 +622,6 @@ export default function UeberblickPage() {
                   ETB ↗
                 </Link>
               }
-              fuss={
-                auftraegeFehlen && entscheidungen.eintraege.length > 0 ? (
-                  <span style={{ fontSize: 11, color: rollen.schwach }}>
-                    Aufträge nicht abrufbar — Folgeaufträge werden nicht gezählt.
-                  </span>
-                ) : undefined
-              }
             >
               <Zustandsfeld
                 zustand={zEntscheidungen}
@@ -617,7 +636,9 @@ export default function UeberblickPage() {
               >
                 <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
                   {entscheidungen.eintraege.map((e) => {
-                    const folgeWort = auftraegeFehlen ? null : folgeText(folge.get(e.id) ?? 0);
+                    // Aus dem ETB-Eintrag selbst (LFH-636), nicht aus der Auftragsliste —
+                    // die bekommt nicht, wer das Aufträge-Modul gesperrt hat.
+                    const folgeWort = folgeText(e.folgeauftraege.length);
                     return (
                       <Zeitachseneintrag
                         key={e.id}
@@ -719,12 +740,13 @@ export default function UeberblickPage() {
 }
 
 /** Eine Abschnittszeile: Lagekante · Name/Kürzel/Leiter/Einheiten/Lagezustand · fester
- *  Auftrag mit Fortschritt (sonst jüngster offener Auftrag) · Stärke und Mittelverteilung.
- *  Die ganze Zeile ist der Link auf den Abschnitt. */
+ *  Auftrag mit Fortschritt (sonst jüngster offener Auftrag) · Stärke und Einheiten je
+ *  Statuskategorie (LFH-609). Die ganze Zeile ist der Link auf den Abschnitt. */
 function AbschnittEintrag({ zeile, ziel }: { zeile: AbschnittZeile; ziel: string }) {
   const { token, rollen } = useRollen();
   const [juengster, ...weitere] = zeile.auftraege;
-  const { mittel, auftragsbilanz } = zeile;
+  const { auftragsbilanz } = zeile;
+  const verteilung = zeile.einheitenStatus;
   const lage = zeile.lagezustand ? abschnittLagezustand[zeile.lagezustand] : null;
   const leitung = [zeile.kurzbezeichnung, zeile.leiter].filter(Boolean).join(' · ');
   // Unterzeile: die Zählung, und wenn der feste Auftrag den Platz hat, der offene
@@ -855,17 +877,19 @@ function AbschnittEintrag({ zeile, ziel }: { zeile: AbschnittZeile; ziel: string
             width: '100%',
           }}
         >
-          <StatusZelle ton="normal" hoehe={24} wert={mittel.bereit} wort="bereit" />
-          <StatusZelle ton="bedien" hoehe={24} wert={mittel.gebunden} wort="gebunden" />
+          <StatusZelle ton="normal" hoehe={24} wert={verteilung.bereit} wort="bereit" />
+          <StatusZelle ton="bedien" hoehe={24} wert={verteilung.gebunden} wort="gebunden" />
           <StatusZelle
-            ton={mittel.ausfall > 0 ? 'alarm' : 'neutral'}
+            ton={verteilung.ausfall > 0 ? 'alarm' : 'neutral'}
             hoehe={24}
-            wert={mittel.ausfall}
+            wert={verteilung.ausfall}
             wort="Ausfall"
           />
         </span>
-        {mittel.ohne > 0 && (
-          <span style={{ ...monoStil(10), color: rollen.schwach }}>+{mittel.ohne} ohne Status</span>
+        {verteilung.ohne > 0 && (
+          <span style={{ ...monoStil(10), color: rollen.schwach }}>
+            +{verteilung.ohne} ohne Status
+          </span>
         )}
       </span>
     </Link>

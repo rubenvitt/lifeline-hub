@@ -21,6 +21,7 @@ import type {
   LageberichtAnzeige,
   LageberichtStatus,
   Meldung,
+  PegelAnzeige,
   Person,
   Schaden,
   Uhs,
@@ -36,6 +37,8 @@ import { baueKraeftebild, staerkeText } from '../../kraefte/kraeftebild';
 import { LAGEBERICHT_STATUS } from '../../kommunikation/phase';
 import { warnstufeKennzahl } from '../../theme/statusFarben';
 import type { KennzahlTon } from '../../components/instrument';
+import { einsatzEinstellungenPfad } from '../../routing/deeplinks';
+import { pegelKennzahl } from '../../pegel/pegelKennzahl';
 import {
   neuesterLagebericht,
   verdichteGefahrengebiete,
@@ -59,14 +62,23 @@ export type Datenzustand = 'daten' | 'laden' | 'fehler' | 'leer';
  * Die Reihenfolge wird NICHT nach Dringlichkeit sortiert: Prüfliste Kriterium 9 verlangt
  * dieselbe Größe an derselben Stelle, in jedem Zustand — wer eine Lage funkt, greift nach
  * der Zahl an ihrem Platz. Die Anzahl ist sechs, weil sie sich 6 → 3 → 2 Spalten ohne Rest
- * teilt. „Pegel" und „Evakuiert" aus dem Entwurf fehlen: dafür gibt es keine Datenquelle
- * (LFH-606, LFH-607), und eine erfundene Kennzahl wäre schlimmer als eine fehlende.
+ * teilt.
+ *
+ * **Pegel steht auf Platz 1 und ersetzt „Höchste Warnstufe"** (LFH-606, Entscheidung des
+ * Auftraggebers vom 22.09.2026, wie im Entwurf S3). Die Datenquelle sind die maßgeblichen
+ * Pegel des Einsatzes (PEGELONLINE, `api/pegel.ts`); die Ableitung steht in
+ * `pegel/pegelKennzahl.ts`. Die Warnstufe verschwindet damit nicht von der Seite: sie steht
+ * als Hinweis im Seitenkopf, sobald sie ein Alarmbeitrag ist, und je Gefahrentyp im Paneel
+ * Gefahrenmatrix. Ist kein Pegel festgelegt, bleibt der Platz belegt („kein Pegel
+ * festgelegt" mit Weg zur Auswahl) — ein wandernder Platz verletzte Kriterium 9.
+ * „Evakuiert" aus dem Entwurf fehlt weiterhin: dafür gibt es keine Datenquelle (LFH-607),
+ * und eine erfundene Kennzahl wäre schlimmer als eine fehlende.
  */
 export const KENNZAHL_ETIKETTEN = [
+  'Pegel',
   'Betroffene',
   'Kräfte',
   'Vermisste',
-  'Höchste Warnstufe',
   'Schäden offen',
   'Einsatzdauer',
 ] as const;
@@ -81,6 +93,11 @@ export interface Kennzahl {
   ton: KennzahlTon;
   /** Modul-Route für `einsatzModulPfad` (die Seite baut den Pfad über `routing/deeplinks`). */
   route: string;
+  /**
+   * Fertiger Pfad, wo das Ziel kein Modul-Einstieg ist (Pegel → Einstellungssektion, gebaut
+   * über `einsatzEinstellungenPfad`). Hat Vorrang vor {@link Kennzahl.route}.
+   */
+  zielPfad?: string;
 }
 
 /** Der Führungsstand unter den drei Paneelen: was vorher eigene Kacheln hatte. */
@@ -111,8 +128,9 @@ export interface Lagebild {
   fuehrung: Fuehrungsstand;
 }
 
-/** Warnstufe → Ton der Kennzahl, aus {@link warnstufeKennzahl} (nicht `warnstufeKarte`:
- *  „keine" ist hier „kein Alarmbeitrag", nicht „vorsichtshalber Gefahr"). Rein. */
+/** Warnstufe → Ton, aus {@link warnstufeKennzahl} (nicht `warnstufeKarte`: „keine" ist hier
+ *  „kein Alarmbeitrag", nicht „vorsichtshalber Gefahr"). Seit LFH-606 trägt ihn der
+ *  Warnstufen-Hinweis im Seitenkopf — die Kennzahl im Band ist dem Pegel gewichen. Rein. */
 export function warnstufeTon(w: Warnstufe): KennzahlTon {
   const rolle = warnstufeKennzahl[w].rolle;
   return rolle === 'alarm' ? 'alarm' : rolle === 'achtung' ? 'achtung' : 'neutral';
@@ -177,6 +195,8 @@ export interface Rohdaten {
   abschnitte: Einsatzabschnitt[];
   auftraege: Auftrag[];
   meldungen: Meldung[];
+  /** Maßgebliche Pegel in Reihenfolge (LFH-606), erster = Leitpegel. */
+  pegel: PegelAnzeige[];
 }
 
 export function baueLagebild(
@@ -197,10 +217,23 @@ export function baueLagebild(
   const gefahren = verdichteGefahrengebiete(r.gefahren);
   const bericht = neuesterLagebericht(r.lageberichte);
   const abgeschlossen = r.einsatz.abgeschlossen_at ?? null;
+  const pegel = pegelKennzahl(r.pegel, jetzt, konv);
 
   // Die Reihenfolge ist die von KENNZAHL_ETIKETTEN; ein Etikett, das es dort nicht gibt,
   // bricht über den Typ `KennzahlEtikett` den Build.
   const kennzahlen: Kennzahl[] = [
+    {
+      // Ziel in JEDEM Fall die Einstellungssektion: dort steht die ganze Liste samt
+      // Reihenfolge, und nur dort wird festgelegt. Die Lagekarte zeigte zwar die Stationen,
+      // kann aber per Deeplink weder die Ebene einschalten noch eine Station ansteuern.
+      etikett: 'Pegel',
+      wert: pegel.wert,
+      einheit: pegel.einheit,
+      notiz: pegel.notiz,
+      ton: pegel.ton,
+      route: 'einstellungen',
+      zielPfad: einsatzEinstellungenPfad(r.einsatz.id, 'pegel'),
+    },
     {
       etikett: 'Betroffene',
       wert: String(betroffene.gesamt),
@@ -223,13 +256,6 @@ export function baueLagebild(
       notiz: betroffene.vermisst > 0 ? 'als vermisst erfasst' : 'keine offenen Fälle',
       ton: betroffene.vermisst > 0 ? 'alarm' : 'neutral',
       route: 'personen',
-    },
-    {
-      etikett: 'Höchste Warnstufe',
-      wert: warnstufeKennzahl[gefahren.hoechste].label,
-      notiz: `${gefahren.anzahlAktiv} Gefahrengebiete aktiv`,
-      ton: warnstufeTon(gefahren.hoechste),
-      route: 'gefahren',
     },
     {
       etikett: 'Schäden offen',

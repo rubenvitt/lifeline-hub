@@ -17,7 +17,7 @@ import {
 import type { EinsatzEinstellungen } from '../api/types';
 
 /**
- * Datenkontext der vier Einstellungs-Sektionen (LFH-345 · C10, H15/M15).
+ * Datenkontext der Einstellungs-Sektionen (LFH-345 · C10, H15/M15; seit LFH-606 auch „Pegel").
  *
  * **Bewusst ein Hook, kein `useOutletContext`.** Jede Sektion stellt ihre Queries selbst und
  * hat ihren eigenen Lade-/Fehler-Riegel; sie ist damit ohne dieses Layout montierbar — was
@@ -63,7 +63,7 @@ export function useEinstellungenDaten(einsatzId: number): EinstellungenDaten {
 }
 
 /**
- * Erklärt die fehlende Berechtigung auf allen vier Sektionen gleich (M16).
+ * Erklärt die fehlende Berechtigung auf den Sektionen mit Einsatz-Schreibrecht gleich (M16).
  *
  * Ausgegraut allein ist eine Ein-Kanal-Aussage und nennt keinen Grund; der Text steht hier
  * statt viermal daneben, damit er nicht auseinanderläuft.

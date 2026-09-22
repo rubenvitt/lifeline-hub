@@ -686,3 +686,76 @@ async fn patch_ohne_bemerkung_laesst_sie_stehen() {
         "absentes Feld lässt die Bemerkung unverändert"
     );
 }
+
+// LFH-609: `status_seit` ist der Zeitpunkt des letzten ECHTEN Statuswechsels. Um „bleibt"
+// von „springt" unterscheiden zu können, wird der Wert per SQL auf einen alten Zeitpunkt
+// gesetzt — `datetime('now')` zweier Aufrufe in derselben Sekunde wäre sonst gleich.
+#[tokio::test]
+async fn status_seit_nur_bei_echtem_statuswechsel() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let fz = fahrzeug_anlegen(&app, &admin, "Florian 1").await;
+    let (_, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &admin,
+        Some(&format!(r#"{{"fahrzeug_id":{fz}}}"#)),
+    )
+    .await;
+    let ef = json["id"].as_i64().unwrap();
+    let start_status = json["status_id"].as_i64().unwrap();
+    assert!(
+        json["status_seit"].is_string(),
+        "Disponieren setzt den Initialstatus und damit „Seit“"
+    );
+
+    let alt = "2000-01-01 00:00:00";
+    let setze_alt = || async {
+        sqlx::query("UPDATE einsatz_fahrzeug SET status_seit = ? WHERE id = ?")
+            .bind(alt)
+            .bind(ef)
+            .execute(&pool)
+            .await
+            .unwrap();
+    };
+    let patch = |body: String| {
+        let app = app.clone();
+        let admin = admin.clone();
+        async move {
+            let (s, j) = anfrage(
+                &app,
+                "PATCH",
+                &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"),
+                &admin,
+                Some(&body),
+            )
+            .await;
+            assert_eq!(s, StatusCode::OK);
+            j
+        }
+    };
+
+    // Nur Bemerkung → bleibt.
+    setze_alt().await;
+    let j = patch(r#"{"bemerkung":"x"}"#.into()).await;
+    assert_eq!(j["status_seit"], alt, "Bemerkung ist kein Statuswechsel");
+
+    // Gleicher Status → bleibt.
+    let j = patch(format!(r#"{{"status_id":{start_status}}}"#)).await;
+    assert_eq!(j["status_seit"], alt, "derselbe Status ist kein Wechsel");
+
+    // Anderer Status → springt.
+    let (_, stati) = anfrage(&app, "GET", "/api/fahrzeug-status", &admin, None).await;
+    let anderer = stati
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|s| s["id"].as_i64().unwrap())
+        .find(|id| *id != start_status)
+        .unwrap();
+    let j = patch(format!(r#"{{"status_id":{anderer}}}"#)).await;
+    let seit = j["status_seit"].as_str().unwrap();
+    assert!(seit > alt, "echter Wechsel setzt „Seit“ neu, war {seit}");
+}

@@ -130,6 +130,12 @@ ist eingefrorenes Archiv — dort wird nichts Neues angelegt.
 - Integration → **`superpowers:finishing-a-development-branch`**, **Ziel `alpha`** (PR-Base
   `alpha`, nicht `main`) → nach erfolgreichem Merge **Status: `shipped`**; ist damit nichts
   mehr offen → `done`
+- **Stehende Wahl im Integrationsmenü: Option 2 — pushen und PR gegen `alpha` öffnen**
+  (Festlegung des Users, 22.09.2026). Das Menü von `finishing-a-development-branch` wird
+  **nicht** mehr vorgelegt, sondern diese Wahl direkt ausgeführt; kein lokaler Merge, der
+  Worktree bleibt für PR-Feedback stehen. Der Board-Status bleibt bis zum Merge auf
+  `in review`, erst der gemergte PR führt auf `shipped`. Abweichen nur, wenn der User im
+  laufenden Task ausdrücklich etwas anderes sagt.
 - Wird der Task verworfen statt umgesetzt → **Status: `cancelled`**
 - Danach: **Abschlussmeldung an den Menschen** (s. u.) — letzter Schritt, nach Merge und
   Board-Status.

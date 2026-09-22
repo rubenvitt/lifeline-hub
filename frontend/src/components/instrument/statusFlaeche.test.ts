@@ -26,39 +26,44 @@ const TOENE: StatusTon[] = ['normal', 'achtung', 'alarm', 'bedien', 'neutral'];
 
 describe('statusFlaeche — Kontrast', () => {
   it.each(TOENE)('Tag/%s: Text ≥ 7 : 1, Kante ≥ 3 : 1', (ton) => {
-    const f = statusFlaeche(farbenHell, ton, false);
+    const f = statusFlaeche(farbenHell, ton);
     expect(kontrast(f.text, f.grund)).toBeGreaterThanOrEqual(7);
     expect(kontrast(f.kante, f.grund)).toBeGreaterThanOrEqual(3);
   });
 
   it.each(TOENE)('Nacht/%s: Text ≥ 5 : 1, Kante ≥ 3 : 1', (ton) => {
-    const f = statusFlaeche(farbenDunkel, ton, true);
+    const f = statusFlaeche(farbenDunkel, ton);
     expect(kontrast(f.text, f.grund)).toBeGreaterThanOrEqual(5);
     expect(kontrast(f.kante, f.grund)).toBeGreaterThanOrEqual(3);
   });
 
   it('nachts ist der Text getönt wie im Entwurf', () => {
-    expect(statusFlaeche(farbenDunkel, 'achtung', true).text).toBe(farbenDunkel.achtung);
-    expect(statusFlaeche(farbenDunkel, 'alarm', true).text).toBe(farbenDunkel.alarm);
-    expect(statusFlaeche(farbenDunkel, 'normal', true).text).toBe(farbenDunkel.normalText);
+    expect(statusFlaeche(farbenDunkel, 'achtung').text).toBe(farbenDunkel.achtung);
+    expect(statusFlaeche(farbenDunkel, 'alarm').text).toBe(farbenDunkel.alarm);
+    // Nachts SIND die Textrollen die Entwurfswerte.
+    expect(farbenDunkel.achtungText).toBe(farbenDunkel.achtung);
+    expect(farbenDunkel.alarmText).toBe(farbenDunkel.alarm);
+    expect(statusFlaeche(farbenDunkel, 'normal').text).toBe(farbenDunkel.normalText);
   });
 
   /**
-   * Der Tagmodus-Sonderfall als Paar: getönt läge er unter dem Boden — genau deshalb
-   * steht er hier. Wird `tokens.ts` um `achtungText`/`alarmText` ergänzt, kippt die erste
-   * Hälfte, und die Rückkehr zum getönten Text wird eine bewusste Entscheidung.
+   * Das Paar aus LFH-618: die FÜLLFARBE trägt am Tag den Boden nicht — deshalb gibt es die
+   * Textrollen, und die Beschriftung ist GETÖNT, nicht `text`. Bis dahin wich der Tag auf
+   * `text` aus; die Kontrastspecs waren grün, aber die Ampel war am Tag farblos.
    */
-  it('am Tag trägt der getönte Text von achtung/alarm den Boden nicht — deshalb `text`', () => {
+  it('am Tag trägt die Füllfarbe den Boden nicht — die Beschriftung nimmt die Textrolle', () => {
     expect(kontrast(farbenHell.achtung, farbenHell.achtungFlaeche)).toBeLessThan(7);
     expect(kontrast(farbenHell.alarm, farbenHell.alarmFlaeche)).toBeLessThan(7);
-    expect(statusFlaeche(farbenHell, 'achtung', false).text).toBe(farbenHell.text);
-    expect(statusFlaeche(farbenHell, 'alarm', false).text).toBe(farbenHell.text);
-    // Die Fläche selbst bleibt getönt — der Ton ist nicht verloren.
-    expect(statusFlaeche(farbenHell, 'alarm', false).grund).toBe(farbenHell.alarmFlaeche);
+    expect(statusFlaeche(farbenHell, 'achtung').text).toBe(farbenHell.achtungText);
+    expect(statusFlaeche(farbenHell, 'alarm').text).toBe(farbenHell.alarmText);
+    expect(statusFlaeche(farbenHell, 'achtung').text).not.toBe(farbenHell.text);
+    expect(statusFlaeche(farbenHell, 'alarm').text).not.toBe(farbenHell.text);
+    // Die Kante bleibt die Füllfarbe.
+    expect(statusFlaeche(farbenHell, 'alarm').kante).toBe(farbenHell.alarm);
   });
 
   it('neutral ist flaeche3 + text2, nicht schwach (nachts unter 5)', () => {
-    expect(statusFlaeche(farbenDunkel, 'neutral', true)).toMatchObject({
+    expect(statusFlaeche(farbenDunkel, 'neutral')).toMatchObject({
       grund: farbenDunkel.flaeche3,
       text: farbenDunkel.text2,
     });

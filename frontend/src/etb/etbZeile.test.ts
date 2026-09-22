@@ -19,6 +19,7 @@ const E = (id: number): EtbEintragAnzeige =>
     received_at: '2026-08-21 10:00:01',
     erfasst_lokal_at: null,
     berichtigt_eintrag_id: null,
+    folgeauftraege: [],
   }) as unknown as EtbEintragAnzeige;
 
 const A = (id?: number): AusstehenderEintrag => ({

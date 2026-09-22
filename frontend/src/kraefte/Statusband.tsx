@@ -4,9 +4,10 @@ import type { BandZelle } from './meldebildRaster';
 import { bandSpalten } from './statusbandStil';
 
 /**
- * Das Statusband des Meldebilds (Neuentwurf S6, `statusStufen`) — Fahrzeuge je FMS-Status,
- * darunter die Personalverteilung in DERSELBEN Spaltengeometrie. Die Zählung steht in
- * `meldebildRaster.ts` (`fahrzeugBand`, `personalBand`), die Spaltenregel rein in
+ * Das Statusband des Meldebilds (Neuentwurf S6, `statusStufen`) — EINHEITEN je FMS-Status
+ * (LFH-609; bis dahin Fahrzeuge, weil es keinen Einheitenstatus gab), darunter die
+ * Personalverteilung in DERSELBEN Spaltengeometrie. Die Zählung steht in
+ * `meldebildRaster.ts` (`einheitBand`, `personalBand`), die Spaltenregel rein in
  * `statusbandStil.ts`; hier wird nur gesetzt.
  *
  * ── DIE ZELLE IST DER BAUSTEIN `Kennzahl` (seit 22.09.2026) ─────────────────────
@@ -15,9 +16,9 @@ import { bandSpalten } from './statusbandStil';
  * Status-Töne führt (`normal` für „frei", `bedien` für „am Einsatzort"), ist jede Zelle eine
  * `Kennzahl`: Code als Augenbraue mit Statuspunkt (8-px-Quadrat in der Rollenfarbe, neutral
  * in `schwach`), Zahl Mono 22 (`klein`; der Eigenbau hatte 26, das kennt die Schriftskala
- * nicht), Wort als Notiz. Die Kontrastregel der Zahl — TAGS bei `achtung`/`alarm` in `text`,
- * weil die Tonfarbe den 7 : 1-Boden auf `flaeche` nicht trägt — liegt jetzt im Baustein
- * (`zahlFarbe`) und gilt damit für jede Kennzahl, nicht nur hier. Neu durch den Baustein:
+ * nicht), Wort als Notiz. Die Kontrastregel der Zahl — `achtung`/`alarm` über ihre
+ * Textrollen, weil die Füllfarbe den 7 : 1-Boden auf `flaeche` am Tag nicht trägt (LFH-618) —
+ * liegt im Baustein (`zahlFarbe`) und gilt damit für jede Kennzahl, nicht nur hier. Neu durch den Baustein:
  * `achtung`/`alarm` tragen seine abgestufte Innenkante (3/6 px) — ein zusätzlicher Kanal,
  * kein Verlust.
  *
@@ -63,28 +64,39 @@ function Auffuellung({ anzahl, spalten }: { anzahl: number; spalten: number }) {
 }
 
 export interface StatusbandProps {
-  fahrzeuge: readonly BandZelle[];
+  einheiten: readonly BandZelle[];
+  /**
+   * Sichtbarer Zusatz am Einheitenband, wenn Filter nur die MITTEL treffen (Träger,
+   * Status, Suche): das Einheitenband zählt wie die Einheitenzeilen darunter alle
+   * Einheiten des Abschnitts — ohne den Satz widersprächen sich die zwei Bänder stumm.
+   */
+  einheitenHinweis?: string | null;
   personal: readonly BandZelle[];
   /** Datenzustand beider Listen zusammen. */
   zustand: 'daten' | 'laden' | 'fehler';
 }
 
-export default function Statusband({ fahrzeuge, personal, zustand }: StatusbandProps) {
-  const { token } = useRollen();
+export default function Statusband({
+  einheiten,
+  einheitenHinweis,
+  personal,
+  zustand,
+}: StatusbandProps) {
+  const { token, rollen } = useRollen();
   const { abBreite } = useViewport();
   const spalten = bandSpalten(abBreite);
   if (zustand !== 'daten') {
     return (
       <Kennzahlenband beschriftung="Statusband">
-        <Kennzahl titel="Fahrzeuge" wert={null} zustand={zustand} />
+        <Kennzahl titel="Einheiten" wert={null} zustand={zustand} />
         <Kennzahl titel="Personal" wert={null} zustand={zustand} />
       </Kennzahlenband>
     );
   }
-  if (fahrzeuge.length === 0 && personal.length === 0) {
+  if (einheiten.length === 0 && personal.length === 0) {
     return (
       <Kennzahlenband beschriftung="Statusband">
-        <Kennzahl titel="Fahrzeuge" wert={0} notiz="keine Kräfte disponiert" />
+        <Kennzahl titel="Einheiten" wert={0} notiz="keine Einheiten gebildet" />
       </Kennzahlenband>
     );
   }
@@ -93,16 +105,24 @@ export default function Statusband({ fahrzeuge, personal, zustand }: StatusbandP
       data-lfh="meldebild-statusband"
       style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS }}
     >
-      {fahrzeuge.length > 0 && (
-        <section aria-label="Fahrzeuge je Status">
+      {einheiten.length > 0 && (
+        <section aria-label="Einheiten je Status">
           <Augenbraue als="h2" style={{ marginBlockEnd: token.marginXXS }}>
-            Fahrzeuge · FMS
+            Einheiten · FMS
           </Augenbraue>
+          {einheitenHinweis && (
+            <div
+              data-lfh="statusband-hinweis"
+              style={{ fontSize: 11, color: rollen.gedaempft, marginBlockEnd: token.marginXXS }}
+            >
+              {einheitenHinweis}
+            </div>
+          )}
           <Kennzahlenband spalten={spalten}>
-            {fahrzeuge.map((z) => (
+            {einheiten.map((z) => (
               <BandZelleAnsicht key={z.schluessel} zelle={z} />
             ))}
-            <Auffuellung anzahl={fahrzeuge.length} spalten={spalten} />
+            <Auffuellung anzahl={einheiten.length} spalten={spalten} />
           </Kennzahlenband>
         </section>
       )}

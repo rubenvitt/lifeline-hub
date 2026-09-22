@@ -122,6 +122,8 @@ pub struct EinheitBody {
     pub soll_unterfuehrer: Option<i64>,
     pub soll_mannschaft: Option<i64>,
     pub bemerkung: Option<String>,
+    /// LFH-614: eigener Funkrufname der Einheit (Freitext, leer = nicht gepflegt).
+    pub funkrufname: Option<String>,
     /// LFH-108: Funk/Kommunikation — Freitext-Schlüssel (digitalfunk/mobil/festnetz).
     pub kommunikationsmittel: Option<String>,
     /// LFH-108: Funk/Kommunikation — Rufnummer/Freitext (PII).
@@ -150,6 +152,7 @@ pub async fn bilden(
     )
     .map_err(AppError::Validation)?;
     let bemerkung = trimme(body.bemerkung);
+    let funkrufname = trimme(body.funkrufname);
     let kommunikationsmittel = trimme(body.kommunikationsmittel);
     let erreichbarkeit = trimme(body.erreichbarkeit);
     let anzeige = einheit_repo::anlegen(
@@ -165,6 +168,7 @@ pub async fn bilden(
             soll_unterfuehrer: body.soll_unterfuehrer,
             soll_mannschaft: body.soll_mannschaft,
             bemerkung: bemerkung.as_deref(),
+            funkrufname: funkrufname.as_deref(),
             kommunikationsmittel: kommunikationsmittel.as_deref(),
             erreichbarkeit: erreichbarkeit.as_deref(),
             sortier: body.sortier,
@@ -222,6 +226,8 @@ pub struct EinheitPatchBody {
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub bemerkung: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub funkrufname: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub kommunikationsmittel: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub erreichbarkeit: Option<Option<String>>,
@@ -268,6 +274,7 @@ pub async fn aktualisieren(
     .map_err(AppError::Validation)?;
 
     let bemerkung = trimme_tri(body.bemerkung);
+    let funkrufname = trimme_tri(body.funkrufname);
     let kommunikationsmittel = trimme_tri(body.kommunikationsmittel);
     let erreichbarkeit = trimme_tri(body.erreichbarkeit);
 
@@ -295,6 +302,7 @@ pub async fn aktualisieren(
             soll_unterfuehrer: body.soll_unterfuehrer,
             soll_mannschaft: body.soll_mannschaft,
             bemerkung: bemerkung.as_ref().map(|v| v.as_deref()),
+            funkrufname: funkrufname.as_ref().map(|v| v.as_deref()),
             kommunikationsmittel: kommunikationsmittel.as_ref().map(|v| v.as_deref()),
             erreichbarkeit: erreichbarkeit.as_ref().map(|v| v.as_deref()),
             sortier: body.sortier,
@@ -649,4 +657,61 @@ pub async fn position(
     .await?;
     sse_einheit(&state, einsatz_id, einheit_id);
     Ok(Json(nachher))
+}
+
+/// Body für den Handstatus (LFH-609). `status_id` ist Pflicht und nullable: `null`
+/// löscht den Handstatus, ein FEHLENDES Feld ist ein Formfehler (400) — sonst wäre ein
+/// leerer Body stillschweigend „löschen“.
+#[derive(Debug, Deserialize)]
+pub struct StatusBody {
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub status_id: Option<Option<i64>>,
+}
+
+/// PUT /api/einsaetze/{id}/einheiten/{eid}/status — Handstatus einer Einheit OHNE
+/// Fahrzeug (LFH-609). Mit Fahrzeugen wird der Status aus ihnen abgeleitet → Setzen ist
+/// 422, Löschen (`null`) bleibt erlaubt.
+/// Ein echter Wechsel schreibt einen System-ETB-Eintrag (atomar) und setzt „Seit“.
+pub async fn status_setzen(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    PfadParam((einsatz_id, eid)): PfadParam<(i64, i64)>,
+    JsonBody(body): JsonBody<StatusBody>,
+) -> Result<Json<EinheitAnzeige>, AppError> {
+    let einsatz = schreib_gate(&state, &benutzer, einsatz_id).await?;
+    let status_id = body
+        .status_id
+        .ok_or_else(|| AppError::Validation("status_id fehlt".into()))?;
+    if let Some(sid) = status_id {
+        if !crate::fahrzeug::status_repo::ist_in_org(&state.pool, einsatz.org_id, sid).await? {
+            return Err(AppError::Validation("Unbekannter Status".into()));
+        }
+    }
+    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
+        .await?
+        .etb_startwert();
+    crate::write_retry!(&state.pool, |conn| {
+        if let Some(w) =
+            einheit_repo::setze_hand_status_tx(conn, einsatz_id, eid, status_id).await?
+        {
+            crate::etb::system_audit_tx(
+                conn,
+                einsatz_id,
+                benutzer.id,
+                startwert,
+                &format!(
+                    "Einheit «{}»: Status «{}» → «{}»",
+                    w.name,
+                    w.vorher.as_deref().unwrap_or("—"),
+                    w.nachher.as_deref().unwrap_or("—")
+                ),
+            )
+            .await?;
+        }
+        Ok(())
+    })?;
+    sse_einheit(&state, einsatz_id, eid);
+    Ok(Json(
+        einheit_repo::laden(&state.pool, einsatz_id, eid).await?,
+    ))
 }

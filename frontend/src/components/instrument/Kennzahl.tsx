@@ -46,14 +46,13 @@ import '../../theme/sprache.css';
  * |---------|----------------|-------------------|---------------------|
  * | normal  | normalText     | 9,18              | 10,92               |
  * | bedien  | bedienText     | 8,41              |  9,95               |
- * | achtung | achtung        | 6,92 ✗            | 11,75               |
- * | alarm   | alarm          | 6,78 ✗            |  6,77               |
+ * | achtung | achtungText    | 9,22              | 11,75               |
+ * | alarm   | alarmText      | 8,96              |  6,77               |
  *
- * `neutral` steht in `text` (Tag 18,47 — die Tagesausweichfarbe unten ist dieselbe Rolle).
- * `achtung`/`alarm` tragen den Tagesboden als Textfarbe nicht (es fehlen Rollen
- * `achtungText`/`alarmText`, dieselbe Lücke wie in `statusFlaeche.ts`). TAGS steht deren
- * Zahl deshalb in `text`; der Ton bleibt in Kante und Statuspunkt sichtbar. Nachts gilt der
- * Entwurf ungebrochen.
+ * `neutral` steht in `text` (Tag 18,47). Bis LFH-618 (22.09.2026) stand die Zahl TAGS bei
+ * `achtung`/`alarm` ebenfalls in `text`, weil die Füllfarben als Text den Boden nicht tragen
+ * (6,92 bzw. 6,78) und die Textrollen fehlten — der Ton war am Tag nur an Kante und Punkt
+ * zu sehen. Jetzt färben beide Modi.
  *
  * ── STATUSPUNKT (Neuentwurf S6, Statusstufen-Kacheln) ──────────────────────────────
  *
@@ -97,12 +96,11 @@ export const FEHLER_ZEICHEN = '?';
 export const STAND_UNBEKANNT = 'Stand unbekannt';
 export const WIRD_ABGERUFEN = 'wird abgerufen';
 
-/** Die Zahlfarbe — nur im Zustand `daten` getönt, Tagesregel siehe Dateikopf. Rein. */
+/** Die Zahlfarbe — nur im Zustand `daten` getönt, Kontrast siehe Dateikopf. Rein. */
 export function zahlFarbe(
-  rollen: Pick<Farbrollen, 'text' | 'normalText' | 'bedienText' | 'achtung' | 'alarm'>,
+  rollen: Pick<Farbrollen, 'text' | 'normalText' | 'bedienText' | 'achtungText' | 'alarmText'>,
   ton: KennzahlTon,
   zustand: KennzahlZustand,
-  dunkel: boolean,
 ): string {
   if (zustand !== 'daten') return rollen.text;
   switch (ton) {
@@ -111,9 +109,9 @@ export function zahlFarbe(
     case 'bedien':
       return rollen.bedienText;
     case 'achtung':
-      return dunkel ? rollen.achtung : rollen.text;
+      return rollen.achtungText;
     case 'alarm':
-      return dunkel ? rollen.alarm : rollen.text;
+      return rollen.alarmText;
     case 'neutral':
       return rollen.text;
   }
@@ -128,9 +126,8 @@ export function punktFarbe(
   rollen: Parameters<typeof statusFlaeche>[0],
   ton: StatusTon,
   zustand: KennzahlZustand,
-  dunkel: boolean,
 ): string {
-  return statusFlaeche(rollen, zustand === 'daten' ? ton : 'neutral', dunkel).kante;
+  return statusFlaeche(rollen, zustand === 'daten' ? ton : 'neutral').kante;
 }
 
 /**
@@ -195,7 +192,7 @@ export function Kennzahl({
   zielBeschriftung,
   style,
 }: KennzahlProps) {
-  const { token, rollen, dunkel } = useRollen();
+  const { token, rollen } = useRollen();
   const zahl =
     zustand === 'laden' ? (
       <b aria-busy="true" style={{ font: 'inherit' }}>
@@ -223,7 +220,7 @@ export function Kennzahl({
               width: 8,
               height: 8,
               flex: '0 0 8px',
-              background: punktFarbe(rollen, punkt, zustand, dunkel),
+              background: punktFarbe(rollen, punkt, zustand),
             }}
           />
           <Augenbraue>{titel}</Augenbraue>
@@ -237,7 +234,7 @@ export function Kennzahl({
           style={{
             ...schriftStil(STUFE[groesse]),
             lineHeight: 1,
-            color: zahlFarbe(rollen, ton, zustand, dunkel),
+            color: zahlFarbe(rollen, ton, zustand),
           }}
         >
           {zahl}

@@ -161,8 +161,11 @@ mod tests {
         assert_ne!(a, b);
         // Muss als base32 dekodierbar sein (RFC4648 ohne Padding) und 160 Bit tragen —
         // 20 Bytes ergeben ungepolstert genau 32 Base32-Zeichen, wie unter totp-rs 5.x.
-        assert_eq!(a.len(), 32, "Secret: {a}");
-        assert!(!a.contains('='), "Secret: {a}");
+        // Diagnose ohne das Secret selbst: ein fehlgeschlagener Assert landet im CI-Log,
+        // und ein TOTP-Secret gehört auch als Wegwerf-Testwert in keinen Log-Strom.
+        // `assert_eq!` nennt die Ist-Länge ohnehin; beim Padding genügt die Aussage.
+        assert_eq!(a.len(), 32);
+        assert!(!a.contains('='), "Secret trägt Base32-Padding");
         let bytes = Secret::try_from_base32(&a).unwrap();
         assert_eq!(bytes.as_bytes().len(), 20);
     }
