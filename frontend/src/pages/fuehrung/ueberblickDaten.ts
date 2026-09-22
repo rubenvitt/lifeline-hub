@@ -17,6 +17,7 @@
 import dayjs, { type Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import type {
+  AbschnittLagezustand,
   Auftrag,
   Einheit,
   EinsatzFahrzeug,
@@ -27,6 +28,7 @@ import type {
   Erinnerung,
   EtbEintragAnzeige,
   Gefahrengebiet,
+  PegelAnzeige,
   Person,
   Warnstufe,
 } from '../../api/types';
@@ -41,6 +43,7 @@ import {
   type StaerkeSumme,
 } from '../../kraefte/kraeftebild';
 import { verdichteGefahrengebiete } from '../lage-dashboard/lageVerdichtung';
+import { prognoseOffen, wasserstandMeter } from '../../pegel/pegelKennzahl';
 import { dauerText } from '../../stab/lagebesprechungZustand';
 import { warnstufeKennzahl, type Statusrolle } from '../../theme/statusFarben';
 
@@ -130,6 +133,23 @@ export function warnstufeKennzahlVon(gebiete: Gefahrengebiet[]): WarnstufeKennza
   };
 }
 
+/**
+ * Notiz der Warnstufen-Kennzahl: die Gebietszahl, dahinter die Pegel-Notiz aus
+ * `pegel/pegelKennzahl.ts:pegelNotizKurz` („Pegel 6,84 m steigend", LFH-606).
+ *
+ * Die Pegel-Notiz wird ANGEHÄNGT, nicht an die Stelle der Gebietszahl gesetzt: die Zahl der
+ * Gebiete mit Warnstufe ist die Begründung des Werts, der Pegel ist die Lage daneben — der
+ * Entwurf S2 zeigt nur den Pegel, verlöre aber genau die Aussage, die die Kennzahl erklärt.
+ * Ohne festgelegten Pegel (`null`) bleibt es bei der Gebietszahl. Rein.
+ */
+export function warnstufeNotiz(anzahlAktiv: number, pegelNotiz: string | null): string {
+  const gebiete =
+    anzahlAktiv === 1
+      ? '1 Gefahrengebiet mit Warnstufe'
+      : `${anzahlAktiv} Gefahrengebiete mit Warnstufe`;
+  return pegelNotiz ? `${gebiete} · ${pegelNotiz}` : gebiete;
+}
+
 export interface AuftraegeKennzahl {
   offen: number;
   /** Davon schon angenommen (`in_arbeit`). */
@@ -201,16 +221,6 @@ export function empfaengerText(a: Auftrag): string | null {
   return namen.length > 0 ? namen.join(', ') : null;
 }
 
-/** Zahl der Folgeaufträge je ETB-Eintrag (`Auftrag.quell_etb_eintrag_id`). */
-export function folgeauftraegeJeEintrag(auftraege: Auftrag[]): Map<number, number> {
-  const m = new Map<number, number>();
-  for (const a of auftraege) {
-    if (a.quell_etb_eintrag_id == null) continue;
-    m.set(a.quell_etb_eintrag_id, (m.get(a.quell_etb_eintrag_id) ?? 0) + 1);
-  }
-  return m;
-}
-
 export function folgeText(anzahl: number): string | null {
   if (anzahl <= 0) return null;
   return anzahl === 1 ? '1 Auftrag' : `${anzahl} Aufträge`;
@@ -218,11 +228,15 @@ export function folgeText(anzahl: number): string | null {
 
 // ── Einsatzabschnitte ───────────────────────────────────────────────────────────
 
-export interface MittelVerteilung {
+/** Einheiten je Kategorie ihres Status (LFH-609). */
+export interface EinheitenVerteilung {
   bereit: number;
   gebunden: number;
   ausfall: number;
-  /** Mittel ohne Statuskategorie — gezählt, damit die drei Zellen nicht mehr behaupten. */
+  /**
+   * Einheiten ohne Kategorie — ohne Status oder „gemischt" über Kategorien hinweg; gezählt,
+   * damit die drei Zellen nicht mehr behaupten.
+   */
   ohne: number;
 }
 
@@ -237,10 +251,33 @@ export interface AbschnittZeile {
   unterabschnitte: number;
   staerke: StaerkeSumme;
   staerkeText: string;
-  mittel: MittelVerteilung;
+  einheitenStatus: EinheitenVerteilung;
   /** Offene Aufträge an diesen Abschnitt (oder einen Unterabschnitt), jüngste zuerst. */
   auftraege: Auftrag[];
+  /** Alle Aufträge an den Teilbaum, jeder einmal; erledigt = vollzogen oder abgenommen.
+   *  Eine ZÄHLUNG, keine Fortschrittsangabe — jeder Auftrag wiegt gleich, deshalb steht
+   *  sie neben der Einschätzung und nicht an ihrer Stelle (LFH-608). */
+  auftragsbilanz: { erledigt: number; gesamt: number };
+  /** Die folgenden vier gehören dem OBERSTEN Abschnitt selbst, nicht dem Teilbaum:
+   *  eine Beurteilung lässt sich nicht aufsummieren. `null` = nicht gepflegt (LFH-608). */
+  kurzbezeichnung: string | null;
+  lagezustand: AbschnittLagezustand | null;
+  abschnittsauftrag: string | null;
+  fortschritt: number | null;
+  /** Schlechtester Lagezustand eines Unterabschnitts, NUR wenn er schlechter ist als der
+   *  eigene. Die Kante bleibt die Beurteilung des Abschnitts selbst; die Seite setzt den
+   *  Unterabschnitt als eigenes Etikett mit Rollenrand daneben, damit ein kritischer
+   *  Unterabschnitt nicht hinter einer grünen Kante verschwindet. */
+  unterLage: AbschnittLagezustand | null;
 }
+
+/** Ordnung der Lagezustände; „nicht beurteilt" liegt unter allen. */
+const LAGE_RANG: Record<AbschnittLagezustand, number> = {
+  planmaessig: 1,
+  angespannt: 2,
+  kritisch: 3,
+};
+const lageRang = (l: AbschnittLagezustand | null | undefined) => (l ? LAGE_RANG[l] : 0);
 
 export interface AbschnittRohdaten {
   abschnitte: Einsatzabschnitt[];
@@ -256,18 +293,46 @@ function abschnittIdAusKey(key: string): number | null {
   return m ? Number(m[1]) : null;
 }
 
-function zaehleImTeilbaum(zeile: MeldebildZeile): { einheiten: number; abschnittIds: number[] } {
-  let einheiten = 0;
+function zaehleImTeilbaum(zeile: MeldebildZeile): {
+  einheiten: number;
+  einheitIds: number[];
+  abschnittIds: number[];
+} {
+  const einheitIds: number[] = [];
   const abschnittIds: number[] = [];
   const id = abschnittIdAusKey(zeile.key);
   if (zeile.art === 'abschnitt' && id != null) abschnittIds.push(id);
-  if (zeile.art === 'einheit' && !zeile.key.startsWith(OHNE_EINHEIT_KEY_PREFIX)) einheiten += 1;
+  if (zeile.art === 'einheit' && !zeile.key.startsWith(OHNE_EINHEIT_KEY_PREFIX)) {
+    const m = /^eh-(\d+)$/.exec(zeile.key);
+    if (m) einheitIds.push(Number(m[1]));
+  }
   for (const kind of zeile.children ?? []) {
     const k = zaehleImTeilbaum(kind);
-    einheiten += k.einheiten;
+    einheitIds.push(...k.einheitIds);
     abschnittIds.push(...k.abschnittIds);
   }
-  return { einheiten, abschnittIds };
+  return { einheiten: einheitIds.length, einheitIds, abschnittIds };
+}
+
+/** Einheiten nach der Kategorie ihres Status — „gemischt" zählt mit, wenn die Kategorie gemeinsam ist. */
+function einheitenVerteilung(einheiten: readonly (Einheit | undefined)[]): EinheitenVerteilung {
+  const v: EinheitenVerteilung = { bereit: 0, gebunden: 0, ausfall: 0, ohne: 0 };
+  for (const e of einheiten) {
+    switch (e?.status?.kategorie) {
+      case 'verfuegbar':
+        v.bereit += 1;
+        break;
+      case 'gebunden':
+        v.gebunden += 1;
+        break;
+      case 'nicht_verfuegbar':
+        v.ausfall += 1;
+        break;
+      default:
+        v.ohne += 1;
+    }
+  }
+  return v;
 }
 
 /**
@@ -276,12 +341,15 @@ function zaehleImTeilbaum(zeile: MeldebildZeile): { einheiten: number; abschnitt
  * Die Sammelzeile „Ohne Abschnitt" steht am Ende, wenn sie etwas trägt: ohne sie gingen
  * die Kräfte außerhalb jedes Abschnitts still aus der Summe verloren.
  *
- * Die Mittelverteilung ist KEIN Einheitenstatus (den gibt es nicht, LFH-609), sondern die
- * Verfügbarkeit der Fahrzeuge UND des Personals im Teilbaum — die Seite beschriftet das so.
+ * Das Raster bereit / gebunden / Ausfall zählt die EINHEITEN im Teilbaum nach der
+ * Kategorie ihres Status (LFH-609, Entwurf S2) — abgeleitet aus den Fahrzeugen oder von
+ * Hand. Bis dahin stand hier die Verfügbarkeit der Mittel, weil es keinen Einheitenstatus
+ * gab; die Seite beschriftet die Zeile entsprechend.
  */
 export function abschnittZeilen(r: AbschnittRohdaten): AbschnittZeile[] {
   const { baum } = baueKraeftebild(r.abschnitte, r.einheiten, r.personal, r.fahrzeuge, r.material);
   const abschnittNachId = new Map(r.abschnitte.map((a) => [a.id, a]));
+  const einheitNachId = new Map(r.einheiten.map((e) => [e.id, e]));
   const offen = r.auftraege
     .filter(istOffen)
     .sort((a, b) => (ms(b.erteilt_at) ?? 0) - (ms(a.erteilt_at) ?? 0) || b.id - a.id);
@@ -289,12 +357,23 @@ export function abschnittZeilen(r: AbschnittRohdaten): AbschnittZeile[] {
   const zeilen: AbschnittZeile[] = baum.map((knoten) => {
     const id = abschnittIdAusKey(knoten.key);
     const abschnitt = id != null ? abschnittNachId.get(id) : undefined;
-    const { einheiten, abschnittIds } = zaehleImTeilbaum(knoten);
+    const { einheiten, einheitIds, abschnittIds } = zaehleImTeilbaum(knoten);
     const teilbaum = new Set(abschnittIds);
-    const p = knoten.personalVerteilung;
-    const f = knoten.fahrzeugVerteilung;
-    const summe = (k: 'verfuegbar' | 'gebunden' | 'nicht_verfuegbar' | 'ohne') =>
-      (p?.[k] ?? 0) + (f?.[k] ?? 0);
+    const anTeilbaum =
+      teilbaum.size === 0
+        ? []
+        : r.auftraege.filter((a) =>
+            (a.empfaenger ?? []).some(
+              (e) => e.abschnitt_id != null && teilbaum.has(e.abschnitt_id),
+            ),
+          );
+    const eigeneLage = abschnitt?.lagezustand ?? null;
+    let unterLage: AbschnittLagezustand | null = null;
+    for (const uid of abschnittIds) {
+      if (uid === id) continue;
+      const l = abschnittNachId.get(uid)?.lagezustand ?? null;
+      if (lageRang(l) > lageRang(unterLage)) unterLage = l;
+    }
     return {
       key: knoten.key,
       abschnittId: knoten.key === OHNE_ABSCHNITT_KEY ? null : id,
@@ -304,20 +383,17 @@ export function abschnittZeilen(r: AbschnittRohdaten): AbschnittZeile[] {
       unterabschnitte: Math.max(0, abschnittIds.length - 1),
       staerke: knoten.staerke,
       staerkeText: staerkeText(knoten.staerke),
-      mittel: {
-        bereit: summe('verfuegbar'),
-        gebunden: summe('gebunden'),
-        ausfall: summe('nicht_verfuegbar'),
-        ohne: summe('ohne'),
+      einheitenStatus: einheitenVerteilung(einheitIds.map((eid) => einheitNachId.get(eid))),
+      auftraege: offen.filter((a) => anTeilbaum.includes(a)),
+      auftragsbilanz: {
+        erledigt: anTeilbaum.filter((a) => !istOffen(a)).length,
+        gesamt: anTeilbaum.length,
       },
-      auftraege:
-        teilbaum.size === 0
-          ? []
-          : offen.filter((a) =>
-              (a.empfaenger ?? []).some(
-                (e) => e.abschnitt_id != null && teilbaum.has(e.abschnitt_id),
-              ),
-            ),
+      kurzbezeichnung: abschnitt?.kurzbezeichnung ?? null,
+      lagezustand: eigeneLage,
+      abschnittsauftrag: abschnitt?.abschnittsauftrag ?? null,
+      fortschritt: abschnitt?.fortschritt ?? null,
+      unterLage: lageRang(unterLage) > lageRang(eigeneLage) ? unterLage : null,
     };
   });
 
@@ -359,12 +435,12 @@ export function entscheidungenAuswahl(
 // ── Nächste Marken ──────────────────────────────────────────────────────────────
 
 export type MarkenTon = 'neutral' | 'achtung' | 'alarm';
-export type MarkenArt = 'auftrag' | 'erinnerung' | 'lagebesprechung';
+export type MarkenArt = 'auftrag' | 'erinnerung' | 'lagebesprechung' | 'pegelprognose';
 
 export interface Marke {
   key: string;
   art: MarkenArt;
-  /** id des Auftrags bzw. der Erinnerung; `null` bei der Lagebesprechung. */
+  /** id des Auftrags, der Erinnerung bzw. des Pegels; `null` bei der Lagebesprechung. */
   id: number | null;
   zeit: string;
   text: string;
@@ -387,16 +463,30 @@ export function markenBewertung(zeit: Dayjs, jetzt: Dayjs): { ton: MarkenTon; wo
   return { ton: minuten < KNAPP_MINUTEN ? 'achtung' : 'neutral', wort };
 }
 
+/** „HANN. MÜNDEN (WESER)" — Station mit Gewässer, ohne Gewässer nur die Station. Rein. */
+export function pegelBezeichnung(p: Pick<PegelAnzeige, 'name' | 'gewaesser'>): string {
+  const gewaesser = p.gewaesser?.trim();
+  return gewaesser ? `${p.name} (${gewaesser})` : p.name;
+}
+
 /**
- * Die anstehenden Fristen aus drei Quellen: Frist offener Aufträge, Fälligkeit offener
- * Erinnerungen, nächste Lagebesprechung. Aufsteigend nach Zeit — Überfälliges steht damit
- * oben, und das ist gewollt: es ist die Marke, die schon gerissen ist.
+ * Die anstehenden Fristen aus vier Quellen: Frist offener Aufträge, Fälligkeit offener
+ * Erinnerungen, nächste Lagebesprechung und der erwartete Höchststand an einem maßgeblichen
+ * Pegel (LFH-628). Aufsteigend nach Zeit — Überfälliges steht damit oben, und das ist
+ * gewollt: es ist die Marke, die schon gerissen ist.
+ *
+ * Die Pegel-Prognose ist davon ausgenommen: sie ist keine Frist, die jemand reißen kann,
+ * sondern eine Erwartung. Ein verstrichener Höchststand ist VORBEI, nicht „überfällig" —
+ * er wird vor dem Sortieren herausgefiltert und steht nie als Alarm oben (Entscheidung des
+ * Auftraggebers vom 22.09.2026). Solange er aussteht, bewertet ihn dieselbe Regel wie die
+ * übrigen Marken („in 23 min", knapp = `achtung`).
  */
 export function naechsteMarken(
   auftraege: Auftrag[],
   erinnerungen: Erinnerung[],
   naechsteLagebesprechung: string | null | undefined,
   jetzt: Dayjs,
+  pegel: readonly PegelAnzeige[] = [],
 ): MarkenAuswahl {
   const roh: { key: string; art: MarkenArt; id: number | null; zeit: string; text: string }[] = [];
   for (const a of auftraege) {
@@ -429,6 +519,20 @@ export function naechsteMarken(
       zeit: naechsteLagebesprechung!,
       text: 'Lagebesprechung',
     });
+  }
+  for (const p of pegel) {
+    const prognose = p.prognose;
+    if (prognose && prognoseOffen(prognose, jetzt.valueOf()) && zeitpunkt(prognose.zeitpunkt)) {
+      roh.push({
+        key: `p-${p.id}`,
+        art: 'pegelprognose',
+        id: p.id,
+        zeit: prognose.zeitpunkt,
+        // Stationsname, Gewässer als Zusatz: es gibt eine Marke je festgelegtem Pegel, und
+        // zwei Pegel am selben Gewässer wären unter „Pegel WESER" nicht zu unterscheiden.
+        text: `Erwarteter Höchststand Pegel ${pegelBezeichnung(p)}: ${wasserstandMeter(prognose.hoechststand_cm)} m`,
+      });
+    }
   }
   const sortiert = roh.sort(
     (a, b) => (ms(a.zeit) ?? 0) - (ms(b.zeit) ?? 0) || a.key.localeCompare(b.key),

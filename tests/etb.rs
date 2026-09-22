@@ -264,6 +264,55 @@ async fn etb_auftrag_mehrfach_aus_einem_eintrag_erlaubt() {
     );
 }
 
+#[tokio::test]
+async fn etb_liste_fuehrt_folgeauftraege_am_quell_eintrag() {
+    // LFH-636: der Quell-Eintrag trägt seine Folgeaufträge auf dem Wire; jeder andere
+    // Eintrag trägt das Feld ebenfalls — als leere Liste, nicht als fehlender Key.
+    let (app, _live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+    let (status, etb) = eintrag_erfassen(
+        &app,
+        &admin,
+        einsatz,
+        r#"{"typ":"entscheidung","inhalt":"Turnhalle Ost wird Notunterkunft"}"#,
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    let quell_id = etb["id"].as_i64().unwrap();
+    assert!(
+        etb.as_object().unwrap().contains_key("folgeauftraege"),
+        "auch die Erfassen-Antwort trägt das Feld"
+    );
+    assert_eq!(etb["folgeauftraege"], serde_json::json!([]));
+
+    let uri = format!("/api/einsaetze/{einsatz}/etb/{quell_id}/auftrag");
+    let (_, a1) = post_json(&app, &admin, &uri, &auftrag_body("Betreuung")).await;
+    let (_, a2) = post_json(&app, &admin, &uri, &auftrag_body("Transport")).await;
+
+    let (status, liste) = etb_abrufen(&app, &admin, einsatz, "").await;
+    assert_eq!(status, StatusCode::OK);
+    let liste = liste.as_array().unwrap();
+    assert_eq!(liste.len(), 3, "Quelle + zwei Anordnungen");
+    for e in liste {
+        assert!(
+            e.as_object().unwrap().contains_key("folgeauftraege"),
+            "Presence, nicht nur Wert: {e}"
+        );
+        if e["id"] == quell_id {
+            assert_eq!(
+                e["folgeauftraege"],
+                serde_json::json!([
+                    { "id": a1["id"], "lfd_nr": a1["lfd_nr"] },
+                    { "id": a2["id"], "lfd_nr": a2["lfd_nr"] },
+                ])
+            );
+        } else {
+            assert_eq!(e["folgeauftraege"], serde_json::json!([]));
+        }
+    }
+}
+
 /// Liest die Auftragsliste des Einsatzes (GET, kein Body).
 async fn get_auftraege(app: &axum::Router, cookie: &str, einsatz: i64) -> (StatusCode, Value) {
     let resp = app

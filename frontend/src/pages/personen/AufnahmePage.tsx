@@ -16,7 +16,11 @@ import {
 import EinsatzSeite from '../../components/EinsatzSeite';
 import { SeitenFehler, SeitenSkeleton } from '../../components/SeitenZustand';
 import { SK_META } from '../../personen/personMeta';
-import AufnahmeFelder, { type AufnahmeEingabe } from '../../personen/AufnahmeFelder';
+import AufnahmeFelder, {
+  aufnahmeZuEingabe,
+  type AufnahmeEingabe,
+  type AufnahmeWerte,
+} from '../../personen/AufnahmeFelder';
 import { erfassePersonOfflineFaehig } from '../../offline/schreiben';
 import { parseRouteId, personenPfad, uhsDetailPfad } from '../../routing/deeplinks';
 import StatusTag from '../../components/StatusTag';
@@ -60,7 +64,7 @@ export default function AufnahmePage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { message } = App.useApp();
-  const [form] = Form.useForm<AufnahmeEingabe>();
+  const [form] = Form.useForm<AufnahmeWerte>();
   const [quittung, setQuittung] = useState<string | null>(null);
   const sitzungsortGeladen = useRef<number | null>(null);
   const [searchParams] = useSearchParams();
@@ -208,13 +212,14 @@ export default function AufnahmePage() {
       )}
 
       {darfSchreiben && (
-        <ErfassungsFormular<AufnahmeEingabe>
+        <ErfassungsFormular<AufnahmeWerte>
           form={form}
           serie
           uebernahme={['antreff_ort']}
           laeuft={anlegenMutation.isPending}
           // `mutateAsync`, nicht `mutate`: nur eine abgelehnte Zusage hält die Felder stehen.
-          onErfassen={(daten) => anlegenMutation.mutateAsync(daten)}
+          // Die Koordinate wird hier aus dem Textfeld zerlegt — dieselbe Funktion wie im Modal.
+          onErfassen={(werte) => anlegenMutation.mutateAsync(aufnahmeZuEingabe(werte))}
           // Erst die Post-Acceptance-Stufe der Hülle darf den Sitzungswert ändern: ein
           // Abbruch während des POST besteht die Generation davor nicht (Muster aus
           // `PersonErfassungModal`).

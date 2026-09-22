@@ -15,6 +15,7 @@ function e(over: Partial<EtbEintragAnzeige>): EtbEintragAnzeige {
     erfasser_name: 'M',
     ereigniszeit: '2026-05-23 10:00:00',
     received_at: '2026-05-23 10:00:00',
+    folgeauftraege: [],
     ...over,
   };
 }

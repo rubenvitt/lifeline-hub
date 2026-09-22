@@ -161,13 +161,15 @@ export default function BetroffenenSeitenleiste({
                   gap: token.marginSM,
                 }}
               >
-                <span style={{ fontSize: 12, color: v.offen ? rollen.achtung : rollen.gedaempft }}>
+                <span
+                  style={{ fontSize: 12, color: v.offen ? rollen.achtungText : rollen.gedaempft }}
+                >
                   {v.label}
                 </span>
                 <span
                   style={{
                     ...monoStil(14),
-                    color: v.offen && v.wert > 0 ? rollen.achtung : rollen.text,
+                    color: v.offen && v.wert > 0 ? rollen.achtungText : rollen.text,
                   }}
                 >
                   {v.wert}

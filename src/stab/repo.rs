@@ -571,6 +571,18 @@ pub async fn sachgebiete_von(
     einsatz_id: i64,
     benutzer_id: i64,
 ) -> Result<Vec<Sachgebiet>, AppError> {
+    let mut conn = pool.acquire().await?;
+    sachgebiete_von_conn(&mut conn, einsatz_id, benutzer_id).await
+}
+
+/// Wie [`sachgebiete_von`], aber auf einer beliebigen Connection/Transaktion — für den
+/// Funktions-Snapshot am ETB-Eintrag (LFH-615), der in derselben Transaktion wie der Eintrag
+/// entsteht und deshalb eine Besetzungsänderung derselben Transaktion schon sieht.
+pub async fn sachgebiete_von_conn(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    benutzer_id: i64,
+) -> Result<Vec<Sachgebiet>, AppError> {
     let werte: Vec<String> = sqlx::query_scalar(
         "SELECT s.sachgebiet FROM einsatz_stabsfunktion s \
          JOIN einsatz_personal ep ON s.personal_id = ep.id \
@@ -580,7 +592,7 @@ pub async fn sachgebiete_von(
     )
     .bind(einsatz_id)
     .bind(benutzer_id)
-    .fetch_all(pool)
+    .fetch_all(&mut *conn)
     .await?;
     Ok(werte.iter().filter_map(|s| Sachgebiet::parse(s)).collect())
 }

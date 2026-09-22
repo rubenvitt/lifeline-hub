@@ -1285,3 +1285,140 @@ describe('PersonenDetailPage — Tiere/Schäden-Zuweisung (LFH-151)', () => {
     expect(screen.queryByText(/wasserschaden/)).not.toBeInTheDocument();
   });
 });
+
+describe('PersonenDetailPage — Zustand, Koordinate, vermisst seit (LFH-613)', () => {
+  const mitKoordinate = {
+    ...detail,
+    zustand: 'gehfähig',
+    // Mehr Stellen als das Textfeld zeigt — so wie ein Kartenklick sie setzt.
+    antreff_lat: 52.269149,
+    antreff_lon: 9.134251,
+  } as PersonDetail;
+
+  it('zeigt Zustand und Koordinate im Lesemodus; der Verorten-Link trägt den Platzier-Auftrag', async () => {
+    render(einsatzAktiv, mitKoordinate);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    expect(screen.getByText('gehfähig')).toBeInTheDocument();
+    expect(document.querySelector('[data-lfh="koordinate"]')).toHaveTextContent('52.2691/9.1343');
+    const link = screen.getByRole('link', { name: 'Auf Lagekarte verorten' });
+    const ziel = new URL(link.getAttribute('href')!, 'http://x');
+    expect(ziel.pathname).toBe('/einsaetze/1/lagekarte');
+    expect(ziel.searchParams.get('platzieren')).toBe('person:10');
+    // Nicht vermisst → keine Zeile „vermisst seit".
+    expect(screen.queryByText('vermisst seit')).not.toBeInTheDocument();
+  });
+
+  it('zeigt Beobachtern keinen Verorten-Link', async () => {
+    render(einsatzBeobachter, mitKoordinate);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    expect(screen.getByText('52.2691/9.1343')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Auf Lagekarte verorten' })).toBeNull();
+  });
+
+  it('bearbeitet Zustand und Koordinate: PATCH mit zerlegtem Paar, ohne „vermisst seit"', async () => {
+    let koerper: Record<string, unknown> | undefined;
+    render(einsatzAktiv, detail, [
+      http.patch('/api/einsaetze/1/personen/10', async ({ request }) => {
+        koerper = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ ...detail });
+      }),
+    ]);
+    await ausMenue(/Bearbeiten/);
+    await userEvent.type(screen.getByLabelText('Zustand'), 'Beinfraktur');
+    await userEvent.type(screen.getByLabelText('Koordinate'), '52,2691/9,1342');
+    // Ohne Status vermisst gibt es das Feld nicht (sonst 422).
+    expect(screen.queryByLabelText('vermisst seit')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await vi.waitFor(() => expect(koerper).toBeDefined());
+    expect(koerper).toMatchObject({
+      zustand: 'Beinfraktur',
+      antreff_lat: 52.2691,
+      antreff_lon: 9.1342,
+    });
+    expect(koerper).not.toHaveProperty('koordinate');
+    expect(koerper).not.toHaveProperty('vermisst_seit');
+  });
+
+  it('lässt eine unveränderte Koordinate weg — keine stille Rundung auf vier Stellen', async () => {
+    let koerper: Record<string, unknown> | undefined;
+    render(einsatzAktiv, mitKoordinate, [
+      http.patch('/api/einsaetze/1/personen/10', async ({ request }) => {
+        koerper = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ ...mitKoordinate });
+      }),
+    ]);
+    await ausMenue(/Bearbeiten/);
+    expect(screen.getByLabelText('Koordinate')).toHaveValue('52.2691/9.1343');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await vi.waitFor(() => expect(koerper).toBeDefined());
+    expect(koerper).not.toHaveProperty('antreff_lat');
+    expect(koerper).not.toHaveProperty('antreff_lon');
+    expect(koerper).toMatchObject({ zustand: 'gehfähig' });
+  });
+
+  it('leert die Koordinate als Paar', async () => {
+    let koerper: Record<string, unknown> | undefined;
+    render(einsatzAktiv, mitKoordinate, [
+      http.patch('/api/einsaetze/1/personen/10', async ({ request }) => {
+        koerper = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ ...detail });
+      }),
+    ]);
+    await ausMenue(/Bearbeiten/);
+    await userEvent.clear(screen.getByLabelText('Koordinate'));
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await vi.waitFor(() => expect(koerper).toBeDefined());
+    expect(koerper).toMatchObject({ antreff_lat: null, antreff_lon: null });
+  });
+
+  it('hält eine unbrauchbare Koordinate an, statt zu senden', async () => {
+    const patch = vi.fn();
+    render(einsatzAktiv, detail, [
+      http.patch('/api/einsaetze/1/personen/10', () => {
+        patch();
+        return HttpResponse.json(detail);
+      }),
+    ]);
+    await ausMenue(/Bearbeiten/);
+    await userEvent.type(screen.getByLabelText('Koordinate'), '52.1');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect(await screen.findByText(/Breite und Länge mit/)).toBeInTheDocument();
+    expect(patch).not.toHaveBeenCalled();
+  });
+
+  it('vermisst: kein Zustand, keine Koordinate, kein Verorten — ein Fundort gibt es nicht', async () => {
+    const vermisst = { ...detail, status: 'vermisst' } as PersonDetail;
+    render(einsatzAktiv, vermisst);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    expect(screen.queryByRole('link', { name: 'Auf Lagekarte verorten' })).toBeNull();
+    await ausMenue(/Bearbeiten/);
+    // Gegenaussage im selben Formular: „vermisst seit" ist da, die zwei Fundort-Felder nicht.
+    expect(screen.getByLabelText('vermisst seit')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Zustand')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Koordinate')).not.toBeInTheDocument();
+  });
+
+  it('vermisst: zeigt „vermisst seit" und sendet es nur, wenn es geändert wurde', async () => {
+    const vermisst = {
+      ...detail,
+      status: 'vermisst',
+      vermisst_seit: '2026-05-27 06:00:00',
+    } as PersonDetail;
+    const koerper: Record<string, unknown>[] = [];
+    render(einsatzAktiv, vermisst, [
+      http.patch('/api/einsaetze/1/personen/10', async ({ request }) => {
+        koerper.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json({ ...vermisst });
+      }),
+    ]);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    expect(screen.getByText('vermisst seit')).toBeInTheDocument();
+
+    await ausMenue(/Bearbeiten/);
+    expect(screen.getByLabelText('vermisst seit')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await vi.waitFor(() => expect(koerper).toHaveLength(1));
+    // Unverändert: KEIN Key — auch kein `null`, das wäre ein 400.
+    expect(koerper[0]).not.toHaveProperty('vermisst_seit');
+  });
+});

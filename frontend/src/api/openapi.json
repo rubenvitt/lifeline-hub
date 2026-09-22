@@ -86,6 +86,15 @@
           "sonstiges"
         ]
       },
+      "AbschnittLagezustand": {
+        "type": "string",
+        "description": "Lagezustand eines Abschnitts (LFH-608), Wire == `lagezustand`. Die Beurteilung trifft\ndie Führung; ohne Beurteilung bleibt das Feld leer — „nicht beurteilt\" ist KEIN\nplanmäßig. Die Farbe liegt im Frontend-Vertrag (`theme/statusFarben.ts`).",
+        "enum": [
+          "planmaessig",
+          "angespannt",
+          "kritisch"
+        ]
+      },
       "AdressatKategorie": {
         "type": "string",
         "description": "Geteilte externe Adressat-Kategorie für Nachforderung (`adressat_kategorie`) und Auftrag\n(`extern_kategorie`) (Schema-Anker für die OpenAPI-Union, LFH-120).",
@@ -1308,7 +1317,8 @@
           "personal_mitglieder",
           "fahrzeug_mitglieder",
           "material_mitglieder",
-          "sprechgruppen"
+          "sprechgruppen",
+          "status"
         ],
         "properties": {
           "abschnitt_id": {
@@ -1367,6 +1377,13 @@
               "string",
               "null"
             ]
+          },
+          "funkrufname": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Eigener Funkrufname der Einheit (LFH-614), fixierte menschenlesbare Kennung im\nMeldebild. `None` = nicht gepflegt; das Frontend leitet dann höchstens aus genau\neinem Fahrzeugmitglied ab."
           },
           "id": {
             "type": "integer",
@@ -1434,6 +1451,10 @@
               "$ref": "#/components/schemas/SprechgruppeAnzeige"
             }
           },
+          "status": {
+            "$ref": "#/components/schemas/EinheitStatus",
+            "description": "Status der Einheit mit „Seit“ (LFH-609) — abgeleitet oder Handstatus."
+          },
           "typ_id": {
             "type": [
               "integer",
@@ -1489,6 +1510,24 @@
           },
           "funkrufname": {
             "type": "string"
+          },
+          "status": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/StatusWert",
+                "description": "Aktueller FMS-Status des Fahrzeugs (LFH-609); `None` = ohne Status."
+              }
+            ]
+          },
+          "status_seit": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Zeitpunkt des letzten Statuswechsels (UTC); `None` = unbekannt."
           }
         }
       },
@@ -1558,6 +1597,65 @@
             ]
           }
         }
+      },
+      "EinheitStatus": {
+        "type": "object",
+        "description": "Status einer Einheit mit „Seit“ (LFH-609). Die Regel steht an\n[`repo::leite_status_ab`].",
+        "required": [
+          "quelle",
+          "verteilung"
+        ],
+        "properties": {
+          "kategorie": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/StatusKategorie",
+                "description": "Die gemeinsame Kategorie — auch bei `Gemischt`, wenn alle Fahrzeuge einen Status\nderselben Kategorie tragen (S3 + S4 sind beide „gebunden“)."
+              }
+            ]
+          },
+          "quelle": {
+            "$ref": "#/components/schemas/EinheitStatusQuelle"
+          },
+          "seit": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Seit wann (UTC). `Fahrzeuge`: der jüngste Wechsel, also seit wann ALLE Fahrzeuge in\ndiesem Status stehen — `None`, sobald ein Fahrzeug keinen Zeitpunkt kennt. `Hand`:\nder Zeitpunkt des Setzens. Bei `Gemischt`/`Ohne` immer `None`."
+          },
+          "status": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/StatusWert",
+                "description": "Der eine Status — gesetzt bei `Fahrzeuge` und `Hand`."
+              }
+            ]
+          },
+          "verteilung": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatusAnteil"
+            },
+            "description": "Nur bei `Gemischt`: Fahrzeuge je Status, in Katalogreihenfolge, „ohne“ zuletzt."
+          }
+        }
+      },
+      "EinheitStatusQuelle": {
+        "type": "string",
+        "description": "Woher der Status einer Einheit kommt (LFH-609). Wire == `as_str()`.\n\nMit Fahrzeugen ist der Status ABGELEITET: tragen alle denselben, gilt er\n(`Fahrzeuge`), sonst ist die Einheit `Gemischt`. Ohne Fahrzeug gilt der von Hand\ngesetzte Status (`Hand`) als Rückfall. `Ohne` heißt: es gibt keinen — weder Hand\nnoch einen Fahrzeugstatus.",
+        "enum": [
+          "fahrzeuge",
+          "gemischt",
+          "hand",
+          "ohne"
+        ]
       },
       "EinheitTyp": {
         "type": "object",
@@ -1689,6 +1787,13 @@
               "null"
             ],
             "description": "Eigene Führungsstelle in diesem Einsatz; nur Anfangsbelegung für neue ETB-Erfassung."
+          },
+          "meine_funktion": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Funktion des abfragenden Benutzers in diesem Einsatz als Klartext für den Kopf\n(„S2 Lage\", „S2/S3\", „Einsatzleitung\"; LFH-615). Abgeleitet aus `meine_sachgebiete`\nund `meine_rolle` über `funktion::ableiten` — fehlt, wenn keine Funktion folgt."
           },
           "meine_rolle": {
             "oneOf": [
@@ -1887,6 +1992,13 @@
               "string",
               "null"
             ]
+          },
+          "status_seit": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Zeitpunkt des letzten Statuswechsels (UTC, LFH-609). `None` bei Dispositionen aus\nder Zeit vor dem Feld — ihr Wechselzeitpunkt ist unbekannt und wird nicht erfunden."
           },
           "traegerorganisation": {
             "type": [
@@ -2189,6 +2301,13 @@
           "sprechgruppen"
         ],
         "properties": {
+          "abschnittsauftrag": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Fester Abschnittsauftrag als Freitext (LFH-608) — nicht zu verwechseln mit den\neinzelnen Aufträgen des Auftragsmoduls."
+          },
           "bemerkung": {
             "type": [
               "string",
@@ -2211,6 +2330,14 @@
               "null"
             ]
           },
+          "fortschritt": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Eingeschätzter Fortschritt in Prozent, 0–100 (LFH-608); fehlt = nicht eingeschätzt."
+          },
           "id": {
             "type": "integer",
             "format": "int64"
@@ -2219,6 +2346,24 @@
             "type": [
               "string",
               "null"
+            ]
+          },
+          "kurzbezeichnung": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Kurzbezeichnung/Rufname im Einsatz, z. B. „EA-N\" (LFH-608); je Einsatz eindeutig."
+          },
+          "lagezustand": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AbschnittLagezustand",
+                "description": "Beurteilter Lagezustand (LFH-608); fehlt = nicht beurteilt."
+              }
             ]
           },
           "leiter_id": {
@@ -2687,7 +2832,8 @@
           "erfasser_id",
           "erfasser_name",
           "ereigniszeit",
-          "received_at"
+          "received_at",
+          "folgeauftraege"
         ],
         "properties": {
           "an": {
@@ -2722,6 +2868,13 @@
           "ereigniszeit": {
             "type": "string"
           },
+          "erfasser_funktion": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Funktion des Erfassers beim Anlegen („S2\", „S2/S3\", „EL\"; LFH-615) — Snapshot, keine\nAbleitung beim Lesen. Fehlt, wenn keine Funktion ableitbar war oder der Eintrag älter\nals die Spalte ist."
+          },
           "erfasser_id": {
             "type": "integer",
             "format": "int64"
@@ -2734,6 +2887,13 @@
               "string",
               "null"
             ]
+          },
+          "folgeauftraege": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FolgeauftragVerweis"
+            },
+            "description": "Aufträge, die AUS diesem Eintrag erteilt wurden (LFH-636) — die Vorwärtsrichtung zu\n`auftrag.quell_etb_eintrag_id` (LFH-112), nicht zu verwechseln mit `auftrag_id` oben\n(Eintrag wurde VON einem Auftrag erzeugt). Aufsteigend nach `lfd_nr`, leer statt\nfehlend. Nicht Teil des SELECT: `repo::laden`/`repo::abfrage` füllen die Liste je\nSeite mit einer gebündelten Abfrage nach."
           },
           "id": {
             "type": "integer",
@@ -3082,6 +3242,27 @@
             "items": {
               "type": "string"
             }
+          }
+        }
+      },
+      "FolgeauftragVerweis": {
+        "type": "object",
+        "description": "Verweis auf einen Folgeauftrag eines ETB-Eintrags (LFH-636): genug für einen Deeplink\n(`id`) und einen unterscheidbaren Namen (`lfd_nr`) — die DB-`id` wird nie angezeigt.",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "lfd_nr": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Laufende Nummer des Auftrags; fehlt nur bei Aufträgen vor LFH-133."
           }
         }
       },
@@ -5300,6 +5481,159 @@
           }
         }
       },
+      "PegelAnzeige": {
+        "type": "object",
+        "description": "Ein festgelegter Pegel eines Einsatzes.",
+        "required": [
+          "id",
+          "station_uuid",
+          "name",
+          "reihenfolge"
+        ],
+        "properties": {
+          "gewaesser": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "messung": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PegelMessung",
+                "description": "Fehlt, wenn weder ein Abruf gelang noch ein Cache-Eintrag vorliegt (Ausfall)."
+              }
+            ]
+          },
+          "name": {
+            "type": "string",
+            "description": "Stationsname zum Zeitpunkt des Festlegens (Snapshot)."
+          },
+          "prognose": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PegelPrognose",
+                "description": "Erwarteter Höchststand (LFH-628); fehlt, wenn keiner gepflegt ist."
+              }
+            ]
+          },
+          "reihenfolge": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Position in der Liste, ab 0; der erste Eintrag ist der Leitpegel."
+          },
+          "station_uuid": {
+            "type": "string",
+            "description": "PEGELONLINE-Stations-UUID (kleingeschrieben)."
+          }
+        }
+      },
+      "PegelMessung": {
+        "type": "object",
+        "description": "Aktueller Messwert einer Station mit Trend.",
+        "required": [
+          "wasserstand_cm",
+          "zeitpunkt"
+        ],
+        "properties": {
+          "trend_cm_pro_h": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "Trend in cm/h (lineare Regression über 60 min vor der jüngsten Messung, eine\nNachkommastelle). Fehlt, wenn das Fenster zu dünn oder zu kurz ist."
+          },
+          "wasserstand_cm": {
+            "type": "number",
+            "format": "double",
+            "description": "Wasserstand der W-Reihe in cm (Einheit der PEGELONLINE-Reihe)."
+          },
+          "zeitpunkt": {
+            "type": "string",
+            "description": "Zeitpunkt der jüngsten Messung, RFC 3339 mit Zonenversatz, wie PEGELONLINE ihn\nliefert (z. B. `2026-09-22T09:15:00+02:00`). Er ist der ehrliche Datenstand — auch\ndann, wenn ein älterer Cache-Eintrag ausgeliefert wird."
+          }
+        }
+      },
+      "PegelPrognose": {
+        "type": "object",
+        "description": "Erwarteter Höchststand an einem festgelegten Pegel (LFH-628), von Hand gepflegt.\n\nEin verstrichener Zeitpunkt bleibt stehen, bis jemand die Prognose löscht oder erneuert:\nob sie „abgelaufen\" ist, entscheidet das Frontend gegen seine Uhr — dieselbe Arbeitsteilung\nwie beim veralteten Messwert.",
+        "required": [
+          "hoechststand_cm",
+          "zeitpunkt",
+          "gesetzt_at"
+        ],
+        "properties": {
+          "gesetzt_at": {
+            "type": "string",
+            "description": "Wann die Prognose zuletzt gesetzt wurde (UTC, Wire-Format)."
+          },
+          "hoechststand_cm": {
+            "type": "number",
+            "format": "double",
+            "description": "Erwarteter Höchststand in cm (dieselbe Einheit wie die Messung)."
+          },
+          "zeitpunkt": {
+            "type": "string",
+            "description": "Zeitpunkt des erwarteten Höchststands, UTC im Wire-Format `YYYY-MM-DD HH:MM:SS`."
+          }
+        }
+      },
+      "PegelVorhersage": {
+        "type": "object",
+        "description": "Vorschlag aus der PEGELONLINE-Vorhersage-Reihe `WV` (LFH-628): der höchste Wert der\nReihe mit seinem Zeitpunkt. Nur ein Teil der Stationen führt die Reihe (gemessen\n22.09.2026: 43).",
+        "required": [
+          "hoechststand_cm",
+          "zeitpunkt",
+          "erstellt",
+          "abschaetzung"
+        ],
+        "properties": {
+          "abschaetzung": {
+            "type": "boolean",
+            "description": "`true`, wenn der Höchstwert aus dem Abschätzungs-Teil der Reihe stammt (`type:\n\"estimate\"`) statt aus der Vorhersage — die Quelle unterscheidet beides ausdrücklich."
+          },
+          "erstellt": {
+            "type": "string",
+            "description": "Wann die Vorhersage gerechnet wurde (`initialized` der Quelle), RFC 3339."
+          },
+          "hoechststand_cm": {
+            "type": "number",
+            "format": "double",
+            "description": "Höchster Wert der Reihe in cm."
+          },
+          "zeitpunkt": {
+            "type": "string",
+            "description": "Zeitpunkt dieses Werts, RFC 3339 mit Versatz, wie die Quelle ihn liefert."
+          }
+        }
+      },
+      "PegelVorhersageAntwort": {
+        "type": "object",
+        "description": "Antwort auf die Vorhersage-Abfrage. `vorhersage` fehlt, wenn die Station keine Reihe `WV`\nführt — das ist kein Fehler, sondern der Normalfall für die meisten Stationen.",
+        "properties": {
+          "vorhersage": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PegelVorhersage"
+              }
+            ]
+          }
+        }
+      },
       "PeilungAntwort": {
         "type": "object",
         "required": [
@@ -5357,6 +5691,17 @@
             ],
             "format": "int64"
           },
+          "aktuelle_verbleib_art": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/VerbleibArt",
+                "description": "Strukturierter Cache des jüngsten Verbleib-Ereignisses (neben der Kurzform\n`aktueller_verbleib`)."
+              }
+            ]
+          },
           "aktueller_platz_id": {
             "type": [
               "integer",
@@ -5370,12 +5715,43 @@
               "null"
             ]
           },
+          "aktueller_verbleib_status": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/VerbleibStatus"
+              }
+            ]
+          },
+          "aktuelles_verbleib_ziel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "alter_geschaetzt": {
             "type": [
               "integer",
               "null"
             ],
             "format": "int64"
+          },
+          "antreff_lat": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "Fundort-Koordinate (WGS84), immer gemeinsam mit `antreff_lon` gesetzt oder leer."
+          },
+          "antreff_lon": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
           },
           "antreff_ort": {
             "type": [
@@ -5458,11 +5834,25 @@
               "null"
             ]
           },
+          "vermisst_seit": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Seit wann die Person vermisst wird (`YYYY-MM-DD HH:MM:SS`, UTC). Nur bei Status\n`vermisst` bedeutsam; beim Verlassen des Status bleibt der Wert dokumentarisch stehen."
+          },
           "vorname": {
             "type": [
               "string",
               "null"
             ]
+          },
+          "zustand": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Zustand in Kurzform (Freitext, z. B. „gehfähig, unterkühlt\")."
           }
         }
       },
@@ -6235,6 +6625,30 @@
           "mannschaft"
         ]
       },
+      "StatusAnteil": {
+        "type": "object",
+        "description": "Anteil eines Status an einer gemischten Einheit; `status: None` = Fahrzeuge ohne Status.",
+        "required": [
+          "anzahl"
+        ],
+        "properties": {
+          "anzahl": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "status": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/StatusWert"
+              }
+            ]
+          }
+        }
+      },
       "StatusKategorie": {
         "type": "string",
         "description": "Status-Kategorie eines Katalog-Eintrags (Schema-Anker für die OpenAPI-Union, LFH-120).\nWire == `status_kategorie`.",
@@ -6243,6 +6657,46 @@
           "gebunden",
           "nicht_verfuegbar"
         ]
+      },
+      "StatusWert": {
+        "type": "object",
+        "description": "Ein aufgelöster Eintrag des FMS-Statuskatalogs (`fahrzeug_status`), wie ihn Fahrzeug\nund Einheit tragen (LFH-609).",
+        "required": [
+          "status_id",
+          "label",
+          "kategorie",
+          "sortier"
+        ],
+        "properties": {
+          "farbe": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fms_anker": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "kategorie": {
+            "$ref": "#/components/schemas/StatusKategorie"
+          },
+          "label": {
+            "type": "string"
+          },
+          "sortier": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Katalog-Sortierung — ordnet die Verteilung einer gemischten Einheit."
+          },
+          "status_id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
       },
       "StichwortVorschlag": {
         "type": "object",
@@ -6683,12 +7137,13 @@
       },
       "VerbleibArt": {
         "type": "string",
-        "description": "Art eines Verbleib-Ereignisses. String = CHECK-Constraint in\n`migrations/0025_person_verbleib.sql`. `Verstorben` = Verbleib des Leichnams\n(NICHT der Admin-Status).",
+        "description": "Art eines Verbleib-Ereignisses. String = CHECK-Constraint in\n`migrations/0025_person_verbleib.sql`, erweitert um `notunterkunft` in\n`migrations/0112_person_verbleib_notunterkunft.sql` (LFH-613). `Verstorben` = Verbleib des\nLeichnams (NICHT der Admin-Status).",
         "enum": [
           "transport",
           "entlassung",
           "vor_ort",
-          "verstorben"
+          "verstorben",
+          "notunterkunft"
         ]
       },
       "VerbleibStatus": {

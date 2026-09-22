@@ -73,6 +73,8 @@ export const EINSATZ_KEYS = {
   // Snapshot-Dokument (LFH-321): eigener Prefix, damit die Listen-Invalidierung
   // (`lage_snapshot`-SSE) die per Design UNVERÄNDERLICHEN Dokumente nicht per Prefix mit-refetcht.
   lageSnapshotDokument: 'einsatz-lage-snapshot-dokument',
+  // Maßgebliche Pegel mit Messung (LFH-606): kein Live-Event, 5-min-Nachfrage.
+  pegel: 'einsatz-pegel',
 } as const;
 
 export type EinsatzKey = (typeof EINSATZ_KEYS)[keyof typeof EINSATZ_KEYS];
@@ -89,7 +91,9 @@ export type EinsatzKey = (typeof EINSATZ_KEYS)[keyof typeof EINSATZ_KEYS];
 export const EINSATZ_STREAM_EVENTS = {
   uhs: [EINSATZ_KEYS.uhs],
   schaden: [EINSATZ_KEYS.schaeden],
-  fahrzeug: [EINSATZ_KEYS.fahrzeuge],
+  // LFH-609: der Status einer Einheit ist aus ihren Fahrzeugen abgeleitet — ein
+  // Statuswechsel am Fahrzeug ändert die Einheitenliste mit.
+  fahrzeug: [EINSATZ_KEYS.fahrzeuge, EINSATZ_KEYS.einheiten, EINSATZ_KEYS.modulZaehler],
   material: [EINSATZ_KEYS.material],
   tier: [EINSATZ_KEYS.tiere],
   lage_zone: [EINSATZ_KEYS.zonen, EINSATZ_KEYS.gefahrengebiete],
@@ -165,6 +169,10 @@ export type EinsatzStreamEvent = keyof typeof EINSATZ_STREAM_EVENTS;
  * - `ortVorschau` (F27/LFH-269): abgeleiteter Geo-Lookup mit Debounce + Client-Cache, kein
  *   Einsatz-Datenobjekt. Hier live zu invalidieren wäre schädlich (Nominatim-ToS), nicht bloß
  *   überflüssig.
+ * - `pegel` (LFH-606): das Backend publiziert kein Live-Ereignis — die Messwerte ändern sich
+ *   im 15-min-Raster der Quelle, die Festlegung ist selten. Die Abfrage fragt stattdessen alle
+ *   5 min nach (`PEGEL_ABRUF_MS` in `api/pegel.ts`); die Mutationen setzen die Antwort per
+ *   `setQueryData`, weil alle drei Routen die vollständige Liste liefern.
  */
 export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.einsatz,
@@ -179,6 +187,7 @@ export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.tier,
   EINSATZ_KEYS.schaden,
   EINSATZ_KEYS.lageSnapshotDokument,
+  EINSATZ_KEYS.pegel,
 ] as const satisfies readonly EinsatzKey[];
 
 /**
@@ -250,6 +259,12 @@ export const einsatzKeys = {
   lagebericht: (einsatzId: number, berichtId: number) =>
     [EINSATZ_KEYS.lagebericht, einsatzId, berichtId] as const,
   kartenbilder: (einsatzId: number) => [EINSATZ_KEYS.kartenbilder, einsatzId] as const,
+  // Maßgebliche Pegel (LFH-606) — NICHT live, siehe NICHT_LIVE_KEYS.
+  pegel: (einsatzId: number) => [EINSATZ_KEYS.pegel, einsatzId] as const,
+  /** Vorschlag aus der Vorhersage-Reihe `WV` je Pegel (LFH-628), Sub-Key unter demselben
+   *  Prefix (Muster `stabLagebesprechungen`). */
+  pegelVorhersage: (einsatzId: number, pegelId: number) =>
+    [EINSATZ_KEYS.pegel, einsatzId, 'vorhersage', pegelId] as const,
 
   // Stab (LFH-46): Führungsorganisation S1–S6.
   stab: (einsatzId: number) => [EINSATZ_KEYS.stab, einsatzId] as const,

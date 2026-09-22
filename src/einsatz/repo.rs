@@ -223,33 +223,44 @@ pub async fn liste_fuer(
                 jetzt,
             )
         })
-        .map(|r| EinsatzAnzeige {
-            id: r.id,
-            org_id: r.org_id,
-            org_name: r.org_name,
-            bezeichnung: r.bezeichnung,
-            stichwort: r.stichwort,
-            status: r.status,
-            begonnen_at: r.begonnen_at,
-            naechste_lagebesprechung_at: r.naechste_lagebesprechung_at,
-            abgeschlossen_at: r.abgeschlossen_at,
-            abgeschlossen_von: r.abgeschlossen_von,
-            einsatzart: r.einsatzart,
-            einsatznummer_intern: r.einsatznummer_intern,
-            angelegt_at: r.angelegt_at,
-            leitstellen_nr: r.leitstellen_nr,
-            einsatzort: r.einsatzort,
-            einsatzort_lat: r.einsatzort_lat,
-            einsatzort_lon: r.einsatzort_lon,
-            meldende_stelle: r.meldende_stelle,
-            sachverhalt: r.sachverhalt,
-            anzahl_betroffene_initial: r.anzahl_betroffene_initial,
-            retention_bis: r.retention_bis,
-            meine_rolle: r.meine_rolle,
-            meine_fuehrungsstelle: r.meine_fuehrungsstelle,
-            // `remove` statt `get`: jede Einsatz-id kommt genau einmal vor, der Eintrag wird
-            // also nicht mehr gebraucht — das spart das Klonen des Vec.
-            meine_sachgebiete: sachgebiete.remove(&r.id).unwrap_or_default(),
+        .map(|r| {
+            let meine_sachgebiete = sachgebiete.remove(&r.id).unwrap_or_default();
+            // Dieselbe reine Ableitung wie `Einsatz::anzeige` — aus Werten, die diese
+            // Funktion ohnehin schon geladen hat, also ohne dritte Abfrage.
+            let meine_funktion = super::funktion::ableiten(
+                &meine_sachgebiete,
+                r.meine_rolle.as_deref().and_then(EinsatzRolle::parse),
+            )
+            .map(|f| f.bezeichnung);
+            EinsatzAnzeige {
+                id: r.id,
+                org_id: r.org_id,
+                org_name: r.org_name,
+                bezeichnung: r.bezeichnung,
+                stichwort: r.stichwort,
+                status: r.status,
+                begonnen_at: r.begonnen_at,
+                naechste_lagebesprechung_at: r.naechste_lagebesprechung_at,
+                abgeschlossen_at: r.abgeschlossen_at,
+                abgeschlossen_von: r.abgeschlossen_von,
+                einsatzart: r.einsatzart,
+                einsatznummer_intern: r.einsatznummer_intern,
+                angelegt_at: r.angelegt_at,
+                leitstellen_nr: r.leitstellen_nr,
+                einsatzort: r.einsatzort,
+                einsatzort_lat: r.einsatzort_lat,
+                einsatzort_lon: r.einsatzort_lon,
+                meldende_stelle: r.meldende_stelle,
+                sachverhalt: r.sachverhalt,
+                anzahl_betroffene_initial: r.anzahl_betroffene_initial,
+                retention_bis: r.retention_bis,
+                meine_rolle: r.meine_rolle,
+                meine_fuehrungsstelle: r.meine_fuehrungsstelle,
+                // `remove` statt `get` (oben): jede Einsatz-id kommt genau einmal vor, der
+                // Eintrag wird also nicht mehr gebraucht — das spart das Klonen des Vec.
+                meine_sachgebiete,
+                meine_funktion,
+            }
         })
         .collect())
 }
@@ -946,6 +957,73 @@ mod tests {
             "Freitext-Label (PII) muss nach Schwärzung NULL sein"
         );
         assert_eq!(lat, 50.1, "operative Position bleibt erhalten (Skelett)");
+    }
+
+    #[tokio::test]
+    async fn schwaerzung_nullt_lagedaten_der_person_und_behaelt_die_kategorien() {
+        // LFH-613, Spec-Szenario „Geschwärzter Einsatz": Zustand (Gesundheitsdatum),
+        // Fundort-Koordinate und Verbleib-Ziel tragen Personenbezug und werden leer; Art und
+        // Status des Verbleibs sowie „vermisst seit" sind Kategorien bzw. Zeitstempel und
+        // bleiben für die statistische Aufbewahrung stehen.
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let einsatz = test_anlegen(&pool, "Lage", None, leit).await.unwrap();
+        abschliessen(&pool, einsatz.id, leit).await.unwrap();
+        sqlx::query("UPDATE einsatz SET geloescht_at = ? WHERE id = ?")
+            .bind("2026-01-01 00:00:00")
+            .bind(einsatz.id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_person (einsatz_id, registrier_nr, status, zustand, \
+                antreff_lat, antreff_lon, vermisst_seit, aktuelle_verbleib_art, \
+                aktuelles_verbleib_ziel, aktueller_verbleib_status, erfasst_von, geaendert_von) \
+             VALUES (?, 1, 'vermisst', 'gehfähig, unterkühlt', 52.2691, 9.1342, \
+                '2026-01-01 06:00:00', 'transport', 'KH Mitte', 'angemeldet', ?, ?)",
+        )
+        .bind(einsatz.id)
+        .bind(leit)
+        .bind(leit)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        assert!(schwaerze_einsatz(&pool, einsatz.id, "2026-02-01 00:00:00")
+            .await
+            .unwrap());
+
+        #[allow(clippy::type_complexity)]
+        let zeile: (
+            Option<String>,
+            Option<f64>,
+            Option<f64>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+        ) = sqlx::query_as(
+            "SELECT zustand, antreff_lat, antreff_lon, aktuelles_verbleib_ziel, \
+                    aktuelle_verbleib_art, aktueller_verbleib_status, vermisst_seit \
+             FROM einsatz_person WHERE einsatz_id = ?",
+        )
+        .bind(einsatz.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            zeile,
+            (
+                None,
+                None,
+                None,
+                None,
+                Some("transport".into()),
+                Some("angemeldet".into()),
+                Some("2026-01-01 06:00:00".into()),
+            ),
+            "Zustand, Koordinate und Ziel leer; Art, Status und vermisst_seit erhalten"
+        );
     }
 
     #[tokio::test]

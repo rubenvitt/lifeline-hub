@@ -3,8 +3,6 @@ import { DownOutlined, LogoutOutlined, UserOutlined } from '@ant-design/icons';
 import type { IconType } from 'react-icons';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
-import type { Sachgebiet } from '../api/types';
-import { SACHGEBIETE } from '../stab/sachgebiete';
 import { useDichte, useThemeMode, type ThemeModus } from '../theme/ThemeModeProvider';
 import { farbenDunkel, rahmenFarben, schrift, type Dichte } from '../theme/tokens';
 import { DARSTELLUNG_OPTIONEN, DICHTE_OPTIONEN } from '../theme/darstellungOptionen';
@@ -16,27 +14,6 @@ function initialen(name: string): string {
   if (teile.length === 0) return '?';
   if (teile.length === 1) return teile[0].slice(0, 2).toUpperCase();
   return (teile[0][0] + teile[teile.length - 1][0]).toUpperCase();
-}
-
-/**
- * Die Funktion im Einsatz als Klartext („S2 Lage") — aus den Sachgebieten, die der
- * Benutzer in DIESEM Einsatz besetzt (`EinsatzAnzeige.meine_sachgebiete`, LFH-46).
- *
- * Besetzt er mehrere, nennt der Kopf das ERSTE in der Reihenfolge S1–S6 (die Liste in
- * `stab/sachgebiete.ts`, nicht die Reihenfolge der Antwort) — der Kopf hat eine Zeile, und
- * eine stabile Wahl ist besser als eine, die mit der Serialisierung wechselt. Alle
- * Sachgebiete stehen auf der Stabsseite.
- *
- * `null`, wenn keines besetzt ist: eine „Funktion des Nutzers" gibt es im Datenmodell sonst
- * nicht (Neuentwurf, bekannte Lücke) — der Aufrufer fällt dann auf den Anzeigenamen zurück,
- * statt eine Funktion zu erfinden.
- */
-export function funktionAusSachgebieten(
-  sachgebiete: readonly Sachgebiet[] | null | undefined,
-): string | null {
-  if (!sachgebiete || sachgebiete.length === 0) return null;
-  const treffer = SACHGEBIETE.find((e) => sachgebiete.includes(e.sachgebiet));
-  return treffer ? `${treffer.kuerzel} ${treffer.label}` : null;
 }
 
 /** Präfixe der beiden Umschalt-Gruppen. Sie tragen den Wert im Schlüssel,
@@ -72,7 +49,9 @@ function umschaltEintrag(
  * Kachel auf `flaeche3`, nicht mehr markenrot. Rot ist im Rahmen genau zweimal vergeben —
  * Logo-Quadrat und aktive Rail-Marke —, eine dritte rote Fläche daneben verwässerte beide.
  * Neben der Kachel steht ab `xl` die FUNKTION (`funktion`, z. B. „S2 Lage"), sonst der
- * Anzeigename.
+ * Anzeigename. Die Funktion leitet das Backend ab (`EinsatzAnzeige.meine_funktion`,
+ * LFH-615) — dieselbe Ableitung, die der ETB-Eintrag als Snapshot trägt; eine zweite im
+ * Frontend könnte davon abweichen.
  *
  * ZWEI GESTALTEN, EINE SCHWELLE — die Schwelle gilt nur noch dem TRIGGER
  * (LFH-329 · B1/M12, eingeschränkt in LFH-392; seit 22.09.2026 `xl` statt `lg`, damit

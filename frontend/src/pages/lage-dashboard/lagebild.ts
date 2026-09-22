@@ -21,6 +21,7 @@ import type {
   LageberichtAnzeige,
   LageberichtStatus,
   Meldung,
+  PegelAnzeige,
   Person,
   Schaden,
   Uhs,
@@ -36,6 +37,8 @@ import { baueKraeftebild, staerkeText } from '../../kraefte/kraeftebild';
 import { LAGEBERICHT_STATUS } from '../../kommunikation/phase';
 import { warnstufeKennzahl } from '../../theme/statusFarben';
 import type { KennzahlTon } from '../../components/instrument';
+import { einsatzEinstellungenPfad } from '../../routing/deeplinks';
+import { pegelKennzahl } from '../../pegel/pegelKennzahl';
 import {
   neuesterLagebericht,
   verdichteGefahrengebiete,
@@ -59,14 +62,23 @@ export type Datenzustand = 'daten' | 'laden' | 'fehler' | 'leer';
  * Die Reihenfolge wird NICHT nach Dringlichkeit sortiert: Prüfliste Kriterium 9 verlangt
  * dieselbe Größe an derselben Stelle, in jedem Zustand — wer eine Lage funkt, greift nach
  * der Zahl an ihrem Platz. Die Anzahl ist sechs, weil sie sich 6 → 3 → 2 Spalten ohne Rest
- * teilt. „Pegel" und „Evakuiert" aus dem Entwurf fehlen: dafür gibt es keine Datenquelle
- * (LFH-606, LFH-607), und eine erfundene Kennzahl wäre schlimmer als eine fehlende.
+ * teilt.
+ *
+ * **Pegel steht auf Platz 1 und ersetzt „Höchste Warnstufe"** (LFH-606, Entscheidung des
+ * Auftraggebers vom 22.09.2026, wie im Entwurf S3). Die Datenquelle sind die maßgeblichen
+ * Pegel des Einsatzes (PEGELONLINE, `api/pegel.ts`); die Ableitung steht in
+ * `pegel/pegelKennzahl.ts`. Die Warnstufe verschwindet damit nicht von der Seite: sie steht
+ * als Hinweis im Seitenkopf, sobald sie ein Alarmbeitrag ist, und je Gefahrentyp im Paneel
+ * Gefahrenmatrix. Ist kein Pegel festgelegt, bleibt der Platz belegt („kein Pegel
+ * festgelegt" mit Weg zur Auswahl) — ein wandernder Platz verletzte Kriterium 9.
+ * „Evakuiert" aus dem Entwurf fehlt weiterhin: dafür gibt es keine Datenquelle (LFH-607),
+ * und eine erfundene Kennzahl wäre schlimmer als eine fehlende.
  */
 export const KENNZAHL_ETIKETTEN = [
+  'Pegel',
   'Betroffene',
   'Kräfte',
   'Vermisste',
-  'Höchste Warnstufe',
   'Schäden offen',
   'Einsatzdauer',
 ] as const;
@@ -81,6 +93,11 @@ export interface Kennzahl {
   ton: KennzahlTon;
   /** Modul-Route für `einsatzModulPfad` (die Seite baut den Pfad über `routing/deeplinks`). */
   route: string;
+  /**
+   * Fertiger Pfad, wo das Ziel kein Modul-Einstieg ist (Pegel → Einstellungssektion, gebaut
+   * über `einsatzEinstellungenPfad`). Hat Vorrang vor {@link Kennzahl.route}.
+   */
+  zielPfad?: string;
 }
 
 /** Der Führungsstand unter den drei Paneelen: was vorher eigene Kacheln hatte. */
@@ -111,8 +128,9 @@ export interface Lagebild {
   fuehrung: Fuehrungsstand;
 }
 
-/** Warnstufe → Ton der Kennzahl, aus {@link warnstufeKennzahl} (nicht `warnstufeKarte`:
- *  „keine" ist hier „kein Alarmbeitrag", nicht „vorsichtshalber Gefahr"). Rein. */
+/** Warnstufe → Ton, aus {@link warnstufeKennzahl} (nicht `warnstufeKarte`: „keine" ist hier
+ *  „kein Alarmbeitrag", nicht „vorsichtshalber Gefahr"). Seit LFH-606 trägt ihn der
+ *  Warnstufen-Hinweis im Seitenkopf — die Kennzahl im Band ist dem Pegel gewichen. Rein. */
 export function warnstufeTon(w: Warnstufe): KennzahlTon {
   const rolle = warnstufeKennzahl[w].rolle;
   return rolle === 'alarm' ? 'alarm' : rolle === 'achtung' ? 'achtung' : 'neutral';
@@ -163,6 +181,37 @@ export function standText(
   return `Stand ${inZone(new Date(datenstand).toISOString(), konv).format('HH:mm')}`;
 }
 
+/**
+ * Schwelle der Notiz „n seit über 4 h" an der Kennzahl „Vermisste" (LFH-613).
+ * Quelle: Neuentwurf S3 (`docs/design/2026-09-21-neuentwurf/neuentwurf.dc.html`, Kennzahl
+ * „Vermisste", Notiz „3 seit über 4 h"). Eine gesetzte Zahl aus dem Entwurf, keine Norm.
+ */
+export const VERMISST_LANG_MS = 4 * 60 * 60_000;
+
+/**
+ * Wie viele Vermisste sind länger als {@link VERMISST_LANG_MS} vermisst, gemessen an `jetzt`?
+ * Rein — die Seite reicht ihren Uhr-Takt durch, damit die Notiz OHNE neue Daten nachzieht.
+ * Ein fehlendes oder unlesbares `vermisst_seit` zählt nicht (keine erfundene Dauer).
+ */
+export function langeVermisst(
+  personen: readonly Pick<Person, 'status' | 'vermisst_seit'>[],
+  jetzt: number,
+): number {
+  let n = 0;
+  for (const p of personen) {
+    if (p.status !== 'vermisst' || !p.vermisst_seit) continue;
+    const seit = wireAlsEpoche(p.vermisst_seit);
+    if (Number.isFinite(seit) && jetzt - seit > VERMISST_LANG_MS) n++;
+  }
+  return n;
+}
+
+/** Notiz der Kennzahl „Vermisste". Rein. */
+export function vermisstNotiz(vermisst: number, lang: number): string {
+  if (vermisst === 0) return 'keine offenen Fälle';
+  return lang > 0 ? `${lang} seit über 4 h` : 'als vermisst erfasst';
+}
+
 export interface Rohdaten {
   einsatz: EinsatzAnzeige;
   personen: Person[];
@@ -177,6 +226,8 @@ export interface Rohdaten {
   abschnitte: Einsatzabschnitt[];
   auftraege: Auftrag[];
   meldungen: Meldung[];
+  /** Maßgebliche Pegel in Reihenfolge (LFH-606), erster = Leitpegel. */
+  pegel: PegelAnzeige[];
 }
 
 export function baueLagebild(
@@ -192,15 +243,29 @@ export function baueLagebild(
     r.material,
   ).verdichtung;
   const betroffene = verdichtePersonen(r.personen);
+  const lang = langeVermisst(r.personen, jetzt);
   const uhs = verdichteUhs(r.uhs);
   const schaeden = verdichteSchaeden(r.schaeden);
   const gefahren = verdichteGefahrengebiete(r.gefahren);
   const bericht = neuesterLagebericht(r.lageberichte);
   const abgeschlossen = r.einsatz.abgeschlossen_at ?? null;
+  const pegel = pegelKennzahl(r.pegel, jetzt, konv);
 
   // Die Reihenfolge ist die von KENNZAHL_ETIKETTEN; ein Etikett, das es dort nicht gibt,
   // bricht über den Typ `KennzahlEtikett` den Build.
   const kennzahlen: Kennzahl[] = [
+    {
+      // Ziel in JEDEM Fall die Einstellungssektion: dort steht die ganze Liste samt
+      // Reihenfolge, und nur dort wird festgelegt. Die Lagekarte zeigte zwar die Stationen,
+      // kann aber per Deeplink weder die Ebene einschalten noch eine Station ansteuern.
+      etikett: 'Pegel',
+      wert: pegel.wert,
+      einheit: pegel.einheit,
+      notiz: pegel.notiz,
+      ton: pegel.ton,
+      route: 'einstellungen',
+      zielPfad: einsatzEinstellungenPfad(r.einsatz.id, 'pegel'),
+    },
     {
       etikett: 'Betroffene',
       wert: String(betroffene.gesamt),
@@ -220,16 +285,9 @@ export function baueLagebild(
     {
       etikett: 'Vermisste',
       wert: String(betroffene.vermisst),
-      notiz: betroffene.vermisst > 0 ? 'als vermisst erfasst' : 'keine offenen Fälle',
+      notiz: vermisstNotiz(betroffene.vermisst, lang),
       ton: betroffene.vermisst > 0 ? 'alarm' : 'neutral',
       route: 'personen',
-    },
-    {
-      etikett: 'Höchste Warnstufe',
-      wert: warnstufeKennzahl[gefahren.hoechste].label,
-      notiz: `${gefahren.anzahlAktiv} Gefahrengebiete aktiv`,
-      ton: warnstufeTon(gefahren.hoechste),
-      route: 'gefahren',
     },
     {
       etikett: 'Schäden offen',

@@ -6,6 +6,7 @@ import { aktualisiereSchaden } from '../../api/einsatzSchaden';
 import { verorteEinheit } from '../../api/einheiten';
 import { verorteFahrzeug } from '../../api/einsatzFahrzeuge';
 import { verortePerson } from '../../api/einsatzPersonal';
+import { aktualisierePerson } from '../../api/einsatzPerson';
 import { zeichneAbschnitt } from '../../api/einsatzabschnitte';
 import { legeZoneAn, aktualisiereZone, loescheZone, type ZonePatch } from '../../api/lagezonen';
 import {
@@ -242,11 +243,21 @@ export function useKartenInteraktion({
         await verorteFahrzeug(einsatzId, platzierungZiel.id, { lat: p.lat, lon: p.lon });
       } else if (platzierungZiel.typ === 'fuehrung') {
         await verortePerson(einsatzId, platzierungZiel.id, { lat: p.lat, lon: p.lon });
+      } else if (platzierungZiel.typ === 'person') {
+        // Betroffene (LFH-613): NUR die zwei Koordinatenfelder — `patchBody` liest vorhandene
+        // Keys, jeder weitere wäre ein „leeren". `verortePerson` oben ist das PERSONAL.
+        await aktualisierePerson(einsatzId, platzierungZiel.id, {
+          antreff_lat: p.lat,
+          antreff_lon: p.lon,
+        });
       } else if (platzierungZiel.typ === 'einsatzort' && einsatz) {
         await aktualisiereEinsatz(einsatzId, kopfMitKoordinate(einsatz, p.lat, p.lon));
       }
+      // Das Ziel reist als Ergebnis zu `onSuccess`: dort steht fest, WEM der PATCH galt,
+      // unabhängig davon, was der Modus bis dahin tut.
+      return platzierungZiel;
     },
-    onSuccess: () => {
+    onSuccess: (ziel) => {
       erfolg('Objekt verortet');
       qc.invalidateQueries({ queryKey: einsatzKeys.einsatz(einsatzId) });
       qc.invalidateQueries({ queryKey: einsatzKeys.uhs(einsatzId) });
@@ -254,6 +265,10 @@ export function useKartenInteraktion({
       qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
       qc.invalidateQueries({ queryKey: einsatzKeys.fahrzeuge(einsatzId) });
       qc.invalidateQueries({ queryKey: einsatzKeys.fuehrungskraefte(einsatzId) });
+      if (ziel?.typ === 'person') {
+        qc.invalidateQueries({ queryKey: einsatzKeys.personen(einsatzId) });
+        qc.invalidateQueries({ queryKey: einsatzKeys.person(einsatzId, ziel.id) });
+      }
       dispatch({ t: 'beenden', arten: ['platzieren'] });
     },
     onError: fehler,

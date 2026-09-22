@@ -71,10 +71,10 @@
 }
 
 .lfh-feld--alarm .lfh-zahl {
-  color: var(--lfh-alarm);
+  color: var(--lfh-alarm-text);
 }
 .lfh-feld--achtung .lfh-zahl {
-  color: var(--lfh-achtung);
+  color: var(--lfh-achtung-text);
 }
 
 /* ── Datenzustände: LADEN, FEHLER und LEER sehen verschieden aus ───────────
@@ -136,14 +136,17 @@
   cursor: pointer;
 }
 .lfh-kennzahl--ziel:hover {
-  background: var(--lfh-flaeche-2);
+  background: var(--lfh-flaeche-3);
 }
 .lfh-kennzahl--ziel:focus-visible {
   outline: 2px solid var(--lfh-bedien);
   outline-offset: -2px;
 }
 
-/* Segmentleiste — Fugenraster auf `linie-stark`; aktiv `flaeche-2` + Text. */
+/* Segmentleiste — Fugenraster auf `linie-stark`; aktiv `flaeche-3` + Text. Der Entwurf nennt
+   `flaeche-2`; die liegt am Tag bei 1,08 : 1 auf `flaeche` und hebt nichts hervor, nachts
+   trennen `flaeche-2` und `flaeche-3` nur 1,02 : 1 (LFH-618). Gilt ebenso für den Hover der
+   Kennzahl oben. */
 .lfh-segmente {
   display: inline-flex;
   flex-wrap: wrap;
@@ -169,7 +172,7 @@
   color: var(--lfh-text);
 }
 .lfh-segment--aktiv {
-  background: var(--lfh-flaeche-2);
+  background: var(--lfh-flaeche-3);
   color: var(--lfh-text);
 }
 /* Gesperrt: sichtbar, fokussierbar (der Grund steht im Tooltip), aber ohne Hover-Aufhellung.

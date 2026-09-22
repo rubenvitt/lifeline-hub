@@ -83,7 +83,17 @@ const volleDaten = {
     { id: 1, funkrufname: 'Florian 1', einheit_id: 10, status_kategorie: 'nicht_verfuegbar' },
   ],
   material: [],
-  einheiten: [{ id: 10, name: 'Zug 1', abschnitt_id: 5, ueber_einheit_id: null, soll: null }],
+  einheiten: [
+    {
+      id: 10,
+      name: 'Zug 1',
+      abschnitt_id: 5,
+      ueber_einheit_id: null,
+      soll: null,
+      // Abgeleitet aus dem ausgefallenen Fahrzeug unten (LFH-609).
+      status: { quelle: 'fahrzeuge', kategorie: 'nicht_verfuegbar', verteilung: [] },
+    },
+  ],
   abschnitte: [
     {
       id: 5,
@@ -116,13 +126,11 @@ const volleDaten = {
     auftrag({
       id: 23,
       auftrag_text: 'Folge A',
-      quell_etb_eintrag_id: 411,
       bearbeitungsstatus: 'vollzogen',
     }),
     auftrag({
       id: 24,
       auftrag_text: 'Folge B',
-      quell_etb_eintrag_id: 411,
       bearbeitungsstatus: 'vollzogen',
     }),
   ],
@@ -139,11 +147,30 @@ const volleDaten = {
       inhalt: 'Turnhalle Ost wird Notunterkunft.',
       erfasser_id: 1,
       erfasser_name: 'Brandt',
+      // Die Zahl kommt aus dem ETB-Eintrag (LFH-636), nicht aus der Auftragsliste: die
+      // Aufträge 23/24 oben tragen bewusst KEINEN `quell_etb_eintrag_id`, sonst stimmten
+      // beide Quellen überein und der Test könnte die alte Ableitung nicht fangen.
+      folgeauftraege: [
+        { id: 23, lfd_nr: 3 },
+        { id: 24, lfd_nr: 4 },
+      ],
     },
   ],
+  /** Maßgebliche Pegel (LFH-606) — im Grundbestand keiner festgelegt. */
+  pegel: [] as unknown[],
 };
 
 type Daten = typeof volleDaten;
+
+/** Ein Leitpegel mit frischer Messung (relativ zur echten Uhr, wie die Seite rechnet). */
+const leitpegel = (messung: Record<string, unknown> | null) => ({
+  id: 1,
+  station_uuid: '47174d8f-1b8e-4599-8a59-b580dd55bc87',
+  name: 'HANN. MÜNDEN',
+  gewaesser: 'WESER',
+  reihenfolge: 0,
+  ...(messung ? { messung } : {}),
+});
 
 function stelleBereit(d: Daten, ueberschreiben: Parameters<typeof server.use> = []) {
   const json = (x: object) => () => HttpResponse.json(x);
@@ -159,6 +186,7 @@ function stelleBereit(d: Daten, ueberschreiben: Parameters<typeof server.use> = 
     http.get('/api/einsaetze/1/gefahrengebiete', json(d.gefahren)),
     http.get('/api/einsaetze/1/auftraege', json(d.auftraege)),
     http.get('/api/einsaetze/1/erinnerungen', json(d.erinnerungen)),
+    http.get('/api/einsaetze/1/pegel', json(d.pegel ?? [])),
     http.get('/api/einsaetze/1/etb', ({ request }) => {
       const url = new URL(request.url);
       // Die Seite fragt NUR Entscheidungen ab — ein Abruf ohne Filter wäre ein Fehler.
@@ -229,14 +257,51 @@ describe('UeberblickPage', () => {
     const b = within(band());
     expect(links[0]).toHaveTextContent('3');
     expect(b.getByText('F/UF/M//Σ 1/0/1//2')).toBeInTheDocument();
-    // Warnstufe: das Wort ist der zweite Kanal — ohne Pegel-Notiz (LFH-606).
+    // Warnstufe: das Wort ist der zweite Kanal. Ohne festgelegten Pegel keine Pegel-Notiz —
+    // die Gegenaussage zum Fall „mit Pegel" unten (LFH-606).
     expect(links[2]).toHaveTextContent('hoch');
+    expect(links[2]).toHaveTextContent('1 Gefahrengebiet mit Warnstufe');
     expect(links[2]).not.toHaveTextContent(/Pegel/);
     expect(b.getByText('davon 1 ü.')).toBeInTheDocument();
     expect(b.getByText('Abschnitt Nord')).toBeInTheDocument();
   });
 
-  it('Abschnittszeile: Leiter, Stärke, Mittelverteilung ehrlich beschriftet, Auftrag, Deeplink', async () => {
+  it('Warnstufe mit festgelegtem Pegel: Notiz „Pegel 6,84 m steigend" (LFH-606)', async () => {
+    stelleBereit({
+      ...volleDaten,
+      pegel: [
+        leitpegel({
+          wasserstand_cm: 684,
+          zeitpunkt: new Date(Date.now() - 10 * 60_000).toISOString(),
+          trend_cm_pro_h: 9.2,
+        }),
+      ],
+    });
+    rendern();
+    await waitFor(() => expect(within(band()).getByText(/Pegel 6,84 m/)).toBeInTheDocument());
+    const warnstufe = within(band()).getAllByRole('link')[2];
+    expect(warnstufe).toHaveTextContent('hoch');
+    expect(warnstufe).toHaveTextContent('1 Gefahrengebiet mit Warnstufe · Pegel 6,84 m steigend');
+    // Die Kennzahl gehört weiter der Warnstufe: Ziel bleibt die Gefahrenseite.
+    expect(warnstufe).toHaveAttribute('href', '/einsaetze/1/gefahren');
+  });
+
+  it('Warnstufe bei Pegel-Ausfall und bei gescheitertem Pegel-Abruf: „Pegel: Stand unbekannt"', async () => {
+    stelleBereit({ ...volleDaten, pegel: [leitpegel(null)] });
+    const erster = rendern();
+    expect(await within(band()).findByText(/Pegel: Stand unbekannt/)).toBeInTheDocument();
+    erster.unmount();
+
+    stelleBereit(volleDaten, [
+      http.get('/api/einsaetze/1/pegel', () => new HttpResponse(null, { status: 500 })),
+    ]);
+    rendern();
+    expect(await within(band()).findByText(/Pegel: Stand unbekannt/)).toBeInTheDocument();
+    // Der tote Pegel-Abruf macht die Warnstufe nicht unlesbar.
+    expect(within(band()).getAllByRole('link')[2]).toHaveTextContent('hoch');
+  });
+
+  it('Abschnittszeile: Leiter, Stärke, Einheiten nach Status ehrlich beschriftet, Auftrag, Deeplink', async () => {
     stelleBereit(volleDaten);
     rendern();
     const p = await waitFor(() => paneel('Einsatzabschnitte'));
@@ -247,9 +312,12 @@ describe('UeberblickPage', () => {
     expect(zeile).toHaveTextContent('1/0/1//2');
     expect(zeile).toHaveTextContent('Trupps verlegen');
     // Der zweite Kanal der Zellen muss im Linknamen ankommen, nicht nur optisch.
-    expect(zeile).toHaveAccessibleName(/1\s*bereit/);
+    // LFH-609: gezählt wird die EINHEIT nach ihrem Status (Ausfall), nicht mehr ihre Mittel
+    // (Personal A bereit, B gebunden, Fahrzeug Ausfall ergäbe 1/1/1).
+    expect(zeile).toHaveAccessibleName(/0\s*bereit/);
+    expect(zeile).toHaveAccessibleName(/0\s*gebunden/);
     expect(zeile).toHaveAccessibleName(/1\s*Ausfall/);
-    // Personal A bereit, B gebunden, Fahrzeug Ausfall — je Zelle das Wort für Vorleser.
+    // Je Zelle das Wort für Vorleser.
     const zellen = zeile.querySelectorAll('[data-lfh="status-zelle"]');
     expect(Array.from(zellen).map((z) => z.getAttribute('title'))).toEqual([
       'bereit',
@@ -261,8 +329,78 @@ describe('UeberblickPage', () => {
       'bedien',
       'alarm',
     ]);
-    expect(within(p).getByText(/Mittel \(Fahrzeuge \+ Personal\)/)).toBeInTheDocument();
+    expect(within(p).getByText(/Einheiten nach Status/)).toBeInTheDocument();
     expect(within(p).getByText('1 Abschnitte · 1 Einheiten')).toBeInTheDocument();
+  });
+
+  it('Abschnittszeile mit Lage (LFH-608): Kante, Stufenwort, Kürzel, fester Auftrag, Fortschritt', async () => {
+    stelleBereit({
+      ...volleDaten,
+      abschnitte: [
+        {
+          ...volleDaten.abschnitte[0],
+          leiter_name: 'Vitt',
+          kurzbezeichnung: 'EA-N',
+          lagezustand: 'kritisch',
+          abschnittsauftrag: 'Deichsicherung km 3,8 – 5,4',
+          fortschritt: 72,
+        } as Daten['abschnitte'][number],
+      ],
+    });
+    rendern();
+    const p = await waitFor(() => paneel('Einsatzabschnitte'));
+    const zeile = await within(p).findByRole('link', { name: /Abschnitt Nord/ });
+    // Die Farbe trägt die Kante, das Wort trägt die Aussage (WCAG 1.4.1).
+    const kante = zeile.querySelector<HTMLElement>('[data-lfh="abschnitt-lagekante"]')!;
+    expect(kante).toHaveAttribute('data-rolle', 'alarm');
+    expect(zeile).toHaveAccessibleName(/kritisch/);
+    expect(zeile).toHaveTextContent('EA-N · Vitt');
+    // Der feste Auftrag steht vorn; der offene Einzelauftrag bleibt als kleine Zeile.
+    expect(zeile).toHaveTextContent('Deichsicherung km 3,8 – 5,4');
+    expect(zeile).toHaveTextContent('1 offen · Trupps verlegen');
+    // Fortschritt: Balken UND Zahl, daneben die Zählung — zwei Aussagen, beide benannt.
+    const balken = zeile.querySelector<HTMLElement>('[data-lfh="abschnitt-fortschritt"]')!;
+    expect(balken.style.width).toBe('72%');
+    expect(zeile).toHaveTextContent('72 %');
+    expect(zeile).toHaveTextContent('0/1 Aufträge erledigt');
+  });
+
+  it('Abschnittszeile meldet einen schlechter beurteilten Unterabschnitt als eigenes Etikett', async () => {
+    stelleBereit({
+      ...volleDaten,
+      abschnitte: [
+        { ...volleDaten.abschnitte[0], lagezustand: 'planmaessig' } as Daten['abschnitte'][number],
+        {
+          ...volleDaten.abschnitte[0],
+          id: 6,
+          name: 'Deichspitze',
+          ueber_abschnitt_id: 5,
+          lagezustand: 'kritisch',
+        } as unknown as Daten['abschnitte'][number],
+      ],
+    });
+    rendern();
+    const p = await waitFor(() => paneel('Einsatzabschnitte'));
+    const zeile = await within(p).findByRole('link', { name: /Abschnitt Nord/ });
+    expect(
+      zeile.querySelector('[data-lfh="abschnitt-lagekante"]')!.getAttribute('data-rolle'),
+    ).toBe('normal');
+    expect(within(zeile).getByText('UA kritisch')).toBeInTheDocument();
+  });
+
+  it('Abschnittszeile ohne gepflegte Lage: keine Kantenfarbe, kein Balken, Auftrag wie bisher', async () => {
+    stelleBereit(volleDaten);
+    rendern();
+    const p = await waitFor(() => paneel('Einsatzabschnitte'));
+    const zeile = await within(p).findByRole('link', { name: /Abschnitt Nord/ });
+    expect(
+      zeile.querySelector('[data-lfh="abschnitt-lagekante"]')!.getAttribute('data-rolle'),
+    ).toBeNull();
+    expect(zeile.querySelector('[data-lfh="abschnitt-fortschritt"]')).toBeNull();
+    expect(zeile).not.toHaveTextContent('%');
+    expect(zeile).not.toHaveTextContent(/planmäßig|angespannt|kritisch/);
+    expect(zeile).toHaveTextContent('Trupps verlegen');
+    expect(zeile).toHaveTextContent('0/1 Aufträge erledigt');
   });
 
   it('Offene Aufträge: überfällige zuerst, Status-Wort, Empfänger und Frist, Deeplink', async () => {
@@ -325,6 +463,39 @@ describe('UeberblickPage', () => {
     expect(marken[1]).toHaveTextContent('Lagebericht an Kreisstab');
     expect(marken[1]).toHaveAttribute('href', '/einsaetze/1/erinnerungen');
     expect(marken[3]).toHaveAttribute('href', '/einsaetze/1/stab');
+  });
+
+  it('Nächste Marken: offene Pegel-Prognose führt in die Pegel-Einstellungen, verstrichene fehlt (LFH-628)', async () => {
+    // Wire-Zeit UTC ohne Zone, relativ zur echten Uhr (die Seite rechnet mit ihr).
+    const wire = (ms: number) => new Date(ms).toISOString().slice(0, 19).replace('T', ' ');
+    const prognose = (ms: number) => ({
+      hoechststand_cm: 710,
+      zeitpunkt: wire(ms),
+      gesetzt_at: wire(Date.now()),
+    });
+    stelleBereit({
+      ...volleDaten,
+      pegel: [
+        { ...leitpegel(null), prognose: prognose(Date.now() + 3 * 3_600_000) },
+        {
+          ...leitpegel(null),
+          id: 2,
+          station_uuid: '5f9c1b54-3c41-4d93-bb48-2b7c7c3f5a61',
+          name: 'WAHNHAUSEN',
+          gewaesser: 'FULDA',
+          reihenfolge: 1,
+          prognose: prognose(Date.now() - 3_600_000),
+        },
+      ],
+    });
+    rendern();
+    const p = await waitFor(() => paneel('Nächste Marken'));
+    const marke = await within(p).findByRole('link', {
+      name: /Erwarteter Höchststand Pegel HANN\. MÜNDEN \(WESER\): 7,10 m/,
+    });
+    expect(marke).toHaveAttribute('href', '/einsaetze/1/einstellungen/pegel');
+    expect(marke).toHaveAttribute('data-ton', 'neutral');
+    expect(within(p).queryByText(/Pegel WAHNHAUSEN/)).toBeNull();
   });
 
   it('Leerzustand: jedes Paneel sagt „nichts da" und bietet, wo sinnvoll, eine Aktion', async () => {
@@ -440,10 +611,11 @@ describe('UeberblickPage', () => {
     expect(auftragsZahl).toHaveTextContent('?');
     // Die Betroffenenzahl hängt an ihrer eigenen Quelle und bleibt lesbar.
     expect(within(band()).getByRole('link', { name: /Betroffene/ })).toHaveTextContent('3');
-    // Folgeaufträge werden nicht still als „keine" gezeigt.
-    expect(
-      await screen.findByText('Aufträge nicht abrufbar — Folgeaufträge werden nicht gezählt.'),
-    ).toBeInTheDocument();
+    // Die Folgeaufträge hängen seit LFH-636 am ETB-Eintrag, nicht an der Auftragsliste:
+    // die Zahl bleibt stehen, und der frühere Ausfallhinweis ist weg.
+    const entscheidungen = await waitFor(() => paneel('Entscheidungen der letzten Stunde'));
+    expect(await within(entscheidungen).findByText('2 Aufträge')).toBeInTheDocument();
+    expect(screen.queryByText(/Folgeaufträge werden nicht gezählt/)).toBeNull();
   });
 
   it('Ladezustand: Kennzahlen und Paneele zeigen „wird abgerufen", keine Null', async () => {

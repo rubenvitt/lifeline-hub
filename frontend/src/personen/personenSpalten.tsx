@@ -1,29 +1,50 @@
+import { App, Typography } from 'antd';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import StatusTag from '../components/StatusTag';
 import SichtungsTag from '../components/SichtungsTag';
-import { Typography } from 'antd';
+import { BemerkungZelle } from '../components/BemerkungZelle';
 import { Select } from '../components/Select';
 import { spaltenFuer, type Kartenplan } from '../components/Datensicht';
 import { monoStil, useRollen } from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
-import { registrierAnzeige } from '../api/einsatzPerson';
+import { aktualisierePerson, registrierAnzeige } from '../api/einsatzPerson';
+import { fehlerText } from '../api/client';
+import { einsatzKeys } from '../api/queryKeys';
 import { personDetailPfad } from '../routing/deeplinks';
 import type { Person } from '../api/types';
 import { STATUS_META } from './personMeta';
 import { GESCHLECHT_KURZ } from './personBefehl';
-import { lueckenText, lueckenVon, verbleibKlasse } from './personenBilanz';
+import { koordinatenText } from './koordinate';
+import {
+  istAngetroffen,
+  lueckenText,
+  lueckenVon,
+  verbleibKlasse,
+  verbleibLabel,
+} from './personenBilanz';
 
 /**
  * Das EINE Spaltenregister der Betroffenen-Listen (LFH-330 · B2; Neuentwurf S7) — reine
  * Anzeige, ohne Aktionen. Speist Zeilen- und Rasteransicht und über den Kartenplan beide
  * Darstellungsformen.
  *
- * Spalten nach dem Entwurf, soweit es Daten gibt: Nr. · Person (Name + Geschlecht/Alter) ·
- * Sichtung · Status · Fundort · Verbleib · Vermerk · Zeit. **„Zustand" fehlt** — an der
- * Person gibt es kein Zustandsfeld (LFH-613); an seiner Stelle steht der Personenstatus als
+ * Spalten nach dem Entwurf: Nr. · Person (Name + Geschlecht/Alter) · Sichtung · Zustand ·
+ * Status · Fundort · Verbleib · Vermerk · Zeit. Der Personenstatus steht zusätzlich als
  * echte Spalte (`StatusTag`, A2-Vertrag).
  *
+ * **„Zustand"** (LFH-613) ist inline bearbeitbar über `BemerkungZelle` — dieselbe
+ * Affordanz wie die optionale Bemerkung der Kräfte-Listen (LFH-369: leeres Feld sagt
+ * „Zustand hinzufügen", Zeilenkennung `R-042` im zugänglichen Namen), PATCH nur mit dem
+ * einen Feld und Wertgleichheits-Riegel im Primitiv. Die Zelle fängt ihren Klick ab: die
+ * Zeile navigiert sonst per `onZeileKlick` auf die Detailseite, und der Riegel des Primitivs
+ * greift nur für Anker.
+ *
+ * **Fundort** zeigt Freitext UND darunter die Koordinate in Mono; eine der beiden schließt
+ * die Fundort-Lücke (`personenBilanz.ts`).
+ *
  * Eine FABRIK, kein Wert: die Verbleib-Spalte nennt die Unfallhilfsstelle beim Namen, und
- * den kennt nur die UHS-Liste der Seite. Durch `spaltenFuer<Person>()` geführt, NIE
+ * den kennt nur die UHS-Liste der Seite; die Zustand-Spalte braucht Einsatz und
+ * Schreibrecht. Durch `spaltenFuer<Person>()` geführt, NIE
  * annotiert — eine Annotation weitet die Schlüssel auf `string`, und der Kartenplan nähme
  * danach jeden Tippfehler unbemerkt an.
  *
@@ -94,7 +115,7 @@ function PersonZelle({ p }: { p: Person }) {
         {ga && <span style={{ ...monoStil(11), color: rollen.gedaempft }}>{ga}</span>}
       </span>
       {offen && (
-        <div data-lfh="luecke" style={{ ...monoStil(11), color: rollen.achtung }}>
+        <div data-lfh="luecke" style={{ ...monoStil(11), color: rollen.achtungText }}>
           {offen}
         </div>
       )}
@@ -105,24 +126,91 @@ function PersonZelle({ p }: { p: Person }) {
 /** Offene Zelle in `achtung`, sonst neutraler Gedankenstrich. */
 function Leerzelle({ offen }: { offen: boolean }) {
   const { rollen } = useRollen();
-  return <span style={{ color: offen ? rollen.achtung : rollen.schwach }}>—</span>;
+  return <span style={{ color: offen ? rollen.achtungText : rollen.schwach }}>—</span>;
 }
 
 function FundortZelle({ p }: { p: Person }) {
   const { rollen } = useRollen();
-  if (!p.antreff_ort) return <Leerzelle offen={lueckenVon(p).fundort} />;
-  return <span style={{ ...monoStil(11), color: rollen.gedaempft }}>{p.antreff_ort}</span>;
+  const koordinate = koordinatenText(p);
+  if (!p.antreff_ort && !koordinate) return <Leerzelle offen={lueckenVon(p).fundort} />;
+  return (
+    <div style={{ minWidth: 0 }}>
+      {p.antreff_ort && <div style={{ fontSize: 12, color: rollen.text2 }}>{p.antreff_ort}</div>}
+      {koordinate && (
+        <div data-lfh="koordinate" style={{ ...monoStil(11), color: rollen.gedaempft }}>
+          {koordinate}
+        </div>
+      )}
+    </div>
+  );
 }
 
-/** Verbleib-Anzeige: Kurzform, sonst die aktuelle UHS, sonst „—". */
+/** Bedienung der Zustand-Spalte; ohne sie bleibt die Spalte reine Anzeige. */
+export interface ZustandBedienung {
+  einsatzId: number;
+  darfSchreiben: boolean;
+}
+
+/**
+ * Schreibzweig der Zustand-Zelle: PATCH mit NUR `zustand` — ein Key, keine Formular-Lesart,
+ * also kann `patchBody` kein anderes Feld leeren. Kein `basis_geaendert_at`: ein einzelnes
+ * Kurzfeld überschreibt bewusst blind (wie die Bemerkung der Kräfte-Listen); ein
+ * Konfliktdialog für „gehfähig" wäre Reibung ohne Schutzgut.
+ */
+function ZustandSchreiben({ p, einsatzId }: { p: Person; einsatzId: number }) {
+  const qc = useQueryClient();
+  const { message } = App.useApp();
+  const mutation = useMutation({
+    mutationFn: (zustand: string) =>
+      aktualisierePerson(einsatzId, p.id, { zustand: zustand.trim() === '' ? null : zustand }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: einsatzKeys.personen(einsatzId) });
+      void qc.invalidateQueries({ queryKey: einsatzKeys.person(einsatzId, p.id) });
+    },
+    onError: (e) => message.error(fehlerText(e, 'Zustand nicht gespeichert')),
+  });
+  return (
+    <BemerkungZelle
+      wert={p.zustand}
+      darfSchreiben
+      bezeichnung="Zustand"
+      kennung={registrierAnzeige(p.registrier_nr)}
+      onSpeichern={(wert) => mutation.mutate(wert)}
+    />
+  );
+}
+
+function ZustandZelle({ p, bedienung }: { p: Person; bedienung?: ZustandBedienung }) {
+  const { rollen } = useRollen();
+  // Der Zustand beschreibt eine ANGETROFFENE Person — einer vermissten wird er nicht
+  // angeboten (dieselbe Regel wie in `AufnahmeFelder` und auf der Detailseite).
+  if (!bedienung?.darfSchreiben || !istAngetroffen(p)) {
+    return p.zustand ? (
+      <span style={{ fontSize: 12, color: rollen.text2 }}>{p.zustand}</span>
+    ) : (
+      <span style={{ color: rollen.schwach }}>—</span>
+    );
+  }
+  return (
+    // Der Klick gehört der Zelle: ohne den Riegel öffnete der Platzhalter die Bearbeitung
+    // UND die Zeile navigierte auf die Detailseite (`onZeileKlick` greift nur Anker ab).
+    <div onClick={(e) => e.stopPropagation()}>
+      <ZustandSchreiben p={p} einsatzId={bedienung.einsatzId} />
+    </div>
+  );
+}
+
+/** Verbleib-Anzeige: Kurzform (sonst Wort) der Art, sonst die aktuelle UHS, sonst „—". */
 export function verbleibText(
-  p: Pick<Person, 'aktueller_verbleib' | 'aktuelle_uhs_id'>,
+  p: Pick<Person, 'aktuelle_verbleib_art' | 'aktueller_verbleib' | 'aktuelle_uhs_id'>,
   uhsName: (id: number) => string | undefined,
 ): string | null {
   const k = verbleibKlasse(p);
   if (k === 'offen') return null;
   if (k === 'uhs') return `UHS ${uhsName(p.aktuelle_uhs_id!) ?? ''}`.trim();
-  return p.aktueller_verbleib ?? null;
+  // Art und Kurzform sind getrennte Felder: fehlt die Kurzform, steht das Wort der Art —
+  // sonst zeigte eine Person MIT Verbleib ein neutrales „—" und keine Lücke.
+  return p.aktueller_verbleib || verbleibLabel(k);
 }
 
 function VerbleibZelle({ p, uhsName }: { p: Person; uhsName: (id: number) => string | undefined }) {
@@ -132,7 +220,10 @@ function VerbleibZelle({ p, uhsName }: { p: Person; uhsName: (id: number) => str
   return <span style={{ fontSize: 12, color: rollen.text2 }}>{text}</span>;
 }
 
-export function personenSpalten(uhsName: (id: number) => string | undefined) {
+export function personenSpalten(
+  uhsName: (id: number) => string | undefined,
+  zustand?: ZustandBedienung,
+) {
   return spaltenFuer<Person>()([
     {
       title: 'Nr.',
@@ -156,6 +247,15 @@ export function personenSpalten(uhsName: (id: number) => string | undefined) {
     },
     { title: 'Sichtung', key: 'sk', width: 104, render: (_, p) => <SkTag p={p} /> },
     {
+      title: 'Zustand',
+      key: 'zustand',
+      // Feste Breite (Entwurf S7: 118 px, hier mit Platz für den Platzhalter-Knopf) — KEINE
+      // weitere Fließspalte neben Person und Vermerk (`fliessBreite` in `KatalogTabelle`).
+      width: 140,
+      suchText: (p) => p.zustand,
+      render: (_, p) => <ZustandZelle p={p} bedienung={zustand} />,
+    },
+    {
       title: 'Status',
       key: 'status',
       width: 118,
@@ -165,7 +265,7 @@ export function personenSpalten(uhsName: (id: number) => string | undefined) {
       title: 'Fundort',
       key: 'fundort',
       abBreite: 'lg',
-      suchText: (p) => p.antreff_ort,
+      suchText: (p) => [p.antreff_ort, koordinatenText(p)].filter(Boolean).join(' ') || null,
       render: (_, p) => <FundortZelle p={p} />,
     },
     {

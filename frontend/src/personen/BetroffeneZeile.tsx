@@ -7,13 +7,14 @@ import SichtungsTag from '../components/SichtungsTag';
 import Tastenkuerzel from '../components/Tastenkuerzel';
 import { useViewport } from '../components/useViewport';
 import { Schnellerfassungszeile, monoStil, useRollen } from '../components/instrument';
+import { formatKoordinate } from './koordinate';
 import { loeseBefehl, loeseUhsAuf, parsePersonBefehl, type BefehlTeil } from './personBefehl';
 
 /**
  * Die Betroffenen-Schnellerfassungszeile (Neuentwurf S7 „Das Formular wird zur Zeile").
  *
  * EINE Eingabe, die per Kürzel parst (`personen/personBefehl.ts`): „Kowalski, Anna w 34
- * sk3 @Weserstadion". Erkannte Teile stehen darunter als Marken — die Sichtung als
+ * sk3 @Weserstadion #52.2691/9.1342". Erkannte Teile stehen darunter als Marken — die Sichtung als
  * `SichtungsTag` (BBK-Kennzeichnung, LFH-455), nie als Designfarbe. Enter erfasst, das Feld
  * leert sich, der Fokus bleibt, die Quittung „Zuletzt: …" steht rechts daneben.
  *
@@ -44,7 +45,8 @@ import { loeseBefehl, loeseUhsAuf, parsePersonBefehl, type BefehlTeil } from './
  *  · Der Fokus kehrt im nächsten Bild ins Feld zurück.
  *
  * Die Anlage selbst läuft über die OFFLINEFÄHIGE Mutation der Seite
- * (`erfassePersonOfflineFaehig`: `client_id`, Sichtung und `uhs_id` im SELBEN POST). Die
+ * (`erfassePersonOfflineFaehig`: `client_id`, Sichtung, `uhs_id` und Koordinate im SELBEN
+ * POST). Die
  * Zeile kennt keinen Transport.
  */
 
@@ -78,15 +80,21 @@ function Marke({ teil, uhsListe }: { teil: BefehlTeil; uhsListe: readonly Uhs[] 
       return 'uhs' in a ? (
         <span style={{ ...monoStil(12), color: rollen.bedien }}>→ UHS {a.uhs.bezeichnung}</span>
       ) : (
-        <span style={{ ...monoStil(12), color: rollen.alarm }} title={a.problem}>
+        <span style={{ ...monoStil(12), color: rollen.alarmText }} title={a.problem}>
           {teil.text} ?
         </span>
       );
     }
+    case 'koordinate':
+      return (
+        <span style={{ ...monoStil(12), color: rollen.gedaempft }} title="Fundort-Koordinate">
+          #{formatKoordinate(teil.lat, teil.lon)}
+        </span>
+      );
     case 'unerkannt':
       return (
         <span
-          style={{ ...monoStil(12), color: rollen.alarm, textDecoration: 'line-through' }}
+          style={{ ...monoStil(12), color: rollen.alarmText, textDecoration: 'line-through' }}
           title={teil.grund}
         >
           {teil.text}
@@ -162,6 +170,8 @@ export default function BetroffeneZeile({
             </span>
             <span style={{ color: rollen.gedaempft }}>m/w/d + Alter</span>
             <span style={{ color: rollen.gedaempft }}>sk1–sk4 · skt · sku</span>
+            {/* Wortlaut des Entwurfs (S7); das Format zeigt der Platzhalter nicht, also hier. */}
+            <span style={{ color: rollen.gedaempft }}>#Koordinate (52.2691/9.1342)</span>
             <span style={{ color: rollen.gedaempft }}>@UHS</span>
           </>
         ) : (
@@ -187,7 +197,7 @@ export default function BetroffeneZeile({
         </span>
       )}
       {versuchFehler && versuchFehler.length > 0 && (
-        <span role="alert" style={{ flexBasis: '100%', color: rollen.alarm }}>
+        <span role="alert" style={{ flexBasis: '100%', color: rollen.alarmText }}>
           Nicht erfasst: {versuchFehler.join(' · ')}
         </span>
       )}

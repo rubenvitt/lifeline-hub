@@ -35,8 +35,11 @@ const SELECT_VERBLEIB: &str = "\
            zeitpunkt_at, erfasst_von \
     FROM person_verbleib";
 
-/// Erfasst ein Verbleib-Ereignis append-only und aktualisiert `aktueller_verbleib`
-/// in DERSELBEN Transaktion. `kurzform` ist die vom Handler berechnete Cache-Kurzform.
+/// Erfasst ein Verbleib-Ereignis append-only und aktualisiert den Verbleib-Cache an der
+/// Person in DERSELBEN Transaktion: die Kurzform `aktueller_verbleib` (vom Handler berechnet)
+/// und — seit LFH-613 — Art, Ziel und Status als eigene Spalten. Der neue Eintrag ist per
+/// Definition der jüngste (`zeitpunkt_at` = jetzt, höchste id), der Cache spiegelt also
+/// genau das Ereignis, das `liste_je_person` zuoberst liefert.
 pub async fn erfassen(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -61,12 +64,19 @@ pub async fn erfassen(
     .bind(erfasst_von)
     .fetch_one(&mut *tx)
     .await?;
-    sqlx::query("UPDATE einsatz_person SET aktueller_verbleib = ? WHERE id = ? AND einsatz_id = ?")
-        .bind(kurzform)
-        .bind(person_id)
-        .bind(einsatz_id)
-        .execute(&mut *tx)
-        .await?;
+    sqlx::query(
+        "UPDATE einsatz_person SET aktueller_verbleib = ?1, aktuelle_verbleib_art = ?2, \
+            aktuelles_verbleib_ziel = ?3, aktueller_verbleib_status = ?4 \
+         WHERE id = ?5 AND einsatz_id = ?6",
+    )
+    .bind(kurzform)
+    .bind(daten.art)
+    .bind(daten.ziel)
+    .bind(daten.status)
+    .bind(person_id)
+    .bind(einsatz_id)
+    .execute(&mut *tx)
+    .await?;
     tx.commit().await?;
     laden(pool, einsatz_id, id).await
 }
@@ -174,5 +184,59 @@ mod tests {
                 .await
                 .unwrap();
         assert_eq!(cache.as_deref(), Some("Transport → KH Mitte"));
+    }
+
+    /// LFH-613: Art, Ziel und Status gehen als eigene Cache-Spalten mit — und ein späteres
+    /// Ereignis ohne Ziel/Status leert sie, statt den Vorwert stehen zu lassen.
+    #[tokio::test]
+    async fn erfassen_pflegt_art_ziel_und_status_im_cache() {
+        let pool = test_pool().await;
+        let (b, e, p) = setup(&pool).await;
+        let cache = |pool: SqlitePool| async move {
+            sqlx::query_as::<_, (Option<String>, Option<String>, Option<String>)>(
+                "SELECT aktuelle_verbleib_art, aktuelles_verbleib_ziel, aktueller_verbleib_status \
+                 FROM einsatz_person WHERE id = ?",
+            )
+            .bind(p)
+            .fetch_one(&pool)
+            .await
+            .unwrap()
+        };
+        erfassen(
+            &pool,
+            e,
+            p,
+            VerbleibDaten {
+                status: Some("angemeldet"),
+                ..daten("transport", Some("KH Mitte"))
+            },
+            "Transport → KH Mitte",
+            b,
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            cache(pool.clone()).await,
+            (
+                Some("transport".into()),
+                Some("KH Mitte".into()),
+                Some("angemeldet".into())
+            )
+        );
+        erfassen(
+            &pool,
+            e,
+            p,
+            daten("notunterkunft", None),
+            "Notunterkunft",
+            b,
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            cache(pool.clone()).await,
+            (Some("notunterkunft".into()), None, None),
+            "Ziel und Status des Vorgängers bleiben nicht stehen"
+        );
     }
 }

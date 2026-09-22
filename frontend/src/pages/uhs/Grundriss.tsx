@@ -1321,6 +1321,8 @@ export default function Grundriss({
           <Select
             options={[
               { value: 'transport', label: 'Transport' },
+              // Beendet den UHS-Aufenthalt wie Transport und Entlassung (LFH-613).
+              { value: 'notunterkunft', label: 'Notunterkunft' },
               { value: 'entlassung', label: 'Entlassung vor Ort' },
               { value: 'vor_ort', label: 'verbleibt vor Ort' },
               { value: 'verstorben', label: 'Verbleib des Leichnams' },

@@ -123,6 +123,7 @@ function einheit(over: Partial<Einheit> = {}): Einheit {
     tz_organisation: null,
     aktueller_br_id: null,
     sprechgruppen: [],
+    status: { quelle: 'ohne', verteilung: [] },
     ...over,
   };
 }

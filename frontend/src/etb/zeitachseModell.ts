@@ -318,3 +318,21 @@ export function zuflussText(anzahl: number): string {
 export function verweisStil(token: { controlHeight: number }): CSSProperties {
   return { display: 'inline-flex', alignItems: 'center', minHeight: token.controlHeight };
 }
+
+/**
+ * Trägt der Eintrag einen gekoppelten Verweis — rückwärts (Befehl, Lagebericht, Auftrag,
+ * der ihn erzeugt hat) oder vorwärts (Folgeaufträge, LFH-636)? EINE Stelle für die Frage,
+ * weil `EtbZeitachse` den Verweisblock nur bei `true` einhängt und `EtbBacklinkBadges` sonst
+ * nichts rendert: zwei getrennt gepflegte Bedingungen liessen die Folgeaufträge einer
+ * Entscheidung ohne Rückverweis still aus der Zeitachse fallen (so gemessen beim Bau).
+ */
+export function hatVerknuepfung(
+  e: Pick<EtbEintragAnzeige, 'befehl_id' | 'lagebericht_id' | 'auftrag_id' | 'folgeauftraege'>,
+): boolean {
+  return (
+    e.befehl_id != null ||
+    e.lagebericht_id != null ||
+    e.auftrag_id != null ||
+    e.folgeauftraege.length > 0
+  );
+}

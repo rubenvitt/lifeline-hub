@@ -48,6 +48,7 @@ function eintrag(over: Partial<EtbEintragAnzeige> = {}): EtbEintragAnzeige {
     lagebericht_id: null,
     auftrag_id: null,
     befehl_id: null,
+    folgeauftraege: [],
     ...over,
   };
 }
@@ -90,6 +91,15 @@ describe('EtbZeitachse – der Eintrag', () => {
     expect(within(z).getByText('Funk')).toBeInTheDocument();
     // Uhrzeit als HH:MM (Anzeigezone), nicht als Wire-String.
     expect(within(z).getByText(/^\d{2}:\d{2}$/)).toBeInTheDocument();
+  });
+
+  it('setzt den Funktions-Snapshot hinter den Verfasser (LFH-615)', () => {
+    const { container } = renderZeitachse({
+      eintraege: [eintrag({ erfasser_funktion: 'S2' }), eintrag({ id: 2, lfd_nr: 2 })],
+    });
+    expect(within(zeileVon(container, 'eintrag-1')).getByText('Max · S2')).toBeInTheDocument();
+    // Ohne Snapshot nur der Name — keine erfundene Funktion.
+    expect(within(zeileVon(container, 'eintrag-2')).getByText('Max')).toBeInTheDocument();
   });
 
   it('ist auf JEDER Breite eine Zeitachse — keine Tabelle, auch nicht im Fükw', () => {
@@ -184,6 +194,31 @@ describe('EtbZeitachse – der Eintrag', () => {
     expect(screen.getByRole('link', { name: 'Befehl' })).toHaveAttribute(
       'href',
       '/einsaetze/1/auftraege/befehle/42',
+    );
+  });
+
+  // LFH-636: eine Entscheidung ohne jeden Rückverweis trägt trotzdem ihre Folgeaufträge —
+  // die Zeitachse darf die Verweiszeile nicht an den Rückverweisen allein festmachen.
+  it('verweist auf Folgeaufträge auch ohne Rückverweis (LFH-636)', () => {
+    renderZeitachse({
+      eintraege: [
+        eintrag({
+          id: 5,
+          typ: 'entscheidung',
+          folgeauftraege: [
+            { id: 31, lfd_nr: 12 },
+            { id: 32, lfd_nr: 13 },
+          ],
+        }),
+      ],
+    });
+    expect(screen.getByRole('link', { name: 'Folgeauftrag Nr. 12' })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/auftraege?auftrag=31',
+    );
+    expect(screen.getByRole('link', { name: 'Folgeauftrag Nr. 13' })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/auftraege?auftrag=32',
     );
   });
 

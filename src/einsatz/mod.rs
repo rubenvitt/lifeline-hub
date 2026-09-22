@@ -1,6 +1,7 @@
 pub mod berechtigung;
 pub mod effektiv;
 pub mod einstellungen;
+pub mod funktion;
 pub mod kontext;
 pub mod modul;
 pub mod modul_override;
@@ -209,6 +210,11 @@ impl Einsatz {
         meine_fuehrungsstelle: Option<String>,
         meine_sachgebiete: Vec<Sachgebiet>,
     ) -> EinsatzAnzeige {
+        let meine_funktion = funktion::ableiten(
+            &meine_sachgebiete,
+            meine_rolle.as_deref().and_then(EinsatzRolle::parse),
+        )
+        .map(|f| f.bezeichnung);
         EinsatzAnzeige {
             id: self.id,
             org_id: self.org_id,
@@ -234,6 +240,7 @@ impl Einsatz {
             meine_rolle,
             meine_fuehrungsstelle,
             meine_sachgebiete,
+            meine_funktion,
         }
     }
 }
@@ -281,6 +288,11 @@ pub struct EinsatzAnzeige {
     /// Optionalitäts-Norm ab LFH-265 eine Wire-Lüge in die andere Richtung.
     #[schema(required)]
     pub meine_sachgebiete: Vec<Sachgebiet>,
+    /// Funktion des abfragenden Benutzers in diesem Einsatz als Klartext für den Kopf
+    /// („S2 Lage", „S2/S3", „Einsatzleitung"; LFH-615). Abgeleitet aus `meine_sachgebiete`
+    /// und `meine_rolle` über `funktion::ableiten` — fehlt, wenn keine Funktion folgt.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub meine_funktion: Option<String>,
 }
 
 /// Mitglied eines Einsatzes für API-Antworten (mit Benutzer-Klartext, ohne Hash).

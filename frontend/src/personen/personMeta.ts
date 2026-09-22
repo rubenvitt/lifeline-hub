@@ -24,6 +24,8 @@ export function kurzVerbleib(v: Verbleib): string {
       return 'verbleibt vor Ort';
     case 'verstorben':
       return 'Verbleib des Leichnams';
+    case 'notunterkunft':
+      return `Notunterkunft${ziel}`;
   }
 }
 

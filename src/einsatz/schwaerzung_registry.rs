@@ -210,6 +210,17 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("aktueller_verbleib", Strategie::NullSetzen),
             retain("aktuelle_uhs_id", G_FK),
             retain("aktueller_platz_id", G_FK),
+            // LFH-613: Zustand ist ein Gesundheitsdatum (Freitext), die Fundort-Koordinate ein
+            // Aufenthaltsort → beide PII. Das Verbleib-Ziel spiegelt person_verbleib.ziel
+            // (Klinikname/Adresse) und wird wie dort gescrubbt.
+            scrub("zustand", Strategie::NullSetzen),
+            scrub("antreff_lat", Strategie::NullSetzen),
+            scrub("antreff_lon", Strategie::NullSetzen),
+            retain("vermisst_seit", G_ZEIT),
+            // Art/Status spiegeln die CHECK-Enums von person_verbleib (dort ebenfalls retain).
+            retain("aktuelle_verbleib_art", G_TRIAGE),
+            scrub("aktuelles_verbleib_ziel", Strategie::NullSetzen),
+            retain("aktueller_verbleib_status", G_TRIAGE),
         ],
     },
     TabellenRegel {
@@ -635,6 +646,14 @@ pub const TABELLEN: &[TabellenRegel] = &[
             ),
             // erreichbarkeit = mögliche Rufnummer der Führung → PII, gescrubbt (LFH-108).
             scrub("erreichbarkeit", Strategie::NullSetzen),
+            // LFH-608: Kürzel, Beurteilung und Einschätzung sind Führungsskelett (RETAIN).
+            // Der feste Abschnittsauftrag ist nullabler Freitext wie `bemerkung` — anders
+            // als `auftrag.auftrag_text` wird er nicht ins ETB gesnapshottet, und „Evakuierung
+            // Uferstraße 3, Familie …" ist genau die Sorte Satz, die hier stehen kann.
+            retain("kurzbezeichnung", G_OP_LABEL),
+            retain("lagezustand", G_ENUM),
+            scrub("abschnittsauftrag", Strategie::NullSetzen), // REVIEW: operativer Freitext
+            retain("fortschritt", G_ZAEHLER),
         ],
     },
     TabellenRegel {
@@ -660,6 +679,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
                 "Kommunikationsart-Schlüssel (digitalfunk/mobil/…), kein Personenbezug (LFH-108)",
             ),
             scrub("erreichbarkeit", Strategie::NullSetzen),
+            // LFH-614 (0105): Rufname der Einheit benennt ein operatives Objekt, keine
+            // Person — wie fahrzeug.funkrufname/snap_funkrufname.
+            retain("funkrufname", G_OP_LABEL),
             retain("sortier", G_KONFIG),
             retain("angelegt_at", G_ZEIT),
             retain("angelegt_von", G_FK),
@@ -668,6 +690,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("tz_fachaufgabe", G_ENUM),
             retain("tz_organisation", G_ENUM),
             retain("aktueller_br_id", G_FK),
+            retain("status_id", G_FK),
+            retain("status_seit", G_ZEIT),
         ],
     },
     TabellenRegel {
@@ -679,6 +703,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("einsatz_id", G_SCOPE),
             retain("fahrzeug_id", G_FK),
             retain("status_id", G_FK),
+            retain("status_seit", G_ZEIT),
             retain("snap_funkrufname", G_OP_SNAP),
             retain("snap_kennzeichen", G_OP_SNAP),
             retain("snap_fahrzeugtyp", G_OP_SNAP),
@@ -767,6 +792,29 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("etb_eintrag_id", G_FK),
             retain("erfasst_von_id", G_FK),
             retain("erfasst_at", G_ZEIT),
+        ],
+    },
+    // LFH-606: maßgebliche Pegel. Stationsname und Gewässer benennen eine Messstelle der
+    // WSV, keine Person — operatives Label. Kein Personenbezug außer dem Benutzer-FK.
+    TabellenRegel {
+        tabelle: "einsatz_pegel",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            retain("station_uuid", G_OP_LABEL),
+            retain("name", G_OP_LABEL),
+            retain("gewaesser", G_OP_LABEL),
+            retain("reihenfolge", G_ZAEHLER),
+            retain("gesetzt_von_id", G_FK),
+            retain("gesetzt_at", G_ZEIT),
+            // LFH-628: erwarteter Höchststand — ein Messwert mit Zeitpunkt, kein Personenbezug
+            // außer dem Benutzer-FK.
+            retain("prognose_cm", G_ZAEHLER),
+            retain("prognose_zeit", G_ZEIT),
+            retain("prognose_gesetzt_von_id", G_FK),
+            retain("prognose_gesetzt_at", G_ZEIT),
         ],
     },
     TabellenRegel {
@@ -940,6 +988,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("meldeweg", G_ETB),
             retain("veranlassung", G_ETB),
             retain("erfasser_id", G_FK),
+            // Funktionskürzel („S2", „EL") aus Sachgebiet/Rolle, keine Person (LFH-615).
+            // Bewusst NICHT aus `einsatz_mitgliedschaft.fuehrungsstelle` (Scrub) abgeleitet.
+            retain("erfasser_funktion", G_ETB),
             retain("ereigniszeit", G_ZEIT),
             retain("received_at", G_ZEIT),
             retain("erfasst_lokal_at", G_ZEIT),

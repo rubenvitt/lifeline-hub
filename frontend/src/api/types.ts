@@ -179,9 +179,13 @@ export interface SprechgruppeEingabe {
 
 // ============================== Struktur (Abschnitte / Einheiten) ==============================
 export type Einsatzabschnitt = S['EinsatzabschnittAnzeige'];
+export type AbschnittLagezustand = S['AbschnittLagezustand'];
 export type EinheitMitgliedPerson = S['EinheitMitgliedPerson'];
 export type EinheitMitgliedFahrzeug = S['EinheitMitgliedFahrzeug'];
 export type Einheit = S['EinheitAnzeige'];
+export type EinheitStatus = S['EinheitStatus'];
+export type EinheitStatusQuelle = S['EinheitStatusQuelle'];
+export type StatusWert = S['StatusWert'];
 export type FuehrungskraftKarte = S['FuehrungskraftKarte'];
 export type OrganisationInfo = S['OrganisationAnzeige'];
 
@@ -338,6 +342,13 @@ export type BefehlVorlageKey = S['BefehlVorlage'];
 export type BefehlStatus = S['BefehlStatus'];
 export type BefehlAbschnitt = S['BefehlAbschnitt'];
 export type BefehlAnzeige = S['BefehlAnzeige'];
+
+// ============================== LFH-606 Pegel-Kennzahl ==============================
+export type PegelAnzeige = S['PegelAnzeige'];
+export type PegelMessung = S['PegelMessung'];
+export type PegelPrognose = S['PegelPrognose'];
+export type PegelVorhersage = S['PegelVorhersage'];
+export type PegelVorhersageAntwort = S['PegelVorhersageAntwort'];
 
 // ============================== LFH-46 Stab (S1–S6) ==============================
 export type Stab = S['StabAnzeige'];

@@ -1,3 +1,43 @@
+## [1.0.0-alpha.32](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.31...v1.0.0-alpha.32) (2026-09-22)
+
+### Features
+
+* **einheit:** Einheitenstatus mit „Seit“, abgeleitet aus den Fahrzeugen (LFH-609) ([978d1aa](https://github.com/rubenvitt/lifeline-hub/commit/978d1aa13467f235e17c19abf6ab022974b0172c))
+* **einheit:** Funkrufname als Stammfeld der Einheit (LFH-614) ([5a8c027](https://github.com/rubenvitt/lifeline-hub/commit/5a8c02750568ae9d2e7bd9ae4077d33bc173f024))
+* **einsatzabschnitt:** Lagezustand, Abschnittsauftrag, Fortschritt und Kürzel (LFH-608) ([717d30e](https://github.com/rubenvitt/lifeline-hub/commit/717d30e08b90c14f6b4dbe4728d1e2a477483ccb))
+* **einsatz:** Funktion des Mitglieds ableiten und am ETB-Eintrag festschreiben (LFH-615) ([78076d4](https://github.com/rubenvitt/lifeline-hub/commit/78076d44c59bb7a2e6e9993b4064e7fa00901e90))
+* **etb:** Folgeauftrag-Verweis am ETB-Eintrag (LFH-636) ([8432032](https://github.com/rubenvitt/lifeline-hub/commit/8432032e08c4ffb276df92d49abad53064b39388))
+* **frontend:** Funktion im Kopf und am ETB-Verfasser aus dem Backend (LFH-615) ([0805ee5](https://github.com/rubenvitt/lifeline-hub/commit/0805ee5118df355f61232522bcfb99f635e1f772))
+* **kraefte:** Einheitenstatus in Meldebild, Lagekarte und Überblick (LFH-609) ([19eb5a1](https://github.com/rubenvitt/lifeline-hub/commit/19eb5a1072b6f02552eef935b088afe92c14ad69))
+* **pegel:** Backend für die Pegel-Kennzahl mit Trend (LFH-606) ([2e6b65b](https://github.com/rubenvitt/lifeline-hub/commit/2e6b65bf1820f053d36e4282a857fa54656677c2))
+* **pegel:** Einstellungssektion „Pegel“ (LFH-606) ([ba755a0](https://github.com/rubenvitt/lifeline-hub/commit/ba755a06f5f4797b58d77b1269650321312f8e49))
+* **pegel:** erwarteter Höchststand am maßgeblichen Pegel (LFH-628) ([7a7cc92](https://github.com/rubenvitt/lifeline-hub/commit/7a7cc92909b4edae15cfa80144411f03df6adc9c))
+* **pegel:** Pegel-Kennzahl auf Platz 1 des Lage-Dashboards (LFH-606) ([7e7403e](https://github.com/rubenvitt/lifeline-hub/commit/7e7403e2f32106019880f78a7ed9f1b90076d758))
+* **pegel:** Pegel-Notiz an der Warnstufe im Überblick (LFH-606) ([0e4ab8c](https://github.com/rubenvitt/lifeline-hub/commit/0e4ab8cb1c1ff528049bac5407304c233ea5fdd2))
+* **pegel:** Schnellweg „Als maßgeblichen Pegel festlegen“ im Fachebenen-Inspector (LFH-606) ([d468847](https://github.com/rubenvitt/lifeline-hub/commit/d46884770fd26b86d105a343a7013040938dbab9))
+* **ueberblick:** Lagekante, Kürzel, fester Auftrag und Fortschritt je Abschnitt (LFH-608) ([cfa0ee4](https://github.com/rubenvitt/lifeline-hub/commit/cfa0ee43854765bd14ab7c7ab1672fd29835abca))
+
+### Bug Fixes
+
+* **einheit:** Migration auf 0105 umnummeriert — 0104 trägt LFH-606 (LFH-609) ([3358cbf](https://github.com/rubenvitt/lifeline-hub/commit/3358cbfb82864a37faa8dd8998ef809b9b73133b))
+* **einheit:** Review-Befunde zum Einheitenstatus (LFH-609) ([b60ba5e](https://github.com/rubenvitt/lifeline-hub/commit/b60ba5e769a472115268bf315617481c54046a0f))
+* **einsatzabschnitt:** Lagewechsel und ETB-Eintrag atomar, UA-Etikett mit Rollenrand (LFH-608) ([955a318](https://github.com/rubenvitt/lifeline-hub/commit/955a318594540f761f09064eaaa8c65eee48a09d))
+* **etb:** Migration auf 0105 umnummeriert (LFH-636) ([ca847c2](https://github.com/rubenvitt/lifeline-hub/commit/ca847c2ad2c9f59838e91a7d66cf075b4a502a6c))
+* **etb:** Review-Nachzüge LFH-636 – Migration 0106, Sortier-Test gegen Anlagereihenfolge ([43b0e19](https://github.com/rubenvitt/lifeline-hub/commit/43b0e192e7ed23e32b100e225e841ff1eb16ac3a))
+* **etb:** Verfasserzeile mit Funktion umbrechen statt die Zeitachse zu verbreitern (LFH-615) ([bd04737](https://github.com/rubenvitt/lifeline-hub/commit/bd047374b0366845e9c1561308b0d98a94cffc5d))
+* **pegel:** abgelaufener Messstand kommt sofort, Erneuerung im Hintergrund (LFH-606) ([5c2d3fc](https://github.com/rubenvitt/lifeline-hub/commit/5c2d3fc52b8ad39057d53e96e5d6f914297fb6e1))
+* **pegel:** Auswahl ohne wählbare Station sagt warum (LFH-606) ([5a7e11c](https://github.com/rubenvitt/lifeline-hub/commit/5a7e11c4f0b1897556f3b11762489678ad7a4ff4))
+* **pegel:** kalter Abruf gebremst, Schreibrouten warten nie, volle Liste 422 (LFH-606) ([a84d473](https://github.com/rubenvitt/lifeline-hub/commit/a84d4738a2a198329a7aadc613dc24b17ec3bb26))
+* **pegel:** Migration auf 0104 umnummeriert (LFH-606) ([f56a98b](https://github.com/rubenvitt/lifeline-hub/commit/f56a98bf297bdedb12e3dd7109a50c46ad42c016))
+* **pegel:** Migration auf 0104, Nummer 0103 ist mit etb_lesemarke doppelt belegt (LFH-606) ([ead6e35](https://github.com/rubenvitt/lifeline-hub/commit/ead6e356f956d6b5d3691ab8386320c72766d95d))
+* **pegel:** Prognose-Migration auf 0106, alpha belegt 0105 (LFH-628) ([007554d](https://github.com/rubenvitt/lifeline-hub/commit/007554d636f83c8a843cbb9272bf2815c3a89ac5))
+* **pegel:** Review-Befunde im Frontend (LFH-606) ([6fbc90a](https://github.com/rubenvitt/lifeline-hub/commit/6fbc90a6957f7c62131249c2c4b649914b5d5ab6))
+* **pegel:** Überblick-Marke nennt die Station, Gewässer als Zusatz (LFH-628) ([ace543f](https://github.com/rubenvitt/lifeline-hub/commit/ace543ff23aeba4b6c81c23e45e5f9c8891f3a81))
+* **security:** CodeQL-Alerts [#1](https://github.com/rubenvitt/lifeline-hub/issues/1)-[#25](https://github.com/rubenvitt/lifeline-hub/issues/25) sichten, drei beheben, Rest begründen ([67277e8](https://github.com/rubenvitt/lifeline-hub/commit/67277e8e84e80a369d601590721ce8b71a68f75d)), closes [#11](https://github.com/rubenvitt/lifeline-hub/issues/11) [12-#23](https://github.com/rubenvitt/12-/issues/23) [#9](https://github.com/rubenvitt/lifeline-hub/issues/9) [4-#8](https://github.com/rubenvitt/4-/issues/8) [#10](https://github.com/rubenvitt/lifeline-hub/issues/10) [#3](https://github.com/rubenvitt/lifeline-hub/issues/3)
+* **security:** Kapazitätsangabe streichen statt Menge nur zu klemmen (CodeQL) ([a177211](https://github.com/rubenvitt/lifeline-hub/commit/a17721136f6257630fe7cecd2ee514b16c990e0d)), closes [#11](https://github.com/rubenvitt/lifeline-hub/issues/11) [#11](https://github.com/rubenvitt/lifeline-hub/issues/11)
+* **theme:** Hellmodus des Neuentwurfs sichtgeprüft und nachgeschärft (LFH-618) ([232a41f](https://github.com/rubenvitt/lifeline-hub/commit/232a41f5d5b3978e9764ce007d6753dcbefc3d48)), closes [604200/#8f1c12](https://github.com/604200/lifeline-hub/issues/8f1c12)
+* **theme:** Review-Befunde zum Hellmodus (LFH-618) ([f91e264](https://github.com/rubenvitt/lifeline-hub/commit/f91e264d8913cd66fd1fc6f896da8c5fe5d1292f))
+
 ## [1.0.0-alpha.31](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.30...v1.0.0-alpha.31) (2026-09-22)
 
 ### Features

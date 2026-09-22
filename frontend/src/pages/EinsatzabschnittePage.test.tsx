@@ -339,6 +339,68 @@ describe('EinsatzabschnittePage', () => {
     });
   });
 
+  it('zeigt Kürzel, Lagezustand, festen Auftrag und Fortschritt in der Lese-Ansicht (LFH-608)', async () => {
+    server.use(
+      ...handlers('einsatzleitung', 'aktiv', [
+        {
+          ...funkAbschnitt,
+          kurzbezeichnung: 'EA-N',
+          lagezustand: 'angespannt',
+          abschnittsauftrag: 'Deichsicherung km 3,8 – 5,4',
+          fortschritt: 72,
+        },
+      ]),
+    );
+    renderPage();
+    await userEvent.click(await screen.findByText('Nord'));
+    expect(await screen.findByText('Lagezustand')).toBeInTheDocument();
+    expect(screen.getByText('EA-N')).toBeInTheDocument();
+    expect(screen.getByText('angespannt')).toBeInTheDocument();
+    expect(screen.getByText('Deichsicherung km 3,8 – 5,4')).toBeInTheDocument();
+    expect(screen.getByText('72 %')).toBeInTheDocument();
+  });
+
+  it('nennt eine fehlende Beurteilung ausdrücklich, statt eine Stufe zu zeigen (LFH-608)', async () => {
+    server.use(...handlers('einsatzleitung', 'aktiv', [funkAbschnitt]));
+    renderPage();
+    await userEvent.click(await screen.findByText('Nord'));
+    expect(await screen.findByText('nicht beurteilt')).toBeInTheDocument();
+    expect(screen.getByText('nicht eingeschätzt')).toBeInTheDocument();
+    expect(screen.queryByText(/planmäßig|angespannt|kritisch/)).toBeNull();
+  });
+
+  it('sendet die vier Lage-Angaben beim Speichern, leere als null (LFH-608)', async () => {
+    let patchBody: Record<string, unknown> | null = null;
+    server.use(
+      ...handlers('einsatzleitung', 'aktiv', [
+        { ...funkAbschnitt, kurzbezeichnung: 'EA-N', abschnittsauftrag: 'Deich halten' },
+      ]),
+      http.patch('/api/einsaetze/1/abschnitte/5', async ({ request }) => {
+        patchBody = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ ...funkAbschnitt, ...patchBody });
+      }),
+    );
+    renderPage();
+    await userEvent.click(await screen.findByText('Nord'));
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+
+    // Vorbelegung aus dem Datensatz
+    expect(await screen.findByLabelText('Kurzbezeichnung')).toHaveValue('EA-N');
+    await userEvent.clear(screen.getByLabelText('Abschnittsauftrag'));
+    await userEvent.click(screen.getByLabelText('Lagezustand'));
+    await userEvent.click(await screen.findByText('kritisch'));
+    await userEvent.type(screen.getByLabelText('Fortschritt'), '40');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(patchBody).not.toBeNull());
+    expect(patchBody).toMatchObject({
+      kurzbezeichnung: 'EA-N',
+      lagezustand: 'kritisch',
+      abschnittsauftrag: null,
+      fortschritt: 40,
+    });
+  });
+
   // LFH-107: „Überblick zuerst" — Detailbereich ist Lese-Ansicht, Bearbeiten ist ein eigener Modus.
   it('zeigt beim Öffnen die Lese-Ansicht (Kerninfos) ohne Formular-Inputs', async () => {
     server.use(...handlers('einsatzleitung', 'aktiv', [funkAbschnitt]));

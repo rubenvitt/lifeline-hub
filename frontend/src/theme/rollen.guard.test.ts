@@ -130,6 +130,8 @@ const FARB_ABBILDUNG: Record<keyof Farbrollen, string> = {
   bedienText: '--lfh-bedien-text',
   aufBedien: '--lfh-auf-bedien',
   normalText: '--lfh-normal-text',
+  achtungText: '--lfh-achtung-text',
+  alarmText: '--lfh-alarm-text',
   normalFlaeche: '--lfh-normal-flaeche',
   achtungFlaeche: '--lfh-achtung-flaeche',
   alarmFlaeche: '--lfh-alarm-flaeche',

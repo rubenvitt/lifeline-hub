@@ -201,6 +201,7 @@ const PERSONEN_FILTER_ERLAUBT: Record<PersonenFilter, true> = {
 const PERSONEN_ANSICHT_ERLAUBT: Record<PersonenAnsicht, true> = {
   zeilen: true,
   raster: true,
+  karte: true,
 };
 
 /**
@@ -411,7 +412,15 @@ export function lagekartePfad(
  * steht, muss die Karte auch aus einem Fremd-Link heraus platzieren können. Wer den Typ
  * erweitert, prüft `pages/LagekartePage.tsx` mit — dort wird der Wert zurückgelesen.
  */
-export type PlatzierenZielTyp = 'schaden' | 'uhs';
+export type PlatzierenZielTyp = 'schaden' | 'uhs' | 'person';
+
+/** Exhaustiv: ein neuer Zieltyp bricht den Typcheck, statt im Parser still zu fehlen. */
+const PLATZIEREN_ZIEL_ERLAUBT: Record<PlatzierenZielTyp, true> = {
+  schaden: true,
+  uhs: true,
+  // Fundort-Koordinate einer Person (LFH-613, „Auf Lagekarte verorten" der Detailseite).
+  person: true,
+};
 
 /**
  * Liest den Platzier-Auftrag aus `?platzieren=<typ>:<id>` zurück.
@@ -425,9 +434,9 @@ export function parsePlatzierenAuftrag(
 ): { typ: PlatzierenZielTyp; id: number } | null {
   if (!wert) return null;
   const [typ, roheId] = wert.split(':');
-  if (typ !== 'schaden' && typ !== 'uhs') return null;
+  if (!typ || !Object.prototype.hasOwnProperty.call(PLATZIEREN_ZIEL_ERLAUBT, typ)) return null;
   const id = parseRouteId(roheId);
-  return id == null ? null : { typ, id };
+  return id == null ? null : { typ: typ as PlatzierenZielTyp, id };
 }
 
 // ── Route-Param-Robustheit ───────────────────────────────────────────────────
@@ -446,8 +455,8 @@ export function parseRouteId(param: string | undefined): number | null {
 
 // ── Sektions-Routen der Einsatz-Einstellungen (LFH-345 · C10) ────────────────
 
-/** Die vier Sektionen von `/einsaetze/:id/einstellungen`. */
-export type EinstellungenSektion = 'allgemein' | 'verhalten' | 'aufbewahrung' | 'module';
+/** Die fünf Sektionen von `/einsaetze/:id/einstellungen` (`pegel` seit LFH-606). */
+export type EinstellungenSektion = 'allgemein' | 'verhalten' | 'aufbewahrung' | 'module' | 'pegel';
 
 /**
  * Sektionen in Bedienreihenfolge — EINE Wahrheit für das Tab-Band, die Routentabelle und
@@ -466,6 +475,8 @@ export const EINSTELLUNGEN_SEKTIONEN: readonly { key: EinstellungenSektion; labe
   { key: 'verhalten', label: 'Verhalten & Automatik' },
   { key: 'aufbewahrung', label: 'Aufbewahrung' },
   { key: 'module', label: 'Module' },
+  // LFH-606: hinten angehängt, nicht vorn — die erste Sektion ist das Redirect-Ziel.
+  { key: 'pegel', label: 'Pegel' },
 ];
 
 /**

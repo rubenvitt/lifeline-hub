@@ -62,6 +62,7 @@ function rendern(route = '/einsaetze/1/einstellungen/allgemein') {
         <Route path="verhalten" element={<div>Sektionsinhalt Verhalten</div>} />
         <Route path="aufbewahrung" element={<div>Sektionsinhalt Aufbewahrung</div>} />
         <Route path="module" element={<div>Sektionsinhalt Module</div>} />
+        <Route path="pegel" element={<div>Sektionsinhalt Pegel</div>} />
       </Route>
     </Routes>,
     { route },
@@ -79,13 +80,14 @@ describe('EinsatzEinstellungenPage (Sektions-Layout)', () => {
     vi.mocked(ladeEinstellungen).mockResolvedValue(EINSTELLUNGEN as never);
   });
 
-  it('zeigt die vier Sektionen als Reiter und den Inhalt der aktiven', async () => {
+  it('zeigt die fünf Sektionen als Reiter und den Inhalt der aktiven', async () => {
     rendern();
 
     expect(await screen.findByRole('tab', { name: 'Allgemein' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Verhalten & Automatik' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Aufbewahrung' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Module' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Pegel' })).toBeInTheDocument();
     expect(screen.getByText('Sektionsinhalt Allgemein')).toBeInTheDocument();
   });
 

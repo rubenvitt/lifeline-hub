@@ -25,6 +25,27 @@ import {
   OFFLINE_SCHREIBAKTION_GESENDET_EVENT,
 } from '../offline/ereignisse';
 import { useOfflineSync } from '../offline/useOfflineSync';
+import type { KartenflaecheProps } from './lagekarte/Kartenflaeche';
+
+/**
+ * Die echte Karte braucht WebGL (MapLibre), jsdom hat keins — Stub nach dem Muster von
+ * `LagekartePage.test.tsx`. Er macht sichtbar, WAS die Kartenansicht der Betroffenen an
+ * die Karte übergibt (Marker samt Beschriftung, Startausschnitt), und bietet je Marker einen
+ * Knopf, der den Klick so meldet wie die echte Karte. Ob die Marker tatsächlich gezeichnet
+ * werden, belegt `e2e/betroffene-karte.spec.ts` über `window.__lfhKarte`.
+ */
+vi.mock('./lagekarte/Kartenflaeche', () => ({
+  default: (props: Partial<KartenflaecheProps>) => (
+    <div data-testid="kartenflaeche-stub">
+      <div data-testid="startansicht">{JSON.stringify(props.startAnsicht ?? null)}</div>
+      {(props.markers ?? []).map((m) => (
+        <button key={m.schluessel} onClick={() => props.onMarkerKlick?.(m.schluessel)}>
+          marker-{m.schluessel}: {m.label}
+        </button>
+      ))}
+    </div>
+  ),
+}));
 
 class FakeEventSource {
   url: string;
@@ -891,6 +912,7 @@ describe('PersonenPage', () => {
       registrier_nr: 21,
       status: 'betroffen' as const,
       aktueller_verbleib: 'Transport → KH Nord',
+      aktuelle_verbleib_art: 'transport' as const,
     };
     const inUhs = {
       ...person,
@@ -933,6 +955,7 @@ describe('PersonenPage', () => {
       registrier_nr: 23,
       status: 'betroffen' as const,
       aktueller_verbleib: 'entlassen',
+      aktuelle_verbleib_art: 'entlassung' as const,
     };
     render(einsatzAktiv, [person, vollstaendig, unbekannt]);
     const offen = (await screen.findByText('R-001')).closest('tr')!;
@@ -986,8 +1009,8 @@ describe('PersonenPage', () => {
     await screen.findByText('R-001');
     const ansicht = screen.getByRole('radiogroup', { name: 'Ansicht' });
     expect(within(ansicht).getByRole('radio', { name: 'Zeilen' })).toBeChecked();
-    // „Karte" gibt es nicht — an der Person gibt es keine Koordinate (LFH-613).
-    expect(within(ansicht).queryByRole('radio', { name: 'Karte' })).not.toBeInTheDocument();
+    // Die dritte Ansicht ist die Karte der Fundorte (LFH-613) — eigener Test unten.
+    expect(within(ansicht).getByRole('radio', { name: 'Karte' })).not.toBeChecked();
 
     await userEvent.click(within(ansicht).getByRole('radio', { name: 'Sichtungsraster' }));
     expect(
@@ -1360,14 +1383,57 @@ describe('PersonenPage', () => {
       render(einsatzAktiv, []);
       await userEvent.type(
         await screen.findByRole('textbox', { name: 'Kurzeingabe Person' }),
-        'Meier #52.1/9.3 sk3',
+        'Meier #52.1 sk3',
       );
       await userEvent.keyboard('{Enter}');
       expect(await screen.findByRole('alert')).toHaveTextContent(
-        /Nicht erfasst: .*eine Koordinate an der Person gibt es nicht/,
+        /Nicht erfasst: .*Koordinate unbrauchbar/,
       );
       expect(post).not.toHaveBeenCalled();
-      expect(feld()).toHaveValue('Meier #52.1/9.3 sk3');
+      expect(feld()).toHaveValue('Meier #52.1 sk3');
+    });
+
+    it('schickt die Koordinate aus „#lat/lon“ im SELBEN POST (LFH-613, Spec-Szenario)', async () => {
+      let koerper: Record<string, unknown> | undefined;
+      server.use(
+        http.post('/api/einsaetze/1/personen', async ({ request }) => {
+          koerper = (await request.json()) as Record<string, unknown>;
+          return HttpResponse.json(
+            {
+              ...person,
+              id: 63,
+              registrier_nr: 63,
+              status: 'betroffen',
+              name: 'Kowalski',
+              vorname: 'Anna',
+              aktuelle_sichtung: 'sk3',
+              antreff_lat: 52.2691,
+              antreff_lon: 9.1342,
+            },
+            { status: 201 },
+          );
+        }),
+      );
+      render(einsatzAktiv, []);
+      const zeile = await screen.findByRole('textbox', { name: 'Kurzeingabe Person' });
+      // Die leere Zeile nennt das Kürzel — sonst wäre es nur über den Code auffindbar.
+      expect(screen.getByText('#Koordinate (52.2691/9.1342)')).toBeInTheDocument();
+      await userEvent.type(zeile, 'Kowalski, Anna w 34 sk3 #52.2691/9.1342');
+      expect(document.querySelector('[data-lfh="erkannt"]')).toHaveTextContent('#52.2691/9.1342');
+      await userEvent.keyboard('{Enter}');
+      await vi.waitFor(() => expect(koerper).toBeDefined());
+      expect(koerper).toMatchObject({
+        name: 'Kowalski',
+        vorname: 'Anna',
+        geschlecht: 'weiblich',
+        alter_geschaetzt: 34,
+        sichtung: 'sk3',
+        antreff_lat: 52.2691,
+        antreff_lon: 9.1342,
+        client_id: expect.any(String),
+      });
+      // Der Name bleibt frei von der Koordinate.
+      expect(koerper!.name).toBe('Kowalski');
     });
 
     it('tut bei leerer Eingabe nichts — kein POST, keine Meldung', async () => {
@@ -1481,6 +1547,20 @@ describe('PersonenPage — Sichtvorgabe aus der URL (LFH-620)', () => {
     await vi.waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
   });
 
+  it('?ansicht=karte öffnet die Kartenansicht und räumt den Parameter', async () => {
+    server.use(
+      http.get('/api/karte/config', () => HttpResponse.json({})),
+      http.get('/api/einsaetze/1/karten-ansichten', () => HttpResponse.json([])),
+    );
+    renderMitSuche('/einsaetze/1/personen?ansicht=karte');
+    // Keine der beiden Personen trägt eine Koordinate, der Einsatz keinen Ort: Leerzustand,
+    // und die Lücke ist gezählt — nur die ANGETROFFENE, die vermisste hat keinen Fundort.
+    expect(await screen.findByText('Keine Person mit Koordinate')).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Karte' })).toBeChecked();
+    expect(screen.getByText('1 Person ohne Koordinate — nicht auf der Karte')).toBeInTheDocument();
+    await vi.waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
+  });
+
   it('räumt einen unbrauchbaren Wert, ohne die Sicht zu verbiegen', async () => {
     // Behält andere Parameter: nur der Sichtauftrag wird geräumt.
     renderMitSuche('/einsaetze/1/personen?filter=patienten&x=1');
@@ -1488,5 +1568,142 @@ describe('PersonenPage — Sichtvorgabe aus der URL (LFH-620)', () => {
     expect(screen.getByRole('tab', { name: 'Alle', selected: true })).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: 'Zeilen' })).toBeChecked();
     await vi.waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent('?x=1'));
+  });
+});
+
+/**
+ * Kartenansicht der Betroffenen (LFH-613, design D7) — mit gestubbter `Kartenflaeche`
+ * (Kopf der Datei). Die Marker-Auswahl selbst prüft `personen/personenKarte.test.ts` ohne
+ * Render; hier geht es um den Weg durch die Seite: wählbar, lazy geladen, die richtigen
+ * Marker übergeben, die Lücke genannt, der Klick führt zur Detailseite.
+ */
+describe('PersonenPage — Kartenansicht (LFH-613)', () => {
+  function Ort() {
+    return <output data-testid="ort">{useLocation().pathname}</output>;
+  }
+
+  function renderKarte(
+    personen: unknown[],
+    einsatzObj: Omit<typeof einsatzAktiv, 'einsatzort_lat' | 'einsatzort_lon'> & {
+      einsatzort_lat: number | null;
+      einsatzort_lon: number | null;
+    } = einsatzAktiv,
+  ) {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
+      http.get('/api/einsaetze/1/personen', () => HttpResponse.json(personen)),
+      http.get('/api/einsaetze/1/tiere', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
+      http.get('/api/karte/config', () => HttpResponse.json({})),
+      http.get('/api/einsaetze/1/karten-ansichten', () => HttpResponse.json([])),
+    );
+    return renderMitProviders(
+      <AuthProvider>
+        <Ort />
+        <Routes>
+          <Route path="/einsaetze/:id/personen" element={<PersonenPage />} />
+          <Route path="/einsaetze/:id/personen/:personId" element={<p>Detailseite</p>} />
+        </Routes>
+      </AuthProvider>,
+      { route: '/einsaetze/1/personen' },
+    );
+  }
+
+  const mitKoordinate = (id: number, reg: number, extra: Partial<Person> = {}): Person => ({
+    ...person,
+    id,
+    registrier_nr: reg,
+    status: 'betroffen',
+    antreff_lat: 52.26 + id / 1000,
+    antreff_lon: 9.13,
+    ...extra,
+  });
+
+  async function waehleKarte() {
+    await screen.findByText('R-001');
+    const ansicht = screen.getByRole('radiogroup', { name: 'Ansicht' });
+    await userEvent.click(within(ansicht).getByRole('radio', { name: 'Karte' }));
+  }
+
+  it('zeigt zwei Marker mit Registriernummer und Sichtung und nennt „3 ohne Koordinate“ (Spec-Szenario)', async () => {
+    const personen = [
+      person, // R-001, ohne Koordinate
+      { ...unbekannt }, // R-002, vermisst: kein Fundort, also auch keine Lücke
+      { ...person, id: 12, registrier_nr: 7 }, // R-007, ohne Koordinate
+      { ...person, id: 15, registrier_nr: 3, antreff_lat: 52.1, antreff_lon: null }, // halbes Paar
+      mitKoordinate(20, 4, { aktuelle_sichtung: 'sk2' }),
+      mitKoordinate(21, 5),
+      // Storniert: weder Marker noch Lücke.
+      mitKoordinate(22, 6, { storniert_at: '2026-05-27 10:00:00' }),
+    ];
+    renderKarte(personen);
+    await waehleKarte();
+
+    expect(await screen.findByTestId('kartenflaeche-stub')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'marker-person-20: R-004 · SK II' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'marker-person-21: R-005 · ohne Sichtung' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /marker-person-22/ })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /^marker-person-/ })).toHaveLength(2);
+    expect(
+      screen.getByText('3 Personen ohne Koordinate — nicht auf der Karte'),
+    ).toBeInTheDocument();
+    // Startausschnitt: Rahmen um die zwei Personen, nicht die Weltübersicht.
+    expect(JSON.parse(screen.getByTestId('startansicht').textContent ?? 'null')).toMatchObject({
+      art: 'rahmen',
+    });
+    // Die Liste ist in dieser Ansicht nicht gerendert — die Karte ERSETZT sie.
+    expect(screen.queryByRole('region', { name: 'Personen' })).not.toBeInTheDocument();
+  });
+
+  it('der Markerklick führt zur Detailseite der Person', async () => {
+    renderKarte([person, mitKoordinate(20, 4)]);
+    await waehleKarte();
+    await userEvent.click(await screen.findByRole('button', { name: /marker-person-20/ }));
+    expect(await screen.findByText('Detailseite')).toBeInTheDocument();
+    expect(screen.getByTestId('ort')).toHaveTextContent('/einsaetze/1/personen/20');
+  });
+
+  it('der Statusfilter gilt auch auf der Karte', async () => {
+    renderKarte([
+      person,
+      mitKoordinate(20, 4, { status: 'betroffen' }),
+      mitKoordinate(21, 5, { status: 'verstorben' }),
+    ]);
+    await waehleKarte();
+    await screen.findByTestId('kartenflaeche-stub');
+    expect(screen.getAllByRole('button', { name: /^marker-person-/ })).toHaveLength(2);
+    await userEvent.click(screen.getByRole('tab', { name: 'Verstorben' }));
+    await vi.waitFor(() =>
+      expect(screen.getAllByRole('button', { name: /^marker-person-/ })).toHaveLength(1),
+    );
+    expect(screen.getByRole('button', { name: /marker-person-21/ })).toBeInTheDocument();
+  });
+
+  it('ohne Person mit Koordinate steht der Einsatzort als Startausschnitt, nicht der Leerzustand', async () => {
+    renderKarte([person], { ...einsatzAktiv, einsatzort_lat: 52.3, einsatzort_lon: 9.2 });
+    await waehleKarte();
+    await screen.findByTestId('kartenflaeche-stub');
+    expect(screen.queryByText('Keine Person mit Koordinate')).not.toBeInTheDocument();
+    expect(JSON.parse(screen.getByTestId('startansicht').textContent ?? 'null')).toMatchObject({
+      art: 'punkt',
+      lat: 52.3,
+      lng: 9.2,
+    });
+    // Der Einsatzort ist kein Personenziel: sein Klick navigiert nicht.
+    await userEvent.click(screen.getByRole('button', { name: /^marker-einsatzort/ }));
+    expect(screen.getByTestId('ort')).toHaveTextContent(/^\/einsaetze\/1\/personen$/);
+    expect(screen.getByText('1 Person ohne Koordinate — nicht auf der Karte')).toBeInTheDocument();
+  });
+
+  it('ohne Koordinate und ohne Einsatzort: Leerzustand statt einer leeren Karte', async () => {
+    renderKarte([person]);
+    await waehleKarte();
+    expect(await screen.findByText('Keine Person mit Koordinate')).toBeInTheDocument();
+    expect(screen.queryByTestId('kartenflaeche-stub')).not.toBeInTheDocument();
   });
 });

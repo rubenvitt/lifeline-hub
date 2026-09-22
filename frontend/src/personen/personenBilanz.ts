@@ -1,4 +1,5 @@
-import type { Person, Sichtungskategorie } from '../api/types';
+import type { Person, Sichtungskategorie, VerbleibArt } from '../api/types';
+import { hatKoordinate } from './koordinate';
 
 /**
  * Die Ableitungen der Betroffenen-Seitenleiste (Neuentwurf S7: „Sichtungsbild",
@@ -13,19 +14,23 @@ import type { Person, Sichtungskategorie } from '../api/types';
  * zählen, meldete genau die Fälle als Versäumnis, in denen niemand etwas versäumt hat.
  * Abgemeldete sind abgeschlossen; eine Lücke dort ist keine Aufgabe mehr.
  *
- *  · ohne Verbleib — kein `aktueller_verbleib` UND keine aktuelle Unfallhilfsstelle. Wer in
- *    einer UHS liegt, ist verortet; „Verbleib offen" hieße dort „wir wissen nicht, wo die
- *    Person ist", und das stimmt nicht.
- *  · ohne Fundort  — `antreff_ort` leer.
+ *  · ohne Verbleib — keine Verbleib-Art UND keine aktuelle Unfallhilfsstelle. Wer in einer
+ *    UHS liegt, ist verortet; „Verbleib offen" hieße dort „wir wissen nicht, wo die Person
+ *    ist", und das stimmt nicht.
+ *  · ohne Fundort  — weder `antreff_ort` (Freitext) noch eine Fundort-Koordinate. Eine der
+ *    beiden genügt: die Koordinate aus `#52.2691/9.1342` IST der Fundort, auch ohne Wort.
  *
- * ── VERBLEIB IST EINE KURZFORM, KEINE STRUKTUR ──────────────────────────────────────────
+ * ── VERBLEIB IST STRUKTUR, NICHT DIE KURZFORM ───────────────────────────────────────────
  *
- * `aktueller_verbleib` ist ein Cache-Text, den das Backend ausschließlich über
- * `VerbleibArt::kurzform` schreibt (`src/person/mod.rs`): `Transport → <Ziel>` bzw.
- * `Transport`, `entlassen`, `vor Ort`, `verstorben`. Die Art ist daraus sauber ableitbar;
- * das Ziel NICHT als eigene Achse — ein strukturierter Verbleib fehlt (LFH-613), also wird
- * nicht nach Klinik aufgegliedert. Ein Text außerhalb der vier Formen fällt auf
- * „sonstiger" statt still in eine der Arten.
+ * Gezählt wird nach `aktuelle_verbleib_art` (LFH-613, Cache des jüngsten Verbleib-Ereignisses,
+ * in derselben Transaktion gepflegt). Die Kurzform `aktueller_verbleib` bleibt Anzeigetext
+ * und wird hier NICHT mehr zurückgeparst — ein Ziel mit „→" oder eine neue Art hätte den
+ * Parser still auf „sonstiger" fallen lassen. Das Ziel (Klinik, Unterkunft) ist gespeichert,
+ * wird aber bewusst nicht aufgegliedert: die Zählung beantwortet „wohin", nicht „in welches
+ * Haus".
+ *
+ * Präzedenz je Person: Verbleib-Art vor Unfallhilfsstelle vor „offen" — trägt eine Person
+ * beides (etwa „vor Ort" und noch eine UHS-Belegung), zählt die Art.
  */
 
 /** Angetroffen = eine Person, bei der Fundort und Verbleib erwartbar sind. */
@@ -44,14 +49,19 @@ export interface Luecken {
 
 type LueckenFelder = Pick<
   Person,
-  'status' | 'aktueller_verbleib' | 'aktuelle_uhs_id' | 'antreff_ort'
+  | 'status'
+  | 'aktuelle_verbleib_art'
+  | 'aktuelle_uhs_id'
+  | 'antreff_ort'
+  | 'antreff_lat'
+  | 'antreff_lon'
 >;
 
 export function lueckenVon(p: LueckenFelder): Luecken {
   if (!istAngetroffen(p)) return { verbleib: false, fundort: false };
   return {
-    verbleib: leer(p.aktueller_verbleib) && p.aktuelle_uhs_id == null,
-    fundort: leer(p.antreff_ort),
+    verbleib: verbleibKlasse(p) === 'offen',
+    fundort: leer(p.antreff_ort) && !hatKoordinate(p),
   };
 }
 
@@ -68,35 +78,30 @@ export function lueckenText(l: Luecken): string | null {
 
 // ── Verbleib ────────────────────────────────────────────────────────────────────────────
 
-export type VerbleibKlasse =
-  'transport' | 'entlassen' | 'vor_ort' | 'verstorben' | 'sonstig' | 'uhs' | 'offen';
-
-/** Kurzform → Art. Pinnt die vier Backend-Formen (Test). */
-export function verbleibArtAus(kurzform: string): Exclude<VerbleibKlasse, 'uhs' | 'offen'> {
-  const t = kurzform.trim();
-  if (t === 'Transport' || t.startsWith('Transport →')) return 'transport';
-  if (t === 'entlassen') return 'entlassen';
-  if (t === 'vor Ort') return 'vor_ort';
-  if (t === 'verstorben') return 'verstorben';
-  return 'sonstig';
-}
+export type VerbleibKlasse = VerbleibArt | 'uhs' | 'offen';
 
 export function verbleibKlasse(
-  p: Pick<Person, 'aktueller_verbleib' | 'aktuelle_uhs_id'>,
+  p: Pick<Person, 'aktuelle_verbleib_art' | 'aktuelle_uhs_id'>,
 ): VerbleibKlasse {
-  if (!leer(p.aktueller_verbleib)) return verbleibArtAus(p.aktueller_verbleib!);
+  if (p.aktuelle_verbleib_art != null) return p.aktuelle_verbleib_art;
   if (p.aktuelle_uhs_id != null) return 'uhs';
   return 'offen';
 }
 
+/** Exhaustiv über `VerbleibArt`: eine neue Art bricht den Typcheck statt still zu fehlen. */
 const VERBLEIB_LABEL: Record<Exclude<VerbleibKlasse, 'uhs'>, string> = {
   transport: 'Transport',
-  entlassen: 'entlassen',
+  notunterkunft: 'Notunterkunft',
+  entlassung: 'entlassen',
   vor_ort: 'vor Ort',
   verstorben: 'verstorben',
-  sonstig: 'sonstiger',
   offen: 'offen',
 };
+
+/** Wort einer Verbleib-Art — Rückfall der Anzeige, wenn die Kurzform fehlt. */
+export function verbleibLabel(art: VerbleibArt): string {
+  return VERBLEIB_LABEL[art];
+}
 
 export interface VerbleibPosten {
   schluessel: string;
@@ -136,6 +141,32 @@ export function verbleibZaehlung(
     ...posten,
     { schluessel: 'offen', label: VERBLEIB_LABEL.offen, wert: offen, offen: true },
   ];
+}
+
+/**
+ * „Transportiert / offen" (Lage-Dashboard, Fuß des Sichtungspaneels; Neuentwurf S3).
+ *
+ *  · transportiert — angetroffen, Verbleib-Art `transport` und Status NICHT `angemeldet`.
+ *    Eine Voranmeldung an der Klinik ist kein erledigter Transport; ohne Statusangabe
+ *    zählt der Transport (das Ereignis ist erfasst, nur nicht fortgeschrieben).
+ *  · offen — dieselbe Lücke „Verbleib offen" wie auf der Betroffenen-Seite
+ *    ({@link lueckenVon}): angetroffen, ohne Verbleib-Art und ohne Unfallhilfsstelle.
+ */
+export function transportBilanz(
+  alle: readonly Pick<
+    Person,
+    'status' | 'aktuelle_verbleib_art' | 'aktueller_verbleib_status' | 'aktuelle_uhs_id'
+  >[],
+): { transportiert: number; offen: number } {
+  let transportiert = 0;
+  let offen = 0;
+  for (const p of alle) {
+    if (!istAngetroffen(p)) continue;
+    const k = verbleibKlasse(p);
+    if (k === 'transport' && p.aktueller_verbleib_status !== 'angemeldet') transportiert++;
+    else if (k === 'offen') offen++;
+  }
+  return { transportiert, offen };
 }
 
 // ── Offene Felder ───────────────────────────────────────────────────────────────────────

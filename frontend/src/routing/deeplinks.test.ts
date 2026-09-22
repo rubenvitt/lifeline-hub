@@ -152,9 +152,11 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
     expect(parsePersonenSicht(new URLSearchParams('filter=patienten&ansicht=raster'))).toEqual({
       ansicht: 'raster',
     });
-    expect(parsePersonenSicht(new URLSearchParams('filter=vermisst&ansicht=karte'))).toEqual({
+    expect(parsePersonenSicht(new URLSearchParams('filter=vermisst&ansicht=globus'))).toEqual({
       filter: 'vermisst',
     });
+    // „karte" ist seit LFH-613 eine Ansicht (Kartenansicht der Betroffenen).
+    expect(parsePersonenSicht(new URLSearchParams('ansicht=karte'))).toEqual({ ansicht: 'karte' });
     expect(parsePersonenSicht(new URLSearchParams(''))).toEqual({});
   });
   it('lagekartePfad mit Platzier-Auftrag', () => {
@@ -187,7 +189,16 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
     expect(parsePlatzierenAuftrag('schaden:abc')).toBeNull();
     expect(parsePlatzierenAuftrag('schaden:0')).toBeNull();
     expect(parsePlatzierenAuftrag('schaden:-1')).toBeNull();
-    expect(parsePlatzierenAuftrag('person:7')).toBeNull();
+    expect(parsePlatzierenAuftrag('tier:7')).toBeNull();
+    expect(parsePlatzierenAuftrag('person:x')).toBeNull();
+    // Kein Prototyp-Schlüssel schlüpft als Typ durch.
+    expect(parsePlatzierenAuftrag('toString:7')).toBeNull();
+  });
+  it('der Platzier-Auftrag „person“ überlebt den Weg durch die URL (LFH-613)', () => {
+    const pfad = lagekartePfad(E, { platzieren: { typ: 'person', id: 42 } });
+    const wert = new URL(pfad, 'http://x').searchParams.get('platzieren');
+    expect(wert).toBe('person:42');
+    expect(parsePlatzierenAuftrag(wert)).toEqual({ typ: 'person', id: 42 });
   });
   it('Hin- und Rückweg passen zusammen', () => {
     // Die belastbare Aussage über das Paar: der Builder erzeugt, was der Parser liest.
@@ -336,13 +347,14 @@ describe('einsatzEinstellungenPfad (LFH-345 · C10, H15/M15)', () => {
     expect(einsatzEinstellungenPfad(E)).toBe('/einsaetze/5/einstellungen/allgemein');
   });
 
-  it('baut alle vier Sektionen', () => {
+  it('baut alle fünf Sektionen', () => {
     expect(einsatzEinstellungenPfad(E, 'allgemein')).toBe('/einsaetze/5/einstellungen/allgemein');
     expect(einsatzEinstellungenPfad(E, 'verhalten')).toBe('/einsaetze/5/einstellungen/verhalten');
     expect(einsatzEinstellungenPfad(E, 'aufbewahrung')).toBe(
       '/einsaetze/5/einstellungen/aufbewahrung',
     );
     expect(einsatzEinstellungenPfad(E, 'module')).toBe('/einsaetze/5/einstellungen/module');
+    expect(einsatzEinstellungenPfad(E, 'pegel')).toBe('/einsaetze/5/einstellungen/pegel');
   });
 
   /**
@@ -356,6 +368,7 @@ describe('einsatzEinstellungenPfad (LFH-345 · C10, H15/M15)', () => {
       'verhalten',
       'aufbewahrung',
       'module',
+      'pegel',
     ]);
     expect(einsatzEinstellungenPfad(E, EINSTELLUNGEN_SEKTIONEN[0].key)).toBe(
       einsatzEinstellungenPfad(E),

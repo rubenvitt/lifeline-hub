@@ -149,6 +149,7 @@ fn serde_wire_gleich_as_str() {
         Entlassung,
         VorOrt,
         Verstorben,
+        Notunterkunft,
     });
     enum_wire_as_str!(lifeline_hub::person::VerbleibStatus {
         Angemeldet,
@@ -227,6 +228,12 @@ fn serde_wire_gleich_as_str() {
 
     // katalog
     enum_wire_as_str!(lifeline_hub::katalog::Betriebsart { Tmo, Dmo });
+    enum_wire_as_str!(lifeline_hub::einheit::EinheitStatusQuelle {
+        Fahrzeuge,
+        Gemischt,
+        Hand,
+        Ohne,
+    });
     enum_wire_as_str!(lifeline_hub::katalog::StatusKategorie {
         Verfuegbar,
         Gebunden,
@@ -325,6 +332,13 @@ fn serde_wire_gleich_as_str() {
         Unterwegs,
         Eingetroffen,
         Abgelehnt,
+    });
+
+    // einsatzabschnitt
+    enum_wire_as_str!(lifeline_hub::einsatzabschnitt::AbschnittLagezustand {
+        Planmaessig,
+        Angespannt,
+        Kritisch,
     });
 
     // einsatz

@@ -4,6 +4,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, vi } from 'vitest';
 import { cleanup, configure } from '@testing-library/react';
 import { server } from './server';
 import { installiereMatchMedia, setzeViewportZurueck } from './viewport';
+import { installiereCssVariablenFilter } from './antdCssVariablen';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 
@@ -73,6 +74,13 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
 // Stub hier lieferte für jede Abfrage `matches: false` und machte damit jede Behauptung
 // über responsives Verhalten zur Attrappe. Details und Setter: ./viewport.
 installiereMatchMedia();
+
+// antd 6 hängt an jedes Bedienelement `css-var-root` samt 464 `--ant-*`-Variablen, und
+// jsdoms `getComputedStyle` zahlt je Element für jede davon — auch aus dem Cache. Ein
+// `getByRole` auf der Lagekarte kostete so 2,4–2,6 s (LFH-623). Der Filter streicht nur die
+// Variablen-DEKLARATIONEN aus antds eingehängten Stilen; jsdom löst `var()` ohnehin nicht
+// auf, an keiner berechneten Standard-Eigenschaft ändert sich etwas. Details: ./antdCssVariablen
+installiereCssVariablenFilter();
 
 // Web-Storage-Polyfill: jsdom liefert hier kein localStorage, und Node 26 stellt sein
 // experimentelles globales localStorage ohne `--localstorage-file` als undefined bereit

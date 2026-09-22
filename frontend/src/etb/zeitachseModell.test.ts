@@ -15,6 +15,7 @@ import {
   teileZufluss,
   typBilanz,
   typSegmente,
+  hatVerknuepfung,
   verweisStil,
 } from './zeitachseModell';
 
@@ -28,6 +29,7 @@ function e(over: Partial<EtbEintragAnzeige>): EtbEintragAnzeige {
     erfasser_name: 'M',
     ereigniszeit: '2026-05-23 10:00:00',
     received_at: '2026-05-23 10:00:00',
+    folgeauftraege: [],
     ...over,
   };
 }
@@ -279,5 +281,15 @@ describe('verweisStil', () => {
     expect(verweisStil({ controlHeight: 30 }).minHeight).toBe(30);
     expect(verweisStil({ controlHeight: 72 }).minHeight).toBe(72);
     expect(verweisStil({ controlHeight: 30 }).display).toBe('inline-flex');
+  });
+});
+
+describe('hatVerknuepfung (LFH-636)', () => {
+  it('kennt jeden Rückverweis und die Folgeaufträge als eigenen Grund', () => {
+    expect(hatVerknuepfung(e({}))).toBe(false);
+    expect(hatVerknuepfung(e({ befehl_id: 1 }))).toBe(true);
+    expect(hatVerknuepfung(e({ lagebericht_id: 1 }))).toBe(true);
+    expect(hatVerknuepfung(e({ auftrag_id: 1 }))).toBe(true);
+    expect(hatVerknuepfung(e({ folgeauftraege: [{ id: 3, lfd_nr: 1 }] }))).toBe(true);
   });
 });
