@@ -17,6 +17,8 @@ export interface EtbFilterWerte {
   von?: string;
   bis?: string;
   erfasser_id?: number;
+  /** „Betrifft Einheit" (LFH-616): Auftrag an die Einheit ODER ihr Name in von/an. */
+  einheit_id?: number;
 }
 
 export interface EtbAbfrage extends EtbFilterWerte {
@@ -31,6 +33,7 @@ export function listeEtb(einsatzId: number, params: EtbAbfrage = {}): Promise<Et
   if (params.von) qs.set('von', params.von);
   if (params.bis) qs.set('bis', params.bis);
   if (params.erfasser_id != null) qs.set('erfasser_id', String(params.erfasser_id));
+  if (params.einheit_id != null) qs.set('einheit_id', String(params.einheit_id));
   if (params.before_lfd_nr != null) qs.set('before_lfd_nr', String(params.before_lfd_nr));
   qs.set('limit', String(params.limit ?? SEITENGROESSE));
   return apiGet<EtbEintragAnzeige[]>(`/api/einsaetze/${einsatzId}/etb?${qs.toString()}`);

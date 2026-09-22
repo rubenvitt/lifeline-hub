@@ -924,6 +924,136 @@ async fn liste_cursor_pagination() {
     assert_eq!(seite2[0]["lfd_nr"], 2);
 }
 
+/// POST mit JSON-Body für die Einheit-Filter-Tests; liefert die `id` der Antwort.
+async fn anlegen_id(app: &axum::Router, cookie: &str, pfad: &str, body: Value) -> i64 {
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(pfad)
+                .header(header::CONTENT_TYPE, "application/json")
+                .header(header::COOKIE, cookie.to_string())
+                .body(Body::from(body.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::CREATED, "{pfad}");
+    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    serde_json::from_slice::<Value>(&bytes).unwrap()["id"]
+        .as_i64()
+        .unwrap()
+}
+
+fn inhalte(json: &Value) -> Vec<String> {
+    let mut v: Vec<String> = json
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|e| e["inhalt"].as_str().unwrap().to_string())
+        .collect();
+    v.sort();
+    v
+}
+
+/// LFH-616: „betrifft Einheit" trägt über ZWEI Wege — den Auftrag an die Einheit
+/// (Fremdschlüssel) und den Namen in von/an (freier Funkverkehr). Beides muss treffen,
+/// eine andere Einheit und ein bloß im Text genannter Name nicht.
+#[tokio::test]
+async fn liste_einheit_filter_ueber_auftrag_und_von_an() {
+    let (app, _live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+    let einheiten = format!("/api/einsaetze/{einsatz}/einheiten");
+    let zug = anlegen_id(
+        &app,
+        &admin,
+        &einheiten,
+        serde_json::json!({"name": "1. Zug"}),
+    )
+    .await;
+    let andere = anlegen_id(
+        &app,
+        &admin,
+        &einheiten,
+        serde_json::json!({"name": "2. Zug"}),
+    )
+    .await;
+
+    anlegen_id(
+        &app,
+        &admin,
+        &format!("/api/einsaetze/{einsatz}/auftraege"),
+        serde_json::json!({
+            "auftrag_text": "Deich sichern",
+            "empfaenger": [{ "empfaenger_typ": "einheit", "einheit_id": zug }]
+        }),
+    )
+    .await;
+    for body in [
+        r#"{"typ":"meldung","inhalt":"von-treffer","von":" 1. zug "}"#,
+        r#"{"typ":"meldung","inhalt":"an-treffer","an":"1. Zug"}"#,
+        r#"{"typ":"meldung","inhalt":"andere","von":"2. Zug"}"#,
+        r#"{"typ":"meldung","inhalt":"nur im Text: 1. Zug"}"#,
+    ] {
+        eintrag_erfassen(&app, &admin, einsatz, body).await;
+    }
+
+    let (status, json) = etb_abrufen(&app, &admin, einsatz, &format!("einheit_id={zug}")).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        inhalte(&json),
+        vec!["Deich sichern", "an-treffer", "von-treffer"]
+    );
+
+    let (_, json) = etb_abrufen(&app, &admin, einsatz, &format!("einheit_id={andere}")).await;
+    assert_eq!(inhalte(&json), vec!["andere"]);
+}
+
+/// Eine Einheit aus einem FREMDEN Einsatz trifft nichts — auch wenn der Name gleich ist.
+#[tokio::test]
+async fn liste_einheit_filter_fremder_einsatz_ist_leer() {
+    let (app, _live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+    let fremd = einsatz_anlegen(&app, &admin, "Fremd").await;
+    let fremde_einheit = anlegen_id(
+        &app,
+        &admin,
+        &format!("/api/einsaetze/{fremd}/einheiten"),
+        serde_json::json!({"name": "1. Zug"}),
+    )
+    .await;
+    eintrag_erfassen(
+        &app,
+        &admin,
+        einsatz,
+        r#"{"typ":"meldung","inhalt":"x","von":"1. Zug"}"#,
+    )
+    .await;
+
+    let (status, json) = etb_abrufen(
+        &app,
+        &admin,
+        einsatz,
+        &format!("einheit_id={fremde_einheit}"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(json.as_array().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn liste_einheit_filter_nicht_numerisch_ist_400() {
+    let (app, _live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+
+    let (status, _) = etb_abrufen(&app, &admin, einsatz, "einheit_id=abc").await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}
+
 #[tokio::test]
 async fn liste_ungueltiger_typ_filter_ist_400() {
     let (app, _live) = setup().await;

@@ -1,5 +1,5 @@
 import { DatePicker, Input, Space } from 'antd';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { EtbFilterWerte } from '../api/etb';
 import { abstand } from '../theme/tokens';
 import { alsBackendZeit, alsOrtszeit } from './filterZeit';
@@ -53,12 +53,19 @@ interface Props {
    * Aufbau — die Leiste ist danach die Quelle des sichtbaren Standes.
    */
   startWerte?: EtbFilterWerte;
+  /**
+   * Kontrollierte Filter der SEITE, die in derselben Zeile stehen sollen (LFH-616: die
+   * Einheit). Sie sind hier nur zu Gast — die Leiste meldet sie nicht, ihre Quelle ist die
+   * URL wie beim Typ oben; sonst liefe die Zwei-Quellen-Frage aus dem Dateikopf ein drittes
+   * Mal.
+   */
+  zusatz?: ReactNode;
 }
 
 /** Frist der Volltext-Entprellung. ~300 ms ist die Vorgabe aus dem Befund M80. */
 const ENTPRELLUNG_MS = 300;
 
-export default function EtbFilterleiste({ onChange, startWerte }: Props) {
+export default function EtbFilterleiste({ onChange, startWerte, zusatz }: Props) {
   const [werte, setWerte] = useState<LeistenFilter>({
     q: startWerte?.q,
     von: startWerte?.von,
@@ -114,6 +121,7 @@ export default function EtbFilterleiste({ onChange, startWerte }: Props) {
         defaultValue={alsOrtszeit(startWerte?.bis)}
         onChange={(d) => aktualisiere({ bis: d ? alsBackendZeit(d) : undefined })}
       />
+      {zusatz}
     </Space>
   );
 }

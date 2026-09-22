@@ -23,6 +23,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import EtbZeitachse from '../etb/EtbZeitachse';
 import EtbBilanz from '../etb/EtbBilanz';
 import EtbLesemarkeBanner from '../etb/EtbLesemarkeBanner';
+import { Select } from '../components/Select';
 import EtbFilterleiste, { type LeistenFilter } from '../etb/EtbFilterleiste';
 import WiedervorlageModal from '../etb/WiedervorlageModal';
 import AuftragAusEtbModal from '../etb/AuftragAusEtbModal';
@@ -398,7 +399,7 @@ export default function EtbPage() {
   const leerInhalt = filterAktiv ? (
     <SeitenLeer
       titel="Kein Eintrag passt zum Filter"
-      hinweis="Zeitraum, Typ oder Suchbegriff einschränken — oder den Filter zurücksetzen."
+      hinweis="Zeitraum, Typ, Einheit oder Suchbegriff einschränken — oder den Filter zurücksetzen."
       aktion={{ label: 'Filter zurücksetzen', onClick: filterZuruecksetzen }}
     />
   ) : darfSchreiben ? (
@@ -415,6 +416,16 @@ export default function EtbPage() {
       hinweis="Sobald jemand mit Schreibrecht etwas einträgt, erscheint es hier."
     />
   );
+
+  /**
+   * Die Einheiten als Filterwahl. Steht eine Einheit in der URL, die (noch) nicht in der
+   * Liste ist — sie lädt noch, oder sie wurde aufgelöst —, bekommt sie eine eigene Zeile:
+   * sonst zeigte der Select die rohe Zahl als Beschriftung.
+   */
+  const einheitOptionen = (einheitenQuery.data ?? []).map((e) => ({ value: e.id, label: e.name }));
+  if (filter.einheit_id != null && !einheitOptionen.some((o) => o.value === filter.einheit_id)) {
+    einheitOptionen.push({ value: filter.einheit_id, label: `Einheit ${filter.einheit_id}` });
+  }
 
   const breit = abBreite('xl');
   const puffer = pufferZustand(ausstehend, abgelehnt);
@@ -492,7 +503,24 @@ export default function EtbPage() {
               oben als Segmentleiste. Entprellung und die Weiche „eigene gegen fremde
               Änderung" bleiben (`EtbFilterleiste`, Effekt oben). */}
           <div ref={filterWurzel}>
-            <EtbFilterleiste key={filterMarke} startWerte={filter} onChange={leisteGeaendert} />
+            <EtbFilterleiste
+              key={filterMarke}
+              startWerte={filter}
+              onChange={leisteGeaendert}
+              zusatz={
+                // Kontrolliert aus der URL wie die Typleiste — Ziel des Knopfs „ETB ↗" an
+                // der Einheit auf der Lagekarte (LFH-616). Kein Entprellen: ein Sprungwert.
+                <Select<number>
+                  aria-label="Nach Einheit filtern"
+                  placeholder="Einheit"
+                  allowClear
+                  style={{ minWidth: 180 }}
+                  value={filter.einheit_id}
+                  options={einheitOptionen}
+                  onChange={(id) => filterAendern({ einheit_id: id ?? undefined })}
+                />
+              }
+            />
           </div>
 
           {/* Die Meldung steht ÜBER der Zeitachse, statt sie auszutauschen: bereits geladene

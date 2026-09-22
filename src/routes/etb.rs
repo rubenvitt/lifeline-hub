@@ -238,6 +238,8 @@ pub struct EtbAbfrageParams {
     pub bis: Option<String>,
     /// Filter nach Erfasser.
     pub erfasser_id: Option<i64>,
+    /// Filter „betrifft Einheit" (LFH-616, Semantik an `repo::EtbFilter::einheit_id`).
+    pub einheit_id: Option<i64>,
     /// Cursor: nur Einträge mit lfd_nr < diesem Wert.
     pub before_lfd_nr: Option<i64>,
     /// Seitengröße (Default STANDARD_LIMIT, max MAX_LIMIT).
@@ -337,6 +339,7 @@ fn filter_aus(params: EtbAbfrageParams, limit: i64) -> Result<repo::EtbFilter, A
         von_zeit,
         bis_zeit,
         erfasser_id: params.erfasser_id,
+        einheit_id: params.einheit_id,
         before_lfd_nr: params.before_lfd_nr,
         limit,
     })
