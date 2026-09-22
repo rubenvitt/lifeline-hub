@@ -63,6 +63,19 @@ describe('PersonalStatusTab', () => {
     expect(screen.getByText('gebunden')).toBeInTheDocument();
   });
 
+  // Neuentwurf (LFH-621): Farbcode und Sortierung stehen Mono mit `tabular-nums`, das Label
+  // nicht. Die Kategorie ist bereits Fläche (`StatusTag`-Vorgabe, keine Mandantenfarbe).
+  it('setzt Farbcode und Sortierung in die Zahlenschrift, das Label nicht', async () => {
+    render(admin, [{ ...status[0], farbe: '#22aa55' }, status[1]]);
+    await screen.findByText('dienstbereit');
+    for (const wert of ['#22aa55', '20']) {
+      const knoten = screen.getByText(wert);
+      expect(knoten.style.fontFamily).toContain('JetBrains Mono');
+      expect(knoten.style.fontVariantNumeric).toBe('tabular-nums');
+    }
+    expect(screen.getByText('alarmiert').style.fontFamily).toBe('');
+  });
+
   it('Admin sieht „Status anlegen", Nicht-Admin nicht', async () => {
     render(admin);
     await screen.findByText('dienstbereit');
