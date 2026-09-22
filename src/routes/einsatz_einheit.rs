@@ -122,6 +122,8 @@ pub struct EinheitBody {
     pub soll_unterfuehrer: Option<i64>,
     pub soll_mannschaft: Option<i64>,
     pub bemerkung: Option<String>,
+    /// LFH-614: eigener Funkrufname der Einheit (Freitext, leer = nicht gepflegt).
+    pub funkrufname: Option<String>,
     /// LFH-108: Funk/Kommunikation — Freitext-Schlüssel (digitalfunk/mobil/festnetz).
     pub kommunikationsmittel: Option<String>,
     /// LFH-108: Funk/Kommunikation — Rufnummer/Freitext (PII).
@@ -150,6 +152,7 @@ pub async fn bilden(
     )
     .map_err(AppError::Validation)?;
     let bemerkung = trimme(body.bemerkung);
+    let funkrufname = trimme(body.funkrufname);
     let kommunikationsmittel = trimme(body.kommunikationsmittel);
     let erreichbarkeit = trimme(body.erreichbarkeit);
     let anzeige = einheit_repo::anlegen(
@@ -165,6 +168,7 @@ pub async fn bilden(
             soll_unterfuehrer: body.soll_unterfuehrer,
             soll_mannschaft: body.soll_mannschaft,
             bemerkung: bemerkung.as_deref(),
+            funkrufname: funkrufname.as_deref(),
             kommunikationsmittel: kommunikationsmittel.as_deref(),
             erreichbarkeit: erreichbarkeit.as_deref(),
             sortier: body.sortier,
@@ -222,6 +226,8 @@ pub struct EinheitPatchBody {
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub bemerkung: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub funkrufname: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub kommunikationsmittel: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub erreichbarkeit: Option<Option<String>>,
@@ -268,6 +274,7 @@ pub async fn aktualisieren(
     .map_err(AppError::Validation)?;
 
     let bemerkung = trimme_tri(body.bemerkung);
+    let funkrufname = trimme_tri(body.funkrufname);
     let kommunikationsmittel = trimme_tri(body.kommunikationsmittel);
     let erreichbarkeit = trimme_tri(body.erreichbarkeit);
 
@@ -295,6 +302,7 @@ pub async fn aktualisieren(
             soll_unterfuehrer: body.soll_unterfuehrer,
             soll_mannschaft: body.soll_mannschaft,
             bemerkung: bemerkung.as_ref().map(|v| v.as_deref()),
+            funkrufname: funkrufname.as_ref().map(|v| v.as_deref()),
             kommunikationsmittel: kommunikationsmittel.as_ref().map(|v| v.as_deref()),
             erreichbarkeit: erreichbarkeit.as_ref().map(|v| v.as_deref()),
             sortier: body.sortier,
