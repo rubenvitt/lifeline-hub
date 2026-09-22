@@ -45,7 +45,7 @@ dann den Code. Referenz für die Berührpunkte eines neuen Moduls ist der Stab-C
 
 ## 7. Abschluss
 
-- [ ] 7.1 e2e: Route `/abloesung` in `gate1-ueberlauf.spec.ts` (kein waagerechter Überlauf bei 390 px) und `gate3-trefflaeche.spec.ts` (Trefffläche der Kartenaktion über zwei Dichtestufen); verifiziert durch `pnpm e2e` auf diese Specs
-- [ ] 7.2 Prüfliste Einsatztauglichkeit `docs/superpowers/specs/2026-09-22-lfh-635-pruefliste.md` nach dem Muster LFH-46 (15 Kriterien, jede Zeile mit Verdikt und Beleg); verifiziert durch Lesen: keine Zeile „nicht geprüft“
-- [ ] 7.3 Browser-Sichtprüfung im Dev-Stack mit Seeds: Schicht beginnen, Vorgabe verkürzen, Vollzug mit Folgeschicht, Rückgängig, Überblick-Marke, Hell/Dunkel; verifiziert durch Screenshots
+- [x] 7.1 e2e: Route `/abloesung` in `gate1-ueberlauf.spec.ts` (kein waagerechter Überlauf bei 390 px) und `gate3-trefflaeche.spec.ts` (Trefffläche der Kartenaktion über zwei Dichtestufen); verifiziert durch `pnpm e2e` auf diese Specs
+- [x] 7.2 Prüfliste Einsatztauglichkeit `docs/superpowers/specs/2026-09-22-lfh-635-pruefliste.md` nach dem Muster LFH-46 (15 Kriterien, jede Zeile mit Verdikt und Beleg); verifiziert durch Lesen: keine Zeile „nicht geprüft“
+- [x] 7.3 Browser-Sichtprüfung im Dev-Stack mit Seeds: Schicht beginnen, Vorgabe verkürzen, Vollzug mit Folgeschicht, Rückgängig, Überblick-Marke, Hell/Dunkel; verifiziert durch Screenshots
 - [ ] 7.4 Voller Gate-Lauf `./scripts/check-all.sh` grün; verifiziert durch Exit-Code 0
