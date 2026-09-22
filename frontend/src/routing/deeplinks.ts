@@ -201,6 +201,7 @@ const PERSONEN_FILTER_ERLAUBT: Record<PersonenFilter, true> = {
 const PERSONEN_ANSICHT_ERLAUBT: Record<PersonenAnsicht, true> = {
   zeilen: true,
   raster: true,
+  karte: true,
 };
 
 /**
@@ -411,7 +412,15 @@ export function lagekartePfad(
  * steht, muss die Karte auch aus einem Fremd-Link heraus platzieren können. Wer den Typ
  * erweitert, prüft `pages/LagekartePage.tsx` mit — dort wird der Wert zurückgelesen.
  */
-export type PlatzierenZielTyp = 'schaden' | 'uhs';
+export type PlatzierenZielTyp = 'schaden' | 'uhs' | 'person';
+
+/** Exhaustiv: ein neuer Zieltyp bricht den Typcheck, statt im Parser still zu fehlen. */
+const PLATZIEREN_ZIEL_ERLAUBT: Record<PlatzierenZielTyp, true> = {
+  schaden: true,
+  uhs: true,
+  // Fundort-Koordinate einer Person (LFH-613, „Auf Lagekarte verorten" der Detailseite).
+  person: true,
+};
 
 /**
  * Liest den Platzier-Auftrag aus `?platzieren=<typ>:<id>` zurück.
@@ -425,9 +434,9 @@ export function parsePlatzierenAuftrag(
 ): { typ: PlatzierenZielTyp; id: number } | null {
   if (!wert) return null;
   const [typ, roheId] = wert.split(':');
-  if (typ !== 'schaden' && typ !== 'uhs') return null;
+  if (!typ || !Object.prototype.hasOwnProperty.call(PLATZIEREN_ZIEL_ERLAUBT, typ)) return null;
   const id = parseRouteId(roheId);
-  return id == null ? null : { typ, id };
+  return id == null ? null : { typ: typ as PlatzierenZielTyp, id };
 }
 
 // ── Route-Param-Robustheit ───────────────────────────────────────────────────

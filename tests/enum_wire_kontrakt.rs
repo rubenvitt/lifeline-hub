@@ -149,6 +149,7 @@ fn serde_wire_gleich_as_str() {
         Entlassung,
         VorOrt,
         Verstorben,
+        Notunterkunft,
     });
     enum_wire_as_str!(lifeline_hub::person::VerbleibStatus {
         Angemeldet,

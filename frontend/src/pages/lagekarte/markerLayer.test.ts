@@ -236,6 +236,7 @@ describe('sorgeFuerMarkerLayer', () => {
     expect(moves).toEqual([
       'marker-status-ring',
       'marker-kreis',
+      'marker-kurz',
       'marker-label',
       'marker-einsatzort-label',
       'marker-symbol',
@@ -243,6 +244,7 @@ describe('sorgeFuerMarkerLayer', () => {
       'spider-legs-line',
       'spider-status-ring',
       'spider-kreis',
+      'spider-kurz',
       'spider-label',
       'spider-symbol',
     ]);
@@ -254,6 +256,37 @@ describe('sorgeFuerMarkerLayer', () => {
     // Schützt vor stillen Klick-Toten: eine Layer-ID-Umbenennung ohne Nachziehen der Konstante
     // bände den Klick-Handler an einen nicht existierenden Layer — hier rot statt unbemerkt.
     for (const id of MARKER_KLICK_LAYER) expect(layers.has(id)).toBe(true);
+  });
+});
+
+describe('Kurzzeichen im Kreis (LFH-613)', () => {
+  it('trägt das Kurzzeichen als Feature-Property — und nur, wenn der Marker eines hat', () => {
+    const fc = baueMarkerFc([
+      mk({ schluessel: 'person-1', typ: 'person', kurzzeichen: 'II' }),
+      mk({ schluessel: 'uhs-1' }),
+    ]);
+    expect(fc.features[0].properties.kurzzeichen).toBe('II');
+    expect(fc.features[1].properties).not.toHaveProperty('kurzzeichen');
+  });
+
+  it('zeigt es OHNE Mindestzoom und ohne Kollision — anders als die Plakette', () => {
+    const { map, layers } = fakeMap();
+    sorgeFuerMarkerLayer(map as never, leer, leer);
+    for (const id of ['marker-kurz', 'spider-kurz']) {
+      const layer = layers.get(id) as {
+        minzoom?: number;
+        filter: unknown;
+        layout: Record<string, unknown>;
+      };
+      expect(layer).toBeDefined();
+      expect(layer.minzoom).toBeUndefined();
+      expect(layer.layout['text-field']).toEqual(['get', 'kurzzeichen']);
+      expect(layer.layout['text-allow-overlap']).toBe(true);
+      expect(layer.layout['text-ignore-placement']).toBe(true);
+      expect(JSON.stringify(layer.filter)).toContain('kurzzeichen');
+    }
+    // Gegenaussage: die Plakette hängt weiter am Zoom.
+    expect((layers.get('marker-label') as { minzoom?: number }).minzoom).toBe(BESCHRIFTUNG_AB_ZOOM);
   });
 });
 

@@ -5,7 +5,12 @@ import {
   liesErfassungsSitzungswert,
   schreibeErfassungsSitzungswert,
 } from '../components/erfassungsSitzung';
-import AufnahmeFelder, { type AufnahmeEingabe, type AufnahmeModus } from './AufnahmeFelder';
+import AufnahmeFelder, {
+  aufnahmeZuEingabe,
+  type AufnahmeEingabe,
+  type AufnahmeModus,
+  type AufnahmeWerte,
+} from './AufnahmeFelder';
 
 /** Erfassungs-Modi der Personen-Schnellerfassung. `null` = Modal geschlossen. */
 export type ErfassungsModus = AufnahmeModus;
@@ -71,7 +76,7 @@ export default function PersonErfassungModal({
   onFertig,
   onCancel,
 }: Props) {
-  const [form] = Form.useForm<AufnahmeEingabe>();
+  const [form] = Form.useForm<AufnahmeWerte>();
   const geladeneOeffnung = useRef<string | null>(null);
 
   useEffect(() => {
@@ -86,18 +91,20 @@ export default function PersonErfassungModal({
     if (ort !== undefined) form.setFieldValue('antreff_ort', ort);
   }, [einsatzId, form, modus]);
 
-  const ortMerken = (daten: AufnahmeEingabe) => {
+  const ortMerken = (daten: AufnahmeWerte) => {
     if (typeof daten.antreff_ort === 'string') {
       schreibeErfassungsSitzungswert(einsatzId, 'person', 'antreff_ort', daten.antreff_ort);
     }
   };
 
   return (
-    <ErfassungsModal<AufnahmeEingabe>
+    <ErfassungsModal<AufnahmeWerte>
       offen={modus !== null}
       titel={modus === null ? '' : TITEL[modus]}
       form={form}
-      onErfassen={onErfassen}
+      // Die Koordinate steht im Formular als EIN Textfeld; zerlegt wird hier, damit der
+      // Aufrufer weiter die Anlage bekommt (dieselbe Funktion wie an der Aufnahme-Route).
+      onErfassen={(werte) => onErfassen(aufnahmeZuEingabe(werte))}
       onErfasst={ortMerken}
       onFertig={onFertig}
       onAbbrechen={onCancel}

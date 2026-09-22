@@ -8,11 +8,18 @@ const SELECT_ALLE: &str = "\
            melder_kontakt, notiz, erfasst_at, erfasst_von, geaendert_at, \
            geaendert_von, storniert_at, \
            aktuelle_sichtung, aktuelle_sichtung_at, aktueller_verbleib, \
-           aktuelle_uhs_id, aktueller_platz_id \
+           aktuelle_uhs_id, aktueller_platz_id, \
+           zustand, antreff_lat, antreff_lon, vermisst_seit, \
+           aktuelle_verbleib_art, aktuelles_verbleib_ziel, aktueller_verbleib_status \
     FROM einsatz_person";
 
 /// Eingabedaten beim Anlegen. Strings bereits getrimmt (Handler-Aufgabe);
 /// leere Werte sollten als `None` ankommen. Status ist immer `erfasst`.
+///
+/// LFH-613: `zustand`, die Koordinate und `vermisst_seit` gehen im selben INSERT mit — sie
+/// sind damit Teil der Replay-idempotenten Anlage (ein `client_id`-Replay schreibt nichts
+/// neu). Paarregel, Wertebereich und `vermisst_seit`-Regeln prüft der Handler; `vermisst_seit`
+/// kommt dort bereits aufgelöst an (Angabe oder Serverzeit, nur bei Status `vermisst`).
 #[derive(Debug)]
 pub struct NeueDaten<'a> {
     pub name: Option<&'a str>,
@@ -24,6 +31,10 @@ pub struct NeueDaten<'a> {
     pub antreff_ort: Option<&'a str>,
     pub melder_kontakt: Option<&'a str>,
     pub notiz: Option<&'a str>,
+    pub zustand: Option<&'a str>,
+    pub antreff_lat: Option<f64>,
+    pub antreff_lon: Option<f64>,
+    pub vermisst_seit: Option<&'a str>,
 }
 
 /// Patch-Daten mit Tri-State-Semantik (LFH-266/F12):
@@ -46,6 +57,13 @@ pub struct PatchDaten<'a> {
     pub antreff_ort: Option<Option<&'a str>>,
     pub melder_kontakt: Option<Option<&'a str>>,
     pub notiz: Option<Option<&'a str>>,
+    // LFH-613. Paarregel lat/lon (gegen den Effektivzustand) und die vermisst_seit-Regeln
+    // (nur bei Status `vermisst`, nie leeren) prüft der Handler — hier ist jedes Feld ein
+    // gewöhnliches Tri-State-Paar.
+    pub zustand: Option<Option<&'a str>>,
+    pub antreff_lat: Option<Option<f64>>,
+    pub antreff_lon: Option<Option<f64>>,
+    pub vermisst_seit: Option<Option<&'a str>>,
 }
 
 /// Personen eines Einsatzes (ohne stornierte), optional nach Status gefiltert.
@@ -152,9 +170,11 @@ pub async fn anlegen_tx_mit_optionen(
         "INSERT INTO einsatz_person \
             (einsatz_id, registrier_nr, status, name, vorname, geschlecht, \
              geburtsdatum, alter_geschaetzt, herkunft_adresse, antreff_ort, \
-             melder_kontakt, notiz, erfasst_von, geaendert_von, client_id) \
+             melder_kontakt, notiz, erfasst_von, geaendert_von, client_id, \
+             zustand, antreff_lat, antreff_lon, vermisst_seit) \
          SELECT ?1, COALESCE(MAX(registrier_nr), 0) + 1, ?2, ?3, ?4, ?5, \
-                ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?12, ?13 \
+                ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?12, ?13, \
+                ?14, ?15, ?16, ?17 \
          FROM einsatz_person WHERE einsatz_id = ?1 \
          RETURNING id, registrier_nr",
     )
@@ -171,6 +191,10 @@ pub async fn anlegen_tx_mit_optionen(
     .bind(daten.notiz)
     .bind(erfasser_id)
     .bind(client_id)
+    .bind(daten.zustand)
+    .bind(daten.antreff_lat)
+    .bind(daten.antreff_lon)
+    .bind(daten.vermisst_seit)
     .fetch_one(&mut *conn)
     .await?;
     Ok((row.0, row.1, true))
@@ -228,9 +252,10 @@ pub async fn aktualisiere(
     // `schaden/repo.rs` — das SQL bleibt statisch, dynamisch ist nur das CAS-Suffix
     // (sqlx 0.9 nimmt für `query` ohnehin nur `&'static str`, format!-SQL bräche den Build).
     //
-    // Die Nummerierung ist hier kein Stil, sondern Absicherung: bei neun aufeinanderfolgenden
+    // Die Nummerierung ist hier kein Stil, sondern Absicherung: bei dreizehn aufeinanderfolgenden
     // Flag/Wert-Paaren würde eine um eine Position verschobene Bind-Kette gleichtypige
-    // Nachbarspalten (name↔vorname, melder_kontakt↔notiz) STILL vertauschen — ohne Compile-
+    // Nachbarspalten (name↔vorname, melder_kontakt↔notiz, antreff_lat↔antreff_lon) STILL
+    // vertauschen — ohne Compile-
     // und ohne Laufzeitfehler. Abgesichert von `aktualisiere_setzt_jede_spalte_an_ihren_platz`.
     let mut sql = String::from(
         "UPDATE einsatz_person SET \
@@ -243,12 +268,16 @@ pub async fn aktualisiere(
             antreff_ort = CASE WHEN ?13 IS NULL THEN antreff_ort ELSE ?14 END, \
             melder_kontakt = CASE WHEN ?15 IS NULL THEN melder_kontakt ELSE ?16 END, \
             notiz = CASE WHEN ?17 IS NULL THEN notiz ELSE ?18 END, \
+            zustand = CASE WHEN ?19 IS NULL THEN zustand ELSE ?20 END, \
+            antreff_lat = CASE WHEN ?21 IS NULL THEN antreff_lat ELSE ?22 END, \
+            antreff_lon = CASE WHEN ?23 IS NULL THEN antreff_lon ELSE ?24 END, \
+            vermisst_seit = CASE WHEN ?25 IS NULL THEN vermisst_seit ELSE ?26 END, \
             geaendert_at = strftime('%Y-%m-%d %H:%M:%S','now'), \
-            geaendert_von = ?19 \
-         WHERE id = ?20 AND einsatz_id = ?21",
+            geaendert_von = ?27 \
+         WHERE id = ?28 AND einsatz_id = ?29",
     );
     if erwartet_geaendert_at.is_some() {
-        sql.push_str(" AND geaendert_at = ?22");
+        sql.push_str(" AND geaendert_at = ?30");
     }
     let mut q = sqlx::query(sqlx::AssertSqlSafe(sql))
         .bind(daten.name.map(|_| 1_i64))
@@ -269,6 +298,14 @@ pub async fn aktualisiere(
         .bind(daten.melder_kontakt.and_then(|v| v))
         .bind(daten.notiz.map(|_| 1_i64))
         .bind(daten.notiz.and_then(|v| v))
+        .bind(daten.zustand.map(|_| 1_i64))
+        .bind(daten.zustand.and_then(|v| v))
+        .bind(daten.antreff_lat.map(|_| 1_i64))
+        .bind(daten.antreff_lat.and_then(|v| v))
+        .bind(daten.antreff_lon.map(|_| 1_i64))
+        .bind(daten.antreff_lon.and_then(|v| v))
+        .bind(daten.vermisst_seit.map(|_| 1_i64))
+        .bind(daten.vermisst_seit.and_then(|v| v))
         .bind(geaendert_von)
         .bind(person_id)
         .bind(einsatz_id);
@@ -299,6 +336,10 @@ pub async fn aktualisiere(
 /// Setzt den Status (Übergangsvalidierung ist Handler-Aufgabe via
 /// `darf_uebergehen`). Setzt `geaendert_at`/`geaendert_von`. `NotFound`, falls
 /// nicht zum Einsatz.
+///
+/// LFH-613 (design.md D4): der Wechsel NACH `vermisst` setzt `vermisst_seit` auf den Zeitpunkt
+/// des Wechsels — im selben UPDATE, damit es keinen Zustand „vermisst ohne seit" gibt. Beim
+/// Verlassen bleibt der Wert dokumentarisch stehen.
 pub async fn setze_status(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -307,9 +348,11 @@ pub async fn setze_status(
     geaendert_von: i64,
 ) -> Result<(), AppError> {
     let betroffen = sqlx::query(
-        "UPDATE einsatz_person SET status = ?, \
-            geaendert_at = strftime('%Y-%m-%d %H:%M:%S','now'), geaendert_von = ? \
-         WHERE id = ? AND einsatz_id = ?",
+        "UPDATE einsatz_person SET status = ?1, \
+            vermisst_seit = CASE WHEN ?1 = 'vermisst' \
+                THEN strftime('%Y-%m-%d %H:%M:%S','now') ELSE vermisst_seit END, \
+            geaendert_at = strftime('%Y-%m-%d %H:%M:%S','now'), geaendert_von = ?2 \
+         WHERE id = ?3 AND einsatz_id = ?4",
     )
     .bind(neuer_status)
     .bind(geaendert_von)
@@ -387,6 +430,10 @@ mod tests {
             antreff_ort: None,
             melder_kontakt: None,
             notiz: None,
+            zustand: None,
+            antreff_lat: None,
+            antreff_lon: None,
+            vermisst_seit: None,
         }
     }
 
@@ -511,8 +558,8 @@ mod tests {
 
     /// Jede Spalte landet an ihrem Platz — der einzige Schutz gegen ein STILLES Vertauschen
     /// gleichtypiger Nachbarspalten (name↔vorname, melder_kontakt↔notiz) durch eine falsche
-    /// Bind-Reihenfolge. Alle neun Felder bekommen distinkte Werte, danach wird jede Spalte
-    /// einzeln geprüft.
+    /// Bind-Reihenfolge. Alle dreizehn Felder bekommen distinkte Werte (lat ≠ lon, damit ein
+    /// Tausch der beiden REAL-Nachbarn auffällt), danach wird jede Spalte einzeln geprüft.
     ///
     /// Bewusst VOR dem Tri-State-Umbau (LFH-266/F12) geschrieben und gegen das damalige
     /// COALESCE-UPDATE grün gelaufen: nur so belegt er, dass die Zuordnung schon vorher
@@ -540,6 +587,10 @@ mod tests {
                 antreff_ort: Some(Some("W-antreff")),
                 melder_kontakt: Some(Some("W-melder")),
                 notiz: Some(Some("W-notiz")),
+                zustand: Some(Some("W-zustand")),
+                antreff_lat: Some(Some(52.25)),
+                antreff_lon: Some(Some(9.125)),
+                vermisst_seit: Some(Some("2026-09-22 06:00:00")),
             },
         )
         .await
@@ -554,6 +605,10 @@ mod tests {
         assert_eq!(a.antreff_ort.as_deref(), Some("W-antreff"));
         assert_eq!(a.melder_kontakt.as_deref(), Some("W-melder"));
         assert_eq!(a.notiz.as_deref(), Some("W-notiz"));
+        assert_eq!(a.zustand.as_deref(), Some("W-zustand"));
+        assert_eq!(a.antreff_lat, Some(52.25));
+        assert_eq!(a.antreff_lon, Some(9.125));
+        assert_eq!(a.vermisst_seit.as_deref(), Some("2026-09-22 06:00:00"));
     }
 
     /// LFH-266/F12: `Some(None)` leert eine Spalte, `None` lässt sie unverändert.

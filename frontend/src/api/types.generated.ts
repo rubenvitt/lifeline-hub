@@ -2000,11 +2000,21 @@ export interface components {
             aktuelle_sichtung_at?: string | null;
             /** Format: int64 */
             aktuelle_uhs_id?: number | null;
+            aktuelle_verbleib_art?: null | components["schemas"]["VerbleibArt"];
             /** Format: int64 */
             aktueller_platz_id?: number | null;
             aktueller_verbleib?: string | null;
+            aktueller_verbleib_status?: null | components["schemas"]["VerbleibStatus"];
+            aktuelles_verbleib_ziel?: string | null;
             /** Format: int64 */
             alter_geschaetzt?: number | null;
+            /**
+             * Format: double
+             * @description Fundort-Koordinate (WGS84), immer gemeinsam mit `antreff_lon` gesetzt oder leer.
+             */
+            antreff_lat?: number | null;
+            /** Format: double */
+            antreff_lon?: number | null;
             antreff_ort?: string | null;
             /** Format: int64 */
             einsatz_id: number;
@@ -2026,7 +2036,14 @@ export interface components {
             registrier_nr: number;
             status: components["schemas"]["PersonStatus"];
             storniert_at?: string | null;
+            /**
+             * @description Seit wann die Person vermisst wird (`YYYY-MM-DD HH:MM:SS`, UTC). Nur bei Status
+             *     `vermisst` bedeutsam; beim Verlassen des Status bleibt der Wert dokumentarisch stehen.
+             */
+            vermisst_seit?: string | null;
             vorname?: string | null;
+            /** @description Zustand in Kurzform (Freitext, z. B. „gehfähig, unterkühlt"). */
+            zustand?: string | null;
         };
         /**
          * @description Detail-Antwort: E‑1-Personenfelder (flatten) + E‑2-Verlauf-Arrays. Genau eine
@@ -2481,11 +2498,12 @@ export interface components {
         };
         /**
          * @description Art eines Verbleib-Ereignisses. String = CHECK-Constraint in
-         *     `migrations/0025_person_verbleib.sql`. `Verstorben` = Verbleib des Leichnams
-         *     (NICHT der Admin-Status).
+         *     `migrations/0025_person_verbleib.sql`, erweitert um `notunterkunft` in
+         *     `migrations/0112_person_verbleib_notunterkunft.sql` (LFH-613). `Verstorben` = Verbleib des
+         *     Leichnams (NICHT der Admin-Status).
          * @enum {string}
          */
-        VerbleibArt: "transport" | "entlassung" | "vor_ort" | "verstorben";
+        VerbleibArt: "transport" | "entlassung" | "vor_ort" | "verstorben" | "notunterkunft";
         /**
          * @description Verbleib-Status (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `status`.
          * @enum {string}

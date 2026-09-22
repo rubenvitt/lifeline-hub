@@ -388,7 +388,9 @@ export default function LagekartePage() {
     onBildMittelpunkt,
   } = useKartenbilder({ einsatzId, kartenRef, bildPlatzierenId, aktiveAnsichtId, quelle, fehler });
 
-  const sichtbareMarker = alleVerortet.filter((m) => layer[m.typ]);
+  // `person` ist ein Markertyp der Betroffenen-Karte (LFH-613), keine Ebene der Lagekarte:
+  // `LayerSichtbar` kennt ihn nicht, und die Lagekarte speist keine Personen ein.
+  const sichtbareMarker = alleVerortet.filter((m) => m.typ !== 'person' && layer[m.typ]);
   // Startausschnitt aus den Daten (Ansichtszentrum → Einsatzort → Objekte); die Karte wendet
   // ihn genau einmal an. Über ALLE verorteten Objekte, nicht nur die sichtbaren Ebenen: eine
   // ausgeblendete Ebene ändert nicht, wo der Einsatz liegt.

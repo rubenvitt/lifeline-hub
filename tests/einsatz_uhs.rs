@@ -569,6 +569,57 @@ async fn cross_modul_verbleib_transport_loest_auto_austritt_aus() {
 }
 
 #[tokio::test]
+async fn cross_modul_verbleib_notunterkunft_loest_auto_austritt_aus() {
+    // LFH-613: Notunterkunft beendet den UHS-Aufenthalt wie transport/entlassung.
+    let (app, pool) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &cookie).await;
+    let uhs = uhs_anlegen_und_aktivieren(&app, &cookie, einsatz, "BHP 50").await;
+    let person = person_anlegen(&app, &cookie, einsatz).await;
+    let (s, _) = json_request(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personen/{person}/status"),
+        &cookie,
+        Some(&json!({"status": "betroffen"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, _) = json_request(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personen/{person}/uhs-belegung"),
+        &cookie,
+        Some(&json!({"art": "eintritt", "uhs_id": uhs})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+    let (s, _) = json_request(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personen/{person}/verbleib"),
+        &cookie,
+        Some(&json!({"art": "notunterkunft", "ziel": "Turnhalle Ost"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+    let inhalte = etb_inhalte(&app, &cookie, einsatz).await;
+    assert!(
+        inhalte
+            .iter()
+            .any(|s| s.contains("verlässt BHP 50") && s.contains("Verbleib notunterkunft")),
+        "Auto-Austritt-ETB mit Verbleib-Anlass erwartet, fand: {inhalte:?}"
+    );
+    let aktuelle_uhs: Option<i64> =
+        sqlx::query_scalar("SELECT aktuelle_uhs_id FROM einsatz_person WHERE id = ?")
+            .bind(person)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(aktuelle_uhs, None, "die Person ist aus der UHS ausgetreten");
+}
+
+#[tokio::test]
 async fn cross_modul_storno_loest_reservierung_auf_auch_ohne_belegung() {
     let (app, pool) = setup_mit_pool().await;
     let cookie = login_cookie(&app, "admin", "startpw12").await;
