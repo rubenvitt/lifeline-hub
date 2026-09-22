@@ -102,7 +102,8 @@ export function sprungZiel(
   return register.find((m) => m.key === marke.zielModul) ?? null;
 }
 
-export type NavZeile = { art: 'modul'; modul: ModulEintrag } | { art: 'sprung'; marke: Sprungmarke };
+export type NavZeile =
+  { art: 'modul'; modul: ModulEintrag } | { art: 'sprung'; marke: Sprungmarke };
 
 /**
  * Module und Marken einer Kategorie in Panel-Reihenfolge. Rein, damit die Anordnung ohne

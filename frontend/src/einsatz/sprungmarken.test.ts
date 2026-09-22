@@ -40,7 +40,10 @@ describe('Sprungmarken (LFH-620)', () => {
         true,
       );
       // Kein Schlüssel eines echten Moduls: Overrides und `modulZuRoute` kennen nur Module.
-      expect(modulRegistry.some((m) => m.key === marke.key), marke.key).toBe(false);
+      expect(
+        modulRegistry.some((m) => m.key === marke.key),
+        marke.key,
+      ).toBe(false);
     }
   });
 
@@ -53,9 +56,9 @@ describe('Sprungmarken (LFH-620)', () => {
       '↗entscheidungen',
       'stab',
     ]);
-    expect(
-      folge(moduleNachKategorie('erfassung'), sprungmarkenNachKategorie('erfassung')),
-    ).toEqual(['etb', 'personen', '↗patienten', '↗vermisste', 'unfallhilfsstellen', 'tiere', 'schaeden']);
+    expect(folge(moduleNachKategorie('erfassung'), sprungmarkenNachKategorie('erfassung'))).toEqual(
+      ['etb', 'personen', '↗patienten', '↗vermisste', 'unfallhilfsstellen', 'tiere', 'schaeden'],
+    );
   });
 
   it('hängt eine Marke ohne auffindbaren Anker ans Ende, statt sie zu verlieren', () => {
