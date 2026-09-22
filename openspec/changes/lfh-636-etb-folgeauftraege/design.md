@@ -53,7 +53,7 @@ zweite Abfrage ist einfacher zu lesen und zu testen. Die IN-Liste ist durch `MAX
 `einsatz_id`-freie IDs — sicher, weil die Seite bereits einsatzgefiltert ist und
 `quell_etb_eintrag_id` vom Erteilen-Handler gegen denselben Einsatz geprüft wird.
 
-**D3 — Index `auftrag(quell_etb_eintrag_id)`** als neue Migration (0104, partiell
+**D3 — Index `auftrag(quell_etb_eintrag_id)`** als neue Migration (0105, partiell
 `WHERE quell_etb_eintrag_id IS NOT NULL`). Ohne ihn ist die IN-Abfrage ein Scan über alle
 Aufträge der Instanz je ETB-Seite. Vor dem Merge die Nummer gegen `origin/alpha` prüfen
 (parallele Branches vergeben dieselbe Nummer).
