@@ -14,7 +14,7 @@ Stand 22.09.2026. Ticket: LFH-628 (Entwicklungsboard), Folgetask zu LFH-606
    erneuert.
 3. Die Migrationskollision im LFH-606-Branch (`0103_einsatz_pegel` neben
    `0103_etb_lesemarke`) gehört dem 606-Branch. Sie ist dort als `0104` behoben und mit
-   PR #91 nach alpha gegangen; dieser Task setzt darauf auf (`0105`).
+   PR #91 nach alpha gegangen; dieser Task setzt darauf auf (`0106`, weil alpha inzwischen `0105_einheit_funkrufname` trägt).
 
 ## Befund PEGELONLINE `WV` (gemessen 22.09.2026)
 
@@ -33,7 +33,7 @@ eines Landes kann eine andere Zahl nennen als die BfG.
 
 ## Backend
 
-**Speicher:** vier Spalten an `einsatz_pegel` (Migration `0105_einsatz_pegel_prognose.sql`):
+**Speicher:** vier Spalten an `einsatz_pegel` (Migration `0106_einsatz_pegel_prognose.sql`):
 `prognose_cm REAL`, `prognose_zeit TEXT` (UTC, Wire-Format), `prognose_gesetzt_von_id`,
 `prognose_gesetzt_at`; ein CHECK hält Wert und Zeitpunkt zusammen. Eine Prognose gehört zu
 genau einer festgelegten Station und fällt mit ihr (entfernen und neu festlegen = neue Zeile
