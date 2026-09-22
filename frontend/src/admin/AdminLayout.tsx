@@ -116,7 +116,8 @@ export default function AdminLayout() {
             itemColor: rollen.text2,
             itemHoverBg: rollen.flaeche,
             itemHoverColor: rollen.text,
-            itemSelectedBg: rollen.flaeche2,
+            // `flaeche3`, nicht `flaeche2`: die läge am Tag bei 1,01 : 1 auf `paneel` (LFH-618).
+            itemSelectedBg: rollen.flaeche3,
             itemSelectedColor: rollen.text,
             activeBarBorderWidth: 0,
           },
@@ -189,7 +190,7 @@ export default function AdminLayout() {
   return (
     <Layout style={{ background: 'transparent' }}>
       {/* Die Verwaltungs-Seitenleiste im Stil des Modulpanels (Neuentwurf, `shell.dc.html`):
-          Grund `paneel`, Haarlinie zur Seite, Radius 0, aktive Zeile auf `flaeche2` statt
+          Grund `paneel`, Haarlinie zur Seite, Radius 0, aktive Zeile auf `flaeche3` statt
           der antd-Pille. Farben aus den Rollen, Höhen aus der Staffel. Ab `lg` immer
           sichtbar; die schmale Bauform steht oben. */}
       <Sider

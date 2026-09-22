@@ -74,7 +74,8 @@ const dateien = lieseQuellen(SRC);
  * Stand Neuentwurf „Instrumententafel" (21.09.2026): Tag `b02318 7a5200 1c6640 1a5fa0
  * a8071a`, Nacht `ff6b6b e8cc3a 52c41a 4d94d6` (`marke` ist in beiden Modi `a8071a`),
  * dazu die drei neuen, unverwechselbaren Textstufen der Nacht `7ddc4a` (normalText),
- * `8ec2f0` (bedienText) und `7db3e8` (bedienHover). Die abgelösten Nachtwerte
+ * `8ec2f0` (bedienText) und `7db3e8` (bedienHover), seit LFH-618 die Tageswerte von
+ * `achtungText`/`alarmText` (`604200 8f1c12`). Die abgelösten Nachtwerte
  * (`ff7a7f f5b942 5cc48d 6fb4ec e04552`) sind entfallen: ein Gate auf Werte, die keine
  * Rolle mehr trägt, schützt nichts.
  *
@@ -85,7 +86,7 @@ const dateien = lieseQuellen(SRC);
  * dort Fehlalarme statt Funde.
  */
 const ROLLENWERT =
-  /#(b02318|7a5200|1c6640|1a5fa0|a8071a|ff6b6b|e8cc3a|52c41a|4d94d6|7ddc4a|8ec2f0|7db3e8)/i;
+  /#(b02318|7a5200|1c6640|1a5fa0|a8071a|ff6b6b|e8cc3a|52c41a|4d94d6|7ddc4a|8ec2f0|7db3e8|604200|8f1c12)/i;
 
 /**
  * Benannte Ausnahmen: Datei + Wert, jeweils mit Grund. Keine Zeilennummer — die bräche

@@ -78,7 +78,7 @@ function Marke({ teil, uhsListe }: { teil: BefehlTeil; uhsListe: readonly Uhs[] 
       return 'uhs' in a ? (
         <span style={{ ...monoStil(12), color: rollen.bedien }}>→ UHS {a.uhs.bezeichnung}</span>
       ) : (
-        <span style={{ ...monoStil(12), color: rollen.alarm }} title={a.problem}>
+        <span style={{ ...monoStil(12), color: rollen.alarmText }} title={a.problem}>
           {teil.text} ?
         </span>
       );
@@ -86,7 +86,7 @@ function Marke({ teil, uhsListe }: { teil: BefehlTeil; uhsListe: readonly Uhs[] 
     case 'unerkannt':
       return (
         <span
-          style={{ ...monoStil(12), color: rollen.alarm, textDecoration: 'line-through' }}
+          style={{ ...monoStil(12), color: rollen.alarmText, textDecoration: 'line-through' }}
           title={teil.grund}
         >
           {teil.text}
@@ -187,7 +187,7 @@ export default function BetroffeneZeile({
         </span>
       )}
       {versuchFehler && versuchFehler.length > 0 && (
-        <span role="alert" style={{ flexBasis: '100%', color: rollen.alarm }}>
+        <span role="alert" style={{ flexBasis: '100%', color: rollen.alarmText }}>
           Nicht erfasst: {versuchFehler.join(' · ')}
         </span>
       )}

@@ -660,6 +660,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
                 "Kommunikationsart-Schlüssel (digitalfunk/mobil/…), kein Personenbezug (LFH-108)",
             ),
             scrub("erreichbarkeit", Strategie::NullSetzen),
+            // LFH-614 (0105): Rufname der Einheit benennt ein operatives Objekt, keine
+            // Person — wie fahrzeug.funkrufname/snap_funkrufname.
+            retain("funkrufname", G_OP_LABEL),
             retain("sortier", G_KONFIG),
             retain("angelegt_at", G_ZEIT),
             retain("angelegt_von", G_FK),

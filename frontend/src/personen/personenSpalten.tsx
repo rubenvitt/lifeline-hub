@@ -94,7 +94,7 @@ function PersonZelle({ p }: { p: Person }) {
         {ga && <span style={{ ...monoStil(11), color: rollen.gedaempft }}>{ga}</span>}
       </span>
       {offen && (
-        <div data-lfh="luecke" style={{ ...monoStil(11), color: rollen.achtung }}>
+        <div data-lfh="luecke" style={{ ...monoStil(11), color: rollen.achtungText }}>
           {offen}
         </div>
       )}
@@ -105,7 +105,7 @@ function PersonZelle({ p }: { p: Person }) {
 /** Offene Zelle in `achtung`, sonst neutraler Gedankenstrich. */
 function Leerzelle({ offen }: { offen: boolean }) {
   const { rollen } = useRollen();
-  return <span style={{ color: offen ? rollen.achtung : rollen.schwach }}>—</span>;
+  return <span style={{ color: offen ? rollen.achtungText : rollen.schwach }}>—</span>;
 }
 
 function FundortZelle({ p }: { p: Person }) {

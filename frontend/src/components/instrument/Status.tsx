@@ -43,8 +43,8 @@ interface StatusZelleProps {
 
 /** Raster-taugliche Zelle: steht im Fugenraster (`gap: 1px` auf `linie`) des Aufrufers. */
 export function StatusZelle({ ton, wert, wort, hoehe = 34, style }: StatusZelleProps) {
-  const { rollen, dunkel } = useRollen();
-  const f = statusFlaeche(rollen, ton, dunkel);
+  const { rollen } = useRollen();
+  const f = statusFlaeche(rollen, ton);
   return (
     <div
       data-lfh="status-zelle"
@@ -80,8 +80,8 @@ interface StatusChipProps {
 
 /** Inline-Chip, Höhe 22 (Entwurf S6): Fläche + Code Mono + Wort 11. */
 export function StatusChip({ ton, wort, code, title, style }: StatusChipProps) {
-  const { token, rollen, dunkel } = useRollen();
-  const f = statusFlaeche(rollen, ton, dunkel);
+  const { token, rollen } = useRollen();
+  const f = statusFlaeche(rollen, ton);
   return (
     <span
       data-lfh="status-chip"

@@ -61,28 +61,30 @@ describe('Kennzahl — Ton und zweiter Kanal', () => {
   });
 
   it('außerhalb von `daten` gibt es weder Tonfarbe noch Kante — ein rotes „?" behauptete eine Lage', () => {
-    expect(zahlFarbe(farbenDunkel, 'alarm', 'fehler', true)).toBe(farbenDunkel.text);
-    expect(zahlFarbe(farbenDunkel, 'alarm', 'laden', true)).toBe(farbenDunkel.text);
-    expect(zahlFarbe(farbenDunkel, 'alarm', 'daten', true)).toBe(farbenDunkel.alarm);
+    expect(zahlFarbe(farbenDunkel, 'alarm', 'fehler')).toBe(farbenDunkel.text);
+    expect(zahlFarbe(farbenDunkel, 'alarm', 'laden')).toBe(farbenDunkel.text);
+    expect(zahlFarbe(farbenDunkel, 'alarm', 'daten')).toBe(farbenDunkel.alarm);
     expect(
       kennzahlStil(farbenHell, tokenFuer('kompakt'), 'alarm', 'fehler').boxShadow,
     ).toBeUndefined();
   });
 
   it('nachts steht die Zahl in der Tonfarbe — alle fünf Töne (Entwurf S6)', () => {
-    expect(zahlFarbe(farbenDunkel, 'normal', 'daten', true)).toBe(farbenDunkel.normalText);
-    expect(zahlFarbe(farbenDunkel, 'bedien', 'daten', true)).toBe(farbenDunkel.bedienText);
-    expect(zahlFarbe(farbenDunkel, 'achtung', 'daten', true)).toBe(farbenDunkel.achtung);
-    expect(zahlFarbe(farbenDunkel, 'alarm', 'daten', true)).toBe(farbenDunkel.alarm);
-    expect(zahlFarbe(farbenDunkel, 'neutral', 'daten', true)).toBe(farbenDunkel.text);
+    expect(zahlFarbe(farbenDunkel, 'normal', 'daten')).toBe(farbenDunkel.normalText);
+    expect(zahlFarbe(farbenDunkel, 'bedien', 'daten')).toBe(farbenDunkel.bedienText);
+    expect(zahlFarbe(farbenDunkel, 'achtung', 'daten')).toBe(farbenDunkel.achtung);
+    expect(zahlFarbe(farbenDunkel, 'alarm', 'daten')).toBe(farbenDunkel.alarm);
+    expect(zahlFarbe(farbenDunkel, 'neutral', 'daten')).toBe(farbenDunkel.text);
   });
 
-  it('tags tragen achtung/alarm den 7:1-Boden nicht — die Zahl nimmt text', () => {
-    expect(zahlFarbe(farbenHell, 'achtung', 'daten', false)).toBe(farbenHell.text);
-    expect(zahlFarbe(farbenHell, 'alarm', 'daten', false)).toBe(farbenHell.text);
-    // Gegenprobe: die Töne mit eigener Textrolle bleiben getönt.
-    expect(zahlFarbe(farbenHell, 'normal', 'daten', false)).toBe(farbenHell.normalText);
-    expect(zahlFarbe(farbenHell, 'bedien', 'daten', false)).toBe(farbenHell.bedienText);
+  it('tags ist auch die achtung-/alarm-Zahl getönt — über die Textrollen (LFH-618)', () => {
+    expect(zahlFarbe(farbenHell, 'achtung', 'daten')).toBe(farbenHell.achtungText);
+    expect(zahlFarbe(farbenHell, 'alarm', 'daten')).toBe(farbenHell.alarmText);
+    // Die Füllfarbe als Zahl fiele unter den Tagesboden — deshalb die eigene Rolle.
+    expect(zahlFarbe(farbenHell, 'achtung', 'daten')).not.toBe(farbenHell.achtung);
+    expect(zahlFarbe(farbenHell, 'alarm', 'daten')).not.toBe(farbenHell.text);
+    expect(zahlFarbe(farbenHell, 'normal', 'daten')).toBe(farbenHell.normalText);
+    expect(zahlFarbe(farbenHell, 'bedien', 'daten')).toBe(farbenHell.bedienText);
   });
 
   it('normal und bedien setzen keine Kante — die Kante trennt nur die Eskalationsstufen', () => {
@@ -201,8 +203,8 @@ describe('Kennzahl — Statuspunkt vor der Augenbraue (S6)', () => {
   });
 
   it('nimmt die Kantenfarbe der Statusfläche — dieselbe Rolle wie der Rand der StatusZelle', () => {
-    expect(punktFarbe(farbenDunkel, 'alarm', 'daten', true)).toBe(farbenDunkel.alarm);
-    expect(punktFarbe(farbenHell, 'normal', 'daten', false)).toBe(farbenHell.normal);
-    expect(punktFarbe(farbenHell, 'alarm', 'laden', false)).toBe(farbenHell.schwach);
+    expect(punktFarbe(farbenDunkel, 'alarm', 'daten')).toBe(farbenDunkel.alarm);
+    expect(punktFarbe(farbenHell, 'normal', 'daten')).toBe(farbenHell.normal);
+    expect(punktFarbe(farbenHell, 'alarm', 'laden')).toBe(farbenHell.schwach);
   });
 });

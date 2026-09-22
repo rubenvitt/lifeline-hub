@@ -41,13 +41,13 @@ describe('StatusTag', () => {
   /**
    * Neuentwurf (Entscheidung 2): die Vorgabe ist die getönte FLÄCHE. Die Erwartungen stehen
    * als Rollenwerte aus der Palette des Modus — die Kontrastrechnung dazu liegt in
-   * `instrument/statusFlaeche.ts`. Geprüft wird der Tagmodus-Sonderfall mit: `achtung`
-   * behält die Fläche, die Beschriftung nimmt `text` (6,02 : 1 getönt läge unter 7).
+   * `instrument/statusFlaeche.ts`. Am Tag beschriften `achtung`/`alarm` mit ihren
+   * Textrollen (LFH-618) — die Füllfarbe läge als Text unter 7 : 1.
    */
   it.each([
     ['light', 'normal', farbenHell.normalFlaeche, farbenHell.normalText, farbenHell.normal],
-    ['light', 'achtung', farbenHell.achtungFlaeche, farbenHell.text, farbenHell.achtung],
-    ['light', 'alarm', farbenHell.alarmFlaeche, farbenHell.text, farbenHell.alarm],
+    ['light', 'achtung', farbenHell.achtungFlaeche, farbenHell.achtungText, farbenHell.achtung],
+    ['light', 'alarm', farbenHell.alarmFlaeche, farbenHell.alarmText, farbenHell.alarm],
     ['light', 'neutral', farbenHell.flaeche3, farbenHell.text2, farbenHell.schwach],
     ['dark', 'achtung', farbenDunkel.achtungFlaeche, farbenDunkel.achtung, farbenDunkel.achtung],
     ['dark', 'alarm', farbenDunkel.alarmFlaeche, farbenDunkel.alarm, farbenDunkel.alarm],
