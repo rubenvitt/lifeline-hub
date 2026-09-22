@@ -6,6 +6,7 @@ import {
   berechneAbloesungZaehler,
   berechneAuftragsZaehler,
   berechneChatZaehler,
+  berechneDokumentZaehler,
   berechneErinnerungsZaehler,
   berechneMeldungsZaehler,
   darfZaehlerLaden,
@@ -52,6 +53,15 @@ describe('Modul-Zähler', () => {
     expect(berechneChatZaehler([{ ungelesen_anzahl: 2 }, { ungelesen_anzahl: 3 }])).toEqual({
       wert: 5,
       beschreibung: '5 ungelesene Chat-Nachrichten',
+    });
+
+    expect(berechneDokumentZaehler([{}, {}, {}])).toEqual({
+      wert: 3,
+      beschreibung: '3 abgelegte Dokumente',
+    });
+    expect(berechneDokumentZaehler([{}])).toEqual({
+      wert: 1,
+      beschreibung: '1 abgelegtes Dokument',
     });
   });
 

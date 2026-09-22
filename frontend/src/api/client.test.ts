@@ -7,6 +7,7 @@ import {
   OFFLINE_QUEUE_BENUTZER_HEADER,
   apiGet,
   apiSend,
+  apiUpload,
   fehlerText,
   istKonflikt,
 } from './client';
@@ -128,5 +129,29 @@ describe('apiSend', () => {
     );
     const fehler = await apiSend('/api/ding', 'POST', {}).catch((e) => e);
     expect(istKonflikt(fehler)).toBe(true);
+  });
+});
+
+describe('apiUpload', () => {
+  it('nutzt ohne Option das 15-s-Standard-Timeout', async () => {
+    const timeout = vi
+      .spyOn(AbortSignal, 'timeout')
+      .mockReturnValue(new AbortController().signal);
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), { status: 200 }),
+    );
+    await apiUpload('/api/upload', new FormData());
+    expect(timeout).toHaveBeenCalledWith(15_000);
+  });
+
+  it('übergibt ein explizites Timeout unverändert', async () => {
+    const timeout = vi
+      .spyOn(AbortSignal, 'timeout')
+      .mockReturnValue(new AbortController().signal);
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), { status: 200 }),
+    );
+    await apiUpload('/api/upload', new FormData(), { timeoutMs: 120_000 });
+    expect(timeout).toHaveBeenCalledWith(120_000);
   });
 });

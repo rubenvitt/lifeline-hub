@@ -89,16 +89,25 @@ export async function apiGet<T>(pfad: string): Promise<T> {
   }
 }
 
+export interface UploadOptionen {
+  /** Abbruch nach dieser Zeit. Default 15 s; große Dateien mit AV-Scan brauchen mehr. */
+  timeoutMs?: number;
+}
+
 /** Lädt Dateien per multipart/form-data hoch. Setzt KEINEN Content-Type-Header,
  *  damit der Browser die Multipart-Boundary selbst bestimmt. Fehler werden wie bei
  *  apiSend/apiGet als {@link ApiError} geworfen. */
-export async function apiUpload<T>(pfad: string, formData: FormData): Promise<T> {
+export async function apiUpload<T>(
+  pfad: string,
+  formData: FormData,
+  optionen: UploadOptionen = {},
+): Promise<T> {
   try {
     const res = await fetch(pfad, {
       method: 'POST',
       credentials: 'same-origin',
       body: formData,
-      signal: AbortSignal.timeout(15_000),
+      signal: AbortSignal.timeout(optionen.timeoutMs ?? 15_000),
     });
     if (!res.ok) return fehlerWerfen(res);
     return (await res.json()) as T;

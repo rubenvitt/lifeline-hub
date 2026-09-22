@@ -250,6 +250,13 @@ export function schaedenPfad(einsatzId: number, opts: { neu?: boolean } = {}): s
   });
 }
 
+/** Dokumentenablage (LFH-632): Listenseite, `?neu=1` fokussiert die Ablage-Erfassung. */
+export function dokumentePfad(einsatzId: number, opts: { neu?: boolean } = {}): string {
+  return mitQuery(einsatzModulPfad(einsatzId, 'dokumente'), {
+    neu: opts.neu ? 1 : undefined,
+  });
+}
+
 /** Ablösungs-Modul (LFH-635): Schichten und fällige Ablösungen je Einheit. */
 export function abloesungPfad(einsatzId: number): string {
   return einsatzModulPfad(einsatzId, 'abloesung');
