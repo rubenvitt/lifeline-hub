@@ -6,7 +6,7 @@ dann den Code. Referenz für die Berührpunkte eines neuen Moduls ist der Stab-C
 
 ## 1. Backend: Schema und Fristen-Unterbau
 
-- [x] 1.1 Migration `0104_abloesung.sql` (Tabelle `einsatz_abloesung` laut design.md D1 mit CHECKs, partiellem UNIQUE `(einheit_id) WHERE status='laufend'`, Index `(einsatz_id, status, faellig_at)`; Spalte `einsatzabschnitt.abloesung_rhythmus_minuten`); vor dem Anlegen `ls migrations` und offene Branches auf Nummernkollision prüfen; verifiziert durch `cargo test --lib db` (Migrationslauf) und einen Repo-Test, der eine zweite laufende Schicht am UNIQUE scheitern sieht
+- [x] 1.1 Migration `0107_abloesung.sql` (Tabelle `einsatz_abloesung` laut design.md D1 mit CHECKs, partiellem UNIQUE `(einheit_id) WHERE status='laufend'`, Index `(einsatz_id, status, faellig_at)`; Spalte `einsatzabschnitt.abloesung_rhythmus_minuten`); vor dem Anlegen `ls migrations` und offene Branches auf Nummernkollision prüfen; verifiziert durch `cargo test --lib db` (Migrationslauf) und einen Repo-Test, der eine zweite laufende Schicht am UNIQUE scheitern sieht
 - [x] 1.2 `erinnerung::repo`: `anlegen_aus_frist_tx` (Pool-Variante delegiert), `setze_auto_frist_tx` (Upsert, setzt `zuletzt_ausgeloest_at = NULL`), `oeffne_letzte_auto_tx`, `loesche_auto_tx`; Konstanten `OBJEKT_ABLOESUNG`/`OBJEKT_ABLOESUNG_VORWARNUNG` in `kommunikation/mod.rs`; verifiziert durch Repo-Tests: Verschieben löst erneut aus, Wiederöffnen löst NICHT erneut aus, Bestandstests von Auftrag/Meldung bleiben grün (`cargo test --lib erinnerung`)
 
 ## 2. Backend: Modul `abloesung`

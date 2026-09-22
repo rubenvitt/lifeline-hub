@@ -56,8 +56,8 @@ fällt niemandem auf.
 ## Impact
 
 - **Datenbank:** neue Migration (Tabelle `einsatz_abloesung`, Spalte
-  `einsatzabschnitt.abloesung_rhythmus_minuten`). Die Nummer wird beim Mergen gegen offene
-  Branches geprüft: LFH-606 trägt auf seinem Branch ebenfalls eine `0103`.
+  `einsatzabschnitt.abloesung_rhythmus_minuten`). Nummer `0107` (beim Rebase auf `alpha`
+  nachgezogen: `0104`–`0106` sind dort inzwischen belegt).
 - **Backend:** neues Modul `src/abloesung/` und neue Routen in `src/routes/abloesung.rs`.
   Berührt werden außerdem `src/einsatz/modul.rs`, `src/live/mod.rs`,
   `src/erinnerung/{repo,scheduler}.rs` (transaktionsfähiges Anlegen und Verschieben einer

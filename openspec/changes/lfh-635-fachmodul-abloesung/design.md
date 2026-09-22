@@ -82,8 +82,8 @@ UNIQUE INDEX (einheit_id) WHERE status='laufend'
   reine Code-Prüfung aus `nachforderung`.
 - **Kein Freitext in der Tabelle.** Damit sind alle Spalten in der Schwärzungsregistry
   `retain`.
-- Die Migrationsnummer ist `0104`. Beim Mergen wird sie gegen offene Branches geprüft
-  (LFH-606 trägt eine eigene `0103`). Eine Kollision wird dort aufgelöst, eine
+- Die Migrationsnummer ist `0107` (beim Rebase auf `alpha` von `0104` nachgezogen, weil
+  LFH-606 dort inzwischen als `0104` liegt und `0105`/`0106` ebenfalls belegt sind). Eine
   angewendete Migration wird nicht editiert.
 
 ### D2 — Fristen: zwei Bezugstypen statt einer Frist mit zwei Zeitpunkten
@@ -231,9 +231,8 @@ ETB-Anzeige.
   Schicht, die Fristen würden als Geister weiterlaufen. → `einheit::repo::aufloesen` löscht
   in derselben Transaktion die Auto-Fristen der Schichten dieser Einheit
   (`loesche_auto_tx`).
-- **Die Migrationsnummer kann mit LFH-606 kollidieren.** → Vor dem Merge gegen
-  `origin/alpha` und offene Branches prüfen und neu nummerieren, solange sie nirgends
-  angewendet ist.
+- **Die Migrationsnummer kollidierte mit LFH-606.** → Beim Rebase auf `origin/alpha`
+  gemessen und von `0104` auf `0107` nachgezogen, solange sie nirgends angewendet war.
 - **Alarmlast bei vielen Einheiten:** Zwei Hinweise je Schicht, bei 20 Einheiten mit
   gleichem Takt also bis zu 40 Hinweise in wenigen Minuten. → Das Budget der AlarmZentrale
   bündelt ab dem vierten Hinweis. Weil Schichten eines Abschnitts meist gleichzeitig beginnen,
