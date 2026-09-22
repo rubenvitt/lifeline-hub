@@ -12,6 +12,7 @@ import type {
   EtbEintragAnzeige,
   Gefahrengebiet,
   LetzteRueckmeldung,
+  PegelAnzeige,
   Person,
 } from '../../api/types';
 import {
@@ -22,7 +23,6 @@ import {
   empfaengerText,
   entscheidungenAuswahl,
   folgeText,
-  folgeauftraegeJeEintrag,
   kraefteKennzahl,
   markenBewertung,
   naechsteMarken,
@@ -123,6 +123,7 @@ const etb = (id: number, ereigniszeit: string, typ = 'entscheidung') =>
     ereigniszeit,
     inhalt: `E${id}`,
     erfasser_name: 'Vitt',
+    folgeauftraege: [],
   }) as unknown as EtbEintragAnzeige;
 
 describe('zeitpunkt', () => {
@@ -228,17 +229,8 @@ describe('offeneAuftraege', () => {
   });
 });
 
-describe('Folgeaufträge je ETB-Eintrag', () => {
-  it('zählt quell_etb_eintrag_id, egal in welchem Status', () => {
-    const m = folgeauftraegeJeEintrag([
-      auftrag({ quell_etb_eintrag_id: 7 }),
-      auftrag({ quell_etb_eintrag_id: 7, bearbeitungsstatus: 'abgenommen' }),
-      auftrag({ quell_etb_eintrag_id: 9 }),
-      auftrag(),
-    ]);
-    expect(m.get(7)).toBe(2);
-    expect(m.get(9)).toBe(1);
-    expect(m.has(1)).toBe(false);
+describe('folgeText', () => {
+  it('nichts bei null, Einzahl und Mehrzahl', () => {
     expect(folgeText(0)).toBeNull();
     expect(folgeText(1)).toBe('1 Auftrag');
     expect(folgeText(3)).toBe('3 Aufträge');
@@ -310,6 +302,49 @@ describe('Nächste Marken', () => {
     ]);
     expect(r.marken[0]).toMatchObject({ art: 'auftrag', id: 103 });
     expect(r.marken[3]).toMatchObject({ art: 'lagebesprechung', id: null });
+  });
+
+  it('Pegel-Prognose (LFH-628): offen als Marke, verstrichen gar nicht — nie „überfällig"', () => {
+    const pegel = (id: number, zeitpunkt: string | null, gewaesser: string | null = 'WESER') =>
+      ({
+        id,
+        station_uuid: `u-${id}`,
+        name: `STATION ${id}`,
+        gewaesser,
+        reihenfolge: id,
+        prognose: zeitpunkt
+          ? { hoechststand_cm: 710, zeitpunkt, gesetzt_at: '2026-09-21 12:00:00' }
+          : undefined,
+      }) as PegelAnzeige;
+    const r = naechsteMarken(
+      [auftrag({ id: 101, auftrag_text: 'Frist', frist_at: nach(45) })],
+      [],
+      null,
+      JETZT,
+      [
+        pegel(1, nach(20)),
+        pegel(2, vor(5)),
+        pegel(3, null),
+        pegel(4, nach(90), null),
+        pegel(5, nach(100)),
+      ],
+    );
+    expect(r.marken.map((m) => [m.art, m.text, m.ton])).toEqual([
+      ['pegelprognose', 'Erwarteter Höchststand Pegel STATION 1 (WESER): 7,10 m', 'achtung'],
+      ['auftrag', 'Frist', 'neutral'],
+      ['pegelprognose', 'Erwarteter Höchststand Pegel STATION 4: 7,10 m', 'neutral'],
+      // Zwei Pegel am selben Gewässer bleiben unterscheidbar.
+      ['pegelprognose', 'Erwarteter Höchststand Pegel STATION 5 (WESER): 7,10 m', 'neutral'],
+    ]);
+    expect(r.marken[0]).toMatchObject({ id: 1, wort: 'in 20 min' });
+    expect(r.marken.some((m) => m.ton === 'alarm')).toBe(false);
+  });
+
+  it('ohne Pegel-Argument dieselben Marken wie vorher', () => {
+    const auftraege = [auftrag({ id: 101, auftrag_text: 'Frist', frist_at: nach(45) })];
+    expect(naechsteMarken(auftraege, [], nach(120), JETZT)).toEqual(
+      naechsteMarken(auftraege, [], nach(120), JETZT, []),
+    );
   });
 
   it('deckelt auf sechs und zählt den Rest', () => {
@@ -468,5 +503,73 @@ describe('abschnittZeilen', () => {
       expect(sued.rueckmeldungBekannt).toBe(true);
       expect(sued.letzteRueckmeldung).toBeNull();
     });
+  });
+  it('zählt die Auftragsbilanz über den Teilbaum, jeden Auftrag einmal (LFH-608)', () => {
+    const nord = zeilen.find((z) => z.abschnittId === 1)!;
+    // drei Aufträge an Nord/Nord-Deich, einer davon vollzogen
+    expect(nord.auftragsbilanz).toEqual({ erledigt: 1, gesamt: 3 });
+    expect(zeilen.find((z) => z.abschnittId === 2)!.auftragsbilanz).toEqual({
+      erledigt: 0,
+      gesamt: 1,
+    });
+    expect(zeilen.find((z) => z.abschnittId == null)!.auftragsbilanz).toEqual({
+      erledigt: 0,
+      gesamt: 0,
+    });
+  });
+});
+
+describe('abschnittZeilen — Lage je Abschnitt (LFH-608)', () => {
+  const roh = (abschnitte: Einsatzabschnitt[], auftraege: Auftrag[] = []) =>
+    abschnittZeilen({
+      abschnitte,
+      einheiten: [],
+      personal: [],
+      fahrzeuge: [],
+      material: [],
+      auftraege,
+    });
+
+  it('übernimmt Kürzel, Lagezustand, festen Auftrag und Fortschritt des Abschnitts', () => {
+    const [nord] = roh([
+      abschnitt(1, 'Nord', {
+        kurzbezeichnung: 'EA-N',
+        lagezustand: 'angespannt',
+        abschnittsauftrag: 'Deichsicherung km 3,8 – 5,4',
+        fortschritt: 72,
+      }),
+    ]);
+    expect(nord.kurzbezeichnung).toBe('EA-N');
+    expect(nord.lagezustand).toBe('angespannt');
+    expect(nord.abschnittsauftrag).toBe('Deichsicherung km 3,8 – 5,4');
+    expect(nord.fortschritt).toBe(72);
+  });
+
+  it('nicht gepflegt bleibt null — kein erfundenes „planmäßig" und keine 0 %', () => {
+    const [nord] = roh([abschnitt(1, 'Nord')]);
+    expect(nord.kurzbezeichnung).toBeNull();
+    expect(nord.lagezustand).toBeNull();
+    expect(nord.abschnittsauftrag).toBeNull();
+    expect(nord.fortschritt).toBeNull();
+    expect(nord.unterLage).toBeNull();
+  });
+
+  it('meldet einen SCHLECHTER beurteilten Unterabschnitt, sonst nichts', () => {
+    const zeilen = roh([
+      abschnitt(1, 'Nord', { lagezustand: 'planmaessig' }),
+      abschnitt(2, 'Nord-Deich', { ueber_abschnitt_id: 1, lagezustand: 'angespannt' }),
+      abschnitt(3, 'Nord-Deich-Spitze', { ueber_abschnitt_id: 2, lagezustand: 'kritisch' }),
+      abschnitt(4, 'Süd', { lagezustand: 'kritisch' }),
+      abschnitt(5, 'Süd-West', { ueber_abschnitt_id: 4, lagezustand: 'angespannt' }),
+      abschnitt(6, 'Ost'),
+      abschnitt(7, 'Ost-UA', { ueber_abschnitt_id: 6, lagezustand: 'planmaessig' }),
+    ]);
+    const nach = (id: number) => zeilen.find((z) => z.abschnittId === id)!;
+    // der schlechteste im ganzen Teilbaum, auch zwei Ebenen tief
+    expect(nach(1).unterLage).toBe('kritisch');
+    // ein besserer Unterabschnitt ist keine Meldung
+    expect(nach(4).unterLage).toBeNull();
+    // ohne eigene Beurteilung ist jede Beurteilung darunter eine Aussage
+    expect(nach(6).unterLage).toBe('planmaessig');
   });
 });

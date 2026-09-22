@@ -635,6 +635,14 @@ pub const TABELLEN: &[TabellenRegel] = &[
             ),
             // erreichbarkeit = mögliche Rufnummer der Führung → PII, gescrubbt (LFH-108).
             scrub("erreichbarkeit", Strategie::NullSetzen),
+            // LFH-608: Kürzel, Beurteilung und Einschätzung sind Führungsskelett (RETAIN).
+            // Der feste Abschnittsauftrag ist nullabler Freitext wie `bemerkung` — anders
+            // als `auftrag.auftrag_text` wird er nicht ins ETB gesnapshottet, und „Evakuierung
+            // Uferstraße 3, Familie …" ist genau die Sorte Satz, die hier stehen kann.
+            retain("kurzbezeichnung", G_OP_LABEL),
+            retain("lagezustand", G_ENUM),
+            scrub("abschnittsauftrag", Strategie::NullSetzen), // REVIEW: operativer Freitext
+            retain("fortschritt", G_ZAEHLER),
         ],
     },
     TabellenRegel {
@@ -790,6 +798,12 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("reihenfolge", G_ZAEHLER),
             retain("gesetzt_von_id", G_FK),
             retain("gesetzt_at", G_ZEIT),
+            // LFH-628: erwarteter Höchststand — ein Messwert mit Zeitpunkt, kein Personenbezug
+            // außer dem Benutzer-FK.
+            retain("prognose_cm", G_ZAEHLER),
+            retain("prognose_zeit", G_ZEIT),
+            retain("prognose_gesetzt_von_id", G_FK),
+            retain("prognose_gesetzt_at", G_ZEIT),
         ],
     },
     TabellenRegel {
@@ -964,6 +978,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("meldeweg", G_ETB),
             retain("veranlassung", G_ETB),
             retain("erfasser_id", G_FK),
+            // Funktionskürzel („S2", „EL") aus Sachgebiet/Rolle, keine Person (LFH-615).
+            // Bewusst NICHT aus `einsatz_mitgliedschaft.fuehrungsstelle` (Scrub) abgeleitet.
+            retain("erfasser_funktion", G_ETB),
             retain("ereigniszeit", G_ZEIT),
             retain("received_at", G_ZEIT),
             retain("erfasst_lokal_at", G_ZEIT),

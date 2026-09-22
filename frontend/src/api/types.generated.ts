@@ -38,6 +38,13 @@ export interface components {
          */
         AbschlussGrund: "uebergabe_halter" | "uebergabe_tierarzt" | "uebergabe_tierheim" | "verstorben" | "freilauf" | "sonstiges";
         /**
+         * @description Lagezustand eines Abschnitts (LFH-608), Wire == `lagezustand`. Die Beurteilung trifft
+         *     die Führung; ohne Beurteilung bleibt das Feld leer — „nicht beurteilt" ist KEIN
+         *     planmäßig. Die Farbe liegt im Frontend-Vertrag (`theme/statusFarben.ts`).
+         * @enum {string}
+         */
+        AbschnittLagezustand: "planmaessig" | "angespannt" | "kritisch";
+        /**
          * @description Geteilte externe Adressat-Kategorie für Nachforderung (`adressat_kategorie`) und Auftrag
          *     (`extern_kategorie`) (Schema-Anker für die OpenAPI-Union, LFH-120).
          * @enum {string}
@@ -614,6 +621,12 @@ export interface components {
             leitstellen_nr?: string | null;
             /** @description Eigene Führungsstelle in diesem Einsatz; nur Anfangsbelegung für neue ETB-Erfassung. */
             meine_fuehrungsstelle?: string | null;
+            /**
+             * @description Funktion des abfragenden Benutzers in diesem Einsatz als Klartext für den Kopf
+             *     („S2 Lage", „S2/S3", „Einsatzleitung"; LFH-615). Abgeleitet aus `meine_sachgebiete`
+             *     und `meine_rolle` über `funktion::ableiten` — fehlt, wenn keine Funktion folgt.
+             */
+            meine_funktion?: string | null;
             meine_rolle?: null | components["schemas"]["EinsatzRolle"];
             /**
              * @description Sachgebiete, die der mit dem abfragenden Benutzer verknüpfte Personaldatensatz in
@@ -801,14 +814,27 @@ export interface components {
          *     `ueber_abschnitt_id` gebaut), inkl. aufgelöstem Leiter-Namen.
          */
         EinsatzabschnittAnzeige: {
+            /**
+             * @description Fester Abschnittsauftrag als Freitext (LFH-608) — nicht zu verwechseln mit den
+             *     einzelnen Aufträgen des Auftragsmoduls.
+             */
+            abschnittsauftrag?: string | null;
             bemerkung?: string | null;
             /** Format: int64 */
             einsatz_id: number;
             erreichbarkeit?: string | null;
             flaeche_geojson?: string | null;
+            /**
+             * Format: int64
+             * @description Eingeschätzter Fortschritt in Prozent, 0–100 (LFH-608); fehlt = nicht eingeschätzt.
+             */
+            fortschritt?: number | null;
             /** Format: int64 */
             id: number;
             kommunikationsmittel?: string | null;
+            /** @description Kurzbezeichnung/Rufname im Einsatz, z. B. „EA-N" (LFH-608); je Einsatz eindeutig. */
+            kurzbezeichnung?: string | null;
+            lagezustand?: null | components["schemas"]["AbschnittLagezustand"];
             /** Format: int64 */
             leiter_id?: number | null;
             /** @description Name der disponierten Leiter-Person (aufgelöst), falls gesetzt. */
@@ -968,10 +994,24 @@ export interface components {
             /** Format: int64 */
             berichtigt_eintrag_id?: number | null;
             ereigniszeit: string;
+            /**
+             * @description Funktion des Erfassers beim Anlegen („S2", „S2/S3", „EL"; LFH-615) — Snapshot, keine
+             *     Ableitung beim Lesen. Fehlt, wenn keine Funktion ableitbar war oder der Eintrag älter
+             *     als die Spalte ist.
+             */
+            erfasser_funktion?: string | null;
             /** Format: int64 */
             erfasser_id: number;
             erfasser_name: string;
             erfasst_lokal_at?: string | null;
+            /**
+             * @description Aufträge, die AUS diesem Eintrag erteilt wurden (LFH-636) — die Vorwärtsrichtung zu
+             *     `auftrag.quell_etb_eintrag_id` (LFH-112), nicht zu verwechseln mit `auftrag_id` oben
+             *     (Eintrag wurde VON einem Auftrag erzeugt). Aufsteigend nach `lfd_nr`, leer statt
+             *     fehlend. Nicht Teil des SELECT: `repo::laden`/`repo::abfrage` füllen die Liste je
+             *     Seite mit einer gebündelten Abfrage nach.
+             */
+            folgeauftraege: components["schemas"]["FolgeauftragVerweis"][];
             /** Format: int64 */
             id: number;
             inhalt: string;
@@ -1078,6 +1118,19 @@ export interface components {
             fahrzeugtyp: string[];
             standort: string[];
             traegerorganisation: string[];
+        };
+        /**
+         * @description Verweis auf einen Folgeauftrag eines ETB-Eintrags (LFH-636): genug für einen Deeplink
+         *     (`id`) und einen unterscheidbaren Namen (`lfd_nr`) — die DB-`id` wird nie angezeigt.
+         */
+        FolgeauftragVerweis: {
+            /** Format: int64 */
+            id: number;
+            /**
+             * Format: int64
+             * @description Laufende Nummer des Auftrags; fehlt nur bei Aufträgen vor LFH-133.
+             */
+            lfd_nr?: number | null;
         };
         /** @description Ein freies taktisches Zeichen (Punkt-Marker ohne Fachobjekt, LFH-170). */
         FreiesZeichenAnzeige: {
@@ -1909,6 +1962,7 @@ export interface components {
             messung?: null | components["schemas"]["PegelMessung"];
             /** @description Stationsname zum Zeitpunkt des Festlegens (Snapshot). */
             name: string;
+            prognose?: null | components["schemas"]["PegelPrognose"];
             /**
              * Format: int64
              * @description Position in der Liste, ab 0; der erste Eintrag ist der Leitpegel.
@@ -1936,6 +1990,52 @@ export interface components {
              *     dann, wenn ein älterer Cache-Eintrag ausgeliefert wird.
              */
             zeitpunkt: string;
+        };
+        /**
+         * @description Erwarteter Höchststand an einem festgelegten Pegel (LFH-628), von Hand gepflegt.
+         *
+         *     Ein verstrichener Zeitpunkt bleibt stehen, bis jemand die Prognose löscht oder erneuert:
+         *     ob sie „abgelaufen" ist, entscheidet das Frontend gegen seine Uhr — dieselbe Arbeitsteilung
+         *     wie beim veralteten Messwert.
+         */
+        PegelPrognose: {
+            /** @description Wann die Prognose zuletzt gesetzt wurde (UTC, Wire-Format). */
+            gesetzt_at: string;
+            /**
+             * Format: double
+             * @description Erwarteter Höchststand in cm (dieselbe Einheit wie die Messung).
+             */
+            hoechststand_cm: number;
+            /** @description Zeitpunkt des erwarteten Höchststands, UTC im Wire-Format `YYYY-MM-DD HH:MM:SS`. */
+            zeitpunkt: string;
+        };
+        /**
+         * @description Vorschlag aus der PEGELONLINE-Vorhersage-Reihe `WV` (LFH-628): der höchste Wert der
+         *     Reihe mit seinem Zeitpunkt. Nur ein Teil der Stationen führt die Reihe (gemessen
+         *     22.09.2026: 43).
+         */
+        PegelVorhersage: {
+            /**
+             * @description `true`, wenn der Höchstwert aus dem Abschätzungs-Teil der Reihe stammt (`type:
+             *     "estimate"`) statt aus der Vorhersage — die Quelle unterscheidet beides ausdrücklich.
+             */
+            abschaetzung: boolean;
+            /** @description Wann die Vorhersage gerechnet wurde (`initialized` der Quelle), RFC 3339. */
+            erstellt: string;
+            /**
+             * Format: double
+             * @description Höchster Wert der Reihe in cm.
+             */
+            hoechststand_cm: number;
+            /** @description Zeitpunkt dieses Werts, RFC 3339 mit Versatz, wie die Quelle ihn liefert. */
+            zeitpunkt: string;
+        };
+        /**
+         * @description Antwort auf die Vorhersage-Abfrage. `vorhersage` fehlt, wenn die Station keine Reihe `WV`
+         *     führt — das ist kein Fehler, sondern der Normalfall für die meisten Stationen.
+         */
+        PegelVorhersageAntwort: {
+            vorhersage?: null | components["schemas"]["PegelVorhersage"];
         };
         PeilungAntwort: {
             bezug_label: string;

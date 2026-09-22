@@ -70,6 +70,7 @@ const eintrag = {
   received_at: '2026-05-23 10:00:01',
   erfasst_lokal_at: null,
   berichtigt_eintrag_id: null,
+  folgeauftraege: [],
 };
 
 /**

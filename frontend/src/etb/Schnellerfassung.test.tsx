@@ -49,6 +49,7 @@ function original(): EtbEintragAnzeige {
     lagebericht_id: null,
     auftrag_id: null,
     befehl_id: null,
+    folgeauftraege: [],
   };
 }
 

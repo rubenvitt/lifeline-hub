@@ -51,8 +51,9 @@
  *    bleibt der Platz belegt und führt zur Einstellungssektion „Pegel".
  *
  * Weggelassen, weil keine Datenquelle existiert: Evakuiert (LFH-607), „Transportiert /
- * offen" im Sichtungsfuß (LFH-613, Verbleib ist Freitext). Prognose und Höchststand am Pegel
- * sind ein eigener Folgetask, nicht Teil von LFH-606.
+ * offen" im Sichtungsfuß (LFH-613, Verbleib ist Freitext). Der erwartete Höchststand am
+ * Leitpegel (LFH-628) steht als Teil der Pegel-Notiz („Prognose 7,10 m bis 18:00"), solange
+ * sein Zeitpunkt aussteht — die Ableitung liegt in `pegel/pegelKennzahl.ts`.
  *
  * ── DATENZUSTÄNDE ──────────────────────────────────────────────────────────────────
  *

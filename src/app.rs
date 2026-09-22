@@ -264,6 +264,15 @@ pub fn build_router(state: AppState) -> Router {
                 .put(routes::pegel::ersetzen)
                 .post(routes::pegel::anfuegen),
         )
+        // Prognose am einzelnen Pegel (LFH-628): eigene Routen, nicht im Vollersatz-PUT.
+        .route(
+            "/api/einsaetze/{id}/pegel/{pegel_id}/prognose",
+            put(routes::pegel::prognose_setzen).delete(routes::pegel::prognose_loeschen),
+        )
+        .route(
+            "/api/einsaetze/{id}/pegel/{pegel_id}/vorhersage",
+            get(routes::pegel::vorhersage_lesen),
+        )
         // Stab (LFH-46): Führungsorganisation S1–S6. Flache Kette wie die Nachbarn.
         .route("/api/einsaetze/{id}/stab", get(routes::stab::laden))
         .route(

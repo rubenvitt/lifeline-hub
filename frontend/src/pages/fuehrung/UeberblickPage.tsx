@@ -20,6 +20,7 @@ import {
   type KennzahlZustand,
 } from '../../components/instrument';
 import { einsatzKeys } from '../../api/queryKeys';
+import { verfasserText } from '../../etb/verfasser';
 import { ladeEinsatz } from '../../api/einsaetze';
 import { listePersonen } from '../../api/einsatzPerson';
 import { listeEinsatzPersonal } from '../../api/einsatzPersonal';
@@ -39,6 +40,7 @@ import {
   einheitenPfad,
   einsaetzePfad,
   einsatzabschnittePfad,
+  einsatzEinstellungenPfad,
   erinnerungenPfad,
   etbPfad,
   gefahrenPfad,
@@ -49,7 +51,8 @@ import {
 } from '../../routing/deeplinks';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { formatUhrzeit, formatUhrzeitMitTag } from '../../anzeige/format';
-import { etbTyp } from '../../theme/statusFarben';
+import { abschnittLagezustand, etbTyp, rollenFarbe } from '../../theme/statusFarben';
+import StatusTag from '../../components/StatusTag';
 import { useViewport } from '../../components/useViewport';
 import {
   abschnittNamen,
@@ -59,7 +62,6 @@ import {
   empfaengerText,
   entscheidungenAuswahl,
   folgeText,
-  folgeauftraegeJeEintrag,
   kraefteKennzahl,
   naechsteMarken,
   offeneAuftraege,
@@ -99,9 +101,17 @@ import { MARKEN_BREITE, rasterStil, zeilenzielStil } from './ueberblickStil';
  * Solange sie lädt oder scheitert, trägt die Zeile dazu schlicht nichts. Keine Fristfarbe:
  * der Überblick zählt Rückmeldungen nicht aus, das tut das Meldebild (S6).
  *
- * BEWUSST WEGGELASSEN (keine erfundenen Daten, Entscheidung 4): Lagezustand-Farbkante und
- * Fortschritt je Abschnitt (LFH-608). Das Raster bereit · gebunden · Ausfall zählt seit
- * LFH-609 die Einheiten nach ihrem Status.
+ * PEGEL-PROGNOSE ALS MARKE (LFH-628): ein offener erwarteter Höchststand steht unter den
+ * nächsten Marken („Erwarteter Höchststand Pegel Weser: 7,10 m") und führt zur
+ * Einstellungssektion, wo er gepflegt wird. Verstrichen fällt er heraus (`naechsteMarken`).
+ * Auch hier bestimmt der Pegel-Abruf NICHT den Zustand des Paneels: ein gescheiterter
+ * Abruf nimmt nur die Prognose-Marke weg, die Fristen der übrigen Quellen bleiben lesbar.
+ *
+ * BEWUSST WEGGELASSEN (keine erfundenen Daten, Entscheidung 4): nichts mehr aus den
+ * Datenlücken des Entwurfs. Das Raster bereit · gebunden · Ausfall zählt seit LFH-609 die
+ * Einheiten nach ihrem Status; Lagezustand, Kürzel, fester Auftrag und Fortschritt je
+ * Abschnitt kommen seit LFH-608 aus dem Abschnitt selbst — und bleiben weg, solange sie
+ * dort nicht gepflegt sind.
  */
 
 /** Der Entscheidungsabruf: nur Typ „Entscheidung", ein Deckel, der die letzte Stunde
@@ -310,7 +320,6 @@ export default function UeberblickPage() {
     [abschnitte, einheiten, personal, fahrzeuge, material, auftraege, rueckmeldungen],
   );
   const entscheidungen = useMemo(() => entscheidungenAuswahl(etb ?? [], jetzt), [etb, jetzt]);
-  const folge = useMemo(() => folgeauftraegeJeEintrag(auftraege ?? []), [auftraege]);
   const marken = useMemo(
     () =>
       naechsteMarken(
@@ -318,8 +327,9 @@ export default function UeberblickPage() {
         erinnerungen ?? [],
         einsatz?.naechste_lagebesprechung_at,
         jetzt,
+        pegel ?? [],
       ),
-    [auftraege, erinnerungen, einsatz?.naechste_lagebesprechung_at, jetzt],
+    [auftraege, erinnerungen, einsatz?.naechste_lagebesprechung_at, jetzt, pegel],
   );
 
   const zBetroffene = zustandVon(personenQ);
@@ -341,7 +351,9 @@ export default function UeberblickPage() {
       ? auftraegePfad(einsatzId, { auftrag: m.id ?? undefined })
       : m.art === 'erinnerung'
         ? erinnerungenPfad(einsatzId)
-        : stabPfad(einsatzId);
+        : m.art === 'pegelprognose'
+          ? einsatzEinstellungenPfad(einsatzId, 'pegel')
+          : stabPfad(einsatzId);
   const markenFarbe = (m: Marke) =>
     m.ton === 'alarm' ? rollen.alarmText : m.ton === 'achtung' ? rollen.achtungText : rollen.text;
 
@@ -628,13 +640,6 @@ export default function UeberblickPage() {
                   ETB ↗
                 </Link>
               }
-              fuss={
-                auftraegeFehlen && entscheidungen.eintraege.length > 0 ? (
-                  <span style={{ fontSize: 11, color: rollen.schwach }}>
-                    Aufträge nicht abrufbar — Folgeaufträge werden nicht gezählt.
-                  </span>
-                ) : undefined
-              }
             >
               <Zustandsfeld
                 zustand={zEntscheidungen}
@@ -649,7 +654,9 @@ export default function UeberblickPage() {
               >
                 <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
                   {entscheidungen.eintraege.map((e) => {
-                    const folgeWort = auftraegeFehlen ? null : folgeText(folge.get(e.id) ?? 0);
+                    // Aus dem ETB-Eintrag selbst (LFH-636), nicht aus der Auftragsliste —
+                    // die bekommt nicht, wer das Aufträge-Modul gesperrt hat.
+                    const folgeWort = folgeText(e.folgeauftraege.length);
                     return (
                       <Zeitachseneintrag
                         key={e.id}
@@ -658,7 +665,7 @@ export default function UeberblickPage() {
                         typwort={etbTyp.entscheidung.label}
                         zeit={uhrzeit(e.ereigniszeit)}
                         nr={`Nr. ${e.lfd_nr}`}
-                        meta={e.erfasser_name}
+                        meta={verfasserText(e)}
                         aktionen={
                           folgeWort ? (
                             <span
@@ -763,9 +770,10 @@ const NUR_VORLESER: CSSProperties = {
   border: 0,
 };
 
-/** Eine Abschnittszeile: Name/Leiter/Einheiten · jüngster offener Auftrag und letzte
- *  Rückmeldung · Stärke und Einheiten je Statuskategorie (LFH-609). Die ganze Zeile ist der
- *  Link auf den Abschnitt. */
+/** Eine Abschnittszeile: Lagekante · Name/Kürzel/Leiter/Einheiten/Lagezustand · fester
+ *  Auftrag mit Fortschritt (sonst jüngster offener Auftrag) und letzte Rückmeldung (LFH-610)
+ *  · Stärke und Einheiten je Statuskategorie (LFH-609). Die ganze Zeile ist der Link auf
+ *  den Abschnitt. */
 function AbschnittEintrag({
   zeile,
   ziel,
@@ -778,27 +786,70 @@ function AbschnittEintrag({
 }) {
   const { token, rollen } = useRollen();
   const [juengster, ...weitere] = zeile.auftraege;
+  const { auftragsbilanz } = zeile;
   const verteilung = zeile.einheitenStatus;
   const rueck = zeile.letzteRueckmeldung;
+  const lage = zeile.lagezustand ? abschnittLagezustand[zeile.lagezustand] : null;
+  const leitung = [zeile.kurzbezeichnung, zeile.leiter].filter(Boolean).join(' · ');
+  // Unterzeile: die Zählung, und wenn der feste Auftrag den Platz hat, der offene
+  // Einzelauftrag dahinter — er wird kleiner, nicht unsichtbar.
+  const unterzeile = [
+    auftragsbilanz.gesamt > 0
+      ? `${auftragsbilanz.erledigt}/${auftragsbilanz.gesamt} Aufträge erledigt`
+      : null,
+    zeile.abschnittsauftrag && juengster
+      ? `${zeile.auftraege.length} offen · ${juengster.auftrag_text}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
   return (
     <Link
       to={ziel}
       data-lfh="ueberblick-abschnitt"
       style={{ ...zeilenzielStil(rollen, token), flexWrap: 'wrap', paddingBlock: token.padding }}
     >
+      {/* Die Lagekante: Farbe NUR als Rand (Bedien-Leitlinie), das Stufenwort steht im
+          StatusTag daneben. Ohne Beurteilung bleibt sie durchsichtig — eine graue Kante
+          sähe aus wie eine Stufe „neutral", die es nicht gibt. */}
+      <span
+        aria-hidden
+        data-lfh="abschnitt-lagekante"
+        data-rolle={lage?.rolle}
+        style={{
+          flex: '0 0 3px',
+          alignSelf: 'stretch',
+          background: lage ? rollenFarbe(lage.rolle, token) : 'transparent',
+        }}
+      />
       <span
         style={{ flex: '0 0 158px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}
       >
         <span style={{ fontSize: 14, fontWeight: 500, overflowWrap: 'anywhere' }}>
           {zeile.name}
         </span>
-        {zeile.leiter && (
-          <span style={{ ...monoStil(11), color: rollen.schwach }}>{zeile.leiter}</span>
-        )}
+        {leitung && <span style={{ ...monoStil(11), color: rollen.schwach }}>{leitung}</span>}
         <span style={{ ...monoStil(11), color: rollen.gedaempft }}>
           {zeile.einheiten === 1 ? '1 Einheit' : `${zeile.einheiten} Einheiten`}
           {zeile.unterabschnitte > 0 && ` · ${zeile.unterabschnitte} UA`}
         </span>
+        {(lage || zeile.unterLage) && (
+          <span style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
+            {lage && <StatusTag darstellung={lage} darstellungsart="rand" />}
+            {/* Ein schlechter beurteilter Unterabschnitt bekommt DIESELBE Form wie der
+                eigene Zustand (Rollenrand + Wort), nicht bloß gedämpften Text — sonst stünde
+                „UA kritisch“ leiser da als ein grünes „planmäßig“ (LFH-608, Review). */}
+            {zeile.unterLage && (
+              <StatusTag
+                darstellung={{
+                  ...abschnittLagezustand[zeile.unterLage],
+                  label: `UA ${abschnittLagezustand[zeile.unterLage].label}`,
+                }}
+                darstellungsart="rand"
+              />
+            )}
+          </span>
+        )}
       </span>
       <span
         style={{
@@ -807,17 +858,16 @@ function AbschnittEintrag({
           display: 'flex',
           flexDirection: 'column',
           gap: 7,
+          fontSize: 12,
+          lineHeight: 1.45,
+          color: rollen.gedaempft,
+          overflowWrap: 'anywhere',
         }}
       >
-        {juengster && (
-          <span
-            style={{
-              fontSize: 12,
-              lineHeight: 1.45,
-              color: rollen.gedaempft,
-              overflowWrap: 'anywhere',
-            }}
-          >
+        {zeile.abschnittsauftrag ? (
+          <span>{zeile.abschnittsauftrag}</span>
+        ) : juengster ? (
+          <span>
             {juengster.auftrag_text}
             {weitere.length > 0 && (
               <span style={{ ...monoStil(10), color: rollen.schwach }}>
@@ -826,7 +876,26 @@ function AbschnittEintrag({
               </span>
             )}
           </span>
+        ) : null}
+        {zeile.fortschritt != null && (
+          <span style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+            {/* Der Balken ist Beiwerk, die Zahl daneben die Aussage — deshalb aria-hidden. */}
+            <span
+              aria-hidden
+              style={{ flex: 1, height: 4, background: rollen.linie, display: 'flex' }}
+            >
+              <span
+                data-lfh="abschnitt-fortschritt"
+                style={{
+                  width: `${zeile.fortschritt}%`,
+                  background: lage ? rollenFarbe(lage.rolle, token) : rollen.gedaempft,
+                }}
+              />
+            </span>
+            <span style={{ ...monoStil(11), color: rollen.schwach }}>{zeile.fortschritt} %</span>
+          </span>
         )}
+        {unterzeile && <span style={{ ...monoStil(10), color: rollen.schwach }}>{unterzeile}</span>}
         {/* Nur wenn die Rückmeldungen feststehen (LFH-610) — sonst gar nichts, auch kein
             Strich. Der verborgene Vorsatz gibt der Zeit im Linknamen ihre Bedeutung; ohne
             ihn läse ein Vorleser eine nackte Uhrzeit neben dem Auftrag. */}

@@ -86,6 +86,15 @@
           "sonstiges"
         ]
       },
+      "AbschnittLagezustand": {
+        "type": "string",
+        "description": "Lagezustand eines Abschnitts (LFH-608), Wire == `lagezustand`. Die Beurteilung trifft\ndie Führung; ohne Beurteilung bleibt das Feld leer — „nicht beurteilt\" ist KEIN\nplanmäßig. Die Farbe liegt im Frontend-Vertrag (`theme/statusFarben.ts`).",
+        "enum": [
+          "planmaessig",
+          "angespannt",
+          "kritisch"
+        ]
+      },
       "AdressatKategorie": {
         "type": "string",
         "description": "Geteilte externe Adressat-Kategorie für Nachforderung (`adressat_kategorie`) und Auftrag\n(`extern_kategorie`) (Schema-Anker für die OpenAPI-Union, LFH-120).",
@@ -1748,6 +1757,13 @@
             ],
             "description": "Eigene Führungsstelle in diesem Einsatz; nur Anfangsbelegung für neue ETB-Erfassung."
           },
+          "meine_funktion": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Funktion des abfragenden Benutzers in diesem Einsatz als Klartext für den Kopf\n(„S2 Lage\", „S2/S3\", „Einsatzleitung\"; LFH-615). Abgeleitet aus `meine_sachgebiete`\nund `meine_rolle` über `funktion::ableiten` — fehlt, wenn keine Funktion folgt."
+          },
           "meine_rolle": {
             "oneOf": [
               {
@@ -2254,6 +2270,13 @@
           "sprechgruppen"
         ],
         "properties": {
+          "abschnittsauftrag": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Fester Abschnittsauftrag als Freitext (LFH-608) — nicht zu verwechseln mit den\neinzelnen Aufträgen des Auftragsmoduls."
+          },
           "bemerkung": {
             "type": [
               "string",
@@ -2276,6 +2299,14 @@
               "null"
             ]
           },
+          "fortschritt": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Eingeschätzter Fortschritt in Prozent, 0–100 (LFH-608); fehlt = nicht eingeschätzt."
+          },
           "id": {
             "type": "integer",
             "format": "int64"
@@ -2284,6 +2315,24 @@
             "type": [
               "string",
               "null"
+            ]
+          },
+          "kurzbezeichnung": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Kurzbezeichnung/Rufname im Einsatz, z. B. „EA-N\" (LFH-608); je Einsatz eindeutig."
+          },
+          "lagezustand": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AbschnittLagezustand",
+                "description": "Beurteilter Lagezustand (LFH-608); fehlt = nicht beurteilt."
+              }
             ]
           },
           "leiter_id": {
@@ -2747,7 +2796,8 @@
           "erfasser_id",
           "erfasser_name",
           "ereigniszeit",
-          "received_at"
+          "received_at",
+          "folgeauftraege"
         ],
         "properties": {
           "an": {
@@ -2782,6 +2832,13 @@
           "ereigniszeit": {
             "type": "string"
           },
+          "erfasser_funktion": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Funktion des Erfassers beim Anlegen („S2\", „S2/S3\", „EL\"; LFH-615) — Snapshot, keine\nAbleitung beim Lesen. Fehlt, wenn keine Funktion ableitbar war oder der Eintrag älter\nals die Spalte ist."
+          },
           "erfasser_id": {
             "type": "integer",
             "format": "int64"
@@ -2794,6 +2851,13 @@
               "string",
               "null"
             ]
+          },
+          "folgeauftraege": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FolgeauftragVerweis"
+            },
+            "description": "Aufträge, die AUS diesem Eintrag erteilt wurden (LFH-636) — die Vorwärtsrichtung zu\n`auftrag.quell_etb_eintrag_id` (LFH-112), nicht zu verwechseln mit `auftrag_id` oben\n(Eintrag wurde VON einem Auftrag erzeugt). Aufsteigend nach `lfd_nr`, leer statt\nfehlend. Nicht Teil des SELECT: `repo::laden`/`repo::abfrage` füllen die Liste je\nSeite mit einer gebündelten Abfrage nach."
           },
           "id": {
             "type": "integer",
@@ -3086,6 +3150,27 @@
             "items": {
               "type": "string"
             }
+          }
+        }
+      },
+      "FolgeauftragVerweis": {
+        "type": "object",
+        "description": "Verweis auf einen Folgeauftrag eines ETB-Eintrags (LFH-636): genug für einen Deeplink\n(`id`) und einen unterscheidbaren Namen (`lfd_nr`) — die DB-`id` wird nie angezeigt.",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "lfd_nr": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Laufende Nummer des Auftrags; fehlt nur bei Aufträgen vor LFH-133."
           }
         }
       },
@@ -5296,6 +5381,17 @@
             "type": "string",
             "description": "Stationsname zum Zeitpunkt des Festlegens (Snapshot)."
           },
+          "prognose": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PegelPrognose",
+                "description": "Erwarteter Höchststand (LFH-628); fehlt, wenn keiner gepflegt ist."
+              }
+            ]
+          },
           "reihenfolge": {
             "type": "integer",
             "format": "int64",
@@ -5331,6 +5427,75 @@
           "zeitpunkt": {
             "type": "string",
             "description": "Zeitpunkt der jüngsten Messung, RFC 3339 mit Zonenversatz, wie PEGELONLINE ihn\nliefert (z. B. `2026-09-22T09:15:00+02:00`). Er ist der ehrliche Datenstand — auch\ndann, wenn ein älterer Cache-Eintrag ausgeliefert wird."
+          }
+        }
+      },
+      "PegelPrognose": {
+        "type": "object",
+        "description": "Erwarteter Höchststand an einem festgelegten Pegel (LFH-628), von Hand gepflegt.\n\nEin verstrichener Zeitpunkt bleibt stehen, bis jemand die Prognose löscht oder erneuert:\nob sie „abgelaufen\" ist, entscheidet das Frontend gegen seine Uhr — dieselbe Arbeitsteilung\nwie beim veralteten Messwert.",
+        "required": [
+          "hoechststand_cm",
+          "zeitpunkt",
+          "gesetzt_at"
+        ],
+        "properties": {
+          "gesetzt_at": {
+            "type": "string",
+            "description": "Wann die Prognose zuletzt gesetzt wurde (UTC, Wire-Format)."
+          },
+          "hoechststand_cm": {
+            "type": "number",
+            "format": "double",
+            "description": "Erwarteter Höchststand in cm (dieselbe Einheit wie die Messung)."
+          },
+          "zeitpunkt": {
+            "type": "string",
+            "description": "Zeitpunkt des erwarteten Höchststands, UTC im Wire-Format `YYYY-MM-DD HH:MM:SS`."
+          }
+        }
+      },
+      "PegelVorhersage": {
+        "type": "object",
+        "description": "Vorschlag aus der PEGELONLINE-Vorhersage-Reihe `WV` (LFH-628): der höchste Wert der\nReihe mit seinem Zeitpunkt. Nur ein Teil der Stationen führt die Reihe (gemessen\n22.09.2026: 43).",
+        "required": [
+          "hoechststand_cm",
+          "zeitpunkt",
+          "erstellt",
+          "abschaetzung"
+        ],
+        "properties": {
+          "abschaetzung": {
+            "type": "boolean",
+            "description": "`true`, wenn der Höchstwert aus dem Abschätzungs-Teil der Reihe stammt (`type:\n\"estimate\"`) statt aus der Vorhersage — die Quelle unterscheidet beides ausdrücklich."
+          },
+          "erstellt": {
+            "type": "string",
+            "description": "Wann die Vorhersage gerechnet wurde (`initialized` der Quelle), RFC 3339."
+          },
+          "hoechststand_cm": {
+            "type": "number",
+            "format": "double",
+            "description": "Höchster Wert der Reihe in cm."
+          },
+          "zeitpunkt": {
+            "type": "string",
+            "description": "Zeitpunkt dieses Werts, RFC 3339 mit Versatz, wie die Quelle ihn liefert."
+          }
+        }
+      },
+      "PegelVorhersageAntwort": {
+        "type": "object",
+        "description": "Antwort auf die Vorhersage-Abfrage. `vorhersage` fehlt, wenn die Station keine Reihe `WV`\nführt — das ist kein Fehler, sondern der Normalfall für die meisten Stationen.",
+        "properties": {
+          "vorhersage": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PegelVorhersage"
+              }
+            ]
           }
         }
       },

@@ -30,12 +30,14 @@ import EtbBacklinkBadges from './EtbBacklinkBadges';
 import type { EtbZeile } from './etbZeile';
 import { MELDEWEG_OPTIONEN } from './schnellerfassungModell';
 import { istNachgetragen } from './typFarben';
+import { verfasserText } from './verfasser';
 import {
   berichtigungsindex,
   einfrieren,
   type Einfrierstand,
   gruppiereNachStunde,
   teileZufluss,
+  hatVerknuepfung,
   verweisStil,
   zuflussText,
 } from './zeitachseModell';
@@ -277,9 +279,7 @@ export default function EtbZeitachse({
             <span aria-hidden="true"> ↗</span>
           </Link>
         )),
-        (e.befehl_id != null || e.lagebericht_id != null || e.auftrag_id != null) && (
-          <EtbBacklinkBadges key="rueck" eintrag={e} einsatzId={einsatzId} />
-        ),
+        hatVerknuepfung(e) && <EtbBacklinkBadges key="rueck" eintrag={e} einsatzId={einsatzId} />,
       ],
       token.marginXS,
     );
@@ -366,7 +366,7 @@ export default function EtbZeitachse({
         meta={vonAn(e.von, e.an)}
         toenung={e.typ === 'berichtigung' ? 'berichtigung' : undefined}
         hinweis={eintragsHinweis(e)}
-        verfasser={e.erfasser_name}
+        verfasser={verfasserText(e)}
         weg={e.meldeweg ? MELDEWEG_LABEL[e.meldeweg] : undefined}
       >
         {/* Unter dem Stundenkopf (h2, s. u.) — `#` im Eintrag wird h3 (LFH-621). */}

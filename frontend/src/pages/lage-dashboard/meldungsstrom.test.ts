@@ -17,6 +17,7 @@ const e = (lfd: number, over: Partial<EtbEintragAnzeige> = {}): EtbEintragAnzeig
     inhalt: `Eintrag ${lfd}`,
     ereigniszeit: '2026-06-11 09:00:00',
     erfasser_name: 'Vitt',
+    folgeauftraege: [],
     ...over,
   }) as EtbEintragAnzeige;
 
@@ -80,6 +81,16 @@ describe('stromQuelle', () => {
   it('ohne `von` der Erfasser, ohne Meldeweg nichts erfunden', () => {
     expect(stromQuelle(e(1, { von: '  ', meldeweg: null }))).toBe('Vitt');
     expect(stromQuelle(e(1, { meldeweg: 'persoenlich' }))).toBe('Vitt · Persönlich');
+  });
+
+  it('ohne `von` trägt der Erfasser seinen Funktions-Snapshot (LFH-615)', () => {
+    expect(stromQuelle(e(1, { erfasser_funktion: 'S2', meldeweg: 'funk' }))).toBe(
+      'Vitt ·\u00A0S2 · Funk',
+    );
+    // Ein gesetztes `von` bleibt die Herkunft — die Funktion des Erfassers ist dann nicht die Quelle.
+    expect(stromQuelle(e(1, { von: 'Deichwache Nord', erfasser_funktion: 'S2' }))).toBe(
+      'Deichwache Nord',
+    );
   });
 });
 

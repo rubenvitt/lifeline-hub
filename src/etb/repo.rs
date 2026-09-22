@@ -1,6 +1,7 @@
-use super::EtbEintragAnzeige;
+use super::{EtbEintragAnzeige, FolgeauftragVerweis};
 use crate::error::AppError;
 use sqlx::{QueryBuilder, Sqlite, SqliteConnection, SqlitePool};
+use std::collections::HashMap;
 
 /// Eingabedaten für einen neuen ETB-Eintrag. Alle Werte sind bereits
 /// validiert und normalisiert (Zeitformat, Pflichtfelder) — das ist Aufgabe
@@ -32,11 +33,15 @@ pub async fn anlegen_tx(
     startwert: i64,
     daten: EintragDaten<'_>,
 ) -> Result<i64, AppError> {
+    // Funktions-Snapshot (LFH-615) HIER und nicht beim Aufrufer: jeder Kopplungspfad
+    // (Meldung, Auftrag, Befehl, Stab …) läuft durch diese Funktion und kann ihn nicht
+    // vergessen. Der Client liefert ihn nie — ein Nachweis, den der Absender setzt, wäre keiner.
+    let funktion = crate::einsatz::funktion::kurz_fuer(&mut *conn, einsatz_id, erfasser_id).await?;
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO etb_eintrag \
             (einsatz_id, lfd_nr, typ, inhalt, von, an, meldeweg, veranlassung, \
-             erfasser_id, ereigniszeit, erfasst_lokal_at, berichtigt_eintrag_id) \
-         SELECT ?, COALESCE(MAX(lfd_nr) + 1, ?), ?, ?, ?, ?, ?, ?, ?, \
+             erfasser_id, erfasser_funktion, ereigniszeit, erfasst_lokal_at, berichtigt_eintrag_id) \
+         SELECT ?, COALESCE(MAX(lfd_nr) + 1, ?), ?, ?, ?, ?, ?, ?, ?, ?, \
                 COALESCE(?, datetime('now')), ?, ? \
          FROM etb_eintrag WHERE einsatz_id = ? \
          RETURNING id",
@@ -50,6 +55,7 @@ pub async fn anlegen_tx(
     .bind(daten.meldeweg)
     .bind(daten.veranlassung)
     .bind(erfasser_id)
+    .bind(funktion)
     .bind(daten.ereigniszeit)
     .bind(daten.erfasst_lokal_at)
     .bind(daten.berichtigt_eintrag_id)
@@ -110,7 +116,21 @@ pub async fn anlegen_idempotent(
         .await?
         .etb_startwert();
     let mut conn = pool.acquire().await?;
-    match insert_mit_client_id(&mut conn, einsatz_id, erfasser_id, startwert, cid, &daten).await {
+    // Snapshot wie in `anlegen_tx` (LFH-615). Außerhalb des INSERTs, weil der Race-Zweig unten
+    // den rohen sqlx-Fehler braucht; ein Replay liefert ohnehin den Originaleintrag samt
+    // Original-Snapshot zurück.
+    let funktion = crate::einsatz::funktion::kurz_fuer(&mut conn, einsatz_id, erfasser_id).await?;
+    match insert_mit_client_id(
+        &mut conn,
+        einsatz_id,
+        erfasser_id,
+        funktion.as_deref(),
+        startwert,
+        cid,
+        &daten,
+    )
+    .await
+    {
         Ok(id) => {
             drop(conn);
             Ok((laden(pool, id).await?, true))
@@ -162,6 +182,7 @@ async fn insert_mit_client_id(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     erfasser_id: i64,
+    erfasser_funktion: Option<&str>,
     startwert: i64,
     client_id: &str,
     daten: &EintragDaten<'_>,
@@ -169,8 +190,9 @@ async fn insert_mit_client_id(
     sqlx::query_scalar(
         "INSERT INTO etb_eintrag \
             (einsatz_id, lfd_nr, typ, inhalt, von, an, meldeweg, veranlassung, \
-             erfasser_id, ereigniszeit, erfasst_lokal_at, berichtigt_eintrag_id, client_id) \
-         SELECT ?, COALESCE(MAX(lfd_nr) + 1, ?), ?, ?, ?, ?, ?, ?, ?, \
+             erfasser_id, erfasser_funktion, ereigniszeit, erfasst_lokal_at, \
+             berichtigt_eintrag_id, client_id) \
+         SELECT ?, COALESCE(MAX(lfd_nr) + 1, ?), ?, ?, ?, ?, ?, ?, ?, ?, \
                 COALESCE(?, datetime('now')), ?, ?, ? \
          FROM etb_eintrag WHERE einsatz_id = ? \
          RETURNING id",
@@ -184,6 +206,7 @@ async fn insert_mit_client_id(
     .bind(daten.meldeweg)
     .bind(daten.veranlassung)
     .bind(erfasser_id)
+    .bind(erfasser_funktion)
     .bind(daten.ereigniszeit)
     .bind(daten.erfasst_lokal_at)
     .bind(daten.berichtigt_eintrag_id)
@@ -196,9 +219,9 @@ async fn insert_mit_client_id(
 /// Lädt einen einzelnen Eintrag als Anzeige (inkl. Erfasser-Name).
 /// `NotFound`, wenn der Eintrag nicht existiert.
 pub async fn laden(pool: &SqlitePool, id: i64) -> Result<EtbEintragAnzeige, AppError> {
-    sqlx::query_as::<_, EtbEintragAnzeige>(
+    let mut eintrag = sqlx::query_as::<_, EtbEintragAnzeige>(
         "SELECT e.id, e.lfd_nr, e.typ, e.inhalt, e.von, e.an, e.meldeweg, e.veranlassung, \
-                e.erfasser_id, b.anzeigename AS erfasser_name, e.ereigniszeit, e.received_at, \
+                e.erfasser_id, b.anzeigename AS erfasser_name, e.erfasser_funktion, e.ereigniszeit, e.received_at, \
                 e.erfasst_lokal_at, e.berichtigt_eintrag_id, e.lagebericht_id, e.auftrag_id, \
                 e.befehl_id \
          FROM etb_eintrag e JOIN benutzer b ON b.id = e.erfasser_id \
@@ -207,7 +230,49 @@ pub async fn laden(pool: &SqlitePool, id: i64) -> Result<EtbEintragAnzeige, AppE
     .bind(id)
     .fetch_optional(pool)
     .await?
-    .ok_or(AppError::NotFound)
+    .ok_or(AppError::NotFound)?;
+    folgeauftraege_nachladen(pool, std::slice::from_mut(&mut eintrag)).await?;
+    Ok(eintrag)
+}
+
+/// Füllt `folgeauftraege` (LFH-636) für alle übergebenen Einträge mit EINER Abfrage nach —
+/// kein N+1 je Zeile. Die IN-Liste ist durch [`MAX_LIMIT`] begrenzt. Die Zuordnung braucht
+/// keinen Einsatz-Filter: die Einträge sind bereits einsatzgefiltert, und
+/// `quell_etb_eintrag_id` wird beim Erteilen gegen denselben Einsatz geprüft
+/// (`routes::etb::auftrag_erteilen`). Aufsteigend nach `lfd_nr`, bei Altbeständen ohne
+/// Nummer nach `id`.
+async fn folgeauftraege_nachladen(
+    pool: &SqlitePool,
+    eintraege: &mut [EtbEintragAnzeige],
+) -> Result<(), AppError> {
+    if eintraege.is_empty() {
+        return Ok(());
+    }
+    let mut qb: QueryBuilder<Sqlite> = QueryBuilder::new(
+        "SELECT quell_etb_eintrag_id, id, lfd_nr FROM auftrag WHERE quell_etb_eintrag_id IN (",
+    );
+    let mut ids = qb.separated(", ");
+    for e in eintraege.iter() {
+        ids.push_bind(e.id);
+    }
+    qb.push(") ORDER BY lfd_nr IS NULL, lfd_nr, id");
+    let zeilen: Vec<(i64, i64, Option<i64>)> = qb.build_query_as().fetch_all(pool).await?;
+    if zeilen.is_empty() {
+        return Ok(());
+    }
+    let index: HashMap<i64, usize> = eintraege
+        .iter()
+        .enumerate()
+        .map(|(i, e)| (e.id, i))
+        .collect();
+    for (quelle, id, lfd_nr) in zeilen {
+        if let Some(&i) = index.get(&quelle) {
+            eintraege[i]
+                .folgeauftraege
+                .push(FolgeauftragVerweis { id, lfd_nr });
+        }
+    }
+    Ok(())
 }
 
 /// Prüft, ob ein Eintrag mit `eintrag_id` zum angegebenen `einsatz_id` gehört.
@@ -261,7 +326,7 @@ pub async fn abfrage(
 ) -> Result<Vec<EtbEintragAnzeige>, AppError> {
     let mut qb: QueryBuilder<Sqlite> = QueryBuilder::new(
         "SELECT e.id, e.lfd_nr, e.typ, e.inhalt, e.von, e.an, e.meldeweg, e.veranlassung, \
-                e.erfasser_id, b.anzeigename AS erfasser_name, e.ereigniszeit, e.received_at, \
+                e.erfasser_id, b.anzeigename AS erfasser_name, e.erfasser_funktion, e.ereigniszeit, e.received_at, \
                 e.erfasst_lokal_at, e.berichtigt_eintrag_id, e.lagebericht_id, e.auftrag_id, \
                 e.befehl_id \
          FROM etb_eintrag e JOIN benutzer b ON b.id = e.erfasser_id",
@@ -316,10 +381,12 @@ pub async fn abfrage(
     qb.push(" ORDER BY e.lfd_nr DESC LIMIT ");
     qb.push_bind(filter.limit);
 
-    qb.build_query_as::<EtbEintragAnzeige>()
+    let mut eintraege = qb
+        .build_query_as::<EtbEintragAnzeige>()
         .fetch_all(pool)
-        .await
-        .map_err(Into::into)
+        .await?;
+    folgeauftraege_nachladen(pool, &mut eintraege).await?;
+    Ok(eintraege)
 }
 
 /// Wandelt eine Nutzereingabe in eine sichere FTS5-Query um: jedes Token wird
@@ -839,5 +906,195 @@ mod tests {
 
         assert_eq!(a.lagebericht_id, None);
         assert_eq!(a.auftrag_id, None);
+    }
+
+    // ── Folgeaufträge (LFH-636) ─────────────────────────────────────────────────────
+
+    /// Erteilt über den echten Weg (`erteile_aus_etb_tx`) einen Auftrag aus `quelle` —
+    /// damit entsteht auch die eigene Anordnung, die selbst KEINEN Folgeauftrag tragen darf.
+    async fn erteile(
+        pool: &SqlitePool,
+        einsatz: i64,
+        benutzer: i64,
+        quelle: i64,
+        text: &str,
+    ) -> i64 {
+        crate::auftrag::repo::erteile_aus_etb_tx(
+            pool,
+            einsatz,
+            quelle,
+            benutzer,
+            crate::auftrag::repo::AuftragDaten {
+                auftrag_text: text,
+                absicht: None,
+                lage: None,
+                ort: None,
+                zeit: None,
+                mittel: None,
+                verbindung: None,
+                sicherheit: None,
+                prioritaet: crate::auftrag::PRIO_NORMAL,
+                richtung: crate::auftrag::RICHTUNG_INTERN,
+                frist_at: None,
+                erteilt_at: "2026-05-23 10:05:00",
+                empfaenger: vec![],
+            },
+        )
+        .await
+        .unwrap()
+    }
+
+    async fn lfd_nr_von(pool: &SqlitePool, auftrag_id: i64) -> i64 {
+        sqlx::query_scalar("SELECT lfd_nr FROM auftrag WHERE id = ?")
+            .bind(auftrag_id)
+            .fetch_one(pool)
+            .await
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn eintrag_ohne_folgeauftrag_traegt_leere_liste() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let e = anlegen(&pool, einsatz, benutzer, daten("ruhig"))
+            .await
+            .unwrap();
+
+        assert!(e.folgeauftraege.is_empty());
+        assert!(laden(&pool, e.id).await.unwrap().folgeauftraege.is_empty());
+        let liste = abfrage(&pool, einsatz, &filter()).await.unwrap();
+        assert!(liste[0].folgeauftraege.is_empty());
+    }
+
+    #[tokio::test]
+    async fn zwei_folgeauftraege_stehen_am_quell_eintrag_aufsteigend() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let quelle = anlegen(
+            &pool,
+            einsatz,
+            benutzer,
+            EintragDaten {
+                typ: "entscheidung",
+                ..daten("Evakuierung Ortsteil Nord")
+            },
+        )
+        .await
+        .unwrap();
+        let a1 = erteile(&pool, einsatz, benutzer, quelle.id, "Betreuung").await;
+        let a2 = erteile(&pool, einsatz, benutzer, quelle.id, "Transport").await;
+        let erwartet = vec![
+            FolgeauftragVerweis {
+                id: a1,
+                lfd_nr: Some(lfd_nr_von(&pool, a1).await),
+            },
+            FolgeauftragVerweis {
+                id: a2,
+                lfd_nr: Some(lfd_nr_von(&pool, a2).await),
+            },
+        ];
+        assert!(
+            erwartet[0].lfd_nr < erwartet[1].lfd_nr,
+            "Vorbedingung: Nummern steigen"
+        );
+
+        assert_eq!(
+            laden(&pool, quelle.id).await.unwrap().folgeauftraege,
+            erwartet
+        );
+
+        let liste = abfrage(&pool, einsatz, &filter()).await.unwrap();
+        // Quelle + zwei Anordnungen der Aufträge.
+        assert_eq!(liste.len(), 3);
+        for e in &liste {
+            if e.id == quelle.id {
+                assert_eq!(e.folgeauftraege, erwartet);
+            } else {
+                assert!(
+                    e.folgeauftraege.is_empty(),
+                    "die eigene Anordnung eines Auftrags ist nicht seine Quelle (Eintrag {})",
+                    e.id
+                );
+            }
+        }
+    }
+
+    /// Die Ordnung folgt der Auftragsnummer, nicht der Anlagereihenfolge: im Test oben
+    /// fallen beide zusammen, und SQLite liefert über den Index ohnehin in rowid-Folge — ohne
+    /// diesen Test bliebe ein gestrichenes `ORDER BY` unbemerkt (Review LFH-636).
+    #[tokio::test]
+    async fn folgeauftraege_ordnen_nach_nummer_nicht_nach_anlage() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let quelle = anlegen(&pool, einsatz, benutzer, daten("Lage"))
+            .await
+            .unwrap();
+        let frueh = erteile(&pool, einsatz, benutzer, quelle.id, "zuerst angelegt").await;
+        let spaet = erteile(&pool, einsatz, benutzer, quelle.id, "danach angelegt").await;
+        let ohne = erteile(&pool, einsatz, benutzer, quelle.id, "Altbestand").await;
+        // Nummer gegen die Anlagereihenfolge drehen; der Altbestand verliert seine Nummer.
+        sqlx::query("UPDATE auftrag SET lfd_nr = 900 WHERE id = ?")
+            .bind(frueh)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("UPDATE auftrag SET lfd_nr = NULL WHERE id = ?")
+            .bind(ohne)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        let ids: Vec<i64> = laden(&pool, quelle.id)
+            .await
+            .unwrap()
+            .folgeauftraege
+            .iter()
+            .map(|f| f.id)
+            .collect();
+        assert_eq!(
+            ids,
+            vec![spaet, frueh, ohne],
+            "nach Nummer, ohne Nummer zuletzt"
+        );
+    }
+
+    #[tokio::test]
+    async fn abgenommener_folgeauftrag_zaehlt_weiter() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let quelle = anlegen(&pool, einsatz, benutzer, daten("Lage"))
+            .await
+            .unwrap();
+        let a = erteile(&pool, einsatz, benutzer, quelle.id, "Sichern").await;
+        sqlx::query("UPDATE auftrag SET abgenommen_at = '2026-05-23 11:00:00' WHERE id = ?")
+            .bind(a)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        let geladen = laden(&pool, quelle.id).await.unwrap();
+        assert_eq!(geladen.folgeauftraege.len(), 1);
+        assert_eq!(geladen.folgeauftraege[0].id, a);
+    }
+
+    #[tokio::test]
+    async fn cursor_seite_traegt_vollstaendige_folgeauftraege() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let quelle = anlegen(&pool, einsatz, benutzer, daten("alt"))
+            .await
+            .unwrap();
+        // Die Aufträge (und ihre Anordnungen) entstehen NACH der Quelle, stehen also auf
+        // einer neueren Seite als sie.
+        erteile(&pool, einsatz, benutzer, quelle.id, "eins").await;
+        erteile(&pool, einsatz, benutzer, quelle.id, "zwei").await;
+
+        let mut f = filter();
+        f.limit = 1;
+        f.before_lfd_nr = Some(quelle.lfd_nr + 1);
+        let seite = abfrage(&pool, einsatz, &f).await.unwrap();
+        assert_eq!(seite.len(), 1);
+        assert_eq!(seite[0].id, quelle.id);
+        assert_eq!(seite[0].folgeauftraege.len(), 2);
     }
 }

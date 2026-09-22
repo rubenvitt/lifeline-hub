@@ -549,3 +549,299 @@ async fn put_und_post_warten_nicht_auf_den_abruf() {
         "schreibende Routen warten nicht: {dauer:?}"
     );
 }
+
+// ---------- Prognose (LFH-628) ----------
+
+fn prognose_pfad(einsatz: i64, pegel_id: i64) -> String {
+    format!("/api/einsaetze/{einsatz}/pegel/{pegel_id}/prognose")
+}
+
+const PROGNOSE: &str = r#"{"hoechststand_cm":709.6,"zeitpunkt":"2026-09-22T18:00:00+02:00"}"#;
+
+/// Legt `[A, B]` fest und liefert die ids in dieser Reihenfolge.
+async fn zwei_pegel(u: &Umgebung, cookie: &str, einsatz: i64) -> (i64, i64) {
+    let (status, json) = anfrage(
+        &u.app,
+        "PUT",
+        &pfad(einsatz),
+        cookie,
+        Some(&liste(&[(A, "Köln"), (B, "Bonn")])),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{json:?}");
+    (
+        json[0]["id"].as_i64().unwrap(),
+        json[1]["id"].as_i64().unwrap(),
+    )
+}
+
+#[tokio::test]
+async fn prognose_setzen_und_loeschen() {
+    let u = setup_pegel().await;
+    let admin = login_cookie(&u.app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&u.app, &admin).await;
+    let (id_a, _) = zwei_pegel(&u, &admin, einsatz).await;
+
+    let (status, json) = anfrage(
+        &u.app,
+        "PUT",
+        &prognose_pfad(einsatz, id_a),
+        &admin,
+        Some(PROGNOSE),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{json:?}");
+    let p = &json[0]["prognose"];
+    assert_eq!(p["hoechststand_cm"], 710.0, "auf ganze cm gerundet");
+    assert_eq!(p["zeitpunkt"], "2026-09-22 16:00:00", "UTC im Wire-Format");
+    assert!(p["gesetzt_at"].is_string());
+    assert!(
+        !json[1].as_object().unwrap().contains_key("prognose"),
+        "ohne Prognose fehlt der Schlüssel, statt null zu sein"
+    );
+
+    // Der GET trägt sie ebenso.
+    let (_, json) = anfrage(&u.app, "GET", &pfad(einsatz), &admin, None).await;
+    assert_eq!(json[0]["prognose"]["hoechststand_cm"], 710.0);
+
+    // Löschen, und ein zweites Löschen ist kein Fehler.
+    for _ in 0..2 {
+        let (status, json) = anfrage(
+            &u.app,
+            "DELETE",
+            &prognose_pfad(einsatz, id_a),
+            &admin,
+            None,
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{json:?}");
+        assert!(!json[0].as_object().unwrap().contains_key("prognose"));
+    }
+}
+
+/// Der Vollersatz-PUT der Liste fasst die Prognose nicht an — sonst nullte jedes Umordnen
+/// in den Einstellungen sie still. Fällt die Station aus der Liste, fällt die Prognose mit.
+#[tokio::test]
+async fn put_der_liste_laesst_die_prognose_stehen() {
+    let u = setup_pegel().await;
+    let admin = login_cookie(&u.app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&u.app, &admin).await;
+    let (id_a, _) = zwei_pegel(&u, &admin, einsatz).await;
+    anfrage(
+        &u.app,
+        "PUT",
+        &prognose_pfad(einsatz, id_a),
+        &admin,
+        Some(PROGNOSE),
+    )
+    .await;
+
+    let (_, json) = anfrage(
+        &u.app,
+        "PUT",
+        &pfad(einsatz),
+        &admin,
+        Some(&liste(&[(B, "Bonn"), (A, "Köln")])),
+    )
+    .await;
+    assert_eq!(uuids(&json), [B, A]);
+    assert_eq!(
+        json[1]["prognose"]["hoechststand_cm"], 710.0,
+        "Umordnen hält sie"
+    );
+
+    anfrage(
+        &u.app,
+        "PUT",
+        &pfad(einsatz),
+        &admin,
+        Some(&liste(&[(B, "Bonn")])),
+    )
+    .await;
+    let (_, json) = anfrage(
+        &u.app,
+        "PUT",
+        &pfad(einsatz),
+        &admin,
+        Some(&liste(&[(B, "Bonn"), (A, "Köln")])),
+    )
+    .await;
+    assert!(
+        !json[1].as_object().unwrap().contains_key("prognose"),
+        "entfernt und neu festgelegt: eine neue Zeile ohne Prognose"
+    );
+}
+
+#[tokio::test]
+async fn prognose_feldfehler_400_fremder_pegel_404_beobachter_403() {
+    let u = setup_pegel().await;
+    let admin = login_cookie(&u.app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&u.app, &admin).await;
+    let anderer = einsatz_anlegen(&u.app, &admin).await;
+    let (id_a, _) = zwei_pegel(&u, &admin, einsatz).await;
+
+    for body in [
+        r#"{"hoechststand_cm":700,"zeitpunkt":"morgen"}"#,
+        r#"{"hoechststand_cm":700,"zeitpunkt":""}"#,
+        r#"{"hoechststand_cm":9999999,"zeitpunkt":"2026-09-22T18:00:00Z"}"#,
+        r#"{"zeitpunkt":"2026-09-22T18:00:00Z"}"#,
+    ] {
+        let (status, json) = anfrage(
+            &u.app,
+            "PUT",
+            &prognose_pfad(einsatz, id_a),
+            &admin,
+            Some(body),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{body}: {json:?}");
+    }
+
+    // Ein Pegel, den es gibt — aber in einem anderen Einsatz.
+    for methode in ["PUT", "DELETE"] {
+        let body = (methode == "PUT").then_some(PROGNOSE);
+        let (status, _) =
+            anfrage(&u.app, methode, &prognose_pfad(anderer, id_a), &admin, body).await;
+        assert_eq!(
+            status,
+            StatusCode::NOT_FOUND,
+            "{methode} über fremden Einsatz"
+        );
+        let (status, _) = anfrage(
+            &u.app,
+            methode,
+            &prognose_pfad(einsatz, 999_999),
+            &admin,
+            body,
+        )
+        .await;
+        assert_eq!(status, StatusCode::NOT_FOUND, "{methode} unbekannter Pegel");
+    }
+
+    let beob = benutzer_anlegen(&u.app, &admin, "beobachter", "keine").await;
+    rolle_setzen(&u.app, &admin, einsatz, beob, "beobachter").await;
+    let beob_cookie = login_cookie(&u.app, "beobachter", "beobachterpw1").await;
+    let (status, _) = anfrage(
+        &u.app,
+        "PUT",
+        &prognose_pfad(einsatz, id_a),
+        &beob_cookie,
+        Some(PROGNOSE),
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+
+    let (_, json) = anfrage(&u.app, "GET", &pfad(einsatz), &admin, None).await;
+    assert!(
+        !json[0].as_object().unwrap().contains_key("prognose"),
+        "nichts geschrieben"
+    );
+}
+
+// ---------- Vorhersage-Reihe WV (LFH-628) ----------
+
+/// Eine PEGELONLINE-Attrappe: `WV` für Station A, 404 für alle anderen. Beantwortet jede
+/// Verbindung mit genau einer Antwort und zählt die Anfragen an die Reihe `WV` — nur die:
+/// das Festlegen der Liste stößt im Hintergrund auch den Abruf der Messreihe `W` an, und der
+/// landet zu einem unbestimmten Zeitpunkt.
+async fn wv_basis(reihe: Value) -> (String, std::sync::Arc<std::sync::atomic::AtomicUsize>) {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let basis = format!("http://{}", listener.local_addr().unwrap());
+    let zaehler = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let z = zaehler.clone();
+    tokio::spawn(async move {
+        while let Ok((mut sock, _)) = listener.accept().await {
+            let reihe = reihe.clone();
+            let z = z.clone();
+            tokio::spawn(async move {
+                let mut puffer = vec![0u8; 4096];
+                let n = sock.read(&mut puffer).await.unwrap_or(0);
+                let anfrage = String::from_utf8_lossy(&puffer[..n]).to_string();
+                if anfrage.contains("/WV/") {
+                    z.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                }
+                let (status, body) = if anfrage.contains(&format!("/stations/{A}/WV/")) {
+                    ("200 OK", reihe.to_string())
+                } else {
+                    ("404 Not Found", r#"{"status":404}"#.to_string())
+                };
+                let antwort = format!(
+                    "HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                    body.len()
+                );
+                let _ = sock.write_all(antwort.as_bytes()).await;
+            });
+        }
+    });
+    (basis, zaehler)
+}
+
+fn vorhersage_pfad(einsatz: i64, pegel_id: i64) -> String {
+    format!("/api/einsaetze/{einsatz}/pegel/{pegel_id}/vorhersage")
+}
+
+#[tokio::test]
+async fn vorhersage_hoechster_kuenftiger_wert_und_404_der_quelle_ist_keine_reihe() {
+    let jetzt = chrono::Utc::now();
+    let z = |h: i64| (jetzt + chrono::Duration::hours(h)).to_rfc3339();
+    let reihe = serde_json::json!([
+        { "initialized": z(-5), "timestamp": z(-3), "value": 999.0, "type": "forecast" },
+        { "initialized": z(-5), "timestamp": z(2), "value": 700.0, "type": "forecast" },
+        { "initialized": z(-5), "timestamp": z(6), "value": 710.0, "type": "forecast" },
+        { "initialized": z(-5), "timestamp": z(50), "value": 705.0, "type": "estimate" }
+    ]);
+    let (basis, zaehler) = wv_basis(reihe).await;
+    let u = setup_mit_pegel_basis(&basis).await;
+    let admin = login_cookie(&u.app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&u.app, &admin).await;
+    let (id_a, id_b) = zwei_pegel(&u, &admin, einsatz).await;
+    let vorher = zaehler.load(std::sync::atomic::Ordering::SeqCst);
+
+    let (status, json) =
+        anfrage(&u.app, "GET", &vorhersage_pfad(einsatz, id_a), &admin, None).await;
+    assert_eq!(status, StatusCode::OK, "{json:?}");
+    let v = &json["vorhersage"];
+    assert_eq!(
+        v["hoechststand_cm"], 710.0,
+        "der vergangene 999 zählt nicht"
+    );
+    assert_eq!(v["zeitpunkt"], z(6));
+    assert_eq!(v["erstellt"], z(-5));
+    assert_eq!(v["abschaetzung"], false);
+
+    let (status, json) =
+        anfrage(&u.app, "GET", &vorhersage_pfad(einsatz, id_b), &admin, None).await;
+    assert_eq!(status, StatusCode::OK, "{json:?}");
+    assert_eq!(
+        json,
+        serde_json::json!({}),
+        "Station ohne WV: kein Fehler, kein Vorschlag"
+    );
+
+    // Beide Antworten liegen im Cache: ein zweiter Aufruf geht nicht mehr zur Quelle.
+    let nach_erstem = zaehler.load(std::sync::atomic::Ordering::SeqCst);
+    assert_eq!(nach_erstem - vorher, 2);
+    anfrage(&u.app, "GET", &vorhersage_pfad(einsatz, id_a), &admin, None).await;
+    anfrage(&u.app, "GET", &vorhersage_pfad(einsatz, id_b), &admin, None).await;
+    assert_eq!(
+        zaehler.load(std::sync::atomic::Ordering::SeqCst),
+        nach_erstem,
+        "auch „keine Reihe“ ist gecacht"
+    );
+}
+
+#[tokio::test]
+async fn vorhersage_ohne_quelle_und_cache_ist_502_fremder_pegel_404() {
+    let u = setup_pegel().await;
+    let admin = login_cookie(&u.app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&u.app, &admin).await;
+    let anderer = einsatz_anlegen(&u.app, &admin).await;
+    let (id_a, _) = zwei_pegel(&u, &admin, einsatz).await;
+
+    let (status, json) =
+        anfrage(&u.app, "GET", &vorhersage_pfad(einsatz, id_a), &admin, None).await;
+    assert_eq!(status, StatusCode::BAD_GATEWAY, "{json:?}");
+    let (status, _) = anfrage(&u.app, "GET", &vorhersage_pfad(anderer, id_a), &admin, None).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}

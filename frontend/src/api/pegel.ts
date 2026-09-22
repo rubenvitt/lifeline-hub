@@ -1,6 +1,6 @@
 import { apiGet, apiSend } from './client';
 import { einsatzKeys } from './queryKeys';
-import type { PegelAnzeige } from './types';
+import type { PegelAnzeige, PegelVorhersageAntwort } from './types';
 
 /**
  * Maßgebliche Pegel eines Einsatzes (LFH-606).
@@ -38,6 +38,41 @@ export function setzePegel(einsatzId: number, stationen: PegelEingabe[]): Promis
 /** Hängt eine Station hinten an; eine schon festgelegte bleibt unverändert (200, idempotent). */
 export function fuegePegelHinzu(einsatzId: number, station: PegelEingabe): Promise<PegelAnzeige[]> {
   return apiSend<PegelAnzeige[]>(`/api/einsaetze/${einsatzId}/pegel`, 'POST', station);
+}
+
+/** Erwarteter Höchststand (LFH-628): Wert in cm, Zeitpunkt ISO-8601 (`toISOString()`). */
+export interface PrognoseEingabe {
+  hoechststand_cm: number;
+  zeitpunkt: string;
+}
+
+/** Setzt die Prognose eines Pegels (überschreibt eine vorhandene); Antwort: die ganze Liste. */
+export function setzePrognose(
+  einsatzId: number,
+  pegelId: number,
+  prognose: PrognoseEingabe,
+): Promise<PegelAnzeige[]> {
+  return apiSend<PegelAnzeige[]>(
+    `/api/einsaetze/${einsatzId}/pegel/${pegelId}/prognose`,
+    'PUT',
+    prognose,
+  );
+}
+
+/** Löscht die Prognose eines Pegels (idempotent); Antwort: die ganze Liste. */
+export function loeschePrognose(einsatzId: number, pegelId: number): Promise<PegelAnzeige[]> {
+  return apiSend<PegelAnzeige[]>(`/api/einsaetze/${einsatzId}/pegel/${pegelId}/prognose`, 'DELETE');
+}
+
+/**
+ * Vorschlag aus der PEGELONLINE-Vorhersage-Reihe `WV` (LFH-628): höchster künftiger Wert.
+ * Ohne Reihe (die meisten Stationen) fehlt `vorhersage`; das ist kein Fehler.
+ */
+export function ladeVorhersage(
+  einsatzId: number,
+  pegelId: number,
+): Promise<PegelVorhersageAntwort> {
+  return apiGet<PegelVorhersageAntwort>(`/api/einsaetze/${einsatzId}/pegel/${pegelId}/vorhersage`);
 }
 
 /**
