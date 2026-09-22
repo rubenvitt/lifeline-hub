@@ -41,7 +41,13 @@
  */
 
 /** Custom Property nur am Anfang einer Deklaration — also direkt nach `{` oder `;`. Ein
- *  Selektor wie `.a--b:hover` hat davor einen Buchstaben und bleibt stehen. */
+ *  Selektor wie `.a--b:hover` hat davor einen Buchstaben und bleibt stehen.
+ *
+ *  Grenze: der Wert endet am ersten `;`, `{` oder `}`, auch in einem String oder einem
+ *  `url(data:…;base64,…)`. Im Bestand trägt kein Token so einen Wert (geprüft 22.09.2026
+ *  über gut 60 Komponenten und drei Themes: 3254 Deklarationen, Regelbäume vor/nach dem
+ *  Filter bis auf die Variablen gleich). Ein künftiges Token mit Data-URI hinterließe
+ *  kaputtes CSS, und jsdom verwürfe Teile der Regel. */
 const CUSTOM_PROPERTY = /(?<=[{;]\s*)--[\w-]+\s*:[^;{}]*;?/g;
 
 /** Entfernt alle Custom-Property-Deklarationen aus einem Stylesheet-Text. Rein und

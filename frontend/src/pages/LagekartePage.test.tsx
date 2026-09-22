@@ -1453,7 +1453,9 @@ describe('LFH-145: Zeichnen-Abschluss + Bestätigung', () => {
     await user.click(await screen.findByText('zone-fertig'));
     await user.click(await screen.findByRole('button', { name: 'Verwerfen' }));
     expect(spy.count()).toBe(0);
-    await waitFor(() => expect(screen.queryByText('Speichern')).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Speichern' })).not.toBeInTheDocument(),
+    );
   });
 
   it('Abbrechen in Phase zeichnen → kein POST, Overlay weg', async () => {
@@ -1483,7 +1485,7 @@ describe('LFH-145: Zeichnen-Abschluss + Bestätigung', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Absperrgrenze zeichnen' }));
     // Zurück in Phase „zeichnen" für den NEUEN Entwurf, keine hängende Bestätigung mehr.
-    expect(screen.queryByText('Speichern')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Speichern' })).not.toBeInTheDocument();
     expect(await screen.findByText('Absperrgrenze · Linie')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Abschließen' })).toBeInTheDocument();
     expect(spy.count()).toBe(0);
