@@ -54,6 +54,11 @@ export default defineConfig(({ mode }) => {
           // Der App-Haupt-Chunk überschreitet das 2-MiB-Default-Precache-Limit.
           // Workaround bis zum Code-Splitting (eigener Folge-Task: MapLibre/antd lazy laden).
           maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
+          // Seitenwechsel auf /api/ MÜSSEN zum Server: der OIDC-Login ist ein Full-Page-Redirect
+          // über `/api/auth/oidc/start` und `/api/auth/oidc/callback`. Ohne diese Ausnahme
+          // beantwortet der Service Worker beide mit dem gecachten `index.html` — der Login
+          // erreicht weder Backend noch IdP und endet stumm wieder auf der Login-Seite.
+          navigateFallbackDenylist: [/^\/api\//],
         },
         manifest: {
           name: 'lifeline-hub',

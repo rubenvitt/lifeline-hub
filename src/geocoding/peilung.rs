@@ -21,7 +21,7 @@ pub struct Peilung {
     pub bezug_label: String,
 }
 
-const ERDRADIUS_M: f64 = 6_371_000.0;
+pub(crate) const ERDRADIUS_M: f64 = 6_371_000.0;
 const STRICHE: [&str; 8] = ["N", "NO", "O", "SO", "S", "SW", "W", "NW"];
 
 /// Haversine-Großkreisdistanz in Metern. Punkte als `(lat, lon)` in Grad.

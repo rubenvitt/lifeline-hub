@@ -1,0 +1,77 @@
+{
+ "Data": [
+  {
+   "Id": 1815635,
+   "MaStRNummer": "SEE980008908440",
+   "EinheitName": "WKW III",
+   "KraftwerkName": null,
+   "SolarparkName": null,
+   "WindparkName": null,
+   "Breitengrad": 48.154,
+   "Laengengrad": 12.652,
+   "Nettonennleistung": 18500.0,
+   "EnergietraegerName": "Wasser",
+   "BetriebsStatusName": "In Betrieb",
+   "AnlagenbetreiberName": "Alzkraftwerke Heider GmbH"
+  },
+  {
+   "Id": 1954215,
+   "MaStRNummer": "SEE989520528877",
+   "EinheitName": "BMKW Bischofferode",
+   "KraftwerkName": null,
+   "SolarparkName": null,
+   "WindparkName": null,
+   "Breitengrad": 51.489714,
+   "Laengengrad": 10.413338,
+   "Nettonennleistung": 18100.0,
+   "EnergietraegerName": "Biomasse",
+   "BetriebsStatusName": "Vorübergehend stillgelegt",
+   "AnlagenbetreiberName": "Stadtwerke Leipzig GmbH"
+  },
+  {
+   "Id": 1988433,
+   "MaStRNummer": "SEE953508633730",
+   "EinheitName": "SWM Leitzach 2 M21",
+   "KraftwerkName": null,
+   "SolarparkName": null,
+   "WindparkName": null,
+   "Breitengrad": 47.874,
+   "Laengengrad": 11.871,
+   "Nettonennleistung": 22000.0,
+   "EnergietraegerName": "Speicher",
+   "BetriebsStatusName": "In Betrieb",
+   "AnlagenbetreiberName": "Stadtwerke München GmbH"
+  },
+  {
+   "Id": 2300063,
+   "MaStRNummer": "SEE932104531640",
+   "EinheitName": "ASO-581280-11",
+   "KraftwerkName": null,
+   "SolarparkName": "SA Giebelstadt II",
+   "WindparkName": null,
+   "Breitengrad": 49.650928,
+   "Laengengrad": 9.969858,
+   "Nettonennleistung": 14240.0,
+   "EnergietraegerName": "Solare Strahlungsenergie",
+   "BetriebsStatusName": "In Betrieb",
+   "AnlagenbetreiberName": "Solaranlage Giebelstadt II GmbH ＆ Co. KG"
+  },
+  {
+   "Id": 5703636,
+   "MaStRNummer": "SEE920051579655",
+   "EinheitName": "HD A1",
+   "KraftwerkName": null,
+   "SolarparkName": null,
+   "WindparkName": "EnBW He Dreiht",
+   "Breitengrad": 54.358732,
+   "Laengengrad": 6.197874,
+   "Nettonennleistung": 15000.0,
+   "EnergietraegerName": "Wind",
+   "BetriebsStatusName": "In Betrieb",
+   "AnlagenbetreiberName": "EnBW He Dreiht GmbH ＆ Co. KG"
+  }
+ ],
+ "Total": 5,
+ "AggregateResults": null,
+ "Errors": null
+}

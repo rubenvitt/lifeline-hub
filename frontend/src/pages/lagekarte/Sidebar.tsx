@@ -32,7 +32,7 @@ import type { FreiesZeichenUpdate, ZoneTyp } from '../../api/types';
 import type { ZeichenModus } from './zeichnen';
 import { ZONE_TYPEN } from './zonenStil';
 import FreiesZeichenPicker from './FreiesZeichenPicker';
-import { FACHEBENEN, fachebeneKeys } from './fachebenen';
+import { FACHEBENEN, fachebeneKeys, istBboxAbhaengig } from './fachebenen';
 import KoordinatenEingabe from '../../anzeige/KoordinatenEingabe';
 import type { LatLon } from '../../anzeige/koordinaten';
 import type { Hintergrundbild } from '../../api/kartenbilder';
@@ -170,6 +170,9 @@ export interface SidebarProps {
       import('../../api/fachebenen').FachebeneStatus
     >
   >;
+  /** Je bbox-abhängiger Ebene: aktiv, aber die Karte ist zu weit herausgezoomt für eine
+   *  Abfrage (LFH-81; bis dahin ein einzelnes Flag nur für KRITIS). */
+  zoomZuKlein?: Partial<Record<import('../../api/fachebenen').FachebeneQuelle, boolean>>;
   /** Lade-Zustand je Fachebene (z. B. KRITIS/Overpass lädt länger → Spinner). */
   fachebenenLaedt?: Partial<Record<import('../../api/fachebenen').FachebeneQuelle, boolean>>;
   /** Bild-Hintergründe */
@@ -817,6 +820,7 @@ export default function Sidebar(props: SidebarProps) {
             const sichtbar = props.fachebenenSichtbar[key];
             const offline = status === 'offline';
             const laedt = sichtbar && props.fachebenenLaedt?.[key];
+            const zoomHinweis = sichtbar && istBboxAbhaengig(key) && props.zoomZuKlein?.[key];
             return (
               <Space key={key} style={{ justifyContent: 'space-between', width: '100%' }}>
                 <Space align="start">
@@ -837,6 +841,14 @@ export default function Sidebar(props: SidebarProps) {
                 </Space>
                 {laedt ? (
                   <Spin size="small" />
+                ) : zoomHinweis ? (
+                  <Tooltip
+                    title={`${def.label}: Objekte werden erst ab einer näheren Zoomstufe geladen`}
+                  >
+                    <Typography.Text type="warning" style={{ fontSize: 11 }}>
+                      näher heranzoomen
+                    </Typography.Text>
+                  </Tooltip>
                 ) : (
                   <>
                     {/* `nowrap`: sonst bricht die Marke mitten im Wort (LFH-83). */}

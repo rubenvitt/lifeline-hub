@@ -534,6 +534,13 @@ pub async fn fachebenen(
             let bbox = crate::karte::typen::Bbox::parse(bbox).map_err(AppError::Validation)?;
             crate::karte::kritis::bestand::abfrage(cache_pool, &bbox).await
         }
+        // LFH-81: wie KRITIS bbox-pflichtig (OSM je Ausschnitt, MaStR bundesweit gecacht und
+        // je Anfrage auf den Ausschnitt gefiltert).
+        "energie" => {
+            let bbox =
+                bbox.ok_or_else(|| AppError::Validation("bbox-Parameter erforderlich".into()))?;
+            quellen::fetch_energie(&state.fachebenen, cache_pool, bbox).await?
+        }
         _ => return Err(AppError::Validation(format!("Unbekannte Quelle: {quelle}"))),
     };
     Ok(Json(antwort))

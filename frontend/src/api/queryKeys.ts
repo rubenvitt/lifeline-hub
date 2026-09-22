@@ -446,10 +446,12 @@ export const globalKeys = {
   adminKarteBereich: (bereich: AdminKarteBereich) => [GLOBAL_KEYS.adminKarte, bereich] as const,
   karteConfig: () => [GLOBAL_KEYS.karteConfig] as const,
 
-  // Externe Fachebenen. `kritis` ist ausgenommen, weil es als einziges eine BBox im Key trägt —
-  // der einzige Weg dorthin ist `fachebeneKritis`, sonst entstünden zwei Cache-Fächer für
-  // denselben Zustand. `bbox` ist `string | null` (useFachebenen.ts), NICHT `undefined`.
-  fachebene: (quelle: Exclude<FachebeneQuelle, 'kritis'>) =>
+  // Externe Fachebenen. Die bbox-abhängigen Quellen `kritis` und `energie` (LFH-81) sind
+  // ausgenommen, weil sie eine BBox im Key tragen — der einzige Weg dorthin ist ihr eigener
+  // Accessor, sonst entstünden zwei Cache-Fächer für denselben Zustand. `bbox` ist
+  // `string | null` (useFachebenen.ts), NICHT `undefined`.
+  fachebene: (quelle: Exclude<FachebeneQuelle, 'kritis' | 'energie'>) =>
     [GLOBAL_KEYS.fachebene, quelle] as const,
   fachebeneKritis: (bbox: string | null) => [GLOBAL_KEYS.fachebene, 'kritis', bbox] as const,
+  fachebeneEnergie: (bbox: string | null) => [GLOBAL_KEYS.fachebene, 'energie', bbox] as const,
 } as const;

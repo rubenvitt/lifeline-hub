@@ -138,6 +138,48 @@ impl Bbox {
             _ => Err("bbox ungültig (west,sued,ost,nord)".to_string()),
         }
     }
+    /// Overpass erwartet sued,west,nord,ost.
+    pub fn overpass(&self) -> String {
+        format!("{},{},{},{}", self.sued, self.west, self.nord, self.ost)
+    }
+    /// Cache-Schlüssel der KRITIS-Ebene. Bleibt byte-gleich zum Stand vor LFH-81
+    /// (`kritis:<bbox>`) — ein anderer Schlüssel ließe den Bestand seinen Cache verlieren.
+    pub fn cache_key(&self) -> String {
+        self.cache_key_mit("kritis")
+    }
+    /// Cache-Schlüssel `<praefix>:<bbox>`, auf 2 Nachkommastellen gerundet (≈1 km); das
+    /// reduziert die Cache-Streuung. Das Präfix trennt die bbox-Ebenen voneinander.
+    pub fn cache_key_mit(&self, praefix: &str) -> String {
+        format!(
+            "{praefix}:{:.2},{:.2},{:.2},{:.2}",
+            self.west, self.sued, self.ost, self.nord
+        )
+    }
+    /// Um `meter` in jede Richtung erweiterter Ausschnitt, auf den gültigen Bereich
+    /// begrenzt. Die Breite rechnet mit dem Erdradius von [`haversine_m`], damit Rand und
+    /// Abstandsmessung dieselbe Erde meinen. Die Länge teilt durch den Kosinus der
+    /// POLNÄHEREN Kante: dort ist ein Längengrad am kürzesten, der Rand also nirgends zu
+    /// schmal. Konstruiert direkt statt über [`Bbox::parse`], weil ein 1°-Ausschnitt mit
+    /// Rand die 1°-Grenze überschreiten darf.
+    ///
+    /// [`haversine_m`]: crate::geocoding::peilung::haversine_m
+    pub fn erweitert_um_m(&self, meter: f64) -> Bbox {
+        let m_je_grad = crate::geocoding::peilung::ERDRADIUS_M.to_radians();
+        let dlat = meter / m_je_grad;
+        let sued = (self.sued - dlat).max(-90.0);
+        let nord = (self.nord + dlat).min(90.0);
+        let dlon = dlat / sued.abs().max(nord.abs()).to_radians().cos();
+        Bbox {
+            west: (self.west - dlon).max(-180.0),
+            sued,
+            ost: (self.ost + dlon).min(180.0),
+            nord,
+        }
+    }
+    /// Liegt der Punkt (Rand eingeschlossen) im Ausschnitt?
+    pub fn enthaelt(&self, lon: f64, lat: f64) -> bool {
+        lon >= self.west && lon <= self.ost && lat >= self.sued && lat <= self.nord
+    }
 }
 
 #[cfg(test)]
@@ -147,6 +189,35 @@ mod bbox_tests {
     fn parst_gueltige_bbox() {
         let b = Bbox::parse("6.0,50.0,7.0,51.0").unwrap();
         assert_eq!((b.west, b.sued, b.ost, b.nord), (6.0, 50.0, 7.0, 51.0));
+    }
+    /// Ein Rand von 2 km: in der Breite überall ~0,018°, in der Länge bei 51,6° N ~0,029°
+    /// (Kosinus der POLNÄHEREN Kante, also eher etwas mehr als nötig).
+    #[test]
+    fn erweitert_um_meter_mit_breitenkorrektur() {
+        let b = Bbox::parse("6.9,51.45,7.3,51.65").unwrap();
+        let e = b.erweitert_um_m(2000.0);
+        let dlat = 2000.0 / 111_194.93;
+        assert!((b.sued - e.sued - dlat).abs() < 1e-4, "{e:?}");
+        assert!((e.nord - b.nord - dlat).abs() < 1e-4, "{e:?}");
+        let dlon = dlat / (51.65_f64 + dlat).to_radians().cos();
+        assert!((b.west - e.west - dlon).abs() < 1e-4, "{e:?}");
+        assert!((e.ost - b.ost - dlon).abs() < 1e-4, "{e:?}");
+        // Ein 1°-Ausschnitt darf wachsen — `parse` hätte ihn als „zu groß" abgelehnt.
+        let voll = Bbox::parse("6.0,51.0,7.0,52.0")
+            .unwrap()
+            .erweitert_um_m(6000.0);
+        assert!(voll.ost - voll.west > 1.0);
+    }
+    #[test]
+    fn erweitert_bleibt_im_gueltigen_bereich() {
+        let b = Bbox::parse("179.5,89.5,180.0,90.0")
+            .unwrap()
+            .erweitert_um_m(6000.0);
+        assert!(b.nord <= 90.0 && b.ost <= 180.0, "{b:?}");
+        let b = Bbox::parse("-180.0,-90.0,-179.5,-89.5")
+            .unwrap()
+            .erweitert_um_m(6000.0);
+        assert!(b.sued >= -90.0 && b.west >= -180.0, "{b:?}");
     }
     #[test]
     fn lehnt_vertauschte_grenzen_ab() {
@@ -173,6 +244,32 @@ mod bbox_tests {
     fn akzeptiert_ganz_deutschland_und_die_welt() {
         assert!(Bbox::parse("5.0,47.0,15.0,55.0").is_ok());
         assert!(Bbox::parse("-180,-90,180,90").is_ok());
+    }
+    /// LFH-81: das Präfix wird Parameter, der KRITIS-Schlüssel bleibt Byte für Byte, was er
+    /// war. Geprüft gegen ein handgeschriebenes Literal — ein Vergleich gegen
+    /// `cache_key_mit("kritis")` prüfte die Funktion gegen sich selbst.
+    #[test]
+    fn cache_schluessel_mit_praefix_und_kritis_byte_gleich() {
+        let b = Bbox::parse("6.9,51.45,7.3,51.65").unwrap();
+        assert_eq!(b.cache_key(), "kritis:6.90,51.45,7.30,51.65");
+        assert_eq!(
+            b.cache_key_mit("energie:osm"),
+            "energie:osm:6.90,51.45,7.30,51.65"
+        );
+    }
+    #[test]
+    fn enthaelt_prueft_mit_rand() {
+        let b = Bbox::parse("6.0,50.0,7.0,51.0").unwrap();
+        assert!(b.enthaelt(6.5, 50.5));
+        assert!(b.enthaelt(6.0, 51.0)); // Rand zählt dazu
+        assert!(!b.enthaelt(7.01, 50.5));
+        assert!(!b.enthaelt(6.5, 49.99));
+    }
+    #[test]
+    fn akzeptiert_bbox_mit_genau_einem_grad_spanne() {
+        // Genau 1.0 Grad in jeder Richtung (nicht > 1.0) → Ok
+        let b = Bbox::parse("6.0,50.0,7.0,51.0").unwrap();
+        assert_eq!(b.west, 6.0);
     }
 }
 

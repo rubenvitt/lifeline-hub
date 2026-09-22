@@ -81,7 +81,7 @@ describe('globalKeys: Byte-Pin gegen die ersetzten Literale (LFH-307)', () => {
     }
   });
 
-  it('Fachebenen: drei einfache Quellen + kritis mit BBox', () => {
+  it('Fachebenen: einfache Quellen + kritis und energie mit BBox', () => {
     expect(globalKeys.fachebene('nina')).toEqual(['fachebene', 'nina']);
     expect(globalKeys.fachebene('dwd')).toEqual(['fachebene', 'dwd']);
     expect(globalKeys.fachebene('pegelonline')).toEqual(['fachebene', 'pegelonline']);
@@ -92,6 +92,14 @@ describe('globalKeys: Byte-Pin gegen die ersetzten Literale (LFH-307)', () => {
     // Zustand, und der `enabled`-Guard lädt dann gegen einen anderen Key als die Invalidierung.
     expect(globalKeys.fachebeneKritis(null)).toEqual(['fachebene', 'kritis', null]);
     expect(globalKeys.fachebeneKritis('1,2,3,4')).toEqual(['fachebene', 'kritis', '1,2,3,4']);
+    // LFH-81: dieselbe Form wie KRITIS, eigenes Fach je Quelle. Kein neuer Prefix — die
+    // Zählung im Leerlauf-Schutz unten bleibt deshalb bei 23.
+    expect(globalKeys.fachebeneEnergie(null)).toEqual(['fachebene', 'energie', null]);
+    expect(globalKeys.fachebeneEnergie('1,2,3,4')).toEqual(['fachebene', 'energie', '1,2,3,4']);
+    // Der bbox-lose Accessor ist für bbox-Quellen gesperrt, sonst entstünden zwei Fächer
+    // für denselben Zustand. Die Sperre ist ein Typ, der Test hält sie über `tsc` fest.
+    // @ts-expect-error — 'energie' ist aus `fachebene` ausgenommen (nur `fachebeneEnergie`)
+    expect(globalKeys.fachebene('energie')).toEqual(['fachebene', 'energie']);
   });
 
   it('LEERLAUF-SCHUTZ: die Registry hat die gemessenen 23 Prefixe und keine Dubletten', () => {

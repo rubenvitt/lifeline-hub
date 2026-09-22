@@ -526,3 +526,195 @@ describe('FachebenenInspector — Fläche (LFH-146)', () => {
     expect(screen.queryByText('Fläche')).not.toBeInTheDocument();
   });
 });
+
+describe('FachebenenInspector — Energieanlagen (LFH-81)', () => {
+  // Wire-Vertrag: flache Properties, `null` für Unbekanntes.
+  const scholven = {
+    titel: 'Kraftwerk Scholven',
+    anlagenart: 'kohle',
+    leistung_mw: 690,
+    betreiber: 'Uniper',
+    betriebsstatus: 'In Betrieb',
+    herkunft: 'osm',
+    mastr_nummer: null,
+    mastr_id: null,
+    mastr_einheiten: null,
+  };
+
+  it('Energie-Punkt zeigt den Energie-Inhalt, nicht den KRITIS-Rückfall', () => {
+    render(<FachebenenInspector quelle="energie" properties={scholven} onSchliessen={() => {}} />);
+    expect(screen.getByText('Kraftwerk Scholven')).toBeInTheDocument();
+    // Die Zeilen, die KRITIS nicht kennt — im Rückfall stünde hier nur der Betreiber.
+    expect(screen.getByText('Anlagenart')).toBeInTheDocument();
+    expect(screen.getByText('Kohle')).toBeInTheDocument();
+    expect(screen.getByText('Leistung')).toBeInTheDocument();
+    expect(screen.getByText('690 MW')).toBeInTheDocument();
+    expect(screen.getByText('Uniper')).toBeInTheDocument();
+    expect(screen.getByText('In Betrieb')).toBeInTheDocument();
+    expect(screen.getByText('OpenStreetMap')).toBeInTheDocument();
+    // Reine OSM-Herkunft: keine MaStR-Zeile, kein Link.
+    expect(screen.queryByText('MaStR-Nummer')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link')).toBeNull();
+    // Die Anlagenart steht als Wort, nie als Rohwert.
+    expect(screen.queryByText('kohle')).not.toBeInTheDocument();
+  });
+
+  it('Leistung „unbekannt" — bei null und bei fehlendem Feld gleich', () => {
+    // Die Quelle schickt `null`; MapLibre liefert null-Properties beim Klick als FEHLEND.
+    const { rerender } = render(
+      <FachebenenInspector
+        quelle="energie"
+        properties={{ ...scholven, anlagenart: 'gas', leistung_mw: null }}
+        onSchliessen={() => {}}
+      />,
+    );
+    expect(screen.getByText('unbekannt')).toBeInTheDocument();
+    expect(screen.queryByText(/MW/)).not.toBeInTheDocument();
+
+    const ohneLeistung: Record<string, unknown> = { ...scholven, anlagenart: 'gas' };
+    delete ohneLeistung.leistung_mw;
+    delete ohneLeistung.betreiber;
+    delete ohneLeistung.betriebsstatus;
+    rerender(
+      <FachebenenInspector quelle="energie" properties={ohneLeistung} onSchliessen={() => {}} />,
+    );
+    expect(screen.getByText('unbekannt')).toBeInTheDocument();
+    // Fehlender Betreiber/Status: die Zeile entfällt, statt „null" zu zeigen.
+    expect(screen.queryByText('Betreiber')).not.toBeInTheDocument();
+    expect(screen.queryByText('null')).not.toBeInTheDocument();
+  });
+
+  it('eine Zeichenkette ist kein Messwert — Leistung bleibt „unbekannt"', () => {
+    render(
+      <FachebenenInspector
+        quelle="energie"
+        properties={{ ...scholven, leistung_mw: 'ca. 690' }}
+        onSchliessen={() => {}}
+      />,
+    );
+    expect(screen.getByText('unbekannt')).toBeInTheDocument();
+  });
+
+  it('MaStR-Herkunft: Nummer als Link auf das Register, Einheitenzahl ab zwei', () => {
+    render(
+      <FachebenenInspector
+        quelle="energie"
+        properties={{
+          ...scholven,
+          titel: 'Pumpspeicherwerk Herdecke',
+          anlagenart: 'speicher',
+          leistung_mw: 153.5,
+          herkunft: 'osm+mastr',
+          mastr_nummer: 'SEE912345678901',
+          mastr_id: 4711,
+          mastr_einheiten: 3,
+        }}
+        onSchliessen={() => {}}
+      />,
+    );
+    expect(screen.getByText('Speicher')).toBeInTheDocument();
+    expect(screen.getByText('153,5 MW')).toBeInTheDocument();
+    expect(screen.getByText('OpenStreetMap + Marktstammdatenregister')).toBeInTheDocument();
+    const link = screen.getByRole('link', { name: 'SEE912345678901' });
+    expect(link).toHaveAttribute(
+      'href',
+      'https://www.marktstammdatenregister.de/MaStR/Einheit/Detail/IndexOeffentlich/4711',
+    );
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link.getAttribute('rel')).toContain('noopener');
+    expect(screen.getByText('MaStR-Einheiten')).toBeInTheDocument();
+    expect(screen.getByText('3')).toBeInTheDocument();
+  });
+
+  it('reine MaStR-Herkunft mit einer Einheit: Nummer, aber keine Einheitenzahl', () => {
+    render(
+      <FachebenenInspector
+        quelle="energie"
+        properties={{
+          ...scholven,
+          titel: 'Solarpark Nord',
+          anlagenart: 'solar',
+          leistung_mw: 12,
+          herkunft: 'mastr',
+          mastr_nummer: 'SEE900000000001',
+          mastr_id: 12,
+          mastr_einheiten: 1,
+        }}
+        onSchliessen={() => {}}
+      />,
+    );
+    expect(screen.getByText('Marktstammdatenregister')).toBeInTheDocument();
+    expect(screen.getByText('Solar')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'SEE900000000001' })).toBeInTheDocument();
+    expect(screen.queryByText('MaStR-Einheiten')).not.toBeInTheDocument();
+  });
+
+  it('eine nicht-ganzzahlige MaStR-ID wird kein Link — die Nummer bleibt Klartext', () => {
+    render(
+      <FachebenenInspector
+        quelle="energie"
+        properties={{
+          ...scholven,
+          herkunft: 'mastr',
+          mastr_nummer: 'SEE900000000002',
+          mastr_id: '../../evil',
+        }}
+        onSchliessen={() => {}}
+      />,
+    );
+    // Nur der Lizenzlink bleibt — die Nummer selbst ist kein Link.
+    expect(screen.queryByRole('link', { name: 'SEE900000000002' })).toBeNull();
+    expect(screen.getByText('SEE900000000002')).toBeInTheDocument();
+  });
+
+  it('MaStR-Herkunft nennt die Datenlizenz als Link (design.md, Entscheidung 5)', () => {
+    for (const herkunft of ['mastr', 'osm+mastr']) {
+      const { unmount } = render(
+        <FachebenenInspector
+          quelle="energie"
+          properties={{ ...scholven, herkunft, mastr_nummer: 'SEE1', mastr_id: 1 }}
+          onSchliessen={() => {}}
+        />,
+      );
+      const link = screen.getByRole('link', {
+        name: 'Datenlizenz Deutschland – Namensnennung – Version 2.0',
+      });
+      expect(link).toHaveAttribute('href', 'https://www.govdata.de/dl-de/by-2-0');
+      expect(link).toHaveAttribute('target', '_blank');
+      expect(link.getAttribute('rel')?.split(' ').sort()).toEqual(['noopener', 'noreferrer']);
+      unmount();
+    }
+  });
+
+  it('reine OSM-Herkunft trägt keinen Lizenzlink', () => {
+    render(<FachebenenInspector quelle="energie" properties={scholven} onSchliessen={() => {}} />);
+    expect(screen.queryByText('Datenlizenz Deutschland – Namensnennung – Version 2.0')).toBeNull();
+  });
+
+  it('bildet alle elf Anlagenarten auf ein deutsches Wort ab', () => {
+    const erwartet: Record<string, string> = {
+      kohle: 'Kohle',
+      gas: 'Gas',
+      oel: 'Öl',
+      kern: 'Kernenergie',
+      abfall: 'Abfall',
+      wasser: 'Wasser',
+      wind: 'Wind',
+      solar: 'Solar',
+      biomasse: 'Biomasse',
+      speicher: 'Speicher',
+      sonstige: 'Sonstige',
+    };
+    for (const [wire, wort] of Object.entries(erwartet)) {
+      const { unmount } = render(
+        <FachebenenInspector
+          quelle="energie"
+          properties={{ ...scholven, anlagenart: wire }}
+          onSchliessen={() => {}}
+        />,
+      );
+      expect(screen.getByText(wort)).toBeInTheDocument();
+      unmount();
+    }
+  });
+});

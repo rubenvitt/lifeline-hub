@@ -22,7 +22,15 @@ export type FachebeneAntwort = S['FachebeneAntwort'];
 
 /** Pfad-Parameter von `/api/karte/fachebenen/:quelle` — FE-lokal (Eingabeseite, kein Response-DTO). */
 export type FachebeneQuelle =
-  'dwd' | 'pegelonline' | 'nina' | 'kritis' | 'hochwasser' | 'autobahn' | 'odl' | 'luftqualitaet';
+  | 'dwd'
+  | 'pegelonline'
+  | 'nina'
+  | 'kritis'
+  | 'hochwasser'
+  | 'autobahn'
+  | 'odl'
+  | 'luftqualitaet'
+  | 'energie';
 
 /**
  * Hochwasserklasse eines LHP-Pegels (LFH-77), wie sie in den Feature-Properties der
@@ -91,7 +99,29 @@ export type OdlStufe = 'keine_messung' | 'normal' | 'erhoeht' | 'stark_erhoeht';
  */
 export type OdlBewertung = 'standort' | 'absolut';
 
-/** Lädt eine Fachebene. `bbox` (west,sued,ost,nord) ist nur für `kritis` nötig. */
+/**
+ * Anlagenart eines Punkts der `energie`-Ebene (LFH-81), wie sie in den Feature-Properties
+ * unter `anlagenart` steht. FE-LOKAL aus demselben Grund wie {@link HochwasserKlasse}: die
+ * Properties sind backendseitig untypisiert. Die Menge ist fest (design.md, Entscheidung 3);
+ * sie deckt MaStR-Energieträger und OSM-`plant:source` mit EINEM Schlüssel ab.
+ */
+export type EnergieAnlagenart =
+  | 'kohle'
+  | 'gas'
+  | 'oel'
+  | 'kern'
+  | 'abfall'
+  | 'wasser'
+  | 'wind'
+  | 'solar'
+  | 'biomasse'
+  | 'speicher'
+  | 'sonstige';
+
+/**
+ * Lädt eine Fachebene. `bbox` (west,sued,ost,nord) brauchen die bbox-abhängigen Ebenen
+ * (`kritis`, `energie` — siehe `istBboxAbhaengig`); das Backend lehnt sie dort ohne ab.
+ */
 export function ladeFachebene(quelle: FachebeneQuelle, bbox?: string): Promise<FachebeneAntwort> {
   const q = bbox ? `?bbox=${encodeURIComponent(bbox)}` : '';
   return apiGet<FachebeneAntwort>(`/api/karte/fachebenen/${quelle}${q}`);

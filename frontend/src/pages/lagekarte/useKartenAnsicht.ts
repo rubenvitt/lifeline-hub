@@ -70,6 +70,8 @@ function leseFachebenen(roh: unknown): FachebenenSichtbar {
     // Dasselbe für LFH-78: jede heute gespeicherte Ansicht kennt `odl` nicht.
     odl: o.odl === true,
     kritis: o.kritis === true,
+    // LFH-81: ein älterer Stand ohne den Schlüssel liest „aus" (siehe `hochwasser`).
+    energie: o.energie === true,
     autobahn: o.autobahn === true,
   };
 }

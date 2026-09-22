@@ -31,7 +31,14 @@ export default function LoginPage() {
   const location = useLocation();
   const [form] = Form.useForm<FormWerte>();
   const [totpForm] = Form.useForm<TotpFormWerte>();
-  const [fehler, setFehler] = useState<string | null>(null);
+  // Der OIDC-Callback leitet JEDEN Fehlschlag generisch auf `/login?fehler=oidc` (Backend
+  // `oidc_fehler_redirect`, bewusst ohne IdP-Detail) — ohne diese Auswertung sähe ein
+  // gescheiterter SSO-Login aus, als wäre nichts passiert.
+  const [fehler, setFehler] = useState<string | null>(() =>
+    new URLSearchParams(location.search).get('fehler') === 'oidc'
+      ? 'Die Anmeldung über Single Sign-On ist fehlgeschlagen'
+      : null,
+  );
   // Welche Aktion gerade läuft — steuert den Spinner GEZIELT (nur der geklickte Button lädt),
   // während `disabled` über das Form weiterhin ALLE Wege sperrt (kein paralleler Doppel-Login).
   const [laedt, setLaedt] = useState<'passwort' | 'passkey' | 'totp' | null>(null);

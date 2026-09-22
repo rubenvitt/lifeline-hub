@@ -26,6 +26,20 @@ vi.mock('./lagekarte/Kartenflaeche', () => ({
       <div data-testid="startansicht">
         {props.startAnsicht === undefined ? 'offen' : JSON.stringify(props.startAnsicht)}
       </div>
+      {/* bbox-Pfad (LFH-81): ob die Seite überhaupt einen Ausschnitt hören will, und ein
+          Auslöser, der einen Ausschnitt meldet wie die echte Karte nach `moveend`. */}
+      <div data-testid="bbox-callback">{props.onBboxAenderung ? 'an' : 'aus'}</div>
+      {/* Die echte Karte meldet Zoom und bbox im selben Zug (`Kartenflaeche.tsx`, `verarbeite`)
+          — der Stub tut das nachgebildet, sonst bliebe eine zoom-gebundene Ebene (Energie,
+          LFH-81) ohne je gemeldeten Zoom fälschlich aus. */}
+      <button
+        onClick={() => {
+          props.onZoomAenderung?.(10);
+          props.onBboxAenderung?.('7.01,51.51,7.12,51.58');
+        }}
+      >
+        bbox-melden
+      </button>
       <button onClick={() => props.onKarteKlick?.({ lng: 8.6, lat: 50.1 })}>karte-klick</button>
       {(props.markers ?? []).map((m) => (
         <button key={m.schluessel} onClick={() => props.onMarkerKlick?.(m.schluessel)}>
@@ -1385,6 +1399,45 @@ async function knopf(name: string): Promise<HTMLElement> {
 function knopfSofort(name: string): HTMLElement {
   return knopfAus(screen.getByText(name));
 }
+
+describe('LagekartePage · bbox-Pfad für bbox-abhängige Ebenen (LFH-81)', () => {
+  it('KRITIS aus, Energie an → der Ausschnitt wird gemeldet und die Ebene damit abgefragt', async () => {
+    const angefragt: (string | null)[] = [];
+    basisHandler([
+      http.get('/api/karte/fachebenen/energie', ({ request }) => {
+        angefragt.push(new URL(request.url).searchParams.get('bbox'));
+        return HttpResponse.json({
+          quelle: 'energie',
+          status: 'ok',
+          attribution: '© OpenStreetMap-Beitragende (ODbL)',
+          features: { type: 'FeatureCollection', features: [] },
+        });
+      }),
+    ]);
+    const user = userEvent.setup();
+    renderSeite();
+    // Ohne sichtbare bbox-Ebene hört die Seite keinen Ausschnitt — die Karte spart sich
+    // dann die Meldung ganz.
+    expect(await screen.findByTestId('bbox-callback')).toHaveTextContent('aus');
+
+    // Seit dem Neuentwurf (22.09.2026) startet das Fachebenen-Paneel der rechten Leiste
+    // eingeklappt — erst aufklappen, dann liegt der Schalter im Baum.
+    await user.click(await knopf('Fachebenen (extern)'));
+    const schalter = (await screen.findByText('Energieanlagen'))
+      .closest('.ant-space')
+      ?.querySelector('button[role="switch"]');
+    expect(schalter).toBeTruthy();
+    await user.click(schalter as Element);
+
+    // Die tragende Aussage: der Ausschnitt hängt nicht mehr an KRITIS. Mit der alten
+    // Bedingung (`fachebenenSichtbar.kritis`) stünde hier weiter „aus".
+    await waitFor(() => expect(screen.getByTestId('bbox-callback')).toHaveTextContent('an'));
+    await user.click(await knopf('bbox-melden'));
+    // Gerastert wie bei KRITIS (0,05°-Gitter nach außen) — derselbe Schlüssel für
+    // benachbarte Ausschnitte, frontend- wie backendseitig.
+    await waitFor(() => expect(angefragt).toContain('7,51.5,7.15,51.6'));
+  });
+});
 
 describe('LFH-145: Zeichnen-Abschluss + Bestätigung', () => {
   it('Zone zeichnen → Overlay „zeichnen" sichtbar', async () => {
