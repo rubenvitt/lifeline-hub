@@ -83,8 +83,10 @@ Lauf vom 22.09.2026 (Backend-Binary aus eigenem `CARGO_TARGET_DIR`, Stand dieses
 - **10:** Keine der Flächen erzeugt einen Alarm. Toasts erscheinen nur nach einer eigenen
   Handlung. Der Übergang zu „veraltet“ ist ein Zustand an der Kennzahl, kein Alarm, und kippt
   je Messung höchstens einmal.
-- **12 · A:** Auf Fükw (1366 px) und Tablet (1024 px) liegt CLS bei höchstens 0,048. Auf
-  390 px liegen beide Seiten über 0,1 — gemessen auch mit **leerer** Pegel-Liste (O1).
+- **12 · A:** Der Beitrag des Pegel-Nachladens zur CLS liegt auf allen drei Breiten bei
+  höchstens 0,012 [M5]. Die Seiten selbst liegen beim **Aufbau** auf 390 px über 0,1 (O1),
+  und auf 1024 px bricht beim Start unter Umständen die Kopfzeile um (O6) — beides ohne
+  Pegel-Bezug; deshalb bleibt die Zeile offen.
 - **12 · C:** Der Platz ist ab dem ersten Render belegt: Der Knopf steht gesperrt da, solange
   die Liste lädt, und wird dann zu Knopf oder Marke [T4]. Nichts wird nachträglich
   eingeschoben.
@@ -130,19 +132,29 @@ Lauf vom 22.09.2026 (Backend-Binary aus eigenem `CARGO_TARGET_DIR`, Stand dieses
   dasselbe Primitiv (`Kennzahl`) mit derselben Rolle `gedaempft`.
 - **[M4]** „Kontrast von Titel, Messzeile und Leitpegel-Marke“: Tag 18,47 / 8,42 / 16,94,
   Nacht 15,70 / 7,27 / 12,87.
-- **[M5]** „…die nachladende Pegel-Angabe hält CLS ≤ 0,1“ (Pegel-Antwort um 1,5 s
-  verzögert):
+- **[M5]** „…das Nachladen der Pegel-Angabe trägt ≤ 0,1 zur CLS bei“. Gemessen wird nur
+  der Beitrag des Nachladens: Die Pegel-Antwort wird zurückgehalten, bis die Seite 700 ms
+  lang keine neue Verschiebung zeigt; dann setzt die Spec eine Marke und gibt sie frei.
+  Gezählt werden die `layout-shift`-Einträge nach der Marke, ohne Eingabe-Folgen. Die
+  Einträge davor stehen mit ihren Quellen als „Aufbau“ daneben.
 
-  | Seite | 1366 | 1024 | 390 |
-  | --- | --- | --- | --- |
-  | Überblick | 0,022 | 0,048 | 0,164 |
-  | Lage-Dashboard | 0,025 | 0,027 | 0,171 |
+  | Seite | Pegel 1366 | Pegel 1024 | Pegel 390 | Aufbau 1366 | Aufbau 1024 | Aufbau 390 |
+  | --- | --- | --- | --- | --- | --- | --- |
+  | Überblick | 0,003 | 0,004 | 0,007 | 0,019 | 0,044 | 0,157 |
+  | Lage-Dashboard | 0,002 | 0,004 | 0,012 | 0,018 | 0,025 | 0,157 |
 
-  Gegenprobe mit leerer Pegel-Liste (Pegel ohne Verzögerung, einmaliger Lauf, nicht
-  eingecheckt): Überblick 0,022 / 0,050 / 0,164, Lage-Dashboard 0,011 / 0,015 / 0,167. Auf
-  1366 und 1024 px sichert die Spec ≤ 0,1 zu. Auf 390 px steht der Wert nur als Messwert.
-- **[M6]** „nachladende Liste und Stationen halten CLS ≤ 0,1“ (Liste 0,8 s, Stationen 1,6 s
-  verzögert): 0,001 / 0,004 / 0,002.
+  Dieselben Werte unter Linux-Chromium (Docker, `mcr.microsoft.com/playwright:v1.62.0-noble`,
+  Browser per `connectOptions`): Pegel 0,003 / 0,004 / 0,007 bzw. 0,002 / 0,004 / 0,012. Die
+  Mutationsprobe „160 px Block über dem Band, sobald die Pegel-Daten da sind“ färbt den Test
+  rot (0,151 auf 390 px).
+
+  **Warum nicht mehr die Seiten-CLS:** Die erste Fassung summierte alle Einträge ab dem
+  Seitenaufbau. In der CI (Run 35726795873, Job „e2e 4/4“) fiel sie bei 1024 px mit
+  0,40–0,45 auf **allen drei** Flächen, auch in der Sektion ohne Kennzahlenband. Das war
+  der Kopfzeilen-Umbruch aus O6 und hatte mit dem Pegel nichts zu tun.
+- **[M6]** „…das Nachladen von Liste und Stationen trägt ≤ 0,1 zur CLS bei“ (beide Antworten
+  zurückgehalten und gemeinsam freigegeben): Pegel-Beitrag 0,000 auf allen drei Breiten,
+  Aufbau 0,001 / 0,004 / 0,002.
 - **[M7]** „Tabulaturdurchlauf ohne verdecktes Fokusziel (390 × 420)“: 37 Stopps, alle vier
   markierten Sektionsziele erreicht (Reiter „Pegel“, beide Zeilenmenüs, Auswahl), 0 verdeckt,
   1 fixierter Knoten im Baum. Messkern `e2e/fokus-kern.ts`.
@@ -208,6 +220,24 @@ Lauf vom 22.09.2026 (Backend-Binary aus eigenem `CARGO_TARGET_DIR`, Stand dieses
 - **O4 · Abstand zwischen den Kennzahl-Zellen:** Das Fugenraster des Neuentwurfs setzt 1 px
   zwischen die Zellen des Bands, im Handschuh-Betrieb fordert Kriterium 2 ≥ 16 px. Das betrifft
   alle sechs Zellen und ist mit dem Band entstanden, nicht mit LFH-606.
+- **O6 · Kopfzeile bricht bei 1024 px beim Start auf zwei Reihen um (Bestand, alle
+  Einsatzseiten):** `einsatz/AlarmZentrale.tsx` startet mit
+  `useState(alarmTonStatus() ?? 'blockiert')` und zeigt damit „Ton blockiert“ als Wort, bis
+  die Audio-Prüfung antwortet. Zusammen mit „Desktop blockiert“ und „VERBINDE“ passt die
+  Kopfzeile bei 1024 px nicht mehr in eine Reihe (der Kommentar dort nennt den Umbruch
+  52 → 104 px selbst). Die ganze Fläche rutscht um 52 px nach unten, das Suchfeld springt nach
+  rechts.
+  - **Beleg CI:** Trace des Retry, 1024-px-Phase. Frame 194865 zeigt die zweireihige
+    Kopfzeile mit „Desktop blockiert · Ton blockiert · VERBINDE“, ~0,5 s später ist sie
+    wieder einreihig.
+  - **Beleg lokal:** Linux-Chromium im Docker, ein Eintrag von 0,4645 mit den Quellen
+    `ant-layout` (y 53 → 105), `kopf-rechts` (y 0 → 52), `kopf-suche` (x 351 → 718);
+    derselbe Wert auf `/einsatzdaten`, einer Route ohne Pegel-Bezug.
+  - **Warum nur in der CI:** Unter macOS und in schnellen Läufen ist der Status schon beim
+    ersten Bild bekannt.
+  - **Mögliche Richtung:** den Zustand „noch nicht geprüft“ nicht als „blockiert“
+    ausgeben. Das ist eine Entscheidung an der Alarmzentrale (LFH-392/LFH-511), keine an
+    LFH-606.
 - **O5 · Helligkeits-/Kontrastregler:** Querschnittlich. Die Leitlinie weist ihn einem eigenen
   Folge-Task zu („Was diese Leitlinie nicht entscheidet“).
 

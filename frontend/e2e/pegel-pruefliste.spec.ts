@@ -393,92 +393,187 @@ for (const modus of ['light', 'dark'] as const) {
 }
 
 /**
- * Kriterium 12 (CLS ≤ 0,1): die Pegel-Notiz hängt an einer EIGENEN Abfrage und kann nach dem
- * Rest der Kennzahlreihe eintreffen. Gemessen wird die Summe der `layout-shift`-Einträge des
- * Browsers (das Kriterium); die Bandhöhe davor/danach steht nur als Messwert dabei — sie wächst
- * gemessen um eine Zeile auch mit LEERER Pegel-Liste, der Sprung gehört also nicht dem Pegel. Die Pegel-Antwort wird bewusst um
- * 1,5 s verzögert, damit der Sprung NACH dem ersten Aufbau liegt — der ungünstige Fall.
+ * Kriterium 12 (CLS ≤ 0,1) — gemessen wird der BEITRAG DES PEGEL-NACHLADENS, nicht die
+ * Seiten-CLS insgesamt.
  *
- * Zugesichert wird ≤ 0,1 auf 1366 und 1024 px (Fükw, Führungs-Tablet). Auf 390 px liegen
- * BEIDE Seiten schon OHNE Pegel-Daten darüber (gemessen 22.09.2026: Überblick 0,164,
- * Lage-Dashboard 0,167 mit leerer Pegel-Liste) — ein Bestandsbefund, der in der Prüfliste
- * als offen geführt wird. Dort steht die Zahl hier nur als Messwert; eine Schranke, die ohne
- * die eigene Änderung schon rot wäre, prüfte nicht diese Änderung.
+ * WARUM SO (CI-Befund 22.09.2026, Run 35726795873): die erste Fassung summierte ALLE
+ * `layout-shift`-Einträge ab Seitenaufbau und fiel in der CI bei 1024 px mit 0,40–0,45 — auf
+ * allen drei Flächen, auch in der Sektion ohne Kennzahlenband. Unter Linux-Chromium (Docker,
+ * `mcr.microsoft.com/playwright:v1.62.0-noble`) reproduziert: EIN Eintrag von 0,4645 kurz
+ * nach dem Mount, Quellen `ant-layout` (y 53 → 105), `kopf-rechts` (y 0 → 52) und
+ * `kopf-suche` — die KOPFZEILE bricht auf eine zweite Reihe um, sobald der Einsatzname im
+ * Umschalter steht, und schiebt die ganze Fläche um 52 px. Gleiche Zahl auf
+ * `/einsatzdaten`, einer Route ohne jeden Pegel-Bezug. Unter macOS bleibt die Kopfzeile bei
+ * 1024 px einreihig (schmalere Schriftmetrik), deshalb war der Sprung lokal unsichtbar. Das
+ * ist ein Bestandsbefund der Kopfzeile (Prüfliste, offener Punkt), kein Beitrag des Pegels —
+ * ein Test, der ihn mitzählt, misst etwas anderes, als er behauptet.
+ *
+ * Deshalb hält die Spec die Pegel-Antworten ZURÜCK, bis die Seite ruhig steht (keine neue
+ * Verschiebung für {@link RUHE_MS}), setzt dann eine Marke (`performance.now()`) und gibt sie
+ * frei. Gezählt wird nur, was NACH der Marke verschiebt und nicht auf eine Eingabe folgt
+ * (`hadRecentInput`). Die Einträge davor stehen mit ihren Quellen als Messwert daneben — so
+ * bleibt sichtbar, was die Seite beim Aufbau tut, ohne es dem Pegel anzulasten.
  */
-async function clsBeobachten(page: Page) {
+const RUHE_MS = 700;
+
+interface Verschiebung {
+  v: number;
+  t: number;
+  eingabe: boolean;
+  quellen: string[];
+}
+
+async function verschiebungenAufzeichnen(page: Page) {
   await page.addInitScript(() => {
-    const w = window as unknown as { __cls: number };
-    w.__cls = 0;
+    const w = window as unknown as { __verschiebungen: unknown[] };
+    w.__verschiebungen = [];
     new PerformanceObserver((liste) => {
-      for (const e of liste.getEntries() as unknown as { value: number; hadRecentInput: boolean }[])
-        if (!e.hadRecentInput) w.__cls += e.value;
+      for (const e of liste.getEntries() as unknown as {
+        value: number;
+        hadRecentInput: boolean;
+        startTime: number;
+        sources: { node?: Node; previousRect: DOMRectReadOnly; currentRect: DOMRectReadOnly }[];
+      }[]) {
+        w.__verschiebungen.push({
+          v: e.value,
+          t: e.startTime,
+          eingabe: e.hadRecentInput,
+          quellen: e.sources.map((q) => {
+            const k = q.node instanceof Element ? q.node : null;
+            const name = k
+              ? `${k.tagName.toLowerCase()}${k.getAttribute('data-lfh') ? `[${k.getAttribute('data-lfh')}]` : ''}`
+              : String(q.node?.nodeName);
+            return `${name} y ${Math.round(q.previousRect.y)}→${Math.round(q.currentRect.y)}`;
+          }),
+        });
+      }
     }).observe({ type: 'layout-shift', buffered: true });
   });
+}
+
+const verschiebungen = (page: Page) =>
+  page.evaluate(() => (window as unknown as { __verschiebungen: Verschiebung[] }).__verschiebungen);
+
+/** Wartet, bis für `RUHE_MS` keine neue Verschiebung dazukommt. */
+async function wartenBisRuhig(page: Page) {
+  let anzahl = -1;
+  let seit = Date.now();
+  const ende = Date.now() + 20_000;
+  while (Date.now() < ende) {
+    const jetzt = (await verschiebungen(page)).length;
+    if (jetzt !== anzahl) {
+      anzahl = jetzt;
+      seit = Date.now();
+    } else if (Date.now() - seit >= RUHE_MS) return;
+    await page.waitForTimeout(100);
+  }
+  throw new Error('Die Seite kommt nicht zur Ruhe — der Pegel-Beitrag wäre nicht trennbar');
+}
+
+/** Hält die Antworten der Muster zurück, bis `freigeben()` die Marke setzt und sie loslässt. */
+async function zurueckhalten(page: Page, antworten: [string, unknown][]) {
+  let loslassen!: () => void;
+  const tor = new Promise<void>((f) => (loslassen = f));
+  for (const [muster, json] of antworten) {
+    await page.route(muster, async (r) => {
+      if (r.request().method() !== 'GET') return r.continue();
+      await tor;
+      await r.fulfill({ json });
+    });
+  }
+  return {
+    freigeben: async () => {
+      const marke = await page.evaluate(() => performance.now());
+      loslassen();
+      return marke;
+    },
+  };
+}
+
+/** Summe der Verschiebungen ab der Marke (ohne Eingabe-Folgen) und die Aufbau-Einträge davor. */
+async function beitragAb(page: Page, marke: number) {
+  const alle = await verschiebungen(page);
+  const nach = alle.filter((e) => e.t >= marke && !e.eingabe);
+  const vor = alle.filter((e) => e.t < marke);
+  const summe = (l: Verschiebung[]) => l.reduce((a, e) => a + e.v, 0);
+  const groesste = [...vor].sort((a, b) => b.v - a.v)[0];
+  return {
+    pegel: summe(nach),
+    aufbau: summe(vor),
+    aufbauQuellen: groesste ? groesste.quellen.slice(0, 3).join(', ') : '—',
+    pegelQuellen:
+      nach
+        .flatMap((e) => e.quellen)
+        .slice(0, 3)
+        .join(', ') || '—',
+  };
 }
 
 for (const [route, text] of [
   ['ueberblick', /Pegel 6,84 m steigend/],
   ['lage-dashboard', /WESER · steigend/],
 ] as const) {
-  test(`${route}: die nachladende Pegel-Angabe hält CLS ≤ 0,1`, async ({ page }) => {
-    test.setTimeout(90_000);
+  test(`${route}: das Nachladen der Pegel-Angabe trägt ≤ 0,1 zur CLS bei`, async ({ page }) => {
+    test.setTimeout(120_000);
     await anmelden(page);
     const einsatzId = await einsatzAnlegen(page, `E2E Pegel CLS ${Date.now()}`);
-    await clsBeobachten(page);
+    await verschiebungenAufzeichnen(page);
     const werte: string[] = [];
     for (const breite of [1366, 1024, 390]) {
       await page.setViewportSize({ width: breite, height: 844 });
       await page.unrouteAll({ behavior: 'ignoreErrors' });
-      await page.route(`**/api/einsaetze/${einsatzId}/pegel`, async (r) => {
-        await new Promise((f) => setTimeout(f, 1500));
-        await r.fulfill({ json: pegelListe(10) });
-      });
+      const pegel = await zurueckhalten(page, [
+        [`**/api/einsaetze/${einsatzId}/pegel`, pegelListe(10)],
+      ]);
       await page.goto(`/einsaetze/${einsatzId}/${route}`);
       const band = page.getByRole('group', { name: 'Lage in Zahlen' });
       await expect(band.locator('a[data-lfh="kennzahl"]').first()).toBeVisible();
-      await page.waitForTimeout(300);
-      const vorher = (await band.boundingBox())!.height;
+      await wartenBisRuhig(page);
+      const marke = await pegel.freigeben();
       await expect(band.getByText(text)).toBeVisible();
-      await page.waitForTimeout(300);
-      const nachher = (await band.boundingBox())!.height;
-      const cls = await page.evaluate(() => (window as unknown as { __cls: number }).__cls);
-      werte.push(`${breite}: Band ${vorher} → ${nachher}, CLS ${cls.toFixed(4)}`);
-      if (breite !== 390) {
-        expect.soft(cls, `CLS ${route} bei ${breite} px`).toBeLessThanOrEqual(0.1);
-      }
+      await wartenBisRuhig(page);
+      const b = await beitragAb(page, marke);
+      werte.push(
+        `${breite}: Pegel ${b.pegel.toFixed(4)} [${b.pegelQuellen}] · Aufbau ${b.aufbau.toFixed(4)} [${b.aufbauQuellen}]`,
+      );
+      expect
+        .soft(b.pegel, `Pegel-Beitrag zur CLS, ${route} bei ${breite} px`)
+        .toBeLessThanOrEqual(0.1);
     }
     test.info().annotations.push({ type: 'messwert', description: werte.join(' | ') });
   });
 }
 
-test('Einstellungssektion Pegel: nachladende Liste und Stationen halten CLS ≤ 0,1', async ({
+test('Einstellungssektion Pegel: das Nachladen von Liste und Stationen trägt ≤ 0,1 zur CLS bei', async ({
   page,
 }) => {
-  test.setTimeout(90_000);
+  test.setTimeout(120_000);
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Pegel Sektion CLS ${Date.now()}`);
-  await clsBeobachten(page);
+  await verschiebungenAufzeichnen(page);
   const werte: string[] = [];
   for (const breite of [1366, 1024, 390]) {
     await page.setViewportSize({ width: breite, height: 844 });
     await page.unrouteAll({ behavior: 'ignoreErrors' });
-    await page.route(`**/api/einsaetze/${einsatzId}/pegel`, async (r) => {
-      await new Promise((f) => setTimeout(f, 800));
-      await r.fulfill({ json: pegelListe(10) });
-    });
-    // Die Stationsliste kommt NACH der Pegel-Liste — der Fall, in dem die Auswahl erst
-    // lädt, während die Liste schon steht.
-    await page.route('**/api/karte/fachebenen/pegelonline', async (r) => {
-      await new Promise((f) => setTimeout(f, 1600));
-      await r.fulfill({ json: STATIONEN });
-    });
+    const antworten = await zurueckhalten(page, [
+      [`**/api/einsaetze/${einsatzId}/pegel`, pegelListe(10)],
+      ['**/api/karte/fachebenen/pegelonline', STATIONEN],
+    ]);
     await page.goto(`/einsaetze/${einsatzId}/einstellungen/pegel`);
+    // Anker: der Rahmen der Einstellungen steht, die Sektion wartet auf ihre Daten.
+    await expect(page.getByRole('tab', { name: 'Pegel' })).toBeVisible();
+    await wartenBisRuhig(page);
+    const marke = await antworten.freigeben();
     await expect(page.getByRole('main').locator('[data-lfh="pegel-titel"]')).toHaveCount(2);
     await expect(page.getByRole('combobox', { name: 'Station wählen' })).toBeEnabled();
-    await page.waitForTimeout(300);
-    const cls = await page.evaluate(() => (window as unknown as { __cls: number }).__cls);
-    werte.push(`${breite}: CLS ${cls.toFixed(4)}`);
-    expect.soft(cls, `CLS Sektion bei ${breite} px`).toBeLessThanOrEqual(0.1);
+    await wartenBisRuhig(page);
+    const b = await beitragAb(page, marke);
+    werte.push(
+      `${breite}: Pegel ${b.pegel.toFixed(4)} [${b.pegelQuellen}] · Aufbau ${b.aufbau.toFixed(4)} [${b.aufbauQuellen}]`,
+    );
+    expect
+      .soft(b.pegel, `Pegel-Beitrag zur CLS, Sektion bei ${breite} px`)
+      .toBeLessThanOrEqual(0.1);
   }
   test.info().annotations.push({ type: 'messwert', description: werte.join(' | ') });
 });
