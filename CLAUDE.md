@@ -147,10 +147,15 @@ umkehrt, steht das am Absatz selbst mit „Neuentwurf 22.09.2026".
   gespeicherte Standard-Module nicht brechen.
 - **Keine erfundenen Daten.** Was der Entwurf zeigt, aber keine Datenquelle hat, wird
   weggelassen — nicht als Platzhalter gebaut — und steht im ClickUp-Epic „Neuentwurf
-  Instrumententafel – Datenlücken des Designs" (LFH-606…LFH-617, z. B. Pegel/Evakuiert 606/607,
+  Instrumententafel – Datenlücken des Designs" (LFH-606…LFH-617, z. B. Evakuiert 607,
   FMS-Status je Einheit 609, „keine Rückmeldung" 610, ETB-Gesamtzahl/Tagesbilanz-Summen 612,
   Koordinate an der Person 613). Die Auslassung trägt ihr Ticket im Code-Kommentar und wird im
-  Test als **Abwesenheit** gepinnt.
+  Test als **Abwesenheit** gepinnt. **Eingelöst ist der Pegel (LFH-606):** er steht auf Platz 1
+  des Kennzahlenbands, „Höchste Warnstufe" ist dafür raus (Entscheidung 22.09.2026; die
+  Warnstufe bleibt im Seitenkopf-Hinweis und in der Gefahrenmatrix). **Eingelöst ist auch die
+  Rückmeldung (LFH-610):** Spalte „Rückmeldung“ und Kachel „keine Rückmeldung“ im Meldebild,
+  letzte Rückmeldung je Abschnitt im Überblick, „Letzte Meldung“ in der Lagekarte; die
+  Entscheidungen stehen in `umsetzung.md`.
 
 ## Frontend — UI-Form-Leitlinie (Drawer-Nutzung)
 
@@ -184,6 +189,20 @@ auf Aufnahme-Route, im Modal, in Listen und Details: Tag ≥ 7:1, Nacht ≥ 5:1.
 wird ungewählt, gewählt und mit Hover geprüft; Alpha wird mitgerechnet, unbelegte
 Bild-/Opacity-Kompositionen werden abgelehnt. Kein zusätzlicher mobiler Status-Slot ist
 Teil dieser Farbentscheidung.
+
+**Tagmodus des Neuentwurfs (LFH-618, 22.09.2026).** Drei Regeln aus der ersten Sichtprüfung
+im Hellmodus, Befunde samt Messwerten in
+`docs/superpowers/specs/2026-09-22-lfh-618-hellmodus-pruefliste.md`:
+**(1)** `achtung`/`alarm` als TEXT lesen `achtungText`/`alarmText` — die Füllfarben tragen den
+Tagesboden 7 : 1 nicht; nachts sind beide Rollen wertgleich mit der Füllfarbe. Kante, Punkt,
+Balken und Legendenfeld bleiben auf der Füllfarbe. Vorher wichen `statusFlaeche` und
+`Kennzahl` am Tag auf `text` aus: die Kontrastspecs waren grün, aber die Ampel am Tag
+farblos. **(2)** Eine Hervorhebung (aktives Segment, aktive Nav-/Modulzeile, Hover) liegt auf
+`flaeche3`, nicht auf `flaeche2` — die liegt am Tag bei 1,01–1,08 : 1 auf `paneel`/`flaeche`
+und ist schlicht nicht da; nachts trennt beide Stufen nur 1,02 : 1. **(3)** Ein Kontrast wird
+gegen den Grund gerechnet, auf dem der Text WIRKLICH steht: die ETB-Typwörter waren gegen
+Weiß gerechnet, die Zeitachse steht auf `grund` — `e2e/hellmodus-kontrast.spec.ts` misst sie
+dort. Der Messkern der Kontrastspecs liegt in `e2e/kontrast-kern.ts`.
 
 **Auf der Karte trägt die Warnstufe der TEXT, nicht die Farbe** (LFH-357). `warnstufeKarte`
 bildet fünf Stufen auf zwei unterscheidbare Rollen ab (`achtung`: niedrig/mittel · `alarm`:

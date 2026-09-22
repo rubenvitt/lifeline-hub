@@ -19,9 +19,9 @@ function rgb(hex: string): string {
 describe('Statusband', () => {
   it('jede Zelle ist eine Kennzahl auf der neutralen Fläche, der Ton im Quadrat und in der Marke', () => {
     const { container } = renderMitProviders(
-      <Statusband fahrzeuge={[zelle('s3', 'achtung', 5)]} personal={[]} zustand="daten" />,
+      <Statusband einheiten={[zelle('s3', 'achtung', 5)]} personal={[]} zustand="daten" />,
     );
-    const band = screen.getByRole('region', { name: 'Fahrzeuge je Status' });
+    const band = screen.getByRole('region', { name: 'Einheiten je Status' });
     const z = band.querySelector('[data-lfh="kennzahl"]') as HTMLElement;
     expect(z).toHaveAttribute('data-ton', 'achtung');
     expect(z).toHaveTextContent('S3');
@@ -32,16 +32,16 @@ describe('Statusband', () => {
     expect(z.style.background).toBe('');
     const quadrat = z.querySelector('[data-lfh="kennzahl-punkt"]') as HTMLElement;
     expect(quadrat.style.background).toBe(rgb(farbenHell.achtung));
-    // Tagesregel: achtung trägt 7 : 1 als Textfarbe nicht — die Zahl steht in `text`.
+    // Am Tag trägt die Zahl die Textrolle — getönt wie nachts, aber über 7 : 1 (LFH-618).
     const wert = z.querySelector('[data-lfh="kennzahl-wert"]') as HTMLElement;
-    expect(wert.style.color).toBe(rgb(farbenHell.text));
+    expect(wert.style.color).toBe(rgb(farbenHell.achtungText));
     expect(container.querySelectorAll('[data-lfh="meldebild-bandzelle"]')).toHaveLength(0);
   });
 
   it('normal und bedien behalten ihre Tonfarbe auch tags', () => {
     renderMitProviders(
       <Statusband
-        fahrzeuge={[zelle('s2', 'normal', 4), zelle('s4', 'bedien', 2)]}
+        einheiten={[zelle('s2', 'normal', 4), zelle('s4', 'bedien', 2)]}
         personal={[]}
         zustand="daten"
       />,
@@ -64,7 +64,7 @@ describe('Statusband', () => {
       setzeViewportBreite(breite);
       renderMitProviders(
         <Statusband
-          fahrzeuge={[
+          einheiten={[
             zelle('s1', 'normal'),
             zelle('s2', 'normal'),
             zelle('s3', 'achtung'),
@@ -74,7 +74,7 @@ describe('Statusband', () => {
           zustand="daten"
         />,
       );
-      const fzg = screen.getByRole('region', { name: 'Fahrzeuge je Status' });
+      const fzg = screen.getByRole('region', { name: 'Einheiten je Status' });
       const pers = screen.getByRole('region', { name: 'Personal je Status' });
       const rasterF = fzg.querySelector('[data-lfh="kennzahlenband"]') as HTMLElement;
       const rasterP = pers.querySelector('[data-lfh="kennzahlenband"]') as HTMLElement;
@@ -91,14 +91,14 @@ describe('Statusband', () => {
     // Sechs Zellen füllen jede der drei Stufen (6, 3, 2) restlos.
     const sechs = ['a', 'b', 'c', 'd', 'e', 'f'].map((k) => zelle(k, 'normal'));
     const { container } = renderMitProviders(
-      <Statusband fahrzeuge={sechs} personal={[]} zustand="daten" />,
+      <Statusband einheiten={sechs} personal={[]} zustand="daten" />,
     );
     expect(container.querySelectorAll('[data-lfh="meldebild-bandluecke"]')).toHaveLength(0);
   });
   it('„keine Rückmeldung" steht als eigene Gruppe, nicht in der FMS-Reihe (LFH-610)', () => {
     renderMitProviders(
       <Statusband
-        fahrzeuge={[zelle('s4', 'bedien', 3)]}
+        einheiten={[zelle('s4', 'bedien', 3)]}
         personal={[]}
         rueckmeldung={{
           schluessel: 'rueckmeldung-keine',
@@ -110,8 +110,8 @@ describe('Statusband', () => {
         zustand="daten"
       />,
     );
-    const fzg = screen.getByRole('region', { name: 'Fahrzeuge je Status' });
-    expect(within(fzg).queryByText('keine Rückmeldung')).toBeNull();
+    const fms = screen.getByRole('region', { name: 'Einheiten je Status' });
+    expect(within(fms).queryByText('keine Rückmeldung')).toBeNull();
     const rueck = screen.getByRole('region', { name: 'Einheiten ohne Rückmeldung' });
     const k = rueck.querySelector('[data-lfh="kennzahl"]') as HTMLElement;
     expect(k).toHaveAttribute('data-ton', 'alarm');
@@ -122,7 +122,7 @@ describe('Statusband', () => {
 
   it('ohne Kachel keine Rückmeldungsgruppe', () => {
     renderMitProviders(
-      <Statusband fahrzeuge={[zelle('s4', 'bedien')]} personal={[]} zustand="daten" />,
+      <Statusband einheiten={[zelle('s4', 'bedien')]} personal={[]} zustand="daten" />,
     );
     expect(screen.queryByRole('region', { name: 'Einheiten ohne Rückmeldung' })).toBeNull();
   });

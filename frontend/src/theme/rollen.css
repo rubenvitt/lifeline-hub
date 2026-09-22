@@ -57,6 +57,8 @@
   --lfh-bedien-text: #164f86;
   --lfh-auf-bedien: #ffffff;
   --lfh-normal-text: #155234;
+  --lfh-achtung-text: #604200;
+  --lfh-alarm-text: #8f1c12;
   --lfh-normal-flaeche: #e3f1e8;
   --lfh-achtung-flaeche: #f7efd5;
   --lfh-alarm-flaeche: #f9e3e3;
@@ -71,13 +73,13 @@
   --lfh-etb-meldung-kante: #1677ff;
   --lfh-etb-meldung-wort: #0a47a6;
   --lfh-etb-anordnung-kante: #b35600;
-  --lfh-etb-anordnung-wort: #8a3f00;
+  --lfh-etb-anordnung-wort: #7a3700;
   --lfh-etb-entscheidung-kante: #722ed1;
   --lfh-etb-entscheidung-wort: #5b1fae;
   --lfh-etb-lage-kante: #0e8c90;
-  --lfh-etb-lage-wort: #006266;
+  --lfh-etb-lage-wort: #005357;
   --lfh-etb-berichtigung-kante: #cf1322;
-  --lfh-etb-berichtigung-wort: #a8071a;
+  --lfh-etb-berichtigung-wort: #8f1c12;
   --lfh-etb-system-kante: #58606a;
   --lfh-etb-system-wort: #474e57;
 
@@ -216,6 +218,8 @@
   --lfh-bedien-text: #8ec2f0;
   --lfh-auf-bedien: #08090b;
   --lfh-normal-text: #7ddc4a;
+  --lfh-achtung-text: #e8cc3a;
+  --lfh-alarm-text: #ff6b6b;
   --lfh-normal-flaeche: #0d1a0a;
   --lfh-achtung-flaeche: #1c1705;
   --lfh-alarm-flaeche: #1c0a0d;

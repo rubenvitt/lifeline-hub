@@ -1,6 +1,7 @@
 import type {
   Auftrag,
   Einheit,
+  EinheitStatus,
   EinsatzFahrzeug,
   EinsatzMaterial,
   EinsatzPersonal,
@@ -9,6 +10,7 @@ import type {
   LetzteRueckmeldung,
   Rueckmeldungen,
   StatusKategorie,
+  StatusWert,
 } from '../api/types';
 import type { Dayjs } from 'dayjs';
 import {
@@ -100,7 +102,21 @@ export interface RasterZeile {
   abschnitt: string | null;
   staerke: StaerkeSumme | null;
   verteilung: MittelVerteilung | null;
-  status: MittelStatus | null;
+  /** Mittel: ihr Einzelstatus. Einheit: ihr Status als Anzeige (LFH-609). */
+  status: MittelStatus | EinheitStatusAnzeige | null;
+  /**
+   * Status der EINHEIT (LFH-609) — abgeleitet aus ihren Fahrzeugen oder von Hand; nur
+   * Einheitenzeilen, `null` für „Ohne Einheit“ und Mittel. Der Serverstand, nicht aus den
+   * gefilterten Listen gerechnet: sonst wechselte der Status einer Einheit mit dem Filter.
+   */
+  einheitStatus: EinheitStatus | null;
+  /**
+   * Die Einheit hat kein Fahrzeug und führt ihren Status deshalb von Hand (LFH-609). Mit
+   * Fahrzeugen lehnt der Server einen Handstatus ab (422) — dort gibt es keinen Auslöser.
+   */
+  handStatus: boolean;
+  /** „Seit“ (UTC) — Einheit: aus `einheitStatus.seit`, Fahrzeug: `status_seit`. */
+  seit: string | null;
   auftrag: AuftragKurz | null;
   tz: TzEinheit | null;
   children?: RasterZeile[];
@@ -142,6 +158,48 @@ export function fahrzeugStatus(
     wort: label != null ? fmsWort(label, anker) : statusKategorie[kategorie!].label,
     code: anker != null ? `S${anker}` : null,
   };
+}
+
+function codeVon(w: StatusWert | null | undefined): string | null {
+  return w?.fms_anker != null ? `S${w.fms_anker}` : null;
+}
+
+/** Ein Katalogeintrag als Chip-Beschreibung (Ton nur aus der Kategorie). */
+export function statusWertAnzeige(w: StatusWert): MittelStatus {
+  return {
+    ton: tonAusKategorie(w.kategorie),
+    wort: fmsWort(w.label, w.fms_anker),
+    code: codeVon(w),
+  };
+}
+
+/** Der Status einer Einheit als Chip plus — bei „gemischt“ — die Verteilung als Text. */
+export interface EinheitStatusAnzeige extends MittelStatus {
+  /** „2× S4 · 1× S3 · 1× ohne Status“ — nur bei `gemischt`, sonst `null`. */
+  verteilung: string | null;
+}
+
+/**
+ * Der Einheitenstatus als Anzeige (LFH-609). `gemischt` erfindet keinen Status: das Wort
+ * sagt „gemischt“, die Verteilung steht daneben, und der Ton kommt nur aus einer
+ * GEMEINSAMEN Kategorie (S3 + S4 → gebunden), sonst bleibt er neutral.
+ */
+export function einheitStatusAnzeige(s: EinheitStatus): EinheitStatusAnzeige {
+  if ((s.quelle === 'fahrzeuge' || s.quelle === 'hand') && s.status) {
+    return { ...statusWertAnzeige(s.status), verteilung: null };
+  }
+  if (s.quelle === 'gemischt') {
+    const verteilung = s.verteilung
+      .map((a) => {
+        const was = a.status
+          ? (codeVon(a.status) ?? fmsWort(a.status.label, a.status.fms_anker))
+          : OHNE_STATUS.label;
+        return `${a.anzahl}× ${was}`;
+      })
+      .join(' · ');
+    return { ton: tonAusKategorie(s.kategorie), wort: 'gemischt', code: null, verteilung };
+  }
+  return { ton: 'neutral', wort: OHNE_STATUS.label, code: null, verteilung: null };
 }
 
 function personStatus(ep: EinsatzPersonal): MittelStatus {
@@ -195,17 +253,20 @@ export function offeneAuftraegeJeEinheit(auftraege: readonly Auftrag[]): Map<num
 // ── Funkrufname ───────────────────────────────────────────────────────────────
 
 /**
- * Der Funkrufname einer Einheit — NUR, wenn er eindeutig ist: genau ein Fahrzeug in der
- * Einheit. Bei null oder mehreren Fahrzeugen gibt es keinen Rufnamen der EINHEIT; ihn zu
- * raten (erstes Fahrzeug, Führungsfahrzeug) wäre eine erfundene Angabe. Ein eigener
- * Rufname je Einheit ist LFH-614.
+ * Der Funkrufname einer Einheit. Zuerst der gepflegte eigene Rufname (`Einheit.funkrufname`,
+ * LFH-614). Fehlt er, NUR der eindeutige: genau ein Fahrzeug in der Einheit. Bei null oder
+ * mehreren Fahrzeugen gibt es dann keinen Rufnamen der EINHEIT; ihn zu raten (erstes
+ * Fahrzeug, Führungsfahrzeug) wäre eine erfundene Angabe.
  *
  * Gelesen aus `Einheit.fahrzeug_mitglieder` (Serverstand), NICHT aus der gefilterten
  * Fahrzeugliste: sonst wechselte der Rufname einer Einheit mit dem Statusfilter.
  */
-export function eindeutigerFunkrufname(
-  fahrzeuge: readonly { funkrufname: string }[] | null | undefined,
-): string | null {
+export function einheitFunkrufname(einheit: {
+  funkrufname?: string | null;
+  fahrzeug_mitglieder?: readonly { funkrufname: string }[] | null;
+}): string | null {
+  if (einheit.funkrufname) return einheit.funkrufname;
+  const fahrzeuge = einheit.fahrzeug_mitglieder;
   if (!fahrzeuge) return null;
   return fahrzeuge.length === 1 ? fahrzeuge[0].funkrufname : null;
 }
@@ -246,6 +307,9 @@ function mittelZeilen(
     abschnitt: null,
     staerke: null,
     verteilung: null,
+    einheitStatus: null,
+    handStatus: false,
+    seit: null,
     auftrag: null,
     tz: null,
   };
@@ -257,6 +321,7 @@ function mittelZeilen(
       bezeichnung: ef.funkrufname,
       zusatz: ef.fahrzeugtyp ?? null,
       status: fahrzeugStatus(ef, katalog),
+      seit: ef.status_seit ?? null,
     })),
     ...personal.map((ep): RasterZeile => ({
       ...leer,
@@ -370,11 +435,14 @@ export function baueMeldebildRaster(e: RasterEingabe): RasterZeile[] {
       einheitId: x.id,
       bezeichnung: x.name,
       zusatz: ueber ? `in ${ueber.name}` : (x.typ_label ?? null),
-      funkrufname: eindeutigerFunkrufname(x.fahrzeug_mitglieder),
+      funkrufname: einheitFunkrufname(x),
       abschnitt: aId != null ? (abschnittName.get(aId) ?? x.abschnitt_name ?? null) : null,
       staerke,
       verteilung,
-      status: null,
+      status: x.status ? einheitStatusAnzeige(x.status) : null,
+      einheitStatus: x.status ?? null,
+      handStatus: (x.fahrzeug_mitglieder ?? []).length === 0,
+      seit: x.status?.seit ?? null,
       auftrag: auftragJe.get(x.id) ?? null,
       tz: {
         typLabel: x.typ_label ?? null,
@@ -406,6 +474,9 @@ export function baueMeldebildRaster(e: RasterEingabe): RasterZeile[] {
       staerke,
       verteilung,
       status: null,
+      einheitStatus: null,
+      handStatus: false,
+      seit: null,
       auftrag: null,
       tz: null,
       children: mittelZeilen(ohneP, ohneF, ohneM, katalog),
@@ -414,9 +485,13 @@ export function baueMeldebildRaster(e: RasterEingabe): RasterZeile[] {
   return zeilen;
 }
 
-/** Eine Einheiten-Zeile mit Ausfall ist eine Problemzeile (Tönung + Zahl als zweiter Kanal). */
+/**
+ * Eine Einheiten-Zeile mit Ausfall ist eine Problemzeile (Tönung + Zahl als zweiter Kanal)
+ * — ein Ausfall unter ihren Mitteln ODER ein Einheitenstatus der Kategorie „nicht
+ * verfügbar“ (LFH-609: eine Einheit ohne Fahrzeug meldet S6 nur über den Handstatus).
+ */
 export function istProblemZeile(z: RasterZeile): boolean {
-  return (z.verteilung?.ausfall ?? 0) > 0;
+  return (z.verteilung?.ausfall ?? 0) > 0 || z.einheitStatus?.kategorie === 'nicht_verfuegbar';
 }
 
 /** Alle Schlüssel mit Kindern — das „alles aufklappen" des Druckpfads. */
@@ -438,8 +513,8 @@ export interface BandZelle {
   ton: StatusTon;
 }
 
-/** Code einer Fahrzeugzelle ohne FMS-Anker — die Art statt einer erfundenen Ziffer. */
-const FAHRZEUG_KURZ = 'Fzg.';
+/** Code einer Einheitenzelle ohne FMS-Anker — die Art statt einer erfundenen Ziffer. */
+const EINHEIT_KURZ = 'Einh.';
 
 // ── Rückmeldung je Einheit (LFH-610) ──────────────────────────────────────────
 
@@ -505,55 +580,64 @@ export function keineRueckmeldungZelle(
 }
 
 /**
- * Fahrzeuge je Status des Katalogs — eine Zelle je Status mit mindestens einem Fahrzeug,
- * in `sortier`-Folge des Katalogs (Precedent: die Materialachse zeigte nur Werte > 0; der
- * Katalog ist mandantengepflegt und hat im Seed zehn Einträge, zehn Nullzellen verdünnten
- * das Band). Unbekannte `status_id` folgen nach dem Katalog, „ohne Status" steht hinten.
+ * Einheiten je Status (Entwurf S6 `statusStufen`, LFH-609) — eine Zelle je Katalogstatus
+ * mit mindestens einer Einheit, in `sortier`-Folge; Fahrzeug- und Handstatus zählen
+ * gleich, es ist derselbe FMS-Katalog. Danach „gemischt“ und „ohne Status“, wenn belegt —
+ * jede Einheit genau einmal, damit sich das Band auf die Einheitenzahl summiert.
  *
- * „ohne Status" ist ECHTE Datenlage — ein disponiertes Fahrzeug, dem noch niemand einen
- * Status gegeben hat — und NICHT die Kachel „keine Rückmeldung" des Entwurfs: die zählt
- * EINHEITEN ohne Rückmeldung (`keineRueckmeldungZelle`, LFH-610) und steht deshalb nicht in
- * diesem Band, das sich auf die Fahrzeugzahl summieren muss. Ohne diese Zelle summierte sich das Band nicht auf die Fahrzeugzahl.
+ * „ohne Status“ ist ECHTE Datenlage — eine Einheit, der noch niemand einen Status gegeben
+ * hat — und NICHT die Kachel „keine Rückmeldung“ des Entwurfs: die zählt Einheiten, von
+ * denen nie eine Rückmeldung kam (`keineRueckmeldungZelle`, LFH-610), und steht in einer
+ * eigenen Gruppe — in diesem Band stünde sie doppelt, das sich auf die Einheitenzahl
+ * summieren muss.
  */
-export function fahrzeugBand(
-  fahrzeuge: readonly EinsatzFahrzeug[],
-  statusKatalog: readonly FahrzeugStatus[],
-): BandZelle[] {
-  const katalog = new Map(statusKatalog.map((s) => [s.id, s]));
-  const gruppen = new Map<number | null, EinsatzFahrzeug[]>();
-  for (const ef of fahrzeuge) {
-    const s = ef.status_id ?? null;
-    const l = gruppen.get(s);
-    if (l) l.push(ef);
-    else gruppen.set(s, [ef]);
-  }
-  const zellen: (BandZelle & { rang: number })[] = [];
-  for (const [statusId, liste] of gruppen) {
-    if (statusId == null) {
-      zellen.push({
-        schluessel: 'fzg-ohne',
-        code: FAHRZEUG_KURZ,
-        wert: liste.length,
-        wort: OHNE_STATUS.label,
-        ton: 'neutral',
-        rang: Number.MAX_SAFE_INTEGER,
-      });
-      continue;
+export function einheitBand(einheiten: readonly Einheit[]): BandZelle[] {
+  const je = new Map<number, { wert: StatusWert; anzahl: number }>();
+  let gemischt = 0;
+  let ohne = 0;
+  for (const e of einheiten) {
+    const s = e.status;
+    if (s && (s.quelle === 'fahrzeuge' || s.quelle === 'hand') && s.status) {
+      const bisher = je.get(s.status.status_id);
+      if (bisher) bisher.anzahl += 1;
+      else je.set(s.status.status_id, { wert: s.status, anzahl: 1 });
+    } else if (s?.quelle === 'gemischt') {
+      gemischt += 1;
+    } else {
+      ohne += 1;
     }
-    const eintrag = katalog.get(statusId);
-    const status = fahrzeugStatus(liste[0], katalog);
+  }
+  const zellen: BandZelle[] = [...je.values()]
+    .sort((a, b) => a.wert.sortier - b.wert.sortier || a.wert.status_id - b.wert.status_id)
+    .map(({ wert, anzahl }) => {
+      const a = statusWertAnzeige(wert);
+      return {
+        schluessel: `eh-${wert.status_id}`,
+        code: a.code ?? EINHEIT_KURZ,
+        wert: anzahl,
+        wort: a.wort,
+        ton: a.ton,
+      };
+    });
+  if (gemischt > 0) {
     zellen.push({
-      schluessel: `fzg-${statusId}`,
-      code: status.code ?? FAHRZEUG_KURZ,
-      wert: liste.length,
-      wort: status.wort,
-      ton: status.ton,
-      rang: eintrag ? eintrag.sortier : Number.MAX_SAFE_INTEGER - 1,
+      schluessel: 'eh-gemischt',
+      code: EINHEIT_KURZ,
+      wert: gemischt,
+      wort: 'gemischt',
+      ton: 'neutral',
     });
   }
-  return zellen
-    .sort((a, b) => a.rang - b.rang || a.wort.localeCompare(b.wort, 'de'))
-    .map(({ schluessel, code, wert, wort, ton }) => ({ schluessel, code, wert, wort, ton }));
+  if (ohne > 0) {
+    zellen.push({
+      schluessel: 'eh-ohne',
+      code: EINHEIT_KURZ,
+      wert: ohne,
+      wort: OHNE_STATUS.label,
+      ton: 'neutral',
+    });
+  }
+  return zellen;
 }
 
 /** Personal je Statuskategorie — vier Eimer in fester Folge, nur die belegten. */

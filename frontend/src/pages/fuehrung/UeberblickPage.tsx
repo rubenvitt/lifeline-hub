@@ -32,6 +32,8 @@ import { listeAuftraege } from '../../api/auftraege';
 import { listeErinnerungen } from '../../api/erinnerungen';
 import { listeEtb } from '../../api/etb';
 import { holeRueckmeldungen } from '../../api/meldungen';
+import { pegelAbfrage } from '../../api/pegel';
+import { PEGEL_STAND_UNBEKANNT, pegelNotizKurz } from '../../pegel/pegelKennzahl';
 import {
   auftraegePfad,
   einheitenPfad,
@@ -62,6 +64,7 @@ import {
   naechsteMarken,
   offeneAuftraege,
   warnstufeKennzahlVon,
+  warnstufeNotiz,
   ueberblickRechteText,
   type AbschnittZeile,
   type Marke,
@@ -81,9 +84,13 @@ import { MARKEN_BREITE, rasterStil, zeilenzielStil } from './ueberblickStil';
  * (`EINSATZ_STREAM_EVENTS`). Die Reihenfolgen sind vollständig bestimmt (Tiebreak über
  * id), ein Refetch ordnet also nichts um, was sich nicht geändert hat.
  *
- * BEWUSST WEGGELASSEN (keine erfundenen Daten, Entscheidung 4): Pegel-Notiz an der
- * Warnstufe (LFH-606), Lagezustand-Farbkante und Fortschritt je Abschnitt (LFH-608),
- * Einheitenstatus (LFH-609 — ersetzt durch die Verfügbarkeit der Mittel).
+ * PEGEL-NOTIZ AN DER WARNSTUFE (LFH-606, Entscheidung 4 des Auftraggebers vom 22.09.2026):
+ * seit es die maßgeblichen Pegel des Einsatzes gibt, trägt die Warnstufen-Kennzahl wieder
+ * „Pegel 6,84 m steigend" — aus derselben Ableitung wie das Lage-Dashboard
+ * (`pegel/pegelKennzahl.ts`). Ohne festgelegten Pegel keine Pegel-Notiz, bei Ausfall oder
+ * gescheitertem Abruf „Pegel: Stand unbekannt". Der Pegel-Abruf bestimmt NICHT den Zustand
+ * der Kennzahl: sie gehört der Warnstufe, ein toter Pegel-Abruf macht die Warnstufe nicht
+ * unlesbar.
  *
  * LETZTE RÜCKMELDUNG JE ABSCHNITT (LFH-610): jüngste Meldung im Teilbaum, direkt an einen
  * Abschnitt oder an eine seiner Einheiten gebunden. Die Quelle hängt am Leserecht auf
@@ -91,6 +98,10 @@ import { MARKEN_BREITE, rasterStil, zeilenzielStil } from './ueberblickStil';
  * Modul der Normalfall und darf das Abschnittspaneel nicht auf „Stand unbekannt" stellen.
  * Solange sie lädt oder scheitert, trägt die Zeile dazu schlicht nichts. Keine Fristfarbe:
  * der Überblick zählt Rückmeldungen nicht aus, das tut das Meldebild (S6).
+ *
+ * BEWUSST WEGGELASSEN (keine erfundenen Daten, Entscheidung 4): Lagezustand-Farbkante und
+ * Fortschritt je Abschnitt (LFH-608). Das Raster bereit · gebunden · Ausfall zählt seit
+ * LFH-609 die Einheiten nach ihrem Status.
  */
 
 /** Der Entscheidungsabruf: nur Typ „Entscheidung", ein Deckel, der die letzte Stunde
@@ -244,6 +255,7 @@ export default function UeberblickPage() {
     queryKey: einsatzKeys.meldungenRueckmeldungen(einsatzId),
     queryFn: () => holeRueckmeldungen(einsatzId),
   });
+  const pegelQ = useQuery(pegelAbfrage(einsatzId));
 
   const einsatz = einsatzQ.data;
   /*
@@ -272,6 +284,16 @@ export default function UeberblickPage() {
     [personal, fahrzeuge, material],
   );
   const warnstufe = useMemo(() => warnstufeKennzahlVon(gefahren ?? []), [gefahren]);
+  const pegel = pegelQ.data;
+  const pegelNotiz = useMemo(
+    () =>
+      pegelQ.isError
+        ? `Pegel: ${PEGEL_STAND_UNBEKANNT}`
+        : pegel
+          ? pegelNotizKurz(pegel, jetzt.valueOf())
+          : null,
+    [pegelQ.isError, pegel, jetzt],
+  );
   const auftragszahl = useMemo(() => auftraegeKennzahl(auftraege ?? []), [auftraege]);
   const offene = useMemo(() => offeneAuftraege(auftraege ?? []), [auftraege]);
   const zeilen = useMemo(
@@ -321,13 +343,13 @@ export default function UeberblickPage() {
         ? erinnerungenPfad(einsatzId)
         : stabPfad(einsatzId);
   const markenFarbe = (m: Marke) =>
-    m.ton === 'alarm' ? rollen.alarm : m.ton === 'achtung' ? rollen.achtung : rollen.text;
+    m.ton === 'alarm' ? rollen.alarmText : m.ton === 'achtung' ? rollen.achtungText : rollen.text;
 
   const ueberfaelligMeta =
     zAuftraege === 'daten' ? (
       <span
         style={{
-          color: auftragszahl.ueberfaellig > 0 ? rollen.achtung : rollen.schwach,
+          color: auftragszahl.ueberfaellig > 0 ? rollen.achtungText : rollen.schwach,
         }}
       >
         {auftragszahl.ueberfaellig > 0
@@ -414,11 +436,7 @@ export default function UeberblickPage() {
             zustand={zWarnstufe}
             ton={warnstufe.ton}
             wert={warnstufe.wort}
-            notiz={
-              warnstufe.anzahlAktiv === 1
-                ? '1 Gefahrengebiet mit Warnstufe'
-                : `${warnstufe.anzahlAktiv} Gefahrengebiete mit Warnstufe`
-            }
+            notiz={warnstufeNotiz(warnstufe.anzahlAktiv, pegelNotiz)}
             ziel={gefahrenPfad(einsatzId)}
           />
           <Kennzahl
@@ -462,7 +480,7 @@ export default function UeberblickPage() {
             fuss={
               zAbschnitte === 'daten' && zeilen.length > 0 ? (
                 <span style={{ ...monoStil(10), color: rollen.schwach }}>
-                  Mittel (Fahrzeuge + Personal): bereit · gebunden · Ausfall
+                  Einheiten nach Status: bereit · gebunden · Ausfall
                   {auftraegeFehlen && ' — Aufträge nicht abrufbar, Auftragstexte fehlen'}
                 </span>
               ) : undefined
@@ -513,7 +531,7 @@ export default function UeberblickPage() {
             >
               <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
                 {offene.slice(0, AUFTRAEGE_MAX).map((a) => {
-                  const farbe = a.ist_ueberfaellig ? rollen.alarm : rollen.gedaempft;
+                  const farbe = a.ist_ueberfaellig ? rollen.alarmText : rollen.gedaempft;
                   return (
                     <li key={a.id}>
                       <Link
@@ -746,8 +764,8 @@ const NUR_VORLESER: CSSProperties = {
 };
 
 /** Eine Abschnittszeile: Name/Leiter/Einheiten · jüngster offener Auftrag und letzte
- *  Rückmeldung · Stärke und Mittelverteilung. Die ganze Zeile ist der Link auf den
- *  Abschnitt. */
+ *  Rückmeldung · Stärke und Einheiten je Statuskategorie (LFH-609). Die ganze Zeile ist der
+ *  Link auf den Abschnitt. */
 function AbschnittEintrag({
   zeile,
   ziel,
@@ -760,7 +778,7 @@ function AbschnittEintrag({
 }) {
   const { token, rollen } = useRollen();
   const [juengster, ...weitere] = zeile.auftraege;
-  const { mittel } = zeile;
+  const verteilung = zeile.einheitenStatus;
   const rueck = zeile.letzteRueckmeldung;
   return (
     <Link
@@ -866,17 +884,19 @@ function AbschnittEintrag({
             width: '100%',
           }}
         >
-          <StatusZelle ton="normal" hoehe={24} wert={mittel.bereit} wort="bereit" />
-          <StatusZelle ton="bedien" hoehe={24} wert={mittel.gebunden} wort="gebunden" />
+          <StatusZelle ton="normal" hoehe={24} wert={verteilung.bereit} wort="bereit" />
+          <StatusZelle ton="bedien" hoehe={24} wert={verteilung.gebunden} wort="gebunden" />
           <StatusZelle
-            ton={mittel.ausfall > 0 ? 'alarm' : 'neutral'}
+            ton={verteilung.ausfall > 0 ? 'alarm' : 'neutral'}
             hoehe={24}
-            wert={mittel.ausfall}
+            wert={verteilung.ausfall}
             wort="Ausfall"
           />
         </span>
-        {mittel.ohne > 0 && (
-          <span style={{ ...monoStil(10), color: rollen.schwach }}>+{mittel.ohne} ohne Status</span>
+        {verteilung.ohne > 0 && (
+          <span style={{ ...monoStil(10), color: rollen.schwach }}>
+            +{verteilung.ohne} ohne Status
+          </span>
         )}
       </span>
     </Link>

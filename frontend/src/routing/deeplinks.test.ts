@@ -336,13 +336,14 @@ describe('einsatzEinstellungenPfad (LFH-345 · C10, H15/M15)', () => {
     expect(einsatzEinstellungenPfad(E)).toBe('/einsaetze/5/einstellungen/allgemein');
   });
 
-  it('baut alle vier Sektionen', () => {
+  it('baut alle fünf Sektionen', () => {
     expect(einsatzEinstellungenPfad(E, 'allgemein')).toBe('/einsaetze/5/einstellungen/allgemein');
     expect(einsatzEinstellungenPfad(E, 'verhalten')).toBe('/einsaetze/5/einstellungen/verhalten');
     expect(einsatzEinstellungenPfad(E, 'aufbewahrung')).toBe(
       '/einsaetze/5/einstellungen/aufbewahrung',
     );
     expect(einsatzEinstellungenPfad(E, 'module')).toBe('/einsaetze/5/einstellungen/module');
+    expect(einsatzEinstellungenPfad(E, 'pegel')).toBe('/einsaetze/5/einstellungen/pegel');
   });
 
   /**
@@ -356,6 +357,7 @@ describe('einsatzEinstellungenPfad (LFH-345 · C10, H15/M15)', () => {
       'verhalten',
       'aufbewahrung',
       'module',
+      'pegel',
     ]);
     expect(einsatzEinstellungenPfad(E, EINSTELLUNGEN_SEKTIONEN[0].key)).toBe(
       einsatzEinstellungenPfad(E),

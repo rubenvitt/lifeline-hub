@@ -41,6 +41,7 @@ pub mod nachforderung;
 pub mod org_einstellungen;
 pub mod organisation;
 pub mod ort_vorschau;
+pub mod pegel;
 pub mod personal;
 pub mod personal_status;
 pub mod qualifikation;

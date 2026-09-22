@@ -36,7 +36,9 @@ Shell-Rahmen · neue Bausteine · neu gedachte Screens.
    - das **ETB ist eine Zeitachse** auf allen Breiten, Schnellerfassung **unten**,
      Seitenleiste „Tagesbilanz“ (Regeländerung zu `tabelleAb="xl"`).
 4. **Keine erfundenen Daten.** Was keine Datenquelle hat, wird weggelassen (nicht als
-   Platzhalter gebaut) und als ClickUp-Task erfasst. Bekannte Lücken: Pegel, Evakuiert,
+   Platzhalter gebaut) und als ClickUp-Task erfasst. Der Pegel ist seit LFH-606 da (Platz 1
+   im Kennzahlenband statt „Höchste Warnstufe", Entscheidung 22.09.2026; Prognose und
+   Höchststand sind ein Folgetask). Bekannte Lücken: Evakuiert,
    Fortschritt je Abschnitt, Abschnittsfarbe, FMS-Status/„Seit“/Rückmeldung je Einheit,
    „keine Rückmeldung“, ETB-Lesemarke „seit Ihrer letzten Sichtung“, ETB-Gesamtzahl und
    Tagesbilanz-Summen (serverseitig), Folgeauftrag-Verweis am ETB-Eintrag, Zustand und
@@ -133,3 +135,44 @@ Das Modulpanel des Entwurfs führt acht Module, die es in der App nicht gab. Ent
 | Ablösung (Kräfte) | Fachmodul, hier verworfen | Folgetask LFH-635 |
 
 Eine Sprungmarke ist **kein Modul** (`frontend/src/einsatz/sprungmarken.ts`). Sie erbt Sichtbarkeit und Sperre ihres Zielmoduls, ist nie `aria-current` und trägt keinen Zähler, weil es für 7/144/9 keine Quelle gibt (LFH-612).
+
+## Einheitenstatus und „Seit“ (LFH-609, 22.09.2026)
+
+Die Lücke „FMS-Status/„Seit“ je Einheit“ ist geschlossen. Die Entscheidung des Auftraggebers:
+
+- Der Status einer Einheit wird **aus ihren Fahrzeugen abgeleitet**, und zwar serverseitig
+  (`einheit::repo::leite_status_ab`). Tragen alle Fahrzeuge denselben Status, gilt er.
+  „Seit“ ist dann der jüngste Wechsel und bleibt leer, sobald ein Fahrzeug keinen
+  Zeitpunkt kennt. Sonst gilt **„gemischt“** mit Verteilung („1× S3 · 2× S4“) und ohne „Seit“.
+- Eine Einheit **ohne Fahrzeug** führt ihren Status **von Hand**
+  (`PUT …/einheiten/{eid}/status`, mit Fahrzeug 422).
+- Das Fahrzeug trägt `status_seit`. Er springt nur bei einem echten Wechsel. Bestandszeilen
+  bleiben leer, weil ein nachgefüllter Wert erfunden wäre.
+- Im Meldebild zählen die Kacheln Einheiten je Status wie im Entwurf S6. Die Zeile zeigt
+  Status und „Seit“, die Verteilung der Mittel steht als eigene Spalte „Mittel“ (ab `xl`).
+  Auf der Lagekarte zeigt „Ausgewählt“ Status und „Seit“. Im Überblick zählt das Raster je
+  Abschnitt die Einheiten nach der Kategorie ihres Status.
+- Nicht Teil davon: das FMS-Tableau (LFH-642), die Rückmeldung bzw. „keine Rückmeldung“
+  (LFH-610) und der Funkrufname der Einheit (LFH-614).
+
+## Rückmeldung je Einheit und Abschnitt (LFH-610, 22.09.2026)
+
+Die Lücke „Rückmeldung je Einheit“ / „keine Rückmeldung“ ist geschlossen. Entscheidungen des
+Auftraggebers:
+
+- Eine Meldung kann an **eine Einheit oder einen Einsatzabschnitt** gebunden werden
+  (`meldung.einheit_id`/`abschnitt_id`, höchstens einer, `ON DELETE SET NULL`). Der Freitext
+  `absender` bleibt Pflicht und trägt den Namen zum Eingangszeitpunkt.
+- **Als Rückmeldung zählt jede gebundene Meldung**, gleich welcher Meldungsart. Maßgeblich ist
+  die jüngste Ereigniszeit.
+- **Rückmeldefrist 60 Minuten**, überschreibbar je Organisation und je Einsatz
+  (`rueckmeldung_frist_min`). Ist die letzte Rückmeldung älter, steht die Zeit in `achtung`.
+- Die Kachel **„keine Rückmeldung“ zählt nur Einheiten, von denen nie eine kam** („—“ in
+  `alarm`); eine überfällige Einheit hat zurückgemeldet und zählt nicht mit.
+- Quelle ist `GET …/meldungen/rueckmeldungen` (Lesezugriff Meldungen). Ohne dieses Recht
+  entfällt die Spalte im Meldebild — es gibt kein falsches Rot.
+- Eine Zuordnung zu einer inzwischen aufgelösten oder fremden Einheit wird beim Anlegen zu
+  „ungebunden“ herabgestuft statt abgelehnt: sonst fiele eine offline erfasste Meldung samt
+  ETB-Eintrag in die abgelehnten Aktionen.
+- Die Lagekarte zeigt „Letzte Meldung“ im taktischen Zeitformat (`1411`) wie der Rest des
+  Paneels, nicht `14:11` wie im Entwurf.

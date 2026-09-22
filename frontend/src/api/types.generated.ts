@@ -473,6 +473,12 @@ export interface components {
             /** Format: int64 */
             fuehrer_id?: number | null;
             fuehrer_name?: string | null;
+            /**
+             * @description Eigener Funkrufname der Einheit (LFH-614), fixierte menschenlesbare Kennung im
+             *     Meldebild. `None` = nicht gepflegt; das Frontend leitet dann höchstens aus genau
+             *     einem Fahrzeugmitglied ab.
+             */
+            funkrufname?: string | null;
             /** Format: int64 */
             id: number;
             ist: components["schemas"]["Staerke"];
@@ -490,6 +496,8 @@ export interface components {
             /** Format: int64 */
             sortier: number;
             sprechgruppen: components["schemas"]["SprechgruppeAnzeige"][];
+            /** @description Status der Einheit mit „Seit“ (LFH-609) — abgeleitet oder Handstatus. */
+            status: components["schemas"]["EinheitStatus"];
             /** Format: int64 */
             typ_id?: number | null;
             typ_label?: string | null;
@@ -507,6 +515,9 @@ export interface components {
             ef_id: number;
             fahrzeugtyp?: string | null;
             funkrufname: string;
+            status?: null | components["schemas"]["StatusWert"];
+            /** @description Zeitpunkt des letzten Statuswechsels (UTC); `None` = unbekannt. */
+            status_seit?: string | null;
         };
         /** @description Material-Mitglied einer Einheit (leichtgewichtig). */
         EinheitMitgliedMaterial: {
@@ -534,6 +545,33 @@ export interface components {
             name: string;
             staerke_position?: null | components["schemas"]["StaerkePosition"];
         };
+        /**
+         * @description Status einer Einheit mit „Seit“ (LFH-609). Die Regel steht an
+         *     [`repo::leite_status_ab`].
+         */
+        EinheitStatus: {
+            kategorie?: null | components["schemas"]["StatusKategorie"];
+            quelle: components["schemas"]["EinheitStatusQuelle"];
+            /**
+             * @description Seit wann (UTC). `Fahrzeuge`: der jüngste Wechsel, also seit wann ALLE Fahrzeuge in
+             *     diesem Status stehen — `None`, sobald ein Fahrzeug keinen Zeitpunkt kennt. `Hand`:
+             *     der Zeitpunkt des Setzens. Bei `Gemischt`/`Ohne` immer `None`.
+             */
+            seit?: string | null;
+            status?: null | components["schemas"]["StatusWert"];
+            /** @description Nur bei `Gemischt`: Fahrzeuge je Status, in Katalogreihenfolge, „ohne“ zuletzt. */
+            verteilung: components["schemas"]["StatusAnteil"][];
+        };
+        /**
+         * @description Woher der Status einer Einheit kommt (LFH-609). Wire == `as_str()`.
+         *
+         *     Mit Fahrzeugen ist der Status ABGELEITET: tragen alle denselben, gilt er
+         *     (`Fahrzeuge`), sonst ist die Einheit `Gemischt`. Ohne Fahrzeug gilt der von Hand
+         *     gesetzte Status (`Hand`) als Rückfall. `Ohne` heißt: es gibt keinen — weder Hand
+         *     noch einen Fahrzeugstatus.
+         * @enum {string}
+         */
+        EinheitStatusQuelle: "fahrzeuge" | "gemischt" | "hand" | "ohne";
         /**
          * @description Einheitstyp-Katalog-Eintrag (org-weit), inkl. aufgelöster optionaler Soll-Stärke.
          *     `aktiv` wird nicht serialisiert (Listen-Endpunkt liefert ohnehin nur aktive).
@@ -644,6 +682,11 @@ export interface components {
             status_id?: number | null;
             status_kategorie?: null | components["schemas"]["StatusKategorie"];
             status_label?: string | null;
+            /**
+             * @description Zeitpunkt des letzten Statuswechsels (UTC, LFH-609). `None` bei Dispositionen aus
+             *     der Zeit vor dem Feld — ihr Wechselzeitpunkt ist unbekannt und wird nicht erfunden.
+             */
+            status_seit?: string | null;
             traegerorganisation?: string | null;
             tz_fachaufgabe?: string | null;
             tz_organisation?: string | null;
@@ -1858,6 +1901,42 @@ export interface components {
             ortsname?: string | null;
             peilung?: null | components["schemas"]["PeilungAntwort"];
         };
+        /** @description Ein festgelegter Pegel eines Einsatzes. */
+        PegelAnzeige: {
+            gewaesser?: string | null;
+            /** Format: int64 */
+            id: number;
+            messung?: null | components["schemas"]["PegelMessung"];
+            /** @description Stationsname zum Zeitpunkt des Festlegens (Snapshot). */
+            name: string;
+            /**
+             * Format: int64
+             * @description Position in der Liste, ab 0; der erste Eintrag ist der Leitpegel.
+             */
+            reihenfolge: number;
+            /** @description PEGELONLINE-Stations-UUID (kleingeschrieben). */
+            station_uuid: string;
+        };
+        /** @description Aktueller Messwert einer Station mit Trend. */
+        PegelMessung: {
+            /**
+             * Format: double
+             * @description Trend in cm/h (lineare Regression über 60 min vor der jüngsten Messung, eine
+             *     Nachkommastelle). Fehlt, wenn das Fenster zu dünn oder zu kurz ist.
+             */
+            trend_cm_pro_h?: number | null;
+            /**
+             * Format: double
+             * @description Wasserstand der W-Reihe in cm (Einheit der PEGELONLINE-Reihe).
+             */
+            wasserstand_cm: number;
+            /**
+             * @description Zeitpunkt der jüngsten Messung, RFC 3339 mit Zonenversatz, wie PEGELONLINE ihn
+             *     liefert (z. B. `2026-09-22T09:15:00+02:00`). Er ist der ehrliche Datenstand — auch
+             *     dann, wenn ein älterer Cache-Eintrag ausgeliefert wird.
+             */
+            zeitpunkt: string;
+        };
         PeilungAntwort: {
             bezug_label: string;
             /** Format: double */
@@ -2192,12 +2271,36 @@ export interface components {
          * @enum {string}
          */
         StaerkePosition: "fuehrer" | "unterfuehrer" | "mannschaft";
+        /** @description Anteil eines Status an einer gemischten Einheit; `status: None` = Fahrzeuge ohne Status. */
+        StatusAnteil: {
+            /** Format: int32 */
+            anzahl: number;
+            status?: null | components["schemas"]["StatusWert"];
+        };
         /**
          * @description Status-Kategorie eines Katalog-Eintrags (Schema-Anker für die OpenAPI-Union, LFH-120).
          *     Wire == `status_kategorie`.
          * @enum {string}
          */
         StatusKategorie: "verfuegbar" | "gebunden" | "nicht_verfuegbar";
+        /**
+         * @description Ein aufgelöster Eintrag des FMS-Statuskatalogs (`fahrzeug_status`), wie ihn Fahrzeug
+         *     und Einheit tragen (LFH-609).
+         */
+        StatusWert: {
+            farbe?: string | null;
+            /** Format: int64 */
+            fms_anker?: number | null;
+            kategorie: components["schemas"]["StatusKategorie"];
+            label: string;
+            /**
+             * Format: int64
+             * @description Katalog-Sortierung — ordnet die Verteilung einer gemischten Einheit.
+             */
+            sortier: number;
+            /** Format: int64 */
+            status_id: number;
+        };
         /** @description Org-weiter Einsatzstichwort-Vorschlag für die Combobox. */
         StichwortVorschlag: {
             /** Format: int64 */

@@ -23,6 +23,7 @@ import EinsatzAllgemein from './pages/einstellungen/EinsatzAllgemein';
 import EinsatzVerhalten from './pages/einstellungen/EinsatzVerhalten';
 import EinsatzAufbewahrung from './pages/einstellungen/EinsatzAufbewahrung';
 import EinsatzModule from './pages/einstellungen/EinsatzModule';
+import EinsatzPegel from './pages/einstellungen/EinsatzPegel';
 import FahrzeugePage from './pages/FahrzeugePage';
 import MaterialPage from './pages/MaterialPage';
 import PersonalPage from './pages/PersonalPage';
@@ -139,6 +140,7 @@ const EINSTELLUNGEN_ROUTEN = (
     <Route path="verhalten" element={<EinsatzVerhalten />} />
     <Route path="aufbewahrung" element={<EinsatzAufbewahrung />} />
     <Route path="module" element={<EinsatzModule />} />
+    <Route path="pegel" element={<EinsatzPegel />} />
     {/* Ein unbekanntes Segment (Tippfehler, veralteter Link) trifft sonst KEIN Kind: das
         Layout stünde mit leerem `<Outlet>` da, und das Reiterband markierte trotzdem die
         erste Sektion — „Allgemein" ausgewählt über weißer Fläche. Dieselbe Regel wie bei

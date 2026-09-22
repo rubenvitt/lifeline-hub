@@ -43,6 +43,13 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
     ]);
   });
 
+  it('fahrzeug invalidiert auch die Einheiten — deren Status ist aus den Fahrzeugen abgeleitet (LFH-609)', () => {
+    expect(EINSATZ_STREAM_EVENTS.fahrzeug).toEqual([
+      EINSATZ_KEYS.fahrzeuge,
+      EINSATZ_KEYS.einheiten,
+    ]);
+  });
+
   it('bildet einheit auf den ×5-Fan-out in exakter Reihenfolge ab', () => {
     expect(EINSATZ_STREAM_EVENTS.einheit).toEqual([
       EINSATZ_KEYS.einheiten,
@@ -124,6 +131,7 @@ describe('einsatzKeys (Factory-Output)', () => {
     expect(einsatzKeys.nachforderungen(1)).toEqual(['einsatz-nachforderungen', 1]);
     expect(einsatzKeys.etb(1)).toEqual(['etb', 1]);
     expect(einsatzKeys.stab(1)).toEqual(['einsatz-stab', 1]);
+    expect(einsatzKeys.pegel(1)).toEqual(['einsatz-pegel', 1]);
   });
 
   it('baut die 3-elementigen Detail-Keys als [prefix, einsatzId, id]', () => {

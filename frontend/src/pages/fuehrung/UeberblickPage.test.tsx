@@ -83,7 +83,17 @@ const volleDaten = {
     { id: 1, funkrufname: 'Florian 1', einheit_id: 10, status_kategorie: 'nicht_verfuegbar' },
   ],
   material: [],
-  einheiten: [{ id: 10, name: 'Zug 1', abschnitt_id: 5, ueber_einheit_id: null, soll: null }],
+  einheiten: [
+    {
+      id: 10,
+      name: 'Zug 1',
+      abschnitt_id: 5,
+      ueber_einheit_id: null,
+      soll: null,
+      // Abgeleitet aus dem ausgefallenen Fahrzeug unten (LFH-609).
+      status: { quelle: 'fahrzeuge', kategorie: 'nicht_verfuegbar', verteilung: [] },
+    },
+  ],
   abschnitte: [
     {
       id: 5,
@@ -141,11 +151,23 @@ const volleDaten = {
       erfasser_name: 'Brandt',
     },
   ],
+  /** Maßgebliche Pegel (LFH-606) — im Grundbestand keiner festgelegt. */
+  pegel: [] as unknown[],
 };
 
 /** Rückmeldungen (LFH-610) sind optional: ohne Angabe liefert der Server eine leere Menge. */
 type Daten = typeof volleDaten & { rueckmeldungen?: object };
 const KEINE_RUECKMELDUNGEN = { frist_min: 60, einheiten: [], abschnitte: [] };
+
+/** Ein Leitpegel mit frischer Messung (relativ zur echten Uhr, wie die Seite rechnet). */
+const leitpegel = (messung: Record<string, unknown> | null) => ({
+  id: 1,
+  station_uuid: '47174d8f-1b8e-4599-8a59-b580dd55bc87',
+  name: 'HANN. MÜNDEN',
+  gewaesser: 'WESER',
+  reihenfolge: 0,
+  ...(messung ? { messung } : {}),
+});
 
 function stelleBereit(d: Daten, ueberschreiben: Parameters<typeof server.use> = []) {
   const json = (x: object) => () => HttpResponse.json(x);
@@ -165,6 +187,7 @@ function stelleBereit(d: Daten, ueberschreiben: Parameters<typeof server.use> = 
       '/api/einsaetze/1/meldungen/rueckmeldungen',
       json(d.rueckmeldungen ?? KEINE_RUECKMELDUNGEN),
     ),
+    http.get('/api/einsaetze/1/pegel', json(d.pegel ?? [])),
     http.get('/api/einsaetze/1/etb', ({ request }) => {
       const url = new URL(request.url);
       // Die Seite fragt NUR Entscheidungen ab — ein Abruf ohne Filter wäre ein Fehler.
@@ -235,14 +258,51 @@ describe('UeberblickPage', () => {
     const b = within(band());
     expect(links[0]).toHaveTextContent('3');
     expect(b.getByText('F/UF/M//Σ 1/0/1//2')).toBeInTheDocument();
-    // Warnstufe: das Wort ist der zweite Kanal — ohne Pegel-Notiz (LFH-606).
+    // Warnstufe: das Wort ist der zweite Kanal. Ohne festgelegten Pegel keine Pegel-Notiz —
+    // die Gegenaussage zum Fall „mit Pegel" unten (LFH-606).
     expect(links[2]).toHaveTextContent('hoch');
+    expect(links[2]).toHaveTextContent('1 Gefahrengebiet mit Warnstufe');
     expect(links[2]).not.toHaveTextContent(/Pegel/);
     expect(b.getByText('davon 1 ü.')).toBeInTheDocument();
     expect(b.getByText('Abschnitt Nord')).toBeInTheDocument();
   });
 
-  it('Abschnittszeile: Leiter, Stärke, Mittelverteilung ehrlich beschriftet, Auftrag, Deeplink', async () => {
+  it('Warnstufe mit festgelegtem Pegel: Notiz „Pegel 6,84 m steigend" (LFH-606)', async () => {
+    stelleBereit({
+      ...volleDaten,
+      pegel: [
+        leitpegel({
+          wasserstand_cm: 684,
+          zeitpunkt: new Date(Date.now() - 10 * 60_000).toISOString(),
+          trend_cm_pro_h: 9.2,
+        }),
+      ],
+    });
+    rendern();
+    await waitFor(() => expect(within(band()).getByText(/Pegel 6,84 m/)).toBeInTheDocument());
+    const warnstufe = within(band()).getAllByRole('link')[2];
+    expect(warnstufe).toHaveTextContent('hoch');
+    expect(warnstufe).toHaveTextContent('1 Gefahrengebiet mit Warnstufe · Pegel 6,84 m steigend');
+    // Die Kennzahl gehört weiter der Warnstufe: Ziel bleibt die Gefahrenseite.
+    expect(warnstufe).toHaveAttribute('href', '/einsaetze/1/gefahren');
+  });
+
+  it('Warnstufe bei Pegel-Ausfall und bei gescheitertem Pegel-Abruf: „Pegel: Stand unbekannt"', async () => {
+    stelleBereit({ ...volleDaten, pegel: [leitpegel(null)] });
+    const erster = rendern();
+    expect(await within(band()).findByText(/Pegel: Stand unbekannt/)).toBeInTheDocument();
+    erster.unmount();
+
+    stelleBereit(volleDaten, [
+      http.get('/api/einsaetze/1/pegel', () => new HttpResponse(null, { status: 500 })),
+    ]);
+    rendern();
+    expect(await within(band()).findByText(/Pegel: Stand unbekannt/)).toBeInTheDocument();
+    // Der tote Pegel-Abruf macht die Warnstufe nicht unlesbar.
+    expect(within(band()).getAllByRole('link')[2]).toHaveTextContent('hoch');
+  });
+
+  it('Abschnittszeile: Leiter, Stärke, Einheiten nach Status ehrlich beschriftet, Auftrag, Deeplink', async () => {
     stelleBereit(volleDaten);
     rendern();
     const p = await waitFor(() => paneel('Einsatzabschnitte'));
@@ -253,9 +313,12 @@ describe('UeberblickPage', () => {
     expect(zeile).toHaveTextContent('1/0/1//2');
     expect(zeile).toHaveTextContent('Trupps verlegen');
     // Der zweite Kanal der Zellen muss im Linknamen ankommen, nicht nur optisch.
-    expect(zeile).toHaveAccessibleName(/1\s*bereit/);
+    // LFH-609: gezählt wird die EINHEIT nach ihrem Status (Ausfall), nicht mehr ihre Mittel
+    // (Personal A bereit, B gebunden, Fahrzeug Ausfall ergäbe 1/1/1).
+    expect(zeile).toHaveAccessibleName(/0\s*bereit/);
+    expect(zeile).toHaveAccessibleName(/0\s*gebunden/);
     expect(zeile).toHaveAccessibleName(/1\s*Ausfall/);
-    // Personal A bereit, B gebunden, Fahrzeug Ausfall — je Zelle das Wort für Vorleser.
+    // Je Zelle das Wort für Vorleser.
     const zellen = zeile.querySelectorAll('[data-lfh="status-zelle"]');
     expect(Array.from(zellen).map((z) => z.getAttribute('title'))).toEqual([
       'bereit',
@@ -267,7 +330,7 @@ describe('UeberblickPage', () => {
       'bedien',
       'alarm',
     ]);
-    expect(within(p).getByText(/Mittel \(Fahrzeuge \+ Personal\)/)).toBeInTheDocument();
+    expect(within(p).getByText(/Einheiten nach Status/)).toBeInTheDocument();
     expect(within(p).getByText('1 Abschnitte · 1 Einheiten')).toBeInTheDocument();
   });
 

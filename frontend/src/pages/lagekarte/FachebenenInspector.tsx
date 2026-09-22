@@ -1,6 +1,12 @@
 import { useState } from 'react';
-import { Button, Descriptions, Tag, Typography, theme } from 'antd';
+import { App, Button, Descriptions, Tag, Typography, theme } from 'antd';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router';
 import { taktischeDtgVoll } from '../../anzeige/format';
+import { PEGEL_MAX, fuegePegelHinzu, pegelAbfrage, pegelSchreibScope } from '../../api/pegel';
+import { einsatzKeys } from '../../api/queryKeys';
+import { SpeicherFehler } from '../../components/SpeicherHinweis';
+import { einsatzEinstellungenPfad } from '../../routing/deeplinks';
 import type { EnergieAnlagenart, FachebeneQuelle } from '../../api/fachebenen';
 import GeoKennzahlen from '../../components/GeoKennzahlen';
 import StatusTag from '../../components/StatusTag';
@@ -19,6 +25,15 @@ export interface FachebenenInspectorProps {
   /** Volle (un-geclippte) Geometrie des angeklickten Features → Fläche/Umfang/Länge (LFH-146). */
   geometrie?: { type: string; coordinates: unknown } | null;
   onSchliessen: () => void;
+  /**
+   * Einsatzbezug für den Schnellweg „Als maßgeblichen Pegel festlegen" an einem
+   * PEGELONLINE-Punkt (LFH-606). Optional und als PROP statt Context: der Inspektor bleibt
+   * ohne Einsatz montierbar (reine Anzeige fremder Daten), und erst mit diesem Bezug hängt
+   * er sich an Abfrage und Mutation — ein neuer Querschnitts-Context für eine Stelle wäre
+   * mehr Mechanik als Bedarf. `darfSchreiben` ist das Einsatz-Schreibrecht der Lagekarte
+   * (im Snapshot-Modus hart `false`), dieselbe Achse wie das Backend-Gate der Pegel-Routen.
+   */
+  pegelBezug?: { einsatzId: number; darfSchreiben: boolean };
 }
 
 /** Wert als getrimmter String oder null (akzeptiert auch Zahlen). */
@@ -151,7 +166,91 @@ function WarnungInhalt({ p }: { p: Record<string, unknown> }) {
   );
 }
 
-function PegelInhalt({ p }: { p: Record<string, unknown> }) {
+/**
+ * Schnellweg „Als maßgeblichen Pegel festlegen" (LFH-606, Entscheidung 2 des Auftraggebers).
+ *
+ * Ist die Station schon maßgeblich, steht das als MARKE statt des Knopfs — auch ohne
+ * Schreibrecht, denn es ist eine Aussage über den Einsatz, keine Aktion. Der Knopf selbst
+ * braucht Schreibrecht und eine `uuid`; ohne `uuid` (ältere Antwort, fremde Quelle) gibt es
+ * nichts, was festgelegt werden könnte, und der Block entfällt.
+ *
+ * Bei fünf festgelegten Pegeln steht der Knopf GESPERRT mit Grund und Weg in die
+ * Einstellungen, statt zu verschwinden (C10/M16) — der Server lehnte einen sechsten ohnehin
+ * ab (POST auf eine volle Liste → 422), das wäre die späteste denkbare Absage. Gespeichert wird per POST (hinten
+ * anfügen, idempotent); die Antwort ist die volle Liste und landet per `setQueryData` im
+ * gemeinsamen Cache-Eintrag von Dashboard, Überblick und Einstellungen.
+ */
+function PegelFestlegen({
+  einsatzId,
+  darfSchreiben,
+  uuid,
+  name,
+  gewaesser,
+}: {
+  einsatzId: number;
+  darfSchreiben: boolean;
+  uuid: string;
+  name: string;
+  gewaesser: string | null;
+}) {
+  const { token } = theme.useToken();
+  const { message } = App.useApp();
+  const qc = useQueryClient();
+  const pegelQ = useQuery(pegelAbfrage(einsatzId));
+  // KEIN `onError`-Toast (H14): der Fehler bleibt im Panel stehen.
+  const festlegen = useMutation({
+    // Derselbe Scope wie die Einstellungssektion: Schreibwege auf die Liste laufen nacheinander.
+    scope: pegelSchreibScope(einsatzId),
+    mutationFn: () => fuegePegelHinzu(einsatzId, { station_uuid: uuid, name, gewaesser }),
+    onSuccess: (liste) => {
+      qc.setQueryData(einsatzKeys.pegel(einsatzId), liste);
+      message.success('Als maßgeblicher Pegel festgelegt');
+    },
+  });
+
+  const liste = pegelQ.data;
+  const index = liste?.findIndex((e) => e.station_uuid.toLowerCase() === uuid) ?? -1;
+  const abstand = { marginTop: token.marginSM };
+
+  if (index >= 0) {
+    return (
+      <div style={abstand} data-lfh="pegel-massgeblich">
+        <Tag>{index === 0 ? 'maßgeblicher Pegel · Leitpegel' : 'maßgeblicher Pegel'}</Tag>
+      </div>
+    );
+  }
+  if (!darfSchreiben) return null;
+
+  const voll = (liste?.length ?? 0) >= PEGEL_MAX;
+  return (
+    <div style={{ ...abstand, display: 'flex', flexDirection: 'column', gap: token.marginXS }}>
+      <SpeicherFehler fehler={festlegen.error} />
+      <Button
+        // Solange die Liste lädt, ist weder „schon maßgeblich" noch „voll" bekannt.
+        disabled={pegelQ.isLoading || voll}
+        loading={festlegen.isPending}
+        onClick={() => festlegen.mutate()}
+      >
+        Als maßgeblichen Pegel festlegen
+      </Button>
+      {voll && (
+        <Typography.Text type="secondary" data-lfh="pegel-grenze">
+          {`Schon ${PEGEL_MAX} maßgebliche Pegel festgelegt — zuerst einen in den `}
+          <Link to={einsatzEinstellungenPfad(einsatzId, 'pegel')}>Einstellungen</Link>
+          {' entfernen.'}
+        </Typography.Text>
+      )}
+    </div>
+  );
+}
+
+function PegelInhalt({
+  p,
+  pegelBezug,
+}: {
+  p: Record<string, unknown>;
+  pegelBezug?: FachebenenInspectorProps['pegelBezug'];
+}) {
   const { token } = theme.useToken();
   const wert = s(p.wert);
   const einheit = s(p.einheit);
@@ -190,6 +289,18 @@ function PegelInhalt({ p }: { p: Record<string, unknown> }) {
           <Descriptions.Item label="Stand">{fmtZeit(s(p.zeitpunkt))}</Descriptions.Item>
         )}
       </Descriptions>
+      {pegelBezug && s(p.uuid) && (
+        <PegelFestlegen
+          // `key` aus der Station: ein Klick auf einen anderen Punkt hängt einen FRISCHEN
+          // Block ein — sonst trüge Station B Fehler und Ladezustand der Mutation von A.
+          key={s(p.uuid)!.toLowerCase()}
+          einsatzId={pegelBezug.einsatzId}
+          darfSchreiben={pegelBezug.darfSchreiben}
+          uuid={s(p.uuid)!.toLowerCase()}
+          name={pick(p, 'titel', 'name') ?? 'Pegel'}
+          gewaesser={s(p.gewaesser)}
+        />
+      )}
     </>
   );
 }
@@ -602,6 +713,7 @@ export default function FachebenenInspector({
   properties,
   geometrie,
   onSchliessen,
+  pegelBezug,
 }: FachebenenInspectorProps) {
   const { token } = theme.useToken();
   const p = properties;
@@ -636,7 +748,7 @@ export default function FachebenenInspector({
       {istWarnung ? (
         <WarnungInhalt p={p} />
       ) : quelle === 'pegelonline' ? (
-        <PegelInhalt p={p} />
+        <PegelInhalt p={p} pegelBezug={pegelBezug} />
       ) : quelle === 'hochwasser' ? (
         <HochwasserInhalt p={p} />
       ) : quelle === 'odl' ? (

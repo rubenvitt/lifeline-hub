@@ -231,6 +231,42 @@ describe('EinheitDetailPage · Funk und Kopfdaten (umgezogen aus EinheitenPage)'
     });
   });
 
+  // LFH-614: eigener Funkrufname der Einheit — vorbelegt aus dem Serverstand, geändert
+  // gesendet, geleert als `null` (nicht als Leerstring, nicht weggelassen).
+  it('belegt den Funkrufnamen vor, sendet Änderung und Leeren', async () => {
+    const bodies: Record<string, unknown>[] = [];
+    // Der Serverstand folgt dem PATCH: die Invalidierung nach dem Speichern lädt neu und
+    // setzt das Formular darauf — ein fester Stand schriebe den alten Wert zurück.
+    let stand: Record<string, unknown> = { ...einheiten[0], funkrufname: 'Heros 3/1' };
+    server.use(
+      http.get('/api/einsaetze/1/einheiten', () =>
+        HttpResponse.json([stand, ...einheiten.slice(1)]),
+      ),
+      ...handlers(),
+      http.patch('/api/einsaetze/1/einheiten/10', async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        bodies.push(body);
+        stand = { ...stand, ...body };
+        return HttpResponse.json(stand);
+      }),
+    );
+    rendere();
+    const feld = await screen.findByLabelText('Funkrufname');
+    await waitFor(() => expect(feld).toHaveValue('Heros 3/1'));
+
+    await userEvent.clear(feld);
+    await userEvent.type(feld, 'Florian HM 12/44');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toMatchObject({ funkrufname: 'Florian HM 12/44' });
+    await waitFor(() => expect(feld).toHaveValue('Florian HM 12/44'));
+
+    await userEvent.clear(feld);
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(bodies).toHaveLength(2));
+    expect(bodies[1]).toHaveProperty('funkrufname', null);
+  });
+
   it('sendet sprechgruppe_ids beim Speichern', async () => {
     let patchBody: Record<string, unknown> | null = null;
     server.use(

@@ -11,6 +11,8 @@ export interface EinheitEingabe {
   soll_unterfuehrer?: number | null;
   soll_mannschaft?: number | null;
   bemerkung?: string | null;
+  /** LFH-614: eigener Funkrufname der Einheit (Freitext, `null` leert). */
+  funkrufname?: string | null;
   sortier?: number;
   /** LFH-109: IDs der zuzuordnenden Sprechgruppen aus dem Katalog. */
   sprechgruppe_ids?: number[];
@@ -77,4 +79,18 @@ export function ordneFahrzeugZu(einsatzId: number, eid: number, efId: number): P
 
 export function gibFahrzeugFrei(einsatzId: number, eid: number, efId: number): Promise<void> {
   return apiSend<void>(`/api/einsaetze/${einsatzId}/einheiten/${eid}/fahrzeug/${efId}`, 'DELETE');
+}
+
+/**
+ * Handstatus einer Einheit OHNE Fahrzeug setzen oder löschen (`null`, LFH-609). Mit
+ * Fahrzeugen führen diese den Status — der Server antwortet dann 422.
+ */
+export function setzeEinheitStatus(
+  einsatzId: number,
+  eid: number,
+  statusId: number | null,
+): Promise<Einheit> {
+  return apiSend<Einheit>(`/api/einsaetze/${einsatzId}/einheiten/${eid}/status`, 'PUT', {
+    status_id: statusId,
+  });
 }

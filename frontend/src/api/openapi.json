@@ -1277,7 +1277,8 @@
           "personal_mitglieder",
           "fahrzeug_mitglieder",
           "material_mitglieder",
-          "sprechgruppen"
+          "sprechgruppen",
+          "status"
         ],
         "properties": {
           "abschnitt_id": {
@@ -1336,6 +1337,13 @@
               "string",
               "null"
             ]
+          },
+          "funkrufname": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Eigener Funkrufname der Einheit (LFH-614), fixierte menschenlesbare Kennung im\nMeldebild. `None` = nicht gepflegt; das Frontend leitet dann höchstens aus genau\neinem Fahrzeugmitglied ab."
           },
           "id": {
             "type": "integer",
@@ -1403,6 +1411,10 @@
               "$ref": "#/components/schemas/SprechgruppeAnzeige"
             }
           },
+          "status": {
+            "$ref": "#/components/schemas/EinheitStatus",
+            "description": "Status der Einheit mit „Seit“ (LFH-609) — abgeleitet oder Handstatus."
+          },
           "typ_id": {
             "type": [
               "integer",
@@ -1458,6 +1470,24 @@
           },
           "funkrufname": {
             "type": "string"
+          },
+          "status": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/StatusWert",
+                "description": "Aktueller FMS-Status des Fahrzeugs (LFH-609); `None` = ohne Status."
+              }
+            ]
+          },
+          "status_seit": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Zeitpunkt des letzten Statuswechsels (UTC); `None` = unbekannt."
           }
         }
       },
@@ -1527,6 +1557,65 @@
             ]
           }
         }
+      },
+      "EinheitStatus": {
+        "type": "object",
+        "description": "Status einer Einheit mit „Seit“ (LFH-609). Die Regel steht an\n[`repo::leite_status_ab`].",
+        "required": [
+          "quelle",
+          "verteilung"
+        ],
+        "properties": {
+          "kategorie": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/StatusKategorie",
+                "description": "Die gemeinsame Kategorie — auch bei `Gemischt`, wenn alle Fahrzeuge einen Status\nderselben Kategorie tragen (S3 + S4 sind beide „gebunden“)."
+              }
+            ]
+          },
+          "quelle": {
+            "$ref": "#/components/schemas/EinheitStatusQuelle"
+          },
+          "seit": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Seit wann (UTC). `Fahrzeuge`: der jüngste Wechsel, also seit wann ALLE Fahrzeuge in\ndiesem Status stehen — `None`, sobald ein Fahrzeug keinen Zeitpunkt kennt. `Hand`:\nder Zeitpunkt des Setzens. Bei `Gemischt`/`Ohne` immer `None`."
+          },
+          "status": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/StatusWert",
+                "description": "Der eine Status — gesetzt bei `Fahrzeuge` und `Hand`."
+              }
+            ]
+          },
+          "verteilung": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatusAnteil"
+            },
+            "description": "Nur bei `Gemischt`: Fahrzeuge je Status, in Katalogreihenfolge, „ohne“ zuletzt."
+          }
+        }
+      },
+      "EinheitStatusQuelle": {
+        "type": "string",
+        "description": "Woher der Status einer Einheit kommt (LFH-609). Wire == `as_str()`.\n\nMit Fahrzeugen ist der Status ABGELEITET: tragen alle denselben, gilt er\n(`Fahrzeuge`), sonst ist die Einheit `Gemischt`. Ohne Fahrzeug gilt der von Hand\ngesetzte Status (`Hand`) als Rückfall. `Ohne` heißt: es gibt keinen — weder Hand\nnoch einen Fahrzeugstatus.",
+        "enum": [
+          "fahrzeuge",
+          "gemischt",
+          "hand",
+          "ohne"
+        ]
       },
       "EinheitTyp": {
         "type": "object",
@@ -1856,6 +1945,13 @@
               "string",
               "null"
             ]
+          },
+          "status_seit": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Zeitpunkt des letzten Statuswechsels (UTC, LFH-609). `None` bei Dispositionen aus\nder Zeit vor dem Feld — ihr Wechselzeitpunkt ist unbekannt und wird nicht erfunden."
           },
           "traegerorganisation": {
             "type": [
@@ -5165,6 +5261,79 @@
           }
         }
       },
+      "PegelAnzeige": {
+        "type": "object",
+        "description": "Ein festgelegter Pegel eines Einsatzes.",
+        "required": [
+          "id",
+          "station_uuid",
+          "name",
+          "reihenfolge"
+        ],
+        "properties": {
+          "gewaesser": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "messung": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PegelMessung",
+                "description": "Fehlt, wenn weder ein Abruf gelang noch ein Cache-Eintrag vorliegt (Ausfall)."
+              }
+            ]
+          },
+          "name": {
+            "type": "string",
+            "description": "Stationsname zum Zeitpunkt des Festlegens (Snapshot)."
+          },
+          "reihenfolge": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Position in der Liste, ab 0; der erste Eintrag ist der Leitpegel."
+          },
+          "station_uuid": {
+            "type": "string",
+            "description": "PEGELONLINE-Stations-UUID (kleingeschrieben)."
+          }
+        }
+      },
+      "PegelMessung": {
+        "type": "object",
+        "description": "Aktueller Messwert einer Station mit Trend.",
+        "required": [
+          "wasserstand_cm",
+          "zeitpunkt"
+        ],
+        "properties": {
+          "trend_cm_pro_h": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "Trend in cm/h (lineare Regression über 60 min vor der jüngsten Messung, eine\nNachkommastelle). Fehlt, wenn das Fenster zu dünn oder zu kurz ist."
+          },
+          "wasserstand_cm": {
+            "type": "number",
+            "format": "double",
+            "description": "Wasserstand der W-Reihe in cm (Einheit der PEGELONLINE-Reihe)."
+          },
+          "zeitpunkt": {
+            "type": "string",
+            "description": "Zeitpunkt der jüngsten Messung, RFC 3339 mit Zonenversatz, wie PEGELONLINE ihn\nliefert (z. B. `2026-09-22T09:15:00+02:00`). Er ist der ehrliche Datenstand — auch\ndann, wenn ein älterer Cache-Eintrag ausgeliefert wird."
+          }
+        }
+      },
       "PeilungAntwort": {
         "type": "object",
         "required": [
@@ -6128,6 +6297,30 @@
           "mannschaft"
         ]
       },
+      "StatusAnteil": {
+        "type": "object",
+        "description": "Anteil eines Status an einer gemischten Einheit; `status: None` = Fahrzeuge ohne Status.",
+        "required": [
+          "anzahl"
+        ],
+        "properties": {
+          "anzahl": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "status": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/StatusWert"
+              }
+            ]
+          }
+        }
+      },
       "StatusKategorie": {
         "type": "string",
         "description": "Status-Kategorie eines Katalog-Eintrags (Schema-Anker für die OpenAPI-Union, LFH-120).\nWire == `status_kategorie`.",
@@ -6136,6 +6329,46 @@
           "gebunden",
           "nicht_verfuegbar"
         ]
+      },
+      "StatusWert": {
+        "type": "object",
+        "description": "Ein aufgelöster Eintrag des FMS-Statuskatalogs (`fahrzeug_status`), wie ihn Fahrzeug\nund Einheit tragen (LFH-609).",
+        "required": [
+          "status_id",
+          "label",
+          "kategorie",
+          "sortier"
+        ],
+        "properties": {
+          "farbe": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fms_anker": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "kategorie": {
+            "$ref": "#/components/schemas/StatusKategorie"
+          },
+          "label": {
+            "type": "string"
+          },
+          "sortier": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Katalog-Sortierung — ordnet die Verteilung einer gemischten Einheit."
+          },
+          "status_id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
       },
       "StichwortVorschlag": {
         "type": "object",

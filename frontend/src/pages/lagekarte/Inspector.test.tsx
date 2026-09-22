@@ -332,6 +332,7 @@ describe('Inspector im Paneel „Ausgewählt"', () => {
         ist: { fuehrer: 1, unterfuehrer: 2, mannschaft: 9 },
         abschnitt_name: 'Nord',
         fuehrer_name: null,
+        status: { quelle: 'ohne', verteilung: [] },
       },
     ],
     fahrzeuge: [],
@@ -366,9 +367,11 @@ describe('Inspector im Paneel „Ausgewählt"', () => {
     expect(raster).toHaveTextContent('Stärke');
     expect(raster).toHaveTextContent('1/2/9//12');
     expect(raster).toHaveTextContent('Nord');
-    // Keine erfundenen Felder: Status/„Seit" einer Einheit (LFH-609).
-    expect(raster).not.toHaveTextContent('Status');
-    expect(raster).not.toHaveTextContent('Seit');
+    // Status und „Seit" einer Einheit (LFH-609): ohne Status steht das auch so da, kein
+    // erfundener Wert.
+    expect(raster).toHaveTextContent('Status');
+    expect(raster).toHaveTextContent('ohne Status');
+    expect(raster).toHaveTextContent('Seit');
     // Ohne Rückmeldungen (lädt, 403, Historie) KEIN Block „Letzte Meldung" (LFH-610).
     expect(screen.queryByText(/Letzte Meldung/)).not.toBeInTheDocument();
     expect(container.querySelector('[data-lfh="auswahl-letzte-meldung"]')).toBeNull();

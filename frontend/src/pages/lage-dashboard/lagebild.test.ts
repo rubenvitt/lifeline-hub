@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import type { Auftrag, EinsatzAnzeige, Gefahrengebiet, Meldung, Person } from '../../api/types';
+import type {
+  Auftrag,
+  EinsatzAnzeige,
+  Gefahrengebiet,
+  Meldung,
+  PegelAnzeige,
+  Person,
+} from '../../api/types';
 import {
   baueLagebild,
   einsatzdauer,
@@ -36,6 +43,7 @@ const roh = (over: Partial<Rohdaten> = {}): Rohdaten => ({
   abschnitte: [],
   auftraege: [],
   meldungen: [],
+  pegel: [],
   ...over,
 });
 
@@ -92,11 +100,12 @@ describe('warnstufeTon', () => {
 describe('baueLagebild', () => {
   it('liefert das Kennzahl-Set des Neuentwurfs in fester Reihenfolge', () => {
     const bild = baueLagebild(roh(), JETZT, BERLIN);
+    // Handgeschrieben: Pegel auf Platz 1, „Höchste Warnstufe" ist raus (LFH-606).
     expect(bild.kennzahlen.map((k) => k.etikett)).toEqual([
+      'Pegel',
       'Betroffene',
       'Kräfte',
       'Vermisste',
-      'Höchste Warnstufe',
       'Schäden offen',
       'Einsatzdauer',
     ]);
@@ -117,17 +126,44 @@ describe('baueLagebild', () => {
       roh({ personen: [p('sk1'), p('sk4'), p('unverletzt'), p(null, 'vermisst')] }),
       JETZT,
     );
-    expect(bild.kennzahlen[0]).toMatchObject({ wert: '4', notiz: '2 Patienten', ton: 'neutral' });
-    expect(bild.kennzahlen[2]).toMatchObject({ wert: '1', ton: 'alarm' });
+    expect(bild.kennzahlen[1]).toMatchObject({ wert: '4', notiz: '2 Patienten', ton: 'neutral' });
+    expect(bild.kennzahlen[3]).toMatchObject({ wert: '1', ton: 'alarm' });
   });
 
-  it('die Warnstufe kommt aus der Gebiets-Übersicht und trägt ihren Ton', () => {
+  it('die Warnstufe kommt aus der Gebiets-Übersicht — für den Kopf-Hinweis, nicht fürs Band', () => {
     const bild = baueLagebild(
       roh({ gefahren: [{ hoechste_warnstufe: 'mittel' } as Gefahrengebiet] }),
       JETZT,
     );
-    expect(bild.kennzahlen[3]).toMatchObject({ wert: 'mittel', ton: 'achtung' });
     expect(bild.hoechsteWarnstufe).toBe('mittel');
+    expect(bild.kennzahlen.map((k) => k.wert)).not.toContain('mittel');
+  });
+
+  it('Pegel: Leitpegel mit Messung auf Platz 1, Ziel ist die Einstellungssektion', () => {
+    const p = {
+      id: 1,
+      station_uuid: '47174d8f-1b8e-4599-8a59-b580dd55bc87',
+      name: 'HANN. MÜNDEN',
+      gewaesser: 'WESER',
+      reihenfolge: 0,
+      // 11:05 UTC in Berliner Sommerzeit geschrieben; JETZT ist 12:00 UTC → 55 min alt.
+      messung: { wasserstand_cm: 684, zeitpunkt: '2026-06-11T13:05:00+02:00', trend_cm_pro_h: 9 },
+    } as PegelAnzeige;
+    const k = baueLagebild(roh({ pegel: [p] }), JETZT, BERLIN).kennzahlen[0];
+    expect(k).toMatchObject({ etikett: 'Pegel', wert: '6,84', einheit: 'm', ton: 'neutral' });
+    expect(k.notiz).toBe('WESER · steigend +9 cm/h · Stand 13:05');
+    expect(k.zielPfad).toBe('/einsaetze/1/einstellungen/pegel');
+  });
+
+  it('Pegel: keiner festgelegt belegt den Platz trotzdem, mit Weg zur Auswahl', () => {
+    const k = baueLagebild(roh(), JETZT, BERLIN).kennzahlen[0];
+    expect(k).toMatchObject({
+      etikett: 'Pegel',
+      wert: '—',
+      notiz: 'kein Pegel festgelegt',
+      ton: 'neutral',
+      zielPfad: '/einsaetze/1/einstellungen/pegel',
+    });
   });
 
   it('Führungsstand: Überfälligkeit ist vom Bearbeitungsstatus unabhängig', () => {

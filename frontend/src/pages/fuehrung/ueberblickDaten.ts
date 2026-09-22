@@ -133,6 +133,23 @@ export function warnstufeKennzahlVon(gebiete: Gefahrengebiet[]): WarnstufeKennza
   };
 }
 
+/**
+ * Notiz der Warnstufen-Kennzahl: die Gebietszahl, dahinter die Pegel-Notiz aus
+ * `pegel/pegelKennzahl.ts:pegelNotizKurz` („Pegel 6,84 m steigend", LFH-606).
+ *
+ * Die Pegel-Notiz wird ANGEHÄNGT, nicht an die Stelle der Gebietszahl gesetzt: die Zahl der
+ * Gebiete mit Warnstufe ist die Begründung des Werts, der Pegel ist die Lage daneben — der
+ * Entwurf S2 zeigt nur den Pegel, verlöre aber genau die Aussage, die die Kennzahl erklärt.
+ * Ohne festgelegten Pegel (`null`) bleibt es bei der Gebietszahl. Rein.
+ */
+export function warnstufeNotiz(anzahlAktiv: number, pegelNotiz: string | null): string {
+  const gebiete =
+    anzahlAktiv === 1
+      ? '1 Gefahrengebiet mit Warnstufe'
+      : `${anzahlAktiv} Gefahrengebiete mit Warnstufe`;
+  return pegelNotiz ? `${gebiete} · ${pegelNotiz}` : gebiete;
+}
+
 export interface AuftraegeKennzahl {
   offen: number;
   /** Davon schon angenommen (`in_arbeit`). */
@@ -221,11 +238,15 @@ export function folgeText(anzahl: number): string | null {
 
 // ── Einsatzabschnitte ───────────────────────────────────────────────────────────
 
-export interface MittelVerteilung {
+/** Einheiten je Kategorie ihres Status (LFH-609). */
+export interface EinheitenVerteilung {
   bereit: number;
   gebunden: number;
   ausfall: number;
-  /** Mittel ohne Statuskategorie — gezählt, damit die drei Zellen nicht mehr behaupten. */
+  /**
+   * Einheiten ohne Kategorie — ohne Status oder „gemischt" über Kategorien hinweg; gezählt,
+   * damit die drei Zellen nicht mehr behaupten.
+   */
   ohne: number;
 }
 
@@ -240,7 +261,7 @@ export interface AbschnittZeile {
   unterabschnitte: number;
   staerke: StaerkeSumme;
   staerkeText: string;
-  mittel: MittelVerteilung;
+  einheitenStatus: EinheitenVerteilung;
   /** Offene Aufträge an diesen Abschnitt (oder einen Unterabschnitt), jüngste zuerst. */
   auftraege: Auftrag[];
   /**
@@ -299,18 +320,42 @@ function zaehleImTeilbaum(zeile: MeldebildZeile): {
   return { einheiten, abschnittIds, einheitIds };
 }
 
+/** Einheiten nach der Kategorie ihres Status — „gemischt" zählt mit, wenn die Kategorie gemeinsam ist. */
+function einheitenVerteilung(einheiten: readonly (Einheit | undefined)[]): EinheitenVerteilung {
+  const v: EinheitenVerteilung = { bereit: 0, gebunden: 0, ausfall: 0, ohne: 0 };
+  for (const e of einheiten) {
+    switch (e?.status?.kategorie) {
+      case 'verfuegbar':
+        v.bereit += 1;
+        break;
+      case 'gebunden':
+        v.gebunden += 1;
+        break;
+      case 'nicht_verfuegbar':
+        v.ausfall += 1;
+        break;
+      default:
+        v.ohne += 1;
+    }
+  }
+  return v;
+}
+
 /**
  * Eine Zeile je OBERSTEM Abschnitt, die Zahlen KUMULIERT über Unterabschnitte — so liest
  * es das Meldebild (`baueKraeftebild`), und so summieren sich die Zeilen zur Einsatzstärke.
  * Die Sammelzeile „Ohne Abschnitt" steht am Ende, wenn sie etwas trägt: ohne sie gingen
  * die Kräfte außerhalb jedes Abschnitts still aus der Summe verloren.
  *
- * Die Mittelverteilung ist KEIN Einheitenstatus (den gibt es nicht, LFH-609), sondern die
- * Verfügbarkeit der Fahrzeuge UND des Personals im Teilbaum — die Seite beschriftet das so.
+ * Das Raster bereit / gebunden / Ausfall zählt die EINHEITEN im Teilbaum nach der
+ * Kategorie ihres Status (LFH-609, Entwurf S2) — abgeleitet aus den Fahrzeugen oder von
+ * Hand. Bis dahin stand hier die Verfügbarkeit der Mittel, weil es keinen Einheitenstatus
+ * gab; die Seite beschriftet die Zeile entsprechend.
  */
 export function abschnittZeilen(r: AbschnittRohdaten): AbschnittZeile[] {
   const { baum } = baueKraeftebild(r.abschnitte, r.einheiten, r.personal, r.fahrzeuge, r.material);
   const abschnittNachId = new Map(r.abschnitte.map((a) => [a.id, a]));
+  const einheitNachId = new Map(r.einheiten.map((e) => [e.id, e]));
   const offen = r.auftraege
     .filter(istOffen)
     .sort((a, b) => (ms(b.erteilt_at) ?? 0) - (ms(a.erteilt_at) ?? 0) || b.id - a.id);
@@ -320,10 +365,6 @@ export function abschnittZeilen(r: AbschnittRohdaten): AbschnittZeile[] {
     const abschnitt = id != null ? abschnittNachId.get(id) : undefined;
     const { einheiten, abschnittIds, einheitIds } = zaehleImTeilbaum(knoten);
     const teilbaum = new Set(abschnittIds);
-    const p = knoten.personalVerteilung;
-    const f = knoten.fahrzeugVerteilung;
-    const summe = (k: 'verfuegbar' | 'gebunden' | 'nicht_verfuegbar' | 'ohne') =>
-      (p?.[k] ?? 0) + (f?.[k] ?? 0);
     return {
       key: knoten.key,
       abschnittId: knoten.key === OHNE_ABSCHNITT_KEY ? null : id,
@@ -333,12 +374,7 @@ export function abschnittZeilen(r: AbschnittRohdaten): AbschnittZeile[] {
       unterabschnitte: Math.max(0, abschnittIds.length - 1),
       staerke: knoten.staerke,
       staerkeText: staerkeText(knoten.staerke),
-      mittel: {
-        bereit: summe('verfuegbar'),
-        gebunden: summe('gebunden'),
-        ausfall: summe('nicht_verfuegbar'),
-        ohne: summe('ohne'),
-      },
+      einheitenStatus: einheitenVerteilung(einheitIds.map((eid) => einheitNachId.get(eid))),
       auftraege:
         teilbaum.size === 0
           ? []

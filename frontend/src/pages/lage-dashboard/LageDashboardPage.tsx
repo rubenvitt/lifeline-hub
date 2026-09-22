@@ -42,8 +42,17 @@
  *    in der SYNC-Anzeige der Kopfleiste (dieselbe Quelle `liveStatusStore`) und als Meta
  *    des Meldungsstroms: „live" nur bei offener Leitung.
  *
- * Weggelassen, weil keine Datenquelle existiert: Pegel (LFH-606), Evakuiert (LFH-607),
- * „Transportiert / offen" im Sichtungsfuß (LFH-613, Verbleib ist Freitext).
+ *  - **Höchste Warnstufe → Pegel** (LFH-606, Entscheidung des Auftraggebers vom 22.09.2026):
+ *    Der Pegel des Leitpegels steht auf Platz 1 des Bands, wie im Entwurf S3, und verdrängt
+ *    die Warnstufen-Kennzahl. Die Warnstufe geht dabei nicht verloren: sie steht als Hinweis
+ *    im Seitenkopf, sobald sie ein Alarmbeitrag ist („Warnstufe hoch"), und je Gefahrentyp
+ *    im Paneel Gefahrenmatrix — eine dritte Stelle mit derselben Aussage wäre Wiederholung,
+ *    der Wasserstand dagegen stand vorher NIRGENDS auf der Seite. Ist kein Pegel festgelegt,
+ *    bleibt der Platz belegt und führt zur Einstellungssektion „Pegel".
+ *
+ * Weggelassen, weil keine Datenquelle existiert: Evakuiert (LFH-607), „Transportiert /
+ * offen" im Sichtungsfuß (LFH-613, Verbleib ist Freitext). Prognose und Höchststand am Pegel
+ * sind ein eigener Folgetask, nicht Teil von LFH-606.
  *
  * ── DATENZUSTÄNDE ──────────────────────────────────────────────────────────────────
  *
@@ -84,6 +93,7 @@ import { listeEinsatzFahrzeuge } from '../../api/einsatzFahrzeuge';
 import { listeEinsatzMaterial } from '../../api/einsatzMaterial';
 import { listeAbschnitte } from '../../api/einsatzabschnitte';
 import { listeEtb } from '../../api/etb';
+import { pegelAbfrage } from '../../api/pegel';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { formatUhrzeitMitTag } from '../../anzeige/format';
 import EinsatzSeite from '../../components/EinsatzSeite';
@@ -212,6 +222,8 @@ export default function LageDashboardPage() {
     queryKey: einsatzKeys.etbListe(einsatzId, { limit: STROM_ABRUF }),
     queryFn: () => listeEtb(einsatzId, { limit: STROM_ABRUF }),
   });
+  // Maßgebliche Pegel (LFH-606): kein Live-Ereignis, 5-min-Nachfrage aus `pegelAbfrage`.
+  const pegelQuery = useQuery(pegelAbfrage(einsatzId));
 
   const einsatz = einsatzQuery.data;
 
@@ -232,6 +244,7 @@ export default function LageDashboardPage() {
         abschnitte: abschnitteQuery.data ?? [],
         auftraege: auftraegeQuery.data ?? [],
         meldungen: meldungenQuery.data ?? [],
+        pegel: pegelQuery.data ?? [],
       },
       jetzt,
       konv,
@@ -252,6 +265,7 @@ export default function LageDashboardPage() {
     abschnitteQuery.data,
     auftraegeQuery.data,
     meldungenQuery.data,
+    pegelQuery.data,
   ]);
 
   // ── Meldungsstrom: Wassermarke statt Einschieben (Festlegung 6) ──────────────────────
@@ -300,10 +314,10 @@ export default function LageDashboardPage() {
   // `Record` über die Etiketten, damit eine siebte Kennzahl hier den Build bricht, statt
   // still den Zustand einer anderen zu tragen.
   const kennzahlZustand: Record<KennzahlEtikett, Datenzustand> = {
+    Pegel: zustandVon(pegelQuery),
     Betroffene: zBetroffene,
     Kräfte: zKraefte,
     Vermisste: zBetroffene,
-    'Höchste Warnstufe': zGefahren,
     'Schäden offen': zustandVon(schaedenQuery),
     Einsatzdauer: zustandVon(einsatzQuery),
   };
@@ -365,7 +379,7 @@ export default function LageDashboardPage() {
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 6,
-                color: warnTon === 'alarm' ? rollen.alarm : rollen.achtung,
+                color: warnTon === 'alarm' ? rollen.alarmText : rollen.achtungText,
               }}
             >
               <span aria-hidden="true" style={{ display: 'inline-flex' }}>
@@ -406,9 +420,8 @@ export default function LageDashboardPage() {
                   einheit={k.einheit}
                   notiz={k.notiz}
                   ton={k.ton}
-
                   zustand={alsKennzahlZustand(kennzahlZustand[k.etikett])}
-                  ziel={einsatzModulPfad(einsatzId, k.route)}
+                  ziel={k.zielPfad ?? einsatzModulPfad(einsatzId, k.route)}
                 />
               ))}
         </Kennzahlenband>
