@@ -513,10 +513,11 @@ pub async fn plaetze_bulk_anlegen(
     let Some(typ) = PlatzTyp::parse(&body.typ) else {
         return Err(AppError::Validation("Unbekannter Platz-Typ".into()));
     };
-    if !(1..=50).contains(&body.menge) {
-        return Err(AppError::UnprocessableEntity(
-            "Menge muss zwischen 1 und 50 liegen".into(),
-        ));
+    if !(1..=platz_repo::MENGE_MAX).contains(&body.menge) {
+        return Err(AppError::UnprocessableEntity(format!(
+            "Menge muss zwischen 1 und {} liegen",
+            platz_repo::MENGE_MAX
+        )));
     }
     uhs_repo::laden(&state.pool, einsatz_id, uhs_id).await?; // 404 falls fremd
 

@@ -368,6 +368,19 @@ export interface Stelle {
 }
 
 /**
+ * Vollständige Regex-Maskierung eines Elementnamens. Vorher stand hier ein
+ * `replace(/\./g, '\\.')`, das genau EIN Metazeichen kannte: der Punkt in
+ * `Space.Compact` war der einzige Fall im Bestand. Das ist eine Maskierung, die nur
+ * solange hält, wie die Liste keinen anderen Sonderfall bekommt — und ein Backslash
+ * oder eine Klammer in einem Namen erzeugte dann kein rotes Gate, sondern ein
+ * **still falsch zählendes**: ein kaputtes Muster findet nichts, und „nichts gefunden"
+ * ist von „kein Verstoß" nicht zu unterscheiden. Deshalb die ganze Zeichenklasse.
+ */
+function regexMaskiert(name: string): string {
+  return name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
  * Alle Verstöße einer Datei. Rein, damit der Selbstbeweis unten sie ohne
  * Dateisystem prüfen kann.
  */
@@ -377,7 +390,7 @@ export function stellenIn(pfad: string, quelltext: string): Stelle[] {
   for (const element of INTERAKTIV) {
     // Punkte im Namen (`Space.Compact`) sind wörtlich zu nehmen. Das `<` im Lookahead
     // lässt generische Typargumente zu (`<Select<T> …>`), siehe Dateikopf.
-    const muster = new RegExp(`<${element.replace(/\./g, '\\.')}(?=[\\s/>{<])`, 'g');
+    const muster = new RegExp(`<${regexMaskiert(element)}(?=[\\s/>{<])`, 'g');
     for (const treffer of text.matchAll(muster)) {
       const start = treffer.index;
       // Ein Typargument zuerst überspringen, sonst endet der Tag-Text an dessen `>`.

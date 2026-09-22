@@ -1370,36 +1370,6 @@ function erstelleZonenPostSpy() {
   return { handler, count: () => anzahl, lastBody: () => letzterBody! };
 }
 
-/**
- * Knopf über seinen sichtbaren Text statt `*ByRole` über die ganze Seite (22.09.2026).
- *
- * GEMESSEN, nicht vermutet: `getByRole('button', { name })` kostete auf der Lagekarte je Aufruf
- * 2,4–2,6 s, allein und ohne Last — der Test „neuer Zeichenstart …" lief einzeln 6,1 s und in
- * der vollen Suite über sein Zeitbudget. Die Zeit steckt NICHT in einer Render-Schleife und
- * nicht in fehlenden Mocks: das CPU-Profil zeigt fast ausschließlich jsdoms
- * `getComputedStyle` (`#resolveLonghand`, `getInheritedPropertyValue`, `var()`-Auflösung).
- * Seit jsdom 30 löst `getComputedStyle` CSS-Variablen auf, und antd 6 trägt an jedem
- * Bedienelement die Klasse `css-var-root` mit ihren Hunderten `--ant-*`-Variablen; die
- * Rollenabfrage ruft das für JEDEN Knopf der Seite, um Namen und Sichtbarkeit zu bestimmen.
- * Ein einzelner antd-Knopf in der Kartenleiste (Liste im Paneel im `aside`) kostete so bis
- * zu 0,85 s — und die Leiste trägt Dutzende.
- *
- * `getByText` fragt keine berechneten Stile ab (3 ms statt 2,4 s). Die Rollenaussage geht
- * dabei nicht verloren: der Treffer wird auf seinen `<button>` hochgereicht und muss einer
- * sein.
- */
-function knopfAus(text: HTMLElement): HTMLElement {
-  const knopf = text.closest('button');
-  expect(knopf, `„${text.textContent}" steht in keinem Knopf`).not.toBeNull();
-  return knopf as HTMLElement;
-}
-async function knopf(name: string): Promise<HTMLElement> {
-  return knopfAus(await screen.findByText(name));
-}
-function knopfSofort(name: string): HTMLElement {
-  return knopfAus(screen.getByText(name));
-}
-
 describe('LagekartePage · bbox-Pfad für bbox-abhängige Ebenen (LFH-81)', () => {
   it('KRITIS aus, Energie an → der Ausschnitt wird gemeldet und die Ebene damit abgefragt', async () => {
     const angefragt: (string | null)[] = [];
@@ -1422,7 +1392,7 @@ describe('LagekartePage · bbox-Pfad für bbox-abhängige Ebenen (LFH-81)', () =
 
     // Seit dem Neuentwurf (22.09.2026) startet das Fachebenen-Paneel der rechten Leiste
     // eingeklappt — erst aufklappen, dann liegt der Schalter im Baum.
-    await user.click(await knopf('Fachebenen (extern)'));
+    await user.click(await screen.findByRole('button', { name: 'Fachebenen (extern)' }));
     const schalter = (await screen.findByText('Energieanlagen'))
       .closest('.ant-space')
       ?.querySelector('button[role="switch"]');
@@ -1432,7 +1402,7 @@ describe('LagekartePage · bbox-Pfad für bbox-abhängige Ebenen (LFH-81)', () =
     // Die tragende Aussage: der Ausschnitt hängt nicht mehr an KRITIS. Mit der alten
     // Bedingung (`fachebenenSichtbar.kritis`) stünde hier weiter „aus".
     await waitFor(() => expect(screen.getByTestId('bbox-callback')).toHaveTextContent('an'));
-    await user.click(await knopf('bbox-melden'));
+    await user.click(await screen.findByRole('button', { name: 'bbox-melden' }));
     // Gerastert wie bei KRITIS (0,05°-Gitter nach außen) — derselbe Schlüssel für
     // benachbarte Ausschnitte, frontend- wie backendseitig.
     await waitFor(() => expect(angefragt).toContain('7,51.5,7.15,51.6'));
@@ -1444,10 +1414,10 @@ describe('LFH-145: Zeichnen-Abschluss + Bestätigung', () => {
     basisHandler();
     const user = userEvent.setup();
     renderSeite();
-    await user.click(await knopf('Gefahrengebiet zeichnen'));
+    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
     expect(await screen.findByText('Gefahrengebiet · Fläche')).toBeInTheDocument();
-    expect(knopfSofort('Abschließen')).toBeInTheDocument();
-    expect(knopfSofort('Abbrechen')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Abschließen' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Abbrechen' })).toBeInTheDocument();
   });
 
   it('nach Abschluss (Stub) → Phase „bestaetigen", noch NICHT persistiert', async () => {
@@ -1455,10 +1425,10 @@ describe('LFH-145: Zeichnen-Abschluss + Bestätigung', () => {
     basisHandler([spy.handler]);
     const user = userEvent.setup();
     renderSeite();
-    await user.click(await knopf('Gefahrengebiet zeichnen'));
+    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
     await user.click(await screen.findByText('zone-fertig'));
-    expect(await knopf('Speichern')).toBeInTheDocument();
-    expect(knopfSofort('Verwerfen')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Speichern' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Verwerfen' })).toBeInTheDocument();
     expect(spy.count()).toBe(0);
   });
 
@@ -1467,9 +1437,9 @@ describe('LFH-145: Zeichnen-Abschluss + Bestätigung', () => {
     basisHandler([spy.handler]);
     const user = userEvent.setup();
     renderSeite();
-    await user.click(await knopf('Gefahrengebiet zeichnen'));
+    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
     await user.click(await screen.findByText('zone-fertig'));
-    await user.click(await knopf('Speichern'));
+    await user.click(await screen.findByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(spy.count()).toBe(1));
     expect(spy.lastBody().typ).toBe('gefahrengebiet');
   });
@@ -1479,11 +1449,13 @@ describe('LFH-145: Zeichnen-Abschluss + Bestätigung', () => {
     basisHandler([spy.handler]);
     const user = userEvent.setup();
     renderSeite();
-    await user.click(await knopf('Gefahrengebiet zeichnen'));
+    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
     await user.click(await screen.findByText('zone-fertig'));
-    await user.click(await knopf('Verwerfen'));
+    await user.click(await screen.findByRole('button', { name: 'Verwerfen' }));
     expect(spy.count()).toBe(0);
-    await waitFor(() => expect(screen.queryByText('Speichern')).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Speichern' })).not.toBeInTheDocument(),
+    );
   });
 
   it('Abbrechen in Phase zeichnen → kein POST, Overlay weg', async () => {
@@ -1491,8 +1463,8 @@ describe('LFH-145: Zeichnen-Abschluss + Bestätigung', () => {
     basisHandler([spy.handler]);
     const user = userEvent.setup();
     renderSeite();
-    await user.click(await knopf('Gefahrengebiet zeichnen'));
-    await user.click(await knopf('Abbrechen'));
+    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+    await user.click(await screen.findByRole('button', { name: 'Abbrechen' }));
     expect(spy.count()).toBe(0);
     await waitFor(() =>
       expect(screen.queryByText('Gefahrengebiet · Fläche')).not.toBeInTheDocument(),
@@ -1507,15 +1479,15 @@ describe('LFH-145: Zeichnen-Abschluss + Bestätigung', () => {
     basisHandler([spy.handler]);
     const user = userEvent.setup();
     renderSeite();
-    await user.click(await knopf('Gefahrengebiet zeichnen'));
+    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
     await user.click(await screen.findByText('zone-fertig'));
-    expect(await knopf('Speichern')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Speichern' })).toBeInTheDocument();
 
-    await user.click(await knopf('Absperrgrenze zeichnen'));
+    await user.click(await screen.findByRole('button', { name: 'Absperrgrenze zeichnen' }));
     // Zurück in Phase „zeichnen" für den NEUEN Entwurf, keine hängende Bestätigung mehr.
-    expect(screen.queryByText('Speichern')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Speichern' })).not.toBeInTheDocument();
     expect(await screen.findByText('Absperrgrenze · Linie')).toBeInTheDocument();
-    expect(knopfSofort('Abschließen')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Abschließen' })).toBeInTheDocument();
     expect(spy.count()).toBe(0);
   });
 });
