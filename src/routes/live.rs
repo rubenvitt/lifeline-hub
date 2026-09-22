@@ -24,7 +24,7 @@ use axum::response::sse::{Event, KeepAlive, Sse};
 use sqlx::SqlitePool;
 use std::collections::HashSet;
 use std::convert::Infallible;
-use tokio_stream::Stream;
+use tokio_stream::{Stream, StreamExt};
 
 /// Die Modul-Keys, die `benutzer` in diesem Einsatz sehen darf.
 ///
@@ -71,5 +71,11 @@ pub async fn stream(
         ev.sichtbar_fuer(&erlaubt)
     });
 
-    Ok(Sse::new(stream).keep_alive(KeepAlive::default()))
+    // Sofort ein erstes Byte (LFH-624). Ein Proxy, der die Header erst mit dem ersten
+    // Body-Byte weitergibt — gemessen der Vite-Dev-Proxy —, hielt sie sonst bis zum ersten
+    // Keep-Alive zurück (15 s), und `EventSource.onopen` feuert erst mit den Headern. Ein
+    // Kommentar trägt kein `id:` und lässt die `Last-Event-ID` des Resyncs unberührt.
+    let verbunden = tokio_stream::once(Ok(Event::default().comment("verbunden")));
+
+    Ok(Sse::new(verbunden.chain(stream)).keep_alive(KeepAlive::default()))
 }

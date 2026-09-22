@@ -637,6 +637,46 @@ async fn admin_post(app: &axum::Router, admin: &str, pfad: &str, body: &str) {
     );
 }
 
+/// LFH-624: Der Feed schickt sein erstes Byte **sofort**, nicht erst mit dem Keep-Alive.
+///
+/// Gemessen: direkt am Backend standen die Header nach 1,6 ms, durch den Vite-Dev-Proxy
+/// erst nach 15,0 s — `http-proxy-3` setzt Status und Header nur und schickt sie mit dem
+/// ersten Body-Byte, und das war ohne Ereignis der Keep-Alive-Kommentar nach
+/// `KeepAlive::default()` = 15 s. So lange stand die Kopfleiste auf „VERBINDE", weil
+/// `EventSource.onopen` die Header braucht. Jeder puffernde Proxy davor verhält sich so.
+///
+/// Das erste Frame ist ein SSE-**Kommentar** (`:`-Zeile): der Browser verwirft ihn, er
+/// trägt kein `id:` und verschiebt deshalb die `Last-Event-ID` des Reconnect-Resyncs nicht.
+#[tokio::test]
+async fn live_feed_sendet_sein_erstes_byte_sofort() {
+    use http_body_util::BodyExt;
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &admin, "Lage").await;
+
+    let feed = live_oeffnen(&app, &admin, eid, None).await;
+    assert_eq!(feed.status(), StatusCode::OK);
+    let mut body = feed.into_body();
+    // Eine Sekunde ist weit unter den 15 s des Keep-Alive, aber großzügig gegen Last.
+    let frame = tokio::time::timeout(
+        std::time::Duration::from_secs(1),
+        std::pin::Pin::new(&mut body).frame(),
+    )
+    .await
+    .expect("ohne Ereignis muss der Feed trotzdem sofort ein erstes Frame schicken")
+    .expect("Stream darf nicht enden")
+    .expect("Frame ohne Fehler");
+    let erstes = String::from_utf8_lossy(frame.data_ref().expect("Datenframe")).into_owned();
+    assert!(
+        erstes.starts_with(':'),
+        "das erste Frame ist ein SSE-Kommentar, war: {erstes:?}"
+    );
+    assert!(
+        sse_ids(&erstes).is_empty() && !erstes.contains("event:"),
+        "der Kommentar trägt weder id noch event, war: {erstes:?}"
+    );
+}
+
 /// Die `id:`-Zeilen eines SSE-Ausschnitts (für den Reconnect-Test).
 fn sse_ids(roh: &str) -> Vec<String> {
     roh.lines()
