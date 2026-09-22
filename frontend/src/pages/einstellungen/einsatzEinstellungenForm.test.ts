@@ -41,6 +41,7 @@ const VOLL = {
   auftrag_nummer_start: 300,
   meldung_bestaetigung_frist_min: 30,
   auftrag_quittierung_frist_min: 45,
+  rueckmeldung_frist_min: 25,
   auto_etb_eintraege: 0,
   retention_dauer_tage: 90,
   etb_nummer_eingefroren: false,
@@ -52,7 +53,7 @@ const VOLL = {
 } as unknown as EinsatzEinstellungen;
 
 describe('zuUpdate', () => {
-  it('mappt alle 18 Felder des Vollersatz-Payloads aus dem geladenen Zustand', () => {
+  it('mappt alle 19 Felder des Vollersatz-Payloads aus dem geladenen Zustand', () => {
     expect(zuUpdate(VOLL)).toEqual({
       standard_modul: 'etb',
       basemap_modus: 'offline',
@@ -70,6 +71,7 @@ describe('zuUpdate', () => {
       auftrag_nummer_start: 300,
       meldung_bestaetigung_frist_min: 30,
       auftrag_quittierung_frist_min: 45,
+      rueckmeldung_frist_min: 25,
       auto_etb_eintraege: false,
       retention_dauer_tage: 90,
     });
@@ -147,6 +149,7 @@ describe('Vollersatz-Merge ueber die Sektionsgrenze', () => {
     expect(payload.zeitzone).toBeNull(); // eigenes Feld, im Formular geleert
     expect(payload.retention_dauer_tage).toBe(90);
     expect(payload.auftrag_quittierung_frist_min).toBe(45);
+    expect(payload.rueckmeldung_frist_min).toBe(25);
   });
 });
 
@@ -167,7 +170,7 @@ describe('normalisiereVerhalten', () => {
     expect(normalisiereVerhalten({ etb_nummer_praefix: '  ' }).etb_nummer_praefix).toBeNull();
   });
 
-  it('reicht alle neun Verhalten-Felder durch; undefined → null (erbt Org)', () => {
+  it('reicht alle zehn Verhalten-Felder durch; undefined → null (erbt Org)', () => {
     expect(
       normalisiereVerhalten({ meldung_nummer_praefix: 'M-', meldung_nummer_start: 7 }),
     ).toEqual({
@@ -179,6 +182,7 @@ describe('normalisiereVerhalten', () => {
       auftrag_nummer_start: null,
       meldung_bestaetigung_frist_min: null,
       auftrag_quittierung_frist_min: null,
+      rueckmeldung_frist_min: null,
       auto_etb_eintraege: null,
     });
   });
@@ -238,6 +242,7 @@ describe('initial* (Umkehr fuer die Formularvorbelegung)', () => {
       auftrag_nummer_start: 300,
       meldung_bestaetigung_frist_min: 30,
       auftrag_quittierung_frist_min: 45,
+      rueckmeldung_frist_min: 25,
       auto_etb_eintraege: false,
     });
   });

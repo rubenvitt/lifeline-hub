@@ -11,6 +11,7 @@ import type {
   Erinnerung,
   EtbEintragAnzeige,
   Gefahrengebiet,
+  LetzteRueckmeldung,
   PegelAnzeige,
   Person,
 } from '../../api/types';
@@ -432,6 +433,76 @@ describe('abschnittZeilen', () => {
     const nord = zeilen.find((z) => z.abschnittId === 1)!;
     expect(nord.auftraege.map((a) => a.auftrag_text)).toEqual(['neu an Nord-Deich', 'alt an Nord']);
     expect(zeilen.find((z) => z.abschnittId == null)!.auftraege).toEqual([]);
+  });
+
+  describe('letzte Rückmeldung (LFH-610)', () => {
+    const rueck = (
+      bezug_id: number,
+      meldung_id: number,
+      minutenVor: number,
+      inhalt: string,
+    ): LetzteRueckmeldung => ({
+      bezug_id,
+      meldung_id,
+      lfd_nr: meldung_id,
+      ereigniszeit: vor(minutenVor),
+      inhalt,
+      meldeweg: 'funk',
+      faellig_at: nach(30),
+    });
+    const mit = (einheitenR: LetzteRueckmeldung[], abschnitteR: LetzteRueckmeldung[]) =>
+      abschnittZeilen({
+        abschnitte,
+        einheiten,
+        personal: personalListe,
+        fahrzeuge,
+        material: [],
+        auftraege: [],
+        rueckmeldungen: { frist_min: 60, einheiten: einheitenR, abschnitte: abschnitteR },
+      });
+
+    it('ohne geladene Rückmeldungen unbekannt — kein erfundenes „keine"', () => {
+      for (const z of zeilen) {
+        expect(z.rueckmeldungBekannt).toBe(false);
+        expect(z.letzteRueckmeldung).toBeNull();
+      }
+    });
+
+    it('jüngste im Teilbaum: Untereinheit und Unterabschnitt zählen mit', () => {
+      const z = mit(
+        [
+          rueck(10, 1, 50, 'Zug 1 alt'),
+          rueck(11, 2, 5, 'Untereinheit jung'),
+          rueck(20, 3, 1, 'Süd'),
+        ],
+        [rueck(3, 4, 20, 'Nord-Deich direkt')],
+      );
+      const nord = z.find((x) => x.abschnittId === 1)!;
+      expect(nord.rueckmeldungBekannt).toBe(true);
+      expect(nord.letzteRueckmeldung?.inhalt).toBe('Untereinheit jung');
+      expect(z.find((x) => x.abschnittId === 2)!.letzteRueckmeldung?.inhalt).toBe('Süd');
+    });
+
+    it('direkt an einen Unterabschnitt gebunden schlägt ältere Einheitsmeldungen', () => {
+      const z = mit([rueck(10, 1, 50, 'Zug 1 alt')], [rueck(3, 4, 20, 'Nord-Deich direkt')]);
+      expect(z.find((x) => x.abschnittId === 1)!.letzteRueckmeldung?.inhalt).toBe(
+        'Nord-Deich direkt',
+      );
+    });
+
+    it('„Ohne Abschnitt" liest nur die eigenen Einheiten, keine fremden Abschnitte', () => {
+      const z = mit([rueck(30, 1, 10, 'ohne Abschnitt')], [rueck(1, 2, 1, 'Nord direkt')]);
+      const ohne = z.find((x) => x.abschnittId == null)!;
+      expect(ohne.letzteRueckmeldung?.inhalt).toBe('ohne Abschnitt');
+      expect(z.find((x) => x.abschnittId === 1)!.letzteRueckmeldung?.inhalt).toBe('Nord direkt');
+    });
+
+    it('geladen, aber nichts im Teilbaum: bekannt und `null`', () => {
+      const z = mit([rueck(10, 1, 5, 'nur Nord')], []);
+      const sued = z.find((x) => x.abschnittId === 2)!;
+      expect(sued.rueckmeldungBekannt).toBe(true);
+      expect(sued.letzteRueckmeldung).toBeNull();
+    });
   });
   it('zählt die Auftragsbilanz über den Teilbaum, jeden Auftrag einmal (LFH-608)', () => {
     const nord = zeilen.find((z) => z.abschnittId === 1)!;

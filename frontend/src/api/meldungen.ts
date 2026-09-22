@@ -1,5 +1,12 @@
 import { apiGet, apiSend, type ApiSendOptionen } from './client';
-import type { LageMeldung, Meldung, MeldungStatus, NeueMeldung, NeuerAuftrag } from './types';
+import type {
+  LageMeldung,
+  Meldung,
+  MeldungStatus,
+  NeueMeldung,
+  NeuerAuftrag,
+  Rueckmeldungen,
+} from './types';
 
 export interface MeldungFilter {
   status?: string;
@@ -12,6 +19,11 @@ export function listeMeldungen(einsatzId: number, filter: MeldungFilter = {}): P
   if (filter.richtung) p.set('richtung', filter.richtung);
   const q = p.toString() ? `?${p.toString()}` : '';
   return apiGet<Meldung[]>(`/api/einsaetze/${einsatzId}/meldungen${q}`);
+}
+
+/** Letzte Rückmeldung je Einheit/Abschnitt samt Frist (LFH-610). Lesezugriff Meldungen. */
+export function holeRueckmeldungen(einsatzId: number): Promise<Rueckmeldungen> {
+  return apiGet<Rueckmeldungen>(`/api/einsaetze/${einsatzId}/meldungen/rueckmeldungen`);
 }
 
 export function legeMeldungAn(

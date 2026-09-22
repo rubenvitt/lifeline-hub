@@ -15,7 +15,7 @@ import { listeAbschnitte } from '../../api/einsatzabschnitte';
 import { listeZonen } from '../../api/lagezonen';
 import { listeFreieZeichen } from '../../api/freieZeichen';
 import { ladeGefahrengebiete } from '../../api/gefahren';
-import { listeLageMeldungen } from '../../api/meldungen';
+import { holeRueckmeldungen, listeLageMeldungen } from '../../api/meldungen';
 import { ladeOrganisation } from '../../api/organisation';
 import { ladeLageSnapshot } from '../../api/lageSnapshot';
 import type { Warnstufe } from '../../api/types';
@@ -126,6 +126,14 @@ export function useLagekarteDaten({
   const lageMeldungenQuery = useQuery({
     queryKey: einsatzKeys.lagemeldungen(einsatzId),
     queryFn: () => listeLageMeldungen(einsatzId),
+    enabled: liveAn,
+  });
+  // Letzte Rückmeldung je Einheit für das Paneel „Ausgewählt" (LFH-610). Nur live: der
+  // gesicherte Stand trägt keine Rückmeldungen, und eine heutige Meldung neben einem
+  // eingefrorenen Lagebild wäre eine falsche Aussage über diesen Stand.
+  const rueckmeldungenQuery = useQuery({
+    queryKey: einsatzKeys.meldungenRueckmeldungen(einsatzId),
+    queryFn: () => holeRueckmeldungen(einsatzId),
     enabled: liveAn,
   });
   const fkQuery = useQuery({
@@ -285,14 +293,17 @@ export function useLagekarteDaten({
   // Abhängigkeitsprüfung verlangte es trotzdem in der Liste. Verglichen werden deshalb die
   // `isError`-BOOLEANS.
   //
-  // NICHT im Katalog: `organisation`, `karte/config` und `einstellungen`. Sie sind
+  // NICHT im Katalog: `organisation`, `karte/config`, `einstellungen` und die Rückmeldungen. Sie sind
   // Render-Kontext, kein Lagebild — ihr Ausfall lässt kein Objekt von der Karte
   // verschwinden. `karte/config` hat mit dem Basemap-Fallback bereits einen eigenen
   // sichtbaren Ausfallpfad („Keine Basemap konfiguriert …" in der Sidebar); ein zweiter,
   // widersprechender Text daneben verwirrt mehr, als er meldet. `organisation` liefert nur
   // den TZ-Vorgabewert — sein Ausfall zeichnet ein taktisches Zeichen mit der
   // Vorgabe-Organisation statt mit der eigenen, aber es fehlt nichts. Und `einstellungen`
-  // trägt Anzeigekonventionen (Koordinatenformat, Zeitzone), keinen Kartengegenstand.
+  // trägt Anzeigekonventionen (Koordinatenformat, Zeitzone), keinen Kartengegenstand. Die
+  // Rückmeldungen (LFH-610) hängen am Leserecht auf „Meldungen": ein 403 ist für Rollen ohne
+  // das Modul der Normalfall und stünde sonst dauerhaft im Ausfallbanner — fehlen sie, fehlt
+  // im Paneel „Ausgewählt" nur der Block „Letzte Meldung".
   //
   // Die live/snapshot-Weiche spiegelt `ladt`: im Historien-Modus sind alle elf Live-Queries
   // abgeschaltet, die EINE Quelle ist das eingefrorene Dokument.
@@ -424,6 +435,10 @@ export function useLagekarteDaten({
       uhs: uhsRoh ?? [],
       schaeden: schaedenRoh ?? [],
       abschnitte: abschnitteRoh ?? [],
+      // Nur ein erfolgreicher Live-Abruf; nach Fehler bleibt `data` in react-query stehen und
+      // wäre ein stiller Altstand.
+      rueckmeldungen:
+        istSnapshot || rueckmeldungenQuery.isError ? undefined : rueckmeldungenQuery.data,
     },
     // Abgeleitete Marker/Flächen/Zonen.
     verortet,

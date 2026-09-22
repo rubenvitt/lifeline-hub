@@ -6,6 +6,7 @@ import { renderMitProviders, neuerQueryClient } from '../../test/utils';
 import { server } from '../../test/server';
 import Inspector from './Inspector';
 import type { KarteMarker } from './marker';
+import type { AuswahlRoh } from './leistenDaten';
 import { EinsatzAnzeigeProvider } from '../../anzeige/AnzeigeKonventionenContext';
 import type { EinsatzEinstellungen } from '../../api/types';
 
@@ -367,11 +368,65 @@ describe('Inspector im Paneel „Ausgewählt"', () => {
     expect(raster).toHaveTextContent('1/2/9//12');
     expect(raster).toHaveTextContent('Nord');
     // Status und „Seit" einer Einheit (LFH-609): ohne Status steht das auch so da, kein
-    // erfundener Wert. „Letzte Meldung" hat weiter keine Quelle (LFH-610).
+    // erfundener Wert.
     expect(raster).toHaveTextContent('Status');
     expect(raster).toHaveTextContent('ohne Status');
     expect(raster).toHaveTextContent('Seit');
+    // Ohne Rückmeldungen (lädt, 403, Historie) KEIN Block „Letzte Meldung" (LFH-610).
     expect(screen.queryByText(/Letzte Meldung/)).not.toBeInTheDocument();
+    expect(container.querySelector('[data-lfh="auswahl-letzte-meldung"]')).toBeNull();
+  });
+
+  const rueckmeldung = (bezug_id: number) => ({
+    bezug_id,
+    meldung_id: 5,
+    lfd_nr: 5,
+    ereigniszeit: '2026-09-21 12:11:00',
+    inhalt: 'Sickerstelle unverändert, Sandsackverbau hält.',
+    meldeweg: 'funk' as const,
+    faellig_at: '2026-09-21 13:11:00',
+  });
+
+  it('Einheit mit Rückmeldung: Block „Letzte Meldung" mit Text und „Zeit · Meldeweg" (LFH-610)', () => {
+    const { container } = renderMitProviders(
+      <Inspector
+        einsatzId={1}
+        marker={einheitMarker}
+        darfSchreiben={false}
+        onSchliessen={() => {}}
+        onVerortungLoeschen={() => {}}
+        roh={{
+          ...(roh as AuswahlRoh),
+          rueckmeldungen: { frist_min: 60, einheiten: [rueckmeldung(1)], abschnitte: [] },
+        }}
+      />,
+    );
+    const block = screen.getByRole('region', { name: 'Letzte Meldung' });
+    expect(block).toHaveTextContent('Sickerstelle unverändert, Sandsackverbau hält.');
+    // Zeit nach der Anzeigekonvention des Paneels (`formatZeitKurz`, taktisch `DDHHmm` bzw.
+    // `HHmm`) — dieselbe wie „Disponiert" im Raster darüber.
+    expect(block).toHaveTextContent(/\d{2}11 · Funk$/);
+    // Neben dem Raster, nicht darin — das `dl` bleibt Feld-für-Feld.
+    const raster = container.querySelector('[data-lfh="auswahl-raster"]') as HTMLElement;
+    expect(raster).not.toContainElement(block);
+  });
+
+  it('Einheit ohne eigene Rückmeldung: kein Block, auch kein Platzhalter', () => {
+    renderMitProviders(
+      <Inspector
+        einsatzId={1}
+        marker={einheitMarker}
+        darfSchreiben={false}
+        onSchliessen={() => {}}
+        onVerortungLoeschen={() => {}}
+        roh={{
+          ...(roh as AuswahlRoh),
+          rueckmeldungen: { frist_min: 60, einheiten: [rueckmeldung(2)], abschnitte: [] },
+        }}
+      />,
+    );
+    expect(screen.queryByText(/Letzte Meldung/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Sickerstelle/)).not.toBeInTheDocument();
   });
 
   it('ohne Rohdaten kein Raster — nur Ort und Aktionen', () => {

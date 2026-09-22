@@ -47,6 +47,7 @@ export interface FormWerteVerhalten {
   auftrag_nummer_start?: number;
   meldung_bestaetigung_frist_min?: number;
   auftrag_quittierung_frist_min?: number;
+  rueckmeldung_frist_min?: number;
   /** Tristate: `undefined` = Org-Standard erben, `true` = An, `false` = Aus. */
   auto_etb_eintraege?: boolean;
 }
@@ -91,6 +92,7 @@ export function zuUpdate(e: EinsatzEinstellungen): EinstellungenUpdate {
     auftrag_nummer_start: e.auftrag_nummer_start ?? null,
     meldung_bestaetigung_frist_min: e.meldung_bestaetigung_frist_min ?? null,
     auftrag_quittierung_frist_min: e.auftrag_quittierung_frist_min ?? null,
+    rueckmeldung_frist_min: e.rueckmeldung_frist_min ?? null,
     auto_etb_eintraege: e.auto_etb_eintraege == null ? null : e.auto_etb_eintraege !== 0,
     retention_dauer_tage: e.retention_dauer_tage ?? null,
   };
@@ -125,6 +127,7 @@ export function normalisiereVerhalten(
   | 'auftrag_nummer_start'
   | 'meldung_bestaetigung_frist_min'
   | 'auftrag_quittierung_frist_min'
+  | 'rueckmeldung_frist_min'
   | 'auto_etb_eintraege'
 > {
   return {
@@ -136,6 +139,7 @@ export function normalisiereVerhalten(
     auftrag_nummer_start: w.auftrag_nummer_start ?? null,
     meldung_bestaetigung_frist_min: w.meldung_bestaetigung_frist_min ?? null,
     auftrag_quittierung_frist_min: w.auftrag_quittierung_frist_min ?? null,
+    rueckmeldung_frist_min: w.rueckmeldung_frist_min ?? null,
     // `undefined` (leerer Select) → `null`: das Backend liest null als „erbt Org-Default".
     auto_etb_eintraege: w.auto_etb_eintraege ?? null,
   };
@@ -174,6 +178,7 @@ export function initialVerhalten(e: EinsatzEinstellungen): FormWerteVerhalten {
     auftrag_nummer_start: e.auftrag_nummer_start ?? undefined,
     meldung_bestaetigung_frist_min: e.meldung_bestaetigung_frist_min ?? undefined,
     auftrag_quittierung_frist_min: e.auftrag_quittierung_frist_min ?? undefined,
+    rueckmeldung_frist_min: e.rueckmeldung_frist_min ?? undefined,
     // Tristate zurück in den Select: null bleibt leer (erbt Org), 0 = Aus, sonst An.
     auto_etb_eintraege: e.auto_etb_eintraege == null ? undefined : e.auto_etb_eintraege !== 0,
   };

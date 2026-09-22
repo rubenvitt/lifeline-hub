@@ -14,6 +14,7 @@ const VOLL = {
   auftrag_nummer_praefix: 'A-',
   meldung_bestaetigung_frist_min: 30,
   auftrag_quittierung_frist_min: 45,
+  rueckmeldung_frist_min: 25,
   auto_etb_eintraege: 0,
   geocoder_url: 'https://geo.example',
   geaendert_at: null,
@@ -21,7 +22,7 @@ const VOLL = {
 } as unknown as OrgEinstellungen;
 
 describe('zuUpdate', () => {
-  it('mappt alle 12 Felder aus dem geladenen Zustand (auto_etb 0 → false)', () => {
+  it('mappt alle 13 Felder aus dem geladenen Zustand (auto_etb 0 → false)', () => {
     expect(zuUpdate(VOLL)).toEqual({
       zeitzone: 'Europe/Berlin',
       zeitformat: '12h',
@@ -33,6 +34,7 @@ describe('zuUpdate', () => {
       auftrag_nummer_praefix: 'A-',
       meldung_bestaetigung_frist_min: 30,
       auftrag_quittierung_frist_min: 45,
+      rueckmeldung_frist_min: 25,
       auto_etb_eintraege: false,
       geocoder_url: 'https://geo.example',
     });
@@ -78,6 +80,7 @@ describe('normalisiereEinsatz', () => {
       auftrag_nummer_praefix: null,
       meldung_bestaetigung_frist_min: null,
       auftrag_quittierung_frist_min: null,
+      rueckmeldung_frist_min: null,
       auto_etb_eintraege: false,
     });
   });

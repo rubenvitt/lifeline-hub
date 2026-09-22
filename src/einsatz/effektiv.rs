@@ -50,6 +50,15 @@ pub fn effektive_auftrag_quittierung_frist_min(
         .or(o.auftrag_quittierung_frist_min)
 }
 
+/// Effektive Rückmeldefrist in Minuten (LFH-610): Einsatz ?? Org. Den hartkodierten
+/// Fallback (`meldung::RUECKMELDUNG_FRIST_DEFAULT_MIN`) setzt der Aufrufer ein.
+pub fn effektive_rueckmeldung_frist_min(
+    e: &EinsatzEinstellungen,
+    o: &OrgEinstellungen,
+) -> Option<i64> {
+    e.rueckmeldung_frist_min.or(o.rueckmeldung_frist_min)
+}
+
 /// Effektive Aufbewahrungsdauer in Tagen: Einsatz ?? Org.
 pub fn effektive_retention_dauer_tage(
     e: &EinsatzEinstellungen,
@@ -230,6 +239,31 @@ mod tests {
     #[test]
     fn meldung_frist_beide_none_ist_none() {
         assert_eq!(effektive_meldung_frist_min(&e(), &o()), None);
+    }
+
+    // ── effektive_rueckmeldung_frist_min ───────────────────────────────────────
+
+    #[test]
+    fn rueckmeldung_frist_einsatz_schlaegt_org() {
+        let e = EinsatzEinstellungen {
+            rueckmeldung_frist_min: Some(20),
+            ..e()
+        };
+        let o = OrgEinstellungen {
+            rueckmeldung_frist_min: Some(90),
+            ..o()
+        };
+        assert_eq!(effektive_rueckmeldung_frist_min(&e, &o), Some(20));
+    }
+
+    #[test]
+    fn rueckmeldung_frist_faellt_auf_org_zurueck() {
+        let org = OrgEinstellungen {
+            rueckmeldung_frist_min: Some(90),
+            ..o()
+        };
+        assert_eq!(effektive_rueckmeldung_frist_min(&e(), &org), Some(90));
+        assert_eq!(effektive_rueckmeldung_frist_min(&e(), &o()), None);
     }
 
     // ── effektive_auftrag_quittierung_frist_min ───────────────────────────────

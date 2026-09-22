@@ -114,6 +114,8 @@ use utoipa::OpenApi;
         crate::material::MaterialStatus,
         crate::meldung::LageMeldungAnzeige,
         crate::meldung::MeldungAnzeige,
+        crate::meldung::LetzteRueckmeldung,
+        crate::meldung::RueckmeldungenAnzeige,
         crate::meldung::MeldungStatus,
         crate::meldung::Meldungsart,
         crate::nachforderung::NachforderungAnzeige,

@@ -7,9 +7,18 @@ import type {
   EinsatzPersonal,
   Einsatzabschnitt,
   FahrzeugStatus,
+  LetzteRueckmeldung,
+  Rueckmeldungen,
   StatusKategorie,
   StatusWert,
 } from '../api/types';
+import type { Dayjs } from 'dayjs';
+import {
+  RUECKMELDUNG_WORT,
+  ohneRueckmeldung,
+  rueckmeldungZustand,
+  type RueckmeldungZustand,
+} from '../meldungen/rueckmeldung';
 import { tonVonRolle, type StatusTon } from '../components/instrument/statusFlaeche';
 import { materialStatus, statusKategorie } from '../theme/statusFarben';
 import { verdichte, type StaerkeSumme, type Rohdaten } from './kraeftebild';
@@ -507,14 +516,80 @@ export interface BandZelle {
 /** Code einer Einheitenzelle ohne FMS-Anker — die Art statt einer erfundenen Ziffer. */
 const EINHEIT_KURZ = 'Einh.';
 
+// ── Rückmeldung je Einheit (LFH-610) ──────────────────────────────────────────
+
+/** Rückmeldung einer Einheitenzeile: der Zustand und — falls vorhanden — die letzte Meldung. */
+export interface RueckmeldungAnzeige {
+  zustand: RueckmeldungZustand;
+  letzte: LetzteRueckmeldung | null;
+}
+
+/** Nur echte Einheiten tragen eine Rückmeldung — „Ohne Einheit" ist `art: 'einheit'`, hat aber keine id. */
+function istEchteEinheit(z: RasterZeile): z is RasterZeile & { einheitId: number } {
+  return z.art === 'einheit' && z.einheitId != null;
+}
+
+/**
+ * Rückmeldung einer Rasterzeile zum Zeitpunkt `jetzt` — `null` für jede Zeile, die keine
+ * echte Einheit ist (Mittel, „Ohne Einheit"). Bewusst NICHT in `baueMeldebildRaster`: der
+ * Zustand hängt an der Seitenuhr, und ein 30-s-Takt soll nicht den ganzen Baum neu bauen.
+ *
+ * `je` ist die Nachschlagetabelle aus `rueckmeldungJeEinheit` — und darf nur übergeben
+ * werden, wenn die Daten WIRKLICH da sind. Eine leere Tabelle heißt „niemand hat je
+ * zurückgemeldet"; wer sie beim Laden oder bei 403 übergibt, färbt jede Einheit rot.
+ */
+export function rueckmeldungDerZeile(
+  z: RasterZeile,
+  je: ReadonlyMap<number, LetzteRueckmeldung>,
+  jetzt: Dayjs,
+): RueckmeldungAnzeige | null {
+  if (!istEchteEinheit(z)) return null;
+  const letzte = je.get(z.einheitId) ?? null;
+  return { zustand: rueckmeldungZustand(letzte, jetzt), letzte };
+}
+
+/** Überfällig oder nie zurückgemeldet — die Zeile wird getönt wie eine Problemzeile. */
+export function istRueckmeldungProblem(r: RueckmeldungAnzeige | null | undefined): boolean {
+  return r != null && r.zustand !== 'aktuell';
+}
+
+/**
+ * Die Kachel „keine Rückmeldung" (Neuentwurf S6): Einheiten, von denen noch NIE eine
+ * Rückmeldung kam. Überfällige zählen NICHT mit (Entscheidung des Auftraggebers,
+ * 22.09.2026) — sie haben zurückgemeldet, nur zu lange her; das zeigt ihre Zeile.
+ *
+ * Gezählt über die GEFILTERTEN Rasterzeilen, wie die übrigen Bandzellen über die gefilterten
+ * Rohlisten: sonst stünde neben einem Abschnittsausschnitt eine Zahl über den ganzen Einsatz.
+ * Bei 0 entfällt die Kachel — die Bandzellen führen nur belegte Eimer, und eine rote Null
+ * meldete das Gegenteil dessen, was sie heißt.
+ */
+export function keineRueckmeldungZelle(
+  zeilen: readonly RasterZeile[],
+  daten: Rueckmeldungen,
+): BandZelle | null {
+  const ids = zeilen.filter(istEchteEinheit).map((z) => z.einheitId);
+  const anzahl = ohneRueckmeldung(ids, daten);
+  if (anzahl === 0) return null;
+  return {
+    schluessel: 'rueckmeldung-keine',
+    code: '—',
+    wert: anzahl,
+    wort: RUECKMELDUNG_WORT.keine,
+    ton: 'alarm',
+  };
+}
+
 /**
  * Einheiten je Status (Entwurf S6 `statusStufen`, LFH-609) — eine Zelle je Katalogstatus
  * mit mindestens einer Einheit, in `sortier`-Folge; Fahrzeug- und Handstatus zählen
  * gleich, es ist derselbe FMS-Katalog. Danach „gemischt“ und „ohne Status“, wenn belegt —
  * jede Einheit genau einmal, damit sich das Band auf die Einheitenzahl summiert.
  *
- * „ohne Status“ ist ECHTE Datenlage und NICHT die Kachel „keine Rückmeldung“ des
- * Entwurfs: die bräuchte einen Zeitpunkt der letzten Rückmeldung (LFH-610).
+ * „ohne Status“ ist ECHTE Datenlage — eine Einheit, der noch niemand einen Status gegeben
+ * hat — und NICHT die Kachel „keine Rückmeldung“ des Entwurfs: die zählt Einheiten, von
+ * denen nie eine Rückmeldung kam (`keineRueckmeldungZelle`, LFH-610), und steht in einer
+ * eigenen Gruppe — in diesem Band stünde sie doppelt, das sich auf die Einheitenzahl
+ * summieren muss.
  */
 export function einheitBand(einheiten: readonly Einheit[]): BandZelle[] {
   const je = new Map<number, { wert: StatusWert; anzahl: number }>();

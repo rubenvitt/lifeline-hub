@@ -152,7 +152,10 @@ umkehrt, steht das am Absatz selbst mit „Neuentwurf 22.09.2026".
   Koordinate an der Person 613). Die Auslassung trägt ihr Ticket im Code-Kommentar und wird im
   Test als **Abwesenheit** gepinnt. **Eingelöst ist der Pegel (LFH-606):** er steht auf Platz 1
   des Kennzahlenbands, „Höchste Warnstufe" ist dafür raus (Entscheidung 22.09.2026; die
-  Warnstufe bleibt im Seitenkopf-Hinweis und in der Gefahrenmatrix).
+  Warnstufe bleibt im Seitenkopf-Hinweis und in der Gefahrenmatrix). **Eingelöst ist auch die
+  Rückmeldung (LFH-610):** Spalte „Rückmeldung“ und Kachel „keine Rückmeldung“ im Meldebild,
+  letzte Rückmeldung je Abschnitt im Überblick, „Letzte Meldung“ in der Lagekarte; die
+  Entscheidungen stehen in `umsetzung.md`.
 
 ## Frontend — UI-Form-Leitlinie (Drawer-Nutzung)
 

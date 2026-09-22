@@ -160,7 +160,9 @@ const volleDaten = {
   pegel: [] as unknown[],
 };
 
-type Daten = typeof volleDaten;
+/** Rückmeldungen (LFH-610) sind optional: ohne Angabe liefert der Server eine leere Menge. */
+type Daten = typeof volleDaten & { rueckmeldungen?: object };
+const KEINE_RUECKMELDUNGEN = { frist_min: 60, einheiten: [], abschnitte: [] };
 
 /** Ein Leitpegel mit frischer Messung (relativ zur echten Uhr, wie die Seite rechnet). */
 const leitpegel = (messung: Record<string, unknown> | null) => ({
@@ -186,6 +188,10 @@ function stelleBereit(d: Daten, ueberschreiben: Parameters<typeof server.use> = 
     http.get('/api/einsaetze/1/gefahrengebiete', json(d.gefahren)),
     http.get('/api/einsaetze/1/auftraege', json(d.auftraege)),
     http.get('/api/einsaetze/1/erinnerungen', json(d.erinnerungen)),
+    http.get(
+      '/api/einsaetze/1/meldungen/rueckmeldungen',
+      json(d.rueckmeldungen ?? KEINE_RUECKMELDUNGEN),
+    ),
     http.get('/api/einsaetze/1/pegel', json(d.pegel ?? [])),
     http.get('/api/einsaetze/1/etb', ({ request }) => {
       const url = new URL(request.url);
@@ -331,6 +337,69 @@ describe('UeberblickPage', () => {
     ]);
     expect(within(p).getByText(/Einheiten nach Status/)).toBeInTheDocument();
     expect(within(p).getByText('1 Abschnitte · 1 Einheiten')).toBeInTheDocument();
+  });
+
+  it('Abschnittszeile: letzte Rückmeldung im Teilbaum mit Zeit und Text (LFH-610)', async () => {
+    const zeit = vor(20);
+    stelleBereit({
+      ...volleDaten,
+      rueckmeldungen: {
+        frist_min: 60,
+        einheiten: [
+          {
+            bezug_id: 10,
+            meldung_id: 7,
+            lfd_nr: 7,
+            ereigniszeit: zeit,
+            inhalt: 'Verbau hält',
+            meldeweg: 'funk',
+            faellig_at: nach(40),
+          },
+        ],
+        abschnitte: [],
+      },
+    });
+    rendern();
+    const p = await waitFor(() => paneel('Einsatzabschnitte'));
+    const zeile = await within(p).findByRole('link', { name: /Abschnitt Nord/ });
+    const rueck = await waitFor(() => {
+      const el = zeile.querySelector<HTMLElement>('[data-lfh="abschnitt-rueckmeldung"]');
+      expect(el).not.toBeNull();
+      return el!;
+    });
+    expect(rueck).toHaveTextContent('Verbau hält');
+    const uhr = dayjs.utc(zeit).local().format('HH:mm');
+    expect(rueck).toHaveTextContent(uhr);
+    // Die Zeit trägt im Linknamen ihre Bedeutung, nicht als nackte Uhrzeit.
+    expect(zeile).toHaveAccessibleName(new RegExp(`Letzte Rückmeldung:\\s*${uhr}\\s+Verbau hält`));
+    expect(rueck).not.toHaveTextContent('noch keine');
+  });
+
+  it('Abschnittszeile: geladen, aber ohne Rückmeldung sagt es ruhig „noch keine"', async () => {
+    stelleBereit(volleDaten);
+    rendern();
+    const p = await waitFor(() => paneel('Einsatzabschnitte'));
+    const zeile = await within(p).findByRole('link', { name: /Abschnitt Nord/ });
+    await waitFor(() => expect(zeile).toHaveTextContent('noch keine Rückmeldung'));
+  });
+
+  it('Abschnittszeile: ohne Leserecht auf Meldungen (403) nichts erfunden, Paneel bleibt', async () => {
+    let abgerufen = false;
+    stelleBereit(volleDaten, [
+      http.get('/api/einsaetze/1/meldungen/rueckmeldungen', () => {
+        abgerufen = true;
+        return HttpResponse.json({ error: 'kein Zugriff' }, { status: 403 });
+      }),
+    ]);
+    rendern();
+    const p = await waitFor(() => paneel('Einsatzabschnitte'));
+    const zeile = await within(p).findByRole('link', { name: /Abschnitt Nord/ });
+    await waitFor(() => expect(abgerufen).toBe(true));
+    // Der Rest der Zeile steht, kein „Stand unbekannt" für das ganze Paneel.
+    await waitFor(() => expect(zeile).toHaveTextContent('1/0/1//2'));
+    expect(within(p).queryByRole('alert')).toBeNull();
+    expect(zeile.querySelector('[data-lfh="abschnitt-rueckmeldung"]')).toBeNull();
+    expect(zeile).not.toHaveTextContent(/Rückmeldung/);
   });
 
   it('Abschnittszeile mit Lage (LFH-608): Kante, Stufenwort, Kürzel, fester Auftrag, Fortschritt', async () => {

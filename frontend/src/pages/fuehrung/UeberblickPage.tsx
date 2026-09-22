@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { Breadcrumb, Button } from 'antd';
@@ -32,6 +32,7 @@ import { ladeGefahrengebiete } from '../../api/gefahren';
 import { listeAuftraege } from '../../api/auftraege';
 import { listeErinnerungen } from '../../api/erinnerungen';
 import { listeEtb } from '../../api/etb';
+import { holeRueckmeldungen } from '../../api/meldungen';
 import { pegelAbfrage } from '../../api/pegel';
 import { PEGEL_STAND_UNBEKANNT, pegelNotizKurz } from '../../pegel/pegelKennzahl';
 import {
@@ -93,14 +94,21 @@ import { MARKEN_BREITE, rasterStil, zeilenzielStil } from './ueberblickStil';
  * der Kennzahl: sie gehört der Warnstufe, ein toter Pegel-Abruf macht die Warnstufe nicht
  * unlesbar.
  *
+ * LETZTE RÜCKMELDUNG JE ABSCHNITT (LFH-610): jüngste Meldung im Teilbaum, direkt an einen
+ * Abschnitt oder an eine seiner Einheiten gebunden. Die Quelle hängt am Leserecht auf
+ * „Meldungen" und läuft deshalb NICHT durch `zustandVon`: ein 403 ist für Rollen ohne das
+ * Modul der Normalfall und darf das Abschnittspaneel nicht auf „Stand unbekannt" stellen.
+ * Solange sie lädt oder scheitert, trägt die Zeile dazu schlicht nichts. Keine Fristfarbe:
+ * der Überblick zählt Rückmeldungen nicht aus, das tut das Meldebild (S6).
+ *
  * PEGEL-PROGNOSE ALS MARKE (LFH-628): ein offener erwarteter Höchststand steht unter den
  * nächsten Marken („Erwarteter Höchststand Pegel Weser: 7,10 m") und führt zur
  * Einstellungssektion, wo er gepflegt wird. Verstrichen fällt er heraus (`naechsteMarken`).
  * Auch hier bestimmt der Pegel-Abruf NICHT den Zustand des Paneels: ein gescheiterter
  * Abruf nimmt nur die Prognose-Marke weg, die Fristen der übrigen Quellen bleiben lesbar.
  *
- * BEWUSST WEGGELASSEN (keine erfundenen Daten, Entscheidung 4): letzte Rückmeldung je
- * Abschnitt (LFH-610). Das Raster bereit · gebunden · Ausfall zählt seit LFH-609 die
+ * BEWUSST WEGGELASSEN (keine erfundenen Daten, Entscheidung 4): nichts mehr aus den
+ * Datenlücken des Entwurfs. Das Raster bereit · gebunden · Ausfall zählt seit LFH-609 die
  * Einheiten nach ihrem Status; Lagezustand, Kürzel, fester Auftrag und Fortschritt je
  * Abschnitt kommen seit LFH-608 aus dem Abschnitt selbst — und bleiben weg, solange sie
  * dort nicht gepflegt sind.
@@ -253,6 +261,10 @@ export default function UeberblickPage() {
     queryKey: einsatzKeys.etbListe(einsatzId, ETB_ENTSCHEIDUNGEN),
     queryFn: () => listeEtb(einsatzId, ETB_ENTSCHEIDUNGEN),
   });
+  const rueckmeldungenQ = useQuery({
+    queryKey: einsatzKeys.meldungenRueckmeldungen(einsatzId),
+    queryFn: () => holeRueckmeldungen(einsatzId),
+  });
   const pegelQ = useQuery(pegelAbfrage(einsatzId));
 
   const einsatz = einsatzQ.data;
@@ -272,6 +284,9 @@ export default function UeberblickPage() {
   const auftraege = auftraegeQ.data;
   const erinnerungen = erinnerungenQ.data;
   const etb = etbQ.data;
+  // Nur ein erfolgreicher Abruf zählt — ein stehengebliebener Stand nach einem Fehler
+  // (react-query behält `data`) wäre sonst eine stille Aussage über veraltete Daten.
+  const rueckmeldungen = rueckmeldungenQ.isError ? undefined : rueckmeldungenQ.data;
 
   const betroffene = useMemo(() => betroffeneKennzahl(personen ?? [], jetzt), [personen, jetzt]);
   const kraefte = useMemo(
@@ -300,8 +315,9 @@ export default function UeberblickPage() {
         fahrzeuge: fahrzeuge ?? [],
         material: material ?? [],
         auftraege: auftraege ?? [],
+        rueckmeldungen,
       }),
-    [abschnitte, einheiten, personal, fahrzeuge, material, auftraege],
+    [abschnitte, einheiten, personal, fahrzeuge, material, auftraege, rueckmeldungen],
   );
   const entscheidungen = useMemo(() => entscheidungenAuswahl(etb ?? [], jetzt), [etb, jetzt]);
   const marken = useMemo(
@@ -504,6 +520,7 @@ export default function UeberblickPage() {
                   <li key={z.key}>
                     <AbschnittEintrag
                       zeile={z}
+                      zeit={frist}
                       ziel={
                         z.abschnittId != null
                           ? einsatzabschnittePfad(einsatzId, { abschnitt: z.abschnittId })
@@ -740,14 +757,38 @@ export default function UeberblickPage() {
   );
 }
 
+/** Visuell verborgen, für Vorleser da — dieselbe Clip-Bauform wie in `instrument/Status`. */
+const NUR_VORLESER: CSSProperties = {
+  position: 'absolute',
+  width: 1,
+  height: 1,
+  padding: 0,
+  margin: -1,
+  overflow: 'hidden',
+  clip: 'rect(0, 0, 0, 0)',
+  whiteSpace: 'nowrap',
+  border: 0,
+};
+
 /** Eine Abschnittszeile: Lagekante · Name/Kürzel/Leiter/Einheiten/Lagezustand · fester
- *  Auftrag mit Fortschritt (sonst jüngster offener Auftrag) · Stärke und Einheiten je
- *  Statuskategorie (LFH-609). Die ganze Zeile ist der Link auf den Abschnitt. */
-function AbschnittEintrag({ zeile, ziel }: { zeile: AbschnittZeile; ziel: string }) {
+ *  Auftrag mit Fortschritt (sonst jüngster offener Auftrag) und letzte Rückmeldung (LFH-610)
+ *  · Stärke und Einheiten je Statuskategorie (LFH-609). Die ganze Zeile ist der Link auf
+ *  den Abschnitt. */
+function AbschnittEintrag({
+  zeile,
+  ziel,
+  zeit,
+}: {
+  zeile: AbschnittZeile;
+  ziel: string;
+  /** Tagesbewusste Uhrzeit — eine Rückmeldung von gestern ist nicht „14:11". */
+  zeit: (utc: string | null | undefined) => string;
+}) {
   const { token, rollen } = useRollen();
   const [juengster, ...weitere] = zeile.auftraege;
   const { auftragsbilanz } = zeile;
   const verteilung = zeile.einheitenStatus;
+  const rueck = zeile.letzteRueckmeldung;
   const lage = zeile.lagezustand ? abschnittLagezustand[zeile.lagezustand] : null;
   const leitung = [zeile.kurzbezeichnung, zeile.leiter].filter(Boolean).join(' · ');
   // Unterzeile: die Zählung, und wenn der feste Auftrag den Platz hat, der offene
@@ -855,6 +896,40 @@ function AbschnittEintrag({ zeile, ziel }: { zeile: AbschnittZeile; ziel: string
           </span>
         )}
         {unterzeile && <span style={{ ...monoStil(10), color: rollen.schwach }}>{unterzeile}</span>}
+        {/* Nur wenn die Rückmeldungen feststehen (LFH-610) — sonst gar nichts, auch kein
+            Strich. Der verborgene Vorsatz gibt der Zeit im Linknamen ihre Bedeutung; ohne
+            ihn läse ein Vorleser eine nackte Uhrzeit neben dem Auftrag. */}
+        {zeile.rueckmeldungBekannt && (
+          <span
+            data-lfh="abschnitt-rueckmeldung"
+            style={{ display: 'flex', alignItems: 'baseline', gap: 10, minWidth: 0 }}
+          >
+            {rueck ? (
+              <>
+                <span style={{ ...monoStil(10), color: rollen.schwach, flex: '0 0 auto' }}>
+                  <span style={NUR_VORLESER}>Letzte Rückmeldung:</span> {zeit(rueck.ereigniszeit)}
+                </span>
+                {/* Leerzeichen zwischen den Flex-Kindern: unsichtbar, trennt aber im Linknamen
+                    Uhrzeit und Text („14:11 Verbau hält" statt „14:11Verbau hält"). */}{' '}
+                <span
+                  title={rueck.inhalt}
+                  style={{
+                    fontSize: 11,
+                    color: rollen.schwach,
+                    minWidth: 0,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {rueck.inhalt}
+                </span>
+              </>
+            ) : (
+              <span style={{ fontSize: 11, color: rollen.schwach }}>noch keine Rückmeldung</span>
+            )}
+          </span>
+        )}
       </span>
       <span
         style={{

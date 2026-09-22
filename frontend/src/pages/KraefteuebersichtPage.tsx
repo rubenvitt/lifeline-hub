@@ -1,5 +1,6 @@
 import { App as AntApp, Button, Input, Segmented, Space, Tag, theme } from 'antd';
 import { TbFilter, TbPlus } from 'react-icons/tb';
+import dayjs, { type Dayjs } from 'dayjs';
 import { formatUhrzeitMitTag, taktischeDtgVoll } from '../anzeige/format';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { Select } from '../components/Select';
@@ -17,6 +18,13 @@ import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
 import { listeEinsatzMaterial } from '../api/einsatzMaterial';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeAuftraege } from '../api/auftraege';
+import { holeRueckmeldungen } from '../api/meldungen';
+import {
+  MELDEWEG_WORT,
+  RUECKMELDUNG_ROLLE,
+  RUECKMELDUNG_WORT,
+  rueckmeldungJeEinheit,
+} from '../meldungen/rueckmeldung';
 import { ApiError } from '../api/client';
 import { listeFahrzeugStatus } from '../api/fahrzeugStatus';
 import {
@@ -32,10 +40,14 @@ import {
   aufklappbareSchluessel,
   baueMeldebildRaster,
   einheitBand,
-  istProblemZeile,
   fmsWort,
+  istProblemZeile,
+  istRueckmeldungProblem,
+  keineRueckmeldungZelle,
   personalBand,
+  rueckmeldungDerZeile,
   type RasterZeile,
+  type RueckmeldungAnzeige,
 } from '../kraefte/meldebildRaster';
 import Statusband from '../kraefte/Statusband';
 import EinheitZeichen from '../kraefte/EinheitZeichen';
@@ -55,7 +67,8 @@ import './kraefteuebersichtPrint.css';
  * MELDEBILD (Neuentwurf S6 „Statusraster über alle Einheiten", 21.09.2026).
  *
  * Aufbau: Seitenkopf (Titel · Mono-Meta · Abschnitt-Filter · „Einheit") → Statusband
- * (Fahrzeuge je FMS-Status, Personal je Kategorie) → Werkzeugzeile außerhalb des Primitivs
+ * (Einheiten je FMS-Status, Personal je Kategorie, Kachel „keine Rückmeldung") →
+ * Werkzeugzeile außerhalb des Primitivs
  * (Auswahlzeile, weitere Filter, Aufklappen, Lagebericht, Druck) → Raster: EINE Zeile je
  * Einheit, die Mittel als aufklappbares Detail. Die Ableitungen stehen rein in
  * `kraefte/meldebildRaster.ts`.
@@ -69,8 +82,16 @@ import './kraefteuebersichtPrint.css';
  * Der Funkrufname der Einheit ist ihr gepflegter eigener (LFH-614); fehlt er, steht nur
  * der eines EINZIGEN Fahrzeugs, sonst bleibt die Zelle leer.
  *
- * WEGGELASSEN, weil ohne Datenquelle (Entscheidung 4, „keine erfundenen Daten"): die
- * Rückmeldung und die Kachel „keine Rückmeldung" (LFH-610).
+ * RÜCKMELDUNG (LFH-610) — seit es `GET …/meldungen/rueckmeldungen` gibt, ist sie da: die
+ * letzte Spalte zeigt die Uhrzeit der letzten Rückmeldung (neutral), überfällig in
+ * `achtung`, nie zurückgemeldet „—" in `alarm`; beide Problemfälle tönen die Zeile. Die
+ * Kachel „keine Rückmeldung" zählt NUR die nie zurückgemeldeten Einheiten. Solange die
+ * Daten laden, gescheitert oder für die Rolle gesperrt (403) sind, steht nirgends „keine" —
+ * eine leere Menge hieße sonst „niemand hat je zurückgemeldet" und färbte alles rot.
+ *
+ * NICHTS IST MEHR WEGGELASSEN: die beiden Lücken, die hier bis 22.09.2026 unter
+ * „Entscheidung 4, keine erfundenen Daten" standen (Einheitenstatus/„Seit", Rückmeldung),
+ * haben seither je eine echte Datenquelle.
  */
 
 /**
@@ -172,8 +193,21 @@ const MITTEL_KURZ = { fahrzeug: 'Fzg.', person: 'Pers.', material: 'Mtl.' } as c
  * gefiltert wird außerhalb über die Rohlisten, aus denen Zeilen und Verteilungen neu
  * entstehen.
  */
-/** Abrufzustand der Aufträge — `gesperrt` ist 403, kein Defekt. */
-type AuftraegeZustand = 'daten' | 'laden' | 'fehler' | 'gesperrt';
+/** Abrufzustand eines Zusatzabrufs — `gesperrt` ist 403, kein Defekt. */
+type AbrufZustand = 'daten' | 'laden' | 'fehler' | 'gesperrt';
+
+function abrufZustand(q: { error: unknown; isError: boolean; isLoading: boolean }): AbrufZustand {
+  if (q.error instanceof ApiError && q.error.status === 403) return 'gesperrt';
+  if (q.isError) return 'fehler';
+  if (q.isLoading) return 'laden';
+  return 'daten';
+}
+
+/** Was die Rückmeldungsspalte braucht: Abrufzustand und die Anzeige je Zeilenschlüssel. */
+interface RueckmeldungSpalte {
+  zustand: AbrufZustand;
+  jeZeile: ReadonlyMap<string, RueckmeldungAnzeige>;
+}
 
 /** Was die Statusspalte außer der Zeile braucht: Zeitformat und den Handstatus-Weg. */
 interface StatusKontext {
@@ -183,8 +217,9 @@ interface StatusKontext {
 
 function rasterSpalten(
   einsatzId: number,
-  auftraegeZustand: AuftraegeZustand,
+  auftraegeZustand: AbrufZustand,
   kontext: StatusKontext,
+  rueckmeldung: RueckmeldungSpalte,
 ) {
   return spaltenFuer<RasterZeile>()([
     {
@@ -246,6 +281,27 @@ function rasterSpalten(
         <AuftragZelle einsatzId={einsatzId} zeile={z} zustand={auftraegeZustand} />
       ),
     },
+    // Letzte Spalte wie im Entwurf, rechtsbündig. KEIN `abBreite` (Begründung wie beim
+    // Abschnitt: das Meldeblatt auf A4 braucht sie). Für eine Rolle ohne Leserecht auf
+    // „Meldungen" (403) entfällt die Spalte ganz — n leere Zellen sagten nichts, und ein
+    // grauer Strich stünde verwechselbar neben dem roten „—" für „nie zurückgemeldet".
+    ...(rueckmeldung.zustand === 'gesperrt'
+      ? []
+      : [
+          {
+            title: 'Rückmeldung',
+            key: 'rueckmeldung',
+            width: 96,
+            align: 'right' as const,
+            render: (_t: unknown, z: RasterZeile) => (
+              <RueckmeldungZelle
+                zeile={z}
+                zustand={rueckmeldung.zustand}
+                anzeige={rueckmeldung.jeZeile.get(z.key) ?? null}
+              />
+            ),
+          },
+        ]),
   ]);
 }
 
@@ -359,7 +415,7 @@ function AuftragZelle({
 }: {
   einsatzId: number;
   zeile: RasterZeile;
-  zustand: AuftraegeZustand;
+  zustand: AbrufZustand;
 }) {
   const { rollen } = useRollen();
   if (z.art !== 'einheit' || z.einheitId == null) return null;
@@ -409,6 +465,68 @@ function AuftragZelle({
   );
 }
 
+/**
+ * Rückmeldungszelle (Neuentwurf S6): Mono 11, Uhrzeit der letzten Rückmeldung.
+ *
+ * Farbe allein trägt die Aussage nicht (WCAG 1.4.1): „nie" ist ein eigenes Zeichen („—"
+ * statt einer Uhrzeit), und jeder Zustand steht als Wort im zugänglichen Namen und im
+ * Tooltip (`RUECKMELDUNG_WORT`). `achtung` als Textfarbe in Mono 11 folgt
+ * `personen/personenSpalten.tsx` (Lückenzeile).
+ */
+function RueckmeldungZelle({
+  zeile: z,
+  zustand,
+  anzeige,
+}: {
+  zeile: RasterZeile;
+  zustand: AbrufZustand;
+  anzeige: RueckmeldungAnzeige | null;
+}) {
+  const { rollen } = useRollen();
+  const { konventionen } = useAnzeigeKonventionen();
+  if (z.art !== 'einheit' || z.einheitId == null) return null;
+  // Scheitert der Abruf, sagt die Zelle, dass sie nichts weiß — NICHT „keine Rückmeldung".
+  if (zustand === 'fehler') {
+    return (
+      <span title="Rückmeldungen nicht abrufbar" style={{ color: rollen.gedaempft }}>
+        ?
+      </span>
+    );
+  }
+  if (zustand !== 'daten' || !anzeige) return null;
+  const rolle = RUECKMELDUNG_ROLLE[anzeige.zustand];
+  const farbe =
+    rolle === 'alarm' ? rollen.alarm : rolle === 'achtung' ? rollen.achtung : rollen.gedaempft;
+  const wort = RUECKMELDUNG_WORT[anzeige.zustand];
+  const l = anzeige.letzte;
+  const zeit = l ? formatUhrzeitMitTag(l.ereigniszeit, konventionen) : null;
+  const beschreibung = l
+    ? [wort, `letzte ${zeit}`, MELDEWEG_WORT[l.meldeweg], `Meldung Nr. ${l.lfd_nr}`].join(' · ')
+    : wort;
+  return (
+    <span
+      role="img"
+      aria-label={beschreibung}
+      title={beschreibung}
+      data-lfh="meldebild-rueckmeldung"
+      data-zustand={anzeige.zustand}
+      style={{ ...monoStil(11), color: farbe, whiteSpace: 'nowrap' }}
+    >
+      {zeit ?? '—'}
+    </span>
+  );
+}
+
+/** Seitenuhr für das Überfällig-Urteil — schlägt ohne Live-Ereignis um (30-s-Takt). */
+function useJetzt(intervallMs = 30_000): Dayjs {
+  const [jetzt, setJetzt] = useState(() => dayjs());
+  useEffect(() => {
+    const t = window.setInterval(() => setJetzt(dayjs()), intervallMs);
+    return () => window.clearInterval(t);
+  }, [intervallMs]);
+  return jetzt;
+}
+
 export default function KraefteuebersichtPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
@@ -418,6 +536,7 @@ export default function KraefteuebersichtPage() {
   const { token } = theme.useToken();
   const qc = useQueryClient();
   const { konventionen } = useAnzeigeKonventionen();
+  const jetzt = useJetzt();
 
   const [filter, setFilter] = useState<FilterWerte>(LEERER_FILTER);
   const [expandedKeys, setExpandedKeys] = useState<React.Key[]>([]);
@@ -456,6 +575,13 @@ export default function KraefteuebersichtPage() {
   const auftraegeQuery = useQuery({
     queryKey: einsatzKeys.auftraege(einsatzId),
     queryFn: () => listeAuftraege(einsatzId),
+  });
+  // Dritter Zusatzabruf (LFH-610). Liegt unter dem `meldungen`-Präfix und wird vom
+  // Live-Ereignis `meldung` mit invalidiert. 403 heißt „Meldungen für diese Rolle nicht
+  // lesbar" — dann gibt es weder Spalte noch Kachel.
+  const rueckmeldungenQuery = useQuery({
+    queryKey: einsatzKeys.meldungenRueckmeldungen(einsatzId),
+    queryFn: () => holeRueckmeldungen(einsatzId),
   });
 
   const traeger = useMemo(
@@ -499,12 +625,33 @@ export default function KraefteuebersichtPage() {
     [gefiltertRoh, statusKatalogQuery.data, auftraegeQuery.data],
   );
 
+  const rueckmeldungZustand = abrufZustand(rueckmeldungenQuery);
+  const rueckmeldungDaten = rueckmeldungZustand === 'daten' ? rueckmeldungenQuery.data : undefined;
+  /**
+   * Anzeige je Zeilenschlüssel — NUR bei lesbaren Daten. Beim Laden, bei Fehler und bei 403
+   * bleibt die Tabelle leer statt einer leeren Nachschlagetabelle, die jede Einheit zu „nie
+   * zurückgemeldet" machte. Hängt an `jetzt`: das Urteil „überfällig" schlägt mit der Uhr um.
+   */
+  const rueckmeldungJeZeile = useMemo(() => {
+    const m = new Map<string, RueckmeldungAnzeige>();
+    if (!rueckmeldungDaten) return m;
+    const je = rueckmeldungJeEinheit(rueckmeldungDaten);
+    for (const z of raster) {
+      const r = rueckmeldungDerZeile(z, je, jetzt);
+      if (r) m.set(z.key, r);
+    }
+    return m;
+  }, [raster, rueckmeldungDaten, jetzt]);
+
   const band = useMemo(
     () => ({
       einheiten: einheitBand(gefiltertRoh.einheiten),
       personal: personalBand(gefiltertRoh.personal),
+      rueckmeldung: rueckmeldungDaten ? keineRueckmeldungZelle(raster, rueckmeldungDaten) : null,
     }),
-    [gefiltertRoh],
+    // Kein `statusKatalogQuery.data` mehr: `einheitBand` liest den Status seit LFH-609 an
+    // der Einheit selbst, nicht mehr über den Katalog.
+    [gefiltertRoh, raster, rueckmeldungDaten],
   );
 
   /**
@@ -534,6 +681,7 @@ export default function KraefteuebersichtPage() {
     [personalQuery.data, fahrzeugeQuery.data, materialQuery.data],
   );
 
+  const auftraegeZustand = abrufZustand(auftraegeQuery);
   const darfSchreibenFrueh = einsatzQuery.data
     ? darfImEinsatzSchreiben(einsatzQuery.data, benutzer)
     : false;
@@ -581,22 +729,17 @@ export default function KraefteuebersichtPage() {
     () =>
       rasterSpalten(
         einsatzId,
-        auftraegeQuery.error instanceof ApiError && auftraegeQuery.error.status === 403
-          ? 'gesperrt'
-          : auftraegeQuery.isError
-            ? 'fehler'
-            : auftraegeQuery.isLoading
-              ? 'laden'
-              : 'daten',
+        auftraegeZustand,
         { zeit: (utc) => formatUhrzeitMitTag(utc, konventionen), handStatus },
+        { zustand: rueckmeldungZustand, jeZeile: rueckmeldungJeZeile },
       ),
     [
       einsatzId,
-      auftraegeQuery.error,
-      auftraegeQuery.isError,
-      auftraegeQuery.isLoading,
+      auftraegeZustand,
       konventionen,
       handStatus,
+      rueckmeldungZustand,
+      rueckmeldungJeZeile,
     ],
   );
 
@@ -774,6 +917,7 @@ export default function KraefteuebersichtPage() {
                 : null
             }
             personal={band.personal}
+            rueckmeldung={band.rueckmeldung}
             zustand={listenFehler ? 'fehler' : listenLaden ? 'laden' : 'daten'}
           />
         </div>
@@ -878,7 +1022,10 @@ export default function KraefteuebersichtPage() {
 
           PROBLEMZEILE: eine Einheit mit Ausfall trägt `meldebild-problemzeile` (Tönung aus
           `--lfh-problem-zeile`, Regel in `kraefteuebersichtPrint.css`); der zweite Kanal ist
-          die Ausfall-Zahl in der Statusspalte. */}
+          die Ausfall-Zahl in der Statusspalte. Dieselbe Tönung trägt eine Einheit mit
+          überfälliger oder fehlender Rückmeldung (LFH-610, Entwurf `rowBg`) — zweiter Kanal
+          dort Uhrzeit bzw. „—" samt Wort im zugänglichen Namen. KEINE zweite Tönungsfarbe:
+          der Entwurf nimmt für beide Fälle denselben Wert. */}
         <Datensicht
           bezeichnung="Meldebild"
           form="tabelle"
@@ -898,7 +1045,11 @@ export default function KraefteuebersichtPage() {
             </span>
           }
           baum={{ kinder: 'children', aufgeklappt: expandedKeys, onAufgeklappt: setExpandedKeys }}
-          zeilenKlasse={(z) => (istProblemZeile(z) ? 'meldebild-problemzeile' : undefined)}
+          zeilenKlasse={(z) =>
+            istProblemZeile(z) || istRueckmeldungProblem(rueckmeldungJeZeile.get(z.key))
+              ? 'meldebild-problemzeile'
+              : undefined
+          }
           karte={{
             art: 'plan',
             titel: { spalte: 'einheit' },

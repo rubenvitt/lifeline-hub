@@ -74,6 +74,7 @@ export interface OrgEinstellungenUpdate {
   auftrag_nummer_praefix: string | null;
   meldung_bestaetigung_frist_min: number | null;
   auftrag_quittierung_frist_min: number | null;
+  rueckmeldung_frist_min: number | null;
   /** Auto-ETB-Dual-Publish: false schaltet ab; true/null = an. */
   auto_etb_eintraege: boolean | null;
   geocoder_url: string | null;
@@ -106,6 +107,7 @@ export interface EinstellungenUpdate {
   auftrag_nummer_start: number | null;
   meldung_bestaetigung_frist_min: number | null;
   auftrag_quittierung_frist_min: number | null;
+  rueckmeldung_frist_min: number | null;
   /** Auto-ETB-Dual-Publish: false schaltet ab; true/null = an. */
   auto_etb_eintraege: boolean | null;
   /** Aufbewahrungs-Dauer-Politik in Tagen (LFH-135); null/0 = keine Auto-Frist. */
@@ -456,9 +458,15 @@ export interface NeueMeldung {
   /** Stabiler Offline-Idempotenzschlüssel; bei Replay liefert der Server die
    * bereits angelegte Meldung statt einer Dublette. */
   client_id?: string;
+  /** Strukturierter Absender (LFH-610): Einheit ODER Abschnitt dieses Einsatzes, nie beide. */
+  einheit_id?: number;
+  abschnitt_id?: number;
 }
 
 export type LageMeldung = S['LageMeldungAnzeige'];
+/** Letzte Rückmeldung je Einheit bzw. direkt gebundenem Abschnitt (LFH-610). */
+export type Rueckmeldungen = S['RueckmeldungenAnzeige'];
+export type LetzteRueckmeldung = S['LetzteRueckmeldung'];
 
 // ============================== LFH-87 Nachforderung Kräfte/Mittel ==============================
 export type NachforderungPrioritaet = S['Prioritaet'];

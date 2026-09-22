@@ -19,6 +19,10 @@ pub struct MeldungDaten<'a> {
     pub bestaetigung_pflicht: bool,
     /// Absolute Bestätigungsfrist (UTC), nur bei Pflicht gesetzt.
     pub bestaetigung_frist_at: Option<&'a str>,
+    /// Strukturierter Absender (LFH-610); höchstens einer gesetzt, Einsatzzugehörigkeit
+    /// vom Handler geprüft.
+    pub einheit_id: Option<i64>,
+    pub abschnitt_id: Option<i64>,
 }
 
 /// SELECT-Projektion inkl. Bearbeitername (LEFT JOIN benutzer), Herkunfts-Rückverweis
@@ -40,7 +44,8 @@ const ANZEIGE_SELECT: &str =
             qb.anzeigename AS bestaetigt_von_name, \
             (ks.quittiert_at IS NOT NULL) AS ist_bestaetigt, \
             (m.bestaetigung_pflicht = 1 AND ks.quittiert_at IS NULL \
-             AND m.bestaetigung_frist_at IS NOT NULL AND m.bestaetigung_frist_at <= ?) AS ist_ueberfaellig \
+             AND m.bestaetigung_frist_at IS NOT NULL AND m.bestaetigung_frist_at <= ?) AS ist_ueberfaellig, \
+            m.einheit_id, m.abschnitt_id \
      FROM meldung m \
      LEFT JOIN benutzer b ON b.id = m.bearbeiter_id \
      LEFT JOIN kommunikation_status ks ON ks.objekt_typ = 'meldung' AND ks.objekt_id = m.id \
@@ -219,8 +224,8 @@ async fn anlegen_mit_client_id(
         "INSERT INTO meldung \
            (einsatz_id, lfd_nr, absender, empfaenger, meldeweg, inhalt, meldungsart, \
             prioritaet, richtung, ereigniszeit, eingang_at, bestaetigung_pflicht, bestaetigung_frist_at, \
-            erfasst_von_id, client_id) \
-         SELECT ?, COALESCE(MAX(lfd_nr) + 1, ?), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? \
+            erfasst_von_id, client_id, einheit_id, abschnitt_id) \
+         SELECT ?, COALESCE(MAX(lfd_nr) + 1, ?), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? \
          FROM meldung WHERE einsatz_id = ? \
          RETURNING id",
     )
@@ -239,6 +244,8 @@ async fn anlegen_mit_client_id(
     .bind(daten.bestaetigung_frist_at)
     .bind(erfasser_id)
     .bind(client_id)
+    .bind(daten.einheit_id)
+    .bind(daten.abschnitt_id)
     .bind(einsatz_id)
     .fetch_one(&mut *tx)
     .await?;
@@ -563,6 +570,48 @@ pub async fn liste_lage_meldungen(
     .map_err(Into::into)
 }
 
+/// Jüngste an eine Einheit gebundene Meldung je Einheit des Einsatzes (LFH-610).
+/// Gleichstand in `ereigniszeit` entscheidet die höhere id (später erfasst).
+/// `faellig_at` bleibt leer; der Handler setzt es aus der effektiven Frist.
+pub async fn letzte_je_einheit(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+) -> Result<Vec<super::LetzteRueckmeldung>, AppError> {
+    letzte_je_bezug(pool, einsatz_id, "einheit_id").await
+}
+
+/// Jüngste DIREKT an einen Abschnitt gebundene Meldung je Abschnitt (LFH-610).
+pub async fn letzte_je_abschnitt(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+) -> Result<Vec<super::LetzteRueckmeldung>, AppError> {
+    letzte_je_bezug(pool, einsatz_id, "abschnitt_id").await
+}
+
+/// `spalte` ist eine der zwei festen Konstanten oben, kein Nutzereingang.
+async fn letzte_je_bezug(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    spalte: &'static str,
+) -> Result<Vec<super::LetzteRueckmeldung>, AppError> {
+    debug_assert!(matches!(spalte, "einheit_id" | "abschnitt_id"));
+    Ok(
+        sqlx::query_as::<_, super::LetzteRueckmeldung>(sqlx::AssertSqlSafe(format!(
+            "SELECT m.{spalte} AS bezug_id, m.id AS meldung_id, m.lfd_nr, m.ereigniszeit, \
+                    m.inhalt, m.meldeweg \
+             FROM meldung m \
+             WHERE m.einsatz_id = ? AND m.{spalte} IS NOT NULL \
+               AND m.id = (SELECT m2.id FROM meldung m2 \
+                           WHERE m2.{spalte} = m.{spalte} \
+                           ORDER BY m2.ereigniszeit DESC, m2.id DESC LIMIT 1) \
+             ORDER BY m.{spalte}"
+        )))
+        .bind(einsatz_id)
+        .fetch_all(pool)
+        .await?,
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -603,6 +652,8 @@ mod tests {
             eingang_at: eingang,
             bestaetigung_pflicht: false,
             bestaetigung_frist_at: None,
+            einheit_id: None,
+            abschnitt_id: None,
         }
     }
 
@@ -1170,6 +1221,8 @@ mod tests {
         MeldungDaten {
             bestaetigung_pflicht: true,
             bestaetigung_frist_at: Some(frist),
+            einheit_id: None,
+            abschnitt_id: None,
             ..daten(inhalt, eingang, eingang)
         }
     }

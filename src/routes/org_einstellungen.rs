@@ -44,6 +44,7 @@ pub struct OrgEinstellungenUpdate {
     // Default-Fristen.
     pub meldung_bestaetigung_frist_min: Option<i64>,
     pub auftrag_quittierung_frist_min: Option<i64>,
+    pub rueckmeldung_frist_min: Option<i64>,
     /// Auto-ETB-Dual-Publish: `false` schaltet ab (gespeichert als 0), `true`/fehlend = an.
     /// Identisch mit `EinstellungenUpdate.auto_etb_eintraege` — bool auf Draht, i64 intern.
     pub auto_etb_eintraege: Option<bool>,
@@ -120,6 +121,7 @@ pub async fn setzen(
     for f in [
         req.meldung_bestaetigung_frist_min,
         req.auftrag_quittierung_frist_min,
+        req.rueckmeldung_frist_min,
     ] {
         if let Some(v) = f {
             if !ist_gueltige_frist_min(v) {
@@ -164,6 +166,7 @@ pub async fn setzen(
             auftrag_nummer_praefix: auftrag_nummer_praefix.as_deref(),
             meldung_bestaetigung_frist_min: req.meldung_bestaetigung_frist_min,
             auftrag_quittierung_frist_min: req.auftrag_quittierung_frist_min,
+            rueckmeldung_frist_min: req.rueckmeldung_frist_min,
             // bool → 0/1; None bleibt None (= Default an).
             auto_etb_eintraege: req.auto_etb_eintraege.map(i64::from),
             geocoder_url: geocoder_url.as_deref(),

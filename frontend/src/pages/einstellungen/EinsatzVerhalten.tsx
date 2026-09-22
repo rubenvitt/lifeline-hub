@@ -56,6 +56,8 @@ export default function EinsatzVerhalten() {
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: einsatzKeys.einstellungen(einsatzId) });
+      // Die Rückmeldefrist steckt im `faellig_at` der Rückmeldungen (LFH-610).
+      qc.invalidateQueries({ queryKey: einsatzKeys.meldungenRueckmeldungen(einsatzId) });
       message.success('Einstellungen gespeichert');
     },
   });
@@ -179,6 +181,19 @@ export default function EinsatzVerhalten() {
                 max={10080}
                 style={{ width: '100%', maxWidth: 200 }}
                 placeholder="keine"
+              />
+            </Form.Item>
+            <Form.Item
+              label="Rückmeldefrist Einheiten (Minuten)"
+              name="rueckmeldung_frist_min"
+              tooltip="Nach so vielen Minuten ohne neue Meldung gilt eine Einheit im Meldebild als überfällig. Leer = Organisations-Vorgabe, sonst 60."
+              extra={orgHinweisWert(orgDefaults?.rueckmeldung_frist_min, 'Min.')}
+            >
+              <InputNumber
+                min={1}
+                max={10080}
+                style={{ width: '100%', maxWidth: 200 }}
+                placeholder="60"
               />
             </Form.Item>
             <Form.Item
