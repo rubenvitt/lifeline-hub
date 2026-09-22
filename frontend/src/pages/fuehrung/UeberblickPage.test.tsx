@@ -83,7 +83,17 @@ const volleDaten = {
     { id: 1, funkrufname: 'Florian 1', einheit_id: 10, status_kategorie: 'nicht_verfuegbar' },
   ],
   material: [],
-  einheiten: [{ id: 10, name: 'Zug 1', abschnitt_id: 5, ueber_einheit_id: null, soll: null }],
+  einheiten: [
+    {
+      id: 10,
+      name: 'Zug 1',
+      abschnitt_id: 5,
+      ueber_einheit_id: null,
+      soll: null,
+      // Abgeleitet aus dem ausgefallenen Fahrzeug unten (LFH-609).
+      status: { quelle: 'fahrzeuge', kategorie: 'nicht_verfuegbar', verteilung: [] },
+    },
+  ],
   abschnitte: [
     {
       id: 5,
@@ -286,7 +296,7 @@ describe('UeberblickPage', () => {
     expect(within(band()).getAllByRole('link')[2]).toHaveTextContent('hoch');
   });
 
-  it('Abschnittszeile: Leiter, Stärke, Mittelverteilung ehrlich beschriftet, Auftrag, Deeplink', async () => {
+  it('Abschnittszeile: Leiter, Stärke, Einheiten nach Status ehrlich beschriftet, Auftrag, Deeplink', async () => {
     stelleBereit(volleDaten);
     rendern();
     const p = await waitFor(() => paneel('Einsatzabschnitte'));
@@ -297,9 +307,12 @@ describe('UeberblickPage', () => {
     expect(zeile).toHaveTextContent('1/0/1//2');
     expect(zeile).toHaveTextContent('Trupps verlegen');
     // Der zweite Kanal der Zellen muss im Linknamen ankommen, nicht nur optisch.
-    expect(zeile).toHaveAccessibleName(/1\s*bereit/);
+    // LFH-609: gezählt wird die EINHEIT nach ihrem Status (Ausfall), nicht mehr ihre Mittel
+    // (Personal A bereit, B gebunden, Fahrzeug Ausfall ergäbe 1/1/1).
+    expect(zeile).toHaveAccessibleName(/0\s*bereit/);
+    expect(zeile).toHaveAccessibleName(/0\s*gebunden/);
     expect(zeile).toHaveAccessibleName(/1\s*Ausfall/);
-    // Personal A bereit, B gebunden, Fahrzeug Ausfall — je Zelle das Wort für Vorleser.
+    // Je Zelle das Wort für Vorleser.
     const zellen = zeile.querySelectorAll('[data-lfh="status-zelle"]');
     expect(Array.from(zellen).map((z) => z.getAttribute('title'))).toEqual([
       'bereit',
@@ -311,7 +324,7 @@ describe('UeberblickPage', () => {
       'bedien',
       'alarm',
     ]);
-    expect(within(p).getByText(/Mittel \(Fahrzeuge \+ Personal\)/)).toBeInTheDocument();
+    expect(within(p).getByText(/Einheiten nach Status/)).toBeInTheDocument();
     expect(within(p).getByText('1 Abschnitte · 1 Einheiten')).toBeInTheDocument();
   });
 

@@ -76,8 +76,22 @@ const abschnitt = (id: number, name: string, over: Partial<Einsatzabschnitt> = {
     ...over,
   }) as unknown as Einsatzabschnitt;
 
-const einheit = (id: number, abschnitt_id: number | null, ueber_einheit_id: number | null = null) =>
-  ({ id, name: `E${id}`, abschnitt_id, ueber_einheit_id, soll: null }) as unknown as Einheit;
+const einheit = (
+  id: number,
+  abschnitt_id: number | null,
+  ueber_einheit_id: number | null = null,
+  kat: 'verfuegbar' | 'gebunden' | 'nicht_verfuegbar' | null = null,
+) =>
+  ({
+    id,
+    name: `E${id}`,
+    abschnitt_id,
+    ueber_einheit_id,
+    soll: null,
+    status: kat
+      ? { quelle: 'gemischt', kategorie: kat, verteilung: [] }
+      : { quelle: 'ohne', verteilung: [] },
+  }) as unknown as Einheit;
 
 const personal = (
   id: number,
@@ -312,9 +326,9 @@ describe('abschnittZeilen', () => {
     abschnitt(3, 'Nord-Deich', { ueber_abschnitt_id: 1 }),
   ];
   const einheiten = [
-    einheit(10, 1),
-    einheit(11, null, 10),
-    einheit(12, 3),
+    einheit(10, 1, null, 'gebunden'),
+    einheit(11, null, 10, 'verfuegbar'),
+    einheit(12, 3, null, 'nicht_verfuegbar'),
     einheit(20, 2),
     einheit(30, null),
   ];
@@ -358,15 +372,20 @@ describe('abschnittZeilen', () => {
     expect(zeilen.map((z) => z.abschnittId)).toEqual([2, 1, null]);
   });
 
-  it('kumuliert Einheiten, Stärke und Mittel über Unterabschnitte und Untereinheiten', () => {
+  it('kumuliert Einheiten, Stärke und Einheitenstatus über Unterabschnitte und Untereinheiten', () => {
     const nord = zeilen.find((z) => z.abschnittId === 1)!;
     expect(nord.leiter).toBe('Vitt');
     expect(nord.einheiten).toBe(3);
     expect(nord.unterabschnitte).toBe(1);
     expect(nord.staerkeText).toBe('1/0/2//3');
-    expect(nord.mittel).toEqual({ bereit: 1, gebunden: 2, ausfall: 2, ohne: 0 });
+    // LFH-609: gezählt werden EINHEITEN nach der Kategorie ihres Status (auch „gemischt"
+    // mit gemeinsamer Kategorie), nicht mehr die Mittel — die Fahrzeuge und das Personal
+    // oben ergäben 1/2/2.
+    expect(nord.einheitenStatus).toEqual({ bereit: 1, gebunden: 1, ausfall: 1, ohne: 0 });
     const sued = zeilen.find((z) => z.abschnittId === 2)!;
-    expect(sued.mittel).toEqual({ bereit: 0, gebunden: 0, ausfall: 0, ohne: 1 });
+    expect(sued.einheitenStatus).toEqual({ bereit: 0, gebunden: 0, ausfall: 0, ohne: 1 });
+    const ohne = zeilen.find((z) => z.abschnittId === null)!;
+    expect(ohne.einheitenStatus).toEqual({ bereit: 0, gebunden: 0, ausfall: 0, ohne: 1 });
   });
 
   it('Summe der Zeilen ist die Einsatzsumme', () => {

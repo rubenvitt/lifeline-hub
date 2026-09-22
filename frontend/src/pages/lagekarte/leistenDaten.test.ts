@@ -104,6 +104,19 @@ const EINHEIT = {
   abschnitt_id: 4,
   abschnitt_name: 'Nord',
   fuehrer_name: 'Meier',
+  status: {
+    quelle: 'fahrzeuge',
+    status: {
+      status_id: 4,
+      label: '4 – Am Einsatzort',
+      kategorie: 'gebunden',
+      fms_anker: 4,
+      sortier: 40,
+    },
+    kategorie: 'gebunden',
+    seit: '2026-09-21 09:12:00',
+    verteilung: [],
+  },
 } as unknown as Einheit;
 
 const FAHRZEUG = {
@@ -129,28 +142,65 @@ const ROH: AuswahlRoh = {
 const zeit = (s: string | null | undefined) => `Z(${s})`;
 
 describe('auswahlRaster', () => {
-  it('Einheit: Stärke in BOS-Schreibweise, Abschnitt, Führer', () => {
+  it('Einheit: Stärke in BOS-Schreibweise, Status mit Code, Seit, Abschnitt, Führer (LFH-609)', () => {
     const raster = auswahlRaster(marker('einheit', 1), ROH, zeit);
     expect(raster.map((f) => [f.label, f.wert])).toEqual([
       ['Stärke', '1/2/9//12'],
+      ['Status', 'S4 · Am Einsatzort'],
+      ['Seit', 'Z(2026-09-21 09:12:00)'],
       ['Abschnitt', 'Nord'],
       ['Führer', 'Meier'],
     ]);
+    expect(raster[1].rolle).toBe('achtung');
   });
 
-  it('Einheit: KEIN Status und KEIN „Seit" — das DTO hat beides nicht (LFH-609)', () => {
-    const labels = auswahlRaster(marker('einheit', 1), ROH, zeit).map((f) => f.label);
-    expect(labels).not.toContain('Status');
-    expect(labels).not.toContain('Seit');
+  it('Einheit gemischt: kein erfundener Status, Verteilung im Wert, „Seit" bleibt leer', () => {
+    const gemischt = {
+      ...EINHEIT,
+      status: {
+        quelle: 'gemischt',
+        kategorie: 'gebunden',
+        verteilung: [
+          {
+            status: {
+              status_id: 3,
+              label: '3 – Auf Anfahrt',
+              kategorie: 'gebunden',
+              fms_anker: 3,
+              sortier: 30,
+            },
+            anzahl: 1,
+          },
+          {
+            status: {
+              status_id: 4,
+              label: '4 – Am Einsatzort',
+              kategorie: 'gebunden',
+              fms_anker: 4,
+              sortier: 40,
+            },
+            anzahl: 2,
+          },
+        ],
+      },
+    } as unknown as Einheit;
+    const raster = auswahlRaster(marker('einheit', 1), { ...ROH, einheiten: [gemischt] }, zeit);
+    expect(raster.find((f) => f.label === 'Status')?.wert).toBe('gemischt (1× S3 · 2× S4)');
+    expect(raster.find((f) => f.label === 'Seit')?.wert).toBe('—');
   });
 
-  it('Fahrzeug: Status mit Rolle aus der Statuskategorie, Disponiert-Zeit, Einheit', () => {
-    const raster = auswahlRaster(marker('fahrzeug', 7), ROH, zeit);
+  it('Fahrzeug: Status mit Rolle aus der Statuskategorie, Seit, Disponiert-Zeit, Einheit', () => {
+    const mitSeit = { ...FAHRZEUG, status_seit: '2026-09-21 10:05:00' } as EinsatzFahrzeug;
+    const raster = auswahlRaster(marker('fahrzeug', 7), { ...ROH, fahrzeuge: [mitSeit] }, zeit);
     expect(raster[0]).toMatchObject({ label: 'Status', wert: 'am Einsatzort', rolle: 'achtung' });
-    expect(raster[1]).toEqual({ label: 'Disponiert', wert: 'Z(2026-09-21 09:12:00)' });
-    expect(raster[2]).toMatchObject({ label: 'Einheit', wert: 'Zug 1' });
-    // „Seit" hätte einen Zeitpunkt des Statuswechsels gebraucht — den führt das DTO nicht.
-    expect(raster.map((f) => f.label)).not.toContain('Seit');
+    expect(raster[1]).toEqual({ label: 'Seit', wert: 'Z(2026-09-21 10:05:00)' });
+    expect(raster[2]).toEqual({ label: 'Disponiert', wert: 'Z(2026-09-21 09:12:00)' });
+    expect(raster[3]).toMatchObject({ label: 'Einheit', wert: 'Zug 1' });
+  });
+
+  it('Fahrzeug ohne bekannten Wechselzeitpunkt: „Seit" ist „—", nicht die Dispozeit', () => {
+    const raster = auswahlRaster(marker('fahrzeug', 7), ROH, zeit);
+    expect(raster.find((f) => f.label === 'Seit')?.wert).toBe('—');
   });
 
   it('UHS: Abschnittsname über die Abschnittsliste', () => {

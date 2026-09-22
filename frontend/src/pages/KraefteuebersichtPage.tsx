@@ -1,16 +1,17 @@
 import { App as AntApp, Button, Input, Segmented, Space, Tag, theme } from 'antd';
 import { TbFilter, TbPlus } from 'react-icons/tb';
-import { taktischeDtgVoll } from '../anzeige/format';
+import { formatUhrzeitMitTag, taktischeDtgVoll } from '../anzeige/format';
+import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { Select } from '../components/Select';
 import { Link, useNavigate, useParams } from 'react-router';
 import React, { useEffect, useMemo, useState } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { auftraegePfad, einheitenPfad, lageberichtDetailPfad } from '../routing/deeplinks';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
-import { listeEinheiten } from '../api/einheiten';
+import { listeEinheiten, setzeEinheitStatus } from '../api/einheiten';
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
 import { listeEinsatzMaterial } from '../api/einsatzMaterial';
@@ -30,8 +31,9 @@ import {
 import {
   aufklappbareSchluessel,
   baueMeldebildRaster,
-  fahrzeugBand,
+  einheitBand,
   istProblemZeile,
+  fmsWort,
   personalBand,
   type RasterZeile,
 } from '../kraefte/meldebildRaster';
@@ -39,7 +41,9 @@ import Statusband from '../kraefte/Statusband';
 import EinheitZeichen from '../kraefte/EinheitZeichen';
 import { KATEGORIE_WERTE } from '../kraefte/statusAchse';
 import { legeLageberichtAn, aktualisiereLagebericht } from '../api/lageberichte';
-import type { StatusKategorie } from '../api/types';
+import type { FahrzeugStatus, StatusKategorie } from '../api/types';
+import StatusWahl, { type StatusOption } from '../components/StatusWahl';
+import { statusKategorie } from '../theme/statusFarben';
 import Datensicht, { spaltenFuer } from '../components/Datensicht';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import EinsatzSeite from '../components/EinsatzSeite';
@@ -56,11 +60,15 @@ import './kraefteuebersichtPrint.css';
  * Einheit, die Mittel als aufklappbares Detail. Die Ableitungen stehen rein in
  * `kraefte/meldebildRaster.ts`.
  *
- * WEGGELASSEN, weil ohne Datenquelle (Entscheidung 4, „keine erfundenen Daten"): der
- * FMS-Status JE EINHEIT und „Seit" (LFH-609), die Rückmeldung und die Kachel „keine
- * Rückmeldung" (LFH-610), der Funkrufname der Einheit, wo er nicht eindeutig aus genau
- * einem Fahrzeug folgt (LFH-614). Die Einheitenzeile trägt statt eines erfundenen Status
- * die VERDICHTETE Verteilung ihrer Mittel (bereit / gebunden / Ausfall).
+ * EINHEITENSTATUS UND „SEIT" (LFH-609, Entscheidung vom 22.09.2026): der Status einer
+ * Einheit wird serverseitig aus ihren Fahrzeugen ABGELEITET — gemeinsam oder „gemischt"
+ * mit Verteilung —, eine Einheit ohne Fahrzeug führt ihn von Hand (Auslöser nur dort).
+ * Das Statusband zählt die Einheiten je Status wie der Entwurf. Die verdichtete
+ * Verteilung der Mittel (bereit / gebunden / Ausfall) bleibt als eigene Spalte „Mittel".
+ *
+ * WEGGELASSEN, weil ohne Datenquelle (Entscheidung 4, „keine erfundenen Daten"): die
+ * Rückmeldung und die Kachel „keine Rückmeldung" (LFH-610), der Funkrufname der Einheit,
+ * wo er nicht eindeutig aus genau einem Fahrzeug folgt (LFH-614).
  */
 
 /**
@@ -129,6 +137,19 @@ export function meldebildMeta(args: {
   );
 }
 
+/**
+ * Der FMS-Katalog als Menüwerte für den Handstatus. Beschriftung wie am Chip
+ * („S2 · Frei auf Wache"), Ton aus der Kategorie, Mandantenfarbe als Punkt.
+ */
+export function handStatusOptionen(katalog: readonly FahrzeugStatus[]): StatusOption<number>[] {
+  return katalog.map((s) => ({
+    wert: s.id,
+    label: s.fms_anker != null ? `S${s.fms_anker} · ${fmsWort(s.label, s.fms_anker)}` : s.label,
+    darstellung: statusKategorie[s.kategorie],
+    farbe: s.farbe,
+  }));
+}
+
 /** Kurzwort der Mittelart — Satz, kein Piktogramm (Regel „Ein Emoji ist keine Ikone"). */
 const MITTEL_KURZ = { fahrzeug: 'Fzg.', person: 'Pers.', material: 'Mtl.' } as const;
 
@@ -144,7 +165,17 @@ const MITTEL_KURZ = { fahrzeug: 'Fzg.', person: 'Pers.', material: 'Mtl.' } as c
 /** Abrufzustand der Aufträge — `gesperrt` ist 403, kein Defekt. */
 type AuftraegeZustand = 'daten' | 'laden' | 'fehler' | 'gesperrt';
 
-function rasterSpalten(einsatzId: number, auftraegeZustand: AuftraegeZustand) {
+/** Was die Statusspalte außer der Zeile braucht: Zeitformat und den Handstatus-Weg. */
+interface StatusKontext {
+  zeit: (utc: string) => string;
+  handStatus: ((z: RasterZeile) => React.ReactNode) | null;
+}
+
+function rasterSpalten(
+  einsatzId: number,
+  auftraegeZustand: AuftraegeZustand,
+  kontext: StatusKontext,
+) {
   return spaltenFuer<RasterZeile>()([
     {
       title: 'Einheit',
@@ -177,8 +208,26 @@ function rasterSpalten(einsatzId: number, auftraegeZustand: AuftraegeZustand) {
     {
       title: 'Status',
       key: 'status',
-      width: 210,
-      render: (_t, z) => <StatusZellen zeile={z} />,
+      width: 200,
+      render: (_t, z) => <StatusSpalte zeile={z} handStatus={kontext.handStatus} />,
+    },
+    {
+      title: 'Seit',
+      key: 'seit',
+      width: 90,
+      render: (_t, z) =>
+        (z.art === 'einheit' && z.einheitId != null) || z.art === 'fahrzeug' ? (
+          <span style={monoStil(12)}>{z.seit ? kontext.zeit(z.seit) : '—'}</span>
+        ) : null,
+    },
+    // Die Mittelverteilung ist Zusatz zum Einheitenstatus, keine Vergleichsachse — sie
+    // weicht auf schmalem Schirm zuerst (Zähler im Spaltenschalter).
+    {
+      title: 'Mittel',
+      key: 'mittel',
+      width: 190,
+      abBreite: 'xl',
+      render: (_t, z) => <MittelVerteilungZellen zeile={z} />,
     },
     {
       title: 'Auftrag',
@@ -221,16 +270,44 @@ function EinheitZelle({ zeile: z }: { zeile: RasterZeile }) {
 }
 
 /**
- * Statusspalte. Mittel: der echte Einzelstatus als Chip (Fahrzeug mit FMS-Code).
- * Einheit: die verdichtete Verteilung ihrer Fahrzeuge und ihres Personals als drei
+ * Statusspalte. Mittel: der echte Einzelstatus als Chip (Fahrzeug mit FMS-Code). Einheit:
+ * ihr Status (LFH-609) — abgeleitet als Chip, „gemischt" mit der Verteilung als Text
+ * daneben, und bei einer Einheit ohne Fahrzeug mit Schreibrecht der Auslöser für den
+ * Handstatus.
+ */
+function StatusSpalte({
+  zeile: z,
+  handStatus,
+}: {
+  zeile: RasterZeile;
+  handStatus: StatusKontext['handStatus'];
+}) {
+  const { token, rollen } = useRollen();
+  if (z.art === 'einheit' && z.handStatus && handStatus) return <>{handStatus(z)}</>;
+  if (!z.status) return null;
+  const verteilung = 'verteilung' in z.status ? z.status.verteilung : null;
+  return (
+    <span style={{ display: 'inline-flex', flexDirection: 'column', gap: token.marginXXS }}>
+      <StatusChip ton={z.status.ton} code={z.status.code ?? undefined} wort={z.status.wort} />
+      {verteilung && (
+        <span
+          data-lfh="meldebild-statusverteilung"
+          style={{ ...monoStil(11), color: rollen.gedaempft }}
+        >
+          {verteilung}
+        </span>
+      )}
+    </span>
+  );
+}
+
+/**
+ * Die verdichtete Verteilung der Fahrzeuge und des Personals einer Einheit als drei
  * Statuszellen in FESTER Folge, auch bei 0 — sonst fluchten zwei Zeilen nicht. Eine 0
  * bekommt keinen Ton: eine rot getönte Null meldete das Gegenteil dessen, was sie heißt.
  */
-function StatusZellen({ zeile: z }: { zeile: RasterZeile }) {
+function MittelVerteilungZellen({ zeile: z }: { zeile: RasterZeile }) {
   const { rollen } = useRollen();
-  if (z.status) {
-    return <StatusChip ton={z.status.ton} code={z.status.code ?? undefined} wort={z.status.wort} />;
-  }
   const v = z.verteilung;
   if (!v) return null;
   const zellen = [
@@ -329,6 +406,8 @@ export default function KraefteuebersichtPage() {
   const navigate = useNavigate();
   const { message } = AntApp.useApp();
   const { token } = theme.useToken();
+  const qc = useQueryClient();
+  const { konventionen } = useAnzeigeKonventionen();
 
   const [filter, setFilter] = useState<FilterWerte>(LEERER_FILTER);
   const [expandedKeys, setExpandedKeys] = useState<React.Key[]>([]);
@@ -412,11 +491,22 @@ export default function KraefteuebersichtPage() {
 
   const band = useMemo(
     () => ({
-      fahrzeuge: fahrzeugBand(gefiltertRoh.fahrzeuge, statusKatalogQuery.data ?? []),
+      einheiten: einheitBand(gefiltertRoh.einheiten),
       personal: personalBand(gefiltertRoh.personal),
     }),
-    [gefiltertRoh, statusKatalogQuery.data],
+    [gefiltertRoh],
   );
+
+  /**
+   * Handstatus einer Einheit ohne Fahrzeug (LFH-609). Kein optimistisches Update: der
+   * Status der Einheit ist eine Ableitung des Servers, und die Antwort trägt ihn fertig.
+   */
+  const handStatusMutation = useMutation({
+    mutationFn: (v: { eid: number; statusId: number | null }) =>
+      setzeEinheitStatus(einsatzId, v.eid, v.statusId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) }),
+    onError: () => message.error('Status nicht gesetzt'),
+  });
 
   const v = useMemo(
     () => verdichte(gefiltertRoh.personal, gefiltertRoh.fahrzeuge, gefiltertRoh.material),
@@ -427,6 +517,48 @@ export default function KraefteuebersichtPage() {
     () => verdichte(personalQuery.data ?? [], fahrzeugeQuery.data ?? [], materialQuery.data ?? []),
     [personalQuery.data, fahrzeugeQuery.data, materialQuery.data],
   );
+
+  const darfSchreibenFrueh = einsatzQuery.data
+    ? darfImEinsatzSchreiben(einsatzQuery.data, benutzer)
+    : false;
+  const statusOptionen = useMemo(
+    () => handStatusOptionen(statusKatalogQuery.data ?? []),
+    [statusKatalogQuery.data],
+  );
+  const handLaeuft = handStatusMutation.isPending;
+  const handEid = handStatusMutation.variables?.eid;
+  const handMutate = handStatusMutation.mutate;
+  const handStatus = useMemo<StatusKontext['handStatus']>(() => {
+    if (!darfSchreibenFrueh) return null;
+    const HandStatusZelle = (z: RasterZeile) => {
+      const s = z.status;
+      const aktuell =
+        z.einheitStatus?.quelle === 'hand' ? (z.einheitStatus.status?.status_id ?? null) : null;
+      return (
+        <StatusWahl<number>
+          darstellung={
+            s && aktuell != null
+              ? {
+                  ...statusKategorie[z.einheitStatus!.status!.kategorie],
+                  label: s.code ? `${s.code} · ${s.wort}` : s.wort,
+                }
+              : null
+          }
+          aktuell={aktuell}
+          optionen={statusOptionen}
+          kennung={z.bezeichnung}
+          laeuft={handLaeuft && handEid === z.einheitId}
+          gesperrt={handLaeuft}
+          darfSchreiben
+          onWaehlen={(wert) => {
+            if (!handLaeuft && z.einheitId != null)
+              handMutate({ eid: z.einheitId, statusId: wert });
+          }}
+        />
+      );
+    };
+    return HandStatusZelle;
+  }, [darfSchreibenFrueh, statusOptionen, handLaeuft, handEid, handMutate]);
 
   const spalten = useMemo(
     () =>
@@ -439,8 +571,16 @@ export default function KraefteuebersichtPage() {
             : auftraegeQuery.isLoading
               ? 'laden'
               : 'daten',
+        { zeit: (utc) => formatUhrzeitMitTag(utc, konventionen), handStatus },
       ),
-    [einsatzId, auftraegeQuery.error, auftraegeQuery.isError, auftraegeQuery.isLoading],
+    [
+      einsatzId,
+      auftraegeQuery.error,
+      auftraegeQuery.isError,
+      auftraegeQuery.isLoading,
+      konventionen,
+      handStatus,
+    ],
   );
 
   const uebernehmen = useMutation({
@@ -610,7 +750,7 @@ export default function KraefteuebersichtPage() {
 
         <div style={{ marginBlock: token.marginLG }}>
           <Statusband
-            fahrzeuge={band.fahrzeuge}
+            einheiten={band.einheiten}
             personal={band.personal}
             zustand={listenFehler ? 'fehler' : listenLaden ? 'laden' : 'daten'}
           />
