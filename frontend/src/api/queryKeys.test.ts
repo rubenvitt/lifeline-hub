@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { EINSATZ_KEYS, EINSATZ_STREAM_EVENTS, einsatzKeys } from './queryKeys';
+import {
+  EINSATZ_KEYS,
+  EINSATZ_STREAM_EVENTS,
+  einsatzKeys,
+  istRueckmeldungenKey,
+} from './queryKeys';
 
 // LFH-122: Das deklarative Event→Keys-Registry ist die EINE Quelle, aus der
 // useEinsatzLiveStream Listener, Invalidierung und den lagged-Vollabgleich ableitet.
@@ -198,5 +203,19 @@ describe('einsatzKeys (Factory-Output)', () => {
     for (const prefix of Object.values(EINSATZ_KEYS)) {
       expect(abgedeckt, `kein Factory-Eintrag für Prefix ${prefix}`).toContain(prefix);
     }
+  });
+});
+
+describe('istRueckmeldungenKey (LFH-610)', () => {
+  it('trifft die Rückmeldungen jedes Einsatzes, aber keine Meldungsliste', () => {
+    expect(istRueckmeldungenKey(['einsatz-meldungen', 7, 'rueckmeldungen'])).toBe(true);
+    expect(istRueckmeldungenKey(['einsatz-meldungen', 7, 'intern'])).toBe(false);
+    expect(istRueckmeldungenKey(['einsatz-meldungen', 7])).toBe(false);
+    expect(istRueckmeldungenKey(['einsatz-auftraege', 7, 'rueckmeldungen'])).toBe(false);
+    expect(einsatzKeys.meldungenRueckmeldungen(7)).toEqual([
+      'einsatz-meldungen',
+      7,
+      'rueckmeldungen',
+    ]);
   });
 });

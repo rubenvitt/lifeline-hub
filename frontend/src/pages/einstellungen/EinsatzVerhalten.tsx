@@ -56,6 +56,8 @@ export default function EinsatzVerhalten() {
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: einsatzKeys.einstellungen(einsatzId) });
+      // Die Rückmeldefrist steckt im `faellig_at` der Rückmeldungen (LFH-610).
+      qc.invalidateQueries({ queryKey: einsatzKeys.meldungenRueckmeldungen(einsatzId) });
       message.success('Einstellungen gespeichert');
     },
   });

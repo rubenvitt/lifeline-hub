@@ -123,49 +123,49 @@ pub struct NeueMeldung {
     pub abschnitt_id: Option<i64>,
 }
 
-/// Prüft den strukturierten Absender (LFH-610). Beide gesetzt oder ein Bezug aus einem
-/// anderen Einsatz ist ein Zusammenhangsfehler (422), kein unbrauchbares Feld: jede id ist
-/// für sich eine gültige Zahl, erst ihre Kombination bzw. ihr Einsatz verbietet die Anlage.
-async fn absender_bezug_pruefen(
+/// Löst den strukturierten Absender auf (LFH-610). Beide gesetzt ist ein
+/// Zusammenhangsfehler (422): jede id ist für sich eine gültige Zahl, erst die Kombination
+/// verbietet die Anlage.
+///
+/// Eine id, die (nicht mehr) zu diesem Einsatz gehört, wird dagegen zu „ungebunden"
+/// herabgestuft, nicht abgelehnt. Der Bezug ist eine Zusatzangabe, der Absender steht als
+/// Freitext ohnehin in der Meldung — und der typische Fall ist kein Fehler des Erfassers:
+/// eine offline erfasste Meldung, deren Einheit bis zum Sync aufgelöst wurde, oder ein über
+/// „Werte behalten" gemerkter Bezug. Eine 422 schöbe dort eine beweissichernde Meldung samt
+/// ETB-Eintrag in die abgelehnten Aktionen. Dasselbe tut `ON DELETE SET NULL` für die
+/// Bestandsmeldungen. Eine fremde id verrät dabei nichts: gespeichert wird NULL.
+async fn absender_bezug_aufloesen(
     state: &AppState,
     einsatz_id: i64,
     einheit_id: Option<i64>,
     abschnitt_id: Option<i64>,
-) -> Result<(), AppError> {
+) -> Result<(Option<i64>, Option<i64>), AppError> {
     if einheit_id.is_some() && abschnitt_id.is_some() {
         return Err(AppError::UnprocessableEntity(
             "Eine Meldung kommt entweder von einer Einheit oder von einem Abschnitt".into(),
         ));
     }
-    if let Some(id) = einheit_id {
-        let gefunden: Option<i64> = sqlx::query_scalar(
-            "SELECT id FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?",
-        )
-        .bind(id)
-        .bind(einsatz_id)
-        .fetch_optional(&state.pool)
-        .await?;
-        if gefunden.is_none() {
-            return Err(AppError::UnprocessableEntity(
-                "Einheit gehört nicht zu diesem Einsatz".into(),
-            ));
+    let einheit_id = match einheit_id {
+        Some(id) => {
+            sqlx::query_scalar("SELECT id FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?")
+                .bind(id)
+                .bind(einsatz_id)
+                .fetch_optional(&state.pool)
+                .await?
         }
-    }
-    if let Some(id) = abschnitt_id {
-        let gefunden: Option<i64> = sqlx::query_scalar(
-            "SELECT id FROM einsatzabschnitt WHERE id = ? AND einsatz_id = ?",
-        )
-        .bind(id)
-        .bind(einsatz_id)
-        .fetch_optional(&state.pool)
-        .await?;
-        if gefunden.is_none() {
-            return Err(AppError::UnprocessableEntity(
-                "Abschnitt gehört nicht zu diesem Einsatz".into(),
-            ));
+        None => None,
+    };
+    let abschnitt_id = match abschnitt_id {
+        Some(id) => {
+            sqlx::query_scalar("SELECT id FROM einsatzabschnitt WHERE id = ? AND einsatz_id = ?")
+                .bind(id)
+                .bind(einsatz_id)
+                .fetch_optional(&state.pool)
+                .await?
         }
-    }
-    Ok(())
+        None => None,
+    };
+    Ok((einheit_id, abschnitt_id))
 }
 
 /// Stellt die offene Auto-Frist-Erinnerung ausnahmslos aus dem persistierten
@@ -282,8 +282,8 @@ pub async fn anlegen(
     if !crate::meldung::richtung_gueltig(richtung) {
         return Err(AppError::Validation("Ungültige Richtung".into()));
     }
-    let (einheit_id, abschnitt_id) = (req.einheit_id, req.abschnitt_id);
-    absender_bezug_pruefen(&state, einsatz_id, einheit_id, abschnitt_id).await?;
+    let (einheit_id, abschnitt_id) =
+        absender_bezug_aufloesen(&state, einsatz_id, req.einheit_id, req.abschnitt_id).await?;
     // Ereigniszeit normalisieren (ISO-8601/SQLite → SQLite-Format), wie ETB.
     let ereigniszeit = crate::etb::normalisiere_zeit(req.ereigniszeit.trim())?;
     let eingang = jetzt();

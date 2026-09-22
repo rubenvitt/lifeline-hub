@@ -121,7 +121,7 @@ async fn einheit_und_abschnitt_zugleich_ist_422() {
 }
 
 #[tokio::test]
-async fn bezug_aus_fremdem_einsatz_ist_422() {
+async fn unbekannter_oder_fremder_bezug_wird_herabgestuft_statt_abgelehnt() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e1 = einsatz_anlegen(&app, &admin).await;
@@ -129,14 +129,41 @@ async fn bezug_aus_fremdem_einsatz_ist_422() {
     let fremde_einheit = einheit_bilden(&app, &admin, e2, "Fremd").await;
     let fremder_abschnitt = abschnitt_anlegen(&app, &admin, e2, "Fremd").await;
 
+    // Offline-Fall: die Einheit wurde bis zum Sync aufgelöst — die Meldung muss trotzdem
+    // entstehen (sonst landet sie in den abgelehnten Aktionen), nur ohne Bezug.
+    let aufgeloest = einheit_bilden(&app, &admin, e1, "Weg").await;
+    let (s, _) = anfrage(
+        &app,
+        "DELETE",
+        &format!("/api/einsaetze/{e1}/einheiten/{aufgeloest}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+
     for bezug in [
+        json!({ "einheit_id": aufgeloest }),
         json!({ "einheit_id": fremde_einheit }),
         json!({ "abschnitt_id": fremder_abschnitt }),
         json!({ "einheit_id": 999_999 }),
     ] {
-        let (s, _) = melden(&app, &admin, e1, "x", "2026-09-22 14:00:00", bezug.clone()).await;
-        assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{bezug}");
+        let (s, m) = melden(&app, &admin, e1, "x", "2026-09-22 14:00:00", bezug.clone()).await;
+        assert_eq!(s, StatusCode::CREATED, "{bezug}");
+        let o = m.as_object().unwrap();
+        assert!(!o.contains_key("einheit_id"), "{bezug}");
+        assert!(!o.contains_key("abschnitt_id"), "{bezug}");
+        assert_eq!(
+            m["absender"], "Florian Nord 1",
+            "Freitext trägt den Namen weiter"
+        );
     }
+    let r = rueckmeldungen(&app, &admin, e2).await;
+    assert!(
+        r["einheiten"].as_array().unwrap().is_empty()
+            && r["abschnitte"].as_array().unwrap().is_empty(),
+        "nichts landet im fremden Einsatz"
+    );
 }
 
 #[tokio::test]
@@ -167,10 +194,34 @@ async fn letzte_rueckmeldung_je_einheit_nach_ereigniszeit() {
     let abschnitt = abschnitt_anlegen(&app, &admin, e, "Nord").await;
 
     let bez_a = json!({ "einheit_id": a });
-    melden(&app, &admin, e, "A früh", "2026-09-22 13:00:00", bez_a.clone()).await;
-    melden(&app, &admin, e, "A spät", "2026-09-22 14:11:00", bez_a.clone()).await;
+    melden(
+        &app,
+        &admin,
+        e,
+        "A früh",
+        "2026-09-22 13:00:00",
+        bez_a.clone(),
+    )
+    .await;
+    melden(
+        &app,
+        &admin,
+        e,
+        "A spät",
+        "2026-09-22 14:11:00",
+        bez_a.clone(),
+    )
+    .await;
     // Nachgetragen: später ERFASST, aber mit älterer Ereigniszeit — zählt nicht als letzte.
-    melden(&app, &admin, e, "A nachgetragen", "2026-09-22 12:00:00", bez_a).await;
+    melden(
+        &app,
+        &admin,
+        e,
+        "A nachgetragen",
+        "2026-09-22 12:00:00",
+        bez_a,
+    )
+    .await;
     melden(
         &app,
         &admin,
@@ -283,7 +334,11 @@ async fn aufgeloeste_einheit_laesst_meldung_stehen_und_verschwindet_aus_rueckmel
         None,
     )
     .await;
-    assert_eq!(s, StatusCode::NO_CONTENT, "Auflösen darf nicht am FK scheitern");
+    assert_eq!(
+        s,
+        StatusCode::NO_CONTENT,
+        "Auflösen darf nicht am FK scheitern"
+    );
 
     let (_, liste) = anfrage(
         &app,

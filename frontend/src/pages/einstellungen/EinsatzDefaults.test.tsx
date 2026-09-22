@@ -1,3 +1,4 @@
+import { QueryClient } from '@tanstack/react-query';
 import { screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
@@ -94,6 +95,29 @@ describe('EinsatzDefaults', () => {
         auto_etb_eintraege: false,
       }),
     );
+  });
+
+  it('invalidiert nach dem Speichern die Rückmeldungen aller Einsätze, sonst nichts (LFH-610)', async () => {
+    // `new QueryClient()` statt `neuerQueryClient()`: dessen gcTime 0 räumte die
+    // unbeobachteten Einträge beim ersten await weg, die Aussage würde trivial.
+    const client = new QueryClient();
+    // Literale Keys, nicht die Factory — sonst prüfte der Test die Factory gegen sich selbst.
+    client.setQueryData(['einsatz-meldungen', 7, 'rueckmeldungen'], { frist_min: 60 });
+    client.setQueryData(['einsatz-meldungen', 8, 'rueckmeldungen'], { frist_min: 60 });
+    client.setQueryData(['einsatz-meldungen', 7, 'intern'], []);
+    renderMitProviders(<EinsatzDefaults />, { client });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() =>
+      expect(client.getQueryState(['einsatz-meldungen', 7, 'rueckmeldungen'])?.isInvalidated).toBe(
+        true,
+      ),
+    );
+    expect(client.getQueryState(['einsatz-meldungen', 8, 'rueckmeldungen'])?.isInvalidated).toBe(
+      true,
+    );
+    expect(client.getQueryState(['einsatz-meldungen', 7, 'intern'])?.isInvalidated).toBe(false);
   });
 
   it('geleertes Präfix-Feld geht als null raus (nicht "") — trim/leer→null-Semantik', async () => {

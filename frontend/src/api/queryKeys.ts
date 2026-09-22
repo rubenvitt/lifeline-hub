@@ -186,6 +186,18 @@ export const NICHT_LIVE_KEYS = [
  * Konvention: 2-elementige Funktionen `[prefix, einsatzId]` sind zugleich der Invalidierungs-
  * Prefix (TanStack matcht per Prefix); Detail-/Filter-Varianten hängen weitere Elemente an.
  */
+/** Sub-Key der Rückmeldungen unter dem `meldungen`-Prefix (LFH-610). */
+const RUECKMELDUNGEN_SUBKEY = 'rueckmeldungen';
+
+/**
+ * Trifft die Rückmeldungen ALLER Einsätze (LFH-610). Die Fälligkeit rechnet der Server
+ * aus der Rückmeldefrist; ändert eine Org-Vorgabe sie, gilt das für jeden Einsatz ohne
+ * eigene Frist — und kein Live-Ereignis sagt es (`einstellungen` ist nicht live).
+ */
+export function istRueckmeldungenKey(key: readonly unknown[]): boolean {
+  return key[0] === EINSATZ_KEYS.meldungen && key[2] === RUECKMELDUNGEN_SUBKEY;
+}
+
 export const einsatzKeys = {
   // Einsatz-Stammdaten
   // einsatzId nullbar: das Command-Palette lädt den Einsatz nur wenn im Einsatzkontext
@@ -273,7 +285,7 @@ export const einsatzKeys = {
   /** Letzte Rückmeldung je Einheit/Abschnitt (LFH-610). Liegt unter dem `meldungen`-Prefix:
    *  jede Meldungs-Invalidierung (Live-Ereignis `meldung`, eigene Anlage) trifft sie mit. */
   meldungenRueckmeldungen: (einsatzId: number) =>
-    [EINSATZ_KEYS.meldungen, einsatzId, 'rueckmeldungen'] as const,
+    [EINSATZ_KEYS.meldungen, einsatzId, RUECKMELDUNGEN_SUBKEY] as const,
   lagemeldungen: (einsatzId: number) => [EINSATZ_KEYS.lagemeldungen, einsatzId] as const,
   auftraege: (einsatzId: number) => [EINSATZ_KEYS.auftraege, einsatzId] as const,
   auftraegeListe: (einsatzId: number, richtung: string, empfaenger: string) =>

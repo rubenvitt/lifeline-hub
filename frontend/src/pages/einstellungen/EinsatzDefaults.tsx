@@ -12,7 +12,7 @@ import {
 import AdminPage from '../../components/AdminPage';
 import { SeitenHinweise, SpeicherFehler } from '../../components/SpeicherHinweis';
 import { useAuth } from '../../auth/AuthContext';
-import { globalKeys } from '../../api/queryKeys';
+import { globalKeys, istRueckmeldungenKey } from '../../api/queryKeys';
 import { speicherLeisteStil } from '../../components/speicherLeiste';
 import {
   type FormWerteEinsatz,
@@ -55,6 +55,8 @@ export default function EinsatzDefaults() {
       speichereOrgEinstellungen(felder),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: globalKeys.orgEinstellungen() });
+      // Die Org-Rückmeldefrist steckt im `faellig_at` jedes Einsatzes ohne eigene (LFH-610).
+      qc.invalidateQueries({ predicate: (q) => istRueckmeldungenKey(q.queryKey) });
       setHatFassung(false);
       message.success('Einstellungen gespeichert');
     },
