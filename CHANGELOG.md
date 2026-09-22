@@ -1,3 +1,13 @@
+## [1.0.0-alpha.29](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.28...v1.0.0-alpha.29) (2026-09-22)
+
+### Features
+
+* **navigation:** Sprungmarken Entscheidungen, Patienten, Vermisste im Modulpanel (LFH-620) ([4e28481](https://github.com/rubenvitt/lifeline-hub/commit/4e284812c7ed0b977ea429d6dc5699c4c19190a5))
+
+### Bug Fixes
+
+* **navigation:** Sprungmarke mit Ikone statt Zeichen, ES2020-kompatibler Test (LFH-620) ([8066f8d](https://github.com/rubenvitt/lifeline-hub/commit/8066f8dd0d71d95927b7f7b4ccef05be70a4b5d9))
+
 ## [1.0.0-alpha.28](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.27...v1.0.0-alpha.28) (2026-09-22)
 
 ### Features
