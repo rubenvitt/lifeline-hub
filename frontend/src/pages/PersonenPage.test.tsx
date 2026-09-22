@@ -1557,9 +1557,7 @@ describe('PersonenPage — Sichtvorgabe aus der URL (LFH-620)', () => {
     // und die Lücke ist gezählt — nur die ANGETROFFENE, die vermisste hat keinen Fundort.
     expect(await screen.findByText('Keine Person mit Koordinate')).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: 'Karte' })).toBeChecked();
-    expect(
-      screen.getByText('1 Person ohne Koordinate — nicht auf der Karte'),
-    ).toBeInTheDocument();
+    expect(screen.getByText('1 Person ohne Koordinate — nicht auf der Karte')).toBeInTheDocument();
     await vi.waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
   });
 
