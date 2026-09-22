@@ -41,13 +41,14 @@
 - Kein neues punktuelles `size=` an interaktiven antd-Elementen, kein Emoji als Ikone, keine Inline-Query-Keys, keine Inline-Einsatz-Pfade.
 - Gate-Kommandos ohne `| tail`. `rtk` wird im Hauptloop verwendet, in Subagenten-/Hintergrund-Shells fehlt es: dort die Befehle ohne `rtk` ausführen.
 - pnpm: `mise exec pnpm@11.10.0 -- pnpm -C /Users/rubeen/dev/personal/lifeline-hub/.claude/worktrees/dev-clickup-lfh-78-0056aa/frontend <cmd>` (immer absoluter `-C`-Pfad).
-- Migrationsnummer `0105` **unmittelbar vor dem Merge** erneut gegen `origin/alpha` prüfen (`git fetch && git ls-tree origin/alpha migrations/ | tail -3`).
+- Migrationsnummer `0114` **unmittelbar vor dem Merge** erneut gegen `origin/alpha` prüfen (`git fetch && git ls-tree origin/alpha migrations/ | tail -3`).
+  Nachtrag: ursprünglich `0105`, nach zwei Rebases auf `origin/alpha` zweimal umnummeriert (`0105` → `0107` → `0114`).
 
 ## Datei-Landkarte
 
 | Datei | Verantwortung | Task |
 |---|---|---|
-| `migrations/0105_einsatz_dokument.sql` | Tabelle + Index | 1 |
+| `migrations/0114_einsatz_dokument.sql` | Tabelle + Index | 1 |
 | `src/anhang/repo.rs` | `LinkerStand`, `linker_stand`, Sweep mit zweitem Linker, `anlegen_tx` | 1 |
 | `src/anhang/mod.rs` | `ERLAUBTE_MIME_DOKUMENT`, `ermittle_mime_fuer(…)` | 2 |
 | `src/routes/anhang.rs` | Download-/Delete-Sperre für Dokument-Anhänge | 1 |
@@ -80,7 +81,7 @@
 Der Datenverlustpfad kommt zuerst. Ohne diesen Task löscht der Purge-Scheduler jedes Dokument 24 h nach dem Upload, still und ohne roten Test.
 
 **Files:**
-- Create: `migrations/0105_einsatz_dokument.sql`
+- Create: `migrations/0114_einsatz_dokument.sql`
 - Modify: `src/anhang/repo.rs` (Sweep `:135-160`, neue `LinkerStand`/`linker_stand`/`anlegen_tx`, Tests)
 - Modify: `src/chat/repo.rs:394-420` (Funktion entfernen), `:276-288` (Link-Guard)
 - Modify: `src/routes/anhang.rs:69-129` (Download), `:131-141` (Delete)
@@ -96,7 +97,7 @@ Der Datenverlustpfad kommt zuerst. Ohne diesen Task löscht der Purge-Scheduler 
 
 - [ ] **Step 1: Migration schreiben**
 
-`migrations/0105_einsatz_dokument.sql`:
+`migrations/0114_einsatz_dokument.sql`:
 
 ```sql
 -- LFH-632: Dokumentenablage je Einsatz. Die Bytes liegen in `anhang` (BLOB, AV-Scan,
@@ -445,7 +446,7 @@ Die Zeile `AND NOT EXISTS (SELECT 1 FROM einsatz_dokument …)` vorübergehend e
 
 ```bash
 cargo fmt --all
-rtk git add migrations/0105_einsatz_dokument.sql src/anhang/repo.rs src/chat/repo.rs src/routes/anhang.rs src/einsatz/schwaerzung_registry.rs tests/anhang.rs tests/chat.rs
+rtk git add migrations/0114_einsatz_dokument.sql src/anhang/repo.rs src/chat/repo.rs src/routes/anhang.rs src/einsatz/schwaerzung_registry.rs tests/anhang.rs tests/chat.rs
 rtk git commit -m "feat(anhang): zweiter Linker einsatz_dokument in Sweep, Download-Sperre und Chat-Guard (LFH-632)"
 ```
 
@@ -1520,7 +1521,7 @@ Expected: alle Schritte grün, e2e inklusive. Ist etwas rot: die Ursache beheben
 rtk git fetch origin && git ls-tree --name-only origin/alpha migrations/ | tail -3
 ```
 
-Belegt `alpha` inzwischen `0105`: rebasen, die Migration umbenennen und das Gate wiederholen.
+Belegt `alpha` inzwischen `0114`: rebasen, die Migration umbenennen und das Gate wiederholen.
 
 - [ ] **Step 5: Commit**
 
