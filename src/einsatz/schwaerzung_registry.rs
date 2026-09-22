@@ -940,6 +940,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("meldeweg", G_ETB),
             retain("veranlassung", G_ETB),
             retain("erfasser_id", G_FK),
+            // Funktionskürzel („S2", „EL") aus Sachgebiet/Rolle, keine Person (LFH-615).
+            // Bewusst NICHT aus `einsatz_mitgliedschaft.fuehrungsstelle` (Scrub) abgeleitet.
+            retain("erfasser_funktion", G_ETB),
             retain("ereigniszeit", G_ZEIT),
             retain("received_at", G_ZEIT),
             retain("erfasst_lokal_at", G_ZEIT),

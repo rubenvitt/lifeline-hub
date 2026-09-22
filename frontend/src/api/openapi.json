@@ -1659,6 +1659,13 @@
             ],
             "description": "Eigene Führungsstelle in diesem Einsatz; nur Anfangsbelegung für neue ETB-Erfassung."
           },
+          "meine_funktion": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Funktion des abfragenden Benutzers in diesem Einsatz als Klartext für den Kopf\n(„S2 Lage\", „S2/S3\", „Einsatzleitung\"; LFH-615). Abgeleitet aus `meine_sachgebiete`\nund `meine_rolle` über `funktion::ableiten` — fehlt, wenn keine Funktion folgt."
+          },
           "meine_rolle": {
             "oneOf": [
               {
@@ -2677,6 +2684,13 @@
           },
           "ereigniszeit": {
             "type": "string"
+          },
+          "erfasser_funktion": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Funktion des Erfassers beim Anlegen („S2\", „S2/S3\", „EL\"; LFH-615) — Snapshot, keine\nAbleitung beim Lesen. Fehlt, wenn keine Funktion ableitbar war oder der Eintrag älter\nals die Spalte ist."
           },
           "erfasser_id": {
             "type": "integer",

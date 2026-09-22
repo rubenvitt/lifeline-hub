@@ -576,6 +576,12 @@ export interface components {
             leitstellen_nr?: string | null;
             /** @description Eigene Führungsstelle in diesem Einsatz; nur Anfangsbelegung für neue ETB-Erfassung. */
             meine_fuehrungsstelle?: string | null;
+            /**
+             * @description Funktion des abfragenden Benutzers in diesem Einsatz als Klartext für den Kopf
+             *     („S2 Lage", „S2/S3", „Einsatzleitung"; LFH-615). Abgeleitet aus `meine_sachgebiete`
+             *     und `meine_rolle` über `funktion::ableiten` — fehlt, wenn keine Funktion folgt.
+             */
+            meine_funktion?: string | null;
             meine_rolle?: null | components["schemas"]["EinsatzRolle"];
             /**
              * @description Sachgebiete, die der mit dem abfragenden Benutzer verknüpfte Personaldatensatz in
@@ -920,6 +926,12 @@ export interface components {
             /** Format: int64 */
             berichtigt_eintrag_id?: number | null;
             ereigniszeit: string;
+            /**
+             * @description Funktion des Erfassers beim Anlegen („S2", „S2/S3", „EL"; LFH-615) — Snapshot, keine
+             *     Ableitung beim Lesen. Fehlt, wenn keine Funktion ableitbar war oder der Eintrag älter
+             *     als die Spalte ist.
+             */
+            erfasser_funktion?: string | null;
             /** Format: int64 */
             erfasser_id: number;
             erfasser_name: string;

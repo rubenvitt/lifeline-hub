@@ -1,0 +1,14 @@
+-- Funktion des Erfassers am ETB-Eintrag (LFH-615): „Vitt · S2", „Brandt · EL" (Neuentwurf S4).
+--
+-- SNAPSHOT, keine Ableitung beim Lesen: die Funktion wird beim Anlegen in derselben
+-- Transaktion festgeschrieben (`etb::repo::anlegen_tx`, Ableitung `einsatz::funktion`). Eine
+-- spätere Umbesetzung darf einen bereits geschriebenen Eintrag nicht umdeuten — das ETB ist
+-- der Nachweis der Tätigkeit der Einsatzleitung (FwDV 100 Anlage 5).
+--
+-- NULL heißt: keine Funktion ableitbar ODER Eintrag älter als diese Spalte. Kein Backfill —
+-- eine nachträglich eingesetzte Funktion wäre eine erfundene Rückdatierung.
+--
+-- Die LFH-46-Spec führt „keine Migration an etb_eintrag" unter ihren Nicht-Zielen; das war
+-- der Zuschnitt jenes Tickets, kein Verbot. Nummer 0110 statt 0104: um 0104 konkurrieren
+-- zur Zeit mehrere parallele Branches.
+ALTER TABLE etb_eintrag ADD COLUMN erfasser_funktion TEXT;

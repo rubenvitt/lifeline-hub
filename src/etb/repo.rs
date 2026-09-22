@@ -32,11 +32,15 @@ pub async fn anlegen_tx(
     startwert: i64,
     daten: EintragDaten<'_>,
 ) -> Result<i64, AppError> {
+    // Funktions-Snapshot (LFH-615) HIER und nicht beim Aufrufer: jeder Kopplungspfad
+    // (Meldung, Auftrag, Befehl, Stab …) läuft durch diese Funktion und kann ihn nicht
+    // vergessen. Der Client liefert ihn nie — ein Nachweis, den der Absender setzt, wäre keiner.
+    let funktion = crate::einsatz::funktion::kurz_fuer(&mut *conn, einsatz_id, erfasser_id).await?;
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO etb_eintrag \
             (einsatz_id, lfd_nr, typ, inhalt, von, an, meldeweg, veranlassung, \
-             erfasser_id, ereigniszeit, erfasst_lokal_at, berichtigt_eintrag_id) \
-         SELECT ?, COALESCE(MAX(lfd_nr) + 1, ?), ?, ?, ?, ?, ?, ?, ?, \
+             erfasser_id, erfasser_funktion, ereigniszeit, erfasst_lokal_at, berichtigt_eintrag_id) \
+         SELECT ?, COALESCE(MAX(lfd_nr) + 1, ?), ?, ?, ?, ?, ?, ?, ?, ?, \
                 COALESCE(?, datetime('now')), ?, ? \
          FROM etb_eintrag WHERE einsatz_id = ? \
          RETURNING id",
@@ -50,6 +54,7 @@ pub async fn anlegen_tx(
     .bind(daten.meldeweg)
     .bind(daten.veranlassung)
     .bind(erfasser_id)
+    .bind(funktion)
     .bind(daten.ereigniszeit)
     .bind(daten.erfasst_lokal_at)
     .bind(daten.berichtigt_eintrag_id)
@@ -110,7 +115,21 @@ pub async fn anlegen_idempotent(
         .await?
         .etb_startwert();
     let mut conn = pool.acquire().await?;
-    match insert_mit_client_id(&mut conn, einsatz_id, erfasser_id, startwert, cid, &daten).await {
+    // Snapshot wie in `anlegen_tx` (LFH-615). Außerhalb des INSERTs, weil der Race-Zweig unten
+    // den rohen sqlx-Fehler braucht; ein Replay liefert ohnehin den Originaleintrag samt
+    // Original-Snapshot zurück.
+    let funktion = crate::einsatz::funktion::kurz_fuer(&mut conn, einsatz_id, erfasser_id).await?;
+    match insert_mit_client_id(
+        &mut conn,
+        einsatz_id,
+        erfasser_id,
+        funktion.as_deref(),
+        startwert,
+        cid,
+        &daten,
+    )
+    .await
+    {
         Ok(id) => {
             drop(conn);
             Ok((laden(pool, id).await?, true))
@@ -162,6 +181,7 @@ async fn insert_mit_client_id(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     erfasser_id: i64,
+    erfasser_funktion: Option<&str>,
     startwert: i64,
     client_id: &str,
     daten: &EintragDaten<'_>,
@@ -169,8 +189,9 @@ async fn insert_mit_client_id(
     sqlx::query_scalar(
         "INSERT INTO etb_eintrag \
             (einsatz_id, lfd_nr, typ, inhalt, von, an, meldeweg, veranlassung, \
-             erfasser_id, ereigniszeit, erfasst_lokal_at, berichtigt_eintrag_id, client_id) \
-         SELECT ?, COALESCE(MAX(lfd_nr) + 1, ?), ?, ?, ?, ?, ?, ?, ?, \
+             erfasser_id, erfasser_funktion, ereigniszeit, erfasst_lokal_at, \
+             berichtigt_eintrag_id, client_id) \
+         SELECT ?, COALESCE(MAX(lfd_nr) + 1, ?), ?, ?, ?, ?, ?, ?, ?, ?, \
                 COALESCE(?, datetime('now')), ?, ?, ? \
          FROM etb_eintrag WHERE einsatz_id = ? \
          RETURNING id",
@@ -184,6 +205,7 @@ async fn insert_mit_client_id(
     .bind(daten.meldeweg)
     .bind(daten.veranlassung)
     .bind(erfasser_id)
+    .bind(erfasser_funktion)
     .bind(daten.ereigniszeit)
     .bind(daten.erfasst_lokal_at)
     .bind(daten.berichtigt_eintrag_id)
@@ -198,7 +220,7 @@ async fn insert_mit_client_id(
 pub async fn laden(pool: &SqlitePool, id: i64) -> Result<EtbEintragAnzeige, AppError> {
     sqlx::query_as::<_, EtbEintragAnzeige>(
         "SELECT e.id, e.lfd_nr, e.typ, e.inhalt, e.von, e.an, e.meldeweg, e.veranlassung, \
-                e.erfasser_id, b.anzeigename AS erfasser_name, e.ereigniszeit, e.received_at, \
+                e.erfasser_id, b.anzeigename AS erfasser_name, e.erfasser_funktion, e.ereigniszeit, e.received_at, \
                 e.erfasst_lokal_at, e.berichtigt_eintrag_id, e.lagebericht_id, e.auftrag_id, \
                 e.befehl_id \
          FROM etb_eintrag e JOIN benutzer b ON b.id = e.erfasser_id \
@@ -261,7 +283,7 @@ pub async fn abfrage(
 ) -> Result<Vec<EtbEintragAnzeige>, AppError> {
     let mut qb: QueryBuilder<Sqlite> = QueryBuilder::new(
         "SELECT e.id, e.lfd_nr, e.typ, e.inhalt, e.von, e.an, e.meldeweg, e.veranlassung, \
-                e.erfasser_id, b.anzeigename AS erfasser_name, e.ereigniszeit, e.received_at, \
+                e.erfasser_id, b.anzeigename AS erfasser_name, e.erfasser_funktion, e.ereigniszeit, e.received_at, \
                 e.erfasst_lokal_at, e.berichtigt_eintrag_id, e.lagebericht_id, e.auftrag_id, \
                 e.befehl_id \
          FROM etb_eintrag e JOIN benutzer b ON b.id = e.erfasser_id",
