@@ -446,8 +446,8 @@ export function parseRouteId(param: string | undefined): number | null {
 
 // ── Sektions-Routen der Einsatz-Einstellungen (LFH-345 · C10) ────────────────
 
-/** Die vier Sektionen von `/einsaetze/:id/einstellungen`. */
-export type EinstellungenSektion = 'allgemein' | 'verhalten' | 'aufbewahrung' | 'module';
+/** Die fünf Sektionen von `/einsaetze/:id/einstellungen` (`pegel` seit LFH-606). */
+export type EinstellungenSektion = 'allgemein' | 'verhalten' | 'aufbewahrung' | 'module' | 'pegel';
 
 /**
  * Sektionen in Bedienreihenfolge — EINE Wahrheit für das Tab-Band, die Routentabelle und
@@ -466,6 +466,8 @@ export const EINSTELLUNGEN_SEKTIONEN: readonly { key: EinstellungenSektion; labe
   { key: 'verhalten', label: 'Verhalten & Automatik' },
   { key: 'aufbewahrung', label: 'Aufbewahrung' },
   { key: 'module', label: 'Module' },
+  // LFH-606: hinten angehängt, nicht vorn — die erste Sektion ist das Redirect-Ziel.
+  { key: 'pegel', label: 'Pegel' },
 ];
 
 /**
