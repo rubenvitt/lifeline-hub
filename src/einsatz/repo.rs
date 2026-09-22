@@ -915,6 +915,91 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn schwaerzung_loescht_dokument_samt_anhang_und_haelt_den_etb_nachweis() {
+        // LFH-632, Entscheidung E9: `einsatz_dokument.anhang_id … ON DELETE CASCADE`. Die
+        // Registry löscht `anhang` VOR `einsatz_dokument` (Reihenfolge in `TABELLEN`); mit
+        // RESTRICT/NO ACTION scheiterte der DELETE auf `anhang` am FK und die ganze
+        // Schwärzung rollte zurück. Der ETB-Nachweis bleibt — samt Titel im Wortlaut (G_ETB).
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let einsatz = test_anlegen(&pool, "Lage", None, leit).await.unwrap();
+        abschliessen(&pool, einsatz.id, leit).await.unwrap();
+        sqlx::query("UPDATE einsatz SET geloescht_at = ? WHERE id = ?")
+            .bind("2026-01-01 00:00:00")
+            .bind(einsatz.id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let anhang_id: i64 = sqlx::query_scalar(
+            "INSERT INTO anhang (einsatz_id, dateiname, mime, groesse, sha256, daten, hochgeladen_von) \
+             VALUES (?, 'familie.jpg', 'image/jpeg', 3, 'deadbeef', ?, ?) RETURNING id",
+        )
+        .bind(einsatz.id)
+        .bind(b"ABC".as_slice())
+        .bind(leit)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let inhalt = "Dokument abgelegt: Foto Familie Müller (Foto)";
+        let etb_id: i64 = sqlx::query_scalar(
+            "INSERT INTO etb_eintrag (einsatz_id, lfd_nr, typ, inhalt, erfasser_id, ereigniszeit) \
+             VALUES (?, 1, 'system', ?, ?, datetime('now')) RETURNING id",
+        )
+        .bind(einsatz.id)
+        .bind(inhalt)
+        .bind(leit)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_dokument \
+               (einsatz_id, anhang_id, kategorie, titel, etb_eintrag_id, abgelegt_von_id) \
+             VALUES (?, ?, 'foto', 'Foto Familie Müller', ?, ?)",
+        )
+        .bind(einsatz.id)
+        .bind(anhang_id)
+        .bind(etb_id)
+        .bind(leit)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        assert!(schwaerze_einsatz(&pool, einsatz.id, "2026-02-01 00:00:00")
+            .await
+            .unwrap());
+
+        let zaehle = |sql: &'static str| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_scalar::<_, i64>(sql)
+                    .bind(einsatz.id)
+                    .fetch_one(&pool)
+                    .await
+                    .unwrap()
+            }
+        };
+        assert_eq!(
+            zaehle("SELECT COUNT(*) FROM anhang WHERE einsatz_id = ?").await,
+            0,
+            "Datei weg"
+        );
+        assert_eq!(
+            zaehle("SELECT COUNT(*) FROM einsatz_dokument WHERE einsatz_id = ?").await,
+            0,
+            "Dokument-Zeile weg"
+        );
+        let etb_inhalt: String = sqlx::query_scalar("SELECT inhalt FROM etb_eintrag WHERE id = ?")
+            .bind(etb_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            etb_inhalt, inhalt,
+            "ETB-Nachweis bleibt im Wortlaut (G_ETB), auch der Titel darin"
+        );
+    }
+
+    #[tokio::test]
     async fn schwaerzung_nullt_freies_zeichen_label_pii() {
         // LFH-170/Review: freies_zeichen.label ist Freitext (kann PII tragen, z. B. „ELW Fam.
         // Müller"). Es MUSS von schwaerze_einsatz genullt werden (wie karte_hintergrundbild.name);

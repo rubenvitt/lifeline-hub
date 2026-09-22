@@ -574,7 +574,7 @@ Tests (jeder mit `setup()`/`login_cookie(&app, "admin", "startpw12")`/`einsatz_a
 10. `entfernen_ist_soft_delete`: DELETE → 204. Danach fehlt das Dokument in der Liste, `datei_laden` → 404, ein zweites DELETE → 404, `GET /etb` enthält `"Dokument entfernt: …"`, und in der DB steht die `anhang`-Zeile noch (mit `setup_mit_pool`: `SELECT COUNT(*) FROM anhang` = 1).
 11. `beobachter_darf_lesen_nicht_ablegen`: Benutzer als Beobachter (`benutzer_anlegen` + `rolle_setzen(..., "beobachter")`, Signaturen in `tests/common/mod.rs:117,251`): GET-Liste 200, `datei_laden` 200, POST → 403, DELETE → 403.
 12. `abgeschlossener_einsatz_ablegen_ist_409`: Einsatz abschließen (Muster aus `tests/stab.rs` suchen: `grep -n abschliess tests/stab.rs tests/common/mod.rs`), POST → 409.
-13. `fremde_org_ist_403_oder_404`: Muster `tests/stab.rs:128` (`status == FORBIDDEN || status == NOT_FOUND`).
+13. `fremde_org_ist_403_oder_404`: Muster `tests/stab.rs:128` (`status == FORBIDDEN || status == NOT_FOUND`). — Im Final-Review auf E5 geschärft und umbenannt: `fremde_org_ist_403` (alle vier Routen 403).
 
 Run: `cargo test --test dokument`
 Expected: FAIL (404 auf allen Routen bzw. Kompilierfehler).

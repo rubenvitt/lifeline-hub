@@ -555,8 +555,11 @@ async fn abgeschlossener_einsatz_ablegen_ist_409() {
     assert_eq!(status, StatusCode::CONFLICT, "{json:?}");
 }
 
+/// Entscheidung E5: eine fremde **Org** scheitert am Einsatz-Extractor (Org-Floor) mit 403,
+/// auf ALLEN vier Routen — vorher stand hier „403 oder 404", das eine 404 aus einem
+/// Handler-Pfad (Ownership statt Org-Grenze) still hätte durchgehen lassen.
 #[tokio::test]
-async fn fremde_org_ist_403_oder_404() {
+async fn fremde_org_ist_403() {
     let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
@@ -566,20 +569,11 @@ async fn fremde_org_ist_403_oder_404() {
     let fremd = login_cookie(&app, "fremd", "fremdpw1").await;
 
     let (status, _) = anfrage(&app, "GET", &pfad(einsatz), &fremd, None).await;
-    assert!(
-        status == StatusCode::FORBIDDEN || status == StatusCode::NOT_FOUND,
-        "GET-Liste: {status}"
-    );
+    assert_eq!(status, StatusCode::FORBIDDEN, "GET-Liste");
     let (status, _, _) = datei_laden(&app, einsatz, did, &fremd).await;
-    assert!(
-        status == StatusCode::FORBIDDEN || status == StatusCode::NOT_FOUND,
-        "Download: {status}"
-    );
+    assert_eq!(status, StatusCode::FORBIDDEN, "Download");
     let (status, _) = ablegen(&app, einsatz, &fremd, Some(PDF), STANDARD).await;
-    assert!(
-        status == StatusCode::FORBIDDEN || status == StatusCode::NOT_FOUND,
-        "POST: {status}"
-    );
+    assert_eq!(status, StatusCode::FORBIDDEN, "POST");
     let (status, _) = anfrage(
         &app,
         "DELETE",
@@ -588,8 +582,5 @@ async fn fremde_org_ist_403_oder_404() {
         None,
     )
     .await;
-    assert!(
-        status == StatusCode::FORBIDDEN || status == StatusCode::NOT_FOUND,
-        "DELETE: {status}"
-    );
+    assert_eq!(status, StatusCode::FORBIDDEN, "DELETE");
 }

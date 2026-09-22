@@ -144,14 +144,25 @@ pub async fn gehoert_anhang_zu_einsatz(
 /// fremde Anhänge ab). Der `ON DELETE CASCADE`-FK räumt die `chat_nachricht_anhang`-
 /// Verknüpfungen automatisch mit. `NotFound`, wenn keine Zeile getroffen wird
 /// (unbekannter oder fremder Anhang) — Freigabepfad gegen monotones Wachstum (LFH-250).
-/// Dokument-gebundene Anhänge weist die Route vorher mit 422 ab (LFH-632).
+///
+/// **Dokument-gebundene Anhänge löscht diese Funktion nie** (LFH-632): die Route weist sie
+/// vorher mit 422 ab, der `NOT EXISTS`-Riegel im DELETE hält dasselbe atomar, auch für
+/// künftige Aufrufer ohne die Routenprüfung und im Fenster zwischen `linker_stand` und
+/// DELETE. Ohne ihn räumte `einsatz_dokument.anhang_id … ON DELETE CASCADE` die
+/// Dokument-Zeile still mit weg — am Soft-Delete und seinem ETB-Nachweis vorbei. Der Fall
+/// liefert `NotFound`, nicht 422: über DIESEN Pfad ist die Zeile nicht löschbar, und aus
+/// `rows_affected() == 0` ist „unbekannt" von „gebunden" nicht zu trennen, ohne eine zweite
+/// Abfrage, die das Rennen wieder öffnete. Im Rennfall antwortet die Route also 404.
 pub async fn loeschen(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<(), AppError> {
-    let betroffen = sqlx::query("DELETE FROM anhang WHERE id = ? AND einsatz_id = ?")
-        .bind(id)
-        .bind(einsatz_id)
-        .execute(pool)
-        .await?
-        .rows_affected();
+    let betroffen = sqlx::query(
+        "DELETE FROM anhang WHERE id = ? AND einsatz_id = ? \
+           AND NOT EXISTS (SELECT 1 FROM einsatz_dokument d WHERE d.anhang_id = anhang.id)",
+    )
+    .bind(id)
+    .bind(einsatz_id)
+    .execute(pool)
+    .await?
+    .rows_affected();
     if betroffen == 0 {
         return Err(AppError::NotFound);
     }
@@ -439,6 +450,38 @@ mod tests {
         );
         assert!(anzeige_laden(&pool, dok).await.is_ok());
         assert!(anzeige_laden(&pool, geloeschtes_dok).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn loeschen_verweigert_dokument_gebundene_anhaenge() {
+        // LFH-632: die Route weist dokument-gebundene Anhänge mit 422 ab; der Repo-Riegel
+        // hält dasselbe auch ohne sie (und im Fenster zwischen Linker-Prüfung und DELETE).
+        // Ohne ihn räumte die CASCADE die `einsatz_dokument`-Zeile still mit weg.
+        let pool = crate::db::test_pool().await;
+        let (von, einsatz) = setup(&pool).await;
+        let frei = anhang_mit_zeit(&pool, einsatz, von, "a.pdf", "2026-01-01 00:00:00").await;
+        let dok = anhang_mit_zeit(&pool, einsatz, von, "b.pdf", "2026-01-01 00:00:00").await;
+        als_dokument(&pool, einsatz, von, dok, false).await;
+
+        assert!(matches!(
+            loeschen(&pool, einsatz, dok).await.unwrap_err(),
+            AppError::NotFound
+        ));
+        assert!(
+            anzeige_laden(&pool, dok).await.is_ok(),
+            "Dokument-Anhang bleibt"
+        );
+        let dokumente: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_dokument WHERE anhang_id = ?")
+                .bind(dok)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(dokumente, 1, "die Dokument-Zeile bleibt (keine CASCADE)");
+
+        // Gegenaussage: ein freier Anhang desselben Einsatzes wird gelöscht.
+        loeschen(&pool, einsatz, frei).await.unwrap();
+        assert!(anzeige_laden(&pool, frei).await.is_err());
     }
 
     #[tokio::test]
