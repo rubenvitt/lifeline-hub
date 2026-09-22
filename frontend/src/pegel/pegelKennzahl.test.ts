@@ -5,6 +5,8 @@ import {
   messEpoche,
   pegelKennzahl,
   pegelNotizKurz,
+  prognoseOffen,
+  prognoseText,
   standZeit,
   trendRichtung,
   trendText,
@@ -230,5 +232,61 @@ describe('pegelNotizKurz (Überblick)', () => {
     expect(pegelNotizKurz([pegel()], JETZT + 2 * 3_600_000)).toBe(
       'Pegel 6,84 m steigend · veraltet',
     );
+  });
+});
+
+describe('Prognose am Leitpegel (LFH-628)', () => {
+  /** 18:00 Berlin = 16:00 UTC, im Wire-Format ohne Zone. */
+  const prognose = (zeitpunkt = '2026-09-22 16:00:00') => ({
+    hoechststand_cm: 710,
+    zeitpunkt,
+    gesetzt_at: '2026-09-22 10:00:00',
+  });
+
+  it('offen: eigener Teil hinter dem Datenstand, vor „+n weitere"', () => {
+    const k = pegelKennzahl(
+      [pegel({ prognose: prognose() }), pegel({ id: 2, reihenfolge: 1 })],
+      JETZT,
+      BERLIN,
+    );
+    expect(k.notiz).toBe(
+      'WESER · steigend +9 cm/h · Stand 14:05 · Prognose 7,10 m bis 18:00 · +1 weitere',
+    );
+  });
+
+  it('ohne Prognose und mit abgelaufener ist die Notiz byte-gleich zur Fassung ohne', () => {
+    const ohne = pegelKennzahl([pegel()], JETZT, BERLIN);
+    expect(ohne.notiz).toBe('WESER · steigend +9 cm/h · Stand 14:05');
+    // 12:00 UTC liegt vor JETZT (12:30 UTC): vorbei.
+    expect(
+      pegelKennzahl([pegel({ prognose: prognose('2026-09-22 12:00:00') })], JETZT, BERLIN),
+    ).toEqual(ohne);
+    // Genau jetzt zählt als verstrichen.
+    expect(
+      pegelKennzahl([pegel({ prognose: prognose('2026-09-22 12:30:00') })], JETZT, BERLIN),
+    ).toEqual(ohne);
+  });
+
+  it('auch bei Ausfall der Messung steht die Prognose', () => {
+    const k = pegelKennzahl([pegel({ messung: undefined, prognose: prognose() })], JETZT, BERLIN);
+    expect(k.fall).toBe('ausfall');
+    expect(k.notiz).toBe('WESER · Stand unbekannt · Prognose 7,10 m bis 18:00');
+  });
+
+  it('nur der Leitpegel zählt — die Prognose eines weiteren Pegels steht nicht in der Kennzahl', () => {
+    const k = pegelKennzahl(
+      [pegel(), pegel({ id: 2, reihenfolge: 1, prognose: prognose() })],
+      JETZT,
+      BERLIN,
+    );
+    expect(k.notiz).not.toContain('Prognose');
+  });
+
+  it('am anderen Tag mit Tag davor; unlesbarer Zeitpunkt gilt als abgelaufen', () => {
+    expect(prognoseText(prognose('2026-09-23 04:00:00'), JETZT, BERLIN)).toBe(
+      'Prognose 7,10 m bis 23. 06:00',
+    );
+    expect(prognoseOffen(prognose('kaputt'), JETZT)).toBe(false);
+    expect(prognoseOffen(prognose(), JETZT)).toBe(true);
   });
 });

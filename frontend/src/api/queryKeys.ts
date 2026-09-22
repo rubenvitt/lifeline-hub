@@ -256,6 +256,10 @@ export const einsatzKeys = {
   kartenbilder: (einsatzId: number) => [EINSATZ_KEYS.kartenbilder, einsatzId] as const,
   // Maßgebliche Pegel (LFH-606) — NICHT live, siehe NICHT_LIVE_KEYS.
   pegel: (einsatzId: number) => [EINSATZ_KEYS.pegel, einsatzId] as const,
+  /** Vorschlag aus der Vorhersage-Reihe `WV` je Pegel (LFH-628), Sub-Key unter demselben
+   *  Prefix (Muster `stabLagebesprechungen`). */
+  pegelVorhersage: (einsatzId: number, pegelId: number) =>
+    [EINSATZ_KEYS.pegel, einsatzId, 'vorhersage', pegelId] as const,
 
   // Stab (LFH-46): Führungsorganisation S1–S6.
   stab: (einsatzId: number) => [EINSATZ_KEYS.stab, einsatzId] as const,

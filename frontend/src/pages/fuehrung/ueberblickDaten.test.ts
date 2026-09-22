@@ -11,6 +11,7 @@ import type {
   Erinnerung,
   EtbEintragAnzeige,
   Gefahrengebiet,
+  PegelAnzeige,
   Person,
 } from '../../api/types';
 import {
@@ -309,6 +310,49 @@ describe('Nächste Marken', () => {
     ]);
     expect(r.marken[0]).toMatchObject({ art: 'auftrag', id: 103 });
     expect(r.marken[3]).toMatchObject({ art: 'lagebesprechung', id: null });
+  });
+
+  it('Pegel-Prognose (LFH-628): offen als Marke, verstrichen gar nicht — nie „überfällig"', () => {
+    const pegel = (id: number, zeitpunkt: string | null, gewaesser: string | null = 'WESER') =>
+      ({
+        id,
+        station_uuid: `u-${id}`,
+        name: `STATION ${id}`,
+        gewaesser,
+        reihenfolge: id,
+        prognose: zeitpunkt
+          ? { hoechststand_cm: 710, zeitpunkt, gesetzt_at: '2026-09-21 12:00:00' }
+          : undefined,
+      }) as PegelAnzeige;
+    const r = naechsteMarken(
+      [auftrag({ id: 101, auftrag_text: 'Frist', frist_at: nach(45) })],
+      [],
+      null,
+      JETZT,
+      [
+        pegel(1, nach(20)),
+        pegel(2, vor(5)),
+        pegel(3, null),
+        pegel(4, nach(90), null),
+        pegel(5, nach(100)),
+      ],
+    );
+    expect(r.marken.map((m) => [m.art, m.text, m.ton])).toEqual([
+      ['pegelprognose', 'Erwarteter Höchststand Pegel STATION 1 (WESER): 7,10 m', 'achtung'],
+      ['auftrag', 'Frist', 'neutral'],
+      ['pegelprognose', 'Erwarteter Höchststand Pegel STATION 4: 7,10 m', 'neutral'],
+      // Zwei Pegel am selben Gewässer bleiben unterscheidbar.
+      ['pegelprognose', 'Erwarteter Höchststand Pegel STATION 5 (WESER): 7,10 m', 'neutral'],
+    ]);
+    expect(r.marken[0]).toMatchObject({ id: 1, wort: 'in 20 min' });
+    expect(r.marken.some((m) => m.ton === 'alarm')).toBe(false);
+  });
+
+  it('ohne Pegel-Argument dieselben Marken wie vorher', () => {
+    const auftraege = [auftrag({ id: 101, auftrag_text: 'Frist', frist_at: nach(45) })];
+    expect(naechsteMarken(auftraege, [], nach(120), JETZT)).toEqual(
+      naechsteMarken(auftraege, [], nach(120), JETZT, []),
+    );
   });
 
   it('deckelt auf sechs und zählt den Rest', () => {

@@ -33,8 +33,15 @@
  *  - **Keiner festgelegt**: Wert „—", Notiz „kein Pegel festgelegt", Ton `neutral` — das ist
  *    kein Messzustand, sondern eine offene Einrichtung (die Seite verlinkt die Auswahl).
  *  - **Mehrere**: Zusatz „+n weitere".
+ *  - **Prognose** (LFH-628): trägt der Leitpegel einen erwarteten Höchststand, dessen
+ *    Zeitpunkt noch vor `jetzt` liegt, steht er als eigener Teil „Prognose 7,10 m bis 18:00"
+ *    hinter dem Datenstand — auch bei Ausfall der Messung, die Prognose ist eine eigene
+ *    Angabe. Eine **abgelaufene** Prognose fällt aus der Kennzahl weg (Entscheidung des
+ *    Auftraggebers vom 22.09.2026: vorbei ist nicht „überfällig"); in den Einstellungen steht
+ *    sie als abgelaufen, bis jemand sie löscht oder erneuert. **Ohne Prognose ist die Notiz
+ *    byte-gleich zur LFH-606-Fassung** — die Bestandstests pinnen das.
  */
-import type { PegelAnzeige } from '../api/types';
+import type { PegelAnzeige, PegelPrognose } from '../api/types';
 import { DEFAULT_KONVENTIONEN, inZone, type AnzeigeKonventionen } from '../anzeige/format';
 
 /** Ab diesem Alter ist eine Messung „veraltet". */
@@ -102,6 +109,36 @@ export function messEpoche(zeitpunkt: string): number {
   return Date.parse(zeitpunkt);
 }
 
+/** Wire-Zeit der Prognose (UTC ohne Zonenkennung, `YYYY-MM-DD HH:MM:SS`) als Epoche; `NaN`
+ *  bei Unlesbarem. Rein. */
+export function prognoseEpoche(zeitpunkt: string): number {
+  return Date.parse(`${zeitpunkt.trim().replace(' ', 'T')}Z`);
+}
+
+/** Ist die Prognose noch offen (Zeitpunkt nach `jetzt`)? Unlesbar zählt als abgelaufen. Rein. */
+export function prognoseOffen(p: PegelPrognose, jetzt: number): boolean {
+  const t = prognoseEpoche(p.zeitpunkt);
+  return Number.isFinite(t) && t > jetzt;
+}
+
+/**
+ * „Prognose 7,10 m bis 18:00" — am anderen Tag mit Tag davor („bis 23. 06:00"), in der
+ * Anzeigezone wie der Datenstand. Rein.
+ */
+export function prognoseText(
+  p: PegelPrognose,
+  jetzt: number,
+  konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
+): string {
+  return `Prognose ${wasserstandMeter(p.hoechststand_cm)} m bis ${standZeit(p.zeitpunkt, jetzt, konv)}`;
+}
+
+/** Prognose-Teil der Notiz, nur solange sie offen ist. */
+function prognoseTeil(leit: PegelAnzeige, jetzt: number, konv: AnzeigeKonventionen): string[] {
+  const p = leit.prognose;
+  return p && prognoseOffen(p, jetzt) ? [prognoseText(p, jetzt, konv)] : [];
+}
+
 /** Der Fall, den die Kennzahl zeigt — für Aufrufer, die daran ein Ziel oder einen Ton hängen. */
 export type PegelFall = 'messung' | 'ausfall' | 'keiner';
 
@@ -148,12 +185,13 @@ export function pegelKennzahl(
   }
   const ort = leit.gewaesser?.trim() || leit.name;
   const weitere = pegel.length > 1 ? [`+${pegel.length - 1} weitere`] : [];
+  const prognose = prognoseTeil(leit, jetzt, konv);
   const m = leitmessung(leit, jetzt);
   if (!m) {
     return {
       fall: 'ausfall',
       wert: '—',
-      notiz: [ort, PEGEL_STAND_UNBEKANNT, ...weitere].join(' · '),
+      notiz: [ort, PEGEL_STAND_UNBEKANNT, ...prognose, ...weitere].join(' · '),
       ton: 'achtung',
       veraltet: false,
     };
@@ -163,9 +201,14 @@ export function pegelKennzahl(
     fall: 'messung',
     wert: m.meter,
     einheit: 'm',
-    notiz: [ort, trendText(m.trend), stand, ...(m.veraltet ? [VERALTET] : []), ...weitere].join(
-      ' · ',
-    ),
+    notiz: [
+      ort,
+      trendText(m.trend),
+      stand,
+      ...(m.veraltet ? [VERALTET] : []),
+      ...prognose,
+      ...weitere,
+    ].join(' · '),
     ton: m.veraltet ? 'achtung' : 'neutral',
     veraltet: m.veraltet,
   };

@@ -5214,6 +5214,17 @@
             "type": "string",
             "description": "Stationsname zum Zeitpunkt des Festlegens (Snapshot)."
           },
+          "prognose": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PegelPrognose",
+                "description": "Erwarteter Höchststand (LFH-628); fehlt, wenn keiner gepflegt ist."
+              }
+            ]
+          },
           "reihenfolge": {
             "type": "integer",
             "format": "int64",
@@ -5249,6 +5260,75 @@
           "zeitpunkt": {
             "type": "string",
             "description": "Zeitpunkt der jüngsten Messung, RFC 3339 mit Zonenversatz, wie PEGELONLINE ihn\nliefert (z. B. `2026-09-22T09:15:00+02:00`). Er ist der ehrliche Datenstand — auch\ndann, wenn ein älterer Cache-Eintrag ausgeliefert wird."
+          }
+        }
+      },
+      "PegelPrognose": {
+        "type": "object",
+        "description": "Erwarteter Höchststand an einem festgelegten Pegel (LFH-628), von Hand gepflegt.\n\nEin verstrichener Zeitpunkt bleibt stehen, bis jemand die Prognose löscht oder erneuert:\nob sie „abgelaufen\" ist, entscheidet das Frontend gegen seine Uhr — dieselbe Arbeitsteilung\nwie beim veralteten Messwert.",
+        "required": [
+          "hoechststand_cm",
+          "zeitpunkt",
+          "gesetzt_at"
+        ],
+        "properties": {
+          "gesetzt_at": {
+            "type": "string",
+            "description": "Wann die Prognose zuletzt gesetzt wurde (UTC, Wire-Format)."
+          },
+          "hoechststand_cm": {
+            "type": "number",
+            "format": "double",
+            "description": "Erwarteter Höchststand in cm (dieselbe Einheit wie die Messung)."
+          },
+          "zeitpunkt": {
+            "type": "string",
+            "description": "Zeitpunkt des erwarteten Höchststands, UTC im Wire-Format `YYYY-MM-DD HH:MM:SS`."
+          }
+        }
+      },
+      "PegelVorhersage": {
+        "type": "object",
+        "description": "Vorschlag aus der PEGELONLINE-Vorhersage-Reihe `WV` (LFH-628): der höchste Wert der\nReihe mit seinem Zeitpunkt. Nur ein Teil der Stationen führt die Reihe (gemessen\n22.09.2026: 43).",
+        "required": [
+          "hoechststand_cm",
+          "zeitpunkt",
+          "erstellt",
+          "abschaetzung"
+        ],
+        "properties": {
+          "abschaetzung": {
+            "type": "boolean",
+            "description": "`true`, wenn der Höchstwert aus dem Abschätzungs-Teil der Reihe stammt (`type:\n\"estimate\"`) statt aus der Vorhersage — die Quelle unterscheidet beides ausdrücklich."
+          },
+          "erstellt": {
+            "type": "string",
+            "description": "Wann die Vorhersage gerechnet wurde (`initialized` der Quelle), RFC 3339."
+          },
+          "hoechststand_cm": {
+            "type": "number",
+            "format": "double",
+            "description": "Höchster Wert der Reihe in cm."
+          },
+          "zeitpunkt": {
+            "type": "string",
+            "description": "Zeitpunkt dieses Werts, RFC 3339 mit Versatz, wie die Quelle ihn liefert."
+          }
+        }
+      },
+      "PegelVorhersageAntwort": {
+        "type": "object",
+        "description": "Antwort auf die Vorhersage-Abfrage. `vorhersage` fehlt, wenn die Station keine Reihe `WV`\nführt — das ist kein Fehler, sondern der Normalfall für die meisten Stationen.",
+        "properties": {
+          "vorhersage": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PegelVorhersage"
+              }
+            ]
           }
         }
       },
