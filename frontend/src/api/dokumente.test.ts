@@ -38,4 +38,15 @@ describe('dokumente-API', () => {
   it('baut den Download-Pfad', () => {
     expect(dokumentDownloadPfad(7, 42)).toBe('/api/einsaetze/7/dokumente/42/datei');
   });
+
+  it('nutzt das 120-s-Upload-Timeout, nicht das 15-s-Standard-Timeout', async () => {
+    const timeout = vi
+      .spyOn(AbortSignal, 'timeout')
+      .mockReturnValue(new AbortController().signal);
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ id: 1 }), { status: 201 }),
+    );
+    await legeDokumentAb(7, { datei: new File(['x'], 'a.pdf'), titel: 'A', kategorie: 'foto' });
+    expect(timeout).toHaveBeenCalledWith(120_000);
+  });
 });
