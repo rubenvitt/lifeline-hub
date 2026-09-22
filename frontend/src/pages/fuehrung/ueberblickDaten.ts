@@ -438,11 +438,7 @@ export function entscheidungenAuswahl(
 
 export type MarkenTon = 'neutral' | 'achtung' | 'alarm';
 export type MarkenArt =
-  | 'auftrag'
-  | 'erinnerung'
-  | 'lagebesprechung'
-  | 'pegelprognose'
-  | 'abloesung';
+  'auftrag' | 'erinnerung' | 'lagebesprechung' | 'pegelprognose' | 'abloesung';
 
 export interface Marke {
   key: string;
