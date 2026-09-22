@@ -12,6 +12,11 @@
 #     basemap.{json,png} (+ @2x). Der aktuelle Offline-Style referenziert zwar noch keine
 #     icon-image-Layer, aber ein echtes, gültiges CC0-Sprite ist Voraussetzung für die spätere
 #     §9-Live-Demo-Stilwahl (POI-Icons).
+#   - Mono-Glyphs (OFL, LFH-622): "JetBrains Mono Regular" für die Beschriftungsplaketten der
+#     Lagekarte (Neuentwurf S5). Hier ist es doch ein Selbstbau: kein gepinntes Release liefert
+#     eine Mono-Familie als SDF-PBF (versatiles-fonts und openmaptiles/fonts führen keine). Gebaut
+#     wird aus der gepinnten TTF mit dem gepinnten `build_pbf_glyphs` (stadiamaps/sdf_font_tools);
+#     die Ausgabe ist deterministisch (zwei Läufe byte-gleich, gemessen). Dieselben Ranges wie Noto.
 #
 # Nach dem Lauf die erzeugten Dateien unter ../assets/karten/{fonts,sprites} einchecken und das
 # Backend neu bauen — rust-embed bettet sie zur Compile-Zeit ein (KartenAssets).
@@ -27,6 +32,13 @@ FONTS_ASSET="noto_sans.tar.gz"       # enthält Fontstack-Ordner noto_sans_regul
 FONTS_STACK_SRC="noto_sans_regular"  # Quell-Ordnername im Archiv
 FONTS_STACK_DEST="Noto Sans Regular" # von basemapStil.ts/text-font erwarteter Name
 
+MONO_REPO="JetBrains/JetBrainsMono"
+MONO_TAG="v2.304"
+MONO_ASSET="JetBrainsMono-2.304.zip"
+MONO_TTF="fonts/ttf/JetBrainsMono-Regular.ttf"  # Pfad im Archiv
+MONO_STACK_DEST="JetBrains Mono Regular"       # = PLAKETTEN_MONO in plakette.ts (byte-gleich)
+GLYPH_TOOL_VERSION="1.5.1"                     # crates.io: build_pbf_glyphs
+
 SPRITE_REPO="versatiles-org/versatiles-style"
 SPRITE_TAG="v5.13.0"
 SPRITE_ASSET="sprites.tar.gz"        # enthält basics/ + markers/ (sprites.{json,png} + @Nx)
@@ -40,6 +52,7 @@ SPRITE_SET="basics"                  # allgemeines CC0-Icon-Set
 FONT_RANGES=(0-255 256-511 512-767 8192-8447)
 
 FONTS_URL="https://github.com/${FONTS_REPO}/releases/download/${FONTS_TAG}/${FONTS_ASSET}"
+MONO_URL="https://github.com/${MONO_REPO}/releases/download/${MONO_TAG}/${MONO_ASSET}"
 SPRITE_URL="https://github.com/${SPRITE_REPO}/releases/download/${SPRITE_TAG}/${SPRITE_ASSET}"
 
 work="$(mktemp -d)"
@@ -71,6 +84,31 @@ for r in "${FONT_RANGES[@]}"; do
   echo "  glyph: $FONTS_STACK_DEST/$r.pbf ($(wc -c < "$font_dest/$r.pbf") Bytes)"
 done
 
+# --- Mono-Glyphs: TTF aus dem gepinnten Release, SDF-PBF mit dem gepinnten Werkzeug ---
+echo "→ Lade Mono-Schrift: $MONO_URL"
+curl -fsSL -o "$work/mono.zip" "$MONO_URL"
+echo "  sha256(mono): $(sha256_of "$work/mono.zip")"
+# Das Werkzeug wird am AUSGEFÜHRTEN `--version` gemessen, nicht an `command -v`: ein
+# Versions-Shim antwortet auf `command -v` auch ohne installiertes Binary.
+glyph_tool="build_pbf_glyphs"
+if ! "$glyph_tool" --version 2>/dev/null | grep -qx "build_pbf_glyphs $GLYPH_TOOL_VERSION"; then
+  echo "→ Baue build_pbf_glyphs $GLYPH_TOOL_VERSION (cargo install, braucht freetype)"
+  cargo install --quiet --locked --version "$GLYPH_TOOL_VERSION" --root "$work/tool" build_pbf_glyphs
+  glyph_tool="$work/tool/bin/build_pbf_glyphs"
+fi
+mkdir -p "$work/mono-src" "$work/mono-out"
+unzip -q -j "$work/mono.zip" "$MONO_TTF" -d "$work/mono-src"
+"$glyph_tool" "$work/mono-src" "$work/mono-out" >/dev/null
+mono_dest="$DEST/fonts/$MONO_STACK_DEST"
+rm -rf "$mono_dest"
+mkdir -p "$mono_dest"
+for r in "${FONT_RANGES[@]}"; do
+  cp "$work/mono-out/JetBrainsMono-Regular/$r.pbf" "$mono_dest/$r.pbf"
+  echo "  glyph: $MONO_STACK_DEST/$r.pbf ($(wc -c < "$mono_dest/$r.pbf") Bytes)"
+done
+# Die OFL verlangt, dass die Lizenz mit der Schrift weitergegeben wird.
+unzip -q -j "$work/mono.zip" "OFL.txt" -d "$mono_dest"
+
 # --- Sprite: basics-Set als basemap.{json,png} (+ @2x) ---
 sprite_dest="$DEST/sprites"
 mkdir -p "$sprite_dest"
@@ -87,6 +125,7 @@ cat <<EOF
 
 Fertig. Provenienz für den Release-Text / Commit festhalten:
   Glyphs: $FONTS_REPO $FONTS_TAG ($FONTS_ASSET → $FONTS_STACK_DEST, Ranges: ${FONT_RANGES[*]}) — OFL (SIL Open Font License)
+  Mono:   $MONO_REPO $MONO_TAG ($MONO_TTF → $MONO_STACK_DEST, build_pbf_glyphs $GLYPH_TOOL_VERSION) — OFL
   Sprite: $SPRITE_REPO $SPRITE_TAG ($SPRITE_ASSET, Set: $SPRITE_SET → basemap) — CC0
 Dateien unter $DEST/{fonts,sprites} einchecken + Backend neu bauen (rust-embed).
 EOF

@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'react';
 // Namespace-Import, weil maplibre-gl ab 6 echtes ESM ohne Default-Export ist (v5 lieferte ein
 // UMD-Bundle, aus dem Bundler/TS per CJS-Interop einen Default synthetisierten). Bewusst KEIN
 // named-Import der Klassen: `Map` würde den globalen `Map` beschatten, den die tzRegistry unten
@@ -70,6 +70,8 @@ import type { Ecken } from '../../api/kartenbilder';
 import { BBOX_MIN_ZOOM } from './fachebenen';
 import type { FachebeneQuelle } from '../../api/fachebenen';
 import { PUNKT_ZOOM, type StartAnsicht } from './startAnsicht';
+import { zonenPlakette } from './plakette';
+import { useRollen } from '../../components/instrument/rollenwerte';
 
 // Worker-URL setzen, bevor die erste Map entsteht — diese Datei ist die einzige Stelle im Repo,
 // die eine Map erzeugt. Der Guard davor ist keine Paranoia, sondern deckt eine gemessene Bruchlinie
@@ -255,6 +257,10 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
 ) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
+  // Namensplaketten der Marker in den Rollen des aktiven Modus (LFH-622) — dieselbe
+  // Plakette wie an den Zonen. `rollen` ist eine der zwei Paletten-Konstanten, also stabil.
+  const { rollen } = useRollen();
+  const markerPlakette = useMemo(() => zonenPlakette(rollen), [rollen]);
   // Aktuelle Marker-Daten als FeatureCollections; nach setStyle re-angelegt (analog flaechenDatenRef).
   const markerDatenRef = useRef<MarkerFeatureCollection>({
     type: 'FeatureCollection',
@@ -411,7 +417,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     const ladendeIcons = new Set<string>();
     map.on('styleimagemissing', (e) => {
       const id = e.id;
-      // Beschriftungsplakette der Zonen (9-Slice, Farben stehen in der Id). Nach `setStyle`
+      // Beschriftungsplakette der Zonen und Marker (9-Slice, Farben stehen in der Id). Nach `setStyle`
       // sind alle Bilder weg; dieser Handler legt sie beim nächsten Bedarf wieder an.
       if (id.startsWith(PLAKETTE_PRAEFIX)) {
         const bild = plakettenBild(id);
@@ -734,8 +740,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    const marker = baueMarkerFc(markers);
-    const einsatzort = baueEinsatzortFc(markers);
+    const marker = baueMarkerFc(markers, markerPlakette);
+    const einsatzort = baueEinsatzortFc(markers, markerPlakette);
     markerDatenRef.current = marker;
     einsatzortDatenRef.current = einsatzort;
     // Registry für styleimagemissing füllen (Key → TzProps). tzIconKey ist die EINE Quelle der
@@ -756,7 +762,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     // Offener Spider hielte einen veralteten getClusterLeaves-Snapshot (cluster_ids ändern sich) →
     // bei jeder Daten-Änderung (SSE/Query-Invalidation) einklappen.
     schliesseSpiderRef.current?.();
-  }, [markers]);
+  }, [markers, markerPlakette]);
 
   // Einzel-Marker-Klick → Inspector (schluessel) + Cursor. Cluster-Klick läuft über die
   // DOM-Donut-Marker (eigener Effekt unten).

@@ -196,6 +196,10 @@ export function baueFreiesZeichenTz(
   } as TzProps;
 }
 
+/** Ersatztext eines freien Zeichens ohne eigenen Namen. Inspector und Leiste zeigen ihn; die
+ *  Kartenplakette nicht (LFH-622) — ein Platzhalter ist kein Name. */
+export const FREIES_ZEICHEN_ERSATZLABEL = '(freies Zeichen)';
+
 /** Leitet Karten-Marker für freie taktische Zeichen ab (immer verortet, LFH-170). */
 export function baueFreieZeichenMarker(zeichen: FreiesZeichen[]): KarteMarker[] {
   return zeichen.map((z) => ({
@@ -204,7 +208,7 @@ export function baueFreieZeichenMarker(zeichen: FreiesZeichen[]): KarteMarker[] 
     id: z.id,
     lat: z.lat,
     lon: z.lon,
-    label: z.label ?? '(freies Zeichen)',
+    label: z.label ?? FREIES_ZEICHEN_ERSATZLABEL,
     farbe: z.farbe ?? FREIES_ZEICHEN_FARBE,
     tz: baueFreiesZeichenTz(z),
   }));

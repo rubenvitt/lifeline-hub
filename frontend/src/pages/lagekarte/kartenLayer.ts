@@ -7,9 +7,13 @@ import type { FachebeneDef } from './fachebenen';
 import type { FeatureCollection } from '../../api/fachebenen';
 import { synchronisiereBildLayer, type BildOverlay } from './bildLayer';
 import { reAnlegenMarker, type MarkerFeatureCollection } from './markerLayer';
-import { farbenDunkel, type Farbrollen } from '../../theme/tokens';
+import { farbenDunkel } from '../../theme/tokens';
+import { plakettenBildId, plakettenSchrift, zonenPlakette, type Plakette } from './plakette';
 
 export type { BildOverlay };
+// Die Plakette ist seit LFH-622 ein eigenes Modul (Marker brauchen sie auch, und
+// `markerLayer` → `kartenLayer` wäre ein Importkreis); die Bestandsimporte laufen weiter.
+export { PLAKETTE_PRAEFIX, plakettenBild, plakettenBildId, zonenPlakette } from './plakette';
 
 export interface AktiveFachebene {
   def: FachebeneDef;
@@ -36,86 +40,8 @@ export interface ZoneFeature {
   plakette?: ZonenPlakette;
 }
 
-/**
- * Beschriftung einer Zone im Entwurfsstil (Neuentwurf S5): dunkle Plakette mit Rahmen
- * `linieStark`, Text in `text`. Die Werte sind AUFGELÖSTE Rollen — MapLibre-`paint` kennt
- * weder `var(--lfh-*)` noch antd-Token, deshalb reicht `useLagekarteDaten` sie durch, wie
- * es den Token für die Zonenfarben schon tut.
- */
-export interface ZonenPlakette {
-  text: string;
-  grund: string;
-  rahmen: string;
-}
-
-/** Plakette aus einem Rollensatz — rein, damit die Rollenwahl ohne Karte prüfbar ist. */
-export function zonenPlakette(rollen: Pick<Farbrollen, 'text' | 'paneel' | 'linieStark'>) {
-  return { text: rollen.text, grund: rollen.paneel, rahmen: rollen.linieStark };
-}
-
-/** Präfix der Plakettenbilder; `styleimagemissing` in `Kartenflaeche.tsx` erkennt es daran. */
-export const PLAKETTE_PRAEFIX = 'plakette|';
-
-/** Bild-Id einer Plakette: die Farben stehen IN der Id, damit der Handler sie nach einem
- *  `setStyle` (der alle Bilder wegwischt) ohne weiteren Zustand neu zeichnen kann. */
-export function plakettenBildId(p: Pick<ZonenPlakette, 'grund' | 'rahmen'>): string {
-  return `${PLAKETTE_PRAEFIX}${p.grund}|${p.rahmen}`;
-}
-
-/** `#rrggbb` → [r, g, b]; alles andere → null (dann gibt es keine Plakette, nur Text). */
-function hexZuRgb(hex: string): [number, number, number] | null {
-  const m = /^#([0-9a-f]{6})$/i.exec(hex.trim());
-  if (!m) return null;
-  const n = Number.parseInt(m[1], 16);
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
-}
-
-/** Kantenlänge des Plakettenbilds; 1 px Rahmen, der Rest dehnbar (9-Slice). */
-const PLAKETTE_KANTE = 8;
-
-/**
- * Das Plakettenbild als Pixeldaten für `map.addImage` — ein 9-Slice aus 1 px Rahmen und
- * dehnbarem Innenraum, das `icon-text-fit` um den Text legt. Rein und exportiert: die
- * Karte selbst läuft in jsdom nicht, die Pixel schon. `null` für eine fremde oder
- * unlesbare Id — der Aufrufer legt dann kein Bild an, und die Beschriftung steht ohne
- * Plakette da, statt dass ein Fehler aus dem MapLibre-Callback fliegt.
- */
-export function plakettenBild(id: string): {
-  width: number;
-  height: number;
-  data: Uint8Array;
-  stretchX: [number, number][];
-  stretchY: [number, number][];
-  content: [number, number, number, number];
-} | null {
-  if (!id.startsWith(PLAKETTE_PRAEFIX)) return null;
-  const [grundHex, rahmenHex] = id.slice(PLAKETTE_PRAEFIX.length).split('|');
-  const grund = hexZuRgb(grundHex ?? '');
-  const rahmen = hexZuRgb(rahmenHex ?? '');
-  if (!grund || !rahmen) return null;
-  const k = PLAKETTE_KANTE;
-  const data = new Uint8Array(k * k * 4);
-  for (let y = 0; y < k; y++) {
-    for (let x = 0; x < k; x++) {
-      const rand = x === 0 || y === 0 || x === k - 1 || y === k - 1;
-      const [r, g, b] = rand ? rahmen : grund;
-      const i = (y * k + x) * 4;
-      data[i] = r;
-      data[i + 1] = g;
-      data[i + 2] = b;
-      // Der Grund deckt nicht ganz (Entwurf: `rgba(12,14,17,.92)`), der Rahmen schon.
-      data[i + 3] = rand ? 255 : 235;
-    }
-  }
-  return {
-    width: k,
-    height: k,
-    data,
-    stretchX: [[1, k - 1]],
-    stretchY: [[1, k - 1]],
-    content: [1, 1, k - 1, k - 1],
-  };
-}
+/** Farben der Beschriftungsplakette — seit LFH-622 für Zonen UND Marker (`plakette.ts`). */
+export type ZonenPlakette = Plakette;
 
 export type FlaechenFeatureCollection = {
   type: 'FeatureCollection';
@@ -252,9 +178,11 @@ export function sorgeFuerZonenLayer(map: MapLibreMap, daten: ZonenFeatureCollect
   }
   // Beschriftung im Entwurfsstil: Plakette (9-Slice-Bild, `icon-text-fit`) statt Halo,
   // Versalien per `text-transform` — der Text selbst bleibt, wie `zonenBeschriftung` ihn
-  // baut. Die Schrift bleibt die Vorgabe des Styles: eine Mono-Familie, die der
-  // Glyphen-Server nicht führt, liesse die Beschriftung ganz verschwinden.
+  // baut. Die Schrift wählt `plakettenSchrift` je Glyphen-Server: Mono nur offline, wo der
+  // eigene Server sie führt. Eine fremde Familie beantwortet der Server mit 404, und MapLibre
+  // zeichnet dann in einer lokalen Systemschrift.
   if (!map.getLayer('zonen-label')) {
+    const schrift = plakettenSchrift(map.getStyle());
     map.addLayer({
       id: 'zonen-label',
       type: 'symbol',
@@ -265,6 +193,7 @@ export function sorgeFuerZonenLayer(map: MapLibreMap, daten: ZonenFeatureCollect
         'text-size': 10,
         'text-transform': 'uppercase',
         'text-letter-spacing': 0.06,
+        ...(schrift ? { 'text-font': schrift } : {}),
         'symbol-placement': 'point',
         'icon-image': ['get', 'plakette'],
         'icon-text-fit': 'both',
