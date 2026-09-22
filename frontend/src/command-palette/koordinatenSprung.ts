@@ -1,4 +1,5 @@
 // frontend/src/command-palette/koordinatenSprung.ts
+import { forward as mgrsVorwaerts } from 'mgrs';
 import { TbMapPin } from 'react-icons/tb';
 import { formatiere, parse, type LatLon } from '../anzeige/koordinaten';
 import type { Koordinatenformat } from '../api/types';
@@ -20,18 +21,24 @@ import type { Befehl } from './typen';
  * entscheidet nur, wie die Zeile den Punkt BESCHRIFTET.
  *
  * Die Formen sind bewusst eng: zwei ganze Zahlen („12 34") sind keine Koordinate, sondern eine
- * Hausnummer, eine Stärke oder ein halber Funkrufname. Dezimalgrad verlangt deshalb
- * Nachkommastellen in BEIDEN Werten. Jeder Fehlgriff hier stellte eine Kartenzeile vor einen
- * Nummerntreffer, und die Palette wählt die oberste Zeile vor.
+ * Hausnummer, eine Stärke oder ein halber Funkrufname, und „12.30 13.45" ist eine
+ * Uhrzeitspanne. Dezimalgrad verlangt deshalb mindestens DREI Nachkommastellen (≙ rund
+ * 100 m) in BEIDEN Werten.
+ *
+ * MGRS BRAUCHT DEN RÜCKWEG (Review-Befund zu LFH-619, gemessen an mgrs 2.2.0): eine
+ * Fahrzeugkennung wie „1 HLF 20" oder eine Uhrzeit wie „12 Uhr 30" hat genau die Form
+ * „Zone · Band · Quadrat · Ziffern", und `toPoint` prüft nicht, ob das 100-km-Quadrat zur
+ * Zone passt — es rechnet sie in Punkte im Südpazifik um. Eine echte Angabe ergibt beim
+ * Zurückrechnen dieselbe Zeichenkette, eine erfundene nicht („1HLF20" → „2JNL…").
  *
  * Rein und exportiert: kein Hook, kein Netz. Die Rechteprüfung („darf ich die Lagekarte
  * sehen?") liegt beim Aufrufer, der die Overrides kennt.
  */
 
 /** Dezimalgrad mit Punkt: Trenner Komma, Semikolon oder Leerraum. */
-const DEZ_PUNKT = /^(-?\d{1,2}\.\d+)\s*[,;\s]\s*(-?\d{1,3}\.\d+)$/;
+const DEZ_PUNKT = /^(-?\d{1,2}\.\d{3,})\s*[,;\s]\s*(-?\d{1,3}\.\d{3,})$/;
 /** Dezimalgrad mit Komma: das Komma ist schon vergeben, Trenner nur Semikolon oder Leerraum. */
-const DEZ_KOMMA = /^(-?\d{1,2},\d+)\s*(?:;|\s)\s*(-?\d{1,3},\d+)$/;
+const DEZ_KOMMA = /^(-?\d{1,2},\d{3,})\s*(?:;|\s)\s*(-?\d{1,3},\d{3,})$/;
 /** MGRS: Zone, Band, 100-km-Quadrat, dann eine gerade Zahl von Ziffern (2–10). */
 const MGRS = /^(\d{1,2})\s*([C-HJ-NP-X])\s*([A-HJ-NP-Z]{2})\s*(\d+)(?:\s+(\d+))?$/i;
 /** UTM: Zone, Band, Rechtswert, Hochwert — anders als MGRS ohne 100-km-Quadrat. */
@@ -72,7 +79,16 @@ export function erkenneKoordinate(eingabe: string): LatLon | null {
     const ziffern = (mgrs[4] ?? '') + (mgrs[5] ?? '');
     // Ohne gerade Ziffernzahl gibt es keine Aufteilung in Rechts- und Hochwert.
     if (ziffern.length < 2 || ziffern.length > 10 || ziffern.length % 2 !== 0) return null;
-    return versuche(text, 'mgrs');
+    const punkt = versuche(text, 'mgrs');
+    if (!punkt) return null;
+    const eingabe = `${Number(mgrs[1])}${mgrs[2]}${mgrs[3]}${ziffern}`.toUpperCase();
+    let zurueck: string;
+    try {
+      zurueck = mgrsVorwaerts([punkt.lon, punkt.lat], ziffern.length / 2);
+    } catch {
+      return null;
+    }
+    return zurueck === eingabe ? punkt : null;
   }
 
   if (UTM.test(text)) return versuche(text, 'utm');

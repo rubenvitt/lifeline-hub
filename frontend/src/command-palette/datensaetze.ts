@@ -547,11 +547,24 @@ export function baueDatensatzTreffer(k: DatensatzKontext): Treffer[] {
 const ETB_SAMMEL_ID = 'datensatz:etb:suche';
 
 /**
+ * Beschriftung des Sammeltreffers. EINE Stelle, weil `sichtbareDatensaetze` sie gegen den
+ * lebenden Begriff vergleicht — zwei Schreibweisen liefen still auseinander.
+ */
+function etbSammelLabel(suche: string): string {
+  return `Alle Einträge zu „${suche}“`;
+}
+
+/**
  * Der ETB-Sammeltreffer „Alle Einträge zu „deich“" mit Trefferzahl (LFH-619, Neuentwurf S2).
  *
- * Er steht HINTER allen Einzeltreffern, ausserhalb beider Deckel und auf Stufe 2: er ist der
- * Weg zu allen, nicht der beste Treffer. Vorn stünde er vor dem einen Eintrag, den jemand
- * gerade gesucht hat, und Enter führte auf eine Liste statt auf den Eintrag.
+ * Er steht HINTER allen Einzeltreffern und ausserhalb beider Deckel: er ist der Weg zu allen,
+ * nicht der beste Treffer. Vorn stünde er vor dem einen Eintrag, den jemand gerade gesucht
+ * hat, und Enter führte auf eine Liste statt auf den Eintrag.
+ *
+ * „Hinten" heisst in der SICHTBAREN Ordnung, nicht im Array (Review-Befund): `ordneTreffer`
+ * sortiert nach Stufe und Score neu. Stufe 3 plus `UNBEWERTET + 1` ist strikt schlechter als
+ * jeder Einzeltreffer — mit der vorigen Stufe 2 stand er bei jeder Mehrwortsuche vorn, weil
+ * dort jeder Einzeltreffer auf Stufe 3 fällt.
  *
  * NUR IM TEXTZWEIG: eine gedruckte Nummer fragt der ETB über den Cursor, „Einträge zu 42"
  * wäre eine Suche nach der Zahl im Text, die niemand gestellt hat. Bei null Treffern gibt es
@@ -569,14 +582,14 @@ function etbSammeltreffer(k: DatensatzKontext, suche: string): Treffer | null {
     befehl: {
       id: ETB_SAMMEL_ID,
       gruppe: 'datensaetze',
-      label: `Alle Einträge zu „${suche}“`,
+      label: etbSammelLabel(suche),
       kontext: `${m.label} · ${n} Treffer`,
       schlagworte: [m.label],
       icon: m.icon,
       ausfuehren: () => k.navigate(ziel),
     },
-    score: UNBEWERTET,
-    stufe: 2,
+    score: UNBEWERTET + 1,
+    stufe: 3,
   };
 }
 
@@ -668,6 +681,11 @@ export function sichtbareDatensaetze(
     // einordnen können, verstecke einen Fehler, statt ihn zu zeigen.
     if (modulKey === null) return true;
     if (erlaubteModule !== null && !erlaubteModule.has(modulKey)) return false;
+    // Der Sammeltreffer trägt seinen Begriff in Beschriftung UND Ziel (Review-Befund zu
+    // LFH-619): gebaut aus dem entprellten Stand, spränge er nach dem Weitertippen auf eine
+    // Suche, die niemand mehr gestellt hat. Ein veralteter Einzeltreffer führt wenigstens auf
+    // einen echten Eintrag; dieser nicht — er gilt deshalb nur für genau den lebenden Begriff.
+    if (t.befehl.id === ETB_SAMMEL_ID && t.befehl.label !== etbSammelLabel(s)) return false;
     // Beide ETB-Zweige teilen sich den Modulschlüssel, und keiner kann ohne alphanumerisches
     // Token antworten: der Volltext läuft dort ins Leere (siehe oben), der Zahlenzweig
     // verlangt ohnehin Ziffern.

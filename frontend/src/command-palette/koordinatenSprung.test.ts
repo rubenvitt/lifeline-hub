@@ -38,6 +38,16 @@ describe('erkenneKoordinate — an der FORM, nicht am eingestellten Format', () 
     nahe(erkenneKoordinate(mgrs.toLowerCase()), BERLIN);
   });
 
+  it('MGRS mit weniger Stellen (1 km) bleibt erlaubt, wenn der Rückweg passt', () => {
+    // 4 Ziffern ≙ 1-km-Quadrat. Dieselbe Zeichenkette muss beim Zurückrechnen herauskommen —
+    // das ist der Riegel gegen die Kennungen im Negativtest unten.
+    const km = formatiere(BERLIN.lat, BERLIN.lon, 'mgrs').replace(
+      /(\d{2})\d{3} (\d{2})\d{3}$/,
+      '$1 $2',
+    );
+    nahe(erkenneKoordinate(km), BERLIN, 1);
+  });
+
   it('UTM, Gauß-Krüger und Grad/Minuten/Sekunden aus der eigenen Formatierung', () => {
     for (const system of ['utm', 'gk', 'dms'] as const) {
       nahe(erkenneKoordinate(formatiere(BERLIN.lat, BERLIN.lon, system)), BERLIN, 3);
@@ -64,6 +74,18 @@ describe('erkenneKoordinate — an der FORM, nicht am eingestellten Format', () 
       '32U MV 123 4567', // ungerade Ziffernzahl
       'Florian 1/44-1',
       '1/3/18//22', // Stärke-Schreibweise
+      // Review-Befund zu LFH-619: Fahrzeug-/Einheitenkennungen und Uhrzeiten haben die Form
+      // „Zahl · Buchstabe · zwei Buchstaben · Ziffern" — die mgrs-Bibliothek rechnet sie
+      // ungeprüft in Punkte im Südpazifik um. Ohne Riegel stünde die Kartenzeile oben und
+      // Enter flöge die Karte weg, statt das Fahrzeug zu öffnen.
+      '1 HLF 20',
+      '1 TLF 3000',
+      '2 DLK 23',
+      '5 SEG 12',
+      '12 Uhr 30',
+      '10 Uhr 15',
+      '12.30 13.45', // Uhrzeitspanne
+      '8.15, 9.30',
     ]) {
       expect(erkenneKoordinate(s), s).toBeNull();
     }

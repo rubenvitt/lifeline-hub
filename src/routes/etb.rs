@@ -289,7 +289,10 @@ pub async fn anzahl(
     Ok(Json(EtbAnzahlAnzeige { anzahl }))
 }
 
-/// Lesezugriff auf den Einsatz plus Modulzugriff „etb“ — die Gates beider Leserouten.
+/// Lesezugriff auf den Einsatz plus Modulzugriff „etb“ — die Gates aller vier Leserouten
+/// (Liste, Zählung, beide Lesemarken-Routen). NICHT Schreibrecht und NICHT „aktiv": ein
+/// Beobachter liest und führt seine Lesemarke ebenso, und ein abgeschlossener Einsatz bleibt
+/// lesbar.
 async fn fordere_lese_gates(
     state: &AppState,
     benutzer: &crate::auth::Benutzer,
@@ -346,20 +349,6 @@ pub struct LesemarkeSetzen {
     pub bis_lfd_nr: i64,
 }
 
-/// Gemeinsame Gates beider Lesemarken-Routen: Lesezugriff + Modulzugriff — NICHT
-/// Schreibrecht und NICHT „aktiv". Die eigene Lesemarke ist kein Schreibzugriff auf den
-/// Einsatz; ein Beobachter führt sie ebenso, und ein abgeschlossener Einsatz bleibt lesbar.
-async fn fordere_lesemarken_zugriff(
-    state: &AppState,
-    benutzer: &crate::auth::Benutzer,
-    einsatz_id: i64,
-) -> Result<(), AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?; // 404, wenn unbekannt
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, benutzer).await
-}
-
 /// GET /api/einsaetze/{id}/etb/lesemarke — der eigene Lesestand (LFH-611): Marke,
 /// Zeitpunkt der letzten Sichtung und die Zahl fremder Einträge darüber.
 pub async fn lesemarke(
@@ -367,7 +356,7 @@ pub async fn lesemarke(
     CurrentUser(benutzer): CurrentUser,
     PfadParam(einsatz_id): PfadParam<i64>,
 ) -> Result<Json<EtbLesemarkeAnzeige>, AppError> {
-    fordere_lesemarken_zugriff(&state, &benutzer, einsatz_id).await?;
+    fordere_lese_gates(&state, &benutzer, einsatz_id).await?;
     Ok(Json(
         lesemarke::laden(&state.pool, einsatz_id, benutzer.id).await?,
     ))
@@ -384,7 +373,7 @@ pub async fn lesemarke_setzen(
     PfadParam(einsatz_id): PfadParam<i64>,
     JsonBody(req): JsonBody<LesemarkeSetzen>,
 ) -> Result<Json<EtbLesemarkeAnzeige>, AppError> {
-    fordere_lesemarken_zugriff(&state, &benutzer, einsatz_id).await?;
+    fordere_lese_gates(&state, &benutzer, einsatz_id).await?;
     if req.bis_lfd_nr < 1 {
         return Err(AppError::Validation(
             "bis_lfd_nr muss mindestens 1 sein".into(),

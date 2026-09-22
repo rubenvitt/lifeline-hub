@@ -908,7 +908,8 @@ describe('CommandPalette · Koordinatensprung (LFH-619)', () => {
       <CommandPalette
         // Ein Modul, dessen Label die getippte Zahl enthält — es darf die Zeile nicht verdrängen.
         befehle={[befehl('m', 'Messpunkt 52.52, 13.41')]}
-        datensatzTreffer={[datensatz('datensatz:personen:1', 'Person 52.52, 13.41')]}
+        // Ein gewöhnlicher Texttreffer (Stufe 3) — ein exakter stünde zu Recht vorn, siehe unten.
+        datensatzTreffer={[datensatz('datensatz:personen:1', 'Person 52.52, 13.41', () => {}, 3)]}
         koordinatenSprung={sprung}
         schliesse={() => {}}
       />,
@@ -919,6 +920,24 @@ describe('CommandPalette · Koordinatensprung (LFH-619)', () => {
     expect(zeilen[0]).toHaveTextContent('Auf Lagekarte zeigen · 52.52, 13.41');
     await u.keyboard('{Enter}');
     expect(karte).toHaveBeenCalledTimes(1);
+  });
+
+  it('ein exakter Datensatztreffer (Stufe 0) steht VOR der Kartenzeile', async () => {
+    // Review-Befund zu LFH-619: mit Score 0 verdrängte die Kartenzeile jeden bewerteten
+    // Stufe-0-Treffer. Die Eingabe, die genau einen Datensatz benennt, meint den Datensatz.
+    const u = userEvent.setup();
+    renderMitProviders(
+      <CommandPalette
+        befehle={[]}
+        datensatzTreffer={[datensatz('datensatz:personen:1', 'Person 52.52, 13.41', () => {}, 0)]}
+        koordinatenSprung={sprung}
+        schliesse={() => {}}
+      />,
+    );
+    await u.type(screen.getByRole('combobox'), '52.52, 13.41');
+    const zeilen = screen.getAllByRole('option');
+    expect(zeilen[0]).toHaveTextContent('Person 52.52, 13.41');
+    expect(zeilen[1]).toHaveTextContent('Auf Lagekarte zeigen');
   });
 
   it('fehlt in einem Präfixmodus — dort ist die Eingabe kein Ort', async () => {

@@ -1153,6 +1153,25 @@ describe('baueDatensatzTreffer — ETB-Sammeltreffer (LFH-619)', () => {
     expect(ids(t)).toEqual(['datensatz:etb:4', 'datensatz:etb:suche']);
   });
 
+  it('bleibt auch in der SICHTBAREN Ordnung hinter einem Einzeltreffer der Stufe 3', () => {
+    // Review-Befund: die Array-Reihenfolge ist nicht die sichtbare, `ordneTreffer` sortiert
+    // neu. Bei einer Mehrwortsuche liegt jeder Einzeltreffer auf Stufe 3 (kein Wort beginnt
+    // mit „deich nord") — mit Stufe 2 stand der Sammeltreffer davor und war vorausgewählt.
+    const t = baueDatensatzTreffer(
+      kontext({
+        suche: 'deich nord',
+        quellen: {
+          etbText: [etb({ id: 4, inhalt: 'Lage am Deich Nord unverändert' })],
+          etbAnzahl: { anzahl: 3 },
+        },
+      }),
+    );
+    expect(ordneTreffer(t, 'deich nord').map((b) => b.id)).toEqual([
+      'datensatz:etb:4',
+      'datensatz:etb:suche',
+    ]);
+  });
+
   it('„1 Treffer" im Singular, keine Zeile bei null Treffern', () => {
     const eins = baueDatensatzTreffer(
       kontext({ suche: 'deich', quellen: { etbAnzahl: { anzahl: 1 } } }),
@@ -1196,5 +1215,16 @@ describe('baueDatensatzTreffer — ETB-Sammeltreffer (LFH-619)', () => {
     expect(sichtbareDatensaetze(t, 'kraefte', 'deich')).toEqual([]);
     expect(sichtbareDatensaetze(t, 'alles', '??')).toEqual([]);
     expect(ids(sichtbareDatensaetze(t, 'etb', 'deich'))).toEqual(['datensatz:etb:suche']);
+  });
+
+  it('ein Sammeltreffer für einen ÄLTEREN Begriff wird nicht angezeigt', () => {
+    // Review-Befund: der Treffer stammt aus dem entprellten Begriff. Beim Weitertippen von
+    // „deich" zu „deichbruch" stünde sonst „Alle Einträge zu „deich““ da und spränge auf eine
+    // Suche, die niemand mehr gestellt hat.
+    const t = baueDatensatzTreffer(
+      kontext({ suche: 'deich', quellen: { etbAnzahl: { anzahl: 5 } } }),
+    );
+    expect(sichtbareDatensaetze(t, 'alles', 'deichbruch')).toEqual([]);
+    expect(ids(sichtbareDatensaetze(t, 'alles', ' deich '))).toEqual(['datensatz:etb:suche']);
   });
 });

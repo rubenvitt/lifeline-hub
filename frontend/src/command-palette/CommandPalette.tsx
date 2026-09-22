@@ -8,6 +8,7 @@ import Tastenkuerzel from '../components/Tastenkuerzel';
 import { schrift } from '../theme/tokens';
 import { sichtbareDatensaetze } from './datensaetze';
 import {
+  UNBEWERTET,
   filtereBefehle,
   filtereNachModus,
   modiMitPraefix,
@@ -150,14 +151,16 @@ export function CommandPalette({
    * Die Kartenzeile nur im Vorgabemodus: hinter einem Präfix ist die Eingabe eine Suche in
    * einer bestimmten Menge (ETB, Kräfte, Aktionen), kein Ort.
    *
-   * Stufe 0 und Score 0 sind hier keine Behauptung ohne Bewertung (vgl. `UNBEWERTET` in
-   * `fuzzy.ts`): die Eingabe IST die Koordinate, genauer kann ein Treffer nicht passen. Die
-   * Zeile steht damit vorn und ist vorausgewählt — ein Enter, und die Karte fliegt hin.
+   * Stufe 0, aber ein Score HINTER jedem anderen Stufe-0-Treffer (Review-Befund zu LFH-619):
+   * steht ein Datensatz oder Befehl da, dessen Name oder Nummer die Eingabe genau trifft,
+   * meint die Eingabe ihn. Vor allem Übrigen steht die Kartenzeile und ist dann
+   * vorausgewählt — ein Enter, und die Karte fliegt hin. `UNBEWERTET + 1` ist strikt
+   * schlechter als jeder Fuse-Score und als jeder unbewertete Datensatztreffer.
    */
   const koordinate = useMemo<Treffer | null>(() => {
     if (modus !== 'alles' || !koordinatenSprung) return null;
     const b = koordinatenSprung(rest);
-    return b ? { befehl: b, score: 0, stufe: 0 } : null;
+    return b ? { befehl: b, score: UNBEWERTET + 1, stufe: 0 } : null;
   }, [modus, rest, koordinatenSprung]);
 
   const treffer = useMemo(() => {
