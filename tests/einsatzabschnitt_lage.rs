@@ -270,3 +270,67 @@ async fn anlegen_mit_lagezustand_nennt_ihn_im_etb() {
     assert!(texte.contains(&"Abschnitt «Süd» angelegt (Lage: planmäßig)".to_string()));
     assert!(texte.contains(&"Abschnitt «West» angelegt".to_string()));
 }
+
+#[tokio::test]
+async fn lagewechsel_bleibt_dokumentiert_wenn_die_sprechgruppen_zuordnung_scheitert() {
+    // Review LFH-608: das Formular schickt `sprechgruppe_ids` bei JEDEM Speichern mit. Scheitert
+    // die Zuordnung, darf der schon gespeicherte Lagewechsel nicht ohne ETB-Eintrag bleiben.
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let aid = anlegen(
+        &app,
+        &admin,
+        einsatz,
+        r#"{"name":"Nord","lagezustand":"planmaessig"}"#,
+    )
+    .await["id"]
+        .as_i64()
+        .unwrap();
+    let vorher = system_etb_anzahl(&app, &admin, einsatz).await;
+
+    let (s, _) = patch(
+        &app,
+        &admin,
+        einsatz,
+        aid,
+        r#"{"lagezustand":"kritisch","sprechgruppe_ids":[987654]}"#,
+    )
+    .await;
+    assert!(
+        s.is_client_error(),
+        "unbekannte Sprechgruppe muss scheitern, war {s}"
+    );
+
+    let (_, liste) = anfrage(&app, "GET", &pfad(einsatz), &admin, None).await;
+    assert_eq!(liste[0]["lagezustand"], "kritisch");
+    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, vorher + 1);
+    assert_eq!(
+        system_texte(&app, &admin, einsatz).await[0],
+        "Lage Abschnitt «Nord»: planmäßig → kritisch"
+    );
+}
+
+#[tokio::test]
+async fn umbenennen_und_lagewechsel_im_selben_patch_nennt_den_neuen_namen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let aid = anlegen(&app, &admin, einsatz, r#"{"name":"Nord"}"#).await["id"]
+        .as_i64()
+        .unwrap();
+    let (s, json) = patch(
+        &app,
+        &admin,
+        einsatz,
+        aid,
+        r#"{"name":"Deich Nord","lagezustand":"angespannt"}"#,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(json["lagezustand"], "angespannt");
+    assert_eq!(
+        system_texte(&app, &admin, einsatz).await[0],
+        "Lage Abschnitt «Deich Nord»: nicht beurteilt → angespannt"
+    );
+}

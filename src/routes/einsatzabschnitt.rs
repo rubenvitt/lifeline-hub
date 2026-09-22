@@ -294,16 +294,6 @@ pub async fn aktualisieren(
         Some(Some(w)) => Some(Some(pruefe_fortschritt(w)?)),
         andere => andere,
     };
-    // Der Vorher-Stand nur, wenn der Lagezustand im Patch steht — sonst gibt es keinen
-    // Wechsel zu protokollieren und keine zusätzliche Abfrage.
-    let lage_vorher = match lagezustand {
-        Some(_) => Some(
-            abschnitt_repo::laden(&state.pool, einsatz_id, aid)
-                .await?
-                .lagezustand,
-        ),
-        None => None,
-    };
     let mut anzeige = abschnitt_repo::patche(
         &state.pool,
         einsatz_id,
@@ -317,12 +307,47 @@ pub async fn aktualisieren(
             erreichbarkeit: erreichbar.as_ref().map(|v| v.as_deref()),
             sortier: body.sortier,
             kurzbezeichnung: kurz.as_ref().map(|v| v.as_deref()),
-            lagezustand,
             abschnittsauftrag: abschnittsauftrag.as_ref().map(|v| v.as_deref()),
             fortschritt,
         },
     )
     .await?;
+    // Lagewechsel + ETB-Eintrag atomar in EINER Tx, und zwar VOR der Sprechgruppen-
+    // Zuordnung: scheitert die mit 422, bleibt der gespeicherte Wechsel trotzdem nicht
+    // undokumentiert (LFH-608, Review). Der Eintrag entsteht nur bei echtem Wechsel.
+    if let Some(neu) = lagezustand {
+        let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
+            .await?
+            .etb_startwert();
+        let etb_id = crate::write_retry!(&state.pool, |conn| {
+            match abschnitt_repo::setze_lagezustand_tx(conn, einsatz_id, aid, neu).await? {
+                Some(wechsel) => {
+                    let text = format!(
+                        "Lage Abschnitt «{}»: {} → {}",
+                        wechsel.name,
+                        lage_wort(wechsel.vorher),
+                        lage_wort(neu)
+                    );
+                    Ok(Some(
+                        crate::etb::system_audit_tx(
+                            conn,
+                            einsatz_id,
+                            benutzer.id,
+                            startwert,
+                            &text,
+                        )
+                        .await?,
+                    ))
+                }
+                None => Ok(None),
+            }
+        })?;
+        if let Some(etb_id) = etb_id {
+            // Live erst nach dem Commit (Reinheits-Kontrakt wie beim Auflösen).
+            state.live.publiziere(einsatz_id, etb_id);
+        }
+        anzeige = abschnitt_repo::laden(&state.pool, einsatz_id, aid).await?;
+    }
     if let Some(ids) = body.sprechgruppe_ids {
         crate::sprechgruppe::repo::setze_abschnitt_sprechgruppen(
             &state.pool,
@@ -333,22 +358,6 @@ pub async fn aktualisieren(
         )
         .await?;
         anzeige = abschnitt_repo::laden(&state.pool, einsatz_id, aid).await?;
-    }
-    if let Some(vorher) = lage_vorher {
-        if vorher != anzeige.lagezustand {
-            super::etb_system_degradiert(
-                &state,
-                einsatz_id,
-                benutzer.id,
-                &format!(
-                    "Lage Abschnitt «{}»: {} → {}",
-                    anzeige.name,
-                    lage_wort(vorher),
-                    lage_wort(anzeige.lagezustand)
-                ),
-            )
-            .await?;
-        }
     }
     sse_abschnitt(&state, einsatz_id, aid);
     Ok(Json(anzeige))

@@ -270,7 +270,8 @@ pub struct AbschnittPatch<'a> {
     pub erreichbarkeit: Option<Option<&'a str>>,
     pub sortier: Option<i64>,
     pub kurzbezeichnung: Option<Option<&'a str>>,
-    pub lagezustand: Option<Option<AbschnittLagezustand>>,
+    // Der Lagezustand fehlt hier absichtlich: er hat mit `setze_lagezustand_tx` einen
+    // eigenen Schreibweg, der den ETB-Eintrag in derselben Transaktion schreibt.
     pub abschnittsauftrag: Option<Option<&'a str>>,
     pub fortschritt: Option<Option<i64>>,
 }
@@ -355,10 +356,9 @@ pub async fn patche(
             erreichbarkeit = CASE WHEN ?11 IS NULL THEN erreichbarkeit ELSE ?12 END, \
             sortier = CASE WHEN ?13 IS NULL THEN sortier ELSE ?14 END, \
             kurzbezeichnung = CASE WHEN ?15 IS NULL THEN kurzbezeichnung ELSE ?16 END, \
-            lagezustand = CASE WHEN ?17 IS NULL THEN lagezustand ELSE ?18 END, \
-            abschnittsauftrag = CASE WHEN ?19 IS NULL THEN abschnittsauftrag ELSE ?20 END, \
-            fortschritt = CASE WHEN ?21 IS NULL THEN fortschritt ELSE ?22 END \
-         WHERE id = ?23 AND einsatz_id = ?24",
+            abschnittsauftrag = CASE WHEN ?17 IS NULL THEN abschnittsauftrag ELSE ?18 END, \
+            fortschritt = CASE WHEN ?19 IS NULL THEN fortschritt ELSE ?20 END \
+         WHERE id = ?21 AND einsatz_id = ?22",
     )
     .bind(patch.ueber_abschnitt_id.map(|_| 1_i64))
     .bind(patch.ueber_abschnitt_id.and_then(|v| v))
@@ -376,8 +376,6 @@ pub async fn patche(
     .bind(patch.sortier)
     .bind(patch.kurzbezeichnung.map(|_| 1_i64))
     .bind(patch.kurzbezeichnung.and_then(|v| v))
-    .bind(patch.lagezustand.map(|_| 1_i64))
-    .bind(patch.lagezustand.and_then(|v| v).map(|l| l.as_str()))
     .bind(patch.abschnittsauftrag.map(|_| 1_i64))
     .bind(patch.abschnittsauftrag.and_then(|v| v))
     .bind(patch.fortschritt.map(|_| 1_i64))
@@ -390,6 +388,46 @@ pub async fn patche(
         return Err(AppError::NotFound);
     }
     laden(pool, einsatz_id, id).await
+}
+
+/// Ein tatsächlicher Wechsel des Lagezustands: der vorherige Wert und der Abschnittsname
+/// (für den ETB-Text, nach einer etwaigen Umbenennung im selben PATCH).
+#[derive(Debug, PartialEq, Eq)]
+pub struct Lagewechsel {
+    pub vorher: Option<AbschnittLagezustand>,
+    pub name: String,
+}
+
+/// Setzt den Lagezustand IN der übergebenen Transaktion und liefert den Wechsel, falls es
+/// einer ist (`None` bei gleichem Wert). Lesen und Schreiben liegen damit unter derselben
+/// Schreibsperre (`write_retry!` → `BEGIN IMMEDIATE`): zwei gleichzeitige Beurteilungen
+/// sehen je den Stand der anderen, und keine Entwarnung geht als „kein Wechsel“ verloren
+/// (LFH-608, Review). `NotFound`, falls der Abschnitt nicht zum Einsatz gehört.
+pub async fn setze_lagezustand_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    id: i64,
+    neu: Option<AbschnittLagezustand>,
+) -> Result<Option<Lagewechsel>, AppError> {
+    let (alt, name): (Option<String>, String) = sqlx::query_as(
+        "SELECT lagezustand, name FROM einsatzabschnitt WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .ok_or(AppError::NotFound)?;
+    let vorher = alt.as_deref().and_then(AbschnittLagezustand::parse);
+    if vorher == neu {
+        return Ok(None);
+    }
+    sqlx::query("UPDATE einsatzabschnitt SET lagezustand = ? WHERE id = ? AND einsatz_id = ?")
+        .bind(neu.map(|l| l.as_str()))
+        .bind(id)
+        .bind(einsatz_id)
+        .execute(&mut *conn)
+        .await?;
+    Ok(Some(Lagewechsel { vorher, name }))
 }
 
 /// Reine Fläche-/Symbol-Felder eines Abschnitts. `Some(None)` = auf NULL, `None` = unverändert.

@@ -252,7 +252,9 @@ export interface AbschnittZeile {
   abschnittsauftrag: string | null;
   fortschritt: number | null;
   /** Schlechtester Lagezustand eines Unterabschnitts, NUR wenn er schlechter ist als der
-   *  eigene — sonst verschwände ein kritischer Unterabschnitt hinter einer grünen Kante. */
+   *  eigene. Die Kante bleibt die Beurteilung des Abschnitts selbst; die Seite setzt den
+   *  Unterabschnitt als eigenes Etikett mit Rollenrand daneben, damit ein kritischer
+   *  Unterabschnitt nicht hinter einer grünen Kante verschwindet. */
   unterLage: AbschnittLagezustand | null;
 }
 

@@ -772,10 +772,17 @@ function AbschnittEintrag({ zeile, ziel }: { zeile: AbschnittZeile; ziel: string
         {(lage || zeile.unterLage) && (
           <span style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
             {lage && <StatusTag darstellung={lage} darstellungsart="rand" />}
+            {/* Ein schlechter beurteilter Unterabschnitt bekommt DIESELBE Form wie der
+                eigene Zustand (Rollenrand + Wort), nicht bloß gedämpften Text — sonst stünde
+                „UA kritisch“ leiser da als ein grünes „planmäßig“ (LFH-608, Review). */}
             {zeile.unterLage && (
-              <span style={{ ...monoStil(10), color: rollen.schwach }}>
-                UA {abschnittLagezustand[zeile.unterLage].label}
-              </span>
+              <StatusTag
+                darstellung={{
+                  ...abschnittLagezustand[zeile.unterLage],
+                  label: `UA ${abschnittLagezustand[zeile.unterLage].label}`,
+                }}
+                darstellungsart="rand"
+              />
             )}
           </span>
         )}

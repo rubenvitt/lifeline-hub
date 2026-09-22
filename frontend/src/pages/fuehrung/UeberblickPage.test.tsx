@@ -297,6 +297,29 @@ describe('UeberblickPage', () => {
     expect(zeile).toHaveTextContent('0/1 Aufträge erledigt');
   });
 
+  it('Abschnittszeile meldet einen schlechter beurteilten Unterabschnitt als eigenes Etikett', async () => {
+    stelleBereit({
+      ...volleDaten,
+      abschnitte: [
+        { ...volleDaten.abschnitte[0], lagezustand: 'planmaessig' } as Daten['abschnitte'][number],
+        {
+          ...volleDaten.abschnitte[0],
+          id: 6,
+          name: 'Deichspitze',
+          ueber_abschnitt_id: 5,
+          lagezustand: 'kritisch',
+        } as unknown as Daten['abschnitte'][number],
+      ],
+    });
+    rendern();
+    const p = await waitFor(() => paneel('Einsatzabschnitte'));
+    const zeile = await within(p).findByRole('link', { name: /Abschnitt Nord/ });
+    expect(
+      zeile.querySelector('[data-lfh="abschnitt-lagekante"]')!.getAttribute('data-rolle'),
+    ).toBe('normal');
+    expect(within(zeile).getByText('UA kritisch')).toBeInTheDocument();
+  });
+
   it('Abschnittszeile ohne gepflegte Lage: keine Kantenfarbe, kein Balken, Auftrag wie bisher', async () => {
     stelleBereit(volleDaten);
     rendern();
