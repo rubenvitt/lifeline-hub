@@ -33,7 +33,8 @@ Stand vor der Änderung (Motivation: proposal.md, Why):
   braucht, bekommt eigene Anforderungen.
 - Keine Änderung an `einsatzKennung`/`kachelKennung`: sie lesen das Feld weiter und fallen
   auf die Leitstellen-Nr. zurück.
-- Das Jahr folgt der Organisations-Zeitzone **nicht** (s. Risiken).
+- Die Validierung von `zeitzone` wird **nicht** verschärft. Sie bleibt „nicht leer“, und ein
+  unbekannter Wert fällt bei der Vergabe auf `Europe/Berlin` zurück (Entscheidung 7).
 
 ## Decisions
 
@@ -74,9 +75,9 @@ verschwindet das Feld, sodass auch kein anderer Aufrufer es noch schreiben kann.
 
 **5. Formatierung an einer Stelle in Rust.**
 Eine reine Funktion `format!("{praefix}{jahr}-{lfd:04}")` mit Unit-Test (Padding, > 9999,
-Vorgabe-Präfix). Das Präfix wird in derselben Transaktion aus `org_einstellungen` gelesen
-(`NULL` → `E-`). Den Jahreswert liefert weiter `strftime('%Y','now')` aus derselben
-Verbindung, wie im Bestand.
+Vorgabe-Präfix). Das Präfix und die Zeitzone werden in derselben Transaktion aus `org_einstellungen` gelesen
+(`NULL` → `E-`). Das Jahr kommt nicht mehr aus `strftime('%Y','now')`, sondern aus
+Entscheidung 7.
 
 **6. Frontend: Formularfeld entfernen, Lesezweig behalten.**
 `EinsatzdatenPage` hat im Lesezweig („Technische Angaben“) schon eine reine Anzeige. Im
@@ -89,11 +90,29 @@ noch **eine** Systemnummer neben der Leitstellen-Nr.
 Speichern der Anzeige-Sektion das Präfix, ohne dass ein Test rot wird oder ein Fehler
 erscheint.
 
+**7. Das Jahr kommt aus der Org-Zeitzone, über `chrono-tz`.**
+Bisher lieferte `strftime('%Y','now')` das UTC-Jahr, und ein Einsatz in der Neujahrsnacht
+bekam bis 01:00 bzw. 02:00 Uhr Ortszeit noch eine Vorjahresnummer. Neu ist die reine Funktion
+`jahr_in_zone(jetzt: DateTime<Utc>, zeitzone: Option<&str>) -> i32`: `chrono_tz::Tz` aus dem
+Namen parsen, bei `None` oder einem Parse-Fehler `Europe/Berlin` nehmen (im Fehlerfall mit
+`tracing::warn!`) und das Jahr des lokalen Datums liefern. `jetzt` wird übergeben statt innen
+gelesen, damit die Neujahrsgrenze ohne Uhr-Mock prüfbar ist. Getestet wird beidseits der
+Grenze in Winter- **und** Sommerzeitzonen sowie mit `UTC`.
+Die Einsatz-Zeitzone wird nicht einbezogen: beim Anlegen gibt es noch keine
+`einsatz_einstellungen`. Die Vorgabe `Europe/Berlin` statt UTC folgt der Oberfläche
+(`AnzeigeEinstellungen`: „Europe/Berlin (Fallback)“).
+Erwogen: `jiff` mit gebündelter tzdb. Verworfen, weil das Repo schon `chrono` nutzt und eine
+zweite Zeitbibliothek keine Wahrheitsquelle mit ihm teilt. Kosten: die eingebettete
+Zeitzonendatenbank macht das Binary etwas größer, das Single-Binary bleibt.
+
 ## Risks / Trade-offs
 
-- [Jahreswechsel in UTC] Ein Einsatz um 00:30 Uhr Ortszeit am 1. Januar bekommt noch die
-  Vorjahresnummer. So ist schon der Bestand. Behoben wäre das nur mit einer Zeitzonen-Bibliothek
-  (kein `chrono-tz` im Baum) → als Nachzug-Ticket erfassen, nicht hier lösen.
+- [Veraltete tzdb] Die Zeitzonendatenbank ist ins Binary kompiliert. Ändert ein Staat seine
+  Regeln, stimmt die Grenze erst nach einem Update von `chrono-tz`. Für die Jahresgrenze in
+  Mitteleuropa ist das praktisch ohne Belang.
+- [Freitext-Zeitzone] Da die Validierung nicht verschärft wird, landet ein Tippfehler still
+  bei `Europe/Berlin`. Das Log zeigt dann eine Warnung. Eine strengere Prüfung wäre eine
+  eigene Bedienentscheidung für beide Einstellungsebenen.
 - [Präfix-Kollision] Zwei verschiedene Präfixe könnten theoretisch denselben Text ergeben.
   Beispiel: Präfix `A` mit lfd. Nr. 5-stellig gegenüber einem anderen Präfix. Dann greift der
   String-Index, und das Sicherheitsnetz aus LFH-245 liefert 409 statt 500. Praktisch ist das

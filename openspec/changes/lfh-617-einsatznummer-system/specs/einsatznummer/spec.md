@@ -10,14 +10,23 @@ pflegbare Leitstellen-Nr. bleibt davon getrennt.
 
 ### Requirement: Vergabe beim Anlegen
 Das System SHALL jedem über `POST /api/einsaetze` angelegten Einsatz eine Einsatznummer im
-Format `<Präfix><JJJJ>-<NNNN>` vergeben. `JJJJ` ist das Kalenderjahr des Anlegezeitpunkts,
-`NNNN` die laufende Nummer, mindestens 4-stellig mit führenden Nullen. Die laufende Nummer
+Format `<Präfix><JJJJ>-<NNNN>` vergeben. `JJJJ` ist das Kalenderjahr des Anlegezeitpunkts in der Zeitzone der Organisation
+(Einstellung `zeitzone`). Fehlt sie oder ist sie keine bekannte IANA-Zeitzone, gilt
+`Europe/Berlin`. `NNNN` ist die laufende Nummer, mindestens 4-stellig mit führenden Nullen. Die laufende Nummer
 MUST je Organisation und Jahr bei 1 beginnen und um 1 steigen. Nummern anderer Organisationen
 und anderer Jahre MUST NOT die Zählung beeinflussen.
 
 #### Scenario: Erster und zweiter Einsatz im Jahr
 - **WHEN** eine Organisation ohne eigenes Präfix im Jahr 2026 zwei Einsätze anlegt
 - **THEN** trägt der erste `E-2026-0001` und der zweite `E-2026-0002`
+
+#### Scenario: Neujahrsnacht zählt zum neuen Jahr
+- **WHEN** eine Organisation mit Zeitzone `Europe/Berlin` (oder ohne Zeitzone) am 01.01.2027 um 00:30 Uhr Ortszeit (31.12.2026 23:30 UTC) einen Einsatz anlegt
+- **THEN** trägt er `E-2027-0001`, nicht eine Nummer des Jahres 2026
+
+#### Scenario: Unbekannte Zeitzone
+- **WHEN** die Zeitzone der Organisation ein Wert ist, der keine IANA-Zeitzone ist
+- **THEN** wird das Jahr in `Europe/Berlin` bestimmt, und das Anlegen gelingt
 
 #### Scenario: Zählung je Organisation getrennt
 - **WHEN** Organisation 2 im Jahr 2026 schon Nummern bis `E-2026-0009` hat und Organisation 1 ihren ersten Einsatz des Jahres anlegt

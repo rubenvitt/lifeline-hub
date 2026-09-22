@@ -10,7 +10,8 @@ Arbeitsweise je Aufgabe: `superpowers:test-driven-development` (erst roter Test,
 ## 2. Vergabe (Backend)
 
 - [ ] 2.1 Reine Formatfunktion für `<Präfix><JJJJ>-<NNNN>` mit Unit-Tests (Vorgabe `E-`, Padding `0001`, `10000` ungekürzt, eigenes Präfix). Verifikation: `cargo test` für die Funktion.
-- [ ] 2.2 `repo::anlegen` umstellen: in der bestehenden `write_retry!`-Transaktion das Präfix aus `org_einstellungen` lesen, `MAX(nummer_lfd)` je `(org_id, nummer_jahr)`, Text + Jahr + lfd. Nr. schreiben, `substr`-Zählung entfernen. Verifikation: die Repo-Tests `anlegen_vergibt_fortlaufende_einsatznummer` / `anlegen_zaehlt_je_organisation_getrennt` auf `E-JJJJ-000N` umgestellt, dazu neue Tests „Zählung setzt hinter Bestandsnummer `JJJJ-003` mit `0004` fort“ und „Präfixwechsel trifft nur neue Einsätze“.
+- [ ] 2.2 `chrono-tz` in `Cargo.toml` aufnehmen und die reine Funktion `jahr_in_zone(jetzt, zeitzone)` bauen (`None`/unbekannt → `Europe/Berlin` mit `tracing::warn!`). Verifikation: Unit-Tests für 31.12. 22:59 UTC und 23:00 UTC in `Europe/Berlin` (2026 bzw. 2027), dieselbe Grenze in `UTC`, `None` wie Berlin, `"Quatsch/Zone"` wie Berlin, und eine Sommerzeitzone (`Australia/Sydney`: 31.12. 13:00 UTC ist schon das neue Jahr).
+- [ ] 2.3 `repo::anlegen` umstellen: in der bestehenden `write_retry!`-Transaktion Präfix und Zeitzone aus `org_einstellungen` lesen, das Jahr über `jahr_in_zone(Utc::now(), …)` bestimmen, `MAX(nummer_lfd)` je `(org_id, nummer_jahr)`, Text + Jahr + lfd. Nr. schreiben, `substr`-Zählung entfernen. Verifikation: die Repo-Tests `anlegen_vergibt_fortlaufende_einsatznummer` / `anlegen_zaehlt_je_organisation_getrennt` auf `E-JJJJ-000N` umgestellt, dazu neue Tests „Zählung setzt hinter Bestandsnummer `JJJJ-003` mit `0004` fort“ und „Präfixwechsel trifft nur neue Einsätze“.
 
 ## 3. Unveränderlichkeit (Backend)
 
@@ -32,4 +33,3 @@ Arbeitsweise je Aufgabe: `superpowers:test-driven-development` (erst roter Test,
 ## 6. Abschluss
 
 - [ ] 6.1 `./scripts/check-all.sh` komplett grün (fmt, lint, Codegen/tsc, cargo test, Vitest, deps, e2e).
-- [ ] 6.2 Nachzug-Ticket für die Jahresgrenze in der Organisations-Zeitzone per `clickup-task-anlegen` erfassen und die Nummer in der Abschlussmeldung nennen.

@@ -15,7 +15,9 @@ erzeugt, unveränderlich).
 
 - Neue Einsätze erhalten eine Einsatznummer im Format `<Präfix><JJJJ>-<NNNN>`. Das Präfix
   ist mindestens 4-stellig, die Vorgabe `E-` ergibt z. B. `E-2026-0001`. Gezählt wird
-  je Organisation und Kalenderjahr fortlaufend.
+  je Organisation und Kalenderjahr fortlaufend. Das Jahr richtet sich nach der **Zeitzone der
+  Organisation** (Vorgabe `Europe/Berlin`), nicht nach UTC. Ein Einsatz um 00:30 Uhr am
+  Neujahrsmorgen zählt damit schon zum neuen Jahr.
 - Neue Org-Nummernkreis-Einstellung **„Präfix Einsatznummer“** (`einsatz_nummer_praefix`) steht
   neben den bestehenden Präfixen für ETB, Meldungen und Aufträge. Leer bedeutet `E-`.
   Beim Anlegen wird das Präfix in die gespeicherte Nummer **eingefroren**. Eine spätere Änderung
@@ -45,6 +47,7 @@ erzeugt, unveränderlich).
 - **Datenbank:** neue Migration nach `0103`: `einsatz.nummer_jahr`, `einsatz.nummer_lfd` plus
   Unique-Index je (Org, Jahr, lfd. Nr.), Übernahme der Bestandsnummern und
   `org_einstellungen.einsatz_nummer_praefix`.
+- **Abhängigkeit:** `chrono-tz` (IANA-Zeitzonendatenbank, passt zum vorhandenen `chrono`).
 - **Backend:** `src/einsatz/repo.rs` (`anlegen`, `patche_kopf`), `src/routes/einsatz.rs`
   (PATCH-Validierung), `src/org/einstellungen.rs` + `src/routes/org_einstellungen.rs`
   (neues Präfix mit bestehender Whitelist), `src/einsatz/schwaerzung_registry.rs` (zwei neue
