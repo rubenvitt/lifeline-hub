@@ -12,6 +12,7 @@ import {
   type sichtungsfarben,
 } from './tokens';
 import type {
+  AbschnittLagezustand,
   BelegungsArt,
   Ausmass,
   BrStatus,
@@ -139,6 +140,20 @@ export const einsatzStatus: Record<EinsatzStatus, StatusDarstellung> = {
   // sagt trotzdem nur, wie das Feld in der Datenbank heißt.
   aktiv: { rolle: 'normal', label: 'Aktiv' },
   abgeschlossen: { rolle: 'neutral', label: 'Abgeschlossen' },
+};
+
+/**
+ * Lagezustand eines Einsatzabschnitts (LFH-608) — die Kante der Abschnittszeile im
+ * Führungs-Überblick. Drei Stufen auf drei A0-Rollen, ohne Umweg: planmäßig ist `normal`
+ * (grün), angespannt `achtung`, kritisch `alarm`. „Nicht beurteilt" hat KEINEN Eintrag —
+ * das Feld ist dann leer, und eine erfundene Neutralstufe behauptete eine Beurteilung,
+ * die niemand getroffen hat. Der Entwurf färbt die UHS-Zeile blau; das ist keine
+ * Lagestufe, sondern Blau als Bedienrolle, und wird deshalb nicht übernommen.
+ */
+export const abschnittLagezustand: Record<AbschnittLagezustand, StatusDarstellung> = {
+  planmaessig: { rolle: 'normal', label: 'planmäßig' },
+  angespannt: { rolle: 'achtung', label: 'angespannt' },
+  kritisch: { rolle: 'alarm', label: 'kritisch' },
 };
 
 /** Registrierung/Fallbearbeitung, unabhängig von der medizinischen Sichtung.

@@ -46,7 +46,8 @@ import {
 } from '../../routing/deeplinks';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { formatUhrzeit, formatUhrzeitMitTag } from '../../anzeige/format';
-import { etbTyp } from '../../theme/statusFarben';
+import { abschnittLagezustand, etbTyp, rollenFarbe } from '../../theme/statusFarben';
+import StatusTag from '../../components/StatusTag';
 import { useViewport } from '../../components/useViewport';
 import {
   abschnittNamen,
@@ -81,9 +82,10 @@ import { MARKEN_BREITE, rasterStil, zeilenzielStil } from './ueberblickStil';
  * id), ein Refetch ordnet also nichts um, was sich nicht geändert hat.
  *
  * BEWUSST WEGGELASSEN (keine erfundenen Daten, Entscheidung 4): Pegel-Notiz an der
- * Warnstufe (LFH-606), Lagezustand-Farbkante und Fortschritt je Abschnitt (LFH-608),
- * Einheitenstatus (LFH-609 — ersetzt durch die Verfügbarkeit der Mittel), letzte
- * Rückmeldung je Abschnitt (LFH-610).
+ * Warnstufe (LFH-606), Einheitenstatus (LFH-609 — ersetzt durch die Verfügbarkeit der
+ * Mittel), letzte Rückmeldung je Abschnitt (LFH-610). Lagezustand, Kürzel, fester
+ * Auftrag und Fortschritt je Abschnitt kommen seit LFH-608 aus dem Abschnitt selbst —
+ * und bleiben weg, solange sie dort nicht gepflegt sind.
  */
 
 /** Der Entscheidungsabruf: nur Typ „Entscheidung", ein Deckel, der die letzte Stunde
@@ -716,44 +718,85 @@ export default function UeberblickPage() {
   );
 }
 
-/** Eine Abschnittszeile: Name/Leiter/Einheiten · jüngster offener Auftrag · Stärke und
- *  Mittelverteilung. Die ganze Zeile ist der Link auf den Abschnitt. */
+/** Eine Abschnittszeile: Lagekante · Name/Kürzel/Leiter/Einheiten/Lagezustand · fester
+ *  Auftrag mit Fortschritt (sonst jüngster offener Auftrag) · Stärke und Mittelverteilung.
+ *  Die ganze Zeile ist der Link auf den Abschnitt. */
 function AbschnittEintrag({ zeile, ziel }: { zeile: AbschnittZeile; ziel: string }) {
   const { token, rollen } = useRollen();
   const [juengster, ...weitere] = zeile.auftraege;
-  const { mittel } = zeile;
+  const { mittel, auftragsbilanz } = zeile;
+  const lage = zeile.lagezustand ? abschnittLagezustand[zeile.lagezustand] : null;
+  const leitung = [zeile.kurzbezeichnung, zeile.leiter].filter(Boolean).join(' · ');
+  // Unterzeile: die Zählung, und wenn der feste Auftrag den Platz hat, der offene
+  // Einzelauftrag dahinter — er wird kleiner, nicht unsichtbar.
+  const unterzeile = [
+    auftragsbilanz.gesamt > 0
+      ? `${auftragsbilanz.erledigt}/${auftragsbilanz.gesamt} Aufträge erledigt`
+      : null,
+    zeile.abschnittsauftrag && juengster
+      ? `${zeile.auftraege.length} offen · ${juengster.auftrag_text}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
   return (
     <Link
       to={ziel}
       data-lfh="ueberblick-abschnitt"
       style={{ ...zeilenzielStil(rollen, token), flexWrap: 'wrap', paddingBlock: token.padding }}
     >
+      {/* Die Lagekante: Farbe NUR als Rand (Bedien-Leitlinie), das Stufenwort steht im
+          StatusTag daneben. Ohne Beurteilung bleibt sie durchsichtig — eine graue Kante
+          sähe aus wie eine Stufe „neutral", die es nicht gibt. */}
+      <span
+        aria-hidden
+        data-lfh="abschnitt-lagekante"
+        data-rolle={lage?.rolle}
+        style={{
+          flex: '0 0 3px',
+          alignSelf: 'stretch',
+          background: lage ? rollenFarbe(lage.rolle, token) : 'transparent',
+        }}
+      />
       <span
         style={{ flex: '0 0 158px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}
       >
         <span style={{ fontSize: 14, fontWeight: 500, overflowWrap: 'anywhere' }}>
           {zeile.name}
         </span>
-        {zeile.leiter && (
-          <span style={{ ...monoStil(11), color: rollen.schwach }}>{zeile.leiter}</span>
-        )}
+        {leitung && <span style={{ ...monoStil(11), color: rollen.schwach }}>{leitung}</span>}
         <span style={{ ...monoStil(11), color: rollen.gedaempft }}>
           {zeile.einheiten === 1 ? '1 Einheit' : `${zeile.einheiten} Einheiten`}
           {zeile.unterabschnitte > 0 && ` · ${zeile.unterabschnitte} UA`}
         </span>
+        {(lage || zeile.unterLage) && (
+          <span style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
+            {lage && <StatusTag darstellung={lage} darstellungsart="rand" />}
+            {zeile.unterLage && (
+              <span style={{ ...monoStil(10), color: rollen.schwach }}>
+                UA {abschnittLagezustand[zeile.unterLage].label}
+              </span>
+            )}
+          </span>
+        )}
       </span>
       <span
         style={{
           flex: '1 1 160px',
           minWidth: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 7,
           fontSize: 12,
           lineHeight: 1.45,
           color: rollen.gedaempft,
           overflowWrap: 'anywhere',
         }}
       >
-        {juengster ? (
-          <>
+        {zeile.abschnittsauftrag ? (
+          <span>{zeile.abschnittsauftrag}</span>
+        ) : juengster ? (
+          <span>
             {juengster.auftrag_text}
             {weitere.length > 0 && (
               <span style={{ ...monoStil(10), color: rollen.schwach }}>
@@ -761,8 +804,27 @@ function AbschnittEintrag({ zeile, ziel }: { zeile: AbschnittZeile; ziel: string
                 · +{weitere.length} weitere offen
               </span>
             )}
-          </>
+          </span>
         ) : null}
+        {zeile.fortschritt != null && (
+          <span style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+            {/* Der Balken ist Beiwerk, die Zahl daneben die Aussage — deshalb aria-hidden. */}
+            <span
+              aria-hidden
+              style={{ flex: 1, height: 4, background: rollen.linie, display: 'flex' }}
+            >
+              <span
+                data-lfh="abschnitt-fortschritt"
+                style={{
+                  width: `${zeile.fortschritt}%`,
+                  background: lage ? rollenFarbe(lage.rolle, token) : rollen.gedaempft,
+                }}
+              />
+            </span>
+            <span style={{ ...monoStil(11), color: rollen.schwach }}>{zeile.fortschritt} %</span>
+          </span>
+        )}
+        {unterzeile && <span style={{ ...monoStil(10), color: rollen.schwach }}>{unterzeile}</span>}
       </span>
       <span
         style={{

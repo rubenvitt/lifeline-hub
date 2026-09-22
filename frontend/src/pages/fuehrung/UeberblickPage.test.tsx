@@ -265,6 +265,53 @@ describe('UeberblickPage', () => {
     expect(within(p).getByText('1 Abschnitte · 1 Einheiten')).toBeInTheDocument();
   });
 
+  it('Abschnittszeile mit Lage (LFH-608): Kante, Stufenwort, Kürzel, fester Auftrag, Fortschritt', async () => {
+    stelleBereit({
+      ...volleDaten,
+      abschnitte: [
+        {
+          ...volleDaten.abschnitte[0],
+          leiter_name: 'Vitt',
+          kurzbezeichnung: 'EA-N',
+          lagezustand: 'kritisch',
+          abschnittsauftrag: 'Deichsicherung km 3,8 – 5,4',
+          fortschritt: 72,
+        } as Daten['abschnitte'][number],
+      ],
+    });
+    rendern();
+    const p = await waitFor(() => paneel('Einsatzabschnitte'));
+    const zeile = await within(p).findByRole('link', { name: /Abschnitt Nord/ });
+    // Die Farbe trägt die Kante, das Wort trägt die Aussage (WCAG 1.4.1).
+    const kante = zeile.querySelector<HTMLElement>('[data-lfh="abschnitt-lagekante"]')!;
+    expect(kante).toHaveAttribute('data-rolle', 'alarm');
+    expect(zeile).toHaveAccessibleName(/kritisch/);
+    expect(zeile).toHaveTextContent('EA-N · Vitt');
+    // Der feste Auftrag steht vorn; der offene Einzelauftrag bleibt als kleine Zeile.
+    expect(zeile).toHaveTextContent('Deichsicherung km 3,8 – 5,4');
+    expect(zeile).toHaveTextContent('1 offen · Trupps verlegen');
+    // Fortschritt: Balken UND Zahl, daneben die Zählung — zwei Aussagen, beide benannt.
+    const balken = zeile.querySelector<HTMLElement>('[data-lfh="abschnitt-fortschritt"]')!;
+    expect(balken.style.width).toBe('72%');
+    expect(zeile).toHaveTextContent('72 %');
+    expect(zeile).toHaveTextContent('0/1 Aufträge erledigt');
+  });
+
+  it('Abschnittszeile ohne gepflegte Lage: keine Kantenfarbe, kein Balken, Auftrag wie bisher', async () => {
+    stelleBereit(volleDaten);
+    rendern();
+    const p = await waitFor(() => paneel('Einsatzabschnitte'));
+    const zeile = await within(p).findByRole('link', { name: /Abschnitt Nord/ });
+    expect(
+      zeile.querySelector('[data-lfh="abschnitt-lagekante"]')!.getAttribute('data-rolle'),
+    ).toBeNull();
+    expect(zeile.querySelector('[data-lfh="abschnitt-fortschritt"]')).toBeNull();
+    expect(zeile).not.toHaveTextContent('%');
+    expect(zeile).not.toHaveTextContent(/planmäßig|angespannt|kritisch/);
+    expect(zeile).toHaveTextContent('Trupps verlegen');
+    expect(zeile).toHaveTextContent('0/1 Aufträge erledigt');
+  });
+
   it('Offene Aufträge: überfällige zuerst, Status-Wort, Empfänger und Frist, Deeplink', async () => {
     stelleBereit(volleDaten);
     rendern();
