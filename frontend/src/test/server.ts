@@ -26,4 +26,12 @@ export const server = setupServer(
    * brauchen, überschreiben per `server.use()`.
    */
   http.get('/api/benutzer-einstellungen', () => HttpResponse.json({ eintraege: {} })),
+  /**
+   * Eigene ETB-Lesemarke (LFH-611) — „nichts Neues" als Default. Die ETB-Seite fragt sie beim
+   * Mount ab; jede Testfläche, die die Seite rendert, müsste den Handler sonst mitbringen, für
+   * ein Banner, mit dem ihr Gegenstand nichts zu tun hat. `{ neue_anzahl: 0 }` ist ein echter
+   * Serverzustand (leeres Tagebuch bzw. nur eigene Einträge), keine Attrappe; das Banner
+   * schweigt dazu. Tests des Banners überschreiben per `server.use()`.
+   */
+  http.get('/api/einsaetze/:einsatzId/etb/lesemarke', () => HttpResponse.json({ neue_anzahl: 0 })),
 );

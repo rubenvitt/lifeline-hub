@@ -126,6 +126,26 @@ function setup(route = '/einsaetze/7/etb') {
 }
 
 describe('EtbPage', () => {
+  it('LFH-611: zeigt die Lesemarke im Rahmen der Zeitachse, über ihr', async () => {
+    setupMSW();
+    server.use(
+      http.get('/api/einsaetze/7/etb/lesemarke', () =>
+        HttpResponse.json({ neue_anzahl: 4, hoechste_lfd_nr: 1 }),
+      ),
+    );
+    setup();
+    const text = await screen.findByText('4 Einträge, die Sie noch nicht gesichtet haben');
+    const rahmen = document.querySelector('[data-lfh="etb-zeitachse-rahmen"]')!;
+    const banner = text.closest('[data-lfh="sammelbanner"]')!;
+    expect(rahmen.contains(banner)).toBe(true);
+    const zeitachse = screen.getByRole('region', { name: 'Einsatztagebuch' });
+    // Im Fluss VOR der Zeitachse, nicht als Überlagerung in ihr.
+    expect(zeitachse.contains(banner)).toBe(false);
+    expect(
+      banner.compareDocumentPosition(zeitachse) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
   it.each(['2099-09-09 15:17:43', null])(
     'LFH-463: lädt beim Öffnen den inzwischen geänderten Termin frisch (%s)',
     async (termin) => {
