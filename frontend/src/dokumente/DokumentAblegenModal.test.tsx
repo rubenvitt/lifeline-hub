@@ -180,6 +180,49 @@ describe('DokumentAblegenModal', () => {
     expect(legeAb.mock.calls[0][1].bezug).toEqual({ typ: 'etb_eintrag', id: 9 });
   });
 
+  it('ersetzt einen automatisch gesetzten Titel bei neuer Dateiwahl', async () => {
+    rendere();
+    const d = await dialog();
+    await userEvent.upload(dateiInput(d), pdf());
+    await userEvent.upload(
+      dateiInput(d),
+      new File(['x'], 'Befehl 3.docx', { type: 'application/octet-stream' }),
+    );
+    expect(within(d).getByRole('textbox', { name: 'Titel' })).toHaveValue('Befehl 3');
+  });
+
+  it('lässt einen getippten Titel auch bei zweiter Dateiwahl stehen', async () => {
+    rendere();
+    const d = await dialog();
+    await userEvent.upload(dateiInput(d), pdf());
+    const titel = within(d).getByRole('textbox', { name: 'Titel' });
+    await userEvent.clear(titel);
+    await userEvent.type(titel, 'Mein Plan');
+    await userEvent.upload(dateiInput(d), new File(['x'], 'Befehl 3.docx'));
+    expect(titel).toHaveValue('Mein Plan');
+  });
+
+  it('das Entfernen der Datei füllt einen geleerten Titel NICHT wieder auf', async () => {
+    // Ohne den `removed`-Riegel läse die Entfernen-Meldung wie eine Dateiwahl: der geleerte
+    // Titel stünde danach wieder auf dem Namen der gerade entfernten Datei.
+    rendere();
+    const d = await dialog();
+    await userEvent.upload(dateiInput(d), pdf());
+    const titel = within(d).getByRole('textbox', { name: 'Titel' });
+    await userEvent.clear(titel);
+    await userEvent.click(within(d).getByRole('button', { name: /remove|entfernen/i }));
+    expect(titel).toHaveValue('');
+  });
+
+  it('fokussiert beim Öffnen „Datei wählen" statt des verborgenen Datei-Inputs', async () => {
+    // Belegt die Verdrahtung. Dass der Knopf im echten Browser fokussierbar ist und das
+    // `<input type="file">` nicht, misst erst das e2e (Task 5) — jsdom rechnet kein display.
+    rendere();
+    const d = await dialog();
+    const knopf = within(d).getByRole('button', { name: /Datei wählen/ });
+    await vi.waitFor(() => expect(document.activeElement).toBe(knopf));
+  });
+
   it('lässt Titel und Datei bei Ablehnung stehen und zeigt den Fehler IM Dialog', async () => {
     legeAb.mockRejectedValue(new ApiError(400, 'Dateityp exe ist nicht erlaubt'));
     rendere();

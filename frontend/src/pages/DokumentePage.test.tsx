@@ -224,6 +224,57 @@ describe('DokumentePage', () => {
     await vi.waitFor(() => expect(loeschAufrufe).toEqual(['5']));
   });
 
+  it('Kartenzweig: Entfernen mit Zeilennamen, rotem OK und DELETE erst nach Bestätigung', async () => {
+    setzeViewportBreite(390);
+    rendere(einsatzAktiv, [dokument(), dokument({ id: 6, titel: 'Foto Einsatzstelle' })]);
+    const ausloeser = await screen.findByRole('button', {
+      name: 'Dokument Lageplan Nord entfernen',
+    });
+    expect(document.querySelector('[data-lfh="datensicht-karte"]')).not.toBeNull();
+    // Der Auslöser bleibt neutral („Rot bedient nichts"), rot ist nur das OK.
+    expect(ausloeser).not.toHaveClass('ant-btn-dangerous');
+    expect(
+      screen.getByRole('button', { name: 'Dokument Foto Einsatzstelle entfernen' }),
+    ).toBeInTheDocument();
+    await userEvent.click(ausloeser);
+    const rueckfrage = (await screen.findByText('Dokument entfernen?')).closest<HTMLElement>(
+      '.ant-popover',
+    )!;
+    const ok = within(rueckfrage).getByRole('button', { name: /OK|Entfernen/ });
+    expect(ok).toHaveClass('ant-btn-dangerous');
+    expect(loeschAufrufe).toEqual([]);
+    await userEvent.click(ok);
+    await vi.waitFor(() => expect(loeschAufrufe).toEqual(['5']));
+  });
+
+  it('zeigt ein gescheitertes Entfernen im Hinweis-Slot der Seite', async () => {
+    rendere(einsatzAktiv, [dokument()]);
+    server.use(
+      http.delete('/api/einsaetze/1/dokumente/:dokId', () =>
+        HttpResponse.json({ error: 'Dokument ist gesperrt' }, { status: 409 }),
+      ),
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Dokument Lageplan Nord entfernen' }),
+    );
+    const rueckfrage = (await screen.findByText('Dokument entfernen?')).closest<HTMLElement>(
+      '.ant-popover',
+    )!;
+    await userEvent.click(within(rueckfrage).getByRole('button', { name: 'Entfernen' }));
+    const alarm = await screen.findByRole('alert');
+    expect(alarm).toHaveTextContent('Nicht entfernt');
+    expect(alarm).toHaveTextContent('Dokument ist gesperrt');
+    expect(alarm.closest('.ant-message')).toBeNull();
+  });
+
+  it('meta zählt im Singular und Plural richtig', async () => {
+    const { unmount } = rendere(einsatzAktiv, [dokument()]);
+    expect(await screen.findByText('1 Dokument')).toBeInTheDocument();
+    unmount();
+    rendere(einsatzAktiv, [dokument(), dokument({ id: 6, titel: 'Zwei' })]);
+    expect(await screen.findByText('2 Dokumente')).toBeInTheDocument();
+  });
+
   it('zeigt einen Fehler an der Stelle der Liste, wenn sie ohne Daten scheitert', async () => {
     rendere(einsatzAktiv, [], { listeStatus: 500 });
     expect(await screen.findByText('Dokumente konnten nicht geladen werden')).toBeInTheDocument();

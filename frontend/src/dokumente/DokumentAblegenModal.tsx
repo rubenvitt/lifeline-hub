@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { App, Button, Collapse, Form, Input, Upload, type UploadFile } from 'antd';
 import { UploadOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -72,6 +72,19 @@ export default function DokumentAblegenModal({ einsatzId, offen, onSchliessen }:
   const qc = useQueryClient();
   const [form] = Form.useForm<AblageFormular>();
   const [bezugOffen, setBezugOffen] = useState(false);
+  /** Welcher Titel zuletzt AUTOMATISCH gesetzt wurde. Nur solange das Feld genau diesen Wert
+   *  trägt, darf eine neue Dateiwahl ihn ersetzen — ein getippter Titel bleibt immer stehen. */
+  const autoTitel = useRef<string | null>(null);
+
+  /**
+   * Fokus auf „Datei wählen" beim Öffnen. Die Hülle fokussiert das erste `<input>` — hier ist
+   * das rc-uploads `<input type="file">` mit `display: none`, im Browser nicht fokussierbar
+   * (jsdom merkt das nicht). Die Hülle bleibt unangetastet; dieser Callback-Ref hängt mit dem
+   * Knopf ein und fokussiert per `requestAnimationFrame`, also NACH dem Effekt der Hülle.
+   */
+  const dateiKnopf = useCallback((knopf: HTMLButtonElement | null) => {
+    if (knopf) requestAnimationFrame(() => knopf.focus());
+  }, []);
 
   const abschnitteQuery = useQuery({
     queryKey: einsatzKeys.abschnitte(einsatzId),
@@ -100,6 +113,7 @@ export default function DokumentAblegenModal({ einsatzId, offen, onSchliessen }:
 
   function schliessen() {
     setBezugOffen(false);
+    autoTitel.current = null;
     mutation.reset();
     onSchliessen();
   }
@@ -154,12 +168,19 @@ export default function DokumentAblegenModal({ einsatzId, offen, onSchliessen }:
           maxCount={1}
           accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif,.tif,.tiff,.txt,.csv,.docx,.xlsx,.pptx"
           onChange={({ file }) => {
-            if (!form.getFieldValue('titel')) {
-              form.setFieldValue('titel', file.name.replace(/\.[^.]+$/, ''));
+            // Das Entfernen einer Datei ist keine Dateiwahl — der Titel bleibt.
+            if (file.status === 'removed') return;
+            const aktuell: string | undefined = form.getFieldValue('titel');
+            if (!aktuell || aktuell === autoTitel.current) {
+              const neu = file.name.replace(/\.[^.]+$/, '');
+              autoTitel.current = neu;
+              form.setFieldValue('titel', neu);
             }
           }}
         >
-          <Button icon={<UploadOutlined />}>Datei wählen</Button>
+          <Button ref={dateiKnopf} icon={<UploadOutlined />}>
+            Datei wählen
+          </Button>
         </Upload>
       </Form.Item>
       <Form.Item

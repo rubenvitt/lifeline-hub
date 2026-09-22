@@ -47,9 +47,10 @@ import DokumentAblegenModal from '../dokumente/DokumentAblegenModal';
  *
  * Eine einzige Zeilenaktion, also keine Bündelung. Sie ist aus Sicht der Oberfläche
  * UNUMKEHRBAR (es gibt keinen Wiederherstellen-Weg), deshalb Rückfrage mit rotem OK-Knopf.
- * Im Kartenzweig trägt die Aktion das Primitiv (`PrimaerAktion` mit `bestaetigung`) — dort
- * bewusst ohne Gefahren-Anstrich, das ist der Vertrag von `Datensicht` („Rot bedient
- * nichts"), nicht eine Auslassung dieser Seite.
+ * Im Kartenzweig trägt die Aktion das Primitiv (`PrimaerAktion` mit `bestaetigung` und
+ * `bestaetigungGefahr`): der Auslöser bleibt neutral („Rot bedient nichts"), der OK-Knopf der
+ * Rückfrage ist rot wie in der Tabelle. `zugaenglicherName` trägt den Titel, damit n Karten
+ * nicht n gleichnamige „Entfernen"-Knöpfe liefern.
  */
 
 const rechteText = (status: EinsatzStatus) =>
@@ -67,7 +68,7 @@ function DownloadAnker({ einsatzId, dokument }: { einsatzId: number; dokument: D
         display: 'inline-flex',
         alignItems: 'center',
         minHeight: token.controlHeight,
-        fontWeight: 600,
+        fontWeight: token.fontWeightStrong,
       }}
     >
       {dokument.titel}
@@ -187,7 +188,14 @@ const dokumentKarte = (
   status: (d) => ({ rolle: 'neutral', label: DOKUMENT_KATEGORIEN[d.kategorie].label }),
   sekundaer: ['bezug', 'datei', 'abgelegt'],
   aktion: darfSchreiben
-    ? { etikett: 'Entfernen', bestaetigung: 'Dokument entfernen?', onKlick: onEntfernen }
+    ? {
+        etikett: 'Entfernen',
+        bestaetigung: 'Dokument entfernen?',
+        // Unumkehrbar: OK der Rückfrage rot, der Auslöser bleibt neutral (Datensicht-Vertrag).
+        bestaetigungGefahr: true,
+        zugaenglicherName: (d) => `Dokument ${d.titel} entfernen`,
+        onKlick: onEntfernen,
+      }
     : undefined,
 });
 
@@ -264,7 +272,11 @@ export default function DokumentePage() {
   return (
     <EinsatzSeite
       dataUpdatedAt={dokumenteQuery.dataUpdatedAt}
-      meta={dokumenteQuery.isSuccess ? `${alle.length} Dokumente` : undefined}
+      meta={
+        dokumenteQuery.isSuccess
+          ? `${alle.length} ${alle.length === 1 ? 'Dokument' : 'Dokumente'}`
+          : undefined
+      }
       titel={
         <Space>
           Dokumente
