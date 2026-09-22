@@ -92,6 +92,15 @@ describe('EtbZeitachse – der Eintrag', () => {
     expect(within(z).getByText(/^\d{2}:\d{2}$/)).toBeInTheDocument();
   });
 
+  it('setzt den Funktions-Snapshot hinter den Verfasser (LFH-615)', () => {
+    const { container } = renderZeitachse({
+      eintraege: [eintrag({ erfasser_funktion: 'S2' }), eintrag({ id: 2, lfd_nr: 2 })],
+    });
+    expect(within(zeileVon(container, 'eintrag-1')).getByText('Max · S2')).toBeInTheDocument();
+    // Ohne Snapshot nur der Name — keine erfundene Funktion.
+    expect(within(zeileVon(container, 'eintrag-2')).getByText('Max')).toBeInTheDocument();
+  });
+
   it('ist auf JEDER Breite eine Zeitachse — keine Tabelle, auch nicht im Fükw', () => {
     for (const breite of [390, 1024, 1366, 1920]) {
       setzeViewportBreite(breite);

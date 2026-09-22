@@ -9,6 +9,7 @@
  * zurückhält.
  */
 import type { EtbEintragAnzeige, MeldeWeg } from '../../api/types';
+import { verfasserText } from '../../etb/verfasser';
 import {
   DEFAULT_KONVENTIONEN,
   formatUhrzeit,
@@ -92,11 +93,11 @@ const MELDEWEG_LABEL = Object.fromEntries(
 /**
  * Quelle eines Eintrags: „von · Meldeweg" (Entwurf: „Deichwache Nord · Funk").
  *
- * Fehlt das `von`, steht der Erfasser da — er ist dann die einzige belegte Herkunft. Ein
- * fehlender Meldeweg fällt weg, statt als „unbekannt" eine Angabe zu behaupten. Rein.
+ * Fehlt das `von`, steht der Erfasser samt Funktions-Snapshot da („Vitt · S2", LFH-615) —
+ * er ist dann die einzige belegte Herkunft. Ein fehlender Meldeweg fällt weg, statt als „unbekannt" eine Angabe zu behaupten. Rein.
  */
 export function stromQuelle(e: EtbEintragAnzeige): string {
-  const von = e.von?.trim() || e.erfasser_name;
+  const von = e.von?.trim() || verfasserText(e);
   return [von, e.meldeweg ? MELDEWEG_LABEL[e.meldeweg] : null].filter(Boolean).join(' · ');
 }
 
