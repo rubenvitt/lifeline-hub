@@ -25,9 +25,14 @@ export default function BausteinPlatzhalterModal({
 
   // Bausteine ohne manuelle Platzhalter sofort einsetzen (kein Dialog nötig).
   useEffect(() => {
-    if (baustein && offenePlatzhalter.length === 0) {
+    if (!baustein) return;
+    if (offenePlatzhalter.length === 0) {
       onEinsetzen(setzeBausteinEin(baustein, einsatz, {}));
+      return;
     }
+    // Zurückgesetzt wird nur, wenn der Dialog aufgeht: antds `Modal` rendert sein
+    // `<Form>` erst beim ersten Öffnen, und eine Formularinstanz ohne `<Form>`
+    // anzufassen meldet rc-field-form als „not connected" (LFH-624).
     form.resetFields();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [baustein]);
