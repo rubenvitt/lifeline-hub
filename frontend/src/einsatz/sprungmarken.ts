@@ -39,8 +39,9 @@ import { modulRegistry, type KategorieKey, type ModulEintrag } from './modulRegi
  *
  * ── WAS NICHT HIERHER GEHÖRT ───────────────────────────────────────────────────────────
  *
- * Zähler: der Entwurf zeigt Entscheidungen 7 · Patienten 144 · Vermisste 9, dafür gibt es
- * keine Quelle (serverseitige Zähler sind LFH-612). Weggelassen, nicht erfunden.
+ * Zähler: der Entwurf zeigt Entscheidungen 7 · Patienten 144 · Vermisste 9. Die
+ * serverseitigen Modulzähler (LFH-612) zählen bewusst nur Module mit belegter Bedeutung;
+ * für Sprungmarken gibt es keine Quelle und keine Entscheidung. Weggelassen, nicht erfunden.
  */
 export interface Sprungmarke {
   key: string;

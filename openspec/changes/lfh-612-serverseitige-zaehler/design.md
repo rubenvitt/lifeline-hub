@@ -56,7 +56,7 @@ Der Neuentwurf LFH-605 zeigt drei Arten von Zahlen: die Summe im ETB-Kopf, die B
 
 - `abfrage` nutzt sie und hängt Cursor, `ORDER BY` und `LIMIT` an.
 - `zaehle(pool, einsatz_id, &EtbZaehlFilter)` nutzt sie mit `SELECT e.typ, COUNT(*) … GROUP BY e.typ`.
-- Die Filterfelder ziehen in eine eigene Struktur `EtbZaehlFilter` (`q`, `typ`, `von_zeit`, `bis_zeit`, `erfasser_id`). `EtbFilter` enthält sie und dazu Cursor und Limit. Die Zählung kann damit gar keinen Cursor bekommen.
+- Die Filterfelder bilden eine eigene Struktur `EtbZaehlFilter` (`q`, `typ`, `von_zeit`, `bis_zeit`, `erfasser_id`). `EtbFilter` bleibt flach (die Bestandstests setzen seine Felder direkt) und liefert sie über `merkmale()`. Die Zählung nimmt nur `EtbZaehlFilter` und kann damit gar keinen Cursor bekommen.
 - Das Parsen der Parameter im Handler (Typ prüfen → 400, `normalisiere_zeit`, `q` trimmen) wandert in eine gemeinsame Funktion, die beide Handler rufen. Eine zweite Kopie wäre die Stelle, an der Liste und Zählung still auseinanderlaufen.
 - *Verworfen:* ein `COUNT(*) OVER ()` in der Liste. Das kostet jede Seite, liefert keine Zahlen je Typ, und bei null Treffern fehlt die Zeile, die es tragen würde.
 
@@ -111,7 +111,7 @@ ModulZaehlerAnzeige {
 ### D5 · Frontend: `useModulZaehler` liest eine Quelle
 
 - `ModulZaehlerQuelle` bekommt die Werte `'etb' | 'personen' | 'einheiten' | 'einsatzabschnitte'` dazu. Die Registry setzt `zaehlerQuelle` an den vier Modulen.
-- Der Hook ruft eine Query `einsatzKeys.modulZaehler(einsatzId)` = `['modul-zaehler', einsatzId]` und bildet die Antwort über reine Funktionen auf `ModulZaehlerMap` ab.
+- Der Hook ruft eine Query `einsatzKeys.modulZaehler(einsatzId)` = `['einsatz-modul-zaehler', einsatzId]` und bildet die Antwort über reine Funktionen auf `ModulZaehlerMap` ab.
 - Die Wortlaute der vier bestehenden Beschreibungen bleiben byte-gleich. Die bisherigen `berechne*Zaehler`-Funktionen werden zu Abbildungen von den Serverfeldern auf `{wert, beschreibung}`.
 - **Die Tests werden bewusst ersetzt, nicht gelöscht.** Die Paare „Wortlaut bei 1“ und „Wortlaut bei n“ bleiben mit den neuen Eingaben erhalten.
 - Neue Beschreibungen:
@@ -119,7 +119,7 @@ ModulZaehlerAnzeige {
   - „248 Betroffene“ (bei 1 „1 Betroffene Person“)
   - „31 Einheiten“
   - „4 Einsatzabschnitte“
-- `darfZaehlerLaden` entfällt als Ladebedingung. Der Server filtert, und ein fehlendes Feld ergibt `undefined`.
+- `darfZaehlerLaden` entfällt als Ladebedingung und heißt jetzt `darfZaehlerZeigen`. Der Server filtert, und ein fehlendes Feld ergibt `undefined`.
   - Die Query läuft, sobald die Einsatz-ID gültig ist.
   - Die Anzeige bleibt trotzdem an `istModulSichtbar`/`istModulGesperrt` gebunden. Ein Modul, das der Rahmen nicht zeigt, zeigt auch keinen Zähler.
   - *Grund:* Die Rechte im Client kennen die Org-Vorgaben nicht (siehe Scope). Die Wahrheit des Servers ist strenger und richtiger.
@@ -139,13 +139,13 @@ ModulZaehlerAnzeige {
 
 ### D7 · Live-Aktualisierung
 
-- `einsatzKeys.modulZaehler` bekommt in `EINSATZ_STREAM_EVENTS` einen Eintrag bei jedem Ereignis, dessen Modul gezählt wird: nach heutigem Stand `etb`, `person`, `einheit`, `abschnitt`, `meldung`, `auftrag`, `befehl`, `erinnerung` und `chat`. Das Frontend kennt kein eigenes Ereignis `sofortmeldung`; die Meldungsliste hängt an `meldung`.
+- `einsatzKeys.modulZaehler` bekommt in `EINSATZ_STREAM_EVENTS` einen Eintrag bei jedem Ereignis, dessen Modul gezählt wird: nach heutigem Stand `etb`, `person`, `personal`, `einheit`, `abschnitt`, `meldung`, `auftrag`, `erinnerung` und `chat`. Das Frontend kennt kein eigenes Ereignis `sofortmeldung`; die Meldungsliste hängt an `meldung`.
 - **Vollständigkeit ist ein Test, keine Liste.** Für jedes Ereignis in `EINSATZ_STREAM_EVENTS`, das den Listen-Key eines gezählten Moduls invalidiert (`etb`, `personen`, `einheiten`, `einsatzabschnitte`, `meldungen`, `auftraege`, `erinnerungen`, `chatKanaele`), MUST es auch `modulZaehler` invalidieren.
   - Die Menge der gezählten Listen-Keys stammt aus derselben Tabelle wie die Abbildung im Hook.
   - Eine Mutationsprobe belegt den Test: Einen Eintrag entfernen muss ihn rot färben.
-- Der Präfix `modul-zaehler` kommt in `EINSATZ_KEYS`. Der Guard `queryKeys.guard.test.ts` verlangt die Einordnung, und sie ist live.
-- **Chat gelesen.** Die Stellen in `ChatPage.tsx`, die nach dem Markieren als gelesen `chatKanaele` invalidieren (Zeilen 188 und 293), invalidieren auch `modulZaehler`. Das Lesen erzeugt kein Live-Ereignis, weil es benutzereigen ist.
-- **Befehl** zählt nicht: Der Zähler „Aufträge“ zählt Aufträge, und `befehl` invalidiert `auftraege`. Nach der Testregel oben bekommt `befehl` daher trotzdem `modulZaehler`. Das ist eine unnötige, aber harmlose Neuberechnung, und die Regel bleibt ohne Ausnahme.
+- Der Präfix `einsatz-modul-zaehler` kommt in `EINSATZ_KEYS`. Der Guard `queryKeys.guard.test.ts` verlangt die Einordnung, und sie ist live.
+- **Chat gelesen.** Die Stelle in `ChatPage.tsx`, die nach dem Markieren als gelesen `chatKanaele` invalidiert, invalidiert auch `modulZaehler` (die zweite Invalidierung dort gehört zum Kanal-Anlegen und ändert keine Ungelesen-Zahl). Das Lesen erzeugt kein Live-Ereignis, weil es benutzereigen ist.
+- **Befehl** zählt nicht und invalidiert auch keine gezählte Liste, bekommt `modulZaehler` also nicht. Umgekehrt trägt `personal` den Key, weil es die Listen der Einheiten und Abschnitte invalidiert — die Regel gilt ohne Ausnahme.
 
 ## Risks / Trade-offs
 
