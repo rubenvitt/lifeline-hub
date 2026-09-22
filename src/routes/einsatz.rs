@@ -687,6 +687,9 @@ pub struct KopfdatenPatch {
     #[serde(default, deserialize_with = "support::deserialize_optional_field")]
     pub stichwort: Option<Option<String>>,
     pub einsatzart: Option<String>,
+    /// Nur, um das Feld zu ERKENNEN: die Einsatznummer vergibt das System beim Anlegen, sie
+    /// ist danach unveränderlich (LFH-617). Mit Wert oder `null` im Body → 400. Das Tri-State
+    /// bleibt, damit auch ein `null` nicht als „fehlt“ durchrutscht.
     #[serde(default, deserialize_with = "support::deserialize_optional_field")]
     pub einsatznummer_intern: Option<Option<String>>,
     #[serde(default, deserialize_with = "support::deserialize_optional_field")]
@@ -723,6 +726,14 @@ pub async fn aktualisieren(
     fordere_schreibrecht_oder_admin(&benutzer, rolle)?;
     fordere_aktiv(&einsatz)?;
 
+    // 400, nicht stilles Ignorieren: ein alter Client hielte seine Änderung sonst für
+    // gespeichert. 400 statt 422 — das Feld ist schon für sich unzulässig (LFH-267).
+    if req.einsatznummer_intern.is_some() {
+        return Err(AppError::Validation(
+            "Die Einsatznummer vergibt das System, sie ist nicht änderbar".into(),
+        ));
+    }
+
     // Die drei Pflichtfelder werden NUR geprüft, wenn sie gesendet wurden — sonst wäre
     // jeder Teil-Patch abgelehnt. Vorhanden-aber-leer bleibt 400 (LFH-305).
     let bezeichnung = match req.bezeichnung {
@@ -757,7 +768,6 @@ pub async fn aktualisieren(
     let naechste_lagebesprechung_at = support::trimme_tri(req.naechste_lagebesprechung_at)
         .map(|zeit| zeit.map(|z| crate::etb::normalisiere_zeit(&z)).transpose())
         .transpose()?;
-    let einsatznummer_intern = support::trimme_tri(req.einsatznummer_intern);
     let leitstellen_nr = support::trimme_tri(req.leitstellen_nr);
     let einsatzort = support::trimme_tri(req.einsatzort);
     let meldende_stelle = support::trimme_tri(req.meldende_stelle);
@@ -770,7 +780,6 @@ pub async fn aktualisieren(
             bezeichnung: bezeichnung.as_deref(),
             stichwort: stichwort.as_ref().map(|v| v.as_deref()),
             einsatzart: req.einsatzart.as_deref(),
-            einsatznummer_intern: einsatznummer_intern.as_ref().map(|v| v.as_deref()),
             leitstellen_nr: leitstellen_nr.as_ref().map(|v| v.as_deref()),
             einsatzort: einsatzort.as_ref().map(|v| v.as_deref()),
             einsatzort_lat: req.einsatzort_lat,
