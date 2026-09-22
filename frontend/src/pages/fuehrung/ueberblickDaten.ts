@@ -130,6 +130,23 @@ export function warnstufeKennzahlVon(gebiete: Gefahrengebiet[]): WarnstufeKennza
   };
 }
 
+/**
+ * Notiz der Warnstufen-Kennzahl: die Gebietszahl, dahinter die Pegel-Notiz aus
+ * `pegel/pegelKennzahl.ts:pegelNotizKurz` („Pegel 6,84 m steigend", LFH-606).
+ *
+ * Die Pegel-Notiz wird ANGEHÄNGT, nicht an die Stelle der Gebietszahl gesetzt: die Zahl der
+ * Gebiete mit Warnstufe ist die Begründung des Werts, der Pegel ist die Lage daneben — der
+ * Entwurf S2 zeigt nur den Pegel, verlöre aber genau die Aussage, die die Kennzahl erklärt.
+ * Ohne festgelegten Pegel (`null`) bleibt es bei der Gebietszahl. Rein.
+ */
+export function warnstufeNotiz(anzahlAktiv: number, pegelNotiz: string | null): string {
+  const gebiete =
+    anzahlAktiv === 1
+      ? '1 Gefahrengebiet mit Warnstufe'
+      : `${anzahlAktiv} Gefahrengebiete mit Warnstufe`;
+  return pegelNotiz ? `${gebiete} · ${pegelNotiz}` : gebiete;
+}
+
 export interface AuftraegeKennzahl {
   offen: number;
   /** Davon schon angenommen (`in_arbeit`). */
