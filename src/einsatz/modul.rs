@@ -130,6 +130,9 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     ("/api/einsaetze/{id}/karten-ansichten", Some("lagekarte")),
     ("/api/einsaetze/{id}/lage-snapshots", Some("lagekarte")),
     ("/api/einsaetze/{id}/anhaenge", None),
+    // Pegel-Kennzahl (LFH-606): steht auf Dashboard und Überblick — modul-los wie die
+    // Einsatz-Kopfdaten.
+    ("/api/einsaetze/{id}/pegel", None),
     // Live-Feed (F01/LFH-227): modul-lose Gate-Route. Die Modul-Berechtigung wirkt
     // NICHT als Türsteher, sondern als Post-Filter pro Event im SSE-Builder — ein
     // Modul-Gate hier würde die anderen Module wieder mit durchlassen.

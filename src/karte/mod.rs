@@ -17,9 +17,9 @@ pub mod registry;
 pub mod tile_cache;
 pub mod typen;
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex, OnceLock};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 /// Betriebs-/Sicherheitsschalter der Karten-Module, prozessweit einmal beim Serverstart
 /// via [`init_karte_config`] aus der CLI/ENV-`Config` gesetzt (LFH-239/F18).
@@ -67,7 +67,20 @@ pub fn karte_config() -> &'static KarteConfig {
 pub struct FachebenenState {
     pub client: reqwest::Client,
     pub inflight: Arc<Mutex<HashSet<String>>>,
+    /// Basis-URL der PEGELONLINE-REST-API für die Zeitreihen je Station (LFH-606,
+    /// `crate::pegel::abruf`). Produktiv [`PEGELONLINE_BASIS_URL`]; Integrationstests lenken
+    /// sie über [`FachebenenState::mit_pegel_basis_url`] auf eine nicht erreichbare Adresse,
+    /// damit kein Test ins Netz geht.
+    pub pegel_basis_url: Arc<str>,
+    /// Letzter gescheiterter Zeitreihenabruf je Station (LFH-606). Während der Abkühlung
+    /// (`pegel::abruf::ABKUEHLUNG`) wird die Station nicht erneut angefragt — sonst warteten
+    /// bei einer unbekannten UUID oder hängenden Quelle alle Aufrufe bis zur Frist. Prozess-
+    /// lokal und je `AppState`, damit Tests einander nicht über einen Static beeinflussen.
+    pub pegel_fehlschlag: Arc<Mutex<HashMap<String, Instant>>>,
 }
+
+/// Produktive Basis-URL der PEGELONLINE-REST-API v2.
+pub const PEGELONLINE_BASIS_URL: &str = "https://www.pegelonline.wsv.de/webservices/rest-api/v2";
 
 impl FachebenenState {
     pub fn neu() -> Self {
@@ -79,7 +92,15 @@ impl FachebenenState {
         FachebenenState {
             client,
             inflight: Arc::new(Mutex::new(HashSet::new())),
+            pegel_basis_url: Arc::from(PEGELONLINE_BASIS_URL),
+            pegel_fehlschlag: Arc::new(Mutex::new(HashMap::new())),
         }
+    }
+
+    /// Lenkt die PEGELONLINE-Zeitreihenabrufe auf eine andere Basis-URL (Tests).
+    pub fn mit_pegel_basis_url(mut self, url: &str) -> Self {
+        self.pegel_basis_url = Arc::from(url.trim_end_matches('/'));
+        self
     }
 }
 
