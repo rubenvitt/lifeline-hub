@@ -435,8 +435,9 @@ export default function LagekartePage() {
   // geladen sind (zonen ist unabhängig vom zone-Layer-Toggle vorhanden).
   /**
    * Escape beendet das Messen (LFH-616) — ein Blick-Werkzeug muss sich so leicht schließen
-   * lassen, wie es geöffnet wird. Am Fenster, nicht am Canvas: dort hört terra-draw selbst auf
-   * Escape (verwirft den offenen Entwurf), und der Canvas hat den Fokus nur nach einem Klick.
+   * lassen, wie es geöffnet wird. Am Fenster, nicht am Canvas: der hat den Fokus nur nach
+   * einem Klick. terra-draw bricht selbst erst beim `keyup` ab — dann ist der Modus schon
+   * beendet; es gibt also keinen zweistufigen Ablauf „erst Entwurf, dann Werkzeug".
    * Nicht, wenn jemand gerade schreibt oder ein anderer Handler die Taste schon genommen hat
    * (ein offenes Menü, ein Dialog). Die übrigen Modi bekommen das bewusst NICHT mit: dort
    * steht ein Entwurf, der mehr kostet als eine Messung.

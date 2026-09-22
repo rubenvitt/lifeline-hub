@@ -1,4 +1,4 @@
-import { App, Button, Modal, Spin, Tag, Typography } from 'antd';
+import { Alert, App, Button, Modal, Spin, Tag, Typography } from 'antd';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../api/client';
@@ -47,16 +47,21 @@ export default function AusKatalogModal({
         // `?: string | null` (absent statt present-null); der Eingabe-Body kennt nur `string | null`.
         attribution: eintrag.attribution ?? null,
         sortier: naechsteSortier,
-        aktiv: true,
-        // LFH-190: Katalog-Quellen (OpenFreeMap/basemap.de — alle proxy-freundlich, kein
-        // OSM-Standard) serverseitig proxen + cachen.
+        // Ein Eintrag mit Betreiberhinweis (LFH-616: Esri, Lizenzauflage) kommt INAKTIV an —
+        // sonst wäre er mit einem Klick die Grundlage aller, und der Hinweis stünde umsonst da.
+        aktiv: !eintrag.hinweis,
+        // LFH-190: Katalog-Quellen serverseitig proxen + cachen — ein Schlüssel bliebe so auf
+        // dem Server. Für OpenFreeMap/basemap.de/TopPlusOpen unbedenklich; ob der Cache bei
+        // Esri erlaubt ist, sagt der Hinweis am Eintrag (LFH-616).
         proxy: true,
       };
       return legeOnlineQuelleAn(body);
     },
-    onSuccess: () => {
+    onSuccess: (_, eintrag) => {
       invalidiereKarte(qc);
-      message.success('Quelle übernommen');
+      message.success(
+        eintrag.hinweis ? 'Quelle übernommen — inaktiv, bitte Hinweis prüfen' : 'Quelle übernommen',
+      );
     },
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Übernehmen fehlgeschlagen'),
   });
@@ -99,9 +104,19 @@ export default function AusKatalogModal({
                     </span>
                   }
                   description={
-                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                      {eintrag.url}
-                    </Typography.Text>
+                    <>
+                      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                        {eintrag.url}
+                      </Typography.Text>
+                      {eintrag.hinweis && (
+                        <Alert
+                          type="warning"
+                          showIcon
+                          title={eintrag.hinweis}
+                          style={{ marginTop: 8 }}
+                        />
+                      )}
+                    </>
                   }
                 />
               </ListenEintrag>

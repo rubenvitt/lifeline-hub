@@ -534,7 +534,20 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     schliesseSpiderRef.current?.(); // setStyle wischt Spider-Sources/Layer → Controller-State sonst stale
     angewandterStyleRef.current = style;
     stilWaechterRef.current.stilAngewandt();
+    // Eine laufende Messung überlebt `setStyle` nicht: `diff: false` wirft die Sources des
+    // terra-draw-Adapters mit weg, und der legt sie nicht neu an — die nächste Zeigerbewegung
+    // (`setData`) und spätestens das Beenden (`removeSource`) würfen (Review LFH-616). Die
+    // Messung wird deshalb VOR dem Wechsel geräumt und danach in derselben Form neu begonnen;
+    // der Messwert ist ein Blick, kein Entwurf, sein Verlust beim Kartenwechsel ist hinnehmbar.
+    const messForm = messenRef.current;
+    if (messForm) messRef.current?.stoppen();
     map.setStyle(style, { diff: false });
+    if (messForm) {
+      map.once('style.load', () => {
+        const noch = messenRef.current;
+        if (noch && messRef.current) messRef.current.starten(noch);
+      });
+    }
     planeReAnlegenNachStyle(
       map,
       () => flaechenDatenRef.current,
@@ -1059,6 +1072,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
             if (g.type === 'Polygon') onFlaecheGezeichnetRef.current?.(g);
           },
           (bereit) => onZeichnenBereitAenderungRef.current?.(bereit),
+          'td-abschnitt',
         );
       }
       drawRef.current.starten('polygon');
@@ -1077,6 +1091,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
           map,
           (g) => onZoneGezeichnetRef.current?.(g),
           (bereit) => onZeichnenBereitAenderungRef.current?.(bereit),
+          'td-zone',
         );
       }
       zoneDrawRef.current.starten(zoneZeichnen);

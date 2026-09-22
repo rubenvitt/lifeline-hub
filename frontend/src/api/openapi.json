@@ -5255,6 +5255,13 @@
             ],
             "description": "LFH-265: absent statt present-null, damit der generierte `attribution?` ehrlich ist."
           },
+          "hinweis": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Betreiberhinweis eines KATALOG-Eintrags (LFH-616), z. B. eine Lizenzauflage. Ein Eintrag\nmit Hinweis wird im Admin-Katalog sichtbar gewarnt und INAKTIV übernommen — er soll\nnicht mit einem Klick zur Grundlage aller werden. In `/api/karte/config` immer absent."
+          },
           "name": {
             "type": "string"
           },

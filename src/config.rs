@@ -53,6 +53,11 @@ pub struct OnlineStyle {
     /// LFH-265: absent statt present-null, damit der generierte `attribution?` ehrlich ist.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub attribution: Option<String>,
+    /// Betreiberhinweis eines KATALOG-Eintrags (LFH-616), z. B. eine Lizenzauflage. Ein Eintrag
+    /// mit Hinweis wird im Admin-Katalog sichtbar gewarnt und INAKTIV übernommen — er soll
+    /// nicht mit einem Klick zur Grundlage aller werden. In `/api/karte/config` immer absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hinweis: Option<String>,
 }
 
 /// Eingebaute, schlüsselfreie Default-Shortlist (alle ohne API-Key, MapLibre-GL-tauglich).
@@ -78,30 +83,35 @@ pub fn default_online_styles() -> Vec<OnlineStyle> {
             url: "https://tiles.openfreemap.org/styles/liberty".into(),
             typ: OnlineStyleTyp::Vektor,
             attribution: Some("© OpenMapTiles © OpenStreetMap-Mitwirkende".into()),
+            hinweis: None,
         },
         OnlineStyle {
             name: "basemap.de Farbe".into(),
             url: "https://sgx.geodatenzentrum.de/gdz_basemapde_vektor/styles/bm_web_col.json".into(),
             typ: OnlineStyleTyp::Vektor,
             attribution: Some("© GeoBasis-DE / BKG (2026) CC BY 4.0".into()),
+            hinweis: None,
         },
         OnlineStyle {
             name: "basemap.de Grau".into(),
             url: "https://sgx.geodatenzentrum.de/gdz_basemapde_vektor/styles/bm_web_gry.json".into(),
             typ: OnlineStyleTyp::Vektor,
             attribution: Some("© GeoBasis-DE / BKG (2026) CC BY 4.0".into()),
+            hinweis: None,
         },
         OnlineStyle {
             name: "OpenFreeMap Dark".into(),
             url: "https://tiles.openfreemap.org/styles/dark".into(),
             typ: OnlineStyleTyp::Vektor,
             attribution: Some("© OpenMapTiles © OpenStreetMap-Mitwirkende".into()),
+            hinweis: None,
         },
         OnlineStyle {
             name: "TopPlusOpen (Topographie)".into(),
             url: "https://sgx.geodatenzentrum.de/wmts_topplus_open/tile/1.0.0/web/default/WEBMERCATOR/{z}/{y}/{x}.png".into(),
             typ: OnlineStyleTyp::Raster,
             attribution: Some("© GeoBasis-DE / BKG (2026), TopPlusOpen".into()),
+            hinweis: None,
         },
         OnlineStyle {
             name: "Satellit (Esri)".into(),
@@ -109,6 +119,12 @@ pub fn default_online_styles() -> Vec<OnlineStyle> {
             typ: OnlineStyleTyp::Raster,
             attribution: Some(
                 "Powered by Esri · Esri, Maxar, Earthstar Geographics, GIS User Community".into(),
+            ),
+            hinweis: Some(
+                "Esri-Nutzungsbedingungen: Der Produktivbetrieb verlangt ein ArcGIS-Konto. \
+                 Über den Proxy werden Kacheln serverseitig zwischengespeichert — prüfen, ob \
+                 die eigene Lizenz das erlaubt. Wird inaktiv übernommen."
+                    .into(),
             ),
         },
     ]
@@ -923,6 +939,10 @@ mod tests {
             "nur Platzhalter, die der Proxy kennt"
         );
         assert!(s.attribution.as_deref().unwrap_or("").contains("Esri"));
+        // Die Lizenzauflage steht am Eintrag, nicht nur im Quelltext-Kommentar — und nur dort:
+        // ein Hinweis an jedem Eintrag wäre keiner mehr.
+        assert!(s.hinweis.as_deref().unwrap_or("").contains("ArcGIS"));
+        assert_eq!(styles.iter().filter(|s| s.hinweis.is_some()).count(), 1);
     }
 
     #[test]
@@ -960,6 +980,7 @@ mod tests {
             url: "https://x/s.json".into(),
             typ: OnlineStyleTyp::Vektor,
             attribution: None,
+            hinweis: None,
         })
         .unwrap();
         let o = v.as_object().unwrap();

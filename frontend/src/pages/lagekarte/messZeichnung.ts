@@ -28,15 +28,17 @@ export interface MessZeichnung {
  *    sich zu stapeln — eine Messung ist ein Blick, kein Lagebild-Objekt, und nichts davon
  *    wird gespeichert.
  *
- * terra-draw verwaltet seine Layer selbst über den Adapter, eine Re-Anlage nach `setStyle`
- * (Poller in `kartenLayer.ts`) braucht es deshalb nicht.
+ * terra-draw verwaltet seine Layer selbst über den Adapter, legt sie nach `setStyle` aber
+ * NICHT neu an. Den Kartenwechsel fängt deshalb `Kartenflaeche` ab (Style-Effekt): Messung
+ * räumen, Stil setzen, nach `style.load` neu beginnen.
  */
 export function createMessung(
   map: MapLibreMap,
   onMessung: (g: MessGeometrie | null, fertig: boolean) => void,
 ): MessZeichnung {
   const draw = new TerraDraw({
-    adapter: new TerraDrawMapLibreGLAdapter({ map }),
+    // Eigener Präfix — Begründung am Parameter `praefix` von `createZeichnung`.
+    adapter: new TerraDrawMapLibreGLAdapter({ map, prefixId: 'td-mess' }),
     modes: [new TerraDrawPolygonMode(), new TerraDrawLineStringMode()],
   });
   const canvas = map.getCanvas();
@@ -78,7 +80,9 @@ export function createMessung(
     }
     if (laufend == null || !ids.includes(laufend)) return;
     if (typ === 'delete') {
-      // Escape auf dem Canvas verwirft den Entwurf (terra-draw-Vorgabe).
+      // Der Entwurf verschwindet ohne unser Zutun (terra-draw bricht ab). Über Escape kommt
+      // das in der Seite nicht vor — deren Fenster-Handler beendet schon beim `keydown` den
+      // ganzen Modus, terra-draw reagiert erst auf `keyup`.
       laufend = null;
       onMessung(null, false);
       return;
