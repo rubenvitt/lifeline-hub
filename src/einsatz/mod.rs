@@ -8,6 +8,7 @@ pub mod purge_scheduler;
 pub mod repo;
 pub mod retention;
 pub mod schwaerzung_registry;
+pub mod zaehler;
 
 use crate::stab::Sachgebiet;
 use serde::Serialize;

@@ -153,7 +153,14 @@ pub fn build_router(state: AppState) -> Router {
         // modul-benannten `…/stream`-Routen; die Modul-Berechtigung wirkt als
         // Post-Filter pro Event statt als Gate der Route.
         .route("/api/einsaetze/{id}/live", get(routes::live::stream))
+        // Modulzähler des Navigationsrahmens (LFH-612): modul-lose Gate-Route wie `/live`,
+        // die Modulrechte filtern die Felder.
+        .route(
+            "/api/einsaetze/{id}/modul-zaehler",
+            get(routes::modul_zaehler::liste),
+        )
         .route("/api/einsaetze/{id}/etb", get(routes::etb::liste))
+        .route("/api/einsaetze/{id}/etb/zaehler", get(routes::etb::zaehler))
         .route(
             "/api/einsaetze/{id}/etb/lesemarke",
             get(routes::etb::lesemarke).post(routes::etb::lesemarke_setzen),

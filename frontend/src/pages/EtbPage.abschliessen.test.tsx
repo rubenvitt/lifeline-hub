@@ -41,6 +41,19 @@ describe('EtbPage – Abschließen', () => {
         HttpResponse.json(einsatz(abgeschlossen ? 'abgeschlossen' : 'aktiv')),
       ),
       http.get('/api/einsaetze/7/etb', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/7/etb/zaehler', () =>
+        HttpResponse.json({
+          gesamt: 0,
+          je_typ: {
+            meldung: 0,
+            anordnung: 0,
+            lage: 0,
+            entscheidung: 0,
+            system: 0,
+            berichtigung: 0,
+          },
+        }),
+      ),
       http.post('/api/einsaetze/7/abschliessen', () => {
         abgeschlossen = true;
         return HttpResponse.json(einsatz('abgeschlossen'));
@@ -68,6 +81,19 @@ describe('EtbPage – Abschließen', () => {
         HttpResponse.json({ ...einsatz('aktiv'), meine_rolle: 'fuehrungspersonal' }),
       ),
       http.get('/api/einsaetze/7/etb', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/7/etb/zaehler', () =>
+        HttpResponse.json({
+          gesamt: 0,
+          je_typ: {
+            meldung: 0,
+            anordnung: 0,
+            lage: 0,
+            entscheidung: 0,
+            system: 0,
+            berichtigung: 0,
+          },
+        }),
+      ),
     );
     renderMitProviders(
       <AuthProvider>
@@ -88,6 +114,19 @@ describe('EtbPage – Abschließen', () => {
         HttpResponse.json({ ...einsatz('aktiv'), meine_rolle: 'beobachter' }),
       ),
       http.get('/api/einsaetze/7/etb', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/7/etb/zaehler', () =>
+        HttpResponse.json({
+          gesamt: 0,
+          je_typ: {
+            meldung: 0,
+            anordnung: 0,
+            lage: 0,
+            entscheidung: 0,
+            system: 0,
+            berichtigung: 0,
+          },
+        }),
+      ),
     );
     renderMitProviders(
       <AuthProvider>

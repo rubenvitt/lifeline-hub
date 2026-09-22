@@ -433,6 +433,24 @@
           }
         }
       },
+      "AuftragsZaehler": {
+        "type": "object",
+        "description": "Aufträge: offen (offen/in Arbeit), davon überfällig.",
+        "required": [
+          "offen",
+          "ueberfaellig"
+        ],
+        "properties": {
+          "offen": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ueberfaellig": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "Ausmass": {
         "type": "string",
         "enum": [
@@ -1251,6 +1269,19 @@
             ]
           },
           "kanal_id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ChatZaehler": {
+        "type": "object",
+        "description": "Chat: für den anfragenden Benutzer ungelesene Nachrichten über alle Kanäle.",
+        "required": [
+          "ungelesen"
+        ],
+        "properties": {
+          "ungelesen": {
             "type": "integer",
             "format": "int64"
           }
@@ -2586,6 +2617,19 @@
           "quittiert"
         ]
       },
+      "ErinnerungsZaehler": {
+        "type": "object",
+        "description": "Erinnerungen: fällig und noch offen.",
+        "required": [
+          "faellig"
+        ],
+        "properties": {
+          "faellig": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "EtbBaustein": {
         "type": "object",
         "description": "Öffentliche Sicht eines ETB-Baustein-Katalogeintrags. Die DB-Spalten `aktiv`,\n`erstellt_at` und `aktualisiert_at` werden bewusst nicht serialisiert.",
@@ -2788,6 +2832,62 @@
           "system",
           "berichtigung"
         ]
+      },
+      "EtbTypZaehler": {
+        "type": "object",
+        "description": "Zahl der Einträge je Eintragstyp. Jeder Typ ist Pflichtfeld: ein Typ ohne Einträge\nsteht als 0 da und fehlt nie — sonst hieße ein fehlendes Feld zweierlei.",
+        "required": [
+          "meldung",
+          "anordnung",
+          "lage",
+          "entscheidung",
+          "system",
+          "berichtigung"
+        ],
+        "properties": {
+          "anordnung": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "berichtigung": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "entscheidung": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "lage": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "meldung": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "system": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "EtbZaehlerAnzeige": {
+        "type": "object",
+        "description": "Antwort von `GET /api/einsaetze/{id}/etb/zaehler`.",
+        "required": [
+          "gesamt",
+          "je_typ"
+        ],
+        "properties": {
+          "gesamt": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Zahl aller Einträge, die zum Filter passen (ohne Filter: das ganze Tagebuch).\nPer Konstruktion die Summe über `je_typ`."
+          },
+          "je_typ": {
+            "$ref": "#/components/schemas/EtbTypZaehler"
+          }
+        }
       },
       "FachebeneAntwort": {
         "type": "object",
@@ -4295,6 +4395,24 @@
           "erledigt"
         ]
       },
+      "MeldungsZaehler": {
+        "type": "object",
+        "description": "Meldungen: offen (Status ≠ erledigt), davon noch nicht gesichtet (Status „neu\").",
+        "required": [
+          "offen",
+          "ungesehen"
+        ],
+        "properties": {
+          "offen": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ungesehen": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "Meldungsart": {
         "type": "string",
         "description": "Meldungsart (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `meldungsart`.",
@@ -4306,6 +4424,19 @@
           "anfrage",
           "sonstige"
         ]
+      },
+      "MengenZaehler": {
+        "type": "object",
+        "description": "Eine reine Menge (Gesamtzahl der Datensätze eines Moduls).",
+        "required": [
+          "gesamt"
+        ],
+        "properties": {
+          "gesamt": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
       },
       "MitgliedAnzeige": {
         "type": "object",
@@ -4339,6 +4470,92 @@
           },
           "zugewiesen_at": {
             "type": "string"
+          }
+        }
+      },
+      "ModulZaehlerAnzeige": {
+        "type": "object",
+        "description": "Antwort von `GET /api/einsaetze/{id}/modul-zaehler`. Feldnamen = Modul-Keys\n(`MODUL_KEYS`, Test unten); ein fehlendes Feld heißt „Modul nicht erlaubt\".",
+        "properties": {
+          "auftraege": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AuftragsZaehler"
+              }
+            ]
+          },
+          "chat": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ChatZaehler"
+              }
+            ]
+          },
+          "einheiten": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/MengenZaehler"
+              }
+            ]
+          },
+          "einsatzabschnitte": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/MengenZaehler"
+              }
+            ]
+          },
+          "erinnerungen": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ErinnerungsZaehler"
+              }
+            ]
+          },
+          "etb": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/MengenZaehler"
+              }
+            ]
+          },
+          "meldungen": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/MeldungsZaehler"
+              }
+            ]
+          },
+          "personen": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/MengenZaehler"
+              }
+            ]
           }
         }
       },

@@ -8,6 +8,7 @@ import { listeBausteine } from '../api/etbBaustein';
 import {
   SEITENGROESSE,
   erteileAuftragAusEtb,
+  ladeEtbZaehler,
   listeEtb,
   type EtbFilterWerte,
   type NeuerEintrag,
@@ -178,6 +179,13 @@ export default function EtbPage() {
     initialPageParam: undefined as number | undefined,
     getNextPageParam: (letzteSeite) =>
       letzteSeite.length === SEITENGROESSE ? letzteSeite[letzteSeite.length - 1].lfd_nr : undefined,
+  });
+
+  // Exakte Zählung über DENSELBEN Filter wie die Liste (LFH-612) — Kopf und Bilanz. Unter
+  // dem `etb`-Prefix, das `etb`-Live-Ereignis zieht sie mit.
+  const zaehlerQuery = useQuery({
+    queryKey: einsatzKeys.etbZaehler(einsatzId, filter),
+    queryFn: () => ladeEtbZaehler(einsatzId, filter),
   });
 
   // Die leere Ersatzliste bleibt: die Chronologie braucht ein Array, und solange der
@@ -433,15 +441,7 @@ export default function EtbPage() {
           items={[{ title: <Link to="/einsaetze">Einsätze</Link> }, { title: einsatz.bezeichnung }]}
         />
       }
-      meta={
-        etbQuery.isSuccess
-          ? kopfMeta({
-              geladen: eintraege.length,
-              weitereSeiten: etbQuery.hasNextPage,
-              filterAktiv,
-            })
-          : undefined
-      }
+      meta={kopfMeta({ gesamt: zaehlerQuery.data?.gesamt, filterAktiv })}
       dataUpdatedAt={etbQuery.dataUpdatedAt}
       aktionen={
         <>
@@ -637,7 +637,8 @@ export default function EtbPage() {
           <EtbBilanz
             einsatzId={einsatzId}
             eintraege={eintraege}
-            weitereSeiten={etbQuery.hasNextPage}
+            zaehler={zaehlerQuery.data}
+            zaehlerFehler={zaehlerQuery.isError}
             filterAktiv={filterAktiv}
             puffer={puffer}
             unbestimmt={!etbQuery.isSuccess}

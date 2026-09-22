@@ -1,7 +1,7 @@
 import { screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { ComponentProps } from 'react';
-import type { EtbEintragAnzeige } from '../api/types';
+import type { EtbEintragAnzeige, EtbZaehler } from '../api/types';
 import { renderMitProviders } from '../test/utils';
 import EtbBilanz from './EtbBilanz';
 
@@ -19,12 +19,26 @@ function e(over: Partial<EtbEintragAnzeige>): EtbEintragAnzeige {
   };
 }
 
+function zaehler(jeTyp: Partial<EtbZaehler['je_typ']>): EtbZaehler {
+  const je_typ = {
+    meldung: 0,
+    anordnung: 0,
+    lage: 0,
+    entscheidung: 0,
+    system: 0,
+    berichtigung: 0,
+    ...jeTyp,
+  };
+  return { gesamt: Object.values(je_typ).reduce((a, b) => a + b, 0), je_typ };
+}
+
 function rendere(over: Partial<ComponentProps<typeof EtbBilanz>> = {}) {
   return renderMitProviders(
     <EtbBilanz
       einsatzId={7}
       eintraege={[]}
-      weitereSeiten={false}
+      zaehler={zaehler({})}
+      zaehlerFehler={false}
       filterAktiv={false}
       puffer={{ art: 'uebertragen' }}
       unbestimmt={false}
@@ -34,30 +48,53 @@ function rendere(over: Partial<ComponentProps<typeof EtbBilanz>> = {}) {
 }
 
 describe('EtbBilanz', () => {
-  it('zählt je Typ über die geladenen Einträge und sagt, dass es die geladenen sind', () => {
+  // LFH-612: die Bilanz zählt, was der SERVER zählt — nicht das geladene Fenster.
+  it('zählt je Typ aus der Serverzählung und misst die Balken gegen deren Gesamtzahl', () => {
     rendere({
       eintraege: [e({ id: 3 }), e({ id: 2 }), e({ id: 1, typ: 'anordnung' })],
-      weitereSeiten: true,
+      zaehler: zaehler({
+        meldung: 218,
+        anordnung: 96,
+        entscheidung: 31,
+        lage: 62,
+        berichtigung: 5,
+      }),
     });
     const meldungen = document.querySelector('[data-typ="meldung"]')!;
-    expect(meldungen).toHaveTextContent('Meldungen2');
+    expect(meldungen).toHaveTextContent('Meldungen218');
     expect(
       within(meldungen as HTMLElement).getByRole('img', {
-        name: 'Meldungen: 2 von 3 geladenen Einträgen',
+        name: 'Meldungen: 218 von 412 Einträgen',
       }),
     ).toBeInTheDocument();
-    expect(document.querySelector('[data-typ="anordnung"]')).toHaveTextContent('1');
-    expect(
-      screen.getByText('in 3 geladenen Einträgen — ältere sind nicht mitgezählt'),
-    ).toBeVisible();
-    // Kein „Tages-" und keine Gesamtzahl, die es nicht gibt.
+    expect(document.querySelector('[data-typ="anordnung"]')).toHaveTextContent('96');
+    expect(screen.getByRole('heading', { name: 'Bilanz' })).toBeVisible();
+    expect(screen.getByText('412 Einträge')).toBeVisible();
+    // „Tages-" entfällt: die Zählung folgt dem Filter, nicht einem Kalendertag.
     expect(screen.queryByText(/Tagesbilanz/)).toBeNull();
+    // System erscheint nur, wenn es vorkommt.
+    expect(document.querySelector('[data-typ="system"]')).toBeNull();
+  });
+
+  it('heißt unter einem Filter „Bilanz im Filter" und zählt Treffer', () => {
+    rendere({ filterAktiv: true, zaehler: zaehler({ meldung: 6, system: 1 }) });
+    expect(screen.getByRole('heading', { name: 'Bilanz im Filter' })).toBeVisible();
+    expect(screen.getByText('7 Treffer')).toBeVisible();
+    expect(screen.getByRole('img', { name: 'Meldungen: 6 von 7 Treffern' })).toBeInTheDocument();
+    expect(document.querySelector('[data-typ="system"]')).toHaveTextContent('1');
   });
 
   it('behauptet während des Ladens keine Zählung', () => {
-    rendere({ unbestimmt: true, eintraege: [] });
-    expect(screen.getByText('Zählung folgt, sobald die Einträge geladen sind.')).toBeVisible();
+    rendere({ zaehler: undefined });
+    expect(screen.getByText('Zählung folgt …')).toBeVisible();
     expect(document.querySelector('[data-typ]')).toBeNull();
+  });
+
+  it('sagt, wenn die Zählung gescheitert ist, statt eine Zahl zu zeigen', () => {
+    rendere({ zaehler: undefined, zaehlerFehler: true });
+    expect(screen.getByText('Zählung nicht verfügbar.')).toBeVisible();
+    expect(document.querySelector('[data-typ]')).toBeNull();
+    expect(screen.queryByText(/\d+ Einträge/)).toBeNull();
   });
 
   it('verlinkt die jüngsten Berichtigungen auf ihren Eintrag, mit der Nummer des Grundeintrags', () => {

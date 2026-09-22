@@ -55,6 +55,19 @@ impl AuftragBearbeitungsstatus {
         }
     }
 
+    /// Ob der Auftrag noch offen ist, also nicht abgeschlossen (LFH-612, Modulzähler).
+    ///
+    /// Spiegelt die Phasen des Frontends (`AUFTRAG_STATUS` in `kommunikation/phase.ts`):
+    /// `offen`/`in_arbeit` sind nicht abgeschlossen, `vollzogen`/`abgenommen` schon. Ein
+    /// vollständiger `match` — ein neuer Status muss hier entschieden werden, statt still
+    /// in eine der beiden Mengen zu fallen.
+    pub fn ist_offen(&self) -> bool {
+        match self {
+            AuftragBearbeitungsstatus::Offen | AuftragBearbeitungsstatus::InArbeit => true,
+            AuftragBearbeitungsstatus::Vollzogen | AuftragBearbeitungsstatus::Abgenommen => false,
+        }
+    }
+
     /// Parst einen gespeicherten/übergebenen Bearbeitungsstatus; `None` bei ungültigem Wert.
     pub fn parse(s: &str) -> Option<AuftragBearbeitungsstatus> {
         match s {

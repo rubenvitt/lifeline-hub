@@ -3,6 +3,7 @@ import type {
   EtbEintragAnzeige,
   EtbLesemarke,
   EtbTyp,
+  EtbZaehler,
   MeldeWeg,
   NeuerAuftrag,
 } from './types';
@@ -23,16 +24,35 @@ export interface EtbAbfrage extends EtbFilterWerte {
   limit?: number;
 }
 
-export function listeEtb(einsatzId: number, params: EtbAbfrage = {}): Promise<EtbEintragAnzeige[]> {
+/**
+ * Die Filtermerkmale als Query-Parameter. Liste UND Zählung bauen sie hier (LFH-612): der
+ * Kopf zeigt „n Treffer", und n muss genau die Menge sein, die die Liste liefert — zwei
+ * Abbildungen liefen beim ersten neuen Filterfeld still auseinander.
+ */
+function filterParameter(filter: EtbFilterWerte): URLSearchParams {
   const qs = new URLSearchParams();
-  if (params.q) qs.set('q', params.q);
-  if (params.typ) qs.set('typ', params.typ);
-  if (params.von) qs.set('von', params.von);
-  if (params.bis) qs.set('bis', params.bis);
-  if (params.erfasser_id != null) qs.set('erfasser_id', String(params.erfasser_id));
+  if (filter.q) qs.set('q', filter.q);
+  if (filter.typ) qs.set('typ', filter.typ);
+  if (filter.von) qs.set('von', filter.von);
+  if (filter.bis) qs.set('bis', filter.bis);
+  if (filter.erfasser_id != null) qs.set('erfasser_id', String(filter.erfasser_id));
+  return qs;
+}
+
+export function listeEtb(einsatzId: number, params: EtbAbfrage = {}): Promise<EtbEintragAnzeige[]> {
+  const qs = filterParameter(params);
   if (params.before_lfd_nr != null) qs.set('before_lfd_nr', String(params.before_lfd_nr));
   qs.set('limit', String(params.limit ?? SEITENGROESSE));
   return apiGet<EtbEintragAnzeige[]>(`/api/einsaetze/${einsatzId}/etb?${qs.toString()}`);
+}
+
+/** Exakte Zahl der Einträge gesamt und je Typ, über denselben Filter wie die Liste (LFH-612). */
+export function ladeEtbZaehler(
+  einsatzId: number,
+  filter: EtbFilterWerte = {},
+): Promise<EtbZaehler> {
+  const qs = filterParameter(filter).toString();
+  return apiGet<EtbZaehler>(`/api/einsaetze/${einsatzId}/etb/zaehler${qs ? `?${qs}` : ''}`);
 }
 
 export interface NeuerEintrag {

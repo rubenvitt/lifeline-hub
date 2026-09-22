@@ -1,8 +1,11 @@
 import type { CSSProperties } from 'react';
 import type { EtbFilterWerte } from '../api/etb';
-import type { EtbEintragAnzeige, EtbTyp } from '../api/types';
+import type { EtbEintragAnzeige, EtbTyp, EtbZaehler } from '../api/types';
 import type { AbgelehnterEintrag, AusstehenderEintrag } from '../offline/queue';
 import type { EtbZeile } from './etbZeile';
+
+/** Zahl je Typ aus der serverseitigen Zählung (LFH-612). */
+type EtbTypZaehler = EtbZaehler['je_typ'];
 
 /**
  * Reine Ableitungen der ETB-Zeitachse (Neuentwurf S4, 21.09.2026) — ohne Darstellung,
@@ -133,60 +136,32 @@ export interface BilanzZeile {
 }
 
 /**
- * Zähler je Typ ÜBER DIE GELADENEN EINTRÄGE — keine Tages-, keine Gesamtzahl.
+ * Die Bilanzzeilen aus der serverseitigen Zählung (LFH-612) — exakt über die Menge, die der
+ * Filter trifft, nicht über das geladene Fenster.
  *
- * Der Server liefert weder eine Gesamtzahl noch Summen je Typ (LFH-612); was hier steht,
- * ist die Zählung des geladenen Fensters und wird vom Aufrufer auch so beschriftet.
  * `system` erscheint nur, wenn es vorkommt: der Typ ist nicht erfassbar und hat kein
  * Filtersegment, eine dauerhafte Nullzeile wäre Rauschen.
  */
-export function typBilanz(eintraege: readonly EtbEintragAnzeige[]): BilanzZeile[] {
-  const zaehler = new Map<EtbTyp, number>();
-  for (const e of eintraege) zaehler.set(e.typ, (zaehler.get(e.typ) ?? 0) + 1);
-  const zeilen: BilanzZeile[] = BILANZ_TYPEN.map((typ) => ({
-    typ,
-    anzahl: zaehler.get(typ) ?? 0,
-  }));
-  const system = zaehler.get('system') ?? 0;
-  if (system > 0) zeilen.push({ typ: 'system', anzahl: system });
+export function typBilanz(jeTyp: EtbTypZaehler): BilanzZeile[] {
+  const zeilen: BilanzZeile[] = BILANZ_TYPEN.map((typ) => ({ typ, anzahl: jeTyp[typ] }));
+  if (jeTyp.system > 0) zeilen.push({ typ: 'system', anzahl: jeTyp.system });
   return zeilen;
 }
 
 /**
- * Was die Zählung umfasst — der Wortlaut, der sie ehrlich macht.
- *
- * Vollständig ist sie nur ohne Filter und ohne weitere Seite; dann (und nur dann) darf
- * sie „alle" sagen.
- */
-export function bilanzUmfang(args: {
-  geladen: number;
-  weitereSeiten: boolean;
-  filterAktiv: boolean;
-}): string {
-  const { geladen, weitereSeiten, filterAktiv } = args;
-  const menge = geladen === 1 ? '1 geladenen Eintrag' : `${geladen} geladenen Einträgen`;
-  if (filterAktiv) return `in ${menge}, die zum Filter passen`;
-  if (weitereSeiten) return `in ${menge} — ältere sind nicht mitgezählt`;
-  return geladen === 1 ? 'im einzigen Eintrag des Tagebuchs' : `in allen ${geladen} Einträgen`;
-}
-
-/**
- * Seitenkopf-Meta: die Zahl, die die Seite wirklich kennt.
- *
- * Ohne weitere Seite und ohne Filter ist die geladene Menge das ganze Tagebuch — dann
- * steht dort schlicht „n Einträge". Sonst „geladen", weil die Gesamtzahl serverseitig
- * fehlt (LFH-612).
+ * Seitenkopf-Meta: die exakte Zahl vom Server (LFH-612) — „n Einträge" für das ganze
+ * Tagebuch, „n Treffer" unter einem Filter. Ohne Zählung (lädt, gescheitert) steht dort
+ * NICHTS: eine Zahl aus dem geladenen Fenster behauptete eine Vollständigkeit, die es nicht
+ * gibt.
  */
 export function kopfMeta(args: {
-  geladen: number;
-  weitereSeiten: boolean;
+  gesamt: number | undefined;
   filterAktiv: boolean;
-}): string {
-  const { geladen, weitereSeiten, filterAktiv } = args;
-  const n = geladen === 1 ? '1 Eintrag' : `${geladen} Einträge`;
-  if (weitereSeiten) return `${n} geladen · ältere vorhanden`;
-  if (filterAktiv) return geladen === 1 ? '1 Treffer' : `${geladen} Treffer`;
-  return n;
+}): string | undefined {
+  const { gesamt, filterAktiv } = args;
+  if (gesamt === undefined) return undefined;
+  if (filterAktiv) return gesamt === 1 ? '1 Treffer' : `${gesamt} Treffer`;
+  return gesamt === 1 ? '1 Eintrag' : `${gesamt} Einträge`;
 }
 
 // ── Puffer ──────────────────────────────────────────────────────────────────────────

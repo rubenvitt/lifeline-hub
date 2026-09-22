@@ -52,6 +52,9 @@ export const EINSATZ_KEYS = {
   kartenAnsicht: 'einsatz-karten-ansicht',
   lageSnapshot: 'einsatz-lage-snapshot',
   stab: 'einsatz-stab',
+  // Modulzähler des Navigationsrahmens (LFH-612): hängt an jedem Ereignis, das die Liste
+  // eines gezählten Moduls invalidiert (Vollständigkeit: `queryKeys.test.ts`).
+  modulZaehler: 'einsatz-modul-zaehler',
   // Nicht live über SSE getrieben (siehe NICHT_LIVE_KEYS + Guard-Test):
   einsatz: 'einsatz',
   einstellungen: 'einsatz-einstellungen',
@@ -99,13 +102,14 @@ export const EINSATZ_STREAM_EVENTS = {
     EINSATZ_KEYS.personal,
     EINSATZ_KEYS.fahrzeuge,
     EINSATZ_KEYS.material,
+    EINSATZ_KEYS.modulZaehler,
   ],
-  abschnitt: [EINSATZ_KEYS.abschnitte, EINSATZ_KEYS.fuehrungskraefte],
+  abschnitt: [EINSATZ_KEYS.abschnitte, EINSATZ_KEYS.fuehrungskraefte, EINSATZ_KEYS.modulZaehler],
   // F01/LFH-227: `person` und `personal` sind getrennte Wire-Events. Vorher trug EIN
   // `person`-Tag beide ID-Räume (betroffene Person vs. einsatz_personal-Disposition),
   // weshalb hier beide Sammlungen hängen mussten — und weshalb das Backend die zwei
   // Module nicht getrennt gaten konnte. Jetzt: betroffene Personen (Modul `personen`).
-  person: [EINSATZ_KEYS.personen],
+  person: [EINSATZ_KEYS.personen, EINSATZ_KEYS.modulZaehler],
   // Disponiertes Personal (Modul `personal`) — die Zuordnung wirkt zugleich auf
   // Einheiten-/Abschnittsführung und die Führungskräfte-Sicht der Lagekarte.
   personal: [
@@ -113,19 +117,20 @@ export const EINSATZ_STREAM_EVENTS = {
     EINSATZ_KEYS.einheiten,
     EINSATZ_KEYS.abschnitte,
     EINSATZ_KEYS.fuehrungskraefte,
+    EINSATZ_KEYS.modulZaehler,
   ],
   lagebericht: [EINSATZ_KEYS.lageberichte, EINSATZ_KEYS.lagebericht],
-  chat: [EINSATZ_KEYS.chatKanaele, EINSATZ_KEYS.chatNachrichten],
-  erinnerung: [EINSATZ_KEYS.erinnerungen],
-  auftrag: [EINSATZ_KEYS.auftraege],
+  chat: [EINSATZ_KEYS.chatKanaele, EINSATZ_KEYS.chatNachrichten, EINSATZ_KEYS.modulZaehler],
+  erinnerung: [EINSATZ_KEYS.erinnerungen, EINSATZ_KEYS.modulZaehler],
+  auftrag: [EINSATZ_KEYS.auftraege, EINSATZ_KEYS.modulZaehler],
   nachforderung: [EINSATZ_KEYS.nachforderungen],
-  meldung: [EINSATZ_KEYS.meldungen, EINSATZ_KEYS.lagemeldungen],
+  meldung: [EINSATZ_KEYS.meldungen, EINSATZ_KEYS.lagemeldungen, EINSATZ_KEYS.modulZaehler],
   // Liste + Detail (Prefix-Match: ['einsatz-br-detail', einsatzId] trifft alle brIds).
   bereitstellungsraum: [EINSATZ_KEYS.br, EINSATZ_KEYS.brDetail],
   karte_bild: [EINSATZ_KEYS.kartenbilder],
   // LFH-207-C: ETB-Zeitachse live halten — ersetzt den dedizierten useEtbStream (2. EventSource
   // auf denselben Live-Endpoint). Prefix-Match deckt ['etb', einsatzId, filter] mit ab.
-  etb: [EINSATZ_KEYS.etb],
+  etb: [EINSATZ_KEYS.etb, EINSATZ_KEYS.modulZaehler],
   // Befehle live (LFH-262/F13): Backend publiziert seit LFH-64 ein `befehl`-Wire-Event bei
   // Anlegen/Ändern/Freigeben/Fortschreiben. Invalidiert Befehls-Liste UND -Detail
   // (Prefix-Match: ['einsatz-befehl', einsatzId, befehlId] trifft alle befehlIds).
@@ -283,6 +288,13 @@ export const einsatzKeys = {
   // `stabLagebesprechungen`): jedes `etb`-Live-Ereignis und jede ETB-Invalidierung zieht die
   // Zahl „neu seit Ihrer letzten Sichtung" mit, ohne eigenen Eintrag im Fan-out.
   etbLesemarke: (einsatzId: number) => [EINSATZ_KEYS.etb, einsatzId, 'lesemarke'] as const,
+  // Exakte Zählung (LFH-612) unter demselben Prefix: das `etb`-Live-Ereignis zieht sie mit.
+  // Der Filter ist Teil des Keys — Kopf und Bilanz zählen genau, was die Liste zeigt.
+  etbZaehler: <F>(einsatzId: number, filter: F) =>
+    [EINSATZ_KEYS.etb, einsatzId, 'zaehler', filter] as const,
+
+  // Modulzähler des Navigationsrahmens (LFH-612)
+  modulZaehler: (einsatzId: number) => [EINSATZ_KEYS.modulZaehler, einsatzId] as const,
 
   // Abgeleitetes
   // Die gerundeten Koordinaten sind Teil des Keys (Cache-Trefferquote + serverseitiger

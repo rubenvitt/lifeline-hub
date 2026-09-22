@@ -134,6 +134,10 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     // NICHT als Türsteher, sondern als Post-Filter pro Event im SSE-Builder — ein
     // Modul-Gate hier würde die anderen Module wieder mit durchlassen.
     ("/api/einsaetze/{id}/live", None),
+    // Modulzähler (LFH-612): modul-lose Gate-Route wie der Live-Feed. Die Modulrechte
+    // wirken als Filter über die Felder der Antwort — ein nicht erlaubtes Modul fehlt —,
+    // nicht als Türsteher der Route.
+    ("/api/einsaetze/{id}/modul-zaehler", None),
 ];
 
 /// Längster-Präfix-Match über [`PFAD_KEY`]. Äußeres `None` = Pfad nicht registriert;

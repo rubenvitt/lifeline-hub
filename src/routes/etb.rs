@@ -12,6 +12,7 @@ use crate::live::LiveEvent;
 /// Modul-Key dieses Route-Moduls (LFH-132); gegen die Override-Map geprüft.
 const MODUL_KEY: &str = "etb";
 use crate::etb::lesemarke::{self, EtbLesemarkeAnzeige};
+use crate::etb::zaehler::EtbZaehlerAnzeige;
 use crate::etb::{normalisiere_zeit, repo, EtbEintragAnzeige, EtbTyp, MeldeWeg};
 use axum::extract::{Query, State};
 use axum::http::{HeaderMap, StatusCode};
@@ -265,7 +266,29 @@ pub async fn liste(
     )
     .await?;
 
-    // Typ validieren, falls gesetzt.
+    let merkmale = filter_merkmale(&params)?;
+    let limit = params
+        .limit
+        .unwrap_or(repo::STANDARD_LIMIT)
+        .clamp(1, repo::MAX_LIMIT);
+
+    let filter = repo::EtbFilter {
+        q: merkmale.q,
+        typ: merkmale.typ,
+        von_zeit: merkmale.von_zeit,
+        bis_zeit: merkmale.bis_zeit,
+        erfasser_id: merkmale.erfasser_id,
+        before_lfd_nr: params.before_lfd_nr,
+        limit,
+    };
+
+    Ok(Json(repo::abfrage(&state.pool, einsatz_id, &filter).await?))
+}
+
+/// Prüft und normalisiert die Filtermerkmale einer ETB-Abfrage (unbekannter Typ und
+/// unlesbare Zeit → 400). Liste und Zählung rufen DIESE Funktion (LFH-612): eine zweite
+/// Kopie wäre die Stelle, an der „n Treffer" im Kopf und die Liste still auseinanderliefen.
+fn filter_merkmale(params: &EtbAbfrageParams) -> Result<repo::EtbZaehlFilter, AppError> {
     if let Some(t) = &params.typ {
         if EtbTyp::parse(t).is_none() {
             return Err(AppError::Validation(
@@ -273,39 +296,49 @@ pub async fn liste(
             ));
         }
     }
-
-    // Zeitgrenzen normalisieren.
-    let von_zeit = match &params.von {
-        Some(s) => Some(normalisiere_zeit(s)?),
-        None => None,
-    };
-    let bis_zeit = match &params.bis {
-        Some(s) => Some(normalisiere_zeit(s)?),
-        None => None,
-    };
-
+    let von_zeit = params.von.as_deref().map(normalisiere_zeit).transpose()?;
+    let bis_zeit = params.bis.as_deref().map(normalisiere_zeit).transpose()?;
     // q nur als Filter nutzen, wenn nach Trim nicht leer.
     let q = params
         .q
+        .as_deref()
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty());
-
-    let limit = params
-        .limit
-        .unwrap_or(repo::STANDARD_LIMIT)
-        .clamp(1, repo::MAX_LIMIT);
-
-    let filter = repo::EtbFilter {
+    Ok(repo::EtbZaehlFilter {
         q,
-        typ: params.typ,
+        typ: params.typ.clone(),
         von_zeit,
         bis_zeit,
         erfasser_id: params.erfasser_id,
-        before_lfd_nr: params.before_lfd_nr,
-        limit,
-    };
+    })
+}
 
-    Ok(Json(repo::abfrage(&state.pool, einsatz_id, &filter).await?))
+/// GET /api/einsaetze/{id}/etb/zaehler — Zahl der Einträge gesamt und je Typ (LFH-612).
+///
+/// Nimmt dieselben Filter wie [`liste`] und zählt über dieselbe Bedingung; `before_lfd_nr`
+/// und `limit` werden ignoriert (sie sind Seiten-, keine Filtermerkmale). Gates wie die
+/// Liste: Lesezugriff (auch Beobachter) + Modul `etb`.
+pub async fn zaehler(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    PfadParam(einsatz_id): PfadParam<i64>,
+    Query(params): Query<EtbAbfrageParams>,
+) -> Result<Json<EtbZaehlerAnzeige>, AppError> {
+    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?; // 404, wenn unbekannt
+    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
+    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
+
+    let merkmale = filter_merkmale(&params)?;
+    let zeilen = repo::zaehle(&state.pool, einsatz_id, &merkmale).await?;
+    Ok(Json(EtbZaehlerAnzeige::aus_zeilen(&zeilen)?))
 }
 
 #[derive(Debug, Deserialize)]

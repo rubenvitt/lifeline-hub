@@ -4,7 +4,6 @@ import type { AbgelehnterEintrag, AusstehenderEintrag } from '../offline/queue';
 import { baueZeilen } from './etbZeile';
 import {
   berichtigungsindex,
-  bilanzUmfang,
   einfrieren,
   filterMitTyp,
   filterZusammenfuehren,
@@ -108,53 +107,42 @@ describe('berichtigungsindex', () => {
   });
 });
 
-describe('Bilanz und Kopfzahl — ehrlich über die geladene Menge', () => {
-  it('zählt je Typ und zeigt System nur, wenn es vorkommt', () => {
-    const ohne = typBilanz([e({ typ: 'meldung' }), e({ typ: 'meldung' }), e({ typ: 'lage' })]);
+describe('Bilanz und Kopfzahl — exakt aus der Serverzählung (LFH-612)', () => {
+  const null_je_typ = {
+    meldung: 0,
+    anordnung: 0,
+    lage: 0,
+    entscheidung: 0,
+    system: 0,
+    berichtigung: 0,
+  };
+
+  it('ordnet die Typen fest und zeigt System nur, wenn es vorkommt', () => {
+    const ohne = typBilanz({ ...null_je_typ, meldung: 218, lage: 62 });
     expect(ohne.map((z) => [z.typ, z.anzahl])).toEqual([
-      ['meldung', 2],
+      ['meldung', 218],
       ['anordnung', 0],
       ['entscheidung', 0],
-      ['lage', 1],
+      ['lage', 62],
       ['berichtigung', 0],
     ]);
-    const mit = typBilanz([e({ typ: 'system' })]);
+    const mit = typBilanz({ ...null_je_typ, system: 1 });
     expect(mit[mit.length - 1]).toEqual({ typ: 'system', anzahl: 1 });
   });
 
   it.each([
-    [
-      { geladen: 100, weitereSeiten: true, filterAktiv: false },
-      'in 100 geladenen Einträgen — ältere sind nicht mitgezählt',
-    ],
-    [
-      { geladen: 12, weitereSeiten: false, filterAktiv: true },
-      'in 12 geladenen Einträgen, die zum Filter passen',
-    ],
-    [{ geladen: 37, weitereSeiten: false, filterAktiv: false }, 'in allen 37 Einträgen'],
-  ])('nennt den Umfang der Zählung %#', (args, text) => {
-    expect(bilanzUmfang(args)).toBe(text);
-  });
-
-  it('sagt „alle" nur ohne Filter und ohne weitere Seite', () => {
-    for (const args of [
-      { geladen: 5, weitereSeiten: true, filterAktiv: false },
-      { geladen: 5, weitereSeiten: false, filterAktiv: true },
-    ]) {
-      expect(bilanzUmfang(args)).not.toContain('allen');
-    }
-  });
-
-  it.each([
-    [
-      { geladen: 100, weitereSeiten: true, filterAktiv: false },
-      '100 Einträge geladen · ältere vorhanden',
-    ],
-    [{ geladen: 3, weitereSeiten: false, filterAktiv: true }, '3 Treffer'],
-    [{ geladen: 1, weitereSeiten: false, filterAktiv: false }, '1 Eintrag'],
-    [{ geladen: 37, weitereSeiten: false, filterAktiv: false }, '37 Einträge'],
+    [{ gesamt: 412, filterAktiv: false }, '412 Einträge'],
+    [{ gesamt: 1, filterAktiv: false }, '1 Eintrag'],
+    [{ gesamt: 7, filterAktiv: true }, '7 Treffer'],
+    [{ gesamt: 1, filterAktiv: true }, '1 Treffer'],
+    [{ gesamt: 0, filterAktiv: true }, '0 Treffer'],
   ])('Kopf-Meta %#', (args, text) => {
     expect(kopfMeta(args)).toBe(text);
+  });
+
+  it('behauptet ohne Zählung keine Zahl', () => {
+    expect(kopfMeta({ gesamt: undefined, filterAktiv: false })).toBeUndefined();
+    expect(kopfMeta({ gesamt: undefined, filterAktiv: true })).toBeUndefined();
   });
 });
 

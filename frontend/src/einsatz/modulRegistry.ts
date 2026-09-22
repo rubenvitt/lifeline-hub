@@ -33,7 +33,17 @@ export type ModulStatus = 'fertig' | 'geplant' | 'wip';
 export type KategorieKey =
   'fuehrung' | 'kraefte' | 'erfassung' | 'lage' | 'kommunikation' | 'einstellungen';
 export type BenoetigteRolle = 'admin' | 'fuehrungskraft';
-export type ModulZaehlerQuelle = 'meldungen' | 'auftraege' | 'erinnerungen' | 'chat';
+/** Module mit Navigationszähler (LFH-612). Die Bedeutung je Quelle legt der Server fest
+ *  (`src/einsatz/zaehler.rs`) — nur für Module, deren Zahl aus dem Entwurf belegt ist. */
+export type ModulZaehlerQuelle =
+  | 'etb'
+  | 'personen'
+  | 'einheiten'
+  | 'einsatzabschnitte'
+  | 'meldungen'
+  | 'auftraege'
+  | 'erinnerungen'
+  | 'chat';
 
 export interface Kategorie {
   key: KategorieKey;
@@ -127,6 +137,7 @@ export const modulRegistry: ModulEintrag[] = [
     route: 'einsatzabschnitte',
     status: 'fertig',
     beschreibung: 'Gliederung des Einsatzes in Abschnitte und Zuordnung von Einheiten.',
+    zaehlerQuelle: 'einsatzabschnitte',
   },
   {
     key: 'auftraege',
@@ -167,6 +178,7 @@ export const modulRegistry: ModulEintrag[] = [
     route: 'einheiten',
     status: 'fertig',
     beschreibung: 'Taktische Einheiten: Führer, Mannschaft, Fahrzeug, Abschnittszuordnung.',
+    zaehlerQuelle: 'einheiten',
   },
   {
     key: 'personal',
@@ -213,6 +225,7 @@ export const modulRegistry: ModulEintrag[] = [
     route: 'etb',
     status: 'fertig',
     beschreibung: 'Einsatztagebuch.',
+    zaehlerQuelle: 'etb',
   },
   {
     key: 'personen',
@@ -223,6 +236,7 @@ export const modulRegistry: ModulEintrag[] = [
     status: 'fertig',
     beschreibung:
       'Ein Personenstamm mit Status-Lebenszyklus (vermisst → betroffen → Patient → verstorben).',
+    zaehlerQuelle: 'personen',
   },
   {
     key: 'unfallhilfsstellen',
@@ -466,12 +480,13 @@ export function istModulSichtbar(modul: ModulEintrag, overrides?: ModulOverrides
  * war im Bestand unbeobachtbar (alle vier Trägermodule sind `fertig`) und ist über einen
  * Registry-Stub in `command-palette/befehle.modulstatus.test.ts` beobachtbar gemacht.
  *
- * BEWUSST NICHT MIT UMGESTELLT: `useModulZaehler.ts` (`darfZaehlerLaden`) führt die
- * ZWEITEILIGE Variante ohne `status === 'fertig'`. Das ist heute unbeobachtbar — alle vier
- * Module mit `zaehlerQuelle` (chat, erinnerungen, auftraege, meldungen) sind `fertig`,
- * beide Fassungen liefern also dasselbe. Ob ein Zähler auch für ein UNFERTIGES Modul laden
- * darf, ist eine fachliche Entscheidung und keine Aufräumarbeit; sie steht offen. Wer sie
- * trifft, zieht die Stelle nach oder schreibt hier hin, warum sie eigenständig bleibt.
+ * BEWUSST NICHT MIT UMGESTELLT: `useModulZaehler.ts` (`darfZaehlerZeigen`) führt die
+ * ZWEITEILIGE Variante ohne `status === 'fertig'`. Das ist heute unbeobachtbar — alle acht
+ * Module mit `zaehlerQuelle` (seit LFH-612 auch etb, personen, einheiten,
+ * einsatzabschnitte) sind `fertig`, beide Fassungen liefern also dasselbe. Ob ein Zähler
+ * auch an einem UNFERTIGEN Modul stehen darf, ist eine fachliche Entscheidung und keine
+ * Aufräumarbeit; sie steht offen. Wer sie trifft, zieht die Stelle nach oder schreibt hier
+ * hin, warum sie eigenständig bleibt.
  */
 export function istModulFreigegeben(
   modul: ModulEintrag,

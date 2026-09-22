@@ -13,6 +13,7 @@ import { AuthProvider } from '../auth/AuthContext';
 import { entwuerfeLaden, entwuerfeLeerenFuerTests } from '../etb/entwuerfe/entwurfStore';
 import { queueLeerenFuerTests } from '../offline/queue';
 import EtbPage from './EtbPage';
+import type { EtbEintragAnzeige } from '../api/types';
 
 function renderMitProviders(
   ui: ReactElement,
@@ -91,6 +92,25 @@ async function waehleZeilenaktion(user: ReturnType<typeof userEvent.setup>, name
   await user.click(within(menue).getByRole('menuitem', { name }));
 }
 
+/**
+ * Serverzählung (LFH-612) für den Kopf und die Bilanz. Die Zahl ist bewusst vom geladenen
+ * Fenster UNABHÄNGIG — genau das ist die Zusicherung: der Kopf zeigt, was der Server zählt,
+ * nicht was die Seite geladen hat.
+ */
+function zaehlung(jeTyp: Partial<Record<EtbEintragAnzeige['typ'], number>>) {
+  const je_typ = {
+    meldung: 0,
+    anordnung: 0,
+    lage: 0,
+    entscheidung: 0,
+    system: 0,
+    berichtigung: 0,
+    ...jeTyp,
+  };
+  const gesamt = Object.values(je_typ).reduce((a, b) => a + b, 0);
+  return http.get('/api/einsaetze/7/etb/zaehler', () => HttpResponse.json({ gesamt, je_typ }));
+}
+
 /** Zeigt den aktuellen Search-String im DOM — ermöglicht Param-Bereinigung zu prüfen. */
 function OrtSpy() {
   const ort = useLocation();
@@ -102,6 +122,7 @@ function setupMSW() {
     http.get('/api/auth/me', () => HttpResponse.json(admin)),
     http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
     http.get('/api/einsaetze/7/etb', () => HttpResponse.json([eintrag])),
+    zaehlung({ meldung: 1 }),
     http.get('/api/etb-bausteine', () => HttpResponse.json([])),
     // Schnellerfassung lädt via useFunkrufnamen disponierte Fahrzeuge/Einheiten
     // (Absender/Empfänger-Vorschläge). Leere Listen genügen für diesen Test.
@@ -112,8 +133,10 @@ function setupMSW() {
   );
 }
 
-function setup(route = '/einsaetze/7/etb') {
+function setup(route = '/einsaetze/7/etb', zusatz: RequestHandler[] = []) {
   setupMSW();
+  // NACH den Vorgaben: `server.use` stellt voran, der zuletzt gesetzte Handler gewinnt.
+  server.use(...zusatz);
   return renderMitProviders(
     <AuthProvider>
       <Routes>
@@ -285,7 +308,7 @@ describe('EtbPage', () => {
     },
   );
 
-  it('zeigt Seitentitel, Einsatz im Ortspfad, Einträge und die ehrliche Zahl im Kopf', async () => {
+  it('zeigt Seitentitel, Einsatz im Ortspfad, Einträge und die Serverzahl im Kopf', async () => {
     setup();
     // Seit dem Neuentwurf (S4) trägt der Seitenkopf den MODULtitel; der Einsatz steht im
     // Ortspfad davor (und im Rahmen der App, der hier nicht mitgerendert wird).
@@ -293,10 +316,9 @@ describe('EtbPage', () => {
     expect(screen.getByText('Hochwasser Nord')).toBeInTheDocument();
     expect(await screen.findByText('Erste Meldung')).toBeInTheDocument();
     expect(screen.getByLabelText(/^Datenstand \d{2}:\d{2}$/)).toBeInTheDocument();
-    // Eine Seite, kein Filter: die geladene Menge IST das Tagebuch — „1 Eintrag", ohne
-    // „geladen". Mehr als das weiß die Seite nicht (Gesamtzahl serverseitig: LFH-612).
+    // Kein Filter: der Kopf nennt die Gesamtzahl der Serverzählung (LFH-612).
     const kopf = document.querySelector('[data-lfh="seitenkopf"]')!;
-    expect(kopf).toHaveTextContent('1 Eintrag');
+    await waitFor(() => expect(kopf).toHaveTextContent('1 Eintrag'));
     expect(kopf).not.toHaveTextContent('geladen');
   });
 
@@ -354,6 +376,7 @@ describe('EtbPage', () => {
         const url = new URL(request.url);
         return HttpResponse.json(url.searchParams.has('before_lfd_nr') ? [ziel] : seite1);
       }),
+      zaehlung({ meldung: 412 }),
       http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([])),
       http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json([])),
       http.get('/api/einsaetze/7/abschnitte', () => HttpResponse.json([])),
@@ -374,11 +397,11 @@ describe('EtbPage', () => {
         'zeile-hervorgehoben',
       ),
     );
-    // Beide Seiten sind jetzt da, eine dritte gibt es nicht: der Kopf nennt die Menge
-    // ohne „geladen" — erst jetzt ist sie das ganze Tagebuch.
+    // Der Kopf nennt die Serverzahl, nicht die 101 geladenen Einträge (LFH-612).
     await waitFor(() =>
-      expect(document.querySelector('[data-lfh="seitenkopf"]')).toHaveTextContent('101 Einträge'),
+      expect(document.querySelector('[data-lfh="seitenkopf"]')).toHaveTextContent('412 Einträge'),
     );
+    expect(document.querySelector('[data-lfh="seitenkopf"]')).not.toHaveTextContent('101');
   });
 
   it('räumt ?eintrag= ohne Highlight, wenn der Eintrag nicht existiert (Pagination erschöpft, kein Endlos-Fetch)', async () => {
@@ -390,6 +413,7 @@ describe('EtbPage', () => {
         if (new URL(request.url).searchParams.has('before_lfd_nr')) folgeSeiten += 1;
         return HttpResponse.json([eintrag]); // 1 < SEITENGROESSE → keine weitere Seite
       }),
+      zaehlung({ meldung: 1 }),
       http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([])),
       http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json([])),
       http.get('/api/einsaetze/7/abschnitte', () => HttpResponse.json([])),
@@ -858,13 +882,65 @@ describe('EtbPage – Zeitachse (Neuentwurf S4)', () => {
     }
   });
 
-  it('zeigt die Bilanz über die geladenen Einträge und den Puffer „übertragen"', async () => {
+  it('zeigt die Bilanz aus der Serverzählung und den Puffer „übertragen"', async () => {
     setzeViewportBreite(1366);
-    setup();
+    setup('/einsaetze/7/etb', [
+      zaehlung({ meldung: 218, anordnung: 96, entscheidung: 31, lage: 62, berichtigung: 5 }),
+    ]);
     await screen.findByText('Erste Meldung');
     const leiste = screen.getByRole('complementary', { name: 'Bilanz des Tagebuchs' });
-    expect(within(leiste).getByText('im einzigen Eintrag des Tagebuchs')).toBeInTheDocument();
+    // Geladen ist EIN Eintrag; die Bilanz zählt trotzdem das ganze Tagebuch.
+    await waitFor(() =>
+      expect(leiste.querySelector('[data-typ="meldung"]')).toHaveTextContent('218'),
+    );
+    expect(within(leiste).getByRole('heading', { name: 'Bilanz' })).toBeInTheDocument();
+    expect(
+      within(leiste).getByRole('img', { name: 'Meldungen: 218 von 412 Einträgen' }),
+    ).toBeInTheDocument();
     expect(within(leiste).getByText('Alle Einträge übertragen')).toBeInTheDocument();
+  });
+
+  it('zählt unter einem Filter die Treffer und nennt die Bilanz so', async () => {
+    setzeViewportBreite(1366);
+    let zaehlQuery = '';
+    setup('/einsaetze/7/etb?q=Deich', [
+      http.get('/api/einsaetze/7/etb/zaehler', ({ request }) => {
+        zaehlQuery = new URL(request.url).search;
+        return HttpResponse.json({
+          gesamt: 7,
+          je_typ: {
+            meldung: 7,
+            anordnung: 0,
+            lage: 0,
+            entscheidung: 0,
+            system: 0,
+            berichtigung: 0,
+          },
+        });
+      }),
+    ]);
+    await screen.findByText('Erste Meldung');
+    const kopf = document.querySelector('[data-lfh="seitenkopf"]')!;
+    await waitFor(() => expect(kopf).toHaveTextContent('7 Treffer'));
+    // Dieselben Filtermerkmale wie die Liste gehen an die Zählung.
+    expect(new URLSearchParams(zaehlQuery).get('q')).toBe('Deich');
+    const leiste = screen.getByRole('complementary', { name: 'Bilanz des Tagebuchs' });
+    expect(within(leiste).getByRole('heading', { name: 'Bilanz im Filter' })).toBeInTheDocument();
+  });
+
+  it('behauptet ohne Zählung keine Gesamtzahl, die Liste bleibt bedienbar', async () => {
+    setzeViewportBreite(1366);
+    setup('/einsaetze/7/etb', [
+      http.get('/api/einsaetze/7/etb/zaehler', () =>
+        HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
+      ),
+    ]);
+    await screen.findByText('Erste Meldung');
+    const leiste = screen.getByRole('complementary', { name: 'Bilanz des Tagebuchs' });
+    expect(await within(leiste).findByText('Zählung nicht verfügbar.')).toBeInTheDocument();
+    const kopf = document.querySelector('[data-lfh="seitenkopf"]')!;
+    expect(kopf).not.toHaveTextContent(/\d+ (Einträge|Eintrag|Treffer)/);
+    expect(screen.getByPlaceholderText(/Inhalt/)).toBeEnabled();
   });
 
   it('meldet einen offline gepufferten Eintrag im Puffer als ausstehend', async () => {
