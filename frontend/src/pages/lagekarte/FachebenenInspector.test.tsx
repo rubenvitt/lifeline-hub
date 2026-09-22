@@ -1,5 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { http, HttpResponse } from 'msw';
+import { server } from '../../test/server';
+import { renderMitProviders } from '../../test/utils';
 import FachebenenInspector from './FachebenenInspector';
 import { FACHEBENEN } from './fachebenen';
 import { taktischeDtgVoll } from '../../anzeige/format';
@@ -716,5 +720,162 @@ describe('FachebenenInspector — Energieanlagen (LFH-81)', () => {
       expect(screen.getByText(wort)).toBeInTheDocument();
       unmount();
     }
+  });
+});
+
+/**
+ * ── SCHNELLWEG „ALS MASSGEBLICHEN PEGEL FESTLEGEN" (LFH-606) ─────────────────────────
+ *
+ * Nur mit `pegelBezug` hängt der Inspektor an Abfrage und Mutation — die Bestandstests oben
+ * rendern ihn nackt, ohne QueryClient, und bleiben so gültig.
+ */
+describe('FachebenenInspector — Pegel festlegen (LFH-606)', () => {
+  const UUID = '47174d8f-1b8e-4599-8a59-b580dd55bc87';
+  const station = {
+    titel: 'HANN. MÜNDEN',
+    gewaesser: 'WESER',
+    uuid: UUID,
+    wert: 684,
+    einheit: 'cm',
+  };
+  const eintrag = (uuid: string, i: number) => ({
+    id: i + 1,
+    station_uuid: uuid,
+    name: `P${i}`,
+    reihenfolge: i,
+  });
+
+  function stelleBereit(liste: unknown[]) {
+    const posts: unknown[] = [];
+    let stand = liste;
+    server.use(
+      http.get('/api/einsaetze/1/pegel', () => HttpResponse.json(stand)),
+      http.post('/api/einsaetze/1/pegel', async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        posts.push(body);
+        stand = [...stand, { id: 99, reihenfolge: stand.length, ...body }];
+        return HttpResponse.json(stand, { status: 201 });
+      }),
+    );
+    return posts;
+  }
+
+  const inspector = (props: Partial<Parameters<typeof FachebenenInspector>[0]> = {}) =>
+    renderMitProviders(
+      <FachebenenInspector
+        quelle="pegelonline"
+        properties={station}
+        onSchliessen={() => {}}
+        pegelBezug={{ einsatzId: 1, darfSchreiben: true }}
+        {...props}
+      />,
+    );
+
+  it('mit Schreibrecht: POST mit Name und Gewässer, danach die Marke statt des Knopfs', async () => {
+    const posts = stelleBereit([eintrag('00000000-0000-4000-8000-000000000001', 0)]);
+    inspector();
+    const knopf = await screen.findByRole('button', { name: 'Als maßgeblichen Pegel festlegen' });
+    await waitFor(() => expect(knopf).toBeEnabled());
+    await userEvent.click(knopf);
+    expect(await screen.findByText('maßgeblicher Pegel')).toBeInTheDocument();
+    expect(posts).toEqual([{ station_uuid: UUID, name: 'HANN. MÜNDEN', gewaesser: 'WESER' }]);
+    expect(screen.queryByRole('button', { name: 'Als maßgeblichen Pegel festlegen' })).toBeNull();
+    expect(await screen.findByText('Als maßgeblicher Pegel festgelegt')).toBeInTheDocument();
+  });
+
+  it('schon maßgeblich: Marke statt Knopf — auch ohne Schreibrecht, als Leitpegel benannt', async () => {
+    stelleBereit([eintrag(UUID, 0)]);
+    inspector({ pegelBezug: { einsatzId: 1, darfSchreiben: false } });
+    expect(await screen.findByText('maßgeblicher Pegel · Leitpegel')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /maßgeblichen Pegel/ })).toBeNull();
+  });
+
+  it('eine groß geschriebene uuid der Quelle trifft den kleingeschriebenen Bestand', async () => {
+    stelleBereit([eintrag('00000000-0000-4000-8000-000000000001', 0), eintrag(UUID, 1)]);
+    inspector({ properties: { ...station, uuid: UUID.toUpperCase() } });
+    expect(await screen.findByText('maßgeblicher Pegel')).toBeInTheDocument();
+  });
+
+  it('ohne Schreibrecht und nicht maßgeblich: weder Knopf noch Marke', async () => {
+    stelleBereit([]);
+    inspector({ pegelBezug: { einsatzId: 1, darfSchreiben: false } });
+    await screen.findByText('HANN. MÜNDEN');
+    // Die Abfrage läuft trotzdem (Marke!) — kurz abwarten, dann darf nichts erscheinen.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByRole('button', { name: /maßgeblichen Pegel/ })).toBeNull();
+    expect(screen.queryByText(/maßgeblicher Pegel/)).toBeNull();
+  });
+
+  it('ohne uuid gibt es nichts festzulegen', async () => {
+    stelleBereit([]);
+    const { uuid: _weg, ...ohneUuid } = station;
+    void _weg;
+    inspector({ properties: ohneUuid });
+    await screen.findByText('HANN. MÜNDEN');
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByRole('button', { name: /maßgeblichen Pegel/ })).toBeNull();
+  });
+
+  it('bei fünf festgelegten Pegeln gesperrt, mit Grund und Weg in die Einstellungen', async () => {
+    stelleBereit([0, 1, 2, 3, 4].map((i) => eintrag(`00000000-0000-4000-8000-00000000000${i}`, i)));
+    inspector();
+    const grund = await screen.findByText(/Schon 5 maßgebliche Pegel festgelegt/);
+    expect(screen.getByRole('button', { name: 'Als maßgeblichen Pegel festlegen' })).toBeDisabled();
+    expect(within(grund).getByRole('link', { name: 'Einstellungen' })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/einstellungen/pegel',
+    );
+  });
+
+  it('ein abgelehnter POST (volle Liste, 422) steht als Fehler im Panel, ohne Erfolgsmeldung', async () => {
+    stelleBereit([eintrag('00000000-0000-4000-8000-000000000001', 0)]);
+    server.use(
+      http.post('/api/einsaetze/1/pegel', () =>
+        HttpResponse.json({ error: 'höchstens 5 Pegel je Einsatz' }, { status: 422 }),
+      ),
+    );
+    inspector();
+    const knopf = await screen.findByRole('button', { name: 'Als maßgeblichen Pegel festlegen' });
+    await waitFor(() => expect(knopf).toBeEnabled());
+    await userEvent.click(knopf);
+    expect(await screen.findByText('Nicht gespeichert')).toBeInTheDocument();
+    expect(screen.getByText('höchstens 5 Pegel je Einsatz')).toBeInTheDocument();
+    expect(screen.queryByText('Als maßgeblicher Pegel festgelegt')).toBeNull();
+  });
+
+  it('Fehler und Ladezustand gehören zur Station: ein anderer Punkt zeigt sie nicht', async () => {
+    stelleBereit([eintrag('00000000-0000-4000-8000-000000000001', 0)]);
+    server.use(
+      http.post('/api/einsaetze/1/pegel', () =>
+        HttpResponse.json({ error: 'abgelehnt' }, { status: 422 }),
+      ),
+    );
+    const { rerender } = inspector();
+    const knopf = await screen.findByRole('button', { name: 'Als maßgeblichen Pegel festlegen' });
+    await waitFor(() => expect(knopf).toBeEnabled());
+    await userEvent.click(knopf);
+    expect(await screen.findByText('Nicht gespeichert')).toBeInTheDocument();
+    // Derselbe Inspektor, ein anderer PEGELONLINE-Punkt (so wechselt die Lagekarte die Auswahl).
+    rerender(
+      <FachebenenInspector
+        quelle="pegelonline"
+        properties={{ ...station, titel: 'KASSEL', uuid: 'a1b2c3d4-0000-4000-8000-000000000003' }}
+        onSchliessen={() => {}}
+        pegelBezug={{ einsatzId: 1, darfSchreiben: true }}
+      />,
+    );
+    expect(await screen.findByText('KASSEL')).toBeInTheDocument();
+    expect(screen.queryByText('Nicht gespeichert')).toBeNull();
+  });
+
+  it('unter fünf kein Grenzhinweis — die Gegenaussage', async () => {
+    stelleBereit([eintrag('00000000-0000-4000-8000-000000000001', 0)]);
+    inspector();
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Als maßgeblichen Pegel festlegen' }),
+      ).toBeEnabled(),
+    );
+    expect(screen.queryByText(/Schon 5 maßgebliche Pegel/)).toBeNull();
   });
 });

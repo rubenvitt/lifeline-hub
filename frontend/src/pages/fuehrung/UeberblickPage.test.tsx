@@ -146,9 +146,21 @@ const volleDaten = {
       ],
     },
   ],
+  /** Maßgebliche Pegel (LFH-606) — im Grundbestand keiner festgelegt. */
+  pegel: [] as unknown[],
 };
 
 type Daten = typeof volleDaten;
+
+/** Ein Leitpegel mit frischer Messung (relativ zur echten Uhr, wie die Seite rechnet). */
+const leitpegel = (messung: Record<string, unknown> | null) => ({
+  id: 1,
+  station_uuid: '47174d8f-1b8e-4599-8a59-b580dd55bc87',
+  name: 'HANN. MÜNDEN',
+  gewaesser: 'WESER',
+  reihenfolge: 0,
+  ...(messung ? { messung } : {}),
+});
 
 function stelleBereit(d: Daten, ueberschreiben: Parameters<typeof server.use> = []) {
   const json = (x: object) => () => HttpResponse.json(x);
@@ -164,6 +176,7 @@ function stelleBereit(d: Daten, ueberschreiben: Parameters<typeof server.use> = 
     http.get('/api/einsaetze/1/gefahrengebiete', json(d.gefahren)),
     http.get('/api/einsaetze/1/auftraege', json(d.auftraege)),
     http.get('/api/einsaetze/1/erinnerungen', json(d.erinnerungen)),
+    http.get('/api/einsaetze/1/pegel', json(d.pegel ?? [])),
     http.get('/api/einsaetze/1/etb', ({ request }) => {
       const url = new URL(request.url);
       // Die Seite fragt NUR Entscheidungen ab — ein Abruf ohne Filter wäre ein Fehler.
@@ -234,11 +247,48 @@ describe('UeberblickPage', () => {
     const b = within(band());
     expect(links[0]).toHaveTextContent('3');
     expect(b.getByText('F/UF/M//Σ 1/0/1//2')).toBeInTheDocument();
-    // Warnstufe: das Wort ist der zweite Kanal — ohne Pegel-Notiz (LFH-606).
+    // Warnstufe: das Wort ist der zweite Kanal. Ohne festgelegten Pegel keine Pegel-Notiz —
+    // die Gegenaussage zum Fall „mit Pegel" unten (LFH-606).
     expect(links[2]).toHaveTextContent('hoch');
+    expect(links[2]).toHaveTextContent('1 Gefahrengebiet mit Warnstufe');
     expect(links[2]).not.toHaveTextContent(/Pegel/);
     expect(b.getByText('davon 1 ü.')).toBeInTheDocument();
     expect(b.getByText('Abschnitt Nord')).toBeInTheDocument();
+  });
+
+  it('Warnstufe mit festgelegtem Pegel: Notiz „Pegel 6,84 m steigend" (LFH-606)', async () => {
+    stelleBereit({
+      ...volleDaten,
+      pegel: [
+        leitpegel({
+          wasserstand_cm: 684,
+          zeitpunkt: new Date(Date.now() - 10 * 60_000).toISOString(),
+          trend_cm_pro_h: 9.2,
+        }),
+      ],
+    });
+    rendern();
+    await waitFor(() => expect(within(band()).getByText(/Pegel 6,84 m/)).toBeInTheDocument());
+    const warnstufe = within(band()).getAllByRole('link')[2];
+    expect(warnstufe).toHaveTextContent('hoch');
+    expect(warnstufe).toHaveTextContent('1 Gefahrengebiet mit Warnstufe · Pegel 6,84 m steigend');
+    // Die Kennzahl gehört weiter der Warnstufe: Ziel bleibt die Gefahrenseite.
+    expect(warnstufe).toHaveAttribute('href', '/einsaetze/1/gefahren');
+  });
+
+  it('Warnstufe bei Pegel-Ausfall und bei gescheitertem Pegel-Abruf: „Pegel: Stand unbekannt"', async () => {
+    stelleBereit({ ...volleDaten, pegel: [leitpegel(null)] });
+    const erster = rendern();
+    expect(await within(band()).findByText(/Pegel: Stand unbekannt/)).toBeInTheDocument();
+    erster.unmount();
+
+    stelleBereit(volleDaten, [
+      http.get('/api/einsaetze/1/pegel', () => new HttpResponse(null, { status: 500 })),
+    ]);
+    rendern();
+    expect(await within(band()).findByText(/Pegel: Stand unbekannt/)).toBeInTheDocument();
+    // Der tote Pegel-Abruf macht die Warnstufe nicht unlesbar.
+    expect(within(band()).getAllByRole('link')[2]).toHaveTextContent('hoch');
   });
 
   it('Abschnittszeile: Leiter, Stärke, Mittelverteilung ehrlich beschriftet, Auftrag, Deeplink', async () => {

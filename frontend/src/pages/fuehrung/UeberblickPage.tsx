@@ -31,6 +31,8 @@ import { ladeGefahrengebiete } from '../../api/gefahren';
 import { listeAuftraege } from '../../api/auftraege';
 import { listeErinnerungen } from '../../api/erinnerungen';
 import { listeEtb } from '../../api/etb';
+import { pegelAbfrage } from '../../api/pegel';
+import { PEGEL_STAND_UNBEKANNT, pegelNotizKurz } from '../../pegel/pegelKennzahl';
 import {
   auftraegePfad,
   einheitenPfad,
@@ -60,6 +62,7 @@ import {
   naechsteMarken,
   offeneAuftraege,
   warnstufeKennzahlVon,
+  warnstufeNotiz,
   ueberblickRechteText,
   type AbschnittZeile,
   type Marke,
@@ -79,10 +82,17 @@ import { MARKEN_BREITE, rasterStil, zeilenzielStil } from './ueberblickStil';
  * (`EINSATZ_STREAM_EVENTS`). Die Reihenfolgen sind vollständig bestimmt (Tiebreak über
  * id), ein Refetch ordnet also nichts um, was sich nicht geändert hat.
  *
- * BEWUSST WEGGELASSEN (keine erfundenen Daten, Entscheidung 4): Pegel-Notiz an der
- * Warnstufe (LFH-606), Lagezustand-Farbkante und Fortschritt je Abschnitt (LFH-608),
- * Einheitenstatus (LFH-609 — ersetzt durch die Verfügbarkeit der Mittel), letzte
- * Rückmeldung je Abschnitt (LFH-610).
+ * PEGEL-NOTIZ AN DER WARNSTUFE (LFH-606, Entscheidung 4 des Auftraggebers vom 22.09.2026):
+ * seit es die maßgeblichen Pegel des Einsatzes gibt, trägt die Warnstufen-Kennzahl wieder
+ * „Pegel 6,84 m steigend" — aus derselben Ableitung wie das Lage-Dashboard
+ * (`pegel/pegelKennzahl.ts`). Ohne festgelegten Pegel keine Pegel-Notiz, bei Ausfall oder
+ * gescheitertem Abruf „Pegel: Stand unbekannt". Der Pegel-Abruf bestimmt NICHT den Zustand
+ * der Kennzahl: sie gehört der Warnstufe, ein toter Pegel-Abruf macht die Warnstufe nicht
+ * unlesbar.
+ *
+ * BEWUSST WEGGELASSEN (keine erfundenen Daten, Entscheidung 4): Lagezustand-Farbkante und
+ * Fortschritt je Abschnitt (LFH-608), Einheitenstatus (LFH-609 — ersetzt durch die
+ * Verfügbarkeit der Mittel), letzte Rückmeldung je Abschnitt (LFH-610).
  */
 
 /** Der Entscheidungsabruf: nur Typ „Entscheidung", ein Deckel, der die letzte Stunde
@@ -232,6 +242,7 @@ export default function UeberblickPage() {
     queryKey: einsatzKeys.etbListe(einsatzId, ETB_ENTSCHEIDUNGEN),
     queryFn: () => listeEtb(einsatzId, ETB_ENTSCHEIDUNGEN),
   });
+  const pegelQ = useQuery(pegelAbfrage(einsatzId));
 
   const einsatz = einsatzQ.data;
   /*
@@ -257,6 +268,16 @@ export default function UeberblickPage() {
     [personal, fahrzeuge, material],
   );
   const warnstufe = useMemo(() => warnstufeKennzahlVon(gefahren ?? []), [gefahren]);
+  const pegel = pegelQ.data;
+  const pegelNotiz = useMemo(
+    () =>
+      pegelQ.isError
+        ? `Pegel: ${PEGEL_STAND_UNBEKANNT}`
+        : pegel
+          ? pegelNotizKurz(pegel, jetzt.valueOf())
+          : null,
+    [pegelQ.isError, pegel, jetzt],
+  );
   const auftragszahl = useMemo(() => auftraegeKennzahl(auftraege ?? []), [auftraege]);
   const offene = useMemo(() => offeneAuftraege(auftraege ?? []), [auftraege]);
   const zeilen = useMemo(
@@ -397,11 +418,7 @@ export default function UeberblickPage() {
             zustand={zWarnstufe}
             ton={warnstufe.ton}
             wert={warnstufe.wort}
-            notiz={
-              warnstufe.anzahlAktiv === 1
-                ? '1 Gefahrengebiet mit Warnstufe'
-                : `${warnstufe.anzahlAktiv} Gefahrengebiete mit Warnstufe`
-            }
+            notiz={warnstufeNotiz(warnstufe.anzahlAktiv, pegelNotiz)}
             ziel={gefahrenPfad(einsatzId)}
           />
           <Kennzahl

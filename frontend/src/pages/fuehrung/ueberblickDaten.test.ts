@@ -26,6 +26,7 @@ import {
   naechsteMarken,
   offeneAuftraege,
   warnstufeKennzahlVon,
+  warnstufeNotiz,
   zeitpunkt,
 } from './ueberblickDaten';
 
@@ -152,6 +153,14 @@ describe('Kennzahlen', () => {
       wort: 'hoch',
       ton: 'alarm',
     });
+  });
+
+  it('Warnstufen-Notiz: Gebietszahl, mit Pegel die Pegel-Notiz dahinter (LFH-606)', () => {
+    expect(warnstufeNotiz(1, null)).toBe('1 Gefahrengebiet mit Warnstufe');
+    expect(warnstufeNotiz(0, null)).toBe('0 Gefahrengebiete mit Warnstufe');
+    expect(warnstufeNotiz(2, 'Pegel 6,84 m steigend')).toBe(
+      '2 Gefahrengebiete mit Warnstufe · Pegel 6,84 m steigend',
+    );
   });
 
   it('Offene Aufträge: offen + in Arbeit, überfällige nur unter offenen, Ton alarm', () => {

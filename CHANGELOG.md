@@ -1,3 +1,14 @@
+## [1.0.0-alpha.31](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.30...v1.0.0-alpha.31) (2026-09-22)
+
+### Features
+
+* **etb:** Banner „neu seit Ihrer letzten Sichtung“ über der Zeitachse (LFH-611) ([4eb2e2d](https://github.com/rubenvitt/lifeline-hub/commit/4eb2e2d198914f5a4f9afcd4ab54121a92c00ba1))
+* **etb:** Lesemarke je Benutzer und Einsatz (LFH-611) ([d2981f0](https://github.com/rubenvitt/lifeline-hub/commit/d2981f0062eaaf5a392795354449b1897a0a6c41))
+
+### Bug Fixes
+
+* **etb:** Review-Befunde zur Lesemarke (LFH-611) ([724e0c6](https://github.com/rubenvitt/lifeline-hub/commit/724e0c68b77b67a2c1fafd48d83fccca1df26baf))
+
 ## [1.0.0-alpha.30](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.29...v1.0.0-alpha.30) (2026-09-22)
 
 ### Features

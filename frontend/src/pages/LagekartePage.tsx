@@ -520,6 +520,9 @@ export default function LagekartePage() {
             properties={fachebeneAuswahl.properties}
             geometrie={fachebeneAuswahl.geometrie}
             onSchliessen={() => setFachebeneAuswahl(null)}
+            // Schnellweg „Als maßgeblichen Pegel festlegen" (LFH-606); wirkt nur an
+            // PEGELONLINE-Punkten.
+            pegelBezug={{ einsatzId, darfSchreiben: !!darfSchreiben }}
           />
         )}
         {ausgewaehlteZone && (

@@ -119,6 +119,7 @@ describe('einsatzKeys (Factory-Output)', () => {
     expect(einsatzKeys.nachforderungen(1)).toEqual(['einsatz-nachforderungen', 1]);
     expect(einsatzKeys.etb(1)).toEqual(['etb', 1]);
     expect(einsatzKeys.stab(1)).toEqual(['einsatz-stab', 1]);
+    expect(einsatzKeys.pegel(1)).toEqual(['einsatz-pegel', 1]);
   });
 
   it('baut die 3-elementigen Detail-Keys als [prefix, einsatzId, id]', () => {
