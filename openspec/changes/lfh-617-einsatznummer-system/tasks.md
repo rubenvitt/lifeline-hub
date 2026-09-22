@@ -15,9 +15,9 @@ Arbeitsweise je Aufgabe: `superpowers:test-driven-development` (erst roter Test,
 
 ## 3. Unveränderlichkeit (Backend)
 
-- [ ] 3.1 `einsatznummer_intern` aus `repo::KopfPatch` und dem SQL von `patche_kopf` entfernen. Die Bind-Reihenfolge der Flag/Wert-Paare nachziehen. Verifikation: `patche_kopf_setzt_jede_spalte_an_ihren_platz` bleibt ohne das Feld grün, jede Spalte landet an ihrem Platz.
-- [ ] 3.2 `routes/einsatz.rs:aktualisieren`: ist `einsatznummer_intern` im Body (Wert **oder** `null`), gibt es 400 mit der Meldung „Die Einsatznummer vergibt das System“, bevor geschrieben wird. Verifikation: `tests/einsatz.rs` — `patch_doppelte_einsatznummer_ist_409` wird zu zwei Tests (Wert → 400, `null` → 400, Nummer danach unverändert, andere Felder nicht übernommen). `basis_kopf` und `einsatz_mit_vollen_kopfdaten` schicken das Feld nicht mehr, und der Test „`leitstellen_nr` bleibt setzbar/leerbar“ ist grün.
-- [ ] 3.3 `tests/einsatz.rs:anlegen_vergibt_einsatznummer_im_format` auf `E-JJJJ-0001`/`-0002` schärfen. Verifikation: der Test prüft den ganzen Text, nicht nur `ends_with`.
+- [x] 3.1 `einsatznummer_intern` aus `repo::KopfPatch` und dem SQL von `patche_kopf` entfernen. Die Bind-Reihenfolge der Flag/Wert-Paare nachziehen. Verifikation: `patche_kopf_setzt_jede_spalte_an_ihren_platz` bleibt ohne das Feld grün, jede Spalte landet an ihrem Platz.
+- [x] 3.2 `routes/einsatz.rs:aktualisieren`: ist `einsatznummer_intern` im Body (Wert **oder** `null`), gibt es 400 mit der Meldung „Die Einsatznummer vergibt das System“, bevor geschrieben wird. Verifikation: `tests/einsatz.rs` — `patch_doppelte_einsatznummer_ist_409` wird zu zwei Tests (Wert → 400, `null` → 400, Nummer danach unverändert, andere Felder nicht übernommen). `basis_kopf` und `einsatz_mit_vollen_kopfdaten` schicken das Feld nicht mehr, und der Test „`leitstellen_nr` bleibt setzbar/leerbar“ ist grün.
+- [x] 3.3 `tests/einsatz.rs:anlegen_vergibt_einsatznummer_im_format` auf `E-JJJJ-0001`/`-0002` schärfen. Verifikation: der Test prüft den ganzen Text, nicht nur `ends_with`.
 
 ## 4. Org-Einstellung (Backend + Codegen)
 
@@ -26,8 +26,9 @@ Arbeitsweise je Aufgabe: `superpowers:test-driven-development` (erst roter Test,
 
 ## 5. Frontend
 
-- [ ] 5.1 `pages/EinsatzdatenPage.tsx`: das `Form.Item` „Einsatznummer (intern)“ und den Schlüssel im Payload (`FormWerte`, Vorbelegung, `leerZuNull`) entfernen. Das Etikett im Lesezweig heißt „Einsatznummer“. Verifikation: `EinsatzdatenPage.test.tsx` — kein Eingabefeld „Einsatznummer“, der PATCH-Body enthält kein `einsatznummer_intern` (Schlüssel-Abwesenheit geprüft), „Leitstellen-Nr.“ bleibt editierbar.
+- [x] 5.1 `pages/EinsatzdatenPage.tsx`: das `Form.Item` „Einsatznummer (intern)“ und den Schlüssel im Payload (`FormWerte`, Vorbelegung, `leerZuNull`) entfernen. Das Etikett im Lesezweig heißt „Einsatznummer“. Verifikation: `EinsatzdatenPage.test.tsx` — kein Eingabefeld „Einsatznummer“, der PATCH-Body enthält kein `einsatznummer_intern` (Schlüssel-Abwesenheit geprüft), „Leitstellen-Nr.“ bleibt editierbar.
 - [ ] 5.2 `pages/einstellungen/orgEinstellungenForm.ts` + `EinsatzDefaults.tsx`: Feld „Präfix Einsatznummer“ (Platzhalter `E-`) aufnehmen, in `zuUpdate` **und** im Einsatz-Normalizer. Verifikation: der Form-Test zeigt, dass ein Speichern der **Anzeige**-Sektion den Bestandswert von `einsatz_nummer_praefix` mitschickt, und ein Komponententest, dass das Feld beim Speichern der Einsatz-Defaults im PUT steht.
+- [x] 5.4 (beim Umsetzen gefunden) Zweiter Absender des Feldes: die Lagekarte schickt beim Verschieben des Einsatzorts den kompletten Kopf mit (`useKartenInteraktion.ts:kopfMitKoordinate`), der e2e-Helfer in `lagekarte-smoke.spec.ts` ebenso. `einsatznummer_intern` fliegt aus dem Typ `KopfdatenUpdate`, also meldet `tsc` jeden Absender. Verifikation: `LagekartePage.test.tsx` „verschiebt den Einsatzort“ prüft, dass der Schlüssel fehlt.
 - [ ] 5.3 Bestehende Frontend-Tests mit `einsatznummer_intern`-Fixtures laufen lassen (Kopfzeile, Kachel, Lagekarte …). Verifikation: die volle Vitest-Suite ist grün.
 
 ## 6. Abschluss

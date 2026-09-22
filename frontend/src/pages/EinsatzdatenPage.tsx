@@ -80,7 +80,6 @@ interface FormWerte {
   bezeichnung: string;
   stichwort?: string;
   einsatzart: Einsatzart;
-  einsatznummer_intern?: string;
   leitstellen_nr?: string;
   einsatzort?: string;
   einsatzort_koord?: LatLon | null;
@@ -242,7 +241,6 @@ export default function EinsatzdatenPage() {
       bezeichnung: einsatz.bezeichnung,
       stichwort: einsatz.stichwort ?? undefined,
       einsatzart: einsatz.einsatzart,
-      einsatznummer_intern: einsatz.einsatznummer_intern ?? undefined,
       leitstellen_nr: einsatz.leitstellen_nr ?? undefined,
       einsatzort: einsatz.einsatzort ?? undefined,
       einsatzort_koord:
@@ -265,7 +263,6 @@ export default function EinsatzdatenPage() {
       bezeichnung: werte.bezeichnung.trim(),
       stichwort: leerZuNull(werte.stichwort),
       einsatzart: werte.einsatzart,
-      einsatznummer_intern: leerZuNull(werte.einsatznummer_intern),
       leitstellen_nr: leerZuNull(werte.leitstellen_nr),
       einsatzort: leerZuNull(werte.einsatzort),
       einsatzort_lat: werte.einsatzort_koord?.lat ?? null,
@@ -333,9 +330,6 @@ export default function EinsatzdatenPage() {
             </Form.Item>
             <Form.Item label="Einsatzart" name="einsatzart" rules={[{ required: true }]}>
               <Select options={EINSATZART_OPTIONEN} />
-            </Form.Item>
-            <Form.Item label="Einsatznummer (intern)" name="einsatznummer_intern">
-              <Input />
             </Form.Item>
             <Form.Item label="Leitstellen-Nr." name="leitstellen_nr">
               <Input />
@@ -455,7 +449,7 @@ export default function EinsatzdatenPage() {
                   <Angaben
                     zeilen={[
                       {
-                        etikett: 'Einsatznummer (intern)',
+                        etikett: 'Einsatznummer',
                         wert: (
                           <span style={monoStil(13)}>{einsatz.einsatznummer_intern ?? '—'}</span>
                         ),
