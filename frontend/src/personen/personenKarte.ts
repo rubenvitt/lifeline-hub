@@ -1,5 +1,5 @@
 import type { GlobalToken } from 'antd';
-import type { Person } from '../api/types';
+import type { Person, Sichtungskategorie } from '../api/types';
 import { registrierAnzeige } from '../api/einsatzPerson';
 import { rollenFarbe, sichtung } from '../theme/statusFarben';
 import { sichtungsfarben } from '../theme/tokens';
@@ -26,6 +26,22 @@ import { istAngetroffen } from './personenBilanz';
  * Der Token kommt wie bei `baueMarker` von der aufrufenden Ebene: die neutrale Rolle
  * hängt am Modus, und das Modul erzeugt MapLibre-Werte, keine DOM-Styles.
  */
+/**
+ * Kurzzeichen IM Markerkreis — der zweite Kanal, der auch unterhalb des Plaketten-Zooms
+ * (`BESCHRIFTUNG_AB_ZOOM`) und bei weichenden Plaketten stehen bleibt (Review LFH-613: sonst
+ * unterschieden sich SK I und SK III auf der Übersicht nur durch die Farbe). Record über die
+ * Union, damit eine neue Kategorie den Typcheck bricht statt still ohne Kürzel zu erscheinen.
+ */
+export const SK_KURZZEICHEN: Record<Sichtungskategorie | 'ohne', string> = {
+  sk1: 'I',
+  sk2: 'II',
+  sk3: 'III',
+  sk4: 'IV',
+  tot: 'T',
+  unverletzt: 'U',
+  ohne: '–',
+};
+
 export function personenMarker(
   personen: readonly Person[],
   token: GlobalToken,
@@ -52,6 +68,7 @@ export function personenMarker(
       lat,
       lon,
       label: `${registrierAnzeige(p.registrier_nr)} · ${skText}`,
+      kurzzeichen: SK_KURZZEICHEN[sk ?? 'ohne'],
       farbe: darstellung?.farbe ? sichtungsfarben[darstellung.farbe] : neutral,
     });
   }

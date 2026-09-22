@@ -170,6 +170,8 @@ export default function BetroffeneZeile({
             </span>
             <span style={{ color: rollen.gedaempft }}>m/w/d + Alter</span>
             <span style={{ color: rollen.gedaempft }}>sk1–sk4 · skt · sku</span>
+            {/* Wortlaut des Entwurfs (S7); das Format zeigt der Platzhalter nicht, also hier. */}
+            <span style={{ color: rollen.gedaempft }}>#Koordinate (52.2691/9.1342)</span>
             <span style={{ color: rollen.gedaempft }}>@UHS</span>
           </>
         ) : (

@@ -71,6 +71,8 @@ describe('personenMarker', () => {
       lon: 8.6,
       label: 'R-042 · SK II',
       farbe: sichtungsfarben.gelb,
+      // Zweiter Kanal IM Kreis, unabhängig vom Plaketten-Zoom.
+      kurzzeichen: 'II',
     });
   });
 

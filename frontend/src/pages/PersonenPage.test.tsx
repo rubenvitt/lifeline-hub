@@ -1415,10 +1415,10 @@ describe('PersonenPage', () => {
         }),
       );
       render(einsatzAktiv, []);
-      await userEvent.type(
-        await screen.findByRole('textbox', { name: 'Kurzeingabe Person' }),
-        'Kowalski, Anna w 34 sk3 #52.2691/9.1342',
-      );
+      const zeile = await screen.findByRole('textbox', { name: 'Kurzeingabe Person' });
+      // Die leere Zeile nennt das Kürzel — sonst wäre es nur über den Code auffindbar.
+      expect(screen.getByText('#Koordinate (52.2691/9.1342)')).toBeInTheDocument();
+      await userEvent.type(zeile, 'Kowalski, Anna w 34 sk3 #52.2691/9.1342');
       expect(document.querySelector('[data-lfh="erkannt"]')).toHaveTextContent('#52.2691/9.1342');
       await userEvent.keyboard('{Enter}');
       await vi.waitFor(() => expect(koerper).toBeDefined());

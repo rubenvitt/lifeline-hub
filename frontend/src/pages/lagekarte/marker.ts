@@ -49,6 +49,9 @@ export interface KarteMarker {
   /** Flächen-/Linien-Geometrie des Markers (z. B. Abschnittsfläche) → Kennzahlen im
    *  Inspector (Fläche/Umfang/Länge, LFH-146). FE-lokal, nicht Teil des Response-DTO. */
   geometrie?: GeoJsonGeometry;
+  /** Kurzzeichen IM Kreis, unabhängig vom Zoom sichtbar (Betroffene: Sichtung „II", LFH-613).
+   *  Nur für Marker ohne taktisches Zeichen (`tz`) — sonst läge es auf dem Symbol. */
+  kurzzeichen?: string;
   /** FMS-Status-Ring, nur für Fahrzeuge. */
   statusFarbe?: string | null;
   /** Lagemeldungs-Herkunft für den Inspector-Backlink (nur typ='lagemeldung').
