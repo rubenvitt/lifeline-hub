@@ -76,6 +76,9 @@ export function blindStyle(theme: KartenTheme): StyleSpecification {
   } as StyleSpecification;
 }
 
+/** Glyphen-Vorlage des Offline-Stils: der eigene, eingebettete Server (`assets/karten/fonts/`). */
+export const OFFLINE_GLYPHS = '/api/karte/offline/fonts/{fontstack}/{range}.pbf';
+
 /**
  * Offline-Vektor-Style über die selbst-servierten Shortbread-MBTiles-Kacheln (LFH-195). Multi-Region
  * (LFH-188, „alle automatisch gemeinsam"): je übergebener Region eine eigene Vector-Source
@@ -85,9 +88,6 @@ export function blindStyle(theme: KartenTheme): StyleSpecification {
  * gleiche Features doppelt — bei identischem Schema/Theme optisch unkritisch (spätere Option:
  * per-Region-bbox-Clip, LFH-188).
  */
-/** Glyphen-Vorlage des Offline-Stils: der eigene, eingebettete Server (`assets/karten/fonts/`). */
-export const OFFLINE_GLYPHS = '/api/karte/offline/fonts/{fontstack}/{range}.pbf';
-
 export function offlineStyle(theme: KartenTheme, regionen: OfflineRegion[]): StyleSpecification {
   const f = FARBEN[theme];
   const sources: Record<string, unknown> = {};

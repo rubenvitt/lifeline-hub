@@ -417,7 +417,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     const ladendeIcons = new Set<string>();
     map.on('styleimagemissing', (e) => {
       const id = e.id;
-      // Beschriftungsplakette der Zonen (9-Slice, Farben stehen in der Id). Nach `setStyle`
+      // Beschriftungsplakette der Zonen und Marker (9-Slice, Farben stehen in der Id). Nach `setStyle`
       // sind alle Bilder weg; dieser Handler legt sie beim nächsten Bedarf wieder an.
       if (id.startsWith(PLAKETTE_PRAEFIX)) {
         const bild = plakettenBild(id);

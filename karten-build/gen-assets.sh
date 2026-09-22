@@ -36,7 +36,7 @@ MONO_REPO="JetBrains/JetBrainsMono"
 MONO_TAG="v2.304"
 MONO_ASSET="JetBrainsMono-2.304.zip"
 MONO_TTF="fonts/ttf/JetBrainsMono-Regular.ttf"  # Pfad im Archiv
-MONO_STACK_DEST="JetBrains Mono Regular"       # von kartenLayer.ts/text-font erwarteter Name
+MONO_STACK_DEST="JetBrains Mono Regular"       # = PLAKETTEN_MONO in plakette.ts (byte-gleich)
 GLYPH_TOOL_VERSION="1.5.1"                     # crates.io: build_pbf_glyphs
 
 SPRITE_REPO="versatiles-org/versatiles-style"
