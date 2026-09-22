@@ -401,8 +401,8 @@ test('Druckpfad des Meldebilds: die Neutralisierer WIRKEN, und keine Spalte ragt
  * bei 950 px erst recht nicht.
  *
  * WARUM GESEEDET WIRD: ohne Kräfte zeigt das Band nur den Leerzustand. Gesät werden Personal
- * UND Fahrzeuge, damit beide Gruppen stehen; die Fahrzeuge tragen den Default-Status neuer
- * Dispositionen.
+ * UND Einheiten mit je einem Fahrzeug, damit beide Gruppen stehen; die Einheiten tragen den
+ * aus dem Default-Status neuer Dispositionen abgeleiteten Status (LFH-609).
  */
 test('Statusband des Meldebilds bricht um statt waagerecht zu scrollen', async ({ page }) => {
   await page.setViewportSize({ width: 1024, height: 768 });
@@ -414,11 +414,22 @@ test('Statusband des Meldebilds bricht um statt waagerecht zu scrollen', async (
       data: { adhoc: { funkrufname: `Florian Musterstadt-Nordwest 3/44-${i}` } },
     });
     expect(antwort.ok(), `Seeding Fahrzeug ${i}: ${antwort.status()}`).toBeTruthy();
+    // Das Band zählt seit LFH-609 Einheiten — das Fahrzeug trägt den Status seiner Einheit.
+    const ef = ((await antwort.json()) as { id: number }).id;
+    const einheit = await page.request.post(`/api/einsaetze/${einsatzId}/einheiten`, {
+      data: { name: `Einsatzeinheit Musterstadt-Nordwest ${i}` },
+    });
+    expect(einheit.ok(), `Seeding Einheit ${i}: ${einheit.status()}`).toBeTruthy();
+    const eid = ((await einheit.json()) as { id: number }).id;
+    const zu = await page.request.put(
+      `/api/einsaetze/${einsatzId}/einheiten/${eid}/fahrzeug/${ef}`,
+    );
+    expect(zu.ok(), `Zuordnung ${i}: ${zu.status()}`).toBeTruthy();
   }
   await page.goto(`/einsaetze/${einsatzId}/kraefteuebersicht`);
 
   const band = page.locator('[data-lfh="meldebild-statusband"]');
-  await expect(band.getByRole('region', { name: 'Fahrzeuge je Status' })).toBeVisible();
+  await expect(band.getByRole('region', { name: 'Einheiten je Status' })).toBeVisible();
   await expect(band.getByRole('region', { name: 'Personal je Status' })).toBeVisible();
 
   const mass = await band.evaluate((el) => ({

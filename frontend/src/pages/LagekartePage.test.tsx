@@ -230,6 +230,8 @@ const EINHEIT_NICHT_VERORTET = {
   lon: null as number | null,
   tz_fachaufgabe: null,
   tz_organisation: null,
+  // Pflichtfeld seit LFH-609 — das Paneel „Ausgewählt" liest es.
+  status: { quelle: 'ohne', verteilung: [] },
 };
 
 const EINHEIT_VERORTET = {
@@ -240,6 +242,8 @@ const EINHEIT_VERORTET = {
   lon: 8.6,
   tz_fachaufgabe: null,
   tz_organisation: null,
+  // Pflichtfeld seit LFH-609 — das Paneel „Ausgewählt" liest es.
+  status: { quelle: 'ohne', verteilung: [] },
 };
 
 const ABSCHNITT_OHNE_FLAECHE = {
