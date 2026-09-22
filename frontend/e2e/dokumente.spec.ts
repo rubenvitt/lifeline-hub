@@ -342,6 +342,15 @@ test.describe('Dichte-Staffel: Download-Anker, Zeilenaktion und Ablegen-Dialog',
         'Lageplan Nord.pdf',
         PDF,
       );
+      // Eine zweite Zeile, damit der Abstand zwischen den Zielen benachbarter Zeilen messbar ist.
+      await seedeDokument(
+        page,
+        einsatzId,
+        'Lageplan Süd',
+        'lagekarte_plan',
+        'Lageplan Süd.pdf',
+        PDF,
+      );
       await page.setViewportSize(FUEKW);
       await page.goto(`/einsaetze/${einsatzId}/dokumente`);
       await stelleDichte(page, dichte);
@@ -384,6 +393,21 @@ test.describe('Dichte-Staffel: Download-Anker, Zeilenaktion und Ablegen-Dialog',
       const abbrechen = (await ziele.Abbrechen.boundingBox())!;
       const ablegen = (await ziele.Ablegen.boundingBox())!;
       const fuge = Math.round((ablegen.x - (abbrechen.x + abbrechen.width)) * 10) / 10;
+      // Senkrechte Fuge zwischen den Entfernen-Knöpfen zweier Zeilen (Kriterium 2, ≥ 16 px).
+      const zeilenziele = await page
+        .getByRole('button', { name: /^Dokument Lageplan .* entfernen$/ })
+        .evaluateAll((els) =>
+          els.map((e) => e.getBoundingClientRect()).sort((a, b) => a.top - b.top),
+        );
+      expect(zeilenziele, 'zwei Zeilen, zwei Entfernen-Knöpfe').toHaveLength(2);
+      const zeilenfuge = Math.round((zeilenziele[1].top - zeilenziele[0].bottom) * 10) / 10;
+      messwerte.push(`Fuge Entfernen Zeile 1|2: ${zeilenfuge} px`);
+      if (dichte === 'handschuh') {
+        expect(
+          zeilenfuge,
+          `Zeilenfuge im Handschuhbetrieb: ${zeilenfuge} px`,
+        ).toBeGreaterThanOrEqual(16);
+      }
       messwerte.push(
         `Klappkopf „Bezug (optional)": ${klappkopf} px`,
         `Fuge Abbrechen|Ablegen: ${fuge} px`,
@@ -481,8 +505,16 @@ test('Tastaturweg: Dialog öffnen, Datei wählen, Kategorie, Enter legt ab', asy
   expect(nachWahl.slice(-3)).toEqual(['Einsatzbefehl 3.pdf', 'Datei entfernen', 'Kategorie']);
   await expect(kategorie).toBeFocused();
   await page.keyboard.type('Befehl');
+  // Erst Enter, wenn die Liste wirklich auf den einen Treffer gefiltert ist — sonst wählt
+  // Enter unter Last den noch aktiven ersten Eintrag oder gar nichts (Gate-Lauf, 1 von 194).
+  const offeneListe = page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)');
+  await expect(offeneListe.locator('.ant-select-item-option')).toHaveCount(1);
+  await expect(offeneListe.locator('.ant-select-item-option-active')).toHaveText('Befehl');
   await page.keyboard.press('Enter');
-  await expect(dialog.locator('.ant-select').first()).toContainText('Befehl');
+  await expect(offeneListe).toHaveCount(0);
+  // Der Titel des gewählten Eintrags — NICHT der Textinhalt der Hülle: der enthält unter
+  // antd 6 auch den getippten Suchtext und wäre schon vor der Wahl „Befehl".
+  await expect(dialog.locator('.ant-select').first().getByTitle('Befehl')).toBeVisible();
 
   // Enter im Titelfeld ist die eingebaute Formularübermittlung (Knopf im `<form>`, LFH-332).
   await page.keyboard.press('Tab');
