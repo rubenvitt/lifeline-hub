@@ -32,6 +32,11 @@ import { modulRegistry, type KategorieKey, type ModulEintrag } from './modulRegi
  * die Hervorhebung — `modulAusPfad` kennt nur Routen. Die Marke zu markieren hieße, die
  * Query als Ort zu behandeln; bei den Personen ist sie nach dem Ankommen ohnehin geräumt.
  *
+ * Folge, gewollt: „Entscheidungen" steht unter Führung, das ETB unter Erfassung. Nach dem
+ * Klick folgt das Panel dem Ort und zeigt Erfassung. Das ist etwas anderes als der
+ * Rail-Fall oben: dort wählt man „Führung" und landet woanders. Hier wählt man ausdrücklich
+ * einen Eintrag, der sein Ziel im Namen trägt („springt zu ETB …").
+ *
  * ── WAS NICHT HIERHER GEHÖRT ───────────────────────────────────────────────────────────
  *
  * Zähler: der Entwurf zeigt Entscheidungen 7 · Patienten 144 · Vermisste 9, dafür gibt es

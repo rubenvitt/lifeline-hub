@@ -63,6 +63,7 @@ describe('Sprungmarken (LFH-620)', () => {
 
   it('hängt eine Marke ohne auffindbaren Anker ans Ende, statt sie zu verlieren', () => {
     const module = moduleNachKategorie('fuehrung').filter((m) => m.key !== 'auftraege');
-    expect(folge(module, sprungmarkenNachKategorie('fuehrung')).at(-1)).toBe('↗entscheidungen');
+    const zeilen = folge(module, sprungmarkenNachKategorie('fuehrung'));
+    expect(zeilen[zeilen.length - 1]).toBe('↗entscheidungen');
   });
 });

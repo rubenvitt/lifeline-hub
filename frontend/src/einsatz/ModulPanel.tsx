@@ -205,11 +205,14 @@ export function ModulListe({
             >
               <span aria-hidden="true" style={modulMarkeStil(farben, false)} />
               <span style={{ minWidth: 0, flex: 1 }}>{marke.label}</span>
-              {/* ↗ als Textzeichen (Neuentwurf, Deeplink-Glyphe) — kein Emoji, keine Ikone
-                  mit englischem `aria-label`. Dekoration: das Ziel steht im Namen. */}
+              {/* Dieselbe Ikone wie am `verweistAuf`-Eintrag unten (LFH-370: Ikone statt
+                  Zeichen). Dekoration in `aria-hidden`-Hülle — das Ziel steht im Namen. */}
               {!gesperrt && (
-                <span aria-hidden="true" style={{ flexShrink: 0, color: farben.schwach }}>
-                  ↗
+                <span
+                  aria-hidden
+                  style={{ display: 'inline-flex', flexShrink: 0, color: farben.schwach }}
+                >
+                  <ExportOutlined />
                 </span>
               )}
               {gesperrt && (

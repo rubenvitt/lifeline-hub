@@ -441,11 +441,13 @@ describe('ModulListe — Sprungmarken', () => {
     const klick = vi.fn();
     zeige({ onSprungKlick: klick });
     const knoepfe = screen.getAllByRole('button').map((b) => b.textContent);
-    expect(knoepfe).toEqual(['Aufträge', 'Entscheidungen↗', 'Stab']);
+    expect(knoepfe).toEqual(['Aufträge', 'Entscheidungen', 'Stab']);
     const sprung = screen.getByRole('button', {
       name: 'Entscheidungen, springt zu ETB, Typ Entscheidung',
     });
     expect(sprung).not.toHaveAttribute('aria-current');
+    // Die Ikone ist Dekoration: kein eigenes Vorleseziel (englisches `aria-label` „export").
+    expect(within(sprung).queryByRole('img')).not.toBeInTheDocument();
     await userEvent.click(sprung);
     expect(klick).toHaveBeenCalledWith(marke);
   });
