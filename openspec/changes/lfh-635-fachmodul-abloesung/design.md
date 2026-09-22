@@ -82,8 +82,8 @@ UNIQUE INDEX (einheit_id) WHERE status='laufend'
   reine Code-Prüfung aus `nachforderung`.
 - **Kein Freitext in der Tabelle.** Damit sind alle Spalten in der Schwärzungsregistry
   `retain`.
-- Die Migrationsnummer ist `0111` (bei zwei Rebases auf `alpha` von `0104` über `0107`
-  nachgezogen, weil dort inzwischen `0104`–`0110` belegt sind). Eine
+- Die Migrationsnummer ist `0113` (bei drei Rebases auf `alpha` von `0104` über `0107` und
+  `0111` nachgezogen, weil dort inzwischen `0104`–`0112` belegt sind). Eine
   angewendete Migration wird nicht editiert.
 
 ### D2 — Fristen: zwei Bezugstypen statt einer Frist mit zwei Zeitpunkten
@@ -232,7 +232,7 @@ ETB-Anzeige.
   in derselben Transaktion die Auto-Fristen der Schichten dieser Einheit
   (`loesche_auto_tx`).
 - **Die Migrationsnummer kollidierte mit LFH-606.** → Beim Rebase auf `origin/alpha`
-  gemessen und von `0104` über `0107` auf `0111` nachgezogen, solange sie nirgends
+  gemessen und von `0104` über `0107` und `0111` auf `0113` nachgezogen, solange sie nirgends
   angewendet war.
 - **Alarmlast bei vielen Einheiten:** Zwei Hinweise je Schicht, bei 20 Einheiten mit
   gleichem Takt also bis zu 40 Hinweise in wenigen Minuten. → Das Budget der AlarmZentrale
