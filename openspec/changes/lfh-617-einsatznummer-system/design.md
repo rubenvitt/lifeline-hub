@@ -53,6 +53,11 @@ Er sichert die Zählung ab. Der bestehende String-Index aus 0005 bleibt stehen. 
 ihn nicht mehr zwingend, er schadet aber nicht, und ein Index-Drop müsste eine applied
 Migration anfassen. Beide Spalten bleiben nullable. Mehrere `NULL` kollidieren in SQLite
 nicht, also bleibt der Altbestand gültig.
+Der Text-Index bleibt dabei **wirksam**, und das hat eine Folge (Nachtrag aus dem Review):
+Ein früher von Hand gesetzter Text im neuen Muster (`E-2026-0005`) trägt keine Zahlen. Er
+zählt also im `MAX(nummer_lfd)` nicht mit, und die Vergabe würde ihn erneut erzeugen. Weil
+das MAX danach nie wächst, würde sie ihn bei jedem weiteren Versuch wieder erzeugen. Deshalb
+überspringt die Vergabe innerhalb derselben Transaktion jeden schon belegten Text.
 
 **3. Die Migration übernimmt Bestandsnummern nur bei exaktem Muster.**
 `UPDATE einsatz SET nummer_jahr = CAST(substr(n,1,4) AS INTEGER), nummer_lfd =

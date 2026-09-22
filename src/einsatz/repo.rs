@@ -78,8 +78,27 @@ pub(crate) async fn anlegen_zum(
         .bind(jahr)
         .fetch_one(&mut *conn)
         .await?;
-        let lfd = max_lfd.unwrap_or(0) + 1;
-        let einsatznummer = super::nummer::formatiere(praefix.as_deref(), jahr, lfd);
+        // Belegte TEXTE überspringen: ein früher von Hand gesetzter Wert im neuen Muster
+        // (z. B. `E-2026-0005`) trägt keine Zahlen und zählt im MAX nicht mit. Ohne das
+        // Ausweichen schlüge der Text-Index aus 0005 an — bei jedem weiteren Versuch
+        // wieder, denn MAX(nummer_lfd) wüchse nie darüber hinaus. Die Schleife endet, weil
+        // eine Org nur endlich viele Texte hat.
+        let mut lfd = max_lfd.unwrap_or(0) + 1;
+        let einsatznummer = loop {
+            let kandidat = super::nummer::formatiere(praefix.as_deref(), jahr, lfd);
+            let belegt: bool = sqlx::query_scalar(
+                "SELECT EXISTS(SELECT 1 FROM einsatz \
+                 WHERE org_id = ? AND einsatznummer_intern = ?)",
+            )
+            .bind(org_id)
+            .bind(&kandidat)
+            .fetch_one(&mut *conn)
+            .await?;
+            if !belegt {
+                break kandidat;
+            }
+            lfd += 1;
+        };
 
         // COALESCE statt eines zweiten INSERT-Zweigs: `einsatzart` und `begonnen_at`
         // sind NOT NULL mit DB-Default. Ein explizit gebundenes NULL überschriebe den
@@ -1611,6 +1630,36 @@ mod tests {
         assert_eq!(bestand, 2, "Bestandstext bleibt wörtlich");
     }
 
+    /// LFH-617 (Review): ein früher VON HAND gesetzter Text, der zufällig dem neuen Muster
+    /// entspricht, trägt keine Zahlen (0104 übernimmt nur `JJJJ-NNN`) und zählt nicht mit.
+    /// Ohne Ausweichen entstünde derselbe Text erneut, der Text-Index aus 0005 schlüge an —
+    /// und weil MAX(nummer_lfd) dann nie wächst, bei JEDEM weiteren Versuch: die Org könnte
+    /// in diesem Jahr keinen Einsatz mehr anlegen. Die Vergabe überspringt belegte Texte.
+    #[tokio::test]
+    async fn anlegen_ueberspringt_handbelegten_nummerntext() {
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let jahr = crate::einsatz::nummer::jahr_in_zone(chrono::Utc::now(), None);
+        for text in [format!("E-{jahr}-0001"), format!("E-{jahr}-0002")] {
+            sqlx::query("INSERT INTO einsatz (org_id, bezeichnung, einsatznummer_intern) VALUES (1, 'Hand', ?)")
+                .bind(text)
+                .execute(&pool)
+                .await
+                .unwrap();
+        }
+
+        let a = test_anlegen(&pool, "A", None, leit).await.unwrap();
+        assert_eq!(
+            a.einsatznummer_intern.as_deref(),
+            Some(format!("E-{jahr}-0003").as_str())
+        );
+        let b = test_anlegen(&pool, "B", None, leit).await.unwrap();
+        assert_eq!(
+            b.einsatznummer_intern.as_deref(),
+            Some(format!("E-{jahr}-0004").as_str())
+        );
+    }
+
     /// LFH-617: das Org-Präfix wird beim Anlegen eingefroren — ein späterer Wechsel trifft
     /// nur neue Einsätze, die Zählung läuft über den Wechsel hinweg weiter.
     #[tokio::test]
@@ -1672,6 +1721,15 @@ mod tests {
             .unwrap();
         let utc = anlegen_zum(&pool, daten(), leit, silvester).await.unwrap();
         assert_eq!(utc.einsatznummer_intern.as_deref(), Some("E-2026-0001"));
+
+        // Unbekannte Zeitzone (die Einstellung prüft nur „nicht leer“): das Anlegen
+        // gelingt und zählt wie Europe/Berlin.
+        sqlx::query("UPDATE org_einstellungen SET zeitzone = 'Quatsch/Zone' WHERE org_id = 1")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let quatsch = anlegen_zum(&pool, daten(), leit, silvester).await.unwrap();
+        assert_eq!(quatsch.einsatznummer_intern.as_deref(), Some("E-2027-0002"));
     }
 
     /// Migriert aus `aktualisiere_kopf_setzt_felder_und_leere_optionals_null` (LFH-306):
@@ -1793,13 +1851,11 @@ mod tests {
         assert_eq!(unveraendert.begonnen_at, "2026-05-25 08:00:00");
     }
 
-    /// Migriert aus `aktualisiere_kopf_doppelte_nummer_ist_conflict` (LFH-306): der 409
-    /// auf den Einsatznummer-Unique-Index überlebt den Umbau auf Flag/Wert-Paare.
+    /// Ersetzt `patche_kopf_doppelte_nummer_ist_conflict`: bis LFH-617 war die Nummer per
+    /// Patch setzbar und ein Duplikat ergab 409. Jetzt kennt `KopfPatch` das Feld nicht
+    /// mehr, und ein Patch anderer Kopffelder lässt Text UND Zahlenspalten stehen.
     #[tokio::test]
     async fn patche_kopf_laesst_die_einsatznummer_unberuehrt() {
-        // Vorher: `patche_kopf_doppelte_nummer_ist_conflict` — die Nummer war per Patch
-        // setzbar und ein Duplikat ergab 409. Seit LFH-617 kennt `KopfPatch` das Feld nicht
-        // mehr; ein vollständiger Patch lässt Text UND Zahlenspalten stehen.
         let pool = crate::db::test_pool().await;
         let leit = benutzer_anlegen(&pool, "leit").await;
         let a = test_anlegen(&pool, "A", None, leit).await.unwrap();
