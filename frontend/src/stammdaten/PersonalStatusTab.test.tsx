@@ -20,9 +20,16 @@ const nichtAdmin = { ...admin, system_rolle: 'keiner' };
 
 /**
  * Fachliche Reihenfolge (`sortier` 10 vor 20), die zugleich NICHT die alphabetische ist —
- * sonst sähe die Tabelle nach dem Sortierklick genauso aus wie davor.
+ * sonst sähe die Tabelle nach dem Sortierklick genauso aus wie davor. `farbe` ist
+ * ausdrücklich `string | null` typisiert, weil ein Test einen Farbcode einsetzt.
  */
-const status = [
+const status: {
+  id: number;
+  label: string;
+  kategorie: string;
+  farbe: string | null;
+  sortier: number;
+}[] = [
   { id: 1, label: 'dienstbereit', kategorie: 'verfuegbar', farbe: null, sortier: 10 },
   { id: 2, label: 'alarmiert', kategorie: 'gebunden', farbe: null, sortier: 20 },
 ];
