@@ -25,7 +25,7 @@ Lauf vom 22.09.2026 (Backend-Binary aus eigenem `CARGO_TARGET_DIR`, Stand dieses
 | --- | --- | --- | --- | --- |
 | 1 | Treffläche | **erfüllt** [M1] | **erfüllt** [M2] | **erfüllt** [T5] |
 | 2 | Handschuh-Modus | **offen → O4** [M1] | **erfüllt** [M2] | **erfüllt** [T5] |
-| 3 | Rückmeldung vor Serverantwort | **nicht anwendbar** | **offen → O2** [T1] | **offen → O2** [T4] |
+| 3 | Rückmeldung vor Serverantwort | **nicht anwendbar** | **erfüllt** [T1, B1] | **erfüllt** [T4, B1] |
 | 4 | Zweite Handlung bei kritischer Aktion | **nicht anwendbar** | **nicht anwendbar** | **nicht anwendbar** |
 | 5 | Kontrast in beiden Modi | **erfüllt** [M3] | **erfüllt** [M4] | **erfüllt** [M4, T5] |
 | 6 | Kein Status allein über Farbe | **erfüllt** [T2, M3] | **erfüllt** [T1] | **erfüllt** [T4] |
@@ -56,9 +56,11 @@ Lauf vom 22.09.2026 (Backend-Binary aus eigenem `CARGO_TARGET_DIR`, Stand dieses
   untereinander); die Spec sichert ≥ 16 px zu. Die Einträge im geöffneten Dreipunkt-Menü
   stehen bündig untereinander (antd-`Dropdown`, im ganzen Bestand so); jeder ist 72 px hoch.
 - **3 · A:** Die Kennzahl liest nur, es gibt keine Aktion.
-- **3 · B/C:** Die Rückmeldung unter 100 ms ist belegt: Während eines PUT sind die Zeilenmenüs
-  gesperrt, „Hinzufügen“ bzw. der Inspector-Knopf zeigen den Ladezustand [T1, T4]. Offen ist
-  die Kommandoreaktion ≤ 2 s (O2).
+- **3 · B/C:** Die Rückmeldung unter 100 ms ist belegt: Während eines PUT sind die
+  Zeilenmenüs gesperrt, „Hinzufügen“ bzw. der Inspector-Knopf zeigen den Ladezustand
+  [T1, T4]. Die Kommandoreaktion ≤ 2 s trägt das Backend seit `2d94f92f`: PUT und POST warten
+  nie auf PEGELONLINE, sie antworten aus dem Cache und stoßen fehlende Messungen im
+  Hintergrund an [B1]. Die Folge für die Anzeige steht als O2.
 - **4:** Keine der Flächen trägt eine kritische Aktion im Sinne des Kriteriums. „Entfernen“
   eines Pegels ist umkehrbar (wieder hinzufügen, derselbe Bildschirm) und löscht keine Daten.
   Nach LFH-378 bekommt eine umkehrbare Aktion keine Rückfrage. „Festlegen“ ist additiv.
@@ -163,6 +165,12 @@ Lauf vom 22.09.2026 (Backend-Binary aus eigenem `CARGO_TARGET_DIR`, Stand dieses
 - **[T5]** `components/dichte.guard.test.ts` (kein punktuelles `size` auf interaktiven
   Elementen) und die Bauform-Gleichheit mit [M2].
 
+**Backend:**
+
+- **[B1]** Commit `2d94f92f` (`src/pegel/abruf.rs`, `Modus::NurCache`): schreibende Routen
+  warten nie auf die Quelle; Beleg ist der Test `nur_cache_wartet_nie_und_stoesst_an` in
+  `src/pegel/abruf.rs`.
+
 **Quelltext:**
 
 - **[Q1]** Kein Hex- oder RGB-Literal und keine Animation/Transition in den neuen und
@@ -176,14 +184,14 @@ Lauf vom 22.09.2026 (Backend-Binary aus eigenem `CARGO_TARGET_DIR`, Stand dieses
   Handschirm bei CLS ≈ 0,16–0,17 — **auch mit leerer Pegel-Liste**. Das ist Bestand der
   Seiten, nicht von LFH-606 verursacht. Der Pegel-Anteil liegt im Rauschen der Messung. Die
   Ursache (welche Abfrage die Verschiebung auslöst) ist nicht untersucht.
-- **O2 · Kommandoreaktion ≤ 2 s beim Festlegen einer neuen Station:** POST und PUT laden die
-  Messung einer noch nicht gecachten Station, bevor sie antworten. Hängt PEGELONLINE, wartet
-  die Antwort bis zu `ABRUF_FRIST` = 8 s (`src/pegel/abruf.rs`, Stand dieses Branches). Die
-  Oberfläche zeigt den Ladezustand; die 2-s-Grenze ist aber nicht zugesichert. Ein
-  bereits gecachter Eintrag kommt sofort (Backend-Test
-  `abgelaufener_eintrag_kommt_sofort_und_nur_ein_hintergrundabruf`). Mögliche Richtung:
-  kalte Stationen im Hintergrund abrufen und ohne Messung antworten. Das ist eine
-  Backend-Entscheidung.
+- **O2 · Neu festgelegte Station zeigt bis zu 5 min „Stand unbekannt“:** Seit `2d94f92f`
+  antworten PUT und POST ohne Messung für eine Station, die noch nicht im Cache liegt, und
+  holen sie im Hintergrund. Das Frontend fragt aber erst im 5-min-Takt wieder nach
+  (`PEGEL_ABRUF_MS`). Bis dahin zeigt die Kennzahl nach dem Festlegen den Ausfallzustand mit
+  Achtungskante, obwohl die Messung längst da ist. Kleine Abhilfe im Frontend: nach einer
+  Mutation, deren Antwort Einträge ohne Messung trägt, einmal nach wenigen Sekunden
+  nachfragen. Nicht umgesetzt, weil die Backend-Änderung parallel entstand und die Frist
+  zum Hintergrundabruf passen muss.
 - **O3 · Keine Browsermessung am Fachebenen-Inspector:** Im e2e gibt es keinen Klickpfad zu
   einem Fachebenen-Punkt. Die Karte ist WebGL, und die Fachebenen-Schalter der Leiste
   (`pages/lagekarte/Sidebar.tsx`, `Switch` in der Fachebenen-Liste) haben **keinen

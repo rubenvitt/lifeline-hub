@@ -176,7 +176,7 @@ function WarnungInhalt({ p }: { p: Record<string, unknown> }) {
  *
  * Bei fünf festgelegten Pegeln steht der Knopf GESPERRT mit Grund und Weg in die
  * Einstellungen, statt zu verschwinden (C10/M16) — der Server lehnte einen sechsten ohnehin
- * mit 400 ab, das wäre die späteste denkbare Absage. Gespeichert wird per POST (hinten
+ * ab (POST auf eine volle Liste → 422), das wäre die späteste denkbare Absage. Gespeichert wird per POST (hinten
  * anfügen, idempotent); die Antwort ist die volle Liste und landet per `setQueryData` im
  * gemeinsamen Cache-Eintrag von Dashboard, Überblick und Einstellungen.
  */
