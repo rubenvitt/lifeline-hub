@@ -27,12 +27,34 @@ pub struct PegelZeile {
     pub name: String,
     pub gewaesser: Option<String>,
     pub reihenfolge: i64,
+    pub prognose_cm: Option<f64>,
+    pub prognose_zeit: Option<String>,
+    pub prognose_gesetzt_at: Option<String>,
+}
+
+impl PegelZeile {
+    /// Die Prognose, wenn Wert und Zeitpunkt gesetzt sind (der CHECK der Migration 0105 hält
+    /// sie zusammen; ein fehlendes `prognose_gesetzt_at` fällt auf den Zeitpunkt zurück).
+    pub fn prognose(&self) -> Option<super::PegelPrognose> {
+        match (self.prognose_cm, &self.prognose_zeit) {
+            (Some(cm), Some(zeit)) => Some(super::PegelPrognose {
+                hoechststand_cm: cm,
+                zeitpunkt: zeit.clone(),
+                gesetzt_at: self
+                    .prognose_gesetzt_at
+                    .clone()
+                    .unwrap_or_else(|| zeit.clone()),
+            }),
+            _ => None,
+        }
+    }
 }
 
 /// Alle festgelegten Pegel eines Einsatzes in Reihenfolge.
 pub async fn liste(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<PegelZeile>, AppError> {
     Ok(sqlx::query_as::<_, PegelZeile>(
-        "SELECT id, station_uuid, name, gewaesser, reihenfolge FROM einsatz_pegel \
+        "SELECT id, station_uuid, name, gewaesser, reihenfolge, \
+         prognose_cm, prognose_zeit, prognose_gesetzt_at FROM einsatz_pegel \
          WHERE einsatz_id = ? ORDER BY reihenfolge, id",
     )
     .bind(einsatz_id)
@@ -84,6 +106,59 @@ pub async fn ersetzen(
         }
         Ok(())
     })
+}
+
+/// Station eines festgelegten Pegels dieses Einsatzes; `None`, wenn die id nicht zu ihm gehört.
+pub async fn station_von(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    pegel_id: i64,
+) -> Result<Option<String>, AppError> {
+    Ok(
+        sqlx::query_scalar(
+            "SELECT station_uuid FROM einsatz_pegel WHERE id = ? AND einsatz_id = ?",
+        )
+        .bind(pegel_id)
+        .bind(einsatz_id)
+        .fetch_optional(pool)
+        .await?,
+    )
+}
+
+/// Setzt (`Some((cm, zeit))`) oder löscht (`None`) die Prognose eines Pegels (LFH-628).
+/// `false`, wenn der Pegel nicht zu diesem Einsatz gehört — die Route macht daraus 404.
+/// Löschen einer nicht gesetzten Prognose ist kein Fehler (idempotent).
+pub async fn setze_prognose(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    pegel_id: i64,
+    benutzer_id: i64,
+    prognose: Option<(f64, &str)>,
+) -> Result<bool, AppError> {
+    let geaendert: u64 = write_retry!(pool, |conn| {
+        let q = match prognose {
+            Some((cm, zeit)) => sqlx::query(
+                "UPDATE einsatz_pegel SET prognose_cm = ?, prognose_zeit = ?, \
+                 prognose_gesetzt_von_id = ?, prognose_gesetzt_at = datetime('now') \
+                 WHERE id = ? AND einsatz_id = ?",
+            )
+            .bind(cm)
+            .bind(zeit)
+            .bind(benutzer_id),
+            None => sqlx::query(
+                "UPDATE einsatz_pegel SET prognose_cm = NULL, prognose_zeit = NULL, \
+                 prognose_gesetzt_von_id = NULL, prognose_gesetzt_at = NULL \
+                 WHERE id = ? AND einsatz_id = ?",
+            ),
+        };
+        let r = q
+            .bind(pegel_id)
+            .bind(einsatz_id)
+            .execute(&mut *conn)
+            .await?;
+        Ok(r.rows_affected())
+    })?;
+    Ok(geaendert > 0)
 }
 
 /// Fügt einen Pegel hinten an. `Ok(false)`, wenn die Station schon festgelegt ist (dann

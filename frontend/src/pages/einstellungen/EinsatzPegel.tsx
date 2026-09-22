@@ -4,6 +4,7 @@ import {
   ArrowDownOutlined,
   ArrowUpOutlined,
   DeleteOutlined,
+  EditOutlined,
   MoreOutlined,
 } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -18,20 +19,27 @@ import { ladeFachebene } from '../../api/fachebenen';
 import {
   PEGEL_MAX,
   fuegePegelHinzu,
+  loeschePrognose,
   pegelAbfrage,
   pegelSchreibScope,
   setzePegel,
+  setzePrognose,
   type PegelEingabe,
 } from '../../api/pegel';
 import { einsatzKeys, globalKeys } from '../../api/queryKeys';
 import type { PegelAnzeige } from '../../api/types';
+import { zeigeRueckgaengig } from '../../kommunikation/rueckgaengig';
 import {
   PEGEL_STAND_UNBEKANNT,
+  prognoseOffen,
+  prognoseText,
   standZeit,
   trendText,
   wasserstandMeter,
 } from '../../pegel/pegelKennzahl';
 import { RECHTE_TEXT, useEinstellungenDaten } from '../EinsatzEinstellungenPage';
+import PegelPrognoseModal from './PegelPrognoseModal';
+import { wiederherstellBody } from './pegelPrognoseKern';
 
 /** Eine wählbare PEGELONLINE-Station aus der Fachebene (`properties` der Features). */
 export interface PegelStation {
@@ -150,6 +158,15 @@ type Aenderung = { art: 'hinzufuegen'; station: PegelEingabe } | PegelOperation;
  * regel direkte Knöpfe, die zweite ein Menü — eine Liste mit wechselnder Bedienform.
  * Entfernen ist umkehrbar (wieder hinzufügen) und trägt deshalb keine Rückfrage (LFH-378).
  *
+ * ── PROGNOSE (LFH-628) ─────────────────────────────────────────────────────────────
+ * Je Zeile „Prognose erfassen…"/„Prognose ändern…" (Dialog `PegelPrognoseModal`) und
+ * „Prognose löschen" im selben Menü. Die Prognose hat eigene Routen am Pegel, nicht den
+ * Vollersatz-PUT der Liste — Umordnen lässt sie stehen. Löschen ist umkehrbar über den
+ * Rückgängig-Toast (LFH-343 · C8: der Rückweg existiert serverseitig, derselbe PUT mit dem
+ * alten Wert), deshalb ohne Rückfrage. Eine verstrichene Prognose steht in der Zeile als
+ * „abgelaufen", bis jemand sie löscht oder erneuert — Dashboard und Überblick zeigen sie
+ * dann schon nicht mehr.
+ *
  * ── FACHEBENE NICHT ERREICHBAR ─────────────────────────────────────────────────────
  * Die Stationsliste kommt aus der Fachebene `pegelonline` (derselbe Cache-Eintrag wie auf
  * der Lagekarte). Antwortet sie nicht, sagt ein Hinweis das; die festgelegte Liste bleibt
@@ -164,6 +181,7 @@ export default function EinsatzPegel() {
   const { konventionen: konv } = useAnzeigeKonventionen();
   const daten = useEinstellungenDaten(einsatzId);
   const [auswahl, setAuswahl] = useState<string | null>(null);
+  const [prognoseFuer, setPrognoseFuer] = useState<PegelAnzeige | null>(null);
   const auswahlId = useId();
 
   const pegelQ = useQuery(pegelAbfrage(einsatzId));
@@ -203,6 +221,27 @@ export default function EinsatzPegel() {
     },
   });
 
+  // Prognose löschen (LFH-628) mit Rückgängig-Weg: derselbe PUT mit dem alten Wert. Beide
+  // laufen im Schreib-Scope der Liste, damit ein gleichzeitiges Umordnen sie nicht überholt.
+  const prognoseLoeschen = useMutation({
+    scope: pegelSchreibScope(einsatzId),
+    mutationFn: (p: PegelAnzeige) => loeschePrognose(einsatzId, p.id),
+    onSuccess: (liste, p) => {
+      qc.setQueryData(einsatzKeys.pegel(einsatzId), liste);
+      const alt = p.prognose;
+      if (!alt) return;
+      zeigeRueckgaengig(message, `Prognose an ${p.name} gelöscht`, () =>
+        prognoseWiederherstellen.mutate({ id: p.id, body: wiederherstellBody(alt) }),
+      );
+    },
+  });
+  const prognoseWiederherstellen = useMutation({
+    scope: pegelSchreibScope(einsatzId),
+    mutationFn: (v: { id: number; body: ReturnType<typeof wiederherstellBody> }) =>
+      setzePrognose(einsatzId, v.id, v.body),
+    onSuccess: (liste) => qc.setQueryData(einsatzKeys.pegel(einsatzId), liste),
+  });
+
   const stationen = useMemo(
     () => stationenAus(stationenQ.data?.features.features ?? []),
     [stationenQ.data],
@@ -226,7 +265,8 @@ export default function EinsatzPegel() {
 
   const liste = pegelQ.data;
   const darf = daten.darfBearbeiten;
-  const laeuft = aendern.isPending;
+  const laeuft =
+    aendern.isPending || prognoseLoeschen.isPending || prognoseWiederherstellen.isPending;
   const voll = liste.length >= PEGEL_MAX;
   const festgelegt = new Set(liste.map((p) => p.station_uuid.toLowerCase()));
   // Keine Auswahl möglich: der Abruf scheitert, oder die Antwort trägt keine wählbare Station
@@ -249,7 +289,7 @@ export default function EinsatzPegel() {
   return (
     <>
       <SeitenHinweise
-        fehler={aendern.error}
+        fehler={aendern.error ?? prognoseLoeschen.error ?? prognoseWiederherstellen.error}
         rechteFehlt={daten.istAktiv && !darf}
         rechteText={RECHTE_TEXT}
       />
@@ -289,6 +329,22 @@ export default function EinsatzPegel() {
                             },
                             { type: 'divider' as const },
                             {
+                              key: 'prognose',
+                              icon: <EditOutlined />,
+                              label: p.prognose ? 'Prognose ändern …' : 'Prognose erfassen …',
+                            },
+                            ...(p.prognose
+                              ? [
+                                  {
+                                    key: 'prognose-loeschen',
+                                    icon: <DeleteOutlined />,
+                                    label: 'Prognose löschen',
+                                    danger: true,
+                                  },
+                                ]
+                              : []),
+                            { type: 'divider' as const },
+                            {
                               key: 'entfernen',
                               icon: <DeleteOutlined />,
                               label: 'Entfernen',
@@ -304,6 +360,8 @@ export default function EinsatzPegel() {
                               aendern.mutate({ art: 'verschieben', uuid, richtung: 1 });
                             else if (key === 'entfernen')
                               aendern.mutate({ art: 'entfernen', uuid });
+                            else if (key === 'prognose') setPrognoseFuer(p);
+                            else if (key === 'prognose-loeschen') prognoseLoeschen.mutate(p);
                           },
                         }}
                       >
@@ -335,6 +393,13 @@ export default function EinsatzPegel() {
                 description={
                   <span style={{ color: rollen.gedaempft }}>
                     {[p.gewaesser, messText(p)].filter(Boolean).join(' · ')}
+                    {p.prognose && (
+                      <span data-lfh="pegel-prognose" style={{ display: 'block' }}>
+                        {prognoseOffen(p.prognose, Date.now())
+                          ? prognoseText(p.prognose, Date.now(), konv)
+                          : `${prognoseText(p.prognose, Date.now(), konv)} · abgelaufen`}
+                      </span>
+                    )}
                   </span>
                 }
               />
@@ -427,6 +492,13 @@ export default function EinsatzPegel() {
           />
         )}
       </Formularpaneel>
+      {prognoseFuer && (
+        <PegelPrognoseModal
+          einsatzId={einsatzId}
+          pegel={prognoseFuer}
+          onSchliessen={() => setPrognoseFuer(null)}
+        />
+      )}
     </>
   );
 }

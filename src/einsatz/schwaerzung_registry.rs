@@ -784,6 +784,12 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("reihenfolge", G_ZAEHLER),
             retain("gesetzt_von_id", G_FK),
             retain("gesetzt_at", G_ZEIT),
+            // LFH-628: erwarteter Höchststand — ein Messwert mit Zeitpunkt, kein Personenbezug
+            // außer dem Benutzer-FK.
+            retain("prognose_cm", G_ZAEHLER),
+            retain("prognose_zeit", G_ZEIT),
+            retain("prognose_gesetzt_von_id", G_FK),
+            retain("prognose_gesetzt_at", G_ZEIT),
         ],
     },
     TabellenRegel {

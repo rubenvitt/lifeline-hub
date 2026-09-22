@@ -566,3 +566,166 @@ describe('EinsatzPegel', () => {
     expect(screen.queryByText(/Noch kein Pegel festgelegt/)).toBeNull();
   });
 });
+
+describe('EinsatzPegel — Prognose (LFH-628)', () => {
+  const ZUKUNFT = '2099-09-22 16:00:00';
+  const VORBEI = '2020-09-22 16:00:00';
+  const mitPrognose = (zeitpunkt: string) => ({
+    ...HMUE,
+    prognose: { hoechststand_cm: 710, zeitpunkt, gesetzt_at: '2026-09-22 12:00:00' },
+  });
+
+  /** Prognose-Routen: zeichnet PUT/DELETE auf und antwortet mit der angepassten Liste. */
+  function prognoseRouten(start: unknown[], vorhersage: 'ja' | 'nein' | 'fehler' = 'nein') {
+    const aufrufe: { methode: string; body?: unknown }[] = [];
+    let liste = start as { id: number; prognose?: unknown }[];
+    server.use(
+      http.get('/api/einsaetze/1/pegel', () => HttpResponse.json(liste)),
+      http.put('/api/einsaetze/1/pegel/:pid/prognose', async ({ request, params }) => {
+        const body = (await request.json()) as { hoechststand_cm: number; zeitpunkt: string };
+        aufrufe.push({ methode: 'PUT', body });
+        liste = liste.map((p) =>
+          p.id === Number(params.pid)
+            ? { ...p, prognose: { ...body, gesetzt_at: '2026-09-22 12:00:00' } }
+            : p,
+        );
+        return HttpResponse.json(liste);
+      }),
+      http.delete('/api/einsaetze/1/pegel/:pid/prognose', ({ params }) => {
+        aufrufe.push({ methode: 'DELETE' });
+        liste = liste.map((p) => (p.id === Number(params.pid) ? { ...p, prognose: undefined } : p));
+        return HttpResponse.json(liste);
+      }),
+      http.get('/api/einsaetze/1/pegel/:pid/vorhersage', () =>
+        vorhersage === 'fehler'
+          ? HttpResponse.json({ error: 'weg' }, { status: 502 })
+          : HttpResponse.json(
+              vorhersage === 'ja'
+                ? {
+                    vorhersage: {
+                      hoechststand_cm: 723,
+                      zeitpunkt: '2099-09-23T06:00:00+02:00',
+                      erstellt: '2099-09-22T07:00:00+02:00',
+                      abschaetzung: false,
+                    },
+                  }
+                : {},
+            ),
+      ),
+    );
+    return aufrufe;
+  }
+
+  it('Zeile zeigt eine offene Prognose, eine verstrichene als „abgelaufen"', async () => {
+    stelleBereit();
+    prognoseRouten([mitPrognose(ZUKUNFT), { ...WAHN, prognose: mitPrognose(VORBEI).prognose }]);
+    rendern();
+    await waitFor(() =>
+      expect(document.querySelectorAll('[data-lfh="pegel-prognose"]')).toHaveLength(2),
+    );
+    const [offen, vorbei] = Array.from(document.querySelectorAll('[data-lfh="pegel-prognose"]'));
+    expect(offen.textContent).toMatch(/^Prognose 7,10 m bis /);
+    expect(offen.textContent).not.toContain('abgelaufen');
+    expect(vorbei.textContent).toMatch(/^Prognose 7,10 m bis .* · abgelaufen$/);
+  });
+
+  it('ohne Prognose keine Prognose-Zeile und kein „Prognose löschen" im Menü', async () => {
+    stelleBereit();
+    prognoseRouten([HMUE]);
+    rendern();
+    await waitFor(() => expect(zeilentitel()).toEqual(['1. HANN. MÜNDEN']));
+    expect(document.querySelector('[data-lfh="pegel-prognose"]')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu Pegel HANN. MÜNDEN' }));
+    const menue = await waitFor(() => {
+      const m = document.querySelector<HTMLElement>(
+        '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+      );
+      expect(m).not.toBeNull();
+      return m!;
+    });
+    expect(within(menue).getByRole('menuitem', { name: /Prognose erfassen/ })).toBeInTheDocument();
+    expect(within(menue).queryByRole('menuitem', { name: /Prognose löschen/ })).toBeNull();
+  });
+
+  it('Erfassen: Vorschlag aus der Vorhersage übernehmen und speichern → PUT in cm', async () => {
+    stelleBereit();
+    const aufrufe = prognoseRouten([HMUE], 'ja');
+    rendern();
+    await waitFor(() => expect(zeilentitel()).toHaveLength(1));
+    await zeilenaktion('HANN. MÜNDEN', /Prognose erfassen/);
+
+    const vorschlag = await waitFor(() => {
+      const v = document.querySelector<HTMLElement>('[data-lfh="pegel-vorhersage"]');
+      expect(v).not.toBeNull();
+      return v!;
+    });
+    expect(vorschlag.textContent).toContain('höchster Wert 7,23 m');
+    await userEvent.click(within(vorschlag).getByRole('button', { name: 'Übernehmen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() => expect(aufrufe).toHaveLength(1));
+    expect(aufrufe[0].methode).toBe('PUT');
+    expect(aufrufe[0].body).toEqual({
+      hoechststand_cm: 723,
+      zeitpunkt: new Date('2099-09-23T06:00:00+02:00').toISOString(),
+    });
+    await waitFor(() =>
+      expect(document.querySelector('[data-lfh="pegel-prognose"]')?.textContent).toMatch(
+        /^Prognose 7,23 m bis /,
+      ),
+    );
+  });
+
+  it('ohne Reihe und bei unerreichbarer Quelle bleibt der Dialog bedienbar, mit Hinweis', async () => {
+    stelleBereit();
+    prognoseRouten([HMUE], 'nein');
+    rendern();
+    await waitFor(() => expect(zeilentitel()).toHaveLength(1));
+    await zeilenaktion('HANN. MÜNDEN', /Prognose erfassen/);
+    expect(
+      await screen.findByText('Für diese Station liefert PEGELONLINE keine Vorhersage.'),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('Erwarteter Höchststand (m)')).toBeEnabled();
+  });
+
+  it('bei unerreichbarer Quelle ein Warnhinweis statt eines Vorschlags', async () => {
+    stelleBereit();
+    prognoseRouten([HMUE], 'fehler');
+    rendern();
+    await waitFor(() => expect(zeilentitel()).toHaveLength(1));
+    await zeilenaktion('HANN. MÜNDEN', /Prognose erfassen/);
+    expect(await screen.findByText(/Vorhersage ist gerade nicht erreichbar/)).toBeInTheDocument();
+  });
+
+  it('Löschen: DELETE, dann „Rückgängig" stellt den alten Wert per PUT wieder her', async () => {
+    stelleBereit();
+    const aufrufe = prognoseRouten([mitPrognose(ZUKUNFT)]);
+    rendern();
+    await waitFor(() =>
+      expect(document.querySelector('[data-lfh="pegel-prognose"]')).not.toBeNull(),
+    );
+    await zeilenaktion('HANN. MÜNDEN', /Prognose löschen/);
+    await waitFor(() => expect(document.querySelector('[data-lfh="pegel-prognose"]')).toBeNull());
+    expect(aufrufe).toEqual([{ methode: 'DELETE' }]);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
+    await waitFor(() => expect(aufrufe).toHaveLength(2));
+    expect(aufrufe[1]).toEqual({
+      methode: 'PUT',
+      body: { hoechststand_cm: 710, zeitpunkt: ZUKUNFT },
+    });
+    await waitFor(() =>
+      expect(document.querySelector('[data-lfh="pegel-prognose"]')).not.toBeNull(),
+    );
+  });
+
+  it('ohne Schreibrecht kein Menü, die Prognose ist trotzdem lesbar', async () => {
+    stelleBereit({ rolle: 'beobachter' });
+    prognoseRouten([mitPrognose(ZUKUNFT)]);
+    rendern();
+    await waitFor(() =>
+      expect(document.querySelector('[data-lfh="pegel-prognose"]')).not.toBeNull(),
+    );
+    expect(screen.queryByRole('button', { name: /Aktionen zu Pegel/ })).toBeNull();
+  });
+});

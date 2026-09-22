@@ -12,6 +12,13 @@
 //! Fälle sind ein Zusammenhang → 422: eine doppelte Station in einer PUT-Liste (VOR der DB
 //! geprüft, sonst käme sie über den UNIQUE-Index als 409 heraus) und ein POST auf eine
 //! volle Liste — dort ist der Body für sich gültig, abgelehnt wird am Zustand des Einsatzes.
+//!
+//! **Prognose (LFH-628)** hat eigene Routen am einzelnen Pegel statt Felder im Listen-PUT:
+//! der ist Vollersatz, und die Einstellungsseite schickt beim Umordnen nur Station, Name und
+//! Gewässer — eine Prognose im selben Body würde bei jedem Pfeildruck mitgeschrieben oder
+//! still genullt. Ein Zeitpunkt in der Vergangenheit wird angenommen (400 nur für die Form):
+//! ob eine Prognose abgelaufen ist, entscheidet die Anzeige gegen ihre Uhr, und ein Nachtrag
+//! darf nicht an einer Uhrabweichung scheitern.
 
 use axum::extract::State;
 use axum::http::StatusCode;
@@ -23,9 +30,9 @@ use crate::app::AppState;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
 use crate::einsatz::modul::OhneModul;
 use crate::error::AppError;
-use crate::extract::JsonBody;
+use crate::extract::{JsonBody, PfadParam};
 use crate::pegel::repo::{self, PegelEingabe};
-use crate::pegel::{abruf, PegelAnzeige, NAME_MAX, PEGEL_MAX};
+use crate::pegel::{abruf, vorhersage, PegelAnzeige, PegelVorhersageAntwort, NAME_MAX, PEGEL_MAX};
 
 #[derive(Debug, Deserialize)]
 pub struct PegelWahl {
@@ -38,6 +45,41 @@ pub struct PegelWahl {
 #[derive(Debug, Deserialize)]
 pub struct PegelListe {
     stationen: Vec<PegelWahl>,
+}
+
+/// Body der Prognose: erwarteter Höchststand in cm und sein Zeitpunkt (ISO-8601).
+#[derive(Debug, Deserialize)]
+pub struct PrognoseEingabe {
+    hoechststand_cm: f64,
+    zeitpunkt: String,
+}
+
+/// Plausible Spanne eines Wasserstands in cm. Pegelnull liegt an manchen Stationen über der
+/// Sohle, negative Werte kommen vor; mehr als 50 m zeigt keine Pegellatte.
+pub const PROGNOSE_MIN_CM: f64 = -1000.0;
+pub const PROGNOSE_MAX_CM: f64 = 5000.0;
+
+/// Prüft die Prognose für sich (400) und normalisiert den Zeitpunkt aufs Wire-Format.
+fn validiere_prognose(p: &PrognoseEingabe) -> Result<(f64, String), AppError> {
+    if !p.hoechststand_cm.is_finite()
+        || !(PROGNOSE_MIN_CM..=PROGNOSE_MAX_CM).contains(&p.hoechststand_cm)
+    {
+        return Err(AppError::Validation(format!(
+            "hoechststand_cm muss zwischen {PROGNOSE_MIN_CM} und {PROGNOSE_MAX_CM} liegen"
+        )));
+    }
+    let zeit = p.zeitpunkt.trim();
+    if zeit.is_empty() {
+        return Err(AppError::Validation(
+            "zeitpunkt darf nicht leer sein".into(),
+        ));
+    }
+    // Auf ganze Zentimeter: die Quelle misst in ganzen cm, eine Prognose genauer als die
+    // Messung wäre Scheingenauigkeit.
+    Ok((
+        p.hoechststand_cm.round(),
+        crate::etb::normalisiere_zeit(zeit)?,
+    ))
 }
 
 /// Prüft einen Eintrag für sich (400) und normalisiert ihn.
@@ -98,6 +140,7 @@ async fn anzeige(
         .into_iter()
         .map(|z| PegelAnzeige {
             messung: messungen.remove(&z.station_uuid),
+            prognose: z.prognose(),
             id: z.id,
             station_uuid: z.station_uuid,
             name: z.name,
@@ -169,6 +212,69 @@ pub async fn anfuegen(
     ))
 }
 
+/// PUT /api/einsaetze/{id}/pegel/{pegel_id}/prognose — erwarteten Höchststand setzen
+/// (überschreibt einen vorhandenen). Pegel nicht in diesem Einsatz → 404.
+pub async fn prognose_setzen(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<OhneModul>,
+    PfadParam((_, pegel_id)): PfadParam<(i64, i64)>,
+    JsonBody(req): JsonBody<PrognoseEingabe>,
+) -> Result<Json<Vec<PegelAnzeige>>, AppError> {
+    let (cm, zeit) = validiere_prognose(&req)?;
+    if !repo::setze_prognose(
+        &state.pool,
+        ctx.einsatz.id,
+        pegel_id,
+        ctx.benutzer.id,
+        Some((cm, &zeit)),
+    )
+    .await?
+    {
+        return Err(AppError::NotFound);
+    }
+    Ok(Json(
+        anzeige(&state, ctx.einsatz.id, abruf::Modus::NurCache).await?,
+    ))
+}
+
+/// DELETE /api/einsaetze/{id}/pegel/{pegel_id}/prognose — Prognose löschen. Idempotent: ohne
+/// gesetzte Prognose ebenfalls 200. Pegel nicht in diesem Einsatz → 404.
+pub async fn prognose_loeschen(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<OhneModul>,
+    PfadParam((_, pegel_id)): PfadParam<(i64, i64)>,
+) -> Result<Json<Vec<PegelAnzeige>>, AppError> {
+    if !repo::setze_prognose(&state.pool, ctx.einsatz.id, pegel_id, ctx.benutzer.id, None).await? {
+        return Err(AppError::NotFound);
+    }
+    Ok(Json(
+        anzeige(&state, ctx.einsatz.id, abruf::Modus::NurCache).await?,
+    ))
+}
+
+/// GET /api/einsaetze/{id}/pegel/{pegel_id}/vorhersage — Vorschlag aus der Reihe `WV`
+/// (höchster künftiger Wert). Ohne Reihe: 200 ohne `vorhersage`. Quelle nicht erreichbar und
+/// nichts im Cache → 502. Pegel nicht in diesem Einsatz → 404.
+pub async fn vorhersage_lesen(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<OhneModul>,
+    PfadParam((_, pegel_id)): PfadParam<(i64, i64)>,
+) -> Result<Json<PegelVorhersageAntwort>, AppError> {
+    let station = repo::station_von(&state.pool, ctx.einsatz.id, pegel_id)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    let cache = crate::cache_db::cache_pool(&state.karten_dir).await;
+    let cache_pool = cache.as_ref().unwrap_or(&state.pool);
+    let reihe = vorhersage::reihe(&state.fachebenen, cache_pool, &station)
+        .await
+        .map_err(|_| {
+            AppError::BadGateway("PEGELONLINE-Vorhersage ist gerade nicht erreichbar".into())
+        })?;
+    Ok(Json(PegelVorhersageAntwort {
+        vorhersage: reihe.and_then(|r| vorhersage::hoechststand(&r, chrono::Utc::now())),
+    }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -220,5 +326,31 @@ mod tests {
         let mut w = wahl("a6ee8177-107b-47dd-bcfd-30960ccc6e9c", "Köln");
         w.gewaesser = Some("  ".into());
         assert_eq!(validiere(w).unwrap().gewaesser, None);
+    }
+
+    fn prognose(cm: f64, zeit: &str) -> PrognoseEingabe {
+        PrognoseEingabe {
+            hoechststand_cm: cm,
+            zeitpunkt: zeit.into(),
+        }
+    }
+
+    #[test]
+    fn prognose_grenzen_und_normalisierung() {
+        let (cm, zeit) = validiere_prognose(&prognose(709.6, "2026-09-22T18:00:00+02:00")).unwrap();
+        assert_eq!(cm, 710.0);
+        assert_eq!(zeit, "2026-09-22 16:00:00");
+        for kaputt in [
+            prognose(f64::NAN, "2026-09-22T18:00:00Z"),
+            prognose(PROGNOSE_MAX_CM + 1.0, "2026-09-22T18:00:00Z"),
+            prognose(PROGNOSE_MIN_CM - 1.0, "2026-09-22T18:00:00Z"),
+            prognose(700.0, "  "),
+            prognose(700.0, "morgen 18 Uhr"),
+        ] {
+            assert!(
+                matches!(validiere_prognose(&kaputt), Err(AppError::Validation(_))),
+                "{kaputt:?}"
+            );
+        }
     }
 }

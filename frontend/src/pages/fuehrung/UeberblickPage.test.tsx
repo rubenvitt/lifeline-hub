@@ -377,6 +377,39 @@ describe('UeberblickPage', () => {
     expect(marken[3]).toHaveAttribute('href', '/einsaetze/1/stab');
   });
 
+  it('Nächste Marken: offene Pegel-Prognose führt in die Pegel-Einstellungen, verstrichene fehlt (LFH-628)', async () => {
+    // Wire-Zeit UTC ohne Zone, relativ zur echten Uhr (die Seite rechnet mit ihr).
+    const wire = (ms: number) => new Date(ms).toISOString().slice(0, 19).replace('T', ' ');
+    const prognose = (ms: number) => ({
+      hoechststand_cm: 710,
+      zeitpunkt: wire(ms),
+      gesetzt_at: wire(Date.now()),
+    });
+    stelleBereit({
+      ...volleDaten,
+      pegel: [
+        { ...leitpegel(null), prognose: prognose(Date.now() + 3 * 3_600_000) },
+        {
+          ...leitpegel(null),
+          id: 2,
+          station_uuid: '5f9c1b54-3c41-4d93-bb48-2b7c7c3f5a61',
+          name: 'WAHNHAUSEN',
+          gewaesser: 'FULDA',
+          reihenfolge: 1,
+          prognose: prognose(Date.now() - 3_600_000),
+        },
+      ],
+    });
+    rendern();
+    const p = await waitFor(() => paneel('Nächste Marken'));
+    const marke = await within(p).findByRole('link', {
+      name: /Erwarteter Höchststand Pegel WESER: 7,10 m/,
+    });
+    expect(marke).toHaveAttribute('href', '/einsaetze/1/einstellungen/pegel');
+    expect(marke).toHaveAttribute('data-ton', 'neutral');
+    expect(within(p).queryByText(/Pegel FULDA/)).toBeNull();
+  });
+
   it('Leerzustand: jedes Paneel sagt „nichts da" und bietet, wo sinnvoll, eine Aktion', async () => {
     stelleBereit({
       personen: [],

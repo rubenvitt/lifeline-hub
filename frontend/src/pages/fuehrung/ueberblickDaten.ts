@@ -27,6 +27,7 @@ import type {
   Erinnerung,
   EtbEintragAnzeige,
   Gefahrengebiet,
+  PegelAnzeige,
   Person,
   Warnstufe,
 } from '../../api/types';
@@ -41,6 +42,7 @@ import {
   type StaerkeSumme,
 } from '../../kraefte/kraeftebild';
 import { verdichteGefahrengebiete } from '../lage-dashboard/lageVerdichtung';
+import { prognoseOffen, wasserstandMeter } from '../../pegel/pegelKennzahl';
 import { dauerText } from '../../stab/lagebesprechungZustand';
 import { warnstufeKennzahl, type Statusrolle } from '../../theme/statusFarben';
 
@@ -376,12 +378,12 @@ export function entscheidungenAuswahl(
 // ── Nächste Marken ──────────────────────────────────────────────────────────────
 
 export type MarkenTon = 'neutral' | 'achtung' | 'alarm';
-export type MarkenArt = 'auftrag' | 'erinnerung' | 'lagebesprechung';
+export type MarkenArt = 'auftrag' | 'erinnerung' | 'lagebesprechung' | 'pegelprognose';
 
 export interface Marke {
   key: string;
   art: MarkenArt;
-  /** id des Auftrags bzw. der Erinnerung; `null` bei der Lagebesprechung. */
+  /** id des Auftrags, der Erinnerung bzw. des Pegels; `null` bei der Lagebesprechung. */
   id: number | null;
   zeit: string;
   text: string;
@@ -405,15 +407,23 @@ export function markenBewertung(zeit: Dayjs, jetzt: Dayjs): { ton: MarkenTon; wo
 }
 
 /**
- * Die anstehenden Fristen aus drei Quellen: Frist offener Aufträge, Fälligkeit offener
- * Erinnerungen, nächste Lagebesprechung. Aufsteigend nach Zeit — Überfälliges steht damit
- * oben, und das ist gewollt: es ist die Marke, die schon gerissen ist.
+ * Die anstehenden Fristen aus vier Quellen: Frist offener Aufträge, Fälligkeit offener
+ * Erinnerungen, nächste Lagebesprechung und der erwartete Höchststand an einem maßgeblichen
+ * Pegel (LFH-628). Aufsteigend nach Zeit — Überfälliges steht damit oben, und das ist
+ * gewollt: es ist die Marke, die schon gerissen ist.
+ *
+ * Die Pegel-Prognose ist davon ausgenommen: sie ist keine Frist, die jemand reißen kann,
+ * sondern eine Erwartung. Ein verstrichener Höchststand ist VORBEI, nicht „überfällig" —
+ * er wird vor dem Sortieren herausgefiltert und steht nie als Alarm oben (Entscheidung des
+ * Auftraggebers vom 22.09.2026). Solange er aussteht, bewertet ihn dieselbe Regel wie die
+ * übrigen Marken („in 23 min", knapp = `achtung`).
  */
 export function naechsteMarken(
   auftraege: Auftrag[],
   erinnerungen: Erinnerung[],
   naechsteLagebesprechung: string | null | undefined,
   jetzt: Dayjs,
+  pegel: readonly PegelAnzeige[] = [],
 ): MarkenAuswahl {
   const roh: { key: string; art: MarkenArt; id: number | null; zeit: string; text: string }[] = [];
   for (const a of auftraege) {
@@ -446,6 +456,18 @@ export function naechsteMarken(
       zeit: naechsteLagebesprechung!,
       text: 'Lagebesprechung',
     });
+  }
+  for (const p of pegel) {
+    const prognose = p.prognose;
+    if (prognose && prognoseOffen(prognose, jetzt.valueOf()) && zeitpunkt(prognose.zeitpunkt)) {
+      roh.push({
+        key: `p-${p.id}`,
+        art: 'pegelprognose',
+        id: p.id,
+        zeit: prognose.zeitpunkt,
+        text: `Erwarteter Höchststand Pegel ${p.gewaesser?.trim() || p.name}: ${wasserstandMeter(prognose.hoechststand_cm)} m`,
+      });
+    }
   }
   const sortiert = roh.sort(
     (a, b) => (ms(a.zeit) ?? 0) - (ms(b.zeit) ?? 0) || a.key.localeCompare(b.key),

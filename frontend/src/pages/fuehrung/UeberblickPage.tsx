@@ -38,6 +38,7 @@ import {
   einheitenPfad,
   einsaetzePfad,
   einsatzabschnittePfad,
+  einsatzEinstellungenPfad,
   erinnerungenPfad,
   etbPfad,
   gefahrenPfad,
@@ -90,6 +91,12 @@ import { MARKEN_BREITE, rasterStil, zeilenzielStil } from './ueberblickStil';
  * gescheitertem Abruf „Pegel: Stand unbekannt". Der Pegel-Abruf bestimmt NICHT den Zustand
  * der Kennzahl: sie gehört der Warnstufe, ein toter Pegel-Abruf macht die Warnstufe nicht
  * unlesbar.
+ *
+ * PEGEL-PROGNOSE ALS MARKE (LFH-628): ein offener erwarteter Höchststand steht unter den
+ * nächsten Marken („Erwarteter Höchststand Pegel Weser: 7,10 m") und führt zur
+ * Einstellungssektion, wo er gepflegt wird. Verstrichen fällt er heraus (`naechsteMarken`).
+ * Auch hier bestimmt der Pegel-Abruf NICHT den Zustand des Paneels: ein gescheiterter
+ * Abruf nimmt nur die Prognose-Marke weg, die Fristen der übrigen Quellen bleiben lesbar.
  *
  * BEWUSST WEGGELASSEN (keine erfundenen Daten, Entscheidung 4): Lagezustand-Farbkante und
  * Fortschritt je Abschnitt (LFH-608), Einheitenstatus (LFH-609 — ersetzt durch die
@@ -302,8 +309,9 @@ export default function UeberblickPage() {
         erinnerungen ?? [],
         einsatz?.naechste_lagebesprechung_at,
         jetzt,
+        pegel ?? [],
       ),
-    [auftraege, erinnerungen, einsatz?.naechste_lagebesprechung_at, jetzt],
+    [auftraege, erinnerungen, einsatz?.naechste_lagebesprechung_at, jetzt, pegel],
   );
 
   const zBetroffene = zustandVon(personenQ);
@@ -325,7 +333,9 @@ export default function UeberblickPage() {
       ? auftraegePfad(einsatzId, { auftrag: m.id ?? undefined })
       : m.art === 'erinnerung'
         ? erinnerungenPfad(einsatzId)
-        : stabPfad(einsatzId);
+        : m.art === 'pegelprognose'
+          ? einsatzEinstellungenPfad(einsatzId, 'pegel')
+          : stabPfad(einsatzId);
   const markenFarbe = (m: Marke) =>
     m.ton === 'alarm' ? rollen.alarm : m.ton === 'achtung' ? rollen.achtung : rollen.text;
 
