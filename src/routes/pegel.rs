@@ -7,10 +7,11 @@
 //! **Kein Live-Ereignis**: die Messwerte ändern sich im 15-min-Raster, die Festlegung ist
 //! selten; das Frontend fragt alle 5 min nach.
 //!
-//! **Linie 400 ↔ 422 (LFH-267):** leerer oder zu langer Name, keine UUID-Form und mehr als
-//! [`PEGEL_MAX`] Einträge scheitern am Feld bzw. an der Liste für sich → 400. Eine doppelte
-//! Station in einer PUT-Liste ist ein Zusammenhang zwischen Einträgen → 422 — und wird VOR
-//! der DB geprüft, sonst käme sie über den UNIQUE-Index als 409 heraus.
+//! **Linie 400 ↔ 422 (LFH-267):** leerer oder zu langer Name, keine UUID-Form und eine
+//! PUT-Liste mit mehr als [`PEGEL_MAX`] Einträgen scheitern am Body für sich → 400. Zwei
+//! Fälle sind ein Zusammenhang → 422: eine doppelte Station in einer PUT-Liste (VOR der DB
+//! geprüft, sonst käme sie über den UNIQUE-Index als 409 heraus) und ein POST auf eine
+//! volle Liste — dort ist der Body für sich gültig, abgelehnt wird am Zustand des Einsatzes.
 
 use axum::extract::State;
 use axum::http::StatusCode;
@@ -80,12 +81,19 @@ fn validiere(w: PegelWahl) -> Result<PegelEingabe, AppError> {
 
 /// Liste samt Messungen. Messungen kommen aus dem Nachschlage-Cache (eigene DB, F09/LFH-240,
 /// Fallback auf den operativen Pool — dieselbe Wahl wie `routes::karte::fachebenen`).
-async fn anzeige(state: &AppState, einsatz_id: i64) -> Result<Vec<PegelAnzeige>, AppError> {
+///
+/// `modus`: der GET darf eine fehlende Messung einmalig abwarten, PUT/POST nie — sie
+/// antworten mit dem Cache und stoßen Fehlendes an, der Client fragt ohnehin nach.
+async fn anzeige(
+    state: &AppState,
+    einsatz_id: i64,
+    modus: abruf::Modus,
+) -> Result<Vec<PegelAnzeige>, AppError> {
     let zeilen = repo::liste(&state.pool, einsatz_id).await?;
     let cache = crate::cache_db::cache_pool(&state.karten_dir).await;
     let cache_pool = cache.as_ref().unwrap_or(&state.pool);
     let uuids: Vec<&str> = zeilen.iter().map(|z| z.station_uuid.as_str()).collect();
-    let mut messungen = abruf::messungen(&state.fachebenen, cache_pool, &uuids).await;
+    let mut messungen = abruf::messungen(&state.fachebenen, cache_pool, &uuids, modus).await;
     Ok(zeilen
         .into_iter()
         .map(|z| PegelAnzeige {
@@ -104,7 +112,9 @@ pub async fn liste(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<OhneModul>,
 ) -> Result<Json<Vec<PegelAnzeige>>, AppError> {
-    Ok(Json(anzeige(&state, ctx.einsatz.id).await?))
+    Ok(Json(
+        anzeige(&state, ctx.einsatz.id, abruf::Modus::Warten).await?,
+    ))
 }
 
 /// PUT /api/einsaetze/{id}/pegel — Liste vollständig ersetzen (Reihenfolge = Array).
@@ -134,7 +144,9 @@ pub async fn ersetzen(
         )));
     }
     repo::ersetzen(&state.pool, ctx.einsatz.id, ctx.benutzer.id, &eintraege).await?;
-    Ok(Json(anzeige(&state, ctx.einsatz.id).await?))
+    Ok(Json(
+        anzeige(&state, ctx.einsatz.id, abruf::Modus::NurCache).await?,
+    ))
 }
 
 /// POST /api/einsaetze/{id}/pegel — einen Pegel hinten anfügen (Karten-Schnellweg).
@@ -151,7 +163,10 @@ pub async fn anfuegen(
     } else {
         StatusCode::OK
     };
-    Ok((status, Json(anzeige(&state, ctx.einsatz.id).await?)))
+    Ok((
+        status,
+        Json(anzeige(&state, ctx.einsatz.id, abruf::Modus::NurCache).await?),
+    ))
 }
 
 #[cfg(test)]

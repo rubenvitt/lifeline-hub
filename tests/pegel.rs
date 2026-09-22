@@ -380,7 +380,7 @@ async fn post_fuegt_hinten_an_und_ist_idempotent() {
 }
 
 #[tokio::test]
-async fn post_bei_voller_liste_neu_ist_400_bestand_bleibt_200() {
+async fn post_bei_voller_liste_neu_ist_422_bestand_bleibt_200() {
     let u = setup_pegel().await;
     let admin = login_cookie(&u.app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&u.app, &admin).await;
@@ -402,7 +402,13 @@ async fn post_bei_voller_liste_neu_ist_400_bestand_bleibt_200() {
         Some(&station(F, "6")),
     )
     .await;
-    assert_eq!(status, StatusCode::BAD_REQUEST, "ein sechster ist zu viel");
+    // Der Body ist für sich gültig, abgelehnt wird am Zustand des Einsatzes → 422
+    // (LFH-267). Ein PUT mit sechs Einträgen ist dagegen 400 (`feldfehler_sind_400`).
+    assert_eq!(
+        status,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "ein sechster ist zu viel"
+    );
 
     // Die Vorhandensein-Prüfung geht der Obergrenze vor.
     let (status, json) = anfrage(
@@ -500,5 +506,46 @@ async fn abgelaufener_cache_kommt_sofort_ohne_auf_den_abruf_zu_warten() {
     assert!(
         dauer < std::time::Duration::from_secs(3),
         "die Antwort darf nicht auf den Abruf (Frist 8 s) warten: {dauer:?}"
+    );
+}
+
+/// PUT und POST warten nie auf einen Abruf: ohne Cache-Eintrag antworten sie sofort ohne
+/// Messung und stoßen den Abruf im Hintergrund an. Mutationsprobe: mit `Modus::Warten` in
+/// den schreibenden Routen reißt die Zeitschranke (Frist 8 s).
+#[tokio::test]
+async fn put_und_post_warten_nicht_auf_den_abruf() {
+    let basis = stumme_basis().await;
+    let u = setup_mit_pegel_basis(&basis).await;
+    let admin = login_cookie(&u.app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&u.app, &admin).await;
+
+    let start = std::time::Instant::now();
+    let (status_post, json_post) = anfrage(
+        &u.app,
+        "POST",
+        &pfad(einsatz),
+        &admin,
+        Some(&station(A, "Köln")),
+    )
+    .await;
+    let (status_put, json_put) = anfrage(
+        &u.app,
+        "PUT",
+        &pfad(einsatz),
+        &admin,
+        Some(&liste(&[(A, "Köln"), (B, "Bonn")])),
+    )
+    .await;
+    let dauer = start.elapsed();
+
+    assert_eq!(status_post, StatusCode::CREATED);
+    assert_eq!(status_put, StatusCode::OK);
+    assert!(!json_post[0].as_object().unwrap().contains_key("messung"));
+    for eintrag in json_put.as_array().unwrap() {
+        assert!(!eintrag.as_object().unwrap().contains_key("messung"));
+    }
+    assert!(
+        dauer < std::time::Duration::from_secs(3),
+        "schreibende Routen warten nicht: {dauer:?}"
     );
 }

@@ -113,9 +113,11 @@ pub async fn anfuegen(
         .bind(einsatz_id)
         .fetch_one(&mut *conn)
         .await?;
+        // Der Body ist für sich gültig; abgelehnt wird am Zustand des Einsatzes → 422
+        // (LFH-267). Ein PUT mit mehr als fünf Einträgen ist dagegen 400 (Route).
         if anzahl as usize >= PEGEL_MAX {
-            return Err(AppError::Validation(format!(
-                "Höchstens {PEGEL_MAX} Pegel je Einsatz"
+            return Err(AppError::UnprocessableEntity(format!(
+                "Höchstens {PEGEL_MAX} Pegel je Einsatz — die Liste ist voll"
             )));
         }
         sqlx::query(

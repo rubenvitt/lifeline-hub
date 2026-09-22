@@ -48,6 +48,10 @@ einzelnen Ausreißer wehrlos.
 Client aus `FachebenenState`. Scheitert der Abruf, wird der **alte** Cache-Eintrag
 ausgeliefert (sein Messzeitpunkt ist der ehrliche Datenstand); ohne Cache fehlt die Messung.
 Das Laden der Liste darf nicht an einem hängenden Abruf warten: Abrufe parallel, mit Timeout.
+Umgesetzt als Stale-while-revalidate: ein abgelaufener Eintrag geht sofort raus, erneuert wird
+im Hintergrund. Gewartet (≤ 8 s) wird nur beim GET ohne jeden Eintrag; PUT/POST warten nie.
+Je Station höchstens ein Abruf (In-flight-Marke `pegel:<uuid>`), nach einem Fehlschlag 60 s
+Abkühlung ohne Abruf.
 
 **Routen** (Gate `OhneModul` wie die Einsatz-Kopfdaten — die Kennzahl steht auf Dashboard
 und Überblick, nicht nur auf der Karte; in `PFAD_KEY` als `None` eintragen):
@@ -63,8 +67,11 @@ Antwort-DTO `PegelAnzeige` (`ToSchema`, Codegen): `id`, `station_uuid`, `name`,
 Optionale Felder mit `skip_serializing_if` (Norm LFH-265). **Kein** Richtungs-Enum auf dem
 Draht — die Richtung formuliert das Frontend aus der Zahl.
 
-Validierung (LFH-267): leere/zu lange `name` (> 200), keine UUID-Form, mehr als **5** Pegel
-→ **400**; doppelte `station_uuid` in einer PUT-Liste → **422**.
+Validierung (LFH-267): leere/zu lange `name` (> 200), keine UUID-Form und eine **PUT**-Liste
+mit mehr als **5** Einträgen scheitern am Body für sich → **400**. Am Zusammenhang scheitern
+→ **422**: doppelte `station_uuid` in einer PUT-Liste und ein **POST** auf eine schon volle
+Liste (der Body ist gültig, abgelehnt wird am Zustand des Einsatzes). Ein POST auf eine
+schon festgelegte Station bleibt 200 — die Vorhandensein-Prüfung geht der Obergrenze vor.
 
 **Live:** kein neues `LiveEvent`. Der Query-Key steht in `NICHT_LIVE_KEYS`, das Frontend
 fragt alle 5 min nach (`refetchInterval`) — die Messwerte ändern sich ohnehin nur im

@@ -17,9 +17,9 @@ pub mod registry;
 pub mod tile_cache;
 pub mod typen;
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex, OnceLock};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 /// Betriebs-/Sicherheitsschalter der Karten-Module, prozessweit einmal beim Serverstart
 /// via [`init_karte_config`] aus der CLI/ENV-`Config` gesetzt (LFH-239/F18).
@@ -72,6 +72,11 @@ pub struct FachebenenState {
     /// sie über [`FachebenenState::mit_pegel_basis_url`] auf eine nicht erreichbare Adresse,
     /// damit kein Test ins Netz geht.
     pub pegel_basis_url: Arc<str>,
+    /// Letzter gescheiterter Zeitreihenabruf je Station (LFH-606). Während der Abkühlung
+    /// (`pegel::abruf::ABKUEHLUNG`) wird die Station nicht erneut angefragt — sonst warteten
+    /// bei einer unbekannten UUID oder hängenden Quelle alle Aufrufe bis zur Frist. Prozess-
+    /// lokal und je `AppState`, damit Tests einander nicht über einen Static beeinflussen.
+    pub pegel_fehlschlag: Arc<Mutex<HashMap<String, Instant>>>,
 }
 
 /// Produktive Basis-URL der PEGELONLINE-REST-API v2.
@@ -88,6 +93,7 @@ impl FachebenenState {
             client,
             inflight: Arc::new(Mutex::new(HashSet::new())),
             pegel_basis_url: Arc::from(PEGELONLINE_BASIS_URL),
+            pegel_fehlschlag: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 

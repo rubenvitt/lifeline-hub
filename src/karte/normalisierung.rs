@@ -591,7 +591,10 @@ mod pegelonline_tests {
     fn station_ohne_uuid_traegt_null() {
         let roh = json!([{ "longname": "X", "longitude": 7.0, "latitude": 51.0 }]);
         let fc = normalisiere_pegelonline(&roh);
-        assert!(fc["features"][0]["properties"]["uuid"].is_null());
+        // Der Key steht da (mit null) — dieselbe Form wie die Nachbarn `km`/`gewaesser`.
+        let props = fc["features"][0]["properties"].as_object().unwrap();
+        assert!(props.contains_key("uuid"), "{props:?}");
+        assert_eq!(props["uuid"], serde_json::Value::Null);
     }
 
     #[test]
