@@ -191,7 +191,7 @@ where
 
 /// Art eines Verbleib-Ereignisses. String = CHECK-Constraint in
 /// `migrations/0025_person_verbleib.sql`, erweitert um `notunterkunft` in
-/// `migrations/0105_person_verbleib_notunterkunft.sql` (LFH-613). `Verstorben` = Verbleib des
+/// `migrations/0107_person_verbleib_notunterkunft.sql` (LFH-613). `Verstorben` = Verbleib des
 /// Leichnams (NICHT der Admin-Status).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]

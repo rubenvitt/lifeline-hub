@@ -2285,14 +2285,14 @@ mod tests {
             .expect("mehrere NULL-lfd_nr müssen erlaubt bleiben (Altbestand)");
     }
 
-    // --- Migration 0104: Lagedaten an einsatz_person (LFH-613) ---
+    // --- Migration 0106: Lagedaten an einsatz_person (LFH-613) ---
     //
-    // test_pool() spielt 0104 auf einer LEEREN DB ein — der Backfill aus person_verbleib liefe
+    // test_pool() spielt 0106 auf einer LEEREN DB ein — der Backfill aus person_verbleib liefe
     // dort über null Zeilen und ein falscher Tiebreak bliebe unsichtbar. Hier eine befüllte
     // Alt-DB (einsatz_person im Minimalzuschnitt, person_verbleib aus der ECHTEN 0025) und die
-    // ECHTE 0104 per include_str!: zwei Ereignisse in derselben Sekunde entscheidet id DESC.
+    // ECHTE 0106 per include_str!: zwei Ereignisse in derselben Sekunde entscheidet id DESC.
     #[tokio::test]
-    async fn migration_0104_backfill_nimmt_juengstes_verbleib_ereignis() {
+    async fn migration_0106_backfill_nimmt_juengstes_verbleib_ereignis() {
         let pool = SqlitePoolOptions::new()
             .max_connections(1)
             .connect_with(
@@ -2335,10 +2335,10 @@ mod tests {
         .await
         .unwrap();
 
-        sqlx::raw_sql(include_str!("../migrations/0104_person_lagedaten.sql"))
+        sqlx::raw_sql(include_str!("../migrations/0106_person_lagedaten.sql"))
             .execute(&pool)
             .await
-            .expect("0104 muss auf einer befüllten DB durchlaufen");
+            .expect("0106 muss auf einer befüllten DB durchlaufen");
 
         type Zeile = (
             Option<String>,
@@ -2456,13 +2456,13 @@ mod tests {
         pool
     }
 
-    // --- Migration 0105: Leaf-Rebuild von person_verbleib mit 'notunterkunft' (LFH-613) ---
+    // --- Migration 0107: Leaf-Rebuild von person_verbleib mit 'notunterkunft' (LFH-613) ---
     //
-    // Auf test_pool() wäre person_verbleib bei 0105 leer: ein vergessener Spaltenname im Copy
+    // Auf test_pool() wäre person_verbleib bei 0107 leer: ein vergessener Spaltenname im Copy
     // oder eine verlorene Sequenz bliebe dort unsichtbar. Hier eine befüllte 0025-DB, deren
-    // höchste Zeile gelöscht ist (Sequenz > MAX(id)), und die ECHTE 0105 per include_str!.
+    // höchste Zeile gelöscht ist (Sequenz > MAX(id)), und die ECHTE 0107 per include_str!.
     #[tokio::test]
-    async fn migration_0105_person_verbleib_rebuild_erhaelt_zeilen_sequenz_und_schema() {
+    async fn migration_0107_person_verbleib_rebuild_erhaelt_zeilen_sequenz_und_schema() {
         let pool = alt_db_person_verbleib().await;
         sqlx::query(
             "INSERT INTO person_verbleib \
@@ -2502,7 +2502,7 @@ mod tests {
                            zeitpunkt_at, erfasst_von FROM person_verbleib ORDER BY id";
         let zeilen_vorher: Vec<Zeile> = sqlx::query_as(alle).fetch_all(&pool).await.unwrap();
 
-        let migration = include_str!("../migrations/0105_person_verbleib_notunterkunft.sql");
+        let migration = include_str!("../migrations/0107_person_verbleib_notunterkunft.sql");
         assert!(
             migration.starts_with("-- no-transaction"),
             "sqlx erkennt die Direktive nur am Dateianfang"
@@ -2510,7 +2510,7 @@ mod tests {
         sqlx::raw_sql(migration)
             .execute(&pool)
             .await
-            .expect("0105 muss auf einer befüllten DB durchlaufen");
+            .expect("0107 muss auf einer befüllten DB durchlaufen");
 
         let zeilen_nachher: Vec<Zeile> = sqlx::query_as(alle).fetch_all(&pool).await.unwrap();
         assert_eq!(
@@ -2575,7 +2575,7 @@ mod tests {
     // und die neue Tabelle hätte gar keinen sqlite_sequence-Eintrag — ohne die Übernahme
     // begänne die Nummerierung wieder bei 1.
     #[tokio::test]
-    async fn migration_0105_erhaelt_sequenz_auch_bei_leerer_tabelle() {
+    async fn migration_0107_erhaelt_sequenz_auch_bei_leerer_tabelle() {
         let pool = alt_db_person_verbleib().await;
         sqlx::query(
             "INSERT INTO person_verbleib (einsatz_id, person_id, art, erfasst_von) \
@@ -2590,7 +2590,7 @@ mod tests {
             .unwrap();
 
         sqlx::raw_sql(include_str!(
-            "../migrations/0105_person_verbleib_notunterkunft.sql"
+            "../migrations/0107_person_verbleib_notunterkunft.sql"
         ))
         .execute(&pool)
         .await
