@@ -1,4 +1,11 @@
-import type { Auftrag, EtbEintragAnzeige, EtbTyp, MeldeWeg, NeuerAuftrag } from './types';
+import type {
+  Auftrag,
+  EtbEintragAnzeige,
+  EtbLesemarke,
+  EtbTyp,
+  MeldeWeg,
+  NeuerAuftrag,
+} from './types';
 import { apiGet, apiSend, type ApiSendOptionen } from './client';
 
 export const SEITENGROESSE = 100;
@@ -60,4 +67,20 @@ export function erteileAuftragAusEtb(
   daten: NeuerAuftrag,
 ): Promise<Auftrag> {
   return apiSend<Auftrag>(`/api/einsaetze/${einsatzId}/etb/${eintragId}/auftrag`, 'POST', daten);
+}
+
+/** Eigener Lesestand im Tagebuch (LFH-611): Marke, letzte Sichtung, fremde Einträge darüber. */
+export function ladeEtbLesemarke(einsatzId: number): Promise<EtbLesemarke> {
+  return apiGet<EtbLesemarke>(`/api/einsaetze/${einsatzId}/etb/lesemarke`);
+}
+
+/**
+ * „Alle als gesichtet markieren" (LFH-611). `bisLfdNr` ist `hoechste_lfd_nr` der zuletzt
+ * gelesenen Lesemarke — markiert wird, was das Banner angesagt hat, nicht was zwischen
+ * Anzeige und Klick eintraf. Der Server rückt nur vorwärts.
+ */
+export function setzeEtbLesemarke(einsatzId: number, bisLfdNr: number): Promise<EtbLesemarke> {
+  return apiSend<EtbLesemarke>(`/api/einsaetze/${einsatzId}/etb/lesemarke`, 'POST', {
+    bis_lfd_nr: bisLfdNr,
+  });
 }

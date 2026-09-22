@@ -1214,6 +1214,18 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("gelesen_at", G_ZEIT),
         ],
     },
+    // ETB-Lesemarke (LFH-611): wer bis wohin gesichtet hat — Struktur, kein Inhalt.
+    TabellenRegel {
+        tabelle: "etb_lesemarke",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        spalten: &[
+            retain("einsatz_id", G_SCOPE),
+            retain("benutzer_id", G_FK),
+            retain("gesichtet_lfd_nr", G_ZAEHLER),
+            retain("gesichtet_at", G_ZEIT),
+        ],
+    },
 ];
 
 /// Sucht die Klassifikation einer Spalte in der Registry (`None`, wenn nicht erfasst).
