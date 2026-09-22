@@ -1,3 +1,10 @@
+## [1.0.0-alpha.27](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.26...v1.0.0-alpha.27) (2026-09-22)
+
+### Bug Fixes
+
+* **etb:** Bausteinformular nur bei offenem Dialog zurücksetzen (LFH-624) ([1d952fa](https://github.com/rubenvitt/lifeline-hub/commit/1d952face9188def7e7c41cc1c1e0652cec71c7c))
+* **live:** Live-Feed schickt beim Aufbau sofort ein erstes Byte (LFH-624) ([e120430](https://github.com/rubenvitt/lifeline-hub/commit/e1204306e8c050795e9328bc65f2b665bde03c9d))
+
 ## [1.0.0-alpha.26](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.25...v1.0.0-alpha.26) (2026-09-22)
 
 ### Features
