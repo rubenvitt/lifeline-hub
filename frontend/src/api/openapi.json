@@ -5556,6 +5556,17 @@
             ],
             "format": "int64"
           },
+          "aktuelle_verbleib_art": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/VerbleibArt",
+                "description": "Strukturierter Cache des jüngsten Verbleib-Ereignisses (neben der Kurzform\n`aktueller_verbleib`)."
+              }
+            ]
+          },
           "aktueller_platz_id": {
             "type": [
               "integer",
@@ -5569,12 +5580,43 @@
               "null"
             ]
           },
+          "aktueller_verbleib_status": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/VerbleibStatus"
+              }
+            ]
+          },
+          "aktuelles_verbleib_ziel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "alter_geschaetzt": {
             "type": [
               "integer",
               "null"
             ],
             "format": "int64"
+          },
+          "antreff_lat": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "Fundort-Koordinate (WGS84), immer gemeinsam mit `antreff_lon` gesetzt oder leer."
+          },
+          "antreff_lon": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
           },
           "antreff_ort": {
             "type": [
@@ -5657,11 +5699,25 @@
               "null"
             ]
           },
+          "vermisst_seit": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Seit wann die Person vermisst wird (`YYYY-MM-DD HH:MM:SS`, UTC). Nur bei Status\n`vermisst` bedeutsam; beim Verlassen des Status bleibt der Wert dokumentarisch stehen."
+          },
           "vorname": {
             "type": [
               "string",
               "null"
             ]
+          },
+          "zustand": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Zustand in Kurzform (Freitext, z. B. „gehfähig, unterkühlt\")."
           }
         }
       },
@@ -6974,12 +7030,13 @@
       },
       "VerbleibArt": {
         "type": "string",
-        "description": "Art eines Verbleib-Ereignisses. String = CHECK-Constraint in\n`migrations/0025_person_verbleib.sql`. `Verstorben` = Verbleib des Leichnams\n(NICHT der Admin-Status).",
+        "description": "Art eines Verbleib-Ereignisses. String = CHECK-Constraint in\n`migrations/0025_person_verbleib.sql`, erweitert um `notunterkunft` in\n`migrations/0112_person_verbleib_notunterkunft.sql` (LFH-613). `Verstorben` = Verbleib des\nLeichnams (NICHT der Admin-Status).",
         "enum": [
           "transport",
           "entlassung",
           "vor_ort",
-          "verstorben"
+          "verstorben",
+          "notunterkunft"
         ]
       },
       "VerbleibStatus": {

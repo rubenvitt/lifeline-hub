@@ -1,5 +1,11 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { http, HttpResponse } from 'msw';
+import type { ReactNode } from 'react';
+import { describe, expect, it, vi } from 'vitest';
+import { server } from '../test/server';
+import { renderMitProviders } from '../test/utils';
+import { koordinatenText } from './koordinate';
 import { pruefeKartenplan, type Kartenplan } from '../components/Datensicht';
 import type { Person } from '../api/types';
 import {
@@ -114,11 +120,12 @@ describe('nameText', () => {
 const spalte = (key: string) => personenSpalten.filter((s) => s.key === key);
 
 describe('personenSpalten — Registerform (Neuentwurf S7)', () => {
-  it('trägt die Spalten des Entwurfs, soweit es Daten gibt — ohne „Zustand" (LFH-613)', () => {
+  it('trägt die Spalten des Entwurfs — „Zustand" nach der Sichtung (LFH-613)', () => {
     expect(personenSpalten.map((s) => s.key)).toEqual([
       'reg',
       'person',
       'sk',
+      'zustand',
       'status',
       'fundort',
       'verbleib',
@@ -164,7 +171,15 @@ describe('personenSpalten — Registerform (Neuentwurf S7)', () => {
     const render_ = spalte('person')[0].render!;
     const { container, rerender } = render(<>{render_(undefined, basis, 0)}</>);
     expect(container.textContent).toBe('Mustermann, Maxm ~40Verbleib offen');
-    rerender(<>{render_(undefined, { ...basis, aktueller_verbleib: 'entlassen' }, 0)}</>);
+    rerender(
+      <>
+        {render_(
+          undefined,
+          { ...basis, aktueller_verbleib: 'entlassen', aktuelle_verbleib_art: 'entlassung' },
+          0,
+        )}
+      </>,
+    );
     expect(container.textContent).toBe('Mustermann, Maxm ~40');
     expect(container.querySelector('[data-lfh="luecke"]')).toBeNull();
   });
@@ -177,16 +192,130 @@ describe('geschlechtAlter / verbleibText', () => {
     expect(geschlechtAlter({ ...basis, geburtsdatum: '1990-01-02' })).toBe('m 1990-01-02');
   });
 
-  it('nennt Kurzform, sonst die UHS beim Namen, sonst nichts', () => {
+  it('nennt die Kurzform der Art, sonst die UHS beim Namen, sonst nichts', () => {
     const name = (id: number) => uhsNamen[id];
     expect(
-      verbleibText({ aktueller_verbleib: 'Transport → KH Nord', aktuelle_uhs_id: 7 }, name),
+      verbleibText(
+        {
+          aktuelle_verbleib_art: 'transport',
+          aktueller_verbleib: 'Transport → KH Nord',
+          aktuelle_uhs_id: 7,
+        },
+        name,
+      ),
     ).toBe('Transport → KH Nord');
     expect(verbleibText({ aktueller_verbleib: null, aktuelle_uhs_id: 7 }, name)).toBe(
       'UHS Weserstadion',
     );
     expect(verbleibText({ aktueller_verbleib: null, aktuelle_uhs_id: 99 }, name)).toBe('UHS');
     expect(verbleibText({ aktueller_verbleib: null, aktuelle_uhs_id: null }, name)).toBeNull();
+  });
+
+  it('fällt ohne Kurzform auf das Wort der Art zurück, statt „—" zu zeigen', () => {
+    const name = (id: number) => uhsNamen[id];
+    expect(
+      verbleibText(
+        { aktuelle_verbleib_art: 'notunterkunft', aktueller_verbleib: null, aktuelle_uhs_id: null },
+        name,
+      ),
+    ).toBe('Notunterkunft');
+  });
+});
+
+describe('Fundort mit Koordinate (LFH-613)', () => {
+  const zelle = (p: Person) => spalte('fundort')[0].render!(undefined, p, 0);
+
+  it('zeigt Freitext und darunter die Koordinate in Mono', () => {
+    const { container } = render(
+      <>{zelle({ ...basis, antreff_lat: 52.2691, antreff_lon: 9.1342 })}</>,
+    );
+    expect(container).toHaveTextContent('Brücke52.2691/9.1342');
+    expect(container.querySelector('[data-lfh="koordinate"]')).toHaveTextContent('52.2691/9.1342');
+  });
+
+  it('zeigt die Koordinate allein ohne „—", wenn der Freitext fehlt', () => {
+    const { container } = render(
+      <>{zelle({ ...basis, antreff_ort: null, antreff_lat: 52.2691, antreff_lon: 9.1342 })}</>,
+    );
+    expect(container.textContent).toBe('52.2691/9.1342');
+  });
+
+  it('macht die Koordinate suchbar und kennt kein halbes Paar', () => {
+    const such = spalte('fundort')[0].suchText!;
+    expect(such({ ...basis, antreff_lat: 52.2691, antreff_lon: 9.1342 })).toBe(
+      'Brücke 52.2691/9.1342',
+    );
+    expect(such({ ...basis, antreff_ort: null })).toBeNull();
+    expect(koordinatenText({ antreff_lat: 52.2691 })).toBeNull();
+  });
+});
+
+describe('Zustand-Spalte (LFH-613)', () => {
+  const mitSchreibrecht = spaltenFabrik(() => undefined, { einsatzId: 1, darfSchreiben: true });
+  const ohneSchreibrecht = spaltenFabrik(() => undefined, { einsatzId: 1, darfSchreiben: false });
+  const zelle = (spalten: typeof personenSpalten, p: Person) =>
+    spalten.find((s) => s.key === 'zustand')!.render!(undefined, p, 0) as ReactNode;
+
+  it('bearbeitet den leeren Zustand in der Zeile: PATCH mit NUR dem Zustand (Spec-Szenario)', async () => {
+    const koerper: unknown[] = [];
+    server.use(
+      http.patch('/api/einsaetze/1/personen/10', async ({ request }) => {
+        koerper.push(await request.json());
+        return HttpResponse.json({ ...basis, zustand: 'gehfähig, unterkühlt' });
+      }),
+    );
+    const zeilenKlick = vi.fn();
+    renderMitProviders(<div onClick={zeilenKlick}>{zelle(mitSchreibrecht, basis)}</div>);
+
+    // Die Zeilenkennung trägt den Namen — n Zeilen, n unterscheidbare Knöpfe.
+    const knopf = screen.getByRole('button', { name: 'Zustand zu R-001 hinzufügen' });
+    expect(knopf).toHaveTextContent('Zustand hinzufügen');
+    await userEvent.click(knopf);
+    // Der Klick bleibt in der Zelle — die Zeile navigiert nicht auf die Detailseite.
+    expect(zeilenKlick).not.toHaveBeenCalled();
+
+    const feld = screen.getByRole('textbox');
+    await userEvent.type(feld, 'gehfähig, unterkühlt');
+    fireEvent.blur(feld);
+    await vi.waitFor(() => expect(koerper).toHaveLength(1));
+    expect(koerper[0]).toEqual({ zustand: 'gehfähig, unterkühlt' });
+  });
+
+  it('bietet einer VERMISSTEN Person keinen Zustand an — auch mit Schreibrecht', () => {
+    renderMitProviders(<>{zelle(mitSchreibrecht, { ...basis, status: 'vermisst' })}</>);
+    expect(screen.queryByRole('button', { name: /Zustand zu R-001/ })).toBeNull();
+    expect(screen.getByText('—')).toBeInTheDocument();
+  });
+
+  it('schickt nichts, wenn der Wert unverändert bleibt (Wertgleichheits-Riegel)', async () => {
+    const patch = vi.fn();
+    server.use(
+      http.patch('/api/einsaetze/1/personen/10', () => {
+        patch();
+        return HttpResponse.json(basis);
+      }),
+    );
+    renderMitProviders(<>{zelle(mitSchreibrecht, basis)}</>);
+    await userEvent.click(screen.getByRole('button', { name: 'Zustand zu R-001 hinzufügen' }));
+    fireEvent.blur(screen.getByRole('textbox'));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(patch).not.toHaveBeenCalled();
+  });
+
+  it('bleibt ohne Schreibrecht reine Anzeige — Wert oder „—", kein Knopf', () => {
+    const { container, rerender } = renderMitProviders(
+      <>{zelle(ohneSchreibrecht, { ...basis, zustand: 'Beinfraktur' })}</>,
+    );
+    expect(container).toHaveTextContent('Beinfraktur');
+    expect(screen.queryByRole('button')).toBeNull();
+    rerender(<>{zelle(ohneSchreibrecht, basis)}</>);
+    expect(container.textContent).toBe('—');
+    expect(screen.queryByRole('button')).toBeNull();
+  });
+
+  it('ist ohne Bedienung (Fabrik mit nur uhsName) ebenfalls nur Anzeige', () => {
+    renderMitProviders(<>{zelle(personenSpalten, basis)}</>);
+    expect(screen.queryByRole('button')).toBeNull();
   });
 });
 

@@ -39,6 +39,35 @@ describe('BemerkungZelle', () => {
     expect(screen.getByRole('button', { name: BEMERKUNG_HINZUFUEGEN })).toBeInTheDocument();
   });
 
+  it('tauscht mit `bezeichnung` nur das Wort — Platzhalter, Name und Stift (LFH-613)', () => {
+    const { rerender } = renderMitProviders(
+      <BemerkungZelle
+        wert={null}
+        darfSchreiben
+        onSpeichern={vi.fn()}
+        kennung="R-042"
+        bezeichnung="Zustand"
+      />,
+    );
+    const knopf = screen.getByRole('button', { name: 'Zustand zu R-042 hinzufügen' });
+    expect(knopf).toHaveTextContent(/^Zustand hinzufügen$/);
+    rerender(
+      <BemerkungZelle
+        wert="gehfähig"
+        darfSchreiben
+        onSpeichern={vi.fn()}
+        kennung="R-042"
+        bezeichnung="Zustand"
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Zustand zu R-042 bearbeiten' })).toBeInTheDocument();
+    // Gegenhälfte: ohne `bezeichnung` bleibt der Bestandswortlaut.
+    rerender(<BemerkungZelle wert={null} darfSchreiben onSpeichern={vi.fn()} />);
+    expect(screen.getByRole('button', { name: BEMERKUNG_HINZUFUEGEN })).toHaveTextContent(
+      BEMERKUNG_HINZUFUEGEN,
+    );
+  });
+
   it('der Platzhalter öffnet ein Eingabefeld und übergibt den getippten Wert', async () => {
     /**
      * Der Test, der den Knopf zur ARBEIT verpflichtet: ein Platzhalter, der zwar einen Namen

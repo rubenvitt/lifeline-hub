@@ -43,9 +43,10 @@ Shell-Rahmen · neue Bausteine · neu gedachte Screens.
    Fortschritt je Abschnitt, Abschnittsfarbe, FMS-Status/„Seit“/Rückmeldung je Einheit,
    „keine Rückmeldung“, ETB-Lesemarke „seit Ihrer letzten Sichtung“, ETB-Gesamtzahl und
    Tagesbilanz-Summen (serverseitig), Folgeauftrag-Verweis am ETB-Eintrag (geschlossen
-   mit LFH-636), Zustand und
-   Koordinate an der Person, strukturierter Verbleib, Funktion des Nutzers (nur
-   Sachgebiete vorhanden), Satellit-Basemap, Messwerkzeug.
+   mit LFH-636), Funktion des Nutzers (nur Sachgebiete vorhanden), Satellit-Basemap,
+   Messwerkzeug. Geschlossen seit LFH-613: Zustand und Fundort-Koordinate an der Person,
+   strukturierter Verbleib (mit Notunterkunft), „vermisst seit“ — samt Ansicht „Karte“ der
+   Betroffenen, „Transportiert / offen“ und „Vermisste – n seit über 4 h“.
 
 ## Palette Nachtbetrieb (aus den Inline-Styles)
 
@@ -129,7 +130,7 @@ Das Modulpanel des Entwurfs führt acht Module, die es in der App nicht gab. Ent
 |---|---|---|
 | Entscheidungen (Führung) | Sicht auf vorhandene Daten | Sprungmarke → ETB `?typ=entscheidung`. Der Folgeauftrag-Verweis steht seit LFH-636 am ETB-Eintrag (Wire `folgeauftraege`, Zeitachse „Folgeauftrag Nr. … ↗“, Zähler im Überblick); ob eine eigene Übersicht (Beschlusslage mit Umsetzungsstand) die Sprungmarke ersetzt, ist neu zu entscheiden |
 | Patienten (Erfassung) | Sicht auf vorhandene Daten | Sprungmarke → Personen `?ansicht=raster` (Sichtungsraster, „Patient" = SK I–IV/tot, `istPatient`) |
-| Vermisste (Erfassung) | Sicht auf vorhandene Daten | Sprungmarke → Personen `?filter=vermisst` (inkl. Abgleich). „vermisst seit" liegt bei LFH-613 |
+| Vermisste (Erfassung) | Sicht auf vorhandene Daten | Sprungmarke → Personen `?filter=vermisst` (inkl. Abgleich). „vermisst seit" gibt es seit LFH-613 (Dashboard-Notiz „n seit über 4 h") |
 | Dokumente (Führung) | Fachmodul, hier verworfen | Folgetask LFH-632 (Dokumentenablage) |
 | Wetter & Pegel (Lage) | Fachmodul nach LFH-606 | Folgetask LFH-633, wartet auf LFH-606 |
 | Prognose (Lage) | kein eigenes Modul | geht in LFH-628 (Pegelprognose/Höchststand) und LFH-633 auf |

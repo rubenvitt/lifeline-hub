@@ -1,5 +1,6 @@
 import type { Sichtungskategorie, Uhs } from '../api/types';
 import type { PersonAnlegenEingabe } from '../api/einsatzPerson';
+import { parseKoordinate } from './koordinate';
 
 /**
  * Der Parser der Betroffenen-Schnellerfassungszeile (Neuentwurf S7 „Das Formular wird zur
@@ -23,18 +24,19 @@ import type { PersonAnlegenEingabe } from '../api/einsatzPerson';
  *                  nächsten Sichtung, zum nächsten Geschlecht oder zum nächsten `@`/`#`
  *                  — es gehört also ans Ende oder vor diese Kürzel. Zahlen gehören zur
  *                  Bezeichnung („@UHS 2").
- *
- * ── WAS ES NICHT GIBT ───────────────────────────────────────────────────────────────────
- *
- * `#Koordinate` aus dem Entwurf: an der Person gibt es keine Koordinate (LFH-613). Ein
- * `#…`-Wort wird deshalb NICHT still als Namensteil geschluckt, sondern als unerkannt
- * gemeldet — sonst stünde die Koordinate hinterher als Nachname im Register.
+ *  · Koordinate    `#` + Breite/Länge (`#52.2691/9.1342`, `#52,2691/9,1342`, Minus
+ *                  erlaubt) — der Fundort als WGS84-Paar (LFH-613). Geht als
+ *                  `antreff_lat`/`antreff_lon` im SELBEN Anlege-POST mit (Offline-Queue,
+ *                  `client_id`); gelesen über `personen/koordinate.ts`, dieselbe Funktion
+ *                  wie in Maske und Detailseite. Ein `#`-Wort wird nie als Namensteil
+ *                  geschluckt — sonst stünde die Koordinate als Nachname im Register.
  *
  * ── UNERKANNTES SPERRT DAS ABSENDEN ─────────────────────────────────────────────────────
  *
- * Doppelte Angaben (zwei Sichtungen), ein Alter außerhalb 0–120, ein `#`, ein `@` ohne
- * Bezeichnung und eine nicht eindeutige Unfallhilfsstelle erzeugen je ein PROBLEM. Mit
- * Problemen wird nicht gesendet: ein halb verstandener Befehl legte eine Person mit
+ * Doppelte Angaben (zwei Sichtungen, zwei Koordinaten), ein Alter außerhalb 0–120, ein
+ * unbrauchbares `#` (halbes Paar, außerhalb des Bereichs), ein `@` ohne Bezeichnung und
+ * eine nicht eindeutige Unfallhilfsstelle erzeugen je ein PROBLEM. Mit Problemen wird
+ * nicht gesendet: ein halb verstandener Befehl legte eine Person mit
  * falscher Sichtung oder in der falschen UHS an — und die Sichtung ist genau die Angabe,
  * an der die Lage hängt. Dieselbe Regel wie `parsePlatzierenAuftrag`: Unbrauchbares ganz
  * verwerfen, nicht halb übernehmen.
@@ -46,6 +48,7 @@ export type BefehlTeil =
   | { art: 'alter'; text: string; wert: number }
   | { art: 'sichtung'; text: string; wert: Sichtungskategorie }
   | { art: 'uhs'; text: string; suche: string }
+  | { art: 'koordinate'; text: string; lat: number; lon: number }
   | { art: 'unerkannt'; text: string; grund: string };
 
 export type GeschlechtWert = 'maennlich' | 'weiblich' | 'divers';
@@ -56,7 +59,13 @@ export interface PersonBefehl {
   /** Die Felder der Anlage — ohne `uhs_id`, die braucht die UHS-Liste ({@link loeseBefehl}). */
   eingabe: Pick<
     PersonAnlegenEingabe,
-    'name' | 'vorname' | 'geschlecht' | 'alter_geschaetzt' | 'sichtung'
+    | 'name'
+    | 'vorname'
+    | 'geschlecht'
+    | 'alter_geschaetzt'
+    | 'sichtung'
+    | 'antreff_lat'
+    | 'antreff_lon'
   >;
   /** Suchtext hinter `@`, oder `null`. */
   uhsSuche: string | null;
@@ -149,6 +158,7 @@ export function parsePersonBefehl(eingabe: string): PersonBefehl {
   let geschlecht: GeschlechtWert | undefined;
   let alter: number | undefined;
   let uhsSuche: string | null = null;
+  let koordinate: { lat: number; lon: number } | undefined;
 
   const setzeSichtung = (wert: Sichtungskategorie, text: string) => {
     if (sichtung != null) {
@@ -178,8 +188,17 @@ export function parsePersonBefehl(eingabe: string): PersonBefehl {
     const naechstes = woerter[i + 1];
 
     if (wort.startsWith('#')) {
-      teile.push({ art: 'unerkannt', text: wort, grund: 'keine Koordinate an der Person' });
-      probleme.push(`„${wort}": eine Koordinate an der Person gibt es nicht`);
+      const k = parseKoordinate(wort);
+      if (!k.ok) {
+        teile.push({ art: 'unerkannt', text: wort, grund: k.grund });
+        probleme.push(`Koordinate unbrauchbar („${wort}": ${k.grund})`);
+      } else if (koordinate != null) {
+        teile.push({ art: 'unerkannt', text: wort, grund: 'Koordinate doppelt' });
+        probleme.push(`Koordinate doppelt angegeben („${wort}")`);
+      } else {
+        koordinate = { lat: k.lat, lon: k.lon };
+        teile.push({ art: 'koordinate', text: wort, lat: k.lat, lon: k.lon });
+      }
       continue;
     }
 
@@ -263,6 +282,7 @@ export function parsePersonBefehl(eingabe: string): PersonBefehl {
       ...(geschlecht != null ? { geschlecht } : {}),
       ...(alter != null ? { alter_geschaetzt: alter } : {}),
       ...(sichtung != null ? { sichtung } : {}),
+      ...(koordinate != null ? { antreff_lat: koordinate.lat, antreff_lon: koordinate.lon } : {}),
     },
     uhsSuche,
     probleme,

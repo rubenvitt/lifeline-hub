@@ -7,7 +7,7 @@ import {
   lueckenVon,
   offeneFelder,
   sichtungsbild,
-  verbleibArtAus,
+  transportBilanz,
   verbleibKlasse,
   verbleibZaehlung,
 } from './personenBilanz';
@@ -27,6 +27,9 @@ const basis: Person = {
   herkunft_adresse: null,
   antreff_ort: 'Brücke',
   aktueller_verbleib: 'Transport → KH Mitte',
+  aktuelle_verbleib_art: 'transport',
+  aktuelles_verbleib_ziel: 'KH Mitte',
+  aktueller_verbleib_status: 'abtransportiert',
   melder_kontakt: null,
   notiz: null,
   erfasst_at: '2026-05-27 09:00:00',
@@ -37,23 +40,6 @@ const basis: Person = {
 };
 let n = 1;
 const p = (extra: Partial<Person>): Person => ({ ...basis, id: ++n, registrier_nr: n, ...extra });
-
-describe('verbleibArtAus — die vier Backend-Kurzformen (src/person/mod.rs)', () => {
-  it.each([
-    ['Transport → KH Mitte', 'transport'],
-    ['Transport', 'transport'],
-    ['entlassen', 'entlassen'],
-    ['vor Ort', 'vor_ort'],
-    ['verstorben', 'verstorben'],
-  ])('„%s" → %s', (kurzform, art) => {
-    expect(verbleibArtAus(kurzform)).toBe(art);
-  });
-
-  it('fällt bei fremdem Text auf „sonstig", nicht still in eine Art', () => {
-    expect(verbleibArtAus('Transporter')).toBe('sonstig');
-    expect(verbleibArtAus('Notunterkunft Ost')).toBe('sonstig');
-  });
-});
 
 describe('Lücken', () => {
   it('kennt nur angetroffene Personen als lückenfähig', () => {
@@ -67,16 +53,42 @@ describe('Lücken', () => {
   });
 
   it('meldet fehlenden Verbleib und fehlenden Fundort getrennt', () => {
-    expect(lueckenVon(p({ aktueller_verbleib: null }))).toEqual({ verbleib: true, fundort: false });
+    expect(lueckenVon(p({ aktuelle_verbleib_art: undefined }))).toEqual({
+      verbleib: true,
+      fundort: false,
+    });
     expect(lueckenVon(p({ antreff_ort: '  ' }))).toEqual({ verbleib: false, fundort: true });
   });
 
+  it('liest den Verbleib aus der Art, nicht aus der Kurzform (LFH-613)', () => {
+    // Eine Kurzform ohne Art schließt die Lücke NICHT mehr — sie wird nicht zurückgeparst.
+    expect(
+      lueckenVon(p({ aktuelle_verbleib_art: undefined, aktueller_verbleib: 'Transport' })).verbleib,
+    ).toBe(true);
+    expect(
+      lueckenVon(p({ aktuelle_verbleib_art: 'notunterkunft', aktueller_verbleib: null })).verbleib,
+    ).toBe(false);
+  });
+
+  it('schließt die Fundort-Lücke mit Freitext ODER Koordinate (LFH-613)', () => {
+    const ohne = { antreff_ort: null, antreff_lat: undefined, antreff_lon: undefined };
+    expect(lueckenVon(p(ohne)).fundort).toBe(true);
+    expect(lueckenVon(p({ ...ohne, antreff_lat: 52.2691, antreff_lon: 9.1342 })).fundort).toBe(
+      false,
+    );
+    expect(lueckenVon(p({ ...ohne, antreff_ort: 'Brücke' })).fundort).toBe(false);
+    // Ein halbes Paar ist kein Fundort (dieselbe Regel wie Anzeige und Bearbeiten).
+    expect(lueckenVon(p({ ...ohne, antreff_lat: 52.2691 })).fundort).toBe(true);
+  });
+
   it('zählt eine Person in einer UHS nicht als „Verbleib offen"', () => {
-    expect(lueckenVon(p({ aktueller_verbleib: null, aktuelle_uhs_id: 7 })).verbleib).toBe(false);
+    expect(lueckenVon(p({ aktuelle_verbleib_art: undefined, aktuelle_uhs_id: 7 })).verbleib).toBe(
+      false,
+    );
   });
 
   it('führt eine vermisste Person ohne Fundort und Verbleib NICHT als Lücke', () => {
-    const vermisst = p({ status: 'vermisst', antreff_ort: null, aktueller_verbleib: null });
+    const vermisst = p({ status: 'vermisst', antreff_ort: null, aktuelle_verbleib_art: undefined });
     expect(hatLuecke(vermisst)).toBe(false);
   });
 
@@ -91,34 +103,53 @@ describe('offeneFelder', () => {
   it('zählt je Feld und je Datensatz', () => {
     const alle = [
       p({}),
-      p({ aktueller_verbleib: null }),
-      p({ aktueller_verbleib: null, antreff_ort: null }),
+      p({ aktuelle_verbleib_art: undefined }),
+      p({ aktuelle_verbleib_art: undefined, antreff_ort: null }),
       p({ antreff_ort: null }),
-      p({ status: 'vermisst', aktueller_verbleib: null, antreff_ort: null }),
+      p({ status: 'vermisst', aktuelle_verbleib_art: undefined, antreff_ort: null }),
     ];
     expect(offeneFelder(alle)).toEqual({ ohneVerbleib: 2, ohneFundort: 2, datensaetze: 3 });
   });
 });
 
 describe('verbleibKlasse / verbleibZaehlung', () => {
-  it('leitet die Klasse aus Kurzform, dann UHS, sonst offen ab', () => {
-    expect(verbleibKlasse({ aktueller_verbleib: 'entlassen', aktuelle_uhs_id: 7 })).toBe(
-      'entlassen',
+  it('leitet die Klasse aus der Art, dann UHS, sonst offen ab', () => {
+    expect(verbleibKlasse({ aktuelle_verbleib_art: 'entlassung', aktuelle_uhs_id: 7 })).toBe(
+      'entlassung',
     );
-    expect(verbleibKlasse({ aktueller_verbleib: null, aktuelle_uhs_id: 7 })).toBe('uhs');
-    expect(verbleibKlasse({ aktueller_verbleib: null, aktuelle_uhs_id: null })).toBe('offen');
+    expect(verbleibKlasse({ aktuelle_verbleib_art: null, aktuelle_uhs_id: 7 })).toBe('uhs');
+    expect(verbleibKlasse({ aktuelle_uhs_id: null })).toBe('offen');
+  });
+
+  it('zählt nach Art — das Spec-Szenario „Zählung nach Art" (LFH-613)', () => {
+    const ohneVerbleib = { aktuelle_verbleib_art: undefined, aktueller_verbleib: null };
+    const alle = [
+      p({ aktuelle_verbleib_art: 'transport' }),
+      p({ aktuelle_verbleib_art: 'transport', aktueller_verbleib_status: 'angemeldet' }),
+      p({ aktuelle_verbleib_art: 'notunterkunft', aktuelles_verbleib_ziel: 'Turnhalle Ost' }),
+      p({ ...ohneVerbleib, aktuelle_uhs_id: 7 }),
+      p(ohneVerbleib),
+    ];
+    const namen: Record<number, string> = { 7: 'Weserstadion' };
+    expect(verbleibZaehlung(alle, (id) => namen[id])).toEqual([
+      { schluessel: 'transport', label: 'Transport', wert: 2, offen: false },
+      { schluessel: 'notunterkunft', label: 'Notunterkunft', wert: 1, offen: false },
+      { schluessel: 'uhs:7', label: 'Weserstadion', wert: 1, offen: false },
+      { schluessel: 'offen', label: 'offen', wert: 1, offen: true },
+    ]);
   });
 
   it('zählt je Art und je UHS, „offen" zuletzt und immer', () => {
+    const ohneVerbleib = { aktuelle_verbleib_art: undefined, aktueller_verbleib: null };
     const alle = [
       p({}),
-      p({ aktueller_verbleib: 'Transport' }),
-      p({ aktueller_verbleib: 'vor Ort' }),
-      p({ aktueller_verbleib: null, aktuelle_uhs_id: 7 }),
-      p({ aktueller_verbleib: null, aktuelle_uhs_id: 7 }),
-      p({ aktueller_verbleib: null, aktuelle_uhs_id: 9 }),
+      p({ aktuelle_verbleib_art: 'transport', aktueller_verbleib: 'Transport' }),
+      p({ aktuelle_verbleib_art: 'vor_ort', aktueller_verbleib: 'vor Ort' }),
+      p({ ...ohneVerbleib, aktuelle_uhs_id: 7 }),
+      p({ ...ohneVerbleib, aktuelle_uhs_id: 7 }),
+      p({ ...ohneVerbleib, aktuelle_uhs_id: 9 }),
       // Vermisst zählt nicht mit — auch nicht als „offen".
-      p({ status: 'vermisst', aktueller_verbleib: null }),
+      p({ status: 'vermisst', ...ohneVerbleib }),
     ];
     const namen: Record<number, string> = { 7: 'Weserstadion' };
     expect(verbleibZaehlung(alle, (id) => namen[id])).toEqual([
@@ -128,6 +159,38 @@ describe('verbleibKlasse / verbleibZaehlung', () => {
       { schluessel: 'uhs:9', label: 'Unfallhilfsstelle', wert: 1, offen: false },
       { schluessel: 'offen', label: 'offen', wert: 0, offen: true },
     ]);
+  });
+
+  it('zählt eine Kurzform ohne Art NICHT still als Art', () => {
+    const alle = [p({ aktuelle_verbleib_art: undefined, aktueller_verbleib: 'Transport' })];
+    expect(verbleibZaehlung(alle, () => undefined)).toEqual([
+      { schluessel: 'offen', label: 'offen', wert: 1, offen: true },
+    ]);
+  });
+});
+
+describe('transportBilanz', () => {
+  it('zählt das Spec-Szenario „Transportiert / offen" als 2 / 2', () => {
+    const ohneVerbleib = { aktuelle_verbleib_art: undefined, aktueller_verbleib: null };
+    const alle = [
+      p({ aktuelle_verbleib_art: 'transport', aktueller_verbleib_status: 'abtransportiert' }),
+      p({ aktuelle_verbleib_art: 'transport', aktueller_verbleib_status: undefined }),
+      p({ aktuelle_verbleib_art: 'transport', aktueller_verbleib_status: 'angemeldet' }),
+      p(ohneVerbleib),
+      p(ohneVerbleib),
+    ];
+    expect(transportBilanz(alle)).toEqual({ transportiert: 2, offen: 2 });
+  });
+
+  it('zählt nur angetroffene Personen; UHS und andere Arten sind weder noch', () => {
+    const ohneVerbleib = { aktuelle_verbleib_art: undefined, aktueller_verbleib: null };
+    const alle = [
+      p({ status: 'vermisst', ...ohneVerbleib }),
+      p({ status: 'abgemeldet', aktuelle_verbleib_art: 'transport' }),
+      p({ ...ohneVerbleib, aktuelle_uhs_id: 7 }),
+      p({ aktuelle_verbleib_art: 'notunterkunft' }),
+    ];
+    expect(transportBilanz(alle)).toEqual({ transportiert: 0, offen: 0 });
   });
 });
 

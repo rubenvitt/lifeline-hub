@@ -29,6 +29,8 @@ export interface MarkerProps {
   textFarbe?: string;
   /** Vorrang bei der Platzvergabe: kleiner gewinnt (`symbol-sort-key`). */
   rang?: number;
+  /** Kurzzeichen IM Kreis (`KarteMarker.kurzzeichen`), ohne Mindestzoom sichtbar. */
+  kurzzeichen?: string;
 }
 
 export type MarkerFeature = {
@@ -68,6 +70,7 @@ function toFeature(mk: KarteMarker, plakette: Plakette): MarkerFeature {
   const properties: MarkerProps = { schluessel: mk.schluessel, typ: mk.typ, farbe: mk.farbe };
   if (mk.tz) properties.icon = tzIconKey(mk.tz);
   if (mk.statusFarbe) properties.statusFarbe = mk.statusFarbe;
+  if (mk.kurzzeichen) properties.kurzzeichen = mk.kurzzeichen;
   const beschriftung = beschriftungVon(mk);
   if (beschriftung) {
     properties.beschriftung = beschriftung;
@@ -113,6 +116,7 @@ export const SPIDER_LEGS_QUELLE = 'spider-legs';
 export const MARKER_KLICK_LAYER = [
   'marker-symbol',
   'marker-kreis',
+  'marker-kurz',
   'marker-status-ring',
   'marker-einsatzort-symbol',
   'marker-label',
@@ -122,6 +126,7 @@ export const MARKER_KLICK_LAYER = [
 export const SPIDER_KLICK_LAYER = [
   'spider-symbol',
   'spider-kreis',
+  'spider-kurz',
   'spider-status-ring',
   'spider-label',
 ] as const;
@@ -136,6 +141,7 @@ export const SPIDER_KLICK_LAYER = [
 const MARKER_LAYER_REIHENFOLGE = [
   'marker-status-ring',
   'marker-kreis',
+  'marker-kurz',
   'marker-label',
   'marker-einsatzort-label',
   'marker-symbol',
@@ -143,6 +149,7 @@ const MARKER_LAYER_REIHENFOLGE = [
   'spider-legs-line',
   'spider-status-ring',
   'spider-kreis',
+  'spider-kurz',
   'spider-label',
   'spider-symbol',
 ] as const;
@@ -159,6 +166,29 @@ const KREIS_PAINT: CircleLayerSpecification['paint'] = {
   'circle-color': ['get', 'farbe'],
   'circle-stroke-color': '#fff',
   'circle-stroke-width': 2,
+};
+/**
+ * Kurzzeichen im Kreis (LFH-613, Betroffenen-Karte): die Sichtung als Wort-Kürzel („II")
+ * IN der Markerfläche — der zweite Kanal neben der Farbe (WCAG 1.4.1), der anders als die
+ * Plakette WEDER am Mindestzoom hängt NOCH einer Kollision weicht. Schwarz mit weißem Hof
+ * liest sich auf allen Sichtungsfarben (rot/gelb/grün/blau/schwarz) — dieselbe Hell-Dunkel-
+ * Paarung wie der weiße Kreisrand von `KREIS_PAINT`.
+ */
+function kurzLayout(
+  schrift: string[] | undefined,
+): NonNullable<SymbolLayerSpecification['layout']> {
+  return {
+    'text-field': ['get', 'kurzzeichen'],
+    'text-size': 9,
+    ...(schrift ? { 'text-font': schrift } : {}),
+    'text-allow-overlap': true,
+    'text-ignore-placement': true,
+  };
+}
+const KURZ_PAINT: SymbolLayerSpecification['paint'] = {
+  'text-color': '#000',
+  'text-halo-color': '#fff',
+  'text-halo-width': 1.5,
 };
 const SYMBOL_LAYOUT: SymbolLayerSpecification['layout'] = {
   'icon-image': ['get', 'icon'],
@@ -277,9 +307,23 @@ export function sorgeFuerMarkerLayer(
   // `getStyle` serialisiert den ganzen Stil.
   const fehlt = (id: string) => !map.getLayer(id);
   const schrift =
-    fehlt('marker-label') || fehlt('marker-einsatzort-label') || fehlt('spider-label')
+    fehlt('marker-label') ||
+    fehlt('marker-einsatzort-label') ||
+    fehlt('marker-kurz') ||
+    fehlt('spider-label') ||
+    fehlt('spider-kurz')
       ? plakettenSchrift(map.getStyle())
       : undefined;
+  if (fehlt('marker-kurz')) {
+    map.addLayer({
+      id: 'marker-kurz',
+      type: 'symbol',
+      source: MARKER_CLUSTER_QUELLE,
+      filter: ['all', ['!', ['has', 'point_count']], ['has', 'kurzzeichen']],
+      layout: kurzLayout(schrift),
+      paint: { ...KURZ_PAINT },
+    });
+  }
   if (fehlt('marker-label')) {
     map.addLayer({
       id: 'marker-label',
@@ -352,6 +396,16 @@ function sorgeFuerSpiderLayer(map: MapLibreMap, schrift: string[] | undefined) {
       source: SPIDER_LEAVES_QUELLE,
       filter: ['has', 'icon'],
       layout: { ...SYMBOL_LAYOUT },
+    });
+  }
+  if (!map.getLayer('spider-kurz')) {
+    map.addLayer({
+      id: 'spider-kurz',
+      type: 'symbol',
+      source: SPIDER_LEAVES_QUELLE,
+      filter: ['has', 'kurzzeichen'],
+      layout: kurzLayout(schrift),
+      paint: { ...KURZ_PAINT },
     });
   }
   // Ohne Mindestzoom: aufgefächert wird, um zu unterscheiden — dort ist der Name der Zweck.

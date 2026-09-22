@@ -184,6 +184,7 @@ export function SichtungsPaneel({
   zeilen,
   erfasst,
   ohneSichtung,
+  transport,
   onNeuladen,
   onPersonen,
   onAufnehmen,
@@ -192,6 +193,8 @@ export function SichtungsPaneel({
   zeilen: SichtungsZeile[];
   erfasst: number;
   ohneSichtung: number;
+  /** „Transportiert / offen" aus `transportBilanz` (LFH-613). */
+  transport: { transportiert: number; offen: number };
   onNeuladen: () => void;
   onPersonen: () => void;
   onAufnehmen: () => void;
@@ -202,13 +205,29 @@ export function SichtungsPaneel({
       titel="Sichtung"
       meta={zustand === 'daten' ? `${erfasst} erfasst` : undefined}
       aktion={<PaneelLink label="Personen" onKlick={onPersonen} />}
-      // „Transportiert / offen" aus dem Entwurf fehlt: der Verbleib ist Freitext
-      // (`aktueller_verbleib`), ein Transport daraus nicht sauber ableitbar (LFH-613).
+      // Fuß: „Ohne Sichtung" (nur wenn > 0) und „Transportiert / offen" (LFH-613,
+      // `personenBilanz.transportBilanz` — gezählt nach Verbleib-Art, eine Voranmeldung ist
+      // kein Transport; „offen" ist dieselbe Lücke wie auf der Betroffenen-Seite).
       fuss={
-        zustand === 'daten' && ohneSichtung > 0 ? (
-          <span style={{ display: 'flex', justifyContent: 'space-between', gap: token.paddingSM }}>
-            <span style={{ fontSize: 11, color: rollen.schwach }}>Ohne Sichtung</span>
-            <span style={{ ...monoStil(12), color: rollen.text2 }}>{ohneSichtung}</span>
+        zustand === 'daten' ? (
+          <span style={{ display: 'grid', gap: token.paddingXS }}>
+            {ohneSichtung > 0 && (
+              <span
+                style={{ display: 'flex', justifyContent: 'space-between', gap: token.paddingSM }}
+              >
+                <span style={{ fontSize: 11, color: rollen.schwach }}>Ohne Sichtung</span>
+                <span style={{ ...monoStil(12), color: rollen.text2 }}>{ohneSichtung}</span>
+              </span>
+            )}
+            <span
+              data-lfh="transport-bilanz"
+              style={{ display: 'flex', justifyContent: 'space-between', gap: token.paddingSM }}
+            >
+              <span style={{ fontSize: 11, color: rollen.schwach }}>Transportiert / offen</span>
+              <span style={{ ...monoStil(12), color: rollen.text2 }}>
+                {transport.transportiert} / {transport.offen}
+              </span>
+            </span>
           </span>
         ) : undefined
       }

@@ -43,6 +43,11 @@ import { Button, Typography } from 'antd';
  *
  * Sie bleiben deshalb draußen; das Primitiv trägt die drei Stellen mit einer OPTIONALEN Notiz.
  *
+ * Seit LFH-613 ein vierter Aufrufer mit anderem WORT: der „Zustand" einer betroffenen Person
+ * (`personen/personenSpalten.tsx`) ist dieselbe optionale Kurznotiz, also dieselbe Affordanz.
+ * {@link BemerkungZelleProps.bezeichnung} tauscht nur das Wort („Zustand hinzufügen"), die
+ * Mechanik bleibt eine.
+ *
  * ── WARUM EIN ECHTER `Button` UND KEIN GESTYLTES `<span onClick>` ───────────────────────
  *
  * Ein handgebautes Bedienziel bräuchte nach der Festlegung aus LFH-365 ZWEI Angaben
@@ -82,12 +87,24 @@ export interface BemerkungZelleProps {
    * Kennung zu erfinden.
    */
   kennung?: string;
+  /**
+   * Das Wort für das Feld in Platzhalter und zugänglichem Namen („Zustand hinzufügen",
+   * „Zustand zu R-042 bearbeiten"). Vorgabe „Bemerkung".
+   */
+  bezeichnung?: string;
 }
 
-/** Wortlaut an EINER Stelle — drei Seiten und ihre drei Tests greifen denselben Namen. */
+/** Wortlaut an EINER Stelle — drei Seiten und ihre drei Tests greifen denselben Namen.
+ *  Entspricht dem Platzhalter mit der Vorgabe-`bezeichnung` (Test pinnt die Gleichheit). */
 export const BEMERKUNG_HINZUFUEGEN = 'Bemerkung hinzufügen';
 
-export function BemerkungZelle({ wert, darfSchreiben, onSpeichern, kennung }: BemerkungZelleProps) {
+export function BemerkungZelle({
+  wert,
+  darfSchreiben,
+  onSpeichern,
+  kennung,
+  bezeichnung = 'Bemerkung',
+}: BemerkungZelleProps) {
   const [bearbeitet, setBearbeitet] = useState(false);
   const knopfRef = useRef<HTMLButtonElement>(null);
   const textRef = useRef<HTMLElement>(null);
@@ -154,10 +171,10 @@ export function BemerkungZelle({ wert, darfSchreiben, onSpeichern, kennung }: Be
         type="link"
         // Sichtbar bleibt der kurze Text, der Name trägt die Zeile — sonst wird die Spalte
         // so breit wie die längste Kennung.
-        aria-label={kennung ? `Bemerkung zu ${kennung} hinzufügen` : undefined}
+        aria-label={kennung ? `${bezeichnung} zu ${kennung} hinzufügen` : undefined}
         onClick={() => setBearbeitet(true)}
       >
-        {BEMERKUNG_HINZUFUEGEN}
+        {`${bezeichnung} hinzufügen`}
       </Button>
     );
   }
@@ -174,7 +191,7 @@ export function BemerkungZelle({ wert, darfSchreiben, onSpeichern, kennung }: Be
         // `tooltip` ist zugleich der zugängliche Name des Stifts (`Base/index.js:271-283`:
         // `aria-label` kommt aus `tooltip` oder, ohne eins, aus antds Locale-Vorgabe
         // „Bearbeiten"). Ohne Kennung bleibt es bei der Vorgabe.
-        tooltip: kennung ? `Bemerkung zu ${kennung} bearbeiten` : undefined,
+        tooltip: kennung ? `${bezeichnung} zu ${kennung} bearbeiten` : undefined,
         onChange: (val) => {
           setBearbeitet(false);
           // antd vergleicht NICHT — `onChange` feuert beim Verlassen unbedingt. Ohne diesen

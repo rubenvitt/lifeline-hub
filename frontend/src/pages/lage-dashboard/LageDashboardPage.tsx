@@ -50,10 +50,12 @@
  *    der Wasserstand dagegen stand vorher NIRGENDS auf der Seite. Ist kein Pegel festgelegt,
  *    bleibt der Platz belegt und führt zur Einstellungssektion „Pegel".
  *
- * Weggelassen, weil keine Datenquelle existiert: Evakuiert (LFH-607), „Transportiert /
- * offen" im Sichtungsfuß (LFH-613, Verbleib ist Freitext). Der erwartete Höchststand am
- * Leitpegel (LFH-628) steht als Teil der Pegel-Notiz („Prognose 7,10 m bis 18:00"), solange
- * sein Zeitpunkt aussteht — die Ableitung liegt in `pegel/pegelKennzahl.ts`.
+ * Weggelassen, weil keine Datenquelle existiert: Evakuiert (LFH-607). Der erwartete
+ * Höchststand am Leitpegel (LFH-628) steht als Teil der Pegel-Notiz („Prognose 7,10 m bis
+ * 18:00"), solange sein Zeitpunkt aussteht — die Ableitung liegt in `pegel/pegelKennzahl.ts`.
+ * „Transportiert / offen" im Sichtungsfuß und die Notiz „n seit über 4 h" an „Vermisste"
+ * gibt es seit LFH-613 (strukturierter Verbleib, `vermisst_seit`); die Notiz zieht mit dem
+ * Uhr-Takt der Seite (`TAKT_MS`) nach, ohne dass neue Daten eintreffen.
  *
  * ── DATENZUSTÄNDE ──────────────────────────────────────────────────────────────────
  *
@@ -120,6 +122,7 @@ import {
 import { sichtungsZeilen, verdichteGefahrenmatrix } from './lageVerdichtung';
 import { STROM_ABRUF, stromAuswahl, wassermarkeNachziehen } from './meldungsstrom';
 import { GefahrenmatrixPaneel, MeldungsstromPaneel, SichtungsPaneel } from './LagePaneele';
+import { transportBilanz } from '../../personen/personenBilanz';
 
 /** Verdichtet mehrere Queries auf einen Zustand. Fehler schlägt Laden: ein halb geladener
  *  Block mit einem toten Teil darf nicht so aussehen, als wäre er vollständig. */
@@ -134,7 +137,8 @@ function alsKennzahlZustand(z: Datenzustand): KennzahlZustand {
   return z === 'leer' ? 'daten' : z;
 }
 
-/** Takt der Uhr: „Stand vor n s" und die Einsatzdauer laufen mit, ohne jede Sekunde zu rendern. */
+/** Takt der Uhr: „Stand vor n s", die Einsatzdauer und „n seit über 4 h" laufen mit, ohne
+ *  jede Sekunde zu rendern. */
 const TAKT_MS = 5000;
 
 function useJetzt(taktMs: number): number {
@@ -457,6 +461,7 @@ export default function LageDashboardPage() {
             zeilen={lagebild ? sichtungsZeilen(lagebild.sk) : []}
             erfasst={lagebild?.betroffeneGesamt ?? 0}
             ohneSichtung={lagebild?.sk.ohne ?? 0}
+            transport={transportBilanz(personenQuery.data ?? [])}
             onNeuladen={() => void personenQuery.refetch()}
             onPersonen={() => navigate(personenPfad(einsatzId))}
             onAufnehmen={() => navigate(personenAufnahmePfad(einsatzId))}

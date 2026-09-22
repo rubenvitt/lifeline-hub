@@ -25,6 +25,22 @@ export interface PersonEingabe {
   antreff_ort?: string | null;
   melder_kontakt?: string | null;
   notiz?: string | null;
+  /** Zustand in Kurzform (Freitext, LFH-613). `null` leert im PATCH. */
+  zustand?: string | null;
+  /**
+   * Fundort-Koordinate (WGS84, LFH-613). Nur als Paar: eine halbe Koordinate ist 422 — im
+   * PATCH gegen den Bestand geprüft, `{ antreff_lon: null }` allein scheitert also.
+   */
+  antreff_lat?: number | null;
+  antreff_lon?: number | null;
+  /**
+   * „vermisst seit" als `YYYY-MM-DD HH:MM:SS` in UTC (LFH-613). Nur bei Status `vermisst`
+   * (sonst 422), höchstens 5 min in der Zukunft (sonst 400). Beim Anlegen ohne Angabe setzt
+   * der Server die Meldezeit. Im PATCH ist `null` ein 400 — das Feld darf deshalb nie über
+   * die Formular-Lesart von `patchBody` (`undefined` → `null`) mitlaufen, wenn es nicht
+   * gesetzt werden soll.
+   */
+  vermisst_seit?: string | null;
 }
 
 /** Offline-/Fastpath-fähige Anlage. `client_id` macht einen Replay nach

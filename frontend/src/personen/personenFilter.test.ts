@@ -80,7 +80,11 @@ describe('filterPersonen', () => {
   it('„Nur Lücken" zeigt genau die Datensätze mit offenem Feld — und wirkt MIT dem Filter', () => {
     const offen = { ...betroffen, id: 20, registrier_nr: 20, aktueller_verbleib: null };
     const vermisstOhneAlles = { ...vermisst, antreff_ort: null, aktueller_verbleib: null };
-    const menge = [{ ...basis, aktueller_verbleib: 'entlassen' }, offen, vermisstOhneAlles];
+    const menge = [
+      { ...basis, aktueller_verbleib: 'entlassen', aktuelle_verbleib_art: 'entlassung' as const },
+      offen,
+      vermisstOhneAlles,
+    ];
     expect(nummern(filterPersonen(menge, { ...SICHT, nurLuecken: true }))).toEqual([20]);
     expect(filterPersonen(menge, { ...SICHT, filter: 'erfasst', nurLuecken: true })).toEqual([]);
   });
@@ -100,7 +104,11 @@ describe('sichtFuerNeuePerson', () => {
 
   it('nimmt „Nur Lücken" nur zurück, wenn die neue Person keine Lücke hat', () => {
     const mitLuecke = { ...betroffen, aktueller_verbleib: null };
-    const ohneLuecke = { ...betroffen, aktueller_verbleib: 'entlassen' };
+    const ohneLuecke = {
+      ...betroffen,
+      aktueller_verbleib: 'entlassen',
+      aktuelle_verbleib_art: 'entlassung' as const,
+    };
     expect(sichtFuerNeuePerson({ ...SICHT, nurLuecken: true }, mitLuecke).nurLuecken).toBe(true);
     expect(sichtFuerNeuePerson({ ...SICHT, nurLuecken: true }, ohneLuecke).nurLuecken).toBe(false);
   });

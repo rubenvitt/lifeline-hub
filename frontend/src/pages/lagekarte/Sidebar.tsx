@@ -53,8 +53,10 @@ export interface LayerSichtbar {
   freies_zeichen: boolean;
 }
 
-/** Platzierbare Punkt-Typen (Fläche/Abschnitt läuft über onAbschnittZeichnenStart). */
-export type PlatzierenPunktTyp = 'uhs' | 'schaden' | 'einheit' | 'fahrzeug' | 'fuehrung';
+/** Platzierbare Punkt-Typen (Fläche/Abschnitt läuft über onAbschnittZeichnenStart).
+ *  `person` (Betroffene, LFH-613) kommt nur über den Deeplink-Auftrag von der Detailseite —
+ *  die Lagekarte führt Personen nicht als Ebene und nicht in „Nicht verortet". */
+export type PlatzierenPunktTyp = 'uhs' | 'schaden' | 'einheit' | 'fahrzeug' | 'fuehrung' | 'person';
 
 const NICHT_VERORTET_LABEL: Record<NichtVerortet['typ'], string> = {
   uhs: 'UHS',

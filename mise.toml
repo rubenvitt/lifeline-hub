@@ -122,7 +122,7 @@ run = [
 
 # ── Worktree-Cleanup (Dry-Run per Default; FORCE=1 führt aus) ───────────────────────
 # Entfernt Worktrees unter .claude/worktrees und .claire/worktrees, die:
-#   1) in main (oder origin/main) gemergt sind UND keine uncommitteten getrackten Änderungen haben, und
+#   1) in alpha (oder origin/alpha) gemergt sind UND keine uncommitteten getrackten Änderungen haben, und
 #   2) Orphan-Verzeichnisse ohne git-Referenz (nicht mehr als Worktree registriert).
 # Übersprungen (behalten): nicht gemergte, locked, sowie gemergte-aber-dirty Worktrees.
 [tasks."clean:worktrees"]
@@ -136,10 +136,11 @@ for a in "$@"; do [ "$a" = "--force" ] && FORCE=1; done
 
 root="$(git rev-parse --show-toplevel)"
 
-# Gemergt = Vorfahre von lokalem main ODER origin/main (konservativ: stale main hält Worktree eher).
+# Gemergt = Vorfahre von lokalem alpha ODER origin/alpha. Feature-Branches zweigen von alpha ab und
+# mergen dorthin; main ist nur die Release-Linie und hinkt hinterher (konservativ: stale alpha hält eher).
 is_merged() {
   local rev="$1" ref
-  for ref in main origin/main; do
+  for ref in alpha origin/alpha; do
     git rev-parse --verify --quiet "$ref" >/dev/null 2>&1 || continue
     git merge-base --is-ancestor "$rev" "$ref" 2>/dev/null && return 0
   done
@@ -162,9 +163,9 @@ flush() {
   local rev="$branch"; [ -n "$rev" ] || rev="$head"   # detached → HEAD-sha ("keine Referenz mehr")
   if is_merged "$rev"; then
     if [ -n "$(git -C "$wt" status --porcelain --untracked-files=no 2>/dev/null)" ]; then
-      keep_dirty="${keep_dirty}${wt}"$'\n'                     # in main, aber uncommittete Änderungen → behalten
+      keep_dirty="${keep_dirty}${wt}"$'\n'                     # in alpha, aber uncommittete Änderungen → behalten
     else
-      remove="${remove}${wt}	${branch}"$'\n'                 # in main + sauber → entfernen (TAB-getrennt)
+      remove="${remove}${wt}	${branch}"$'\n'                 # in alpha + sauber → entfernen (TAB-getrennt)
     fi
   else
     keep_unmerged="${keep_unmerged}${wt}	${branch}"$'\n'
@@ -195,24 +196,24 @@ done
 echo
 echo "Worktree-Cleanup — Plan (root: $root)"
 echo "──────────────────────────────────────────────────────────"
-printf '%s' "$remove"        | sed '/^$/d' | while IFS=$'\t' read -r p b; do echo "  🗑  entfernen (in main):                 $p ${b:+[$b]}"; done
+printf '%s' "$remove"        | sed '/^$/d' | while IFS=$'\t' read -r p b; do echo "  🗑  entfernen (in alpha):                $p ${b:+[$b]}"; done
 printf '%s' "$orphans"       | sed '/^$/d' | while read -r p;            do echo "  🗑  entfernen (Orphan, keine git-Referenz): $p"; done
-printf '%s' "$keep_dirty"    | sed '/^$/d' | while read -r p;            do echo "  ⏭  behalten  (in main, ABER uncommitted):  $p"; done
-printf '%s' "$keep_unmerged" | sed '/^$/d' | while IFS=$'\t' read -r p b; do echo "  ⏭  behalten  (nicht in main):             $p ${b:+[$b]}"; done
+printf '%s' "$keep_dirty"    | sed '/^$/d' | while read -r p;            do echo "  ⏭  behalten  (in alpha, ABER uncommitted): $p"; done
+printf '%s' "$keep_unmerged" | sed '/^$/d' | while IFS=$'\t' read -r p b; do echo "  ⏭  behalten  (nicht in alpha):            $p ${b:+[$b]}"; done
 printf '%s' "$keep_locked"   | sed '/^$/d' | while read -r p;            do echo "  🔒 behalten  (locked):                    $p"; done
 echo
 
 if [ "$FORCE" != 1 ]; then
   echo "Dry-Run — es wurde NICHTS entfernt."
   echo "Ausführen mit:  FORCE=1 mise run clean:worktrees"
-  echo "Tipp: vorher 'git fetch' für ein aktuelles origin/main."
+  echo "Tipp: vorher 'git fetch' für ein aktuelles origin/alpha."
   exit 0
 fi
 
 echo "→ Entferne geplante Worktrees/Branches …"
 printf '%s' "$remove" | sed '/^$/d' | while IFS=$'\t' read -r p b; do
   git worktree remove --force "$p" && echo "  ✓ entfernt: $p"
-  if [ -n "$b" ] && [ "$b" != main ]; then
+  if [ -n "$b" ] && [ "$b" != main ] && [ "$b" != alpha ]; then
     git branch -D "$b" >/dev/null 2>&1 && echo "    ✓ Branch gelöscht: $b" || true
   fi
 done

@@ -2,7 +2,7 @@ import { Alert, App, Breadcrumb, Button, type InputRef } from 'antd';
 import { CloseOutlined } from '@ant-design/icons';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { parsePersonenSicht, personDetailPfad } from '../routing/deeplinks';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
@@ -61,8 +61,10 @@ import {
  * ── AUFBAU ──────────────────────────────────────────────────────────────────────────────
  *
  *  · Seitenkopf: Titel „Betroffene", Mono-Meta „n erfasst", rechts die Ansicht als
- *    Segmentleiste („Zeilen" / „Sichtungsraster") und die zwei Masken-Wege. „Karte" aus
- *    dem Entwurf fehlt: an der Person gibt es keine Koordinate (LFH-613). Der UHS-Bezug
+ *    Segmentleiste („Zeilen" / „Sichtungsraster" / „Karte") und die Masken-Wege. Die
+ *    Karte (LFH-613, `personen/BetroffeneKarte.tsx`) zeigt die Fundort-Koordinaten und
+ *    nennt, wie viele Personen ohne Koordinate fehlen; sie wird per `React.lazy` erst
+ *    geladen, wenn sie gewählt ist — MapLibre gehört nicht ins Bündel der Liste. Der UHS-Bezug
  *    des Entwurfs im Meta fehlt ebenfalls — die Liste ist einsatzweit, einen eindeutigen
  *    UHS-Bezug hat sie nicht.
  *  · Schnellerfassungszeile `/person` (`personen/BetroffeneZeile.tsx`) — eine Eingabe, die
@@ -82,7 +84,11 @@ const SEITENLEISTE_BREITE = 268;
 const ANSICHT_OPTIONEN = [
   { wert: 'zeilen', label: 'Zeilen' },
   { wert: 'raster', label: 'Sichtungsraster' },
+  { wert: 'karte', label: 'Karte' },
 ] as const satisfies readonly { wert: PersonenAnsicht; label: string }[];
+
+/** Eigenes Bündel: MapLibre lädt erst, wenn „Karte" gewählt ist (LFH-613, design D7). */
+const BetroffeneKarte = lazy(() => import('../personen/BetroffeneKarte'));
 
 type Sicht = PersonenSicht;
 /** Quittung der Erfassungszeile — aus der ANTWORT, oder die gesendeten Werte als „vorgemerkt". */
@@ -595,7 +601,7 @@ export default function PersonenPage() {
   const zeilen = filterPersonen(alle, sicht);
   const uhsNamen = new Map(uhsListe.map((u) => [u.id, u.bezeichnung]));
   const uhsName = (id: number) => uhsNamen.get(id);
-  const register = personenSpalten(uhsName);
+  const register = personenSpalten(uhsName, { einsatzId, darfSchreiben });
 
   /**
    * Die Spaltenliste der Zeilen-Ansicht: Register plus Abgleichspalte.
@@ -762,7 +768,22 @@ export default function PersonenPage() {
               onWechsel={(filter) => aendereSichtFuer(einsatzId, (alt) => ({ ...alt, filter }))}
               style={{ marginBottom: token.marginSM }}
             />
-            {sicht.ansicht === 'raster' ? (
+            {sicht.ansicht === 'karte' ? (
+              // Statusfilter und Lücken-Filter gelten auch hier: die Karte zeigt dieselbe
+              // Menge wie die Zeilen, nur verortet.
+              <Suspense fallback={<SeitenSkeleton />}>
+                {personenQuery.isLoading ? (
+                  <SeitenSkeleton />
+                ) : (
+                  <BetroffeneKarte
+                    einsatzId={einsatzId}
+                    einsatz={einsatz}
+                    personen={zeilen}
+                    onPersonKlick={(pid) => navigate(personDetailPfad(einsatzId, pid))}
+                  />
+                )}
+              </Suspense>
+            ) : sicht.ansicht === 'raster' ? (
               /**
                * SICHTUNGSRASTER — die verallgemeinerte Patienten-Sicht: ALLE Personen der
                * Filtermenge nach Sichtung gruppiert, samt „unverletzt" und „ohne Sichtung".

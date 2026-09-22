@@ -155,6 +155,8 @@ export const OBJEKTART: Record<MarkerTyp, string> = {
   einsatzort: 'Einsatzort',
   lagemeldung: 'Lagemeldung',
   freies_zeichen: 'Taktisches Zeichen',
+  // Nur auf der Betroffenen-Karte (LFH-613); die Lagekarte führt Personen nicht als Ebene.
+  person: 'Person',
 };
 
 /** Stärke in BOS-Schreibweise `F/UF/M//Σ` (wie `StaerkeAnzeige`), „—" ohne Angabe. */
