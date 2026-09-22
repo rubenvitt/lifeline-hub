@@ -149,6 +149,10 @@ pub struct EinsatzFahrzeugAnzeige {
     pub status_label: Option<String>,
     pub status_kategorie: Option<StatusKategorie>,
     pub status_farbe: Option<String>,
+    /// Zeitpunkt des letzten Statuswechsels (UTC, LFH-609). `None` bei Dispositionen aus
+    /// der Zeit vor dem Feld — ihr Wechselzeitpunkt ist unbekannt und wird nicht erfunden.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status_seit: Option<String>,
     pub bemerkung: Option<String>,
     pub lat: Option<f64>,
     pub lon: Option<f64>,

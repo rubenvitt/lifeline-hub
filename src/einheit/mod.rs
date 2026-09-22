@@ -2,6 +2,7 @@ pub mod mitglied_repo;
 pub mod repo;
 pub mod typ_repo;
 
+use crate::katalog::StatusKategorie;
 use crate::sprechgruppe::SprechgruppeAnzeige;
 use crate::staerke::Staerke;
 use serde::Serialize;
@@ -50,6 +51,82 @@ pub struct EinheitMitgliedFahrzeug {
     pub ef_id: i64,
     pub funkrufname: String,
     pub fahrzeugtyp: Option<String>,
+    /// Aktueller FMS-Status des Fahrzeugs (LFH-609); `None` = ohne Status.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<StatusWert>,
+    /// Zeitpunkt des letzten Statuswechsels (UTC); `None` = unbekannt.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status_seit: Option<String>,
+}
+
+/// Ein aufgelöster Eintrag des FMS-Statuskatalogs (`fahrzeug_status`), wie ihn Fahrzeug
+/// und Einheit tragen (LFH-609).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct StatusWert {
+    pub status_id: i64,
+    pub label: String,
+    pub kategorie: StatusKategorie,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub farbe: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fms_anker: Option<i64>,
+    /// Katalog-Sortierung — ordnet die Verteilung einer gemischten Einheit.
+    pub sortier: i64,
+}
+
+/// Woher der Status einer Einheit kommt (LFH-609). Wire == `as_str()`.
+///
+/// Mit Fahrzeugen ist der Status ABGELEITET: tragen alle denselben, gilt er
+/// (`Fahrzeuge`), sonst ist die Einheit `Gemischt`. Ohne Fahrzeug gilt der von Hand
+/// gesetzte Status (`Hand`) als Rückfall. `Ohne` heißt: es gibt keinen — weder Hand
+/// noch einen Fahrzeugstatus.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum EinheitStatusQuelle {
+    Fahrzeuge,
+    Gemischt,
+    Hand,
+    Ohne,
+}
+
+impl EinheitStatusQuelle {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            EinheitStatusQuelle::Fahrzeuge => "fahrzeuge",
+            EinheitStatusQuelle::Gemischt => "gemischt",
+            EinheitStatusQuelle::Hand => "hand",
+            EinheitStatusQuelle::Ohne => "ohne",
+        }
+    }
+}
+
+/// Anteil eines Status an einer gemischten Einheit; `status: None` = Fahrzeuge ohne Status.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct StatusAnteil {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<StatusWert>,
+    pub anzahl: u32,
+}
+
+/// Status einer Einheit mit „Seit“ (LFH-609). Die Regel steht an
+/// [`repo::leite_status_ab`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct EinheitStatus {
+    pub quelle: EinheitStatusQuelle,
+    /// Der eine Status — gesetzt bei `Fahrzeuge` und `Hand`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<StatusWert>,
+    /// Die gemeinsame Kategorie — auch bei `Gemischt`, wenn alle Fahrzeuge einen Status
+    /// derselben Kategorie tragen (S3 + S4 sind beide „gebunden“).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kategorie: Option<StatusKategorie>,
+    /// Seit wann (UTC). `Fahrzeuge`: der jüngste Wechsel, also seit wann ALLE Fahrzeuge in
+    /// diesem Status stehen — `None`, sobald ein Fahrzeug keinen Zeitpunkt kennt. `Hand`:
+    /// der Zeitpunkt des Setzens. Bei `Gemischt`/`Ohne` immer `None`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub seit: Option<String>,
+    /// Nur bei `Gemischt`: Fahrzeuge je Status, in Katalogreihenfolge, „ohne“ zuletzt.
+    pub verteilung: Vec<StatusAnteil>,
 }
 
 /// Material-Mitglied einer Einheit (leichtgewichtig).
@@ -97,6 +174,8 @@ pub struct EinheitAnzeige {
     pub fahrzeug_mitglieder: Vec<EinheitMitgliedFahrzeug>,
     pub material_mitglieder: Vec<EinheitMitgliedMaterial>,
     pub sprechgruppen: Vec<SprechgruppeAnzeige>,
+    /// Status der Einheit mit „Seit“ (LFH-609) — abgeleitet oder Handstatus.
+    pub status: EinheitStatus,
 }
 
 #[cfg(test)]

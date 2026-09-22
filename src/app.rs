@@ -889,6 +889,10 @@ pub fn build_router(state: AppState) -> Router {
             patch(routes::einsatz_einheit::position),
         )
         .route(
+            "/api/einsaetze/{id}/einheiten/{eid}/status",
+            put(routes::einsatz_einheit::status_setzen),
+        )
+        .route(
             "/api/einsaetze/{id}/einheiten/{eid}",
             delete(routes::einsatz_einheit::aufloesen),
         )

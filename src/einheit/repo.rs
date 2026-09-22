@@ -1,4 +1,7 @@
-use super::{mitglied_repo, EinheitAnzeige};
+use super::{
+    mitglied_repo, EinheitAnzeige, EinheitMitgliedFahrzeug, EinheitStatus, EinheitStatusQuelle,
+    StatusAnteil, StatusWert,
+};
 use crate::error::AppError;
 use crate::staerke::Staerke;
 use sqlx::{SqliteConnection, SqlitePool};
@@ -48,6 +51,133 @@ struct Row {
     typ_soll_fuehrer: Option<i64>,
     typ_soll_unterfuehrer: Option<i64>,
     typ_soll_mannschaft: Option<i64>,
+    status_seit: Option<String>,
+    hand_status_id: Option<i64>,
+    hand_status_label: Option<String>,
+    hand_status_kategorie: Option<crate::katalog::StatusKategorie>,
+    hand_status_farbe: Option<String>,
+    hand_status_fms_anker: Option<i64>,
+    hand_status_sortier: Option<i64>,
+}
+
+impl Row {
+    /// Der Handstatus als aufgelöster Katalogeintrag; `None` ohne (gültigen) Eintrag.
+    fn hand_status(&self) -> Option<StatusWert> {
+        match (
+            self.hand_status_id,
+            self.hand_status_label.as_ref(),
+            self.hand_status_kategorie,
+        ) {
+            (Some(status_id), Some(label), Some(kategorie)) => Some(StatusWert {
+                status_id,
+                label: label.clone(),
+                kategorie,
+                farbe: self.hand_status_farbe.clone(),
+                fms_anker: self.hand_status_fms_anker,
+                sortier: self.hand_status_sortier.unwrap_or(0),
+            }),
+            _ => None,
+        }
+    }
+}
+
+/// Status einer Einheit (LFH-609, Entscheidung des Auftraggebers vom 22.09.2026).
+///
+/// - **Mit Fahrzeugen abgeleitet**: tragen alle denselben Status, gilt er; „Seit“ ist der
+///   JÜNGSTE Wechsel (seit dann stehen alle darin) und `None`, sobald ein Fahrzeug keinen
+///   Zeitpunkt kennt — das Maximum über bekannte Werte wäre ein erfundener Zeitpunkt.
+///   Sonst ist die Einheit `Gemischt` mit Verteilung und ohne „Seit“; eine gemeinsame
+///   Kategorie (S3 + S4 → gebunden) bleibt dabei erhalten. Tragen alle Fahrzeuge keinen
+///   Status, gibt es keinen (`Ohne`).
+/// - **Ohne Fahrzeug**: der Handstatus als Rückfall, sonst `Ohne`.
+///
+/// Ein gespeicherter Handstatus an einer Einheit MIT Fahrzeugen wird nicht gezeigt: die
+/// Fahrzeuge führen. Er bleibt stehen und gilt wieder, wenn die Einheit ihre Fahrzeuge
+/// abgibt — mit seinem damaligen „Seit“, der dann ehrlich sagt, wie alt er ist.
+pub fn leite_status_ab(
+    fahrzeuge: &[EinheitMitgliedFahrzeug],
+    hand: Option<StatusWert>,
+    hand_seit: Option<String>,
+) -> EinheitStatus {
+    let leer = |quelle| EinheitStatus {
+        quelle,
+        status: None,
+        kategorie: None,
+        seit: None,
+        verteilung: Vec::new(),
+    };
+    if fahrzeuge.is_empty() {
+        return match hand {
+            Some(h) => EinheitStatus {
+                quelle: EinheitStatusQuelle::Hand,
+                kategorie: Some(h.kategorie),
+                status: Some(h),
+                seit: hand_seit,
+                verteilung: Vec::new(),
+            },
+            None => leer(EinheitStatusQuelle::Ohne),
+        };
+    }
+    if fahrzeuge.iter().all(|f| f.status.is_none()) {
+        return leer(EinheitStatusQuelle::Ohne);
+    }
+    let erster = fahrzeuge[0].status.as_ref().map(|s| s.status_id);
+    if erster.is_some()
+        && fahrzeuge
+            .iter()
+            .all(|f| f.status.as_ref().map(|s| s.status_id) == erster)
+    {
+        let seit = fahrzeuge
+            .iter()
+            .map(|f| f.status_seit.clone())
+            .collect::<Option<Vec<String>>>()
+            .and_then(|v| v.into_iter().max());
+        let status = fahrzeuge[0].status.clone();
+        return EinheitStatus {
+            quelle: EinheitStatusQuelle::Fahrzeuge,
+            kategorie: status.as_ref().map(|s| s.kategorie),
+            status,
+            seit,
+            verteilung: Vec::new(),
+        };
+    }
+
+    // Gemischt: je Status zählen, in Katalogreihenfolge, „ohne Status“ zuletzt.
+    let mut anteile: Vec<StatusAnteil> = Vec::new();
+    for f in fahrzeuge {
+        let id = f.status.as_ref().map(|s| s.status_id);
+        match anteile
+            .iter_mut()
+            .find(|a| a.status.as_ref().map(|s| s.status_id) == id)
+        {
+            Some(a) => a.anzahl += 1,
+            None => anteile.push(StatusAnteil {
+                status: f.status.clone(),
+                anzahl: 1,
+            }),
+        }
+    }
+    anteile.sort_by_key(|a| match &a.status {
+        Some(s) => (0, s.sortier, s.status_id),
+        None => (1, 0, 0),
+    });
+    let erste_kat = fahrzeuge[0].status.as_ref().map(|s| s.kategorie);
+    let kategorie = if erste_kat.is_some()
+        && fahrzeuge
+            .iter()
+            .all(|f| f.status.as_ref().map(|s| s.kategorie) == erste_kat)
+    {
+        erste_kat
+    } else {
+        None
+    };
+    EinheitStatus {
+        quelle: EinheitStatusQuelle::Gemischt,
+        status: None,
+        kategorie,
+        seit: None,
+        verteilung: anteile,
+    }
 }
 
 const SELECT_AUFGELOEST: &str = "\
@@ -59,9 +189,13 @@ const SELECT_AUFGELOEST: &str = "\
            e.aktueller_br_id, \
            e.soll_fuehrer, e.soll_unterfuehrer, e.soll_mannschaft, \
            t.soll_fuehrer AS typ_soll_fuehrer, t.soll_unterfuehrer AS typ_soll_unterfuehrer, \
-           t.soll_mannschaft AS typ_soll_mannschaft \
+           t.soll_mannschaft AS typ_soll_mannschaft, \
+           e.status_seit, hs.id AS hand_status_id, hs.label AS hand_status_label, \
+           hs.kategorie AS hand_status_kategorie, hs.farbe AS hand_status_farbe, \
+           hs.fms_anker AS hand_status_fms_anker, hs.sortier AS hand_status_sortier \
     FROM einsatz_einheit e \
     LEFT JOIN einheit_typ t ON t.id = e.typ_id \
+    LEFT JOIN fahrzeug_status hs ON hs.id = e.status_id \
     LEFT JOIN einsatzabschnitt ab ON ab.id = e.abschnitt_id \
     LEFT JOIN einsatz_personal fp ON fp.id = e.fuehrer_id";
 
@@ -173,6 +307,11 @@ async fn zu_anzeige_batch(
         // Jede Einheit kommt im Satz genau einmal vor → entnehmen statt klonen.
         let personal_mitglieder = anreicherung.personal.remove(&row.id).unwrap_or_default();
         let fahrzeug_mitglieder = anreicherung.fahrzeuge.remove(&row.id).unwrap_or_default();
+        let status = leite_status_ab(
+            &fahrzeug_mitglieder,
+            row.hand_status(),
+            row.status_seit.clone(),
+        );
         let material_mitglieder = anreicherung.material.remove(&row.id).unwrap_or_default();
         let sprechgruppen = anreicherung
             .sprechgruppen
@@ -206,6 +345,7 @@ async fn zu_anzeige_batch(
             fahrzeug_mitglieder,
             material_mitglieder,
             sprechgruppen,
+            status,
         });
     }
     Ok(out)
@@ -497,6 +637,74 @@ pub async fn patche(
     laden(pool, einsatz_id, id).await
 }
 
+/// Ergebnis von [`setze_hand_status_tx`]: die Labels vor/nach dem Setzen, `None` wenn
+/// sich nichts geändert hat (kein ETB-Eintrag).
+pub struct HandStatusWechsel {
+    pub name: String,
+    pub vorher: Option<String>,
+    pub nachher: Option<String>,
+}
+
+/// Setzt den Handstatus einer Einheit (LFH-609) auf einer offenen Transaktion. `status_id`
+/// ist bereits gegen den Katalog der Org geprüft (`None` = löschen). Eine Einheit mit
+/// Fahrzeug führt ihren Status über die Fahrzeuge → `UnprocessableEntity` (der
+/// Zusammenhang verbietet die Aktion, nicht das Feld). `status_seit` springt nur bei einem
+/// echten Wechsel. Liefert `None`, wenn der Status unverändert blieb.
+pub async fn setze_hand_status_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    id: i64,
+    status_id: Option<i64>,
+) -> Result<Option<HandStatusWechsel>, AppError> {
+    let (name, alt_id, alt_label): (String, Option<i64>, Option<String>) = sqlx::query_as(
+        "SELECT e.name, e.status_id, s.label FROM einsatz_einheit e \
+         LEFT JOIN fahrzeug_status s ON s.id = e.status_id \
+         WHERE e.id = ? AND e.einsatz_id = ?",
+    )
+    .bind(id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .ok_or(AppError::NotFound)?;
+    let fahrzeuge: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_fahrzeug WHERE einheit_id = ?")
+            .bind(id)
+            .fetch_one(&mut *conn)
+            .await?;
+    if fahrzeuge > 0 {
+        return Err(AppError::UnprocessableEntity(
+            "Die Einheit führt ihren Status über ihre Fahrzeuge".into(),
+        ));
+    }
+    if alt_id == status_id {
+        return Ok(None);
+    }
+    sqlx::query(
+        "UPDATE einsatz_einheit SET status_id = ?1, \
+         status_seit = CASE WHEN ?1 IS NULL THEN NULL ELSE datetime('now') END \
+         WHERE id = ?2 AND einsatz_id = ?3",
+    )
+    .bind(status_id)
+    .bind(id)
+    .bind(einsatz_id)
+    .execute(&mut *conn)
+    .await?;
+    let neu_label: Option<String> = match status_id {
+        Some(sid) => {
+            sqlx::query_scalar("SELECT label FROM fahrzeug_status WHERE id = ?")
+                .bind(sid)
+                .fetch_optional(&mut *conn)
+                .await?
+        }
+        None => None,
+    };
+    Ok(Some(HandStatusWechsel {
+        name,
+        vorher: alt_label,
+        nachher: neu_label,
+    }))
+}
+
 /// Reine Geo-/Symbol-Felder einer Einheit. `Some(None)` = auf NULL, `None` = unverändert.
 #[derive(Debug, Default)]
 pub struct PositionPatch<'a> {
@@ -643,6 +851,136 @@ pub async fn loese_auf(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<()
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ── LFH-609: Ableitung des Einheitenstatus ──────────────────────────────────────
+
+    fn sw(id: i64, kategorie: crate::katalog::StatusKategorie, sortier: i64) -> StatusWert {
+        StatusWert {
+            status_id: id,
+            label: format!("S{id}"),
+            kategorie,
+            farbe: None,
+            fms_anker: Some(id),
+            sortier,
+        }
+    }
+
+    fn fz(ef_id: i64, status: Option<StatusWert>, seit: Option<&str>) -> EinheitMitgliedFahrzeug {
+        EinheitMitgliedFahrzeug {
+            ef_id,
+            funkrufname: format!("F{ef_id}"),
+            fahrzeugtyp: None,
+            status,
+            status_seit: seit.map(str::to_string),
+        }
+    }
+
+    use crate::katalog::StatusKategorie::{Gebunden, NichtVerfuegbar, Verfuegbar};
+
+    #[test]
+    fn ohne_fahrzeug_gilt_der_handstatus() {
+        let s = leite_status_ab(
+            &[],
+            Some(sw(2, Verfuegbar, 20)),
+            Some("2026-09-22 08:00:00".into()),
+        );
+        assert_eq!(s.quelle, EinheitStatusQuelle::Hand);
+        assert_eq!(s.status.unwrap().status_id, 2);
+        assert_eq!(s.kategorie, Some(Verfuegbar));
+        assert_eq!(s.seit.as_deref(), Some("2026-09-22 08:00:00"));
+    }
+
+    #[test]
+    fn ohne_fahrzeug_und_ohne_hand_gibt_es_keinen() {
+        let s = leite_status_ab(&[], None, None);
+        assert_eq!(s.quelle, EinheitStatusQuelle::Ohne);
+        assert!(s.status.is_none() && s.seit.is_none() && s.kategorie.is_none());
+    }
+
+    #[test]
+    fn gleicher_status_seit_ist_der_juengste_wechsel_und_hand_zaehlt_nicht() {
+        let s = leite_status_ab(
+            &[
+                fz(1, Some(sw(4, Gebunden, 40)), Some("2026-09-22 09:12:00")),
+                fz(2, Some(sw(4, Gebunden, 40)), Some("2026-09-22 09:40:00")),
+            ],
+            Some(sw(2, Verfuegbar, 20)),
+            Some("2026-09-22 07:00:00".into()),
+        );
+        assert_eq!(s.quelle, EinheitStatusQuelle::Fahrzeuge);
+        assert_eq!(s.status.unwrap().status_id, 4);
+        assert_eq!(s.seit.as_deref(), Some("2026-09-22 09:40:00"));
+    }
+
+    #[test]
+    fn ein_unbekannter_zeitpunkt_macht_seit_unbekannt() {
+        let s = leite_status_ab(
+            &[
+                fz(1, Some(sw(4, Gebunden, 40)), Some("2026-09-22 09:12:00")),
+                fz(2, Some(sw(4, Gebunden, 40)), None),
+            ],
+            None,
+            None,
+        );
+        assert_eq!(s.quelle, EinheitStatusQuelle::Fahrzeuge);
+        assert_eq!(
+            s.seit, None,
+            "das Maximum über bekannte Werte wäre erfunden"
+        );
+    }
+
+    #[test]
+    fn alle_fahrzeuge_ohne_status_ergibt_ohne() {
+        let s = leite_status_ab(
+            &[fz(1, None, None), fz(2, None, None)],
+            Some(sw(2, Verfuegbar, 20)),
+            None,
+        );
+        assert_eq!(s.quelle, EinheitStatusQuelle::Ohne);
+    }
+
+    #[test]
+    fn gemischt_mit_gleicher_kategorie_behaelt_die_kategorie() {
+        let s = leite_status_ab(
+            &[
+                fz(1, Some(sw(4, Gebunden, 40)), Some("2026-09-22 09:12:00")),
+                fz(2, Some(sw(3, Gebunden, 30)), Some("2026-09-22 09:40:00")),
+                fz(3, Some(sw(4, Gebunden, 40)), Some("2026-09-22 09:50:00")),
+            ],
+            None,
+            None,
+        );
+        assert_eq!(s.quelle, EinheitStatusQuelle::Gemischt);
+        assert_eq!(s.kategorie, Some(Gebunden));
+        assert_eq!(s.seit, None);
+        let v: Vec<(Option<i64>, u32)> = s
+            .verteilung
+            .iter()
+            .map(|a| (a.status.as_ref().map(|x| x.status_id), a.anzahl))
+            .collect();
+        assert_eq!(v, vec![(Some(3), 1), (Some(4), 2)], "Katalogreihenfolge");
+    }
+
+    #[test]
+    fn gemischt_ueber_kategorien_und_ohne_status_zuletzt() {
+        let s = leite_status_ab(
+            &[
+                fz(1, None, None),
+                fz(2, Some(sw(6, NichtVerfuegbar, 60)), None),
+                fz(3, Some(sw(4, Gebunden, 40)), None),
+            ],
+            None,
+            None,
+        );
+        assert_eq!(s.quelle, EinheitStatusQuelle::Gemischt);
+        assert_eq!(s.kategorie, None);
+        let v: Vec<Option<i64>> = s
+            .verteilung
+            .iter()
+            .map(|a| a.status.as_ref().map(|x| x.status_id))
+            .collect();
+        assert_eq!(v, vec![Some(4), Some(6), None]);
+    }
 
     /// Org(1) + Einsatz + ein Benutzer (angelegt_von); liefert (einsatz, benutzer).
     async fn setup(pool: &SqlitePool) -> (i64, i64) {

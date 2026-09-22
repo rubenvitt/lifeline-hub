@@ -668,6 +668,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("tz_fachaufgabe", G_ENUM),
             retain("tz_organisation", G_ENUM),
             retain("aktueller_br_id", G_FK),
+            retain("status_id", G_FK),
+            retain("status_seit", G_ZEIT),
         ],
     },
     TabellenRegel {
@@ -679,6 +681,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("einsatz_id", G_SCOPE),
             retain("fahrzeug_id", G_FK),
             retain("status_id", G_FK),
+            retain("status_seit", G_ZEIT),
             retain("snap_funkrufname", G_OP_SNAP),
             retain("snap_kennzeichen", G_OP_SNAP),
             retain("snap_fahrzeugtyp", G_OP_SNAP),

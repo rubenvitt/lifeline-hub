@@ -650,3 +650,59 @@ pub async fn position(
     sse_einheit(&state, einsatz_id, einheit_id);
     Ok(Json(nachher))
 }
+
+/// Body für den Handstatus (LFH-609). `status_id` ist Pflicht und nullable: `null`
+/// löscht den Handstatus, ein FEHLENDES Feld ist ein Formfehler (400) — sonst wäre ein
+/// leerer Body stillschweigend „löschen“.
+#[derive(Debug, Deserialize)]
+pub struct StatusBody {
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub status_id: Option<Option<i64>>,
+}
+
+/// PUT /api/einsaetze/{id}/einheiten/{eid}/status — Handstatus einer Einheit OHNE
+/// Fahrzeug (LFH-609). Mit Fahrzeugen wird der Status aus ihnen abgeleitet → 422.
+/// Ein echter Wechsel schreibt einen System-ETB-Eintrag (atomar) und setzt „Seit“.
+pub async fn status_setzen(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    PfadParam((einsatz_id, eid)): PfadParam<(i64, i64)>,
+    JsonBody(body): JsonBody<StatusBody>,
+) -> Result<Json<EinheitAnzeige>, AppError> {
+    let einsatz = schreib_gate(&state, &benutzer, einsatz_id).await?;
+    let status_id = body
+        .status_id
+        .ok_or_else(|| AppError::Validation("status_id fehlt".into()))?;
+    if let Some(sid) = status_id {
+        if !crate::fahrzeug::status_repo::ist_in_org(&state.pool, einsatz.org_id, sid).await? {
+            return Err(AppError::Validation("Unbekannter Status".into()));
+        }
+    }
+    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
+        .await?
+        .etb_startwert();
+    crate::write_retry!(&state.pool, |conn| {
+        if let Some(w) =
+            einheit_repo::setze_hand_status_tx(conn, einsatz_id, eid, status_id).await?
+        {
+            crate::etb::system_audit_tx(
+                conn,
+                einsatz_id,
+                benutzer.id,
+                startwert,
+                &format!(
+                    "Einheit «{}»: Status «{}» → «{}»",
+                    w.name,
+                    w.vorher.as_deref().unwrap_or("—"),
+                    w.nachher.as_deref().unwrap_or("—")
+                ),
+            )
+            .await?;
+        }
+        Ok(())
+    })?;
+    sse_einheit(&state, einsatz_id, eid);
+    Ok(Json(
+        einheit_repo::laden(&state.pool, einsatz_id, eid).await?,
+    ))
+}

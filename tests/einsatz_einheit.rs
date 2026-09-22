@@ -1176,3 +1176,212 @@ async fn patch_leerer_name_ist_400_absenter_laesst_namen_stehen() {
     assert_eq!(json["name"], "1. Zug");
     assert_eq!(json["sortier"], 9);
 }
+
+// ── LFH-609: Einheitenstatus (abgeleitet aus Fahrzeugen, Handstatus als Rückfall) ────
+
+async fn status_id(app: &axum::Router, cookie: &str, label: &str) -> i64 {
+    let (_, stati) = anfrage(app, "GET", "/api/fahrzeug-status", cookie, None).await;
+    stati
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["label"] == label)
+        .unwrap_or_else(|| panic!("Status {label} im Seed"))["id"]
+        .as_i64()
+        .unwrap()
+}
+
+async fn einheit_json(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    id: i64,
+) -> serde_json::Value {
+    let (_, liste) = anfrage(
+        app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/einheiten"),
+        cookie,
+        None,
+    )
+    .await;
+    liste
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|e| e["id"] == id)
+        .unwrap()
+        .clone()
+}
+
+async fn hand_status(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    einheit: i64,
+    body: &str,
+) -> (StatusCode, serde_json::Value) {
+    anfrage(
+        app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/einheiten/{einheit}/status"),
+        cookie,
+        Some(body),
+    )
+    .await
+}
+
+#[tokio::test]
+async fn einheit_ohne_fahrzeug_fuehrt_handstatus_mit_etb_und_seit() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let e = einheit_bilden(&app, &admin, einsatz, "Fachberater EVU").await;
+
+    let neu = einheit_json(&app, &admin, einsatz, e).await;
+    assert_eq!(neu["status"]["quelle"], "ohne");
+
+    let s4 = status_id(&app, &admin, "4 – Am Einsatzort").await;
+    let etb_vorher = system_etb_anzahl(&app, &admin, einsatz).await;
+    let (s, json) = hand_status(
+        &app,
+        &admin,
+        einsatz,
+        e,
+        &format!(r#"{{"status_id":{s4}}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(json["status"]["quelle"], "hand");
+    assert_eq!(json["status"]["status"]["status_id"], s4);
+    assert_eq!(json["status"]["kategorie"], "gebunden");
+    assert!(json["status"]["seit"].is_string());
+    assert_eq!(
+        system_etb_anzahl(&app, &admin, einsatz).await,
+        etb_vorher + 1
+    );
+
+    // Derselbe Status erneut: kein Wechsel, kein ETB.
+    let (s, _) = hand_status(
+        &app,
+        &admin,
+        einsatz,
+        e,
+        &format!(r#"{{"status_id":{s4}}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(
+        system_etb_anzahl(&app, &admin, einsatz).await,
+        etb_vorher + 1
+    );
+
+    // null löscht.
+    let (s, json) = hand_status(&app, &admin, einsatz, e, r#"{"status_id":null}"#).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(json["status"]["quelle"], "ohne");
+    assert_eq!(
+        system_etb_anzahl(&app, &admin, einsatz).await,
+        etb_vorher + 2
+    );
+}
+
+#[tokio::test]
+async fn handstatus_formfehler_400_und_zusammenhang_422() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let e = einheit_bilden(&app, &admin, einsatz, "Zug 1").await;
+
+    assert_eq!(
+        hand_status(&app, &admin, einsatz, e, r#"{"status_id":999999}"#)
+            .await
+            .0,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        hand_status(&app, &admin, einsatz, e, "{}").await.0,
+        StatusCode::BAD_REQUEST
+    );
+
+    let ef = fahrzeug_anlegen(&app, &admin, einsatz, "Florian 1").await;
+    fahrzeug_zuordnen(&app, &admin, einsatz, e, ef).await;
+    let s2 = status_id(&app, &admin, "2 – Frei auf Wache").await;
+    assert_eq!(
+        hand_status(
+            &app,
+            &admin,
+            einsatz,
+            e,
+            &format!(r#"{{"status_id":{s2}}}"#)
+        )
+        .await
+        .0,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "mit Fahrzeug führen die Fahrzeuge den Status"
+    );
+}
+
+#[tokio::test]
+async fn beobachter_darf_keinen_handstatus_setzen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let e = einheit_bilden(&app, &admin, einsatz, "X").await;
+    let erika = benutzer_anlegen(&app, &admin, "erika", "keine").await;
+    rolle_setzen(&app, &admin, einsatz, erika, "beobachter").await;
+    let erika_c = login_cookie(&app, "erika", "erikapw1").await;
+    let s2 = status_id(&app, &admin, "2 – Frei auf Wache").await;
+    assert_eq!(
+        hand_status(
+            &app,
+            &erika_c,
+            einsatz,
+            e,
+            &format!(r#"{{"status_id":{s2}}}"#)
+        )
+        .await
+        .0,
+        StatusCode::FORBIDDEN
+    );
+}
+
+#[tokio::test]
+async fn einheitenstatus_folgt_den_fahrzeugen_gemeinsam_oder_gemischt() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let e = einheit_bilden(&app, &admin, einsatz, "Zug 1").await;
+    let a = fahrzeug_anlegen(&app, &admin, einsatz, "Florian 1").await;
+    let b = fahrzeug_anlegen(&app, &admin, einsatz, "Florian 2").await;
+    fahrzeug_zuordnen(&app, &admin, einsatz, e, a).await;
+    fahrzeug_zuordnen(&app, &admin, einsatz, e, b).await;
+
+    // Beide tragen den Initialstatus → gemeinsam, mit „Seit“.
+    let j = einheit_json(&app, &admin, einsatz, e).await;
+    assert_eq!(j["status"]["quelle"], "fahrzeuge");
+    assert!(j["status"]["seit"].is_string());
+    assert!(j["fahrzeug_mitglieder"][0]["status"]["status_id"].is_i64());
+
+    // Eines wechselt → gemischt, Verteilung 1/1, ohne „Seit“.
+    let s6 = status_id(&app, &admin, "6 – Nicht einsatzbereit").await;
+    let (s, _) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{b}"),
+        &admin,
+        Some(&format!(r#"{{"status_id":{s6}}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let j = einheit_json(&app, &admin, einsatz, e).await;
+    assert_eq!(j["status"]["quelle"], "gemischt");
+    assert!(!j["status"].as_object().unwrap().contains_key("seit"));
+    let anzahlen: Vec<i64> = j["status"]["verteilung"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|x| x["anzahl"].as_i64().unwrap())
+        .collect();
+    assert_eq!(anzahlen, vec![1, 1]);
+}

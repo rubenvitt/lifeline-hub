@@ -408,34 +408,14 @@ pub async fn personal_mitglieder_map(
     Ok(map)
 }
 
-#[derive(sqlx::FromRow)]
-struct FahrzeugRow {
-    ef_id: i64,
-    funkrufname: String,
-    fahrzeugtyp: Option<String>,
-}
-
-/// Fahrzeug-Mitglieder einer Einheit (Snapshot-Funkrufname/-typ).
-pub async fn fahrzeug_mitglieder(
-    pool: &SqlitePool,
-    einheit_id: i64,
-) -> Result<Vec<EinheitMitgliedFahrzeug>, AppError> {
-    let rows = sqlx::query_as::<_, FahrzeugRow>(
-        "SELECT id AS ef_id, snap_funkrufname AS funkrufname, snap_fahrzeugtyp AS fahrzeugtyp \
-         FROM einsatz_fahrzeug WHERE einheit_id = ? ORDER BY id",
-    )
-    .bind(einheit_id)
-    .fetch_all(pool)
-    .await?;
-    Ok(rows
-        .into_iter()
-        .map(|r| EinheitMitgliedFahrzeug {
-            ef_id: r.ef_id,
-            funkrufname: r.funkrufname,
-            fahrzeugtyp: r.fahrzeugtyp,
-        })
-        .collect())
-}
+/// Spalten eines Fahrzeug-Mitglieds samt aufgelöstem FMS-Status (LFH-609). EINE Quelle
+/// für die Einzel- und die Sammelabfrage, damit beide dasselbe Mitglied liefern.
+const FAHRZEUG_MITGLIED_SPALTEN: &str = "\
+    ef.einheit_id, ef.id AS ef_id, ef.snap_funkrufname AS funkrufname, \
+    ef.snap_fahrzeugtyp AS fahrzeugtyp, ef.status_seit, \
+    s.id AS status_id, s.label AS status_label, s.kategorie AS status_kategorie, \
+    s.farbe AS status_farbe, s.fms_anker AS status_fms_anker, s.sortier AS status_sortier \
+    FROM einsatz_fahrzeug ef LEFT JOIN fahrzeug_status s ON s.id = ef.status_id";
 
 #[derive(sqlx::FromRow)]
 struct FahrzeugZeileMitEinheit {
@@ -443,6 +423,53 @@ struct FahrzeugZeileMitEinheit {
     ef_id: i64,
     funkrufname: String,
     fahrzeugtyp: Option<String>,
+    status_seit: Option<String>,
+    status_id: Option<i64>,
+    status_label: Option<String>,
+    status_kategorie: Option<crate::katalog::StatusKategorie>,
+    status_farbe: Option<String>,
+    status_fms_anker: Option<i64>,
+    status_sortier: Option<i64>,
+}
+
+impl FahrzeugZeileMitEinheit {
+    fn zu_mitglied(self) -> EinheitMitgliedFahrzeug {
+        let status = match (self.status_id, self.status_label, self.status_kategorie) {
+            (Some(status_id), Some(label), Some(kategorie)) => Some(super::StatusWert {
+                status_id,
+                label,
+                kategorie,
+                farbe: self.status_farbe,
+                fms_anker: self.status_fms_anker,
+                sortier: self.status_sortier.unwrap_or(0),
+            }),
+            _ => None,
+        };
+        EinheitMitgliedFahrzeug {
+            ef_id: self.ef_id,
+            funkrufname: self.funkrufname,
+            fahrzeugtyp: self.fahrzeugtyp,
+            status,
+            status_seit: self.status_seit,
+        }
+    }
+}
+
+/// Fahrzeug-Mitglieder einer Einheit (Snapshot-Funkrufname/-typ, aufgelöster Status).
+pub async fn fahrzeug_mitglieder(
+    pool: &SqlitePool,
+    einheit_id: i64,
+) -> Result<Vec<EinheitMitgliedFahrzeug>, AppError> {
+    let rows = sqlx::query_as::<_, FahrzeugZeileMitEinheit>(sqlx::AssertSqlSafe(format!(
+        "SELECT {FAHRZEUG_MITGLIED_SPALTEN} WHERE ef.einheit_id = ? ORDER BY ef.id"
+    )))
+    .bind(einheit_id)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(FahrzeugZeileMitEinheit::zu_mitglied)
+        .collect())
 }
 
 /// Fahrzeug-Mitglieder ALLER Einheiten eines Einsatzes in EINER Abfrage (kein N+1,
@@ -451,25 +478,17 @@ pub async fn fahrzeug_mitglieder_map(
     pool: &SqlitePool,
     einsatz_id: i64,
 ) -> Result<HashMap<i64, Vec<EinheitMitgliedFahrzeug>>, AppError> {
-    let zeilen = sqlx::query_as::<_, FahrzeugZeileMitEinheit>(
-        "SELECT einheit_id, id AS ef_id, snap_funkrufname AS funkrufname, \
-                snap_fahrzeugtyp AS fahrzeugtyp \
-         FROM einsatz_fahrzeug \
-         WHERE einheit_id IN (SELECT id FROM einsatz_einheit WHERE einsatz_id = ?) \
-         ORDER BY id",
-    )
+    let zeilen = sqlx::query_as::<_, FahrzeugZeileMitEinheit>(sqlx::AssertSqlSafe(format!(
+        "SELECT {FAHRZEUG_MITGLIED_SPALTEN} \
+         WHERE ef.einheit_id IN (SELECT id FROM einsatz_einheit WHERE einsatz_id = ?) \
+         ORDER BY ef.id"
+    )))
     .bind(einsatz_id)
     .fetch_all(pool)
     .await?;
     let mut map: HashMap<i64, Vec<EinheitMitgliedFahrzeug>> = HashMap::new();
     for z in zeilen {
-        map.entry(z.einheit_id)
-            .or_default()
-            .push(EinheitMitgliedFahrzeug {
-                ef_id: z.ef_id,
-                funkrufname: z.funkrufname,
-                fahrzeugtyp: z.fahrzeugtyp,
-            });
+        map.entry(z.einheit_id).or_default().push(z.zu_mitglied());
     }
     Ok(map)
 }

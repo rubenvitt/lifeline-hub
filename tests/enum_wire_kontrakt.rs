@@ -227,6 +227,12 @@ fn serde_wire_gleich_as_str() {
 
     // katalog
     enum_wire_as_str!(lifeline_hub::katalog::Betriebsart { Tmo, Dmo });
+    enum_wire_as_str!(lifeline_hub::einheit::EinheitStatusQuelle {
+        Fahrzeuge,
+        Gemischt,
+        Hand,
+        Ohne,
+    });
     enum_wire_as_str!(lifeline_hub::katalog::StatusKategorie {
         Verfuegbar,
         Gebunden,
