@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react';
 import { theme } from 'antd';
 import { ExportOutlined, LockOutlined, ToolOutlined } from '@ant-design/icons';
 import { istModulGesperrt, istModulSichtbar, type ModulEintrag } from './modulRegistry';
+import { navZeilen, sprungZiel, type Sprungmarke } from './sprungmarken';
 import { form, schrift, type Farbrollen } from '../theme/tokens';
 import type { BenutzerAnzeige, EinsatzAnzeige, ModulOverrides } from '../api/types';
 import type { ModulZaehlerMap } from './useModulZaehler';
@@ -41,6 +42,12 @@ interface ListeProps {
   mindestTrefflaeche?: number;
   /** Bereits berechnete, berechtigungsgesteuerte Zähler je Registry-Quelle. */
   zaehler?: ModulZaehlerMap;
+  /**
+   * Sprungmarken dieser Kategorie (LFH-620, `sprungmarken.ts`). Sie erben Sichtbarkeit und
+   * Sperre ihres Zielmoduls und sind nie `aria-current`.
+   */
+  sprungmarken?: Sprungmarke[];
+  onSprungKlick?: (marke: Sprungmarke) => void;
 }
 
 /** Die Farbrollen, die eine Modulzeile liest — als Ausschnitt, damit der Test sie setzen kann. */
@@ -161,16 +168,60 @@ export function ModulListe({
   onModulKlick,
   mindestTrefflaeche,
   zaehler,
+  sprungmarken = [],
+  onSprungKlick,
 }: ListeProps) {
   const { token } = theme.useToken();
   const farben = useModusFarben();
   // Ausgeblendete Module nicht rendern (nicht-ausblendbare bleiben immer sichtbar).
   // Beide Aufrufer — das Panel und das `ModulAkkordeon` — reichen die Kategorieliste
-  // roh aus `moduleNachKategorie` herein; der Filter gehört deshalb hierher.
-  const sichtbareModule = module.filter((m) => istModulSichtbar(m, overrides));
+  // roh aus `moduleNachKategorie` herein; der Filter gehört deshalb hierher. Die
+  // Anordnung mit den Sprungmarken fällt VOR dem Filter (`navZeilen`).
+  const zeilen = navZeilen(module, sprungmarken);
   return (
     <div style={modulListenStil(token)}>
-      {sichtbareModule.map((m) => {
+      {zeilen.map((zeile) => {
+        if (zeile.art === 'sprung') {
+          const { marke } = zeile;
+          const ziel = sprungZiel(marke);
+          // Ein Sprung in ein ausgeblendetes oder unfertiges Modul wäre einer ins Leere.
+          if (!ziel || ziel.status !== 'fertig' || !istModulSichtbar(ziel, overrides)) return null;
+          const gesperrt = istModulGesperrt(ziel, benutzer, overrides);
+          return (
+            <button
+              key={`sprung:${marke.key}`}
+              type="button"
+              data-lfh="modul-sprungmarke"
+              disabled={gesperrt}
+              title={gesperrt ? 'Keine Berechtigung' : `Springt zu ${marke.hinweis}`}
+              // Das Ziel gehört in den Namen: sichtbar steht nur „Entscheidungen", und wer
+              // vorliest, soll vor dem Klick wissen, dass er im ETB landet.
+              aria-label={`${marke.label}, springt zu ${marke.hinweis}`}
+              onClick={() => !gesperrt && onSprungKlick?.(marke)}
+              style={{
+                ...modulZeilenStil(token, farben, { aktiv: false, gesperrt, mindestTrefflaeche }),
+                ...fussFokusabstandStil,
+              }}
+            >
+              <span aria-hidden="true" style={modulMarkeStil(farben, false)} />
+              <span style={{ minWidth: 0, flex: 1 }}>{marke.label}</span>
+              {/* ↗ als Textzeichen (Neuentwurf, Deeplink-Glyphe) — kein Emoji, keine Ikone
+                  mit englischem `aria-label`. Dekoration: das Ziel steht im Namen. */}
+              {!gesperrt && (
+                <span aria-hidden="true" style={{ flexShrink: 0, color: farben.schwach }}>
+                  ↗
+                </span>
+              )}
+              {gesperrt && (
+                <span aria-hidden style={{ display: 'inline-flex', flexShrink: 0 }}>
+                  <LockOutlined />
+                </span>
+              )}
+            </button>
+          );
+        }
+        const m = zeile.modul;
+        if (!istModulSichtbar(m, overrides)) return null;
         const gesperrt = istModulGesperrt(m, benutzer, overrides);
         const aktiv = m.key === aktiverModulKey;
         const modulZaehler = m.zaehlerQuelle ? zaehler?.[m.zaehlerQuelle] : undefined;

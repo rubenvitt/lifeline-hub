@@ -22,6 +22,7 @@ import {
   stabPfad,
   etbPfad,
   parseEtbFilter,
+  parsePersonenSicht,
   personalPfad,
   einheitenPfad,
   fahrzeugePfad,
@@ -132,6 +133,29 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
   });
   it('personenPfad mit ?neu=1', () => {
     expect(personenPfad(E, { neu: true })).toBe('/einsaetze/5/personen?neu=1');
+  });
+  it('personenPfad mit Sichtvorgabe (LFH-620)', () => {
+    expect(personenPfad(E, { filter: 'vermisst', ansicht: 'zeilen' })).toBe(
+      '/einsaetze/5/personen?filter=vermisst&ansicht=zeilen',
+    );
+    expect(personenPfad(E, { ansicht: 'raster' })).toBe('/einsaetze/5/personen?ansicht=raster');
+  });
+  it('parsePersonenSicht liest zurück, was personenPfad geschrieben hat', () => {
+    const pfad = personenPfad(E, { filter: 'verstorben', ansicht: 'raster' });
+    expect(parsePersonenSicht(new URLSearchParams(pfad.split('?')[1]))).toEqual({
+      filter: 'verstorben',
+      ansicht: 'raster',
+    });
+  });
+  it('parsePersonenSicht verwirft je Achse einen unbekannten Wert GANZ', () => {
+    // „patienten" ist bewusst kein Filterwert: Patient ist eine Darstellung, kein Status.
+    expect(parsePersonenSicht(new URLSearchParams('filter=patienten&ansicht=raster'))).toEqual({
+      ansicht: 'raster',
+    });
+    expect(parsePersonenSicht(new URLSearchParams('filter=vermisst&ansicht=karte'))).toEqual({
+      filter: 'vermisst',
+    });
+    expect(parsePersonenSicht(new URLSearchParams(''))).toEqual({});
   });
   it('lagekartePfad mit Platzier-Auftrag', () => {
     /*
