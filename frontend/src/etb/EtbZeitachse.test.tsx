@@ -48,6 +48,7 @@ function eintrag(over: Partial<EtbEintragAnzeige> = {}): EtbEintragAnzeige {
     lagebericht_id: null,
     auftrag_id: null,
     befehl_id: null,
+    folgeauftraege: [],
     ...over,
   };
 }
@@ -184,6 +185,31 @@ describe('EtbZeitachse – der Eintrag', () => {
     expect(screen.getByRole('link', { name: 'Befehl' })).toHaveAttribute(
       'href',
       '/einsaetze/1/auftraege/befehle/42',
+    );
+  });
+
+  // LFH-636: eine Entscheidung ohne jeden Rückverweis trägt trotzdem ihre Folgeaufträge —
+  // die Zeitachse darf die Verweiszeile nicht an den Rückverweisen allein festmachen.
+  it('verweist auf Folgeaufträge auch ohne Rückverweis (LFH-636)', () => {
+    renderZeitachse({
+      eintraege: [
+        eintrag({
+          id: 5,
+          typ: 'entscheidung',
+          folgeauftraege: [
+            { id: 31, lfd_nr: 12 },
+            { id: 32, lfd_nr: 13 },
+          ],
+        }),
+      ],
+    });
+    expect(screen.getByRole('link', { name: 'Folgeauftrag Nr. 12' })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/auftraege?auftrag=31',
+    );
+    expect(screen.getByRole('link', { name: 'Folgeauftrag Nr. 13' })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/auftraege?auftrag=32',
     );
   });
 

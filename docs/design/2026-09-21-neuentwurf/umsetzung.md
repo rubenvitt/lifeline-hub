@@ -39,7 +39,8 @@ Shell-Rahmen · neue Bausteine · neu gedachte Screens.
    Platzhalter gebaut) und als ClickUp-Task erfasst. Bekannte Lücken: Pegel, Evakuiert,
    Fortschritt je Abschnitt, Abschnittsfarbe, FMS-Status/„Seit“/Rückmeldung je Einheit,
    „keine Rückmeldung“, ETB-Lesemarke „seit Ihrer letzten Sichtung“, ETB-Gesamtzahl und
-   Tagesbilanz-Summen (serverseitig), Folgeauftrag-Verweis am ETB-Eintrag, Zustand und
+   Tagesbilanz-Summen (serverseitig), Folgeauftrag-Verweis am ETB-Eintrag (geschlossen
+   mit LFH-636), Zustand und
    Koordinate an der Person, strukturierter Verbleib, Funktion des Nutzers (nur
    Sachgebiete vorhanden), Satellit-Basemap, Messwerkzeug.
 
@@ -123,7 +124,7 @@ Das Modulpanel des Entwurfs führt acht Module, die es in der App nicht gab. Ent
 
 | Modul | Entscheidung | Umsetzung |
 |---|---|---|
-| Entscheidungen (Führung) | Sicht auf vorhandene Daten | Sprungmarke → ETB `?typ=entscheidung`. Eine eigene Übersicht lohnt erst mit Folgeauftrag-Verweis (LFH-636) |
+| Entscheidungen (Führung) | Sicht auf vorhandene Daten | Sprungmarke → ETB `?typ=entscheidung`. Der Folgeauftrag-Verweis steht seit LFH-636 am ETB-Eintrag (Wire `folgeauftraege`, Zeitachse „Folgeauftrag Nr. … ↗“, Zähler im Überblick); ob eine eigene Übersicht (Beschlusslage mit Umsetzungsstand) die Sprungmarke ersetzt, ist neu zu entscheiden |
 | Patienten (Erfassung) | Sicht auf vorhandene Daten | Sprungmarke → Personen `?ansicht=raster` (Sichtungsraster, „Patient" = SK I–IV/tot, `istPatient`) |
 | Vermisste (Erfassung) | Sicht auf vorhandene Daten | Sprungmarke → Personen `?filter=vermisst` (inkl. Abgleich). „vermisst seit" liegt bei LFH-613 |
 | Dokumente (Führung) | Fachmodul, hier verworfen | Folgetask LFH-632 (Dokumentenablage) |

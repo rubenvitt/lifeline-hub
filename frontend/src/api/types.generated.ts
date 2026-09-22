@@ -924,6 +924,14 @@ export interface components {
             erfasser_id: number;
             erfasser_name: string;
             erfasst_lokal_at?: string | null;
+            /**
+             * @description Aufträge, die AUS diesem Eintrag erteilt wurden (LFH-636) — die Vorwärtsrichtung zu
+             *     `auftrag.quell_etb_eintrag_id` (LFH-112), nicht zu verwechseln mit `auftrag_id` oben
+             *     (Eintrag wurde VON einem Auftrag erzeugt). Aufsteigend nach `lfd_nr`, leer statt
+             *     fehlend. Nicht Teil des SELECT: `repo::laden`/`repo::abfrage` füllen die Liste je
+             *     Seite mit einer gebündelten Abfrage nach.
+             */
+            folgeauftraege: components["schemas"]["FolgeauftragVerweis"][];
             /** Format: int64 */
             id: number;
             inhalt: string;
@@ -1030,6 +1038,19 @@ export interface components {
             fahrzeugtyp: string[];
             standort: string[];
             traegerorganisation: string[];
+        };
+        /**
+         * @description Verweis auf einen Folgeauftrag eines ETB-Eintrags (LFH-636): genug für einen Deeplink
+         *     (`id`) und einen unterscheidbaren Namen (`lfd_nr`) — die DB-`id` wird nie angezeigt.
+         */
+        FolgeauftragVerweis: {
+            /** Format: int64 */
+            id: number;
+            /**
+             * Format: int64
+             * @description Laufende Nummer des Auftrags; fehlt nur bei Aufträgen vor LFH-133.
+             */
+            lfd_nr?: number | null;
         };
         /** @description Ein freies taktisches Zeichen (Punkt-Marker ohne Fachobjekt, LFH-170). */
         FreiesZeichenAnzeige: {

@@ -56,7 +56,6 @@ import {
   empfaengerText,
   entscheidungenAuswahl,
   folgeText,
-  folgeauftraegeJeEintrag,
   kraefteKennzahl,
   naechsteMarken,
   offeneAuftraege,
@@ -273,7 +272,6 @@ export default function UeberblickPage() {
     [abschnitte, einheiten, personal, fahrzeuge, material, auftraege],
   );
   const entscheidungen = useMemo(() => entscheidungenAuswahl(etb ?? [], jetzt), [etb, jetzt]);
-  const folge = useMemo(() => folgeauftraegeJeEintrag(auftraege ?? []), [auftraege]);
   const marken = useMemo(
     () =>
       naechsteMarken(
@@ -594,13 +592,6 @@ export default function UeberblickPage() {
                   ETB ↗
                 </Link>
               }
-              fuss={
-                auftraegeFehlen && entscheidungen.eintraege.length > 0 ? (
-                  <span style={{ fontSize: 11, color: rollen.schwach }}>
-                    Aufträge nicht abrufbar — Folgeaufträge werden nicht gezählt.
-                  </span>
-                ) : undefined
-              }
             >
               <Zustandsfeld
                 zustand={zEntscheidungen}
@@ -615,7 +606,9 @@ export default function UeberblickPage() {
               >
                 <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
                   {entscheidungen.eintraege.map((e) => {
-                    const folgeWort = auftraegeFehlen ? null : folgeText(folge.get(e.id) ?? 0);
+                    // Aus dem ETB-Eintrag selbst (LFH-636), nicht aus der Auftragsliste —
+                    // die bekommt nicht, wer das Aufträge-Modul gesperrt hat.
+                    const folgeWort = folgeText(e.folgeauftraege.length);
                     return (
                       <Zeitachseneintrag
                         key={e.id}

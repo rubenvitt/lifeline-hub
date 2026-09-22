@@ -21,7 +21,6 @@ import {
   empfaengerText,
   entscheidungenAuswahl,
   folgeText,
-  folgeauftraegeJeEintrag,
   kraefteKennzahl,
   markenBewertung,
   naechsteMarken,
@@ -107,6 +106,7 @@ const etb = (id: number, ereigniszeit: string, typ = 'entscheidung') =>
     ereigniszeit,
     inhalt: `E${id}`,
     erfasser_name: 'Vitt',
+    folgeauftraege: [],
   }) as unknown as EtbEintragAnzeige;
 
 describe('zeitpunkt', () => {
@@ -204,17 +204,8 @@ describe('offeneAuftraege', () => {
   });
 });
 
-describe('Folgeaufträge je ETB-Eintrag', () => {
-  it('zählt quell_etb_eintrag_id, egal in welchem Status', () => {
-    const m = folgeauftraegeJeEintrag([
-      auftrag({ quell_etb_eintrag_id: 7 }),
-      auftrag({ quell_etb_eintrag_id: 7, bearbeitungsstatus: 'abgenommen' }),
-      auftrag({ quell_etb_eintrag_id: 9 }),
-      auftrag(),
-    ]);
-    expect(m.get(7)).toBe(2);
-    expect(m.get(9)).toBe(1);
-    expect(m.has(1)).toBe(false);
+describe('folgeText', () => {
+  it('nichts bei null, Einzahl und Mehrzahl', () => {
     expect(folgeText(0)).toBeNull();
     expect(folgeText(1)).toBe('1 Auftrag');
     expect(folgeText(3)).toBe('3 Aufträge');

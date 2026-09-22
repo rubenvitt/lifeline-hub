@@ -17,6 +17,7 @@ const e = (lfd: number, over: Partial<EtbEintragAnzeige> = {}): EtbEintragAnzeig
     inhalt: `Eintrag ${lfd}`,
     ereigniszeit: '2026-06-11 09:00:00',
     erfasser_name: 'Vitt',
+    folgeauftraege: [],
     ...over,
   }) as EtbEintragAnzeige;
 

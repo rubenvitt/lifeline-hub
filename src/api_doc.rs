@@ -65,6 +65,7 @@ use utoipa::OpenApi;
         crate::erinnerung::ErinnerungAnzeige,
         crate::erinnerung::ErinnerungStatus,
         crate::etb::EtbEintragAnzeige,
+        crate::etb::FolgeauftragVerweis,
         crate::etb::lesemarke::EtbLesemarkeAnzeige,
         crate::etb::EtbTyp,
         crate::etb::MeldeWeg,
