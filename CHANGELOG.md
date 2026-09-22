@@ -1,3 +1,20 @@
+## [1.0.0-alpha.25](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.24...v1.0.0-alpha.25) (2026-09-22)
+
+### Features
+
+* **lagekarte:** Energieanlagen in der Ebenenauswahl, Ausschnitt für jede bbox-Ebene (LFH-81) ([60a995f](https://github.com/rubenvitt/lifeline-hub/commit/60a995f50c3eda0e5424f5be24907ebd823b62a2))
+* **lagekarte:** Fachebene Energieanlagen im Backend (LFH-81) ([f53687c](https://github.com/rubenvitt/lifeline-hub/commit/f53687cea13fd0c94ee9ca317a7fef8e5fc32c89))
+
+### Bug Fixes
+
+* **auth:** OIDC-Login am Service Worker vorbei, Fehlschlag sichtbar machen ([e6b41e4](https://github.com/rubenvitt/lifeline-hub/commit/e6b41e4329677cb5facd9804a49484199192c720))
+* **ci:** Vitest-5-Blobpfad frontend/.vitest/blob/ statt .vitest-reports/ ([8e17508](https://github.com/rubenvitt/lifeline-hub/commit/8e1750862a8134aa2532b5b06fb06b7ca031010a))
+* **deps:** jsdom bei 30.0.1 halten, 30.1.0 bricht Datei-Uploads in Tests ([d45a399](https://github.com/rubenvitt/lifeline-hub/commit/d45a3993fcb2d9244af2dfc311ed3e7676368009)), closes [value/#checkedness](https://github.com/value/lifeline-hub/issues/checkedness)
+* **lagekarte:** Energie-Abruf hält die Kartenanfrage nicht auf, keine Doppelpunkte am Rand (LFH-81) ([ec7d2db](https://github.com/rubenvitt/lifeline-hub/commit/ec7d2dbcf20ed02b1e2ac0f78fdfcf740f8e9416))
+* **lagekarte:** Energie-Ebene bleibt auf breiten Schirmen nicht leer (LFH-81) ([7a59cb6](https://github.com/rubenvitt/lifeline-hub/commit/7a59cb69cd07cfa4d9538d0e78c055c4af440981))
+* **lagekarte:** Energie-Ebene fragt eine unvollständige Antwort bald neu ab (LFH-81) ([8420148](https://github.com/rubenvitt/lifeline-hub/commit/842014825756b1046a017a481a6b64c6cccc94f4))
+* **lagekarte:** Energie-Sammlung aktualisiert sich, Quellennennung folgt den gezeichneten Punkten (LFH-81) ([438dd68](https://github.com/rubenvitt/lifeline-hub/commit/438dd6878b16bfc75c457dc59c0fcad850aca19b))
+
 ## [1.0.0-alpha.24](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.23...v1.0.0-alpha.24) (2026-09-21)
 
 ### Features
