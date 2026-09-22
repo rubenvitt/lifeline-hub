@@ -36,7 +36,9 @@ Shell-Rahmen · neue Bausteine · neu gedachte Screens.
    - das **ETB ist eine Zeitachse** auf allen Breiten, Schnellerfassung **unten**,
      Seitenleiste „Tagesbilanz“ (Regeländerung zu `tabelleAb="xl"`).
 4. **Keine erfundenen Daten.** Was keine Datenquelle hat, wird weggelassen (nicht als
-   Platzhalter gebaut) und als ClickUp-Task erfasst. Bekannte Lücken: Pegel, Evakuiert,
+   Platzhalter gebaut) und als ClickUp-Task erfasst. Der Pegel ist seit LFH-606 da (Platz 1
+   im Kennzahlenband statt „Höchste Warnstufe", Entscheidung 22.09.2026; Prognose und
+   Höchststand sind ein Folgetask). Bekannte Lücken: Evakuiert,
    Fortschritt je Abschnitt, Abschnittsfarbe, FMS-Status/„Seit“/Rückmeldung je Einheit,
    „keine Rückmeldung“, ETB-Lesemarke „seit Ihrer letzten Sichtung“, ETB-Gesamtzahl und
    Tagesbilanz-Summen (serverseitig), Folgeauftrag-Verweis am ETB-Eintrag, Zustand und

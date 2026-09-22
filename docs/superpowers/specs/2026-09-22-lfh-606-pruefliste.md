@@ -60,7 +60,8 @@ Lauf vom 22.09.2026 (Backend-Binary aus eigenem `CARGO_TARGET_DIR`, Stand dieses
   Zeilenmenüs gesperrt, „Hinzufügen“ bzw. der Inspector-Knopf zeigen den Ladezustand
   [T1, T4]. Die Kommandoreaktion ≤ 2 s trägt das Backend seit `2d94f92f`: PUT und POST warten
   nie auf PEGELONLINE, sie antworten aus dem Cache und stoßen fehlende Messungen im
-  Hintergrund an [B1]. Die Folge für die Anzeige steht als O2.
+  Hintergrund an [B1]; die Anzeige holt die fehlende Messung einmal nach ~10 s nach (O2,
+  eingelöst).
 - **4:** Keine der Flächen trägt eine kritische Aktion im Sinne des Kriteriums. „Entfernen“
   eines Pegels ist umkehrbar (wieder hinzufügen, derselbe Bildschirm) und löscht keine Daten.
   Nach LFH-378 bekommt eine umkehrbare Aktion keine Rückfrage. „Festlegen“ ist additiv.
@@ -148,7 +149,7 @@ Lauf vom 22.09.2026 (Backend-Binary aus eigenem `CARGO_TARGET_DIR`, Stand dieses
 
 **Komponenten- und Unit-Tests** (Vitest):
 
-- **[T1]** `pages/einstellungen/EinsatzPegel.test.tsx` (21 Tests): Zeilenmenüs während des
+- **[T1]** `pages/einstellungen/EinsatzPegel.test.tsx` (27 Tests): Zeilenmenüs während des
   PUT gesperrt, „Hinzufügen“ mit Ladezustand bis zur Antwort. Die Mutationsprobe
   „`disabled={false}` am Dropdown“ färbt den Sperrtest rot. Voller Tastaturweg samt sichtbarem
   Label. Gesperrte Richtungen an den Enden statt Weglassen. Ohne Schreibrecht Grund oben,
@@ -162,6 +163,9 @@ Lauf vom 22.09.2026 (Backend-Binary aus eigenem `CARGO_TARGET_DIR`, Stand dieses
 - **[T4]** `pages/lagekarte/FachebenenInspector.test.tsx`, Block „Pegel festlegen“: Knopf erst
   nach geladener Liste bedienbar, Marke statt Knopf, gesperrt mit Grund und Weg bei fünf
   Pegeln, nichts ohne Schreibrecht oder `uuid`.
+- **[T6]** `api/pegel.test.ts` (reine Nachfrage-Regel) und `api/pegelNachfrage.test.tsx`
+  (TanStack-Kreislauf mit Fake-Timern: genau ein Abruf nach ~10 s, keine Schleife, ohne Lücke
+  keine Nachfrage).
 - **[T5]** `components/dichte.guard.test.ts` (kein punktuelles `size` auf interaktiven
   Elementen) und die Bauform-Gleichheit mit [M2].
 
@@ -184,14 +188,17 @@ Lauf vom 22.09.2026 (Backend-Binary aus eigenem `CARGO_TARGET_DIR`, Stand dieses
   Handschirm bei CLS ≈ 0,16–0,17 — **auch mit leerer Pegel-Liste**. Das ist Bestand der
   Seiten, nicht von LFH-606 verursacht. Der Pegel-Anteil liegt im Rauschen der Messung. Die
   Ursache (welche Abfrage die Verschiebung auslöst) ist nicht untersucht.
-- **O2 · Neu festgelegte Station zeigt bis zu 5 min „Stand unbekannt“:** Seit `2d94f92f`
-  antworten PUT und POST ohne Messung für eine Station, die noch nicht im Cache liegt, und
-  holen sie im Hintergrund. Das Frontend fragt aber erst im 5-min-Takt wieder nach
-  (`PEGEL_ABRUF_MS`). Bis dahin zeigt die Kennzahl nach dem Festlegen den Ausfallzustand mit
-  Achtungskante, obwohl die Messung längst da ist. Kleine Abhilfe im Frontend: nach einer
-  Mutation, deren Antwort Einträge ohne Messung trägt, einmal nach wenigen Sekunden
-  nachfragen. Nicht umgesetzt, weil die Backend-Änderung parallel entstand und die Frist
-  zum Hintergrundabruf passen muss.
+- **O2 · Neu festgelegte Station zeigt bis zu 5 min „Stand unbekannt“ — eingelöst.** Seit
+  `2d94f92f` antworten PUT und POST für eine noch nicht gecachte Station ohne Messung. Das
+  Frontend fragt jetzt **einmal** nach ~10 s nach, wenn einem Eintrag die Messung fehlt
+  (`PEGEL_NACHFRAGE_MS`), nach Schreiben wie beim ersten Laden. Fehlt sie danach weiter, gilt
+  wieder der 5-min-Takt. Träger ist `refetchInterval` als Funktion der Daten
+  (`naechsterPegelAbruf` in `api/pegel.ts`), kein eigener Timer; das Intervall endet mit dem
+  letzten Beobachter. Gemessen dabei: TanStack wertet `refetchInterval` bei jedem Render und
+  jeder Zustandsänderung aus, nicht nur nach einem Abruf. Eine Funktion, die sich beim
+  ersten Aufruf „erledigt“ merkt, setzt das kurze Intervall deshalb vor dem Feuern zurück; die
+  Regel ist darum idempotent je Datenstand. Belege: [T6]; Mutationsproben „fester Takt“,
+  „nicht idempotent“ und „immer kurz“ färben je mindestens einen Test rot.
 - **O3 · Keine Browsermessung am Fachebenen-Inspector:** Im e2e gibt es keinen Klickpfad zu
   einem Fachebenen-Punkt. Die Karte ist WebGL, und die Fachebenen-Schalter der Leiste
   (`pages/lagekarte/Sidebar.tsx`, `Switch` in der Fachebenen-Liste) haben **keinen
