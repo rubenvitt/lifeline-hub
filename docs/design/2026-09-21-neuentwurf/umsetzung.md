@@ -135,3 +135,22 @@ Das Modulpanel des Entwurfs führt acht Module, die es in der App nicht gab. Ent
 | Ablösung (Kräfte) | Fachmodul, hier verworfen | Folgetask LFH-635 |
 
 Eine Sprungmarke ist **kein Modul** (`frontend/src/einsatz/sprungmarken.ts`). Sie erbt Sichtbarkeit und Sperre ihres Zielmoduls, ist nie `aria-current` und trägt keinen Zähler, weil es für 7/144/9 keine Quelle gibt (LFH-612).
+
+## Einheitenstatus und „Seit“ (LFH-609, 22.09.2026)
+
+Die Lücke „FMS-Status/„Seit“ je Einheit“ ist geschlossen. Die Entscheidung des Auftraggebers:
+
+- Der Status einer Einheit wird **aus ihren Fahrzeugen abgeleitet**, und zwar serverseitig
+  (`einheit::repo::leite_status_ab`). Tragen alle Fahrzeuge denselben Status, gilt er.
+  „Seit“ ist dann der jüngste Wechsel und bleibt leer, sobald ein Fahrzeug keinen
+  Zeitpunkt kennt. Sonst gilt **„gemischt“** mit Verteilung („1× S3 · 2× S4“) und ohne „Seit“.
+- Eine Einheit **ohne Fahrzeug** führt ihren Status **von Hand**
+  (`PUT …/einheiten/{eid}/status`, mit Fahrzeug 422).
+- Das Fahrzeug trägt `status_seit`. Er springt nur bei einem echten Wechsel. Bestandszeilen
+  bleiben leer, weil ein nachgefüllter Wert erfunden wäre.
+- Im Meldebild zählen die Kacheln Einheiten je Status wie im Entwurf S6. Die Zeile zeigt
+  Status und „Seit“, die Verteilung der Mittel steht als eigene Spalte „Mittel“ (ab `xl`).
+  Auf der Lagekarte zeigt „Ausgewählt“ Status und „Seit“. Im Überblick zählt das Raster je
+  Abschnitt die Einheiten nach der Kategorie ihres Status.
+- Nicht Teil davon: das FMS-Tableau (LFH-642), die Rückmeldung bzw. „keine Rückmeldung“
+  (LFH-610) und der Funkrufname der Einheit (LFH-614).
