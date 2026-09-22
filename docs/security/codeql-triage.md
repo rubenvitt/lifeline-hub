@@ -24,7 +24,7 @@ Stand: 22.09.2026 · Alerts #1–#25.
 | Alert | Query | Ort | Was geändert wurde |
 |---|---|---|---|
 | #24, #25 | `rust/cleartext-logging` | `src/auth/totp/mod.rs` | Das frisch erzeugte TOTP-Secret stand in zwei `assert!`-Meldungen und wäre bei einem Fehlschlag im CI-Log gelandet. Die Meldungen tragen es nicht mehr; `assert_eq!` nennt die Ist-Länge ohnehin selbst. |
-| #11 | `rust/uncontrolled-allocation-size` | `src/uhs/platz_repo.rs` | `Vec::with_capacity(menge)` — `menge` kam aus dem Request-Body. Die Grenze lag **nur** in der Route (`1..=50`), das Repo hatte sie als Annahme. Jetzt `platz_repo::MENGE_MAX` als eine Wahrheit: die Route validiert dagegen (422), das Repo klemmt vor der Allokation. |
+| #11 | `rust/uncontrolled-allocation-size` | `src/uhs/platz_repo.rs` | `Vec::with_capacity(menge)` — `menge` kam aus dem Request-Body. Die Grenze lag **nur** in der Route (`1..=50`), das Repo hatte sie als Annahme. Jetzt `platz_repo::MENGE_MAX` als eine Wahrheit: die Route validiert dagegen (422), das Repo klemmt die Schleife. Die Kapazitätsangabe ist **ganz entfallen** (siehe unten). |
 | #1 | `js/incomplete-sanitization` | `frontend/src/components/dichte.guard.test.ts` | Die Regex-Maskierung des Elementnamens kannte genau ein Metazeichen (den Punkt in `Space.Compact`). Ersetzt durch `regexMaskiert()` über die ganze Zeichenklasse. |
 
 Zu #11 im Einzelnen: die Klemme ist **kein** Ersatz für die Route-Validierung, sondern ihre
@@ -33,6 +33,20 @@ das eine Fehleingabe stillschweigend zurechtbiegt, wäre eine Verschlechterung. 
 dass die Zahl nicht mehr davon abhängt, dass **jeder** künftige Aufrufer vorher prüft.
 `anlegen_bulk_klemmt_menge_auf_menge_max` prüft den Repo-Aufruf unter Umgehung der Route; die
 Mutationsprobe (Klemme raus) färbt ihn rot.
+
+**Die Klemme allein hat den Alert nicht geschlossen, und das ist der lehrreiche Teil.** Der
+erste Anlauf liess `Vec::with_capacity(menge)` stehen und klemmte `menge` davor. Fachlich ist
+das dicht — die Allokation kann `MENGE_MAX` nicht überschreiten. CodeQL meldete die Zeile
+trotzdem, nur unter einer **neuen** Alert-Nummer, weil sich der Zeileninhalt und damit der
+Fingerabdruck geändert hatte: der Rust-Pack (0.1.42) führt `Ord::clamp` nicht als Barriere, die
+Taint-Spur vom Request-Body zur Allokation blieb also bestehen. Erst das **Streichen** der
+Kapazitätsangabe hat den Sink entfernt.
+
+Daraus zwei Dinge zum Mitnehmen: eine Wertgrenze, die eine statische Analyse nicht sieht, ist
+für sie keine Grenze — und ein Fix, der eine gemeldete Zeile bloss umschreibt statt die
+Konstruktion aufzulösen, erzeugt einen neuen Alert statt den alten zu schliessen. Die Klemme
+bleibt trotzdem stehen: sie begrenzt die **Schleife** (bis zu `MENGE_MAX` INSERTs mit
+DB-Rundlauf), und das ist die Schranke, auf die es im Betrieb ankommt.
 
 ---
 

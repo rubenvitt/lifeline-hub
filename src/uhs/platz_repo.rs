@@ -126,7 +126,13 @@ pub async fn anlegen_bulk(
     .fetch_one(pool)
     .await?;
     let menge = menge.clamp(0, MENGE_MAX);
-    let mut neue = Vec::with_capacity(menge as usize);
+    // KEIN `Vec::with_capacity(menge)`: die Kapazität käme aus dem Request-Body, und die
+    // Klemme darüber ist zwar die echte Schranke, aber keine, die eine statische Analyse
+    // sieht — CodeQL führt `clamp` nicht als Barriere und meldete die Zeile weiter
+    // (rust/uncontrolled-allocation-size). Der Hinweis ist hier ohnehin nichts wert: bei
+    // höchstens MENGE_MAX Elementen stehen ~6 amortisierte Reallokationen gegen ebenso
+    // viele einzelne INSERTs mit DB-Rundlauf. Wer ihn zurückholt, holt die Meldung mit.
+    let mut neue = Vec::new();
     for i in 1..=menge {
         let bezeichnung = format!("{label} {}", max + i);
         let (pos_x, pos_y) = raster_position(belegt + i - 1);
