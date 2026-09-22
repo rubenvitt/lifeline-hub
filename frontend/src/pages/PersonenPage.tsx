@@ -3,7 +3,7 @@ import { CloseOutlined } from '@ant-design/icons';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { personDetailPfad } from '../routing/deeplinks';
+import { parsePersonenSicht, personDetailPfad } from '../routing/deeplinks';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
@@ -32,6 +32,7 @@ import {
   gefundenePersonen,
   rasterSchluessel,
   sichtFuerNeuePerson,
+  sichtNachSprung,
   type PersonenAnsicht,
   type PersonenFilter,
   type PersonenSicht,
@@ -484,6 +485,32 @@ export default function PersonenPage() {
     const pid = searchParams.get('person');
     if (pid) navigate(personDetailPfad(einsatzId, Number(pid)), { replace: true });
   }, [searchParams, einsatzId, navigate]);
+
+  // Sichtvorgabe: ?filter= / ?ansicht= (LFH-620, Sprungmarken „Patienten"/„Vermisste" im
+  // Modulpanel). Apply-then-clean wie `?neu=1`: die Sicht ist Seitenzustand, die URL trägt
+  // nur den Auftrag. Geräumt wird auch ein UNBRAUCHBARER Wert — sonst stünde er in der
+  // Adresse und beim Teilen des Links wieder im Auftrag, ohne je zu wirken.
+  //
+  // Über den Setter direkt, nicht über `aendereSichtFuer`: der ist je Render neu und
+  // löste den Effekt sonst bei jedem Render wieder aus. Der Setter ist stabil.
+  //
+  // KEINE Weiche „eigene gegen fremde Änderung" wie auf der ETB-Seite: dort setzt ein
+  // Remount die UNKONTROLLIERTE Filterleiste neu auf. `sicht` hier ist kontrollierter
+  // Zustand, die Segmentleisten lesen ihn direkt — nichts wird neu aufgesetzt, und das
+  // Räumen der Parameter löst keinen zweiten Auftrag aus, weil dann keiner mehr steht.
+  useEffect(() => {
+    if (!searchParams.has('filter') && !searchParams.has('ansicht')) return;
+    const vorgabe = parsePersonenSicht(searchParams);
+    setSichtNachEinsatz((alt) => {
+      const bisher = alt[einsatzId] ?? SICHT_VORGABE;
+      const neu = sichtNachSprung(bisher, vorgabe);
+      return neu === bisher ? alt : { ...alt, [einsatzId]: neu };
+    });
+    const rest = new URLSearchParams(searchParams);
+    rest.delete('filter');
+    rest.delete('ansicht');
+    setSearchParams(rest, { replace: true });
+  }, [searchParams, setSearchParams, einsatzId]);
 
   // Schnellaktion: ?neu=1 öffnet die Schnellerfassung (Command-Palette, LFH-11).
   // Warten bis der Einsatz geladen ist; Param immer löschen, aber Modal nur bei Schreibrecht öffnen.

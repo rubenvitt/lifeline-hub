@@ -116,3 +116,20 @@ Werte, die in Nachtmodus- und Hellfassung existieren müssen, gehören als Rolle
   Hinweiszeile Mono darunter; `@` Einheit, `#` Koordinate. Die Erfassungs-Norm
   (Enter sendet, Offline-Queue mit `client_id`, Sichtung im selben POST) gilt weiter.
 - **Sammelbanner**: Grund bedien-dunkel, Pfeilikone, Text, rechts Mono-Aktion.
+
+## Module aus dem Entwurf ohne Gegenstück (LFH-620, 22.09.2026)
+
+Das Modulpanel des Entwurfs führt acht Module, die es in der App nicht gab. Entscheidung je Modul:
+
+| Modul | Entscheidung | Umsetzung |
+|---|---|---|
+| Entscheidungen (Führung) | Sicht auf vorhandene Daten | Sprungmarke → ETB `?typ=entscheidung`. Eine eigene Übersicht lohnt erst mit Folgeauftrag-Verweis (LFH-636) |
+| Patienten (Erfassung) | Sicht auf vorhandene Daten | Sprungmarke → Personen `?ansicht=raster` (Sichtungsraster, „Patient" = SK I–IV/tot, `istPatient`) |
+| Vermisste (Erfassung) | Sicht auf vorhandene Daten | Sprungmarke → Personen `?filter=vermisst` (inkl. Abgleich). „vermisst seit" liegt bei LFH-613 |
+| Dokumente (Führung) | Fachmodul, hier verworfen | Folgetask LFH-632 (Dokumentenablage) |
+| Wetter & Pegel (Lage) | Fachmodul nach LFH-606 | Folgetask LFH-633, wartet auf LFH-606 |
+| Prognose (Lage) | kein eigenes Modul | geht in LFH-628 (Pegelprognose/Höchststand) und LFH-633 auf |
+| Verpflegung (Kräfte) | Fachmodul, hier verworfen | Folgetask LFH-634 |
+| Ablösung (Kräfte) | Fachmodul, hier verworfen | Folgetask LFH-635 |
+
+Eine Sprungmarke ist **kein Modul** (`frontend/src/einsatz/sprungmarken.ts`). Sie erbt Sichtbarkeit und Sperre ihres Zielmoduls, ist nie `aria-current` und trägt keinen Zähler, weil es für 7/144/9 keine Quelle gibt (LFH-612).

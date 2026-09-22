@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { Person } from '../api/types';
-import { filterPersonen, gefundenePersonen, sichtFuerNeuePerson } from './personenFilter';
+import {
+  SICHT_VORGABE,
+  filterPersonen,
+  gefundenePersonen,
+  sichtFuerNeuePerson,
+  sichtNachSprung,
+} from './personenFilter';
 
 /**
  * Die Filterkette der Personenliste als reine Funktionen (Muster
@@ -113,5 +119,27 @@ describe('gefundenePersonen', () => {
 
   it('lässt erfasst und vermisst draußen', () => {
     expect(nummern(gefundenePersonen([basis, vermisst]))).toEqual([]);
+  });
+});
+
+describe('sichtNachSprung (LFH-620)', () => {
+  const vorher = { ansicht: 'raster', filter: 'betroffen', nurLuecken: true } as const;
+
+  it('übernimmt nur die genannten Achsen und nimmt den Lücken-Filter immer zurück', () => {
+    expect(sichtNachSprung(vorher, { filter: 'vermisst' })).toEqual({
+      ansicht: 'raster',
+      filter: 'vermisst',
+      nurLuecken: false,
+    });
+    expect(sichtNachSprung(vorher, { ansicht: 'zeilen', filter: 'alle' })).toEqual({
+      ansicht: 'zeilen',
+      filter: 'alle',
+      nurLuecken: false,
+    });
+  });
+
+  it('lässt die Sicht ohne Vorgabe unverändert, samt Identität', () => {
+    expect(sichtNachSprung(vorher, {})).toBe(vorher);
+    expect(sichtNachSprung(SICHT_VORGABE, {})).toBe(SICHT_VORGABE);
   });
 });

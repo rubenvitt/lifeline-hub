@@ -2,7 +2,7 @@ import { http, HttpResponse } from 'msw';
 import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Route, Routes, useNavigate } from 'react-router';
+import { Route, Routes, useLocation, useNavigate } from 'react-router';
 import { server } from '../test/server';
 import { setzeViewportBreite } from '../test/viewport';
 import { renderMitProviders } from '../test/utils';
@@ -1423,5 +1423,70 @@ describe('PersonenPage', () => {
         client_id: expect.any(String),
       });
     });
+  });
+});
+
+/**
+ * Sichtvorgabe aus der URL (LFH-620) — der Anspringweg der Sprungmarken „Patienten" und
+ * „Vermisste" im Modulpanel. Geprüft werden BEIDE Hälften von apply-then-clean: die Sicht
+ * steht, UND die Parameter sind weg. Nur die erste Hälfte wäre auch mit einer Seite grün,
+ * die den Filter bloß aus der URL spiegelt.
+ */
+describe('PersonenPage — Sichtvorgabe aus der URL (LFH-620)', () => {
+  function Suche() {
+    return <output data-testid="suche">{useLocation().search}</output>;
+  }
+
+  function renderMitSuche(route: string) {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
+      http.get('/api/einsaetze/1/personen', () => HttpResponse.json([person, unbekannt])),
+      http.get('/api/einsaetze/1/tiere', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
+    );
+    return renderMitProviders(
+      <AuthProvider>
+        <Routes>
+          <Route
+            path="/einsaetze/:id/personen"
+            element={
+              <>
+                <Suche />
+                <PersonenPage />
+              </>
+            }
+          />
+        </Routes>
+      </AuthProvider>,
+      { route },
+    );
+  }
+
+  it('?filter=vermisst setzt den Statusfilter und räumt den Parameter', async () => {
+    renderMitSuche('/einsaetze/1/personen?filter=vermisst&ansicht=zeilen');
+    expect(await screen.findByText('R-002')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Vermisst', selected: true })).toBeInTheDocument();
+    // Die erfasste Person steht unter „Vermisst" nicht — die Vorgabe wirkt auf die Zeilen.
+    expect(screen.queryByText('R-001')).not.toBeInTheDocument();
+    await vi.waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
+  });
+
+  it('?ansicht=raster öffnet das Sichtungsraster über alle Personen', async () => {
+    renderMitSuche('/einsaetze/1/personen?ansicht=raster&filter=alle');
+    expect(
+      await screen.findByRole('region', { name: 'Betroffene nach Sichtungskategorie' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Alle', selected: true })).toBeInTheDocument();
+    await vi.waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(/^$/));
+  });
+
+  it('räumt einen unbrauchbaren Wert, ohne die Sicht zu verbiegen', async () => {
+    // Behält andere Parameter: nur der Sichtauftrag wird geräumt.
+    renderMitSuche('/einsaetze/1/personen?filter=patienten&x=1');
+    await screen.findByText('R-001');
+    expect(screen.getByRole('tab', { name: 'Alle', selected: true })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Zeilen' })).toBeChecked();
+    await vi.waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent('?x=1'));
   });
 });

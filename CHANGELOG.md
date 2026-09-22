@@ -1,3 +1,23 @@
+## [1.0.0-alpha.29](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.28...v1.0.0-alpha.29) (2026-09-22)
+
+### Features
+
+* **navigation:** Sprungmarken Entscheidungen, Patienten, Vermisste im Modulpanel (LFH-620) ([4e28481](https://github.com/rubenvitt/lifeline-hub/commit/4e284812c7ed0b977ea429d6dc5699c4c19190a5))
+
+### Bug Fixes
+
+* **navigation:** Sprungmarke mit Ikone statt Zeichen, ES2020-kompatibler Test (LFH-620) ([8066f8d](https://github.com/rubenvitt/lifeline-hub/commit/8066f8dd0d71d95927b7f7b4ccef05be70a4b5d9))
+
+## [1.0.0-alpha.28](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.27...v1.0.0-alpha.28) (2026-09-22)
+
+### Features
+
+* **markdown:** Überschriftenebene nennt der Einbauort (LFH-621) ([a37962c](https://github.com/rubenvitt/lifeline-hub/commit/a37962c97946745b4e096e3ad31ca6231552d105))
+
+### Bug Fixes
+
+* **chat:** aria-current an der Kanal-Schaltfläche statt am inneren Element (LFH-621) ([0c238e9](https://github.com/rubenvitt/lifeline-hub/commit/0c238e9ddff0c1354f9df321cd148187d1fb4596))
+
 ## [1.0.0-alpha.27](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.26...v1.0.0-alpha.27) (2026-09-22)
 
 ### Bug Fixes

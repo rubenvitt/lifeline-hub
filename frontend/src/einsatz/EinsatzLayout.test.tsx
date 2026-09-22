@@ -49,7 +49,13 @@ const einsatz = {
  * davon steht, welche Kind-Route gerade matcht.
  */
 function PfadAnzeige() {
-  return <span data-testid="pfad">{useLocation().pathname}</span>;
+  const { pathname, search } = useLocation();
+  // `data-suche` für die Sprungmarken (LFH-620): ihr Ziel ist eine Query, kein Pfad.
+  return (
+    <span data-testid="pfad" data-suche={search}>
+      {pathname}
+    </span>
+  );
 }
 
 /** Liest den aktuellen Pfad aus der `PfadAnzeige`-Sonde. */
@@ -582,6 +588,32 @@ describe('EinsatzLayout · Einsatzkennung im Kopf (Neuentwurf)', () => {
 });
 
 describe('EinsatzLayout · Rail-Klick (LFH-337 · H12)', () => {
+  /**
+   * Sprungmarke (LFH-620): der Klick führt ins ZIELmodul mit Sichtauftrag, die Hervorhebung
+   * bleibt beim Modul, in dem man dann steht. Und er wird nicht als Modulbesuch gemerkt —
+   * „Vermisste" ist kein Modulschlüssel.
+   */
+  it('springt über eine Sprungmarke ins Zielmodul, ohne sie als Besuch zu merken', async () => {
+    localStorage.clear();
+    setup();
+    await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Vermisste, springt zu Personen, Filter Vermisst' }),
+    );
+
+    await waitFor(() => expect(pfad()).toBe('/einsaetze/7/personen'));
+    expect(screen.getByTestId('pfad')).toHaveAttribute(
+      'data-suche',
+      '?filter=vermisst&ansicht=zeilen',
+    );
+    expect(screen.getByRole('button', { name: 'Personen' })).toHaveAttribute(
+      'aria-current',
+      'true',
+    );
+    expect(leseZuletztModule(7)).toEqual([]);
+  });
+
   it('springt beim Klick auf eine ANDERE Kategorie in deren erstes Modul', async () => {
     setup();
     await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
