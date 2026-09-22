@@ -7,7 +7,7 @@
 -- Die Tabelle trägt AUTOINCREMENT → der sqlite_sequence-Eintrag wird umgehängt, sonst
 -- vergäbe SQLite nach dem Löschen der höchsten Zeile deren id erneut.
 -- Schema = 0025 1:1 (keine späteren ADD COLUMN), einzige Änderung ist der art-CHECK.
--- Abgesichert von db::tests::migration_0107_person_verbleib_rebuild_* (include_str!).
+-- Abgesichert von db::tests::migration_0112_person_verbleib_rebuild_* (include_str!).
 
 CREATE TABLE person_verbleib_neu (
     id             INTEGER PRIMARY KEY AUTOINCREMENT,

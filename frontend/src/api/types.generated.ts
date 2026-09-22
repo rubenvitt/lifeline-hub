@@ -2499,7 +2499,7 @@ export interface components {
         /**
          * @description Art eines Verbleib-Ereignisses. String = CHECK-Constraint in
          *     `migrations/0025_person_verbleib.sql`, erweitert um `notunterkunft` in
-         *     `migrations/0107_person_verbleib_notunterkunft.sql` (LFH-613). `Verstorben` = Verbleib des
+         *     `migrations/0112_person_verbleib_notunterkunft.sql` (LFH-613). `Verstorben` = Verbleib des
          *     Leichnams (NICHT der Admin-Status).
          * @enum {string}
          */
