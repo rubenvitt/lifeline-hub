@@ -78,11 +78,21 @@ pub async fn anlegen(
     laden(pool, uhs_id, id).await
 }
 
+/// Obergrenze für [`anlegen_bulk`]. Steht **hier** und nicht in der Route, weil die
+/// Schleife und die Vorab-Allokation hier liegen: eine Grenze, die nur der Aufrufer kennt,
+/// ist für dieses Modul keine Zusicherung, sondern eine Annahme. Die Route validiert gegen
+/// dieselbe Konstante und antwortet 422 — wer sie dort ändert, ändert sie für beide.
+pub const MENGE_MAX: i64 = 50;
+
 /// Legt `menge` Plätze desselben Typs mit automatisch fortlaufenden Bezeichnungen
 /// `"<label> <n>"` an (LFH-16: „nach Typ anlegen statt jedes Mal einen Namen vergeben").
 /// `n` setzt hinter der höchsten bereits vergebenen Nummer dieses Labels fort — auch
 /// **stornierte** Zeilen zählen mit, weil `UNIQUE(uhs_id, bezeichnung)` Soft-Deletes
 /// umfasst und eine wiederverwendete Nummer sonst kollidiert. Rückgabe in Anlegereihenfolge.
+///
+/// `menge` wird auf [`MENGE_MAX`] geklemmt, bevor daraus eine Kapazität wird: die Zahl kommt
+/// aus dem Request-Body, und `Vec::with_capacity` allokiert sofort — ohne die Klemme hinge
+/// die Allokationsgröße daran, dass **jeder** künftige Aufrufer vorher prüft.
 pub async fn anlegen_bulk(
     pool: &SqlitePool,
     uhs_id: i64,
@@ -115,7 +125,8 @@ pub async fn anlegen_bulk(
     .bind(uhs_id)
     .fetch_one(pool)
     .await?;
-    let mut neue = Vec::with_capacity(menge.max(0) as usize);
+    let menge = menge.clamp(0, MENGE_MAX);
+    let mut neue = Vec::with_capacity(menge as usize);
     for i in 1..=menge {
         let bezeichnung = format!("{label} {}", max + i);
         let (pos_x, pos_y) = raster_position(belegt + i - 1);
@@ -353,6 +364,30 @@ mod tests {
         assert_eq!(p.verfuegbarkeit, Verfuegbarkeit::Frei);
         assert_eq!(p.pos_x, Some(100.0));
         assert!(p.reserviert_fuer_person_id.is_none());
+    }
+
+    /// Die Obergrenze gehört dem Repo, nicht nur der Route: `menge` fließt aus dem
+    /// Request-Body direkt in `Vec::with_capacity`, und eine Grenze, die nur ein Aufrufer
+    /// kennt, fällt mit dem nächsten Aufrufer. Geprüft wird deshalb der Repo-Aufruf
+    /// selbst, unter Umgehung der Route. Die Gegenrichtung steht daneben: unterhalb der
+    /// Grenze klemmt nichts — ohne sie wäre ein Klemmen auf einen Festwert nicht von
+    /// einem Klemmen auf `MENGE_MAX` zu unterscheiden.
+    #[tokio::test]
+    async fn anlegen_bulk_klemmt_menge_auf_menge_max() {
+        let pool = test_pool().await;
+        let (_b, _e, u, _, _) = setup(&pool).await;
+
+        let zuviel = anlegen_bulk(&pool, u, "bett", "Bett", MENGE_MAX + 5_000)
+            .await
+            .unwrap();
+        assert_eq!(zuviel.len(), MENGE_MAX as usize);
+
+        // Eigener Pool: `setup` legt eine Organisation mit fester id an und ist je Pool
+        // genau einmal aufrufbar.
+        let pool2 = test_pool().await;
+        let (_b2, _e2, u2, _, _) = setup(&pool2).await;
+        let knapp = anlegen_bulk(&pool2, u2, "bett", "Bett", 3).await.unwrap();
+        assert_eq!(knapp.len(), 3);
     }
 
     #[tokio::test]
