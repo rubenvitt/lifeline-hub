@@ -13,8 +13,8 @@ Stand 22.09.2026. Ticket: LFH-628 (Entwicklungsboard), Folgetask zu LFH-606
    In den Einstellungen steht die Prognose als „abgelaufen“, bis jemand sie löscht oder
    erneuert.
 3. Die Migrationskollision im LFH-606-Branch (`0103_einsatz_pegel` neben
-   `0103_etb_lesemarke`) wird **auf dem 606-Branch** behoben (→ `0104`), dieser Task
-   stapelt darauf (`0105`).
+   `0103_etb_lesemarke`) gehört dem 606-Branch. Sie ist dort als `0104` behoben und mit
+   PR #91 nach alpha gegangen; dieser Task setzt darauf auf (`0105`).
 
 ## Befund PEGELONLINE `WV` (gemessen 22.09.2026)
 
@@ -75,7 +75,9 @@ Systemeintrag.
   **Leitpegels** hinter dem Datenstand, auch bei Ausfall der Messung. Ohne oder mit
   abgelaufener Prognose ist die Notiz byte-gleich zur LFH-606-Fassung.
 - `fuehrung/ueberblickDaten.ts:naechsteMarken`: vierte Quelle `pegelprognose`, Text
-  „Erwarteter Höchststand Pegel <Gewässer>: 7,10 m“, Ziel `…/einstellungen/pegel`. Die
+  „Erwarteter Höchststand Pegel <Station> (<Gewässer>): 7,10 m“, Ziel
+  `…/einstellungen/pegel`. Die Station steht vorn, weil es eine Marke je festgelegtem Pegel
+  gibt und zwei Pegel am selben Gewässer sonst nicht zu unterscheiden wären. Die
   verstrichene Prognose wird **vor** dem Sortieren herausgefiltert und steht nie als
   „überfällig“ oben. Alle festgelegten Pegel, nicht nur der Leitpegel.
 - `einstellungen/EinsatzPegel.tsx`: je Zeile die Prognose (offen / „· abgelaufen“), im

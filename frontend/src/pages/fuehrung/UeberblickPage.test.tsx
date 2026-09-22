@@ -403,11 +403,11 @@ describe('UeberblickPage', () => {
     rendern();
     const p = await waitFor(() => paneel('Nächste Marken'));
     const marke = await within(p).findByRole('link', {
-      name: /Erwarteter Höchststand Pegel WESER: 7,10 m/,
+      name: /Erwarteter Höchststand Pegel HANN\. MÜNDEN \(WESER\): 7,10 m/,
     });
     expect(marke).toHaveAttribute('href', '/einsaetze/1/einstellungen/pegel');
     expect(marke).toHaveAttribute('data-ton', 'neutral');
-    expect(within(p).queryByText(/Pegel FULDA/)).toBeNull();
+    expect(within(p).queryByText(/Pegel WAHNHAUSEN/)).toBeNull();
   });
 
   it('Leerzustand: jedes Paneel sagt „nichts da" und bietet, wo sinnvoll, eine Aktion', async () => {

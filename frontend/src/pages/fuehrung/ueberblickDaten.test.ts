@@ -315,12 +315,20 @@ describe('Nächste Marken', () => {
       [],
       null,
       JETZT,
-      [pegel(1, nach(20)), pegel(2, vor(5)), pegel(3, null), pegel(4, nach(90), null)],
+      [
+        pegel(1, nach(20)),
+        pegel(2, vor(5)),
+        pegel(3, null),
+        pegel(4, nach(90), null),
+        pegel(5, nach(100)),
+      ],
     );
     expect(r.marken.map((m) => [m.art, m.text, m.ton])).toEqual([
-      ['pegelprognose', 'Erwarteter Höchststand Pegel WESER: 7,10 m', 'achtung'],
+      ['pegelprognose', 'Erwarteter Höchststand Pegel STATION 1 (WESER): 7,10 m', 'achtung'],
       ['auftrag', 'Frist', 'neutral'],
       ['pegelprognose', 'Erwarteter Höchststand Pegel STATION 4: 7,10 m', 'neutral'],
+      // Zwei Pegel am selben Gewässer bleiben unterscheidbar.
+      ['pegelprognose', 'Erwarteter Höchststand Pegel STATION 5 (WESER): 7,10 m', 'neutral'],
     ]);
     expect(r.marken[0]).toMatchObject({ id: 1, wort: 'in 20 min' });
     expect(r.marken.some((m) => m.ton === 'alarm')).toBe(false);

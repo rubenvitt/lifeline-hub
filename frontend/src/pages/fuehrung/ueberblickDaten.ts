@@ -406,6 +406,12 @@ export function markenBewertung(zeit: Dayjs, jetzt: Dayjs): { ton: MarkenTon; wo
   return { ton: minuten < KNAPP_MINUTEN ? 'achtung' : 'neutral', wort };
 }
 
+/** „HANN. MÜNDEN (WESER)" — Station mit Gewässer, ohne Gewässer nur die Station. Rein. */
+export function pegelBezeichnung(p: Pick<PegelAnzeige, 'name' | 'gewaesser'>): string {
+  const gewaesser = p.gewaesser?.trim();
+  return gewaesser ? `${p.name} (${gewaesser})` : p.name;
+}
+
 /**
  * Die anstehenden Fristen aus vier Quellen: Frist offener Aufträge, Fälligkeit offener
  * Erinnerungen, nächste Lagebesprechung und der erwartete Höchststand an einem maßgeblichen
@@ -465,7 +471,9 @@ export function naechsteMarken(
         art: 'pegelprognose',
         id: p.id,
         zeit: prognose.zeitpunkt,
-        text: `Erwarteter Höchststand Pegel ${p.gewaesser?.trim() || p.name}: ${wasserstandMeter(prognose.hoechststand_cm)} m`,
+        // Stationsname, Gewässer als Zusatz: es gibt eine Marke je festgelegtem Pegel, und
+        // zwei Pegel am selben Gewässer wären unter „Pegel WESER" nicht zu unterscheiden.
+        text: `Erwarteter Höchststand Pegel ${pegelBezeichnung(p)}: ${wasserstandMeter(prognose.hoechststand_cm)} m`,
       });
     }
   }
