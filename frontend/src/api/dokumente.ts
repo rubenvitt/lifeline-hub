@@ -1,6 +1,14 @@
 import { apiGet, apiSend, apiUpload } from './client';
 import type { Dokument, DokumentKategorie } from './types';
 
+/**
+ * Höchstgröße einer Datei: 25 MiB, Spiegel von `MAX_GROESSE` in `src/anhang/mod.rs` (dort
+ * `len > MAX_GROESSE` → 400 „Datei ist zu groß (25 MiB erlaubt)"). Der Dialog prüft vorab,
+ * damit niemand 25 MiB über eine Mobilfunkstrecke schickt, nur um die Absage zu lesen.
+ * Wer den Serverwert ändert, ändert diesen mit — es gibt keinen Codegen dafür.
+ */
+export const DOKUMENT_MAX_GROESSE = 25 * 1024 * 1024;
+
 /** 25 MiB + clamd-Scan über eine Mobilfunkstrecke: 15 s reichen nicht (LFH-632). */
 export const DOKUMENT_UPLOAD_TIMEOUT_MS = 120_000;
 

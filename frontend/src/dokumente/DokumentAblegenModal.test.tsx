@@ -12,7 +12,7 @@ vi.mock('../api/dokumente', async (importOriginal) => {
   const echt = await importOriginal<typeof import('../api/dokumente')>();
   return { ...echt, legeDokumentAb: vi.fn() };
 });
-import { legeDokumentAb } from '../api/dokumente';
+import { DOKUMENT_MAX_GROESSE, legeDokumentAb } from '../api/dokumente';
 
 const legeAb = vi.mocked(legeDokumentAb);
 
@@ -212,6 +212,40 @@ describe('DokumentAblegenModal', () => {
     await userEvent.clear(titel);
     await userEvent.click(within(d).getByRole('button', { name: /remove|entfernen/i }));
     expect(titel).toHaveValue('');
+  });
+
+  /** Eine Datei mit vorgetäuschter Größe — kein 25-MiB-Puffer im Test. antd liest `file.size`. */
+  function pdfMitGroesse(groesse: number) {
+    const datei = pdf();
+    Object.defineProperty(datei, 'size', { value: groesse });
+    return datei;
+  }
+
+  it('weist eine Datei über 25 MiB vor dem Hochladen ab', async () => {
+    rendere();
+    const d = await dialog();
+    await fuellePflicht(d, pdfMitGroesse(DOKUMENT_MAX_GROESSE + 1));
+    // Vorbedingung: die Datei ist wirklich angekommen (Titel aus dem Dateinamen) — sonst wäre
+    // „nicht abgeschickt" trivial wahr, weil schon die Pflichtregel griffe.
+    expect(within(d).getByRole('textbox', { name: 'Titel' })).toHaveValue('Lageplan Nord');
+    expect(await within(d).findByText('Datei ist zu groß (25 MiB erlaubt)')).toBeInTheDocument();
+
+    await userEvent.click(within(d).getByRole('button', { name: 'Ablegen' }));
+    await vi.waitFor(() =>
+      expect(within(d).getAllByText('Datei ist zu groß (25 MiB erlaubt)')).toHaveLength(1),
+    );
+    expect(legeAb).not.toHaveBeenCalled();
+  });
+
+  it('lässt eine Datei von genau 25 MiB durch (der Server prüft mit „>")', async () => {
+    legeAb.mockResolvedValue({} as never);
+    rendere();
+    const d = await dialog();
+    await fuellePflicht(d, pdfMitGroesse(DOKUMENT_MAX_GROESSE));
+    await userEvent.click(within(d).getByRole('button', { name: 'Ablegen' }));
+
+    await vi.waitFor(() => expect(legeAb).toHaveBeenCalledTimes(1));
+    expect(within(d).queryByText('Datei ist zu groß (25 MiB erlaubt)')).not.toBeInTheDocument();
   });
 
   it('fokussiert beim Öffnen „Datei wählen" statt des verborgenen Datei-Inputs', async () => {

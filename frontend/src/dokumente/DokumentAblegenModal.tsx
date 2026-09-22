@@ -6,7 +6,12 @@ import { Select } from '../components/Select';
 import { ErfassungsModal } from '../components/Erfassung';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { einsatzKeys } from '../api/queryKeys';
-import { legeDokumentAb, type DokumentAblage, type DokumentBezugTyp } from '../api/dokumente';
+import {
+  DOKUMENT_MAX_GROESSE,
+  legeDokumentAb,
+  type DokumentAblage,
+  type DokumentBezugTyp,
+} from '../api/dokumente';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinheiten } from '../api/einheiten';
 import { listeEtb } from '../api/etb';
@@ -31,6 +36,9 @@ interface AblageFormular {
  *  die Abfrage nicht das Cache-Fach der Infinite-Query von `EtbPage` teilt. */
 const ETB_BEZUG_DECKEL = 100;
 const BEZUG_TYPEN: readonly DokumentBezugTyp[] = ['abschnitt', 'einheit', 'etb_eintrag'];
+/** Wortgleich mit der Server-Absage (`src/anhang/mod.rs`, `pruefe_groesse`): eine Absage, ein
+ *  Wortlaut — gleich, ob der Dialog sie vorab gibt oder der Server. */
+const ZU_GROSS = `Datei ist zu groß (${DOKUMENT_MAX_GROESSE / 1024 / 1024} MiB erlaubt)`;
 const kuerze = (text: string, max: number) =>
   text.length > max ? `${text.slice(0, max - 1)}…` : text;
 
@@ -161,7 +169,18 @@ export default function DokumentAblegenModal({ einsatzId, offen, onSchliessen }:
         getValueFromEvent={(e: { fileList?: UploadFile[] } | UploadFile[]) =>
           Array.isArray(e) ? e : e?.fileList
         }
-        rules={[{ required: true, message: 'Bitte eine Datei wählen' }]}
+        rules={[
+          { required: true, message: 'Bitte eine Datei wählen' },
+          {
+            // Vorab statt nach 25 MiB Upload: der Server lehnt dieselbe Grenze mit `>` ab.
+            validator: (_, liste?: UploadFile[]) => {
+              const groesse = liste?.[0]?.originFileObj?.size ?? liste?.[0]?.size ?? 0;
+              return groesse > DOKUMENT_MAX_GROESSE
+                ? Promise.reject(new Error(ZU_GROSS))
+                : Promise.resolve();
+            },
+          },
+        ]}
       >
         <Upload
           beforeUpload={() => false}
