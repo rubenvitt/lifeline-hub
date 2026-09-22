@@ -1,3 +1,18 @@
+## [1.0.0-alpha.26](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.25...v1.0.0-alpha.26) (2026-09-22)
+
+### Features
+
+* **shell:** Neuentwurf-Rahmen und Instrument-Bausteine ([82e9440](https://github.com/rubenvitt/lifeline-hub/commit/82e9440faa8f3f7fd77af5fba1e1d8d6a22935b9))
+* **theme:** Neuentwurf-Fundament – Nachtbetrieb als Vorgabe, neue Palette und Rollen ([aed31b4](https://github.com/rubenvitt/lifeline-hub/commit/aed31b40bc56ac549763e358573bf44f22557cb8)), closes [#4d94d6](https://github.com/rubenvitt/lifeline-hub/issues/4d94d6)
+* **ui:** Neuentwurf konsolidiert – volle Breite, Bausteine, Restflächen, Karte/Meldebild/Dashboard ([060a1b3](https://github.com/rubenvitt/lifeline-hub/commit/060a1b3921cfd26dede44d3f301da1368e43d2a5))
+* **ui:** Neuentwurf-Screens – Überblick, Lage-Dashboard, ETB-Zeitachse, Lagekarte, Meldebild, Betroffene, Restseiten ([69ff732](https://github.com/rubenvitt/lifeline-hub/commit/69ff7321667615612585c972a4d257f634f93bb3))
+
+### Bug Fixes
+
+* **theme:** Selektor im Rollen-Guard vollständig escapen (CodeQL) ([c79b2d7](https://github.com/rubenvitt/lifeline-hub/commit/c79b2d71828140df0a958a223d45201ece9dc3b2))
+* **ui:** e2e-Befunde des Neuentwurfs – Deeplink-Anker, Fokusabstand zur Fußzeile, Verwaltung mobil, Chat-Lesebreite, Kopfleiste einzeilig ab 1024 px ([dd702d5](https://github.com/rubenvitt/lifeline-hub/commit/dd702d50989f643dac8b1b68cbd913f4fc2b05ec))
+* **ui:** Review-Befunde – ETB-Einfrieren per Wassermarke, Überblick-Schreibrecht, Kartenstart wartet auf Ansichten, Dashboard-Wassermarke je Einsatz ([fbbd8b2](https://github.com/rubenvitt/lifeline-hub/commit/fbbd8b27ccd1fa784afe5103f054b4393779a075))
+
 ## [1.0.0-alpha.25](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.24...v1.0.0-alpha.25) (2026-09-22)
 
 ### Features
