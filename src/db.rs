@@ -155,6 +155,33 @@ mod tests {
         );
     }
 
+    /// Jede Migrationsnummer genau einmal. Parallele Branches greifen gern zur selben
+    /// nächsten freien Nummer, und beim Merge kollidiert das textuell nicht — die Dateien
+    /// heissen ja verschieden. Erst beim Einspielen scheitert `_sqlx_migrations.version`,
+    /// und zwar in JEDEM Test, der eine Datenbank anlegt, mit einer Meldung, die keine
+    /// Datei nennt (gemessen am 22.09.2026: dreimal `0106` nach #97/#98/#99). Dieser Test
+    /// nennt die Kollision beim Namen.
+    #[test]
+    fn migrationsnummern_sind_eindeutig() {
+        let mut je_nummer: std::collections::BTreeMap<i64, Vec<String>> = Default::default();
+        for m in sqlx::migrate!("./migrations").iter() {
+            je_nummer
+                .entry(m.version)
+                .or_default()
+                .push(m.description.to_string());
+        }
+        let doppelt: Vec<String> = je_nummer
+            .iter()
+            .filter(|(_, namen)| namen.len() > 1)
+            .map(|(nummer, namen)| format!("{nummer:04}: {}", namen.join(", ")))
+            .collect();
+        assert!(
+            doppelt.is_empty(),
+            "Migrationsnummer mehrfach vergeben — eine davon auf die nächste freie Nummer \
+             umlegen: {doppelt:?}"
+        );
+    }
+
     #[tokio::test]
     async fn migrations_create_app_meta() {
         let pool = test_pool().await;
