@@ -44,7 +44,7 @@
 
 ## 7. Abschluss
 
-- [ ] 7.1 LFH-613-Verweise im Frontend-Kommentarbestand (`PersonenPage`, `personenSpalten`, `personBefehl`, `personenBilanz`, `LageDashboardPage`, `LagePaneele`) auf den neuen Stand bringen, und `umsetzung.md` fortschreiben. Verifikation: `rg "LFH-613" frontend/src` zeigt nur noch zutreffende Aussagen.
-- [ ] 7.2 Folgetask „Personen als Layer auf der Lagekarte“ über `clickup-task-anlegen` erfassen. Verifikation: der Task existiert im Entwicklungsboard.
+- [x] 7.1 LFH-613-Verweise im Frontend-Kommentarbestand (`PersonenPage`, `personenSpalten`, `personBefehl`, `personenBilanz`, `LageDashboardPage`, `LagePaneele`) auf den neuen Stand bringen, und `umsetzung.md` fortschreiben. Verifikation: `rg "LFH-613" frontend/src` zeigt nur noch zutreffende Aussagen.
+- [x] 7.2 Folgetask „Personen als Layer auf der Lagekarte“ über `clickup-task-anlegen` erfassen. Verifikation: der Task existiert im Entwicklungsboard.
 - [ ] 7.3 Gesamt-Gate `./scripts/check-all.sh` (ohne `| tail`). `cargo test --no-default-features` entfällt, weil der Anhang-Code nicht berührt wird. Verifikation: Exit 0.
 - [ ] 7.4 Prüfliste Einsatztauglichkeit (15 Kriterien) für die umgebaute Betroffenen-Seite und die Kartenansicht ausfüllen, jede Zeile mit Verdikt. Verifikation: die Prüfliste liegt unter `docs/superpowers/specs/2026-09-22-lfh-613-pruefliste.md`.
