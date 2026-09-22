@@ -120,9 +120,9 @@ export function GefahrenmatrixPaneel({
                       textAlign: 'end',
                       color:
                         ton === 'alarm'
-                          ? rollen.alarm
+                          ? rollen.alarmText
                           : ton === 'achtung'
-                            ? rollen.achtung
+                            ? rollen.achtungText
                             : rollen.gedaempft,
                     }}
                   >
