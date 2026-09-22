@@ -5,6 +5,9 @@ import { Breadcrumb, Button } from 'antd';
 import { TbFileText, TbPlus } from 'react-icons/tb';
 import dayjs, { type Dayjs } from 'dayjs';
 import EinsatzSeite from '../../components/EinsatzSeite';
+import { RechteHinweis } from '../../components/SpeicherHinweis';
+import { useAuth } from '../../auth/AuthContext';
+import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import {
   Augenbraue,
   Kennzahl,
@@ -58,6 +61,7 @@ import {
   naechsteMarken,
   offeneAuftraege,
   warnstufeKennzahlVon,
+  ueberblickRechteText,
   type AbschnittZeile,
   type Marke,
 } from './ueberblickDaten';
@@ -183,6 +187,7 @@ export default function UeberblickPage() {
   const breit = abBreite('lg');
   const { konventionen } = useAnzeigeKonventionen();
   const jetzt = useJetzt();
+  const { benutzer } = useAuth();
 
   const einsatzQ = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -230,6 +235,12 @@ export default function UeberblickPage() {
   });
 
   const einsatz = einsatzQ.data;
+  /*
+   * Die Schreibwege der Seite (Eintrag, Leer-Aktionen) hängen am Einsatz-Schreibrecht wie
+   * auf den Nachbarseiten. Solange der Einsatz lädt, ist das Recht unbekannt — gesperrt,
+   * aber ohne Hinweis: ein Grund, der beim Laden aufblitzt, wäre eine falsche Aussage.
+   */
+  const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
   const personen = personenQ.data;
   const personal = personalQ.data;
   const fahrzeuge = fahrzeugeQ.data;
@@ -328,6 +339,12 @@ export default function UeberblickPage() {
         />
       }
       dataUpdatedAt={einsatzQ.dataUpdatedAt}
+      // Bedingt übergeben (Muster `StabPage`): ein JSX-Element ist immer truthy und
+      // hinterließe mit Schreibrecht ein leeres `div` mit Außenabstand.
+      hinweis={
+        einsatz != null &&
+        !darfSchreiben && <RechteHinweis sichtbar text={ueberblickRechteText(einsatz.status)} />
+      }
       aktionen={
         <>
           <Button
@@ -340,8 +357,10 @@ export default function UeberblickPage() {
           >
             Lagebericht
           </Button>
+          {/* Gesperrt statt versteckt (C10/M16): der Hinweis darüber nennt den Grund. */}
           <Button
             type="primary"
+            disabled={!darfSchreiben}
             icon={
               <Ikone>
                 <TbPlus size={14} />
@@ -438,7 +457,11 @@ export default function UeberblickPage() {
               zustand={zAbschnitte}
               leer={zeilen.length === 0}
               leerText="Noch keine Abschnitte und keine Kräfte erfasst."
-              leerAktion={{ text: 'Abschnitt anlegen', ziel: einsatzabschnittePfad(einsatzId) }}
+              leerAktion={
+                darfSchreiben
+                  ? { text: 'Abschnitt anlegen', ziel: einsatzabschnittePfad(einsatzId) }
+                  : undefined
+              }
               onNeuladen={() => {
                 void abschnitteQ.refetch();
                 void einheitenQ.refetch();
@@ -583,7 +606,11 @@ export default function UeberblickPage() {
                 zustand={zEntscheidungen}
                 leer={entscheidungen.eintraege.length === 0}
                 leerText="Noch keine Entscheidung im Einsatztagebuch."
-                leerAktion={{ text: 'Eintrag erfassen', ziel: etbPfad(einsatzId, { neu: true }) }}
+                leerAktion={
+                  darfSchreiben
+                    ? { text: 'Eintrag erfassen', ziel: etbPfad(einsatzId, { neu: true }) }
+                    : undefined
+                }
                 onNeuladen={() => void etbQ.refetch()}
               >
                 <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>

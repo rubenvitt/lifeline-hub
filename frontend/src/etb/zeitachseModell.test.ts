@@ -5,7 +5,7 @@ import { baueZeilen } from './etbZeile';
 import {
   berichtigungsindex,
   bilanzUmfang,
-  einfrierSchluessel,
+  einfrieren,
   filterMitTyp,
   filterZusammenfuehren,
   gruppiereNachStunde,
@@ -203,30 +203,84 @@ describe('Typfilter', () => {
 
 describe('teileZufluss', () => {
   const zeilen = baueZeilen({
-    eintraege: [e({ id: 3 }), e({ id: 2 }), e({ id: 1 })],
+    eintraege: [e({ id: 3, lfd_nr: 3 }), e({ id: 2, lfd_nr: 2 }), e({ id: 1, lfd_nr: 1 })],
     ausstehend: [puffer],
     abgelehnt: [],
   });
+  /** Eingefroren, als nur Nr. 1 und Nr. 2 zu sehen waren. */
+  const stand = einfrieren(
+    baueZeilen({
+      eintraege: [e({ id: 2, lfd_nr: 2 }), e({ id: 1, lfd_nr: 1 })],
+      ausstehend: [],
+      abgelehnt: [],
+    }),
+  )!;
 
   it('zeigt ohne Einfrieren alles', () => {
     expect(teileZufluss(zeilen, null)).toEqual({ sichtbar: zeilen, zurueckgehalten: 0 });
   });
 
-  it('hält neue gesendete Einträge zurück, zeigt gepufferte immer', () => {
-    const gefroren = new Set(['eintrag-2', 'eintrag-1']);
-    const { sichtbar, zurueckgehalten } = teileZufluss(zeilen, gefroren);
+  it('hält einen fremden NEUEN Eintrag über der Wassermarke zurück, zeigt gepufferte immer', () => {
+    expect(stand.wassermarke).toBe(2);
+    const { sichtbar, zurueckgehalten } = teileZufluss(zeilen, stand, 99);
     expect(zurueckgehalten).toBe(1);
     expect(sichtbar.map((z) => z.schluessel)).toEqual(['ausstehend-1', 'eintrag-2', 'eintrag-1']);
   });
 
   it('lässt entfallene Einträge sofort fallen', () => {
-    const gefroren = new Set(['eintrag-9', 'eintrag-3']);
-    const { sichtbar } = teileZufluss(zeilen, gefroren);
+    const { sichtbar } = teileZufluss(zeilen, einfrieren(zeilen));
     expect(sichtbar.map((z) => z.schluessel)).not.toContain('eintrag-9');
   });
 
-  it('friert nur gesendete Einträge ein', () => {
-    expect([...einfrierSchluessel(zeilen)]).toEqual(['eintrag-3', 'eintrag-2', 'eintrag-1']);
+  /*
+   * Befund A (Review 22.09.2026): ein Deeplink auf einen nicht geladenen Grundeintrag lädt
+   * ÄLTERE Seiten nach, während der Fokus im Verweis liegt. Die Vorgängerin hielt alles
+   * zurück, was nicht im Einfrier-Satz stand — auch das Alte, das unter dem Cursor gar
+   * nicht springen kann (es kommt UNTEN an). Das Banner meldete es als „neu", und der
+   * Sprung fand seine Zeile nicht.
+   */
+  it('sortiert nachgeladene ÄLTERE Einträge sofort ein, auch eingefroren', () => {
+    const mitAelteren = baueZeilen({
+      eintraege: [e({ id: 2, lfd_nr: 2 }), e({ id: 1, lfd_nr: 1 }), e({ id: 7, lfd_nr: 0 })],
+      ausstehend: [],
+      abgelehnt: [],
+    });
+    const eng = einfrieren(
+      baueZeilen({ eintraege: [e({ id: 2, lfd_nr: 2 })], ausstehend: [], abgelehnt: [] }),
+    )!;
+    const { sichtbar, zurueckgehalten } = teileZufluss(mitAelteren, eng, 99);
+    expect(zurueckgehalten).toBe(0);
+    expect(sichtbar.map((z) => z.schluessel)).toEqual(['eintrag-2', 'eintrag-1', 'eintrag-7']);
+  });
+
+  /*
+   * Befund B: der eigene gepufferte Eintrag wird gesendet — die Pufferzeile geht, die
+   * Serverzeile kommt mit neuem Schlüssel. Hielte die Achse sie zurück, wäre der eigene
+   * Eintrag für diesen Moment nirgends zu sehen.
+   */
+  it('hält den EIGENEN gerade gesendeten Eintrag nie zurück', () => {
+    const nachSenden = baueZeilen({
+      eintraege: [e({ id: 3, lfd_nr: 3, erfasser_id: 42 }), e({ id: 2, lfd_nr: 2 })],
+      ausstehend: [],
+      abgelehnt: [],
+    });
+    const { sichtbar, zurueckgehalten } = teileZufluss(nachSenden, stand, 42);
+    expect(zurueckgehalten).toBe(0);
+    expect(sichtbar.map((z) => z.schluessel)).toEqual(['eintrag-3', 'eintrag-2']);
+    // Gegenprobe: derselbe Eintrag eines ANDEREN Erfassers bleibt zurück.
+    expect(teileZufluss(nachSenden, stand, 7).zurueckgehalten).toBe(1);
+  });
+
+  it('friert nur gesendete Einträge ein und merkt sich die höchste Nummer', () => {
+    const s = einfrieren(zeilen)!;
+    expect([...s.schluessel]).toEqual(['eintrag-3', 'eintrag-2', 'eintrag-1']);
+    expect(s.wassermarke).toBe(3);
+  });
+
+  it('friert eine Folge ohne gesendeten Eintrag nicht ein', () => {
+    expect(
+      einfrieren(baueZeilen({ eintraege: [], ausstehend: [puffer], abgelehnt: [] })),
+    ).toBeNull();
   });
 });
 

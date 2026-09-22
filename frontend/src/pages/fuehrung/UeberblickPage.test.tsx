@@ -25,6 +25,7 @@ const einsatz = {
   org_id: 1,
   org_name: 'THW',
   meine_sachgebiete: [],
+  meine_rolle: 'fuehrungspersonal',
   naechste_lagebesprechung_at: nach(120),
 };
 
@@ -357,6 +358,71 @@ describe('UeberblickPage', () => {
     expect(within(band()).getByText('noch keine angelegt')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Eintrag erfassen' }));
     expect(screen.getByTestId('ort')).toHaveTextContent('/einsaetze/1/etb?neu=1');
+  });
+
+  /*
+   * Review 22.09.2026: die Schreibwege der Seite trugen keinen Rechte-Riegel. Getestet als
+   * PAAR — mit Recht stehen die Leer-Aktionen (oben: „Eintrag erfassen"), ohne Recht fehlen
+   * sie, und die Primäraktion steht gesperrt mit Grund (C10/M16, C11/M45).
+   */
+  const leereDaten = {
+    personen: [],
+    personal: [],
+    fahrzeuge: [],
+    material: [],
+    einheiten: [],
+    abschnitte: [],
+    gefahren: [],
+    auftraege: [],
+    erinnerungen: [],
+    etb: [],
+  } as unknown as Daten;
+
+  it('mit Schreibrecht: Leer-Aktion „Abschnitt anlegen", kein Rechtehinweis', async () => {
+    stelleBereit(leereDaten);
+    rendern();
+    await userEvent.click(await screen.findByRole('button', { name: 'Abschnitt anlegen' }));
+    expect(screen.getByTestId('ort')).toHaveTextContent('/einsaetze/1/einsatzabschnitte');
+  });
+
+  it('mit Schreibrecht: „Eintrag" bedienbar, kein Rechtehinweis', async () => {
+    stelleBereit(volleDaten);
+    rendern();
+    await screen.findByText('Hochwasser Weserlauf');
+    expect(screen.getByRole('button', { name: 'Eintrag' })).toBeEnabled();
+    expect(screen.queryByText(/Nur Einsatzleitung und Führungspersonal/)).toBeNull();
+  });
+
+  it('ohne Schreibrecht: „Eintrag" gesperrt mit Grund, Leer-Aktionen zum Schreiben fehlen', async () => {
+    stelleBereit(leereDaten, [
+      http.get('/api/einsaetze/1', () =>
+        HttpResponse.json({ ...einsatz, meine_rolle: 'beobachter' }),
+      ),
+    ]);
+    rendern();
+    expect(await screen.findByText(/Nur Einsatzleitung und Führungspersonal/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Eintrag' })).toBeDisabled();
+    expect(
+      await screen.findByText('Noch keine Entscheidung im Einsatztagebuch.'),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText('Noch keine Abschnitte und keine Kräfte erfasst.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Eintrag erfassen' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Abschnitt anlegen' })).toBeNull();
+    // Reine Navigation bleibt: sie schreibt nichts.
+    expect(screen.getByRole('button', { name: 'Zu den Aufträgen' })).toBeInTheDocument();
+  });
+
+  it('abgeschlossener Einsatz: der Grund nennt den Abschluss, nicht die Rolle', async () => {
+    stelleBereit(volleDaten, [
+      http.get('/api/einsaetze/1', () =>
+        HttpResponse.json({ ...einsatz, status: 'abgeschlossen' }),
+      ),
+    ]);
+    rendern();
+    expect(await screen.findByText(/Der Einsatz ist abgeschlossen/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Eintrag' })).toBeDisabled();
   });
 
   it('Fehler ist nicht leer: ausgefallene Aufträge zeigen „Stand unbekannt", der Rest bleibt', async () => {

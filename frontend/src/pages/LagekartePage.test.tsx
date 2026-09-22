@@ -532,6 +532,49 @@ describe('LagekartePage', () => {
     );
   });
 
+  /*
+   * Review 22.09.2026: das Gate wartete nur auf die Marker-Quellen, nicht auf die
+   * Ansichten-Query. Kam die langsamer, entschied die Karte ohne Ansicht (Einsatzort) — und
+   * die Startansicht wird genau einmal verbraucht (`Kartenflaeche`), die gespeicherte
+   * Ansicht kam also nie mehr zum Zug.
+   */
+  it('wartet mit der Startansicht auf eine langsame Ansichten-Abfrage', async () => {
+    let freigeben: () => void = () => {};
+    const freigabe = new Promise<void>((r) => (freigeben = r));
+    basisHandler([
+      http.get('/api/einsaetze/1/karten-ansichten', async () => {
+        await freigabe;
+        return HttpResponse.json([
+          {
+            id: 1,
+            einsatz_id: 1,
+            name: 'Standard',
+            reihenfolge: 0,
+            ist_standard: true,
+            zentrum_lat: 49.4,
+            zentrum_lon: 8.7,
+            zoom: 12,
+            erstellt_at: '',
+            geaendert_at: '',
+          },
+        ]);
+      }),
+    ]);
+    renderSeite();
+    // Die Marker-Quellen sind da (die Liste steht) — die Ansichten noch nicht.
+    expect(await screen.findByRole('button', { name: 'Nicht verortet 1' })).toBeInTheDocument();
+    expect(screen.getByTestId('startansicht')).toHaveTextContent('offen');
+    freigeben();
+    await waitFor(() =>
+      expect(JSON.parse(screen.getByTestId('startansicht').textContent ?? 'null')).toEqual({
+        art: 'punkt',
+        lng: 8.7,
+        lat: 49.4,
+        zoom: 12,
+      }),
+    );
+  });
+
   it('öffnet selbst KEINE SSE-Verbindung (der Live-Stream ist ins EinsatzLayout gehoben)', async () => {
     // Regression: zuvor öffnete die Seite 6 EventSources, dann eine eigene; seit LFH-97
     // besitzt das EinsatzLayout die EINE Verbindung pro Einsatz (HTTP/1.1-6-Limit). Die Seite

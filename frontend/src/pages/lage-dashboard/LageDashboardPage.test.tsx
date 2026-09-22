@@ -5,7 +5,7 @@ import { delay, http, HttpResponse } from 'msw';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Route, Routes } from 'react-router';
+import { Route, Routes, useNavigate } from 'react-router';
 import { QueryClient } from '@tanstack/react-query';
 import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
@@ -629,6 +629,43 @@ describe('LageDashboardPage — Meldungsstrom', () => {
     await userEvent.click(within(box).getByRole('button', { name: 'anzeigen' }));
     expect(within(box).getByText('Deichbruch km 4')).toBeInTheDocument();
     expect(within(box).queryByText('1 neuer Eintrag')).toBeNull();
+  });
+
+  /*
+   * Review 22.09.2026: `angezeigtBis` hing an der Seiteninstanz, nicht am Einsatz. Beim
+   * Wechsel auf einen anderen Einsatz in DERSELBEN Instanz (gleiche Route, andere `:id`)
+   * galt die Marke des alten weiter — der neue zeigte nur seine Einträge bis zur alten
+   * Nummer und meldete den Rest als „neu".
+   */
+  it('setzt die Wassermarke beim Einsatzwechsel in derselben Instanz zurück', async () => {
+    mockEndpunkte({ etb: [1, 2, 3, 4, 5].map((n) => etb(n)) });
+    server.use(
+      http.get('/api/einsaetze/2', () => HttpResponse.json({ ...einsatz, id: 2 })),
+      http.get('/api/einsaetze/2/etb', () =>
+        HttpResponse.json([1, 2, 3, 4, 5, 6, 7].map((n) => etb(n, { id: 2000 + n }))),
+      ),
+      http.get('/api/einsaetze/2/gefahrengebiete/:gid/matrix', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/2/:modul', () => HttpResponse.json([])),
+    );
+    function Wechsel() {
+      const navigate = useNavigate();
+      return <button onClick={() => navigate('/einsaetze/2/lage-dashboard')}>wechseln</button>;
+    }
+    renderMitProviders(
+      <>
+        <Wechsel />
+        <Routes>
+          <Route path="/einsaetze/:id/lage-dashboard" element={<LageDashboardPage />} />
+        </Routes>
+      </>,
+      { route: '/einsaetze/1/lage-dashboard' },
+    );
+    const box = () => paneel('Meldungsstrom');
+    await waitFor(() => expect(box().querySelectorAll('li[data-lfd-nr]')).toHaveLength(5));
+
+    await userEvent.click(screen.getByRole('button', { name: 'wechseln' }));
+    await waitFor(() => expect(box().querySelector('li[data-lfd-nr="7"]')).not.toBeNull());
+    expect(within(box()).queryByText(/neuer? Einträge?/)).toBeNull();
   });
 
   it('ein leerer Strom füllt sich direkt — über einer leeren Fläche springt nichts', async () => {

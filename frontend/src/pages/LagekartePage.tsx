@@ -138,6 +138,7 @@ export default function LagekartePage() {
     ansichtenFehler,
     ansichtenFehlerUrsache,
     ansichtenNeuLaden,
+    ansichtenLaden,
     neueAnsicht,
     umbenennen,
     setzeStandard,
@@ -389,11 +390,13 @@ export default function LagekartePage() {
   // Startausschnitt aus den Daten (Ansichtszentrum → Einsatzort → Objekte); die Karte wendet
   // ihn genau einmal an. Über ALLE verorteten Objekte, nicht nur die sichtbaren Ebenen: eine
   // ausgeblendete Ebene ändert nicht, wo der Einsatz liegt.
-  // `undefined`, solange eine Marker-Quelle noch lädt: die Karte entscheidet erst über das
-  // vollständige Bild.
+  // `undefined`, solange eine Marker-Quelle ODER die Ansichtsliste noch lädt: die Karte
+  // entscheidet erst über das vollständige Bild — die Ansicht steht in der Reihenfolge ganz
+  // vorn, und die Karte wendet den Start nur einmal an.
+  const startOffen = markerLaden || ansichtenLaden;
   const start = useMemo(
-    () => (markerLaden ? undefined : startAnsicht(alleVerortet, aktiveAnsicht)),
-    [markerLaden, alleVerortet, aktiveAnsicht],
+    () => (startOffen ? undefined : startAnsicht(alleVerortet, aktiveAnsicht)),
+    [startOffen, alleVerortet, aktiveAnsicht],
   );
   const aktiverMarker = alleVerortet.find((m) => m.schluessel === auswahl) ?? null;
   // Freies taktisches Zeichen zur Marker-Auswahl (LFH-170): der Inspector editiert den ROHEN

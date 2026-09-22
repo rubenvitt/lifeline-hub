@@ -553,6 +553,8 @@ export default function EtbPage() {
               zeilen={chronologie}
               einsatzId={einsatzId}
               highlightId={highlightId}
+              sprungMarke={hervorhebung?.marke}
+              eigeneBenutzerId={benutzer?.id}
               ladend={etbQuery.isLoading}
               fehler={etbQuery.isError}
               leerText={leerInhalt}

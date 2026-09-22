@@ -256,6 +256,18 @@ export default function LageDashboardPage() {
 
   // ── Meldungsstrom: Wassermarke statt Einschieben (Festlegung 6) ──────────────────────
   const [angezeigtBis, setAngezeigtBis] = useState<number | null>(null);
+  /*
+   * Die Marke gehört zu EINEM Einsatz: ein Wechsel der `:id` in derselben Seiteninstanz
+   * (gleiche Route, React behält die Komponente) setzt sie zurück — sonst zeigte der neue
+   * Einsatz nur seine Einträge bis zur Nummer des alten und meldete den Rest als „neu"
+   * (Review 22.09.2026). Im Render angeglichen, nicht per Effekt: ein Effekt ließe genau
+   * einen Commit mit der falschen Marke durch.
+   */
+  const [markeFuer, setMarkeFuer] = useState(einsatzId);
+  if (markeFuer !== einsatzId) {
+    setMarkeFuer(einsatzId);
+    setAngezeigtBis(null);
+  }
   const etbDaten = etbQuery.data;
   // Abgeleiteter Zustand während des Renderns (React-Muster „storing information from
   // previous renders"): der erste Abruf und ein leer gewordenes Paneel ziehen die Marke

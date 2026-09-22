@@ -376,4 +376,78 @@ describe('EtbZeitachse – Sammelbanner', () => {
     expect(screen.getByText('Noch nicht gesendet')).toBeInTheDocument();
     expect(screen.queryByRole('status')).toBeNull();
   });
+
+  /*
+   * Review 22.09.2026, Befund A: „Grundeintrag anzeigen" auf einen nicht geladenen
+   * Eintrag — der Fokus steht im Verweis, die Seite lädt ÄLTERE Seiten nach. Die kommen
+   * unten an und springen unter nichts; sie gehören sofort in die Achse, nicht ins Banner.
+   */
+  it('sortiert nachgeladene ältere Einträge auch eingefroren sofort ein', () => {
+    const berichtigung = eintrag({
+      id: 20,
+      lfd_nr: 20,
+      typ: 'berichtigung',
+      inhalt: 'Korrektur',
+      berichtigt_eintrag_id: 5,
+    });
+    const grund = eintrag({ id: 5, lfd_nr: 5, inhalt: 'Grundeintrag alt' });
+    const { container, neu: setze } = renderZeitachse({ zeilen: zeilenAus([berichtigung]) });
+    act(() => screen.getByRole('link', { name: 'Grundeintrag anzeigen' }).focus());
+    setze(zeilenAus([berichtigung, grund]));
+    expect(screen.getByText('Grundeintrag alt')).toBeInTheDocument();
+    expect(zeileVon(container, 'eintrag-5')).toBeInTheDocument();
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  /*
+   * Befund B: der eigene gepufferte Eintrag geht raus — `ausstehend-<queueId>` verschwindet,
+   * `eintrag-<dbId>` kommt mit neuem Schlüssel. Zurückgehalten wäre er nirgends zu sehen.
+   */
+  it('zeigt den eigenen gerade gesendeten Eintrag sofort, auch eingefroren', () => {
+    const { neu: setze } = renderZeitachse({
+      zeilen: baueZeilen({ eintraege: [alt], ausstehend: [ausstehend()], abgelehnt: [] }),
+      onWiedervorlage: vi.fn(),
+      eigeneBenutzerId: 42,
+    });
+    act(() => screen.getByRole('button', { name: 'Aktionen zu Eintrag 1' }).focus());
+    setze(
+      zeilenAus([
+        eintrag({ id: 2, lfd_nr: 2, inhalt: 'Noch nicht gesendet', erfasser_id: 42 }),
+        alt,
+      ]),
+    );
+    expect(screen.getByText('Noch nicht gesendet')).toBeInTheDocument();
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  it('meldet den NEUEN Eintrag eines anderen Erfassers weiter im Banner', () => {
+    const { neu: setze } = renderZeitachse({
+      zeilen: zeilenAus([alt]),
+      onWiedervorlage: vi.fn(),
+      eigeneBenutzerId: 42,
+    });
+    act(() => screen.getByRole('button', { name: 'Aktionen zu Eintrag 1' }).focus());
+    setze(zeilenAus([eintrag({ id: 2, lfd_nr: 2, inhalt: 'Fremd', erfasser_id: 7 }), alt]));
+    expect(screen.queryByText('Fremd')).toBeNull();
+    expect(screen.getByRole('status')).toHaveTextContent('1 neuer Eintrag');
+  });
+
+  it('hebt das Einfrieren beim Sprung auf einen Eintrag auf (?eintrag=)', () => {
+    const bau = (zeilen: readonly EtbZeile[], sprungMarke?: number) => (
+      <EtbZeitachse
+        einsatzId={1}
+        zeilen={zeilen}
+        onWiedervorlage={vi.fn()}
+        highlightId={sprungMarke != null ? 2 : null}
+        sprungMarke={sprungMarke}
+      />
+    );
+    const { rerender } = renderMitProviders(bau(zeilenAus([alt])));
+    act(() => screen.getByRole('button', { name: 'Aktionen zu Eintrag 1' }).focus());
+    rerender(bau(zeilenAus([neu, alt])));
+    expect(screen.queryByText('Neu')).toBeNull();
+    rerender(bau(zeilenAus([neu, alt]), 1));
+    expect(screen.getByText('Neu')).toBeInTheDocument();
+    expect(screen.queryByRole('status')).toBeNull();
+  });
 });

@@ -20,6 +20,7 @@ import type {
   Auftrag,
   Einheit,
   EinsatzFahrzeug,
+  EinsatzStatus,
   EinsatzMaterial,
   EinsatzPersonal,
   Einsatzabschnitt,
@@ -437,4 +438,15 @@ export function naechsteMarken(
     ...markenBewertung(zeitpunkt(m.zeit)!, jetzt),
   }));
   return { marken, weitere: Math.max(0, sortiert.length - MARKEN_MAX) };
+}
+
+/**
+ * Grund der fehlenden Schreibberechtigung als ganzer Satz (C10/M16, C11/M45): die
+ * Primäraktion steht gesperrt da, der Satz nennt den Grund. Nennt die zwei Schreibwege,
+ * die der Überblick anbietet — Einträge erfassen und Abschnitte anlegen.
+ */
+export function ueberblickRechteText(einsatzStatus: EinsatzStatus): string {
+  return einsatzStatus !== 'aktiv'
+    ? 'Der Einsatz ist abgeschlossen — Einsatztagebuch und Abschnitte sind nur noch lesbar.'
+    : 'Nur Einsatzleitung und Führungspersonal können Einträge erfassen und Abschnitte anlegen.';
 }

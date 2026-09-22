@@ -264,32 +264,68 @@ export function filterZusammenfuehren(
 // ── Zufluss (Sammelbanner) ──────────────────────────────────────────────────────────
 
 /**
+ * Der Stand, auf dem die Zeitachse eingefroren ist: die gezeigten Schlüssel plus die
+ * höchste gezeigte laufende Nummer (Wassermarke). `lfd_nr` wächst je Einsatz streng — ein
+ * Eintrag darüber ist NEU, einer darunter ist ÄLTER (nachgeladene Seite) und kann unter
+ * dem Cursor nicht springen, weil er unten ankommt.
+ */
+export interface Einfrierstand {
+  schluessel: ReadonlySet<string>;
+  wassermarke: number;
+}
+
+/**
  * Live-Zufluss, der nicht unter dem Cursor springt (Bedien-Leitlinie Festlegung 6,
- * WCAG 3.2.5): solange die Zeitachse eingefroren ist, bleiben NEUE gesendete Einträge
- * zurück und werden gezählt; entfallene fallen sofort weg (eine nicht mehr vorhandene
- * Zeile kann man nicht zeigen), und gepufferte Zeilen stehen immer — sie sind die
- * eigenen, gerade erfassten, und ihr Verschwinden wäre der teuerste Fehlermodus.
+ * WCAG 3.2.5): solange die Zeitachse eingefroren ist, bleiben NEUE fremde Einträge — über
+ * der Wassermarke — zurück und werden gezählt. Alles andere steht sofort:
  *
+ * - **Ältere** (unter der Wassermarke): eine nachgeladene Seite, etwa weil der Deeplink
+ *   `?eintrag=` einen Grundeintrag sucht. Die Vorgängerin hielt jede Zeile außerhalb des
+ *   Einfrier-Satzes zurück — das Banner meldete die alten Einträge als „neu", und der
+ *   Sprung fand seine Zeile nicht (Review 22.09.2026, Befund A).
+ * - **Eigene** (`erfasser_id` = angemeldete Person): der eben gesendete Eintrag wechselt
+ *   den Schlüssel (`ausstehend-<queueId>` → `eintrag-<dbId>`); zurückgehalten wäre er in
+ *   diesem Moment nirgends zu sehen — der teuerste Fehlermodus (Befund B).
+ * - **Gepufferte**: sie sind die eigenen, noch nicht gesendeten.
+ *
+ * Entfallene fallen sofort weg (eine nicht mehr vorhandene Zeile kann man nicht zeigen).
  * Die Reihenfolge bleibt die frische: neue Einträge kommen oben an, die gezeigten
  * behalten ihre relative Folge, also wandert unter dem Cursor nichts.
  */
 export function teileZufluss(
   zeilen: readonly EtbZeile[],
-  gefroren: ReadonlySet<string> | null,
+  gefroren: Einfrierstand | null,
+  eigeneBenutzerId?: number | null,
 ): { sichtbar: EtbZeile[]; zurueckgehalten: number } {
   if (gefroren == null) return { sichtbar: [...zeilen], zurueckgehalten: 0 };
   const sichtbar: EtbZeile[] = [];
   let zurueckgehalten = 0;
   for (const z of zeilen) {
-    if (z.art !== 'eintrag' || gefroren.has(z.schluessel)) sichtbar.push(z);
-    else zurueckgehalten += 1;
+    const zurueck =
+      z.art === 'eintrag' &&
+      !gefroren.schluessel.has(z.schluessel) &&
+      z.eintrag.lfd_nr > gefroren.wassermarke &&
+      (eigeneBenutzerId == null || z.eintrag.erfasser_id !== eigeneBenutzerId);
+    if (zurueck) zurueckgehalten += 1;
+    else sichtbar.push(z);
   }
   return { sichtbar, zurueckgehalten };
 }
 
-/** Die Schlüssel, die beim Einfrieren gezeigt werden — nur gesendete Einträge. */
-export function einfrierSchluessel(zeilen: readonly EtbZeile[]): Set<string> {
-  return new Set(zeilen.filter((z) => z.art === 'eintrag').map((z) => z.schluessel));
+/**
+ * Friert den gezeigten Stand ein — nur gesendete Einträge. Eine Folge ohne gesendeten
+ * Eintrag friert nicht ein: sonst landete die erste Lieferung ganz hinter dem Banner
+ * (dieselbe Falle, die `Datensicht` dokumentiert).
+ */
+export function einfrieren(zeilen: readonly EtbZeile[]): Einfrierstand | null {
+  const schluessel = new Set<string>();
+  let wassermarke = -Infinity;
+  for (const z of zeilen) {
+    if (z.art !== 'eintrag') continue;
+    schluessel.add(z.schluessel);
+    wassermarke = Math.max(wassermarke, z.eintrag.lfd_nr);
+  }
+  return schluessel.size > 0 ? { schluessel, wassermarke } : null;
 }
 
 export function zuflussText(anzahl: number): string {

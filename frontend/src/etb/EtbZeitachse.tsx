@@ -24,7 +24,8 @@ import { MELDEWEG_OPTIONEN } from './schnellerfassungModell';
 import { istNachgetragen } from './typFarben';
 import {
   berichtigungsindex,
-  einfrierSchluessel,
+  einfrieren,
+  type Einfrierstand,
   gruppiereNachStunde,
   teileZufluss,
   verweisStil,
@@ -38,6 +39,13 @@ interface Props {
   einsatzId: number;
   /** Per ?eintrag=<id> adressierter Eintrag — wird hervorgehoben (LFH-25). */
   highlightId?: number | null;
+  /**
+   * Zählt je Sprung über `?eintrag=` hoch (auch auf denselben Eintrag). Ein Sprung hebt das
+   * Einfrieren auf: das Ziel könnte sonst hinter dem Sammelbanner stehen.
+   */
+  sprungMarke?: number;
+  /** Die angemeldete Person — ihre eigenen Einträge werden nie zurückgehalten. */
+  eigeneBenutzerId?: number | null;
   /** Wenn gesetzt, bietet jeder Eintrag „Berichtigen" an (nicht an einer Berichtigung). */
   onBerichtigen?: (eintrag: EtbEintragAnzeige) => void;
   /** Wenn gesetzt, bietet jeder Eintrag „Wiedervorlage" an (ETB→Erinnerung, LFH-106). */
@@ -111,8 +119,9 @@ function hinweisZeile(teile: ReactNode[], luft: number): ReactNode {
  * ── LIVE-ZUFLUSS SPRINGT NICHT UNTER DEM CURSOR ─────────────────────────────────────
  *
  * Solange der Fokus in der Zeitachse liegt (Aktionsmenü, Verweis), ist die Menge der
- * gesendeten Einträge eingefroren; Neues wird als Sammelbanner gezählt und erst auf
- * „anzeigen" eingefügt (Bedien-Leitlinie Festlegung 6, WCAG 3.2.5). Das Banner liegt als
+ * gesendeten Einträge eingefroren; NEUES fremder Erfasser (über der Wassermarke, s.
+ * `teileZufluss`) wird als Sammelbanner gezählt und erst auf „anzeigen" eingefügt —
+ * nachgeladene ältere und eigene Einträge stehen sofort, ein Sprung taut auf (Bedien-Leitlinie Festlegung 6, WCAG 3.2.5). Das Banner liegt als
  * Überlagerung über der Liste, nicht in ihrem Fluss — ein Banner, das beim Eintreffen
  * Platz nähme, schöbe genau die Zeilen weg, die es schützen soll. Gepufferte Einträge
  * stehen immer: sie sind die eigenen.
@@ -121,6 +130,8 @@ export default function EtbZeitachse({
   zeilen,
   einsatzId,
   highlightId,
+  sprungMarke,
+  eigeneBenutzerId,
   onBerichtigen,
   onWiedervorlage,
   onAuftragErteilen,
@@ -133,26 +144,30 @@ export default function EtbZeitachse({
   const { token, rollen } = useRollen();
   const { konventionen } = useAnzeigeKonventionen();
   const wurzel = useRef<HTMLDivElement>(null);
-  const [gefroren, setGefroren] = useState<ReadonlySet<string> | null>(null);
+  const [gefroren, setGefroren] = useState<Einfrierstand | null>(null);
+  /*
+   * Ein Sprung taut auf, und zwar IM RENDER (Zustandsangleich an eine Prop), nicht in
+   * einem Effekt: der Scroll-Effekt der Seite läuft im selben Commit und fände das Ziel
+   * sonst noch hinter dem Banner.
+   */
+  const [gesehenerSprung, setGesehenerSprung] = useState(sprungMarke);
+  if (sprungMarke !== gesehenerSprung) {
+    setGesehenerSprung(sprungMarke);
+    setGefroren(null);
+  }
 
   const eintraege = useMemo(
     () => zeilen.flatMap((z) => (z.art === 'eintrag' ? [z.eintrag] : [])),
     [zeilen],
   );
   const index = useMemo(() => berichtigungsindex(eintraege), [eintraege]);
-  const { sichtbar, zurueckgehalten } = teileZufluss(zeilen, gefroren);
+  const { sichtbar, zurueckgehalten } = teileZufluss(zeilen, gefroren, eigeneBenutzerId);
   const gruppen = gruppiereNachStunde(sichtbar, (utc) =>
     inZone(utc, konventionen).format('YYYY-MM-DD HH'),
   );
 
   const betreten = useCallback(() => {
-    setGefroren((vorher) => {
-      if (vorher != null) return vorher;
-      const schluessel = einfrierSchluessel(zeilen);
-      // Eine leere Folge friert nicht ein: sonst landete die erste Lieferung ganz hinter
-      // dem Banner (dieselbe Falle, die `Datensicht` dokumentiert).
-      return schluessel.size > 0 ? schluessel : null;
-    });
+    setGefroren((vorher) => vorher ?? einfrieren(zeilen));
   }, [zeilen]);
 
   const verlassen = useCallback((e: FocusEvent<HTMLDivElement>) => {
@@ -392,7 +407,7 @@ export default function EtbZeitachse({
           <Sammelbanner
             aktion={{
               label: 'anzeigen',
-              onKlick: () => setGefroren(einfrierSchluessel(zeilen)),
+              onKlick: () => setGefroren(einfrieren(zeilen)),
             }}
             style={{ position: 'absolute', insetInline: 0, top: 0 }}
           >
