@@ -1,3 +1,15 @@
+## [1.0.0-alpha.34](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.33...v1.0.0-alpha.34) (2026-09-22)
+
+### Features
+
+* **fuehrung,lagekarte:** letzte Rückmeldung im Überblick und in der Lagekarte (LFH-610) ([fbc22e9](https://github.com/rubenvitt/lifeline-hub/commit/fbc22e9cf23697c34cf2e22047fde45e06bfdb54))
+* **kraefte:** Rückmeldung je Einheit im Meldebild (LFH-610) ([9125862](https://github.com/rubenvitt/lifeline-hub/commit/9125862cd92345271ef253346927d89d21f2253b))
+* **meldung:** Rückmeldung je Einheit/Abschnitt mit Frist (LFH-610) ([310051f](https://github.com/rubenvitt/lifeline-hub/commit/310051f71907f5efd2f8b4bedb27d12257cbc968))
+
+### Bug Fixes
+
+* **meldung:** Review-Befunde zur Rückmeldung (LFH-610) ([35c880b](https://github.com/rubenvitt/lifeline-hub/commit/35c880b4138d3d2f1efe1887f21a13f9f1c52d56))
+
 ## [1.0.0-alpha.33](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.32...v1.0.0-alpha.33) (2026-09-22)
 
 ### Features
