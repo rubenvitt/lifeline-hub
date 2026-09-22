@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { Alert, App, Button, Dropdown, Tag, Typography } from 'antd';
 import {
   ArrowDownOutlined,
@@ -139,6 +139,7 @@ export default function EinsatzPegel() {
   const { konventionen: konv } = useAnzeigeKonventionen();
   const daten = useEinstellungenDaten(einsatzId);
   const [auswahl, setAuswahl] = useState<string | null>(null);
+  const auswahlId = useId();
 
   const pegelQ = useQuery(pegelAbfrage(einsatzId));
   const stationenQ = useQuery({
@@ -298,16 +299,27 @@ export default function EinsatzPegel() {
           )}
         />
 
+        {/* Sichtbares Label ÜBER dem Feld (Prüfliste Kriterium 15), kein bloßes aria-label:
+            der Platzhalter verschwindet mit der ersten Eingabe. */}
+        <label
+          htmlFor={auswahlId}
+          style={{
+            display: 'block',
+            marginBlockStart: token.margin,
+            marginBlockEnd: token.marginXS,
+          }}
+        >
+          Station wählen
+        </label>
         <div
           style={{
             display: 'flex',
             flexWrap: 'wrap',
             gap: token.marginSM,
-            marginBlockStart: token.margin,
           }}
         >
           <Select<string>
-            aria-label="Station wählen"
+            id={auswahlId}
             style={{ flex: '1 1 16rem', minWidth: 0 }}
             placeholder="Station suchen (Name, Gewässer, km)"
             value={auswahl ?? undefined}

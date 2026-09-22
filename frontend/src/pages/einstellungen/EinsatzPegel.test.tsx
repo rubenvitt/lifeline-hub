@@ -1,5 +1,5 @@
-import { http, HttpResponse } from 'msw';
-import { screen, waitFor, within } from '@testing-library/react';
+import { delay, http, HttpResponse } from 'msw';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router';
@@ -70,6 +70,8 @@ interface Aufbau {
   stationenLeer?: boolean;
   pegelStatus?: number;
   putStatus?: number;
+  /** Schreibende Antworten verzögern (ms) — für die Rückmeldung VOR der Serverantwort. */
+  verzoegerung?: number;
 }
 
 /** Stellt die Endpunkte bereit und zeichnet die schreibenden Aufrufe auf. */
@@ -100,6 +102,7 @@ function stelleBereit(a: Aufbau = {}) {
         stationen: { station_uuid: string; name: string; gewaesser?: string | null }[];
       };
       aufrufe.push({ methode: 'PUT', body });
+      if (a.verzoegerung) await delay(a.verzoegerung);
       if (a.putStatus) {
         return HttpResponse.json({ error: 'station doppelt' }, { status: a.putStatus });
       }
@@ -119,6 +122,7 @@ function stelleBereit(a: Aufbau = {}) {
         gewaesser?: string | null;
       };
       aufrufe.push({ methode: 'POST', body });
+      if (a.verzoegerung) await delay(a.verzoegerung);
       liste = [...liste, { id: 9, reihenfolge: liste.length, ...body }];
       return HttpResponse.json(liste, { status: 201 });
     }),
@@ -290,6 +294,66 @@ describe('EinsatzPegel', () => {
       },
     ]);
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('Rückmeldung vor der Serverantwort: während des PUT sind die Zeilenmenüs gesperrt', async () => {
+    // Prüfliste Kriterium 3: kein optimistisches Update, aber sofort sichtbarer Zustand.
+    stelleBereit({ verzoegerung: 400 });
+    rendern();
+    await waitFor(() => expect(zeilentitel()).toHaveLength(2));
+    await zeilenaktion('HANN. MÜNDEN', /Nach unten/);
+    for (const k of screen.getAllByRole('button', { name: /^Aktionen zu Pegel/ })) {
+      expect(k).toBeDisabled();
+    }
+    await waitFor(() => expect(zeilentitel()).toEqual(['1. WAHNHAUSEN', '2. HANN. MÜNDEN']));
+    for (const k of screen.getAllByRole('button', { name: /^Aktionen zu Pegel/ })) {
+      expect(k).toBeEnabled();
+    }
+  });
+
+  it('Rückmeldung vor der Serverantwort: „Hinzufügen" zeigt Laden, bis der POST antwortet', async () => {
+    stelleBereit({ verzoegerung: 400 });
+    rendern();
+    await waitFor(() => expect(zeilentitel()).toHaveLength(2));
+    await waehleStation('KASSEL · FULDA · km 81,73');
+    const knopf = screen.getByRole('button', { name: 'Hinzufügen' });
+    await userEvent.click(knopf);
+    expect(knopf.className).toContain('ant-btn-loading');
+    await waitFor(() => expect(zeilentitel()).toHaveLength(3));
+    expect(knopf.className).not.toContain('ant-btn-loading');
+  });
+
+  it('ganz ohne Maus: Auswahl per Tippen + Enter, dann Tab und Enter auf „Hinzufügen"', async () => {
+    // Prüfliste Kriterium 15 (volle Tastaturbedienung). Das Label steht sichtbar über dem Feld
+    // und benennt es — `getByLabelText` findet das Feld nur über das `<label for>`.
+    const aufrufe = stelleBereit();
+    rendern();
+    await waitFor(() => expect(zeilentitel()).toHaveLength(2));
+    const feld = screen.getByLabelText('Station wählen');
+    expect(screen.getByText('Station wählen', { selector: 'label' })).toBeVisible();
+    await userEvent.click(feld);
+    await userEvent.keyboard('KASS');
+    await waitFor(() =>
+      expect(
+        document.querySelector(
+          '.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-active',
+        ),
+      ).not.toBeNull(),
+    );
+    // rc-select wertet am Enter das legacy `keyCode` aus — `userEvent` v14 setzt es nicht
+    // (dieselbe Falle wie antds `Editable`, CLAUDE.md), deshalb `fireEvent` mit keyCode.
+    fireEvent.keyDown(feld, { key: 'Enter', code: 'Enter', keyCode: 13, which: 13 });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Hinzufügen' })).toBeEnabled());
+    // Der Weg zum Knopf: Tab (über den Leeren-Knopf des Feldes, den antd fokussierbar macht).
+    for (let i = 0; i < 3 && document.activeElement?.textContent !== 'Hinzufügen'; i += 1) {
+      await userEvent.tab();
+    }
+    expect(screen.getByRole('button', { name: 'Hinzufügen' })).toHaveFocus();
+    await userEvent.keyboard('{Enter}');
+    await waitFor(() => expect(zeilentitel()).toHaveLength(3));
+    expect(aufrufe).toEqual([
+      { methode: 'POST', body: { station_uuid: UUID_KASS, name: 'KASSEL', gewaesser: 'FULDA' } },
+    ]);
   });
 
   it('bei fünf Pegeln ist Hinzufügen gesperrt, mit Grund', async () => {
