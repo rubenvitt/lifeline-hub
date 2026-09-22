@@ -2,7 +2,7 @@
 
 ## 1. Backend: Wire-Feld und Abfrage
 
-- [x] 1.1 Migration `0105_auftrag_quell_etb_index.sql` (partieller Index auf `auftrag(quell_etb_eintrag_id)`) anlegen; Nummer gegen `origin/alpha` geprüft; `cargo test` läuft mit ihr durch
+- [x] 1.1 Migration `0106_auftrag_quell_etb_index.sql` (partieller Index auf `auftrag(quell_etb_eintrag_id)`) anlegen; Nummer gegen `origin/alpha` geprüft; `cargo test` läuft mit ihr durch
 - [x] 1.2 `FolgeauftragVerweis { id, lfd_nr: Option<i64> }` (ToSchema, `skip_serializing_if` an `lfd_nr`) und Feld `folgeauftraege` mit `#[sqlx(skip)]` an `EtbEintragAnzeige`; Schema in `src/api_doc.rs` registriert — geprüft durch Kompilieren und 1.4
 - [x] 1.3 TDD in `src/etb/repo.rs`: roter Test zuerst (zwei Aufträge aus einer Entscheidung → beide am Quell-Eintrag, aufsteigend nach `lfd_nr`, Anordnungs-Einträge leer; Eintrag ohne Auftrag → leer; abgenommener Auftrag zählt; Cursor-Seite trägt vollständige Liste), dann gebündelte Abfrage in `laden` und `abfrage` — Tests grün
 - [x] 1.4 Routentest: `GET …/etb` liefert `folgeauftraege` als Key (Presence per `contains_key`, auch bei `[]`) und nach `POST …/etb/{eid}/auftrag` den erzeugten Auftrag am Quell-Eintrag — Test grün

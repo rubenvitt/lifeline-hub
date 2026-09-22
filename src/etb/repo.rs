@@ -997,6 +997,45 @@ mod tests {
         }
     }
 
+    /// Die Ordnung folgt der Auftragsnummer, nicht der Anlagereihenfolge: im Test oben
+    /// fallen beide zusammen, und SQLite liefert über den Index ohnehin in rowid-Folge — ohne
+    /// diesen Test bliebe ein gestrichenes `ORDER BY` unbemerkt (Review LFH-636).
+    #[tokio::test]
+    async fn folgeauftraege_ordnen_nach_nummer_nicht_nach_anlage() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let quelle = anlegen(&pool, einsatz, benutzer, daten("Lage"))
+            .await
+            .unwrap();
+        let frueh = erteile(&pool, einsatz, benutzer, quelle.id, "zuerst angelegt").await;
+        let spaet = erteile(&pool, einsatz, benutzer, quelle.id, "danach angelegt").await;
+        let ohne = erteile(&pool, einsatz, benutzer, quelle.id, "Altbestand").await;
+        // Nummer gegen die Anlagereihenfolge drehen; der Altbestand verliert seine Nummer.
+        sqlx::query("UPDATE auftrag SET lfd_nr = 900 WHERE id = ?")
+            .bind(frueh)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("UPDATE auftrag SET lfd_nr = NULL WHERE id = ?")
+            .bind(ohne)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        let ids: Vec<i64> = laden(&pool, quelle.id)
+            .await
+            .unwrap()
+            .folgeauftraege
+            .iter()
+            .map(|f| f.id)
+            .collect();
+        assert_eq!(
+            ids,
+            vec![spaet, frueh, ohne],
+            "nach Nummer, ohne Nummer zuletzt"
+        );
+    }
+
     #[tokio::test]
     async fn abgenommener_folgeauftrag_zaehlt_weiter() {
         let pool = crate::db::test_pool().await;
