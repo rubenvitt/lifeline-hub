@@ -69,10 +69,13 @@ async function setupBelegterPlatz(page: Page): Promise<string> {
   // dann nichts, und beide Tests unten schlugen fehl, obwohl die Funktion
   // arbeitet — mit 1 s Wartezeit davor waren sie gemessen grün.
   //
-  // KEINE feste Wartezeit, sondern die Bedingung selbst: genau EIN Namens-Tag.
+  // KEINE feste Wartezeit, sondern die Bedingung selbst: genau EINE Personenmarke mit dem
+  // Namen (über `data-lfh`, nicht über eine antd-Klasse — LFH-621).
   // Ein `waitForTimeout` wäre auf einer langsameren Maschine wieder zu kurz und
   // hier meist zu lang.
-  await expect(page.locator('.ant-tag').filter({ hasText: personName })).toHaveCount(1);
+  await expect(
+    page.locator('[data-lfh="personenkarte"]').filter({ hasText: personName }),
+  ).toHaveCount(1);
   return personName;
 }
 
@@ -281,7 +284,7 @@ test('UHS Grundriss: Person-Drag sprengt nicht die Scroll-Region der linken Spal
   // Detail öffnen — der Grundriss wird direkt angezeigt (Personen-Spalten + Fläche).
   await page.getByRole('button', { name: uhsName }).click();
 
-  // Personenkarte in der linken Spalte finden (Tag mit Reg.-Nr. · Name).
+  // Personenkarte in der linken Spalte finden (Marke mit Reg.-Nr. · Name).
   const karte = page.getByText(personName).first();
   await expect(karte).toBeVisible();
 

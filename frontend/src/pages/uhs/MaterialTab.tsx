@@ -10,6 +10,7 @@ import KatalogTabelle from '../../components/KatalogTabelle';
 import { ErfassungsModal } from '../../components/Erfassung';
 import Datenstand from '../../components/Datenstand';
 import StatusTag from '../../components/StatusTag';
+import { monoStil } from '../../components/instrument';
 import { materialStatus } from '../../theme/statusFarben';
 
 interface Props {
@@ -72,7 +73,12 @@ export default function MaterialTab({ einsatzId, uhs, schreibgeschuetzt }: Props
       key: 'kategorie',
       render: (v: string | null) => v ?? '—',
     },
-    { title: 'Menge', dataIndex: 'menge', key: 'menge' },
+    {
+      title: 'Menge',
+      dataIndex: 'menge',
+      key: 'menge',
+      render: (n: number) => <span style={monoStil(12)}>{n}</span>,
+    },
     {
       title: 'Status',
       dataIndex: 'status',
