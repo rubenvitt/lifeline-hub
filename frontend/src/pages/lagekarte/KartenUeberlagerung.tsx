@@ -1,5 +1,5 @@
 import { useRef, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
-import { TbCompass, TbCrosshair, TbMinus, TbPencil, TbPlus } from 'react-icons/tb';
+import { TbCompass, TbCrosshair, TbMinus, TbPencil, TbPlus, TbRulerMeasure } from 'react-icons/tb';
 import { naechsterIndex, monoStil, segmentStil, useRollen } from '../../components/instrument';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { useZeigerLage, type ZeigerQuelle } from './mausPosition';
@@ -173,18 +173,22 @@ function Kartenknopf({
   onClick,
   kante,
   farbe,
+  gedrueckt,
   children,
 }: {
   beschriftung: string;
   onClick: () => void;
   kante: number;
   farbe: string;
+  /** Gesetzt = Umschalter; der Zustand steht in `aria-pressed`, die Optik folgt daraus (CSS). */
+  gedrueckt?: boolean;
   children: ReactNode;
 }) {
   return (
     <button
       type="button"
       aria-label={beschriftung}
+      aria-pressed={gedrueckt}
       title={beschriftung}
       onClick={onClick}
       className="lfh-kartenknopf"
@@ -217,6 +221,12 @@ export interface KartenUeberlagerungProps {
   onNorden: () => void;
   /** Öffnet die Zeichenwerkzeuge der Leiste; ohne Schreibrecht nicht gesetzt → kein Knopf. */
   onZeichnen?: () => void;
+  /**
+   * Messwerkzeug an/aus (LFH-616). Steht auch OHNE Schreibrecht da: gemessen wird nur,
+   * gespeichert nichts — anders als der Stift darunter.
+   */
+  onMessen: () => void;
+  messenAktiv: boolean;
 }
 
 export default function KartenUeberlagerung(props: KartenUeberlagerungProps) {
@@ -285,6 +295,16 @@ export default function KartenUeberlagerung(props: KartenUeberlagerungProps) {
           farbe={rollen.gedaempft}
         >
           <TbCompass size={16} />
+        </Kartenknopf>
+        {/* Reihenfolge wie im Entwurf S5: Lineal vor Stift. */}
+        <Kartenknopf
+          beschriftung="Messen"
+          onClick={props.onMessen}
+          kante={kante}
+          farbe={props.messenAktiv ? rollen.bedien : rollen.gedaempft}
+          gedrueckt={props.messenAktiv}
+        >
+          <TbRulerMeasure size={16} />
         </Kartenknopf>
         {props.onZeichnen && (
           <Kartenknopf

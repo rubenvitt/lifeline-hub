@@ -34,6 +34,8 @@ import FreiesZeichenInspector from './lagekarte/FreiesZeichenInspector';
 import ZonenInspector from './lagekarte/ZonenInspector';
 import FachebenenInspector from './lagekarte/FachebenenInspector';
 import ZeichnenSteuerung from './lagekarte/ZeichnenSteuerung';
+import MessSteuerung from './lagekarte/MessSteuerung';
+import { erzeugeMessQuelle } from './lagekarte/messQuelle';
 import { HistorienBanner } from './lagekarte/HistorienBanner';
 import { SnapshotLeiste } from './lagekarte/SnapshotLeiste';
 import { KartenFuss, bandStil } from './lagekarte/KartenFuss';
@@ -114,6 +116,8 @@ export default function LagekartePage() {
   const [massstabZiel, setMassstabZiel] = useState<HTMLDivElement | null>(null);
   // Zeichnen-Knopf über der Karte → Paneel „Zeichnen" der Leiste öffnen (Zähler, s. Sidebar).
   const [zeichnenAnfrage, setZeichnenAnfrage] = useState(0);
+  // Laufende Messung (LFH-616): Karte meldet, nur das Mess-Band rendert mit (`messQuelle.ts`).
+  const messQuelle = useMemo(() => erzeugeMessQuelle(), []);
 
   // Karten-Config vorziehen — dieselbe globale Query wie in useLagekarteDaten (react-query
   // dedupliziert), aber hier zuerst, weil useKartenAnsicht sie für die config-validierte
@@ -324,6 +328,7 @@ export default function LagekartePage() {
     fachebeneAuswahl,
     bildPlatzierenId,
     zeichenPlatzieren,
+    messForm,
     exklusiverModusAktiv,
     zeichenSerie,
     setZeichenSerie,
@@ -349,6 +354,8 @@ export default function LagekartePage() {
     onZeichenPlatzierenAbbrechen,
     onZeichenPlatzierenFertig,
     onZoneZeichnenFertig,
+    onMessenStart,
+    onMessenBeenden,
     zeichenAendern,
     zeichenVerschieben,
     zeichenLoeschen,
@@ -426,6 +433,26 @@ export default function LagekartePage() {
   // Zone selektieren und anfliegen, dann den Param räumen (apply-then-clean, StrictMode-fest
   // wie GefahrenPage LFH-150: searchParams NICHT in-place mutieren). Läuft, sobald die Zonen
   // geladen sind (zonen ist unabhängig vom zone-Layer-Toggle vorhanden).
+  /**
+   * Escape beendet das Messen (LFH-616) — ein Blick-Werkzeug muss sich so leicht schließen
+   * lassen, wie es geöffnet wird. Am Fenster, nicht am Canvas: dort hört terra-draw selbst auf
+   * Escape (verwirft den offenen Entwurf), und der Canvas hat den Fokus nur nach einem Klick.
+   * Nicht, wenn jemand gerade schreibt oder ein anderer Handler die Taste schon genommen hat
+   * (ein offenes Menü, ein Dialog). Die übrigen Modi bekommen das bewusst NICHT mit: dort
+   * steht ein Entwurf, der mehr kostet als eine Messung.
+   */
+  useEffect(() => {
+    if (!messForm) return;
+    const taste = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      const ziel = e.target as HTMLElement | null;
+      if (ziel?.closest('input, textarea, [contenteditable="true"]')) return;
+      onMessenBeenden();
+    };
+    window.addEventListener('keydown', taste);
+    return () => window.removeEventListener('keydown', taste);
+  }, [messForm, onMessenBeenden]);
+
   useEffect(() => {
     const ziel = parseRouteId(searchParams.get('gefahrengebiet') ?? undefined);
     if (ziel == null) return;
@@ -664,6 +691,8 @@ export default function LagekartePage() {
         onZoneKlick={onZoneKlick}
         onZoneGezeichnet={onZoneGezeichnet}
         onZeichnenBereitAenderung={setZeichnenBereit}
+        messen={messForm}
+        onMessung={(geometrie, fertig) => messQuelle.melde({ geometrie, fertig })}
         fachebenen={aktiveFachebenen}
         // Der Ausschnitt hängt an JEDER sichtbaren bbox-Ebene, nicht mehr an KRITIS
         // allein (LFH-81) — sonst bliebe „Energie an, KRITIS aus" dauerhaft leer.
@@ -686,6 +715,8 @@ export default function LagekartePage() {
         onZoomRein={() => kartenRef.current?.zoomRein()}
         onZoomRaus={() => kartenRef.current?.zoomRaus()}
         onNorden={() => kartenRef.current?.nachNorden()}
+        onMessen={() => (messForm ? onMessenBeenden() : onMessenStart('strecke'))}
+        messenAktiv={messForm != null}
         onZeichnen={
           darfSchreiben
             ? () => {
@@ -733,6 +764,22 @@ export default function LagekartePage() {
           onSerieWechsel={zeichneAbschnittId != null ? undefined : setZoneSerie}
           serieAnzahl={zeichneAbschnittId != null ? undefined : zoneSerieAnzahl}
           onFertig={zeichneAbschnittId != null ? undefined : onZoneZeichnenFertig}
+        />
+        <MessSteuerung
+          form={messForm}
+          quelle={messQuelle}
+          onForm={onMessenStart}
+          onAbschliessen={() => {
+            if (!kartenRef.current?.messungAbschliessen()) {
+              message.warning(
+                messForm === 'flaeche'
+                  ? 'Mindestens 3 verschiedene Punkte für eine Fläche'
+                  : 'Mindestens 2 verschiedene Punkte für eine Strecke',
+              );
+            }
+          }}
+          onNeu={() => kartenRef.current?.neuMessen()}
+          onBeenden={onMessenBeenden}
         />
         {/* Maßstab (metrisch): MapLibres `ScaleControl`, von `Kartenflaeche` über seine
             `IControl`-Schnittstelle in dieses Band gehängt — nicht in MapLibres eigene Ecke,

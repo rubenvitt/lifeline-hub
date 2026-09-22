@@ -21,6 +21,7 @@ import type { FachebeneQuelle } from '../../api/fachebenen';
 import type { KarteMarker } from './marker';
 import type { GeoJsonGeometry, GeoJsonPolygon } from './geo';
 import type { ZeichenModus } from './zeichnen';
+import type { MessForm } from './messung';
 import type { PlatzierenPunktTyp } from './Sidebar';
 
 /** EinsatzAnzeige → KopfdatenUpdate (Vollersatz) mit überschriebener Koordinate. */
@@ -66,7 +67,13 @@ type KartenModus =
   | { art: 'abschnitt'; id: number }
   | { art: 'zone'; entwurf: ZoneEntwurf; bestaetigung: ZoneBestaetigung | null; speichern: boolean }
   | { art: 'bild'; id: number }
-  | { art: 'zeichen'; spec: FreiesZeichenUpdate };
+  | { art: 'zeichen'; spec: FreiesZeichenUpdate }
+  /**
+   * Messen (LFH-616) ist ein exklusiver Modus wie die anderen: es zeichnet auf der Karte, und
+   * ein Klick darf dabei weder ein Panel öffnen noch etwas verorten. Anders als die übrigen
+   * braucht es KEIN Schreibrecht — gemessen wird nur, gespeichert nichts.
+   */
+  | { art: 'messen'; form: MessForm };
 
 type ModusAktion =
   | { t: 'platzieren'; ziel: { typ: PlatzierenPunktTyp | 'einsatzort'; id: number } }
@@ -74,6 +81,7 @@ type ModusAktion =
   | { t: 'zone'; entwurf: ZoneEntwurf }
   | { t: 'bild'; id: number }
   | { t: 'zeichen'; spec: FreiesZeichenUpdate }
+  | { t: 'messen'; form: MessForm }
   | { t: 'zoneGezeichnet'; geometrie: GeoJsonGeometry }
   | { t: 'zoneSpeichernStart' }
   /** Beenden nur, wenn der laufende Modus einer der genannten ist (sonst No-op). */
@@ -108,6 +116,8 @@ function modusReducer(state: KartenModus, a: ModusAktion): KartenModus {
       return { art: 'bild', id: a.id };
     case 'zeichen':
       return { art: 'zeichen', spec: a.spec };
+    case 'messen':
+      return { art: 'messen', form: a.form };
     case 'zone':
       return { art: 'zone', entwurf: a.entwurf, bestaetigung: null, speichern: false };
     case 'zoneGezeichnet':
@@ -223,6 +233,7 @@ export function useKartenInteraktion({
   const zoneSpeichern = modus.art === 'zone' ? modus.speichern : false;
   const bildPlatzierenId = modus.art === 'bild' ? modus.id : null;
   const zeichenPlatzieren = modus.art === 'zeichen' ? modus.spec : null;
+  const messForm = modus.art === 'messen' ? modus.form : null;
 
   // Ein wechselseitig-exklusiver Interaktionsmodus ist aktiv. Während dessen darf ein
   // Karten-Klick auf ein bestehendes Objekt kein Auswahl-Panel öffnen (LFH-208: sonst
@@ -511,6 +522,16 @@ export function useKartenInteraktion({
     setAuswahl(null);
   };
   const onBildPlatzierenFertig = () => dispatch({ t: 'beenden', arten: ['bild'] });
+  /** Messen starten oder die Form wechseln; eine offene Auswahl schließt wie bei jedem Modus. */
+  const onMessenStart = (form: MessForm) => {
+    dispatch({ t: 'messen', form });
+    setAuswahl(null);
+  };
+  /**
+   * Beendet NUR das Messen. `useCallback`, weil ein Escape-Effekt der Seite daran hängt —
+   * `dispatch` ist stabil, die leeren Deps sind vollständig.
+   */
+  const onMessenBeenden = useCallback(() => dispatch({ t: 'beenden', arten: ['messen'] }), []);
 
   // Abschnittsfläche zeichnen fertig → persistieren, dann Zeichenmodus beenden.
   const onFlaecheGezeichnet = (poly: GeoJsonPolygon) => {
@@ -597,6 +618,7 @@ export function useKartenInteraktion({
     fachebeneAuswahl,
     bildPlatzierenId,
     zeichenPlatzieren,
+    messForm,
     exklusiverModusAktiv,
     // Serienmodus (LFH-332/M76).
     zeichenSerie,
@@ -630,6 +652,8 @@ export function useKartenInteraktion({
     onZeichenPlatzierenStart,
     onZeichenPlatzierenAbbrechen,
     onZeichenPlatzierenFertig,
+    onMessenStart,
+    onMessenBeenden,
     onFlaecheGezeichnet,
     onFlaecheKlick,
     onZoneKlick,

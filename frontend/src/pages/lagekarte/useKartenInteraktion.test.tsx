@@ -117,6 +117,12 @@ const MODI: { name: string; familie: string; betreten: (r: HookResult) => void }
     familie: 'zeichen',
     betreten: (r) => act(() => r.current.onZeichenPlatzierenStart({ grundzeichen: 'stelle' })),
   },
+  // LFH-616: Messen zeichnet ebenfalls auf der Karte und ist damit exklusiv.
+  {
+    name: 'messen',
+    familie: 'messen',
+    betreten: (r) => act(() => r.current.onMessenStart('strecke')),
+  },
 ];
 
 /** Welche Modus-Familien sind gerade scharf? Mehr als eine = verletzte Exklusivität. */
@@ -127,6 +133,7 @@ function aktiveFamilien(r: HookResult): string[] {
   if (r.current.zeichneAbschnittId != null) f.add('abschnitt');
   if (r.current.zoneEntwurf != null || r.current.zoneBestaetigung != null) f.add('zone');
   if (r.current.zeichenPlatzieren != null) f.add('zeichen');
+  if (r.current.messForm != null) f.add('messen');
   return [...f].sort();
 }
 
@@ -723,5 +730,21 @@ describe('useKartenInteraktion — Serienmodus Zone (LFH-332)', () => {
 
     act(() => result.current.onZoneZeichnenStart({ typ: 'absperrgrenze', modus: 'linie' }));
     expect(result.current.zoneSerieAnzahl).toBe(0);
+  });
+});
+
+describe('useKartenInteraktion — Messen (LFH-616)', () => {
+  it('wechselt die Form ohne Umweg über idle und endet nur auf eigenes Beenden', () => {
+    const { result } = rendere();
+    act(() => result.current.onMessenStart('strecke'));
+    act(() => result.current.onMessenStart('flaeche'));
+    expect(result.current.messForm).toBe('flaeche');
+    // Ein fremdes Beenden (Zeichnen abbrechen) lässt das Messen stehen …
+    act(() => result.current.onZeichnenAbbrechen());
+    expect(result.current.messForm).toBe('flaeche');
+    // … das eigene nicht.
+    act(() => result.current.onMessenBeenden());
+    expect(result.current.messForm).toBeNull();
+    expect(result.current.exklusiverModusAktiv).toBe(false);
   });
 });
