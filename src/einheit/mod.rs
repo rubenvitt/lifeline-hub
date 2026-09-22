@@ -79,6 +79,11 @@ pub struct EinheitAnzeige {
     pub fuehrer_id: Option<i64>,
     pub fuehrer_name: Option<String>,
     pub bemerkung: Option<String>,
+    /// Eigener Funkrufname der Einheit (LFH-614), fixierte menschenlesbare Kennung im
+    /// Meldebild. `None` = nicht gepflegt; das Frontend leitet dann höchstens aus genau
+    /// einem Fahrzeugmitglied ab.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub funkrufname: Option<String>,
     /// Funk/Kommunikation (LFH-108): Freitext-Schlüssel (digitalfunk/mobil/festnetz).
     pub kommunikationsmittel: Option<String>,
     /// Funk/Kommunikation (LFH-108): Rufnummer/Freitext (PII → schwaerze_einsatz).

@@ -473,6 +473,12 @@ export interface components {
             /** Format: int64 */
             fuehrer_id?: number | null;
             fuehrer_name?: string | null;
+            /**
+             * @description Eigener Funkrufname der Einheit (LFH-614), fixierte menschenlesbare Kennung im
+             *     Meldebild. `None` = nicht gepflegt; das Frontend leitet dann höchstens aus genau
+             *     einem Fahrzeugmitglied ab.
+             */
+            funkrufname?: string | null;
             /** Format: int64 */
             id: number;
             ist: components["schemas"]["Staerke"];
