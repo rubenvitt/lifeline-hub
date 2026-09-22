@@ -2740,6 +2740,43 @@
           }
         }
       },
+      "EtbLesemarkeAnzeige": {
+        "type": "object",
+        "description": "Lesestand einer Person im Tagebuch eines Einsatzes.",
+        "required": [
+          "neue_anzahl"
+        ],
+        "properties": {
+          "gesichtet_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Wann die Marke zuletzt vorgerückt ist (UTC, SQLite-Format). Fehlt ohne Marke."
+          },
+          "gesichtet_lfd_nr": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Bis zu dieser laufenden Nummer hat die Person das Tagebuch als gesichtet markiert.\nFehlt, solange sie es noch nie getan hat."
+          },
+          "hoechste_lfd_nr": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Höchste vergebene laufende Nummer im Einsatz zum Zeitpunkt der Antwort; fehlt bei\nleerem Tagebuch. „Alle als gesichtet markieren\" schickt GENAU diesen Wert zurück:\nmarkiert wird, was angesagt war — nicht, was zwischen Anzeige und Klick eintraf."
+          },
+          "neue_anzahl": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Einträge ANDERER Erfasser über der Marke (ohne Marke: alle fremden Einträge). Die\neigenen zählen nie — wer sie geschrieben hat, hat sie gesehen."
+          }
+        }
+      },
       "EtbTyp": {
         "type": "string",
         "description": "Eintragstyp eines ETB-Eintrags. Wird als TEXT in der DB gespeichert.",

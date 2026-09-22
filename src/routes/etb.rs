@@ -11,6 +11,7 @@ use crate::live::LiveEvent;
 
 /// Modul-Key dieses Route-Moduls (LFH-132); gegen die Override-Map geprüft.
 const MODUL_KEY: &str = "etb";
+use crate::etb::lesemarke::{self, EtbLesemarkeAnzeige};
 use crate::etb::{normalisiere_zeit, repo, EtbEintragAnzeige, EtbTyp, MeldeWeg};
 use axum::extract::{Query, State};
 use axum::http::{HeaderMap, StatusCode};
@@ -305,4 +306,71 @@ pub async fn liste(
     };
 
     Ok(Json(repo::abfrage(&state.pool, einsatz_id, &filter).await?))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct LesemarkeSetzen {
+    /// Bis zu dieser laufenden Nummer gilt das Tagebuch als gesichtet. Der Client schickt
+    /// `hoechste_lfd_nr` aus der zuletzt gelesenen Lesemarke zurück (s. [`EtbLesemarkeAnzeige`]).
+    pub bis_lfd_nr: i64,
+}
+
+/// Gemeinsame Gates beider Lesemarken-Routen: Lesezugriff + Modulzugriff — NICHT
+/// Schreibrecht und NICHT „aktiv". Die eigene Lesemarke ist kein Schreibzugriff auf den
+/// Einsatz; ein Beobachter führt sie ebenso, und ein abgeschlossener Einsatz bleibt lesbar.
+async fn fordere_lesemarken_zugriff(
+    state: &AppState,
+    benutzer: &crate::auth::Benutzer,
+    einsatz_id: i64,
+) -> Result<(), AppError> {
+    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?; // 404, wenn unbekannt
+    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
+    fordere_lesezugriff(benutzer, &einsatz, rolle)?;
+    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, benutzer).await
+}
+
+/// GET /api/einsaetze/{id}/etb/lesemarke — der eigene Lesestand (LFH-611): Marke,
+/// Zeitpunkt der letzten Sichtung und die Zahl fremder Einträge darüber.
+pub async fn lesemarke(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    PfadParam(einsatz_id): PfadParam<i64>,
+) -> Result<Json<EtbLesemarkeAnzeige>, AppError> {
+    fordere_lesemarken_zugriff(&state, &benutzer, einsatz_id).await?;
+    Ok(Json(
+        lesemarke::laden(&state.pool, einsatz_id, benutzer.id).await?,
+    ))
+}
+
+/// POST /api/einsaetze/{id}/etb/lesemarke — „alle als gesichtet markieren" (LFH-611).
+/// Nur vorwärts; kein Live-Ereignis, die Marke gehört einer Person.
+///
+/// 400: `bis_lfd_nr` fehlt oder ist < 1 (das Feld für sich). 422: `bis_lfd_nr` liegt über
+/// der höchsten vergebenen Nummer — erst der Zustand des Einsatzes verbietet das.
+pub async fn lesemarke_setzen(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    PfadParam(einsatz_id): PfadParam<i64>,
+    JsonBody(req): JsonBody<LesemarkeSetzen>,
+) -> Result<Json<EtbLesemarkeAnzeige>, AppError> {
+    fordere_lesemarken_zugriff(&state, &benutzer, einsatz_id).await?;
+    if req.bis_lfd_nr < 1 {
+        return Err(AppError::Validation(
+            "bis_lfd_nr muss mindestens 1 sein".into(),
+        ));
+    }
+    let hoechste: Option<i64> =
+        sqlx::query_scalar("SELECT MAX(lfd_nr) FROM etb_eintrag WHERE einsatz_id = ?")
+            .bind(einsatz_id)
+            .fetch_one(&state.pool)
+            .await?;
+    if req.bis_lfd_nr > hoechste.unwrap_or(0) {
+        return Err(AppError::UnprocessableEntity(
+            "bis_lfd_nr liegt über dem jüngsten Eintrag".into(),
+        ));
+    }
+    lesemarke::setzen(&state.pool, einsatz_id, benutzer.id, req.bis_lfd_nr).await?;
+    Ok(Json(
+        lesemarke::laden(&state.pool, einsatz_id, benutzer.id).await?,
+    ))
 }
