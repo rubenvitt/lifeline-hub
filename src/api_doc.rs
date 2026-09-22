@@ -72,6 +72,7 @@ use utoipa::OpenApi;
         crate::etb::EtbEintragAnzeige,
         crate::etb::FolgeauftragVerweis,
         crate::etb::lesemarke::EtbLesemarkeAnzeige,
+        crate::routes::etb::EtbAnzahlAnzeige,
         crate::etb::EtbTyp,
         crate::etb::MeldeWeg,
         crate::etb_baustein::EtbBaustein,

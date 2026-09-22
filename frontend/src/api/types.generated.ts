@@ -955,6 +955,14 @@ export interface components {
          * @enum {string}
          */
         ErinnerungStatus: "offen" | "erledigt" | "quittiert";
+        /** @description Trefferzahl eines ETB-Filters (`GET /api/einsaetze/{id}/etb/anzahl`). */
+        EtbAnzahlAnzeige: {
+            /**
+             * Format: int64
+             * @description Zahl der Einträge, auf die der Filter passt — ohne Seitendeckel.
+             */
+            anzahl: number;
+        };
         /**
          * @description Öffentliche Sicht eines ETB-Baustein-Katalogeintrags. Die DB-Spalten `aktiv`,
          *     `erstellt_at` und `aktualisiert_at` werden bewusst nicht serialisiert.

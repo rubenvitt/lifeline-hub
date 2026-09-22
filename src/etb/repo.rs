@@ -332,6 +332,41 @@ pub async fn abfrage(
          FROM etb_eintrag e JOIN benutzer b ON b.id = e.erfasser_id",
     );
 
+    push_filter(&mut qb, einsatz_id, filter);
+
+    qb.push(" ORDER BY e.lfd_nr DESC LIMIT ");
+    qb.push_bind(filter.limit);
+
+    let mut eintraege = qb
+        .build_query_as::<EtbEintragAnzeige>()
+        .fetch_all(pool)
+        .await?;
+    folgeauftraege_nachladen(pool, &mut eintraege).await?;
+    Ok(eintraege)
+}
+
+/// Zählt die Einträge, die [`abfrage`] mit demselben Filter liefern würde — OHNE
+/// Seitendeckel (LFH-619, Sammeltreffer der Sprungpalette). `filter.limit` wird ignoriert.
+///
+/// Der WHERE-Teil kommt aus [`push_filter`], derselben Funktion wie bei der Liste: eine eigene
+/// Zählbedingung wäre eine zweite Meinung darüber, was ein Treffer ist, und liefe beim
+/// nächsten neuen Filter still auseinander.
+pub async fn anzahl(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    filter: &EtbFilter,
+) -> Result<i64, AppError> {
+    let mut qb: QueryBuilder<Sqlite> = QueryBuilder::new("SELECT COUNT(*) FROM etb_eintrag e");
+    push_filter(&mut qb, einsatz_id, filter);
+    qb.build_query_scalar::<i64>()
+        .fetch_one(pool)
+        .await
+        .map_err(Into::into)
+}
+
+/// FTS-Join und WHERE-Klausel für [`abfrage`] und [`anzahl`]. Erwartet eine Abfrage über
+/// `etb_eintrag e`, deren FROM-Teil gerade geschrieben ist.
+fn push_filter(qb: &mut QueryBuilder<Sqlite>, einsatz_id: i64, filter: &EtbFilter) {
     // FTS-Join nur, wenn ein Volltext-Query gesetzt ist (Auswertung in Task 6).
     // Der Join verbindet nur per rowid; das MATCH gehört in die WHERE-Klausel
     // (FTS5 wertet MATCH nur als top-level AND-Term gegen die FTS-Tabelle aus).
@@ -377,16 +412,6 @@ pub async fn abfrage(
         qb.push(" AND e.lfd_nr < ");
         qb.push_bind(cursor);
     }
-
-    qb.push(" ORDER BY e.lfd_nr DESC LIMIT ");
-    qb.push_bind(filter.limit);
-
-    let mut eintraege = qb
-        .build_query_as::<EtbEintragAnzeige>()
-        .fetch_all(pool)
-        .await?;
-    folgeauftraege_nachladen(pool, &mut eintraege).await?;
-    Ok(eintraege)
 }
 
 /// Wandelt eine Nutzereingabe in eine sichere FTS5-Query um: jedes Token wird

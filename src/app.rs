@@ -154,6 +154,7 @@ pub fn build_router(state: AppState) -> Router {
         // Post-Filter pro Event statt als Gate der Route.
         .route("/api/einsaetze/{id}/live", get(routes::live::stream))
         .route("/api/einsaetze/{id}/etb", get(routes::etb::liste))
+        .route("/api/einsaetze/{id}/etb/anzahl", get(routes::etb::anzahl))
         .route(
             "/api/einsaetze/{id}/etb/lesemarke",
             get(routes::etb::lesemarke).post(routes::etb::lesemarke_setzen),

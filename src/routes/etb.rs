@@ -253,18 +253,56 @@ pub async fn liste(
     PfadParam(einsatz_id): PfadParam<i64>,
     Query(params): Query<EtbAbfrageParams>,
 ) -> Result<Json<Vec<EtbEintragAnzeige>>, AppError> {
+    fordere_lese_gates(&state, &benutzer, einsatz_id).await?;
+    let limit = params
+        .limit
+        .unwrap_or(repo::STANDARD_LIMIT)
+        .clamp(1, repo::MAX_LIMIT);
+    let filter = filter_aus(params, limit)?;
+    Ok(Json(repo::abfrage(&state.pool, einsatz_id, &filter).await?))
+}
+
+/// Trefferzahl eines ETB-Filters (`GET /api/einsaetze/{id}/etb/anzahl`).
+#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
+pub struct EtbAnzahlAnzeige {
+    /// Zahl der Einträge, auf die der Filter passt — ohne Seitendeckel.
+    pub anzahl: i64,
+}
+
+/// GET /api/einsaetze/{id}/etb/anzahl — wie viele Einträge der Filter von [`liste`] trifft
+/// (LFH-619, Sammeltreffer der Sprungpalette „ETB · Einträge zu … — 31 Treffer“).
+///
+/// DIESELBEN Gates und DERSELBE Filteraufbau wie die Liste ([`fordere_lese_gates`],
+/// [`filter_aus`]): eine Zahl, die anders filtert als die Liste, auf die der Treffer springt,
+/// wäre eine Behauptung ohne Beleg. `limit` und `before_lfd_nr` werden ignoriert — gezählt
+/// wird ungedeckelt, und genau das kann die gedeckelte Liste nicht.
+pub async fn anzahl(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    PfadParam(einsatz_id): PfadParam<i64>,
+    Query(params): Query<EtbAbfrageParams>,
+) -> Result<Json<EtbAnzahlAnzeige>, AppError> {
+    fordere_lese_gates(&state, &benutzer, einsatz_id).await?;
+    let mut filter = filter_aus(params, repo::STANDARD_LIMIT)?;
+    filter.before_lfd_nr = None;
+    let anzahl = repo::anzahl(&state.pool, einsatz_id, &filter).await?;
+    Ok(Json(EtbAnzahlAnzeige { anzahl }))
+}
+
+/// Lesezugriff auf den Einsatz plus Modulzugriff „etb“ — die Gates beider Leserouten.
+async fn fordere_lese_gates(
+    state: &AppState,
+    benutzer: &crate::auth::Benutzer,
+    einsatz_id: i64,
+) -> Result<(), AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?; // 404, wenn unbekannt
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
+    fordere_lesezugriff(benutzer, &einsatz, rolle)?;
+    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, benutzer).await
+}
 
+/// Prüft und normalisiert die Abfrageparameter zu einem [`repo::EtbFilter`].
+fn filter_aus(params: EtbAbfrageParams, limit: i64) -> Result<repo::EtbFilter, AppError> {
     // Typ validieren, falls gesetzt.
     if let Some(t) = &params.typ {
         if EtbTyp::parse(t).is_none() {
@@ -290,12 +328,7 @@ pub async fn liste(
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty());
 
-    let limit = params
-        .limit
-        .unwrap_or(repo::STANDARD_LIMIT)
-        .clamp(1, repo::MAX_LIMIT);
-
-    let filter = repo::EtbFilter {
+    Ok(repo::EtbFilter {
         q,
         typ: params.typ,
         von_zeit,
@@ -303,9 +336,7 @@ pub async fn liste(
         erfasser_id: params.erfasser_id,
         before_lfd_nr: params.before_lfd_nr,
         limit,
-    };
-
-    Ok(Json(repo::abfrage(&state.pool, einsatz_id, &filter).await?))
+    })
 }
 
 #[derive(Debug, Deserialize)]
