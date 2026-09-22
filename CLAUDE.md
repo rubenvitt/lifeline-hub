@@ -119,7 +119,14 @@ umkehrt, steht das am Absatz selbst mit „Neuentwurf 22.09.2026".
   des aktiven Modus für TSX, weil antd `paneel`, `flaeche3` & Co. nicht kennt).
 - **Seitenkopf 44 px** in `components/EinsatzSeite.tsx` (`SEITENKOPF_HOEHE`, Boden, der mit der
   Staffel wächst): `titel` 14/600 als `h1` (Paneele gliedern darunter ab `h2`) · `meta` Mono · `aktionen` rechts (Primär blau gefüllt,
-  sekundär umrandet). **`breite` ist per Vorgabe `'voll'`** — die Instrumententafel füllt die
+  sekundär umrandet). **Markdown-Inhalt hängt sich in diese Gliederung ein, nicht daneben**
+  (LFH-621): `components/Markdown.tsx` und `MarkdownEditor` tragen die Pflicht-Prop
+  `unterEbene` — die Ebene der nächsten Überschrift über dem Text, `#` wird die Stufe darunter,
+  `h6` ist der Boden. Kein fester Versatz: der frühere Versatz 3 ließ `###` und tiefer auch
+  dort auf `h6` zusammenfallen, wo nur der Seitentitel oder ein Zeitachsenkopf darüber steht.
+  Heute: Lagebericht/Befehl lesend 3 (unter dem Abschnittskopf), Befehl-Entwurf 2 (Paneel),
+  Lagebericht-Entwurf und ETB-Schnellerfassung 1, ETB-Einträge 2 (der Gruppenkopf der
+  Zeitachse ist ein `h2`). **`breite` ist per Vorgabe `'voll'`** — die Instrumententafel füllt die
   Inhaltsbreite; `'schmal'` (`flaeche.seiteSchmal`) ist die begründete Ausnahme für reine
   Formularseiten. `flaeche.seiteBreit` lebt nur noch, bis Bestandsaufrufer es beim eigenen
   Umbau streichen. Der Akzentstrich über dem Titel ist entfallen.
@@ -324,6 +331,21 @@ Bounding-Boxen bei 1280 px und 1024 px. **Nicht bei 390 px**, und das ist eine A
 statt einer Lücke: die Lagekarten-Sidebar ist fest 300 px breit, dort bliebe für die
 Kartenfläche nichts übrig — eine eigene Frage (Sidebar-Responsivität), kein Teil dieser
 Stapelentscheidung.
+
+**Sprungmarken sind keine Module** (LFH-620, `einsatz/sprungmarken.ts`). Führt der
+Entwurf ein „Modul“, dessen Daten ein vorhandenes Modul schon trägt (Entscheidungen =
+ETB `?typ=entscheidung`, Patienten = Personen im Sichtungsraster, Vermisste = Personen
+`?filter=vermisst`), steht im Modulpanel eine **Sprungmarke** statt eines
+Registry-Eintrags. Das ist weder `verweistAuf` noch ein neuer Modulschlüssel. Ein Modul
+hätte eigene Overrides (ETB gesperrt, Entscheidungen frei → 403), bräuchte `MODUL_KEYS`
+im Backend und führte den Rail-Kategoriesprung über `modulZielRoute` in eine fremde
+Kategorie. Eine Marke erbt Sichtbarkeit und Sperre ihres Zielmoduls, ist nie
+`aria-current` und trägt ihr Ziel im zugänglichen Namen („…, springt zu ETB, Typ
+Entscheidung“). Ihr Pfad kommt aus `routing/deeplinks.ts`. Die Personenseite übernimmt
+`?filter=`/`?ansicht=` apply-then-clean (`parsePersonenSicht`, `sichtNachSprung`,
+Lücken-Filter fällt dabei). Ein Filterwert „patienten“ existiert bewusst nicht, weil
+Patient eine Darstellung ist und kein Status. Die Entscheidung je Entwurfsmodul steht in
+`docs/design/2026-09-21-neuentwurf/umsetzung.md`.
 
 **Eine benannte Ausnahme: der Navigations-Drawer** (LFH-329/B1, `einsatz/EinsatzLayout.tsx`
 mit `einsatz/ModulAkkordeon.tsx`). Unterhalb `lg` liegt der Einsatz-Navigationsrahmen in einem

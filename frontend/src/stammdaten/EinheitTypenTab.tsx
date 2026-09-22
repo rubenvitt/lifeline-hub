@@ -9,6 +9,7 @@ import {
   type TableColumnsType,
 } from 'antd';
 import AdminPage from '../components/AdminPage';
+import { monoStil } from '../components/instrument';
 import { ErfassungsModal } from '../components/Erfassung';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle from '../components/KatalogTabelle';
@@ -125,12 +126,19 @@ export default function EinheitTypenTab() {
     {
       title: 'Soll-Stärke (F/UF/M//Σ)',
       key: 'soll',
-      render: (_, t) => <StaerkeAnzeige wert={t.soll ?? null} />,
+      // Mono an der AUFRUFSTELLE, nicht im Primitiv: `StaerkeAnzeige` rendert bewusst ein
+      // Fragment, damit zusammengesetzte Textzeilen nicht in mehrere Textknoten zerfallen.
+      render: (_, t) => (
+        <span style={monoStil(12)}>
+          <StaerkeAnzeige wert={t.soll ?? null} />
+        </span>
+      ),
     },
     {
       title: 'Sortierung',
       dataIndex: 'sortier',
       key: 'sortier',
+      render: (n: number) => <span style={monoStil(12)}>{n}</span>,
       // Numerisch vergleichen, nicht über die Zeichenkette: nur so steht 5 vor 40.
       sorter: (a, b) => a.sortier - b.sortier,
     },

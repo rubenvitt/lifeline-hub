@@ -385,14 +385,15 @@ test.describe('UHS-Grundriss unter Touch', () => {
     //     (dnd-kit setzt `touchAction: 'none'` sehr wohl — aber auf sein eigenes
     //     DragOverlay, das `position: fixed` neben der Liste schwebt und nicht in dieser
     //     Kette liegt.)
-    // Der Startknoten hängt am NAMEN, nicht am ersten Tag im Container: die gezogene Person
-    // steht heute zufällig oben (sie wird zuerst angelegt), und ein `querySelector('.ant-tag')`
-    // wäre damit von der Anlagereihenfolge abhängig statt von der Aussage. Die Mutationsprobe
-    // deckt das nicht auf — sie trifft nur das obere Ende der Kette.
+    // Der Startknoten hängt am NAMEN, nicht an der ersten Personenmarke im Container: die
+    // gezogene Person steht heute zufällig oben (sie wird zuerst angelegt), und ein
+    // `querySelector` auf die erste Marke wäre damit von der Anlagereihenfolge abhängig statt
+    // von der Aussage. Die Mutationsprobe deckt das nicht auf — sie trifft nur das obere Ende
+    // der Kette. Gegriffen wird über `data-lfh`, nicht über eine antd-Klasse (LFH-621).
     const gesperrt = await spalte.evaluate((container, name) => {
-      const start = Array.from(container.querySelectorAll<HTMLElement>('.ant-tag')).find((tag) =>
-        tag.textContent?.includes(name),
-      );
+      const start = Array.from(
+        container.querySelectorAll<HTMLElement>('[data-lfh="personenkarte"]'),
+      ).find((karte) => karte.textContent?.includes(name));
       if (!start) throw new Error(`gezogene Karte „${name}" steht nicht in der Warteliste`);
       const treffer: string[] = [];
       let n: HTMLElement | null = start;

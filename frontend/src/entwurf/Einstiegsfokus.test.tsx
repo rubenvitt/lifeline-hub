@@ -44,10 +44,10 @@ function Maske({ feld }: { feld?: string }) {
         <Input />
       </Form.Item>
       <Form.Item label="Auftrag" name="auftrag">
-        <MarkdownEditor />
+        <MarkdownEditor unterEbene={3} />
       </Form.Item>
       <Form.Item label="Eigene Lage" name="eigene_lage">
-        <MarkdownEditor />
+        <MarkdownEditor unterEbene={3} />
       </Form.Item>
       <Einstiegsfokus form={form} feld={feld} />
     </Form>

@@ -43,6 +43,19 @@ describe('EinheitTypenTab', () => {
     expect(screen.getByText('Sonstige')).toBeInTheDocument();
   });
 
+  // Neuentwurf (LFH-621): Zahlen stehen Mono mit `tabular-nums` — die Stärke UND die Sortierung.
+  // Das Label bleibt Satzschrift; ohne die Gegenprobe wäre „alles Mono" ebenso grün.
+  it('setzt Soll-Stärke und Sortierung in die Zahlenschrift, das Label nicht', async () => {
+    render(nichtAdmin);
+    await screen.findByText('Zug');
+    for (const zahl of ['1/3/18//22', '40']) {
+      const knoten = screen.getByText(zahl);
+      expect(knoten.style.fontFamily).toContain('JetBrains Mono');
+      expect(knoten.style.fontVariantNumeric).toBe('tabular-nums');
+    }
+    expect(screen.getByText('Zug').style.fontFamily).toBe('');
+  });
+
   it('Admin sieht „Typ anlegen"', async () => {
     render(admin);
     await screen.findByText('Zug');

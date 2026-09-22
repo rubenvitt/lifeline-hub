@@ -8,6 +8,7 @@ import { personDetailPfad } from '../../routing/deeplinks';
 import type { Person, UhsBelegung, UhsDetail, BelegungsArt } from '../../api/types';
 import Datensicht, { spaltenFuer } from '../../components/Datensicht';
 import StatusTag from '../../components/StatusTag';
+import { monoStil } from '../../components/instrument';
 import { belegungsArt } from '../../theme/statusFarben';
 import Datenstand, { gemeinsamerDatenstand } from '../../components/Datenstand';
 
@@ -73,7 +74,12 @@ export default function BewegungenTab({ uhs, dataUpdatedAt }: Props) {
           dataIndex: 'zeitpunkt_at',
           // Lexikographisch ordnungstreu für `'2026-06-23 10:00:00'` — kein Datumsparser nötig.
           sortWert: (b) => b.zeitpunkt_at,
-          render: (v: string) => <ZeitAnzeige wert={v} format="dtgVoll" />,
+          // Mono an der AUFRUFSTELLE: `ZeitAnzeige` rendert bewusst ein Fragment.
+          render: (v: string) => (
+            <span style={monoStil(12)}>
+              <ZeitAnzeige wert={v} format="dtgVoll" />
+            </span>
+          ),
         },
         {
           key: 'person_id',

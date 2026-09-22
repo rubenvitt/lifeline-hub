@@ -118,7 +118,8 @@ describe('befehlPrint.css — Entwurfsausdruck (M86)', () => {
     // Fällt diese Behauptung, fehlen dieser Datei die Toggle- und die
     // Akkordeon-Regel aus `lageberichtPrint.css`.
     const seite = readFileSync(join(hier, 'BefehlDetailPage.tsx'), 'utf8');
-    expect(seite).toContain('<MarkdownEditor layout="split"');
+    // Als Muster, nicht als Zeichenkette: mit mehr Props bricht Prettier das Tag um.
+    expect(seite).toMatch(/<MarkdownEditor\s+layout="split"/);
     // Als JSX-Prop bzw. Import gepinnt, nicht als Wort: ein Kommentar, der „toggle" oder
     // „Akkordeon" erwähnt, ändert am Layout nichts und darf nicht rot färben.
     expect(seite).not.toContain('layout="toggle"');

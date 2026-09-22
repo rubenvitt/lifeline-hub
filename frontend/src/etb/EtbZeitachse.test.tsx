@@ -112,7 +112,10 @@ describe('EtbZeitachse – der Eintrag', () => {
     });
     const gruppen = container.querySelectorAll('[role="group"]');
     expect(gruppen).toHaveLength(2);
-    expect(gruppen[0].getAttribute('aria-label')).toMatch(/^23\.05\. · \d{2} Uhr$/);
+    // Der Name kommt aus dem Kopf (`aria-labelledby`), nicht aus einem eigenen `aria-label` —
+    // sonst sagte der Vorleser die Stunde doppelt an (LFH-621).
+    expect(gruppen[0]).toHaveAccessibleName(/^23\.05\. · \d{2} Uhr$/);
+    expect(gruppen[0]).not.toHaveAttribute('aria-label');
     const texte = [...container.querySelectorAll('[data-zeile]')].map((z) => z.textContent);
     expect(texte[0]).toContain('drei');
     expect(texte[2]).toContain('eins');
@@ -182,6 +185,22 @@ describe('EtbZeitachse – der Eintrag', () => {
       'href',
       '/einsaetze/1/auftraege/befehle/42',
     );
+  });
+
+  // LFH-621: der Gruppenkopf ist eine echte Überschrift (h2), und die Überschriften IM
+  // Eintrag hängen darunter — `#` wird h3, nicht mehr pauschal h4, `###` wird h5 statt h6.
+  it('gliedert Einträge unter dem Gruppenkopf (h2) — `#` im Eintrag wird h3', () => {
+    renderZeitachse({
+      eintraege: [
+        eintrag({
+          ereigniszeit: '2026-05-23 10:05:00',
+          inhalt: '# Lage\n\n### Detail',
+        }),
+      ],
+    });
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent(/^23\.05\. · \d{2} Uhr$/);
+    expect(screen.getByRole('heading', { level: 3, name: 'Lage' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 5, name: 'Detail' })).toBeInTheDocument();
   });
 
   it('rendert Markdown-Inhalt (kein Rohtext mit **)', () => {

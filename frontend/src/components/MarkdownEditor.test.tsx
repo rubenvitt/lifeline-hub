@@ -8,20 +8,25 @@ import MarkdownEditor from './MarkdownEditor';
 
 describe('MarkdownEditor', () => {
   it('zeigt den value im Schreib-Textfeld an', () => {
-    render(<MarkdownEditor value="## Lage" onChange={() => {}} />);
+    render(<MarkdownEditor unterEbene={3} value="## Lage" onChange={() => {}} />);
     expect(screen.getByRole('textbox')).toHaveValue('## Lage');
   });
 
   it('meldet Eingaben über onChange als reinen String', async () => {
     const onChange = vi.fn();
-    render(<MarkdownEditor value="" onChange={onChange} />);
+    render(<MarkdownEditor unterEbene={3} value="" onChange={onChange} />);
     await userEvent.type(screen.getByRole('textbox'), 'x');
     expect(onChange).toHaveBeenLastCalledWith('x');
   });
 
   it('split-Layout rendert die Vorschau live (formatiert, kein Rohtext)', () => {
     const { container } = render(
-      <MarkdownEditor value="Lage **kritisch**" onChange={() => {}} layout="split" />,
+      <MarkdownEditor
+        unterEbene={3}
+        value="Lage **kritisch**"
+        onChange={() => {}}
+        layout="split"
+      />,
     );
     // Vorschau ist im split-Layout dauerhaft sichtbar.
     expect(container.querySelector('.markdown strong')).toHaveTextContent('kritisch');
@@ -29,7 +34,7 @@ describe('MarkdownEditor', () => {
 
   it('tabs-Layout zeigt zunächst das Textfeld, die Vorschau erst nach Umschalten', async () => {
     const { container } = render(
-      <MarkdownEditor value={'- a\n- b'} onChange={() => {}} layout="tabs" />,
+      <MarkdownEditor unterEbene={3} value={'- a\n- b'} onChange={() => {}} layout="tabs" />,
     );
     // Vor dem Umschalten: keine gerenderte Markdown-Vorschau.
     expect(container.querySelector('.markdown')).toBeNull();
@@ -38,12 +43,12 @@ describe('MarkdownEditor', () => {
   });
 
   it('zeigt bei leerem Inhalt einen dezenten Vorschau-Hinweis statt eines leeren Kastens', () => {
-    render(<MarkdownEditor value="" onChange={() => {}} layout="split" />);
+    render(<MarkdownEditor unterEbene={3} value="" onChange={() => {}} layout="split" />);
     expect(screen.getByText(/vorschau/i)).toBeInTheDocument();
   });
 
   it('reicht placeholder an das Textfeld durch', () => {
-    render(<MarkdownEditor value="" onChange={() => {}} placeholder="Inhalt …" />);
+    render(<MarkdownEditor unterEbene={3} value="" onChange={() => {}} placeholder="Inhalt …" />);
     expect(screen.getByPlaceholderText('Inhalt …')).toBeInTheDocument();
   });
 
@@ -53,7 +58,7 @@ describe('MarkdownEditor', () => {
       return (
         <Form form={form} initialValues={{ inhalt: '' }}>
           <Form.Item name="inhalt">
-            <MarkdownEditor />
+            <MarkdownEditor unterEbene={3} />
           </Form.Item>
           <button type="button" onClick={() => form.setFieldsValue({ inhalt: '**fett**' })}>
             baustein
@@ -71,11 +76,11 @@ describe('MarkdownEditor', () => {
   it('spiegelt fortlaufende Eingabe in der split-Vorschau (gesteuert von außen)', async () => {
     function Wrapper() {
       const [v, setV] = useState('');
-      return <MarkdownEditor value={v} onChange={setV} layout="split" />;
+      return <MarkdownEditor unterEbene={3} value={v} onChange={setV} layout="split" />;
     }
     const { container } = render(<Wrapper />);
     await userEvent.type(screen.getByRole('textbox'), '# Titel');
-    // `#` rendert als h4 mit der Quellstufe als Klasse (`Markdown.tsx`, UEBERSCHRIFT_VERSATZ).
+    // `#` rendert unter `unterEbene` 3 als h4, mit der Quellstufe als Klasse (`Markdown.tsx`).
     expect(container.querySelector('.markdown .md-h1')).toHaveTextContent('Titel');
   });
 });
@@ -85,6 +90,7 @@ describe('MarkdownEditor – toggle-Variante', () => {
     function Wrap() {
       return (
         <MarkdownEditor
+          unterEbene={3}
           layout="toggle"
           variante="kompakt"
           placeholder="Inhalt …"
@@ -109,7 +115,7 @@ describe('MarkdownEditor – toggle-Variante', () => {
    */
   it('wickelt sein Textfeld NICHT in die Eingabespalte (anders als split)', () => {
     const { container: zu } = renderMitProviders(
-      <MarkdownEditor layout="toggle" value="**fett**" onChange={() => {}} />,
+      <MarkdownEditor unterEbene={3} layout="toggle" value="**fett**" onChange={() => {}} />,
     );
     expect(zu.querySelectorAll('.markdown-editor--toggle textarea')).toHaveLength(1);
     expect(zu.querySelector('.markdown-editor__eingabe')).toBeNull();
@@ -117,7 +123,7 @@ describe('MarkdownEditor – toggle-Variante', () => {
     expect(zu.querySelector('.markdown-editor__vorschau')).toBeNull();
 
     const { container: gespalten } = renderMitProviders(
-      <MarkdownEditor layout="split" value="**fett**" onChange={() => {}} />,
+      <MarkdownEditor unterEbene={3} layout="split" value="**fett**" onChange={() => {}} />,
     );
     expect(gespalten.querySelectorAll('.markdown-editor__eingabe textarea')).toHaveLength(1);
     expect(gespalten.querySelector('.markdown-editor__vorschau')).not.toBeNull();
@@ -127,6 +133,7 @@ describe('MarkdownEditor – toggle-Variante', () => {
     const onKeyDown = vi.fn();
     renderMitProviders(
       <MarkdownEditor
+        unterEbene={3}
         layout="toggle"
         placeholder="Inhalt …"
         value=""

@@ -116,8 +116,14 @@ describe('KanalListe', () => {
         onKanalAnlegen={vi.fn()}
       />,
     );
-    const zeilen = Array.from(document.querySelectorAll('[data-lfh="kanal-zeile"]'));
-    expect(zeilen.map((z) => z.getAttribute('aria-current'))).toEqual([null, 'true']);
+    // Am Element MIT der Rolle (LFH-621): vorher saß es am inneren `div`, und die
+    // Schaltfläche selbst war für Vorleser nie „aktuell".
+    const aktiv = screen.getByRole('button', { current: true });
+    expect(aktiv).toHaveTextContent('S2/S3');
+    expect(screen.getAllByRole('button', { current: false })).not.toContain(aktiv);
+    for (const zeile of document.querySelectorAll('[data-lfh="kanal-zeile"]')) {
+      expect(zeile).not.toHaveAttribute('aria-current');
+    }
   });
 
   it('legt einen Kanal per Enter im Namensfeld an (Erfassungs-Hülle)', async () => {

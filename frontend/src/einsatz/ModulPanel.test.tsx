@@ -5,6 +5,7 @@ import { renderMitProviders } from '../test/utils';
 import { dichten, farbenDunkel } from '../theme/tokens';
 import ModulPanel, { modulListenStil, modulMarkeStil, modulZeilenStil } from './ModulPanel';
 import type { ModulEintrag } from './modulRegistry';
+import type { Sprungmarke } from './sprungmarken';
 import type { BenutzerAnzeige, ModulOverrides } from '../api/types';
 
 const ueberschreibung = (
@@ -401,5 +402,72 @@ describe('ModulPanel · Einsatzdauer im Fuß', () => {
     const panel = container.querySelector<HTMLElement>('[data-lfh="modul-panel"]')!;
     expect(panel).toHaveStyle({ backgroundColor: farbenDunkel.paneel, width: '208px' });
     expect(screen.getByText('Führung')).toHaveStyle({ textTransform: 'uppercase' });
+  });
+});
+
+/**
+ * Sprungmarken (LFH-620): gefilterte Sichten in ein vorhandenes Modul. Die Marke erbt
+ * Sichtbarkeit und Sperre ihres ZIELmoduls — geprüft an einem echten Registry-Schlüssel
+ * (`etb`), weil `sprungZiel` in der Registry nachschlägt.
+ */
+describe('ModulListe — Sprungmarken', () => {
+  const marke: Sprungmarke = {
+    key: 'entscheidungen',
+    kategorie: 'fuehrung',
+    label: 'Entscheidungen',
+    zielModul: 'etb',
+    nach: 'auftraege',
+    hinweis: 'ETB, Typ Entscheidung',
+    pfad: () => '/einsaetze/1/etb?typ=entscheidung',
+  };
+  const fuehrung: ModulEintrag[] = [
+    basis({ key: 'auftraege', kategorie: 'fuehrung', label: 'Aufträge', status: 'fertig' }),
+    basis({ key: 'stab', kategorie: 'fuehrung', label: 'Stab', status: 'fertig' }),
+  ];
+  const zeige = (props: { overrides?: ModulOverrides; onSprungKlick?: (m: Sprungmarke) => void }) =>
+    renderMitProviders(
+      <ModulPanel
+        titel="Führung"
+        module={fuehrung}
+        benutzer={ohne}
+        aktiverModulKey="auftraege"
+        onModulKlick={() => {}}
+        sprungmarken={[marke]}
+        {...props}
+      />,
+    );
+
+  it('steht hinter ihrem Anker, nennt das Ziel im Namen und ist nie aktuell', async () => {
+    const klick = vi.fn();
+    zeige({ onSprungKlick: klick });
+    const knoepfe = screen.getAllByRole('button').map((b) => b.textContent);
+    expect(knoepfe).toEqual(['Aufträge', 'Entscheidungen', 'Stab']);
+    const sprung = screen.getByRole('button', {
+      name: 'Entscheidungen, springt zu ETB, Typ Entscheidung',
+    });
+    expect(sprung).not.toHaveAttribute('aria-current');
+    // Die Ikone ist Dekoration: kein eigenes Vorleseziel (englisches `aria-label` „export").
+    expect(within(sprung).queryByRole('img')).not.toBeInTheDocument();
+    await userEvent.click(sprung);
+    expect(klick).toHaveBeenCalledWith(marke);
+  });
+
+  it('verschwindet mit dem ausgeblendeten Zielmodul, nicht mit dem Anker', () => {
+    const { unmount } = zeige({ overrides: ueberschreibung('etb', false) });
+    expect(screen.queryByRole('button', { name: /Entscheidungen/ })).not.toBeInTheDocument();
+    unmount();
+    // Gegenprobe: ein ausgeblendeter ANKER nimmt die Marke nicht mit.
+    zeige({ overrides: ueberschreibung('auftraege', false) });
+    expect(screen.getByRole('button', { name: /Entscheidungen/ })).toBeInTheDocument();
+  });
+
+  it('ist gesperrt, wenn das Zielmodul für den Benutzer gesperrt ist', async () => {
+    const klick = vi.fn();
+    zeige({ overrides: ueberschreibung('etb', true, 'fuehrungskraft'), onSprungKlick: klick });
+    const sprung = screen.getByRole('button', { name: /Entscheidungen/ });
+    expect(sprung).toBeDisabled();
+    expect(sprung).toHaveAttribute('title', 'Keine Berechtigung');
+    await userEvent.click(sprung);
+    expect(klick).not.toHaveBeenCalled();
   });
 });

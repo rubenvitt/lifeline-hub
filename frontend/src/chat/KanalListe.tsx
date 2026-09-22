@@ -87,6 +87,8 @@ export default function KanalListe({
             return (
               <ListenEintrag
                 onClick={() => onWechsel(k.id)}
+                // Am Element mit `role="button"`, nicht an der inneren Zeile (LFH-621).
+                aria-current={aktiv ? 'true' : undefined}
                 // Handgebautes Bedienziel: ZWEI Angaben (LFH-365) — Boden plus Polsterung.
                 style={{
                   cursor: 'pointer',
@@ -99,7 +101,6 @@ export default function KanalListe({
               >
                 <div
                   data-lfh="kanal-zeile"
-                  aria-current={aktiv ? 'true' : undefined}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
