@@ -148,6 +148,8 @@ use utoipa::OpenApi;
         crate::routes::organisation::OrganisationAnzeige,
         crate::routes::ort_vorschau::OrtVorschauAntwort,
         crate::routes::ort_vorschau::PeilungAntwort,
+        crate::pegel::PegelAnzeige,
+        crate::pegel::PegelMessung,
         crate::schaden::AbschlussGrund,
         crate::schaden::Ausmass,
         crate::schaden::SchadenAnzeige,

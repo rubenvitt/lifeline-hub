@@ -6,7 +6,9 @@ use serde_json::{json, Value};
 /// PEGELONLINE `stations.json` (mit `includeTimeseries`) → GeoJSON-Points. Der aktuelle
 /// Wasserstand stammt aus der Zeitreihe `shortname == "W"` (Stationen führen mehrere
 /// Reihen: W=Wasserstand, Q=Abfluss, …). Zusätzlich Gewässer, Stations-km, Zeitpunkt und
-/// die fachliche Einordnung (`stateMnwMhw`: niedrig/normal/hoch).
+/// die fachliche Einordnung (`stateMnwMhw`: niedrig/normal/hoch). Die Stations-`uuid` geht
+/// additiv mit (LFH-606): über sie legt ein Einsatz seinen maßgeblichen Pegel fest und
+/// holt dessen Zeitreihe (`crate::pegel`).
 pub fn normalisiere_pegelonline(roh: &Value) -> Value {
     let stationen = roh.as_array().cloned().unwrap_or_default();
     let features: Vec<Value> = stationen
@@ -24,6 +26,7 @@ pub fn normalisiere_pegelonline(roh: &Value) -> Value {
                 .and_then(|w| w.get("longname"))
                 .and_then(|v| v.as_str());
             let km = st.get("km").and_then(|v| v.as_f64());
+            let uuid = st.get("uuid").and_then(|v| v.as_str());
             // Wasserstand-Zeitreihe heraussuchen.
             let w = st
                 .get("timeseries")
@@ -45,6 +48,7 @@ pub fn normalisiere_pegelonline(roh: &Value) -> Value {
                 "properties": {
                     "titel": name,
                     "kategorie": "pegel",
+                    "uuid": uuid,
                     "gewaesser": gewaesser,
                     "km": km,
                     "wert": wert,
@@ -557,6 +561,7 @@ mod pegelonline_tests {
         // Reale Struktur: currentMeasurement liegt unter timeseries[shortname=="W"].
         let roh = json!([
             {
+                "uuid": "a6ee8177-107b-47dd-bcfd-30960ccc6e9c",
                 "longname": "KÖLN", "longitude": 6.96, "latitude": 50.94, "km": 688.0,
                 "water": { "longname": "RHEIN" },
                 "timeseries": [
@@ -575,6 +580,18 @@ mod pegelonline_tests {
         assert_eq!(f["properties"]["wert"], 320.0);
         assert_eq!(f["properties"]["einheit"], "cm");
         assert_eq!(f["properties"]["zustand"], "hoch");
+        // LFH-606: die uuid geht additiv mit — Auswahlliste und Karten-Schnellweg brauchen sie.
+        assert_eq!(
+            f["properties"]["uuid"],
+            "a6ee8177-107b-47dd-bcfd-30960ccc6e9c"
+        );
+    }
+
+    #[test]
+    fn station_ohne_uuid_traegt_null() {
+        let roh = json!([{ "longname": "X", "longitude": 7.0, "latitude": 51.0 }]);
+        let fc = normalisiere_pegelonline(&roh);
+        assert!(fc["features"][0]["properties"]["uuid"].is_null());
     }
 
     #[test]
@@ -589,6 +606,7 @@ mod pegelonline_tests {
     fn pegelonline_output_passt_auf_den_geojson_anker() {
         let roh = json!([
             {
+                "uuid": "a6ee8177-107b-47dd-bcfd-30960ccc6e9c",
                 "longname": "KÖLN", "longitude": 6.96, "latitude": 50.94, "km": 688.0,
                 "water": { "longname": "RHEIN" },
                 "timeseries": [

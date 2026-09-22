@@ -332,6 +332,10 @@ export type BefehlStatus = S['BefehlStatus'];
 export type BefehlAbschnitt = S['BefehlAbschnitt'];
 export type BefehlAnzeige = S['BefehlAnzeige'];
 
+// ============================== LFH-606 Pegel-Kennzahl ==============================
+export type PegelAnzeige = S['PegelAnzeige'];
+export type PegelMessung = S['PegelMessung'];
+
 // ============================== LFH-46 Stab (S1–S6) ==============================
 export type Stab = S['StabAnzeige'];
 export type Stabsfunktion = S['StabsfunktionAnzeige'];

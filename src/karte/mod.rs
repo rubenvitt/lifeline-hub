@@ -67,7 +67,15 @@ pub fn karte_config() -> &'static KarteConfig {
 pub struct FachebenenState {
     pub client: reqwest::Client,
     pub inflight: Arc<Mutex<HashSet<String>>>,
+    /// Basis-URL der PEGELONLINE-REST-API für die Zeitreihen je Station (LFH-606,
+    /// `crate::pegel::abruf`). Produktiv [`PEGELONLINE_BASIS_URL`]; Integrationstests lenken
+    /// sie über [`FachebenenState::mit_pegel_basis_url`] auf eine nicht erreichbare Adresse,
+    /// damit kein Test ins Netz geht.
+    pub pegel_basis_url: Arc<str>,
 }
+
+/// Produktive Basis-URL der PEGELONLINE-REST-API v2.
+pub const PEGELONLINE_BASIS_URL: &str = "https://www.pegelonline.wsv.de/webservices/rest-api/v2";
 
 impl FachebenenState {
     pub fn neu() -> Self {
@@ -79,7 +87,14 @@ impl FachebenenState {
         FachebenenState {
             client,
             inflight: Arc::new(Mutex::new(HashSet::new())),
+            pegel_basis_url: Arc::from(PEGELONLINE_BASIS_URL),
         }
+    }
+
+    /// Lenkt die PEGELONLINE-Zeitreihenabrufe auf eine andere Basis-URL (Tests).
+    pub fn mit_pegel_basis_url(mut self, url: &str) -> Self {
+        self.pegel_basis_url = Arc::from(url.trim_end_matches('/'));
+        self
     }
 }
 

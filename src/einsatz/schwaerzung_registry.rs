@@ -769,6 +769,23 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("erfasst_at", G_ZEIT),
         ],
     },
+    // LFH-606: maßgebliche Pegel. Stationsname und Gewässer benennen eine Messstelle der
+    // WSV, keine Person — operatives Label. Kein Personenbezug außer dem Benutzer-FK.
+    TabellenRegel {
+        tabelle: "einsatz_pegel",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            retain("station_uuid", G_OP_LABEL),
+            retain("name", G_OP_LABEL),
+            retain("gewaesser", G_OP_LABEL),
+            retain("reihenfolge", G_ZAEHLER),
+            retain("gesetzt_von_id", G_FK),
+            retain("gesetzt_at", G_ZEIT),
+        ],
+    },
     TabellenRegel {
         tabelle: "einsatz_einstellungen",
         scoping: Scoping::EinsatzId,

@@ -1781,6 +1781,42 @@ export interface components {
             ortsname?: string | null;
             peilung?: null | components["schemas"]["PeilungAntwort"];
         };
+        /** @description Ein festgelegter Pegel eines Einsatzes. */
+        PegelAnzeige: {
+            gewaesser?: string | null;
+            /** Format: int64 */
+            id: number;
+            messung?: null | components["schemas"]["PegelMessung"];
+            /** @description Stationsname zum Zeitpunkt des Festlegens (Snapshot). */
+            name: string;
+            /**
+             * Format: int64
+             * @description Position in der Liste, ab 0; der erste Eintrag ist der Leitpegel.
+             */
+            reihenfolge: number;
+            /** @description PEGELONLINE-Stations-UUID (kleingeschrieben). */
+            station_uuid: string;
+        };
+        /** @description Aktueller Messwert einer Station mit Trend. */
+        PegelMessung: {
+            /**
+             * Format: double
+             * @description Trend in cm/h (lineare Regression über 60 min vor der jüngsten Messung, eine
+             *     Nachkommastelle). Fehlt, wenn das Fenster zu dünn oder zu kurz ist.
+             */
+            trend_cm_pro_h?: number | null;
+            /**
+             * Format: double
+             * @description Wasserstand der W-Reihe in cm (Einheit der PEGELONLINE-Reihe).
+             */
+            wasserstand_cm: number;
+            /**
+             * @description Zeitpunkt der jüngsten Messung, RFC 3339 mit Zonenversatz, wie PEGELONLINE ihn
+             *     liefert (z. B. `2026-09-22T09:15:00+02:00`). Er ist der ehrliche Datenstand — auch
+             *     dann, wenn ein älterer Cache-Eintrag ausgeliefert wird.
+             */
+            zeitpunkt: string;
+        };
         PeilungAntwort: {
             bezug_label: string;
             /** Format: double */

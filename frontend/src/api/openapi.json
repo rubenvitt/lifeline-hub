@@ -5046,6 +5046,79 @@
           }
         }
       },
+      "PegelAnzeige": {
+        "type": "object",
+        "description": "Ein festgelegter Pegel eines Einsatzes.",
+        "required": [
+          "id",
+          "station_uuid",
+          "name",
+          "reihenfolge"
+        ],
+        "properties": {
+          "gewaesser": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "messung": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PegelMessung",
+                "description": "Fehlt, wenn weder ein Abruf gelang noch ein Cache-Eintrag vorliegt (Ausfall)."
+              }
+            ]
+          },
+          "name": {
+            "type": "string",
+            "description": "Stationsname zum Zeitpunkt des Festlegens (Snapshot)."
+          },
+          "reihenfolge": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Position in der Liste, ab 0; der erste Eintrag ist der Leitpegel."
+          },
+          "station_uuid": {
+            "type": "string",
+            "description": "PEGELONLINE-Stations-UUID (kleingeschrieben)."
+          }
+        }
+      },
+      "PegelMessung": {
+        "type": "object",
+        "description": "Aktueller Messwert einer Station mit Trend.",
+        "required": [
+          "wasserstand_cm",
+          "zeitpunkt"
+        ],
+        "properties": {
+          "trend_cm_pro_h": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "Trend in cm/h (lineare Regression über 60 min vor der jüngsten Messung, eine\nNachkommastelle). Fehlt, wenn das Fenster zu dünn oder zu kurz ist."
+          },
+          "wasserstand_cm": {
+            "type": "number",
+            "format": "double",
+            "description": "Wasserstand der W-Reihe in cm (Einheit der PEGELONLINE-Reihe)."
+          },
+          "zeitpunkt": {
+            "type": "string",
+            "description": "Zeitpunkt der jüngsten Messung, RFC 3339 mit Zonenversatz, wie PEGELONLINE ihn\nliefert (z. B. `2026-09-22T09:15:00+02:00`). Er ist der ehrliche Datenstand — auch\ndann, wenn ein älterer Cache-Eintrag ausgeliefert wird."
+          }
+        }
+      },
       "PeilungAntwort": {
         "type": "object",
         "required": [
