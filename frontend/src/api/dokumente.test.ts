@@ -40,9 +40,7 @@ describe('dokumente-API', () => {
   });
 
   it('nutzt das 120-s-Upload-Timeout, nicht das 15-s-Standard-Timeout', async () => {
-    const timeout = vi
-      .spyOn(AbortSignal, 'timeout')
-      .mockReturnValue(new AbortController().signal);
+    const timeout = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(new AbortController().signal);
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify({ id: 1 }), { status: 201 }),
     );

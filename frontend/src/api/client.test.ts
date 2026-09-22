@@ -134,9 +134,7 @@ describe('apiSend', () => {
 
 describe('apiUpload', () => {
   it('nutzt ohne Option das 15-s-Standard-Timeout', async () => {
-    const timeout = vi
-      .spyOn(AbortSignal, 'timeout')
-      .mockReturnValue(new AbortController().signal);
+    const timeout = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(new AbortController().signal);
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify({ ok: true }), { status: 200 }),
     );
@@ -145,9 +143,7 @@ describe('apiUpload', () => {
   });
 
   it('übergibt ein explizites Timeout unverändert', async () => {
-    const timeout = vi
-      .spyOn(AbortSignal, 'timeout')
-      .mockReturnValue(new AbortController().signal);
+    const timeout = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(new AbortController().signal);
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify({ ok: true }), { status: 200 }),
     );
