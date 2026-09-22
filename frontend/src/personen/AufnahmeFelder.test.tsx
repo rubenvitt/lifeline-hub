@@ -1,8 +1,13 @@
 import { Form } from 'antd';
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { renderMitProviders } from '../test/utils';
-import AufnahmeFelder, { skFlaechenStil, type AufnahmeModus } from './AufnahmeFelder';
+import AufnahmeFelder, {
+  aufnahmeZuEingabe,
+  skFlaechenStil,
+  type AufnahmeModus,
+} from './AufnahmeFelder';
 
 /**
  * Die Feldgruppe der Personen-Aufnahme (LFH-340 · C5, Befund H31).
@@ -77,6 +82,66 @@ describe('AufnahmeFelder — Feldbudget', () => {
     expect(screen.getByLabelText('Antreffort')).toBeInTheDocument();
     // Bis C5 war der Name sichtbar; er hat der Sichtung Platz gemacht.
     expect(screen.queryByLabelText('Name')).not.toBeInTheDocument();
+  });
+});
+
+describe('AufnahmeFelder — Zustand, Koordinate, vermisst seit (LFH-613)', () => {
+  const feldZahl = (c: HTMLElement) => c.querySelectorAll('.ant-form-item').length;
+
+  it.each<[AufnahmeModus, number]>([
+    ['schnell', 4],
+    ['betroffen', 4],
+    ['vermisst', 3],
+  ])(
+    '%s: sichtbares Budget unverändert (%i), die neuen Felder erst nach dem Aufklappen',
+    async (modus, sichtbar) => {
+      const { container } = zeige(modus);
+      expect(feldZahl(container)).toBe(sichtbar);
+      for (const label of ['Zustand', 'Koordinate', 'vermisst seit']) {
+        expect(screen.queryByLabelText(label)).not.toBeInTheDocument();
+      }
+      await userEvent.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
+      await waitFor(() => expect(screen.getByLabelText('Notiz')).toBeInTheDocument());
+      expect(feldZahl(container)).toBeGreaterThan(sichtbar);
+      if (modus === 'vermisst') {
+        // Eine vermisste Person ist nicht angetroffen: kein Zustand, kein Fundort.
+        expect(screen.getByLabelText('vermisst seit')).toBeInTheDocument();
+        expect(screen.queryByLabelText('Zustand')).not.toBeInTheDocument();
+        expect(screen.queryByLabelText('Koordinate')).not.toBeInTheDocument();
+      } else {
+        // Ohne Status `vermisst` wäre „vermisst seit" ein 422.
+        expect(screen.getByLabelText('Zustand')).toBeInTheDocument();
+        expect(screen.getByLabelText('Koordinate')).toBeInTheDocument();
+        expect(screen.queryByLabelText('vermisst seit')).not.toBeInTheDocument();
+      }
+    },
+  );
+});
+
+describe('aufnahmeZuEingabe', () => {
+  it('zerlegt die Koordinate in antreff_lat/antreff_lon und lässt den Text weg', () => {
+    expect(aufnahmeZuEingabe({ zustand: 'gehfähig', koordinate: '52,2691/9,1342' })).toEqual({
+      zustand: 'gehfähig',
+      antreff_lat: 52.2691,
+      antreff_lon: 9.1342,
+    });
+  });
+
+  it('schickt ohne Angabe weder Koordinate noch „vermisst seit" — auch nicht als null', () => {
+    const e = aufnahmeZuEingabe({
+      antreff_ort: 'Brücke',
+      koordinate: '  ',
+      vermisst_seit: undefined,
+    });
+    expect(e).toEqual({ antreff_ort: 'Brücke' });
+    expect(e).not.toHaveProperty('vermisst_seit');
+    expect(e).not.toHaveProperty('antreff_lat');
+  });
+
+  it('reicht „vermisst seit" als Wire-String durch', () => {
+    expect(aufnahmeZuEingabe({ vermisst_seit: '2026-09-22 06:00:00' })).toEqual({
+      vermisst_seit: '2026-09-22 06:00:00',
+    });
   });
 });
 

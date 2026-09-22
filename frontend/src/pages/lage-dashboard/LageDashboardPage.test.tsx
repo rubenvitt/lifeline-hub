@@ -55,7 +55,11 @@ const einsatz = {
   org_name: 'THW Musterstadt',
 };
 
-const person = (sichtung: string | null, status = 'betroffen') => ({
+const person = (
+  sichtung: string | null,
+  status = 'betroffen',
+  extra: Record<string, unknown> = {},
+) => ({
   id: Math.floor(Math.random() * 1e9),
   einsatz_id: 1,
   registrier_nr: 1,
@@ -79,6 +83,7 @@ const person = (sichtung: string | null, status = 'betroffen') => ({
   aktueller_verbleib: null,
   aktuelle_uhs_id: null,
   aktueller_platz_id: null,
+  ...extra,
 });
 
 const auftrag = (over: Partial<Auftrag> = {}): Auftrag => ({
@@ -368,6 +373,55 @@ describe('LageDashboardPage — Kennzahlenband', () => {
     expect(kante(kennzahl('Vermisste'))).toBe(6);
     // Betroffene sind eine Menge, keine Gefahrenmeldung — ohne Kante.
     expect(kante(kennzahl('Betroffene'))).toBe(0);
+  });
+
+  it('Spec-Szenario: drei Vermisste, zwei seit über 4 h → Notiz „2 seit über 4 h"', async () => {
+    const seit = (msZurueck: number) =>
+      new Date(Date.now() - msZurueck).toISOString().slice(0, 19).replace('T', ' ');
+    const stunde = 60 * 60_000;
+    mockEndpunkte({
+      personen: [
+        person(null, 'vermisst', { vermisst_seit: seit(6 * stunde) }),
+        person(null, 'vermisst', { vermisst_seit: seit(5 * stunde) }),
+        person(null, 'vermisst', { vermisst_seit: seit(1 * stunde) }),
+      ],
+    });
+    render();
+    await kennzahlGeladen('Vermisste');
+    expect(kennzahl('Vermisste')).toHaveTextContent('3');
+    expect(kennzahl('Vermisste')).toHaveTextContent('2 seit über 4 h');
+  });
+
+  describe('mit fester Uhr', () => {
+    afterEach(() => vi.useRealTimers());
+
+    it('die Notiz erscheint nach Ablauf der Schwelle OHNE neue Daten', async () => {
+      // Nur Uhr und Intervalle gefälscht: MSW und `waitFor` laufen weiter auf echten Timeouts.
+      vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
+      vi.setSystemTime(new Date('2026-06-08T14:00:00Z'));
+      let abrufe = 0;
+      mockEndpunkte({});
+      server.use(
+        http.get('/api/einsaetze/1/personen', () => {
+          abrufe++;
+          // 3 h 59 min vor „jetzt" — eine Minute unter der Schwelle.
+          return HttpResponse.json([
+            person(null, 'vermisst', { vermisst_seit: '2026-06-08 10:01:00' }),
+          ]);
+        }),
+      );
+      render();
+      await kennzahlGeladen('Vermisste');
+      expect(kennzahl('Vermisste')).toHaveTextContent('als vermisst erfasst');
+      const abrufeVorher = abrufe;
+
+      // Zwei Minuten später: nur der Uhr-Takt der Seite läuft, kein Abruf.
+      act(() => {
+        vi.advanceTimersByTime(2 * 60_000);
+      });
+      await waitFor(() => expect(kennzahl('Vermisste')).toHaveTextContent('1 seit über 4 h'));
+      expect(abrufe).toBe(abrufeVorher);
+    });
   });
 
   it('ohne Vermisste gibt es keine Kante und den Wortlaut statt einer nackten Null', async () => {
@@ -698,8 +752,38 @@ describe('LageDashboardPage — Sichtung', () => {
     expect(zeilen[0].querySelector('[data-lfh="sichtungsfeld"]')).not.toBeNull();
     expect(zeilen[0]).toHaveTextContent('SK I');
     expect(within(box).getByText('Ohne Sichtung')).toBeInTheDocument();
-    // „Transportiert / offen" ist nicht sauber ableitbar (LFH-613) und fehlt.
-    expect(within(box).queryByText(/Transportiert/)).toBeNull();
+    // Ohne jeden Verbleib: nichts transportiert, alle fünf angetroffen und offen.
+    expect(box.querySelector('[data-lfh="transport-bilanz"]')).toHaveTextContent(
+      'Transportiert / offen0 / 5',
+    );
+  });
+
+  it('Spec-Szenario „Transportiert / offen": 2 / 2 — eine Voranmeldung ist kein Transport', async () => {
+    const transport = (verbleibStatus?: string) =>
+      person('sk2', 'betroffen', {
+        aktuelle_verbleib_art: 'transport',
+        aktueller_verbleib: 'Transport → KH Nord',
+        ...(verbleibStatus ? { aktueller_verbleib_status: verbleibStatus } : {}),
+      });
+    mockEndpunkte({
+      personen: [
+        transport('abtransportiert'),
+        transport(),
+        transport('angemeldet'),
+        person('sk3'),
+        person('sk3'),
+        // Weder noch: in einer UHS verortet, und vermisst ist nicht angetroffen.
+        person('sk3', 'betroffen', { aktuelle_uhs_id: 7 }),
+        person(null, 'vermisst'),
+      ],
+    });
+    render();
+    const box = paneel('Sichtung');
+    await waitFor(() =>
+      expect(box.querySelector('[data-lfh="transport-bilanz"]')).toHaveTextContent(
+        'Transportiert / offen2 / 2',
+      ),
+    );
   });
 
   it('nimmt Tote dazu, sobald es welche gibt', async () => {

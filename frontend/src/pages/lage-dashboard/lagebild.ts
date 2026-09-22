@@ -181,6 +181,37 @@ export function standText(
   return `Stand ${inZone(new Date(datenstand).toISOString(), konv).format('HH:mm')}`;
 }
 
+/**
+ * Schwelle der Notiz „n seit über 4 h" an der Kennzahl „Vermisste" (LFH-613).
+ * Quelle: Neuentwurf S3 (`docs/design/2026-09-21-neuentwurf/neuentwurf.dc.html`, Kennzahl
+ * „Vermisste", Notiz „3 seit über 4 h"). Eine gesetzte Zahl aus dem Entwurf, keine Norm.
+ */
+export const VERMISST_LANG_MS = 4 * 60 * 60_000;
+
+/**
+ * Wie viele Vermisste sind länger als {@link VERMISST_LANG_MS} vermisst, gemessen an `jetzt`?
+ * Rein — die Seite reicht ihren Uhr-Takt durch, damit die Notiz OHNE neue Daten nachzieht.
+ * Ein fehlendes oder unlesbares `vermisst_seit` zählt nicht (keine erfundene Dauer).
+ */
+export function langeVermisst(
+  personen: readonly Pick<Person, 'status' | 'vermisst_seit'>[],
+  jetzt: number,
+): number {
+  let n = 0;
+  for (const p of personen) {
+    if (p.status !== 'vermisst' || !p.vermisst_seit) continue;
+    const seit = wireAlsEpoche(p.vermisst_seit);
+    if (Number.isFinite(seit) && jetzt - seit > VERMISST_LANG_MS) n++;
+  }
+  return n;
+}
+
+/** Notiz der Kennzahl „Vermisste". Rein. */
+export function vermisstNotiz(vermisst: number, lang: number): string {
+  if (vermisst === 0) return 'keine offenen Fälle';
+  return lang > 0 ? `${lang} seit über 4 h` : 'als vermisst erfasst';
+}
+
 export interface Rohdaten {
   einsatz: EinsatzAnzeige;
   personen: Person[];
@@ -212,6 +243,7 @@ export function baueLagebild(
     r.material,
   ).verdichtung;
   const betroffene = verdichtePersonen(r.personen);
+  const lang = langeVermisst(r.personen, jetzt);
   const uhs = verdichteUhs(r.uhs);
   const schaeden = verdichteSchaeden(r.schaeden);
   const gefahren = verdichteGefahrengebiete(r.gefahren);
@@ -253,7 +285,7 @@ export function baueLagebild(
     {
       etikett: 'Vermisste',
       wert: String(betroffene.vermisst),
-      notiz: betroffene.vermisst > 0 ? 'als vermisst erfasst' : 'keine offenen Fälle',
+      notiz: vermisstNotiz(betroffene.vermisst, lang),
       ton: betroffene.vermisst > 0 ? 'alarm' : 'neutral',
       route: 'personen',
     },

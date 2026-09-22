@@ -77,11 +77,20 @@ import type {
   VerbleibArt,
 } from '../api/types';
 import {
+  lagekartePfad,
   parseRouteId,
   personenPfad,
   schadenDetailPfad,
   tiereDetailPfad,
 } from '../routing/deeplinks';
+import { koordinatenText } from '../personen/koordinate';
+import { KoordinateFeld, VermisstSeitFeld } from '../personen/LagedatenFelder';
+import {
+  bearbeitenWerteAus,
+  bearbeitenZuPatch,
+  verortenLinkStil,
+  type PersonBearbeitenWerte,
+} from '../personen/personBearbeiten';
 
 const TIER_SPEZIES_LABEL: Record<Spezies, string> = {
   hund: 'Hund',
@@ -160,8 +169,8 @@ export default function PersonenDetailPage() {
 
   const qc = useQueryClient();
   const { message, modal } = App.useApp();
-  const [editForm] = Form.useForm<PersonEingabe>();
-  const editSitzung = useEditSitzung<PersonEingabe>(editForm);
+  const [editForm] = Form.useForm<PersonBearbeitenWerte>();
+  const editSitzung = useEditSitzung<PersonBearbeitenWerte>(editForm);
 
   const fehler = (e: unknown) =>
     message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
@@ -728,7 +737,15 @@ export default function PersonenDetailPage() {
             form={editForm}
             layout="vertical"
             initialValues={sitzung.werte}
-            onFinish={(daten) => editMutation.mutate({ daten, basis: sitzung.basis })}
+            // Koordinate und „vermisst seit" werden gegen die Werte beim Öffnen gemessen:
+            // unverändert gehen sie gar nicht mit (Rundung, 400 auf `null`) —
+            // `personen/personBearbeiten.ts`.
+            onFinish={(werte) =>
+              editMutation.mutate({
+                daten: bearbeitenZuPatch(werte, sitzung.werte, person.status === 'vermisst'),
+                basis: sitzung.basis,
+              })
+            }
           >
             <Form.Item label="Name" name="name">
               <Input />
@@ -756,9 +773,14 @@ export default function PersonenDetailPage() {
             <Form.Item label="Herkunft / Adresse" name="herkunft_adresse">
               <Input />
             </Form.Item>
+            <Form.Item label="Zustand" name="zustand">
+              <Input placeholder="z. B. gehfähig, unterkühlt" />
+            </Form.Item>
             <Form.Item label="Antreffort" name="antreff_ort">
               <Input />
             </Form.Item>
+            <KoordinateFeld />
+            {person.status === 'vermisst' && <VermisstSeitFeld />}
             <Form.Item label="Melder / Kontakt" name="melder_kontakt">
               <Input />
             </Form.Item>
@@ -784,7 +806,35 @@ export default function PersonenDetailPage() {
             <Descriptions.Item label="Herkunft / Adresse">
               {person.herkunft_adresse ?? '—'}
             </Descriptions.Item>
+            <Descriptions.Item label="Zustand">{person.zustand ?? '—'}</Descriptions.Item>
             <Descriptions.Item label="Antreffort">{person.antreff_ort ?? '—'}</Descriptions.Item>
+            <Descriptions.Item label="Koordinate">
+              <Space wrap size="middle">
+                <span data-lfh="koordinate" style={{ fontFamily: token.fontFamilyCode }}>
+                  {koordinatenText(person) ?? '—'}
+                </span>
+                {darfSchreiben && !person.storniert_at && (
+                  // Ein Link, kein Knopf: das Ziel ist eine Adresse (Platzier-Auftrag an die
+                  // Lagekarte, LFH-340-Muster), in einem neuen Tab öffenbar. Die zwei
+                  // Angaben des handgebauten Bedienziels (LFH-365) trägt `verortenLinkStil`.
+                  <Link
+                    to={lagekartePfad(einsatzId, { platzieren: { typ: 'person', id: person.id } })}
+                    style={verortenLinkStil(token)}
+                  >
+                    Auf Lagekarte verorten
+                  </Link>
+                )}
+              </Space>
+            </Descriptions.Item>
+            {person.status === 'vermisst' && (
+              <Descriptions.Item label="vermisst seit">
+                {person.vermisst_seit ? (
+                  <ZeitAnzeige wert={person.vermisst_seit} format="dtgVoll" />
+                ) : (
+                  '—'
+                )}
+              </Descriptions.Item>
+            )}
             <Descriptions.Item label="Melder / Kontakt">
               {person.melder_kontakt ?? '—'}
             </Descriptions.Item>
@@ -997,17 +1047,7 @@ export default function PersonenDetailPage() {
 
   /** Die Bearbeiten-Sitzung öffnen — Formularwerte und CAS-Basis aus DEMSELBEN Snapshot. */
   function starteBearbeiten() {
-    const werte: PersonEingabe = {
-      name: p.name,
-      vorname: p.vorname,
-      geschlecht: p.geschlecht,
-      geburtsdatum: p.geburtsdatum,
-      alter_geschaetzt: p.alter_geschaetzt,
-      herkunft_adresse: p.herkunft_adresse,
-      antreff_ort: p.antreff_ort,
-      melder_kontakt: p.melder_kontakt,
-      notiz: p.notiz,
-    };
+    const werte = bearbeitenWerteAus(p);
     // Spaetere Live-/Refetch-Staende duerfen nur den Lesemodus aktualisieren.
     editSitzung.starte(p, werte);
   }
@@ -1261,6 +1301,7 @@ export default function PersonenDetailPage() {
             <Select
               options={[
                 { value: 'transport', label: 'Transport' },
+                { value: 'notunterkunft', label: 'Notunterkunft' },
                 { value: 'entlassung', label: 'Entlassung vor Ort' },
                 { value: 'vor_ort', label: 'verbleibt vor Ort' },
                 { value: 'verstorben', label: 'Verbleib des Leichnams' },

@@ -210,6 +210,55 @@ describe('PersonErfassungModal — Feldbudget', () => {
   });
 });
 
+describe('PersonErfassungModal — Zustand, Koordinate, vermisst seit (LFH-613)', () => {
+  it('schickt Zustand und die zerlegte Koordinate mit — den Koordinatentext nicht', async () => {
+    const { onErfassen } = zeige();
+    const nutzer = userEvent.setup();
+    await nutzer.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
+    await nutzer.type(await screen.findByLabelText('Zustand'), 'gehfähig, unterkühlt');
+    await nutzer.type(screen.getByLabelText('Koordinate'), '52,2691/9,1342');
+    await nutzer.type(screen.getByLabelText('Antreffort'), 'Deich{Enter}');
+
+    await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
+    const daten = onErfassen.mock.calls[0][0];
+    expect(daten).toMatchObject({
+      zustand: 'gehfähig, unterkühlt',
+      antreff_lat: 52.2691,
+      antreff_lon: 9.1342,
+      antreff_ort: 'Deich',
+    });
+    expect(daten).not.toHaveProperty('koordinate');
+    expect(daten).not.toHaveProperty('vermisst_seit');
+  });
+
+  it('sendet eine unbrauchbare Koordinate NICHT und sagt warum', async () => {
+    const { onErfassen } = zeige();
+    const nutzer = userEvent.setup();
+    await nutzer.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
+    await nutzer.type(await screen.findByLabelText('Koordinate'), '95/9');
+    await nutzer.type(screen.getByLabelText('Antreffort'), 'Deich{Enter}');
+
+    expect(await screen.findByText('Breite außerhalb ±90')).toBeInTheDocument();
+    expect(onErfassen).not.toHaveBeenCalled();
+  });
+
+  it('Vermisst-Modus: „vermisst seit" geht als UTC-Wire-String mit', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    zeige({ modus: 'vermisst', onErfassen });
+    const nutzer = userEvent.setup();
+    await nutzer.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
+    const picker = await screen.findByLabelText('vermisst seit');
+    await nutzer.click(picker);
+    // Enter übernimmt den getippten Zeitpunkt UND sendet ab — das Feld liegt im `<form>`.
+    await nutzer.type(picker, '22.09.2026 08:00{Enter}');
+
+    await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
+    // Ortszeit 08:00 → UTC; gegen den absoluten Zeitpunkt geprüft, nicht gegen sich selbst.
+    const erwartet = new Date(2026, 8, 22, 8, 0, 0).toISOString().slice(0, 19).replace('T', ' ');
+    expect(onErfassen.mock.calls[0][0]).toMatchObject({ vermisst_seit: erwartet });
+  });
+});
+
 describe('PersonErfassungModal — Ablehnung', () => {
   it('lässt den Wortlaut stehen, wenn das Speichern fehlschlägt', async () => {
     const onErfassen = vi.fn().mockRejectedValue(new Error('abgelehnt'));

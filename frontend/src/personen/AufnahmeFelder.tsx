@@ -4,6 +4,8 @@ import type { CSSProperties } from 'react';
 import { Select } from '../components/Select';
 import type { PersonEingabe } from '../api/einsatzPerson';
 import type { Sichtungskategorie } from '../api/types';
+import { parseKoordinate } from './koordinate';
+import { KoordinateFeld, VermisstSeitFeld } from './LagedatenFelder';
 
 /**
  * Werte der Personen-Aufnahme. `PersonEingabe` plus die Erst-Sichtung — und NUR diese
@@ -12,6 +14,33 @@ import type { Sichtungskategorie } from '../api/types';
  * `Form.useForm<PersonEingabe>` darüber verlöre `sichtung` still.
  */
 export type AufnahmeEingabe = PersonEingabe & { sichtung?: Sichtungskategorie };
+
+/**
+ * Die FORMULARwerte der Maske — `AufnahmeEingabe` bis auf die Koordinate: die steht als
+ * EIN Textfeld (`52.2691/9.1342`, Design D6) statt als zwei Zahlen und wird erst von
+ * {@link aufnahmeZuEingabe} in `antreff_lat`/`antreff_lon` zerlegt. „vermisst seit" liegt
+ * schon im Formular als Wire-String (UTC), die Umrechnung macht das `Form.Item` selbst.
+ */
+export type AufnahmeWerte = Omit<AufnahmeEingabe, 'antreff_lat' | 'antreff_lon'> & {
+  koordinate?: string;
+};
+
+/**
+ * Formularwerte → Anlage. Beide Mounts rufen sie, damit es EINE Zerlegung gibt.
+ *
+ * Nur GESETZTE Werte gehen mit: `vermisst_seit` fehlt ohne Angabe ganz (dann setzt der
+ * Server die Meldezeit), eine leere Koordinate ebenso. Ein unbrauchbarer Koordinatentext
+ * erreicht diese Funktion nicht — die Feldprüfung hält das Absenden vorher an.
+ */
+export function aufnahmeZuEingabe(werte: AufnahmeWerte): AufnahmeEingabe {
+  const { koordinate, vermisst_seit, ...rest } = werte;
+  const k = koordinate && koordinate.trim() !== '' ? parseKoordinate(koordinate) : null;
+  return {
+    ...rest,
+    ...(k?.ok ? { antreff_lat: k.lat, antreff_lon: k.lon } : {}),
+    ...(vermisst_seit ? { vermisst_seit } : {}),
+  };
+}
 
 /** Erfassungs-Modi der Personen-Aufnahme. */
 export type AufnahmeModus = 'schnell' | 'vermisst' | 'betroffen';
@@ -54,6 +83,19 @@ export function skFlaechenStil(token: { controlHeight: number }): CSSProperties 
  * langsamste Teil und in der Masse der Fälle unbekannt. Pflichtfelder gibt es weiterhin
  * keine: eine Person, von der man nichts weiß, muss trotzdem erfassbar sein.
  *
+ * Unter „Weitere Angaben" (LFH-613) liegen zusätzlich **Zustand** und **Koordinate**
+ * (Fundort als `52.2691/9.1342`, geprüft über `personen/koordinate.ts` — dieselbe Funktion
+ * wie in der Schnellerfassungszeile und auf der Detailseite), im Vermisst-Modus statt
+ * ihrer **„vermisst seit"**. Das sichtbare Budget wächst dadurch nicht. Der Collapse bleibt
+ * OHNE `forceRender` (Entscheidung und Beleg in `PersonErfassungModal.test.tsx`): ein Wert
+ * entsteht nur aufgeklappt, und einmal aufgeklappt bleibt der Bereich eingehängt — eine
+ * ungültige Koordinate hält das Absenden also auch nach dem Zuklappen an.
+ *
+ * Zustand und Koordinate fehlen im Vermisst-Modus: beide beschreiben eine ANGETROFFENE
+ * Person — eine Koordinate an einer vermissten Person stünde auf der Betroffenen-Karte wie
+ * ein Fundort. „vermisst seit" fehlt umgekehrt außerhalb: das Backend lehnt es ohne Status
+ * `vermisst` mit 422 ab.
+ *
  * ── DIE SICHTUNG FEHLT IM VERMISST-MODUS, UND ZWAR MIT ABSICHT ─────
  *
  * Eine vermisste Person ist nicht angetroffen und damit nicht sichtbar. Das ist keine
@@ -74,9 +116,20 @@ export default function AufnahmeFelder({ modus }: { modus: AufnahmeModus }) {
         <Input />
       </Form.Item>
       {modus === 'vermisst' && (
-        <Form.Item label="Melder / Kontakt" name="melder_kontakt">
-          <Input placeholder="Angehöriger, Kontaktdaten" />
-        </Form.Item>
+        <>
+          <VermisstSeitFeld hinweis="Ohne Angabe gilt der Zeitpunkt der Meldung." />
+          <Form.Item label="Melder / Kontakt" name="melder_kontakt">
+            <Input placeholder="Angehöriger, Kontaktdaten" />
+          </Form.Item>
+        </>
+      )}
+      {modus !== 'vermisst' && (
+        <>
+          <Form.Item label="Zustand" name="zustand">
+            <Input placeholder="z. B. gehfähig, unterkühlt" />
+          </Form.Item>
+          <KoordinateFeld />
+        </>
       )}
       <Form.Item label="Notiz" name="notiz">
         <Input.TextArea rows={2} />

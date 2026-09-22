@@ -11,9 +11,10 @@ import { hatLuecke } from './personenBilanz';
  * („Patienten") eine ANDERE DARSTELLUNG (nach Sichtung gruppiert). Zwei Achsen in einer
  * Reiterleiste verwischten, welche von beiden gerade die Zeilen bestimmt. Jetzt:
  *
- *  · `ansicht`    — „Zeilen" oder „Sichtungsraster" (Segmentleiste im Seitenkopf). Das
- *                   Raster ist die verallgemeinerte Patienten-Gruppierung: ALLE Personen
- *                   nach Sichtung, samt „unverletzt" und „ohne Sichtung".
+ *  · `ansicht`    — „Zeilen", „Sichtungsraster" oder „Karte" (Segmentleiste im Seitenkopf).
+ *                   Das Raster ist die verallgemeinerte Patienten-Gruppierung: ALLE
+ *                   Personen nach Sichtung, samt „unverletzt" und „ohne Sichtung". Die
+ *                   Karte zeigt die Fundorte (LFH-613, `personen/BetroffeneKarte.tsx`).
  *  · `filter`     — der Personenstatus (Neu/Vermisst/Betroffen/Verstorben/Alle), als
  *                   zweite Leiste über der Tabelle. Gilt in BEIDEN Ansichten.
  *  · `nurLuecken` — Umschalter aus der Seitenleiste „Offene Felder". Gilt ebenfalls in
@@ -27,7 +28,7 @@ import { hatLuecke } from './personenBilanz';
 /** Statusfilter der Seite. `'alle'` filtert nicht. */
 export type PersonenFilter = 'erfasst' | 'vermisst' | 'betroffen' | 'verstorben' | 'alle';
 
-export type PersonenAnsicht = 'zeilen' | 'raster';
+export type PersonenAnsicht = 'zeilen' | 'raster' | 'karte';
 
 export interface PersonenSicht {
   ansicht: PersonenAnsicht;

@@ -19,28 +19,28 @@
 ## 3. Frontend-Grundlagen
 
 - [x] 3.1 `api/einsatzPerson.ts` (`PersonAnlegenEingabe`, `PersonEingabe`, Verbleib-Art-Union mit `notunterkunft`) und die Offline-Queue-Typen nachziehen. Verifikation: `tsc` ist grün.
-- [ ] 3.2 Koordinaten-Parser als reine Funktion (`personen/koordinate.ts`: `parseKoordinate`, `formatKoordinate`), mit Punkt, Komma, Minus und Bereich. Verifikation: Unit-Tests einschließlich der Ablehnungsfälle.
-- [ ] 3.3 `personBefehl.ts`: der Teil `koordinate` ersetzt die `#`-Ablehnung, `eingabe` trägt `antreff_lat/lon`, und ein zweites `#` oder ein ungültiges `#` ist ein Problem. Verifikation: den bestehenden Test „schluckt #… nicht als Namen“ umschreiben, dazu das Spec-Szenario „Koordinate in der Schnellerfassung“ als Parser- und Zeilentest mit geprüftem POST-Body.
-- [ ] 3.4 `personenBilanz.ts` auf `aktuelle_verbleib_art` umstellen, `notunterkunft` wird ein Posten, die Fundort-Lücke schließt Freitext ODER Koordinate. Verifikation: Unit-Test für das Spec-Szenario „Zählung nach Art“, `verbleibArtAus` ist entfernt, und kein Test pinnt es mehr.
+- [x] 3.2 Koordinaten-Parser als reine Funktion (`personen/koordinate.ts`: `parseKoordinate`, `formatKoordinate`), mit Punkt, Komma, Minus und Bereich. Verifikation: Unit-Tests einschließlich der Ablehnungsfälle.
+- [x] 3.3 `personBefehl.ts`: der Teil `koordinate` ersetzt die `#`-Ablehnung, `eingabe` trägt `antreff_lat/lon`, und ein zweites `#` oder ein ungültiges `#` ist ein Problem. Verifikation: den bestehenden Test „schluckt #… nicht als Namen“ umschreiben, dazu das Spec-Szenario „Koordinate in der Schnellerfassung“ als Parser- und Zeilentest mit geprüftem POST-Body.
+- [x] 3.4 `personenBilanz.ts` auf `aktuelle_verbleib_art` umstellen, `notunterkunft` wird ein Posten, die Fundort-Lücke schließt Freitext ODER Koordinate. Verifikation: Unit-Test für das Spec-Szenario „Zählung nach Art“, `verbleibArtAus` ist entfernt, und kein Test pinnt es mehr.
 
 ## 4. Frontend-Anzeige Betroffene
 
-- [ ] 4.1 Spalte „Zustand“ über `BemerkungZelle` mit PATCH und Wertgleichheits-Riegel, die Fundort-Spalte zeigt die Koordinate. Verifikation: `personenSpalten.test.tsx` mit umgeschriebenem „ohne Zustand“-Test, dazu ein Test für das Spec-Szenario „Zustand in der Liste bearbeiten“.
-- [ ] 4.2 Maske (`AufnahmeFelder`): „Zustand“ und „Koordinate“ unter „Weitere Angaben“, bei Status vermisst ein Feld „vermisst seit“. Das sichtbare Feldbudget bleibt unverändert. Verifikation: `AufnahmeFelder.test.tsx` zählt die sichtbaren Felder vor und nach dem Aufklappen (`forceRender`), und der POST-Body enthält die Felder.
-- [ ] 4.3 Detailseite: Zustand, Koordinate (Textfeld mit `parseKoordinate`) und „vermisst seit“ bearbeitbar, dazu die Aktion „Auf Lagekarte verorten“ als Deeplink. Verifikation: `PersonenDetailPage.test.tsx` für den PATCH-Body und den Link mit `?platzieren=person:<id>`.
-- [ ] 4.4 Seitenleiste „Verbleib“ und „Offene Felder“ lesen die neue Bilanz. Verifikation: Komponententest mit einem Notunterkunft-Posten.
+- [x] 4.1 Spalte „Zustand“ über `BemerkungZelle` mit PATCH und Wertgleichheits-Riegel, die Fundort-Spalte zeigt die Koordinate. Verifikation: `personenSpalten.test.tsx` mit umgeschriebenem „ohne Zustand“-Test, dazu ein Test für das Spec-Szenario „Zustand in der Liste bearbeiten“.
+- [x] 4.2 Maske (`AufnahmeFelder`): „Zustand“ und „Koordinate“ unter „Weitere Angaben“, bei Status vermisst ein Feld „vermisst seit“. Das sichtbare Feldbudget bleibt unverändert. Verifikation: `AufnahmeFelder.test.tsx` zählt die sichtbaren Felder vor und nach dem Aufklappen (`forceRender`), und der POST-Body enthält die Felder.
+- [x] 4.3 Detailseite: Zustand, Koordinate (Textfeld mit `parseKoordinate`) und „vermisst seit“ bearbeitbar, dazu die Aktion „Auf Lagekarte verorten“ als Deeplink. Verifikation: `PersonenDetailPage.test.tsx` für den PATCH-Body und den Link mit `?platzieren=person:<id>`.
+- [x] 4.4 Seitenleiste „Verbleib“ und „Offene Felder“ lesen die neue Bilanz. Verifikation: Komponententest mit einem Notunterkunft-Posten.
 
 ## 5. Kartenansicht und Verorten
 
-- [ ] 5.1 `MarkerTyp` bekommt `person`, dazu `personen/personenKarte.ts` (`personenMarker`, Anzahl ohne Koordinate, Farbe aus der Sichtungsachse, Label `R-042 · SK II`). Verifikation: Unit-Test gegen das Spec-Szenario „Personen auf der Karte“ (2 Marker, 3 ohne Koordinate).
-- [ ] 5.2 `personen/BetroffeneKarte.tsx` mit `Kartenflaeche` + `useBasemap`, per `React.lazy` in die Segmentleiste „Karte“ von `PersonenPage`, Leerzustand und Hinweis „n ohne Koordinate“. Verifikation: `PersonenPage.test.tsx` mit gemocktem `Kartenflaeche`. Die Ansicht ist wählbar, die Marker werden übergeben, und der Markerklick navigiert zur Detailseite. Der bisherige Test „Karte gibt es nicht“ ist umgeschrieben.
-- [ ] 5.3 Platzier-Auftrag `person`: `PlatzierenZielTyp`/`PlatzierenPunktTyp` und ein `useKartenInteraktion`-Zweig rufen `aktualisierePerson` mit lat/lon. Verifikation: `deeplinks.test.ts` für den Roundtrip `person:<id>`, dazu der Test des Mutationszweigs.
+- [x] 5.1 `MarkerTyp` bekommt `person`, dazu `personen/personenKarte.ts` (`personenMarker`, Anzahl ohne Koordinate, Farbe aus der Sichtungsachse, Label `R-042 · SK II`). Verifikation: Unit-Test gegen das Spec-Szenario „Personen auf der Karte“ (2 Marker, 3 ohne Koordinate).
+- [x] 5.2 `personen/BetroffeneKarte.tsx` mit `Kartenflaeche` + `useBasemap`, per `React.lazy` in die Segmentleiste „Karte“ von `PersonenPage`, Leerzustand und Hinweis „n ohne Koordinate“. Verifikation: `PersonenPage.test.tsx` mit gemocktem `Kartenflaeche`. Die Ansicht ist wählbar, die Marker werden übergeben, und der Markerklick navigiert zur Detailseite. Der bisherige Test „Karte gibt es nicht“ ist umgeschrieben.
+- [x] 5.3 Platzier-Auftrag `person`: `PlatzierenZielTyp`/`PlatzierenPunktTyp` und ein `useKartenInteraktion`-Zweig rufen `aktualisierePerson` mit lat/lon. Verifikation: `deeplinks.test.ts` für den Roundtrip `person:<id>`, dazu der Test des Mutationszweigs.
 - [ ] 5.4 e2e `e2e/betroffene-karte.spec.ts`: eine Person mit Koordinate anlegen, Ansicht „Karte“, ein Marker ist über `window.__lfhKarte` vorhanden. Verifikation: `pnpm e2e` für diese Spec ist grün.
 
 ## 6. Lage-Dashboard
 
-- [ ] 6.1 Sichtungspaneel-Fuß „Transportiert / offen“ als reine Ableitung. Verifikation: Unit-Test für das Spec-Szenario (2 / 2 mit einer angemeldeten Person), der Test „fehlt (LFH-613)“ in `LageDashboardPage.test.tsx` ist umgeschrieben.
-- [ ] 6.2 Die Kennzahl „Vermisste“ bekommt die Notiz „n seit über 4 h“ aus `vermisst_seit` und dem Uhr-Takt. Verifikation: Unit-Test für das Spec-Szenario mit fester Uhr, dazu ein Test, dass die Notiz ohne neue Daten nach Ablauf der Schwelle erscheint.
+- [x] 6.1 Sichtungspaneel-Fuß „Transportiert / offen“ als reine Ableitung. Verifikation: Unit-Test für das Spec-Szenario (2 / 2 mit einer angemeldeten Person), der Test „fehlt (LFH-613)“ in `LageDashboardPage.test.tsx` ist umgeschrieben.
+- [x] 6.2 Die Kennzahl „Vermisste“ bekommt die Notiz „n seit über 4 h“ aus `vermisst_seit` und dem Uhr-Takt. Verifikation: Unit-Test für das Spec-Szenario mit fester Uhr, dazu ein Test, dass die Notiz ohne neue Daten nach Ablauf der Schwelle erscheint.
 
 ## 7. Abschluss
 

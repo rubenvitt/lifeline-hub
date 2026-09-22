@@ -32,6 +32,12 @@ const einsatzUhsApi = vi.hoisted(() => ({
 }));
 vi.mock('../../api/einsatzUhs', () => einsatzUhsApi);
 
+// Betroffene verorten (LFH-613): der Platzier-Auftrag `person` schreibt die Fundort-Koordinate.
+const einsatzPersonApi = vi.hoisted(() => ({
+  aktualisierePerson: vi.fn(() => Promise.resolve({ id: 10 })),
+}));
+vi.mock('../../api/einsatzPerson', () => einsatzPersonApi);
+
 function wrapper() {
   const client = neuerQueryClient();
   return ({ children }: { children: ReactNode }) => (
@@ -239,6 +245,47 @@ describe('useKartenInteraktion — Verorten', () => {
     });
     einsatzUhsApi.aktualisiereUhs.mockReset();
     einsatzUhsApi.aktualisiereUhs.mockImplementation(() => Promise.resolve({ id: 2 }));
+  });
+});
+
+describe('useKartenInteraktion — Betroffene verorten (LFH-613)', () => {
+  it('Platzier-Auftrag person: Klick PATCHt NUR die Fundort-Koordinate und invalidiert die Personen', async () => {
+    einsatzPersonApi.aktualisierePerson.mockClear();
+    const client = neuerQueryClient();
+    const invalidiert = vi.spyOn(client, 'invalidateQueries');
+    const erfolg = vi.fn();
+    const { result } = renderHook(
+      () =>
+        useKartenInteraktion({
+          einsatzId: 1,
+          einsatz: undefined,
+          darfSchreiben: true,
+          alleVerortet: [],
+          fehler: vi.fn(),
+          erfolg,
+        }),
+      {
+        wrapper: ({ children }: { children: ReactNode }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    act(() => result.current.onPlatzierenStart({ typ: 'person', id: 10 }));
+    act(() => result.current.onKarteKlick({ lng: 8.6, lat: 50.1 }));
+
+    await waitFor(() => expect(einsatzPersonApi.aktualisierePerson).toHaveBeenCalledTimes(1));
+    // Genau die zwei Felder — kein weiterer Key, der als „leeren" gelesen würde.
+    expect(einsatzPersonApi.aktualisierePerson).toHaveBeenCalledWith(1, 10, {
+      antreff_lat: 50.1,
+      antreff_lon: 8.6,
+    });
+    await waitFor(() => expect(erfolg).toHaveBeenCalledWith('Objekt verortet'));
+    const keys = invalidiert.mock.calls.map((c) => c[0]?.queryKey);
+    // Literale statt Factory (CLAUDE.md, Query-Key-Registry): sonst prüfte der Test die Factory gegen sich selbst.
+    expect(keys).toContainEqual(['einsatz-personen', 1]);
+    expect(keys).toContainEqual(['einsatz-person', 1, 10]);
+    expect(result.current.platzierungZiel).toBeNull();
   });
 });
 

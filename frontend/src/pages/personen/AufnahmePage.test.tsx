@@ -188,6 +188,29 @@ describe('AufnahmePage', () => {
     expect(screen.getByRole('radiogroup')).toBeInTheDocument();
   });
 
+  it('schickt Zustand und Koordinate aus „Weitere Angaben" im selben POST (LFH-613)', async () => {
+    let gesendet: Record<string, unknown> = {};
+    render(einsatzAktiv, [
+      http.post('/api/einsaetze/1/personen', async ({ request }) => {
+        gesendet = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(angelegt, { status: 201 });
+      }),
+    ]);
+    await screen.findByRole('radiogroup');
+    await userEvent.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
+    await userEvent.type(await screen.findByLabelText('Zustand'), 'Beinfraktur');
+    await userEvent.type(screen.getByLabelText('Koordinate'), '#52.2691/9.1342');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
+
+    await screen.findByText(/Erfasst als R-047/);
+    expect(gesendet).toMatchObject({
+      zustand: 'Beinfraktur',
+      antreff_lat: 52.2691,
+      antreff_lon: 9.1342,
+    });
+    expect(gesendet).not.toHaveProperty('koordinate');
+  });
+
   it('leert die Felder nach dem Serien-Speichern und setzt den Fokus zurück', async () => {
     render(einsatzAktiv, [
       http.post('/api/einsaetze/1/personen', () => HttpResponse.json(angelegt, { status: 201 })),

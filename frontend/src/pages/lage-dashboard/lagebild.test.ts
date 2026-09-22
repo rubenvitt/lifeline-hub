@@ -8,6 +8,9 @@ import type {
   Person,
 } from '../../api/types';
 import {
+  VERMISST_LANG_MS,
+  langeVermisst,
+  vermisstNotiz,
   baueLagebild,
   einsatzdauer,
   lagebildZeit,
@@ -186,5 +189,46 @@ describe('baueLagebild', () => {
       meldungenUeberfaellig: 1,
       bericht: null,
     });
+  });
+});
+
+describe('Vermisste seit über 4 h (LFH-613)', () => {
+  // JETZT = 2026-06-11 12:00:00 UTC.
+  const v = (vermisst_seit?: string, status: Person['status'] = 'vermisst') =>
+    ({ status, vermisst_seit, aktuelle_sichtung: null }) as Person;
+
+  it('pinnt die Schwelle als Literal (Neuentwurf S3)', () => {
+    expect(VERMISST_LANG_MS).toBe(14_400_000);
+  });
+
+  it('Spec-Szenario: drei Vermisste, zwei seit über 4 h → „2 seit über 4 h"', () => {
+    const personen = [v('2026-06-11 06:00:00'), v('2026-06-11 07:59:59'), v('2026-06-11 10:00:00')];
+    expect(langeVermisst(personen, JETZT)).toBe(2);
+    const bild = baueLagebild(roh({ personen }), JETZT);
+    expect(bild.kennzahlen[2]).toMatchObject({ wert: '3', notiz: '2 seit über 4 h', ton: 'alarm' });
+  });
+
+  it('zählt genau 4 h NICHT, eine Sekunde darüber schon', () => {
+    expect(langeVermisst([v('2026-06-11 08:00:00')], JETZT)).toBe(0);
+    expect(langeVermisst([v('2026-06-11 07:59:59')], JETZT)).toBe(1);
+  });
+
+  it('zählt nur vermisste Personen mit lesbarem Zeitpunkt', () => {
+    expect(
+      langeVermisst([v('2026-06-11 01:00:00', 'betroffen'), v(undefined), v('kaputt')], JETZT),
+    ).toBe(0);
+  });
+
+  it('schreibt die Notiz mit der Zeit fort — dieselben Daten, später gefragt', () => {
+    const personen = [v('2026-06-11 09:00:00')];
+    expect(baueLagebild(roh({ personen }), JETZT).kennzahlen[2].notiz).toBe('als vermisst erfasst');
+    expect(baueLagebild(roh({ personen }), JETZT + 60 * 60_000 + 1000).kennzahlen[2].notiz).toBe(
+      '1 seit über 4 h',
+    );
+  });
+
+  it('vermisstNotiz: ohne Vermisste der Leerwortlaut', () => {
+    expect(vermisstNotiz(0, 0)).toBe('keine offenen Fälle');
+    expect(vermisstNotiz(2, 0)).toBe('als vermisst erfasst');
   });
 });

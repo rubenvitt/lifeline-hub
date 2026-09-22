@@ -29,7 +29,10 @@ export type MarkerTyp =
   | 'fuehrung'
   | 'abschnitt'
   | 'lagemeldung'
-  | 'freies_zeichen';
+  | 'freies_zeichen'
+  /** Betroffene (LFH-613): nur auf der Kartenansicht der Betroffenen-Seite, KEINE
+   *  Lagekarten-Ebene — `useLagekarteDaten` erzeugt diesen Typ nie. */
+  | 'person';
 
 export interface KarteMarker {
   /** Stabil & eindeutig über alle Typen: 'einsatzort' | 'uhs-<id>' | 'schaden-<id>'. */

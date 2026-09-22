@@ -142,15 +142,64 @@ describe('Sichtung', () => {
 });
 
 describe('Koordinate und Unerkanntes', () => {
-  it('schluckt „#…" nicht als Namen, sondern meldet es (LFH-613)', () => {
-    const b = parsePersonBefehl('Kowalski #52.2691/9.1342 sk3');
-    expect(b.eingabe.name).toBe('Kowalski');
+  it('liest „#lat/lon“ als Koordinate im Spec-Szenario (LFH-613)', () => {
+    const b = parsePersonBefehl('Kowalski, Anna w 34 sk3 #52.2691/9.1342');
+    expect(b.probleme).toEqual([]);
     expect(b.teile).toContainEqual({
-      art: 'unerkannt',
+      art: 'koordinate',
       text: '#52.2691/9.1342',
-      grund: 'keine Koordinate an der Person',
+      lat: 52.2691,
+      lon: 9.1342,
     });
-    expect(b.probleme).toHaveLength(1);
+    expect(b.eingabe).toEqual({
+      name: 'Kowalski',
+      vorname: 'Anna',
+      geschlecht: 'weiblich',
+      alter_geschaetzt: 34,
+      sichtung: 'sk3',
+      antreff_lat: 52.2691,
+      antreff_lon: 9.1342,
+    });
+  });
+
+  it('nimmt das deutsche Dezimalkomma und Minus', () => {
+    const b = parsePersonBefehl('Meier #-52,5/-9,25');
+    expect(b.eingabe).toMatchObject({ name: 'Meier', antreff_lat: -52.5, antreff_lon: -9.25 });
+    expect(b.probleme).toEqual([]);
+  });
+
+  it.each(['#52.2691', '#95/9', '#52/200', '#', '#abc/9'])(
+    'schluckt ein unbrauchbares „%s“ nicht als Namen, sondern meldet es',
+    (wort) => {
+      const b = parsePersonBefehl(`Kowalski ${wort} sk3`);
+      expect(b.eingabe.name).toBe('Kowalski');
+      expect(b.eingabe).not.toHaveProperty('antreff_lat');
+      expect(b.eingabe).not.toHaveProperty('antreff_lon');
+      expect(b.teile).toContainEqual(expect.objectContaining({ art: 'unerkannt', text: wort }));
+      expect(b.probleme).toHaveLength(1);
+      expect(b.probleme[0]).toMatch(/^Koordinate unbrauchbar/);
+    },
+  );
+
+  it('meldet eine zweite Koordinate, statt die erste still zu überschreiben', () => {
+    const b = parsePersonBefehl('Kowalski #52.1/9.3 #53/10');
+    expect(b.eingabe).toMatchObject({ antreff_lat: 52.1, antreff_lon: 9.3 });
+    expect(b.probleme).toEqual(['Koordinate doppelt angegeben („#53/10")']);
+  });
+
+  it('beendet einen „@“-Suchtext an der Koordinate', () => {
+    const b = parsePersonBefehl('Bauer @Weserstadion #52.1/9.3');
+    expect(b.uhsSuche).toBe('Weserstadion');
+    expect(b.eingabe).toMatchObject({ antreff_lat: 52.1, antreff_lon: 9.3 });
+  });
+
+  it('bringt die Koordinate durch loeseBefehl in die Anlage', () => {
+    const e = loeseBefehl(parsePersonBefehl('Kowalski #52.2691/9.1342'), []);
+    expect(e).toEqual({
+      ok: true,
+      eingabe: { name: 'Kowalski', antreff_lat: 52.2691, antreff_lon: 9.1342 },
+      uhs: null,
+    });
   });
 
   it('ist bei nur Leerraum leer und ohne Problem', () => {
