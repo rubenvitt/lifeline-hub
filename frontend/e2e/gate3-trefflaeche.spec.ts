@@ -1189,3 +1189,58 @@ test('Stab: ETB-Links, Werkzeug-Links, „Besetzung ändern" und Kopfaktion folg
 
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
+
+// ── Ablösung (LFH-635) ────────────────────────────────────────────────────────────────
+//
+// Die Seite trägt KEIN handgebautes Bedienziel: Primäraktion je Karte, Dreipunkt-Auslöser und
+// der Bearbeiten-Knopf je Abschnittsvorgabe sind antd-`Button` und erben `controlHeight` vom
+// `ConfigProvider`. Gemessen wird trotzdem, weil die Karte eine eigene Flex-Hülle ist
+// (`abloesung/AbloesungKarte.tsx`): ein `align-items`/Schrumpfen darin könnte die Knöpfe
+// unter den Boden drücken, ohne dass eine Größen-Prop im Quelltext stünde. Gesät werden ZWEI
+// Schichten → je zwei Primär- und Dreipunkt-Knöpfe; mit einer allein wäre die Schleife über
+// die Karten nicht als Schleife belegt.
+
+test('Ablösung: Kartenaktionen und Vorgabe-Knopf folgen der Dichte-Staffel 30 / 48 / 72 px', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Abloesung`);
+
+  const post = async (pfad: string, data: unknown, was: string) => {
+    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/${pfad}`, { data });
+    expect(
+      antwort.ok(),
+      `Seeding ${was}: ${antwort.status()} ${await antwort.text()}`,
+    ).toBeTruthy();
+    return (await antwort.json()) as { id: number };
+  };
+  const abschnitt = await post('abschnitte', { name: 'Deichwache Nord' }, 'Abschnitt');
+  for (const name of ['Florian Nord 1', 'Florian Nord 2']) {
+    const einheit = await post('einheiten', { name, abschnitt_id: abschnitt.id }, name);
+    await post('abloesungen', { einheit_id: einheit.id, rhythmus_minuten: 360 }, `Schicht ${name}`);
+  }
+
+  const gemessen: string[] = [];
+  for (const { dichte, soll } of STAFFEL) {
+    await page.goto(`/einsaetze/${einsatzId}/abloesung`);
+    await stelleDichte(page, dichte);
+
+    const karten = page.locator('[data-lfh="abloesung-karte"]');
+    await expect(karten).toHaveCount(2);
+    const vollziehen = karten.getByRole('button', { name: 'Ablösung vollziehen', exact: true });
+    const primaer = await alleHaltenStufe(vollziehen, soll, `Vollziehen (${dichte})`, 2);
+    const menue = karten.getByRole('button', { name: /^Aktionen zu Florian Nord \d$/ });
+    const dreipunkt = await alleHaltenStufe(menue, soll, `Dreipunkt (${dichte})`, 2);
+    const vorgabe = await haeltStufe(
+      page.getByRole('button', { name: 'Rhythmus-Vorgabe Deichwache Nord ändern', exact: true }),
+      soll,
+      `Vorgabe-Knopf (${dichte})`,
+    );
+    gemessen.push(
+      `${dichte} (Soll ≥ ${soll}): Vollziehen ${primaer}, Dreipunkt ${dreipunkt}, Vorgabe ${vorgabe}`,
+    );
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});

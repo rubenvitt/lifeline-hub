@@ -37,8 +37,8 @@ export function abstandText(faelligAt: string, jetzt: Dayjs): string {
  * (Regel aus LFH-343 · C8): überfällig rot, Vorwarnung gelb, sonst die Linienfarbe. Der zweite
  * Kanal ist das Wort im Etikett (WCAG 1.4.1), die Uhrzeit steht immer daneben. Nichts blinkt.
  *
- * Aktionen: „Ablösung vollziehen" ist die eine sichtbare Primäraktion. „Ablösende Einheit
- * planen" und „Rhythmus ändern" liegen im Dreipunkt-Menü — mit der Primäraktion sind es drei,
+ * Aktionen: „Ablösung vollziehen" ist die eine sichtbare Kartenaktion. „Ablösende Einheit
+ * planen" und „Rhythmus ändern" liegen im Dreipunkt-Menü — mit der Kartenaktion sind es drei,
  * und ab drei wird gebündelt (LFH-365). Ohne Schreibrecht fällt die Aktionszeile ganz weg
  * (C11: n Karten × gesperrte Knöpfe kosten Platz für null Handlungsmöglichkeit; der Grund
  * steht einmal im Seitenkopf).
@@ -128,9 +128,10 @@ export default function AbloesungKarte({
         {darfSchreiben && laufend && (
           <Flex justify="flex-end" gap={token.marginXS} style={{ marginTop: token.marginXS }}>
             {onVollziehen && (
-              <Button type="primary" onClick={() => onVollziehen(s)}>
-                Ablösung vollziehen
-              </Button>
+              // Kein `type="primary"`: die EINE Primäraktion der Seite steht im Kopf
+              // („Schicht beginnen", LFH-340 · C5); n blaue Kartenknöpfe gleichen Gewichts
+              // nähmen der Einstufung am Rand die Aufmerksamkeit.
+              <Button onClick={() => onVollziehen(s)}>Ablösung vollziehen</Button>
             )}
             {menuItems && menuItems.length > 0 && (
               <Dropdown

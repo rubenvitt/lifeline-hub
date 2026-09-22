@@ -635,12 +635,12 @@ pub async fn vorgabe_setzen(
 
         let inhalt = match (rhythmus_minuten, vorher) {
             (Some(n), Some(v)) => format!(
-                "Ablösung Abschnitt «{abschnitt_name}» auf {}-Rhythmus gesetzt (vorher {}).",
+                "Ablösung Abschnitt «{abschnitt_name}»: Rhythmus auf {} gesetzt (vorher {}).",
                 rhythmus_text(n),
                 rhythmus_text(v)
             ),
             (Some(n), None) => format!(
-                "Ablösung Abschnitt «{abschnitt_name}» auf {}-Rhythmus gesetzt.",
+                "Ablösung Abschnitt «{abschnitt_name}»: Rhythmus auf {} gesetzt.",
                 rhythmus_text(n)
             ),
             (None, Some(v)) => format!(

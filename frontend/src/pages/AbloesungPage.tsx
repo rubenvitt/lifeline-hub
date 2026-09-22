@@ -310,7 +310,7 @@ export default function AbloesungPage() {
                   <Text strong>{v.abschnitt_name}</Text>{' '}
                   <Text type="secondary">
                     {v.rhythmus_minuten != null
-                      ? `${rhythmusText(v.rhythmus_minuten)}-Rhythmus`
+                      ? `Rhythmus ${rhythmusText(v.rhythmus_minuten)}`
                       : 'keine Vorgabe'}
                     {v.laufende_schichten > 0 ? ` · ${v.laufende_schichten} laufend` : ''}
                   </Text>
