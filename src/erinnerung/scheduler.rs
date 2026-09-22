@@ -295,6 +295,8 @@ mod tests {
                 eingang_at: "2026-06-11 09:55:00",
                 bestaetigung_pflicht: true,
                 bestaetigung_frist_at: Some("2026-06-11 10:00:00"),
+                einheit_id: None,
+                abschnitt_id: None,
             },
         )
         .await
@@ -354,6 +356,8 @@ mod tests {
                 eingang_at: "2026-06-11 09:55:00",
                 bestaetigung_pflicht: true,
                 bestaetigung_frist_at: Some("2026-06-11 10:00:00"),
+                einheit_id: None,
+                abschnitt_id: None,
             },
         )
         .await
@@ -406,6 +410,8 @@ mod tests {
                 eingang_at: "2026-06-11 09:55:00",
                 bestaetigung_pflicht: true,
                 bestaetigung_frist_at: Some("2026-06-11 10:00:00"),
+                einheit_id: None,
+                abschnitt_id: None,
             },
         )
         .await

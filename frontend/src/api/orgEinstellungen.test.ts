@@ -70,6 +70,7 @@ describe('speichereOrgEinstellungen', () => {
       auftrag_nummer_praefix: null,
       meldung_bestaetigung_frist_min: null,
       auftrag_quittierung_frist_min: null,
+      rueckmeldung_frist_min: null,
       auto_etb_eintraege: null,
       geocoder_url: null,
     };
@@ -102,6 +103,7 @@ describe('speichereOrgEinstellungen', () => {
       auftrag_nummer_praefix: null,
       meldung_bestaetigung_frist_min: null,
       auftrag_quittierung_frist_min: null,
+      rueckmeldung_frist_min: null,
       auto_etb_eintraege: false,
       geocoder_url: null,
     };

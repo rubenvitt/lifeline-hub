@@ -270,6 +270,10 @@ export const einsatzKeys = {
   meldungen: (einsatzId: number) => [EINSATZ_KEYS.meldungen, einsatzId] as const,
   meldungenListe: (einsatzId: number, richtung: string) =>
     [EINSATZ_KEYS.meldungen, einsatzId, richtung] as const,
+  /** Letzte Rückmeldung je Einheit/Abschnitt (LFH-610). Liegt unter dem `meldungen`-Prefix:
+   *  jede Meldungs-Invalidierung (Live-Ereignis `meldung`, eigene Anlage) trifft sie mit. */
+  meldungenRueckmeldungen: (einsatzId: number) =>
+    [EINSATZ_KEYS.meldungen, einsatzId, 'rueckmeldungen'] as const,
   lagemeldungen: (einsatzId: number) => [EINSATZ_KEYS.lagemeldungen, einsatzId] as const,
   auftraege: (einsatzId: number) => [EINSATZ_KEYS.auftraege, einsatzId] as const,
   auftraegeListe: (einsatzId: number, richtung: string, empfaenger: string) =>

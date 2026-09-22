@@ -270,6 +270,10 @@ pub fn build_router(state: AppState) -> Router {
         )
         .route("/api/einsaetze/{id}/meldungen", get(routes::meldung::liste))
         .route(
+            "/api/einsaetze/{id}/meldungen/rueckmeldungen",
+            get(routes::meldung::rueckmeldungen),
+        )
+        .route(
             "/api/einsaetze/{id}/meldungen",
             post(routes::meldung::anlegen),
         )

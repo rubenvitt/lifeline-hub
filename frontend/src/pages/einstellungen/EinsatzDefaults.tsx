@@ -195,6 +195,18 @@ export default function EinsatzDefaults() {
               placeholder="kein Default"
             />
           </Form.Item>
+          <Form.Item
+            label="Rückmeldefrist Einheiten (Minuten)"
+            name="rueckmeldung_frist_min"
+            tooltip="Nach so vielen Minuten ohne neue Meldung gilt eine Einheit im Meldebild als überfällig. Leer = 60."
+          >
+            <InputNumber
+              min={1}
+              max={10080}
+              style={{ width: '100%', maxWidth: 200 }}
+              placeholder="60"
+            />
+          </Form.Item>
 
           <Form.Item
             label="Automatische ETB-Einträge"

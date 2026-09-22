@@ -829,6 +829,11 @@ export interface components {
              * @description Aufbewahrungs-Dauer-Politik in Tagen (LFH-135); `None` = keine Auto-Frist.
              */
             retention_dauer_tage?: number | null;
+            /**
+             * Format: int64
+             * @description Rückmeldefrist in Minuten (LFH-610); fehlt = keine eigene Vorgabe.
+             */
+            rueckmeldung_frist_min?: number | null;
             standard_modul?: string | null;
             zeitformat?: null | components["schemas"]["Zeitformat"];
             zeitzone?: string | null;
@@ -1404,6 +1409,32 @@ export interface components {
             naechste_at?: string | null;
         };
         /**
+         * @description Letzte Rückmeldung eines Absenders (Einheit oder direkt gebundener Abschnitt, LFH-610).
+         *     Als Rückmeldung zählt jede an den Absender gebundene Meldung, gleich welcher
+         *     Meldungsart; maßgeblich ist die jüngste `ereigniszeit`.
+         */
+        LetzteRueckmeldung: {
+            /**
+             * Format: int64
+             * @description `einsatz_einheit.id` bzw. `einsatzabschnitt.id`, je nach Liste.
+             */
+            bezug_id: number;
+            /** @description Zeitpunkt der Rückmeldung (UTC, SQLite-Format) — die Ereigniszeit, nicht der Eingang. */
+            ereigniszeit: string;
+            /**
+             * @description `ereigniszeit` + Rückmeldefrist (UTC). Ab diesem Zeitpunkt gilt der Absender als
+             *     überfällig; der Vergleich mit „jetzt" liegt beim Client, damit die Anzeige ohne
+             *     neues Ereignis umschlägt.
+             */
+            faellig_at: string;
+            inhalt: string;
+            /** Format: int64 */
+            lfd_nr: number;
+            meldeweg: components["schemas"]["MeldeWeg"];
+            /** Format: int64 */
+            meldung_id: number;
+        };
+        /**
          * @description SSE-Wire-Event-Namen als BE↔FE-Kontrakt (LFH-298). Schema-Anker für die OpenAPI-Union;
          *     die Emitter routen über `as_str()`, das Frontend filtert exakt auf diese Wire-Tags.
          * @enum {string}
@@ -1438,6 +1469,11 @@ export interface components {
          *     `lage_meldung_id` als Herkunfts-Rückverweis, `ist_offen` für Posteingang-Filter).
          */
         MeldungAnzeige: {
+            /**
+             * Format: int64
+             * @description Strukturierter Absender (LFH-610): der Einsatzabschnitt, von dem die Meldung kam.
+             */
+            abschnitt_id?: number | null;
             absender: string;
             /** Format: int64 */
             auftrag_id?: number | null;
@@ -1458,6 +1494,13 @@ export interface components {
             /** @description Sofortmeldung & Eskalation (LFH-85/97): aktive Bestätigungspflicht. */
             bestaetigung_pflicht: boolean;
             eingang_at: string;
+            /**
+             * Format: int64
+             * @description Strukturierter Absender (LFH-610): die Einheit, von der die Meldung kam. Höchstens
+             *     einer von `einheit_id`/`abschnitt_id` ist gesetzt; `absender` bleibt der Name zum
+             *     Eingangszeitpunkt. NULL, wenn nicht gebunden oder die Einheit aufgelöst wurde.
+             */
+            einheit_id?: number | null;
             /** Format: int64 */
             einsatz_id: number;
             empfaenger?: string | null;
@@ -1757,6 +1800,11 @@ export interface components {
             org_id: number;
             /** Format: int64 */
             retention_dauer_tage?: number | null;
+            /**
+             * Format: int64
+             * @description Rückmeldefrist in Minuten (LFH-610); fehlt = keine eigene Vorgabe.
+             */
+            rueckmeldung_frist_min?: number | null;
             zeitformat?: null | components["schemas"]["Zeitformat"];
             zeitzone?: string | null;
         };
@@ -1780,6 +1828,11 @@ export interface components {
             org_id: number;
             /** Format: int64 */
             retention_dauer_tage?: number | null;
+            /**
+             * Format: int64
+             * @description Rückmeldefrist in Minuten (LFH-610); fehlt = keine eigene Vorgabe.
+             */
+            rueckmeldung_frist_min?: number | null;
             zeitformat?: null | components["schemas"]["Zeitformat"];
             zeitzone?: string | null;
         };
@@ -1966,6 +2019,20 @@ export interface components {
          * @enum {string}
          */
         Richtung: "intern" | "extern";
+        /**
+         * @description Antwort von `GET …/meldungen/rueckmeldungen` (LFH-610). Einheiten ohne Eintrag haben
+         *     noch nie zurückgemeldet. Die Abschnittsliste enthält nur DIREKT an den Abschnitt
+         *     gebundene Meldungen; die Rückmeldung über den Teilbaum rechnet der Client aus beiden.
+         */
+        RueckmeldungenAnzeige: {
+            abschnitte: components["schemas"]["LetzteRueckmeldung"][];
+            einheiten: components["schemas"]["LetzteRueckmeldung"][];
+            /**
+             * Format: int64
+             * @description Effektive Rückmeldefrist in Minuten (Einsatz ?? Org ?? 60).
+             */
+            frist_min: number;
+        };
         /**
          * @description Sachgebiet der Führungsorganisation (FwDV 100 Anlage 2). Wire == `as_str()`.
          *

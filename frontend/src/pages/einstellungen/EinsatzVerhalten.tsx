@@ -182,6 +182,19 @@ export default function EinsatzVerhalten() {
               />
             </Form.Item>
             <Form.Item
+              label="Rückmeldefrist Einheiten (Minuten)"
+              name="rueckmeldung_frist_min"
+              tooltip="Nach so vielen Minuten ohne neue Meldung gilt eine Einheit im Meldebild als überfällig. Leer = Organisations-Vorgabe, sonst 60."
+              extra={orgHinweisWert(orgDefaults?.rueckmeldung_frist_min, 'Min.')}
+            >
+              <InputNumber
+                min={1}
+                max={10080}
+                style={{ width: '100%', maxWidth: 200 }}
+                placeholder="60"
+              />
+            </Form.Item>
+            <Form.Item
               label="Automatische ETB-Einträge"
               name="auto_etb_eintraege"
               tooltip="Meldungen und Aufträge erzeugen automatisch einen verknüpften ETB-Eintrag. Leer = Org-Standard erben."

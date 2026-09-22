@@ -148,6 +148,7 @@ pub struct EinsatzEinstellungen {
     pub auftrag_nummer_start: Option<i64>,
     pub meldung_bestaetigung_frist_min: Option<i64>,
     pub auftrag_quittierung_frist_min: Option<i64>,
+    pub rueckmeldung_frist_min: Option<i64>,
     /// 0 = Auto-ETB-Dual-Publish aus; NULL/1 = an (heutiges Verhalten).
     pub auto_etb_eintraege: Option<i64>,
     /// Aufbewahrungs-Dauer-Politik in Tagen (LFH-135). NULL = keine Auto-Frist.
@@ -177,6 +178,7 @@ impl EinsatzEinstellungen {
             auftrag_nummer_start: None,
             meldung_bestaetigung_frist_min: None,
             auftrag_quittierung_frist_min: None,
+            rueckmeldung_frist_min: None,
             auto_etb_eintraege: None,
             retention_dauer_tage: None,
             geaendert_at: None,
@@ -238,6 +240,7 @@ impl EinsatzEinstellungen {
             auftrag_nummer_start: self.auftrag_nummer_start,
             meldung_bestaetigung_frist_min: self.meldung_bestaetigung_frist_min,
             auftrag_quittierung_frist_min: self.auftrag_quittierung_frist_min,
+            rueckmeldung_frist_min: self.rueckmeldung_frist_min,
             auto_etb_eintraege: self.auto_etb_eintraege,
             retention_dauer_tage: self.retention_dauer_tage,
             etb_nummer_eingefroren: etb_eingefroren,
@@ -274,6 +277,9 @@ pub struct EinstellungenAnzeige {
     pub auftrag_nummer_start: Option<i64>,
     pub meldung_bestaetigung_frist_min: Option<i64>,
     pub auftrag_quittierung_frist_min: Option<i64>,
+    /// Rückmeldefrist in Minuten (LFH-610); fehlt = keine eigene Vorgabe.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rueckmeldung_frist_min: Option<i64>,
     pub auto_etb_eintraege: Option<i64>,
     /// Aufbewahrungs-Dauer-Politik in Tagen (LFH-135); `None` = keine Auto-Frist.
     pub retention_dauer_tage: Option<i64>,
@@ -297,7 +303,7 @@ pub async fn laden_oder_default(
                 fachebenen_sichtbar, zeitzone, zeitformat, einheiten, koordinatenformat, \
                 etb_nummer_praefix, etb_nummer_start, meldung_nummer_praefix, meldung_nummer_start, \
                 auftrag_nummer_praefix, auftrag_nummer_start, meldung_bestaetigung_frist_min, \
-                auftrag_quittierung_frist_min, auto_etb_eintraege, retention_dauer_tage, \
+                auftrag_quittierung_frist_min, rueckmeldung_frist_min, auto_etb_eintraege, retention_dauer_tage, \
                 geaendert_at, geaendert_von \
          FROM einsatz_einstellungen WHERE einsatz_id = ?",
     )
@@ -327,6 +333,7 @@ pub struct EinstellungenDaten<'a> {
     pub auftrag_nummer_start: Option<i64>,
     pub meldung_bestaetigung_frist_min: Option<i64>,
     pub auftrag_quittierung_frist_min: Option<i64>,
+    pub rueckmeldung_frist_min: Option<i64>,
     pub auto_etb_eintraege: Option<i64>,
     pub retention_dauer_tage: Option<i64>,
 }
@@ -344,9 +351,9 @@ pub async fn speichern(
              fachebenen_sichtbar, zeitzone, zeitformat, einheiten, koordinatenformat, \
              etb_nummer_praefix, etb_nummer_start, meldung_nummer_praefix, meldung_nummer_start, \
              auftrag_nummer_praefix, auftrag_nummer_start, meldung_bestaetigung_frist_min, \
-             auftrag_quittierung_frist_min, auto_etb_eintraege, retention_dauer_tage, \
+             auftrag_quittierung_frist_min, rueckmeldung_frist_min, auto_etb_eintraege, retention_dauer_tage, \
              geaendert_at, geaendert_von) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?) \
          ON CONFLICT(einsatz_id) DO UPDATE SET \
              standard_modul = excluded.standard_modul, \
              basemap_modus = excluded.basemap_modus, \
@@ -364,6 +371,7 @@ pub async fn speichern(
              auftrag_nummer_start = excluded.auftrag_nummer_start, \
              meldung_bestaetigung_frist_min = excluded.meldung_bestaetigung_frist_min, \
              auftrag_quittierung_frist_min = excluded.auftrag_quittierung_frist_min, \
+             rueckmeldung_frist_min = excluded.rueckmeldung_frist_min, \
              auto_etb_eintraege = excluded.auto_etb_eintraege, \
              retention_dauer_tage = excluded.retention_dauer_tage, \
              geaendert_at = excluded.geaendert_at, \
@@ -386,6 +394,7 @@ pub async fn speichern(
     .bind(daten.auftrag_nummer_start)
     .bind(daten.meldung_bestaetigung_frist_min)
     .bind(daten.auftrag_quittierung_frist_min)
+    .bind(daten.rueckmeldung_frist_min)
     .bind(daten.auto_etb_eintraege)
     .bind(daten.retention_dauer_tage)
     .bind(erfasser_id)

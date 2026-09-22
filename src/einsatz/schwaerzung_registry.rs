@@ -793,6 +793,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("auftrag_nummer_start", G_KONFIG),
             retain("meldung_bestaetigung_frist_min", G_KONFIG),
             retain("auftrag_quittierung_frist_min", G_KONFIG),
+            retain("rueckmeldung_frist_min", G_KONFIG),
             retain("auto_etb_eintraege", G_KONFIG),
             retain("retention_dauer_tage", G_KONFIG),
         ],
@@ -982,6 +983,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("eskaliert", G_KONFIG),
             retain("richtung", G_ENUM),
             retain("erledigt_at", G_ZEIT),
+            retain("einheit_id", G_FK),
+            retain("abschnitt_id", G_FK),
         ],
     },
     TabellenRegel {

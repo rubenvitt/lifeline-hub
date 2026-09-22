@@ -2406,6 +2406,14 @@
             "format": "int64",
             "description": "Aufbewahrungs-Dauer-Politik in Tagen (LFH-135); `None` = keine Auto-Frist."
           },
+          "rueckmeldung_frist_min": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Rückmeldefrist in Minuten (LFH-610); fehlt = keine eigene Vorgabe."
+          },
           "standard_modul": {
             "type": [
               "string",
@@ -4001,6 +4009,48 @@
           }
         }
       },
+      "LetzteRueckmeldung": {
+        "type": "object",
+        "description": "Letzte Rückmeldung eines Absenders (Einheit oder direkt gebundener Abschnitt, LFH-610).\nAls Rückmeldung zählt jede an den Absender gebundene Meldung, gleich welcher\nMeldungsart; maßgeblich ist die jüngste `ereigniszeit`.",
+        "required": [
+          "bezug_id",
+          "meldung_id",
+          "lfd_nr",
+          "ereigniszeit",
+          "inhalt",
+          "meldeweg",
+          "faellig_at"
+        ],
+        "properties": {
+          "bezug_id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "`einsatz_einheit.id` bzw. `einsatzabschnitt.id`, je nach Liste."
+          },
+          "ereigniszeit": {
+            "type": "string",
+            "description": "Zeitpunkt der Rückmeldung (UTC, SQLite-Format) — die Ereigniszeit, nicht der Eingang."
+          },
+          "faellig_at": {
+            "type": "string",
+            "description": "`ereigniszeit` + Rückmeldefrist (UTC). Ab diesem Zeitpunkt gilt der Absender als\nüberfällig; der Vergleich mit „jetzt\" liegt beim Client, damit die Anzeige ohne\nneues Ereignis umschlägt."
+          },
+          "inhalt": {
+            "type": "string"
+          },
+          "lfd_nr": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "meldeweg": {
+            "$ref": "#/components/schemas/MeldeWeg"
+          },
+          "meldung_id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "LiveEvent": {
         "type": "string",
         "description": "SSE-Wire-Event-Namen als BE↔FE-Kontrakt (LFH-298). Schema-Anker für die OpenAPI-Union;\ndie Emitter routen über `as_str()`, das Frontend filtert exakt auf diese Wire-Tags.",
@@ -4136,6 +4186,14 @@
           "ist_ueberfaellig"
         ],
         "properties": {
+          "abschnitt_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Strukturierter Absender (LFH-610): der Einsatzabschnitt, von dem die Meldung kam."
+          },
           "absender": {
             "type": "string"
           },
@@ -4194,6 +4252,14 @@
           },
           "eingang_at": {
             "type": "string"
+          },
+          "einheit_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Strukturierter Absender (LFH-610): die Einheit, von der die Meldung kam. Höchstens\neiner von `einheit_id`/`abschnitt_id` ist gesetzt; `absender` bleibt der Name zum\nEingangszeitpunkt. NULL, wenn nicht gebunden oder die Einheit aufgelöst wurde."
           },
           "einsatz_id": {
             "type": "integer",
@@ -4917,6 +4983,14 @@
             ],
             "format": "int64"
           },
+          "rueckmeldung_frist_min": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Rückmeldefrist in Minuten (LFH-610); fehlt = keine eigene Vorgabe."
+          },
           "zeitformat": {
             "oneOf": [
               {
@@ -5011,6 +5085,14 @@
               "null"
             ],
             "format": "int64"
+          },
+          "rueckmeldung_frist_min": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Rückmeldefrist in Minuten (LFH-610); fehlt = keine eigene Vorgabe."
           },
           "zeitformat": {
             "oneOf": [
@@ -5572,6 +5654,34 @@
           "intern",
           "extern"
         ]
+      },
+      "RueckmeldungenAnzeige": {
+        "type": "object",
+        "description": "Antwort von `GET …/meldungen/rueckmeldungen` (LFH-610). Einheiten ohne Eintrag haben\nnoch nie zurückgemeldet. Die Abschnittsliste enthält nur DIREKT an den Abschnitt\ngebundene Meldungen; die Rückmeldung über den Teilbaum rechnet der Client aus beiden.",
+        "required": [
+          "frist_min",
+          "einheiten",
+          "abschnitte"
+        ],
+        "properties": {
+          "abschnitte": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LetzteRueckmeldung"
+            }
+          },
+          "einheiten": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LetzteRueckmeldung"
+            }
+          },
+          "frist_min": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Effektive Rückmeldefrist in Minuten (Einsatz ?? Org ?? 60)."
+          }
+        }
       },
       "Sachgebiet": {
         "type": "string",

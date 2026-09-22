@@ -6,6 +6,8 @@ import { ThunderboltOutlined, SendOutlined } from '@ant-design/icons';
 import { useEffect } from 'react';
 import dayjs from 'dayjs';
 import type {
+  Einheit,
+  Einsatzabschnitt,
   Meldungsart,
   MeldungMeldeweg,
   MeldungPrioritaet,
@@ -21,6 +23,8 @@ function dayjsZuWire(d: dayjs.Dayjs): string {
 }
 
 interface MeldungFormWerte {
+  /** Strukturierter Absender (LFH-610): `einheit:<id>` bzw. `abschnitt:<id>`, leer = frei. */
+  von?: string;
   absender: string;
   empfaenger?: string;
   meldeweg: MeldungMeldeweg;
@@ -34,6 +38,7 @@ interface MeldungFormWerte {
 }
 
 const DEFAULTS: MeldungFormWerte = {
+  von: undefined,
   absender: '',
   empfaenger: '',
   meldeweg: 'funk',
@@ -48,7 +53,8 @@ const DEFAULTS: MeldungFormWerte = {
 
 /**
  * Wiederholfelder einer Meldungs-Serie (LFH-332/B4). Am Funkgerät wechselt der
- * Wortlaut, nicht die Gegenstelle: Absender, Meldeweg und Adressat bleiben über
+ * Wortlaut, nicht die Gegenstelle: Absender (samt Einheit/Abschnitt, LFH-610),
+ * Meldeweg und Adressat bleiben über
  * mehrere Meldungen gleich. Alles andere — insbesondere `inhalt` und
  * `ereigniszeit` — wird geleert, weil ein stehengebliebener Wortlaut die
  * nächste Meldung verfälschen würde.
@@ -57,12 +63,27 @@ const DEFAULTS: MeldungFormWerte = {
  * läuft deshalb nicht über geänderte Defaults, sondern über das Re-Seeding der
  * Hülle (zurücksetzen, dann die gemerkten Felder wieder setzen).
  */
-const UEBERNAHME: (keyof MeldungFormWerte & string)[] = ['absender', 'meldeweg', 'empfaenger'];
+const UEBERNAHME: (keyof MeldungFormWerte & string)[] = [
+  'von',
+  'absender',
+  'meldeweg',
+  'empfaenger',
+];
+
+/** `einheit:<id>` / `abschnitt:<id>` → Bezugsfelder der Meldung. Unbekanntes → kein Bezug. */
+export function vonZuBezug(von: string | undefined): Pick<NeueMeldung, 'einheit_id' | 'abschnitt_id'> {
+  const m = /^(einheit|abschnitt):(\d+)$/.exec(von ?? '');
+  if (!m) return {};
+  const id = Number(m[2]);
+  return m[1] === 'einheit' ? { einheit_id: id } : { abschnitt_id: id };
+}
 
 export default function MeldungFormular({
   senden,
   onAnlegen,
   card = true,
+  einheiten = [],
+  abschnitte = [],
 }: {
   senden: boolean;
   /**
@@ -74,6 +95,9 @@ export default function MeldungFormular({
   /** Umschließendes Paneel mit Titel rendern. `false` für Inline-Einbettung, wo der
    *  Container den Titel schon liefert (vermeidet doppelte Überschrift, LFH-112). */
   card?: boolean;
+  /** Auswahl für den strukturierten Absender (LFH-610). Leer ⇒ das Feld entfällt. */
+  einheiten?: Einheit[];
+  abschnitte?: Einsatzabschnitt[];
 }) {
   const [form] = Form.useForm<MeldungFormWerte>();
   const meldungsart = Form.useWatch('meldungsart', form);
@@ -108,6 +132,7 @@ export default function MeldungFormular({
   // hatte.
   const absenden = (w: MeldungFormWerte) =>
     onAnlegen({
+      ...vonZuBezug(w.von),
       absender: w.absender.trim(),
       empfaenger: w.empfaenger?.trim() || undefined,
       meldeweg: w.meldeweg,
@@ -121,6 +146,25 @@ export default function MeldungFormular({
       bestaetigung_frist_min:
         w.bestaetigung_pflicht && w.frist_min != null ? w.frist_min : undefined,
     });
+
+  const vonOptionen = [
+    {
+      label: 'Einheiten',
+      options: einheiten.map((e) => ({ value: `einheit:${e.id}`, label: e.name })),
+    },
+    {
+      label: 'Einsatzabschnitte',
+      options: abschnitte.map((a) => ({ value: `abschnitt:${a.id}`, label: a.name })),
+    },
+  ].filter((g) => g.options.length > 0);
+  const vonName = new Map(vonOptionen.flatMap((g) => g.options.map((o) => [o.value, o.label])));
+
+  /** Wer eine Einheit wählt, bekommt ihren Namen als Absender vorbelegt — überschreibbar,
+   *  denn der Funkrufname am Gerät ist oft genauer als der Einheitenname. */
+  const vonGewaehlt = (von: string | undefined) => {
+    const name = von ? vonName.get(von) : undefined;
+    if (name) form.setFieldValue('absender', name);
+  };
 
   const formular = (
     <ErfassungsFormular<MeldungFormWerte>
@@ -153,7 +197,24 @@ export default function MeldungFormular({
         </Button>
       </Space>
       <Row gutter={16}>
-        <Col xs={24} sm={12}>
+        {vonOptionen.length > 0 && (
+          <Col xs={24} sm={8}>
+            <Form.Item
+              name="von"
+              label="Von Einheit / Abschnitt"
+              tooltip="Bindet die Meldung an die Einheit. Sie zählt dann als deren Rückmeldung im Meldebild."
+            >
+              <Select<string>
+                aria-label="Von Einheit / Abschnitt"
+                allowClear
+                placeholder="nicht zugeordnet"
+                options={vonOptionen}
+                onChange={vonGewaehlt}
+              />
+            </Form.Item>
+          </Col>
+        )}
+        <Col xs={24} sm={vonOptionen.length > 0 ? 8 : 12}>
           <Form.Item
             name="absender"
             label="Absender (Funkrufname/Stelle)"
@@ -162,7 +223,7 @@ export default function MeldungFormular({
             <Input aria-label="Absender" />
           </Form.Item>
         </Col>
-        <Col xs={24} sm={12}>
+        <Col xs={24} sm={vonOptionen.length > 0 ? 8 : 12}>
           <Form.Item name="empfaenger" label="Empfänger / Adressat">
             <Input placeholder="z. B. ELW 1, S3" />
           </Form.Item>
