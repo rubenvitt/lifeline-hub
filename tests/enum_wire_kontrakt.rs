@@ -537,7 +537,7 @@ fn stab_besetzung_art_wire() {
 }
 
 /// LFH-635: Ablösung. `AbloesungStatus` und `RhythmusQuelle` tragen die DB-CHECK-Werte aus
-/// `migrations/0107_abloesung.sql`; `Einstufung` ist berechnet, aber Wire-Kontrakt des
+/// `migrations/0111_abloesung.sql`; `Einstufung` ist berechnet, aber Wire-Kontrakt des
 /// Frontends (`abloesung/einstufung.ts` rechnet dieselben drei Stufen nach).
 #[test]
 fn abloesung_status_wire() {

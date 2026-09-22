@@ -56,8 +56,8 @@ fällt niemandem auf.
 ## Impact
 
 - **Datenbank:** neue Migration (Tabelle `einsatz_abloesung`, Spalte
-  `einsatzabschnitt.abloesung_rhythmus_minuten`). Nummer `0107` (beim Rebase auf `alpha`
-  nachgezogen: `0104`–`0106` sind dort inzwischen belegt).
+  `einsatzabschnitt.abloesung_rhythmus_minuten`). Nummer `0111` (bei zwei Rebases auf `alpha`
+  nachgezogen: `0104`–`0110` sind dort inzwischen belegt).
 - **Backend:** neues Modul `src/abloesung/` und neue Routen in `src/routes/abloesung.rs`.
   Berührt werden außerdem `src/einsatz/modul.rs`, `src/live/mod.rs`,
   `src/erinnerung/{repo,scheduler}.rs` (transaktionsfähiges Anlegen und Verschieben einer

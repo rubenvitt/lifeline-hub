@@ -21,7 +21,7 @@ pub mod repo;
 /// bewusst nicht einstellbar (design.md, Non-Goals).
 pub const VORWARNUNG_MINUTEN: i64 = 30;
 
-/// Obergrenze eines Rhythmus: 7 Tage in Minuten (DB-CHECK in `0107_abloesung.sql`).
+/// Obergrenze eines Rhythmus: 7 Tage in Minuten (DB-CHECK in `0111_abloesung.sql`).
 pub const RHYTHMUS_MAX_MINUTEN: i64 = 10_080;
 
 /// Status einer Schicht. Wire == `as_str()`.
