@@ -338,7 +338,9 @@ export default function EtbZeitachse({
           }
           hinweisTon={z.art === 'abgelehnt' ? 'alarm' : 'schwach'}
         >
-          <Markdown variante="kompakt">{p.eintrag.inhalt}</Markdown>
+          <Markdown variante="kompakt" unterEbene={2}>
+            {p.eintrag.inhalt}
+          </Markdown>
         </Zeitachseneintrag>
       );
     }
@@ -358,7 +360,10 @@ export default function EtbZeitachse({
         verfasser={e.erfasser_name}
         weg={e.meldeweg ? MELDEWEG_LABEL[e.meldeweg] : undefined}
       >
-        <Markdown variante="kompakt">{e.inhalt}</Markdown>
+        {/* Unter dem Tageskopf (h2, s. u.) — `#` im Eintrag wird h3 (LFH-621). */}
+        <Markdown variante="kompakt" unterEbene={2}>
+          {e.inhalt}
+        </Markdown>
       </Zeitachseneintrag>
     );
   }
@@ -382,7 +387,9 @@ export default function EtbZeitachse({
             background: rollen.grund,
           }}
         >
-          <Augenbraue>{g.etikett}</Augenbraue>
+          {/* Der Tageskopf ist eine echte Überschrift (h2): er gliedert die Zeitachse, und
+              die Überschriften IN den Einträgen hängen darunter (LFH-621). */}
+          <Augenbraue als="h2">{g.etikett}</Augenbraue>
         </div>
         <ol style={{ margin: 0, padding: 0 }}>{g.zeilen.map(zeile)}</ol>
       </div>

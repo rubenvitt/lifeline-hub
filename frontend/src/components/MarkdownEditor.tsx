@@ -2,7 +2,7 @@ import { Button, Input, Tabs, Typography } from 'antd';
 import type { GetRef } from 'antd';
 import { EyeOutlined } from '@ant-design/icons';
 import { forwardRef, useState, type KeyboardEvent } from 'react';
-import Markdown from './Markdown';
+import Markdown, { type UnterEbene } from './Markdown';
 import './MarkdownEditor.css';
 
 /** Ref-Typ des inneren antd Input.TextArea (hat `resizableTextArea.textArea`). */
@@ -24,6 +24,11 @@ interface Props {
   layout?: Layout;
   /** Darstellung der Vorschau — soll der späteren Anzeige entsprechen. */
   variante?: Variante;
+  /**
+   * Ebene der nächsten Überschrift über dem Feld — an die Vorschau durchgereicht, damit ein
+   * `#` im Entwurf dieselbe Stufe bekommt wie an seinem Einbauort (LFH-621).
+   */
+  unterEbene: UnterEbene;
   placeholder?: string;
   autoSize?: boolean | { minRows?: number; maxRows?: number };
   rows?: number;
@@ -46,6 +51,7 @@ const MarkdownEditor = forwardRef<TextAreaRef, Props>(function MarkdownEditor(
     onChange,
     layout = 'split',
     variante = 'dokument',
+    unterEbene,
     placeholder,
     autoSize,
     rows,
@@ -71,7 +77,9 @@ const MarkdownEditor = forwardRef<TextAreaRef, Props>(function MarkdownEditor(
   );
 
   const vorschau = value.trim() ? (
-    <Markdown variante={variante}>{value}</Markdown>
+    <Markdown variante={variante} unterEbene={unterEbene}>
+      {value}
+    </Markdown>
   ) : (
     <Typography.Text type="secondary">Noch nichts zu zeigen.</Typography.Text>
   );

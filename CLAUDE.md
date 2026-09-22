@@ -119,7 +119,14 @@ umkehrt, steht das am Absatz selbst mit „Neuentwurf 22.09.2026".
   des aktiven Modus für TSX, weil antd `paneel`, `flaeche3` & Co. nicht kennt).
 - **Seitenkopf 44 px** in `components/EinsatzSeite.tsx` (`SEITENKOPF_HOEHE`, Boden, der mit der
   Staffel wächst): `titel` 14/600 als `h1` (Paneele gliedern darunter ab `h2`) · `meta` Mono · `aktionen` rechts (Primär blau gefüllt,
-  sekundär umrandet). **`breite` ist per Vorgabe `'voll'`** — die Instrumententafel füllt die
+  sekundär umrandet). **Markdown-Inhalt hängt sich in diese Gliederung ein, nicht daneben**
+  (LFH-621): `components/Markdown.tsx` und `MarkdownEditor` tragen die Pflicht-Prop
+  `unterEbene` — die Ebene der nächsten Überschrift über dem Text, `#` wird die Stufe darunter,
+  `h6` ist der Boden. Kein fester Versatz: der frühere Versatz 3 ließ `###` und tiefer auch
+  dort auf `h6` zusammenfallen, wo nur der Seitentitel oder ein Zeitachsenkopf darüber steht.
+  Heute: Lagebericht/Befehl lesend 3 (unter dem Abschnittskopf), Befehl-Entwurf 2 (Paneel),
+  Lagebericht-Entwurf und ETB-Schnellerfassung 1, ETB-Einträge 2 (der Gruppenkopf der
+  Zeitachse ist ein `h2`). **`breite` ist per Vorgabe `'voll'`** — die Instrumententafel füllt die
   Inhaltsbreite; `'schmal'` (`flaeche.seiteSchmal`) ist die begründete Ausnahme für reine
   Formularseiten. `flaeche.seiteBreit` lebt nur noch, bis Bestandsaufrufer es beim eigenen
   Umbau streichen. Der Akzentstrich über dem Titel ist entfallen.

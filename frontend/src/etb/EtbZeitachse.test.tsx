@@ -184,6 +184,22 @@ describe('EtbZeitachse – der Eintrag', () => {
     );
   });
 
+  // LFH-621: der Gruppenkopf ist eine echte Überschrift (h2), und die Überschriften IM
+  // Eintrag hängen darunter — `#` wird h3, nicht mehr pauschal h4, `###` wird h5 statt h6.
+  it('gliedert Einträge unter dem Gruppenkopf (h2) — `#` im Eintrag wird h3', () => {
+    renderZeitachse({
+      eintraege: [
+        eintrag({
+          ereigniszeit: '2026-05-23 10:05:00',
+          inhalt: '# Lage\n\n### Detail',
+        }),
+      ],
+    });
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent(/^23\.05\. · \d{2} Uhr$/);
+    expect(screen.getByRole('heading', { level: 3, name: 'Lage' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 5, name: 'Detail' })).toBeInTheDocument();
+  });
+
   it('rendert Markdown-Inhalt (kein Rohtext mit **)', () => {
     const { container } = renderZeitachse({
       eintraege: [eintrag({ inhalt: '**Lage** erkundet' })],
