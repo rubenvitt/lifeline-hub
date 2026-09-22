@@ -2,7 +2,7 @@ use super::AnhangAnzeige;
 use crate::error::AppError;
 use chrono::{DateTime, Duration, Utc};
 use sha2::{Digest, Sha256};
-use sqlx::SqlitePool;
+use sqlx::{SqliteConnection, SqlitePool};
 
 /// Karenz (Stunden), die ein verwaister Anhang „überleben" darf, bevor der Sweep ihn
 /// entfernt — großzügig gewählt, damit ein regulärer Upload→Senden-Ablauf (Anhang wird
@@ -40,7 +40,8 @@ pub async fn anzeige_laden(pool: &SqlitePool, id: i64) -> Result<AnhangAnzeige, 
 }
 
 /// Persistiert einen Anhang (Bytes als BLOB) und liefert seine Anzeige.
-/// `groesse` und `sha256` werden serverseitig aus den Bytes berechnet.
+/// `groesse` und `sha256` werden serverseitig aus den Bytes berechnet. Der INSERT selbst
+/// liegt in [`anlegen_tx`], damit es ihn nur einmal gibt.
 pub async fn anlegen(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -49,8 +50,32 @@ pub async fn anlegen(
     mime: &str,
     daten: &[u8],
 ) -> Result<AnhangAnzeige, AppError> {
-    let groesse = daten.len() as i64;
-    let sha = sha256_hex(daten);
+    let id = {
+        let mut conn = pool.acquire().await?;
+        anlegen_tx(
+            &mut conn,
+            einsatz_id,
+            hochgeladen_von,
+            dateiname,
+            mime,
+            daten,
+        )
+        .await?
+    };
+    anzeige_laden(pool, id).await
+}
+
+/// Persistiert einen Anhang INNERHALB einer offenen Transaktion und liefert die neue `id`
+/// (LFH-632: Dokument-Ablage legt Anhang, Dokument und ETB-Eintrag atomar an). Die
+/// Pool-Variante [`anlegen`] bleibt für den Chat-Upload.
+pub async fn anlegen_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    hochgeladen_von: i64,
+    dateiname: &str,
+    mime: &str,
+    daten: &[u8],
+) -> Result<i64, AppError> {
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO anhang (einsatz_id, dateiname, mime, groesse, sha256, daten, hochgeladen_von) \
          VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
@@ -58,13 +83,13 @@ pub async fn anlegen(
     .bind(einsatz_id)
     .bind(dateiname)
     .bind(mime)
-    .bind(groesse)
-    .bind(sha)
+    .bind(daten.len() as i64)
+    .bind(sha256_hex(daten))
     .bind(daten)
     .bind(hochgeladen_von)
-    .fetch_one(pool)
+    .fetch_one(&mut *conn)
     .await?;
-    anzeige_laden(pool, id).await
+    Ok(id)
 }
 
 /// Lädt die Download-Metadaten OHNE die Bytes: `(dateiname, mime, sha256)`. Speist die
@@ -119,6 +144,7 @@ pub async fn gehoert_anhang_zu_einsatz(
 /// fremde Anhänge ab). Der `ON DELETE CASCADE`-FK räumt die `chat_nachricht_anhang`-
 /// Verknüpfungen automatisch mit. `NotFound`, wenn keine Zeile getroffen wird
 /// (unbekannter oder fremder Anhang) — Freigabepfad gegen monotones Wachstum (LFH-250).
+/// Dokument-gebundene Anhänge weist die Route vorher mit 422 ab (LFH-632).
 pub async fn loeschen(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<(), AppError> {
     let betroffen = sqlx::query("DELETE FROM anhang WHERE id = ? AND einsatz_id = ?")
         .bind(id)
@@ -132,15 +158,66 @@ pub async fn loeschen(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<(),
     Ok(())
 }
 
-/// Löscht „verwaiste" Anhänge (an KEINE `chat_nachricht_anhang`-Zeile gebunden — z. B.
-/// hochgeladen aber nie gesendet), deren Upload länger als [`VERWAISTE_KARENZ_STUNDEN`]
-/// zurückliegt. Gegen monotones BLOB-Wachstum (LFH-250). Injiziertes `jetzt` =
-/// deterministisch testbar; der `WHERE`-Guard macht wiederholte Läufe idempotent.
-/// Liefert die Anzahl gelöschter Anhänge.
+/// Wer einen Anhang referenziert — über ALLE Linker aggregiert (LFH-116 → LFH-632).
+/// Vorher lag diese Frage chat-lokal in `chat::repo` und kannte nur einen Linker.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LinkerStand {
+    /// Verknüpfungen über `chat_nachricht_anhang`.
+    pub chat_gesamt: i64,
+    /// Davon an nicht soft-gelöschten Nachrichten.
+    pub chat_lebend: i64,
+    /// Verknüpfungen über `einsatz_dokument` (0 oder 1, `anhang_id UNIQUE`), gelöscht oder nicht.
+    pub dokument_gesamt: i64,
+}
+
+impl LinkerStand {
+    /// Der Anhang gehört zur Dokumentenablage (LFH-632).
+    pub fn ist_dokument(&self) -> bool {
+        self.dokument_gesamt > 0
+    }
+
+    /// Ob der **generische** Download (`GET /anhaenge/{aid}`) gesperrt ist:
+    /// (a) ein Dokument-Anhang ist nur über die modul-gegatete Dokument-Route ladbar —
+    ///     die generische Route ist modul-los (`PFAD_KEY … None`) und wäre sonst ein Bypass
+    ///     für ein ausgeblendetes Dokumente-Modul und für soft-gelöschte Dokumente;
+    /// (b) Chat-Tombstone (LFH-116): an ≥ 1 Nachricht verknüpft und ALLE tragen den
+    ///     Tombstone. Ein verwaister Anhang (Upload→Senden) bleibt ladbar.
+    pub fn generischer_download_gesperrt(&self) -> bool {
+        self.ist_dokument() || (self.chat_gesamt > 0 && self.chat_lebend == 0)
+    }
+}
+
+/// Aggregiert die Linker eines Anhangs. Ein unbekannter Anhang liefert lauter Nullen —
+/// die Existenz prüft der Aufrufer vorher (`gehoert_anhang_zu_einsatz`).
+pub async fn linker_stand(pool: &SqlitePool, anhang_id: i64) -> Result<LinkerStand, AppError> {
+    let (chat_gesamt, chat_lebend, dokument_gesamt): (i64, i64, i64) = sqlx::query_as(
+        "SELECT \
+           (SELECT COUNT(*) FROM chat_nachricht_anhang WHERE anhang_id = ?1), \
+           (SELECT COUNT(*) FROM chat_nachricht_anhang cna \
+              JOIN chat_nachricht n ON n.id = cna.nachricht_id \
+             WHERE cna.anhang_id = ?1 AND n.geloescht_at IS NULL), \
+           (SELECT COUNT(*) FROM einsatz_dokument WHERE anhang_id = ?1)",
+    )
+    .bind(anhang_id)
+    .fetch_one(pool)
+    .await?;
+    Ok(LinkerStand {
+        chat_gesamt,
+        chat_lebend,
+        dokument_gesamt,
+    })
+}
+
+/// Löscht „verwaiste" Anhänge — an KEINEN Linker gebunden (weder `chat_nachricht_anhang`
+/// noch `einsatz_dokument`), z. B. hochgeladen aber nie gesendet —, deren Upload länger als
+/// [`VERWAISTE_KARENZ_STUNDEN`] zurückliegt. Gegen monotones BLOB-Wachstum (LFH-250).
+/// Injiziertes `jetzt` = deterministisch testbar; der `WHERE`-Guard macht wiederholte Läufe
+/// idempotent. Liefert die Anzahl gelöschter Anhänge.
 ///
-/// Heute referenziert NUR `chat_nachricht_anhang` die `anhang`-Tabelle. Kommt ein zweiter
-/// Linker (ETB/Lageobjekte) hinzu, MUSS dieses `NOT EXISTS` um ihn erweitert werden — sonst
-/// löscht der Sweep dort gebundene Anhänge (analoger Vorbehalt wie beim Tombstone-Guard).
+/// **Jeder Linker gehört in dieses `NOT EXISTS`** (LFH-632 hat den zweiten ergänzt). Ein
+/// fehlender Linker macht keinen Fehler, sondern löscht dort gebundene Dateien nach der
+/// Karenz still — der Test `sweep_verwaiste_haelt_dokument_gebundene_anhaenge` pinnt das.
+/// Ein soft-gelöschtes Dokument ist bewusst KEIN Orphan (Beweissicherung, LFH-632 E1).
 pub async fn sweep_verwaiste(pool: &SqlitePool, jetzt: DateTime<Utc>) -> Result<u64, AppError> {
     let grenze = (jetzt - Duration::hours(VERWAISTE_KARENZ_STUNDEN))
         .format("%Y-%m-%d %H:%M:%S")
@@ -149,7 +226,9 @@ pub async fn sweep_verwaiste(pool: &SqlitePool, jetzt: DateTime<Utc>) -> Result<
         "DELETE FROM anhang \
          WHERE erstellt_at < ? \
            AND NOT EXISTS \
-               (SELECT 1 FROM chat_nachricht_anhang cna WHERE cna.anhang_id = anhang.id)",
+               (SELECT 1 FROM chat_nachricht_anhang cna WHERE cna.anhang_id = anhang.id) \
+           AND NOT EXISTS \
+               (SELECT 1 FROM einsatz_dokument d WHERE d.anhang_id = anhang.id)",
     )
     .bind(grenze)
     .execute(pool)
@@ -304,5 +383,102 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(zweiter, 0, "idempotent: kein erneutes Löschen");
+    }
+
+    /// Hängt einen Anhang als Dokument an (direkter INSERT, inkl. ETB-Pflicht-FK).
+    async fn als_dokument(
+        pool: &SqlitePool,
+        einsatz_id: i64,
+        von: i64,
+        anhang_id: i64,
+        geloescht: bool,
+    ) {
+        let etb_id: i64 = sqlx::query_scalar(
+            "INSERT INTO etb_eintrag (einsatz_id, lfd_nr, typ, inhalt, erfasser_id, ereigniszeit) \
+             VALUES (?, (SELECT COALESCE(MAX(lfd_nr), 0) + 1 FROM etb_eintrag WHERE einsatz_id = ?), \
+                     'system', 'Dokument abgelegt', ?, datetime('now')) RETURNING id",
+        )
+        .bind(einsatz_id)
+        .bind(einsatz_id)
+        .bind(von)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_dokument \
+               (einsatz_id, anhang_id, kategorie, titel, etb_eintrag_id, abgelegt_von_id, geloescht_at) \
+             VALUES (?, ?, 'foto', 'Titel', ?, ?, CASE WHEN ? THEN datetime('now') END)",
+        )
+        .bind(einsatz_id)
+        .bind(anhang_id)
+        .bind(etb_id)
+        .bind(von)
+        .bind(geloescht)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn sweep_verwaiste_haelt_dokument_gebundene_anhaenge() {
+        let pool = crate::db::test_pool().await;
+        let (von, einsatz) = setup(&pool).await;
+        let dok = anhang_mit_zeit(&pool, einsatz, von, "plan.pdf", "2026-01-01 00:00:00").await;
+        let geloeschtes_dok =
+            anhang_mit_zeit(&pool, einsatz, von, "alt.pdf", "2026-01-01 00:00:00").await;
+        als_dokument(&pool, einsatz, von, dok, false).await;
+        als_dokument(&pool, einsatz, von, geloeschtes_dok, true).await;
+
+        let geloescht = sweep_verwaiste(&pool, t("2026-06-16 00:00:00"))
+            .await
+            .unwrap();
+
+        assert_eq!(
+            geloescht, 0,
+            "ein Dokument ist kein Orphan — auch ein soft-gelöschtes nicht"
+        );
+        assert!(anzeige_laden(&pool, dok).await.is_ok());
+        assert!(anzeige_laden(&pool, geloeschtes_dok).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn linker_stand_zaehlt_beide_linker() {
+        let pool = crate::db::test_pool().await;
+        let (von, einsatz) = setup(&pool).await;
+        let frei = anhang_mit_zeit(&pool, einsatz, von, "a.pdf", "2026-01-01 00:00:00").await;
+        let dok = anhang_mit_zeit(&pool, einsatz, von, "b.pdf", "2026-01-01 00:00:00").await;
+        als_dokument(&pool, einsatz, von, dok, false).await;
+
+        let s = linker_stand(&pool, frei).await.unwrap();
+        assert_eq!((s.chat_gesamt, s.chat_lebend, s.dokument_gesamt), (0, 0, 0));
+        assert!(!s.ist_dokument());
+        assert!(
+            !s.generischer_download_gesperrt(),
+            "verwaist bleibt ladbar (Upload→Senden)"
+        );
+
+        let s = linker_stand(&pool, dok).await.unwrap();
+        assert_eq!(s.dokument_gesamt, 1);
+        assert!(s.ist_dokument());
+        assert!(
+            s.generischer_download_gesperrt(),
+            "Dokument-Anhang nur über die Modul-Route"
+        );
+    }
+
+    #[test]
+    fn generischer_download_gesperrt_folgt_dem_chat_tombstone() {
+        let nur_tot = LinkerStand {
+            chat_gesamt: 2,
+            chat_lebend: 0,
+            dokument_gesamt: 0,
+        };
+        let einer_lebt = LinkerStand {
+            chat_gesamt: 2,
+            chat_lebend: 1,
+            dokument_gesamt: 0,
+        };
+        assert!(nur_tot.generischer_download_gesperrt());
+        assert!(!einer_lebt.generischer_download_gesperrt());
     }
 }
