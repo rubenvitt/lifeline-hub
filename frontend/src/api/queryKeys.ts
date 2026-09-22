@@ -52,6 +52,7 @@ export const EINSATZ_KEYS = {
   kartenAnsicht: 'einsatz-karten-ansicht',
   lageSnapshot: 'einsatz-lage-snapshot',
   stab: 'einsatz-stab',
+  abloesungen: 'einsatz-abloesungen',
   // Nicht live über SSE getrieben (siehe NICHT_LIVE_KEYS + Guard-Test):
   einsatz: 'einsatz',
   einstellungen: 'einsatz-einstellungen',
@@ -103,8 +104,12 @@ export const EINSATZ_STREAM_EVENTS = {
     EINSATZ_KEYS.personal,
     EINSATZ_KEYS.fahrzeuge,
     EINSATZ_KEYS.material,
+    // LFH-635: Ablösungsschichten tragen den Einheitsnamen per Join, und das Auflösen einer
+    // Einheit entfernt ihre Schichten — beides feuert nur `einheit`.
+    EINSATZ_KEYS.abloesungen,
   ],
-  abschnitt: [EINSATZ_KEYS.abschnitte, EINSATZ_KEYS.fuehrungskraefte],
+  // LFH-635: Abschnittsname und -liste speisen die Rhythmus-Vorgaben der Ablösung.
+  abschnitt: [EINSATZ_KEYS.abschnitte, EINSATZ_KEYS.fuehrungskraefte, EINSATZ_KEYS.abloesungen],
   // F01/LFH-227: `person` und `personal` sind getrennte Wire-Events. Vorher trug EIN
   // `person`-Tag beide ID-Räume (betroffene Person vs. einsatz_personal-Disposition),
   // weshalb hier beide Sammlungen hängen mussten — und weshalb das Backend die zwei
@@ -145,6 +150,10 @@ export const EINSATZ_STREAM_EVENTS = {
   // (['einsatz-stab', einsatzId, 'lagebesprechungen']) — kein eigener Singular-Key,
   // sonst entstünde die Silent-Gap-Falle der Detail-Keys oben.
   stab: [EINSATZ_KEYS.stab],
+  // Ablösung live (LFH-635): Schichten und Rhythmus-Vorgaben hängen unter EINEM Prefix
+  // (Sub-Keys 'liste'/'vorgaben'), damit ein Ereignis beide trifft. Trägt das Ereignis `art`,
+  // stammt es vom Scheduler und alarmiert zusätzlich (Escape-Hatch im Live-Hook).
+  abloesung: [EINSATZ_KEYS.abloesungen],
 } as const satisfies Record<string, readonly EinsatzKey[]>;
 
 export type EinsatzStreamEvent = keyof typeof EINSATZ_STREAM_EVENTS;
@@ -263,6 +272,13 @@ export const einsatzKeys = {
 
   // Stab (LFH-46): Führungsorganisation S1–S6.
   stab: (einsatzId: number) => [EINSATZ_KEYS.stab, einsatzId] as const,
+  // Ablösung (LFH-635): argumentlos = Invalidierungs-Prefix; Liste je Statusfilter und die
+  // Rhythmus-Vorgaben hängen als Sub-Keys darunter.
+  abloesungen: (einsatzId: number) => [EINSATZ_KEYS.abloesungen, einsatzId] as const,
+  abloesungListe: (einsatzId: number, status: 'laufend' | 'abgeloest') =>
+    [EINSATZ_KEYS.abloesungen, einsatzId, 'liste', status] as const,
+  abloesungVorgaben: (einsatzId: number) =>
+    [EINSATZ_KEYS.abloesungen, einsatzId, 'vorgaben'] as const,
   /** Historie der Lagebesprechungen als Sub-Key unter DEMSELBEN Prefix (Spec 9.3). */
   stabLagebesprechungen: (einsatzId: number) =>
     [EINSATZ_KEYS.stab, einsatzId, 'lagebesprechungen'] as const,

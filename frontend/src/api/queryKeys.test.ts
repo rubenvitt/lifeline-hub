@@ -18,6 +18,8 @@ describe('EINSATZ_KEYS', () => {
     // trifft still ein anderes Cache-Fach: kein Fehler, kein roter Test, kein auffälliger
     // Request. Der Byte-Pin ist die einzige Stelle, die das bemerkt.
     expect(EINSATZ_KEYS.stab).toBe('einsatz-stab');
+    // LFH-635: handgeschriebenes Literal, nicht über EINSATZ_KEYS.
+    expect(EINSATZ_KEYS.abloesungen).toBe('einsatz-abloesungen');
   });
 });
 
@@ -45,13 +47,15 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
     ]);
   });
 
-  it('bildet einheit auf den ×5-Fan-out in exakter Reihenfolge ab', () => {
+  it('bildet einheit auf den ×6-Fan-out in exakter Reihenfolge ab', () => {
     expect(EINSATZ_STREAM_EVENTS.einheit).toEqual([
       EINSATZ_KEYS.einheiten,
       EINSATZ_KEYS.fuehrungskraefte,
       EINSATZ_KEYS.personal,
       EINSATZ_KEYS.fahrzeuge,
       EINSATZ_KEYS.material,
+      // LFH-635: Einheitsname und Auflösung wirken auf die Ablösungsschichten.
+      EINSATZ_KEYS.abloesungen,
     ]);
   });
 
@@ -178,6 +182,15 @@ describe('einsatzKeys (Factory-Output)', () => {
     // LFH-543: Sub-Key UNTER dem Stab-Prefix — das `stab`-Ereignis invalidiert ihn mit.
     // Als Literal gepinnt: ein geänderter Key bricht nichts, er trifft still ein anderes Fach.
     expect(einsatzKeys.stabLagebesprechungen(1)).toEqual(['einsatz-stab', 1, 'lagebesprechungen']);
+    // LFH-635: Liste und Vorgaben UNTER dem Ablösungs-Prefix — das `abloesung`-Ereignis trifft beide.
+    expect(einsatzKeys.abloesungen(1)).toEqual(['einsatz-abloesungen', 1]);
+    expect(einsatzKeys.abloesungListe(1, 'laufend')).toEqual([
+      'einsatz-abloesungen',
+      1,
+      'liste',
+      'laufend',
+    ]);
+    expect(einsatzKeys.abloesungVorgaben(1)).toEqual(['einsatz-abloesungen', 1, 'vorgaben']);
     expect(einsatzKeys.etbListe(1, { typ: 'x' })).toEqual(['etb', 1, { typ: 'x' }]);
     // LFH-611: Lesemarke UNTER dem ETB-Prefix — das `etb`-Ereignis invalidiert sie mit.
     expect(einsatzKeys.etbLesemarke(1)).toEqual(['etb', 1, 'lesemarke']);

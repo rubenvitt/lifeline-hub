@@ -250,6 +250,11 @@ export function schaedenPfad(einsatzId: number, opts: { neu?: boolean } = {}): s
   });
 }
 
+/** Ablösungs-Modul (LFH-635): Schichten und fällige Ablösungen je Einheit. */
+export function abloesungPfad(einsatzId: number): string {
+  return einsatzModulPfad(einsatzId, 'abloesung');
+}
+
 /**
  * Stab-Modul (LFH-46). `?neu=1` wird ab ST5 (LFH-543) von der Seite gelesen und geräumt
  * (Abschluss der Lagebesprechung, apply-then-clean wie ETB/Schäden).

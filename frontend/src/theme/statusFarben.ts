@@ -12,6 +12,7 @@ import {
   type sichtungsfarben,
 } from './tokens';
 import type {
+  AbloesungEinstufung,
   AbschnittLagezustand,
   BelegungsArt,
   Ausmass,
@@ -463,6 +464,19 @@ export const odlStufe: Record<OdlStufe, StatusDarstellung> = {
   normal: { rolle: 'normal', label: 'unauffällig' },
   erhoeht: { rolle: 'achtung', label: 'erhöht' },
   stark_erhoeht: { rolle: 'alarm', label: 'stark erhöht' },
+};
+
+/**
+ * Einstufung einer laufenden Ablösungsschicht (LFH-635). Drei Stufen, nicht mehr
+ * (EEMUA 191/ISA-18.2: ≤ 3 Eskalationsstufen). „planmäßig" ist `neutral`, nicht `normal`:
+ * dass eine Einheit noch nicht abgelöst werden muss, ist kein Gutzustand, den man grün
+ * hervorheben müsste — es ist der Ruhezustand der Liste. Das Wort trägt den zweiten Kanal;
+ * die Uhrzeit der Fälligkeit steht immer daneben.
+ */
+export const abloesungEinstufung: Record<AbloesungEinstufung, StatusDarstellung> = {
+  planmaessig: { rolle: 'neutral', label: 'planmäßig' },
+  vorwarnung: { rolle: 'achtung', label: 'Ablösung bald fällig' },
+  ueberfaellig: { rolle: 'alarm', label: 'überfällig' },
 };
 
 /**

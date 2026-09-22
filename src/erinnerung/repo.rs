@@ -163,6 +163,8 @@ pub struct FaelligeErinnerung {
     /// die Eskalation des Bezugs auf (LFH-97), ohne Fremdtabellen-Polling.
     pub bezug_typ: Option<String>,
     pub bezug_id: Option<i64>,
+    /// Titel der Erinnerung — der Ablösungs-Hinweis (LFH-635) trägt ihn in die AlarmZentrale.
+    pub titel: String,
 }
 
 /// Liefert offene Erinnerungen, die fällig sind (`faellig_at <= jetzt`) und für
@@ -174,7 +176,7 @@ pub async fn faellige_zum_ausloesen(
     jetzt: &str,
 ) -> Result<Vec<FaelligeErinnerung>, AppError> {
     sqlx::query_as::<_, FaelligeErinnerung>(
-        "SELECT id, einsatz_id, faellig_at, intervall_minuten, bezug_typ, bezug_id \
+        "SELECT id, einsatz_id, faellig_at, intervall_minuten, bezug_typ, bezug_id, titel \
          FROM erinnerung \
          WHERE status = 'offen' AND faellig_at <= ? \
            AND (zuletzt_ausgeloest_at IS NULL OR zuletzt_ausgeloest_at < faellig_at) \

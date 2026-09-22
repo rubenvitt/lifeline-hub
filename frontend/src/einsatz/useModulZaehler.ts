@@ -1,10 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
+import type { Dayjs } from 'dayjs';
+import { listeAbloesungen } from '../api/abloesungen';
 import { listeAuftraege } from '../api/auftraege';
 import { listeErinnerungen } from '../api/erinnerungen';
 import { listeKanaele } from '../api/chat';
 import { listeMeldungen } from '../api/meldungen';
 import { einsatzKeys } from '../api/queryKeys';
 import type {
+  Abloesung,
   Auftrag,
   BenutzerAnzeige,
   ChatKanal,
@@ -12,6 +15,8 @@ import type {
   Meldung,
   ModulOverrides,
 } from '../api/types';
+import { zaehleFaellige } from '../abloesung/einstufung';
+import { useEinstufungsUhr } from '../abloesung/useUhr';
 import { AUFTRAG_STATUS, istAbgeschlossen } from '../kommunikation';
 import {
   istModulGesperrt,
@@ -90,6 +95,18 @@ export function berechneChatZaehler(
   };
 }
 
+/** LFH-635: Schichten in der Vorwarnzeit oder überfällig — was jetzt Handlung braucht. */
+export function berechneAbloesungZaehler(
+  abloesungen: readonly Abloesung[],
+  jetzt: Dayjs,
+): ModulZaehlerWert {
+  const faellig = zaehleFaellige(abloesungen, jetzt);
+  return {
+    wert: faellig,
+    beschreibung: `${plural(faellig, 'Ablösung', 'Ablösungen')} fällig oder in den nächsten 30 min`,
+  };
+}
+
 /**
  * Zähler laden nur für ein tatsächlich sichtbares UND freies Modul. Damit erzeugt ein
  * ausgeblendetes/rollen-gesperrtes Modul weder 403-Rauschen noch einen Seitenkanal über Daten.
@@ -113,6 +130,7 @@ export function useModulZaehler({ einsatzId, benutzer, overrides }: Args): Modul
   const erinnerungenAktiv =
     gueltigerEinsatz && darfZaehlerLaden('erinnerungen', benutzer, overrides);
   const chatAktiv = gueltigerEinsatz && darfZaehlerLaden('chat', benutzer, overrides);
+  const abloesungAktiv = gueltigerEinsatz && darfZaehlerLaden('abloesung', benutzer, overrides);
 
   const meldungen = useQuery({
     queryKey: einsatzKeys.meldungen(einsatzId),
@@ -135,6 +153,15 @@ export function useModulZaehler({ einsatzId, benutzer, overrides }: Args): Modul
     enabled: chatAktiv,
   });
 
+  const abloesungen = useQuery({
+    queryKey: einsatzKeys.abloesungListe(einsatzId, 'laufend'),
+    queryFn: () => listeAbloesungen(einsatzId, 'laufend'),
+    enabled: abloesungAktiv,
+  });
+  // Die Einstufung hängt an der Uhr, nicht nur am Abruf: ohne Wecker bliebe der Zähler bei
+  // einer Schicht, die gerade in die Vorwarnzeit läuft, still auf dem alten Stand.
+  const jetzt = useEinstufungsUhr(abloesungAktiv ? abloesungen.data : undefined);
+
   return {
     meldungen:
       meldungenAktiv && meldungen.isSuccess ? berechneMeldungsZaehler(meldungen.data) : undefined,
@@ -145,5 +172,9 @@ export function useModulZaehler({ einsatzId, benutzer, overrides }: Args): Modul
         ? berechneErinnerungsZaehler(erinnerungen.data)
         : undefined,
     chat: chatAktiv && chat.isSuccess ? berechneChatZaehler(chat.data) : undefined,
+    abloesung:
+      abloesungAktiv && abloesungen.isSuccess
+        ? berechneAbloesungZaehler(abloesungen.data, jetzt)
+        : undefined,
   };
 }

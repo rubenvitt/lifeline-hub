@@ -40,12 +40,13 @@ const ALLE_MAPS = Object.fromEntries(
 ) as Record<string, Record<string, sf.StatusDarstellung>>;
 
 describe('Statusfarb-Vertrag', () => {
-  it('deckt alle neunzehn Vertragskarten ab — eine weitere Map rutscht nicht still durch', () => {
+  it('deckt alle zwanzig Vertragskarten ab — eine weitere Map rutscht nicht still durch', () => {
     // „Karten", nicht „Enums": `dringlichkeit` ist über eine {@link Statusrolle} geschlüsselt
     // und damit die eine Karte, die keine Domänen-Achse beschriftet, sondern die Stufe selbst.
     // Beide Zugänge von LFH-358 stehen hier — sie lagen bis dahin AUSSERHALB und liefen damit
     // an genau dieser Liste vorbei; das war der Befund, nicht die Zahl.
     expect(Object.keys(ALLE_MAPS).sort()).toEqual([
+      'abloesungEinstufung',
       'abschnittLagezustand',
       'belegungsArt',
       'brStatus',
@@ -173,7 +174,18 @@ describe('Warnstufe als Fläche (LFH-368 · B5h)', () => {
     // `StatusDarstellung` hineinzubiegen hätte den Kanal-Vertrag verwässert.
     expect(Object.keys(ALLE_MAPS)).not.toContain('warnstufeFlaeche');
     expect(Object.keys(ALLE_MAPS)).not.toContain('sichtung');
-    expect(Object.keys(ALLE_MAPS)).toHaveLength(19);
+    expect(Object.keys(ALLE_MAPS)).toHaveLength(20);
+  });
+});
+
+describe('abloesungEinstufung (LFH-635)', () => {
+  it('bildet die drei Stufen auf Rolle und Wort ab', () => {
+    expect(sf.abloesungEinstufung.planmaessig).toEqual({ rolle: 'neutral', label: 'planmäßig' });
+    expect(sf.abloesungEinstufung.vorwarnung).toEqual({
+      rolle: 'achtung',
+      label: 'Ablösung bald fällig',
+    });
+    expect(sf.abloesungEinstufung.ueberfaellig).toEqual({ rolle: 'alarm', label: 'überfällig' });
   });
 });
 

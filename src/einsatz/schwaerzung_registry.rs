@@ -654,6 +654,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("lagezustand", G_ENUM),
             scrub("abschnittsauftrag", Strategie::NullSetzen), // REVIEW: operativer Freitext
             retain("fortschritt", G_ZAEHLER),
+            // LFH-635: Rhythmus-Vorgabe der Ablösung in Minuten.
+            retain("abloesung_rhythmus_minuten", G_KONFIG),
         ],
     },
     TabellenRegel {
@@ -771,6 +773,32 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("bezeichnung", Strategie::NullSetzen), // REVIEW: Name/Stelle extern bzw. rückwärtig
             retain("gesetzt_von_id", G_FK),
             retain("gesetzt_at", G_ZEIT),
+        ],
+    },
+    // LFH-635: Ablösungsschichten. Kein Freitext in der Tabelle (bewusst, design.md D1) —
+    // Namen kommen per Join aus `einsatz_einheit`/`einsatzabschnitt` und werden dort
+    // klassifiziert. Alles Struktur, Zeit oder Enum → RETAIN.
+    TabellenRegel {
+        tabelle: "einsatz_abloesung",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            retain("einheit_id", G_FK),
+            retain("abschnitt_id", G_FK),
+            retain("beginn_at", G_ZEIT),
+            retain("rhythmus_minuten", G_KONFIG),
+            retain("rhythmus_quelle", G_ENUM),
+            retain("faellig_at", G_ZEIT),
+            retain("abloesende_einheit_id", G_FK),
+            retain("status", G_ENUM),
+            retain("vollzogen_at", G_ZEIT),
+            retain("vollzogen_von_id", G_FK),
+            retain("vorgaenger_id", G_FK),
+            retain("etb_vollzug_id", G_FK),
+            retain("angelegt_von_id", G_FK),
+            retain("angelegt_at", G_ZEIT),
         ],
     },
     // LFH-46: abgeschlossene Lagebesprechungen. `entschluss` bleibt RETAIN (G_FUEHRUNG) —

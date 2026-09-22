@@ -30,6 +30,74 @@ export interface components {
          * @enum {string}
          */
         AbgleichStatus: "verdacht" | "bestaetigt" | "verworfen";
+        /** @description Öffentliche Darstellung einer Schicht. */
+        AbloesungAnzeige: {
+            /** Format: int64 */
+            abloesende_einheit_id?: number | null;
+            abloesende_einheit_name?: string | null;
+            /** Format: int64 */
+            abschnitt_id?: number | null;
+            abschnitt_name?: string | null;
+            angelegt_at: string;
+            beginn_at: string;
+            /** Format: int64 */
+            einheit_id: number;
+            einheit_name: string;
+            /** Format: int64 */
+            einsatz_id: number;
+            einstufung?: null | components["schemas"]["Einstufung"];
+            faellig_at: string;
+            /**
+             * Format: int64
+             * @description Die Folgeschicht, die beim Vollzug dieser Schicht entstand.
+             */
+            folgeschicht_id?: number | null;
+            /** Format: int64 */
+            id: number;
+            /** Format: int64 */
+            rhythmus_minuten: number;
+            rhythmus_quelle: components["schemas"]["RhythmusQuelle"];
+            /**
+             * @description Der Vollzug lässt sich zurücknehmen: abgelöst, und eine Folgeschicht ist entweder
+             *     nicht vorhanden oder noch unberührt (laufend).
+             */
+            ruecknehmbar: boolean;
+            status: components["schemas"]["AbloesungStatus"];
+            vollzogen_at?: string | null;
+            /** Format: int64 */
+            vollzogen_von_id?: number | null;
+            /**
+             * Format: int64
+             * @description Die abgelöste Schicht, aus deren Vollzug diese hervorging.
+             */
+            vorgaenger_id?: number | null;
+        };
+        /**
+         * @description Status einer Schicht. Wire == `as_str()`.
+         * @enum {string}
+         */
+        AbloesungStatus: "laufend" | "abgeloest";
+        /**
+         * @description Antwort auf einen Vollzug: die abgelöste Schicht und — mit ablösender Einheit — die
+         *     Folgeschicht.
+         */
+        AbloesungVollzugAnzeige: {
+            abgeloest: components["schemas"]["AbloesungAnzeige"];
+            folgeschicht?: null | components["schemas"]["AbloesungAnzeige"];
+        };
+        /** @description Rhythmus-Vorgabe eines Einsatzabschnitts. */
+        AbloesungVorgabeAnzeige: {
+            /** Format: int64 */
+            abschnitt_id: number;
+            abschnitt_name: string;
+            /**
+             * Format: int64
+             * @description Laufende Schichten mit Einsatzstelle in diesem Abschnitt.
+             */
+            laufende_schichten: number;
+            /** Format: int64 */
+            rhythmus_minuten?: number | null;
+        };
         /**
          * @description Abschlussgrund beim Übergang `→ abgeschlossen`. String = CHECK-Constraint.
          *     `etb_label` erscheint in Klammern in der ETB-Spur (Spec: "abgeschlossen
@@ -910,6 +978,12 @@ export interface components {
             org_defaults: components["schemas"]["OrgEinstellungenHinweis"];
         };
         /**
+         * @description Einstufung einer laufenden Schicht gegen die aktuelle Zeit. Höchstens drei Stufen
+         *     (EEMUA 191/ISA-18.2: ≤ 3 Eskalationsstufen). Wire == `as_str()`.
+         * @enum {string}
+         */
+        Einstufung: "planmaessig" | "vorwarnung" | "ueberfaellig";
+        /**
          * @description Empfänger-Diskriminator eines Auftrags (Schema-Anker für die OpenAPI-Union, LFH-120).
          *     Wire == `empfaenger_typ`.
          * @enum {string}
@@ -1504,7 +1578,7 @@ export interface components {
          *     die Emitter routen über `as_str()`, das Frontend filtert exakt auf diese Wire-Tags.
          * @enum {string}
          */
-        LiveEvent: "uhs" | "schaden" | "fahrzeug" | "material" | "tier" | "lage_zone" | "freies_zeichen" | "gefahr" | "einheit" | "abschnitt" | "person" | "personal" | "lagebericht" | "chat" | "erinnerung" | "auftrag" | "nachforderung" | "meldung" | "bereitstellungsraum" | "karte_bild" | "etb" | "befehl" | "stab" | "karten_ansicht" | "lage_snapshot" | "sofortmeldung" | "lagged";
+        LiveEvent: "uhs" | "schaden" | "fahrzeug" | "material" | "tier" | "lage_zone" | "freies_zeichen" | "gefahr" | "einheit" | "abschnitt" | "person" | "personal" | "lagebericht" | "chat" | "erinnerung" | "auftrag" | "nachforderung" | "meldung" | "bereitstellungsraum" | "karte_bild" | "etb" | "befehl" | "stab" | "abloesung" | "karten_ansicht" | "lage_snapshot" | "sofortmeldung" | "lagged";
         /** @description Öffentliche Material-Darstellung (ohne `org_id`). */
         MaterialAnzeige: {
             angelegt_at: string;
@@ -2156,6 +2230,11 @@ export interface components {
             region: string;
             slug: string;
         };
+        /**
+         * @description Herkunft des Rhythmus einer Schicht. Wire == `as_str()`.
+         * @enum {string}
+         */
+        RhythmusQuelle: "abschnitt" | "einheit";
         /**
          * @description Geteilte Richtung für Auftrag/Meldung (Schema-Anker für die OpenAPI-Union, LFH-120).
          *     Wire == `richtung`.

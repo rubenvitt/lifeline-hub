@@ -26,6 +26,7 @@ import {
   TbInbox,
   TbSettings,
   TbBuildingWarehouse,
+  TbArrowsExchange,
 } from 'react-icons/tb';
 import type { BenutzerAnzeige, ModulOverrides } from '../api/types';
 
@@ -33,7 +34,7 @@ export type ModulStatus = 'fertig' | 'geplant' | 'wip';
 export type KategorieKey =
   'fuehrung' | 'kraefte' | 'erfassung' | 'lage' | 'kommunikation' | 'einstellungen';
 export type BenoetigteRolle = 'admin' | 'fuehrungskraft';
-export type ModulZaehlerQuelle = 'meldungen' | 'auftraege' | 'erinnerungen' | 'chat';
+export type ModulZaehlerQuelle = 'meldungen' | 'auftraege' | 'erinnerungen' | 'chat' | 'abloesung';
 
 export interface Kategorie {
   key: KategorieKey;
@@ -203,6 +204,18 @@ export const modulRegistry: ModulEintrag[] = [
     route: 'bereitstellungsraeume',
     status: 'fertig',
     beschreibung: 'Bereitstellungsräume: bereitgestellte Einheiten und Fahrzeuge.',
+  },
+  {
+    // LFH-635: Schichten und fällige Ablösungen je Einheit. Der Zähler nennt die Schichten
+    // in der Vorwarnzeit oder überfällig — was jetzt Handlung braucht, nicht die Gesamtzahl.
+    key: 'abloesung',
+    kategorie: 'kraefte',
+    label: 'Ablösung',
+    icon: TbArrowsExchange,
+    route: 'abloesung',
+    status: 'fertig',
+    beschreibung: 'Schichten der Einheiten: Rhythmus, fällige Ablösungen, Vollzug.',
+    zaehlerQuelle: 'abloesung',
   },
   // Erfassung
   {
@@ -467,8 +480,8 @@ export function istModulSichtbar(modul: ModulEintrag, overrides?: ModulOverrides
  * Registry-Stub in `command-palette/befehle.modulstatus.test.ts` beobachtbar gemacht.
  *
  * BEWUSST NICHT MIT UMGESTELLT: `useModulZaehler.ts` (`darfZaehlerLaden`) führt die
- * ZWEITEILIGE Variante ohne `status === 'fertig'`. Das ist heute unbeobachtbar — alle vier
- * Module mit `zaehlerQuelle` (chat, erinnerungen, auftraege, meldungen) sind `fertig`,
+ * ZWEITEILIGE Variante ohne `status === 'fertig'`. Das ist heute unbeobachtbar — alle fünf
+ * Module mit `zaehlerQuelle` (chat, erinnerungen, auftraege, meldungen, abloesung) sind `fertig`,
  * beide Fassungen liefern also dasselbe. Ob ein Zähler auch für ein UNFERTIGES Modul laden
  * darf, ist eine fachliche Entscheidung und keine Aufräumarbeit; sie steht offen. Wer sie
  * trifft, zieht die Stelle nach oder schreibt hier hin, warum sie eigenständig bleibt.
