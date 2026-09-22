@@ -40,12 +40,13 @@ const ALLE_MAPS = Object.fromEntries(
 ) as Record<string, Record<string, sf.StatusDarstellung>>;
 
 describe('Statusfarb-Vertrag', () => {
-  it('deckt alle achtzehn Vertragskarten ab — eine weitere Map rutscht nicht still durch', () => {
+  it('deckt alle neunzehn Vertragskarten ab — eine weitere Map rutscht nicht still durch', () => {
     // „Karten", nicht „Enums": `dringlichkeit` ist über eine {@link Statusrolle} geschlüsselt
     // und damit die eine Karte, die keine Domänen-Achse beschriftet, sondern die Stufe selbst.
     // Beide Zugänge von LFH-358 stehen hier — sie lagen bis dahin AUSSERHALB und liefen damit
     // an genau dieser Liste vorbei; das war der Befund, nicht die Zahl.
     expect(Object.keys(ALLE_MAPS).sort()).toEqual([
+      'abschnittLagezustand',
       'belegungsArt',
       'brStatus',
       'dringlichkeit',
@@ -172,7 +173,7 @@ describe('Warnstufe als Fläche (LFH-368 · B5h)', () => {
     // `StatusDarstellung` hineinzubiegen hätte den Kanal-Vertrag verwässert.
     expect(Object.keys(ALLE_MAPS)).not.toContain('warnstufeFlaeche');
     expect(Object.keys(ALLE_MAPS)).not.toContain('sichtung');
-    expect(Object.keys(ALLE_MAPS)).toHaveLength(18);
+    expect(Object.keys(ALLE_MAPS)).toHaveLength(19);
   });
 });
 
@@ -456,5 +457,16 @@ describe('Nacht-Algorithmus hält die Signalfarben auf dem Rollenwert (Neuentwur
     });
     expect(dunkelToken.colorPrimaryBg).toBe(nurDunkel.colorPrimaryBg);
     expect(dunkelToken.colorBgBase).toBe(nurDunkel.colorBgBase);
+  });
+});
+
+describe('abschnittLagezustand (LFH-608)', () => {
+  it('legt die drei Stufen auf die drei Dringlichkeitsrollen, ohne Bedienblau', () => {
+    // Gegen handgeschriebene Literale — die Rollen sind die Aussage, nicht die Konstante.
+    expect(sf.abschnittLagezustand).toEqual({
+      planmaessig: { rolle: 'normal', label: 'planmäßig' },
+      angespannt: { rolle: 'achtung', label: 'angespannt' },
+      kritisch: { rolle: 'alarm', label: 'kritisch' },
+    });
   });
 });

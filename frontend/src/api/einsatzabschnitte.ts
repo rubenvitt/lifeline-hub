@@ -1,4 +1,4 @@
-import type { Einsatzabschnitt } from './types';
+import type { AbschnittLagezustand, Einsatzabschnitt } from './types';
 import { apiGet, apiSend } from './client';
 
 export interface AbschnittEingabe {
@@ -11,6 +11,14 @@ export interface AbschnittEingabe {
   sortier?: number;
   /** LFH-109: IDs der zuzuordnenden Sprechgruppen aus dem Katalog. */
   sprechgruppe_ids?: number[];
+  /** LFH-608: Rufname im Einsatz („EA-N"), je Einsatz eindeutig (409 sonst). */
+  kurzbezeichnung?: string | null;
+  /** LFH-608: `null` = nicht beurteilt; ein Wechsel schreibt einen ETB-Eintrag. */
+  lagezustand?: AbschnittLagezustand | null;
+  /** LFH-608: fester Abschnittsauftrag (Freitext). */
+  abschnittsauftrag?: string | null;
+  /** LFH-608: eingeschätzter Fortschritt 0–100; `null` = nicht eingeschätzt. */
+  fortschritt?: number | null;
 }
 
 export function listeAbschnitte(einsatzId: number): Promise<Einsatzabschnitt[]> {

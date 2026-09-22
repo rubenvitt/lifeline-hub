@@ -6,6 +6,7 @@ import {
   Descriptions,
   Form,
   Input,
+  InputNumber,
   Popconfirm,
   Space,
   Tag,
@@ -31,7 +32,7 @@ import {
   type AbschnittEingabe,
 } from '../api/einsatzabschnitte';
 import { ApiError } from '../api/client';
-import type { Einheit, Einsatzabschnitt } from '../api/types';
+import type { AbschnittLagezustand, Einheit, Einsatzabschnitt } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import FunkErreichbarkeit, {
   KOMMUNIKATIONSMITTEL_OPTIONEN,
@@ -52,7 +53,13 @@ import { useViewport } from '../components/useViewport';
 import { abschnittStaerken, nachfahrenInkl } from './einsatzabschnitte/abschnittStaerke';
 import AbschnittKnoten from './einsatzabschnitte/AbschnittKnoten';
 import StatusTag from '../components/StatusTag';
-import { einsatzStatus } from '../theme/statusFarben';
+import { abschnittLagezustand, einsatzStatus } from '../theme/statusFarben';
+
+/** Auswahl des Lagezustands in Stufenfolge — Wortlaut aus dem Farbvertrag, nicht doppelt. */
+const LAGEZUSTAND_OPTIONEN = (['planmaessig', 'angespannt', 'kritisch'] as const).map((l) => ({
+  value: l,
+  label: abschnittLagezustand[l].label,
+}));
 
 function baueBaum(abschnitte: Einsatzabschnitt[], einheiten: Einheit[]): TreeDataNode[] {
   const kinder = new Map<number | null, Einsatzabschnitt[]>();
@@ -84,6 +91,10 @@ interface AbschnittWerte {
   sprechgruppe_ids?: number[];
   kommunikationsmittel?: string;
   erreichbarkeit?: string;
+  kurzbezeichnung?: string;
+  lagezustand?: AbschnittLagezustand | null;
+  abschnittsauftrag?: string;
+  fortschritt?: number | null;
 }
 
 export default function EinsatzabschnittePage() {
@@ -150,6 +161,10 @@ export default function EinsatzabschnittePage() {
         sprechgruppe_ids: werte.sprechgruppe_ids ?? [],
         kommunikationsmittel: werte.kommunikationsmittel || null,
         erreichbarkeit: werte.erreichbarkeit?.trim() || null,
+        kurzbezeichnung: werte.kurzbezeichnung?.trim() || null,
+        lagezustand: werte.lagezustand ?? null,
+        abschnittsauftrag: werte.abschnittsauftrag?.trim() || null,
+        fortschritt: werte.fortschritt ?? null,
       };
       return aktuell && !entwurf
         ? aktualisiereAbschnitt(einsatzId, aktuell.id, daten)
@@ -190,6 +205,10 @@ export default function EinsatzabschnittePage() {
         sprechgruppe_ids: aktuell.sprechgruppen?.map((s) => s.id) ?? [],
         kommunikationsmittel: aktuell.kommunikationsmittel ?? undefined,
         erreichbarkeit: aktuell.erreichbarkeit ?? undefined,
+        kurzbezeichnung: aktuell.kurzbezeichnung ?? undefined,
+        lagezustand: aktuell.lagezustand ?? undefined,
+        abschnittsauftrag: aktuell.abschnittsauftrag ?? undefined,
+        fortschritt: aktuell.fortschritt ?? undefined,
       });
     }
   }, [aktuell, bearbeiten, entwurf, form]);
@@ -433,6 +452,13 @@ export default function EinsatzabschnittePage() {
               <Form.Item label="Name" name="name" rules={[{ required: true, whitespace: true }]}>
                 <Input autoFocus />
               </Form.Item>
+              <Form.Item
+                label="Kurzbezeichnung"
+                name="kurzbezeichnung"
+                extra="Rufname im Einsatz, z. B. „EA-N“ — je Einsatz nur einmal vergeben."
+              >
+                <Input maxLength={20} allowClear />
+              </Form.Item>
               <Form.Item label="Über-Abschnitt" name="ueber_abschnitt_id">
                 <TreeSelect
                   allowClear
@@ -442,6 +468,34 @@ export default function EinsatzabschnittePage() {
               </Form.Item>
               <Form.Item label="Abschnittsleiter" name="leiter_id">
                 <Select allowClear placeholder="Disponierte Person" options={personalOptionen} />
+              </Form.Item>
+
+              <Augenbraue
+                als="h3"
+                style={{
+                  display: 'block',
+                  marginTop: token.marginXS,
+                  marginBottom: token.marginSM,
+                }}
+              >
+                Lage
+              </Augenbraue>
+              <Form.Item
+                label="Lagezustand"
+                name="lagezustand"
+                extra="Leer heißt „nicht beurteilt“. Jeder Wechsel wird im ETB vermerkt."
+              >
+                <Select allowClear placeholder="nicht beurteilt" options={LAGEZUSTAND_OPTIONEN} />
+              </Form.Item>
+              <Form.Item label="Abschnittsauftrag" name="abschnittsauftrag">
+                <Input.TextArea rows={2} placeholder="Fester Auftrag des Abschnitts" />
+              </Form.Item>
+              <Form.Item
+                label="Fortschritt"
+                name="fortschritt"
+                extra="Eigene Einschätzung in Prozent. Leer heißt „nicht eingeschätzt“, nicht 0 %."
+              >
+                <InputNumber min={0} max={100} precision={0} suffix="%" />
               </Form.Item>
 
               <Augenbraue
@@ -500,8 +554,37 @@ export default function EinsatzabschnittePage() {
           ) : aktuell ? (
             <>
               <Descriptions column={1} size="small" bordered>
+                {aktuell.kurzbezeichnung && (
+                  <Descriptions.Item label="Kurzbezeichnung">
+                    {aktuell.kurzbezeichnung}
+                  </Descriptions.Item>
+                )}
                 <Descriptions.Item label="Abschnittsleiter">
                   {aktuell.leiter_name ?? '—'}
+                </Descriptions.Item>
+                {/* Die fehlende Beurteilung steht als WORT da, nicht als leere Zelle: sonst
+                    ist „noch nicht beurteilt“ von „vergessen anzuzeigen“ nicht zu trennen. */}
+                <Descriptions.Item label="Lagezustand">
+                  {aktuell.lagezustand ? (
+                    <StatusTag
+                      darstellung={abschnittLagezustand[aktuell.lagezustand]}
+                      darstellungsart="rand"
+                    />
+                  ) : (
+                    <span style={{ color: rollen.gedaempft }}>nicht beurteilt</span>
+                  )}
+                </Descriptions.Item>
+                {aktuell.abschnittsauftrag && (
+                  <Descriptions.Item label="Abschnittsauftrag">
+                    {aktuell.abschnittsauftrag}
+                  </Descriptions.Item>
+                )}
+                <Descriptions.Item label="Fortschritt">
+                  {aktuell.fortschritt != null ? (
+                    <span style={monoStil(13)}>{aktuell.fortschritt} %</span>
+                  ) : (
+                    <span style={{ color: rollen.gedaempft }}>nicht eingeschätzt</span>
+                  )}
                 </Descriptions.Item>
                 <Descriptions.Item label="Funk / Erreichbarkeit">
                   <FunkErreichbarkeit

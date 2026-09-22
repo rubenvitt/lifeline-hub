@@ -1,4 +1,4 @@
-use super::EinsatzabschnittAnzeige;
+use super::{AbschnittLagezustand, EinsatzabschnittAnzeige};
 use crate::error::AppError;
 use sqlx::{SqliteConnection, SqlitePool};
 
@@ -15,6 +15,10 @@ pub struct AbschnittDaten<'a> {
     pub kommunikationsmittel: Option<&'a str>,
     pub erreichbarkeit: Option<&'a str>,
     pub sortier: i64,
+    pub kurzbezeichnung: Option<&'a str>,
+    pub lagezustand: Option<AbschnittLagezustand>,
+    pub abschnittsauftrag: Option<&'a str>,
+    pub fortschritt: Option<i64>,
 }
 
 const SELECT_AUFGELOEST: &str = "\
@@ -22,7 +26,7 @@ const SELECT_AUFGELOEST: &str = "\
            p.snap_name AS leiter_name, a.bemerkung, \
            a.flaeche_geojson, a.tz_fachaufgabe, a.tz_organisation, \
            a.sprechgruppe_tmo, a.sprechgruppe_dmo, a.kommunikationsmittel, a.erreichbarkeit, \
-           a.sortier \
+           a.sortier, a.kurzbezeichnung, a.lagezustand, a.abschnittsauftrag, a.fortschritt \
     FROM einsatzabschnitt a \
     LEFT JOIN einsatz_personal p ON p.id = a.leiter_id";
 
@@ -43,6 +47,10 @@ struct Row {
     kommunikationsmittel: Option<String>,
     erreichbarkeit: Option<String>,
     sortier: i64,
+    kurzbezeichnung: Option<String>,
+    lagezustand: Option<String>,
+    abschnittsauftrag: Option<String>,
+    fortschritt: Option<i64>,
 }
 
 fn zu_anzeige(row: Row) -> EinsatzabschnittAnzeige {
@@ -62,6 +70,15 @@ fn zu_anzeige(row: Row) -> EinsatzabschnittAnzeige {
         kommunikationsmittel: row.kommunikationsmittel,
         erreichbarkeit: row.erreichbarkeit,
         sortier: row.sortier,
+        kurzbezeichnung: row.kurzbezeichnung,
+        // Der DB-CHECK lässt nur die drei Werte zu; ein unlesbarer Altwert fiele auf
+        // „nicht beurteilt" statt die ganze Liste mit einem 500 zu verlieren.
+        lagezustand: row
+            .lagezustand
+            .as_deref()
+            .and_then(AbschnittLagezustand::parse),
+        abschnittsauftrag: row.abschnittsauftrag,
+        fortschritt: row.fortschritt,
         sprechgruppen: Vec::new(), // befüllt durch laden()/liste()
     }
 }
@@ -214,11 +231,15 @@ pub async fn anlegen(
     daten: AbschnittDaten<'_>,
 ) -> Result<EinsatzabschnittAnzeige, AppError> {
     validiere(pool, einsatz_id, None, &daten).await?;
+    if let Some(kurz) = daten.kurzbezeichnung {
+        pruefe_kurzbezeichnung_frei(pool, einsatz_id, None, kurz).await?;
+    }
     let id = sqlx::query_scalar::<_, i64>(
         "INSERT INTO einsatzabschnitt \
             (einsatz_id, ueber_abschnitt_id, name, leiter_id, bemerkung, \
-             kommunikationsmittel, erreichbarkeit, sortier) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+             kommunikationsmittel, erreichbarkeit, sortier, \
+             kurzbezeichnung, lagezustand, abschnittsauftrag, fortschritt) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(einsatz_id)
     .bind(daten.ueber_abschnitt_id)
@@ -228,6 +249,10 @@ pub async fn anlegen(
     .bind(daten.kommunikationsmittel)
     .bind(daten.erreichbarkeit)
     .bind(daten.sortier)
+    .bind(daten.kurzbezeichnung)
+    .bind(daten.lagezustand.map(|l| l.as_str()))
+    .bind(daten.abschnittsauftrag)
+    .bind(daten.fortschritt)
     .fetch_one(pool)
     .await?;
     laden(pool, einsatz_id, id).await
@@ -244,6 +269,11 @@ pub struct AbschnittPatch<'a> {
     pub kommunikationsmittel: Option<Option<&'a str>>,
     pub erreichbarkeit: Option<Option<&'a str>>,
     pub sortier: Option<i64>,
+    pub kurzbezeichnung: Option<Option<&'a str>>,
+    // Der Lagezustand fehlt hier absichtlich: er hat mit `setze_lagezustand_tx` einen
+    // eigenen Schreibweg, der den ETB-Eintrag in derselben Transaktion schreibt.
+    pub abschnittsauftrag: Option<Option<&'a str>>,
+    pub fortschritt: Option<Option<i64>>,
 }
 
 /// Validiert nur die **gesendeten** Bezugsfelder. `Some(None)` (Zuordnung lösen) und ein
@@ -267,7 +297,37 @@ async fn validiere_patch(
     if let Some(Some(leiter)) = patch.leiter_id {
         pruefe_leiter(pool, einsatz_id, leiter).await?;
     }
+    if let Some(Some(kurz)) = patch.kurzbezeichnung {
+        pruefe_kurzbezeichnung_frei(pool, einsatz_id, Some(self_id), kurz).await?;
+    }
     Ok(())
+}
+
+/// Ob ein Kürzel im Einsatz noch frei ist (ohne den Abschnitt selbst). Groß-/Klein-
+/// schreibung zählt nicht, wie im UNIQUE-Index (`0104`). Der Index ist das eigentliche
+/// Netz (UNIQUE → 409, LFH-245); die Vorprüfung liefert nur die sprechende Meldung.
+async fn pruefe_kurzbezeichnung_frei(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    self_id: Option<i64>,
+    kurz: &str,
+) -> Result<(), AppError> {
+    let belegt: Option<String> = sqlx::query_scalar(
+        "SELECT name FROM einsatzabschnitt \
+         WHERE einsatz_id = ? AND kurzbezeichnung = ? COLLATE NOCASE AND id IS NOT ? \
+         LIMIT 1",
+    )
+    .bind(einsatz_id)
+    .bind(kurz)
+    .bind(self_id)
+    .fetch_optional(pool)
+    .await?;
+    match belegt {
+        Some(name) => Err(AppError::Conflict(format!(
+            "Kurzbezeichnung «{kurz}» ist im Einsatz schon vergeben (Abschnitt «{name}»)"
+        ))),
+        None => Ok(()),
+    }
 }
 
 /// Teil-Patch der editierbaren Felder (Parent-Wechsel zyklenfrei). `NotFound`,
@@ -294,8 +354,11 @@ pub async fn patche(
             bemerkung = CASE WHEN ?7 IS NULL THEN bemerkung ELSE ?8 END, \
             kommunikationsmittel = CASE WHEN ?9 IS NULL THEN kommunikationsmittel ELSE ?10 END, \
             erreichbarkeit = CASE WHEN ?11 IS NULL THEN erreichbarkeit ELSE ?12 END, \
-            sortier = CASE WHEN ?13 IS NULL THEN sortier ELSE ?14 END \
-         WHERE id = ?15 AND einsatz_id = ?16",
+            sortier = CASE WHEN ?13 IS NULL THEN sortier ELSE ?14 END, \
+            kurzbezeichnung = CASE WHEN ?15 IS NULL THEN kurzbezeichnung ELSE ?16 END, \
+            abschnittsauftrag = CASE WHEN ?17 IS NULL THEN abschnittsauftrag ELSE ?18 END, \
+            fortschritt = CASE WHEN ?19 IS NULL THEN fortschritt ELSE ?20 END \
+         WHERE id = ?21 AND einsatz_id = ?22",
     )
     .bind(patch.ueber_abschnitt_id.map(|_| 1_i64))
     .bind(patch.ueber_abschnitt_id.and_then(|v| v))
@@ -311,6 +374,12 @@ pub async fn patche(
     .bind(patch.erreichbarkeit.and_then(|v| v))
     .bind(patch.sortier.map(|_| 1_i64))
     .bind(patch.sortier)
+    .bind(patch.kurzbezeichnung.map(|_| 1_i64))
+    .bind(patch.kurzbezeichnung.and_then(|v| v))
+    .bind(patch.abschnittsauftrag.map(|_| 1_i64))
+    .bind(patch.abschnittsauftrag.and_then(|v| v))
+    .bind(patch.fortschritt.map(|_| 1_i64))
+    .bind(patch.fortschritt.and_then(|v| v))
     .bind(id)
     .bind(einsatz_id)
     .execute(pool)
@@ -319,6 +388,46 @@ pub async fn patche(
         return Err(AppError::NotFound);
     }
     laden(pool, einsatz_id, id).await
+}
+
+/// Ein tatsächlicher Wechsel des Lagezustands: der vorherige Wert und der Abschnittsname
+/// (für den ETB-Text, nach einer etwaigen Umbenennung im selben PATCH).
+#[derive(Debug, PartialEq, Eq)]
+pub struct Lagewechsel {
+    pub vorher: Option<AbschnittLagezustand>,
+    pub name: String,
+}
+
+/// Setzt den Lagezustand IN der übergebenen Transaktion und liefert den Wechsel, falls es
+/// einer ist (`None` bei gleichem Wert). Lesen und Schreiben liegen damit unter derselben
+/// Schreibsperre (`write_retry!` → `BEGIN IMMEDIATE`): zwei gleichzeitige Beurteilungen
+/// sehen je den Stand der anderen, und keine Entwarnung geht als „kein Wechsel“ verloren
+/// (LFH-608, Review). `NotFound`, falls der Abschnitt nicht zum Einsatz gehört.
+pub async fn setze_lagezustand_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    id: i64,
+    neu: Option<AbschnittLagezustand>,
+) -> Result<Option<Lagewechsel>, AppError> {
+    let (alt, name): (Option<String>, String) = sqlx::query_as(
+        "SELECT lagezustand, name FROM einsatzabschnitt WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .ok_or(AppError::NotFound)?;
+    let vorher = alt.as_deref().and_then(AbschnittLagezustand::parse);
+    if vorher == neu {
+        return Ok(None);
+    }
+    sqlx::query("UPDATE einsatzabschnitt SET lagezustand = ? WHERE id = ? AND einsatz_id = ?")
+        .bind(neu.map(|l| l.as_str()))
+        .bind(id)
+        .bind(einsatz_id)
+        .execute(&mut *conn)
+        .await?;
+    Ok(Some(Lagewechsel { vorher, name }))
 }
 
 /// Reine Fläche-/Symbol-Felder eines Abschnitts. `Some(None)` = auf NULL, `None` = unverändert.
@@ -451,6 +560,10 @@ mod tests {
             sortier: 0,
             kommunikationsmittel: None,
             erreichbarkeit: None,
+            kurzbezeichnung: None,
+            lagezustand: None,
+            abschnittsauftrag: None,
+            fortschritt: None,
         }
     }
 
@@ -522,6 +635,10 @@ mod tests {
                 sortier: 0,
                 kommunikationsmittel: Some("digitalfunk"),
                 erreichbarkeit: Some("0151 23456"),
+                kurzbezeichnung: None,
+                lagezustand: None,
+                abschnittsauftrag: None,
+                fortschritt: None,
             },
         )
         .await

@@ -167,6 +167,16 @@ ist „offen“ `achtung`, „übergeben“ `bedien`, „abgeschlossen“ neutra
 „gering“ neutral, „mittel“/„groß“ `achtung`, „katastrophal“ `alarm`; die Labels unterscheiden
 die zusammengefassten Stufen.
 
+**Lagezustand je Einsatzabschnitt (LFH-608)** liegt als `abschnittLagezustand` im selben
+Vertrag: planmäßig `normal`, angespannt `achtung`, kritisch `alarm`. „Nicht beurteilt“ ist
+**kein** Eintrag, sondern ein leeres Feld — ohne Kantenfarbe im Überblick, als Wort in der
+Detailansicht. Das Blau der UHS-Zeile im Entwurf ist Bedienblau und keine Lagestufe. Ein
+Wechsel des Lagezustands schreibt einen System-ETB-Eintrag, die übrigen Abschnittsfelder
+nicht. Der Fortschritt ist eine **manuelle Einschätzung** (leer ≠ 0 %); die Zählung
+„n/m Aufträge erledigt“ steht daneben und ersetzt sie nicht, weil jeder Auftrag gleich
+wiegt. Die Überblickszeile trägt die Werte des obersten Abschnitts selbst und meldet einen
+schlechter beurteilten Unterabschnitt eigens („UA kritisch“).
+
 **Sichtung ist eine eigene fachliche Farbachse am selben zentralen Ort**, keine A0-Rolle.
 `SichtungsTag` zeigt die feste Kennzeichnung aus `tokens.ts` als umrandetes Farbfeld:
 SK I rot, II gelb, III grün, IV blau, Tote schwarz; „unverletzt“ ohne erfundene Fachfarbe

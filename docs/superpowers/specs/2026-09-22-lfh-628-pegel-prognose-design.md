@@ -33,7 +33,7 @@ eines Landes kann eine andere Zahl nennen als die BfG.
 
 ## Backend
 
-**Speicher:** vier Spalten an `einsatz_pegel` (Migration `0106_einsatz_pegel_prognose.sql`):
+**Speicher:** vier Spalten an `einsatz_pegel` (Migration `0107_einsatz_pegel_prognose.sql`):
 `prognose_cm REAL`, `prognose_zeit TEXT` (UTC, Wire-Format), `prognose_gesetzt_von_id`,
 `prognose_gesetzt_at`; ein CHECK hält Wert und Zeitpunkt zusammen. Eine Prognose gehört zu
 genau einer festgelegten Station und fällt mit ihr (entfernen und neu festlegen = neue Zeile

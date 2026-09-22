@@ -635,6 +635,14 @@ pub const TABELLEN: &[TabellenRegel] = &[
             ),
             // erreichbarkeit = mögliche Rufnummer der Führung → PII, gescrubbt (LFH-108).
             scrub("erreichbarkeit", Strategie::NullSetzen),
+            // LFH-608: Kürzel, Beurteilung und Einschätzung sind Führungsskelett (RETAIN).
+            // Der feste Abschnittsauftrag ist nullabler Freitext wie `bemerkung` — anders
+            // als `auftrag.auftrag_text` wird er nicht ins ETB gesnapshottet, und „Evakuierung
+            // Uferstraße 3, Familie …" ist genau die Sorte Satz, die hier stehen kann.
+            retain("kurzbezeichnung", G_OP_LABEL),
+            retain("lagezustand", G_ENUM),
+            scrub("abschnittsauftrag", Strategie::NullSetzen), // REVIEW: operativer Freitext
+            retain("fortschritt", G_ZAEHLER),
         ],
     },
     TabellenRegel {
