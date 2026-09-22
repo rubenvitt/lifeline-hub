@@ -58,9 +58,9 @@ export function wirksameDarstellungsart(
  * Fläche, Zahl bleibt lesbar"). Die Werte und ihre Kontrastrechnung liegen an EINER
  * Stelle, `components/instrument/statusFlaeche.ts` — dieselbe Übersetzung tragen
  * `StatusChip` und `StatusZelle`. Die Böden aus Kriterium 5 (`e2e/*kontrast*.spec.ts`:
- * Tag ≥ 7, Nacht ≥ 5) halten in jeder Rolle; wo der getönte Text im Tagmodus darunter
- * fiele (`achtung` 6,02, `alarm` 5,52), nimmt die Beschriftung `text` (16,06 / 15,06),
- * die Fläche behält ihren Ton. Der 1-px-Rand bleibt in der Rollenfarbe stehen, weil
+ * Tag ≥ 7, Nacht ≥ 5) halten in jeder Rolle; `achtung`/`alarm` beschriften dafür mit
+ * ihren Textrollen `achtungText`/`alarmText` (Tag 8,02 / 7,31, LFH-618), die Füllfarbe
+ * allein fiele am Tag darunter. Der 1-px-Rand bleibt in der Rollenfarbe stehen, weil
  * `kraefte-kontrast.spec.ts` ihn als tragende Kante misst (≥ 3 : 1 gegen den Grund).
  *
  * DIE RAND-FORM BLEIBT für zwei Fälle, und das ist Vertrag, nicht Übergang:
@@ -93,11 +93,11 @@ export default function StatusTag({
   farbe: ueberschrieben,
   darstellungsart,
 }: StatusTagProps) {
-  const { token, rollen, dunkel } = useRollen();
+  const { token, rollen } = useRollen();
   const mandantenfarbe = ueberschrieben?.trim();
   const art = wirksameDarstellungsart(darstellung, mandantenfarbe, darstellungsart);
   const ton = tonVonRolle(darstellung.rolle);
-  const flaeche = art === 'flaeche' && ton != null ? statusFlaeche(rollen, ton, dunkel) : null;
+  const flaeche = art === 'flaeche' && ton != null ? statusFlaeche(rollen, ton) : null;
   const farbe = flaeche ? flaeche.kante : rollenFarbe(darstellung.rolle, token);
   return (
     <Tag

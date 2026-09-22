@@ -17,15 +17,15 @@ import type { Farbrollen } from '../../theme/tokens';
  * |----------|------------------------------|-------|-------|
  * | normal   | normalText / normalFlaeche   | 7,87  | 10,44 |
  * | bedien   | bedienText / bedienFlaeche   | 7,11  |  9,65 |
- * | achtung  | achtung / achtungFlaeche     | 6,02 ✗| 11,18 |
- * | alarm    | alarm / alarmFlaeche         | 5,52 ✗|  6,89 |
+ * | achtung  | achtungText / achtungFlaeche | 8,02  | 11,18 |
+ * | alarm    | alarmText / alarmFlaeche     | 7,31  |  6,89 |
  * | neutral  | text2 / flaeche3             | 10,30 | 10,89 |
  *
- * Im TAGMODUS tragen `achtung` und `alarm` als Textfarbe den Boden nicht — es fehlen
- * Rollen `achtungText`/`alarmText` in `theme/tokens.ts` (für `normal` und `bedien` gibt es
- * sie). Bis dahin behält die Fläche dort ihren Ton, die BESCHRIFTUNG aber nimmt `text`:
- * text/achtungFlaeche 16,06, text/alarmFlaeche 15,06. Der Ton bleibt als Fläche und als
- * Kante sichtbar, die Lesbarkeit ist gesichert. Nachts gilt der Entwurf ungebrochen.
+ * Bis LFH-618 (22.09.2026) wich der TAGMODUS bei `achtung`/`alarm` auf `text` aus: die
+ * Füllfarben tragen als Text den Boden nicht (6,02 bzw. 5,52), und die Textrollen fehlten.
+ * Das machte die Kontrastspecs grün, aber die Ampel am Tag farblos — S3 und S6 standen im
+ * Meldebild schwarz, nachts gelb und rot. Seit es `achtungText`/`alarmText` gibt, färben
+ * beide Modi; die Füllfarbe bleibt die KANTE.
  *
  * `neutral` hat keine Statusfläche — `flaeche3` + `text2`, NICHT `schwach` (4,72 nachts,
  * unter 5) und nicht `gedaempft` (6,60 am Tag, unter 7).
@@ -49,40 +49,29 @@ type Benoetigt = Pick<
   | 'normalText'
   | 'normalFlaeche'
   | 'achtung'
+  | 'achtungText'
   | 'achtungFlaeche'
   | 'alarm'
+  | 'alarmText'
   | 'alarmFlaeche'
   | 'bedien'
   | 'bedienText'
   | 'bedienFlaeche'
   | 'flaeche3'
-  | 'text'
   | 'text2'
   | 'schwach'
 >;
 
-export function statusFlaeche(
-  rollen: Benoetigt,
-  ton: StatusTon,
-  dunkel: boolean,
-): StatusFlaecheWerte {
+export function statusFlaeche(rollen: Benoetigt, ton: StatusTon): StatusFlaecheWerte {
   switch (ton) {
     case 'normal':
       return { grund: rollen.normalFlaeche, text: rollen.normalText, kante: rollen.normal };
     case 'bedien':
       return { grund: rollen.bedienFlaeche, text: rollen.bedienText, kante: rollen.bedien };
     case 'achtung':
-      return {
-        grund: rollen.achtungFlaeche,
-        text: dunkel ? rollen.achtung : rollen.text,
-        kante: rollen.achtung,
-      };
+      return { grund: rollen.achtungFlaeche, text: rollen.achtungText, kante: rollen.achtung };
     case 'alarm':
-      return {
-        grund: rollen.alarmFlaeche,
-        text: dunkel ? rollen.alarm : rollen.text,
-        kante: rollen.alarm,
-      };
+      return { grund: rollen.alarmFlaeche, text: rollen.alarmText, kante: rollen.alarm };
     case 'neutral':
       return { grund: rollen.flaeche3, text: rollen.text2, kante: rollen.schwach };
   }

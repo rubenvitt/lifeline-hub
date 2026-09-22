@@ -53,7 +53,7 @@ interface ListeProps {
 /** Die Farbrollen, die eine Modulzeile liest — als Ausschnitt, damit der Test sie setzen kann. */
 export type ModulZeilenFarben = Pick<
   Farbrollen,
-  'flaeche2' | 'text' | 'text2' | 'gedaempft' | 'schwach' | 'bedien'
+  'flaeche3' | 'text' | 'text2' | 'gedaempft' | 'schwach' | 'bedien'
 >;
 
 /**
@@ -68,8 +68,10 @@ export type ModulZeilenFarben = Pick<
  * ZWEI Angaben, nicht eine (Konvention aus LFH-365): `minHeight` aus `controlHeight` PLUS
  * die mitziehende Polsterung. Die 34 px des Entwurfs sind Skizze; der Boden ist die Staffel.
  *
- * NEUENTWURF (21.09.2026): aktiv trägt die Zeile `flaeche2` und `text`, inaktiv
- * `gedaempft` — keine blaue Fläche mehr. Die Bedienfarbe steckt allein in der 2 × 16-px-Marke
+ * NEUENTWURF (21.09.2026): aktiv trägt die Zeile `flaeche3` und `text`, inaktiv
+ * `gedaempft` — keine blaue Fläche mehr. Der Entwurf nennt `flaeche2`; die liegt am Tag bei
+ * 1,01 : 1 auf `paneel` und ist dort schlicht nicht da (LFH-618), nachts trennt beide
+ * Stufen nur 1,02 : 1. Die Bedienfarbe steckt allein in der 2 × 16-px-Marke
  * ({@link modulMarkeStil}); sie ist der ZWEITE Kanal neben der Fläche (WCAG 1.4.1), und
  * `aria-current` der dritte.
  *
@@ -98,7 +100,7 @@ export function modulZeilenStil(
     width: '100%',
     fontSize: 13,
     cursor: zustand.gesperrt ? 'not-allowed' : 'pointer',
-    background: zustand.aktiv ? farben.flaeche2 : 'transparent',
+    background: zustand.aktiv ? farben.flaeche3 : 'transparent',
     color: zustand.gesperrt
       ? token.colorTextDisabled
       : zustand.aktiv
