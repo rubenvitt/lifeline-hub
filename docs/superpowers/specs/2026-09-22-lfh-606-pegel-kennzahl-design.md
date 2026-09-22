@@ -31,7 +31,7 @@ PEGELONLINE REST v2 (gemessen 22.09.2026):
 
 ## Backend
 
-**Tabelle** `einsatz_pegel` (Migration `0103_einsatz_pegel.sql`):
+**Tabelle** `einsatz_pegel` (Migration `0104_einsatz_pegel.sql`):
 `id`, `einsatz_id` (FK, `ON DELETE CASCADE`), `station_uuid TEXT NOT NULL`,
 `name TEXT NOT NULL` (Snapshot zum Festlegen), `gewaesser TEXT`, `reihenfolge INTEGER NOT NULL`,
 `gesetzt_von_id` (FK benutzer), `gesetzt_at`, `UNIQUE(einsatz_id, station_uuid)`.
