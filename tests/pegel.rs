@@ -42,6 +42,24 @@ impl Umgebung {
 }
 
 async fn setup_pegel() -> Umgebung {
+    setup_mit_pegel_basis("http://127.0.0.1:1").await
+}
+
+/// Eine PEGELONLINE-Basis, die Verbindungen annimmt und nie antwortet — ein Abruf dorthin
+/// hängt bis zur 8-s-Frist, statt wie `127.0.0.1:1` sofort zu scheitern.
+async fn stumme_basis() -> String {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let basis = format!("http://{}", listener.local_addr().unwrap());
+    tokio::spawn(async move {
+        let mut offen = Vec::new();
+        while let Ok((sock, _)) = listener.accept().await {
+            offen.push(sock);
+        }
+    });
+    basis
+}
+
+async fn setup_mit_pegel_basis(basis: &str) -> Umgebung {
     let pool = lifeline_hub::db::test_pool().await;
     bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
         .await
@@ -51,8 +69,7 @@ async fn setup_pegel() -> Umgebung {
         pool: pool.clone(),
         live: lifeline_hub::live::LiveHub::new(),
         karten_dir: dir.path().to_path_buf(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu()
-            .mit_pegel_basis_url("http://127.0.0.1:1"),
+        fachebenen: lifeline_hub::karte::FachebenenState::neu().mit_pegel_basis_url(basis),
         download_client: lifeline_hub::karte::download::download_client(),
         download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
         karten_service_url: None,
@@ -444,9 +461,13 @@ async fn messung_aus_dem_cache_mit_trend() {
     );
 }
 
+/// Abgelaufener Eintrag bei hängender Quelle: GET liefert den alten Stand SOFORT
+/// (Stale-while-revalidate) und wartet nicht die 8-s-Frist des Abrufs ab. Mutationsprobe:
+/// wartet `reihe_fuer` wieder auf den Abruf, reißt die Zeitschranke.
 #[tokio::test]
-async fn abgelaufener_cache_und_ausfall_liefert_den_alten_stand() {
-    let u = setup_pegel().await;
+async fn abgelaufener_cache_kommt_sofort_ohne_auf_den_abruf_zu_warten() {
+    let basis = stumme_basis().await;
+    let u = setup_mit_pegel_basis(&basis).await;
     let admin = login_cookie(&u.app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&u.app, &admin).await;
     let cache_pool = u.cache_pool().await;
@@ -456,6 +477,7 @@ async fn abgelaufener_cache_und_ausfall_liefert_den_alten_stand() {
         .await
         .unwrap();
 
+    let start = std::time::Instant::now();
     let (status, json) = anfrage(
         &u.app,
         "POST",
@@ -464,9 +486,19 @@ async fn abgelaufener_cache_und_ausfall_liefert_den_alten_stand() {
         Some(&station(A, "Köln")),
     )
     .await;
+    let (status_get, json_get) = anfrage(&u.app, "GET", &pfad(einsatz), &admin, None).await;
+    let dauer = start.elapsed();
+
     assert_eq!(status, StatusCode::CREATED);
-    assert_eq!(
-        json[0]["messung"]["zeitpunkt"], "2026-09-22T09:15:00+02:00",
-        "der alte Eintrag mit seinem ehrlichen Messzeitpunkt"
+    assert_eq!(status_get, StatusCode::OK);
+    for j in [&json, &json_get] {
+        assert_eq!(
+            j[0]["messung"]["zeitpunkt"], "2026-09-22T09:15:00+02:00",
+            "der alte Eintrag mit seinem ehrlichen Messzeitpunkt"
+        );
+    }
+    assert!(
+        dauer < std::time::Duration::from_secs(3),
+        "die Antwort darf nicht auf den Abruf (Frist 8 s) warten: {dauer:?}"
     );
 }

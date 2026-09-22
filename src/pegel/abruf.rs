@@ -1,14 +1,20 @@
 //! Abruf der PEGELONLINE-Zeitreihe je Station mit Cache (LFH-606).
 //!
 //! Je Station ein Eintrag `pegel:<uuid>` in `karte::cache` (die geparste Reihe der letzten
-//! drei Stunden). Frisch (< 5 min) → ohne Netz; sonst Abruf. Scheitert der Abruf, gilt der
-//! **alte** Eintrag — sein Messzeitpunkt ist der ehrliche Datenstand, das Frontend markiert
-//! ihn selbst als veraltet. Ohne Eintrag fehlt die Messung.
+//! drei Stunden). Stale-while-revalidate wie bei den Fachebenen (`karte::quellen`):
 //!
-//! Das Laden der Liste darf nicht an einer hängenden Station warten: alle Stationen werden
-//! parallel geholt, jede unter [`ABRUF_FRIST`].
+//! - frisch (< 5 min) → sofort, ohne Netz;
+//! - abgelaufen → **sofort** den alten Stand ausliefern und im Hintergrund erneuern. Sein
+//!   Messzeitpunkt ist der ehrliche Datenstand, das Frontend markiert ihn selbst als
+//!   veraltet. Je Station läuft höchstens EIN Hintergrundabruf (In-flight-Schlüssel
+//!   `pegel:<uuid>` in `FachebenenState::inflight`) — parallele GETs starten keine n Abrufe;
+//! - gar kein Eintrag → einmalig warten, höchstens [`ABRUF_FRIST`]. Scheitert das, fehlt
+//!   die Messung.
+//!
+//! Alle Stationen einer Liste laufen parallel.
 
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::Duration;
 
 use futures::future::join_all;
@@ -26,7 +32,7 @@ pub const TTL_S: i64 = 5 * 60;
 /// hält auch eine Verbindung auf, die langsam, aber nicht tot ist.
 pub const ABRUF_FRIST: Duration = Duration::from_secs(8);
 
-/// Cache-Schlüssel einer Station.
+/// Cache-Schlüssel einer Station (zugleich ihr In-flight-Schlüssel).
 pub fn cache_schluessel(station_uuid: &str) -> String {
     format!("pegel:{station_uuid}")
 }
@@ -36,25 +42,19 @@ pub fn messungen_url(basis: &str, station_uuid: &str) -> String {
     format!("{basis}/stations/{station_uuid}/W/measurements.json?start=PT3H")
 }
 
-/// Liefert die Reihe einer Station: frischer Cache, sonst Abruf, sonst alter Cache.
-async fn reihe_fuer(
-    fachebenen: &FachebenenState,
-    pool: &SqlitePool,
-    station_uuid: &str,
+/// Holt die Reihe von der Quelle und schreibt sie in den Cache. `None` bei jedem Fehlschlag
+/// (geloggt). Besitzt alle Eingaben, damit es als Hintergrundaufgabe laufen kann.
+async fn erneuere(
+    client: reqwest::Client,
+    basis: Arc<str>,
+    pool: SqlitePool,
+    station_uuid: String,
 ) -> Option<Vec<Messpunkt>> {
-    let schluessel = cache_schluessel(station_uuid);
-    let alt = cache::eintrag_wert::<Vec<Messpunkt>>(pool, &schluessel).await;
-    if let Some((reihe, alter)) = &alt {
-        if *alter < TTL_S {
-            return Some(reihe.clone());
-        }
-    }
-    let url = messungen_url(&fachebenen.pegel_basis_url, station_uuid);
-    let fehler = match tokio::time::timeout(ABRUF_FRIST, hole_json(&fachebenen.client, &url)).await
-    {
+    let url = messungen_url(&basis, &station_uuid);
+    let fehler = match tokio::time::timeout(ABRUF_FRIST, hole_json(&client, &url)).await {
         Ok(Ok(roh)) => match parse_messungen(&roh) {
             Some(reihe) => {
-                cache::setze_wert(pool, &schluessel, &reihe).await;
+                cache::setze_wert(&pool, &cache_schluessel(&station_uuid), &reihe).await;
                 return Some(reihe);
             }
             None => "Antwort ist keine Messreihe".to_string(),
@@ -63,7 +63,45 @@ async fn reihe_fuer(
         Err(_) => format!("keine Antwort binnen {} s", ABRUF_FRIST.as_secs()),
     };
     tracing::warn!("PEGELONLINE-Messreihe {station_uuid}: {fehler}");
-    alt.map(|(reihe, _)| reihe)
+    None
+}
+
+/// Liefert die Reihe einer Station nach der SWR-Regel im Modulkopf.
+async fn reihe_fuer(
+    fachebenen: &FachebenenState,
+    pool: &SqlitePool,
+    station_uuid: &str,
+) -> Option<Vec<Messpunkt>> {
+    let schluessel = cache_schluessel(station_uuid);
+    let abruf = || {
+        erneuere(
+            fachebenen.client.clone(),
+            fachebenen.pegel_basis_url.clone(),
+            pool.clone(),
+            station_uuid.to_string(),
+        )
+    };
+    match cache::eintrag_wert::<Vec<Messpunkt>>(pool, &schluessel).await {
+        Some((reihe, alter)) if alter < TTL_S => Some(reihe),
+        Some((reihe, _)) => {
+            // Den Mutex NIE über ein await halten (!Send) — nur einfügen und loslassen.
+            let beansprucht = fachebenen
+                .inflight
+                .lock()
+                .unwrap()
+                .insert(schluessel.clone());
+            if beansprucht {
+                let inflight = fachebenen.inflight.clone();
+                let fut = abruf();
+                tokio::spawn(async move {
+                    fut.await;
+                    inflight.lock().unwrap().remove(&schluessel);
+                });
+            }
+            Some(reihe)
+        }
+        None => abruf().await,
+    }
 }
 
 /// Messungen für alle Stationen, parallel. Stationen ohne Messung fehlen in der Map.
@@ -145,6 +183,57 @@ mod tests {
             Some("2026-09-22T09:15:00+02:00"),
             "der alte Stand mit seinem ehrlichen Messzeitpunkt"
         );
+    }
+
+    /// Eine Quelle, die Verbindungen annimmt, zählt und nie antwortet.
+    async fn stumme_quelle() -> (String, Arc<std::sync::atomic::AtomicUsize>) {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let basis = format!("http://{}", listener.local_addr().unwrap());
+        let zaehler = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let z = zaehler.clone();
+        tokio::spawn(async move {
+            let mut offen = Vec::new();
+            while let Ok((sock, _)) = listener.accept().await {
+                z.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                offen.push(sock); // offen halten, nie antworten
+            }
+        });
+        (basis, zaehler)
+    }
+
+    #[tokio::test]
+    async fn abgelaufener_eintrag_kommt_sofort_und_nur_ein_hintergrundabruf() {
+        let pool = crate::db::test_pool().await;
+        cache::setze_wert(&pool, &cache_schluessel(UUID), &reihe()).await;
+        sqlx::query("UPDATE fachebenen_cache SET gespeichert_at = unixepoch() - 3600")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let (basis, zaehler) = stumme_quelle().await;
+        let fe = FachebenenState::neu().mit_pegel_basis_url(&basis);
+
+        let start = std::time::Instant::now();
+        for _ in 0..3 {
+            let m = messungen(&fe, &pool, &[UUID]).await;
+            assert!(m.contains_key(UUID), "alter Stand kommt sofort");
+        }
+        assert!(
+            start.elapsed() < Duration::from_secs(2),
+            "kein Warten auf den Abruf: {:?}",
+            start.elapsed()
+        );
+        // Dem Hintergrundabruf Zeit geben, die Verbindung aufzubauen.
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        assert_eq!(
+            zaehler.load(std::sync::atomic::Ordering::SeqCst),
+            1,
+            "drei GETs, ein Abruf"
+        );
+        assert!(fe
+            .inflight
+            .lock()
+            .unwrap()
+            .contains(&cache_schluessel(UUID)));
     }
 
     #[tokio::test]
