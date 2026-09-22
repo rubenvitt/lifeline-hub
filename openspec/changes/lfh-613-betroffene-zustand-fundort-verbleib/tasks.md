@@ -14,11 +14,11 @@
 - [x] 2.4 Anlege-POST: `zustand`, `antreff_lat/lon` (Paar- und Bereichsprüfung 422) und `vermisst_seit` (400/422 nach D4/D5) in `NeueDaten` und im INSERT. Verifikation: Integrationstests je Spec-Szenario, dazu ein Replay derselben `client_id`, bei dem `vermisst_seit` und die Koordinate unverändert bleiben und keine zweite Person entsteht.
 - [x] 2.5 PATCH: `zustand`, `antreff_lat/lon` gegen den effektiven Zustand und `vermisst_seit` (nur bei vermisst, `null` ergibt 400) als Tri-State. Die Bindekette ist nummeriert. Verifikation: `aktualisiere_setzt_jede_spalte_an_ihren_platz` ist erweitert und grün, dazu Tests „Halbe Koordinate im PATCH gegen den Bestand“ und „Leeren ist nicht vorgesehen“.
 - [x] 2.6 Der Statuswechsel nach `vermisst` setzt `vermisst_seit = now`. Verifikation: Integrationstest „Wechsel nach vermisst“, der Zeitpunkt liegt nach dem Wechsel und nicht bei der Anlage.
-- [ ] 2.7 Codegen mit `scripts/check-typ-codegen.sh`, danach `openapi.json`/`types.generated.ts` committen. Verifikation: das Skript endet mit Exit 0 ohne Diff.
+- [x] 2.7 Codegen mit `scripts/check-typ-codegen.sh`, danach `openapi.json`/`types.generated.ts` committen. Verifikation: das Skript endet mit Exit 0 ohne Diff.
 
 ## 3. Frontend-Grundlagen
 
-- [ ] 3.1 `api/einsatzPerson.ts` (`PersonAnlegenEingabe`, `PersonEingabe`, Verbleib-Art-Union mit `notunterkunft`) und die Offline-Queue-Typen nachziehen. Verifikation: `tsc` ist grün.
+- [x] 3.1 `api/einsatzPerson.ts` (`PersonAnlegenEingabe`, `PersonEingabe`, Verbleib-Art-Union mit `notunterkunft`) und die Offline-Queue-Typen nachziehen. Verifikation: `tsc` ist grün.
 - [ ] 3.2 Koordinaten-Parser als reine Funktion (`personen/koordinate.ts`: `parseKoordinate`, `formatKoordinate`), mit Punkt, Komma, Minus und Bereich. Verifikation: Unit-Tests einschließlich der Ablehnungsfälle.
 - [ ] 3.3 `personBefehl.ts`: der Teil `koordinate` ersetzt die `#`-Ablehnung, `eingabe` trägt `antreff_lat/lon`, und ein zweites `#` oder ein ungültiges `#` ist ein Problem. Verifikation: den bestehenden Test „schluckt #… nicht als Namen“ umschreiben, dazu das Spec-Szenario „Koordinate in der Schnellerfassung“ als Parser- und Zeilentest mit geprüftem POST-Body.
 - [ ] 3.4 `personenBilanz.ts` auf `aktuelle_verbleib_art` umstellen, `notunterkunft` wird ein Posten, die Fundort-Lücke schließt Freitext ODER Koordinate. Verifikation: Unit-Test für das Spec-Szenario „Zählung nach Art“, `verbleibArtAus` ist entfernt, und kein Test pinnt es mehr.
