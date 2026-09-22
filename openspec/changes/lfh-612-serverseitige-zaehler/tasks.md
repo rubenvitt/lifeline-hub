@@ -67,27 +67,17 @@
 ## 5. Abschluss
 
 - [x] 5.1 In `CLAUDE.md` den Verweis `EtbTabelle.tsx:117-119` und die ETB-Stellen, die sich auf die fehlende Gesamtzahl berufen, auf den neuen Stand bringen. Verifikation: `grep -n "EtbTabelle.tsx:117" CLAUDE.md` findet nichts mehr.
-- [ ] 5.2 Gesamt-Gate `./scripts/check-all.sh` ausführen. Verifikation: Exit 0, ohne `| tail`.
+- [x] 5.2 Gesamt-Gate `./scripts/check-all.sh`: **Exit 0**, alle neun Schritte, nach dem
+      Merge von `origin/alpha` (87 fremde Commits) — Rust-Workspace grün, Vitest 5099 Tests
+      in 400 Dateien ohne Fehlschlag, e2e 186 Tests in 3,5 min, Audits und Selbsttests grün.
 
-  Stand 22.09.2026 — **jeder der neun Schritte ist grün gefahren, aber nicht in EINEM Lauf**;
-  die Maschine trug durchgehend Fremdlast aus anderen Sessions (Load 20–150, ruhig wäre < 5):
-  - Schritte 1–4 (Format · Lint · Typ-Drift samt `tsc` · Rust-Suite Workspace, 83 Suiten):
-    grün, zuletzt im vierten Lauf am Stück.
-  - Schritt 5 (Vitest, 4865 Tests): 4863 grün, **2 Fehlschläge, beide `Test timed out in
-    10000ms`** in `pages/PersonenDetailPage.test.tsx` und `stammdaten/PersonalTab.test.tsx` —
-    zwei Dateien, die diese Änderung nicht anfasst (ein früherer Lauf unter Load ~150 hatte
-    13 solcher Timeouts in 6 Dateien). Die Zuordnung zur Last ist **gemessen, nicht
-    vermutet**: dieselben Dateien abwechselnd mit und ohne den neuen MSW-Default-Handler aus
-    `src/test/server.ts` (der einzige Querschnitts-Eingriff dieser Änderung) — `PersonalTab`
-    4/4 rot in BEIDEN Fassungen bei Load ~100, `PersonenDetailPage` 2/2 grün in BEIDEN
-    Fassungen bei Load ~25. Isoliert sind beide Dateien grün.
-  - Schritt 6 (`check-deps.sh`, Rust- und Frontend-Audit), 8 (Ruhefenster-Selbsttest) und
-    9 (`check-deps.test.sh`): einzeln gefahren, Exit 0.
-  - Schritt 7 (`pnpm e2e`): **174 Tests grün in 5,7 min**, Exit 0 — gegen den produktiven
-    Frontend-Build. Kein Spec greift auf die geänderten Wortlaute zu;
-    `etb-chronologie.spec.ts` hängt am unveränderten `aria-label` „Bilanz des Tagebuchs".
-
-  Offen bleibt damit nur ein ununterbrochener Exit-0-Lauf auf ruhiger Maschine.
+  Die drei Läufe davor liefen unter Fremdlast anderer Sessions (Load bis 150) in Timeouts —
+  13, dann 2 Fehlschläge, alle `Test timed out in 10000ms`, alle in Dateien, die diese
+  Änderung nicht anfasst. Die Zuordnung zur Last ist gemessen statt vermutet: dieselben
+  Dateien abwechselnd mit und ohne den neuen MSW-Default-Handler aus `src/test/server.ts`
+  (der einzige Querschnitts-Eingriff) — `PersonalTab` 4/4 rot in BEIDEN Fassungen bei Load
+  ~100, `PersonenDetailPage` 2/2 grün in BEIDEN Fassungen bei Load ~25. Der ruhige Lauf hat
+  es bestätigt. Wer hier wieder rote Dateien sieht, prüft zuerst `uptime`.
 - [x] 5.3 Sichtprüfung im Browser — gegen ein echtes Backend (eigene DB, Port 8099) mit
       produktivem Frontend-Build, Daten über die API angelegt (25 ETB-Einträge plus 14
       System-/Modul-Einträge, 5 Betroffene, 2 Einheiten, 2 Abschnitte, 3 Meldungen,
