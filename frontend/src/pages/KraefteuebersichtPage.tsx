@@ -58,9 +58,10 @@ import './kraefteuebersichtPrint.css';
  *
  * WEGGELASSEN, weil ohne Datenquelle (Entscheidung 4, „keine erfundenen Daten"): der
  * FMS-Status JE EINHEIT und „Seit" (LFH-609), die Rückmeldung und die Kachel „keine
- * Rückmeldung" (LFH-610), der Funkrufname der Einheit, wo er nicht eindeutig aus genau
- * einem Fahrzeug folgt (LFH-614). Die Einheitenzeile trägt statt eines erfundenen Status
- * die VERDICHTETE Verteilung ihrer Mittel (bereit / gebunden / Ausfall).
+ * Rückmeldung" (LFH-610). Der Funkrufname der Einheit ist ihr gepflegter eigener
+ * (LFH-614); fehlt er, steht nur der eines EINZIGEN Fahrzeugs, sonst bleibt die Zelle
+ * leer. Die Einheitenzeile trägt statt eines erfundenen Status die VERDICHTETE Verteilung
+ * ihrer Mittel (bereit / gebunden / Ausfall).
  */
 
 /**

@@ -102,7 +102,9 @@ describe('Zeitachseneintrag', () => {
         x
       </Zeitachseneintrag>,
     );
-    expect(screen.getByText('Grundeintrag anzeigen ↗')).toHaveStyle({ color: farbenHell.alarm });
+    expect(screen.getByText('Grundeintrag anzeigen ↗')).toHaveStyle({
+      color: farbenHell.alarmText,
+    });
     expect(screen.getByText('Vitt · S2')).toBeInTheDocument();
     expect(screen.getByText('Funk')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Aktionen zu Eintrag 1' })).toBeInTheDocument();

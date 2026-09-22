@@ -325,13 +325,13 @@ export default function UeberblickPage() {
         ? erinnerungenPfad(einsatzId)
         : stabPfad(einsatzId);
   const markenFarbe = (m: Marke) =>
-    m.ton === 'alarm' ? rollen.alarm : m.ton === 'achtung' ? rollen.achtung : rollen.text;
+    m.ton === 'alarm' ? rollen.alarmText : m.ton === 'achtung' ? rollen.achtungText : rollen.text;
 
   const ueberfaelligMeta =
     zAuftraege === 'daten' ? (
       <span
         style={{
-          color: auftragszahl.ueberfaellig > 0 ? rollen.achtung : rollen.schwach,
+          color: auftragszahl.ueberfaellig > 0 ? rollen.achtungText : rollen.schwach,
         }}
       >
         {auftragszahl.ueberfaellig > 0
@@ -512,7 +512,7 @@ export default function UeberblickPage() {
             >
               <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
                 {offene.slice(0, AUFTRAEGE_MAX).map((a) => {
-                  const farbe = a.ist_ueberfaellig ? rollen.alarm : rollen.gedaempft;
+                  const farbe = a.ist_ueberfaellig ? rollen.alarmText : rollen.gedaempft;
                   return (
                     <li key={a.id}>
                       <Link

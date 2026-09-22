@@ -1337,6 +1337,13 @@
               "null"
             ]
           },
+          "funkrufname": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Eigener Funkrufname der Einheit (LFH-614), fixierte menschenlesbare Kennung im\nMeldebild. `None` = nicht gepflegt; das Frontend leitet dann höchstens aus genau\neinem Fahrzeugmitglied ab."
+          },
           "id": {
             "type": "integer",
             "format": "int64"

@@ -41,10 +41,10 @@ const TOENUNG: Record<Zeilentoenung, keyof Farbrollen> = {
 
 /** Hinweisfarbe je Ton — rein. */
 export function hinweisFarbe(
-  rollen: Pick<Farbrollen, 'schwach' | 'bedien' | 'alarm'>,
+  rollen: Pick<Farbrollen, 'schwach' | 'bedien' | 'alarmText'>,
   ton: HinweisTon,
 ): string {
-  return ton === 'alarm' ? rollen.alarm : ton === 'bedien' ? rollen.bedien : rollen.schwach;
+  return ton === 'alarm' ? rollen.alarmText : ton === 'bedien' ? rollen.bedien : rollen.schwach;
 }
 
 /** Grund der Zeile — rein. Ohne Tönung transparent (die Fläche darunter trägt). */
