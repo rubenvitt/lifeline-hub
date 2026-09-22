@@ -21,7 +21,7 @@ import {
   fuegePegelHinzu,
   pegelAbfrage,
   setzePegel,
-  type PegelWahl,
+  type PegelEingabe,
 } from '../../api/pegel';
 import { einsatzKeys, globalKeys } from '../../api/queryKeys';
 import type { PegelAnzeige } from '../../api/types';
@@ -66,7 +66,7 @@ export function stationenAus(features: readonly { properties?: unknown }[]): Peg
 }
 
 /** Server-Eintrag → Wahl für den Vollersatz-PUT (Snapshot-Name und Gewässer bleiben). */
-function alsWahl(p: PegelAnzeige): PegelWahl {
+function alsWahl(p: PegelAnzeige): PegelEingabe {
   return { station_uuid: p.station_uuid, name: p.name, gewaesser: p.gewaesser ?? null };
 }
 
@@ -80,7 +80,7 @@ export function verschiebe<T>(liste: readonly T[], index: number, richtung: -1 |
 }
 
 type Aenderung =
-  { art: 'hinzufuegen'; station: PegelWahl } | { art: 'setzen'; stationen: PegelWahl[] };
+  { art: 'hinzufuegen'; station: PegelEingabe } | { art: 'setzen'; stationen: PegelEingabe[] };
 
 /**
  * Sektion `…/einstellungen/pegel` (LFH-606) — die maßgeblichen Pegel des Einsatzes.

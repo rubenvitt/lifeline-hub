@@ -11,7 +11,7 @@ import type { PegelAnzeige } from './types';
  */
 
 /** Eine Station, wie sie gewählt wird (Snapshot von Name und Gewässer zum Festlegen). */
-export interface PegelWahl {
+export interface PegelEingabe {
   station_uuid: string;
   name: string;
   gewaesser?: string | null;
@@ -31,12 +31,12 @@ export function listePegel(einsatzId: number): Promise<PegelAnzeige[]> {
 }
 
 /** Ersetzt die Liste vollständig; die Reihenfolge ist die des Arrays (erster = Leitpegel). */
-export function setzePegel(einsatzId: number, stationen: PegelWahl[]): Promise<PegelAnzeige[]> {
+export function setzePegel(einsatzId: number, stationen: PegelEingabe[]): Promise<PegelAnzeige[]> {
   return apiSend<PegelAnzeige[]>(`/api/einsaetze/${einsatzId}/pegel`, 'PUT', { stationen });
 }
 
 /** Hängt eine Station hinten an; eine schon festgelegte bleibt unverändert (200, idempotent). */
-export function fuegePegelHinzu(einsatzId: number, station: PegelWahl): Promise<PegelAnzeige[]> {
+export function fuegePegelHinzu(einsatzId: number, station: PegelEingabe): Promise<PegelAnzeige[]> {
   return apiSend<PegelAnzeige[]>(`/api/einsaetze/${einsatzId}/pegel`, 'POST', station);
 }
 
