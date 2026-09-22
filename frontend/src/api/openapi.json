@@ -86,6 +86,15 @@
           "sonstiges"
         ]
       },
+      "AbschnittLagezustand": {
+        "type": "string",
+        "description": "Lagezustand eines Abschnitts (LFH-608), Wire == `lagezustand`. Die Beurteilung trifft\ndie Führung; ohne Beurteilung bleibt das Feld leer — „nicht beurteilt\" ist KEIN\nplanmäßig. Die Farbe liegt im Frontend-Vertrag (`theme/statusFarben.ts`).",
+        "enum": [
+          "planmaessig",
+          "angespannt",
+          "kritisch"
+        ]
+      },
       "AdressatKategorie": {
         "type": "string",
         "description": "Geteilte externe Adressat-Kategorie für Nachforderung (`adressat_kategorie`) und Auftrag\n(`extern_kategorie`) (Schema-Anker für die OpenAPI-Union, LFH-120).",
@@ -2158,6 +2167,13 @@
           "sprechgruppen"
         ],
         "properties": {
+          "abschnittsauftrag": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Fester Abschnittsauftrag als Freitext (LFH-608) — nicht zu verwechseln mit den\neinzelnen Aufträgen des Auftragsmoduls."
+          },
           "bemerkung": {
             "type": [
               "string",
@@ -2180,6 +2196,14 @@
               "null"
             ]
           },
+          "fortschritt": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Eingeschätzter Fortschritt in Prozent, 0–100 (LFH-608); fehlt = nicht eingeschätzt."
+          },
           "id": {
             "type": "integer",
             "format": "int64"
@@ -2188,6 +2212,24 @@
             "type": [
               "string",
               "null"
+            ]
+          },
+          "kurzbezeichnung": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Kurzbezeichnung/Rufname im Einsatz, z. B. „EA-N\" (LFH-608); je Einsatz eindeutig."
+          },
+          "lagezustand": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AbschnittLagezustand",
+                "description": "Beurteilter Lagezustand (LFH-608); fehlt = nicht beurteilt."
+              }
             ]
           },
           "leiter_id": {

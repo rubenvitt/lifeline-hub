@@ -62,6 +62,7 @@ use utoipa::OpenApi;
         crate::einsatz::einstellungen::Zeitformat,
         crate::einsatz::modul_override::EinsatzModulOverride,
         crate::einsatzabschnitt::EinsatzabschnittAnzeige,
+        crate::einsatzabschnitt::AbschnittLagezustand,
         crate::erinnerung::ErinnerungAnzeige,
         crate::erinnerung::ErinnerungStatus,
         crate::etb::EtbEintragAnzeige,

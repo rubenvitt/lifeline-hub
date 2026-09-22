@@ -11,7 +11,7 @@ use crate::live::LiveEvent;
 /// Modul-Key dieses Route-Moduls (LFH-132).
 const MODUL_KEY: &str = "einsatzabschnitte";
 use crate::einsatzabschnitt::repo::{self as abschnitt_repo, AbschnittDaten, AbschnittPatch};
-use crate::einsatzabschnitt::EinsatzabschnittAnzeige;
+use crate::einsatzabschnitt::{AbschnittLagezustand, EinsatzabschnittAnzeige};
 use crate::error::AppError;
 use crate::routes::support::{trimme, trimme_tri};
 use axum::extract::State;
@@ -25,6 +25,45 @@ fn sse_abschnitt(state: &AppState, einsatz_id: i64, aid: i64) {
     state
         .live
         .publiziere_event(einsatz_id, LiveEvent::Abschnitt, data);
+}
+
+/// Längster zulässiger Kurzname — ein Rufname wie „EA-Nord", kein zweiter Name.
+const KURZBEZEICHNUNG_MAX: usize = 20;
+
+/// Unbekannter Lagezustand → 400: das Feld ist für sich unbrauchbar (LFH-267).
+fn parse_lagezustand(s: &str) -> Result<AbschnittLagezustand, AppError> {
+    AbschnittLagezustand::parse(s).ok_or_else(|| {
+        AppError::Validation(format!(
+            "Unbekannter Lagezustand «{s}» (erlaubt: planmaessig, angespannt, kritisch)"
+        ))
+    })
+}
+
+/// Fortschritt außerhalb 0–100 → 400, nicht 422: der Wert scheitert am Feld selbst, nicht
+/// am Zusammenhang (Trennlinie LFH-267). Die 422 der Koordinaten-Ranges in
+/// `einsatz_uhs.rs` ist gewachsener Bestand, keine Regel für Neues.
+fn pruefe_fortschritt(wert: i64) -> Result<i64, AppError> {
+    if (0..=100).contains(&wert) {
+        Ok(wert)
+    } else {
+        Err(AppError::Validation(
+            "Fortschritt muss zwischen 0 und 100 Prozent liegen".into(),
+        ))
+    }
+}
+
+fn pruefe_kurzbezeichnung(kurz: &str) -> Result<(), AppError> {
+    if kurz.chars().count() > KURZBEZEICHNUNG_MAX {
+        return Err(AppError::Validation(format!(
+            "Kurzbezeichnung darf höchstens {KURZBEZEICHNUNG_MAX} Zeichen lang sein"
+        )));
+    }
+    Ok(())
+}
+
+/// Lesbarer Lagezustand für den ETB; `None` = die Beurteilung fehlt.
+fn lage_wort(l: Option<AbschnittLagezustand>) -> &'static str {
+    l.map_or("nicht beurteilt", |l| l.wort())
 }
 
 /// GET /api/einsaetze/{id}/abschnitte — flache Liste (Baum baut das FE). Nur Lesezugriff.
@@ -59,6 +98,12 @@ pub struct AbschnittBody {
     pub sortier: i64,
     /// Sprechgruppen-IDs; `Some` ersetzt die Zuordnung vollständig, `None` lässt sie unverändert.
     pub sprechgruppe_ids: Option<Vec<i64>>,
+    pub kurzbezeichnung: Option<String>,
+    /// Wire-Wert von [`AbschnittLagezustand`]; als String gelesen, damit ein unbekannter
+    /// Wert eine sprechende 400 bekommt statt der Extractor-Meldung.
+    pub lagezustand: Option<String>,
+    pub abschnittsauftrag: Option<String>,
+    pub fortschritt: Option<i64>,
 }
 
 /// POST /api/einsaetze/{id}/abschnitte — anlegen. Schreibrecht + aktiv. ETB-Eintrag.
@@ -88,6 +133,16 @@ pub async fn anlegen(
     let bemerkung = trimme(body.bemerkung);
     let mittel = trimme(body.kommunikationsmittel);
     let erreichbar = trimme(body.erreichbarkeit);
+    let kurz = trimme(body.kurzbezeichnung);
+    if let Some(k) = &kurz {
+        pruefe_kurzbezeichnung(k)?;
+    }
+    let lagezustand = trimme(body.lagezustand)
+        .as_deref()
+        .map(parse_lagezustand)
+        .transpose()?;
+    let abschnittsauftrag = trimme(body.abschnittsauftrag);
+    let fortschritt = body.fortschritt.map(pruefe_fortschritt).transpose()?;
     let mut anzeige = abschnitt_repo::anlegen(
         &state.pool,
         einsatz_id,
@@ -99,6 +154,10 @@ pub async fn anlegen(
             kommunikationsmittel: mittel.as_deref(),
             erreichbarkeit: erreichbar.as_deref(),
             sortier: body.sortier,
+            kurzbezeichnung: kurz.as_deref(),
+            lagezustand,
+            abschnittsauftrag: abschnittsauftrag.as_deref(),
+            fortschritt,
         },
     )
     .await?;
@@ -117,7 +176,10 @@ pub async fn anlegen(
         &state,
         einsatz_id,
         benutzer.id,
-        &format!("Abschnitt «{}» angelegt", anzeige.name),
+        &match anzeige.lagezustand {
+            Some(l) => format!("Abschnitt «{}» angelegt (Lage: {})", anzeige.name, l.wort()),
+            None => format!("Abschnitt «{}» angelegt", anzeige.name),
+        },
     )
     .await?;
     sse_abschnitt(&state, einsatz_id, anzeige.id);
@@ -160,10 +222,32 @@ pub struct AbschnittPatchBody {
     /// Sprechgruppen-IDs; `Some` ersetzt die Zuordnung vollständig, `None` lässt sie
     /// unverändert — das Feld war schon vor LFH-306 tri-state.
     pub sprechgruppe_ids: Option<Vec<i64>>,
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
+    pub kurzbezeichnung: Option<Option<String>>,
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
+    pub lagezustand: Option<Option<String>>,
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
+    pub abschnittsauftrag: Option<Option<String>>,
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
+    pub fortschritt: Option<Option<i64>>,
 }
 
 /// PATCH /api/einsaetze/{id}/abschnitte/{aid} — echter Teil-Patch (LFH-306).
-/// Kein ETB-Eintrag (reine Korrektur; Auflösen ist die sinntragende Aktion).
+/// Kein ETB-Eintrag für Korrekturen — AUSSER beim Wechsel des Lagezustands (LFH-608):
+/// „Abschnitt Nord ist kritisch" ist eine Lagemeldung, keine Stammdatenpflege, und gehört
+/// mit Zeitpunkt und Urheber ins Tagebuch.
 pub async fn aktualisieren(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
@@ -196,6 +280,30 @@ pub async fn aktualisieren(
     let bemerkung = trimme_tri(body.bemerkung);
     let mittel = trimme_tri(body.kommunikationsmittel);
     let erreichbar = trimme_tri(body.erreichbarkeit);
+    let kurz = trimme_tri(body.kurzbezeichnung);
+    if let Some(Some(k)) = &kurz {
+        pruefe_kurzbezeichnung(k)?;
+    }
+    let lagezustand = match trimme_tri(body.lagezustand) {
+        Some(Some(s)) => Some(Some(parse_lagezustand(&s)?)),
+        Some(None) => Some(None),
+        None => None,
+    };
+    let abschnittsauftrag = trimme_tri(body.abschnittsauftrag);
+    let fortschritt = match body.fortschritt {
+        Some(Some(w)) => Some(Some(pruefe_fortschritt(w)?)),
+        andere => andere,
+    };
+    // Der Vorher-Stand nur, wenn der Lagezustand im Patch steht — sonst gibt es keinen
+    // Wechsel zu protokollieren und keine zusätzliche Abfrage.
+    let lage_vorher = match lagezustand {
+        Some(_) => Some(
+            abschnitt_repo::laden(&state.pool, einsatz_id, aid)
+                .await?
+                .lagezustand,
+        ),
+        None => None,
+    };
     let mut anzeige = abschnitt_repo::patche(
         &state.pool,
         einsatz_id,
@@ -208,6 +316,10 @@ pub async fn aktualisieren(
             kommunikationsmittel: mittel.as_ref().map(|v| v.as_deref()),
             erreichbarkeit: erreichbar.as_ref().map(|v| v.as_deref()),
             sortier: body.sortier,
+            kurzbezeichnung: kurz.as_ref().map(|v| v.as_deref()),
+            lagezustand,
+            abschnittsauftrag: abschnittsauftrag.as_ref().map(|v| v.as_deref()),
+            fortschritt,
         },
     )
     .await?;
@@ -221,6 +333,22 @@ pub async fn aktualisieren(
         )
         .await?;
         anzeige = abschnitt_repo::laden(&state.pool, einsatz_id, aid).await?;
+    }
+    if let Some(vorher) = lage_vorher {
+        if vorher != anzeige.lagezustand {
+            super::etb_system_degradiert(
+                &state,
+                einsatz_id,
+                benutzer.id,
+                &format!(
+                    "Lage Abschnitt «{}»: {} → {}",
+                    anzeige.name,
+                    lage_wort(vorher),
+                    lage_wort(anzeige.lagezustand)
+                ),
+            )
+            .await?;
+        }
     }
     sse_abschnitt(&state, einsatz_id, aid);
     Ok(Json(anzeige))
