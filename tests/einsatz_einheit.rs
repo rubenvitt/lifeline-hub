@@ -1323,6 +1323,64 @@ async fn handstatus_formfehler_400_und_zusammenhang_422() {
 }
 
 #[tokio::test]
+async fn handstatus_ruht_unter_fahrzeugen_und_bleibt_loeschbar() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let e = einheit_bilden(&app, &admin, einsatz, "Zug 1").await;
+    let s2 = status_id(&app, &admin, "2 – Frei auf Wache").await;
+    let (s, _) = hand_status(
+        &app,
+        &admin,
+        einsatz,
+        e,
+        &format!(r#"{{"status_id":{s2}}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+
+    // Mit Fahrzeug führen die Fahrzeuge; der Handstatus ist nicht zu sehen.
+    let ef = fahrzeug_anlegen(&app, &admin, einsatz, "Florian 1").await;
+    fahrzeug_zuordnen(&app, &admin, einsatz, e, ef).await;
+    assert_eq!(
+        einheit_json(&app, &admin, einsatz, e).await["status"]["quelle"],
+        "fahrzeuge"
+    );
+
+    // Gibt die Einheit das Fahrzeug ab, gilt der gespeicherte Handstatus wieder.
+    let (s, _) = anfrage(
+        &app,
+        "DELETE",
+        &format!("/api/einsaetze/{einsatz}/einheiten/{e}/fahrzeug/{ef}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let j = einheit_json(&app, &admin, einsatz, e).await;
+    assert_eq!(j["status"]["quelle"], "hand");
+    assert_eq!(j["status"]["status"]["status_id"], s2);
+
+    // Löschen geht auch, solange Fahrzeuge da sind — sonst bliebe der alte Wert stehen.
+    fahrzeug_zuordnen(&app, &admin, einsatz, e, ef).await;
+    let (s, _) = hand_status(&app, &admin, einsatz, e, r#"{"status_id":null}"#).await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, _) = anfrage(
+        &app,
+        "DELETE",
+        &format!("/api/einsaetze/{einsatz}/einheiten/{e}/fahrzeug/{ef}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    assert_eq!(
+        einheit_json(&app, &admin, einsatz, e).await["status"]["quelle"],
+        "ohne"
+    );
+}
+
+#[tokio::test]
 async fn beobachter_darf_keinen_handstatus_setzen() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;

@@ -319,6 +319,20 @@ describe('KraefteuebersichtPage — Statusband', () => {
     expect(zelle).toHaveAttribute('data-ton', 'achtung');
   });
 
+  it('sagt am Einheitenband, dass Suche/Träger/Status nur die Mittel filtern — und schweigt ohne', async () => {
+    mitEinheit();
+    const { container } = setup();
+    await screen.findByText('1. Zug');
+    const hinweis = () => container.querySelector('[data-lfh="statusband-hinweis"]');
+    expect(hinweis()).toBeNull();
+    fireEvent.change(screen.getByPlaceholderText('Suche...'), { target: { value: 'xyz' } });
+    await waitFor(() => expect(hinweis()).toHaveTextContent(/wirken auf die Mittel/));
+    // Das Band zählt weiter die Einheit — wie die Einheitenzeile darunter.
+    expect(
+      container.querySelector('[aria-label="Einheiten je Status"] [data-lfh="kennzahl"]'),
+    ).toHaveTextContent('1');
+  });
+
   it('führt die Personalverteilung als eigene Zellen', async () => {
     vi.mocked(listeEinsatzPersonal).mockResolvedValue([PERSON_P1]);
     setup();

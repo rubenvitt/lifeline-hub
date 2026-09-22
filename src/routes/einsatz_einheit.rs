@@ -661,7 +661,8 @@ pub struct StatusBody {
 }
 
 /// PUT /api/einsaetze/{id}/einheiten/{eid}/status — Handstatus einer Einheit OHNE
-/// Fahrzeug (LFH-609). Mit Fahrzeugen wird der Status aus ihnen abgeleitet → 422.
+/// Fahrzeug (LFH-609). Mit Fahrzeugen wird der Status aus ihnen abgeleitet → Setzen ist
+/// 422, Löschen (`null`) bleibt erlaubt.
 /// Ein echter Wechsel schreibt einen System-ETB-Eintrag (atomar) und setzt „Seit“.
 pub async fn status_setzen(
     State(state): State<AppState>,

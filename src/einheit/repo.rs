@@ -647,8 +647,8 @@ pub struct HandStatusWechsel {
 
 /// Setzt den Handstatus einer Einheit (LFH-609) auf einer offenen Transaktion. `status_id`
 /// ist bereits gegen den Katalog der Org geprüft (`None` = löschen). Eine Einheit mit
-/// Fahrzeug führt ihren Status über die Fahrzeuge → `UnprocessableEntity` (der
-/// Zusammenhang verbietet die Aktion, nicht das Feld). `status_seit` springt nur bei einem
+/// Fahrzeug führt ihren Status über die Fahrzeuge → SETZEN ist `UnprocessableEntity` (der
+/// Zusammenhang verbietet die Aktion, nicht das Feld), Löschen bleibt erlaubt. `status_seit` springt nur bei einem
 /// echten Wechsel. Liefert `None`, wenn der Status unverändert blieb.
 pub async fn setze_hand_status_tx(
     conn: &mut SqliteConnection,
@@ -671,13 +671,16 @@ pub async fn setze_hand_status_tx(
             .bind(id)
             .fetch_one(&mut *conn)
             .await?;
-    if fahrzeuge > 0 {
+    if alt_id == status_id {
+        return Ok(None);
+    }
+    // LÖSCHEN bleibt auch mit Fahrzeugen erlaubt: ein gespeicherter Handstatus tauchte
+    // sonst unvermeidlich wieder auf, sobald die Einheit ihre Fahrzeuge abgibt — mit einem
+    // Wert, den niemand mehr entfernen könnte, solange sie welche hat.
+    if fahrzeuge > 0 && status_id.is_some() {
         return Err(AppError::UnprocessableEntity(
             "Die Einheit führt ihren Status über ihre Fahrzeuge".into(),
         ));
-    }
-    if alt_id == status_id {
-        return Ok(None);
     }
     sqlx::query(
         "UPDATE einsatz_einheit SET status_id = ?1, \

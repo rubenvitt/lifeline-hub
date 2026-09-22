@@ -65,13 +65,24 @@ function Auffuellung({ anzahl, spalten }: { anzahl: number; spalten: number }) {
 
 export interface StatusbandProps {
   einheiten: readonly BandZelle[];
+  /**
+   * Sichtbarer Zusatz am Einheitenband, wenn Filter nur die MITTEL treffen (Träger,
+   * Status, Suche): das Einheitenband zählt wie die Einheitenzeilen darunter alle
+   * Einheiten des Abschnitts — ohne den Satz widersprächen sich die zwei Bänder stumm.
+   */
+  einheitenHinweis?: string | null;
   personal: readonly BandZelle[];
   /** Datenzustand beider Listen zusammen. */
   zustand: 'daten' | 'laden' | 'fehler';
 }
 
-export default function Statusband({ einheiten, personal, zustand }: StatusbandProps) {
-  const { token } = useRollen();
+export default function Statusband({
+  einheiten,
+  einheitenHinweis,
+  personal,
+  zustand,
+}: StatusbandProps) {
+  const { token, rollen } = useRollen();
   const { abBreite } = useViewport();
   const spalten = bandSpalten(abBreite);
   if (zustand !== 'daten') {
@@ -99,6 +110,14 @@ export default function Statusband({ einheiten, personal, zustand }: StatusbandP
           <Augenbraue als="h2" style={{ marginBlockEnd: token.marginXXS }}>
             Einheiten · FMS
           </Augenbraue>
+          {einheitenHinweis && (
+            <div
+              data-lfh="statusband-hinweis"
+              style={{ fontSize: 11, color: rollen.gedaempft, marginBlockEnd: token.marginXXS }}
+            >
+              {einheitenHinweis}
+            </div>
+          )}
           <Kennzahlenband spalten={spalten}>
             {einheiten.map((z) => (
               <BandZelleAnsicht key={z.schluessel} zelle={z} />

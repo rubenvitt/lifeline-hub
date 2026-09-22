@@ -142,13 +142,21 @@ export function meldebildMeta(args: {
  * („S2 · Frei auf Wache"), Ton aus der Kategorie, Mandantenfarbe als Punkt.
  */
 export function handStatusOptionen(katalog: readonly FahrzeugStatus[]): StatusOption<number>[] {
-  return katalog.map((s) => ({
-    wert: s.id,
-    label: s.fms_anker != null ? `S${s.fms_anker} · ${fmsWort(s.label, s.fms_anker)}` : s.label,
-    darstellung: statusKategorie[s.kategorie],
-    farbe: s.farbe,
-  }));
+  return [
+    ...katalog.map((s) => ({
+      wert: s.id,
+      label: s.fms_anker != null ? `S${s.fms_anker} · ${fmsWort(s.label, s.fms_anker)}` : s.label,
+      darstellung: statusKategorie[s.kategorie],
+      farbe: s.farbe,
+    })),
+    // Der Handstatus muss sich auch wieder ENTFERNEN lassen — sonst bliebe ein einmal
+    // gesetzter Wert für immer stehen und tauchte nach jeder Fahrzeugabgabe wieder auf.
+    { wert: KEIN_HANDSTATUS, label: 'kein Status' },
+  ];
 }
+
+/** Menüwert für „Handstatus löschen" — eine Katalog-ID ist nie negativ. */
+export const KEIN_HANDSTATUS = -1;
 
 /** Kurzwort der Mittelart — Satz, kein Piktogramm (Regel „Ein Emoji ist keine Ikone"). */
 const MITTEL_KURZ = { fahrzeug: 'Fzg.', person: 'Pers.', material: 'Mtl.' } as const;
@@ -505,7 +513,13 @@ export default function KraefteuebersichtPage() {
     mutationFn: (v: { eid: number; statusId: number | null }) =>
       setzeEinheitStatus(einsatzId, v.eid, v.statusId),
     onSuccess: () => qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) }),
-    onError: () => message.error('Status nicht gesetzt'),
+    // Auch der Fehlerweg holt den Serverstand: ein 422 heißt meist, dass die Einheit
+    // inzwischen ein Fahrzeug hat — ohne Refetch bliebe der Auslöser stehen und jeder
+    // weitere Versuch scheiterte ohne Grund.
+    onError: (e) => {
+      void qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
+      message.error(e instanceof ApiError && e.status === 422 ? e.message : 'Status nicht gesetzt');
+    },
   });
 
   const v = useMemo(
@@ -545,6 +559,7 @@ export default function KraefteuebersichtPage() {
               : null
           }
           aktuell={aktuell}
+          farbe={aktuell != null ? z.einheitStatus?.status?.farbe : null}
           optionen={statusOptionen}
           kennung={z.bezeichnung}
           laeuft={handLaeuft && handEid === z.einheitId}
@@ -552,7 +567,7 @@ export default function KraefteuebersichtPage() {
           darfSchreiben
           onWaehlen={(wert) => {
             if (!handLaeuft && z.einheitId != null)
-              handMutate({ eid: z.einheitId, statusId: wert });
+              handMutate({ eid: z.einheitId, statusId: wert === KEIN_HANDSTATUS ? null : wert });
           }}
         />
       );
@@ -751,6 +766,11 @@ export default function KraefteuebersichtPage() {
         <div style={{ marginBlock: token.marginLG }}>
           <Statusband
             einheiten={band.einheiten}
+            einheitenHinweis={
+              filter.traeger || filter.kategorie || filter.suche.trim()
+                ? 'alle Einheiten des Abschnitts — Träger-, Status- und Suchfilter wirken auf die Mittel'
+                : null
+            }
             personal={band.personal}
             zustand={listenFehler ? 'fehler' : listenLaden ? 'laden' : 'daten'}
           />
