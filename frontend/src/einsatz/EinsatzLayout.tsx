@@ -15,6 +15,7 @@ import {
   type KategorieKey,
   type ModulEintrag,
 } from './modulRegistry';
+import { sprungmarkenNachKategorie, type Sprungmarke } from './sprungmarken';
 import EinsatzSwitcher from './EinsatzSwitcher';
 import IconRail from './IconRail';
 import ModulPanel from './ModulPanel';
@@ -310,6 +311,16 @@ export default function EinsatzLayout() {
     setNavOffen(false);
   }
 
+  /**
+   * Klick auf eine Sprungmarke (LFH-620). Bewusst NICHT im „Zuletzt"-Speicher: der trägt
+   * Modulschlüssel, und eine Marke ist keins — ihr Zielmodul zu merken hieße, eine Wahl
+   * aufzuschreiben, die so niemand getroffen hat.
+   */
+  function onSprungKlick(marke: Sprungmarke) {
+    navigate(marke.pfad(einsatzId));
+    setNavOffen(false);
+  }
+
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <Header style={KOPF_STIL}>
@@ -461,6 +472,8 @@ export default function EinsatzLayout() {
             zaehler={modulZaehler}
             aktiverModulKey={aktuellesModul?.key ?? null}
             onModulKlick={onModulKlick}
+            sprungmarken={sprungmarkenNachKategorie(offeneKategorie)}
+            onSprungKlick={onSprungKlick}
           />
         )}
         <Content style={{ padding: 'var(--lfh-seiten-polsterung)' }}>
@@ -495,6 +508,7 @@ export default function EinsatzLayout() {
             zaehler={modulZaehler}
             onKategorieKlick={onDrawerKategorieKlick}
             onModulKlick={onModulKlick}
+            onSprungKlick={onSprungKlick}
           />
         </Drawer>
       )}

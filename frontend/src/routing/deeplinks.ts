@@ -27,6 +27,7 @@
  */
 import type { EtbFilterWerte } from '../api/etb';
 import type { EtbTyp } from '../api/types';
+import type { PersonenAnsicht, PersonenFilter } from '../personen/personenFilter';
 
 /** Zentrale Route zur Einsatzliste. */
 export function einsaetzePfad(): string {
@@ -160,12 +161,67 @@ export function erinnerungenPfad(einsatzId: number): string {
 
 export function personenPfad(
   einsatzId: number,
-  opts: { person?: number; neu?: boolean } = {},
+  opts: {
+    person?: number;
+    neu?: boolean;
+    /**
+     * Sichtvorgabe (LFH-620): die Seite übernimmt sie beim Ankommen und räumt die Parameter
+     * (apply-then-clean wie `?neu=1`). Die Sicht selbst bleibt Seitenzustand — die URL
+     * trägt einen AUFTRAG, keinen gespiegelten Filter. Anspringer sind die Sprungmarken
+     * „Patienten" und „Vermisste" im Modulpanel (`einsatz/sprungmarken.ts`).
+     */
+    filter?: PersonenFilter;
+    ansicht?: PersonenAnsicht;
+  } = {},
 ): string {
   return mitQuery(einsatzModulPfad(einsatzId, 'personen'), {
     person: opts.person,
     neu: opts.neu ? 1 : undefined,
+    filter: opts.filter,
+    ansicht: opts.ansicht,
   });
+}
+
+/**
+ * Erlaubte Werte der Personen-Sichtvorgabe — exhaustive Records aus demselben Grund wie
+ * {@link ETB_TYP_ERLAUBT}: eine neue Variante bricht den Typcheck, statt zur Laufzeit
+ * still verworfen zu werden.
+ *
+ * Bewusst KEIN `'patienten'`: „Patient" ist kein Personenstatus, sondern eine
+ * Darstellung (`ansicht: 'raster'`, `personen/personenFilter.ts`). Ein sechster
+ * Filterwert vermengte die beiden Achsen wieder, die der Neuentwurf getrennt hat.
+ */
+const PERSONEN_FILTER_ERLAUBT: Record<PersonenFilter, true> = {
+  alle: true,
+  erfasst: true,
+  vermisst: true,
+  betroffen: true,
+  verstorben: true,
+};
+const PERSONEN_ANSICHT_ERLAUBT: Record<PersonenAnsicht, true> = {
+  zeilen: true,
+  raster: true,
+};
+
+/**
+ * Umkehr der Sichtvorgabe von {@link personenPfad} (LFH-620). Je Achse wird ein
+ * unbekannter Wert GANZ verworfen (Regel aus `parsePlatzierenAuftrag`/`parseEtbFilter`);
+ * die andere Achse bleibt davon unberührt, weil beide unabhängig sind.
+ */
+export function parsePersonenSicht(params: URLSearchParams): {
+  filter?: PersonenFilter;
+  ansicht?: PersonenAnsicht;
+} {
+  const werte: { filter?: PersonenFilter; ansicht?: PersonenAnsicht } = {};
+  const filter = params.get('filter');
+  if (filter && Object.prototype.hasOwnProperty.call(PERSONEN_FILTER_ERLAUBT, filter)) {
+    werte.filter = filter as PersonenFilter;
+  }
+  const ansicht = params.get('ansicht');
+  if (ansicht && Object.prototype.hasOwnProperty.call(PERSONEN_ANSICHT_ERLAUBT, ansicht)) {
+    werte.ansicht = ansicht as PersonenAnsicht;
+  }
+  return werte;
 }
 
 /**

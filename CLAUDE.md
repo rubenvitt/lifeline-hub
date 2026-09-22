@@ -332,6 +332,21 @@ statt einer Lücke: die Lagekarten-Sidebar ist fest 300 px breit, dort bliebe f�
 Kartenfläche nichts übrig — eine eigene Frage (Sidebar-Responsivität), kein Teil dieser
 Stapelentscheidung.
 
+**Sprungmarken sind keine Module** (LFH-620, `einsatz/sprungmarken.ts`). Führt der
+Entwurf ein „Modul“, dessen Daten ein vorhandenes Modul schon trägt (Entscheidungen =
+ETB `?typ=entscheidung`, Patienten = Personen im Sichtungsraster, Vermisste = Personen
+`?filter=vermisst`), steht im Modulpanel eine **Sprungmarke** statt eines
+Registry-Eintrags. Das ist weder `verweistAuf` noch ein neuer Modulschlüssel. Ein Modul
+hätte eigene Overrides (ETB gesperrt, Entscheidungen frei → 403), bräuchte `MODUL_KEYS`
+im Backend und führte den Rail-Kategoriesprung über `modulZielRoute` in eine fremde
+Kategorie. Eine Marke erbt Sichtbarkeit und Sperre ihres Zielmoduls, ist nie
+`aria-current` und trägt ihr Ziel im zugänglichen Namen („…, springt zu ETB, Typ
+Entscheidung“). Ihr Pfad kommt aus `routing/deeplinks.ts`. Die Personenseite übernimmt
+`?filter=`/`?ansicht=` apply-then-clean (`parsePersonenSicht`, `sichtNachSprung`,
+Lücken-Filter fällt dabei). Ein Filterwert „patienten“ existiert bewusst nicht, weil
+Patient eine Darstellung ist und kein Status. Die Entscheidung je Entwurfsmodul steht in
+`docs/design/2026-09-21-neuentwurf/umsetzung.md`.
+
 **Eine benannte Ausnahme: der Navigations-Drawer** (LFH-329/B1, `einsatz/EinsatzLayout.tsx`
 mit `einsatz/ModulAkkordeon.tsx`). Unterhalb `lg` liegt der Einsatz-Navigationsrahmen in einem
 Drawer statt inline. Er zeigt **Navigation, keine Entität** — kein Datensatz, kein Formular,

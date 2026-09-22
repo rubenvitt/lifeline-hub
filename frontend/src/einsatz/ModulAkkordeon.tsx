@@ -8,6 +8,7 @@ import {
   type KategorieKey,
   type ModulEintrag,
 } from './modulRegistry';
+import { sprungmarkenNachKategorie, type Sprungmarke } from './sprungmarken';
 import type { BenutzerAnzeige, ModulOverrides } from '../api/types';
 import type { ModulZaehlerMap } from './useModulZaehler';
 
@@ -38,6 +39,8 @@ interface Props {
   overrides?: ModulOverrides;
   onKategorieKlick: (key: KategorieKey) => void;
   onModulKlick: (modul: ModulEintrag) => void;
+  /** Sprungmarken (LFH-620) — dieselben wie im Panel, je Kategorie. */
+  onSprungKlick?: (marke: Sprungmarke) => void;
   zaehler?: ModulZaehlerMap;
 }
 
@@ -56,6 +59,7 @@ export default function ModulAkkordeon({
   overrides,
   onKategorieKlick,
   onModulKlick,
+  onSprungKlick,
   zaehler,
 }: Props) {
   const { token } = theme.useToken();
@@ -108,6 +112,8 @@ export default function ModulAkkordeon({
                   onModulKlick={onModulKlick}
                   mindestTrefflaeche={TREFFLAECHE}
                   zaehler={zaehler}
+                  sprungmarken={sprungmarkenNachKategorie(k.key)}
+                  onSprungKlick={onSprungKlick}
                 />
               </div>
             )}

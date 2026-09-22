@@ -87,6 +87,28 @@ export function sichtFuerNeuePerson(sicht: PersonenSicht, p: Person): PersonenSi
   return { ...sicht, filter, nurLuecken };
 }
 
+/**
+ * Die Sicht nach einem Sprung von außen (LFH-620, Sprungmarken „Patienten"/„Vermisste").
+ *
+ * Übernommen wird nur, was die Vorgabe nennt; eine fehlende Achse bleibt, wie sie war.
+ * Der Lücken-Filter fällt dagegen IMMER: wer „Vermisste" anspringt, erwartet die
+ * Vermissten — ein von früher stehengebliebenes „nur offene Felder" zeigte stattdessen
+ * still eine Teilmenge, und die Seitenleiste mit dem Schalter steht unter `xl` gar nicht
+ * im Blick. Ohne jede Vorgabe bleibt die Sicht unverändert (dieselbe Identität), damit ein
+ * leerer Auftrag keinen Render auslöst.
+ */
+export function sichtNachSprung(
+  sicht: PersonenSicht,
+  vorgabe: { filter?: PersonenFilter; ansicht?: PersonenAnsicht },
+): PersonenSicht {
+  if (!vorgabe.filter && !vorgabe.ansicht) return sicht;
+  return {
+    ansicht: vorgabe.ansicht ?? sicht.ansicht,
+    filter: vorgabe.filter ?? sicht.filter,
+    nurLuecken: false,
+  };
+}
+
 /** Rasterschlüssel einer Person: ihre Sichtung oder `'ohne'`. */
 export function rasterSchluessel(p: Pick<Person, 'aktuelle_sichtung'>): string {
   return p.aktuelle_sichtung ?? 'ohne';
