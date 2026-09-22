@@ -1,3 +1,4 @@
+pub mod lesemarke;
 pub mod repo;
 
 use crate::error::AppError;
