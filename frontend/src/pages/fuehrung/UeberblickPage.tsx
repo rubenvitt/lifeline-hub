@@ -21,7 +21,7 @@ import {
 } from '../../components/instrument';
 import { einsatzKeys } from '../../api/queryKeys';
 import { verfasserText } from '../../etb/verfasser';
-import { ladeEinsatz } from '../../api/einsaetze';
+import { ladeEinsatz, ladeModulOverrides } from '../../api/einsaetze';
 import { listePersonen } from '../../api/einsatzPerson';
 import { listeEinsatzPersonal } from '../../api/einsatzPersonal';
 import { listeEinsatzFahrzeuge } from '../../api/einsatzFahrzeuge';
@@ -34,6 +34,8 @@ import { listeErinnerungen } from '../../api/erinnerungen';
 import { listeEtb } from '../../api/etb';
 import { pegelAbfrage } from '../../api/pegel';
 import { PEGEL_STAND_UNBEKANNT, pegelNotizKurz } from '../../pegel/pegelKennzahl';
+import { listeAbloesungen } from '../../api/abloesungen';
+import { darfZaehlerLaden } from '../../einsatz/useModulZaehler';
 import {
   auftraegePfad,
   einheitenPfad,
@@ -47,6 +49,7 @@ import {
   lageberichtePfad,
   personenPfad,
   stabPfad,
+  abloesungPfad,
 } from '../../routing/deeplinks';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { formatUhrzeit, formatUhrzeitMitTag } from '../../anzeige/format';
@@ -249,6 +252,20 @@ export default function UeberblickPage() {
     queryKey: einsatzKeys.erinnerungen(einsatzId),
     queryFn: () => listeErinnerungen(einsatzId, false),
   });
+  // LFH-635: Ablösungsmarken nur, wenn das Modul für diese Person sichtbar und frei ist —
+  // sonst gäbe es ein 403 und einen Seitenkanal über ausgeblendete Daten (dieselbe Prüfung
+  // wie beim Modulzähler, `darfZaehlerLaden`).
+  const overridesQ = useQuery({
+    queryKey: einsatzKeys.modulOverrides(einsatzId),
+    queryFn: () => ladeModulOverrides(einsatzId),
+  });
+  const abloesungSichtbar =
+    overridesQ.isSuccess && darfZaehlerLaden('abloesung', benutzer, overridesQ.data);
+  const abloesungenQ = useQuery({
+    queryKey: einsatzKeys.abloesungListe(einsatzId, 'laufend'),
+    queryFn: () => listeAbloesungen(einsatzId, 'laufend'),
+    enabled: abloesungSichtbar,
+  });
   const etbQ = useQuery({
     queryKey: einsatzKeys.etbListe(einsatzId, ETB_ENTSCHEIDUNGEN),
     queryFn: () => listeEtb(einsatzId, ETB_ENTSCHEIDUNGEN),
@@ -312,8 +329,17 @@ export default function UeberblickPage() {
         einsatz?.naechste_lagebesprechung_at,
         jetzt,
         pegel ?? [],
+        abloesungSichtbar ? (abloesungenQ.data ?? []) : [],
       ),
-    [auftraege, erinnerungen, einsatz?.naechste_lagebesprechung_at, jetzt, pegel],
+    [
+      auftraege,
+      erinnerungen,
+      einsatz?.naechste_lagebesprechung_at,
+      jetzt,
+      pegel,
+      abloesungSichtbar,
+      abloesungenQ.data,
+    ],
   );
 
   const zBetroffene = zustandVon(personenQ);
@@ -337,7 +363,9 @@ export default function UeberblickPage() {
         ? erinnerungenPfad(einsatzId)
         : m.art === 'pegelprognose'
           ? einsatzEinstellungenPfad(einsatzId, 'pegel')
-          : stabPfad(einsatzId);
+          : m.art === 'abloesung'
+            ? abloesungPfad(einsatzId)
+            : stabPfad(einsatzId);
   const markenFarbe = (m: Marke) =>
     m.ton === 'alarm' ? rollen.alarmText : m.ton === 'achtung' ? rollen.achtungText : rollen.text;
 

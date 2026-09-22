@@ -359,6 +359,52 @@ describe('useEinsatzLiveStream', () => {
     window.removeEventListener('lfh:erinnerung-alarm', alarm);
   });
 
+  it('LFH-635: abloesung mit art alarmiert, ohne art nur Refresh; Ablösungsfristen nicht als Erinnerung', async () => {
+    vi.stubGlobal('EventSource', FakeEventSource);
+    const client = neuerQueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    const abloesung = vi.fn();
+    const erinnerung = vi.fn();
+    window.addEventListener('lfh:abloesung-alarm', abloesung);
+    window.addEventListener('lfh:erinnerung-alarm', erinnerung);
+    render(
+      <QueryClientProvider client={client}>
+        <Probe id={9} />
+      </QueryClientProvider>,
+    );
+    FakeEventSource.letzte?.emit('abloesung', JSON.stringify({ einsatz_id: 9 }));
+    await waitFor(() => {
+      const calls = spy.mock.calls.map((c) => (c[0] as { queryKey: unknown[] }).queryKey);
+      expect(calls).toContainEqual(['einsatz-abloesungen', 9]);
+    });
+    expect(abloesung).not.toHaveBeenCalled();
+    FakeEventSource.letzte?.emit(
+      'abloesung',
+      JSON.stringify({ einsatz_id: 9, abloesung_id: 4, art: 'faellig', titel: 'x' }),
+    );
+    await waitFor(() => expect(abloesung).toHaveBeenCalledTimes(1));
+    FakeEventSource.letzte?.emit(
+      'erinnerung',
+      JSON.stringify({ einsatz_id: 9, erinnerung_id: 8, bezug_typ: 'abloesung', bezug_id: 4 }),
+    );
+    FakeEventSource.letzte?.emit(
+      'erinnerung',
+      JSON.stringify({
+        einsatz_id: 9,
+        erinnerung_id: 9,
+        bezug_typ: 'abloesung_vorwarnung',
+        bezug_id: 4,
+      }),
+    );
+    await waitFor(() => {
+      const calls = spy.mock.calls.map((c) => (c[0] as { queryKey: unknown[] }).queryKey);
+      expect(calls).toContainEqual(['einsatz-erinnerungen', 9]);
+    });
+    expect(erinnerung).not.toHaveBeenCalled();
+    window.removeEventListener('lfh:abloesung-alarm', abloesung);
+    window.removeEventListener('lfh:erinnerung-alarm', erinnerung);
+  });
+
   it('feuert KEINEN erinnerung-Alarm bei bezug_typ=meldung (Doppel-Alarm-Guard, sofortmeldung trägt)', async () => {
     vi.stubGlobal('EventSource', FakeEventSource);
     const client = neuerQueryClient();

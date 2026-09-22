@@ -40,8 +40,8 @@ dann den Code. Referenz für die Berührpunkte eines neuen Moduls ist der Stab-C
 
 ## 6. Frontend: Alarm und Überblick
 
-- [ ] 6.1 `useEinsatzLiveStream`: `onErinnerung` überspringt `abloesung*`, neuer Listener `abloesung` alarmiert nur mit `art` (faellig → Ton `alarm`, vorwarnung → `dezent`) und feuert `lfh:abloesung-alarm`; `AlarmZentrale`: Ziel `'abloesung'`, Titel, Deeplink, eigener Budget-Scope; verifiziert durch Tests im Muster der bestehenden Erinnerungs-Alarm-Tests (ein Hinweis, kein Doppelalarm, vierter Hinweis wird gebündelt)
-- [ ] 6.2 Überblick: `naechsteMarken` mit Quelle `abloesungen` und Gruppierung (Abschnitt + Minute), `markenZiel` → `abloesungPfad`, Query nur bei sichtbarem Modul; verifiziert durch `ueberblickDaten.test.ts` („15:30 Ablösung Deichwache Nord, 2 Einheiten“, Einzelmarke, `MARKEN_MAX` gilt weiter) und `UeberblickPage.test.tsx` (Modul aus → keine Anfrage)
+- [x] 6.1 `useEinsatzLiveStream`: `onErinnerung` überspringt `abloesung*`, neuer Listener `abloesung` alarmiert nur mit `art` (faellig → Ton `alarm`, vorwarnung → `dezent`) und feuert `lfh:abloesung-alarm`; `AlarmZentrale`: Ziel `'abloesung'`, Titel, Deeplink, derselbe Budget-Weg wie alle Quellen (Abweichung beim Bauen: ein eigener Zähler hätte das gemeinsame Budget von drei sichtbaren Hinweisen ausgehebelt; eigen ist nur der Sammeltext „n weitere Ablösungen“); verifiziert durch Tests im Muster der bestehenden Erinnerungs-Alarm-Tests (ein Hinweis, kein Doppelalarm, vierter Hinweis wird gebündelt)
+- [x] 6.2 Überblick: `naechsteMarken` mit Quelle `abloesungen` und Gruppierung (Abschnitt + Minute), `markenZiel` → `abloesungPfad`, Query nur bei sichtbarem Modul; verifiziert durch `ueberblickDaten.test.ts` („15:30 Ablösung Deichwache Nord, 2 Einheiten“, Einzelmarke, `MARKEN_MAX` gilt weiter) und `UeberblickPage.test.tsx` (Modul aus → keine Anfrage)
 
 ## 7. Abschluss
 

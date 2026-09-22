@@ -89,7 +89,7 @@ export function useEinsatzLiveStream(einsatzId: number): void {
       let detail: {
         einsatz_id?: number;
         erinnerung_id?: number;
-        bezug_typ?: 'auftrag' | 'meldung' | 'etb' | null;
+        bezug_typ?: 'auftrag' | 'meldung' | 'etb' | 'abloesung' | 'abloesung_vorwarnung' | null;
         bezug_id?: number | null;
       } = {};
       try {
@@ -102,6 +102,9 @@ export function useEinsatzLiveStream(einsatzId: number): void {
       // Die Registry-Invalidierung von einsatz-erinnerungen (separater Listener) trägt diesen Fall.
       if (detail.erinnerung_id == null) return;
       if (detail.bezug_typ === 'meldung') return; // Doppel-Alarm-Guard
+      // LFH-635: Ablösungsfristen alarmieren über das eigene `abloesung`-Ereignis (Gate
+      // `abloesung` statt `erinnerungen`) — hier nicht ein zweites Mal.
+      if (detail.bezug_typ === 'abloesung' || detail.bezug_typ === 'abloesung_vorwarnung') return;
       if (detail.bezug_typ === 'auftrag') {
         spieleAlarmTon('alarm');
         inval(EINSATZ_KEYS.auftraege);
@@ -111,6 +114,22 @@ export function useEinsatzLiveStream(einsatzId: number): void {
       window.dispatchEvent(new CustomEvent('lfh:erinnerung-alarm', { detail }));
     };
     listeners.push(['erinnerung', onErinnerung as EventListener]);
+
+    // Ablösungs-Hinweis (LFH-635): NEBEN der Registry-Invalidierung (deckt 'abloesung' ab)
+    // alarmiert dieser Listener nur, wenn `art` gesetzt ist — das setzt ausschliesslich der
+    // Scheduler. Die CRUD-Routen senden dasselbe Ereignis nur mit {einsatz_id} als Refresh.
+    const onAbloesung = (ev: MessageEvent) => {
+      let detail: { art?: 'vorwarnung' | 'faellig' } = {};
+      try {
+        detail = JSON.parse(ev.data);
+      } catch {
+        /* Payload optional */
+      }
+      if (detail.art !== 'vorwarnung' && detail.art !== 'faellig') return;
+      spieleAlarmTon(detail.art === 'faellig' ? 'alarm' : 'dezent');
+      window.dispatchEvent(new CustomEvent('lfh:abloesung-alarm', { detail }));
+    };
+    listeners.push(['abloesung', onAbloesung as EventListener]);
 
     // Reconnect-Resync + sichtbarer Fehlerpfad (F14/LFH-263):
     // - `ersterOpen` ist EFFEKT-lokal (kein useRef): pro Verbindung/Mount neu, sonst würde ein
