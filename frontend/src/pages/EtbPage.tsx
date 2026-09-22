@@ -22,6 +22,7 @@ import { SeitenFehler, SeitenLeer, SeitenSkeleton } from '../components/SeitenZu
 import { useEffect, useMemo, useRef, useState } from 'react';
 import EtbZeitachse from '../etb/EtbZeitachse';
 import EtbBilanz from '../etb/EtbBilanz';
+import EtbLesemarkeBanner from '../etb/EtbLesemarkeBanner';
 import EtbFilterleiste, { type LeistenFilter } from '../etb/EtbFilterleiste';
 import WiedervorlageModal from '../etb/WiedervorlageModal';
 import AuftragAusEtbModal from '../etb/AuftragAusEtbModal';
@@ -549,6 +550,9 @@ export default function EtbPage() {
             data-lfh="etb-zeitachse-rahmen"
             style={{ border: `1px solid ${rollen.linie}`, background: rollen.grund }}
           >
+            {/* „neu seit Ihrer letzten Sichtung" (LFH-611) — im Fluss über der Zeitachse wie
+                im Entwurf S4; das Sammelbanner des Live-Zuflusses liegt dagegen AUF ihr. */}
+            <EtbLesemarkeBanner einsatzId={einsatzId} />
             <EtbZeitachse
               zeilen={chronologie}
               einsatzId={einsatzId}

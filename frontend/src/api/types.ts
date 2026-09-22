@@ -130,6 +130,8 @@ export type EtbTyp = S['EtbTyp'];
 export type MeldeWeg = S['MeldeWeg'];
 export type EtbEintragAnzeige = S['EtbEintragAnzeige'];
 export type EtbBaustein = S['EtbBaustein'];
+/** Eigener Lesestand im Tagebuch eines Einsatzes (LFH-611). */
+export type EtbLesemarke = S['EtbLesemarkeAnzeige'];
 
 // ============================== LFH-298 SSE-Live-Feed ==============================
 /** Wire-Event-Namen des Einsatz-Live-Feeds; Kontrakt gegen `EINSATZ_STREAM_EVENTS`

@@ -288,6 +288,10 @@ export const einsatzKeys = {
   // ETB
   etb: (einsatzId: number) => [EINSATZ_KEYS.etb, einsatzId] as const,
   etbListe: <F>(einsatzId: number, filter: F) => [EINSATZ_KEYS.etb, einsatzId, filter] as const,
+  // Eigene Lesemarke (LFH-611) als Sub-Key unter DEMSELBEN Prefix wie die Liste (Muster
+  // `stabLagebesprechungen`): jedes `etb`-Live-Ereignis und jede ETB-Invalidierung zieht die
+  // Zahl „neu seit Ihrer letzten Sichtung" mit, ohne eigenen Eintrag im Fan-out.
+  etbLesemarke: (einsatzId: number) => [EINSATZ_KEYS.etb, einsatzId, 'lesemarke'] as const,
 
   // Abgeleitetes
   // Die gerundeten Koordinaten sind Teil des Keys (Cache-Trefferquote + serverseitiger

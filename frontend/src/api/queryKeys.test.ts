@@ -171,6 +171,8 @@ describe('einsatzKeys (Factory-Output)', () => {
     // Als Literal gepinnt: ein geänderter Key bricht nichts, er trifft still ein anderes Fach.
     expect(einsatzKeys.stabLagebesprechungen(1)).toEqual(['einsatz-stab', 1, 'lagebesprechungen']);
     expect(einsatzKeys.etbListe(1, { typ: 'x' })).toEqual(['etb', 1, { typ: 'x' }]);
+    // LFH-611: Lesemarke UNTER dem ETB-Prefix — das `etb`-Ereignis invalidiert sie mit.
+    expect(einsatzKeys.etbLesemarke(1)).toEqual(['etb', 1, 'lesemarke']);
     // Die gerundeten Koordinaten sind Teil des Keys — Cache-Trefferquote hängt daran.
     expect(einsatzKeys.ortVorschau(1, 52.123, 13.456, 'uhs:5')).toEqual([
       'ort-vorschau',

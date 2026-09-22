@@ -155,6 +155,10 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/einsaetze/{id}/live", get(routes::live::stream))
         .route("/api/einsaetze/{id}/etb", get(routes::etb::liste))
         .route(
+            "/api/einsaetze/{id}/etb/lesemarke",
+            get(routes::etb::lesemarke).post(routes::etb::lesemarke_setzen),
+        )
+        .route(
             "/api/einsaetze/{id}/etb/{eintrag_id}/auftrag",
             post(routes::etb::auftrag_erteilen),
         )

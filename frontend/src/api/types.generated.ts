@@ -941,6 +941,30 @@ export interface components {
             veranlassung?: string | null;
             von?: string | null;
         };
+        /** @description Lesestand einer Person im Tagebuch eines Einsatzes. */
+        EtbLesemarkeAnzeige: {
+            /** @description Wann die Marke zuletzt vorgerückt ist (UTC, SQLite-Format). Fehlt ohne Marke. */
+            gesichtet_at?: string | null;
+            /**
+             * Format: int64
+             * @description Bis zu dieser laufenden Nummer hat die Person das Tagebuch als gesichtet markiert.
+             *     Fehlt, solange sie es noch nie getan hat.
+             */
+            gesichtet_lfd_nr?: number | null;
+            /**
+             * Format: int64
+             * @description Höchste vergebene laufende Nummer im Einsatz zum Zeitpunkt der Antwort; fehlt bei
+             *     leerem Tagebuch. „Alle als gesichtet markieren" schickt GENAU diesen Wert zurück:
+             *     markiert wird, was angesagt war — nicht, was zwischen Anzeige und Klick eintraf.
+             */
+            hoechste_lfd_nr?: number | null;
+            /**
+             * Format: int64
+             * @description Einträge ANDERER Erfasser über der Marke (ohne Marke: alle fremden Einträge). Die
+             *     eigenen zählen nie — wer sie geschrieben hat, hat sie gesehen.
+             */
+            neue_anzahl: number;
+        };
         /**
          * @description Eintragstyp eines ETB-Eintrags. Wird als TEXT in der DB gespeichert.
          * @enum {string}
