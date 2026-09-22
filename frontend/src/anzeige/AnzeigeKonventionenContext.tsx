@@ -14,6 +14,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import { useKoordinatenSystemOverride } from './koordinatenSystemStore';
 import {
   DEFAULT_KONVENTIONEN,
+  effektivesKoordinatenformat,
   formatKoordinate,
   formatZeit,
   formatZeitKurz,
@@ -73,8 +74,11 @@ export function EinsatzAnzeigeProvider({
       zeitformat: data?.zeitformat ?? data?.org_defaults?.zeitformat ?? null,
       einheiten: data?.einheiten ?? data?.org_defaults?.einheiten ?? null,
       // Der app-weite Anwender-Override (localStorage) sticht zusätzlich alles.
-      koordinatenformat:
-        override ?? data?.koordinatenformat ?? data?.org_defaults?.koordinatenformat ?? null,
+      koordinatenformat: effektivesKoordinatenformat(
+        override,
+        data?.koordinatenformat,
+        data?.org_defaults?.koordinatenformat,
+      ),
     };
     return bindeFormatter(konventionen);
   }, [

@@ -354,7 +354,9 @@ describe('CommandPalette · Modusanzeige (LFH-391 · A4)', () => {
     expect(fuss).toHaveTextContent('zeigt nur Aktionen');
     expect(fuss).toHaveTextContent('sucht im Einsatztagebuch');
     expect(fuss).toHaveTextContent('öffnen');
-    // Nur, was funktioniert: kein „Koordinate", kein „im Panel" aus dem Entwurf.
+    // Nur, was funktioniert: kein „im Panel" aus dem Entwurf (LFH-645), und die Koordinate
+    // nur dort, wo es einen Sprung gibt — ohne `koordinatenSprung` (ausserhalb eines
+    // Einsatzes) wäre der Hinweis eine Einladung ins Leere.
     expect(fuss).not.toHaveTextContent('Koordinate');
     expect(fuss).not.toHaveTextContent('Panel');
     expect(modusZeile()).toBeNull();
@@ -878,5 +880,78 @@ describe('CommandPalette · Entprellung nach aussen (LFH-391 · C3)', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+/**
+ * Koordinatensprung (LFH-619). Die Palette bekommt eine FUNKTION über den lebenden Rest —
+ * nicht eine fertige Zeile —, weil der entprellte Stand hinter der Eingabe herhinkt. Die
+ * Aussagen hier sind die der Anzeige: wo die Zeile steht, wann sie fehlt, was Enter tut.
+ */
+describe('CommandPalette · Koordinatensprung (LFH-619)', () => {
+  const karte = vi.fn();
+  const sprung = (rest: string): Befehl | null =>
+    /^\d+\.\d+, \d+\.\d+$/.test(rest)
+      ? {
+          id: `koordinate:${rest}`,
+          gruppe: 'koordinate',
+          label: `Auf Lagekarte zeigen · ${rest}`,
+          ausfuehren: karte,
+        }
+      : null;
+
+  it('stellt die Kartenzeile an die Spitze, und Enter springt', async () => {
+    const u = userEvent.setup();
+    karte.mockClear();
+    renderMitProviders(
+      <CommandPalette
+        // Ein Modul, dessen Label die getippte Zahl enthält — es darf die Zeile nicht verdrängen.
+        befehle={[befehl('m', 'Messpunkt 52.52, 13.41')]}
+        datensatzTreffer={[datensatz('datensatz:personen:1', 'Person 52.52, 13.41')]}
+        koordinatenSprung={sprung}
+        schliesse={() => {}}
+      />,
+    );
+    await u.type(screen.getByRole('combobox'), '52.52, 13.41');
+
+    const zeilen = screen.getAllByRole('option');
+    expect(zeilen[0]).toHaveTextContent('Auf Lagekarte zeigen · 52.52, 13.41');
+    await u.keyboard('{Enter}');
+    expect(karte).toHaveBeenCalledTimes(1);
+  });
+
+  it('fehlt in einem Präfixmodus — dort ist die Eingabe kein Ort', async () => {
+    const u = userEvent.setup();
+    const aufgerufen = vi.fn(sprung);
+    renderMitProviders(
+      <CommandPalette befehle={[]} koordinatenSprung={aufgerufen} schliesse={() => {}} />,
+    );
+    await u.type(screen.getByRole('combobox'), '@52.52, 13.41');
+
+    expect(screen.queryByText(/Auf Lagekarte zeigen/)).not.toBeInTheDocument();
+  });
+
+  it('fehlt, sobald die Eingabe keine Koordinate mehr ist', async () => {
+    const u = userEvent.setup();
+    renderMitProviders(
+      <CommandPalette befehle={[]} koordinatenSprung={sprung} schliesse={() => {}} />,
+    );
+    const feld = screen.getByRole('combobox');
+    await u.type(feld, '52.52, 13.41');
+    expect(screen.getByText(/Auf Lagekarte zeigen/)).toBeInTheDocument();
+    await u.type(feld, 'x');
+    expect(screen.queryByText(/Auf Lagekarte zeigen/)).not.toBeInTheDocument();
+  });
+
+  it('die Fußzeile nennt den Weg nur, wenn es den Sprung gibt', () => {
+    renderMitProviders(
+      <CommandPalette befehle={[]} koordinatenSprung={sprung} schliesse={() => {}} />,
+    );
+    const fuss = document.querySelector('[data-lfh="palette-fuss"]');
+    expect(fuss).toHaveTextContent('Koordinate → Lagekarte');
+    // `#` bleibt das ETB-Präfix — der Entwurf hatte dort „# Koordinate".
+    expect(fuss).toHaveTextContent('sucht im Einsatztagebuch');
+    expect(fuss).not.toHaveTextContent('Panel');
   });
 });

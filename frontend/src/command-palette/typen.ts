@@ -167,6 +167,7 @@ export interface BefehlKontext {
 export const GRUPPEN_REIHENFOLGE = [
   'ausgefuehrt',
   'aktionen',
+  'koordinate',
   'datensaetze',
   'schnellaktionen',
   'zuletzt',
@@ -188,6 +189,13 @@ export const GRUPPEN_LABEL: Record<BefehlGruppe, string> = {
    */
   ausgefuehrt: 'Zuletzt ausgeführt',
   aktionen: 'Aktionen',
+  /**
+   * Der Koordinatensprung (LFH-619, `koordinatenSprung.ts`): höchstens EINE Zeile, und nur
+   * solange die Eingabe die Form einer Koordinate hat. Wie bei `datensaetze` ist der Slot
+   * Formalie — die Zeile entsteht nie in der leeren Startansicht; sichtbar vorn steht sie,
+   * weil sie auf Stufe 0 läuft.
+   */
+  koordinate: 'Koordinate',
   /**
    * Gefundene Datensätze aus den Modullisten (LFH-391 · C1). EINE Gruppe für alle neun
    * Entitäten, die Modulherkunft steht im Label — neun Gruppen wären neun Überschriften
@@ -218,7 +226,8 @@ export const GRUPPEN_LABEL: Record<BefehlGruppe, string> = {
  * Fehlers ist genau die: ein Befehl, der ins Gedächtnis gerät, obwohl er nicht hineingehört,
  * steht dauerhaft und an oberster Stelle da.
  *
- * VIER Gruppen stehen aus VIER verschiedenen Gründen auf `false`:
+ * SECHS Gruppen stehen aus FÜNF verschiedenen Gründen auf `false` (`module` und `zuletzt`
+ * teilen sich einen):
  *
  *  - `module` und `zuletzt`: das IST der Dublettenriegel, und er sitzt an der SCHREIBseite
  *    statt als eigene Filterschleife. Dasselbe Modul steht bereits zweimal in der Liste
@@ -234,6 +243,8 @@ export const GRUPPEN_LABEL: Record<BefehlGruppe, string> = {
  *    stünde „Speichern" da und schriebe etwas anderes. Dazu ist die Gruppe ohnehin die erste
  *    sichtbare der Startansicht — ein Gedächtniseintrag verdoppelte eine Zeile, die eine
  *    Zeile tiefer schon steht.
+ *  - `koordinate` (LFH-619): eine getippte Stelle ist kein wiederkehrender Befehl, und die
+ *    Zeile gibt es nur, solange die Eingabe eine Koordinate ist — im Startzustand nie.
  *  - `ausgefuehrt` selbst: die Kopie merkt sich nicht sich selbst. Ihre `ausfuehren` trägt
  *    die Meldung des ORIGINALS bereits in sich (siehe `befehle.ts`) — ein Griff ins
  *    Gedächtnis rückt den Befehl also sehr wohl nach vorn, nur unter seiner echten ID.
@@ -255,6 +266,9 @@ export const GRUPPEN_LABEL: Record<BefehlGruppe, string> = {
 export const GRUPPE_MERKBAR: Record<BefehlGruppe, boolean> = {
   ausgefuehrt: false,
   aktionen: false,
+  // Eine einmal getippte Stelle ist kein wiederkehrender Befehl — und wie ein Datensatz
+  // entsteht die Zeile nur, solange dieselbe Eingabe steht (LFH-619).
+  koordinate: false,
   datensaetze: false,
   schnellaktionen: true,
   zuletzt: false,
@@ -277,6 +291,7 @@ export const GRUPPE_MERKBAR: Record<BefehlGruppe, boolean> = {
 export const GRUPPE_NUR_ORDNUNG: Record<BefehlGruppe, boolean> = {
   ausgefuehrt: true,
   aktionen: false,
+  koordinate: false,
   datensaetze: false,
   schnellaktionen: false,
   zuletzt: true,

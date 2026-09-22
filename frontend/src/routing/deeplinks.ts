@@ -392,6 +392,7 @@ export function lagekartePfad(
     ansicht?: number;
     snapshot?: number;
     platzieren?: { typ: PlatzierenZielTyp; id: number };
+    zentrum?: Kartenzentrum;
   } = {},
 ): string {
   return mitQuery(einsatzModulPfad(einsatzId, 'lagekarte'), {
@@ -402,7 +403,38 @@ export function lagekartePfad(
     // Platzier-Auftrag (LFH-340 · C5): die Karte geht in den Platzier-Modus für genau
     // dieses Objekt, der nächste Klick auf die Karte setzt seine Koordinate.
     platzieren: opts.platzieren ? `${opts.platzieren.typ}:${opts.platzieren.id}` : undefined,
+    // Kartenmittelpunkt (LFH-619, Koordinatensprung der Sprungpalette): die Karte fliegt
+    // die Stelle an und räumt den Parameter. Fünf Nachkommastellen ≙ rund 1 m.
+    zentrum: opts.zentrum ? `${runde5(opts.zentrum.lat)},${runde5(opts.zentrum.lon)}` : undefined,
   });
+}
+
+/** Ein WGS84-Punkt, auf den die Lagekarte springen soll. */
+export interface Kartenzentrum {
+  lat: number;
+  lon: number;
+}
+
+/** Rundet auf fünf Nachkommastellen, ohne abschliessende Nullen in die URL zu schreiben. */
+function runde5(x: number): string {
+  return String(Number(x.toFixed(5)));
+}
+
+/**
+ * Liest den Kartenmittelpunkt aus `?zentrum=<lat>,<lon>` zurück (LFH-619).
+ *
+ * Wie `parsePlatzierenAuftrag`: Unbrauchbares wird GANZ verworfen, nicht halb gefüllt — eine
+ * halbe Koordinate liefe mit `NaN` oder `0` in `flyTo` und schickte die Karte auf den
+ * Nullmeridian. Der Wertebereich wird mitgeprüft, weil der Parameter ein Fremd-Link sein kann.
+ */
+export function parseKartenzentrum(wert: string | null | undefined): Kartenzentrum | null {
+  if (!wert) return null;
+  const teile = wert.split(',');
+  if (teile.length !== 2 || teile.some((t) => t.trim() === '')) return null;
+  const [lat, lon] = teile.map(Number);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
+  return { lat, lon };
 }
 
 /**

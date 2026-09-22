@@ -11,7 +11,12 @@ import { useViewport } from '../components/useViewport';
 import { useRollen } from '../components/instrument';
 import { ladeKarteConfig } from '../api/karte';
 import { globalKeys } from '../api/queryKeys';
-import { gefahrenPfad, parsePlatzierenAuftrag, parseRouteId } from '../routing/deeplinks';
+import {
+  gefahrenPfad,
+  parseKartenzentrum,
+  parsePlatzierenAuftrag,
+  parseRouteId,
+} from '../routing/deeplinks';
 import { parsePolygon, polygonZentroid } from './lagekarte/geo';
 import { useThemeMode } from '../theme/ThemeModeProvider';
 import { useKartenbilder } from './lagekarte/useKartenbilder';
@@ -477,6 +482,31 @@ export default function LagekartePage() {
     naechste.delete('platzieren');
     setSearchParams(naechste, { replace: true });
   }, [searchParams, setSearchParams, ladt, darfSchreiben, onPlatzierenStart]);
+
+  /**
+   * Koordinatensprung (LFH-619): `?zentrum=<lat>,<lon>` aus der Sprungpalette — anfliegen,
+   * dann räumen. Dasselbe apply-then-clean wie die beiden Deeplinks darüber; ein
+   * stehengebliebener Mittelpunkt zöge die Karte bei jedem Neuladen zurück an die Stelle.
+   *
+   * KEIN Schreibrecht nötig: Anfliegen ist Lesen. Ein unbrauchbarer Wert wird trotzdem
+   * geräumt, er hätte beim nächsten Laden nichts Besseres zu sagen.
+   *
+   * `if (ladt) return` aus demselben Grund wie beim Platzier-Auftrag: erst mit der
+   * `Kartenflaeche` gibt es eine Karte, die das Ziel annimmt. Das Ziel geht über `flyToZiel`,
+   * NICHT über die Startansicht — der Anflug belegt die Karteninstanz als „gestartet"
+   * (`startAufKarteRef` in `Kartenflaeche.tsx`), die später fertig geladene Startansicht zieht
+   * die Karte also nicht wieder weg.
+   */
+  useEffect(() => {
+    const roh = searchParams.get('zentrum');
+    if (roh === null) return;
+    if (ladt) return;
+    const zentrum = parseKartenzentrum(roh);
+    if (zentrum) setFlyToZiel({ lng: zentrum.lon, lat: zentrum.lat });
+    const naechste = new URLSearchParams(searchParams);
+    naechste.delete('zentrum');
+    setSearchParams(naechste, { replace: true });
+  }, [searchParams, setSearchParams, ladt, setFlyToZiel]);
 
   if (ladt) {
     return <SeitenSkeleton />;
