@@ -159,6 +159,7 @@ interface KartenHaken {
   getCanvas(): HTMLCanvasElement;
   jumpTo(o: { center: [number, number]; zoom: number }): void;
   once(ereignis: string, f: () => void): void;
+  queryRenderedFeatures(p: [number, number], o: { layers: string[] }): unknown[];
 }
 
 /**
@@ -218,6 +219,23 @@ async function markerKante(page: Page, ll: [number, number]) {
       beste: Math.max(k(rand, grund), k(kante, grund)),
     };
   }, png.toString('base64'));
+}
+
+/**
+ * Kurzzeichen im Kreis (Tabelle 4, Nr. 6): wirklich GEZEICHNET, nicht nur in der Quelle.
+ * `queryRenderedFeatures` auf `marker-kurz` liefert nur, was MapLibre platziert hat — ein
+ * Symbol, das bei Kollision wiche oder am Mindestzoom hinge, fehlte hier. Die Lesbarkeit
+ * selbst ist die Paarung Schwarz auf weißem Hof (21 : 1, `KURZ_PAINT`) [abgeleitet]: 9-px-
+ * Glyphen mit Kantenglättung ergeben keinen belastbaren Pixelwert.
+ */
+async function kurzzeichenGezeichnet(page: Page, ll: [number, number]): Promise<string | null> {
+  return page.evaluate((ziel) => {
+    const k = (window as unknown as { __lfhKarte: KartenHaken }).__lfhKarte;
+    const p = k.project(ziel);
+    const f = k.queryRenderedFeatures([p.x, p.y], { layers: ['marker-kurz'] });
+    const wert = (f[0] as { properties?: { kurzzeichen?: string } } | undefined)?.properties;
+    return wert?.kurzzeichen ?? null;
+  }, ll);
 }
 
 for (const modus of ['light', 'dark'] as const) {
@@ -418,8 +436,21 @@ for (const modus of ['light', 'dark'] as const) {
     werte.push(`Cluster-Kern ${kernWert.toFixed(2)}`);
 
     await page.locator('[data-lfh="betroffene-karte"] canvas').scrollIntoViewIfNeeded();
+    const kuerzel: Record<string, string> = {
+      sk1: 'I',
+      sk2: 'II',
+      sk3: 'III',
+      sk4: 'IV',
+      tot: 'T',
+      unverletzt: 'U',
+      ohne: '–',
+    };
     for (const [sk, ll] of orte) {
       const m = await markerKante(page, ll);
+      // Zoom 11, Nachbarn 0,5° (rund 33 km) entfernt: gestreute Fundorte ohne Cluster.
+      expect(await kurzzeichenGezeichnet(page, ll), `Kurzzeichen ${sk ?? 'ohne'}`).toBe(
+        kuerzel[sk ?? 'ohne'],
+      );
       expect(
         m.beste,
         `${modus}/Markerkante ${sk ?? 'ohne'}: ${JSON.stringify(m)}`,
