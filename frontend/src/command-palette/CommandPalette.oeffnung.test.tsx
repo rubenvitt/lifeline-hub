@@ -177,6 +177,45 @@ describe('CommandPalette · → Vorschau (LFH-645)', () => {
     expect(screen.getByRole('option', { name: 'Florian Mustermann' })).toBeInTheDocument();
   });
 
+  it('Esc führt auch zurück, wenn der Fokus auf „Zurück" steht (Review-Befund)', async () => {
+    const u = userEvent.setup();
+    const { schliesse } = palette([person()]);
+    await u.keyboard('{ArrowRight}');
+    await u.tab();
+    const zurueck = screen.getByRole('button', { name: /Zurück/ });
+    expect(zurueck).toHaveFocus();
+    // Ohne Riegel an der Palettenwurzel sähe NUR der globale Dispatcher diese Taste — und
+    // schlösse die ganze Palette, statt eine Ebene zurückzugehen.
+    const nichtVerhindert = fireEvent.keyDown(zurueck, { key: 'Escape' });
+    expect(nichtVerhindert).toBe(false);
+    expect(vorschauRegion()).toBeNull();
+    expect(screen.getByRole('combobox')).toHaveFocus();
+    expect(schliesse).not.toHaveBeenCalled();
+  });
+
+  it('scrollt die markierte Zeile nach der Rückkehr wieder in den Blick (Review-Befund)', async () => {
+    // Die Liste hängt in der Vorschau aus und kommt mit `scrollTop` 0 zurück. `aktiv` ändert
+    // sich beim Rückweg nicht — hinge das Einscrollen nur daran, stünde die Markierung
+    // ausserhalb des Blicks. jsdom rechnet kein Layout; geprüft wird der Aufruf am richtigen
+    // Knoten, der Blick selbst im Browser.
+    const u = userEvent.setup();
+    const original = Element.prototype.scrollIntoView;
+    const scrolle = vi.fn();
+    Element.prototype.scrollIntoView = scrolle;
+    try {
+      palette([speichern(), person()]);
+      await u.keyboard('{ArrowDown}{ArrowRight}');
+      scrolle.mockClear();
+      await u.keyboard('{Escape}');
+      expect(scrolle).toHaveBeenCalled();
+      expect(scrolle.mock.contexts[scrolle.mock.contexts.length - 1]).toBe(
+        screen.getByRole('option', { name: 'Florian Mustermann' }),
+      );
+    } finally {
+      Element.prototype.scrollIntoView = original;
+    }
+  });
+
   it('← führt ebenfalls zurück', async () => {
     const u = userEvent.setup();
     palette([person()]);

@@ -368,7 +368,6 @@ function PaletteHost({
     () => ({ ids: zuletztBefehlIds, merke: gedaechtnis.merke }),
     [zuletztBefehlIds, gedaechtnis.merke],
   );
-  const befehle = useBefehle(tastaturAktionen, gefroren);
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const einsatzId = einsatzIdAusPfad(pathname);
@@ -391,6 +390,9 @@ function PaletteHost({
     },
     [navigate],
   );
+  // ALLE drei Befehlsquellen öffnen über `gehZu` — die festen Befehle, die Datensätze und
+  // der Koordinatensprung. Nur so gilt der neue Tab für jede Zeile mit Ziel (LFH-645).
+  const befehle = useBefehle(tastaturAktionen, gefroren, gehZu);
   const melde = useCallback((modus: PaletteModus, rest: string) => {
     // Gleicher Stand → gleiches Objekt: die Frist läuft auch beim blossen Öffnen einmal ab
     // und meldete sonst je Palettenöffnung ein neues, inhaltsgleiches Objekt.

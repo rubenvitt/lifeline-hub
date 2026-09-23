@@ -97,6 +97,34 @@ test('Strg+↵ öffnet eine Person im neuen Tab — kalt, angemeldet, am Datensa
   await tab.close();
 });
 
+/**
+ * Eine FESTE Navigationszeile (Modul) — sie kommt aus `useBefehle`, nicht aus dem
+ * Datensatz-Finder. Genau dieser Weg verwarf die Öffnungsart (Review-Befund): der Hook hatte
+ * ein eigenes `navigate` und reichte nur den Pfad weiter. Strg/⌘+KLICK zugleich, damit auch
+ * der Mausweg im Browser belegt ist.
+ */
+test('Strg/⌘+Klick auf ein Modul öffnet es im neuen Tab, der alte Tab bleibt', async ({
+  page,
+  context,
+}) => {
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Neuer Tab Modul ${Date.now()}`);
+  await zumModul(page, einsatzId, 'etb');
+  await suche(page, 'Lagekarte');
+  const modul = page.getByRole('option', { name: 'Lagekarte', exact: true });
+  await expect(modul).toBeVisible();
+
+  const neuerTab = context.waitForEvent('page');
+  await modul.click({ modifiers: ['ControlOrMeta'] });
+  const tab = await neuerTab;
+
+  await expect(tab).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/lagekarte`));
+  await expect(tab.locator('header').first()).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/etb$`));
+  await expect(paletteInput(page)).toBeHidden();
+  await tab.close();
+});
+
 test('der Koordinatensprung trägt auch im neuen Tab bis auf die Lagekarte', async ({
   page,
   context,
@@ -140,8 +168,57 @@ test('→ zeigt die Personenvorschau in der Palette, Esc führt zurück, ein zwe
   await expect(vorschau).toBeHidden();
   await expect(paletteInput(page)).toHaveValue(kennung);
   await expect(personOption(page, kennung)).toHaveAttribute('aria-selected', 'true');
+  // Im BLICK, nicht nur markiert: die Liste kommt mit `scrollTop` 0 zurück (Review-Befund).
+  // `toBeVisible` hielte auch eine Zeile unterhalb des sichtbaren Bereichs für sichtbar.
+  await expect(personOption(page, kennung)).toBeInViewport();
 
   await page.keyboard.press('Escape');
   await expect(paletteInput(page)).toBeHidden();
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/etb`));
+});
+
+/** Schlüssel der gespeicherten Dichtewahl (`e2e/dichte.spec.ts`). */
+const DICHTE_SCHLUESSEL = 'lifeline-hub.dichte';
+
+/**
+ * Böden der Dichte-Staffel als LITERALE (CLAUDE.md, Gate 3): aus dem Token zurückgelesen
+ * prüfte die Messung den Token gegen sich selbst.
+ */
+const BODEN = { kompakt: 30, komfortabel: 48, handschuh: 72 } as const;
+
+/**
+ * „Zurück" in der Vorschau ist ein antd-`Button` und soll seine Höhe vom `ConfigProvider`
+ * erben. Das ist eine ANNAHME, bis sie gemessen ist (LFH-396: ein Inline-`<a>` erbte gemessen
+ * 17 px in jeder Stufe) — deshalb die Messung über alle drei Stufen. Er ist neben Esc/← der
+ * einzige Weg zurück, und für Maus und Finger der einzige sichtbare. (Den Weg HINEIN gibt es
+ * auf Touch noch nicht — LFH-665.)
+ */
+test('„Zurück" in der Vorschau hält den Dichte-Boden in allen drei Stufen', async ({ page }) => {
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Vorschau Dichte ${Date.now()}`);
+  const kennung = await personErfassen(page, einsatzId);
+  await zumModul(page, einsatzId, 'etb');
+
+  for (const [stufe, boden] of Object.entries(BODEN)) {
+    await page.evaluate(([s, w]) => window.localStorage.setItem(s, w), [
+      DICHTE_SCHLUESSEL,
+      stufe,
+    ] as const);
+    await page.reload();
+    await expect(page.locator('html')).toHaveAttribute('data-dichte', stufe);
+    await expect(page.locator('header').first()).toBeVisible();
+
+    await suche(page, kennung);
+    await expect(personOption(page, kennung)).toHaveAttribute('aria-selected', 'true');
+    await page.keyboard.press('ArrowRight');
+    const zurueck = page
+      .getByRole('region', { name: /^Vorschau:/ })
+      .getByRole('button', { name: 'Zurück' });
+    await expect(zurueck).toBeVisible();
+    const box = (await zurueck.boundingBox())!;
+    expect(box.height, `${stufe}: Höhe`).toBeGreaterThanOrEqual(boden - 0.5);
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Escape');
+    await expect(paletteInput(page)).toBeHidden();
+  }
 });

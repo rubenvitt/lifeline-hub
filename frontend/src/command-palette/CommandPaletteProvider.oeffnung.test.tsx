@@ -123,6 +123,18 @@ describe('CommandPaletteProvider · Öffnungswege (LFH-645)', () => {
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
   });
 
+  it('Esc mit Fokus auf „Zurück" geht eine Ebene zurück, statt die Palette zu schliessen', async () => {
+    const u = userEvent.setup();
+    app();
+    await u.keyboard('{Control>}k{/Control}');
+    await u.keyboard('{ArrowRight}');
+    await u.tab();
+    expect(screen.getByRole('button', { name: /Zurück/ })).toHaveFocus();
+    await u.keyboard('{Escape}');
+    expect(screen.queryByRole('region', { name: /^Vorschau/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('listbox')).toBeInTheDocument();
+  });
+
   // Der Riegel ist der `offen`-Zweig des globalen Dispatchers, NICHT die Palette: gemessen
   // bleibt dieser Test grün, wenn die Palette Strg+↵ gar nicht abfängt. Er pinnt das
   // Verhalten aus der Spec, damit ein Umbau des Dispatchers es nicht still kippt.

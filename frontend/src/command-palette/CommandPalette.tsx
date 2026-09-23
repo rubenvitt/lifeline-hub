@@ -297,13 +297,16 @@ export function CommandPalette({
     return () => clearTimeout(frist);
   }, [modus, rest]);
 
-  // aktiven Eintrag in den Sichtbereich scrollen
+  // aktiven Eintrag in den Sichtbereich scrollen — auch nach der Rückkehr aus der Vorschau
+  // (LFH-645, Review-Befund): die Liste hängt dort aus und kommt mit `scrollTop` 0 zurück,
+  // `aktiv` ändert sich beim Rückweg aber nicht. Ohne `vorschau` in der Liste stünde die
+  // Markierung auf Platz 8 in der Handschuh-Stufe ausserhalb des Blicks.
   useEffect(() => {
     const el = listeRef.current?.querySelector('[aria-selected="true"]');
     if (el instanceof HTMLElement && typeof el.scrollIntoView === 'function') {
       el.scrollIntoView({ block: 'nearest' });
     }
-  }, [aktiv]);
+  }, [aktiv, vorschau]);
 
   function fuehreAus(b: Befehl | undefined) {
     if (!b) return;
@@ -327,6 +330,21 @@ export function CommandPalette({
     inputRef.current?.focus();
   }
 
+  /**
+   * Esc/← aus der Vorschau, an der WURZEL der Palette (LFH-645, Review-Befund): am Suchfeld
+   * allein sah die Taste nur, wer dort stand — mit Fokus auf „Zurück" (ein Tab weiter) kam
+   * Esc allein beim globalen Dispatcher an, und der schloss die GANZE Palette. Hier bubbelt
+   * jeder fokussierte Nachfahre durch. `preventDefault` ist tragend: ohne es liest der
+   * Dispatcher auf `window` dieselbe Taste als `verwerfen` (über den Provider gemessen).
+   */
+  function aufWurzelTaste(e: KeyboardEvent<HTMLDivElement>) {
+    if (!vorschau || e.defaultPrevented || e.nativeEvent.isComposing) return;
+    if (e.key === 'Escape' || e.key === 'ArrowLeft') {
+      e.preventDefault();
+      zurueckZurListe();
+    }
+  }
+
   function aufTaste(e: KeyboardEvent<HTMLInputElement>) {
     if (e.nativeEvent.isComposing) return;
     // Strg/⌘+↵ gehört der Palette. Ohne Ziel geschieht NICHTS, und das braucht kein
@@ -342,15 +360,11 @@ export function CommandPalette({
       return;
     }
     if (vorschau) {
-      // In der Vorschau gibt es keine Liste: Esc/← führen zurück, ↵ öffnet. Esc MUSS
-      // `preventDefault` rufen — sonst schlösse der globale `verwerfen` die Palette gleich
-      // mit, statt eine Ebene zurückzugehen. Pfeil hoch/runter verschieben nichts, was man
-      // nicht sieht; alle übrigen Tasten gehen ans Feld, und eine Änderung am Begriff
-      // verlässt die Vorschau (`onChange`).
-      if (e.key === 'Escape' || e.key === 'ArrowLeft') {
-        e.preventDefault();
-        zurueckZurListe();
-      } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      // In der Vorschau gibt es keine Liste: ↵ öffnet, Pfeil hoch/runter verschieben nichts,
+      // was man nicht sieht. Esc/← behandelt die WURZEL (`aufWurzelTaste`) — sie gelten auch,
+      // wenn der Fokus auf „Zurück" steht. Alle übrigen Tasten gehen ans Feld, und eine
+      // Änderung am Begriff verlässt die Vorschau (`onChange`).
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         e.preventDefault();
       } else if (e.key === 'Enter' && !e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
         e.preventDefault();
@@ -508,7 +522,9 @@ export function CommandPalette({
       }}
       destroyOnHidden
     >
-      <div>
+      {/* Kein Bedienziel und kein eigener Tab-Stopp — nur die Stelle, an der Esc/← aus der
+          Vorschau jeden fokussierten Nachfahren erreichen. */}
+      <div onKeyDown={aufWurzelTaste}>
         <div
           style={{
             display: 'flex',
