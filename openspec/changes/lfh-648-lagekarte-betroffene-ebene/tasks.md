@@ -129,5 +129,7 @@ dann der Code. Pfade relativ zu `frontend/src/`.
   `?platzieren=person:` prüft nur das Schreibrecht, nicht das Modul „Personen“.
   Verifikation: Beide Tickets sind auf dem Entwicklungsboard angelegt und in der
   Abschlussmeldung genannt.
-- [ ] 9.3 `./scripts/check-all.sh` vollständig ausführen. Verifikation: Exit-Code 0,
-  ohne `| tail`.
+- [x] 9.3 `./scripts/check-all.sh` vollständig ausführen. Verifikation: Exit-Code 0,
+  ohne `| tail`. Stand 23.09.2026: Schritte 1–6 und 8–9 grün (Vitest 5341/5341). e2e 206/207:
+  rot war nur `uhs-grundriss-touch.spec.ts` (Mobil), eine Seite, die dieser Change nicht anfasst.
+  Einzeln wiederholt war der Spec 3/3 grün, es ist also der bekannte Flake unter Gate-Last.
