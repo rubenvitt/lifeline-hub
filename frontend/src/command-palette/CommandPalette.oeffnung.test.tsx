@@ -5,7 +5,7 @@
 // `openspec/changes/lfh-645-palette-vorschau-neuer-tab/specs/sprungpalette/spec.md`.
 import { describe, it, expect, vi } from 'vitest';
 import userEvent from '@testing-library/user-event';
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { renderMitProviders } from '../test/utils';
 import { CommandPalette } from './CommandPalette';
 import type { Befehl } from './typen';
@@ -207,10 +207,15 @@ describe('CommandPalette · → Vorschau (LFH-645)', () => {
       await u.keyboard('{ArrowDown}{ArrowRight}');
       scrolle.mockClear();
       await u.keyboard('{Escape}');
-      expect(scrolle).toHaveBeenCalled();
-      expect(scrolle.mock.contexts[scrolle.mock.contexts.length - 1]).toBe(
-        screen.getByRole('option', { name: 'Florian Mustermann' }),
-      );
+      // `waitFor`: das Einscrollen läuft im Effekt nach dem Rückweg. Unter CI-Last kam dieser
+      // Effekt erst nach dem `keyboard`-Await an (gemessen in PR #122: 1 von 4 Shards rot,
+      // lokal 5/5 grün) — die Aussage ist „wird eingescrollt", nicht „im selben Tick".
+      await waitFor(() => {
+        expect(scrolle).toHaveBeenCalled();
+        expect(scrolle.mock.contexts[scrolle.mock.contexts.length - 1]).toBe(
+          screen.getByRole('option', { name: 'Florian Mustermann' }),
+        );
+      });
     } finally {
       Element.prototype.scrollIntoView = original;
     }
