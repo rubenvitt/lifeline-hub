@@ -28,8 +28,10 @@ Geschlossenes trägt **[abgeleitet]**. Alle Zieltickets sind angelegt.
 Die Browser-Messungen (Gate 1, Gate 3) stammen von `e8b357d1`/`5f5375ae`. Die abschließende
 Review-Runde (`256cbba0` Backend-ETB-Texte, `fc58fee2` Frontend) ändert an den gemessenen
 Flächen nur Wortlaute (Kopf der Stellentabelle „keine Meldung", „≈" an der Plangröße) und
-den Fehlerpfad der Rücknahme; Trefflächen und Abstände sind davon nicht berührt
-[abgeleitet], die Gates wurden dafür nicht neu gefahren.
+den Fehlerpfad der Rücknahme. Danach lief `./scripts/check-all.sh` auf `fabd40b0` mit Exit 0,
+einschließlich der vollen e2e-Suite mit Gate 1 und Gate 3 (204 bestanden, 0 übersprungen)
+und Vitest (420 Dateien, 5 380 Tests). Die Messwerte oben gelten damit auch für den
+Code-Stand `fc58fee2`.
 
 | Nachweis | Ergebnis | Stand |
 | --- | --- | --- |
