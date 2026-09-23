@@ -837,8 +837,16 @@ async fn negative_anzahl_oder_unlesbarer_zeitpunkt_ist_400_und_speichert_nichts(
     let n = etb(&w.pool, w.e).await.len();
     let r = stand(&w, id, -1, Erhebung::Gezaehlt, "2026-09-23 12:00:00").await;
     assert_eq!(status(r), StatusCode::BAD_REQUEST);
-    let r = stand(&w, id, 5, Erhebung::Gezaehlt, "23.09.2026 12:00").await;
-    assert_eq!(status(r), StatusCode::BAD_REQUEST);
+    // Auch ein lesbarer, aber nicht auf Drahtform gepolsterter Zeitpunkt ist 400: er stünde
+    // im Textvergleich der „aktuell“-Abfrage falsch sortiert.
+    for t in [
+        "23.09.2026 12:00",
+        "2026-9-3 1:02:03",
+        " 2026-09-23 12:00:00",
+    ] {
+        let r = stand(&w, id, 5, Erhebung::Gezaehlt, t).await;
+        assert_eq!(status(r), StatusCode::BAD_REQUEST, "{t:?}");
+    }
     assert_eq!(
         zaehle(&w.pool, "SELECT COUNT(*) FROM evakuierung_stand").await,
         0
@@ -1387,7 +1395,12 @@ async fn kopfzahl_ohne_meldungen_summiert_nichts() {
 #[tokio::test]
 async fn kopfzahl_mit_unlesbarem_zeitpunkt_ist_400() {
     let w = welt().await;
-    for t in ["morgen", "2026-09-23", "2026-09-23T13:30:00Z"] {
+    for t in [
+        "morgen",
+        "2026-09-23",
+        "2026-09-23T13:30:00Z",
+        "2026-9-23 13:30:00",
+    ] {
         assert_eq!(
             status(kopfzahl(&w.pool, w.e, t).await),
             StatusCode::BAD_REQUEST,
@@ -1456,5 +1469,36 @@ async fn etb_nennt_keine_freitexte() {
         for g in geheim {
             assert!(!e.2.contains(g), "{g:?} im ETB: {}", e.2);
         }
+    }
+}
+
+/// Das Löschen eines Einsatzes räumt alle vier Tabellen trotz Zeigerzyklus
+/// (`stand_id` ↔ `bezirk_id`) und NOT-NULL-Bezug auf `etb_eintrag`.
+#[tokio::test]
+async fn einsatz_loeschen_kaskadiert_sauber() {
+    let w = welt().await;
+    let bid = bezirk(&w, "Uferstraße", 640).await;
+    let m = stand(&w, bid, 12, Erhebung::Gezaehlt, "2026-09-23 12:00:00")
+        .await
+        .unwrap();
+    stand_zurueck(&w, m.meldung_id).await.unwrap();
+    stand(&w, bid, 20, Erhebung::Gezaehlt, "2026-09-23 13:00:00")
+        .await
+        .unwrap();
+    let sid = stelle(&w, "Turnhalle Ost", Some(150)).await;
+    belegung(&w, sid, 9, "2026-09-23 12:00:00").await.unwrap();
+
+    sqlx::query("DELETE FROM einsatz WHERE id = ?")
+        .bind(w.e)
+        .execute(&w.pool)
+        .await
+        .unwrap();
+    for sql in [
+        "SELECT COUNT(*) FROM evakuierungsbezirk",
+        "SELECT COUNT(*) FROM evakuierung_stand",
+        "SELECT COUNT(*) FROM betreuungsstelle",
+        "SELECT COUNT(*) FROM betreuungsstelle_belegung",
+    ] {
+        assert_eq!(zaehle(&w.pool, sql).await, 0, "{sql}");
     }
 }

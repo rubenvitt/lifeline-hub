@@ -414,15 +414,16 @@ fn anzahl_pruefen(feld: &str, n: i64) -> Result<(), AppError> {
 
 /// Der Zeitpunkt muss im Drahtformat vorliegen; die Route hat ihn normalisiert und gegen die
 /// Zukunft geprüft. Das Repo sichert nur das Format, damit der Textvergleich in der
-/// „aktuell“-Abfrage trägt.
+/// „aktuell“-Abfrage trägt. Als Rundreise, weil chrono beim Parsen ungepolsterte Felder
+/// annimmt: `2026-9-3 1:02:03` wäre lesbar, sortierte als Text aber hinter `2026-09-23 …`.
 fn zeitpunkt_pruefen(s: &str) -> Result<(), AppError> {
-    chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S")
-        .map(|_| ())
-        .map_err(|_| {
-            AppError::Validation(format!(
-                "Ungültiger Zeitpunkt '{s}' (erwartet: YYYY-MM-DD HH:MM:SS, UTC)"
-            ))
-        })
+    const FORMAT: &str = "%Y-%m-%d %H:%M:%S";
+    match chrono::NaiveDateTime::parse_from_str(s, FORMAT) {
+        Ok(t) if t.format(FORMAT).to_string() == s => Ok(()),
+        _ => Err(AppError::Validation(format!(
+            "Ungültiger Zeitpunkt '{s}' (erwartet: YYYY-MM-DD HH:MM:SS, UTC)"
+        ))),
+    }
 }
 
 // ── Hilfen innerhalb der Transaktion ────────────────────────────────────────────────────────
