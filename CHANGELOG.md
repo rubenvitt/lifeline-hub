@@ -1,3 +1,39 @@
+## [1.0.0-alpha.36](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.35...v1.0.0-alpha.36) (2026-09-23)
+
+### Dokumentenablage
+
+Neue Funktion zur strukturierten Ablage von Einsatzdokumenten:
+- Dokumente können kategorisiert hochgeladen und direkt einem Einsatztagebuch-Eintrag, einem Kartenelement (Schadenstelle, Einheit, Betroffener, Gefahrengebiet) oder einem Auftrag zugeordnet werden
+- Schnellaktion „Dokument ablegen" aus allen relevanten Modulen heraus verfügbar
+- Filter nach Kategorie, Bezug und Suchbegriff in der Dokumentenliste
+- Unterstützte Dateitypen: PDF, Office-Dokumente, Bilder (JPEG, PNG, HEIC, HEIF, TIFF) bis 25 MiB
+- Dokumente erscheinen automatisch im Einsatztagebuch und lösen Live-Benachrichtigungen aus
+- Entfernen von Dokumenten ist nachvollziehbar: Das Dokument wird gelöscht, der ETB-Eintrag mit Titel bleibt erhalten
+
+### Lagekarte
+
+Messwerkzeug für Entfernungen und Flächen:
+- Neuer Lineal-Knopf in der Kartensteuerung zum Messen von Strecken und Flächen
+- Live-Anzeige der Messwerte während des Zeichnens
+- Messergebnisse werden nicht gespeichert, für schnelle Lagefeststellung vor Ort
+
+Satellitenansicht als Kartengrundlage:
+- Online-Katalog bietet nun Satellitenbilder (Esri) als zusätzliche Kartengrundlage
+- Umschaltung zwischen klassischer Karte und Satellitenansicht über die Kartensteuerung
+
+Verbesserungen:
+- Einheiten auf der Karte zeigen jetzt einen direkten Link zum Einsatztagebuch für alle ETB-Einträge dieser Einheit
+- Mehrere Zeichenwerkzeuge können nun gleichzeitig auf einer Karte verwendet werden
+
+### Einsatztagebuch
+
+- Neuer Filter nach Einheit: zeigt alle Einträge, die eine bestimmte Einheit betreffen (eigene Aufträge, Funkverkehr mit dieser Einheit)
+
+### Release-Prozess
+
+- Release-Notizen werden nun KI-gestützt erstellt, mit automatischem Rückfall auf konventionelle Generierung bei Fehlern
+- Konsistente Release-Notizen zwischen Changelog und GitHub-Release
+
 ## [1.0.0-alpha.35](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.34...v1.0.0-alpha.35) (2026-09-23)
 
 ### Features
