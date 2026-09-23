@@ -85,7 +85,7 @@ test('das Tableau läuft auf 390, 1024 und 1366 px nicht waagerecht über', asyn
   }
 });
 
-test('die Ziffer 4 setzt den Status der fokussierten Kachel, und er übersteht das Neuladen', async ({
+test('Ziffern setzen den Status der fokussierten Kachel nacheinander, und er übersteht das Neuladen', async ({
   page,
 }) => {
   await anmelden(page);
@@ -102,6 +102,14 @@ test('die Ziffer 4 setzt den Status der fokussierten Kachel, und er übersteht d
   await expect(knopf).toContainText('S4');
   await expect(knopf).toContainText('Am Einsatzort');
 
+  // Während der Mutation ist der Knopf `disabled`, und der Browser wirft den Fokus auf
+  // <body> (Review LFH-642). Das Tableau gibt ihn danach zurück — sonst ginge die zweite
+  // Ziffer ins Leere. Das ist die Aussage, die jsdom nicht tragen kann.
+  await expect(knopf).toBeFocused();
+  await page.keyboard.press('5');
+  await expect(knopf).toContainText('S5');
+  await expect(knopf).toBeFocused();
+
   // Die andere Kachel bleibt unberührt — die Ziffer wirkt nur, wo der Fokus steht.
   await expect(
     tableau(page).getByRole('button', { name: `Status von ${FAHRZEUG_FREI} ändern` }),
@@ -110,5 +118,5 @@ test('die Ziffer 4 setzt den Status der fokussierten Kachel, und er übersteht d
   await page.goto(`/einsaetze/${einsatzId}/fahrzeuge?ansicht=tableau`);
   await expect(
     tableau(page).getByRole('button', { name: `Status von ${FAHRZEUG_EINHEIT} ändern` }),
-  ).toContainText('S4');
+  ).toContainText('S5');
 });

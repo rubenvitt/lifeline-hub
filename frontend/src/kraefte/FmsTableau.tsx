@@ -1,6 +1,7 @@
 import { App, Skeleton, Typography } from 'antd';
 import {
   useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -57,6 +58,19 @@ import { fahrzeugStatus } from './meldebildRaster';
  * Reihenfolge ohnehin nicht. Ein Wechsel ins Statusmenü ist KEIN Verlassen — dieselbe
  * Ausnahme wie in `Datensicht` (`pruefeVerlassen`, LFH-339). Entfernte Fahrzeuge fallen
  * sofort weg: was es nicht mehr gibt, lässt sich nicht zurückhalten.
+ *
+ * ── FOKUS NACH DEM WECHSEL (gemessen im Review, Chromium und WebKit) ───────────────────
+ *
+ * Während der Mutation sind ALLE Auslöser `disabled` (Riegel der Seite). Ein fokussierter
+ * Knopf, der `disabled` wird, verliert den Fokus an `<body>` — mit `focusout` und
+ * `relatedTarget = null`. Das Menü gibt den Fokus ohnehin nur bei Escape zurück. Ohne
+ * Gegenmaßnahme wirkte die zweite Ziffer ins Leere, und die Schleuse taute ausgerechnet in
+ * dem Moment auf, in dem jemand bedient. Deshalb merkt sich das Tableau das gewählte
+ * Fahrzeug ({@link fokusZiel}): solange der Wechsel läuft, gilt der Fokusverlust nicht als
+ * Verlassen, und danach geht der Fokus an den Auslöser der Kachel zurück — aber nur, wenn
+ * er noch auf `<body>` liegt; wer inzwischen woanders ist, wird nicht zurückgeholt.
+ * `StatusWahl` selbst bleibt unverändert: die Tabelle hat dasselbe Verhalten, dort ist aber
+ * keine Ziffernfolge und keine Schleuse daran gebunden.
  */
 
 export interface FmsTableauProps {
@@ -69,11 +83,13 @@ export interface FmsTableauProps {
   darfSchreiben: boolean;
   /** Derselbe Deskriptor wie in Tabelle und Karte — ein Bedienweg. */
   bedienungVon: (ef: EinsatzFahrzeug) => StatusBedienung;
+  /** Fahrzeuge ODER ihre Gliederung laden noch zum ersten Mal. */
   ladend?: boolean;
 }
 
 const KACHEL = 'fms-kachel';
 const OVERLAY = '.ant-dropdown, .ant-select-dropdown, .ant-picker-dropdown';
+const ZIFFER_HINWEIS = 'fms-tableau-ziffer';
 
 function darstellungVon(ef: EinsatzFahrzeug): StatusDarstellung | null {
   if (!ef.status_label || !ef.status_kategorie) return null;
@@ -107,6 +123,8 @@ export default function FmsTableau({
   const zuordnung = useMemo(() => zifferZuordnung(katalog), [katalog]);
   const optionen = useMemo(() => fmsStatusOptionen(katalog), [katalog]);
   const zifferBelegt = [...zuordnung.values()].some((z) => z.art === 'eindeutig');
+  /** Fahrzeug, dessen Auslöser nach dem laufenden Wechsel den Fokus zurückbekommt. */
+  const fokusZiel = useRef<number | null>(null);
 
   // ── Zuflussschleuse ─────────────────────────────────────────────────────────────────
   const [gefroren, setGefroren] = useState<ReadonlySet<number> | null>(null);
@@ -120,6 +138,8 @@ export default function FmsTableau({
     if (gefroren == null && fahrzeuge.length > 0) friereEin();
   };
   const verlassen = (e: FocusEvent<HTMLElement>) => {
+    // Der eigene Wechsel sperrt den Knopf und wirft den Fokus auf `<body>` — kein Verlassen.
+    if (fokusZiel.current != null) return;
     const ziel = e.relatedTarget;
     if (ziel instanceof Node && wurzel.current?.contains(ziel)) return;
     if (ziel instanceof Element && ziel.closest(OVERLAY)) return;
@@ -127,6 +147,42 @@ export default function FmsTableau({
   };
 
   const gruppen = baueFmsTableau(gezeigt, einheiten);
+
+  const waehle = (ef: EinsatzFahrzeug, bedienung: StatusBedienung, statusId: number) => {
+    fokusZiel.current = ef.id;
+    bedienung.onWaehlen(statusId);
+  };
+
+  // Der Abschluss der Mutation kommt als neuer `bedienungVon`-Stand von der Seite (dort je
+  // Render neu gebaut), das Verschwinden einer Kachel als neue `fahrzeuge` — beide stehen
+  // deshalb in den Abhängigkeiten. Gelesen werden sonst nur Refs und das DOM.
+  useEffect(() => {
+    const aktiv = document.activeElement;
+    const aufBody = aktiv == null || aktiv === document.body;
+    const id = fokusZiel.current;
+    if (id != null) {
+      const ef = fahrzeuge.find((f) => f.id === id);
+      if (ef) {
+        const b = bedienungVon(ef);
+        if (b.laeuft || b.gesperrt) return;
+      }
+      fokusZiel.current = null;
+      if (ef && aufBody) {
+        wurzel.current
+          ?.querySelector<HTMLElement>(`[data-lfh="${KACHEL}"][data-ef-id="${id}"] button`)
+          ?.focus();
+        return;
+      }
+    }
+    // WebKit feuert beim Entfernen des fokussierten Knotens KEIN `focusout` (gemessen im
+    // Review): verschwindet die Kachel unter dem Fokus, erreichte `verlassen` die Wurzel nie
+    // und die Schleuse bliebe gefroren. Deshalb hier nachgeprüft — ein offenes Menü im
+    // Portal zählt weiter als drinnen.
+    if (gefroren == null) return;
+    if (aktiv instanceof Node && wurzel.current?.contains(aktiv)) return;
+    if (aktiv instanceof Element && aktiv.closest(OVERLAY)) return;
+    setGefroren(null);
+  }, [gefroren, fahrzeuge, bedienungVon]);
 
   // ── Ziffern ─────────────────────────────────────────────────────────────────────────
   const tasteGedrueckt = (e: KeyboardEvent<HTMLElement>) => {
@@ -146,18 +202,24 @@ export default function FmsTableau({
     e.preventDefault();
     const ziffer = Number(e.key);
     const zielStatus = zuordnung.get(ziffer);
+    // Fester Schlüssel: eine gehaltene Taste ersetzt den Hinweis, statt Toasts zu stapeln
+    // (Muster `kommunikation/rueckgaengig.tsx`).
     if (!zielStatus) {
-      void message.info(`Ziffer ${ziffer} ist keinem Status zugeordnet`);
+      void message.info({
+        key: ZIFFER_HINWEIS,
+        content: `Ziffer ${ziffer} ist keinem Status zugeordnet`,
+      });
       return;
     }
     if (zielStatus.art === 'mehrdeutig') {
-      void message.warning(
-        `Ziffer ${ziffer} ist im Statuskatalog ${zielStatus.anzahl}-fach belegt — Status bitte über das Menü wählen`,
-      );
+      void message.warning({
+        key: ZIFFER_HINWEIS,
+        content: `Ziffer ${ziffer} ist im Statuskatalog ${zielStatus.anzahl}-fach belegt — Status bitte über das Menü wählen`,
+      });
       return;
     }
     if (zielStatus.status.id === ef.status_id) return;
-    bedienung.onWaehlen(zielStatus.status.id);
+    waehle(ef, bedienung, zielStatus.status.id);
   };
 
   const gedaempft: CSSProperties = { color: rollen.gedaempft, minWidth: 0 };
@@ -167,7 +229,9 @@ export default function FmsTableau({
     whiteSpace: 'nowrap',
   };
 
-  if (ladend && fahrzeuge.length === 0) return <Skeleton active />;
+  // Auch während die Gliederung (Einheiten) noch lädt: sonst stünde kurz „Alle Fahrzeuge"
+  // da, und die Kacheln sortierten sich nach der Antwort in die Abschnitte um.
+  if (ladend) return <Skeleton active />;
 
   return (
     <section
@@ -260,6 +324,7 @@ export default function FmsTableau({
                   <StatusWahl
                     {...bedienung}
                     optionen={optionen}
+                    onWaehlen={(w) => waehle(ef, bedienung, Number(w))}
                     darstellung={darstellungVon(ef)}
                     etikett={<StatusChip ton={status.ton} code={status.code} wort={status.wort} />}
                     darfSchreiben={darfSchreiben}

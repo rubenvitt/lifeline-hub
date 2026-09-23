@@ -322,8 +322,12 @@ export default function FahrzeugePage() {
   });
 
   // Cross-Modul-Deeplink (LFH-25): ?fahrzeug=<id> hebt die Zeile hervor (Scroll best-effort).
+  // Der Deeplink zielt auf eine ZEILE — im Tableau gibt es keine, und `scrolleZurZeile` liefe
+  // still ins Leere (Review LFH-642). Er schaltet deshalb auf die Liste.
   useQueryParamSelektion('fahrzeug', efQuery.isSuccess, (fid) => {
-    if ((efQuery.data ?? []).some((f) => f.id === fid)) setHighlightId(fid);
+    if (!(efQuery.data ?? []).some((f) => f.id === fid)) return;
+    setAnsichtNachEinsatz((alt) => ({ ...alt, [einsatzId]: 'liste' }));
+    setHighlightId(fid);
   });
   useEffect(() => {
     if (highlightId == null) return;
@@ -791,14 +795,16 @@ export default function FahrzeugePage() {
               fahrzeuge={efs}
               katalog={stati}
               einheiten={einheitenQuery.data ?? null}
+              // Nur ohne Daten: scheitert bloß ein Refetch, steht die bekannte Gliederung
+              // weiter da — ein „ohne Gliederung" daneben behauptete das Gegenteil.
               einheitenHinweis={
-                einheitenQuery.isError
+                einheitenQuery.isError && !einheitenQuery.data
                   ? 'Einheiten nicht abrufbar — Fahrzeuge ohne Gliederung'
                   : undefined
               }
               darfSchreiben={darfSchreiben}
               bedienungVon={statusBedienungVon}
-              ladend={efQuery.isLoading}
+              ladend={efQuery.isLoading || einheitenQuery.isLoading}
             />
           ) : (
             <Datensicht

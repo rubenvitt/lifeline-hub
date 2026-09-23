@@ -281,4 +281,117 @@ describe('FmsTableau (LFH-642)', () => {
       expect(screen.getByText('Florian 0')).toBeInTheDocument();
     });
   });
+
+  /**
+   * Review LFH-642, im Browser gemessen: während der Mutation sind alle Auslöser `disabled`,
+   * und ein fokussierter Knopf, der `disabled` wird, verliert den Fokus an `<body>`
+   * (`focusout` mit `relatedTarget = null`). jsdom tut das NICHT von selbst — der Test
+   * spielt es mit `blur()` nach.
+   */
+  describe('Fokus nach dem Statuswechsel', () => {
+    function zeigeMitSperre() {
+      const onWaehlen = vi.fn();
+      const offen = (ef: EinsatzFahrzeug): StatusBedienung => ({
+        optionen: [],
+        aktuell: ef.status_id,
+        kennung: ef.funkrufname,
+        onWaehlen,
+      });
+      const gesperrt = (ef: EinsatzFahrzeug): StatusBedienung => ({
+        ...offen(ef),
+        gesperrt: true,
+        laeuft: ef.id === 10,
+      });
+      const props: FmsTableauProps = {
+        fahrzeuge: [fzg(10, 'Florian 1')],
+        katalog: KATALOG,
+        einheiten: EINHEITEN,
+        darfSchreiben: true,
+        bedienungVon: offen,
+      };
+      const r = renderMitProviders(<FmsTableau {...props} />);
+      return { ...r, props, offen, gesperrt, onWaehlen };
+    }
+
+    it('gibt den Fokus zurück, und die Schleuse bleibt dabei zu', () => {
+      const { rerender, props, offen, gesperrt, onWaehlen } = zeigeMitSperre();
+      const neu = [...props.fahrzeuge, fzg(11, 'Florian 0')];
+      tippe(ausloeser('Florian 1'), '4');
+      expect(onWaehlen).toHaveBeenCalledExactlyOnceWith(3);
+
+      // Mutation läuft: Fokus fällt auf <body>, Knopf gesperrt, ein neues Fahrzeug kommt an.
+      // Der Fokusverlust steht VOR der Sperre, weil jsdom `blur()` an einem gesperrten
+      // Knopf ignoriert — gleichwertig für die Aussage: focusout ohne relatedTarget.
+      act(() => ausloeser('Florian 1').blur());
+      rerender(<FmsTableau {...props} fahrzeuge={neu} bedienungVon={gesperrt} />);
+      expect(document.activeElement).toBe(document.body);
+      expect(screen.queryByText('Florian 0')).toBeNull();
+
+      // Mutation fertig: der Fokus steht wieder am Auslöser, die zweite Ziffer wirkt.
+      rerender(<FmsTableau {...props} fahrzeuge={neu} bedienungVon={offen} />);
+      expect(ausloeser('Florian 1')).toHaveFocus();
+      expect(screen.queryByText('Florian 0')).toBeNull();
+      fireEvent.keyDown(ausloeser('Florian 1'), { key: '2' });
+      expect(onWaehlen).toHaveBeenLastCalledWith(1);
+    });
+
+    it('auch über das Menü', async () => {
+      const { rerender, props, offen, gesperrt, onWaehlen } = zeigeMitSperre();
+      await userEvent.click(ausloeser('Florian 1'));
+      const menue = document.querySelector<HTMLElement>(
+        '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+      )!;
+      await userEvent.click(within(menue).getByRole('menuitem', { name: /S4 · Am Einsatzort/ }));
+      expect(onWaehlen).toHaveBeenCalledWith(3);
+
+      // Das Menü gibt den Fokus nur bei Escape zurück (rc-dropdown) — er liegt danach auf
+      // <body>. In jsdom bleibt er stehen, deshalb von Hand.
+      act(() => (document.activeElement as HTMLElement | null)?.blur());
+      rerender(<FmsTableau {...props} bedienungVon={gesperrt} />);
+      expect(document.activeElement).toBe(document.body);
+      rerender(<FmsTableau {...props} bedienungVon={offen} />);
+      expect(ausloeser('Florian 1')).toHaveFocus();
+    });
+
+    it('holt den Fokus nicht zurück, wenn die Person inzwischen woanders steht', () => {
+      const { rerender, props, offen, gesperrt } = zeigeMitSperre();
+      const woanders = document.createElement('button');
+      document.body.appendChild(woanders);
+      try {
+        tippe(ausloeser('Florian 1'), '4');
+        rerender(<FmsTableau {...props} bedienungVon={gesperrt} />);
+        act(() => woanders.focus());
+        rerender(<FmsTableau {...props} bedienungVon={offen} />);
+        expect(woanders).toHaveFocus();
+      } finally {
+        woanders.remove();
+      }
+    });
+  });
+
+  it('taut die Schleuse auf, wenn die fokussierte Kachel verschwindet (WebKit feuert kein focusout)', () => {
+    const { rerender, props } = zeige({ fahrzeuge: [fzg(10, 'Florian 1'), fzg(12, 'Florian 5')] });
+    act(() => ausloeser('Florian 1').focus());
+    // Fahrzeug 10 wird fremd entfernt, gleichzeitig kommt Fahrzeug 11 an. jsdom verschiebt
+    // den Fokus beim Entfernen still auf <body>, wie WebKit — ohne Ereignis.
+    rerender(<FmsTableau {...props} fahrzeuge={[fzg(12, 'Florian 5'), fzg(11, 'Florian 0')]} />);
+    expect(screen.getByText('Florian 0')).toBeInTheDocument();
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  it('stapelt bei wiederholter Ziffer keine Hinweise', async () => {
+    zeige();
+    const knopf = ausloeser('Florian 1');
+    tippe(knopf, '9');
+    tippe(knopf, '9');
+    tippe(knopf, '9');
+    await screen.findByText(/Ziffer 9 ist keinem Status zugeordnet/);
+    expect(screen.getAllByText(/Ziffer 9 ist keinem Status zugeordnet/)).toHaveLength(1);
+  });
+
+  it('zeigt während des ersten Ladens (auch der Gliederung) ein Skelett statt „Alle Fahrzeuge"', () => {
+    zeige({ einheiten: null, ladend: true });
+    expect(screen.queryByRole('heading', { name: 'Alle Fahrzeuge' })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'FMS-Tableau' })).toBeNull();
+  });
 });

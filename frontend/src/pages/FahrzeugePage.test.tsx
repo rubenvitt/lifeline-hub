@@ -951,7 +951,7 @@ describe('FahrzeugePage — FMS-Tableau', () => {
   }
 
   function renderTableau(
-    einheiten: () => Response | ReturnType<typeof HttpResponse.json> = () =>
+    einheiten: () => Response | Promise<Response> = () =>
       HttpResponse.json([{ id: 1, name: 'Zug 1', abschnitt_id: 10, abschnitt_name: 'EA Nord' }]),
     route = '/einsaetze/7/fahrzeuge?ansicht=tableau',
   ) {
@@ -1049,6 +1049,54 @@ describe('FahrzeugePage — FMS-Tableau', () => {
     expect(
       within(tableau).getByRole('button', { name: 'Status von Florian 1 ändern' }),
     ).toBeEnabled();
+  });
+
+  it('ein gescheiterter Refetch der Einheiten behauptet nicht „ohne Gliederung"', async () => {
+    // Erst gelingt der Abruf, nach dem Statuswechsel (der die Einheiten invalidiert) nicht.
+    let abrufe = 0;
+    renderTableau(() => {
+      abrufe += 1;
+      return abrufe === 1
+        ? HttpResponse.json([{ id: 1, name: 'Zug 1', abschnitt_id: 10, abschnitt_name: 'EA Nord' }])
+        : HttpResponse.json({ error: 'kaputt' }, { status: 500 });
+    });
+    const tableau = await screen.findByRole('region', { name: 'FMS-Tableau' });
+    const knopf = await within(tableau).findByRole('button', {
+      name: 'Status von Florian 1 ändern',
+    });
+    act(() => knopf.focus());
+    fireEvent.keyDown(knopf, { key: '4' });
+    await waitFor(() => expect(abrufe).toBeGreaterThanOrEqual(2));
+    await waitFor(() => expect(within(tableau).getByText('S4')).toBeInTheDocument());
+    expect(within(tableau).getByRole('heading', { name: 'EA Nord' })).toBeInTheDocument();
+    expect(within(tableau).queryByText(/Einheiten nicht abrufbar/)).toBeNull();
+  });
+
+  it('zeigt bis zur Antwort der Einheiten keine ungegliederte Fläche', async () => {
+    let antworte: () => void = () => {};
+    const gate = new Promise<void>((r) => (antworte = r));
+    renderTableau(async () => {
+      await gate;
+      return HttpResponse.json([
+        { id: 1, name: 'Zug 1', abschnitt_id: 10, abschnitt_name: 'EA Nord' },
+      ]);
+    });
+    // Die Fahrzeuge sind da (Kopfzeile nennt sie), das Tableau wartet auf die Gliederung.
+    await screen.findByText('1 Fahrzeuge');
+    expect(screen.queryByRole('heading', { name: 'Alle Fahrzeuge' })).toBeNull();
+    antworte();
+    expect(await screen.findByRole('heading', { name: 'EA Nord' })).toBeInTheDocument();
+  });
+
+  it('ein ?fahrzeug=-Deeplink schaltet auf die Liste — im Tableau gäbe es keine Zeile', async () => {
+    renderTableau(undefined, '/einsaetze/7/fahrzeuge?ansicht=tableau&fahrzeug=10');
+    await waitFor(() => expect(screen.getByTestId('ort')).toHaveTextContent(''));
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'FMS-Tableau' })).toBeNull());
+    expect(
+      within(screen.getByRole('radiogroup', { name: 'Ansicht' })).getByRole('radio', {
+        name: 'Liste',
+      }),
+    ).toBeChecked();
   });
 });
 
