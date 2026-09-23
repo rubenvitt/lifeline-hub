@@ -310,6 +310,19 @@ pub struct EtbFilter {
     pub bis_zeit: Option<String>,
     /// Filter nach Erfasser.
     pub erfasser_id: Option<i64>,
+    /// Filter „betrifft Einheit" (LFH-616). Ein ETB-Eintrag hat keine Einheit-Spalte; er
+    /// betrifft eine Einheit, wenn EINER von zwei Wegen trägt:
+    /// 1. **Fremdschlüssel über den Auftrag**: `e.auftrag_id` zeigt auf einen Auftrag mit der
+    ///    Einheit als Empfänger (Anordnung und Vollzugsmeldung).
+    /// 2. **Name in von/an**: `von` oder `an` ist — getrimmt, ASCII-Groß/Klein egal — der
+    ///    AKTUELLE Einheitsname. Das deckt den freien Funkverkehr ab, die Mehrheit im ETB.
+    ///    Grenzen, bewusst: nach einer Umbenennung fallen ältere Einträge heraus; eine
+    ///    Empfängerliste in `an` trifft nicht exakt (die fängt Weg 1); Funkrufnamen der
+    ///    Fahrzeuge einer Einheit zählen nicht mit.
+    ///
+    /// Eine Einheit aus einem fremden Einsatz liefert über `ee.einsatz_id = e.einsatz_id`
+    /// nichts statt fremder Treffer.
+    pub einheit_id: Option<i64>,
     /// Cursor: nur Einträge mit `lfd_nr <` diesem Wert (für ältere Seiten).
     pub before_lfd_nr: Option<i64>,
     /// Seitengröße (vom Handler auf [1, MAX_LIMIT] geklemmt).
@@ -407,6 +420,23 @@ fn push_filter(qb: &mut QueryBuilder<Sqlite>, einsatz_id: i64, filter: &EtbFilte
     if let Some(eid) = filter.erfasser_id {
         qb.push(" AND e.erfasser_id = ");
         qb.push_bind(eid);
+    }
+    if let Some(einheit) = filter.einheit_id {
+        qb.push(
+            " AND (EXISTS (SELECT 1 FROM auftrag_empfaenger ae \
+                           WHERE ae.auftrag_id = e.auftrag_id \
+                             AND ae.empfaenger_typ = 'einheit' AND ae.einheit_id = ",
+        );
+        qb.push_bind(einheit);
+        qb.push(
+            ") OR EXISTS (SELECT 1 FROM einsatz_einheit ee \
+                          WHERE ee.einsatz_id = e.einsatz_id AND ee.id = ",
+        );
+        qb.push_bind(einheit);
+        qb.push(
+            " AND (TRIM(e.von) = ee.name COLLATE NOCASE \
+                               OR TRIM(e.an) = ee.name COLLATE NOCASE)))",
+        );
     }
     if let Some(cursor) = filter.before_lfd_nr {
         qb.push(" AND e.lfd_nr < ");

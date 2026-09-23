@@ -773,6 +773,44 @@ describe('EtbPage – Zeitachse (Neuentwurf S4)', () => {
     await waitFor(() => expect(screen.getByTestId('ort-suche')).not.toHaveTextContent('typ='));
   });
 
+  it('LFH-616: filtert nach der Einheit aus der URL und schreibt eine Wahl zurück', async () => {
+    const abrufe: string[] = [];
+    setupMSW();
+    server.use(
+      http.get('/api/einsaetze/7/einheiten', () =>
+        HttpResponse.json([
+          { id: 5, name: '1. Zug' },
+          { id: 6, name: '2. Zug' },
+        ]),
+      ),
+      http.get('/api/einsaetze/7/etb', ({ request }) => {
+        abrufe.push(new URL(request.url).search);
+        return HttpResponse.json([eintrag]);
+      }),
+    );
+    renderMitProviders(
+      <AuthProvider>
+        <Routes>
+          <Route path="/einsaetze/:id/etb" element={<EtbPage />} />
+        </Routes>
+        <OrtSpy />
+      </AuthProvider>,
+      { route: '/einsaetze/7/etb?einheit_id=5' },
+    );
+    await screen.findByText('Erste Meldung');
+    // Der Deeplink der Lagekarte kommt am Server an …
+    expect(abrufe.some((a) => a.includes('einheit_id=5'))).toBe(true);
+    // … und die Wahl ist sichtbar benannt, nicht als rohe Zahl.
+    const wahl = screen.getByRole('combobox', { name: 'Nach Einheit filtern' });
+    const feld = wahl.closest('.ant-select') as HTMLElement;
+    await waitFor(() => expect(within(feld).getByText('1. Zug')).toBeInTheDocument());
+
+    await userEvent.click(wahl);
+    const option = await screen.findByTitle('2. Zug');
+    await userEvent.click(option);
+    await waitFor(() => expect(screen.getByTestId('ort-suche')).toHaveTextContent('einheit_id=6'));
+  });
+
   it('ein Nachläufer der Suchfrist verliert den eben gewählten Typ nicht', async () => {
     /*
      * Die Wettlauf-Stelle über die Komponentengrenze: Suche entprellt (300 ms) in der

@@ -1941,6 +1941,12 @@ export interface components {
         OnlineStyle: {
             /** @description LFH-265: absent statt present-null, damit der generierte `attribution?` ehrlich ist. */
             attribution?: string | null;
+            /**
+             * @description Betreiberhinweis eines KATALOG-Eintrags (LFH-616), z. B. eine Lizenzauflage. Ein Eintrag
+             *     mit Hinweis wird im Admin-Katalog sichtbar gewarnt und INAKTIV übernommen — er soll
+             *     nicht mit einem Klick zur Grundlage aller werden. In `/api/karte/config` immer absent.
+             */
+            hinweis?: string | null;
             name: string;
             /**
              * @description `#[schema(required)]` (LFH-265): `typ` wird IMMER serialisiert — `#[serde(default)]`

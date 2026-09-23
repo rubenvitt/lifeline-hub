@@ -457,4 +457,41 @@ describe('Inspector im Paneel „Ausgewählt"', () => {
     expect(link).toHaveTextContent('Im Fachmodul öffnen↗');
     expect(link.querySelector('.ant-btn')).toHaveClass('ant-btn-primary');
   });
+
+  it('LFH-616: an der Einheit springt „ETB ↗" ins nach ihr gefilterte Tagebuch', () => {
+    renderMitProviders(
+      <Inspector
+        einsatzId={1}
+        marker={einheitMarker}
+        darfSchreiben
+        onSchliessen={() => {}}
+        onVerortungLoeschen={() => {}}
+      />,
+    );
+    const etb = screen.getByRole('link', {
+      name: `Einsatztagebuch zu ${einheitMarker.label}`,
+    });
+    expect(etb).toHaveAttribute('href', `/einsaetze/1/etb?einheit_id=${einheitMarker.id}`);
+    expect(etb).toHaveTextContent('ETB↗');
+    // Sekundär: die Hauptaktion bleibt der Fachmodul-Sprung.
+    expect(etb.querySelector('.ant-btn')).not.toHaveClass('ant-btn-primary');
+    // Beide Sprünge stehen in EINER Zeile, der rote Knopf abgesetzt darunter.
+    const zeile = etb.closest('[data-lfh="inspector-sprung"]');
+    expect(zeile).toContainElement(screen.getByRole('link', { name: 'Im Fachmodul öffnen' }));
+    expect(zeile).not.toContainElement(screen.getByRole('button', { name: 'Verortung löschen' }));
+  });
+
+  it('LFH-616: andere Marker bekommen keinen ETB-Sprung — der Filter kennt nur Einheiten', () => {
+    renderMitProviders(
+      <Inspector
+        einsatzId={1}
+        marker={{ ...einheitMarker, schluessel: 'schaden-1', typ: 'schaden' }}
+        darfSchreiben
+        onSchliessen={() => {}}
+        onVerortungLoeschen={() => {}}
+      />,
+    );
+    expect(screen.getByRole('link', { name: 'Im Fachmodul öffnen' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Einsatztagebuch/ })).not.toBeInTheDocument();
+  });
 });

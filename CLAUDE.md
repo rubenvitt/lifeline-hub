@@ -459,6 +459,29 @@ Alltag wichtigsten:
   (ein übergebener Callback ist kein Rechtebeleg). Im Test über das geöffnete Menü greifen
   (`.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]` + `within`), per Teilstring.
   Träger, MeldungKarte-Entscheidung und gemessene Fallen: `docs/leitlinien/bedien-leitlinie-herleitungen.md`.
+- **Ein Sprung ist keine Handlung** (LFH-616, Inspector der Lagekarte). Gezählt werden für
+  „höchstens zwei, sonst bündeln“ die Aktionen, die etwas **ändern**. Zwei Deeplinks
+  („Im Fachmodul öffnen ↗“ | „ETB ↗“) bilden zusammen **eine** Zeile Navigation. Sie
+  stehen nebeneinander in einer umbrechenden Flex-Zeile (`data-lfh="inspector-sprung"`), die
+  rote Handlung steht abgesetzt darunter. Der Deeplink trägt die Zeilenkennung im
+  zugänglichen Namen („Einsatztagebuch zu 1. Zug“), sichtbar steht nur „ETB ↗“.
+  Das **Messwerkzeug** derselben Karte ist ein exklusiver Modus im Reducer von
+  `useKartenInteraktion` wie Zeichnen und Platzieren. Es braucht aber **kein** Schreibrecht,
+  weil nichts gespeichert wird. Es ist der einzige Modus, den Escape beendet: Die übrigen
+  tragen einen Entwurf, der mehr kostet als ein Blick. Sein Stand läuft wie die
+  Zeigerkoordinate über eine Quelle (`messQuelle.ts`), nicht über den Seiten-State. Im
+  Bildtakt neu zu rendern wäre die Folge. terra-draw meldet neben der Figur eigene
+  **Hilfspunkte** als `create` (gemessen im Browser). `messZeichnung.ts` nimmt deshalb nur
+  die Geometrie der gewählten Form als laufende Messung.
+  **Drei terra-draw-Instanzen auf einer Karte brauchen drei Präfixe.** Abschnitt, Zone und
+  Messen hatten den Vorgabe-Präfix `td` des Adapters gemeinsam. Die Effekte laufen in
+  Deklarationsreihenfolge, die zweite Instanz legte `td-polygon` also an, solange die erste
+  es noch hielt. MapLibre warf „Source … already exists“, die Seite fiel in die
+  Error-Boundary (im Browser gemessen: Messen → Gefahrengebiet zeichnen). Jede Instanz trägt
+  deshalb ihren eigenen `prefixId` (`td-abschnitt`/`td-zone`/`td-mess`). Nach `setStyle`
+  legt der Adapter seine Sources **nicht** neu an. `Kartenflaeche` räumt eine laufende
+  Messung deshalb vor dem Stilwechsel und beginnt sie nach `style.load` neu. Für einen
+  offenen Zonen-/Abschnittsentwurf ist dieselbe Lücke Bestand und nicht gelöst.
 - **Ein leeres Feld muss sagen, dass man es schreiben kann** (LFH-369 · B5i, Befund M21). Eine
   inline bearbeitbare, **optionale** Angabe nimmt `components/BemerkungZelle.tsx` — nicht
   `Typography.Text editable` von Hand. Bei leerem Wert blieb davon genau das Stift-Icon übrig:

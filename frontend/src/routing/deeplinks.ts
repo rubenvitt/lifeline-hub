@@ -297,6 +297,8 @@ export function etbPfad(
     typ?: EtbTyp;
     von?: string;
     bis?: string;
+    /** „Betrifft Einheit" (LFH-616) — der Knopf „ETB ↗" an der Einheit auf der Lagekarte. */
+    einheit_id?: number;
   } = {},
 ): string {
   return mitQuery(einsatzModulPfad(einsatzId, 'etb'), {
@@ -306,6 +308,7 @@ export function etbPfad(
     typ: opts.typ,
     von: opts.von,
     bis: opts.bis,
+    einheit_id: opts.einheit_id,
   });
 }
 
@@ -334,6 +337,10 @@ export function parseEtbFilter(params: URLSearchParams): EtbFilterWerte {
   if (von) werte.von = von;
   const bis = params.get('bis');
   if (bis) werte.bis = bis;
+  // Dieselbe Prüfung wie `parseRouteId`: `abc` oder `0` ergäben am Server 400 bzw. einen
+  // Filter auf nichts — dann lieber gar keiner.
+  const einheit = parseRouteId(params.get('einheit_id') ?? undefined);
+  if (einheit != null) werte.einheit_id = einheit;
   return werte;
 }
 

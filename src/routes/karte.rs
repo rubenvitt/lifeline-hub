@@ -97,6 +97,7 @@ pub async fn config(State(state): State<AppState>) -> Result<Json<KarteConfigAnt
                 url,
                 typ,
                 attribution: q.attribution,
+                hinweis: None,
             }
         })
         .collect();

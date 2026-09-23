@@ -294,11 +294,18 @@ describe('Kartengrundlage', () => {
   const STILE = [
     { name: 'Liberty', url: 'x', typ: 'vektor', attribution: null },
     { name: 'TopPlus', url: 'y', typ: 'raster', attribution: null },
+    { name: 'Satellit (Esri)', url: 'z', typ: 'raster', attribution: null },
   ] as never[];
 
-  it('ein Segment je Online-Stil, dazu Offline und Blind — kein „Satellit" (LFH-616)', () => {
+  it('ein Segment je Online-Stil, dazu Offline und Blind — Satellit ist ein Stil (LFH-616)', () => {
     const optionen = grundlageOptionen(STILE, true);
-    expect(optionen.map((o) => o.label)).toEqual(['Liberty', 'TopPlus', 'Offline', 'Blind']);
+    expect(optionen.map((o) => o.label)).toEqual([
+      'Liberty',
+      'TopPlus',
+      'Satellit (Esri)',
+      'Offline',
+      'Blind',
+    ]);
     expect(optionen.every((o) => o.gesperrt == null)).toBe(true);
   });
 

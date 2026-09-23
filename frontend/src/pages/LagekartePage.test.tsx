@@ -44,6 +44,27 @@ vi.mock('./lagekarte/Kartenflaeche', () => ({
         bbox-melden
       </button>
       <button onClick={() => props.onKarteKlick?.({ lng: 8.6, lat: 50.1 })}>karte-klick</button>
+      {/* Messen (LFH-616): welche Form die Karte bekommt, und ein Auslöser, der eine
+          abgeschlossene Strecke von ~111 m meldet wie terra-draw beim Doppelklick. */}
+      <div data-testid="messen">{props.messen ?? 'aus'}</div>
+      {props.messen && (
+        <button
+          onClick={() =>
+            props.onMessung?.(
+              {
+                type: 'LineString',
+                coordinates: [
+                  [9, 52],
+                  [9, 52.001],
+                ],
+              },
+              true,
+            )
+          }
+        >
+          mess-fertig
+        </button>
+      )}
       {(props.markers ?? []).map((m) => (
         <button key={m.schluessel} onClick={() => props.onMarkerKlick?.(m.schluessel)}>
           marker-{m.schluessel}
@@ -878,6 +899,26 @@ describe('LagekartePage', () => {
     expect(screen.getByText('Abschnitte')).toBeInTheDocument();
     // Nicht-verortete Einheit erscheint mit korrektem Label in der Nicht-verortet-Liste.
     expect(await screen.findByText('Einheit: Zug 1')).toBeInTheDocument();
+  });
+
+  it('LFH-616: Messen über den Kartenknopf — Wert im Fuß, Escape beendet', async () => {
+    basisHandler([]);
+    const user = userEvent.setup();
+    renderSeite();
+    await user.click(await screen.findByRole('button', { name: 'Messen' }));
+    expect(screen.getByTestId('messen')).toHaveTextContent('strecke');
+    expect(screen.getByRole('button', { name: 'Messen' })).toHaveAttribute('aria-pressed', 'true');
+
+    await user.click(screen.getByText('mess-fertig'));
+    expect(document.querySelector('[data-lfh="messwert"]')).toHaveTextContent('111 m');
+
+    // Formwechsel geht an die Karte, der Modus bleibt.
+    await user.click(screen.getByRole('radio', { name: 'Fläche' }));
+    expect(screen.getByTestId('messen')).toHaveTextContent('flaeche');
+
+    await user.keyboard('{Escape}');
+    expect(screen.getByTestId('messen')).toHaveTextContent('aus');
+    expect(document.querySelector('[data-lfh="mess-steuerung"]')).toBeNull();
   });
 
   it('platziert eine Einheit: wählen → Karten-Klick → PATCH /position mit lat/lon', async () => {

@@ -21,6 +21,8 @@ function basis(over: Partial<Parameters<typeof KartenUeberlagerung>[0]> = {}) {
     onZoomRaus: vi.fn(),
     onNorden: vi.fn(),
     onZeichnen: vi.fn(),
+    onMessen: vi.fn(),
+    messenAktiv: false,
     ...over,
   };
 }
@@ -42,6 +44,29 @@ describe('KartenUeberlagerung — Knopfblock', () => {
   it('ohne Schreibrecht (kein onZeichnen) gibt es keinen Zeichnen-Knopf', () => {
     renderMitProviders(<KartenUeberlagerung {...basis({ onZeichnen: undefined })} />);
     expect(screen.queryByRole('button', { name: 'Zeichenwerkzeuge' })).not.toBeInTheDocument();
+  });
+
+  it('LFH-616: Messen ist ein Umschalter und steht auch ohne Schreibrecht da', () => {
+    const p = basis({ onZeichnen: undefined });
+    const { rerender } = renderMitProviders(<KartenUeberlagerung {...p} />);
+    const knopf = screen.getByRole('button', { name: 'Messen' });
+    expect(knopf).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(knopf);
+    expect(p.onMessen).toHaveBeenCalledTimes(1);
+    rerender(<KartenUeberlagerung {...p} messenAktiv />);
+    expect(screen.getByRole('button', { name: 'Messen' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('LFH-616: das Lineal steht vor dem Stift, wie im Entwurf S5', () => {
+    renderMitProviders(<KartenUeberlagerung {...basis()} />);
+    const namen = screen.getByRole('group', { name: 'Kartensteuerung' }).querySelectorAll('button');
+    expect([...namen].map((b) => b.getAttribute('aria-label'))).toEqual([
+      'Hineinzoomen',
+      'Herauszoomen',
+      'Nach Norden ausrichten',
+      'Messen',
+      'Zeichenwerkzeuge',
+    ]);
   });
 
   it('die Knopfkante folgt dem Dichte-Boden, nie unter die 32 px des Entwurfs', () => {

@@ -325,3 +325,93 @@ test('Lagekarte: startet auf dem Einsatzort; die Zeitachse deckt die Karte nicht
   await expect(page.getByRole('button', { name: 'Zeitachse einblenden' })).toBeVisible();
   await expect(page.locator('[data-lfh="zeitachse"]')).toHaveCount(0);
 });
+
+/**
+ * Messwerkzeug (LFH-616). Hier und nicht in Vitest, weil der tragende Teil die Ereignisfolge
+ * des ECHTEN terra-draw ist: welche Features es bei `create` meldet (die Figur UND eigene
+ * Hilfspunkte), wann `finish` kommt und ob der Wert bei der Bewegung mitläuft. Der Unit-Test
+ * von `messZeichnung.ts` fährt eine nachgebaute Folge — dieser prüft, ob sie stimmt.
+ */
+test('Lagekarte: Messwerkzeug misst Strecke und Fläche und schließt mit Escape', async ({
+  page,
+}) => {
+  const seitenFehler: Error[] = [];
+  page.on('pageerror', (fehler) => seitenFehler.push(fehler));
+
+  await anmelden(page);
+  const eid = await einsatzAnlegenUndOeffnen(page);
+  await page.goto(`/einsaetze/${eid}/lagekarte`);
+  const canvas = page.getByTestId('kartenflaeche').locator('canvas.maplibregl-canvas');
+  await expect(canvas).toHaveCount(1);
+
+  const knopf = page.getByRole('button', { name: 'Messen' });
+  await knopf.click();
+  await expect(knopf).toHaveAttribute('aria-pressed', 'true');
+  await expect(canvas).toHaveCSS('cursor', 'crosshair');
+  const wert = page.locator('[data-lfh="messwert"]');
+  await expect(wert).toHaveText('—');
+
+  const box = (await canvas.boundingBox())!;
+  const punkt = (dx: number, dy: number) => ({
+    x: box.x + box.width / 2 + dx,
+    y: box.y + box.height / 2 + dy,
+  });
+
+  // Strecke: zwei Punkte, der Wert läuft schon vor dem Abschluss mit.
+  await page.mouse.click(punkt(-120, 0).x, punkt(-120, 0).y);
+  await page.mouse.move(punkt(0, 0).x, punkt(0, 0).y, { steps: 4 });
+  await expect(wert).toHaveText(/^\d[\d.,]* (m|km)$/);
+  await page.mouse.click(punkt(0, 0).x, punkt(0, 0).y);
+  await page.getByRole('button', { name: 'Abschließen' }).click();
+  await expect(page.getByRole('button', { name: 'Neu messen' })).toBeVisible();
+  await expect(wert).toHaveText(/^\d[\d.,]* (m|km)$/);
+
+  // Kartenwechsel mitten in einer Messung (Review LFH-616): „Hell" ergibt einen anderen
+  // Blind-Stil, also `setStyle` mit `diff: false` — das wirft die Sources des Adapters weg.
+  // Ohne Räumen davor warf die nächste Zeigerbewegung (`setData` auf `undefined`). Erwartet:
+  // die Messung beginnt in derselben Form neu und nimmt wieder Punkte an.
+  await page.mouse.click(punkt(-120, 40).x, punkt(-120, 40).y);
+  await page.getByRole('button', { name: 'Benutzermenü' }).click();
+  await page.getByRole('menuitem', { name: /Hell/ }).click();
+  await expect(wert).toHaveText('—');
+  await page.mouse.click(punkt(-120, -40).x, punkt(-120, -40).y);
+  await page.mouse.move(punkt(60, -40).x, punkt(60, -40).y, { steps: 4 });
+  await expect(wert).toHaveText(/^\d[\d.,]* (m|km)$/);
+  await page.mouse.click(punkt(60, -40).x, punkt(60, -40).y);
+  await page.getByRole('button', { name: 'Abschließen' }).click();
+  await expect(page.getByRole('button', { name: 'Neu messen' })).toBeVisible();
+
+  // Fläche: drei Punkte, dann Inhalt und Umfang. Alle ÜBER der Mitte — unter ihr liegt das
+  // Mess-Band im Kartenfuß, ein Klick dort träfe den Knopf statt der Karte.
+  await page.getByRole('radio', { name: 'Fläche' }).click();
+  await expect(wert).toHaveText('—');
+  for (const [dx, dy] of [
+    [-100, -120],
+    [100, -120],
+    [0, -20],
+  ]) {
+    await page.mouse.click(punkt(dx, dy).x, punkt(dx, dy).y);
+  }
+  await page.getByRole('button', { name: 'Abschließen' }).click();
+  await expect(page.getByRole('button', { name: 'Neu messen' })).toBeVisible();
+  await expect(wert).toHaveText(/(m²|ha|km²)\s*Umfang \d/);
+
+  // Direkt aus dem Messen ins Zeichnen (Review LFH-616): drei terra-draw-Instanzen auf EINER
+  // Karte. Mit dem gemeinsamen Vorgabe-Präfix „td" legte die Zone ihre Sources an, solange
+  // die Messung sie noch hielt — MapLibre warf „Source … already exists", die Seite brach
+  // ab. Die Effekte laufen in Deklarationsreihenfolge, das Stoppen der Messung kommt zu spät.
+  await page.getByRole('button', { name: 'Gefahrengebiet zeichnen' }).click();
+  await expect(page.getByRole('button', { name: 'Abschließen' })).toBeVisible();
+  await expect(page.locator('[data-lfh="mess-steuerung"]')).toHaveCount(0);
+  await expect(knopf).toHaveAttribute('aria-pressed', 'false');
+  await page.getByRole('button', { name: 'Abbrechen' }).click();
+
+  // Escape beendet das Werkzeug, der Knopf springt zurück.
+  await knopf.click();
+  await expect(page.locator('[data-lfh="mess-steuerung"]')).toHaveCount(1);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('[data-lfh="mess-steuerung"]')).toHaveCount(0);
+  await expect(knopf).toHaveAttribute('aria-pressed', 'false');
+
+  expect(seitenFehler.map((f) => f.message)).toEqual([]);
+});

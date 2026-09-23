@@ -25,6 +25,13 @@
   outline: 2px solid var(--lfh-bedien);
   outline-offset: -2px;
 }
+/* Umschalter (Messen, LFH-616): eingerastet = tiefere Fläche plus blaue Innenkante. Die
+   Farbe allein wäre ein Ein-Kanal-Zustand; die Kante ist der zweite, `aria-pressed` der
+   dritte für Vorlesende. */
+.lfh-kartenknopf[aria-pressed='true'] {
+  background: var(--lfh-flaeche-3);
+  box-shadow: inset 2px 0 0 var(--lfh-bedien);
+}
 .lfh-kartenknopf:disabled {
   cursor: not-allowed;
   color: var(--lfh-schwach);

@@ -373,6 +373,16 @@ describe('etbPfad mit Filterachse (LFH-342 · C7)', () => {
     expect(parseEtbFilter(new URLSearchParams('q=x&typ=quatsch'))).toEqual({ q: 'x' });
   });
 
+  it('trägt die Einheit hin und zurück (LFH-616)', () => {
+    const pfad = etbPfad(7, { einheit_id: 12 });
+    expect(pfad).toBe('/einsaetze/7/etb?einheit_id=12');
+    expect(parseEtbFilter(new URLSearchParams(pfad.split('?')[1]))).toEqual({ einheit_id: 12 });
+  });
+
+  it.each(['abc', '0', '-3', '1.5', ''])('verwirft einheit_id=%s GANZ (LFH-616)', (wert) => {
+    expect(parseEtbFilter(new URLSearchParams(`q=x&einheit_id=${wert}`))).toEqual({ q: 'x' });
+  });
+
   it('liefert für eine leere Query ein leeres Filterobjekt', () => {
     // Trägt die Gegenaussage zu `filterAktiv` in `EtbPage`: ohne Parameter ist kein
     // Filter gesetzt, und der leer-OHNE-Filter-Zweig aus B3 greift.
