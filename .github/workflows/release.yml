@@ -36,6 +36,12 @@ on:
         required: false
       RELEASE_APP_PRIVATE_KEY:
         required: false
+      # Die Release-Notizen schreibt Claude (`scripts/release/ki-notizen.mjs`). Aus demselben
+      # Grund optional wie die App-Secrets: fehlt der Schlüssel, entstehen die konventionellen
+      # Notizen wie bisher — mit Warnung im Protokoll, ohne roten Lauf. Ein Release scheitert
+      # nie an der Prosa.
+      ANTHROPIC_API_KEY:
+        required: false
 
 permissions:
   contents: read
@@ -145,6 +151,7 @@ jobs:
           GIT_AUTHOR_EMAIL: noreply@github.com
           GIT_COMMITTER_NAME: lifeline-hub-release
           GIT_COMMITTER_EMAIL: noreply@github.com
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         # Der ganze Schritt läuft unter `mise exec`, weil der prepareCmd `pnpm` auf dem PATH
         # braucht (er bumpt frontend/package.json) — nicht nur semantic-release selbst.
         run: mise exec node@26.7.0 pnpm@11.10.0 -- pnpm exec semantic-release
