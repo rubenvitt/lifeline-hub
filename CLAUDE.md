@@ -1408,7 +1408,8 @@ Lokal bleibt es der Weg vor dem Merge:
 
 Reihenfolge (billig → teuer): `check-fmt.sh` (rustfmt **und** Prettier) → `pnpm lint` →
 `check-typ-codegen.sh` (enthält `tsc`) → `cargo test --workspace` → Vitest →
-`check-deps.sh` → `pnpm e2e` → `release-ruhefenster.test.sh` → `check-deps.test.sh`.
+`check-deps.sh` → `pnpm e2e` → `release-ruhefenster.test.sh` + `ki-notizen.test.mjs` →
+`check-deps.test.sh`.
 
 - **Schritt 1 prüft zwei Sprachen, nicht eine** (LFH-354). `prettier --check` liegt **in**
   `check-fmt.sh` statt in einem eigenen Schritt: es ist dieselbe Frage wie bei rustfmt
@@ -1498,6 +1499,22 @@ Reihenfolge (billig → teuer): `check-fmt.sh` (rustfmt **und** Prettier) → `p
   Wer das Fenster vergrössert, hebt den Job-Timeout in `release.yml` mit und bedenkt, dass
   Push-Läufe desselben Kanals in EINER Nebenläufigkeitsgruppe stehen — ein wartender
   Release hält den nächsten Gate-Lauf auf.
+- **Die Release-Notizen schreibt Claude, hinter einer Hülle** (`scripts/release/ki-notizen.mjs`,
+  übernommen aus einsatzzeichen). Das nackte Plugin `semantic-release-claude-changelog` trägt
+  drei stille Fehlerbilder, die die Hülle schliesst: semantic-release erzeugt die Notizen
+  nach dem Versions-Commit **ein zweites Mal** (`prepare.getNextInput`), das Modell formuliert
+  dabei neu — in einsatzzeichen weichen CHANGELOG und GitHub-Release von v1.5.0 gemessen
+  voneinander ab; deshalb wird das Ergebnis je Version gemerkt. Ein Fehlschlag kommt als
+  Text zurück („No release notes generated due to an error.") und stünde für immer im
+  CHANGELOG; deshalb fällt jeder unbrauchbare Text — und ein fehlendes Secret
+  `ANTHROPIC_API_KEY` — auf die **konventionellen Notizen** zurück, mit Warnung, ohne roten
+  Lauf. Claude bekommt **genau einen Zug** (`maxTurns: 1`): das Plugin startet einen Agenten
+  mit Lesewerkzeugen im Checkout, und dort liegt der App-Token (`persist-credentials: true`) —
+  eine präparierte Commit-Nachricht hätte ihn sonst in die öffentlichen Notizen holen
+  können. Und das Plugin kürzt still auf 100 Commits; die Hülle gibt alle, bei Übergrösse nur
+  die Kopfzeilen, sonst konventionell. Die Versionskopfzeile (Vergleichslink, Datum) kommt
+  weiter aus dem konventionellen Generator, damit das CHANGELOG-Format gleich bleibt.
+  Die Vorlage (`KI_PROMPT`) steht in `release.config.mjs`.
 
 `scripts/check-deps.sh` (LFH-253/G01) prüft Abhängigkeiten gegen RUSTSEC/GHSA. Fehlt
 `cargo-audit`, warnt es laut und exitet 0 statt zu brechen. Bekannte, bewertete Advisories

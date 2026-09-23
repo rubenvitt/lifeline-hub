@@ -264,12 +264,18 @@ schritt_7() {
 }
 
 schritt_8() {
-  echo "==> [8/$SCHRITTE] Ruhefenster vor dem Release (Selbsttest)"
+  echo "==> [8/$SCHRITTE] Release-Werkzeug: Ruhefenster und KI-Notizen (Selbsttests)"
   # Im `schnell`-Bündel und nicht bei den teuren Suiten: der Test baut ein paar
   # Temp-Repositories und ist in rund vier Sekunden durch. Er prüft NICHT das Release
   # selbst, sondern die Entscheidung, ob ein Lauf releasen darf — und die ist in beide
   # Richtungen still (Begründung im Kopf des Testskripts).
   "$ROOT/scripts/release-ruhefenster.test.sh"
+  # Dieselbe Frage für die Release-Notizen: nicht, was Claude schreibt, sondern dass ein
+  # Fehlschlag auf die konventionellen Notizen zurückfällt und CHANGELOG und GitHub-Release
+  # denselben Text tragen. Im selben Schritt, weil es dasselbe Werkzeug ist und ein neuer
+  # Schritt das Gate umnummerierte. Braucht nur Node — die Generatoren sind Attrappen, die
+  # Release-Werkzeuge im Root müssen dafür nicht installiert sein.
+  mise exec node@26.7.0 -- node --test "$ROOT/scripts/release/ki-notizen.test.mjs"
 }
 
 schritt_9() {
