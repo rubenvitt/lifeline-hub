@@ -1343,17 +1343,24 @@ test('Betreuung: Karten- und Zeilenaktionen folgen der Dichte-Staffel 30 / 48 / 
       .locator('[data-lfh="datensicht-karte"]');
     await expect(karten).toHaveCount(2);
     const standMelden = karten.getByRole('button', { name: /^Stand melden für Bezirk / });
-    const karteStand = await alleHaltenStufe(standMelden, soll, `Stand melden (${dichte})`, 2);
     const karteMenue = karten.getByRole('button', { name: /^Aktionen zu Bezirk / });
+    // GENAUE Zahlen vor der Messung: `alleHaltenStufe` prüft nur eine Untergrenze. Ohne diese
+    // Zeilen bliebe grün, wenn die geschlossene Stelle doch „Belegung melden" trüge oder eine
+    // Karte zwei Menü-Auslöser hätte — Punkt (a) der Prüfliste wäre dann behauptet, nicht belegt.
+    await expect(standMelden).toHaveCount(2);
+    await expect(karteMenue).toHaveCount(2);
+    const karteStand = await alleHaltenStufe(standMelden, soll, `Stand melden (${dichte})`, 2);
     const karteDrei = await alleHaltenStufe(karteMenue, soll, `Dreipunkt Bezirk (${dichte})`, 2);
 
     const tabelle = page.getByRole('region', { name: 'Betreuungsstellen' });
     await expect(tabelle.locator('tr[data-row-key^="stelle-"]')).toHaveCount(3);
     const belegung = tabelle.getByRole('button', { name: /^Belegung melden für / });
+    const zeileMenue = tabelle.getByRole('button', { name: /^Aktionen zu Stelle / });
+    await expect(belegung).toHaveCount(2);
+    await expect(zeileMenue).toHaveCount(3);
     const zeileBelegung = await alleHaltenStufe(belegung, soll, `Belegung melden (${dichte})`, 2);
     // Drei, nicht zwei: auch die geschlossene Stelle behält ihr Menü (Bündelung nach der
     // Rechteprüfung gezählt, nicht nach dem Zeilenzustand — Prüfliste, Punkt a).
-    const zeileMenue = tabelle.getByRole('button', { name: /^Aktionen zu Stelle / });
     const zeileDrei = await alleHaltenStufe(zeileMenue, soll, `Dreipunkt Stelle (${dichte})`, 3);
 
     const kopf = await haeltStufe(
