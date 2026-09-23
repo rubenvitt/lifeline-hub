@@ -139,7 +139,11 @@ const stellenSpalten = (
             title: 'Aktionen',
             immerSichtbar: true,
             render: (_: unknown, s: Betreuungsstelle) => (
-              <Space wrap>
+              // `middle` statt der Vorgabe: die führt auf `abstand.xs` = 3 / 5 / 7 px, im
+              // Handschuh-Betrieb also 7 px zwischen „Belegung melden" und dem Dreipunkt —
+              // gemessen in Gate 3 (`e2e/gate3-trefflaeche.spec.ts`, „Betreuung: …"). `middle`
+              // führt auf `abstand.md` = 11 / 18 / 26 px und hält Kriterium 2 (≥ 16 px).
+              <Space wrap size="middle">
                 {s.status !== 'geschlossen' && (
                   <Button
                     aria-label={`Belegung melden für ${s.bezeichnung}`}
