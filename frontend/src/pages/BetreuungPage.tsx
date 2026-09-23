@@ -325,7 +325,7 @@ export default function BetreuungPage() {
       titel="Betreuung"
       meta={
         betreuungQuery.data
-          ? `${bezirke.length} Bezirke · ${stellen.length} Betreuungsstellen`
+          ? `${bezirke.length} ${bezirke.length === 1 ? 'Bezirk' : 'Bezirke'} · ${stellen.length} ${stellen.length === 1 ? 'Betreuungsstelle' : 'Betreuungsstellen'}`
           : undefined
       }
       dataUpdatedAt={betreuungQuery.dataUpdatedAt}
