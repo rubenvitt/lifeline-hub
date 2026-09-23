@@ -1,3 +1,47 @@
+## [1.0.0-alpha.40](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.39...v1.0.0-alpha.40) (2026-09-23)
+
+### Wichtige Änderungen
+
+Diese Version führt ein neues Fachmodul **Betreuung** ein, das Evakuierung und Betreuungsstellen verwaltet. Es wird eine Datenbankmigration durchgeführt, die automatisch beim ersten Start erfolgt.
+
+### Betreuung
+
+Neu: Das Fachmodul **Betreuung** steht ab dieser Version zur Verfügung. Es unterstützt die Erfassung und Dokumentation von Evakuierungsmaßnahmen und Betreuungsstellen.
+
+**Evakuierung:**
+- Evakuierungsbezirke können angelegt und bearbeitet werden
+- Plangröße der zu evakuierenden Personen kann hinterlegt werden (geschätzt oder konkret)
+- Standmeldungen dokumentieren den Fortschritt der Evakuierung
+- Kennzahl „Evakuiert" zeigt den aktuellen Stand im Verhältnis zur Plangröße
+- Kartendarstellung im Plan-Modus zeigt alle Evakuierungsbezirke auf einen Blick
+
+**Betreuungsstellen:**
+- Betreuungsstellen können angelegt, bearbeitet und geschlossen werden
+- Kapazität (Plangröße) wird beim Anlegen erfasst
+- Belegungsmeldungen dokumentieren die Auslastung
+- Freie Plätze und Auslastung (gering/mittel/hoch/voll) werden angezeigt
+- Tabellendarstellung mit allen relevanten Informationen auf einen Blick
+- Vor dem Schließen einer Stelle muss eine Leermeldung (Belegung 0) erfasst werden
+
+**Bedienung:**
+- Direktlinks zu einzelnen Bezirken oder Stellen mit automatischem Scrollen und Hervorhebung
+- Rückgängig-Funktion für Stand- und Belegungsmeldungen direkt nach dem Melden
+- Aktionsmenü an jeder Karte und Tabellenzeile mit allen verfügbaren Aktionen
+- Ohne Schreibrecht werden gesperrte Aktionen mit Hinweis auf den Grund angezeigt
+- Zeitpunkte können bei allen Meldungen angepasst werden, jedoch maximal 60 Sekunden in der Zukunft
+
+**Einsatztagebuch:**
+- Alle Aktionen im Betreuungsmodul werden automatisch im Einsatztagebuch dokumentiert
+- Nachträge und Rücknahmen werden korrekt gekennzeichnet und unterschieden
+- Bei Nachtragung älterer Meldungen wird der aktuelle Stand mit angegeben
+
+**Lagedarstellung:**
+- Betreuungsdaten werden in Echtzeit über Live-Ereignisse an alle Arbeitsplätze verteilt
+- Status von Evakuierungsbezirken und Betreuungsstellen sind farblich gekennzeichnet
+
+**Datenschutz:**
+- Bezeichnungen von Bezirken und Stellen werden bei der Schwärzung von Einsätzen automatisch anonymisiert
+
 ## [1.0.0-alpha.39](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.38...v1.0.0-alpha.39) (2026-09-23)
 
 ### Wichtige Änderungen
