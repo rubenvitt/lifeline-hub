@@ -21,21 +21,21 @@ import { kontrast, randKontrast } from './kontrast-kern';
  *    Seitengrund, vor dem er als Kante steht, und gegen die eigene Kartenfläche: ≥ 3 : 1;
  *  · der Rand des Etiketts gegen die Kartenfläche und gegen seine eigene Tönung: ≥ 3 : 1.
  *
- * DREI BENANNTE AUSNAHMEN, alle drei keine Eigenheit dieser Seite, sondern Eigenschaften
+ * ZWEI BENANNTE AUSNAHMEN, beide keine Eigenheit dieser Seite, sondern Eigenschaften
  * geteilter Rollen bzw. Primitive — dort liegt jeweils das Ticket, hier gilt bis dahin die
  * absolute Untergrenze 4,5 : 1 aus Kriterium 5, der Zielwert steht in jeder Meldung:
- *  · TERTIÄRTEXT (`schwach`: Augenbrauen, `Typography type="secondary"`, Feldhilfe,
- *    Platzhalter) — Tag 5,33 auf `grund`, 5,84 auf `paneel`, hier zuerst gemessen 5,20 auf
- *    `alarmFlaeche` und 6,37 als Platzhalter auf Weiß; nachts 4,81 auf der Dialogfläche.
+ *  · TERTIÄRTEXT (`schwach`: Augenbrauen, `Typography type="secondary"` samt „Stand",
+ *    Feldhilfe, Platzhalter, Ortspfad im Seitenkopf bis auf das letzte Glied) — Tag 5,33
+ *    auf `grund`, 5,84 auf `paneel`, hier zuerst gemessen 5,20 auf `alarmFlaeche` und 6,37
+ *    als Platzhalter auf Weiß; nachts 4,81 auf der Dialogfläche.
  *    Welcher Boden für diese Textstufe gilt, entscheidet LFH-643; die Prüfliste von LFH-618
  *    hat die Frage ausdrücklich dorthin gelegt („eine globale Textstufe gehört nicht neben
  *    einen Rollen-Fix"). Gilt in BEIDEN Modi.
  *  · WEISS AUF `bedien` in jedem Primärknopf (Kopfaktion, Absende-Knopf der Dialoge) — Tag
  *    6,59 (`theme/tokens.ts`), nachts hält er. → LFH-661. Nur am Tag.
- *  · DER SEITENKOPF (`EinsatzSeite`: Brotkrumen, „Stand") — geteiltes Primitiv jeder
- *    Einsatzseite, am Tag derselbe Tertiärton (5,33). Nur am Tag.
- * Jeder andere Text — Einheit, Etikett, Abstand, Zeit, Nebenknöpfe, Feldbeschriftungen —
- * trägt den vollen Boden. FALLEN DIE AUSNAHMEN, wenn LFH-643/LFH-661 landen.
+ * Jeder andere Text — Einheit, Etikett, Abstand, Zeit, Nebenknöpfe, Feldbeschriftungen,
+ * Seitentitel und Kopf-Meta — trägt den vollen Boden. FALLEN DIE AUSNAHMEN, wenn
+ * LFH-643/LFH-661 landen.
  *
  * DER RAND DER PLANMÄSSIGEN UND DER ABGELÖSTEN KARTE ist KEIN Zustandsträger: planmäßig heißt
  * „nichts zu tun", die Karte trägt dort die Linienfarbe (Kopfkommentar `AbloesungKarte`,
@@ -46,7 +46,7 @@ import { kontrast, randKontrast } from './kontrast-kern';
  */
 
 const TEXT = { light: 7, dark: 5 } as const;
-/** Absolute Untergrenze aus Kriterium 5 („nie < 4,5 : 1"), für die drei Ausnahmen oben. */
+/** Absolute Untergrenze aus Kriterium 5 („nie < 4,5 : 1"), für die zwei Ausnahmen oben. */
 const BODEN = 4.5;
 const ZUSTAND = 3;
 
@@ -59,6 +59,9 @@ const TERTIAER = [
   // Die Feldhilfe der Dialoge („Leer: jetzt") — antds `colorTextDescription`.
   '.ant-form-item-extra',
   '.ant-select-placeholder',
+  // Der Ortspfad im Seitenkopf bis auf sein letztes Glied (`EinsatzSeite`: `itemColor`/
+  // `linkColor`/`separatorColor` = `schwach`, `lastItemColor` = `text2`).
+  '.lfh-seitenkopf__pfad li:not(:last-child)',
 ].join(', ');
 
 const KARTEN = [
@@ -243,9 +246,7 @@ for (const modus of ['light', 'dark'] as const) {
           ? 'Tertiärtext → LFH-643'
           : tag && primaer
             ? 'Weiß auf bedien → LFH-661'
-            : tag && flaeche === 'kopf'
-              ? 'Seitenkopf, Tertiärton → LFH-643'
-              : null;
+            : null;
         const schranke = ausnahme ? BODEN : TEXT[modus];
         const kontext = `${modus}, ${ansicht}, ${flaeche}, „${text}": ${m.verhaeltnis.toFixed(2)} : 1 (Ziel ≥ ${TEXT[modus]}, Schranke ≥ ${schranke}${ausnahme ? `, ${ausnahme}` : ''}) ${JSON.stringify(m)}`;
         messwerte.push({ modus, ansicht, flaeche, art: 'text', wortlaut: text, ausnahme, ...m });
@@ -306,6 +307,8 @@ for (const modus of ['light', 'dark'] as const) {
       'Deichwache Kontrast',
       'Im Einsatz seit',
       'Zeitpunkt',
+      'Ablösung',
+      /^4 laufend · 2 fällig$/,
     ])
       pruefeGesehen(tragend, true);
     for (const ausnahme of ['fällig', 'abgelöst', `Abgelöst durch ${FOLGE}`, 'Leer: jetzt'])
