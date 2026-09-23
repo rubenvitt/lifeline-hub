@@ -160,7 +160,8 @@ mod tests {
     /// heissen ja verschieden. Erst beim Einspielen scheitert `_sqlx_migrations.version`,
     /// und zwar in JEDEM Test, der eine Datenbank anlegt, mit einer Meldung, die keine
     /// Datei nennt (gemessen am 22.09.2026: dreimal `0106` nach #97/#98/#99). Dieser Test
-    /// nennt die Kollision beim Namen.
+    /// nennt die Kollision beim Namen — aber nur im EIGENEN Stand. Gegen den aktuellen
+    /// Ziel-Branch prüft `scripts/check-migrationen.sh` (LFH-658), und zwar vor dem Merge.
     #[test]
     fn migrationsnummern_sind_eindeutig() {
         let mut je_nummer: std::collections::BTreeMap<i64, Vec<String>> = Default::default();
@@ -180,6 +181,70 @@ mod tests {
             "Migrationsnummer mehrfach vergeben — eine davon auf die nächste freie Nummer \
              umlegen: {doppelt:?}"
         );
+    }
+
+    /// LFH-658: sqlx 0.9 spielt eine kleinere Version, die NACH einer größeren auftaucht,
+    /// still nach — kein „applied out of order", kein Fehler. Eine Datenbank, die `0118`
+    /// schon hat, nimmt ein später gemergtes `0117` also einfach mit, eine frische Datenbank
+    /// spielt beide in Nummernfolge. Darauf ruht die Regel „anhängen, nicht einschieben"
+    /// aus `scripts/check-migrationen.sh`: sie ist die einzige Stelle, die den Einschub
+    /// bemerkt. Wird sqlx hier strenger, ist dieser Test rot und die Regel neu zu bewerten.
+    #[tokio::test]
+    async fn sqlx_spielt_eingeschobene_kleinere_version_still_nach() {
+        use sqlx::migrate::{Migration, MigrationType, Migrator};
+        use sqlx::SqlSafeStr;
+        use std::borrow::Cow;
+
+        fn migration(version: i64, sql: &'static str) -> Migration {
+            Migration::new(
+                version,
+                Cow::Borrowed("einschub"),
+                MigrationType::Simple,
+                sql.into_sql_str(),
+                false,
+            )
+        }
+        let v1 = migration(1, "CREATE TABLE eingeschoben (id INTEGER);");
+        let v2 = migration(2, "CREATE TABLE zuerst (id INTEGER);");
+
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(SqliteConnectOptions::new().filename(":memory:"))
+            .await
+            .unwrap();
+
+        let versionen = || async {
+            sqlx::query_scalar::<_, i64>("SELECT version FROM _sqlx_migrations ORDER BY version")
+                .fetch_all(&pool)
+                .await
+                .unwrap()
+        };
+
+        let nur_v2 = Migrator {
+            migrations: Cow::Owned(vec![v2.clone()]),
+            ..Migrator::DEFAULT
+        };
+        nur_v2.run(&pool).await.expect("v2 allein");
+        assert_eq!(versionen().await, vec![2]);
+
+        let beide = Migrator {
+            migrations: Cow::Owned(vec![v1, v2]),
+            ..Migrator::DEFAULT
+        };
+        beide
+            .run(&pool)
+            .await
+            .expect("sqlx meldet den Einschub nicht als Fehler");
+
+        assert_eq!(
+            versionen().await,
+            vec![1, 2],
+            "v1 wurde nach v2 nachgespielt"
+        );
+        sqlx::query("SELECT id FROM eingeschoben")
+            .fetch_all(&pool)
+            .await
+            .expect("die eingeschobene Migration ist angewendet");
     }
 
     #[tokio::test]
