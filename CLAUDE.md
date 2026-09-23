@@ -194,6 +194,16 @@ Personenstatus. **Die Sichtung ist die eine Ausnahme vom Vorrang des Neuentwurfs
 (22.09.2026): dessen Farben (II orange, III gelb, IV grau) hat der Auftraggeber ausdrücklich
 abgelehnt — `SichtungsTag`/`sichtungsfarben` bleiben BBK.
 
+**Nachzug LFH-650 (gemessen, Prüfliste `2026-09-22-lfh-613-pruefliste.md`):** Blauer
+Bedien-TEXT nimmt `rollen.bedienText`, nicht antds `colorLink` — der Linkton trug auf einer
+Lückenzeile 5,93 (Tag) / 4,50 (Nacht). Personen-Marker tragen eine unsichtbare Trefferzone mit
+dem Durchmesser `controlHeight` (`KarteMarker.trefferDurchmesser`) und außen 2 px Schwarz um den
+weißen Rand (Weiß + Schwarz halten gegen jeden Grund ≥ 4,58); die Lagekarte setzt beides nicht.
+Personen-Cluster zeigen ihren Ring nach Sichtung und im Kern das Kürzel der dringlichsten
+Kategorie — kein eigenes Personen-Segment mehr. Die gefüllte `BemerkungZelle` ist ein
+Textknopf (gleiche Höhe wie der Platzhalter), der Fehler einer Inline-Zelle steht an der Zelle
+(`data-fehler`), nicht im Toast.
+
 `e2e/betroffene-kontrast.spec.ts` prüft die tatsächlich zusammengesetzten Text-/Hintergrundpaare
 auf Aufnahme-Route, im Modal, in Listen und Details: Tag ≥ 7:1, Nacht ≥ 5:1. Die Sichtungswahl
 wird ungewählt, gewählt und mit Hover geprüft; Alpha wird mitgerechnet, unbelegte
