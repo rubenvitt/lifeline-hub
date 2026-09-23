@@ -15,12 +15,14 @@ import type {
   AbloesungEinstufung,
   AbschnittLagezustand,
   BelegungsArt,
+  BetreuungsstelleStatus,
   Ausmass,
   BrStatus,
   EinsatzStatus,
   EtbTyp,
   MaterialStatus,
   PersonStatus,
+  Raeumungszustand,
   SchadenStatus,
   Sichtungskategorie,
   StatusKategorie,
@@ -479,6 +481,67 @@ export const abloesungEinstufung: Record<AbloesungEinstufung, StatusDarstellung>
   vorwarnung: { rolle: 'achtung', label: 'Ablösung bald fällig' },
   ueberfaellig: { rolle: 'alarm', label: 'überfällig' },
 };
+
+/**
+ * Räumungszustand eines Evakuierungsbezirks (LFH-639, design.md D8). „angeordnet" und
+ * „läuft" teilen sich `achtung` — beide sind Handlungsbedarf, die Räumung ist nicht
+ * abgeschlossen; unterschieden wird über das Pflichtwort. „geräumt" ist der erreichte
+ * Sollzustand (`normal`), „aufgehoben" ist beendet (`neutral`) und zählt auch in der
+ * Kennzahl nicht mehr mit.
+ *
+ * KEIN `bedien`: nach A2 trägt die Rolle eine aktive Beziehung (Übergabe, Reservierung,
+ * Verortung), keinen Zustand der Entität selbst.
+ */
+export const raeumungszustand: Record<Raeumungszustand, StatusDarstellung> = {
+  angeordnet: { rolle: 'achtung', label: 'angeordnet' },
+  laeuft: { rolle: 'achtung', label: 'läuft' },
+  geraeumt: { rolle: 'normal', label: 'geräumt' },
+  aufgehoben: { rolle: 'neutral', label: 'aufgehoben' },
+};
+
+/**
+ * Betriebsstatus einer Betreuungsstelle (LFH-639, design.md D8). Präzedenz `uhsStatus`
+ * (`geplant` → `neutral`, `aktiv` → `normal`) — mit einer bewussten Abweichung:
+ * „geschlossen" ist `neutral`, nicht `alarm` wie `uhsStatus.aufgeloest`. Eine Stelle
+ * lässt sich wieder öffnen (design.md D4); ein umkehrbarer Zustand ist kein Alarm.
+ *
+ * Die ART der Stelle (Anlaufstelle … Notunterkunft) bekommt keine Karte: sie ist eine
+ * Kategorie, kein Zustand — derselbe Schluss wie bei {@link uhsTyp}, nur ohne Einträge.
+ */
+export const betreuungsstelleStatus: Record<BetreuungsstelleStatus, StatusDarstellung> = {
+  vorbereitet: { rolle: 'neutral', label: 'vorbereitet' },
+  in_betrieb: { rolle: 'normal', label: 'in Betrieb' },
+  geschlossen: { rolle: 'neutral', label: 'geschlossen' },
+};
+
+/**
+ * Auslastung einer Betreuungsstelle (LFH-639, design.md D8) — eine BERECHNETE Einstufung,
+ * keine Karte über einem Enum. Deshalb eine Funktion und kein exportiertes Objekt: der
+ * Abdeckungstest leitet die Vertragskarten aus den Objekt-Exporten ab, eine Stufentabelle
+ * hier daneben zählte dort als dreiundzwanzigste Karte.
+ *
+ *  - **Keine Kapazität → `null`.** Ohne Kapazität gibt es nichts, wogegen man messen könnte
+ *    (und keine Zahl freier Plätze).
+ *  - **Keine Meldung → `null`.** Keine Meldung ist nicht 0 und nicht „leer".
+ *  - **Unter 90 % → `null`.** Für diesen Bereich nennt D8 kein Wort, und eine Farbe ohne
+ *    Wort bräche den zweiten Kanal (WCAG 1.4.1).
+ *  - **Ab 90 % `achtung` „fast voll", genau 100 % `alarm` „voll", darüber `alarm`
+ *    „überbelegt".** Eine Belegung über der Kapazität ist erlaubt (Spec „Überbelegung").
+ *
+ * Verglichen wird GANZZAHLIG (`belegt · 10 ≥ kapazität · 9`), nicht über einen Quotienten:
+ * bei Kapazität 150 liegt die Schwelle genau auf 135, und ein Gleitkomma-Quotient darf an
+ * einer solchen Kante nicht entscheiden. Rein.
+ */
+export function auslastung(
+  belegt: number | null | undefined,
+  kapazitaet: number | null | undefined,
+): StatusDarstellung | null {
+  if (belegt == null || kapazitaet == null || kapazitaet < 1) return null;
+  if (belegt > kapazitaet) return { rolle: 'alarm', label: 'überbelegt' };
+  if (belegt === kapazitaet) return { rolle: 'alarm', label: 'voll' };
+  if (belegt * 10 >= kapazitaet * 9) return { rolle: 'achtung', label: 'fast voll' };
+  return null;
+}
 
 /**
  * Amtliche DWD-Warnstufe einer Wetterwarnung am Einsatzort (LFH-633, Modul „Wetter & Pegel").

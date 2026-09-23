@@ -50,6 +50,30 @@ describe('modulRegistry', () => {
     expect(etb?.route).toBe('etb');
   });
 
+  it('führt Betreuung in der Erfassung direkt nach den Unfallhilfsstellen (LFH-639)', () => {
+    // Reihenfolge-Pin: dieselbe Folge wie `MODUL_KEYS` im Backend (`src/einsatz/modul.rs`).
+    expect(moduleNachKategorie('erfassung').map((m) => m.key)).toEqual([
+      'etb',
+      'personen',
+      'unfallhilfsstellen',
+      'betreuung',
+      'tiere',
+      'schaeden',
+    ]);
+    const betreuung = modulRegistry.find((m) => m.key === 'betreuung');
+    expect(betreuung).toMatchObject({
+      kategorie: 'erfassung',
+      label: 'Betreuung',
+      route: 'betreuung',
+      status: 'fertig',
+      // Ohne Zählerquelle fände `darfZaehlerZeigen('betreuung', …)` kein Modul und der
+      // Zähler wie die Kennzahl blieben still aus.
+      zaehlerQuelle: 'betreuung',
+    });
+    expect(typeof betreuung?.icon).toBe('function');
+    expect(betreuung?.beschreibung?.trim()).toBeTruthy();
+  });
+
   it('liefert jede Kategorie aus der Reihenfolge mit mindestens einem Modul', () => {
     for (const k of kategorien) {
       expect(moduleNachKategorie(k.key).length).toBeGreaterThan(0);

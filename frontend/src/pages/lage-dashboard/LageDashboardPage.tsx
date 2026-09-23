@@ -65,7 +65,9 @@
  * Zuschnitt: kommt während der Betrachtung ein neuer an, tauscht die Reihe nicht unter dem
  * Blick, sondern ein Sammelbanner bietet ihn an („übernehmen").
  *
- * Weggelassen, weil keine Datenquelle existiert: Evakuiert (LFH-607). Der erwartete
+ * Noch nicht im Band: Evakuiert. Die Datenquelle gibt es seit LFH-639
+ * (`betreuung/useEvakuierungKennzahl.ts`, gegatet wie der Modulzähler); den Platz hat LFH-640
+ * festgelegt (Lageplatz B, siehe oben), eingetragen wird sie mit LFH-607. Der erwartete
  * Höchststand am Leitpegel (LFH-628) steht als Teil der Pegel-Notiz („Prognose 7,10 m bis
  * 18:00"), solange sein Zeitpunkt aussteht — die Ableitung liegt in `pegel/pegelKennzahl.ts`.
  * „Transportiert / offen" im Sichtungsfuß und die Notiz „n seit über 4 h" an „Vermisste"

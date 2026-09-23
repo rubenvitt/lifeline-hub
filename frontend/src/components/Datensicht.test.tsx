@@ -874,6 +874,63 @@ describe('Datensicht · Kartenzweig', () => {
     expect(container.querySelectorAll('[data-lfh="datensicht-karte"] button')).toHaveLength(1);
   });
 
+  it('weitere Aktionen: EIN Menü-Auslöser je Zeile, mit der Zeilenkennung im Namen (LFH-639)', async () => {
+    // Plan-Modus trägt genau EINE Primäraktion; alles Weitere wird gebündelt (LFH-365).
+    // Der Auslöser ist icon-only, sein Name trägt die Zeilenkennung — sonst lieferten
+    // n Karten n gleichnamige Knöpfe.
+    setzeViewportBreite(390);
+    const onWahl = vi.fn();
+    rendere({
+      karte: {
+        ...karte,
+        aktion: { etikett: 'Melden', onKlick: () => {} },
+        weitere: {
+          eintraege: () => [
+            { key: 'bearbeiten', label: 'Bearbeiten' },
+            { key: 'stornieren', label: 'Stornieren', gefahr: true },
+          ],
+          zugaenglicherName: (f) => `Aktionen zu ${f.funkrufname}`,
+          onWahl,
+        },
+      },
+    });
+    const ausloeser = screen.getByRole('button', { name: 'Aktionen zu Rotkreuz 2' });
+    expect(screen.getAllByRole('button', { name: /^Aktionen zu / })).toHaveLength(3);
+    // Die Primäraktion bleibt daneben stehen — das Menü ersetzt sie nicht.
+    expect(screen.getAllByRole('button', { name: 'Melden' })).toHaveLength(3);
+    await userEvent.click(ausloeser);
+    const menue = await waitFor(() => {
+      const m = document.querySelector(
+        '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+      ) as HTMLElement | null;
+      expect(m).not.toBeNull();
+      return m!;
+    });
+    // Die Gefahr steht hinter einem Trenner, nicht bündig unter dem Neutralen.
+    expect(menue.querySelector('.ant-dropdown-menu-item-divider')).not.toBeNull();
+    const eintrag = within(menue).getByRole('menuitem', { name: /Stornieren/ });
+    expect(eintrag).toHaveClass('ant-dropdown-menu-item-danger');
+    await userEvent.click(eintrag);
+    expect(onWahl).toHaveBeenCalledWith('stornieren', DREI[1]);
+  });
+
+  it('weitere Aktionen: bleibt nach dem Filtern nichts übrig, gibt es GAR KEINEN Auslöser', () => {
+    // Gegenhälfte: ein deaktivierter oder leerer Auslöser wäre ein Ziel ohne Wirkung.
+    setzeViewportBreite(390);
+    rendere({
+      karte: {
+        ...karte,
+        weitere: {
+          eintraege: (f) => (f.id === 2 ? [{ key: 'bearbeiten', label: 'Bearbeiten' }] : []),
+          zugaenglicherName: (f) => `Aktionen zu ${f.funkrufname}`,
+          onWahl: () => {},
+        },
+      },
+    });
+    expect(screen.getAllByRole('button', { name: /^Aktionen zu / })).toHaveLength(1);
+    expect(screen.getByRole('button', { name: 'Aktionen zu Rotkreuz 2' })).toBeInTheDocument();
+  });
+
   it('der Statusslot rendert ein Etikett MIT Text, nicht nur eine Farbe', () => {
     // `label` ist am `StatusDarstellung`-Typ Pflichtfeld und damit der erzwungene zweite
     // Kanal (WCAG 1.4.1). Ein Slot, der nur eine Rolle liefert, bricht den Typcheck.

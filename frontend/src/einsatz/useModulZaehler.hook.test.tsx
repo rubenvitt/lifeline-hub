@@ -52,11 +52,12 @@ describe('useModulZaehler (LFH-612)', () => {
     // Ein fehlendes Feld bleibt fehlend — keine erfundene 0.
     expect(result.current.auftraege).toBeUndefined();
     // Genau die eine Zählabfrage für die acht Serverquellen — die Listen, aus denen der Rahmen
-    // vorher zählte, nie. Dazu kommen nur die zwei Browser-Zähler (LFH-632, LFH-635), die
-    // ihre eigene Modulliste lesen und nicht in der Serverantwort stehen.
-    await waitFor(() => expect(angefragt).toHaveLength(3));
+    // vorher zählte, nie. Dazu kommen nur die drei Browser-Zähler (LFH-632, LFH-635,
+    // LFH-639), die ihre eigene Modulliste lesen und nicht in der Serverantwort stehen.
+    await waitFor(() => expect(angefragt).toHaveLength(4));
     expect([...angefragt].sort()).toEqual([
       '/api/einsaetze/7/abloesungen',
+      '/api/einsaetze/7/betreuung',
       '/api/einsaetze/7/dokumente',
       '/api/einsaetze/7/modul-zaehler',
     ]);

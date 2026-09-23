@@ -1,12 +1,20 @@
 import { useQuery } from '@tanstack/react-query';
 import type { Dayjs } from 'dayjs';
 import { listeAbloesungen } from '../api/abloesungen';
+import { ladeBetreuung } from '../api/betreuung';
 import { listeDokumente } from '../api/dokumente';
 import { ladeModulZaehler } from '../api/modulZaehler';
 import { EINSATZ_KEYS, einsatzKeys, type EinsatzKey } from '../api/queryKeys';
-import type { Abloesung, BenutzerAnzeige, ModulOverrides, ModulZaehler } from '../api/types';
+import type {
+  Abloesung,
+  BenutzerAnzeige,
+  Evakuierungsbezirk,
+  ModulOverrides,
+  ModulZaehler,
+} from '../api/types';
 import { zaehleFaellige } from '../abloesung/einstufung';
 import { useEinstufungsUhr } from '../abloesung/useUhr';
+import { istAktiverBezirk } from '../betreuung/evakuierungKennzahl';
 import {
   istModulGesperrt,
   istModulSichtbar,
@@ -114,7 +122,7 @@ export function bildeZaehler(antwort: ModulZaehler): ModulZaehlerMap {
 }
 
 /**
- * Die zwei Zähler, die der Browser selbst rechnet (LFH-632, LFH-635) — sie stehen NICHT in
+ * Die drei Zähler, die der Browser selbst rechnet (LFH-632, LFH-635, LFH-639) — sie stehen NICHT in
  * der Serverantwort und deshalb auch nicht in {@link ZAEHLER_QUELLEN}/{@link ZAEHLER_LISTEN_KEYS}:
  * ihre Frische hängt an der eigenen Modulliste, nicht am Modulzähler-Key.
  */
@@ -136,11 +144,28 @@ export function berechneAbloesungZaehler(
 }
 
 /**
+ * LFH-639: aktive Evakuierungsbezirke — nicht storniert, nicht aufgehoben. „Aktiv" steht
+ * EINMAL in `betreuung/evakuierungKennzahl.ts`, damit Zähler und Kennzahl nicht
+ * auseinanderlaufen. Browser-Zähler, weil die Seite und die Kennzahl dieselbe Übersicht
+ * (`einsatzKeys.betreuung`) ohnehin laden — ein Serverfeld wäre ein zweites Cache-Fach für
+ * dieselbe Aussage.
+ */
+export function berechneBetreuungZaehler(
+  bezirke: ReadonlyArray<Pick<Evakuierungsbezirk, 'raeumung' | 'storniert_at'>>,
+): ModulZaehlerWert {
+  const aktiv = bezirke.filter(istAktiverBezirk).length;
+  return {
+    wert: aktiv,
+    beschreibung: plural(aktiv, 'aktiver Evakuierungsbezirk', 'aktive Evakuierungsbezirke'),
+  };
+}
+
+/**
  * Ob der Rahmen den Zähler einer Quelle zeigen darf: nur an einem sichtbaren UND freien
  * Modul. Das Laden filtert seit LFH-612 der Server (ein nicht erlaubtes Modul fehlt in der
  * Antwort, dort mit den Org-Vorgaben, die der Client nicht kennt); diese Prüfung hält die
  * Anzeige zusätzlich an dieselbe Sicht wie die Navigation — ein Modul, das der Rahmen nicht
- * zeigt, zeigt auch keine Zahl. Für die zwei Browser-Zähler ist sie zugleich das Ladegate:
+ * zeigt, zeigt auch keine Zahl. Für die drei Browser-Zähler ist sie zugleich das Ladegate:
  * ein ausgeblendetes oder gesperrtes Modul erzeugt weder 403-Rauschen noch einen Seitenkanal.
  */
 export function darfZaehlerZeigen(
@@ -156,12 +181,14 @@ export function darfZaehlerZeigen(
 
 /**
  * Die Zähler des Einsatz-Navigationsrahmens: EINE Serverabfrage für die acht Serverquellen
- * (LFH-612), dazu die zwei Browser-Zähler aus ihren eigenen Modullisten (LFH-632, LFH-635).
+ * (LFH-612), dazu die drei Browser-Zähler aus ihren eigenen Modullisten (LFH-632, LFH-635,
+ * LFH-639).
  */
 export function useModulZaehler({ einsatzId, benutzer, overrides }: Args): ModulZaehlerMap {
   const gueltigerEinsatz = Number.isFinite(einsatzId);
   const dokumenteAktiv = gueltigerEinsatz && darfZaehlerZeigen('dokumente', benutzer, overrides);
   const abloesungAktiv = gueltigerEinsatz && darfZaehlerZeigen('abloesung', benutzer, overrides);
+  const betreuungAktiv = gueltigerEinsatz && darfZaehlerZeigen('betreuung', benutzer, overrides);
 
   const zaehler = useQuery({
     queryKey: einsatzKeys.modulZaehler(einsatzId),
@@ -178,6 +205,12 @@ export function useModulZaehler({ einsatzId, benutzer, overrides }: Args): Modul
     queryFn: () => listeAbloesungen(einsatzId, 'laufend'),
     enabled: abloesungAktiv,
   });
+  // Dieselbe Übersicht wie Seite und Kennzahl (LFH-639): ein Abruf, ein Cache-Fach.
+  const betreuung = useQuery({
+    queryKey: einsatzKeys.betreuung(einsatzId),
+    queryFn: () => ladeBetreuung(einsatzId),
+    enabled: betreuungAktiv,
+  });
   // Die Einstufung hängt an der Uhr, nicht nur am Abruf: ohne Wecker bliebe der Zähler bei
   // einer Schicht, die gerade in die Vorwarnzeit läuft, still auf dem alten Stand.
   const jetzt = useEinstufungsUhr(abloesungAktiv ? abloesungen.data : undefined);
@@ -191,6 +224,9 @@ export function useModulZaehler({ einsatzId, benutzer, overrides }: Args): Modul
   }
   if (abloesungAktiv && abloesungen.isSuccess) {
     karte.abloesung = berechneAbloesungZaehler(abloesungen.data, jetzt);
+  }
+  if (betreuungAktiv && betreuung.isSuccess) {
+    karte.betreuung = berechneBetreuungZaehler(betreuung.data.bezirke);
   }
   return karte;
 }

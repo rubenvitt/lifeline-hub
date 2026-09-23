@@ -881,6 +881,70 @@
           }
         }
       },
+      "BelegungKopfzahl": {
+        "type": "object",
+        "description": "Kopfzahl „in Betreuung“ zu einem Zeitpunkt (Verpflegung, LFH-634). Ohne Personenbezug.",
+        "required": [
+          "zeitpunkt_at",
+          "summe",
+          "stellen_ohne_meldung",
+          "stellen"
+        ],
+        "properties": {
+          "stellen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BelegungKopfzahlStelle"
+            }
+          },
+          "stellen_ohne_meldung": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Zahl der Stellen, die bis zum Stichtag keine Meldung haben."
+          },
+          "summe": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Summe über die Stellen MIT Meldung bis zum Stichtag. Ist `stellen_ohne_meldung` > 0,\nist die Summe eine Untergrenze; bei 0 Stellen mit Meldung heißt `summe = 0` „nichts\ngemeldet“, nicht „niemand in Betreuung“."
+          },
+          "zeitpunkt_at": {
+            "type": "string",
+            "description": "Stichtag, UTC ohne Zonenkennung."
+          }
+        }
+      },
+      "BelegungKopfzahlStelle": {
+        "type": "object",
+        "description": "Belegung einer Stelle zum Stichtag der Kopfzahl.",
+        "required": [
+          "stelle_id",
+          "bezeichnung"
+        ],
+        "properties": {
+          "belegt": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Fehlt, wenn die Stelle bis zum Stichtag keine Meldung hat — sie zählt dann nicht mit."
+          },
+          "bezeichnung": {
+            "type": "string"
+          },
+          "stelle_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "zeitpunkt_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Zeitpunkt der maßgeblichen Meldung."
+          }
+        }
+      },
       "BelegungsArt": {
         "type": "string",
         "description": "Art eines Belegungs-Events. String = CHECK in\n`migrations/0029_person_uhs_belegung.sql`. Append-only.",
@@ -889,6 +953,29 @@
           "wechsel",
           "austritt"
         ]
+      },
+      "BelegungsmeldungAnzeige": {
+        "type": "object",
+        "description": "Die aktuelle Belegungsmeldung einer Stelle.",
+        "required": [
+          "id",
+          "belegt",
+          "zeitpunkt_at"
+        ],
+        "properties": {
+          "belegt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "zeitpunkt_at": {
+            "type": "string",
+            "description": "Zeitpunkt der Meldung, UTC ohne Zonenkennung (`YYYY-MM-DD HH:MM:SS`)."
+          }
+        }
       },
       "BenutzerAnzeige": {
         "type": "object",
@@ -968,6 +1055,137 @@
           "rueckwaertig"
         ]
       },
+      "BetreuungUebersicht": {
+        "type": "object",
+        "description": "Die eine Lesequelle der Modulseite (`GET …/betreuung`): alle nicht stornierten Bezirke\nund Stellen eines Einsatzes.",
+        "required": [
+          "bezirke",
+          "stellen"
+        ],
+        "properties": {
+          "bezirke": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EvakuierungsbezirkAnzeige"
+            }
+          },
+          "stellen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BetreuungsstelleAnzeige"
+            }
+          }
+        }
+      },
+      "BetreuungsstelleAnzeige": {
+        "type": "object",
+        "description": "Öffentliche Darstellung einer Betreuungsstelle mit ihrer aktuellen Belegung.",
+        "required": [
+          "id",
+          "einsatz_id",
+          "bezeichnung",
+          "art",
+          "status",
+          "angelegt_at"
+        ],
+        "properties": {
+          "abschnitt_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "abschnitt_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "angelegt_at": {
+            "type": "string"
+          },
+          "art": {
+            "$ref": "#/components/schemas/BetreuungsstelleArt"
+          },
+          "belegung": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/BelegungsmeldungAnzeige",
+                "description": "Fehlt, solange keine (nicht zurückgenommene) Belegungsmeldung vorliegt."
+              }
+            ]
+          },
+          "bezeichnung": {
+            "type": "string"
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "geaendert_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "kapazitaet_personen": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Fehlt bei unbekannter Kapazität; dann gibt es auch keine Zahl freier Plätze."
+          },
+          "notiz": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "standort": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/BetreuungsstelleStatus"
+          },
+          "storniert_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "BetreuungsstelleArt": {
+        "type": "string",
+        "description": "Einrichtungsstufe einer Betreuungsstelle (DRK-Glossar Betreuungsdienst). Eine Kategorie,\nkein Zustand — sie bekommt keine Statusfarbe (D8). Wire == `as_str()`.",
+        "enum": [
+          "anlaufstelle",
+          "betreuungsstelle",
+          "betreuungsplatz",
+          "notunterkunft"
+        ]
+      },
+      "BetreuungsstelleStatus": {
+        "type": "string",
+        "description": "Betriebsstatus einer Betreuungsstelle. `geschlossen` ist umkehrbar (D4). Wire == `as_str()`.",
+        "enum": [
+          "vorbereitet",
+          "in_betrieb",
+          "geschlossen"
+        ]
+      },
       "Betriebsart": {
         "type": "string",
         "description": "Betriebsart einer TETRA-Sprechgruppe (Schema-Anker für die OpenAPI-Union, LFH-120).\nWire == `betriebsart` (per-Variante, Großbuchstaben — `rename_all` trifft nicht).",
@@ -975,6 +1193,23 @@
           "TMO",
           "DMO"
         ]
+      },
+      "BezirkMeldungAnzeige": {
+        "type": "object",
+        "description": "Antwort auf „Stand melden“ und „Standmeldung zurücknehmen“: die ID der gemeldeten bzw.\nzurückgenommenen Meldung und der Bezirk danach. Die ID steht eigens da, weil `bezirk.stand`\ndie AKTUELLE Meldung ist — bei einer nachgetragenen älteren Meldung eine andere, und ein\nRückgängig über `stand.id` nähme dann die falsche zurück.",
+        "required": [
+          "meldung_id",
+          "bezirk"
+        ],
+        "properties": {
+          "bezirk": {
+            "$ref": "#/components/schemas/EvakuierungsbezirkAnzeige"
+          },
+          "meldung_id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
       },
       "BezugTyp": {
         "type": "string",
@@ -2955,6 +3190,14 @@
           "extern"
         ]
       },
+      "Erhebung": {
+        "type": "string",
+        "description": "Erhebungsart einer Zahl (Plangröße oder Stand). Wire == `as_str()`.",
+        "enum": [
+          "gezaehlt",
+          "geschaetzt"
+        ]
+      },
       "ErinnerungAnzeige": {
         "type": "object",
         "description": "Öffentliche Darstellung einer Erinnerung. `ist_faellig` wird pro Read aus\n`faellig_at <= jetzt` berechnet (nicht persistiert) — die Fälligkeit ist\ndamit unabhängig davon korrekt, ob/wann der Scheduler-Tick lief.",
@@ -3378,6 +3621,120 @@
           },
           "je_typ": {
             "$ref": "#/components/schemas/EtbTypZaehler"
+          }
+        }
+      },
+      "EvakuierungsbezirkAnzeige": {
+        "type": "object",
+        "description": "Öffentliche Darstellung eines Evakuierungsbezirks mit seinem aktuellen Stand.",
+        "required": [
+          "id",
+          "einsatz_id",
+          "bezeichnung",
+          "plan_personen",
+          "plan_erhebung",
+          "raeumung",
+          "angelegt_at"
+        ],
+        "properties": {
+          "abschnitt_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "abschnitt_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "angelegt_at": {
+            "type": "string"
+          },
+          "bezeichnung": {
+            "type": "string"
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "geaendert_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "notiz": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "plan_erhebung": {
+            "$ref": "#/components/schemas/Erhebung"
+          },
+          "plan_personen": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "raeumung": {
+            "$ref": "#/components/schemas/Raeumungszustand"
+          },
+          "sammelstelle": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "stand": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/EvakuierungsstandAnzeige",
+                "description": "Fehlt, solange keine (nicht zurückgenommene) Standmeldung vorliegt — „keine Meldung“\nist nicht „0 evakuiert“."
+              }
+            ]
+          },
+          "storniert_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "EvakuierungsstandAnzeige": {
+        "type": "object",
+        "description": "Die aktuelle Standmeldung eines Bezirks.",
+        "required": [
+          "id",
+          "evakuiert",
+          "erhebung",
+          "zeitpunkt_at"
+        ],
+        "properties": {
+          "erhebung": {
+            "$ref": "#/components/schemas/Erhebung"
+          },
+          "evakuiert": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "zeitpunkt_at": {
+            "type": "string",
+            "description": "Zeitpunkt der Meldung, UTC ohne Zonenkennung (`YYYY-MM-DD HH:MM:SS`)."
           }
         }
       },
@@ -4692,6 +5049,7 @@
           "stab",
           "dokument",
           "abloesung",
+          "betreuung",
           "karten_ansicht",
           "lage_snapshot",
           "sofortmeldung",
@@ -6617,6 +6975,16 @@
           }
         }
       },
+      "Raeumungszustand": {
+        "type": "string",
+        "description": "Räumungszustand eines Evakuierungsbezirks. Wire == `as_str()`.",
+        "enum": [
+          "angeordnet",
+          "laeuft",
+          "geraeumt",
+          "aufgehoben"
+        ]
+      },
       "RegionDto": {
         "type": "object",
         "description": "Eine vom zentralen karten-service baubare Region (LFH-323, verschoben aus `karten-service`).\nAuf `String`-Felder umgebaut (vorher `&'static str`), damit `lifeline-hub` die Proxy-Antwort\ndeserialisieren kann; `karten-service`s `dtos()` klont die `alle()`-Refs entsprechend.",
@@ -7200,6 +7568,23 @@
           "status_id": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "StelleMeldungAnzeige": {
+        "type": "object",
+        "description": "Antwort auf „Belegung melden“ und „Belegungsmeldung zurücknehmen“, gebaut wie\n[`BezirkMeldungAnzeige`].",
+        "required": [
+          "meldung_id",
+          "stelle"
+        ],
+        "properties": {
+          "meldung_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "stelle": {
+            "$ref": "#/components/schemas/BetreuungsstelleAnzeige"
           }
         }
       },

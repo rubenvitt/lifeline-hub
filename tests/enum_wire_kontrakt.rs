@@ -608,6 +608,68 @@ fn abloesung_einstufung_wire() {
     });
 }
 
+/// LFH-639: Betreuung. Die vier Enums tragen die DB-CHECK-Werte aus
+/// `migrations/0117_betreuung.sql`; zusätzlich gegen die Literale und gegen `ALLE`, weil
+/// `parse` die Werte einzeln aufzählt und eine dort vergessene Variante per API nicht
+/// setzbar wäre.
+#[test]
+fn betreuung_erhebung_wire() {
+    enum_wire_as_str!(lifeline_hub::betreuung::Erhebung {
+        Gezaehlt,
+        Geschaetzt,
+    });
+    enum_wire!(lifeline_hub::betreuung::Erhebung {
+        Gezaehlt => "gezaehlt",
+        Geschaetzt => "geschaetzt",
+    } in lifeline_hub::betreuung::Erhebung::ALLE);
+}
+
+#[test]
+fn betreuung_raeumungszustand_wire() {
+    enum_wire_as_str!(lifeline_hub::betreuung::Raeumungszustand {
+        Angeordnet,
+        Laeuft,
+        Geraeumt,
+        Aufgehoben,
+    });
+    enum_wire!(lifeline_hub::betreuung::Raeumungszustand {
+        Angeordnet => "angeordnet",
+        Laeuft => "laeuft",
+        Geraeumt => "geraeumt",
+        Aufgehoben => "aufgehoben",
+    } in lifeline_hub::betreuung::Raeumungszustand::ALLE);
+}
+
+#[test]
+fn betreuung_betreuungsstelle_art_wire() {
+    enum_wire_as_str!(lifeline_hub::betreuung::BetreuungsstelleArt {
+        Anlaufstelle,
+        Betreuungsstelle,
+        Betreuungsplatz,
+        Notunterkunft,
+    });
+    enum_wire!(lifeline_hub::betreuung::BetreuungsstelleArt {
+        Anlaufstelle => "anlaufstelle",
+        Betreuungsstelle => "betreuungsstelle",
+        Betreuungsplatz => "betreuungsplatz",
+        Notunterkunft => "notunterkunft",
+    } in lifeline_hub::betreuung::BetreuungsstelleArt::ALLE);
+}
+
+#[test]
+fn betreuung_betreuungsstelle_status_wire() {
+    enum_wire_as_str!(lifeline_hub::betreuung::BetreuungsstelleStatus {
+        Vorbereitet,
+        InBetrieb,
+        Geschlossen,
+    });
+    enum_wire!(lifeline_hub::betreuung::BetreuungsstelleStatus {
+        Vorbereitet => "vorbereitet",
+        InBetrieb => "in_betrieb",
+        Geschlossen => "geschlossen",
+    } in lifeline_hub::betreuung::BetreuungsstelleStatus::ALLE);
+}
+
 /// LFH-298: SSE-Wire-Event-Namen als BE↔FE-Kontrakt. `LiveEvent` ist die Wahrheitsquelle der
 /// Wire-Event-Namen — die Emitter routen über `as_str()`, utoipa erzeugt daraus die
 /// FE-Union (`types.generated.ts`). Pinnt jede Variante gegen ihr load-bearing Wire-Literal
@@ -645,6 +707,7 @@ fn live_event_wire() {
         Stab => "stab",
         Dokument => "dokument",
         Abloesung => "abloesung",
+        Betreuung => "betreuung",
         KartenAnsicht => "karten_ansicht",
         LageSnapshot => "lage_snapshot",
         Sofortmeldung => "sofortmeldung",

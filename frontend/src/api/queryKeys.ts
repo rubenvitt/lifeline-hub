@@ -57,6 +57,7 @@ export const EINSATZ_KEYS = {
   modulZaehler: 'einsatz-modul-zaehler',
   dokumente: 'einsatz-dokumente',
   abloesungen: 'einsatz-abloesungen',
+  betreuung: 'einsatz-betreuung',
   // Nicht live über SSE getrieben (siehe NICHT_LIVE_KEYS + Guard-Test):
   einsatz: 'einsatz',
   einstellungen: 'einsatz-einstellungen',
@@ -116,11 +117,14 @@ export const EINSATZ_STREAM_EVENTS = {
     EINSATZ_KEYS.abloesungen,
   ],
   // LFH-635: Abschnittsname und -liste speisen die Rhythmus-Vorgaben der Ablösung.
+  // LFH-639 (design.md D6): Bezirke und Betreuungsstellen tragen den Abschnittsnamen per
+  // Join — Umbenennen oder Löschen eines Abschnitts feuert nur dieses Ereignis.
   abschnitt: [
     EINSATZ_KEYS.abschnitte,
     EINSATZ_KEYS.fuehrungskraefte,
     EINSATZ_KEYS.modulZaehler,
     EINSATZ_KEYS.abloesungen,
+    EINSATZ_KEYS.betreuung,
   ],
   // F01/LFH-227: `person` und `personal` sind getrennte Wire-Events. Vorher trug EIN
   // `person`-Tag beide ID-Räume (betroffene Person vs. einsatz_personal-Disposition),
@@ -170,6 +174,9 @@ export const EINSATZ_STREAM_EVENTS = {
   // (Sub-Keys 'liste'/'vorgaben'), damit ein Ereignis beide trifft. Trägt das Ereignis `art`,
   // stammt es vom Scheduler und alarmiert zusätzlich (Escape-Hatch im Live-Hook).
   abloesung: [EINSATZ_KEYS.abloesungen],
+  // Betreuung live (LFH-639): Bezirke, Stellen und ihre Meldereihen hängen unter EINEM Prefix,
+  // damit ein Ereignis Übersicht und Kopfzahl trifft. Nutzlast nur Kennungen.
+  betreuung: [EINSATZ_KEYS.betreuung],
 } as const satisfies Record<string, readonly EinsatzKey[]>;
 
 export type EinsatzStreamEvent = keyof typeof EINSATZ_STREAM_EVENTS;
@@ -315,6 +322,15 @@ export const einsatzKeys = {
     [EINSATZ_KEYS.abloesungen, einsatzId, 'liste', status] as const,
   abloesungVorgaben: (einsatzId: number) =>
     [EINSATZ_KEYS.abloesungen, einsatzId, 'vorgaben'] as const,
+  // Betreuung (LFH-639): argumentlos = Invalidierungs-Prefix — Übersicht, Modulzähler und
+  // Kennzahl teilen ihn (ein Abruf). Die Kopfzahl hängt als Sub-Key darunter, der Stichtag
+  // als Wire-String (UTC ohne Zonenkennung, `alsBackendZeit`), nie als Objekt. Ohne Stichtag
+  // („jetzt“, wie `ladeBelegungKopfzahl` ohne `zeitpunkt`) steht der feste Platzhalter 'jetzt'.
+  // Ein ausdrücklicher Stichtag muss stabil sein, nie „jetzt“ als Zeitstempel: der hieße bei
+  // jedem Rendern anders und wäre jedes Mal ein neues Cache-Fach samt neuem Abruf.
+  betreuung: (einsatzId: number) => [EINSATZ_KEYS.betreuung, einsatzId] as const,
+  betreuungKopfzahl: (einsatzId: number, zeitpunkt?: string) =>
+    [EINSATZ_KEYS.betreuung, einsatzId, 'kopfzahl', zeitpunkt ?? 'jetzt'] as const,
   /** Historie der Lagebesprechungen als Sub-Key unter DEMSELBEN Prefix (Spec 9.3). */
   stabLagebesprechungen: (einsatzId: number) =>
     [EINSATZ_KEYS.stab, einsatzId, 'lagebesprechungen'] as const,

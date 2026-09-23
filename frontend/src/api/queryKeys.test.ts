@@ -29,6 +29,8 @@ describe('EINSATZ_KEYS', () => {
     expect(EINSATZ_KEYS.dokumente).toBe('einsatz-dokumente');
     // LFH-635: handgeschriebenes Literal, nicht über EINSATZ_KEYS.
     expect(EINSATZ_KEYS.abloesungen).toBe('einsatz-abloesungen');
+    // LFH-639: handgeschriebenes Literal, nicht über EINSATZ_KEYS.
+    expect(EINSATZ_KEYS.betreuung).toBe('einsatz-betreuung');
   });
 });
 
@@ -73,6 +75,19 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
       EINSATZ_KEYS.modulZaehler,
       // LFH-635: Einheitsname und Auflösung wirken auf die Ablösungsschichten.
       EINSATZ_KEYS.abloesungen,
+    ]);
+  });
+
+  it('bildet abschnitt auf Abschnitte, Führungskräfte, Modulzähler, Ablösung und Betreuung ab (LFH-612/635/639)', () => {
+    // Ohne Guard (design.md D10 a): Bezirke und Stellen tragen den Abschnittsnamen per Join.
+    // Umbenennen oder Löschen eines Abschnitts feuert nur `abschnitt` — fehlt die Betreuung
+    // hier, zeigt die Seite still den alten Namen.
+    expect(EINSATZ_STREAM_EVENTS.abschnitt).toEqual([
+      EINSATZ_KEYS.abschnitte,
+      EINSATZ_KEYS.fuehrungskraefte,
+      EINSATZ_KEYS.modulZaehler,
+      EINSATZ_KEYS.abloesungen,
+      EINSATZ_KEYS.betreuung,
     ]);
   });
 
@@ -243,6 +258,19 @@ describe('einsatzKeys (Factory-Output)', () => {
       'laufend',
     ]);
     expect(einsatzKeys.abloesungVorgaben(1)).toEqual(['einsatz-abloesungen', 1, 'vorgaben']);
+    // LFH-639: Betreuungs-Prefix als Literal gepinnt.
+    expect(einsatzKeys.betreuung(1)).toEqual(['einsatz-betreuung', 1]);
+    // LFH-639: Kopfzahl UNTER dem Betreuungs-Prefix — das `betreuung`-Ereignis trifft sie mit.
+    // Der Stichtag ist der Wire-String (UTC ohne Zonenkennung), kein Objekt.
+    expect(einsatzKeys.betreuungKopfzahl(1, '2026-09-23 12:00:00')).toEqual([
+      'einsatz-betreuung',
+      1,
+      'kopfzahl',
+      '2026-09-23 12:00:00',
+    ]);
+    // Ohne Stichtag („jetzt“) ein fester Platzhalter statt eines sekundengenauen Zeitstempels —
+    // sonst entstünde bei jedem Rendern ein neuer Key und damit ein neuer Abruf.
+    expect(einsatzKeys.betreuungKopfzahl(1)).toEqual(['einsatz-betreuung', 1, 'kopfzahl', 'jetzt']);
     expect(einsatzKeys.etbListe(1, { typ: 'x' })).toEqual(['etb', 1, { typ: 'x' }]);
     // LFH-611: Lesemarke UNTER dem ETB-Prefix — das `etb`-Ereignis invalidiert sie mit.
     expect(einsatzKeys.etbLesemarke(1)).toEqual(['etb', 1, 'lesemarke']);

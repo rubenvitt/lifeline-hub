@@ -407,6 +407,7 @@ const MODUL_GET_PFADE: &[(&str, &str)] = &[
     ("erinnerungen", "erinnerungen"),
     ("auftraege", "auftraege"),
     ("abloesung", "abloesungen"),
+    ("betreuung", "betreuung"),
     ("meldungen", "meldungen"),
     ("nachforderungen", "nachforderungen"),
     ("fahrzeuge", "fahrzeuge"),

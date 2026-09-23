@@ -42,7 +42,7 @@ Shell-Rahmen · neue Bausteine · neu gedachte Screens.
    bewusste Entscheidungen am Einsatz belegen (Spec
    `docs/superpowers/specs/2026-09-23-lfh-640-lagebezogene-kennzahlreihe-design.md`). Der erwartete
    Höchststand seit LFH-628 (Zusatz in der Kennzahl, Marke im Überblick). Bekannte Lücken:
-   Evakuiert,
+   Evakuiert (Datenquelle seit LFH-639, Lageplatz B seit LFH-640, Einbau LFH-607),
    Fortschritt je Abschnitt, Abschnittsfarbe, FMS-Status/„Seit“/Rückmeldung je Einheit,
    „keine Rückmeldung“, ETB-Lesemarke „seit Ihrer letzten Sichtung“, ETB-Gesamtzahl und
    Tagesbilanz-Summen (serverseitig), Folgeauftrag-Verweis am ETB-Eintrag (geschlossen

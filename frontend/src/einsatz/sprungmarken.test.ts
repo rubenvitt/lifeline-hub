@@ -65,7 +65,16 @@ describe('Sprungmarken (LFH-620)', () => {
       'dokumente',
     ]);
     expect(folge(moduleNachKategorie('erfassung'), sprungmarkenNachKategorie('erfassung'))).toEqual(
-      ['etb', 'personen', '↗patienten', '↗vermisste', 'unfallhilfsstellen', 'tiere', 'schaeden'],
+      [
+        'etb',
+        'personen',
+        '↗patienten',
+        '↗vermisste',
+        'unfallhilfsstellen',
+        'betreuung',
+        'tiere',
+        'schaeden',
+      ],
     );
     expect(folge(moduleNachKategorie('kraefte'), sprungmarkenNachKategorie('kraefte'))).toEqual([
       'kraefteuebersicht',

@@ -1256,6 +1256,154 @@ test('Ablösung: Kartenaktionen und Vorgabe-Knopf folgen der Dichte-Staffel 30 /
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
+// ── Betreuung (LFH-639) ───────────────────────────────────────────────────────────────
+//
+// Zwei Blöcke, zwei Formen: Bezirke als Karten im Plan-Modus der `Datensicht`, Stellen als
+// Tabelle. Die Seite trägt KEIN handgebautes Bedienziel: „Stand melden", „Belegung melden",
+// beide Dreipunkt-Auslöser, die Kopfaktion und „Betreuungsstelle anlegen" sind antd-`Button`
+// und erben `controlHeight`. Gemessen wird trotzdem, aus zwei Gründen:
+//  - der Menü-Auslöser der Karte ist NEU im Primitiv (`weitere`, LFH-639) und steht in der
+//    Aktionsleiste von `ListenEintrag`; ein `align-items`/Schrumpfen dort drückte ihn unter
+//    den Boden, ohne dass eine Größen-Prop im Quelltext stünde;
+//  - die Tabellenzelle legt ihre zwei Ziele in ein `Space wrap` — dort entscheidet der
+//    Abstand, nicht die Höhe, ob der Handschuh-Betrieb trägt (Kriterium 2: ≥ 16 px).
+//
+// Gesät werden ZWEI Bezirke (je zwei Primär- und Dreipunkt-Knöpfe) und DREI Stellen, davon
+// eine geschlossen: dort entfällt „Belegung melden", der Dreipunkt bleibt — 2 Primär-, 3
+// Dreipunkt-Knöpfe in der Tabelle. Namen OHNE „Betreuung" (design.md D10 e: die Palette
+// durchsucht Module und Einsätze gemeinsam).
+//
+// BELEGT, NICHT BEHAUPTET (23.09.2026): der erste Lauf war rot am Abstand der Tabellenzeile
+// („Abstand Zeilenaktionen (handschuh, gemessen 7px)", `Space`-Vorgabe = `abstand.xs`); der
+// Fix ist `size="middle"` in `betreuung/StellenBlock.tsx` (11 / 18 / 26 px). Mutationsprobe
+// „Stufe festgenagelt": `stelleDichte` schreibt immer `'kompakt'`, die `data-dichte`-Wache
+// entfernt, `STAFFEL` nur `handschuh` → rot an der ersten Höhenmessung, „Stand melden
+// (handschuh) #1 (gemessen 30px hoch, Soll ≥ 72)". Danach zurückgesetzt.
+
+test('Betreuung: Karten- und Zeilenaktionen folgen der Dichte-Staffel 30 / 48 / 72 px', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Raeumung`);
+
+  const senden = async (methode: 'post' | 'patch', pfad: string, data: unknown, was: string) => {
+    const antwort = await page.request[methode](`/api/einsaetze/${einsatzId}/betreuung/${pfad}`, {
+      data,
+    });
+    expect(
+      antwort.ok(),
+      `Seeding ${was}: ${antwort.status()} ${await antwort.text()}`,
+    ).toBeTruthy();
+    return (await antwort.json()) as { id: number };
+  };
+  const BEZIRKE = ['Deichweg 1–9', 'Uferstraße 12–40'];
+  for (const bezeichnung of BEZIRKE) {
+    const bezirk = await senden(
+      'post',
+      'bezirke',
+      { bezeichnung, plan_personen: 640, plan_erhebung: 'geschaetzt' },
+      `Bezirk ${bezeichnung}`,
+    );
+    await senden(
+      'post',
+      `bezirke/${bezirk.id}/staende`,
+      { evakuiert: 212, erhebung: 'gezaehlt' },
+      'Stand',
+    );
+  }
+  const OFFEN = ['Turnhalle Ost', 'Gemeindehaus Süd'];
+  for (const bezeichnung of OFFEN) {
+    const stelle = await senden(
+      'post',
+      'stellen',
+      { bezeichnung, art: 'notunterkunft', kapazitaet_personen: 150 },
+      `Stelle ${bezeichnung}`,
+    );
+    await senden('patch', `stellen/${stelle.id}`, { status: 'in_betrieb' }, 'Status');
+    await senden('post', `stellen/${stelle.id}/belegungen`, { belegt: 140 }, 'Belegung');
+  }
+  // Ohne Meldung darf eine Stelle schließen (design.md D4) — kein Leermelden nötig.
+  const zu = await senden(
+    'post',
+    'stellen',
+    { bezeichnung: 'Schule Nord', art: 'anlaufstelle' },
+    'Stelle Schule Nord',
+  );
+  await senden('patch', `stellen/${zu.id}`, { status: 'geschlossen' }, 'Schließen');
+
+  const gemessen: string[] = [];
+  for (const { dichte, soll } of STAFFEL) {
+    await page.goto(`/einsaetze/${einsatzId}/betreuung`);
+    await stelleDichte(page, dichte);
+
+    const karten = page
+      .getByRole('region', { name: 'Evakuierungsbezirke' })
+      .locator('[data-lfh="datensicht-karte"]');
+    await expect(karten).toHaveCount(2);
+    const standMelden = karten.getByRole('button', { name: /^Stand melden für Bezirk / });
+    const karteMenue = karten.getByRole('button', { name: /^Aktionen zu Bezirk / });
+    // GENAUE Zahlen vor der Messung: `alleHaltenStufe` prüft nur eine Untergrenze. Ohne diese
+    // Zeilen bliebe grün, wenn die geschlossene Stelle doch „Belegung melden" trüge oder eine
+    // Karte zwei Menü-Auslöser hätte — Punkt (a) der Prüfliste wäre dann behauptet, nicht belegt.
+    await expect(standMelden).toHaveCount(2);
+    await expect(karteMenue).toHaveCount(2);
+    const karteStand = await alleHaltenStufe(standMelden, soll, `Stand melden (${dichte})`, 2);
+    const karteDrei = await alleHaltenStufe(karteMenue, soll, `Dreipunkt Bezirk (${dichte})`, 2);
+
+    const tabelle = page.getByRole('region', { name: 'Betreuungsstellen' });
+    await expect(tabelle.locator('tr[data-row-key^="stelle-"]')).toHaveCount(3);
+    const belegung = tabelle.getByRole('button', { name: /^Belegung melden für / });
+    const zeileMenue = tabelle.getByRole('button', { name: /^Aktionen zu Stelle / });
+    await expect(belegung).toHaveCount(2);
+    await expect(zeileMenue).toHaveCount(3);
+    const zeileBelegung = await alleHaltenStufe(belegung, soll, `Belegung melden (${dichte})`, 2);
+    // Drei, nicht zwei: auch die geschlossene Stelle behält ihr Menü (Bündelung nach der
+    // Rechteprüfung gezählt, nicht nach dem Zeilenzustand — Prüfliste, Punkt a).
+    const zeileDrei = await alleHaltenStufe(zeileMenue, soll, `Dreipunkt Stelle (${dichte})`, 3);
+
+    const kopf = await haeltStufe(
+      page
+        .locator('[data-lfh="seitenkopf-aktionen"]')
+        .getByRole('button', { name: 'Evakuierungsbezirk anlegen', exact: true }),
+      soll,
+      `Kopfaktion (${dichte})`,
+    );
+    const stelleAnlegen = await haeltStufe(
+      page.getByRole('button', { name: 'Betreuungsstelle anlegen', exact: true }),
+      soll,
+      `Betreuungsstelle anlegen (${dichte})`,
+    );
+
+    // Abstand Primäraktion ↔ Dreipunkt, je an der ersten Karte bzw. Zeile. Im
+    // Handschuh-Betrieb ≥ 16 px (MIL-STD-1472F Fig. 24 [abgeleitet], Prüfliste Kriterium 2).
+    const luecke = async (links: Locator, rechts: Locator) => {
+      const l = (await links.boundingBox())!;
+      const r = (await rechts.boundingBox())!;
+      return Math.round(r.x - (l.x + l.width));
+    };
+    const lueckeKarte = await luecke(standMelden.first(), karteMenue.first());
+    const lueckeZeile = await luecke(belegung.first(), zeileMenue.first());
+    if (dichte === 'handschuh') {
+      expect(
+        lueckeKarte,
+        `Abstand Kartenaktionen (handschuh, gemessen ${lueckeKarte}px)`,
+      ).toBeGreaterThanOrEqual(16);
+      expect(
+        lueckeZeile,
+        `Abstand Zeilenaktionen (handschuh, gemessen ${lueckeZeile}px)`,
+      ).toBeGreaterThanOrEqual(16);
+    }
+    gemessen.push(
+      `${dichte} (Soll ≥ ${soll}): Stand melden ${karteStand}, Dreipunkt Bezirk ${karteDrei}, ` +
+        `Belegung melden ${zeileBelegung}, Dreipunkt Stelle ${zeileDrei}, Kopf ${kopf}, ` +
+        `Stelle anlegen ${stelleAnlegen}, Abstand Karte ${lueckeKarte}, Abstand Zeile ${lueckeZeile}`,
+    );
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
 // ─── Betroffene (LFH-650, Nachzug zur LFH-613-Prüfliste, Tabellen 1, 3 und 4, Nr. 1 · 2) ──
 //
 // Vier Flächen, alle mit denselben Helfern wie oben:

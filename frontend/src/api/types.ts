@@ -443,6 +443,107 @@ export interface VollzugBody {
   abloesende_einheit_id?: number;
 }
 
+// ============================== LFH-639 Betreuung ==============================
+export type Erhebung = S['Erhebung'];
+export type Raeumungszustand = S['Raeumungszustand'];
+export type BetreuungsstelleArt = S['BetreuungsstelleArt'];
+export type BetreuungsstelleStatus = S['BetreuungsstelleStatus'];
+export type Evakuierungsbezirk = S['EvakuierungsbezirkAnzeige'];
+export type Evakuierungsstand = S['EvakuierungsstandAnzeige'];
+export type Betreuungsstelle = S['BetreuungsstelleAnzeige'];
+export type Belegungsmeldung = S['BelegungsmeldungAnzeige'];
+export type BetreuungUebersicht = S['BetreuungUebersicht'];
+export type BelegungKopfzahl = S['BelegungKopfzahl'];
+export type BelegungKopfzahlStelle = S['BelegungKopfzahlStelle'];
+/** Antwort auf Melden/Zurücknehmen eines Stands: `meldung_id` ist die GEMELDETE bzw.
+ *  zurückgenommene Meldung — `bezirk.stand` ist die aktuelle und bei einer Nachtragung
+ *  eine andere. Ein Rückgängig nimmt deshalb `meldung_id`, nie `bezirk.stand.id`. */
+export type BezirkMeldung = S['BezirkMeldungAnzeige'];
+/** Wie {@link BezirkMeldung}, für Belegungsmeldungen einer Stelle. */
+export type StelleMeldung = S['StelleMeldungAnzeige'];
+
+/**
+ * LFH-120: kein Backend-Schema — Eingabe-Body von `POST …/betreuung/bezirke`
+ * (`BezirkAnlegen` in `src/routes/betreuung.rs`), FE-lokal.
+ */
+export interface EvakuierungsbezirkEingabe {
+  bezeichnung: string;
+  /** Ganzzahlig ≥ 1; fehlt oder kleiner → 400. */
+  plan_personen: number;
+  plan_erhebung: Erhebung;
+  abschnitt_id?: number;
+  sammelstelle?: string;
+  notiz?: string;
+}
+
+/**
+ * LFH-120: kein Backend-Schema — Eingabe-Body von `PATCH …/betreuung/bezirke/{id}`
+ * (`BezirkAendern`). DREIWERTIG bei `abschnitt_id`/`sammelstelle`/`notiz`: Schlüssel fehlt =
+ * unverändert · `null` = lösen bzw. leeren. Ein PATCH ohne tatsächliche Änderung schreibt
+ * keinen ETB-Eintrag.
+ */
+export interface EvakuierungsbezirkPatch {
+  bezeichnung?: string;
+  abschnitt_id?: number | null;
+  plan_personen?: number;
+  plan_erhebung?: Erhebung;
+  raeumung?: Raeumungszustand;
+  sammelstelle?: string | null;
+  notiz?: string | null;
+}
+
+/**
+ * LFH-120: kein Backend-Schema — Eingabe-Body von `POST …/betreuung/bezirke/{id}/staende`
+ * (`StandMelden`). `evakuiert` ist eine ABSOLUTE Anzahl (≥ 0), kein Delta. Ohne
+ * `zeitpunkt_at` gilt „jetzt"; sonst UTC `YYYY-MM-DD HH:mm:ss` über `alsBackendZeit`
+ * (`etb/filterZeit.ts`), höchstens 60 s in der Zukunft.
+ */
+export interface StandmeldungEingabe {
+  evakuiert: number;
+  erhebung: Erhebung;
+  zeitpunkt_at?: string;
+}
+
+/**
+ * LFH-120: kein Backend-Schema — Eingabe-Body von `POST …/betreuung/stellen`
+ * (`StelleAnlegen`). Ohne Kapazität gibt es keine Zahl freier Plätze.
+ */
+export interface BetreuungsstelleEingabe {
+  bezeichnung: string;
+  art: BetreuungsstelleArt;
+  abschnitt_id?: number;
+  /** Ganzzahlig ≥ 1, sonst 400. */
+  kapazitaet_personen?: number;
+  standort?: string;
+  notiz?: string;
+}
+
+/**
+ * LFH-120: kein Backend-Schema — Eingabe-Body von `PATCH …/betreuung/stellen/{id}`
+ * (`StelleAendern`). DREIWERTIG bei `abschnitt_id`/`kapazitaet_personen`/`standort`/`notiz`:
+ * Schlüssel fehlt = unverändert · `null` = lösen bzw. „keine Kapazität" bzw. leeren.
+ * `status: 'geschlossen'` bei Belegung > 0 ist 422 (design.md D4).
+ */
+export interface BetreuungsstellePatch {
+  bezeichnung?: string;
+  art?: BetreuungsstelleArt;
+  abschnitt_id?: number | null;
+  kapazitaet_personen?: number | null;
+  status?: BetreuungsstelleStatus;
+  standort?: string | null;
+  notiz?: string | null;
+}
+
+/**
+ * LFH-120: kein Backend-Schema — Eingabe-Body von `POST …/betreuung/stellen/{id}/belegungen`
+ * (`BelegungMelden`). Absolute Anzahl (≥ 0); Zeitpunkt wie bei {@link StandmeldungEingabe}.
+ * Nicht `BelegungEingabe` — den Namen trägt die UHS-Belegung (`api/einsatzUhs.ts`).
+ */
+export interface BelegungsmeldungEingabe {
+  belegt: number;
+  zeitpunkt_at?: string;
+}
+
 // ============================== LFH-51 Terminierte Erinnerungen ==============================
 export type Erinnerung = S['ErinnerungAnzeige'];
 

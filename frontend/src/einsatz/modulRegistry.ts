@@ -28,6 +28,7 @@ import {
   TbBuildingWarehouse,
   TbFiles,
   TbArrowsExchange,
+  TbHomeHeart,
   TbCloudStorm,
 } from 'react-icons/tb';
 import type { BenutzerAnzeige, ModulOverrides } from '../api/types';
@@ -47,9 +48,10 @@ export type ServerZaehlerQuelle =
   | 'auftraege'
   | 'erinnerungen'
   | 'chat';
-/** Module, deren Zähler der BROWSER aus der eigenen Modulliste rechnet (LFH-632, LFH-635).
- *  `abloesung` hängt an der Uhr (Vorwarnzeit), ein Server-Schnappschuss trüge das nicht. */
-export type ClientZaehlerQuelle = 'dokumente' | 'abloesung';
+/** Module, deren Zähler der BROWSER aus der eigenen Modulliste rechnet (LFH-632, LFH-635,
+ *  LFH-639). `abloesung` hängt an der Uhr (Vorwarnzeit), ein Server-Schnappschuss trüge das
+ *  nicht; `betreuung` teilt sich die Übersicht mit Seite und Kennzahl. */
+export type ClientZaehlerQuelle = 'dokumente' | 'abloesung' | 'betreuung';
 export type ModulZaehlerQuelle = ServerZaehlerQuelle | ClientZaehlerQuelle;
 
 export interface Kategorie {
@@ -276,6 +278,20 @@ export const modulRegistry: ModulEintrag[] = [
     status: 'fertig',
     beschreibung:
       'Behandlungs-/Sammelstellen als Örtlichkeiten mit Plätzen, Belegung und Material.',
+  },
+  {
+    // LFH-639: Evakuierung und Unterbringung als MENGEN mit Zeitbezug, nicht über einzeln
+    // erfasste Personen. Der Zähler nennt die aktiven Evakuierungsbezirke; dieselbe Übersicht
+    // speist die Kennzahl „Evakuiert N · von M geplant" (`betreuung/evakuierungKennzahl.ts`).
+    // Reihenfolge wie `MODUL_KEYS` im Backend (`src/einsatz/modul.rs`).
+    key: 'betreuung',
+    kategorie: 'erfassung',
+    label: 'Betreuung',
+    icon: TbHomeHeart,
+    route: 'betreuung',
+    status: 'fertig',
+    beschreibung: 'Evakuierungsbezirke mit Stand „evakuiert" und Betreuungsstellen mit Belegung.',
+    zaehlerQuelle: 'betreuung',
   },
   {
     key: 'tiere',
@@ -520,9 +536,9 @@ export function istModulSichtbar(modul: ModulEintrag, overrides?: ModulOverrides
  * Registry-Stub in `command-palette/befehle.modulstatus.test.ts` beobachtbar gemacht.
  *
  * BEWUSST NICHT MIT UMGESTELLT: `useModulZaehler.ts` (`darfZaehlerZeigen`) führt die
- * ZWEITEILIGE Variante ohne `status === 'fertig'`. Das ist heute unbeobachtbar — alle zehn
- * Module mit `zaehlerQuelle` (acht vom Server gezählt, `dokumente` und `abloesung` im
- * Browser) sind `fertig`, beide Fassungen liefern also dasselbe. Ob ein Zähler auch an einem
+ * ZWEITEILIGE Variante ohne `status === 'fertig'`. Das ist heute unbeobachtbar — alle elf
+ * Module mit `zaehlerQuelle` (acht vom Server gezählt, `dokumente`, `abloesung` und
+ * `betreuung` im Browser) sind `fertig`, beide Fassungen liefern also dasselbe. Ob ein Zähler auch an einem
  * UNFERTIGEN Modul stehen darf, ist eine fachliche Entscheidung und keine Aufräumarbeit; sie
  * steht offen. Wer sie trifft, zieht die Stelle nach oder schreibt hier hin, warum sie
  * eigenständig bleibt.

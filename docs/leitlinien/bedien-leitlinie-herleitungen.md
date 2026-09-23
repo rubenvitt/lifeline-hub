@@ -143,7 +143,8 @@ Sichtbarkeitsfilterung keine Aktion übrig, wird **gar kein** Auslöser gerender
 deaktivierten. Der zugängliche Name trägt die **Zeilenkennung** (`Aktionen zu Eintrag 7`), weil n
 Zeilen sonst n gleichnamige Knöpfe liefern. Träger: `chat/NachrichtenStrom.tsx:88`,
 `etb/EtbZeitachse.tsx` (vorher `EtbTabelle.tsx`), `etb/MetaChip.tsx`,
-`pages/lagekarte/Sidebar.tsx` (Bild-Zeile).
+`pages/lagekarte/Sidebar.tsx` (Bild-Zeile), `components/Datensicht.tsx` (`weitere`, LFH-639 —
+der Kartenmodus baut den Auslöser selbst neben der einen Primäraktion).
 **Gezählt wird NACH der Rechteprüfung** (LFH-366): fällt die Menge unter drei, ist ein Menü
 keine Bündelung, sondern ein Umweg — die Bild-Zeile zeigt ohne Schreibrecht ihre eine Aktion
 weiter direkt. Beide Fälle gehören als **Paar** getestet; „mit Recht ist der direkte Knopf WEG"

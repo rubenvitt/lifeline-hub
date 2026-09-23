@@ -6,6 +6,7 @@ pub mod backup;
 pub mod befehl;
 pub mod benutzer;
 pub mod benutzer_einstellungen;
+pub mod betreuung;
 pub mod chat;
 #[cfg(feature = "dev-seeds")]
 pub mod dev;

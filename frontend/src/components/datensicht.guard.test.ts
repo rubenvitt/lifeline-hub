@@ -32,8 +32,8 @@ import { describe, expect, it } from 'vitest';
  *
  * ── DIE FÜNF GEPFLEGTEN LISTEN ──────────────────────────────────────────────────
  *
- * Drei SEMANTISCHE Ausnahmemengen ({@link KARTEN_EIGENBAU} — leer, {@link NUR_KARTE} — zwei,
- * {@link NUR_TABELLE} — eine), eine PFLICHTMENGE ({@link VOLLMENGE_PFLICHT} — eine) und eine
+ * Drei SEMANTISCHE Ausnahmemengen ({@link KARTEN_EIGENBAU} — leer, {@link NUR_KARTE} — drei,
+ * {@link NUR_TABELLE} — zwei), eine PFLICHTMENGE ({@link VOLLMENGE_PFLICHT} — eine) und eine
  * SCHULDMENGE ({@link REITERSCHLUESSEL_OFFEN} — seit Bündel T LEER, der eine Eintrag wurde
  * getilgt statt fortgeschrieben). Alle fünf sind auf ihre Länge gepinnt und werden auf tote
  * Einträge geprüft: wer eine Datei einträgt, ohne sie umzubauen, fällt am
@@ -202,6 +202,9 @@ const KARTEN_EIGENBAU: string[] = [];
  */
 const NUR_KARTE: string[] = [
   '/src/auftraege/BefehlListe.tsx',
+  // LFH-639 (design.md D7): ein Evakuierungsbezirk wird GELESEN („was ist mit diesem
+  // Bezirk?"), nicht verglichen — Karten in jeder Breite, Plan-Modus mit gebündeltem Menü.
+  '/src/betreuung/EvakuierungBlock.tsx',
   '/src/pages/LageberichtePage.tsx',
   // Die Lagemeldungen standen hier von LFH-348 · C13 bis zum Neuentwurf (22.09.2026).
   // Seitdem sind sie eine Zeitachse außerhalb der Datensicht (`lagemeldungen/zeitachse.ts`,
@@ -217,7 +220,12 @@ const NUR_KARTE: string[] = [
  * `KatalogTabelle.tsx`. Die Verbotsmarke allein kann die Formwahl also nicht prüfen; nur die
  * Anwesenheit des Literals kann es.
  */
-const NUR_TABELLE: string[] = ['/src/pages/KraefteuebersichtPage.tsx'];
+const NUR_TABELLE: string[] = [
+  // LFH-639 (design.md D7): Betreuungsstellen werden VERGLICHEN („welche hat noch Platz?") —
+  // Tabelle in jeder Breite, nicht erst ab `md`.
+  '/src/betreuung/StellenBlock.tsx',
+  '/src/pages/KraefteuebersichtPage.tsx',
+];
 
 /**
  * Dateien, deren `Datensicht` die ZEILENMENGE nicht antasten darf — keine Freitextsuche,
@@ -272,6 +280,11 @@ const REITERSCHLUESSEL_OFFEN: string[] = [];
  */
 const KONSUMENTEN = [
   '/src/auftraege/BefehlListe.tsx',
+  // LFH-639: die Betreuungsseite trägt ZWEI Sichten in zwei Dateien — Bezirke als Karten,
+  // Stellen als Tabelle. Getrennte Dateien statt zweier Sichten in einer, damit jede ihre
+  // eigene Formbegründung und ihr eigenes Spaltenregister hat.
+  '/src/betreuung/EvakuierungBlock.tsx',
+  '/src/betreuung/StellenBlock.tsx',
   // Die ETB-Chronologie (`etb/EtbTabelle.tsx`) war von LFH-342 · C7 bis zum Neuentwurf
   // (S4, 21.09.2026) die elfte Konsumentin. Seitdem ist das Tagebuch auf allen Breiten eine
   // Zeitachse (`etb/EtbZeitachse.tsx`) und kein Konsument mehr — begründet an
@@ -853,11 +866,12 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
     // einträgt, begründet wie über der Liste beschrieben — sonst wächst die Ausnahme über
     // das Band und der Kartenplan wäre nur noch ein Vorschlag.
     expect(KARTEN_EIGENBAU).toHaveLength(0);
-    // Zwei Kartenmodule (Befehle, Lageberichte — die Lagemeldungen sind seit dem Neuentwurf
-    // eine Zeitachse), eine Vergleichsfläche. Wer einträgt, ohne umzubauen, fällt am
+    // Drei Kartenmodule (Befehle, Lageberichte, Evakuierungsbezirke seit LFH-639 — die
+    // Lagemeldungen sind seit dem Neuentwurf eine Zeitachse), zwei Vergleichsflächen
+    // (Meldebild, Betreuungsstellen seit LFH-639). Wer einträgt, ohne umzubauen, fällt am
     // Anwesenheits-Gegentest oben auf; wer umbaut, ohne einzutragen, an der Formprüfung.
-    expect(NUR_KARTE).toHaveLength(2);
-    expect(NUR_TABELLE).toHaveLength(1);
+    expect(NUR_KARTE).toHaveLength(3);
+    expect(NUR_TABELLE).toHaveLength(2);
     // Die vierte ist keine Ausnahme, sondern eine PFLICHT — und sie ist ausdrücklich
     // dateibezogen. Ein zweiter Eintrag braucht dieselbe Herleitung wie das Meldebild
     // (Aggregate stromaufwärts über die Vollmenge), nicht bloß den Verweis hierauf.
@@ -876,7 +890,7 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
     expect(dateien[PRIMITIV]).toContain('KatalogTabelle');
   });
 
-  it('der Scan sieht genau die geplanten Konsumenten (Neuentwurf: zehn)', () => {
+  it('der Scan sieht genau die geplanten Konsumenten (seit LFH-639: zwölf)', () => {
     /**
      * Die Gleichheit prüft BEIDE Richtungen: eine Datei, die still aus dem Primitiv
      * herausfällt, verschwindet aus dem Scan und bleibt in {@link KONSUMENTEN} stehen; eine

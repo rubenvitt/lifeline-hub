@@ -31,6 +31,13 @@ pub enum Strategie {
     /// (nullable, aber ein CHECK erzwingt einen Wert, sobald ein Statusfeld gesetzt ist —
     /// z. B. `einsatz_schaden.uebergeben_an` bei `status='uebergeben'`).
     PlatzhalterWennGesetzt,
+    /// `col = SCHWAERZUNG_PLATZHALTER || ' ' || id` — NOT-NULL-Textspalte unter einem
+    /// UNIQUE-Index (LFH-639: `evakuierungsbezirk.bezeichnung`, `betreuungsstelle.bezeichnung`,
+    /// eindeutig je Einsatz unter den nicht stornierten Zeilen). Ein für alle Zeilen gleicher
+    /// Platzhalter verletzte den Index ab der zweiten Zeile, und die ganze Schwärzung bräche
+    /// in ihrer Transaktion ab. Die Zeilen-ID ist Struktur (`G_PK`) und trägt keinen
+    /// Personenbezug.
+    PlatzhalterMitId,
     /// Die ganze Zeile wird gelöscht (`DELETE FROM t WHERE …`). Für Tabellen, deren
     /// Nutzlast selbst PII ist und die kein zu erhaltendes Skelett tragen (`anhang`:
     /// Foto-BLOBs Betroffener). CASCADE räumt abhängige Verknüpfungszeilen mit.
@@ -832,6 +839,93 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("angelegt_at", G_ZEIT),
         ],
     },
+    // LFH-639: Betreuung. Mengen, keine Personen — Anzahlen, Plangrößen, Kapazitäten,
+    // Zustände, Arten und Zeitpunkte bleiben als Statistik-Skelett. Die Bezeichnung trägt oft
+    // eine Adresse („Uferstraße 12–40“, „Turnhalle Ost, Ostring 5“) und wird deshalb anders als
+    // `uhs.bezeichnung` ersetzt (Spec „Schwärzung“). Sammelstelle, Standort und Notiz sind
+    // Freitexte mit möglichem Personen- oder Adressbezug → NULL. Die ETB-Texte nennen nur
+    // Bezeichnung und Zahlen (design.md D5), der Scrub hier läuft also nicht ins Leere.
+    TabellenRegel {
+        tabelle: "evakuierungsbezirk",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            retain("abschnitt_id", G_FK),
+            // NOT NULL unter partiellem UNIQUE-Index → je Zeile eigener Platzhalter.
+            scrub("bezeichnung", Strategie::PlatzhalterMitId),
+            retain("plan_personen", G_ZAEHLER),
+            retain("plan_erhebung", G_ENUM),
+            retain("raeumung", G_ENUM),
+            scrub("sammelstelle", Strategie::NullSetzen),
+            scrub("notiz", Strategie::NullSetzen),
+            retain("stand_id", G_FK),
+            retain("storniert_at", G_ZEIT),
+            retain("storniert_von_id", G_FK),
+            retain("angelegt_at", G_ZEIT),
+            retain("angelegt_von_id", G_FK),
+            retain("geaendert_at", G_ZEIT),
+        ],
+    },
+    TabellenRegel {
+        tabelle: "evakuierung_stand",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("bezirk_id", G_FK),
+            retain("einsatz_id", G_SCOPE),
+            retain("evakuiert", G_ZAEHLER),
+            retain("erhebung", G_ENUM),
+            retain("zeitpunkt_at", G_ZEIT),
+            retain("erfasst_at", G_ZEIT),
+            retain("erfasst_von_id", G_FK),
+            retain("etb_eintrag_id", G_FK),
+            retain("zurueckgenommen_at", G_ZEIT),
+            retain("zurueckgenommen_von_id", G_FK),
+        ],
+    },
+    TabellenRegel {
+        tabelle: "betreuungsstelle",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            retain("abschnitt_id", G_FK),
+            // NOT NULL unter partiellem UNIQUE-Index → je Zeile eigener Platzhalter.
+            scrub("bezeichnung", Strategie::PlatzhalterMitId),
+            retain("art", G_ENUM),
+            retain("kapazitaet_personen", G_ZAEHLER),
+            retain("status", G_ENUM),
+            scrub("standort", Strategie::NullSetzen),
+            scrub("notiz", Strategie::NullSetzen),
+            retain("belegung_id", G_FK),
+            retain("storniert_at", G_ZEIT),
+            retain("storniert_von_id", G_FK),
+            retain("angelegt_at", G_ZEIT),
+            retain("angelegt_von_id", G_FK),
+            retain("geaendert_at", G_ZEIT),
+        ],
+    },
+    TabellenRegel {
+        tabelle: "betreuungsstelle_belegung",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("stelle_id", G_FK),
+            retain("einsatz_id", G_SCOPE),
+            retain("belegt", G_ZAEHLER),
+            retain("zeitpunkt_at", G_ZEIT),
+            retain("erfasst_at", G_ZEIT),
+            retain("erfasst_von_id", G_FK),
+            retain("etb_eintrag_id", G_FK),
+            retain("zurueckgenommen_at", G_ZEIT),
+            retain("zurueckgenommen_von_id", G_FK),
+        ],
+    },
     // LFH-46: abgeschlossene Lagebesprechungen. `entschluss` bleibt RETAIN (G_FUEHRUNG) —
     // dieselbe Klassifikation wie `lagebericht.abschnitte` und `befehl`, deren Inhalt derselbe
     // Entschluss der Einsatzleitung ist. Ein Alleingang auf Scrub für genau eine der drei
@@ -1425,6 +1519,10 @@ pub async fn scrubbe_aus_registry(
                     sets.push(format!(
                         "{spalte} = CASE WHEN {spalte} IS NULL THEN NULL ELSE ? END"
                     ));
+                    platzhalter_binds += 1;
+                }
+                Strategie::PlatzhalterMitId => {
+                    sets.push(format!("{spalte} = ? || ' ' || id"));
                     platzhalter_binds += 1;
                 }
                 Strategie::ZeileLoeschen => unreachable!("oben abgefangen"),
