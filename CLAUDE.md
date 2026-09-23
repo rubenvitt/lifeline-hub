@@ -273,6 +273,14 @@ unter `md` (`form="auto"`) ist die begründungspflichtige Ausnahme, nicht der No
 Begründung steht im Dateikopf von `Datensicht.tsx`, die Regel in Abschnitt AK3b des
 Drawer-Specs. Keine der 13 Katalogtabellen wird zu Karten.
 
+**Die erste Kachel-Überblicksfläche mit Bedienung ist das FMS-Tableau** (LFH-642,
+`kraefte/FmsTableau.tsx`). Es ist eine **Ansicht** der Fahrzeugseite (`?ansicht=tableau`,
+Sprungmarke) und kein eigenes Modul, weil Endpunkte und Live-Event am Schlüssel `fahrzeuge`
+hängen. Die Kachel trägt genau ein Bedienziel, `StatusWahl`, und ist selbst nicht klickbar.
+Sortiert wird nach Abschnitt → Einheit → Funkrufname, nie nach Status. Die Ziffern 0–9 sind
+über `fms_anker` nur Beschleuniger: Ein doppelt belegter Anker setzt nichts. Formverdikt und
+Prüfliste stehen in `docs/superpowers/specs/2026-09-23-lfh-642-pruefliste.md`.
+
 **ETB-Nachzüge LFH-463/464:** Der `tabelleAb`-Punkt, den LFH-464 der ETB-Chronologie als
 einziger Konsumentin nach Browsermessung auf `xl` gesetzt hatte (`lg` behob den gemessenen
 1024-px-Engpass nicht), ist mit dem Neuentwurf (22.09.2026) **entfallen** — das Tagebuch ist
