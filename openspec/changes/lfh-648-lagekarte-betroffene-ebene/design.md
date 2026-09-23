@@ -52,7 +52,7 @@ Warum die Änderung kommt, steht in `proposal.md`, die Anforderungen in
   personenbezogen, der Titel trägt die Sichtung bereits.
 - **Keine Liste „Nicht verortet“ für Personen.** Die Lücke zeigt die Betroffenen-Seite.
 - Die Org-Default-Drift im Client wird hier nicht geschlossen, sondern nur still abgefangen
-  (D2). Folgeticket.
+  (D2). Folgeticket LFH-669.
 
 ## Decisions
 
@@ -123,9 +123,12 @@ Ein Fachebenen-Eintrag wäre der falsche Träger. Fachebenen sind Fremdquellen m
 Backend-Pfadparameter, die Schlüsselliste ist in `fachebenen.test.ts` gepinnt.
 
 ### D5 Eigene geclusterte Quelle `marker-personen`
-- **Aufteilung:** `baueMarkerFc` wird dreigeteilt. Einsatzort, Personen und der Rest
-  bekommen je eine FeatureCollection. Die Personen-Quelle ist geclustert wie
-  `marker-cluster` (Radius 45, `clusterMaxZoom` 14, `clusterProperties`).
+- **Aufteilung:** `sorgeFuerMarkerLayer`/`reAnlegenMarker` teilen die clusterbaren Marker
+  aus `baueMarkerFc` an EINER Stelle auf (`teileNachQuelle`): Personen nach
+  `marker-personen`, der Rest nach `marker-cluster`. Beim Umsetzen gewählt statt einer
+  eigenen `bauePersonenFc` mit neuer Signatur, weil so weder `kartenLayer.ts` noch eine
+  Konsumentin der Kartenfläche wissen muss, dass es zwei Quellen gibt. Die Personen-Quelle
+  ist geclustert wie `marker-cluster` (Radius 45, `clusterMaxZoom` 14, `clusterProperties`).
 - **Layer:** Personen tragen kein Icon und keinen Status. Sie brauchen deshalb nur Kreis,
   Kürzel und Plakette: `personen-kreis`, `personen-kurz`, `personen-label`. Diese Layer
   kommen in `MARKER_LAYER_REIHENFOLGE` **vor** alle übrigen Marker-Layer, liegen also unter
@@ -219,7 +222,9 @@ Schlüssel im opaken JSON liegen und schaden nicht.
 
 Keine, die Spec oder Aufgabenschnitt ändern.
 
-Die zwei Folgetickets legt die Umsetzung per `clickup-task-anlegen` an, statt sie mitzunehmen:
-- Org-Default-Drift im Client-Gate.
-- Der Platzier-Auftrag `?platzieren=person:<id>` prüft nur das Schreibrecht, nicht das Modul
-  „Personen“.
+Die Folgetickets hat die Umsetzung per `clickup-task-anlegen` angelegt, statt sie mitzunehmen:
+- **LFH-669** Org-Default-Drift im Client-Gate.
+- **LFH-670** Der Platzier-Auftrag `?platzieren=person:<id>` prüft nur das Schreibrecht, nicht
+  das Modul „Personen“.
+- **LFH-671** (aus der Prüfliste, Kriterium 5) Ausgeschaltete Ebenen-Zeilen stehen in `schwach`
+  und erreichen im Tagmodus nur 5,8 : 1. Das ist Bestand und gilt für alle Zeilen.

@@ -17,7 +17,8 @@ import { istModulGesperrt, istModulSichtbar, type ModulEintrag } from '../../ein
  *   Ladelücke sagte der Registry-Default „frei", der Einsatz aber womöglich „ausgeblendet".
  * - `'gesperrt'`: Rollen-Schranke im Client ODER der Server lehnt mit 403 ab. Letzteres ist der
  *   Fall, den der Client nicht sieht — `istModulGesperrt` kennt die Org-Defaults nicht, das
- *   Backend schon. Beides ist „Keine Berechtigung", kein Ausfall einer Lagebild-Quelle.
+ *   Backend schon. Beides ist „Keine Berechtigung", kein Ausfall einer Lagebild-Quelle. Die strukturelle
+ *   Lösung (eine effektive Freigabe vom Server) ist LFH-669.
  * - `'rueckblick'`: Historien-Modus. Gesicherte Lagestände tragen keine Personen.
  * - `'frei'`: laden und — bei eingeschaltetem Schalter — zeichnen.
  */

@@ -124,7 +124,7 @@ dann der Code. Pfade relativ zu `frontend/src/`.
   geänderte Lagekarten-Leiste ausfüllen und im Change ablegen
   (`openspec/changes/lfh-648-lagekarte-betroffene-ebene/pruefliste.md`). Jede Zeile trägt
   ein Verdikt. Verifikation: Datei vorhanden, keine Zeile „nicht geprüft“.
-- [ ] 9.2 Folgetickets per `clickup-task-anlegen`: (a) Org-Default-Drift im Client-Gate
+- [x] 9.2 Folgetickets per `clickup-task-anlegen`: (a) Org-Default-Drift im Client-Gate
   (`istModulGesperrt` kennt keine Org-Defaults), (b) der Platzier-Auftrag
   `?platzieren=person:` prüft nur das Schreibrecht, nicht das Modul „Personen“.
   Verifikation: Beide Tickets sind auf dem Entwicklungsboard angelegt und in der
