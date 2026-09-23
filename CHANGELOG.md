@@ -1,3 +1,62 @@
+## [1.0.0-alpha.39](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.38...v1.0.0-alpha.39) (2026-09-23)
+
+### Wichtige Änderungen
+
+Die Backend-Migrationen dieses Releases müssen in der richtigen Reihenfolge angewendet werden. Beim Zusammenführen mehrerer Entwicklungszweige wurde eine automatische Prüfung eingeführt, die Migrationsnummern-Kollisionen verhindert.
+
+### Führung und Lageüberblick
+
+Das Lage-Dashboard zeigt nun eine **lagebezogene Kennzahlreihe** mit sechs Plätzen: vier feste Kernplätze (Betroffene, Kräfte, Vermisste, Einsatzdauer) und zwei Lageplätze. Der erste Lageplatz zeigt den Pegel nur bei festgelegtem Pegel, sonst „Verbleib offen". Der dritte Platz zeigt „Schäden offen". Die Kennzahlreihe reagiert auf bewusste Entscheidungen am Einsatz und hält den gewählten Zuschnitt mit einem Sammelbanner.
+
+Ein neues Fachmodul **Wetter & Pegel** steht zur Verfügung und bietet:
+- 24-Stunden-Pegelverlauf mit Verlaufslinie, Minimal- und Maximalwerten
+- DWD-Warnungen der Warnzelle des Einsatzorts (aktuelle und angekündigte) mit amtlicher Warnstufe und Beschreibung
+- 24-Stunden-Wettervorhersage im 3-Stunden-Takt
+
+Jeder Teil des Moduls trägt seinen eigenen Datenstand und zeigt an, wenn Informationen veraltet sind (ab 30 Minuten für Pegel, ab 3 Stunden für Wetter) oder der Abruf fehlgeschlagen ist. Das Modul ist über die Pegel-Kennzahl und die Überblick-Marke erreichbar.
+
+### Einsatztagebuch
+
+Das Einsatztagebuch zeigt nun **serverseitige Zähler**: Die Kopfzeile und Bilanz-Leiste zeigen die exakte Gesamtzahl aller Einträge und die Verteilung nach Typ – auch über das aktuell geladene Fenster hinaus. Im Filter wird die genaue Trefferzahl angezeigt („7 Treffer" statt einer Zählung der sichtbaren Zeilen).
+
+### Lagekarte
+
+Die Lagekarte bietet eine neue Ebene **„Betroffene"**, die Personen als eigene Kartenelemente anzeigt. Die Ebene ist standardmäßig ausgeblendet und folgt dem Zugriffsrecht auf das Modul „Personen". Sie zeigt:
+- Personen-Marker mit vergrößerter Trefferzone je Dichtestufe (30/48/72 px)
+- Personen-Cluster, die ihre Zusammensetzung nach Sichtungskategorie farblich darstellen
+- Sichtungslegende mit modusfolgender Außenkante
+- Verortung löschen für Personen im Inspector
+
+Die Cluster werden in einer eigenen Ebene unter den Kräfte-Markern dargestellt. Bei geteilter Ansicht bleibt die Ebenenauswahl „Betroffene" auch ohne Modulzugriff gespeichert. Im Historienmodus wird die Ebene bei ausgeblendeten Modulen nicht angezeigt.
+
+### Kräfte und Mittel
+
+Die Fahrzeugseite bietet eine neue Ansicht **„FMS-Tableau"**, die Fahrzeuge nach Einheiten gegliedert als Kachelraster darstellt. Jede Kachel zeigt Rufname und FMS-Status und kann per **Ziffernkürzel 0–9** direkt angesteuert werden. Nach einem Statuswechsel kehrt der Fokus automatisch zum Auslöser zurück, sodass mehrere Fahrzeuge hintereinander per Tastatur bedient werden können. Die Ansicht ist über eine Segmentleiste „Liste / FMS-Tableau" und einen Deeplink `?ansicht=tableau` erreichbar.
+
+Die Modulzähler im Überblick (Einheiten, Einsatzabschnitte, Meldungen, Aufträge, Erinnerungen, Chat) werden nun **serverseitig** gezählt und zeigen exakte Zahlen ohne Laden der vollständigen Listen. Die Anzeige aktualisiert sich live bei Änderungen.
+
+### Betroffene
+
+Die **Zustand-Zelle** in der Personenliste zeigt während des Speicherns den eingegebenen Wert mit Ladeanzeige und hält diesen Zustand bis zum Refetch. Fehler beim Speichern werden direkt an der betroffenen Zeile angezeigt statt als Toast. Der Zustandswert wird als Textknopf mit Stift-Symbol dargestellt, sodass die gesamte Zelle als Trefffläche dient.
+
+Auf der Betroffenen-Karte tragen Personen-Marker eine **schwarze Außenkante** außerhalb des weißen Rands, um gegen jeden Kartenhintergrund Kontrast zu halten. Die Trefferzone der Marker wurde auf die volle Höhe der Dichtestufe vergrößert. Personen-Cluster zeigen ihre Zusammensetzung nach Sichtungskategorie mit farbigem Donut und dem Kürzel der dringlichsten Kategorie im Kern.
+
+Der Kartenhinweis „Alle angetroffenen Personen stehen auf der Karte" steht dauerhaft über der Karte – ohne automatischen Kartensprung beim ersten Öffnen.
+
+### Sprungpalette
+
+Die Sprungpalette unterstützt neue Öffnungswege:
+- **Strg+↵** bzw. **⌘+↵** (oder Strg/⌘+Klick) öffnen das Ziel der markierten Zeile in einem **neuen Tab**
+- **→** am Ende des Suchfelds zeigt eine **Vorschau** direkt in der Palette (z. B. Personendetails), **Esc** oder **←** führen zurück zur Trefferliste
+
+Nach der Rückkehr aus der Vorschau scrollt die markierte Zeile wieder in den sichtbaren Bereich. Die Fußzeile der Palette zeigt die verfügbaren Öffnungswege statisch an.
+
+### Betrieb und Installation
+
+Es wurde eine automatische Prüfung der **Migrationsnummern** eingeführt: Pull Requests dürfen nur neue Migrationen anhängen, nicht einschieben. Bei Konflikten bietet das Prüfskript eine automatische Umnummerierung an. Die Prüfung läuft als GitHub-Commit-Status und verhindert, dass zwei parallel entwickelte Branches dieselbe Migrationsnummer verwenden.
+
+Die Kontrast- und Layoutstabilität der Betroffenen-Flächen wurde gemessen und verbessert: Bedienelemente wie „Zustand hinzufügen" und „Auf Lagekarte verorten" erfüllen die Kontrastanforderungen (Tag ≥ 7:1, Nacht ≥ 5:1), die Schnellerfassung bleibt auch bei schmalen Displays (390 px) layoutstabil.
+
 ## [1.0.0-alpha.38](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.37...v1.0.0-alpha.38) (2026-09-23)
 
 ### Ablösung und Schichtverwaltung
