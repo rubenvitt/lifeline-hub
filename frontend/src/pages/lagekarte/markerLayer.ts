@@ -149,6 +149,7 @@ export const SPIDER_KLICK_LAYER = [
 const MARKER_LAYER_REIHENFOLGE = [
   'marker-treffer',
   'marker-status-ring',
+  'marker-kante',
   'marker-kreis',
   'marker-kurz',
   'marker-label',
@@ -158,6 +159,7 @@ const MARKER_LAYER_REIHENFOLGE = [
   'spider-legs-line',
   'spider-treffer',
   'spider-status-ring',
+  'spider-kante',
   'spider-kreis',
   'spider-kurz',
   'spider-label',
@@ -182,6 +184,20 @@ const TREFFER_PAINT: CircleLayerSpecification['paint'] = {
   'circle-radius': ['/', ['get', 'treffer'], 2],
   'circle-opacity': 0,
   'circle-stroke-width': 0,
+};
+/**
+ * Dunkle Außenkante der Personen-Marker (LFH-650): 1,5 px Schwarz AUSSERHALB des weißen
+ * Rands von {@link KREIS_PAINT} (MapLibre zeichnet `circle-stroke` außen, der Rand endet bei
+ * 9 + 2 = 11 px). Der weiße Rand allein ist auf heller Grundlage keine Kante — gemessen
+ * gegen den Kartengrund `#e8e8e8` (`e2e/betroffene-kontrast.spec.ts`), und SK II gelb füllt
+ * dort auch nicht aus. Weiß UND Schwarz nebeneinander halten gegen JEDEN Grund ≥ 3 : 1
+ * (WCAG 1.4.11): max(K(weiß, g), K(schwarz, g)) ≥ √21 ≈ 4,58 für jede Farbe g — deshalb
+ * trägt die Kante auch auf Grundkarten, die e2e nicht lädt. Dieselbe Hell-Dunkel-Paarung wie
+ * das Kurzzeichen (`KURZ_PAINT`). Nur für Features mit `sk`: die Lagekarte bleibt gleich.
+ */
+const KANTE_PAINT: CircleLayerSpecification['paint'] = {
+  'circle-radius': 12.5,
+  'circle-color': '#000',
 };
 const KREIS_PAINT: CircleLayerSpecification['paint'] = {
   'circle-radius': 9,
@@ -302,6 +318,15 @@ export function sorgeFuerMarkerLayer(
       paint: { ...TREFFER_PAINT },
     });
   }
+  if (!map.getLayer('marker-kante')) {
+    map.addLayer({
+      id: 'marker-kante',
+      type: 'circle',
+      source: MARKER_CLUSTER_QUELLE,
+      filter: ['all', ['!', ['has', 'point_count']], ['has', 'sk']],
+      paint: { ...KANTE_PAINT },
+    });
+  }
   // Lagemeldung (kein TZ) — einfacher Kreis (heutige Optik: farbig, weißer Rand).
   if (!map.getLayer('marker-kreis')) {
     map.addLayer({
@@ -418,6 +443,15 @@ function sorgeFuerSpiderLayer(map: MapLibreMap, schrift: string[] | undefined) {
       source: SPIDER_LEAVES_QUELLE,
       filter: ['has', 'statusFarbe'],
       paint: { ...STATUS_RING_PAINT },
+    });
+  }
+  if (!map.getLayer('spider-kante')) {
+    map.addLayer({
+      id: 'spider-kante',
+      type: 'circle',
+      source: SPIDER_LEAVES_QUELLE,
+      filter: ['has', 'sk'],
+      paint: { ...KANTE_PAINT },
     });
   }
   if (!map.getLayer('spider-kreis')) {

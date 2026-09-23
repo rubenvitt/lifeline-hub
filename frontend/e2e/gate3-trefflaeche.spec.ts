@@ -1255,3 +1255,307 @@ test('Ablösung: Kartenaktionen und Vorgabe-Knopf folgen der Dichte-Staffel 30 /
   }
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
+
+// ─── Betroffene (LFH-650, Nachzug zur LFH-613-Prüfliste, Tabellen 1, 3 und 4, Nr. 1 · 2) ──
+//
+// Vier Flächen, alle mit denselben Helfern wie oben:
+//  - Liste `/personen`: der Zustand-Knopf LEER („Zustand zu R-001 hinzufügen") und GEFÜLLT
+//    („Zustand zu R-002 bearbeiten"). Bis LFH-650 war das Ziel am gefüllten Wert antds
+//    kleiner Typography-Stift; seitdem ist der Wert selbst ein Textknopf (`BemerkungZelle`).
+//    Dazu der Abstand zum nächsten Bedienziel derselben Zeile.
+//  - Detailseite: „Auf Lagekarte verorten", ein handgebauter `<Link>` in einer
+//    `Descriptions`-Zelle. LFH-396 hat genau so einen Anker mit 17 px in jeder Stufe gemessen.
+//  - Aufnahme-Route und Modal, „Weitere Angaben" aufgeklappt: Zustand, Koordinate und —
+//    im Modus „vermisst" — „vermisst seit".
+//  - Karte `?ansicht=karte`: Marker (WebGL — gemessen per KLICK mit Versatz neben den
+//    gezeichneten Kreis), Cluster-Donut (DOM) und die Zoom-/Nord-Knöpfe der Überlagerung.
+//
+// MUTATIONSPROBE (Akzeptanzkriterium), am 23.09.2026 mit temporären Änderungen gefahren:
+//  - `BemerkungZelle` auf den Stand vor LFH-650 (Typography-Stift) zurückgedreht: rot an
+//    „Zustand-Knopf gefüllt (kompakt) (gemessen 15px hoch, Soll ≥ 30)" — schon die erste
+//    Stufe fällt, der Stift liegt unter dem 24-px-Boden.
+//  - `trefferDurchmesser` aus `personenMarker` entfernt: rot am Versatzklick in `kompakt`
+//    (URL bleibt auf der Liste) — neben dem gezeichneten Kreis trifft dann nichts mehr.
+//
+// Messwerte nach dem Umbau (23.09.2026): Zustand-Knopf leer/gefüllt 30 / 48 / 72, nächstes
+// Bedienziel der Zeile ≥ 321 px entfernt · Verorten-Link 30 / 48 / 72 hoch, ≥ 149 px breit ·
+// Zustand, Koordinate, „vermisst seit" 30,1 / 48 / 72 · Kartenknöpfe 32 / 48 / 72 · Donut
+// 46 / 48 / 72 · Versatzklick 13 / 22 / 34 px neben der Kreismitte trifft.
+
+/** Die Zeile einer Person in der Tabelle (antd `data-row-key` = DB-`id`). */
+const personZeile = (page: Page, id: number) =>
+  page.locator(`tr.ant-table-row[data-row-key="${id}"]`);
+
+async function personAnlegen(page: Page, einsatzId: string, daten: object): Promise<number> {
+  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/personen`, { data: daten });
+  expect(antwort.ok(), `Seeding Person: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
+  return ((await antwort.json()) as { id: number }).id;
+}
+
+/**
+ * Kleinster Abstand von `ziel` zu irgendeinem anderen Bedienziel innerhalb von `bereich`
+ * (Achsen-Abstand wie oben: bei Überlappung in einer Achse zählt die andere). Vorfahren und
+ * Nachfahren des Ziels zählen nicht — sie SIND das Ziel.
+ */
+async function abstandZuNachbarn(bereich: Locator, ziel: Locator): Promise<number> {
+  const zielGriff = await ziel.elementHandle();
+  return bereich.evaluate((wurzel, z) => {
+    const a = (z as Element).getBoundingClientRect();
+    const kandidaten = wurzel.querySelectorAll<HTMLElement>(
+      'a[href], button, [role="button"], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+    );
+    let min = Number.POSITIVE_INFINITY;
+    for (const k of kandidaten) {
+      if (k === z || k.contains(z as Element) || (z as Element).contains(k)) continue;
+      const b = k.getBoundingClientRect();
+      if (b.width === 0 || b.height === 0) continue;
+      const dx = Math.max(b.left - a.right, a.left - b.right, 0);
+      const dy = Math.max(b.top - a.bottom, a.top - b.bottom, 0);
+      min = Math.min(min, Math.max(dx, dy));
+    }
+    return min;
+  }, zielGriff);
+}
+
+test('Betroffene Liste: Zustand-Knopf leer und gefüllt folgen der Staffel, Abstand ≥ 16 px im Handschuh', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Betroffene`);
+  await personAnlegen(page, einsatzId, { name: 'Albers' });
+  const gefuellt = await personAnlegen(page, einsatzId, { name: 'Brandt', zustand: 'gehfähig' });
+
+  const gemessen: string[] = [];
+  for (const { dichte, soll } of STAFFEL) {
+    await page.goto(`/einsaetze/${einsatzId}/personen`);
+    await stelleDichte(page, dichte);
+    const leer = page.getByRole('button', { name: 'Zustand zu R-001 hinzufügen' });
+    const voll = page.getByRole('button', { name: 'Zustand zu R-002 bearbeiten' });
+    const hLeer = await haeltStufe(leer, soll, `Zustand-Knopf leer (${dichte})`);
+    const hVoll = await haeltStufe(voll, soll, `Zustand-Knopf gefüllt (${dichte})`);
+    for (const [ziel, name] of [
+      [leer, 'leer'],
+      [voll, 'gefüllt'],
+    ] as const) {
+      const breite = (await ziel.boundingBox())!.width;
+      expect(breite, `Zustand-Knopf ${name} (${dichte}) breit ${breite}px`).toBeGreaterThanOrEqual(
+        24 - SUBPIXEL,
+      );
+    }
+    const abstand = await abstandZuNachbarn(personZeile(page, gefuellt), voll);
+    if (dichte === 'handschuh') {
+      expect(abstand, `Abstand Zustand-Knopf → Nachbarziel (handschuh)`).toBeGreaterThanOrEqual(
+        16 - SUBPIXEL,
+      );
+    }
+    gemessen.push(
+      `${dichte} (Soll ≥ ${soll}): leer ${hLeer}, gefüllt ${hVoll}, Abstand ${abstand}`,
+    );
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+test('Betroffene Detailseite: „Auf Lagekarte verorten" folgt der Staffel', async ({ page }) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Verorten`);
+  const id = await personAnlegen(page, einsatzId, { name: 'Claasen' });
+
+  const gemessen: string[] = [];
+  for (const { dichte, soll } of STAFFEL) {
+    await page.goto(`/einsaetze/${einsatzId}/personen/${id}`);
+    await stelleDichte(page, dichte);
+    const link = page.getByRole('link', { name: 'Auf Lagekarte verorten', exact: true });
+    const hoehe = await haeltStufe(link, soll, `Verorten-Link (${dichte})`);
+    const breite = (await link.boundingBox())!.width;
+    expect(breite).toBeGreaterThanOrEqual(24 - SUBPIXEL);
+    await expect(link).toHaveAttribute('href', /platzieren=person/);
+    gemessen.push(`${dichte} (Soll ≥ ${soll}): ${hoehe} × ${breite}`);
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+test('Betroffene Aufnahme: Zustand, Koordinate und „vermisst seit" folgen der Staffel (Route und Modal)', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Aufnahme`);
+
+  /**
+   * Die sichtbare Feldhülle: ein nacktes `Input` IST sie (Klasse `ant-input`), beim
+   * DatePicker ist es der Vorfahr `.ant-picker` — NICHT das innere `.ant-picker-input`, das
+   * gemessen nur 15 px hoch ist. Deshalb Klassen-TOKEN statt Teilstring.
+   */
+  const huelle = (feld: Locator) =>
+    feld.locator(
+      'xpath=ancestor-or-self::*[contains(concat(" ", normalize-space(@class), " "), " ant-input ") or contains(concat(" ", normalize-space(@class), " "), " ant-picker ")][1]',
+    );
+
+  const gemessen: string[] = [];
+  for (const { dichte, soll } of STAFFEL) {
+    // Route (Modus betroffen): Zustand + Koordinate.
+    await page.goto(`/einsaetze/${einsatzId}/personen/aufnahme`);
+    await stelleDichte(page, dichte);
+    await page.getByRole('button', { name: /Weitere Angaben/ }).click();
+    const zustand = await haeltStufe(
+      huelle(page.getByLabel('Zustand', { exact: true })),
+      soll,
+      `Route Zustand (${dichte})`,
+    );
+    const koordinate = await haeltStufe(
+      huelle(page.getByLabel('Koordinate', { exact: true })),
+      soll,
+      `Route Koordinate (${dichte})`,
+    );
+
+    // Modal „Vermisst melden": „vermisst seit".
+    await page.goto(`/einsaetze/${einsatzId}/personen`);
+    await page.getByRole('button', { name: 'Vermisst melden' }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('button', { name: /Weitere Angaben/ }).click();
+    const seit = await haeltStufe(
+      huelle(dialog.getByLabel('vermisst seit', { exact: true })),
+      soll,
+      `Modal vermisst seit (${dichte})`,
+    );
+    await page.keyboard.press('Escape');
+    gemessen.push(
+      `${dichte} (Soll ≥ ${soll}): Zustand ${zustand}, Koordinate ${koordinate}, vermisst seit ${seit}`,
+    );
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+interface KartenHaken {
+  loaded(): boolean;
+  project(lngLat: [number, number]): { x: number; y: number };
+  getCanvas(): HTMLCanvasElement;
+  jumpTo(o: { center: [number, number]; zoom: number }): void;
+  queryRenderedFeatures(p: [number, number], o: { layers: string[] }): unknown[];
+  once(ereignis: string, f: () => void): void;
+}
+
+async function karteBereit(page: Page) {
+  await page.waitForFunction(
+    () => Boolean((window as unknown as { __lfhKarte?: KartenHaken }).__lfhKarte?.loaded()),
+    undefined,
+    { timeout: 60_000 },
+  );
+}
+
+/** Seitenkoordinaten eines Punkts auf der Karte. */
+async function aufSeite(page: Page, lngLat: [number, number]) {
+  return page.evaluate((ll) => {
+    const k = (window as unknown as { __lfhKarte: KartenHaken }).__lfhKarte;
+    const p = k.project(ll);
+    const r = k.getCanvas().getBoundingClientRect();
+    return { x: r.left + p.x, y: r.top + p.y };
+  }, lngLat);
+}
+
+test('Betroffene Karte: Marker-Trefferzone, Cluster-Donut und Kartenknöpfe folgen der Staffel', async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Karte`);
+  // Zwei EINZELNE Marker weit auseinander (kein Cluster) und ein enges Paar, das bei jedem
+  // Startausschnitt zu einem Cluster verschmilzt (rund 20 m Abstand).
+  const einzeln: [number, number] = [8.8, 53.0];
+  const zielId = await personAnlegen(page, einsatzId, {
+    name: 'Einzeln',
+    antreff_lat: einzeln[1],
+    antreff_lon: einzeln[0],
+    sichtung: 'sk2',
+  });
+  await personAnlegen(page, einsatzId, { name: 'Fern', antreff_lat: 53.3, antreff_lon: 9.3 });
+  for (const [i, sk] of (['sk1', 'sk3'] as const).entries()) {
+    await personAnlegen(page, einsatzId, {
+      name: `Paar ${i}`,
+      antreff_lat: 52.8 + i * 0.0002,
+      antreff_lon: 8.6,
+      sichtung: sk,
+    });
+  }
+
+  const gemessen: string[] = [];
+  for (const { dichte, soll } of STAFFEL) {
+    await page.goto(`/einsaetze/${einsatzId}/personen?ansicht=karte`);
+    await stelleDichte(page, dichte);
+    await karteBereit(page);
+
+    // Kartenknöpfe (DOM): Hineinzoomen, Herauszoomen, Nach Norden.
+    let knopf = Number.POSITIVE_INFINITY;
+    for (const name of ['Hineinzoomen', 'Herauszoomen', 'Nach Norden ausrichten']) {
+      knopf = Math.min(
+        knopf,
+        await haeltStufe(
+          page.getByRole('button', { name, exact: true }),
+          soll,
+          `${name} (${dichte})`,
+        ),
+      );
+    }
+
+    // Cluster (DOM-Donut): das Klickziel ist die Hülle bzw. der Ring, gemessen in BEIDEN Achsen.
+    // MapLibre setzt `maplibregl-marker` auf das übergebene Element SELBST: ohne Hülle ist
+    // der Ring der Marker (und trägt `data-sichtung`), mit Hülle steckt der Ring darin.
+    const cluster = page.locator(
+      '.maplibregl-marker[data-sichtung], .maplibregl-marker:has([data-sichtung])',
+    );
+    await expect(cluster).toHaveCount(1, { timeout: 20_000 });
+    const donut = (await cluster.boundingBox())!;
+    expect(donut.height, `Cluster-Donut (${dichte}) hoch ${donut.height}`).toBeGreaterThanOrEqual(
+      soll - SUBPIXEL,
+    );
+    expect(donut.width, `Cluster-Donut (${dichte}) breit ${donut.width}`).toBeGreaterThanOrEqual(
+      soll - SUBPIXEL,
+    );
+    await expect(cluster.locator('[data-lfh="cluster-sichtung"]')).toHaveText('I');
+
+    // Marker (WebGL): ein Klick NEBEN den gezeichneten Kreis (Außenkante bei 12,5 px), aber
+    // innerhalb der Zone, öffnet die Person. Versatz = halbe Stufe minus 2 px, also in
+    // `kompakt` 13 px — schon dort außerhalb der Zeichnung.
+    // Erst den Marker in die Kartenmitte holen und die Karte ins Bild scrollen: in
+    // `handschuh` schiebt der höhere Seitenkopf den Startausschnitt unter den Viewport, und ein
+    // Klick außerhalb des Viewports trifft nichts. Zoom 15 liegt über `clusterMaxZoom` (14).
+    await page.locator('[data-lfh="betroffene-karte"] canvas').scrollIntoViewIfNeeded();
+    // `idle` statt `loaded()`: nach einem Sprung ohne Kachelquelle bleibt `loaded()` gemessen
+    // stehen, `idle` feuert, sobald nichts mehr zu zeichnen ist.
+    await page.evaluate(
+      (ll) =>
+        new Promise<void>((fertig) => {
+          const k = (window as unknown as { __lfhKarte: KartenHaken }).__lfhKarte;
+          k.once('idle', () => fertig());
+          k.jumpTo({ center: ll, zoom: 15 });
+        }),
+      einzeln,
+    );
+    const mitte = await aufSeite(page, einzeln);
+    const versatz = soll / 2 - 2;
+    const daneben = await page.evaluate(
+      ([x, y]) => {
+        const k = (window as unknown as { __lfhKarte: KartenHaken }).__lfhKarte;
+        const r = k.getCanvas().getBoundingClientRect();
+        const p: [number, number] = [x - r.left, y - r.top];
+        const sichtbar = ['marker-kante', 'marker-kreis', 'marker-kurz'];
+        return k.queryRenderedFeatures(p, { layers: sichtbar }).length;
+      },
+      [mitte.x + versatz, mitte.y] as const,
+    );
+    // Selbstprobe des Versatzes: dort ist NICHTS gezeichnet, sonst mäße der Klick den Kreis.
+    expect(daneben, `am Versatz ${versatz}px liegt kein gezeichneter Marker`).toBe(0);
+    await page.mouse.click(mitte.x + versatz, mitte.y);
+    await expect(page).toHaveURL(new RegExp(`/personen/${zielId}$`));
+    gemessen.push(
+      `${dichte} (Soll ≥ ${soll}): Knöpfe ${knopf}, Donut ${donut.width}×${donut.height}, Versatzklick ${versatz}px trifft`,
+    );
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});

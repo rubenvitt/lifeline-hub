@@ -236,6 +236,7 @@ describe('sorgeFuerMarkerLayer', () => {
     expect(moves).toEqual([
       'marker-treffer',
       'marker-status-ring',
+      'marker-kante',
       'marker-kreis',
       'marker-kurz',
       'marker-label',
@@ -245,6 +246,7 @@ describe('sorgeFuerMarkerLayer', () => {
       'spider-legs-line',
       'spider-treffer',
       'spider-status-ring',
+      'spider-kante',
       'spider-kreis',
       'spider-kurz',
       'spider-label',
@@ -270,6 +272,20 @@ describe('sorgeFuerMarkerLayer', () => {
     }
     expect(MARKER_KLICK_LAYER).toContain('marker-treffer');
     expect(SPIDER_KLICK_LAYER).toContain('spider-treffer');
+  });
+
+  it('die dunkle Außenkante (LFH-650) liegt direkt unter dem Kreis, schwarz und nur an Personen', () => {
+    const { map, layers, moves } = fakeMap();
+    sorgeFuerMarkerLayer(map as never, leer, leer);
+    for (const id of ['marker-kante', 'spider-kante']) {
+      const layer = layers.get(id) as { filter: unknown; paint: Record<string, unknown> };
+      expect(JSON.stringify(layer.filter)).toContain('["has","sk"]');
+      expect(layer.paint['circle-color']).toBe('#000');
+      // Außen über den weißen Rand hinaus: Kreis 9 + Rand 2 = 11 < 12,5.
+      expect(layer.paint['circle-radius']).toBe(12.5);
+    }
+    expect(moves.indexOf('marker-kante')).toBe(moves.indexOf('marker-kreis') - 1);
+    expect(moves.indexOf('spider-kante')).toBe(moves.indexOf('spider-kreis') - 1);
   });
 
   it('legt alle in MARKER_KLICK_LAYER referenzierten Layer real an (Konstanten-Kopplung)', () => {

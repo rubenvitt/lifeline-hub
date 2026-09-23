@@ -786,6 +786,20 @@ describe('LageDashboardPage — Sichtung', () => {
     );
   });
 
+  it('„Ohne Sichtung" steht auch bei 0 — die Zeile springt nicht mit dem Wert (LFH-650)', async () => {
+    /**
+     * Vorher nur bei `> 0` gerendert: der erste ungesichtete Zugang schob die Transport-Zeile
+     * und das Paneel nach unten (Prüfliste LFH-613, Tabelle 5, Nr. 12). Die Gegenhälfte, dass
+     * der Wert bei > 0 stimmt, trägt der Test oben.
+     */
+    mockEndpunkte({ personen: [person('sk1'), person('sk3')] });
+    render();
+    const box = paneel('Sichtung');
+    await waitFor(() =>
+      expect(box.querySelector('[data-lfh="ohne-sichtung"]')).toHaveTextContent('Ohne Sichtung0'),
+    );
+  });
+
   it('nimmt Tote dazu, sobald es welche gibt', async () => {
     mockEndpunkte({ personen: [person('sk2'), person('tot')] });
     render();
