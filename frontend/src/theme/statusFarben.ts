@@ -30,6 +30,7 @@ import type {
   UhsTyp,
   Verfuegbarkeit,
   Warnstufe,
+  WetterWarnstufe,
 } from '../api/types';
 import type { HochwasserKlasse, LuftqualitaetKlasse, OdlStufe } from '../api/fachebenen';
 
@@ -541,6 +542,25 @@ export function auslastung(
   if (belegt * 10 >= kapazitaet * 9) return { rolle: 'achtung', label: 'fast voll' };
   return null;
 }
+
+/**
+ * Amtliche DWD-Warnstufe einer Wetterwarnung am Einsatzort (LFH-633, Modul „Wetter & Pegel").
+ *
+ * DIESELBE VERENGUNG WIE {@link hochwasserKlasse}: der DWD führt vier Stufen in vier Tönen
+ * (gelb/orange/rot/violett), A0 hat drei Statusrollen. `gering`/`maessig` fallen auf
+ * `achtung`, `schwer`/`extrem` auf `alarm`; unterschieden werden sie über die amtlichen
+ * Bezeichnungen im Pflichtfeld `label` (WCAG 1.4.1).
+ *
+ * `gering` ist NICHT `neutral`: eine amtliche Warnung ist kein Ruhezustand. Und keine Stufe
+ * ist Blau — der `FachebenenInspector` der Lagekarte legte „Minor" auf Blau, das ist
+ * `bedien` und bezeichnet eine aktive Beziehung, keine Gefahr (Folgeticket zur Kartenebene).
+ */
+export const dwdWarnstufe: Record<WetterWarnstufe, StatusDarstellung> = {
+  gering: { rolle: 'achtung', label: 'Wetterwarnung' },
+  maessig: { rolle: 'achtung', label: 'Markantes Wetter' },
+  schwer: { rolle: 'alarm', label: 'Unwetterwarnung' },
+  extrem: { rolle: 'alarm', label: 'Extremes Unwetter' },
+};
 
 /**
  * Die drei Rollen, die eine Kennzahl **stufen** können — bewusst eine VERENGUNG von

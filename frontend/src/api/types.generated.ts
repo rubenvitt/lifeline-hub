@@ -2264,6 +2264,38 @@ export interface components {
             zeitpunkt: string;
         };
         /**
+         * @description Verlauf der letzten 24 Stunden eines festgelegten Pegels (LFH-633), für die Verlaufslinie
+         *     der Modulseite „Wetter & Pegel".
+         *
+         *     Eine eigene Route statt eines Felds in [`PegelAnzeige`]: die Liste laden auch Dashboard
+         *     und Überblick alle 5 min, dort wäre die Reihe nur Gewicht.
+         */
+        PegelVerlauf: {
+            /**
+             * Format: int64
+             * @description `id` des Pegels aus [`PegelAnzeige`].
+             */
+            pegel_id: number;
+            /**
+             * @description Nach Zeit aufsteigend, höchstens 288 Punkte (`trend::VERLAUF_MAX_PUNKTE`). Leer, wenn
+             *     die Station keinen Stand hat — dann fehlt auch die Messung der Liste.
+             */
+            punkte: components["schemas"]["PegelVerlaufPunkt"][];
+        };
+        /** @description Ein Punkt des 24-h-Verlaufs (LFH-633). */
+        PegelVerlaufPunkt: {
+            /**
+             * Format: double
+             * @description Wasserstand der W-Reihe in cm.
+             */
+            wasserstand_cm: number;
+            /**
+             * @description Zeitpunkt der Messung, RFC 3339 mit Zonenversatz, wie PEGELONLINE ihn liefert —
+             *     dieselbe Form wie [`PegelMessung::zeitpunkt`].
+             */
+            zeitpunkt: string;
+        };
+        /**
          * @description Vorschlag aus der PEGELONLINE-Vorhersage-Reihe `WV` (LFH-628): der höchste Wert der
          *     Reihe mit seinem Zeitpunkt. Nur ein Teil der Stationen führt die Reihe (gemessen
          *     22.09.2026: 43).
@@ -2870,6 +2902,123 @@ export interface components {
          * @enum {string}
          */
         Warnstufe: "keine" | "niedrig" | "mittel" | "hoch" | "akut";
+        /** @description Antwort von `GET /api/einsaetze/{id}/wetter`. */
+        WetterAnzeige: {
+            ort?: null | components["schemas"]["WetterOrt"];
+            vorhersage: components["schemas"]["WetterVorhersageTeil"];
+            warnungen: components["schemas"]["WetterWarnungen"];
+        };
+        /** @description Die Warnzelle (Gemeinde), in der der Einsatzort liegt — `location` der Quelle. */
+        WetterOrt: {
+            /** @description Kreis bzw. kreisfreie Stadt (`district`). */
+            kreis?: string | null;
+            /** @description Bundesland (`state`). */
+            land?: string | null;
+            /** @description Name der Warnzelle, z. B. „Stadt Bremerhaven“. */
+            name: string;
+        };
+        /**
+         * @description Vorhersagewerte einer Stunde (MOSMIX). Jeder Wert, den die Quelle nicht liefert, fehlt —
+         *     er wird nie zu 0.
+         */
+        WetterStunde: {
+            /**
+             * Format: double
+             * @description Böen in km/h.
+             */
+            boeen_kmh?: number | null;
+            /**
+             * Format: double
+             * @description Niederschlag der Stunde in mm.
+             */
+            niederschlag_mm?: number | null;
+            /**
+             * Format: double
+             * @description Niederschlagswahrscheinlichkeit in %.
+             */
+            niederschlag_wahrscheinlichkeit?: number | null;
+            /**
+             * Format: double
+             * @description Lufttemperatur in °C.
+             */
+            temperatur_c?: number | null;
+            /**
+             * Format: double
+             * @description Mittlerer Wind in km/h.
+             */
+            wind_kmh?: number | null;
+            /**
+             * Format: double
+             * @description Windrichtung in Grad (0 = Nord, im Uhrzeigersinn), woher der Wind weht.
+             */
+            windrichtung_grad?: number | null;
+            /** @description Beginn der Stunde, RFC 3339 in UTC (`…Z`). */
+            zeitpunkt: string;
+        };
+        /**
+         * @description Zustand eines Teils der Wetter-Antwort. Wire == `as_str()`.
+         * @enum {string}
+         */
+        WetterTeilZustand: "ok" | "kein_ort" | "ausfall";
+        /**
+         * @description Vorhersage für den Einsatzort: die Station, aus deren Vorhersage die Werte stammen, und
+         *     die Stunden ab der laufenden Stunde, aufsteigend.
+         */
+        WetterVorhersage: {
+            /**
+             * Format: double
+             * @description Entfernung der Station zum (gerundeten) Einsatzort in Metern.
+             */
+            entfernung_m?: number | null;
+            /** @description Stationsname, wie die Quelle ihn führt (MOSMIX: Großbuchstaben, z. B. „BREMEN“). */
+            station?: string | null;
+            stunden: components["schemas"]["WetterStunde"][];
+        };
+        /** @description Teil „Vorhersage“ der Wetter-Antwort. */
+        WetterVorhersageTeil: {
+            /** @description Zeitpunkt des letzten erfolgreichen Abrufs, RFC 3339 in UTC. Nur bei `ok`. */
+            abgerufen_at?: string | null;
+            daten?: null | components["schemas"]["WetterVorhersage"];
+            zustand: components["schemas"]["WetterTeilZustand"];
+        };
+        /**
+         * @description Amtliche Warnstufe des DWD, abgebildet aus `severity` der Quelle. Wire == `as_str()`.
+         *
+         *     Die Reihenfolge der Varianten ist die Schwere (`Ord`): die Liste wird danach absteigend
+         *     sortiert.
+         * @enum {string}
+         */
+        WetterWarnstufe: "gering" | "maessig" | "schwer" | "extrem";
+        /** @description Eine amtliche Wetterwarnung des DWD. Zeitpunkte RFC 3339 in UTC (`…Z`). */
+        WetterWarnung: {
+            /** @description Ausgabe der Warnung (`effective`). */
+            ausgegeben?: string | null;
+            /** @description Beginn (`onset`). „gilt jetzt“ gegen „angekündigt“ trennt das Frontend daran. */
+            beginn?: string | null;
+            beschreibung?: string | null;
+            /**
+             * @description Ende (`expires`). Fehlt, wenn die Quelle keins nennt; eine Warnung mit verstrichenem
+             *     Ende erscheint nie.
+             */
+            ende?: string | null;
+            /** @description Ereignis, z. B. „STURMBÖEN“ (`event_de`; so schreibt der DWD es). */
+            ereignis: string;
+            handlungsempfehlung?: string | null;
+            stufe: components["schemas"]["WetterWarnstufe"];
+            /** @description Überschrift, z. B. „Amtliche WARNUNG vor STURMBÖEN“ (`headline_de`). */
+            ueberschrift: string;
+        };
+        /** @description Teil „Warnungen“ der Wetter-Antwort. */
+        WetterWarnungen: {
+            /** @description Zeitpunkt des letzten erfolgreichen Abrufs, RFC 3339 in UTC. Nur bei `ok`. */
+            abgerufen_at?: string | null;
+            /**
+             * @description Gültige Warnungen, Stufe absteigend, dann Beginn aufsteigend. Nur bei `ok` — dort
+             *     auch leer, wenn keine gilt.
+             */
+            daten?: components["schemas"]["WetterWarnung"][] | null;
+            zustand: components["schemas"]["WetterTeilZustand"];
+        };
         /**
          * @description Zeitformat (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `zeitformat`
          *     (per-Variante, `rename_all` trifft die Ziffern-Kürzel nicht).

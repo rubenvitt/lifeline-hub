@@ -37,7 +37,8 @@ set -euo pipefail
 # Bündel-Auswahl für die parallele CI (LFH-534). OHNE Argument läuft alles wie bisher —
 # das ist der Weg vor dem Merge und die Vorgabe, an der sich nichts geändert hat.
 #   --nur schnell    rustfmt, Lint, Typ-Drift, Advisories,
-#                    Selbsttests der Gate-Skripte            (Sekunden bis ~1:20)
+#                    Selbsttests der Gate-Skripte,
+#                    Migrationsnummern gegen origin/alpha    (Sekunden bis ~1:20)
 #   --nur rust       cargo test --workspace                  (~17 min)
 #   --nur frontend   Vitest                                  (~16 min, shardbar)
 #   --nur e2e        Playwright                              (~18 min, shardbar)
@@ -52,7 +53,7 @@ while [ $# -gt 0 ]; do
       shift 2
       ;;
     --nur=*) NUR="${1#--nur=}"; shift ;;
-    -h|--help) sed -n '31,39p' "$0"; exit 0 ;;
+    -h|--help) sed -n '/^# Bündel-Auswahl/,/^#   VITEST_SHARD/p' "$0"; exit 0 ;;
     *) echo "FEHLER: unbekanntes Argument '$1'." >&2; exit 2 ;;
   esac
 done
@@ -85,7 +86,7 @@ FE="$ROOT/frontend"
 # ändert, prüft BEIDE Schritte (5 und 7) — eine Version, die nur einen davon grün
 # macht, ist keine.
 PNPM="mise exec node@26.7.0 pnpm@11.10.0 -- pnpm"
-SCHRITTE=9
+SCHRITTE=10
 
 # ZEITZONE FESTNAGELN (LFH-522, gemessen im ersten CI-Lauf).
 # Ohne diese Zeile hängt das Ergebnis der Suite an der Zone des Rechners: `EtbFilterleiste`
@@ -109,10 +110,10 @@ if [ -n "${geraeumt// /}" ]; then
   echo "==> Dev-Variablen werden für die Testläufe geräumt: $geraeumt"
 fi
 
-# ── Die neun Schritte, je als Funktion ──────────────────────────────────────────────
+# ── Die zehn Schritte, je als Funktion ──────────────────────────────────────────────
 # Warum Funktionen statt einer geraden Abfolge: die CI fährt sie seit LFH-534 auf MEHREREN
 # Runnern parallel und muss sie deshalb einzeln ansprechen können. Der Aufruf ohne Argument
-# ist davon unberührt — er fährt weiterhin alle neun der Reihe nach, und das bleibt der
+# ist davon unberührt — er fährt weiterhin alle zehn der Reihe nach, und das bleibt der
 # Weg vor dem Merge.
 #
 # Die Nummer in der Ausgabe ist die Position im GESAMTgate, nicht im gerade laufenden
@@ -288,16 +289,33 @@ schritt_9() {
   "$ROOT/scripts/check-deps.test.sh"
 }
 
+schritt_10() {
+  echo "==> [10/$SCHRITTE] Migrationsnummern gegen den Ziel-Branch (LFH-658)"
+  # Erst der Selbsttest: das Prüfskript ist die einzige Stelle, die eine eingeschobene
+  # Nummer bemerkt (sqlx spielt sie still nach), und es irrt in beide Richtungen still.
+  "$ROOT/scripts/check-migrationen.test.sh"
+  # Dann die Prüfung selbst, gegen `origin/alpha` so frisch wie der letzte `fetch` — eine
+  # Frühwarnung, keine Durchsetzung. Durchgesetzt wird über `.github/workflows/migrationen.yml`,
+  # der jeden offenen PR bei jedem Push auf den Ziel-Branch neu bewertet. Ohne den Ref (der
+  # flache PR-Checkout der CI hat ihn nicht) wird laut übersprungen, nicht gebrochen.
+  if git -C "$ROOT" rev-parse --verify --quiet 'origin/alpha^{commit}' > /dev/null; then
+    "$ROOT/scripts/check-migrationen.sh" origin/alpha
+  else
+    echo "    ÜBERSPRUNGEN: origin/alpha fehlt in diesem Checkout." >&2
+    echo "    Im PR prüft das der Workflow 'Migrationsnummern'; lokal hilft 'git fetch origin alpha'." >&2
+  fi
+}
+
 # ── Bündel für die parallele CI ─────────────────────────────────────────────────────
 # `schnell` trägt alles, was in Sekunden bis gut einer Minute fertig ist, und scheitert
 # deshalb früh; die drei teuren Schritte bekommen je einen eigenen Runner.
-BUENDEL_schnell="1 2 3 6 8 9"
+BUENDEL_schnell="1 2 3 6 8 9 10"
 BUENDEL_rust="4"
 BUENDEL_frontend="5"
 BUENDEL_e2e="7"
-BUENDEL_alle="1 2 3 4 5 6 7 8 9"
+BUENDEL_alle="1 2 3 4 5 6 7 8 9 10"
 
-# SELBSTPRÜFUNG: die vier Bündel müssen ZUSAMMEN genau die neun Schritte ergeben — jeden
+# SELBSTPRÜFUNG: die vier Bündel müssen ZUSAMMEN genau die zehn Schritte ergeben — jeden
 # genau einmal. Ohne diese Zeile fiele beim Umsortieren still ein Schritt aus der CI heraus,
 # und niemand sähe es: die Jobs blieben grün, nur geprüft würde weniger. Das ist teurer als
 # ein roter Lauf.

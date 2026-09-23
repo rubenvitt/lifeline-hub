@@ -29,6 +29,7 @@ import {
   TbFiles,
   TbArrowsExchange,
   TbHomeHeart,
+  TbCloudStorm,
 } from 'react-icons/tb';
 import type { BenutzerAnzeige, ModulOverrides } from '../api/types';
 
@@ -332,6 +333,16 @@ export const modulRegistry: ModulEintrag[] = [
       'Gefahrenmatrix (Gefahrentyp × Schutzobjekt → Warnstufe) und Verknüpfung der Gefahrengebiete.',
   },
   {
+    key: 'wetter-pegel',
+    kategorie: 'lage',
+    label: 'Wetter & Pegel',
+    icon: TbCloudStorm,
+    route: 'wetter-pegel',
+    status: 'fertig',
+    beschreibung:
+      'Maßgebliche Pegel mit 24-h-Verlauf, DWD-Warnungen und Vorhersage für den Einsatzort.',
+  },
+  {
     key: 'lagemeldungen',
     kategorie: 'lage',
     label: 'Lagemeldungen',
@@ -524,6 +535,22 @@ export function istModulFreigegeben(
     istModulSichtbar(modul, overrides) &&
     !istModulGesperrt(modul, benutzer, overrides)
   );
+}
+
+/**
+ * {@link istModulFreigegeben} über den Modul-Key — für Verweise AUS anderen Seiten auf ein
+ * Modul (LFH-633: Pegel-Kennzahl und Überblick-Marke → „Wetter & Pegel"). Ein unbekannter
+ * Key ist nie frei: ein Link auf ein Modul, das es nicht gibt, wäre ein Sprung ins Leere.
+ * Bewusst nicht `darfZaehlerLaden` — das findet sein Modul über `zaehlerQuelle` und sagte
+ * für jedes Modul ohne Zähler still `false`.
+ */
+export function istKeyFreigegeben(
+  key: string,
+  benutzer: BenutzerAnzeige | null,
+  overrides?: ModulOverrides,
+): boolean {
+  const modul = modulRegistry.find((m) => m.key === key);
+  return !!modul && istModulFreigegeben(modul, benutzer, overrides);
 }
 
 /**

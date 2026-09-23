@@ -351,6 +351,19 @@ export type PegelPrognose = S['PegelPrognose'];
 export type PegelVorhersage = S['PegelVorhersage'];
 export type PegelVorhersageAntwort = S['PegelVorhersageAntwort'];
 
+// ============================== LFH-633 Wetter & Pegel ==============================
+export type PegelVerlauf = S['PegelVerlauf'];
+export type PegelVerlaufPunkt = S['PegelVerlaufPunkt'];
+export type WetterAnzeige = S['WetterAnzeige'];
+export type WetterOrt = S['WetterOrt'];
+export type WetterWarnungen = S['WetterWarnungen'];
+export type WetterWarnung = S['WetterWarnung'];
+export type WetterWarnstufe = S['WetterWarnstufe'];
+export type WetterVorhersageTeil = S['WetterVorhersageTeil'];
+export type WetterVorhersage = S['WetterVorhersage'];
+export type WetterStunde = S['WetterStunde'];
+export type WetterTeilZustand = S['WetterTeilZustand'];
+
 // ============================== LFH-632 Dokumentenablage ==============================
 export type Dokument = S['DokumentAnzeige'];
 export type DokumentKategorie = S['DokumentKategorie'];

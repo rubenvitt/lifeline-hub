@@ -1,0 +1,143 @@
+# Migrationsnummern (LFH-658): prüft jeden offenen PR gegen den AKTUELLEN Ziel-Branch.
+#
+# Das Problem, das `ci.yml` nicht lösen kann: der PR-Lauf dort prüft den Merge mit dem
+# Ziel-Branch, wie er ZUM ZEITPUNKT DES LAUFS war. Mergt danach ein anderer PR mit derselben
+# Migrationsnummer, bleibt der erste grün — und `alpha` wird beim zweiten Merge rot, in jedem
+# Test, der eine Datenbank anlegt (22.09.2026: dreimal `0106`). Eine Merge Queue, die das
+# eigentlich löst, gibt es für Repositories eines Benutzerkontos nicht; „Branches must be up
+# to date" erzwänge nach JEDEM Merge einen vollen CI-Lauf für jeden offenen PR.
+#
+# Deshalb zwei Auslöser für dieselbe Prüfung:
+#   pull_request  — der PR selbst bewegt sich (neu, neuer Commit, anderer Ziel-Branch).
+#   push          — der ZIEL-Branch bewegt sich. Dann wird jeder offene PR gegen diesen
+#                   Branch neu bewertet, ohne dass er selbst einen Commit bekommt.
+#
+# Beide setzen den Commit-Status `Migrationsnummern` auf den Kopf-Commit des PRs. Ein Status
+# und kein Check-Run, weil nur ein Status auf einen FREMDEN Commit gesetzt werden kann: der
+# Push-Lauf gehört nicht zum PR. Der Jobname lautet absichtlich anders, damit Check-Run und
+# Status nicht denselben Namen tragen. Im Ruleset 17017911 steht `Migrationsnummern` als
+# Required Check OHNE `integration_id` — ob GitHub Statusmeldungen des GITHUB_TOKEN der
+# Actions-App zuordnet, ist nicht gemessen, und ein falscher Pin ließe jeden PR still hängen.
+#
+# Die Regel steht in `scripts/check-migrationen.sh`, nicht hier (Muster wie
+# `release-ruhefenster.sh`): dort ist sie gegen echte Git-Repositories selbstgetestet.
+name: Migrationsnummern
+
+on:
+  pull_request:
+    # `edited` deckt den Wechsel des Ziel-Branches ab (und kostet bei Titeländerungen ein paar
+    # Sekunden — billiger als ein Status, der gegen den falschen Branch prüft).
+    types: [opened, synchronize, reopened, edited]
+    branches: [main, beta, alpha]
+  push:
+    branches: [main, beta, alpha]
+
+permissions:
+  contents: read
+
+concurrency:
+  # Je PR bzw. je Ziel-Branch zählt nur der jüngste Stand.
+  group: migrationen-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pr:
+    name: Migrationen prüfen
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      statuses: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Der KOPF des PRs, nicht der Merge-Ref: geprüft wird, was der Branch mitbringt.
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - name: Ziel-Branch frisch holen
+        env:
+          BASIS: ${{ github.event.pull_request.base.ref }}
+        run: git fetch --no-tags origin "+refs/heads/$BASIS:refs/remotes/origin/$BASIS"
+      - name: Prüfen und Status setzen
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASIS: ${{ github.event.pull_request.base.ref }}
+          KOPF: ${{ github.event.pull_request.head.sha }}
+          # Aus einem Fork hat der Token keine Schreibrechte; der Status kommt dann mit dem
+          # nächsten Push auf den Ziel-Branch (Job unten), bis dahin steht der PR auf „Expected".
+          STATUS_SETZEN: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+          LAUF: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          # Die Regel kommt vom ZIEL-Branch, nicht aus dem PR — sonst bewertete ein PR sich
+          # mit seiner eigenen Fassung selbst, und ein Branch, der vor LFH-658 abgezweigt
+          # ist, hätte gar keine (Exit 127 → Status „error"). Nur wenn der Ziel-Branch die
+          # Regel noch nicht trägt (etwa `main` vor der nächsten Freigabe), gilt die des PRs.
+          pruefer=scripts/check-migrationen.sh
+          if git cat-file -e "origin/$BASIS:scripts/check-migrationen.sh" 2> /dev/null; then
+            pruefer="$RUNNER_TEMP/check-migrationen.sh"
+            git show "origin/$BASIS:scripts/check-migrationen.sh" > "$pruefer"
+            chmod +x "$pruefer"
+          fi
+          code=0
+          "$pruefer" "origin/$BASIS" "$KOPF" || code=$?
+          case "$code" in
+            0) state=success; text="Neue Migrationen liegen über $BASIS." ;;
+            1) state=failure; text="Migrationsnummer kollidiert oder ist eingeschoben (gegen $BASIS)." ;;
+            *) state=error; text="Prüfung nicht möglich, siehe Lauf." ;;
+          esac
+          if [ "$STATUS_SETZEN" = true ]; then
+            gh api "repos/$GITHUB_REPOSITORY/statuses/$KOPF" \
+              -f state="$state" -f context=Migrationsnummern \
+              -f description="$text" -f target_url="$LAUF" > /dev/null
+          fi
+          exit "$code"
+
+  offene-prs:
+    name: Offene PRs neu bewerten
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      statuses: write
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Jeden offenen PR gegen diesen Branch prüfen
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASIS: ${{ github.ref_name }}
+          LAUF: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          # Das Skript kommt hier vom Ziel-Branch selbst, nicht aus dem PR.
+          git fetch --no-tags origin "+refs/heads/$BASIS:refs/remotes/origin/$BASIS"
+          gh pr list --repo "$GITHUB_REPOSITORY" --base "$BASIS" --state open --limit 200 \
+            --json number --jq '.[].number' > prs.txt
+          echo "Offene PRs gegen $BASIS: $(wc -l < prs.txt)"
+          rot=0
+          while read -r nr; do
+            # Ein PR, der zwischen Liste und Abruf geschlossen wurde, bricht die Runde nicht ab.
+            git fetch --no-tags --quiet origin "+refs/pull/$nr/head:refs/remotes/pr/$nr" || {
+              echo "::warning::PR #$nr: Kopf nicht abrufbar, übersprungen"; continue; }
+            kopf="$(git rev-parse "refs/remotes/pr/$nr")"
+            echo "::group::PR #$nr ($kopf)"
+            code=0
+            scripts/check-migrationen.sh "origin/$BASIS" "$kopf" || code=$?
+            echo "::endgroup::"
+            case "$code" in
+              0) state=success; text="Neue Migrationen liegen über $BASIS." ;;
+              1) state=failure; text="Migrationsnummer kollidiert oder ist eingeschoben (gegen $BASIS)."
+                 rot=$((rot + 1)); echo "::warning::PR #$nr: Migrationsnummer gegen $BASIS verletzt" ;;
+              *) state=error; text="Prüfung nicht möglich, siehe Lauf."
+                 rot=$((rot + 1)); echo "::warning::PR #$nr: Prüfung nicht möglich (Exit $code)" ;;
+            esac
+            gh api "repos/$GITHUB_REPOSITORY/statuses/$kopf" \
+              -f state="$state" -f context=Migrationsnummern \
+              -f description="$text" -f target_url="$LAUF" > /dev/null
+          done < prs.txt
+          # Der Lauf selbst bleibt grün: rot ist der PR, nicht der Ziel-Branch. Die Zahl steht
+          # in der Zusammenfassung, damit ein Blick auf den Push-Lauf reicht.
+          echo "PRs mit rotem Status \`Migrationsnummern\`: $rot" >> "$GITHUB_STEP_SUMMARY"

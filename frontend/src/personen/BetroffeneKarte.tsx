@@ -32,7 +32,9 @@ import { personenMarker } from './personenKarte';
  *   gefragt ist hier, wo die Betroffenen liegen. Ohne beides: Leerzustand statt einer
  *   Weltkarte, auf der nichts steht.
  * - **Die Lücke wird GESAGT:** „n ohne Koordinate" steht über der Karte. Eine Karte, die
- *   still weniger zeigt als die Liste, läse sich als vollständig.
+ *   still weniger zeigt als die Liste, läse sich als vollständig. Die Zeile steht IMMER da —
+ *   ohne Lücke sagt sie das (LFH-650): kam sie nur bei `> 0`, sprang die ganze Karte um eine
+ *   Zeile, sobald die letzte Person live verortet wurde oder die erste ohne dazukam.
  * - **Begrenzte Höhe in `dvh`** (Höhenkette, LFH-343 · C8): das Layout darüber gibt keine
  *   Höhe vor, und die Browserleiste des Handschirms frisst bei `vh` den unteren Rand.
  */
@@ -53,7 +55,15 @@ export function personIdAusSchluessel(schluessel: string): number | null {
   return Number.isInteger(id) && id > 0 ? id : null;
 }
 
-export function ohneKoordinateText(anzahl: number): string {
+/**
+ * `verortet` = Personen-Marker auf der Karte. Ohne Lücke UND ohne Marker (Filter „vermisst",
+ * leere Auswahl) wäre „alle stehen auf der Karte" über einer leeren Karte falsch (Review
+ * LFH-650) — dann sagt der Satz, dass die Auswahl keine angetroffene Person enthält. Die Karte
+ * zeigt die GEFILTERTE Menge, deshalb „dieser Auswahl".
+ */
+export function ohneKoordinateText(anzahl: number, verortet: number): string {
+  if (anzahl === 0 && verortet === 0) return 'Keine angetroffene Person in dieser Auswahl';
+  if (anzahl === 0) return 'Alle angetroffenen Personen dieser Auswahl stehen auf der Karte';
   return anzahl === 1
     ? '1 Person ohne Koordinate — nicht auf der Karte'
     : `${anzahl} Personen ohne Koordinate — nicht auf der Karte`;
@@ -96,19 +106,19 @@ export default function BetroffeneKarte({
   const alleMarker = useMemo(() => [...ort, ...marker], [ort, marker]);
   const start = useMemo(() => startAnsicht(marker.length > 0 ? marker : ort), [marker, ort]);
 
-  const hinweis =
-    ohneKoordinate > 0 ? (
-      <div
-        data-lfh="betroffene-karte-ohne-koordinate"
-        style={{
-          color: token.colorTextSecondary,
-          fontSize: token.fontSizeSM,
-          marginBlockEnd: token.marginXS,
-        }}
-      >
-        {ohneKoordinateText(ohneKoordinate)}
-      </div>
-    ) : null;
+  const hinweis = (
+    <div
+      data-lfh="betroffene-karte-ohne-koordinate"
+      data-anzahl={ohneKoordinate}
+      style={{
+        color: token.colorTextSecondary,
+        fontSize: token.fontSizeSM,
+        marginBlockEnd: token.marginXS,
+      }}
+    >
+      {ohneKoordinateText(ohneKoordinate, marker.length)}
+    </div>
+  );
 
   if (start === null) {
     return (

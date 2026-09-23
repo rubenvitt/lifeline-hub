@@ -102,15 +102,20 @@ export function bearbeitenZuPatch(
  * Steuerhöhe, LFH-396): ZWEI Angaben nach LFH-365, `minHeight` aus der Dichtestufe plus
  * Polsterung. Rein und exportiert, damit die Zusicherung über zwei Stufen ohne Render
  * prüfbar ist.
+ *
+ * Die Farbe ist `bedienText`, nicht antds `colorLink` (LFH-650, gemessen in
+ * `e2e/betroffene-kontrast.spec.ts`): der geerbte Linkton trug auf dem Seitengrund am Tag
+ * 5,51 und nachts 4,82 — unter 7 bzw. 5 : 1.
  */
-export function verortenLinkStil(token: {
-  controlHeight: number;
-  paddingSM: number;
-}): CSSProperties {
+export function verortenLinkStil(
+  token: { controlHeight: number; paddingSM: number },
+  bedienText: string,
+): CSSProperties {
   return {
     display: 'inline-flex',
     alignItems: 'center',
     minHeight: token.controlHeight,
     paddingInline: token.paddingSM,
+    color: bedienText,
   };
 }

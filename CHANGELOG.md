@@ -1,3 +1,11 @@
+## [1.0.0-alpha.38](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.37...v1.0.0-alpha.38) (2026-09-23)
+
+### Ablösung und Schichtverwaltung
+
+**Überarbeitete Darstellung neuer Schichten:** Schichten, die von anderen Stationen begonnen wurden, erscheinen nicht mehr sofort in der Übersicht, sondern werden zunächst in einem Sammelbanner zusammengefasst. Erst nach Bestätigung werden sie in die Ansicht übernommen. Dies verhindert ungewollte Unterbrechungen während der Arbeit. Eigene Schichten und Änderungen an bereits sichtbaren Schichten erscheinen weiterhin sofort.
+
+**Verbesserte Lesbarkeit bei Tag und Nacht:** Die Kontrastverhältnisse der Schichtkarten wurden überprüft und erfüllen nun durchgängig die Anforderungen für gute Lesbarkeit sowohl im Tagmodus als auch im Nachtmodus. Dies betrifft alle Kartenzustände (planmäßig, ablösebedürftig, abgelöst) sowie die zugehörigen Dialoge.
+
 ## [1.0.0-alpha.37](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.36...v1.0.0-alpha.37) (2026-09-23)
 
 ### Wichtige Änderungen

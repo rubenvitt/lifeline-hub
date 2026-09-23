@@ -40,7 +40,7 @@ const ALLE_MAPS = Object.fromEntries(
 ) as Record<string, Record<string, sf.StatusDarstellung>>;
 
 describe('Statusfarb-Vertrag', () => {
-  it('deckt alle zweiundzwanzig Vertragskarten ab — eine weitere Map rutscht nicht still durch', () => {
+  it('deckt alle dreiundzwanzig Vertragskarten ab — eine weitere Map rutscht nicht still durch', () => {
     // „Karten", nicht „Enums": `dringlichkeit` ist über eine {@link Statusrolle} geschlüsselt
     // und damit die eine Karte, die keine Domänen-Achse beschriftet, sondern die Stufe selbst.
     // Beide Zugänge von LFH-358 stehen hier — sie lagen bis dahin AUSSERHALB und liefen damit
@@ -52,6 +52,7 @@ describe('Statusfarb-Vertrag', () => {
       'betreuungsstelleStatus',
       'brStatus',
       'dringlichkeit',
+      'dwdWarnstufe',
       'einsatzStatus',
       'etbTyp',
       'hochwasserKlasse',
@@ -176,7 +177,24 @@ describe('Warnstufe als Fläche (LFH-368 · B5h)', () => {
     // `StatusDarstellung` hineinzubiegen hätte den Kanal-Vertrag verwässert.
     expect(Object.keys(ALLE_MAPS)).not.toContain('warnstufeFlaeche');
     expect(Object.keys(ALLE_MAPS)).not.toContain('sichtung');
-    expect(Object.keys(ALLE_MAPS)).toHaveLength(22);
+    expect(Object.keys(ALLE_MAPS)).toHaveLength(23);
+  });
+});
+
+describe('dwdWarnstufe (LFH-633)', () => {
+  // Byte-Pin gegen handgeschriebene Literale: die amtlichen Bezeichnungen des DWD sind der
+  // zweite Kanal, je zwei Stufen teilen sich eine Rolle.
+  it('bildet die vier DWD-Stufen auf Rolle und amtliche Bezeichnung ab', () => {
+    expect(sf.dwdWarnstufe.gering).toEqual({ rolle: 'achtung', label: 'Wetterwarnung' });
+    expect(sf.dwdWarnstufe.maessig).toEqual({ rolle: 'achtung', label: 'Markantes Wetter' });
+    expect(sf.dwdWarnstufe.schwer).toEqual({ rolle: 'alarm', label: 'Unwetterwarnung' });
+    expect(sf.dwdWarnstufe.extrem).toEqual({ rolle: 'alarm', label: 'Extremes Unwetter' });
+  });
+
+  it('keine Warnstufe ist Bedienblau oder neutral — eine amtliche Warnung ist kein Ruhezustand', () => {
+    for (const d of Object.values(sf.dwdWarnstufe)) {
+      expect(['achtung', 'alarm']).toContain(d.rolle);
+    }
   });
 });
 

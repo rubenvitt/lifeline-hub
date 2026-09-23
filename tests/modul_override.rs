@@ -422,6 +422,7 @@ const MODUL_GET_PFADE: &[(&str, &str)] = &[
     ("einsatzabschnitte", "abschnitte"),
     ("lageberichte", "lageberichte"),
     ("gefahrenzonen", "gefahrengebiete"),
+    ("wetter-pegel", "wetter"),
     ("lagekarte", "zonen"),
     ("lagekarte", "karte/fuehrungskraefte"),
     ("lagemeldungen", "lage/meldungen"),

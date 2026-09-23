@@ -230,6 +230,12 @@ export interface Rohdaten {
   meldungen: Meldung[];
   /** Maßgebliche Pegel in Reihenfolge (LFH-606), erster = Leitpegel. */
   pegel: PegelAnzeige[];
+  /**
+   * Ziel der Pegel-Kennzahl (LFH-633): die Modulseite „Wetter & Pegel", wenn sie für die
+   * Person frei ist (`pegelZielPfad`). Ohne Angabe die Pflege in Einstellungen › Pegel. Die
+   * Entscheidung trifft die Seite — diese Datei kennt weder Benutzer noch Overrides.
+   */
+  pegelZiel?: string;
 }
 
 export function baueLagebild(
@@ -257,16 +263,16 @@ export function baueLagebild(
   // bricht über den Typ `KennzahlEtikett` den Build.
   const kennzahlen: Kennzahl[] = [
     {
-      // Ziel in JEDEM Fall die Einstellungssektion: dort steht die ganze Liste samt
-      // Reihenfolge, und nur dort wird festgelegt. Die Lagekarte zeigte zwar die Stationen,
-      // kann aber per Deeplink weder die Ebene einschalten noch eine Station ansteuern.
+      // Ziel: die Modulseite „Wetter & Pegel" mit Verlauf (LFH-633), wenn sie frei ist —
+      // sonst die Einstellungssektion, wo festgelegt wird. Die Lagekarte zeigte zwar die
+      // Stationen, kann aber per Deeplink weder die Ebene einschalten noch eine ansteuern.
       etikett: 'Pegel',
       wert: pegel.wert,
       einheit: pegel.einheit,
       notiz: pegel.notiz,
       ton: pegel.ton,
       route: 'einstellungen',
-      zielPfad: einsatzEinstellungenPfad(r.einsatz.id, 'pegel'),
+      zielPfad: r.pegelZiel ?? einsatzEinstellungenPfad(r.einsatz.id, 'pegel'),
     },
     {
       etikett: 'Betroffene',
