@@ -31,8 +31,10 @@ export type MarkerTyp =
   | 'abschnitt'
   | 'lagemeldung'
   | 'freies_zeichen'
-  /** Betroffene (LFH-613): nur auf der Kartenansicht der Betroffenen-Seite, KEINE
-   *  Lagekarten-Ebene — `useLagekarteDaten` erzeugt diesen Typ nie. */
+  /** Betroffene (LFH-613). Erzeugt ausschließlich `personenMarker` — auf der Betroffenen-Seite
+   *  und seit LFH-648 als Ebene „Betroffene" der Lagekarte. Dort laufen sie als eigene Liste
+   *  `personenVerortet` NEBEN `alleVerortet` (Startausschnitt/Kopfzahl ohne Personen) und
+   *  clustern — nur dort — in eigener Quelle (`clusterQuelle`, `PERSONEN_CLUSTER_QUELLE`). */
   | 'person';
 
 export interface KarteMarker {
@@ -66,6 +68,13 @@ export interface KarteMarker {
    * zeigen kann (`clusterDonut.ts`). `'ohne'` = noch nicht gesichtet.
    */
   sichtung?: Sichtungskategorie | 'ohne';
+  /**
+   * Eigene Cluster-Quelle (LFH-648): gesetzt NUR auf der Lagekarte, für die Ebene „Betroffene".
+   * Dort clustern Personen getrennt von den Kräften und liegen unter ihnen
+   * (`PERSONEN_CLUSTER_QUELLE`). Die Betroffenen-Karte setzt es nicht — ihre Personen bleiben
+   * in `marker-cluster` mit den Sichtungs-Donuts aus LFH-650.
+   */
+  clusterQuelle?: 'personen';
   /** FMS-Status-Ring, nur für Fahrzeuge. */
   statusFarbe?: string | null;
   /** Lagemeldungs-Herkunft für den Inspector-Backlink (nur typ='lagemeldung').

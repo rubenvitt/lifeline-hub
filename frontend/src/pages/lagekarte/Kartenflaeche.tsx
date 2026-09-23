@@ -24,8 +24,13 @@ import {
   baueEinsatzortFc,
   reAnlegenMarker,
   pinneMarkerLayerNachOben,
+  CLUSTER_QUELLEN,
+  clusterSchluessel,
   MARKER_CLUSTER_QUELLE,
   MARKER_KLICK_LAYER,
+  PERSONEN_CLUSTER_KLICK_LAYER,
+  PERSONEN_CLUSTER_QUELLE,
+  personenClusterTreffer,
   naechstesMerkmal,
   SPIDER_KLICK_LAYER,
   setzeSpiderDaten,
@@ -285,18 +290,25 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
   });
   // Image-Key → TzProps; der styleimagemissing-Handler erzeugt daraus lazy die Karten-Icons.
   const tzRegistryRef = useRef<Map<string, TzProps>>(new Map());
-  // Cluster-DOM-Donut-Marker (cluster_id → Marker). clusterDomRef = alle bekannten,
-  // clusterDomOnScreenRef = aktuell auf der Karte (Mapbox-Donut-Sync-Muster).
+  // Cluster-DOM-Donut-Marker (`clusterSchluessel` → Marker). clusterDomRef = alle bekannten,
+  // clusterDomOnScreenRef = aktuell auf der Karte (Mapbox-Donut-Sync-Muster). Nur für
+  // `marker-cluster`: Personen-Cluster (LFH-648) sind WebGL-Layer, damit sie UNTER den Kräften
+  // liegen — ein DOM-Donut hinge über dem Canvas.
   const clusterDomRef = useRef<Record<string, maplibregl.Marker>>({});
   const clusterDomOnScreenRef = useRef<Record<string, maplibregl.Marker>>({});
-  // Offener Spider: cluster_id (String) oder null. spiderTokenRef entwertet in-flight getClusterLeaves
+  // Offener Spider: Cluster-Schlüssel (Quelle + cluster_id) oder null. spiderTokenRef entwertet in-flight getClusterLeaves
   // (Race-Guard: schneller A→B-Wechsel darf nicht A's Leaves über B malen).
   const spiderOffenRef = useRef<string | null>(null);
   const spiderTokenRef = useRef(0);
   // Controller-Funktionen als Refs, damit der DOM-Donut-Klickhandler + die Daten-/Style-Effekte sie
   // aufrufen können, ohne als Dependency neu zu binden.
   const oeffneSpiderRef = useRef<
-    (clusterId: string, center: [number, number], anzahl: number) => void
+    (
+      quelle: (typeof CLUSTER_QUELLEN)[number],
+      clusterId: number,
+      center: [number, number],
+      anzahl: number,
+    ) => void
   >(() => {});
   const schliesseSpiderRef = useRef<() => void>(() => {});
   // Entscheidet, welches error-Event die Basemap abstuft (LFH-325): Kachel-Fehler nie,
@@ -844,12 +856,17 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     const map = mapRef.current;
     if (!map) return;
     const aktualisiere = () => {
+      // Solange Kacheln nachladen, bleiben die stehenden Donuts, wie sie sind — sonst flackerten
+      // sie bei jedem Zoom/Pan weg und wieder her (Review-Befund LFH-648).
       if (!map.isSourceLoaded(MARKER_CLUSTER_QUELLE)) return;
       const neu: Record<string, maplibregl.Marker> = {};
       for (const f of map.querySourceFeatures(MARKER_CLUSTER_QUELLE)) {
         const props = f.properties as Record<string, unknown>;
         if (!props.cluster) continue;
-        const id = String(props.cluster_id);
+        const clusterId = Number(props.cluster_id);
+        // Derselbe Schlüssel wie der offene Spider (`spiderOffenRef`): die Hülle eines Donuts
+        // (LFH-650) findet so ihren Cluster wieder.
+        const id = clusterSchluessel(MARKER_CLUSTER_QUELLE, clusterId);
         if (neu[id]) continue; // querySourceFeatures kann denselben Cluster über mehrere Tiles liefern
         let marker = clusterDomRef.current[id];
         if (!marker) {
@@ -860,7 +877,12 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
             // Donut-Klick fächert auf (statt reinzuzoomen); der Controller toggelt/fällt bei
             // Großclustern auf Reinzoomen zurück. stopPropagation → erreicht den allgemeinen
             // map-click NICHT (Re-Klick läuft über oeffne, nicht über das Leer-Klick-Einklappen).
-            oeffneSpiderRef.current?.(id, coords, Number(props.point_count ?? 0));
+            oeffneSpiderRef.current?.(
+              MARKER_CLUSTER_QUELLE,
+              clusterId,
+              coords,
+              Number(props.point_count ?? 0),
+            );
           });
           marker = new maplibregl.Marker({ element: el }).setLngLat(coords);
           clusterDomRef.current[id] = marker;
@@ -906,18 +928,26 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       if (mapRef.current) setzeSpiderDaten(map, leer, leer);
     };
 
-    const oeffne = (clusterId: string, center: [number, number], anzahl: number) => {
-      if (spiderOffenRef.current === clusterId) {
+    const oeffne = (
+      quelle: (typeof CLUSTER_QUELLEN)[number],
+      clusterId: number,
+      center: [number, number],
+      anzahl: number,
+    ) => {
+      const schluessel = clusterSchluessel(quelle, clusterId);
+      if (spiderOffenRef.current === schluessel) {
         schliesse();
         return;
       } // Toggle / erneuter Klick
       schliesse(); // A→B: A einklappen
-      const src = map.getSource(MARKER_CLUSTER_QUELLE) as GeoJSONSource | undefined;
+      // Die Quelle des geklickten Donuts fragen: ein Personen-Cluster kennt `marker-cluster`
+      // nicht (LFH-648). Die Spider-Quellen bleiben gemeinsam — offen ist höchstens einer.
+      const src = map.getSource(quelle) as GeoJSONSource | undefined;
       if (!src) return;
       // Großcluster → Fallback: reinzoomen (verkleinert Cluster, dann erneut auffächerbar).
       if (anzahl > SPIDER_CAP) {
         src
-          .getClusterExpansionZoom(Number(clusterId))
+          .getClusterExpansionZoom(clusterId)
           .then((zoom) => map.easeTo({ center, zoom }))
           .catch(() => {
             /* Cluster nach Daten-Update weg → ignorieren */
@@ -926,7 +956,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       }
       const token = ++spiderTokenRef.current;
       src
-        .getClusterLeaves(Number(clusterId), SPIDER_CAP, 0)
+        .getClusterLeaves(clusterId, SPIDER_CAP, 0)
         .then((leaves) => {
           if (token !== spiderTokenRef.current) return; // stale (anderer Cluster geklickt / eingeklappt)
           const projektor: SpiderProjektor = {
@@ -936,8 +966,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
           const props = leaves.map((f) => f.properties as MarkerProps);
           const { leaves: leafFc, legs } = baueSpiderFc(props, center, projektor);
           setzeSpiderDaten(map, leafFc, legs);
-          spiderOffenRef.current = clusterId;
-          setzeHuelleDurchlaessig(clusterDomRef.current[clusterId]?.getElement(), true);
+          spiderOffenRef.current = schluessel;
+          setzeHuelleDurchlaessig(clusterDomRef.current[schluessel]?.getElement(), true);
         })
         .catch(() => {
           /* Cluster nach Daten-Update weg → ignorieren */
@@ -950,12 +980,41 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     const aufKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') schliesse();
     };
+    // Karten-Klick: ein Personen-Cluster (WebGL-Layer, LFH-648) fächert auf — aber nur, wenn er
+    // das OBERSTE Feature am Punkt ist. Jeder andere Klick klappt ein wie bisher (leerer Klick,
+    // Leaf-Routing, Klick auf ein Kräfte-Zeichen über dem Cluster).
+    const klick = (e: maplibregl.MapMouseEvent) => {
+      const layers = [
+        ...MARKER_KLICK_LAYER,
+        ...SPIDER_KLICK_LAYER,
+        ...PERSONEN_CLUSTER_KLICK_LAYER,
+      ].filter((id) => map.getLayer(id));
+      const treffer = layers.length
+        ? personenClusterTreffer(map.queryRenderedFeatures(e.point, { layers }))
+        : null;
+      if (treffer)
+        oeffne(PERSONEN_CLUSTER_QUELLE, treffer.clusterId, treffer.center, treffer.anzahl);
+      else schliesse();
+    };
+    const zeiger = (an: boolean) => () => {
+      map.getCanvas().style.cursor = an ? 'pointer' : '';
+    };
+    const rein = zeiger(true);
+    const raus = zeiger(false);
     map.on('movestart', schliesse); // jede Karten-Bewegung/Zoom klappt ein
-    map.on('click', schliesse); // leerer Klick (und nach Leaf-Routing) klappt ein
+    map.on('click', klick);
+    for (const id of PERSONEN_CLUSTER_KLICK_LAYER) {
+      map.on('mouseenter', id, rein);
+      map.on('mouseleave', id, raus);
+    }
     window.addEventListener('keydown', aufKey);
     return () => {
       map.off('movestart', schliesse);
-      map.off('click', schliesse);
+      map.off('click', klick);
+      for (const id of PERSONEN_CLUSTER_KLICK_LAYER) {
+        map.off('mouseenter', id, rein);
+        map.off('mouseleave', id, raus);
+      }
       window.removeEventListener('keydown', aufKey);
       schliesse();
     };

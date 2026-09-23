@@ -23,6 +23,7 @@ import { einheitStatusAnzeige } from '../../kraefte/meldebildRaster';
 import type { KarteMarker, MarkerTyp } from './marker';
 import type { BasemapModus } from './basemapStil';
 import type { LayerSichtbar } from './Sidebar';
+import { PERSONEN_SPERRGRUND, type PersonenZugriff } from './personenEbene';
 
 /**
  * Reine Ableitungen der rechten Kartenleiste (Neuentwurf S5 „Karte führt, Daten folgen").
@@ -33,7 +34,8 @@ import type { LayerSichtbar } from './Sidebar';
 
 // ── Ebenen ─────────────────────────────────────────────────────────────────────────────
 
-/** Reihenfolge und Wortlaut der Ebenen-Zeilen — dieselben zehn Schalter wie bisher. */
+/** Reihenfolge und Wortlaut der Ebenen-Zeilen — die zehn Schalter von vor LFH-648 plus
+ *  „Betroffene" (LFH-648) am Ende: die einzige Ebene mit Vorgabe aus und Zugriffsgrenze. */
 export const EBENEN: readonly { key: keyof LayerSichtbar; name: string }[] = [
   { key: 'einsatzort', name: 'Einsatzort' },
   { key: 'einheit', name: 'Einheiten' },
@@ -45,6 +47,7 @@ export const EBENEN: readonly { key: keyof LayerSichtbar; name: string }[] = [
   { key: 'schaden', name: 'Schäden' },
   { key: 'lagemeldung', name: 'Lagemeldungen' },
   { key: 'freies_zeichen', name: 'Taktische Zeichen' },
+  { key: 'person', name: 'Betroffene' },
 ];
 
 /**
@@ -67,6 +70,11 @@ export function ebenenFarbe(key: keyof LayerSichtbar, rollen: Farbrollen): strin
       return rollen.achtung;
     case 'freies_zeichen':
       return rollen.gedaempft;
+    // Betroffene (LFH-648): die Marker tragen Sichtungsfarben, die ein einzelnes Farbfeld
+    // nicht erklären kann — das tut die Sichtungslegende. Hier steht deshalb eine
+    // neutrale Textstufe, und ausdrücklich NICHT der Default: Blau ist Bedienung.
+    case 'person':
+      return rollen.text2;
     default:
       return rollen.bedien;
   }
@@ -75,9 +83,22 @@ export function ebenenFarbe(key: keyof LayerSichtbar, rollen: Farbrollen): strin
 export interface EbenenZeile {
   key: keyof LayerSichtbar;
   name: string;
-  /** Zahl der Objekte — oder „—", wenn die Lagebild-Quellen nicht vollständig geladen sind. */
-  anzahl: number | '—';
+  /** Zahl der Objekte — oder „—", wenn die Lagebild-Quellen nicht vollständig geladen sind.
+   *  `null` an einer gesperrten Zeile: dort steht der Grund, und eine Zahl verriete die Menge. */
+  anzahl: number | '—' | null;
   sichtbar: boolean;
+  /** Gesetzt = die Zeile ist nicht schaltbar und sagt, warum (LFH-648, nur „Betroffene"). */
+  sperrgrund?: string;
+}
+
+/** Zugriffsangabe der Ebene „Betroffene" (LFH-648) — ihre Marker laufen getrennt von
+ *  `alleVerortet`, die Zahl kommt deshalb von außen. */
+export interface PersonenEbenenAngabe {
+  zugriff: PersonenZugriff;
+  anzahl: number;
+  /** Die Personenliste scheiterte: „—" an DIESER Zeile. Die übrigen zählen weiter — ihre
+   *  Quellen sind nicht betroffen. */
+  fehler?: boolean;
 }
 
 /**
@@ -96,13 +117,43 @@ export function ebenenZeilen(
   zonenAnzahl: number,
   layer: LayerSichtbar,
   quellenFehler: boolean,
+  personen: PersonenEbenenAngabe = { zugriff: 'ausgeblendet', anzahl: 0 },
 ): EbenenZeile[] {
   const zaehlung = new Map<MarkerTyp, number>();
   for (const m of verortet) zaehlung.set(m.typ, (zaehlung.get(m.typ) ?? 0) + 1);
-  return EBENEN.map(({ key, name }) => {
+  return EBENEN.flatMap(({ key, name }): EbenenZeile[] => {
+    if (key === 'person') return personenZeile(name, layer.person, quellenFehler, personen);
     const n = key === 'zone' ? zonenAnzahl : (zaehlung.get(key) ?? 0);
-    return { key, name, anzahl: quellenFehler ? '—' : n, sichtbar: layer[key] };
+    return [{ key, name, anzahl: quellenFehler ? '—' : n, sichtbar: layer[key] }];
   });
+}
+
+/**
+ * Die Zeile „Betroffene" folgt der Einsatz-Navigation (`einsatz/ModulPanel.tsx`): ein im
+ * Einsatz ausgeblendetes Modul erscheint gar nicht, ein gesperrtes steht gesperrt da — mit
+ * Grund und ohne Zahl (CLAUDE.md: fehlende Berechtigung wird erklärt, nicht stumm
+ * weggeschaltet; die Zahl wäre die Menge, die der Benutzer nicht sehen darf). Eine gesperrte
+ * Zeile ist nie „an", auch wenn die geteilte Ansicht den Schalter trägt.
+ */
+function personenZeile(
+  name: string,
+  an: boolean,
+  quellenFehler: boolean,
+  { zugriff, anzahl, fehler }: PersonenEbenenAngabe,
+): EbenenZeile[] {
+  if (zugriff === 'ausgeblendet') return [];
+  if (zugriff === 'frei') {
+    return [{ key: 'person', name, anzahl: quellenFehler || fehler ? '—' : anzahl, sichtbar: an }];
+  }
+  return [
+    {
+      key: 'person',
+      name,
+      anzahl: null,
+      sichtbar: false,
+      sperrgrund: PERSONEN_SPERRGRUND[zugriff],
+    },
+  ];
 }
 
 /** Zahl der verorteten Objekte für den Seitenkopf (ohne den Einsatzort-Anker). */

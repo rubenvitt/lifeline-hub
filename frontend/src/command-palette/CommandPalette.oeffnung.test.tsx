@@ -207,13 +207,15 @@ describe('CommandPalette · → Vorschau (LFH-645)', () => {
       await u.keyboard('{ArrowDown}{ArrowRight}');
       scrolle.mockClear();
       await u.keyboard('{Escape}');
-      // Das Einscrollen läuft im Effekt nach dem Commit; unter CI-Last kam der erst nach dem
-      // synchronen Griff an (PR #121, Frontend-Suite 4/4). Die Aussage bleibt dieselbe: ohne
-      // `vorschau` in den Deps wird der Knoten gar nicht gescrollt, `waitFor` läuft dann aus.
-      await waitFor(() => expect(scrolle).toHaveBeenCalled());
-      expect(scrolle.mock.contexts[scrolle.mock.contexts.length - 1]).toBe(
-        screen.getByRole('option', { name: 'Florian Mustermann' }),
-      );
+      // `waitFor`: das Einscrollen läuft im Effekt nach dem Rückweg. Unter CI-Last kam dieser
+      // Effekt erst nach dem `keyboard`-Await an (gemessen in PR #122: 1 von 4 Shards rot,
+      // lokal 5/5 grün) — die Aussage ist „wird eingescrollt", nicht „im selben Tick".
+      await waitFor(() => {
+        expect(scrolle).toHaveBeenCalled();
+        expect(scrolle.mock.contexts[scrolle.mock.contexts.length - 1]).toBe(
+          screen.getByRole('option', { name: 'Florian Mustermann' }),
+        );
+      });
     } finally {
       Element.prototype.scrollIntoView = original;
     }

@@ -52,7 +52,7 @@ function rendere(fehler: (e: unknown) => void = vi.fn(), erfolg: (text: string) 
         einsatzId: 1,
         einsatz: undefined,
         darfSchreiben: true,
-        alleVerortet: [],
+        waehlbar: [],
         fehler,
         erfolg,
       }),
@@ -267,7 +267,7 @@ describe('useKartenInteraktion — Betroffene verorten (LFH-613)', () => {
           einsatzId: 1,
           einsatz: undefined,
           darfSchreiben: true,
-          alleVerortet: [],
+          waehlbar: [],
           fehler: vi.fn(),
           erfolg,
         }),
@@ -293,6 +293,54 @@ describe('useKartenInteraktion — Betroffene verorten (LFH-613)', () => {
     expect(keys).toContainEqual(['einsatz-personen', 1]);
     expect(keys).toContainEqual(['einsatz-person', 1, 10]);
     expect(result.current.platzierungZiel).toBeNull();
+  });
+});
+
+describe('useKartenInteraktion — Betroffene: Verortung löschen (LFH-648)', () => {
+  it('leert NUR die Fundort-Koordinate und invalidiert Liste und Person', async () => {
+    einsatzPersonApi.aktualisierePerson.mockClear();
+    const client = neuerQueryClient();
+    const invalidiert = vi.spyOn(client, 'invalidateQueries');
+    const { result } = renderHook(
+      () =>
+        useKartenInteraktion({
+          einsatzId: 1,
+          einsatz: undefined,
+          darfSchreiben: true,
+          waehlbar: [],
+          fehler: vi.fn(),
+          erfolg: vi.fn(),
+        }),
+      {
+        wrapper: ({ children }: { children: ReactNode }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    act(() =>
+      result.current.loescheVerortung({
+        schluessel: 'person-10',
+        typ: 'person',
+        id: 10,
+        lat: 50.1,
+        lon: 8.6,
+        label: 'R-010 · SK II',
+        farbe: '#000',
+      }),
+    );
+
+    await waitFor(() => expect(einsatzPersonApi.aktualisierePerson).toHaveBeenCalledTimes(1));
+    // Genau die zwei Felder: `patchBody` liest vorhandene Keys, jeder weitere wäre ein „leeren".
+    expect(einsatzPersonApi.aktualisierePerson).toHaveBeenCalledWith(1, 10, {
+      antreff_lat: null,
+      antreff_lon: null,
+    });
+    await waitFor(() => {
+      const keys = invalidiert.mock.calls.map((c) => c[0]?.queryKey);
+      expect(keys).toContainEqual(['einsatz-personen', 1]);
+      expect(keys).toContainEqual(['einsatz-person', 1, 10]);
+    });
   });
 });
 
@@ -603,7 +651,7 @@ describe('useKartenInteraktion — Serienmodus Zone (LFH-332)', () => {
           einsatzId: 1,
           einsatz: undefined,
           darfSchreiben: true,
-          alleVerortet: [],
+          waehlbar: [],
           fehler: vi.fn(),
           erfolg: vi.fn(),
         }),

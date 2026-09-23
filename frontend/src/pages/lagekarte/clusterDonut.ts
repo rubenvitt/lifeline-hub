@@ -52,7 +52,9 @@ export const SK_DRINGLICHKEIT: readonly (Sichtungskategorie | 'ohne')[] = [
   'ohne',
 ];
 
-function skFarbe(k: Sichtungskategorie | 'ohne'): string {
+/** Segment- bzw. Füllfarbe einer Sichtung — auch für die WebGL-Personen-Cluster der Lagekarte
+ *  (LFH-648), damit Donut und Kreis dieselbe Farbe für dieselbe Kategorie tragen. */
+export function skFarbe(k: Sichtungskategorie | 'ohne'): string {
   const farbe = k === 'ohne' ? null : sichtung[k].farbe;
   return farbe ? sichtungsfarben[farbe] : DONUT_NEUTRAL;
 }

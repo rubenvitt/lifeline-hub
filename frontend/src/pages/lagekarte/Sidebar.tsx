@@ -17,6 +17,7 @@ import {
   AimOutlined,
   DeleteOutlined,
   FullscreenOutlined,
+  LockOutlined,
   MoreOutlined,
   UploadOutlined,
 } from '@ant-design/icons';
@@ -24,7 +25,13 @@ import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 
 import { TbLayersIntersect } from 'react-icons/tb';
 import { monoStil, useRollen } from '../../components/instrument';
 import { KlappPaneel, LeistenAbschnitt, usePaneelZustand } from './KlappPaneel';
-import { ebenenFarbe, ebenenZeilen, type EbenenZeile } from './leistenDaten';
+import {
+  ebenenFarbe,
+  ebenenZeilen,
+  type EbenenZeile,
+  type PersonenEbenenAngabe,
+} from './leistenDaten';
+import Sichtungslegende from './Sichtungslegende';
 import './lagekarte.css';
 import type { KarteMarker, NichtVerortet } from './marker';
 import type { BasemapModus, KartenThemeWahl } from './basemapStil';
@@ -51,11 +58,15 @@ export interface LayerSichtbar {
   zone: boolean;
   lagemeldung: boolean;
   freies_zeichen: boolean;
+  /** Ebene „Betroffene" (LFH-648). Der Schalter ist die Wahl, NICHT die Zugriffsgrenze —
+   *  gezeichnet wird nur bei freigegebenem Modul „Personen" (`personenZugriff`). */
+  person: boolean;
 }
 
 /** Platzierbare Punkt-Typen (Fläche/Abschnitt läuft über onAbschnittZeichnenStart).
  *  `person` (Betroffene, LFH-613) kommt nur über den Deeplink-Auftrag von der Detailseite —
- *  die Lagekarte führt Personen nicht als Ebene und nicht in „Nicht verortet". */
+ *  die Lagekarte führt Personen zwar als Ebene (LFH-648), aber nicht in „Nicht verortet":
+ *  die Koordinaten-Lücke zeigt die Betroffenen-Seite. */
 export type PlatzierenPunktTyp = 'uhs' | 'schaden' | 'einheit' | 'fahrzeug' | 'fuehrung' | 'person';
 
 const NICHT_VERORTET_LABEL: Record<NichtVerortet['typ'], string> = {
@@ -145,6 +156,11 @@ export interface SidebarProps {
   onLayerToggle: (key: keyof LayerSichtbar, an: boolean) => void;
   /** Zahl der Zonen der aktiven Ansicht — UNGEGATTERT (siehe `ebenenZeilen`). */
   zonenAnzahl: number;
+  /**
+   * Ebene „Betroffene" (LFH-648): Zugriff und Zahl der Personen-Marker. Die laufen getrennt
+   * von `verortet`, die Zahl kommt deshalb von hier. Fehlt die Angabe, gibt es keine Zeile.
+   */
+  personen?: PersonenEbenenAngabe;
   /**
    * Gewählte Kartengrundlage. Gewählt wird sie in der Segmentleiste über der Karte; das
    * Paneel „Kartengrundlage" trägt nur, was dort keinen Platz hat (Karten-Design, Hinweise).
@@ -262,6 +278,7 @@ function EbenenZeilenKnopf({
 }) {
   const { token, rollen } = useRollen();
   const farbe = ebenenFarbe(zeile.key, rollen);
+  if (zeile.sperrgrund) return <GesperrteEbenenZeile zeile={zeile} grund={zeile.sperrgrund} />;
   return (
     <button
       type="button"
@@ -294,6 +311,57 @@ function EbenenZeilenKnopf({
       />
       <span style={{ flex: 1, minWidth: 0, fontSize: 12 }}>{zeile.name}</span>
       <span style={{ ...monoStil(11), color: rollen.schwach }}>{zeile.anzahl}</span>
+    </button>
+  );
+}
+
+/**
+ * Eine gesperrte Ebenen-Zeile (LFH-648, heute nur „Betroffene"): dieselbe Bauform wie ein
+ * gesperrtes Modul in der Einsatz-Navigation (`einsatz/ModulPanel.tsx`) — `disabled`, Schloss
+ * in `aria-hidden`-Hülle (sonst läse ein antd-Icon sein englisches `aria-label` „lock" vor),
+ * und der GRUND als Text statt einer Zahl. Kein `role="switch"`: eine Ebene ohne Zugriff hat
+ * keinen Zustand, den man umlegen könnte. Die Zahl entfällt, weil sie die Menge wäre, die der
+ * Benutzer nicht sehen darf. Das leere Farbfeld hält die Spalte der übrigen Zeilen.
+ */
+function GesperrteEbenenZeile({ zeile, grund }: { zeile: EbenenZeile; grund: string }) {
+  const { token, rollen } = useRollen();
+  return (
+    <button
+      type="button"
+      disabled
+      aria-label={`${zeile.name} – ${grund}`}
+      title={grund}
+      data-ebene={zeile.key}
+      data-gesperrt="true"
+      className="lfh-ebenenzeile"
+      style={{
+        ...ebenenZeileStil(token),
+        cursor: 'not-allowed',
+        background: 'transparent',
+        borderBlockEnd: `1px solid ${rollen.flaeche3}`,
+        // `text2`, nicht `schwach`: der Grund ist die Aussage der Zeile und muss im Tagmodus
+        // 7 : 1 halten (Prüfliste Kriterium 5; `schwach` auf `paneel` misst dort 5,8 : 1).
+        // Gesperrt sagt das Schloss und das Wort, nicht eine blassere Schrift.
+        color: rollen.text2,
+      }}
+    >
+      <span
+        aria-hidden="true"
+        style={{
+          width: FARBFELD,
+          height: FARBFELD,
+          flex: `0 0 ${FARBFELD}px`,
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: 11,
+          color: rollen.schwach,
+        }}
+      >
+        <LockOutlined />
+      </span>
+      <span style={{ flex: 1, minWidth: 0, fontSize: 12 }}>{zeile.name}</span>
+      <span style={{ fontSize: 11 }}>{grund}</span>
     </button>
   );
 }
@@ -428,7 +496,9 @@ export default function Sidebar(props: SidebarProps) {
     props.zonenAnzahl,
     props.layer,
     sektionFehler.nichtVerortet != null,
+    props.personen,
   );
+  const zeigeSichtungslegende = props.layer.person && props.personen?.zugriff === 'frei';
 
   // Zeichnen-Knopf über der Karte: Paneel öffnen und in den Blick holen. `setze` ist stabil;
   // der Effekt hängt allein am Zähler, damit ein Zuklappen ihn nicht erneut auslöst.
@@ -506,6 +576,7 @@ export default function Sidebar(props: SidebarProps) {
             />
           ))}
         </div>
+        {zeigeSichtungslegende && <Sichtungslegende />}
       </LeistenAbschnitt>
 
       <LeistenAbschnitt titel="Ausgewählt" kennung="ausgewaehlt">

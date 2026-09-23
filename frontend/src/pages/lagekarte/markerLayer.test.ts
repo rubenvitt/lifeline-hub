@@ -6,6 +6,11 @@ import {
   reAnlegenMarker,
   MARKER_CLUSTER_QUELLE,
   MARKER_EINSATZORT_QUELLE,
+  PERSONEN_CLUSTER_QUELLE,
+  CLUSTER_QUELLEN,
+  clusterSchluessel,
+  PERSONEN_CLUSTER_KLICK_LAYER,
+  personenClusterTreffer,
   MARKER_KLICK_LAYER,
   naechstesMerkmal,
   SPIDER_LEAVES_QUELLE,
@@ -235,6 +240,16 @@ describe('sorgeFuerMarkerLayer', () => {
     // Die Plaketten liegen UNTER den Zeichen: MapLibre vergibt Platz von oben nach unten, die
     // Zeichen (allow-overlap) belegen ihn also zuerst, und keine Plakette deckt ein Zeichen zu.
     expect(moves).toEqual([
+      // Betroffene auf der Lagekarte (LFH-648) GANZ unten: sie liegen unter jedem Kräfte-/
+      // Objektzeichen — auch ihre CLUSTER, deshalb sind die WebGL-Layer und kein DOM-Donut.
+      'personen-cluster-kante',
+      'personen-cluster-kreis',
+      'personen-cluster-zahl',
+      'personen-treffer',
+      'personen-kante',
+      'personen-kreis',
+      'personen-kurz',
+      'personen-label',
       'marker-treffer',
       'marker-status-ring',
       'marker-kante',
@@ -453,6 +468,143 @@ describe('Spider-Layer', () => {
     setzeSpiderDaten(map as never, leaves, legs);
     expect(sources.get(SPIDER_LEAVES_QUELLE)!.setData).toHaveBeenCalledWith(leaves);
     expect(sources.get(SPIDER_LEGS_QUELLE)!.setData).toHaveBeenCalledWith(legs);
+  });
+});
+
+describe('Eigene Cluster-Quelle der Betroffenen (LFH-648)', () => {
+  it('legt `marker-personen` geclustert an wie `marker-cluster` — Personen clustern nur untereinander', () => {
+    const { map, sources } = fakeMap();
+    sorgeFuerMarkerLayer(map as never, leer, leer);
+    const spec = sources.get(PERSONEN_CLUSTER_QUELLE)!.spec as {
+      cluster: boolean;
+      clusterRadius: number;
+      clusterMaxZoom: number;
+      clusterProperties: Record<string, unknown>;
+    };
+    const kraefte = sources.get(MARKER_CLUSTER_QUELLE)!.spec as typeof spec;
+    expect(spec.cluster).toBe(true);
+    expect(spec.clusterRadius).toBe(kraefte.clusterRadius);
+    expect(spec.clusterMaxZoom).toBe(kraefte.clusterMaxZoom);
+    // Der Donut liest dieselbe Aggregation — ein Personen-Cluster ist ein reines Personen-Segment.
+    expect(spec.clusterProperties.c_person).toBeDefined();
+    expect(CLUSTER_QUELLEN).toEqual([MARKER_CLUSTER_QUELLE, PERSONEN_CLUSTER_QUELLE]);
+  });
+
+  it('reAnlegenMarker leitet Personen in ihre Quelle und hält sie aus `marker-cluster` heraus', () => {
+    const { map, sources } = fakeMap();
+    const marker = baueMarkerFc([
+      mk({ schluessel: 'fahrzeug-1', typ: 'fahrzeug' }),
+      mk({
+        schluessel: 'person-11',
+        typ: 'person',
+        kurzzeichen: 'II',
+        label: 'R-042 · SK II',
+        clusterQuelle: 'personen',
+      }),
+      // Betroffenen-Karte (LFH-650): ohne `clusterQuelle` bleibt die Person in `marker-cluster`
+      // und bekommt dort ihren Sichtungs-Donut.
+      mk({ schluessel: 'person-12', typ: 'person', kurzzeichen: 'I', label: 'R-043 · SK I' }),
+    ]);
+    reAnlegenMarker(map as never, marker, leer);
+    const schluessel = (quelle: string) =>
+      (
+        sources.get(quelle)!.setData.mock.lastCall![0] as {
+          features: { properties: { schluessel: string } }[];
+        }
+      ).features.map((f) => f.properties.schluessel);
+    expect(schluessel(MARKER_CLUSTER_QUELLE)).toEqual(['fahrzeug-1', 'person-12']);
+    expect(schluessel(PERSONEN_CLUSTER_QUELLE)).toEqual(['person-11']);
+  });
+
+  it('die Personen-Layer lesen nur die Personen-Quelle und schließen Cluster aus; die Plakette hängt am Zoom', () => {
+    const { map, layers } = fakeMap();
+    sorgeFuerMarkerLayer(map as never, leer, leer);
+    for (const id of ['personen-kreis', 'personen-kurz', 'personen-label']) {
+      const l = layers.get(id) as { source: string; filter: unknown; minzoom?: number };
+      expect(l.source).toBe(PERSONEN_CLUSTER_QUELLE);
+      expect(JSON.stringify(l.filter)).toContain('point_count');
+    }
+    expect((layers.get('personen-label') as { minzoom?: number }).minzoom).toBe(
+      BESCHRIFTUNG_AB_ZOOM,
+    );
+    // Klickbar wie jeder andere Marker (→ Inspector).
+    for (const id of ['personen-kreis', 'personen-kurz', 'personen-label']) {
+      expect(MARKER_KLICK_LAYER as readonly string[]).toContain(id);
+    }
+  });
+
+  it('die Plakette einer Person trägt die Beschriftung aus dem Marker — kein Name kommt hinzu', () => {
+    const fc = baueMarkerFc([
+      mk({ schluessel: 'person-11', typ: 'person', label: 'R-042 · SK II', kurzzeichen: 'II' }),
+    ]);
+    expect(fc.features[0].properties.beschriftung).toBe('R-042 · SK II');
+  });
+
+  it('Personen-Cluster sind WebGL-Layer der Personen-Quelle — kein DOM-Donut über den Kräften', () => {
+    // Review-Befund: ein DOM-Donut hängt über dem Canvas, deckte ein Fahrzeugzeichen zu und
+    // fing dessen Klick ab. Der Donut-Sync läuft deshalb nur über `marker-cluster`.
+    const { map, layers } = fakeMap();
+    sorgeFuerMarkerLayer(map as never, leer, leer);
+    const kreis = layers.get('personen-cluster-kreis') as { source: string; filter: unknown };
+    const zahl = layers.get('personen-cluster-zahl') as {
+      source: string;
+      layout: Record<string, unknown>;
+    };
+    expect(kreis.source).toBe(PERSONEN_CLUSTER_QUELLE);
+    expect(JSON.stringify(kreis.filter)).toBe(JSON.stringify(['has', 'point_count']));
+    expect(zahl.source).toBe(PERSONEN_CLUSTER_QUELLE);
+    // Zahl UND Kürzel der dringlichsten Sichtung — nie nur die Farbe (WCAG 1.4.1).
+    expect(JSON.stringify(zahl.layout['text-field'])).toContain('point_count_abbreviated');
+    expect(JSON.stringify(zahl.layout['text-field'])).toContain('s_sk1');
+    expect([...PERSONEN_CLUSTER_KLICK_LAYER]).toEqual([
+      'personen-cluster-kreis',
+      'personen-cluster-zahl',
+    ]);
+    // Die Cluster-Layer sind KEINE Einzelmarker-Klickziele (die öffnen den Inspector).
+    for (const id of PERSONEN_CLUSTER_KLICK_LAYER) {
+      expect(MARKER_KLICK_LAYER as readonly string[]).not.toContain(id);
+    }
+  });
+
+  it('clusterSchluessel trennt gleiche cluster_id aus zwei Quellen', () => {
+    // cluster_id ist nur je Quelle eindeutig: ohne Quellen-Präfix überschriebe der
+    // Personen-Donut 7 den Kräfte-Donut 7 im DOM-Sync.
+    expect(clusterSchluessel(MARKER_CLUSTER_QUELLE, 7)).not.toBe(
+      clusterSchluessel(PERSONEN_CLUSTER_QUELLE, 7),
+    );
+    expect(clusterSchluessel(MARKER_CLUSTER_QUELLE, 7)).toBe(
+      clusterSchluessel(MARKER_CLUSTER_QUELLE, '7'),
+    );
+  });
+});
+
+describe('personenClusterTreffer (LFH-648)', () => {
+  const cluster = {
+    layer: { id: 'personen-cluster-kreis' },
+    properties: { cluster: true, cluster_id: 7, point_count: 3 },
+    geometry: { type: 'Point', coordinates: [11.5, 53.55] },
+  };
+  const einheit = {
+    layer: { id: 'marker-symbol' },
+    properties: { schluessel: 'einheit-1' },
+    geometry: { type: 'Point', coordinates: [11.5, 53.55] },
+  };
+
+  it('liefert den Personen-Cluster, wenn er das OBERSTE Feature am Klickpunkt ist', () => {
+    expect(personenClusterTreffer([cluster])).toEqual({
+      clusterId: 7,
+      center: [11.5, 53.55],
+      anzahl: 3,
+    });
+  });
+
+  it('ein Kräfte-Zeichen über dem Cluster gewinnt — der Klick gehört ihm, nicht dem Spider', () => {
+    // queryRenderedFeatures liefert von oben nach unten: das Zeichen liegt über dem Cluster.
+    expect(personenClusterTreffer([einheit, cluster])).toBeNull();
+  });
+
+  it('leerer Klick: kein Treffer', () => {
+    expect(personenClusterTreffer([])).toBeNull();
   });
 });
 
