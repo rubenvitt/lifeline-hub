@@ -281,8 +281,8 @@ describe('sorgeFuerMarkerLayer', () => {
       const layer = layers.get(id) as { filter: unknown; paint: Record<string, unknown> };
       expect(JSON.stringify(layer.filter)).toContain('["has","sk"]');
       expect(layer.paint['circle-color']).toBe('#000');
-      // Außen über den weißen Rand hinaus: Kreis 9 + Rand 2 = 11 < 12,5.
-      expect(layer.paint['circle-radius']).toBe(12.5);
+      // Außen über den weißen Rand hinaus: Kreis 9 + Rand 2 = 11, Kante bis 13 (2 px).
+      expect(layer.paint['circle-radius']).toBe(13);
     }
     expect(moves.indexOf('marker-kante')).toBe(moves.indexOf('marker-kreis') - 1);
     expect(moves.indexOf('spider-kante')).toBe(moves.indexOf('spider-kreis') - 1);

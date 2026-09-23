@@ -186,9 +186,10 @@ const TREFFER_PAINT: CircleLayerSpecification['paint'] = {
   'circle-stroke-width': 0,
 };
 /**
- * Dunkle Außenkante der Personen-Marker (LFH-650): 1,5 px Schwarz AUSSERHALB des weißen
+ * Dunkle Außenkante der Personen-Marker (LFH-650): 2 px Schwarz AUSSERHALB des weißen
  * Rands von {@link KREIS_PAINT} (MapLibre zeichnet `circle-stroke` außen, der Rand endet bei
- * 9 + 2 = 11 px). Der weiße Rand allein ist auf heller Grundlage keine Kante — gemessen
+ * 9 + 2 = 11 px). Zwei, nicht anderthalb Pixel: bei 1,5 px zerfiel die Kante bei DPR 1 in
+ * Kantenglättung, gemessen 3,60 statt ≥ 17 gegen den hellen Grund. Der weiße Rand allein ist auf heller Grundlage keine Kante — gemessen
  * gegen den Kartengrund `#e8e8e8` (`e2e/betroffene-kontrast.spec.ts`), und SK II gelb füllt
  * dort auch nicht aus. Weiß UND Schwarz nebeneinander halten gegen JEDEN Grund ≥ 3 : 1
  * (WCAG 1.4.11): max(K(weiß, g), K(schwarz, g)) ≥ √21 ≈ 4,58 für jede Farbe g — deshalb
@@ -196,7 +197,7 @@ const TREFFER_PAINT: CircleLayerSpecification['paint'] = {
  * das Kurzzeichen (`KURZ_PAINT`). Nur für Features mit `sk`: die Lagekarte bleibt gleich.
  */
 const KANTE_PAINT: CircleLayerSpecification['paint'] = {
-  'circle-radius': 12.5,
+  'circle-radius': 13,
   'circle-color': '#000',
 };
 const KREIS_PAINT: CircleLayerSpecification['paint'] = {

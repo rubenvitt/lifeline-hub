@@ -1393,6 +1393,25 @@ describe('PersonenPage', () => {
       expect(feld()).toHaveValue('Meier #52.1 sk3');
     });
 
+    it('der Kürzel-Hinweis bleibt beim Tippen stehen, unsichtbar und aus der Beschreibung genommen (LFH-650)', async () => {
+      /**
+       * Bei 390 px sprang der Inhalt unter der Zeile mit dem ersten Zeichen 40 px nach oben,
+       * weil der mehrzeilige Hinweis der kürzeren Erkennungszeile WICH (gemessen in
+       * `e2e/betroffene-layout.spec.ts`). Jetzt liegen beide gestapelt; die Höhe misst die
+       * e2e-Spec, hier steht die Struktur, aus der sie folgt — samt der Gegenhälfte, dass
+       * Vorlesende den verdeckten Hinweis nicht mehr hören.
+       */
+      render(einsatzAktiv, []);
+      const zeile = await screen.findByRole('textbox', { name: 'Kurzeingabe Person' });
+      expect(zeile).toHaveAccessibleDescription(/#Koordinate \(52\.2691\/9\.1342\)/);
+      await userEvent.type(zeile, 'Kowalski sk2');
+      const hinweis = screen.getByText('#Koordinate (52.2691/9.1342)').parentElement!;
+      expect(hinweis).toHaveStyle({ visibility: 'hidden' });
+      expect(hinweis).toHaveAttribute('aria-hidden', 'true');
+      expect(zeile).toHaveAccessibleDescription(/^erkannt:/);
+      expect(zeile).not.toHaveAccessibleDescription(/Kürzel/);
+    });
+
     it('schickt die Koordinate aus „#lat/lon“ im SELBEN POST (LFH-613, Spec-Szenario)', async () => {
       let koerper: Record<string, unknown> | undefined;
       server.use(

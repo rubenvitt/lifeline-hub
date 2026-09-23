@@ -1,6 +1,7 @@
 import { useId, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
-import { Button, Typography, theme } from 'antd';
+import { Button, Typography } from 'antd';
 import { EditOutlined } from '@ant-design/icons';
+import { useRollen } from './instrument/rollenwerte';
 
 /**
  * Inline bearbeitbare Bemerkung — mit sichtbarer Affordanz im LEEREN Zustand (LFH-369 · B5i).
@@ -153,7 +154,7 @@ export function BemerkungZelle({
   laeuft = false,
 }: BemerkungZelleProps) {
   const [bearbeitet, setBearbeitet] = useState(false);
-  const { token } = theme.useToken();
+  const { token, rollen } = useRollen();
   const wertId = useId();
   // EIN Ref für beide Knöpfe: Platzhalter und Wertknopf stehen nie gleichzeitig im Baum.
   const knopfRef = useRef<HTMLButtonElement>(null);
@@ -218,6 +219,11 @@ export function BemerkungZelle({
         ref={knopfRef}
         type="link"
         loading={laeuft}
+        // `bedienText` statt antds `colorLink` (LFH-650, gemessen in
+        // `e2e/betroffene-kontrast.spec.ts`): in einer Zeile mit Lücken-Tönung trug
+        // `colorLink` am Tag 5,93 und nachts 4,50 — unter 7 bzw. 5 : 1. `bedienText` ist die
+        // Rolle für blauen TEXT, wie `achtungText`/`alarmText` für ihre Füllfarben (LFH-618).
+        style={{ color: rollen.bedienText }}
         // Sichtbar bleibt der kurze Text, der Name trägt die Zeile — sonst wird die Spalte
         // so breit wie die längste Kennung.
         aria-label={kennung ? `${bezeichnung} zu ${kennung} hinzufügen` : undefined}

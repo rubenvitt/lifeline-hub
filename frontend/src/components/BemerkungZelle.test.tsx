@@ -326,6 +326,18 @@ describe('BemerkungZelle', () => {
     // „Rot bedient nichts": eine Bemerkung zu ergänzen ist keine Gefahr.
     expect(knopf).not.toHaveClass('ant-btn-dangerous');
   });
+
+  it('der Platzhalter steht in `bedienText`, nicht in antds `colorLink` (LFH-650)', () => {
+    /**
+     * Gemessen in `e2e/betroffene-kontrast.spec.ts`: auf einer Zeile mit Lücken-Tönung trug
+     * `colorLink` am Tag 5,93 und nachts 4,50. Der Wert steht als Literal — aus dem Token
+     * gelesen prüfte der Test die Rolle gegen sich selbst.
+     */
+    renderMitProviders(<BemerkungZelle wert={null} darfSchreiben onSpeichern={vi.fn()} />);
+    expect(screen.getByRole('button', { name: BEMERKUNG_HINZUFUEGEN }).style.color).toBe(
+      'rgb(22, 79, 134)',
+    );
+  });
 });
 
 /**

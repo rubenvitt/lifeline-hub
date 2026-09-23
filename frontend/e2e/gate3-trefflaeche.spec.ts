@@ -1519,7 +1519,7 @@ test('Betroffene Karte: Marker-Trefferzone, Cluster-Donut und Kartenknöpfe folg
     );
     await expect(cluster.locator('[data-lfh="cluster-sichtung"]')).toHaveText('I');
 
-    // Marker (WebGL): ein Klick NEBEN den gezeichneten Kreis (Außenkante bei 12,5 px), aber
+    // Marker (WebGL): ein Klick NEBEN den gezeichneten Kreis (Außenkante bei 13 px), aber
     // innerhalb der Zone, öffnet die Person. Versatz = halbe Stufe minus 2 px, also in
     // `kompakt` 13 px — schon dort außerhalb der Zeichnung.
     // Erst den Marker in die Kartenmitte holen und die Karte ins Bild scrollen: in
