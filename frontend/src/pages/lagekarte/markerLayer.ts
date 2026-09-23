@@ -31,6 +31,10 @@ export interface MarkerProps {
   rang?: number;
   /** Kurzzeichen IM Kreis (`KarteMarker.kurzzeichen`), ohne Mindestzoom sichtbar. */
   kurzzeichen?: string;
+  /** Durchmesser der unsichtbaren Trefferzone (`KarteMarker.trefferDurchmesser`, LFH-650). */
+  treffer?: number;
+  /** Sichtung (`KarteMarker.sichtung`) — Summand der Cluster-Aggregation `s_<kategorie>`. */
+  sk?: string;
 }
 
 export type MarkerFeature = {
@@ -71,6 +75,8 @@ function toFeature(mk: KarteMarker, plakette: Plakette): MarkerFeature {
   if (mk.tz) properties.icon = tzIconKey(mk.tz);
   if (mk.statusFarbe) properties.statusFarbe = mk.statusFarbe;
   if (mk.kurzzeichen) properties.kurzzeichen = mk.kurzzeichen;
+  if (mk.trefferDurchmesser) properties.treffer = mk.trefferDurchmesser;
+  if (mk.sichtung) properties.sk = mk.sichtung;
   const beschriftung = beschriftungVon(mk);
   if (beschriftung) {
     properties.beschriftung = beschriftung;
@@ -114,6 +120,7 @@ export const SPIDER_LEAVES_QUELLE = 'spider-leaves';
 export const SPIDER_LEGS_QUELLE = 'spider-legs';
 // Die Plakette ist Klickziel wie ihr Zeichen: wer den Namen trifft, meint den Marker.
 export const MARKER_KLICK_LAYER = [
+  'marker-treffer',
   'marker-symbol',
   'marker-kreis',
   'marker-kurz',
@@ -124,6 +131,7 @@ export const MARKER_KLICK_LAYER = [
 ] as const;
 // Aufgefächerte Spider-Leaves sind klickbar wie Einzelmarker (→ onMarkerKlick).
 export const SPIDER_KLICK_LAYER = [
+  'spider-treffer',
   'spider-symbol',
   'spider-kreis',
   'spider-kurz',
@@ -139,6 +147,7 @@ export const SPIDER_KLICK_LAYER = [
 // Kollision hält jede Plakette von fremden Zeichen fern — lägen die Plaketten oben, deckten
 // sie Nachbarzeichen zu. Der Einsatzort-Name liegt über den übrigen und gewinnt gegen sie.
 const MARKER_LAYER_REIHENFOLGE = [
+  'marker-treffer',
   'marker-status-ring',
   'marker-kreis',
   'marker-kurz',
@@ -147,6 +156,7 @@ const MARKER_LAYER_REIHENFOLGE = [
   'marker-symbol',
   'marker-einsatzort-symbol',
   'spider-legs-line',
+  'spider-treffer',
   'spider-status-ring',
   'spider-kreis',
   'spider-kurz',
@@ -160,6 +170,18 @@ const STATUS_RING_PAINT: CircleLayerSpecification['paint'] = {
   'circle-radius': 20,
   'circle-color': ['get', 'statusFarbe'],
   'circle-opacity': 0.9,
+};
+/**
+ * Unsichtbare Trefferzone (LFH-650): ein Kreis mit dem Durchmesser aus der Feature-Eigenschaft
+ * `treffer`, ohne Füllung und ohne Rand. Er liegt UNTER allen Markerebenen und ist Klickziel
+ * wie sie — MapLibre prüft beim Treffertest die Geometrie, nicht die Deckkraft (gemessen in
+ * `e2e/betroffene-karte.spec.ts`: ein Klick mit Versatz neben den gezeichneten Kreis öffnet
+ * die Person). Nur Features mit `treffer` erzeugen eine Zone; die Lagekarte setzt keins.
+ */
+const TREFFER_PAINT: CircleLayerSpecification['paint'] = {
+  'circle-radius': ['/', ['get', 'treffer'], 2],
+  'circle-opacity': 0,
+  'circle-stroke-width': 0,
 };
 const KREIS_PAINT: CircleLayerSpecification['paint'] = {
   'circle-radius': 9,
@@ -271,6 +293,15 @@ export function sorgeFuerMarkerLayer(
       paint: { ...STATUS_RING_PAINT },
     });
   }
+  if (!map.getLayer('marker-treffer')) {
+    map.addLayer({
+      id: 'marker-treffer',
+      type: 'circle',
+      source: MARKER_CLUSTER_QUELLE,
+      filter: ['all', ['!', ['has', 'point_count']], ['has', 'treffer']],
+      paint: { ...TREFFER_PAINT },
+    });
+  }
   // Lagemeldung (kein TZ) — einfacher Kreis (heutige Optik: farbig, weißer Rand).
   if (!map.getLayer('marker-kreis')) {
     map.addLayer({
@@ -369,6 +400,15 @@ function sorgeFuerSpiderLayer(map: MapLibreMap, schrift: string[] | undefined) {
       type: 'line',
       source: SPIDER_LEGS_QUELLE,
       paint: { 'line-color': '#64748b', 'line-width': 1.5, 'line-opacity': 0.7 },
+    });
+  }
+  if (!map.getLayer('spider-treffer')) {
+    map.addLayer({
+      id: 'spider-treffer',
+      type: 'circle',
+      source: SPIDER_LEAVES_QUELLE,
+      filter: ['has', 'treffer'],
+      paint: { ...TREFFER_PAINT },
     });
   }
   if (!map.getLayer('spider-status-ring')) {

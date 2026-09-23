@@ -234,6 +234,7 @@ describe('sorgeFuerMarkerLayer', () => {
     // Die Plaketten liegen UNTER den Zeichen: MapLibre vergibt Platz von oben nach unten, die
     // Zeichen (allow-overlap) belegen ihn also zuerst, und keine Plakette deckt ein Zeichen zu.
     expect(moves).toEqual([
+      'marker-treffer',
       'marker-status-ring',
       'marker-kreis',
       'marker-kurz',
@@ -242,6 +243,7 @@ describe('sorgeFuerMarkerLayer', () => {
       'marker-symbol',
       'marker-einsatzort-symbol',
       'spider-legs-line',
+      'spider-treffer',
       'spider-status-ring',
       'spider-kreis',
       'spider-kurz',
@@ -250,12 +252,44 @@ describe('sorgeFuerMarkerLayer', () => {
     ]);
   });
 
+  it('die Trefferzone (LFH-650) ist unsichtbar, liegt ganz unten, ist Klickziel und nur für Features MIT `treffer`', () => {
+    const { map, layers } = fakeMap();
+    sorgeFuerMarkerLayer(map as never, leer, leer);
+    for (const id of ['marker-treffer', 'spider-treffer']) {
+      const layer = layers.get(id) as {
+        type: string;
+        filter: unknown;
+        paint: Record<string, unknown>;
+      };
+      expect(layer.type).toBe('circle');
+      // Ohne `treffer` keine Zone — die Lagekarte setzt die Eigenschaft nicht und bleibt gleich.
+      expect(JSON.stringify(layer.filter)).toContain('["has","treffer"]');
+      expect(layer.paint['circle-opacity']).toBe(0);
+      // Radius = halber Durchmesser aus der Feature-Eigenschaft, keine feste Zahl.
+      expect(layer.paint['circle-radius']).toEqual(['/', ['get', 'treffer'], 2]);
+    }
+    expect(MARKER_KLICK_LAYER).toContain('marker-treffer');
+    expect(SPIDER_KLICK_LAYER).toContain('spider-treffer');
+  });
+
   it('legt alle in MARKER_KLICK_LAYER referenzierten Layer real an (Konstanten-Kopplung)', () => {
     const { map, layers } = fakeMap();
     sorgeFuerMarkerLayer(map as never, leer, leer);
     // Schützt vor stillen Klick-Toten: eine Layer-ID-Umbenennung ohne Nachziehen der Konstante
     // bände den Klick-Handler an einen nicht existierenden Layer — hier rot statt unbemerkt.
     for (const id of MARKER_KLICK_LAYER) expect(layers.has(id)).toBe(true);
+  });
+});
+
+describe('Trefferzone und Sichtung als Feature-Properties (LFH-650)', () => {
+  it('trägt beide nur, wenn der Marker sie hat — ein Lagekarten-Marker bekommt keins', () => {
+    const fc = baueMarkerFc([
+      mk({ schluessel: 'person-1', typ: 'person', trefferDurchmesser: 48, sichtung: 'sk1' }),
+      mk({ schluessel: 'uhs-1' }),
+    ]);
+    expect(fc.features[0].properties).toMatchObject({ treffer: 48, sk: 'sk1' });
+    expect(fc.features[1].properties).not.toHaveProperty('treffer');
+    expect(fc.features[1].properties).not.toHaveProperty('sk');
   });
 });
 

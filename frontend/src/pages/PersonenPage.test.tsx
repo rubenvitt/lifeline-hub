@@ -1660,6 +1660,22 @@ describe('PersonenPage — Kartenansicht (LFH-613)', () => {
     expect(screen.queryByRole('region', { name: 'Personen' })).not.toBeInTheDocument();
   });
 
+  it('ohne Lücke SAGT die Hinweiszeile es, statt zu verschwinden — kein Kartensprung (LFH-650)', async () => {
+    /**
+     * Befund Tabelle 4, Nr. 12 der LFH-613-Prüfliste: die Zeile stand nur bei `> 0` da. Wurde
+     * die letzte Person live verortet, sprang die ganze Karte um eine Zeile unter dem Zeiger.
+     * Jetzt steht sie immer; die e2e-Spec misst den Sprung im Browser.
+     */
+    // Beide angetroffenen Personen tragen eine Koordinate — R-001 bleibt der Anker von
+    // `waehleKarte`.
+    renderKarte([mitKoordinate(person.id, person.registrier_nr), mitKoordinate(20, 4)]);
+    await waehleKarte();
+    await screen.findByTestId('kartenflaeche-stub');
+    expect(
+      screen.getByText('Alle angetroffenen Personen stehen auf der Karte'),
+    ).toBeInTheDocument();
+  });
+
   it('der Markerklick führt zur Detailseite der Person', async () => {
     renderKarte([person, mitKoordinate(20, 4)]);
     await waehleKarte();

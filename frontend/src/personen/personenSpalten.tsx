@@ -191,7 +191,10 @@ function ZustandSchreiben({ p, einsatzId }: { p: Person; einsatzId: number }) {
       data-fehler={fehler ? 'true' : undefined}
       style={
         fehler
-          ? { borderInlineStart: `3px solid ${token.colorError}`, paddingInlineStart: token.paddingXS }
+          ? {
+              borderInlineStart: `3px solid ${token.colorError}`,
+              paddingInlineStart: token.paddingXS,
+            }
           : undefined
       }
     >

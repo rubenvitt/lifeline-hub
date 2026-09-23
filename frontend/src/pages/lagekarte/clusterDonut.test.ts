@@ -3,8 +3,12 @@ import {
   clusterTypProperties,
   donutSegmente,
   baueClusterDonut,
+  dringlichsteSichtung,
   CLUSTER_TYP_FARBE,
+  SK_DRINGLICHKEIT,
 } from './clusterDonut';
+import { SK_KURZZEICHEN } from '../../personen/personenKarte';
+import { sichtungsfarben } from '../../theme/tokens';
 
 describe('clusterTypProperties', () => {
   it('liefert für jeden clusterbaren Typ eine Summen-Aggregation c_<typ>', () => {
@@ -51,5 +55,72 @@ describe('baueClusterDonut', () => {
   it('kürzt große Zahlen (≥1000) auf k-Notation', () => {
     const el = baueClusterDonut({ point_count: 1500, c_fahrzeug: 1500 });
     expect(el.textContent).toBe('1.5k');
+  });
+});
+
+/**
+ * Personen-Cluster (LFH-650): statt eines Rosé-Segments (`#be185d`, außerhalb der Tokens und
+ * neben SK-I-Rot) zeigt der Ring die Zusammensetzung nach Sichtung in den Farben der
+ * Sichtungsachse, der Kern das Kürzel der dringlichsten Kategorie.
+ */
+describe('Personen-Cluster nach Sichtung (LFH-650)', () => {
+  it('aggregiert Personen je Sichtung (s_<k>) und die größte Trefferzone', () => {
+    const props = clusterTypProperties();
+    for (const k of SK_DRINGLICHKEIT) {
+      expect(JSON.stringify(props[`s_${k}`])).toBe(
+        JSON.stringify(['+', ['case', ['==', ['get', 'sk'], k], 1, 0]]),
+      );
+    }
+    expect(props.treffer).toEqual(['max', ['coalesce', ['get', 'treffer'], 0]]);
+  });
+
+  it('führt jede Kategorie aus SK_KURZZEICHEN genau einmal in der Dringlichkeit', () => {
+    expect([...SK_DRINGLICHKEIT].sort()).toEqual(Object.keys(SK_KURZZEICHEN).sort());
+    // Literal-Pin der Reihenfolge — SK I zuerst, „ohne" zuletzt.
+    expect(SK_DRINGLICHKEIT).toEqual(['sk1', 'sk2', 'sk3', 'sk4', 'tot', 'unverletzt', 'ohne']);
+  });
+
+  it('färbt Personen-Segmente aus der Sichtungsachse — und NIE rosé', () => {
+    const segs = donutSegmente({ point_count: 6, c_person: 6, s_sk1: 1, s_sk2: 2, s_ohne: 3 });
+    expect(segs.map((s) => [s.sichtung, s.farbe, s.count])).toEqual([
+      ['sk1', sichtungsfarben.rot, 1],
+      ['sk2', sichtungsfarben.gelb, 2],
+      ['ohne', '#94a3b8', 3],
+    ]);
+    expect(JSON.stringify(segs).toLowerCase()).not.toContain('#be185d');
+    expect(Object.values(CLUSTER_TYP_FARBE)).not.toContain('#be185d');
+  });
+
+  it('nennt die dringlichste Sichtung — SK I schlägt alles, „ohne" nur allein', () => {
+    expect(dringlichsteSichtung({ s_sk3: 4, s_sk1: 1, s_ohne: 9 })).toBe('sk1');
+    expect(dringlichsteSichtung({ s_tot: 1, s_unverletzt: 2 })).toBe('tot');
+    expect(dringlichsteSichtung({ s_ohne: 2 })).toBe('ohne');
+    expect(dringlichsteSichtung({ c_fahrzeug: 3 })).toBeNull();
+  });
+
+  it('der Kern trägt Zahl UND Kürzel, Tooltip und Name sagen es als Satz', () => {
+    const el = baueClusterDonut({ point_count: 5, c_person: 5, s_sk1: 1, s_sk3: 4 });
+    expect(el.querySelector('[data-lfh="cluster-sichtung"]')!.textContent).toBe('I');
+    expect(el.textContent).toBe('5I');
+    expect(el.title).toBe('5 Personen, dringlichste Sichtung: SK I');
+    expect(el.getAttribute('aria-label')).toBe(el.title);
+    // Gegenhälfte: ein Lagekarten-Cluster ohne Personen bekommt weder Kürzel noch Satz.
+    const lage = baueClusterDonut({ point_count: 3, c_fahrzeug: 3 });
+    expect(lage.querySelector('[data-lfh="cluster-sichtung"]')).toBeNull();
+    expect(lage.title).toBe('');
+  });
+
+  it('hüllt den Ring in eine Trefferzone, wenn die Blätter eine größere verlangen', () => {
+    const gross = baueClusterDonut({ point_count: 2, c_person: 2, s_sk2: 2, treffer: 72 });
+    expect(gross.dataset.lfh).toBe('cluster-treffer');
+    expect(gross.style.width).toBe('72px');
+    expect(gross.style.height).toBe('72px');
+    // Name wandert an die Hülle — das Klickziel —, nicht doppelt an den Ring.
+    expect(gross.getAttribute('aria-label')).toBe('2 Personen, dringlichste Sichtung: SK II');
+    expect(gross.firstElementChild!.getAttribute('aria-label')).toBeNull();
+    // Kleiner als der gezeichnete Ring (36 + log2(3)·6 ≈ 46 px bei zwei Blättern): keine Hülle.
+    const klein = baueClusterDonut({ point_count: 2, c_person: 2, s_sk2: 2, treffer: 30 });
+    expect(klein.dataset.lfh).toBeUndefined();
+    expect(klein.style.width).toBe('46px');
   });
 });

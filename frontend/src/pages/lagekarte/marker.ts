@@ -8,6 +8,7 @@ import type {
   FuehrungskraftKarte,
   LageMeldung,
   Schaden,
+  Sichtungskategorie,
   Uhs,
 } from '../../api/types';
 import {
@@ -52,6 +53,19 @@ export interface KarteMarker {
   /** Kurzzeichen IM Kreis, unabhängig vom Zoom sichtbar (Betroffene: Sichtung „II", LFH-613).
    *  Nur für Marker ohne taktisches Zeichen (`tz`) — sonst läge es auf dem Symbol. */
   kurzzeichen?: string;
+  /**
+   * Durchmesser der unsichtbaren Trefferzone in px (LFH-650). Der gezeichnete Kreis bleibt
+   * klein (~22 px); die Zone macht die Trefffläche so groß wie die Dichtestufe verlangt
+   * (`token.controlHeight`: 30 / 48 / 72). Ohne Angabe gibt es keine Zone — die Lagekarte
+   * setzt sie nicht und bleibt damit unverändert.
+   */
+  trefferDurchmesser?: number;
+  /**
+   * Sichtungskategorie eines Personen-Markers (LFH-650) — speist die Cluster-Aggregation,
+   * damit ein Cluster seine Zusammensetzung nach Sichtung und die dringlichste Kategorie
+   * zeigen kann (`clusterDonut.ts`). `'ohne'` = noch nicht gesichtet.
+   */
+  sichtung?: Sichtungskategorie | 'ohne';
   /** FMS-Status-Ring, nur für Fahrzeuge. */
   statusFarbe?: string | null;
   /** Lagemeldungs-Herkunft für den Inspector-Backlink (nur typ='lagemeldung').

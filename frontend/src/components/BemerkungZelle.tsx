@@ -83,10 +83,7 @@ import { EditOutlined } from '@ant-design/icons';
  * Rendern prüfbar ist (Muster `bedienzielStil`): `minHeight` aus `controlHeight` trägt den
  * Boden, die Polsterung den Abstand des umbrechenden Textes zum Rand.
  */
-export function wertKnopfStil(token: {
-  controlHeight: number;
-  paddingXS: number;
-}): CSSProperties {
+export function wertKnopfStil(token: { controlHeight: number; paddingXS: number }): CSSProperties {
   return {
     height: 'auto',
     minHeight: token.controlHeight,
@@ -239,7 +236,9 @@ export function BemerkungZelle({
         // `loading` sperrt zugleich den zweiten Klick, solange der erste noch schreibt, und
         // ersetzt die Stift-Ikone durch antds Ladeanzeige — der neue Wert steht schon da.
         loading={laeuft}
-        aria-label={kennung ? `${bezeichnung} zu ${kennung} bearbeiten` : `${bezeichnung} bearbeiten`}
+        aria-label={
+          kennung ? `${bezeichnung} zu ${kennung} bearbeiten` : `${bezeichnung} bearbeiten`
+        }
         aria-describedby={wertId}
         style={wertKnopfStil(token)}
         onClick={() => setBearbeitet(true)}
