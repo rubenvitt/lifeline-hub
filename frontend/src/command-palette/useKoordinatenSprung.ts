@@ -8,7 +8,7 @@ import { effektivesKoordinatenformat } from '../anzeige/format';
 import { useKoordinatenSystemOverride } from '../anzeige/koordinatenSystemStore';
 import { istModulFreigegeben, modulRegistry } from '../einsatz/modulRegistry';
 import { erkenneKoordinate, koordinatenBefehl } from './koordinatenSprung';
-import type { Befehl, PaletteModus } from './typen';
+import type { Befehl, Oeffnung, PaletteModus } from './typen';
 
 /** Frische wie beim Datensatz-Finder: die Fächer hängen am SSE-Fan-out. */
 const FRISCH_MS = 60_000;
@@ -39,7 +39,7 @@ export function useKoordinatenSprung({
   modus: PaletteModus;
   /** Der ENTPRELLTE Rest hinter dem Präfix. */
   suche: string;
-  navigate: (pfad: string) => void;
+  navigate: (pfad: string, oeffnung?: Oeffnung) => void;
 }): (rest: string) => Befehl | null {
   const { benutzer } = useAuth();
   const override = useKoordinatenSystemOverride();

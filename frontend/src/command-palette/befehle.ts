@@ -33,8 +33,8 @@ import {
   unfallhilfsstellenListePfad,
 } from '../routing/deeplinks';
 import type { IconType } from 'react-icons';
-import { GRUPPE_MERKBAR } from './typen';
-import type { Befehl, BefehlKontext, TastaturAktionId } from './typen';
+import { GRUPPE_MERKBAR, sprungZu } from './typen';
+import type { Befehl, BefehlKontext, Oeffnung, TastaturAktionId } from './typen';
 import type { ThemeModus } from '../theme/ThemeModeProvider';
 import type { Dichte } from '../theme/tokens';
 import type { Koordinatenformat } from '../api/types';
@@ -287,10 +287,7 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
         label: m.label,
         kontext: kategorieKontext(m.kategorie),
         icon: m.icon,
-        ausfuehren: () => {
-          k.merkeModulBesuch?.(m.key);
-          k.navigate(ziel);
-        },
+        ...sprungZu(ziel, k.navigate, () => k.merkeModulBesuch?.(m.key)),
       });
     }
 
@@ -305,10 +302,7 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
         kontext: kategorieKontext(m.kategorie),
         icon: m.icon,
         schlagworte: m.beschreibung ? [m.beschreibung] : undefined,
-        ausfuehren: () => {
-          k.merkeModulBesuch?.(m.key);
-          k.navigate(ziel);
-        },
+        ...sprungZu(ziel, k.navigate, () => k.merkeModulBesuch?.(m.key)),
       });
     }
 
@@ -328,7 +322,7 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
           label: a.label,
           icon: TbPlus,
           schlagworte: a.schlagworte,
-          ausfuehren: () => k.navigate(ziel),
+          ...sprungZu(ziel, k.navigate),
         });
       }
     }
@@ -343,7 +337,7 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
       label: e.bezeichnung,
       icon: TbList,
       schlagworte: e.stichwort ? [e.stichwort] : undefined,
-      ausfuehren: () => k.navigate(einsatzPfad(e.id)),
+      ...sprungZu(einsatzPfad(e.id), k.navigate),
     });
   }
 
@@ -385,14 +379,14 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
     gruppe: 'navigation',
     label: 'Alle Einsätze',
     icon: TbList,
-    ausfuehren: () => k.navigate(einsaetzePfad()),
+    ...sprungZu(einsaetzePfad(), k.navigate),
   });
   befehle.push({
     id: 'nav:profil',
     gruppe: 'navigation',
     label: 'Profil',
     icon: TbUser,
-    ausfuehren: () => k.navigate('/profil'),
+    ...sprungZu('/profil', k.navigate),
   });
   // Zwei Stufen, bewusst getrennt (LFH-328/M8): Verwaltungsbereich und Stammdaten hängen am
   // AdminLayout-Gate `darfVerwaltung` — vorher standen sie unter `system_rolle === 'admin'`
@@ -404,14 +398,14 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
       gruppe: 'navigation',
       label: 'Stammdaten',
       icon: TbList,
-      ausfuehren: () => k.navigate('/stammdaten'),
+      ...sprungZu('/stammdaten', k.navigate),
     });
     befehle.push({
       id: 'nav:admin',
       gruppe: 'navigation',
       label: 'Administration',
       icon: TbSettings,
-      ausfuehren: () => k.navigate('/admin'),
+      ...sprungZu('/admin', k.navigate),
     });
   }
   // Die Benutzerverwaltung bleibt strenger: `/benutzer` leitet auf `/admin/benutzer`, und
@@ -422,7 +416,7 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
       gruppe: 'navigation',
       label: 'Benutzerverwaltung',
       icon: TbUser,
-      ausfuehren: () => k.navigate('/benutzer'),
+      ...sprungZu('/benutzer', k.navigate),
     });
   }
   // `nichtMerkbar`: der einzige Befehl der Palette ohne Rückweg. Merkbar stünde er nach der
@@ -485,9 +479,11 @@ function mitGedaechtnis(befehle: Befehl[], k: BefehlKontext): Befehl[] {
         istMerkbar(b)
           ? {
               ...b,
-              ausfuehren: () => {
+              // Die Öffnungsart geht durch (LFH-645): ein Griff mit Strg/⌘+↵ merkt sich den
+              // Befehl genauso wie ein ↵, und die Kopie im Gedächtnis erbt diese Wicklung.
+              ausfuehren: (oeffnung?: Oeffnung) => {
                 k.merkeBefehl?.(b.id);
-                b.ausfuehren();
+                b.ausfuehren(oeffnung);
               },
             }
           : b,

@@ -707,3 +707,89 @@ describe('baueBefehle — was ins Gedächtnis kommt', () => {
     expect(merkeBefehl).toHaveBeenCalledTimes(1);
   });
 });
+
+/**
+ * LFH-645: die Öffnungsart läuft als Argument durch `ausfuehren` bis zu `navigate`, `ziel` ist
+ * die Marke, an der die Palette entscheidet, ob Strg/⌘+↵ überhaupt greift. Die Bauform hat
+ * genau EINE Fehlerrichtung, die kein anderer Test sieht: ein Bauort setzt `ziel`, reicht das
+ * Argument aber nicht durch — dann öffnet „neuer Tab" still im aktuellen Tab.
+ *
+ * Der Kontext belegt deshalb JEDE Gruppe, auch das Gedächtnis: eine Gedächtniszeile ist eine
+ * Spread-Kopie ihres Originals, ihre Wicklung in `mitGedaechtnis` muss das Argument ebenfalls
+ * weitergeben.
+ */
+describe('baueBefehle — Öffnungsart und Ziel (LFH-645)', () => {
+  function vollerKontext() {
+    return kontext({
+      benutzer: admin,
+      einsaetze: [
+        {
+          id: 7,
+          bezeichnung: 'Hochwasser',
+          status: 'aktiv',
+        } as EinsatzAnzeige,
+      ],
+      zuletztModulKeys: ['etb'],
+      zuletztBefehlIds: ['nav:profil', 'aktion:personen'],
+      merkeBefehl: vi.fn(),
+      merkeModulBesuch: vi.fn(),
+      tastaturAktionen: { speichern: vi.fn() },
+    });
+  }
+
+  it('belegt jede Befehlsgruppe (sonst prüft der Guard weniger, als er behauptet)', () => {
+    const gruppen = new Set(baueBefehle(vollerKontext()).map((b) => b.gruppe));
+    // `koordinate` und `datensaetze` baut `baueBefehle` nicht — sie haben eigene Guards.
+    for (const g of GRUPPEN_REIHENFOLGE.filter((x) => x !== 'koordinate' && x !== 'datensaetze')) {
+      expect(gruppen, g).toContain(g);
+    }
+  });
+
+  it('jede Zeile mit Ziel navigiert mit der verlangten Öffnungsart auf genau dieses Ziel', () => {
+    const k = vollerKontext();
+    const mitZiel = baueBefehle(k).filter((b) => b.ziel !== undefined);
+    expect(mitZiel.length).toBeGreaterThan(10);
+    for (const b of mitZiel) {
+      vi.mocked(k.navigate).mockClear();
+      b.ausfuehren('neuerTab');
+      expect(k.navigate, b.id).toHaveBeenCalledTimes(1);
+      expect(k.navigate, b.id).toHaveBeenCalledWith(b.ziel, 'neuerTab');
+    }
+  });
+
+  it('ohne Ziel sind ausschliesslich Aktionen, Einstellungen und Abmelden', () => {
+    const ohneZiel = baueBefehle(vollerKontext()).filter((b) => b.ziel === undefined);
+    for (const b of ohneZiel) {
+      expect(
+        b.gruppe === 'aktionen' || b.gruppe === 'einstellungen' || b.id === 'nav:abmelden',
+        b.id,
+      ).toBe(true);
+    }
+  });
+
+  it('die Gedächtniszeile trägt das Ziel ihres Originals', () => {
+    const b = baueBefehle(vollerKontext());
+    const original = b.find((x) => x.id === 'nav:profil')!;
+    const kopie = b.find((x) => x.id === 'ausgefuehrt:nav:profil')!;
+    expect(kopie.ziel).toBe('/profil');
+    expect(kopie.ziel).toBe(original.ziel);
+  });
+
+  it('der neue Tab merkt sich Befehl und Modulbesuch wie ein normales Öffnen', () => {
+    const k = vollerKontext();
+    const b = baueBefehle(k);
+    b.find((x) => x.id === 'nav:stammdaten')!.ausfuehren('neuerTab');
+    expect(k.merkeBefehl).toHaveBeenCalledWith('nav:stammdaten');
+    b.find((x) => x.id === 'modul:etb')!.ausfuehren('neuerTab');
+    expect(k.merkeModulBesuch).toHaveBeenCalledWith('etb');
+    expect(k.navigate).toHaveBeenLastCalledWith('/einsaetze/5/etb', 'neuerTab');
+  });
+
+  it('ohne Argument bleibt es beim bisherigen Öffnen im aktuellen Tab', () => {
+    const k = vollerKontext();
+    baueBefehle(k).find((x) => x.id === 'nav:profil')!.ausfuehren();
+    const [pfad, oeffnung] = vi.mocked(k.navigate).mock.calls[0];
+    expect(pfad).toBe('/profil');
+    expect(oeffnung ?? 'hier').toBe('hier');
+  });
+});

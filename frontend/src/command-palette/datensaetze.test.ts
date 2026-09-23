@@ -1228,3 +1228,51 @@ describe('baueDatensatzTreffer — ETB-Sammeltreffer (LFH-619)', () => {
     expect(ids(sichtbareDatensaetze(t, 'alles', ' deich '))).toEqual(['datensatz:etb:suche']);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('baueDatensatzTreffer — Öffnungsart und Vorschau (LFH-645)', () => {
+  function trefferAllerArten(navigate = vi.fn()) {
+    return baueDatensatzTreffer(
+      kontext({
+        suche: 'flor',
+        navigate,
+        quellen: {
+          personen: [person({ id: 11, name: 'Florian' })],
+          uhs: [uhs({ id: 12, bezeichnung: 'Florian-Platz' })],
+          fahrzeuge: [fahrzeug({ id: 13, funkrufname: 'Florian 1' })],
+          personal: [personal({ id: 14, name: 'Florian' })],
+          einheiten: [einheit({ id: 15, name: 'Florian SEG' })],
+          etbText: [etb({ id: 16, inhalt: 'Florian meldet' })],
+          etbAnzahl: { anzahl: 3 },
+        },
+      }),
+    );
+  }
+
+  it('jede Datensatzzeile trägt ihr Ziel und reicht die Öffnungsart durch', () => {
+    const navigate = vi.fn();
+    const t = trefferAllerArten(navigate);
+    // Sechs Einzeltreffer plus der ETB-Sammeltreffer — sonst prüfte der Guard weniger.
+    expect(t).toHaveLength(7);
+    for (const { befehl: b } of t) {
+      expect(b.ziel, b.id).toBeDefined();
+      navigate.mockClear();
+      b.ausfuehren('neuerTab');
+      expect(navigate, b.id).toHaveBeenCalledWith(b.ziel, 'neuerTab');
+    }
+  });
+
+  it('↵ bleibt beim bisherigen Aufruf mit nur dem Pfad', () => {
+    const navigate = vi.fn();
+    const p = trefferAllerArten(navigate).find((x) => x.befehl.id === 'datensatz:personen:11')!;
+    p.befehl.ausfuehren();
+    expect(navigate).toHaveBeenCalledWith(p.befehl.ziel);
+  });
+
+  it('nur die Person trägt eine Vorschau — mit Einsatz und id', () => {
+    const t = trefferAllerArten();
+    const mitVorschau = t.filter((x) => x.befehl.vorschau);
+    expect(mitVorschau.map((x) => x.befehl.id)).toEqual(['datensatz:personen:11']);
+    expect(mitVorschau[0].befehl.vorschau).toEqual({ art: 'person', einsatzId: 5, id: 11 });
+  });
+});

@@ -74,7 +74,65 @@ export interface Befehl {
    * gefolgt von Enter löst also aus, was hier drinsteht.
    */
   nichtMerkbar?: true;
-  ausfuehren: () => void;
+  /**
+   * Das Navigationsziel der Zeile (LFH-645) — die MARKE, an der die Palette entscheidet, ob
+   * Strg/⌘+↵ überhaupt greift. Fehlt es (Aktionen, Einstellungen, Abmelden), bleibt die Taste
+   * wirkungslos und fällt NICHT auf ↵ zurück: ein Modifier, der still die Grundaktion
+   * auslöst, lügt.
+   *
+   * Es ist Angabe, nicht Weg: navigiert wird weiterhin in `ausfuehren`, denn dort hängen die
+   * Nebenwirkungen (Modulbesuch, Gedächtnis), die für beide Öffnungsarten gleich gelten.
+   * Wer `ziel` setzt, reicht `oeffnung` bis zu `navigate` durch — das prüft der Guard in
+   * `befehle.test.ts` für jede Zeile.
+   */
+  ziel?: string;
+  /** Lese-Vorschau in der Palette (LFH-645, Taste →). Siehe {@link VorschauZiel}. */
+  vorschau?: VorschauZiel;
+  /**
+   * `oeffnung` erreicht nur Zeilen mit {@link Befehl.ziel} — die Palette übergibt
+   * `'neuerTab'` ausschliesslich dort. Befehle ohne Ziel ignorieren das Argument.
+   */
+  ausfuehren: (oeffnung?: Oeffnung) => void;
+}
+
+/**
+ * Wie eine Zeile mit Ziel geöffnet wird (LFH-645): im aktuellen Tab (↵) oder in einem neuen
+ * Browser-Tab (Strg/⌘+↵). EIN Argument an `ausfuehren` statt eines zweiten Callbacks je
+ * Befehl — sonst stünde jede Nebenwirkung an zwölf Bauorten doppelt und liefe auseinander.
+ */
+export type Oeffnung = 'hier' | 'neuerTab';
+
+/**
+ * Was die Vorschau zeigt (LFH-645). Eine DISKRIMINIERTE Union als Datum, keine
+ * Render-Funktion: `Vorschau.tsx` bildet `art` exhaustiv ab, eine neue Sorte bricht dort den
+ * Typcheck statt still zu fehlen. Heute trägt sie allein die Person; die übrigen
+ * Datensatzsorten sind Folgearbeit.
+ */
+export type VorschauZiel = { art: 'person'; einsatzId: number; id: number };
+
+/**
+ * Ziel und Weg einer Navigationszeile aus EINER Hand (LFH-645) — für alle drei Bauorte
+ * (`befehle.ts`, `datensaetze.ts`, `koordinatenSprung.ts`). Der Bauort nennt das Ziel nur
+ * einmal: `ziel` (die Marke für Strg/⌘+↵) und der Pfad in `navigate` können nicht
+ * auseinanderlaufen, und die Öffnungsart geht immer durch.
+ *
+ * 'hier' wird NICHT mitgeschickt: der gewöhnliche Weg bleibt für jeden Konsumenten von
+ * `navigate` die bisherige Ein-Argument-Form. `vorher` trägt die Nebenwirkung, die für beide
+ * Öffnungsarten gilt (Modulbesuch) — ein neuer Tab ist ein Öffnen wie jedes andere.
+ */
+export function sprungZu(
+  ziel: string,
+  navigate: (pfad: string, oeffnung?: Oeffnung) => void,
+  vorher?: () => void,
+): Pick<Befehl, 'ziel' | 'ausfuehren'> {
+  return {
+    ziel,
+    ausfuehren: (oeffnung) => {
+      vorher?.();
+      if (oeffnung === 'neuerTab') navigate(ziel, oeffnung);
+      else navigate(ziel);
+    },
+  };
 }
 
 export interface BefehlKontext {
@@ -131,7 +189,8 @@ export interface BefehlKontext {
    * WELCHE Befehle melden, entscheidet {@link GRUPPE_MERKBAR}, nicht der Aufrufer.
    */
   merkeBefehl?: (id: string) => void;
-  navigate: (pfad: string) => void;
+  /** `oeffnung` fehlt = im aktuellen Tab (LFH-645). */
+  navigate: (pfad: string, oeffnung?: Oeffnung) => void;
   setThemeModus: (m: ThemeModus) => void;
   setDichte: (d: Dichte) => void;
   setKoordinaten: (f: Koordinatenformat) => void;
