@@ -48,7 +48,7 @@ import {
   type RasterZeile,
   type RueckmeldungAnzeige,
 } from '../kraefte/meldebildRaster';
-import { fmsStatusOptionen } from '../kraefte/fmsTableau';
+import { fmsStatusOptionen } from '../kraefte/fmsTableauKern';
 import Statusband from '../kraefte/Statusband';
 import EinheitZeichen from '../kraefte/EinheitZeichen';
 import { KATEGORIE_WERTE } from '../kraefte/statusAchse';

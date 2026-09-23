@@ -7,7 +7,7 @@ import {
   OHNE_EINHEIT_TITEL,
   UNGEGLIEDERT_TITEL,
   zifferZuordnung,
-} from './fmsTableau';
+} from './fmsTableauKern';
 
 function status(
   id: number,
@@ -104,7 +104,8 @@ describe('baueFmsTableau (LFH-642)', () => {
   });
 
   it('führt eine unbekannte Einheit unter „ohne Einheit" statt sie zu verlieren', () => {
-    const ohne = baueFmsTableau(fahrzeuge, einheiten).at(-1)!;
+    const gruppen = baueFmsTableau(fahrzeuge, einheiten);
+    const ohne = gruppen[gruppen.length - 1];
     expect(ohne.kacheln.map((k) => [k.ef.funkrufname, k.einheit])).toEqual([
       ['MTW', null],
       ['RTW', null],
@@ -136,7 +137,9 @@ describe('baueFmsTableau (LFH-642)', () => {
   it('ein Statuswechsel verschiebt keine Kachel (Kriterium 12)', () => {
     const vorher = baueFmsTableau(fahrzeuge, einheiten);
     const nachher = baueFmsTableau(
-      fahrzeuge.map((f) => (f.id === 13 ? { ...f, status_id: 5, status_kategorie: 'verfuegbar' } : f)),
+      fahrzeuge.map((f) =>
+        f.id === 13 ? { ...f, status_id: 5, status_kategorie: 'verfuegbar' } : f,
+      ),
       einheiten,
     );
     const folge = (g: ReturnType<typeof baueFmsTableau>) =>

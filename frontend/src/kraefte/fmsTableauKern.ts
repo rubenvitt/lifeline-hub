@@ -6,6 +6,11 @@ import { fmsWort } from './meldebildRaster';
 /**
  * Reines Modell des FMS-Tableaus (LFH-642) — Gliederung, Menüwerte, Ziffernzuordnung.
  *
+ * Der Name trägt das Suffix `Kern` mit Absicht: `fmsTableau.ts` kollidierte
+ * case-insensitiv mit `FmsTableau.tsx`, und Vite löst `.ts` vor `.tsx` auf — der Import
+ * der Komponente träfe auf macOS still diese Datei (gemessen, dieselbe Falle wie
+ * `components/direkteinstiegKern.ts`).
+ *
  * ── FORMVERDIKT ────────────────────────────────────────────────────────────────────────
  *
  * Kachel, nicht Tabelle (LFH-19/LFH-330, entschieden am 23.09.2026). Die Frage an diese
@@ -43,7 +48,9 @@ export interface FmsGruppe {
 const vergleiche = (a: string, b: string) => a.localeCompare(b, 'de', { numeric: true });
 
 function nachEinheitUndFunkruf(a: FmsKachel, b: FmsKachel): number {
-  return vergleiche(a.einheit ?? '', b.einheit ?? '') || vergleiche(a.ef.funkrufname, b.ef.funkrufname);
+  return (
+    vergleiche(a.einheit ?? '', b.einheit ?? '') || vergleiche(a.ef.funkrufname, b.ef.funkrufname)
+  );
 }
 
 /**

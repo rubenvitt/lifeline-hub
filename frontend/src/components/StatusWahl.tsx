@@ -178,13 +178,14 @@ export default function StatusWahl<W extends string | number>({
 }: StatusWahlProps<W>): ReactElement {
   const { token } = theme.useToken();
 
-  const etikett = eigenesEtikett != null ? (
-    eigenesEtikett
-  ) : darstellung ? (
-    <StatusTag darstellung={darstellung} farbe={farbe} />
-  ) : (
-    <span>{OHNE_STATUS}</span>
-  );
+  const etikett =
+    eigenesEtikett != null ? (
+      eigenesEtikett
+    ) : darstellung ? (
+      <StatusTag darstellung={darstellung} farbe={farbe} />
+    ) : (
+      <span>{OHNE_STATUS}</span>
+    );
 
   // Ohne Schreibrecht KEIN Auslöser — nicht ein gesperrter. Ein deaktivierter Knopf
   // verspricht eine Fähigkeit, die es hier nicht gibt (Muster: LFH-365, „bleibt keine
