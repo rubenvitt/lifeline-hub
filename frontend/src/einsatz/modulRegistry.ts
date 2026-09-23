@@ -522,6 +522,22 @@ export function istModulFreigegeben(
 }
 
 /**
+ * {@link istModulFreigegeben} über den Modul-Key — für Verweise AUS anderen Seiten auf ein
+ * Modul (LFH-633: Pegel-Kennzahl und Überblick-Marke → „Wetter & Pegel"). Ein unbekannter
+ * Key ist nie frei: ein Link auf ein Modul, das es nicht gibt, wäre ein Sprung ins Leere.
+ * Bewusst nicht `darfZaehlerLaden` — das findet sein Modul über `zaehlerQuelle` und sagte
+ * für jedes Modul ohne Zähler still `false`.
+ */
+export function istKeyFreigegeben(
+  key: string,
+  benutzer: BenutzerAnzeige | null,
+  overrides?: ModulOverrides,
+): boolean {
+  const modul = modulRegistry.find((m) => m.key === key);
+  return !!modul && istModulFreigegeben(modul, benutzer, overrides);
+}
+
+/**
  * Ziel der Default-Route /einsaetze/:id: der Führungsüberblick (Neuentwurf, Entscheidung 3
  * des Auftraggebers: „Führung · Überblick ist die Startseite eines Einsatzes"), solange er
  * fertig ist, sonst der ETB-Fallback. Bis 21.09.2026 stand hier das Lage-Dashboard.

@@ -1,6 +1,6 @@
 import { apiGet, apiSend } from './client';
 import { einsatzKeys } from './queryKeys';
-import type { PegelAnzeige, PegelVorhersageAntwort } from './types';
+import type { PegelAnzeige, PegelVerlauf, PegelVorhersageAntwort } from './types';
 
 /**
  * Maßgebliche Pegel eines Einsatzes (LFH-606).
@@ -172,4 +172,23 @@ export function pegelAbfrage(einsatzId: number) {
  */
 export function pegelSchreibScope(einsatzId: number) {
   return { id: `pegel-schreiben-${einsatzId}` };
+}
+
+/**
+ * 24-h-Verlauf aller festgelegten Pegel (LFH-633), in Pegel-Reihenfolge. Eine Station ohne
+ * Stand kommt mit leerer Reihe. Eigene Route statt Feld in der Liste: die Liste lesen auch
+ * Dashboard und Überblick alle 5 min, die Reihe braucht nur die Modulseite.
+ */
+export function ladeVerlauf(einsatzId: number): Promise<PegelVerlauf[]> {
+  return apiGet<PegelVerlauf[]>(`/api/einsaetze/${einsatzId}/pegel/verlauf`);
+}
+
+/** Abfrage des Verlaufs — derselbe 5-min-Takt wie die Liste, damit Wert und Linie EIN Stand
+ *  bleiben (beide lesen denselben Cache-Eintrag im Backend). */
+export function pegelVerlaufAbfrage(einsatzId: number) {
+  return {
+    queryKey: einsatzKeys.pegelVerlauf(einsatzId),
+    queryFn: () => ladeVerlauf(einsatzId),
+    refetchInterval: PEGEL_ABRUF_MS,
+  };
 }

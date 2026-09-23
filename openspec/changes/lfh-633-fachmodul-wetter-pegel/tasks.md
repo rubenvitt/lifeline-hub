@@ -121,7 +121,7 @@ Sky und PEGELONLINE werden über `FachebenenState`-Basis-URLs auf lokale Stubs g
 
 ## 4. Frontend: Unterbau
 
-- [ ] 4.1 API und Keys:
+- [x] 4.1 API und Keys:
   - `api/pegel.ts` bekommt `ladeVerlauf(einsatzId)` und `pegelVerlaufAbfrage`;
   - neu `api/wetter.ts` mit `ladeWetter` und `wetterAbfrage`, Nachfrage `PEGEL_ABRUF_MS`;
   - `queryKeys.ts` bekommt `einsatzKeys.pegelVerlauf(id)` als Sub-Key von `einsatz-pegel`
@@ -150,7 +150,7 @@ Sky und PEGELONLINE werden über `FachebenenState`-Basis-URLs auf lokale Stubs g
 
   Verifiziert durch Unit-Tests mit Grenzfällen: genau 30 min, 30 min + 1 s, Beginn = jetzt,
   0°/359°/null.
-- [ ] 4.4 `theme/statusFarben.ts`: Vertragskarte `dwdWarnstufe` nach design.md D6. Der
+- [x] 4.4 `theme/statusFarben.ts`: Vertragskarte `dwdWarnstufe` nach design.md D6. Der
   Abdeckungstest wächst von 20 auf 21, samt Literal-Liste. Verifiziert durch `pnpm vitest
   run src/theme`.
 - [x] 4.5 `wetter/Verlaufslinie.tsx` mit reiner, exportierter `verlaufsPfad(punkte, breite,
@@ -164,7 +164,7 @@ Sky und PEGELONLINE werden über `FachebenenState`-Basis-URLs auf lokale Stubs g
 
 ## 5. Frontend: Seite und Wege
 
-- [ ] 5.1 Registry und Router:
+- [x] 5.1 Registry und Router:
   - Registry-Eintrag `wetter-pegel`: Kategorie `lage`, Label „Wetter & Pegel“, Ikone aus
     `react-icons/tb`, Route `wetter-pegel`, Status `fertig`, hinter `gefahrenzonen`;
   - `App.tsx` `MODUL_ELEMENTE`;
@@ -173,7 +173,7 @@ Sky und PEGELONLINE werden über `FachebenenState`-Basis-URLs auf lokale Stubs g
 
   Verifiziert durch `modulRegistry.test.ts`, `EinsatzLayout.test.tsx` und den Backend-Guard
   `backend_modul_keys_decken_frontend_registry`.
-- [ ] 5.2 `pages/WetterPegelPage.tsx` mit Paneel Pegel:
+- [x] 5.2 `pages/WetterPegelPage.tsx` mit Paneel Pegel:
   - `EinsatzSeite` mit `dataUpdatedAt` und Primäraktion „Pegel festlegen“ als Link;
   - Liste je Pegel aus `pegelZeile` mit `Verlaufslinie`;
   - Leerzustand „kein Pegel festgelegt“ mit Weg zu den Einstellungen;
@@ -181,7 +181,7 @@ Sky und PEGELONLINE werden über `FachebenenState`-Basis-URLs auf lokale Stubs g
 
   Verifiziert durch `WetterPegelPage.test.tsx`: Reihenfolge, veraltet-Marke, Ausfall ohne
   Linie, Leerzustand, genau eine Primäraktion im Kopf-Slot.
-- [ ] 5.3 Paneele Warnungen und Vorhersage:
+- [x] 5.3 Paneele Warnungen und Vorhersage:
   - Gemeinde und Stand im Kopf;
   - Abschnitte „gilt jetzt“/„angekündigt“;
   - `StatusChip` mit Stufenwort;
@@ -192,7 +192,7 @@ Sky und PEGELONLINE werden über `FachebenenState`-Basis-URLs auf lokale Stubs g
 
   Verifiziert durch Tests je Zustand, darunter: Ausfall der Warnungen lässt den Pegelbereich
   unberührt, und ein fehlender Einzelwert zeigt „—“ statt 0.
-- [ ] 5.4 Wege:
+- [x] 5.4 Wege:
   - `lagebild.ts` nimmt `pegelZiel` als Eingabe;
   - `LageDashboardPage` und die Überblick-Marke `pegelprognose` entscheiden über
     `darfZaehlerLaden('wetter-pegel', …)` zwischen `wetterPegelPfad` und
@@ -203,7 +203,7 @@ Sky und PEGELONLINE werden über `FachebenenState`-Basis-URLs auf lokale Stubs g
 
 ## 6. Abschluss
 
-- [ ] 6.1 e2e: neue hermetische Spec `e2e/wetter-pegel.spec.ts` (`page.route`-Fixtures nach
+- [x] 6.1 e2e: neue hermetische Spec `e2e/wetter-pegel.spec.ts` (`page.route`-Fixtures nach
   dem Muster `pegel-pruefliste.spec.ts`). Sie prüft:
   - „Stand unbekannt“ bei Wetterausfall, während die Pegelwerte stehen bleiben;
   - veraltet-Marke;

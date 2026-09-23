@@ -536,6 +536,29 @@ test('Gate 1: keine tragende Route läuft auf 1366, 1024 oder 390 px waagerecht 
     );
     await post('abloesungen', { einheit_id: einheit.id, rhythmus_minuten: 390 }, 'Schicht');
   }
+  // LFH-633: Wetter per Stub — sonst ginge das Backend an Bright Sky, sobald der Einsatz
+  // einen Ort hat. Langer Gemeindename als Querlauf-Stoff; die Pegel bleiben echt (leer).
+  await page.route(`**/api/einsaetze/${einsatzId}/wetter`, (route) =>
+    route.fulfill({
+      json: {
+        ort: { name: 'Samtgemeinde Sottrum-Hellwege-Horstedt-Reeßum', kreis: 'Rotenburg (Wümme)' },
+        warnungen: {
+          zustand: 'ok',
+          abgerufen_at: new Date().toISOString(),
+          daten: [
+            {
+              stufe: 'schwer',
+              ereignis: 'ORKANARTIGE BÖEN',
+              ueberschrift: 'Amtliche UNWETTERWARNUNG vor ORKANARTIGEN BÖEN im Kreisgebiet',
+              beginn: new Date(Date.now() - 3_600_000).toISOString(),
+              ende: new Date(Date.now() + 3_600_000).toISOString(),
+            },
+          ],
+        },
+        vorhersage: { zustand: 'ausfall' },
+      },
+    }),
+  );
 
   // Eine Route je Layoutfamilie: Ebene-1-Shell, Lagebild, Modulseite unter dem
   // Einsatz-Workspace, Verwaltung unter dem Admin-Layout. Die vier hängen an
@@ -625,6 +648,11 @@ test('Gate 1: keine tragende Route läuft auf 1366, 1024 oder 390 px waagerecht 
     {
       pfad: `/einsaetze/${einsatzId}/tiere`,
       anker: (p: Page) => p.getByText('Donnerhall-vom-Wiesengrund'),
+    },
+    {
+      // LFH-633: Datenanker ist die gestubte Warnung, nicht der Seitenkopf.
+      pfad: `/einsaetze/${einsatzId}/wetter-pegel`,
+      anker: (p: Page) => p.getByText('Orkanartige Böen'),
     },
     {
       // LFH-635: Datenanker ist die Karte der gesäten Schicht, nicht der Seitenkopf.

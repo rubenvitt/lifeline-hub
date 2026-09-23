@@ -23,6 +23,8 @@ import {
   stabPfad,
   dokumentePfad,
   abloesungPfad,
+  wetterPegelPfad,
+  pegelZielPfad,
   etbPfad,
   parseEtbFilter,
   parsePersonenSicht,
@@ -263,6 +265,15 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
   });
   it('abloesungPfad (LFH-635)', () => {
     expect(abloesungPfad(E)).toBe('/einsaetze/5/abloesung');
+  });
+
+  it('wetterPegelPfad (LFH-633)', () => {
+    expect(wetterPegelPfad(E)).toBe('/einsaetze/5/wetter-pegel');
+  });
+
+  it('pegelZielPfad: Modul frei → Modulseite, sonst Einstellungen › Pegel (LFH-633)', () => {
+    expect(pegelZielPfad(E, true)).toBe('/einsaetze/5/wetter-pegel');
+    expect(pegelZielPfad(E, false)).toBe('/einsaetze/5/einstellungen/pegel');
   });
 
   it('stabPfad ohne Optionen', () => {

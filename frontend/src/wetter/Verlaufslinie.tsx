@@ -74,8 +74,7 @@ export function verlaufsPfad(
   const werte = imFenster.map((p) => p.cm);
   const minCm = Math.min(...werte);
   const maxCm = Math.max(...werte);
-  const mitZusatz =
-    zusatzCm != null && Number.isFinite(zusatzCm) ? [...werte, zusatzCm] : werte;
+  const mitZusatz = zusatzCm != null && Number.isFinite(zusatzCm) ? [...werte, zusatzCm] : werte;
   let unten = Math.min(...mitZusatz);
   let oben = Math.max(...mitZusatz);
   const spanne = oben - unten;
@@ -94,9 +93,7 @@ export function verlaufsPfad(
     t: p.t,
     cm: p.cm,
   }));
-  const d = punkte
-    .map((p, i) => `${i === 0 ? 'M' : 'L'}${runde(p.x)} ${runde(p.y)}`)
-    .join(' ');
+  const d = punkte.map((p, i) => `${i === 0 ? 'M' : 'L'}${runde(p.x)} ${runde(p.y)}`).join(' ');
   const letzter = punkte[punkte.length - 1];
   return { d, punkte, letzter: { x: letzter.x, y: letzter.y }, minCm, maxCm, yFuer };
 }
@@ -170,7 +167,14 @@ export default function Verlaufslinie({
         onPointerLeave={() => setZeiger(null)}
       >
         <g transform={`translate(0 ${RAND})`} aria-hidden>
-          <line x1={0} x2={BREITE} y1={HOEHE} y2={HOEHE} stroke={rollen.rasterLinie} strokeWidth={1} />
+          <line
+            x1={0}
+            x2={BREITE}
+            y1={HOEHE}
+            y2={HOEHE}
+            stroke={rollen.rasterLinie}
+            strokeWidth={1}
+          />
           {prognoseY != null && (
             <line
               data-lfh="verlauf-prognose"

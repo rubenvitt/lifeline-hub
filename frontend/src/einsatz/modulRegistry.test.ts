@@ -12,6 +12,7 @@ import {
   erstesFreigegebenesModul,
   modulZuRoute,
   modulAusPfad,
+  istKeyFreigegeben,
   type ModulEintrag,
 } from './modulRegistry';
 import type { BenutzerAnzeige, ModulOverrides } from '../api/types';
@@ -402,5 +403,27 @@ describe('modulZuRoute / modulAusPfad', () => {
     // Kein Einsatz-Bereich: ein Pfad, dessen DRITTES Segment zufällig wie eine Modulroute
     // heisst, ist keiner — sonst gälte `/admin/stammdaten/personal` als Modul „Personal".
     expect(modulAusPfad('/admin/stammdaten/personal')).toBeNull();
+  });
+});
+
+describe('istKeyFreigegeben (LFH-633)', () => {
+  const versteckt = (key: string): ModulOverrides =>
+    ({
+      [key]: {
+        einsatz_id: 7,
+        modul_key: key,
+        sichtbar: false,
+        benoetigte_rolle: null,
+        geaendert_at: null,
+      },
+    }) as unknown as ModulOverrides;
+
+  it('Paar: sichtbares Modul ist frei, ausgeblendetes nicht', () => {
+    expect(istKeyFreigegeben('wetter-pegel', ohne, {})).toBe(true);
+    expect(istKeyFreigegeben('wetter-pegel', ohne, versteckt('wetter-pegel'))).toBe(false);
+  });
+
+  it('ein unbekannter Key ist nie frei — kein Link auf ein Modul, das es nicht gibt', () => {
+    expect(istKeyFreigegeben('gibt-es-nicht', admin, {})).toBe(false);
   });
 });

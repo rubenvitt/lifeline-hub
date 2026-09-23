@@ -81,7 +81,9 @@ describe('<Verlaufslinie>', () => {
 
   it('ist ein Bild mit der Aussage als Namen; min und max stehen als Text', () => {
     render(<Verlaufslinie punkte={reihe} richtung="steigend" />);
-    const bild = screen.getByRole('img', { name: 'Verlauf 24 h: 5,62 m bis 6,84 m, zuletzt steigend' });
+    const bild = screen.getByRole('img', {
+      name: 'Verlauf 24 h: 5,62 m bis 6,84 m, zuletzt steigend',
+    });
     expect(bild.tagName.toLowerCase()).toBe('svg');
     expect(screen.getByText('6,84 m')).toBeInTheDocument();
     expect(screen.getByText('5,62 m')).toBeInTheDocument();

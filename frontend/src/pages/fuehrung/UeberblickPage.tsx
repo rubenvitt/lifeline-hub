@@ -7,6 +7,7 @@ import dayjs, { type Dayjs } from 'dayjs';
 import EinsatzSeite from '../../components/EinsatzSeite';
 import { RechteHinweis } from '../../components/SpeicherHinweis';
 import { useAuth } from '../../auth/AuthContext';
+import { istKeyFreigegeben } from '../../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import {
   Augenbraue,
@@ -42,7 +43,6 @@ import {
   einheitenPfad,
   einsaetzePfad,
   einsatzabschnittePfad,
-  einsatzEinstellungenPfad,
   erinnerungenPfad,
   etbPfad,
   gefahrenPfad,
@@ -51,6 +51,7 @@ import {
   personenPfad,
   stabPfad,
   abloesungPfad,
+  pegelZielPfad,
 } from '../../routing/deeplinks';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { formatUhrzeit, formatUhrzeitMitTag } from '../../anzeige/format';
@@ -269,6 +270,10 @@ export default function UeberblickPage() {
   });
   const abloesungSichtbar =
     overridesQ.isSuccess && darfZaehlerLaden('abloesung', benutzer, overridesQ.data);
+  // LFH-633: die Marke „Erwarteter Höchststand" führt auf „Wetter & Pegel", wenn das Modul
+  // frei ist, sonst auf die Pflege (`pegelZielPfad`).
+  const wetterPegelFrei =
+    overridesQ.isSuccess && istKeyFreigegeben('wetter-pegel', benutzer, overridesQ.data);
   const abloesungenQ = useQuery({
     queryKey: einsatzKeys.abloesungListe(einsatzId, 'laufend'),
     queryFn: () => listeAbloesungen(einsatzId, 'laufend'),
@@ -378,7 +383,7 @@ export default function UeberblickPage() {
       : m.art === 'erinnerung'
         ? erinnerungenPfad(einsatzId)
         : m.art === 'pegelprognose'
-          ? einsatzEinstellungenPfad(einsatzId, 'pegel')
+          ? pegelZielPfad(einsatzId, wetterPegelFrei)
           : m.art === 'abloesung'
             ? abloesungPfad(einsatzId)
             : stabPfad(einsatzId);
