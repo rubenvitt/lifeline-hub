@@ -5,7 +5,7 @@
 // `openspec/changes/lfh-645-palette-vorschau-neuer-tab/specs/sprungpalette/spec.md`.
 import { describe, it, expect, vi } from 'vitest';
 import userEvent from '@testing-library/user-event';
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { renderMitProviders } from '../test/utils';
 import { CommandPalette } from './CommandPalette';
 import type { Befehl } from './typen';
@@ -207,7 +207,10 @@ describe('CommandPalette · → Vorschau (LFH-645)', () => {
       await u.keyboard('{ArrowDown}{ArrowRight}');
       scrolle.mockClear();
       await u.keyboard('{Escape}');
-      expect(scrolle).toHaveBeenCalled();
+      // Das Einscrollen läuft im Effekt nach dem Commit; unter CI-Last kam der erst nach dem
+      // synchronen Griff an (PR #121, Frontend-Suite 4/4). Die Aussage bleibt dieselbe: ohne
+      // `vorschau` in den Deps wird der Knoten gar nicht gescrollt, `waitFor` läuft dann aus.
+      await waitFor(() => expect(scrolle).toHaveBeenCalled());
       expect(scrolle.mock.contexts[scrolle.mock.contexts.length - 1]).toBe(
         screen.getByRole('option', { name: 'Florian Mustermann' }),
       );
