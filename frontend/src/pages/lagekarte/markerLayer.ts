@@ -109,11 +109,31 @@ export function baueEinsatzortFc(
 }
 
 export const MARKER_CLUSTER_QUELLE = 'marker-cluster';
+/**
+ * Eigene geclusterte Quelle der Betroffenen (LFH-648). Personen clustern NUR untereinander:
+ * in `marker-cluster` schluckte ein Cluster aus 40 Betroffenen bei MANV-Dichte die
+ * Fahrzeuge daneben — genau der Dichte-Schaden, den die Ebene nicht anrichten darf. Ihre
+ * Layer liegen unter allen übrigen Markern (`MARKER_LAYER_REIHENFOLGE`).
+ */
+export const PERSONEN_CLUSTER_QUELLE = 'marker-personen';
+/** Alle geclusterten Marker-Quellen — Donut-Sync und Spider-Controller laufen über diese Liste. */
+export const CLUSTER_QUELLEN = [MARKER_CLUSTER_QUELLE, PERSONEN_CLUSTER_QUELLE] as const;
+export type ClusterQuelle = (typeof CLUSTER_QUELLEN)[number];
+/**
+ * Schlüssel eines Clusters über alle Quellen: `cluster_id` ist nur JE Quelle eindeutig. Ohne
+ * Präfix überschrieben sich zwei Donuts mit derselben id im DOM-Sync gegenseitig.
+ */
+export function clusterSchluessel(quelle: ClusterQuelle, clusterId: number | string): string {
+  return `${quelle}:${clusterId}`;
+}
 export const MARKER_EINSATZORT_QUELLE = 'marker-einsatzort';
 export const SPIDER_LEAVES_QUELLE = 'spider-leaves';
 export const SPIDER_LEGS_QUELLE = 'spider-legs';
 // Die Plakette ist Klickziel wie ihr Zeichen: wer den Namen trifft, meint den Marker.
 export const MARKER_KLICK_LAYER = [
+  'personen-kreis',
+  'personen-kurz',
+  'personen-label',
   'marker-symbol',
   'marker-kreis',
   'marker-kurz',
@@ -139,6 +159,10 @@ export const SPIDER_KLICK_LAYER = [
 // Kollision hält jede Plakette von fremden Zeichen fern — lägen die Plaketten oben, deckten
 // sie Nachbarzeichen zu. Der Einsatzort-Name liegt über den übrigen und gewinnt gegen sie.
 const MARKER_LAYER_REIHENFOLGE = [
+  // Betroffene (LFH-648) zuunterst: jedes Kräfte-/Objektzeichen liegt über ihnen.
+  'personen-kreis',
+  'personen-kurz',
+  'personen-label',
   'marker-status-ring',
   'marker-kreis',
   'marker-kurz',
@@ -231,6 +255,40 @@ const PLAKETTEN_PAINT: SymbolLayerSpecification['paint'] = { 'text-color': ['get
 const leerFc = (): MarkerFeatureCollection => ({ type: 'FeatureCollection', features: [] });
 
 /**
+ * Teilt die clusterbaren Marker auf ihre Quellen (LFH-648): Personen in `marker-personen`,
+ * alles andere in `marker-cluster`. Die EINE Stelle der Zuordnung — die Aufrufer reichen
+ * weiter die ganze Menge (`baueMarkerFc`), und keine Konsumentin der Kartenfläche muss
+ * wissen, dass es zwei Quellen gibt.
+ */
+function teileNachQuelle(
+  marker: MarkerFeatureCollection,
+): Record<ClusterQuelle, MarkerFeatureCollection> {
+  const personen: MarkerFeature[] = [];
+  const rest: MarkerFeature[] = [];
+  for (const f of marker.features) (f.properties.typ === 'person' ? personen : rest).push(f);
+  return {
+    [MARKER_CLUSTER_QUELLE]: { type: 'FeatureCollection', features: rest },
+    [PERSONEN_CLUSTER_QUELLE]: { type: 'FeatureCollection', features: personen },
+  };
+}
+
+/** Clusterquelle mit den Einstellungen, die beide Marker-Quellen teilen. */
+function clusterQuelle(data: MarkerFeatureCollection) {
+  // clusterRadius:45 px — moderates Zusammenfassen erst bei echtem Gedränge (dezent, kein
+  // aggressives Verschmelzen schon bei lockerer Streuung). clusterMaxZoom:14 — ab Zoom 14
+  // wird nicht mehr geclustert (Einzelmarker), passend zur Detailarbeit auf Stadt-/Objektebene.
+  return {
+    type: 'geojson' as const,
+    data: data as never,
+    cluster: true,
+    clusterRadius: 45,
+    clusterMaxZoom: 14,
+    // per-Typ-Counts am Cluster-Feature → speisen die Donut-Segmente (clusterDonut).
+    clusterProperties: clusterTypProperties() as never,
+  };
+}
+
+/**
  * Idempotent: Sources (Cluster + ungeclusterter Einsatzort) und circle/symbol-Layer für
  * Marker + Clustering. Style-Wechsel entfernt Sources/Layer → bei der Re-Anlage erneut aufrufen.
  * Layer-Reihenfolge (Mal-Reihenfolge von unten): Status-Ring, Kreis (Lagemeldung), TZ-Symbol,
@@ -241,19 +299,9 @@ export function sorgeFuerMarkerLayer(
   marker: MarkerFeatureCollection,
   einsatzort: MarkerFeatureCollection,
 ) {
-  if (!map.getSource(MARKER_CLUSTER_QUELLE)) {
-    // clusterRadius:45 px — moderates Zusammenfassen erst bei echtem Gedränge (dezent, kein
-    // aggressives Verschmelzen schon bei lockerer Streuung). clusterMaxZoom:14 — ab Zoom 14
-    // wird nicht mehr geclustert (Einzelmarker), passend zur Detailarbeit auf Stadt-/Objektebene.
-    map.addSource(MARKER_CLUSTER_QUELLE, {
-      type: 'geojson',
-      data: marker as never,
-      cluster: true,
-      clusterRadius: 45,
-      clusterMaxZoom: 14,
-      // per-Typ-Counts am Cluster-Feature → speisen die Donut-Segmente (clusterDonut).
-      clusterProperties: clusterTypProperties() as never,
-    });
+  const geteilt = teileNachQuelle(marker);
+  for (const quelle of CLUSTER_QUELLEN) {
+    if (!map.getSource(quelle)) map.addSource(quelle, clusterQuelle(geteilt[quelle]));
   }
   if (!map.getSource(MARKER_EINSATZORT_QUELLE)) {
     map.addSource(MARKER_EINSATZORT_QUELLE, { type: 'geojson', data: einsatzort as never });
@@ -310,10 +358,45 @@ export function sorgeFuerMarkerLayer(
     fehlt('marker-label') ||
     fehlt('marker-einsatzort-label') ||
     fehlt('marker-kurz') ||
+    fehlt('personen-kurz') ||
+    fehlt('personen-label') ||
     fehlt('spider-label') ||
     fehlt('spider-kurz')
       ? plakettenSchrift(map.getStyle())
       : undefined;
+  // Betroffene (LFH-648): Kreis in Sichtungsfarbe, Kürzel darin, Plakette „R-042 · SK II" ab
+  // `BESCHRIFTUNG_AB_ZOOM` — dieselbe Optik wie die übrigen Kreis-Marker, nur aus der eigenen
+  // Quelle. Kein Symbol- und kein Status-Layer: Personen tragen weder TZ noch FMS-Status.
+  if (fehlt('personen-kreis')) {
+    map.addLayer({
+      id: 'personen-kreis',
+      type: 'circle',
+      source: PERSONEN_CLUSTER_QUELLE,
+      filter: ['!', ['has', 'point_count']],
+      paint: { ...KREIS_PAINT },
+    });
+  }
+  if (fehlt('personen-kurz')) {
+    map.addLayer({
+      id: 'personen-kurz',
+      type: 'symbol',
+      source: PERSONEN_CLUSTER_QUELLE,
+      filter: ['all', ['!', ['has', 'point_count']], ['has', 'kurzzeichen']],
+      layout: kurzLayout(schrift),
+      paint: { ...KURZ_PAINT },
+    });
+  }
+  if (fehlt('personen-label')) {
+    map.addLayer({
+      id: 'personen-label',
+      type: 'symbol',
+      source: PERSONEN_CLUSTER_QUELLE,
+      minzoom: BESCHRIFTUNG_AB_ZOOM,
+      filter: ['all', ['!', ['has', 'point_count']], ['has', 'beschriftung']],
+      layout: plakettenLayout(schrift),
+      paint: { ...PLAKETTEN_PAINT },
+    });
+  }
   if (fehlt('marker-kurz')) {
     map.addLayer({
       id: 'marker-kurz',
@@ -445,7 +528,10 @@ export function reAnlegenMarker(
   einsatzort: MarkerFeatureCollection,
 ) {
   sorgeFuerMarkerLayer(map, marker, einsatzort);
-  (map.getSource(MARKER_CLUSTER_QUELLE) as GeoJSONSource | undefined)?.setData(marker as never);
+  const geteilt = teileNachQuelle(marker);
+  for (const quelle of CLUSTER_QUELLEN) {
+    (map.getSource(quelle) as GeoJSONSource | undefined)?.setData(geteilt[quelle] as never);
+  }
   (map.getSource(MARKER_EINSATZORT_QUELLE) as GeoJSONSource | undefined)?.setData(
     einsatzort as never,
   );

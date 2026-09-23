@@ -83,19 +83,21 @@ dann der Code. Pfade relativ zu `frontend/src/`.
 
 ## 7. Eigene Cluster-Quelle (D5)
 
-- [ ] 7.1 `pages/lagekarte/markerLayer.ts`: `baueMarkerFc` schließt `person` aus, eine neue
-  Funktion `bauePersonenFc` liefert nur `person`. Dazu die geclusterte Quelle
+- [x] 7.1 `pages/lagekarte/markerLayer.ts`: Personen in ihre eigene Quelle leiten. Beim Umsetzen
+  vereinfacht: statt `bauePersonenFc` plus neuer Signatur teilt `reAnlegenMarker` die Menge
+  aus `baueMarkerFc` intern auf (`teileNachQuelle`, EINE Stelle der Zuordnung); damit
+  ändern sich weder `kartenLayer.ts` noch eine Konsumentin der Kartenfläche. Dazu die geclusterte Quelle
   `marker-personen` mit den Layern `personen-kreis`, `personen-kurz`, `personen-label`
   (in der Reihenfolge ganz unten, in den Klick-Layern) und `reAnlegenMarker` mit drei
   Collections. `kartenLayer.ts` wird mitgezogen. Verifikation: `markerLayer.test.ts`,
   Person landet nur in der Personen-FC, Reihenfolge Personen-Layer vor `marker-status-ring`,
   `beschriftung` ohne Name.
-- [ ] 7.2 `pages/lagekarte/Kartenflaeche.tsx`: Donut-Sync und Spider-Controller über die
+- [x] 7.2 `pages/lagekarte/Kartenflaeche.tsx`: Donut-Sync und Spider-Controller über die
   Liste der Cluster-Quellen führen. DOM-Map-Schlüssel `${quelle}:${cluster_id}`,
   `oeffneSpider` mit Quelle. Verifikation: bestehende Kartenflaeche- und
   Lagekarten-Tests grün; eine reine Hilfsfunktion für den Schlüssel mit Unit-Test
   „zwei Quellen, gleiche `cluster_id` → zwei Schlüssel“.
-- [ ] 7.3 Kommentare nachziehen: `marker.ts` (`MarkerTyp`: keine Lagekarten-Ebene mehr),
+- [x] 7.3 Kommentare nachziehen: `marker.ts` (`MarkerTyp`: keine Lagekarten-Ebene mehr),
   `Sidebar.tsx` (Platzier-Typ), `leistenDaten.ts` („zehn“), `clusterDonut.ts`.
   Verifikation: Beim `rg "keine Lagekarten-Ebene|zehn Schalter" frontend/src` bleibt kein
   veralteter Treffer.

@@ -30,8 +30,10 @@ export type MarkerTyp =
   | 'abschnitt'
   | 'lagemeldung'
   | 'freies_zeichen'
-  /** Betroffene (LFH-613): nur auf der Kartenansicht der Betroffenen-Seite, KEINE
-   *  Lagekarten-Ebene — `useLagekarteDaten` erzeugt diesen Typ nie. */
+  /** Betroffene (LFH-613). Erzeugt ausschließlich `personenMarker` — auf der Betroffenen-Seite
+   *  und seit LFH-648 als Ebene „Betroffene" der Lagekarte. Dort laufen sie als eigene Liste
+   *  `personenVerortet` NEBEN `alleVerortet` (Startausschnitt/Kopfzahl ohne Personen) und
+   *  clustern in eigener Quelle (`PERSONEN_CLUSTER_QUELLE`). */
   | 'person';
 
 export interface KarteMarker {

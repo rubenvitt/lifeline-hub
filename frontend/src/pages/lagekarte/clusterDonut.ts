@@ -16,8 +16,9 @@ export const CLUSTER_TYP_FARBE: Record<ClusterTyp, string> = {
   schaden: '#ea580c', // orange
   lagemeldung: '#d48806', // amber
   freies_zeichen: '#4f46e5', // indigo
-  // Betroffene (LFH-613): Personen clustern auf IHRER Karte (`BetroffeneKarte`) wie alle
-  // Nicht-Einsatzort-Marker; ohne Segment zeigte ein Personen-Cluster eine Zahl ohne Ring.
+  // Betroffene (LFH-613): Personen clustern in ihrer EIGENEN Quelle (`marker-personen`,
+  // LFH-648 — auf der Betroffenen-Karte wie auf der Lagekarte), ein Personen-Donut ist also
+  // stets einfarbig; ohne Segment zeigte er eine Zahl ohne Ring.
   // Eigener Donut-Ton wie die übrigen dieser Legacy-Palette, bewusst KEINE Sichtungsfarbe —
   // der Ring zeigt die Objektart, nicht die Kategorie.
   person: '#be185d', // rosé
