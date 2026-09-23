@@ -1,5 +1,5 @@
 import { Button, Dropdown, theme } from 'antd';
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import StatusTag from './StatusTag';
 import { rollenFarbe, type StatusDarstellung } from '../theme/statusFarben';
 
@@ -151,6 +151,14 @@ export interface StatusWahlProps<W> {
   gesperrt?: boolean;
   /** Ohne Schreibrecht wird ein reines Etikett gerendert, KEIN Auslöser. */
   darfSchreiben: boolean;
+  /**
+   * Eigene Anzeige des aktuellen Stands statt des `StatusTag` aus
+   * {@link StatusWahlProps.darstellung} — im FMS-Tableau (LFH-642) der `StatusChip` mit
+   * S-Code und Wort. Gilt für Auslöser UND Lesezweig: zwei Formen desselben Status je nach
+   * Recht wären ein Unterschied ohne Bedeutung. Das Wort als zweiter Kanal (WCAG 1.4.1)
+   * liegt dann beim Aufrufer.
+   */
+  etikett?: ReactNode;
 }
 
 /** Kein Status gesetzt: derselbe Gedankenstrich wie im Lesezweig von `BemerkungZelle`. */
@@ -166,10 +174,13 @@ export default function StatusWahl<W extends string | number>({
   laeuft = false,
   gesperrt = false,
   darfSchreiben,
+  etikett: eigenesEtikett,
 }: StatusWahlProps<W>): ReactElement {
   const { token } = theme.useToken();
 
-  const etikett = darstellung ? (
+  const etikett = eigenesEtikett != null ? (
+    eigenesEtikett
+  ) : darstellung ? (
     <StatusTag darstellung={darstellung} farbe={farbe} />
   ) : (
     <span>{OHNE_STATUS}</span>
