@@ -72,13 +72,17 @@ Test rot färben.
 
 ### 3. Tasten: der Palette-Handler verhindert den globalen
 
-In `aufTaste` gilt diese Reihenfolge: `isComposing` → Vorschau-Zweig → Liste.
-Strg/⌘+↵ ruft **immer** `preventDefault()`, auch ohne Ziel. Sonst griffe der globale
-Handler und löste `speichern` der Seite unter der Palette aus. Esc und ← im Vorschau-Zweig
-rufen `preventDefault()` aus demselben Grund, denn sonst schlösse der globale `verwerfen`
-die Palette. Ob React-Handler im Portal der Palette vor dem `window`-Listener laufen, ist
-gemessen zu belegen. Ein Test prüft deshalb „Esc aus der Vorschau lässt die Palette offen“
-über den echten Provider, nicht über die präsentationale Palette allein.
+In `aufTaste` gilt diese Reihenfolge: `isComposing` → Strg/⌘+↵ → Vorschau-Zweig → Liste.
+Esc und ← im Vorschau-Zweig rufen `preventDefault()`, sonst schlösse der globale
+`verwerfen` die Palette. Das ist über den echten Provider gemessen: ohne das
+`preventDefault` wird „Esc aus der Vorschau lässt die Palette offen“ rot.
+
+**Korrektur beim Bauen:** Der erste Entwurf hielt fest, Strg/⌘+↵ müsse auch ohne Ziel
+abgefangen werden, weil sonst der globale Handler `speichern` der Seite unter der Palette
+auslöse. Die Mutationsprobe hat das widerlegt: bei offener Palette schluckt der Dispatcher
+Mutationstasten selbst (`offen`-Zweig). Ohne Ziel tut die Palette deshalb nichts und ruft
+auch kein `preventDefault`. Der Provider-Test pinnt das Verhalten trotzdem, damit ein Umbau
+des Dispatchers es nicht still kippt.
 
 → greift nur bei `selectionStart === selectionEnd === value.length` und nur, wenn die
 markierte Zeile eine `vorschau` hat. In jedem anderen Fall bleibt → unbehandelt. Das

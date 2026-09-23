@@ -18,7 +18,7 @@ import { einsatzIdAusPfad } from './einsatzPfad';
 import { modulAusPfad } from '../einsatz/modulRegistry';
 import { CommandPalette } from './CommandPalette';
 import { tastaturAktionFuerEreignis } from './befehle';
-import type { PaletteModus, TastaturAktionen } from './typen';
+import type { Oeffnung, PaletteModus, TastaturAktionen } from './typen';
 
 interface TastaturEbene {
   id: symbol;
@@ -379,9 +379,15 @@ function PaletteHost({
 
   // Identitätsstabil, weil beide in `useMemo`-Dependencies der Hooks darunter stehen: ein
   // je Render frisch gebautes Paar machte deren Memoisierung wirkungslos.
+  //
+  // Der NEUE TAB (LFH-645, Strg/⌘+↵) wird hier geöffnet und nirgends sonst: die Palette bleibt
+  // präsentational, die Bauorte der Befehle rein. Die Pfade sind App-absolut und der Router
+  // läuft ohne `basename` — sie sind damit direkt eine URL dieses Ursprungs. `noopener`, weil
+  // der neue Tab mit diesem nichts teilen muss; die Sitzung liegt im Cookie und reist mit.
   const gehZu = useCallback(
-    (pfad: string) => {
-      navigate(pfad);
+    (pfad: string, oeffnung?: Oeffnung) => {
+      if (oeffnung === 'neuerTab') window.open(pfad, '_blank', 'noopener');
+      else navigate(pfad);
     },
     [navigate],
   );
@@ -418,6 +424,8 @@ function PaletteHost({
       // Ausserhalb eines Einsatzes gibt es keine Lagekarte, auf die man springen könnte —
       // dann auch keinen Fußhinweis (LFH-619).
       koordinatenSprung={einsatzId == null ? undefined : koordinatenSprung}
+      // Vorschauen gibt es nur für Datensätze, Datensätze nur im Einsatz (LFH-645).
+      vorschauVerfuegbar={einsatzId != null}
       schliesse={schliesse}
     />
   );

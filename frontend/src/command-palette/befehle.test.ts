@@ -787,7 +787,9 @@ describe('baueBefehle — Öffnungsart und Ziel (LFH-645)', () => {
 
   it('ohne Argument bleibt es beim bisherigen Öffnen im aktuellen Tab', () => {
     const k = vollerKontext();
-    baueBefehle(k).find((x) => x.id === 'nav:profil')!.ausfuehren();
+    baueBefehle(k)
+      .find((x) => x.id === 'nav:profil')!
+      .ausfuehren();
     const [pfad, oeffnung] = vi.mocked(k.navigate).mock.calls[0];
     expect(pfad).toBe('/profil');
     expect(oeffnung ?? 'hier').toBe('hier');

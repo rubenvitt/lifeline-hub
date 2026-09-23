@@ -238,8 +238,16 @@ export function tastaturAktionFuerEreignis(e: TastaturEreignis): TastaturAktionI
  * jede unbekannte Id mit dem Filter-Kürzel beschriftete, ist ersatzlos entfallen.
  */
 export function kuerzelFuerTastaturAktion(id: TastaturAktionId, userAgent: string): string | null {
-  const mac = /Mac|iPhone|iPad|iPod/.test(userAgent);
-  return TASTATUR_AKTIONEN[id].kuerzel(mac);
+  return TASTATUR_AKTIONEN[id].kuerzel(istApplePlattform(userAgent));
+}
+
+/**
+ * EINE Plattformweiche für alle sichtbaren Kürzel — die Palette liest sie seit LFH-645 auch
+ * für „⌘ ↵ / Strg + ↵ neuer Tab". Zwei Ausdrücke wären zwei Stellen, an denen ein iPad mit
+ * Tastatur einmal ⌘ und einmal Strg angezeigt bekäme.
+ */
+export function istApplePlattform(userAgent: string): boolean {
+  return /Mac|iPhone|iPad|iPod/.test(userAgent);
 }
 
 export function baueBefehle(k: BefehlKontext): Befehl[] {
