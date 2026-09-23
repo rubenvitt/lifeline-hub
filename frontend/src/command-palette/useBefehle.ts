@@ -1,6 +1,6 @@
 // frontend/src/command-palette/useBefehle.ts
 import { useCallback, useMemo } from 'react';
-import { useLocation, useNavigate } from 'react-router';
+import { useLocation } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
@@ -13,7 +13,7 @@ import { baueBefehle } from './befehle';
 import { leseZuletztModule, merkeModulBesuch } from '../einsatz/zuletztModule';
 import { modulAusPfad } from '../einsatz/modulRegistry';
 import type { BefehlsGedaechtnis } from './useZuletztBefehle';
-import type { Befehl, TastaturAktionen } from './typen';
+import type { Befehl, BefehlKontext, TastaturAktionen } from './typen';
 
 /** Kein Gedächtnis übergeben → keine Gruppe, keine Aufzeichnung. EIN Objekt statt eines
  *  Vorgabewerts im Kopf: ein `{}` dort wäre je Render eine neue Identität und machte das
@@ -28,15 +28,24 @@ const OHNE_GEDAECHTNIS: BefehlsGedaechtnis = { ids: [], merke: () => {} };
  * der Palette überleben, und der Lesestand muss beim Öffnen schon dastehen — beides kann
  * nur ein Träger oberhalb der Palette leisten. Die Herleitung steht an `useZuletztBefehle`.
  * Optional, weil `useBefehle` auch ausserhalb des Paletten-Rahmens gerendert wird.
+ *
+ * `navigate` kommt ebenfalls von AUSSEN, und zwar PFLICHT (LFH-645): es ist das `gehZu` des
+ * Paletten-Hosts, der als EINZIGE Stelle den neuen Tab öffnet — derselbe Weg, den
+ * Datensätze und Koordinatensprung nehmen. Der Hook hatte sein eigenes `useNavigate` und
+ * reichte nur den Pfad weiter (`(p) => navigate(p)`); Strg/⌘+↵ öffnete damit jede feste
+ * Navigationszeile still im aktuellen Tab (Review-Befund, `useBefehle.test.tsx`). Ein
+ * optionales `navigate` mit Router-Rückfall liefe in genau denselben Fehler zurück.
+ * Identitätsstabil übergeben — es steht in der Dependency-Liste unten.
  */
 export function useBefehle(
-  tastaturAktionen?: TastaturAktionen,
-  gedaechtnis: BefehlsGedaechtnis = OHNE_GEDAECHTNIS,
+  tastaturAktionen: TastaturAktionen | undefined,
+  gedaechtnis: BefehlsGedaechtnis | undefined,
+  navigate: BefehlKontext['navigate'],
 ): Befehl[] {
+  const gedaechtnisOderLeer = gedaechtnis ?? OHNE_GEDAECHTNIS;
   const { benutzer, logout } = useAuth();
   const { setModus } = useThemeMode();
   const { setDichte } = useDichte();
-  const navigate = useNavigate();
   const { pathname } = useLocation();
   const einsatzId = einsatzIdAusPfad(pathname);
   /**
@@ -112,9 +121,9 @@ export function useBefehle(
         zuletztModulKeys,
         aktuellerModulKey,
         merkeModulBesuch: merkeBesuch,
-        zuletztBefehlIds: gedaechtnis.ids,
-        merkeBefehl: gedaechtnis.merke,
-        navigate: (p) => navigate(p),
+        zuletztBefehlIds: gedaechtnisOderLeer.ids,
+        merkeBefehl: gedaechtnisOderLeer.merke,
+        navigate,
         setThemeModus: setModus,
         setDichte,
         setKoordinaten: setzeOverride,
@@ -144,7 +153,7 @@ export function useBefehle(
       zuletztModulKeys,
       aktuellerModulKey,
       merkeBesuch,
-      gedaechtnis,
+      gedaechtnisOderLeer,
     ],
   );
 }

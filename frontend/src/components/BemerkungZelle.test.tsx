@@ -1,8 +1,9 @@
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { renderMitProviders } from '../test/utils';
-import { BemerkungZelle, BEMERKUNG_HINZUFUEGEN } from './BemerkungZelle';
+import { dichten } from '../theme/tokens';
+import { BemerkungZelle, BEMERKUNG_HINZUFUEGEN, wertKnopfStil } from './BemerkungZelle';
 
 /**
  * Verhalten der Bemerkungszelle (LFH-369 · B5i, Befund M21).
@@ -103,11 +104,59 @@ describe('BemerkungZelle', () => {
     expect(onSpeichern).toHaveBeenCalledWith('Achse defekt');
   });
 
-  it('gefüllter Wert: Text plus Stift, kein Platzhalter — und der Stift öffnet weiterhin', async () => {
+  it('gefüllter Wert: der Wert selbst ist der Knopf, benannt als Aufforderung, beschrieben durch den Wert (LFH-650)', async () => {
     /**
-     * Regressionsschutz für die kontrollierte `editing`-Prop: wer sie setzt und `onStart`
-     * vergisst, nimmt dem gefüllten Wert lautlos die Bearbeitbarkeit. Der Stift wäre noch da
-     * und klickte ins Leere.
+     * Seit LFH-650 trägt nicht mehr antds kleiner Stift, sondern der Wert als
+     * `Button type="text"` — dieselbe Bauform wie der Platzhalter, damit beide Zustände
+     * gleich hoch sind (gemessen in `e2e/gate3-trefflaeche.spec.ts`). Die Aussagen hier:
+     * es IST ein antd-Knopf (erbt `controlHeight`), er steht in der Textfarbe (`text`, nicht
+     * `link` — der Wert ist Inhalt, kein Verweis), und der Wert geht für Vorlesende nicht
+     * verloren: das `aria-label` verdeckt den Inhalt, die Beschreibung bringt ihn zurück.
+     */
+    renderMitProviders(
+      <BemerkungZelle wert="gehfähig" darfSchreiben kennung="R-042" onSpeichern={vi.fn()} />,
+    );
+    const knopf = screen.getByRole('button', { name: 'Bemerkung zu R-042 bearbeiten' });
+    expect(knopf).toHaveClass('ant-btn', 'ant-btn-text');
+    expect(knopf).not.toHaveClass('ant-btn-sm');
+    expect(knopf).toHaveAccessibleDescription('gehfähig');
+    expect(knopf).toHaveTextContent('gehfähig');
+    // Die Stift-Ikone ist kein eigenes Vorleseziel (`role="img"` mit englischem Namen).
+    expect(within(knopf).queryByRole('img')).toBeNull();
+    // Der Klick auf den WERT öffnet — nicht nur ein Ikonknopf daneben.
+    await userEvent.click(within(knopf).getByText('gehfähig'));
+    expect(screen.getByRole('textbox')).toHaveValue('gehfähig');
+  });
+
+  it('während ein Schreibvorgang läuft, steht der NEUE Wert schon da und öffnet nicht erneut (LFH-650)', async () => {
+    /**
+     * Der Befund aus der LFH-613-Prüfliste (Tabelle 1, Nr. 3): bis zur Serverantwort stand bei
+     * einem vorher leeren Feld wieder „… hinzufügen" da — die Eingabe wirkte verworfen. Der
+     * Aufrufer reicht den neuen Wert samt `laeuft`; die Zelle zeigt ihn mit Ladeanzeige und
+     * nimmt keinen zweiten Klick an, solange der erste schreibt.
+     */
+    const { rerender } = renderMitProviders(
+      <BemerkungZelle wert="gehfähig" darfSchreiben laeuft kennung="R-042" onSpeichern={vi.fn()} />,
+    );
+    const knopf = screen.getByRole('button', { name: 'Bemerkung zu R-042 bearbeiten' });
+    expect(knopf).toHaveTextContent('gehfähig');
+    expect(knopf).toHaveClass('ant-btn-loading');
+    await userEvent.click(knopf);
+    expect(screen.queryByRole('textbox')).toBeNull();
+    // Gegenhälfte: ohne `laeuft` keine Ladeanzeige — sonst prüfte die Zeile oben nichts.
+    rerender(
+      <BemerkungZelle wert="gehfähig" darfSchreiben kennung="R-042" onSpeichern={vi.fn()} />,
+    );
+    expect(screen.getByRole('button', { name: 'Bemerkung zu R-042 bearbeiten' })).not.toHaveClass(
+      'ant-btn-loading',
+    );
+  });
+
+  it('gefüllter Wert: Wertknopf statt Platzhalter — und der Knopf öffnet das Eingabefeld', async () => {
+    /**
+     * Regressionsschutz für den Weg in die Bearbeitung: seit LFH-650 öffnet der Wertknopf per
+     * `setBearbeitet(true)`, `Typography` steht nur noch für das Eingabefeld im Baum. Fiele
+     * der `onClick` weg, stünde der Wert da und klickte ins Leere.
      */
     const onSpeichern = vi.fn();
     renderMitProviders(
@@ -122,13 +171,7 @@ describe('BemerkungZelle', () => {
     expect(screen.getByText('Tank leer')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: BEMERKUNG_HINZUFUEGEN })).toBeNull();
 
-    /**
-     * Über die KENNUNG gegriffen, nicht über antds Vorgabenamen: `test/utils.tsx` rendert
-     * ohne `locale`, dort heißt der Stift „Edit" — in Produktion setzt `ThemeModeProvider`
-     * `deDE`, dort „Bearbeiten" (`locale/de_DE.js:78-79`). Ein Test auf „Edit" prüfte also
-     * einen Namen, den nie jemand zu sehen bekommt, und bräche, sobald die Testhülle eine
-     * Locale bekommt.
-     */
+    // Über die KENNUNG gegriffen: sie trägt den zugänglichen Namen des Wertknopfs.
     await userEvent.click(
       screen.getByRole('button', { name: 'Bemerkung zu Florian 1 bearbeiten' }),
     );
@@ -276,5 +319,54 @@ describe('BemerkungZelle', () => {
     expect(knopf.style.minHeight).toBe('');
     // „Rot bedient nichts": eine Bemerkung zu ergänzen ist keine Gefahr.
     expect(knopf).not.toHaveClass('ant-btn-dangerous');
+  });
+
+  it('der Platzhalter steht in `bedienText`, nicht in antds `colorLink` (LFH-650)', () => {
+    /**
+     * Gemessen in `e2e/betroffene-kontrast.spec.ts`: auf einer Zeile mit Lücken-Tönung trug
+     * `colorLink` am Tag 5,93 und nachts 4,50. Der Wert steht als Literal — aus dem Token
+     * gelesen prüfte der Test die Rolle gegen sich selbst.
+     */
+    renderMitProviders(<BemerkungZelle wert={null} darfSchreiben onSpeichern={vi.fn()} />);
+    expect(screen.getByRole('button', { name: BEMERKUNG_HINZUFUEGEN }).style.color).toBe(
+      'rgb(22, 79, 134)',
+    );
+  });
+});
+
+/**
+ * Der gefüllte Wertknopf darf umbrechen (`height: auto`) und ist damit ein handgebautes
+ * Bedienziel mit ZWEI Angaben (LFH-365). Böden als Literale, die Werte aus `dichten` — aus
+ * dem antd-Token zurückgelesen prüfte die Zusicherung den Token gegen sich selbst.
+ */
+describe('wertKnopfStil (LFH-650)', () => {
+  const tokenFuer = (stufe: keyof typeof dichten) => ({
+    controlHeight: dichten[stufe].zeilenhoehe,
+    paddingXS: dichten[stufe].abstand.xs,
+    paddingSM: dichten[stufe].abstand.sm,
+  });
+
+  it('trägt den Boden aus controlHeight — 30 / 48 / 72 px', () => {
+    expect(wertKnopfStil(tokenFuer('kompakt')).minHeight).toBe(30);
+    expect(wertKnopfStil(tokenFuer('komfortabel')).minHeight).toBe(48);
+    expect(wertKnopfStil(tokenFuer('handschuh')).minHeight).toBe(72);
+  });
+
+  it('zieht Höhe UND Polsterung über die Stufen mit, statt auf einer zu kleben', () => {
+    const k = wertKnopfStil(tokenFuer('kompakt'));
+    const h = wertKnopfStil(tokenFuer('handschuh'));
+    expect(k.paddingBlock).toBe(3);
+    expect(h.paddingBlock).toBe(7);
+    expect(k.paddingInline).toBe(7);
+    expect(h.paddingInline).toBe(16);
+    expect(Number(k.minHeight)).toBeLessThan(Number(h.minHeight));
+  });
+
+  it('darf umbrechen: feste antd-Höhe aufgehoben, Text links', () => {
+    expect(wertKnopfStil(tokenFuer('kompakt'))).toMatchObject({
+      height: 'auto',
+      whiteSpace: 'normal',
+      textAlign: 'start',
+    });
   });
 });

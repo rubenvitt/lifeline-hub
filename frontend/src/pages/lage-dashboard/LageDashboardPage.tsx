@@ -78,11 +78,14 @@ import {
   lageberichtePfad,
   meldungenPfad,
   personenAufnahmePfad,
+  pegelZielPfad,
   personenPfad,
   unfallhilfsstellenListePfad,
 } from '../../routing/deeplinks';
 import { abonniereLiveStatus, leseLiveStatus } from '../../live/liveStatusStore';
-import { ladeEinsatz } from '../../api/einsaetze';
+import { ladeEinsatz, ladeModulOverrides } from '../../api/einsaetze';
+import { useAuth } from '../../auth/AuthContext';
+import { istKeyFreigegeben } from '../../einsatz/modulRegistry';
 import { listePersonen } from '../../api/einsatzPerson';
 import { listeUhs } from '../../api/einsatzUhs';
 import { listeSchaeden } from '../../api/einsatzSchaden';
@@ -229,6 +232,18 @@ export default function LageDashboardPage() {
   });
   // Maßgebliche Pegel (LFH-606): kein Live-Ereignis, 5-min-Nachfrage aus `pegelAbfrage`.
   const pegelQuery = useQuery(pegelAbfrage(einsatzId));
+  // LFH-633: die Pegel-Kennzahl führt auf „Wetter & Pegel", wenn das Modul für diese Person
+  // frei ist — sonst auf die Pflege. Bis die Overrides da sind, gilt die Pflege: ein Link auf
+  // ein womöglich ausgeblendetes Modul wäre ein Sprung ins Leere.
+  const { benutzer } = useAuth();
+  const overridesQuery = useQuery({
+    queryKey: einsatzKeys.modulOverrides(einsatzId),
+    queryFn: () => ladeModulOverrides(einsatzId),
+  });
+  const pegelZiel = pegelZielPfad(
+    einsatzId,
+    overridesQuery.isSuccess && istKeyFreigegeben('wetter-pegel', benutzer, overridesQuery.data),
+  );
 
   const einsatz = einsatzQuery.data;
 
@@ -250,6 +265,7 @@ export default function LageDashboardPage() {
         auftraege: auftraegeQuery.data ?? [],
         meldungen: meldungenQuery.data ?? [],
         pegel: pegelQuery.data ?? [],
+        pegelZiel,
       },
       jetzt,
       konv,
@@ -271,6 +287,7 @@ export default function LageDashboardPage() {
     auftraegeQuery.data,
     meldungenQuery.data,
     pegelQuery.data,
+    pegelZiel,
   ]);
 
   // ── Meldungsstrom: Wassermarke statt Einschieben (Festlegung 6) ──────────────────────

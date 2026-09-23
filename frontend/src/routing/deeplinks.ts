@@ -262,6 +262,21 @@ export function abloesungPfad(einsatzId: number): string {
   return einsatzModulPfad(einsatzId, 'abloesung');
 }
 
+/** Fachmodul „Wetter & Pegel" (LFH-633): Pegel mit Verlauf, DWD-Warnungen, Vorhersage. */
+export function wetterPegelPfad(einsatzId: number): string {
+  return einsatzModulPfad(einsatzId, 'wetter-pegel');
+}
+
+/**
+ * Ziel eines Pegel-Verweises (Dashboard-Kennzahl, Überblick-Marke): die Modulseite, wenn sie
+ * für die Person frei ist, sonst die Pflege in Einstellungen › Pegel (LFH-633). Die Frage
+ * „frei?" beantwortet der Aufrufer (`istKeyFreigegeben`), damit diese Datei keine Registry
+ * und keinen Benutzer kennen muss.
+ */
+export function pegelZielPfad(einsatzId: number, modulFrei: boolean): string {
+  return modulFrei ? wetterPegelPfad(einsatzId) : einsatzEinstellungenPfad(einsatzId, 'pegel');
+}
+
 /**
  * Stab-Modul (LFH-46). `?neu=1` wird ab ST5 (LFH-543) von der Seite gelesen und geräumt
  * (Abschluss der Lagebesprechung, apply-then-clean wie ETB/Schäden).
@@ -376,8 +391,41 @@ export function einheitDetailPfad(einsatzId: number, einheitId: number): string 
   return `${einsatzModulPfad(einsatzId, 'einheiten')}/${einheitId}`;
 }
 
-export function fahrzeugePfad(einsatzId: number, opts: { fahrzeug?: number } = {}): string {
-  return mitQuery(einsatzModulPfad(einsatzId, 'fahrzeuge'), { fahrzeug: opts.fahrzeug });
+/**
+ * Darstellung der Fahrzeugseite (LFH-642): die Tabelle oder das FMS-Tableau. Das Tableau
+ * ist eine ANSICHT dieses Moduls und kein eigenes Modul — Endpunkte und Live-Ereignis
+ * hängen am Schlüssel `fahrzeuge`, ein eigener Schlüssel wäre getrennt schaltbar und
+ * endete in 403 ohne Live-Updates. Anspringer ist die Sprungmarke „FMS-Tableau"
+ * (`einsatz/sprungmarken.ts`).
+ */
+export type FahrzeugeAnsicht = 'liste' | 'tableau';
+
+/**
+ * `ansicht` ist wie bei {@link personenPfad} ein AUFTRAG: die Seite übernimmt ihn beim
+ * Ankommen und räumt den Parameter (apply-then-clean); die Ansicht bleibt Seitenzustand.
+ */
+export function fahrzeugePfad(
+  einsatzId: number,
+  opts: { fahrzeug?: number; ansicht?: FahrzeugeAnsicht } = {},
+): string {
+  return mitQuery(einsatzModulPfad(einsatzId, 'fahrzeuge'), {
+    fahrzeug: opts.fahrzeug,
+    ansicht: opts.ansicht,
+  });
+}
+
+/** Exhaustiver Record aus demselben Grund wie {@link ETB_TYP_ERLAUBT}. */
+const FAHRZEUGE_ANSICHT_ERLAUBT: Record<FahrzeugeAnsicht, true> = {
+  liste: true,
+  tableau: true,
+};
+
+/** Umkehr von {@link fahrzeugePfad}: ein unbekannter Wert wird GANZ verworfen. */
+export function parseFahrzeugeAnsicht(params: URLSearchParams): FahrzeugeAnsicht | undefined {
+  const ansicht = params.get('ansicht');
+  return ansicht && Object.prototype.hasOwnProperty.call(FAHRZEUGE_ANSICHT_ERLAUBT, ansicht)
+    ? (ansicht as FahrzeugeAnsicht)
+    : undefined;
 }
 
 export function einsatzabschnittePfad(

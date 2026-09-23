@@ -124,3 +124,107 @@ test('Betroffene mit Koordinate stehen als Marker auf der Karte, die Lücke wird
     '1 Person ohne Koordinate — nicht auf der Karte',
   );
 });
+
+interface SpiderHaken extends MapHaken {
+  project(ll: [number, number]): { x: number; y: number };
+  getCanvas(): HTMLCanvasElement;
+  jumpTo(o: { center: [number, number]; zoom: number }): void;
+  once(ereignis: string, f: () => void): void;
+  getSource(id: string): { _data?: unknown } | undefined;
+  querySourceFeatures(quelle: string): {
+    properties: Record<string, unknown> | null;
+    geometry: { type: string; coordinates: [number, number] };
+  }[];
+}
+
+// Review LFH-650 (Befund „hoch"): in `handschuh` legt der Cluster-Donut eine 72-px-Hülle
+// (Radius 36) um den Ring; die aufgefächerten Blätter liegen ab 40 px, ihr gezeichneter Kreis
+// beginnt bei 27 px. Die Hülle fing den Tipp auf den inneren Teil eines Blatts ab und klappte
+// den Spider zu. Gemessen wird GENAU dieser Punkt: 30 px vom Mittelpunkt in Richtung Blatt —
+// innerhalb der alten Hülle UND innerhalb des gezeichneten Blattkreises.
+test('Handschuh: ein Tipp auf den inneren Teil eines aufgefächerten Blatts öffnet die Person, statt den Spider zu schließen', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await anmelden(page);
+  const einsatzId = await post(page, '/api/einsaetze', {
+    bezeichnung: `E2E Spider ${Date.now()}`,
+  });
+  const ids: number[] = [];
+  for (const i of [0, 1]) {
+    ids.push(
+      await post(page, `/api/einsaetze/${einsatzId}/personen`, {
+        name: `Paar ${i}`,
+        antreff_lat: 53.0 + i * 0.0001,
+        antreff_lon: 8.8,
+        sichtung: 'sk2',
+      }),
+    );
+  }
+  // Erst die Stufe setzen, DANN die Karte aufrufen: `?ansicht=karte` wird nach dem ersten
+  // Laden aus der URL geräumt, ein Neuladen danach landete in der Zeilenansicht.
+  await page.evaluate(() => localStorage.setItem('lifeline-hub.dichte', 'handschuh'));
+  await page.goto(`/einsaetze/${einsatzId}/personen?ansicht=karte`);
+  await expect(page.locator('html')).toHaveAttribute('data-dichte', 'handschuh');
+  // Nur auf die Instanz warten, nicht auf `loaded()`: der Startausschnitt rahmt zwei Punkte
+  // im Abstand von rund 11 m und springt dabei auf einen extremen Zoom; ohne Kachelquelle blieb
+  // `loaded()` dort gemessen stehen. Bereit ist die Karte nach dem EIGENEN Sprung (`idle`).
+  await page.waitForFunction(
+    () => Boolean((window as unknown as { __lfhKarte?: MapHaken }).__lfhKarte),
+    undefined,
+    { timeout: 60_000 },
+  );
+  await page.locator('[data-lfh="betroffene-karte"] canvas').scrollIntoViewIfNeeded();
+  // Zoom 12: beide Personen (rund 11 m auseinander) bilden sicher einen Cluster.
+  await page.evaluate(
+    () =>
+      new Promise<void>((fertig) => {
+        const k = (window as unknown as { __lfhKarte: SpiderHaken }).__lfhKarte;
+        k.once('idle', () => fertig());
+        k.jumpTo({ center: [8.8, 53.00005], zoom: 12 });
+      }),
+  );
+  const huelle = page.locator('[data-lfh="cluster-treffer"]');
+  await expect(huelle).toHaveCount(1, { timeout: 20_000 });
+  const kasten = (await huelle.boundingBox())!;
+  expect(kasten.width).toBeGreaterThanOrEqual(71.5);
+  const mitte = { x: kasten.x + kasten.width / 2, y: kasten.y + kasten.height / 2 };
+  await page.mouse.click(mitte.x, mitte.y);
+
+  // Die aufgefächerten Blätter aus der Spider-Quelle, auf die Seite projiziert.
+  let blaetter: { id: number; x: number; y: number }[] = [];
+  await expect
+    .poll(
+      async () => {
+        blaetter = await page.evaluate(() => {
+          const k = (window as unknown as { __lfhKarte: SpiderHaken }).__lfhKarte;
+          const r = k.getCanvas().getBoundingClientRect();
+          // `querySourceFeatures` liefert ein Merkmal je Kachel, die es berührt — gemessen
+          // dreifach; je Schlüssel zählt eins.
+          const je = new Map<string, { id: number; x: number; y: number }>();
+          for (const f of k.querySourceFeatures('spider-leaves')) {
+            const s = String(f.properties?.schluessel ?? '');
+            const p = k.project(f.geometry.coordinates);
+            je.set(s, { id: Number(s.replace('person-', '')), x: r.left + p.x, y: r.top + p.y });
+          }
+          return [...je.values()];
+        });
+        return blaetter.length;
+      },
+      { timeout: 10_000 },
+    )
+    .toBe(2);
+
+  const blatt = blaetter[0];
+  const dx = blatt.x - mitte.x;
+  const dy = blatt.y - mitte.y;
+  const d = Math.hypot(dx, dy);
+  // Selbstprobe der Geometrie: das Blatt liegt außerhalb der Ringmitte, der Messpunkt
+  // (30 px) innerhalb der Hülle (36) UND innerhalb des gezeichneten Blattkreises (Kante 13).
+  expect(d).toBeGreaterThan(36);
+  expect(d - 30).toBeLessThan(13);
+  await page.mouse.click(mitte.x + (dx / d) * 30, mitte.y + (dy / d) * 30);
+  await expect(page).toHaveURL(new RegExp(`/personen/${blatt.id}$`));
+  expect(ids).toContain(blatt.id);
+});

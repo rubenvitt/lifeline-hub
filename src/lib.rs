@@ -55,4 +55,5 @@ pub mod tls;
 pub mod tx;
 pub mod uhs;
 pub mod verbindung;
+pub mod wetter;
 pub mod zulassung;

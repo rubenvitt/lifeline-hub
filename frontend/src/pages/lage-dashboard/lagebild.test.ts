@@ -158,6 +158,14 @@ describe('baueLagebild', () => {
     expect(k.zielPfad).toBe('/einsaetze/1/einstellungen/pegel');
   });
 
+  it('Pegel: das Ziel kommt als Eingabe — Modulseite, wenn sie frei ist (LFH-633)', () => {
+    // Die Seite entscheidet über `istKeyFreigegeben`; ohne Angabe bleibt es die Pflege.
+    const mitModul = baueLagebild(roh({ pegelZiel: '/einsaetze/1/wetter-pegel' }), JETZT, BERLIN);
+    expect(mitModul.kennzahlen[0].zielPfad).toBe('/einsaetze/1/wetter-pegel');
+    const ohneModul = baueLagebild(roh(), JETZT, BERLIN);
+    expect(ohneModul.kennzahlen[0].zielPfad).toBe('/einsaetze/1/einstellungen/pegel');
+  });
+
   it('Pegel: keiner festgelegt belegt den Platz trotzdem, mit Weg zur Auswahl', () => {
     const k = baueLagebild(roh(), JETZT, BERLIN).kennzahlen[0];
     expect(k).toMatchObject({

@@ -23,12 +23,15 @@ import {
   stabPfad,
   dokumentePfad,
   abloesungPfad,
+  wetterPegelPfad,
+  pegelZielPfad,
   etbPfad,
   parseEtbFilter,
   parsePersonenSicht,
   personalPfad,
   einheitenPfad,
   fahrzeugePfad,
+  parseFahrzeugeAnsicht,
   einsatzabschnittePfad,
   meldungenPfad,
   auftraegePfad,
@@ -265,6 +268,15 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
     expect(abloesungPfad(E)).toBe('/einsaetze/5/abloesung');
   });
 
+  it('wetterPegelPfad (LFH-633)', () => {
+    expect(wetterPegelPfad(E)).toBe('/einsaetze/5/wetter-pegel');
+  });
+
+  it('pegelZielPfad: Modul frei → Modulseite, sonst Einstellungen › Pegel (LFH-633)', () => {
+    expect(pegelZielPfad(E, true)).toBe('/einsaetze/5/wetter-pegel');
+    expect(pegelZielPfad(E, false)).toBe('/einsaetze/5/einstellungen/pegel');
+  });
+
   it('stabPfad ohne Optionen', () => {
     expect(stabPfad(E)).toBe('/einsaetze/5/stab');
   });
@@ -286,6 +298,17 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
   });
   it('fahrzeugePfad mit ?fahrzeug=', () => {
     expect(fahrzeugePfad(E, { fahrzeug: 6 })).toBe('/einsaetze/5/fahrzeuge?fahrzeug=6');
+  });
+  it('fahrzeugePfad mit ?ansicht= (Sprungmarke FMS-Tableau, LFH-642)', () => {
+    expect(fahrzeugePfad(E, { ansicht: 'tableau' })).toBe('/einsaetze/5/fahrzeuge?ansicht=tableau');
+  });
+  it('parseFahrzeugeAnsicht liest beide Ansichten und verwirft einen unbekannten Wert GANZ', () => {
+    expect(parseFahrzeugeAnsicht(new URLSearchParams('ansicht=tableau'))).toBe('tableau');
+    expect(parseFahrzeugeAnsicht(new URLSearchParams('ansicht=liste'))).toBe('liste');
+    expect(parseFahrzeugeAnsicht(new URLSearchParams('ansicht=kachel'))).toBeUndefined();
+    // Ein geerbter Objektschlüssel ist kein erlaubter Wert (hasOwnProperty, nicht `in`).
+    expect(parseFahrzeugeAnsicht(new URLSearchParams('ansicht=toString'))).toBeUndefined();
+    expect(parseFahrzeugeAnsicht(new URLSearchParams(''))).toBeUndefined();
   });
   it('einsatzabschnittePfad mit ?abschnitt=', () => {
     expect(einsatzabschnittePfad(E, { abschnitt: 2 })).toBe(

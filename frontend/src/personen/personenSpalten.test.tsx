@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
+import { QueryClient } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { server } from '../test/server';
@@ -279,6 +280,109 @@ describe('Zustand-Spalte (LFH-613)', () => {
     fireEvent.blur(feld);
     await vi.waitFor(() => expect(koerper).toHaveLength(1));
     expect(koerper[0]).toEqual({ zustand: 'gehfähig, unterkühlt' });
+  });
+
+  it('zeigt während des Speicherns den GETIPPTEN Wert mit Ladeanzeige, nicht wieder den Platzhalter (LFH-650)', async () => {
+    /**
+     * Befund Tabelle 1, Nr. 3 der LFH-613-Prüfliste: bis zur Serverantwort stand bei einem
+     * vorher leeren Feld wieder „Zustand hinzufügen" da — die Eingabe wirkte verworfen. Die
+     * Antwort wird hier festgehalten, damit der Zwischenzustand überhaupt beobachtbar ist.
+     */
+    let freigeben!: () => void;
+    const gehalten = new Promise<void>((r) => (freigeben = r));
+    server.use(
+      http.patch('/api/einsaetze/1/personen/10', async () => {
+        await gehalten;
+        return HttpResponse.json({ ...basis, zustand: 'gehfähig' });
+      }),
+    );
+    renderMitProviders(<>{zelle(mitSchreibrecht, basis)}</>);
+    await userEvent.click(screen.getByRole('button', { name: 'Zustand zu R-001 hinzufügen' }));
+    const feld = screen.getByRole('textbox');
+    await userEvent.type(feld, 'gehfähig');
+    fireEvent.blur(feld);
+
+    const knopf = await screen.findByRole('button', { name: 'Zustand zu R-001 bearbeiten' });
+    expect(knopf).toHaveTextContent('gehfähig');
+    expect(knopf).toHaveClass('ant-btn-loading');
+    expect(screen.queryByRole('button', { name: 'Zustand zu R-001 hinzufügen' })).toBeNull();
+    freigeben();
+  });
+
+  it('hält den Laufzustand über die Serverantwort hinaus, bis der Refetch steht — kein Zurückspringen (Review LFH-650)', async () => {
+    /**
+     * `onSuccess` GIBT die Invalidierung zurück; react-query hält `isPending`, bis sie
+     * aufgelöst ist. Ohne das käme zwischen PATCH-Antwort und Refetch eine Runde mit dem ALTEN
+     * Wert — bei leerem Feld wieder „Zustand hinzufügen". Hier wird die Invalidierung
+     * festgehalten: die Antwort ist längst da, die Zelle muss trotzdem den getippten Wert
+     * zeigen. Mutationsprobe: ohne `return` fällt sie sofort auf den Platzhalter zurück.
+     */
+    const koerper: unknown[] = [];
+    server.use(
+      http.patch('/api/einsaetze/1/personen/10', async ({ request }) => {
+        koerper.push(await request.json());
+        return HttpResponse.json({ ...basis, zustand: 'gehfähig' });
+      }),
+    );
+    const client = new QueryClient();
+    let freigeben!: () => void;
+    const gehalten = new Promise<void>((r) => (freigeben = r));
+    vi.spyOn(client, 'invalidateQueries').mockImplementation(() => gehalten);
+    renderMitProviders(<>{zelle(mitSchreibrecht, basis)}</>, { client });
+    await userEvent.click(screen.getByRole('button', { name: 'Zustand zu R-001 hinzufügen' }));
+    await userEvent.type(screen.getByRole('textbox'), 'gehfähig');
+    fireEvent.blur(screen.getByRole('textbox'));
+
+    await vi.waitFor(() => expect(koerper).toHaveLength(1));
+    await vi.waitFor(() => expect(client.invalidateQueries).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 30));
+    const knopf = screen.getByRole('button', { name: 'Zustand zu R-001 bearbeiten' });
+    expect(knopf).toHaveTextContent('gehfähig');
+    expect(knopf).toHaveClass('ant-btn-loading');
+    freigeben();
+    // Gegenhälfte: steht der Refetch, endet der Laufzustand (hier ohne neue Daten: der
+    // statische Prop bleibt leer, also kehrt der Platzhalter zurück).
+    expect(
+      await screen.findByRole('button', { name: 'Zustand zu R-001 hinzufügen' }),
+    ).toBeInTheDocument();
+  });
+
+  it('meldet einen Fehler AN DER ZELLE statt als Toast, und der nächste Versuch räumt ihn (LFH-650)', async () => {
+    /**
+     * Befund Tabelle 1, Nr. 9: der Fehler war nur `message.error` — am oberen Rand, nach drei
+     * Sekunden weg, während der Wert still auf den alten zurücksprang. Jetzt trägt die Zelle
+     * die Marke (`data-fehler`, Muster LFH-345 · H15) und einen Satz mit Grund. Die zweite
+     * Hälfte ist die Zusicherung, dass die Marke nicht stehen bleibt.
+     */
+    let scheitern = true;
+    server.use(
+      http.patch('/api/einsaetze/1/personen/10', () =>
+        scheitern
+          ? HttpResponse.json({ error: 'Datenbank gesperrt' }, { status: 409 })
+          : HttpResponse.json({ ...basis, zustand: 'gehfähig' }),
+      ),
+    );
+    const { container } = renderMitProviders(<>{zelle(mitSchreibrecht, basis)}</>);
+    await userEvent.click(screen.getByRole('button', { name: 'Zustand zu R-001 hinzufügen' }));
+    await userEvent.type(screen.getByRole('textbox'), 'gehfähig');
+    fireEvent.blur(screen.getByRole('textbox'));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Nicht gespeichert: Datenbank gesperrt',
+    );
+    const zellHuelle = container.querySelector('[data-lfh="zustand-zelle"]')!;
+    expect(zellHuelle).toHaveAttribute('data-fehler', 'true');
+    // Kein Toast mehr: die Meldung steht nirgends in antds Message-Portal.
+    expect(document.querySelector('.ant-message')?.textContent ?? '').not.toContain(
+      'Datenbank gesperrt',
+    );
+
+    scheitern = false;
+    await userEvent.click(screen.getByRole('button', { name: 'Zustand zu R-001 hinzufügen' }));
+    await userEvent.type(screen.getByRole('textbox'), 'gehfähig');
+    fireEvent.blur(screen.getByRole('textbox'));
+    await vi.waitFor(() => expect(zellHuelle).not.toHaveAttribute('data-fehler'));
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 
   it('bietet einer VERMISSTEN Person keinen Zustand an — auch mit Schreibrecht', () => {

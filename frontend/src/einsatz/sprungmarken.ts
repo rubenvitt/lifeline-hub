@@ -1,4 +1,4 @@
-import { etbPfad, personenPfad } from '../routing/deeplinks';
+import { etbPfad, fahrzeugePfad, personenPfad } from '../routing/deeplinks';
 import { modulRegistry, type KategorieKey, type ModulEintrag } from './modulRegistry';
 
 /**
@@ -90,6 +90,17 @@ export const sprungmarken: Sprungmarke[] = [
     nach: 'patienten',
     hinweis: 'Personen, Filter Vermisst',
     pfad: (einsatzId) => personenPfad(einsatzId, { ansicht: 'zeilen', filter: 'vermisst' }),
+  },
+  {
+    // LFH-642: das Tableau ist eine Ansicht der Fahrzeugseite. Als Marke erbt es Sichtbarkeit
+    // und Sperre von `fahrzeuge` — dort hängen Status-PATCH und Live-Ereignis.
+    key: 'fms-tableau',
+    kategorie: 'kraefte',
+    label: 'FMS-Tableau',
+    zielModul: 'fahrzeuge',
+    nach: 'fahrzeuge',
+    hinweis: 'Fahrzeuge, FMS-Tableau',
+    pfad: (einsatzId) => fahrzeugePfad(einsatzId, { ansicht: 'tableau' }),
   },
 ];
 

@@ -845,3 +845,115 @@ async fn vorhersage_ohne_quelle_und_cache_ist_502_fremder_pegel_404() {
     let (status, _) = anfrage(&u.app, "GET", &vorhersage_pfad(anderer, id_a), &admin, None).await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
+
+// ---------- Verlauf (LFH-633) ----------
+
+fn verlauf_pfad(einsatz: i64) -> String {
+    format!("/api/einsaetze/{einsatz}/pegel/verlauf")
+}
+
+/// Verlauf aus dem vorbelegten Cache, in der Reihenfolge der Pegel; eine Station ohne Stand
+/// liefert eine leere Reihe statt zu fehlen. Die Quelle ist tot (ECONNREFUSED): die Station
+/// ohne Cache darf die Antwort nicht aufhalten.
+#[tokio::test]
+async fn verlauf_aus_dem_cache_in_pegel_reihenfolge() {
+    let u = setup_pegel().await;
+    let admin = login_cookie(&u.app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&u.app, &admin).await;
+    let cache_pool = u.cache_pool().await;
+    // Unsortiert in den Cache: der Verlauf ordnet selbst.
+    let mut reihe_a = steigende_reihe();
+    reihe_a.reverse();
+    assert!(cache::setze_wert(&cache_pool, &format!("pegel:{A}"), &reihe_a).await);
+    assert!(
+        cache::setze_wert(
+            &cache_pool,
+            &format!("pegel:{B}"),
+            &steigende_reihe()[3..].to_vec()
+        )
+        .await
+    );
+    anfrage(
+        &u.app,
+        "PUT",
+        &pfad(einsatz),
+        &admin,
+        Some(&liste(&[(B, "Bonn"), (C, "Mainz"), (A, "Köln")])),
+    )
+    .await;
+    let (_, liste_json) = anfrage(&u.app, "GET", &pfad(einsatz), &admin, None).await;
+    let ids: Vec<i64> = liste_json
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|p| p["id"].as_i64().unwrap())
+        .collect();
+
+    let start = std::time::Instant::now();
+    let (status, json) = anfrage(&u.app, "GET", &verlauf_pfad(einsatz), &admin, None).await;
+    assert!(
+        start.elapsed() < std::time::Duration::from_secs(3),
+        "{:?}",
+        start.elapsed()
+    );
+    assert_eq!(status, StatusCode::OK, "{json:?}");
+    let eintraege = json.as_array().expect("Liste");
+    let pegel_ids: Vec<i64> = eintraege
+        .iter()
+        .map(|v| v["pegel_id"].as_i64().unwrap())
+        .collect();
+    assert_eq!(pegel_ids, ids, "Reihenfolge der Pegel");
+
+    assert_eq!(
+        eintraege[0]["punkte"],
+        serde_json::json!([
+            { "zeitpunkt": "2026-09-22T09:00:00+02:00", "wasserstand_cm": 107.5 },
+            { "zeitpunkt": "2026-09-22T09:15:00+02:00", "wasserstand_cm": 110.0 },
+        ])
+    );
+    assert_eq!(
+        eintraege[1]["punkte"],
+        serde_json::json!([]),
+        "C: kein Stand → leere Reihe"
+    );
+    let punkte_a = eintraege[2]["punkte"].as_array().unwrap();
+    assert_eq!(punkte_a.len(), 5);
+    assert_eq!(punkte_a[0]["wasserstand_cm"], 100.0, "aufsteigend");
+    assert_eq!(
+        punkte_a[4]["zeitpunkt"], "2026-09-22T09:15:00+02:00",
+        "derselbe Stand wie die Messung der Liste"
+    );
+    assert_eq!(
+        liste_json[2]["messung"]["zeitpunkt"],
+        punkte_a[4]["zeitpunkt"]
+    );
+}
+
+#[tokio::test]
+async fn verlauf_liest_der_beobachter_die_fremde_org_nicht() {
+    let u = setup_pegel().await;
+    let admin = login_cookie(&u.app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&u.app, &admin).await;
+    let beob = benutzer_anlegen(&u.app, &admin, "beobachter", "keine").await;
+    rolle_setzen(&u.app, &admin, einsatz, beob, "beobachter").await;
+    let beob_cookie = login_cookie(&u.app, "beobachter", "beobachterpw1").await;
+    fremde_org_anlegen(&u.pool, "Fremd-Orga", "fremd", "fremdpw1", "fuehrungskraft").await;
+    let fremd = login_cookie(&u.app, "fremd", "fremdpw1").await;
+
+    let (status, json) = anfrage(&u.app, "GET", &verlauf_pfad(einsatz), &beob_cookie, None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        json,
+        serde_json::json!([]),
+        "ohne Festlegung eine leere Liste"
+    );
+
+    // Fremde Org: der Org-Floor des Einsatz-Kontexts (`berechtigung::fordere_org_zugehoerigkeit`)
+    // antwortet plattformweit mit 403, nicht mit 404 — dieselbe Antwort wie auf der Liste
+    // (`fremde_org_wird_auf_allen_routen_abgewiesen`). Ein unbekannter Einsatz ist 404.
+    let (status, json) = anfrage(&u.app, "GET", &verlauf_pfad(einsatz), &fremd, None).await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "{json:?}");
+    assert!(json.get(0).is_none(), "keine Reihe für die fremde Org");
+    let (status, _) = anfrage(&u.app, "GET", &verlauf_pfad(999_999), &admin, None).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}

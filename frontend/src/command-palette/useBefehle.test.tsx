@@ -63,11 +63,15 @@ function wrapper(route: string) {
 
 describe('useBefehle', () => {
   it('liefert Modul-Befehle im Einsatz-Kontext', async () => {
-    const { result } = renderHook(() => useBefehle(), { wrapper: wrapper('/einsaetze/5/etb') });
+    const { result } = renderHook(() => useBefehle(undefined, undefined, vi.fn()), {
+      wrapper: wrapper('/einsaetze/5/etb'),
+    });
     await waitFor(() => expect(result.current.some((b) => b.id === 'modul:etb')).toBe(true));
   });
   it('liefert keine Modul-Befehle außerhalb eines Einsatzes', () => {
-    const { result } = renderHook(() => useBefehle(), { wrapper: wrapper('/profil') });
+    const { result } = renderHook(() => useBefehle(undefined, undefined, vi.fn()), {
+      wrapper: wrapper('/profil'),
+    });
     expect(result.current.some((b) => b.gruppe === 'module')).toBe(false);
   });
 
@@ -81,7 +85,9 @@ describe('useBefehle', () => {
    */
   it('lässt das Modul der aktuellen Route aus der Zuletzt-Gruppe heraus', async () => {
     localStorage.setItem('lfh:nav:zuletzt:5', JSON.stringify(['etb', 'personen']));
-    const { result } = renderHook(() => useBefehle(), { wrapper: wrapper('/einsaetze/5/etb') });
+    const { result } = renderHook(() => useBefehle(undefined, undefined, vi.fn()), {
+      wrapper: wrapper('/einsaetze/5/etb'),
+    });
 
     await waitFor(() => expect(result.current.some((b) => b.id === 'zuletzt:personen')).toBe(true));
     expect(result.current.some((b) => b.id === 'zuletzt:etb')).toBe(false);
@@ -89,9 +95,32 @@ describe('useBefehle', () => {
     expect(result.current.some((b) => b.id === 'modul:etb')).toBe(true);
   });
 
+  /**
+   * DIE NAHT der Öffnungsart (LFH-645, Review-Befund): `befehle.test.ts` prüft das
+   * Durchreichen am reinen `baueBefehle` mit einem eigenen `navigate`. Hier hängt es an der
+   * VERDRAHTUNG — der Hook verwarf das zweite Argument (`(p) => navigate(p)`), und jede
+   * Modul-, Zuletzt-, Schnellaktions- und Navigationszeile öffnete mit Strg/⌘+↵ still im
+   * aktuellen Tab. Kein Test sah es: der Provider-Test mockt diesen Hook, e2e fuhr nur Person
+   * und Koordinate.
+   */
+  it('reicht die Öffnungsart bis zum übergebenen navigate durch', async () => {
+    const navigate = vi.fn();
+    const { result } = renderHook(() => useBefehle(undefined, undefined, navigate), {
+      wrapper: wrapper('/einsaetze/5/etb'),
+    });
+    await waitFor(() => expect(result.current.some((b) => b.id === 'modul:personen')).toBe(true));
+    result.current.find((b) => b.id === 'modul:personen')!.ausfuehren('neuerTab');
+    expect(navigate).toHaveBeenCalledWith('/einsaetze/5/personen', 'neuerTab');
+    navigate.mockClear();
+    result.current.find((b) => b.id === 'nav:profil')!.ausfuehren('neuerTab');
+    expect(navigate).toHaveBeenCalledWith('/profil', 'neuerTab');
+  });
+
   it('reicht die aktiven Tastaturaktionen als sichtbare Befehle durch', () => {
     const speichern = vi.fn();
-    const { result } = renderHook(() => useBefehle({ speichern }), { wrapper: wrapper('/profil') });
+    const { result } = renderHook(() => useBefehle({ speichern }, undefined, vi.fn()), {
+      wrapper: wrapper('/profil'),
+    });
 
     const befehl = result.current.find((b) => b.id === 'tastatur:speichern');
     expect(befehl).toBeDefined();

@@ -290,6 +290,15 @@ pub fn build_router(state: AppState) -> Router {
                 .put(routes::pegel::ersetzen)
                 .post(routes::pegel::anfuegen),
         )
+        // 24-h-Verlauf je Pegel (LFH-633) für die Modulseite „Wetter & Pegel", modul-los wie
+        // die Liste. Das statische Segment `verlauf` schlägt `{pegel_id}` ohnehin.
+        .route(
+            "/api/einsaetze/{id}/pegel/verlauf",
+            get(routes::pegel::verlauf),
+        )
+        // Wetter am Einsatzort (LFH-633): Warnungen und Vorhersage, am Modul `wetter-pegel`
+        // gegatet. Ein Quellausfall ist kein HTTP-Fehler, sondern ein Zustand je Teil.
+        .route("/api/einsaetze/{id}/wetter", get(routes::wetter::anzeige))
         // Prognose am einzelnen Pegel (LFH-628): eigene Routen, nicht im Vollersatz-PUT.
         .route(
             "/api/einsaetze/{id}/pegel/{pegel_id}/prognose",
