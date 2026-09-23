@@ -5,6 +5,7 @@ import type {
   Raeumungszustand,
   Betreuungsstelle,
 } from '../api/types';
+import type { EvakuierungKennzahl } from './evakuierungKennzahl';
 
 /**
  * Wortlaut und Zahlformat des Fachmoduls Betreuung (LFH-639), rein und exportiert.
@@ -41,6 +42,21 @@ export function evakuiertText(
 ): string {
   const n = b.stand ? mengeText(b.stand.evakuiert, b.stand.erhebung) : 'keine Meldung';
   return `${n} · von ${mengeText(b.plan_personen, b.plan_erhebung)} geplant`;
+}
+
+/**
+ * Die Kennzahl „Evakuiert N · von M geplant" als Text — für den Blockkopf der Seite und das
+ * Lagebild (LFH-607). „≈" vor N, sobald ein beteiligter Stand oder eine Plangröße geschätzt
+ * ist; Bezirke ohne Meldung stehen dahinter, statt als 0 in N zu verschwinden.
+ */
+export function kennzahlText(k: EvakuierungKennzahl | null): string {
+  if (k == null) return 'keine geplante Evakuierung';
+  const n =
+    k.evakuiert == null
+      ? 'keine Meldung'
+      : `${k.geschaetzt ? '≈ ' : ''}${personenZahl(k.evakuiert)}`;
+  const ohne = k.ohneMeldung > 0 ? ` · ${personenZahl(k.ohneMeldung)} ohne Meldung` : '';
+  return `${n} · von ${personenZahl(k.geplant)} geplant${ohne}`;
 }
 
 /** Freie Plätze — `null` ohne Kapazität (Spec: „keine Zahl freier Plätze") oder ohne Meldung. */

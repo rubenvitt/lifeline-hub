@@ -273,7 +273,7 @@ describe('App-Routing', () => {
     );
     renderApp('/einsaetze/7/betreuung');
     await waitFor(() =>
-      expect(screen.getByRole('heading', { name: /Betreuung/ })).toBeInTheDocument(),
+      expect(screen.getByRole('heading', { level: 1, name: 'Betreuung' })).toBeInTheDocument(),
     );
     expect(screen.queryByText(/🚧/)).not.toBeInTheDocument();
   });

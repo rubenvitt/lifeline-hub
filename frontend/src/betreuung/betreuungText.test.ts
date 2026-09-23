@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { evakuiertText, freiePlaetze, mengeText, personenZahl } from './betreuungText';
+import {
+  evakuiertText,
+  freiePlaetze,
+  kennzahlText,
+  mengeText,
+  personenZahl,
+} from './betreuungText';
 
 /** Schmales geschütztes Leerzeichen — als Literal, nicht aus der Datei zurückgelesen. */
 const T = ' ';
@@ -67,5 +73,30 @@ describe('betreuungText (LFH-639)', () => {
         belegung: { id: 1, belegt: 170, zeitpunkt_at: 'x' },
       }),
     ).toBe(-20);
+  });
+
+  it('Kennzahltext: ≈ bei geschätztem Anteil, Bezirke ohne Meldung ausgewiesen, keine Kennzahl benannt', () => {
+    expect(
+      kennzahlText({
+        evakuiert: 1320,
+        geplant: 1850,
+        bezirke: 2,
+        ohneMeldung: 0,
+        geschaetzt: false,
+      }),
+    ).toBe(`1${T}320 · von 1${T}850 geplant`);
+    expect(
+      kennzahlText({ evakuiert: 600, geplant: 1850, bezirke: 2, ohneMeldung: 1, geschaetzt: true }),
+    ).toBe(`≈ 600 · von 1${T}850 geplant · 1 ohne Meldung`);
+    expect(
+      kennzahlText({
+        evakuiert: null,
+        geplant: 640,
+        bezirke: 1,
+        ohneMeldung: 1,
+        geschaetzt: false,
+      }),
+    ).toBe('keine Meldung · von 640 geplant · 1 ohne Meldung');
+    expect(kennzahlText(null)).toBe('keine geplante Evakuierung');
   });
 });
