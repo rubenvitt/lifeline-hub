@@ -223,6 +223,9 @@ describe('einsatzKeys (Factory-Output)', () => {
       'kopfzahl',
       '2026-09-23 12:00:00',
     ]);
+    // Ohne Stichtag („jetzt“) ein fester Platzhalter statt eines sekundengenauen Zeitstempels —
+    // sonst entstünde bei jedem Rendern ein neuer Key und damit ein neuer Abruf.
+    expect(einsatzKeys.betreuungKopfzahl(1)).toEqual(['einsatz-betreuung', 1, 'kopfzahl', 'jetzt']);
     expect(einsatzKeys.etbListe(1, { typ: 'x' })).toEqual(['etb', 1, { typ: 'x' }]);
     // LFH-611: Lesemarke UNTER dem ETB-Prefix — das `etb`-Ereignis invalidiert sie mit.
     expect(einsatzKeys.etbLesemarke(1)).toEqual(['etb', 1, 'lesemarke']);

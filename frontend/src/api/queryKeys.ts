@@ -308,10 +308,13 @@ export const einsatzKeys = {
     [EINSATZ_KEYS.abloesungen, einsatzId, 'vorgaben'] as const,
   // Betreuung (LFH-639): argumentlos = Invalidierungs-Prefix — Übersicht, Modulzähler und
   // Kennzahl teilen ihn (ein Abruf). Die Kopfzahl hängt als Sub-Key darunter, der Stichtag
-  // als Wire-String (UTC ohne Zonenkennung, `alsBackendZeit`), nie als Objekt.
+  // als Wire-String (UTC ohne Zonenkennung, `alsBackendZeit`), nie als Objekt. Ohne Stichtag
+  // („jetzt“, wie `ladeBelegungKopfzahl` ohne `zeitpunkt`) steht der feste Platzhalter 'jetzt'.
+  // Ein ausdrücklicher Stichtag muss stabil sein, nie „jetzt“ als Zeitstempel: der hieße bei
+  // jedem Rendern anders und wäre jedes Mal ein neues Cache-Fach samt neuem Abruf.
   betreuung: (einsatzId: number) => [EINSATZ_KEYS.betreuung, einsatzId] as const,
-  betreuungKopfzahl: (einsatzId: number, zeitpunkt: string) =>
-    [EINSATZ_KEYS.betreuung, einsatzId, 'kopfzahl', zeitpunkt] as const,
+  betreuungKopfzahl: (einsatzId: number, zeitpunkt?: string) =>
+    [EINSATZ_KEYS.betreuung, einsatzId, 'kopfzahl', zeitpunkt ?? 'jetzt'] as const,
   /** Historie der Lagebesprechungen als Sub-Key unter DEMSELBEN Prefix (Spec 9.3). */
   stabLagebesprechungen: (einsatzId: number) =>
     [EINSATZ_KEYS.stab, einsatzId, 'lagebesprechungen'] as const,
