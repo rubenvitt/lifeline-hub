@@ -5,18 +5,18 @@ dann der Code. Pfade relativ zu `frontend/src/`.
 
 ## 1. Regressionsschutz vor dem Umbau
 
-- [ ] 1.1 In `pages/LagekartePage.test.tsx` einen Test anlegen: Liefert `…/personen` eine
+- [x] 1.1 In `pages/LagekartePage.test.tsx` einen Test anlegen: Liefert `…/personen` eine
   Person mit Koordinate, zeigt die Karte bei Bestandsansicht und ohne Layer-Flag keinen
   `marker-person-*`. Zusätzlich `basisHandler` um einen Standard-Handler `…/personen` → `[]`
   ergänzen. Verifikation: Der Test ist grün gegen den heutigen harten Filter, und die übrigen
   59 Tests bleiben grün.
-- [ ] 1.2 In `personen/personenKarte.test.ts` einen Fall mit gesetztem `name`/`vorname`
+- [x] 1.2 In `personen/personenKarte.test.ts` einen Fall mit gesetztem `name`/`vorname`
   anlegen: Das `label` ist genau `R-042 · SK II` und enthält keinen Namensteil.
   Verifikation: Vitest grün, Mutationsprobe „Name ins Label“ färbt ihn rot.
 
 ## 2. Ebenen-Schlüssel und Vorgabe (D4)
 
-- [ ] 2.1 `person` in `LayerSichtbar` (`pages/lagekarte/Sidebar.tsx`), `LAYER_KEYS` und
+- [x] 2.1 `person` in `LayerSichtbar` (`pages/lagekarte/Sidebar.tsx`), `LAYER_KEYS` und
   `LAYER_DEFAULT` (`person: false`) in `pages/lagekarte/useKartenAnsicht.ts` sowie in
   `EBENEN` (`leistenDaten.ts`, Name „Betroffene“) eintragen. `ebenenFarbe` bekommt den Fall
   `person` → `neutral`. Verifikation: Neue Tests in `useKartenAnsicht.test.tsx`:
@@ -26,18 +26,20 @@ dann der Code. Pfade relativ zu `frontend/src/`.
 
 ## 3. Daten-Gate (D2, D3, D8)
 
-- [ ] 3.1 In `pages/lagekarte/useLagekarteDaten.ts` die Overrides-Query
+- [x] 3.1 In `pages/lagekarte/useLagekarteDaten.ts` die Overrides-Query
   (`einsatzKeys.modulOverrides`) und die Personen-Query auf `einsatzKeys.personen(einsatzId)`
   anlegen, mit `enabled: liveAn && overrides.isFetched && istModulFreigegeben(...)`.
   `personenVerortet` über `personenMarker` ableiten, nach einem Fehler `[]`. Verifikation:
   `useLagekarteDaten.test.tsx`, freies Modul → Marker da; Override `sichtbar:false` → kein
   Request an `…/personen` (MSW-Zähler 0).
-- [ ] 3.2 `personenZugriff` (`'frei'|'gesperrt'|'ausgeblendet'|'rueckblick'`) ableiten.
+- [x] 3.2 `personenZugriff` (`'frei'|'gesperrt'|'ausgeblendet'|'rueckblick'`) ableiten.
   Ein 403 der Query wird zu `'gesperrt'`, der Snapshot zu `'rueckblick'`. Verifikation:
   Hook-Tests je Zustand. Den Paarfall 403 gegen 500 prüfen: nur 500 bringt „Betroffene“
   in `fehlerhafteQuellen`.
-- [ ] 3.3 `markerLaden` und `neuLaden` um die Personen-Query ergänzen, nur bei freiem
-  Modul. `personenVerortet` darf nicht in `alleVerortet` landen. Verifikation: Hook-Test,
+- [x] 3.3 `neuLaden` um die Personen-Query ergänzen, nur bei freiem Modul. `markerLaden`
+  bleibt OHNE Personen: es gatet allein den Startausschnitt, und der hängt nach D3 nicht an
+  Personen (beim Umsetzen gemessen: einziger Konsument `LagekartePage.tsx`, `startOffen`).
+  `personenVerortet` darf nicht in `alleVerortet` landen. Verifikation: Hook-Test,
   `alleVerortet` enthält keinen `person`-Typ, auch wenn Personen geladen sind.
 
 ## 4. Lagekarten-Seite verdrahten (D3)

@@ -30,6 +30,7 @@ const ALLE_AN: LayerSichtbar = {
   zone: true,
   lagemeldung: true,
   freies_zeichen: true,
+  person: true,
 };
 
 const marker = (typ: KarteMarker['typ'], id = 1, label = 'X'): KarteMarker => ({
@@ -43,7 +44,7 @@ const marker = (typ: KarteMarker['typ'], id = 1, label = 'X'): KarteMarker => ({
 });
 
 describe('ebenenZeilen', () => {
-  it('führt dieselben zehn Schalter wie die Ebenen der Karte, jeden genau einmal', () => {
+  it('führt dieselben elf Schalter wie die Ebenen der Karte, jeden genau einmal', () => {
     const keys = EBENEN.map((e) => e.key).sort();
     expect(keys).toEqual((Object.keys(ALLE_AN) as (keyof LayerSichtbar)[]).sort());
   });
@@ -88,6 +89,13 @@ describe('ebenenFarbe', () => {
     expect(ebenenFarbe('einsatzort', farbenDunkel)).toBe(farbenDunkel.marke);
     expect(ebenenFarbe('uhs', farbenDunkel)).toBe(farbenDunkel.bedien);
     expect(ebenenFarbe('zone', farbenDunkel)).toBe(farbenDunkel.alarm);
+  });
+
+  it('„Betroffene" trägt kein Bedien-Blau: die Marker zeichnen Sichtungsfarben, die Zeile bleibt neutral', () => {
+    // Blau bedient (LFH-352) — und das Farbfeld einer Zeile kann fünf Sichtungsfarben nicht
+    // erklären; das tut die Sichtungslegende (LFH-648).
+    expect(ebenenFarbe('person', farbenDunkel)).not.toBe(farbenDunkel.bedien);
+    expect(ebenenFarbe('person', farbenDunkel)).toBe(farbenDunkel.text2);
   });
 });
 

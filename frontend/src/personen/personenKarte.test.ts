@@ -125,6 +125,28 @@ describe('personenMarker', () => {
     expect(marker.map((m) => m.farbe)).toEqual([sichtungsfarben.rot, sichtungsfarben.schwarz]);
   });
 
+  it('AK LFH-648: ein ERFASSTER Name steht nicht in der Beschriftung', () => {
+    // Alle übrigen Fixtures tragen name/vorname: null — ohne diesen Fall belegte kein Test,
+    // dass die Beschriftung den Namen weglässt, statt nur keinen vorzufinden. Dieselbe
+    // Beschriftung ist auf der Lagekarte Plakette UND Inspector-Titel.
+    const { marker } = personenMarker(
+      [
+        p({
+          id: 1,
+          registrier_nr: 42,
+          name: 'Kowalski',
+          vorname: 'Anna',
+          aktuelle_sichtung: 'sk2',
+          antreff_lat: 50,
+          antreff_lon: 8,
+        }),
+      ],
+      token,
+    );
+    expect(marker[0].label).toBe('R-042 · SK II');
+    expect(JSON.stringify(marker[0])).not.toMatch(/Kowalski|Anna/);
+  });
+
   it('eine halbe Koordinate zählt als „ohne Koordinate"', () => {
     const { marker, ohneKoordinate } = personenMarker([p({ id: 1, antreff_lat: 50 })], token);
     expect(marker).toHaveLength(0);

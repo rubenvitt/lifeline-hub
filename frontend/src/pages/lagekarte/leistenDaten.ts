@@ -33,7 +33,8 @@ import type { LayerSichtbar } from './Sidebar';
 
 // ── Ebenen ─────────────────────────────────────────────────────────────────────────────
 
-/** Reihenfolge und Wortlaut der Ebenen-Zeilen — dieselben zehn Schalter wie bisher. */
+/** Reihenfolge und Wortlaut der Ebenen-Zeilen — die zehn Schalter von vor LFH-648 plus
+ *  „Betroffene" (LFH-648) am Ende: die einzige Ebene mit Vorgabe aus und Zugriffsgrenze. */
 export const EBENEN: readonly { key: keyof LayerSichtbar; name: string }[] = [
   { key: 'einsatzort', name: 'Einsatzort' },
   { key: 'einheit', name: 'Einheiten' },
@@ -45,6 +46,7 @@ export const EBENEN: readonly { key: keyof LayerSichtbar; name: string }[] = [
   { key: 'schaden', name: 'Schäden' },
   { key: 'lagemeldung', name: 'Lagemeldungen' },
   { key: 'freies_zeichen', name: 'Taktische Zeichen' },
+  { key: 'person', name: 'Betroffene' },
 ];
 
 /**
@@ -67,6 +69,11 @@ export function ebenenFarbe(key: keyof LayerSichtbar, rollen: Farbrollen): strin
       return rollen.achtung;
     case 'freies_zeichen':
       return rollen.gedaempft;
+    // Betroffene (LFH-648): die Marker tragen Sichtungsfarben, die ein einzelnes Farbfeld
+    // nicht erklären kann — das tut die Sichtungslegende. Hier steht deshalb eine
+    // neutrale Textstufe, und ausdrücklich NICHT der Default: Blau ist Bedienung.
+    case 'person':
+      return rollen.text2;
     default:
       return rollen.bedien;
   }

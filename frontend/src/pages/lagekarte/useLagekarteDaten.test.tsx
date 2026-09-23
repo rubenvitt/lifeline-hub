@@ -26,6 +26,16 @@ vi.mock('../../api/lageSnapshot', () => ({
 
 import { useLagekarteDaten } from './useLagekarteDaten';
 
+// Ebene „Betroffene" (LFH-648): ohne Benutzer ist das Modul „Personen" im Client frei, die
+// Personen-Query läuft also in jedem Live-Test. Vorgaben hier, damit sie nicht in jedem
+// Bestandstest als Ausfall „Betroffene" auftaucht; ein Test kann sie per `server.use` überlagern.
+beforeEach(() => {
+  server.use(
+    http.get('/api/einsaetze/5/modul-overrides', () => HttpResponse.json({})),
+    http.get('/api/einsaetze/5/personen', () => HttpResponse.json([])),
+  );
+});
+
 function wrapper() {
   const client = neuerQueryClient();
   return ({ children }: { children: ReactNode }) => (
@@ -378,5 +388,147 @@ describe('useLagekarteDaten markerLaden', () => {
     expect(result.current.markerLaden).toBe(true);
     freigeben();
     await waitFor(() => expect(result.current.markerLaden).toBe(false));
+  });
+});
+
+/**
+ * Ebene „Betroffene" (LFH-648): die Zugriffsgrenze sitzt an der Personen-QUERY. Die Tests
+ * zählen deshalb die Requests an `…/personen` mit — „nichts gezeichnet" allein belegte nicht,
+ * dass für einen Benutzer ohne Zugriff auch nichts geladen wurde.
+ */
+describe('useLagekarteDaten Betroffene (LFH-648)', () => {
+  const PERSON = {
+    id: 11,
+    einsatz_id: 5,
+    registrier_nr: 42,
+    status: 'betroffen',
+    name: 'Kowalski',
+    vorname: 'Anna',
+    aktuelle_sichtung: 'sk2',
+    antreff_lat: 50.05,
+    antreff_lon: 8.55,
+    storniert_at: null,
+  };
+
+  /** Alle Live-Quellen gesund; Overrides und Personen je Fall. Liefert den Personen-Zähler. */
+  function handler(overrides: Record<string, unknown>, personen: () => Response) {
+    const zaehler = { personen: 0 };
+    server.use(
+      http.get('/api/einsaetze/5', () =>
+        HttpResponse.json({ id: 5, bezeichnung: 'T', status: 'aktiv' }),
+      ),
+      http.get('/api/organisation', () =>
+        HttpResponse.json({ id: 1, name: 'Org', tz_organisation: null }),
+      ),
+      http.get('/api/karte/config', () =>
+        HttpResponse.json({
+          online_styles: [],
+          offline_verfuegbar: false,
+          offline_tiles_url: null,
+          offline_attribution: null,
+          offline_regionen: [],
+          karten_bau_verfuegbar: false,
+        }),
+      ),
+      http.get('/api/einsaetze/5/einstellungen', () =>
+        HttpResponse.json({ einsatz_id: 5, org_defaults: { org_id: 1 } }),
+      ),
+      ...[
+        '/api/einsaetze/5/uhs',
+        '/api/einsaetze/5/schaeden',
+        '/api/einsaetze/5/einheiten',
+        '/api/einsaetze/5/fahrzeuge',
+        '/api/einsaetze/5/abschnitte',
+        '/api/einsaetze/5/zonen',
+        '/api/einsaetze/5/freie-zeichen',
+        '/api/einsaetze/5/gefahrengebiete',
+        '/api/einsaetze/5/lage/meldungen',
+        '/api/einsaetze/5/karte/fuehrungskraefte',
+      ].map((pfad) => http.get(pfad, () => HttpResponse.json([]))),
+      http.get('/api/einsaetze/5/meldungen/rueckmeldungen', () =>
+        HttpResponse.json(RUECKMELDUNGEN),
+      ),
+      http.get('/api/einsaetze/5/modul-overrides', () => HttpResponse.json(overrides)),
+      http.get('/api/einsaetze/5/personen', () => {
+        zaehler.personen += 1;
+        return personen();
+      }),
+    );
+    return zaehler;
+  }
+
+  function render() {
+    return renderHook(() => useLagekarteDaten({ einsatzId: 5, zeigeZonen: true }), {
+      wrapper: wrapper(),
+    });
+  }
+
+  it('frei: Personen kommen als eigene Liste — NICHT in `alleVerortet`', async () => {
+    const z = handler({}, () => HttpResponse.json([PERSON]));
+    const { result } = render();
+    await waitFor(() => expect(result.current.personenVerortet).toHaveLength(1));
+    expect(result.current.personenZugriff).toBe('frei');
+    expect(result.current.personenVerortet[0]).toMatchObject({
+      schluessel: 'person-11',
+      typ: 'person',
+      label: 'R-042 · SK II',
+    });
+    // Startausschnitt und Kopfzahl hängen an `alleVerortet` — Personen dürfen dort nie landen.
+    expect(result.current.alleVerortet.some((m) => m.typ === 'person')).toBe(false);
+    expect(z.personen).toBe(1);
+    expect(result.current.fehlerhafteQuellen).toEqual([]);
+  });
+
+  it('Modul im Einsatz ausgeblendet: „ausgeblendet" und KEIN Request an …/personen', async () => {
+    const z = handler({ personen: { sichtbar: false, benoetigte_rolle: null } }, () =>
+      HttpResponse.json([PERSON]),
+    );
+    const { result } = render();
+    await waitFor(() => expect(result.current.ladt).toBe(false));
+    await waitFor(() => expect(result.current.personenZugriff).toBe('ausgeblendet'));
+    expect(result.current.personenVerortet).toEqual([]);
+    expect(z.personen).toBe(0);
+  });
+
+  it('Rollensperre im Client: „gesperrt" und KEIN Request', async () => {
+    // Die Auth ist hier gemockt ohne Benutzer — eine Führungskraft-Schranke sperrt also.
+    const z = handler({ personen: { sichtbar: true, benoetigte_rolle: 'fuehrungskraft' } }, () =>
+      HttpResponse.json([PERSON]),
+    );
+    const { result } = render();
+    await waitFor(() => expect(result.current.personenZugriff).toBe('gesperrt'));
+    expect(result.current.personenVerortet).toEqual([]);
+    expect(z.personen).toBe(0);
+  });
+
+  it('Server lehnt mit 403 ab (Org-Default-Drift): „gesperrt", keine Marker, KEIN Ausfall', async () => {
+    const z = handler({}, () => new HttpResponse(null, { status: 403 }));
+    const { result } = render();
+    await waitFor(() => expect(result.current.personenZugriff).toBe('gesperrt'));
+    expect(result.current.personenVerortet).toEqual([]);
+    expect(result.current.fehlerhafteQuellen).toEqual([]);
+    expect(z.personen).toBe(1);
+  });
+
+  it('echter Ausfall (500) bei freiem Modul: „Betroffene" steht im Ausfall, keine Altdaten', async () => {
+    handler({}, () => new HttpResponse(null, { status: 500 }));
+    const { result } = render();
+    await waitFor(() => expect(result.current.fehlerhafteQuellen).toEqual(['Betroffene']));
+    expect(result.current.personenZugriff).toBe('frei');
+    expect(result.current.personenVerortet).toEqual([]);
+  });
+
+  it('Historien-Modus: „rueckblick", keine Personen, kein Request', async () => {
+    const z = handler({}, () => HttpResponse.json([PERSON]));
+    ladeLageSnapshot.mockResolvedValue(dokument('keine'));
+    const { result } = renderHook(
+      () =>
+        useLagekarteDaten({ einsatzId: 5, zeigeZonen: true, quelle: { typ: 'snapshot', id: 9 } }),
+      { wrapper: wrapper() },
+    );
+    await waitFor(() => expect(result.current.ladt).toBe(false));
+    expect(result.current.personenZugriff).toBe('rueckblick');
+    expect(result.current.personenVerortet).toEqual([]);
+    expect(z.personen).toBe(0);
   });
 });

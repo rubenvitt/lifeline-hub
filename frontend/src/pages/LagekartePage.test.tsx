@@ -290,6 +290,32 @@ const FUEHRUNGSKRAFT_VERORTET = {
   ist_abschnittsleiter: false,
 };
 
+// Betroffene Person mit Fundort (LFH-648). Name und Vorname sind ABSICHTLICH gesetzt: die
+// Lagekarte darf sie nie zeigen, und nur ein gesetzter Name kann das belegen.
+const PERSON_VERORTET = {
+  id: 11,
+  einsatz_id: 1,
+  registrier_nr: 42,
+  status: 'betroffen',
+  name: 'Kowalski',
+  vorname: 'Anna',
+  geschlecht: null,
+  geburtsdatum: null,
+  alter_geschaetzt: null,
+  herkunft_adresse: null,
+  antreff_ort: null,
+  melder_kontakt: null,
+  notiz: null,
+  aktuelle_sichtung: 'sk2',
+  antreff_lat: 50.05,
+  antreff_lon: 8.55,
+  erfasst_at: '',
+  erfasst_von: 1,
+  geaendert_at: '',
+  geaendert_von: 1,
+  storniert_at: null,
+};
+
 const ORG_DRK = { id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' };
 
 // Einsatz-Einstellungen: die Seite liest davon heute nichts, die Query läuft aber (Render-
@@ -338,6 +364,11 @@ function basisHandler(
       HttpResponse.json({ frist_min: 60, einheiten: [], abschnitte: [] }),
     ),
     http.get('/api/einsaetze/1/gefahrengebiete', () => HttpResponse.json([])),
+    // Ebene „Betroffene" (LFH-648): ohne Anmeldung (`/auth/me` → 401) ist das Modul im Client
+    // frei, die Query läuft also in JEDEM Test — ohne diese zwei Handler stünde „Betroffene"
+    // überall im Ausfallbanner.
+    http.get('/api/einsaetze/1/modul-overrides', () => HttpResponse.json({})),
+    http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])),
     http.get('/api/organisation', () =>
       HttpResponse.json({ id: 1, name: 'Org', tz_organisation: null }),
     ),
@@ -1637,5 +1668,25 @@ describe('LagekartePage · Neuentwurf S5', () => {
     // Geschwister im Fluss des Fußes (LFH-355) — die Positionierung gehört dem Rahmen.
     expect(band.parentElement?.dataset.lfh).toBe('karten-fuss');
     expect(band.style.position).toBe('');
+  });
+});
+
+/**
+ * Ebene „Betroffene" (LFH-648). Die Zugriffsgrenze sitzt an der DATENquelle, nicht am
+ * Schalter: eine geteilte Ansicht mit eingeschalteter Ebene darf für jemanden ohne das Modul
+ * „Personen" nichts zeigen. Die Tests führen deshalb Paare — mit/ohne Zugriff bei derselben
+ * Ansicht.
+ */
+describe('LagekartePage · Ebene „Betroffene" (LFH-648)', () => {
+  it('Bestandsansicht ohne Schalterwert: keine Personen-Marker, obwohl eine Person verortet ist', async () => {
+    // Regressionsschutz für den Umbau: vorher schloss ein harter Filter Personen aus, danach
+    // trägt die Vorgabe „aus" (LAYER_DEFAULT.person = false) dieselbe Aussage.
+    basisHandler([
+      http.get('/api/einsaetze/1/personen', () => HttpResponse.json([PERSON_VERORTET])),
+    ]);
+    renderSeite();
+    // Warten, bis die übrigen Marker stehen — sonst wäre die Negativaussage trivial.
+    expect(await screen.findByText('marker-schaden-9')).toBeInTheDocument();
+    expect(screen.queryByText(/^marker-person-/)).not.toBeInTheDocument();
   });
 });

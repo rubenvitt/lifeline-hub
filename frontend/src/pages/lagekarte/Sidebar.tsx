@@ -51,11 +51,15 @@ export interface LayerSichtbar {
   zone: boolean;
   lagemeldung: boolean;
   freies_zeichen: boolean;
+  /** Ebene „Betroffene" (LFH-648). Der Schalter ist die Wahl, NICHT die Zugriffsgrenze —
+   *  gezeichnet wird nur bei freigegebenem Modul „Personen" (`personenZugriff`). */
+  person: boolean;
 }
 
 /** Platzierbare Punkt-Typen (Fläche/Abschnitt läuft über onAbschnittZeichnenStart).
  *  `person` (Betroffene, LFH-613) kommt nur über den Deeplink-Auftrag von der Detailseite —
- *  die Lagekarte führt Personen nicht als Ebene und nicht in „Nicht verortet". */
+ *  die Lagekarte führt Personen zwar als Ebene (LFH-648), aber nicht in „Nicht verortet":
+ *  die Koordinaten-Lücke zeigt die Betroffenen-Seite. */
 export type PlatzierenPunktTyp = 'uhs' | 'schaden' | 'einheit' | 'fahrzeug' | 'fuehrung' | 'person';
 
 const NICHT_VERORTET_LABEL: Record<NichtVerortet['typ'], string> = {
