@@ -144,13 +144,37 @@ fn text_stand_gemeldet_mit_und_ohne_vorwert() {
 #[test]
 fn text_stand_zurueckgenommen() {
     assert_eq!(
-        stand_zurueckgenommen(X, Some(212)),
+        stand_zurueckgenommen(X, Some(212), true),
         "Meldung zurückgenommen, Stand Bezirk ‚Uferstraße 12–40‘ wieder 212."
     );
     assert_eq!(
-        stand_zurueckgenommen(X, None),
+        stand_zurueckgenommen(X, None, true),
         "Meldung zurückgenommen, Bezirk ‚Uferstraße 12–40‘ ohne Standmeldung."
     );
+}
+
+/// Eine nachgetragene ältere Meldung ändert den Stand nicht (D2): kein „vorher“, das sich mit
+/// der Ereigniszeit der Nachtragung als Rückgang läse.
+#[test]
+fn text_stand_nachgetragen() {
+    let t = stand_nachgetragen(X, 300, Erhebung::Gezaehlt, 480, 640);
+    assert_eq!(
+        t,
+        "Bezirk ‚Uferstraße 12–40‘: 300 evakuiert (gezählt), nachgetragen, aktueller Stand \
+         bleibt 480, Plan 640."
+    );
+    assert!(!t.contains("vorher"), "{t}");
+}
+
+/// Die Rücknahme einer nicht aktuellen Meldung ändert den Stand nicht: „bleibt“, nie „wieder“.
+#[test]
+fn text_stand_zurueckgenommen_nicht_aktuell() {
+    let t = stand_zurueckgenommen(X, Some(480), false);
+    assert_eq!(
+        t,
+        "Meldung zurückgenommen, Stand Bezirk ‚Uferstraße 12–40‘ bleibt 480."
+    );
+    assert!(!t.contains("wieder"), "{t}");
 }
 
 #[test]
@@ -234,13 +258,35 @@ fn text_belegung() {
         "Betreuungsstelle ‚Turnhalle Ost‘: 60 untergebracht."
     );
     assert_eq!(
-        belegung_zurueckgenommen(Y, Some(60)),
+        belegung_zurueckgenommen(Y, Some(60), true),
         "Meldung zurückgenommen, Belegung Betreuungsstelle ‚Turnhalle Ost‘ wieder 60."
     );
     assert_eq!(
-        belegung_zurueckgenommen(Y, None),
+        belegung_zurueckgenommen(Y, None, true),
         "Meldung zurückgenommen, Betreuungsstelle ‚Turnhalle Ost‘ ohne Belegungsmeldung."
     );
+}
+
+#[test]
+fn text_belegung_nachtrag_und_ruecknahme_nicht_aktuell() {
+    let t = belegung_nachgetragen(Y, 30, 89, Some(150));
+    assert_eq!(
+        t,
+        "Betreuungsstelle ‚Turnhalle Ost‘: 30 untergebracht, nachgetragen, aktuelle Belegung \
+         bleibt 89, Kapazität 150."
+    );
+    assert!(!t.contains("vorher"), "{t}");
+    assert_eq!(
+        belegung_nachgetragen(Y, 30, 89, None),
+        "Betreuungsstelle ‚Turnhalle Ost‘: 30 untergebracht, nachgetragen, aktuelle Belegung \
+         bleibt 89."
+    );
+    let t = belegung_zurueckgenommen(Y, Some(89), false);
+    assert_eq!(
+        t,
+        "Meldung zurückgenommen, Belegung Betreuungsstelle ‚Turnhalle Ost‘ bleibt 89."
+    );
+    assert!(!t.contains("wieder"), "{t}");
 }
 
 /// D5: kein ETB-Text nennt Sammelstelle, Standort oder Notiz — weder ihren Inhalt (die
@@ -261,7 +307,9 @@ fn kein_text_nennt_sammelstelle_standort_notiz() {
         ),
         bezirk_storniert(X),
         stand_gemeldet(X, 480, Erhebung::Gezaehlt, Some(212), 640),
-        stand_zurueckgenommen(X, Some(212)),
+        stand_nachgetragen(X, 300, Erhebung::Gezaehlt, 480, 640),
+        stand_zurueckgenommen(X, Some(212), true),
+        stand_zurueckgenommen(X, Some(480), false),
         stelle_angelegt(Y, BetreuungsstelleArt::Notunterkunft, Some(150)),
         stelle_geaendert(
             Y,
@@ -278,7 +326,9 @@ fn kein_text_nennt_sammelstelle_standort_notiz() {
         ),
         stelle_storniert(Y),
         belegung_gemeldet(Y, 89, Some(60), Some(150)),
-        belegung_zurueckgenommen(Y, Some(60)),
+        belegung_nachgetragen(Y, 30, 89, Some(150)),
+        belegung_zurueckgenommen(Y, Some(60), true),
+        belegung_zurueckgenommen(Y, Some(89), false),
     ];
     for t in &alle {
         let klein = t.to_lowercase();

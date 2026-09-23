@@ -98,8 +98,11 @@ append-only gespeichert werden. Der aktuelle Stand eines Bezirks MUST die nicht
 zurückgenommene Meldung mit dem jüngsten Zeitpunkt sein (bei gleichem Zeitpunkt die
 zuletzt erfasste). Jede Meldung MUST in derselben Transaktion einen ETB-Eintrag vom Typ
 Meldung schreiben, der Bezirk, neue Anzahl, vorherigen aktuellen Stand, Erhebungsart und
-Plangröße nennt. Sein Ereigniszeitpunkt ist der Zeitpunkt der Meldung. Die Anzahl MUST die
-Plangröße übersteigen dürfen.
+Plangröße nennt. Liegt der Zeitpunkt der Meldung vor dem der aktuellen Meldung
+(Nachtragung), MUST der Eintrag stattdessen die Meldung als nachgetragen kennzeichnen und
+den unverändert bleibenden aktuellen Stand nennen, nicht als vorherigen Wert. Sein
+Ereigniszeitpunkt ist der Zeitpunkt der Meldung. Die Anzahl MUST die Plangröße übersteigen
+dürfen.
 
 #### Scenario: Erste Meldung
 - **WHEN** für „Uferstraße 12–40“ (Plan 640) 212 evakuiert, gezählt, gemeldet wird
@@ -115,6 +118,7 @@ Plangröße übersteigen dürfen.
 - **WHEN** eine Meldung mit einem Zeitpunkt vor der jüngsten vorhandenen Meldung eingeht
 - **THEN** bleibt der aktuelle Stand unverändert
 - **AND** die Meldung ist gespeichert und im ETB mit ihrem Ereigniszeitpunkt nachgewiesen
+- **AND** der ETB-Eintrag nennt „nachgetragen“ und den bleibenden aktuellen Stand, kein „vorher“
 
 #### Scenario: Stand über der Plangröße
 - **WHEN** bei Plangröße 640 der Stand 700 gemeldet wird
@@ -133,7 +137,9 @@ Plangröße übersteigen dürfen.
 Das System SHALL eine Standmeldung zurücknehmen können. Die Meldung MUST gespeichert
 bleiben und als zurückgenommen gekennzeichnet werden. Der aktuelle Stand MUST danach aus
 den verbleibenden Meldungen neu bestimmt werden. Die Rücknahme MUST einen ETB-Eintrag vom
-Typ Berichtigung schreiben, der auf den ETB-Eintrag der Meldung verweist.
+Typ Berichtigung schreiben, der auf den ETB-Eintrag der Meldung verweist. War die
+zurückgenommene Meldung nicht die aktuelle, MUST der Eintrag sagen, dass der Stand bleibt,
+und darf keine Änderung des Stands unterstellen.
 
 #### Scenario: Letzte Meldung zurücknehmen
 - **WHEN** bei den Meldungen 212 und 480 die Meldung 480 zurückgenommen wird
@@ -143,6 +149,11 @@ Typ Berichtigung schreiben, der auf den ETB-Eintrag der Meldung verweist.
 #### Scenario: Einzige Meldung zurücknehmen
 - **WHEN** die einzige Meldung eines Bezirks zurückgenommen wird
 - **THEN** hat der Bezirk keinen aktuellen Stand mehr
+
+#### Scenario: Nicht aktuelle Meldung zurücknehmen
+- **WHEN** bei aktuellem Stand 480 eine ältere oder nachgetragene Meldung zurückgenommen wird
+- **THEN** bleibt der aktuelle Stand 480
+- **AND** die Berichtigung nennt „bleibt 480“, kein „wieder“
 
 #### Scenario: Doppelt zurücknehmen
 - **WHEN** eine bereits zurückgenommene Meldung erneut zurückgenommen wird
@@ -195,7 +206,9 @@ eine absolute Anzahl untergebrachter Personen (ganzzahlig ≥ 0) und einen Zeitp
 (Vorgabe: jetzt, nicht in der Zukunft). Meldungen MUST append-only gespeichert werden. Die
 aktuelle Belegung MUST die nicht zurückgenommene Meldung mit dem jüngsten Zeitpunkt sein.
 Jede Meldung MUST in derselben Transaktion einen ETB-Eintrag vom Typ Meldung schreiben, der
-Stelle, neue Anzahl, vorherige aktuelle Belegung und, falls gesetzt, die Kapazität nennt.
+Stelle, neue Anzahl, vorherige aktuelle Belegung und, falls gesetzt, die Kapazität nennt;
+eine nachgetragene Meldung nennt wie beim Stand „nachgetragen“ und die bleibende aktuelle
+Belegung statt eines vorherigen Werts.
 Eine Meldung an eine Stelle im Status `geschlossen` MUST abgelehnt werden. Die Anzahl MUST
 die Kapazität übersteigen dürfen. Belegungsmeldungen MUST sich wie Standmeldungen
 zurücknehmen lassen.

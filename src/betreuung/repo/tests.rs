@@ -782,7 +782,66 @@ async fn nachgetragene_aeltere_meldung_laesst_den_stand_stehen() {
     let etb = etb(&w.pool, w.e).await;
     let e = etb.iter().find(|e| e.0 == alt.etb_id).unwrap();
     assert_eq!(e.4, "2026-09-23 12:00:00");
-    assert!(e.2.contains("212"), "{}", e.2);
+    // D5: die Nachtragung sagt, dass der Stand bleibt — „vorher 480“ läse sich mit der
+    // Ereigniszeit 12:00 als Rückgang, den es nie gab.
+    assert!(
+        e.2.contains("212") && e.2.contains("nachgetragen") && e.2.contains("bleibt 480"),
+        "{}",
+        e.2
+    );
+    assert!(!e.2.contains("vorher"), "{}", e.2);
+}
+
+/// Grenze der Nachtragung: gleicher Zeitpunkt wie die aktuelle Meldung ist KEINE Nachtragung
+/// — die spätere Erfassung gewinnt (D2), der Text nennt den Vorwert.
+#[tokio::test]
+async fn gleicher_zeitpunkt_ist_keine_nachtragung() {
+    let w = welt().await;
+    let id = bezirk(&w, "Uferstraße", 640).await;
+    stand(&w, id, 300, Erhebung::Gezaehlt, "2026-09-23 12:00:00")
+        .await
+        .unwrap();
+    let m = stand(&w, id, 310, Erhebung::Gezaehlt, "2026-09-23 12:00:00")
+        .await
+        .unwrap();
+    let etb = etb(&w.pool, w.e).await;
+    let e = etb.iter().find(|e| e.0 == m.etb_id).unwrap();
+    assert!(e.2.contains("310") && e.2.contains("vorher 300"), "{}", e.2);
+    assert!(!e.2.contains("nachgetragen"), "{}", e.2);
+}
+
+/// Der Fall aus dem Review: 212 um 12:00, 480 um 14:00, 300 für 13:00 nachgetragen und
+/// wieder zurückgenommen. Der Stand ist durchgehend 480; kein Eintrag darf eine Änderung
+/// unterstellen.
+#[tokio::test]
+async fn nachtrag_und_ruecknahme_des_nachtrags_nennen_den_bleibenden_stand() {
+    let w = welt().await;
+    let id = bezirk(&w, "Uferstraße", 640).await;
+    stand(&w, id, 212, Erhebung::Gezaehlt, "2026-09-23 12:00:00")
+        .await
+        .unwrap();
+    stand(&w, id, 480, Erhebung::Gezaehlt, "2026-09-23 14:00:00")
+        .await
+        .unwrap();
+    let nach = stand(&w, id, 300, Erhebung::Gezaehlt, "2026-09-23 13:00:00")
+        .await
+        .unwrap();
+    assert_eq!(aktueller_stand(&w, id).await, Some(480));
+    let r = stand_zurueck(&w, nach.meldung_id).await.unwrap();
+    assert_eq!(aktueller_stand(&w, id).await, Some(480));
+    let etb = etb(&w.pool, w.e).await;
+    let meldung = etb.iter().find(|e| e.0 == nach.etb_id).unwrap();
+    assert_eq!(
+        meldung.2,
+        "Bezirk ‚Uferstraße‘: 300 evakuiert (gezählt), nachgetragen, aktueller Stand bleibt \
+         480, Plan 640."
+    );
+    let berichtigung = etb.iter().find(|e| e.0 == r.etb_id).unwrap();
+    assert_eq!(berichtigung.3, Some(nach.etb_id));
+    assert_eq!(
+        berichtigung.2,
+        "Meldung zurückgenommen, Stand Bezirk ‚Uferstraße‘ bleibt 480."
+    );
 }
 
 /// D2: bei gleichem Zeitpunkt gewinnt die später erfasste Meldung (größere id).
@@ -962,8 +1021,13 @@ async fn aeltere_meldung_zuruecknehmen_laesst_stand_stehen() {
     stand(&w, id, 480, Erhebung::Gezaehlt, "2026-09-23 13:00:00")
         .await
         .unwrap();
-    stand_zurueck(&w, alt.meldung_id).await.unwrap();
+    let r = stand_zurueck(&w, alt.meldung_id).await.unwrap();
     assert_eq!(aktueller_stand(&w, id).await, Some(480));
+    // „wieder 480“ unterstellte eine Änderung, die es nicht gab.
+    let etb = etb(&w.pool, w.e).await;
+    let e = etb.iter().find(|e| e.0 == r.etb_id).unwrap();
+    assert!(e.2.contains("bleibt 480"), "{}", e.2);
+    assert!(!e.2.contains("wieder"), "{}", e.2);
 }
 
 #[tokio::test]
@@ -1305,6 +1369,38 @@ async fn belegung_zuruecknehmen_wie_standmeldung() {
     assert_eq!(
         status(belegung_zurueck(&w, m.meldung_id).await),
         StatusCode::UNPROCESSABLE_ENTITY
+    );
+}
+
+/// Belegung wie Stand: eine nachgetragene ältere Meldung lässt die Belegung stehen und sagt
+/// das; ihre Rücknahme ebenso. Gleicher Zeitpunkt ist keine Nachtragung.
+#[tokio::test]
+async fn belegung_nachtrag_und_ruecknahme_des_nachtrags() {
+    let w = welt().await;
+    let id = stelle(&w, "Turnhalle Ost", Some(150)).await;
+    belegung(&w, id, 60, "2026-09-23 12:00:00").await.unwrap();
+    belegung(&w, id, 89, "2026-09-23 14:00:00").await.unwrap();
+    let nach = belegung(&w, id, 30, "2026-09-23 13:00:00").await.unwrap();
+    assert_eq!(aktuelle_belegung(&w, id).await, Some(89));
+    let r = belegung_zurueck(&w, nach.meldung_id).await.unwrap();
+    assert_eq!(aktuelle_belegung(&w, id).await, Some(89));
+    let gleich = belegung(&w, id, 95, "2026-09-23 14:00:00").await.unwrap();
+    assert_eq!(aktuelle_belegung(&w, id).await, Some(95));
+
+    let etb = etb(&w.pool, w.e).await;
+    let text = |etb_id: i64| etb.iter().find(|e| e.0 == etb_id).unwrap().2.clone();
+    assert_eq!(
+        text(nach.etb_id),
+        "Betreuungsstelle ‚Turnhalle Ost‘: 30 untergebracht, nachgetragen, aktuelle Belegung \
+         bleibt 89, Kapazität 150."
+    );
+    assert_eq!(
+        text(r.etb_id),
+        "Meldung zurückgenommen, Belegung Betreuungsstelle ‚Turnhalle Ost‘ bleibt 89."
+    );
+    assert_eq!(
+        text(gleich.etb_id),
+        "Betreuungsstelle ‚Turnhalle Ost‘: 95 untergebracht, vorher 89, Kapazität 150."
     );
 }
 

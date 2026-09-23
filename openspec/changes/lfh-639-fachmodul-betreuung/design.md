@@ -181,10 +181,21 @@ bezirk_id | stelle_id})`.
 | Räumung → angeordnet/aufgehoben | `entscheidung` | „Evakuierung Bezirk ‚X' aufgehoben.“ |
 | Räumung → läuft/geräumt | `meldung` | „Bezirk ‚X' geräumt.“ |
 | Standmeldung | `meldung` | „Bezirk ‚X': 480 evakuiert (gezählt), vorher 212, Plan 640.“ |
+| Standmeldung, nachgetragen (Zeitpunkt strikt vor der aktuellen) | `meldung` | „Bezirk ‚X': 300 evakuiert (gezählt), nachgetragen, aktueller Stand bleibt 480, Plan 640.“ |
 | Belegungsmeldung | `meldung` | „Betreuungsstelle ‚Y': 89 untergebracht, vorher 60, Kapazität 150.“ |
+| Belegungsmeldung, nachgetragen | `meldung` | „Betreuungsstelle ‚Y': 30 untergebracht, nachgetragen, aktuelle Belegung bleibt 89, Kapazität 150.“ |
 | Stelle anlegen/ändern/Status/Storno, Bezirk Storno/Stammdaten | `system` | „Betreuungsstelle ‚Y' (Notunterkunft) angelegt.“ |
 | Rücknahme einer Meldung | `berichtigung` + `berichtigt_eintrag_id` | „Meldung zurückgenommen, Stand Bezirk ‚X' wieder 212.“ |
+| Rücknahme einer nicht aktuellen Meldung | `berichtigung` + `berichtigt_eintrag_id` | „Meldung zurückgenommen, Stand Bezirk ‚X' bleibt 480.“ |
 
+- **Nachtragung erkennen, bevor das ETB geschrieben wird:** Der ETB-Eintrag entsteht vor
+  dem INSERT der Meldung. Deshalb vergleicht der Schreibpfad den Zeitpunkt der neuen Meldung
+  mit dem der aktuellen (über den Zeiger gelesen). Nur **strikt früher** ist eine
+  Nachtragung; bei gleichem Zeitpunkt gewinnt die größere `id` (D2), die neue Meldung wird
+  aktuell und nennt „vorher“. Ebenso prüft die Rücknahme vor dem UPDATE, ob die
+  zurückgenommene Meldung der Zeiger war: nur dann „wieder N“, sonst „bleibt N“. Das ETB ist
+  nicht berichtigbar; ein „vorher 480“ mit der Ereigniszeit der Nachtragung läse sich als
+  Rückgang, den es nie gab.
 - **Leerlauf-Riegel:** Ein PATCH ohne tatsächliche Änderung schreibt nichts. Das ist dieselbe
   Bauform wie in `abloesung/repo.rs`. Eine Standmeldung mit derselben Zahl wie der Vorwert
   ist dagegen **keine** Leermeldung: Sie bestätigt den Stand zu einem neuen Zeitpunkt und

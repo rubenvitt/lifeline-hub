@@ -521,7 +521,11 @@ struct BezirkRoh {
     raeumung: Raeumungszustand,
     sammelstelle: Option<String>,
     notiz: Option<String>,
+    /// Der Zeiger auf die aktuelle Meldung und deren Anzahl und Zeitpunkt. Der Zeitpunkt
+    /// trennt Fortschreibung von Nachtragung, BEVOR das ETB geschrieben wird (D5).
+    stand_id: Option<i64>,
     stand_evakuiert: Option<i64>,
+    stand_zeitpunkt_at: Option<String>,
     storniert_at: Option<String>,
 }
 
@@ -532,7 +536,8 @@ async fn bezirk_roh_tx(
 ) -> Result<BezirkRoh, AppError> {
     sqlx::query_as(
         "SELECT b.bezeichnung, b.abschnitt_id, b.plan_personen, b.plan_erhebung, b.raeumung, \
-                b.sammelstelle, b.notiz, st.evakuiert AS stand_evakuiert, b.storniert_at \
+                b.sammelstelle, b.notiz, b.stand_id, st.evakuiert AS stand_evakuiert, \
+                st.zeitpunkt_at AS stand_zeitpunkt_at, b.storniert_at \
          FROM evakuierungsbezirk b LEFT JOIN evakuierung_stand st ON st.id = b.stand_id \
          WHERE b.id = ? AND b.einsatz_id = ?",
     )
@@ -566,7 +571,10 @@ struct StelleRoh {
     status: BetreuungsstelleStatus,
     standort: Option<String>,
     notiz: Option<String>,
+    /// Zeiger, Anzahl und Zeitpunkt der aktuellen Belegungsmeldung, wie bei [`BezirkRoh`].
+    belegung_id: Option<i64>,
     belegung_belegt: Option<i64>,
+    belegung_zeitpunkt_at: Option<String>,
     storniert_at: Option<String>,
 }
 
@@ -577,7 +585,8 @@ async fn stelle_roh_tx(
 ) -> Result<StelleRoh, AppError> {
     sqlx::query_as(
         "SELECT s.bezeichnung, s.art, s.abschnitt_id, s.kapazitaet_personen, s.status, \
-                s.standort, s.notiz, m.belegt AS belegung_belegt, s.storniert_at \
+                s.standort, s.notiz, s.belegung_id, m.belegt AS belegung_belegt, \
+                m.zeitpunkt_at AS belegung_zeitpunkt_at, s.storniert_at \
          FROM betreuungsstelle s LEFT JOIN betreuungsstelle_belegung m ON m.id = s.belegung_id \
          WHERE s.id = ? AND s.einsatz_id = ?",
     )
@@ -595,6 +604,21 @@ fn stelle_lebt(roh: &StelleRoh) -> Result<(), AppError> {
             roh.bezeichnung
         ))),
         None => Ok(()),
+    }
+}
+
+/// Der aktuelle Wert, wenn die neue Meldung eine NACHTRAGUNG ist: ihr Zeitpunkt liegt STRIKT
+/// vor dem der aktuellen Meldung. Bei gleichem Zeitpunkt gewinnt die größere id (D2), die neue
+/// Meldung wird also aktuell und ist keine Nachtragung. Der Textvergleich trägt, weil
+/// `zeitpunkt_pruefen` die Drahtform erzwingt (gepolstert, UTC ohne Zonenkennung).
+fn nachtrag_gegen(
+    neu_zeitpunkt: &str,
+    aktuell: Option<i64>,
+    aktuell_zeitpunkt: Option<&str>,
+) -> Option<i64> {
+    match (aktuell, aktuell_zeitpunkt) {
+        (Some(n), Some(z)) if neu_zeitpunkt < z => Some(n),
+        _ => None,
     }
 }
 
@@ -845,13 +869,27 @@ pub async fn stand_melden_tx(
     zeitpunkt_pruefen(&eingabe.zeitpunkt_at)?;
     let roh = bezirk_roh_tx(conn, einsatz_id, bezirk_id).await?;
     bezirk_lebt(&roh)?;
-    let inhalt = etb_text::stand_gemeldet(
-        &roh.bezeichnung,
-        eingabe.evakuiert,
-        eingabe.erhebung,
+    let nachtrag = nachtrag_gegen(
+        &eingabe.zeitpunkt_at,
         roh.stand_evakuiert,
-        roh.plan_personen,
+        roh.stand_zeitpunkt_at.as_deref(),
     );
+    let inhalt = match nachtrag {
+        Some(aktuell) => etb_text::stand_nachgetragen(
+            &roh.bezeichnung,
+            eingabe.evakuiert,
+            eingabe.erhebung,
+            aktuell,
+            roh.plan_personen,
+        ),
+        None => etb_text::stand_gemeldet(
+            &roh.bezeichnung,
+            eingabe.evakuiert,
+            eingabe.erhebung,
+            roh.stand_evakuiert,
+            roh.plan_personen,
+        ),
+    };
     let etb_id = crate::etb::repo::anlegen_tx(
         conn,
         einsatz_id,
@@ -917,8 +955,11 @@ pub async fn stand_zuruecknehmen_tx(
     .bind(stand_id)
     .execute(&mut *conn)
     .await?;
+    // VOR dem UPDATE gelesen (`roh`): war die zurückgenommene Meldung nicht die aktuelle,
+    // bleibt der Stand stehen, und der Text sagt „bleibt“ statt „wieder“.
+    let war_aktuell = roh.stand_id == Some(stand_id);
     let jetzt = stand_zeiger_neu_tx(conn, bezirk_id).await?;
-    let inhalt = etb_text::stand_zurueckgenommen(&roh.bezeichnung, jetzt);
+    let inhalt = etb_text::stand_zurueckgenommen(&roh.bezeichnung, jetzt, war_aktuell);
     let etb_id = crate::etb::repo::anlegen_tx(
         conn,
         einsatz_id,
@@ -1128,12 +1169,25 @@ pub async fn belegung_melden_tx(
             roh.bezeichnung
         )));
     }
-    let inhalt = etb_text::belegung_gemeldet(
-        &roh.bezeichnung,
-        eingabe.belegt,
+    let nachtrag = nachtrag_gegen(
+        &eingabe.zeitpunkt_at,
         roh.belegung_belegt,
-        roh.kapazitaet_personen,
+        roh.belegung_zeitpunkt_at.as_deref(),
     );
+    let inhalt = match nachtrag {
+        Some(aktuell) => etb_text::belegung_nachgetragen(
+            &roh.bezeichnung,
+            eingabe.belegt,
+            aktuell,
+            roh.kapazitaet_personen,
+        ),
+        None => etb_text::belegung_gemeldet(
+            &roh.bezeichnung,
+            eingabe.belegt,
+            roh.belegung_belegt,
+            roh.kapazitaet_personen,
+        ),
+    };
     let etb_id = crate::etb::repo::anlegen_tx(
         conn,
         einsatz_id,
@@ -1205,8 +1259,9 @@ pub async fn belegung_zuruecknehmen_tx(
     .bind(belegung_id)
     .execute(&mut *conn)
     .await?;
+    let war_aktuell = roh.belegung_id == Some(belegung_id);
     let jetzt = belegung_zeiger_neu_tx(conn, stelle_id).await?;
-    let inhalt = etb_text::belegung_zurueckgenommen(&roh.bezeichnung, jetzt);
+    let inhalt = etb_text::belegung_zurueckgenommen(&roh.bezeichnung, jetzt, war_aktuell);
     let etb_id = crate::etb::repo::anlegen_tx(
         conn,
         einsatz_id,

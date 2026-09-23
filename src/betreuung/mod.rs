@@ -511,14 +511,43 @@ pub mod etb_text {
         )
     }
 
-    /// `jetzt` = der nach der Rücknahme aktuelle Stand.
-    pub fn stand_zurueckgenommen(bezeichnung: &str, jetzt: Option<i64>) -> String {
-        match jetzt {
-            Some(n) => format!(
+    /// Eine nachgetragene Standmeldung: ihr Zeitpunkt liegt STRIKT vor dem der aktuellen
+    /// Meldung, der Stand bleibt also stehen (D2). „vorher N“ stünde hier falsch — mit der
+    /// Ereigniszeit der Nachtragung läse es sich als Rückgang, den es nie gab, und das ETB ist
+    /// nicht berichtigbar. `aktuell` = der Stand, der bleibt.
+    pub fn stand_nachgetragen(
+        bezeichnung: &str,
+        evakuiert: i64,
+        erhebung: Erhebung,
+        aktuell: i64,
+        plan: i64,
+    ) -> String {
+        format!(
+            "Bezirk {}: {evakuiert} evakuiert ({}), nachgetragen, aktueller Stand bleibt \
+             {aktuell}, Plan {plan}.",
+            q(bezeichnung),
+            erhebung.label()
+        )
+    }
+
+    /// `jetzt` = der nach der Rücknahme aktuelle Stand. `war_aktuell`: die zurückgenommene
+    /// Meldung war die aktuelle — nur dann ändert sich der Stand („wieder N“); sonst bleibt er
+    /// („bleibt N“), und „wieder“ unterstellte eine Änderung, die es nicht gab.
+    pub fn stand_zurueckgenommen(
+        bezeichnung: &str,
+        jetzt: Option<i64>,
+        war_aktuell: bool,
+    ) -> String {
+        match (jetzt, war_aktuell) {
+            (Some(n), true) => format!(
                 "Meldung zurückgenommen, Stand Bezirk {} wieder {n}.",
                 q(bezeichnung)
             ),
-            None => format!(
+            (Some(n), false) => format!(
+                "Meldung zurückgenommen, Stand Bezirk {} bleibt {n}.",
+                q(bezeichnung)
+            ),
+            (None, _) => format!(
                 "Meldung zurückgenommen, Bezirk {} ohne Standmeldung.",
                 q(bezeichnung)
             ),
@@ -604,14 +633,41 @@ pub mod etb_text {
         )
     }
 
-    /// `jetzt` = die nach der Rücknahme aktuelle Belegung.
-    pub fn belegung_zurueckgenommen(bezeichnung: &str, jetzt: Option<i64>) -> String {
-        match jetzt {
-            Some(n) => format!(
+    /// Eine nachgetragene Belegungsmeldung, wie [`stand_nachgetragen`]. `aktuell` = die
+    /// Belegung, die bleibt.
+    pub fn belegung_nachgetragen(
+        bezeichnung: &str,
+        belegt: i64,
+        aktuell: i64,
+        kapazitaet: Option<i64>,
+    ) -> String {
+        let kapazitaet = kapazitaet
+            .map(|k| format!(", Kapazität {k}"))
+            .unwrap_or_default();
+        format!(
+            "Betreuungsstelle {}: {belegt} untergebracht, nachgetragen, aktuelle Belegung \
+             bleibt {aktuell}{kapazitaet}.",
+            q(bezeichnung)
+        )
+    }
+
+    /// `jetzt` = die nach der Rücknahme aktuelle Belegung; `war_aktuell` wie bei
+    /// [`stand_zurueckgenommen`].
+    pub fn belegung_zurueckgenommen(
+        bezeichnung: &str,
+        jetzt: Option<i64>,
+        war_aktuell: bool,
+    ) -> String {
+        match (jetzt, war_aktuell) {
+            (Some(n), true) => format!(
                 "Meldung zurückgenommen, Belegung Betreuungsstelle {} wieder {n}.",
                 q(bezeichnung)
             ),
-            None => format!(
+            (Some(n), false) => format!(
+                "Meldung zurückgenommen, Belegung Betreuungsstelle {} bleibt {n}.",
+                q(bezeichnung)
+            ),
+            (None, _) => format!(
                 "Meldung zurückgenommen, Betreuungsstelle {} ohne Belegungsmeldung.",
                 q(bezeichnung)
             ),
