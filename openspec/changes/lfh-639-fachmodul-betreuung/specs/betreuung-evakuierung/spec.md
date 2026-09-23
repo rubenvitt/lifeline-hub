@@ -210,8 +210,8 @@ zurücknehmen lassen.
 - **THEN** ist die aktuelle Belegung 170 und das System lehnt nicht ab
 
 #### Scenario: Geschlossene Stelle
-- **WHEN** für eine geschlossene Stelle eine Belegung gemeldet wird
-- **THEN** antwortet das System mit 422 und speichert nichts
+- **WHEN** für eine geschlossene Stelle eine Belegung gemeldet oder eine Belegungsmeldung zurückgenommen wird
+- **THEN** antwortet das System mit 422 und ändert nichts
 
 ### Requirement: Kopfzahl in Betreuung zu einem Zeitpunkt
 
@@ -293,7 +293,7 @@ Primäraktion gesperrt stehen lassen.
 
 #### Scenario: Fremde Organisation
 - **WHEN** ein Benutzer einer anderen Organisation die Bezirke eines Einsatzes abruft
-- **THEN** antwortet das System mit 404
+- **THEN** antwortet das System mit 403 oder 404 und gibt keine Daten des Einsatzes preis
 
 ### Requirement: Schwärzung
 

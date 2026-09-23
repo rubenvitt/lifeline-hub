@@ -145,7 +145,7 @@ Aktionen an einem stornierten Bezirk oder einer stornierten Stelle (Präzedenz
 UNIQUE-Sicherheitsnetz. Einen Überschreiben-Dialog gibt es nicht, eine Schleife wie in
 LFH-299/300 kann also nicht entstehen. **422** steht für einen umkehrbaren Zustand, der die
 Aktion verbietet: eine Stelle mit Belegung > 0 schließen, eine geschlossene Stelle
-belegen, eine bereits zurückgenommene Meldung erneut zurücknehmen (Präzedenz
+belegen oder an ihr eine Belegung zurücknehmen (sonst entstünde „geschlossen und belegt“), eine bereits zurückgenommene Meldung erneut zurücknehmen (Präzedenz
 `abloesung/repo.rs`: Rücknahme ohne Vollzug → 422). „Geschlossen“ ist nach D4 umkehrbar
 und damit kein Lebensende. **400** gilt für das Feld allein: Anzahl < 0, Plangröße < 1,
 Kapazität < 1, leere Bezeichnung, unbekannter Enum-Wert, Zeitpunkt unlesbar oder in der
@@ -224,6 +224,9 @@ GET    /api/einsaetze/{id}/betreuung/belegung?zeitpunkt=     → Kopfzahl „in 
   optionales Objekt (`stand?: { evakuiert, erhebung, zeitpunkt_at, id }`). Optional nach der
   Norm aus LFH-265 (`skip_serializing_if`), damit „keine Meldung“ auf dem Draht fehlt statt
   `0` oder `null`. Ebenso `kapazitaet_personen?`.
+- Fremde Organisation: Der Org-Floor der Gate-Extraktoren weist mit 403 ab, ein unbekannter
+  Einsatz ist 404. Beide geben nichts preis, der Test akzeptiert beide (Bestand
+  `tests/stab.rs`).
 - Wird ein Abschnitt umbenannt oder gelöscht, trifft das den per Join gelesenen
   Abschnittsnamen. `EINSATZ_STREAM_EVENTS.abschnitt` invalidiert deshalb zusätzlich
   `EINSATZ_KEYS.betreuung` (ohne Guard, so auch bei der Ablösung).
