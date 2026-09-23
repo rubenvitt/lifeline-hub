@@ -205,8 +205,14 @@ describe('CommandPalette · → Vorschau (LFH-645)', () => {
     try {
       palette([speichern(), person()]);
       await u.keyboard('{ArrowDown}{ArrowRight}');
+      // Beide Übergänge werden abgewartet, bevor gezählt wird: unter CI-Last lief das `waitFor`
+      // unten auch mit fünf Sekunden leer (PR #121, Frontend-Suite 4/4, lokal nicht
+      // nachstellbar). Ohne diese Anker ist nicht zu unterscheiden, ob das Einscrollen fehlt
+      // oder die Tastenfolge die Vorschau noch gar nicht geöffnet bzw. verlassen hatte.
+      await waitFor(() => expect(vorschauRegion()).not.toBeNull());
       scrolle.mockClear();
       await u.keyboard('{Escape}');
+      await waitFor(() => expect(vorschauRegion()).toBeNull());
       // `waitFor`: das Einscrollen läuft im Effekt nach dem Rückweg. Unter CI-Last kam dieser
       // Effekt erst nach dem `keyboard`-Await an (gemessen in PR #122: 1 von 4 Shards rot,
       // lokal 5/5 grün) — die Aussage ist „wird eingescrollt", nicht „im selben Tick".

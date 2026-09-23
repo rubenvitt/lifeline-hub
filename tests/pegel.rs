@@ -957,3 +957,105 @@ async fn verlauf_liest_der_beobachter_die_fremde_org_nicht() {
     let (status, _) = anfrage(&u.app, "GET", &verlauf_pfad(999_999), &admin, None).await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
+
+// ---------- Lagekennzahlen am Einsatz (LFH-640) ----------
+
+/// `lagekennzahlen` des Einsatzes aus Detail- UND Listenantwort. Das Feld wird an zwei Stellen
+/// gebaut (`Einsatz::anzeige`, `repo::liste_fuer`) — geprüft wird beides, und das
+/// Vorhandensein per `contains_key`: ein fehlender Key sähe per Index wie `null` aus.
+async fn lagekennzahlen(u: &Umgebung, cookie: &str, einsatz: i64) -> (Value, Value) {
+    let (status, detail) = anfrage(
+        &u.app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}"),
+        cookie,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{detail:?}");
+    assert!(
+        detail.as_object().unwrap().contains_key("lagekennzahlen"),
+        "Detail: nie absent, leer ist []: {detail:?}"
+    );
+    let (status, liste) = anfrage(&u.app, "GET", "/api/einsaetze", cookie, None).await;
+    assert_eq!(status, StatusCode::OK, "{liste:?}");
+    let zeile = liste
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|e| e["id"].as_i64() == Some(einsatz))
+        .expect("Einsatz in der Liste")
+        .clone();
+    assert!(
+        zeile.as_object().unwrap().contains_key("lagekennzahlen"),
+        "Liste: nie absent, leer ist []: {zeile:?}"
+    );
+    (
+        detail["lagekennzahlen"].clone(),
+        zeile["lagekennzahlen"].clone(),
+    )
+}
+
+#[tokio::test]
+async fn pegel_festlegen_schaltet_die_lagekennzahl_am_einsatz() {
+    let u = setup_pegel().await;
+    let admin = login_cookie(&u.app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&u.app, &admin).await;
+    let leer = serde_json::json!([]);
+    let pegel = serde_json::json!(["pegel"]);
+
+    assert_eq!(
+        lagekennzahlen(&u, &admin, einsatz).await,
+        (leer.clone(), leer.clone())
+    );
+
+    // Anfügen (Weg aus dem Fachebenen-Inspektor der Lagekarte).
+    let (status, _) = anfrage(
+        &u.app,
+        "POST",
+        &pfad(einsatz),
+        &admin,
+        Some(&format!(r#"{{"station_uuid":"{A}","name":"Köln"}}"#)),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(
+        lagekennzahlen(&u, &admin, einsatz).await,
+        (pegel.clone(), pegel.clone())
+    );
+
+    // Leeren über den Vollersatz (Weg aus den Einstellungen).
+    let (status, _) = anfrage(
+        &u.app,
+        "PUT",
+        &pfad(einsatz),
+        &admin,
+        Some(r#"{"stationen":[]}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        lagekennzahlen(&u, &admin, einsatz).await,
+        (leer.clone(), leer)
+    );
+
+    // Ein Pegel an EINEM Einsatz schaltet keinen anderen.
+    let anderer = einsatz_anlegen(&u.app, &admin).await;
+    let (status, _) = anfrage(
+        &u.app,
+        "PUT",
+        &pfad(einsatz),
+        &admin,
+        Some(&liste(&[(B, "Bonn")])),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        lagekennzahlen(&u, &admin, einsatz).await,
+        (pegel.clone(), pegel)
+    );
+    assert_eq!(
+        lagekennzahlen(&u, &admin, anderer).await,
+        (serde_json::json!([]), serde_json::json!([]))
+    );
+}

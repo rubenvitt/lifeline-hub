@@ -3,6 +3,7 @@ pub mod effektiv;
 pub mod einstellungen;
 pub mod funktion;
 pub mod kontext;
+pub mod lagekennzahl;
 pub mod modul;
 pub mod modul_override;
 pub mod nummer;
@@ -195,6 +196,9 @@ pub struct Einsatz {
     pub geloescht_at: Option<String>,
     /// Read-only Join-Feld (organisation.name der eigenen Org); via `laden` befüllt.
     pub org_name: String,
+    /// Read-only abgeleitet (LFH-640): mindestens ein maßgeblicher Pegel festgelegt. Auslöser
+    /// der Lagekennzahl `pegel`, siehe [`lagekennzahl::ableiten`].
+    pub pegel_festgelegt: bool,
 }
 
 impl Einsatz {
@@ -242,6 +246,7 @@ impl Einsatz {
             meine_fuehrungsstelle,
             meine_sachgebiete,
             meine_funktion,
+            lagekennzahlen: lagekennzahl::ableiten(self.pegel_festgelegt),
         }
     }
 }
@@ -294,6 +299,14 @@ pub struct EinsatzAnzeige {
     /// und `meine_rolle` über `funktion::ableiten` — fehlt, wenn keine Funktion folgt.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub meine_funktion: Option<String>,
+    /// Aktive lagebezogene Kennzahlen (LFH-640): welche Lageplätze des Kennzahlenbands im
+    /// Lage-Dashboard belegt sind. Gesetzt nur durch bewusste Entscheidungen (heute: Pegel
+    /// festgelegt), nie durch Messwerte.
+    ///
+    /// **Leer ist `[]`, nie `absent`** — wie `meine_sachgebiete` an zwei Stellen gebaut, deshalb
+    /// `#[schema(required)]` und kein `skip_serializing_if`.
+    #[schema(required)]
+    pub lagekennzahlen: Vec<lagekennzahl::Lagekennzahl>,
 }
 
 /// Mitglied eines Einsatzes für API-Antworten (mit Benutzer-Klartext, ohne Hash).
@@ -349,6 +362,7 @@ mod tests {
             id: 1,
             org_id: 1,
             org_name: "Orga".into(),
+            pegel_festgelegt: false,
             bezeichnung: "Lage".into(),
             stichwort: None,
             status: EinsatzStatus::Aktiv,

@@ -13,6 +13,8 @@ import {
   vermisstNotiz,
   baueLagebild,
   einsatzdauer,
+  kennzahlReihe,
+  reihenWechsel,
   lagebildZeit,
   standText,
   warnstufeTon,
@@ -33,7 +35,8 @@ const roh = (over: Partial<Rohdaten> = {}): Rohdaten => ({
     begonnen_at: '2026-06-11 05:19:00',
     abgeschlossen_at: null,
     status: 'aktiv',
-  } as EinsatzAnzeige,
+    lagekennzahlen: [],
+  } as unknown as EinsatzAnzeige,
   personen: [],
   uhs: [],
   schaeden: [],
@@ -100,22 +103,136 @@ describe('warnstufeTon', () => {
   });
 });
 
-describe('baueLagebild', () => {
-  it('liefert das Kennzahl-Set des Neuentwurfs in fester Reihenfolge', () => {
-    const bild = baueLagebild(roh(), JETZT, BERLIN);
-    // Handgeschrieben: Pegel auf Platz 1, „Höchste Warnstufe" ist raus (LFH-606).
-    expect(bild.kennzahlen.map((k) => k.etikett)).toEqual([
-      'Pegel',
+/**
+ * Die lagebezogene Kennzahlreihe (LFH-640). Alle Erwartungen sind HANDGESCHRIEBENE Literale —
+ * aus der Platzbeschreibung gelesen prüfte der Pin die Beschreibung gegen sich selbst.
+ * Spec: `docs/superpowers/specs/2026-09-23-lfh-640-lagebezogene-kennzahlreihe-design.md`.
+ */
+describe('kennzahlReihe (LFH-640)', () => {
+  const KERN = { 1: 'Betroffene', 3: 'Kräfte', 4: 'Vermisste', 5: 'Einsatzdauer' } as const;
+
+  it('ohne Auslöser: beide Lageplätze tragen ihre Füllkennzahl', () => {
+    expect(kennzahlReihe([])).toEqual([
+      'Verbleib offen',
       'Betroffene',
+      'Schäden offen',
       'Kräfte',
       'Vermisste',
-      'Schäden offen',
       'Einsatzdauer',
     ]);
   });
 
+  it('Pegel festgelegt: der Pegel steht auf Platz 1, Platz 3 bleibt „Schäden offen"', () => {
+    expect(kennzahlReihe(['pegel'])).toEqual([
+      'Pegel',
+      'Betroffene',
+      'Schäden offen',
+      'Kräfte',
+      'Vermisste',
+      'Einsatzdauer',
+    ]);
+  });
+
+  it('für jede Eingabe: sechs Plätze, der Kern auf den Indizes 1, 3, 4 und 5', () => {
+    for (const aktiv of [[], ['pegel']] as const) {
+      const reihe = kennzahlReihe(aktiv);
+      expect(reihe).toHaveLength(6);
+      for (const [i, etikett] of Object.entries(KERN)) expect(reihe[Number(i)]).toBe(etikett);
+    }
+  });
+
+  it('Heimatplatz: ein hinzukommender Auslöser ändert genau EINEN Platz', () => {
+    const vorher = kennzahlReihe([]);
+    const nachher = kennzahlReihe(['pegel']);
+    const geaendert = vorher.flatMap((e, i) => (e === nachher[i] ? [] : [i]));
+    expect(geaendert).toEqual([0]);
+  });
+
+  it('die Reihenfolge der Auslöser am Einsatz ändert nichts', () => {
+    expect(kennzahlReihe(['pegel', 'pegel'])).toEqual(kennzahlReihe(['pegel']));
+  });
+});
+
+describe('reihenWechsel', () => {
+  it('nennt je geändertem Platz „neu statt alt"', () => {
+    expect(reihenWechsel(kennzahlReihe([]), kennzahlReihe(['pegel']))).toBe(
+      'Pegel statt Verbleib offen',
+    );
+    expect(reihenWechsel(kennzahlReihe(['pegel']), kennzahlReihe([]))).toBe(
+      'Verbleib offen statt Pegel',
+    );
+  });
+
+  it('gleiche Reihe → kein Wechsel', () => {
+    expect(reihenWechsel(kennzahlReihe(['pegel']), kennzahlReihe(['pegel']))).toBeNull();
+  });
+});
+
+describe('baueLagebild', () => {
+  it('baut die Kennzahlen in der Reihe des Einsatzes', () => {
+    const ohne = baueLagebild(roh(), JETZT, BERLIN);
+    expect(ohne.kennzahlen.map((k) => k.etikett)).toEqual([
+      'Verbleib offen',
+      'Betroffene',
+      'Schäden offen',
+      'Kräfte',
+      'Vermisste',
+      'Einsatzdauer',
+    ]);
+    const mit = baueLagebild(
+      roh({ einsatz: { ...roh().einsatz, lagekennzahlen: ['pegel'] } }),
+      JETZT,
+      BERLIN,
+    );
+    expect(mit.kennzahlen.map((k) => k.etikett)).toEqual([
+      'Pegel',
+      'Betroffene',
+      'Schäden offen',
+      'Kräfte',
+      'Vermisste',
+      'Einsatzdauer',
+    ]);
+  });
+
+  it('eine übergebene Reihe schlägt die des Einsatzes (gehaltener Zuschnitt der Seite)', () => {
+    const bild = baueLagebild(roh(), JETZT, BERLIN, kennzahlReihe(['pegel']));
+    expect(bild.kennzahlen[0].etikett).toBe('Pegel');
+  });
+
+  it('Verbleib offen: Angetroffene ohne Verbleib, Notiz transportiert, Achtung bei > 0', () => {
+    const p = (extra: Partial<Person>) =>
+      ({
+        status: 'betroffen',
+        aktuelle_verbleib_art: null,
+        aktuelle_uhs_id: null,
+        ...extra,
+      }) as Person;
+    const bild = baueLagebild(
+      roh({
+        personen: [
+          p({}),
+          p({}),
+          p({ aktuelle_verbleib_art: 'transport', aktueller_verbleib_status: 'abtransportiert' }),
+          p({ status: 'vermisst' }),
+        ],
+      }),
+      JETZT,
+      BERLIN,
+    );
+    expect(bild.kennzahlen[0]).toMatchObject({
+      etikett: 'Verbleib offen',
+      wert: '2',
+      notiz: '1 transportiert',
+      ton: 'achtung',
+      route: 'personen',
+    });
+    const leer = baueLagebild(roh(), JETZT, BERLIN).kennzahlen[0];
+    expect(leer).toMatchObject({ wert: '0', ton: 'neutral' });
+  });
+
   it('Einsatzdauer: Wert, Einheit und Beginn in der Anzeigezone', () => {
     const dauer = baueLagebild(roh(), JETZT, BERLIN).kennzahlen[5];
+    expect(dauer.etikett).toBe('Einsatzdauer');
     expect(dauer.wert).toBe('6:41');
     expect(dauer.einheit).toBe('h');
     // 05:19 UTC → 07:19 Berlin; derselbe Tag wie „jetzt" braucht keinen Tag.
@@ -129,8 +246,9 @@ describe('baueLagebild', () => {
       roh({ personen: [p('sk1'), p('sk4'), p('unverletzt'), p(null, 'vermisst')] }),
       JETZT,
     );
-    expect(bild.kennzahlen[1]).toMatchObject({ wert: '4', notiz: '2 Patienten', ton: 'neutral' });
-    expect(bild.kennzahlen[3]).toMatchObject({ wert: '1', ton: 'alarm' });
+    const nach = (e: string) => bild.kennzahlen.find((k) => k.etikett === e);
+    expect(nach('Betroffene')).toMatchObject({ wert: '4', notiz: '2 Patienten', ton: 'neutral' });
+    expect(nach('Vermisste')).toMatchObject({ wert: '1', ton: 'alarm' });
   });
 
   it('die Warnstufe kommt aus der Gebiets-Übersicht — für den Kopf-Hinweis, nicht fürs Band', () => {
@@ -152,7 +270,11 @@ describe('baueLagebild', () => {
       // 11:05 UTC in Berliner Sommerzeit geschrieben; JETZT ist 12:00 UTC → 55 min alt.
       messung: { wasserstand_cm: 684, zeitpunkt: '2026-06-11T13:05:00+02:00', trend_cm_pro_h: 9 },
     } as PegelAnzeige;
-    const k = baueLagebild(roh({ pegel: [p] }), JETZT, BERLIN).kennzahlen[0];
+    const k = baueLagebild(
+      roh({ pegel: [p], einsatz: { ...roh().einsatz, lagekennzahlen: ['pegel'] } }),
+      JETZT,
+      BERLIN,
+    ).kennzahlen[0];
     expect(k).toMatchObject({ etikett: 'Pegel', wert: '6,84', einheit: 'm', ton: 'neutral' });
     expect(k.notiz).toBe('WESER · steigend +9 cm/h · Stand 13:05');
     expect(k.zielPfad).toBe('/einsaetze/1/einstellungen/pegel');
@@ -160,21 +282,20 @@ describe('baueLagebild', () => {
 
   it('Pegel: das Ziel kommt als Eingabe — Modulseite, wenn sie frei ist (LFH-633)', () => {
     // Die Seite entscheidet über `istKeyFreigegeben`; ohne Angabe bleibt es die Pflege.
-    const mitModul = baueLagebild(roh({ pegelZiel: '/einsaetze/1/wetter-pegel' }), JETZT, BERLIN);
+    const mitPegel = { ...roh().einsatz, lagekennzahlen: ['pegel'] } as EinsatzAnzeige;
+    const mitModul = baueLagebild(
+      roh({ einsatz: mitPegel, pegelZiel: '/einsaetze/1/wetter-pegel' }),
+      JETZT,
+      BERLIN,
+    );
     expect(mitModul.kennzahlen[0].zielPfad).toBe('/einsaetze/1/wetter-pegel');
-    const ohneModul = baueLagebild(roh(), JETZT, BERLIN);
+    const ohneModul = baueLagebild(roh({ einsatz: mitPegel }), JETZT, BERLIN);
     expect(ohneModul.kennzahlen[0].zielPfad).toBe('/einsaetze/1/einstellungen/pegel');
   });
 
-  it('Pegel: keiner festgelegt belegt den Platz trotzdem, mit Weg zur Auswahl', () => {
-    const k = baueLagebild(roh(), JETZT, BERLIN).kennzahlen[0];
-    expect(k).toMatchObject({
-      etikett: 'Pegel',
-      wert: '—',
-      notiz: 'kein Pegel festgelegt',
-      ton: 'neutral',
-      zielPfad: '/einsaetze/1/einstellungen/pegel',
-    });
+  it('Pegel: ohne festgelegten Pegel gibt es keinen Pegel-Platz (LFH-640 statt LFH-606)', () => {
+    const etiketten = baueLagebild(roh(), JETZT, BERLIN).kennzahlen.map((k) => k.etikett);
+    expect(etiketten).not.toContain('Pegel');
   });
 
   it('Führungsstand: Überfälligkeit ist vom Bearbeitungsstatus unabhängig', () => {
