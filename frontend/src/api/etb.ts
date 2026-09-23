@@ -1,5 +1,6 @@
 import type {
   Auftrag,
+  EtbAnzahl,
   EtbEintragAnzeige,
   EtbLesemarke,
   EtbTyp,
@@ -33,6 +34,20 @@ export function listeEtb(einsatzId: number, params: EtbAbfrage = {}): Promise<Et
   if (params.before_lfd_nr != null) qs.set('before_lfd_nr', String(params.before_lfd_nr));
   qs.set('limit', String(params.limit ?? SEITENGROESSE));
   return apiGet<EtbEintragAnzeige[]>(`/api/einsaetze/${einsatzId}/etb?${qs.toString()}`);
+}
+
+/**
+ * Trefferzahl eines ETB-Filters ohne Seitendeckel (LFH-619). Derselbe Filter wie
+ * {@link listeEtb}, aber ohne `limit`/`before_lfd_nr` — die Route zählt ungedeckelt.
+ */
+export function zaehleEtb(einsatzId: number, params: EtbFilterWerte = {}): Promise<EtbAnzahl> {
+  const qs = new URLSearchParams();
+  if (params.q) qs.set('q', params.q);
+  if (params.typ) qs.set('typ', params.typ);
+  if (params.von) qs.set('von', params.von);
+  if (params.bis) qs.set('bis', params.bis);
+  if (params.erfasser_id != null) qs.set('erfasser_id', String(params.erfasser_id));
+  return apiGet<EtbAnzahl>(`/api/einsaetze/${einsatzId}/etb/anzahl?${qs.toString()}`);
 }
 
 export interface NeuerEintrag {

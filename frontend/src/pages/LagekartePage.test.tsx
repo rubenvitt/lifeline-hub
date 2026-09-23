@@ -28,6 +28,9 @@ vi.mock('./lagekarte/Kartenflaeche', () => ({
       </div>
       {/* bbox-Pfad (LFH-81): ob die Seite überhaupt einen Ausschnitt hören will, und ein
           Auslöser, der einen Ausschnitt meldet wie die echte Karte nach `moveend`. */}
+      {/* Anflugziel (LFH-619): der Koordinatensprung der Sprungpalette kommt als
+          ?zentrum= an und muss hier als Ziel ankommen. */}
+      <div data-testid="flyto">{JSON.stringify(props.flyToZiel ?? null)}</div>
       <div data-testid="bbox-callback">{props.onBboxAenderung ? 'an' : 'aus'}</div>
       {/* Die echte Karte meldet Zoom und bbox im selben Zug (`Kartenflaeche.tsx`, `verarbeite`)
           — der Stub tut das nachgebildet, sonst bliebe eine zoom-gebundene Ebene (Energie,
@@ -1165,6 +1168,38 @@ describe('LagekartePage', () => {
     await waitFor(() =>
       expect(screen.getByTestId('location-search')).not.toHaveTextContent('platzieren'),
     );
+  });
+
+  /**
+   * Koordinatensprung (LFH-619): die Sprungpalette schickt `?zentrum=<lat>,<lon>`. Die Karte
+   * fliegt die Stelle an und räumt den Parameter — ein stehengebliebener Mittelpunkt zöge die
+   * Karte bei jedem Neuladen wieder dorthin, auch nachdem man längst weitergeschoben hat.
+   * Ein Beobachter darf das: Anfliegen ist Lesen.
+   */
+  it('Deeplink ?zentrum= fliegt die Stelle an und räumt den Param (LFH-619)', async () => {
+    basisHandler([
+      http.get('/api/einsaetze/1', () =>
+        HttpResponse.json({ ...EINSATZ, meine_rolle: 'beobachter' }),
+      ),
+    ]);
+    renderSeiteMitSonde('/einsaetze/1/lagekarte?zentrum=52.52,13.405');
+
+    await waitFor(() =>
+      expect(screen.getByTestId('flyto')).toHaveTextContent('{"lng":13.405,"lat":52.52}'),
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('zentrum'),
+    );
+  });
+
+  it('Deeplink ?zentrum=: ein unbrauchbarer Wert fliegt nichts an und wird trotzdem geräumt', async () => {
+    basisHandler();
+    renderSeiteMitSonde('/einsaetze/1/lagekarte?zentrum=52.52');
+
+    await waitFor(() =>
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('zentrum'),
+    );
+    expect(screen.getByTestId('flyto')).toHaveTextContent('null');
   });
 
   it('Deeplink ?platzieren=: ein Beobachter kommt nicht in den Platzier-Modus', async () => {

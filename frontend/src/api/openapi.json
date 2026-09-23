@@ -2739,6 +2739,20 @@
           "quittiert"
         ]
       },
+      "EtbAnzahlAnzeige": {
+        "type": "object",
+        "description": "Trefferzahl eines ETB-Filters (`GET /api/einsaetze/{id}/etb/anzahl`).",
+        "required": [
+          "anzahl"
+        ],
+        "properties": {
+          "anzahl": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Zahl der Einträge, auf die der Filter passt — ohne Seitendeckel."
+          }
+        }
+      },
       "EtbBaustein": {
         "type": "object",
         "description": "Öffentliche Sicht eines ETB-Baustein-Katalogeintrags. Die DB-Spalten `aktiv`,\n`erstellt_at` und `aktualisiert_at` werden bewusst nicht serialisiert.",

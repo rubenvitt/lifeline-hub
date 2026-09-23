@@ -12,7 +12,10 @@ import { listeAuftraege } from '../api/auftraege';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import { listeEinheiten } from '../api/einheiten';
-import { listeEtb } from '../api/etb';
+import { listeEtb, zaehleEtb } from '../api/etb';
+import { listeLageberichte } from '../api/lageberichte';
+import { ladeGefahrengebiete } from '../api/gefahren';
+import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { istModulFreigegeben, modulRegistry } from '../einsatz/modulRegistry';
 import {
   baueDatensatzTreffer,
@@ -39,7 +42,7 @@ import {
  * Öffnen (`{offen && <PaletteHost/>}` in `CommandPaletteProvider.tsx`), jede hier angehängte
  * Query feuert also im Moment des Tastendrucks. Warm sind ohne Zutun nur `meldungen` und
  * `auftraege` (die Modulzähler im `EinsatzLayout`); auf jeder anderen Modulseite wären es
- * bis zu neun kalte Abrufe für eine Palette, die vielleicht nur „Dunkel" sucht.
+ * bis zu vierzehn kalte Abrufe für eine Palette, die vielleicht nur „Dunkel" sucht.
  *
  * MUSTER ist `pages/ChatPage.tsx` (Sachbezug-Picker, dort mit derselben Begründung:
  * „vermeidet 6 eager Requests bei jedem Chat-Öffnen") — übernommen, nicht neu erfunden.
@@ -71,7 +74,7 @@ import {
  * Deutlich über dem globalen Vorgabewert (10 s, `api/queryClient.ts`), und das ist keine
  * Nachlässigkeit: diese Fächer hängen am SSE-Fan-out (`EINSATZ_STREAM_EVENTS`), eine
  * Änderung erreicht sie also über die Invalidierung und nicht über das Ablaufen der Frist.
- * Ohne die längere Frist holte jedes Öffnen der Palette bis zu neun Listen neu, obwohl die
+ * Ohne die längere Frist holte jedes Öffnen der Palette bis zu zwölf Listen neu, obwohl die
  * Modulseite daneben dieselben Daten gerade anzeigt.
  */
 const FRISCH_MS = 60_000;
@@ -98,7 +101,7 @@ export interface DatensatzAbruf {
 /**
  * Die drei Riegel vor jedem `enabled`, an EINER Stelle (LFH-391 · C3).
  *
- * Rein und exportiert, weil zwei Hooks sie brauchen: `useDatensaetze` für seine zehn Listen
+ * Rein und exportiert, weil zwei Hooks sie brauchen: `useDatensaetze` für seine vierzehn Abrufe
  * UND `useDatensatzTreffer` für den Sichtbarkeits-Abruf darunter. Zwei Kopien wären zwei
  * Bedingungen, und die Overrides liefen dann in einem Zustand los, in dem keine einzige
  * Liste folgt — ein Request für eine Ansicht ohne Datensatzzeile.
@@ -136,6 +139,16 @@ export function etbSuchSchluessel(einsatzId: number, q: string) {
  */
 export function etbNummerSchluessel(einsatzId: number, nummer: number) {
   return einsatzKeys.etbListe(einsatzId, { before_lfd_nr: nummer + 1, limit: 1 });
+}
+
+/**
+ * Cache-Fach der ETB-Zählung (LFH-619). Unter dem ETB-Prefix, damit jedes `etb`-Live-Ereignis
+ * die Zahl mit invalidiert; das `anzahl: true` trennt das Fach von der Liste der ETB-Seite
+ * und vom Volltextfach oben — eine Zahl und ein Array unter einem Schlüssel wären derselbe
+ * stille Fehler wie in {@link etbSuchSchluessel} beschrieben.
+ */
+export function etbAnzahlSchluessel(einsatzId: number, q: string) {
+  return einsatzKeys.etbListe(einsatzId, { q, anzahl: true });
 }
 
 /**
@@ -252,6 +265,25 @@ export function useDatensaetze({ einsatzId, modus, suche }: DatensatzAbruf): Dat
     enabled: darfLaden('einheiten'),
     staleTime: FRISCH_MS,
   });
+  // LFH-619 — dieselben geteilten Fächer wie Lageberichte-, Gefahren- und Abschnittsseite.
+  const lageberichteQuery = useQuery({
+    queryKey: einsatzKeys.lageberichte(id),
+    queryFn: () => listeLageberichte(id),
+    enabled: darfLaden('lageberichte'),
+    staleTime: FRISCH_MS,
+  });
+  const gefahrengebieteQuery = useQuery({
+    queryKey: einsatzKeys.gefahrengebiete(id),
+    queryFn: () => ladeGefahrengebiete(id),
+    enabled: darfLaden('gefahrengebiete'),
+    staleTime: FRISCH_MS,
+  });
+  const abschnitteQuery = useQuery({
+    queryKey: einsatzKeys.abschnitte(id),
+    queryFn: () => listeAbschnitte(id),
+    enabled: darfLaden('abschnitte'),
+    staleTime: FRISCH_MS,
+  });
 
   /**
    * Der ETB ist die einzige serverseitig gefilterte Quelle — und die einzige mit ZWEI
@@ -289,9 +321,21 @@ export function useDatensaetze({ einsatzId, modus, suche }: DatensatzAbruf): Dat
     staleTime: FRISCH_MS,
     gcTime: ETB_SUCH_GC_MS,
   });
+  /**
+   * Die Zahl hinter dem Sammeltreffer (LFH-619) — an denselben Riegeln wie der Volltext:
+   * keine Nummer, mindestens ein alphanumerisches Token. Ohne `q` zählte die Route das ganze
+   * Tagebuch, und die Zeile hiesse „Alle Einträge zu ??".
+   */
+  const etbAnzahlQuery = useQuery({
+    queryKey: etbAnzahlSchluessel(id, rest),
+    queryFn: () => zaehleEtb(id, { q: rest }),
+    enabled: darfLaden('etbAnzahl') && zahl === null && etbVolltextMoeglich(rest),
+    staleTime: FRISCH_MS,
+    gcTime: ETB_SUCH_GC_MS,
+  });
 
   /**
-   * Über die zehn Datenreferenzen memoisiert, nicht je Render frisch gebaut: das Ergebnis
+   * Über die Datenreferenzen memoisiert, nicht je Render frisch gebaut: das Ergebnis
    * geht in ein `useMemo` des Aufrufers, und ein je Render neues Objekt machte das dort
    * wirkungslos.
    */
@@ -307,6 +351,10 @@ export function useDatensaetze({ einsatzId, modus, suche }: DatensatzAbruf): Dat
       einheiten: einheitenQuery.data,
       etbNummer: etbNummerQuery.data,
       etbText: etbTextQuery.data,
+      etbAnzahl: etbAnzahlQuery.data,
+      lageberichte: lageberichteQuery.data,
+      gefahrengebiete: gefahrengebieteQuery.data,
+      abschnitte: abschnitteQuery.data,
     }),
     [
       personenQuery.data,
@@ -319,6 +367,10 @@ export function useDatensaetze({ einsatzId, modus, suche }: DatensatzAbruf): Dat
       einheitenQuery.data,
       etbNummerQuery.data,
       etbTextQuery.data,
+      etbAnzahlQuery.data,
+      lageberichteQuery.data,
+      gefahrengebieteQuery.data,
+      abschnitteQuery.data,
     ],
   );
 }
@@ -358,7 +410,7 @@ export function useDatensatzTreffer({
 
   // `aktuellerModulKey` gehört NICHT in `DatensatzAbruf`: er entscheidet nichts über den
   // Abruf, nur über die Rangfolge (LFH-391 · C4). Stünde er dort, hinge das `enabled` der
-  // zehn Listen an ihm, und ein Modulwechsel bei offener Palette startete sie neu.
+  // vierzehn Abrufe an ihm, und ein Modulwechsel bei offener Palette startete sie neu.
   return useMemo(
     () =>
       einsatzId == null
