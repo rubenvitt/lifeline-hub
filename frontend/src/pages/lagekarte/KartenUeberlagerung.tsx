@@ -223,10 +223,11 @@ export interface KartenUeberlagerungProps {
   onZeichnen?: () => void;
   /**
    * Messwerkzeug an/aus (LFH-616). Steht auch OHNE Schreibrecht da: gemessen wird nur,
-   * gespeichert nichts — anders als der Stift darunter.
+   * gespeichert nichts — anders als der Stift darunter. Nicht gesetzt (Karte ohne
+   * Messwerkzeug, z. B. `personen/BetroffeneKarte.tsx`) → kein Knopf.
    */
-  onMessen: () => void;
-  messenAktiv: boolean;
+  onMessen?: () => void;
+  messenAktiv?: boolean;
 }
 
 export default function KartenUeberlagerung(props: KartenUeberlagerungProps) {
@@ -297,15 +298,17 @@ export default function KartenUeberlagerung(props: KartenUeberlagerungProps) {
           <TbCompass size={16} />
         </Kartenknopf>
         {/* Reihenfolge wie im Entwurf S5: Lineal vor Stift. */}
-        <Kartenknopf
-          beschriftung="Messen"
-          onClick={props.onMessen}
-          kante={kante}
-          farbe={props.messenAktiv ? rollen.bedien : rollen.gedaempft}
-          gedrueckt={props.messenAktiv}
-        >
-          <TbRulerMeasure size={16} />
-        </Kartenknopf>
+        {props.onMessen && (
+          <Kartenknopf
+            beschriftung="Messen"
+            onClick={props.onMessen}
+            kante={kante}
+            farbe={props.messenAktiv ? rollen.bedien : rollen.gedaempft}
+            gedrueckt={props.messenAktiv ?? false}
+          >
+            <TbRulerMeasure size={16} />
+          </Kartenknopf>
+        )}
         {props.onZeichnen && (
           <Kartenknopf
             beschriftung="Zeichenwerkzeuge"
