@@ -18,6 +18,11 @@
 //! (etwa 1 km): Einsätze am selben Ort teilen sich einen Abruf, und an den Dritten geht weder
 //! die genaue Lage noch ein Einsatzbezug. Die Warnzelle ist ohnehin gröber als 1 km.
 //!
+//! **Der Schlüssel trägt außerdem die Organisation** (nicht die Anfrage): ein instanzweit
+//! geteilter Eintrag verriete über `abgerufen_at`, dass eine FREMDE Organisation in den
+//! letzten Stunden am selben Ort Wetter abgefragt hat — also dort einen Einsatz führt. Geteilt
+//! wird deshalb nur innerhalb einer Organisation (Review LFH-633).
+//!
 //! Der Cache hält die Warnungen **ungefiltert**; abgelaufene entfernt [`anzeige`] bei jeder
 //! Antwort (`quelle::gueltige`), vergangene Vorhersagestunden ebenso
 //! (`quelle::kommende_stunden`).
@@ -54,18 +59,21 @@ pub const ABRUF_FRIST: Duration = Duration::from_secs(8);
 /// Ruhezeit eines Schlüssels nach einem gescheiterten Abruf.
 pub const ABKUEHLUNG: Duration = Duration::from_secs(60);
 
-/// Ein auf zwei Nachkommastellen gerundeter Ort, wie er in Schlüssel und Anfrage steht.
+/// Ein auf zwei Nachkommastellen gerundeter Ort einer Organisation. `lat`/`lon` stehen in
+/// Schlüssel UND Anfrage, `org_id` nur im Schlüssel — an den Dritten geht keine Kennung.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GerundeterOrt {
+    pub org_id: i64,
     pub lat: String,
     pub lon: String,
 }
 
 impl GerundeterOrt {
-    pub fn neu(lat: f64, lon: f64) -> Self {
+    pub fn neu(org_id: i64, lat: f64, lon: f64) -> Self {
         // `+ 0.0` macht aus einer −0.00 eine 0.00: sonst zwei Schlüssel für denselben Ort.
         let runde = |x: f64| format!("{:.2}", (x * 100.0).round() / 100.0 + 0.0);
         GerundeterOrt {
+            org_id,
             lat: runde(lat),
             lon: runde(lon),
         }
@@ -110,15 +118,15 @@ const VORHERSAGE: Teil<WetterVorhersage> = Teil {
 
 /// Cache-Schlüssel (zugleich In-flight- und Abkühlungsschlüssel).
 fn schluessel(praefix: &str, ort: &GerundeterOrt) -> String {
-    format!("{praefix}:{},{}", ort.lat, ort.lon)
+    format!("{praefix}:{}:{},{}", ort.org_id, ort.lat, ort.lon)
 }
 
-/// Cache-Schlüssel der Warnungen, z. B. `wetter-warnungen:53.08,8.80`.
+/// Cache-Schlüssel der Warnungen, z. B. `wetter-warnungen:1:53.08,8.80` (Org 1).
 pub fn schluessel_warnungen(ort: &GerundeterOrt) -> String {
     schluessel(WARNUNGEN.praefix, ort)
 }
 
-/// Cache-Schlüssel der Vorhersage, z. B. `wetter-vorhersage:53.08,8.80`.
+/// Cache-Schlüssel der Vorhersage, z. B. `wetter-vorhersage:1:53.08,8.80` (Org 1).
 pub fn schluessel_vorhersage(ort: &GerundeterOrt) -> String {
     schluessel(VORHERSAGE.praefix, ort)
 }
@@ -310,10 +318,12 @@ fn abgerufen_at(jetzt: DateTime<Utc>, alter_s: i64) -> String {
 }
 
 /// Die ganze Antwort des Wetter-Endpunkts. `ort` ist der Einsatzort (lat, lon); ohne ihn
-/// sind beide Teile `kein_ort`, und es gibt keinen Abruf. Beide Teile laufen parallel.
+/// sind beide Teile `kein_ort`, und es gibt keinen Abruf. `org_id` ist die Organisation des
+/// Einsatzes (nur im Cache-Schlüssel). Beide Teile laufen parallel.
 pub async fn anzeige(
     fe: &FachebenenState,
     pool: &SqlitePool,
+    org_id: i64,
     ort: Option<(f64, f64)>,
     jetzt: DateTime<Utc>,
 ) -> WetterAnzeige {
@@ -332,7 +342,7 @@ pub async fn anzeige(
             },
         };
     };
-    let ort = GerundeterOrt::neu(lat, lon);
+    let ort = GerundeterOrt::neu(org_id, lat, lon);
     let (warn, vorh) = tokio::join!(
         warnlage(fe, pool, &ort, jetzt),
         vorhersage(fe, pool, &ort, jetzt)
@@ -381,11 +391,12 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     /// Bremen-Mitte, nicht auf einer Rundungsgrenze.
+    const ORG: i64 = 1;
     const LAT: f64 = 53.0793;
     const LON: f64 = 8.8017;
 
     fn ort() -> GerundeterOrt {
-        GerundeterOrt::neu(LAT, LON)
+        GerundeterOrt::neu(ORG, LAT, LON)
     }
 
     fn fmt(t: DateTime<Utc>) -> String {
@@ -507,17 +518,27 @@ mod tests {
 
     #[test]
     fn rundung_von_schluessel_und_anfrage() {
-        let o = GerundeterOrt::neu(53.0849, 8.8);
+        let o = GerundeterOrt::neu(1, 53.0849, 8.8);
         assert_eq!(o.lat, "53.08");
         assert_eq!(o.lon, "8.80");
-        assert_eq!(schluessel_warnungen(&o), "wetter-warnungen:53.08,8.80");
-        assert_eq!(schluessel_vorhersage(&o), "wetter-vorhersage:53.08,8.80");
+        assert_eq!(schluessel_warnungen(&o), "wetter-warnungen:1:53.08,8.80");
+        assert_eq!(schluessel_vorhersage(&o), "wetter-vorhersage:1:53.08,8.80");
         assert_eq!(
-            GerundeterOrt::neu(53.0751, 8.7951),
-            GerundeterOrt::neu(53.0849, 8.8049),
+            GerundeterOrt::neu(1, 53.0751, 8.7951),
+            GerundeterOrt::neu(1, 53.0849, 8.8049),
             "derselbe Kilometer, derselbe Schlüssel"
         );
-        assert_eq!(GerundeterOrt::neu(-0.001, 0.0).lat, "0.00", "keine −0.00");
+        // Dieselbe Zelle, fremde Organisation: eigener Schlüssel — sonst verriete
+        // `abgerufen_at` den Einsatz der anderen Org.
+        assert_ne!(
+            schluessel_warnungen(&GerundeterOrt::neu(1, 53.08, 8.80)),
+            schluessel_warnungen(&GerundeterOrt::neu(2, 53.08, 8.80)),
+        );
+        assert_eq!(
+            GerundeterOrt::neu(1, -0.001, 0.0).lat,
+            "0.00",
+            "keine −0.00"
+        );
         assert_eq!(
             warnungen_url("https://b", &o),
             "https://b/alerts?lat=53.08&lon=8.80&tz=Etc/UTC"
@@ -537,11 +558,11 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (basis, zaehler) = quelle_404().await;
         let fe = FachebenenState::neu().mit_wetter_basis_url(&basis);
-        let a = anzeige(&fe, &pool, None, Utc::now()).await;
+        let a = anzeige(&fe, &pool, ORG, None, Utc::now()).await;
         assert_eq!(a.warnungen.zustand, WetterTeilZustand::KeinOrt);
         assert_eq!(a.vorhersage.zustand, WetterTeilZustand::KeinOrt);
         assert_eq!(a.ort, None);
-        let a = anzeige(&fe, &pool, Some((f64::NAN, 8.8)), Utc::now()).await;
+        let a = anzeige(&fe, &pool, ORG, Some((f64::NAN, 8.8)), Utc::now()).await;
         assert_eq!(a.warnungen.zustand, WetterTeilZustand::KeinOrt);
         tokio::time::sleep(Duration::from_millis(100)).await;
         assert_eq!(anzahl(&zaehler), 0);
@@ -561,7 +582,7 @@ mod tests {
         let (basis, zaehler) = quelle_404().await;
         let fe = FachebenenState::neu().mit_wetter_basis_url(&basis);
 
-        let a = anzeige(&fe, &pool, Some((LAT, LON)), jetzt).await;
+        let a = anzeige(&fe, &pool, ORG, Some((LAT, LON)), jetzt).await;
         assert_eq!(a.ort.as_ref().unwrap().name, "Stadt Bremen");
         assert_eq!(a.warnungen.zustand, WetterTeilZustand::Ok);
         assert_eq!(a.warnungen.daten.as_ref().unwrap().len(), 1);
@@ -578,7 +599,7 @@ mod tests {
         cache::setze_wert(&pool, &schluessel_warnungen(&ort()), &warnlage_mit(vec![])).await;
         altere(&pool, 120).await;
         let jetzt = Utc::now();
-        let a = anzeige(&ohne_netz(), &pool, Some((LAT, LON)), jetzt).await;
+        let a = anzeige(&ohne_netz(), &pool, ORG, Some((LAT, LON)), jetzt).await;
         let abgerufen = DateTime::parse_from_rfc3339(a.warnungen.abgerufen_at.as_deref().unwrap())
             .unwrap()
             .with_timezone(&Utc);
@@ -621,7 +642,7 @@ mod tests {
     #[tokio::test]
     async fn kalt_und_ausfall_ist_ausfall() {
         let pool = crate::db::test_pool().await;
-        let a = anzeige(&ohne_netz(), &pool, Some((LAT, LON)), Utc::now()).await;
+        let a = anzeige(&ohne_netz(), &pool, ORG, Some((LAT, LON)), Utc::now()).await;
         assert_eq!(a.warnungen.zustand, WetterTeilZustand::Ausfall);
         assert_eq!(a.vorhersage.zustand, WetterTeilZustand::Ausfall);
         assert_eq!(a.warnungen.daten, None);
@@ -640,7 +661,7 @@ mod tests {
 
         // Knapp unter beiden Obergrenzen: alter Stand, Abruf im Hintergrund.
         altere(&pool, OBERGRENZE_WARNUNGEN_S - 60).await;
-        let a = anzeige(&fe, &pool, Some((LAT, LON)), jetzt).await;
+        let a = anzeige(&fe, &pool, ORG, Some((LAT, LON)), jetzt).await;
         assert_eq!(a.warnungen.zustand, WetterTeilZustand::Ok);
         assert_eq!(a.vorhersage.zustand, WetterTeilZustand::Ok);
 
@@ -649,7 +670,7 @@ mod tests {
         warte_bis_marken_frei(&fe).await;
         fe.wetter_fehlschlag.lock().unwrap().clear();
         altere(&pool, 7 * 3600).await;
-        let a = anzeige(&fe, &pool, Some((LAT, LON)), jetzt).await;
+        let a = anzeige(&fe, &pool, ORG, Some((LAT, LON)), jetzt).await;
         assert_eq!(a.warnungen.zustand, WetterTeilZustand::Ausfall);
         assert_eq!(a.warnungen.daten, None);
         assert_eq!(a.vorhersage.zustand, WetterTeilZustand::Ok);
@@ -658,7 +679,7 @@ mod tests {
         warte_bis_marken_frei(&fe).await;
         fe.wetter_fehlschlag.lock().unwrap().clear();
         altere(&pool, 13 * 3600).await;
-        let a = anzeige(&fe, &pool, Some((LAT, LON)), jetzt).await;
+        let a = anzeige(&fe, &pool, ORG, Some((LAT, LON)), jetzt).await;
         assert_eq!(a.vorhersage.zustand, WetterTeilZustand::Ausfall);
         assert!(anzahl(&zaehler) >= 3, "zu alt heißt: neu abrufen");
     }
@@ -696,7 +717,7 @@ mod tests {
         let fe = FachebenenState::neu().mit_wetter_basis_url(&basis);
         let abgebrochen = tokio::time::timeout(
             Duration::from_millis(300),
-            anzeige(&fe, &pool, Some((LAT, LON)), Utc::now()),
+            anzeige(&fe, &pool, ORG, Some((LAT, LON)), Utc::now()),
         )
         .await;
         assert!(abgebrochen.is_err(), "der Abruf hing");
@@ -718,7 +739,7 @@ mod tests {
         )
         .await;
         altere(&pool, 45 * 60).await;
-        let a = anzeige(&ohne_netz(), &pool, Some((LAT, LON)), jetzt).await;
+        let a = anzeige(&ohne_netz(), &pool, ORG, Some((LAT, LON)), jetzt).await;
         assert_eq!(a.warnungen.zustand, WetterTeilZustand::Ok);
         let daten = a.warnungen.daten.unwrap();
         assert_eq!(daten.len(), 1);
@@ -760,7 +781,7 @@ mod tests {
         });
         let pool = crate::db::test_pool().await;
         let fe = FachebenenState::neu().mit_wetter_basis_url(&basis);
-        let a = anzeige(&fe, &pool, Some((LAT, LON)), Utc::now()).await;
+        let a = anzeige(&fe, &pool, ORG, Some((LAT, LON)), Utc::now()).await;
         assert_eq!(a.ort.unwrap().name, "Stadt Bremen");
         assert_eq!(a.warnungen.zustand, WetterTeilZustand::Ok);
         assert_eq!(a.vorhersage.zustand, WetterTeilZustand::Ok);

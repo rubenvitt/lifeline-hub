@@ -62,7 +62,11 @@ export function niederschlagText(
   return `${menge} · ${p}`;
 }
 
-/** „S 11 km/h · Böen 19 km/h" — Richtung als Wort (Herkunft), kein Pfeil-Bildzeichen. */
+/**
+ * „aus S 11 km/h · Böen 19 km/h" — Richtung als Wort (Herkunft), kein Pfeil-Bildzeichen.
+ * Das „aus" trägt die Richtung auch dann, wenn sie fehlt: „aus —" ist als fehlend lesbar,
+ * ein nackter Strich vor der Zahl läse sich wie ein Minus.
+ */
 export function windText(
   kmh: number | null | undefined,
   boeenKmh: number | null | undefined,
@@ -71,7 +75,7 @@ export function windText(
   const richtung = himmelsrichtung(grad);
   const mittel = da(kmh) ? `${GANZ.format(kmh)} km/h` : FEHLT;
   const boeen = da(boeenKmh) ? `${GANZ.format(boeenKmh)} km/h` : FEHLT;
-  return `${richtung ? `${richtung} ` : ''}${mittel} · Böen ${boeen}`;
+  return `aus ${richtung ?? FEHLT} ${mittel} · Böen ${boeen}`;
 }
 
 /**

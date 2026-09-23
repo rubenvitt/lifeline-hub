@@ -50,9 +50,10 @@ describe('Messwerte — ein fehlender Wert ist ein Strich, nie 0', () => {
   });
 
   it('Wind mit Richtung und Böen', () => {
-    expect(windText(11.1, 18.5, 192)).toBe('S 11 km/h · Böen 19 km/h');
-    expect(windText(11.1, undefined, undefined)).toBe('11 km/h · Böen —');
-    expect(windText(undefined, undefined, undefined)).toBe('— · Böen —');
+    expect(windText(11.1, 18.5, 192)).toBe('aus S 11 km/h · Böen 19 km/h');
+    // Eine fehlende Richtung ist fehlend markiert, nicht still weggelassen.
+    expect(windText(11.1, undefined, undefined)).toBe('aus — 11 km/h · Böen —');
+    expect(windText(undefined, undefined, undefined)).toBe('aus — — · Böen —');
   });
 });
 

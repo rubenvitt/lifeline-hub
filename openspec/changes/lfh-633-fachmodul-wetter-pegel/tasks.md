@@ -195,7 +195,8 @@ Sky und PEGELONLINE werden über `FachebenenState`-Basis-URLs auf lokale Stubs g
 - [x] 5.4 Wege:
   - `lagebild.ts` nimmt `pegelZiel` als Eingabe;
   - `LageDashboardPage` und die Überblick-Marke `pegelprognose` entscheiden über
-    `darfZaehlerLaden('wetter-pegel', …)` zwischen `wetterPegelPfad` und
+    `istKeyFreigegeben('wetter-pegel', …)` (nicht `darfZaehlerLaden`, das über `zaehlerQuelle`
+    sucht) zwischen `wetterPegelPfad` und
     `einsatzEinstellungenPfad(id, 'pegel')`.
 
   Verifiziert durch die Testpaare „Modul sichtbar → Modulseite“ und „Modul ausgeblendet →

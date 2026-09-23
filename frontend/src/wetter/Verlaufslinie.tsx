@@ -12,8 +12,8 @@
  *    volle Höhe füllen: das läse sich wie ein Hochwasser.
  *  - **Die Farbe trägt keine Bedeutung.** Die Linie steht in der Textfarbe; ob der Pegel
  *    steigt, sagt das Wort in der Zeile daneben. Beschriftet sind nur Tiefst- und Höchstwert
- *    (Beschriftung selektiv), die Zeitspanne und — falls gepflegt — die Prognose als
- *    gestrichelte Hilfslinie.
+ *    (Beschriftung selektiv, jeweils AUF der Höhe ihres Werts), die Zeitspanne und — falls
+ *    gepflegt — die Prognose als gestrichelte Hilfslinie, direkt an der Linie beschriftet.
  *  - **Zugänglich als ein Bild mit Aussage** („Verlauf 24 h: 5,62 m bis 6,84 m, zuletzt
  *    steigend"); die sichtbaren Beschriftungen sind dafür `aria-hidden`, sonst läse ein
  *    Vorleser dieselben Zahlen zweimal. Der Zeiger zeigt den nächstgelegenen Messpunkt als
@@ -98,6 +98,28 @@ export function verlaufsPfad(
   return { d, punkte, letzter: { x: letzter.x, y: letzter.y }, minCm, maxCm, yFuer };
 }
 
+/**
+ * Höhe der Beschriftungen von Höchst- und Tiefstwert in viewBox-Einheiten (einschließlich
+ * des Innenrands `rand`): AUF der Höhe ihres Werts, nicht an den Rändern des Felds — sonst
+ * stünde bei einer Prognose weit über der Reihe „5,80 m" neben der Prognoselinie. Liegen
+ * beide dichter als `abstand` beieinander (Mindestspanne, fast waagerechte Reihe), rücken sie
+ * symmetrisch um ihre Mitte auseinander, damit sie sich nicht überdecken. Rein.
+ */
+export function beschriftungsHoehen(
+  g: Pick<VerlaufsGeometrie, 'minCm' | 'maxCm' | 'yFuer'>,
+  rand: number,
+  abstand: number,
+): { max: number; min: number } {
+  let max = rand + g.yFuer(g.maxCm);
+  let min = rand + g.yFuer(g.minCm);
+  if (min - max < abstand) {
+    const mitte = (min + max) / 2;
+    max = mitte - abstand / 2;
+    min = mitte + abstand / 2;
+  }
+  return { max, min };
+}
+
 /** Die Aussage des Bilds in Worten (zugänglicher Name). Rein. */
 export function verlaufsAussage(
   minCm: number,
@@ -112,6 +134,8 @@ const BREITE = 240;
 const HOEHE = 48;
 /** Innenrand oben/unten: Platz für die Endmarke (r 4) samt Ring (2). */
 const RAND = 6;
+/** Mindestabstand der zwei Wertbeschriftungen in viewBox-Einheiten (etwa eine Zeile Mono 11). */
+const BESCHRIFTUNG_ABSTAND = 14;
 
 export interface VerlaufslinieProps {
   punkte: readonly VerlaufsPunkt[];
@@ -146,6 +170,8 @@ export default function Verlaufslinie({
   const zeit = (t: number) => formatUhrzeit(new Date(t).toISOString(), konv);
   const meta = { ...monoStil(11), color: rollen.gedaempft };
   const prognoseY = prognoseCm != null ? g.yFuer(prognoseCm) : null;
+  const lage = beschriftungsHoehen(g, RAND, BESCHRIFTUNG_ABSTAND);
+  const prozent = (y: number) => `${(y / (HOEHE + 2 * RAND)) * 100}%`;
 
   return (
     <div
@@ -175,21 +201,32 @@ export default function Verlaufslinie({
             stroke={rollen.rasterLinie}
             strokeWidth={1}
           />
-          {prognoseY != null && (
-            <line
-              data-lfh="verlauf-prognose"
-              x1={0}
-              x2={BREITE}
-              y1={prognoseY}
-              y2={prognoseY}
-              stroke={rollen.gedaempft}
-              strokeWidth={1}
-              strokeDasharray="4 3"
-            />
+          {prognoseY != null && prognoseCm != null && (
+            <g data-lfh="verlauf-prognose">
+              <line
+                x1={0}
+                x2={BREITE}
+                y1={prognoseY}
+                y2={prognoseY}
+                stroke={rollen.gedaempft}
+                strokeWidth={1}
+                strokeDasharray="4 3"
+              />
+              {/* Direkt an der Hilfslinie beschriftet — eine Linie ohne Wert liest man sonst
+                  gegen die Beschriftung daneben ab. Liegt sie oben am Rand, steht der Text
+                  darunter statt außerhalb des Felds. */}
+              <text
+                x={2}
+                y={prognoseY < 12 ? prognoseY + 10 : prognoseY - 3}
+                fill={rollen.gedaempft}
+                style={{ fontFamily: monoStil(11).fontFamily, fontSize: 9 }}
+              >
+                Prognose {wasserstandMeter(prognoseCm)} m
+              </text>
+            </g>
           )}
           <path
             data-lfh="verlauf-linie"
-            data-farbe="text"
             d={g.d}
             fill="none"
             stroke={rollen.text}
@@ -218,26 +255,34 @@ export default function Verlaufslinie({
           />
         </g>
       </svg>
-      <div
-        aria-hidden
-        style={{
-          ...meta,
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
-          paddingBlock: RAND / 2,
-        }}
-      >
-        <span>{wasserstandMeter(g.maxCm)} m</span>
-        <span>{wasserstandMeter(g.minCm)} m</span>
+      <div aria-hidden style={{ ...meta, position: 'relative', minWidth: '8ch' }}>
+        {(
+          [
+            ['max', g.maxCm, lage.max],
+            ['min', g.minCm, lage.min],
+          ] as const
+        ).map(([name, cm, y]) => (
+          <span
+            key={name}
+            data-lfh={`verlauf-${name}`}
+            style={{
+              position: 'absolute',
+              insetInlineStart: 0,
+              top: prozent(y),
+              transform: 'translateY(-50%)',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {wasserstandMeter(cm)} m
+          </span>
+        ))}
       </div>
       <div
         aria-hidden
         style={{ ...meta, display: 'flex', justifyContent: 'space-between', gap: token.marginXS }}
       >
         <span>−24 h</span>
-        {prognoseCm != null && <span>Prognose {wasserstandMeter(prognoseCm)} m</span>}
-        <span>
+        <span data-lfh="verlauf-ablesung">
           {abgelesen
             ? `${zeit(abgelesen.t)} · ${wasserstandMeter(abgelesen.cm)} m`
             : zeit(g.punkte[g.punkte.length - 1].t)}

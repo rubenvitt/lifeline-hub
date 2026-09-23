@@ -1,6 +1,7 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
-import Verlaufslinie, { MIN_SPANNE_CM, verlaufsAussage, verlaufsPfad } from './Verlaufslinie';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { farbenHell } from '../theme/tokens';
+import Verlaufslinie, { beschriftungsHoehen, verlaufsAussage, verlaufsPfad } from './Verlaufslinie';
 
 /** 14:05 Berliner Sommerzeit = 12:05 UTC. */
 const ENDE = '2026-09-22T14:05:00+02:00';
@@ -43,7 +44,8 @@ describe('verlaufsPfad (reine Geometrie)', () => {
   it('kleine Schwankungen werden nicht zur vollen Höhe aufgeblasen (Mindestspanne)', () => {
     const g = verlaufsPfad([punkt(60, 500), punkt(0, 501)], 240, 60)!;
     const hub = Math.abs(g.punkte[0].y - g.punkte[1].y);
-    expect(hub).toBeLessThan((60 * 1) / MIN_SPANNE_CM + 0.001);
+    // Literal statt aus der Konstante zurückgelesen: 60 px Höhe / 20 cm Mindestspanne × 1 cm.
+    expect(hub).toBeCloseTo(3);
   });
 
   it('ein einzelner Punkt ist ein Pfad ohne Linie, aber mit Marke', () => {
@@ -64,6 +66,27 @@ describe('verlaufsPfad (reine Geometrie)', () => {
   it('leer oder ohne lesbaren Zeitpunkt → null', () => {
     expect(verlaufsPfad([], 240, 60)).toBeNull();
     expect(verlaufsPfad([{ zeitpunkt: 'kaputt', wasserstand_cm: 1 }], 240, 60)).toBeNull();
+  });
+});
+
+describe('beschriftungsHoehen', () => {
+  it('Höchst- und Tiefstwert stehen AUF der Höhe ihrer Werte, nicht an den Rändern', () => {
+    // Reihe 560–640 cm, Prognose 710: die Reihe liegt im unteren Teil des Felds, weit genug
+    // gespreizt, dass kein Auseinanderrücken greift.
+    const g = verlaufsPfad([punkt(60, 560), punkt(0, 640)], 240, 48, 710)!;
+    const lage = beschriftungsHoehen(g, 6, 14);
+    expect(lage.max).toBeCloseTo(6 + g.yFuer(640));
+    expect(lage.min).toBeCloseTo(6 + g.yFuer(560));
+    // Die Prognose liegt deutlich darüber — die Beschriftung „6,40 m" steht nicht neben ihr.
+    expect(6 + g.yFuer(710)).toBeLessThan(lage.max - 14);
+  });
+
+  it('liegen beide dicht, rücken sie symmetrisch auf den Mindestabstand auseinander', () => {
+    const g = verlaufsPfad([punkt(60, 500), punkt(0, 501)], 240, 48)!;
+    const lage = beschriftungsHoehen(g, 6, 14);
+    expect(lage.min - lage.max).toBeCloseTo(14);
+    const mitte = 6 + (g.yFuer(500) + g.yFuer(501)) / 2;
+    expect((lage.min + lage.max) / 2).toBeCloseTo(mitte);
   });
 });
 
@@ -99,10 +122,42 @@ describe('<Verlaufslinie>', () => {
   });
 
   it('keine Farbe als einziger Träger: die Linie trägt Textfarbe, keine Status-Rolle', () => {
+    // Ohne Theme-Provider ist der Modus hell (`istDunkel` auf antds Vorgabe-Token).
     const { container } = render(<Verlaufslinie punkte={reihe} richtung="steigend" />);
     const linie = container.querySelector('[data-lfh="verlauf-linie"]')!;
     expect(linie.getAttribute('stroke-width')).toBe('2');
-    expect(linie.getAttribute('data-farbe')).toBe('text');
+    expect(linie.getAttribute('stroke')).toBe(farbenHell.text);
+    for (const rolle of [farbenHell.alarm, farbenHell.achtung, farbenHell.bedien]) {
+      expect(linie.getAttribute('stroke')).not.toBe(rolle);
+    }
+  });
+
+  it('der Zeiger liest den nächstgelegenen Messpunkt ab und gibt ihn beim Verlassen frei', () => {
+    render(
+      <Verlaufslinie punkte={reihe} richtung="steigend" konv={{ zeitzone: 'Europe/Berlin' }} />,
+    );
+    const svg = screen.getByRole('img');
+    // Absichtlich ≠ viewBox-Breite (240): ein falscher Maßstab fiele auf.
+    vi.spyOn(svg, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 480,
+      height: 120,
+      right: 480,
+      bottom: 120,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+    const ablesung = () => document.querySelector('[data-lfh="verlauf-ablesung"]')!.textContent;
+    // Ohne Zeiger: die Zeit des jüngsten Punkts (14:05).
+    expect(ablesung()).toBe('14:05');
+    // Knapp rechts der Mitte (Pixel 250 von 480 ≈ viewBox 125): der mittlere Punkt,
+    // −12 h = 02:05, 6,00 m.
+    fireEvent.pointerMove(svg, { clientX: 250 });
+    expect(ablesung()).toBe('02:05 · 6,00 m');
+    fireEvent.pointerLeave(svg);
+    expect(ablesung()).toBe('14:05');
   });
 
   it('ohne Punkte rendert sie nichts', () => {

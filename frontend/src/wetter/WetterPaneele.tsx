@@ -157,6 +157,9 @@ function WarnungEintrag({
         <span>
           <Button
             type="link"
+            // Die Zeilenkennung gehört in den zugänglichen Namen: n Warnungen ergäben sonst n
+            // gleichnamige Umschalter (Regel wie bei der Aktionsbündelung, LFH-365).
+            aria-label={`${offen ? 'Beschreibung ausblenden' : 'Beschreibung und Handlungsempfehlung'} zu ${titelSchreibung(w.ereignis)}`}
             aria-expanded={offen}
             aria-controls={textId}
             onClick={() => setOffen((o) => !o)}
@@ -204,17 +207,30 @@ function WarnGruppe({
         {titel} ({liste.length})
       </Augenbraue>
       <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-        {liste.map((w, i) => (
-          <WarnungEintrag
-            key={`${w.ereignis}-${w.beginn ?? ''}-${i}`}
-            w={w}
-            jetzt={jetzt}
-            konv={konv}
-          />
+        {warnungsSchluessel(liste).map(([schluessel, w]) => (
+          <WarnungEintrag key={schluessel} w={w} jetzt={jetzt} konv={konv} />
         ))}
       </ul>
     </section>
   );
+}
+
+/**
+ * Stabiler Schlüssel je Warnung aus ihrem INHALT, nicht aus dem Listenplatz: beim Nachladen
+ * kann vorne eine Warnung dazukommen oder wegfallen, und ein Index-Schlüssel hängte dann alle
+ * folgenden Einträge neu ein (eine aufgeklappte Beschreibung klappte zu oder sprang auf die
+ * Nachbarwarnung). Echte Dubletten bekommen einen Zähler je gleichem Grundschlüssel. Rein.
+ */
+export function warnungsSchluessel(
+  liste: readonly WetterWarnung[],
+): Array<[string, WetterWarnung]> {
+  const gesehen = new Map<string, number>();
+  return liste.map((w) => {
+    const grund = [w.stufe, w.ereignis, w.beginn ?? '', w.ende ?? '', w.ueberschrift].join('|');
+    const n = gesehen.get(grund) ?? 0;
+    gesehen.set(grund, n + 1);
+    return [n === 0 ? grund : `${grund}#${n}`, w];
+  });
 }
 
 function ortName(ort: WetterOrt | null | undefined): string | null {
@@ -233,8 +249,11 @@ export function WarnungenPaneel({
   const teil = wetter?.warnungen;
   const stand = teil ? teilStand(teil, 'warnungen', jetzt, konv) : null;
   const ort = ortName(wetter?.ort);
-  const liste = teil?.zustand === 'ok' ? (teil.daten ?? []) : [];
-  const { giltJetzt, angekuendigt } = teileWarnungen(liste, jetzt);
+  const { giltJetzt, angekuendigt } = teileWarnungen(
+    teil?.zustand === 'ok' ? (teil.daten ?? []) : [],
+    jetzt,
+  );
+  const anzahl = giltJetzt.length + angekuendigt.length;
   const mitInhalt = stand && (stand.art === 'aktuell' || stand.art === 'veraltet');
   return (
     <Paneel
@@ -252,7 +271,7 @@ export function WarnungenPaneel({
       >
         {stand && <StandHinweis stand={stand} onEinsatzdaten={onEinsatzdaten} />}
         {mitInhalt &&
-          (liste.length === 0 ? (
+          (anzahl === 0 ? (
             <div
               data-lfh="wetter-keine-warnung"
               style={{ paddingBlock: token.paddingSM, paddingInline: token.padding, fontSize: 12 }}
@@ -275,7 +294,7 @@ export function VorhersagePaneel({ zustand, wetter, jetzt, konv, onNeuladen }: T
   const teil = wetter?.vorhersage;
   const stand = teil ? teilStand(teil, 'vorhersage', jetzt, konv) : null;
   const daten = teil?.zustand === 'ok' ? teil.daten : null;
-  const stunden = daten ? dreiStundenTakt(daten.stunden) : [];
+  const stunden = daten ? dreiStundenTakt(daten.stunden, jetzt) : [];
   const mitInhalt = stand && (stand.art === 'aktuell' || stand.art === 'veraltet');
   const station = daten ? stationText(daten.station, daten.entfernung_m) : null;
   return (
@@ -312,7 +331,7 @@ export function VorhersagePaneel({ zustand, wetter, jetzt, konv, onNeuladen }: T
                 als="div"
                 style={{ paddingInline: token.padding, paddingBlockStart: token.paddingSM }}
               >
-                Zeit · Temperatur · Niederschlag, Wahrscheinlichkeit · Wind aus, Böen
+                Zeit · Temperatur · Niederschlag, Wahrscheinlichkeit · Wind, Böen
               </Augenbraue>
               <ul
                 aria-label="Vorhersage je drei Stunden"

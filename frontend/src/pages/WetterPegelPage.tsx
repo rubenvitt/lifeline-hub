@@ -1,7 +1,9 @@
 import { Alert, Breadcrumb, Button, Spin } from 'antd';
 import { useQuery } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { ladeEinsatz } from '../api/einsaetze';
+import type { PegelAnzeige, PegelVerlauf } from '../api/types';
 import { pegelAbfrage, pegelVerlaufAbfrage } from '../api/pegel';
 import { einsatzKeys } from '../api/queryKeys';
 import { wetterAbfrage } from '../api/wetter';
@@ -13,6 +15,30 @@ import { useRollen, type PaneelDatenzustand } from '../components/instrument';
 import { einsatzdatenPfad, einsatzEinstellungenPfad } from '../routing/deeplinks';
 import PegelPaneel from '../wetter/PegelPaneel';
 import { VorhersagePaneel, WarnungenPaneel } from '../wetter/WetterPaneele';
+import { teileWarnungen } from '../wetter/wetterStand';
+
+/** „1 Warnung" · „n Warnungen" (Seitenkopf). Rein. */
+export function warnungenMeta(n: number): string {
+  return n === 1 ? '1 Warnung' : `${n} Warnungen`;
+}
+
+/**
+ * Zeigt ein Pegel einen Messwert, aber keine Verlaufsreihe? Dann hat der Verlauf beim
+ * Einhängen gegen die Liste verloren: beide Abfragen treffen einen kalten Cache-Eintrag, und
+ * nur eine gewinnt die In-flight-Marke des Backends (`pegel::abruf`). Die Liste heilt sich
+ * über ihre 10-s-Nachfrage selbst, der Verlauf hat nur den 5-min-Takt — ohne Nachziehen
+ * stünde bis zu 5 min ein Wert neben „noch kein Verlauf". Ohne Messung fehlt beides: das ist
+ * ein Ausfall, kein Wettlauf. Rein.
+ */
+export function verlaufLuecke(
+  pegel: readonly PegelAnzeige[],
+  verlauf: readonly PegelVerlauf[] | undefined,
+): boolean {
+  if (!verlauf) return false;
+  return pegel.some(
+    (p) => p.messung && !(verlauf.find((v) => v.pegel_id === p.id)?.punkte.length ?? 0),
+  );
+}
 
 /** Datenzustand eines Paneels aus einer Abfrage (`leer` entscheidet der Aufrufer). */
 function paneelZustand(q: { isLoading: boolean; isError: boolean }): PaneelDatenzustand {
@@ -53,6 +79,15 @@ export default function WetterPegelPage() {
   const verlaufQuery = useQuery(pegelVerlaufAbfrage(einsatzId));
   const wetterQuery = useQuery(wetterAbfrage(einsatzId));
 
+  // Den Verlauf an die Liste koppeln (siehe `verlaufLuecke`): jede NEUE Listenantwort zieht
+  // ihn einmal nach, solange eine Lücke besteht. Bleibt sie, geschieht bis zur nächsten
+  // Listenantwort nichts — keine Schleife.
+  const luecke = verlaufLuecke(pegelQuery.data ?? [], verlaufQuery.data);
+  const { refetch: verlaufNeuLaden } = verlaufQuery;
+  useEffect(() => {
+    if (luecke) void verlaufNeuLaden();
+  }, [pegelQuery.dataUpdatedAt, luecke, verlaufNeuLaden]);
+
   if (einsatzQuery.isLoading) {
     return (
       <div style={{ textAlign: 'center', paddingTop: 80 }}>
@@ -71,14 +106,18 @@ export default function WetterPegelPage() {
       ? 'leer'
       : paneelZustand(pegelQuery);
   const warnungen = wetterQuery.data?.warnungen;
-  const warnAnzahl = warnungen?.zustand === 'ok' ? (warnungen.daten ?? []).length : null;
+  // Aus derselben gefilterten Menge wie das Paneel: eine seit dem letzten Abruf abgelaufene
+  // Warnung zählt nicht mehr mit.
+  const warnLage =
+    warnungen?.zustand === 'ok' ? teileWarnungen(warnungen.daten ?? [], jetzt) : null;
+  const warnAnzahl = warnLage ? warnLage.giltJetzt.length + warnLage.angekuendigt.length : null;
 
   return (
     <EinsatzSeite
       titel="Wetter & Pegel"
       meta={[
         pegelQuery.data ? `${pegel.length} Pegel` : null,
-        warnAnzahl != null ? `${warnAnzahl} Warnungen` : null,
+        warnAnzahl != null ? warnungenMeta(warnAnzahl) : null,
       ]
         .filter(Boolean)
         .join(' · ')}

@@ -8,7 +8,7 @@ import { MemoryRouter, Route, Routes } from 'react-router';
 import { server } from '../test/server';
 import { AuthProvider } from '../auth/AuthContext';
 import type { PegelAnzeige, PegelVerlauf, WetterAnzeige } from '../api/types';
-import WetterPegelPage from './WetterPegelPage';
+import WetterPegelPage, { verlaufLuecke, warnungenMeta } from './WetterPegelPage';
 
 vi.mock('../api/einsaetze', () => ({
   ladeEinsatz: vi.fn(() =>
@@ -132,6 +132,26 @@ function renderPage() {
 
 const pegelZeilen = () => document.querySelectorAll('[data-lfh="pegel-zeile"]');
 
+describe('reine Helfer der Seite', () => {
+  it('warnungenMeta: Singular und Plural', () => {
+    expect(warnungenMeta(0)).toBe('0 Warnungen');
+    expect(warnungenMeta(1)).toBe('1 Warnung');
+    expect(warnungenMeta(2)).toBe('2 Warnungen');
+  });
+
+  it('verlaufLuecke: Messwert da, Reihe fehlt oder leer → nachziehen; Ausfall allein nicht', () => {
+    const mit = pegel({ id: 1 });
+    const ohne = pegel({ id: 2, messung: undefined });
+    expect(verlaufLuecke([mit], [verlauf(1)])).toBe(false);
+    expect(verlaufLuecke([mit], [{ pegel_id: 1, punkte: [] }])).toBe(true);
+    expect(verlaufLuecke([mit], [])).toBe(true);
+    // Ohne Messung fehlt beides — das ist ein Ausfall, kein Wettlauf.
+    expect(verlaufLuecke([ohne], [{ pegel_id: 2, punkte: [] }])).toBe(false);
+    // Solange der Verlauf lädt oder scheitert, entscheidet die Abfrage selbst.
+    expect(verlaufLuecke([mit], undefined)).toBe(false);
+  });
+});
+
 describe('WetterPegelPage (LFH-633)', () => {
   beforeEach(() => vi.clearAllMocks());
 
@@ -171,6 +191,17 @@ describe('WetterPegelPage (LFH-633)', () => {
       expect(zeile.getAttribute('data-ton')).toBe('achtung');
       expect(within(zeile).getByText(/veraltet/)).toBeInTheDocument();
       expect(within(zeile).getByText('6,84')).toBeInTheDocument();
+      // Die Kante ist der zweite Kanal neben dem Wort — der Ton allein belegt sie nicht.
+      expect(zeile.style.boxShadow).toMatch(/^inset 3px 0(px)? 0(px)? /);
+    });
+
+    it('eine frische Messung trägt keine Kante (Gegenstück)', async () => {
+      antworten({ liste: [pegel({ id: 1 })], reihen: [verlauf(1)] });
+      renderPage();
+      await screen.findByText('STATION 1 · WESER');
+      const zeile = pegelZeilen()[0] as HTMLElement;
+      expect(zeile.getAttribute('data-ton')).toBe('neutral');
+      expect(zeile.style.boxShadow).toBe('');
     });
 
     it('fällt nur der Verlauf aus, bleiben die Werte stehen', async () => {
@@ -219,16 +250,48 @@ describe('WetterPegelPage (LFH-633)', () => {
       antworten();
       renderPage();
       const knopf = await screen.findByRole('button', {
-        name: 'Beschreibung und Handlungsempfehlung',
+        name: 'Beschreibung und Handlungsempfehlung zu Sturmböen',
       });
       expect(knopf).toHaveAttribute('aria-expanded', 'false');
       expect(screen.queryByText('Achten Sie auf herabstürzende Äste.')).toBeNull();
       await userEvent.click(knopf);
       expect(screen.getByText('Achten Sie auf herabstürzende Äste.')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Beschreibung ausblenden' })).toHaveAttribute(
-        'aria-expanded',
-        'true',
-      );
+      expect(
+        screen.getByRole('button', { name: 'Beschreibung ausblenden zu Sturmböen' }),
+      ).toHaveAttribute('aria-expanded', 'true');
+    });
+
+    it('zwei Warnungen mit Text: zwei unterscheidbare Umschalter (Zeilenkennung im Namen)', async () => {
+      const w = wetterOk();
+      const daten = (w.warnungen.daten ?? []).map((x) => ({
+        ...x,
+        beschreibung: `Text zu ${x.ereignis}`,
+      }));
+      antworten({ wetter: { ...w, warnungen: { ...w.warnungen, daten } } });
+      renderPage();
+      expect(
+        await screen.findByRole('button', {
+          name: 'Beschreibung und Handlungsempfehlung zu Sturmböen',
+        }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', {
+          name: 'Beschreibung und Handlungsempfehlung zu Orkanartige Böen',
+        }),
+      ).toBeInTheDocument();
+    });
+
+    it('eine seit dem Abruf abgelaufene Warnung zählt im Kopf nicht mit; eine einzelne heißt „1 Warnung"', async () => {
+      const w = wetterOk();
+      const [sturm, orkan] = w.warnungen.daten ?? [];
+      const abgelaufen = { ...sturm, ereignis: 'FROST', beginn: vor(120 * MIN), ende: vor(MIN) };
+      antworten({
+        wetter: { ...w, warnungen: { ...w.warnungen, daten: [orkan, abgelaufen] } },
+      });
+      renderPage();
+      expect(await screen.findByText('Orkanartige Böen')).toBeInTheDocument();
+      expect(screen.queryByText('Frost')).toBeNull();
+      expect(screen.getByText(/1 Warnung(?!en)/)).toBeInTheDocument();
     });
 
     it('keine gültige Warnung: ausdrücklich gesagt, mit Gemeinde', async () => {

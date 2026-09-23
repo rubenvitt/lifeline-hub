@@ -130,9 +130,16 @@ Neues Modul `src/wetter/` mit folgenden Dateien:
 - `quelle.rs`: Parsen der Bright-Sky-Antworten, reine Funktionen.
 - `abruf.rs`: SWR-Cache mit In-flight-Marke und Abkühlung.
 
-Die Cache-Schlüssel lauten `wetter-warnungen:<lat>,<lon>` und `wetter-vorhersage:<lat>,<lon>`.
-Die Koordinaten sind auf **zwei Nachkommastellen** gerundet, das sind etwa 1 km. Einsätze am
-selben Ort teilen sich damit einen Abruf. Die Warnzelle ist ohnehin gröber als 1 km.
+Die Cache-Schlüssel lauten `wetter-warnungen:<org>:<lat>,<lon>` und
+`wetter-vorhersage:<org>:<lat>,<lon>`. Die Koordinaten sind auf **zwei Nachkommastellen**
+gerundet, das sind etwa 1 km. Einsätze derselben Organisation am selben Ort teilen sich damit
+einen Abruf. Die Warnzelle ist ohnehin gröber als 1 km. Die Organisation steht nur im
+Schlüssel, nicht in der Anfrage. Ein instanzweit geteilter Eintrag verriete über
+`abgerufen_at`, dass eine fremde Organisation in den letzten Stunden am selben Ort abgefragt
+hat (Review-Befund).
+Das Frontend prüft die Obergrenze zusätzlich gegen seine Uhr (`wetterStand.ts`,
+`OBERGRENZE_MS`). Es filtert auch abgelaufene Warnungen und vergangene Stunden erneut. Ohne
+neue Antwort, etwa bei einem Rechner offline, griffe die Prüfung des Backends sonst nie.
 
 | Teil | TTL | Anfrage |
 |---|---|---|
@@ -215,9 +222,10 @@ Darunter folgt ein Raster aus drei `Paneel`en.
 
 - Ein eigenes, schlankes SVG ohne neue Abhängigkeit.
 - Die x-Achse ist die Zeit (24 h), die y-Achse der Bereich min…max mit Rand.
-- Beschriftet sind nur min und max (Mono) sowie „−24 h“ und „jetzt“.
+- Beschriftet sind nur min und max (Mono, auf der Höhe ihres Werts) sowie „−24 h“ und die
+  Uhrzeit des jüngsten Punkts (das Fenster endet dort, nicht bei „jetzt“).
 - Die Linie steht in `token.colorText`, der jüngste Punkt als Marke. Eine gültige Prognose
-  erscheint als gestrichelte waagerechte Hilfslinie mit Beschriftung.
+  erscheint als gestrichelte waagerechte Hilfslinie, direkt an der Linie beschriftet.
 - Die Farbe trägt keine Bedeutung. Der Steigungszustand steht bereits als Wort in der Zeile.
 - Die Linie ist `role="img"` mit `aria-label`, das die Aussage in Worten trägt: „Verlauf
   24 h: 5,62 m bis 6,84 m, zuletzt steigend“.
@@ -274,8 +282,10 @@ Das Gerüst folgt dem Muster LFH-635 (`openspec/changes/lfh-635-fachmodul-abloes
 Die Wege aus Dashboard und Überblick laufen so:
 
 - Dashboard (`lagebild.ts`) und Überblick (`UeberblickPage.tsx`, Marke `pegelprognose`)
-  entscheiden mit `darfZaehlerLaden('wetter-pegel', benutzer, overrides)`. Das ist dieselbe
-  Sichtbarkeitsprüfung, die der Überblick schon für die Ablösung nutzt.
+  entscheiden mit `istKeyFreigegeben('wetter-pegel', benutzer, overrides)`
+  (`einsatz/modulRegistry.ts`). `darfZaehlerLaden` taugt dafür nicht, weil es sein Modul über
+  `zaehlerQuelle` sucht und das Modul keine hat. Bis die Overrides geladen sind, gilt die
+  Pflege.
 - Ist das Modul sichtbar, geht es zu `wetterPegelPfad`, sonst zu
   `einsatzEinstellungenPfad(id, 'pegel')`.
 - `lagebild.ts` bleibt rein: Die Entscheidung kommt als Eingabe `pegelZiel` herein, sie wird

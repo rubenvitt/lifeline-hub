@@ -169,7 +169,9 @@ pub async fn liste(
 
 /// GET /api/einsaetze/{id}/pegel/verlauf — je festgelegtem Pegel, in dessen Reihenfolge, der
 /// Verlauf der letzten 24 Stunden. Liest über denselben Weg wie die Messung der Liste
-/// (`abruf::reihen`), Wert und Linie sind also ein Stand. Station ohne Stand → leere Reihe.
+/// (`abruf::reihen`) und damit aus demselben Cache-Eintrag. Es sind aber zwei Anfragen: dass
+/// Wert und Linie ein Stand sind, ist der Normalfall, keine Zusicherung. Station ohne Stand →
+/// leere Reihe.
 pub async fn verlauf(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<OhneModul>,

@@ -1,10 +1,13 @@
 /**
  * Reine Einordnung der Wetterteile der Modulseite „Wetter & Pegel" (LFH-633, design.md D2).
  *
- * Arbeitsteilung wie beim Pegel (LFH-606): die OBERGRENZE, ab der ein Stand gar nicht mehr
- * taugt (6 h Warnungen, 12 h Vorhersage), prüft das Backend — nur es kennt das Cache-Alter —
- * und meldet dann `ausfall`. Ob ein Stand „veraltet" ist, entscheidet diese Datei gegen die
- * Uhr der Anzeige, aus `abgerufen_at` (letzter erfolgreicher Abruf, RFC 3339).
+ * Arbeitsteilung wie beim Pegel (LFH-606): das Backend prüft beim Antworten die OBERGRENZE,
+ * ab der ein Stand gar nicht mehr taugt (6 h Warnungen, 12 h Vorhersage), und meldet dann
+ * `ausfall`. Ob ein Stand „veraltet" ist, entscheidet diese Datei gegen die Uhr der Anzeige,
+ * aus `abgerufen_at` (letzter erfolgreicher Abruf, RFC 3339) — und sie prüft die Obergrenze
+ * NOCH EINMAL: kommt keine neue Antwort (Rechner offline, aus dem Ruhezustand geweckt), hält
+ * die Abfrage ihre alten Daten, und die Prüfung des Backends greift nie. Aus demselben Grund
+ * fallen abgelaufene Warnungen und vergangene Vorhersagestunden hier noch einmal heraus.
  *
  * Die Eingabetypen sind strukturell, damit die Datei nicht an den Namen der generierten
  * Wire-Typen hängt, sondern nur an den Feldern, die sie liest.
@@ -20,6 +23,13 @@ export const VERALTET_AB_MS: Record<WetterTeilName, number> = {
   warnungen: 30 * 60_000,
   // MOSMIX wird stündlich gerechnet; der Abruf läuft alle 30 min.
   vorhersage: 3 * 60 * 60_000,
+};
+
+/** Ab diesem Alter ist ein Stand „Stand unbekannt" — dieselben Grenzen wie im Backend
+ *  (`wetter::abruf`, OBERGRENZE_*), hier gegen die Uhr der Anzeige. */
+export const OBERGRENZE_MS: Record<WetterTeilName, number> = {
+  warnungen: 6 * 60 * 60_000,
+  vorhersage: 12 * 60 * 60_000,
 };
 
 export { PEGEL_STAND_UNBEKANNT as STAND_UNBEKANNT, VERALTET };
@@ -45,21 +55,27 @@ export function teilStand(
   if (teil.zustand !== 'ok' || !Number.isFinite(epoche)) {
     return { art: 'unbekannt', stand: PEGEL_STAND_UNBEKANNT };
   }
+  const alter = jetzt - epoche;
+  if (alter > OBERGRENZE_MS[name]) return { art: 'unbekannt', stand: PEGEL_STAND_UNBEKANNT };
   const stand = `Stand ${standZeit(teil.abgerufen_at as string, jetzt, konv)}`;
-  return { art: jetzt - epoche > VERALTET_AB_MS[name] ? 'veraltet' : 'aktuell', stand };
+  return { art: alter > VERALTET_AB_MS[name] ? 'veraltet' : 'aktuell', stand };
 }
 
 /**
- * „gilt jetzt" (Beginn ≤ jetzt oder unbekannt) gegen „angekündigt". Die Reihenfolge der
- * Eingabe (Backend: Stufe absteigend, dann Beginn) bleibt in beiden Hälften erhalten. Rein.
+ * „gilt jetzt" (Beginn ≤ jetzt oder unbekannt) gegen „angekündigt". Eine Warnung, deren Ende
+ * verstrichen ist (`ende ≤ jetzt`, dieselbe Grenze wie `quelle::gueltige` im Backend), fällt
+ * heraus — die Abfrage läuft alle 5 min, die Uhr alle 30 s. Die Reihenfolge der Eingabe
+ * (Backend: Stufe absteigend, dann Beginn) bleibt in beiden Hälften erhalten. Rein.
  */
-export function teileWarnungen<W extends { beginn?: string | null }>(
+export function teileWarnungen<W extends { beginn?: string | null; ende?: string | null }>(
   warnungen: readonly W[],
   jetzt: number,
 ): { giltJetzt: W[]; angekuendigt: W[] } {
   const giltJetzt: W[] = [];
   const angekuendigt: W[] = [];
   for (const w of warnungen) {
+    const ende = w.ende ? Date.parse(w.ende) : Number.NaN;
+    if (Number.isFinite(ende) && ende <= jetzt) continue;
     const t = w.beginn ? Date.parse(w.beginn) : Number.NaN;
     (Number.isFinite(t) && t > jetzt ? angekuendigt : giltJetzt).push(w);
   }
@@ -69,11 +85,20 @@ export function teileWarnungen<W extends { beginn?: string | null }>(
 const DREI_STUNDEN_MS = 3 * 60 * 60_000;
 const TAG_MS = 24 * 60 * 60_000;
 
+const STUNDE_MS = 60 * 60_000;
+
 /**
- * Jede dritte Stunde ab der ersten, innerhalb von 24 h — gezählt nach ZEIT, nicht nach
- * Index: fehlt in der Reihe eine Stunde, verrutscht der Takt sonst unbemerkt. Rein.
+ * Jede dritte Stunde ab der laufenden, innerhalb von 24 h — gezählt nach ZEIT, nicht nach
+ * Index: fehlt in der Reihe eine Stunde, verrutscht der Takt sonst unbemerkt. Stunden VOR der
+ * laufenden fallen heraus, auch wenn seit dem letzten Abruf eine volle Stunde verstrichen ist
+ * (dieselbe Regel wie `quelle::kommende_stunden` im Backend). Rein.
  */
-export function dreiStundenTakt<S extends { zeitpunkt: string }>(stunden: readonly S[]): S[] {
+export function dreiStundenTakt<S extends { zeitpunkt: string }>(
+  alle: readonly S[],
+  jetzt: number,
+): S[] {
+  const laufende = Math.floor(jetzt / STUNDE_MS) * STUNDE_MS;
+  const stunden = alle.filter((s) => Date.parse(s.zeitpunkt) >= laufende);
   const erste = stunden.length ? Date.parse(stunden[0].zeitpunkt) : Number.NaN;
   if (!Number.isFinite(erste)) return [];
   return stunden.filter((s) => {

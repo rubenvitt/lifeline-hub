@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  OBERGRENZE_MS,
   VERALTET_AB_MS,
   dreiStundenTakt,
   himmelsrichtung,
@@ -40,6 +41,29 @@ describe('teilStand', () => {
     ).toBe('veraltet');
   });
 
+  it('Obergrenze auch gegen die eigene Uhr: gehaltene Daten werden „Stand unbekannt" (6 h / 12 h)', () => {
+    // Ohne neue Antwort (offline, aufgewachter Rechner) prüft das Backend nichts mehr.
+    expect(OBERGRENZE_MS).toEqual({ warnungen: 6 * 60 * MIN, vorhersage: 12 * 60 * MIN });
+    expect(
+      teilStand({ zustand: 'ok', abgerufen_at: vor(6 * 60 * MIN) }, 'warnungen', JETZT, BERLIN).art,
+    ).toBe('veraltet');
+    expect(
+      teilStand({ zustand: 'ok', abgerufen_at: vor(6 * 60 * MIN + 1) }, 'warnungen', JETZT, BERLIN),
+    ).toEqual({ art: 'unbekannt', stand: 'Stand unbekannt' });
+    expect(
+      teilStand({ zustand: 'ok', abgerufen_at: vor(12 * 60 * MIN) }, 'vorhersage', JETZT, BERLIN)
+        .art,
+    ).toBe('veraltet');
+    expect(
+      teilStand(
+        { zustand: 'ok', abgerufen_at: vor(12 * 60 * MIN + 1) },
+        'vorhersage',
+        JETZT,
+        BERLIN,
+      ).art,
+    ).toBe('unbekannt');
+  });
+
   it('Ausfall und unlesbarer Stand sind „Stand unbekannt"; kein Ort bleibt eigener Zustand', () => {
     expect(teilStand({ zustand: 'ausfall' }, 'warnungen', JETZT, BERLIN)).toEqual({
       art: 'unbekannt',
@@ -66,6 +90,20 @@ describe('teileWarnungen', () => {
     expect(giltJetzt.map((w) => w.id)).toEqual(['a', 'd', 'b']);
     expect(angekuendigt.map((w) => w.id)).toEqual(['c']);
   });
+
+  it('eine Warnung, deren Ende verstrichen ist, fällt heraus — auch ohne neuen Abruf', () => {
+    const vorbei = { id: 'vorbei', beginn: vor(120 * MIN), ende: vor(MIN) };
+    const genauJetzt = { id: 'genau', beginn: vor(120 * MIN), ende: new Date(JETZT).toISOString() };
+    const laeuft = {
+      id: 'laeuft',
+      beginn: vor(120 * MIN),
+      ende: new Date(JETZT + MIN).toISOString(),
+    };
+    const offen = { id: 'offen', beginn: vor(MIN), ende: null };
+    const { giltJetzt } = teileWarnungen([vorbei, genauJetzt, laeuft, offen], JETZT);
+    // `ende ≤ jetzt` ist dieselbe Grenze wie im Backend (`quelle::gueltige`).
+    expect(giltJetzt.map((w) => w.id)).toEqual(['laeuft', 'offen']);
+  });
 });
 
 describe('dreiStundenTakt', () => {
@@ -73,7 +111,7 @@ describe('dreiStundenTakt', () => {
     const stunden = Array.from({ length: 25 }, (_, i) => ({
       zeitpunkt: new Date(Date.UTC(2026, 8, 22, 13 + i)).toISOString(),
     }));
-    const auswahl = dreiStundenTakt(stunden);
+    const auswahl = dreiStundenTakt(stunden, Date.UTC(2026, 8, 22, 13, 30));
     expect(auswahl).toHaveLength(8);
     expect(auswahl[0]).toBe(stunden[0]);
     expect(auswahl[1]).toBe(stunden[3]);
@@ -82,12 +120,20 @@ describe('dreiStundenTakt', () => {
 
   it('eine Lücke in der Reihe verschiebt den Takt nicht (nach Zeit, nicht nach Index)', () => {
     const t = (h: number) => ({ zeitpunkt: new Date(Date.UTC(2026, 8, 22, h)).toISOString() });
-    const auswahl = dreiStundenTakt([t(12), t(14), t(15), t(18)]);
+    const auswahl = dreiStundenTakt([t(12), t(14), t(15), t(18)], Date.UTC(2026, 8, 22, 12, 10));
     expect(auswahl.map((s) => s.zeitpunkt)).toEqual([t(12), t(15), t(18)].map((s) => s.zeitpunkt));
   });
 
+  it('eine vergangene Stunde fällt heraus, auch ohne neuen Abruf; der Takt beginnt bei der laufenden', () => {
+    const t = (h: number) => ({ zeitpunkt: new Date(Date.UTC(2026, 8, 22, h)).toISOString() });
+    const reihe = [10, 11, 12, 13, 14, 15, 16].map(t);
+    // 12:30 — die Stunden 10 und 11 sind vorbei, 12 läuft.
+    const auswahl = dreiStundenTakt(reihe, Date.UTC(2026, 8, 22, 12, 30));
+    expect(auswahl.map((s) => s.zeitpunkt)).toEqual([t(12), t(15)].map((s) => s.zeitpunkt));
+  });
+
   it('leer bleibt leer', () => {
-    expect(dreiStundenTakt([])).toEqual([]);
+    expect(dreiStundenTakt([], JETZT)).toEqual([]);
   });
 });
 

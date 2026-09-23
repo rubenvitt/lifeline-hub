@@ -29,6 +29,13 @@ pub async fn anzeige(
     let cache = crate::cache_db::cache_pool(&state.karten_dir).await;
     let cache_pool = cache.as_ref().unwrap_or(&state.pool);
     Ok(Json(
-        abruf::anzeige(&state.fachebenen, cache_pool, ort, chrono::Utc::now()).await,
+        abruf::anzeige(
+            &state.fachebenen,
+            cache_pool,
+            ctx.einsatz.org_id,
+            ort,
+            chrono::Utc::now(),
+        )
+        .await,
     ))
 }

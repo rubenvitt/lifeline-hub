@@ -183,8 +183,12 @@ export function ladeVerlauf(einsatzId: number): Promise<PegelVerlauf[]> {
   return apiGet<PegelVerlauf[]>(`/api/einsaetze/${einsatzId}/pegel/verlauf`);
 }
 
-/** Abfrage des Verlaufs — derselbe 5-min-Takt wie die Liste, damit Wert und Linie EIN Stand
- *  bleiben (beide lesen denselben Cache-Eintrag im Backend). */
+/**
+ * Abfrage des Verlaufs im 5-min-Takt. Liste und Verlauf lesen im Backend denselben
+ * Cache-Eintrag, sind aber ZWEI Anfragen: im Normalfall zeigen Wert und Linie einen Stand,
+ * zugesichert ist das nicht. Die 10-s-Nachfrage der Liste hat der Verlauf nicht — die Seite
+ * zieht ihn deshalb nach, wenn ein Wert ohne Reihe dasteht (`verlaufLuecke`).
+ */
 export function pegelVerlaufAbfrage(einsatzId: number) {
   return {
     queryKey: einsatzKeys.pegelVerlauf(einsatzId),
