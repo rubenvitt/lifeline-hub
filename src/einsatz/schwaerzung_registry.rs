@@ -161,6 +161,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("abgeschlossen_von", G_FK),
             retain("einsatzart", G_ENUM),
             retain("einsatznummer_intern", G_ZAEHLER),
+            retain("nummer_jahr", G_ZAEHLER),
+            retain("nummer_lfd", G_ZAEHLER),
             retain("angelegt_at", G_ZEIT),
             retain(
                 "leitstellen_nr",

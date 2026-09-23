@@ -664,6 +664,9 @@ describe('LagekartePage', () => {
       expect(patchBody!.einsatzort_lon).toBe(8.6);
       expect(patchBody!.bezeichnung).toBe('Test'); // andere Kopffelder bleiben erhalten (Vollersatz)
     });
+    // LFH-617: die Einsatznummer ist nicht änderbar — schon der Schlüssel (auch mit `null`)
+    // wäre beim Server 400, und das Verschieben des Einsatzorts schlüge fehl.
+    expect(patchBody).not.toHaveProperty('einsatznummer_intern');
   });
 
   it('Marker-Klick öffnet den Inspector mit Modul-Link', async () => {

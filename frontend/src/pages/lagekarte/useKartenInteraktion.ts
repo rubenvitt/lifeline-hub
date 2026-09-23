@@ -34,7 +34,6 @@ function kopfMitKoordinate(
     bezeichnung: e.bezeichnung,
     stichwort: e.stichwort ?? null,
     einsatzart: e.einsatzart,
-    einsatznummer_intern: e.einsatznummer_intern ?? null,
     leitstellen_nr: e.leitstellen_nr ?? null,
     einsatzort: e.einsatzort ?? null,
     einsatzort_lat: lat,

@@ -275,7 +275,6 @@ test('Lagekarte: startet auf dem Einsatzort; die Zeitachse deckt die Karte nicht
       bezeichnung: e.bezeichnung,
       stichwort: e.stichwort ?? null,
       einsatzart: e.einsatzart,
-      einsatznummer_intern: e.einsatznummer_intern ?? null,
       leitstellen_nr: e.leitstellen_nr ?? null,
       einsatzort: e.einsatzort ?? null,
       einsatzort_lat: ort.lat,

@@ -64,7 +64,8 @@ export interface KopfdatenUpdate {
   bezeichnung: string;
   stichwort: string | null;
   einsatzart: Einsatzart;
-  einsatznummer_intern: string | null;
+  // Keine `einsatznummer_intern`: die vergibt das System beim Anlegen, der Server weist
+  // den Schlüssel im PATCH mit 400 ab — auch mit `null` (LFH-617).
   leitstellen_nr: string | null;
   einsatzort: string | null;
   einsatzort_lat: number | null;

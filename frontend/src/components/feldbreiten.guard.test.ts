@@ -122,10 +122,18 @@ describe('Feldbreiten im Verwaltungsteil', () => {
     }
   });
 
-  it('die vierzehn umgestellten Felder (plus Neuzugänge) tragen eine Obergrenze statt einer Festbreite', () => {
+  it('die vierzehn umgestellten Felder (plus seither neue) tragen eine Obergrenze statt einer Festbreite', () => {
+    // Felder, die NACH B1 in diesen Bereichen dazugekommen sind und die fluide Form von
+    // Anfang an tragen. Sie stehen hier namentlich, damit die Vierzehn im Testnamen die
+    // Zahl der UMGESTELLTEN bleibt und nicht still mitwächst.
+    const neuSeitB1 = [
+      // LFH-610: Rückmeldefrist, gleich in der fluiden Form gebaut.
+      'pages/einstellungen/EinsatzDefaults.tsx',
+      // LFH-617: „Präfix Einsatznummer“ neben den drei übrigen Präfixen.
+      'pages/einstellungen/EinsatzDefaults.tsx',
+    ];
     const erwartet: Record<string, number> = {
-      // 6 umgestellte + die Rückmeldefrist (LFH-610), gleich in der fluiden Form gebaut.
-      'pages/einstellungen/EinsatzDefaults.tsx': 7,
+      'pages/einstellungen/EinsatzDefaults.tsx': 8,
       'stammdaten/QualifikationenTab.tsx': 1,
       'stammdaten/EtbBausteinFormModal.tsx': 1,
       'stammdaten/PersonalStatusTab.tsx': 1,
@@ -151,8 +159,7 @@ describe('Feldbreiten im Verwaltungsteil', () => {
     // Summiert wird das GEMESSENE, nicht die Erwartungsmap. Sonst verglich diese
     // Zeile eine hartkodierte Zahl mit einer hartkodierten Zahl und belegte über
     // den Quellbaum nichts — die vierzehn im Testnamen wäre nirgends erzwungen.
-    // 14 umgestellte + 1 Neuzugang (Rückmeldefrist, LFH-610).
-    expect(Object.values(gemessen).reduce((a, b) => a + b, 0)).toBe(15);
+    expect(Object.values(gemessen).reduce((a, b) => a + b, 0)).toBe(14 + neuSeitB1.length);
   });
 
   it('der Scanner findet die verbotene Form wirklich (Selbstbeweis)', () => {

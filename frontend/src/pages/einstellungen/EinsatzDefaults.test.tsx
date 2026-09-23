@@ -35,6 +35,7 @@ const VOLL = {
   etb_nummer_praefix: 'EB-',
   meldung_nummer_praefix: 'M-',
   auftrag_nummer_praefix: 'A-',
+  einsatz_nummer_praefix: 'WF-',
   meldung_bestaetigung_frist_min: 30,
   auftrag_quittierung_frist_min: 45,
   rueckmeldung_frist_min: 25,
@@ -89,6 +90,7 @@ describe('EinsatzDefaults', () => {
         etb_nummer_praefix: 'EB-',
         meldung_nummer_praefix: 'M-',
         auftrag_nummer_praefix: 'A-',
+        einsatz_nummer_praefix: 'WF-',
         meldung_bestaetigung_frist_min: 30,
         auftrag_quittierung_frist_min: 45,
         rueckmeldung_frist_min: 25,
@@ -130,6 +132,23 @@ describe('EinsatzDefaults', () => {
     await waitFor(() =>
       expect(speichereOrgEinstellungen).toHaveBeenCalledWith(
         expect.objectContaining({ etb_nummer_praefix: null }),
+      ),
+    );
+  });
+
+  it('LFH-617: das Einsatznummer-Präfix ist editierbar und geht in den PUT', async () => {
+    renderMitProviders(<EinsatzDefaults />);
+
+    const feld = await screen.findByLabelText('Präfix Einsatznummer');
+    expect(feld).toHaveValue('WF-');
+    expect(feld).toHaveAttribute('placeholder', 'E-');
+    await userEvent.clear(feld);
+    await userEvent.type(feld, 'OV-');
+    fireEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() =>
+      expect(speichereOrgEinstellungen).toHaveBeenCalledWith(
+        expect.objectContaining({ einsatz_nummer_praefix: 'OV-' }),
       ),
     );
   });

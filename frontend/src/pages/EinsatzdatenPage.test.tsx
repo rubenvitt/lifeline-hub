@@ -422,6 +422,34 @@ describe('EinsatzdatenPage · Gliederung (LFH-345, M14)', () => {
     expect(await screen.findByText('LS-4711')).toBeInTheDocument();
   });
 
+  it('LFH-617: die Einsatznummer ist Anzeige, kein Eingabefeld — und geht nicht in den PATCH', async () => {
+    let patchBody: Record<string, unknown> | null = null;
+    setup({ einsatz: { einsatznummer_intern: 'E-2026-0431', leitstellen_nr: 'LS-1' } });
+    server.use(
+      http.patch('/api/einsaetze/7', async ({ request }) => {
+        patchBody = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(basisEinsatz);
+      }),
+    );
+    const user = userEvent.setup();
+
+    // Lesezweig: die Nummer steht unter „Einsatznummer“ in den technischen Angaben.
+    await user.click(await screen.findByText('Technische Angaben'));
+    expect(await screen.findByText('E-2026-0431')).toBeInTheDocument();
+    expect(screen.getByText('Einsatznummer')).toBeInTheDocument();
+
+    // Bearbeiten: kein Feld für die Systemnummer, die Leitstellen-Nr. bleibt editierbar.
+    await user.click(screen.getByRole('button', { name: 'Bearbeiten' }));
+    expect(screen.queryByLabelText(/Einsatznummer/)).toBeNull();
+    expect(screen.getByLabelText('Leitstellen-Nr.')).toHaveValue('LS-1');
+
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(patchBody).not.toBeNull());
+    // Abwesenheit des SCHLÜSSELS, nicht bloß `null`: auch `null` ist beim Server 400.
+    expect(patchBody).not.toHaveProperty('einsatznummer_intern');
+    expect(patchBody).toHaveProperty('leitstellen_nr', 'LS-1');
+  });
+
   it('setzt den Fokus beim Bearbeiten aufs erste Feld', async () => {
     setup();
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));

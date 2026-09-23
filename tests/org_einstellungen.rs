@@ -419,3 +419,68 @@ async fn modul_put_nicht_ausblendbar_key_ist_erlaubt() {
         "NICHT_AUSBLENDBAR-Key muss als Rollen-Default setzbar sein; body={body}"
     );
 }
+
+// ─── Einsatznummer-Präfix (LFH-617) ─────────────────────────────────────────
+
+/// Das Präfix der Einsatznummer ist eine Org-Nummernkreis-Einstellung: PUT → GET liefert
+/// es, und der nächste neue Einsatz trägt es (eingefroren in seine Nummer).
+#[tokio::test]
+async fn einsatz_nummer_praefix_persistiert_und_greift_beim_anlegen() {
+    let app = setup().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+
+    let (status, body) = put_einstellungen(
+        &app,
+        &admin_cookie,
+        serde_json::json!({"einsatz_nummer_praefix": " WF- "}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "body={body}");
+    let (_, get_body) = get_einstellungen(&app, Some(&admin_cookie)).await;
+    assert_eq!(
+        get_body["einsatz_nummer_praefix"], "WF-",
+        "getrimmt gespeichert"
+    );
+
+    let (status, einsatz) = anfrage(
+        &app,
+        "POST",
+        "/api/einsaetze",
+        &admin_cookie,
+        Some(r#"{"bezeichnung":"Lage"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "body={einsatz}");
+    let nr = einsatz["einsatznummer_intern"].as_str().unwrap();
+    assert!(
+        nr.starts_with("WF-") && nr.ends_with("-0001"),
+        "Nummer {nr}"
+    );
+}
+
+/// Dieselbe Whitelist wie die übrigen Präfixe: zu lang oder unerlaubtes Zeichen → 400,
+/// der gespeicherte Wert bleibt stehen.
+#[tokio::test]
+async fn einsatz_nummer_praefix_ungueltig_ist_400() {
+    let app = setup().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+    let (status, _) = put_einstellungen(
+        &app,
+        &admin_cookie,
+        serde_json::json!({"einsatz_nummer_praefix": "WF-"}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    for schlecht in ["NEUNZEICH", "E#"] {
+        let (status, _) = put_einstellungen(
+            &app,
+            &admin_cookie,
+            serde_json::json!({"einsatz_nummer_praefix": schlecht}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{schlecht} muss 400 sein");
+    }
+    let (_, get_body) = get_einstellungen(&app, Some(&admin_cookie)).await;
+    assert_eq!(get_body["einsatz_nummer_praefix"], "WF-");
+}
