@@ -188,7 +188,21 @@ export default function LagekartePage() {
     zonen,
     freieZeichen,
     rohdaten,
+    personenZugriff,
+    personenVerortet,
   } = useLagekarteDaten({ einsatzId, zeigeZonen: layer.zone, aktiveAnsichtId, quelle });
+
+  // Ebene „Betroffene" (LFH-648): gezeichnet nur bei eingeschaltetem Schalter UND freiem
+  // Modul. Wählbar (Marker-Klick, Inspector) ist genau, was gezeichnet wird — Startausschnitt
+  // und Kopfzahl bleiben dagegen auf `alleVerortet` und damit ohne Personen.
+  const personenAufKarte = useMemo(
+    () => (layer.person && personenZugriff === 'frei' ? personenVerortet : []),
+    [layer.person, personenZugriff, personenVerortet],
+  );
+  const waehlbar = useMemo(
+    () => (personenAufKarte.length ? [...alleVerortet, ...personenAufKarte] : alleVerortet),
+    [alleVerortet, personenAufKarte],
+  );
 
   const {
     onFachebeneToggle,
@@ -375,7 +389,7 @@ export default function LagekartePage() {
     einsatzId,
     einsatz,
     darfSchreiben,
-    alleVerortet,
+    waehlbar,
     aktiveAnsichtId,
     fehler,
     erfolg,
@@ -400,9 +414,13 @@ export default function LagekartePage() {
     onBildMittelpunkt,
   } = useKartenbilder({ einsatzId, kartenRef, bildPlatzierenId, aktiveAnsichtId, quelle, fehler });
 
-  // `person` ist ein Markertyp der Betroffenen-Karte (LFH-613), keine Ebene der Lagekarte:
-  // `LayerSichtbar` kennt ihn nicht, und die Lagekarte speist keine Personen ein.
-  const sichtbareMarker = alleVerortet.filter((m) => m.typ !== 'person' && layer[m.typ]);
+  // Betroffene (LFH-648) laufen getrennt von `alleVerortet` und nur bei freiem Modul
+  // „Personen" auf die Karte — der Schalter allein genügt nicht, er gehört einer geteilten
+  // Ansicht (`personenEbene.ts`).
+  const sichtbareMarker = useMemo(
+    () => [...alleVerortet.filter((m) => layer[m.typ]), ...personenAufKarte],
+    [alleVerortet, layer, personenAufKarte],
+  );
   // Startausschnitt aus den Daten (Ansichtszentrum → Einsatzort → Objekte); die Karte wendet
   // ihn genau einmal an. Über ALLE verorteten Objekte, nicht nur die sichtbaren Ebenen: eine
   // ausgeblendete Ebene ändert nicht, wo der Einsatz liegt.
@@ -414,7 +432,7 @@ export default function LagekartePage() {
     () => (startOffen ? undefined : startAnsicht(alleVerortet, aktiveAnsicht)),
     [startOffen, alleVerortet, aktiveAnsicht],
   );
-  const aktiverMarker = alleVerortet.find((m) => m.schluessel === auswahl) ?? null;
+  const aktiverMarker = waehlbar.find((m) => m.schluessel === auswahl) ?? null;
   // Freies taktisches Zeichen zur Marker-Auswahl (LFH-170): der Inspector editiert den ROHEN
   // Record, nicht die gestrippte Marker-tz (sonst verlöre der Editor gestrippte Overlays).
   const ausgewaehltesZeichen =
@@ -855,6 +873,7 @@ export default function LagekartePage() {
         layer={layer}
         onLayerToggle={(k, an) => setLayer((l) => ({ ...l, [k]: an }))}
         zonenAnzahl={zonen.length}
+        personen={{ zugriff: personenZugriff, anzahl: personenVerortet.length }}
         basemap={basemap}
         grundlageWahl={istSchmal ? grundlageWahl : undefined}
         onMarkerWaehlen={onMarkerWaehlen}

@@ -44,26 +44,26 @@ dann der Code. Pfade relativ zu `frontend/src/`.
 
 ## 4. Lagekarten-Seite verdrahten (D3)
 
-- [ ] 4.1 In `pages/LagekartePage.tsx` den harten Filter entfernen. `sichtbareMarker`
+- [x] 4.1 In `pages/LagekartePage.tsx` den harten Filter entfernen. `sichtbareMarker`
   bekommt `personenVerortet` nur bei `layer.person && personenZugriff === 'frei'`. Der
   Marker-Lookup für `aktiverMarker`/`onMarkerWaehlen` sieht beide Listen. Startausschnitt
   und `verortetAnzahl` bleiben auf `alleVerortet`. Verifikation: Paartest mit Ansicht
   `person: true`: mit Zugriff erscheint `marker-person-*`; mit 403 und Override-Sperre
   keiner und kein Ausfallbanner. Außerdem: gleiche Kopfzahl „verortet“ mit und ohne
   Personen, und ein Klick auf `marker-person-*` füllt „Ausgewählt“.
-- [ ] 4.2 `ebenenZeilen` (`leistenDaten.ts`) zählt `person` aus `personenVerortet` und
+- [x] 4.2 `ebenenZeilen` (`leistenDaten.ts`) zählt `person` aus `personenVerortet` und
   bekommt den Zugriffszustand. Bei `'ausgeblendet'` gibt es keine Zeile, bei
   `'gesperrt'`/`'rueckblick'` eine Zeile mit Sperrgrund und ohne Anzahl. Verifikation:
   `leistenDaten.test.ts` je Zustand.
 
 ## 5. Ebenen-Zeile und Legende (D6)
 
-- [ ] 5.1 `EbenenZeilenKnopf` bekommt den Sperrzustand: `disabled`, `LockOutlined` in einer
+- [x] 5.1 `EbenenZeilenKnopf` bekommt den Sperrzustand: `disabled`, `LockOutlined` in einer
   `aria-hidden`-Hülle, den Grund als sichtbaren Text und im zugänglichen Namen, keine Anzahl.
   Verifikation: `Sidebar.test.tsx`. `toHaveLength(10)` wird zum Paar (11 mit Zugriff, 10
   ausgeblendet). Die gesperrte Zeile ist nicht umschaltbar (kein `onLayerToggle`-Aufruf),
   hat keine Ziffer, und `queryByRole('img')` in der Zeile liefert `null`.
-- [ ] 5.2 `SK_KURZZEICHEN` aus `personen/personenKarte.ts` exportieren und die Komponente
+- [x] 5.2 `SK_KURZZEICHEN` aus `personen/personenKarte.ts` nutzen (war bereits exportiert) und die Komponente
   `pages/lagekarte/Sichtungslegende.tsx` bauen: sieben Einträge aus `sichtung`,
   `sichtungsfarben`, Kürzel und `SK_WORT`. Sie wird nur bei eingeschalteter, freier Ebene
   gerendert. Verifikation: Komponententest mit sieben Einträgen und Wortlaut je Eintrag;
@@ -72,11 +72,11 @@ dann der Code. Pfade relativ zu `frontend/src/`.
 
 ## 6. Inspector (D7)
 
-- [ ] 6.1 `markerToUrl` bekommt den Fall `person` → `personDetailPfad`, `inspectorExclude`
+- [x] 6.1 `markerToUrl` bekommt den Fall `person` → `personDetailPfad`, `inspectorExclude`
   den Zweig `person`. Verifikation: `markerToUrl.test.ts` mit dem neuen Fall;
   `Inspector.test.tsx` mit gesetztem Namen: der Titel ist `R-042 · SK II`, `Kowalski`/`Anna`
   sind nicht im Dokument, der Link zeigt auf `/einsaetze/1/personen/<id>`.
-- [ ] 6.2 `loescheVerortung` (`pages/lagekarte/useKartenInteraktion.ts`) bekommt den Zweig
+- [x] 6.2 `loescheVerortung` (`pages/lagekarte/useKartenInteraktion.ts`) bekommt den Zweig
   `person`: PATCH nur mit `antreff_lat/antreff_lon: null`, danach Invalidierung von
   `personen`/`person`. Verifikation: `useKartenInteraktion.test.tsx` mit dem exakten
   PATCH-Body und beiden Invalidierungen, nach dem Muster des Platzier-Tests.

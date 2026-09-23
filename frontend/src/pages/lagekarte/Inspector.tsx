@@ -88,6 +88,10 @@ function inspectorExclude(m: KarteMarker, einsatzId: number): string | undefined
       return undefined;
     case 'abschnitt':
       return undefined;
+    // Betroffene (LFH-648) stehen in keiner Peilungsquelle der Ort-Vorschau (sie prüft nur
+    // den Einsatz-Lesezugriff und darf deshalb keine Personen kennen) → nichts auszuschließen.
+    case 'person':
+      return undefined;
   }
 }
 

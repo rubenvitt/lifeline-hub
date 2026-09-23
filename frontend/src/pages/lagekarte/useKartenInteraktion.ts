@@ -135,7 +135,9 @@ interface KartenInteraktionArgs {
   einsatzId: number;
   einsatz: EinsatzAnzeige | undefined;
   darfSchreiben: boolean;
-  alleVerortet: KarteMarker[];
+  /** Alle anwählbaren Marker: `alleVerortet` plus — bei sichtbarer Ebene — die Betroffenen
+   *  (LFH-648), die bewusst NICHT in `alleVerortet` stehen. */
+  waehlbar: KarteMarker[];
   /** Aktive Ansicht (B/LFH-320): neu angelegte Objekte werden auf ihr gestempelt. */
   aktiveAnsichtId?: number;
   /** Stabiler Fehler-Handler (useCallback über App.useApp-message). */
@@ -155,7 +157,7 @@ export function useKartenInteraktion({
   einsatzId,
   einsatz,
   darfSchreiben,
-  alleVerortet,
+  waehlbar,
   aktiveAnsichtId,
   fehler,
   erfolg,
@@ -335,7 +337,7 @@ export function useKartenInteraktion({
 
   function onMarkerWaehlen(schluessel: string) {
     setSelektion({ art: 'objekt', schluessel });
-    const m = alleVerortet.find((x) => x.schluessel === schluessel);
+    const m = waehlbar.find((x) => x.schluessel === schluessel);
     if (m) setFlyToZiel({ lng: m.lon, lat: m.lat });
   }
 
@@ -363,6 +365,16 @@ export function useKartenInteraktion({
     } else if (marker.typ === 'abschnitt') {
       zeichneAbschnitt(einsatzId, marker.id, { flaeche_geojson: null })
         .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.abschnitte(einsatzId) }))
+        .catch(fehler);
+    } else if (marker.typ === 'person') {
+      // Betroffene (LFH-648): NUR die zwei Koordinatenfelder, wie im Platzier-Zweig — die
+      // Person bleibt bestehen, nur ihr Fundort-Punkt geht. Umkehrbar über „Auf Lagekarte
+      // verorten" der Detailseite, deshalb ohne Rückfrage (CLAUDE.md, LFH-363).
+      aktualisierePerson(einsatzId, marker.id, { antreff_lat: null, antreff_lon: null })
+        .then(() => {
+          qc.invalidateQueries({ queryKey: einsatzKeys.personen(einsatzId) });
+          qc.invalidateQueries({ queryKey: einsatzKeys.person(einsatzId, marker.id) });
+        })
         .catch(fehler);
     }
     setAuswahl(null);

@@ -495,3 +495,60 @@ describe('Inspector im Paneel „Ausgewählt"', () => {
     expect(screen.queryByRole('link', { name: /Einsatztagebuch/ })).not.toBeInTheDocument();
   });
 });
+
+describe('Inspector für Betroffene (LFH-648)', () => {
+  beforeEach(() => {
+    server.use(
+      http.get('/api/einsaetze/:id/ort-vorschau', () =>
+        HttpResponse.json({ peilung: null, ortsname: null }),
+      ),
+    );
+  });
+
+  // Der Marker stammt aus `personenMarker`: das Label trägt Registriernummer und Sichtung,
+  // und der Inspector liest KEINE Personenliste — der Name kann also nirgends herkommen.
+  const personMarker = {
+    schluessel: 'person-11',
+    typ: 'person',
+    id: 11,
+    lat: 50.05,
+    lon: 8.55,
+    label: 'R-042 · SK II',
+    kurzzeichen: 'II',
+    farbe: '#fadb14',
+  } as KarteMarker;
+
+  it('Titel ist „R-042 · SK II", die Unterzeile „Person", der Link die Detailseite', () => {
+    renderMitProviders(
+      <Inspector
+        einsatzId={1}
+        marker={personMarker}
+        darfSchreiben={false}
+        onSchliessen={() => {}}
+        onVerortungLoeschen={() => {}}
+      />,
+    );
+    expect(screen.getByText('R-042 · SK II')).toBeInTheDocument();
+    expect(screen.getByText('Person')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Im Fachmodul öffnen' })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/personen/11',
+    );
+  });
+
+  it('mit Schreibrecht: „Verortung löschen" reicht den Personen-Marker durch', async () => {
+    const geloescht: KarteMarker[] = [];
+    renderMitProviders(
+      <Inspector
+        einsatzId={1}
+        marker={personMarker}
+        darfSchreiben
+        onSchliessen={() => {}}
+        onVerortungLoeschen={(m) => geloescht.push(m)}
+      />,
+    );
+    screen.getByRole('button', { name: /Verortung löschen/ }).click();
+    expect(geloescht.map((m) => m.schluessel)).toEqual(['person-11']);
+  });
+});
+
