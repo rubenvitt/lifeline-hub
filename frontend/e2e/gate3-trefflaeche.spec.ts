@@ -1272,6 +1272,13 @@ test('Ablösung: Kartenaktionen und Vorgabe-Knopf folgen der Dichte-Staffel 30 /
 // eine geschlossen: dort entfällt „Belegung melden", der Dreipunkt bleibt — 2 Primär-, 3
 // Dreipunkt-Knöpfe in der Tabelle. Namen OHNE „Betreuung" (design.md D10 e: die Palette
 // durchsucht Module und Einsätze gemeinsam).
+//
+// BELEGT, NICHT BEHAUPTET (23.09.2026): der erste Lauf war rot am Abstand der Tabellenzeile
+// („Abstand Zeilenaktionen (handschuh, gemessen 7px)", `Space`-Vorgabe = `abstand.xs`); der
+// Fix ist `size="middle"` in `betreuung/StellenBlock.tsx` (11 / 18 / 26 px). Mutationsprobe
+// „Stufe festgenagelt": `stelleDichte` schreibt immer `'kompakt'`, die `data-dichte`-Wache
+// entfernt, `STAFFEL` nur `handschuh` → rot an der ersten Höhenmessung, „Stand melden
+// (handschuh) #1 (gemessen 30px hoch, Soll ≥ 72)". Danach zurückgesetzt.
 
 test('Betreuung: Karten- und Zeilenaktionen folgen der Dichte-Staffel 30 / 48 / 72 px', async ({
   page,

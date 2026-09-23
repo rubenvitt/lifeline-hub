@@ -535,6 +535,42 @@ test('Gate 1: keine tragende Route läuft auf 1366, 1024 oder 390 px waagerecht 
       'Einheit (Ablösung)',
     );
     await post('abloesungen', { einheit_id: einheit.id, rhythmus_minuten: 390 }, 'Schicht');
+
+    // LFH-639: ein Bezirk mit langem Namen, gemeldetem Stand, Räumungsetikett und Abschnitt
+    // (alle drei Sekundärfelder der Karte gefüllt) und eine Stelle mit langem Namen, deren
+    // Belegung das Auslastungswort „fast voll" neben die Zahl setzt — die breiteste Zelle der
+    // Tabelle. Namen OHNE „Betreuung" (design.md D10 e).
+    const bezirk = await post(
+      'betreuung/bezirke',
+      {
+        bezeichnung: 'Uferstraße 12–40 und Deichweg 1–9 zwischen Schleuse und Pumpwerk Nordwest',
+        plan_personen: 1210,
+        plan_erhebung: 'geschaetzt',
+        abschnitt_id: abschnitt.id,
+      },
+      'Bezirk',
+    );
+    await post(
+      `betreuung/bezirke/${bezirk.id}/staende`,
+      { evakuiert: 1180, erhebung: 'geschaetzt' },
+      'Stand',
+    );
+    const antwort = await page.request.patch(
+      `/api/einsaetze/${einsatzId}/betreuung/bezirke/${bezirk.id}`,
+      { data: { raeumung: 'laeuft' } },
+    );
+    expect(antwort.ok(), `Seeding Räumung: ${antwort.status()}`).toBeTruthy();
+    const stelle = await post(
+      'betreuung/stellen',
+      {
+        bezeichnung: 'Notunterkunft Mehrzweckhalle Gesamtschule Musterstadt-Nordwest',
+        art: 'notunterkunft',
+        kapazitaet_personen: 1500,
+        abschnitt_id: abschnitt.id,
+      },
+      'Stelle',
+    );
+    await post(`betreuung/stellen/${stelle.id}/belegungen`, { belegt: 1420 }, 'Belegung');
   }
 
   // Eine Route je Layoutfamilie: Ebene-1-Shell, Lagebild, Modulseite unter dem
@@ -633,6 +669,16 @@ test('Gate 1: keine tragende Route läuft auf 1366, 1024 oder 390 px waagerecht 
         p.getByRole('article', {
           name: 'Schicht Fachgruppe Wasserschaden/Pumpen Ortsverband Musterstadt-Nordwest',
         }),
+    },
+    {
+      // LFH-639: Datenanker ist die Karte des gesäten Bezirks — der Kartenblock steht in
+      // JEDER Breite (`form="karte"`), die Stellen-Tabelle dahinter trägt auf 390 px ihren
+      // eigenen waagerechten Bildlauf (Katalogtabelle), der kein Verstoß ist.
+      pfad: `/einsaetze/${einsatzId}/betreuung`,
+      anker: (p: Page) =>
+        p
+          .getByRole('region', { name: 'Evakuierungsbezirke' })
+          .getByText('Uferstraße 12–40 und Deichweg 1–9 zwischen Schleuse und Pumpwerk Nordwest'),
     },
   ];
 
