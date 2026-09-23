@@ -4,7 +4,7 @@ import { TbMapPin } from 'react-icons/tb';
 import { formatiere, parse, type LatLon } from '../anzeige/koordinaten';
 import type { Koordinatenformat } from '../api/types';
 import { lagekartePfad } from '../routing/deeplinks';
-import type { Befehl } from './typen';
+import { sprungZu, type Befehl, type Oeffnung } from './typen';
 
 /**
  * Der Koordinatensprung der Sprungpalette (LFH-619): wer eine Koordinate tippt, bekommt ganz
@@ -123,7 +123,8 @@ export function koordinatenBefehl({
   einsatzId: number;
   punkt: LatLon;
   format: Koordinatenformat;
-  navigate: (pfad: string) => void;
+  /** `oeffnung` fehlt = im aktuellen Tab (LFH-645). */
+  navigate: (pfad: string, oeffnung?: Oeffnung) => void;
 }): Befehl {
   return {
     id: `koordinate:${kurz(punkt.lat)},${kurz(punkt.lon)}`,
@@ -131,6 +132,6 @@ export function koordinatenBefehl({
     label: `Auf Lagekarte zeigen · ${formatiere(punkt.lat, punkt.lon, format)}`,
     kontext: 'Koordinate',
     icon: TbMapPin,
-    ausfuehren: () => navigate(lagekartePfad(einsatzId, { zentrum: punkt })),
+    ...sprungZu(lagekartePfad(einsatzId, { zentrum: punkt }), navigate),
   };
 }

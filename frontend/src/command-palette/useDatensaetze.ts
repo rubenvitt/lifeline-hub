@@ -21,6 +21,7 @@ import {
   baueDatensatzTreffer,
   etbVolltextMoeglich,
   zahlAusSuche,
+  type DatensatzKontext,
   type DatensatzQuellen,
 } from './datensaetze';
 import type { Treffer } from './fuzzy';
@@ -397,7 +398,7 @@ export function useDatensatzTreffer({
   navigate,
 }: DatensatzAbruf & {
   aktuellerModulKey: string | null;
-  navigate: (pfad: string) => void;
+  navigate: DatensatzKontext['navigate'];
 }): Treffer[] {
   const { benutzer } = useAuth();
   const quellen = useDatensaetze({ einsatzId, modus, suche });
