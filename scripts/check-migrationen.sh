@@ -53,6 +53,9 @@ KOPF="${POSITIONAL[1]:-HEAD}"
 
 ROOT="$(git rev-parse --show-toplevel)"
 cd "$ROOT"
+# Ohne das kämen Pfade mit Nicht-ASCII-Bytes gequotet zurück (`"migrations/0117_gr\303\266…"`),
+# endeten auf `.sql"` und fielen still aus jeder Prüfung.
+git() { command git -c core.quotePath=false "$@"; }
 
 commit_von() { # <ref> <rolle>
   git rev-parse --verify --quiet "$1^{commit}" || {

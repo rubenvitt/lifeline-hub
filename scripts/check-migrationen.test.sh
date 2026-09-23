@@ -143,10 +143,10 @@ r="$(repo_neu kein_sql)"
 datei "$r" feature migrations/README.md
 pruefe "Nicht-SQL-Datei unter migrations/ grün" 0 "$(lauf "$r")"
 
-# 11 — DIE FALLE der Merge-Base: hat der Branch alpha schon hereingemergt, ist die
-# Abzweigung die alpha-Spitze. Die Kollision muss trotzdem rot bleiben — ein Skript, das
-# „neu" gegen die Merge-Base und „frei" ebenfalls gegen die Merge-Base prüfte, sähe sie hier
-# nicht mehr, weil 0003_fremd dann zum Bestand zählt.
+# 11 — Der übliche Weg nach einer Kollision: alpha wird hereingemergt. Dann IST die
+# Abzweigung die alpha-Spitze, und 0003_fremd zählt zum Bestand. Die eigene 0003 muss
+# trotzdem als neu erkannt und rot bleiben — das Hereinmergen allein löst nichts, erst das
+# Umnummerieren. (Welche Hälfte des Skripts welche Mutation fängt, zeigen Fall 3 und 4.)
 r="$(repo_neu nachgezogen)"
 datei "$r" feature migrations/0003_eigen.sql
 datei "$r" alpha migrations/0003_fremd.sql
@@ -155,44 +155,58 @@ git -C "$r" merge -q --no-edit alpha
 pruefe "Kollision nach Hereinmergen von alpha rot" 1 "$(lauf "$r")"
 
 # 12 — Umnummerieren: zwei eigene Migrationen ziehen hinter alpha, die Verweise ziehen mit,
-# die Folgeprüfung ist grün. Die FALLE dabei: das Ziel der ersten (0004) ist der heutige Platz
-# der zweiten. Ohne Zwischenschritt scheitert `git mv` daran oder überschreibt die Datei —
-# deshalb wird auch der Inhalt verglichen, nicht nur der Name.
+# die Folgeprüfung ist grün. Die FALLE dabei: beide tragen dieselbe Beschreibung, das Ziel der
+# ersten (0004_x) ist also genau der heutige Name der zweiten — als Datei wie als Verweis.
+# Einphasig schlüge `git mv` fehl, und die Ersetzung `0003_x -> 0004_x` machte aus dem
+# Verweis auf die erste einen auf die zweite, den der nächste Schritt dann auf 0005 zöge.
+# Deshalb wird auch der Inhalt verglichen, nicht nur der Name.
 r="$(repo_neu umnummerieren)"
-datei "$r" feature migrations/0003_eigen.sql
-datei "$r" feature migrations/0004_zweite.sql
+datei "$r" feature migrations/0003_x.sql
+datei "$r" feature migrations/0004_x.sql
 git -C "$r" checkout -q feature
-inhalt_eigen="$(cat "$r/migrations/0003_eigen.sql")"
-inhalt_zweite="$(cat "$r/migrations/0004_zweite.sql")"
+inhalt_erste="$(cat "$r/migrations/0003_x.sql")"
+inhalt_zweite="$(cat "$r/migrations/0004_x.sql")"
 mkdir -p "$r/src"
-printf 'const M: &str = include_str!("../migrations/0003_eigen.sql");\n' > "$r/src/db.rs"
-printf 'const N: &str = include_str!("../migrations/0004_zweite.sql");\n' >> "$r/src/db.rs"
+printf 'const M: &str = include_str!("../migrations/0003_x.sql");\n' > "$r/src/db.rs"
+printf 'const N: &str = include_str!("../migrations/0004_x.sql");\n' >> "$r/src/db.rs"
 git -C "$r" add -A && git -C "$r" commit -q -m verweis
 datei "$r" alpha migrations/0003_fremd.sql
 pruefe "umnummerieren läuft durch" 0 "$(lauf "$r" --umnummerieren)"
-pruefe "erste Migration liegt auf 0004, mit ihrem Inhalt" "$inhalt_eigen" \
-  "$(cat "$r/migrations/0004_eigen.sql" 2>/dev/null || echo fehlt)"
+pruefe "erste Migration liegt auf 0004, mit ihrem Inhalt" "$inhalt_erste" \
+  "$(cat "$r/migrations/0004_x.sql" 2>/dev/null || echo fehlt)"
 pruefe "zweite Migration liegt auf 0005, mit ihrem Inhalt" "$inhalt_zweite" \
-  "$(cat "$r/migrations/0005_zweite.sql" 2>/dev/null || echo fehlt)"
-pruefe "alte Namen sind weg" "nein" \
-  "$([ -e "$r/migrations/0003_eigen.sql" ] || [ -e "$r/migrations/0004_zweite.sql" ] && echo ja || echo nein)"
+  "$(cat "$r/migrations/0005_x.sql" 2>/dev/null || echo fehlt)"
+pruefe "alter Name der ersten ist weg" "nein" \
+  "$([ -e "$r/migrations/0003_x.sql" ] && echo ja || echo nein)"
 pruefe "Verweise sind nachgezogen" \
-  "$(printf '%s\n%s' 'const M: &str = include_str!("../migrations/0004_eigen.sql");' \
-                    'const N: &str = include_str!("../migrations/0005_zweite.sql");')" \
+  "$(printf '%s\n%s' 'const M: &str = include_str!("../migrations/0004_x.sql");' \
+                    'const N: &str = include_str!("../migrations/0005_x.sql");')" \
   "$(cat "$r/src/db.rs")"
 git -C "$r" add -A && { git -C "$r" commit -q -m umnummeriert || true; }
 pruefe "nach dem Umnummerieren grün" 0 "$(lauf "$r")"
 
 # 13 — Umnummerieren fasst Bestands-Migrationen nicht an: eine geänderte eingespielte
 # Migration lässt sich nicht wegnummerieren, das Skript bricht ab statt umzubenennen.
+# Die kollidierende neue Migration im Fixture ist nötig: ohne sie gäbe es nichts
+# umzunummerieren, und „nichts wurde umbenannt" wäre trivial wahr.
 r="$(repo_neu umnummerieren_bestand)"
+datei "$r" feature migrations/0003_eigen.sql
+datei "$r" alpha migrations/0003_fremd.sql
 git -C "$r" checkout -q feature
 echo "-- geändert" >> "$r/migrations/0002_b.sql"
 git -C "$r" commit -q -am aendern
 pruefe "umnummerieren verweigert bei geänderter Bestands-Migration" 1 \
   "$(lauf "$r" --umnummerieren)"
-pruefe "Bestands-Migration bleibt liegen" "ja" \
-  "$([ -f "$r/migrations/0002_b.sql" ] && echo ja || echo nein)"
+pruefe "nichts wurde umbenannt" "ja ja" \
+  "$([ -f "$r/migrations/0002_b.sql" ] && echo ja || echo nein) $([ -f "$r/migrations/0003_eigen.sql" ] && echo ja || echo nein)"
+
+# 15 — Nicht-ASCII im Namen: mit der Git-Vorgabe core.quotePath=true kämen solche Pfade
+# in Anführungszeichen zurück, endeten auf `.sql"` und fielen still aus jeder Prüfung.
+r="$(repo_neu umlaut)"
+datei "$r" feature migrations/0003_größe.sql
+datei "$r" alpha migrations/0003_fremd.sql
+pruefe "Kollision mit Umlaut im Namen rot" 1 "$(lauf "$r")"
+enthaelt "Umlaut-Datei wird im Klartext genannt" "0003_größe.sql"
 
 # 14 — Eine unbekannte Basis ist ein Aufruffehler, kein Befund.
 r="$(repo_neu basis_fehlt)"

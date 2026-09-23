@@ -1661,6 +1661,14 @@ entstehen daraus verschiedene Schemata, ohne dass irgendetwas rot wird.
 steht B noch grün. PRs aus Forks bekommen ihren Status erst mit dem nächsten Push auf den
 Ziel-Branch, weil der Token dort nicht schreiben darf.
 
+**Migrationen entstehen nur über `alpha`.** Die Regel kennt keine Kanal-Ausnahme. Bringt ein
+Hotfix direkt auf `beta`/`main` eine `0117` mit, während `alpha` schon bis `0120` reicht,
+ist der Rückweg nach `alpha` rot. Die nächste Freigabe `alpha → main` ist es ebenfalls, und
+auflösen ließe es sich nur, indem man eine eingespielte Migration umbenennt. Ein Hotfix mit
+Schemaänderung geht deshalb über `alpha`. Freigaben laufen als Merge-Commit, nicht als
+Squash: Nach einem Squash bleibt die Abzweigung alt, und jede frühere Migration erschiene
+wieder als eingeschoben.
+
 ## Backend — ClamAV-Upload-Scan (Default-AN, LFH-114/LFH-224)
 
 Der clamd-Virenscan der Uploads (`src/anhang/mod.rs`) hängt am Cargo-Feature `clamav`, das

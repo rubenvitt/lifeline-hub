@@ -69,8 +69,18 @@ jobs:
           STATUS_SETZEN: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
           LAUF: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
+          # Die Regel kommt vom ZIEL-Branch, nicht aus dem PR — sonst bewertete ein PR sich
+          # mit seiner eigenen Fassung selbst, und ein Branch, der vor LFH-658 abgezweigt
+          # ist, hätte gar keine (Exit 127 → Status „error"). Nur wenn der Ziel-Branch die
+          # Regel noch nicht trägt (etwa `main` vor der nächsten Freigabe), gilt die des PRs.
+          pruefer=scripts/check-migrationen.sh
+          if git cat-file -e "origin/$BASIS:scripts/check-migrationen.sh" 2> /dev/null; then
+            pruefer="$RUNNER_TEMP/check-migrationen.sh"
+            git show "origin/$BASIS:scripts/check-migrationen.sh" > "$pruefer"
+            chmod +x "$pruefer"
+          fi
           code=0
-          scripts/check-migrationen.sh "origin/$BASIS" "$KOPF" || code=$?
+          "$pruefer" "origin/$BASIS" "$KOPF" || code=$?
           case "$code" in
             0) state=success; text="Neue Migrationen liegen über $BASIS." ;;
             1) state=failure; text="Migrationsnummer kollidiert oder ist eingeschoben (gegen $BASIS)." ;;

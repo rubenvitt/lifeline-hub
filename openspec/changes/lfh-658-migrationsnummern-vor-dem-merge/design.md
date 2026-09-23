@@ -139,6 +139,14 @@ sqlx strenger, zeigt der rote Test, dass die Regel neu bewertet werden kann.
   Ruleset-Bypass liegt allein bei der Release-App, der Fall braucht also eine
   Einzelentscheidung.
 
+- [Hotfix mit Migration direkt auf `beta`/`main`, während `alpha` schon höhere Nummern
+  trägt] → Die Rückführung nach `alpha` und die nächste Freigabe wären rot, und lösen
+  ließe es sich nur durch Umbenennen einer eingespielten Migration. Festlegung: Migrationen
+  entstehen nur über `alpha`, Freigaben laufen als Merge-Commit und nicht als Squash. Ein
+  Squash ließe die Abzweigung alt, und frühere Migrationen erschienen wieder als neu.
+- [PR-Job mit der Skriptfassung des PRs] → Der PR-Job führt die Fassung vom Ziel-Branch
+  aus. Sonst bewertete ein PR sich selbst, und Alt-Branches ohne Skript bekämen `error`.
+
 ## Migration Plan
 
 1. PR mit Skript, Selbsttest, Workflow, Doku und Test nach `alpha` mergen. Der eigene
