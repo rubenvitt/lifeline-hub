@@ -221,6 +221,24 @@ pub fn build_router(state: AppState) -> Router {
                     MAX_GLEICHZEITIGE_ASSET_DOWNLOADS,
                 )),
         )
+        // Dokumentenablage (LFH-632): eigener Präfix mit Modul-Gate; Upload/Download wie Anhänge
+        // mit Body-Limit und Download-Concurrency-Cap.
+        .route(
+            "/api/einsaetze/{id}/dokumente",
+            get(routes::dokument::liste)
+                .post(routes::dokument::ablegen)
+                .layer(DefaultBodyLimit::max(26 * 1024 * 1024)),
+        )
+        .route(
+            "/api/einsaetze/{id}/dokumente/{did}",
+            delete(routes::dokument::entfernen),
+        )
+        .route(
+            "/api/einsaetze/{id}/dokumente/{did}/datei",
+            get(routes::dokument::datei).layer(ConcurrencyLimitLayer::new(
+                MAX_GLEICHZEITIGE_ASSET_DOWNLOADS,
+            )),
+        )
         .route(
             "/api/einsaetze/{id}/erinnerungen",
             get(routes::erinnerung::liste),

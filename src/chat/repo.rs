@@ -274,12 +274,16 @@ pub async fn anlegen_mit_anhaengen(
 ) -> Result<ChatNachrichtAnzeige, AppError> {
     let id = crate::write_retry!(pool, |conn| {
         for &aid in anhang_ids {
-            let treffer: Option<i64> =
-                sqlx::query_scalar("SELECT 1 FROM anhang WHERE id = ? AND einsatz_id = ?")
-                    .bind(aid)
-                    .bind(einsatz_id)
-                    .fetch_optional(&mut *conn)
-                    .await?;
+            // Dokument-Anhänge (LFH-632) sind nicht verknüpfbar: sie gehören der
+            // Dokumentenablage, ein zweiter Linker würde deren Lösch-/Rechte-Semantik aushebeln.
+            let treffer: Option<i64> = sqlx::query_scalar(
+                "SELECT 1 FROM anhang a WHERE a.id = ? AND a.einsatz_id = ? \
+                   AND NOT EXISTS (SELECT 1 FROM einsatz_dokument d WHERE d.anhang_id = a.id)",
+            )
+            .bind(aid)
+            .bind(einsatz_id)
+            .fetch_optional(&mut *conn)
+            .await?;
             if treffer.is_none() {
                 return Err(AppError::Validation(
                     "Unbekannter oder fremder Anhang".into(),
@@ -389,33 +393,6 @@ pub async fn loeschen(pool: &SqlitePool, nachricht_id: i64) -> Result<(), AppErr
         .execute(pool)
         .await?;
     Ok(())
-}
-
-/// Ob ein Anhang NUR noch an soft-gelöschten Chat-Nachrichten hängt (LFH-116):
-/// er ist an mindestens EINE Nachricht verknüpft UND alle verknüpfenden Nachrichten
-/// tragen den Tombstone (`geloescht_at`). Dann wird der Byte-Download gesperrt.
-///
-/// n:m-Semantik (chat_nachricht_anhang): Ein verwaister Anhang (an keiner Nachricht
-/// verknüpft, z. B. hochgeladen aber noch nicht gesendet) oder einer, der noch an
-/// mindestens einer LEBENDEN Nachricht hängt, bleibt ladbar (`false`). Bewusst
-/// chat-lokal — heute referenziert nur `chat_nachricht_anhang` die `anhang`-Tabelle;
-/// kommt ein zweiter Linker (ETB/Lageobjekte) hinzu, muss dieser Guard zu einer
-/// Aggregation über alle Linker heraufgezogen werden.
-pub async fn anhang_nur_an_geloeschten_nachrichten(
-    pool: &SqlitePool,
-    anhang_id: i64,
-) -> Result<bool, AppError> {
-    let (gesamt, lebend): (i64, i64) = sqlx::query_as(
-        "SELECT COUNT(*) AS gesamt, \
-                COALESCE(SUM(CASE WHEN n.geloescht_at IS NULL THEN 1 ELSE 0 END), 0) AS lebend \
-         FROM chat_nachricht_anhang cna \
-         JOIN chat_nachricht n ON n.id = cna.nachricht_id \
-         WHERE cna.anhang_id = ?",
-    )
-    .bind(anhang_id)
-    .fetch_one(pool)
-    .await?;
-    Ok(gesamt > 0 && lebend == 0)
 }
 
 /// Prüft, ob das Bezug-Ziel (polymorph, LFH-103) zum Einsatz gehört — FK-Ersatz, da
@@ -1214,7 +1191,7 @@ mod tests {
         assert!(matches!(ergebnis.unwrap_err(), AppError::Conflict(_)));
     }
 
-    // --- LFH-116: anhang_nur_an_geloeschten_nachrichten (n:m-Semantik) ---
+    // --- LFH-116: Tombstone-Sperre über anhang::repo::linker_stand (n:m-Semantik) ---
 
     async fn anhang_anlegen(pool: &SqlitePool, einsatz: i64, benutzer: i64) -> i64 {
         crate::anhang::repo::anlegen(pool, einsatz, benutzer, "f.pdf", "application/pdf", b"x")
@@ -1229,9 +1206,10 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
         let aid = anhang_anlegen(&pool, einsatz, benutzer).await;
-        assert!(!anhang_nur_an_geloeschten_nachrichten(&pool, aid)
+        assert!(!crate::anhang::repo::linker_stand(&pool, aid)
             .await
-            .unwrap());
+            .unwrap()
+            .generischer_download_gesperrt());
     }
 
     #[tokio::test]
@@ -1243,9 +1221,10 @@ mod tests {
         anlegen_mit_anhaengen(&pool, einsatz, benutzer, kid, "m", &[aid])
             .await
             .unwrap();
-        assert!(!anhang_nur_an_geloeschten_nachrichten(&pool, aid)
+        assert!(!crate::anhang::repo::linker_stand(&pool, aid)
             .await
-            .unwrap());
+            .unwrap()
+            .generischer_download_gesperrt());
     }
 
     #[tokio::test]
@@ -1258,9 +1237,10 @@ mod tests {
             .await
             .unwrap();
         loeschen(&pool, m.id).await.unwrap();
-        assert!(anhang_nur_an_geloeschten_nachrichten(&pool, aid)
+        assert!(crate::anhang::repo::linker_stand(&pool, aid)
             .await
-            .unwrap());
+            .unwrap()
+            .generischer_download_gesperrt());
     }
 
     #[tokio::test]
@@ -1277,9 +1257,10 @@ mod tests {
             .await
             .unwrap();
         loeschen(&pool, m1.id).await.unwrap();
-        assert!(!anhang_nur_an_geloeschten_nachrichten(&pool, aid)
+        assert!(!crate::anhang::repo::linker_stand(&pool, aid)
             .await
-            .unwrap());
+            .unwrap()
+            .generischer_download_gesperrt());
     }
 
     #[tokio::test]
@@ -1296,9 +1277,10 @@ mod tests {
             .unwrap();
         loeschen(&pool, m1.id).await.unwrap();
         loeschen(&pool, m2.id).await.unwrap();
-        assert!(anhang_nur_an_geloeschten_nachrichten(&pool, aid)
+        assert!(crate::anhang::repo::linker_stand(&pool, aid)
             .await
-            .unwrap());
+            .unwrap()
+            .generischer_download_gesperrt());
     }
 
     // --- LFH-116: Metadaten-Unterdrückung für soft-gelöschte Nachrichten ---

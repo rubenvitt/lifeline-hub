@@ -424,6 +424,7 @@ const MODUL_GET_PFADE: &[(&str, &str)] = &[
     ("lagekarte", "zonen"),
     ("lagekarte", "karte/fuehrungskraefte"),
     ("lagemeldungen", "lage/meldungen"),
+    ("dokumente", "dokumente"),
 ];
 
 /// Module ohne eigene daten-besitzende Backend-Routen (reine Aggregation/Sicht):

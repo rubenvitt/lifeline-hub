@@ -161,6 +161,7 @@ describe('modulRegistry', () => {
       'einsatzabschnitte',
       'auftraege',
       'stab',
+      'dokumente',
     ]);
     const kraefte = moduleNachKategorie('kraefte');
     expect(kraefte[0].key).toBe('kraefteuebersicht');

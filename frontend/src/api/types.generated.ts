@@ -525,6 +525,41 @@ export interface components {
          * @enum {string}
          */
         Dienststatus: "in_dienst" | "ausser_dienst";
+        /** @description Öffentliche Darstellung eines Dokuments (ohne Bytes). */
+        DokumentAnzeige: {
+            abgelegt_at: string;
+            /** Format: int64 */
+            abgelegt_von_id: number;
+            abgelegt_von_name?: string | null;
+            /** Format: int64 */
+            bezug_abschnitt_id?: number | null;
+            bezug_abschnitt_name?: string | null;
+            /** Format: int64 */
+            bezug_einheit_id?: number | null;
+            bezug_einheit_name?: string | null;
+            /** Format: int64 */
+            bezug_etb_eintrag_id?: number | null;
+            /** Format: int64 */
+            bezug_etb_lfd_nr?: number | null;
+            dateiname: string;
+            /** Format: int64 */
+            einsatz_id: number;
+            /** Format: int64 */
+            etb_eintrag_id: number;
+            /** Format: int64 */
+            groesse: number;
+            /** Format: int64 */
+            id: number;
+            kategorie: components["schemas"]["DokumentKategorie"];
+            mime: string;
+            titel: string;
+        };
+        /**
+         * @description Kategorie eines abgelegten Dokuments. Wire == `as_str()`; `ALLE` ist zugleich die
+         *     Anzeigereihenfolge (Vertrag, nicht Dekoration).
+         * @enum {string}
+         */
+        DokumentKategorie: "lagekarte_plan" | "befehl" | "formular" | "foto" | "sonstiges";
         /**
          * @description Aufgelöste Einheiten-Anzeige inkl. Typ/Abschnitt-Labels, Führer-Identität,
          *     Mitgliedern und berechneter Stärke. `soll` ist optional (Override → Typ-Default →
@@ -1617,7 +1652,7 @@ export interface components {
          *     die Emitter routen über `as_str()`, das Frontend filtert exakt auf diese Wire-Tags.
          * @enum {string}
          */
-        LiveEvent: "uhs" | "schaden" | "fahrzeug" | "material" | "tier" | "lage_zone" | "freies_zeichen" | "gefahr" | "einheit" | "abschnitt" | "person" | "personal" | "lagebericht" | "chat" | "erinnerung" | "auftrag" | "nachforderung" | "meldung" | "bereitstellungsraum" | "karte_bild" | "etb" | "befehl" | "stab" | "abloesung" | "karten_ansicht" | "lage_snapshot" | "sofortmeldung" | "lagged";
+        LiveEvent: "uhs" | "schaden" | "fahrzeug" | "material" | "tier" | "lage_zone" | "freies_zeichen" | "gefahr" | "einheit" | "abschnitt" | "person" | "personal" | "lagebericht" | "chat" | "erinnerung" | "auftrag" | "nachforderung" | "meldung" | "bereitstellungsraum" | "karte_bild" | "etb" | "befehl" | "stab" | "dokument" | "abloesung" | "karten_ansicht" | "lage_snapshot" | "sofortmeldung" | "lagged";
         /** @description Öffentliche Material-Darstellung (ohne `org_id`). */
         MaterialAnzeige: {
             angelegt_at: string;

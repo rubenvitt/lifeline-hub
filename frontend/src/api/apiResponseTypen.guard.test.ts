@@ -59,9 +59,15 @@ const AUSNAHMEN: Record<string, string> = {
   'queryKeyScan.ts#Fund': 'Rückgabetyp des Query-Key-Scanners (LFH-312) — kein Wire-Typ.',
   'client.ts#ApiSendOptionen':
     'FE-lokale Transportoptionen für Request-Header — weder Request- noch Response-Wire-DTO.',
+  'client.ts#UploadOptionen':
+    'FE-lokale Transportoptionen für Datei-Uploads (Timeout, LFH-632) — weder Request- noch ' +
+    'Response-Wire-DTO.',
 
   // ── Request-/Eingabe-DTOs, die die Namenskonvention nicht treffen. ──
   'lagezonen.ts#ZoneNeu': 'POST-Body einer Lage-Zone (Wortstellung „Neu" hinten statt vorn).',
+  'dokumente.ts#DokumentAblage':
+    'Multipart-Eingabe-DTO fürs Ablegen eines Dokuments (Datei + Metadaten, LFH-632) — der ' +
+    'Wortstamm „Ablage" trifft die Namenskonvention nicht.',
   'etb.ts#EtbFilterWerte': 'Formular-Werte der ETB-Filterleiste — reine Eingabeseite.',
   'etb.ts#EtbAbfrage': 'Query-Parameter der ETB-Abfrage (erweitert EtbFilterWerte).',
   'types.ts#FachebenenSichtbar':

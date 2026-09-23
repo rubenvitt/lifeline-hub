@@ -520,6 +520,35 @@ pub const TABELLEN: &[TabellenRegel] = &[
         ],
     },
     TabellenRegel {
+        // LFH-632: ganze Zeile löschen wie `anhang` — der Titel ist Freitext (kann PII tragen,
+        // „Foto Familie Müller“), und die Datei, die die Zeile beschreibt, ist ohnehin weg
+        // (CASCADE von `anhang`, Entscheidung E9; `anhang` steht deshalb VOR dieser Regel).
+        // Der Titel ÜBERLEBT trotzdem im Wortlaut: `dokument::repo` schreibt ihn in die
+        // System-ETB-Einträge „Dokument abgelegt: {titel} ({kategorie})“ und „Dokument
+        // entfernt: {titel} ({kategorie})“, und `etb_eintrag.inhalt` ist Retain (G_ETB). Das
+        // ist die ETB-Politik — rechtsverbindliche Führungsdokumentation wird dort nicht
+        // gescrubbt, für diesen Titel so wenig wie für jeden anderen ETB-Freitext. Gepinnt in
+        // `einsatz::repo::tests::schwaerzung_loescht_dokument_samt_anhang_und_haelt_den_etb_nachweis`.
+        tabelle: "einsatz_dokument",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        spalten: &[
+            scrub("id", Strategie::ZeileLoeschen),
+            scrub("einsatz_id", Strategie::ZeileLoeschen),
+            scrub("anhang_id", Strategie::ZeileLoeschen),
+            scrub("kategorie", Strategie::ZeileLoeschen),
+            scrub("titel", Strategie::ZeileLoeschen),
+            scrub("bezug_abschnitt_id", Strategie::ZeileLoeschen),
+            scrub("bezug_einheit_id", Strategie::ZeileLoeschen),
+            scrub("bezug_etb_eintrag_id", Strategie::ZeileLoeschen),
+            scrub("etb_eintrag_id", Strategie::ZeileLoeschen),
+            scrub("abgelegt_von_id", Strategie::ZeileLoeschen),
+            scrub("abgelegt_at", Strategie::ZeileLoeschen),
+            scrub("geloescht_at", Strategie::ZeileLoeschen),
+            scrub("geloescht_von_id", Strategie::ZeileLoeschen),
+        ],
+    },
+    TabellenRegel {
         // Ganze Zeile löschen (LFH-321): `daten` ist das eingefrorene volle Lagebild inkl.
         // PII (Personal-Marker, Freitext-Labels) — die Nutzlast IST die PII, kein zu
         // erhaltendes Skelett. KEINE ETB-Kopplung → nicht Retain-fähig wie lagebericht/

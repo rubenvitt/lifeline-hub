@@ -41,6 +41,8 @@ use utoipa::OpenApi;
         crate::config::OfflineKatalogEintrag,
         crate::config::OnlineStyle,
         crate::config::OnlineStyleTyp,
+        crate::dokument::DokumentAnzeige,
+        crate::dokument::DokumentKategorie,
         crate::einheit::EinheitAnzeige,
         crate::einheit::EinheitMitgliedFahrzeug,
         crate::einheit::EinheitStatus,

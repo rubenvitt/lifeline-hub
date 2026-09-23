@@ -9,6 +9,7 @@ pub mod benutzer_einstellungen;
 pub mod chat;
 #[cfg(feature = "dev-seeds")]
 pub mod dev;
+pub mod dokument;
 pub mod einheit_typ;
 pub mod einsatz;
 pub mod einsatz_bereitstellungsraum;

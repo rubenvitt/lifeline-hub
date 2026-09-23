@@ -89,6 +89,10 @@ pub const OHNE_ZULASSUNGSGRENZE: &[(&str, &str)] = &[
     // Voll-BLOB-Read bis 25 MiB. NUR GET — das DELETE im selben MethodRouter ist ein reiner
     // DB-Delete und bleibt geregelt.
     ("GET", "/api/einsaetze/{id}/anhaenge/{aid}"),
+    // Dokumentenablage (LFH-632): Multipart bis 26 MiB + clamd-Scan; Voll-BLOB-Download.
+    // NUR POST bzw. GET — die Liste (GET auf dem POST-Pfad) und das DELETE bleiben geregelt.
+    ("POST", "/api/einsaetze/{id}/dokumente"),
+    ("GET", "/api/einsaetze/{id}/dokumente/{did}/datei"),
     // Zweiter Multipart-Upload, ebenfalls mit clamd-Scan. NUR POST — das GET auf demselben
     // Pfad ist die kurze Liste.
     ("POST", "/api/einsaetze/{id}/karte/hintergrundbilder"),

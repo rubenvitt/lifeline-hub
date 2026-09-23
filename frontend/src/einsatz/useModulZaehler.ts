@@ -4,6 +4,7 @@ import { listeAbloesungen } from '../api/abloesungen';
 import { listeAuftraege } from '../api/auftraege';
 import { listeErinnerungen } from '../api/erinnerungen';
 import { listeKanaele } from '../api/chat';
+import { listeDokumente } from '../api/dokumente';
 import { listeMeldungen } from '../api/meldungen';
 import { einsatzKeys } from '../api/queryKeys';
 import type {
@@ -95,6 +96,11 @@ export function berechneChatZaehler(
   };
 }
 
+export function berechneDokumentZaehler(dokumente: readonly unknown[]): ModulZaehlerWert {
+  const n = dokumente.length;
+  return { wert: n, beschreibung: plural(n, 'abgelegtes Dokument', 'abgelegte Dokumente') };
+}
+
 /** LFH-635: Schichten in der Vorwarnzeit oder überfällig — was jetzt Handlung braucht. */
 export function berechneAbloesungZaehler(
   abloesungen: readonly Abloesung[],
@@ -130,6 +136,7 @@ export function useModulZaehler({ einsatzId, benutzer, overrides }: Args): Modul
   const erinnerungenAktiv =
     gueltigerEinsatz && darfZaehlerLaden('erinnerungen', benutzer, overrides);
   const chatAktiv = gueltigerEinsatz && darfZaehlerLaden('chat', benutzer, overrides);
+  const dokumenteAktiv = gueltigerEinsatz && darfZaehlerLaden('dokumente', benutzer, overrides);
   const abloesungAktiv = gueltigerEinsatz && darfZaehlerLaden('abloesung', benutzer, overrides);
 
   const meldungen = useQuery({
@@ -152,6 +159,11 @@ export function useModulZaehler({ einsatzId, benutzer, overrides }: Args): Modul
     queryFn: () => listeKanaele(einsatzId),
     enabled: chatAktiv,
   });
+  const dokumente = useQuery({
+    queryKey: einsatzKeys.dokumente(einsatzId),
+    queryFn: () => listeDokumente(einsatzId),
+    enabled: dokumenteAktiv,
+  });
 
   const abloesungen = useQuery({
     queryKey: einsatzKeys.abloesungListe(einsatzId, 'laufend'),
@@ -172,6 +184,8 @@ export function useModulZaehler({ einsatzId, benutzer, overrides }: Args): Modul
         ? berechneErinnerungsZaehler(erinnerungen.data)
         : undefined,
     chat: chatAktiv && chat.isSuccess ? berechneChatZaehler(chat.data) : undefined,
+    dokumente:
+      dokumenteAktiv && dokumente.isSuccess ? berechneDokumentZaehler(dokumente.data) : undefined,
     abloesung:
       abloesungAktiv && abloesungen.isSuccess
         ? berechneAbloesungZaehler(abloesungen.data, jetzt)

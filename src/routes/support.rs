@@ -6,11 +6,14 @@
 //! modul-spezifischen `sse_*`-Notify-Wrapper bleiben bewusst lokal (unterscheiden sich in
 //! Event-Name und Payload-Keys).
 
+use crate::anhang;
 use crate::error::AppError;
 use crate::live::{LiveEvent, LiveNachricht, Replay};
-use axum::http::{header, HeaderMap, HeaderName};
+use axum::http::{header, HeaderMap, HeaderName, HeaderValue, StatusCode};
 use axum::response::sse::Event;
+use axum::response::{IntoResponse, Response};
 use serde::Deserialize;
+use sqlx::SqlitePool;
 use std::convert::Infallible;
 use tokio::sync::broadcast::Receiver;
 use tokio_stream::wrappers::BroadcastStream;
@@ -72,6 +75,53 @@ pub fn if_none_match_matcht(headers: &HeaderMap, etag: &str) -> bool {
                 kandidat == "*" || kandidat == etag
             })
         })
+}
+
+/// Liefert einen `anhang`-BLOB als Download-Antwort (LFH-258/LFH-632): ETag aus dem sha256,
+/// `Cache-Control` nach [`ASSET_CACHE_CONTROL`], 304-Kurzschluss bei passendem
+/// `If-None-Match` OHNE den BLOB zu lesen, sonst `Content-Type` + `attachment` und die Bytes.
+///
+/// Geteilt vom generischen Anhang-Download und vom Dokument-Download, damit beide Pfade
+/// dieselbe Header-Sequenz tragen. Die **Zugriffsprüfung** (Einsatz-Zugehörigkeit,
+/// Linker-Sperre, Modul-Gate) macht der Aufrufer VORHER — dieser Helfer prüft nichts.
+/// Der Karten-Hintergrundbild-Download bleibt außen vor: er liest aus einer eigenen Tabelle.
+pub async fn anhang_antwort(
+    pool: &SqlitePool,
+    anhang_id: i64,
+    req_headers: &HeaderMap,
+) -> Result<Response, AppError> {
+    let (dateiname, mime, sha256) = anhang::repo::meta_fuer_download(pool, anhang_id).await?;
+    let etag = etag_von(&sha256);
+
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        header::ETAG,
+        HeaderValue::from_str(&etag)
+            .map_err(|e| AppError::Internal(format!("Ungültiger ETag: {e}")))?,
+    );
+    headers.insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static(ASSET_CACHE_CONTROL),
+    );
+
+    if if_none_match_matcht(req_headers, &etag) {
+        return Ok((StatusCode::NOT_MODIFIED, headers).into_response());
+    }
+
+    headers.insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_str(&mime)
+            .unwrap_or(HeaderValue::from_static("application/octet-stream")),
+    );
+    // Content-Disposition mit ASCII-Fallback + RFC-5987 filename* (Umlaute etc.);
+    // geteilte Infrastruktur in `anhang::content_disposition` (LFH-238).
+    headers.insert(
+        header::CONTENT_DISPOSITION,
+        HeaderValue::from_str(&anhang::content_disposition(&dateiname))
+            .map_err(|e| AppError::Internal(format!("Ungültiger Header: {e}")))?,
+    );
+    let (_, _, daten) = anhang::repo::laden_bytes(pool, anhang_id).await?;
+    Ok((headers, daten).into_response())
 }
 
 /// Trimmt einen optionalen String und macht ihn bei leerem Ergebnis zu `None`

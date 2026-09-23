@@ -21,6 +21,7 @@ import {
   personenPfad,
   schaedenPfad,
   stabPfad,
+  dokumentePfad,
   abloesungPfad,
   etbPfad,
   parseEtbFilter,
@@ -253,6 +254,12 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
   });
   it('schaedenPfad mit ?neu=1', () => {
     expect(schaedenPfad(E, { neu: true })).toBe('/einsaetze/5/schaeden?neu=1');
+  });
+  it('dokumentePfad ohne Optionen', () => {
+    expect(dokumentePfad(E)).toBe('/einsaetze/5/dokumente');
+  });
+  it('dokumentePfad mit ?neu=1', () => {
+    expect(dokumentePfad(E, { neu: true })).toBe('/einsaetze/5/dokumente?neu=1');
   });
   it('abloesungPfad (LFH-635)', () => {
     expect(abloesungPfad(E)).toBe('/einsaetze/5/abloesung');

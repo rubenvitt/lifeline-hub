@@ -66,15 +66,40 @@ pub fn pruefe_groesse(len: usize) -> Result<(), AppError> {
     Ok(())
 }
 
+/// Allowlist der Dokumentenablage (LFH-632, E4): die Chat-Liste plus HEIC/HEIF
+/// (iPhone-Kamera-Standard) und TIFF (Scans). Der Chat bleibt bei [`ERLAUBTE_MIME`].
+pub const ERLAUBTE_MIME_DOKUMENT: &[&str] = &[
+    "image/jpeg",
+    "image/png",
+    "image/gif",
+    "image/webp",
+    "image/heic",
+    "image/heif",
+    "image/tiff",
+    "application/pdf",
+    "text/plain",
+    "text/csv",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+];
+
 /// Leitet den MIME-Typ aus der Dateiendung ab (mime_guess) und prüft ihn gegen
-/// die Allowlist. Der vom Client gemeldete Content-Type wird bewusst NICHT als
-/// Sicherheitsentscheidung herangezogen (manipulierbar) — die Endung ist hier
+/// die Chat-Allowlist [`ERLAUBTE_MIME`]. Der vom Client gemeldete Content-Type wird bewusst
+/// NICHT als Sicherheitsentscheidung herangezogen (manipulierbar) — die Endung ist hier
 /// die maßgebliche, knappe Heuristik; echtes Content-Sniffing folgt mit LFH-114.
 pub fn ermittle_mime(dateiname: &str) -> Result<String, AppError> {
+    ermittle_mime_aus(dateiname, ERLAUBTE_MIME)
+}
+
+/// Wie [`ermittle_mime`], aber gegen eine übergebene Allowlist. `mime_guess` kennt
+/// `.heic`/`.heif`/`.tif`/`.tiff` selbst (gemessen, mime_guess 2.0.5) — eine eigene
+/// Endungstabelle ist deshalb nicht nötig; der Unit-Test unten pinnt das.
+pub fn ermittle_mime_aus(dateiname: &str, erlaubt: &[&str]) -> Result<String, AppError> {
     let mime = mime_guess::from_path(dateiname)
         .first_raw()
         .ok_or_else(|| AppError::Validation("Dateityp nicht erkennbar".into()))?;
-    if !ERLAUBTE_MIME.contains(&mime) {
+    if !erlaubt.contains(&mime) {
         return Err(AppError::Validation(format!(
             "Dateityp {mime} ist nicht erlaubt"
         )));
@@ -310,6 +335,32 @@ fn klassifiziere_antwort(antwort: &[u8]) -> ScanErgebnis {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// LFH-632: die Dokumenten-Allowlist erkennt HEIC/HEIF/TIFF über `mime_guess`, die
+    /// Chat-Allowlist lehnt sie weiter ab (E4).
+    #[test]
+    fn dokument_allowlist_kennt_heic_und_tiff_chat_nicht() {
+        for (datei, mime) in [
+            ("a.heic", "image/heic"),
+            ("a.HEIC", "image/heic"),
+            ("a.heif", "image/heif"),
+            ("a.tif", "image/tiff"),
+            ("a.tiff", "image/tiff"),
+        ] {
+            assert_eq!(
+                ermittle_mime_aus(datei, ERLAUBTE_MIME_DOKUMENT).unwrap(),
+                mime,
+                "{datei}"
+            );
+        }
+        assert!(ermittle_mime("a.heic").is_err());
+        assert!(ermittle_mime("a.tiff").is_err());
+        assert!(ermittle_mime_aus("a.exe", ERLAUBTE_MIME_DOKUMENT).is_err());
+        // Die Dokumenten-Liste ist eine Obermenge der Chat-Liste.
+        for m in ERLAUBTE_MIME {
+            assert!(ERLAUBTE_MIME_DOKUMENT.contains(m), "{m}");
+        }
+    }
 
     #[test]
     fn pruefe_groesse_lehnt_leer_und_zu_gross_ab() {

@@ -26,6 +26,7 @@ import {
   TbInbox,
   TbSettings,
   TbBuildingWarehouse,
+  TbFiles,
   TbArrowsExchange,
 } from 'react-icons/tb';
 import type { BenutzerAnzeige, ModulOverrides } from '../api/types';
@@ -34,7 +35,8 @@ export type ModulStatus = 'fertig' | 'geplant' | 'wip';
 export type KategorieKey =
   'fuehrung' | 'kraefte' | 'erfassung' | 'lage' | 'kommunikation' | 'einstellungen';
 export type BenoetigteRolle = 'admin' | 'fuehrungskraft';
-export type ModulZaehlerQuelle = 'meldungen' | 'auftraege' | 'erinnerungen' | 'chat' | 'abloesung';
+export type ModulZaehlerQuelle =
+  'meldungen' | 'auftraege' | 'erinnerungen' | 'chat' | 'dokumente' | 'abloesung';
 
 export interface Kategorie {
   key: KategorieKey;
@@ -147,6 +149,16 @@ export const modulRegistry: ModulEintrag[] = [
     route: 'stab',
     status: 'fertig',
     beschreibung: 'Führungsorganisation (S1–S6) und Lagebesprechungen der Einsatzleitung',
+  },
+  {
+    key: 'dokumente',
+    kategorie: 'fuehrung',
+    label: 'Dokumente',
+    icon: TbFiles,
+    route: 'dokumente',
+    status: 'fertig',
+    beschreibung: 'Abgelegte Dateien des Einsatzes: Lagepläne, Befehle, Formulare, Fotos.',
+    zaehlerQuelle: 'dokumente',
   },
   // Kräfte & Mittel — das Meldebild (bis 21.09.2026 „Kräfteübersicht" unter Lage) steht
   // vorn: es ist die Verdichtung der Kategorie. Route und Schlüssel bleiben, damit

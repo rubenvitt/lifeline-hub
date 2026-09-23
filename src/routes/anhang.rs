@@ -4,11 +4,11 @@ use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
 use crate::error::AppError;
 use crate::extract::PfadParam;
 use axum::extract::{Multipart, State};
-use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
-use axum::response::{IntoResponse, Response};
+use axum::http::{HeaderMap, StatusCode};
+use axum::response::Response;
 use axum::Json;
 
-use super::support::{etag_von, if_none_match_matcht, ASSET_CACHE_CONTROL};
+use super::support::anhang_antwort;
 
 /// POST /api/einsaetze/{id}/anhaenge — generischer Datei-Upload (multipart).
 /// Schreibrecht + aktiver Einsatz. Jedes Datei-Feld wird einzeln validiert
@@ -70,11 +70,11 @@ pub async fn hochladen(
 /// Lesezugriff (inkl. Beobachter) + Pflicht-Ownership-Guard gegen Cross-Einsatz-
 /// Zugriff (fremder Einsatz → NotFound, kein ID-Raten).
 ///
-/// Gatet zusätzlich (LFH-116) auf den Chat-Tombstone: hängt der Anhang NUR noch an
-/// soft-gelöschten Nachrichten, ist er gesperrt (404) — der Direkt-Deeplink umgeht
-/// sonst die Frontend-Ausblendung. Verwaiste oder an einer lebenden Nachricht hängende
-/// Anhänge bleiben ladbar (n:m-Semantik). Heute referenziert nur `chat_nachricht_anhang`
-/// die `anhang`-Tabelle; ein zweiter Linker (ETB/Lageobjekte) erfordert eine Aggregation.
+/// Gatet zusätzlich über [`anhang::repo::linker_stand`] (Aggregation über ALLE Linker):
+/// (LFH-116) hängt der Anhang NUR noch an soft-gelöschten Nachrichten, ist er gesperrt
+/// (404) — der Direkt-Deeplink umgeht sonst die Frontend-Ausblendung; (LFH-632) gehört er
+/// zur Dokumentenablage, ist er nur über die modul-gegatete Dokument-Route ladbar (404).
+/// Verwaiste oder an einer lebenden Nachricht hängende Anhänge bleiben ladbar (n:m).
 pub async fn herunterladen(
     State(state): State<AppState>,
     _ctx: EinsatzLesezugriff,
@@ -85,58 +85,44 @@ pub async fn herunterladen(
     if !anhang::repo::gehoert_anhang_zu_einsatz(&state.pool, anhang_id, einsatz_id).await? {
         return Err(AppError::NotFound);
     }
-    // LFH-116: Sperren, wenn der Anhang nur noch an soft-gelöschten Chat-Nachrichten
-    // hängt (Tombstone) — der Direkt-Deeplink umgeht sonst die Frontend-Ausblendung.
-    if crate::chat::repo::anhang_nur_an_geloeschten_nachrichten(&state.pool, anhang_id).await? {
+    // LFH-116 + LFH-632: Aggregation über ALLE Linker. Gesperrt, wenn der Anhang zur
+    // Dokumentenablage gehört (nur über die modul-gegatete Route ladbar) oder nur noch an
+    // soft-gelöschten Chat-Nachrichten hängt (Tombstone).
+    if anhang::repo::linker_stand(&state.pool, anhang_id)
+        .await?
+        .generischer_download_gesperrt()
+    {
         return Err(AppError::NotFound);
     }
 
-    // Cache-Kurzschluss (LFH-258): sha256-Meta OHNE BLOB laden; passt der If-None-Match-
-    // Header, antworten wir 304 und sparen den teuren Voll-BLOB-Read.
-    let (dateiname, mime, sha256) =
-        anhang::repo::meta_fuer_download(&state.pool, anhang_id).await?;
-    let etag = etag_von(&sha256);
-
-    let mut headers = HeaderMap::new();
-    headers.insert(
-        header::ETAG,
-        HeaderValue::from_str(&etag)
-            .map_err(|e| AppError::Internal(format!("Ungültiger ETag: {e}")))?,
-    );
-    headers.insert(
-        header::CACHE_CONTROL,
-        HeaderValue::from_static(ASSET_CACHE_CONTROL),
-    );
-
-    if if_none_match_matcht(&req_headers, &etag) {
-        return Ok((StatusCode::NOT_MODIFIED, headers).into_response());
-    }
-
-    headers.insert(
-        header::CONTENT_TYPE,
-        HeaderValue::from_str(&mime)
-            .unwrap_or(HeaderValue::from_static("application/octet-stream")),
-    );
-    // Content-Disposition mit ASCII-Fallback + RFC-5987 filename* (Umlaute etc.);
-    // geteilte Infrastruktur in `anhang::content_disposition` (LFH-238).
-    headers.insert(
-        header::CONTENT_DISPOSITION,
-        HeaderValue::from_str(&anhang::content_disposition(&dateiname))
-            .map_err(|e| AppError::Internal(format!("Ungültiger Header: {e}")))?,
-    );
-    let (_, _, daten) = anhang::repo::laden_bytes(&state.pool, anhang_id).await?;
-    Ok((headers, daten).into_response())
+    // Cache-Kurzschluss (LFH-258) + Header-Sequenz: geteilt mit dem Dokument-Download.
+    anhang_antwort(&state.pool, anhang_id, &req_headers).await
 }
 
 /// DELETE /api/einsaetze/{id}/anhaenge/{aid} — Anhang hart löschen (Freigabepfad, LFH-250).
 /// Schreibrecht + aktiver Einsatz; die Ownership erzwingt die einsatz-gescopte Query
 /// (fremder Anhang → NotFound). Der `ON DELETE CASCADE`-FK räumt die
-/// `chat_nachricht_anhang`-Verknüpfungen mit.
+/// `chat_nachricht_anhang`-Verknüpfungen mit. Dokument-gebundene Anhänge (LFH-632) werden
+/// mit 422 abgewiesen — sie entfernt die Dokumentenablage (Soft-Delete mit ETB-Nachweis).
 pub async fn loeschen(
     State(state): State<AppState>,
     _ctx: EinsatzSchreibzugriff,
     PfadParam((einsatz_id, anhang_id)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
+    // Ownership zuerst (fremd/unbekannt → 404), dann die Linker-Frage.
+    if !anhang::repo::gehoert_anhang_zu_einsatz(&state.pool, anhang_id, einsatz_id).await? {
+        return Err(AppError::NotFound);
+    }
+    // LFH-632: ein Dokument-Anhang wird über die Dokumentenablage entfernt (Soft-Delete mit
+    // ETB-Nachweis). Der generische Hard-Delete hätte beides umgangen → Zustand verbietet es.
+    if anhang::repo::linker_stand(&state.pool, anhang_id)
+        .await?
+        .ist_dokument()
+    {
+        return Err(AppError::UnprocessableEntity(
+            "Anhang gehört zur Dokumentenablage und wird dort entfernt".into(),
+        ));
+    }
     anhang::repo::loeschen(&state.pool, einsatz_id, anhang_id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
