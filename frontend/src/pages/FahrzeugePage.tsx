@@ -13,7 +13,7 @@ import {
 } from 'antd';
 import { Select } from '../components/Select';
 import { BemerkungZelle } from '../components/BemerkungZelle';
-import { Link, useParams } from 'react-router';
+import { Link, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { ladeEinsatz } from '../api/einsaetze';
@@ -39,8 +39,14 @@ import type { EinsatzFahrzeug, EinsatzPersonal, Staerke } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import StatusWahl, { type StatusOption } from '../components/StatusWahl';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { monoStil } from '../components/instrument';
-import { kraefteuebersichtPfad } from '../routing/deeplinks';
+import { monoStil, Segmentleiste } from '../components/instrument';
+import {
+  kraefteuebersichtPfad,
+  parseFahrzeugeAnsicht,
+  type FahrzeugeAnsicht,
+} from '../routing/deeplinks';
+import { listeEinheiten } from '../api/einheiten';
+import FmsTableau from '../kraefte/FmsTableau';
 import Verdichtungszeile from '../kraefte/Verdichtungszeile';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import Datensicht, { scrolleZurZeile, spaltenFuer } from '../components/Datensicht';
@@ -243,6 +249,16 @@ function BesatzungsBlock({
   );
 }
 
+/**
+ * Zwei Ansichten derselben Menge (LFH-642): die Tabelle zum Pflegen und Vergleichen, das
+ * FMS-Tableau als Überblicksfläche mit Statuswahl. Beide lesen dieselbe Query und bedienen
+ * dieselbe `statusMutation` — das Tableau ist kein zweites Modul.
+ */
+const ANSICHT_OPTIONEN = [
+  { wert: 'liste', label: 'Liste' },
+  { wert: 'tableau', label: 'FMS-Tableau' },
+] as const satisfies readonly { wert: FahrzeugeAnsicht; label: string }[];
+
 export default function FahrzeugePage() {
   const { id } = useParams();
   const einsatzId = Number(id);
@@ -252,6 +268,29 @@ export default function FahrzeugePage() {
   const [adhocOffen, setAdhocOffen] = useState(false);
   const [highlightId, setHighlightId] = useState<number | null>(null);
   const [form] = Form.useForm<AdhocEingabe>();
+  // Je Einsatz, damit ein Wechsel des Einsatzes in derselben Instanz nicht die Ansicht des
+  // vorigen mitnimmt (Muster `PersonenPage`).
+  const [ansichtNachEinsatz, setAnsichtNachEinsatz] = useState<Record<number, FahrzeugeAnsicht>>(
+    {},
+  );
+  const ansicht = ansichtNachEinsatz[einsatzId] ?? 'liste';
+  const setzeAnsicht = (a: FahrzeugeAnsicht) =>
+    setAnsichtNachEinsatz((alt) => ({ ...alt, [einsatzId]: a }));
+
+  // Sichtvorgabe ?ansicht= (Sprungmarke „FMS-Tableau"): apply-then-clean wie bei den
+  // Personen (LFH-620). Geräumt wird auch ein unbrauchbarer Wert, sonst stünde er beim
+  // Teilen des Links wieder im Auftrag, ohne je zu wirken. Über den Setter direkt — er ist
+  // stabil, `setzeAnsicht` ist je Render neu. Geklont statt in-place gelöscht (LFH-156):
+  // `?fahrzeug=` räumt `useQueryParamSelektion` getrennt und später.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (!searchParams.has('ansicht')) return;
+    const vorgabe = parseFahrzeugeAnsicht(searchParams);
+    if (vorgabe) setAnsichtNachEinsatz((alt) => ({ ...alt, [einsatzId]: vorgabe }));
+    const rest = new URLSearchParams(searchParams);
+    rest.delete('ansicht');
+    setSearchParams(rest, { replace: true });
+  }, [searchParams, setSearchParams, einsatzId]);
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -272,6 +311,14 @@ export default function FahrzeugePage() {
   const personalQuery = useQuery({
     queryKey: einsatzKeys.personal(einsatzId),
     queryFn: () => listeEinsatzPersonal(einsatzId),
+  });
+  // Nur das Tableau gliedert nach Einheit/Abschnitt. Die Route hängt am Modul `einheiten`
+  // (`src/routes/einsatz_einheit.rs`), nicht an `fahrzeuge` — ist es gesperrt, läuft das
+  // Tableau ungegliedert weiter, statt mit der Einheitenliste auszufallen.
+  const einheitenQuery = useQuery({
+    queryKey: einsatzKeys.einheiten(einsatzId),
+    queryFn: () => listeEinheiten(einsatzId),
+    enabled: ansicht === 'tableau',
   });
 
   // Cross-Modul-Deeplink (LFH-25): ?fahrzeug=<id> hebt die Zeile hervor (Scroll best-effort).
@@ -658,27 +705,36 @@ export default function FahrzeugePage() {
         />
       }
       aktionen={
-        darfSchreiben && (
-          // `wrap` plus `maxWidth` (LFH-339 · C4, gemessen): das `minWidth: 260` des
-          // Auswahlfeldes und der Knopf daneben ergeben zusammen mehr als 390 px. Der
-          // Umbruch im Seitenkopf-Primitiv allein reicht nicht — er verschiebt den Block
-          // nur unter den Titel, wo er weiterhin zu breit ist.
-          <Space wrap style={{ minWidth: 0 }}>
-            <Select
-              style={{ minWidth: 260, maxWidth: '100%' }}
-              placeholder="Stamm-Fahrzeug disponieren …"
-              value={null}
-              options={poolOptionen}
-              notFoundContent={poolInhalt}
-              loading={disponiereMutation.isPending}
-              disabled={disponiereMutation.isPending}
-              onSelect={(fahrzeugId) => {
-                if (fahrzeugId != null) disponiereMutation.mutate(fahrzeugId);
-              }}
-            />
-            <Button onClick={() => setAdhocOffen(true)}>Ad-hoc-Fahrzeug</Button>
-          </Space>
-        )
+        // `wrap` plus `maxWidth` (LFH-339 · C4, gemessen): das `minWidth: 260` des
+        // Auswahlfeldes und der Knopf daneben ergeben zusammen mehr als 390 px. Der
+        // Umbruch im Seitenkopf-Primitiv allein reicht nicht — er verschiebt den Block
+        // nur unter den Titel, wo er weiterhin zu breit ist.
+        <Space wrap style={{ minWidth: 0 }}>
+          {/* Der Umschalter steht auch ohne Schreibrecht: lesen kann jeder beide Ansichten. */}
+          <Segmentleiste<FahrzeugeAnsicht>
+            beschriftung="Ansicht"
+            optionen={ANSICHT_OPTIONEN}
+            wert={ansicht}
+            onWechsel={setzeAnsicht}
+          />
+          {darfSchreiben && (
+            <>
+              <Select
+                style={{ minWidth: 260, maxWidth: '100%' }}
+                placeholder="Stamm-Fahrzeug disponieren …"
+                value={null}
+                options={poolOptionen}
+                notFoundContent={poolInhalt}
+                loading={disponiereMutation.isPending}
+                disabled={disponiereMutation.isPending}
+                onSelect={(fahrzeugId) => {
+                  if (fahrzeugId != null) disponiereMutation.mutate(fahrzeugId);
+                }}
+              />
+              <Button onClick={() => setAdhocOffen(true)}>Ad-hoc-Fahrzeug</Button>
+            </>
+          )}
+        </Space>
       }
       hinweis={
         !darfSchreiben &&
@@ -730,56 +786,72 @@ export default function FahrzeugePage() {
         <>
           {standVeraltet && <SeitenStandVeraltet onWiederholen={() => void efQuery.refetch()} />}
           <Verdichtungszeile einsatzId={einsatzId} pfad={kraefteuebersichtPfad(einsatzId)} />
-          <Datensicht
-            bezeichnung="Fahrzeuge im Einsatz"
-            spalten={spalten}
-            daten={efs}
-            zeilenSchluessel="id"
-            ladend={efQuery.isLoading}
-            leerText="Noch keine Fahrzeuge disponiert"
-            suche={{ platzhalter: 'Funkrufname, Typ, Kennzeichen' }}
-            standardSortierung={{ spalte: 'funkrufname', richtung: 'auf' }}
-            spaltenAusVoreinstellung={['bemerkung']}
-            gruppen={{
-              schluessel: (ef) => kategorieVon(ef.status_kategorie),
-              etikett: kategorieEtikett,
-              reihenfolge: KATEGORIE_REIHENFOLGE,
-            }}
-            zeilenKlasse={(r) => (r.id === highlightId ? 'zeile-hervorgehoben' : undefined)}
-            // Besatzung je Fahrzeug standardmäßig eingeklappt, per Icon aufklappbar; die
-            // kompakte Ist/Soll-Stärke steht dauerhaft in der Besatzungs-Spalte. Läuft nur im
-            // Tabellenzweig — unter `md` fehlt der Block, und das ist an dieser Stelle sichtbar.
-            aufklappzeile={(ef) => (
-              <BesatzungsBlock
-                ef={ef}
-                personal={personal}
-                darfSchreiben={darfSchreiben}
-                freiInhalt={besatzungInhalt}
-                onZuordnen={(epId) => besatzungZuMutation.mutate({ efId: ef.id, epId })}
-                onFreigeben={(epId) => besatzungFreiMutation.mutate({ efId: ef.id, epId })}
-              />
-            )}
-            karte={{
-              art: 'plan',
-              titel: { spalte: 'funkrufname' },
-              // NICHT das `render` der Statusspalte — der Slot nimmt die Vertragsachse als
-              // Deskriptor. Seit LFH-339 · C4 tragen beide Zweige damit dieselbe Darstellung
-              // UND denselben Bedienweg; die Mandantenfarbe geht über `statusBedienung.farbe`
-              // mit und steht auf Rand und Text, nie auf der Fläche.
-              status: (ef) => statusDarstellung(ef),
-              // Der Bedienweg sitzt hier und NICHT im `aktion`-Slot: der ist mit „Entfernen"
-              // belegt, und `Datensicht` sichert genau eine Primäraktion zu (Zielform-Spec §5).
-              statusBedienung: (ef) => (darfSchreiben ? statusBedienungVon(ef) : null),
-              sekundaer: ['typ', 'traeger', 'besatzung'],
-              aktion: darfSchreiben
-                ? {
-                    etikett: 'Entfernen',
-                    bestaetigung: 'Aus Einsatz entfernen?',
-                    onKlick: (ef) => entfernenMutation.mutate(ef.id),
-                  }
-                : undefined,
-            }}
-          />
+          {ansicht === 'tableau' ? (
+            <FmsTableau
+              fahrzeuge={efs}
+              katalog={stati}
+              einheiten={einheitenQuery.data ?? null}
+              einheitenHinweis={
+                einheitenQuery.isError
+                  ? 'Einheiten nicht abrufbar — Fahrzeuge ohne Gliederung'
+                  : undefined
+              }
+              darfSchreiben={darfSchreiben}
+              bedienungVon={statusBedienungVon}
+              ladend={efQuery.isLoading}
+            />
+          ) : (
+            <Datensicht
+              bezeichnung="Fahrzeuge im Einsatz"
+              spalten={spalten}
+              daten={efs}
+              zeilenSchluessel="id"
+              ladend={efQuery.isLoading}
+              leerText="Noch keine Fahrzeuge disponiert"
+              suche={{ platzhalter: 'Funkrufname, Typ, Kennzeichen' }}
+              standardSortierung={{ spalte: 'funkrufname', richtung: 'auf' }}
+              spaltenAusVoreinstellung={['bemerkung']}
+              gruppen={{
+                schluessel: (ef) => kategorieVon(ef.status_kategorie),
+                etikett: kategorieEtikett,
+                reihenfolge: KATEGORIE_REIHENFOLGE,
+              }}
+              zeilenKlasse={(r) => (r.id === highlightId ? 'zeile-hervorgehoben' : undefined)}
+              // Besatzung je Fahrzeug standardmäßig eingeklappt, per Icon aufklappbar; die
+              // kompakte Ist/Soll-Stärke steht dauerhaft in der Besatzungs-Spalte. Läuft nur im
+              // Tabellenzweig — unter `md` fehlt der Block, und das ist an dieser Stelle sichtbar.
+              aufklappzeile={(ef) => (
+                <BesatzungsBlock
+                  ef={ef}
+                  personal={personal}
+                  darfSchreiben={darfSchreiben}
+                  freiInhalt={besatzungInhalt}
+                  onZuordnen={(epId) => besatzungZuMutation.mutate({ efId: ef.id, epId })}
+                  onFreigeben={(epId) => besatzungFreiMutation.mutate({ efId: ef.id, epId })}
+                />
+              )}
+              karte={{
+                art: 'plan',
+                titel: { spalte: 'funkrufname' },
+                // NICHT das `render` der Statusspalte — der Slot nimmt die Vertragsachse als
+                // Deskriptor. Seit LFH-339 · C4 tragen beide Zweige damit dieselbe Darstellung
+                // UND denselben Bedienweg; die Mandantenfarbe geht über `statusBedienung.farbe`
+                // mit und steht auf Rand und Text, nie auf der Fläche.
+                status: (ef) => statusDarstellung(ef),
+                // Der Bedienweg sitzt hier und NICHT im `aktion`-Slot: der ist mit „Entfernen"
+                // belegt, und `Datensicht` sichert genau eine Primäraktion zu (Zielform-Spec §5).
+                statusBedienung: (ef) => (darfSchreiben ? statusBedienungVon(ef) : null),
+                sekundaer: ['typ', 'traeger', 'besatzung'],
+                aktion: darfSchreiben
+                  ? {
+                      etikett: 'Entfernen',
+                      bestaetigung: 'Aus Einsatz entfernen?',
+                      onKlick: (ef) => entfernenMutation.mutate(ef.id),
+                    }
+                  : undefined,
+              }}
+            />
+          )}
         </>
       )}
 

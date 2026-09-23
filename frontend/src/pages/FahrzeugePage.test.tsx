@@ -2,7 +2,7 @@ import { http, HttpResponse } from 'msw';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import { Route, Routes } from 'react-router';
+import { Route, Routes, useLocation } from 'react-router';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
@@ -936,6 +936,119 @@ describe('FahrzeugePage · Ad-hoc-Schnellerfassung', () => {
     await userEvent.type(within(dialog).getByLabelText('Funkrufname'), 'Florian 44/1');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Disponieren' }));
     await waitFor(() => expect(dialog).toHaveClass('ant-zoom-leave'));
+  });
+});
+
+/**
+ * FMS-Tableau (LFH-642): eine ANSICHT dieser Seite, angesprungen über `?ansicht=tableau`
+ * (Sprungmarke). Die Ansicht selbst prüft `kraefte/FmsTableau.test.tsx`; hier steht, was
+ * nur die Seite weiß — Auftrag aus der URL, Umschalter, Mutationsweg, Einheiten-Ausfall.
+ */
+describe('FahrzeugePage — FMS-Tableau', () => {
+  function Ort() {
+    const l = useLocation();
+    return <output data-testid="ort">{l.search}</output>;
+  }
+
+  function renderTableau(
+    einheiten: () => Response | ReturnType<typeof HttpResponse.json> = () =>
+      HttpResponse.json([{ id: 1, name: 'Zug 1', abschnitt_id: 10, abschnitt_name: 'EA Nord' }]),
+    route = '/einsaetze/7/fahrzeuge?ansicht=tableau',
+  ) {
+    const patches: unknown[] = [];
+    // Der Serverstand wandert mit dem PATCH — sonst holte der Refetch nach `onSettled` den
+    // alten Status zurück, und der Test prüfte den Handler statt der Seite.
+    let stand: Record<string, unknown> = {
+      ...ef,
+      einheit_id: 1,
+      status_seit: '2026-05-26 09:10:00',
+    };
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz())),
+      http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([stand])),
+      http.get('/api/einsaetze/7/personal', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/7/einheiten', einheiten),
+      http.get('/api/fahrzeug-status', () => HttpResponse.json(stati)),
+      http.get('/api/fahrzeuge', () => HttpResponse.json([])),
+      http.patch('/api/einsaetze/7/fahrzeuge/10', async ({ request }) => {
+        const body = await request.json();
+        patches.push(body);
+        stand = {
+          ...stand,
+          status_id: 3,
+          status_label: 'vor_ort',
+          status_seit: '2026-05-26 09:30:00',
+        };
+        return HttpResponse.json(stand);
+      }),
+    );
+    renderMitProviders(
+      <AuthProvider>
+        <Routes>
+          <Route
+            path="/einsaetze/:id/fahrzeuge"
+            element={
+              <>
+                <FahrzeugePage />
+                <Ort />
+              </>
+            }
+          />
+        </Routes>
+      </AuthProvider>,
+      { route },
+    );
+    return { patches };
+  }
+
+  it('übernimmt ?ansicht=tableau und räumt den Parameter (apply-then-clean)', async () => {
+    renderTableau();
+    const tableau = await screen.findByRole('region', { name: 'FMS-Tableau' });
+    expect(await within(tableau).findByRole('heading', { name: 'EA Nord' })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('ort')).toHaveTextContent(''));
+    // Der Auftrag ist verbraucht, die Ansicht bleibt Seitenzustand.
+    expect(screen.getByRole('region', { name: 'FMS-Tableau' })).toBeInTheDocument();
+  });
+
+  it('räumt einen unbekannten Wert ebenfalls und bleibt bei der Liste', async () => {
+    renderTableau(undefined, '/einsaetze/7/fahrzeuge?ansicht=kachel');
+    await screen.findByText('Florian 1');
+    await waitFor(() => expect(screen.getByTestId('ort')).toHaveTextContent(''));
+    expect(screen.queryByRole('region', { name: 'FMS-Tableau' })).toBeNull();
+  });
+
+  it('schaltet über die Segmentleiste zwischen Liste und Tableau', async () => {
+    renderTableau(undefined, '/einsaetze/7/fahrzeuge');
+    const ansicht = await screen.findByRole('radiogroup', { name: 'Ansicht' });
+    expect(screen.queryByRole('region', { name: 'FMS-Tableau' })).toBeNull();
+    await userEvent.click(within(ansicht).getByRole('radio', { name: 'FMS-Tableau' }));
+    expect(await screen.findByRole('region', { name: 'FMS-Tableau' })).toBeInTheDocument();
+    await userEvent.click(within(ansicht).getByRole('radio', { name: 'Liste' }));
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'FMS-Tableau' })).toBeNull());
+  });
+
+  it('eine Ziffer in der Kachel geht über denselben PATCH wie das Menü', async () => {
+    const { patches } = renderTableau();
+    const tableau = await screen.findByRole('region', { name: 'FMS-Tableau' });
+    const knopf = await within(tableau).findByRole('button', {
+      name: 'Status von Florian 1 ändern',
+    });
+    act(() => knopf.focus());
+    fireEvent.keyDown(knopf, { key: '4' });
+    await waitFor(() => expect(patches).toEqual([{ status_id: 3 }]));
+    // Serverstand übernommen: der Chip zeigt S4, „seit" die Zeit aus der Antwort.
+    await waitFor(() => expect(within(tableau).getByText('S4')).toBeInTheDocument());
+  });
+
+  it('bleibt ohne Einheiten (Modul gesperrt) bedienbar und sagt, warum ungegliedert', async () => {
+    renderTableau(() => HttpResponse.json({ error: 'Modul gesperrt' }, { status: 403 }));
+    const tableau = await screen.findByRole('region', { name: 'FMS-Tableau' });
+    expect(await within(tableau).findByText(/Einheiten nicht abrufbar/)).toBeInTheDocument();
+    expect(within(tableau).getByRole('heading', { name: 'Alle Fahrzeuge' })).toBeInTheDocument();
+    expect(
+      within(tableau).getByRole('button', { name: 'Status von Florian 1 ändern' }),
+    ).toBeEnabled();
   });
 });
 

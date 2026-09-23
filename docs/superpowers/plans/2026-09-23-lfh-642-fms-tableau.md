@@ -11,6 +11,7 @@ Es gibt nur **einen Mutationsweg**, die bestehende `statusMutation` der `Fahrzeu
 **Tech Stack:** React 19, antd 6, TanStack Query, Vitest + RTL + MSW, Playwright.
 
 **Entscheidungen des Auftraggebers (23.09.2026):**
+
 - **Einstieg:** Sprungmarke plus Ansicht.
 - **Gliederung:** Abschnitt → Einheit.
 - **Form:** Kachel-Raster.
@@ -42,6 +43,7 @@ Es gibt nur **einen Mutationsweg**, die bestehende `statusMutation` der `Fahrzeu
 **Files:** `frontend/src/routing/deeplinks.ts` (+ Test), `frontend/src/einsatz/sprungmarken.ts` (+ Test)
 
 **Produces:**
+
 - `type FahrzeugeAnsicht = 'liste' | 'tableau'`
 - `fahrzeugePfad(einsatzId, { fahrzeug?, ansicht? })`
 - `parseFahrzeugeAnsicht(params): FahrzeugeAnsicht | undefined`
@@ -60,6 +62,7 @@ Es gibt nur **einen Mutationsweg**, die bestehende `statusMutation` der `Fahrzeu
 **Files:** `frontend/src/kraefte/fmsTableau.ts` + `fmsTableau.test.ts`. `pages/KraefteuebersichtPage.tsx` nutzt dazu `fmsStatusOptionen`.
 
 **Produces:**
+
 - **`fmsStatusOptionen(katalog)`** liefert `StatusOption<number>[]`:
   - Label: `S${anker} · ${fmsWort}` bzw. `label`
   - Darstellung aus der Kategorie, Farbe `farbe`
@@ -116,6 +119,7 @@ interface FmsTableauProps {
 ```
 
 **Aufbau:**
+
 - Wurzel `<section aria-label="FMS-Tableau" onKeyDown onFocus onBlur>`.
 - Je Gruppe ein `Paneel` (Titel, Meta `n Fzg.`), darin ein CSS-Grid `repeat(auto-fill, minmax(min(100%, 208px), 1fr))`.
 - **Kachel** (`data-lfh="fms-kachel"`, `data-ef-id`):
