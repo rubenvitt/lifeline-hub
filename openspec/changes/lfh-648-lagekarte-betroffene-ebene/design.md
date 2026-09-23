@@ -133,14 +133,19 @@ Backend-Pfadparameter, die Schlüsselliste ist in `fachebenen.test.ts` gepinnt.
   Kürzel und Plakette: `personen-kreis`, `personen-kurz`, `personen-label`. Diese Layer
   kommen in `MARKER_LAYER_REIHENFOLGE` **vor** alle übrigen Marker-Layer, liegen also unter
   den Kräften. Sie werden in die Klick-Layer aufgenommen.
-- **Donut-Sync und Spider-Controller** in `Kartenflaeche.tsx` iterieren künftig über
-  eine Liste von Cluster-Quellen:
-  - Die DOM-Map wird nach `${quelle}:${cluster_id}` geschlüsselt. `cluster_id` ist nur
-    innerhalb einer Quelle eindeutig, zwei Quellen mit Cluster 7 überschrieben sich sonst
-    gegenseitig die Donuts.
-  - `oeffneSpider` bekommt die Quelle mit, damit `getClusterLeaves` und
-    `getClusterExpansionZoom` die richtige Quelle fragen.
-  - Die Spider-Quellen bleiben gemeinsam. Es ist immer höchstens ein Spider offen.
+- **Personen-Cluster als WebGL-Layer, nicht als DOM-Donut** (Review-Befund beim Umsetzen):
+  Ein DOM-Donut hängt über dem Canvas. Er deckte ein Fahrzeugzeichen zu und fing dessen
+  Klick ab, das verletzte „Cluster unter den Kräften“. Deshalb zeichnen
+  `personen-cluster-kreis` und `personen-cluster-zahl` die Cluster, ganz unten in
+  `MARKER_LAYER_REIHENFOLGE`. Der Donut-Sync bleibt bei `marker-cluster` allein; mit zwei
+  Quellen hatte er zudem die Donuts einer nachladenden Quelle abgeräumt (Flackern).
+  - Ein Karten-Klick fächert einen Personen-Cluster nur auf, wenn er das OBERSTE Feature am
+    Punkt ist (`personenClusterTreffer`, rein). Liegt ein Kräfte-Zeichen darüber, gehört der
+    Klick dem Zeichen.
+  - Der Spider-Controller bekommt die Quelle mit (`oeffne(quelle, …)`), damit
+    `getClusterLeaves`/`getClusterExpansionZoom` die richtige Quelle fragen. Sein
+    Offen-Schlüssel ist `${quelle}:${cluster_id}`, denn `cluster_id` ist nur je Quelle
+    eindeutig. Die Spider-Quellen bleiben gemeinsam.
 - **Betroffene-Karte:** Sie nutzt dieselbe `Kartenflaeche`, ihre Personen landen dadurch in
   der neuen Quelle. Sichtbar ändert sich dort nichts, aber `e2e/betroffene-karte.spec.ts`
   liest dann `marker-personen` statt `marker-cluster`.

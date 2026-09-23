@@ -111,6 +111,16 @@ describe('ebenenZeilen', () => {
     expect(person.anzahl).toBeNull();
   });
 
+  it('„Betroffene" frei, aber die Personenliste scheiterte: „—" an dieser Zeile, die übrigen zählen', () => {
+    const zeilen = ebenenZeilen([marker('uhs')], 0, ALLE_AN, false, {
+      zugriff: 'frei',
+      anzahl: 0,
+      fehler: true,
+    });
+    expect(zeilen.find((z) => z.key === 'person')!.anzahl).toBe('—');
+    expect(zeilen.find((z) => z.key === 'uhs')!.anzahl).toBe(1);
+  });
+
   it('„Betroffene" ausgeblendet: keine Zeile', () => {
     const zeilen = ebenenZeilen([], 0, ALLE_AN, false, { zugriff: 'ausgeblendet', anzahl: 0 });
     expect(zeilen.map((z) => z.key)).not.toContain('person');

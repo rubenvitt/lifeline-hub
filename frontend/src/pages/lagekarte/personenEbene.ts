@@ -34,12 +34,15 @@ export function personenZugriffVon(a: {
   /** Die Personenliste kam mit 403 zurück. */
   abgelehnt: boolean;
 }): PersonenZugriff {
-  if (a.istSnapshot) return 'rueckblick';
   if (!a.rechteBekannt || !a.modul) return 'ausgeblendet';
   if (a.modul.status !== 'fertig' || !istModulSichtbar(a.modul, a.overrides)) {
     return 'ausgeblendet';
   }
-  if (istModulGesperrt(a.modul, a.benutzer, a.overrides) || a.abgelehnt) return 'gesperrt';
+  if (istModulGesperrt(a.modul, a.benutzer, a.overrides)) return 'gesperrt';
+  // Rückblick erst NACH Sichtbarkeit und Rolle: ein im Einsatz ausgeblendetes Modul zeigt
+  // auch im Historien-Modus keine Zeile (Review-Befund LFH-648).
+  if (a.istSnapshot) return 'rueckblick';
+  if (a.abgelehnt) return 'gesperrt';
   return 'frei';
 }
 

@@ -22,7 +22,7 @@ import { useThemeMode } from '../theme/ThemeModeProvider';
 import { useKartenbilder } from './lagekarte/useKartenbilder';
 import { useBasemap } from './lagekarte/useBasemap';
 import { useKartenAnsicht } from './lagekarte/useKartenAnsicht';
-import { useLagekarteDaten } from './lagekarte/useLagekarteDaten';
+import { QUELLE_BETROFFENE, useLagekarteDaten } from './lagekarte/useLagekarteDaten';
 import { useFachebenen } from './lagekarte/useFachebenen';
 import { useKartenInteraktion } from './lagekarte/useKartenInteraktion';
 import { braucheViewportBbox, rasterBbox } from './lagekarte/fachebenen';
@@ -190,11 +190,13 @@ export default function LagekartePage() {
     rohdaten,
     personenZugriff,
     personenVerortet,
+    personenFehler,
   } = useLagekarteDaten({ einsatzId, zeigeZonen: layer.zone, aktiveAnsichtId, quelle });
 
   // Ebene „Betroffene" (LFH-648): gezeichnet nur bei eingeschaltetem Schalter UND freiem
-  // Modul. Wählbar (Marker-Klick, Inspector) ist genau, was gezeichnet wird — Startausschnitt
-  // und Kopfzahl bleiben dagegen auf `alleVerortet` und damit ohne Personen.
+  // Modul. Personen sind nur wählbar (Marker-Klick, Inspector), solange sie gezeichnet werden;
+  // für die übrigen Ebenen bleibt `alleVerortet` der Lookup wie bisher. Startausschnitt und
+  // Kopfzahl bleiben auf `alleVerortet` und damit ohne Personen.
   const personenAufKarte = useMemo(
     () => (layer.person && personenZugriff === 'frei' ? personenVerortet : []),
     [layer.person, personenZugriff, personenVerortet],
@@ -560,6 +562,9 @@ export default function LagekartePage() {
 
   const onlineStyles = config?.online_styles ?? [];
   const quellenFehler = fehlerhafteQuellen.length > 0;
+  // Ohne die Personenliste (LFH-648): Personen speisen weder die Kopfzahl noch „Nicht
+  // verortet" — ihr Ausfall darf dort keine Zahl zu „—" machen. Der Hinweis nennt sie trotzdem.
+  const lagebildFehler = fehlerhafteQuellen.some((q) => q !== QUELLE_BETROFFENE);
 
   // „Ausgewählt": die Inspectors, die vorher über der Karte schwebten, stehen jetzt in der
   // rechten Leiste. Mehrere gleichzeitig (Marker UND Zone) bleiben möglich, wie bisher.
@@ -655,7 +660,7 @@ export default function LagekartePage() {
           Lagekarte
         </Typography.Title>
         <span data-lfh="seitenkopf-meta" style={seitenMetaStil(farben)}>
-          {kopfMeta(verortetAnzahl(alleVerortet), nichtVerortetAlle.length, quellenFehler)}
+          {kopfMeta(verortetAnzahl(alleVerortet), nichtVerortetAlle.length, lagebildFehler)}
         </span>
       </div>
       {!breit && (
@@ -873,7 +878,11 @@ export default function LagekartePage() {
         layer={layer}
         onLayerToggle={(k, an) => setLayer((l) => ({ ...l, [k]: an }))}
         zonenAnzahl={zonen.length}
-        personen={{ zugriff: personenZugriff, anzahl: personenVerortet.length }}
+        personen={{
+          zugriff: personenZugriff,
+          anzahl: personenVerortet.length,
+          fehler: personenFehler,
+        }}
         basemap={basemap}
         grundlageWahl={istSchmal ? grundlageWahl : undefined}
         onMarkerWaehlen={onMarkerWaehlen}
@@ -917,7 +926,7 @@ export default function LagekartePage() {
            nicht, sondern trägt den erneuten Abruf — die eine Handlung, die das Overlay
            bewusst nicht anbietet, weil es für elf Quellen zugleich spricht. */
         sektionFehler={{
-          nichtVerortet: quellenFehler
+          nichtVerortet: lagebildFehler
             ? { text: 'Objektlisten konnten nicht geladen werden', onWiederholen: neuLaden }
             : undefined,
           bilder: bilderFehler

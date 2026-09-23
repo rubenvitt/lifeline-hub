@@ -6,7 +6,7 @@ import type {
 } from 'maplibre-gl';
 import { FREIES_ZEICHEN_ERSATZLABEL, type KarteMarker, type MarkerTyp } from './marker';
 import { tzIconKey } from './markerIcons';
-import { clusterTypProperties } from './clusterDonut';
+import { CLUSTER_TYP_FARBE, clusterTypProperties } from './clusterDonut';
 import { farbenDunkel } from '../../theme/tokens';
 import { plakettenBildId, plakettenSchrift, zonenPlakette, type Plakette } from './plakette';
 
@@ -116,8 +116,19 @@ export const MARKER_CLUSTER_QUELLE = 'marker-cluster';
  * Layer liegen unter allen übrigen Markern (`MARKER_LAYER_REIHENFOLGE`).
  */
 export const PERSONEN_CLUSTER_QUELLE = 'marker-personen';
-/** Alle geclusterten Marker-Quellen — Donut-Sync und Spider-Controller laufen über diese Liste. */
+/** Alle geclusterten Marker-Quellen (Spider-Controller: die Quelle des geöffneten Clusters). */
 export const CLUSTER_QUELLEN = [MARKER_CLUSTER_QUELLE, PERSONEN_CLUSTER_QUELLE] as const;
+/**
+ * Klickziele der Personen-CLUSTER (LFH-648). Sie sind bewusst WebGL-Layer und kein DOM-Donut
+ * wie die Kräfte-Cluster: ein DOM-Marker hängt ÜBER dem Canvas, ein Personen-Donut deckte
+ * damit ein Fahrzeugzeichen zu und fing dessen Klick ab (Review-Befund). Als Layer liegen sie
+ * in `MARKER_LAYER_REIHENFOLGE` ganz unten. Kein Teil von `MARKER_KLICK_LAYER` — ein Klick
+ * darauf fächert auf, er wählt nichts für den Inspector aus.
+ */
+export const PERSONEN_CLUSTER_KLICK_LAYER = [
+  'personen-cluster-kreis',
+  'personen-cluster-zahl',
+] as const;
 export type ClusterQuelle = (typeof CLUSTER_QUELLEN)[number];
 /**
  * Schlüssel eines Clusters über alle Quellen: `cluster_id` ist nur JE Quelle eindeutig. Ohne
@@ -125,6 +136,31 @@ export type ClusterQuelle = (typeof CLUSTER_QUELLEN)[number];
  */
 export function clusterSchluessel(quelle: ClusterQuelle, clusterId: number | string): string {
   return `${quelle}:${clusterId}`;
+}
+/**
+ * Entscheidet einen Karten-Klick für die Personen-Cluster (LFH-648): ist das OBERSTE Feature am
+ * Klickpunkt ein Personen-Cluster, wird er aufgefächert. Liegt ein anderes Zeichen darüber, gehört
+ * der Klick ihm — genau das ist die Zusicherung „Personen verdecken keine Kräfte". Rein, damit sie
+ * ohne WebGL prüfbar ist; `features` kommt von `queryRenderedFeatures` (oben zuerst).
+ */
+export function personenClusterTreffer(
+  features: readonly {
+    layer: { id: string };
+    properties: Record<string, unknown> | null;
+    geometry: { type: string; coordinates?: unknown };
+  }[],
+): { clusterId: number; center: [number, number]; anzahl: number } | null {
+  const oben = features[0];
+  if (!oben || !(PERSONEN_CLUSTER_KLICK_LAYER as readonly string[]).includes(oben.layer.id)) {
+    return null;
+  }
+  if (oben.geometry.type !== 'Point') return null;
+  const props = oben.properties ?? {};
+  return {
+    clusterId: Number(props.cluster_id),
+    center: oben.geometry.coordinates as [number, number],
+    anzahl: Number(props.point_count ?? 0),
+  };
 }
 export const MARKER_EINSATZORT_QUELLE = 'marker-einsatzort';
 export const SPIDER_LEAVES_QUELLE = 'spider-leaves';
@@ -159,7 +195,10 @@ export const SPIDER_KLICK_LAYER = [
 // Kollision hält jede Plakette von fremden Zeichen fern — lägen die Plaketten oben, deckten
 // sie Nachbarzeichen zu. Der Einsatzort-Name liegt über den übrigen und gewinnt gegen sie.
 const MARKER_LAYER_REIHENFOLGE = [
-  // Betroffene (LFH-648) zuunterst: jedes Kräfte-/Objektzeichen liegt über ihnen.
+  // Betroffene (LFH-648) zuunterst: jedes Kräfte-/Objektzeichen liegt über ihnen, auch über
+  // ihren Clustern.
+  'personen-cluster-kreis',
+  'personen-cluster-zahl',
   'personen-kreis',
   'personen-kurz',
   'personen-label',
@@ -360,6 +399,7 @@ export function sorgeFuerMarkerLayer(
     fehlt('marker-kurz') ||
     fehlt('personen-kurz') ||
     fehlt('personen-label') ||
+    fehlt('personen-cluster-zahl') ||
     fehlt('spider-label') ||
     fehlt('spider-kurz')
       ? plakettenSchrift(map.getStyle())
@@ -367,6 +407,38 @@ export function sorgeFuerMarkerLayer(
   // Betroffene (LFH-648): Kreis in Sichtungsfarbe, Kürzel darin, Plakette „R-042 · SK II" ab
   // `BESCHRIFTUNG_AB_ZOOM` — dieselbe Optik wie die übrigen Kreis-Marker, nur aus der eigenen
   // Quelle. Kein Symbol- und kein Status-Layer: Personen tragen weder TZ noch FMS-Status.
+  // Personen-Cluster: Kreis in der Donut-Farbe der Objektart (`CLUSTER_TYP_FARBE.person`,
+  // dieselbe wie das Personen-Segment eines Donuts), gestaffelt nach Menge, mit Zahl.
+  if (fehlt('personen-cluster-kreis')) {
+    map.addLayer({
+      id: 'personen-cluster-kreis',
+      type: 'circle',
+      source: PERSONEN_CLUSTER_QUELLE,
+      filter: ['has', 'point_count'],
+      paint: {
+        'circle-color': CLUSTER_TYP_FARBE.person,
+        'circle-radius': ['step', ['get', 'point_count'], 14, 10, 18, 50, 22],
+        'circle-stroke-color': '#fff',
+        'circle-stroke-width': 2,
+      },
+    });
+  }
+  if (fehlt('personen-cluster-zahl')) {
+    map.addLayer({
+      id: 'personen-cluster-zahl',
+      type: 'symbol',
+      source: PERSONEN_CLUSTER_QUELLE,
+      filter: ['has', 'point_count'],
+      layout: {
+        'text-field': ['get', 'point_count_abbreviated'],
+        'text-size': 11,
+        ...(schrift ? { 'text-font': schrift } : {}),
+        'text-allow-overlap': true,
+        'text-ignore-placement': true,
+      },
+      paint: { 'text-color': '#fff' },
+    });
+  }
   if (fehlt('personen-kreis')) {
     map.addLayer({
       id: 'personen-kreis',

@@ -38,6 +38,10 @@ import { rollenwerte } from '../../components/instrument';
 import type { SnapshotDaten, Standquelle } from './snapshotDaten';
 import { personenZugriffVon } from './personenEbene';
 
+/** Name der Personen-Quelle im Ausfallhinweis — die Seite filtert sie für Kopfzahl und
+ *  „Nicht verortet" heraus, die Personen nie enthalten (LFH-648). */
+export const QUELLE_BETROFFENE = 'Betroffene';
+
 /** Registry-Eintrag des Moduls „Personen" — die Frage „darf diese Ebene laden" hängt daran. */
 const PERSONEN_MODUL = modulRegistry.find((m) => m.key === 'personen');
 
@@ -155,10 +159,11 @@ export function useLagekarteDaten({
   // „gesperrt". Der Key ist der argumentlose Bestands-Accessor — dasselbe Cache-Fach wie
   // Personenseite, Dashboard, Chat und Palette, live invalidiert vom `person`-Event (das
   // ausschließlich an Leser mit „Personen" geht, `src/live/mod.rs`). Kein eigenes Fach.
+  // Overrides sind Render-Kontext wie Config/Einstellungen, kein Teil des gesicherten Stands —
+  // sie laden auch im Historien-Modus: ein ausgeblendetes Modul zeigt dort ebenfalls keine Zeile.
   const overridesQuery = useQuery({
     queryKey: einsatzKeys.modulOverrides(einsatzId),
     queryFn: () => ladeModulOverrides(einsatzId),
-    enabled: liveAn,
   });
   const personenVorab = personenZugriffVon({
     istSnapshot,
@@ -181,6 +186,8 @@ export function useLagekarteDaten({
     overrides: overridesQuery.data,
     abgelehnt: personenQuery.error instanceof ApiError && personenQuery.error.status === 403,
   });
+  // Nur bei freiem Modul: ein 403 ist „gesperrt" (Zustand der Zeile), kein Ausfall.
+  const personenFehler = personenZugriff === 'frei' && personenQuery.isError;
   const orgQuery = useQuery({
     queryKey: globalKeys.organisation(),
     queryFn: ladeOrganisation,
@@ -361,8 +368,7 @@ export function useLagekarteDaten({
       ['Gefahrengebiete', gebieteQuery.isError],
       ['Lagemeldungen', lageMeldungenQuery.isError],
       ['Personal', fkQuery.isError],
-      // Nur bei freiem Modul: ein 403 ist „gesperrt" (Zustand der Zeile), kein Ausfall.
-      ['Betroffene', personenZugriff === 'frei' && personenQuery.isError],
+      [QUELLE_BETROFFENE, personenFehler],
     ];
     return katalog.filter(([, kaputt]) => kaputt).map(([name]) => name);
   }, [
@@ -379,8 +385,7 @@ export function useLagekarteDaten({
     gebieteQuery.isError,
     lageMeldungenQuery.isError,
     fkQuery.isError,
-    personenZugriff,
-    personenQuery.isError,
+    personenFehler,
   ]);
 
   // Erneuter Abruf: gezielt nur die GESCHEITERTEN Quellen. Ein pauschales Invalidieren träfe
@@ -404,7 +409,7 @@ export function useLagekarteDaten({
       if (q.isError) void q.refetch();
     }
     // Personen nur bei freiem Modul — ein 403 ist kein Ausfall und wird nicht wiederholt.
-    if (personenZugriff === 'frei' && personenQuery.isError) void personenQuery.refetch();
+    if (personenFehler) void personenQuery.refetch();
   };
 
   const lageMeldungMarker = useMemo(
@@ -505,5 +510,9 @@ export function useLagekarteDaten({
     // Ebene „Betroffene" (LFH-648): Zugriffszustand für Zeile/Legende, Marker getrennt.
     personenZugriff,
     personenVerortet,
+    /** Die Personenliste scheiterte bei freiem Modul (kein 403). Steht zugleich als
+     *  `QUELLE_BETROFFENE` in `fehlerhafteQuellen` — die Seite trennt beides, weil Personen
+     *  weder Kopfzahl noch „Nicht verortet" speisen. */
+    personenFehler,
   };
 }

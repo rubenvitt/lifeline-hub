@@ -25,5 +25,7 @@ describe('Sichtungslegende (LFH-648)', () => {
     expect(feld.closest('[aria-hidden="true"]')).not.toBeNull();
     // jsdom normalisiert die Farbe zu rgb(); SK I ist `sichtungsfarben.rot` (#f5222d).
     expect(feld.style.background).toBe('rgb(245, 34, 45)');
+    // Äußere Kante folgt dem Modus — sonst verschwände Gelb mit weißem Ring auf hellem Grund.
+    expect(feld.style.boxShadow).toMatch(/^0 0 0 1px /);
   });
 });

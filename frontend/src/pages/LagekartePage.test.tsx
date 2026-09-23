@@ -1750,6 +1750,45 @@ describe('LagekartePage · Ebene „Betroffene" (LFH-648)', () => {
     expect(anfragen).toBe(0);
   });
 
+  it('Benutzer ohne Zugriff speichert die geteilte Ansicht: „Betroffene" bleibt eingeschaltet', async () => {
+    // Das Flag gehört der geteilten Ansicht. Würde es für Benutzer ohne Recht auf `false`
+    // „bereinigt", überschriebe das Speichern die Wahl der Führungskraft (design D4).
+    let body: Record<string, unknown> | null = null;
+    basisHandler([
+      ANSICHT_BETROFFENE_AN,
+      http.get('/api/einsaetze/1/personen', () => new HttpResponse(null, { status: 403 })),
+      http.patch('/api/einsaetze/1/karten-ansichten/1', async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ id: 1, einsatz_id: 1, name: 'Standard', ist_standard: true });
+      }),
+    ]);
+    const user = userEvent.setup();
+    renderSeite();
+    // Vorbedingung: der Zugriff ist wirklich gesperrt, nicht bloß noch nicht geladen.
+    expect(await screen.findByText('Keine Berechtigung')).toBeInTheDocument();
+    await user.click(screen.getByRole('switch', { name: 'Schäden' }));
+    await user.click(await screen.findByRole('button', { name: /In dieser Ansicht speichern/ }));
+    await waitFor(() => expect(body).not.toBeNull());
+    const layer = body!.layer_sichtbar as Record<string, boolean>;
+    expect(layer.schaden).toBe(false);
+    expect(layer.person).toBe(true);
+  });
+
+  it('Ausfall der Personenliste (500): Hinweis nennt „Betroffene", Kopfzahl und Objektlisten bleiben', async () => {
+    basisHandler([
+      ANSICHT_BETROFFENE_AN,
+      http.get('/api/einsaetze/1/personen', () => new HttpResponse(null, { status: 500 })),
+    ]);
+    renderSeite();
+    const overlay = await screen.findByTestId('lagebild-unvollstaendig');
+    expect(overlay).toHaveTextContent('Lagebild unvollständig: Betroffene');
+    // Personen stehen weder in der Kopfzahl noch in „Nicht verortet" — ihr Ausfall darf dort
+    // keine Zahl zu „—" machen (Spec: Startausschnitt und Kopfzahl ohne Betroffene).
+    expect(screen.getByText('1 verortet · 1 nicht verortet')).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'Schäden' })).toHaveTextContent('Schäden1');
+    expect(screen.getByRole('switch', { name: 'Betroffene' })).toHaveTextContent('Betroffene—');
+  });
+
   it('die Kopfzahl „verortet" zählt Betroffene nicht mit', async () => {
     basisHandler([
       ANSICHT_BETROFFENE_AN,

@@ -412,7 +412,7 @@ describe('useLagekarteDaten Betroffene (LFH-648)', () => {
 
   /** Alle Live-Quellen gesund; Overrides und Personen je Fall. Liefert den Personen-Zähler. */
   function handler(overrides: Record<string, unknown>, personen: () => Response) {
-    const zaehler = { personen: 0 };
+    const zaehler = { personen: 0, overrides: 0 };
     server.use(
       http.get('/api/einsaetze/5', () =>
         HttpResponse.json({ id: 5, bezeichnung: 'T', status: 'aktiv' }),
@@ -448,7 +448,10 @@ describe('useLagekarteDaten Betroffene (LFH-648)', () => {
       http.get('/api/einsaetze/5/meldungen/rueckmeldungen', () =>
         HttpResponse.json(RUECKMELDUNGEN),
       ),
-      http.get('/api/einsaetze/5/modul-overrides', () => HttpResponse.json(overrides)),
+      http.get('/api/einsaetze/5/modul-overrides', () => {
+        zaehler.overrides += 1;
+        return HttpResponse.json(overrides);
+      }),
       http.get('/api/einsaetze/5/personen', () => {
         zaehler.personen += 1;
         return personen();
@@ -526,9 +529,26 @@ describe('useLagekarteDaten Betroffene (LFH-648)', () => {
         useLagekarteDaten({ einsatzId: 5, zeigeZonen: true, quelle: { typ: 'snapshot', id: 9 } }),
       { wrapper: wrapper() },
     );
-    await waitFor(() => expect(result.current.ladt).toBe(false));
-    expect(result.current.personenZugriff).toBe('rueckblick');
+    await waitFor(() => expect(result.current.personenZugriff).toBe('rueckblick'));
     expect(result.current.personenVerortet).toEqual([]);
     expect(z.personen).toBe(0);
+  });
+
+  it('Historien-Modus mit ausgeblendetem Modul: keine Zeile, nicht „rueckblick"', async () => {
+    // Die Overrides sind Render-Kontext, kein Teil des gesicherten Stands — sie laden auch im
+    // Rückblick. Ohne sie wäre „ausgeblendet" hier der triviale Ladezustand.
+    const z = handler({ personen: { sichtbar: false, benoetigte_rolle: null } }, () =>
+      HttpResponse.json([PERSON]),
+    );
+    ladeLageSnapshot.mockResolvedValue(dokument('keine'));
+    const { result } = renderHook(
+      () =>
+        useLagekarteDaten({ einsatzId: 5, zeigeZonen: true, quelle: { typ: 'snapshot', id: 9 } }),
+      { wrapper: wrapper() },
+    );
+    await waitFor(() => expect(z.overrides).toBe(1));
+    await waitFor(() => expect(result.current.ladt).toBe(false));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(result.current.personenZugriff).toBe('ausgeblendet');
   });
 });

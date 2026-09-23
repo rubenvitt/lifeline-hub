@@ -65,6 +65,9 @@ export default function Sichtungslegende() {
               borderRadius: '50%',
               background: farbe(k),
               border: `2px solid ${token.colorWhite}`,
+              // Äußere Kante in der Textfarbe des Modus (CLAUDE.md, Sichtungsachse): ohne sie
+              // verschwände der weiße Ring — und mit ihm Gelb — auf hellem Grund.
+              boxShadow: `0 0 0 1px ${token.colorText}`,
               ...monoStil(8),
               color: sichtungsfarben.schwarz,
               textShadow: `0 0 2px ${token.colorWhite}`,

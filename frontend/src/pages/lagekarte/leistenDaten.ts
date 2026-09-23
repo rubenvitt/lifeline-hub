@@ -96,6 +96,9 @@ export interface EbenenZeile {
 export interface PersonenEbenenAngabe {
   zugriff: PersonenZugriff;
   anzahl: number;
+  /** Die Personenliste scheiterte: „—" an DIESER Zeile. Die übrigen zählen weiter — ihre
+   *  Quellen sind nicht betroffen. */
+  fehler?: boolean;
 }
 
 /**
@@ -136,11 +139,11 @@ function personenZeile(
   name: string,
   an: boolean,
   quellenFehler: boolean,
-  { zugriff, anzahl }: PersonenEbenenAngabe,
+  { zugriff, anzahl, fehler }: PersonenEbenenAngabe,
 ): EbenenZeile[] {
   if (zugriff === 'ausgeblendet') return [];
   if (zugriff === 'frei') {
-    return [{ key: 'person', name, anzahl: quellenFehler ? '—' : anzahl, sichtbar: an }];
+    return [{ key: 'person', name, anzahl: quellenFehler || fehler ? '—' : anzahl, sichtbar: an }];
   }
   return [
     {

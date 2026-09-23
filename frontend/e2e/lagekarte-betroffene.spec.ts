@@ -19,6 +19,8 @@ const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 interface MapHaken {
   loaded(): boolean;
   jumpTo(o: { center: [number, number]; zoom: number }): void;
+  project(ll: [number, number]): { x: number; y: number };
+  getCanvas(): HTMLCanvasElement;
   querySourceFeatures(quelle: string): { properties: Record<string, unknown> | null }[];
 }
 
@@ -84,6 +86,17 @@ async function springe(page: Page, center: [number, number], zoom: number) {
       (window as unknown as { __lfhKarte: MapHaken }).__lfhKarte.jumpTo({ center: c, zoom: z }),
     { c: center, z: zoom },
   );
+}
+
+/** Klick auf die Karte an einer Geokoordinate — WebGL-Layer haben kein DOM-Element. */
+async function klickeAuf(page: Page, ll: [number, number]) {
+  const p = await page.evaluate((c) => {
+    const k = (window as unknown as { __lfhKarte: MapHaken }).__lfhKarte;
+    const px = k.project(c);
+    const r = k.getCanvas().getBoundingClientRect();
+    return { x: r.left + px.x, y: r.top + px.y };
+  }, ll);
+  await page.mouse.click(p.x, p.y);
 }
 
 // Ort der Lage: eine Einheit mitten in dreißig Betroffenen; drei weitere Betroffene rund
@@ -185,14 +198,26 @@ test('Betroffene: eigene Cluster-Quelle, Kräfte bleiben einzeln, ohne Modulzugr
   expect(personenIn(kraefte)).toBe(0);
   // Legende steht bei eingeschalteter Ebene.
   await expect(page.getByRole('list', { name: 'Sichtungslegende' })).toBeVisible();
+  // Personen-Cluster sind WebGL-Layer UNTER den Kräften, kein DOM-Donut über dem Canvas:
+  // hier gibt es nur Personen-Cluster und eine einzelne Einheit, also keinen Donut.
+  await expect(page.locator('.maplibregl-marker')).toHaveCount(0);
+  // Und die Einheit mitten in der Traube bleibt anwählbar — der Klick gehört dem Zeichen
+  // obenauf, nicht dem Personen-Cluster darunter (Review-Befund: ein DOM-Donut fing ihn ab).
+  const ausgewaehlt = page.locator('[data-paneel="ausgewaehlt"]');
+  await expect(async () => {
+    await klickeAuf(page, MITTE);
+    await expect(ausgewaehlt.getByText('Zug Mitte')).toBeVisible({ timeout: 1_000 });
+  }).toPass({ timeout: 20_000 });
+  await page.keyboard.press('Escape');
 
-  // Die ferne Dreiergruppe fächert auf: nur ihr Donut ist im Bild.
+  // Die ferne Dreiergruppe fächert per Klick auf ihren Cluster-Kreis auf.
   await springe(page, FERN, 12);
-  // Am Zähler „3" greifen, nicht an „dem einen Donut": der DOM-Sync läuft auf `render`, und
-  // direkt nach dem Sprung können noch Donuts der Traube stehen.
-  const donut = page.locator('.maplibregl-marker').filter({ hasText: /^3$/ });
-  await expect(donut).toHaveCount(1, { timeout: 30_000 });
-  await donut.click();
+  await expect
+    .poll(async () => (await features(page, 'marker-personen')).some((p) => p.cluster), {
+      timeout: 30_000,
+    })
+    .toBe(true);
+  await klickeAuf(page, [FERN[0], FERN[1] + 0.0002]);
   await expect
     .poll(
       async () =>
