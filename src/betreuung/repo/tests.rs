@@ -1502,3 +1502,43 @@ async fn einsatz_loeschen_kaskadiert_sauber() {
         assert_eq!(zaehle(&w.pool, sql).await, 0, "{sql}");
     }
 }
+
+/// D4 (Controller-Entscheid): An einer geschlossenen Stelle ist eine Rücknahme 422 — sonst
+/// stünde die Stelle nach Rücknahme der Leermeldung „geschlossen und belegt“ da.
+#[tokio::test]
+async fn ruecknahme_an_geschlossener_stelle_ist_422_und_aendert_nichts() {
+    let w = welt().await;
+    let id = stelle(&w, "Turnhalle Ost", Some(150)).await;
+    belegung(&w, id, 40, "2026-09-23 12:00:00").await.unwrap();
+    let leer = belegung(&w, id, 0, "2026-09-23 13:00:00").await.unwrap();
+    stelle_status(&w, id, Status::Geschlossen).await.unwrap();
+    let n = etb(&w.pool, w.e).await.len();
+
+    assert_eq!(
+        status(belegung_zurueck(&w, leer.meldung_id).await),
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    assert_eq!(etb(&w.pool, w.e).await.len(), n, "kein ETB-Eintrag");
+    let zurueck: Option<String> =
+        sqlx::query_scalar("SELECT zurueckgenommen_at FROM betreuungsstelle_belegung WHERE id = ?")
+            .bind(leer.meldung_id)
+            .fetch_one(&w.pool)
+            .await
+            .unwrap();
+    assert_eq!(zurueck, None);
+    assert_eq!(aktuelle_belegung(&w, id).await, Some(0));
+}
+
+/// Gegenstück: nach dem Wiederöffnen geht dieselbe Rücknahme durch.
+#[tokio::test]
+async fn ruecknahme_nach_wiederoeffnen_gelingt() {
+    let w = welt().await;
+    let id = stelle(&w, "Turnhalle Ost", Some(150)).await;
+    belegung(&w, id, 40, "2026-09-23 12:00:00").await.unwrap();
+    let leer = belegung(&w, id, 0, "2026-09-23 13:00:00").await.unwrap();
+    stelle_status(&w, id, Status::Geschlossen).await.unwrap();
+    stelle_status(&w, id, Status::InBetrieb).await.unwrap();
+
+    belegung_zurueck(&w, leer.meldung_id).await.unwrap();
+    assert_eq!(aktuelle_belegung(&w, id).await, Some(40));
+}

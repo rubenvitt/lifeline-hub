@@ -10,7 +10,8 @@
 //! Bezeichnung, Plangröße/Kapazität < 1, Anzahl < 0, unlesbarer Zeitpunkt); 404 für fremde
 //! Objekte und Abschnitte; 409 nur aus dem Lebenszyklus (storniert) und für die doppelte
 //! Bezeichnung; 422 für umkehrbare Zustände (belegte Stelle schließen, geschlossene Stelle
-//! belegen, doppelte Rücknahme). Es gibt kein CAS und damit keinen Überschreiben-Dialog.
+//! belegen, Belegungsmeldung an einer geschlossenen Stelle zurücknehmen, doppelte Rücknahme).
+//! Es gibt kein CAS und damit keinen Überschreiben-Dialog.
 
 use sqlx::{SqliteConnection, SqlitePool};
 
@@ -1162,7 +1163,10 @@ pub async fn belegung_melden_tx(
     })
 }
 
-/// Nimmt eine Belegungsmeldung zurück — genau wie eine Standmeldung.
+/// Nimmt eine Belegungsmeldung zurück, im Ablauf wie eine Standmeldung. Zusätzlich gilt D4: an
+/// einer geschlossenen Stelle ist die Rücknahme 422, sonst stünde sie nach Rücknahme der
+/// Leermeldung „geschlossen und belegt“ da. Reihenfolge: storniert 409 → geschlossen 422 →
+/// bereits zurückgenommen 422.
 pub async fn belegung_zuruecknehmen_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -1181,6 +1185,13 @@ pub async fn belegung_zuruecknehmen_tx(
     .ok_or(AppError::NotFound)?;
     let roh = stelle_roh_tx(conn, einsatz_id, stelle_id).await?;
     stelle_lebt(&roh)?;
+    if roh.status == BetreuungsstelleStatus::Geschlossen {
+        return Err(AppError::UnprocessableEntity(format!(
+            "Betreuungsstelle ‚{}‘ ist geschlossen — erst wieder in Betrieb setzen, dann die \
+             Meldung zurücknehmen",
+            roh.bezeichnung
+        )));
+    }
     if zurueckgenommen_at.is_some() {
         return Err(AppError::UnprocessableEntity(
             "Die Belegungsmeldung ist bereits zurückgenommen".into(),
