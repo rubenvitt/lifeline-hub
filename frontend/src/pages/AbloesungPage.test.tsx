@@ -64,7 +64,7 @@ const schicht = (over: Partial<Abloesung> & { id: number }): Abloesung => ({
 
 function renderPage() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
+  const ergebnis = render(
     <QueryClientProvider client={client}>
       <AntApp>
         <AuthProvider>
@@ -76,6 +76,17 @@ function renderPage() {
         </AuthProvider>
       </AntApp>
     </QueryClientProvider>,
+  );
+  return { ...ergebnis, client };
+}
+
+const kartenNamen = () => screen.getAllByRole('article').map((k) => k.getAttribute('aria-label'));
+const sammelbanner = () => document.querySelector('[data-lfh="sammelbanner"]');
+
+/** Stellt die Server-Antwort für „laufend" um; „abgelöst" bleibt leer. */
+function laufendLiefert(schichten: Abloesung[]) {
+  listeAbloesungen.mockImplementation((_e: number, status: string) =>
+    Promise.resolve(status === 'laufend' ? schichten : []),
   );
 }
 
@@ -223,5 +234,160 @@ describe('AbloesungPage (LFH-635)', () => {
     await userEvent.clear(within(dialog).getByLabelText('Rhythmus (Stunden)'));
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(setzeAbloesungVorgabe).toHaveBeenLastCalledWith(1, 7, null));
+  });
+
+  // ── LFH-647: fremde Neuzugänge per Sammelbanner, Prüfliste Kriterium 12 ──────────────
+  describe('Live-Zufluss (LFH-647)', () => {
+    const eins = () => schicht({ id: 1, faellig_at: inMinuten(-12) });
+    const zwei = () => schicht({ id: 2, faellig_at: inMinuten(20) });
+    const drei = () => schicht({ id: 3, faellig_at: inMinuten(240), rhythmus_quelle: 'einheit' });
+    // Die fremde Schicht ist die überfälligste — die Server-Ordnung stellt sie OBEN hin.
+    // Landete sie unten, verschöbe sich auch ohne Schleuse nichts, und der Test bewiese nichts.
+    const fremd = () =>
+      schicht({ id: 9, einheit_id: 19, einheit_name: 'Florian 9', faellig_at: inMinuten(-40) });
+
+    it('eine fremd angelegte Schicht verschiebt keine Karte, bis das Banner bedient wird', async () => {
+      const { client } = renderPage();
+      await screen.findAllByRole('article');
+      expect(sammelbanner()).toBeNull();
+
+      laufendLiefert([fremd(), eins(), zwei(), drei()]);
+      await client.invalidateQueries();
+
+      await waitFor(() => expect(sammelbanner()).not.toBeNull());
+      expect(sammelbanner()).toHaveTextContent('1 neue Schicht, davon 1 fällig');
+      expect(kartenNamen()).toEqual([
+        'Schicht Florian 1',
+        'Schicht Florian 2',
+        'Schicht Florian 3',
+      ]);
+      // Die Zahlen lügen nicht: der Kopf zählt die zurückgehaltene mit, nur die Karte wartet.
+      expect(screen.getByText('4 laufend · 3 fällig')).toBeInTheDocument();
+
+      await userEvent.click(
+        within(sammelbanner() as HTMLElement).getByRole('button', { name: 'anzeigen' }),
+      );
+      expect(kartenNamen()).toEqual([
+        'Schicht Florian 9',
+        'Schicht Florian 1',
+        'Schicht Florian 2',
+        'Schicht Florian 3',
+      ]);
+      expect(sammelbanner()).toBeNull();
+    });
+
+    it('Änderungen an vorhandenen Karten erscheinen sofort, ohne Banner', async () => {
+      const { client } = renderPage();
+      await screen.findAllByRole('article');
+      laufendLiefert([
+        eins(),
+        schicht({
+          id: 2,
+          faellig_at: inMinuten(20),
+          abloesende_einheit_id: 17,
+          abloesende_einheit_name: 'Florian 17',
+        }),
+        drei(),
+      ]);
+      await client.invalidateQueries();
+      const karte = await screen.findByRole('article', { name: 'Schicht Florian 2' });
+      await within(karte).findByText('Ablösung geplant durch Florian 17');
+      expect(sammelbanner()).toBeNull();
+    });
+
+    it('eine eigene neue Schicht steht sofort an ihrem Fälligkeitsplatz', async () => {
+      // Florian 2 (Einheit 12) ist frei, damit der Dialog ihn anbietet.
+      laufendLiefert([eins(), drei()]);
+      const eigene = schicht({
+        id: 9,
+        einheit_id: 12,
+        einheit_name: 'Florian 2',
+        faellig_at: inMinuten(-40),
+      });
+      beginneSchicht.mockImplementation(() => {
+        laufendLiefert([eigene, eins(), drei()]);
+        return Promise.resolve(eigene);
+      });
+      renderPage();
+      await screen.findAllByRole('article');
+      await userEvent.click(screen.getByRole('button', { name: 'Schicht beginnen' }));
+      const dialog = await screen.findByRole('dialog');
+      await userEvent.click(within(dialog).getByRole('combobox', { name: 'Einheit' }));
+      await userEvent.click(await screen.findByTitle('Florian 2'));
+      await userEvent.type(within(dialog).getByLabelText('Rhythmus (Stunden)'), '4');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Schicht beginnen' }));
+
+      await waitFor(() =>
+        expect(kartenNamen()).toEqual([
+          'Schicht Florian 2',
+          'Schicht Florian 1',
+          'Schicht Florian 3',
+        ]),
+      );
+      expect(sammelbanner()).toBeNull();
+    });
+
+    it('trifft der Datenstand VOR der eigenen Antwort ein, rückt die Karte mit der Antwort nach', async () => {
+      laufendLiefert([eins(), drei()]);
+      const eigene = schicht({
+        id: 9,
+        einheit_id: 12,
+        einheit_name: 'Florian 2',
+        faellig_at: inMinuten(-40),
+      });
+      let antworte: (a: Abloesung) => void = () => {};
+      beginneSchicht.mockImplementation(() => new Promise<Abloesung>((r) => (antworte = r)));
+      const { client } = renderPage();
+      await screen.findAllByRole('article');
+      await userEvent.click(screen.getByRole('button', { name: 'Schicht beginnen' }));
+      const dialog = await screen.findByRole('dialog');
+      await userEvent.click(within(dialog).getByRole('combobox', { name: 'Einheit' }));
+      await userEvent.click(await screen.findByTitle('Florian 2'));
+      await userEvent.type(within(dialog).getByLabelText('Rhythmus (Stunden)'), '4');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Schicht beginnen' }));
+      await waitFor(() => expect(beginneSchicht).toHaveBeenCalled());
+
+      // Das Live-Ereignis war schneller als die Antwort: noch ist die Id nicht als eigene bekannt.
+      laufendLiefert([eigene, eins(), drei()]);
+      await client.invalidateQueries();
+      await waitFor(() => expect(sammelbanner()).not.toBeNull());
+      expect(kartenNamen()).toEqual(['Schicht Florian 1', 'Schicht Florian 3']);
+
+      antworte(eigene);
+      await waitFor(() =>
+        expect(kartenNamen()).toEqual([
+          'Schicht Florian 2',
+          'Schicht Florian 1',
+          'Schicht Florian 3',
+        ]),
+      );
+      expect(sammelbanner()).toBeNull();
+    });
+
+    it('das Banner steht in der Segmentzeile, die immer gerendert wird', async () => {
+      // Nimmt das Banner beim Erscheinen eine eigene Zeile, schiebt es genau die Karten weg,
+      // die es schützen soll. Die Zeile existiert vorher schon; die Höhe misst e2e.
+      const { client } = renderPage();
+      await screen.findAllByRole('article');
+      const zeile = document.querySelector('[data-lfh="abloesung-werkzeugzeile"]');
+      expect(zeile).not.toBeNull();
+      laufendLiefert([fremd(), eins(), zwei(), drei()]);
+      await client.invalidateQueries();
+      await waitFor(() => expect(sammelbanner()).not.toBeNull());
+      expect(sammelbanner()!.parentElement).toBe(zeile);
+    });
+
+    it('ein Ansichtswechsel gibt die zurückgehaltenen frei', async () => {
+      const { client } = renderPage();
+      await screen.findAllByRole('article');
+      laufendLiefert([fremd(), eins(), zwei(), drei()]);
+      await client.invalidateQueries();
+      await waitFor(() => expect(sammelbanner()).not.toBeNull());
+      await userEvent.click(screen.getByRole('radio', { name: 'Abgelöst' }));
+      await screen.findByText('Noch keine Ablösung vollzogen');
+      await userEvent.click(screen.getByRole('radio', { name: /^Laufend/ }));
+      await waitFor(() => expect(kartenNamen()).toHaveLength(4));
+      expect(sammelbanner()).toBeNull();
+    });
   });
 });

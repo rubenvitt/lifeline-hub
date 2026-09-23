@@ -26,11 +26,25 @@ import {
 } from '../abloesung/AbloesungDialoge';
 import { rhythmusText, zaehleFaellige } from '../abloesung/einstufung';
 import { useUhr } from '../abloesung/useUhr';
+import {
+  freigegeben,
+  LEERER_ZUFLUSSSTAND,
+  nachgefuehrt,
+  teileZufluss,
+  zuflussText,
+  type Zuflussstand,
+} from '../abloesung/zufluss';
 import { useAuth } from '../auth/AuthContext';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { RechteHinweis } from '../components/SpeicherHinweis';
 import { SeitenLeer } from '../components/SeitenZustand';
-import { Paneel, PaneelZeile, Segmentleiste, useRollen } from '../components/instrument';
+import {
+  Paneel,
+  PaneelZeile,
+  Sammelbanner,
+  Segmentleiste,
+  useRollen,
+} from '../components/instrument';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 
@@ -52,8 +66,15 @@ type Rhythmusziel =
  *
  * FORM: eine LISTE, keine Tabelle (LFH-330/B2) — die Frage ist „was ist mit dieser Einheit?",
  * nicht „welche von diesen ist die richtige?", und die Ordnung ist die Fälligkeit, die der
- * Server festlegt. Die Liste ist klein (eine Karte je eingesetzter Einheit) und springt nicht
- * unter dem Cursor: neue Schichten landen an ihrem Fälligkeitsplatz, nicht oben.
+ * Server festlegt. Neue Schichten landen deshalb an ihrem Fälligkeitsplatz, auch OBERHALB
+ * einer gezeigten Karte. Fremde Neuzugänge warten darum hinter dem Sammelbanner, eigene
+ * stehen sofort (LFH-647, Regeln in `abloesung/zufluss.ts`).
+ *
+ * DAS BANNER NIMMT KEINE EIGENE ZEILE. Es steht in der Segmentzeile, die immer gerendert wird
+ * und deren Höhe es nicht ändert (`nowrap`, gleiche Steuerhöhe, Text mit Auslassung) — ein
+ * Banner, das beim Eintreffen Platz nähme, schöbe genau die Karten weg, die es schützen soll.
+ * Kein `sticky`-Overlay wie in der ETB-Zeitachse: es verdeckte die oberste, also die
+ * dringlichste Karte (Prüfliste Kriterium 13). Die Höhe misst `e2e/abloesung-zufluss.spec.ts`.
  *
  * DIE UHR tickt alle 30 s (`useUhr`): Einstufung und „in x min" laufen mit, ohne Abruf.
  * Nichts blinkt — der Hinweis bei Fälligkeit kommt einmalig über die AlarmZentrale.
@@ -72,6 +93,12 @@ export default function AbloesungPage() {
   const [vollzugSchicht, setVollzugSchicht] = useState<Abloesung | null>(null);
   const [abloeserSchicht, setAbloeserSchicht] = useState<Abloesung | null>(null);
   const [rhythmusZiel, setRhythmusZiel] = useState<Rhythmusziel | null>(null);
+  // An den Einsatz gebunden: wechselt die Route den Einsatz bei stehender Komponente, wären
+  // sonst alle Schichten des neuen Einsatzes „fremde Neuzugänge".
+  const [zuflussZustand, setZuflussZustand] = useState<{ einsatzId: number } & Zuflussstand>({
+    einsatzId,
+    ...LEERER_ZUFLUSSSTAND,
+  });
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -103,6 +130,30 @@ export default function AbloesungPage() {
   const laufende = useMemo(() => laufendQuery.data ?? [], [laufendQuery.data]);
   const vorgaben = useMemo(() => vorgabenQuery.data ?? [], [vorgabenQuery.data]);
 
+  // ── Live-Zufluss (LFH-647) ─────────────────────────────────────────────────────────
+  // NUR die gerenderte Liste nimmt `sichtbar`. Kopfzeile, Segmentzähler, Fälligkeitszahl und
+  // die freien Einheiten rechnen mit der vollen Menge: die Zahlen dürfen nicht lügen, und ein
+  // „Schicht beginnen" für eine Einheit, deren Schicht nur zurückgehalten ist, lehnte der
+  // Server ab.
+  const zufluss: Zuflussstand =
+    zuflussZustand.einsatzId === einsatzId ? zuflussZustand : LEERER_ZUFLUSSSTAND;
+  const { sichtbar, zurueckgehalten } = teileZufluss(laufende, zufluss);
+  // Nachführen IM RENDER (Zustandsangleich an die Daten, Muster `EtbZeitachse`), nicht im
+  // Effekt: ein Effekt ließe einen Bildaufbau mit veraltetem Stand durch. `nachgefuehrt`
+  // liefert `null`, wenn nichts zu tun ist — das ist der Riegel gegen die Schleife.
+  if (laufendQuery.data) {
+    const neu = nachgefuehrt(zufluss, sichtbar);
+    if (neu || zuflussZustand.einsatzId !== einsatzId) {
+      setZuflussZustand({ einsatzId, ...(neu ?? zufluss) });
+    }
+  }
+  const merkeEigene = (id: number) =>
+    setZuflussZustand((z) => {
+      const basis = z.einsatzId === einsatzId ? z : { einsatzId, ...LEERER_ZUFLUSSSTAND };
+      return { ...basis, eigene: new Set([...basis.eigene, id]) };
+    });
+  const gibFrei = () => setZuflussZustand({ einsatzId, ...freigegeben(zufluss, laufende) });
+
   // Einheiten ohne laufende Schicht — nur sie können beginnen oder ablösen.
   const freieEinheiten: EinheitOption[] = useMemo(() => {
     const belegt = new Set(laufende.map((a) => a.einheit_id));
@@ -131,6 +182,7 @@ export default function AbloesungPage() {
   const beginnenMut = useMutation({
     mutationFn: (body: Parameters<typeof beginneSchicht>[1]) => beginneSchicht(einsatzId, body),
     onSuccess: (a) => {
+      merkeEigene(a.id);
       invalidiere();
       message.success(`Schicht von ${a.einheit_name} begonnen`);
     },
@@ -138,6 +190,8 @@ export default function AbloesungPage() {
   const zuruecknehmenMut = useMutation({
     mutationFn: (abloesungId: number) => nimmVollzugZurueck(einsatzId, abloesungId),
     onSuccess: (a) => {
+      // Die zurückgenommene Schicht kehrt in die laufenden zurück — als eigene Handlung.
+      merkeEigene(a.id);
       invalidiere();
       message.success(`Vollzug der Ablösung ${a.einheit_name} zurückgenommen`);
     },
@@ -158,6 +212,7 @@ export default function AbloesungPage() {
     // (LFH-343 · C8). Der Dialog davor ist keine Rückfrage, sondern die Erfassung von
     // Zeitpunkt und Ablöser.
     onSuccess: (v) => {
+      if (v.folgeschicht) merkeEigene(v.folgeschicht.id);
       invalidiere();
       const text = v.folgeschicht
         ? `Ablösung vollzogen: ${v.abgeloest.einheit_name} durch ${v.folgeschicht.einheit_name}`
@@ -199,7 +254,7 @@ export default function AbloesungPage() {
   }
   const einsatz = einsatzQuery.data;
   const faellig = zaehleFaellige(laufende, jetzt);
-  const liste = ansicht === 'laufend' ? laufende : (abgeloestQuery.data ?? []);
+  const liste = ansicht === 'laufend' ? sichtbar : (abgeloestQuery.data ?? []);
   const listenQuery = ansicht === 'laufend' ? laufendQuery : abgeloestQuery;
   const oeffneBeginnen = () => {
     beginnenMut.reset();
@@ -231,16 +286,47 @@ export default function AbloesungPage() {
         !darfSchreiben && <RechteHinweis sichtbar text={abloesungRechteText(einsatz.status)} />
       }
     >
-      <Flex wrap gap={token.marginSM} style={{ marginBottom: token.margin }} align="center">
+      {/* Die Werkzeugzeile: immer gerendert, `nowrap`, Mindesthöhe = Steuerhöhe + 2 px Rahmen
+          (Segmentleiste und Banner tragen beide einen 1-px-Rand). Das Banner ändert ihre Höhe
+          nicht, also verschiebt es keine Karte. */}
+      <Flex
+        gap={token.marginSM}
+        align="center"
+        data-lfh="abloesung-werkzeugzeile"
+        style={{ marginBottom: token.margin, minHeight: token.controlHeight + 2 }}
+      >
         <Segmentleiste
           beschriftung="Ansicht"
           wert={ansicht}
-          onWechsel={setAnsicht}
+          onWechsel={(w) => {
+            // Ein Ansichtswechsel ist die Bitte, den aktuellen Stand zu sehen.
+            gibFrei();
+            setAnsicht(w);
+          }}
           optionen={[
             { wert: 'laufend', label: `Laufend (${laufende.length})` },
             { wert: 'abgeloest', label: 'Abgelöst' },
           ]}
+          style={{ flex: 'none' }}
         />
+        {ansicht === 'laufend' && zurueckgehalten.length > 0 && (
+          <Sammelbanner
+            aktion={{ label: 'anzeigen', onKlick: gibFrei }}
+            style={{ flex: '1 1 0', minWidth: 0, flexWrap: 'nowrap', paddingBlock: 0 }}
+          >
+            <span
+              title={zuflussText(zurueckgehalten, jetzt)}
+              style={{
+                display: 'block',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {zuflussText(zurueckgehalten, jetzt)}
+            </span>
+          </Sammelbanner>
+        )}
       </Flex>
 
       {listenQuery.isError && (
