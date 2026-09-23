@@ -26,4 +26,4 @@
 
 - [x] 5.1 In CLAUDE.md, Abschnitt Bedien-Leitlinie, die Palettenregel eintragen: Öffnungsart als Argument, `ziel` als Marke, Vorschau in der Palette statt Drawer, ⇧↵ frei. Belegen mit einem Diff-Review.
 - [x] 5.2 Folgetickets per `clickup-task-anlegen` anlegen: (a) Vorschauen für die übrigen Datensatzsorten, (b) Tippziel für die Vorschau auf Touch/Tablet, (c) gegebenenfalls kalt scheiternde Deeplinks aus 4.1 (entfallen: beide Kaltstarts grün). Angelegt: LFH-664, LFH-665. Belegen mit den angelegten `custom_id`s im Abschlusskommentar von LFH-645.
-- [ ] 5.3 `./scripts/check-all.sh` grün. Die Einsatztauglichkeits-Prüfliste (15 Kriterien) für die umgebaute Palette als ClickUp-Kommentar an LFH-645 anhängen. Belegen mit der Ausgabe des Gates und dem Kommentar.
+- [x] 5.3 `./scripts/check-all.sh` grün. Die Einsatztauglichkeits-Prüfliste (15 Kriterien) für die umgebaute Palette als ClickUp-Kommentar an LFH-645 anhängen. Belegen mit der Ausgabe des Gates und dem Kommentar.
