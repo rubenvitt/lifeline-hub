@@ -140,4 +140,40 @@ describe('StatusWahl', () => {
     await userEvent.click(within(menue).getByRole('menuitem', { name: /Frei auf Funk/ }));
     expect(onWaehlen).toHaveBeenCalledWith(1);
   });
+
+  describe('eigenes Etikett (LFH-642)', () => {
+    const chip = <span data-testid="chip">S4 · Am Einsatzort</span>;
+
+    it('trägt am Auslöser das übergebene Etikett statt des StatusTag', () => {
+      renderMitProviders(
+        <StatusWahl
+          darstellung={gebunden}
+          etikett={chip}
+          aktuell={4}
+          optionen={OPTIONEN}
+          kennung={KENNUNG}
+          onWaehlen={vi.fn()}
+          darfSchreiben
+        />,
+      );
+      const knopf = screen.getByRole('button', { name: `Status von ${KENNUNG} ändern` });
+      expect(within(knopf).getByTestId('chip')).toBeInTheDocument();
+      expect(knopf.querySelector('.ant-tag')).toBeNull();
+    });
+
+    it('zeigt es auch im Lesezweig ohne Schreibrecht', () => {
+      renderMitProviders(
+        <StatusWahl
+          darstellung={gebunden}
+          etikett={chip}
+          optionen={OPTIONEN}
+          kennung={KENNUNG}
+          onWaehlen={vi.fn()}
+          darfSchreiben={false}
+        />,
+      );
+      expect(screen.getByTestId('chip')).toBeInTheDocument();
+      expect(screen.queryByRole('button')).toBeNull();
+    });
+  });
 });

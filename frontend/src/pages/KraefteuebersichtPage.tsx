@@ -40,7 +40,6 @@ import {
   aufklappbareSchluessel,
   baueMeldebildRaster,
   einheitBand,
-  fmsWort,
   istProblemZeile,
   istRueckmeldungProblem,
   keineRueckmeldungZelle,
@@ -49,6 +48,7 @@ import {
   type RasterZeile,
   type RueckmeldungAnzeige,
 } from '../kraefte/meldebildRaster';
+import { fmsStatusOptionen } from '../kraefte/fmsTableauKern';
 import Statusband from '../kraefte/Statusband';
 import EinheitZeichen from '../kraefte/EinheitZeichen';
 import { KATEGORIE_WERTE } from '../kraefte/statusAchse';
@@ -166,12 +166,8 @@ export function meldebildMeta(args: {
  */
 export function handStatusOptionen(katalog: readonly FahrzeugStatus[]): StatusOption<number>[] {
   return [
-    ...katalog.map((s) => ({
-      wert: s.id,
-      label: s.fms_anker != null ? `S${s.fms_anker} · ${fmsWort(s.label, s.fms_anker)}` : s.label,
-      darstellung: statusKategorie[s.kategorie],
-      farbe: s.farbe,
-    })),
+    // Dieselbe Beschriftung wie im FMS-Tableau (LFH-642) — eine Quelle für beide Menüs.
+    ...fmsStatusOptionen(katalog),
     // Der Handstatus muss sich auch wieder ENTFERNEN lassen — sonst bliebe ein einmal
     // gesetzter Wert für immer stehen und tauchte nach jeder Fahrzeugabgabe wieder auf.
     { wert: KEIN_HANDSTATUS, label: 'kein Status' },
