@@ -31,7 +31,9 @@
  *  - **Ausfall** (festgelegt, aber keine Messung): Wert „—", Notiz „Stand unbekannt", Ton
  *    `achtung` — ein fehlender Pegel ist nicht harmloser als ein veralteter.
  *  - **Keiner festgelegt**: Wert „—", Notiz „kein Pegel festgelegt", Ton `neutral` — das ist
- *    kein Messzustand, sondern eine offene Einrichtung (die Seite verlinkt die Auswahl).
+ *    kein Messzustand, sondern eine offene Einrichtung. Seit LFH-640 steht die Kennzahl im
+ *    Lage-Dashboard nur bei festgelegtem Pegel; dieser Zweig greift dort nur noch, wenn der
+ *    gehaltene Zuschnitt den Pegel zeigt, während er anderswo schon entfernt wurde.
  *  - **Mehrere**: Zusatz „+n weitere".
  *  - **Prognose** (LFH-628): trägt der Leitpegel einen erwarteten Höchststand, dessen
  *    Zeitpunkt noch vor `jetzt` liegt, steht er als eigener Teil „Prognose 7,10 m bis 18:00"

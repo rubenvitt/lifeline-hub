@@ -46,6 +46,7 @@ const basisEinsatz: EinsatzAnzeige = {
   org_id: 1,
   org_name: 'DRK Musterstadt',
   meine_sachgebiete: [],
+  lagekennzahlen: [],
 };
 
 const mitglieder = [

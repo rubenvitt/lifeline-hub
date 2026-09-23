@@ -28,6 +28,8 @@ export type BenutzerAnzeige = S['BenutzerAnzeige'];
 export type EinsatzStatus = S['EinsatzStatus'];
 export type EinsatzRolle = S['EinsatzRolle'];
 export type Einsatzart = S['Einsatzart'];
+/** Aktive lagebezogene Kennzahl am Einsatz (LFH-640) — Auslöser eines Lageplatzes im Lage-Dashboard. */
+export type Lagekennzahl = S['Lagekennzahl'];
 export type EinsatzAnzeige = S['EinsatzAnzeige'];
 export type MitgliedAnzeige = S['MitgliedAnzeige'];
 export type StichwortVorschlag = S['StichwortVorschlag'];

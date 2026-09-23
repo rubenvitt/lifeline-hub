@@ -18,6 +18,7 @@ import type {
   EinsatzPersonal,
   Einsatzabschnitt,
   Gefahrengebiet,
+  Lagekennzahl,
   LageberichtAnzeige,
   LageberichtStatus,
   Meldung,
@@ -39,6 +40,7 @@ import { warnstufeKennzahl } from '../../theme/statusFarben';
 import type { KennzahlTon } from '../../components/instrument';
 import { einsatzEinstellungenPfad } from '../../routing/deeplinks';
 import { pegelKennzahl } from '../../pegel/pegelKennzahl';
+import { transportBilanz } from '../../personen/personenBilanz';
 import {
   neuesterLagebericht,
   verdichteGefahrengebiete,
@@ -53,39 +55,87 @@ import {
 export type Datenzustand = 'daten' | 'laden' | 'fehler' | 'leer';
 
 /**
- * Die sechs Kennzahl-Etiketten, in fester Reihenfolge (Neuentwurf S3).
- *
- * EINE Quelle für beide Reihen: die Plätze, die die Seite vor dem ersten Einsatz-Abruf
- * stellt (Prüfliste Kriterium 12, CLS ≤ 0,1), und die Kennzahlen aus {@link baueLagebild}.
- * `LageDashboardPage.test.tsx` pinnt beide gegen handgeschriebene Literale.
- *
- * Die Reihenfolge wird NICHT nach Dringlichkeit sortiert: Prüfliste Kriterium 9 verlangt
- * dieselbe Größe an derselben Stelle, in jedem Zustand — wer eine Lage funkt, greift nach
- * der Zahl an ihrem Platz. Die Anzahl ist sechs, weil sie sich 6 → 3 → 2 Spalten ohne Rest
- * teilt.
- *
- * **Pegel steht auf Platz 1 und ersetzt „Höchste Warnstufe"** (LFH-606, Entscheidung des
- * Auftraggebers vom 22.09.2026, wie im Entwurf S3). Die Datenquelle sind die maßgeblichen
- * Pegel des Einsatzes (PEGELONLINE, `api/pegel.ts`); die Ableitung steht in
- * `pegel/pegelKennzahl.ts`. Die Warnstufe verschwindet damit nicht von der Seite: sie steht
- * als Hinweis im Seitenkopf, sobald sie ein Alarmbeitrag ist, und je Gefahrentyp im Paneel
- * Gefahrenmatrix. Ist kein Pegel festgelegt, bleibt der Platz belegt („kein Pegel
- * festgelegt" mit Weg zur Auswahl) — ein wandernder Platz verletzte Kriterium 9.
- * „Evakuiert" aus dem Entwurf steht noch nicht in dieser Reihe. Die Datenquelle gibt es seit
- * LFH-639 (`betreuung/evakuierungKennzahl.ts` samt Hook `useEvakuierungKennzahl`); welchen
- * Platz sie bekommt, entscheidet LFH-640, eingebaut wird sie mit LFH-607. Bis dahin bleibt die
- * Reihe bei sechs: ein Platz ohne diese Entscheidung verschöbe die übrigen (Kriterium 9).
+ * Alle Kennzahl-Etiketten, die das Band tragen kann (LFH-640). Die Reihe eines Einsatzes ist
+ * eine Auswahl von sechs davon — siehe {@link kennzahlReihe}.
  */
 export const KENNZAHL_ETIKETTEN = [
   'Pegel',
+  'Verbleib offen',
   'Betroffene',
+  'Schäden offen',
   'Kräfte',
   'Vermisste',
-  'Schäden offen',
   'Einsatzdauer',
 ] as const;
 
 export type KennzahlEtikett = (typeof KENNZAHL_ETIKETTEN)[number];
+
+/**
+ * Die Kennzahlreihe hat IMMER sechs Plätze (LFH-640, Entscheidung des Auftraggebers vom
+ * 23.09.2026; Spec `docs/superpowers/specs/2026-09-23-lfh-640-lagebezogene-kennzahlreihe-design.md`).
+ * Sechs teilen sich 6 → 3 → 2 Spalten ohne Rest, und die Platzzahl steht fest, bevor irgendeine
+ * Abfrage da ist: die Ladeplätze vor dem Einsatz-Abruf halten die Bandhöhe (Kriterium 12).
+ */
+export const KENNZAHL_PLAETZE = 6;
+
+type Lageplatz = 'A' | 'B';
+
+/**
+ * Heimatplatz und Rang jeder Lagekennzahl. JEDE Kennzahl hat genau EINEN Platz — sie steht
+ * dort oder gar nicht, sie rutscht nie (Prüfliste Kriterium 9: dieselbe Größe an derselben
+ * Stelle). Deshalb füllt die Reihe NICHT nach Rang auf: sonst änderte eine Entscheidung zwei
+ * Plätze statt einem. Konkurrieren zwei aktive Kandidaten um einen Platz, gewinnt der
+ * kleinere Rang.
+ *
+ * Der `Record` über `Lagekennzahl` ist Absicht: bringt der Typ-Codegen eine neue Variante
+ * (LFH-607: `evakuiert`, Platz B), bricht diese Datei den Build, statt sie still zu übergehen.
+ */
+const LAGEKENNZAHL: Record<
+  Lagekennzahl,
+  { etikett: KennzahlEtikett; platz: Lageplatz; rang: number }
+> = {
+  pegel: { etikett: 'Pegel', platz: 'A', rang: 0 },
+};
+
+/**
+ * Was ein Lageplatz ohne aktiven Kandidaten trägt — echte Daten aus jeder Lage, nie ein
+ * Platzhalter („Weglassen statt erfinden", `umsetzung.md` Punkt 4). Über Kreuz gewählt:
+ * Platz A ist frei, wenn kein Pegel festgelegt ist (MANV, Brand, Unfall) — dort ist der
+ * offene Verbleib die Führungsfrage. Platz B ist frei, solange keine Evakuierung angeordnet
+ * ist; ein Hochwasser mit Pegel behält so „Schäden offen".
+ */
+const FUELLUNG: Record<Lageplatz, KennzahlEtikett> = {
+  A: 'Verbleib offen',
+  B: 'Schäden offen',
+};
+
+/**
+ * Die sechs Etiketten eines Einsatzes aus seinen aktiven Lagekennzahlen
+ * (`EinsatzAnzeige.lagekennzahlen`). Plätze 2, 4, 5, 6 sind der Kern, Plätze 1 und 3 die
+ * Lageplätze A und B. Rein.
+ */
+export function kennzahlReihe(aktiv: readonly Lagekennzahl[]): KennzahlEtikett[] {
+  const belegung = (platz: Lageplatz): KennzahlEtikett => {
+    const kandidaten = aktiv
+      .map((k) => LAGEKENNZAHL[k])
+      .filter((k) => k.platz === platz)
+      .sort((a, b) => a.rang - b.rang);
+    return kandidaten[0]?.etikett ?? FUELLUNG[platz];
+  };
+  return [belegung('A'), 'Betroffene', belegung('B'), 'Kräfte', 'Vermisste', 'Einsatzdauer'];
+}
+
+/**
+ * Wortlaut des Sammelbanners, wenn ein neuer Zuschnitt während der Betrachtung ankommt:
+ * „Pegel statt Verbleib offen" je geändertem Platz. `null` bei gleicher Reihe. Rein.
+ */
+export function reihenWechsel(
+  alt: readonly KennzahlEtikett[],
+  neu: readonly KennzahlEtikett[],
+): string | null {
+  const teile = neu.flatMap((e, i) => (e === alt[i] ? [] : [`${e} statt ${alt[i]}`]));
+  return teile.length > 0 ? teile.join(' · ') : null;
+}
 
 export interface Kennzahl {
   etikett: KennzahlEtikett;
@@ -238,10 +288,16 @@ export interface Rohdaten {
   pegelZiel?: string;
 }
 
+/**
+ * `reihe` ist die Kennzahlreihe, die die Seite gerade zeigt — sie HÄLT ihren Zuschnitt, wenn
+ * während der Betrachtung ein neuer ankommt (Sammelbanner, siehe `LageDashboardPage`). Ohne
+ * Angabe gilt die Reihe des Einsatzes.
+ */
 export function baueLagebild(
   r: Rohdaten,
   jetzt: number,
   konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
+  reihe: readonly KennzahlEtikett[] = kennzahlReihe(r.einsatz.lagekennzahlen),
 ): Lagebild {
   const kraefte = baueKraeftebild(
     r.abschnitte,
@@ -258,11 +314,12 @@ export function baueLagebild(
   const bericht = neuesterLagebericht(r.lageberichte);
   const abgeschlossen = r.einsatz.abgeschlossen_at ?? null;
   const pegel = pegelKennzahl(r.pegel, jetzt, konv);
+  const transport = transportBilanz(r.personen);
 
-  // Die Reihenfolge ist die von KENNZAHL_ETIKETTEN; ein Etikett, das es dort nicht gibt,
-  // bricht über den Typ `KennzahlEtikett` den Build.
-  const kennzahlen: Kennzahl[] = [
-    {
+  // Jede Kennzahl, die das Band tragen kann; die Reihe wählt sechs davon. Der `Record` über
+  // `KennzahlEtikett` erzwingt, dass jedes Etikett gebaut wird.
+  const alle: Record<KennzahlEtikett, Kennzahl> = {
+    Pegel: {
       // Ziel: die Modulseite „Wetter & Pegel" mit Verlauf (LFH-633), wenn sie frei ist —
       // sonst die Einstellungssektion, wo festgelegt wird. Die Lagekarte zeigte zwar die
       // Stationen, kann aber per Deeplink weder die Ebene einschalten noch eine ansteuern.
@@ -274,14 +331,23 @@ export function baueLagebild(
       route: 'einstellungen',
       zielPfad: r.pegelZiel ?? einsatzEinstellungenPfad(r.einsatz.id, 'pegel'),
     },
-    {
+    'Verbleib offen': {
+      // Angetroffene ohne Verbleib — dieselbe Zählung wie „Transportiert / offen" im Fuß des
+      // Sichtungspaneels (`transportBilanz`). Die Kennzahl ist der Blickfang ohne Pegel.
+      etikett: 'Verbleib offen',
+      wert: String(transport.offen),
+      notiz: `${transport.transportiert} transportiert`,
+      ton: transport.offen > 0 ? 'achtung' : 'neutral',
+      route: 'personen',
+    },
+    Betroffene: {
       etikett: 'Betroffene',
       wert: String(betroffene.gesamt),
       notiz: `${betroffene.patienten} Patienten`,
       ton: 'neutral',
       route: 'personen',
     },
-    {
+    Kräfte: {
       // Die Gesamtstärke führt; F/UF/M//Σ steht in der Notiz, damit die BOS-Schreibweise
       // nicht verloren geht, die vorher das Band und die Kräfte-Kachel trugen.
       etikett: 'Kräfte',
@@ -290,21 +356,21 @@ export function baueLagebild(
       ton: 'neutral',
       route: 'kraefteuebersicht',
     },
-    {
+    Vermisste: {
       etikett: 'Vermisste',
       wert: String(betroffene.vermisst),
       notiz: vermisstNotiz(betroffene.vermisst, lang),
       ton: betroffene.vermisst > 0 ? 'alarm' : 'neutral',
       route: 'personen',
     },
-    {
+    'Schäden offen': {
       etikett: 'Schäden offen',
       wert: String(schaeden.offen),
       notiz: `von ${schaeden.gesamt} gemeldet`,
       ton: schaeden.offen > 0 ? 'achtung' : 'neutral',
       route: 'schaeden',
     },
-    {
+    Einsatzdauer: {
       etikett: 'Einsatzdauer',
       wert: einsatzdauer(r.einsatz.begonnen_at, jetzt, abgeschlossen),
       einheit: 'h',
@@ -314,7 +380,8 @@ export function baueLagebild(
       ton: 'neutral',
       route: 'einsatzdaten',
     },
-  ];
+  };
+  const kennzahlen = reihe.map((e) => alle[e]);
 
   return {
     kennzahlen,

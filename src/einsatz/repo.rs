@@ -143,7 +143,8 @@ pub async fn laden(pool: &SqlitePool, einsatz_id: i64) -> Result<Einsatz, AppErr
                 e.angelegt_at, e.leitstellen_nr, e.einsatzort, e.einsatzort_lat, e.einsatzort_lon, \
                 e.meldende_stelle, e.sachverhalt, e.anzahl_betroffene_initial, \
                 e.retention_bis, e.geloescht_at, e.naechste_lagebesprechung_at, \
-                o.name AS org_name \
+                o.name AS org_name, \
+                EXISTS (SELECT 1 FROM einsatz_pegel p WHERE p.einsatz_id = e.id) AS pegel_festgelegt \
          FROM einsatz e \
          LEFT JOIN organisation o ON o.id = e.org_id \
          WHERE e.id = ?",
@@ -222,6 +223,7 @@ pub async fn liste_fuer(
         geloescht_at: Option<String>,
         meine_rolle: Option<String>,
         meine_fuehrungsstelle: Option<String>,
+        pegel_festgelegt: bool,
     }
 
     let rows = sqlx::query_as::<_, Row>(
@@ -230,7 +232,8 @@ pub async fn liste_fuer(
                 e.angelegt_at, e.leitstellen_nr, e.einsatzort, e.einsatzort_lat, e.einsatzort_lon, \
                 e.meldende_stelle, e.sachverhalt, e.anzahl_betroffene_initial, \
                 e.retention_bis, e.geloescht_at, e.naechste_lagebesprechung_at, \
-                m.einsatz_rolle AS meine_rolle, m.fuehrungsstelle AS meine_fuehrungsstelle \
+                m.einsatz_rolle AS meine_rolle, m.fuehrungsstelle AS meine_fuehrungsstelle, \
+                EXISTS (SELECT 1 FROM einsatz_pegel p WHERE p.einsatz_id = e.id) AS pegel_festgelegt \
          FROM einsatz e \
          LEFT JOIN organisation o ON o.id = e.org_id \
          LEFT JOIN einsatz_mitgliedschaft m \
@@ -299,6 +302,7 @@ pub async fn liste_fuer(
                 // Eintrag wird also nicht mehr gebraucht — das spart das Klonen des Vec.
                 meine_sachgebiete,
                 meine_funktion,
+                lagekennzahlen: super::lagekennzahl::ableiten(r.pegel_festgelegt),
             }
         })
         .collect())

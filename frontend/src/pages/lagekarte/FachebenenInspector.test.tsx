@@ -806,6 +806,17 @@ describe('FachebenenInspector — Pegel festlegen (LFH-606)', () => {
     expect(screen.queryByText(/maßgeblicher Pegel/)).toBeNull();
   });
 
+  it('das Festlegen erneuert den Einsatz — dort steht der Auslöser der Lagekennzahl (LFH-640)', async () => {
+    stelleBereit([]);
+    const { client } = inspector();
+    const erneuert = vi.spyOn(client, 'invalidateQueries');
+    const knopf = await screen.findByRole('button', { name: 'Als maßgeblichen Pegel festlegen' });
+    await waitFor(() => expect(knopf).toBeEnabled());
+    await userEvent.click(knopf);
+    await screen.findByText('Als maßgeblicher Pegel festgelegt');
+    expect(erneuert).toHaveBeenCalledWith({ queryKey: ['einsatz', 1] });
+  });
+
   it('ohne uuid gibt es nichts festzulegen', async () => {
     stelleBereit([]);
     const { uuid: _weg, ...ohneUuid } = station;

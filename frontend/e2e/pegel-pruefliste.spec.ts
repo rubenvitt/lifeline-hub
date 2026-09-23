@@ -88,6 +88,19 @@ async function einsatzAnlegen(page: Page, bezeichnung: string): Promise<string> 
   return String(((await r.json()) as { id: number }).id);
 }
 
+/**
+ * Legt einen maßgeblichen Pegel ECHT im Backend fest (LFH-640). Die Kennzahl des
+ * Lage-Dashboards erscheint nur, wenn der Einsatz den Auslöser `pegel` trägt — und den
+ * liefert der Einsatz-Abruf, nicht die per `page.route` gestellte Pegelliste. Der PUT wartet
+ * nicht auf die Quelle (`tests/pegel.rs`, `put_und_post_warten_nicht_auf_den_abruf`).
+ */
+async function legePegelFest(page: Page, einsatzId: string) {
+  const r = await page.request.put(`/api/einsaetze/${einsatzId}/pegel`, {
+    data: { stationen: [{ station_uuid: UUID[0], name: 'HANN. MÜNDEN', gewaesser: 'WESER' }] },
+  });
+  expect(r.ok(), `Pegel festlegen: ${r.status()} ${await r.text()}`).toBeTruthy();
+}
+
 /** Stellt die Pegel-Abfrage und die Stationsliste auf Literale. */
 async function stellePegel(page: Page, einsatzId: string, liste: unknown[]) {
   await page.route(`**/api/einsaetze/${einsatzId}/pegel`, (route) =>
@@ -184,6 +197,7 @@ for (const modus of ['light', 'dark'] as const) {
     await page.setViewportSize({ width: 1366, height: 768 });
     await anmelden(page);
     const einsatzId = await einsatzAnlegen(page, `E2E Pegel Kontrast ${Date.now()}`);
+    await legePegelFest(page, einsatzId);
     await page.addInitScript(([k, v]) => localStorage.setItem(k, v), [THEMA_SCHLUESSEL, modus]);
 
     const werte: string[] = [];
@@ -517,6 +531,7 @@ for (const [route, text] of [
     test.setTimeout(120_000);
     await anmelden(page);
     const einsatzId = await einsatzAnlegen(page, `E2E Pegel CLS ${Date.now()}`);
+    await legePegelFest(page, einsatzId);
     await verschiebungenAufzeichnen(page);
     const werte: string[] = [];
     for (const breite of [1366, 1024, 390]) {

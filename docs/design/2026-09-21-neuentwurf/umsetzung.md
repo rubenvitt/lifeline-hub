@@ -37,9 +37,12 @@ Shell-Rahmen · neue Bausteine · neu gedachte Screens.
      Seitenleiste „Tagesbilanz“ (Regeländerung zu `tabelleAb="xl"`).
 4. **Keine erfundenen Daten.** Was keine Datenquelle hat, wird weggelassen (nicht als
    Platzhalter gebaut) und als ClickUp-Task erfasst. Der Pegel ist seit LFH-606 da (Platz 1
-   im Kennzahlenband statt „Höchste Warnstufe", Entscheidung 22.09.2026), der erwartete
+   im Kennzahlenband statt „Höchste Warnstufe", Entscheidung 22.09.2026); seit LFH-640 steht
+   er dort nur bei festgelegtem Pegel — das Band hat vier Kernplätze und zwei Lageplätze, die
+   bewusste Entscheidungen am Einsatz belegen (Spec
+   `docs/superpowers/specs/2026-09-23-lfh-640-lagebezogene-kennzahlreihe-design.md`). Der erwartete
    Höchststand seit LFH-628 (Zusatz in der Kennzahl, Marke im Überblick). Bekannte Lücken:
-   Evakuiert (Datenquelle seit LFH-639, Platz im Kennzahlenband LFH-640, Einbau LFH-607),
+   Evakuiert (Datenquelle seit LFH-639, Lageplatz B seit LFH-640, Einbau LFH-607),
    Fortschritt je Abschnitt, Abschnittsfarbe, FMS-Status/„Seit“/Rückmeldung je Einheit,
    „keine Rückmeldung“, ETB-Lesemarke „seit Ihrer letzten Sichtung“, ETB-Gesamtzahl und
    Tagesbilanz-Summen (serverseitig), Folgeauftrag-Verweis am ETB-Eintrag (geschlossen

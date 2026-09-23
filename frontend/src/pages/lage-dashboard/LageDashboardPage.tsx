@@ -8,7 +8,7 @@
  * Alter des Datenstands und — nur wenn die höchste Warnstufe ein Alarmbeitrag ist — dem
  * Warnstufen-Hinweis. Darunter die volle Fläche im FUGENRASTER (`gap: 1px` auf `linie`):
  *
- *  1. Kennzahlenband, sechs Zellen in fester Reihenfolge (`KENNZAHL_ETIKETTEN`).
+ *  1. Kennzahlenband, sechs Plätze: vier Kernplätze und zwei Lageplätze (LFH-640, siehe unten).
  *  2. Drei Paneele nebeneinander (1fr 1fr 1.1fr, unter `lg` gestapelt): Gefahrenmatrix
  *     (je Gefahrentyp über alle Gebiete auf die höchste Stufe verdichtet), Sichtung (BBK-
  *     Farben, Anteil an allen Gesichteten), Meldungsstrom (jüngste ETB-Einträge aller Typen,
@@ -47,13 +47,27 @@
  *    die Warnstufen-Kennzahl. Die Warnstufe geht dabei nicht verloren: sie steht als Hinweis
  *    im Seitenkopf, sobald sie ein Alarmbeitrag ist („Warnstufe hoch"), und je Gefahrentyp
  *    im Paneel Gefahrenmatrix — eine dritte Stelle mit derselben Aussage wäre Wiederholung,
- *    der Wasserstand dagegen stand vorher NIRGENDS auf der Seite. Ist kein Pegel festgelegt,
- *    bleibt der Platz belegt und führt zur Einstellungssektion „Pegel".
+ *    der Wasserstand dagegen stand vorher NIRGENDS auf der Seite.
+ *
+ * ── LAGEBEZOGENE KENNZAHLREIHE (LFH-640) ───────────────────────────────────────────
+ *
+ * Eine feste Reihe passt nur zu einer Lage. Seit LFH-640 (Spec
+ * `docs/superpowers/specs/2026-09-23-lfh-640-lagebezogene-kennzahlreihe-design.md`) hat das
+ * Band sechs Plätze: Kern auf 2/4/5/6 (Betroffene, Kräfte, Vermisste, Einsatzdauer),
+ * Lageplätze auf 1 und 3. Platz 1 zeigt den Pegel, wenn einer festgelegt ist, sonst
+ * „Verbleib offen"; Platz 3 zeigt „Schäden offen" (LFH-607 trägt dort „Evakuiert" ein).
+ * Das ERSETZT die LFH-606-Festlegung „ohne Pegel bleibt der Platz belegt": beim MANV war
+ * „kein Pegel festgelegt" eine Aufforderung ins Leere. Festgelegt wird weiter in den
+ * Einsatz-Einstellungen und im Fachebenen-Inspektor der Lagekarte.
+ *
+ * Wer die Plätze belegt, steht am EINSATZ (`lagekennzahlen`), nicht an den Fachabfragen:
+ * sonst stünde beim Laden kurz eine andere Kennzahl auf Platz 1. Und die Seite HÄLT ihren
+ * Zuschnitt: kommt während der Betrachtung ein neuer an, tauscht die Reihe nicht unter dem
+ * Blick, sondern ein Sammelbanner bietet ihn an („übernehmen").
  *
  * Noch nicht im Band: Evakuiert. Die Datenquelle gibt es seit LFH-639
- * (`betreuung/useEvakuierungKennzahl.ts`, gegatet wie der Modulzähler); über den Platz
- * entscheidet LFH-640, der Einbau folgt mit LFH-607. Bis dahin bleibt es bei sechs
- * Kennzahlen — ein siebter Platz ohne diese Entscheidung verschöbe die übrigen. Der erwartete
+ * (`betreuung/useEvakuierungKennzahl.ts`, gegatet wie der Modulzähler); den Platz hat LFH-640
+ * festgelegt (Lageplatz B, siehe oben), eingetragen wird sie mit LFH-607. Der erwartete
  * Höchststand am Leitpegel (LFH-628) steht als Teil der Pegel-Notiz („Prognose 7,10 m bis
  * 18:00"), solange sein Zeitpunkt aussteht — die Ableitung liegt in `pegel/pegelKennzahl.ts`.
  * „Transportiert / offen" im Sichtungsfuß und die Notiz „n seit über 4 h" an „Vermisste"
@@ -111,15 +125,18 @@ import { useViewport } from '../../components/useViewport';
 import {
   Kennzahl,
   Kennzahlenband,
+  Sammelbanner,
   monoStil,
   useRollen,
   type KennzahlZustand,
 } from '../../components/instrument';
 import { warnstufeKennzahl } from '../../theme/statusFarben';
 import {
-  KENNZAHL_ETIKETTEN,
+  KENNZAHL_PLAETZE,
   baueLagebild,
+  kennzahlReihe,
   lagebildZeit,
+  reihenWechsel,
   standText,
   warnstufeTon,
   type Datenzustand,
@@ -250,8 +267,45 @@ export default function LageDashboardPage() {
 
   const einsatz = einsatzQuery.data;
 
+  // ── Kennzahlreihe: gehaltener Zuschnitt (LFH-640) ────────────────────────────────────
+  // Die Reihe des Einsatzes, wie der Server sie gerade meldet — als Schlüssel-String, damit
+  // ein Refetch mit gleichem Inhalt keine neue Identität erzeugt.
+  const serverReiheSchluessel = einsatz ? kennzahlReihe(einsatz.lagekennzahlen).join('|') : null;
+  /*
+   * Die Reihe, mit der die Seite für DIESEN Einsatz aufgebaut wurde. Im Render angeglichen,
+   * nicht per Effekt (dasselbe Muster wie die Wassermarke unten): beim ersten Einsatz-Abruf
+   * und bei einem Wechsel der `:id` gilt die Serverreihe sofort; danach hält die Seite sie,
+   * bis „übernehmen" geklickt wird. Ein Effekt ließe einen Commit mit der falschen Reihe durch.
+   *
+   * Gehalten wird erst, wenn kein Abruf des Einsatzes mehr läuft. Wer einen Pegel festlegt und
+   * sofort zum Dashboard wechselt, findet im Speicher noch den alten Einsatz, während der von
+   * der Mutation ausgelöste Abruf unterwegs ist. Hielte die Seite diesen Stand, meldete sie die
+   * EIGENE Entscheidung als Banner (Spec: „beim Rückweg … ohne Banner"). Bis dahin folgt die
+   * Reihe dem Server, wie beim ersten Aufbau.
+   */
+  const [zuschnitt, setZuschnitt] = useState<{ einsatzId: number; schluessel: string } | null>(
+    null,
+  );
+  if (
+    serverReiheSchluessel != null &&
+    !einsatzQuery.isFetching &&
+    zuschnitt?.einsatzId !== einsatzId
+  ) {
+    setZuschnitt({ einsatzId, schluessel: serverReiheSchluessel });
+  }
+  const reiheSchluessel =
+    zuschnitt?.einsatzId === einsatzId ? zuschnitt.schluessel : serverReiheSchluessel;
+  const reihe = useMemo(
+    () => (reiheSchluessel == null ? null : (reiheSchluessel.split('|') as KennzahlEtikett[])),
+    [reiheSchluessel],
+  );
+  const wechsel =
+    reihe && serverReiheSchluessel != null && serverReiheSchluessel !== reiheSchluessel
+      ? reihenWechsel(reihe, serverReiheSchluessel.split('|') as KennzahlEtikett[])
+      : null;
+
   const lagebild = useMemo(() => {
-    if (!einsatz) return null;
+    if (!einsatz || !reihe) return null;
     return baueLagebild(
       {
         einsatz,
@@ -272,9 +326,11 @@ export default function LageDashboardPage() {
       },
       jetzt,
       konv,
+      reihe,
     );
   }, [
     einsatz,
+    reihe,
     jetzt,
     konv,
     personenQuery.data,
@@ -335,11 +391,11 @@ export default function LageDashboardPage() {
   const zStrom: Datenzustand =
     zStromRoh === 'daten' && (etbDaten ?? []).length === 0 ? 'leer' : zStromRoh;
 
-  // Je Kennzahl der Zustand IHRER Quelle, in der Reihenfolge von KENNZAHL_ETIKETTEN — als
-  // `Record` über die Etiketten, damit eine siebte Kennzahl hier den Build bricht, statt
-  // still den Zustand einer anderen zu tragen.
+  // Je Kennzahl der Zustand IHRER Quelle — als `Record` über alle Etiketten, damit eine neue
+  // Kennzahl hier den Build bricht, statt still den Zustand einer anderen zu tragen.
   const kennzahlZustand: Record<KennzahlEtikett, Datenzustand> = {
     Pegel: zustandVon(pegelQuery),
+    'Verbleib offen': zBetroffene,
     Betroffene: zBetroffene,
     Kräfte: zKraefte,
     Vermisste: zBetroffene,
@@ -426,16 +482,31 @@ export default function LageDashboardPage() {
           border: `1px solid ${rollen.linie}`,
         }}
       >
+        {wechsel && (
+          <Sammelbanner
+            aktion={{
+              label: 'übernehmen',
+              onKlick: () =>
+                serverReiheSchluessel != null &&
+                setZuschnitt({ einsatzId, schluessel: serverReiheSchluessel }),
+            }}
+          >
+            Kennzahlreihe geändert: {wechsel}
+          </Sammelbanner>
+        )}
         {/* Die sechs Plätze stehen auch vor dem ersten Einsatz-Abruf (Kriterium 12, CLS):
-            ohne Lagebild als Ladezelle ohne Ziel — es gibt noch nichts, wohin sie führte. */}
+            ohne Lagebild als Ladezelle ohne Ziel — es gibt noch nichts, wohin sie führte.
+            OHNE Beschriftung: welche Kennzahl auf die Lageplätze kommt, steht erst mit dem
+            Einsatz fest, eine geratene wechselte beim Eintreffen. Das geschützte Leerzeichen
+            hält die Zeilenhöhe der Augenbraue. */}
         <Kennzahlenband
           beschriftung="Lage in Zahlen"
           spalten={bandSpalten}
           style={{ border: 'none' }}
         >
           {lagebild == null
-            ? KENNZAHL_ETIKETTEN.map((etikett) => (
-                <Kennzahl key={etikett} titel={etikett} wert="" zustand="laden" />
+            ? Array.from({ length: KENNZAHL_PLAETZE }, (_, i) => (
+                <Kennzahl key={i} titel={'\u00a0'} wert="" zustand="laden" />
               ))
             : lagebild.kennzahlen.map((k) => (
                 <Kennzahl

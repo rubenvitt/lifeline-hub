@@ -149,16 +149,20 @@ umkehrt, steht das am Absatz selbst mit „Neuentwurf 22.09.2026".
   weggelassen — nicht als Platzhalter gebaut — und steht im ClickUp-Epic „Neuentwurf
   Instrumententafel – Datenlücken des Designs" (LFH-606…LFH-617, z. B. Evakuiert 607,
   FMS-Status je Einheit 609, Koordinate an der Person 613). Bei Evakuiert ist die Datenquelle
-  seit LFH-639 da; den Platz im Kennzahlenband entscheidet LFH-640, den Einbau bringt LFH-607.
-  Die Auslassung trägt ihr Ticket im Code-Kommentar und wird im Test als **Abwesenheit**
-  gepinnt. **Eingelöst ist der Pegel (LFH-606):** er steht auf Platz 1 des Kennzahlenbands,
-  „Höchste Warnstufe" ist dafür raus (Entscheidung 22.09.2026; die Warnstufe bleibt im
-  Seitenkopf-Hinweis und in der Gefahrenmatrix). **Eingelöst ist auch die Rückmeldung
-  (LFH-610):** Spalte „Rückmeldung“ und Kachel „keine Rückmeldung“ im Meldebild, letzte
-  Rückmeldung je Abschnitt im Überblick, „Letzte Meldung“ in der Lagekarte; die Entscheidungen
-  stehen in `umsetzung.md`. **Eingelöst sind ebenso die ETB-Gesamtzahl und die Bilanz-Summen
-  (LFH-612)** — der Server zählt sie über denselben Filter wie die Liste, Einzelheiten im
-  ETB-Absatz weiter unten.
+  seit LFH-639 da; eingetragen wird sie mit LFH-607 auf Lageplatz B (LFH-640). Die Auslassung
+  trägt ihr Ticket im Code-Kommentar und wird im Test als **Abwesenheit** gepinnt. **Eingelöst ist der Pegel (LFH-606):** er steht auf Platz 1
+  des Kennzahlenbands, „Höchste Warnstufe" ist dafür raus (Entscheidung 22.09.2026; die
+  Warnstufe bleibt im Seitenkopf-Hinweis und in der Gefahrenmatrix). **Seit LFH-640 nur bei
+  festgelegtem Pegel:** das Band hat immer sechs Plätze, vier Kernplätze und zwei Lageplätze;
+  jede Kennzahl hat genau einen Heimatplatz, belegt wird ein Lageplatz nur durch eine bewusste
+  Entscheidung am Einsatz (`EinsatzAnzeige.lagekennzahlen`), nie durch einen Messwert, und
+  ein neuer Zuschnitt während der Betrachtung kommt als Sammelbanner, nicht als Tausch
+  (Spec `docs/superpowers/specs/2026-09-23-lfh-640-lagebezogene-kennzahlreihe-design.md`). **Eingelöst ist auch die
+  Rückmeldung (LFH-610):** Spalte „Rückmeldung“ und Kachel „keine Rückmeldung“ im Meldebild,
+  letzte Rückmeldung je Abschnitt im Überblick, „Letzte Meldung“ in der Lagekarte; die
+  Entscheidungen stehen in `umsetzung.md`. **Eingelöst sind ebenso die ETB-Gesamtzahl und die
+  Bilanz-Summen (LFH-612)** — der Server zählt sie über denselben Filter wie die Liste,
+  Einzelheiten im ETB-Absatz weiter unten.
 
 ## Frontend — UI-Form-Leitlinie (Drawer-Nutzung)
 

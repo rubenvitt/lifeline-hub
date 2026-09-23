@@ -827,6 +827,15 @@ export interface components {
             einsatzort_lon?: number | null;
             /** Format: int64 */
             id: number;
+            /**
+             * @description Aktive lagebezogene Kennzahlen (LFH-640): welche Lageplätze des Kennzahlenbands im
+             *     Lage-Dashboard belegt sind. Gesetzt nur durch bewusste Entscheidungen (heute: Pegel
+             *     festgelegt), nie durch Messwerte.
+             *
+             *     **Leer ist `[]`, nie `absent`** — wie `meine_sachgebiete` an zwei Stellen gebaut, deshalb
+             *     `#[schema(required)]` und kein `skip_serializing_if`.
+             */
+            lagekennzahlen: components["schemas"]["Lagekennzahl"][];
             leitstellen_nr?: string | null;
             /** @description Eigene Führungsstelle in diesem Einsatz; nur Anfangsbelegung für neue ETB-Erfassung. */
             meine_fuehrungsstelle?: string | null;
@@ -1796,6 +1805,14 @@ export interface components {
             lfd_nr: number;
             naechste_at?: string | null;
         };
+        /**
+         * @description Eine aktive lagebezogene Kennzahl. Wire == `as_str()`.
+         *
+         *     Die Plätze und Füllkennzahlen stehen im Frontend (`pages/lage-dashboard/lagebild.ts`);
+         *     hier steht nur, welche Auslöser gesetzt sind. LFH-607 ergänzt `Evakuiert`.
+         * @enum {string}
+         */
+        Lagekennzahl: "pegel";
         /**
          * @description Letzte Rückmeldung eines Absenders (Einheit oder direkt gebundener Abschnitt, LFH-610).
          *     Als Rückmeldung zählt jede an den Absender gebundene Meldung, gleich welcher
