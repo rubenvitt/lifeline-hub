@@ -376,8 +376,41 @@ export function einheitDetailPfad(einsatzId: number, einheitId: number): string 
   return `${einsatzModulPfad(einsatzId, 'einheiten')}/${einheitId}`;
 }
 
-export function fahrzeugePfad(einsatzId: number, opts: { fahrzeug?: number } = {}): string {
-  return mitQuery(einsatzModulPfad(einsatzId, 'fahrzeuge'), { fahrzeug: opts.fahrzeug });
+/**
+ * Darstellung der Fahrzeugseite (LFH-642): die Tabelle oder das FMS-Tableau. Das Tableau
+ * ist eine ANSICHT dieses Moduls und kein eigenes Modul — Endpunkte und Live-Ereignis
+ * hängen am Schlüssel `fahrzeuge`, ein eigener Schlüssel wäre getrennt schaltbar und
+ * endete in 403 ohne Live-Updates. Anspringer ist die Sprungmarke „FMS-Tableau"
+ * (`einsatz/sprungmarken.ts`).
+ */
+export type FahrzeugeAnsicht = 'liste' | 'tableau';
+
+/**
+ * `ansicht` ist wie bei {@link personenPfad} ein AUFTRAG: die Seite übernimmt ihn beim
+ * Ankommen und räumt den Parameter (apply-then-clean); die Ansicht bleibt Seitenzustand.
+ */
+export function fahrzeugePfad(
+  einsatzId: number,
+  opts: { fahrzeug?: number; ansicht?: FahrzeugeAnsicht } = {},
+): string {
+  return mitQuery(einsatzModulPfad(einsatzId, 'fahrzeuge'), {
+    fahrzeug: opts.fahrzeug,
+    ansicht: opts.ansicht,
+  });
+}
+
+/** Exhaustiver Record aus demselben Grund wie {@link ETB_TYP_ERLAUBT}. */
+const FAHRZEUGE_ANSICHT_ERLAUBT: Record<FahrzeugeAnsicht, true> = {
+  liste: true,
+  tableau: true,
+};
+
+/** Umkehr von {@link fahrzeugePfad}: ein unbekannter Wert wird GANZ verworfen. */
+export function parseFahrzeugeAnsicht(params: URLSearchParams): FahrzeugeAnsicht | undefined {
+  const ansicht = params.get('ansicht');
+  return ansicht && Object.prototype.hasOwnProperty.call(FAHRZEUGE_ANSICHT_ERLAUBT, ansicht)
+    ? (ansicht as FahrzeugeAnsicht)
+    : undefined;
 }
 
 export function einsatzabschnittePfad(
