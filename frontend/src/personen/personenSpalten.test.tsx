@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
+import { QueryClient } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { server } from '../test/server';
@@ -306,6 +307,44 @@ describe('Zustand-Spalte (LFH-613)', () => {
     expect(knopf).toHaveClass('ant-btn-loading');
     expect(screen.queryByRole('button', { name: 'Zustand zu R-001 hinzufügen' })).toBeNull();
     freigeben();
+  });
+
+  it('hält den Laufzustand über die Serverantwort hinaus, bis der Refetch steht — kein Zurückspringen (Review LFH-650)', async () => {
+    /**
+     * `onSuccess` GIBT die Invalidierung zurück; react-query hält `isPending`, bis sie
+     * aufgelöst ist. Ohne das käme zwischen PATCH-Antwort und Refetch eine Runde mit dem ALTEN
+     * Wert — bei leerem Feld wieder „Zustand hinzufügen". Hier wird die Invalidierung
+     * festgehalten: die Antwort ist längst da, die Zelle muss trotzdem den getippten Wert
+     * zeigen. Mutationsprobe: ohne `return` fällt sie sofort auf den Platzhalter zurück.
+     */
+    const koerper: unknown[] = [];
+    server.use(
+      http.patch('/api/einsaetze/1/personen/10', async ({ request }) => {
+        koerper.push(await request.json());
+        return HttpResponse.json({ ...basis, zustand: 'gehfähig' });
+      }),
+    );
+    const client = new QueryClient();
+    let freigeben!: () => void;
+    const gehalten = new Promise<void>((r) => (freigeben = r));
+    vi.spyOn(client, 'invalidateQueries').mockImplementation(() => gehalten);
+    renderMitProviders(<>{zelle(mitSchreibrecht, basis)}</>, { client });
+    await userEvent.click(screen.getByRole('button', { name: 'Zustand zu R-001 hinzufügen' }));
+    await userEvent.type(screen.getByRole('textbox'), 'gehfähig');
+    fireEvent.blur(screen.getByRole('textbox'));
+
+    await vi.waitFor(() => expect(koerper).toHaveLength(1));
+    await vi.waitFor(() => expect(client.invalidateQueries).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 30));
+    const knopf = screen.getByRole('button', { name: 'Zustand zu R-001 bearbeiten' });
+    expect(knopf).toHaveTextContent('gehfähig');
+    expect(knopf).toHaveClass('ant-btn-loading');
+    freigeben();
+    // Gegenhälfte: steht der Refetch, endet der Laufzustand (hier ohne neue Daten: der
+    // statische Prop bleibt leer, also kehrt der Platzhalter zurück).
+    expect(
+      await screen.findByRole('button', { name: 'Zustand zu R-001 hinzufügen' }),
+    ).toBeInTheDocument();
   });
 
   it('meldet einen Fehler AN DER ZELLE statt als Toast, und der nächste Versuch räumt ihn (LFH-650)', async () => {

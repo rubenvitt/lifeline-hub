@@ -177,8 +177,9 @@ const STATUS_RING_PAINT: CircleLayerSpecification['paint'] = {
  * Unsichtbare Trefferzone (LFH-650): ein Kreis mit dem Durchmesser aus der Feature-Eigenschaft
  * `treffer`, ohne Füllung und ohne Rand. Er liegt UNTER allen Markerebenen und ist Klickziel
  * wie sie — MapLibre prüft beim Treffertest die Geometrie, nicht die Deckkraft (gemessen in
- * `e2e/betroffene-karte.spec.ts`: ein Klick mit Versatz neben den gezeichneten Kreis öffnet
- * die Person). Nur Features mit `treffer` erzeugen eine Zone; die Lagekarte setzt keins.
+ * `e2e/gate3-trefflaeche.spec.ts`, „Betroffene Karte …": ein Klick mit Versatz neben den
+ * gezeichneten Kreis öffnet die Person). Überlappen sich Zonen, wählt der Klick-Handler das
+ * nächstgelegene Merkmal ({@link naechstesMerkmal}). Nur Features mit `treffer` erzeugen eine Zone; die Lagekarte setzt keins.
  */
 const TREFFER_PAINT: CircleLayerSpecification['paint'] = {
   'circle-radius': ['/', ['get', 'treffer'], 2],
@@ -195,6 +196,11 @@ const TREFFER_PAINT: CircleLayerSpecification['paint'] = {
  * (WCAG 1.4.11): max(K(weiß, g), K(schwarz, g)) ≥ √21 ≈ 4,58 für jede Farbe g — deshalb
  * trägt die Kante auch auf Grundkarten, die e2e nicht lädt. Dieselbe Hell-Dunkel-Paarung wie
  * das Kurzzeichen (`KURZ_PAINT`). Nur für Features mit `sk`: die Lagekarte bleibt gleich.
+ *
+ * Bewusst `'#000'` und NICHT `sichtungsfarben.schwarz`: die Kante ist eine Kontur, keine
+ * Sichtungsaussage — sie steht an JEDEM Personen-Marker gleich. Aus der Sichtungsachse gelesen
+ * sähe sie wie eine Bindung an „Tote" aus, die es nicht gibt; „tot" unterscheidet sich durch
+ * die gefüllte Fläche und das Kürzel „T". Gleicher Wert wie der Text von `KURZ_PAINT`.
  */
 const KANTE_PAINT: CircleLayerSpecification['paint'] = {
   'circle-radius': 13,
@@ -534,4 +540,30 @@ export function setzeSpiderDaten(
 ) {
   (map.getSource(SPIDER_LEAVES_QUELLE) as GeoJSONSource | undefined)?.setData(leaves as never);
   (map.getSource(SPIDER_LEGS_QUELLE) as GeoJSONSource | undefined)?.setData(legs as never);
+}
+
+/**
+ * Das Merkmal, das einem Klickpunkt am NÄCHSTEN liegt (Review LFH-650). Seit den Trefferzonen
+ * überlappen die Klickflächen benachbarter Marker regelmäßig (Zone 48/72 px, Spider-Abstand
+ * 40 px); MapLibre liefert die Treffer aber in Zeichenreihenfolge, nicht nach Abstand. Ohne
+ * diese Wahl öffnete ein Tipp neben Person A womöglich die obenauf gezeichnete Person B.
+ * Rein, damit die Wahl ohne WebGL prüfbar ist; `projiziere` ist `map.project`.
+ */
+export function naechstesMerkmal<F extends { geometry?: { type: string; coordinates?: unknown } }>(
+  merkmale: readonly F[],
+  punkt: { x: number; y: number },
+  projiziere: (lngLat: [number, number]) => { x: number; y: number },
+): F | undefined {
+  let bestes: F | undefined;
+  let abstand = Number.POSITIVE_INFINITY;
+  for (const m of merkmale) {
+    if (m.geometry?.type !== 'Point') continue;
+    const p = projiziere(m.geometry.coordinates as [number, number]);
+    const d = Math.hypot(p.x - punkt.x, p.y - punkt.y);
+    if (d < abstand) {
+      abstand = d;
+      bestes = m;
+    }
+  }
+  return bestes ?? merkmale[0];
 }

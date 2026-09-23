@@ -4,6 +4,7 @@ import {
   donutSegmente,
   baueClusterDonut,
   dringlichsteSichtung,
+  setzeHuelleDurchlaessig,
   CLUSTER_TYP_FARBE,
   SK_DRINGLICHKEIT,
 } from './clusterDonut';
@@ -122,5 +123,37 @@ describe('Personen-Cluster nach Sichtung (LFH-650)', () => {
     const klein = baueClusterDonut({ point_count: 2, c_person: 2, s_sk2: 2, treffer: 30 });
     expect(klein.dataset.lfh).toBeUndefined();
     expect(klein.style.width).toBe('46px');
+  });
+});
+
+describe('setzeHuelleDurchlaessig (Review LFH-650)', () => {
+  it('lässt bei offenem Spider die Hülle durch, der Ring bleibt klickbar — und stellt es zurück', () => {
+    /**
+     * In `handschuh` reicht die 72-px-Hülle über die inneren Pixel der aufgefächerten Blätter
+     * (Blätter ab 40 px, ihr Kreis ab 27 px vom Mittelpunkt). Offen muss sie durchlassen, sonst
+     * klappt ein Tipp auf ein Blatt den Spider zu, statt die Person zu öffnen.
+     */
+    const huelle = baueClusterDonut({ point_count: 2, c_person: 2, s_sk2: 2, treffer: 72 });
+    const ring = huelle.firstElementChild as HTMLElement;
+    setzeHuelleDurchlaessig(huelle, true);
+    expect(huelle.style.pointerEvents).toBe('none');
+    expect(ring.style.pointerEvents).toBe('auto');
+    setzeHuelleDurchlaessig(huelle, false);
+    expect(huelle.style.pointerEvents).toBe('');
+    expect(ring.style.pointerEvents).toBe('');
+  });
+
+  it('fasst einen Donut OHNE Hülle nicht an', () => {
+    const ring = baueClusterDonut({ point_count: 3, c_fahrzeug: 3 });
+    setzeHuelleDurchlaessig(ring, true);
+    expect(ring.style.pointerEvents).toBe('');
+  });
+
+  it('der Personen-Cluster ist ein benanntes Bild (role="img"), kein namenloses div', () => {
+    const el = baueClusterDonut({ point_count: 5, c_person: 5, s_sk1: 1, s_sk3: 4 });
+    expect(el.getAttribute('role')).toBe('img');
+    const gross = baueClusterDonut({ point_count: 2, c_person: 2, s_sk2: 2, treffer: 72 });
+    expect(gross.getAttribute('role')).toBe('img');
+    expect(gross.firstElementChild!.getAttribute('role')).toBeNull();
   });
 });

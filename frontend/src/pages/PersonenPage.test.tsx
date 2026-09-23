@@ -1691,8 +1691,24 @@ describe('PersonenPage — Kartenansicht (LFH-613)', () => {
     await waehleKarte();
     await screen.findByTestId('kartenflaeche-stub');
     expect(
-      screen.getByText('Alle angetroffenen Personen stehen auf der Karte'),
+      screen.getByText('Alle angetroffenen Personen dieser Auswahl stehen auf der Karte'),
     ).toBeInTheDocument();
+  });
+
+  it('ohne Lücke und ohne Marker behauptet der Hinweis KEINE vollständige Karte (Review LFH-650)', async () => {
+    // Filter „Vermisst": keine angetroffene Person in der Auswahl. „Alle stehen auf der Karte"
+    // über einer leeren Karte wäre falsch.
+    renderKarte([mitKoordinate(person.id, person.registrier_nr), { ...unbekannt }], {
+      ...einsatzAktiv,
+      einsatzort_lat: 52.3,
+      einsatzort_lon: 9.2,
+    });
+    await waehleKarte();
+    await userEvent.click(screen.getByRole('tab', { name: 'Vermisst' }));
+    expect(
+      await screen.findByText('Keine angetroffene Person in dieser Auswahl'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/stehen auf der Karte/)).not.toBeInTheDocument();
   });
 
   it('der Markerklick führt zur Detailseite der Person', async () => {

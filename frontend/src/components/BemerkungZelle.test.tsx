@@ -152,11 +152,11 @@ describe('BemerkungZelle', () => {
     );
   });
 
-  it('gefüllter Wert: Text plus Stift, kein Platzhalter — und der Knopf öffnet weiterhin', async () => {
+  it('gefüllter Wert: Wertknopf statt Platzhalter — und der Knopf öffnet das Eingabefeld', async () => {
     /**
-     * Regressionsschutz für die kontrollierte `editing`-Prop: wer sie setzt und `onStart`
-     * vergisst, nimmt dem gefüllten Wert lautlos die Bearbeitbarkeit. Der Stift wäre noch da
-     * und klickte ins Leere.
+     * Regressionsschutz für den Weg in die Bearbeitung: seit LFH-650 öffnet der Wertknopf per
+     * `setBearbeitet(true)`, `Typography` steht nur noch für das Eingabefeld im Baum. Fiele
+     * der `onClick` weg, stünde der Wert da und klickte ins Leere.
      */
     const onSpeichern = vi.fn();
     renderMitProviders(
@@ -171,13 +171,7 @@ describe('BemerkungZelle', () => {
     expect(screen.getByText('Tank leer')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: BEMERKUNG_HINZUFUEGEN })).toBeNull();
 
-    /**
-     * Über die KENNUNG gegriffen, nicht über antds Vorgabenamen: `test/utils.tsx` rendert
-     * ohne `locale`, dort heißt der Stift „Edit" — in Produktion setzt `ThemeModeProvider`
-     * `deDE`, dort „Bearbeiten" (`locale/de_DE.js:78-79`). Ein Test auf „Edit" prüfte also
-     * einen Namen, den nie jemand zu sehen bekommt, und bräche, sobald die Testhülle eine
-     * Locale bekommt.
-     */
+    // Über die KENNUNG gegriffen: sie trägt den zugänglichen Namen des Wertknopfs.
     await userEvent.click(
       screen.getByRole('button', { name: 'Bemerkung zu Florian 1 bearbeiten' }),
     );
@@ -349,6 +343,7 @@ describe('wertKnopfStil (LFH-650)', () => {
   const tokenFuer = (stufe: keyof typeof dichten) => ({
     controlHeight: dichten[stufe].zeilenhoehe,
     paddingXS: dichten[stufe].abstand.xs,
+    paddingSM: dichten[stufe].abstand.sm,
   });
 
   it('trägt den Boden aus controlHeight — 30 / 48 / 72 px', () => {
@@ -362,6 +357,8 @@ describe('wertKnopfStil (LFH-650)', () => {
     const h = wertKnopfStil(tokenFuer('handschuh'));
     expect(k.paddingBlock).toBe(3);
     expect(h.paddingBlock).toBe(7);
+    expect(k.paddingInline).toBe(7);
+    expect(h.paddingInline).toBe(16);
     expect(Number(k.minHeight)).toBeLessThan(Number(h.minHeight));
   });
 

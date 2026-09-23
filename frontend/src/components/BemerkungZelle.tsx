@@ -56,8 +56,9 @@ import { useRollen } from './instrument/rollenwerte';
  * (`minHeight: token.controlHeight` PLUS Polsterung aus `token.paddingSM`/`token.padding`)
  * und eine Zusicherung über zwei Dichtestufen, weil kein Guard eine Pixelangabe sieht. Ein
  * antd-`Button` erbt seine Höhe stattdessen vom `ConfigProvider` und schuldet nichts davon.
- * `type="link"` liefert zugleich die Bedienfarbe aus dem Token (`colorLink`, blau) statt
- * eines Hex-Literals — „Rot bedient nichts" (LFH-352/LFH-315).
+ * `type="link"` macht ihn zum Bedienziel in Blau — die TEXTfarbe kommt seit LFH-650 aber aus
+ * `rollen.bedienText`, nicht aus antds `colorLink` (gemessen zu schwach, siehe am Knopf) —
+ * „Rot bedient nichts" (LFH-352/LFH-315).
  *
  * ── DER GEFÜLLTE WERT IST SELBST DAS ZIEL (LFH-650) ────────────────────────────────────
  *
@@ -84,11 +85,18 @@ import { useRollen } from './instrument/rollenwerte';
  * Rendern prüfbar ist (Muster `bedienzielStil`): `minHeight` aus `controlHeight` trägt den
  * Boden, die Polsterung den Abstand des umbrechenden Textes zum Rand.
  */
-export function wertKnopfStil(token: { controlHeight: number; paddingXS: number }): CSSProperties {
+export function wertKnopfStil(token: {
+  controlHeight: number;
+  paddingXS: number;
+  paddingSM: number;
+}): CSSProperties {
   return {
     height: 'auto',
     minHeight: token.controlHeight,
+    // Beide Achsen gesetzt (Konvention LFH-365: Polsterung aus `paddingSM`), nicht nur die
+    // Blockachse — sonst hinge die Inline-Polsterung an antds Knopfvorgabe statt an der Stufe.
     paddingBlock: token.paddingXS,
+    paddingInline: token.paddingSM,
     maxWidth: '100%',
     whiteSpace: 'normal',
     textAlign: 'start',
@@ -172,8 +180,9 @@ export function BemerkungZelle({
    * 1. **Abbrechen / leer geblieben:** `Typography` hängt in derselben Runde aus, in der der
    *    Platzhalter zurückkommt. antds Effekt läuft für diesen Wert nie.
    * 2. **Gespeichert, Wert kommt NACH:** die Mutation läuft, der neue Wert trifft per
-   *    Invalidierung erst eine Runde später ein. Dann hängt der Platzhalter aus und ein
-   *    FRISCHES `Typography` ein — das kein `prevEditing` hat, also auch nicht fokussiert.
+   *    Invalidierung erst eine Runde später ein. Dann wechselt der Zweig vom Platzhalter zum
+   *    Wertknopf — ein FRISCHER Knopf, den niemand fokussiert. (Vor LFH-650 war es ein
+   *    frisches `Typography` ohne `prevEditing`; der Fall ist derselbe.)
    *
    * In beiden Fällen landet der Fokus sonst auf `<body>`; genau diese Klasse führt die
    * Erfassungs-Norm schon. Deshalb ein Merker, der den Zweigwechsel ÜBERLEBT, statt einer

@@ -39,8 +39,8 @@ const DONUT_NEUTRAL = '#94a3b8';
  * Sichtungskategorien in der Reihenfolge der DRINGLICHKEIT: SK I vor II vor III, dann SK IV
  * (ohne Überlebenschance — betreuend, nicht zuerst), Tote, Unverletzte, und zuletzt „ohne":
  * noch nicht gesichtet ist keine Kategorie, der Cluster sagt dann „–". Dieselbe Reihenfolge
- * legt die Segmente im Ring. Record-Schlüssel aus `SK_KURZZEICHEN`, damit eine neue Kategorie
- * hier nicht still fehlt (der Test zählt beide gegeneinander).
+ * legt die Segmente im Ring. Ein Array, kein Record — dass keine Kategorie aus `SK_KURZZEICHEN`
+ * fehlt, sichert `clusterDonut.test.ts` („führt jede Kategorie … genau einmal"), nicht der Typ.
  */
 export const SK_DRINGLICHKEIT: readonly (Sichtungskategorie | 'ohne')[] = [
   'sk1',
@@ -201,6 +201,10 @@ export function baueClusterDonut(props: Record<string, unknown>): HTMLDivElement
     kern.appendChild(kurz);
     const text = personenClusterText(gesamt, dringlichst);
     ring.title = text;
+    // Ein `aria-label` braucht eine Rolle, sonst wird es auf einem nackten `div` übergangen.
+    // `img`, nicht `button`: der Donut ist kein Tastaturziel (die Auffächerung ist Zeiger-
+    // Bedienung der Karte), eine Knopfrolle ohne Fokus versprach etwas, das nicht geht.
+    ring.setAttribute('role', 'img');
     ring.setAttribute('aria-label', text);
     ring.dataset.sichtung = dringlichst;
   }
@@ -221,10 +225,27 @@ export function baueClusterDonut(props: Record<string, unknown>): HTMLDivElement
   ].join(';');
   if (ring.title) {
     huelle.title = ring.title;
+    huelle.setAttribute('role', 'img');
     huelle.setAttribute('aria-label', ring.getAttribute('aria-label')!);
     ring.removeAttribute('title');
+    ring.removeAttribute('role');
     ring.removeAttribute('aria-label');
   }
   huelle.appendChild(ring);
   return huelle;
+}
+
+/**
+ * Macht die Trefferzonen-Hülle eines Donuts für Klicks durchlässig, solange sein Spider offen
+ * ist (Review LFH-650). In `handschuh` misst die Hülle 72 px (Radius 36), die aufgefächerten
+ * Blätter liegen aber schon ab 40 px vom Mittelpunkt — ihr gezeichneter Kreis beginnt bei
+ * 27 px. Ohne das fing die Hülle den Tipp auf den inneren Teil eines Blatts ab und klappte den
+ * Spider zu, statt die Person zu öffnen. Der Ring selbst bleibt klickbar (erneuter Klick
+ * klappt weiter ein), nur die Fläche um ihn herum gibt nach. Ohne Hülle: nichts zu tun.
+ */
+export function setzeHuelleDurchlaessig(el: HTMLElement | undefined, durchlaessig: boolean) {
+  if (!el || el.dataset.lfh !== 'cluster-treffer') return;
+  el.style.pointerEvents = durchlaessig ? 'none' : '';
+  const ring = el.firstElementChild as HTMLElement | null;
+  if (ring) ring.style.pointerEvents = durchlaessig ? 'auto' : '';
 }

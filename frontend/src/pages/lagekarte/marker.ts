@@ -54,8 +54,8 @@ export interface KarteMarker {
    *  Nur für Marker ohne taktisches Zeichen (`tz`) — sonst läge es auf dem Symbol. */
   kurzzeichen?: string;
   /**
-   * Durchmesser der unsichtbaren Trefferzone in px (LFH-650). Der gezeichnete Kreis bleibt
-   * klein (~22 px); die Zone macht die Trefffläche so groß wie die Dichtestufe verlangt
+   * Durchmesser der unsichtbaren Trefferzone in px (LFH-650). Der gezeichnete Personen-
+   * Marker bleibt klein (Kreis, weißer Rand, schwarze Kante: 26 px); die Zone macht die Trefffläche so groß wie die Dichtestufe verlangt
    * (`token.controlHeight`: 30 / 48 / 72). Ohne Angabe gibt es keine Zone — die Lagekarte
    * setzt sie nicht und bleibt damit unverändert.
    */

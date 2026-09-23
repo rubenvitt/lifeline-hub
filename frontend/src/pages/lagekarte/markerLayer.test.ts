@@ -7,6 +7,7 @@ import {
   MARKER_CLUSTER_QUELLE,
   MARKER_EINSATZORT_QUELLE,
   MARKER_KLICK_LAYER,
+  naechstesMerkmal,
   SPIDER_LEAVES_QUELLE,
   SPIDER_LEGS_QUELLE,
   SPIDER_KLICK_LAYER,
@@ -452,5 +453,29 @@ describe('Spider-Layer', () => {
     setzeSpiderDaten(map as never, leaves, legs);
     expect(sources.get(SPIDER_LEAVES_QUELLE)!.setData).toHaveBeenCalledWith(leaves);
     expect(sources.get(SPIDER_LEGS_QUELLE)!.setData).toHaveBeenCalledWith(legs);
+  });
+});
+
+describe('naechstesMerkmal (Review LFH-650)', () => {
+  // Projektion = Identität in Bildschirm-Pixeln, damit die Abstände lesbar bleiben.
+  const punkt = (x: number, y: number, schluessel: string) => ({
+    geometry: { type: 'Point', coordinates: [x, y] },
+    properties: { schluessel },
+  });
+  const projiziere = ([x, y]: [number, number]) => ({ x, y });
+
+  it('wählt das NÄCHSTE Merkmal, nicht das erste der Zeichenreihenfolge', () => {
+    // B liegt obenauf (zuerst geliefert), der Tipp ist aber näher an A.
+    const b = punkt(40, 0, 'person-b');
+    const a = punkt(0, 0, 'person-a');
+    expect(naechstesMerkmal([b, a], { x: 12, y: 0 }, projiziere)).toBe(a);
+    // Gegenhälfte: näher an B → B.
+    expect(naechstesMerkmal([b, a], { x: 30, y: 0 }, projiziere)).toBe(b);
+  });
+
+  it('fällt ohne Punktgeometrie auf das erste Merkmal zurück, leer ergibt undefined', () => {
+    const flaeche = { geometry: { type: 'Polygon' }, properties: { schluessel: 'x' } };
+    expect(naechstesMerkmal([flaeche], { x: 0, y: 0 }, projiziere)).toBe(flaeche);
+    expect(naechstesMerkmal([], { x: 0, y: 0 }, projiziere)).toBeUndefined();
   });
 });

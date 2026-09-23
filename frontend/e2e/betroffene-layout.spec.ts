@@ -127,8 +127,11 @@ test('Liste: Zustand speichern ändert die Zeilenhöhe in KEINER Stufe, eine liv
   const werte: string[] = [];
 
   for (const dichte of ['kompakt', 'komfortabel', 'handschuh'] as const) {
-    // Je Stufe drei frische Personen: die erste bekommt ihren Zustand, die zweite ihre
-    // Koordinate, die dritte ist die Folgezeile, deren Lage gemessen wird.
+    // Je Stufe drei frische Personen. Die Liste sortiert nach Registriernummer ABSTEIGEND
+    // (Review LFH-650: ohne Anker war die gemessene Zeile in `kompakt` die letzte, und die
+    // Folgezeilen-Prüfung lief leer). Der Anker wird deshalb ZUERST angelegt und steht damit
+    // direkt unter der ersten; die zweite bekommt die Koordinate.
+    await post(page, `/api/einsaetze/${einsatzId}/personen`, { name: `Anker ${dichte}` });
     const erste = await post(page, `/api/einsaetze/${einsatzId}/personen`, {
       name: `Zustand ${dichte}`,
     });
@@ -147,8 +150,9 @@ test('Liste: Zustand speichern ändert die Zeilenhöhe in KEINER Stufe, eine liv
 
     // ── Zustand speichern: eigene Eingabe → Geometrie ──
     const vorher = await kasten(zeile(erste));
-    const folge = (await folgeZeile(erste).count()) ? folgeZeile(erste) : null;
-    const folgeVorher = folge ? await kasten(folge) : null;
+    const folge = folgeZeile(erste);
+    await expect(folge, `Folgezeile unter der gemessenen Zeile (${dichte})`).toHaveCount(1);
+    const folgeVorher = await kasten(folge);
     const reg = (await zeile(erste).locator('td').first().innerText()).trim();
     await page.getByRole('button', { name: `Zustand zu ${reg} hinzufügen` }).click();
     await page.keyboard.type('gehfähig');
@@ -161,8 +165,7 @@ test('Liste: Zustand speichern ändert die Zeilenhöhe in KEINER Stufe, eine liv
     // RELATIV zur eigenen Zeile: `Tab` schiebt den Fokus weiter, und in `handschuh` scrollt
     // der Browser ihn dabei ins Bild — die absolute Lage wanderte gemessen um 40 px, ohne
     // dass die Tabelle ihre Form änderte.
-    const dFolge =
-      folge && folgeVorher ? (await kasten(folge)).y - nachher.y - (folgeVorher.y - vorher.y) : 0;
+    const dFolge = (await kasten(folge)).y - nachher.y - (folgeVorher.y - vorher.y);
     expect(
       Math.abs(dh),
       `Zeilenhöhe nach dem Speichern (${dichte}): ${vorher.height} → ${nachher.height}`,
@@ -185,6 +188,12 @@ test('Liste: Zustand speichern ändert die Zeilenhöhe in KEINER Stufe, eine liv
     expect
       .soft(b.summe, `CLS-Beitrag der Live-Koordinate (${dichte}) [${b.quellen}]`)
       .toBeLessThanOrEqual(0.1);
+    // Die CLS-Schwelle allein meldete ein Einschieben von ~20 px nie (Review LFH-650: der
+    // Anteil einer Zeile am Viewport ist klein). Die Zeilenhöhe ist die schärfere Aussage.
+    expect(
+      Math.abs(hoeheNachher - hoeheVorher),
+      `Zeilenhöhe nach Live-Koordinate (${dichte}): ${hoeheVorher} → ${hoeheNachher}`,
+    ).toBeLessThanOrEqual(1);
     werte.push(
       `${dichte}: Zustand Δh ${dh.toFixed(2)} / Folgezeile ${dFolge.toFixed(2)} · Live-Koordinate Zeile ${hoeheVorher.toFixed(1)}→${hoeheNachher.toFixed(1)}, CLS ${b.summe.toFixed(4)} [${b.quellen}]`,
     );
@@ -266,9 +275,12 @@ test('Karte: die Hinweiszeile springt nicht, wenn die letzte Lücke live geschlo
     antreff_lat: 53.1,
     antreff_lon: 8.9,
   });
-  await expect(hinweis).toHaveText('Alle angetroffenen Personen stehen auf der Karte', {
-    timeout: 15_000,
-  });
+  await expect(hinweis).toHaveText(
+    'Alle angetroffenen Personen dieser Auswahl stehen auf der Karte',
+    {
+      timeout: 15_000,
+    },
+  );
   await wartenBisRuhig(page);
   const nachher = await kasten(karte);
   const b = await beitragAb(page, m);
@@ -283,13 +295,20 @@ test('Karte: die Hinweiszeile springt nicht, wenn die letzte Lücke live geschlo
 test('Lage-Dashboard: Sichtungspaneel beim ersten Laden und beim Wechsel „Ohne Sichtung" 0 → 1', async ({
   page,
 }) => {
-  test.setTimeout(150_000);
+  test.setTimeout(180_000);
   await verschiebungenAufzeichnen(page);
   await anmelden(page);
-  const einsatzId = await post(page, '/api/einsaetze', { bezeichnung: `E2E Fuss ${Date.now()}` });
-  await post(page, `/api/einsaetze/${einsatzId}/personen`, { name: 'Gesichtet', sichtung: 'sk2' });
   const werte: string[] = [];
   for (const breite of [1366, 1024, 390]) {
+    // Je Breite ein FRISCHER Einsatz mit nur einer gesichteten Person: sonst ist „Ohne Sichtung"
+    // ab der zweiten Breite schon > 0, und der „Wechsel 0 → 1" wäre keiner (Review LFH-650).
+    const einsatzId = await post(page, '/api/einsaetze', {
+      bezeichnung: `E2E Fuss ${breite} ${Date.now()}`,
+    });
+    await post(page, `/api/einsaetze/${einsatzId}/personen`, {
+      name: 'Gesichtet',
+      sichtung: 'sk2',
+    });
     await page.setViewportSize({ width: breite, height: 844 });
     // Erstes Laden: die Personen-Antwort wird zurückgehalten, bis die Seite ruhig steht.
     let loslassen!: () => void;
@@ -311,7 +330,9 @@ test('Lage-Dashboard: Sichtungspaneel beim ersten Laden und beim Wechsel „Ohne
     await page.unrouteAll({ behavior: 'ignoreErrors' });
 
     // Wechsel 0 → 1 von außen: eine ungesichtete Person kommt dazu.
+    await expect(page.locator('[data-lfh="ohne-sichtung"]')).toHaveText(/Ohne Sichtung0$/);
     await page.mouse.move(0, 0);
+    const transportVorher = await kasten(page.locator('[data-lfh="transport-bilanz"]'));
     const m2 = await marke(page);
     await post(page, `/api/einsaetze/${einsatzId}/personen`, { name: `Neu ${breite}` });
     await expect(page.locator('[data-lfh="ohne-sichtung"]')).not.toHaveText(/Ohne Sichtung0$/, {
@@ -319,8 +340,15 @@ test('Lage-Dashboard: Sichtungspaneel beim ersten Laden und beim Wechsel „Ohne
     });
     await wartenBisRuhig(page);
     const wechsel = await beitragAb(page, m2);
+    // Geometrie neben der CLS: die Transport-Zeile darf beim Wechsel nicht wandern — genau das
+    // tat sie, als „Ohne Sichtung" erst ab > 0 erschien.
+    const dTransport =
+      (await kasten(page.locator('[data-lfh="transport-bilanz"]'))).y - transportVorher.y;
+    expect
+      .soft(Math.abs(dTransport), `Transport-Zeile wandert (${breite}px)`)
+      .toBeLessThanOrEqual(1);
     werte.push(
-      `${breite}: erstes Laden ${laden.summe.toFixed(4)} [${laden.quellen}] · Wechsel ${wechsel.summe.toFixed(4)} [${wechsel.quellen}]`,
+      `${breite}: erstes Laden ${laden.summe.toFixed(4)} [${laden.quellen}] · Wechsel ${wechsel.summe.toFixed(4)}, Transport-Zeile ${dTransport.toFixed(1)}px [${wechsel.quellen}]`,
     );
     expect.soft(laden.summe, `CLS erstes Laden ${breite}px`).toBeLessThanOrEqual(0.1);
     expect.soft(wechsel.summe, `CLS Wechsel ${breite}px`).toBeLessThanOrEqual(0.1);

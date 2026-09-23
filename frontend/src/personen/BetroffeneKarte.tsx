@@ -55,8 +55,15 @@ export function personIdAusSchluessel(schluessel: string): number | null {
   return Number.isInteger(id) && id > 0 ? id : null;
 }
 
-export function ohneKoordinateText(anzahl: number): string {
-  if (anzahl === 0) return 'Alle angetroffenen Personen stehen auf der Karte';
+/**
+ * `verortet` = Personen-Marker auf der Karte. Ohne Lücke UND ohne Marker (Filter „vermisst",
+ * leere Auswahl) wäre „alle stehen auf der Karte" über einer leeren Karte falsch (Review
+ * LFH-650) — dann sagt der Satz, dass die Auswahl keine angetroffene Person enthält. Die Karte
+ * zeigt die GEFILTERTE Menge, deshalb „dieser Auswahl".
+ */
+export function ohneKoordinateText(anzahl: number, verortet: number): string {
+  if (anzahl === 0 && verortet === 0) return 'Keine angetroffene Person in dieser Auswahl';
+  if (anzahl === 0) return 'Alle angetroffenen Personen dieser Auswahl stehen auf der Karte';
   return anzahl === 1
     ? '1 Person ohne Koordinate — nicht auf der Karte'
     : `${anzahl} Personen ohne Koordinate — nicht auf der Karte`;
@@ -109,7 +116,7 @@ export default function BetroffeneKarte({
         marginBlockEnd: token.marginXS,
       }}
     >
-      {ohneKoordinateText(ohneKoordinate)}
+      {ohneKoordinateText(ohneKoordinate, marker.length)}
     </div>
   );
 

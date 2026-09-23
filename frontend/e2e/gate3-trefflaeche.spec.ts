@@ -1280,7 +1280,7 @@ test('Ablösung: Kartenaktionen und Vorgabe-Knopf folgen der Dichte-Staffel 30 /
 // Messwerte nach dem Umbau (23.09.2026): Zustand-Knopf leer/gefüllt 30 / 48 / 72, nächstes
 // Bedienziel der Zeile ≥ 321 px entfernt · Verorten-Link 30 / 48 / 72 hoch, ≥ 149 px breit ·
 // Zustand, Koordinate, „vermisst seit" 30,1 / 48 / 72 · Kartenknöpfe 32 / 48 / 72 · Donut
-// 46 / 48 / 72 · Versatzklick 13 / 22 / 34 px neben der Kreismitte trifft.
+// 46 / 48 / 72 · Versatzklick 14 / 23 / 35 px neben der Kreismitte trifft.
 
 /** Die Zeile einer Person in der Tabelle (antd `data-row-key` = DB-`id`). */
 const personZeile = (page: Page, id: number) =>
@@ -1299,7 +1299,7 @@ async function personAnlegen(page: Page, einsatzId: string, daten: object): Prom
  */
 async function abstandZuNachbarn(bereich: Locator, ziel: Locator): Promise<number> {
   const zielGriff = await ziel.elementHandle();
-  return bereich.evaluate((wurzel, z) => {
+  const abstand = await bereich.evaluate((wurzel, z) => {
     const a = (z as Element).getBoundingClientRect();
     const kandidaten = wurzel.querySelectorAll<HTMLElement>(
       'a[href], button, [role="button"], input, select, textarea, [tabindex]:not([tabindex="-1"])',
@@ -1315,6 +1315,9 @@ async function abstandZuNachbarn(bereich: Locator, ziel: Locator): Promise<numbe
     }
     return min;
   }, zielGriff);
+  // Ohne jedes Nachbarziel bliebe der Wert +∞ und „≥ 16 px" trivial grün (Review LFH-650).
+  expect(Number.isFinite(abstand), 'mindestens ein Nachbarziel in der Zeile').toBe(true);
+  return abstand;
 }
 
 test('Betroffene Liste: Zustand-Knopf leer und gefüllt folgen der Staffel, Abstand ≥ 16 px im Handschuh', async ({
@@ -1378,6 +1381,22 @@ test('Betroffene Detailseite: „Auf Lagekarte verorten" folgt der Staffel', asy
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
+/**
+ * Wartet, bis die Einblend-Animation des Modals vorbei ist. antds Zoom skaliert den Dialog
+ * beim Öffnen; unter Last gemessen 42,86 statt 48 px (× 0,893) — der Test maß die
+ * Animation, nicht das Feld. `getAnimations()` ist leer, sobald nichts mehr läuft.
+ */
+async function modalRuht(page: Page) {
+  await page.waitForFunction(() => {
+    const m = document.querySelector('.ant-modal');
+    return (
+      m != null &&
+      m.getAnimations({ subtree: true }).length === 0 &&
+      !/ant-zoom-(enter|appear)/.test(m.className)
+    );
+  });
+}
+
 test('Betroffene Aufnahme: Zustand, Koordinate und „vermisst seit" folgen der Staffel (Route und Modal)', async ({
   page,
 }) => {
@@ -1413,11 +1432,31 @@ test('Betroffene Aufnahme: Zustand, Koordinate und „vermisst seit" folgen der 
       `Route Koordinate (${dichte})`,
     );
 
+    // Modal „Schnellerfassung": dieselben zwei Felder im zweiten Mount von `AufnahmeFelder`.
+    await page.goto(`/einsaetze/${einsatzId}/personen`);
+    await page.getByRole('button', { name: 'Schnellerfassung' }).click();
+    const schnell = page.getByRole('dialog');
+    await schnell.getByRole('button', { name: /Weitere Angaben/ }).click();
+    await modalRuht(page);
+    const modalZustand = await haeltStufe(
+      huelle(schnell.getByLabel('Zustand', { exact: true })),
+      soll,
+      `Modal Zustand (${dichte})`,
+    );
+    await haeltStufe(
+      huelle(schnell.getByLabel('Koordinate', { exact: true })),
+      soll,
+      `Modal Koordinate (${dichte})`,
+    );
+    await page.keyboard.press('Escape');
+    await expect(schnell).toBeHidden();
+
     // Modal „Vermisst melden": „vermisst seit".
     await page.goto(`/einsaetze/${einsatzId}/personen`);
     await page.getByRole('button', { name: 'Vermisst melden' }).click();
     const dialog = page.getByRole('dialog');
     await dialog.getByRole('button', { name: /Weitere Angaben/ }).click();
+    await modalRuht(page);
     const seit = await haeltStufe(
       huelle(dialog.getByLabel('vermisst seit', { exact: true })),
       soll,
@@ -1425,7 +1464,7 @@ test('Betroffene Aufnahme: Zustand, Koordinate und „vermisst seit" folgen der 
     );
     await page.keyboard.press('Escape');
     gemessen.push(
-      `${dichte} (Soll ≥ ${soll}): Zustand ${zustand}, Koordinate ${koordinate}, vermisst seit ${seit}`,
+      `${dichte} (Soll ≥ ${soll}): Zustand ${zustand}, Koordinate ${koordinate}, Modal Zustand ${modalZustand}, vermisst seit ${seit}`,
     );
   }
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
@@ -1520,8 +1559,8 @@ test('Betroffene Karte: Marker-Trefferzone, Cluster-Donut und Kartenknöpfe folg
     await expect(cluster.locator('[data-lfh="cluster-sichtung"]')).toHaveText('I');
 
     // Marker (WebGL): ein Klick NEBEN den gezeichneten Kreis (Außenkante bei 13 px), aber
-    // innerhalb der Zone, öffnet die Person. Versatz = halbe Stufe minus 2 px, also in
-    // `kompakt` 13 px — schon dort außerhalb der Zeichnung.
+    // innerhalb der Zone, öffnet die Person. Versatz = halbe Stufe minus 1 px, also in
+    // `kompakt` 14 px — einen Pixel außerhalb der Zeichnung (Kante bis 13), nicht AUF ihr.
     // Erst den Marker in die Kartenmitte holen und die Karte ins Bild scrollen: in
     // `handschuh` schiebt der höhere Seitenkopf den Startausschnitt unter den Viewport, und ein
     // Klick außerhalb des Viewports trifft nichts. Zoom 15 liegt über `clusterMaxZoom` (14).
@@ -1538,7 +1577,7 @@ test('Betroffene Karte: Marker-Trefferzone, Cluster-Donut und Kartenknöpfe folg
       einzeln,
     );
     const mitte = await aufSeite(page, einzeln);
-    const versatz = soll / 2 - 2;
+    const versatz = soll / 2 - 1;
     const daneben = await page.evaluate(
       ([x, y]) => {
         const k = (window as unknown as { __lfhKarte: KartenHaken }).__lfhKarte;
