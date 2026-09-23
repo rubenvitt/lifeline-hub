@@ -40,6 +40,7 @@ pub mod lagebericht;
 pub mod live;
 pub mod material;
 pub mod meldung;
+pub mod modul_zaehler;
 pub mod nachforderung;
 pub mod org_einstellungen;
 pub mod organisation;

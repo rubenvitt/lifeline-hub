@@ -329,58 +329,44 @@ pub struct EtbFilter {
     pub limit: i64,
 }
 
-/// Fragt Einträge eines Einsatzes ab. Sortierung: `lfd_nr DESC` (neueste zuerst),
-/// stabiler Cursor über `before_lfd_nr`. Die fachliche Anzeige-Sortierung nach
-/// `ereigniszeit` erfolgt clientseitig (beide Zeitstempel werden geliefert).
-pub async fn abfrage(
-    pool: &SqlitePool,
-    einsatz_id: i64,
-    filter: &EtbFilter,
-) -> Result<Vec<EtbEintragAnzeige>, AppError> {
-    let mut qb: QueryBuilder<Sqlite> = QueryBuilder::new(
-        "SELECT e.id, e.lfd_nr, e.typ, e.inhalt, e.von, e.an, e.meldeweg, e.veranlassung, \
-                e.erfasser_id, b.anzeigename AS erfasser_name, e.erfasser_funktion, e.ereigniszeit, e.received_at, \
-                e.erfasst_lokal_at, e.berichtigt_eintrag_id, e.lagebericht_id, e.auftrag_id, \
-                e.befehl_id \
-         FROM etb_eintrag e JOIN benutzer b ON b.id = e.erfasser_id",
-    );
-
-    push_filter(&mut qb, einsatz_id, filter);
-
-    qb.push(" ORDER BY e.lfd_nr DESC LIMIT ");
-    qb.push_bind(filter.limit);
-
-    let mut eintraege = qb
-        .build_query_as::<EtbEintragAnzeige>()
-        .fetch_all(pool)
-        .await?;
-    folgeauftraege_nachladen(pool, &mut eintraege).await?;
-    Ok(eintraege)
+impl EtbFilter {
+    /// Die Filtermerkmale ohne Cursor und Limit — genau das, was auch die Zählungen
+    /// ([`zaehle`], [`anzahl`]) bekommen.
+    pub fn merkmale(&self) -> EtbZaehlFilter {
+        EtbZaehlFilter {
+            q: self.q.clone(),
+            typ: self.typ.clone(),
+            von_zeit: self.von_zeit.clone(),
+            bis_zeit: self.bis_zeit.clone(),
+            erfasser_id: self.erfasser_id,
+            einheit_id: self.einheit_id,
+        }
+    }
 }
 
-/// Zählt die Einträge, die [`abfrage`] mit demselben Filter liefern würde — OHNE
-/// Seitendeckel (LFH-619, Sammeltreffer der Sprungpalette). `filter.limit` wird ignoriert.
+/// Die Filtermerkmale der ETB-Abfrage OHNE Seitenparameter (LFH-612). Die Zählungen nehmen
+/// bewusst diesen Typ und nicht [`EtbFilter`]: sie können damit gar keinen Cursor und kein
+/// Limit bekommen, eine „Gesamtzahl" über eine Seite ist strukturell ausgeschlossen.
+/// Die Bedeutung der Felder steht an [`EtbFilter`].
+#[derive(Debug, Default, Clone)]
+pub struct EtbZaehlFilter {
+    pub q: Option<String>,
+    pub typ: Option<String>,
+    pub von_zeit: Option<String>,
+    pub bis_zeit: Option<String>,
+    pub erfasser_id: Option<i64>,
+    pub einheit_id: Option<i64>,
+}
+
+/// Schreibt FTS-Join und WHERE-Bedingung einer ETB-Abfrage (Einsatz + Filtermerkmale) in
+/// `qb`. **Die eine Quelle** für Liste und beide Zählungen (LFH-612, LFH-619): zählte eine
+/// Zählung mit einer eigenen Bedingung, liefen Kopf („n Treffer") und Liste bei der ersten
+/// Abweichung still auseinander — ohne roten Test, ohne Fehlerbild.
 ///
-/// Der WHERE-Teil kommt aus [`push_filter`], derselben Funktion wie bei der Liste: eine eigene
-/// Zählbedingung wäre eine zweite Meinung darüber, was ein Treffer ist, und liefe beim
-/// nächsten neuen Filter still auseinander.
-pub async fn anzahl(
-    pool: &SqlitePool,
-    einsatz_id: i64,
-    filter: &EtbFilter,
-) -> Result<i64, AppError> {
-    let mut qb: QueryBuilder<Sqlite> = QueryBuilder::new("SELECT COUNT(*) FROM etb_eintrag e");
-    push_filter(&mut qb, einsatz_id, filter);
-    qb.build_query_scalar::<i64>()
-        .fetch_one(pool)
-        .await
-        .map_err(Into::into)
-}
-
-/// FTS-Join und WHERE-Klausel für [`abfrage`] und [`anzahl`]. Erwartet eine Abfrage über
-/// `etb_eintrag e`, deren FROM-Teil gerade geschrieben ist.
-fn push_filter(qb: &mut QueryBuilder<Sqlite>, einsatz_id: i64, filter: &EtbFilter) {
-    // FTS-Join nur, wenn ein Volltext-Query gesetzt ist (Auswertung in Task 6).
+/// Erwartet, dass `qb` bis zum `FROM etb_eintrag e …` gefüllt ist; der Aufrufer hängt danach
+/// Cursor, `GROUP BY`, `ORDER BY`, `LIMIT` an.
+fn filter_bedingung(qb: &mut QueryBuilder<Sqlite>, einsatz_id: i64, filter: &EtbZaehlFilter) {
+    // FTS-Join nur, wenn ein Volltext-Query gesetzt ist.
     // Der Join verbindet nur per rowid; das MATCH gehört in die WHERE-Klausel
     // (FTS5 wertet MATCH nur als top-level AND-Term gegen die FTS-Tabelle aus).
     let fts: Option<String> = filter
@@ -407,15 +393,15 @@ fn push_filter(qb: &mut QueryBuilder<Sqlite>, einsatz_id: i64, filter: &EtbFilte
 
     if let Some(typ) = &filter.typ {
         qb.push(" AND e.typ = ");
-        qb.push_bind(typ);
+        qb.push_bind(typ.clone());
     }
     if let Some(v) = &filter.von_zeit {
         qb.push(" AND e.ereigniszeit >= ");
-        qb.push_bind(v);
+        qb.push_bind(v.clone());
     }
     if let Some(b) = &filter.bis_zeit {
         qb.push(" AND e.ereigniszeit <= ");
-        qb.push_bind(b);
+        qb.push_bind(b.clone());
     }
     if let Some(eid) = filter.erfasser_id {
         qb.push(" AND e.erfasser_id = ");
@@ -438,10 +424,76 @@ fn push_filter(qb: &mut QueryBuilder<Sqlite>, einsatz_id: i64, filter: &EtbFilte
                                OR TRIM(e.an) = ee.name COLLATE NOCASE)))",
         );
     }
+}
+
+/// Fragt Einträge eines Einsatzes ab. Sortierung: `lfd_nr DESC` (neueste zuerst),
+/// stabiler Cursor über `before_lfd_nr`. Die fachliche Anzeige-Sortierung nach
+/// `ereigniszeit` erfolgt clientseitig (beide Zeitstempel werden geliefert).
+pub async fn abfrage(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    filter: &EtbFilter,
+) -> Result<Vec<EtbEintragAnzeige>, AppError> {
+    // Der Join auf `benutzer` liefert nur `erfasser_name` und filtert nichts
+    // (`erfasser_id` ist ein NOT-NULL-Fremdschlüssel) — deshalb steht er hier und nicht
+    // in der gemeinsamen Bedingung, die die Zählungen ohne ihn fahren.
+    let mut qb: QueryBuilder<Sqlite> = QueryBuilder::new(
+        "SELECT e.id, e.lfd_nr, e.typ, e.inhalt, e.von, e.an, e.meldeweg, e.veranlassung, \
+                e.erfasser_id, b.anzeigename AS erfasser_name, e.erfasser_funktion, e.ereigniszeit, e.received_at, \
+                e.erfasst_lokal_at, e.berichtigt_eintrag_id, e.lagebericht_id, e.auftrag_id, \
+                e.befehl_id \
+         FROM etb_eintrag e JOIN benutzer b ON b.id = e.erfasser_id",
+    );
+    filter_bedingung(&mut qb, einsatz_id, &filter.merkmale());
+
     if let Some(cursor) = filter.before_lfd_nr {
         qb.push(" AND e.lfd_nr < ");
         qb.push_bind(cursor);
     }
+
+    qb.push(" ORDER BY e.lfd_nr DESC LIMIT ");
+    qb.push_bind(filter.limit);
+
+    let mut eintraege = qb
+        .build_query_as::<EtbEintragAnzeige>()
+        .fetch_all(pool)
+        .await?;
+    folgeauftraege_nachladen(pool, &mut eintraege).await?;
+    Ok(eintraege)
+}
+
+/// Zählt die Einträge, die [`abfrage`] mit denselben Filtermerkmalen liefern würde — OHNE
+/// Seitendeckel (LFH-619, Sammeltreffer der Sprungpalette). Die Bedingung kommt aus
+/// [`filter_bedingung`], derselben Funktion wie bei der Liste.
+pub async fn anzahl(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    filter: &EtbZaehlFilter,
+) -> Result<i64, AppError> {
+    let mut qb: QueryBuilder<Sqlite> = QueryBuilder::new("SELECT COUNT(*) FROM etb_eintrag e");
+    filter_bedingung(&mut qb, einsatz_id, filter);
+    qb.build_query_scalar::<i64>()
+        .fetch_one(pool)
+        .await
+        .map_err(Into::into)
+}
+
+/// Zählt die Einträge eines Einsatzes je Typ über dieselbe Bedingung wie [`abfrage`]
+/// (LFH-612). Liefert die Rohzeilen `(typ, anzahl)`; die Zuordnung zu den Feldern macht
+/// [`super::zaehler::EtbZaehlerAnzeige::aus_zeilen`] mit einem vollständigen `match`.
+pub async fn zaehle(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    filter: &EtbZaehlFilter,
+) -> Result<Vec<(String, i64)>, AppError> {
+    let mut qb: QueryBuilder<Sqlite> =
+        QueryBuilder::new("SELECT e.typ, COUNT(*) FROM etb_eintrag e");
+    filter_bedingung(&mut qb, einsatz_id, filter);
+    qb.push(" GROUP BY e.typ");
+    qb.build_query_as::<(String, i64)>()
+        .fetch_all(pool)
+        .await
+        .map_err(Into::into)
 }
 
 /// Wandelt eine Nutzereingabe in eine sichere FTS5-Query um: jedes Token wird

@@ -1,4 +1,4 @@
-import { etbPfad, personenPfad } from '../routing/deeplinks';
+import { etbPfad, fahrzeugePfad, personenPfad } from '../routing/deeplinks';
 import { modulRegistry, type KategorieKey, type ModulEintrag } from './modulRegistry';
 
 /**
@@ -39,8 +39,9 @@ import { modulRegistry, type KategorieKey, type ModulEintrag } from './modulRegi
  *
  * ── WAS NICHT HIERHER GEHÖRT ───────────────────────────────────────────────────────────
  *
- * Zähler: der Entwurf zeigt Entscheidungen 7 · Patienten 144 · Vermisste 9, dafür gibt es
- * keine Quelle (serverseitige Zähler sind LFH-612). Weggelassen, nicht erfunden.
+ * Zähler: der Entwurf zeigt Entscheidungen 7 · Patienten 144 · Vermisste 9. Die
+ * serverseitigen Modulzähler (LFH-612) zählen bewusst nur Module mit belegter Bedeutung;
+ * für Sprungmarken gibt es keine Quelle und keine Entscheidung. Weggelassen, nicht erfunden.
  */
 export interface Sprungmarke {
   key: string;
@@ -89,6 +90,17 @@ export const sprungmarken: Sprungmarke[] = [
     nach: 'patienten',
     hinweis: 'Personen, Filter Vermisst',
     pfad: (einsatzId) => personenPfad(einsatzId, { ansicht: 'zeilen', filter: 'vermisst' }),
+  },
+  {
+    // LFH-642: das Tableau ist eine Ansicht der Fahrzeugseite. Als Marke erbt es Sichtbarkeit
+    // und Sperre von `fahrzeuge` — dort hängen Status-PATCH und Live-Ereignis.
+    key: 'fms-tableau',
+    kategorie: 'kraefte',
+    label: 'FMS-Tableau',
+    zielModul: 'fahrzeuge',
+    nach: 'fahrzeuge',
+    hinweis: 'Fahrzeuge, FMS-Tableau',
+    pfad: (einsatzId) => fahrzeugePfad(einsatzId, { ansicht: 'tableau' }),
   },
 ];
 

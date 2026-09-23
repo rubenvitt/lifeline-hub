@@ -31,8 +31,12 @@ const LAYER_KEYS: (keyof LayerSichtbar)[] = [
   'zone',
   'lagemeldung',
   'freies_zeichen',
+  'person',
 ];
-/** Layer-Default beim Seed/ohne gespeicherten Wert: alle Ebenen an (heutiges Verhalten). */
+/** Layer-Default beim Seed/ohne gespeicherten Wert: alle Ebenen an (heutiges Verhalten) —
+ *  AUSSER „Betroffene" (LFH-648): Vorgabe aus. Weil `leseLayer` den Default unter jeden
+ *  gespeicherten Stand legt, öffnet damit auch jede ältere Ansicht ohne den Schlüssel die
+ *  Ebene ausgeschaltet. */
 const LAYER_DEFAULT: LayerSichtbar = {
   einsatzort: true,
   uhs: true,
@@ -44,6 +48,7 @@ const LAYER_DEFAULT: LayerSichtbar = {
   zone: true,
   lagemeldung: true,
   freies_zeichen: true,
+  person: false,
 };
 
 /** Kanonischer Konfigurations-Stand einer Kartenansicht (View-Config, ohne Kamera). */
@@ -77,7 +82,8 @@ function leseFachebenen(roh: unknown): FachebenenSichtbar {
 }
 
 function leseLayer(roh: unknown): LayerSichtbar {
-  // NULL/undefined = „alle an" (Seed-Default). Vorhandene Bool-Map überschreibt Feld für Feld.
+  // NULL/undefined = Seed-Default (alle an, „Betroffene" aus). Vorhandene Bool-Map überschreibt
+  // Feld für Feld.
   if (!roh || typeof roh !== 'object') return { ...LAYER_DEFAULT };
   const o = roh as Record<string, unknown>;
   const out = { ...LAYER_DEFAULT };

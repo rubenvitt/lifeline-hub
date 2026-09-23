@@ -148,15 +148,17 @@ umkehrt, steht das am Absatz selbst mit „Neuentwurf 22.09.2026".
 - **Keine erfundenen Daten.** Was der Entwurf zeigt, aber keine Datenquelle hat, wird
   weggelassen — nicht als Platzhalter gebaut — und steht im ClickUp-Epic „Neuentwurf
   Instrumententafel – Datenlücken des Designs" (LFH-606…LFH-617, z. B. Evakuiert 607,
-  FMS-Status je Einheit 609, „keine Rückmeldung" 610, ETB-Gesamtzahl/Tagesbilanz-Summen 612,
-  Koordinate an der Person 613). Bei Evakuiert ist die Datenquelle seit LFH-639 da; den Platz
-  im Kennzahlenband entscheidet LFH-640, den Einbau bringt LFH-607. Die Auslassung trägt ihr
-  Ticket im Code-Kommentar und wird im Test als **Abwesenheit** gepinnt. **Eingelöst ist der
-  Pegel (LFH-606):** er steht auf Platz 1 des Kennzahlenbands, „Höchste Warnstufe" ist dafür
-  raus (Entscheidung 22.09.2026; die Warnstufe bleibt im Seitenkopf-Hinweis und in der
-  Gefahrenmatrix). **Eingelöst ist auch die Rückmeldung (LFH-610):** Spalte „Rückmeldung“ und
-  Kachel „keine Rückmeldung“ im Meldebild, letzte Rückmeldung je Abschnitt im Überblick,
-  „Letzte Meldung“ in der Lagekarte; die Entscheidungen stehen in `umsetzung.md`.
+  FMS-Status je Einheit 609, Koordinate an der Person 613). Bei Evakuiert ist die Datenquelle
+  seit LFH-639 da; den Platz im Kennzahlenband entscheidet LFH-640, den Einbau bringt LFH-607.
+  Die Auslassung trägt ihr Ticket im Code-Kommentar und wird im Test als **Abwesenheit**
+  gepinnt. **Eingelöst ist der Pegel (LFH-606):** er steht auf Platz 1 des Kennzahlenbands,
+  „Höchste Warnstufe" ist dafür raus (Entscheidung 22.09.2026; die Warnstufe bleibt im
+  Seitenkopf-Hinweis und in der Gefahrenmatrix). **Eingelöst ist auch die Rückmeldung
+  (LFH-610):** Spalte „Rückmeldung“ und Kachel „keine Rückmeldung“ im Meldebild, letzte
+  Rückmeldung je Abschnitt im Überblick, „Letzte Meldung“ in der Lagekarte; die Entscheidungen
+  stehen in `umsetzung.md`. **Eingelöst sind ebenso die ETB-Gesamtzahl und die Bilanz-Summen
+  (LFH-612)** — der Server zählt sie über denselben Filter wie die Liste, Einzelheiten im
+  ETB-Absatz weiter unten.
 
 ## Frontend — UI-Form-Leitlinie (Drawer-Nutzung)
 
@@ -274,6 +276,14 @@ unter `md` (`form="auto"`) ist die begründungspflichtige Ausnahme, nicht der No
 Begründung steht im Dateikopf von `Datensicht.tsx`, die Regel in Abschnitt AK3b des
 Drawer-Specs. Keine der 13 Katalogtabellen wird zu Karten.
 
+**Die erste Kachel-Überblicksfläche mit Bedienung ist das FMS-Tableau** (LFH-642,
+`kraefte/FmsTableau.tsx`). Es ist eine **Ansicht** der Fahrzeugseite (`?ansicht=tableau`,
+Sprungmarke) und kein eigenes Modul, weil Endpunkte und Live-Event am Schlüssel `fahrzeuge`
+hängen. Die Kachel trägt genau ein Bedienziel, `StatusWahl`, und ist selbst nicht klickbar.
+Sortiert wird nach Abschnitt → Einheit → Funkrufname, nie nach Status. Die Ziffern 0–9 sind
+über `fms_anker` nur Beschleuniger: Ein doppelt belegter Anker setzt nichts. Formverdikt und
+Prüfliste stehen in `docs/superpowers/specs/2026-09-23-lfh-642-pruefliste.md`.
+
 **ETB-Nachzüge LFH-463/464:** Der `tabelleAb`-Punkt, den LFH-464 der ETB-Chronologie als
 einziger Konsumentin nach Browsermessung auf `xl` gesetzt hatte (`lg` behob den gemessenen
 1024-px-Engpass nicht), ist mit dem Neuentwurf (22.09.2026) **entfallen** — das Tagebuch ist
@@ -328,9 +338,23 @@ die **neunzehnte** Konsumentin, LFH-330/AP8), ebenso die **Lagemeldungen**
 (`pages/LagemeldungenPage.tsx`, Zeitachse mit Typkante „Lage"), und `KARTEN_EIGENBAU` ist
 **wieder leer** (`datensicht.guard.test.ts` pinnt die Länge 0). Die Seite trägt auf breitem
 Schirm rechts eine Seitenleiste „Bilanz" (`etb/EtbBilanz.tsx`) — **nicht** „Tagesbilanz" wie
-im Entwurf: sie zählt nur die geladenen Einträge, Summen und Gesamtzahl fehlen serverseitig
-(LFH-612) — und die Erfassung **unten** am Fuß der Zeitachse (`.etb-erfassung-sticky` in
+im Entwurf — und die Erfassung **unten** am Fuß der Zeitachse (`.etb-erfassung-sticky` in
 `index.css`, Grund `kopf`).
+**Kopfzahl und Bilanz zählt der Server, über DENSELBEN Filter wie die Liste** (LFH-612,
+`GET …/etb/zaehler`, gemeinsame Bedingung `etb/repo.rs:filter_bedingung`): ohne Filter „412
+Einträge" und „Bilanz", mit Filter „7 Treffer" und „Bilanz im Filter". Eine feste Tagesgrenze
+gibt es nicht (der Server kennt keine Zeitzone), einen Tag zeigt der Zeitraumfilter. Lädt die
+Zählung noch oder ist sie gescheitert, steht **keine** Zahl da — nie eine Zählung des geladenen
+Fensters. Liste und Zählung parsen ihre Parameter über `routes/etb.rs:filter_merkmale`; eine
+zweite Kopie wäre die Stelle, an der „n Treffer" und die Liste still auseinanderliefen
+(`tests/etb_zaehler.rs` prüft die Parität gegen die seitenweise geladene Liste).
+**Modulzähler** (LFH-612, `GET …/modul-zaehler`, `src/einsatz/zaehler.rs`): nur Module mit
+belegter Bedeutung — ETB, Betroffene, Einheiten, Einsatzabschnitte als Gesamtmenge; Meldungen,
+Aufträge, Erinnerungen, Chat mit ihrer bisherigen Handlungsmenge. Ein nicht erlaubtes Modul
+**fehlt** in der Antwort statt 0 (Rechte über `berechtigung::erlaubte_module`, dieselbe
+Auswertung wie der Live-Feed). Ein weiteres Modul braucht eine eigene Entscheidung. Wer eine
+gezählte Liste live invalidiert, invalidiert `modulZaehler` mit — `queryKeys.test.ts` leitet
+das aus `ZAEHLER_LISTEN_KEYS` ab.
 **Eine gemessene Falle bleibt, auch ohne Datensicht:** jede Zeile trägt
 `data-lfh="datensicht-karte"` und die Zeilenklasse selbst — daran findet `scrolleZurZeile` sie,
 und daran hängt der Deeplink `?eintrag=`. Wer einen neuen Eigenbau in `KARTEN_EIGENBAU`

@@ -37,7 +37,7 @@ import { holeRueckmeldungen } from '../../api/meldungen';
 import { pegelAbfrage } from '../../api/pegel';
 import { PEGEL_STAND_UNBEKANNT, pegelNotizKurz } from '../../pegel/pegelKennzahl';
 import { listeAbloesungen } from '../../api/abloesungen';
-import { darfZaehlerLaden } from '../../einsatz/useModulZaehler';
+import { darfZaehlerZeigen } from '../../einsatz/useModulZaehler';
 import {
   auftraegePfad,
   einheitenPfad,
@@ -263,13 +263,13 @@ export default function UeberblickPage() {
   });
   // LFH-635: Ablösungsmarken nur, wenn das Modul für diese Person sichtbar und frei ist —
   // sonst gäbe es ein 403 und einen Seitenkanal über ausgeblendete Daten (dieselbe Prüfung
-  // wie beim Modulzähler, `darfZaehlerLaden`).
+  // wie beim Modulzähler, `darfZaehlerZeigen`).
   const overridesQ = useQuery({
     queryKey: einsatzKeys.modulOverrides(einsatzId),
     queryFn: () => ladeModulOverrides(einsatzId),
   });
   const abloesungSichtbar =
-    overridesQ.isSuccess && darfZaehlerLaden('abloesung', benutzer, overridesQ.data);
+    overridesQ.isSuccess && darfZaehlerZeigen('abloesung', benutzer, overridesQ.data);
   // LFH-633: die Marke „Erwarteter Höchststand" führt auf „Wetter & Pegel", wenn das Modul
   // frei ist, sonst auf die Pflege (`pegelZielPfad`).
   const wetterPegelFrei =

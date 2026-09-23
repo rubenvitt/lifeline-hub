@@ -1,5 +1,6 @@
 pub mod lesemarke;
 pub mod repo;
+pub mod zaehler;
 
 use crate::error::AppError;
 use chrono::{DateTime, NaiveDateTime, Utc};

@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ladeBetreuung } from '../api/betreuung';
 import { einsatzKeys } from '../api/queryKeys';
 import type { BenutzerAnzeige, ModulOverrides } from '../api/types';
-import { darfZaehlerLaden } from '../einsatz/useModulZaehler';
+import { darfZaehlerZeigen } from '../einsatz/useModulZaehler';
 import { evakuierungKennzahl, type EvakuierungKennzahl } from './evakuierungKennzahl';
 
 /**
@@ -35,7 +35,7 @@ interface Args {
  * DIESELBE Query wie Modulseite und Modulzähler (`einsatzKeys.betreuung`) — ein Abruf, ein
  * Cache-Fach, und das Live-Ereignis `betreuung` frischt alle drei auf.
  *
- * Gegatet über `darfZaehlerLaden('betreuung', …)`: dieselbe Rechteprüfung wie der Zähler in
+ * Gegatet über `darfZaehlerZeigen('betreuung', …)`: dieselbe Rechteprüfung wie der Zähler in
  * der Navigation, nicht eine zweite, die auseinanderlaufen könnte.
  */
 export function useEvakuierungKennzahl({
@@ -43,7 +43,7 @@ export function useEvakuierungKennzahl({
   benutzer,
   overrides,
 }: Args): EvakuierungKennzahlZustand {
-  const aktiv = Number.isFinite(einsatzId) && darfZaehlerLaden('betreuung', benutzer, overrides);
+  const aktiv = Number.isFinite(einsatzId) && darfZaehlerZeigen('betreuung', benutzer, overrides);
   const query = useQuery({
     queryKey: einsatzKeys.betreuung(einsatzId),
     queryFn: () => ladeBetreuung(einsatzId),

@@ -13,9 +13,15 @@ const folge = (module: ModulEintrag[], marken: Sprungmarke[]) =>
   navZeilen(module, marken).map((z) => (z.art === 'modul' ? z.modul.key : `↗${z.marke.key}`));
 
 describe('Sprungmarken (LFH-620)', () => {
-  it('führt genau die drei entschiedenen Sichten', () => {
-    // Die übrigen Module des Entwurfs sind Folgetasks oder verworfen — siehe LFH-620.
-    expect(sprungmarken.map((m) => m.key)).toEqual(['entscheidungen', 'patienten', 'vermisste']);
+  it('führt genau die entschiedenen Sichten', () => {
+    // Die übrigen Module des Entwurfs sind Folgetasks oder verworfen — siehe LFH-620. Das
+    // FMS-Tableau ist LFH-642: eine Ansicht der Fahrzeugseite, kein eigenes Modul.
+    expect(sprungmarken.map((m) => m.key)).toEqual([
+      'entscheidungen',
+      'patienten',
+      'vermisste',
+      'fms-tableau',
+    ]);
   });
 
   it('springt über die zentralen Builder auf die erwarteten Adressen', () => {
@@ -25,6 +31,7 @@ describe('Sprungmarken (LFH-620)', () => {
       entscheidungen: '/einsaetze/7/etb?typ=entscheidung',
       patienten: '/einsaetze/7/personen?filter=alle&ansicht=raster',
       vermisste: '/einsaetze/7/personen?filter=vermisst&ansicht=zeilen',
+      'fms-tableau': '/einsaetze/7/fahrzeuge?ansicht=tableau',
     });
   });
 
@@ -69,6 +76,16 @@ describe('Sprungmarken (LFH-620)', () => {
         'schaeden',
       ],
     );
+    expect(folge(moduleNachKategorie('kraefte'), sprungmarkenNachKategorie('kraefte'))).toEqual([
+      'kraefteuebersicht',
+      'einheiten',
+      'personal',
+      'fahrzeuge',
+      '↗fms-tableau',
+      'material',
+      'bereitstellungsraeume',
+      'abloesung',
+    ]);
   });
 
   it('hängt eine Marke ohne auffindbaren Anker ans Ende, statt sie zu verlieren', () => {

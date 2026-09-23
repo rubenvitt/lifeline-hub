@@ -185,7 +185,11 @@ export default function ChatPage() {
     let aktiv = true;
     void markiereKanalGelesen(einsatzId, kanalId)
       .then(() => {
-        if (aktiv) void qc.invalidateQueries({ queryKey: einsatzKeys.chatKanaele(einsatzId) });
+        if (!aktiv) return;
+        void qc.invalidateQueries({ queryKey: einsatzKeys.chatKanaele(einsatzId) });
+        // Das Lesen ist benutzereigen und erzeugt kein Live-Ereignis — der Chat-Zähler im
+        // Navigationsrahmen (LFH-612) fiele sonst erst beim nächsten fremden Ereignis.
+        void qc.invalidateQueries({ queryKey: einsatzKeys.modulZaehler(einsatzId) });
       })
       .catch(() => {
         // Die Kanalliste behält ihren ungelesenen Stand und macht den Fehlschlag damit sichtbar;

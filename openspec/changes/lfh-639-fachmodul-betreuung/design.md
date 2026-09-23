@@ -324,7 +324,7 @@ das Paar „kein Bezirk → null“ / „Abruffehler → Zustand fehler“ auf H
 (`useEvakuierungKennzahl`), damit LFH-607 den Hook nur noch einsetzen muss. Der Hook liefert
 vier Zustände: `aus` (Modul ausgeblendet oder gesperrt, kein Abruf), `laden`, `fehler` (hat
 Vorrang vor Altdaten im Cache) und `daten` mit `kennzahl` oder `null`. Er lädt nur hinter
-`darfZaehlerLaden('betreuung', …)`, sonst antwortet das Backend mit 403, und er teilt den
+`darfZaehlerZeigen('betreuung', …)` (bis LFH-612 `darfZaehlerLaden`), sonst antwortet das Backend mit 403, und er teilt den
 Query-Key `einsatzKeys.betreuung` mit Seite und Modulzähler.
 
 ### D10 — Registrierung und Guards
@@ -333,7 +333,7 @@ Die vollständige Liste steht in `tasks.md`. Diese Stellen sind **ohne** Guard u
 leicht übersehen:
 
 - (a) die zusätzliche Invalidierung am Ereignis `abschnitt` (D6),
-- (b) das Konsumenten-Gating über `darfZaehlerLaden`,
+- (b) das Konsumenten-Gating über `darfZaehlerZeigen`,
 - (c) der ETB-Eintrag je Meldung, gesichert nur über Tests,
 - (d) e2e-Route in `gate1-ueberlauf.spec.ts`,
 - (e) Fixture-Namen ohne „Betreuung“, weil die Palette Module und Einsätze gemeinsam

@@ -10,14 +10,14 @@ import { useModulZaehler } from './useModulZaehler';
 
 /**
  * Der Hook des Modulzählers am Draht (LFH-639, Prüfliste Tabelle 3 „Sichtbarkeit"). Der Test
- * der reinen Funktion `darfZaehlerLaden` in `useModulZaehler.test.ts` sieht NICHT, ob die
+ * der reinen Funktion `darfZaehlerZeigen` in `useModulZaehler.test.ts` sieht NICHT, ob die
  * Entscheidung an der `useQuery` ankommt — fiele `enabled: betreuungAktiv` weg, bliebe er grün,
  * und die Navigation fragte ein verstecktes Modul ab (403-Rauschen, Seitenkanal). Deshalb hier
  * der MSW-Anfragezähler als Paar: versteckt → 0 Anfragen, sichtbar → genau 1.
  *
- * Die sechs anderen Zählermodule sind in beiden Fällen ausgeblendet: ihre Abrufe liefen sonst
- * gegen `onUnhandledRequest: 'error'` (`test/setup.ts`), und der Test prüfte nebenbei fremde
- * Module.
+ * Die anderen Zählermodule sind in beiden Fällen ausgeblendet, damit der Test keine fremden
+ * Module mitprüft; die Serverabfrage `modul-zaehler` (LFH-612) beantwortet der Vorgabe-Handler
+ * aus `test/server.ts`.
  */
 
 const benutzer: BenutzerAnzeige = {

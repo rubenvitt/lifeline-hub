@@ -66,7 +66,7 @@ describe('modulRegistry', () => {
       label: 'Betreuung',
       route: 'betreuung',
       status: 'fertig',
-      // Ohne Zählerquelle fände `darfZaehlerLaden('betreuung', …)` kein Modul und der
+      // Ohne Zählerquelle fände `darfZaehlerZeigen('betreuung', …)` kein Modul und der
       // Zähler wie die Kennzahl blieben still aus.
       zaehlerQuelle: 'betreuung',
     });

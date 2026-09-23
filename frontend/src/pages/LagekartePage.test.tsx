@@ -290,6 +290,32 @@ const FUEHRUNGSKRAFT_VERORTET = {
   ist_abschnittsleiter: false,
 };
 
+// Betroffene Person mit Fundort (LFH-648). Name und Vorname sind ABSICHTLICH gesetzt: die
+// Lagekarte darf sie nie zeigen, und nur ein gesetzter Name kann das belegen.
+const PERSON_VERORTET = {
+  id: 11,
+  einsatz_id: 1,
+  registrier_nr: 42,
+  status: 'betroffen',
+  name: 'Kowalski',
+  vorname: 'Anna',
+  geschlecht: null,
+  geburtsdatum: null,
+  alter_geschaetzt: null,
+  herkunft_adresse: null,
+  antreff_ort: null,
+  melder_kontakt: null,
+  notiz: null,
+  aktuelle_sichtung: 'sk2',
+  antreff_lat: 50.05,
+  antreff_lon: 8.55,
+  erfasst_at: '',
+  erfasst_von: 1,
+  geaendert_at: '',
+  geaendert_von: 1,
+  storniert_at: null,
+};
+
 const ORG_DRK = { id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' };
 
 // Einsatz-Einstellungen: die Seite liest davon heute nichts, die Query läuft aber (Render-
@@ -338,6 +364,11 @@ function basisHandler(
       HttpResponse.json({ frist_min: 60, einheiten: [], abschnitte: [] }),
     ),
     http.get('/api/einsaetze/1/gefahrengebiete', () => HttpResponse.json([])),
+    // Ebene „Betroffene" (LFH-648): ohne Anmeldung (`/auth/me` → 401) ist das Modul im Client
+    // frei, die Query läuft also in JEDEM Test — ohne diese zwei Handler stünde „Betroffene"
+    // überall im Ausfallbanner.
+    http.get('/api/einsaetze/1/modul-overrides', () => HttpResponse.json({})),
+    http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])),
     http.get('/api/organisation', () =>
       HttpResponse.json({ id: 1, name: 'Org', tz_organisation: null }),
     ),
@@ -1637,5 +1668,150 @@ describe('LagekartePage · Neuentwurf S5', () => {
     // Geschwister im Fluss des Fußes (LFH-355) — die Positionierung gehört dem Rahmen.
     expect(band.parentElement?.dataset.lfh).toBe('karten-fuss');
     expect(band.style.position).toBe('');
+  });
+});
+
+/**
+ * Ebene „Betroffene" (LFH-648). Die Zugriffsgrenze sitzt an der DATENquelle, nicht am
+ * Schalter: eine geteilte Ansicht mit eingeschalteter Ebene darf für jemanden ohne das Modul
+ * „Personen" nichts zeigen. Die Tests führen deshalb Paare — mit/ohne Zugriff bei derselben
+ * Ansicht.
+ */
+describe('LagekartePage · Ebene „Betroffene" (LFH-648)', () => {
+  it('Bestandsansicht ohne Schalterwert: keine Personen-Marker, obwohl eine Person verortet ist', async () => {
+    // Regressionsschutz für den Umbau: vorher schloss ein harter Filter Personen aus, danach
+    // trägt die Vorgabe „aus" (LAYER_DEFAULT.person = false) dieselbe Aussage.
+    basisHandler([
+      http.get('/api/einsaetze/1/personen', () => HttpResponse.json([PERSON_VERORTET])),
+    ]);
+    renderSeite();
+    // Warten, bis die übrigen Marker stehen — sonst wäre die Negativaussage trivial.
+    expect(await screen.findByText('marker-schaden-9')).toBeInTheDocument();
+    expect(screen.queryByText(/^marker-person-/)).not.toBeInTheDocument();
+  });
+
+  /** Dieselbe geteilte Ansicht in jedem Fall: „Betroffene" ist eingeschaltet. */
+  const ANSICHT_BETROFFENE_AN = http.get('/api/einsaetze/1/karten-ansichten', () =>
+    HttpResponse.json([
+      {
+        id: 1,
+        einsatz_id: 1,
+        name: 'Standard',
+        reihenfolge: 0,
+        ist_standard: true,
+        layer_sichtbar: { person: true },
+        erstellt_at: '',
+        geaendert_at: '',
+      },
+    ]),
+  );
+
+  it('mit Zugriff: die eingeschaltete Ebene zeichnet die Person — ohne Namen', async () => {
+    basisHandler([
+      ANSICHT_BETROFFENE_AN,
+      http.get('/api/einsaetze/1/personen', () => HttpResponse.json([PERSON_VERORTET])),
+    ]);
+    renderSeite();
+    expect(await screen.findByText('marker-person-11')).toBeInTheDocument();
+    expect(screen.queryByText(/Kowalski|Anna/)).not.toBeInTheDocument();
+  });
+
+  it('403 trotz eingeschalteter Ebene: kein Personen-Marker und KEIN Ausfallhinweis', async () => {
+    basisHandler([
+      ANSICHT_BETROFFENE_AN,
+      http.get('/api/einsaetze/1/personen', () => new HttpResponse(null, { status: 403 })),
+    ]);
+    renderSeite();
+    expect(await screen.findByText('marker-schaden-9')).toBeInTheDocument();
+    // Die Zeile kippt erst nach der Antwort auf „gesperrt" — auf sie warten, sonst wäre die
+    // Negativaussage vor dem 403 trivial.
+    expect(await screen.findByText('Keine Berechtigung')).toBeInTheDocument();
+    expect(screen.queryByText(/^marker-person-/)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('lagebild-unvollstaendig')).not.toBeInTheDocument();
+  });
+
+  it('Modul ausgeblendet trotz eingeschalteter Ebene: kein Marker, keine Zeile, kein Request', async () => {
+    let anfragen = 0;
+    basisHandler([
+      ANSICHT_BETROFFENE_AN,
+      http.get('/api/einsaetze/1/modul-overrides', () =>
+        HttpResponse.json({ personen: { sichtbar: false, benoetigte_rolle: null } }),
+      ),
+      http.get('/api/einsaetze/1/personen', () => {
+        anfragen += 1;
+        return HttpResponse.json([PERSON_VERORTET]);
+      }),
+    ]);
+    renderSeite();
+    expect(await screen.findByText('marker-schaden-9')).toBeInTheDocument();
+    expect(await screen.findByRole('switch', { name: 'Schäden' })).toBeInTheDocument();
+    expect(screen.queryByRole('switch', { name: /Betroffene/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/^marker-person-/)).not.toBeInTheDocument();
+    expect(anfragen).toBe(0);
+  });
+
+  it('Benutzer ohne Zugriff speichert die geteilte Ansicht: „Betroffene" bleibt eingeschaltet', async () => {
+    // Das Flag gehört der geteilten Ansicht. Würde es für Benutzer ohne Recht auf `false`
+    // „bereinigt", überschriebe das Speichern die Wahl der Führungskraft (design D4).
+    let body: Record<string, unknown> | null = null;
+    basisHandler([
+      ANSICHT_BETROFFENE_AN,
+      http.get('/api/einsaetze/1/personen', () => new HttpResponse(null, { status: 403 })),
+      http.patch('/api/einsaetze/1/karten-ansichten/1', async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ id: 1, einsatz_id: 1, name: 'Standard', ist_standard: true });
+      }),
+    ]);
+    const user = userEvent.setup();
+    renderSeite();
+    // Vorbedingung: der Zugriff ist wirklich gesperrt, nicht bloß noch nicht geladen.
+    expect(await screen.findByText('Keine Berechtigung')).toBeInTheDocument();
+    await user.click(screen.getByRole('switch', { name: 'Schäden' }));
+    await user.click(await screen.findByRole('button', { name: /In dieser Ansicht speichern/ }));
+    await waitFor(() => expect(body).not.toBeNull());
+    const layer = body!.layer_sichtbar as Record<string, boolean>;
+    expect(layer.schaden).toBe(false);
+    expect(layer.person).toBe(true);
+  });
+
+  it('Ausfall der Personenliste (500): Hinweis nennt „Betroffene", Kopfzahl und Objektlisten bleiben', async () => {
+    basisHandler([
+      ANSICHT_BETROFFENE_AN,
+      http.get('/api/einsaetze/1/personen', () => new HttpResponse(null, { status: 500 })),
+    ]);
+    renderSeite();
+    const overlay = await screen.findByTestId('lagebild-unvollstaendig');
+    expect(overlay).toHaveTextContent('Lagebild unvollständig: Betroffene');
+    // Personen stehen weder in der Kopfzahl noch in „Nicht verortet" — ihr Ausfall darf dort
+    // keine Zahl zu „—" machen (Spec: Startausschnitt und Kopfzahl ohne Betroffene).
+    expect(screen.getByText('1 verortet · 1 nicht verortet')).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'Schäden' })).toHaveTextContent('Schäden1');
+    expect(screen.getByRole('switch', { name: 'Betroffene' })).toHaveTextContent('Betroffene—');
+  });
+
+  it('die Kopfzahl „verortet" zählt Betroffene nicht mit', async () => {
+    basisHandler([
+      ANSICHT_BETROFFENE_AN,
+      http.get('/api/einsaetze/1/personen', () => HttpResponse.json([PERSON_VERORTET])),
+    ]);
+    renderSeite();
+    expect(await screen.findByText('marker-person-11')).toBeInTheDocument();
+    // Ein Schaden ist verortet, die UHS nicht — die Person darf die „1" nicht zur „2" machen.
+    expect(screen.getByText('1 verortet · 1 nicht verortet')).toBeInTheDocument();
+  });
+
+  it('ein Klick auf den Personen-Marker füllt „Ausgewählt" mit Registriernummer und Sichtung', async () => {
+    basisHandler([
+      ANSICHT_BETROFFENE_AN,
+      http.get('/api/einsaetze/1/personen', () => HttpResponse.json([PERSON_VERORTET])),
+    ]);
+    const user = userEvent.setup();
+    renderSeite();
+    await user.click(await screen.findByText('marker-person-11'));
+    expect(await screen.findByText('R-042 · SK II')).toBeInTheDocument();
+    expect(screen.queryByText(/Kowalski|Anna/)).not.toBeInTheDocument();
+    // Item-Route (Deeplink-Muster LFH-25), nicht die Einsatzdaten des `default`-Zweigs.
+    const link = await screen.findByRole('link', { name: /Im Fachmodul öffnen/ });
+    expect(link).toHaveAttribute('href', '/einsaetze/1/personen/11');
   });
 });

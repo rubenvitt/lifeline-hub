@@ -224,6 +224,13 @@ export interface components {
             quittiert_von_id?: number | null;
             snap_anzeige: string;
         };
+        /** @description Aufträge: offen (offen/in Arbeit), davon überfällig. */
+        AuftragsZaehler: {
+            /** Format: int64 */
+            offen: number;
+            /** Format: int64 */
+            ueberfaellig: number;
+        };
         /** @enum {string} */
         Ausmass: "gering" | "mittel" | "gross" | "katastrophal";
         /** @description Öffentliche Darstellung eines Providers für die Login-UI (`GET /api/auth/providers`). */
@@ -613,6 +620,11 @@ export interface components {
             inhalt?: string | null;
             /** Format: int64 */
             kanal_id: number;
+        };
+        /** @description Chat: für den anfragenden Benutzer ungelesene Nachrichten über alle Kanäle. */
+        ChatZaehler: {
+            /** Format: int64 */
+            ungelesen: number;
         };
         /**
          * @description Dienststatus im Stamm (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `dienststatus`.
@@ -1168,6 +1180,11 @@ export interface components {
          * @enum {string}
          */
         ErinnerungStatus: "offen" | "erledigt" | "quittiert";
+        /** @description Erinnerungen: fällig und noch offen. */
+        ErinnerungsZaehler: {
+            /** Format: int64 */
+            faellig: number;
+        };
         /** @description Trefferzahl eines ETB-Filters (`GET /api/einsaetze/{id}/etb/anzahl`). */
         EtbAnzahlAnzeige: {
             /**
@@ -1274,6 +1291,34 @@ export interface components {
          * @enum {string}
          */
         EtbTyp: "meldung" | "anordnung" | "lage" | "entscheidung" | "system" | "berichtigung";
+        /**
+         * @description Zahl der Einträge je Eintragstyp. Jeder Typ ist Pflichtfeld: ein Typ ohne Einträge
+         *     steht als 0 da und fehlt nie — sonst hieße ein fehlendes Feld zweierlei.
+         */
+        EtbTypZaehler: {
+            /** Format: int64 */
+            anordnung: number;
+            /** Format: int64 */
+            berichtigung: number;
+            /** Format: int64 */
+            entscheidung: number;
+            /** Format: int64 */
+            lage: number;
+            /** Format: int64 */
+            meldung: number;
+            /** Format: int64 */
+            system: number;
+        };
+        /** @description Antwort von `GET /api/einsaetze/{id}/etb/zaehler`. */
+        EtbZaehlerAnzeige: {
+            /**
+             * Format: int64
+             * @description Zahl aller Einträge, die zum Filter passen (ohne Filter: das ganze Tagebuch).
+             *     Per Konstruktion die Summe über `je_typ`.
+             */
+            gesamt: number;
+            je_typ: components["schemas"]["EtbTypZaehler"];
+        };
         /** @description Öffentliche Darstellung eines Evakuierungsbezirks mit seinem aktuellen Stand. */
         EvakuierungsbezirkAnzeige: {
             /** Format: int64 */
@@ -1889,11 +1934,23 @@ export interface components {
          * @enum {string}
          */
         MeldungStatus: "neu" | "gesichtet" | "in_bearbeitung" | "erledigt";
+        /** @description Meldungen: offen (Status ≠ erledigt), davon noch nicht gesichtet (Status „neu"). */
+        MeldungsZaehler: {
+            /** Format: int64 */
+            offen: number;
+            /** Format: int64 */
+            ungesehen: number;
+        };
         /**
          * @description Meldungsart (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `meldungsart`.
          * @enum {string}
          */
         Meldungsart: "lagemeldung" | "sofortmeldung" | "rueckmeldung" | "vollzugsmeldung" | "anfrage" | "sonstige";
+        /** @description Eine reine Menge (Gesamtzahl der Datensätze eines Moduls). */
+        MengenZaehler: {
+            /** Format: int64 */
+            gesamt: number;
+        };
         /** @description Mitglied eines Einsatzes für API-Antworten (mit Benutzer-Klartext, ohne Hash). */
         MitgliedAnzeige: {
             anzeigename: string;
@@ -1903,6 +1960,20 @@ export interface components {
             einsatz_rolle: components["schemas"]["EinsatzRolle"];
             fuehrungsstelle?: string | null;
             zugewiesen_at: string;
+        };
+        /**
+         * @description Antwort von `GET /api/einsaetze/{id}/modul-zaehler`. Feldnamen = Modul-Keys
+         *     (`MODUL_KEYS`, Test unten); ein fehlendes Feld heißt „Modul nicht erlaubt".
+         */
+        ModulZaehlerAnzeige: {
+            auftraege?: null | components["schemas"]["AuftragsZaehler"];
+            chat?: null | components["schemas"]["ChatZaehler"];
+            einheiten?: null | components["schemas"]["MengenZaehler"];
+            einsatzabschnitte?: null | components["schemas"]["MengenZaehler"];
+            erinnerungen?: null | components["schemas"]["ErinnerungsZaehler"];
+            etb?: null | components["schemas"]["MengenZaehler"];
+            meldungen?: null | components["schemas"]["MeldungsZaehler"];
+            personen?: null | components["schemas"]["MengenZaehler"];
         };
         /**
          * @description Anzeige einer Nachforderung inkl. Ersteller-Name (JOIN) und abgeleitetem `ist_offen`

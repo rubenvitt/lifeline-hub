@@ -37,8 +37,22 @@ export type ModulStatus = 'fertig' | 'geplant' | 'wip';
 export type KategorieKey =
   'fuehrung' | 'kraefte' | 'erfassung' | 'lage' | 'kommunikation' | 'einstellungen';
 export type BenoetigteRolle = 'admin' | 'fuehrungskraft';
-export type ModulZaehlerQuelle =
-  'meldungen' | 'auftraege' | 'erinnerungen' | 'chat' | 'dokumente' | 'abloesung' | 'betreuung';
+/** Module mit Navigationszähler, die der SERVER zählt (LFH-612). Die Bedeutung je Quelle
+ *  legt `src/einsatz/zaehler.rs` fest — nur für Module, deren Zahl aus dem Entwurf belegt ist. */
+export type ServerZaehlerQuelle =
+  | 'etb'
+  | 'personen'
+  | 'einheiten'
+  | 'einsatzabschnitte'
+  | 'meldungen'
+  | 'auftraege'
+  | 'erinnerungen'
+  | 'chat';
+/** Module, deren Zähler der BROWSER aus der eigenen Modulliste rechnet (LFH-632, LFH-635,
+ *  LFH-639). `abloesung` hängt an der Uhr (Vorwarnzeit), ein Server-Schnappschuss trüge das
+ *  nicht; `betreuung` teilt sich die Übersicht mit Seite und Kennzahl. */
+export type ClientZaehlerQuelle = 'dokumente' | 'abloesung' | 'betreuung';
+export type ModulZaehlerQuelle = ServerZaehlerQuelle | ClientZaehlerQuelle;
 
 export interface Kategorie {
   key: KategorieKey;
@@ -132,6 +146,7 @@ export const modulRegistry: ModulEintrag[] = [
     route: 'einsatzabschnitte',
     status: 'fertig',
     beschreibung: 'Gliederung des Einsatzes in Abschnitte und Zuordnung von Einheiten.',
+    zaehlerQuelle: 'einsatzabschnitte',
   },
   {
     key: 'auftraege',
@@ -182,6 +197,7 @@ export const modulRegistry: ModulEintrag[] = [
     route: 'einheiten',
     status: 'fertig',
     beschreibung: 'Taktische Einheiten: Führer, Mannschaft, Fahrzeug, Abschnittszuordnung.',
+    zaehlerQuelle: 'einheiten',
   },
   {
     key: 'personal',
@@ -240,6 +256,7 @@ export const modulRegistry: ModulEintrag[] = [
     route: 'etb',
     status: 'fertig',
     beschreibung: 'Einsatztagebuch.',
+    zaehlerQuelle: 'etb',
   },
   {
     key: 'personen',
@@ -250,6 +267,7 @@ export const modulRegistry: ModulEintrag[] = [
     status: 'fertig',
     beschreibung:
       'Ein Personenstamm mit Status-Lebenszyklus (vermisst → betroffen → Patient → verstorben).',
+    zaehlerQuelle: 'personen',
   },
   {
     key: 'unfallhilfsstellen',
@@ -517,13 +535,13 @@ export function istModulSichtbar(modul: ModulEintrag, overrides?: ModulOverrides
  * war im Bestand unbeobachtbar (alle vier Trägermodule sind `fertig`) und ist über einen
  * Registry-Stub in `command-palette/befehle.modulstatus.test.ts` beobachtbar gemacht.
  *
- * BEWUSST NICHT MIT UMGESTELLT: `useModulZaehler.ts` (`darfZaehlerLaden`) führt die
- * ZWEITEILIGE Variante ohne `status === 'fertig'`. Das ist heute unbeobachtbar — alle sieben
- * Module mit `zaehlerQuelle` (chat, erinnerungen, auftraege, meldungen, dokumente, abloesung,
- * betreuung) sind `fertig`,
- * beide Fassungen liefern also dasselbe. Ob ein Zähler auch für ein UNFERTIGES Modul laden
- * darf, ist eine fachliche Entscheidung und keine Aufräumarbeit; sie steht offen. Wer sie
- * trifft, zieht die Stelle nach oder schreibt hier hin, warum sie eigenständig bleibt.
+ * BEWUSST NICHT MIT UMGESTELLT: `useModulZaehler.ts` (`darfZaehlerZeigen`) führt die
+ * ZWEITEILIGE Variante ohne `status === 'fertig'`. Das ist heute unbeobachtbar — alle elf
+ * Module mit `zaehlerQuelle` (acht vom Server gezählt, `dokumente`, `abloesung` und
+ * `betreuung` im Browser) sind `fertig`, beide Fassungen liefern also dasselbe. Ob ein Zähler auch an einem
+ * UNFERTIGEN Modul stehen darf, ist eine fachliche Entscheidung und keine Aufräumarbeit; sie
+ * steht offen. Wer sie trifft, zieht die Stelle nach oder schreibt hier hin, warum sie
+ * eigenständig bleibt.
  */
 export function istModulFreigegeben(
   modul: ModulEintrag,
@@ -541,7 +559,7 @@ export function istModulFreigegeben(
  * {@link istModulFreigegeben} über den Modul-Key — für Verweise AUS anderen Seiten auf ein
  * Modul (LFH-633: Pegel-Kennzahl und Überblick-Marke → „Wetter & Pegel"). Ein unbekannter
  * Key ist nie frei: ein Link auf ein Modul, das es nicht gibt, wäre ein Sprung ins Leere.
- * Bewusst nicht `darfZaehlerLaden` — das findet sein Modul über `zaehlerQuelle` und sagte
+ * Bewusst nicht `darfZaehlerZeigen` — das findet sein Modul über `zaehlerQuelle` und sagte
  * für jedes Modul ohne Zähler still `false`.
  */
 export function istKeyFreigegeben(

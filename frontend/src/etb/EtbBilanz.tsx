@@ -1,6 +1,6 @@
 import { CheckOutlined } from '@ant-design/icons';
 import { Link } from 'react-router';
-import type { EtbEintragAnzeige } from '../api/types';
+import type { EtbEintragAnzeige, EtbZaehler } from '../api/types';
 import {
   Augenbraue,
   Balken,
@@ -16,7 +16,7 @@ import { etbPfad } from '../routing/deeplinks';
 import { etbTypFarbe } from '../theme/statusFarben';
 import {
   berichtigungsindex,
-  bilanzUmfang,
+  kopfMeta,
   letzteBerichtigungen,
   typBilanz,
   verweisStil,
@@ -25,13 +25,16 @@ import {
 
 interface Props {
   einsatzId: number;
-  /** Die geladenen, gesendeten Einträge (ohne Puffer). */
+  /** Die geladenen, gesendeten Einträge (ohne Puffer) — Quelle der Berichtigungen. */
   eintraege: readonly EtbEintragAnzeige[];
-  /** Liegen ältere Seiten noch auf dem Server? */
-  weitereSeiten: boolean;
+  /** Serverseitige Zählung über denselben Filter wie die Liste; fehlt, solange sie lädt
+   *  oder gescheitert ist (LFH-612). */
+  zaehler: EtbZaehler | undefined;
+  /** Die Zählung ist gescheitert (sonst: sie lädt noch). */
+  zaehlerFehler: boolean;
   filterAktiv: boolean;
   puffer: PufferZustand;
-  /** Der Abruf läuft oder ist gescheitert — dann wird nichts gezählt. */
+  /** Der Listenabruf läuft oder ist gescheitert — dann gibt es keine Berichtigungen. */
   unbestimmt: boolean;
 }
 
@@ -49,38 +52,49 @@ const MEHRZAHL: Record<EtbEintragAnzeige['typ'], string> = {
  * Die Seitenleiste des Einsatztagebuchs (Neuentwurf S4): Bilanz nach Typ, jüngste
  * Berichtigungen, Zustand des Puffers.
  *
- * ── WARUM „BILANZ" UND NICHT „TAGESBILANZ" — UND WARUM ÜBERHAUPT ────────────────────
+ * ── WARUM „BILANZ" UND NICHT „TAGESBILANZ" ─────────────────────────────────────────
  *
- * Der Entwurf zeigt „Tagesbilanz" mit Summen wie „218 Meldungen". Der Server liefert
- * keine Summen je Typ und keine Gesamtzahl (LFH-612), und die Seite lädt das Tagebuch in
- * Fenstern zu hundert Einträgen, neueste zuerst. Eine Zahl ohne Beschriftung behauptete
- * also eine Vollständigkeit, die es nicht gibt — derselbe Einwand, mit dem die
- * Vorgängerin die clientseitige Suche ablehnte.
+ * Der Entwurf zeigt „Tagesbilanz" mit Summen wie „218 Meldungen" — die sich dort aber zur
+ * Gesamtzahl des Kopfs („412 Einträge") addieren, also gerade keinen Kalendertag zählen.
+ * Seit LFH-612 zählt der Server exakt, und zwar über DENSELBEN Filter wie die Liste
+ * (Entscheidung vom 22.09.2026): ohne Filter das ganze Tagebuch („Bilanz"), mit Filter
+ * genau die Treffer („Bilanz im Filter"). Wer einen Tag sehen will, setzt den
+ * Zeitraumfilter — eine feste Tagesgrenze bräuchte eine Zeitzone, die der Server nicht
+ * kennt. Die Balken messen gegen die Gesamtzahl derselben Zählung.
  *
- * Weggelassen ist sie trotzdem nicht: die Aufteilung der GELADENEN Einträge ist echt und
- * für die laufende Lage nützlich (die jüngsten hundert Einträge sind die Lage). Sie steht
- * deshalb mit ihrem Umfang da — „in 100 geladenen Einträgen — ältere sind nicht
- * mitgezählt" bzw. „in allen 37 Einträgen", wenn wirklich alles geladen ist
- * ({@link bilanzUmfang}). Die Balken messen gegen die geladene Menge, nie gegen eine
- * Gesamtzahl, die es nicht gibt. „Tages-" entfällt: das Fenster ist kein Kalendertag.
+ * Solange die Zählung lädt oder gescheitert ist, steht KEINE Zahl da: eine Zählung des
+ * geladenen Fensters behauptete eine Vollständigkeit, die es nicht gibt.
+ *
+ * Die Berichtigungen darunter kommen weiter aus den geladenen Einträgen und sagen das.
  */
 export default function EtbBilanz({
   einsatzId,
   eintraege,
-  weitereSeiten,
+  zaehler,
+  zaehlerFehler,
   filterAktiv,
   puffer,
   unbestimmt,
 }: Props) {
   const { token, rollen } = useRollen();
   const { konventionen } = useAnzeigeKonventionen();
-  const bilanz = typBilanz(eintraege);
-  const umfang = bilanzUmfang({ geladen: eintraege.length, weitereSeiten, filterAktiv });
+  const bilanz = zaehler ? typBilanz(zaehler.je_typ) : [];
+  const gesamt = zaehler?.gesamt ?? 0;
+  const menge = filterAktiv
+    ? gesamt === 1
+      ? 'Treffer'
+      : 'Treffern'
+    : gesamt === 1
+      ? 'Eintrag'
+      : 'Einträgen';
   const berichtigungen = letzteBerichtigungen(eintraege);
   const index = berichtigungsindex(eintraege);
 
   return (
-    <Paneel titel="Bilanz" meta={unbestimmt ? undefined : 'geladene Einträge'}>
+    <Paneel
+      titel={filterAktiv ? 'Bilanz im Filter' : 'Bilanz'}
+      meta={kopfMeta({ gesamt: zaehler?.gesamt, filterAktiv })}
+    >
       <div
         style={{
           display: 'flex',
@@ -89,15 +103,12 @@ export default function EtbBilanz({
           padding: token.padding,
         }}
       >
-        {unbestimmt ? (
-          <span style={{ fontSize: 11, color: rollen.gedaempft }}>
-            Zählung folgt, sobald die Einträge geladen sind.
+        {!zaehler ? (
+          <span data-lfh="bilanz-offen" style={{ fontSize: 11, color: rollen.gedaempft }}>
+            {zaehlerFehler ? 'Zählung nicht verfügbar.' : 'Zählung folgt …'}
           </span>
         ) : (
           <>
-            <span data-lfh="bilanz-umfang" style={{ fontSize: 11, color: rollen.gedaempft }}>
-              {umfang}
-            </span>
             {bilanz.map((b) => (
               <div
                 key={b.typ}
@@ -116,9 +127,9 @@ export default function EtbBilanz({
                 </div>
                 <Balken
                   wert={b.anzahl}
-                  max={eintraege.length}
+                  max={gesamt}
                   farbe={etbTypFarbe(b.typ, token).kante}
-                  beschriftung={`${MEHRZAHL[b.typ]}: ${b.anzahl} von ${eintraege.length} geladenen Einträgen`}
+                  beschriftung={`${MEHRZAHL[b.typ]}: ${b.anzahl} von ${gesamt} ${menge}`}
                 />
               </div>
             ))}
