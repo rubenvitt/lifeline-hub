@@ -1,3 +1,22 @@
+## [1.0.0-alpha.35](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.34...v1.0.0-alpha.35) (2026-09-23)
+
+### Features
+
+* **abloesung:** Hinweis in der AlarmZentrale und Marken im Überblick (LFH-635) ([fe07ffb](https://github.com/rubenvitt/lifeline-hub/commit/fe07ffbe0d3c31ac4dbf24bd8b3c88fc058f717e))
+* **abloesung:** Routen, Live-Ereignis, Scheduler-Hinweis und Frontend-Unterbau (LFH-635) ([7e3ed37](https://github.com/rubenvitt/lifeline-hub/commit/7e3ed3712b42e5fa233aba654e16f1047d669ca5))
+* **abloesung:** Schichten, Fristen und Vollzug im Backend-Repo (LFH-635) ([c9b6dbd](https://github.com/rubenvitt/lifeline-hub/commit/c9b6dbde7fd19fb88f61aca5cff8d71ef2a39083))
+* **abloesung:** Seite mit Schichtliste, Vollzug, Rückgängig und Rhythmus-Vorgaben (LFH-635) ([650d30a](https://github.com/rubenvitt/lifeline-hub/commit/650d30a7c99c1ef8bb9d1841550cc8e98ef9e7bb))
+* **etb:** Zählroute für die Trefferzahl eines ETB-Filters (LFH-619) ([58d7d8c](https://github.com/rubenvitt/lifeline-hub/commit/58d7d8c0b7fa67d3f47807cb3cf6b29ce20a0e2c))
+* **palette:** Koordinatensprung auf die Lagekarte (LFH-619) ([e12ddfb](https://github.com/rubenvitt/lifeline-hub/commit/e12ddfb25cf35323003f1aa1085f11ad81e54403))
+* **palette:** Lageberichte, Gefahrengebiete, Abschnitte und ETB-Sammeltreffer (LFH-619) ([e126430](https://github.com/rubenvitt/lifeline-hub/commit/e12643014b3c61f6b405a1b5947dd286bc5252e9))
+
+### Bug Fixes
+
+* **abloesung:** Abstand der Kartenaktionen folgt der Dichte, im Handschuh 16 px (LFH-635) ([11c6a94](https://github.com/rubenvitt/lifeline-hub/commit/11c6a94974db0cb76dfb8efff9e765d6673aa61d))
+* **abloesung:** Modulzähler liest die Zeit bei neuer Liste frisch (LFH-635) ([708df92](https://github.com/rubenvitt/lifeline-hub/commit/708df92afb8015e4b9e17229606924aa9893b496))
+* **migrations:** Doppelte 0113 auflösen, meldung_rueckmeldung → 0114 ([c98bea6](https://github.com/rubenvitt/lifeline-hub/commit/c98bea6cc7990f73d2c16c71ee195a01ae36954c)), closes [#108](https://github.com/rubenvitt/lifeline-hub/issues/108)
+* **palette:** Review-Korrekturen am Koordinatensprung und Sammeltreffer (LFH-619) ([1c785d2](https://github.com/rubenvitt/lifeline-hub/commit/1c785d2912f32ce92ee2a65fbae73ad366875e61))
+
 ## [1.0.0-alpha.34](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.33...v1.0.0-alpha.34) (2026-09-22)
 
 ### Features
