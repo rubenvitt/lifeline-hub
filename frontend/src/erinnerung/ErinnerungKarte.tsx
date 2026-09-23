@@ -3,7 +3,13 @@ import { ClockCircleOutlined } from '@ant-design/icons';
 import type { ReactNode } from 'react';
 import { Link, useParams } from 'react-router';
 import type { Erinnerung } from '../api/types';
-import { auftraegePfad, etbPfad, meldungenPfad, parseRouteId } from '../routing/deeplinks';
+import {
+  auftraegePfad,
+  etbPfad,
+  meldungenPfad,
+  parseRouteId,
+  abloesungPfad,
+} from '../routing/deeplinks';
 import { ERINNERUNG_STATUS, StatusBadge, QuittungIndikator, formatZeit } from '../kommunikation';
 import KommKarte from '../kommunikation/KommKarte';
 import { StatusChip, monoStil } from '../components/instrument';
@@ -28,6 +34,10 @@ const BEZUG_LINK: Record<
   auftrag: { pfad: (einsatzId, id) => auftraegePfad(einsatzId, { auftrag: id }), wort: 'Auftrag' },
   meldung: { pfad: (einsatzId, id) => meldungenPfad(einsatzId, { meldung: id }), wort: 'Meldung' },
   etb: { pfad: (einsatzId, id) => etbPfad(einsatzId, { eintrag: id }), wort: 'ETB-Eintrag' },
+  // LFH-635: Auto-Fristen einer Ablösungsschicht. Die Seite kennt keine Selektion per Query —
+  // der Link führt auf die Liste, die nach Fälligkeit geordnet ist.
+  abloesung: { pfad: (einsatzId) => abloesungPfad(einsatzId), wort: 'Ablösung' },
+  abloesung_vorwarnung: { pfad: (einsatzId) => abloesungPfad(einsatzId), wort: 'Ablösung' },
 };
 
 /** Deeplink zum Quell-Objekt, sofern bezug_typ/-id gesetzt und Route bekannt. */

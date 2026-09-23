@@ -379,6 +379,8 @@ export default function MeldungenPage() {
             // leeren, wenn der Datensatz wirklich angekommen ist. Den Fehler-Toast
             // wirft weiterhin `onError` der Mutation.
             onAnlegen={(d) => anlegenMutation.mutateAsync(d)}
+            einheiten={einheitenQuery.data}
+            abschnitte={abschnitteQuery.data}
           />
         </Paneel>
       )}

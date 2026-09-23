@@ -116,6 +116,39 @@ const SUCCESS_COMMENT_TEMPLATE = [
   '%>🚀 <%= satz %><%= nachsatz %>',
 ].join('\n');
 
+/*
+ * DIE VORLAGE FÜR DIE KI-NOTIZEN — nach dem Muster von einsatzzeichen, auf die Leserschaft
+ * dieses Projekts gedreht: wer im Einsatz führt oder den Hub betreibt, nicht wer den Code
+ * kennt. `{{version}}` und `{{commits}}` setzt das Plugin ein, jeweils GENAU EINMAL (es
+ * ersetzt nur das erste Vorkommen). Die Versionsüberschrift schreibt das Modell bewusst
+ * nicht: sie kommt aus den konventionellen Notizen, damit Format und Vergleichslink im
+ * CHANGELOG gleich bleiben.
+ */
+const KI_PROMPT = `Erstelle Release Notes für Version {{version}} von Lifeline Hub – Führungsunterstützung für Einsatzlagen im Bevölkerungsschutz (Einsatztagebuch, Lagekarte, Kräfte und Mittel, Betroffenen- und Schadenserfassung, Meldungen, Aufträge und Befehle, Lageberichte), ausgeliefert als eine ausführbare Datei, die auch ohne Internetverbindung läuft.
+
+Hier sind die Commits dieses Releases:
+
+\`\`\`json
+{{commits}}
+\`\`\`
+
+WICHTIG: Deine Antwort darf NUR die Release Notes im Markdown-Format enthalten. Kein zusätzlicher Text, keine Erklärungen, keine Überschrift mit der Versionsnummer.
+
+Die Release Notes sollen:
+
+1. Auf Deutsch geschrieben sein
+2. Änderungen thematisch nach Bereichen der Anwendung gruppieren (z.B. "Einsatztagebuch", "Lagekarte", "Kräfte und Mittel", "Betroffene", "Kommunikation", "Führung", "Verwaltung", "Betrieb und Installation") statt nach Commit-Typ (Feature/Bugfix)
+3. Für Führungskräfte und Betreiber geschrieben sein: technische Commit-Messages in beschreibende Sätze übersetzen, die sagen, was sich in der Bedienung oder im Betrieb ändert
+4. Rein technische Commits weglassen (Tests, CI, Linter, Formatierung, Refactoring ohne spürbare Wirkung, Abhängigkeits-Updates ohne Wirkung, Release-Pipeline, Review-Korrekturen an Änderungen desselben Releases)
+5. Bugfixes den jeweiligen Bereichen zuordnen, nicht separat auflisten
+6. Keine Commit-Hashes, keine Ticket-Nummern (LFH-…), keine Pull-Request-Nummern, keine Datei- oder Funktionsnamen
+7. Nichts behaupten, was nicht aus den Commits hervorgeht
+8. Markdown-Formatierung mit ## für Abschnitts-Überschriften
+9. Kompakt und scanbar sein – Qualität vor Quantität
+10. Breaking Changes (Datenmodell, Migrationen, Konfiguration, Schnittstellen, Aufrufparameter) prominent am Anfang unter "## Wichtige Änderungen" hervorheben
+
+Starte direkt mit den Release Notes, gruppiert wie oben beschrieben, mit ## ...`;
+
 /** @type {import('semantic-release').GlobalConfig} */
 export default {
   /*
@@ -175,7 +208,21 @@ export default {
      * Deshalb steht in package.json `^9.3.1`, und .github/dependabot.yml sperrt den
      * Major-Bump. Beides fällt erst, wenn semantic-release seinen Writer auf 9 hebt.
      */
-    ['@semantic-release/release-notes-generator', { preset: 'conventionalcommits' }],
+    /*
+     * DIE NOTIZEN SCHREIBT CLAUDE, die konventionellen bleiben die Rückfallebene — und die
+     * Quelle der Kopfzeile (Version, Vergleichslink, Datum). Übernommen aus einsatzzeichen,
+     * aber hinter einer eigenen Hülle statt als nacktes Plugin: warum, steht im Kopf von
+     * `scripts/release/ki-notizen.mjs` (zwei verschiedene Texte je Version, Fehlertext als
+     * Release-Text, stilles Abschneiden nach 100 Commits). `preset` geht an den
+     * konventionellen Generator, `promptTemplate` an Claude.
+     *
+     * Ohne das Secret `ANTHROPIC_API_KEY` läuft der Release unverändert mit den
+     * konventionellen Notizen weiter — Warnung im Protokoll, kein roter Lauf.
+     */
+    [
+      './scripts/release/ki-notizen.mjs',
+      { preset: 'conventionalcommits', promptTemplate: KI_PROMPT },
+    ],
     ['@semantic-release/changelog', { changelogFile: 'CHANGELOG.md' }],
     [
       '@semantic-release/exec',

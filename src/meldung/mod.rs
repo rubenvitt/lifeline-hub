@@ -21,6 +21,11 @@ pub const PRIO_NORMAL: &str = "normal";
 /// Sofortmeldungen (LFH-97), wenn der Absetzer kein Override angibt.
 pub const BESTAETIGUNG_FRIST_DEFAULT_MIN: i64 = 5;
 
+/// Vorgabe der Rückmeldefrist (Minuten ab der letzten Rückmeldung einer Einheit, LFH-610),
+/// wenn weder Einsatz noch Org eine setzen. 60 deckt sich mit den Beispieldaten des
+/// Neuentwurfs (50 min unauffällig, 65 min überfällig) — Entscheidung des Auftraggebers.
+pub const RUECKMELDUNG_FRIST_DEFAULT_MIN: i64 = 60;
+
 /// Meldungsart (Nachrichtenvordruck-Klassifikation).
 pub const ART_LAGEMELDUNG: &str = "lagemeldung";
 pub const ART_SOFORTMELDUNG: &str = "sofortmeldung";
@@ -208,6 +213,45 @@ pub struct MeldungAnzeige {
     pub ist_bestaetigt: bool,
     /// Abgeleitet: pflichtig, unbestätigt und Frist <= jetzt.
     pub ist_ueberfaellig: bool,
+    /// Strukturierter Absender (LFH-610): die Einheit, von der die Meldung kam. Höchstens
+    /// einer von `einheit_id`/`abschnitt_id` ist gesetzt; `absender` bleibt der Name zum
+    /// Eingangszeitpunkt. NULL, wenn nicht gebunden oder die Einheit aufgelöst wurde.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub einheit_id: Option<i64>,
+    /// Strukturierter Absender (LFH-610): der Einsatzabschnitt, von dem die Meldung kam.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub abschnitt_id: Option<i64>,
+}
+
+/// Letzte Rückmeldung eines Absenders (Einheit oder direkt gebundener Abschnitt, LFH-610).
+/// Als Rückmeldung zählt jede an den Absender gebundene Meldung, gleich welcher
+/// Meldungsart; maßgeblich ist die jüngste `ereigniszeit`.
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
+pub struct LetzteRueckmeldung {
+    /// `einsatz_einheit.id` bzw. `einsatzabschnitt.id`, je nach Liste.
+    pub bezug_id: i64,
+    pub meldung_id: i64,
+    pub lfd_nr: i64,
+    /// Zeitpunkt der Rückmeldung (UTC, SQLite-Format) — die Ereigniszeit, nicht der Eingang.
+    pub ereigniszeit: String,
+    pub inhalt: String,
+    pub meldeweg: MeldeWeg,
+    /// `ereigniszeit` + Rückmeldefrist (UTC). Ab diesem Zeitpunkt gilt der Absender als
+    /// überfällig; der Vergleich mit „jetzt" liegt beim Client, damit die Anzeige ohne
+    /// neues Ereignis umschlägt.
+    #[sqlx(skip)]
+    pub faellig_at: String,
+}
+
+/// Antwort von `GET …/meldungen/rueckmeldungen` (LFH-610). Einheiten ohne Eintrag haben
+/// noch nie zurückgemeldet. Die Abschnittsliste enthält nur DIREKT an den Abschnitt
+/// gebundene Meldungen; die Rückmeldung über den Teilbaum rechnet der Client aus beiden.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct RueckmeldungenAnzeige {
+    /// Effektive Rückmeldefrist in Minuten (Einsatz ?? Org ?? 60).
+    pub frist_min: i64,
+    pub einheiten: Vec<LetzteRueckmeldung>,
+    pub abschnitte: Vec<LetzteRueckmeldung>,
 }
 
 /// Lageobjekt aus lagerelevanter Meldung (LFH-95). Herkunfts-Felder (meldung_*)

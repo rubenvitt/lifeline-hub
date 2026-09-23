@@ -80,6 +80,40 @@ pub async fn tick_einmal(pool: &SqlitePool, live: &LiveHub, jetzt: DateTime<Utc>
             })
             .to_string(),
         );
+        // Ablösungsfrist (LFH-635): zusätzlich das Modul-Event `abloesung` mit `art`. Das
+        // Gate von `erinnerung` erreicht nur Leser des Moduls `erinnerungen`; der Hinweis muss
+        // aber bei denen ankommen, die die Ablösung führen (design.md D3). Das Frontend
+        // alarmiert nur über DIESES Event und überspringt den `erinnerung`-Zweig für
+        // `abloesung*` (kein Doppelalarm).
+        let art = match f.bezug_typ.as_deref() {
+            Some(crate::kommunikation::OBJEKT_ABLOESUNG) => Some("faellig"),
+            Some(crate::kommunikation::OBJEKT_ABLOESUNG_VORWARNUNG) => Some("vorwarnung"),
+            _ => None,
+        };
+        if let (Some(art), Some(abloesung_id)) = (art, f.bezug_id) {
+            // Die Fälligkeit der Schicht, nicht die der Vorwarn-Frist: der Hinweis nennt die
+            // Uhrzeit, zu der abgelöst werden muss.
+            let faellig_at = match art {
+                "vorwarnung" => parse(&f.faellig_at)
+                    .map(|v| {
+                        fmt(v + chrono::Duration::minutes(crate::abloesung::VORWARNUNG_MINUTEN))
+                    })
+                    .unwrap_or_else(|| f.faellig_at.clone()),
+                _ => f.faellig_at.clone(),
+            };
+            live.publiziere_event(
+                f.einsatz_id,
+                LiveEvent::Abloesung,
+                serde_json::json!({
+                    "einsatz_id": f.einsatz_id,
+                    "abloesung_id": abloesung_id,
+                    "art": art,
+                    "titel": f.titel,
+                    "faellig_at": faellig_at,
+                })
+                .to_string(),
+            );
+        }
         // Re-Highlight nur bei frischer Eskalation (ein Event, kein Spam auf Folge-Ticks).
         if let Some(mid) = eskaliert_mid {
             live.publiziere_event(
@@ -267,6 +301,69 @@ mod tests {
         assert_eq!(v["bezug_id"], serde_json::Value::Null);
     }
 
+    /// LFH-635: je Ablösungsfrist genau ein `abloesung`-Ereignis mit `art` — Vorwarnung und
+    /// Fälligkeit je einmal, beim nächsten Tick keines mehr. Die Vorwarnung nennt die
+    /// Fälligkeit der Schicht, nicht ihre eigene.
+    #[tokio::test]
+    async fn abloesungsfristen_publizieren_je_einmal_das_modul_event() {
+        use crate::kommunikation::{OBJEKT_ABLOESUNG, OBJEKT_ABLOESUNG_VORWARNUNG};
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let live = LiveHub::new();
+        let mut rx = live.abonniere(e);
+        let mut conn = pool.acquire().await.unwrap();
+        repo::setze_auto_frist_tx(
+            &mut conn,
+            e,
+            b,
+            OBJEKT_ABLOESUNG_VORWARNUNG,
+            9,
+            "Ablösung in 30 min: Florian 1",
+            "2026-09-22 15:00:00",
+        )
+        .await
+        .unwrap();
+        repo::setze_auto_frist_tx(
+            &mut conn,
+            e,
+            b,
+            OBJEKT_ABLOESUNG,
+            9,
+            "Ablösung fällig: Florian 1",
+            "2026-09-22 15:30:00",
+        )
+        .await
+        .unwrap();
+        drop(conn);
+
+        let abloesung_events = |rx: &mut tokio::sync::broadcast::Receiver<_>| {
+            let mut v: Vec<serde_json::Value> = Vec::new();
+            while let Ok(n) = rx.try_recv() {
+                let n: crate::live::LiveNachricht = n;
+                if n.event.as_str() == "abloesung" {
+                    v.push(serde_json::from_str(&n.data).unwrap());
+                }
+            }
+            v
+        };
+
+        tick_einmal(&pool, &live, t("2026-09-22 15:00:30")).await;
+        let v = abloesung_events(&mut rx);
+        assert_eq!(v.len(), 1);
+        assert_eq!(v[0]["art"], "vorwarnung");
+        assert_eq!(v[0]["abloesung_id"], 9);
+        assert_eq!(v[0]["faellig_at"], "2026-09-22 15:30:00");
+        assert_eq!(v[0]["titel"], "Ablösung in 30 min: Florian 1");
+
+        tick_einmal(&pool, &live, t("2026-09-22 15:30:30")).await;
+        let v = abloesung_events(&mut rx);
+        assert_eq!(v.len(), 1);
+        assert_eq!(v[0]["art"], "faellig");
+
+        tick_einmal(&pool, &live, t("2026-09-22 15:31:00")).await;
+        assert!(abloesung_events(&mut rx).is_empty(), "keine Wiederholung");
+    }
+
     /// LFH-97: die Auto-Frist-Erinnerung einer bestätigungspflichtigen Sofortmeldung
     /// (bezug_typ='meldung') eskaliert die Meldung beim Frist-Tick und re-highlightet via
     /// SSE-Tag 'sofortmeldung' — auf demselben Tick, ohne Fremdtabellen-Polling.
@@ -295,6 +392,8 @@ mod tests {
                 eingang_at: "2026-06-11 09:55:00",
                 bestaetigung_pflicht: true,
                 bestaetigung_frist_at: Some("2026-06-11 10:00:00"),
+                einheit_id: None,
+                abschnitt_id: None,
             },
         )
         .await
@@ -354,6 +453,8 @@ mod tests {
                 eingang_at: "2026-06-11 09:55:00",
                 bestaetigung_pflicht: true,
                 bestaetigung_frist_at: Some("2026-06-11 10:00:00"),
+                einheit_id: None,
+                abschnitt_id: None,
             },
         )
         .await
@@ -406,6 +507,8 @@ mod tests {
                 eingang_at: "2026-06-11 09:55:00",
                 bestaetigung_pflicht: true,
                 bestaetigung_frist_at: Some("2026-06-11 10:00:00"),
+                einheit_id: None,
+                abschnitt_id: None,
             },
         )
         .await

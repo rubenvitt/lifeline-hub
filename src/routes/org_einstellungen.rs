@@ -41,9 +41,12 @@ pub struct OrgEinstellungenUpdate {
     pub etb_nummer_praefix: Option<String>,
     pub meldung_nummer_praefix: Option<String>,
     pub auftrag_nummer_praefix: Option<String>,
+    /// Präfix der Einsatznummer (LFH-617) — wird beim Anlegen in die Nummer eingefroren.
+    pub einsatz_nummer_praefix: Option<String>,
     // Default-Fristen.
     pub meldung_bestaetigung_frist_min: Option<i64>,
     pub auftrag_quittierung_frist_min: Option<i64>,
+    pub rueckmeldung_frist_min: Option<i64>,
     /// Auto-ETB-Dual-Publish: `false` schaltet ab (gespeichert als 0), `true`/fehlend = an.
     /// Identisch mit `EinstellungenUpdate.auto_etb_eintraege` — bool auf Draht, i64 intern.
     pub auto_etb_eintraege: Option<bool>,
@@ -101,10 +104,12 @@ pub async fn setzen(
     let etb_nummer_praefix = bereinige(req.etb_nummer_praefix);
     let meldung_nummer_praefix = bereinige(req.meldung_nummer_praefix);
     let auftrag_nummer_praefix = bereinige(req.auftrag_nummer_praefix);
+    let einsatz_nummer_praefix = bereinige(req.einsatz_nummer_praefix);
     for p in [
         &etb_nummer_praefix,
         &meldung_nummer_praefix,
         &auftrag_nummer_praefix,
+        &einsatz_nummer_praefix,
     ] {
         if let Some(v) = p.as_deref() {
             if !ist_gueltiges_nummer_praefix(v) {
@@ -120,6 +125,7 @@ pub async fn setzen(
     for f in [
         req.meldung_bestaetigung_frist_min,
         req.auftrag_quittierung_frist_min,
+        req.rueckmeldung_frist_min,
     ] {
         if let Some(v) = f {
             if !ist_gueltige_frist_min(v) {
@@ -162,8 +168,10 @@ pub async fn setzen(
             etb_nummer_praefix: etb_nummer_praefix.as_deref(),
             meldung_nummer_praefix: meldung_nummer_praefix.as_deref(),
             auftrag_nummer_praefix: auftrag_nummer_praefix.as_deref(),
+            einsatz_nummer_praefix: einsatz_nummer_praefix.as_deref(),
             meldung_bestaetigung_frist_min: req.meldung_bestaetigung_frist_min,
             auftrag_quittierung_frist_min: req.auftrag_quittierung_frist_min,
+            rueckmeldung_frist_min: req.rueckmeldung_frist_min,
             // bool → 0/1; None bleibt None (= Default an).
             auto_etb_eintraege: req.auto_etb_eintraege.map(i64::from),
             geocoder_url: geocoder_url.as_deref(),

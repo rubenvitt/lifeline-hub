@@ -20,8 +20,19 @@ import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeAuftraege } from '../api/auftraege';
 import { ApiError } from '../api/client';
 import { listeFahrzeugStatus } from '../api/fahrzeugStatus';
+import { holeRueckmeldungen } from '../api/meldungen';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
 import { legeLageberichtAn, aktualisiereLagebericht } from '../api/lageberichte';
-import type { Auftrag, EinsatzAnzeige, FahrzeugStatus } from '../api/types';
+import type {
+  Auftrag,
+  EinsatzAnzeige,
+  FahrzeugStatus,
+  LetzteRueckmeldung,
+  Rueckmeldungen,
+} from '../api/types';
+
+dayjs.extend(utc);
 
 vi.mock('../api/einsaetze', () => ({ ladeEinsatz: vi.fn() }));
 vi.mock('../api/einheiten', () => ({ listeEinheiten: vi.fn(), setzeEinheitStatus: vi.fn() }));
@@ -31,6 +42,7 @@ vi.mock('../api/einsatzMaterial', () => ({ listeEinsatzMaterial: vi.fn() }));
 vi.mock('../api/einsatzabschnitte', () => ({ listeAbschnitte: vi.fn() }));
 vi.mock('../api/auftraege', () => ({ listeAuftraege: vi.fn() }));
 vi.mock('../api/fahrzeugStatus', () => ({ listeFahrzeugStatus: vi.fn() }));
+vi.mock('../api/meldungen', () => ({ holeRueckmeldungen: vi.fn() }));
 vi.mock('../api/lageberichte', () => ({
   legeLageberichtAn: vi.fn(() => Promise.resolve({ id: 99 })),
   aktualisiereLagebericht: vi.fn(() => Promise.resolve({})),
@@ -162,6 +174,25 @@ const AUFTRAG_A3 = {
   empfaenger: [{ id: 31, einheit_id: 20 }],
 } as unknown as Auftrag;
 
+const KEINE_RUECKMELDUNGEN: Rueckmeldungen = { frist_min: 60, einheiten: [], abschnitte: [] };
+
+/** Wire-Format der Rückmeldungs-Zeitstempel: UTC ohne Zonenkennung. */
+const wire = (d: dayjs.Dayjs) => d.utc().format('YYYY-MM-DD HH:mm:ss');
+
+/** Rückmeldung einer Einheit, relativ zu JETZT — sonst hinge das Urteil am Testdatum. */
+function rueckmeldungVon(bezugId: number, faelligInMin: number): LetzteRueckmeldung {
+  const ereignis = dayjs().subtract(10, 'minute');
+  return {
+    bezug_id: bezugId,
+    meldung_id: 500 + bezugId,
+    lfd_nr: 7,
+    ereigniszeit: wire(ereignis),
+    inhalt: 'Lage unverändert',
+    meldeweg: 'funk',
+    faellig_at: wire(dayjs().add(faelligInMin, 'minute')),
+  };
+}
+
 let drucke: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
@@ -176,6 +207,7 @@ beforeEach(() => {
   vi.mocked(listeAbschnitte).mockResolvedValue([]);
   vi.mocked(listeAuftraege).mockResolvedValue([]);
   vi.mocked(listeFahrzeugStatus).mockResolvedValue(KATALOG);
+  vi.mocked(holeRueckmeldungen).mockResolvedValue(KEINE_RUECKMELDUNGEN);
 });
 
 /**
@@ -340,11 +372,30 @@ describe('KraefteuebersichtPage — Statusband', () => {
     expect(within(gruppe).getByText('gebunden')).toBeInTheDocument();
   });
 
-  it('zeigt „keine Rückmeldung" NICHT — dafür gibt es keine Daten (LFH-610)', async () => {
+  // Bis LFH-610 stand hier die Abwesenheit („dafür gibt es keine Daten"). Seit es die
+  // Rückmeldungen gibt, sind es die positiven Aussagen — und ihre Gegenproben.
+  it('zeigt die Kachel „keine Rückmeldung" mit der Zahl nie zurückgemeldeter Einheiten (LFH-610)', async () => {
     mitEinheit();
     setup();
-    await screen.findAllByText('Am Einsatzort');
-    expect(screen.queryByText(/keine Rückmeldung/i)).toBeNull();
+    const gruppe = await screen.findByRole('region', { name: 'Einheiten ohne Rückmeldung' });
+    const k = gruppe.querySelector('[data-lfh="kennzahl"]') as HTMLElement;
+    expect(k).toHaveAttribute('data-ton', 'alarm');
+    expect(k).toHaveTextContent('—');
+    expect(k).toHaveTextContent('1');
+    expect(k).toHaveTextContent('keine Rückmeldung');
+  });
+
+  it('eine ÜBERFÄLLIGE Einheit zählt nicht in die Kachel', async () => {
+    mitEinheit();
+    vi.mocked(holeRueckmeldungen).mockResolvedValue({
+      ...KEINE_RUECKMELDUNGEN,
+      einheiten: [rueckmeldungVon(20, -1)],
+    });
+    setup();
+    await waitFor(() =>
+      expect(document.querySelector('[data-zustand="ueberfaellig"]')).not.toBeNull(),
+    );
+    expect(screen.queryByRole('region', { name: 'Einheiten ohne Rückmeldung' })).toBeNull();
   });
 
   it('meldet einen gescheiterten Abruf als „Stand unbekannt", nicht als Null', async () => {
@@ -407,7 +458,14 @@ describe('KraefteuebersichtPage — Raster', () => {
   });
 
   it('tönt eine Einheit mit Ausfall als Problemzeile — mit der Ausfall-Zahl als zweitem Kanal', async () => {
+    // Die Spalte „Mittel" steht ab `xl` (LFH-609).
     setzeViewportBreite(1440);
+    // Beide Einheiten haben in der Frist zurückgemeldet: sonst tönte schon die fehlende
+    // Rückmeldung (LFH-610) die Zeile, und die Gegenprobe an eh-20 prüfte nichts über Ausfall.
+    vi.mocked(holeRueckmeldungen).mockResolvedValue({
+      ...KEINE_RUECKMELDUNGEN,
+      einheiten: [rueckmeldungVon(20, 30), rueckmeldungVon(21, 30)],
+    });
     vi.mocked(listeEinheiten).mockResolvedValue([
       EINHEIT_E10,
       { ...EINHEIT_E10, id: 21, name: '2. Zug' },
@@ -493,6 +551,120 @@ describe('KraefteuebersichtPage — Raster', () => {
       return z;
     });
     expect(within(e).queryByTitle('Aufträge nicht abrufbar')).toBeNull();
+  });
+
+  // ── Rückmeldung (LFH-610) ──────────────────────────────────────────────────
+  const rueckZelle = (container: HTMLElement, schluessel: string) =>
+    zeile(container, schluessel)?.querySelector(
+      '[data-lfh="meldebild-rueckmeldung"]',
+    ) as HTMLElement | null;
+
+  it('nie zurückgemeldet: „—" in alarm, Wort im zugänglichen Namen, Zeile getönt', async () => {
+    mitEinheit();
+    const { container } = setup();
+    await screen.findByText('1. Zug');
+    expect(screen.getByRole('columnheader', { name: 'Rückmeldung' })).toBeInTheDocument();
+    const c = await waitFor(() => {
+      const z = rueckZelle(container, 'eh-20');
+      expect(z).not.toBeNull();
+      return z!;
+    });
+    expect(c).toHaveTextContent('—');
+    expect(c).toHaveAttribute('data-zustand', 'keine');
+    expect(within(zeile(container, 'eh-20')!).getByRole('img', { name: 'keine Rückmeldung' })).toBe(
+      c,
+    );
+    expect(c.style.color).not.toBe('');
+    expect(zeile(container, 'eh-20')).toHaveClass('meldebild-problemzeile');
+  });
+
+  it('in der Frist: Uhrzeit neutral, Zeile NICHT getönt', async () => {
+    mitEinheit();
+    vi.mocked(holeRueckmeldungen).mockResolvedValue({
+      ...KEINE_RUECKMELDUNGEN,
+      einheiten: [rueckmeldungVon(20, 30)],
+    });
+    const { container } = setup();
+    const c = await waitFor(() => {
+      const z = rueckZelle(container, 'eh-20');
+      expect(z).toHaveAttribute('data-zustand', 'aktuell');
+      return z!;
+    });
+    expect(c.textContent).toMatch(/\d{2}:\d{2}$/);
+    expect(c).toHaveAttribute(
+      'aria-label',
+      expect.stringMatching(/^Rückmeldung in der Frist · letzte .* · Funk · Meldung Nr\. 7$/),
+    );
+    expect(zeile(container, 'eh-20')).not.toHaveClass('meldebild-problemzeile');
+    expect(screen.queryByRole('region', { name: 'Einheiten ohne Rückmeldung' })).toBeNull();
+  });
+
+  it('überfällig: Uhrzeit in achtung, Wort „überfällig", Zeile getönt', async () => {
+    mitEinheit();
+    vi.mocked(holeRueckmeldungen).mockResolvedValue({
+      ...KEINE_RUECKMELDUNGEN,
+      einheiten: [rueckmeldungVon(20, -1)],
+    });
+    const { container } = setup();
+    const c = await waitFor(() => {
+      const z = rueckZelle(container, 'eh-20');
+      expect(z).toHaveAttribute('data-zustand', 'ueberfaellig');
+      return z!;
+    });
+    expect(c.textContent).toMatch(/\d{2}:\d{2}$/);
+    expect(c.getAttribute('aria-label')).toMatch(/^Rückmeldung überfällig · /);
+    expect(zeile(container, 'eh-20')).toHaveClass('meldebild-problemzeile');
+  });
+
+  it('„Ohne Einheit" trägt keine Rückmeldung und zählt nicht in die Kachel', async () => {
+    vi.mocked(listeEinsatzPersonal).mockResolvedValue([PERSON_P1]);
+    const { container } = setup();
+    await screen.findByText('Ohne Einheit');
+    await waitFor(() => expect(holeRueckmeldungen).toHaveBeenCalled());
+    await screen.findByRole('columnheader', { name: 'Rückmeldung' });
+    expect(rueckZelle(container, 'eh-ohne')).toBeNull();
+    expect(zeile(container, 'eh-ohne')).not.toHaveClass('meldebild-problemzeile');
+    expect(screen.queryByRole('region', { name: 'Einheiten ohne Rückmeldung' })).toBeNull();
+  });
+
+  it('403 auf Meldungen: keine Spalte, keine Kachel, nirgends „keine Rückmeldung"', async () => {
+    mitEinheit();
+    vi.mocked(holeRueckmeldungen).mockRejectedValue(new ApiError(403, 'verboten'));
+    const { container } = setup();
+    await screen.findByText('1. Zug');
+    await waitFor(() => expect(holeRueckmeldungen).toHaveBeenCalled());
+    // Abwarten, bis der Abruf entschieden ist — vorher wäre die Spalte ohnehin leer.
+    await waitFor(() =>
+      expect(screen.queryByRole('columnheader', { name: 'Rückmeldung' })).toBeNull(),
+    );
+    expect(screen.queryByText(/keine Rückmeldung/i)).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Einheiten ohne Rückmeldung' })).toBeNull();
+    expect(zeile(container, 'eh-20')).not.toHaveClass('meldebild-problemzeile');
+  });
+
+  it('ein gescheiterter Abruf sagt „?", nicht „keine Rückmeldung"', async () => {
+    mitEinheit();
+    vi.mocked(holeRueckmeldungen).mockRejectedValue(new Error('kaputt'));
+    const { container } = setup();
+    await screen.findByText('1. Zug');
+    await waitFor(() =>
+      expect(
+        within(zeile(container, 'eh-20')!).getByTitle('Rückmeldungen nicht abrufbar'),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.queryByText(/keine Rückmeldung/i)).toBeNull();
+    expect(zeile(container, 'eh-20')).not.toHaveClass('meldebild-problemzeile');
+  });
+
+  it('solange die Rückmeldungen laden, steht nirgends „keine"', async () => {
+    mitEinheit();
+    vi.mocked(holeRueckmeldungen).mockReturnValue(new Promise(() => {}));
+    const { container } = setup();
+    // `findAll`: seit LFH-609 steht „Am Einsatzort" zweimal — im Band und am Einheitenstatus.
+    await screen.findAllByText('Am Einsatzort');
+    expect(rueckZelle(container, 'eh-20')).toBeNull();
+    expect(screen.queryByText(/keine Rückmeldung/i)).toBeNull();
+    expect(zeile(container, 'eh-20')).not.toHaveClass('meldebild-problemzeile');
   });
 
   it('der Abschnitt bleibt auch schmal sichtbar — er ist die Gliederung (kein abBreite)', async () => {

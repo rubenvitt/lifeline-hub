@@ -8,13 +8,14 @@
 
 /// Alle gültigen Modul-Keys (Spiegel der Frontend-`modulRegistry`-`key`-Werte).
 /// Reihenfolge wie in der FE-Registry (Kategorie für Kategorie) — rein dokumentarisch.
-pub const MODUL_KEYS: [&str; 26] = [
+pub const MODUL_KEYS: [&str; 28] = [
     // Führung (Neuentwurf 21.09.2026: Überblick als Startseite, Aufträge hierher verschoben)
     "ueberblick",
     "einsatzdaten",
     "einsatzabschnitte",
     "auftraege",
     "stab",
+    "dokumente",
     // Kräfte & Mittel (Meldebild = `kraefteuebersicht`, bis 21.09.2026 unter Lage)
     "kraefteuebersicht",
     "einheiten",
@@ -22,6 +23,7 @@ pub const MODUL_KEYS: [&str; 26] = [
     "fahrzeuge",
     "material",
     "bereitstellungsraeume",
+    "abloesung",
     // Erfassung
     "etb",
     "personen",
@@ -115,6 +117,8 @@ modul_marker! {
     Auftraege => "auftraege",
     Lagekarte => "lagekarte",
     Stab => "stab",
+    Dokumente => "dokumente",
+    Abloesung => "abloesung",
 }
 
 /// Pfad-Präfix (app.rs-Route) → erwarteter Modul-Key (LFH-230). `None` = modul-lose
@@ -127,6 +131,8 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     ("/api/einsaetze/{id}/meldungen", Some("meldungen")),
     ("/api/einsaetze/{id}/auftraege", Some("auftraege")),
     ("/api/einsaetze/{id}/stab", Some("stab")),
+    ("/api/einsaetze/{id}/dokumente", Some("dokumente")),
+    ("/api/einsaetze/{id}/abloesungen", Some("abloesung")),
     ("/api/einsaetze/{id}/karten-ansichten", Some("lagekarte")),
     ("/api/einsaetze/{id}/lage-snapshots", Some("lagekarte")),
     ("/api/einsaetze/{id}/anhaenge", None),
@@ -228,6 +234,7 @@ mod tests {
         assert_eq!(Lagemeldungen::KEY, Some("lagemeldungen"));
         assert_eq!(Auftraege::KEY, Some("auftraege"));
         assert_eq!(Stab::KEY, Some("stab"));
+        assert_eq!(Dokumente::KEY, Some("dokumente"));
         assert_eq!(OhneModul::KEY, None);
     }
 

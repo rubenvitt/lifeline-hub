@@ -12,7 +12,7 @@ import {
 import AdminPage from '../../components/AdminPage';
 import { SeitenHinweise, SpeicherFehler } from '../../components/SpeicherHinweis';
 import { useAuth } from '../../auth/AuthContext';
-import { globalKeys } from '../../api/queryKeys';
+import { globalKeys, istRueckmeldungenKey } from '../../api/queryKeys';
 import { speicherLeisteStil } from '../../components/speicherLeiste';
 import {
   type FormWerteEinsatz,
@@ -55,6 +55,8 @@ export default function EinsatzDefaults() {
       speichereOrgEinstellungen(felder),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: globalKeys.orgEinstellungen() });
+      // Die Org-Rückmeldefrist steckt im `faellig_at` jedes Einsatzes ohne eigene (LFH-610).
+      qc.invalidateQueries({ predicate: (q) => istRueckmeldungenKey(q.queryKey) });
       setHatFassung(false);
       message.success('Einstellungen gespeichert');
     },
@@ -147,8 +149,15 @@ export default function EinsatzDefaults() {
 
         <Formularpaneel
           titel="Verhalten & Automatik"
-          beschreibung="Nummernkreis-Präfixe und Default-Fristen für neue Einsätze. Präfixe sind reine Anzeige. Leer = kein Default (hartkodierter Fallback)."
+          beschreibung="Nummernkreis-Präfixe und Default-Fristen für neue Einsätze. Das Präfix der Einsatznummer wird beim Anlegen fest in die Nummer übernommen; die übrigen Präfixe sind reine Anzeige. Leer = kein Default (hartkodierter Fallback)."
         >
+          <Form.Item
+            label="Präfix Einsatznummer"
+            name="einsatz_nummer_praefix"
+            tooltip="Steht vor Jahr und laufender Nummer (z. B. E-2026-0001). Gilt nur für neu angelegte Einsätze — bestehende Nummern ändern sich nicht. Leer = E-. Max. 8 Zeichen."
+          >
+            <Input maxLength={8} placeholder="E-" style={{ width: '100%', maxWidth: 200 }} />
+          </Form.Item>
           <Form.Item
             label="Präfix ETB"
             name="etb_nummer_praefix"
@@ -193,6 +202,18 @@ export default function EinsatzDefaults() {
               max={10080}
               style={{ width: '100%', maxWidth: 200 }}
               placeholder="kein Default"
+            />
+          </Form.Item>
+          <Form.Item
+            label="Rückmeldefrist Einheiten (Minuten)"
+            name="rueckmeldung_frist_min"
+            tooltip="Nach so vielen Minuten ohne neue Meldung gilt eine Einheit im Meldebild als überfällig. Leer = 60."
+          >
+            <InputNumber
+              min={1}
+              max={10080}
+              style={{ width: '100%', maxWidth: 200 }}
+              placeholder="60"
             />
           </Form.Item>
 

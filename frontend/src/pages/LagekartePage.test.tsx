@@ -28,6 +28,9 @@ vi.mock('./lagekarte/Kartenflaeche', () => ({
       </div>
       {/* bbox-Pfad (LFH-81): ob die Seite überhaupt einen Ausschnitt hören will, und ein
           Auslöser, der einen Ausschnitt meldet wie die echte Karte nach `moveend`. */}
+      {/* Anflugziel (LFH-619): der Koordinatensprung der Sprungpalette kommt als
+          ?zentrum= an und muss hier als Ziel ankommen. */}
+      <div data-testid="flyto">{JSON.stringify(props.flyToZiel ?? null)}</div>
       <div data-testid="bbox-callback">{props.onBboxAenderung ? 'an' : 'aus'}</div>
       {/* Die echte Karte meldet Zoom und bbox im selben Zug (`Kartenflaeche.tsx`, `verarbeite`)
           — der Stub tut das nachgebildet, sonst bliebe eine zoom-gebundene Ebene (Energie,
@@ -41,6 +44,27 @@ vi.mock('./lagekarte/Kartenflaeche', () => ({
         bbox-melden
       </button>
       <button onClick={() => props.onKarteKlick?.({ lng: 8.6, lat: 50.1 })}>karte-klick</button>
+      {/* Messen (LFH-616): welche Form die Karte bekommt, und ein Auslöser, der eine
+          abgeschlossene Strecke von ~111 m meldet wie terra-draw beim Doppelklick. */}
+      <div data-testid="messen">{props.messen ?? 'aus'}</div>
+      {props.messen && (
+        <button
+          onClick={() =>
+            props.onMessung?.(
+              {
+                type: 'LineString',
+                coordinates: [
+                  [9, 52],
+                  [9, 52.001],
+                ],
+              },
+              true,
+            )
+          }
+        >
+          mess-fertig
+        </button>
+      )}
       {(props.markers ?? []).map((m) => (
         <button key={m.schluessel} onClick={() => props.onMarkerKlick?.(m.schluessel)}>
           marker-{m.schluessel}
@@ -310,6 +334,9 @@ function basisHandler(
     http.get('/api/einsaetze/1/freie-zeichen', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/karte/fuehrungskraefte', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/lage/meldungen', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/meldungen/rueckmeldungen', () =>
+      HttpResponse.json({ frist_min: 60, einheiten: [], abschnitte: [] }),
+    ),
     http.get('/api/einsaetze/1/gefahrengebiete', () => HttpResponse.json([])),
     http.get('/api/organisation', () =>
       HttpResponse.json({ id: 1, name: 'Org', tz_organisation: null }),
@@ -637,6 +664,9 @@ describe('LagekartePage', () => {
       expect(patchBody!.einsatzort_lon).toBe(8.6);
       expect(patchBody!.bezeichnung).toBe('Test'); // andere Kopffelder bleiben erhalten (Vollersatz)
     });
+    // LFH-617: die Einsatznummer ist nicht änderbar — schon der Schlüssel (auch mit `null`)
+    // wäre beim Server 400, und das Verschieben des Einsatzorts schlüge fehl.
+    expect(patchBody).not.toHaveProperty('einsatznummer_intern');
   });
 
   it('Marker-Klick öffnet den Inspector mit Modul-Link', async () => {
@@ -872,6 +902,26 @@ describe('LagekartePage', () => {
     expect(screen.getByText('Abschnitte')).toBeInTheDocument();
     // Nicht-verortete Einheit erscheint mit korrektem Label in der Nicht-verortet-Liste.
     expect(await screen.findByText('Einheit: Zug 1')).toBeInTheDocument();
+  });
+
+  it('LFH-616: Messen über den Kartenknopf — Wert im Fuß, Escape beendet', async () => {
+    basisHandler([]);
+    const user = userEvent.setup();
+    renderSeite();
+    await user.click(await screen.findByRole('button', { name: 'Messen' }));
+    expect(screen.getByTestId('messen')).toHaveTextContent('strecke');
+    expect(screen.getByRole('button', { name: 'Messen' })).toHaveAttribute('aria-pressed', 'true');
+
+    await user.click(screen.getByText('mess-fertig'));
+    expect(document.querySelector('[data-lfh="messwert"]')).toHaveTextContent('111 m');
+
+    // Formwechsel geht an die Karte, der Modus bleibt.
+    await user.click(screen.getByRole('radio', { name: 'Fläche' }));
+    expect(screen.getByTestId('messen')).toHaveTextContent('flaeche');
+
+    await user.keyboard('{Escape}');
+    expect(screen.getByTestId('messen')).toHaveTextContent('aus');
+    expect(document.querySelector('[data-lfh="mess-steuerung"]')).toBeNull();
   });
 
   it('platziert eine Einheit: wählen → Karten-Klick → PATCH /position mit lat/lon', async () => {
@@ -1162,6 +1212,38 @@ describe('LagekartePage', () => {
     await waitFor(() =>
       expect(screen.getByTestId('location-search')).not.toHaveTextContent('platzieren'),
     );
+  });
+
+  /**
+   * Koordinatensprung (LFH-619): die Sprungpalette schickt `?zentrum=<lat>,<lon>`. Die Karte
+   * fliegt die Stelle an und räumt den Parameter — ein stehengebliebener Mittelpunkt zöge die
+   * Karte bei jedem Neuladen wieder dorthin, auch nachdem man längst weitergeschoben hat.
+   * Ein Beobachter darf das: Anfliegen ist Lesen.
+   */
+  it('Deeplink ?zentrum= fliegt die Stelle an und räumt den Param (LFH-619)', async () => {
+    basisHandler([
+      http.get('/api/einsaetze/1', () =>
+        HttpResponse.json({ ...EINSATZ, meine_rolle: 'beobachter' }),
+      ),
+    ]);
+    renderSeiteMitSonde('/einsaetze/1/lagekarte?zentrum=52.52,13.405');
+
+    await waitFor(() =>
+      expect(screen.getByTestId('flyto')).toHaveTextContent('{"lng":13.405,"lat":52.52}'),
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('zentrum'),
+    );
+  });
+
+  it('Deeplink ?zentrum=: ein unbrauchbarer Wert fliegt nichts an und wird trotzdem geräumt', async () => {
+    basisHandler();
+    renderSeiteMitSonde('/einsaetze/1/lagekarte?zentrum=52.52');
+
+    await waitFor(() =>
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('zentrum'),
+    );
+    expect(screen.getByTestId('flyto')).toHaveTextContent('null');
   });
 
   it('Deeplink ?platzieren=: ein Beobachter kommt nicht in den Platzier-Modus', async () => {

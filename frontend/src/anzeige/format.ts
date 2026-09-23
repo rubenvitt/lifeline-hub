@@ -11,7 +11,7 @@
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
-import type { Zeitformat, EinheitenSystem, Koordinatenformat } from '../api/types';
+import type { EinheitenSystem, Koordinatenformat, Zeitformat } from '../api/types';
 import { formatiere } from './koordinaten';
 
 // Idempotent (mehrfaches extend ist unschädlich) — robust bei isoliertem Import.
@@ -155,6 +155,23 @@ export function formatUhrzeitMitTag(
   const d = inZone(utcStr, konv);
   const jetzt = konv.zeitzone ? dayjs().tz(konv.zeitzone) : dayjs();
   return d.isSame(jetzt, 'day') ? d.format('HH:mm') : d.format('DD. HH:mm');
+}
+
+/**
+ * Das wirksame Koordinatenformat: Anwender-Override vor Einsatz-Einstellung vor Org-Default.
+ * Drei Einzelwerte statt des Einstellungsobjekts, damit ein `useMemo` des Aufrufers an
+ * Primitiven hängt und nicht an einer je Abruf neuen Objektidentität.
+ *
+ * Herausgezogen für den zweiten Leser, die Sprungpalette (LFH-619): sie hängt auf App-Ebene
+ * und damit AUSSERHALB des `EinsatzAnzeigeProvider`, sähe über dessen Hook also nur die
+ * Defaults. Zwei Kopien der Reihenfolge wären zwei Meinungen darüber, welches Format gilt.
+ */
+export function effektivesKoordinatenformat(
+  override: Koordinatenformat | null,
+  einsatz: Koordinatenformat | null | undefined,
+  orgDefault: Koordinatenformat | null | undefined,
+): Koordinatenformat | null {
+  return override ?? einsatz ?? orgDefault ?? null;
 }
 
 /** WGS84-Koordinate → Anzeige-String je Koordinatenformat (Default: dezimal). */

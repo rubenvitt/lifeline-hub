@@ -775,3 +775,109 @@ async fn download_304_umgeht_ownership_guard_nicht() {
         "Ownership-Guard vor 304 — kein 304-Bypass des Zugriffsschutzes"
     );
 }
+
+// --- LFH-632: `einsatz_dokument` als zweiter Linker auf `anhang` ---
+
+/// Legt per direktem SQL einen Anhang samt `einsatz_dokument`-Zeile (inkl. ETB-Pflicht-FK)
+/// an und liefert die `anhang.id`. Die Dokument-Route gibt es in diesem Task noch nicht.
+async fn dokument_anhang(pool: &sqlx::SqlitePool, einsatz: i64) -> i64 {
+    let von: i64 = sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = 'admin'")
+        .fetch_one(pool)
+        .await
+        .unwrap();
+    let aid: i64 = sqlx::query_scalar(
+        "INSERT INTO anhang (einsatz_id, dateiname, mime, groesse, sha256, daten, hochgeladen_von) \
+         VALUES (?, 'plan.pdf', 'application/pdf', 3, 'deadbeef', ?, ?) RETURNING id",
+    )
+    .bind(einsatz)
+    .bind(b"ABC".as_slice())
+    .bind(von)
+    .fetch_one(pool)
+    .await
+    .unwrap();
+    let etb_id: i64 = sqlx::query_scalar(
+        "INSERT INTO etb_eintrag (einsatz_id, lfd_nr, typ, inhalt, erfasser_id, ereigniszeit) \
+         VALUES (?, (SELECT COALESCE(MAX(lfd_nr), 0) + 1 FROM etb_eintrag WHERE einsatz_id = ?), \
+                 'system', 'Dokument abgelegt', ?, datetime('now')) RETURNING id",
+    )
+    .bind(einsatz)
+    .bind(einsatz)
+    .bind(von)
+    .fetch_one(pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO einsatz_dokument \
+           (einsatz_id, anhang_id, kategorie, titel, etb_eintrag_id, abgelegt_von_id) \
+         VALUES (?, ?, 'lagekarte_plan', 'Plan', ?, ?)",
+    )
+    .bind(einsatz)
+    .bind(aid)
+    .bind(etb_id)
+    .bind(von)
+    .execute(pool)
+    .await
+    .unwrap();
+    aid
+}
+
+/// LFH-632: Ein Dokument-Anhang ist über die generische, modul-lose Route nicht ladbar —
+/// sonst wäre sie ein Bypass für das Modul-Gate und für soft-gelöschte Dokumente.
+#[tokio::test]
+async fn dokument_anhang_generischer_download_ist_404() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let aid = dokument_anhang(&pool, einsatz).await;
+
+    let (s, _, _) = download(&app, einsatz, aid, &admin).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+}
+
+/// LFH-632: Der generische Hard-Delete verweigert einen Dokument-Anhang (422) — das
+/// Entfernen läuft über die Dokumentenablage (Soft-Delete mit ETB-Nachweis).
+#[tokio::test]
+async fn dokument_anhang_generisches_loeschen_ist_422() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let aid = dokument_anhang(&pool, einsatz).await;
+
+    assert_eq!(
+        delete_anhang(&app, einsatz, aid, &admin).await,
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM anhang WHERE id = ?")
+        .bind(aid)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(n, 1, "der Anhang bleibt erhalten");
+}
+
+/// LFH-632: Ein Dokument-Anhang lässt sich nicht an eine Chat-Nachricht hängen.
+#[tokio::test]
+async fn dokument_anhang_nicht_an_chat_verknuepfbar() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let kid = default_kanal(&app, einsatz, &admin).await;
+    let aid = dokument_anhang(&pool, einsatz).await;
+
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/chat/kanaele/{kid}/nachrichten"),
+        &admin,
+        Some(&format!(r#"{{"inhalt":"x","anhang_ids":[{aid}]}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    let n: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM chat_nachricht_anhang WHERE anhang_id = ?")
+            .bind(aid)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(n, 0, "keine Verknüpfung entstanden");
+}

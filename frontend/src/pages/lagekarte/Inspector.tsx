@@ -5,6 +5,7 @@ import { Select } from '../../components/Select';
 import FeldLabel from '../../components/FeldLabel';
 import GeoKennzahlen from '../../components/GeoKennzahlen';
 import { Link } from 'react-router';
+import { etbPfad } from '../../routing/deeplinks';
 import type { KarteMarker, MarkerTyp } from './marker';
 import { markerToUrl } from './markerToUrl';
 import { geoKennzahlen } from './geo';
@@ -22,6 +23,7 @@ import {
   LEERE_ROHDATEN,
   auswahlRaster,
   auswahlUnterzeile,
+  letzteMeldungBlock,
   type AuswahlRoh,
   type RasterFeld,
 } from './leistenDaten';
@@ -133,7 +135,7 @@ function RasterZelle({ feld }: { feld: RasterFeld }) {
  * Marker-Inspector im Paneel „Ausgewählt" der rechten Kartenleiste (Neuentwurf S5):
  * Symbol-Kachel mit dem taktischen Zeichen, Name, Mono-Unterzeile (Objektart · Typ),
  * Datenraster in zwei Spalten mit Augenbrauen — nur Felder mit Datenquelle, siehe
- * `auswahlRaster` —, Ort, und die Aktionen.
+ * `auswahlRaster` —, bei einer Einheit die letzte Meldung (LFH-610), Ort, und die Aktionen.
  */
 export default function Inspector({
   einsatzId,
@@ -155,6 +157,7 @@ export default function Inspector({
   const kennzahlen = marker.geometrie ? geoKennzahlen(marker.geometrie) : null;
   const bild = useMemo(() => tzBildUrl(marker.tz), [marker.tz]);
   const raster = auswahlRaster(marker, roh, formatZeitKurz);
+  const letzte = letzteMeldungBlock(marker, roh, formatZeitKurz);
 
   const symbolAuswahl = darfSchreiben && onSymbolAendern && TAKTISCHE_TYPEN.includes(marker.typ);
 
@@ -188,6 +191,23 @@ export default function Inspector({
             <RasterZelle key={f.label} feld={f} />
           ))}
         </dl>
+      )}
+      {/* Eigener Block NEBEN dem Raster, nicht darin: ein Meldungstext ist kein Feld mit
+          Augenbraue über einem Wert, und im zweispaltigen `dl` bräche er auf die halbe Breite. */}
+      {letzte && (
+        <section
+          data-lfh="auswahl-letzte-meldung"
+          aria-label="Letzte Meldung"
+          style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS }}
+        >
+          <Augenbraue>Letzte Meldung</Augenbraue>
+          <span
+            style={{ fontSize: 12, lineHeight: 1.5, color: rollen.text2, overflowWrap: 'anywhere' }}
+          >
+            {letzte.text}
+          </span>
+          <span style={{ ...monoStil(10), color: rollen.schwach }}>{letzte.meta}</span>
+        </section>
       )}
       {marker.typ === 'lagemeldung' && marker.lageMeldung && (
         <Typography.Paragraph style={{ margin: 0, fontSize: 12, color: rollen.text2 }}>
@@ -245,18 +265,41 @@ export default function Inspector({
           Knöpfe tragen zusammen rund 300 px Eigenbreite und passen damit in keiner
           Dichtestufe nebeneinander. Dieselbe Bauform wie in `ZonenInspector` und
           `FreiesZeichenInspector`. Kein Dreipunkt-Menü: gezählt wird nach der Rechteprüfung
-          (LFH-366), und es bleiben höchstens zwei Aktionen — ein Menü wäre ein Umweg.
+          (LFH-366), und es bleiben höchstens zwei HANDLUNGEN — ein Menü wäre ein Umweg.
+          Die Sprünge „Im Fachmodul öffnen" und „ETB" (LFH-616, nur an der Einheit) zählen
+          als EINE Zeile Navigation, nicht als zwei Aktionen: sie ändern nichts, und der
+          Entwurf S5 stellt sie als Paar nebeneinander.
           `size="middle"`: der rote Knopf steht nicht bündig unter dem blauen (LFH-363). */}
       <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
-        {/* `display: block` am Anker: er ist inline, sonst liefe das `block` am Knopf darin
-            ins Leere und die Zeile bliebe auf Textbreite. Das ↗ ist Deeplink-Zeichen des
-            Entwurfs und steht `aria-hidden` — der zugängliche Name bleibt die Handlung. */}
-        <Link to={modulLink} style={{ display: 'block' }}>
-          <Button type="primary" block>
-            {marker.typ === 'lagemeldung' ? 'Zur Quell-Meldung' : 'Im Fachmodul öffnen'}
-            <span aria-hidden="true">↗</span>
-          </Button>
-        </Link>
+        {/* Umbrechende Zeile statt fester Spalten: „ETB ↗" ist kurz, passt aber in der
+            Handschuh-Stufe nicht mehr neben den Fachmodul-Knopf — dann bricht es darunter,
+            statt von der Karte abgeschnitten zu werden (`KartenDetailCard` scrollt). */}
+        <div
+          data-lfh="inspector-sprung"
+          style={{ display: 'flex', flexWrap: 'wrap', gap: token.marginXS }}
+        >
+          {/* `display: block` am Anker: er ist inline, sonst liefe das `block` am Knopf darin
+              ins Leere und die Zeile bliebe auf Textbreite. Das ↗ ist Deeplink-Zeichen des
+              Entwurfs und steht `aria-hidden` — der zugängliche Name bleibt die Handlung. */}
+          <Link to={modulLink} style={{ display: 'block', flex: '1 1 auto' }}>
+            <Button type="primary" block>
+              {marker.typ === 'lagemeldung' ? 'Zur Quell-Meldung' : 'Im Fachmodul öffnen'}
+              <span aria-hidden="true">↗</span>
+            </Button>
+          </Link>
+          {marker.typ === 'einheit' && (
+            // Der zugängliche Name trägt die Einheit: „ETB" allein sagte nicht, WESSEN.
+            <Link
+              to={etbPfad(einsatzId, { einheit_id: marker.id })}
+              aria-label={`Einsatztagebuch zu ${marker.label}`}
+              style={{ display: 'block', flex: '1 1 auto' }}
+            >
+              <Button block>
+                ETB<span aria-hidden="true">↗</span>
+              </Button>
+            </Link>
+          )}
+        </div>
         {/* Lagemeldungen sind auf der Karte read-only: verortet wird ausschließlich beim
             Übergeben (LFH-113). Re-/Ent-Verorten würde am ON-CONFLICT-Upsert ohnehin verpuffen. */}
         {darfSchreiben && marker.typ !== 'einsatzort' && marker.typ !== 'lagemeldung' && (

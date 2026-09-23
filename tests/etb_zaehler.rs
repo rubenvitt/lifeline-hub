@@ -236,6 +236,74 @@ async fn zaehlung_folgt_jedem_filter_wie_die_liste() {
     assert_eq!(v["gesamt"].as_i64(), Some(2));
 }
 
+/// Der Einheitenfilter aus LFH-616 kam parallel zu LFH-612 und läuft seit dem Merge durch
+/// dieselbe Bedingung (`filter_bedingung`). Beide Zählungen — `zaehler` (LFH-612) und
+/// `anzahl` (LFH-619) — müssen ihn tragen, sonst zeigt der Kopf bei gesetzter Einheit die
+/// ungefilterte Zahl über einer gefilterten Liste.
+#[tokio::test]
+async fn einheitenfilter_zaehlt_wie_die_liste() {
+    let (app, admin, einsatz) = aufbau().await;
+    let mut ids = Vec::new();
+    for name in ["1. Zug", "2. Zug"] {
+        let (status, v) = anfrage(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{einsatz}/einheiten"),
+            &admin,
+            Some(&format!(r#"{{"name":"{name}"}}"#)),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CREATED, "einheit: {v:?}");
+        ids.push(v["id"].as_i64().unwrap());
+    }
+    let (zug, andere) = (ids[0], ids[1]);
+    let (status, v) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/auftraege"),
+        &admin,
+        Some(&format!(
+            r#"{{"auftrag_text":"Deich sichern","empfaenger":[{{"empfaenger_typ":"einheit","einheit_id":{zug}}}]}}"#
+        )),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "auftrag: {v:?}");
+    for body in [
+        r#"{"typ":"meldung","inhalt":"von-treffer","von":" 1. zug "}"#,
+        r#"{"typ":"lage","inhalt":"an-treffer","an":"1. Zug"}"#,
+        r#"{"typ":"meldung","inhalt":"andere","von":"2. Zug"}"#,
+        r#"{"typ":"meldung","inhalt":"nur im Text: 1. Zug"}"#,
+    ] {
+        erfassen(&app, &admin, einsatz, body).await;
+    }
+
+    for query in [
+        format!("?einheit_id={zug}"),
+        format!("?einheit_id={andere}"),
+        format!("?einheit_id={zug}&typ=meldung"),
+    ] {
+        let liste = liste_vollstaendig(&app, &admin, einsatz, &query).await;
+        let v = zaehler_ok(&app, &admin, einsatz, &query).await;
+        assert_eq!(v["gesamt"].as_i64(), Some(liste), "zaehler {query}: {v:?}");
+        assert_eq!(summe_je_typ(&v), liste, "Σ je_typ {query}: {v:?}");
+        let (status, a) = anfrage(
+            &app,
+            "GET",
+            &format!("/api/einsaetze/{einsatz}/etb/anzahl{query}"),
+            &admin,
+            None,
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "anzahl {query}: {a:?}");
+        assert_eq!(a["anzahl"].as_i64(), Some(liste), "anzahl {query}: {a:?}");
+    }
+    // Handgerechnet: Auftrag (Anordnung) + von-Treffer + an-Treffer. Die Parität allein ließe
+    // einen Filter durch, der in Liste UND Zählung gleichermaßen fehlt.
+    let v = zaehler_ok(&app, &admin, einsatz, &format!("?einheit_id={zug}")).await;
+    assert_eq!(v["gesamt"].as_i64(), Some(3), "{v:?}");
+    assert_eq!(v["je_typ"]["lage"].as_i64(), Some(1), "{v:?}");
+}
+
 #[tokio::test]
 async fn unbekannter_typ_und_unlesbare_zeit_sind_400() {
     let (app, admin, einsatz) = aufbau().await;

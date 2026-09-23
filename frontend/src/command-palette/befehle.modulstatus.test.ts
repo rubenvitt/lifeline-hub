@@ -93,6 +93,12 @@ describe('baueBefehle — Schnellaktionen folgen der Leseachse', () => {
       baueBefehle(kontext())
         .map((x) => x.id)
         .filter((id) => id.startsWith('aktion:')),
-    ).toEqual(['aktion:etb', 'aktion:unfallhilfsstellen', 'aktion:schaeden', 'aktion:stab']);
+    ).toEqual([
+      'aktion:etb',
+      'aktion:unfallhilfsstellen',
+      'aktion:schaeden',
+      'aktion:stab',
+      'aktion:dokumente',
+    ]);
   });
 });

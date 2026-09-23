@@ -72,8 +72,11 @@ export interface OrgEinstellungenUpdate {
   etb_nummer_praefix: string | null;
   meldung_nummer_praefix: string | null;
   auftrag_nummer_praefix: string | null;
+  /** Präfix der Einsatznummer (LFH-617) — beim Anlegen in die Nummer eingefroren. */
+  einsatz_nummer_praefix: string | null;
   meldung_bestaetigung_frist_min: number | null;
   auftrag_quittierung_frist_min: number | null;
+  rueckmeldung_frist_min: number | null;
   /** Auto-ETB-Dual-Publish: false schaltet ab; true/null = an. */
   auto_etb_eintraege: boolean | null;
   geocoder_url: string | null;
@@ -106,6 +109,7 @@ export interface EinstellungenUpdate {
   auftrag_nummer_start: number | null;
   meldung_bestaetigung_frist_min: number | null;
   auftrag_quittierung_frist_min: number | null;
+  rueckmeldung_frist_min: number | null;
   /** Auto-ETB-Dual-Publish: false schaltet ab; true/null = an. */
   auto_etb_eintraege: boolean | null;
   /** Aufbewahrungs-Dauer-Politik in Tagen (LFH-135); null/0 = keine Auto-Frist. */
@@ -137,6 +141,8 @@ export type EtbZaehler = S['EtbZaehlerAnzeige'];
 /** Zähler je erlaubtem Modul für den Navigationsrahmen (LFH-612); ein fehlendes Feld heißt
  *  „Modul nicht erlaubt", nicht 0. */
 export type ModulZaehler = S['ModulZaehlerAnzeige'];
+/** Trefferzahl eines ETB-Filters ohne Seitendeckel (LFH-619, Sammeltreffer der Palette). */
+export type EtbAnzahl = S['EtbAnzahlAnzeige'];
 
 // ============================== LFH-298 SSE-Live-Feed ==============================
 /** Wire-Event-Namen des Einsatz-Live-Feeds; Kontrakt gegen `EINSATZ_STREAM_EVENTS`
@@ -350,6 +356,10 @@ export type PegelPrognose = S['PegelPrognose'];
 export type PegelVorhersage = S['PegelVorhersage'];
 export type PegelVorhersageAntwort = S['PegelVorhersageAntwort'];
 
+// ============================== LFH-632 Dokumentenablage ==============================
+export type Dokument = S['DokumentAnzeige'];
+export type DokumentKategorie = S['DokumentKategorie'];
+
 // ============================== LFH-46 Stab (S1–S6) ==============================
 export type Stab = S['StabAnzeige'];
 export type Stabsfunktion = S['StabsfunktionAnzeige'];
@@ -379,6 +389,43 @@ export interface LagebesprechungAbschlussBody {
   entschluss: string;
   abgehalten_at?: string;
   naechste_at?: string | null;
+}
+
+// ============================== LFH-635 Ablösung ==============================
+export type Abloesung = S['AbloesungAnzeige'];
+export type AbloesungStatus = S['AbloesungStatus'];
+export type AbloesungVollzug = S['AbloesungVollzugAnzeige'];
+export type AbloesungVorgabe = S['AbloesungVorgabeAnzeige'];
+export type AbloesungEinstufung = S['Einstufung'];
+export type RhythmusQuelle = S['RhythmusQuelle'];
+
+/**
+ * LFH-120: kein Backend-Schema — Eingabe-Body von `POST …/abloesungen`, FE-lokal.
+ * Ohne `rhythmus_minuten` gilt die Vorgabe des Abschnitts der Einheit (fehlt die, 400);
+ * ohne `beginn_at` der Zeitpunkt der Anlage. Zeiten als UTC 'YYYY-MM-DD HH:mm:ss'.
+ */
+export interface SchichtBeginnenBody {
+  einheit_id: number;
+  beginn_at?: string;
+  rhythmus_minuten?: number;
+}
+
+/**
+ * LFH-120: kein Backend-Schema — Eingabe-Body von `PATCH …/abloesungen/{id}`, FE-lokal.
+ * DREIWERTIG (`src/routes/abloesung.rs`, `Aendern`): Schlüssel fehlt = unverändert ·
+ * `rhythmus_minuten: null` = zurück zur Abschnittsvorgabe · `abloesende_einheit_id: null` =
+ * Planung aufheben.
+ */
+export interface SchichtAendernBody {
+  beginn_at?: string;
+  rhythmus_minuten?: number | null;
+  abloesende_einheit_id?: number | null;
+}
+
+/** LFH-120: kein Backend-Schema — Eingabe-Body von `POST …/abloesungen/{id}/vollzug`. */
+export interface VollzugBody {
+  vollzogen_at?: string;
+  abloesende_einheit_id?: number;
 }
 
 // ============================== LFH-51 Terminierte Erinnerungen ==============================
@@ -461,9 +508,15 @@ export interface NeueMeldung {
   /** Stabiler Offline-Idempotenzschlüssel; bei Replay liefert der Server die
    * bereits angelegte Meldung statt einer Dublette. */
   client_id?: string;
+  /** Strukturierter Absender (LFH-610): Einheit ODER Abschnitt dieses Einsatzes, nie beide. */
+  einheit_id?: number;
+  abschnitt_id?: number;
 }
 
 export type LageMeldung = S['LageMeldungAnzeige'];
+/** Letzte Rückmeldung je Einheit bzw. direkt gebundenem Abschnitt (LFH-610). */
+export type Rueckmeldungen = S['RueckmeldungenAnzeige'];
+export type LetzteRueckmeldung = S['LetzteRueckmeldung'];
 
 // ============================== LFH-87 Nachforderung Kräfte/Mittel ==============================
 export type NachforderungPrioritaet = S['Prioritaet'];

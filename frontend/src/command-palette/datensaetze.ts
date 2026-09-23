@@ -8,11 +8,16 @@ import {
   uhsLabel,
 } from '../chat/bezug';
 import { istModulFreigegeben, modulRegistry } from '../einsatz/modulRegistry';
+import { gefahrengebietName } from '../api/gefahren';
+import { kettenKoepfe } from '../lageberichte/ketten';
 import {
   auftraegePfad,
   einheitDetailPfad,
+  einsatzabschnittePfad,
   etbPfad,
   fahrzeugePfad,
+  gefahrenPfad,
+  lageberichtDetailPfad,
   meldungenPfad,
   personDetailPfad,
   personalPfad,
@@ -32,7 +37,11 @@ import type {
   Auftrag,
   BenutzerAnzeige,
   Einheit,
+  Einsatzabschnitt,
   EinsatzFahrzeug,
+  EtbAnzahl,
+  Gefahrengebiet,
+  LageberichtAnzeige,
   EinsatzPersonal,
   EtbEintragAnzeige,
   Meldung,
@@ -85,6 +94,16 @@ export interface DatensatzQuellen {
    * Treffer weg.
    */
   etbText?: EtbEintragAnzeige[];
+  /**
+   * Trefferzahl des ETB-Volltexts OHNE Seitendeckel (`GET …/etb/anzahl`, LFH-619). Sie trägt
+   * den Sammeltreffer „Alle Einträge zu …", der auf die gefilterte ETB-Seite springt — die
+   * einzelnen Einträge darüber sind auf fünf gedeckelt, die Zahl nicht.
+   */
+  etbAnzahl?: EtbAnzahl;
+  /** LFH-619: Lageberichte (im Kern auf die Kettenköpfe reduziert), Gefahrengebiete, Abschnitte. */
+  lageberichte?: LageberichtAnzeige[];
+  gefahrengebiete?: Gefahrengebiet[];
+  abschnitte?: Einsatzabschnitt[];
 }
 
 export interface DatensatzKontext {
@@ -155,7 +174,7 @@ export function zahlAusSuche(suche: string): { nummer: number; sorte: Nummernsor
   };
 }
 
-/** Eine auf ihre suchbaren Merkmale reduzierte Zeile — eine Form für alle neun Entitäten. */
+/** Eine auf ihre suchbaren Merkmale reduzierte Zeile — eine Form für alle zwölf Entitäten. */
 interface Kandidat {
   modulKey: string;
   id: number;
@@ -212,8 +231,8 @@ function baueQuelle<T>(
 }
 
 /**
- * Die neun Module in EINER Tabelle — Rechteschlüssel, Nummernfeld, Beschriftung und Ziel je
- * Zeile beieinander. Verteilt auf neun Zweige wäre jede der vier Regeln neunmal zu prüfen.
+ * Die zwölf Module in EINER Tabelle — Rechteschlüssel, Nummernfeld, Beschriftung und Ziel je
+ * Zeile beieinander. Verteilt auf zwölf Zweige wäre jede der vier Regeln zwölfmal zu prüfen.
  *
  * DIE REIHENFOLGE IST NUR GLEICHSTANDSACHSE, keine Rangfolge: über die Stufe deckelt
  * `baueDatensatzTreffer`, die sichtbare Ordnung macht `ordneTreffer`. Sie folgt der
@@ -313,6 +332,36 @@ function quellen(k: DatensatzKontext): Quelle[] {
       id: (x) => x.id,
       label: (x) => x.name,
       ziel: (id, x) => einheitDetailPfad(id, x.id),
+    }),
+    // LFH-619. Hinten in der Tabelle, weil nach Führungsunterlagen seltener gesucht wird als
+    // nach Personen und Kräften — die Stufe ordnet ohnehin davor.
+    //
+    // Von einem Lagebericht nur der KETTENKOPF: jede Fortschreibung ist ein eigener
+    // Datensatz mit demselben Titel, und zwei gleichnamige Zeilen, von denen eine auf einen
+    // überholten Stand springt, sind genau das Bild, gegen das die Lageberichte-Liste
+    // `kettenKoepfe` benutzt (LFH-348 · N23).
+    baueQuelle(
+      'lageberichte',
+      'text',
+      q.lageberichte ? kettenKoepfe(q.lageberichte).map((k) => k.kopf) : undefined,
+      e,
+      {
+        id: (b) => b.id,
+        label: (b) => b.titel,
+        ziel: (id, b) => lageberichtDetailPfad(id, b.id),
+      },
+    ),
+    baueQuelle('gefahrengebiete', 'text', q.gefahrengebiete, e, {
+      id: (g) => g.id,
+      // Derselbe Rückfall wie auf der Gefahrenseite: ein unbenanntes Gebiet heisst dort
+      // „Gefahrengebiet #3", hier also auch.
+      label: (g) => gefahrengebietName(g.label, g.id),
+      ziel: (id, g) => gefahrenPfad(id, { gefahrengebiet: g.id }),
+    }),
+    baueQuelle('abschnitte', 'text', q.abschnitte, e, {
+      id: (a) => a.id,
+      label: (a) => a.name,
+      ziel: (id, a) => einsatzabschnittePfad(id, { abschnitt: a.id }),
     }),
   ];
 }
@@ -490,7 +539,58 @@ export function baueDatensatzTreffer(k: DatensatzKontext): Treffer[] {
     jeQuelle.set(r.quelle, bisher + 1);
     textTreffer.push(r.treffer);
   }
-  return [...nummerTreffer, ...textTreffer];
+  const sammel = zahl === null ? etbSammeltreffer(k, suche) : null;
+  return [...nummerTreffer, ...textTreffer, ...(sammel ? [sammel] : [])];
+}
+
+/** Id des ETB-Sammeltreffers — eine je Suche, deshalb kein Datensatz-Id-Teil. */
+const ETB_SAMMEL_ID = 'datensatz:etb:suche';
+
+/**
+ * Beschriftung des Sammeltreffers. EINE Stelle, weil `sichtbareDatensaetze` sie gegen den
+ * lebenden Begriff vergleicht — zwei Schreibweisen liefen still auseinander.
+ */
+function etbSammelLabel(suche: string): string {
+  return `Alle Einträge zu „${suche}“`;
+}
+
+/**
+ * Der ETB-Sammeltreffer „Alle Einträge zu „deich“" mit Trefferzahl (LFH-619, Neuentwurf S2).
+ *
+ * Er steht HINTER allen Einzeltreffern und ausserhalb beider Deckel: er ist der Weg zu allen,
+ * nicht der beste Treffer. Vorn stünde er vor dem einen Eintrag, den jemand gerade gesucht
+ * hat, und Enter führte auf eine Liste statt auf den Eintrag.
+ *
+ * „Hinten" heisst in der SICHTBAREN Ordnung, nicht im Array (Review-Befund): `ordneTreffer`
+ * sortiert nach Stufe und Score neu. Stufe 3 plus `UNBEWERTET + 1` ist strikt schlechter als
+ * jeder Einzeltreffer — mit der vorigen Stufe 2 stand er bei jeder Mehrwortsuche vorn, weil
+ * dort jeder Einzeltreffer auf Stufe 3 fällt.
+ *
+ * NUR IM TEXTZWEIG: eine gedruckte Nummer fragt der ETB über den Cursor, „Einträge zu 42"
+ * wäre eine Suche nach der Zahl im Text, die niemand gestellt hat. Bei null Treffern gibt es
+ * keine Zeile — „0 Treffer" als anwählbare Zeile führte auf eine leere Seite.
+ */
+function etbSammeltreffer(k: DatensatzKontext, suche: string): Treffer | null {
+  const erlaubt = PALETTE_MODI[k.modus].quellen;
+  if (erlaubt !== null && !erlaubt.includes('etbAnzahl')) return null;
+  const n = k.quellen.etbAnzahl?.anzahl ?? 0;
+  if (n <= 0) return null;
+  const m = modulRegistry.find((x) => x.key === QUELLE_MODUL.etbAnzahl);
+  if (!m || !istModulFreigegeben(m, k.benutzer, k.overrides)) return null;
+  const ziel = etbPfad(k.einsatzId, { q: suche });
+  return {
+    befehl: {
+      id: ETB_SAMMEL_ID,
+      gruppe: 'datensaetze',
+      label: etbSammelLabel(suche),
+      kontext: `${m.label} · ${n} Treffer`,
+      schlagworte: [m.label],
+      icon: m.icon,
+      ausfuehren: () => k.navigate(ziel),
+    },
+    score: UNBEWERTET + 1,
+    stufe: 3,
+  };
 }
 
 function schluessel(kand: Kandidat): string {
@@ -507,7 +607,9 @@ function schluessel(kand: Kandidat): string {
  * Palette, und 42 statische Befehle haben keine Datenquelle.
  */
 function modulKeyAusId(befehlId: string): string | null {
-  const t = /^datensatz:([^:]+):\d+$/.exec(befehlId);
+  // `suche` ist der ETB-Sammeltreffer (LFH-619) — er gehört zum ETB wie jeder Eintrag und muss
+  // denselben Riegeln unterliegen; ohne ihn liefe er als „nicht unsere Achse" überall durch.
+  const t = /^datensatz:([^:]+):(?:\d+|suche)$/.exec(befehlId);
   return t ? t[1] : null;
 }
 
@@ -579,6 +681,11 @@ export function sichtbareDatensaetze(
     // einordnen können, verstecke einen Fehler, statt ihn zu zeigen.
     if (modulKey === null) return true;
     if (erlaubteModule !== null && !erlaubteModule.has(modulKey)) return false;
+    // Der Sammeltreffer trägt seinen Begriff in Beschriftung UND Ziel (Review-Befund zu
+    // LFH-619): gebaut aus dem entprellten Stand, spränge er nach dem Weitertippen auf eine
+    // Suche, die niemand mehr gestellt hat. Ein veralteter Einzeltreffer führt wenigstens auf
+    // einen echten Eintrag; dieser nicht — er gilt deshalb nur für genau den lebenden Begriff.
+    if (t.befehl.id === ETB_SAMMEL_ID && t.befehl.label !== etbSammelLabel(s)) return false;
     // Beide ETB-Zweige teilen sich den Modulschlüssel, und keiner kann ohne alphanumerisches
     // Token antworten: der Volltext läuft dort ins Leere (siehe oben), der Zahlenzweig
     // verlangt ohnehin Ziffern.

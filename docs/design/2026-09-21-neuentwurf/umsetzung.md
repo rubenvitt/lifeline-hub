@@ -157,3 +157,25 @@ Die Lücke „FMS-Status/„Seit“ je Einheit“ ist geschlossen. Die Entscheid
   Abschnitt die Einheiten nach der Kategorie ihres Status.
 - Nicht Teil davon: das FMS-Tableau (LFH-642), die Rückmeldung bzw. „keine Rückmeldung“
   (LFH-610) und der Funkrufname der Einheit (LFH-614).
+
+## Rückmeldung je Einheit und Abschnitt (LFH-610, 22.09.2026)
+
+Die Lücke „Rückmeldung je Einheit“ / „keine Rückmeldung“ ist geschlossen. Entscheidungen des
+Auftraggebers:
+
+- Eine Meldung kann an **eine Einheit oder einen Einsatzabschnitt** gebunden werden
+  (`meldung.einheit_id`/`abschnitt_id`, höchstens einer, `ON DELETE SET NULL`). Der Freitext
+  `absender` bleibt Pflicht und trägt den Namen zum Eingangszeitpunkt.
+- **Als Rückmeldung zählt jede gebundene Meldung**, gleich welcher Meldungsart. Maßgeblich ist
+  die jüngste Ereigniszeit.
+- **Rückmeldefrist 60 Minuten**, überschreibbar je Organisation und je Einsatz
+  (`rueckmeldung_frist_min`). Ist die letzte Rückmeldung älter, steht die Zeit in `achtung`.
+- Die Kachel **„keine Rückmeldung“ zählt nur Einheiten, von denen nie eine kam** („—“ in
+  `alarm`); eine überfällige Einheit hat zurückgemeldet und zählt nicht mit.
+- Quelle ist `GET …/meldungen/rueckmeldungen` (Lesezugriff Meldungen). Ohne dieses Recht
+  entfällt die Spalte im Meldebild — es gibt kein falsches Rot.
+- Eine Zuordnung zu einer inzwischen aufgelösten oder fremden Einheit wird beim Anlegen zu
+  „ungebunden“ herabgestuft statt abgelehnt: sonst fiele eine offline erfasste Meldung samt
+  ETB-Eintrag in die abgelehnten Aktionen.
+- Die Lagekarte zeigt „Letzte Meldung“ im taktischen Zeitformat (`1411`) wie der Rest des
+  Paneels, nicht `14:11` wie im Entwurf.

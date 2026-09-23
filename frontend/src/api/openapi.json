@@ -74,6 +74,189 @@
           "verworfen"
         ]
       },
+      "AbloesungAnzeige": {
+        "type": "object",
+        "description": "Öffentliche Darstellung einer Schicht.",
+        "required": [
+          "id",
+          "einsatz_id",
+          "einheit_id",
+          "einheit_name",
+          "beginn_at",
+          "rhythmus_minuten",
+          "rhythmus_quelle",
+          "faellig_at",
+          "status",
+          "ruecknehmbar",
+          "angelegt_at"
+        ],
+        "properties": {
+          "abloesende_einheit_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "abloesende_einheit_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "abschnitt_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "abschnitt_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "angelegt_at": {
+            "type": "string"
+          },
+          "beginn_at": {
+            "type": "string"
+          },
+          "einheit_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "einheit_name": {
+            "type": "string"
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "einstufung": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Einstufung",
+                "description": "Nur bei laufenden Schichten; berechnet gegen die Zeit der Abfrage."
+              }
+            ]
+          },
+          "faellig_at": {
+            "type": "string"
+          },
+          "folgeschicht_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Die Folgeschicht, die beim Vollzug dieser Schicht entstand."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "rhythmus_minuten": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "rhythmus_quelle": {
+            "$ref": "#/components/schemas/RhythmusQuelle"
+          },
+          "ruecknehmbar": {
+            "type": "boolean",
+            "description": "Der Vollzug lässt sich zurücknehmen: abgelöst, und eine Folgeschicht ist entweder\nnicht vorhanden oder noch unberührt (laufend)."
+          },
+          "status": {
+            "$ref": "#/components/schemas/AbloesungStatus"
+          },
+          "vollzogen_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "vollzogen_von_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "vorgaenger_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Die abgelöste Schicht, aus deren Vollzug diese hervorging."
+          }
+        }
+      },
+      "AbloesungStatus": {
+        "type": "string",
+        "description": "Status einer Schicht. Wire == `as_str()`.",
+        "enum": [
+          "laufend",
+          "abgeloest"
+        ]
+      },
+      "AbloesungVollzugAnzeige": {
+        "type": "object",
+        "description": "Antwort auf einen Vollzug: die abgelöste Schicht und — mit ablösender Einheit — die\nFolgeschicht.",
+        "required": [
+          "abgeloest"
+        ],
+        "properties": {
+          "abgeloest": {
+            "$ref": "#/components/schemas/AbloesungAnzeige"
+          },
+          "folgeschicht": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AbloesungAnzeige"
+              }
+            ]
+          }
+        }
+      },
+      "AbloesungVorgabeAnzeige": {
+        "type": "object",
+        "description": "Rhythmus-Vorgabe eines Einsatzabschnitts.",
+        "required": [
+          "abschnitt_id",
+          "abschnitt_name",
+          "laufende_schichten"
+        ],
+        "properties": {
+          "abschnitt_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "abschnitt_name": {
+            "type": "string"
+          },
+          "laufende_schichten": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Laufende Schichten mit Einsatzstelle in diesem Abschnitt."
+          },
+          "rhythmus_minuten": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          }
+        }
+      },
       "AbschlussGrund": {
         "type": "string",
         "description": "Abschlussgrund beim Übergang `→ abgeschlossen`. String = CHECK-Constraint.\n`etb_label` erscheint in Klammern in der ETB-Spur (Spec: \"abgeschlossen\n(uebergabe_tierarzt)\") — daher identisch zum DB-String.",
@@ -1302,6 +1485,116 @@
         "enum": [
           "in_dienst",
           "ausser_dienst"
+        ]
+      },
+      "DokumentAnzeige": {
+        "type": "object",
+        "description": "Öffentliche Darstellung eines Dokuments (ohne Bytes).",
+        "required": [
+          "id",
+          "einsatz_id",
+          "kategorie",
+          "titel",
+          "dateiname",
+          "mime",
+          "groesse",
+          "etb_eintrag_id",
+          "abgelegt_von_id",
+          "abgelegt_at"
+        ],
+        "properties": {
+          "abgelegt_at": {
+            "type": "string"
+          },
+          "abgelegt_von_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "abgelegt_von_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bezug_abschnitt_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "bezug_abschnitt_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bezug_einheit_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "bezug_einheit_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bezug_etb_eintrag_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "bezug_etb_lfd_nr": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "dateiname": {
+            "type": "string"
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "etb_eintrag_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "groesse": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "kategorie": {
+            "$ref": "#/components/schemas/DokumentKategorie"
+          },
+          "mime": {
+            "type": "string"
+          },
+          "titel": {
+            "type": "string"
+          }
+        }
+      },
+      "DokumentKategorie": {
+        "type": "string",
+        "description": "Kategorie eines abgelegten Dokuments. Wire == `as_str()`; `ALLE` ist zugleich die\nAnzeigereihenfolge (Vertrag, nicht Dekoration).",
+        "enum": [
+          "lagekarte_plan",
+          "befehl",
+          "formular",
+          "foto",
+          "sonstiges"
         ]
       },
       "EinheitAnzeige": {
@@ -2582,6 +2875,14 @@
             "format": "int64",
             "description": "Aufbewahrungs-Dauer-Politik in Tagen (LFH-135); `None` = keine Auto-Frist."
           },
+          "rueckmeldung_frist_min": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Rückmeldefrist in Minuten (LFH-610); fehlt = keine eigene Vorgabe."
+          },
           "standard_modul": {
             "type": [
               "string",
@@ -2624,6 +2925,15 @@
           }
         ],
         "description": "Antwort-Shape von `einstellungen_laden`: rohe Einsatz-Override-Werte (geflacht)\nplus org-weite Defaults als eingebettetes Objekt (ohne Audit-Felder)."
+      },
+      "Einstufung": {
+        "type": "string",
+        "description": "Einstufung einer laufenden Schicht gegen die aktuelle Zeit. Höchstens drei Stufen\n(EEMUA 191/ISA-18.2: ≤ 3 Eskalationsstufen). Wire == `as_str()`.",
+        "enum": [
+          "planmaessig",
+          "vorwarnung",
+          "ueberfaellig"
+        ]
       },
       "EmpfaengerTyp": {
         "type": "string",
@@ -2772,6 +3082,20 @@
           "faellig": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "EtbAnzahlAnzeige": {
+        "type": "object",
+        "description": "Trefferzahl eines ETB-Filters (`GET /api/einsaetze/{id}/etb/anzahl`).",
+        "required": [
+          "anzahl"
+        ],
+        "properties": {
+          "anzahl": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Zahl der Einträge, auf die der Filter passt — ohne Seitendeckel."
           }
         }
       },
@@ -4282,6 +4606,48 @@
           }
         }
       },
+      "LetzteRueckmeldung": {
+        "type": "object",
+        "description": "Letzte Rückmeldung eines Absenders (Einheit oder direkt gebundener Abschnitt, LFH-610).\nAls Rückmeldung zählt jede an den Absender gebundene Meldung, gleich welcher\nMeldungsart; maßgeblich ist die jüngste `ereigniszeit`.",
+        "required": [
+          "bezug_id",
+          "meldung_id",
+          "lfd_nr",
+          "ereigniszeit",
+          "inhalt",
+          "meldeweg",
+          "faellig_at"
+        ],
+        "properties": {
+          "bezug_id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "`einsatz_einheit.id` bzw. `einsatzabschnitt.id`, je nach Liste."
+          },
+          "ereigniszeit": {
+            "type": "string",
+            "description": "Zeitpunkt der Rückmeldung (UTC, SQLite-Format) — die Ereigniszeit, nicht der Eingang."
+          },
+          "faellig_at": {
+            "type": "string",
+            "description": "`ereigniszeit` + Rückmeldefrist (UTC). Ab diesem Zeitpunkt gilt der Absender als\nüberfällig; der Vergleich mit „jetzt\" liegt beim Client, damit die Anzeige ohne\nneues Ereignis umschlägt."
+          },
+          "inhalt": {
+            "type": "string"
+          },
+          "lfd_nr": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "meldeweg": {
+            "$ref": "#/components/schemas/MeldeWeg"
+          },
+          "meldung_id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "LiveEvent": {
         "type": "string",
         "description": "SSE-Wire-Event-Namen als BE↔FE-Kontrakt (LFH-298). Schema-Anker für die OpenAPI-Union;\ndie Emitter routen über `as_str()`, das Frontend filtert exakt auf diese Wire-Tags.",
@@ -4309,6 +4675,8 @@
           "etb",
           "befehl",
           "stab",
+          "dokument",
+          "abloesung",
           "karten_ansicht",
           "lage_snapshot",
           "sofortmeldung",
@@ -4417,6 +4785,14 @@
           "ist_ueberfaellig"
         ],
         "properties": {
+          "abschnitt_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Strukturierter Absender (LFH-610): der Einsatzabschnitt, von dem die Meldung kam."
+          },
           "absender": {
             "type": "string"
           },
@@ -4475,6 +4851,14 @@
           },
           "eingang_at": {
             "type": "string"
+          },
+          "einheit_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Strukturierter Absender (LFH-610): die Einheit, von der die Meldung kam. Höchstens\neiner von `einheit_id`/`abschnitt_id` ist gesetzt; `absender` bleibt der Name zum\nEingangszeitpunkt. NULL, wenn nicht gebunden oder die Einheit aufgelöst wurde."
           },
           "einsatz_id": {
             "type": "integer",
@@ -5199,6 +5583,13 @@
             ],
             "description": "LFH-265: absent statt present-null, damit der generierte `attribution?` ehrlich ist."
           },
+          "hinweis": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Betreiberhinweis eines KATALOG-Eintrags (LFH-616), z. B. eine Lizenzauflage. Ein Eintrag\nmit Hinweis wird im Admin-Katalog sichtbar gewarnt und INAKTIV übernommen — er soll\nnicht mit einem Klick zur Grundlage aller werden. In `/api/karte/config` immer absent."
+          },
           "name": {
             "type": "string"
           },
@@ -5254,6 +5645,12 @@
               {
                 "$ref": "#/components/schemas/EinheitenSystem"
               }
+            ]
+          },
+          "einsatz_nummer_praefix": {
+            "type": [
+              "string",
+              "null"
             ]
           },
           "etb_nummer_praefix": {
@@ -5314,6 +5711,14 @@
               "null"
             ],
             "format": "int64"
+          },
+          "rueckmeldung_frist_min": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Rückmeldefrist in Minuten (LFH-610); fehlt = keine eigene Vorgabe."
           },
           "zeitformat": {
             "oneOf": [
@@ -5409,6 +5814,14 @@
               "null"
             ],
             "format": "int64"
+          },
+          "rueckmeldung_frist_min": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Rückmeldefrist in Minuten (LFH-610); fehlt = keine eigene Vorgabe."
           },
           "zeitformat": {
             "oneOf": [
@@ -6172,6 +6585,14 @@
           }
         }
       },
+      "RhythmusQuelle": {
+        "type": "string",
+        "description": "Herkunft des Rhythmus einer Schicht. Wire == `as_str()`.",
+        "enum": [
+          "abschnitt",
+          "einheit"
+        ]
+      },
       "Richtung": {
         "type": "string",
         "description": "Geteilte Richtung für Auftrag/Meldung (Schema-Anker für die OpenAPI-Union, LFH-120).\nWire == `richtung`.",
@@ -6179,6 +6600,34 @@
           "intern",
           "extern"
         ]
+      },
+      "RueckmeldungenAnzeige": {
+        "type": "object",
+        "description": "Antwort von `GET …/meldungen/rueckmeldungen` (LFH-610). Einheiten ohne Eintrag haben\nnoch nie zurückgemeldet. Die Abschnittsliste enthält nur DIREKT an den Abschnitt\ngebundene Meldungen; die Rückmeldung über den Teilbaum rechnet der Client aus beiden.",
+        "required": [
+          "frist_min",
+          "einheiten",
+          "abschnitte"
+        ],
+        "properties": {
+          "abschnitte": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LetzteRueckmeldung"
+            }
+          },
+          "einheiten": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LetzteRueckmeldung"
+            }
+          },
+          "frist_min": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Effektive Rückmeldefrist in Minuten (Einsatz ?? Org ?? 60)."
+          }
+        }
       },
       "Sachgebiet": {
         "type": "string",

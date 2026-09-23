@@ -155,6 +155,33 @@ mod tests {
         );
     }
 
+    /// Jede Migrationsnummer genau einmal. Parallele Branches greifen gern zur selben
+    /// nächsten freien Nummer, und beim Merge kollidiert das textuell nicht — die Dateien
+    /// heissen ja verschieden. Erst beim Einspielen scheitert `_sqlx_migrations.version`,
+    /// und zwar in JEDEM Test, der eine Datenbank anlegt, mit einer Meldung, die keine
+    /// Datei nennt (gemessen am 22.09.2026: dreimal `0106` nach #97/#98/#99). Dieser Test
+    /// nennt die Kollision beim Namen.
+    #[test]
+    fn migrationsnummern_sind_eindeutig() {
+        let mut je_nummer: std::collections::BTreeMap<i64, Vec<String>> = Default::default();
+        for m in sqlx::migrate!("./migrations").iter() {
+            je_nummer
+                .entry(m.version)
+                .or_default()
+                .push(m.description.to_string());
+        }
+        let doppelt: Vec<String> = je_nummer
+            .iter()
+            .filter(|(_, namen)| namen.len() > 1)
+            .map(|(nummer, namen)| format!("{nummer:04}: {}", namen.join(", ")))
+            .collect();
+        assert!(
+            doppelt.is_empty(),
+            "Migrationsnummer mehrfach vergeben — eine davon auf die nächste freie Nummer \
+             umlegen: {doppelt:?}"
+        );
+    }
+
     #[tokio::test]
     async fn migrations_create_app_meta() {
         let pool = test_pool().await;
@@ -2604,5 +2631,79 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(neue_id, 3, "gelöschte ids werden nicht wiedervergeben");
+    }
+
+    /// LFH-617: 0115 übernimmt nur Bestandsnummern im EXAKTEN Muster `JJJJ-NNN` in die
+    /// Zahlenspalten. Läuft gegen die ECHTE Migration (include_str!) auf einem Minimal-Schema
+    /// des Vorstands — ein `2026-01` neben `2026-001` ergäbe sonst dasselbe Zahlenpaar und
+    /// spränge den neuen Unique-Index mitten in der Migration.
+    #[tokio::test]
+    async fn migration_0115_uebernimmt_nur_exakte_bestandsnummern() {
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(SqliteConnectOptions::new().filename(":memory:"))
+            .await
+            .expect("In-Memory-Pool");
+        sqlx::raw_sql(
+            "CREATE TABLE einsatz (id INTEGER PRIMARY KEY, org_id INTEGER NOT NULL, \
+                                   einsatznummer_intern TEXT); \
+             CREATE UNIQUE INDEX idx_einsatz_nummer ON einsatz(org_id, einsatznummer_intern); \
+             CREATE TABLE org_einstellungen (org_id INTEGER PRIMARY KEY); \
+             INSERT INTO einsatz (id, org_id, einsatznummer_intern) VALUES \
+                 (1, 1, '2026-001'), (2, 1, '2026-01'), (3, 1, 'EN-4711'), (4, 1, NULL), \
+                 (5, 1, '2025-007'), (6, 2, '2026-001'), (7, 1, '2026-0010');",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        sqlx::raw_sql(include_str!("../migrations/0115_einsatznummer_system.sql"))
+            .execute(&pool)
+            .await
+            .expect("0115 muss auf Bestand mit Handwerten durchlaufen");
+
+        let zeilen: Vec<(i64, Option<String>, Option<i64>, Option<i64>)> = sqlx::query_as(
+            "SELECT id, einsatznummer_intern, nummer_jahr, nummer_lfd FROM einsatz ORDER BY id",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            zeilen,
+            vec![
+                (1, Some("2026-001".into()), Some(2026), Some(1)),
+                (2, Some("2026-01".into()), None, None),
+                (3, Some("EN-4711".into()), None, None),
+                (4, None, None, None),
+                (5, Some("2025-007".into()), Some(2025), Some(7)),
+                (6, Some("2026-001".into()), Some(2026), Some(1)),
+                (7, Some("2026-0010".into()), None, None),
+            ],
+            "Text bleibt wörtlich; Zahlen nur beim exakten Muster"
+        );
+
+        // Neue Präfix-Spalte existiert und ist leer.
+        sqlx::query(
+            "INSERT INTO org_einstellungen (org_id, einsatz_nummer_praefix) VALUES (1, 'WF-')",
+        )
+        .execute(&pool)
+        .await
+        .expect("einsatz_nummer_praefix muss existieren");
+
+        // Unique je (org, jahr, lfd): Dublette abgewiesen, mehrere NULL erlaubt.
+        let dup = sqlx::query(
+            "INSERT INTO einsatz (org_id, einsatznummer_intern, nummer_jahr, nummer_lfd) \
+             VALUES (1, 'E-2026-0001', 2026, 1)",
+        )
+        .execute(&pool)
+        .await;
+        assert!(
+            dup.is_err(),
+            "doppelte (org, jahr, lfd) muss abgewiesen werden"
+        );
+        sqlx::query("INSERT INTO einsatz (org_id) VALUES (1), (1)")
+            .execute(&pool)
+            .await
+            .expect("mehrere NULL-Zahlenpaare bleiben erlaubt (Altbestand)");
     }
 }

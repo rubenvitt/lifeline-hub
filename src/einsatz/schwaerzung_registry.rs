@@ -161,6 +161,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("abgeschlossen_von", G_FK),
             retain("einsatzart", G_ENUM),
             retain("einsatznummer_intern", G_ZAEHLER),
+            retain("nummer_jahr", G_ZAEHLER),
+            retain("nummer_lfd", G_ZAEHLER),
             retain("angelegt_at", G_ZEIT),
             retain(
                 "leitstellen_nr",
@@ -520,6 +522,35 @@ pub const TABELLEN: &[TabellenRegel] = &[
         ],
     },
     TabellenRegel {
+        // LFH-632: ganze Zeile löschen wie `anhang` — der Titel ist Freitext (kann PII tragen,
+        // „Foto Familie Müller“), und die Datei, die die Zeile beschreibt, ist ohnehin weg
+        // (CASCADE von `anhang`, Entscheidung E9; `anhang` steht deshalb VOR dieser Regel).
+        // Der Titel ÜBERLEBT trotzdem im Wortlaut: `dokument::repo` schreibt ihn in die
+        // System-ETB-Einträge „Dokument abgelegt: {titel} ({kategorie})“ und „Dokument
+        // entfernt: {titel} ({kategorie})“, und `etb_eintrag.inhalt` ist Retain (G_ETB). Das
+        // ist die ETB-Politik — rechtsverbindliche Führungsdokumentation wird dort nicht
+        // gescrubbt, für diesen Titel so wenig wie für jeden anderen ETB-Freitext. Gepinnt in
+        // `einsatz::repo::tests::schwaerzung_loescht_dokument_samt_anhang_und_haelt_den_etb_nachweis`.
+        tabelle: "einsatz_dokument",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        spalten: &[
+            scrub("id", Strategie::ZeileLoeschen),
+            scrub("einsatz_id", Strategie::ZeileLoeschen),
+            scrub("anhang_id", Strategie::ZeileLoeschen),
+            scrub("kategorie", Strategie::ZeileLoeschen),
+            scrub("titel", Strategie::ZeileLoeschen),
+            scrub("bezug_abschnitt_id", Strategie::ZeileLoeschen),
+            scrub("bezug_einheit_id", Strategie::ZeileLoeschen),
+            scrub("bezug_etb_eintrag_id", Strategie::ZeileLoeschen),
+            scrub("etb_eintrag_id", Strategie::ZeileLoeschen),
+            scrub("abgelegt_von_id", Strategie::ZeileLoeschen),
+            scrub("abgelegt_at", Strategie::ZeileLoeschen),
+            scrub("geloescht_at", Strategie::ZeileLoeschen),
+            scrub("geloescht_von_id", Strategie::ZeileLoeschen),
+        ],
+    },
+    TabellenRegel {
         // Ganze Zeile löschen (LFH-321): `daten` ist das eingefrorene volle Lagebild inkl.
         // PII (Personal-Marker, Freitext-Labels) — die Nutzlast IST die PII, kein zu
         // erhaltendes Skelett. KEINE ETB-Kopplung → nicht Retain-fähig wie lagebericht/
@@ -654,6 +685,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("lagezustand", G_ENUM),
             scrub("abschnittsauftrag", Strategie::NullSetzen), // REVIEW: operativer Freitext
             retain("fortschritt", G_ZAEHLER),
+            // LFH-635: Rhythmus-Vorgabe der Ablösung in Minuten.
+            retain("abloesung_rhythmus_minuten", G_KONFIG),
         ],
     },
     TabellenRegel {
@@ -773,6 +806,32 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("gesetzt_at", G_ZEIT),
         ],
     },
+    // LFH-635: Ablösungsschichten. Kein Freitext in der Tabelle (bewusst, design.md D1) —
+    // Namen kommen per Join aus `einsatz_einheit`/`einsatzabschnitt` und werden dort
+    // klassifiziert. Alles Struktur, Zeit oder Enum → RETAIN.
+    TabellenRegel {
+        tabelle: "einsatz_abloesung",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            retain("einheit_id", G_FK),
+            retain("abschnitt_id", G_FK),
+            retain("beginn_at", G_ZEIT),
+            retain("rhythmus_minuten", G_KONFIG),
+            retain("rhythmus_quelle", G_ENUM),
+            retain("faellig_at", G_ZEIT),
+            retain("abloesende_einheit_id", G_FK),
+            retain("status", G_ENUM),
+            retain("vollzogen_at", G_ZEIT),
+            retain("vollzogen_von_id", G_FK),
+            retain("vorgaenger_id", G_FK),
+            retain("etb_vollzug_id", G_FK),
+            retain("angelegt_von_id", G_FK),
+            retain("angelegt_at", G_ZEIT),
+        ],
+    },
     // LFH-46: abgeschlossene Lagebesprechungen. `entschluss` bleibt RETAIN (G_FUEHRUNG) —
     // dieselbe Klassifikation wie `lagebericht.abschnitte` und `befehl`, deren Inhalt derselbe
     // Entschluss der Einsatzleitung ist. Ein Alleingang auf Scrub für genau eine der drei
@@ -841,6 +900,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("auftrag_nummer_start", G_KONFIG),
             retain("meldung_bestaetigung_frist_min", G_KONFIG),
             retain("auftrag_quittierung_frist_min", G_KONFIG),
+            retain("rueckmeldung_frist_min", G_KONFIG),
             retain("auto_etb_eintraege", G_KONFIG),
             retain("retention_dauer_tage", G_KONFIG),
         ],
@@ -1033,6 +1093,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("eskaliert", G_KONFIG),
             retain("richtung", G_ENUM),
             retain("erledigt_at", G_ZEIT),
+            retain("einheit_id", G_FK),
+            retain("abschnitt_id", G_FK),
         ],
     },
     TabellenRegel {

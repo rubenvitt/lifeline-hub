@@ -310,6 +310,19 @@ pub struct EtbFilter {
     pub bis_zeit: Option<String>,
     /// Filter nach Erfasser.
     pub erfasser_id: Option<i64>,
+    /// Filter „betrifft Einheit" (LFH-616). Ein ETB-Eintrag hat keine Einheit-Spalte; er
+    /// betrifft eine Einheit, wenn EINER von zwei Wegen trägt:
+    /// 1. **Fremdschlüssel über den Auftrag**: `e.auftrag_id` zeigt auf einen Auftrag mit der
+    ///    Einheit als Empfänger (Anordnung und Vollzugsmeldung).
+    /// 2. **Name in von/an**: `von` oder `an` ist — getrimmt, ASCII-Groß/Klein egal — der
+    ///    AKTUELLE Einheitsname. Das deckt den freien Funkverkehr ab, die Mehrheit im ETB.
+    ///    Grenzen, bewusst: nach einer Umbenennung fallen ältere Einträge heraus; eine
+    ///    Empfängerliste in `an` trifft nicht exakt (die fängt Weg 1); Funkrufnamen der
+    ///    Fahrzeuge einer Einheit zählen nicht mit.
+    ///
+    /// Eine Einheit aus einem fremden Einsatz liefert über `ee.einsatz_id = e.einsatz_id`
+    /// nichts statt fremder Treffer.
+    pub einheit_id: Option<i64>,
     /// Cursor: nur Einträge mit `lfd_nr <` diesem Wert (für ältere Seiten).
     pub before_lfd_nr: Option<i64>,
     /// Seitengröße (vom Handler auf [1, MAX_LIMIT] geklemmt).
@@ -317,8 +330,8 @@ pub struct EtbFilter {
 }
 
 impl EtbFilter {
-    /// Die Filtermerkmale ohne Cursor und Limit — genau das, was auch die Zählung
-    /// ([`zaehle`]) bekommt.
+    /// Die Filtermerkmale ohne Cursor und Limit — genau das, was auch die Zählungen
+    /// ([`zaehle`], [`anzahl`]) bekommen.
     pub fn merkmale(&self) -> EtbZaehlFilter {
         EtbZaehlFilter {
             q: self.q.clone(),
@@ -326,13 +339,15 @@ impl EtbFilter {
             von_zeit: self.von_zeit.clone(),
             bis_zeit: self.bis_zeit.clone(),
             erfasser_id: self.erfasser_id,
+            einheit_id: self.einheit_id,
         }
     }
 }
 
-/// Die Filtermerkmale der ETB-Abfrage OHNE Seitenparameter (LFH-612). Die Zählung nimmt
-/// bewusst diesen Typ und nicht [`EtbFilter`]: sie kann damit gar keinen Cursor und kein
+/// Die Filtermerkmale der ETB-Abfrage OHNE Seitenparameter (LFH-612). Die Zählungen nehmen
+/// bewusst diesen Typ und nicht [`EtbFilter`]: sie können damit gar keinen Cursor und kein
 /// Limit bekommen, eine „Gesamtzahl" über eine Seite ist strukturell ausgeschlossen.
+/// Die Bedeutung der Felder steht an [`EtbFilter`].
 #[derive(Debug, Default, Clone)]
 pub struct EtbZaehlFilter {
     pub q: Option<String>,
@@ -340,16 +355,18 @@ pub struct EtbZaehlFilter {
     pub von_zeit: Option<String>,
     pub bis_zeit: Option<String>,
     pub erfasser_id: Option<i64>,
+    pub einheit_id: Option<i64>,
 }
 
 /// Schreibt FTS-Join und WHERE-Bedingung einer ETB-Abfrage (Einsatz + Filtermerkmale) in
-/// `qb`. **Die eine Quelle** für Liste und Zählung (LFH-612): zählte die Zählung mit einer
-/// eigenen Bedingung, liefen Kopf („n Treffer") und Liste bei der ersten Abweichung still
-/// auseinander — ohne roten Test, ohne Fehlerbild.
+/// `qb`. **Die eine Quelle** für Liste und beide Zählungen (LFH-612, LFH-619): zählte eine
+/// Zählung mit einer eigenen Bedingung, liefen Kopf („n Treffer") und Liste bei der ersten
+/// Abweichung still auseinander — ohne roten Test, ohne Fehlerbild.
 ///
 /// Erwartet, dass `qb` bis zum `FROM etb_eintrag e …` gefüllt ist; der Aufrufer hängt danach
 /// Cursor, `GROUP BY`, `ORDER BY`, `LIMIT` an.
 fn filter_bedingung(qb: &mut QueryBuilder<Sqlite>, einsatz_id: i64, filter: &EtbZaehlFilter) {
+    // FTS-Join nur, wenn ein Volltext-Query gesetzt ist.
     // Der Join verbindet nur per rowid; das MATCH gehört in die WHERE-Klausel
     // (FTS5 wertet MATCH nur als top-level AND-Term gegen die FTS-Tabelle aus).
     let fts: Option<String> = filter
@@ -390,6 +407,23 @@ fn filter_bedingung(qb: &mut QueryBuilder<Sqlite>, einsatz_id: i64, filter: &Etb
         qb.push(" AND e.erfasser_id = ");
         qb.push_bind(eid);
     }
+    if let Some(einheit) = filter.einheit_id {
+        qb.push(
+            " AND (EXISTS (SELECT 1 FROM auftrag_empfaenger ae \
+                           WHERE ae.auftrag_id = e.auftrag_id \
+                             AND ae.empfaenger_typ = 'einheit' AND ae.einheit_id = ",
+        );
+        qb.push_bind(einheit);
+        qb.push(
+            ") OR EXISTS (SELECT 1 FROM einsatz_einheit ee \
+                          WHERE ee.einsatz_id = e.einsatz_id AND ee.id = ",
+        );
+        qb.push_bind(einheit);
+        qb.push(
+            " AND (TRIM(e.von) = ee.name COLLATE NOCASE \
+                               OR TRIM(e.an) = ee.name COLLATE NOCASE)))",
+        );
+    }
 }
 
 /// Fragt Einträge eines Einsatzes ab. Sortierung: `lfd_nr DESC` (neueste zuerst),
@@ -402,7 +436,7 @@ pub async fn abfrage(
 ) -> Result<Vec<EtbEintragAnzeige>, AppError> {
     // Der Join auf `benutzer` liefert nur `erfasser_name` und filtert nichts
     // (`erfasser_id` ist ein NOT-NULL-Fremdschlüssel) — deshalb steht er hier und nicht
-    // in der gemeinsamen Bedingung, die die Zählung ohne ihn fährt.
+    // in der gemeinsamen Bedingung, die die Zählungen ohne ihn fahren.
     let mut qb: QueryBuilder<Sqlite> = QueryBuilder::new(
         "SELECT e.id, e.lfd_nr, e.typ, e.inhalt, e.von, e.an, e.meldeweg, e.veranlassung, \
                 e.erfasser_id, b.anzeigename AS erfasser_name, e.erfasser_funktion, e.ereigniszeit, e.received_at, \
@@ -426,6 +460,22 @@ pub async fn abfrage(
         .await?;
     folgeauftraege_nachladen(pool, &mut eintraege).await?;
     Ok(eintraege)
+}
+
+/// Zählt die Einträge, die [`abfrage`] mit denselben Filtermerkmalen liefern würde — OHNE
+/// Seitendeckel (LFH-619, Sammeltreffer der Sprungpalette). Die Bedingung kommt aus
+/// [`filter_bedingung`], derselben Funktion wie bei der Liste.
+pub async fn anzahl(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    filter: &EtbZaehlFilter,
+) -> Result<i64, AppError> {
+    let mut qb: QueryBuilder<Sqlite> = QueryBuilder::new("SELECT COUNT(*) FROM etb_eintrag e");
+    filter_bedingung(&mut qb, einsatz_id, filter);
+    qb.build_query_scalar::<i64>()
+        .fetch_one(pool)
+        .await
+        .map_err(Into::into)
 }
 
 /// Zählt die Einträge eines Einsatzes je Typ über dieselbe Bedingung wie [`abfrage`]

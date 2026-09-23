@@ -211,12 +211,29 @@ export function spaltenFuer<T extends object>(): <const K extends string>(
  * `bestaetigung` ist nicht Zierde: die drei Bestands-„Entfernen" (Fahrzeuge, Personal,
  * Material) hängen an einer Rückfrage. Ohne dieses Feld feuerte die Aktion im Kartenzweig
  * ohne Rückfrage — Prüflisten-Kriterium 4.
+ *
+ * ZWEI KNÖPFE, ZWEI REGELN (LFH-632). Der AUSLÖSER bleibt immer neutral — er bedient, und
+ * Rot bedient nichts. Der OK-Knopf der RÜCKFRAGE ist etwas anderes: er bestätigt, und für
+ * eine UNUMKEHRBARE Aktion verlangt CLAUDE.md dort `okButtonProps={{ danger: true }}`
+ * („sonst bestätigt man das Löschen mit einem blauen Knopf"). Deshalb gibt es genau diese
+ * eine Gefahren-Angabe, als Opt-in und nur für die Rückfrage: {@link bestaetigungGefahr}.
+ * Umkehrbares („Aus Einsatz entfernen" im Material) setzt es nicht.
  */
 export interface PrimaerAktion<T> {
   etikett: string;
   onKlick: (zeile: T) => void;
-  /** Rückfragetitel. Gesetzt ⇒ Rückfrage vor dem Auslösen, ohne Gefahren-Anstrich. */
+  /** Rückfragetitel. Gesetzt ⇒ Rückfrage vor dem Auslösen; der Auslöser bleibt neutral. */
   bestaetigung?: string;
+  /**
+   * Nur mit `bestaetigung`: färbt den OK-Knopf der Rückfrage rot — für unumkehrbare
+   * Aktionen. Der Auslöser bleibt davon unberührt.
+   */
+  bestaetigungGefahr?: true;
+  /**
+   * Zugänglicher Name des Auslösers je Zeile (`aria-label`), z. B. „Dokument X entfernen".
+   * Ohne ihn liefern n Karten n gleichnamige Knöpfe; das sichtbare `etikett` bleibt kurz.
+   */
+  zugaenglicherName?: (zeile: T) => string;
   /** Zeilenweise Ausblendung (Schreibrecht, Zustand). Fehlt = immer sichtbar. */
   sichtbar?: (zeile: T) => boolean;
 }
@@ -1445,11 +1462,16 @@ export default function Datensicht<T extends object, const K extends string>(
           key="aktion"
           title={aktion!.bestaetigung}
           onConfirm={() => aktion!.onKlick(zeile)}
+          okButtonProps={aktion!.bestaetigungGefahr ? { danger: true } : undefined}
         >
-          <Button>{aktion!.etikett}</Button>
+          <Button aria-label={aktion!.zugaenglicherName?.(zeile)}>{aktion!.etikett}</Button>
         </Popconfirm>
       ) : (
-        <Button key="aktion" onClick={() => aktion!.onKlick(zeile)}>
+        <Button
+          key="aktion"
+          aria-label={aktion!.zugaenglicherName?.(zeile)}
+          onClick={() => aktion!.onKlick(zeile)}
+        >
           {aktion!.etikett}
         </Button>
       )

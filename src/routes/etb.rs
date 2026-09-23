@@ -239,6 +239,8 @@ pub struct EtbAbfrageParams {
     pub bis: Option<String>,
     /// Filter nach Erfasser.
     pub erfasser_id: Option<i64>,
+    /// Filter „betrifft Einheit" (LFH-616, Semantik an `repo::EtbFilter::einheit_id`).
+    pub einheit_id: Option<i64>,
     /// Cursor: nur Einträge mit lfd_nr < diesem Wert.
     pub before_lfd_nr: Option<i64>,
     /// Seitengröße (Default STANDARD_LIMIT, max MAX_LIMIT).
@@ -254,18 +256,7 @@ pub async fn liste(
     PfadParam(einsatz_id): PfadParam<i64>,
     Query(params): Query<EtbAbfrageParams>,
 ) -> Result<Json<Vec<EtbEintragAnzeige>>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?; // 404, wenn unbekannt
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-
+    fordere_lese_gates(&state, &benutzer, einsatz_id).await?;
     let merkmale = filter_merkmale(&params)?;
     let limit = params
         .limit
@@ -278,6 +269,7 @@ pub async fn liste(
         von_zeit: merkmale.von_zeit,
         bis_zeit: merkmale.bis_zeit,
         erfasser_id: merkmale.erfasser_id,
+        einheit_id: merkmale.einheit_id,
         before_lfd_nr: params.before_lfd_nr,
         limit,
     };
@@ -285,10 +277,70 @@ pub async fn liste(
     Ok(Json(repo::abfrage(&state.pool, einsatz_id, &filter).await?))
 }
 
+/// Trefferzahl eines ETB-Filters (`GET /api/einsaetze/{id}/etb/anzahl`).
+#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
+pub struct EtbAnzahlAnzeige {
+    /// Zahl der Einträge, auf die der Filter passt — ohne Seitendeckel.
+    pub anzahl: i64,
+}
+
+/// GET /api/einsaetze/{id}/etb/anzahl — wie viele Einträge der Filter von [`liste`] trifft
+/// (LFH-619, Sammeltreffer der Sprungpalette „ETB · Einträge zu … — 31 Treffer“).
+///
+/// DIESELBEN Gates und DIESELBEN Filtermerkmale wie die Liste ([`fordere_lese_gates`],
+/// [`filter_merkmale`]): eine Zahl, die anders filtert als die Liste, auf die der Treffer
+/// springt, wäre eine Behauptung ohne Beleg. `limit` und `before_lfd_nr` werden ignoriert —
+/// [`repo::EtbZaehlFilter`] kann sie gar nicht tragen.
+pub async fn anzahl(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    PfadParam(einsatz_id): PfadParam<i64>,
+    Query(params): Query<EtbAbfrageParams>,
+) -> Result<Json<EtbAnzahlAnzeige>, AppError> {
+    fordere_lese_gates(&state, &benutzer, einsatz_id).await?;
+    let merkmale = filter_merkmale(&params)?;
+    let anzahl = repo::anzahl(&state.pool, einsatz_id, &merkmale).await?;
+    Ok(Json(EtbAnzahlAnzeige { anzahl }))
+}
+
+/// GET /api/einsaetze/{id}/etb/zaehler — Zahl der Einträge gesamt und je Typ (LFH-612).
+///
+/// Nimmt dieselben Filter wie [`liste`] und zählt über dieselbe Bedingung; `before_lfd_nr`
+/// und `limit` werden ignoriert (sie sind Seiten-, keine Filtermerkmale). Gates wie die
+/// Liste: Lesezugriff (auch Beobachter) + Modul `etb`.
+pub async fn zaehler(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    PfadParam(einsatz_id): PfadParam<i64>,
+    Query(params): Query<EtbAbfrageParams>,
+) -> Result<Json<EtbZaehlerAnzeige>, AppError> {
+    fordere_lese_gates(&state, &benutzer, einsatz_id).await?;
+    let merkmale = filter_merkmale(&params)?;
+    let zeilen = repo::zaehle(&state.pool, einsatz_id, &merkmale).await?;
+    Ok(Json(EtbZaehlerAnzeige::aus_zeilen(&zeilen)?))
+}
+
+/// Lesezugriff auf den Einsatz plus Modulzugriff „etb“ — die Gates aller fünf Leserouten
+/// (Liste, beide Zählungen, beide Lesemarken-Routen). NICHT Schreibrecht und NICHT „aktiv":
+/// ein Beobachter liest und führt seine Lesemarke ebenso, und ein abgeschlossener Einsatz
+/// bleibt lesbar.
+async fn fordere_lese_gates(
+    state: &AppState,
+    benutzer: &crate::auth::Benutzer,
+    einsatz_id: i64,
+) -> Result<(), AppError> {
+    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?; // 404, wenn unbekannt
+    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
+    fordere_lesezugriff(benutzer, &einsatz, rolle)?;
+    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, benutzer).await
+}
+
 /// Prüft und normalisiert die Filtermerkmale einer ETB-Abfrage (unbekannter Typ und
-/// unlesbare Zeit → 400). Liste und Zählung rufen DIESE Funktion (LFH-612): eine zweite
-/// Kopie wäre die Stelle, an der „n Treffer" im Kopf und die Liste still auseinanderliefen.
+/// unlesbare Zeit → 400). Liste und beide Zählungen rufen DIESE Funktion (LFH-612): eine
+/// zweite Kopie wäre die Stelle, an der „n Treffer" im Kopf und die Liste still
+/// auseinanderliefen.
 fn filter_merkmale(params: &EtbAbfrageParams) -> Result<repo::EtbZaehlFilter, AppError> {
+    // Typ validieren, falls gesetzt.
     if let Some(t) = &params.typ {
         if EtbTyp::parse(t).is_none() {
             return Err(AppError::Validation(
@@ -310,35 +362,8 @@ fn filter_merkmale(params: &EtbAbfrageParams) -> Result<repo::EtbZaehlFilter, Ap
         von_zeit,
         bis_zeit,
         erfasser_id: params.erfasser_id,
+        einheit_id: params.einheit_id,
     })
-}
-
-/// GET /api/einsaetze/{id}/etb/zaehler — Zahl der Einträge gesamt und je Typ (LFH-612).
-///
-/// Nimmt dieselben Filter wie [`liste`] und zählt über dieselbe Bedingung; `before_lfd_nr`
-/// und `limit` werden ignoriert (sie sind Seiten-, keine Filtermerkmale). Gates wie die
-/// Liste: Lesezugriff (auch Beobachter) + Modul `etb`.
-pub async fn zaehler(
-    State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
-    Query(params): Query<EtbAbfrageParams>,
-) -> Result<Json<EtbZaehlerAnzeige>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?; // 404, wenn unbekannt
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-
-    let merkmale = filter_merkmale(&params)?;
-    let zeilen = repo::zaehle(&state.pool, einsatz_id, &merkmale).await?;
-    Ok(Json(EtbZaehlerAnzeige::aus_zeilen(&zeilen)?))
 }
 
 #[derive(Debug, Deserialize)]
@@ -348,20 +373,6 @@ pub struct LesemarkeSetzen {
     pub bis_lfd_nr: i64,
 }
 
-/// Gemeinsame Gates beider Lesemarken-Routen: Lesezugriff + Modulzugriff — NICHT
-/// Schreibrecht und NICHT „aktiv". Die eigene Lesemarke ist kein Schreibzugriff auf den
-/// Einsatz; ein Beobachter führt sie ebenso, und ein abgeschlossener Einsatz bleibt lesbar.
-async fn fordere_lesemarken_zugriff(
-    state: &AppState,
-    benutzer: &crate::auth::Benutzer,
-    einsatz_id: i64,
-) -> Result<(), AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?; // 404, wenn unbekannt
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, benutzer).await
-}
-
 /// GET /api/einsaetze/{id}/etb/lesemarke — der eigene Lesestand (LFH-611): Marke,
 /// Zeitpunkt der letzten Sichtung und die Zahl fremder Einträge darüber.
 pub async fn lesemarke(
@@ -369,7 +380,7 @@ pub async fn lesemarke(
     CurrentUser(benutzer): CurrentUser,
     PfadParam(einsatz_id): PfadParam<i64>,
 ) -> Result<Json<EtbLesemarkeAnzeige>, AppError> {
-    fordere_lesemarken_zugriff(&state, &benutzer, einsatz_id).await?;
+    fordere_lese_gates(&state, &benutzer, einsatz_id).await?;
     Ok(Json(
         lesemarke::laden(&state.pool, einsatz_id, benutzer.id).await?,
     ))
@@ -386,7 +397,7 @@ pub async fn lesemarke_setzen(
     PfadParam(einsatz_id): PfadParam<i64>,
     JsonBody(req): JsonBody<LesemarkeSetzen>,
 ) -> Result<Json<EtbLesemarkeAnzeige>, AppError> {
-    fordere_lesemarken_zugriff(&state, &benutzer, einsatz_id).await?;
+    fordere_lese_gates(&state, &benutzer, einsatz_id).await?;
     if req.bis_lfd_nr < 1 {
         return Err(AppError::Validation(
             "bis_lfd_nr muss mindestens 1 sein".into(),

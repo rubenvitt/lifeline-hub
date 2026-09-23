@@ -12,8 +12,10 @@ const VOLL = {
   etb_nummer_praefix: 'EB-',
   meldung_nummer_praefix: 'M-',
   auftrag_nummer_praefix: 'A-',
+  einsatz_nummer_praefix: 'WF-',
   meldung_bestaetigung_frist_min: 30,
   auftrag_quittierung_frist_min: 45,
+  rueckmeldung_frist_min: 25,
   auto_etb_eintraege: 0,
   geocoder_url: 'https://geo.example',
   geaendert_at: null,
@@ -21,7 +23,7 @@ const VOLL = {
 } as unknown as OrgEinstellungen;
 
 describe('zuUpdate', () => {
-  it('mappt alle 12 Felder aus dem geladenen Zustand (auto_etb 0 → false)', () => {
+  it('mappt alle 13 Felder aus dem geladenen Zustand (auto_etb 0 → false)', () => {
     expect(zuUpdate(VOLL)).toEqual({
       zeitzone: 'Europe/Berlin',
       zeitformat: '12h',
@@ -31,8 +33,11 @@ describe('zuUpdate', () => {
       etb_nummer_praefix: 'EB-',
       meldung_nummer_praefix: 'M-',
       auftrag_nummer_praefix: 'A-',
+      // LFH-617: fehlte es hier, nullte jedes Speichern der ANZEIGE-Sektion das Präfix.
+      einsatz_nummer_praefix: 'WF-',
       meldung_bestaetigung_frist_min: 30,
       auftrag_quittierung_frist_min: 45,
+      rueckmeldung_frist_min: 25,
       auto_etb_eintraege: false,
       geocoder_url: 'https://geo.example',
     });
@@ -76,9 +81,18 @@ describe('normalisiereEinsatz', () => {
       etb_nummer_praefix: null,
       meldung_nummer_praefix: null,
       auftrag_nummer_praefix: null,
+      einsatz_nummer_praefix: null,
       meldung_bestaetigung_frist_min: null,
       auftrag_quittierung_frist_min: null,
+      rueckmeldung_frist_min: null,
       auto_etb_eintraege: false,
     });
+  });
+
+  it('LFH-617: trimmt das Einsatznummer-Präfix', () => {
+    expect(
+      normalisiereEinsatz({ einsatz_nummer_praefix: ' WF- ', auto_etb_eintraege: true })
+        .einsatz_nummer_praefix,
+    ).toBe('WF-');
   });
 });

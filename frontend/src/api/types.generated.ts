@@ -30,6 +30,74 @@ export interface components {
          * @enum {string}
          */
         AbgleichStatus: "verdacht" | "bestaetigt" | "verworfen";
+        /** @description Öffentliche Darstellung einer Schicht. */
+        AbloesungAnzeige: {
+            /** Format: int64 */
+            abloesende_einheit_id?: number | null;
+            abloesende_einheit_name?: string | null;
+            /** Format: int64 */
+            abschnitt_id?: number | null;
+            abschnitt_name?: string | null;
+            angelegt_at: string;
+            beginn_at: string;
+            /** Format: int64 */
+            einheit_id: number;
+            einheit_name: string;
+            /** Format: int64 */
+            einsatz_id: number;
+            einstufung?: null | components["schemas"]["Einstufung"];
+            faellig_at: string;
+            /**
+             * Format: int64
+             * @description Die Folgeschicht, die beim Vollzug dieser Schicht entstand.
+             */
+            folgeschicht_id?: number | null;
+            /** Format: int64 */
+            id: number;
+            /** Format: int64 */
+            rhythmus_minuten: number;
+            rhythmus_quelle: components["schemas"]["RhythmusQuelle"];
+            /**
+             * @description Der Vollzug lässt sich zurücknehmen: abgelöst, und eine Folgeschicht ist entweder
+             *     nicht vorhanden oder noch unberührt (laufend).
+             */
+            ruecknehmbar: boolean;
+            status: components["schemas"]["AbloesungStatus"];
+            vollzogen_at?: string | null;
+            /** Format: int64 */
+            vollzogen_von_id?: number | null;
+            /**
+             * Format: int64
+             * @description Die abgelöste Schicht, aus deren Vollzug diese hervorging.
+             */
+            vorgaenger_id?: number | null;
+        };
+        /**
+         * @description Status einer Schicht. Wire == `as_str()`.
+         * @enum {string}
+         */
+        AbloesungStatus: "laufend" | "abgeloest";
+        /**
+         * @description Antwort auf einen Vollzug: die abgelöste Schicht und — mit ablösender Einheit — die
+         *     Folgeschicht.
+         */
+        AbloesungVollzugAnzeige: {
+            abgeloest: components["schemas"]["AbloesungAnzeige"];
+            folgeschicht?: null | components["schemas"]["AbloesungAnzeige"];
+        };
+        /** @description Rhythmus-Vorgabe eines Einsatzabschnitts. */
+        AbloesungVorgabeAnzeige: {
+            /** Format: int64 */
+            abschnitt_id: number;
+            abschnitt_name: string;
+            /**
+             * Format: int64
+             * @description Laufende Schichten mit Einsatzstelle in diesem Abschnitt.
+             */
+            laufende_schichten: number;
+            /** Format: int64 */
+            rhythmus_minuten?: number | null;
+        };
         /**
          * @description Abschlussgrund beim Übergang `→ abgeschlossen`. String = CHECK-Constraint.
          *     `etb_label` erscheint in Klammern in der ETB-Spur (Spec: "abgeschlossen
@@ -469,6 +537,41 @@ export interface components {
          * @enum {string}
          */
         Dienststatus: "in_dienst" | "ausser_dienst";
+        /** @description Öffentliche Darstellung eines Dokuments (ohne Bytes). */
+        DokumentAnzeige: {
+            abgelegt_at: string;
+            /** Format: int64 */
+            abgelegt_von_id: number;
+            abgelegt_von_name?: string | null;
+            /** Format: int64 */
+            bezug_abschnitt_id?: number | null;
+            bezug_abschnitt_name?: string | null;
+            /** Format: int64 */
+            bezug_einheit_id?: number | null;
+            bezug_einheit_name?: string | null;
+            /** Format: int64 */
+            bezug_etb_eintrag_id?: number | null;
+            /** Format: int64 */
+            bezug_etb_lfd_nr?: number | null;
+            dateiname: string;
+            /** Format: int64 */
+            einsatz_id: number;
+            /** Format: int64 */
+            etb_eintrag_id: number;
+            /** Format: int64 */
+            groesse: number;
+            /** Format: int64 */
+            id: number;
+            kategorie: components["schemas"]["DokumentKategorie"];
+            mime: string;
+            titel: string;
+        };
+        /**
+         * @description Kategorie eines abgelegten Dokuments. Wire == `as_str()`; `ALLE` ist zugleich die
+         *     Anzeigereihenfolge (Vertrag, nicht Dekoration).
+         * @enum {string}
+         */
+        DokumentKategorie: "lagekarte_plan" | "befehl" | "formular" | "foto" | "sonstiges";
         /**
          * @description Aufgelöste Einheiten-Anzeige inkl. Typ/Abschnitt-Labels, Führer-Identität,
          *     Mitgliedern und berechneter Stärke. `soll` ist optional (Override → Typ-Default →
@@ -910,6 +1013,11 @@ export interface components {
              * @description Aufbewahrungs-Dauer-Politik in Tagen (LFH-135); `None` = keine Auto-Frist.
              */
             retention_dauer_tage?: number | null;
+            /**
+             * Format: int64
+             * @description Rückmeldefrist in Minuten (LFH-610); fehlt = keine eigene Vorgabe.
+             */
+            rueckmeldung_frist_min?: number | null;
             standard_modul?: string | null;
             zeitformat?: null | components["schemas"]["Zeitformat"];
             zeitzone?: string | null;
@@ -921,6 +1029,12 @@ export interface components {
         EinstellungenMitOrgDefaults: components["schemas"]["EinstellungenAnzeige"] & {
             org_defaults: components["schemas"]["OrgEinstellungenHinweis"];
         };
+        /**
+         * @description Einstufung einer laufenden Schicht gegen die aktuelle Zeit. Höchstens drei Stufen
+         *     (EEMUA 191/ISA-18.2: ≤ 3 Eskalationsstufen). Wire == `as_str()`.
+         * @enum {string}
+         */
+        Einstufung: "planmaessig" | "vorwarnung" | "ueberfaellig";
         /**
          * @description Empfänger-Diskriminator eines Auftrags (Schema-Anker für die OpenAPI-Union, LFH-120).
          *     Wire == `empfaenger_typ`.
@@ -971,6 +1085,14 @@ export interface components {
         ErinnerungsZaehler: {
             /** Format: int64 */
             faellig: number;
+        };
+        /** @description Trefferzahl eines ETB-Filters (`GET /api/einsaetze/{id}/etb/anzahl`). */
+        EtbAnzahlAnzeige: {
+            /**
+             * Format: int64
+             * @description Zahl der Einträge, auf die der Filter passt — ohne Seitendeckel.
+             */
+            anzahl: number;
         };
         /**
          * @description Öffentliche Sicht eines ETB-Baustein-Katalogeintrags. Die DB-Spalten `aktiv`,
@@ -1545,11 +1667,37 @@ export interface components {
             naechste_at?: string | null;
         };
         /**
+         * @description Letzte Rückmeldung eines Absenders (Einheit oder direkt gebundener Abschnitt, LFH-610).
+         *     Als Rückmeldung zählt jede an den Absender gebundene Meldung, gleich welcher
+         *     Meldungsart; maßgeblich ist die jüngste `ereigniszeit`.
+         */
+        LetzteRueckmeldung: {
+            /**
+             * Format: int64
+             * @description `einsatz_einheit.id` bzw. `einsatzabschnitt.id`, je nach Liste.
+             */
+            bezug_id: number;
+            /** @description Zeitpunkt der Rückmeldung (UTC, SQLite-Format) — die Ereigniszeit, nicht der Eingang. */
+            ereigniszeit: string;
+            /**
+             * @description `ereigniszeit` + Rückmeldefrist (UTC). Ab diesem Zeitpunkt gilt der Absender als
+             *     überfällig; der Vergleich mit „jetzt" liegt beim Client, damit die Anzeige ohne
+             *     neues Ereignis umschlägt.
+             */
+            faellig_at: string;
+            inhalt: string;
+            /** Format: int64 */
+            lfd_nr: number;
+            meldeweg: components["schemas"]["MeldeWeg"];
+            /** Format: int64 */
+            meldung_id: number;
+        };
+        /**
          * @description SSE-Wire-Event-Namen als BE↔FE-Kontrakt (LFH-298). Schema-Anker für die OpenAPI-Union;
          *     die Emitter routen über `as_str()`, das Frontend filtert exakt auf diese Wire-Tags.
          * @enum {string}
          */
-        LiveEvent: "uhs" | "schaden" | "fahrzeug" | "material" | "tier" | "lage_zone" | "freies_zeichen" | "gefahr" | "einheit" | "abschnitt" | "person" | "personal" | "lagebericht" | "chat" | "erinnerung" | "auftrag" | "nachforderung" | "meldung" | "bereitstellungsraum" | "karte_bild" | "etb" | "befehl" | "stab" | "karten_ansicht" | "lage_snapshot" | "sofortmeldung" | "lagged";
+        LiveEvent: "uhs" | "schaden" | "fahrzeug" | "material" | "tier" | "lage_zone" | "freies_zeichen" | "gefahr" | "einheit" | "abschnitt" | "person" | "personal" | "lagebericht" | "chat" | "erinnerung" | "auftrag" | "nachforderung" | "meldung" | "bereitstellungsraum" | "karte_bild" | "etb" | "befehl" | "stab" | "dokument" | "abloesung" | "karten_ansicht" | "lage_snapshot" | "sofortmeldung" | "lagged";
         /** @description Öffentliche Material-Darstellung (ohne `org_id`). */
         MaterialAnzeige: {
             angelegt_at: string;
@@ -1579,6 +1727,11 @@ export interface components {
          *     `lage_meldung_id` als Herkunfts-Rückverweis, `ist_offen` für Posteingang-Filter).
          */
         MeldungAnzeige: {
+            /**
+             * Format: int64
+             * @description Strukturierter Absender (LFH-610): der Einsatzabschnitt, von dem die Meldung kam.
+             */
+            abschnitt_id?: number | null;
             absender: string;
             /** Format: int64 */
             auftrag_id?: number | null;
@@ -1599,6 +1752,13 @@ export interface components {
             /** @description Sofortmeldung & Eskalation (LFH-85/97): aktive Bestätigungspflicht. */
             bestaetigung_pflicht: boolean;
             eingang_at: string;
+            /**
+             * Format: int64
+             * @description Strukturierter Absender (LFH-610): die Einheit, von der die Meldung kam. Höchstens
+             *     einer von `einheit_id`/`abschnitt_id` ist gesetzt; `absender` bleibt der Name zum
+             *     Eingangszeitpunkt. NULL, wenn nicht gebunden oder die Einheit aufgelöst wurde.
+             */
+            einheit_id?: number | null;
             /** Format: int64 */
             einsatz_id: number;
             empfaenger?: string | null;
@@ -1887,6 +2047,12 @@ export interface components {
         OnlineStyle: {
             /** @description LFH-265: absent statt present-null, damit der generierte `attribution?` ehrlich ist. */
             attribution?: string | null;
+            /**
+             * @description Betreiberhinweis eines KATALOG-Eintrags (LFH-616), z. B. eine Lizenzauflage. Ein Eintrag
+             *     mit Hinweis wird im Admin-Katalog sichtbar gewarnt und INAKTIV übernommen — er soll
+             *     nicht mit einem Klick zur Grundlage aller werden. In `/api/karte/config` immer absent.
+             */
+            hinweis?: string | null;
             name: string;
             /**
              * @description `#[schema(required)]` (LFH-265): `typ` wird IMMER serialisiert — `#[serde(default)]`
@@ -1911,6 +2077,7 @@ export interface components {
             /** Format: int64 */
             auto_etb_eintraege?: number | null;
             einheiten?: null | components["schemas"]["EinheitenSystem"];
+            einsatz_nummer_praefix?: string | null;
             etb_nummer_praefix?: string | null;
             geaendert_at?: string | null;
             /** Format: int64 */
@@ -1924,6 +2091,11 @@ export interface components {
             org_id: number;
             /** Format: int64 */
             retention_dauer_tage?: number | null;
+            /**
+             * Format: int64
+             * @description Rückmeldefrist in Minuten (LFH-610); fehlt = keine eigene Vorgabe.
+             */
+            rueckmeldung_frist_min?: number | null;
             zeitformat?: null | components["schemas"]["Zeitformat"];
             zeitzone?: string | null;
         };
@@ -1947,6 +2119,11 @@ export interface components {
             org_id: number;
             /** Format: int64 */
             retention_dauer_tage?: number | null;
+            /**
+             * Format: int64
+             * @description Rückmeldefrist in Minuten (LFH-610); fehlt = keine eigene Vorgabe.
+             */
+            rueckmeldung_frist_min?: number | null;
             zeitformat?: null | components["schemas"]["Zeitformat"];
             zeitzone?: string | null;
         };
@@ -2228,11 +2405,30 @@ export interface components {
             slug: string;
         };
         /**
+         * @description Herkunft des Rhythmus einer Schicht. Wire == `as_str()`.
+         * @enum {string}
+         */
+        RhythmusQuelle: "abschnitt" | "einheit";
+        /**
          * @description Geteilte Richtung für Auftrag/Meldung (Schema-Anker für die OpenAPI-Union, LFH-120).
          *     Wire == `richtung`.
          * @enum {string}
          */
         Richtung: "intern" | "extern";
+        /**
+         * @description Antwort von `GET …/meldungen/rueckmeldungen` (LFH-610). Einheiten ohne Eintrag haben
+         *     noch nie zurückgemeldet. Die Abschnittsliste enthält nur DIREKT an den Abschnitt
+         *     gebundene Meldungen; die Rückmeldung über den Teilbaum rechnet der Client aus beiden.
+         */
+        RueckmeldungenAnzeige: {
+            abschnitte: components["schemas"]["LetzteRueckmeldung"][];
+            einheiten: components["schemas"]["LetzteRueckmeldung"][];
+            /**
+             * Format: int64
+             * @description Effektive Rückmeldefrist in Minuten (Einsatz ?? Org ?? 60).
+             */
+            frist_min: number;
+        };
         /**
          * @description Sachgebiet der Führungsorganisation (FwDV 100 Anlage 2). Wire == `as_str()`.
          *

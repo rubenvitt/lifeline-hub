@@ -577,6 +577,27 @@ async fn detail_status(app: &axum::Router, cookie: &str, einsatz_id: i64) -> Sta
         .status()
 }
 
+/// GET des Einsatz-Details als Cookie-Inhaber; liefert (Status, JSON).
+async fn einsatz_detail(app: &axum::Router, cookie: &str, einsatz_id: i64) -> (StatusCode, Value) {
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/einsaetze/{einsatz_id}"))
+                .header(header::COOKIE, cookie.to_string())
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let status = resp.status();
+    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+    )
+}
+
 /// Liefert die Anzahl der Einsätze in der Liste des Cookie-Inhabers.
 async fn listen_groesse(app: &axum::Router, cookie: &str) -> usize {
     let resp = app
@@ -689,7 +710,6 @@ fn basis_kopf(bezeichnung: &str) -> Value {
         "bezeichnung": bezeichnung,
         "stichwort": null,
         "einsatzart": "realeinsatz",
-        "einsatznummer_intern": null,
         "leitstellen_nr": null,
         "einsatzort": null,
         "einsatzort_lat": null,
@@ -1027,22 +1047,68 @@ async fn patch_leere_optionals_werden_null() {
     assert!(antwort["einsatzort"].is_null());
 }
 
+/// LFH-617: die Einsatznummer vergibt das System, sie ist nicht per PATCH änderbar. Das
+/// Feld im Body ist 400 — nicht stilles Ignorieren, sonst hielte ein alter Client seine
+/// Änderung für gespeichert. Die übrigen Felder desselben Requests werden NICHT übernommen.
 #[tokio::test]
-async fn patch_doppelte_einsatznummer_ist_409() {
+async fn patch_mit_einsatznummer_ist_400() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    benutzer_anlegen(&app, &admin, "frieda", "fuehrungskraft").await;
-    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    let (_, a) = einsatz_anlegen(&app, &admin, "A").await;
+    let id = a["id"].as_i64().unwrap();
+    let nummer = a["einsatznummer_intern"].as_str().unwrap().to_string();
 
-    let (_, a) = einsatz_anlegen(&app, &frieda, "A").await;
-    let (_, b) = einsatz_anlegen(&app, &frieda, "B").await;
-    let nummer_a = a["einsatznummer_intern"].as_str().unwrap().to_string();
-    let id_b = b["id"].as_i64().unwrap();
+    let (status, fehler) = patch_kopf(
+        &app,
+        &admin,
+        id,
+        json!({"einsatznummer_intern": "EN-4711", "bezeichnung": "Umbenannt"}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert!(
+        fehler["error"].as_str().unwrap().contains("Einsatznummer"),
+        "Meldung nennt das Feld: {fehler}"
+    );
 
-    let mut body = basis_kopf("B");
-    body["einsatznummer_intern"] = json!(nummer_a);
-    let (status, _) = patch_kopf(&app, &frieda, id_b, body).await;
-    assert_eq!(status, StatusCode::CONFLICT);
+    let (_, jetzt) = einsatz_detail(&app, &admin, id).await;
+    assert_eq!(jetzt["einsatznummer_intern"], nummer.as_str());
+    assert_eq!(jetzt["bezeichnung"], "A", "Nachbarfeld nicht übernommen");
+}
+
+/// Grenzt gegen den vorigen ab: auch `null` (Leeren) ist 400 — die innere Option des
+/// Tri-State darf nicht als „fehlt“ durchrutschen.
+#[tokio::test]
+async fn patch_einsatznummer_null_ist_400() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, a) = einsatz_anlegen(&app, &admin, "A").await;
+    let id = a["id"].as_i64().unwrap();
+    let nummer = a["einsatznummer_intern"].as_str().unwrap().to_string();
+
+    let (status, _) = patch_kopf(&app, &admin, id, json!({"einsatznummer_intern": null})).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    let (_, jetzt) = einsatz_detail(&app, &admin, id).await;
+    assert_eq!(jetzt["einsatznummer_intern"], nummer.as_str());
+}
+
+/// Die Leitstellen-Nr. bleibt das freie Feld: setzen und leeren gehen weiter, und die
+/// Systemnummer bleibt dabei stehen.
+#[tokio::test]
+async fn patch_leitstellen_nr_bleibt_frei() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, a) = einsatz_anlegen(&app, &admin, "A").await;
+    let id = a["id"].as_i64().unwrap();
+    let nummer = a["einsatznummer_intern"].as_str().unwrap().to_string();
+
+    let (status, b) = patch_kopf(&app, &admin, id, json!({"leitstellen_nr": "LS-7"})).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(b["leitstellen_nr"], "LS-7");
+    let (status, c) = patch_kopf(&app, &admin, id, json!({"leitstellen_nr": null})).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(c["leitstellen_nr"].is_null());
+    assert_eq!(c["einsatznummer_intern"], nummer.as_str());
 }
 
 #[tokio::test]
@@ -1065,18 +1131,11 @@ async fn angelegt_at_bleibt_bei_patch_unveraendert() {
 async fn anlegen_vergibt_einsatznummer_im_format() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
+    let jahr = lifeline_hub::einsatz::nummer::jahr_in_zone(chrono::Utc::now(), None);
     let (_, a) = einsatz_anlegen(&app, &admin, "A").await;
     let (_, b) = einsatz_anlegen(&app, &admin, "B").await;
-    let nr_a = a["einsatznummer_intern"].as_str().unwrap();
-    let nr_b = b["einsatznummer_intern"].as_str().unwrap();
-    assert!(
-        nr_a.ends_with("-001"),
-        "erste Nummer endet auf -001: {nr_a}"
-    );
-    assert!(
-        nr_b.ends_with("-002"),
-        "zweite Nummer endet auf -002: {nr_b}"
-    );
+    assert_eq!(a["einsatznummer_intern"], format!("E-{jahr}-0001"));
+    assert_eq!(b["einsatznummer_intern"], format!("E-{jahr}-0002"));
 }
 
 /// PUT /api/einsaetze/{id}/aufbewahrungsfrist mit Cookie + JSON-Body.
@@ -1836,7 +1895,6 @@ async fn einsatz_mit_vollen_kopfdaten(app: &axum::Router, admin: &str) -> i64 {
     let mut body = basis_kopf("Lage Nord");
     body["stichwort"] = json!("H1");
     body["einsatzart"] = json!("uebung");
-    body["einsatznummer_intern"] = json!("EN-4711");
     body["leitstellen_nr"] = json!("LS-42");
     body["einsatzort"] = json!("Hauptstraße 1");
     body["einsatzort_lat"] = json!(52.5);
@@ -1880,7 +1938,11 @@ async fn patch_nur_koordinate_laesst_die_uebrigen_felder_stehen() {
     assert_eq!(a["sachverhalt"], "Meldebild");
     assert_eq!(a["anzahl_betroffene_initial"], 5);
     assert_eq!(a["begonnen_at"], "2026-05-20 10:00:00");
-    assert_eq!(a["einsatznummer_intern"], "EN-4711", "Nummer bleibt");
+    let nr = a["einsatznummer_intern"].as_str().unwrap();
+    assert!(
+        nr.starts_with("E-") && nr.ends_with("-0001"),
+        "Systemnummer bleibt: {nr}"
+    );
 }
 
 /// Grenzt gegen den vorigen ab: `null` leert genau die gesendeten Felder — und trennt die

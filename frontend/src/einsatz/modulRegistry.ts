@@ -26,6 +26,8 @@ import {
   TbInbox,
   TbSettings,
   TbBuildingWarehouse,
+  TbFiles,
+  TbArrowsExchange,
 } from 'react-icons/tb';
 import type { BenutzerAnzeige, ModulOverrides } from '../api/types';
 
@@ -33,9 +35,9 @@ export type ModulStatus = 'fertig' | 'geplant' | 'wip';
 export type KategorieKey =
   'fuehrung' | 'kraefte' | 'erfassung' | 'lage' | 'kommunikation' | 'einstellungen';
 export type BenoetigteRolle = 'admin' | 'fuehrungskraft';
-/** Module mit Navigationszähler (LFH-612). Die Bedeutung je Quelle legt der Server fest
- *  (`src/einsatz/zaehler.rs`) — nur für Module, deren Zahl aus dem Entwurf belegt ist. */
-export type ModulZaehlerQuelle =
+/** Module mit Navigationszähler, die der SERVER zählt (LFH-612). Die Bedeutung je Quelle
+ *  legt `src/einsatz/zaehler.rs` fest — nur für Module, deren Zahl aus dem Entwurf belegt ist. */
+export type ServerZaehlerQuelle =
   | 'etb'
   | 'personen'
   | 'einheiten'
@@ -44,6 +46,10 @@ export type ModulZaehlerQuelle =
   | 'auftraege'
   | 'erinnerungen'
   | 'chat';
+/** Module, deren Zähler der BROWSER aus der eigenen Modulliste rechnet (LFH-632, LFH-635).
+ *  `abloesung` hängt an der Uhr (Vorwarnzeit), ein Server-Schnappschuss trüge das nicht. */
+export type ClientZaehlerQuelle = 'dokumente' | 'abloesung';
+export type ModulZaehlerQuelle = ServerZaehlerQuelle | ClientZaehlerQuelle;
 
 export interface Kategorie {
   key: KategorieKey;
@@ -158,6 +164,16 @@ export const modulRegistry: ModulEintrag[] = [
     status: 'fertig',
     beschreibung: 'Führungsorganisation (S1–S6) und Lagebesprechungen der Einsatzleitung',
   },
+  {
+    key: 'dokumente',
+    kategorie: 'fuehrung',
+    label: 'Dokumente',
+    icon: TbFiles,
+    route: 'dokumente',
+    status: 'fertig',
+    beschreibung: 'Abgelegte Dateien des Einsatzes: Lagepläne, Befehle, Formulare, Fotos.',
+    zaehlerQuelle: 'dokumente',
+  },
   // Kräfte & Mittel — das Meldebild (bis 21.09.2026 „Kräfteübersicht" unter Lage) steht
   // vorn: es ist die Verdichtung der Kategorie. Route und Schlüssel bleiben, damit
   // Deeplinks und gespeicherte Standard-Module nicht brechen.
@@ -215,6 +231,18 @@ export const modulRegistry: ModulEintrag[] = [
     route: 'bereitstellungsraeume',
     status: 'fertig',
     beschreibung: 'Bereitstellungsräume: bereitgestellte Einheiten und Fahrzeuge.',
+  },
+  {
+    // LFH-635: Schichten und fällige Ablösungen je Einheit. Der Zähler nennt die Schichten
+    // in der Vorwarnzeit oder überfällig — was jetzt Handlung braucht, nicht die Gesamtzahl.
+    key: 'abloesung',
+    kategorie: 'kraefte',
+    label: 'Ablösung',
+    icon: TbArrowsExchange,
+    route: 'abloesung',
+    status: 'fertig',
+    beschreibung: 'Schichten der Einheiten: Rhythmus, fällige Ablösungen, Vollzug.',
+    zaehlerQuelle: 'abloesung',
   },
   // Erfassung
   {
@@ -481,12 +509,12 @@ export function istModulSichtbar(modul: ModulEintrag, overrides?: ModulOverrides
  * Registry-Stub in `command-palette/befehle.modulstatus.test.ts` beobachtbar gemacht.
  *
  * BEWUSST NICHT MIT UMGESTELLT: `useModulZaehler.ts` (`darfZaehlerZeigen`) führt die
- * ZWEITEILIGE Variante ohne `status === 'fertig'`. Das ist heute unbeobachtbar — alle acht
- * Module mit `zaehlerQuelle` (seit LFH-612 auch etb, personen, einheiten,
- * einsatzabschnitte) sind `fertig`, beide Fassungen liefern also dasselbe. Ob ein Zähler
- * auch an einem UNFERTIGEN Modul stehen darf, ist eine fachliche Entscheidung und keine
- * Aufräumarbeit; sie steht offen. Wer sie trifft, zieht die Stelle nach oder schreibt hier
- * hin, warum sie eigenständig bleibt.
+ * ZWEITEILIGE Variante ohne `status === 'fertig'`. Das ist heute unbeobachtbar — alle zehn
+ * Module mit `zaehlerQuelle` (acht vom Server gezählt, `dokumente` und `abloesung` im
+ * Browser) sind `fertig`, beide Fassungen liefern also dasselbe. Ob ein Zähler auch an einem
+ * UNFERTIGEN Modul stehen darf, ist eine fachliche Entscheidung und keine Aufräumarbeit; sie
+ * steht offen. Wer sie trifft, zieht die Stelle nach oder schreibt hier hin, warum sie
+ * eigenständig bleibt.
  */
 export function istModulFreigegeben(
   modul: ModulEintrag,

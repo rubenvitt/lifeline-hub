@@ -148,12 +148,15 @@ umkehrt, steht das am Absatz selbst mit „Neuentwurf 22.09.2026".
 - **Keine erfundenen Daten.** Was der Entwurf zeigt, aber keine Datenquelle hat, wird
   weggelassen — nicht als Platzhalter gebaut — und steht im ClickUp-Epic „Neuentwurf
   Instrumententafel – Datenlücken des Designs" (LFH-606…LFH-617, z. B. Evakuiert 607,
-  FMS-Status je Einheit 609, „keine Rückmeldung" 610, Koordinate an der Person 613). Die Auslassung trägt ihr Ticket im Code-Kommentar und wird im
-  Test als **Abwesenheit** gepinnt. **Eingelöst ist der Pegel (LFH-606):** er steht auf Platz 1
+  FMS-Status je Einheit 609, Koordinate an der Person 613). Die Auslassung trägt ihr Ticket im
+  Code-Kommentar und wird im Test als **Abwesenheit** gepinnt. **Eingelöst ist der Pegel (LFH-606):** er steht auf Platz 1
   des Kennzahlenbands, „Höchste Warnstufe" ist dafür raus (Entscheidung 22.09.2026; die
-  Warnstufe bleibt im Seitenkopf-Hinweis und in der Gefahrenmatrix). **Eingelöst sind auch die
-  ETB-Gesamtzahl und die Bilanz-Summen (LFH-612)** — der Server zählt sie über denselben
-  Filter wie die Liste, Einzelheiten im ETB-Absatz weiter unten.
+  Warnstufe bleibt im Seitenkopf-Hinweis und in der Gefahrenmatrix). **Eingelöst ist auch die
+  Rückmeldung (LFH-610):** Spalte „Rückmeldung“ und Kachel „keine Rückmeldung“ im Meldebild,
+  letzte Rückmeldung je Abschnitt im Überblick, „Letzte Meldung“ in der Lagekarte; die
+  Entscheidungen stehen in `umsetzung.md`. **Eingelöst sind ebenso die ETB-Gesamtzahl und die
+  Bilanz-Summen (LFH-612)** — der Server zählt sie über denselben Filter wie die Liste,
+  Einzelheiten im ETB-Absatz weiter unten.
 
 ## Frontend — UI-Form-Leitlinie (Drawer-Nutzung)
 
@@ -471,6 +474,29 @@ Alltag wichtigsten:
   (ein übergebener Callback ist kein Rechtebeleg). Im Test über das geöffnete Menü greifen
   (`.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]` + `within`), per Teilstring.
   Träger, MeldungKarte-Entscheidung und gemessene Fallen: `docs/leitlinien/bedien-leitlinie-herleitungen.md`.
+- **Ein Sprung ist keine Handlung** (LFH-616, Inspector der Lagekarte). Gezählt werden für
+  „höchstens zwei, sonst bündeln“ die Aktionen, die etwas **ändern**. Zwei Deeplinks
+  („Im Fachmodul öffnen ↗“ | „ETB ↗“) bilden zusammen **eine** Zeile Navigation. Sie
+  stehen nebeneinander in einer umbrechenden Flex-Zeile (`data-lfh="inspector-sprung"`), die
+  rote Handlung steht abgesetzt darunter. Der Deeplink trägt die Zeilenkennung im
+  zugänglichen Namen („Einsatztagebuch zu 1. Zug“), sichtbar steht nur „ETB ↗“.
+  Das **Messwerkzeug** derselben Karte ist ein exklusiver Modus im Reducer von
+  `useKartenInteraktion` wie Zeichnen und Platzieren. Es braucht aber **kein** Schreibrecht,
+  weil nichts gespeichert wird. Es ist der einzige Modus, den Escape beendet: Die übrigen
+  tragen einen Entwurf, der mehr kostet als ein Blick. Sein Stand läuft wie die
+  Zeigerkoordinate über eine Quelle (`messQuelle.ts`), nicht über den Seiten-State. Im
+  Bildtakt neu zu rendern wäre die Folge. terra-draw meldet neben der Figur eigene
+  **Hilfspunkte** als `create` (gemessen im Browser). `messZeichnung.ts` nimmt deshalb nur
+  die Geometrie der gewählten Form als laufende Messung.
+  **Drei terra-draw-Instanzen auf einer Karte brauchen drei Präfixe.** Abschnitt, Zone und
+  Messen hatten den Vorgabe-Präfix `td` des Adapters gemeinsam. Die Effekte laufen in
+  Deklarationsreihenfolge, die zweite Instanz legte `td-polygon` also an, solange die erste
+  es noch hielt. MapLibre warf „Source … already exists“, die Seite fiel in die
+  Error-Boundary (im Browser gemessen: Messen → Gefahrengebiet zeichnen). Jede Instanz trägt
+  deshalb ihren eigenen `prefixId` (`td-abschnitt`/`td-zone`/`td-mess`). Nach `setStyle`
+  legt der Adapter seine Sources **nicht** neu an. `Kartenflaeche` räumt eine laufende
+  Messung deshalb vor dem Stilwechsel und beginnt sie nach `style.load` neu. Für einen
+  offenen Zonen-/Abschnittsentwurf ist dieselbe Lücke Bestand und nicht gelöst.
 - **Ein leeres Feld muss sagen, dass man es schreiben kann** (LFH-369 · B5i, Befund M21). Eine
   inline bearbeitbare, **optionale** Angabe nimmt `components/BemerkungZelle.tsx` — nicht
   `Typography.Text editable` von Hand. Bei leerem Wert blieb davon genau das Stift-Icon übrig:
@@ -1397,7 +1423,8 @@ Lokal bleibt es der Weg vor dem Merge:
 
 Reihenfolge (billig → teuer): `check-fmt.sh` (rustfmt **und** Prettier) → `pnpm lint` →
 `check-typ-codegen.sh` (enthält `tsc`) → `cargo test --workspace` → Vitest →
-`check-deps.sh` → `pnpm e2e` → `release-ruhefenster.test.sh` → `check-deps.test.sh`.
+`check-deps.sh` → `pnpm e2e` → `release-ruhefenster.test.sh` + `ki-notizen.test.mjs` →
+`check-deps.test.sh`.
 
 - **Schritt 1 prüft zwei Sprachen, nicht eine** (LFH-354). `prettier --check` liegt **in**
   `check-fmt.sh` statt in einem eigenen Schritt: es ist dieselbe Frage wie bei rustfmt
@@ -1487,6 +1514,22 @@ Reihenfolge (billig → teuer): `check-fmt.sh` (rustfmt **und** Prettier) → `p
   Wer das Fenster vergrössert, hebt den Job-Timeout in `release.yml` mit und bedenkt, dass
   Push-Läufe desselben Kanals in EINER Nebenläufigkeitsgruppe stehen — ein wartender
   Release hält den nächsten Gate-Lauf auf.
+- **Die Release-Notizen schreibt Claude, hinter einer Hülle** (`scripts/release/ki-notizen.mjs`,
+  übernommen aus einsatzzeichen). Das nackte Plugin `semantic-release-claude-changelog` trägt
+  drei stille Fehlerbilder, die die Hülle schliesst: semantic-release erzeugt die Notizen
+  nach dem Versions-Commit **ein zweites Mal** (`prepare.getNextInput`), das Modell formuliert
+  dabei neu — in einsatzzeichen weichen CHANGELOG und GitHub-Release von v1.5.0 gemessen
+  voneinander ab; deshalb wird das Ergebnis je Version gemerkt. Ein Fehlschlag kommt als
+  Text zurück („No release notes generated due to an error.") und stünde für immer im
+  CHANGELOG; deshalb fällt jeder unbrauchbare Text — und ein fehlendes Secret
+  `ANTHROPIC_API_KEY` — auf die **konventionellen Notizen** zurück, mit Warnung, ohne roten
+  Lauf. Claude bekommt **genau einen Zug** (`maxTurns: 1`): das Plugin startet einen Agenten
+  mit Lesewerkzeugen im Checkout, und dort liegt der App-Token (`persist-credentials: true`) —
+  eine präparierte Commit-Nachricht hätte ihn sonst in die öffentlichen Notizen holen
+  können. Und das Plugin kürzt still auf 100 Commits; die Hülle gibt alle, bei Übergrösse nur
+  die Kopfzeilen, sonst konventionell. Die Versionskopfzeile (Vergleichslink, Datum) kommt
+  weiter aus dem konventionellen Generator, damit das CHANGELOG-Format gleich bleibt.
+  Die Vorlage (`KI_PROMPT`) steht in `release.config.mjs`.
 
 `scripts/check-deps.sh` (LFH-253/G01) prüft Abhängigkeiten gegen RUSTSEC/GHSA. Fehlt
 `cargo-audit`, warnt es laut und exitet 0 statt zu brechen. Bekannte, bewertete Advisories

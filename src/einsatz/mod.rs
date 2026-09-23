@@ -5,6 +5,7 @@ pub mod funktion;
 pub mod kontext;
 pub mod modul;
 pub mod modul_override;
+pub mod nummer;
 pub mod purge_scheduler;
 pub mod repo;
 pub mod retention;

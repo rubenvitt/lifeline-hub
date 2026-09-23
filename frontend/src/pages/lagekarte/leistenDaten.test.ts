@@ -13,6 +13,7 @@ import {
   grundlageAufloesen,
   grundlageOptionen,
   grundlageWert,
+  letzteMeldungBlock,
   staerkeText,
   verortetAnzahl,
   type AuswahlRoh,
@@ -229,6 +230,51 @@ describe('auswahlRaster', () => {
   });
 });
 
+describe('letzteMeldungBlock (LFH-610)', () => {
+  const rueck = (bezug_id: number, inhalt: string, meldeweg: 'funk' | 'telefon' = 'funk') => ({
+    bezug_id,
+    meldung_id: bezug_id * 10,
+    lfd_nr: 3,
+    ereigniszeit: '2026-09-21 14:11:00',
+    inhalt,
+    meldeweg,
+    faellig_at: '2026-09-21 15:11:00',
+  });
+  const MIT: AuswahlRoh = {
+    ...ROH,
+    rueckmeldungen: {
+      frist_min: 60,
+      einheiten: [rueck(1, 'Sandsackverbau hält.'), rueck(2, 'andere', 'telefon')],
+      abschnitte: [rueck(4, 'direkt an Nord')],
+    },
+  };
+
+  it('Einheit: Wortlaut und Meta-Zeile „Zeit · Meldeweg"', () => {
+    expect(letzteMeldungBlock(marker('einheit', 1), MIT, zeit)).toEqual({
+      text: 'Sandsackverbau hält.',
+      meta: 'Z(2026-09-21 14:11:00) · Funk',
+    });
+    expect(letzteMeldungBlock(marker('einheit', 2), MIT, zeit)?.meta).toMatch(/· Telefon$/);
+  });
+
+  it('kein Block, wenn die Rückmeldungen nicht vorliegen (lädt, 403, Historie)', () => {
+    expect(letzteMeldungBlock(marker('einheit', 1), ROH, zeit)).toBeNull();
+    expect(letzteMeldungBlock(marker('einheit', 1), LEERE_ROHDATEN, zeit)).toBeNull();
+  });
+
+  it('kein Block für eine Einheit ohne Meldung — nichts erfunden', () => {
+    expect(letzteMeldungBlock(marker('einheit', 99), MIT, zeit)).toBeNull();
+  });
+
+  it('nur Einheiten: ein Abschnitt mit gleicher id liest nicht die Einheitsliste', () => {
+    // Einheit-id 4 gibt es nicht, Abschnitt 4 hat eine Meldung — der Abschnittsmarker bleibt leer,
+    // und eine Einheit mit der id eines Abschnitts träfe nie dessen Meldung.
+    expect(letzteMeldungBlock(marker('abschnitt', 4), MIT, zeit)).toBeNull();
+    expect(letzteMeldungBlock(marker('fahrzeug', 1), MIT, zeit)).toBeNull();
+    expect(letzteMeldungBlock(marker('einheit', 4), MIT, zeit)).toBeNull();
+  });
+});
+
 describe('auswahlUnterzeile', () => {
   it('Objektart plus Typ, wo die Daten ihn tragen', () => {
     expect(auswahlUnterzeile(marker('einheit', 1), ROH)).toBe('Einheit · Zug');
@@ -248,11 +294,18 @@ describe('Kartengrundlage', () => {
   const STILE = [
     { name: 'Liberty', url: 'x', typ: 'vektor', attribution: null },
     { name: 'TopPlus', url: 'y', typ: 'raster', attribution: null },
+    { name: 'Satellit (Esri)', url: 'z', typ: 'raster', attribution: null },
   ] as never[];
 
-  it('ein Segment je Online-Stil, dazu Offline und Blind — kein „Satellit" (LFH-616)', () => {
+  it('ein Segment je Online-Stil, dazu Offline und Blind — Satellit ist ein Stil (LFH-616)', () => {
     const optionen = grundlageOptionen(STILE, true);
-    expect(optionen.map((o) => o.label)).toEqual(['Liberty', 'TopPlus', 'Offline', 'Blind']);
+    expect(optionen.map((o) => o.label)).toEqual([
+      'Liberty',
+      'TopPlus',
+      'Satellit (Esri)',
+      'Offline',
+      'Blind',
+    ]);
     expect(optionen.every((o) => o.gesperrt == null)).toBe(true);
   });
 

@@ -117,6 +117,55 @@ pub struct NeueMeldung {
     /// Stabiler, client-generierter Idempotenzschlüssel für Offline-Queue und
     /// Timeout-Replay. Fehlend/leer behält das Verhalten älterer Clients.
     pub client_id: Option<String>,
+    /// Strukturierter Absender (LFH-610): Einheit dieses Einsatzes. Schließt `abschnitt_id` aus.
+    pub einheit_id: Option<i64>,
+    /// Strukturierter Absender (LFH-610): Einsatzabschnitt dieses Einsatzes.
+    pub abschnitt_id: Option<i64>,
+}
+
+/// Löst den strukturierten Absender auf (LFH-610). Beide gesetzt ist ein
+/// Zusammenhangsfehler (422): jede id ist für sich eine gültige Zahl, erst die Kombination
+/// verbietet die Anlage.
+///
+/// Eine id, die (nicht mehr) zu diesem Einsatz gehört, wird dagegen zu „ungebunden"
+/// herabgestuft, nicht abgelehnt. Der Bezug ist eine Zusatzangabe, der Absender steht als
+/// Freitext ohnehin in der Meldung — und der typische Fall ist kein Fehler des Erfassers:
+/// eine offline erfasste Meldung, deren Einheit bis zum Sync aufgelöst wurde, oder ein über
+/// „Werte behalten" gemerkter Bezug. Eine 422 schöbe dort eine beweissichernde Meldung samt
+/// ETB-Eintrag in die abgelehnten Aktionen. Dasselbe tut `ON DELETE SET NULL` für die
+/// Bestandsmeldungen. Eine fremde id verrät dabei nichts: gespeichert wird NULL.
+async fn absender_bezug_aufloesen(
+    state: &AppState,
+    einsatz_id: i64,
+    einheit_id: Option<i64>,
+    abschnitt_id: Option<i64>,
+) -> Result<(Option<i64>, Option<i64>), AppError> {
+    if einheit_id.is_some() && abschnitt_id.is_some() {
+        return Err(AppError::UnprocessableEntity(
+            "Eine Meldung kommt entweder von einer Einheit oder von einem Abschnitt".into(),
+        ));
+    }
+    let einheit_id = match einheit_id {
+        Some(id) => {
+            sqlx::query_scalar("SELECT id FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?")
+                .bind(id)
+                .bind(einsatz_id)
+                .fetch_optional(&state.pool)
+                .await?
+        }
+        None => None,
+    };
+    let abschnitt_id = match abschnitt_id {
+        Some(id) => {
+            sqlx::query_scalar("SELECT id FROM einsatzabschnitt WHERE id = ? AND einsatz_id = ?")
+                .bind(id)
+                .bind(einsatz_id)
+                .fetch_optional(&state.pool)
+                .await?
+        }
+        None => None,
+    };
+    Ok((einheit_id, abschnitt_id))
 }
 
 /// Stellt die offene Auto-Frist-Erinnerung ausnahmslos aus dem persistierten
@@ -233,6 +282,8 @@ pub async fn anlegen(
     if !crate::meldung::richtung_gueltig(richtung) {
         return Err(AppError::Validation("Ungültige Richtung".into()));
     }
+    let (einheit_id, abschnitt_id) =
+        absender_bezug_aufloesen(&state, einsatz_id, req.einheit_id, req.abschnitt_id).await?;
     // Ereigniszeit normalisieren (ISO-8601/SQLite → SQLite-Format), wie ETB.
     let ereigniszeit = crate::etb::normalisiere_zeit(req.ereigniszeit.trim())?;
     let eingang = jetzt();
@@ -288,6 +339,8 @@ pub async fn anlegen(
             eingang_at: &eingang,
             bestaetigung_pflicht: pflicht,
             bestaetigung_frist_at: frist_at.as_deref(),
+            einheit_id,
+            abschnitt_id,
         },
     )
     .await?;
@@ -488,6 +541,45 @@ pub async fn auftrag_erteilen(
     Ok((StatusCode::CREATED, Json(m)))
 }
 
+/// GET /api/einsaetze/{id}/meldungen/rueckmeldungen — letzte Rückmeldung je Einheit und je
+/// direkt gebundenem Abschnitt samt Fälligkeit (LFH-610). Lesezugriff Meldungen: die
+/// Antwort trägt den Wortlaut der Meldung, sie ist also genauso vertraulich wie die Liste.
+pub async fn rueckmeldungen(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Meldungen>,
+) -> Result<Json<crate::meldung::RueckmeldungenAnzeige>, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    let einst = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id).await?;
+    let org_einst =
+        crate::org::einstellungen::laden_oder_default(&state.pool, ctx.einsatz.org_id).await?;
+    let frist_min = crate::einsatz::effektiv::effektive_rueckmeldung_frist_min(&einst, &org_einst)
+        .unwrap_or(crate::meldung::RUECKMELDUNG_FRIST_DEFAULT_MIN);
+    let mit_faelligkeit = |mut liste: Vec<crate::meldung::LetzteRueckmeldung>| {
+        for r in &mut liste {
+            r.faellig_at = faellig_at(&r.ereigniszeit, frist_min);
+        }
+        liste
+    };
+    Ok(Json(crate::meldung::RueckmeldungenAnzeige {
+        frist_min,
+        einheiten: mit_faelligkeit(repo::letzte_je_einheit(&state.pool, einsatz_id).await?),
+        abschnitte: mit_faelligkeit(repo::letzte_je_abschnitt(&state.pool, einsatz_id).await?),
+    }))
+}
+
+/// `ereigniszeit` (SQLite-Format, vom Anlegen normalisiert) + `frist_min`. Ein nicht
+/// parsebarer Altwert fällt auf die Ereigniszeit selbst zurück — die Einheit gilt dann
+/// sofort als überfällig, was auffällt, statt still als rechtzeitig durchzugehen.
+fn faellig_at(ereigniszeit: &str, frist_min: i64) -> String {
+    NaiveDateTime::parse_from_str(ereigniszeit, "%Y-%m-%d %H:%M:%S")
+        .map(|n| {
+            (n + Duration::minutes(frist_min))
+                .format("%Y-%m-%d %H:%M:%S")
+                .to_string()
+        })
+        .unwrap_or_else(|_| ereigniszeit.to_string())
+}
+
 /// GET /api/einsaetze/{id}/lage/meldungen — Lageobjekte aus Meldungen (Lese-Oberfläche, LFH-95).
 pub async fn lage_liste(
     State(state): State<AppState>,
@@ -507,6 +599,12 @@ mod tests {
 
     fn e() -> EinsatzEinstellungen {
         EinsatzEinstellungen::leer(1)
+    }
+
+    #[test]
+    fn faellig_at_addiert_frist_ueber_die_tagesgrenze() {
+        assert_eq!(faellig_at("2026-09-22 23:30:00", 60), "2026-09-23 00:30:00");
+        assert_eq!(faellig_at("kaputt", 60), "kaputt");
     }
     fn o() -> OrgEinstellungen {
         OrgEinstellungen::leer(1)

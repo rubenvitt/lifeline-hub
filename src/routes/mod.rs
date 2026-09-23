@@ -1,3 +1,4 @@
+pub mod abloesung;
 pub mod anhang;
 pub mod auftrag;
 pub mod auth;
@@ -8,6 +9,7 @@ pub mod benutzer_einstellungen;
 pub mod chat;
 #[cfg(feature = "dev-seeds")]
 pub mod dev;
+pub mod dokument;
 pub mod einheit_typ;
 pub mod einsatz;
 pub mod einsatz_bereitstellungsraum;

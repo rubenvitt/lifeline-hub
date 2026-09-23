@@ -406,6 +406,7 @@ const MODUL_GET_PFADE: &[(&str, &str)] = &[
     ("chat", "chat/kanaele"),
     ("erinnerungen", "erinnerungen"),
     ("auftraege", "auftraege"),
+    ("abloesung", "abloesungen"),
     ("meldungen", "meldungen"),
     ("nachforderungen", "nachforderungen"),
     ("fahrzeuge", "fahrzeuge"),
@@ -423,6 +424,7 @@ const MODUL_GET_PFADE: &[(&str, &str)] = &[
     ("lagekarte", "zonen"),
     ("lagekarte", "karte/fuehrungskraefte"),
     ("lagemeldungen", "lage/meldungen"),
+    ("dokumente", "dokumente"),
 ];
 
 /// Module ohne eigene daten-besitzende Backend-Routen (reine Aggregation/Sicht):

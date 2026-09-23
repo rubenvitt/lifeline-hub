@@ -55,6 +55,8 @@ export const EINSATZ_KEYS = {
   // Modulzähler des Navigationsrahmens (LFH-612): hängt an jedem Ereignis, das die Liste
   // eines gezählten Moduls invalidiert (Vollständigkeit: `queryKeys.test.ts`).
   modulZaehler: 'einsatz-modul-zaehler',
+  dokumente: 'einsatz-dokumente',
+  abloesungen: 'einsatz-abloesungen',
   // Nicht live über SSE getrieben (siehe NICHT_LIVE_KEYS + Guard-Test):
   einsatz: 'einsatz',
   einstellungen: 'einsatz-einstellungen',
@@ -107,8 +109,17 @@ export const EINSATZ_STREAM_EVENTS = {
     EINSATZ_KEYS.fahrzeuge,
     EINSATZ_KEYS.material,
     EINSATZ_KEYS.modulZaehler,
+    // LFH-635: Ablösungsschichten tragen den Einheitsnamen per Join, und das Auflösen einer
+    // Einheit entfernt ihre Schichten — beides feuert nur `einheit`.
+    EINSATZ_KEYS.abloesungen,
   ],
-  abschnitt: [EINSATZ_KEYS.abschnitte, EINSATZ_KEYS.fuehrungskraefte, EINSATZ_KEYS.modulZaehler],
+  // LFH-635: Abschnittsname und -liste speisen die Rhythmus-Vorgaben der Ablösung.
+  abschnitt: [
+    EINSATZ_KEYS.abschnitte,
+    EINSATZ_KEYS.fuehrungskraefte,
+    EINSATZ_KEYS.modulZaehler,
+    EINSATZ_KEYS.abloesungen,
+  ],
   // F01/LFH-227: `person` und `personal` sind getrennte Wire-Events. Vorher trug EIN
   // `person`-Tag beide ID-Räume (betroffene Person vs. einsatz_personal-Disposition),
   // weshalb hier beide Sammlungen hängen mussten — und weshalb das Backend die zwei
@@ -150,6 +161,13 @@ export const EINSATZ_STREAM_EVENTS = {
   // (['einsatz-stab', einsatzId, 'lagebesprechungen']) — kein eigener Singular-Key,
   // sonst entstünde die Silent-Gap-Falle der Detail-Keys oben.
   stab: [EINSATZ_KEYS.stab],
+  // Dokumentenablage live (LFH-632): Ablegen/Entfernen publiziert `dokument` → die Liste
+  // aller Betrachter aktualisiert sich. Der ETB-Nachweis kommt über das eigene `etb`-Ereignis.
+  dokument: [EINSATZ_KEYS.dokumente],
+  // Ablösung live (LFH-635): Schichten und Rhythmus-Vorgaben hängen unter EINEM Prefix
+  // (Sub-Keys 'liste'/'vorgaben'), damit ein Ereignis beide trifft. Trägt das Ereignis `art`,
+  // stammt es vom Scheduler und alarmiert zusätzlich (Escape-Hatch im Live-Hook).
+  abloesung: [EINSATZ_KEYS.abloesungen],
 } as const satisfies Record<string, readonly EinsatzKey[]>;
 
 export type EinsatzStreamEvent = keyof typeof EINSATZ_STREAM_EVENTS;
@@ -200,6 +218,18 @@ export const NICHT_LIVE_KEYS = [
  * Konvention: 2-elementige Funktionen `[prefix, einsatzId]` sind zugleich der Invalidierungs-
  * Prefix (TanStack matcht per Prefix); Detail-/Filter-Varianten hängen weitere Elemente an.
  */
+/** Sub-Key der Rückmeldungen unter dem `meldungen`-Prefix (LFH-610). */
+const RUECKMELDUNGEN_SUBKEY = 'rueckmeldungen';
+
+/**
+ * Trifft die Rückmeldungen ALLER Einsätze (LFH-610). Die Fälligkeit rechnet der Server
+ * aus der Rückmeldefrist; ändert eine Org-Vorgabe sie, gilt das für jeden Einsatz ohne
+ * eigene Frist — und kein Live-Ereignis sagt es (`einstellungen` ist nicht live).
+ */
+export function istRueckmeldungenKey(key: readonly unknown[]): boolean {
+  return key[0] === EINSATZ_KEYS.meldungen && key[2] === RUECKMELDUNGEN_SUBKEY;
+}
+
 export const einsatzKeys = {
   // Einsatz-Stammdaten
   // einsatzId nullbar: das Command-Palette lädt den Einsatz nur wenn im Einsatzkontext
@@ -268,9 +298,19 @@ export const einsatzKeys = {
 
   // Stab (LFH-46): Führungsorganisation S1–S6.
   stab: (einsatzId: number) => [EINSATZ_KEYS.stab, einsatzId] as const,
+  // Ablösung (LFH-635): argumentlos = Invalidierungs-Prefix; Liste je Statusfilter und die
+  // Rhythmus-Vorgaben hängen als Sub-Keys darunter.
+  abloesungen: (einsatzId: number) => [EINSATZ_KEYS.abloesungen, einsatzId] as const,
+  abloesungListe: (einsatzId: number, status: 'laufend' | 'abgeloest') =>
+    [EINSATZ_KEYS.abloesungen, einsatzId, 'liste', status] as const,
+  abloesungVorgaben: (einsatzId: number) =>
+    [EINSATZ_KEYS.abloesungen, einsatzId, 'vorgaben'] as const,
   /** Historie der Lagebesprechungen als Sub-Key unter DEMSELBEN Prefix (Spec 9.3). */
   stabLagebesprechungen: (einsatzId: number) =>
     [EINSATZ_KEYS.stab, einsatzId, 'lagebesprechungen'] as const,
+
+  // Dokumentenablage (LFH-632).
+  dokumente: (einsatzId: number) => [EINSATZ_KEYS.dokumente, einsatzId] as const,
 
   // Bereitstellungsraum
   br: (einsatzId: number) => [EINSATZ_KEYS.br, einsatzId] as const,
@@ -290,6 +330,10 @@ export const einsatzKeys = {
   meldungen: (einsatzId: number) => [EINSATZ_KEYS.meldungen, einsatzId] as const,
   meldungenListe: (einsatzId: number, richtung: string) =>
     [EINSATZ_KEYS.meldungen, einsatzId, richtung] as const,
+  /** Letzte Rückmeldung je Einheit/Abschnitt (LFH-610). Liegt unter dem `meldungen`-Prefix:
+   *  jede Meldungs-Invalidierung (Live-Ereignis `meldung`, eigene Anlage) trifft sie mit. */
+  meldungenRueckmeldungen: (einsatzId: number) =>
+    [EINSATZ_KEYS.meldungen, einsatzId, RUECKMELDUNGEN_SUBKEY] as const,
   lagemeldungen: (einsatzId: number) => [EINSATZ_KEYS.lagemeldungen, einsatzId] as const,
   auftraege: (einsatzId: number) => [EINSATZ_KEYS.auftraege, einsatzId] as const,
   auftraegeListe: (einsatzId: number, richtung: string, empfaenger: string) =>

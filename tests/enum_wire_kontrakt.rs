@@ -536,6 +536,50 @@ fn stab_besetzung_art_wire() {
     });
 }
 
+/// LFH-632: Dokumentenablage. `DokumentKategorie` trägt die DB-CHECK-Werte aus
+/// `migrations/0116_einsatz_dokument.sql` — Drift endet sonst im Constraint-Sicherheitsnetz.
+#[test]
+fn dokument_kategorie_wire() {
+    enum_wire_as_str!(lifeline_hub::dokument::DokumentKategorie {
+        LagekartePlan,
+        Befehl,
+        Formular,
+        Foto,
+        Sonstiges,
+    });
+    // Zusätzlich gegen die Literale der CHECK-Liste und gegen `ALLE` (Anzeigereihenfolge
+    // UND Parse-Basis: eine dort vergessene Variante wäre per API nicht ablegbar).
+    enum_wire!(lifeline_hub::dokument::DokumentKategorie {
+        LagekartePlan => "lagekarte_plan",
+        Befehl => "befehl",
+        Formular => "formular",
+        Foto => "foto",
+        Sonstiges => "sonstiges",
+    } in lifeline_hub::dokument::DokumentKategorie::ALLE);
+}
+
+/// LFH-635: Ablösung. `AbloesungStatus` und `RhythmusQuelle` tragen die DB-CHECK-Werte aus
+/// `migrations/0114_abloesung.sql`; `Einstufung` ist berechnet, aber Wire-Kontrakt des
+/// Frontends (`abloesung/einstufung.ts` rechnet dieselben drei Stufen nach).
+#[test]
+fn abloesung_status_wire() {
+    enum_wire_as_str!(lifeline_hub::abloesung::AbloesungStatus { Laufend, Abgeloest });
+}
+
+#[test]
+fn abloesung_rhythmus_quelle_wire() {
+    enum_wire_as_str!(lifeline_hub::abloesung::RhythmusQuelle { Abschnitt, Einheit });
+}
+
+#[test]
+fn abloesung_einstufung_wire() {
+    enum_wire_as_str!(lifeline_hub::abloesung::Einstufung {
+        Planmaessig,
+        Vorwarnung,
+        Ueberfaellig,
+    });
+}
+
 /// LFH-298: SSE-Wire-Event-Namen als BE↔FE-Kontrakt. `LiveEvent` ist die Wahrheitsquelle der
 /// Wire-Event-Namen — die Emitter routen über `as_str()`, utoipa erzeugt daraus die
 /// FE-Union (`types.generated.ts`). Pinnt jede Variante gegen ihr load-bearing Wire-Literal
@@ -571,6 +615,8 @@ fn live_event_wire() {
         Etb => "etb",
         Befehl => "befehl",
         Stab => "stab",
+        Dokument => "dokument",
+        Abloesung => "abloesung",
         KartenAnsicht => "karten_ansicht",
         LageSnapshot => "lage_snapshot",
         Sofortmeldung => "sofortmeldung",

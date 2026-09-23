@@ -17,6 +17,7 @@
 import dayjs, { type Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import type {
+  Abloesung,
   AbschnittLagezustand,
   Auftrag,
   Einheit,
@@ -28,8 +29,10 @@ import type {
   Erinnerung,
   EtbEintragAnzeige,
   Gefahrengebiet,
+  LetzteRueckmeldung,
   PegelAnzeige,
   Person,
+  Rueckmeldungen,
   Warnstufe,
 } from '../../api/types';
 import type { KennzahlTon } from '../../components/instrument';
@@ -43,8 +46,10 @@ import {
   type StaerkeSumme,
 } from '../../kraefte/kraeftebild';
 import { verdichteGefahrengebiete } from '../lage-dashboard/lageVerdichtung';
+import { letzteImTeilbaum } from '../../meldungen/rueckmeldung';
 import { prognoseOffen, wasserstandMeter } from '../../pegel/pegelKennzahl';
 import { dauerText } from '../../stab/lagebesprechungZustand';
+import { abloesungsMarken } from '../../abloesung/einstufung';
 import { warnstufeKennzahl, type Statusrolle } from '../../theme/statusFarben';
 
 dayjs.extend(utc);
@@ -254,6 +259,15 @@ export interface AbschnittZeile {
   einheitenStatus: EinheitenVerteilung;
   /** Offene Aufträge an diesen Abschnitt (oder einen Unterabschnitt), jüngste zuerst. */
   auftraege: Auftrag[];
+  /**
+   * Stehen die Rückmeldungen fest (LFH-610)? `false` solange sie laden, bei 403 (kein
+   * Leserecht auf „Meldungen") und bei Fehler — dann zeigt die Zeile GAR NICHTS dazu, auch
+   * kein „—": ein Strich behauptete „keine Rückmeldung", und das weiß die Seite nicht.
+   */
+  rueckmeldungBekannt: boolean;
+  /** Jüngste Rückmeldung im Teilbaum (Abschnitte direkt UND Einheiten darin); `null`, wenn
+   *  keine vorliegt oder {@link rueckmeldungBekannt} `false` ist. */
+  letzteRueckmeldung: LetzteRueckmeldung | null;
   /** Alle Aufträge an den Teilbaum, jeder einmal; erledigt = vollzogen oder abgenommen.
    *  Eine ZÄHLUNG, keine Fortschrittsangabe — jeder Auftrag wiegt gleich, deshalb steht
    *  sie neben der Einschätzung und nicht an ihrer Stelle (LFH-608). */
@@ -286,6 +300,8 @@ export interface AbschnittRohdaten {
   fahrzeuge: EinsatzFahrzeug[];
   material: EinsatzMaterial[];
   auftraege: Auftrag[];
+  /** `GET …/meldungen/rueckmeldungen`; `undefined`, solange nicht (oder nie) geladen. */
+  rueckmeldungen?: Rueckmeldungen;
 }
 
 function abschnittIdAusKey(key: string): number | null {
@@ -293,25 +309,33 @@ function abschnittIdAusKey(key: string): number | null {
   return m ? Number(m[1]) : null;
 }
 
+/** Einheit-id aus dem Meldebild-Schlüssel `eh-<id>`; die Sammelzeilen `eh-ohne-…` fallen
+ *  am Muster heraus, weil `ohne` keine Ziffernfolge ist. */
+function einheitIdAusKey(key: string): number | null {
+  const m = /^eh-(\d+)$/.exec(key);
+  return m ? Number(m[1]) : null;
+}
+
 function zaehleImTeilbaum(zeile: MeldebildZeile): {
   einheiten: number;
-  einheitIds: number[];
   abschnittIds: number[];
+  einheitIds: number[];
 } {
-  const einheitIds: number[] = [];
+  let einheiten = 0;
   const abschnittIds: number[] = [];
+  const einheitIds: number[] = [];
   const id = abschnittIdAusKey(zeile.key);
   if (zeile.art === 'abschnitt' && id != null) abschnittIds.push(id);
-  if (zeile.art === 'einheit' && !zeile.key.startsWith(OHNE_EINHEIT_KEY_PREFIX)) {
-    const m = /^eh-(\d+)$/.exec(zeile.key);
-    if (m) einheitIds.push(Number(m[1]));
-  }
+  if (zeile.art === 'einheit' && !zeile.key.startsWith(OHNE_EINHEIT_KEY_PREFIX)) einheiten += 1;
+  const einheitId = zeile.art === 'einheit' ? einheitIdAusKey(zeile.key) : null;
+  if (einheitId != null) einheitIds.push(einheitId);
   for (const kind of zeile.children ?? []) {
     const k = zaehleImTeilbaum(kind);
-    einheitIds.push(...k.einheitIds);
+    einheiten += k.einheiten;
     abschnittIds.push(...k.abschnittIds);
+    einheitIds.push(...k.einheitIds);
   }
-  return { einheiten: einheitIds.length, einheitIds, abschnittIds };
+  return { einheiten, abschnittIds, einheitIds };
 }
 
 /** Einheiten nach der Kategorie ihres Status — „gemischt" zählt mit, wenn die Kategorie gemeinsam ist. */
@@ -357,7 +381,7 @@ export function abschnittZeilen(r: AbschnittRohdaten): AbschnittZeile[] {
   const zeilen: AbschnittZeile[] = baum.map((knoten) => {
     const id = abschnittIdAusKey(knoten.key);
     const abschnitt = id != null ? abschnittNachId.get(id) : undefined;
-    const { einheiten, einheitIds, abschnittIds } = zaehleImTeilbaum(knoten);
+    const { einheiten, abschnittIds, einheitIds } = zaehleImTeilbaum(knoten);
     const teilbaum = new Set(abschnittIds);
     const anTeilbaum =
       teilbaum.size === 0
@@ -394,6 +418,13 @@ export function abschnittZeilen(r: AbschnittRohdaten): AbschnittZeile[] {
       abschnittsauftrag: abschnitt?.abschnittsauftrag ?? null,
       fortschritt: abschnitt?.fortschritt ?? null,
       unterLage: lageRang(unterLage) > lageRang(eigeneLage) ? unterLage : null,
+      // Anders als bei den Aufträgen KEIN Kurzschluss auf leeren `teilbaum`: die Sammelzeile
+      // „Ohne Abschnitt" hat keine Abschnitt-ids, ihre Einheiten melden trotzdem zurück.
+      rueckmeldungBekannt: r.rueckmeldungen != null,
+      letzteRueckmeldung:
+        r.rueckmeldungen != null
+          ? letzteImTeilbaum(r.rueckmeldungen, teilbaum, new Set(einheitIds))
+          : null,
     };
   });
 
@@ -435,12 +466,14 @@ export function entscheidungenAuswahl(
 // ── Nächste Marken ──────────────────────────────────────────────────────────────
 
 export type MarkenTon = 'neutral' | 'achtung' | 'alarm';
-export type MarkenArt = 'auftrag' | 'erinnerung' | 'lagebesprechung' | 'pegelprognose';
+export type MarkenArt =
+  'auftrag' | 'erinnerung' | 'lagebesprechung' | 'pegelprognose' | 'abloesung';
 
 export interface Marke {
   key: string;
   art: MarkenArt;
-  /** id des Auftrags, der Erinnerung bzw. des Pegels; `null` bei der Lagebesprechung. */
+  /** id des Auftrags, der Erinnerung bzw. des Pegels; `null` bei der Lagebesprechung und der
+   *  Ablösung (eine Ablösungsmarke fasst mehrere Schichten zusammen, LFH-635). */
   id: number | null;
   zeit: string;
   text: string;
@@ -470,16 +503,21 @@ export function pegelBezeichnung(p: Pick<PegelAnzeige, 'name' | 'gewaesser'>): s
 }
 
 /**
- * Die anstehenden Fristen aus vier Quellen: Frist offener Aufträge, Fälligkeit offener
- * Erinnerungen, nächste Lagebesprechung und der erwartete Höchststand an einem maßgeblichen
- * Pegel (LFH-628). Aufsteigend nach Zeit — Überfälliges steht damit oben, und das ist
- * gewollt: es ist die Marke, die schon gerissen ist.
+ * Die anstehenden Fristen aus fünf Quellen: Frist offener Aufträge, Fälligkeit offener
+ * Erinnerungen, nächste Lagebesprechung, der erwartete Höchststand an einem maßgeblichen
+ * Pegel (LFH-628) und fällige Ablösungen (LFH-635). Aufsteigend nach Zeit — Überfälliges
+ * steht damit oben, und das ist gewollt: es ist die Marke, die schon gerissen ist.
  *
  * Die Pegel-Prognose ist davon ausgenommen: sie ist keine Frist, die jemand reißen kann,
  * sondern eine Erwartung. Ein verstrichener Höchststand ist VORBEI, nicht „überfällig" —
  * er wird vor dem Sortieren herausgefiltert und steht nie als Alarm oben (Entscheidung des
  * Auftraggebers vom 22.09.2026). Solange er aussteht, bewertet ihn dieselbe Regel wie die
  * übrigen Marken („in 23 min", knapp = `achtung`).
+ *
+ * Ablösungen kommen als eigene Quelle (je Abschnitt und Minute zusammengefasst:
+ * „Ablösung Deichwache Nord, 2 Einheiten"); ihre Auto-Fristen in den Erinnerungen werden
+ * deshalb hier ÜBERSPRUNGEN — sonst stünde dieselbe Ablösung doppelt, einmal davon als
+ * Vorwarnung eine halbe Stunde früher.
  */
 export function naechsteMarken(
   auftraege: Auftrag[],
@@ -487,6 +525,7 @@ export function naechsteMarken(
   naechsteLagebesprechung: string | null | undefined,
   jetzt: Dayjs,
   pegel: readonly PegelAnzeige[] = [],
+  abloesungen: readonly Abloesung[] = [],
 ): MarkenAuswahl {
   const roh: { key: string; art: MarkenArt; id: number | null; zeit: string; text: string }[] = [];
   for (const a of auftraege) {
@@ -501,6 +540,7 @@ export function naechsteMarken(
     }
   }
   for (const e of erinnerungen) {
+    if (e.bezug_typ === 'abloesung' || e.bezug_typ === 'abloesung_vorwarnung') continue;
     if (e.status === 'offen' && zeitpunkt(e.faellig_at)) {
       roh.push({
         key: `e-${e.id}`,
@@ -510,6 +550,9 @@ export function naechsteMarken(
         text: e.titel,
       });
     }
+  }
+  for (const m of abloesungsMarken(abloesungen)) {
+    roh.push({ key: m.key, art: 'abloesung', id: null, zeit: m.zeit, text: m.text });
   }
   if (zeitpunkt(naechsteLagebesprechung)) {
     roh.push({

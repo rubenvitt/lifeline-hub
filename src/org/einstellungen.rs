@@ -27,9 +27,13 @@ pub struct OrgEinstellungen {
     pub etb_nummer_praefix: Option<String>,
     pub meldung_nummer_praefix: Option<String>,
     pub auftrag_nummer_praefix: Option<String>,
+    // Präfix der Einsatznummer (LFH-617): NICHT display-only — `einsatz::repo::anlegen`
+    // friert es in die Nummer ein. NULL = `einsatz::nummer::PRAEFIX_VORGABE`.
+    pub einsatz_nummer_praefix: Option<String>,
     // Default-Fristen.
     pub meldung_bestaetigung_frist_min: Option<i64>,
     pub auftrag_quittierung_frist_min: Option<i64>,
+    pub rueckmeldung_frist_min: Option<i64>,
     // Auto-ETB-Schalter: 0 = aus; NULL/1 = an.
     pub auto_etb_eintraege: Option<i64>,
     // Geocoder-Basis-URL (serverseitig; kein Leak an Mitglieder).
@@ -50,8 +54,10 @@ impl OrgEinstellungen {
             etb_nummer_praefix: None,
             meldung_nummer_praefix: None,
             auftrag_nummer_praefix: None,
+            einsatz_nummer_praefix: None,
             meldung_bestaetigung_frist_min: None,
             auftrag_quittierung_frist_min: None,
+            rueckmeldung_frist_min: None,
             auto_etb_eintraege: None,
             geocoder_url: None,
             geaendert_at: None,
@@ -71,8 +77,10 @@ impl OrgEinstellungen {
             etb_nummer_praefix: self.etb_nummer_praefix.clone(),
             meldung_nummer_praefix: self.meldung_nummer_praefix.clone(),
             auftrag_nummer_praefix: self.auftrag_nummer_praefix.clone(),
+            einsatz_nummer_praefix: self.einsatz_nummer_praefix.clone(),
             meldung_bestaetigung_frist_min: self.meldung_bestaetigung_frist_min,
             auftrag_quittierung_frist_min: self.auftrag_quittierung_frist_min,
+            rueckmeldung_frist_min: self.rueckmeldung_frist_min,
             auto_etb_eintraege: self.auto_etb_eintraege,
             geocoder_url: self.geocoder_url.clone(),
             geaendert_at: self.geaendert_at.clone(),
@@ -95,6 +103,7 @@ impl OrgEinstellungen {
             auftrag_nummer_praefix: self.auftrag_nummer_praefix.clone(),
             meldung_bestaetigung_frist_min: self.meldung_bestaetigung_frist_min,
             auftrag_quittierung_frist_min: self.auftrag_quittierung_frist_min,
+            rueckmeldung_frist_min: self.rueckmeldung_frist_min,
             auto_etb_eintraege: self.auto_etb_eintraege,
         }
     }
@@ -115,8 +124,12 @@ pub struct OrgEinstellungenAnzeige {
     pub etb_nummer_praefix: Option<String>,
     pub meldung_nummer_praefix: Option<String>,
     pub auftrag_nummer_praefix: Option<String>,
+    pub einsatz_nummer_praefix: Option<String>,
     pub meldung_bestaetigung_frist_min: Option<i64>,
     pub auftrag_quittierung_frist_min: Option<i64>,
+    /// Rückmeldefrist in Minuten (LFH-610); fehlt = keine eigene Vorgabe.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rueckmeldung_frist_min: Option<i64>,
     pub auto_etb_eintraege: Option<i64>,
     pub geocoder_url: Option<String>,
     pub geaendert_at: Option<String>,
@@ -141,6 +154,9 @@ pub struct OrgEinstellungenHinweis {
     pub auftrag_nummer_praefix: Option<String>,
     pub meldung_bestaetigung_frist_min: Option<i64>,
     pub auftrag_quittierung_frist_min: Option<i64>,
+    /// Rückmeldefrist in Minuten (LFH-610); fehlt = keine eigene Vorgabe.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rueckmeldung_frist_min: Option<i64>,
     pub auto_etb_eintraege: Option<i64>,
 }
 
@@ -156,8 +172,10 @@ pub struct OrgEinstellungenDaten<'a> {
     pub etb_nummer_praefix: Option<&'a str>,
     pub meldung_nummer_praefix: Option<&'a str>,
     pub auftrag_nummer_praefix: Option<&'a str>,
+    pub einsatz_nummer_praefix: Option<&'a str>,
     pub meldung_bestaetigung_frist_min: Option<i64>,
     pub auftrag_quittierung_frist_min: Option<i64>,
+    pub rueckmeldung_frist_min: Option<i64>,
     pub auto_etb_eintraege: Option<i64>,
     pub geocoder_url: Option<&'a str>,
 }
@@ -171,8 +189,8 @@ pub async fn laden_oder_default(
     let row = sqlx::query_as::<_, OrgEinstellungen>(
         "SELECT org_id, zeitzone, zeitformat, einheiten, koordinatenformat, \
                 retention_dauer_tage, etb_nummer_praefix, meldung_nummer_praefix, \
-                auftrag_nummer_praefix, meldung_bestaetigung_frist_min, \
-                auftrag_quittierung_frist_min, auto_etb_eintraege, geocoder_url, \
+                auftrag_nummer_praefix, einsatz_nummer_praefix, meldung_bestaetigung_frist_min, \
+                auftrag_quittierung_frist_min, rueckmeldung_frist_min, auto_etb_eintraege, geocoder_url, \
                 geaendert_at, geaendert_von \
          FROM org_einstellungen WHERE org_id = ?",
     )
@@ -194,10 +212,10 @@ pub async fn speichern(
         "INSERT INTO org_einstellungen \
             (org_id, zeitzone, zeitformat, einheiten, koordinatenformat, \
              retention_dauer_tage, etb_nummer_praefix, meldung_nummer_praefix, \
-             auftrag_nummer_praefix, meldung_bestaetigung_frist_min, \
-             auftrag_quittierung_frist_min, auto_etb_eintraege, geocoder_url, \
+             auftrag_nummer_praefix, einsatz_nummer_praefix, meldung_bestaetigung_frist_min, \
+             auftrag_quittierung_frist_min, rueckmeldung_frist_min, auto_etb_eintraege, geocoder_url, \
              geaendert_at, geaendert_von) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?) \
          ON CONFLICT(org_id) DO UPDATE SET \
              zeitzone = excluded.zeitzone, \
              zeitformat = excluded.zeitformat, \
@@ -207,8 +225,10 @@ pub async fn speichern(
              etb_nummer_praefix = excluded.etb_nummer_praefix, \
              meldung_nummer_praefix = excluded.meldung_nummer_praefix, \
              auftrag_nummer_praefix = excluded.auftrag_nummer_praefix, \
+             einsatz_nummer_praefix = excluded.einsatz_nummer_praefix, \
              meldung_bestaetigung_frist_min = excluded.meldung_bestaetigung_frist_min, \
              auftrag_quittierung_frist_min = excluded.auftrag_quittierung_frist_min, \
+             rueckmeldung_frist_min = excluded.rueckmeldung_frist_min, \
              auto_etb_eintraege = excluded.auto_etb_eintraege, \
              geocoder_url = excluded.geocoder_url, \
              geaendert_at = excluded.geaendert_at, \
@@ -223,8 +243,10 @@ pub async fn speichern(
     .bind(daten.etb_nummer_praefix)
     .bind(daten.meldung_nummer_praefix)
     .bind(daten.auftrag_nummer_praefix)
+    .bind(daten.einsatz_nummer_praefix)
     .bind(daten.meldung_bestaetigung_frist_min)
     .bind(daten.auftrag_quittierung_frist_min)
+    .bind(daten.rueckmeldung_frist_min)
     .bind(daten.auto_etb_eintraege)
     .bind(daten.geocoder_url)
     .bind(erfasser_id)
@@ -296,8 +318,10 @@ mod tests {
                 etb_nummer_praefix: Some("EB-"),
                 meldung_nummer_praefix: Some("M-"),
                 auftrag_nummer_praefix: Some("A-"),
+                einsatz_nummer_praefix: Some("WF-"),
                 meldung_bestaetigung_frist_min: Some(30),
                 auftrag_quittierung_frist_min: Some(45),
+                rueckmeldung_frist_min: Some(90),
                 auto_etb_eintraege: Some(0),
                 geocoder_url: Some("https://nominatim.example.org"),
             },
@@ -307,6 +331,12 @@ mod tests {
 
         assert_eq!(g.org_id, 1);
         assert_eq!(g.zeitzone.as_deref(), Some("Europe/Berlin"));
+        assert_eq!(g.einsatz_nummer_praefix.as_deref(), Some("WF-"));
+        assert_eq!(
+            g.auftrag_nummer_praefix.as_deref(),
+            Some("A-"),
+            "Nachbar nicht verrutscht"
+        );
         assert_eq!(g.zeitformat.as_deref(), Some("24h"));
         assert_eq!(g.einheiten.as_deref(), Some("metrisch"));
         assert_eq!(g.koordinatenformat.as_deref(), Some("mgrs"));
@@ -316,6 +346,7 @@ mod tests {
         assert_eq!(g.auftrag_nummer_praefix.as_deref(), Some("A-"));
         assert_eq!(g.meldung_bestaetigung_frist_min, Some(30));
         assert_eq!(g.auftrag_quittierung_frist_min, Some(45));
+        assert_eq!(g.rueckmeldung_frist_min, Some(90));
         assert_eq!(g.auto_etb_eintraege, Some(0));
         assert_eq!(
             g.geocoder_url.as_deref(),

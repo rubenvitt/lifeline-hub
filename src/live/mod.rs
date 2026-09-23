@@ -32,6 +32,8 @@ pub enum LiveEvent {
     Etb,
     Befehl,
     Stab,
+    Dokument,
+    Abloesung,
     KartenAnsicht,
     LageSnapshot,
     Sofortmeldung,
@@ -41,7 +43,7 @@ pub enum LiveEvent {
 impl LiveEvent {
     /// Alle Varianten in kanonischer Reihenfolge — Anker für den Wire-Kontrakt-Guard
     /// (`tests/enum_wire_kontrakt.rs`) und die Exhaustiveness-Prüfung.
-    pub const ALLE: [LiveEvent; 27] = [
+    pub const ALLE: [LiveEvent; 29] = [
         LiveEvent::Uhs,
         LiveEvent::Schaden,
         LiveEvent::Fahrzeug,
@@ -65,6 +67,8 @@ impl LiveEvent {
         LiveEvent::Etb,
         LiveEvent::Befehl,
         LiveEvent::Stab,
+        LiveEvent::Dokument,
+        LiveEvent::Abloesung,
         LiveEvent::KartenAnsicht,
         LiveEvent::LageSnapshot,
         LiveEvent::Sofortmeldung,
@@ -99,6 +103,8 @@ impl LiveEvent {
             LiveEvent::Etb => "etb",
             LiveEvent::Befehl => "befehl",
             LiveEvent::Stab => "stab",
+            LiveEvent::Dokument => "dokument",
+            LiveEvent::Abloesung => "abloesung",
             LiveEvent::KartenAnsicht => "karten_ansicht",
             LiveEvent::LageSnapshot => "lage_snapshot",
             LiveEvent::Sofortmeldung => "sofortmeldung",
@@ -168,6 +174,14 @@ impl LiveEvent {
             // stattgefunden hat. Der Einsatzkopf bleibt FE-seitig NICHT_LIVE und wird beim
             // nächsten Abruf frisch — der dokumentierte Nachlauf, kein Fehler.
             LiveEvent::Stab => &["stab"],
+            // Nur `dokumente`: das Dokument ist ein Datenobjekt der Dokumentenablage; der
+            // ETB-Nachweis läuft über das eigene `etb`-Ereignis.
+            LiveEvent::Dokument => &["dokumente"],
+            // Nur `abloesung`: Schichten sind Datenobjekte des Ablösungsmoduls. Der
+            // Scheduler-Hinweis zu einer Ablösungsfrist geht über DIESES Event statt über
+            // `erinnerung` — so erreicht er Ablösungs-Leser, ohne dass sie alle Erinnerungen
+            // des Einsatzes erfahren (LFH-635, design.md D3).
+            LiveEvent::Abloesung => &["abloesung"],
             // Die Kartenansicht-Konfiguration lebt auf der Lage-Karte; wer `lagekarte`
             // sehen darf, darf ihre Änderung erfahren (Cache-Invalidierung des Switchers).
             LiveEvent::KartenAnsicht => &["lagekarte"],
@@ -528,6 +542,8 @@ mod tests {
             (LiveEvent::Etb, &["etb"]),
             (LiveEvent::Befehl, &["auftraege"]),
             (LiveEvent::Stab, &["stab"]),
+            (LiveEvent::Dokument, &["dokumente"]),
+            (LiveEvent::Abloesung, &["abloesung"]),
             (LiveEvent::KartenAnsicht, &["lagekarte"]),
             (LiveEvent::LageSnapshot, &["lagekarte"]),
             (LiveEvent::Sofortmeldung, &["meldungen"]),

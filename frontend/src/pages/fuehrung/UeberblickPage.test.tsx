@@ -160,7 +160,9 @@ const volleDaten = {
   pegel: [] as unknown[],
 };
 
-type Daten = typeof volleDaten;
+/** Rückmeldungen (LFH-610) sind optional: ohne Angabe liefert der Server eine leere Menge. */
+type Daten = typeof volleDaten & { rueckmeldungen?: object };
+const KEINE_RUECKMELDUNGEN = { frist_min: 60, einheiten: [], abschnitte: [] };
 
 /** Ein Leitpegel mit frischer Messung (relativ zur echten Uhr, wie die Seite rechnet). */
 const leitpegel = (messung: Record<string, unknown> | null) => ({
@@ -186,7 +188,14 @@ function stelleBereit(d: Daten, ueberschreiben: Parameters<typeof server.use> = 
     http.get('/api/einsaetze/1/gefahrengebiete', json(d.gefahren)),
     http.get('/api/einsaetze/1/auftraege', json(d.auftraege)),
     http.get('/api/einsaetze/1/erinnerungen', json(d.erinnerungen)),
+    http.get(
+      '/api/einsaetze/1/meldungen/rueckmeldungen',
+      json(d.rueckmeldungen ?? KEINE_RUECKMELDUNGEN),
+    ),
     http.get('/api/einsaetze/1/pegel', json(d.pegel ?? [])),
+    // LFH-635: Modul-Overrides (für die Sichtbarkeit der Ablösung) und laufende Schichten.
+    http.get('/api/einsaetze/1/modul-overrides', json({})),
+    http.get('/api/einsaetze/1/abloesungen', json([])),
     http.get('/api/einsaetze/1/etb', ({ request }) => {
       const url = new URL(request.url);
       // Die Seite fragt NUR Entscheidungen ab — ein Abruf ohne Filter wäre ein Fehler.
@@ -331,6 +340,69 @@ describe('UeberblickPage', () => {
     ]);
     expect(within(p).getByText(/Einheiten nach Status/)).toBeInTheDocument();
     expect(within(p).getByText('1 Abschnitte · 1 Einheiten')).toBeInTheDocument();
+  });
+
+  it('Abschnittszeile: letzte Rückmeldung im Teilbaum mit Zeit und Text (LFH-610)', async () => {
+    const zeit = vor(20);
+    stelleBereit({
+      ...volleDaten,
+      rueckmeldungen: {
+        frist_min: 60,
+        einheiten: [
+          {
+            bezug_id: 10,
+            meldung_id: 7,
+            lfd_nr: 7,
+            ereigniszeit: zeit,
+            inhalt: 'Verbau hält',
+            meldeweg: 'funk',
+            faellig_at: nach(40),
+          },
+        ],
+        abschnitte: [],
+      },
+    });
+    rendern();
+    const p = await waitFor(() => paneel('Einsatzabschnitte'));
+    const zeile = await within(p).findByRole('link', { name: /Abschnitt Nord/ });
+    const rueck = await waitFor(() => {
+      const el = zeile.querySelector<HTMLElement>('[data-lfh="abschnitt-rueckmeldung"]');
+      expect(el).not.toBeNull();
+      return el!;
+    });
+    expect(rueck).toHaveTextContent('Verbau hält');
+    const uhr = dayjs.utc(zeit).local().format('HH:mm');
+    expect(rueck).toHaveTextContent(uhr);
+    // Die Zeit trägt im Linknamen ihre Bedeutung, nicht als nackte Uhrzeit.
+    expect(zeile).toHaveAccessibleName(new RegExp(`Letzte Rückmeldung:\\s*${uhr}\\s+Verbau hält`));
+    expect(rueck).not.toHaveTextContent('noch keine');
+  });
+
+  it('Abschnittszeile: geladen, aber ohne Rückmeldung sagt es ruhig „noch keine"', async () => {
+    stelleBereit(volleDaten);
+    rendern();
+    const p = await waitFor(() => paneel('Einsatzabschnitte'));
+    const zeile = await within(p).findByRole('link', { name: /Abschnitt Nord/ });
+    await waitFor(() => expect(zeile).toHaveTextContent('noch keine Rückmeldung'));
+  });
+
+  it('Abschnittszeile: ohne Leserecht auf Meldungen (403) nichts erfunden, Paneel bleibt', async () => {
+    let abgerufen = false;
+    stelleBereit(volleDaten, [
+      http.get('/api/einsaetze/1/meldungen/rueckmeldungen', () => {
+        abgerufen = true;
+        return HttpResponse.json({ error: 'kein Zugriff' }, { status: 403 });
+      }),
+    ]);
+    rendern();
+    const p = await waitFor(() => paneel('Einsatzabschnitte'));
+    const zeile = await within(p).findByRole('link', { name: /Abschnitt Nord/ });
+    await waitFor(() => expect(abgerufen).toBe(true));
+    // Der Rest der Zeile steht, kein „Stand unbekannt" für das ganze Paneel.
+    await waitFor(() => expect(zeile).toHaveTextContent('1/0/1//2'));
+    expect(within(p).queryByRole('alert')).toBeNull();
+    expect(zeile.querySelector('[data-lfh="abschnitt-rueckmeldung"]')).toBeNull();
+    expect(zeile).not.toHaveTextContent(/Rückmeldung/);
   });
 
   it('Abschnittszeile mit Lage (LFH-608): Kante, Stufenwort, Kürzel, fester Auftrag, Fortschritt', async () => {
@@ -496,6 +568,71 @@ describe('UeberblickPage', () => {
     expect(marke).toHaveAttribute('href', '/einsaetze/1/einstellungen/pegel');
     expect(marke).toHaveAttribute('data-ton', 'neutral');
     expect(within(p).queryByText(/Pegel WAHNHAUSEN/)).toBeNull();
+  });
+
+  it('Nächste Marken: fällige Ablösungen je Abschnitt zusammengefasst, Link zur Ablösung (LFH-635)', async () => {
+    const schicht = (id: number) => ({
+      id,
+      einsatz_id: 1,
+      einheit_id: 100 + id,
+      einheit_name: `Florian ${id}`,
+      abschnitt_id: 5,
+      abschnitt_name: 'Deichwache Nord',
+      beginn_at: vor(300),
+      rhythmus_minuten: 360,
+      rhythmus_quelle: 'abschnitt',
+      faellig_at: nach(60),
+      status: 'laufend',
+      ruecknehmbar: false,
+      angelegt_at: vor(300),
+    });
+    stelleBereit(volleDaten, [
+      http.get('/api/einsaetze/1/abloesungen', () => HttpResponse.json([schicht(1), schicht(2)])),
+      // Die Auto-Frist derselben Ablösung in den Erinnerungen darf keine zweite Marke werden.
+      http.get('/api/einsaetze/1/erinnerungen', () =>
+        HttpResponse.json([
+          ...volleDaten.erinnerungen,
+          {
+            id: 9,
+            titel: 'Ablösung fällig: Florian 1',
+            faellig_at: nach(60),
+            status: 'offen',
+            bezug_typ: 'abloesung',
+            bezug_id: 1,
+          },
+        ]),
+      ),
+    ]);
+    rendern();
+    const p = await waitFor(() => paneel('Nächste Marken'));
+    const marke = await within(p).findByText('Ablösung Deichwache Nord, 2 Einheiten');
+    expect(marke.closest('a')).toHaveAttribute('href', '/einsaetze/1/abloesung');
+    expect(within(p).queryByText('Ablösung fällig: Florian 1')).toBeNull();
+  });
+
+  it('Nächste Marken: ohne sichtbares Modul Ablösung keine Anfrage und keine Marke (LFH-635)', async () => {
+    let abgefragt = 0;
+    stelleBereit(volleDaten, [
+      http.get('/api/einsaetze/1/modul-overrides', () =>
+        HttpResponse.json({
+          abloesung: {
+            einsatz_id: 1,
+            modul_key: 'abloesung',
+            sichtbar: false,
+            benoetigte_rolle: null,
+            geaendert_at: null,
+          },
+        }),
+      ),
+      http.get('/api/einsaetze/1/abloesungen', () => {
+        abgefragt += 1;
+        return HttpResponse.json([]);
+      }),
+    ]);
+    rendern();
+    const p = await waitFor(() => paneel('Nächste Marken'));
+    await within(p).findByText('Lagebesprechung');
+    expect(abgefragt).toBe(0);
   });
 
   it('Leerzustand: jedes Paneel sagt „nichts da" und bietet, wo sinnvoll, eine Aktion', async () => {

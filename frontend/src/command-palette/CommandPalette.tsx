@@ -8,6 +8,7 @@ import Tastenkuerzel from '../components/Tastenkuerzel';
 import { schrift } from '../theme/tokens';
 import { sichtbareDatensaetze } from './datensaetze';
 import {
+  UNBEWERTET,
   filtereBefehle,
   filtereNachModus,
   modiMitPraefix,
@@ -70,6 +71,16 @@ interface Props {
    * Wahrheit darüber, was „der Suchbegriff" ist.
    */
   onSucheEntprellt?: (modus: PaletteModus, rest: string) => void;
+  /**
+   * Koordinatensprung (LFH-619): liefert für den LEBENDEN Rest die Zeile „Auf Lagekarte
+   * zeigen", wenn er die Form einer Koordinate hat — sonst `null`.
+   *
+   * Eine Funktion und keine fertige Zeile, weil der entprellte Stand der Eingabe um bis zu
+   * 300 ms hinterherhinkt: nach dem Löschen einer Ziffer stünde sonst noch ein Punkt da, den
+   * niemand mehr meint. Fehlt die Prop (ausserhalb eines Einsatzes), gibt es weder Zeile
+   * noch Fußhinweis.
+   */
+  koordinatenSprung?: (rest: string) => Befehl | null;
   schliesse: () => void;
 }
 
@@ -78,6 +89,7 @@ export function CommandPalette({
   befehle,
   datensatzTreffer = KEINE_TREFFER,
   onSucheEntprellt,
+  koordinatenSprung,
   schliesse,
 }: Props) {
   const { token } = theme.useToken();
@@ -135,6 +147,22 @@ export function CommandPalette({
     [datensatzTreffer, modus, rest],
   );
 
+  /**
+   * Die Kartenzeile nur im Vorgabemodus: hinter einem Präfix ist die Eingabe eine Suche in
+   * einer bestimmten Menge (ETB, Kräfte, Aktionen), kein Ort.
+   *
+   * Stufe 0, aber ein Score HINTER jedem anderen Stufe-0-Treffer (Review-Befund zu LFH-619):
+   * steht ein Datensatz oder Befehl da, dessen Name oder Nummer die Eingabe genau trifft,
+   * meint die Eingabe ihn. Vor allem Übrigen steht die Kartenzeile und ist dann
+   * vorausgewählt — ein Enter, und die Karte fliegt hin. `UNBEWERTET + 1` ist strikt
+   * schlechter als jeder Fuse-Score und als jeder unbewertete Datensatztreffer.
+   */
+  const koordinate = useMemo<Treffer | null>(() => {
+    if (modus !== 'alles' || !koordinatenSprung) return null;
+    const b = koordinatenSprung(rest);
+    return b ? { befehl: b, score: UNBEWERTET + 1, stufe: 0 } : null;
+  }, [modus, rest, koordinatenSprung]);
+
   const treffer = useMemo(() => {
     const statisch = filtereBefehle(imModus, rest);
     // Bei LEERER Suche bleiben die Datensatz-Treffer draussen, und das ist kein Sonderfall
@@ -144,8 +172,9 @@ export function CommandPalette({
     // Startansicht ist per Vertrag kuratiert (LFH-337 · M11), nicht eine Datenhalde.
     // (Der Riegel darüber deckt diesen Fall mit ab — die Zeile bleibt trotzdem stehen: sie
     // trennt die zwei RENDERZWEIGE, nicht die Trefferquelle.)
-    return rest === '' ? statisch : [...statisch, ...anstehendeDatensaetze];
-  }, [imModus, rest, anstehendeDatensaetze]);
+    if (rest === '') return statisch;
+    return [...(koordinate ? [koordinate] : []), ...statisch, ...anstehendeDatensaetze];
+  }, [imModus, rest, anstehendeDatensaetze, koordinate]);
   /**
    * Zwei Zustände, zwei Ordnungen (LFH-391 · A3):
    *
@@ -459,10 +488,11 @@ export function CommandPalette({
         </div>
         {/*
          * FUSSZEILE (Neuentwurf): Mono 10, NUR Hinweise, die wirklich funktionieren — Enter
-         * öffnet, und die drei Präfixe aus `PALETTE_MODI` (eine Quelle, kein zweiter
-         * Wortlaut). Der Entwurf zeigt zusätzlich „⇧↵ im Panel" und „# Koordinate"; beides
-         * gibt es nicht (`#` ist das ETB-Präfix, eine Koordinatensuche fehlt) und steht
-         * deshalb nicht da.
+         * öffnet, die drei Präfixe aus `PALETTE_MODI` (eine Quelle, kein zweiter Wortlaut)
+         * und, wo es einen Sprung gibt, die Koordinate (LFH-619). Der Entwurf zeigt sie als
+         * „# Koordinate"; `#` bleibt aber das ETB-Präfix — die Koordinate braucht kein
+         * Zeichen, sie wird an ihrer Form erkannt (`koordinatenSprung.ts`). „⇧↵ im Panel"
+         * fehlt weiter: was das fachlich heisst, klärt LFH-645.
          */}
         <div
           data-lfh="palette-fuss"
@@ -494,6 +524,7 @@ export function CommandPalette({
               {m.legende}
             </span>
           ))}
+          {koordinatenSprung && <span>Koordinate → Lagekarte</span>}
         </div>
       </div>
     </Modal>

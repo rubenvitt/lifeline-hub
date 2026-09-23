@@ -44,6 +44,7 @@ const BASIS = {
   auftrag_nummer_start: null,
   meldung_bestaetigung_frist_min: null,
   auftrag_quittierung_frist_min: null,
+  rueckmeldung_frist_min: null,
   auto_etb_eintraege: null,
   etb_nummer_eingefroren: false,
   meldung_nummer_eingefroren: false,
@@ -82,6 +83,7 @@ describe('EinsatzVerhalten', () => {
       etb_nummer_start: 100,
       meldung_bestaetigung_frist_min: 30,
       auftrag_quittierung_frist_min: 45,
+      rueckmeldung_frist_min: 25,
       auto_etb_eintraege: 0,
     } as never);
 
@@ -99,6 +101,7 @@ describe('EinsatzVerhalten', () => {
           etb_nummer_start: 100,
           meldung_bestaetigung_frist_min: 30,
           auftrag_quittierung_frist_min: 45,
+          rueckmeldung_frist_min: 25,
           // auto_etb_eintraege: 0 im Datensatz → Select „Aus" → false im Payload.
           auto_etb_eintraege: false,
         }),
@@ -149,6 +152,7 @@ describe('EinsatzVerhalten', () => {
         auftrag_nummer_praefix: 'AU-',
         meldung_bestaetigung_frist_min: 30,
         auftrag_quittierung_frist_min: 60,
+        rueckmeldung_frist_min: 90,
         auto_etb_eintraege: 1,
       },
     } as never);
@@ -158,6 +162,7 @@ describe('EinsatzVerhalten', () => {
     expect(await screen.findByText('Standard (Org): EB-')).toBeInTheDocument();
     expect(screen.getByText('Standard (Org): 30 Min.')).toBeInTheDocument();
     expect(screen.getByText('Standard (Org): 60 Min.')).toBeInTheDocument();
+    expect(screen.getByText('Standard (Org): 90 Min.')).toBeInTheDocument();
     expect(screen.getByText('Standard (Org): An')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
@@ -168,6 +173,7 @@ describe('EinsatzVerhalten', () => {
           etb_nummer_praefix: null,
           meldung_bestaetigung_frist_min: null,
           auftrag_quittierung_frist_min: null,
+          rueckmeldung_frist_min: null,
         }),
       ),
     );

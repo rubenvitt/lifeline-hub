@@ -1,3 +1,102 @@
+## [1.0.0-alpha.37](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.36...v1.0.0-alpha.37) (2026-09-23)
+
+### Wichtige Änderungen
+
+Die Einsatznummer wird ab dieser Version automatisch vom System vergeben und kann nicht mehr manuell bearbeitet werden. Das Format lautet `<Präfix><Jahr>-<laufende Nummer>`, wobei das Präfix in den Organisationseinstellungen konfiguriert werden kann. Bestehende Einsätze mit dem bisherigen Format `JJJJ-NNN` werden bei der Aktualisierung übernommen. Die Jahresgrenze richtet sich nach der in den Organisationseinstellungen hinterlegten Zeitzone (Vorgabe: Europe/Berlin).
+
+### Verwaltung
+
+**Einsatznummer-Vergabe:** Die Einsatznummer wird jetzt automatisch beim Anlegen eines Einsatzes vergeben. Das Eingabefeld in den Einsatzdaten entfällt. In den Einstellungen kann unter „Einsatz-Defaults" ein individuelles Präfix für die Einsatznummer der Organisation festgelegt werden. Die laufende Nummer wird je Kalenderjahr und Organisation neu gezählt.
+
+### Betrieb und Installation
+
+**Datenbankmigrationen:** Ein Fehler in den Datenbank-Migrationsdateien wurde behoben, der beim Update von Version alpha.34 auf neuere Versionen zu Abbrüchen führen konnte. Die Migration für die automatische Einsatznummer-Vergabe läuft nun korrekt durch.
+
+**CI-Pipeline:** Die Code-Coverage-Messung wurde in einen eigenen Workflow ausgelagert, um lange Wartezeiten bei aufeinanderfolgenden Releases auf dem Alpha-Kanal zu vermeiden. Neue Commits brechen nun veraltete Coverage-Läufe ab.
+
+## [1.0.0-alpha.36](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.35...v1.0.0-alpha.36) (2026-09-23)
+
+### Dokumentenablage
+
+Neue Funktion zur strukturierten Ablage von Einsatzdokumenten:
+- Dokumente können kategorisiert hochgeladen und direkt einem Einsatztagebuch-Eintrag, einem Kartenelement (Schadenstelle, Einheit, Betroffener, Gefahrengebiet) oder einem Auftrag zugeordnet werden
+- Schnellaktion „Dokument ablegen" aus allen relevanten Modulen heraus verfügbar
+- Filter nach Kategorie, Bezug und Suchbegriff in der Dokumentenliste
+- Unterstützte Dateitypen: PDF, Office-Dokumente, Bilder (JPEG, PNG, HEIC, HEIF, TIFF) bis 25 MiB
+- Dokumente erscheinen automatisch im Einsatztagebuch und lösen Live-Benachrichtigungen aus
+- Entfernen von Dokumenten ist nachvollziehbar: Das Dokument wird gelöscht, der ETB-Eintrag mit Titel bleibt erhalten
+
+### Lagekarte
+
+Messwerkzeug für Entfernungen und Flächen:
+- Neuer Lineal-Knopf in der Kartensteuerung zum Messen von Strecken und Flächen
+- Live-Anzeige der Messwerte während des Zeichnens
+- Messergebnisse werden nicht gespeichert, für schnelle Lagefeststellung vor Ort
+
+Satellitenansicht als Kartengrundlage:
+- Online-Katalog bietet nun Satellitenbilder (Esri) als zusätzliche Kartengrundlage
+- Umschaltung zwischen klassischer Karte und Satellitenansicht über die Kartensteuerung
+
+Verbesserungen:
+- Einheiten auf der Karte zeigen jetzt einen direkten Link zum Einsatztagebuch für alle ETB-Einträge dieser Einheit
+- Mehrere Zeichenwerkzeuge können nun gleichzeitig auf einer Karte verwendet werden
+
+### Einsatztagebuch
+
+- Neuer Filter nach Einheit: zeigt alle Einträge, die eine bestimmte Einheit betreffen (eigene Aufträge, Funkverkehr mit dieser Einheit)
+
+### Release-Prozess
+
+- Release-Notizen werden nun KI-gestützt erstellt, mit automatischem Rückfall auf konventionelle Generierung bei Fehlern
+- Konsistente Release-Notizen zwischen Changelog und GitHub-Release
+
+## [1.0.0-alpha.35](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.34...v1.0.0-alpha.35) (2026-09-23)
+
+### Features
+
+* **abloesung:** Hinweis in der AlarmZentrale und Marken im Überblick (LFH-635) ([fe07ffb](https://github.com/rubenvitt/lifeline-hub/commit/fe07ffbe0d3c31ac4dbf24bd8b3c88fc058f717e))
+* **abloesung:** Routen, Live-Ereignis, Scheduler-Hinweis und Frontend-Unterbau (LFH-635) ([7e3ed37](https://github.com/rubenvitt/lifeline-hub/commit/7e3ed3712b42e5fa233aba654e16f1047d669ca5))
+* **abloesung:** Schichten, Fristen und Vollzug im Backend-Repo (LFH-635) ([c9b6dbd](https://github.com/rubenvitt/lifeline-hub/commit/c9b6dbde7fd19fb88f61aca5cff8d71ef2a39083))
+* **abloesung:** Seite mit Schichtliste, Vollzug, Rückgängig und Rhythmus-Vorgaben (LFH-635) ([650d30a](https://github.com/rubenvitt/lifeline-hub/commit/650d30a7c99c1ef8bb9d1841550cc8e98ef9e7bb))
+* **etb:** Zählroute für die Trefferzahl eines ETB-Filters (LFH-619) ([58d7d8c](https://github.com/rubenvitt/lifeline-hub/commit/58d7d8c0b7fa67d3f47807cb3cf6b29ce20a0e2c))
+* **palette:** Koordinatensprung auf die Lagekarte (LFH-619) ([e12ddfb](https://github.com/rubenvitt/lifeline-hub/commit/e12ddfb25cf35323003f1aa1085f11ad81e54403))
+* **palette:** Lageberichte, Gefahrengebiete, Abschnitte und ETB-Sammeltreffer (LFH-619) ([e126430](https://github.com/rubenvitt/lifeline-hub/commit/e12643014b3c61f6b405a1b5947dd286bc5252e9))
+
+### Bug Fixes
+
+* **abloesung:** Abstand der Kartenaktionen folgt der Dichte, im Handschuh 16 px (LFH-635) ([11c6a94](https://github.com/rubenvitt/lifeline-hub/commit/11c6a94974db0cb76dfb8efff9e765d6673aa61d))
+* **abloesung:** Modulzähler liest die Zeit bei neuer Liste frisch (LFH-635) ([708df92](https://github.com/rubenvitt/lifeline-hub/commit/708df92afb8015e4b9e17229606924aa9893b496))
+* **migrations:** Doppelte 0113 auflösen, meldung_rueckmeldung → 0114 ([c98bea6](https://github.com/rubenvitt/lifeline-hub/commit/c98bea6cc7990f73d2c16c71ee195a01ae36954c)), closes [#108](https://github.com/rubenvitt/lifeline-hub/issues/108)
+* **palette:** Review-Korrekturen am Koordinatensprung und Sammeltreffer (LFH-619) ([1c785d2](https://github.com/rubenvitt/lifeline-hub/commit/1c785d2912f32ce92ee2a65fbae73ad366875e61))
+
+## [1.0.0-alpha.34](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.33...v1.0.0-alpha.34) (2026-09-22)
+
+### Features
+
+* **fuehrung,lagekarte:** letzte Rückmeldung im Überblick und in der Lagekarte (LFH-610) ([fbc22e9](https://github.com/rubenvitt/lifeline-hub/commit/fbc22e9cf23697c34cf2e22047fde45e06bfdb54))
+* **kraefte:** Rückmeldung je Einheit im Meldebild (LFH-610) ([9125862](https://github.com/rubenvitt/lifeline-hub/commit/9125862cd92345271ef253346927d89d21f2253b))
+* **meldung:** Rückmeldung je Einheit/Abschnitt mit Frist (LFH-610) ([310051f](https://github.com/rubenvitt/lifeline-hub/commit/310051f71907f5efd2f8b4bedb27d12257cbc968))
+
+### Bug Fixes
+
+* **meldung:** Review-Befunde zur Rückmeldung (LFH-610) ([35c880b](https://github.com/rubenvitt/lifeline-hub/commit/35c880b4138d3d2f1efe1887f21a13f9f1c52d56))
+
+## [1.0.0-alpha.33](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.32...v1.0.0-alpha.33) (2026-09-22)
+
+### Features
+
+* **person:** Codegen und Frontend-Typen für die Lagedaten der Betroffenen ([37fc1c4](https://github.com/rubenvitt/lifeline-hub/commit/37fc1c4945b9b7ef0e85f253507f2ccd63f36c0d))
+* **personen:** Zustand, Koordinate, Verbleib-Zählung, Kartenansicht und Dashboard-Angaben ([7923f5b](https://github.com/rubenvitt/lifeline-hub/commit/7923f5b17d0e603f9539d6cc0d8f6a4101b0c7bb))
+* **person:** Migrationen und Schwärzung für die Lagedaten der Betroffenen ([379dcad](https://github.com/rubenvitt/lifeline-hub/commit/379dcad0bf13fbea6797fa3031cfe42242ee6ade))
+* **person:** Zustand, Fundort-Koordinate, Verbleib-Struktur und „vermisst seit“ in der API ([33ab0ee](https://github.com/rubenvitt/lifeline-hub/commit/33ab0ee7f9d0d5153697b2e012c16209183eb722))
+
+### Bug Fixes
+
+* **migrations:** LFH-613-Migrationen auf 0106/0107 umnummerieren ([436921c](https://github.com/rubenvitt/lifeline-hub/commit/436921c0ee063624cd4063dd887d4cd3e1c7542f))
+* **migrations:** LFH-613-Migrationen auf 0111/0112 umnummerieren ([46561d1](https://github.com/rubenvitt/lifeline-hub/commit/46561d1314829c456eee0366eb60804e65d4ef52))
+* **personen:** Fundort-Angaben nur an angetroffenen Personen, e2e für die Karte ([c79b113](https://github.com/rubenvitt/lifeline-hub/commit/c79b11396623830880af26585af9d2ca5e378fc8))
+* **personen:** Sichtung auf der Karte ohne Zoomschwelle lesbar, Kürzel-Hinweis #Koordinate ([9f5f6e1](https://github.com/rubenvitt/lifeline-hub/commit/9f5f6e1a4a12ab1487365b48e70dc3a9e6af004a)), closes [#Koordinate](https://github.com/rubenvitt/lifeline-hub/issues/Koordinate)
+
 ## [1.0.0-alpha.32](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.31...v1.0.0-alpha.32) (2026-09-22)
 
 ### Features

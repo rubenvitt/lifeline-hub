@@ -166,6 +166,7 @@ describe('baueBefehle — Schnellaktionen', () => {
       'aktion:unfallhilfsstellen',
       'aktion:schaeden',
       'aktion:stab',
+      'aktion:dokumente',
     ]);
   });
   /**
@@ -184,6 +185,7 @@ describe('baueBefehle — Schnellaktionen', () => {
       ['aktion:unfallhilfsstellen', '/einsaetze/5/unfallhilfsstellen/liste?neu=1'],
       ['aktion:schaeden', '/einsaetze/5/schaeden?neu=1'],
       ['aktion:stab', '/einsaetze/5/stab?neu=1'],
+      ['aktion:dokumente', '/einsaetze/5/dokumente?neu=1'],
     ] as const) {
       b.find((x) => x.id === id)!.ausfuehren();
       expect(k.navigate).toHaveBeenCalledWith(ziel);

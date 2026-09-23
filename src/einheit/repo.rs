@@ -830,6 +830,9 @@ pub async fn loese_auf_tx(
     .await?
     .ok_or(AppError::NotFound)?;
 
+    // LFH-635: der CASCADE entfernt die Ablösungsschichten der Einheit, ihre Auto-Fristen
+    // hängen aber ohne FK daran und liefen sonst als Geister im Scheduler weiter.
+    crate::abloesung::repo::loesche_fristen_der_einheit_tx(conn, id).await?;
     sqlx::query("UPDATE einsatz_personal SET einheit_id = NULL WHERE einheit_id = ?")
         .bind(id)
         .execute(&mut *conn)

@@ -30,8 +30,10 @@ export interface FormWerteEinsatz {
   etb_nummer_praefix?: string;
   meldung_nummer_praefix?: string;
   auftrag_nummer_praefix?: string;
+  einsatz_nummer_praefix?: string;
   meldung_bestaetigung_frist_min?: number;
   auftrag_quittierung_frist_min?: number;
+  rueckmeldung_frist_min?: number;
   auto_etb_eintraege: boolean;
 }
 
@@ -46,8 +48,10 @@ export function zuUpdate(e: OrgEinstellungen): OrgEinstellungenUpdate {
     etb_nummer_praefix: e.etb_nummer_praefix ?? null,
     meldung_nummer_praefix: e.meldung_nummer_praefix ?? null,
     auftrag_nummer_praefix: e.auftrag_nummer_praefix ?? null,
+    einsatz_nummer_praefix: e.einsatz_nummer_praefix ?? null,
     meldung_bestaetigung_frist_min: e.meldung_bestaetigung_frist_min ?? null,
     auftrag_quittierung_frist_min: e.auftrag_quittierung_frist_min ?? null,
+    rueckmeldung_frist_min: e.rueckmeldung_frist_min ?? null,
     // 0 = aus; null/1 = an (Default an).
     auto_etb_eintraege: e.auto_etb_eintraege !== 0,
     geocoder_url: e.geocoder_url ?? null,
@@ -79,8 +83,10 @@ export function normalisiereEinsatz(
   | 'etb_nummer_praefix'
   | 'meldung_nummer_praefix'
   | 'auftrag_nummer_praefix'
+  | 'einsatz_nummer_praefix'
   | 'meldung_bestaetigung_frist_min'
   | 'auftrag_quittierung_frist_min'
+  | 'rueckmeldung_frist_min'
   | 'auto_etb_eintraege'
 > {
   return {
@@ -88,8 +94,10 @@ export function normalisiereEinsatz(
     etb_nummer_praefix: w.etb_nummer_praefix?.trim() || null,
     meldung_nummer_praefix: w.meldung_nummer_praefix?.trim() || null,
     auftrag_nummer_praefix: w.auftrag_nummer_praefix?.trim() || null,
+    einsatz_nummer_praefix: w.einsatz_nummer_praefix?.trim() || null,
     meldung_bestaetigung_frist_min: w.meldung_bestaetigung_frist_min ?? null,
     auftrag_quittierung_frist_min: w.auftrag_quittierung_frist_min ?? null,
+    rueckmeldung_frist_min: w.rueckmeldung_frist_min ?? null,
     auto_etb_eintraege: w.auto_etb_eintraege,
   };
 }
@@ -112,8 +120,10 @@ export function initialEinsatz(e: OrgEinstellungen): FormWerteEinsatz {
     etb_nummer_praefix: e.etb_nummer_praefix ?? undefined,
     meldung_nummer_praefix: e.meldung_nummer_praefix ?? undefined,
     auftrag_nummer_praefix: e.auftrag_nummer_praefix ?? undefined,
+    einsatz_nummer_praefix: e.einsatz_nummer_praefix ?? undefined,
     meldung_bestaetigung_frist_min: e.meldung_bestaetigung_frist_min ?? undefined,
     auftrag_quittierung_frist_min: e.auftrag_quittierung_frist_min ?? undefined,
+    rueckmeldung_frist_min: e.rueckmeldung_frist_min ?? undefined,
     auto_etb_eintraege: e.auto_etb_eintraege !== 0,
   };
 }

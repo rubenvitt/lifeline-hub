@@ -15,11 +15,14 @@ import {
   tiereDetailPfad,
   schadenDetailPfad,
   tierePfad,
+  parseKartenzentrum,
   parsePlatzierenAuftrag,
   personenAufnahmePfad,
   personenPfad,
   schaedenPfad,
   stabPfad,
+  dokumentePfad,
+  abloesungPfad,
   etbPfad,
   parseEtbFilter,
   parsePersonenSicht,
@@ -177,6 +180,38 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
     const params = new URLSearchParams(pfad.split('?')[1]);
     expect(parsePlatzierenAuftrag(params.get('platzieren'))).toEqual({ typ: 'uhs', id: 3 });
   });
+  it('lagekartePfad trägt einen Kartenmittelpunkt als ?zentrum=lat,lon (LFH-619)', () => {
+    // Fünf Nachkommastellen ≙ rund 1 m — genauer als jede Angabe, die jemand abtippt,
+    // und kurz genug, um als Link lesbar zu bleiben.
+    const pfad = lagekartePfad(E, { zentrum: { lat: 52.520008, lon: 13.404954 } });
+    expect(new URL(pfad, 'http://x').searchParams.get('zentrum')).toBe('52.52001,13.40495');
+  });
+  it('der Kartenmittelpunkt überlebt den Weg durch die URL', () => {
+    const pfad = lagekartePfad(E, { zentrum: { lat: -33.8688, lon: 151.2093 } });
+    const wert = new URL(pfad, 'http://x').searchParams.get('zentrum');
+    expect(parseKartenzentrum(wert)).toEqual({ lat: -33.8688, lon: 151.2093 });
+  });
+  it('parseKartenzentrum verwirft Unbrauchbares ganz statt halb zu füllen', () => {
+    // Eine halbe Koordinate schickte die Karte auf den Nullmeridian.
+    for (const w of [
+      null,
+      '',
+      '52.5',
+      '52.5,',
+      ',13.4',
+      'a,b',
+      '52.5,13.4,7',
+      '91,13',
+      '52,181',
+      '-91,0',
+      'NaN,1',
+      'Infinity,1',
+      '52.5 13.4',
+    ]) {
+      expect(parseKartenzentrum(w), String(w)).toBeNull();
+    }
+    expect(parseKartenzentrum('0,0')).toEqual({ lat: 0, lon: 0 });
+  });
   it('parsePlatzierenAuftrag liest den Auftrag zurück', () => {
     expect(parsePlatzierenAuftrag('schaden:7')).toEqual({ typ: 'schaden', id: 7 });
     expect(parsePlatzierenAuftrag('uhs:2')).toEqual({ typ: 'uhs', id: 2 });
@@ -220,6 +255,16 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
   it('schaedenPfad mit ?neu=1', () => {
     expect(schaedenPfad(E, { neu: true })).toBe('/einsaetze/5/schaeden?neu=1');
   });
+  it('dokumentePfad ohne Optionen', () => {
+    expect(dokumentePfad(E)).toBe('/einsaetze/5/dokumente');
+  });
+  it('dokumentePfad mit ?neu=1', () => {
+    expect(dokumentePfad(E, { neu: true })).toBe('/einsaetze/5/dokumente?neu=1');
+  });
+  it('abloesungPfad (LFH-635)', () => {
+    expect(abloesungPfad(E)).toBe('/einsaetze/5/abloesung');
+  });
+
   it('stabPfad ohne Optionen', () => {
     expect(stabPfad(E)).toBe('/einsaetze/5/stab');
   });
@@ -333,6 +378,16 @@ describe('etbPfad mit Filterachse (LFH-342 · C7)', () => {
     // Dieselbe Regel wie bei `parsePlatzierenAuftrag` (LFH-340 · C5): ein unbrauchbarer
     // Wert ergibt keinen Filter auf diesen Wert, sondern gar keinen.
     expect(parseEtbFilter(new URLSearchParams('q=x&typ=quatsch'))).toEqual({ q: 'x' });
+  });
+
+  it('trägt die Einheit hin und zurück (LFH-616)', () => {
+    const pfad = etbPfad(7, { einheit_id: 12 });
+    expect(pfad).toBe('/einsaetze/7/etb?einheit_id=12');
+    expect(parseEtbFilter(new URLSearchParams(pfad.split('?')[1]))).toEqual({ einheit_id: 12 });
+  });
+
+  it.each(['abc', '0', '-3', '1.5', ''])('verwirft einheit_id=%s GANZ (LFH-616)', (wert) => {
+    expect(parseEtbFilter(new URLSearchParams(`q=x&einheit_id=${wert}`))).toEqual({ q: 'x' });
   });
 
   it('liefert für eine leere Query ein leeres Filterobjekt', () => {

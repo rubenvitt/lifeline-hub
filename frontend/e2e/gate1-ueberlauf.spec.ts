@@ -510,6 +510,32 @@ test('Gate 1: keine tragende Route läuft auf 1366, 1024 oder 390 px waagerecht 
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Gate1 ${Date.now()}`);
   await seedeUeberlaufstoff(page, einsatzId);
+  // LFH-635: eine Schicht mit absichtlich langem Einheits- und Abschnittsnamen. Eigenes
+  // Seeding, weil die Einheit ihre id für die Schicht liefern muss.
+  {
+    const post = async (pfad: string, data: unknown, was: string) => {
+      const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/${pfad}`, { data });
+      expect(
+        antwort.ok(),
+        `Seeding ${was}: ${antwort.status()} ${await antwort.text()}`,
+      ).toBeTruthy();
+      return (await antwort.json()) as { id: number };
+    };
+    const abschnitt = await post(
+      'abschnitte',
+      { name: 'Deichverteidigung Nordwestring zwischen Kilometer 4,7 und 6,2' },
+      'Abschnitt (Ablösung)',
+    );
+    const einheit = await post(
+      'einheiten',
+      {
+        name: 'Fachgruppe Wasserschaden/Pumpen Ortsverband Musterstadt-Nordwest',
+        abschnitt_id: abschnitt.id,
+      },
+      'Einheit (Ablösung)',
+    );
+    await post('abloesungen', { einheit_id: einheit.id, rhythmus_minuten: 390 }, 'Schicht');
+  }
 
   // Eine Route je Layoutfamilie: Ebene-1-Shell, Lagebild, Modulseite unter dem
   // Einsatz-Workspace, Verwaltung unter dem Admin-Layout. Die vier hängen an
@@ -599,6 +625,14 @@ test('Gate 1: keine tragende Route läuft auf 1366, 1024 oder 390 px waagerecht 
     {
       pfad: `/einsaetze/${einsatzId}/tiere`,
       anker: (p: Page) => p.getByText('Donnerhall-vom-Wiesengrund'),
+    },
+    {
+      // LFH-635: Datenanker ist die Karte der gesäten Schicht, nicht der Seitenkopf.
+      pfad: `/einsaetze/${einsatzId}/abloesung`,
+      anker: (p: Page) =>
+        p.getByRole('article', {
+          name: 'Schicht Fachgruppe Wasserschaden/Pumpen Ortsverband Musterstadt-Nordwest',
+        }),
     },
   ];
 

@@ -1966,7 +1966,7 @@ dependencies = [
 
 [[package]]
 name = "lifeline-hub"
-version = "1.0.0-alpha.32"
+version = "1.0.0-alpha.37"
 dependencies = [
  "anyhow",
  "argon2",
@@ -1974,6 +1974,7 @@ dependencies = [
  "axum-extra",
  "axum-server",
  "chrono",
+ "chrono-tz",
  "clamav-client",
  "clap",
  "fs4",

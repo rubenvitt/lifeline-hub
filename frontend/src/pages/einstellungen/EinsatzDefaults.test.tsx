@@ -1,3 +1,4 @@
+import { QueryClient } from '@tanstack/react-query';
 import { screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
@@ -34,8 +35,10 @@ const VOLL = {
   etb_nummer_praefix: 'EB-',
   meldung_nummer_praefix: 'M-',
   auftrag_nummer_praefix: 'A-',
+  einsatz_nummer_praefix: 'WF-',
   meldung_bestaetigung_frist_min: 30,
   auftrag_quittierung_frist_min: 45,
+  rueckmeldung_frist_min: 25,
   auto_etb_eintraege: 0,
   geocoder_url: 'https://geo.example',
   geaendert_at: null,
@@ -87,11 +90,36 @@ describe('EinsatzDefaults', () => {
         etb_nummer_praefix: 'EB-',
         meldung_nummer_praefix: 'M-',
         auftrag_nummer_praefix: 'A-',
+        einsatz_nummer_praefix: 'WF-',
         meldung_bestaetigung_frist_min: 30,
         auftrag_quittierung_frist_min: 45,
+        rueckmeldung_frist_min: 25,
         auto_etb_eintraege: false,
       }),
     );
+  });
+
+  it('invalidiert nach dem Speichern die Rückmeldungen aller Einsätze, sonst nichts (LFH-610)', async () => {
+    // `new QueryClient()` statt `neuerQueryClient()`: dessen gcTime 0 räumte die
+    // unbeobachteten Einträge beim ersten await weg, die Aussage würde trivial.
+    const client = new QueryClient();
+    // Literale Keys, nicht die Factory — sonst prüfte der Test die Factory gegen sich selbst.
+    client.setQueryData(['einsatz-meldungen', 7, 'rueckmeldungen'], { frist_min: 60 });
+    client.setQueryData(['einsatz-meldungen', 8, 'rueckmeldungen'], { frist_min: 60 });
+    client.setQueryData(['einsatz-meldungen', 7, 'intern'], []);
+    renderMitProviders(<EinsatzDefaults />, { client });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() =>
+      expect(client.getQueryState(['einsatz-meldungen', 7, 'rueckmeldungen'])?.isInvalidated).toBe(
+        true,
+      ),
+    );
+    expect(client.getQueryState(['einsatz-meldungen', 8, 'rueckmeldungen'])?.isInvalidated).toBe(
+      true,
+    );
+    expect(client.getQueryState(['einsatz-meldungen', 7, 'intern'])?.isInvalidated).toBe(false);
   });
 
   it('geleertes Präfix-Feld geht als null raus (nicht "") — trim/leer→null-Semantik', async () => {
@@ -104,6 +132,23 @@ describe('EinsatzDefaults', () => {
     await waitFor(() =>
       expect(speichereOrgEinstellungen).toHaveBeenCalledWith(
         expect.objectContaining({ etb_nummer_praefix: null }),
+      ),
+    );
+  });
+
+  it('LFH-617: das Einsatznummer-Präfix ist editierbar und geht in den PUT', async () => {
+    renderMitProviders(<EinsatzDefaults />);
+
+    const feld = await screen.findByLabelText('Präfix Einsatznummer');
+    expect(feld).toHaveValue('WF-');
+    expect(feld).toHaveAttribute('placeholder', 'E-');
+    await userEvent.clear(feld);
+    await userEvent.type(feld, 'OV-');
+    fireEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() =>
+      expect(speichereOrgEinstellungen).toHaveBeenCalledWith(
+        expect.objectContaining({ einsatz_nummer_praefix: 'OV-' }),
       ),
     );
   });

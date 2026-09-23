@@ -22,6 +22,7 @@ import {
 } from '../einsatz/modulRegistry';
 import { darfVerwaltung } from '../einsatz/schreibrecht';
 import {
+  dokumentePfad,
   einsaetzePfad,
   einsatzModulPfad,
   einsatzPfad,
@@ -103,6 +104,15 @@ export const SCHNELLAKTIONEN: {
     pfad: (id) => stabPfad(id, { neu: true }),
     label: 'Lagebesprechung abschließen',
     schlagworte: ['lagebesprechung', 'entschluss', 'stab', 'führungsvorgang'],
+  },
+  {
+    // LFH-632: ans ENDE, hinter die Lagebesprechung — die Erfassungshäufigkeit einer Ablage
+    // ist nicht gemessen, und eine neue Zeile ordnet die Bestandszeilen nicht um (der
+    // `toEqual`-Pin in `befehle.test.ts` ist Absicht). Leser: `pages/DokumentePage.tsx`.
+    modulKey: 'dokumente',
+    pfad: (id) => dokumentePfad(id, { neu: true }),
+    label: 'Dokument ablegen',
+    schlagworte: ['datei', 'hochladen', 'foto', 'lageplan', 'formular'],
   },
 ];
 

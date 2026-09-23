@@ -24,6 +24,14 @@ export function createZeichnung(
   map: MapLibreMap,
   onFertig: (geometrie: GeoJsonGeometry) => void,
   onBereitschaftAendern: (bereit: boolean) => void = () => {},
+  /**
+   * Präfix der Sources/Layer, die der Adapter auf der Karte anlegt. Auf EINER Karte leben
+   * drei terra-draw-Instanzen (Abschnitt, Zone, Messen); mit dem gemeinsamen Vorgabe-Präfix
+   * „td" legte die zweite `td-polygon` an, solange die erste es noch hielt, und MapLibre warf
+   * „Source … already exists" (gemessen im Browser, Review LFH-616). Jede Instanz trägt
+   * deshalb ihren eigenen.
+   */
+  praefix = 'td-zeichnen',
 ): Zeichnung {
   // Hinweis: terra-draw-maplibre-gl-adapter@1.x nimmt KEIN `lib` — er importiert maplibre-gl gar
   // nicht, sondern duck-typed gegen die übergebene Map-Instanz (sein einziger maplibre-Import ist
@@ -31,7 +39,7 @@ export function createZeichnung(
   // Daher der lose Peer-Range `>=4`, daher kein Dual-Instance-Risiko — und daher überstand er den
   // Sprung auf maplibre 6 unverändert.
   const draw = new TerraDraw({
-    adapter: new TerraDrawMapLibreGLAdapter({ map }),
+    adapter: new TerraDrawMapLibreGLAdapter({ map, prefixId: praefix }),
     modes: [new TerraDrawPolygonMode(), new TerraDrawLineStringMode()],
   });
   const canvas = map.getCanvas();

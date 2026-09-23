@@ -827,7 +827,39 @@ describe('Datensicht · Kartenzweig', () => {
 
     await userEvent.click(knoepfe[0]);
     expect(onKlick).not.toHaveBeenCalled();
+    // Ohne Opt-in bleibt auch der OK-Knopf neutral (Gegenhälfte zu `bestaetigungGefahr`).
+    expect(await screen.findByRole('button', { name: 'OK' })).not.toHaveClass('ant-btn-dangerous');
     await userEvent.click(await screen.findByRole('button', { name: 'OK' }));
+    expect(onKlick).toHaveBeenCalledWith(DREI[0]);
+  });
+
+  it('bestaetigungGefahr färbt NUR den OK-Knopf der Rückfrage rot, der Auslöser bleibt neutral', async () => {
+    // Paar zum Fall darüber: dort bleibt der OK-Knopf ohne Opt-in neutral.
+    setzeViewportBreite(390);
+    const onKlick = vi.fn();
+    const { container } = rendere({
+      karte: {
+        ...karte,
+        aktion: {
+          etikett: 'Entfernen',
+          bestaetigung: 'Wirklich?',
+          bestaetigungGefahr: true,
+          zugaenglicherName: (f) => `${f.funkrufname} entfernen`,
+          onKlick,
+        },
+      },
+    });
+    const ausloeser = screen.getByRole('button', { name: `${DREI[0].funkrufname} entfernen` });
+    expect(ausloeser).not.toHaveClass('ant-btn-dangerous');
+    expect(ausloeser).toHaveTextContent('Entfernen');
+    expect(
+      container.querySelectorAll('[data-lfh="datensicht-karte"] button[aria-label$=" entfernen"]'),
+    ).toHaveLength(3);
+    await userEvent.click(ausloeser);
+    const ok = await screen.findByRole('button', { name: 'OK' });
+    expect(ok).toHaveClass('ant-btn-dangerous');
+    expect(onKlick).not.toHaveBeenCalled();
+    await userEvent.click(ok);
     expect(onKlick).toHaveBeenCalledWith(DREI[0]);
   });
 

@@ -12,6 +12,7 @@ import type { ReactNode, RefObject } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { useBefehle } from './useBefehle';
 import { useDatensatzTreffer } from './useDatensaetze';
+import { useKoordinatenSprung } from './useKoordinatenSprung';
 import { useZuletztBefehle, type BefehlsGedaechtnis } from './useZuletztBefehle';
 import { einsatzIdAusPfad } from './einsatzPfad';
 import { modulAusPfad } from '../einsatz/modulRegistry';
@@ -402,11 +403,21 @@ function PaletteHost({
     navigate: gehZu,
   });
 
+  const koordinatenSprung = useKoordinatenSprung({
+    einsatzId,
+    modus: stand.modus,
+    suche: stand.rest,
+    navigate: gehZu,
+  });
+
   return (
     <CommandPalette
       befehle={befehle}
       datensatzTreffer={datensatzTreffer}
       onSucheEntprellt={melde}
+      // Ausserhalb eines Einsatzes gibt es keine Lagekarte, auf die man springen könnte —
+      // dann auch keinen Fußhinweis (LFH-619).
+      koordinatenSprung={einsatzId == null ? undefined : koordinatenSprung}
       schliesse={schliesse}
     />
   );

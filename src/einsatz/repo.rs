@@ -31,6 +31,18 @@ pub async fn anlegen(
     daten: NeuerEinsatzDaten<'_>,
     ersteller_id: i64,
 ) -> Result<Einsatz, AppError> {
+    anlegen_zum(pool, daten, ersteller_id, chrono::Utc::now()).await
+}
+
+/// [`anlegen`] mit hineingereichtem Zeitpunkt für das Jahr der Einsatznummer — nur damit
+/// die Neujahrsgrenze ohne Uhr-Mock prüfbar ist. `angelegt_at`/`begonnen_at` bleiben
+/// `datetime('now')` der Datenbank.
+pub(crate) async fn anlegen_zum(
+    pool: &SqlitePool,
+    daten: NeuerEinsatzDaten<'_>,
+    ersteller_id: i64,
+    jetzt: chrono::DateTime<chrono::Utc>,
+) -> Result<Einsatz, AppError> {
     // Ein Einsatz gehört zur Organisation SEINES ERSTELLERS (F05/LFH-232). Vorher stand
     // hier `SELECT id FROM organisation ORDER BY id LIMIT 1` („Single-Org in T1") — sobald
     // eine zweite Organisation existiert, wäre jeder ihrer Einsätze in Org 1 gelandet und
@@ -45,32 +57,57 @@ pub async fn anlegen(
         .ok_or_else(|| AppError::Internal("Ersteller nicht gefunden".into()))?;
 
     let einsatz_id = crate::write_retry!(pool, |conn| {
-        // Einsatznummer JJJJ-NNN: NNN je Organisation + Jahr fortlaufend, 3-stellig.
-        // 'JJJJ-' ist 5 Zeichen lang → substr(..., 6) liefert den NNN-Teil.
-        // BEGIN IMMEDIATE (F09) schließt die read-then-write-Lücke zwischen MAX(nr)-Read
-        // und Insert; der Unique-Index sichert zusätzlich ab.
-        let jahr: String = sqlx::query_scalar("SELECT strftime('%Y','now')")
-            .fetch_one(&mut *conn)
-            .await?;
-        let praefix = format!("{jahr}-");
-        let max_nr: Option<i64> = sqlx::query_scalar(
-            "SELECT MAX(CAST(substr(einsatznummer_intern, 6) AS INTEGER)) \
-             FROM einsatz WHERE org_id = ? AND einsatznummer_intern LIKE ?",
+        // Einsatznummer <Präfix><JJJJ>-<NNNN> (LFH-617): NNNN je Organisation + Jahr
+        // fortlaufend über die Zahlenspalten, nicht über die Zerlegung des Textes. Präfix
+        // und Zeitzone kommen aus den Org-Einstellungen; das Präfix wird in den Text
+        // eingefroren, das Jahr zählt in der Org-Zeitzone (sonst Europe/Berlin).
+        // BEGIN IMMEDIATE (F09) schließt die read-then-write-Lücke zwischen MAX-Read und
+        // Insert; der Unique-Index (org_id, nummer_jahr, nummer_lfd) sichert zusätzlich ab.
+        let (praefix, zeitzone): (Option<String>, Option<String>) = sqlx::query_as(
+            "SELECT einsatz_nummer_praefix, zeitzone FROM org_einstellungen WHERE org_id = ?",
         )
         .bind(org_id)
-        .bind(format!("{praefix}%"))
+        .fetch_optional(&mut *conn)
+        .await?
+        .unwrap_or((None, None));
+        let jahr = super::nummer::jahr_in_zone(jetzt, zeitzone.as_deref());
+        let max_lfd: Option<i64> = sqlx::query_scalar(
+            "SELECT MAX(nummer_lfd) FROM einsatz WHERE org_id = ? AND nummer_jahr = ?",
+        )
+        .bind(org_id)
+        .bind(jahr)
         .fetch_one(&mut *conn)
         .await?;
-        let einsatznummer = format!("{praefix}{:03}", max_nr.unwrap_or(0) + 1);
+        // Belegte TEXTE überspringen: ein früher von Hand gesetzter Wert im neuen Muster
+        // (z. B. `E-2026-0005`) trägt keine Zahlen und zählt im MAX nicht mit. Ohne das
+        // Ausweichen schlüge der Text-Index aus 0005 an — bei jedem weiteren Versuch
+        // wieder, denn MAX(nummer_lfd) wüchse nie darüber hinaus. Die Schleife endet, weil
+        // eine Org nur endlich viele Texte hat.
+        let mut lfd = max_lfd.unwrap_or(0) + 1;
+        let einsatznummer = loop {
+            let kandidat = super::nummer::formatiere(praefix.as_deref(), jahr, lfd);
+            let belegt: bool = sqlx::query_scalar(
+                "SELECT EXISTS(SELECT 1 FROM einsatz \
+                 WHERE org_id = ? AND einsatznummer_intern = ?)",
+            )
+            .bind(org_id)
+            .bind(&kandidat)
+            .fetch_one(&mut *conn)
+            .await?;
+            if !belegt {
+                break kandidat;
+            }
+            lfd += 1;
+        };
 
         // COALESCE statt eines zweiten INSERT-Zweigs: `einsatzart` und `begonnen_at`
         // sind NOT NULL mit DB-Default. Ein explizit gebundenes NULL überschriebe den
         // Default und verletzte die Bedingung — COALESCE lässt den Default greifen.
         let einsatz_id: i64 = sqlx::query_scalar(
             "INSERT INTO einsatz (org_id, bezeichnung, stichwort, einsatzart, begonnen_at, \
-                                  einsatznummer_intern, angelegt_at) \
+                                  einsatznummer_intern, nummer_jahr, nummer_lfd, angelegt_at) \
              VALUES (?, ?, ?, COALESCE(?, 'realeinsatz'), COALESCE(?, datetime('now')), ?, \
-                     datetime('now')) RETURNING id",
+                     ?, ?, datetime('now')) RETURNING id",
         )
         .bind(org_id)
         .bind(daten.bezeichnung)
@@ -78,6 +115,8 @@ pub async fn anlegen(
         .bind(daten.einsatzart)
         .bind(daten.begonnen_at)
         .bind(&einsatznummer)
+        .bind(jahr)
+        .bind(lfd)
         .fetch_one(&mut *conn)
         .await?;
 
@@ -627,7 +666,8 @@ pub struct KopfPatch<'a> {
     pub bezeichnung: Option<&'a str>,
     pub stichwort: Option<Option<&'a str>>,
     pub einsatzart: Option<&'a str>,
-    pub einsatznummer_intern: Option<Option<&'a str>>,
+    // Keine `einsatznummer_intern`: die Einsatznummer vergibt das System beim Anlegen und
+    // sie ist danach unveränderlich (LFH-617). Der Handler weist das Feld mit 400 ab.
     pub leitstellen_nr: Option<Option<&'a str>>,
     pub einsatzort: Option<Option<&'a str>>,
     pub einsatzort_lat: Option<Option<f64>>,
@@ -642,11 +682,11 @@ pub struct KopfPatch<'a> {
 }
 
 /// Teil-Patch der editierbaren Kopf-Spalten. Nicht-editierbare Spalten (status,
-/// abgeschlossen_*, angelegt_at, org_id, id) bleiben unberührt. Ein Verstoß gegen den
-/// Einsatznummer-Unique-Index ergibt `Conflict` (409).
+/// abgeschlossen_*, angelegt_at, org_id, id) bleiben unberührt — ebenso die Einsatznummer
+/// (`einsatznummer_intern`, `nummer_jahr`, `nummer_lfd`), die nur `anlegen` schreibt (LFH-617).
 ///
 /// Flag/Wert-Paare mit **nummerierten** Parametern (LFH-266/F12, Vorlage `person/repo.rs`).
-/// Bei dreizehn gleichtypigen Paaren ist die Nummerierung die eigentliche Absicherung: eine um
+/// Bei zwölf gleichtypigen Paaren ist die Nummerierung die eigentliche Absicherung: eine um
 /// eine Position verschobene Bind-Kette vertauschte Nachbarspalten
 /// (`meldende_stelle`↔`sachverhalt`, `einsatzort_lat`↔`einsatzort_lon`) STILL — ohne
 /// Compile- und ohne Laufzeitfehler. Abgesichert von
@@ -661,19 +701,18 @@ pub async fn patche_kopf(
             bezeichnung = CASE WHEN ?1 IS NULL THEN bezeichnung ELSE ?2 END, \
             stichwort = CASE WHEN ?3 IS NULL THEN stichwort ELSE ?4 END, \
             einsatzart = CASE WHEN ?5 IS NULL THEN einsatzart ELSE ?6 END, \
-            einsatznummer_intern = CASE WHEN ?7 IS NULL THEN einsatznummer_intern ELSE ?8 END, \
-            leitstellen_nr = CASE WHEN ?9 IS NULL THEN leitstellen_nr ELSE ?10 END, \
-            einsatzort = CASE WHEN ?11 IS NULL THEN einsatzort ELSE ?12 END, \
-            einsatzort_lat = CASE WHEN ?13 IS NULL THEN einsatzort_lat ELSE ?14 END, \
-            einsatzort_lon = CASE WHEN ?15 IS NULL THEN einsatzort_lon ELSE ?16 END, \
-            meldende_stelle = CASE WHEN ?17 IS NULL THEN meldende_stelle ELSE ?18 END, \
-            sachverhalt = CASE WHEN ?19 IS NULL THEN sachverhalt ELSE ?20 END, \
+            leitstellen_nr = CASE WHEN ?7 IS NULL THEN leitstellen_nr ELSE ?8 END, \
+            einsatzort = CASE WHEN ?9 IS NULL THEN einsatzort ELSE ?10 END, \
+            einsatzort_lat = CASE WHEN ?11 IS NULL THEN einsatzort_lat ELSE ?12 END, \
+            einsatzort_lon = CASE WHEN ?13 IS NULL THEN einsatzort_lon ELSE ?14 END, \
+            meldende_stelle = CASE WHEN ?15 IS NULL THEN meldende_stelle ELSE ?16 END, \
+            sachverhalt = CASE WHEN ?17 IS NULL THEN sachverhalt ELSE ?18 END, \
             anzahl_betroffene_initial = \
-                CASE WHEN ?21 IS NULL THEN anzahl_betroffene_initial ELSE ?22 END, \
-            begonnen_at = CASE WHEN ?23 IS NULL THEN begonnen_at ELSE ?24 END, \
+                CASE WHEN ?19 IS NULL THEN anzahl_betroffene_initial ELSE ?20 END, \
+            begonnen_at = CASE WHEN ?21 IS NULL THEN begonnen_at ELSE ?22 END, \
             naechste_lagebesprechung_at = \
-                CASE WHEN ?25 IS NULL THEN naechste_lagebesprechung_at ELSE ?26 END \
-         WHERE id = ?27",
+                CASE WHEN ?23 IS NULL THEN naechste_lagebesprechung_at ELSE ?24 END \
+         WHERE id = ?25",
     )
     .bind(patch.bezeichnung.map(|_| 1_i64))
     .bind(patch.bezeichnung)
@@ -681,8 +720,6 @@ pub async fn patche_kopf(
     .bind(patch.stichwort.and_then(|v| v))
     .bind(patch.einsatzart.map(|_| 1_i64))
     .bind(patch.einsatzart)
-    .bind(patch.einsatznummer_intern.map(|_| 1_i64))
-    .bind(patch.einsatznummer_intern.and_then(|v| v))
     .bind(patch.leitstellen_nr.map(|_| 1_i64))
     .bind(patch.leitstellen_nr.and_then(|v| v))
     .bind(patch.einsatzort.map(|_| 1_i64))
@@ -705,13 +742,6 @@ pub async fn patche_kopf(
     .execute(pool)
     .await;
 
-    if let Err(sqlx::Error::Database(db_err)) = &ergebnis {
-        if db_err.is_unique_violation() {
-            return Err(AppError::Conflict(
-                "Einsatznummer ist in dieser Organisation bereits vergeben".into(),
-            ));
-        }
-    }
     ergebnis?;
 
     laden(pool, einsatz_id).await
@@ -912,6 +942,91 @@ mod tests {
         )
         .await
         .unwrap();
+    }
+
+    #[tokio::test]
+    async fn schwaerzung_loescht_dokument_samt_anhang_und_haelt_den_etb_nachweis() {
+        // LFH-632, Entscheidung E9: `einsatz_dokument.anhang_id … ON DELETE CASCADE`. Die
+        // Registry löscht `anhang` VOR `einsatz_dokument` (Reihenfolge in `TABELLEN`); mit
+        // RESTRICT/NO ACTION scheiterte der DELETE auf `anhang` am FK und die ganze
+        // Schwärzung rollte zurück. Der ETB-Nachweis bleibt — samt Titel im Wortlaut (G_ETB).
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let einsatz = test_anlegen(&pool, "Lage", None, leit).await.unwrap();
+        abschliessen(&pool, einsatz.id, leit).await.unwrap();
+        sqlx::query("UPDATE einsatz SET geloescht_at = ? WHERE id = ?")
+            .bind("2026-01-01 00:00:00")
+            .bind(einsatz.id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let anhang_id: i64 = sqlx::query_scalar(
+            "INSERT INTO anhang (einsatz_id, dateiname, mime, groesse, sha256, daten, hochgeladen_von) \
+             VALUES (?, 'familie.jpg', 'image/jpeg', 3, 'deadbeef', ?, ?) RETURNING id",
+        )
+        .bind(einsatz.id)
+        .bind(b"ABC".as_slice())
+        .bind(leit)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let inhalt = "Dokument abgelegt: Foto Familie Müller (Foto)";
+        let etb_id: i64 = sqlx::query_scalar(
+            "INSERT INTO etb_eintrag (einsatz_id, lfd_nr, typ, inhalt, erfasser_id, ereigniszeit) \
+             VALUES (?, 1, 'system', ?, ?, datetime('now')) RETURNING id",
+        )
+        .bind(einsatz.id)
+        .bind(inhalt)
+        .bind(leit)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_dokument \
+               (einsatz_id, anhang_id, kategorie, titel, etb_eintrag_id, abgelegt_von_id) \
+             VALUES (?, ?, 'foto', 'Foto Familie Müller', ?, ?)",
+        )
+        .bind(einsatz.id)
+        .bind(anhang_id)
+        .bind(etb_id)
+        .bind(leit)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        assert!(schwaerze_einsatz(&pool, einsatz.id, "2026-02-01 00:00:00")
+            .await
+            .unwrap());
+
+        let zaehle = |sql: &'static str| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_scalar::<_, i64>(sql)
+                    .bind(einsatz.id)
+                    .fetch_one(&pool)
+                    .await
+                    .unwrap()
+            }
+        };
+        assert_eq!(
+            zaehle("SELECT COUNT(*) FROM anhang WHERE einsatz_id = ?").await,
+            0,
+            "Datei weg"
+        );
+        assert_eq!(
+            zaehle("SELECT COUNT(*) FROM einsatz_dokument WHERE einsatz_id = ?").await,
+            0,
+            "Dokument-Zeile weg"
+        );
+        let etb_inhalt: String = sqlx::query_scalar("SELECT inhalt FROM etb_eintrag WHERE id = ?")
+            .bind(etb_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            etb_inhalt, inhalt,
+            "ETB-Nachweis bleibt im Wortlaut (G_ETB), auch der Titel darin"
+        );
     }
 
     #[tokio::test]
@@ -1428,20 +1543,17 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let leit = benutzer_anlegen(&pool, "leit").await;
 
-        let jahr: String = sqlx::query_scalar("SELECT strftime('%Y','now')")
-            .fetch_one(&pool)
-            .await
-            .unwrap();
+        let jahr = crate::einsatz::nummer::jahr_in_zone(chrono::Utc::now(), None);
 
         let a = test_anlegen(&pool, "Lage A", None, leit).await.unwrap();
         let b = test_anlegen(&pool, "Lage B", None, leit).await.unwrap();
         assert_eq!(
             a.einsatznummer_intern.as_deref(),
-            Some(format!("{jahr}-001").as_str())
+            Some(format!("E-{jahr}-0001").as_str())
         );
         assert_eq!(
             b.einsatznummer_intern.as_deref(),
-            Some(format!("{jahr}-002").as_str())
+            Some(format!("E-{jahr}-0002").as_str())
         );
 
         // angelegt_at wurde gesetzt (nicht der '' Default).
@@ -1453,28 +1565,171 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let leit = benutzer_anlegen(&pool, "leit").await; // legt Org id=1 an
 
-        let jahr: String = sqlx::query_scalar("SELECT strftime('%Y','now')")
-            .fetch_one(&pool)
-            .await
-            .unwrap();
+        let jahr = crate::einsatz::nummer::jahr_in_zone(chrono::Utc::now(), None);
 
         // Zweite Organisation mit bereits hoher Nummer — darf Org 1 nicht beeinflussen.
         sqlx::query("INSERT INTO organisation (id, name) VALUES (2, 'Orga 2')")
             .execute(&pool)
             .await
             .unwrap();
-        sqlx::query("INSERT INTO einsatz (org_id, bezeichnung, einsatznummer_intern) VALUES (2, 'Fremd', ?)")
-            .bind(format!("{jahr}-009"))
-            .execute(&pool)
-            .await
-            .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz (org_id, bezeichnung, einsatznummer_intern, nummer_jahr, nummer_lfd) \
+             VALUES (2, 'Fremd', ?, ?, 9)",
+        )
+        .bind(format!("E-{jahr}-0009"))
+        .bind(jahr)
+        .execute(&pool)
+        .await
+        .unwrap();
 
-        // anlegen nutzt Org 1 (ORDER BY id LIMIT 1) → beginnt bei 001.
+        // anlegen nutzt die Org des Erstellers (Org 1) → beginnt bei 0001.
         let a = test_anlegen(&pool, "Lage", None, leit).await.unwrap();
         assert_eq!(
             a.einsatznummer_intern.as_deref(),
-            Some(format!("{jahr}-001").as_str())
+            Some(format!("E-{jahr}-0001").as_str())
         );
+    }
+
+    /// LFH-617: Bestandsnummern `JJJJ-NNN` (von 0115 in die Zahlenspalten übernommen) zählen
+    /// mit — die Zählung setzt dahinter fort, ihr Text bleibt wörtlich. Ein Vorjahr zählt nicht.
+    #[tokio::test]
+    async fn anlegen_setzt_hinter_bestandsnummern_fort() {
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let jahr = crate::einsatz::nummer::jahr_in_zone(chrono::Utc::now(), None);
+
+        for (text, j, lfd) in [
+            (format!("{jahr}-001"), jahr, 1),
+            (format!("{jahr}-003"), jahr, 3),
+            (format!("{}-042", jahr - 1), jahr - 1, 42),
+        ] {
+            sqlx::query(
+                "INSERT INTO einsatz (org_id, bezeichnung, einsatznummer_intern, nummer_jahr, nummer_lfd) \
+                 VALUES (1, 'Bestand', ?, ?, ?)",
+            )
+            .bind(&text)
+            .bind(j)
+            .bind(lfd)
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+
+        let neu = test_anlegen(&pool, "Neu", None, leit).await.unwrap();
+        assert_eq!(
+            neu.einsatznummer_intern.as_deref(),
+            Some(format!("E-{jahr}-0004").as_str())
+        );
+        let bestand: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM einsatz WHERE einsatznummer_intern IN (?, ?)")
+                .bind(format!("{jahr}-001"))
+                .bind(format!("{jahr}-003"))
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(bestand, 2, "Bestandstext bleibt wörtlich");
+    }
+
+    /// LFH-617 (Review): ein früher VON HAND gesetzter Text, der zufällig dem neuen Muster
+    /// entspricht, trägt keine Zahlen (0115 übernimmt nur `JJJJ-NNN`) und zählt nicht mit.
+    /// Ohne Ausweichen entstünde derselbe Text erneut, der Text-Index aus 0005 schlüge an —
+    /// und weil MAX(nummer_lfd) dann nie wächst, bei JEDEM weiteren Versuch: die Org könnte
+    /// in diesem Jahr keinen Einsatz mehr anlegen. Die Vergabe überspringt belegte Texte.
+    #[tokio::test]
+    async fn anlegen_ueberspringt_handbelegten_nummerntext() {
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let jahr = crate::einsatz::nummer::jahr_in_zone(chrono::Utc::now(), None);
+        for text in [format!("E-{jahr}-0001"), format!("E-{jahr}-0002")] {
+            sqlx::query("INSERT INTO einsatz (org_id, bezeichnung, einsatznummer_intern) VALUES (1, 'Hand', ?)")
+                .bind(text)
+                .execute(&pool)
+                .await
+                .unwrap();
+        }
+
+        let a = test_anlegen(&pool, "A", None, leit).await.unwrap();
+        assert_eq!(
+            a.einsatznummer_intern.as_deref(),
+            Some(format!("E-{jahr}-0003").as_str())
+        );
+        let b = test_anlegen(&pool, "B", None, leit).await.unwrap();
+        assert_eq!(
+            b.einsatznummer_intern.as_deref(),
+            Some(format!("E-{jahr}-0004").as_str())
+        );
+    }
+
+    /// LFH-617: das Org-Präfix wird beim Anlegen eingefroren — ein späterer Wechsel trifft
+    /// nur neue Einsätze, die Zählung läuft über den Wechsel hinweg weiter.
+    #[tokio::test]
+    async fn praefixwechsel_trifft_nur_neue_einsaetze() {
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let jahr = crate::einsatz::nummer::jahr_in_zone(chrono::Utc::now(), None);
+
+        let alt = test_anlegen(&pool, "Alt", None, leit).await.unwrap();
+        sqlx::query(
+            "INSERT INTO org_einstellungen (org_id, einsatz_nummer_praefix) VALUES (1, 'WF-')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        let neu = test_anlegen(&pool, "Neu", None, leit).await.unwrap();
+
+        assert_eq!(
+            laden(&pool, alt.id)
+                .await
+                .unwrap()
+                .einsatznummer_intern
+                .as_deref(),
+            Some(format!("E-{jahr}-0001").as_str()),
+            "bestehende Nummer ändert sich nicht"
+        );
+        assert_eq!(
+            neu.einsatznummer_intern.as_deref(),
+            Some(format!("WF-{jahr}-0002").as_str())
+        );
+    }
+
+    /// LFH-617: das Jahr folgt der Org-Zeitzone, nicht UTC. Fester Zeitpunkt in der
+    /// Neujahrsnacht (23:30 UTC = 00:30 MEZ): Berlin zählt schon 2027, eine Org mit
+    /// Zeitzone `UTC` noch 2026. Mit der früheren `strftime`-Vergabe wären beide 2026.
+    #[tokio::test]
+    async fn anlegen_zaehlt_das_jahr_in_der_org_zeitzone() {
+        use chrono::TimeZone;
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let silvester = chrono::Utc
+            .with_ymd_and_hms(2026, 12, 31, 23, 30, 0)
+            .unwrap();
+        let daten = || NeuerEinsatzDaten {
+            bezeichnung: "Neujahr",
+            stichwort: None,
+            einsatzart: None,
+            begonnen_at: None,
+        };
+
+        // Ohne Einstellung: Europe/Berlin.
+        let berlin = anlegen_zum(&pool, daten(), leit, silvester).await.unwrap();
+        assert_eq!(berlin.einsatznummer_intern.as_deref(), Some("E-2027-0001"));
+
+        // Org stellt UTC ein → dieselbe Sekunde gehört noch zu 2026.
+        sqlx::query("INSERT INTO org_einstellungen (org_id, zeitzone) VALUES (1, 'UTC')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let utc = anlegen_zum(&pool, daten(), leit, silvester).await.unwrap();
+        assert_eq!(utc.einsatznummer_intern.as_deref(), Some("E-2026-0001"));
+
+        // Unbekannte Zeitzone (die Einstellung prüft nur „nicht leer“): das Anlegen
+        // gelingt und zählt wie Europe/Berlin.
+        sqlx::query("UPDATE org_einstellungen SET zeitzone = 'Quatsch/Zone' WHERE org_id = 1")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let quatsch = anlegen_zum(&pool, daten(), leit, silvester).await.unwrap();
+        assert_eq!(quatsch.einsatznummer_intern.as_deref(), Some("E-2027-0002"));
     }
 
     /// Migriert aus `aktualisiere_kopf_setzt_felder_und_leere_optionals_null` (LFH-306):
@@ -1496,7 +1751,6 @@ mod tests {
                 bezeichnung: Some("Neu"),
                 stichwort: Some(Some("H1")),
                 einsatzart: Some(crate::einsatz::EINSATZART_UEBUNG),
-                einsatznummer_intern: Some(einsatz.einsatznummer_intern.as_deref()),
                 leitstellen_nr: Some(None),
                 einsatzort: Some(Some("Hauptstraße 1")),
                 einsatzort_lat: Some(Some(52.5)),
@@ -1531,6 +1785,11 @@ mod tests {
         );
         // angelegt_at bleibt unverändert (Audit-Spur).
         assert_eq!(aktualisiert.angelegt_at, einsatz.angelegt_at);
+        // Die Einsatznummer schreibt nur `anlegen` (LFH-617).
+        assert_eq!(
+            aktualisiert.einsatznummer_intern,
+            einsatz.einsatznummer_intern
+        );
     }
 
     /// Der Kern von LFH-306: ein Patch fasst nur die gesendeten Spalten an. Der
@@ -1592,27 +1851,43 @@ mod tests {
         assert_eq!(unveraendert.begonnen_at, "2026-05-25 08:00:00");
     }
 
-    /// Migriert aus `aktualisiere_kopf_doppelte_nummer_ist_conflict` (LFH-306): der 409
-    /// auf den Einsatznummer-Unique-Index überlebt den Umbau auf Flag/Wert-Paare.
+    /// Ersetzt `patche_kopf_doppelte_nummer_ist_conflict`: bis LFH-617 war die Nummer per
+    /// Patch setzbar und ein Duplikat ergab 409. Jetzt kennt `KopfPatch` das Feld nicht
+    /// mehr, und ein Patch anderer Kopffelder lässt Text UND Zahlenspalten stehen.
     #[tokio::test]
-    async fn patche_kopf_doppelte_nummer_ist_conflict() {
+    async fn patche_kopf_laesst_die_einsatznummer_unberuehrt() {
         let pool = crate::db::test_pool().await;
         let leit = benutzer_anlegen(&pool, "leit").await;
         let a = test_anlegen(&pool, "A", None, leit).await.unwrap();
-        let b = test_anlegen(&pool, "B", None, leit).await.unwrap();
+        let vorher: (Option<String>, Option<i64>, Option<i64>) = sqlx::query_as(
+            "SELECT einsatznummer_intern, nummer_jahr, nummer_lfd FROM einsatz WHERE id = ?",
+        )
+        .bind(a.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
 
-        // b auf a's Nummer setzen → Unique-Verstoß → Conflict.
-        let err = patche_kopf(
+        patche_kopf(
             &pool,
-            b.id,
+            a.id,
             KopfPatch {
-                einsatznummer_intern: Some(a.einsatznummer_intern.as_deref()),
+                bezeichnung: Some("A2"),
+                leitstellen_nr: Some(Some("LS-1")),
                 ..Default::default()
             },
         )
         .await
-        .unwrap_err();
-        assert!(matches!(err, AppError::Conflict(_)));
+        .unwrap();
+
+        let nachher: (Option<String>, Option<i64>, Option<i64>) = sqlx::query_as(
+            "SELECT einsatznummer_intern, nummer_jahr, nummer_lfd FROM einsatz WHERE id = ?",
+        )
+        .bind(a.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(nachher, vorher);
+        assert!(vorher.0.is_some() && vorher.1.is_some() && vorher.2 == Some(1));
     }
 
     #[tokio::test]

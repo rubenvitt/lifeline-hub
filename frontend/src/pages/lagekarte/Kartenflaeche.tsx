@@ -38,6 +38,8 @@ import type { TzProps } from './taktischesZeichen';
 import type { GeoJsonPolygon, GeoJsonGeometry } from './geo';
 import { werteFachebenenKlickAus } from './geo';
 import { createZeichnung, type Zeichnung, type ZeichenModus } from './zeichnen';
+import { createMessung, type MessZeichnung } from './messZeichnung';
+import type { MessForm, MessGeometrie } from './messung';
 import { wendeKartenDatenAn } from './kartenDaten';
 import { absolutiereProxyAnfrage } from './basemapStil';
 import { neuerStilFehlerWaechter } from './stilFehlerWaechter';
@@ -175,6 +177,10 @@ export interface KartenflaecheProps {
   onZeichnenBereitAenderung?: (bereit: boolean) => void;
   /** Klick auf eine Zone → Inspector. */
   onZoneKlick?: (id: number) => void;
+  /** Messwerkzeug (LFH-616): aktive Form oder `null`. */
+  messen?: MessForm | null;
+  /** Laufender bzw. abgeschlossener Messentwurf; `null` = nichts gesetzt. */
+  onMessung?: (geometrie: MessGeometrie | null, fertig: boolean) => void;
   /** Aktive Fachebenen mit Daten (externe Overlays). */
   fachebenen?: AktiveFachebene[];
   /** Bild-Hintergründe (Overlays über der Basemap, unter Abschnitten/Zonen/Markern). */
@@ -216,6 +222,10 @@ export interface KartenHandle {
   zoneAbschliessen(): boolean;
   /** Aktives Abschnitt-Zeichnen abschließen. No-op, wenn nicht aktiv. */
   abschnittAbschliessen(): boolean;
+  /** Laufende Messung abschließen (LFH-616); false bei zu wenigen Punkten. */
+  messungAbschliessen(): boolean;
+  /** Messung verwerfen und in derselben Form neu beginnen. */
+  neuMessen(): void;
   /** Eine Zoomstufe hinein/heraus — die Knöpfe der Überlagerung ersetzen `NavigationControl`. */
   zoomRein(): void;
   zoomRaus(): void;
@@ -241,6 +251,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     zoneZeichnenNonce,
     onZoneGezeichnet,
     onZoneKlick,
+    messen,
+    onMessung,
     onZeichnenBereitAenderung,
     fachebenen,
     onBboxAenderung,
@@ -317,6 +329,13 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
   onZoneGezeichnetRef.current = onZoneGezeichnet;
   const onZeichnenBereitAenderungRef = useRef(onZeichnenBereitAenderung);
   onZeichnenBereitAenderungRef.current = onZeichnenBereitAenderung;
+  // Dritter Controller: Messen (LFH-616). Eigene Instanz, weil er bei jeder Änderung meldet
+  // statt erst beim Abschluss — Begründung in `messZeichnung.ts`.
+  const messRef = useRef<MessZeichnung | null>(null);
+  const onMessungRef = useRef(onMessung);
+  onMessungRef.current = onMessung;
+  const messenRef = useRef(messen);
+  messenRef.current = messen;
 
   // Imperative API für die Page: Upload-Platzierung (Viewport-Mitte, Bild-Seitenverhältnis)
   // und Auf-Bild-Zentrieren. Pixel-Raum via project/unproject → exakt, ohne cos(lat)-Verzerrung.
@@ -347,6 +366,13 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       },
       abschnittAbschliessen() {
         return drawRef.current?.abschliessen() ?? false;
+      },
+      messungAbschliessen() {
+        return messRef.current?.abschliessen() ?? false;
+      },
+      neuMessen() {
+        const form = messenRef.current;
+        if (form) messRef.current?.starten(form);
       },
       zoomRein() {
         mapRef.current?.zoomIn();
@@ -508,7 +534,20 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     schliesseSpiderRef.current?.(); // setStyle wischt Spider-Sources/Layer → Controller-State sonst stale
     angewandterStyleRef.current = style;
     stilWaechterRef.current.stilAngewandt();
+    // Eine laufende Messung überlebt `setStyle` nicht: `diff: false` wirft die Sources des
+    // terra-draw-Adapters mit weg, und der legt sie nicht neu an — die nächste Zeigerbewegung
+    // (`setData`) und spätestens das Beenden (`removeSource`) würfen (Review LFH-616). Die
+    // Messung wird deshalb VOR dem Wechsel geräumt und danach in derselben Form neu begonnen;
+    // der Messwert ist ein Blick, kein Entwurf, sein Verlust beim Kartenwechsel ist hinnehmbar.
+    const messForm = messenRef.current;
+    if (messForm) messRef.current?.stoppen();
     map.setStyle(style, { diff: false });
+    if (messForm) {
+      map.once('style.load', () => {
+        const noch = messenRef.current;
+        if (noch && messRef.current) messRef.current.starten(noch);
+      });
+    }
     planeReAnlegenNachStyle(
       map,
       () => flaechenDatenRef.current,
@@ -1033,6 +1072,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
             if (g.type === 'Polygon') onFlaecheGezeichnetRef.current?.(g);
           },
           (bereit) => onZeichnenBereitAenderungRef.current?.(bereit),
+          'td-abschnitt',
         );
       }
       drawRef.current.starten('polygon');
@@ -1051,6 +1091,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
           map,
           (g) => onZoneGezeichnetRef.current?.(g),
           (bereit) => onZeichnenBereitAenderungRef.current?.(bereit),
+          'td-zone',
         );
       }
       zoneDrawRef.current.starten(zoneZeichnen);
@@ -1061,6 +1102,20 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     // gleich bleibendem Modus (Zone→Zone-Wechsel), damit starten() einen offenen Entwurf verwirft.
   }, [zoneZeichnen, zoneZeichnenNonce]);
 
+  // Messen an-/abschalten bzw. die Form wechseln; `starten` verwirft dabei die alte Figur.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (messen) {
+      if (!messRef.current) {
+        messRef.current = createMessung(map, (g, fertig) => onMessungRef.current?.(g, fertig));
+      }
+      messRef.current.starten(messen);
+    } else if (messRef.current) {
+      messRef.current.stoppen();
+    }
+  }, [messen]);
+
   // Controller bei Unmount sauber zerstören.
   useEffect(
     () => () => {
@@ -1068,6 +1123,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       drawRef.current = null;
       zoneDrawRef.current?.zerstoeren();
       zoneDrawRef.current = null;
+      messRef.current?.zerstoeren();
+      messRef.current = null;
     },
     [],
   );

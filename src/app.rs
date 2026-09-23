@@ -161,6 +161,7 @@ pub fn build_router(state: AppState) -> Router {
         )
         .route("/api/einsaetze/{id}/etb", get(routes::etb::liste))
         .route("/api/einsaetze/{id}/etb/zaehler", get(routes::etb::zaehler))
+        .route("/api/einsaetze/{id}/etb/anzahl", get(routes::etb::anzahl))
         .route(
             "/api/einsaetze/{id}/etb/lesemarke",
             get(routes::etb::lesemarke).post(routes::etb::lesemarke_setzen),
@@ -227,6 +228,24 @@ pub fn build_router(state: AppState) -> Router {
                     MAX_GLEICHZEITIGE_ASSET_DOWNLOADS,
                 )),
         )
+        // Dokumentenablage (LFH-632): eigener Präfix mit Modul-Gate; Upload/Download wie Anhänge
+        // mit Body-Limit und Download-Concurrency-Cap.
+        .route(
+            "/api/einsaetze/{id}/dokumente",
+            get(routes::dokument::liste)
+                .post(routes::dokument::ablegen)
+                .layer(DefaultBodyLimit::max(26 * 1024 * 1024)),
+        )
+        .route(
+            "/api/einsaetze/{id}/dokumente/{did}",
+            delete(routes::dokument::entfernen),
+        )
+        .route(
+            "/api/einsaetze/{id}/dokumente/{did}/datei",
+            get(routes::dokument::datei).layer(ConcurrencyLimitLayer::new(
+                MAX_GLEICHZEITIGE_ASSET_DOWNLOADS,
+            )),
+        )
         .route(
             "/api/einsaetze/{id}/erinnerungen",
             get(routes::erinnerung::liste),
@@ -281,6 +300,32 @@ pub fn build_router(state: AppState) -> Router {
             get(routes::pegel::vorhersage_lesen),
         )
         // Stab (LFH-46): Führungsorganisation S1–S6. Flache Kette wie die Nachbarn.
+        // Ablösung (LFH-635). `vorgaben` vor `{aid}` ist für axum egal (statisches Segment
+        // schlägt Parameter), steht aber zur Lesbarkeit zuerst.
+        .route(
+            "/api/einsaetze/{id}/abloesungen",
+            get(routes::abloesung::liste).post(routes::abloesung::beginnen),
+        )
+        .route(
+            "/api/einsaetze/{id}/abloesungen/vorgaben",
+            get(routes::abloesung::vorgaben),
+        )
+        .route(
+            "/api/einsaetze/{id}/abloesungen/vorgaben/{abschnitt_id}",
+            put(routes::abloesung::vorgabe_setzen),
+        )
+        .route(
+            "/api/einsaetze/{id}/abloesungen/{aid}",
+            patch(routes::abloesung::aendern),
+        )
+        .route(
+            "/api/einsaetze/{id}/abloesungen/{aid}/vollzug",
+            post(routes::abloesung::vollziehen),
+        )
+        .route(
+            "/api/einsaetze/{id}/abloesungen/{aid}/vollzug/zuruecknehmen",
+            post(routes::abloesung::zuruecknehmen),
+        )
         .route("/api/einsaetze/{id}/stab", get(routes::stab::laden))
         .route(
             "/api/einsaetze/{id}/stab/besetzung/{sachgebiet}",
@@ -292,6 +337,10 @@ pub fn build_router(state: AppState) -> Router {
                 .post(routes::stab::lagebesprechung_abschliessen),
         )
         .route("/api/einsaetze/{id}/meldungen", get(routes::meldung::liste))
+        .route(
+            "/api/einsaetze/{id}/meldungen/rueckmeldungen",
+            get(routes::meldung::rueckmeldungen),
+        )
         .route(
             "/api/einsaetze/{id}/meldungen",
             post(routes::meldung::anlegen),

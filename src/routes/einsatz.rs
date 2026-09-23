@@ -229,6 +229,7 @@ pub struct EinstellungenUpdate {
     pub auftrag_nummer_start: Option<i64>,
     pub meldung_bestaetigung_frist_min: Option<i64>,
     pub auftrag_quittierung_frist_min: Option<i64>,
+    pub rueckmeldung_frist_min: Option<i64>,
     /// Auto-ETB-Dual-Publish: `false` schaltet ab (gespeichert als 0), `true`/fehlend = an.
     pub auto_etb_eintraege: Option<bool>,
     /// Aufbewahrungs-Dauer-Politik in Tagen (LFH-135); `null`/0 hebt sie auf bzw. ist
@@ -378,6 +379,7 @@ pub async fn einstellungen_setzen(
     for f in [
         req.meldung_bestaetigung_frist_min,
         req.auftrag_quittierung_frist_min,
+        req.rueckmeldung_frist_min,
     ] {
         if let Some(v) = f {
             if !einstellungen::ist_gueltige_frist_min(v) {
@@ -464,6 +466,7 @@ pub async fn einstellungen_setzen(
             auftrag_nummer_start: req.auftrag_nummer_start,
             meldung_bestaetigung_frist_min: req.meldung_bestaetigung_frist_min,
             auftrag_quittierung_frist_min: req.auftrag_quittierung_frist_min,
+            rueckmeldung_frist_min: req.rueckmeldung_frist_min,
             // bool → 0/1; None bleibt None (= Default an).
             auto_etb_eintraege: req.auto_etb_eintraege.map(i64::from),
             retention_dauer_tage: req.retention_dauer_tage,
@@ -684,6 +687,9 @@ pub struct KopfdatenPatch {
     #[serde(default, deserialize_with = "support::deserialize_optional_field")]
     pub stichwort: Option<Option<String>>,
     pub einsatzart: Option<String>,
+    /// Nur, um das Feld zu ERKENNEN: die Einsatznummer vergibt das System beim Anlegen, sie
+    /// ist danach unveränderlich (LFH-617). Mit Wert oder `null` im Body → 400. Das Tri-State
+    /// bleibt, damit auch ein `null` nicht als „fehlt“ durchrutscht.
     #[serde(default, deserialize_with = "support::deserialize_optional_field")]
     pub einsatznummer_intern: Option<Option<String>>,
     #[serde(default, deserialize_with = "support::deserialize_optional_field")]
@@ -720,6 +726,14 @@ pub async fn aktualisieren(
     fordere_schreibrecht_oder_admin(&benutzer, rolle)?;
     fordere_aktiv(&einsatz)?;
 
+    // 400, nicht stilles Ignorieren: ein alter Client hielte seine Änderung sonst für
+    // gespeichert. 400 statt 422 — das Feld ist schon für sich unzulässig (LFH-267).
+    if req.einsatznummer_intern.is_some() {
+        return Err(AppError::Validation(
+            "Die Einsatznummer vergibt das System, sie ist nicht änderbar".into(),
+        ));
+    }
+
     // Die drei Pflichtfelder werden NUR geprüft, wenn sie gesendet wurden — sonst wäre
     // jeder Teil-Patch abgelehnt. Vorhanden-aber-leer bleibt 400 (LFH-305).
     let bezeichnung = match req.bezeichnung {
@@ -754,7 +768,6 @@ pub async fn aktualisieren(
     let naechste_lagebesprechung_at = support::trimme_tri(req.naechste_lagebesprechung_at)
         .map(|zeit| zeit.map(|z| crate::etb::normalisiere_zeit(&z)).transpose())
         .transpose()?;
-    let einsatznummer_intern = support::trimme_tri(req.einsatznummer_intern);
     let leitstellen_nr = support::trimme_tri(req.leitstellen_nr);
     let einsatzort = support::trimme_tri(req.einsatzort);
     let meldende_stelle = support::trimme_tri(req.meldende_stelle);
@@ -767,7 +780,6 @@ pub async fn aktualisieren(
             bezeichnung: bezeichnung.as_deref(),
             stichwort: stichwort.as_ref().map(|v| v.as_deref()),
             einsatzart: req.einsatzart.as_deref(),
-            einsatznummer_intern: einsatznummer_intern.as_ref().map(|v| v.as_deref()),
             leitstellen_nr: leitstellen_nr.as_ref().map(|v| v.as_deref()),
             einsatzort: einsatzort.as_ref().map(|v| v.as_deref()),
             einsatzort_lat: req.einsatzort_lat,

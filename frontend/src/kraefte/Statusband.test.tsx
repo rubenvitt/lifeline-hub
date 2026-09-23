@@ -95,4 +95,35 @@ describe('Statusband', () => {
     );
     expect(container.querySelectorAll('[data-lfh="meldebild-bandluecke"]')).toHaveLength(0);
   });
+  it('„keine Rückmeldung" steht als eigene Gruppe, nicht in der FMS-Reihe (LFH-610)', () => {
+    renderMitProviders(
+      <Statusband
+        einheiten={[zelle('s4', 'bedien', 3)]}
+        personal={[]}
+        rueckmeldung={{
+          schluessel: 'rueckmeldung-keine',
+          code: '—',
+          wert: 2,
+          wort: 'keine Rückmeldung',
+          ton: 'alarm',
+        }}
+        zustand="daten"
+      />,
+    );
+    const fms = screen.getByRole('region', { name: 'Einheiten je Status' });
+    expect(within(fms).queryByText('keine Rückmeldung')).toBeNull();
+    const rueck = screen.getByRole('region', { name: 'Einheiten ohne Rückmeldung' });
+    const k = rueck.querySelector('[data-lfh="kennzahl"]') as HTMLElement;
+    expect(k).toHaveAttribute('data-ton', 'alarm');
+    expect(k).toHaveTextContent('—');
+    expect(k).toHaveTextContent('2');
+    expect(k).toHaveTextContent('keine Rückmeldung');
+  });
+
+  it('ohne Kachel keine Rückmeldungsgruppe', () => {
+    renderMitProviders(
+      <Statusband einheiten={[zelle('s4', 'bedien')]} personal={[]} zustand="daten" />,
+    );
+    expect(screen.queryByRole('region', { name: 'Einheiten ohne Rückmeldung' })).toBeNull();
+  });
 });

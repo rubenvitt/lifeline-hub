@@ -167,6 +167,7 @@ export interface BefehlKontext {
 export const GRUPPEN_REIHENFOLGE = [
   'ausgefuehrt',
   'aktionen',
+  'koordinate',
   'datensaetze',
   'schnellaktionen',
   'zuletzt',
@@ -189,8 +190,15 @@ export const GRUPPEN_LABEL: Record<BefehlGruppe, string> = {
   ausgefuehrt: 'Zuletzt ausgeführt',
   aktionen: 'Aktionen',
   /**
-   * Gefundene Datensätze aus den Modullisten (LFH-391 · C1). EINE Gruppe für alle neun
-   * Entitäten, die Modulherkunft steht im Label — neun Gruppen wären neun Überschriften
+   * Der Koordinatensprung (LFH-619, `koordinatenSprung.ts`): höchstens EINE Zeile, und nur
+   * solange die Eingabe die Form einer Koordinate hat. Wie bei `datensaetze` ist der Slot
+   * Formalie — die Zeile entsteht nie in der leeren Startansicht; sichtbar vorn steht sie,
+   * weil sie auf Stufe 0 läuft.
+   */
+  koordinate: 'Koordinate',
+  /**
+   * Gefundene Datensätze aus den Modullisten (LFH-391 · C1). EINE Gruppe für alle zwölf
+   * Entitäten, die Modulherkunft steht im Label — zwölf Gruppen wären zwölf Überschriften
    * für im Schnitt ein bis zwei Zeilen, und bei AKTIVER Suche rendert die Palette seit A3
    * ohnehin flach.
    *
@@ -218,7 +226,8 @@ export const GRUPPEN_LABEL: Record<BefehlGruppe, string> = {
  * Fehlers ist genau die: ein Befehl, der ins Gedächtnis gerät, obwohl er nicht hineingehört,
  * steht dauerhaft und an oberster Stelle da.
  *
- * VIER Gruppen stehen aus VIER verschiedenen Gründen auf `false`:
+ * SECHS Gruppen stehen aus FÜNF verschiedenen Gründen auf `false` (`module` und `zuletzt`
+ * teilen sich einen):
  *
  *  - `module` und `zuletzt`: das IST der Dublettenriegel, und er sitzt an der SCHREIBseite
  *    statt als eigene Filterschleife. Dasselbe Modul steht bereits zweimal in der Liste
@@ -234,6 +243,8 @@ export const GRUPPEN_LABEL: Record<BefehlGruppe, string> = {
  *    stünde „Speichern" da und schriebe etwas anderes. Dazu ist die Gruppe ohnehin die erste
  *    sichtbare der Startansicht — ein Gedächtniseintrag verdoppelte eine Zeile, die eine
  *    Zeile tiefer schon steht.
+ *  - `koordinate` (LFH-619): eine getippte Stelle ist kein wiederkehrender Befehl, und die
+ *    Zeile gibt es nur, solange die Eingabe eine Koordinate ist — im Startzustand nie.
  *  - `ausgefuehrt` selbst: die Kopie merkt sich nicht sich selbst. Ihre `ausfuehren` trägt
  *    die Meldung des ORIGINALS bereits in sich (siehe `befehle.ts`) — ein Griff ins
  *    Gedächtnis rückt den Befehl also sehr wohl nach vorn, nur unter seiner echten ID.
@@ -255,6 +266,9 @@ export const GRUPPEN_LABEL: Record<BefehlGruppe, string> = {
 export const GRUPPE_MERKBAR: Record<BefehlGruppe, boolean> = {
   ausgefuehrt: false,
   aktionen: false,
+  // Eine einmal getippte Stelle ist kein wiederkehrender Befehl — und wie ein Datensatz
+  // entsteht die Zeile nur, solange dieselbe Eingabe steht (LFH-619).
+  koordinate: false,
   datensaetze: false,
   schnellaktionen: true,
   zuletzt: false,
@@ -277,6 +291,7 @@ export const GRUPPE_MERKBAR: Record<BefehlGruppe, boolean> = {
 export const GRUPPE_NUR_ORDNUNG: Record<BefehlGruppe, boolean> = {
   ausgefuehrt: true,
   aktionen: false,
+  koordinate: false,
   datensaetze: false,
   schnellaktionen: false,
   zuletzt: true,
@@ -303,7 +318,7 @@ export const GRUPPE_NUR_ORDNUNG: Record<BefehlGruppe, boolean> = {
  * bekommen KEINEN Wortalias. Der Grund ist derselbe wie bei '>' und trägt hier sogar
  * weiter — ein getipptes „etb" ist ein SUCHBEGRIFF, es steht als Modullabel in der Liste;
  * es zugleich als Moduswechsel zu lesen machte die Eingabe mehrdeutig. Und unerreichbar
- * wird ohne Präfix nichts: der Vorgabemodus durchsucht alle zehn Quellen, die Präfixe
+ * wird ohne Präfix nichts: der Vorgabemodus durchsucht alle vierzehn Quellen, die Präfixe
  * kürzen nur.
  */
 export type PaletteModus = 'alles' | 'aktionen' | 'etb' | 'kraefte';
@@ -359,7 +374,7 @@ export const PALETTE_MODI: Record<PaletteModus, ModusBeschreibung> = {
   etb: {
     praefix: '#',
     gruppen: [],
-    quellen: ['etbNummer', 'etbText'],
+    quellen: ['etbNummer', 'etbText', 'etbAnzahl'],
     hinweis: 'Nur Einsatztagebuch',
     legende: 'sucht im Einsatztagebuch',
   },
@@ -390,7 +405,7 @@ export const PALETTE_MODI: Record<PaletteModus, ModusBeschreibung> = {
  * Nach unten begrenzt es der Zahlenzweig: die kürzeste gedruckte Kennung im System ist
  * zweistellig, mit N = 3 wäre „42 findet die Person 42" unerfüllbar. Nach oben begrenzt es
  * die Selektivität: ein einzelnes Zeichen ist keine Anfrage, es trifft in einer
- * MANV-Personenliste alles und kostet zehn Abrufe für null Aussage.
+ * MANV-Personenliste alles und kostet ein Dutzend Abrufe für null Aussage.
  *
  * HIER und nicht in `useDatensaetze.ts`, weil die Palette die Zahl selbst braucht: bei
  * einem einzelnen Zeichen im Datensatz-Modus ist die Liste per Konstruktion leer, und ein
@@ -407,14 +422,15 @@ export function modusZeigtDatensaetze(modus: PaletteModus): boolean {
 /**
  * Quelle → Modulschlüssel der LESEACHSE (`istModulFreigegeben`).
  *
- * NEUN MODULE, ZEHN QUELLEN: 'Kräfte' zerfällt in `fahrzeuge`, `personal` und `einheiten`,
- * die in der `modulRegistry` drei getrennte Einträge mit eigener Sichtbarkeits- und
- * Rollenschranke sind — ein Sammelbegriff wäre eine vierte, erfundene Achse. Die beiden
- * ETB-Zweige teilen sich denselben Schlüssel: ein Modul, zwei Abfragewege.
+ * ZWÖLF MODULE, VIERZEHN QUELLEN (seit LFH-619): 'Kräfte' zerfällt in `fahrzeuge`,
+ * `personal` und `einheiten`, die in der `modulRegistry` drei getrennte Einträge mit eigener
+ * Sichtbarkeits- und Rollenschranke sind — ein Sammelbegriff wäre eine vierte, erfundene
+ * Achse. Die drei ETB-Zweige (Nummer, Volltext, Zählung) teilen sich denselben Schlüssel: ein
+ * Modul, drei Abfragewege.
  *
  * HIER und nicht neben den Abrufen (C2 hatte sie dort), weil der REINE Kern sie ebenfalls
  * braucht: er darf `useDatensaetze.ts` nicht importieren, das zöge react-query und die
- * neun API-Clients in eine Datei, die ohne Netz prüfbar sein soll. Zwei Kopien wären zwei
+ * zwölf API-Clients in eine Datei, die ohne Netz prüfbar sein soll. Zwei Kopien wären zwei
  * Zuordnungen, die auseinanderlaufen, ohne dass ein Test es sieht — der Kern filterte dann
  * nach einem anderen Modul als der Abruf.
  */
@@ -429,4 +445,10 @@ export const QUELLE_MODUL = {
   einheiten: 'einheiten',
   etbNummer: 'etb',
   etbText: 'etb',
+  etbAnzahl: 'etb',
+  // LFH-619. `gefahrenzonen` ist der Registry-Schlüssel des Moduls „Gefahren" — die
+  // Gefahrengebiete wohnen dort, nicht unter einem eigenen Schlüssel.
+  lageberichte: 'lageberichte',
+  gefahrengebiete: 'gefahrenzonen',
+  abschnitte: 'einsatzabschnitte',
 } as const satisfies Record<DatensatzQuelle, string>;

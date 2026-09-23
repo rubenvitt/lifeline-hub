@@ -33,7 +33,7 @@ afterEach(() => {
 });
 
 describe('useModulZaehler (LFH-612)', () => {
-  it('liest EINE Zählantwort und lädt keine Modullisten', async () => {
+  it('liest EINE Zählantwort und lädt keine Listen der Servermodule', async () => {
     server.events.on('request:start', merke);
     server.use(
       http.get('/api/einsaetze/7/modul-zaehler', () =>
@@ -51,8 +51,15 @@ describe('useModulZaehler (LFH-612)', () => {
     expect(result.current.meldungen?.beschreibung).toBe('3 offene Meldungen, davon 1 ungesehen');
     // Ein fehlendes Feld bleibt fehlend — keine erfundene 0.
     expect(result.current.auftraege).toBeUndefined();
-    // Genau die eine Abfrage — die vier Listen, aus denen der Rahmen vorher zählte, nie.
-    expect(angefragt).toEqual(['/api/einsaetze/7/modul-zaehler']);
+    // Genau die eine Zählabfrage für die acht Serverquellen — die Listen, aus denen der Rahmen
+    // vorher zählte, nie. Dazu kommen nur die zwei Browser-Zähler (LFH-632, LFH-635), die
+    // ihre eigene Modulliste lesen und nicht in der Serverantwort stehen.
+    await waitFor(() => expect(angefragt).toHaveLength(3));
+    expect([...angefragt].sort()).toEqual([
+      '/api/einsaetze/7/abloesungen',
+      '/api/einsaetze/7/dokumente',
+      '/api/einsaetze/7/modul-zaehler',
+    ]);
   });
 
   it('zeigt keinen Zähler an einem Modul, das der Rahmen ausblendet', async () => {

@@ -55,6 +55,8 @@ const EINSATZ = 1;
 let zaehler: Record<string, number>;
 /** Angefragte ETB-Adressen; die Fragezeichenkette IST die Aussage des Cursor-Tests. */
 let etbAdressen: URL[];
+/** Angefragte Zähl-Adressen des ETB-Sammeltreffers (LFH-619). */
+let anzahlAdressen: URL[];
 /** Sichtbarkeits-Overrides, die der Handler ausliefert — je Test gesetzt. */
 let overrides: Record<string, object>;
 
@@ -77,6 +79,7 @@ const FAHRZEUG = { id: 3, einsatz_id: EINSATZ, funkrufname: 'Florian 42' };
 beforeEach(() => {
   zaehler = {};
   etbAdressen = [];
+  anzahlAdressen = [];
   overrides = {};
   server.use(
     http.get('/api/einsaetze/:id/modul-overrides', () => {
@@ -91,6 +94,14 @@ beforeEach(() => {
     http.get('/api/einsaetze/:id/fahrzeuge', json('fahrzeuge', [FAHRZEUG])),
     http.get('/api/einsaetze/:id/personal', json('personal', [])),
     http.get('/api/einsaetze/:id/einheiten', json('einheiten', [])),
+    http.get('/api/einsaetze/:id/lageberichte', json('lageberichte', [])),
+    http.get('/api/einsaetze/:id/gefahrengebiete', json('gefahrengebiete', [])),
+    http.get('/api/einsaetze/:id/abschnitte', json('abschnitte', [])),
+    http.get('/api/einsaetze/:id/etb/anzahl', ({ request }) => {
+      zaehler['etb-anzahl'] = (zaehler['etb-anzahl'] ?? 0) + 1;
+      anzahlAdressen.push(new URL(request.url));
+      return HttpResponse.json({ anzahl: 31 });
+    }),
     http.get('/api/einsaetze/:id/etb', ({ request }) => {
       zaehler.etb = (zaehler.etb ?? 0) + 1;
       etbAdressen.push(new URL(request.url));
@@ -415,7 +426,8 @@ describe('useDatensaetze — die zwei Datensatz-Modi (LFH-391 · C3)', () => {
     await waitFor(() => expect(zaehler.etb).toBe(1));
     await ruhe();
 
-    expect(Object.keys(zaehler).sort()).toEqual(['etb', 'modul-overrides']);
+    // Der Sammeltreffer (LFH-619) gehört zum ETB und kommt deshalb unter „#" mit.
+    expect(Object.keys(zaehler).sort()).toEqual(['etb', 'etb-anzahl', 'modul-overrides']);
   });
 
   /**
@@ -440,5 +452,43 @@ describe('useDatensaetze — die zwei Datensatz-Modi (LFH-391 · C3)', () => {
       [],
     );
     expect(zaehler.schaeden, 'aber sie fragt nicht erneut').toBe(1);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('useDatensaetze — weitere Quellen und ETB-Zählung (LFH-619)', () => {
+  it('holt ohne Präfix auch Lageberichte, Gefahrengebiete und Abschnitte', async () => {
+    const { result } = starte({ suche: 'deich' });
+    await waitFor(() => expect(zaehler.abschnitte).toBe(1));
+    expect(zaehler.lageberichte).toBe(1);
+    expect(zaehler.gefahrengebiete).toBe(1);
+    await waitFor(() => expect(result.current.abschnitte).toEqual([]));
+  });
+
+  it('zählt den Volltext mit demselben q, ohne limit', async () => {
+    const { result } = starte({ suche: 'deich' });
+    await waitFor(() => expect(anzahlAdressen).toHaveLength(1));
+    const p = anzahlAdressen[0].searchParams;
+    expect(p.get('q')).toBe('deich');
+    expect(p.get('limit')).toBeNull();
+    await waitFor(() => expect(result.current.etbAnzahl).toEqual({ anzahl: 31 }));
+  });
+
+  it('zählt nicht bei einer Nummer und nicht bei rein nicht-alphanumerischer Eingabe', async () => {
+    // Paar: die Personenliste belegt, dass überhaupt etwas lief.
+    const { rerender } = starte({ suche: '42' });
+    await waitFor(() => expect(zaehler.personen).toBe(1));
+    rerender({ suche: '??' });
+    await ruhe();
+    expect(zaehler['etb-anzahl']).toBeUndefined();
+  });
+
+  it('unter „@" weder Zählung noch Führungsunterlagen', async () => {
+    starte({ suche: 'deich', modus: 'kraefte' });
+    await waitFor(() => expect(zaehler.einheiten).toBe(1));
+    await ruhe();
+    for (const k of ['etb-anzahl', 'lageberichte', 'gefahrengebiete', 'abschnitte']) {
+      expect(zaehler[k], k).toBeUndefined();
+    }
   });
 });

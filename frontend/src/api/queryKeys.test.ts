@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { ZAEHLER_LISTEN_KEYS } from '../einsatz/useModulZaehler';
-import { EINSATZ_KEYS, EINSATZ_STREAM_EVENTS, einsatzKeys } from './queryKeys';
+import {
+  EINSATZ_KEYS,
+  EINSATZ_STREAM_EVENTS,
+  einsatzKeys,
+  istRueckmeldungenKey,
+} from './queryKeys';
 
 // LFH-122: Das deklarative Event→Keys-Registry ist die EINE Quelle, aus der
 // useEinsatzLiveStream Listener, Invalidierung und den lagged-Vollabgleich ableitet.
@@ -20,6 +25,10 @@ describe('EINSATZ_KEYS', () => {
     // Request. Der Byte-Pin ist die einzige Stelle, die das bemerkt.
     expect(EINSATZ_KEYS.stab).toBe('einsatz-stab');
     expect(EINSATZ_KEYS.modulZaehler).toBe('einsatz-modul-zaehler');
+    // LFH-632: ebenfalls als Literal gepinnt.
+    expect(EINSATZ_KEYS.dokumente).toBe('einsatz-dokumente');
+    // LFH-635: handgeschriebenes Literal, nicht über EINSATZ_KEYS.
+    expect(EINSATZ_KEYS.abloesungen).toBe('einsatz-abloesungen');
   });
 });
 
@@ -54,7 +63,7 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
     ]);
   });
 
-  it('bildet einheit auf den ×5-Fan-out in exakter Reihenfolge ab', () => {
+  it('bildet einheit auf den ×6-Fan-out in exakter Reihenfolge ab', () => {
     expect(EINSATZ_STREAM_EVENTS.einheit).toEqual([
       EINSATZ_KEYS.einheiten,
       EINSATZ_KEYS.fuehrungskraefte,
@@ -62,6 +71,8 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
       EINSATZ_KEYS.fahrzeuge,
       EINSATZ_KEYS.material,
       EINSATZ_KEYS.modulZaehler,
+      // LFH-635: Einheitsname und Auflösung wirken auf die Ablösungsschichten.
+      EINSATZ_KEYS.abloesungen,
     ]);
   });
 
@@ -167,6 +178,7 @@ describe('einsatzKeys (Factory-Output)', () => {
     expect(einsatzKeys.nachforderungen(1)).toEqual(['einsatz-nachforderungen', 1]);
     expect(einsatzKeys.etb(1)).toEqual(['etb', 1]);
     expect(einsatzKeys.stab(1)).toEqual(['einsatz-stab', 1]);
+    expect(einsatzKeys.dokumente(1)).toEqual(['einsatz-dokumente', 1]);
     expect(einsatzKeys.pegel(1)).toEqual(['einsatz-pegel', 1]);
     expect(einsatzKeys.pegelVorhersage(1, 7)).toEqual(['einsatz-pegel', 1, 'vorhersage', 7]);
   });
@@ -219,6 +231,15 @@ describe('einsatzKeys (Factory-Output)', () => {
     // LFH-543: Sub-Key UNTER dem Stab-Prefix — das `stab`-Ereignis invalidiert ihn mit.
     // Als Literal gepinnt: ein geänderter Key bricht nichts, er trifft still ein anderes Fach.
     expect(einsatzKeys.stabLagebesprechungen(1)).toEqual(['einsatz-stab', 1, 'lagebesprechungen']);
+    // LFH-635: Liste und Vorgaben UNTER dem Ablösungs-Prefix — das `abloesung`-Ereignis trifft beide.
+    expect(einsatzKeys.abloesungen(1)).toEqual(['einsatz-abloesungen', 1]);
+    expect(einsatzKeys.abloesungListe(1, 'laufend')).toEqual([
+      'einsatz-abloesungen',
+      1,
+      'liste',
+      'laufend',
+    ]);
+    expect(einsatzKeys.abloesungVorgaben(1)).toEqual(['einsatz-abloesungen', 1, 'vorgaben']);
     expect(einsatzKeys.etbListe(1, { typ: 'x' })).toEqual(['etb', 1, { typ: 'x' }]);
     // LFH-611: Lesemarke UNTER dem ETB-Prefix — das `etb`-Ereignis invalidiert sie mit.
     expect(einsatzKeys.etbLesemarke(1)).toEqual(['etb', 1, 'lesemarke']);
@@ -251,5 +272,19 @@ describe('einsatzKeys (Factory-Output)', () => {
     for (const prefix of Object.values(EINSATZ_KEYS)) {
       expect(abgedeckt, `kein Factory-Eintrag für Prefix ${prefix}`).toContain(prefix);
     }
+  });
+});
+
+describe('istRueckmeldungenKey (LFH-610)', () => {
+  it('trifft die Rückmeldungen jedes Einsatzes, aber keine Meldungsliste', () => {
+    expect(istRueckmeldungenKey(['einsatz-meldungen', 7, 'rueckmeldungen'])).toBe(true);
+    expect(istRueckmeldungenKey(['einsatz-meldungen', 7, 'intern'])).toBe(false);
+    expect(istRueckmeldungenKey(['einsatz-meldungen', 7])).toBe(false);
+    expect(istRueckmeldungenKey(['einsatz-auftraege', 7, 'rueckmeldungen'])).toBe(false);
+    expect(einsatzKeys.meldungenRueckmeldungen(7)).toEqual([
+      'einsatz-meldungen',
+      7,
+      'rueckmeldungen',
+    ]);
   });
 });
