@@ -339,7 +339,10 @@ function GesperrteEbenenZeile({ zeile, grund }: { zeile: EbenenZeile; grund: str
         cursor: 'not-allowed',
         background: 'transparent',
         borderBlockEnd: `1px solid ${rollen.flaeche3}`,
-        color: rollen.schwach,
+        // `text2`, nicht `schwach`: der Grund ist die Aussage der Zeile und muss im Tagmodus
+        // 7 : 1 halten (Prüfliste Kriterium 5; `schwach` auf `paneel` misst dort 5,8 : 1).
+        // Gesperrt sagt das Schloss und das Wort, nicht eine blassere Schrift.
+        color: rollen.text2,
       }}
     >
       <span
@@ -352,6 +355,7 @@ function GesperrteEbenenZeile({ zeile, grund }: { zeile: EbenenZeile; grund: str
           alignItems: 'center',
           justifyContent: 'center',
           fontSize: 11,
+          color: rollen.schwach,
         }}
       >
         <LockOutlined />

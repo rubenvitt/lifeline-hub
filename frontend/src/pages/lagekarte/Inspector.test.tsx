@@ -551,4 +551,3 @@ describe('Inspector für Betroffene (LFH-648)', () => {
     expect(geloescht.map((m) => m.schluessel)).toEqual(['person-11']);
   });
 });
-

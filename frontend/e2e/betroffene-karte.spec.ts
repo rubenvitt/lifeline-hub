@@ -46,16 +46,19 @@ async function personen(page: Page, einsatzId: number): Promise<PersonZeile[]> {
   return (await antwort.json()) as PersonZeile[];
 }
 
-/** Die Marker-Schlüssel, die die Quelle gerade trägt (Cluster-Punkte haben keinen). */
-async function schluesselInQuelle(page: Page): Promise<string[]> {
-  return page.evaluate(() => {
+/**
+ * Die Marker-Schlüssel, die eine Quelle gerade trägt (Cluster-Punkte haben keinen). Personen
+ * stehen seit LFH-648 in ihrer eigenen Quelle `marker-personen`, auch auf dieser Karte.
+ */
+async function schluesselInQuelle(page: Page, quelle = 'marker-personen'): Promise<string[]> {
+  return page.evaluate((q) => {
     const k = (window as unknown as { __lfhKarte?: MapHaken }).__lfhKarte;
     if (!k || !k.loaded()) return [];
     return k
-      .querySourceFeatures('marker-cluster')
+      .querySourceFeatures(q)
       .map((f) => f.properties?.schluessel)
       .filter((s): s is string => typeof s === 'string');
-  });
+  }, quelle);
 }
 
 test('Betroffene mit Koordinate stehen als Marker auf der Karte, die Lücke wird gezählt', async ({
@@ -118,6 +121,10 @@ test('Betroffene mit Koordinate stehen als Marker auf der Karte, die Lücke wird
     .toEqual(expect.arrayContaining([`person-${mitKoordinate}`, `person-${ausZeile}`]));
   const schluessel = await schluesselInQuelle(page);
   expect(schluessel).not.toContain(`person-${ohneKoordinate}`);
+  // Gegenaussage zur Quellen-Trennung: keine Person in der Kräfte-/Objektquelle.
+  expect(
+    (await schluesselInQuelle(page, 'marker-cluster')).filter((k) => k.startsWith('person-')),
+  ).toEqual([]);
 
   // Die Lücke wird GESAGT: genau die eine Person ohne Koordinate.
   await expect(page.locator('[data-lfh="betroffene-karte-ohne-koordinate"]')).toHaveText(

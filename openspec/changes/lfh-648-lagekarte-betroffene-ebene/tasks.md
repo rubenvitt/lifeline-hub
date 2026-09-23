@@ -104,10 +104,10 @@ dann der Code. Pfade relativ zu `frontend/src/`.
 
 ## 8. Browser-Beleg (e2e)
 
-- [ ] 8.1 `e2e/betroffene-karte.spec.ts` auf die Quelle `marker-personen` umstellen.
+- [x] 8.1 `e2e/betroffene-karte.spec.ts` auf die Quelle `marker-personen` umstellen.
   Verifikation: Der Spec ist grün, und ein Personen-Schlüssel steht nicht in
   `marker-cluster`.
-- [ ] 8.2 Neuer Spec `e2e/lagekarte-betroffene.spec.ts`:
+- [x] 8.2 Neuer Spec `e2e/lagekarte-betroffene.spec.ts`:
   - Als Nicht-Admin: Person mit Koordinate anlegen und Ebene einschalten → Feature in
     `marker-personen`. Mit Override `personen` `sichtbar:false` → kein Feature, keine
     Zeile.
@@ -119,7 +119,7 @@ dann der Code. Pfade relativ zu `frontend/src/`.
 
 ## 9. Abschluss
 
-- [ ] 9.1 Prüfliste Einsatztauglichkeit (15 Kriterien,
+- [x] 9.1 Prüfliste Einsatztauglichkeit (15 Kriterien,
   `docs/superpowers/specs/2026-07-25-bedien-leitlinie-einsatzkontexte.md`) für die
   geänderte Lagekarten-Leiste ausfüllen und im Change ablegen
   (`openspec/changes/lfh-648-lagekarte-betroffene-ebene/pruefliste.md`). Jede Zeile trägt
