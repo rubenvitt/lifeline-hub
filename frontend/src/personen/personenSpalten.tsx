@@ -1,4 +1,4 @@
-import { App, Typography } from 'antd';
+import { Typography } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import StatusTag from '../components/StatusTag';
 import SichtungsTag from '../components/SichtungsTag';
@@ -156,27 +156,59 @@ export interface ZustandBedienung {
  * also kann `patchBody` kein anderes Feld leeren. Kein `basis_geaendert_at`: ein einzelnes
  * Kurzfeld überschreibt bewusst blind (wie die Bemerkung der Kräfte-Listen); ein
  * Konfliktdialog für „gehfähig" wäre Reibung ohne Schutzgut.
+ *
+ * **Laufzustand und Fehler an der Zeile (LFH-650).** Bis dahin rief die Zelle `mutate` ohne
+ * Rückkanal: der neue Wert erschien erst nach der Invalidierung, bei einem vorher leeren Feld
+ * stand bis dahin wieder „Zustand hinzufügen" da, und ein Fehler war ein Toast am oberen Rand,
+ * nach drei Sekunden weg — während der Wert still auf den alten zurücksprang (LFH-613-Prüfliste,
+ * Tabelle 1, Nr. 3 und 9). Jetzt:
+ *
+ * - Während der Mutation zeigt die Zelle den GETIPPTEN Wert mit Ladeanzeige (`variables`).
+ * - `onSuccess` gibt die Invalidierung ZURÜCK: react-query hält `isPending`, bis der neue Stand
+ *   in der Liste steht. Ohne das gäbe es zwischen Antwort und Refetch eine Runde mit dem alten
+ *   Wert — genau das Zurückspringen, das hier weg soll.
+ * - Ein Fehler steht AN DER ZELLE (`data-fehler`, linker Rand aus `colorError`, Satz in
+ *   `alarmText`) nach dem Muster aus LFH-345 · H14/H15, kein Toast. Er geht beim nächsten
+ *   Versuch von selbst (react-query setzt `error` beim Übergang nach `pending` zurück).
  */
 function ZustandSchreiben({ p, einsatzId }: { p: Person; einsatzId: number }) {
   const qc = useQueryClient();
-  const { message } = App.useApp();
+  const { token, rollen } = useRollen();
   const mutation = useMutation({
     mutationFn: (zustand: string) =>
       aktualisierePerson(einsatzId, p.id, { zustand: zustand.trim() === '' ? null : zustand }),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: einsatzKeys.personen(einsatzId) });
-      void qc.invalidateQueries({ queryKey: einsatzKeys.person(einsatzId, p.id) });
-    },
-    onError: (e) => message.error(fehlerText(e, 'Zustand nicht gespeichert')),
+    onSuccess: () =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: einsatzKeys.personen(einsatzId) }),
+        qc.invalidateQueries({ queryKey: einsatzKeys.person(einsatzId, p.id) }),
+      ]),
   });
+  const laeuft = mutation.isPending;
+  const fehler = mutation.isError ? fehlerText(mutation.error, 'Grund unbekannt') : null;
   return (
-    <BemerkungZelle
-      wert={p.zustand}
-      darfSchreiben
-      bezeichnung="Zustand"
-      kennung={registrierAnzeige(p.registrier_nr)}
-      onSpeichern={(wert) => mutation.mutate(wert)}
-    />
+    <div
+      data-lfh="zustand-zelle"
+      data-fehler={fehler ? 'true' : undefined}
+      style={
+        fehler
+          ? { borderInlineStart: `3px solid ${token.colorError}`, paddingInlineStart: token.paddingXS }
+          : undefined
+      }
+    >
+      <BemerkungZelle
+        wert={laeuft ? mutation.variables : p.zustand}
+        laeuft={laeuft}
+        darfSchreiben
+        bezeichnung="Zustand"
+        kennung={registrierAnzeige(p.registrier_nr)}
+        onSpeichern={(wert) => mutation.mutate(wert)}
+      />
+      {fehler && (
+        <div role="alert" style={{ fontSize: 12, color: rollen.alarmText }}>
+          Nicht gespeichert: {fehler}
+        </div>
+      )}
+    </div>
   );
 }
 

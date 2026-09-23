@@ -1,5 +1,6 @@
-import { useLayoutEffect, useRef, useState } from 'react';
-import { Button, Typography } from 'antd';
+import { useId, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { Button, Typography, theme } from 'antd';
+import { EditOutlined } from '@ant-design/icons';
 
 /**
  * Inline bearbeitbare Bemerkung — mit sichtbarer Affordanz im LEEREN Zustand (LFH-369 · B5i).
@@ -56,7 +57,49 @@ import { Button, Typography } from 'antd';
  * antd-`Button` erbt seine Höhe stattdessen vom `ConfigProvider` und schuldet nichts davon.
  * `type="link"` liefert zugleich die Bedienfarbe aus dem Token (`colorLink`, blau) statt
  * eines Hex-Literals — „Rot bedient nichts" (LFH-352/LFH-315).
+ *
+ * ── DER GEFÜLLTE WERT IST SELBST DAS ZIEL (LFH-650) ────────────────────────────────────
+ *
+ * Bis LFH-650 war das Bedienziel am gefüllten Wert antds Stift aus `Typography editable` —
+ * ein Ikonknopf, dessen Fläche keine Dichtestufe kannte, und der Wert daneben blanker Text.
+ * Zwei Befunde der LFH-613-Prüfliste hingen daran: der Stift blieb in jeder Stufe klein
+ * (Gate 3, Nr. 1 · 2), und die Zeile SCHRUMPFTE nach dem ersten Speichern, weil der
+ * Platzhalter-Knopf (`controlHeight`, in `handschuh` 72 px) blankem Text wich (Nr. 12).
+ *
+ * Jetzt ist der Wert ein `Button type="text"` mit Stift-Ikone: dieselbe Bauform wie der
+ * Platzhalter, also dieselbe Höhe in beiden Zuständen und die ganze Zelle als Trefffläche.
+ * `type="text"` statt `link`, weil der Wert Inhalt ist und in der Textfarbe steht — blau
+ * gesetzt läse er sich als Verweis. Der Knopf darf umbrechen (lange Bemerkungen der
+ * Kräfte-Listen), deshalb `height: auto` — und damit schuldet er die ZWEI Angaben eines
+ * handgebauten Bedienziels (LFH-365): {@link wertKnopfStil}, rein und exportiert.
+ *
+ * Der zugängliche NAME bleibt die Aufforderung („Zustand zu R-042 bearbeiten") und der
+ * Wert wird zur BESCHREIBUNG (`aria-describedby`): ein `aria-label` verdeckt den Inhalt,
+ * ohne die Beschreibung hörte man in der Zelle nur noch „bearbeiten".
  */
+
+/**
+ * Stil des gefüllten Wertknopfs. Rein, damit die Zusicherung über zwei Dichtestufen ohne
+ * Rendern prüfbar ist (Muster `bedienzielStil`): `minHeight` aus `controlHeight` trägt den
+ * Boden, die Polsterung den Abstand des umbrechenden Textes zum Rand.
+ */
+export function wertKnopfStil(token: {
+  controlHeight: number;
+  paddingXS: number;
+}): CSSProperties {
+  return {
+    height: 'auto',
+    minHeight: token.controlHeight,
+    paddingBlock: token.paddingXS,
+    maxWidth: '100%',
+    whiteSpace: 'normal',
+    textAlign: 'start',
+    // Der Text beginnt links wie jede andere Zelle; antd zentriert Knopfinhalt.
+    justifyContent: 'flex-start',
+    overflowWrap: 'anywhere',
+  };
+}
+
 export interface BemerkungZelleProps {
   /**
    * Aktueller Wert. `null`/`undefined`/`''` = leer, dann erscheint der Platzhalter.
@@ -92,6 +135,12 @@ export interface BemerkungZelleProps {
    * „Zustand zu R-042 bearbeiten"). Vorgabe „Bemerkung".
    */
   bezeichnung?: string;
+  /**
+   * Ein Schreibvorgang läuft (LFH-650). Der Aufrufer reicht dann den NEUEN Wert als `wert`
+   * — die Zelle zeigt ihn sofort mit Ladeanzeige, statt bis zur Serverantwort den alten
+   * Stand oder den Platzhalter zu zeigen (vorher wirkte die Eingabe verworfen).
+   */
+  laeuft?: boolean;
 }
 
 /** Wortlaut an EINER Stelle — drei Seiten und ihre drei Tests greifen denselben Namen.
@@ -104,10 +153,13 @@ export function BemerkungZelle({
   onSpeichern,
   kennung,
   bezeichnung = 'Bemerkung',
+  laeuft = false,
 }: BemerkungZelleProps) {
   const [bearbeitet, setBearbeitet] = useState(false);
+  const { token } = theme.useToken();
+  const wertId = useId();
+  // EIN Ref für beide Knöpfe: Platzhalter und Wertknopf stehen nie gleichzeitig im Baum.
   const knopfRef = useRef<HTMLButtonElement>(null);
-  const textRef = useRef<HTMLElement>(null);
   const fokusZurueck = useRef(false);
   const gefuellt = !!wert;
 
@@ -115,8 +167,9 @@ export function BemerkungZelle({
    * Fokusrückgabe nach dem Verlassen der Bearbeitung.
    *
    * antd stellt sie selbst her, aber nur auf seinen EIGENEN Stift (`Base/index.js:90-95`) und
-   * nur, solange `Typography.Text` am Baum bleibt. Hier bleibt es das oft nicht — beide Fälle
-   * sind gemessen, und der zweite ist der, den der Betrieb nimmt:
+   * nur, solange `Typography.Text` am Baum bleibt. Hier bleibt es das nie — seit LFH-650
+   * steht `Typography` nur noch WÄHREND der Bearbeitung im Baum, außerhalb trägt ein
+   * eigener Knopf. Beide Fälle sind gemessen, und der zweite ist der, den der Betrieb nimmt:
    *
    * 1. **Abbrechen / leer geblieben:** `Typography` hängt in derselben Runde aus, in der der
    *    Platzhalter zurückkommt. antds Effekt läuft für diesen Wert nie.
@@ -141,9 +194,7 @@ export function BemerkungZelle({
       return;
     }
     if (!fokusZurueck.current) return;
-    const ziel = gefuellt
-      ? textRef.current?.querySelector<HTMLElement>('.ant-typography-edit')
-      : knopfRef.current;
+    const ziel = knopfRef.current;
     if (!ziel) return;
     if (document.activeElement === document.body || document.activeElement === null) ziel.focus();
     else fokusZurueck.current = false;
@@ -156,19 +207,20 @@ export function BemerkungZelle({
    * **gleiche Bedeutung des Leerzustands** (beide Zweige sagen „hier steht nichts"), nicht als
    * gleicher Wortlaut.
    *
-   * Was hier ausdrücklich NICHT behauptet wird, ist gleiche Zeilenhöhe: der Lesezweig gibt
-   * blanken Text zurück, der Schreibzweig einen `Button` mit `controlHeight` und Polsterung —
-   * die sind nicht gleich hoch, und dass beide durch dieselbe Datei laufen, ändert daran
-   * nichts. jsdom rechnet ohnehin kein Layout; wer die Höhen angleichen will, braucht eine
-   * e2e-Messung und eine eigene Entscheidung.
+   * Was hier ausdrücklich NICHT behauptet wird, ist gleiche Zeilenhöhe ZWISCHEN Lese- und
+   * Schreibzweig: der Lesezweig gibt blanken Text zurück, der Schreibzweig einen `Button` mit
+   * `controlHeight` — die sind nicht gleich hoch. INNERHALB des Schreibzweigs sind leer und
+   * gefüllt seit LFH-650 gleich hoch (beide Knöpfe), gemessen in
+   * `e2e/gate3-trefflaeche.spec.ts`.
    */
   if (!darfSchreiben) return <>{wert || '—'}</>;
 
-  if (!gefuellt && !bearbeitet) {
+  if (!bearbeitet && !gefuellt) {
     return (
       <Button
         ref={knopfRef}
         type="link"
+        loading={laeuft}
         // Sichtbar bleibt der kurze Text, der Name trägt die Zeile — sonst wird die Spalte
         // so breit wie die längste Kennung.
         aria-label={kennung ? `${bezeichnung} zu ${kennung} hinzufügen` : undefined}
@@ -179,19 +231,37 @@ export function BemerkungZelle({
     );
   }
 
+  if (!bearbeitet) {
+    return (
+      <Button
+        ref={knopfRef}
+        type="text"
+        // `loading` sperrt zugleich den zweiten Klick, solange der erste noch schreibt, und
+        // ersetzt die Stift-Ikone durch antds Ladeanzeige — der neue Wert steht schon da.
+        loading={laeuft}
+        aria-label={kennung ? `${bezeichnung} zu ${kennung} bearbeiten` : `${bezeichnung} bearbeiten`}
+        aria-describedby={wertId}
+        style={wertKnopfStil(token)}
+        onClick={() => setBearbeitet(true)}
+      >
+        <span id={wertId}>{wert}</span>
+        {/* Ikone ohne eigenes Vorleseziel: `@ant-design/icons` bringt `role="img"` mit
+            englischem Namen („edit") mit (CLAUDE.md, „Ein Emoji ist keine Ikone"). */}
+        {!laeuft && (
+          <span aria-hidden="true" style={{ color: token.colorTextSecondary }}>
+            <EditOutlined />
+          </span>
+        )}
+      </Button>
+    );
+  }
+
   return (
     <Typography.Text
-      ref={textRef}
       editable={{
-        // `editing` KONTROLLIERT: nur so kann der Platzhalter-Knopf die Bearbeitung von
-        // außen öffnen. Dann muss `onStart` mitgeführt werden, sonst öffnet der Stift am
-        // gefüllten Wert nicht mehr — antd ruft im kontrollierten Fall nur noch diesen Weg.
-        editing: bearbeitet,
-        onStart: () => setBearbeitet(true),
-        // `tooltip` ist zugleich der zugängliche Name des Stifts (`Base/index.js:271-283`:
-        // `aria-label` kommt aus `tooltip` oder, ohne eins, aus antds Locale-Vorgabe
-        // „Bearbeiten"). Ohne Kennung bleibt es bei der Vorgabe.
-        tooltip: kennung ? `${bezeichnung} zu ${kennung} bearbeiten` : undefined,
+        // `editing` KONTROLLIERT und hier immer an: außerhalb der Bearbeitung trägt einer der
+        // beiden Knöpfe oben, `Typography` steht nur für das Eingabefeld im Baum.
+        editing: true,
         onChange: (val) => {
           setBearbeitet(false);
           // antd vergleicht NICHT — `onChange` feuert beim Verlassen unbedingt. Ohne diesen

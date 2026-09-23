@@ -281,6 +281,71 @@ describe('Zustand-Spalte (LFH-613)', () => {
     expect(koerper[0]).toEqual({ zustand: 'gehfähig, unterkühlt' });
   });
 
+  it('zeigt während des Speicherns den GETIPPTEN Wert mit Ladeanzeige, nicht wieder den Platzhalter (LFH-650)', async () => {
+    /**
+     * Befund Tabelle 1, Nr. 3 der LFH-613-Prüfliste: bis zur Serverantwort stand bei einem
+     * vorher leeren Feld wieder „Zustand hinzufügen" da — die Eingabe wirkte verworfen. Die
+     * Antwort wird hier festgehalten, damit der Zwischenzustand überhaupt beobachtbar ist.
+     */
+    let freigeben!: () => void;
+    const gehalten = new Promise<void>((r) => (freigeben = r));
+    server.use(
+      http.patch('/api/einsaetze/1/personen/10', async () => {
+        await gehalten;
+        return HttpResponse.json({ ...basis, zustand: 'gehfähig' });
+      }),
+    );
+    renderMitProviders(<>{zelle(mitSchreibrecht, basis)}</>);
+    await userEvent.click(screen.getByRole('button', { name: 'Zustand zu R-001 hinzufügen' }));
+    const feld = screen.getByRole('textbox');
+    await userEvent.type(feld, 'gehfähig');
+    fireEvent.blur(feld);
+
+    const knopf = await screen.findByRole('button', { name: 'Zustand zu R-001 bearbeiten' });
+    expect(knopf).toHaveTextContent('gehfähig');
+    expect(knopf).toHaveClass('ant-btn-loading');
+    expect(screen.queryByRole('button', { name: 'Zustand zu R-001 hinzufügen' })).toBeNull();
+    freigeben();
+  });
+
+  it('meldet einen Fehler AN DER ZELLE statt als Toast, und der nächste Versuch räumt ihn (LFH-650)', async () => {
+    /**
+     * Befund Tabelle 1, Nr. 9: der Fehler war nur `message.error` — am oberen Rand, nach drei
+     * Sekunden weg, während der Wert still auf den alten zurücksprang. Jetzt trägt die Zelle
+     * die Marke (`data-fehler`, Muster LFH-345 · H15) und einen Satz mit Grund. Die zweite
+     * Hälfte ist die Zusicherung, dass die Marke nicht stehen bleibt.
+     */
+    let scheitern = true;
+    server.use(
+      http.patch('/api/einsaetze/1/personen/10', () =>
+        scheitern
+          ? HttpResponse.json({ error: 'Datenbank gesperrt' }, { status: 409 })
+          : HttpResponse.json({ ...basis, zustand: 'gehfähig' }),
+      ),
+    );
+    const { container } = renderMitProviders(<>{zelle(mitSchreibrecht, basis)}</>);
+    await userEvent.click(screen.getByRole('button', { name: 'Zustand zu R-001 hinzufügen' }));
+    await userEvent.type(screen.getByRole('textbox'), 'gehfähig');
+    fireEvent.blur(screen.getByRole('textbox'));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Nicht gespeichert: Datenbank gesperrt',
+    );
+    const zellHuelle = container.querySelector('[data-lfh="zustand-zelle"]')!;
+    expect(zellHuelle).toHaveAttribute('data-fehler', 'true');
+    // Kein Toast mehr: die Meldung steht nirgends in antds Message-Portal.
+    expect(document.querySelector('.ant-message')?.textContent ?? '').not.toContain(
+      'Datenbank gesperrt',
+    );
+
+    scheitern = false;
+    await userEvent.click(screen.getByRole('button', { name: 'Zustand zu R-001 hinzufügen' }));
+    await userEvent.type(screen.getByRole('textbox'), 'gehfähig');
+    fireEvent.blur(screen.getByRole('textbox'));
+    await vi.waitFor(() => expect(zellHuelle).not.toHaveAttribute('data-fehler'));
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
   it('bietet einer VERMISSTEN Person keinen Zustand an — auch mit Schreibrecht', () => {
     renderMitProviders(<>{zelle(mitSchreibrecht, { ...basis, status: 'vermisst' })}</>);
     expect(screen.queryByRole('button', { name: /Zustand zu R-001/ })).toBeNull();
