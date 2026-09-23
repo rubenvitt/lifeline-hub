@@ -146,7 +146,7 @@ Typ Berichtigung schreiben, der auf den ETB-Eintrag der Meldung verweist.
 
 #### Scenario: Doppelt zurücknehmen
 - **WHEN** eine bereits zurückgenommene Meldung erneut zurückgenommen wird
-- **THEN** antwortet das System mit 409
+- **THEN** antwortet das System mit 422 und ändert nichts
 
 ### Requirement: Betreuungsstelle
 
@@ -184,6 +184,10 @@ oder sie keine Belegungsmeldung hat.
 - **WHEN** eine stornierte Stelle geändert, erneut storniert oder mit einer Belegung gemeldet werden soll
 - **THEN** antwortet das System mit 409
 
+#### Scenario: Geschlossene Stelle wieder öffnen
+- **WHEN** eine geschlossene Stelle auf `in_betrieb` gesetzt wird
+- **THEN** ist sie wieder in Betrieb und nimmt Belegungsmeldungen an
+
 ### Requirement: Belegung melden
 
 Das System SHALL je Betreuungsstelle Belegungsmeldungen führen. Eine Belegungsmeldung trägt
@@ -207,7 +211,7 @@ zurücknehmen lassen.
 
 #### Scenario: Geschlossene Stelle
 - **WHEN** für eine geschlossene Stelle eine Belegung gemeldet wird
-- **THEN** antwortet das System mit 409 und speichert nichts
+- **THEN** antwortet das System mit 422 und speichert nichts
 
 ### Requirement: Kopfzahl in Betreuung zu einem Zeitpunkt
 

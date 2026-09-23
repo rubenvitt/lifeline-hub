@@ -122,6 +122,14 @@ im ETB, mit `ereigniszeit = zeitpunkt_at`. Ein Zeitpunkt in der Zukunft (mehr al
 Toleranz für Uhrenversatz) ist **400**, weil das Feld für sich unbrauchbar ist. Geparst
 wird mit demselben `zeit()`-Helfer wie in `routes/abloesung.rs`.
 
+**Der Draht trägt UTC ohne Zonenkennung** (`YYYY-MM-DD HH:mm:ss`). Das Frontend schreibt
+über `alsBackendZeit` und liest über dessen Umkehr aus `etb/filterZeit.ts`, nie über
+`dayjs(s)`. Sonst ergibt eine als UTC gelesene Ortszeit entweder ein 400 für „jetzt“
+(Sommer: zwei Stunden in der Zukunft) oder eine stille Verschiebung der Stand-Zeit um den
+Zonenversatz. Beide Richtungen sind in `filterZeit.test.ts` beidseits der
+Sommerzeitgrenzen belegt. Die Dialoge bekommen einen eigenen Test, der den gesendeten
+Wire-Wert gegen den absoluten Zeitpunkt prüft.
+
 ### D3 — Nebenläufigkeit ohne CAS, deshalb nur eine 409-Quelle
 
 Zwei Personen, die gleichzeitig eine absolute Zahl melden, verlieren nichts: Jede Meldung
@@ -131,14 +139,18 @@ Das Modul führt deshalb **kein** `basis_geaendert_at` ein. Serialisiert wird ü
 `write_retry!` (BEGIN IMMEDIATE). Auch PATCH an Bezirk und Stelle bleibt ohne CAS: beide
 Schreibvorgänge stehen im ETB, der zweite gewinnt. Das entspricht der Ablösung.
 
-Damit hat **409 in diesem Modul genau eine Quelle, den Lebenszyklus**: storniert, bereits
-zurückgenommen, geschlossene Stelle, dazu die doppelte Bezeichnung über das
-UNIQUE-Sicherheitsnetz. Einen Überschreiben-Dialog gibt es nicht, und eine Schleife wie in
-LFH-299/300 kann nicht entstehen. **422** bleibt dem Zusammenhang vorbehalten: eine Stelle
-mit Belegung > 0 schließen. **400** gilt für das Feld allein: Anzahl < 0, Plangröße < 1,
+Damit hat **409 in diesem Modul genau eine Quelle: den Lebenszyklus**. Dazu zählen
+Aktionen an einem stornierten Bezirk oder einer stornierten Stelle (Präzedenz
+`uhs/repo.rs`: „UHS ist bereits storniert“ → 409) und die doppelte Bezeichnung über das
+UNIQUE-Sicherheitsnetz. Einen Überschreiben-Dialog gibt es nicht, eine Schleife wie in
+LFH-299/300 kann also nicht entstehen. **422** steht für einen umkehrbaren Zustand, der die
+Aktion verbietet: eine Stelle mit Belegung > 0 schließen, eine geschlossene Stelle
+belegen, eine bereits zurückgenommene Meldung erneut zurücknehmen (Präzedenz
+`abloesung/repo.rs`: Rücknahme ohne Vollzug → 422). „Geschlossen“ ist nach D4 umkehrbar
+und damit kein Lebensende. **400** gilt für das Feld allein: Anzahl < 0, Plangröße < 1,
 Kapazität < 1, leere Bezeichnung, unbekannter Enum-Wert, Zeitpunkt unlesbar oder in der
-Zukunft. Gilt diese Einordnung, wird sie mit Verweis auf `src/error.rs` in den
-Handler-Kommentar geschrieben.
+Zukunft. Diese Einordnung steht mit Verweis auf `src/error.rs` und CLAUDE.md
+(„Statuscode-Konvention“) im Handler-Kommentar.
 
 **Verworfen:** CAS über `basis_stand_id` (so noch in der Scope-Synthese). Der Konflikt
 schützt nichts, was D2 nicht schon ordnet. Er hätte aber eine zweite 409-Quelle auf
@@ -247,9 +259,10 @@ GET    /api/einsaetze/{id}/betreuung/belegung?zeitpunkt=     → Kopfzahl „in 
 - **Rechte:** Ohne Schreibrecht erscheint `RechteHinweis`, die Primäraktion bleibt gesperrt
   stehen. Die Zeilenaktionen entfallen (LFH-346, zwei Zuschnitte).
 - **Live:** Neue oder fremd geänderte Bezirke und Stellen erscheinen über den
-  Query-Refetch. Das Sammelbanner aus der Leitlinie ist bei zwei kurzen, selten
-  wachsenden Listen nicht verlangt. Die Prüfliste nimmt das als Verdikt für Kriterium 12 auf
-  und stützt es mit einer Messung.
+  Query-Refetch. Fremd angelegte Bezirke oder Stellen werden in v1 ohne Sammelbanner
+  eingeschoben. Die Prüfliste führt Kriterium 12 deshalb nach dem Präzedenzfall der
+  Ablösung (LFH-647) als **offen → Nachzug-Ticket**, nicht als erfüllt. Geänderte Zahlen an
+  bestehenden Zeilen verschieben kein Layout.
 
 ### D8 — Statusfarben: zwei neue Verträge, keine Farbe für die Art
 
@@ -258,13 +271,16 @@ GET    /api/einsaetze/{id}/betreuung/belegung?zeitpunkt=     → Kopfzahl „in 
 
 | Karte | Wert | Rolle | Begründung |
 |---|---|---|---|
-| Räumung | angeordnet | `achtung` | Handlungsbedarf, noch nicht begonnen |
-| Räumung | läuft | `bedien` | aktive Tätigkeit (Präzedenz `verfuegbarkeit.reserviert`) |
-| Räumung | geräumt | neutral | abgeschlossen, kein Handlungsbedarf |
-| Räumung | aufgehoben | neutral | beendet |
-| Stelle | vorbereitet | neutral | – |
-| Stelle | in Betrieb | `bedien` | aktive Beziehung |
-| Stelle | geschlossen | neutral | – |
+| Räumung | angeordnet | `achtung` | Handlungsbedarf, Räumung noch nicht begonnen |
+| Räumung | läuft | `achtung` | Handlungsbedarf, Räumung nicht abgeschlossen (Label unterscheidet) |
+| Räumung | geräumt | `normal` | Sollzustand erreicht |
+| Räumung | aufgehoben | `neutral` | beendet |
+| Stelle | vorbereitet | `neutral` | Präzedenz `uhsStatus.geplant` |
+| Stelle | in Betrieb | `normal` | Präzedenz `uhsStatus.aktiv`, `brStatus.aktiv` |
+| Stelle | geschlossen | `neutral` | umkehrbar, kein Alarm (anders als `uhsStatus.aufgeloest`) |
+
+`bedien` wird **nicht** vergeben: Nach A2 trägt die Rolle eine aktive Beziehung
+(Übergabe, Reservierung, Verortung), keinen Zustand der Entität selbst.
 
 Das Label ist Pflichtfeld und damit der zweite Kanal. Die **Auslastung** einer Stelle ist
 eine berechnete Einstufung: ab 90 % der Kapazität `achtung` („fast voll“), ab 100 %
