@@ -1615,6 +1615,52 @@ gepflegt. Wahrheitsquelle: die `#[derive(ToSchema)]`-Response-Structs + Domänen
   Presence wird deshalb per `v.as_object().unwrap().contains_key("feld")` geprüft; sonst bleibt
   der Test nach der Umstellung grün und belegt nichts (`tests/ort_vorschau.rs` ist die Referenz).
 
+## Backend — Migrationsvergabe (LFH-658)
+
+**Die Migrationsnummer bleibt fortlaufend** (`migrations/0001_…` ff.). Neu ist die Regel
+**„anhängen, nicht einschieben“**: Eine Migration, die ein Branch neu mitbringt, trägt eine
+Nummer, die **größer als jede Nummer auf dem aktuellen Ziel-Branch** ist. Eine freie Nummer
+genügt nicht. Eine Migration, die es an der Abzweigung schon gab, wird weder geändert noch
+umbenannt oder gelöscht.
+
+- **Prüfen:** `scripts/check-migrationen.sh` (Vorgabe: gegen `origin/alpha`, also vorher
+  `git fetch`). Bei einem Verstoß nennt das Skript die Datei und die nächste freie Nummer.
+- **Umlegen:** `scripts/check-migrationen.sh --umnummerieren`. Es benennt die eigenen neuen
+  Migrationen um und ersetzt jeden Verweis auf den alten Dateinamen, also `include_str!` in
+  Tests und Pfade in der Doku. Es committet nicht. Eine alte Nummer in Bezeichnern, etwa
+  `migration_0117_…` als Testname, listet es nur auf.
+- **Durchgesetzt** wird die Regel über `.github/workflows/migrationen.yml`. Der Workflow setzt
+  den Commit-Status `Migrationsnummern` beim Öffnen und Aktualisieren eines PRs und bewertet
+  **bei jedem Push auf `alpha`/`beta`/`main` alle offenen PRs gegen diesen Branch neu**. Der
+  Status ist ein Required Check im Ruleset 17017911. Mergt PR A, wird PR B rot, ohne sich
+  selbst zu bewegen. `db::tests::migrationsnummern_sind_eindeutig` bleibt das Netz auf dem
+  eigenen Stand. Lokal läuft die Prüfung als Schritt 10 von `check-all.sh` und ist dort nur
+  so frisch wie der letzte `fetch`.
+
+**Warum die Nummer verschieden sein muss und dazu höher:** sqlx 0.9 spielt eine kleinere,
+noch nicht eingespielte Version **still** nach. Es gibt keine Prüfung „applied out of order“,
+festgehalten in `db::tests::sqlx_spielt_eingeschobene_kleinere_version_still_nach`. Eine DB,
+die `0118` schon hat, nimmt ein später gemergtes `0117` ohne Meldung mit, eine frische DB
+spielt beide in Nummernfolge. Bei den Tabellen-Rebuilds dieses Projekts (0082, 0089, 0112)
+entstehen daraus verschiedene Schemata, ohne dass irgendetwas rot wird.
+
+**Verworfen, mit Grund** (Einzelheiten in
+`openspec/changes/lfh-658-migrationsnummern-vor-dem-merge/design.md`):
+- **Zeitstempel-Versionen** schließen Kollisionen aus, die Reihenfolge aber nicht. Aus einer
+  lauten Kollision würde ein stiller Einschub, und die Prüfung gegen den Ziel-Branch bräuchte
+  es trotzdem. Ein späterer Wechsel ginge ohne Bruch: Versionen sind `i64`, ein Zeitstempel
+  sortiert hinter `0116`.
+- **Nummer erst beim Merge vergeben:** Es gibt keinen Haken vor dem GitHub-Merge, der ohne
+  Bot-Push umbenennt. Ein Bot-Push löst die volle CI erneut aus. Platzhalternamen brechen
+  zudem `include_str!`.
+- **„Branches must be up to date“** kostet nach jedem Merge einen vollen CI-Lauf für jeden
+  offenen PR, auch ohne Migration. Eine **Merge Queue** bietet GitHub nur für Repositories
+  von Organisationen an.
+
+**Bekannte Grenze:** Zwischen dem Merge von A und dem Ende des Push-Laufs, etwa eine Minute,
+steht B noch grün. PRs aus Forks bekommen ihren Status erst mit dem nächsten Push auf den
+Ziel-Branch, weil der Token dort nicht schreiben darf.
+
 ## Backend — ClamAV-Upload-Scan (Default-AN, LFH-114/LFH-224)
 
 Der clamd-Virenscan der Uploads (`src/anhang/mod.rs`) hängt am Cargo-Feature `clamav`, das
