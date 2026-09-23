@@ -71,8 +71,10 @@ export type Datenzustand = 'daten' | 'laden' | 'fehler' | 'leer';
  * als Hinweis im Seitenkopf, sobald sie ein Alarmbeitrag ist, und je Gefahrentyp im Paneel
  * Gefahrenmatrix. Ist kein Pegel festgelegt, bleibt der Platz belegt („kein Pegel
  * festgelegt" mit Weg zur Auswahl) — ein wandernder Platz verletzte Kriterium 9.
- * „Evakuiert" aus dem Entwurf fehlt weiterhin: dafür gibt es keine Datenquelle (LFH-607),
- * und eine erfundene Kennzahl wäre schlimmer als eine fehlende.
+ * „Evakuiert" aus dem Entwurf steht noch nicht in dieser Reihe. Die Datenquelle gibt es seit
+ * LFH-639 (`betreuung/evakuierungKennzahl.ts` samt Hook `useEvakuierungKennzahl`); welchen
+ * Platz sie bekommt, entscheidet LFH-640, eingebaut wird sie mit LFH-607. Bis dahin bleibt die
+ * Reihe bei sechs: ein Platz ohne diese Entscheidung verschöbe die übrigen (Kriterium 9).
  */
 export const KENNZAHL_ETIKETTEN = [
   'Pegel',

@@ -50,7 +50,10 @@
  *    der Wasserstand dagegen stand vorher NIRGENDS auf der Seite. Ist kein Pegel festgelegt,
  *    bleibt der Platz belegt und führt zur Einstellungssektion „Pegel".
  *
- * Weggelassen, weil keine Datenquelle existiert: Evakuiert (LFH-607). Der erwartete
+ * Noch nicht im Band: Evakuiert. Die Datenquelle gibt es seit LFH-639
+ * (`betreuung/useEvakuierungKennzahl.ts`, gegatet wie der Modulzähler); über den Platz
+ * entscheidet LFH-640, der Einbau folgt mit LFH-607. Bis dahin bleibt es bei sechs
+ * Kennzahlen — ein siebter Platz ohne diese Entscheidung verschöbe die übrigen. Der erwartete
  * Höchststand am Leitpegel (LFH-628) steht als Teil der Pegel-Notiz („Prognose 7,10 m bis
  * 18:00"), solange sein Zeitpunkt aussteht — die Ableitung liegt in `pegel/pegelKennzahl.ts`.
  * „Transportiert / offen" im Sichtungsfuß und die Notiz „n seit über 4 h" an „Vermisste"

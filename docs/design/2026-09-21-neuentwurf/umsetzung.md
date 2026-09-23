@@ -39,7 +39,7 @@ Shell-Rahmen · neue Bausteine · neu gedachte Screens.
    Platzhalter gebaut) und als ClickUp-Task erfasst. Der Pegel ist seit LFH-606 da (Platz 1
    im Kennzahlenband statt „Höchste Warnstufe", Entscheidung 22.09.2026), der erwartete
    Höchststand seit LFH-628 (Zusatz in der Kennzahl, Marke im Überblick). Bekannte Lücken:
-   Evakuiert,
+   Evakuiert (Datenquelle seit LFH-639, Platz im Kennzahlenband LFH-640, Einbau LFH-607),
    Fortschritt je Abschnitt, Abschnittsfarbe, FMS-Status/„Seit“/Rückmeldung je Einheit,
    „keine Rückmeldung“, ETB-Lesemarke „seit Ihrer letzten Sichtung“, ETB-Gesamtzahl und
    Tagesbilanz-Summen (serverseitig), Folgeauftrag-Verweis am ETB-Eintrag (geschlossen

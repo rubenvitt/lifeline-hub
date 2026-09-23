@@ -149,8 +149,9 @@ umkehrt, steht das am Absatz selbst mit „Neuentwurf 22.09.2026".
   weggelassen — nicht als Platzhalter gebaut — und steht im ClickUp-Epic „Neuentwurf
   Instrumententafel – Datenlücken des Designs" (LFH-606…LFH-617, z. B. Evakuiert 607,
   FMS-Status je Einheit 609, „keine Rückmeldung" 610, ETB-Gesamtzahl/Tagesbilanz-Summen 612,
-  Koordinate an der Person 613). Die Auslassung trägt ihr Ticket im Code-Kommentar und wird im
-  Test als **Abwesenheit** gepinnt. **Eingelöst ist der Pegel (LFH-606):** er steht auf Platz 1
+  Koordinate an der Person 613). Bei Evakuiert ist die Datenquelle seit LFH-639 da; den Platz
+  im Kennzahlenband entscheidet LFH-640, den Einbau bringt LFH-607. Die Auslassung trägt ihr
+  Ticket im Code-Kommentar und wird im Test als **Abwesenheit** gepinnt. **Eingelöst ist der Pegel (LFH-606):** er steht auf Platz 1
   des Kennzahlenbands, „Höchste Warnstufe" ist dafür raus (Entscheidung 22.09.2026; die
   Warnstufe bleibt im Seitenkopf-Hinweis und in der Gefahrenmatrix). **Eingelöst ist auch die
   Rückmeldung (LFH-610):** Spalte „Rückmeldung“ und Kachel „keine Rückmeldung“ im Meldebild,
