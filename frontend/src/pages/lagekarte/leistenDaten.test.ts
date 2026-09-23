@@ -30,6 +30,7 @@ const ALLE_AN: LayerSichtbar = {
   zone: true,
   lagemeldung: true,
   freies_zeichen: true,
+  person: true,
 };
 
 const marker = (typ: KarteMarker['typ'], id = 1, label = 'X'): KarteMarker => ({
@@ -43,7 +44,7 @@ const marker = (typ: KarteMarker['typ'], id = 1, label = 'X'): KarteMarker => ({
 });
 
 describe('ebenenZeilen', () => {
-  it('führt dieselben zehn Schalter wie die Ebenen der Karte, jeden genau einmal', () => {
+  it('führt dieselben elf Schalter wie die Ebenen der Karte, jeden genau einmal', () => {
     const keys = EBENEN.map((e) => e.key).sort();
     expect(keys).toEqual((Object.keys(ALLE_AN) as (keyof LayerSichtbar)[]).sort());
   });
@@ -76,6 +77,55 @@ describe('ebenenZeilen', () => {
     expect(zeilen.every((z) => z.anzahl === '—')).toBe(true);
   });
 
+  // Ebene „Betroffene" (LFH-648): die Zeile folgt dem ZUGRIFF, nicht bloß dem Schalter.
+  it('„Betroffene" ohne Personenangabe: keine Zeile (Vorgabe „ausgeblendet")', () => {
+    const zeilen = ebenenZeilen([], 0, ALLE_AN, false);
+    expect(zeilen.map((z) => z.key)).not.toContain('person');
+    expect(zeilen).toHaveLength(10);
+  });
+
+  it('„Betroffene" frei: Zeile mit der Zahl der übergebenen Personen-Marker, Schaltzustand vom Schalter', () => {
+    const zeilen = ebenenZeilen([], 0, { ...ALLE_AN, person: false }, false, {
+      zugriff: 'frei',
+      anzahl: 3,
+    });
+    const person = zeilen.find((z) => z.key === 'person')!;
+    expect(person).toMatchObject({ name: 'Betroffene', anzahl: 3, sichtbar: false });
+    expect(person.sperrgrund).toBeUndefined();
+    expect(zeilen).toHaveLength(11);
+  });
+
+  it('„Betroffene" gesperrt: Zeile mit Grund und OHNE Zahl — auch bei eingeschaltetem Schalter', () => {
+    const zeilen = ebenenZeilen([], 0, ALLE_AN, false, { zugriff: 'gesperrt', anzahl: 5 });
+    const person = zeilen.find((z) => z.key === 'person')!;
+    expect(person.sperrgrund).toBe('Keine Berechtigung');
+    expect(person.anzahl).toBeNull();
+    // Nie „an": eine gesperrte Ebene zeichnet nichts, egal was die geteilte Ansicht sagt.
+    expect(person.sichtbar).toBe(false);
+  });
+
+  it('„Betroffene" im Rückblick: Grund statt einer „0", die niemand gesichert hat', () => {
+    const zeilen = ebenenZeilen([], 0, ALLE_AN, false, { zugriff: 'rueckblick', anzahl: 0 });
+    const person = zeilen.find((z) => z.key === 'person')!;
+    expect(person.sperrgrund).toBe('Nicht in gesicherten Lageständen');
+    expect(person.anzahl).toBeNull();
+  });
+
+  it('„Betroffene" frei, aber die Personenliste scheiterte: „—" an dieser Zeile, die übrigen zählen', () => {
+    const zeilen = ebenenZeilen([marker('uhs')], 0, ALLE_AN, false, {
+      zugriff: 'frei',
+      anzahl: 0,
+      fehler: true,
+    });
+    expect(zeilen.find((z) => z.key === 'person')!.anzahl).toBe('—');
+    expect(zeilen.find((z) => z.key === 'uhs')!.anzahl).toBe(1);
+  });
+
+  it('„Betroffene" ausgeblendet: keine Zeile', () => {
+    const zeilen = ebenenZeilen([], 0, ALLE_AN, false, { zugriff: 'ausgeblendet', anzahl: 0 });
+    expect(zeilen.map((z) => z.key)).not.toContain('person');
+  });
+
   it('trägt den Schaltzustand je Ebene', () => {
     const zeilen = ebenenZeilen([], 0, { ...ALLE_AN, schaden: false }, false);
     expect(zeilen.find((z) => z.key === 'schaden')!.sichtbar).toBe(false);
@@ -88,6 +138,13 @@ describe('ebenenFarbe', () => {
     expect(ebenenFarbe('einsatzort', farbenDunkel)).toBe(farbenDunkel.marke);
     expect(ebenenFarbe('uhs', farbenDunkel)).toBe(farbenDunkel.bedien);
     expect(ebenenFarbe('zone', farbenDunkel)).toBe(farbenDunkel.alarm);
+  });
+
+  it('„Betroffene" trägt kein Bedien-Blau: die Marker zeichnen Sichtungsfarben, die Zeile bleibt neutral', () => {
+    // Blau bedient (LFH-352) — und das Farbfeld einer Zeile kann fünf Sichtungsfarben nicht
+    // erklären; das tut die Sichtungslegende (LFH-648).
+    expect(ebenenFarbe('person', farbenDunkel)).not.toBe(farbenDunkel.bedien);
+    expect(ebenenFarbe('person', farbenDunkel)).toBe(farbenDunkel.text2);
   });
 });
 

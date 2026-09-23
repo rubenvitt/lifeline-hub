@@ -40,6 +40,7 @@ const basisProps: SidebarProps = {
     zone: true,
     lagemeldung: true,
     freies_zeichen: true,
+    person: false,
   },
   onLayerToggle: vi.fn(),
   zonenAnzahl: 0,
@@ -906,6 +907,77 @@ describe('Sidebar: Paneel „Ebenen"', () => {
     expect(zeilen).toHaveLength(10);
     for (const z of zeilen) expect(z).toHaveTextContent('—');
     expect(screen.getByRole('switch', { name: 'UHS' })).not.toHaveTextContent('1');
+  });
+
+  // Ebene „Betroffene" (LFH-648) — die Zeile folgt dem Zugriff, gepaart gegen die Vorgabe.
+  it('„Betroffene" frei: elfte schaltbare Zeile mit Anzahl; ohne Angabe bleibt es bei zehn', () => {
+    const { unmount } = renderMitProviders(<Sidebar {...basisProps} />);
+    const gruppe = () => screen.getByRole('group', { name: 'Ebenen ein- und ausblenden' });
+    expect(within(gruppe()).getAllByRole('switch')).toHaveLength(10);
+    expect(within(gruppe()).queryByRole('switch', { name: 'Betroffene' })).toBeNull();
+    unmount();
+
+    const onLayerToggle = vi.fn();
+    renderMitProviders(
+      <Sidebar
+        {...basisProps}
+        onLayerToggle={onLayerToggle}
+        personen={{ zugriff: 'frei', anzahl: 3 }}
+      />,
+    );
+    expect(within(gruppe()).getAllByRole('switch')).toHaveLength(11);
+    const zeile = screen.getByRole('switch', { name: 'Betroffene' });
+    expect(zeile).toHaveTextContent('Betroffene3');
+    expect(zeile).toHaveAttribute('aria-checked', 'false');
+    fireEvent.click(zeile);
+    expect(onLayerToggle).toHaveBeenCalledWith('person', true);
+  });
+
+  it('„Betroffene" gesperrt: nicht schaltbar, Grund statt Zahl, Schloss ohne eigenes Vorleseziel', () => {
+    const onLayerToggle = vi.fn();
+    renderMitProviders(
+      <Sidebar
+        {...basisProps}
+        layer={{ ...basisProps.layer, person: true }}
+        onLayerToggle={onLayerToggle}
+        personen={{ zugriff: 'gesperrt', anzahl: 7 }}
+      />,
+    );
+    // Kein Schalter — eine gesperrte Ebene hat keinen Zustand, den man umlegen könnte.
+    expect(screen.queryByRole('switch', { name: /Betroffene/ })).toBeNull();
+    const zeile = screen.getByRole('button', { name: 'Betroffene – Keine Berechtigung' });
+    expect(zeile).toBeDisabled();
+    expect(within(zeile).getByText('Keine Berechtigung')).toBeInTheDocument();
+    // Keine Zahl: sie wäre die Menge, die der Benutzer nicht sehen darf.
+    expect(zeile.textContent).not.toMatch(/\d/);
+    // Das Schloss ist Dekoration (aria-hidden-Hülle), kein englisches „lock" im Vorlesebaum.
+    expect(within(zeile).queryByRole('img')).toBeNull();
+    fireEvent.click(zeile);
+    expect(onLayerToggle).not.toHaveBeenCalled();
+    // Eingeschaltet in der geteilten Ansicht — trotzdem keine Legende.
+    expect(screen.queryByRole('list', { name: 'Sichtungslegende' })).toBeNull();
+  });
+
+  it('„Betroffene" im Rückblick: Grund „Nicht in gesicherten Lageständen"', () => {
+    renderMitProviders(<Sidebar {...basisProps} personen={{ zugriff: 'rueckblick', anzahl: 0 }} />);
+    expect(
+      screen.getByRole('button', { name: 'Betroffene – Nicht in gesicherten Lageständen' }),
+    ).toBeDisabled();
+  });
+
+  it('Sichtungslegende nur bei eingeschalteter, freier Ebene', () => {
+    const { rerender } = renderMitProviders(
+      <Sidebar {...basisProps} personen={{ zugriff: 'frei', anzahl: 1 }} />,
+    );
+    expect(screen.queryByRole('list', { name: 'Sichtungslegende' })).toBeNull();
+    rerender(
+      <Sidebar
+        {...basisProps}
+        layer={{ ...basisProps.layer, person: true }}
+        personen={{ zugriff: 'frei', anzahl: 1 }}
+      />,
+    );
+    expect(screen.getByRole('list', { name: 'Sichtungslegende' })).toBeInTheDocument();
   });
 
   it('trägt den Zustand als Wort (aria-checked), nicht nur am Farbfeld', () => {

@@ -219,6 +219,62 @@ describe('useKartenAnsicht', () => {
     await waitFor(() => expect(result.current.dirty).toBe(true));
   });
 
+  // Ebene „Betroffene" (LFH-648): Vorgabe AUS. `leseLayer` legt den Default unter — ohne
+  // ausdrückliches `person: false` öffnete jede Bestandsansicht mit sichtbaren Personen.
+  it('liest eine Ansicht ohne `person`-Schlüssel als „Betroffene aus", die übrigen Ebenen bleiben', async () => {
+    ladeKartenAnsichten.mockResolvedValue([
+      standardansicht({ layer_sichtbar: { schaden: false } } as Partial<KartenAnsicht>),
+    ]);
+    const { result } = renderHook(() => useKartenAnsicht({ einsatzId: 5, config: CONFIG }), {
+      wrapper: wrapper(),
+    });
+    await waitFor(() => expect(result.current.basemap).toBe('offline'));
+    expect(result.current.layer.person).toBe(false);
+    expect(result.current.layer.schaden).toBe(false);
+    expect(result.current.layer.uhs).toBe(true);
+    expect(result.current.dirty).toBe(false);
+  });
+
+  it('eine Ansicht ganz ohne Layer-Stand öffnet „Betroffene" ebenfalls aus', async () => {
+    ladeKartenAnsichten.mockResolvedValue([standardansicht()]);
+    const { result } = renderHook(() => useKartenAnsicht({ einsatzId: 5, config: CONFIG }), {
+      wrapper: wrapper(),
+    });
+    await waitFor(() => expect(result.current.basemap).toBe('offline'));
+    expect(result.current.layer.person).toBe(false);
+    expect(result.current.layer.einheit).toBe(true);
+  });
+
+  it('das Einschalten von „Betroffene" macht die Ansicht schmutzig und wird gespeichert', async () => {
+    ladeKartenAnsichten.mockResolvedValue([standardansicht()]);
+    patcheKartenAnsicht.mockResolvedValue(standardansicht());
+    const { result } = renderHook(() => useKartenAnsicht({ einsatzId: 5, config: CONFIG }), {
+      wrapper: wrapper(),
+    });
+    await waitFor(() => expect(result.current.basemap).toBe('offline'));
+    act(() => result.current.setLayer((l) => ({ ...l, person: true })));
+    await waitFor(() => expect(result.current.dirty).toBe(true));
+    await act(async () => {
+      await result.current.speichern();
+    });
+    expect(patcheKartenAnsicht).toHaveBeenCalledWith(
+      5,
+      1,
+      expect.objectContaining({ layer_sichtbar: expect.objectContaining({ person: true }) }),
+    );
+  });
+
+  it('hydratisiert eine gespeicherte, eingeschaltete „Betroffene"-Ebene', async () => {
+    ladeKartenAnsichten.mockResolvedValue([
+      standardansicht({ layer_sichtbar: { person: true } } as Partial<KartenAnsicht>),
+    ]);
+    const { result } = renderHook(() => useKartenAnsicht({ einsatzId: 5, config: CONFIG }), {
+      wrapper: wrapper(),
+    });
+    await waitFor(() => expect(result.current.layer.person).toBe(true));
+    expect(result.current.dirty).toBe(false);
+  });
+
   it('wird schmutzig bei Basemap-Wechsel und wieder sauber nach dem Speichern', async () => {
     ladeKartenAnsichten.mockResolvedValue([standardansicht({ basemap_modus: 'offline' })]);
     patcheKartenAnsicht.mockImplementation((_e: number, _a: number, patch: PatchKartenAnsicht) =>
