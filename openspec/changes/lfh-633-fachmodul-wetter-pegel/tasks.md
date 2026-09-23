@@ -213,7 +213,7 @@ Sky und PEGELONLINE werden über `FachebenenState`-Basis-URLs auf lokale Stubs g
 
   Die Route kommt außerdem in `gate1-ueberlauf.spec.ts`. Verifiziert durch `pnpm e2e` auf
   diese Specs.
-- [ ] 6.2 Prüfliste Einsatztauglichkeit `docs/superpowers/specs/2026-09-23-lfh-633-pruefliste.md`
+- [x] 6.2 Prüfliste Einsatztauglichkeit `docs/superpowers/specs/2026-09-23-lfh-633-pruefliste.md`
   nach dem Muster LFH-635: 15 Kriterien, jede Zeile mit Verdikt und Beleg. Sie enthält das
   bewertete Restrisiko „Koordinate an Dritten“ aus design.md. Verifiziert durch Lesen: keine
   Zeile „nicht geprüft“.
@@ -223,7 +223,7 @@ Sky und PEGELONLINE werden über `FachebenenState`-Basis-URLs auf lokale Stubs g
   - Unwetterwarnung als Modulzähler/Hinweis (Alarmbudget).
 
   Verifiziert durch die angelegten Task-IDs im Abschlussbericht.
-- [ ] 6.4 Browser-Sichtprüfung im Dev-Stack mit Seeds:
+- [x] 6.4 Browser-Sichtprüfung im Dev-Stack mit Seeds:
   - Einsatz mit Einsatzort und festgelegtem Pegel: Verlauf, Warnungen, Vorhersage;
   - Einsatz ohne Ort;
   - Hell/Dunkel.
