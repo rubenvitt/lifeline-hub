@@ -1,6 +1,7 @@
 import { Button, Checkbox, Dropdown, Popconfirm, Space, Typography, theme } from 'antd';
 import type { Key, ReactNode } from 'react';
-import type { TableColumnType } from 'antd';
+import type { MenuProps, TableColumnType } from 'antd';
+import { MoreOutlined } from '@ant-design/icons';
 import {
   isValidElement,
   useCallback,
@@ -238,6 +239,50 @@ export interface PrimaerAktion<T> {
   sichtbar?: (zeile: T) => boolean;
 }
 
+/** Ein Eintrag des gebündelten Menüs ({@link WeitereAktionen}). */
+export interface MenueEintrag {
+  key: string;
+  label: string;
+  /**
+   * Unumkehrbares (Stornieren). Der Eintrag wird rot und steht hinter einem Trenner — der
+   * Menü-Trenner ist dort die Trennung, die in einer Knopfreihe der Abstand wäre
+   * (CLAUDE.md, „Rot steht auch nicht bündig neben Neutralem").
+   */
+  gefahr?: true;
+}
+
+/**
+ * Weitere Zeilenaktionen, GEBÜNDELT (LFH-365 · B5e, eingeführt mit LFH-639).
+ *
+ * Der Plan-Modus sichert genau EINE Primäraktion zu ({@link PrimaerAktion}). Eine Zeile mit
+ * mehr Handlungen bekam bis hierher nur den Eigenbau (`art: 'eigen'`) — und damit alles, was
+ * das Primitiv sonst garantiert, in Handarbeit. Dieser Deskriptor ist der dritte Weg: die
+ * EINE Primäraktion bleibt sichtbar, alles Weitere steht in einem Menü, dessen Auslöser das
+ * Primitiv baut — icon-only `type="text"`, `trigger={['click']}`, `autoFocus`, Zuordnung am
+ * `menu` statt je Eintrag (ein Riegel hat so einen Ort).
+ *
+ * `eintraege` wird NACH der Rechte- und Zustandsprüfung ausgewertet: liefert es nichts, gibt
+ * es gar keinen Auslöser, keinen deaktivierten. Ein Deskriptor, kein `ReactNode`-Slot — aus
+ * demselben Grund wie bei der Primäraktion: Form und Höhe gehören dem Primitiv.
+ */
+export interface WeitereAktionen<T> {
+  eintraege: (zeile: T) => readonly MenueEintrag[];
+  /** Zugänglicher Name des Auslösers MIT Zeilenkennung („Aktionen zu Bezirk X"). */
+  zugaenglicherName: (zeile: T) => string;
+  onWahl: (key: string, zeile: T) => void;
+}
+
+/** Menüeinträge für antd: die Gefahr hinter einem Trenner, sonst in Lieferreihenfolge. */
+export function menueEintraege(eintraege: readonly MenueEintrag[]): MenuProps['items'] {
+  const neutral = eintraege.filter((e) => !e.gefahr);
+  const gefahr = eintraege.filter((e) => e.gefahr);
+  return [
+    ...neutral.map((e) => ({ key: e.key, label: e.label })),
+    ...(neutral.length > 0 && gefahr.length > 0 ? [{ type: 'divider' as const }] : []),
+    ...gefahr.map((e) => ({ key: e.key, label: e.label, danger: true })),
+  ];
+}
+
 /**
  * Titelzeile der Karte UND erste Spalte der Tabelle.
  *
@@ -291,6 +336,8 @@ export type Kartenplan<T, K extends string> =
       /** HÖCHSTENS DREI Sekundärfelder — der Tupeltyp erzwingt die Obergrenze. */
       sekundaer?: readonly [K?, K?, K?];
       aktion?: PrimaerAktion<T>;
+      /** Gebündelte weitere Aktionen neben der Primäraktion — siehe {@link WeitereAktionen}. */
+      weitere?: WeitereAktionen<T>;
     }
   | {
       art: 'eigen';
@@ -1477,13 +1524,39 @@ export default function Datensicht<T extends object, const K extends string>(
       )
     ) : null;
 
+    const weitere = karte.weitere;
+    const weitereEintraege = weitere?.eintraege(zeile) ?? [];
+    const menueKnopf =
+      weitere && weitereEintraege.length > 0 ? (
+        <Dropdown
+          key="weitere"
+          trigger={['click']}
+          autoFocus
+          menu={{
+            items: menueEintraege(weitereEintraege),
+            onClick: ({ key }) => weitere.onWahl(key, zeile),
+          }}
+        >
+          <Button
+            type="text"
+            aria-label={weitere.zugaenglicherName(zeile)}
+            icon={
+              <span aria-hidden="true" style={{ display: 'inline-flex' }}>
+                <MoreOutlined />
+              </span>
+            }
+          />
+        </Dropdown>
+      ) : null;
+    const aktionen = [knopf, menueKnopf].filter((k) => k != null);
+
     return (
       <div
         data-lfh="datensicht-karte"
         className={zeilenKlasse?.(zeile)}
         style={{ paddingInlineStart: token.padding * Math.min(tiefe, TIEFE_DECKEL) }}
       >
-        <ListenEintrag actions={knopf ? [knopf] : undefined}>
+        <ListenEintrag actions={aktionen.length > 0 ? aktionen : undefined}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginXXS }}>
             <div
               style={{
