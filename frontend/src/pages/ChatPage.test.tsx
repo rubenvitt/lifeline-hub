@@ -131,6 +131,16 @@ describe('ChatPage', () => {
     await waitFor(() => expect(markiert).toBeGreaterThan(0));
   });
 
+  // LFH-612: Das Lesen erzeugt kein Live-Ereignis; ohne eigene Invalidierung stünde der
+  // Chat-Zähler im Navigationsrahmen bis zum nächsten fremden Ereignis auf dem alten Wert.
+  it('zieht nach dem Lesen den Modulzähler nach', async () => {
+    const { client } = setup(1);
+    const invalidiert = vi.spyOn(client, 'invalidateQueries');
+    await waitFor(() =>
+      expect(invalidiert).toHaveBeenCalledWith({ queryKey: ['einsatz-modul-zaehler', 7] }),
+    );
+  });
+
   it('markiert neue Nachrichten im Hintergrund erst beim Zurückkehren gelesen', async () => {
     const sichtbarkeit = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
     let markiert = 0;

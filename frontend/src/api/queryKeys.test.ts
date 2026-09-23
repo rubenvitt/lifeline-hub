@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ZAEHLER_LISTEN_KEYS } from '../einsatz/useModulZaehler';
 import {
   EINSATZ_KEYS,
   EINSATZ_STREAM_EVENTS,
@@ -23,6 +24,7 @@ describe('EINSATZ_KEYS', () => {
     // trifft still ein anderes Cache-Fach: kein Fehler, kein roter Test, kein auffälliger
     // Request. Der Byte-Pin ist die einzige Stelle, die das bemerkt.
     expect(EINSATZ_KEYS.stab).toBe('einsatz-stab');
+    expect(EINSATZ_KEYS.modulZaehler).toBe('einsatz-modul-zaehler');
     // LFH-632: ebenfalls als Literal gepinnt.
     expect(EINSATZ_KEYS.dokumente).toBe('einsatz-dokumente');
     // LFH-635: handgeschriebenes Literal, nicht über EINSATZ_KEYS.
@@ -35,7 +37,10 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
   // `person`-Tag beide ID-Räume (betroffene Person vs. einsatz_personal-Disposition) und
   // musste deshalb ×5 fan-outen; getrennt kann das Backend die Module getrennt gaten.
   it('bildet person nur auf die Personen-Registrierung ab', () => {
-    expect(EINSATZ_STREAM_EVENTS.person).toEqual([EINSATZ_KEYS.personen]);
+    expect(EINSATZ_STREAM_EVENTS.person).toEqual([
+      EINSATZ_KEYS.personen,
+      EINSATZ_KEYS.modulZaehler,
+    ]);
   });
 
   it('bildet personal auf den Dispositions-Fan-out in exakter Reihenfolge ab', () => {
@@ -44,6 +49,7 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
       EINSATZ_KEYS.einheiten,
       EINSATZ_KEYS.abschnitte,
       EINSATZ_KEYS.fuehrungskraefte,
+      EINSATZ_KEYS.modulZaehler,
     ]);
   });
 
@@ -51,6 +57,9 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
     expect(EINSATZ_STREAM_EVENTS.fahrzeug).toEqual([
       EINSATZ_KEYS.fahrzeuge,
       EINSATZ_KEYS.einheiten,
+      // Die Einheitenliste ist eine gezählte Menge (LFH-612) — wer sie invalidiert, zieht
+      // den Modulzähler mit.
+      EINSATZ_KEYS.modulZaehler,
     ]);
   });
 
@@ -61,6 +70,7 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
       EINSATZ_KEYS.personal,
       EINSATZ_KEYS.fahrzeuge,
       EINSATZ_KEYS.material,
+      EINSATZ_KEYS.modulZaehler,
       // LFH-635: Einheitsname und Auflösung wirken auf die Ablösungsschichten.
       EINSATZ_KEYS.abloesungen,
     ]);
@@ -85,6 +95,7 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
     expect(EINSATZ_STREAM_EVENTS.meldung).toEqual([
       EINSATZ_KEYS.meldungen,
       EINSATZ_KEYS.lagemeldungen,
+      EINSATZ_KEYS.modulZaehler,
     ]);
     expect(EINSATZ_STREAM_EVENTS.bereitstellungsraum).toEqual([
       EINSATZ_KEYS.br,
@@ -95,6 +106,36 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
   it('mappt jedes Wire-Event auf mindestens einen Key', () => {
     for (const [ev, keys] of Object.entries(EINSATZ_STREAM_EVENTS)) {
       expect(keys.length, ev).toBeGreaterThan(0);
+    }
+  });
+
+  // LFH-612: Vollständigkeit ist eine REGEL, keine Liste. Wer die Liste eines gezählten
+  // Moduls invalidiert, hat eine gezählte Menge verändert — ohne den Modulzähler stünde im
+  // Navigationsrahmen still eine alte Zahl. Die gezählten Listen-Keys kommen aus dem Hook
+  // selbst (`ZAEHLER_LISTEN_KEYS`), nicht aus einer Kopie hier.
+  it('invalidiert den Modulzähler bei jedem Ereignis, das eine gezählte Liste invalidiert', () => {
+    const gezaehlt = new Set<string>(Object.values(ZAEHLER_LISTEN_KEYS));
+    const betroffen = Object.entries(EINSATZ_STREAM_EVENTS).filter(([, keys]) =>
+      (keys as readonly string[]).some((k) => gezaehlt.has(k)),
+    );
+    // Gegenprobe gegen eine leere Menge — sonst wäre die Schleife trivial grün.
+    expect(betroffen.map(([ev]) => ev)).toEqual(
+      expect.arrayContaining([
+        'etb',
+        'person',
+        'einheit',
+        // Seit LFH-609 leitet sich der Einheitenstatus aus den Fahrzeugen ab: das
+        // `fahrzeug`-Ereignis invalidiert die Einheitenliste und damit eine gezählte Menge.
+        'fahrzeug',
+        'abschnitt',
+        'meldung',
+        'auftrag',
+        'erinnerung',
+        'chat',
+      ]),
+    );
+    for (const [ev, keys] of betroffen) {
+      expect(keys, ev).toContain(EINSATZ_KEYS.modulZaehler);
     }
   });
 
@@ -205,6 +246,9 @@ describe('einsatzKeys (Factory-Output)', () => {
     expect(einsatzKeys.etbListe(1, { typ: 'x' })).toEqual(['etb', 1, { typ: 'x' }]);
     // LFH-611: Lesemarke UNTER dem ETB-Prefix — das `etb`-Ereignis invalidiert sie mit.
     expect(einsatzKeys.etbLesemarke(1)).toEqual(['etb', 1, 'lesemarke']);
+    // LFH-612: Zählung UNTER dem ETB-Prefix, mit Filter im Key — das `etb`-Ereignis zieht sie mit.
+    expect(einsatzKeys.etbZaehler(1, { q: 'x' })).toEqual(['etb', 1, 'zaehler', { q: 'x' }]);
+    expect(einsatzKeys.modulZaehler(1)).toEqual(['einsatz-modul-zaehler', 1]);
     // Die gerundeten Koordinaten sind Teil des Keys — Cache-Trefferquote hängt daran.
     expect(einsatzKeys.ortVorschau(1, 52.123, 13.456, 'uhs:5')).toEqual([
       'ort-vorschau',

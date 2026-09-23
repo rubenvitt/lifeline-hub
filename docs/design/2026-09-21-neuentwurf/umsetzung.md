@@ -137,7 +137,7 @@ Das Modulpanel des Entwurfs führt acht Module, die es in der App nicht gab. Ent
 | Verpflegung (Kräfte) | Fachmodul, hier verworfen | Folgetask LFH-634 |
 | Ablösung (Kräfte) | Fachmodul, hier verworfen | Folgetask LFH-635 |
 
-Eine Sprungmarke ist **kein Modul** (`frontend/src/einsatz/sprungmarken.ts`). Sie erbt Sichtbarkeit und Sperre ihres Zielmoduls, ist nie `aria-current` und trägt keinen Zähler, weil es für 7/144/9 keine Quelle gibt (LFH-612).
+Eine Sprungmarke ist **kein Modul** (`frontend/src/einsatz/sprungmarken.ts`). Sie erbt Sichtbarkeit und Sperre ihres Zielmoduls, ist nie `aria-current` und trägt keinen Zähler, weil es für 7/144/9 keine Quelle gibt — die Modulzähler aus LFH-612 zählen bewusst nur Module mit belegter Bedeutung, Sprungmarken gehören nicht dazu.
 
 ## Einheitenstatus und „Seit“ (LFH-609, 22.09.2026)
 

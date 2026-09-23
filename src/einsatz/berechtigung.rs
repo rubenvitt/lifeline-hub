@@ -6,7 +6,7 @@ use crate::einsatz::effektiv::effektive_modul_rolle;
 use crate::error::AppError;
 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use sqlx::SqlitePool;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// DSGVO-Schonfrist in Stunden: solange bleibt ein abgeschlossener Einsatz
 /// für alle Mitglieder lesbar; danach nur noch für höhere Berechtigungen.
@@ -284,6 +284,30 @@ pub async fn fordere_modul_zugriff_laden(
     let overrides = modul_override::laden_alle(pool, einsatz_id).await?;
     let org_defaults = crate::org::modul_einstellung::laden_alle(pool, org_id).await?;
     fordere_modul_zugriff(&overrides, &org_defaults, modul_key, benutzer)
+}
+
+/// Die Modul-Keys, die `benutzer` in diesem Einsatz sehen darf — [`fordere_modul_zugriff`]
+/// über alle [`super::modul::MODUL_KEYS`] auf einmal.
+///
+/// Lädt Override- und Org-Default-Map genau einmal (zwei indizierte Reads, je ≤25 Zeilen
+/// über die PKs `(einsatz_id, modul_key)` / `(org_id, modul_key)`) und wertet danach rein
+/// in-memory aus. Konsumenten: der Event-Filter des Live-Feeds (F01/LFH-227) und die
+/// Modulzähler (LFH-612) — beide gehören keinem Modul und lassen die Modulrechte als
+/// FILTER wirken, nicht als Türsteher. Eine zweite Auswertung der Rangfolge daneben wäre
+/// die Stelle, an der ein Zähler ein Modul verriete, das die Liste mit 403 abweist.
+pub async fn erlaubte_module(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    org_id: i64,
+    benutzer: &Benutzer,
+) -> Result<HashSet<&'static str>, AppError> {
+    let overrides = modul_override::laden_alle(pool, einsatz_id).await?;
+    let org_defaults = crate::org::modul_einstellung::laden_alle(pool, org_id).await?;
+    Ok(super::modul::MODUL_KEYS
+        .iter()
+        .copied()
+        .filter(|key| fordere_modul_zugriff(&overrides, &org_defaults, key, benutzer).is_ok())
+        .collect())
 }
 
 #[cfg(test)]

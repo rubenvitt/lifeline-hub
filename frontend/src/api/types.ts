@@ -136,6 +136,11 @@ export type EtbEintragAnzeige = S['EtbEintragAnzeige'];
 export type EtbBaustein = S['EtbBaustein'];
 /** Eigener Lesestand im Tagebuch eines Einsatzes (LFH-611). */
 export type EtbLesemarke = S['EtbLesemarkeAnzeige'];
+/** Exakte Zahl der ETB-Einträge gesamt und je Typ, filtertreu zur Liste (LFH-612). */
+export type EtbZaehler = S['EtbZaehlerAnzeige'];
+/** Zähler je erlaubtem Modul für den Navigationsrahmen (LFH-612); ein fehlendes Feld heißt
+ *  „Modul nicht erlaubt", nicht 0. */
+export type ModulZaehler = S['ModulZaehlerAnzeige'];
 /** Trefferzahl eines ETB-Filters ohne Seitendeckel (LFH-619, Sammeltreffer der Palette). */
 export type EtbAnzahl = S['EtbAnzahlAnzeige'];
 

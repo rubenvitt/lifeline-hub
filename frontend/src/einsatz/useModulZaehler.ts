@@ -1,29 +1,18 @@
 import { useQuery } from '@tanstack/react-query';
 import type { Dayjs } from 'dayjs';
 import { listeAbloesungen } from '../api/abloesungen';
-import { listeAuftraege } from '../api/auftraege';
-import { listeErinnerungen } from '../api/erinnerungen';
-import { listeKanaele } from '../api/chat';
 import { listeDokumente } from '../api/dokumente';
-import { listeMeldungen } from '../api/meldungen';
-import { einsatzKeys } from '../api/queryKeys';
-import type {
-  Abloesung,
-  Auftrag,
-  BenutzerAnzeige,
-  ChatKanal,
-  Erinnerung,
-  Meldung,
-  ModulOverrides,
-} from '../api/types';
+import { ladeModulZaehler } from '../api/modulZaehler';
+import { EINSATZ_KEYS, einsatzKeys, type EinsatzKey } from '../api/queryKeys';
+import type { Abloesung, BenutzerAnzeige, ModulOverrides, ModulZaehler } from '../api/types';
 import { zaehleFaellige } from '../abloesung/einstufung';
 import { useEinstufungsUhr } from '../abloesung/useUhr';
-import { AUFTRAG_STATUS, istAbgeschlossen } from '../kommunikation';
 import {
   istModulGesperrt,
   istModulSichtbar,
   modulRegistry,
   type ModulZaehlerQuelle,
+  type ServerZaehlerQuelle,
 } from './modulRegistry';
 
 export interface ModulZaehlerWert {
@@ -44,58 +33,91 @@ function plural(anzahl: number, singular: string, pluralText: string): string {
   return `${anzahl} ${anzahl === 1 ? singular : pluralText}`;
 }
 
-export function berechneMeldungsZaehler(
-  meldungen: Array<Pick<Meldung, 'ist_offen' | 'status'>>,
-): ModulZaehlerWert {
-  const offen = meldungen.filter((meldung) => meldung.ist_offen).length;
-  const ungesehen = meldungen.filter(
-    (meldung) => meldung.ist_offen && meldung.status === 'neu',
-  ).length;
-  return {
+type Antwort<Q extends ServerZaehlerQuelle> = NonNullable<ModulZaehler[Q]>;
+
+/**
+ * Serverfeld → Zahl + Bedeutung, je Quelle (LFH-612).
+ *
+ * WAS gezählt wird, entscheidet der Server (`src/einsatz/zaehler.rs`); hier steht nur, wie
+ * es heißt. Die vier Kommunikations-Wortlaute sind byte-gleich zum Stand vor LFH-612, als
+ * der Browser sie aus vollen Listen rechnete — Tooltip und zugänglicher Name ändern sich
+ * durch den Umzug nicht.
+ *
+ * Ein `Record` über das String-Union der Quellen: eine neue Quelle ohne Abbildung bricht den
+ * Typcheck, statt still ohne Zähler zu bleiben.
+ */
+const ABBILDUNG: { [Q in ServerZaehlerQuelle]: (z: Antwort<Q>) => ModulZaehlerWert } = {
+  etb: ({ gesamt }) => ({
+    wert: gesamt,
+    beschreibung: `${plural(gesamt, 'Eintrag', 'Einträge')} im Einsatztagebuch`,
+  }),
+  personen: ({ gesamt }) => ({
+    wert: gesamt,
+    beschreibung: plural(gesamt, 'betroffene Person', 'Betroffene'),
+  }),
+  einheiten: ({ gesamt }) => ({
+    wert: gesamt,
+    beschreibung: plural(gesamt, 'Einheit', 'Einheiten'),
+  }),
+  einsatzabschnitte: ({ gesamt }) => ({
+    wert: gesamt,
+    beschreibung: plural(gesamt, 'Einsatzabschnitt', 'Einsatzabschnitte'),
+  }),
+  meldungen: ({ offen, ungesehen }) => ({
     wert: offen,
     beschreibung: `${plural(offen, 'offene Meldung', 'offene Meldungen')}, davon ${plural(ungesehen, 'ungesehen', 'ungesehen')}`,
-  };
-}
-
-export function berechneAuftragsZaehler(
-  auftraege: Array<Pick<Auftrag, 'bearbeitungsstatus' | 'ist_ueberfaellig'>>,
-): ModulZaehlerWert {
-  const offen = auftraege.filter(
-    (auftrag) => !istAbgeschlossen(AUFTRAG_STATUS[auftrag.bearbeitungsstatus]?.phase ?? 'offen'),
-  ).length;
-  const ueberfaellig = auftraege.filter(
-    (auftrag) =>
-      auftrag.ist_ueberfaellig &&
-      !istAbgeschlossen(AUFTRAG_STATUS[auftrag.bearbeitungsstatus]?.phase ?? 'offen'),
-  ).length;
-  return {
+  }),
+  auftraege: ({ offen, ueberfaellig }) => ({
     wert: offen,
     beschreibung: `${plural(offen, 'offener Auftrag', 'offene Aufträge')}, davon ${plural(ueberfaellig, 'überfällig', 'überfällig')}`,
-  };
-}
-
-export function berechneErinnerungsZaehler(
-  erinnerungen: Array<Pick<Erinnerung, 'ist_faellig' | 'status'>>,
-): ModulZaehlerWert {
-  const faellig = erinnerungen.filter(
-    (erinnerung) => erinnerung.ist_faellig && erinnerung.status === 'offen',
-  ).length;
-  return {
+  }),
+  erinnerungen: ({ faellig }) => ({
     wert: faellig,
     beschreibung: plural(faellig, 'fällige Erinnerung', 'fällige Erinnerungen'),
-  };
-}
-
-export function berechneChatZaehler(
-  kanaele: Array<Pick<ChatKanal, 'ungelesen_anzahl'>>,
-): ModulZaehlerWert {
-  const ungelesen = kanaele.reduce((summe, kanal) => summe + kanal.ungelesen_anzahl, 0);
-  return {
+  }),
+  chat: ({ ungelesen }) => ({
     wert: ungelesen,
     beschreibung: plural(ungelesen, 'ungelesene Chat-Nachricht', 'ungelesene Chat-Nachrichten'),
-  };
+  }),
+};
+
+/** Alle Quellen, die der Server zählt — die Schlüssel der Abbildung, nicht eine zweite Liste. */
+export const ZAEHLER_QUELLEN = Object.keys(ABBILDUNG) as ServerZaehlerQuelle[];
+
+/**
+ * Die Listen-Keys der gezählten Module. Wer einen davon invalidiert, verändert eine gezählte
+ * Menge und muss den Modulzähler mit invalidieren — `queryKeys.test.ts` prüft das gegen
+ * {@link EINSATZ_STREAM_EVENTS}. Hier und nicht im Test, damit eine neue Quelle ohne
+ * Listen-Key den Typcheck bricht.
+ */
+export const ZAEHLER_LISTEN_KEYS: Record<ServerZaehlerQuelle, EinsatzKey> = {
+  etb: EINSATZ_KEYS.etb,
+  personen: EINSATZ_KEYS.personen,
+  einheiten: EINSATZ_KEYS.einheiten,
+  einsatzabschnitte: EINSATZ_KEYS.abschnitte,
+  meldungen: EINSATZ_KEYS.meldungen,
+  auftraege: EINSATZ_KEYS.auftraege,
+  erinnerungen: EINSATZ_KEYS.erinnerungen,
+  chat: EINSATZ_KEYS.chatKanaele,
+};
+
+/** Bildet die Serverantwort auf die Anzeige ab. Ein fehlendes Feld (Modul nicht erlaubt)
+ *  bleibt fehlend — es wird nie zu 0. */
+export function bildeZaehler(antwort: ModulZaehler): ModulZaehlerMap {
+  const karte: ModulZaehlerMap = {};
+  for (const quelle of ZAEHLER_QUELLEN) {
+    const feld = antwort[quelle];
+    if (feld == null) continue;
+    karte[quelle] = (ABBILDUNG[quelle] as (z: typeof feld) => ModulZaehlerWert)(feld);
+  }
+  return karte;
 }
 
+/**
+ * Die zwei Zähler, die der Browser selbst rechnet (LFH-632, LFH-635) — sie stehen NICHT in
+ * der Serverantwort und deshalb auch nicht in {@link ZAEHLER_QUELLEN}/{@link ZAEHLER_LISTEN_KEYS}:
+ * ihre Frische hängt an der eigenen Modulliste, nicht am Modulzähler-Key.
+ */
 export function berechneDokumentZaehler(dokumente: readonly unknown[]): ModulZaehlerWert {
   const n = dokumente.length;
   return { wert: n, beschreibung: plural(n, 'abgelegtes Dokument', 'abgelegte Dokumente') };
@@ -114,10 +136,14 @@ export function berechneAbloesungZaehler(
 }
 
 /**
- * Zähler laden nur für ein tatsächlich sichtbares UND freies Modul. Damit erzeugt ein
- * ausgeblendetes/rollen-gesperrtes Modul weder 403-Rauschen noch einen Seitenkanal über Daten.
+ * Ob der Rahmen den Zähler einer Quelle zeigen darf: nur an einem sichtbaren UND freien
+ * Modul. Das Laden filtert seit LFH-612 der Server (ein nicht erlaubtes Modul fehlt in der
+ * Antwort, dort mit den Org-Vorgaben, die der Client nicht kennt); diese Prüfung hält die
+ * Anzeige zusätzlich an dieselbe Sicht wie die Navigation — ein Modul, das der Rahmen nicht
+ * zeigt, zeigt auch keine Zahl. Für die zwei Browser-Zähler ist sie zugleich das Ladegate:
+ * ein ausgeblendetes oder gesperrtes Modul erzeugt weder 403-Rauschen noch einen Seitenkanal.
  */
-export function darfZaehlerLaden(
+export function darfZaehlerZeigen(
   quelle: ModulZaehlerQuelle,
   benutzer: BenutzerAnzeige | null,
   overrides?: ModulOverrides,
@@ -128,43 +154,25 @@ export function darfZaehlerLaden(
   );
 }
 
-/** Berechtigungsgesteuerte Counter-Abfragen für den Einsatz-Navigationsrahmen. */
+/**
+ * Die Zähler des Einsatz-Navigationsrahmens: EINE Serverabfrage für die acht Serverquellen
+ * (LFH-612), dazu die zwei Browser-Zähler aus ihren eigenen Modullisten (LFH-632, LFH-635).
+ */
 export function useModulZaehler({ einsatzId, benutzer, overrides }: Args): ModulZaehlerMap {
   const gueltigerEinsatz = Number.isFinite(einsatzId);
-  const meldungenAktiv = gueltigerEinsatz && darfZaehlerLaden('meldungen', benutzer, overrides);
-  const auftraegeAktiv = gueltigerEinsatz && darfZaehlerLaden('auftraege', benutzer, overrides);
-  const erinnerungenAktiv =
-    gueltigerEinsatz && darfZaehlerLaden('erinnerungen', benutzer, overrides);
-  const chatAktiv = gueltigerEinsatz && darfZaehlerLaden('chat', benutzer, overrides);
-  const dokumenteAktiv = gueltigerEinsatz && darfZaehlerLaden('dokumente', benutzer, overrides);
-  const abloesungAktiv = gueltigerEinsatz && darfZaehlerLaden('abloesung', benutzer, overrides);
+  const dokumenteAktiv = gueltigerEinsatz && darfZaehlerZeigen('dokumente', benutzer, overrides);
+  const abloesungAktiv = gueltigerEinsatz && darfZaehlerZeigen('abloesung', benutzer, overrides);
 
-  const meldungen = useQuery({
-    queryKey: einsatzKeys.meldungen(einsatzId),
-    queryFn: () => listeMeldungen(einsatzId),
-    enabled: meldungenAktiv,
-  });
-  const auftraege = useQuery({
-    queryKey: einsatzKeys.auftraege(einsatzId),
-    queryFn: () => listeAuftraege(einsatzId),
-    enabled: auftraegeAktiv,
-  });
-  const erinnerungen = useQuery({
-    queryKey: einsatzKeys.erinnerungen(einsatzId),
-    queryFn: () => listeErinnerungen(einsatzId, false),
-    enabled: erinnerungenAktiv,
-  });
-  const chat = useQuery({
-    queryKey: einsatzKeys.chatKanaele(einsatzId),
-    queryFn: () => listeKanaele(einsatzId),
-    enabled: chatAktiv,
+  const zaehler = useQuery({
+    queryKey: einsatzKeys.modulZaehler(einsatzId),
+    queryFn: () => ladeModulZaehler(einsatzId),
+    enabled: gueltigerEinsatz,
   });
   const dokumente = useQuery({
     queryKey: einsatzKeys.dokumente(einsatzId),
     queryFn: () => listeDokumente(einsatzId),
     enabled: dokumenteAktiv,
   });
-
   const abloesungen = useQuery({
     queryKey: einsatzKeys.abloesungListe(einsatzId, 'laufend'),
     queryFn: () => listeAbloesungen(einsatzId, 'laufend'),
@@ -174,21 +182,15 @@ export function useModulZaehler({ einsatzId, benutzer, overrides }: Args): Modul
   // einer Schicht, die gerade in die Vorwarnzeit läuft, still auf dem alten Stand.
   const jetzt = useEinstufungsUhr(abloesungAktiv ? abloesungen.data : undefined);
 
-  return {
-    meldungen:
-      meldungenAktiv && meldungen.isSuccess ? berechneMeldungsZaehler(meldungen.data) : undefined,
-    auftraege:
-      auftraegeAktiv && auftraege.isSuccess ? berechneAuftragsZaehler(auftraege.data) : undefined,
-    erinnerungen:
-      erinnerungenAktiv && erinnerungen.isSuccess
-        ? berechneErinnerungsZaehler(erinnerungen.data)
-        : undefined,
-    chat: chatAktiv && chat.isSuccess ? berechneChatZaehler(chat.data) : undefined,
-    dokumente:
-      dokumenteAktiv && dokumente.isSuccess ? berechneDokumentZaehler(dokumente.data) : undefined,
-    abloesung:
-      abloesungAktiv && abloesungen.isSuccess
-        ? berechneAbloesungZaehler(abloesungen.data, jetzt)
-        : undefined,
-  };
+  const karte: ModulZaehlerMap = zaehler.isSuccess ? bildeZaehler(zaehler.data) : {};
+  for (const quelle of ZAEHLER_QUELLEN) {
+    if (!darfZaehlerZeigen(quelle, benutzer, overrides)) delete karte[quelle];
+  }
+  if (dokumenteAktiv && dokumente.isSuccess) {
+    karte.dokumente = berechneDokumentZaehler(dokumente.data);
+  }
+  if (abloesungAktiv && abloesungen.isSuccess) {
+    karte.abloesung = berechneAbloesungZaehler(abloesungen.data, jetzt);
+  }
+  return karte;
 }

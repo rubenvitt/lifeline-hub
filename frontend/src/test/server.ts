@@ -34,4 +34,11 @@ export const server = setupServer(
    * schweigt dazu. Tests des Banners überschreiben per `server.use()`.
    */
   http.get('/api/einsaetze/:einsatzId/etb/lesemarke', () => HttpResponse.json({ neue_anzahl: 0 })),
+  /**
+   * Modulzähler des Navigationsrahmens (LFH-612) — leere Antwort als Default. Der Rahmen
+   * fragt sie beim Mount ab; `{}` heißt „kein gezähltes Modul erlaubt" und ist ein echter
+   * Serverzustand, keine Attrappe mit erfundenen Zahlen: kein Modul zeigt dann eine Zahl.
+   * Tests der Zähler überschreiben per `server.use()`.
+   */
+  http.get('/api/einsaetze/:einsatzId/modul-zaehler', () => HttpResponse.json({})),
 );

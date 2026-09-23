@@ -12,6 +12,7 @@ use crate::live::LiveEvent;
 /// Modul-Key dieses Route-Moduls (LFH-132); gegen die Override-Map geprüft.
 const MODUL_KEY: &str = "etb";
 use crate::etb::lesemarke::{self, EtbLesemarkeAnzeige};
+use crate::etb::zaehler::EtbZaehlerAnzeige;
 use crate::etb::{normalisiere_zeit, repo, EtbEintragAnzeige, EtbTyp, MeldeWeg};
 use axum::extract::{Query, State};
 use axum::http::{HeaderMap, StatusCode};
@@ -256,11 +257,23 @@ pub async fn liste(
     Query(params): Query<EtbAbfrageParams>,
 ) -> Result<Json<Vec<EtbEintragAnzeige>>, AppError> {
     fordere_lese_gates(&state, &benutzer, einsatz_id).await?;
+    let merkmale = filter_merkmale(&params)?;
     let limit = params
         .limit
         .unwrap_or(repo::STANDARD_LIMIT)
         .clamp(1, repo::MAX_LIMIT);
-    let filter = filter_aus(params, limit)?;
+
+    let filter = repo::EtbFilter {
+        q: merkmale.q,
+        typ: merkmale.typ,
+        von_zeit: merkmale.von_zeit,
+        bis_zeit: merkmale.bis_zeit,
+        erfasser_id: merkmale.erfasser_id,
+        einheit_id: merkmale.einheit_id,
+        before_lfd_nr: params.before_lfd_nr,
+        limit,
+    };
+
     Ok(Json(repo::abfrage(&state.pool, einsatz_id, &filter).await?))
 }
 
@@ -274,10 +287,10 @@ pub struct EtbAnzahlAnzeige {
 /// GET /api/einsaetze/{id}/etb/anzahl — wie viele Einträge der Filter von [`liste`] trifft
 /// (LFH-619, Sammeltreffer der Sprungpalette „ETB · Einträge zu … — 31 Treffer“).
 ///
-/// DIESELBEN Gates und DERSELBE Filteraufbau wie die Liste ([`fordere_lese_gates`],
-/// [`filter_aus`]): eine Zahl, die anders filtert als die Liste, auf die der Treffer springt,
-/// wäre eine Behauptung ohne Beleg. `limit` und `before_lfd_nr` werden ignoriert — gezählt
-/// wird ungedeckelt, und genau das kann die gedeckelte Liste nicht.
+/// DIESELBEN Gates und DIESELBEN Filtermerkmale wie die Liste ([`fordere_lese_gates`],
+/// [`filter_merkmale`]): eine Zahl, die anders filtert als die Liste, auf die der Treffer
+/// springt, wäre eine Behauptung ohne Beleg. `limit` und `before_lfd_nr` werden ignoriert —
+/// [`repo::EtbZaehlFilter`] kann sie gar nicht tragen.
 pub async fn anzahl(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
@@ -285,16 +298,32 @@ pub async fn anzahl(
     Query(params): Query<EtbAbfrageParams>,
 ) -> Result<Json<EtbAnzahlAnzeige>, AppError> {
     fordere_lese_gates(&state, &benutzer, einsatz_id).await?;
-    let mut filter = filter_aus(params, repo::STANDARD_LIMIT)?;
-    filter.before_lfd_nr = None;
-    let anzahl = repo::anzahl(&state.pool, einsatz_id, &filter).await?;
+    let merkmale = filter_merkmale(&params)?;
+    let anzahl = repo::anzahl(&state.pool, einsatz_id, &merkmale).await?;
     Ok(Json(EtbAnzahlAnzeige { anzahl }))
 }
 
-/// Lesezugriff auf den Einsatz plus Modulzugriff „etb“ — die Gates aller vier Leserouten
-/// (Liste, Zählung, beide Lesemarken-Routen). NICHT Schreibrecht und NICHT „aktiv": ein
-/// Beobachter liest und führt seine Lesemarke ebenso, und ein abgeschlossener Einsatz bleibt
-/// lesbar.
+/// GET /api/einsaetze/{id}/etb/zaehler — Zahl der Einträge gesamt und je Typ (LFH-612).
+///
+/// Nimmt dieselben Filter wie [`liste`] und zählt über dieselbe Bedingung; `before_lfd_nr`
+/// und `limit` werden ignoriert (sie sind Seiten-, keine Filtermerkmale). Gates wie die
+/// Liste: Lesezugriff (auch Beobachter) + Modul `etb`.
+pub async fn zaehler(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    PfadParam(einsatz_id): PfadParam<i64>,
+    Query(params): Query<EtbAbfrageParams>,
+) -> Result<Json<EtbZaehlerAnzeige>, AppError> {
+    fordere_lese_gates(&state, &benutzer, einsatz_id).await?;
+    let merkmale = filter_merkmale(&params)?;
+    let zeilen = repo::zaehle(&state.pool, einsatz_id, &merkmale).await?;
+    Ok(Json(EtbZaehlerAnzeige::aus_zeilen(&zeilen)?))
+}
+
+/// Lesezugriff auf den Einsatz plus Modulzugriff „etb“ — die Gates aller fünf Leserouten
+/// (Liste, beide Zählungen, beide Lesemarken-Routen). NICHT Schreibrecht und NICHT „aktiv":
+/// ein Beobachter liest und führt seine Lesemarke ebenso, und ein abgeschlossener Einsatz
+/// bleibt lesbar.
 async fn fordere_lese_gates(
     state: &AppState,
     benutzer: &crate::auth::Benutzer,
@@ -306,8 +335,11 @@ async fn fordere_lese_gates(
     fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, benutzer).await
 }
 
-/// Prüft und normalisiert die Abfrageparameter zu einem [`repo::EtbFilter`].
-fn filter_aus(params: EtbAbfrageParams, limit: i64) -> Result<repo::EtbFilter, AppError> {
+/// Prüft und normalisiert die Filtermerkmale einer ETB-Abfrage (unbekannter Typ und
+/// unlesbare Zeit → 400). Liste und beide Zählungen rufen DIESE Funktion (LFH-612): eine
+/// zweite Kopie wäre die Stelle, an der „n Treffer" im Kopf und die Liste still
+/// auseinanderliefen.
+fn filter_merkmale(params: &EtbAbfrageParams) -> Result<repo::EtbZaehlFilter, AppError> {
     // Typ validieren, falls gesetzt.
     if let Some(t) = &params.typ {
         if EtbTyp::parse(t).is_none() {
@@ -316,32 +348,21 @@ fn filter_aus(params: EtbAbfrageParams, limit: i64) -> Result<repo::EtbFilter, A
             ));
         }
     }
-
-    // Zeitgrenzen normalisieren.
-    let von_zeit = match &params.von {
-        Some(s) => Some(normalisiere_zeit(s)?),
-        None => None,
-    };
-    let bis_zeit = match &params.bis {
-        Some(s) => Some(normalisiere_zeit(s)?),
-        None => None,
-    };
-
+    let von_zeit = params.von.as_deref().map(normalisiere_zeit).transpose()?;
+    let bis_zeit = params.bis.as_deref().map(normalisiere_zeit).transpose()?;
     // q nur als Filter nutzen, wenn nach Trim nicht leer.
     let q = params
         .q
+        .as_deref()
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty());
-
-    Ok(repo::EtbFilter {
+    Ok(repo::EtbZaehlFilter {
         q,
-        typ: params.typ,
+        typ: params.typ.clone(),
         von_zeit,
         bis_zeit,
         erfasser_id: params.erfasser_id,
         einheit_id: params.einheit_id,
-        before_lfd_nr: params.before_lfd_nr,
-        limit,
     })
 }
 
