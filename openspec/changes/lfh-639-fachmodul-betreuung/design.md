@@ -262,10 +262,14 @@ GET    /api/einsaetze/{id}/betreuung/belegung?zeitpunkt=     → Kopfzahl „in 
 - **Rechte:** Ohne Schreibrecht erscheint `RechteHinweis`, die Primäraktion bleibt gesperrt
   stehen. Die Zeilenaktionen entfallen (LFH-346, zwei Zuschnitte).
 - **Live:** Neue oder fremd geänderte Bezirke und Stellen erscheinen über den
-  Query-Refetch. Fremd angelegte Bezirke oder Stellen werden in v1 ohne Sammelbanner
-  eingeschoben. Die Prüfliste führt Kriterium 12 deshalb nach dem Präzedenzfall der
-  Ablösung (LFH-647) als **offen → Nachzug-Ticket**, nicht als erfüllt. Geänderte Zahlen an
-  bestehenden Zeilen verschieben kein Layout.
+  Query-Refetch. Beide Blöcke erben das Zuflussverhalten von `Datensicht`
+  (`zufluss = 'sammelbanner'`): Solange der Fokus in einer Sicht liegt, bleiben die Zeilen
+  stehen, und Neuzugänge erscheinen als Sammelbanner. Ohne Fokus werden sie direkt
+  eingeschoben. Geänderte Zahlen an bestehenden Zeilen verschieben kein Layout. Die
+  Prüfliste bewertet Kriterium 12 gegen dieses Verhalten.
+- **Kartenaktionen:** Der Kartenmodus von `Datensicht` bekommt einen optionalen Menüslot
+  `weitere` neben der einen Primäraktion (Bündelung nach LFH-365). Das ersetzt einen
+  zweiten Karten-Eigenbau.
 
 ### D8 — Statusfarben: zwei neue Verträge, keine Farbe für die Art
 
