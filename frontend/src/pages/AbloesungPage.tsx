@@ -152,7 +152,13 @@ export default function AbloesungPage() {
       const basis = z.einsatzId === einsatzId ? z : { einsatzId, ...LEERER_ZUFLUSSSTAND };
       return { ...basis, eigene: new Set([...basis.eigene, id]) };
     });
-  const gibFrei = () => setZuflussZustand({ einsatzId, ...freigegeben(zufluss, laufende) });
+  // Funktional: eine gerade eingereihte Vormerkung (`merkeEigene`) darf die Freigabe nicht
+  // überschreiben.
+  const gibFrei = () =>
+    setZuflussZustand((z) => ({
+      einsatzId,
+      ...freigegeben(z.einsatzId === einsatzId ? z : LEERER_ZUFLUSSSTAND, laufende),
+    }));
 
   // Einheiten ohne laufende Schicht — nur sie können beginnen oder ablösen.
   const freieEinheiten: EinheitOption[] = useMemo(() => {
