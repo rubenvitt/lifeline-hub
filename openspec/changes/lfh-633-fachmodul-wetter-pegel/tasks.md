@@ -230,4 +230,4 @@ Sky und PEGELONLINE werden über `FachebenenState`-Basis-URLs auf lokale Stubs g
   - Hell/Dunkel.
 
   Verifiziert durch Screenshots.
-- [ ] 6.5 Voller Gate-Lauf `./scripts/check-all.sh` grün. Verifiziert durch Exit-Code 0.
+- [x] 6.5 Voller Gate-Lauf `./scripts/check-all.sh` grün. Verifiziert durch Exit-Code 0.

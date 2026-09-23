@@ -9,7 +9,7 @@ verlangt diese Liste an jeder neuen Seite. Planung, Spec und Entwurf liegen in
 | Angabe | Wert |
 | --- | --- |
 | Route | `/einsaetze/:id/wetter-pegel` (`frontend/src/pages/WetterPegelPage.tsx`) |
-| Stand | Commit `c1acab7d` auf `feat/lfh-633-wetter-pegel-modul` |
+| Stand | Commit `145e79d1` auf `feat/lfh-633-wetter-pegel-modul` (nach Review-Fixes und Rebase auf `origin/alpha` `77fa8f06`) |
 | Zielkontext | Fükw (1366 px, Tastatur + Maus, Nachtmodus als Regelfall); Führungs-Tablet in `komfortabel`/`handschuh`; mobil 390 px lesend |
 | Nicht enthalten | DWD-Kartenebene der Lagekarte (→ LFH-662), Modulzähler oder Hinweis bei Unwetter (→ LFH-663), Pflege der Pegel (bleibt in Einstellungen › Pegel, dort LFH-606/628) |
 
@@ -27,14 +27,16 @@ Quelltext Geschlossenes trägt **[abgeleitet]**.
 
 | Nachweis | Ergebnis | Stand |
 | --- | --- | --- |
-| `e2e/wetter-pegel.spec.ts` „Quellausfall: …" | beide Wetter-Paneele zeigen „Stand unbekannt“ im Sichtbereich (`toBeInViewport`), 0 Warnungen, 0 Vorhersagezeilen; der Leitpegel zeigt weiter „6,84“ und seine Verlaufslinie | `c1acab7d` |
-| `e2e/wetter-pegel.spec.ts` „Alter Warnstand: …" (45 min) | Liste bleibt (2 Warnungen), Hinweis „… · veraltet — die Aktualisierung gelingt gerade nicht“ | `c1acab7d` |
-| `e2e/wetter-pegel.spec.ts` „Gate 1: …", lange Stations- und Gemeindenamen, Beschreibung aufgeklappt | Querlauf **0 / 0 / 0 px** auf 1366 / 1024 / 390 | `c1acab7d` |
-| `e2e/gate1-ueberlauf.spec.ts` „Gate 1: keine tragende Route …" mit der Route `/wetter-pegel` | kein Querlauf auf 1366 / 1024 / 390 px | `c1acab7d` |
-| `e2e/wetter-pegel.spec.ts` „Gate 3: …" | Primäraktion „Pegel festlegen“ **30 / 48 / 72** px · Umschalter „Beschreibung und Handlungsempfehlung“ **30 / 48 / 72** px | `c1acab7d` |
-| `e2e/wetter-pegel.spec.ts` „Kontrast der Warnstufen-Chips im Modus light/dark" | Wort im Chip „Markantes Wetter“ (`achtung`) und „Unwetterwarnung“ (`alarm`): Tag ≥ 7 : 1, Nacht ≥ 5 : 1 (`kontrast-kern.ts`, Alpha gemischt) | `c1acab7d` |
-| Browser-Sichtprüfung gegen die echten Quellen (Playwright-Skript, Einsatz „Hochwasser Weser“ in Bremen, Pegel HOYA und INTSCHEDE) | Nacht und Tag, 1366 und 390 px: zwei Verlaufslinien mit je 96 Punkten, „Keine gültigen Warnungen für Stadt Bremen.“, acht Vorhersagezeilen, „Station Bremen, 3,3 km“. Einsatz ohne Ort: Erklärung in beiden Paneelen, **ein** Weg zu den Einsatzdaten. Dashboard-Kennzahl „Pegel“ zeigt auf `/einsaetze/1/wetter-pegel` | `c1acab7d` |
-| Grep über `wetter/*.ts(x)` und `pages/WetterPegelPage.tsx` (ohne Tests) | Farbliterale **0** · `animation`/`blink`/`keyframes`/`transition` **0** · `danger` **0** · `sticky`/`fixed` **0** · `size=` nur `Spin size="large"` (Ladeanzeige) | `c1acab7d` [abgeleitet] |
+| `e2e/wetter-pegel.spec.ts` „Quellausfall: …" | beide Wetter-Paneele zeigen „Stand unbekannt“ im Sichtbereich (`toBeInViewport`), 0 Warnungen, 0 Vorhersagezeilen; der Leitpegel zeigt weiter „6,84“ und seine Verlaufslinie | `145e79d1` |
+| `e2e/wetter-pegel.spec.ts` „Alter Warnstand: …" (45 min) | Liste bleibt (2 Warnungen), Hinweis „… · veraltet — die Aktualisierung gelingt gerade nicht“ | `145e79d1` |
+| `e2e/wetter-pegel.spec.ts` „Gate 1: …", lange Stations- und Gemeindenamen, Beschreibung aufgeklappt | Querlauf **0 / 0 / 0 px** auf 1366 / 1024 / 390 | `145e79d1` |
+| `e2e/gate1-ueberlauf.spec.ts` „Gate 1: keine tragende Route …" mit der Route `/wetter-pegel` | kein Querlauf auf 1366 / 1024 / 390 px | `145e79d1` |
+| `e2e/wetter-pegel.spec.ts` „Gate 3: …" | Primäraktion „Pegel festlegen“ **30 / 48 / 72** px · Umschalter „Beschreibung und Handlungsempfehlung zu Sturmböen“ **30 / 48 / 72** px | `145e79d1` |
+| `e2e/wetter-pegel.spec.ts` „Kontrast der Warnstufen-Chips im Modus light/dark" | Wort im Chip „Markantes Wetter“ (`achtung`) und „Unwetterwarnung“ (`alarm`): Tag ≥ 7 : 1, Nacht ≥ 5 : 1 (`kontrast-kern.ts`, Alpha gemischt) | `145e79d1` |
+| Browser-Sichtprüfung gegen die echten Quellen (Playwright-Skript, Einsatz „Hochwasser Weser“ in Bremen, Pegel HOYA und INTSCHEDE) | Nacht und Tag, 1366 und 390 px: zwei Verlaufslinien mit je 96 Punkten, „Keine gültigen Warnungen für Stadt Bremen.“, acht Vorhersagezeilen, „Station Bremen, 3,3 km“. Einsatz ohne Ort: Erklärung in beiden Paneelen, **ein** Weg zu den Einsatzdaten. Dashboard-Kennzahl „Pegel“ zeigt auf `/einsaetze/1/wetter-pegel` | `145e79d1` |
+| Browser-Sichtprüfung nach den Review-Fixes (echte Quellen, Prognose an HOYA gesetzt) | Tiefst- und Höchstwert stehen auf der Höhe ihrer Werte, die Prognose „3,95 m“ ist direkt an der gestrichelten Linie beschriftet, auch bei 390 px ohne Überdeckung; Windrichtung „aus SW …“ | `145e79d1` |
+| `./scripts/check-all.sh` (alle 9 Stufen) | grün: fmt, Lint, Codegen + `tsc`, `cargo test --workspace`, Vitest, Deps, e2e 215/215 (darunter alle sechs Tests aus `wetter-pegel.spec.ts`) | `145e79d1` |
+| Grep über `wetter/*.ts(x)` und `pages/WetterPegelPage.tsx` (ohne Tests) | Farbliterale **0** · `animation`/`blink`/`keyframes`/`transition` **0** · `danger` **0** · `sticky`/`fixed` **0** · `size=` nur `Spin size="large"` (Ladeanzeige) | `145e79d1` [abgeleitet] |
 
 ---
 
@@ -66,7 +68,7 @@ Nur die Zeilen, die sich von Tabelle 1 unterscheiden. Nr. 3, 4, 8, 11, 13, 14 un
 
 | Nr. | Kriterium | Verdikt | Beleg / Begründung | Zielticket |
 | --- | --- | --- | --- | --- |
-| 1/2 | Trefffläche, Handschuh | **erfüllt** | Gate 3: der Umschalter „Beschreibung und Handlungsempfehlung“ misst 30 / 48 / 72 px. Er ist ein antd-`Button type="link"`, kein handgebautes Ziel. „Einsatzort in den Einsatzdaten verorten“ ist ein antd-`Button` [abgeleitet] | — |
+| 1/2 | Trefffläche, Handschuh | **erfüllt** | Gate 3: der Umschalter „Beschreibung und Handlungsempfehlung zu <Ereignis>“ misst 30 / 48 / 72 px; die Zeilenkennung steht im zugänglichen Namen (`WetterPegelPage.test.tsx` „zwei Warnungen mit Text …“). Er ist ein antd-`Button type="link"`, kein handgebautes Ziel. „Einsatzort in den Einsatzdaten verorten“ ist ein antd-`Button` [abgeleitet] | — |
 | 5 | **Kontrast** | **erfüllt** | Stufen-Chips gemessen: Tag ≥ 7, Nacht ≥ 5 (`wetter-pegel.spec.ts`, beide Modi). Die übrigen Texte nutzen `text`/`text2`/`achtungText` [abgeleitet] | — |
 | 6 | **Kein Status allein über Farbe** | **erfüllt** | Jede Stufe trägt die amtliche Bezeichnung als Wort (`dwdWarnstufe`, Pflichtfeld `label`; `statusFarben.test.ts` „dwdWarnstufe (LFH-633)“ und der Kanaltest über alle Karten). Der Zustand steht als Wort: „Stand unbekannt“, „veraltet“, „Keine gültigen Warnungen für …“. Die Gruppen „Gilt jetzt“ und „Angekündigt“ sind Überschriften. Ein fehlender Einzelwert erscheint als „—“, nie als 0 (`WetterPegelPage.test.tsx` „acht 3-h-Zeilen …“, `wetterText.test.ts`) | — |
 | 7 | **Eine Farbe = eine Bedeutung** | **erfüllt** | `achtung` steht für Wetterwarnung/markant und für „veraltet“, `alarm` für Unwetter/extrem. Keine Stufe liegt auf Blau (`bedien`); der Test „keine Warnstufe ist Bedienblau oder neutral“ pinnt das | — |

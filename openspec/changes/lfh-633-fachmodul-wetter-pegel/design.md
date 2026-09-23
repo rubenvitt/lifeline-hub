@@ -100,10 +100,10 @@ WetterTeil = { zustand: ok | kein_ort | ausfall, abgerufen_at?, daten? }
   Baseline des Guards `alle_modul_gruppen_gegated_get_baseline_und_versteckt` geht damit nie
   ins Netz.
 - **`ausfall`**: Es gibt keinen Cache, und der Abruf scheitert. Oder der Cache ist älter als
-  die Obergrenze (6 h Warnungen, 12 h Vorhersage). Die Obergrenze prüft das **Backend**,
-  weil nur es das Cache-Alter kennt. Die Schwelle für „veraltet“ (30 min / 3 h) prüft das
-  **Frontend** gegen `abgerufen_at` und seine Uhr. Das ist dieselbe Arbeitsteilung wie beim
-  Pegel (LFH-606).
+  die Obergrenze (6 h Warnungen, 12 h Vorhersage). Die Obergrenze prüft das **Backend** beim
+  Antworten, weil nur es das Cache-Alter kennt. Das **Frontend** prüft die Schwelle für
+  „veraltet“ (30 min / 3 h) und die Obergrenze noch einmal gegen `abgerufen_at` und seine
+  Uhr, weil gehaltene Daten ohne neue Antwort sonst nie ablaufen (siehe D3).
 - `abgerufen_at` ist `jetzt − Cache-Alter`, also der Zeitpunkt des letzten erfolgreichen
   Abrufs. Er ist RFC 3339 in UTC.
 - **Abgelaufene Warnungen** (`expires ≤ jetzt`) filtert das Backend bei **jeder** Antwort
@@ -115,8 +115,9 @@ WetterTeil = { zustand: ok | kein_ort | ausfall, abgerufen_at?, daten? }
   und wird aus `severity` (`minor|moderate|severe|extreme`) abgebildet. Ein unbekannter Wert
   lässt die Warnung **nicht** fallen, er wird `gering`, und geloggt wird er ebenfalls. Eine
   Warnung zu verschweigen wäre schlimmer als eine zu niedrige Stufe mit ihrem Ereignistext.
-  Nur `category = met` wird gezeigt. `health` (Hitze/UV) ist kein Wetterereignis im
-  Einsatzsinn; der Filter wird im Code benannt.
+  Gefiltert wird nur `category = health` (Hitze/UV), denn das ist kein Wetterereignis im
+  Einsatzsinn. Eine unbekannte Kategorie bleibt stehen und wird geloggt, aus demselben Grund
+  wie die unbekannte Stufe. Der Filter wird im Code benannt.
 
 Die zwei Teile sind in einer Antwort gebündelt, weil sie denselben Ort und dasselbe Gate
 haben und die Seite beide zugleich zeigt. Ein Ausfall eines Teils wird **nicht** zum

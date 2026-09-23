@@ -115,8 +115,9 @@ Die vier Stufen und ihre Bezeichnungen sind:
 
 ### Requirement: Wettervorhersage für den Einsatzort
 
-Das System SHALL für den Einsatzort eine Vorhersage der nächsten 24 Stunden liefern und
-zeigen. Die Seite zeigt je Stunde:
+Das System SHALL für den Einsatzort eine Vorhersage der nächsten 24 Stunden liefern, und
+zwar stündlich. Die Seite MUST sie im 3-Stunden-Takt von der laufenden Stunde an zeigen, das
+sind acht Zeilen. Je gezeigter Stunde stehen:
 
 - Temperatur in °C;
 - Niederschlag in mm;
@@ -130,7 +131,7 @@ nicht als 0. Die Seite MUST den Quellenvermerk „Datenbasis: Deutscher Wetterdi
 
 #### Scenario: Vorhersage mit Station
 - **WHEN** die Quelle für den Einsatzort eine Vorhersage der Station „Bremen“ in 4,2 km Entfernung liefert
-- **THEN** zeigt die Seite die Stundenwerte der nächsten 24 Stunden mit dem Hinweis „Station Bremen, 4,2 km“
+- **THEN** zeigt die Seite die Werte der nächsten 24 Stunden im 3-Stunden-Takt mit dem Hinweis „Station Bremen, 4,2 km“
 
 #### Scenario: Fehlender Einzelwert
 - **WHEN** die Quelle für eine Stunde keine Niederschlagswahrscheinlichkeit liefert
