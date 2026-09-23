@@ -286,20 +286,31 @@ GET    /api/einsaetze/{id}/betreuung/belegung?zeitpunkt=     → Kopfzahl „in 
 (Übergabe, Reservierung, Verortung), keinen Zustand der Entität selbst.
 
 Das Label ist Pflichtfeld und damit der zweite Kanal. Die **Auslastung** einer Stelle ist
-eine berechnete Einstufung: ab 90 % der Kapazität `achtung` („fast voll“), ab 100 %
-`alarm` („voll“ bzw. „überbelegt“). Das Wort ist Pflicht. Die Art (Anlaufstelle usw.) ist
-eine Kategorie, kein Zustand, und bekommt keine Farbe.
+eine berechnete Einstufung: ab 90 % der Kapazität `achtung` („fast voll“), genau 100 %
+`alarm` („voll“), darüber `alarm` („überbelegt“). Das Wort ist Pflicht. Ohne Kapazität, ohne
+Meldung und unter 90 % gibt es keine Einstufung (`null`), weil für diesen Bereich kein Wort
+festgelegt ist und eine Farbe ohne Wort den zweiten Kanal bräche. Verglichen wird ganzzahlig
+(`belegt · 10 ≥ kapazität · 9`). `auslastung()` ist eine Funktion und kein exportiertes
+Objekt, weil der Abdeckungstest die Vertragskarten aus den Objekt-Exporten ableitet. Die Art
+(Anlaufstelle usw.) ist eine Kategorie, kein Zustand, und bekommt keine Farbe.
 
 ### D9 — Kennzahl als reine Funktion, nicht als Zelle
 
 `frontend/src/betreuung/evakuierungKennzahl.ts` nach dem Vorbild von
 `pegel/pegelKennzahl.ts`. Die Funktion nimmt die Bezirke aus der Übersicht und gibt `null`
-(keine geplante Evakuierung) oder `{ evakuiert, geplant, ohneMeldung, geschaetzt }` zurück.
+(keine geplante Evakuierung) oder `{ evakuiert, geplant, bezirke, ohneMeldung, geschaetzt }`
+zurück. `evakuiert` ist `number | null`: `null`, wenn kein aktiver Bezirk eine Meldung hat,
+denn „nichts gemeldet“ ist nicht „niemand evakuiert“. `bezirke` ist die Zahl der aktiven
+Bezirke. „Aktiv“ (nicht storniert, nicht `aufgehoben`) steht genau einmal, in
+`istAktiverBezirk`; Kennzahl und Modulzähler lesen beide von dort.
 Die Abgrenzung „Fehler ist nicht null“ trägt der Aufrufer über den Query-Zustand. Die
 Funktion bekommt nur Daten. Getestet werden alle Szenarien der Kennzahl-Anforderung, dazu
 das Paar „kein Bezirk → null“ / „Abruffehler → Zustand fehler“ auf Hook-Ebene
-(`useEvakuierungKennzahl`), damit LFH-607 den Hook nur noch einsetzen muss. Der Hook lädt
-nur hinter `darfZaehlerLaden('betreuung', …)`, sonst antwortet das Backend mit 403.
+(`useEvakuierungKennzahl`), damit LFH-607 den Hook nur noch einsetzen muss. Der Hook liefert
+vier Zustände: `aus` (Modul ausgeblendet oder gesperrt, kein Abruf), `laden`, `fehler` (hat
+Vorrang vor Altdaten im Cache) und `daten` mit `kennzahl` oder `null`. Er lädt nur hinter
+`darfZaehlerLaden('betreuung', …)`, sonst antwortet das Backend mit 403, und er teilt den
+Query-Key `einsatzKeys.betreuung` mit Seite und Modulzähler.
 
 ### D10 — Registrierung und Guards
 
