@@ -74,6 +74,8 @@ export const EINSATZ_KEYS = {
   lageSnapshotDokument: 'einsatz-lage-snapshot-dokument',
   // Maßgebliche Pegel mit Messung (LFH-606): kein Live-Event, 5-min-Nachfrage.
   pegel: 'einsatz-pegel',
+  // Wetter am Einsatzort (LFH-633): DWD-Warnungen + Vorhersage, kein Live-Event.
+  wetter: 'einsatz-wetter',
 } as const;
 
 export type EinsatzKey = (typeof EINSATZ_KEYS)[keyof typeof EINSATZ_KEYS];
@@ -181,6 +183,9 @@ export type EinsatzStreamEvent = keyof typeof EINSATZ_STREAM_EVENTS;
  *   im 15-min-Raster der Quelle, die Festlegung ist selten. Die Abfrage fragt stattdessen alle
  *   5 min nach (`PEGEL_ABRUF_MS` in `api/pegel.ts`); die Mutationen setzen die Antwort per
  *   `setQueryData`, weil alle drei Routen die vollständige Liste liefern.
+ * - `wetter` (LFH-633): Warnungen und Vorhersage kommen von einer externen Quelle (Bright
+ *   Sky), nicht aus einem Einsatz-Datenobjekt — es gibt kein Ereignis, das sie ändert. Die
+ *   Abfrage fragt alle 5 min nach, derselbe Takt wie die Pegel.
  */
 export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.einsatz,
@@ -196,6 +201,7 @@ export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.schaden,
   EINSATZ_KEYS.lageSnapshotDokument,
   EINSATZ_KEYS.pegel,
+  EINSATZ_KEYS.wetter,
 ] as const satisfies readonly EinsatzKey[];
 
 /**
@@ -285,6 +291,10 @@ export const einsatzKeys = {
    *  Prefix (Muster `stabLagebesprechungen`). */
   pegelVorhersage: (einsatzId: number, pegelId: number) =>
     [EINSATZ_KEYS.pegel, einsatzId, 'vorhersage', pegelId] as const,
+  /** 24-h-Verlauf aller Pegel (LFH-633), Sub-Key unter demselben, nicht-live Prefix. */
+  pegelVerlauf: (einsatzId: number) => [EINSATZ_KEYS.pegel, einsatzId, 'verlauf'] as const,
+  /** Wetter am Einsatzort (LFH-633) — NICHT live, siehe NICHT_LIVE_KEYS. */
+  wetter: (einsatzId: number) => [EINSATZ_KEYS.wetter, einsatzId] as const,
 
   // Stab (LFH-46): Führungsorganisation S1–S6.
   stab: (einsatzId: number) => [EINSATZ_KEYS.stab, einsatzId] as const,

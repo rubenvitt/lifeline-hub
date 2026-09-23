@@ -5,6 +5,7 @@ import {
   messEpoche,
   pegelKennzahl,
   pegelNotizKurz,
+  pegelZeile,
   prognoseOffen,
   prognoseText,
   standZeit,
@@ -288,5 +289,82 @@ describe('Prognose am Leitpegel (LFH-628)', () => {
     );
     expect(prognoseOffen(prognose('kaputt'), JETZT)).toBe(false);
     expect(prognoseOffen(prognose(), JETZT)).toBe(true);
+  });
+});
+
+describe('pegelZeile (eine Station, Modulseite LFH-633)', () => {
+  it('frische Messung: Meter, Einheit, Trendtext, Stand, neutral, nicht veraltet', () => {
+    const z = pegelZeile(pegel(), JETZT, BERLIN);
+    expect(z).toEqual({
+      fall: 'messung',
+      name: 'HANN. MÜNDEN',
+      gewaesser: 'WESER',
+      wert: '6,84',
+      einheit: 'm',
+      trend: 'steigend +9 cm/h',
+      richtung: 'steigend',
+      stand: 'Stand 14:05',
+      veraltet: false,
+      ton: 'neutral',
+      prognose: null,
+    });
+  });
+
+  it('älter als 60 min: veraltet mit Ton achtung, der Wert bleibt mit seinem Stand stehen', () => {
+    const z = pegelZeile(
+      pegel({
+        messung: { wasserstand_cm: 684, zeitpunkt: '2026-09-22T13:29:00+02:00', trend_cm_pro_h: 1 },
+      }),
+      JETZT,
+      BERLIN,
+    );
+    expect(z.fall).toBe('messung');
+    expect(z.wert).toBe('6,84');
+    expect(z.stand).toBe('Stand 13:29');
+    expect(z.veraltet).toBe(true);
+    expect(z.ton).toBe('achtung');
+  });
+
+  it('ohne Messung: „—", „Stand unbekannt", kein Trend, Ton achtung — die Prognose bleibt', () => {
+    const z = pegelZeile(
+      pegel({
+        messung: undefined,
+        prognose: {
+          hoechststand_cm: 710,
+          zeitpunkt: '2026-09-22 16:00:00',
+          gesetzt_at: '2026-09-22 10:00:00',
+        },
+      }),
+      JETZT,
+      BERLIN,
+    );
+    expect(z).toMatchObject({
+      fall: 'ausfall',
+      wert: '—',
+      stand: 'Stand unbekannt',
+      trend: null,
+      richtung: null,
+      ton: 'achtung',
+      veraltet: false,
+      prognose: 'Prognose 7,10 m bis 18:00',
+    });
+    expect(z.einheit).toBeUndefined();
+  });
+
+  it('eine abgelaufene Prognose fällt weg; ohne Gewässer ist es null', () => {
+    const z = pegelZeile(
+      pegel({
+        gewaesser: undefined,
+        prognose: {
+          hoechststand_cm: 710,
+          zeitpunkt: '2026-09-22 12:00:00',
+          gesetzt_at: '2026-09-22 10:00:00',
+        },
+      }),
+      JETZT,
+      BERLIN,
+    );
+    expect(z.prognose).toBeNull();
+    expect(z.gewaesser).toBeNull();
   });
 });
