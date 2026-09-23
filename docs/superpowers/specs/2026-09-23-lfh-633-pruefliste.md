@@ -58,7 +58,7 @@ Quelltext Geschlossenes trägt **[abgeleitet]**.
 | 14 | **Tabellenseite vollständig** | **nicht anwendbar** | Keine Tabelle: 1 bis 5 Pegel, gefragt ist „was ist mit diesem Pegel?“ (Dateikopf `PegelPaneel.tsx`) | — |
 | 15 | **Erfassungsmaske vollständig** | **nicht anwendbar** | Keine Erfassung | — |
 
-**Bilanz:** 10 erfüllt (davon 3 [abgeleitet]) · 1 offen · 3 nicht anwendbar, dazu Nr. 10 mit Folgeentscheidung.
+**Bilanz:** 11 erfüllt (davon 3 [abgeleitet]: Nr. 5, 12, 13) · 1 offen · 3 nicht anwendbar; Nr. 10 mit Folgeentscheidung in LFH-663.
 
 ## Tabelle 2 — Warnungen und Vorhersage
 
