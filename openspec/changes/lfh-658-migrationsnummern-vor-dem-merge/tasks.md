@@ -24,7 +24,7 @@
 
 ## 3. Gate und CI
 
-- [ ] 3.1 `scripts/check-all.sh`: Selbsttest und lokale Prüfung gegen `origin/alpha` (mit
+- [x] 3.1 `scripts/check-all.sh`: Selbsttest und lokale Prüfung gegen `origin/alpha` (mit
   lautem Überspringen ohne Ref) ins `schnell`-Bündel aufnehmen, Hilfetext und
   Bündel-Summenprüfung nachziehen. Prüfen mit `./scripts/check-all.sh --nur schnell`.
 - [x] 3.2 `.github/workflows/migrationen.yml` mit `pull_request`- und `push`-Auslöser wie in
@@ -38,13 +38,13 @@
 - [x] 4.1 `CLAUDE.md`: neuer Abschnitt „Backend — Migrationsvergabe (LFH-658)“ mit der
   Entscheidung, den drei verworfenen Wegen samt Grund, der Regel, dem Befehl zum
   Umnummerieren und der Grenze (Rennfenster). Kurz halten, auf design.md verweisen.
-- [ ] 4.2 Memory `migrations-nummernkollision-merge` auf das neue Werkzeug umstellen.
+- [x] 4.2 Memory `migrations-nummernkollision-merge` auf das neue Werkzeug umstellen.
 
 ## 5. Verifikation und Einführung
 
-- [ ] 5.1 `cargo test --workspace`, `./scripts/check-all.sh --nur schnell` sowie
+- [x] 5.1 `cargo test --workspace`, `./scripts/check-all.sh --nur schnell` sowie
   `cargo fmt --all -- --check` grün, Ausgaben gelesen.
-- [ ] 5.2 PR gegen `alpha` öffnen und prüfen, dass der eigene Status `Migrationsnummern`
+- [x] 5.2 PR gegen `alpha` öffnen und prüfen, dass der eigene Status `Migrationsnummern`
   gesetzt ist (`gh api repos/rubenvitt/lifeline-hub/commits/<sha>/status`).
 - [ ] 5.3 Nach dem Merge prüfen, dass der Push-Lauf allen offenen PRs einen Status gesetzt
   hat. **Nur mit Freigabe des Users**: `Migrationsnummern` als Required Check (ohne
