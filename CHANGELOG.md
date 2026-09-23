@@ -1,3 +1,19 @@
+## [1.0.0-alpha.37](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.36...v1.0.0-alpha.37) (2026-09-23)
+
+### Wichtige Änderungen
+
+Die Einsatznummer wird ab dieser Version automatisch vom System vergeben und kann nicht mehr manuell bearbeitet werden. Das Format lautet `<Präfix><Jahr>-<laufende Nummer>`, wobei das Präfix in den Organisationseinstellungen konfiguriert werden kann. Bestehende Einsätze mit dem bisherigen Format `JJJJ-NNN` werden bei der Aktualisierung übernommen. Die Jahresgrenze richtet sich nach der in den Organisationseinstellungen hinterlegten Zeitzone (Vorgabe: Europe/Berlin).
+
+### Verwaltung
+
+**Einsatznummer-Vergabe:** Die Einsatznummer wird jetzt automatisch beim Anlegen eines Einsatzes vergeben. Das Eingabefeld in den Einsatzdaten entfällt. In den Einstellungen kann unter „Einsatz-Defaults" ein individuelles Präfix für die Einsatznummer der Organisation festgelegt werden. Die laufende Nummer wird je Kalenderjahr und Organisation neu gezählt.
+
+### Betrieb und Installation
+
+**Datenbankmigrationen:** Ein Fehler in den Datenbank-Migrationsdateien wurde behoben, der beim Update von Version alpha.34 auf neuere Versionen zu Abbrüchen führen konnte. Die Migration für die automatische Einsatznummer-Vergabe läuft nun korrekt durch.
+
+**CI-Pipeline:** Die Code-Coverage-Messung wurde in einen eigenen Workflow ausgelagert, um lange Wartezeiten bei aufeinanderfolgenden Releases auf dem Alpha-Kanal zu vermeiden. Neue Commits brechen nun veraltete Coverage-Läufe ab.
+
 ## [1.0.0-alpha.36](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.35...v1.0.0-alpha.36) (2026-09-23)
 
 ### Dokumentenablage
