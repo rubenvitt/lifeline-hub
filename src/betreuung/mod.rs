@@ -355,6 +355,24 @@ pub struct BelegungKopfzahlStelle {
     pub zeitpunkt_at: Option<String>,
 }
 
+/// Antwort auf „Stand melden“ und „Standmeldung zurücknehmen“: die ID der gemeldeten bzw.
+/// zurückgenommenen Meldung und der Bezirk danach. Die ID steht eigens da, weil `bezirk.stand`
+/// die AKTUELLE Meldung ist — bei einer nachgetragenen älteren Meldung eine andere, und ein
+/// Rückgängig über `stand.id` nähme dann die falsche zurück.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct BezirkMeldungAnzeige {
+    pub meldung_id: i64,
+    pub bezirk: EvakuierungsbezirkAnzeige,
+}
+
+/// Antwort auf „Belegung melden“ und „Belegungsmeldung zurücknehmen“, gebaut wie
+/// [`BezirkMeldungAnzeige`].
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct StelleMeldungAnzeige {
+    pub meldung_id: i64,
+    pub stelle: BetreuungsstelleAnzeige,
+}
+
 /// Kopfzahl „in Betreuung“ zu einem Zeitpunkt (Verpflegung, LFH-634). Ohne Personenbezug.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct BelegungKopfzahl {

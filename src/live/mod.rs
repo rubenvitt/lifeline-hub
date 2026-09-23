@@ -34,6 +34,7 @@ pub enum LiveEvent {
     Stab,
     Dokument,
     Abloesung,
+    Betreuung,
     KartenAnsicht,
     LageSnapshot,
     Sofortmeldung,
@@ -43,7 +44,7 @@ pub enum LiveEvent {
 impl LiveEvent {
     /// Alle Varianten in kanonischer Reihenfolge — Anker für den Wire-Kontrakt-Guard
     /// (`tests/enum_wire_kontrakt.rs`) und die Exhaustiveness-Prüfung.
-    pub const ALLE: [LiveEvent; 29] = [
+    pub const ALLE: [LiveEvent; 30] = [
         LiveEvent::Uhs,
         LiveEvent::Schaden,
         LiveEvent::Fahrzeug,
@@ -69,6 +70,7 @@ impl LiveEvent {
         LiveEvent::Stab,
         LiveEvent::Dokument,
         LiveEvent::Abloesung,
+        LiveEvent::Betreuung,
         LiveEvent::KartenAnsicht,
         LiveEvent::LageSnapshot,
         LiveEvent::Sofortmeldung,
@@ -105,6 +107,7 @@ impl LiveEvent {
             LiveEvent::Stab => "stab",
             LiveEvent::Dokument => "dokument",
             LiveEvent::Abloesung => "abloesung",
+            LiveEvent::Betreuung => "betreuung",
             LiveEvent::KartenAnsicht => "karten_ansicht",
             LiveEvent::LageSnapshot => "lage_snapshot",
             LiveEvent::Sofortmeldung => "sofortmeldung",
@@ -182,6 +185,13 @@ impl LiveEvent {
             // `erinnerung` — so erreicht er Ablösungs-Leser, ohne dass sie alle Erinnerungen
             // des Einsatzes erfahren (LFH-635, design.md D3).
             LiveEvent::Abloesung => &["abloesung"],
+            // Nur `betreuung`: Bezirke, Stellen und ihre Meldereihen sind Datenobjekte des
+            // Betreuungsmoduls (LFH-639). NICHT `einsatzabschnitte`, obwohl die Übersicht den
+            // Abschnittsnamen per Join mitliest: die Richtung ist umgekehrt — ein
+            // Abschnitts-Ereignis macht die Betreuungs-Übersicht stale, und das invalidiert das
+            // Frontend über `EINSATZ_STREAM_EVENTS.abschnitt` (design.md D6), ohne dass ein
+            // Abschnitts-Leser von Bezirken erführe. Der ETB-Nachweis läuft über `etb`.
+            LiveEvent::Betreuung => &["betreuung"],
             // Die Kartenansicht-Konfiguration lebt auf der Lage-Karte; wer `lagekarte`
             // sehen darf, darf ihre Änderung erfahren (Cache-Invalidierung des Switchers).
             LiveEvent::KartenAnsicht => &["lagekarte"],
@@ -544,6 +554,7 @@ mod tests {
             (LiveEvent::Stab, &["stab"]),
             (LiveEvent::Dokument, &["dokumente"]),
             (LiveEvent::Abloesung, &["abloesung"]),
+            (LiveEvent::Betreuung, &["betreuung"]),
             (LiveEvent::KartenAnsicht, &["lagekarte"]),
             (LiveEvent::LageSnapshot, &["lagekarte"]),
             (LiveEvent::Sofortmeldung, &["meldungen"]),

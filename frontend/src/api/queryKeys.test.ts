@@ -27,6 +27,8 @@ describe('EINSATZ_KEYS', () => {
     expect(EINSATZ_KEYS.dokumente).toBe('einsatz-dokumente');
     // LFH-635: handgeschriebenes Literal, nicht über EINSATZ_KEYS.
     expect(EINSATZ_KEYS.abloesungen).toBe('einsatz-abloesungen');
+    // LFH-639: handgeschriebenes Literal, nicht über EINSATZ_KEYS.
+    expect(EINSATZ_KEYS.betreuung).toBe('einsatz-betreuung');
   });
 });
 
@@ -199,6 +201,8 @@ describe('einsatzKeys (Factory-Output)', () => {
       'laufend',
     ]);
     expect(einsatzKeys.abloesungVorgaben(1)).toEqual(['einsatz-abloesungen', 1, 'vorgaben']);
+    // LFH-639: Betreuungs-Prefix als Literal gepinnt.
+    expect(einsatzKeys.betreuung(1)).toEqual(['einsatz-betreuung', 1]);
     expect(einsatzKeys.etbListe(1, { typ: 'x' })).toEqual(['etb', 1, { typ: 'x' }]);
     // LFH-611: Lesemarke UNTER dem ETB-Prefix — das `etb`-Ereignis invalidiert sie mit.
     expect(einsatzKeys.etbLesemarke(1)).toEqual(['etb', 1, 'lesemarke']);

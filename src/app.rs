@@ -319,6 +319,57 @@ pub fn build_router(state: AppState) -> Router {
             "/api/einsaetze/{id}/abloesungen/{aid}/vollzug/zuruecknehmen",
             post(routes::abloesung::zuruecknehmen),
         )
+        // Betreuung (LFH-639): Evakuierungsbezirke und Betreuungsstellen mit je einer
+        // Meldereihe. Rücknahmen hängen an der Meldung, nicht am Objekt — die Route kennt
+        // Bezirk bzw. Stelle erst aus der Meldung.
+        .route(
+            "/api/einsaetze/{id}/betreuung",
+            get(routes::betreuung::uebersicht),
+        )
+        .route(
+            "/api/einsaetze/{id}/betreuung/belegung",
+            get(routes::betreuung::kopfzahl),
+        )
+        .route(
+            "/api/einsaetze/{id}/betreuung/bezirke",
+            post(routes::betreuung::bezirk_anlegen),
+        )
+        .route(
+            "/api/einsaetze/{id}/betreuung/bezirke/{bid}",
+            patch(routes::betreuung::bezirk_aendern),
+        )
+        .route(
+            "/api/einsaetze/{id}/betreuung/bezirke/{bid}/stornieren",
+            post(routes::betreuung::bezirk_stornieren),
+        )
+        .route(
+            "/api/einsaetze/{id}/betreuung/bezirke/{bid}/staende",
+            post(routes::betreuung::stand_melden),
+        )
+        .route(
+            "/api/einsaetze/{id}/betreuung/staende/{sid}/zuruecknehmen",
+            post(routes::betreuung::stand_zuruecknehmen),
+        )
+        .route(
+            "/api/einsaetze/{id}/betreuung/stellen",
+            post(routes::betreuung::stelle_anlegen),
+        )
+        .route(
+            "/api/einsaetze/{id}/betreuung/stellen/{sid}",
+            patch(routes::betreuung::stelle_aendern),
+        )
+        .route(
+            "/api/einsaetze/{id}/betreuung/stellen/{sid}/stornieren",
+            post(routes::betreuung::stelle_stornieren),
+        )
+        .route(
+            "/api/einsaetze/{id}/betreuung/stellen/{sid}/belegungen",
+            post(routes::betreuung::belegung_melden),
+        )
+        .route(
+            "/api/einsaetze/{id}/betreuung/belegungen/{mid}/zuruecknehmen",
+            post(routes::betreuung::belegung_zuruecknehmen),
+        )
         .route("/api/einsaetze/{id}/stab", get(routes::stab::laden))
         .route(
             "/api/einsaetze/{id}/stab/besetzung/{sachgebiet}",

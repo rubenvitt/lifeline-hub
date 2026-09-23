@@ -54,6 +54,7 @@ export const EINSATZ_KEYS = {
   stab: 'einsatz-stab',
   dokumente: 'einsatz-dokumente',
   abloesungen: 'einsatz-abloesungen',
+  betreuung: 'einsatz-betreuung',
   // Nicht live über SSE getrieben (siehe NICHT_LIVE_KEYS + Guard-Test):
   einsatz: 'einsatz',
   einstellungen: 'einsatz-einstellungen',
@@ -158,6 +159,9 @@ export const EINSATZ_STREAM_EVENTS = {
   // (Sub-Keys 'liste'/'vorgaben'), damit ein Ereignis beide trifft. Trägt das Ereignis `art`,
   // stammt es vom Scheduler und alarmiert zusätzlich (Escape-Hatch im Live-Hook).
   abloesung: [EINSATZ_KEYS.abloesungen],
+  // Betreuung live (LFH-639): Bezirke, Stellen und ihre Meldereihen hängen unter EINEM Prefix,
+  // damit ein Ereignis Übersicht und Kopfzahl trifft. Nutzlast nur Kennungen.
+  betreuung: [EINSATZ_KEYS.betreuung],
 } as const satisfies Record<string, readonly EinsatzKey[]>;
 
 export type EinsatzStreamEvent = keyof typeof EINSATZ_STREAM_EVENTS;
@@ -295,6 +299,9 @@ export const einsatzKeys = {
     [EINSATZ_KEYS.abloesungen, einsatzId, 'liste', status] as const,
   abloesungVorgaben: (einsatzId: number) =>
     [EINSATZ_KEYS.abloesungen, einsatzId, 'vorgaben'] as const,
+  // Betreuung (LFH-639): argumentlos = Invalidierungs-Prefix. Die Kopfzahl-Variante hängt
+  // Gruppe 3 darunter.
+  betreuung: (einsatzId: number) => [EINSATZ_KEYS.betreuung, einsatzId] as const,
   /** Historie der Lagebesprechungen als Sub-Key unter DEMSELBEN Prefix (Spec 9.3). */
   stabLagebesprechungen: (einsatzId: number) =>
     [EINSATZ_KEYS.stab, einsatzId, 'lagebesprechungen'] as const,

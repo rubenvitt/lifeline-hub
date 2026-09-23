@@ -672,6 +672,219 @@ mod tests {
         assert_eq!(tick_einmal(&pool, t("2026-06-02 12:00:00")).await, 0);
     }
 
+    /// LFH-639, Spec-Szenario „Einsatz schwärzen“ — bewusst mit ZWEI aktiven Bezirken und
+    /// ZWEI aktiven Stellen: die Bezeichnung steht unter einem partiellen UNIQUE-Index
+    /// `(einsatz_id, bezeichnung) WHERE storniert_at IS NULL`. Ein für alle Zeilen gleicher
+    /// Platzhalter verletzte ihn, und die ganze Schwärzung bräche ab (mit einem Bezirk, wie im
+    /// Szenario, bliebe das unsichtbar).
+    #[tokio::test]
+    async fn schwaerzung_betreuung_ersetzt_bezeichnungen_und_haelt_mengen() {
+        use crate::betreuung::repo as b;
+        use crate::betreuung::{BetreuungsstelleArt, BetreuungsstelleStatus, Erhebung};
+
+        let pool = crate::db::test_pool().await;
+        sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let nutzer: i64 = sqlx::query_scalar(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1,'Leit','leit','h') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let e: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung, status, abgeschlossen_at, abgeschlossen_von, \
+                retention_bis, geloescht_at) \
+             VALUES (1,'Hochwasser','abgeschlossen','2026-01-01 00:00:00', ?, \
+                '2026-02-01 00:00:00','2026-02-15 00:00:00') RETURNING id",
+        )
+        .bind(nutzer)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        let mut tx = pool.begin().await.unwrap();
+        for (bezeichnung, plan) in [("Uferstraße 12–40", 640), ("Deichweg 1–9", 120)] {
+            let g = b::bezirk_anlegen_tx(
+                &mut tx,
+                e,
+                nutzer,
+                1,
+                &b::BezirkEingabe {
+                    bezeichnung: bezeichnung.into(),
+                    abschnitt_id: None,
+                    plan_personen: plan,
+                    plan_erhebung: Erhebung::Geschaetzt,
+                    sammelstelle: Some("Parkplatz bei Familie Müller".into()),
+                    notiz: Some("Frau Schulz, Rollstuhl".into()),
+                },
+            )
+            .await
+            .unwrap();
+            b::stand_melden_tx(
+                &mut tx,
+                e,
+                g.id,
+                nutzer,
+                1,
+                &b::StandEingabe {
+                    evakuiert: 212,
+                    erhebung: Erhebung::Gezaehlt,
+                    zeitpunkt_at: "2026-01-01 09:30:00".into(),
+                },
+            )
+            .await
+            .unwrap();
+        }
+        for bezeichnung in ["Turnhalle Ost, Ostring 5", "Weserstadion"] {
+            let g = b::stelle_anlegen_tx(
+                &mut tx,
+                e,
+                nutzer,
+                1,
+                &b::StelleEingabe {
+                    bezeichnung: bezeichnung.into(),
+                    art: BetreuungsstelleArt::Notunterkunft,
+                    abschnitt_id: None,
+                    kapazitaet_personen: Some(150),
+                    standort: Some("Ostring 5".into()),
+                    notiz: Some("Ansprechpartner Herr Meier 0170".into()),
+                },
+            )
+            .await
+            .unwrap();
+            b::stelle_aendern_tx(
+                &mut tx,
+                e,
+                g.id,
+                nutzer,
+                1,
+                &b::StelleAenderung {
+                    status: Some(BetreuungsstelleStatus::InBetrieb),
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap();
+            b::belegung_melden_tx(
+                &mut tx,
+                e,
+                g.id,
+                nutzer,
+                1,
+                &b::BelegungEingabe {
+                    belegt: 89,
+                    zeitpunkt_at: "2026-01-01 10:00:00".into(),
+                },
+            )
+            .await
+            .unwrap();
+        }
+        tx.commit().await.unwrap();
+
+        assert!(
+            super::repo::schwaerze_einsatz(&pool, e, "2026-06-01 12:00:00")
+                .await
+                .expect("Schwärzung darf nicht am UNIQUE-Index scheitern"),
+            "Einsatz wurde geschwärzt"
+        );
+
+        let bezirk_zeilen: Vec<(String, Option<String>, Option<String>, i64, String, String)> =
+            sqlx::query_as(
+                "SELECT bezeichnung, sammelstelle, notiz, plan_personen, plan_erhebung, raeumung \
+                 FROM evakuierungsbezirk WHERE einsatz_id = ? ORDER BY id",
+            )
+            .bind(e)
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+        let stellen_zeilen: Vec<(
+            String,
+            Option<String>,
+            Option<String>,
+            Option<i64>,
+            String,
+            String,
+        )> = sqlx::query_as(
+            "SELECT bezeichnung, standort, notiz, kapazitaet_personen, art, status \
+                 FROM betreuungsstelle WHERE einsatz_id = ? ORDER BY id",
+        )
+        .bind(e)
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        let mut bezeichnungen = std::collections::BTreeSet::new();
+        for (bez, sammel, notiz, plan, erhebung, raeumung) in &bezirk_zeilen {
+            assert!(
+                bez.starts_with(super::repo::SCHWAERZUNG_PLATZHALTER),
+                "Platzhalter-Bezeichnung: {bez:?}"
+            );
+            assert!(!bez.contains("Uferstraße") && !bez.contains("Deichweg"));
+            assert_eq!((sammel, notiz), (&None, &None), "Freitexte leer");
+            assert!(*plan == 640 || *plan == 120, "Plangröße bleibt");
+            assert_eq!(erhebung, "geschaetzt");
+            assert_eq!(raeumung, "angeordnet");
+            bezeichnungen.insert(bez.clone());
+        }
+        for (bez, standort, notiz, kap, art, status) in &stellen_zeilen {
+            assert!(
+                bez.starts_with(super::repo::SCHWAERZUNG_PLATZHALTER),
+                "Platzhalter-Bezeichnung: {bez:?}"
+            );
+            assert!(!bez.contains("Ostring") && !bez.contains("Weserstadion"));
+            assert_eq!((standort, notiz), (&None, &None), "Freitexte leer");
+            assert_eq!(*kap, Some(150), "Kapazität bleibt");
+            assert_eq!(art, "notunterkunft");
+            assert_eq!(status, "in_betrieb");
+        }
+        assert_eq!(bezirk_zeilen.len(), 2);
+        assert_eq!(stellen_zeilen.len(), 2);
+        assert_eq!(bezeichnungen.len(), 2, "je Bezirk ein eigener Platzhalter");
+
+        // Meldereihen unverändert: Anzahlen, Erhebung, Zeitpunkte, Zeiger
+        let staende: Vec<(i64, String, String)> = sqlx::query_as(
+            "SELECT evakuiert, erhebung, zeitpunkt_at FROM evakuierung_stand \
+             WHERE einsatz_id = ? ORDER BY id",
+        )
+        .bind(e)
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            staende,
+            vec![
+                (212, "gezaehlt".into(), "2026-01-01 09:30:00".into()),
+                (212, "gezaehlt".into(), "2026-01-01 09:30:00".into()),
+            ]
+        );
+        let belegungen: Vec<(i64, String)> = sqlx::query_as(
+            "SELECT belegt, zeitpunkt_at FROM betreuungsstelle_belegung \
+             WHERE einsatz_id = ? ORDER BY id",
+        )
+        .bind(e)
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            belegungen,
+            vec![
+                (89, "2026-01-01 10:00:00".into()),
+                (89, "2026-01-01 10:00:00".into()),
+            ]
+        );
+        let uebersicht = crate::betreuung::repo::uebersicht(&pool, e).await.unwrap();
+        assert!(uebersicht
+            .bezirke
+            .iter()
+            .all(|b| b.stand.as_ref().map(|s| s.evakuiert) == Some(212)));
+        assert!(uebersicht
+            .stellen
+            .iter()
+            .all(|s| s.belegung.as_ref().map(|m| m.belegt) == Some(89)));
+    }
+
     #[tokio::test]
     async fn soft_geloescht_vor_karenz_wird_nicht_geschwaerzt() {
         // Phase B greift erst nach KARENZ_TAGE. Direkt nach dem Soft-Delete (gleicher

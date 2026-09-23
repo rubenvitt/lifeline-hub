@@ -307,12 +307,52 @@ export interface components {
             uhs_id: number;
             zeitpunkt_at: string;
         };
+        /** @description Kopfzahl „in Betreuung“ zu einem Zeitpunkt (Verpflegung, LFH-634). Ohne Personenbezug. */
+        BelegungKopfzahl: {
+            stellen: components["schemas"]["BelegungKopfzahlStelle"][];
+            /**
+             * Format: int64
+             * @description Zahl der Stellen, die bis zum Stichtag keine Meldung haben.
+             */
+            stellen_ohne_meldung: number;
+            /**
+             * Format: int64
+             * @description Summe über die Stellen MIT Meldung bis zum Stichtag. Ist `stellen_ohne_meldung` > 0,
+             *     ist die Summe eine Untergrenze; bei 0 Stellen mit Meldung heißt `summe = 0` „nichts
+             *     gemeldet“, nicht „niemand in Betreuung“.
+             */
+            summe: number;
+            /** @description Stichtag, UTC ohne Zonenkennung. */
+            zeitpunkt_at: string;
+        };
+        /** @description Belegung einer Stelle zum Stichtag der Kopfzahl. */
+        BelegungKopfzahlStelle: {
+            /**
+             * Format: int64
+             * @description Fehlt, wenn die Stelle bis zum Stichtag keine Meldung hat — sie zählt dann nicht mit.
+             */
+            belegt?: number | null;
+            bezeichnung: string;
+            /** Format: int64 */
+            stelle_id: number;
+            /** @description Zeitpunkt der maßgeblichen Meldung. */
+            zeitpunkt_at?: string | null;
+        };
         /**
          * @description Art eines Belegungs-Events. String = CHECK in
          *     `migrations/0029_person_uhs_belegung.sql`. Append-only.
          * @enum {string}
          */
         BelegungsArt: "eintritt" | "wechsel" | "austritt";
+        /** @description Die aktuelle Belegungsmeldung einer Stelle. */
+        BelegungsmeldungAnzeige: {
+            /** Format: int64 */
+            belegt: number;
+            /** Format: int64 */
+            id: number;
+            /** @description Zeitpunkt der Meldung, UTC ohne Zonenkennung (`YYYY-MM-DD HH:MM:SS`). */
+            zeitpunkt_at: string;
+        };
         /** @description Öffentliche Benutzerdarstellung (ohne Passwort-Hash) für API-Antworten. */
         BenutzerAnzeige: {
             aktiv: boolean;
@@ -353,11 +393,65 @@ export interface components {
          */
         BesetzungArt: "einsatzleitung" | "personal" | "extern" | "rueckwaertig";
         /**
+         * @description Die eine Lesequelle der Modulseite (`GET …/betreuung`): alle nicht stornierten Bezirke
+         *     und Stellen eines Einsatzes.
+         */
+        BetreuungUebersicht: {
+            bezirke: components["schemas"]["EvakuierungsbezirkAnzeige"][];
+            stellen: components["schemas"]["BetreuungsstelleAnzeige"][];
+        };
+        /** @description Öffentliche Darstellung einer Betreuungsstelle mit ihrer aktuellen Belegung. */
+        BetreuungsstelleAnzeige: {
+            /** Format: int64 */
+            abschnitt_id?: number | null;
+            abschnitt_name?: string | null;
+            angelegt_at: string;
+            art: components["schemas"]["BetreuungsstelleArt"];
+            belegung?: null | components["schemas"]["BelegungsmeldungAnzeige"];
+            bezeichnung: string;
+            /** Format: int64 */
+            einsatz_id: number;
+            geaendert_at?: string | null;
+            /** Format: int64 */
+            id: number;
+            /**
+             * Format: int64
+             * @description Fehlt bei unbekannter Kapazität; dann gibt es auch keine Zahl freier Plätze.
+             */
+            kapazitaet_personen?: number | null;
+            notiz?: string | null;
+            standort?: string | null;
+            status: components["schemas"]["BetreuungsstelleStatus"];
+            storniert_at?: string | null;
+        };
+        /**
+         * @description Einrichtungsstufe einer Betreuungsstelle (DRK-Glossar Betreuungsdienst). Eine Kategorie,
+         *     kein Zustand — sie bekommt keine Statusfarbe (D8). Wire == `as_str()`.
+         * @enum {string}
+         */
+        BetreuungsstelleArt: "anlaufstelle" | "betreuungsstelle" | "betreuungsplatz" | "notunterkunft";
+        /**
+         * @description Betriebsstatus einer Betreuungsstelle. `geschlossen` ist umkehrbar (D4). Wire == `as_str()`.
+         * @enum {string}
+         */
+        BetreuungsstelleStatus: "vorbereitet" | "in_betrieb" | "geschlossen";
+        /**
          * @description Betriebsart einer TETRA-Sprechgruppe (Schema-Anker für die OpenAPI-Union, LFH-120).
          *     Wire == `betriebsart` (per-Variante, Großbuchstaben — `rename_all` trifft nicht).
          * @enum {string}
          */
         Betriebsart: "TMO" | "DMO";
+        /**
+         * @description Antwort auf „Stand melden“ und „Standmeldung zurücknehmen“: die ID der gemeldeten bzw.
+         *     zurückgenommenen Meldung und der Bezirk danach. Die ID steht eigens da, weil `bezirk.stand`
+         *     die AKTUELLE Meldung ist — bei einer nachgetragenen älteren Meldung eine andere, und ein
+         *     Rückgängig über `stand.id` nähme dann die falsche zurück.
+         */
+        BezirkMeldungAnzeige: {
+            bezirk: components["schemas"]["EvakuierungsbezirkAnzeige"];
+            /** Format: int64 */
+            meldung_id: number;
+        };
         /**
          * @description Typ des polymorphen Sachbezugs einer Nachricht (LFH-103). Code-validiert (kein
          *     DB-CHECK, analog `auftrag.prioritaet`/`meldung.status`); die Codes sind die
@@ -1030,6 +1124,11 @@ export interface components {
          */
         EmpfaengerTyp: "abschnitt" | "einheit" | "funktion" | "person" | "fahrzeug" | "extern";
         /**
+         * @description Erhebungsart einer Zahl (Plangröße oder Stand). Wire == `as_str()`.
+         * @enum {string}
+         */
+        Erhebung: "gezaehlt" | "geschaetzt";
+        /**
          * @description Öffentliche Darstellung einer Erinnerung. `ist_faellig` wird pro Read aus
          *     `faellig_at <= jetzt` berechnet (nicht persistiert) — die Fälligkeit ist
          *     damit unabhängig davon korrekt, ob/wann der Scheduler-Tick lief.
@@ -1175,6 +1274,37 @@ export interface components {
          * @enum {string}
          */
         EtbTyp: "meldung" | "anordnung" | "lage" | "entscheidung" | "system" | "berichtigung";
+        /** @description Öffentliche Darstellung eines Evakuierungsbezirks mit seinem aktuellen Stand. */
+        EvakuierungsbezirkAnzeige: {
+            /** Format: int64 */
+            abschnitt_id?: number | null;
+            abschnitt_name?: string | null;
+            angelegt_at: string;
+            bezeichnung: string;
+            /** Format: int64 */
+            einsatz_id: number;
+            geaendert_at?: string | null;
+            /** Format: int64 */
+            id: number;
+            notiz?: string | null;
+            plan_erhebung: components["schemas"]["Erhebung"];
+            /** Format: int64 */
+            plan_personen: number;
+            raeumung: components["schemas"]["Raeumungszustand"];
+            sammelstelle?: string | null;
+            stand?: null | components["schemas"]["EvakuierungsstandAnzeige"];
+            storniert_at?: string | null;
+        };
+        /** @description Die aktuelle Standmeldung eines Bezirks. */
+        EvakuierungsstandAnzeige: {
+            erhebung: components["schemas"]["Erhebung"];
+            /** Format: int64 */
+            evakuiert: number;
+            /** Format: int64 */
+            id: number;
+            /** @description Zeitpunkt der Meldung, UTC ohne Zonenkennung (`YYYY-MM-DD HH:MM:SS`). */
+            zeitpunkt_at: string;
+        };
         /** @description Einheitlicher Umschlag für jede Fachebene. */
         FachebeneAntwort: {
             attribution: string;
@@ -1652,7 +1782,7 @@ export interface components {
          *     die Emitter routen über `as_str()`, das Frontend filtert exakt auf diese Wire-Tags.
          * @enum {string}
          */
-        LiveEvent: "uhs" | "schaden" | "fahrzeug" | "material" | "tier" | "lage_zone" | "freies_zeichen" | "gefahr" | "einheit" | "abschnitt" | "person" | "personal" | "lagebericht" | "chat" | "erinnerung" | "auftrag" | "nachforderung" | "meldung" | "bereitstellungsraum" | "karte_bild" | "etb" | "befehl" | "stab" | "dokument" | "abloesung" | "karten_ansicht" | "lage_snapshot" | "sofortmeldung" | "lagged";
+        LiveEvent: "uhs" | "schaden" | "fahrzeug" | "material" | "tier" | "lage_zone" | "freies_zeichen" | "gefahr" | "einheit" | "abschnitt" | "person" | "personal" | "lagebericht" | "chat" | "erinnerung" | "auftrag" | "nachforderung" | "meldung" | "bereitstellungsraum" | "karte_bild" | "etb" | "befehl" | "stab" | "dokument" | "abloesung" | "betreuung" | "karten_ansicht" | "lage_snapshot" | "sofortmeldung" | "lagged";
         /** @description Öffentliche Material-Darstellung (ohne `org_id`). */
         MaterialAnzeige: {
             angelegt_at: string;
@@ -2323,6 +2453,11 @@ export interface components {
             label: string;
         };
         /**
+         * @description Räumungszustand eines Evakuierungsbezirks. Wire == `as_str()`.
+         * @enum {string}
+         */
+        Raeumungszustand: "angeordnet" | "laeuft" | "geraeumt" | "aufgehoben";
+        /**
          * @description Eine vom zentralen karten-service baubare Region (LFH-323, verschoben aus `karten-service`).
          *     Auf `String`-Felder umgebaut (vorher `&'static str`), damit `lifeline-hub` die Proxy-Antwort
          *     deserialisieren kann; `karten-service`s `dtos()` klont die `alle()`-Refs entsprechend.
@@ -2546,6 +2681,15 @@ export interface components {
             sortier: number;
             /** Format: int64 */
             status_id: number;
+        };
+        /**
+         * @description Antwort auf „Belegung melden“ und „Belegungsmeldung zurücknehmen“, gebaut wie
+         *     [`BezirkMeldungAnzeige`].
+         */
+        StelleMeldungAnzeige: {
+            /** Format: int64 */
+            meldung_id: number;
+            stelle: components["schemas"]["BetreuungsstelleAnzeige"];
         };
         /** @description Org-weiter Einsatzstichwort-Vorschlag für die Combobox. */
         StichwortVorschlag: {
