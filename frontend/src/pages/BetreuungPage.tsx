@@ -178,15 +178,43 @@ export default function BetreuungPage() {
     },
     onError: invalidiere,
   });
+  const belegungZurueckMut = useMutation({
+    mutationFn: (meldungId: number) => nimmBelegungZurueck(einsatzId, meldungId),
+    onSuccess: (r) => {
+      invalidiere();
+      message.success(`Meldung zu ${r.stelle.bezeichnung} zurückgenommen`);
+    },
+    onError: invalidiere,
+  });
+  // Beide Rücknahmen melden ihren Fehler an DERSELBEN Stelle über der Seite (C10/H14). Ohne
+  // Räumen bliebe ein alter Fehler dort für immer stehen — die Rücknahme startet aus dem
+  // Toast, ein erneutes Absenden in derselben Maske gibt es nicht — und verdeckte über das
+  // `??` jede spätere Ablehnung der anderen Rücknahme. Jede Rücknahme räumt deshalb die
+  // andere, jede Meldung räumt beide.
+  const { reset: resetStandZurueck, mutate: standZuruecknehmen } = standZurueckMut;
+  const { reset: resetBelegungZurueck, mutate: belegungZuruecknehmen } = belegungZurueckMut;
+  const nimmStandmeldungZurueck = (meldungId: number) => {
+    resetBelegungZurueck();
+    standZuruecknehmen(meldungId);
+  };
+  const nimmBelegungsmeldungZurueck = (meldungId: number) => {
+    resetStandZurueck();
+    belegungZuruecknehmen(meldungId);
+  };
+  const raeumeRuecknahmeFehler = () => {
+    resetStandZurueck();
+    resetBelegungZurueck();
+  };
   const standMut = useMutation({
     mutationFn: ({ bezirkId, body }: { bezirkId: number; body: StandmeldungEingabe }) =>
       meldeStand(einsatzId, bezirkId, body),
+    onMutate: raeumeRuecknahmeFehler,
     onSuccess: (r, { body }) => {
       invalidiere();
       zeigeRueckgaengig(
         message,
         `Stand ${r.bezirk.bezeichnung} gemeldet: ${personenZahl(body.evakuiert)} evakuiert`,
-        () => standZurueckMut.mutate(r.meldung_id),
+        () => nimmStandmeldungZurueck(r.meldung_id),
       );
     },
   });
@@ -222,23 +250,16 @@ export default function BetreuungPage() {
       message.success(`Betreuungsstelle ${s.bezeichnung} storniert`);
     },
   });
-  const belegungZurueckMut = useMutation({
-    mutationFn: (meldungId: number) => nimmBelegungZurueck(einsatzId, meldungId),
-    onSuccess: (r) => {
-      invalidiere();
-      message.success(`Meldung zu ${r.stelle.bezeichnung} zurückgenommen`);
-    },
-    onError: invalidiere,
-  });
   const belegungMut = useMutation({
     mutationFn: ({ stelleId, body }: { stelleId: number; body: BelegungsmeldungEingabe }) =>
       meldeBelegung(einsatzId, stelleId, body),
+    onMutate: raeumeRuecknahmeFehler,
     onSuccess: (r, { body }) => {
       invalidiere();
       zeigeRueckgaengig(
         message,
         `Belegung ${r.stelle.bezeichnung} gemeldet: ${personenZahl(body.belegt)} untergebracht`,
-        () => belegungZurueckMut.mutate(r.meldung_id),
+        () => nimmBelegungsmeldungZurueck(r.meldung_id),
       );
     },
   });

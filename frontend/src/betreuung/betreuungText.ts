@@ -46,17 +46,18 @@ export function evakuiertText(
 
 /**
  * Die Kennzahl „Evakuiert N · von M geplant" als Text — für den Blockkopf der Seite und das
- * Lagebild (LFH-607). „≈" vor N, sobald ein beteiligter Stand oder eine Plangröße geschätzt
- * ist; Bezirke ohne Meldung stehen dahinter, statt als 0 in N zu verschwinden.
+ * Lagebild (LFH-607). Ist ein beteiligter Stand oder eine Plangröße geschätzt, trägt die
+ * Kennzahl ein „≈" (Spec „Kennzahl"): vor N, solange es ein N gibt; ohne jede Meldung vor M —
+ * dann kann nur die Plangröße geschätzt sein, und ohne das Zeichen wirkte sie gezählt. Bezirke
+ * ohne Meldung stehen dahinter, statt als 0 in N zu verschwinden.
  */
 export function kennzahlText(k: EvakuierungKennzahl | null): string {
   if (k == null) return 'keine geplante Evakuierung';
-  const n =
-    k.evakuiert == null
-      ? 'keine Meldung'
-      : `${k.geschaetzt ? '≈ ' : ''}${personenZahl(k.evakuiert)}`;
+  const ca = k.geschaetzt ? '≈ ' : '';
+  const n = k.evakuiert == null ? 'keine Meldung' : `${ca}${personenZahl(k.evakuiert)}`;
+  const m = k.evakuiert == null ? `${ca}${personenZahl(k.geplant)}` : personenZahl(k.geplant);
   const ohne = k.ohneMeldung > 0 ? ` · ${personenZahl(k.ohneMeldung)} ohne Meldung` : '';
-  return `${n} · von ${personenZahl(k.geplant)} geplant${ohne}`;
+  return `${n} · von ${m} geplant${ohne}`;
 }
 
 /** Freie Plätze — `null` ohne Kapazität (Spec: „keine Zahl freier Plätze") oder ohne Meldung. */

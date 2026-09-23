@@ -6,6 +6,7 @@ import { App as AntApp } from 'antd';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import BetreuungPage from './BetreuungPage';
 import { AuthProvider } from '../auth/AuthContext';
+import { ApiError } from '../api/client';
 import type { BetreuungUebersicht, Betreuungsstelle, Evakuierungsbezirk } from '../api/types';
 
 const einsatz = vi.hoisted(() => ({
@@ -198,6 +199,25 @@ describe('BetreuungPage (LFH-639)', () => {
     expect(within(schule).queryByText(/voll|überbelegt/)).toBeNull();
   });
 
+  it('Kopf Betreuungsstellen: gemeldete Summe mit „ohne Meldung" — ohne jede Meldung „keine Meldung", nie 0', async () => {
+    renderPage();
+    await screen.findByText('Turnhalle Ost');
+    // 89 + 140, die Schule hat nicht gemeldet.
+    expect(screen.getByText('229 untergebracht · 1 ohne Meldung')).toBeInTheDocument();
+  });
+
+  it('Kopf Betreuungsstellen ohne jede Meldung: „keine Meldung", nicht „0 untergebracht"', async () => {
+    // Spec (Kopfzahl): „nichts gemeldet" ist nicht „niemand in Betreuung".
+    api.ladeBetreuung.mockResolvedValue({
+      bezirke: [],
+      stellen: [SCHULE, stelle({ id: 11, bezeichnung: 'Halle West' })],
+    });
+    renderPage();
+    await screen.findByText('Halle West');
+    expect(screen.getByText('keine Meldung · 2 ohne Meldung')).toBeInTheDocument();
+    expect(screen.queryByText(/0 untergebracht/)).toBeNull();
+  });
+
   it('genau EINE Primäraktion im Kopf; „Betreuungsstelle anlegen" steht sekundär im Block', async () => {
     renderPage();
     await screen.findByText('Uferstraße 12–40');
@@ -319,6 +339,64 @@ describe('BetreuungPage (LFH-639)', () => {
       await userEvent.click(rueckwege[0]);
       await waitFor(() => expect(api.nimmBelegungZurueck).toHaveBeenCalledWith(1, 91));
       expect(api.nimmStandZurueck).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Fehler einer Rücknahme (C10/H14)', () => {
+    const TITEL = 'Meldung konnte nicht zurückgenommen werden';
+
+    async function meldeStandUndNimmZurueck() {
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'Stand melden für Bezirk Uferstraße 12–40' }),
+      );
+      const dialog = await dialogMit('Stand melden: Uferstraße 12–40');
+      await userEvent.type(within(dialog).getByLabelText('Evakuiert (Personen)'), '500');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Melden' }));
+      await userEvent.click(await screen.findByRole('button', { name: /Rückgängig/ }));
+      await waitFor(() => expect(api.nimmStandZurueck).toHaveBeenCalledWith(1, 77));
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    }
+
+    async function meldeBelegung() {
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Belegung melden für Turnhalle Ost' }),
+      );
+      const dialog = await dialogMit('Belegung melden: Turnhalle Ost');
+      await userEvent.type(within(dialog).getByLabelText('Belegt (Personen)'), '95');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Melden' }));
+      await waitFor(() => expect(api.meldeBelegung).toHaveBeenCalledWith(1, 8, { belegt: 95 }));
+    }
+
+    beforeEach(() => {
+      api.meldeStand.mockResolvedValue({ meldung_id: 77, bezirk: UFER });
+      api.meldeBelegung.mockResolvedValue({ meldung_id: 91, stelle: TURNHALLE });
+      // Zwei VERSCHIEDENE Wortlaute als `ApiError`: mit einem nackten `Error` zeigte der
+      // Alert beide Male denselben Rückfalltext, und „der neue Text steht da" wäre trivial.
+      api.nimmStandZurueck.mockRejectedValue(new ApiError(422, 'Stand-Rücknahme abgelehnt'));
+      api.nimmBelegungZurueck.mockRejectedValue(new ApiError(422, 'Belegungs-Rücknahme abgelehnt'));
+    });
+
+    it('eine spätere Ablehnung der anderen Rücknahme wird gezeigt, nicht vom alten Fehler verdeckt', async () => {
+      renderPage();
+      await meldeStandUndNimmZurueck();
+      expect(await screen.findByText('Stand-Rücknahme abgelehnt')).toBeInTheDocument();
+      expect(screen.getByText(TITEL)).toBeInTheDocument();
+
+      await meldeBelegung();
+      await userEvent.click(await screen.findByRole('button', { name: /Rückgängig/ }));
+      await waitFor(() => expect(api.nimmBelegungZurueck).toHaveBeenCalledWith(1, 91));
+      expect(await screen.findByText('Belegungs-Rücknahme abgelehnt')).toBeInTheDocument();
+      expect(screen.queryByText('Stand-Rücknahme abgelehnt')).toBeNull();
+    });
+
+    it('nach einer erfolgreichen Meldung ist der Fehler der Rücknahme weg', async () => {
+      renderPage();
+      await meldeStandUndNimmZurueck();
+      expect(await screen.findByText('Stand-Rücknahme abgelehnt')).toBeInTheDocument();
+
+      await meldeBelegung();
+      await waitFor(() => expect(screen.queryByText(TITEL)).toBeNull());
+      expect(screen.queryByText('Stand-Rücknahme abgelehnt')).toBeNull();
     });
   });
 

@@ -6,6 +6,7 @@ import {
   mengeText,
   personenZahl,
 } from './betreuungText';
+import { evakuierungKennzahl } from './evakuierungKennzahl';
 
 /** Schmales geschütztes Leerzeichen — als Literal, nicht aus der Datei zurückgelesen. */
 const T = ' ';
@@ -98,5 +99,45 @@ describe('betreuungText (LFH-639)', () => {
       }),
     ).toBe('keine Meldung · von 640 geplant · 1 ohne Meldung');
     expect(kennzahlText(null)).toBe('keine geplante Evakuierung');
+  });
+
+  it('Kennzahltext ohne Meldung: eine geschätzte Plangröße bleibt gekennzeichnet (≈ an M)', () => {
+    // Spec „Kennzahl": ist eine beteiligte Plangröße geschätzt, MUST die Kennzahl als
+    // geschätzt gekennzeichnet sein — auch solange noch kein Stand gemeldet ist.
+    expect(
+      kennzahlText({
+        evakuiert: null,
+        geplant: 1850,
+        bezirke: 1,
+        ohneMeldung: 1,
+        geschaetzt: true,
+      }),
+    ).toBe(`keine Meldung · von ≈ 1${T}850 geplant · 1 ohne Meldung`);
+  });
+
+  it('Kennzahltext „nur Plan geschätzt": der Vorgabeweg des Anlegen-Dialogs, noch ohne Stand', () => {
+    // Zusammengesetzt statt als Flag: nur so ist „nur die Plangröße ist geschätzt" überhaupt
+    // ausdrückbar — genau der Fall aus dem Review (BezirkAnlegenDialog belegt `geschaetzt` vor).
+    const k = evakuierungKennzahl([
+      {
+        raeumung: 'angeordnet',
+        storniert_at: undefined,
+        plan_personen: 1850,
+        plan_erhebung: 'geschaetzt',
+        stand: undefined,
+      },
+    ]);
+    expect(kennzahlText(k)).toBe(`keine Meldung · von ≈ 1${T}850 geplant · 1 ohne Meldung`);
+    // Gegenstück: gezählte Plangröße ohne Stand trägt kein ≈.
+    const gezaehlt = evakuierungKennzahl([
+      {
+        raeumung: 'angeordnet',
+        storniert_at: undefined,
+        plan_personen: 1850,
+        plan_erhebung: 'gezaehlt',
+        stand: undefined,
+      },
+    ]);
+    expect(kennzahlText(gezaehlt)).toBe(`keine Meldung · von 1${T}850 geplant · 1 ohne Meldung`);
   });
 });

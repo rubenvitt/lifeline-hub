@@ -218,6 +218,9 @@ export default function StellenBlock({
   const gemeldet = stellen.filter((s) => s.belegung != null);
   const summe = gemeldet.reduce((n, s) => n + s.belegung!.belegt, 0);
   const ohne = stellen.length - gemeldet.length;
+  // Hat keine Stelle gemeldet, ist die Summe 0 nur „nichts gemeldet", nicht „niemand in
+  // Betreuung" (Spec, Kopfzahl) — dasselbe Wort wie im Evakuierungsblock (`kennzahlText`).
+  const kopfzahl = gemeldet.length === 0 ? 'keine Meldung' : `${personenZahl(summe)} untergebracht`;
 
   return (
     <div style={{ marginBottom: token.marginLG }}>
@@ -227,7 +230,7 @@ export default function StellenBlock({
         meta={
           ladend || stellen.length === 0
             ? undefined
-            : `${personenZahl(summe)} untergebracht${ohne > 0 ? ` · ${personenZahl(ohne)} ohne Meldung` : ''}`
+            : `${kopfzahl}${ohne > 0 ? ` · ${personenZahl(ohne)} ohne Meldung` : ''}`
         }
         dataUpdatedAt={dataUpdatedAt}
         // Sekundär und im Block, nicht im Kopf: die EINE Primäraktion der Seite ist
