@@ -204,6 +204,8 @@ function PegelFestlegen({
     mutationFn: () => fuegePegelHinzu(einsatzId, { station_uuid: uuid, name, gewaesser }),
     onSuccess: (liste) => {
       qc.setQueryData(einsatzKeys.pegel(einsatzId), liste);
+      // Auslöser der Lagekennzahl am Einsatz (LFH-640) — siehe `EinsatzPegel`.
+      void qc.invalidateQueries({ queryKey: einsatzKeys.einsatz(einsatzId) });
       message.success('Als maßgeblicher Pegel festgelegt');
     },
   });

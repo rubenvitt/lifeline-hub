@@ -242,17 +242,17 @@ unverändert, ihre Verdikte stehen in der Prüfliste zu LFH-606.
 | # | Kriterium | Verdikt (Ziel) |
 |---|---|---|
 | 1 | Treffläche | erfüllt, unverändert: die Kennzahl ist ein Link über die ganze Zelle |
-| 2 | Handschuh-Modus | erfüllt, unverändert: die Zellen erben die Dichteachse; der „übernehmen“-Knopf ist ein antd-`Button` und erbt `controlHeight` |
+| 2 | Handschuh-Modus | offen → O4 aus LFH-606 (Bestand: 1-px-Fugen zwischen den Zellen). Der „übernehmen“-Knopf ist ein antd-`Button` und erbt `controlHeight` |
 | 3 | Rückmeldung vor Serverantwort | nicht anwendbar: „übernehmen“ ist rein lokal, ohne Serveraufruf |
 | 4 | Kritische Aktion, zweite Handlung | nicht anwendbar: keine kritische Aktion |
 | 5 | Kontrast | erfüllt, unverändert: dieselbe `Kennzahl`-Komponente, dasselbe Sammelbanner wie im Meldungsstrom |
 | 6 | Status nicht allein über Farbe | erfüllt: der Ton von „Verbleib offen“ steht zusätzlich als Zahl und Notiz |
 | 7 | Eine Farbe = eine Bedeutung | erfüllt: `achtung` für offene Arbeit wie bei „Schäden offen“ |
-| 8 | Helligkeitsregler | nicht anwendbar: seitenübergreifend, hier unberührt |
+| 8 | Helligkeitsregler | offen → O5 aus LFH-606 (querschnittlich, eigener Folge-Task) |
 | 9 | Kritische Anzeigen im Blickfeld, dieselbe Größe an derselben Stelle | **erfüllt, Kern dieses Tickets**: feste Heimatplätze, Wechsel nur durch Entscheidung, pro Entscheidung ein Platz, kein Tausch unter dem Blick |
 | 10 | Alarmbudget | erfüllt: das Banner ist eine Mitteilung ohne Alarmton und erscheint nur bei einer Entscheidung |
 | 11 | Warnverhalten | erfüllt: kein Blinken, das Banner ist statisch |
-| 12 | Kein Sprung unter dem Cursor | erfüllt: sechs Plätze vor jedem Abruf, das Banner ist opt-in. **Nachweis:** die CLS-Spec des Dashboards läuft ohne und mit festgelegtem Pegel |
+| 12 | Kein Sprung unter dem Cursor | für das Band erfüllt: sechs Plätze vor jedem Abruf, der Wechsel ist opt-in. **Nachweis:** Die CLS-Spec misst den Pegel-Beitrag mit echt festgelegtem Pegel. Der Seitenaufbau auf 390 px bleibt Bestand (O1 aus LFH-606) |
 | 13 | Fokus nie verdeckt | erfüllt, unverändert |
 | 14 | Tabellenseite | nicht anwendbar |
 | 15 | Erfassungsmaske | nicht anwendbar |

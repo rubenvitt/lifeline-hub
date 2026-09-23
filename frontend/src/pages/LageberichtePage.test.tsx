@@ -47,6 +47,7 @@ const einsatz: EinsatzAnzeige = {
   org_id: 1,
   org_name: 'Orga',
   meine_sachgebiete: [],
+  lagekennzahlen: [],
 };
 
 const bericht: LageberichtAnzeige = {

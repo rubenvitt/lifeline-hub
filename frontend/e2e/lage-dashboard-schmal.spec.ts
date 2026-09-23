@@ -131,6 +131,7 @@ async function jedeKennzahlStehtInIhrerZelle(page: Page) {
       klient: k.clientWidth,
     })),
   );
+  // Immer sechs Plätze, gleich welche Lagekennzahlen der Einsatz trägt (LFH-640).
   expect(masse).toHaveLength(6);
   for (const [i, mass] of masse.entries()) {
     expect(mass.scroll, `Kennzahl ${i + 1}: Inhalt läuft aus der Zelle`).toBeLessThanOrEqual(

@@ -53,6 +53,8 @@ const einsatz = {
   meine_rolle: 'einsatzleitung',
   org_id: 1,
   org_name: 'THW Musterstadt',
+  // Ein Hochwasser mit festgelegtem Pegel (LFH-640): Platz 1 trägt den Pegel.
+  lagekennzahlen: ['pegel'],
 };
 
 const person = (
@@ -237,6 +239,9 @@ interface Daten {
   /** Der Einsatz-Abruf bleibt hängen — der einzige Zustand, in dem `baueLagebild`
    *  noch gar nichts liefert und das Kennzahlenband seine Plätze selbst stellen muss. */
   einsatzLaedt?: boolean;
+  /** Aktive Lagekennzahlen am Einsatz (LFH-640), zur Anfragezeit gelesen — ein Test kann sie
+   *  zwischen zwei Abrufen ändern. Vorgabe: die des Fixtures (`['pegel']`). */
+  lagekennzahlen?: string[];
 }
 
 function mockEndpunkte(d: Daten) {
@@ -244,7 +249,10 @@ function mockEndpunkte(d: Daten) {
   server.use(
     http.get('/api/einsaetze/1', async () => {
       if (d.einsatzLaedt) await delay('infinite');
-      return HttpResponse.json(einsatz);
+      return HttpResponse.json({
+        ...einsatz,
+        lagekennzahlen: d.lagekennzahlen ?? einsatz.lagekennzahlen,
+      });
     }),
     http.get('/api/einsaetze/1/personen', () =>
       d.personenStatus ? new HttpResponse(null, { status: d.personenStatus }) : json(d.personen),
@@ -295,16 +303,40 @@ function render() {
   );
 }
 
-/** Das gepinnte Kennzahl-Set — handgeschrieben, NICHT aus `KENNZAHL_ETIKETTEN` gelesen:
- *  sonst prüfte der Pin die Konstante gegen sich selbst. */
-const KENNZAHL_SET = [
+/**
+ * Die gepinnten Kennzahlreihen (LFH-640) — handgeschrieben, NICHT aus `kennzahlReihe`
+ * gelesen: sonst prüfte der Pin die Ableitung gegen sich selbst.
+ */
+/** Ein festgelegter Pegel ohne Messung (Ausfall) — trägt Gewässer und Name, kein Wert. */
+const PEGEL_AUSFALL = {
+  id: 1,
+  station_uuid: '47174d8f-1b8e-4599-8a59-b580dd55bc87',
+  name: 'HANN. MÜNDEN',
+  gewaesser: 'WESER',
+  reihenfolge: 0,
+};
+
+const REIHE_MIT_PEGEL = [
   'Pegel',
   'Betroffene',
+  'Schäden offen',
   'Kräfte',
   'Vermisste',
-  'Schäden offen',
   'Einsatzdauer',
 ];
+const REIHE_OHNE_AUSLOESER = [
+  'Verbleib offen',
+  'Betroffene',
+  'Schäden offen',
+  'Kräfte',
+  'Vermisste',
+  'Einsatzdauer',
+];
+
+/** Die Etiketten des Bands in Reihenfolge. */
+function etiketten(): (string | null | undefined)[] {
+  return zellen().map((z) => z.querySelector('.lfh-augenbraue')?.textContent);
+}
 
 /** Die Zellen eines Kennzahlenbands (über seinen zugänglichen Gruppennamen). */
 function zellen(band = 'Lage in Zahlen'): HTMLElement[] {
@@ -344,31 +376,76 @@ function kante(el: HTMLElement): number {
 }
 
 describe('LageDashboardPage — Kennzahlenband', () => {
-  it('trägt genau 6 Kennzahlen in fester Reihenfolge', async () => {
-    // Der Reihenfolge-Pin bleibt (Prüfliste Kriterium 9: dieselbe Größe an derselben Stelle,
-    // nie nach Dringlichkeit umsortiert) — neu belegt mit dem Set des Neuentwurfs S3.
-    // Pegel auf Platz 1 statt „Höchste Warnstufe" (LFH-606); Evakuiert fehlt bewusst
-    // (keine Datenquelle, LFH-607).
+  it('sechs Plätze, Kern fest: mit festgelegtem Pegel steht er auf Platz 1', async () => {
+    // Prüfliste Kriterium 9: dieselbe Größe an derselben Stelle, nie nach Dringlichkeit
+    // umsortiert. Seit LFH-640 bestimmt der Einsatz die zwei Lageplätze (1 und 3).
     mockEndpunkte({ personen: [person('sk1')] });
     render();
     await kennzahlGeladen('Betroffene');
-    const etiketten = zellen().map((z) => z.querySelector('.lfh-augenbraue')?.textContent);
-    expect(etiketten).toEqual(KENNZAHL_SET);
+    expect(etiketten()).toEqual(REIHE_MIT_PEGEL);
   });
 
-  it('stellt schon während des Einsatz-Abrufs sechs Plätze — ohne Ziel und ohne Stand', async () => {
-    // Prüfliste Kriterium 12 (CLS): ohne die Plätze sprängen sechs Zellen später herein.
+  it('ohne Auslöser: kein Pegel-Platz, Platz 1 trägt „Verbleib offen" (LFH-640 statt LFH-606)', async () => {
+    mockEndpunkte({ lagekennzahlen: [], personen: [person('sk1')] });
+    render();
+    await kennzahlGeladen('Betroffene');
+    expect(etiketten()).toEqual(REIHE_OHNE_AUSLOESER);
+    // Der eine Angetroffene hat keinen Verbleib: offene Arbeit, Achtung.
+    const verbleib = kennzahl('Verbleib offen');
+    expect(verbleib.querySelector('[data-lfh="kennzahl-wert"]')?.textContent).toBe('1');
+    expect(verbleib).toHaveTextContent('0 transportiert');
+    expect(verbleib.getAttribute('data-ton')).toBe('achtung');
+    expect(verbleib).toHaveAttribute('href', '/einsaetze/1/personen');
+  });
+
+  it('stellt schon während des Einsatz-Abrufs sechs Plätze — ohne Beschriftung, Ziel und Stand', async () => {
+    // Prüfliste Kriterium 12 (CLS): ohne die Plätze sprängen sechs Zellen später herein. Die
+    // Beschriftung fehlt bewusst — welche Kennzahl auf die Lageplätze kommt, sagt erst der
+    // Einsatz; das geschützte Leerzeichen hält die Zeilenhöhe.
     mockEndpunkte({ einsatzLaedt: true });
     render();
     const plaetze = zellen();
-    expect(plaetze.map((z) => z.querySelector('.lfh-augenbraue')?.textContent)).toEqual(
-      KENNZAHL_SET,
-    );
+    expect(plaetze).toHaveLength(6);
     for (const p of plaetze) {
+      expect(p.querySelector('.lfh-augenbraue')?.textContent).toBe('\u00a0');
       expect(p.textContent).toContain('wird abgerufen');
       // Kein Link: es gibt noch nichts, wohin der Platz führen könnte.
       expect(p.tagName).not.toBe('A');
     }
+  });
+
+  it('ein neuer Zuschnitt beim erneuten Abruf wird GEHALTEN und per Sammelbanner angeboten', async () => {
+    // Spec LFH-640, „Wechsel während der Betrachtung": die Reihe tauscht nicht unter dem
+    // Blick (Kriterium 9/12), sie wechselt erst auf „übernehmen".
+    const daten: Daten = { lagekennzahlen: [] };
+    mockEndpunkte(daten);
+    const { client } = render();
+    await kennzahlGeladen('Verbleib offen');
+    expect(screen.queryByText(/Kennzahlreihe geändert/)).toBeNull();
+
+    // Anderswo wird ein Pegel festgelegt; der nächste Einsatz-Abruf bringt den Auslöser.
+    daten.lagekennzahlen = ['pegel'];
+    await act(() => client.invalidateQueries({ queryKey: einsatzKeys.einsatz(1) }));
+    const banner = await screen.findByText('Kennzahlreihe geändert: Pegel statt Verbleib offen');
+    expect(etiketten()).toEqual(REIHE_OHNE_AUSLOESER);
+
+    await userEvent.click(
+      within(banner.closest('[data-lfh="sammelbanner"]') as HTMLElement).getByRole('button', {
+        name: 'übernehmen',
+      }),
+    );
+    await waitFor(() => expect(etiketten()).toEqual(REIHE_MIT_PEGEL));
+    expect(screen.queryByText(/Kennzahlreihe geändert/)).toBeNull();
+  });
+
+  it('ein erneuter Abruf mit UNVERÄNDERTEM Zuschnitt zeigt kein Banner', async () => {
+    mockEndpunkte({});
+    const { client } = render();
+    await kennzahlGeladen('Pegel');
+    await act(() => client.invalidateQueries({ queryKey: einsatzKeys.einsatz(1) }));
+    await kennzahlGeladen('Pegel');
+    expect(screen.queryByText(/Kennzahlreihe geändert/)).toBeNull();
+    expect(etiketten()).toEqual(REIHE_MIT_PEGEL);
   });
 
   it('zeigt Betroffene mit Patienten-Notiz und Vermisste mit Alarmkante', async () => {
@@ -614,15 +691,14 @@ describe('LageDashboardPage — Kennzahlenband', () => {
     expect(zelle).not.toHaveTextContent('?');
   });
 
-  it('kein Pegel festgelegt: der Platz bleibt belegt und führt auf die Modulseite (dort der Weg zur Auswahl)', async () => {
-    mockEndpunkte({});
+  it('der Pegel führt auf die Modulseite „Wetter & Pegel“, wenn sie frei ist (LFH-633)', async () => {
+    mockEndpunkte({ pegel: [PEGEL_AUSFALL] });
     render();
     const zelle = await waitFor(() => {
       const z = kennzahl('Pegel');
-      expect(z).toHaveTextContent('kein Pegel festgelegt');
+      expect(z).toHaveTextContent('WESER');
       return z;
     });
-    expect(zelle.querySelector('[data-lfh="kennzahl-wert"]')?.textContent).toBe('—');
     await waitFor(() => expect(zelle).toHaveAttribute('href', '/einsaetze/1/wetter-pegel'));
   });
 
@@ -630,6 +706,7 @@ describe('LageDashboardPage — Kennzahlenband', () => {
     // Vor der Override-Antwort gilt ohnehin die Pflege; die Aussage trägt erst NACH ihr.
     const overridesGeliefert = { n: 0 };
     mockEndpunkte({
+      pegel: [PEGEL_AUSFALL],
       overridesGeliefert,
       overrides: {
         'wetter-pegel': {
@@ -644,7 +721,7 @@ describe('LageDashboardPage — Kennzahlenband', () => {
     render();
     const zelle = await waitFor(() => {
       const z = kennzahl('Pegel');
-      expect(z).toHaveTextContent('kein Pegel festgelegt');
+      expect(z).toHaveTextContent('WESER');
       return z;
     });
     await waitFor(() => expect(overridesGeliefert.n).toBeGreaterThan(0));
@@ -943,6 +1020,35 @@ describe('LageDashboardPage — Meldungsstrom', () => {
     await userEvent.click(screen.getByRole('button', { name: 'wechseln' }));
     await waitFor(() => expect(box().querySelector('li[data-lfd-nr="7"]')).not.toBeNull());
     expect(within(box()).queryByText(/neuer? Einträge?/)).toBeNull();
+  });
+
+  it('ein Einsatzwechsel in derselben Instanz übernimmt den neuen Zuschnitt OHNE Banner', async () => {
+    // Die gehaltene Reihe gehört zu EINEM Einsatz (LFH-640) — wie die Wassermarke oben.
+    mockEndpunkte({ lagekennzahlen: [] });
+    server.use(
+      http.get('/api/einsaetze/2', () =>
+        HttpResponse.json({ ...einsatz, id: 2, lagekennzahlen: ['pegel'] }),
+      ),
+      http.get('/api/einsaetze/2/gefahrengebiete/:gid/matrix', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/2/:modul', () => HttpResponse.json([])),
+    );
+    function Wechsel() {
+      const navigate = useNavigate();
+      return <button onClick={() => navigate('/einsaetze/2/lage-dashboard')}>wechseln</button>;
+    }
+    renderMitProviders(
+      <>
+        <Wechsel />
+        <Routes>
+          <Route path="/einsaetze/:id/lage-dashboard" element={<LageDashboardPage />} />
+        </Routes>
+      </>,
+      { route: '/einsaetze/1/lage-dashboard' },
+    );
+    await kennzahlGeladen('Verbleib offen');
+    await userEvent.click(screen.getByRole('button', { name: 'wechseln' }));
+    await waitFor(() => expect(etiketten()).toEqual(REIHE_MIT_PEGEL));
+    expect(screen.queryByText(/Kennzahlreihe geändert/)).toBeNull();
   });
 
   it('ein leerer Strom füllt sich direkt — über einer leeren Fläche springt nichts', async () => {

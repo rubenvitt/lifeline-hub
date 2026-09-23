@@ -321,6 +321,24 @@ describe('EinsatzPegel', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
+  it('eine gesendete Änderung erneuert den Einsatz — dort steht der Auslöser der Lagekennzahl (LFH-640)', async () => {
+    // Ohne das sähe das Lage-Dashboard den neuen Zuschnitt erst beim nächsten Einsatz-Abruf.
+    stelleBereit();
+    let einsatzAbrufe = 0;
+    server.use(
+      http.get('/api/einsaetze/1', () => {
+        einsatzAbrufe++;
+        return HttpResponse.json(einsatz());
+      }),
+    );
+    rendern(eigenerClient());
+    await waitFor(() => expect(zeilentitel()).toHaveLength(2));
+    const vorher = einsatzAbrufe;
+    await zeilenaktion('WAHNHAUSEN', /Entfernen/);
+    await waitFor(() => expect(zeilentitel()).toEqual(['1. HANN. MÜNDEN']));
+    await waitFor(() => expect(einsatzAbrufe).toBeGreaterThan(vorher));
+  });
+
   it('Rückmeldung vor der Serverantwort: während des PUT sind die Zeilenmenüs gesperrt', async () => {
     // Prüfliste Kriterium 3: kein optimistisches Update, aber sofort sichtbarer Zustand.
     stelleBereit({ verzoegerung: 400 });

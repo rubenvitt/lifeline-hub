@@ -44,6 +44,7 @@ function einsatz(over: Partial<EinsatzAnzeige> = {}): EinsatzAnzeige {
     org_id: 1,
     org_name: 'Org',
     meine_sachgebiete: [],
+    lagekennzahlen: [],
     ...over,
   };
 }

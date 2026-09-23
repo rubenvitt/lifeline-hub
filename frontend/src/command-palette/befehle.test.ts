@@ -144,6 +144,7 @@ const aktiverEinsatz: EinsatzAnzeige = {
   org_id: 1,
   org_name: 'KV',
   meine_sachgebiete: [],
+  lagekennzahlen: [],
 };
 const beendet: EinsatzAnzeige = {
   ...aktiverEinsatz,

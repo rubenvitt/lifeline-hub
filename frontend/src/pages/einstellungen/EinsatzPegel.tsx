@@ -215,6 +215,9 @@ export default function EinsatzPegel() {
     },
     onSuccess: ({ liste, gesendet }, a) => {
       qc.setQueryData(einsatzKeys.pegel(einsatzId), liste);
+      // Die Festlegung ist Auslöser der Lagekennzahl am Einsatz (LFH-640): ohne das hier sähe
+      // das Lage-Dashboard den neuen Zuschnitt erst beim nächsten Einsatz-Abruf.
+      if (gesendet) void qc.invalidateQueries({ queryKey: einsatzKeys.einsatz(einsatzId) });
       if (a.art === 'hinzufuegen') setAuswahl(null);
       if (gesendet) message.success('Pegel gespeichert');
       else message.info('Diese Station ist nicht mehr festgelegt — die Liste ist aktualisiert.');

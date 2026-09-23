@@ -299,6 +299,7 @@ mod tests {
             id: 1,
             org_id: 1,
             org_name: "Orga".into(),
+            pegel_festgelegt: false,
             bezeichnung: "Lage".into(),
             stichwort: None,
             status,
