@@ -194,6 +194,16 @@ Personenstatus. **Die Sichtung ist die eine Ausnahme vom Vorrang des Neuentwurfs
 (22.09.2026): dessen Farben (II orange, III gelb, IV grau) hat der Auftraggeber ausdrücklich
 abgelehnt — `SichtungsTag`/`sichtungsfarben` bleiben BBK.
 
+**Nachzug LFH-650 (gemessen, Prüfliste `2026-09-22-lfh-613-pruefliste.md`):** Blauer
+Bedien-TEXT nimmt `rollen.bedienText`, nicht antds `colorLink` — der Linkton trug auf einer
+Lückenzeile 5,93 (Tag) / 4,50 (Nacht). Personen-Marker tragen eine unsichtbare Trefferzone mit
+dem Durchmesser `controlHeight` (`KarteMarker.trefferDurchmesser`) und außen 2 px Schwarz um den
+weißen Rand (Weiß + Schwarz halten gegen jeden Grund ≥ 4,58); die Lagekarte setzt beides nicht.
+Personen-Cluster zeigen ihren Ring nach Sichtung und im Kern das Kürzel der dringlichsten
+Kategorie — kein eigenes Personen-Segment mehr. Die gefüllte `BemerkungZelle` ist ein
+Textknopf (gleiche Höhe wie der Platzhalter), der Fehler einer Inline-Zelle steht an der Zelle
+(`data-fehler`), nicht im Toast.
+
 `e2e/betroffene-kontrast.spec.ts` prüft die tatsächlich zusammengesetzten Text-/Hintergrundpaare
 auf Aufnahme-Route, im Modal, in Listen und Details: Tag ≥ 7:1, Nacht ≥ 5:1. Die Sichtungswahl
 wird ungewählt, gewählt und mit Hover geprüft; Alpha wird mitgerechnet, unbelegte
@@ -448,6 +458,21 @@ Alltag wichtigsten:
   dieselbe Trennung, aus der `dichte.guard.test.ts` `Card`/`Descriptions` heraushält. Geprüft
   wird die reine `tastenkuerzelStil`-Funktion nach dem Muster von `bedienzielStil`, samt der
   **Abwesenheit** von `minHeight`.
+- **Die Sprungpalette öffnet auf drei Wegen, nach dem Raycast-Muster** (LFH-645): ↵ öffnet,
+  **Strg/⌘+↵** (auch Strg/⌘+Klick) öffnet das Ziel im **neuen Browser-Tab**, **→** zeigt am
+  Textende eine Lese-Vorschau **in** der Palette. Die Vorschau ersetzt die Liste; Esc/← führen
+  zurück, Begriff und Markierung bleiben. „⇧↵ im Panel“ aus dem Neuentwurf ist entfallen, ⇧↵
+  ist frei, und es gibt keine neue Drawer-Fläche. `Befehl.ziel` ist die Marke,
+  `ausfuehren(oeffnung?)` reicht `'neuerTab'` bis `navigate`. Navigationszeilen entstehen nur
+  über `sprungZu` (`command-palette/typen.ts`), die Guards in `befehle.test.ts` und
+  `datensaetze.test.ts` prüfen das Durchreichen je Zeile. Die Fehlerrichtung ist sonst still:
+  „neuer Tab“ öffnet dann hier. Eine Zeile ohne Ziel bleibt bei Strg/⌘+↵ wirkungslos, es gibt
+  keinen Rückfall auf ↵. Esc in der Vorschau **muss** `preventDefault` rufen, sonst schließt
+  der globale `verwerfen` die Palette mit. Strg/⌘+↵ ohne Ziel braucht dagegen kein Abfangen,
+  der Dispatcher schluckt Mutationstasten bei offener Palette selbst. Beides ist gemessen. Eine
+  neue Vorschausorte bekommt einen Eintrag in `VorschauZiel` und einen Zweig in
+  `command-palette/Vorschau.tsx` (exhaustiv). Ihr Inhalt ist ein Lese-Bauteil, das auch außerhalb
+  der Palette steht (Vorbild `personen/PersonVorschau.tsx`, geteilt mit `PersonDetailDrawer`).
 - **Datensatz-Aktionen werden gebündelt, nicht aufgereiht** (LFH-365 · B5e). Ab drei Aktionen
   an einer Zeile oder Karte, **gezählt nach der Rechteprüfung**: ein `Dropdown` mit
   `menu={{ items }}`, `trigger={['click']}`, `autoFocus` und icon-only `<Button type="text">`,
@@ -1614,6 +1639,60 @@ gepflegt. Wahrheitsquelle: die `#[derive(ToSchema)]`-Response-Structs + Domänen
   von `null` — serde_json liefert beim Index-Zugriff auf ein Object in beiden Fällen `Null`.
   Presence wird deshalb per `v.as_object().unwrap().contains_key("feld")` geprüft; sonst bleibt
   der Test nach der Umstellung grün und belegt nichts (`tests/ort_vorschau.rs` ist die Referenz).
+
+## Backend — Migrationsvergabe (LFH-658)
+
+**Die Migrationsnummer bleibt fortlaufend** (`migrations/0001_…` ff.). Neu ist die Regel
+**„anhängen, nicht einschieben“**: Eine Migration, die ein Branch neu mitbringt, trägt eine
+Nummer, die **größer als jede Nummer auf dem aktuellen Ziel-Branch** ist. Eine freie Nummer
+genügt nicht. Eine Migration, die es an der Abzweigung schon gab, wird weder geändert noch
+umbenannt oder gelöscht.
+
+- **Prüfen:** `scripts/check-migrationen.sh` (Vorgabe: gegen `origin/alpha`, also vorher
+  `git fetch`). Bei einem Verstoß nennt das Skript die Datei und die nächste freie Nummer.
+- **Umlegen:** `scripts/check-migrationen.sh --umnummerieren`. Es benennt die eigenen neuen
+  Migrationen um und ersetzt jeden Verweis auf den alten Dateinamen, also `include_str!` in
+  Tests und Pfade in der Doku. Es committet nicht. Eine alte Nummer in Bezeichnern, etwa
+  `migration_0117_…` als Testname, listet es nur auf.
+- **Durchgesetzt** wird die Regel über `.github/workflows/migrationen.yml`. Der Workflow setzt
+  den Commit-Status `Migrationsnummern` beim Öffnen und Aktualisieren eines PRs und bewertet
+  **bei jedem Push auf `alpha`/`beta`/`main` alle offenen PRs gegen diesen Branch neu**. Der
+  Status ist ein Required Check im Ruleset 17017911. Mergt PR A, wird PR B rot, ohne sich
+  selbst zu bewegen. `db::tests::migrationsnummern_sind_eindeutig` bleibt das Netz auf dem
+  eigenen Stand. Lokal läuft die Prüfung als Schritt 10 von `check-all.sh` und ist dort nur
+  so frisch wie der letzte `fetch`.
+
+**Warum die Nummer verschieden sein muss und dazu höher:** sqlx 0.9 spielt eine kleinere,
+noch nicht eingespielte Version **still** nach. Es gibt keine Prüfung „applied out of order“,
+festgehalten in `db::tests::sqlx_spielt_eingeschobene_kleinere_version_still_nach`. Eine DB,
+die `0118` schon hat, nimmt ein später gemergtes `0117` ohne Meldung mit, eine frische DB
+spielt beide in Nummernfolge. Bei den Tabellen-Rebuilds dieses Projekts (0082, 0089, 0112)
+entstehen daraus verschiedene Schemata, ohne dass irgendetwas rot wird.
+
+**Verworfen, mit Grund** (Einzelheiten in
+`openspec/changes/lfh-658-migrationsnummern-vor-dem-merge/design.md`):
+- **Zeitstempel-Versionen** schließen Kollisionen aus, die Reihenfolge aber nicht. Aus einer
+  lauten Kollision würde ein stiller Einschub, und die Prüfung gegen den Ziel-Branch bräuchte
+  es trotzdem. Ein späterer Wechsel ginge ohne Bruch: Versionen sind `i64`, ein Zeitstempel
+  sortiert hinter `0116`.
+- **Nummer erst beim Merge vergeben:** Es gibt keinen Haken vor dem GitHub-Merge, der ohne
+  Bot-Push umbenennt. Ein Bot-Push löst die volle CI erneut aus. Platzhalternamen brechen
+  zudem `include_str!`.
+- **„Branches must be up to date“** kostet nach jedem Merge einen vollen CI-Lauf für jeden
+  offenen PR, auch ohne Migration. Eine **Merge Queue** bietet GitHub nur für Repositories
+  von Organisationen an.
+
+**Bekannte Grenze:** Zwischen dem Merge von A und dem Ende des Push-Laufs, etwa eine Minute,
+steht B noch grün. PRs aus Forks bekommen ihren Status erst mit dem nächsten Push auf den
+Ziel-Branch, weil der Token dort nicht schreiben darf.
+
+**Migrationen entstehen nur über `alpha`.** Die Regel kennt keine Kanal-Ausnahme. Bringt ein
+Hotfix direkt auf `beta`/`main` eine `0117` mit, während `alpha` schon bis `0120` reicht,
+ist der Rückweg nach `alpha` rot. Die nächste Freigabe `alpha → main` ist es ebenfalls, und
+auflösen ließe es sich nur, indem man eine eingespielte Migration umbenennt. Ein Hotfix mit
+Schemaänderung geht deshalb über `alpha`. Freigaben laufen als Merge-Commit, nicht als
+Squash: Nach einem Squash bleibt die Abzweigung alt, und jede frühere Migration erschiene
+wieder als eingeschoben.
 
 ## Backend — ClamAV-Upload-Scan (Default-AN, LFH-114/LFH-224)
 

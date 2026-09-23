@@ -197,8 +197,13 @@ export default function LagekartePage() {
   // Modul. Personen sind nur wählbar (Marker-Klick, Inspector), solange sie gezeichnet werden;
   // für die übrigen Ebenen bleibt `alleVerortet` der Lookup wie bisher. Startausschnitt und
   // Kopfzahl bleiben auf `alleVerortet` und damit ohne Personen.
+  // `clusterQuelle`: auf DIESER Karte clustern Personen getrennt und liegen unter den Kräften
+  // (`PERSONEN_CLUSTER_QUELLE`); die Betroffenen-Karte setzt es nicht.
   const personenAufKarte = useMemo(
-    () => (layer.person && personenZugriff === 'frei' ? personenVerortet : []),
+    () =>
+      layer.person && personenZugriff === 'frei'
+        ? personenVerortet.map((m) => ({ ...m, clusterQuelle: 'personen' as const }))
+        : [],
     [layer.person, personenZugriff, personenVerortet],
   );
   const waehlbar = useMemo(

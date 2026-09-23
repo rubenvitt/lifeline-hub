@@ -262,6 +262,21 @@ export function abloesungPfad(einsatzId: number): string {
   return einsatzModulPfad(einsatzId, 'abloesung');
 }
 
+/** Fachmodul „Wetter & Pegel" (LFH-633): Pegel mit Verlauf, DWD-Warnungen, Vorhersage. */
+export function wetterPegelPfad(einsatzId: number): string {
+  return einsatzModulPfad(einsatzId, 'wetter-pegel');
+}
+
+/**
+ * Ziel eines Pegel-Verweises (Dashboard-Kennzahl, Überblick-Marke): die Modulseite, wenn sie
+ * für die Person frei ist, sonst die Pflege in Einstellungen › Pegel (LFH-633). Die Frage
+ * „frei?" beantwortet der Aufrufer (`istKeyFreigegeben`), damit diese Datei keine Registry
+ * und keinen Benutzer kennen muss.
+ */
+export function pegelZielPfad(einsatzId: number, modulFrei: boolean): string {
+  return modulFrei ? wetterPegelPfad(einsatzId) : einsatzEinstellungenPfad(einsatzId, 'pegel');
+}
+
 /**
  * Stab-Modul (LFH-46). `?neu=1` wird ab ST5 (LFH-543) von der Seite gelesen und geräumt
  * (Abschluss der Lagebesprechung, apply-then-clean wie ETB/Schäden).

@@ -124,8 +124,12 @@ Backend-Pfadparameter, die Schlüsselliste ist in `fachebenen.test.ts` gepinnt.
 
 ### D5 Eigene geclusterte Quelle `marker-personen`
 - **Aufteilung:** `sorgeFuerMarkerLayer`/`reAnlegenMarker` teilen die clusterbaren Marker
-  aus `baueMarkerFc` an EINER Stelle auf (`teileNachQuelle`): Personen nach
-  `marker-personen`, der Rest nach `marker-cluster`. Beim Umsetzen gewählt statt einer
+  aus `baueMarkerFc` an EINER Stelle auf (`teileNachQuelle`): was `clusterQuelle: 'personen'`
+  trägt, geht nach `marker-personen`, der Rest nach `marker-cluster`. Das Feld setzt NUR die
+  Lagekarte. Die Betroffenen-Karte behält ihre Personen in `marker-cluster` samt
+  Sichtungs-Donut, Trefferzone und Außenkante aus LFH-650; dort gibt es keine Kräfte, die ein
+  Donut verdecken könnte. Datengetrieben statt per Kartenschalter, damit `kartenLayer.ts` nach
+  einem Stilwechsel nichts weiter wissen muss (Merge mit LFH-650, 23.09.2026). Beim Umsetzen gewählt statt einer
   eigenen `bauePersonenFc` mit neuer Signatur, weil so weder `kartenLayer.ts` noch eine
   Konsumentin der Kartenfläche wissen muss, dass es zwei Quellen gibt. Die Personen-Quelle
   ist geclustert wie `marker-cluster` (Radius 45, `clusterMaxZoom` 14, `clusterProperties`).
@@ -136,8 +140,12 @@ Backend-Pfadparameter, die Schlüsselliste ist in `fachebenen.test.ts` gepinnt.
 - **Personen-Cluster als WebGL-Layer, nicht als DOM-Donut** (Review-Befund beim Umsetzen):
   Ein DOM-Donut hängt über dem Canvas. Er deckte ein Fahrzeugzeichen zu und fing dessen
   Klick ab, das verletzte „Cluster unter den Kräften“. Deshalb zeichnen
-  `personen-cluster-kreis` und `personen-cluster-zahl` die Cluster, ganz unten in
-  `MARKER_LAYER_REIHENFOLGE`. Der Donut-Sync bleibt bei `marker-cluster` allein; mit zwei
+  `personen-cluster-kante`, `personen-cluster-kreis` und `personen-cluster-zahl` die Cluster,
+  ganz unten in `MARKER_LAYER_REIHENFOLGE`. Die Füllung ist die Farbe der DRINGLICHSTEN
+  Sichtung, darin stehen Zahl und Kürzel. Beides kommt aus derselben Aggregation `s_<kategorie>`
+  wie der Sichtungs-Donut aus LFH-650, das Rosé aus LFH-613 entfällt. Die Einzel-Personen
+  tragen dort Trefferzone und Außenkante wie in `marker-cluster` (`personen-treffer`,
+  `personen-kante`). Der Donut-Sync bleibt bei `marker-cluster` allein; mit zwei
   Quellen hatte er zudem die Donuts einer nachladenden Quelle abgeräumt (Flackern).
   - Ein Karten-Klick fächert einen Personen-Cluster nur auf, wenn er das OBERSTE Feature am
     Punkt ist (`personenClusterTreffer`, rein). Liegt ein Kräfte-Zeichen darüber, gehört der

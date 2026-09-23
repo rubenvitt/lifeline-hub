@@ -69,6 +69,10 @@ export function personenMarker(
       lon,
       label: `${registrierAnzeige(p.registrier_nr)} · ${skText}`,
       kurzzeichen: SK_KURZZEICHEN[sk ?? 'ohne'],
+      sichtung: sk ?? 'ohne',
+      // Trefffläche nach der Dichtestufe (LFH-650): der gezeichnete Kreis bleibt ~22 px,
+      // die unsichtbare Zone darunter misst `controlHeight` (30 / 48 / 72).
+      trefferDurchmesser: token.controlHeight,
       farbe: darstellung?.farbe ? sichtungsfarben[darstellung.farbe] : neutral,
     });
   }

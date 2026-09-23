@@ -3,12 +3,13 @@
 //! der Override-Validierung.
 //!
 //! **Spiegel zur Frontend-`modulRegistry.ts`:** Die Key-Menge MUSS mit der FE-Registry
-//! synchron bleiben (ein Test in `tests/einsatz.rs` fängt Drift). Das Backend braucht
+//! synchron bleiben (`backend_modul_keys_decken_frontend_registry` in
+//! `tests/modul_override.rs` fängt Drift). Das Backend braucht
 //! nur die Keys + die ausblendbar-Eigenschaft — Labels/Icons/Routen bleiben rein FE.
 
 /// Alle gültigen Modul-Keys (Spiegel der Frontend-`modulRegistry`-`key`-Werte).
 /// Reihenfolge wie in der FE-Registry (Kategorie für Kategorie) — rein dokumentarisch.
-pub const MODUL_KEYS: [&str; 28] = [
+pub const MODUL_KEYS: [&str; 29] = [
     // Führung (Neuentwurf 21.09.2026: Überblick als Startseite, Aufträge hierher verschoben)
     "ueberblick",
     "einsatzdaten",
@@ -35,6 +36,7 @@ pub const MODUL_KEYS: [&str; 28] = [
     "lagekarte",
     "lageberichte",
     "gefahrenzonen",
+    "wetter-pegel",
     "lagemeldungen",
     // Kommunikation
     "chat",
@@ -119,6 +121,7 @@ modul_marker! {
     Stab => "stab",
     Dokumente => "dokumente",
     Abloesung => "abloesung",
+    WetterPegel => "wetter-pegel",
 }
 
 /// Pfad-Präfix (app.rs-Route) → erwarteter Modul-Key (LFH-230). `None` = modul-lose
@@ -133,6 +136,9 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     ("/api/einsaetze/{id}/stab", Some("stab")),
     ("/api/einsaetze/{id}/dokumente", Some("dokumente")),
     ("/api/einsaetze/{id}/abloesungen", Some("abloesung")),
+    // Wetter & Pegel (LFH-633): nur der Wetter-Endpunkt ist am Modul gegatet. Der
+    // Pegelverlauf liegt unter dem modul-losen Pegel-Präfix unten.
+    ("/api/einsaetze/{id}/wetter", Some("wetter-pegel")),
     ("/api/einsaetze/{id}/karten-ansichten", Some("lagekarte")),
     ("/api/einsaetze/{id}/lage-snapshots", Some("lagekarte")),
     ("/api/einsaetze/{id}/anhaenge", None),
@@ -231,6 +237,7 @@ mod tests {
         assert_eq!(Auftraege::KEY, Some("auftraege"));
         assert_eq!(Stab::KEY, Some("stab"));
         assert_eq!(Dokumente::KEY, Some("dokumente"));
+        assert_eq!(WetterPegel::KEY, Some("wetter-pegel"));
         assert_eq!(OhneModul::KEY, None);
     }
 
@@ -254,6 +261,16 @@ mod tests {
         assert_eq!(key_fuer_pfad("/api/einsaetze/{id}/anhaenge"), Some(None));
         assert_eq!(
             key_fuer_pfad("/api/einsaetze/{id}/anhaenge/{aid}"),
+            Some(None)
+        );
+        // Wetter & Pegel (LFH-633): der Wetter-Endpunkt ist am Modul gegatet, der Pegelverlauf
+        // bleibt unter dem modul-losen Pegel-Präfix.
+        assert_eq!(
+            key_fuer_pfad("/api/einsaetze/{id}/wetter"),
+            Some(Some("wetter-pegel"))
+        );
+        assert_eq!(
+            key_fuer_pfad("/api/einsaetze/{id}/pegel/verlauf"),
             Some(None)
         );
         // Noch DEFERRED / nicht registriert.

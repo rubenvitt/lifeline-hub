@@ -29,8 +29,10 @@ import {
   DATENSATZ_MINDESTZEICHEN,
   PALETTE_MODI,
   QUELLE_MODUL,
+  sprungZu,
   type Befehl,
   type DatensatzQuelle,
+  type Oeffnung,
   type PaletteModus,
 } from './typen';
 import type {
@@ -133,7 +135,8 @@ export interface DatensatzKontext {
    * zu unterscheiden, und das ist genau der Fall, den niemand bemerkt.
    */
   aktuellerModulKey: string | null;
-  navigate: (pfad: string) => void;
+  /** `oeffnung` fehlt = im aktuellen Tab (LFH-645). */
+  navigate: (pfad: string, oeffnung?: Oeffnung) => void;
   quellen: DatensatzQuellen;
 }
 
@@ -456,7 +459,7 @@ export function baueDatensatzTreffer(k: DatensatzKontext): Treffer[] {
 
   const alsTreffer = (kand: Kandidat, stufe: 0 | 1 | 2 | 3): Treffer => {
     gesehen.add(schluessel(kand));
-    return { befehl: befehlFuer(kand, k.navigate), score: UNBEWERTET, stufe };
+    return { befehl: befehlFuer(kand, k.einsatzId, k.navigate), score: UNBEWERTET, stufe };
   };
 
   if (zahl) {
@@ -586,7 +589,7 @@ function etbSammeltreffer(k: DatensatzKontext, suche: string): Treffer | null {
       kontext: `${m.label} · ${n} Treffer`,
       schlagworte: [m.label],
       icon: m.icon,
-      ausfuehren: () => k.navigate(ziel),
+      ...sprungZu(ziel, k.navigate),
     },
     score: UNBEWERTET + 1,
     stufe: 3,
@@ -701,7 +704,11 @@ export function sichtbareDatensaetze(
  * Die Ikone kommt aus der `modulRegistry`, die Modulherkunft ebenso: eine zweite
  * Namensquelle fällt niemandem auf, weil beide Seiten plausibel aussehen (Befund M14).
  */
-function befehlFuer(kand: Kandidat, navigate: (pfad: string) => void): Befehl {
+function befehlFuer(
+  kand: Kandidat,
+  einsatzId: number,
+  navigate: DatensatzKontext['navigate'],
+): Befehl {
   const m = modulRegistry.find((x) => x.key === kand.modulKey);
   return {
     id: schluessel(kand),
@@ -712,6 +719,11 @@ function befehlFuer(kand: Kandidat, navigate: (pfad: string) => void): Befehl {
     kontext: m?.label ?? kand.modulKey,
     schlagworte: [m?.label ?? kand.modulKey],
     icon: m?.icon,
-    ausfuehren: () => navigate(kand.ziel),
+    ...sprungZu(kand.ziel, navigate),
+    // Die Vorschau in der Palette (LFH-645, Taste →) trägt heute allein die Person — ihr
+    // Inhalt liegt als `PersonVorschau` schon vor. Die übrigen Sorten sind Folgearbeit.
+    ...(kand.modulKey === QUELLE_MODUL.personen
+      ? { vorschau: { art: 'person' as const, einsatzId, id: kand.id } }
+      : {}),
   };
 }

@@ -1,4 +1,5 @@
-//! Reine Auswertung einer PEGELONLINE-Zeitreihe (LFH-606): Parsen, jüngste Messung, Trend.
+//! Reine Auswertung einer PEGELONLINE-Zeitreihe (LFH-606): Parsen, jüngste Messung, Trend
+//! und der 24-h-Verlauf für die Modulseite „Wetter & Pegel" (LFH-633).
 //!
 //! **Warum Regression statt Differenz:** „jetzt minus vor einer Stunde" hängt an genau zwei
 //! Messungen; ein einzelner Ausreißer an einer der beiden schlägt voll auf den Trend durch
@@ -16,6 +17,11 @@ use super::PegelMessung;
 pub const FENSTER_S: i64 = 60 * 60;
 /// Mindestspanne der Messungen im Fenster, ab der ein Trend ausgewiesen wird (Sekunden).
 pub const MIN_SPANNE_S: i64 = 30 * 60;
+/// Länge des Verlaufs vor der jüngsten Messung (Sekunden).
+pub const VERLAUF_S: i64 = 24 * 60 * 60;
+/// Höchstzahl der Verlaufspunkte: 5-min-Raster über 24 h. Die Quelle misst meist im
+/// 15-min-Raster (96 Punkte); Stationen im 1-min-Takt kämen sonst auf bis zu 1440.
+pub const VERLAUF_MAX_PUNKTE: usize = 288;
 
 /// Ein Messpunkt, wie er im Cache (`pegel:<uuid>`) liegt. Der Zeitstempel bleibt der
 /// Originalstring der Quelle, damit die Anzeige den Zonenversatz der Quelle behält.
@@ -66,6 +72,39 @@ pub fn messung_aus_reihe(reihe: &[Messpunkt]) -> Option<PegelMessung> {
         zeitpunkt: juengste.zeitpunkt.clone(),
         trend_cm_pro_h: trend_cm_pro_h(&zeitreihe),
     })
+}
+
+/// Verlauf der letzten 24 Stunden: aufsteigend nach absolutem Zeitpunkt, alles vor
+/// `jüngster − 24 h` abgeschnitten, Punkte ohne lesbaren Zeitstempel verworfen.
+///
+/// Ist die Reihe dann länger als [`VERLAUF_MAX_PUNKTE`], wird sie auf ebenso viele
+/// gleich breite Zeitfächer (5 min) ausgedünnt, je Fach der letzte Punkt. Der jüngste Punkt
+/// bleibt damit immer erhalten — er ist der Wert, den die Zeile daneben als Messung zeigt.
+/// Den Trend rechnet weiter die volle Reihe (`messung_aus_reihe`), nicht dieser Auszug.
+pub fn verlauf(reihe: &[Messpunkt]) -> Vec<Messpunkt> {
+    let mut punkte: Vec<(i64, &Messpunkt)> = reihe
+        .iter()
+        .filter_map(|p| zeit(p).map(|t| (t.timestamp(), p)))
+        .collect();
+    // Stabil: bei gleichem Zeitpunkt bleibt die Reihenfolge der Quelle.
+    punkte.sort_by_key(|(t, _)| *t);
+    let Some(&(t_max, _)) = punkte.last() else {
+        return Vec::new();
+    };
+    let beginn = t_max - VERLAUF_S;
+    punkte.retain(|(t, _)| *t >= beginn);
+    if punkte.len() <= VERLAUF_MAX_PUNKTE {
+        return punkte.into_iter().map(|(_, p)| p.clone()).collect();
+    }
+    let breite = VERLAUF_S / VERLAUF_MAX_PUNKTE as i64;
+    let mut faecher: Vec<Option<&Messpunkt>> = vec![None; VERLAUF_MAX_PUNKTE];
+    for (t, p) in punkte {
+        // Der jüngste Punkt liegt genau auf `beginn + 24 h` und fiele rechnerisch in ein
+        // 289. Fach — er gehört ins letzte.
+        let fach = (((t - beginn) / breite) as usize).min(VERLAUF_MAX_PUNKTE - 1);
+        faecher[fach] = Some(p);
+    }
+    faecher.into_iter().flatten().cloned().collect()
 }
 
 /// Trend in cm/h über `(unix_sekunden, wert_cm)`: Kleinste-Quadrate-Steigung über alle
@@ -253,6 +292,67 @@ mod tests {
         assert_eq!(reihe.len(), 1);
         assert_eq!(reihe[0].wert_cm, 63.0);
         assert_eq!(parse_messungen(&json!([])), Some(vec![]));
+    }
+
+    /// Punkte im Raster `schritt_s` (Sekunden), der letzte um 2026-09-22T12:00:00Z; `werte`
+    /// ist aufsteigend in der Zeit.
+    fn reihe_im_raster(n: usize, schritt_s: i64) -> Vec<Messpunkt> {
+        let ende = DateTime::parse_from_rfc3339("2026-09-22T12:00:00Z").unwrap();
+        (0..n)
+            .map(|i| Messpunkt {
+                zeitpunkt: (ende - chrono::Duration::seconds((n - 1 - i) as i64 * schritt_s))
+                    .to_rfc3339(),
+                wert_cm: i as f64,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn verlauf_sortiert_aufsteigend() {
+        let roh = json!([
+            { "timestamp": "2026-09-22T09:15:00+02:00", "value": 110.0 },
+            { "timestamp": "2026-09-22T06:15:00Z", "value": 100.0 },
+            { "timestamp": "2026-09-22T08:30:00+02:00", "value": 102.5 },
+        ]);
+        let v = verlauf(&parse_messungen(&roh).unwrap());
+        let werte: Vec<f64> = v.iter().map(|p| p.wert_cm).collect();
+        assert_eq!(werte, vec![100.0, 102.5, 110.0]);
+        assert_eq!(
+            v[2].zeitpunkt, "2026-09-22T09:15:00+02:00",
+            "Originalstring der Quelle"
+        );
+    }
+
+    #[test]
+    fn verlauf_schneidet_alles_vor_24_h_ab() {
+        // 25 h im 15-min-Raster: 101 Punkte, davon liegen 97 in [jüngster − 24 h, jüngster].
+        let v = verlauf(&reihe_im_raster(101, 15 * 60));
+        assert_eq!(v.len(), 97);
+        assert_eq!(v[0].wert_cm, 4.0, "genau 24 h vorher bleibt drin");
+        assert_eq!(v.last().unwrap().wert_cm, 100.0);
+    }
+
+    #[test]
+    fn verlauf_duennt_eine_minutenreihe_aus() {
+        // 1-min-Takt über 24 h: 1441 Punkte inklusive beider Ränder.
+        let roh = reihe_im_raster(1441, 60);
+        let v = verlauf(&roh);
+        assert!(v.len() <= VERLAUF_MAX_PUNKTE, "{}", v.len());
+        assert!(v.len() >= VERLAUF_MAX_PUNKTE - 1, "{}", v.len());
+        assert_eq!(v.last(), roh.last(), "der jüngste Punkt bleibt erhalten");
+        let zeiten: Vec<i64> = v.iter().map(|p| zeit(p).unwrap().timestamp()).collect();
+        assert!(zeiten.windows(2).all(|w| w[0] < w[1]), "aufsteigend");
+    }
+
+    #[test]
+    fn verlauf_laesst_kurze_reihen_unberuehrt() {
+        let roh = reihe_im_raster(96, 15 * 60);
+        assert_eq!(verlauf(&roh), roh);
+    }
+
+    #[test]
+    fn verlauf_einer_leeren_reihe_ist_leer() {
+        assert!(verlauf(&[]).is_empty());
     }
 
     #[test]

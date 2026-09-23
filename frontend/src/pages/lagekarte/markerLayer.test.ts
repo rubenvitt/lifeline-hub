@@ -12,6 +12,7 @@ import {
   PERSONEN_CLUSTER_KLICK_LAYER,
   personenClusterTreffer,
   MARKER_KLICK_LAYER,
+  naechstesMerkmal,
   SPIDER_LEAVES_QUELLE,
   SPIDER_LEGS_QUELLE,
   SPIDER_KLICK_LAYER,
@@ -239,14 +240,19 @@ describe('sorgeFuerMarkerLayer', () => {
     // Die Plaketten liegen UNTER den Zeichen: MapLibre vergibt Platz von oben nach unten, die
     // Zeichen (allow-overlap) belegen ihn also zuerst, und keine Plakette deckt ein Zeichen zu.
     expect(moves).toEqual([
-      // Betroffene (LFH-648) GANZ unten: sie liegen unter jedem Kräfte-/Objektzeichen —
-      // auch ihre CLUSTER, deshalb sind die WebGL-Layer und kein DOM-Donut.
+      // Betroffene auf der Lagekarte (LFH-648) GANZ unten: sie liegen unter jedem Kräfte-/
+      // Objektzeichen — auch ihre CLUSTER, deshalb sind die WebGL-Layer und kein DOM-Donut.
+      'personen-cluster-kante',
       'personen-cluster-kreis',
       'personen-cluster-zahl',
+      'personen-treffer',
+      'personen-kante',
       'personen-kreis',
       'personen-kurz',
       'personen-label',
+      'marker-treffer',
       'marker-status-ring',
+      'marker-kante',
       'marker-kreis',
       'marker-kurz',
       'marker-label',
@@ -254,12 +260,48 @@ describe('sorgeFuerMarkerLayer', () => {
       'marker-symbol',
       'marker-einsatzort-symbol',
       'spider-legs-line',
+      'spider-treffer',
       'spider-status-ring',
+      'spider-kante',
       'spider-kreis',
       'spider-kurz',
       'spider-label',
       'spider-symbol',
     ]);
+  });
+
+  it('die Trefferzone (LFH-650) ist unsichtbar, liegt ganz unten, ist Klickziel und nur für Features MIT `treffer`', () => {
+    const { map, layers } = fakeMap();
+    sorgeFuerMarkerLayer(map as never, leer, leer);
+    for (const id of ['marker-treffer', 'spider-treffer']) {
+      const layer = layers.get(id) as {
+        type: string;
+        filter: unknown;
+        paint: Record<string, unknown>;
+      };
+      expect(layer.type).toBe('circle');
+      // Ohne `treffer` keine Zone — die Lagekarte setzt die Eigenschaft nicht und bleibt gleich.
+      expect(JSON.stringify(layer.filter)).toContain('["has","treffer"]');
+      expect(layer.paint['circle-opacity']).toBe(0);
+      // Radius = halber Durchmesser aus der Feature-Eigenschaft, keine feste Zahl.
+      expect(layer.paint['circle-radius']).toEqual(['/', ['get', 'treffer'], 2]);
+    }
+    expect(MARKER_KLICK_LAYER).toContain('marker-treffer');
+    expect(SPIDER_KLICK_LAYER).toContain('spider-treffer');
+  });
+
+  it('die dunkle Außenkante (LFH-650) liegt direkt unter dem Kreis, schwarz und nur an Personen', () => {
+    const { map, layers, moves } = fakeMap();
+    sorgeFuerMarkerLayer(map as never, leer, leer);
+    for (const id of ['marker-kante', 'spider-kante']) {
+      const layer = layers.get(id) as { filter: unknown; paint: Record<string, unknown> };
+      expect(JSON.stringify(layer.filter)).toContain('["has","sk"]');
+      expect(layer.paint['circle-color']).toBe('#000');
+      // Außen über den weißen Rand hinaus: Kreis 9 + Rand 2 = 11, Kante bis 13 (2 px).
+      expect(layer.paint['circle-radius']).toBe(13);
+    }
+    expect(moves.indexOf('marker-kante')).toBe(moves.indexOf('marker-kreis') - 1);
+    expect(moves.indexOf('spider-kante')).toBe(moves.indexOf('spider-kreis') - 1);
   });
 
   it('legt alle in MARKER_KLICK_LAYER referenzierten Layer real an (Konstanten-Kopplung)', () => {
@@ -268,6 +310,18 @@ describe('sorgeFuerMarkerLayer', () => {
     // Schützt vor stillen Klick-Toten: eine Layer-ID-Umbenennung ohne Nachziehen der Konstante
     // bände den Klick-Handler an einen nicht existierenden Layer — hier rot statt unbemerkt.
     for (const id of MARKER_KLICK_LAYER) expect(layers.has(id)).toBe(true);
+  });
+});
+
+describe('Trefferzone und Sichtung als Feature-Properties (LFH-650)', () => {
+  it('trägt beide nur, wenn der Marker sie hat — ein Lagekarten-Marker bekommt keins', () => {
+    const fc = baueMarkerFc([
+      mk({ schluessel: 'person-1', typ: 'person', trefferDurchmesser: 48, sichtung: 'sk1' }),
+      mk({ schluessel: 'uhs-1' }),
+    ]);
+    expect(fc.features[0].properties).toMatchObject({ treffer: 48, sk: 'sk1' });
+    expect(fc.features[1].properties).not.toHaveProperty('treffer');
+    expect(fc.features[1].properties).not.toHaveProperty('sk');
   });
 });
 
@@ -440,7 +494,16 @@ describe('Eigene Cluster-Quelle der Betroffenen (LFH-648)', () => {
     const { map, sources } = fakeMap();
     const marker = baueMarkerFc([
       mk({ schluessel: 'fahrzeug-1', typ: 'fahrzeug' }),
-      mk({ schluessel: 'person-11', typ: 'person', kurzzeichen: 'II', label: 'R-042 · SK II' }),
+      mk({
+        schluessel: 'person-11',
+        typ: 'person',
+        kurzzeichen: 'II',
+        label: 'R-042 · SK II',
+        clusterQuelle: 'personen',
+      }),
+      // Betroffenen-Karte (LFH-650): ohne `clusterQuelle` bleibt die Person in `marker-cluster`
+      // und bekommt dort ihren Sichtungs-Donut.
+      mk({ schluessel: 'person-12', typ: 'person', kurzzeichen: 'I', label: 'R-043 · SK I' }),
     ]);
     reAnlegenMarker(map as never, marker, leer);
     const schluessel = (quelle: string) =>
@@ -449,7 +512,7 @@ describe('Eigene Cluster-Quelle der Betroffenen (LFH-648)', () => {
           features: { properties: { schluessel: string } }[];
         }
       ).features.map((f) => f.properties.schluessel);
-    expect(schluessel(MARKER_CLUSTER_QUELLE)).toEqual(['fahrzeug-1']);
+    expect(schluessel(MARKER_CLUSTER_QUELLE)).toEqual(['fahrzeug-1', 'person-12']);
     expect(schluessel(PERSONEN_CLUSTER_QUELLE)).toEqual(['person-11']);
   });
 
@@ -490,7 +553,9 @@ describe('Eigene Cluster-Quelle der Betroffenen (LFH-648)', () => {
     expect(kreis.source).toBe(PERSONEN_CLUSTER_QUELLE);
     expect(JSON.stringify(kreis.filter)).toBe(JSON.stringify(['has', 'point_count']));
     expect(zahl.source).toBe(PERSONEN_CLUSTER_QUELLE);
-    expect(zahl.layout['text-field']).toEqual(['get', 'point_count_abbreviated']);
+    // Zahl UND Kürzel der dringlichsten Sichtung — nie nur die Farbe (WCAG 1.4.1).
+    expect(JSON.stringify(zahl.layout['text-field'])).toContain('point_count_abbreviated');
+    expect(JSON.stringify(zahl.layout['text-field'])).toContain('s_sk1');
     expect([...PERSONEN_CLUSTER_KLICK_LAYER]).toEqual([
       'personen-cluster-kreis',
       'personen-cluster-zahl',
@@ -540,5 +605,29 @@ describe('personenClusterTreffer (LFH-648)', () => {
 
   it('leerer Klick: kein Treffer', () => {
     expect(personenClusterTreffer([])).toBeNull();
+  });
+});
+
+describe('naechstesMerkmal (Review LFH-650)', () => {
+  // Projektion = Identität in Bildschirm-Pixeln, damit die Abstände lesbar bleiben.
+  const punkt = (x: number, y: number, schluessel: string) => ({
+    geometry: { type: 'Point', coordinates: [x, y] },
+    properties: { schluessel },
+  });
+  const projiziere = ([x, y]: [number, number]) => ({ x, y });
+
+  it('wählt das NÄCHSTE Merkmal, nicht das erste der Zeichenreihenfolge', () => {
+    // B liegt obenauf (zuerst geliefert), der Tipp ist aber näher an A.
+    const b = punkt(40, 0, 'person-b');
+    const a = punkt(0, 0, 'person-a');
+    expect(naechstesMerkmal([b, a], { x: 12, y: 0 }, projiziere)).toBe(a);
+    // Gegenhälfte: näher an B → B.
+    expect(naechstesMerkmal([b, a], { x: 30, y: 0 }, projiziere)).toBe(b);
+  });
+
+  it('fällt ohne Punktgeometrie auf das erste Merkmal zurück, leer ergibt undefined', () => {
+    const flaeche = { geometry: { type: 'Polygon' }, properties: { schluessel: 'x' } };
+    expect(naechstesMerkmal([flaeche], { x: 0, y: 0 }, projiziere)).toBe(flaeche);
+    expect(naechstesMerkmal([], { x: 0, y: 0 }, projiziere)).toBeUndefined();
   });
 });

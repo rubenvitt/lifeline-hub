@@ -140,6 +140,9 @@ describe('einsatzKeys (Factory-Output)', () => {
     expect(einsatzKeys.dokumente(1)).toEqual(['einsatz-dokumente', 1]);
     expect(einsatzKeys.pegel(1)).toEqual(['einsatz-pegel', 1]);
     expect(einsatzKeys.pegelVorhersage(1, 7)).toEqual(['einsatz-pegel', 1, 'vorhersage', 7]);
+    // LFH-633: Verlauf als Sub-Key des Pegel-Prefix, Wetter als eigener Prefix.
+    expect(einsatzKeys.pegelVerlauf(1)).toEqual(['einsatz-pegel', 1, 'verlauf']);
+    expect(einsatzKeys.wetter(1)).toEqual(['einsatz-wetter', 1]);
   });
 
   it('baut die 3-elementigen Detail-Keys als [prefix, einsatzId, id]', () => {

@@ -1393,6 +1393,25 @@ describe('PersonenPage', () => {
       expect(feld()).toHaveValue('Meier #52.1 sk3');
     });
 
+    it('der Kürzel-Hinweis bleibt beim Tippen stehen, unsichtbar und aus der Beschreibung genommen (LFH-650)', async () => {
+      /**
+       * Bei 390 px sprang der Inhalt unter der Zeile mit dem ersten Zeichen 40 px nach oben,
+       * weil der mehrzeilige Hinweis der kürzeren Erkennungszeile WICH (gemessen in
+       * `e2e/betroffene-layout.spec.ts`). Jetzt liegen beide gestapelt; die Höhe misst die
+       * e2e-Spec, hier steht die Struktur, aus der sie folgt — samt der Gegenhälfte, dass
+       * Vorlesende den verdeckten Hinweis nicht mehr hören.
+       */
+      render(einsatzAktiv, []);
+      const zeile = await screen.findByRole('textbox', { name: 'Kurzeingabe Person' });
+      expect(zeile).toHaveAccessibleDescription(/#Koordinate \(52\.2691\/9\.1342\)/);
+      await userEvent.type(zeile, 'Kowalski sk2');
+      const hinweis = screen.getByText('#Koordinate (52.2691/9.1342)').parentElement!;
+      expect(hinweis).toHaveStyle({ visibility: 'hidden' });
+      expect(hinweis).toHaveAttribute('aria-hidden', 'true');
+      expect(zeile).toHaveAccessibleDescription(/^erkannt:/);
+      expect(zeile).not.toHaveAccessibleDescription(/Kürzel/);
+    });
+
     it('schickt die Koordinate aus „#lat/lon“ im SELBEN POST (LFH-613, Spec-Szenario)', async () => {
       let koerper: Record<string, unknown> | undefined;
       server.use(
@@ -1658,6 +1677,38 @@ describe('PersonenPage — Kartenansicht (LFH-613)', () => {
     });
     // Die Liste ist in dieser Ansicht nicht gerendert — die Karte ERSETZT sie.
     expect(screen.queryByRole('region', { name: 'Personen' })).not.toBeInTheDocument();
+  });
+
+  it('ohne Lücke SAGT die Hinweiszeile es, statt zu verschwinden — kein Kartensprung (LFH-650)', async () => {
+    /**
+     * Befund Tabelle 4, Nr. 12 der LFH-613-Prüfliste: die Zeile stand nur bei `> 0` da. Wurde
+     * die letzte Person live verortet, sprang die ganze Karte um eine Zeile unter dem Zeiger.
+     * Jetzt steht sie immer; die e2e-Spec misst den Sprung im Browser.
+     */
+    // Beide angetroffenen Personen tragen eine Koordinate — R-001 bleibt der Anker von
+    // `waehleKarte`.
+    renderKarte([mitKoordinate(person.id, person.registrier_nr), mitKoordinate(20, 4)]);
+    await waehleKarte();
+    await screen.findByTestId('kartenflaeche-stub');
+    expect(
+      screen.getByText('Alle angetroffenen Personen dieser Auswahl stehen auf der Karte'),
+    ).toBeInTheDocument();
+  });
+
+  it('ohne Lücke und ohne Marker behauptet der Hinweis KEINE vollständige Karte (Review LFH-650)', async () => {
+    // Filter „Vermisst": keine angetroffene Person in der Auswahl. „Alle stehen auf der Karte"
+    // über einer leeren Karte wäre falsch.
+    renderKarte([mitKoordinate(person.id, person.registrier_nr), { ...unbekannt }], {
+      ...einsatzAktiv,
+      einsatzort_lat: 52.3,
+      einsatzort_lon: 9.2,
+    });
+    await waehleKarte();
+    await userEvent.click(screen.getByRole('tab', { name: 'Vermisst' }));
+    expect(
+      await screen.findByText('Keine angetroffene Person in dieser Auswahl'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/stehen auf der Karte/)).not.toBeInTheDocument();
   });
 
   it('der Markerklick führt zur Detailseite der Person', async () => {

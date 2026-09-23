@@ -1,11 +1,12 @@
 // frontend/src/command-palette/CommandPalette.tsx
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { KeyboardEvent } from 'react';
-import { Modal, Input, theme, type InputRef } from 'antd';
-import { TbSearch } from 'react-icons/tb';
+import type { KeyboardEvent, MouseEvent } from 'react';
+import { Button, Modal, Input, theme, type InputRef } from 'antd';
+import { TbArrowLeft, TbSearch } from 'react-icons/tb';
 import { augenbraueStil, useModusFarben } from '../components/rahmenStil';
 import Tastenkuerzel from '../components/Tastenkuerzel';
 import { schrift } from '../theme/tokens';
+import { istApplePlattform } from './befehle';
 import { sichtbareDatensaetze } from './datensaetze';
 import {
   UNBEWERTET,
@@ -26,6 +27,7 @@ import {
   type Befehl,
   type PaletteModus,
 } from './typen';
+import { Vorschau } from './Vorschau';
 import { palettenZeilenStil } from './zeilenStil';
 
 /**
@@ -51,6 +53,44 @@ const MASKE = 'rgba(5, 6, 8, 0.72)';
 /** EIN Leer-Array statt eines Vorgabewerts im Kopf: ein `[]` dort wäre je Render eine neue
  *  Identität und machte die `useMemo` darunter wirkungslos. */
 const KEINE_TREFFER: Treffer[] = [];
+
+/**
+ * Das Kürzel „neuer Tab" als Marke — dieselbe Schreibweise wie das Speichern-Kürzel in
+ * `TASTATUR_AKTIONEN` („⌘ ↵" / „Strg + ↵"), damit ein Kürzel nicht zweimal verschieden
+ * aussieht.
+ */
+function neuerTabKuerzel(userAgent: string): string {
+  return istApplePlattform(userAgent) ? '⌘ ↵' : 'Strg + ↵';
+}
+
+/**
+ * Strg/⌘+↵ (LFH-645). Beide Modifier gelten auf JEDER Plattform: Strg+↵ auf dem Mac ist
+ * keine andere Bedienung, die man abfangen müsste, und `tastaturAktionFuerEreignis` liest
+ * `speichern` genauso aus beiden. Shift/Alt bleiben ausgenommen — ⇧↵ ist bewusst frei.
+ */
+function istNeuerTabTaste(e: {
+  key: string;
+  ctrlKey: boolean;
+  metaKey: boolean;
+  altKey: boolean;
+  shiftKey: boolean;
+}) {
+  return e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey;
+}
+
+/**
+ * Sichtbar versteckt (Screenreader-only). Die Live-Region der Palette steht immer im Baum;
+ * die Ansage „Vorschau: …" braucht sie, aber nicht als zweite sichtbare Überschrift über
+ * der Vorschau, die ihren Namen schon im Kopf trägt.
+ */
+const NUR_VORLESEN = {
+  position: 'absolute',
+  width: 1,
+  height: 1,
+  overflow: 'hidden',
+  clip: 'rect(0 0 0 0)',
+  whiteSpace: 'nowrap',
+} as const;
 
 interface Props {
   befehle: Befehl[];
@@ -81,6 +121,14 @@ interface Props {
    * noch Fußhinweis.
    */
   koordinatenSprung?: (rest: string) => Befehl | null;
+  /**
+   * Kann es hier eine Vorschau geben (LFH-645)? Nur im Einsatz — ausserhalb gibt es keine
+   * Datensätze. Steuert allein den FUSSHINWEIS; ob eine Zeile eine Vorschau hat, sagt die
+   * Zeile selbst (`Befehl.vorschau`) und ihre →-Marke.
+   */
+  vorschauVerfuegbar?: boolean;
+  /** Für die Plattformweiche des Kürzels; Vorgabe `navigator.userAgent`. */
+  userAgent?: string;
   schliesse: () => void;
 }
 
@@ -90,6 +138,8 @@ export function CommandPalette({
   datensatzTreffer = KEINE_TREFFER,
   onSucheEntprellt,
   koordinatenSprung,
+  vorschauVerfuegbar = false,
+  userAgent = typeof navigator === 'undefined' ? '' : navigator.userAgent,
   schliesse,
 }: Props) {
   const { token } = theme.useToken();
@@ -105,6 +155,13 @@ export function CommandPalette({
    * dem Cursor" (WCAG 3.2.5).
    */
   const [aktivId, setAktivId] = useState<string | null>(null);
+  /**
+   * Die offene Vorschau (LFH-645, Taste →) — als BEFEHL, nicht als Id: treffen während der
+   * offenen Vorschau neue Datensatztreffer ein, darf die gezeigte Person nicht verschwinden,
+   * nur weil ihre Zeile aus `flach` gefallen ist. `suche` und `aktivId` bleiben unberührt,
+   * damit der Rückweg Begriff und Markierung wiederfindet.
+   */
+  const [vorschau, setVorschau] = useState<Befehl | null>(null);
   const listeRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<InputRef>(null);
 
@@ -240,13 +297,16 @@ export function CommandPalette({
     return () => clearTimeout(frist);
   }, [modus, rest]);
 
-  // aktiven Eintrag in den Sichtbereich scrollen
+  // aktiven Eintrag in den Sichtbereich scrollen — auch nach der Rückkehr aus der Vorschau
+  // (LFH-645, Review-Befund): die Liste hängt dort aus und kommt mit `scrollTop` 0 zurück,
+  // `aktiv` ändert sich beim Rückweg aber nicht. Ohne `vorschau` in der Liste stünde die
+  // Markierung auf Platz 8 in der Handschuh-Stufe ausserhalb des Blicks.
   useEffect(() => {
     const el = listeRef.current?.querySelector('[aria-selected="true"]');
     if (el instanceof HTMLElement && typeof el.scrollIntoView === 'function') {
       el.scrollIntoView({ block: 'nearest' });
     }
-  }, [aktiv]);
+  }, [aktiv, vorschau]);
 
   function fuehreAus(b: Befehl | undefined) {
     if (!b) return;
@@ -254,8 +314,77 @@ export function CommandPalette({
     b.ausfuehren();
   }
 
+  /**
+   * Strg/⌘+↵ und Strg/⌘+Klick (LFH-645): NUR eine Zeile mit `ziel` bekommt `'neuerTab'`. Ohne
+   * Ziel geschieht nichts — kein Rückfall auf ↵: ein Modifier, der still die Grundaktion
+   * auslöst, lügt, und auf „Speichern" hiesse das speichern.
+   */
+  function oeffneImNeuenTab(b: Befehl | undefined) {
+    if (!b?.ziel) return;
+    schliesse();
+    b.ausfuehren('neuerTab');
+  }
+
+  function zurueckZurListe() {
+    setVorschau(null);
+    inputRef.current?.focus();
+  }
+
+  /**
+   * Esc/← aus der Vorschau, an der WURZEL der Palette (LFH-645, Review-Befund): am Suchfeld
+   * allein sah die Taste nur, wer dort stand — mit Fokus auf „Zurück" (ein Tab weiter) kam
+   * Esc allein beim globalen Dispatcher an, und der schloss die GANZE Palette. Hier bubbelt
+   * jeder fokussierte Nachfahre durch. `preventDefault` ist tragend: ohne es liest der
+   * Dispatcher auf `window` dieselbe Taste als `verwerfen` (über den Provider gemessen).
+   */
+  function aufWurzelTaste(e: KeyboardEvent<HTMLDivElement>) {
+    if (!vorschau || e.defaultPrevented || e.nativeEvent.isComposing) return;
+    if (e.key === 'Escape' || e.key === 'ArrowLeft') {
+      e.preventDefault();
+      zurueckZurListe();
+    }
+  }
+
   function aufTaste(e: KeyboardEvent<HTMLInputElement>) {
     if (e.nativeEvent.isComposing) return;
+    // Strg/⌘+↵ gehört der Palette. Ohne Ziel geschieht NICHTS, und das braucht kein
+    // `preventDefault`: der globale Dispatcher schluckt Mutationstasten bei offener Palette
+    // selbst (`offen`-Zweig in `CommandPaletteProvider`) — gemessen, die Seite darunter
+    // speichert auch ohne Abfangen hier nicht.
+    if (istNeuerTabTaste(e)) {
+      const b = vorschau ?? flach[aktiv];
+      if (b?.ziel) {
+        e.preventDefault();
+        oeffneImNeuenTab(b);
+      }
+      return;
+    }
+    if (vorschau) {
+      // In der Vorschau gibt es keine Liste: ↵ öffnet, Pfeil hoch/runter verschieben nichts,
+      // was man nicht sieht. Esc/← behandelt die WURZEL (`aufWurzelTaste`) — sie gelten auch,
+      // wenn der Fokus auf „Zurück" steht. Alle übrigen Tasten gehen ans Feld, und eine
+      // Änderung am Begriff verlässt die Vorschau (`onChange`).
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+      } else if (e.key === 'Enter' && !e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+        e.preventDefault();
+        fuehreAus(vorschau);
+      }
+      return;
+    }
+    if (e.key === 'ArrowRight') {
+      // Nur am TEXTENDE und ohne Auswahl (Bauform: Autovorschlag der fish-Shell) — mitten im
+      // Wort bleibt → die Cursortaste, die es im Suchfeld immer war.
+      const feld = e.currentTarget;
+      const b = flach[aktiv];
+      const amEnde =
+        feld.selectionStart === feld.value.length && feld.selectionEnd === feld.value.length;
+      if (b?.vorschau && amEnde) {
+        e.preventDefault();
+        setVorschau(b);
+      }
+      return;
+    }
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       if (flach.length) setAktivId(flach[(aktiv + 1) % flach.length].id);
@@ -269,6 +398,11 @@ export function CommandPalette({
   }
 
   const aktiverId = flach[aktiv]?.id;
+  const hinweisStil = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: token.marginXS,
+  } as const;
   // Gilt für JEDEN Modus, der Datensätze durchsucht — auch für den Vorgabemodus: dort ist
   // die Liste bei einem Zeichen nur selten leer, aber wenn sie es ist, fehlt genau dieses
   // eine Zeichen.
@@ -312,7 +446,7 @@ export function CommandPalette({
         // Der Kontext BESCHREIBT, er benennt nicht (Begründung an `Befehl.kontext`).
         aria-describedby={kontextId}
         onMouseEnter={() => setAktivId(b.id)}
-        onClick={() => fuehreAus(b)}
+        onClick={(e: MouseEvent) => (e.ctrlKey || e.metaKey ? oeffneImNeuenTab(b) : fuehreAus(b))}
         style={{
           ...palettenZeilenStil(token),
           // Aktive Zeile (Neuentwurf): Grund `flaeche3`, Ikone in Bedienfarbe. Der Text
@@ -345,6 +479,14 @@ export function CommandPalette({
           </span>
         )}
         {b.kuerzel && <Tastenkuerzel>{b.kuerzel}</Tastenkuerzel>}
+        {/* Die →-Marke (LFH-645) sagt ZEILENGENAU, dass → hier eine Vorschau öffnet — der
+            Fußhinweis kann das nicht, er steht statisch (ein je Zeile wechselnder Hinweis
+            änderte die Zeilenzahl der Fußzeile und liesse die Palette springen). */}
+        {istAktiv && b.vorschau && (
+          <Tastenkuerzel aria-hidden style={{ color: farben.schwach }}>
+            →
+          </Tastenkuerzel>
+        )}
         {/* Die Enter-Marke steht NUR an der aktiven Zeile (Entwurf): sie sagt, was Enter
             gerade auslöst. Satz, kein Ziel — `aria-hidden`, der Weg steht in der Fußzeile. */}
         {istAktiv && !b.kuerzel && (
@@ -380,7 +522,9 @@ export function CommandPalette({
       }}
       destroyOnHidden
     >
-      <div>
+      {/* Kein Bedienziel und kein eigener Tab-Stopp — nur die Stelle, an der Esc/← aus der
+          Vorschau jeden fokussierten Nachfahren erreichen. */}
+      <div onKeyDown={aufWurzelTaste}>
         <div
           style={{
             display: 'flex',
@@ -402,11 +546,17 @@ export function CommandPalette({
             // einer davon als zugänglichen Namen der Combobox (`gate1-ueberlauf.spec.ts`).
             placeholder="Suchen: Module, Aktionen, Einstellungen …"
             role="combobox"
-            aria-expanded={flach.length > 0}
-            aria-controls="cmd-liste"
-            aria-activedescendant={aktiverId ? `cmd-${aktiverId}` : undefined}
+            // In der Vorschau steht keine Listbox im Baum (LFH-645): kein `aria-controls`
+            // ins Leere, keine aktive Option, die es nicht gibt.
+            aria-expanded={!vorschau && flach.length > 0}
+            aria-controls={vorschau ? undefined : 'cmd-liste'}
+            aria-activedescendant={!vorschau && aktiverId ? `cmd-${aktiverId}` : undefined}
             value={suche}
-            onChange={(e) => setSuche(e.target.value)}
+            onChange={(e) => {
+              // Ein geänderter Begriff ist eine neue Suche — die Vorschau gehört zur alten.
+              setVorschau(null);
+              setSuche(e.target.value);
+            }}
             onKeyDown={aufTaste}
             style={{ flex: 1, padding: 0, fontSize: 16 }}
           />
@@ -437,35 +587,78 @@ export function CommandPalette({
             {PALETTE_MODI[modus].hinweis}
           </div>
         )}
-        <div
-          id="cmd-liste"
-          role="listbox"
-          ref={listeRef}
-          // `min(60vh, 480px)` statt der festen 380 (LFH-337 · M11): auf dem Fükw-Schirm
-          // zeigte der Kasten von 42+ Befehlen rund sieben. `60vh` deckelt ihn auf niedrigen
-          // Schirmen, wo 480 px über den Rand liefen.
-          style={{
-            maxHeight: 'min(60vh, 480px)',
-            overflowY: 'auto',
-            paddingBlock: token.paddingXS,
-          }}
-        >
-          {sucheAktiv && flach.map((b) => optionsZeile(b))}
-          {gruppen.map((x) => (
-            <div key={x.gruppe} role="group" aria-label={GRUPPEN_LABEL[x.gruppe]}>
-              {/* Gruppen-Augenbraue (10/600/.14em, Versalien) — `schriftskala.augenbraue`. */}
-              <div
-                style={{
-                  ...augenbraueStil(farben.schwach),
-                  padding: `${token.paddingSM}px ${token.padding}px ${token.paddingXS}px`,
-                }}
-              >
-                {GRUPPEN_LABEL[x.gruppe]}
-              </div>
-              {x.items.map((b) => optionsZeile(b))}
+        {vorschau?.vorschau ? (
+          /*
+           * DIE VORSCHAU (LFH-645, Taste →) ersetzt die Liste, statt neben ihr zu stehen:
+           * 640 px tragen Liste und Lese-Ansicht nicht nebeneinander. Der Fokus bleibt im
+           * Suchfeld — Esc/← führen von dort zurück, ↵ öffnet. Nur LESEN: die Vorschau
+           * verändert keinen Datensatz, sie ist dasselbe Bauteil wie der Personen-Drawer.
+           *
+           * „Zurück" ist ein antd-`Button` und erbt damit `controlHeight` — kein handgebautes
+           * Bedienziel, das die zwei Angaben aus LFH-365 schuldete.
+           */
+          <div role="region" aria-label={`Vorschau: ${vorschau.label}`} data-lfh="palette-vorschau">
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: token.paddingSM,
+                padding: `${token.paddingXS}px ${token.padding}px`,
+                borderBottom: `1px solid ${token.colorBorderSecondary}`,
+              }}
+            >
+              <Button type="text" icon={<TbArrowLeft aria-hidden />} onClick={zurueckZurListe}>
+                Zurück
+              </Button>
+              <span style={{ flex: 1, minWidth: 0, fontSize: 13 }}>{vorschau.label}</span>
+              {vorschau.kontext && (
+                <span style={{ flexShrink: 0, fontSize: 11, color: farben.schwach }}>
+                  {vorschau.kontext}
+                </span>
+              )}
             </div>
-          ))}
-        </div>
+            <div
+              style={{
+                // Derselbe Deckel wie die Liste: die Palette wechselt beim → nicht ihre Höhe.
+                maxHeight: 'min(60vh, 480px)',
+                overflowY: 'auto',
+                padding: token.padding,
+              }}
+            >
+              <Vorschau ziel={vorschau.vorschau} />
+            </div>
+          </div>
+        ) : (
+          <div
+            id="cmd-liste"
+            role="listbox"
+            ref={listeRef}
+            // `min(60vh, 480px)` statt der festen 380 (LFH-337 · M11): auf dem Fükw-Schirm
+            // zeigte der Kasten von 42+ Befehlen rund sieben. `60vh` deckelt ihn auf niedrigen
+            // Schirmen, wo 480 px über den Rand liefen.
+            style={{
+              maxHeight: 'min(60vh, 480px)',
+              overflowY: 'auto',
+              paddingBlock: token.paddingXS,
+            }}
+          >
+            {sucheAktiv && flach.map((b) => optionsZeile(b))}
+            {gruppen.map((x) => (
+              <div key={x.gruppe} role="group" aria-label={GRUPPEN_LABEL[x.gruppe]}>
+                {/* Gruppen-Augenbraue (10/600/.14em, Versalien) — `schriftskala.augenbraue`. */}
+                <div
+                  style={{
+                    ...augenbraueStil(farben.schwach),
+                    padding: `${token.paddingSM}px ${token.padding}px ${token.paddingXS}px`,
+                  }}
+                >
+                  {GRUPPEN_LABEL[x.gruppe]}
+                </div>
+                {x.items.map((b) => optionsZeile(b))}
+              </div>
+            ))}
+          </div>
+        )}
         {/*
          * Zwei Leerzustände, nicht einer (LFH-391 · C3): wer '@a' tippt, sieht per
          * Konstruktion nichts — die statischen Befehle sind vom Modus ausgefiltert, die
@@ -482,17 +675,30 @@ export function CommandPalette({
         <div
           data-lfh="palette-leerzustand"
           aria-live="polite"
-          style={{ padding: leerText ? token.padding : 0, color: token.colorTextSecondary }}
+          style={
+            vorschau
+              ? NUR_VORLESEN
+              : { padding: leerText ? token.padding : 0, color: token.colorTextSecondary }
+          }
         >
-          {leerText}
+          {/* In der Vorschau sagt dieselbe Region an, WO man ist — der Fokus bleibt im
+              Suchfeld, die neue Region allein hörte niemand. */}
+          {vorschau ? `Vorschau: ${vorschau.label}. Escape führt zurück.` : leerText}
         </div>
         {/*
          * FUSSZEILE (Neuentwurf): Mono 10, NUR Hinweise, die wirklich funktionieren — Enter
          * öffnet, die drei Präfixe aus `PALETTE_MODI` (eine Quelle, kein zweiter Wortlaut)
          * und, wo es einen Sprung gibt, die Koordinate (LFH-619). Der Entwurf zeigt sie als
          * „# Koordinate"; `#` bleibt aber das ETB-Präfix — die Koordinate braucht kein
-         * Zeichen, sie wird an ihrer Form erkannt (`koordinatenSprung.ts`). „⇧↵ im Panel"
-         * fehlt weiter: was das fachlich heisst, klärt LFH-645.
+         * Zeichen, sie wird an ihrer Form erkannt (`koordinatenSprung.ts`).
+         *
+         * „⇧↵ im Panel" aus dem Entwurf ist ENTSCHIEDEN und entfallen (LFH-645, Raycast-
+         * Muster): Strg/⌘+↵ öffnet im neuen Tab, → zeigt die Vorschau IN der Palette, ⇧↵
+         * bleibt frei. Die Hinweise stehen STATISCH — „neuer Tab" gilt für fast jede Zeile,
+         * „→ Vorschau" nur im Einsatz (Muster Koordinate); ob die markierte Zeile eine
+         * Vorschau hat, sagt ihre →-Marke. Ein je Zeile wechselnder Hinweis änderte die
+         * Zeilenzahl dieser umbrechenden Fußzeile und liesse die Palette beim Pfeilen springen.
+         * In der Vorschau gilt die Präfixlegende nicht; dort stehen die drei gültigen Wege.
          */}
         <div
           data-lfh="palette-fuss"
@@ -508,23 +714,39 @@ export function CommandPalette({
             color: farben.schwach,
           }}
         >
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: token.marginXS }}>
+          <span style={hinweisStil}>
             <Tastenkuerzel>↵</Tastenkuerzel>
             öffnen
           </span>
-          {modiMitPraefix().map((m) => (
-            // Das Präfixzeichen als Marke, nicht als Satzzeichen im Fließtext: ein nacktes
-            // '>' hat weder Rahmen noch Abstand zum Nachbarn — JSX verschluckt den Umbruch
-            // zwischen zwei Elementen ersatzlos, deshalb die Flex-Zeile mit `gap`.
-            <span
-              key={m.modus}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: token.marginXS }}
-            >
-              <Tastenkuerzel>{m.praefix}</Tastenkuerzel>
-              {m.legende}
+          <span style={hinweisStil}>
+            <Tastenkuerzel>{neuerTabKuerzel(userAgent)}</Tastenkuerzel>
+            neuer Tab
+          </span>
+          {vorschau ? (
+            <span style={hinweisStil}>
+              <Tastenkuerzel>Esc</Tastenkuerzel>
+              zurück
             </span>
-          ))}
-          {koordinatenSprung && <span>Koordinate → Lagekarte</span>}
+          ) : (
+            <>
+              {vorschauVerfuegbar && (
+                <span style={hinweisStil}>
+                  <Tastenkuerzel>→</Tastenkuerzel>
+                  Vorschau
+                </span>
+              )}
+              {modiMitPraefix().map((m) => (
+                // Das Präfixzeichen als Marke, nicht als Satzzeichen im Fließtext: ein nacktes
+                // '>' hat weder Rahmen noch Abstand zum Nachbarn — JSX verschluckt den Umbruch
+                // zwischen zwei Elementen ersatzlos, deshalb die Flex-Zeile mit `gap`.
+                <span key={m.modus} style={hinweisStil}>
+                  <Tastenkuerzel>{m.praefix}</Tastenkuerzel>
+                  {m.legende}
+                </span>
+              ))}
+              {koordinatenSprung && <span>Koordinate → Lagekarte</span>}
+            </>
+          )}
         </div>
       </div>
     </Modal>

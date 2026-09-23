@@ -717,8 +717,8 @@ describe('EinsatzLayout · Rail-Klick (LFH-337 · H12)', () => {
         'lage-dashboard',
         'lagekarte',
         'lageberichte',
-        'kraefteuebersicht',
         'gefahrenzonen',
+        'wetter-pegel',
         'lagemeldungen',
       ].map((key) => [
         key,

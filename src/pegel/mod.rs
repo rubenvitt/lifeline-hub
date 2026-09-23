@@ -3,7 +3,8 @@
 //!
 //! - `repo`: die Festlegung (Tabelle `einsatz_pegel`, Reihenfolge = Leitpegel zuerst).
 //! - `abruf`: die Zeitreihe je Station über PEGELONLINE, gecacht in `karte::cache`.
-//! - `trend`: reine Trendrechnung (lineare Regression über 60 min).
+//! - `trend`: reine Trendrechnung (lineare Regression über 60 min) und der 24-h-Verlauf
+//!   (LFH-633).
 //! - `vorhersage`: die Vorhersage-Reihe `WV` einer Station als Vorschlag für die Prognose
 //!   (LFH-628) — nur ein Vorschlag, die Prognose selbst wird von Hand gepflegt.
 //!
@@ -98,4 +99,28 @@ pub struct PegelVorhersage {
 pub struct PegelVorhersageAntwort {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub vorhersage: Option<PegelVorhersage>,
+}
+
+/// Ein Punkt des 24-h-Verlaufs (LFH-633).
+#[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
+pub struct PegelVerlaufPunkt {
+    /// Zeitpunkt der Messung, RFC 3339 mit Zonenversatz, wie PEGELONLINE ihn liefert —
+    /// dieselbe Form wie [`PegelMessung::zeitpunkt`].
+    pub zeitpunkt: String,
+    /// Wasserstand der W-Reihe in cm.
+    pub wasserstand_cm: f64,
+}
+
+/// Verlauf der letzten 24 Stunden eines festgelegten Pegels (LFH-633), für die Verlaufslinie
+/// der Modulseite „Wetter & Pegel".
+///
+/// Eine eigene Route statt eines Felds in [`PegelAnzeige`]: die Liste laden auch Dashboard
+/// und Überblick alle 5 min, dort wäre die Reihe nur Gewicht.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct PegelVerlauf {
+    /// `id` des Pegels aus [`PegelAnzeige`].
+    pub pegel_id: i64,
+    /// Nach Zeit aufsteigend, höchstens 288 Punkte (`trend::VERLAUF_MAX_PUNKTE`). Leer, wenn
+    /// die Station keinen Stand hat — dann fehlt auch die Messung der Liste.
+    pub punkte: Vec<PegelVerlaufPunkt>,
 }

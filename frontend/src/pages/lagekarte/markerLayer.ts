@@ -2,11 +2,13 @@ import type {
   Map as MapLibreMap,
   GeoJSONSource,
   CircleLayerSpecification,
+  ExpressionSpecification,
   SymbolLayerSpecification,
 } from 'maplibre-gl';
 import { FREIES_ZEICHEN_ERSATZLABEL, type KarteMarker, type MarkerTyp } from './marker';
 import { tzIconKey } from './markerIcons';
-import { CLUSTER_TYP_FARBE, clusterTypProperties } from './clusterDonut';
+import { SK_DRINGLICHKEIT, clusterTypProperties, skFarbe } from './clusterDonut';
+import { SK_KURZZEICHEN } from '../../personen/personenKarte';
 import { farbenDunkel } from '../../theme/tokens';
 import { plakettenBildId, plakettenSchrift, zonenPlakette, type Plakette } from './plakette';
 
@@ -31,6 +33,12 @@ export interface MarkerProps {
   rang?: number;
   /** Kurzzeichen IM Kreis (`KarteMarker.kurzzeichen`), ohne Mindestzoom sichtbar. */
   kurzzeichen?: string;
+  /** Durchmesser der unsichtbaren Trefferzone (`KarteMarker.trefferDurchmesser`, LFH-650). */
+  treffer?: number;
+  /** Sichtung (`KarteMarker.sichtung`) — Summand der Cluster-Aggregation `s_<kategorie>`. */
+  sk?: string;
+  /** Eigene Cluster-Quelle (`KarteMarker.clusterQuelle`, LFH-648) — liest `teileNachQuelle`. */
+  quelle?: 'personen';
 }
 
 export type MarkerFeature = {
@@ -71,6 +79,9 @@ function toFeature(mk: KarteMarker, plakette: Plakette): MarkerFeature {
   if (mk.tz) properties.icon = tzIconKey(mk.tz);
   if (mk.statusFarbe) properties.statusFarbe = mk.statusFarbe;
   if (mk.kurzzeichen) properties.kurzzeichen = mk.kurzzeichen;
+  if (mk.trefferDurchmesser) properties.treffer = mk.trefferDurchmesser;
+  if (mk.sichtung) properties.sk = mk.sichtung;
+  if (mk.clusterQuelle) properties.quelle = mk.clusterQuelle;
   const beschriftung = beschriftungVon(mk);
   if (beschriftung) {
     properties.beschriftung = beschriftung;
@@ -167,9 +178,13 @@ export const SPIDER_LEAVES_QUELLE = 'spider-leaves';
 export const SPIDER_LEGS_QUELLE = 'spider-legs';
 // Die Plakette ist Klickziel wie ihr Zeichen: wer den Namen trifft, meint den Marker.
 export const MARKER_KLICK_LAYER = [
+  // Einzel-Personen der Lagekarte (LFH-648); ihre CLUSTER sind kein Inspector-Ziel, sondern
+  // fächern auf (`PERSONEN_CLUSTER_KLICK_LAYER`).
+  'personen-treffer',
   'personen-kreis',
   'personen-kurz',
   'personen-label',
+  'marker-treffer',
   'marker-symbol',
   'marker-kreis',
   'marker-kurz',
@@ -180,6 +195,7 @@ export const MARKER_KLICK_LAYER = [
 ] as const;
 // Aufgefächerte Spider-Leaves sind klickbar wie Einzelmarker (→ onMarkerKlick).
 export const SPIDER_KLICK_LAYER = [
+  'spider-treffer',
   'spider-symbol',
   'spider-kreis',
   'spider-kurz',
@@ -195,14 +211,19 @@ export const SPIDER_KLICK_LAYER = [
 // Kollision hält jede Plakette von fremden Zeichen fern — lägen die Plaketten oben, deckten
 // sie Nachbarzeichen zu. Der Einsatzort-Name liegt über den übrigen und gewinnt gegen sie.
 const MARKER_LAYER_REIHENFOLGE = [
-  // Betroffene (LFH-648) zuunterst: jedes Kräfte-/Objektzeichen liegt über ihnen, auch über
-  // ihren Clustern.
+  // Betroffene auf der Lagekarte (LFH-648) zuunterst: jedes Kräfte-/Objektzeichen liegt über
+  // ihnen, auch über ihren Clustern.
+  'personen-cluster-kante',
   'personen-cluster-kreis',
   'personen-cluster-zahl',
+  'personen-treffer',
+  'personen-kante',
   'personen-kreis',
   'personen-kurz',
   'personen-label',
+  'marker-treffer',
   'marker-status-ring',
+  'marker-kante',
   'marker-kreis',
   'marker-kurz',
   'marker-label',
@@ -210,7 +231,9 @@ const MARKER_LAYER_REIHENFOLGE = [
   'marker-symbol',
   'marker-einsatzort-symbol',
   'spider-legs-line',
+  'spider-treffer',
   'spider-status-ring',
+  'spider-kante',
   'spider-kreis',
   'spider-kurz',
   'spider-label',
@@ -223,6 +246,39 @@ const STATUS_RING_PAINT: CircleLayerSpecification['paint'] = {
   'circle-radius': 20,
   'circle-color': ['get', 'statusFarbe'],
   'circle-opacity': 0.9,
+};
+/**
+ * Unsichtbare Trefferzone (LFH-650): ein Kreis mit dem Durchmesser aus der Feature-Eigenschaft
+ * `treffer`, ohne Füllung und ohne Rand. Er liegt UNTER allen Markerebenen und ist Klickziel
+ * wie sie — MapLibre prüft beim Treffertest die Geometrie, nicht die Deckkraft (gemessen in
+ * `e2e/gate3-trefflaeche.spec.ts`, „Betroffene Karte …": ein Klick mit Versatz neben den
+ * gezeichneten Kreis öffnet die Person). Überlappen sich Zonen, wählt der Klick-Handler das
+ * nächstgelegene Merkmal ({@link naechstesMerkmal}). Nur Features mit `treffer` erzeugen eine Zone; die Lagekarte setzt keins.
+ */
+const TREFFER_PAINT: CircleLayerSpecification['paint'] = {
+  'circle-radius': ['/', ['get', 'treffer'], 2],
+  'circle-opacity': 0,
+  'circle-stroke-width': 0,
+};
+/**
+ * Dunkle Außenkante der Personen-Marker (LFH-650): 2 px Schwarz AUSSERHALB des weißen
+ * Rands von {@link KREIS_PAINT} (MapLibre zeichnet `circle-stroke` außen, der Rand endet bei
+ * 9 + 2 = 11 px). Zwei, nicht anderthalb Pixel: bei 1,5 px zerfiel die Kante bei DPR 1 in
+ * Kantenglättung, gemessen 3,60 statt ≥ 17 gegen den hellen Grund. Der weiße Rand allein ist auf heller Grundlage keine Kante — gemessen
+ * gegen den Kartengrund `#e8e8e8` (`e2e/betroffene-kontrast.spec.ts`), und SK II gelb füllt
+ * dort auch nicht aus. Weiß UND Schwarz nebeneinander halten gegen JEDEN Grund ≥ 3 : 1
+ * (WCAG 1.4.11): max(K(weiß, g), K(schwarz, g)) ≥ √21 ≈ 4,58 für jede Farbe g — deshalb
+ * trägt die Kante auch auf Grundkarten, die e2e nicht lädt. Dieselbe Hell-Dunkel-Paarung wie
+ * das Kurzzeichen (`KURZ_PAINT`). Nur für Features mit `sk`: die Lagekarte bleibt gleich.
+ *
+ * Bewusst `'#000'` und NICHT `sichtungsfarben.schwarz`: die Kante ist eine Kontur, keine
+ * Sichtungsaussage — sie steht an JEDEM Personen-Marker gleich. Aus der Sichtungsachse gelesen
+ * sähe sie wie eine Bindung an „Tote" aus, die es nicht gibt; „tot" unterscheidet sich durch
+ * die gefüllte Fläche und das Kürzel „T". Gleicher Wert wie der Text von `KURZ_PAINT`.
+ */
+const KANTE_PAINT: CircleLayerSpecification['paint'] = {
+  'circle-radius': 13,
+  'circle-color': '#000',
 };
 const KREIS_PAINT: CircleLayerSpecification['paint'] = {
   'circle-radius': 9,
@@ -294,21 +350,45 @@ const PLAKETTEN_PAINT: SymbolLayerSpecification['paint'] = { 'text-color': ['get
 const leerFc = (): MarkerFeatureCollection => ({ type: 'FeatureCollection', features: [] });
 
 /**
- * Teilt die clusterbaren Marker auf ihre Quellen (LFH-648): Personen in `marker-personen`,
- * alles andere in `marker-cluster`. Die EINE Stelle der Zuordnung — die Aufrufer reichen
- * weiter die ganze Menge (`baueMarkerFc`), und keine Konsumentin der Kartenfläche muss
- * wissen, dass es zwei Quellen gibt.
+ * Teilt die clusterbaren Marker auf ihre Quellen (LFH-648): was `clusterQuelle: 'personen'`
+ * trägt (die Betroffenen der Lagekarte), in `marker-personen`, alles andere in
+ * `marker-cluster`. Datengetrieben statt über einen Kartenschalter: die Betroffenen-Karte
+ * setzt das Feld nicht und behält ihre Sichtungs-Donuts (LFH-650), und `kartenLayer.ts` muss
+ * nach einem Stilwechsel nichts weiter wissen. Die EINE Stelle der Zuordnung.
  */
 function teileNachQuelle(
   marker: MarkerFeatureCollection,
 ): Record<ClusterQuelle, MarkerFeatureCollection> {
   const personen: MarkerFeature[] = [];
   const rest: MarkerFeature[] = [];
-  for (const f of marker.features) (f.properties.typ === 'person' ? personen : rest).push(f);
+  for (const f of marker.features) (f.properties.quelle === 'personen' ? personen : rest).push(f);
   return {
     [MARKER_CLUSTER_QUELLE]: { type: 'FeatureCollection', features: rest },
     [PERSONEN_CLUSTER_QUELLE]: { type: 'FeatureCollection', features: personen },
   };
+}
+
+/** Kreisradius eines Personen-Clusters nach Menge, plus `zuschlag` (für die Außenkante). */
+function clusterRadius(zuschlag: number): ExpressionSpecification {
+  return ['step', ['get', 'point_count'], 14 + zuschlag, 10, 18 + zuschlag, 50, 22 + zuschlag];
+}
+
+/**
+ * MapLibre-Ausdruck „Wert der dringlichsten Sichtung im Cluster": die erste Kategorie aus
+ * `SK_DRINGLICHKEIT`, deren Zähler `s_<kategorie>` (aus `clusterTypProperties`) positiv ist.
+ */
+function nachDringlichkeit(
+  wert: (k: (typeof SK_DRINGLICHKEIT)[number]) => string,
+): ExpressionSpecification {
+  const zweige: unknown[] = [];
+  for (const k of SK_DRINGLICHKEIT.slice(0, -1)) {
+    zweige.push(['>', ['get', `s_${k}`], 0], wert(k));
+  }
+  return [
+    'case',
+    ...zweige,
+    wert(SK_DRINGLICHKEIT[SK_DRINGLICHKEIT.length - 1]),
+  ] as ExpressionSpecification;
 }
 
 /** Clusterquelle mit den Einstellungen, die beide Marker-Quellen teilen. */
@@ -356,6 +436,24 @@ export function sorgeFuerMarkerLayer(
       source: MARKER_CLUSTER_QUELLE,
       filter: ['all', ['!', ['has', 'point_count']], ['has', 'statusFarbe']],
       paint: { ...STATUS_RING_PAINT },
+    });
+  }
+  if (!map.getLayer('marker-treffer')) {
+    map.addLayer({
+      id: 'marker-treffer',
+      type: 'circle',
+      source: MARKER_CLUSTER_QUELLE,
+      filter: ['all', ['!', ['has', 'point_count']], ['has', 'treffer']],
+      paint: { ...TREFFER_PAINT },
+    });
+  }
+  if (!map.getLayer('marker-kante')) {
+    map.addLayer({
+      id: 'marker-kante',
+      type: 'circle',
+      source: MARKER_CLUSTER_QUELLE,
+      filter: ['all', ['!', ['has', 'point_count']], ['has', 'sk']],
+      paint: { ...KANTE_PAINT },
     });
   }
   // Lagemeldung (kein TZ) — einfacher Kreis (heutige Optik: farbig, weißer Rand).
@@ -407,8 +505,19 @@ export function sorgeFuerMarkerLayer(
   // Betroffene (LFH-648): Kreis in Sichtungsfarbe, Kürzel darin, Plakette „R-042 · SK II" ab
   // `BESCHRIFTUNG_AB_ZOOM` — dieselbe Optik wie die übrigen Kreis-Marker, nur aus der eigenen
   // Quelle. Kein Symbol- und kein Status-Layer: Personen tragen weder TZ noch FMS-Status.
-  // Personen-Cluster: Kreis in der Donut-Farbe der Objektart (`CLUSTER_TYP_FARBE.person`,
-  // dieselbe wie das Personen-Segment eines Donuts), gestaffelt nach Menge, mit Zahl.
+  // Personen-Cluster der Lagekarte: Kreis in der Farbe der DRINGLICHSTEN Sichtung (dieselbe
+  // Aggregation `s_<kategorie>` wie der Sichtungs-Donut der Betroffenen-Karte, LFH-650), darin
+  // Zahl und Kürzel — die Kategorie also nie allein über die Farbe (WCAG 1.4.1). Weißer Rand
+  // plus schwarze Außenkante wie am Einzelmarker (`KANTE_PAINT`): hält gegen jeden Grund.
+  if (fehlt('personen-cluster-kante')) {
+    map.addLayer({
+      id: 'personen-cluster-kante',
+      type: 'circle',
+      source: PERSONEN_CLUSTER_QUELLE,
+      filter: ['has', 'point_count'],
+      paint: { 'circle-color': '#000', 'circle-radius': clusterRadius(4) },
+    });
+  }
   if (fehlt('personen-cluster-kreis')) {
     map.addLayer({
       id: 'personen-cluster-kreis',
@@ -416,8 +525,8 @@ export function sorgeFuerMarkerLayer(
       source: PERSONEN_CLUSTER_QUELLE,
       filter: ['has', 'point_count'],
       paint: {
-        'circle-color': CLUSTER_TYP_FARBE.person,
-        'circle-radius': ['step', ['get', 'point_count'], 14, 10, 18, 50, 22],
+        'circle-color': nachDringlichkeit(skFarbe),
+        'circle-radius': clusterRadius(0),
         'circle-stroke-color': '#fff',
         'circle-stroke-width': 2,
       },
@@ -430,13 +539,41 @@ export function sorgeFuerMarkerLayer(
       source: PERSONEN_CLUSTER_QUELLE,
       filter: ['has', 'point_count'],
       layout: {
-        'text-field': ['get', 'point_count_abbreviated'],
+        'text-field': [
+          'format',
+          ['get', 'point_count_abbreviated'],
+          {},
+          '\n',
+          {},
+          nachDringlichkeit((k) => SK_KURZZEICHEN[k]),
+          { 'font-scale': 0.8 },
+        ],
         'text-size': 11,
         ...(schrift ? { 'text-font': schrift } : {}),
         'text-allow-overlap': true,
         'text-ignore-placement': true,
       },
-      paint: { 'text-color': '#fff' },
+      paint: { ...KURZ_PAINT },
+    });
+  }
+  // Trefferzone und Außenkante der Einzel-Personen wie in `marker-cluster` (LFH-650) — die
+  // Personen der Lagekarte tragen `treffer`/`sk` aus `personenMarker`.
+  if (fehlt('personen-treffer')) {
+    map.addLayer({
+      id: 'personen-treffer',
+      type: 'circle',
+      source: PERSONEN_CLUSTER_QUELLE,
+      filter: ['all', ['!', ['has', 'point_count']], ['has', 'treffer']],
+      paint: { ...TREFFER_PAINT },
+    });
+  }
+  if (fehlt('personen-kante')) {
+    map.addLayer({
+      id: 'personen-kante',
+      type: 'circle',
+      source: PERSONEN_CLUSTER_QUELLE,
+      filter: ['all', ['!', ['has', 'point_count']], ['has', 'sk']],
+      paint: { ...KANTE_PAINT },
     });
   }
   if (fehlt('personen-kreis')) {
@@ -526,6 +663,15 @@ function sorgeFuerSpiderLayer(map: MapLibreMap, schrift: string[] | undefined) {
       paint: { 'line-color': '#64748b', 'line-width': 1.5, 'line-opacity': 0.7 },
     });
   }
+  if (!map.getLayer('spider-treffer')) {
+    map.addLayer({
+      id: 'spider-treffer',
+      type: 'circle',
+      source: SPIDER_LEAVES_QUELLE,
+      filter: ['has', 'treffer'],
+      paint: { ...TREFFER_PAINT },
+    });
+  }
   if (!map.getLayer('spider-status-ring')) {
     map.addLayer({
       id: 'spider-status-ring',
@@ -533,6 +679,15 @@ function sorgeFuerSpiderLayer(map: MapLibreMap, schrift: string[] | undefined) {
       source: SPIDER_LEAVES_QUELLE,
       filter: ['has', 'statusFarbe'],
       paint: { ...STATUS_RING_PAINT },
+    });
+  }
+  if (!map.getLayer('spider-kante')) {
+    map.addLayer({
+      id: 'spider-kante',
+      type: 'circle',
+      source: SPIDER_LEAVES_QUELLE,
+      filter: ['has', 'sk'],
+      paint: { ...KANTE_PAINT },
     });
   }
   if (!map.getLayer('spider-kreis')) {
@@ -617,4 +772,30 @@ export function setzeSpiderDaten(
 ) {
   (map.getSource(SPIDER_LEAVES_QUELLE) as GeoJSONSource | undefined)?.setData(leaves as never);
   (map.getSource(SPIDER_LEGS_QUELLE) as GeoJSONSource | undefined)?.setData(legs as never);
+}
+
+/**
+ * Das Merkmal, das einem Klickpunkt am NÄCHSTEN liegt (Review LFH-650). Seit den Trefferzonen
+ * überlappen die Klickflächen benachbarter Marker regelmäßig (Zone 48/72 px, Spider-Abstand
+ * 40 px); MapLibre liefert die Treffer aber in Zeichenreihenfolge, nicht nach Abstand. Ohne
+ * diese Wahl öffnete ein Tipp neben Person A womöglich die obenauf gezeichnete Person B.
+ * Rein, damit die Wahl ohne WebGL prüfbar ist; `projiziere` ist `map.project`.
+ */
+export function naechstesMerkmal<F extends { geometry?: { type: string; coordinates?: unknown } }>(
+  merkmale: readonly F[],
+  punkt: { x: number; y: number },
+  projiziere: (lngLat: [number, number]) => { x: number; y: number },
+): F | undefined {
+  let bestes: F | undefined;
+  let abstand = Number.POSITIVE_INFINITY;
+  for (const m of merkmale) {
+    if (m.geometry?.type !== 'Point') continue;
+    const p = projiziere(m.geometry.coordinates as [number, number]);
+    const d = Math.hypot(p.x - punkt.x, p.y - punkt.y);
+    if (d < abstand) {
+      abstand = d;
+      bestes = m;
+    }
+  }
+  return bestes ?? merkmale[0];
 }

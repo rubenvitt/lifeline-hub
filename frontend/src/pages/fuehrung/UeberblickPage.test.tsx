@@ -1,5 +1,5 @@
 import { delay, http, HttpResponse } from 'msw';
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { Route, Routes, useLocation } from 'react-router';
@@ -537,7 +537,7 @@ describe('UeberblickPage', () => {
     expect(marken[3]).toHaveAttribute('href', '/einsaetze/1/stab');
   });
 
-  it('Nächste Marken: offene Pegel-Prognose führt in die Pegel-Einstellungen, verstrichene fehlt (LFH-628)', async () => {
+  describe('Nächste Marken: offene Pegel-Prognose (LFH-628), Ziel nach LFH-633', () => {
     // Wire-Zeit UTC ohne Zone, relativ zur echten Uhr (die Seite rechnet mit ihr).
     const wire = (ms: number) => new Date(ms).toISOString().slice(0, 19).replace('T', ' ');
     const prognose = (ms: number) => ({
@@ -545,7 +545,7 @@ describe('UeberblickPage', () => {
       zeitpunkt: wire(ms),
       gesetzt_at: wire(Date.now()),
     });
-    stelleBereit({
+    const daten = () => ({
       ...volleDaten,
       pegel: [
         { ...leitpegel(null), prognose: prognose(Date.now() + 3 * 3_600_000) },
@@ -560,14 +560,48 @@ describe('UeberblickPage', () => {
         },
       ],
     });
-    rendern();
-    const p = await waitFor(() => paneel('Nächste Marken'));
-    const marke = await within(p).findByRole('link', {
-      name: /Erwarteter Höchststand Pegel HANN\. MÜNDEN \(WESER\): 7,10 m/,
+    const marke = async () => {
+      const p = await waitFor(() => paneel('Nächste Marken'));
+      const m = await within(p).findByRole('link', {
+        name: /Erwarteter Höchststand Pegel HANN\. MÜNDEN \(WESER\): 7,10 m/,
+      });
+      return { p, m };
+    };
+
+    it('Modul „Wetter & Pegel" frei → die Marke führt auf die Modulseite; verstrichene fehlt', async () => {
+      stelleBereit(daten());
+      rendern();
+      const { p, m } = await marke();
+      expect(m).toHaveAttribute('href', '/einsaetze/1/wetter-pegel');
+      expect(m).toHaveAttribute('data-ton', 'neutral');
+      expect(within(p).queryByText(/Pegel WAHNHAUSEN/)).toBeNull();
     });
-    expect(marke).toHaveAttribute('href', '/einsaetze/1/einstellungen/pegel');
-    expect(marke).toHaveAttribute('data-ton', 'neutral');
-    expect(within(p).queryByText(/Pegel WAHNHAUSEN/)).toBeNull();
+
+    it('Modul ausgeblendet → die Marke führt in die Pegel-Einstellungen', async () => {
+      // Vor der Override-Antwort gilt ohnehin die Pflege; die Aussage trägt erst NACH ihr.
+      let overridesGeliefert = 0;
+      stelleBereit(daten(), [
+        http.get('/api/einsaetze/1/modul-overrides', () => {
+          overridesGeliefert += 1;
+          return HttpResponse.json({
+            'wetter-pegel': {
+              einsatz_id: 1,
+              modul_key: 'wetter-pegel',
+              sichtbar: false,
+              benoetigte_rolle: null,
+              geaendert_at: null,
+            },
+          });
+        }),
+      ]);
+      rendern();
+      const { m } = await marke();
+      await waitFor(() => expect(overridesGeliefert).toBeGreaterThan(0));
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 20));
+      });
+      expect(m).toHaveAttribute('href', '/einsaetze/1/einstellungen/pegel');
+    });
   });
 
   it('Nächste Marken: fällige Ablösungen je Abschnitt zusammengefasst, Link zur Ablösung (LFH-635)', async () => {

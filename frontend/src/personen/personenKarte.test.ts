@@ -73,7 +73,23 @@ describe('personenMarker', () => {
       farbe: sichtungsfarben.gelb,
       // Zweiter Kanal IM Kreis, unabhängig vom Plaketten-Zoom.
       kurzzeichen: 'II',
+      // Speist die Cluster-Aggregation nach Sichtung (LFH-650).
+      sichtung: 'sk2',
     });
+    expect(marker[1]).toMatchObject({ sichtung: 'ohne', kurzzeichen: '–' });
+  });
+
+  it('die Trefferzone folgt der Dichtestufe — controlHeight, keine feste Zahl (LFH-650)', () => {
+    /**
+     * Der gezeichnete Kreis bleibt eine feste MapLibre-Angabe (~22 px); die Zone darunter
+     * trägt die Trefffläche. Geprüft über zwei Stufen mit LITERALEN Böden — aus dem Token
+     * zurückgelesen prüfte die Aussage den Token gegen sich selbst (LFH-365).
+     */
+    const personen = [p({ id: 1, antreff_lat: 50.1, antreff_lon: 8.6 })];
+    const kompakt = personenMarker(personen, { ...token, controlHeight: 30 });
+    const handschuh = personenMarker(personen, { ...token, controlHeight: 72 });
+    expect(kompakt.marker[0].trefferDurchmesser).toBe(30);
+    expect(handschuh.marker[0].trefferDurchmesser).toBe(72);
   });
 
   it('stornierte Personen stehen weder auf der Karte noch in der Zählung', () => {

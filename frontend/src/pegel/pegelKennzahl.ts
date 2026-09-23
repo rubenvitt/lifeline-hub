@@ -173,6 +173,67 @@ function leitmessung(leit: PegelAnzeige, jetzt: number): Leitmessung | null {
   };
 }
 
+/**
+ * Eine Station für sich (Modulseite „Wetter & Pegel“, LFH-633): dieselben Regeln wie die
+ * Kennzahl — Meter, Trendwort, Stand, „veraltet“ ab 60 min, „Stand unbekannt“ bei Ausfall,
+ * Prognose nur solange offen —, aber je Pegel statt nur für den Leitpegel. Die Kennzahl baut
+ * auf dieser Ableitung auf, damit die Schwellen an genau einer Stelle stehen.
+ */
+export interface PegelZeile {
+  fall: Exclude<PegelFall, 'keiner'>;
+  name: string;
+  gewaesser: string | null;
+  wert: string;
+  /** Nur im Fall `messung`. */
+  einheit?: 'm';
+  /** „steigend +9 cm/h" …; `null` bei Ausfall (dort gibt es keinen Trend, nicht „unbekannt"). */
+  trend: string | null;
+  richtung: TrendRichtung | null;
+  /** „Stand 14:05" bzw. bei Ausfall „Stand unbekannt". */
+  stand: string;
+  veraltet: boolean;
+  ton: 'neutral' | 'achtung';
+  /** „Prognose 7,10 m bis 18:00", solange sie offen ist, sonst `null`. */
+  prognose: string | null;
+}
+
+/** Ableitung für EINE Station. Rein. */
+export function pegelZeile(
+  p: PegelAnzeige,
+  jetzt: number,
+  konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
+): PegelZeile {
+  const kopf = {
+    name: p.name,
+    gewaesser: p.gewaesser?.trim() || null,
+    prognose: prognoseTeil(p, jetzt, konv)[0] ?? null,
+  };
+  const m = leitmessung(p, jetzt);
+  if (!m) {
+    return {
+      ...kopf,
+      fall: 'ausfall',
+      wert: '—',
+      trend: null,
+      richtung: null,
+      stand: PEGEL_STAND_UNBEKANNT,
+      veraltet: false,
+      ton: 'achtung',
+    };
+  }
+  return {
+    ...kopf,
+    fall: 'messung',
+    wert: m.meter,
+    einheit: 'm',
+    trend: trendText(m.trend),
+    richtung: trendRichtung(m.trend),
+    stand: `Stand ${standZeit(m.zeitpunkt, jetzt, konv)}`,
+    veraltet: m.veraltet,
+    ton: m.veraltet ? 'achtung' : 'neutral',
+  };
+}
+
 /** Kennzahl für das Band des Lage-Dashboards. `pegel` in Reihenfolge, erster = Leitpegel. Rein. */
 export function pegelKennzahl(
   pegel: readonly PegelAnzeige[],
@@ -183,34 +244,33 @@ export function pegelKennzahl(
   if (!leit) {
     return { fall: 'keiner', wert: '—', notiz: KEIN_PEGEL, ton: 'neutral', veraltet: false };
   }
-  const ort = leit.gewaesser?.trim() || leit.name;
+  const z = pegelZeile(leit, jetzt, konv);
+  const ort = z.gewaesser ?? z.name;
   const weitere = pegel.length > 1 ? [`+${pegel.length - 1} weitere`] : [];
-  const prognose = prognoseTeil(leit, jetzt, konv);
-  const m = leitmessung(leit, jetzt);
-  if (!m) {
+  const prognose = z.prognose ? [z.prognose] : [];
+  if (z.fall === 'ausfall') {
     return {
       fall: 'ausfall',
-      wert: '—',
-      notiz: [ort, PEGEL_STAND_UNBEKANNT, ...prognose, ...weitere].join(' · '),
-      ton: 'achtung',
+      wert: z.wert,
+      notiz: [ort, z.stand, ...prognose, ...weitere].join(' · '),
+      ton: z.ton,
       veraltet: false,
     };
   }
-  const stand = `Stand ${standZeit(m.zeitpunkt, jetzt, konv)}`;
   return {
     fall: 'messung',
-    wert: m.meter,
-    einheit: 'm',
+    wert: z.wert,
+    einheit: z.einheit,
     notiz: [
       ort,
-      trendText(m.trend),
-      stand,
-      ...(m.veraltet ? [VERALTET] : []),
+      z.trend ?? TREND_UNBEKANNT,
+      z.stand,
+      ...(z.veraltet ? [VERALTET] : []),
       ...prognose,
       ...weitere,
     ].join(' · '),
-    ton: m.veraltet ? 'achtung' : 'neutral',
-    veraltet: m.veraltet,
+    ton: z.ton,
+    veraltet: z.veraltet,
   };
 }
 

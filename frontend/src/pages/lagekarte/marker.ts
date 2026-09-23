@@ -8,6 +8,7 @@ import type {
   FuehrungskraftKarte,
   LageMeldung,
   Schaden,
+  Sichtungskategorie,
   Uhs,
 } from '../../api/types';
 import {
@@ -33,7 +34,7 @@ export type MarkerTyp =
   /** Betroffene (LFH-613). Erzeugt ausschließlich `personenMarker` — auf der Betroffenen-Seite
    *  und seit LFH-648 als Ebene „Betroffene" der Lagekarte. Dort laufen sie als eigene Liste
    *  `personenVerortet` NEBEN `alleVerortet` (Startausschnitt/Kopfzahl ohne Personen) und
-   *  clustern in eigener Quelle (`PERSONEN_CLUSTER_QUELLE`). */
+   *  clustern — nur dort — in eigener Quelle (`clusterQuelle`, `PERSONEN_CLUSTER_QUELLE`). */
   | 'person';
 
 export interface KarteMarker {
@@ -54,6 +55,26 @@ export interface KarteMarker {
   /** Kurzzeichen IM Kreis, unabhängig vom Zoom sichtbar (Betroffene: Sichtung „II", LFH-613).
    *  Nur für Marker ohne taktisches Zeichen (`tz`) — sonst läge es auf dem Symbol. */
   kurzzeichen?: string;
+  /**
+   * Durchmesser der unsichtbaren Trefferzone in px (LFH-650). Der gezeichnete Personen-
+   * Marker bleibt klein (Kreis, weißer Rand, schwarze Kante: 26 px); die Zone macht die Trefffläche so groß wie die Dichtestufe verlangt
+   * (`token.controlHeight`: 30 / 48 / 72). Ohne Angabe gibt es keine Zone — die Lagekarte
+   * setzt sie nicht und bleibt damit unverändert.
+   */
+  trefferDurchmesser?: number;
+  /**
+   * Sichtungskategorie eines Personen-Markers (LFH-650) — speist die Cluster-Aggregation,
+   * damit ein Cluster seine Zusammensetzung nach Sichtung und die dringlichste Kategorie
+   * zeigen kann (`clusterDonut.ts`). `'ohne'` = noch nicht gesichtet.
+   */
+  sichtung?: Sichtungskategorie | 'ohne';
+  /**
+   * Eigene Cluster-Quelle (LFH-648): gesetzt NUR auf der Lagekarte, für die Ebene „Betroffene".
+   * Dort clustern Personen getrennt von den Kräften und liegen unter ihnen
+   * (`PERSONEN_CLUSTER_QUELLE`). Die Betroffenen-Karte setzt es nicht — ihre Personen bleiben
+   * in `marker-cluster` mit den Sichtungs-Donuts aus LFH-650.
+   */
+  clusterQuelle?: 'personen';
   /** FMS-Status-Ring, nur für Fahrzeuge. */
   statusFarbe?: string | null;
   /** Lagemeldungs-Herkunft für den Inspector-Backlink (nur typ='lagemeldung').

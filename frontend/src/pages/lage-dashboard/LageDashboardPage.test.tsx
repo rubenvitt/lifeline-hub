@@ -230,6 +230,10 @@ interface Daten {
   /** Maßgebliche Pegel (LFH-606) und ein erzwungener Fehlerstatus ihres Abrufs. */
   pegel?: unknown[];
   pegelStatus?: number;
+  /** Modul-Overrides des Einsatzes (LFH-633: entscheidet das Ziel der Pegel-Kennzahl). */
+  overrides?: Record<string, unknown>;
+  /** Zählt die gelieferten Override-Antworten (Test wartet auf die Entscheidung). */
+  overridesGeliefert?: { n: number };
   /** Der Einsatz-Abruf bleibt hängen — der einzige Zustand, in dem `baueLagebild`
    *  noch gar nichts liefert und das Kennzahlenband seine Plätze selbst stellen muss. */
   einsatzLaedt?: boolean;
@@ -269,6 +273,12 @@ function mockEndpunkte(d: Daten) {
     http.get('/api/einsaetze/1/pegel', () =>
       d.pegelStatus ? new HttpResponse(null, { status: d.pegelStatus }) : json(d.pegel),
     ),
+    // LFH-633: ohne diesen Handler scheiterte die Abfrage in jedem Test, und die Kennzahl
+    // bliebe auf der Pflege stehen — die href-Aussagen belegten dann nur den Fehlerpfad.
+    http.get('/api/einsaetze/1/modul-overrides', () => {
+      if (d.overridesGeliefert) d.overridesGeliefert.n += 1;
+      return HttpResponse.json(d.overrides ?? {});
+    }),
   );
 }
 
@@ -549,7 +559,8 @@ describe('LageDashboardPage — Kennzahlenband', () => {
     );
     expect(notiz).not.toContain('veraltet');
     expect(zelle.getAttribute('data-ton')).toBe('neutral');
-    expect(zelle).toHaveAttribute('href', '/einsaetze/1/einstellungen/pegel');
+    // Modul „Wetter & Pegel" frei (keine Overrides) → die Kennzahl führt dorthin (LFH-633).
+    await waitFor(() => expect(zelle).toHaveAttribute('href', '/einsaetze/1/wetter-pegel'));
   });
 
   it('Pegel veraltet: das Wort in der Notiz und die Achtungskante', async () => {
@@ -603,7 +614,7 @@ describe('LageDashboardPage — Kennzahlenband', () => {
     expect(zelle).not.toHaveTextContent('?');
   });
 
-  it('kein Pegel festgelegt: der Platz bleibt belegt und führt zur Auswahl', async () => {
+  it('kein Pegel festgelegt: der Platz bleibt belegt und führt auf die Modulseite (dort der Weg zur Auswahl)', async () => {
     mockEndpunkte({});
     render();
     const zelle = await waitFor(() => {
@@ -612,6 +623,34 @@ describe('LageDashboardPage — Kennzahlenband', () => {
       return z;
     });
     expect(zelle.querySelector('[data-lfh="kennzahl-wert"]')?.textContent).toBe('—');
+    await waitFor(() => expect(zelle).toHaveAttribute('href', '/einsaetze/1/wetter-pegel'));
+  });
+
+  it('Modul „Wetter & Pegel" ausgeblendet → die Pegel-Kennzahl führt in die Pflege (LFH-633)', async () => {
+    // Vor der Override-Antwort gilt ohnehin die Pflege; die Aussage trägt erst NACH ihr.
+    const overridesGeliefert = { n: 0 };
+    mockEndpunkte({
+      overridesGeliefert,
+      overrides: {
+        'wetter-pegel': {
+          einsatz_id: 1,
+          modul_key: 'wetter-pegel',
+          sichtbar: false,
+          benoetigte_rolle: null,
+          geaendert_at: null,
+        },
+      },
+    });
+    render();
+    const zelle = await waitFor(() => {
+      const z = kennzahl('Pegel');
+      expect(z).toHaveTextContent('kein Pegel festgelegt');
+      return z;
+    });
+    await waitFor(() => expect(overridesGeliefert.n).toBeGreaterThan(0));
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20));
+    });
     expect(zelle).toHaveAttribute('href', '/einsaetze/1/einstellungen/pegel');
   });
 
@@ -783,6 +822,20 @@ describe('LageDashboardPage — Sichtung', () => {
       expect(box.querySelector('[data-lfh="transport-bilanz"]')).toHaveTextContent(
         'Transportiert / offen2 / 2',
       ),
+    );
+  });
+
+  it('„Ohne Sichtung" steht auch bei 0 — die Zeile springt nicht mit dem Wert (LFH-650)', async () => {
+    /**
+     * Vorher nur bei `> 0` gerendert: der erste ungesichtete Zugang schob die Transport-Zeile
+     * und das Paneel nach unten (Prüfliste LFH-613, Tabelle 5, Nr. 12). Die Gegenhälfte, dass
+     * der Wert bei > 0 stimmt, trägt der Test oben.
+     */
+    mockEndpunkte({ personen: [person('sk1'), person('sk3')] });
+    render();
+    const box = paneel('Sichtung');
+    await waitFor(() =>
+      expect(box.querySelector('[data-lfh="ohne-sichtung"]')).toHaveTextContent('Ohne Sichtung0'),
     );
   });
 

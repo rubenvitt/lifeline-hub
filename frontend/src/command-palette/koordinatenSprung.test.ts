@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { formatiere } from '../anzeige/koordinaten';
 import { erkenneKoordinate, koordinatenBefehl } from './koordinatenSprung';
 
@@ -125,5 +125,19 @@ describe('koordinatenBefehl', () => {
       navigate: () => {},
     });
     expect(a.id).not.toBe(b.id);
+  });
+});
+
+describe('koordinatenBefehl — Öffnungsart (LFH-645)', () => {
+  it('trägt die Lagekarte als Ziel und reicht den neuen Tab durch', () => {
+    const navigate = vi.fn();
+    const b = koordinatenBefehl({ einsatzId: 5, punkt: BERLIN, format: 'wgs84', navigate });
+    expect(b.ziel).toMatch(/^\/einsaetze\/5\/lagekarte\?/);
+    b.ausfuehren('neuerTab');
+    expect(navigate).toHaveBeenCalledWith(b.ziel, 'neuerTab');
+    navigate.mockClear();
+    b.ausfuehren();
+    expect(navigate).toHaveBeenCalledWith(b.ziel);
+    expect(b.vorschau).toBeUndefined();
   });
 });
