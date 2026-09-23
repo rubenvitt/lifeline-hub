@@ -1,12 +1,16 @@
 import { render, screen, waitFor, act, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
 import { App as AntApp } from 'antd';
 import { StrictMode, useState } from 'react';
 import { MemoryRouter, Routes, Route, useLocation, useNavigate } from 'react-router';
 import AlarmZentrale from './AlarmZentrale';
 import { istAlarmGemutet } from '../alarm/alarmTon';
 import { setzeViewportBreite, VIEWPORT_STANDARD } from '../test/viewport';
+
+dayjs.extend(utc);
 
 function AlarmTestRoute({ mitSteuerung }: { mitSteuerung: boolean }) {
   const { notification } = AntApp.useApp();
@@ -297,6 +301,60 @@ describe('AlarmZentrale', () => {
     expect(screen.queryByRole('button', { name: 'Zu Aufträgen' })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Zu Erinnerungen' }));
     expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/1/erinnerungen');
+  });
+
+  it('zeigt einen Ablösungs-Hinweis mit Einheit und Uhrzeit und springt zur Ablösung (LFH-635)', async () => {
+    renderAlarm({ initialEntry: '/einsaetze/1/start' });
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('lfh:abloesung-alarm', {
+          detail: {
+            abloesung_id: 9,
+            art: 'faellig',
+            titel: 'Ablösung fällig: Florian 1',
+            faellig_at: '2026-09-22 13:30:00',
+          },
+        }),
+      );
+    });
+    expect(await screen.findByText('Ablösung fällig')).toBeInTheDocument();
+    const uhrzeit = dayjs.utc('2026-09-22 13:30:00').local().format('HH:mm');
+    expect(screen.getByText(`Ablösung fällig: Florian 1, ${uhrzeit}`)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Öffnen' }));
+    expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/1/abloesung');
+  });
+
+  it('Ablösung: Vorwarnung und Fälligkeit sind zwei Hinweise, die Wiederholung derselben keiner', async () => {
+    renderAlarm();
+    const senden = (art: 'vorwarnung' | 'faellig') =>
+      window.dispatchEvent(
+        new CustomEvent('lfh:abloesung-alarm', {
+          detail: { abloesung_id: 9, art, titel: 'Ablösung fällig: Florian 1' },
+        }),
+      );
+    act(() => {
+      senden('vorwarnung');
+      senden('faellig');
+      senden('faellig');
+    });
+    expect(await screen.findByText('Ablösung in 30 min')).toBeInTheDocument();
+    expect(screen.getAllByText('Ablösung fällig')).toHaveLength(1);
+  });
+
+  it('bündelt vier Ablösungen mit dem Ablösungs-Ziel — dasselbe Budget wie alle Quellen', async () => {
+    renderAlarm({ initialEntry: '/einsaetze/1/start' });
+    act(() => {
+      for (let id = 1; id <= 4; id += 1) {
+        window.dispatchEvent(
+          new CustomEvent('lfh:abloesung-alarm', {
+            detail: { abloesung_id: id, art: 'faellig', titel: `Ablösung fällig: F${id}` },
+          }),
+        );
+      }
+    });
+    expect(await screen.findByText('3 weitere Ablösungen')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Zu Ablösungen' }));
+    expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/1/abloesung');
   });
 
   it('bietet bei gemischter Bündelung getrennte Aktionen nur für betroffene Module', async () => {

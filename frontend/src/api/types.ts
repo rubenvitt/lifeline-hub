@@ -380,6 +380,43 @@ export interface LagebesprechungAbschlussBody {
   naechste_at?: string | null;
 }
 
+// ============================== LFH-635 Ablösung ==============================
+export type Abloesung = S['AbloesungAnzeige'];
+export type AbloesungStatus = S['AbloesungStatus'];
+export type AbloesungVollzug = S['AbloesungVollzugAnzeige'];
+export type AbloesungVorgabe = S['AbloesungVorgabeAnzeige'];
+export type AbloesungEinstufung = S['Einstufung'];
+export type RhythmusQuelle = S['RhythmusQuelle'];
+
+/**
+ * LFH-120: kein Backend-Schema — Eingabe-Body von `POST …/abloesungen`, FE-lokal.
+ * Ohne `rhythmus_minuten` gilt die Vorgabe des Abschnitts der Einheit (fehlt die, 400);
+ * ohne `beginn_at` der Zeitpunkt der Anlage. Zeiten als UTC 'YYYY-MM-DD HH:mm:ss'.
+ */
+export interface SchichtBeginnenBody {
+  einheit_id: number;
+  beginn_at?: string;
+  rhythmus_minuten?: number;
+}
+
+/**
+ * LFH-120: kein Backend-Schema — Eingabe-Body von `PATCH …/abloesungen/{id}`, FE-lokal.
+ * DREIWERTIG (`src/routes/abloesung.rs`, `Aendern`): Schlüssel fehlt = unverändert ·
+ * `rhythmus_minuten: null` = zurück zur Abschnittsvorgabe · `abloesende_einheit_id: null` =
+ * Planung aufheben.
+ */
+export interface SchichtAendernBody {
+  beginn_at?: string;
+  rhythmus_minuten?: number | null;
+  abloesende_einheit_id?: number | null;
+}
+
+/** LFH-120: kein Backend-Schema — Eingabe-Body von `POST …/abloesungen/{id}/vollzug`. */
+export interface VollzugBody {
+  vollzogen_at?: string;
+  abloesende_einheit_id?: number;
+}
+
 // ============================== LFH-51 Terminierte Erinnerungen ==============================
 export type Erinnerung = S['ErinnerungAnzeige'];
 

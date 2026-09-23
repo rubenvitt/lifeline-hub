@@ -406,6 +406,7 @@ const MODUL_GET_PFADE: &[(&str, &str)] = &[
     ("chat", "chat/kanaele"),
     ("erinnerungen", "erinnerungen"),
     ("auftraege", "auftraege"),
+    ("abloesung", "abloesungen"),
     ("meldungen", "meldungen"),
     ("nachforderungen", "nachforderungen"),
     ("fahrzeuge", "fahrzeuge"),

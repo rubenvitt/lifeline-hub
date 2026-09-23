@@ -17,6 +17,11 @@ pub const OBJEKT_CHAT_NACHRICHT: &str = "chat_nachricht";
 pub const OBJEKT_ERINNERUNG: &str = "erinnerung";
 pub const OBJEKT_AUFTRAG: &str = "auftrag";
 pub const OBJEKT_MELDUNG: &str = "meldung";
+/// Auto-Fristen einer Ablösungsschicht (LFH-635): zur Fälligkeit und 30 min vorher. Zwei
+/// Bezugstypen statt einer Frist mit zwei Zeitpunkten — so deckt der partielle UNIQUE-Index
+/// `idx_erinnerung_auto_bezug` beide ab, ohne dass man ihn anfasst.
+pub const OBJEKT_ABLOESUNG: &str = "abloesung";
+pub const OBJEKT_ABLOESUNG_VORWARNUNG: &str = "abloesung_vorwarnung";
 
 /// Vollzug-Achse (Achse 2): Bearbeitungszustand eines Objekts.
 pub const VOLLZUG_OFFEN: &str = "offen";

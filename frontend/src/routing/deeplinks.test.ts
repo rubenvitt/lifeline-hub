@@ -21,6 +21,7 @@ import {
   personenPfad,
   schaedenPfad,
   stabPfad,
+  abloesungPfad,
   etbPfad,
   parseEtbFilter,
   parsePersonenSicht,
@@ -253,6 +254,10 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
   it('schaedenPfad mit ?neu=1', () => {
     expect(schaedenPfad(E, { neu: true })).toBe('/einsaetze/5/schaeden?neu=1');
   });
+  it('abloesungPfad (LFH-635)', () => {
+    expect(abloesungPfad(E)).toBe('/einsaetze/5/abloesung');
+  });
+
   it('stabPfad ohne Optionen', () => {
     expect(stabPfad(E)).toBe('/einsaetze/5/stab');
   });

@@ -74,6 +74,189 @@
           "verworfen"
         ]
       },
+      "AbloesungAnzeige": {
+        "type": "object",
+        "description": "Öffentliche Darstellung einer Schicht.",
+        "required": [
+          "id",
+          "einsatz_id",
+          "einheit_id",
+          "einheit_name",
+          "beginn_at",
+          "rhythmus_minuten",
+          "rhythmus_quelle",
+          "faellig_at",
+          "status",
+          "ruecknehmbar",
+          "angelegt_at"
+        ],
+        "properties": {
+          "abloesende_einheit_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "abloesende_einheit_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "abschnitt_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "abschnitt_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "angelegt_at": {
+            "type": "string"
+          },
+          "beginn_at": {
+            "type": "string"
+          },
+          "einheit_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "einheit_name": {
+            "type": "string"
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "einstufung": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Einstufung",
+                "description": "Nur bei laufenden Schichten; berechnet gegen die Zeit der Abfrage."
+              }
+            ]
+          },
+          "faellig_at": {
+            "type": "string"
+          },
+          "folgeschicht_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Die Folgeschicht, die beim Vollzug dieser Schicht entstand."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "rhythmus_minuten": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "rhythmus_quelle": {
+            "$ref": "#/components/schemas/RhythmusQuelle"
+          },
+          "ruecknehmbar": {
+            "type": "boolean",
+            "description": "Der Vollzug lässt sich zurücknehmen: abgelöst, und eine Folgeschicht ist entweder\nnicht vorhanden oder noch unberührt (laufend)."
+          },
+          "status": {
+            "$ref": "#/components/schemas/AbloesungStatus"
+          },
+          "vollzogen_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "vollzogen_von_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "vorgaenger_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Die abgelöste Schicht, aus deren Vollzug diese hervorging."
+          }
+        }
+      },
+      "AbloesungStatus": {
+        "type": "string",
+        "description": "Status einer Schicht. Wire == `as_str()`.",
+        "enum": [
+          "laufend",
+          "abgeloest"
+        ]
+      },
+      "AbloesungVollzugAnzeige": {
+        "type": "object",
+        "description": "Antwort auf einen Vollzug: die abgelöste Schicht und — mit ablösender Einheit — die\nFolgeschicht.",
+        "required": [
+          "abgeloest"
+        ],
+        "properties": {
+          "abgeloest": {
+            "$ref": "#/components/schemas/AbloesungAnzeige"
+          },
+          "folgeschicht": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AbloesungAnzeige"
+              }
+            ]
+          }
+        }
+      },
+      "AbloesungVorgabeAnzeige": {
+        "type": "object",
+        "description": "Rhythmus-Vorgabe eines Einsatzabschnitts.",
+        "required": [
+          "abschnitt_id",
+          "abschnitt_name",
+          "laufende_schichten"
+        ],
+        "properties": {
+          "abschnitt_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "abschnitt_name": {
+            "type": "string"
+          },
+          "laufende_schichten": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Laufende Schichten mit Einsatzstelle in diesem Abschnitt."
+          },
+          "rhythmus_minuten": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          }
+        }
+      },
       "AbschlussGrund": {
         "type": "string",
         "description": "Abschlussgrund beim Übergang `→ abgeschlossen`. String = CHECK-Constraint.\n`etb_label` erscheint in Klammern in der ETB-Spur (Spec: \"abgeschlossen\n(uebergabe_tierarzt)\") — daher identisch zum DB-String.",
@@ -2602,6 +2785,15 @@
         ],
         "description": "Antwort-Shape von `einstellungen_laden`: rohe Einsatz-Override-Werte (geflacht)\nplus org-weite Defaults als eingebettetes Objekt (ohne Audit-Felder)."
       },
+      "Einstufung": {
+        "type": "string",
+        "description": "Einstufung einer laufenden Schicht gegen die aktuelle Zeit. Höchstens drei Stufen\n(EEMUA 191/ISA-18.2: ≤ 3 Eskalationsstufen). Wire == `as_str()`.",
+        "enum": [
+          "planmaessig",
+          "vorwarnung",
+          "ueberfaellig"
+        ]
+      },
       "EmpfaengerTyp": {
         "type": "string",
         "description": "Empfänger-Diskriminator eines Auftrags (Schema-Anker für die OpenAPI-Union, LFH-120).\nWire == `empfaenger_typ`.",
@@ -4273,6 +4465,7 @@
           "etb",
           "befehl",
           "stab",
+          "abloesung",
           "karten_ansicht",
           "lage_snapshot",
           "sofortmeldung",
@@ -6050,6 +6243,14 @@
             "type": "string"
           }
         }
+      },
+      "RhythmusQuelle": {
+        "type": "string",
+        "description": "Herkunft des Rhythmus einer Schicht. Wire == `as_str()`.",
+        "enum": [
+          "abschnitt",
+          "einheit"
+        ]
       },
       "Richtung": {
         "type": "string",

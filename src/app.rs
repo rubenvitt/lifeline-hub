@@ -275,6 +275,32 @@ pub fn build_router(state: AppState) -> Router {
             get(routes::pegel::vorhersage_lesen),
         )
         // Stab (LFH-46): Führungsorganisation S1–S6. Flache Kette wie die Nachbarn.
+        // Ablösung (LFH-635). `vorgaben` vor `{aid}` ist für axum egal (statisches Segment
+        // schlägt Parameter), steht aber zur Lesbarkeit zuerst.
+        .route(
+            "/api/einsaetze/{id}/abloesungen",
+            get(routes::abloesung::liste).post(routes::abloesung::beginnen),
+        )
+        .route(
+            "/api/einsaetze/{id}/abloesungen/vorgaben",
+            get(routes::abloesung::vorgaben),
+        )
+        .route(
+            "/api/einsaetze/{id}/abloesungen/vorgaben/{abschnitt_id}",
+            put(routes::abloesung::vorgabe_setzen),
+        )
+        .route(
+            "/api/einsaetze/{id}/abloesungen/{aid}",
+            patch(routes::abloesung::aendern),
+        )
+        .route(
+            "/api/einsaetze/{id}/abloesungen/{aid}/vollzug",
+            post(routes::abloesung::vollziehen),
+        )
+        .route(
+            "/api/einsaetze/{id}/abloesungen/{aid}/vollzug/zuruecknehmen",
+            post(routes::abloesung::zuruecknehmen),
+        )
         .route("/api/einsaetze/{id}/stab", get(routes::stab::laden))
         .route(
             "/api/einsaetze/{id}/stab/besetzung/{sachgebiet}",

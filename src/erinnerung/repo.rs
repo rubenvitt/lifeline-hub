@@ -1,6 +1,6 @@
 use super::{ErinnerungAnzeige, STATUS_ERLEDIGT, STATUS_OFFEN, STATUS_QUITTIERT};
 use crate::error::AppError;
-use sqlx::SqlitePool;
+use sqlx::{SqliteConnection, SqlitePool};
 
 /// Eingabedaten für eine neue (manuelle) Erinnerung — bereits vom Handler validiert.
 #[derive(Debug)]
@@ -163,6 +163,8 @@ pub struct FaelligeErinnerung {
     /// die Eskalation des Bezugs auf (LFH-97), ohne Fremdtabellen-Polling.
     pub bezug_typ: Option<String>,
     pub bezug_id: Option<i64>,
+    /// Titel der Erinnerung — der Ablösungs-Hinweis (LFH-635) trägt ihn in die AlarmZentrale.
+    pub titel: String,
 }
 
 /// Liefert offene Erinnerungen, die fällig sind (`faellig_at <= jetzt`) und für
@@ -174,7 +176,7 @@ pub async fn faellige_zum_ausloesen(
     jetzt: &str,
 ) -> Result<Vec<FaelligeErinnerung>, AppError> {
     sqlx::query_as::<_, FaelligeErinnerung>(
-        "SELECT id, einsatz_id, faellig_at, intervall_minuten, bezug_typ, bezug_id \
+        "SELECT id, einsatz_id, faellig_at, intervall_minuten, bezug_typ, bezug_id, titel \
          FROM erinnerung \
          WHERE status = 'offen' AND faellig_at <= ? \
            AND (zuletzt_ausgeloest_at IS NULL OR zuletzt_ausgeloest_at < faellig_at) \
@@ -234,9 +236,38 @@ pub async fn anlegen_aus_frist(
     faellig_at: &str,
     jetzt: &str,
 ) -> Result<ErinnerungAnzeige, AppError> {
-    // Atomarer Ensure: konkurrierende Replays dürfen beide bis hier gelangen. Der
-    // partielle Unique-Index lässt genau einen Insert gewinnen; der Verlierer liest
-    // anschließend denselben offenen Datensatz statt mit einem Unique-Fehler zu enden.
+    let id = {
+        let mut conn = pool.acquire().await?;
+        anlegen_aus_frist_tx(
+            &mut conn,
+            einsatz_id,
+            ersteller_id,
+            bezug_typ,
+            bezug_id,
+            titel,
+            faellig_at,
+        )
+        .await?
+    };
+    laden(pool, id, jetzt).await
+}
+
+/// Transaktionsfähige Variante von [`anlegen_aus_frist`] (LFH-635): liefert die `id` der
+/// offenen Auto-Frist des Bezugs — neu angelegt oder die bereits bestehende.
+///
+/// Atomarer Ensure: konkurrierende Replays dürfen beide bis hier gelangen. Der partielle
+/// Unique-Index lässt genau einen Insert gewinnen; der Verlierer liest anschließend denselben
+/// offenen Datensatz statt mit einem Unique-Fehler zu enden. Eine bestehende Frist wird
+/// dabei **nicht** verschoben — dafür ist [`setze_auto_frist_tx`] da.
+pub async fn anlegen_aus_frist_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    ersteller_id: i64,
+    bezug_typ: &str,
+    bezug_id: i64,
+    titel: &str,
+    faellig_at: &str,
+) -> Result<i64, AppError> {
     let eingefuegt: Option<i64> = sqlx::query_scalar(
         "INSERT INTO erinnerung \
            (einsatz_id, titel, faellig_at, bezug_typ, bezug_id, quelle, erstellt_von_id) \
@@ -249,23 +280,123 @@ pub async fn anlegen_aus_frist(
     .bind(bezug_typ)
     .bind(bezug_id)
     .bind(ersteller_id)
-    .fetch_optional(pool)
+    .fetch_optional(&mut *conn)
     .await?;
-    let id = match eingefuegt {
-        Some(id) => id,
-        None => {
-            sqlx::query_scalar(
-                "SELECT id FROM erinnerung \
+    match eingefuegt {
+        Some(id) => Ok(id),
+        None => Ok(sqlx::query_scalar(
+            "SELECT id FROM erinnerung \
              WHERE quelle = 'auto_frist' AND status = 'offen' \
                AND bezug_typ = ? AND bezug_id = ?",
+        )
+        .bind(bezug_typ)
+        .bind(bezug_id)
+        .fetch_one(&mut *conn)
+        .await?),
+    }
+}
+
+/// Setzt die offene Auto-Frist eines Bezugs auf `faellig_at` (Upsert, LFH-635): gibt es eine,
+/// werden Zeitpunkt und Titel ersetzt und `zuletzt_ausgeloest_at` geleert — eine
+/// **verschobene** Frist löst zum neuen Zeitpunkt erneut aus. Gibt es keine, wird sie angelegt.
+#[allow(clippy::too_many_arguments)]
+pub async fn setze_auto_frist_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    ersteller_id: i64,
+    bezug_typ: &str,
+    bezug_id: i64,
+    titel: &str,
+    faellig_at: &str,
+) -> Result<i64, AppError> {
+    let bestehend: Option<i64> = sqlx::query_scalar(
+        "UPDATE erinnerung SET faellig_at = ?, titel = ?, zuletzt_ausgeloest_at = NULL \
+         WHERE quelle = 'auto_frist' AND status = 'offen' AND bezug_typ = ? AND bezug_id = ? \
+         RETURNING id",
+    )
+    .bind(faellig_at)
+    .bind(titel)
+    .bind(bezug_typ)
+    .bind(bezug_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    match bestehend {
+        Some(id) => Ok(id),
+        None => {
+            anlegen_aus_frist_tx(
+                conn,
+                einsatz_id,
+                ersteller_id,
+                bezug_typ,
+                bezug_id,
+                titel,
+                faellig_at,
             )
-            .bind(bezug_typ)
-            .bind(bezug_id)
-            .fetch_one(pool)
-            .await?
+            .await
         }
-    };
-    laden(pool, id, jetzt).await
+    }
+}
+
+/// Öffnet die zuletzt geschlossene Auto-Frist eines Bezugs wieder (Rücknahme, LFH-635).
+///
+/// `zuletzt_ausgeloest_at` bleibt **bewusst stehen**: eine Frist, die schon ausgelöst hatte,
+/// löst nicht ein zweites Mal aus — die Rücknahme ist eine Korrektur, kein neuer Anlass.
+/// Existiert bereits eine offene Auto-Frist des Bezugs, passiert nichts (der partielle
+/// UNIQUE-Index ließe keine zweite zu). Liefert, ob eine Frist geöffnet wurde.
+pub async fn oeffne_letzte_auto_tx(
+    conn: &mut SqliteConnection,
+    bezug_typ: &str,
+    bezug_id: i64,
+) -> Result<bool, AppError> {
+    let r = sqlx::query(
+        "UPDATE erinnerung SET status = ?, erledigt_at = NULL \
+         WHERE id = ( \
+             SELECT id FROM erinnerung \
+             WHERE quelle = 'auto_frist' AND status = ? AND bezug_typ = ? AND bezug_id = ? \
+             ORDER BY erledigt_at DESC, id DESC LIMIT 1) \
+           AND NOT EXISTS ( \
+             SELECT 1 FROM erinnerung \
+             WHERE quelle = 'auto_frist' AND status = ? AND bezug_typ = ? AND bezug_id = ?)",
+    )
+    .bind(STATUS_OFFEN)
+    .bind(STATUS_ERLEDIGT)
+    .bind(bezug_typ)
+    .bind(bezug_id)
+    .bind(STATUS_OFFEN)
+    .bind(bezug_typ)
+    .bind(bezug_id)
+    .execute(&mut *conn)
+    .await?;
+    Ok(r.rows_affected() > 0)
+}
+
+/// Entfernt **alle** Auto-Fristen eines Bezugs (LFH-635): für einen Bezug, der selbst
+/// verschwindet (zurückgenommene Folgeschicht, aufgelöste Einheit). Eine erledigte Frist ohne
+/// Bezug bliebe sonst als Geist in der Erinnerungsliste stehen.
+pub async fn loesche_auto_tx(
+    conn: &mut SqliteConnection,
+    bezug_typ: &str,
+    bezug_id: i64,
+) -> Result<(), AppError> {
+    // Die geteilten Kommunikations-Achsen hängen polymorph (ohne FK) an der Erinnerung und
+    // gingen sonst als verwaiste Zeilen zurück.
+    sqlx::query(
+        "DELETE FROM kommunikation_status WHERE objekt_typ = 'erinnerung' AND objekt_id IN ( \
+             SELECT id FROM erinnerung \
+             WHERE quelle = 'auto_frist' AND bezug_typ = ? AND bezug_id = ?)",
+    )
+    .bind(bezug_typ)
+    .bind(bezug_id)
+    .execute(&mut *conn)
+    .await?;
+    sqlx::query(
+        "DELETE FROM erinnerung WHERE quelle = 'auto_frist' AND bezug_typ = ? AND bezug_id = ?",
+    )
+    .bind(bezug_typ)
+    .bind(bezug_id)
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
 }
 
 /// Stellt die offene Auto-Frist-Erinnerung einer Meldung mit EINEM atomaren
@@ -587,6 +718,110 @@ mod tests {
 
         let alle = liste(&pool, e, false, "2026-06-11 10:05:00").await.unwrap();
         assert_eq!(alle.len(), 1, "nur eine Auto-Erinnerung je Bezug");
+    }
+
+    /// LFH-635: Eine verschobene Auto-Frist löst zum neuen Zeitpunkt erneut aus — sonst
+    /// bliebe eine schon ausgelöste Ablösung nach einer Rhythmusänderung stumm.
+    #[tokio::test]
+    async fn setze_auto_frist_verschiebt_und_loest_erneut_aus() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let mut conn = pool.acquire().await.unwrap();
+        let id = setze_auto_frist_tx(&mut conn, e, b, "abloesung", 7, "A", "2026-06-11 10:00:00")
+            .await
+            .unwrap();
+        drop(conn);
+        let faellig = faellige_zum_ausloesen(&pool, "2026-06-11 10:00:00")
+            .await
+            .unwrap();
+        assert_eq!(faellig.len(), 1);
+        markiere_ausgeloest(&pool, id, None, "2026-06-11 10:00:00")
+            .await
+            .unwrap();
+        assert!(faellige_zum_ausloesen(&pool, "2026-06-11 11:00:00")
+            .await
+            .unwrap()
+            .is_empty());
+
+        let mut conn = pool.acquire().await.unwrap();
+        let id2 = setze_auto_frist_tx(&mut conn, e, b, "abloesung", 7, "B", "2026-06-11 12:00:00")
+            .await
+            .unwrap();
+        drop(conn);
+        assert_eq!(
+            id2, id,
+            "dieselbe Zeile wird verschoben, keine zweite angelegt"
+        );
+        assert!(faellige_zum_ausloesen(&pool, "2026-06-11 11:59:59")
+            .await
+            .unwrap()
+            .is_empty());
+        let wieder = faellige_zum_ausloesen(&pool, "2026-06-11 12:00:00")
+            .await
+            .unwrap();
+        assert_eq!(wieder.len(), 1, "verschobene Frist löst erneut aus");
+        let a = laden(&pool, id, "2026-06-11 12:00:00").await.unwrap();
+        assert_eq!(a.titel, "B");
+    }
+
+    /// LFH-635: Wiederöffnen stellt die Frist her, ohne eine schon erfolgte Auslösung zu
+    /// wiederholen; mit bereits offener Frist desselben Bezugs passiert nichts.
+    #[tokio::test]
+    async fn oeffne_letzte_auto_loest_nicht_erneut_aus() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let mut conn = pool.acquire().await.unwrap();
+        let id = setze_auto_frist_tx(&mut conn, e, b, "abloesung", 7, "A", "2026-06-11 10:00:00")
+            .await
+            .unwrap();
+        drop(conn);
+        markiere_ausgeloest(&pool, id, None, "2026-06-11 10:00:00")
+            .await
+            .unwrap();
+        schliesse_offene_auto(&pool, "abloesung", 7, "2026-06-11 10:10:00")
+            .await
+            .unwrap();
+
+        let mut conn = pool.acquire().await.unwrap();
+        assert!(oeffne_letzte_auto_tx(&mut conn, "abloesung", 7)
+            .await
+            .unwrap());
+        assert!(
+            !oeffne_letzte_auto_tx(&mut conn, "abloesung", 7)
+                .await
+                .unwrap(),
+            "bereits offen → kein zweites Öffnen"
+        );
+        drop(conn);
+        let a = laden(&pool, id, "2026-06-11 10:20:00").await.unwrap();
+        assert_eq!(a.status, STATUS_OFFEN);
+        assert!(a.erledigt_at.is_none());
+        assert!(
+            faellige_zum_ausloesen(&pool, "2026-06-11 10:20:00")
+                .await
+                .unwrap()
+                .is_empty(),
+            "die schon erfolgte Auslösung wiederholt sich nicht"
+        );
+    }
+
+    /// LFH-635: `loesche_auto_tx` entfernt alle Auto-Fristen des Bezugs, fremde bleiben.
+    #[tokio::test]
+    async fn loesche_auto_entfernt_nur_den_bezug() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let mut conn = pool.acquire().await.unwrap();
+        setze_auto_frist_tx(&mut conn, e, b, "abloesung", 7, "A", "2026-06-11 10:00:00")
+            .await
+            .unwrap();
+        setze_auto_frist_tx(&mut conn, e, b, "abloesung", 8, "B", "2026-06-11 10:00:00")
+            .await
+            .unwrap();
+        loesche_auto_tx(&mut conn, "abloesung", 7).await.unwrap();
+        drop(conn);
+        let alle = liste(&pool, e, false, "2026-06-11 10:00:00").await.unwrap();
+        assert_eq!(alle.len(), 1);
+        assert_eq!(alle[0].bezug_id, Some(8));
     }
 
     #[tokio::test]

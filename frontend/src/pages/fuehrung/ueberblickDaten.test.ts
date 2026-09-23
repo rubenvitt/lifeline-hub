@@ -2,6 +2,7 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { describe, expect, it } from 'vitest';
 import type {
+  Abloesung,
   Auftrag,
   AuftragEmpfaenger,
   Einheit,
@@ -345,6 +346,38 @@ describe('Nächste Marken', () => {
     expect(naechsteMarken(auftraege, [], nach(120), JETZT)).toEqual(
       naechsteMarken(auftraege, [], nach(120), JETZT, []),
     );
+  });
+
+  it('führt Ablösungen als eigene Quelle und überspringt deren Auto-Fristen (LFH-635)', () => {
+    const schicht = (id: number, abschnitt_id: number | null, faellig_at: string) =>
+      ({
+        id,
+        einheit_name: `Florian ${id}`,
+        abschnitt_id,
+        abschnitt_name: abschnitt_id != null ? 'Deichwache Nord' : undefined,
+        faellig_at,
+        status: 'laufend',
+      }) as unknown as Abloesung;
+    const frist = (id: number, bezug_typ: string, faellig_at: string) =>
+      ({
+        id,
+        faellig_at,
+        status: 'offen',
+        titel: `Frist ${id}`,
+        bezug_typ,
+      }) as unknown as Erinnerung;
+    const r = naechsteMarken(
+      [],
+      [frist(1, 'abloesung', nach(10)), frist(2, 'abloesung_vorwarnung', vor(20))],
+      null,
+      JETZT,
+      [],
+      [schicht(1, 7, nach(10)), schicht(2, 7, nach(10)), schicht(3, null, nach(40))],
+    );
+    expect(r.marken.map((m) => [m.art, m.text, m.ton])).toEqual([
+      ['abloesung', 'Ablösung Deichwache Nord, 2 Einheiten', 'achtung'],
+      ['abloesung', 'Ablösung Florian 3', 'neutral'],
+    ]);
   });
 
   it('deckelt auf sechs und zählt den Rest', () => {

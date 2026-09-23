@@ -17,6 +17,7 @@
 import dayjs, { type Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import type {
+  Abloesung,
   AbschnittLagezustand,
   Auftrag,
   Einheit,
@@ -48,6 +49,7 @@ import { verdichteGefahrengebiete } from '../lage-dashboard/lageVerdichtung';
 import { letzteImTeilbaum } from '../../meldungen/rueckmeldung';
 import { prognoseOffen, wasserstandMeter } from '../../pegel/pegelKennzahl';
 import { dauerText } from '../../stab/lagebesprechungZustand';
+import { abloesungsMarken } from '../../abloesung/einstufung';
 import { warnstufeKennzahl, type Statusrolle } from '../../theme/statusFarben';
 
 dayjs.extend(utc);
@@ -464,12 +466,14 @@ export function entscheidungenAuswahl(
 // ── Nächste Marken ──────────────────────────────────────────────────────────────
 
 export type MarkenTon = 'neutral' | 'achtung' | 'alarm';
-export type MarkenArt = 'auftrag' | 'erinnerung' | 'lagebesprechung' | 'pegelprognose';
+export type MarkenArt =
+  'auftrag' | 'erinnerung' | 'lagebesprechung' | 'pegelprognose' | 'abloesung';
 
 export interface Marke {
   key: string;
   art: MarkenArt;
-  /** id des Auftrags, der Erinnerung bzw. des Pegels; `null` bei der Lagebesprechung. */
+  /** id des Auftrags, der Erinnerung bzw. des Pegels; `null` bei der Lagebesprechung und der
+   *  Ablösung (eine Ablösungsmarke fasst mehrere Schichten zusammen, LFH-635). */
   id: number | null;
   zeit: string;
   text: string;
@@ -499,16 +503,21 @@ export function pegelBezeichnung(p: Pick<PegelAnzeige, 'name' | 'gewaesser'>): s
 }
 
 /**
- * Die anstehenden Fristen aus vier Quellen: Frist offener Aufträge, Fälligkeit offener
- * Erinnerungen, nächste Lagebesprechung und der erwartete Höchststand an einem maßgeblichen
- * Pegel (LFH-628). Aufsteigend nach Zeit — Überfälliges steht damit oben, und das ist
- * gewollt: es ist die Marke, die schon gerissen ist.
+ * Die anstehenden Fristen aus fünf Quellen: Frist offener Aufträge, Fälligkeit offener
+ * Erinnerungen, nächste Lagebesprechung, der erwartete Höchststand an einem maßgeblichen
+ * Pegel (LFH-628) und fällige Ablösungen (LFH-635). Aufsteigend nach Zeit — Überfälliges
+ * steht damit oben, und das ist gewollt: es ist die Marke, die schon gerissen ist.
  *
  * Die Pegel-Prognose ist davon ausgenommen: sie ist keine Frist, die jemand reißen kann,
  * sondern eine Erwartung. Ein verstrichener Höchststand ist VORBEI, nicht „überfällig" —
  * er wird vor dem Sortieren herausgefiltert und steht nie als Alarm oben (Entscheidung des
  * Auftraggebers vom 22.09.2026). Solange er aussteht, bewertet ihn dieselbe Regel wie die
  * übrigen Marken („in 23 min", knapp = `achtung`).
+ *
+ * Ablösungen kommen als eigene Quelle (je Abschnitt und Minute zusammengefasst:
+ * „Ablösung Deichwache Nord, 2 Einheiten"); ihre Auto-Fristen in den Erinnerungen werden
+ * deshalb hier ÜBERSPRUNGEN — sonst stünde dieselbe Ablösung doppelt, einmal davon als
+ * Vorwarnung eine halbe Stunde früher.
  */
 export function naechsteMarken(
   auftraege: Auftrag[],
@@ -516,6 +525,7 @@ export function naechsteMarken(
   naechsteLagebesprechung: string | null | undefined,
   jetzt: Dayjs,
   pegel: readonly PegelAnzeige[] = [],
+  abloesungen: readonly Abloesung[] = [],
 ): MarkenAuswahl {
   const roh: { key: string; art: MarkenArt; id: number | null; zeit: string; text: string }[] = [];
   for (const a of auftraege) {
@@ -530,6 +540,7 @@ export function naechsteMarken(
     }
   }
   for (const e of erinnerungen) {
+    if (e.bezug_typ === 'abloesung' || e.bezug_typ === 'abloesung_vorwarnung') continue;
     if (e.status === 'offen' && zeitpunkt(e.faellig_at)) {
       roh.push({
         key: `e-${e.id}`,
@@ -539,6 +550,9 @@ export function naechsteMarken(
         text: e.titel,
       });
     }
+  }
+  for (const m of abloesungsMarken(abloesungen)) {
+    roh.push({ key: m.key, art: 'abloesung', id: null, zeit: m.zeit, text: m.text });
   }
   if (zeitpunkt(naechsteLagebesprechung)) {
     roh.push({

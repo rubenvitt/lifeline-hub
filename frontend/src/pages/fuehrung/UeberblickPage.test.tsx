@@ -193,6 +193,9 @@ function stelleBereit(d: Daten, ueberschreiben: Parameters<typeof server.use> = 
       json(d.rueckmeldungen ?? KEINE_RUECKMELDUNGEN),
     ),
     http.get('/api/einsaetze/1/pegel', json(d.pegel ?? [])),
+    // LFH-635: Modul-Overrides (für die Sichtbarkeit der Ablösung) und laufende Schichten.
+    http.get('/api/einsaetze/1/modul-overrides', json({})),
+    http.get('/api/einsaetze/1/abloesungen', json([])),
     http.get('/api/einsaetze/1/etb', ({ request }) => {
       const url = new URL(request.url);
       // Die Seite fragt NUR Entscheidungen ab — ein Abruf ohne Filter wäre ein Fehler.
@@ -565,6 +568,71 @@ describe('UeberblickPage', () => {
     expect(marke).toHaveAttribute('href', '/einsaetze/1/einstellungen/pegel');
     expect(marke).toHaveAttribute('data-ton', 'neutral');
     expect(within(p).queryByText(/Pegel WAHNHAUSEN/)).toBeNull();
+  });
+
+  it('Nächste Marken: fällige Ablösungen je Abschnitt zusammengefasst, Link zur Ablösung (LFH-635)', async () => {
+    const schicht = (id: number) => ({
+      id,
+      einsatz_id: 1,
+      einheit_id: 100 + id,
+      einheit_name: `Florian ${id}`,
+      abschnitt_id: 5,
+      abschnitt_name: 'Deichwache Nord',
+      beginn_at: vor(300),
+      rhythmus_minuten: 360,
+      rhythmus_quelle: 'abschnitt',
+      faellig_at: nach(60),
+      status: 'laufend',
+      ruecknehmbar: false,
+      angelegt_at: vor(300),
+    });
+    stelleBereit(volleDaten, [
+      http.get('/api/einsaetze/1/abloesungen', () => HttpResponse.json([schicht(1), schicht(2)])),
+      // Die Auto-Frist derselben Ablösung in den Erinnerungen darf keine zweite Marke werden.
+      http.get('/api/einsaetze/1/erinnerungen', () =>
+        HttpResponse.json([
+          ...volleDaten.erinnerungen,
+          {
+            id: 9,
+            titel: 'Ablösung fällig: Florian 1',
+            faellig_at: nach(60),
+            status: 'offen',
+            bezug_typ: 'abloesung',
+            bezug_id: 1,
+          },
+        ]),
+      ),
+    ]);
+    rendern();
+    const p = await waitFor(() => paneel('Nächste Marken'));
+    const marke = await within(p).findByText('Ablösung Deichwache Nord, 2 Einheiten');
+    expect(marke.closest('a')).toHaveAttribute('href', '/einsaetze/1/abloesung');
+    expect(within(p).queryByText('Ablösung fällig: Florian 1')).toBeNull();
+  });
+
+  it('Nächste Marken: ohne sichtbares Modul Ablösung keine Anfrage und keine Marke (LFH-635)', async () => {
+    let abgefragt = 0;
+    stelleBereit(volleDaten, [
+      http.get('/api/einsaetze/1/modul-overrides', () =>
+        HttpResponse.json({
+          abloesung: {
+            einsatz_id: 1,
+            modul_key: 'abloesung',
+            sichtbar: false,
+            benoetigte_rolle: null,
+            geaendert_at: null,
+          },
+        }),
+      ),
+      http.get('/api/einsaetze/1/abloesungen', () => {
+        abgefragt += 1;
+        return HttpResponse.json([]);
+      }),
+    ]);
+    rendern();
+    const p = await waitFor(() => paneel('Nächste Marken'));
+    await within(p).findByText('Lagebesprechung');
+    expect(abgefragt).toBe(0);
   });
 
   it('Leerzustand: jedes Paneel sagt „nichts da" und bietet, wo sinnvoll, eine Aktion', async () => {

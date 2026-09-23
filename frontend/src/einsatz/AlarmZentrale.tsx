@@ -17,7 +17,14 @@ import {
   fordereDesktopPermission,
   zeigeDesktopAlarm,
 } from '../alarm/desktopAlarm';
-import { auftraegePfad, erinnerungenPfad, meldungenPfad } from '../routing/deeplinks';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import {
+  abloesungPfad,
+  auftraegePfad,
+  erinnerungenPfad,
+  meldungenPfad,
+} from '../routing/deeplinks';
 import { useViewport } from '../components/useViewport';
 import { farbenDunkel, rahmenFarben } from '../theme/tokens';
 
@@ -32,6 +39,32 @@ import { farbenDunkel, rahmenFarben } from '../theme/tokens';
  */
 export function alarmKnopfFarbe(auffaellig: boolean): string {
   return auffaellig ? farbenDunkel.achtung : rahmenFarben.gedaempft;
+}
+
+dayjs.extend(utc);
+
+/** Payload des Scheduler-Hinweises `abloesung` (LFH-635, `src/erinnerung/scheduler.rs`). */
+export type AbloesungAlarmDetail = {
+  abloesung_id?: number;
+  art?: 'vorwarnung' | 'faellig';
+  /** „Ablösung fällig: Florian 1" — Titel der Frist, trägt den Einheitsnamen. */
+  titel?: string;
+  /** Fälligkeit der Schicht (UTC-Wire), auch bei der Vorwarnung. */
+  faellig_at?: string;
+};
+
+/** Toast-Text eines Ablösungshinweises: Einheit und Ortszeit der Fälligkeit (rein, getestet). */
+export function abloesungAlarmText(detail: AbloesungAlarmDetail): {
+  titel: string;
+  beschreibung: string;
+} {
+  const einheit = detail.titel?.split(': ').slice(1).join(': ') || 'eine Einheit';
+  const f = detail.faellig_at ? dayjs.utc(detail.faellig_at) : null;
+  const uhrzeit = f?.isValid() ? f.local().format('HH:mm') : null;
+  const bei = uhrzeit ? `${einheit}, ${uhrzeit}` : einheit;
+  return detail.art === 'vorwarnung'
+    ? { titel: 'Ablösung in 30 min', beschreibung: `Ablösung bald fällig: ${bei}` }
+    : { titel: 'Ablösung fällig', beschreibung: `Ablösung fällig: ${bei}` };
 }
 
 type ErinnerungDetail = {
@@ -51,7 +84,7 @@ type AlarmToast = {
 
 const MAX_SICHTBARE_TOASTS = 3;
 
-type AlarmZiel = 'meldungen' | 'auftraege' | 'erinnerungen';
+type AlarmZiel = 'meldungen' | 'auftraege' | 'erinnerungen' | 'abloesung';
 
 type AlarmScope = {
   keyPrefix: string;
@@ -120,6 +153,7 @@ export default function AlarmZentrale() {
     (ziel: AlarmZiel) => {
       if (ziel === 'auftraege') return auftraegePfad(einsatzId);
       if (ziel === 'erinnerungen') return erinnerungenPfad(einsatzId);
+      if (ziel === 'abloesung') return abloesungPfad(einsatzId);
       return meldungenPfad(einsatzId);
     },
     [einsatzId],
@@ -132,6 +166,7 @@ export default function AlarmZentrale() {
     const nurSofortmeldungen = ziele.size === 1 && ziele.has('meldungen');
     const nurAuftraege = ziele.size === 1 && ziele.has('auftraege');
     const nurErinnerungen = ziele.size === 1 && ziele.has('erinnerungen');
+    const nurAbloesungen = ziele.size === 1 && ziele.has('abloesung');
     let titel = `${anzahl} weitere Alarme`;
     let beschreibung =
       'Weitere Ereignisse sind eingegangen. Bitte in den betroffenen Modulen sichten.';
@@ -144,11 +179,15 @@ export default function AlarmZentrale() {
     } else if (nurErinnerungen) {
       titel = `${anzahl} weitere Erinnerungen`;
       beschreibung = 'Weitere Erinnerungen sind fällig. Bitte gesammelt sichten.';
+    } else if (nurAbloesungen) {
+      titel = `${anzahl} weitere Ablösungen`;
+      beschreibung = 'Weitere Ablösungen sind fällig oder stehen an. Bitte gesammelt sichten.';
     }
     const zielKonfiguration: Array<{ ziel: AlarmZiel; text: string }> = [
       { ziel: 'meldungen', text: 'Zu Meldungen' },
       { ziel: 'auftraege', text: 'Zu Aufträgen' },
       { ziel: 'erinnerungen', text: 'Zu Erinnerungen' },
+      { ziel: 'abloesung', text: 'Zu Ablösungen' },
     ];
 
     alarmScope.eigeneToastKeys.add(alarmScope.sammelKey);
@@ -368,6 +407,49 @@ export default function AlarmZentrale() {
     };
     window.addEventListener('lfh:erinnerung-alarm', onErinnerung);
     return () => window.removeEventListener('lfh:erinnerung-alarm', onErinnerung);
+  }, [alarmScope, notification, navigate, einsatzId, zeigeAlarmToast]);
+
+  // Fällige oder anstehende Ablösung (LFH-635). Läuft durch DENSELBEN Budget-Weg
+  // (`zeigeAlarmToast`: höchstens drei sichtbar, der Rest gebündelt) — ein eigener Zähler
+  // hebelte das Budget aus, das gerade über alle Quellen gemeinsam gilt. Vorwarnung und
+  // Fälligkeit derselben Schicht sind zwei Hinweise (eigener Key je Art), aber jeder genau
+  // einmal: der Scheduler löst je Frist einmal aus.
+  useEffect(() => {
+    const onAbloesung = (ev: Event) => {
+      const detail = (ev as CustomEvent<AbloesungAlarmDetail>).detail ?? {};
+      const fachKey =
+        detail.abloesung_id != null
+          ? `abloesung-${detail.abloesung_id}-${detail.art ?? 'faellig'}`
+          : `abloesung-${++alarmScope.zaehler}`;
+      const key = `${alarmScope.keyPrefix}-${fachKey}`;
+      const { titel, beschreibung } = abloesungAlarmText(detail);
+      const ziel = abloesungPfad(einsatzId);
+      const oeffnen = () => {
+        if (!alarmScope.aktiv) return;
+        navigate(ziel);
+        notification.destroy(key);
+      };
+      zeigeAlarmToast({
+        key,
+        art: detail.art === 'vorwarnung' ? 'info' : 'warning',
+        titel,
+        beschreibung,
+        aktion: (
+          <Button type="primary" onClick={oeffnen}>
+            Öffnen
+          </Button>
+        ),
+        ziel: 'abloesung',
+      });
+      zeigeDesktopAlarm(titel, {
+        koerper: beschreibung,
+        beiKlick: () => {
+          if (alarmScope.aktiv) navigate(ziel);
+        },
+      });
+    };
+    window.addEventListener('lfh:abloesung-alarm', onAbloesung);
+    return () => window.removeEventListener('lfh:abloesung-alarm', onAbloesung);
   }, [alarmScope, notification, navigate, einsatzId, zeigeAlarmToast]);
 
   const tonUmschalten = async () => {
