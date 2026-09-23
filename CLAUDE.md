@@ -448,6 +448,21 @@ Alltag wichtigsten:
   dieselbe Trennung, aus der `dichte.guard.test.ts` `Card`/`Descriptions` heraushält. Geprüft
   wird die reine `tastenkuerzelStil`-Funktion nach dem Muster von `bedienzielStil`, samt der
   **Abwesenheit** von `minHeight`.
+- **Die Sprungpalette öffnet auf drei Wegen, nach dem Raycast-Muster** (LFH-645): ↵ öffnet,
+  **Strg/⌘+↵** (auch Strg/⌘+Klick) öffnet das Ziel im **neuen Browser-Tab**, **→** zeigt am
+  Textende eine Lese-Vorschau **in** der Palette. Die Vorschau ersetzt die Liste; Esc/← führen
+  zurück, Begriff und Markierung bleiben. „⇧↵ im Panel“ aus dem Neuentwurf ist entfallen, ⇧↵
+  ist frei, und es gibt keine neue Drawer-Fläche. `Befehl.ziel` ist die Marke,
+  `ausfuehren(oeffnung?)` reicht `'neuerTab'` bis `navigate`. Navigationszeilen entstehen nur
+  über `sprungZu` (`command-palette/typen.ts`), die Guards in `befehle.test.ts` und
+  `datensaetze.test.ts` prüfen das Durchreichen je Zeile. Die Fehlerrichtung ist sonst still:
+  „neuer Tab“ öffnet dann hier. Eine Zeile ohne Ziel bleibt bei Strg/⌘+↵ wirkungslos, es gibt
+  keinen Rückfall auf ↵. Esc in der Vorschau **muss** `preventDefault` rufen, sonst schließt
+  der globale `verwerfen` die Palette mit. Strg/⌘+↵ ohne Ziel braucht dagegen kein Abfangen,
+  der Dispatcher schluckt Mutationstasten bei offener Palette selbst. Beides ist gemessen. Eine
+  neue Vorschausorte bekommt einen Eintrag in `VorschauZiel` und einen Zweig in
+  `command-palette/Vorschau.tsx` (exhaustiv). Ihr Inhalt ist ein Lese-Bauteil, das auch außerhalb
+  der Palette steht (Vorbild `personen/PersonVorschau.tsx`, geteilt mit `PersonDetailDrawer`).
 - **Datensatz-Aktionen werden gebündelt, nicht aufgereiht** (LFH-365 · B5e). Ab drei Aktionen
   an einer Zeile oder Karte, **gezählt nach der Rechteprüfung**: ein `Dropdown` mit
   `menu={{ items }}`, `trigger={['click']}`, `autoFocus` und icon-only `<Button type="text">`,
