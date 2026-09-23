@@ -8,6 +8,7 @@ pub mod backup;
 pub mod befehl;
 pub mod benutzer_einstellungen;
 pub mod bereitstellungsraum;
+pub mod betreuung;
 pub mod cache_db;
 pub mod chat;
 pub mod config;
