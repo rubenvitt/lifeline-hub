@@ -77,7 +77,6 @@ test('eine getippte Koordinate springt auf die Lagekarte, und die Karte steht do
       bezeichnung: e.bezeichnung,
       stichwort: e.stichwort ?? null,
       einsatzart: e.einsatzart,
-      einsatznummer_intern: e.einsatznummer_intern ?? null,
       leitstellen_nr: e.leitstellen_nr ?? null,
       einsatzort: 'München',
       einsatzort_lat: ORT.lat,
