@@ -9,7 +9,7 @@ Prüfliste gilt nicht als fertig. Die Dokumentenablage ist ein neues Modul unter
 | Angabe | Wert |
 | --- | --- |
 | Route | `/einsaetze/:id/dokumente` (`frontend/src/pages/DokumentePage.tsx`) |
-| Stand | Commit `30a8c324` auf `claude/lfh-632-f2fa9d` (Basis `origin/alpha` `47a40665`; Migration `0114_einsatz_dokument.sql`) |
+| Stand | Commit `30a8c324` auf `claude/lfh-632-f2fa9d` (Basis `origin/alpha` `47a40665`; Migration `0116_einsatz_dokument.sql`) |
 | Zielkontext | Fükw (1280–1366 px, Tastatur + Maus, Nachtbetrieb als Vorgabe) als Primärkontext; Führungs-Tablet in `komfortabel`/`handschuh`; mobil 390 px nur lesend und ablegend, ohne Vergleichsansicht (Kartenform) |
 | Nicht enthalten | Vorschau (Bild/PDF), EXIF-/GPS-Bereinigung, Metadaten ändern, Offline-Ablage — nicht gebaut; wo ein Kriterium daran hängt, steht es als „offen" in der Zeile |
 
@@ -48,7 +48,7 @@ Messwerte hängen als Anhang an den Tests.
 | Sondierlauf (nicht eingecheckt), Seitenkopf und Werkzeugzeile | „Dokument ablegen" und das Suchfeld der Werkzeugzeile **30 / 48 / 72** px | `759a5d74` |
 | Grep über `pages/DokumentePage.tsx`, `dokumente/*.tsx` (ohne Tests) | `size=` **0** · Farbliterale (`#…`, `rgb(`, `color=`) **0** · `danger` **2** (Entfernen-Knopf der Tabelle, `okButtonProps` der Rückfrage) · `animation`/`keyframes`/`transition` **0** · `sticky`/`fixed` **0** · Toast-Aufrufe **2**, beide `message.success` im `onSuccess` einer eigenen Mutation | `759a5d74` [abgeleitet] |
 
-**Migrationsnummer:** die Tabelle liegt in `migrations/0114_einsatz_dokument.sql`. Sie wurde nach
+**Migrationsnummer:** die Tabelle liegt in `migrations/0116_einsatz_dokument.sql`. Sie wurde nach
 zwei Rebases zweimal umnummeriert (`0105` → `0107` → `0114`), weil `origin/alpha` die Nummern
 darunter belegte. Die frühere Einschränkung dieser Liste — alpha trug dreimal `0106`, der Server
 startete nicht, die Läufe brauchten eine lokale Umnummerierung — ist mit `47a40665` erledigt: alle
