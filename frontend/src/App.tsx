@@ -40,6 +40,7 @@ import SchaedenPage from './pages/SchaedenPage';
 import DokumentePage from './pages/DokumentePage';
 import StabPage from './pages/StabPage';
 import AbloesungPage from './pages/AbloesungPage';
+import BetreuungPage from './pages/BetreuungPage';
 import SchaedenDetailPage from './pages/SchaedenDetailPage';
 import PersonenDetailPage from './pages/PersonenDetailPage';
 import AufnahmePage from './pages/personen/AufnahmePage';
@@ -101,6 +102,7 @@ const MODUL_ELEMENTE: Record<string, ReactElement> = {
   abloesung: <AbloesungPage />,
   personen: <PersonenPage />,
   unfallhilfsstellen: <UnfallhilfsstellenDefault />,
+  betreuung: <BetreuungPage />,
   bereitstellungsraeume: <BereitstellungsraeumeDefault />,
   tiere: <TierePage />,
   schaeden: <SchaedenPage />,

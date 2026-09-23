@@ -68,6 +68,18 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
     ]);
   });
 
+  it('bildet abschnitt auf Abschnitte, Führungskräfte, Ablösung und Betreuung ab (LFH-635/639)', () => {
+    // Ohne Guard (design.md D10 a): Bezirke und Stellen tragen den Abschnittsnamen per Join.
+    // Umbenennen oder Löschen eines Abschnitts feuert nur `abschnitt` — fehlt die Betreuung
+    // hier, zeigt die Seite still den alten Namen.
+    expect(EINSATZ_STREAM_EVENTS.abschnitt).toEqual([
+      EINSATZ_KEYS.abschnitte,
+      EINSATZ_KEYS.fuehrungskraefte,
+      EINSATZ_KEYS.abloesungen,
+      EINSATZ_KEYS.betreuung,
+    ]);
+  });
+
   it('bildet die 1:1-Events auf genau einen Key ab', () => {
     expect(EINSATZ_STREAM_EVENTS.uhs).toEqual([EINSATZ_KEYS.uhs]);
     expect(EINSATZ_STREAM_EVENTS.schaden).toEqual([EINSATZ_KEYS.schaeden]);
@@ -203,6 +215,14 @@ describe('einsatzKeys (Factory-Output)', () => {
     expect(einsatzKeys.abloesungVorgaben(1)).toEqual(['einsatz-abloesungen', 1, 'vorgaben']);
     // LFH-639: Betreuungs-Prefix als Literal gepinnt.
     expect(einsatzKeys.betreuung(1)).toEqual(['einsatz-betreuung', 1]);
+    // LFH-639: Kopfzahl UNTER dem Betreuungs-Prefix — das `betreuung`-Ereignis trifft sie mit.
+    // Der Stichtag ist der Wire-String (UTC ohne Zonenkennung), kein Objekt.
+    expect(einsatzKeys.betreuungKopfzahl(1, '2026-09-23 12:00:00')).toEqual([
+      'einsatz-betreuung',
+      1,
+      'kopfzahl',
+      '2026-09-23 12:00:00',
+    ]);
     expect(einsatzKeys.etbListe(1, { typ: 'x' })).toEqual(['etb', 1, { typ: 'x' }]);
     // LFH-611: Lesemarke UNTER dem ETB-Prefix — das `etb`-Ereignis invalidiert sie mit.
     expect(einsatzKeys.etbLesemarke(1)).toEqual(['etb', 1, 'lesemarke']);

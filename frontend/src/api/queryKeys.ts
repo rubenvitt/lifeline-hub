@@ -111,7 +111,14 @@ export const EINSATZ_STREAM_EVENTS = {
     EINSATZ_KEYS.abloesungen,
   ],
   // LFH-635: Abschnittsname und -liste speisen die Rhythmus-Vorgaben der Ablösung.
-  abschnitt: [EINSATZ_KEYS.abschnitte, EINSATZ_KEYS.fuehrungskraefte, EINSATZ_KEYS.abloesungen],
+  // LFH-639 (design.md D6): Bezirke und Betreuungsstellen tragen den Abschnittsnamen per
+  // Join — Umbenennen oder Löschen eines Abschnitts feuert nur dieses Ereignis.
+  abschnitt: [
+    EINSATZ_KEYS.abschnitte,
+    EINSATZ_KEYS.fuehrungskraefte,
+    EINSATZ_KEYS.abloesungen,
+    EINSATZ_KEYS.betreuung,
+  ],
   // F01/LFH-227: `person` und `personal` sind getrennte Wire-Events. Vorher trug EIN
   // `person`-Tag beide ID-Räume (betroffene Person vs. einsatz_personal-Disposition),
   // weshalb hier beide Sammlungen hängen mussten — und weshalb das Backend die zwei
@@ -299,9 +306,12 @@ export const einsatzKeys = {
     [EINSATZ_KEYS.abloesungen, einsatzId, 'liste', status] as const,
   abloesungVorgaben: (einsatzId: number) =>
     [EINSATZ_KEYS.abloesungen, einsatzId, 'vorgaben'] as const,
-  // Betreuung (LFH-639): argumentlos = Invalidierungs-Prefix. Die Kopfzahl-Variante hängt
-  // Gruppe 3 darunter.
+  // Betreuung (LFH-639): argumentlos = Invalidierungs-Prefix — Übersicht, Modulzähler und
+  // Kennzahl teilen ihn (ein Abruf). Die Kopfzahl hängt als Sub-Key darunter, der Stichtag
+  // als Wire-String (UTC ohne Zonenkennung, `alsBackendZeit`), nie als Objekt.
   betreuung: (einsatzId: number) => [EINSATZ_KEYS.betreuung, einsatzId] as const,
+  betreuungKopfzahl: (einsatzId: number, zeitpunkt: string) =>
+    [EINSATZ_KEYS.betreuung, einsatzId, 'kopfzahl', zeitpunkt] as const,
   /** Historie der Lagebesprechungen als Sub-Key unter DEMSELBEN Prefix (Spec 9.3). */
   stabLagebesprechungen: (einsatzId: number) =>
     [EINSATZ_KEYS.stab, einsatzId, 'lagebesprechungen'] as const,

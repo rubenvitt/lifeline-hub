@@ -40,7 +40,7 @@ const ALLE_MAPS = Object.fromEntries(
 ) as Record<string, Record<string, sf.StatusDarstellung>>;
 
 describe('Statusfarb-Vertrag', () => {
-  it('deckt alle zwanzig Vertragskarten ab — eine weitere Map rutscht nicht still durch', () => {
+  it('deckt alle zweiundzwanzig Vertragskarten ab — eine weitere Map rutscht nicht still durch', () => {
     // „Karten", nicht „Enums": `dringlichkeit` ist über eine {@link Statusrolle} geschlüsselt
     // und damit die eine Karte, die keine Domänen-Achse beschriftet, sondern die Stufe selbst.
     // Beide Zugänge von LFH-358 stehen hier — sie lagen bis dahin AUSSERHALB und liefen damit
@@ -49,6 +49,7 @@ describe('Statusfarb-Vertrag', () => {
       'abloesungEinstufung',
       'abschnittLagezustand',
       'belegungsArt',
+      'betreuungsstelleStatus',
       'brStatus',
       'dringlichkeit',
       'einsatzStatus',
@@ -58,6 +59,7 @@ describe('Statusfarb-Vertrag', () => {
       'materialStatus',
       'odlStufe',
       'personStatus',
+      'raeumungszustand',
       'schadenAusmass',
       'schadenStatus',
       'statusKategorie',
@@ -174,7 +176,7 @@ describe('Warnstufe als Fläche (LFH-368 · B5h)', () => {
     // `StatusDarstellung` hineinzubiegen hätte den Kanal-Vertrag verwässert.
     expect(Object.keys(ALLE_MAPS)).not.toContain('warnstufeFlaeche');
     expect(Object.keys(ALLE_MAPS)).not.toContain('sichtung');
-    expect(Object.keys(ALLE_MAPS)).toHaveLength(20);
+    expect(Object.keys(ALLE_MAPS)).toHaveLength(22);
   });
 });
 
@@ -186,6 +188,88 @@ describe('abloesungEinstufung (LFH-635)', () => {
       label: 'Ablösung bald fällig',
     });
     expect(sf.abloesungEinstufung.ueberfaellig).toEqual({ rolle: 'alarm', label: 'überfällig' });
+  });
+});
+
+describe('Betreuung (LFH-639, design.md D8)', () => {
+  // Byte-Pin gegen handgeschriebene Literale. `bedien` kommt nicht vor: die Rolle trägt eine
+  // aktive Beziehung (Übergabe, Reservierung, Verortung), keinen Zustand der Entität selbst.
+  it('bildet die vier Räumungszustände ab — „läuft" teilt `achtung` mit „angeordnet"', () => {
+    expect(sf.raeumungszustand).toEqual({
+      angeordnet: { rolle: 'achtung', label: 'angeordnet' },
+      laeuft: { rolle: 'achtung', label: 'läuft' },
+      geraeumt: { rolle: 'normal', label: 'geräumt' },
+      aufgehoben: { rolle: 'neutral', label: 'aufgehoben' },
+    });
+  });
+
+  it('bildet die drei Stellenstatus ab — „geschlossen" ist umkehrbar und kein Alarm', () => {
+    expect(sf.betreuungsstelleStatus).toEqual({
+      vorbereitet: { rolle: 'neutral', label: 'vorbereitet' },
+      in_betrieb: { rolle: 'normal', label: 'in Betrieb' },
+      geschlossen: { rolle: 'neutral', label: 'geschlossen' },
+    });
+  });
+
+  it('vergibt in beiden Karten nie `bedien`', () => {
+    const rollen = [
+      ...Object.values(sf.raeumungszustand),
+      ...Object.values(sf.betreuungsstelleStatus),
+    ].map((d) => d.rolle);
+    expect(rollen).not.toContain('bedien');
+  });
+});
+
+describe('auslastung (LFH-639, design.md D8)', () => {
+  const FAST_VOLL = { rolle: 'achtung', label: 'fast voll' };
+  const VOLL = { rolle: 'alarm', label: 'voll' };
+  const UEBERBELEGT = { rolle: 'alarm', label: 'überbelegt' };
+
+  it('stuft ohne Kapazität nicht ein — es gibt keine Zahl, gegen die man messen könnte', () => {
+    expect(sf.auslastung(40, null)).toBeNull();
+    expect(sf.auslastung(40, undefined)).toBeNull();
+  });
+
+  it('stuft ohne Meldung nicht ein — keine Meldung ist nicht 0', () => {
+    expect(sf.auslastung(null, 150)).toBeNull();
+    expect(sf.auslastung(undefined, 150)).toBeNull();
+  });
+
+  it('Grenzen bei Kapazität 100: 89 % nichts, 90 % fast voll, 100 % voll, 101 % überbelegt', () => {
+    expect(sf.auslastung(89, 100)).toBeNull();
+    expect(sf.auslastung(90, 100)).toEqual(FAST_VOLL);
+    expect(sf.auslastung(99, 100)).toEqual(FAST_VOLL);
+    expect(sf.auslastung(100, 100)).toEqual(VOLL);
+    expect(sf.auslastung(101, 100)).toEqual(UEBERBELEGT);
+  });
+
+  it('Grenzen bei nicht runder Kapazität 150 — ganzzahlig verglichen, keine Gleitkomma-Kante', () => {
+    // 90 % von 150 = 135. 134 liegt darunter (89,3 %), 135 genau auf der Schwelle.
+    expect(sf.auslastung(134, 150)).toBeNull();
+    expect(sf.auslastung(135, 150)).toEqual(FAST_VOLL);
+    expect(sf.auslastung(149, 150)).toEqual(FAST_VOLL);
+    expect(sf.auslastung(150, 150)).toEqual(VOLL);
+    expect(sf.auslastung(151, 150)).toEqual(UEBERBELEGT);
+  });
+
+  it('Grenze bei Kapazität 7, wo 90 % keine ganze Zahl ist (6,3)', () => {
+    expect(sf.auslastung(6, 7)).toBeNull();
+    expect(sf.auslastung(7, 7)).toEqual(VOLL);
+  });
+
+  it('eine leere Stelle ist nicht eingestuft, auch bei kleiner Kapazität', () => {
+    expect(sf.auslastung(0, 1)).toBeNull();
+    expect(sf.auslastung(1, 1)).toEqual(VOLL);
+  });
+
+  it('trägt immer ein Wort — der zweite Kanal ist Pflicht', () => {
+    for (const [b, k] of [
+      [90, 100],
+      [100, 100],
+      [170, 150],
+    ] as const) {
+      expect(sf.auslastung(b, k)?.label.trim()).toBeTruthy();
+    }
   });
 });
 

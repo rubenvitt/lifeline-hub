@@ -23,6 +23,7 @@ import {
   stabPfad,
   dokumentePfad,
   abloesungPfad,
+  betreuungPfad,
   etbPfad,
   parseEtbFilter,
   parsePersonenSicht,
@@ -263,6 +264,24 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
   });
   it('abloesungPfad (LFH-635)', () => {
     expect(abloesungPfad(E)).toBe('/einsaetze/5/abloesung');
+  });
+
+  it('betreuungPfad ohne Selektion trifft die Registry-Route (LFH-639)', () => {
+    expect(betreuungPfad(E)).toBe('/einsaetze/5/betreuung');
+    expect(betreuungPfad(E, {})).toBe('/einsaetze/5/betreuung');
+  });
+
+  it('betreuungPfad selektiert Bezirk bzw. Stelle per Query-Param — Round-Trip (LFH-639)', () => {
+    // Query-Param statt Item-Route: das Modul hat keine Detailseite (LFH-25, design.md D7).
+    const bezirk = betreuungPfad(E, { bezirk: 12 });
+    expect(bezirk.split('?')[0]).toBe('/einsaetze/5/betreuung');
+    const pb = new URLSearchParams(bezirk.split('?')[1]);
+    expect(pb.get('bezirk')).toBe('12');
+    expect(pb.has('stelle')).toBe(false);
+
+    const stelle = new URLSearchParams(betreuungPfad(E, { stelle: 4 }).split('?')[1]);
+    expect(stelle.get('stelle')).toBe('4');
+    expect(stelle.has('bezirk')).toBe(false);
   });
 
   it('stabPfad ohne Optionen', () => {

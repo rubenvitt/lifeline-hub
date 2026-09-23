@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import type { Dayjs } from 'dayjs';
 import { listeAbloesungen } from '../api/abloesungen';
 import { listeAuftraege } from '../api/auftraege';
+import { ladeBetreuung } from '../api/betreuung';
 import { listeErinnerungen } from '../api/erinnerungen';
 import { listeKanaele } from '../api/chat';
 import { listeDokumente } from '../api/dokumente';
@@ -13,11 +14,13 @@ import type {
   BenutzerAnzeige,
   ChatKanal,
   Erinnerung,
+  Evakuierungsbezirk,
   Meldung,
   ModulOverrides,
 } from '../api/types';
 import { zaehleFaellige } from '../abloesung/einstufung';
 import { useEinstufungsUhr } from '../abloesung/useUhr';
+import { istAktiverBezirk } from '../betreuung/evakuierungKennzahl';
 import { AUFTRAG_STATUS, istAbgeschlossen } from '../kommunikation';
 import {
   istModulGesperrt,
@@ -114,6 +117,21 @@ export function berechneAbloesungZaehler(
 }
 
 /**
+ * LFH-639: aktive Evakuierungsbezirke — nicht storniert, nicht aufgehoben. „Aktiv" steht
+ * EINMAL in `betreuung/evakuierungKennzahl.ts`, damit Zähler und Kennzahl nicht
+ * auseinanderlaufen.
+ */
+export function berechneBetreuungZaehler(
+  bezirke: ReadonlyArray<Pick<Evakuierungsbezirk, 'raeumung' | 'storniert_at'>>,
+): ModulZaehlerWert {
+  const aktiv = bezirke.filter(istAktiverBezirk).length;
+  return {
+    wert: aktiv,
+    beschreibung: plural(aktiv, 'aktiver Evakuierungsbezirk', 'aktive Evakuierungsbezirke'),
+  };
+}
+
+/**
  * Zähler laden nur für ein tatsächlich sichtbares UND freies Modul. Damit erzeugt ein
  * ausgeblendetes/rollen-gesperrtes Modul weder 403-Rauschen noch einen Seitenkanal über Daten.
  */
@@ -138,6 +156,7 @@ export function useModulZaehler({ einsatzId, benutzer, overrides }: Args): Modul
   const chatAktiv = gueltigerEinsatz && darfZaehlerLaden('chat', benutzer, overrides);
   const dokumenteAktiv = gueltigerEinsatz && darfZaehlerLaden('dokumente', benutzer, overrides);
   const abloesungAktiv = gueltigerEinsatz && darfZaehlerLaden('abloesung', benutzer, overrides);
+  const betreuungAktiv = gueltigerEinsatz && darfZaehlerLaden('betreuung', benutzer, overrides);
 
   const meldungen = useQuery({
     queryKey: einsatzKeys.meldungen(einsatzId),
@@ -170,6 +189,12 @@ export function useModulZaehler({ einsatzId, benutzer, overrides }: Args): Modul
     queryFn: () => listeAbloesungen(einsatzId, 'laufend'),
     enabled: abloesungAktiv,
   });
+  // Dieselbe Query wie Seite und Kennzahl (`useEvakuierungKennzahl`): ein Abruf, ein Cache-Fach.
+  const betreuung = useQuery({
+    queryKey: einsatzKeys.betreuung(einsatzId),
+    queryFn: () => ladeBetreuung(einsatzId),
+    enabled: betreuungAktiv,
+  });
   // Die Einstufung hängt an der Uhr, nicht nur am Abruf: ohne Wecker bliebe der Zähler bei
   // einer Schicht, die gerade in die Vorwarnzeit läuft, still auf dem alten Stand.
   const jetzt = useEinstufungsUhr(abloesungAktiv ? abloesungen.data : undefined);
@@ -189,6 +214,10 @@ export function useModulZaehler({ einsatzId, benutzer, overrides }: Args): Modul
     abloesung:
       abloesungAktiv && abloesungen.isSuccess
         ? berechneAbloesungZaehler(abloesungen.data, jetzt)
+        : undefined,
+    betreuung:
+      betreuungAktiv && betreuung.isSuccess
+        ? berechneBetreuungZaehler(betreuung.data.bezirke)
         : undefined,
   };
 }

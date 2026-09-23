@@ -28,6 +28,7 @@ import {
   TbBuildingWarehouse,
   TbFiles,
   TbArrowsExchange,
+  TbHomeHeart,
 } from 'react-icons/tb';
 import type { BenutzerAnzeige, ModulOverrides } from '../api/types';
 
@@ -36,7 +37,7 @@ export type KategorieKey =
   'fuehrung' | 'kraefte' | 'erfassung' | 'lage' | 'kommunikation' | 'einstellungen';
 export type BenoetigteRolle = 'admin' | 'fuehrungskraft';
 export type ModulZaehlerQuelle =
-  'meldungen' | 'auftraege' | 'erinnerungen' | 'chat' | 'dokumente' | 'abloesung';
+  'meldungen' | 'auftraege' | 'erinnerungen' | 'chat' | 'dokumente' | 'abloesung' | 'betreuung';
 
 export interface Kategorie {
   key: KategorieKey;
@@ -258,6 +259,20 @@ export const modulRegistry: ModulEintrag[] = [
     status: 'fertig',
     beschreibung:
       'Behandlungs-/Sammelstellen als Örtlichkeiten mit Plätzen, Belegung und Material.',
+  },
+  {
+    // LFH-639: Evakuierung und Unterbringung als MENGEN mit Zeitbezug, nicht über einzeln
+    // erfasste Personen. Der Zähler nennt die aktiven Evakuierungsbezirke; dieselbe Übersicht
+    // speist die Kennzahl „Evakuiert N · von M geplant" (`betreuung/evakuierungKennzahl.ts`).
+    // Reihenfolge wie `MODUL_KEYS` im Backend (`src/einsatz/modul.rs`).
+    key: 'betreuung',
+    kategorie: 'erfassung',
+    label: 'Betreuung',
+    icon: TbHomeHeart,
+    route: 'betreuung',
+    status: 'fertig',
+    beschreibung: 'Evakuierungsbezirke mit Stand „evakuiert" und Betreuungsstellen mit Belegung.',
+    zaehlerQuelle: 'betreuung',
   },
   {
     key: 'tiere',
@@ -492,8 +507,9 @@ export function istModulSichtbar(modul: ModulEintrag, overrides?: ModulOverrides
  * Registry-Stub in `command-palette/befehle.modulstatus.test.ts` beobachtbar gemacht.
  *
  * BEWUSST NICHT MIT UMGESTELLT: `useModulZaehler.ts` (`darfZaehlerLaden`) führt die
- * ZWEITEILIGE Variante ohne `status === 'fertig'`. Das ist heute unbeobachtbar — alle fünf
- * Module mit `zaehlerQuelle` (chat, erinnerungen, auftraege, meldungen, abloesung) sind `fertig`,
+ * ZWEITEILIGE Variante ohne `status === 'fertig'`. Das ist heute unbeobachtbar — alle sieben
+ * Module mit `zaehlerQuelle` (chat, erinnerungen, auftraege, meldungen, dokumente, abloesung,
+ * betreuung) sind `fertig`,
  * beide Fassungen liefern also dasselbe. Ob ein Zähler auch für ein UNFERTIGES Modul laden
  * darf, ist eine fachliche Entscheidung und keine Aufräumarbeit; sie steht offen. Wer sie
  * trifft, zieht die Stelle nach oder schreibt hier hin, warum sie eigenständig bleibt.

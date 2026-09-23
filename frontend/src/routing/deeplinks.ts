@@ -263,6 +263,21 @@ export function abloesungPfad(einsatzId: number): string {
 }
 
 /**
+ * Betreuungs-Modul (LFH-639). Keine Detailroute (design.md D7) — ein Bezirk bzw. eine
+ * Betreuungsstelle wird deshalb per Query-Param selektiert (LFH-25): `?bezirk=<id>` /
+ * `?stelle=<id>`, stabile DB-`id`, die Seite scrollt auf die Zeile.
+ */
+export function betreuungPfad(
+  einsatzId: number,
+  opts: { bezirk?: number; stelle?: number } = {},
+): string {
+  return mitQuery(einsatzModulPfad(einsatzId, 'betreuung'), {
+    bezirk: opts.bezirk,
+    stelle: opts.stelle,
+  });
+}
+
+/**
  * Stab-Modul (LFH-46). `?neu=1` wird ab ST5 (LFH-543) von der Seite gelesen und geräumt
  * (Abschluss der Lagebesprechung, apply-then-clean wie ETB/Schäden).
  */

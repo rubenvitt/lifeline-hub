@@ -5,6 +5,7 @@ import type { BenutzerAnzeige, ModulOverrides } from '../api/types';
 import {
   berechneAbloesungZaehler,
   berechneAuftragsZaehler,
+  berechneBetreuungZaehler,
   berechneChatZaehler,
   berechneDokumentZaehler,
   berechneErinnerungsZaehler,
@@ -89,6 +90,47 @@ describe('Modul-Zähler', () => {
         dayjs.utc('2026-09-22 15:10:00'),
       ),
     ).toEqual({ wert: 2, beschreibung: '2 Ablösungen fällig oder in den nächsten 30 min' });
+  });
+
+  it('zählt die aktiven Evakuierungsbezirke — ohne aufgehobene und stornierte (LFH-639)', () => {
+    const bezirk = (
+      id: number,
+      raeumung: 'angeordnet' | 'laeuft' | 'geraeumt' | 'aufgehoben',
+      storniert_at?: string,
+    ) => ({ id, raeumung, storniert_at });
+    expect(
+      berechneBetreuungZaehler([
+        bezirk(1, 'angeordnet'),
+        bezirk(2, 'laeuft'),
+        bezirk(3, 'geraeumt'),
+        bezirk(4, 'aufgehoben'),
+        // Die Übersicht liefert keine stornierten; eine Mutationsantwort im Cache könnte.
+        bezirk(5, 'angeordnet', '2026-09-23 10:00:00'),
+      ]),
+    ).toEqual({ wert: 3, beschreibung: '3 aktive Evakuierungsbezirke' });
+    expect(berechneBetreuungZaehler([bezirk(1, 'laeuft')])).toEqual({
+      wert: 1,
+      beschreibung: '1 aktiver Evakuierungsbezirk',
+    });
+    expect(berechneBetreuungZaehler([])).toEqual({
+      wert: 0,
+      beschreibung: '0 aktive Evakuierungsbezirke',
+    });
+  });
+
+  it('lädt den Betreuungszähler nur bei sichtbarem Modul (LFH-639)', () => {
+    expect(darfZaehlerLaden('betreuung', benutzer)).toBe(true);
+    const versteckt: ModulOverrides = {
+      betreuung: {
+        einsatz_id: 7,
+        modul_key: 'betreuung',
+        sichtbar: false,
+        benoetigte_rolle: null,
+        geaendert_at: null,
+        geaendert_von: null,
+      },
+    };
+    expect(darfZaehlerLaden('betreuung', benutzer, versteckt)).toBe(false);
   });
 
   it('lädt keine Zähler für ausgeblendete oder rollen-gesperrte Module', () => {
