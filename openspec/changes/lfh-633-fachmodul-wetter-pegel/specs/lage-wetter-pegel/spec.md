@@ -28,6 +28,10 @@ modul-los, weil Dashboard und Überblick sie ebenfalls lesen.
 
 #### Scenario: Fremder Einsatz
 - **WHEN** eine Person den Wetter-Endpunkt eines Einsatzes einer anderen Organisation aufruft
+- **THEN** antwortet das System mit 403, wie jeder Einsatz-Endpunkt an der Org-Grenze
+
+#### Scenario: Unbekannter Einsatz
+- **WHEN** eine Person den Wetter-Endpunkt eines Einsatzes aufruft, den es nicht gibt
 - **THEN** antwortet das System mit 404
 
 ### Requirement: Pegel mit 24-h-Verlauf
@@ -61,7 +65,7 @@ letzten 60 Minuten gerechnet werden.
 
 #### Scenario: Verlauf eines fremden Einsatzes
 - **WHEN** eine Person den Verlauf-Endpunkt eines Einsatzes einer anderen Organisation aufruft
-- **THEN** antwortet das System mit 404
+- **THEN** antwortet das System mit 403, wie `GET …/pegel`
 
 ### Requirement: DWD-Warnungen für den Einsatzort
 

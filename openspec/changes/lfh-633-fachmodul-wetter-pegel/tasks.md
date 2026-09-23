@@ -7,7 +7,7 @@ Sky und PEGELONLINE werden über `FachebenenState`-Basis-URLs auf lokale Stubs g
 
 ## 1. Backend: Pegelverlauf
 
-- [ ] 1.1 `src/pegel/abruf.rs`:
+- [x] 1.1 `src/pegel/abruf.rs`:
   - `messungen_url` fragt `start=P1D` ab (Test `url_und_schluessel` angepasst);
   - neu: `reihen(fe, pool, uuids, modus) -> HashMap<String, Vec<Messpunkt>>` über denselben
     `reihe_fuer`-Weg;
@@ -15,7 +15,7 @@ Sky und PEGELONLINE werden über `FachebenenState`-Basis-URLs auf lokale Stubs g
 
   Verifiziert durch `cargo test --lib pegel::abruf`. Die Bestandstests bleiben grün, der neue
   Test „reihen liefert die Cache-Reihe unverändert“ kommt dazu.
-- [ ] 1.2 `src/pegel/trend.rs`: reine Funktion `verlauf(reihe) -> Vec<Messpunkt>`:
+- [x] 1.2 `src/pegel/trend.rs`: reine Funktion `verlauf(reihe) -> Vec<Messpunkt>`:
   - sortiert aufsteigend;
   - schneidet alles älter als 24 h vor dem jüngsten Punkt ab;
   - dünnt über 288 Punkten auf 288 Buckets aus, je Bucket der letzte Punkt, der jüngste
@@ -23,25 +23,29 @@ Sky und PEGELONLINE werden über `FachebenenState`-Basis-URLs auf lokale Stubs g
 
   Verifiziert durch Unit-Tests: unsortierte Eingabe, 25-h-Reihe, 1-min-Reihe mit 1440
   Punkten → ≤ 288, jüngster Punkt erhalten, leere Reihe.
-- [ ] 1.3 DTOs `PegelVerlauf { pegel_id, punkte }` und `PegelVerlaufPunkt { zeitpunkt,
+- [x] 1.3 DTOs `PegelVerlauf { pegel_id, punkte }` und `PegelVerlaufPunkt { zeitpunkt,
   wasserstand_cm }` in `src/pegel/mod.rs`. Route `GET /api/einsaetze/{id}/pegel/verlauf`
   (`EinsatzLesezugriff<OhneModul>`, Reihenfolge der Pegel, Station ohne Stand → leere
   `punkte`) in `src/routes/pegel.rs` + `src/app.rs`. Verifiziert durch `tests/pegel.rs`:
   - Verlauf aus vorbelegtem Cache in Pegel-Reihenfolge;
   - Station ohne Cache → leere Reihe, kein Warten über die Frist;
   - Beobachter liest (200);
-  - fremde Org → 404.
+  - fremde Org → 403 (Org-Floor; Spec angeglichen), unbekannter Einsatz → 404.
+
+  Umgesetzt mit einer Abweichung: eine fremde Org bekommt **403**, nicht 404. Das ist der
+  Org-Floor des Einsatz-Kontexts (`berechtigung::fordere_org_zugehoerigkeit`), plattformweit
+  und auch für `GET …/pegel`. Ein unbekannter Einsatz ist 404. Gleiches gilt für 3.2.
 
 ## 2. Backend: Wetter-Unterbau
 
-- [ ] 2.1 `src/karte/mod.rs`:
+- [x] 2.1 `src/karte/mod.rs`:
   - `FachebenenState` erhält `wetter_basis_url` mit Vorgabe
     `BRIGHTSKY_BASIS_URL = "https://api.brightsky.dev"` und dem Setter `mit_wetter_basis_url`;
   - neu ist das eigene Abkühlungsfeld `wetter_fehlschlag`.
 
   Verifiziert durch `cargo test --lib karte` und den Build aller Test-Konstruktionen (Memory
   `appstate-feld-bricht-test-konstruktionen`).
-- [ ] 2.2 `src/wetter/mod.rs` + `src/wetter/quelle.rs`:
+- [x] 2.2 `src/wetter/mod.rs` + `src/wetter/quelle.rs`:
   - DTOs `WetterAnzeige`, `WetterOrt`, `WetterTeilZustand` (`ok|kein_ort|ausfall`),
     `WetterWarnungen`, `WetterWarnung`, `WetterVorhersage`, `WetterStunde`;
   - Enum `WetterWarnstufe` (`gering|maessig|schwer|extrem`, `as_str`);
@@ -58,7 +62,7 @@ Sky und PEGELONLINE werden über `FachebenenState`-Basis-URLs auf lokale Stubs g
   - `expires` in der Vergangenheit gefiltert;
   - `null`-Werte bleiben `None` und werden nicht zu 0;
   - Station und Entfernung aus `sources`.
-- [ ] 2.3 `src/wetter/abruf.rs`: SWR nach dem Muster von `pegel::abruf`:
+- [x] 2.3 `src/wetter/abruf.rs`: SWR nach dem Muster von `pegel::abruf`:
   - Schlüssel `wetter-warnungen:<lat2>,<lon2>` / `wetter-vorhersage:<lat2>,<lon2>`;
   - TTL 5 min / 30 min;
   - Obergrenze 6 h / 12 h → `ausfall`;
@@ -79,14 +83,14 @@ Sky und PEGELONLINE werden über `FachebenenState`-Basis-URLs auf lokale Stubs g
 
 ## 3. Backend: Route, Gates, Codegen
 
-- [ ] 3.1 `src/einsatz/modul.rs`:
+- [x] 3.1 `src/einsatz/modul.rs`:
   - `wetter-pegel` in `MODUL_KEYS` (29) hinter `gefahrenzonen`;
   - Marker `WetterPegel => "wetter-pegel"`;
   - `PFAD_KEY` `("/api/einsaetze/{id}/wetter", Some("wetter-pegel"))`;
   - Doc-Kommentar zum Drift-Test auf `tests/modul_override.rs` korrigiert.
 
   Verifiziert durch die Unit-Tests in `modul.rs`.
-- [ ] 3.2 `src/routes/wetter.rs` + `routes/mod.rs` + `app.rs`: `GET /api/einsaetze/{id}/wetter`
+- [x] 3.2 `src/routes/wetter.rs` + `routes/mod.rs` + `app.rs`: `GET /api/einsaetze/{id}/wetter`
   mit `EinsatzLesezugriff<WetterPegel>`. Der Einsatzort kommt aus `einsatzort_lat/lon`. Der
   Nachschlage-Cache-Pool wird gewählt wie in `routes::pegel::anzeige`. Verifiziert durch
   `tests/wetter.rs` (Stub-Quelle):
@@ -95,13 +99,13 @@ Sky und PEGELONLINE werden über `FachebenenState`-Basis-URLs auf lokale Stubs g
   - Stub tot → `ausfall` für beide, trotzdem 200;
   - Beobachter liest;
   - Modul ausgeblendet → 403;
-  - fremde Org → 404.
-- [ ] 3.3 Guards:
+  - fremde Org → 403 (Org-Floor; Spec angeglichen), unbekannter Einsatz → 404.
+- [x] 3.3 Guards:
   - `MODUL_GET_PFADE` in `tests/modul_override.rs` bekommt `("wetter-pegel", "wetter")`;
   - `einsatz_kontext_guard` bleibt ohne Ausnahme grün.
 
   Verifiziert durch `cargo test --test modul_override --test einsatz_kontext_guard`.
-- [ ] 3.4 OpenAPI:
+- [x] 3.4 OpenAPI:
   - Schemas der neuen DTOs und `WetterWarnstufe`/`WetterTeilZustand` in `src/api_doc.rs`;
   - `enum_wire!`-Blöcke in `tests/enum_wire_kontrakt.rs`;
   - `scripts/check-typ-codegen.sh` laufen lassen und `openapi.json`/`types.generated.ts`
@@ -110,6 +114,10 @@ Sky und PEGELONLINE werden über `FachebenenState`-Basis-URLs auf lokale Stubs g
 
   Verifiziert durch `cargo test --test enum_wire_kontrakt`, `cargo test --test
   openapi_spec_aktuell` und das grüne Codegen-Skript.
+
+  Stand vor dem Commit: `enum_wire_kontrakt`, `openapi_spec_aktuell` und `tsc` sind grün,
+  die Dateien sind regeneriert. Rot ist nur der Diff-Schritt des Skripts, weil die
+  regenerierten Dateien noch nicht committet sind.
 
 ## 4. Frontend: Unterbau
 
@@ -125,14 +133,14 @@ Sky und PEGELONLINE werden über `FachebenenState`-Basis-URLs auf lokale Stubs g
   - `queryKeys.guard.test.ts`;
   - `liveEvent.contract.test.ts` (Klassifikation genau einmal);
   - `deeplinks.test.ts`.
-- [ ] 4.2 `pegel/pegelKennzahl.ts`:
+- [x] 4.2 `pegel/pegelKennzahl.ts`:
   - neue exportierte Ableitung `pegelZeile(p, jetzt, konv)` für **eine** Station: Wert,
     Einheit, Trendtext, Stand, veraltet, Ausfall, Prognosetext;
   - `pegelKennzahl` nutzt sie für den Leitpegel.
 
   Verifiziert durch `pegelKennzahl.test.ts`. Die Bestandstests bleiben unverändert grün, neu
   kommen Tests für eine Station ohne Messung, mit veralteter und mit frischer Messung dazu.
-- [ ] 4.3 `wetter/wetterStand.ts`:
+- [x] 4.3 `wetter/wetterStand.ts`:
   - reine Einordnung eines Teils mit `ok` + `abgerufen_at` gegen `jetzt`: aktuell, veraltet
     ab 30 min bzw. 3 h;
   - `ausfall` → „Stand unbekannt“;
@@ -145,7 +153,7 @@ Sky und PEGELONLINE werden über `FachebenenState`-Basis-URLs auf lokale Stubs g
 - [ ] 4.4 `theme/statusFarben.ts`: Vertragskarte `dwdWarnstufe` nach design.md D6. Der
   Abdeckungstest wächst von 20 auf 21, samt Literal-Liste. Verifiziert durch `pnpm vitest
   run src/theme`.
-- [ ] 4.5 `wetter/Verlaufslinie.tsx` mit reiner, exportierter `verlaufsPfad(punkte, breite,
+- [x] 4.5 `wetter/Verlaufslinie.tsx` mit reiner, exportierter `verlaufsPfad(punkte, breite,
   hoehe)`. Vor dem Bauen den Skill `dataviz` laden. Verifiziert durch Tests:
   - Pfad für drei Punkte;
   - waagerechte Reihe ohne Division durch 0;
@@ -209,7 +217,7 @@ Sky und PEGELONLINE werden über `FachebenenState`-Basis-URLs auf lokale Stubs g
   nach dem Muster LFH-635: 15 Kriterien, jede Zeile mit Verdikt und Beleg. Sie enthält das
   bewertete Restrisiko „Koordinate an Dritten“ aus design.md. Verifiziert durch Lesen: keine
   Zeile „nicht geprüft“.
-- [ ] 6.3 Folgetickets per `clickup-task-anlegen`:
+- [x] 6.3 Folgetickets per `clickup-task-anlegen`:
   - DWD-Kartenebene ohne Alterskennzeichnung sowie Farb-/Emoji-Abweichung im
     `FachebenenInspector`;
   - Unwetterwarnung als Modulzähler/Hinweis (Alarmbudget).

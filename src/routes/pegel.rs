@@ -4,6 +4,10 @@
 //! Überblick, nicht nur auf der Karte. Alle drei Routen antworten mit der vollständigen
 //! Liste samt Messungen — das Frontend setzt damit genau einen Cache-Eintrag.
 //!
+//! Der **24-h-Verlauf** (LFH-633) für die Modulseite „Wetter & Pegel" hat eine eigene
+//! Listenroute und bleibt ebenfalls modul-los: die Pegeldaten sind über die Liste ohnehin für
+//! jeden Leser offen, ein Modul-Gate schützte hier nichts.
+//!
 //! **Kein Live-Ereignis**: die Messwerte ändern sich im 15-min-Raster, die Festlegung ist
 //! selten; das Frontend fragt alle 5 min nach.
 //!
@@ -32,7 +36,10 @@ use crate::einsatz::modul::OhneModul;
 use crate::error::AppError;
 use crate::extract::{JsonBody, PfadParam};
 use crate::pegel::repo::{self, PegelEingabe};
-use crate::pegel::{abruf, vorhersage, PegelAnzeige, PegelVorhersageAntwort, NAME_MAX, PEGEL_MAX};
+use crate::pegel::{
+    abruf, trend, vorhersage, PegelAnzeige, PegelVerlauf, PegelVerlaufPunkt,
+    PegelVorhersageAntwort, NAME_MAX, PEGEL_MAX,
+};
 
 #[derive(Debug, Deserialize)]
 pub struct PegelWahl {
@@ -157,6 +164,39 @@ pub async fn liste(
 ) -> Result<Json<Vec<PegelAnzeige>>, AppError> {
     Ok(Json(
         anzeige(&state, ctx.einsatz.id, abruf::Modus::Warten).await?,
+    ))
+}
+
+/// GET /api/einsaetze/{id}/pegel/verlauf — je festgelegtem Pegel, in dessen Reihenfolge, der
+/// Verlauf der letzten 24 Stunden. Liest über denselben Weg wie die Messung der Liste
+/// (`abruf::reihen`), Wert und Linie sind also ein Stand. Station ohne Stand → leere Reihe.
+pub async fn verlauf(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<OhneModul>,
+) -> Result<Json<Vec<PegelVerlauf>>, AppError> {
+    let zeilen = repo::liste(&state.pool, ctx.einsatz.id).await?;
+    let cache = crate::cache_db::cache_pool(&state.karten_dir).await;
+    let cache_pool = cache.as_ref().unwrap_or(&state.pool);
+    let uuids: Vec<&str> = zeilen.iter().map(|z| z.station_uuid.as_str()).collect();
+    let mut reihen =
+        abruf::reihen(&state.fachebenen, cache_pool, &uuids, abruf::Modus::Warten).await;
+    Ok(Json(
+        zeilen
+            .iter()
+            .map(|z| PegelVerlauf {
+                pegel_id: z.id,
+                punkte: reihen
+                    .remove(&z.station_uuid)
+                    .map(|r| trend::verlauf(&r))
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|p| PegelVerlaufPunkt {
+                        zeitpunkt: p.zeitpunkt,
+                        wasserstand_cm: p.wert_cm,
+                    })
+                    .collect(),
+            })
+            .collect(),
     ))
 }
 

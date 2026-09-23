@@ -1,7 +1,8 @@
 //! Abruf der PEGELONLINE-Zeitreihe je Station mit Cache (LFH-606).
 //!
 //! Je Station ein Eintrag `pegel:<uuid>` in `karte::cache` (die geparste Reihe der letzten
-//! drei Stunden). Stale-while-revalidate wie bei den Fachebenen (`karte::quellen`):
+//! 24 Stunden; bis LFH-633 waren es drei — ältere Einträge bleiben gültig und wachsen mit
+//! dem nächsten Abruf). Stale-while-revalidate wie bei den Fachebenen (`karte::quellen`):
 //!
 //! - frisch (< 5 min) → sofort, ohne Netz;
 //! - abgelaufen → **sofort** den alten Stand ausliefern und im Hintergrund erneuern. Sein
@@ -57,9 +58,11 @@ pub fn cache_schluessel(station_uuid: &str) -> String {
     format!("pegel:{station_uuid}")
 }
 
-/// URL der W-Zeitreihe (Wasserstand) der letzten drei Stunden.
+/// URL der W-Zeitreihe (Wasserstand) der letzten 24 Stunden (LFH-633: für den Verlauf; der
+/// Trend nutzt davon weiter nur die letzten 60 min, `trend::FENSTER_S`). Gemessen: 96 Punkte
+/// im 15-min-Raster, rund 5,6 KB je Station.
 pub fn messungen_url(basis: &str, station_uuid: &str) -> String {
-    format!("{basis}/stations/{station_uuid}/W/measurements.json?start=PT3H")
+    format!("{basis}/stations/{station_uuid}/W/measurements.json?start=P1D")
 }
 
 /// Holt die Reihe von der Quelle und schreibt sie in den Cache. `None` bei jedem Fehlschlag
@@ -188,6 +191,28 @@ async fn reihe_fuer(
     }
 }
 
+/// Rohe Reihen für alle Stationen, parallel, nach der Regel im Modulkopf. Stationen ohne
+/// Stand fehlen in der Map.
+///
+/// Messung (`messungen`) und Verlauf (`routes::pegel::verlauf`) lesen beide hierüber: Wert
+/// und Verlaufslinie stammen damit aus demselben Cache-Eintrag, also aus EINEM Stand.
+pub async fn reihen(
+    fachebenen: &FachebenenState,
+    pool: &SqlitePool,
+    station_uuids: &[&str],
+    modus: Modus,
+) -> HashMap<String, Vec<Messpunkt>> {
+    let ergebnisse = join_all(station_uuids.iter().map(|uuid| async move {
+        let reihe = reihe_fuer(fachebenen, pool, uuid, modus).await;
+        (uuid.to_string(), reihe)
+    }))
+    .await;
+    ergebnisse
+        .into_iter()
+        .filter_map(|(uuid, r)| r.map(|r| (uuid, r)))
+        .collect()
+}
+
 /// Messungen für alle Stationen, parallel. Stationen ohne Messung fehlen in der Map.
 pub async fn messungen(
     fachebenen: &FachebenenState,
@@ -195,16 +220,10 @@ pub async fn messungen(
     station_uuids: &[&str],
     modus: Modus,
 ) -> HashMap<String, PegelMessung> {
-    let ergebnisse = join_all(station_uuids.iter().map(|uuid| async move {
-        let messung = reihe_fuer(fachebenen, pool, uuid, modus)
-            .await
-            .and_then(|r| messung_aus_reihe(&r));
-        (uuid.to_string(), messung)
-    }))
-    .await;
-    ergebnisse
+    reihen(fachebenen, pool, station_uuids, modus)
+        .await
         .into_iter()
-        .filter_map(|(uuid, m)| m.map(|m| (uuid, m)))
+        .filter_map(|(uuid, r)| messung_aus_reihe(&r).map(|m| (uuid, m)))
         .collect()
 }
 
@@ -239,7 +258,7 @@ mod tests {
     fn url_und_schluessel() {
         assert_eq!(
             messungen_url("https://x/v2", UUID),
-            format!("https://x/v2/stations/{UUID}/W/measurements.json?start=PT3H")
+            format!("https://x/v2/stations/{UUID}/W/measurements.json?start=P1D")
         );
         assert_eq!(cache_schluessel(UUID), format!("pegel:{UUID}"));
     }
@@ -252,6 +271,18 @@ mod tests {
         let m = m.get(UUID).expect("Messung aus dem Cache");
         assert_eq!(m.wasserstand_cm, 110.0);
         assert_eq!(m.trend_cm_pro_h, Some(10.0));
+    }
+
+    #[tokio::test]
+    async fn reihen_liefert_die_cache_reihe_unveraendert() {
+        // Derselbe Weg wie `messungen`: Wert und Verlaufslinie bleiben EIN Stand. Eine
+        // Station ohne Cache fehlt in der Map, statt als leere Reihe aufzutauchen.
+        let pool = crate::db::test_pool().await;
+        cache::setze_wert(&pool, &cache_schluessel(UUID), &reihe()).await;
+        let andere = "593647aa-9fea-43ec-a7d6-6476a76ae868";
+        let r = reihen(&ohne_netz(), &pool, &[UUID, andere], Modus::Warten).await;
+        assert_eq!(r.get(UUID), Some(&reihe()));
+        assert!(!r.contains_key(andere));
     }
 
     #[tokio::test]

@@ -558,6 +558,27 @@ fn dokument_kategorie_wire() {
     } in lifeline_hub::dokument::DokumentKategorie::ALLE);
 }
 
+/// LFH-633: Wetter am Einsatzort. `WetterWarnstufe` ist aus `severity` der Quelle abgebildet
+/// (Frontend-Vertragskarte `dwdWarnstufe`), `WetterTeilZustand` trägt den Zustand je Teil.
+#[test]
+fn wetter_warnstufe_wire() {
+    enum_wire_as_str!(lifeline_hub::wetter::WetterWarnstufe {
+        Gering,
+        Maessig,
+        Schwer,
+        Extrem,
+    });
+}
+
+#[test]
+fn wetter_teil_zustand_wire() {
+    enum_wire_as_str!(lifeline_hub::wetter::WetterTeilZustand {
+        Ok,
+        KeinOrt,
+        Ausfall,
+    });
+}
+
 /// LFH-635: Ablösung. `AbloesungStatus` und `RhythmusQuelle` tragen die DB-CHECK-Werte aus
 /// `migrations/0114_abloesung.sql`; `Einstufung` ist berechnet, aber Wire-Kontrakt des
 /// Frontends (`abloesung/einstufung.ts` rechnet dieselben drei Stufen nach).

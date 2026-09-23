@@ -1,4 +1,6 @@
 //! Aggregator für externe Fachebenen (NINA, DWD, PEGELONLINE, KRITIS/OSM-Extrakt).
+//! `FachebenenState` trägt außerdem die Basis-URLs und Bremsen der Einsatz-Nachschlagequellen
+//! (Pegel LFH-606, Wetter LFH-633).
 //! Holt externe Geodaten, normalisiert sie zu GeoJSON und liefert einen
 //! einheitlichen Umschlag mit definiertem Offline-Verhalten.
 
@@ -77,10 +79,22 @@ pub struct FachebenenState {
     /// bei einer unbekannten UUID oder hängenden Quelle alle Aufrufe bis zur Frist. Prozess-
     /// lokal und je `AppState`, damit Tests einander nicht über einen Static beeinflussen.
     pub pegel_fehlschlag: Arc<Mutex<HashMap<String, Instant>>>,
+    /// Basis-URL von Bright Sky für Warnungen und Vorhersage am Einsatzort (LFH-633,
+    /// `crate::wetter::abruf`). Produktiv [`BRIGHTSKY_BASIS_URL`]; an einer Stelle
+    /// austauschbar, etwa gegen eine eigene Instanz. Tests lenken sie über
+    /// [`FachebenenState::mit_wetter_basis_url`] auf einen lokalen Stub.
+    pub wetter_basis_url: Arc<str>,
+    /// Letzter gescheiterter Wetterabruf je Cache-Schlüssel (LFH-633). Bewusst getrennt von
+    /// [`Self::pegel_fehlschlag`]: ein Ausfall von Bright Sky sperrt keine Pegelstation und
+    /// umgekehrt.
+    pub wetter_fehlschlag: Arc<Mutex<HashMap<String, Instant>>>,
 }
 
 /// Produktive Basis-URL der PEGELONLINE-REST-API v2.
 pub const PEGELONLINE_BASIS_URL: &str = "https://www.pegelonline.wsv.de/webservices/rest-api/v2";
+
+/// Produktive Basis-URL von Bright Sky (freie JSON-API auf DWD-Open-Data, ohne Schlüssel).
+pub const BRIGHTSKY_BASIS_URL: &str = "https://api.brightsky.dev";
 
 impl FachebenenState {
     pub fn neu() -> Self {
@@ -94,6 +108,8 @@ impl FachebenenState {
             inflight: Arc::new(Mutex::new(HashSet::new())),
             pegel_basis_url: Arc::from(PEGELONLINE_BASIS_URL),
             pegel_fehlschlag: Arc::new(Mutex::new(HashMap::new())),
+            wetter_basis_url: Arc::from(BRIGHTSKY_BASIS_URL),
+            wetter_fehlschlag: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -102,10 +118,45 @@ impl FachebenenState {
         self.pegel_basis_url = Arc::from(url.trim_end_matches('/'));
         self
     }
+
+    /// Lenkt die Wetterabrufe (Bright Sky) auf eine andere Basis-URL (Tests).
+    pub fn mit_wetter_basis_url(mut self, url: &str) -> Self {
+        self.wetter_basis_url = Arc::from(url.trim_end_matches('/'));
+        self
+    }
 }
 
 impl Default for FachebenenState {
     fn default() -> Self {
         Self::neu()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn wetter_basis_vorgabe_und_setter() {
+        let fe = FachebenenState::neu();
+        assert_eq!(&*fe.wetter_basis_url, BRIGHTSKY_BASIS_URL);
+        let fe = fe.mit_wetter_basis_url("http://127.0.0.1:9/");
+        assert_eq!(&*fe.wetter_basis_url, "http://127.0.0.1:9");
+        assert_eq!(
+            &*fe.pegel_basis_url, PEGELONLINE_BASIS_URL,
+            "die Pegel-Basis bleibt unberührt"
+        );
+    }
+
+    #[test]
+    fn wetter_und_pegel_kuehlen_getrennt_ab() {
+        // Ein Wetterausfall sperrt keine Pegelstation und umgekehrt: zwei eigene Merker.
+        let fe = FachebenenState::neu();
+        fe.wetter_fehlschlag
+            .lock()
+            .unwrap()
+            .insert("x".into(), Instant::now());
+        assert!(fe.pegel_fehlschlag.lock().unwrap().is_empty());
+        assert!(!Arc::ptr_eq(&fe.wetter_fehlschlag, &fe.pegel_fehlschlag));
     }
 }

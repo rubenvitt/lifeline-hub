@@ -28,6 +28,7 @@ import {
   TbBuildingWarehouse,
   TbFiles,
   TbArrowsExchange,
+  TbCloudStorm,
 } from 'react-icons/tb';
 import type { BenutzerAnzeige, ModulOverrides } from '../api/types';
 
@@ -315,6 +316,16 @@ export const modulRegistry: ModulEintrag[] = [
     status: 'fertig',
     beschreibung:
       'Gefahrenmatrix (Gefahrentyp × Schutzobjekt → Warnstufe) und Verknüpfung der Gefahrengebiete.',
+  },
+  {
+    key: 'wetter-pegel',
+    kategorie: 'lage',
+    label: 'Wetter & Pegel',
+    icon: TbCloudStorm,
+    route: 'wetter-pegel',
+    status: 'fertig',
+    beschreibung:
+      'Maßgebliche Pegel mit 24-h-Verlauf, DWD-Warnungen und Vorhersage für den Einsatzort.',
   },
   {
     key: 'lagemeldungen',
