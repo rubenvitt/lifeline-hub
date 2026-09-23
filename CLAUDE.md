@@ -151,12 +151,12 @@ umkehrt, steht das am Absatz selbst mit „Neuentwurf 22.09.2026".
   FMS-Status je Einheit 609, „keine Rückmeldung" 610, ETB-Gesamtzahl/Tagesbilanz-Summen 612,
   Koordinate an der Person 613). Bei Evakuiert ist die Datenquelle seit LFH-639 da; den Platz
   im Kennzahlenband entscheidet LFH-640, den Einbau bringt LFH-607. Die Auslassung trägt ihr
-  Ticket im Code-Kommentar und wird im Test als **Abwesenheit** gepinnt. **Eingelöst ist der Pegel (LFH-606):** er steht auf Platz 1
-  des Kennzahlenbands, „Höchste Warnstufe" ist dafür raus (Entscheidung 22.09.2026; die
-  Warnstufe bleibt im Seitenkopf-Hinweis und in der Gefahrenmatrix). **Eingelöst ist auch die
-  Rückmeldung (LFH-610):** Spalte „Rückmeldung“ und Kachel „keine Rückmeldung“ im Meldebild,
-  letzte Rückmeldung je Abschnitt im Überblick, „Letzte Meldung“ in der Lagekarte; die
-  Entscheidungen stehen in `umsetzung.md`.
+  Ticket im Code-Kommentar und wird im Test als **Abwesenheit** gepinnt. **Eingelöst ist der
+  Pegel (LFH-606):** er steht auf Platz 1 des Kennzahlenbands, „Höchste Warnstufe" ist dafür
+  raus (Entscheidung 22.09.2026; die Warnstufe bleibt im Seitenkopf-Hinweis und in der
+  Gefahrenmatrix). **Eingelöst ist auch die Rückmeldung (LFH-610):** Spalte „Rückmeldung“ und
+  Kachel „keine Rückmeldung“ im Meldebild, letzte Rückmeldung je Abschnitt im Überblick,
+  „Letzte Meldung“ in der Lagekarte; die Entscheidungen stehen in `umsetzung.md`.
 
 ## Frontend — UI-Form-Leitlinie (Drawer-Nutzung)
 
@@ -325,8 +325,10 @@ im Entwurf: sie zählt nur die geladenen Einträge, Summen und Gesamtzahl fehlen
 `data-lfh="datensicht-karte"` und die Zeilenklasse selbst — daran findet `scrolleZurZeile` sie,
 und daran hängt der Deeplink `?eintrag=`. Wer einen neuen Eigenbau in `KARTEN_EIGENBAU`
 einträgt, begründet ihn gegen den Plan-Modus (Titel + Status + höchstens **drei**
-Sekundärfelder + genau **eine** Primäraktion) und prüft dieselbe Falle: `Datensicht` gibt beim
-Eigenbau `karte.render(...)` **roh** zurück, Marke und Klasse entstehen nur im Plan-Modus.
+Sekundärfelder + genau **eine** Primäraktion, daneben seit LFH-639 optional **ein** gebündeltes
+Menü `weitere`) und prüft dieselbe Falle: `Datensicht` gibt beim Eigenbau `karte.render(...)`
+**roh** zurück, Marke und Klasse entstehen nur im Plan-Modus. Mehr Zeilenaktionen allein sind
+deshalb kein Grund mehr für einen zweiten Eigenbau — sie gehören ins Menü.
 **Die ≥ 50-%-Zusicherung für den Meldungstext im Fükw gilt weiter** und wird in
 `e2e/etb-chronologie.spec.ts` jetzt an der Zeitachse gemessen — gegen die **Contentbreite**,
 nie gegen die Breite des eigenen Containers: der Befund ist in der Contentbreite formuliert,
@@ -459,7 +461,10 @@ Alltag wichtigsten:
   `domEvent.stopPropagation()`. Der Rechte-Riegel gehört an die Ableitung, nicht ans Rendern
   (ein übergebener Callback ist kein Rechtebeleg). Im Test über das geöffnete Menü greifen
   (`.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]` + `within`), per Teilstring.
-  Träger, MeldungKarte-Entscheidung und gemessene Fallen: `docs/leitlinien/bedien-leitlinie-herleitungen.md`.
+  Im Kartenmodus baut `components/Datensicht.tsx` den Auslöser selbst (`weitere`, LFH-639:
+  Deskriptor mit `eintraege`/`zugaenglicherName`/`onWahl`, Gefahr hinter dem Trenner). Träger,
+  MeldungKarte-Entscheidung und gemessene Fallen:
+  `docs/leitlinien/bedien-leitlinie-herleitungen.md`.
 - **Ein Sprung ist keine Handlung** (LFH-616, Inspector der Lagekarte). Gezählt werden für
   „höchstens zwei, sonst bündeln“ die Aktionen, die etwas **ändern**. Zwei Deeplinks
   („Im Fachmodul öffnen ↗“ | „ETB ↗“) bilden zusammen **eine** Zeile Navigation. Sie

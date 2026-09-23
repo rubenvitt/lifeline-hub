@@ -40,7 +40,7 @@ LFH-635 (Ablösung) und LFH-632 (Dokumente):
 
 ## 5. Nachweis und Abschluss
 
-- [ ] 5.1 e2e: Route in `e2e/gate1-ueberlauf.spec.ts` (390/1024/1366 px), Gate-3-Test „Betreuung: Karten- und Zeilenaktionen folgen der Dichte-Staffel 30 / 48 / 72 px“ in `e2e/gate3-trefflaeche.spec.ts` mit gesäten Bezirken und Stellen (Fixture-Namen ohne „Betreuung“) und Mutationsprobe „Stufe festgenagelt → rot“. Verifiziert durch `pnpm e2e` auf beide Specs
-- [ ] 5.2 Prüfliste `docs/superpowers/specs/2026-09-23-lfh-639-pruefliste.md` nach dem Muster von `2026-09-22-lfh-635-pruefliste.md`: alle 15 Kriterien mit Verdikt und Beleg, offene Punkte mit Zielticket. Verifiziert dadurch, dass keine Zeile „nicht geprüft“ trägt
+- [x] 5.1 e2e: Route in `e2e/gate1-ueberlauf.spec.ts` (390/1024/1366 px), Gate-3-Test „Betreuung: Karten- und Zeilenaktionen folgen der Dichte-Staffel 30 / 48 / 72 px“ in `e2e/gate3-trefflaeche.spec.ts` mit gesäten Bezirken und Stellen (Fixture-Namen ohne „Betreuung“) und Mutationsprobe „Stufe festgenagelt → rot“. Verifiziert durch `pnpm e2e` auf beide Specs
+- [x] 5.2 Prüfliste `docs/superpowers/specs/2026-09-23-lfh-639-pruefliste.md` nach dem Muster von `2026-09-22-lfh-635-pruefliste.md`: alle 15 Kriterien mit Verdikt und Beleg, offene Punkte mit Zielticket. Verifiziert dadurch, dass keine Zeile „nicht geprüft“ trägt
 - [ ] 5.3 Nachzüge als Tickets im Entwicklungsboard anlegen (`clickup-task-anlegen`): Lagekarte für Betreuung (Stellen-Marker, Bezirk als Fläche), FK `person_verbleib.betreuungsstelle_id`, Offline-Erfassung von Stand und Belegung, Verlaufsansicht der Meldereihen, und was die Prüfliste sonst offen lässt. Verifiziert durch die Ticketnummern in der Abschlussmeldung
 - [ ] 5.4 Gesamtgate `./scripts/check-all.sh` grün (ohne `| tail`). Verifiziert durch den Exit-Code 0 des Laufs
