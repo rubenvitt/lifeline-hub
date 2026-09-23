@@ -205,20 +205,22 @@ export function SichtungsPaneel({
       titel="Sichtung"
       meta={zustand === 'daten' ? `${erfasst} erfasst` : undefined}
       aktion={<PaneelLink label="Personen" onKlick={onPersonen} />}
-      // Fuß: „Ohne Sichtung" (nur wenn > 0) und „Transportiert / offen" (LFH-613,
+      // Fuß: „Ohne Sichtung" und „Transportiert / offen" (LFH-613,
       // `personenBilanz.transportBilanz` — gezählt nach Verbleib-Art, eine Voranmeldung ist
       // kein Transport; „offen" ist dieselbe Lücke wie auf der Betroffenen-Seite).
+      // „Ohne Sichtung" steht seit LFH-650 IMMER, auch mit 0: kam und ging die Zeile live mit
+      // dem Wert, schob sie die Transport-Zeile und das ganze Paneel mit (Prüfliste LFH-613,
+      // Tabelle 5, Nr. 12). Eine 0 ist hier eine Aussage — alle Erfassten sind gesichtet.
       fuss={
         zustand === 'daten' ? (
           <span style={{ display: 'grid', gap: token.paddingXS }}>
-            {ohneSichtung > 0 && (
-              <span
-                style={{ display: 'flex', justifyContent: 'space-between', gap: token.paddingSM }}
-              >
-                <span style={{ fontSize: 11, color: rollen.schwach }}>Ohne Sichtung</span>
-                <span style={{ ...monoStil(12), color: rollen.text2 }}>{ohneSichtung}</span>
-              </span>
-            )}
+            <span
+              data-lfh="ohne-sichtung"
+              style={{ display: 'flex', justifyContent: 'space-between', gap: token.paddingSM }}
+            >
+              <span style={{ fontSize: 11, color: rollen.schwach }}>Ohne Sichtung</span>
+              <span style={{ ...monoStil(12), color: rollen.text2 }}>{ohneSichtung}</span>
+            </span>
             <span
               data-lfh="transport-bilanz"
               style={{ display: 'flex', justifyContent: 'space-between', gap: token.paddingSM }}

@@ -1,3 +1,4 @@
+import { useRollen } from '../components/instrument/rollenwerte';
 import { bezugsDarstellung } from '../theme/statusFarben';
 import StatusTag from '../components/StatusTag';
 import SichtungsTag from '../components/SichtungsTag';
@@ -19,7 +20,6 @@ import {
   Spin,
   Tag,
   Typography,
-  theme,
   type MenuProps,
   type TableColumnsType,
 } from 'antd';
@@ -158,7 +158,7 @@ function menueEintraege(aktionen: Kopfaktion[]): MenuProps['items'] {
 }
 
 export default function PersonenDetailPage() {
-  const { token } = theme.useToken();
+  const { token, rollen } = useRollen();
   const { id, personId: personIdParam } = useParams();
   const einsatzId = Number(id);
   const personId = Number(personIdParam);
@@ -825,7 +825,7 @@ export default function PersonenDetailPage() {
                   // Angaben des handgebauten Bedienziels (LFH-365) trägt `verortenLinkStil`.
                   <Link
                     to={lagekartePfad(einsatzId, { platzieren: { typ: 'person', id: person.id } })}
-                    style={verortenLinkStil(token)}
+                    style={verortenLinkStil(token, rollen.bedienText)}
                   >
                     Auf Lagekarte verorten
                   </Link>

@@ -151,36 +151,46 @@ export default function BetroffeneZeile({
   }
 
   const leer = befehl.leer;
+  // Kürzel-Hinweis und „erkannt: …" liegen GESTAPELT in derselben Rasterzelle (LFH-650):
+  // der Hinweis bleibt beim Tippen im Baum und wird nur unsichtbar, die Zeile behält also
+  // seine Höhe. Vorher wich er der kürzeren Erkennungszeile, und bei 390 px sprang der Inhalt
+  // darunter mit dem ersten Zeichen gemessen 40 px nach oben (`e2e/betroffene-layout.spec.ts`).
+  // `visibility: hidden` nimmt ihn zugleich aus der Beschreibung des Feldes
+  // (`aria-describedby`): unsichtbarer Text zählt für den Beschreibungstext nicht.
+  const stapel = { gridArea: '1 / 1' } as const;
   const hinweiszeile = (
     <>
-      <span
-        id={hinweisId}
-        style={{
-          display: 'inline-flex',
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          columnGap: token.padding,
-          rowGap: token.marginXXS,
-        }}
-      >
-        {leer ? (
-          <>
-            <span>
-              Kürzel: <span style={{ color: rollen.gedaempft }}>Name, Vorname</span>
-            </span>
-            <span style={{ color: rollen.gedaempft }}>m/w/d + Alter</span>
-            <span style={{ color: rollen.gedaempft }}>sk1–sk4 · skt · sku</span>
-            {/* Wortlaut des Entwurfs (S7); das Format zeigt der Platzhalter nicht, also hier. */}
-            <span style={{ color: rollen.gedaempft }}>#Koordinate (52.2691/9.1342)</span>
-            <span style={{ color: rollen.gedaempft }}>@UHS</span>
-          </>
-        ) : (
+      <span id={hinweisId} style={{ display: 'inline-grid', minWidth: 0 }}>
+        <span
+          aria-hidden={leer ? undefined : true}
+          style={{
+            ...stapel,
+            display: 'inline-flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            columnGap: token.padding,
+            rowGap: token.marginXXS,
+            visibility: leer ? 'visible' : 'hidden',
+          }}
+        >
+          <span>
+            Kürzel: <span style={{ color: rollen.gedaempft }}>Name, Vorname</span>
+          </span>
+          <span style={{ color: rollen.gedaempft }}>m/w/d + Alter</span>
+          <span style={{ color: rollen.gedaempft }}>sk1–sk4 · skt · sku</span>
+          {/* Wortlaut des Entwurfs (S7); das Format zeigt der Platzhalter nicht, also hier. */}
+          <span style={{ color: rollen.gedaempft }}>#Koordinate (52.2691/9.1342)</span>
+          <span style={{ color: rollen.gedaempft }}>@UHS</span>
+        </span>
+        {!leer && (
           <span
             data-lfh="erkannt"
             style={{
+              ...stapel,
               display: 'inline-flex',
               flexWrap: 'wrap',
               alignItems: 'center',
+              alignSelf: 'start',
               gap: token.marginXS,
             }}
           >

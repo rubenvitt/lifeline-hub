@@ -26,6 +26,7 @@ import {
   pinneMarkerLayerNachOben,
   MARKER_CLUSTER_QUELLE,
   MARKER_KLICK_LAYER,
+  naechstesMerkmal,
   SPIDER_KLICK_LAYER,
   setzeSpiderDaten,
   type MarkerFeatureCollection,
@@ -33,7 +34,7 @@ import {
 } from './markerLayer';
 import { baueSpiderFc, SPIDER_CAP, type SpiderProjektor } from './spiderfy';
 import { tzIconKey } from './markerIcons';
-import { baueClusterDonut } from './clusterDonut';
+import { baueClusterDonut, setzeHuelleDurchlaessig } from './clusterDonut';
 import type { TzProps } from './taktischesZeichen';
 import type { GeoJsonPolygon, GeoJsonGeometry } from './geo';
 import { werteFachebenenKlickAus } from './geo';
@@ -808,8 +809,13 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
+    // EIN Handler über alle Klickebenen, nicht einer je Ebene (Review LFH-650): je Ebene feuerte
+    // ein Tipp, der Kreis, Kurzzeichen und Trefferzone zugleich trifft, `onMarkerKlick` bis zu
+    // dreimal — seit den überlappenden Trefferzonen womöglich mit VERSCHIEDENEN Schlüsseln.
+    // Gewählt wird das Merkmal, das dem Klickpunkt am nächsten liegt.
     const klickMarker = (e: maplibregl.MapLayerMouseEvent) => {
-      const schluessel = e.features?.[0]?.properties?.schluessel;
+      const merkmal = naechstesMerkmal(e.features ?? [], e.point, (ll) => map.project(ll));
+      const schluessel = merkmal?.properties?.schluessel;
       if (typeof schluessel === 'string') onMarkerKlick?.(schluessel);
     };
     const enter = () => {
@@ -820,17 +826,13 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     };
     // Aufgefächerte Spider-Leaves verhalten sich wie Einzelmarker (Klick → onMarkerKlick, Cursor).
     const klickLayer = [...MARKER_KLICK_LAYER, ...SPIDER_KLICK_LAYER];
-    for (const id of klickLayer) {
-      map.on('click', id, klickMarker);
-      map.on('mouseenter', id, enter);
-      map.on('mouseleave', id, leave);
-    }
+    map.on('click', klickLayer, klickMarker);
+    map.on('mouseenter', klickLayer, enter);
+    map.on('mouseleave', klickLayer, leave);
     return () => {
-      for (const id of klickLayer) {
-        map.off('click', id, klickMarker);
-        map.off('mouseenter', id, enter);
-        map.off('mouseleave', id, leave);
-      }
+      map.off('click', klickLayer, klickMarker);
+      map.off('mouseenter', klickLayer, enter);
+      map.off('mouseleave', klickLayer, leave);
     };
   }, [onMarkerKlick]);
 
@@ -896,6 +898,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     const schliesse = () => {
       spiderTokenRef.current++; // in-flight getClusterLeaves entwerten (load-bearing)
       if (spiderOffenRef.current === null) return;
+      setzeHuelleDurchlaessig(clusterDomRef.current[spiderOffenRef.current]?.getElement(), false);
       spiderOffenRef.current = null;
       // mapRef wird im Map-Cleanup ZUERST genullt (Effekt-Reihenfolge) → beim Unmount mit offenem
       // Spider ist die Map schon entfernt; getSource würfe sonst (kein internes Guard). Token-Bump
@@ -934,6 +937,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
           const { leaves: leafFc, legs } = baueSpiderFc(props, center, projektor);
           setzeSpiderDaten(map, leafFc, legs);
           spiderOffenRef.current = clusterId;
+          setzeHuelleDurchlaessig(clusterDomRef.current[clusterId]?.getElement(), true);
         })
         .catch(() => {
           /* Cluster nach Daten-Update weg → ignorieren */

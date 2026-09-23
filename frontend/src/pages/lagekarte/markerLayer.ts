@@ -31,6 +31,10 @@ export interface MarkerProps {
   rang?: number;
   /** Kurzzeichen IM Kreis (`KarteMarker.kurzzeichen`), ohne Mindestzoom sichtbar. */
   kurzzeichen?: string;
+  /** Durchmesser der unsichtbaren Trefferzone (`KarteMarker.trefferDurchmesser`, LFH-650). */
+  treffer?: number;
+  /** Sichtung (`KarteMarker.sichtung`) — Summand der Cluster-Aggregation `s_<kategorie>`. */
+  sk?: string;
 }
 
 export type MarkerFeature = {
@@ -71,6 +75,8 @@ function toFeature(mk: KarteMarker, plakette: Plakette): MarkerFeature {
   if (mk.tz) properties.icon = tzIconKey(mk.tz);
   if (mk.statusFarbe) properties.statusFarbe = mk.statusFarbe;
   if (mk.kurzzeichen) properties.kurzzeichen = mk.kurzzeichen;
+  if (mk.trefferDurchmesser) properties.treffer = mk.trefferDurchmesser;
+  if (mk.sichtung) properties.sk = mk.sichtung;
   const beschriftung = beschriftungVon(mk);
   if (beschriftung) {
     properties.beschriftung = beschriftung;
@@ -114,6 +120,7 @@ export const SPIDER_LEAVES_QUELLE = 'spider-leaves';
 export const SPIDER_LEGS_QUELLE = 'spider-legs';
 // Die Plakette ist Klickziel wie ihr Zeichen: wer den Namen trifft, meint den Marker.
 export const MARKER_KLICK_LAYER = [
+  'marker-treffer',
   'marker-symbol',
   'marker-kreis',
   'marker-kurz',
@@ -124,6 +131,7 @@ export const MARKER_KLICK_LAYER = [
 ] as const;
 // Aufgefächerte Spider-Leaves sind klickbar wie Einzelmarker (→ onMarkerKlick).
 export const SPIDER_KLICK_LAYER = [
+  'spider-treffer',
   'spider-symbol',
   'spider-kreis',
   'spider-kurz',
@@ -139,7 +147,9 @@ export const SPIDER_KLICK_LAYER = [
 // Kollision hält jede Plakette von fremden Zeichen fern — lägen die Plaketten oben, deckten
 // sie Nachbarzeichen zu. Der Einsatzort-Name liegt über den übrigen und gewinnt gegen sie.
 const MARKER_LAYER_REIHENFOLGE = [
+  'marker-treffer',
   'marker-status-ring',
+  'marker-kante',
   'marker-kreis',
   'marker-kurz',
   'marker-label',
@@ -147,7 +157,9 @@ const MARKER_LAYER_REIHENFOLGE = [
   'marker-symbol',
   'marker-einsatzort-symbol',
   'spider-legs-line',
+  'spider-treffer',
   'spider-status-ring',
+  'spider-kante',
   'spider-kreis',
   'spider-kurz',
   'spider-label',
@@ -160,6 +172,39 @@ const STATUS_RING_PAINT: CircleLayerSpecification['paint'] = {
   'circle-radius': 20,
   'circle-color': ['get', 'statusFarbe'],
   'circle-opacity': 0.9,
+};
+/**
+ * Unsichtbare Trefferzone (LFH-650): ein Kreis mit dem Durchmesser aus der Feature-Eigenschaft
+ * `treffer`, ohne Füllung und ohne Rand. Er liegt UNTER allen Markerebenen und ist Klickziel
+ * wie sie — MapLibre prüft beim Treffertest die Geometrie, nicht die Deckkraft (gemessen in
+ * `e2e/gate3-trefflaeche.spec.ts`, „Betroffene Karte …": ein Klick mit Versatz neben den
+ * gezeichneten Kreis öffnet die Person). Überlappen sich Zonen, wählt der Klick-Handler das
+ * nächstgelegene Merkmal ({@link naechstesMerkmal}). Nur Features mit `treffer` erzeugen eine Zone; die Lagekarte setzt keins.
+ */
+const TREFFER_PAINT: CircleLayerSpecification['paint'] = {
+  'circle-radius': ['/', ['get', 'treffer'], 2],
+  'circle-opacity': 0,
+  'circle-stroke-width': 0,
+};
+/**
+ * Dunkle Außenkante der Personen-Marker (LFH-650): 2 px Schwarz AUSSERHALB des weißen
+ * Rands von {@link KREIS_PAINT} (MapLibre zeichnet `circle-stroke` außen, der Rand endet bei
+ * 9 + 2 = 11 px). Zwei, nicht anderthalb Pixel: bei 1,5 px zerfiel die Kante bei DPR 1 in
+ * Kantenglättung, gemessen 3,60 statt ≥ 17 gegen den hellen Grund. Der weiße Rand allein ist auf heller Grundlage keine Kante — gemessen
+ * gegen den Kartengrund `#e8e8e8` (`e2e/betroffene-kontrast.spec.ts`), und SK II gelb füllt
+ * dort auch nicht aus. Weiß UND Schwarz nebeneinander halten gegen JEDEN Grund ≥ 3 : 1
+ * (WCAG 1.4.11): max(K(weiß, g), K(schwarz, g)) ≥ √21 ≈ 4,58 für jede Farbe g — deshalb
+ * trägt die Kante auch auf Grundkarten, die e2e nicht lädt. Dieselbe Hell-Dunkel-Paarung wie
+ * das Kurzzeichen (`KURZ_PAINT`). Nur für Features mit `sk`: die Lagekarte bleibt gleich.
+ *
+ * Bewusst `'#000'` und NICHT `sichtungsfarben.schwarz`: die Kante ist eine Kontur, keine
+ * Sichtungsaussage — sie steht an JEDEM Personen-Marker gleich. Aus der Sichtungsachse gelesen
+ * sähe sie wie eine Bindung an „Tote" aus, die es nicht gibt; „tot" unterscheidet sich durch
+ * die gefüllte Fläche und das Kürzel „T". Gleicher Wert wie der Text von `KURZ_PAINT`.
+ */
+const KANTE_PAINT: CircleLayerSpecification['paint'] = {
+  'circle-radius': 13,
+  'circle-color': '#000',
 };
 const KREIS_PAINT: CircleLayerSpecification['paint'] = {
   'circle-radius': 9,
@@ -271,6 +316,24 @@ export function sorgeFuerMarkerLayer(
       paint: { ...STATUS_RING_PAINT },
     });
   }
+  if (!map.getLayer('marker-treffer')) {
+    map.addLayer({
+      id: 'marker-treffer',
+      type: 'circle',
+      source: MARKER_CLUSTER_QUELLE,
+      filter: ['all', ['!', ['has', 'point_count']], ['has', 'treffer']],
+      paint: { ...TREFFER_PAINT },
+    });
+  }
+  if (!map.getLayer('marker-kante')) {
+    map.addLayer({
+      id: 'marker-kante',
+      type: 'circle',
+      source: MARKER_CLUSTER_QUELLE,
+      filter: ['all', ['!', ['has', 'point_count']], ['has', 'sk']],
+      paint: { ...KANTE_PAINT },
+    });
+  }
   // Lagemeldung (kein TZ) — einfacher Kreis (heutige Optik: farbig, weißer Rand).
   if (!map.getLayer('marker-kreis')) {
     map.addLayer({
@@ -371,6 +434,15 @@ function sorgeFuerSpiderLayer(map: MapLibreMap, schrift: string[] | undefined) {
       paint: { 'line-color': '#64748b', 'line-width': 1.5, 'line-opacity': 0.7 },
     });
   }
+  if (!map.getLayer('spider-treffer')) {
+    map.addLayer({
+      id: 'spider-treffer',
+      type: 'circle',
+      source: SPIDER_LEAVES_QUELLE,
+      filter: ['has', 'treffer'],
+      paint: { ...TREFFER_PAINT },
+    });
+  }
   if (!map.getLayer('spider-status-ring')) {
     map.addLayer({
       id: 'spider-status-ring',
@@ -378,6 +450,15 @@ function sorgeFuerSpiderLayer(map: MapLibreMap, schrift: string[] | undefined) {
       source: SPIDER_LEAVES_QUELLE,
       filter: ['has', 'statusFarbe'],
       paint: { ...STATUS_RING_PAINT },
+    });
+  }
+  if (!map.getLayer('spider-kante')) {
+    map.addLayer({
+      id: 'spider-kante',
+      type: 'circle',
+      source: SPIDER_LEAVES_QUELLE,
+      filter: ['has', 'sk'],
+      paint: { ...KANTE_PAINT },
     });
   }
   if (!map.getLayer('spider-kreis')) {
@@ -459,4 +540,30 @@ export function setzeSpiderDaten(
 ) {
   (map.getSource(SPIDER_LEAVES_QUELLE) as GeoJSONSource | undefined)?.setData(leaves as never);
   (map.getSource(SPIDER_LEGS_QUELLE) as GeoJSONSource | undefined)?.setData(legs as never);
+}
+
+/**
+ * Das Merkmal, das einem Klickpunkt am NÄCHSTEN liegt (Review LFH-650). Seit den Trefferzonen
+ * überlappen die Klickflächen benachbarter Marker regelmäßig (Zone 48/72 px, Spider-Abstand
+ * 40 px); MapLibre liefert die Treffer aber in Zeichenreihenfolge, nicht nach Abstand. Ohne
+ * diese Wahl öffnete ein Tipp neben Person A womöglich die obenauf gezeichnete Person B.
+ * Rein, damit die Wahl ohne WebGL prüfbar ist; `projiziere` ist `map.project`.
+ */
+export function naechstesMerkmal<F extends { geometry?: { type: string; coordinates?: unknown } }>(
+  merkmale: readonly F[],
+  punkt: { x: number; y: number },
+  projiziere: (lngLat: [number, number]) => { x: number; y: number },
+): F | undefined {
+  let bestes: F | undefined;
+  let abstand = Number.POSITIVE_INFINITY;
+  for (const m of merkmale) {
+    if (m.geometry?.type !== 'Point') continue;
+    const p = projiziere(m.geometry.coordinates as [number, number]);
+    const d = Math.hypot(p.x - punkt.x, p.y - punkt.y);
+    if (d < abstand) {
+      abstand = d;
+      bestes = m;
+    }
+  }
+  return bestes ?? merkmale[0];
 }
