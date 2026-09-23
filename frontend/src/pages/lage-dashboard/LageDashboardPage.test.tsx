@@ -1025,9 +1025,10 @@ describe('LageDashboardPage — Meldungsstrom', () => {
   it('ein Einsatzwechsel in derselben Instanz übernimmt den neuen Zuschnitt OHNE Banner', async () => {
     // Die gehaltene Reihe gehört zu EINEM Einsatz (LFH-640) — wie die Wassermarke oben.
     mockEndpunkte({ lagekennzahlen: [] });
+    let zweiter = ['pegel'];
     server.use(
       http.get('/api/einsaetze/2', () =>
-        HttpResponse.json({ ...einsatz, id: 2, lagekennzahlen: ['pegel'] }),
+        HttpResponse.json({ ...einsatz, id: 2, lagekennzahlen: zweiter }),
       ),
       http.get('/api/einsaetze/2/gefahrengebiete/:gid/matrix', () => HttpResponse.json([])),
       http.get('/api/einsaetze/2/:modul', () => HttpResponse.json([])),
@@ -1036,7 +1037,7 @@ describe('LageDashboardPage — Meldungsstrom', () => {
       const navigate = useNavigate();
       return <button onClick={() => navigate('/einsaetze/2/lage-dashboard')}>wechseln</button>;
     }
-    renderMitProviders(
+    const { client } = renderMitProviders(
       <>
         <Wechsel />
         <Routes>
@@ -1047,6 +1048,31 @@ describe('LageDashboardPage — Meldungsstrom', () => {
     );
     await kennzahlGeladen('Verbleib offen');
     await userEvent.click(screen.getByRole('button', { name: 'wechseln' }));
+    await waitFor(() => expect(etiketten()).toEqual(REIHE_MIT_PEGEL));
+    expect(screen.queryByText(/Kennzahlreihe geändert/)).toBeNull();
+
+    // Und für den NEUEN Einsatz wird wieder gehalten (Review LFH-640): ohne das tauschte eine
+    // fremde Entscheidung nach jedem Wechsel die Reihe unter dem Blick.
+    zweiter = [];
+    await act(() => client.invalidateQueries({ queryKey: einsatzKeys.einsatz(2) }));
+    expect(
+      await screen.findByText('Kennzahlreihe geändert: Verbleib offen statt Pegel'),
+    ).toBeInTheDocument();
+    expect(etiketten()).toEqual(REIHE_MIT_PEGEL);
+  });
+
+  it('die EIGENE Entscheidung, deren Abruf beim Aufbau noch läuft, gilt ohne Banner', async () => {
+    // Spec LFH-640: wer in den Einstellungen einen Pegel festlegt und sofort zurückwechselt,
+    // findet im Speicher noch den alten Einsatz. Gehalten wird erst nach dem laufenden Abruf.
+    mockEndpunkte({ lagekennzahlen: ['pegel'] });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(einsatzKeys.einsatz(1), { ...einsatz, lagekennzahlen: [] });
+    renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/lage-dashboard" element={<LageDashboardPage />} />
+      </Routes>,
+      { route: '/einsaetze/1/lage-dashboard', client },
+    );
     await waitFor(() => expect(etiketten()).toEqual(REIHE_MIT_PEGEL));
     expect(screen.queryByText(/Kennzahlreihe geändert/)).toBeNull();
   });

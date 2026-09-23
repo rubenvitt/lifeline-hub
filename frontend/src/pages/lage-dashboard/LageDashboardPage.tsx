@@ -274,11 +274,21 @@ export default function LageDashboardPage() {
    * nicht per Effekt (dasselbe Muster wie die Wassermarke unten): beim ersten Einsatz-Abruf
    * und bei einem Wechsel der `:id` gilt die Serverreihe sofort; danach hält die Seite sie,
    * bis „übernehmen" geklickt wird. Ein Effekt ließe einen Commit mit der falschen Reihe durch.
+   *
+   * Gehalten wird erst, wenn kein Abruf des Einsatzes mehr läuft. Wer einen Pegel festlegt und
+   * sofort zum Dashboard wechselt, findet im Speicher noch den alten Einsatz, während der von
+   * der Mutation ausgelöste Abruf unterwegs ist. Hielte die Seite diesen Stand, meldete sie die
+   * EIGENE Entscheidung als Banner (Spec: „beim Rückweg … ohne Banner"). Bis dahin folgt die
+   * Reihe dem Server, wie beim ersten Aufbau.
    */
   const [zuschnitt, setZuschnitt] = useState<{ einsatzId: number; schluessel: string } | null>(
     null,
   );
-  if (serverReiheSchluessel != null && zuschnitt?.einsatzId !== einsatzId) {
+  if (
+    serverReiheSchluessel != null &&
+    !einsatzQuery.isFetching &&
+    zuschnitt?.einsatzId !== einsatzId
+  ) {
     setZuschnitt({ einsatzId, schluessel: serverReiheSchluessel });
   }
   const reiheSchluessel =
