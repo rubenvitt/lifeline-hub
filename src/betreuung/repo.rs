@@ -69,6 +69,9 @@ pub struct StelleAenderung {
     pub status: Option<BetreuungsstelleStatus>,
     pub standort: Option<Option<String>>,
     pub notiz: Option<Option<String>>,
+    /// Koordinate (LFH-673), tri-state je Wert; gegen den Bestand als Paar geprüft.
+    pub lat: Option<Option<f64>>,
+    pub lon: Option<Option<f64>>,
 }
 
 /// Eingabe „Stand melden“. `zeitpunkt_at` hat die Route normalisiert (UTC,
@@ -93,6 +96,10 @@ pub struct BelegungEingabe {
 pub struct Geschrieben {
     pub id: i64,
     pub etb_ids: Vec<i64>,
+    /// Die Verortung einer Stelle hat sich geändert (LFH-673, design.md D3) — wirksam, auch
+    /// wo kein ETB-Eintrag davon zeugt (die Koordinate steht nie im ETB). Die Route verteilt
+    /// dann trotzdem live; ohne diese Marke sähe keine zweite Karte den Marker wandern.
+    pub still_geaendert: bool,
 }
 
 /// Ergebnis einer Meldung oder Rücknahme: die Meldezeile, ihr Objekt (Bezirk bzw. Stelle —
@@ -132,7 +139,7 @@ macro_rules! bezirk_select {
 macro_rules! stelle_select {
     () => {
         "SELECT s.id, s.einsatz_id, s.abschnitt_id, a.name AS abschnitt_name, s.bezeichnung, \
-                s.art, s.kapazitaet_personen, s.status, s.standort, s.notiz, \
+                s.art, s.kapazitaet_personen, s.status, s.standort, s.notiz, s.lat, s.lon, \
                 m.id AS belegung_id, m.belegt AS belegung_belegt, \
                 m.zeitpunkt_at AS belegung_zeitpunkt_at, \
                 s.storniert_at, s.angelegt_at, s.geaendert_at \
@@ -218,6 +225,8 @@ struct StelleZeile {
     status: String,
     standort: Option<String>,
     notiz: Option<String>,
+    lat: Option<f64>,
+    lon: Option<f64>,
     belegung_id: Option<i64>,
     belegung_belegt: Option<i64>,
     belegung_zeitpunkt_at: Option<String>,
@@ -249,6 +258,8 @@ impl TryFrom<StelleZeile> for BetreuungsstelleAnzeige {
             status: aus_db(z.status)?,
             standort: z.standort,
             notiz: z.notiz,
+            lat: z.lat,
+            lon: z.lon,
             belegung,
             storniert_at: z.storniert_at,
             angelegt_at: z.angelegt_at,
@@ -391,6 +402,28 @@ fn plan_pruefen(plan: i64) -> Result<(), AppError> {
         return Err(AppError::Validation(format!(
             "plan_personen muss mindestens 1 sein, war {plan}"
         )));
+    }
+    Ok(())
+}
+
+/// Koordinate als Paar: beide gesetzt oder beide leer, Breite −90…90, Länge −180…180.
+/// Wortlaut wie an der UHS (`routes/einsatz_uhs.rs`), damit alle Verortungswege gleich
+/// antworten.
+fn koordinate_pruefen(lat: Option<f64>, lon: Option<f64>) -> Result<(), AppError> {
+    if lat.is_some() != lon.is_some() {
+        return Err(AppError::UnprocessableEntity(
+            "lat und lon müssen gemeinsam gesetzt oder gemeinsam leer sein".into(),
+        ));
+    }
+    if lat.is_some_and(|la| !(-90.0..=90.0).contains(&la)) {
+        return Err(AppError::UnprocessableEntity(
+            "lat muss zwischen -90 und 90 liegen".into(),
+        ));
+    }
+    if lon.is_some_and(|lo| !(-180.0..=180.0).contains(&lo)) {
+        return Err(AppError::UnprocessableEntity(
+            "lon muss zwischen -180 und 180 liegen".into(),
+        ));
     }
     Ok(())
 }
@@ -571,6 +604,8 @@ struct StelleRoh {
     status: BetreuungsstelleStatus,
     standort: Option<String>,
     notiz: Option<String>,
+    lat: Option<f64>,
+    lon: Option<f64>,
     /// Zeiger, Anzahl und Zeitpunkt der aktuellen Belegungsmeldung, wie bei [`BezirkRoh`].
     belegung_id: Option<i64>,
     belegung_belegt: Option<i64>,
@@ -585,7 +620,7 @@ async fn stelle_roh_tx(
 ) -> Result<StelleRoh, AppError> {
     sqlx::query_as(
         "SELECT s.bezeichnung, s.art, s.abschnitt_id, s.kapazitaet_personen, s.status, \
-                s.standort, s.notiz, s.belegung_id, m.belegt AS belegung_belegt, \
+                s.standort, s.notiz, s.lat, s.lon, s.belegung_id, m.belegt AS belegung_belegt, \
                 m.zeitpunkt_at AS belegung_zeitpunkt_at, s.storniert_at \
          FROM betreuungsstelle s LEFT JOIN betreuungsstelle_belegung m ON m.id = s.belegung_id \
          WHERE s.id = ? AND s.einsatz_id = ?",
@@ -707,6 +742,7 @@ pub async fn bezirk_anlegen_tx(
     Ok(Geschrieben {
         id,
         etb_ids: vec![etb_id],
+        still_geaendert: false,
     })
 }
 
@@ -753,6 +789,7 @@ pub async fn bezirk_aendern_tx(
         return Ok(Geschrieben {
             id,
             etb_ids: Vec::new(),
+            still_geaendert: false,
         });
     }
     if stammdaten.bezeichnung_vorher.is_some() {
@@ -817,7 +854,11 @@ pub async fn bezirk_aendern_tx(
             .await?,
         );
     }
-    Ok(Geschrieben { id, etb_ids })
+    Ok(Geschrieben {
+        id,
+        etb_ids,
+        still_geaendert: false,
+    })
 }
 
 /// Storniert einen Bezirk (Fehlanlage). Die Bezeichnung wird wieder frei; der Bezirk nimmt
@@ -850,6 +891,7 @@ pub async fn bezirk_stornieren_tx(
     Ok(Geschrieben {
         id,
         etb_ids: vec![etb_id],
+        still_geaendert: false,
     })
 }
 
@@ -1016,6 +1058,7 @@ pub async fn stelle_anlegen_tx(
     Ok(Geschrieben {
         id,
         etb_ids: vec![etb_id],
+        still_geaendert: false,
     })
 }
 
@@ -1052,6 +1095,13 @@ pub async fn stelle_aendern_tx(
         Some(v) => text_opt(v.as_deref()),
         None => roh.notiz.clone(),
     };
+    // Koordinate (LFH-673): Effektivzustand gegen den Rohstand DIESER Transaktion — ein im
+    // Handler vorab gelesener Stand könnte zwischen Prüfung und UPDATE veralten und das Paar
+    // zerreißen. 422 wie bei der UHS (Zusammenhang zweier Felder; design.md D4 begründet die
+    // Abweichung von der 400-Linie des Moduls).
+    let lat = eingabe.lat.unwrap_or(roh.lat);
+    let lon = eingabe.lon.unwrap_or(roh.lon);
+    koordinate_pruefen(lat, lon)?;
 
     let stammdaten = etb_text::StelleStammdaten {
         bezeichnung_vorher: (bezeichnung != roh.bezeichnung).then_some(roh.bezeichnung.as_str()),
@@ -1062,10 +1112,16 @@ pub async fn stelle_aendern_tx(
         weitere_angaben: standort != roh.standort || notiz != roh.notiz,
     };
     let status_neu = status != roh.status;
-    if stammdaten.leer() && !status_neu {
+    // Die Verortung ist eine EIGENE Achse, nicht Teil von `StelleStammdaten`: die erzeugt den
+    // ETB-Text, und der nennt nie einen Standort (LFH-639 D5). Hinge die Koordinate nur am
+    // UPDATE, schnitte der Leerlauf-Riegel einen reinen Karten-PATCH still ab (200, nichts
+    // gespeichert).
+    let verortung_neu = lat != roh.lat || lon != roh.lon;
+    if stammdaten.leer() && !status_neu && !verortung_neu {
         return Ok(Geschrieben {
             id,
             etb_ids: Vec::new(),
+            still_geaendert: false,
         });
     }
     if status_neu && status == BetreuungsstelleStatus::Geschlossen {
@@ -1086,7 +1142,7 @@ pub async fn stelle_aendern_tx(
 
     sqlx::query(
         "UPDATE betreuungsstelle SET bezeichnung = ?, art = ?, abschnitt_id = ?, \
-            kapazitaet_personen = ?, status = ?, standort = ?, notiz = ?, \
+            kapazitaet_personen = ?, status = ?, standort = ?, notiz = ?, lat = ?, lon = ?, \
             geaendert_at = datetime('now') \
          WHERE id = ?",
     )
@@ -1097,6 +1153,8 @@ pub async fn stelle_aendern_tx(
     .bind(status.as_str())
     .bind(&standort)
     .bind(&notiz)
+    .bind(lat)
+    .bind(lon)
     .bind(id)
     .execute(&mut *conn)
     .await?;
@@ -1114,7 +1172,11 @@ pub async fn stelle_aendern_tx(
             crate::etb::system_audit_tx(conn, einsatz_id, benutzer_id, startwert, inhalt).await?,
         );
     }
-    Ok(Geschrieben { id, etb_ids })
+    Ok(Geschrieben {
+        id,
+        etb_ids,
+        still_geaendert: verortung_neu,
+    })
 }
 
 /// Storniert eine Stelle (Fehlanlage). Bereits storniert → 409.
@@ -1146,6 +1208,7 @@ pub async fn stelle_stornieren_tx(
     Ok(Geschrieben {
         id,
         etb_ids: vec![etb_id],
+        still_geaendert: false,
     })
 }
 

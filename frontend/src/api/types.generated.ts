@@ -426,6 +426,14 @@ export interface components {
              * @description Fehlt bei unbekannter Kapazität; dann gibt es auch keine Zahl freier Plätze.
              */
             kapazitaet_personen?: number | null;
+            /**
+             * Format: double
+             * @description Koordinate auf der Lagekarte (LFH-673). Beide fehlen = nicht verortet; die App hält
+             *     sie als Paar.
+             */
+            lat?: number | null;
+            /** Format: double */
+            lon?: number | null;
             notiz?: string | null;
             standort?: string | null;
             status: components["schemas"]["BetreuungsstelleStatus"];

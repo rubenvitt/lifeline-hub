@@ -901,6 +901,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("status", G_ENUM),
             scrub("standort", Strategie::NullSetzen),
             scrub("notiz", Strategie::NullSetzen),
+            // LFH-673: Koordinate auf der Lagekarte — Geo-Skelett wie `uhs.lat/lon`.
+            retain("lat", G_GEO),
+            retain("lon", G_GEO),
             retain("belegung_id", G_FK),
             retain("storniert_at", G_ZEIT),
             retain("storniert_von_id", G_FK),

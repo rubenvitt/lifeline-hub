@@ -1144,6 +1144,21 @@
             "format": "int64",
             "description": "Fehlt bei unbekannter Kapazität; dann gibt es auch keine Zahl freier Plätze."
           },
+          "lat": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "Koordinate auf der Lagekarte (LFH-673). Beide fehlen = nicht verortet; die App hält\nsie als Paar."
+          },
+          "lon": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
           "notiz": {
             "type": [
               "string",
