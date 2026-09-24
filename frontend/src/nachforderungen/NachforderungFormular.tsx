@@ -162,7 +162,10 @@ export default function NachforderungFormular({
         </Col>
         <Col xs={24} sm={12}>
           <Form.Item name="begruendung" label="Begründung / Lagebezug">
-            <TextArea rows={1} />
+            {/* Wächst bis vier Zeilen: eine Vorbelegung aus der Verpflegung (LFH-634) trägt
+                Bedarf, Ausgabe und fehlende Sonderkost — in einer festen Zeile war die Hälfte
+                davon nicht zu sehen. */}
+            <TextArea autoSize={{ minRows: 1, maxRows: 4 }} />
           </Form.Item>
         </Col>
       </Row>

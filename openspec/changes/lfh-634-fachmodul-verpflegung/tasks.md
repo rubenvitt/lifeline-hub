@@ -54,8 +54,8 @@ und `betreuung` (LFH-639).
 
 - [x] 6.1 e2e: Verpflegungsroute in `e2e/gate1-ueberlauf.spec.ts` (gesätes Zeitfenster mit langer Bezeichnung und langem Ort) und ein Eintrag in `e2e/gate3-trefflaeche.spec.ts` für die Kartenaktionen (30 / 48 / 72 px). Die Stab-Werkzeugzählung wird geprüft. Verifiziert durch einen grünen `pnpm e2e` auf beiden Specs.
 - [x] 6.2 Kontrast: `e2e/verpflegung-kontrast.spec.ts` nach dem Muster von `abloesung-kontrast.spec.ts` mit Messkern `e2e/kontrast-kern.ts`. Gemessen wird jeder Text der Karten und Dialoge in Tag- und Nachtmodus, gegen den Grund, auf dem er wirklich steht (LFH-618, Regel 3). Der kritische Fall ist „Unterdeckung“ auf der Alarmfläche im Tagmodus über `alarmText` (Regel 1). Dazu Karten- und Etikettrand. Verifiziert durch einen grünen Spec-Lauf und eine Mutationsprobe (Alarmfläche auf `alarm` → rot).
-- [ ] 6.3 Browser-Sichtprüfung in Tag und Nacht: Anlegen mit Vorschlägen, Ausgabe mit Rückgängig, Unterdeckung, Nachfordern-Sprung, ETB-Einträge. Screenshots gehen in die Prüfliste.
-- [ ] 6.4 Prüfliste Einsatztauglichkeit `docs/superpowers/specs/2026-09-24-lfh-634-pruefliste.md` nach dem Muster von LFH-635: alle 15 Kriterien mit Verdikt und Beleg.
+- [x] 6.3 Browser-Sichtprüfung in Tag und Nacht: Anlegen mit Vorschlägen, Ausgabe mit Rückgängig, Unterdeckung, Nachfordern-Sprung, ETB-Einträge. Screenshots gehen in die Prüfliste.
+- [x] 6.4 Prüfliste Einsatztauglichkeit `docs/superpowers/specs/2026-09-24-lfh-634-pruefliste.md` nach dem Muster von LFH-635: alle 15 Kriterien mit Verdikt und Beleg.
 - [x] 6.5 CLAUDE.md: Absatz zum Modul Verpflegung (Zeitfenster statt Schicht; Bedarf erfasst, nicht gerechnet; Nachschub nur über Nachforderung; Vertragskarte 24; Modulzähler bewusst keiner). Den Stand „Stand 22.09.2026: 18“ im Vertragskarten-Absatz nachziehen. Verifiziert durch Lesen des Diffs.
 - [x] 6.6 Folgeticket „Offline-Fähigkeit der Verpflegungs-Ausgaben“ angelegt: LFH-688, im Proposal und Design nachgetragen.
 - [ ] 6.7 Vor dem Merge: `git fetch`, `scripts/check-migrationen.sh` (ggf. `--umnummerieren`), dann `./scripts/check-all.sh` grün. Verifiziert durch das Log des Laufs.
