@@ -148,7 +148,7 @@ Zonentypen im ETB festgehalten werden, mit dem Typwort „Evakuierungsbezirk“.
 
 #### Scenario: Bezirksfläche zeichnen
 - **WHEN** eine Person mit Schreibrecht auf der Lagekarte eine Fläche vom Typ Evakuierungsbezirk zeichnet
-- **THEN** entsteht eine Zone dieses Typs, und das ETB enthält „Evakuierungsbezirk … angelegt“
+- **THEN** entsteht eine Zone dieses Typs, und das ETB enthält „Evakuierungsbezirk … eingerichtet“ (Verb der übrigen Zonentypen)
 
 #### Scenario: Linie als Evakuierungsbezirk
 - **WHEN** eine Zone vom Typ Evakuierungsbezirk mit einer Linie als Geometrie angelegt werden soll
@@ -215,7 +215,9 @@ Die Anzeige eines Evakuierungsbezirks SHALL die Zahl der ihm zugeordneten Zonen 
 Die Betreuungsseite MUST je Bezirk mit mindestens einer Zone „Auf Karte zeigen“ anbieten,
 auch Personen ohne Schreibrecht (ein Sprung ist Lesen).
 Die Adresse `/einsaetze/<id>/lagekarte?evakuierungsbezirk=<bezirk-id>` MUST eine Zone dieses
-Bezirks auswählen, die Karte dorthin führen und den Parameter danach entfernen. Die
+Bezirks auswählen, die Karte dorthin führen und den Parameter danach entfernen. Liegt die
+Zone in einer anderen Kartenansicht, MUST die Karte zuerst zu dieser Ansicht wechseln. Ein
+unbrauchbarer Wert oder ein Bezirk ohne Zone MUST den Parameter ebenfalls entfernen. Die
 Auswahl einer zugeordneten Zone MUST für Personen mit Lesezugriff auf das Modul Bezirk,
 Räumungszustand und den Stand „evakuiert N von M“ zeigen und einen Sprung ins Modul
 anbieten, der den Bezirk dort auswählt. Die Beschriftung einer zugeordneten Zone auf der
@@ -224,6 +226,10 @@ Karte MUST für diese Personen den Räumungszustand als Text tragen.
 #### Scenario: Aus dem Modul auf die Karte
 - **WHEN** auf der Betreuungsseite am Bezirk „Uferstraße 12–40“ „Auf Karte zeigen“ gewählt wird
 - **THEN** öffnet die Lagekarte mit einer Zone dieses Bezirks ausgewählt, und die Adresse enthält danach kein `evakuierungsbezirk` mehr
+
+#### Scenario: Fläche in einer anderen Ansicht
+- **WHEN** die einzige Zone des Bezirks in der Ansicht „Nord“ liegt und die Karte mit der Standardansicht öffnet
+- **THEN** wechselt die Karte zur Ansicht „Nord“ und wählt dort die Zone aus
 
 #### Scenario: Bezirk ohne Fläche
 - **WHEN** ein Bezirk keine zugeordnete Zone hat

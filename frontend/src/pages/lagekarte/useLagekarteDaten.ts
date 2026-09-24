@@ -565,6 +565,13 @@ export function useLagekarteDaten({
     einstellungenLaedt: einstellungenQuery.isLoading,
     // Ansichts-gefiltert (B/LFH-320): nur Objekte der aktiven Ansicht + ansichtslose.
     zonen,
+    // UNGEFILTERT und ob die Liste feststeht (LFH-673): ein Deeplink auf eine Bezirksfläche
+    // muss sie auch finden, wenn sie in einer anderen Ansicht liegt, und einen Auftrag ohne
+    // Treffer räumen können, statt ewig zu warten.
+    zonenAlle: zonenRoh ?? [],
+    zonenGeladen: istSnapshot ? !snapQuery.isLoading : zonenQuery.isFetched,
+    // Stehen die Modulrechte fest? Der Platzier-Auftrag für eine Stelle wartet darauf.
+    rechteBekannt: overridesQuery.isFetched,
     gebiete: gebieteRoh ?? [],
     // Evakuierungsbezirke (LFH-673) für den Zonen-Inspector — leer ohne Modulrecht.
     bezirke: bezirkeRoh ?? [],

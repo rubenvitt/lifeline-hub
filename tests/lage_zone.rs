@@ -1321,3 +1321,29 @@ async fn zuordnung_ohne_modul_betreuung_ist_403_loesen_bleibt_erlaubt() {
     .await;
     assert_eq!(s, StatusCode::OK, "{j:?}");
 }
+
+#[tokio::test]
+async fn bezirk_storno_meldet_jede_geloeste_flaeche_als_lage_zone() {
+    let (app, live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let ufer = bezirk_anlegen(&app, &admin, e, "Uferstraße 12–40").await;
+    let (_, z) = bezirksflaeche(&app, &admin, e, Some(ufer)).await;
+    let zid = z["id"].as_i64().unwrap();
+    let mut rx = live.abonniere(e);
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/betreuung/bezirke/{ufer}/stornieren"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let n = recv_until_tag(&mut rx, "lage_zone", Duration::from_secs(1)).await;
+    let v: Value = serde_json::from_str(&n.data).unwrap();
+    assert_eq!(
+        v["zone_id"], zid,
+        "die Karte zeichnet die Fläche ohne Bezirk neu"
+    );
+}

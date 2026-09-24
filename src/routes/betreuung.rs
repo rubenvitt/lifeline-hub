@@ -264,11 +264,7 @@ pub async fn bezirk_stornieren(
     publiziere(&state, einsatz_id, &g.etb_ids, Objekt::Bezirk(g.id));
     // LFH-673: die Karte zeichnet die gelösten Flächen jetzt ohne Bezirk.
     for zid in geloeste_zonen {
-        state.live.publiziere_event(
-            einsatz_id,
-            LiveEvent::LageZone,
-            serde_json::json!({ "einsatz_id": einsatz_id, "zone_id": zid }).to_string(),
-        );
+        super::lage_zone::sse_zone(&state, einsatz_id, zid);
     }
     Ok(Json(
         repo::bezirk_laden(&state.pool, einsatz_id, g.id).await?,

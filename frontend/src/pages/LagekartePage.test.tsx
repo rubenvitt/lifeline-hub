@@ -1224,6 +1224,86 @@ describe('LagekartePage', () => {
     );
   });
 
+  it('Deeplink ?evakuierungsbezirk=: Fläche in einer anderen Ansicht → erst Ansicht wechseln, dann wählen (LFH-673)', async () => {
+    const ZONE_NORD = {
+      id: 8,
+      einsatz_id: 1,
+      typ: 'evakuierungsbezirk',
+      geometrie_typ: 'Polygon',
+      geometrie: '{"type":"Polygon","coordinates":[[[8.6,50.1],[8.7,50.1],[8.7,50.2],[8.6,50.1]]]}',
+      label: null,
+      farbe: null,
+      notiz: null,
+      gefahrengebiet_id: null,
+      evakuierungsbezirk_id: 5,
+      ansicht_id: 2,
+      erstellt_von: 1,
+      erstellt_at: '',
+      geaendert_at: '',
+    };
+    basisHandler([
+      http.get('/api/einsaetze/1/zonen', () => HttpResponse.json([ZONE_NORD])),
+      http.get('/api/einsaetze/1/karten-ansichten', () =>
+        HttpResponse.json([
+          {
+            id: 1,
+            einsatz_id: 1,
+            name: 'Standard',
+            reihenfolge: 0,
+            ist_standard: true,
+            erstellt_at: '',
+            geaendert_at: '',
+          },
+          {
+            id: 2,
+            einsatz_id: 1,
+            name: 'Nord',
+            reihenfolge: 1,
+            ist_standard: false,
+            erstellt_at: '',
+            geaendert_at: '',
+          },
+        ]),
+      ),
+    ]);
+    renderSeiteMitSonde('/einsaetze/1/lagekarte?evakuierungsbezirk=5');
+    expect(await screen.findByLabelText('Gehört zu Evakuierungsbezirk')).toBeInTheDocument();
+    await waitFor(() => {
+      const ort = screen.getByTestId('location-search').textContent ?? '';
+      expect(ort).toContain('ansicht=2');
+      expect(ort).not.toContain('evakuierungsbezirk');
+    });
+  });
+
+  it('Deeplink ?evakuierungsbezirk=: unbrauchbar oder ohne Fläche wird geräumt (LFH-673)', async () => {
+    basisHandler();
+    const { unmount } = renderSeiteMitSonde('/einsaetze/1/lagekarte?evakuierungsbezirk=abc');
+    await waitFor(() =>
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('evakuierungsbezirk'),
+    );
+    unmount();
+    renderSeiteMitSonde('/einsaetze/1/lagekarte?evakuierungsbezirk=77');
+    await waitFor(() =>
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('evakuierungsbezirk'),
+    );
+    expect(screen.queryByLabelText('Gehört zu Evakuierungsbezirk')).not.toBeInTheDocument();
+  });
+
+  it('Deeplink ?platzieren=betreuungsstelle: ohne Modul Betreuung kein Platziermodus (LFH-673)', async () => {
+    basisHandler([
+      http.get('/api/einsaetze/1/modul-overrides', () =>
+        HttpResponse.json({
+          betreuung: { einsatz_id: 1, modul_key: 'betreuung', sichtbar: false },
+        }),
+      ),
+    ]);
+    renderSeiteMitSonde('/einsaetze/1/lagekarte?platzieren=betreuungsstelle:4');
+    await waitFor(() =>
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('platzieren'),
+    );
+    expect(screen.queryByText(/Klick auf die Karte setzt die Koordinate/)).not.toBeInTheDocument();
+  });
+
   it('Reverse-Deeplink ?gefahrengebiet=: räumt den Param aus der URL (apply-then-clean) und die Selektion bleibt bestehen (LFH-155)', async () => {
     const ZONE_GG = {
       id: 7,

@@ -766,6 +766,50 @@ describe('useLagekarteDaten Betreuungsstellen (LFH-673)', () => {
     );
   });
 
+  it('Rechteverlust bei gefülltem Cache: Stellen und Bezirke verschwinden trotz Altstand', async () => {
+    const BEZIRK = {
+      id: 31,
+      einsatz_id: 5,
+      bezeichnung: 'Uferstraße 12–40',
+      plan_personen: 640,
+      plan_erhebung: 'geschaetzt',
+      raeumung: 'laeuft',
+      flaechen: 0,
+      angelegt_at: '',
+    };
+    handler({}, () => HttpResponse.json({ bezirke: [BEZIRK], stellen: [STELLE] }));
+    const client = neuerQueryClient();
+    const { result } = renderHook(() => useLagekarteDaten({ einsatzId: 5, zeigeZonen: true }), {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <QueryClientProvider client={client}>{children}</QueryClientProvider>
+      ),
+    });
+    await waitFor(() =>
+      expect(result.current.alleVerortet.some((m) => m.typ === 'betreuungsstelle')).toBe(true),
+    );
+    expect(result.current.bezirke).toHaveLength(1);
+    // Die Leitung sperrt das Modul; die Overrides laden neu, der Betreuungs-Cache bleibt stehen.
+    server.use(
+      http.get('/api/einsaetze/5/modul-overrides', () =>
+        HttpResponse.json({
+          betreuung: {
+            einsatz_id: 5,
+            modul_key: 'betreuung',
+            sichtbar: true,
+            benoetigte_rolle: 'fuehrungskraft',
+          },
+        }),
+      ),
+    );
+    await client.invalidateQueries({ queryKey: ['einsatz-modul-overrides', 5] });
+    await waitFor(() => expect(result.current.betreuungZugriff).toBe('gesperrt'));
+    expect(client.getQueryData(['einsatz-betreuung', 5])).toBeTruthy(); // Vorbedingung: Altstand
+    expect(result.current.alleVerortet.some((m) => m.typ === 'betreuungsstelle')).toBe(false);
+    expect(result.current.nichtVerortetAlle.some((m) => m.typ === 'betreuungsstelle')).toBe(false);
+    expect(result.current.bezirke).toEqual([]);
+    expect(result.current.rohdaten.betreuungsstellen).toEqual([]);
+  });
+
   it('Bezirksfläche ohne Modulrecht: nur das Typwort, keine Bezirksangaben', async () => {
     handler({}, () => new HttpResponse(null, { status: 403 }));
     server.use(

@@ -23,13 +23,16 @@ const STILE: Record<Exclude<ZoneTyp, 'freie_skizze'>, ZoneStil> = {
   absperrbereich: { fillColor: '#fa8c16', fillOpacity: 0.2, lineColor: '#fa8c16', lineWidth: 2 },
   absperrgrenze: { fillColor: '#cf1322', fillOpacity: 0, lineColor: '#cf1322', lineWidth: 4 },
   sperrgebiet: { fillColor: '#8c8c8c', fillOpacity: 0.3, lineColor: '#595959', lineWidth: 2 },
-  // LFH-673 (design.md D9): kein Rot (Gefahr), kein Orange (Absperrbereich), kein Grau
-  // (Sperrgebiet) — ein Räumungsbezirk ist ein Auftrag, keine Gefahrenfläche. Der
-  // Räumungszustand steht als Text in der Beschriftung, nicht in der Farbe.
+  // LFH-673 (design.md D9, Entscheidung 24.09.2026): Siena-Braun, der einzige noch freie
+  // Farbton der Karte. NICHT Violett — `#722ed1` ist exakt der Stil der Abschnittsflächen
+  // (`kartenLayer.ts`) —, NICHT Petrol (Fachebene Hochwasser), kein Rot/Orange/Grau der
+  // Gefahren- und Sperrflächen. Linie gegen beide Blindkarten-Gründe gerechnet: 3,36 : 1
+  // nachts (`#0f1115`), 4,58 : 1 tags (`#e8e8e8`), also ≥ 3 : 1 (WCAG 1.4.11). Den
+  // Räumungszustand trägt die Beschriftung, nicht die Farbe.
   evakuierungsbezirk: {
-    fillColor: '#722ed1',
+    fillColor: '#a0522d',
     fillOpacity: 0.15,
-    lineColor: '#722ed1',
+    lineColor: '#a0522d',
     lineWidth: 2,
   },
 };

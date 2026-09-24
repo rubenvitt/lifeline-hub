@@ -131,11 +131,15 @@ describe('zonenBeschriftung', () => {
 describe('Evakuierungsbezirk (LFH-673)', () => {
   it('eigener Stil, nur Fläche, im Zeichen-Katalog', () => {
     expect(zoneStil('evakuierungsbezirk', null)).toEqual({
-      fillColor: '#722ed1',
+      fillColor: '#a0522d',
       fillOpacity: 0.15,
-      lineColor: '#722ed1',
+      lineColor: '#a0522d',
       lineWidth: 2,
     });
+    // Nicht der Abschnittston (`kartenLayer.ts`) und nicht Hochwasser-Petrol (`fachebenen.ts`)
+    // — beide lagen im ersten Entwurf gleich bzw. daneben.
+    expect(zoneStil('evakuierungsbezirk', null).lineColor).not.toBe('#722ed1');
+    expect(zoneStil('evakuierungsbezirk', null).lineColor).not.toBe('#08979c');
     const typ = ZONE_TYPEN.find((t) => t.typ === 'evakuierungsbezirk')!;
     expect(typ).toEqual({
       typ: 'evakuierungsbezirk',
@@ -144,7 +148,7 @@ describe('Evakuierungsbezirk (LFH-673)', () => {
     });
     // Unterscheidbar von den Gefahren-/Absperrflächen.
     for (const andere of ['gefahrengebiet', 'absperrbereich', 'sperrgebiet'] as const) {
-      expect(zoneStil(andere, null).fillColor).not.toBe('#722ed1');
+      expect(zoneStil(andere, null).fillColor).not.toBe('#a0522d');
     }
   });
 

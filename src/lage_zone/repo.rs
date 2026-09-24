@@ -147,6 +147,14 @@ pub async fn anlegen_tx(
     einsatz_id: i64,
     daten: ZoneNeu<'_>,
 ) -> Result<i64, AppError> {
+    let bezirk_id = if daten.typ == "evakuierungsbezirk" {
+        daten.evakuierungsbezirk_id
+    } else {
+        None
+    };
+    if let Some(b) = bezirk_id {
+        bezirk_lebt_tx(&mut *conn, einsatz_id, b).await?;
+    }
     let gebiet_id = if daten.typ == "gefahrengebiet" {
         Some(
             crate::gefahr::repo::gebiet_anlegen(
@@ -171,10 +179,37 @@ pub async fn anlegen_tx(
     // ansicht_id NUR in der Zone (LFH-320) — die Gefahrengebiet-Gruppe oben ist ansichtslos.
     .bind(daten.ansicht_id)
     // Nur an Bezirksflächen (LFH-673); an jedem anderen Typ bleibt die Spalte leer.
-    .bind(if daten.typ == "evakuierungsbezirk" { daten.evakuierungsbezirk_id } else { None })
+    .bind(bezirk_id)
     .bind(daten.erstellt_von)
     .fetch_one(&mut *conn).await?;
     Ok(id)
+}
+
+/// In-Tx-Wache der Bezirks-Zuordnung (LFH-673): der Bezirk gehört zum Einsatz und ist nicht
+/// storniert — geprüft auf DERSELBEN Verbindung wie der Schreibvorgang. Die Route prüft
+/// vorab (für die genauen Codes 403/404/409); diese Wache schließt das Fenster zwischen
+/// Vorabprüfung und Schreiben, in dem ein paralleler Storno die Fläche sonst wieder an eine
+/// Fehlanlage hängen ließe (Review LFH-673, Befund 2). Verfehlt → 409.
+async fn bezirk_lebt_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    bezirk_id: i64,
+) -> Result<(), AppError> {
+    let lebt: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM evakuierungsbezirk \
+         WHERE id = ? AND einsatz_id = ? AND storniert_at IS NULL)",
+    )
+    .bind(bezirk_id)
+    .bind(einsatz_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    if lebt {
+        Ok(())
+    } else {
+        Err(AppError::Conflict(
+            "Evakuierungsbezirk ist nicht mehr zuordenbar (storniert)".into(),
+        ))
+    }
 }
 
 /// Pool-Wrapper: legt an (eigene Tx) und lädt die Anzeige. Delegiert an [`anlegen_tx`].
@@ -237,16 +272,17 @@ pub async fn aktualisiere(
         }
     };
 
-    // Bezirks-Zuordnung (LFH-673): Effektivwert wie `ziel_gebiet` — ein anderer Typ trägt nie
-    // einen Bezirk, sonst gewinnt der Patch, sonst bleibt der Bestand.
-    let ziel_bezirk: Option<i64> = if neuer_typ != "evakuierungsbezirk" {
-        None
-    } else {
-        match daten.evakuierungsbezirk_id {
-            Some(v) => v,
-            None => vorher.evakuierungsbezirk_id,
+    // Bezirks-Zuordnung (LFH-673): ein anderer Typ trägt nie einen Bezirk, sonst gewinnt der
+    // Patch, sonst bleibt der Bestand — der Bestand aber aus der ZEILE (CASE im UPDATE), nicht
+    // aus dem vorab gelesenen `vorher`: ein paralleler Storno hat sie womöglich schon gelöst,
+    // und ein reiner Label-PATCH hängte die Fläche sonst wieder an die Fehlanlage (Review
+    // LFH-673, Befund 2). Beim Setzen zusätzlich die Wache in derselben Transaktion.
+    let bezirk_weg = neuer_typ != "evakuierungsbezirk";
+    if !bezirk_weg {
+        if let Some(Some(b)) = daten.evakuierungsbezirk_id {
+            bezirk_lebt_tx(&mut tx, einsatz_id, b).await?;
         }
-    };
+    }
 
     let betroffen = sqlx::query(
         "UPDATE lage_zone SET \
@@ -256,7 +292,8 @@ pub async fn aktualisiere(
             notiz = CASE WHEN ? THEN ? ELSE notiz END, \
             gefahrengebiet_id = ?, \
             ansicht_id = CASE WHEN ? THEN ? ELSE ansicht_id END, \
-            evakuierungsbezirk_id = ?, \
+            evakuierungsbezirk_id = CASE WHEN ? THEN NULL WHEN ? THEN ? \
+                                         ELSE evakuierungsbezirk_id END, \
             geaendert_at = datetime('now') \
          WHERE id = ? AND einsatz_id = ?",
     )
@@ -272,7 +309,9 @@ pub async fn aktualisiere(
     .bind(ziel_gebiet)
     .bind(daten.ansicht_id.is_some())
     .bind(daten.ansicht_id.flatten())
-    .bind(ziel_bezirk)
+    .bind(bezirk_weg)
+    .bind(daten.evakuierungsbezirk_id.is_some())
+    .bind(daten.evakuierungsbezirk_id.flatten())
     .bind(id)
     .bind(einsatz_id)
     .execute(&mut *tx)
@@ -622,5 +661,120 @@ mod tests {
             laden(&pool, einsatz, z.id).await.unwrap_err(),
             AppError::NotFound
         ));
+    }
+
+    // ── LFH-673: Bezirks-Zuordnung — Wache in der Transaktion, Bestand aus der Zeile ──
+
+    async fn bezirk(pool: &SqlitePool, einsatz: i64, von: i64, storniert: bool) -> i64 {
+        sqlx::query_scalar(
+            "INSERT INTO evakuierungsbezirk \
+                (einsatz_id, bezeichnung, plan_personen, plan_erhebung, angelegt_von_id, \
+                 storniert_at) \
+             VALUES (?, ?, 640, 'geschaetzt', ?, CASE WHEN ? THEN datetime('now') END) \
+             RETURNING id",
+        )
+        .bind(einsatz)
+        .bind(if storniert {
+            "Fehlanlage"
+        } else {
+            "Uferstraße"
+        })
+        .bind(von)
+        .bind(storniert)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    fn bezirksflaeche(von: i64, bezirk: Option<i64>) -> ZoneNeu<'static> {
+        ZoneNeu {
+            typ: "evakuierungsbezirk",
+            geometrie_typ: "Polygon",
+            geometrie: POLY,
+            label: None,
+            farbe: None,
+            notiz: None,
+            ansicht_id: None,
+            evakuierungsbezirk_id: bezirk,
+            erstellt_von: von,
+        }
+    }
+
+    /// Am Vorabcheck der Route vorbei: die Wache in der Transaktion lehnt einen stornierten
+    /// Bezirk selbst ab (409) — sonst schlösse ein paralleler Storno das Fenster nicht.
+    #[tokio::test]
+    async fn stornierter_bezirk_scheitert_an_der_wache_in_der_transaktion() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, von) = setup(&pool).await;
+        let tot = bezirk(&pool, einsatz, von, true).await;
+        let err = anlegen(&pool, einsatz, bezirksflaeche(von, Some(tot)))
+            .await
+            .unwrap_err();
+        assert!(matches!(err, AppError::Conflict(_)), "{err:?}");
+        let z = anlegen(&pool, einsatz, bezirksflaeche(von, None))
+            .await
+            .unwrap();
+        let err = aktualisiere(
+            &pool,
+            einsatz,
+            z.id,
+            von,
+            ZonePatch {
+                evakuierungsbezirk_id: Some(Some(tot)),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap_err();
+        assert!(matches!(err, AppError::Conflict(_)), "{err:?}");
+        assert_eq!(
+            laden(&pool, einsatz, z.id)
+                .await
+                .unwrap()
+                .evakuierungsbezirk_id,
+            None
+        );
+    }
+
+    /// Ein Patch ohne Zuordnung lässt die Spalte, wie sie in der ZEILE steht — nicht wie ein
+    /// vorab gelesener Stand sie zeigte.
+    #[tokio::test]
+    async fn label_patch_laesst_die_zuordnung_der_zeile_stehen() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, von) = setup(&pool).await;
+        let b = bezirk(&pool, einsatz, von, false).await;
+        let z = anlegen(&pool, einsatz, bezirksflaeche(von, Some(b)))
+            .await
+            .unwrap();
+        let n = aktualisiere(
+            &pool,
+            einsatz,
+            z.id,
+            von,
+            ZonePatch {
+                label: Some(Some("Nordufer")),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(n.evakuierungsbezirk_id, Some(b));
+        assert_eq!(n.label.as_deref(), Some("Nordufer"));
+    }
+
+    #[tokio::test]
+    async fn verweis_zeigt_auf_evakuierungsbezirk_mit_set_null() {
+        let pool = crate::db::test_pool().await;
+        let fk: Vec<(String, String, String)> = sqlx::query_as(
+            "SELECT \"table\", \"to\", on_delete FROM pragma_foreign_key_list('lage_zone') \
+             WHERE \"from\" = 'evakuierungsbezirk_id'",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            fk,
+            vec![("evakuierungsbezirk".into(), "id".into(), "SET NULL".into())]
+        );
     }
 }

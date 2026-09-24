@@ -224,8 +224,11 @@ Sekundärfelder (Evakuiert, Stand, Abschnitt), und keins davon ist entbehrlicher
 
 - `ZONE_TYPEN` bekommt `{typ: 'evakuierungsbezirk', label: 'Evakuierungsbezirk', geometrie:
   'Polygon'}`, und `STILE` ein neues Literal (der Dateikopf hält die Zonenstile bewusst
-  rollenfrei). Vorschlag: Violett `#722ed1`, Füllung 0,15, Linie 2, durchgezogen. Das
-  ist kein Rot (Gefahr), kein Orange (Absperrbereich) und kein Grau (Sperrgebiet).
+  rollenfrei): **Siena-Braun `#a0522d`**, Füllung 0,15, Linie 2, durchgezogen
+  (Entscheidung 24.09.2026). Der erste Vorschlag Violett `#722ed1` fiel beim Nachmessen
+  durch: er ist exakt der Stil der Abschnittsflächen (`kartenLayer.ts`) und hält nachts nur
+  2,72 : 1. Petrol belegt die Fachebene Hochwasser. Braun ist der einzige freie Ton und hält
+  3,36 : 1 nachts und 4,58 : 1 tags gegen die Blindkarte (WCAG 1.4.11).
 - `zonenBeschriftung` bekommt einen Zweig für zugeordnete Bezirke: Zonenname, sonst die
   Bezirksbezeichnung, sonst das Typwort, und darunter „Räumung: <Zustand>“. Das Wort kommt
   aus dem Label, das die Betreuungsseite schon benutzt, damit es an einer Stelle steht.
@@ -293,8 +296,3 @@ ist damit der Test, der die Eintragung erzwingt. Der Rebuild ändert nichts am S
   deshalb vorher ein `DELETE`/Umtypisieren dieser Zonen. Das ist ein Hinweis für den
   Betrieb, kein Automatismus.
 
-## Open Questions
-
-- Die genauen Farbliterale (`#0891b2`, `#722ed1`) werden beim Umsetzen im Browser gegen
-  die Nacht- und Tagkarte geprüft und können sich innerhalb der Grenzen aus D8/D9
-  verschieben. Das ändert weder Spec noch Schnitt.

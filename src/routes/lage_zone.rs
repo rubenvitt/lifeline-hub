@@ -20,7 +20,7 @@ use axum::Json;
 use serde::Deserialize;
 
 /// SSE-Notify (Lage-Karte): eine Zone hat sich geändert. Event-Tag `lage_zone`.
-fn sse_zone(state: &AppState, einsatz_id: i64, zid: i64) {
+pub(crate) fn sse_zone(state: &AppState, einsatz_id: i64, zid: i64) {
     let data = serde_json::json!({ "einsatz_id": einsatz_id, "zone_id": zid }).to_string();
     state
         .live

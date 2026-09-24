@@ -188,6 +188,9 @@ export default function LagekartePage() {
     alleVerortet,
     nichtVerortetAlle,
     zonen,
+    zonenAlle,
+    zonenGeladen,
+    rechteBekannt,
     freieZeichen,
     rohdaten,
     personenZugriff,
@@ -496,22 +499,51 @@ export default function LagekartePage() {
     setSearchParams(naechste, { replace: true });
   }, [zonen, searchParams, setSearchParams, setZoneAuswahl, setFlyToZiel]);
 
-  // Bezirksfläche (LFH-673): ?evakuierungsbezirk=<id> von der Betreuungsseite — dasselbe
-  // apply-then-clean wie `?gefahrengebiet=` darüber, auch mit derselben Wartebedingung (die
-  // Betreuungsseite bietet den Sprung nur bei mindestens einer Fläche an).
+  // Bezirksfläche (LFH-673): ?evakuierungsbezirk=<id> von der Betreuungsseite — apply-then-
+  // clean wie `?gefahrengebiet=`, aber mit zwei Unterschieden, weil der Sprung aus einem
+  // anderen Modul kommt und die Kartenansicht nicht kennt (Review LFH-673, Befund 1):
+  // (1) gesucht wird in ALLEN Zonen; liegt die Fläche in einer anderen Ansicht, wechselt die
+  //     Karte zuerst dorthin (`?ansicht=`), der Auftrag bleibt für die nächste Runde stehen;
+  // (2) ein unbrauchbarer Wert oder ein Auftrag ohne Fläche wird geräumt, sobald die Zonen
+  //     feststehen — sonst stünde er bei jedem Neuladen wieder in der Adresse.
   useEffect(() => {
-    const ziel = parseRouteId(searchParams.get('evakuierungsbezirk') ?? undefined);
-    if (ziel == null) return;
-    const zone = zonen.find((z) => z.evakuierungsbezirk_id === ziel);
-    if (!zone) return;
+    const roh = searchParams.get('evakuierungsbezirk');
+    if (roh === null) return;
+    const raeumen = () => {
+      const naechste = new URLSearchParams(searchParams);
+      naechste.delete('evakuierungsbezirk');
+      setSearchParams(naechste, { replace: true });
+    };
+    const ziel = parseRouteId(roh);
+    if (ziel == null) {
+      raeumen();
+      return;
+    }
+    const zone = zonenAlle.find((z) => z.evakuierungsbezirk_id === ziel);
+    if (!zone) {
+      if (zonenGeladen) raeumen();
+      return;
+    }
+    if (zone.ansicht_id != null && zone.ansicht_id !== aktiveAnsichtId) {
+      const naechste = new URLSearchParams(searchParams);
+      naechste.set('ansicht', String(zone.ansicht_id));
+      setSearchParams(naechste, { replace: true });
+      return;
+    }
     setZoneAuswahl(zone.id);
     const poly = parsePolygon(zone.geometrie);
     const zentroid = poly ? polygonZentroid(poly) : null;
     if (zentroid) setFlyToZiel({ lng: zentroid[0], lat: zentroid[1] });
-    const naechste = new URLSearchParams(searchParams);
-    naechste.delete('evakuierungsbezirk');
-    setSearchParams(naechste, { replace: true });
-  }, [zonen, searchParams, setSearchParams, setZoneAuswahl, setFlyToZiel]);
+    raeumen();
+  }, [
+    zonenAlle,
+    zonenGeladen,
+    aktiveAnsichtId,
+    searchParams,
+    setSearchParams,
+    setZoneAuswahl,
+    setFlyToZiel,
+  ]);
 
   /**
    * Platzier-Auftrag von außen (LFH-340 · C5): `?platzieren=schaden:5` schickt die Karte in
@@ -545,16 +577,29 @@ export default function LagekartePage() {
     const auftrag = parsePlatzierenAuftrag(searchParams.get('platzieren'));
     if (!auftrag) return;
     if (ladt) return;
+    // Eine Stelle (LFH-673) platziert nur, wer das Modul Betreuung lesen darf — sonst endete
+    // der Klick auf die Karte in einem 403, die späteste denkbare Absage (Review, Befund 4).
+    // Bis die Rechte feststehen, bleibt der Auftrag stehen.
+    const istStelle = auftrag.typ === 'betreuungsstelle';
+    if (istStelle && !rechteBekannt) return;
     // ERST ANWENDEN, DANN RÄUMEN — apply-then-clean heißt genau diese Reihenfolge, und der
     // Gefahrengebiet-Effekt darüber hält sie ebenso (`setZoneAuswahl`/`setFlyToZiel` vor dem
     // `delete`). Umgekehrt gemessen: mit dem Räumen zuerst kam die Navigation nicht durch,
     // während der Modus startete — der Parameter blieb in der URL stehen und der nächste
     // Neuladen-Vorgang schickte die Karte erneut hinein.
-    if (darfSchreiben) onPlatzierenStart(auftrag);
+    if (darfSchreiben && (!istStelle || betreuungZugriff === 'frei')) onPlatzierenStart(auftrag);
     const naechste = new URLSearchParams(searchParams);
     naechste.delete('platzieren');
     setSearchParams(naechste, { replace: true });
-  }, [searchParams, setSearchParams, ladt, darfSchreiben, onPlatzierenStart]);
+  }, [
+    searchParams,
+    setSearchParams,
+    ladt,
+    darfSchreiben,
+    onPlatzierenStart,
+    rechteBekannt,
+    betreuungZugriff,
+  ]);
 
   /**
    * Koordinatensprung (LFH-619): `?zentrum=<lat>,<lon>` aus der Sprungpalette — anfliegen,

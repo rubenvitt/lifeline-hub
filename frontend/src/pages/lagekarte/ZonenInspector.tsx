@@ -277,6 +277,12 @@ export default function ZonenInspector({
               options={[
                 { value: KEIN_BEZIRK, label: 'nicht zugeordnet' },
                 ...bezirke.map((b) => ({ value: b.id, label: b.bezeichnung })),
+                // Zugeordnet, aber (noch) nicht in der Liste — die Übersicht lädt, oder der
+                // Bezirk wurde eben storniert. Sonst stünde die rohe id im Feld.
+                ...(entwurf.evakuierungsbezirk_id != null &&
+                !bezirke.some((b) => b.id === entwurf.evakuierungsbezirk_id)
+                  ? [{ value: entwurf.evakuierungsbezirk_id, label: 'Bezirk nicht verfügbar' }]
+                  : []),
               ]}
               onChange={(v) => bezirkZuordnen(v)}
             />
