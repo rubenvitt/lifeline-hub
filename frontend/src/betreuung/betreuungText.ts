@@ -5,6 +5,7 @@ import type {
   Raeumungszustand,
   Betreuungsstelle,
 } from '../api/types';
+import { auslastung } from '../theme/statusFarben';
 import type { EvakuierungKennzahl } from './evakuierungKennzahl';
 
 /**
@@ -77,6 +78,30 @@ export function freiePlaetze(
 ): number | null {
   if (s.kapazitaet_personen == null || s.belegung == null) return null;
   return s.kapazitaet_personen - s.belegung.belegt;
+}
+
+/**
+ * Zahl der Stellen, die „voll" oder „überbelegt" sind — die Einstufungen mit der Rolle `alarm`
+ * (LFH-678, Kriterium 9 der Prüfliste LFH-639). „fast voll" (`achtung`) zählt nicht.
+ *
+ * Abgeleitet aus {@link auslastung}, nicht aus eigenen Schwellen: sonst könnten Kopfzahl und
+ * Wort in der Spalte „belegt" auseinanderlaufen. Eine geschlossene Stelle braucht keinen
+ * Sonderfall — schließen darf man nur bei Belegung 0 (design.md), sie ist also nie voll.
+ */
+export function volleStellen(
+  stellen: readonly Pick<Betreuungsstelle, 'kapazitaet_personen' | 'belegung'>[],
+): number {
+  return stellen.filter(
+    (s) => auslastung(s.belegung?.belegt, s.kapazitaet_personen)?.rolle === 'alarm',
+  ).length;
+}
+
+/** „ · 2 voll" zum Anhängen an eine Kopfzeile; bei 0 leer — kein „0 voll". */
+export function volleStellenSegment(
+  stellen: readonly Pick<Betreuungsstelle, 'kapazitaet_personen' | 'belegung'>[],
+): string {
+  const n = volleStellen(stellen);
+  return n > 0 ? ` · ${personenZahl(n)} voll` : '';
 }
 
 export const ERHEBUNG_LABEL: Record<Erhebung, string> = {

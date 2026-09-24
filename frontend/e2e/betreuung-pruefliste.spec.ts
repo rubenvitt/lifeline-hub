@@ -505,7 +505,7 @@ for (const modus of ['light', 'dark'] as const) {
     };
     for (const [flaeche, tragend] of [
       ['kopf', 'Betreuung'],
-      ['kopf', /^4 Bezirke · 6 Betreuungsstellen$/],
+      ['kopf', /^4 Bezirke · 6 Betreuungsstellen · 2 voll$/],
       // Kennzahl im Blockkopf und die Sekundärfelder der Bezirkskarten, mit „≈" und
       // „keine Meldung" als zweitem Kanal.
       ['inhalt', /^≈ 362 · von 1\s170 geplant · 1 ohne Meldung$/],
@@ -522,7 +522,7 @@ for (const modus of ['light', 'dark'] as const) {
       ['inhalt', 'vorbereitet'],
       ['inhalt', 'geschlossen'],
       // Kopf der Stellentabelle.
-      ['inhalt', /^457 untergebracht · 2 ohne Meldung$/],
+      ['inhalt', /^457 untergebracht · 2 voll · 2 ohne Meldung$/],
       ['inhalt', 'Stand melden'],
       ['inhalt', 'Belegung melden'],
       ['inhalt', 'Betreuungsstelle anlegen'],
