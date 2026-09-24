@@ -1,3 +1,24 @@
+## [1.0.0-alpha.41](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.40...v1.0.0-alpha.41) (2026-09-24)
+
+### Lage-Dashboard
+
+- Die Kennzahl „Evakuiert" wird auf Lageplatz B angezeigt, sobald der Einsatz aktive Evakuierungsbezirke hat. Sie zeigt die Anzahl evakuierter Personen und die geplante Gesamtzahl. Ohne aktive Bezirke bleibt der Platz leer. Ein Klick auf die Kennzahl führt zur Betreuungsseite, sofern das Modul freigeschaltet ist.
+
+### Betroffene
+
+- Änderungen an Evakuierungsbezirken auf der Betreuungsseite aktualisieren die Einsatzansicht, damit die Kennzahl „Evakuiert" sofort den neuen Stand widerspiegelt.
+
+### Bedienung und Navigation
+
+- Die Sprungpalette zeigt nun für alle Datensatzsorten eine Vorschau-Ansicht (→): Einsatztagebuch-Einträge, Meldungen, Aufträge, Fahrzeuge, Personal, Einheiten, Schäden, Unterbringungs- und Hilfsmittelstandorte, Lageberichte, Gefahrengebiete und Einsatzabschnitte können direkt in der Palette betrachtet werden, ohne die aktuelle Seite zu verlassen.
+- Vorschauen von Gefahrengebieten zeigen die bewerteten Gefahren als Matrixauszug.
+- Verweise innerhalb der Vorschau schließen die Palette automatisch.
+- Existiert ein Datensatz nicht mehr, wird dies in der Vorschau als „nicht mehr vorhanden" angezeigt.
+
+### Ablösung
+
+- Die Reihenfolge der Schichtkarten bleibt nach Fälligkeit eingefroren, auch wenn andere Nutzer Rhythmus oder Beginn ändern. Weicht die Sortierung des Servers ab, erscheint ein Sammelbanner „Reihenfolge geändert" mit Hinweis auf fällige Schichten, die weiter unten stehen. Ein Klick auf das Banner übernimmt die neue Sortierung. Die Ansicht taut auch bei Ansichtswechsel oder eigener Änderung von Rhythmus oder Vorgabe auf.
+
 ## [1.0.0-alpha.40](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.39...v1.0.0-alpha.40) (2026-09-23)
 
 ### Wichtige Änderungen
