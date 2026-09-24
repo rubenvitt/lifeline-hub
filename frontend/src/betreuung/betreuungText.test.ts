@@ -6,6 +6,7 @@ import {
   kennzahlText,
   mengeText,
   personenZahl,
+  volleStellen,
 } from './betreuungText';
 import { evakuierungKennzahl } from './evakuierungKennzahl';
 
@@ -75,6 +76,22 @@ describe('betreuungText (LFH-639)', () => {
         belegung: { id: 1, belegt: 170, zeitpunkt_at: 'x' },
       }),
     ).toBe(-20);
+  });
+
+  it('volle Stellen: „voll" und „überbelegt" zählen, „fast voll" und Stellen ohne Einstufung nicht (LFH-678)', () => {
+    const b = (belegt: number) => ({ id: 1, belegt, zeitpunkt_at: 'x' });
+    expect(volleStellen([])).toBe(0);
+    expect(
+      volleStellen([
+        { kapazitaet_personen: 150, belegung: b(150) }, // voll
+        { kapazitaet_personen: 150, belegung: b(170) }, // überbelegt
+        { kapazitaet_personen: 150, belegung: b(140) }, // fast voll — kein Alarm
+        { kapazitaet_personen: 150, belegung: b(89) },
+        { kapazitaet_personen: 150, belegung: undefined }, // keine Meldung
+        { kapazitaet_personen: undefined, belegung: b(400) }, // ohne Kapazität keine Einstufung
+        { kapazitaet_personen: 0, belegung: b(3) }, // Kapazität 0: `auslastung` stuft nicht ein
+      ]),
+    ).toBe(2);
   });
 
   it('Kennzahltext: ≈ bei geschätztem Anteil, Bezirke ohne Meldung ausgewiesen, keine Kennzahl benannt', () => {
