@@ -633,8 +633,13 @@ export function antdKomponenten(farben: Farbrollen): NonNullable<ThemeConfig['co
  * bindet die Breite nicht an die Höhe — ein Ein-Zeichen-Etikett („…", „+") fiele weiter
  * durch, und jedes breite Etikett wüchse grundlos mit, auch in Reihen mehrerer Knöpfe.
  * Ein `minWidth` wirkt nur dort, wo der Knopf zu schmal WÄRE, und lässt alle übrigen
- * unberührt. Er ist dieselbe Regel, die antd selbst für icon-only (`width`) und runde
- * Knöpfe (`minWidth`) anlegt, nur für alle Formen.
+ * unberührt. Er ist dieselbe Regel, die antd selbst für icon-only (`width`) und
+ * Kreisknöpfe (`minWidth`) anlegt, nur für alle Formen.
+ *
+ * GRENZE: als Inline-Stil überstimmt er antds Kreis-`minWidth` (`controlHeight`) — in
+ * `kompakt` fiele ein Kreisknopf mit Text von 30 auf 24 px Mindestbreite, und `FloatButton`
+ * erreicht der Kontext ebenfalls. Heute gibt es keinen Aufrufer von beidem; wer einen
+ * einführt, prüft das.
  *
  * WARUM EIN WERT FÜR ALLE GRÖSSEN: der Boden aus Gate 3 hängt an der Stufe, nicht an der
  * Knopfgröße. In `komfortabel` und `handschuh` fallen kleine und volle Höhe ohnehin

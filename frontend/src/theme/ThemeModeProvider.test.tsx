@@ -282,6 +282,21 @@ describe('Bediendichte — die kurze Achse beschrifteter Knöpfe (LFH-381)', () 
     expect(screen.getByRole('button', { name: 'Abbrechen' }).style.minWidth).toBe('72px');
   });
 
+  // Das Gegenstück zur Ausnahme darunter: antd führt Kontext- und Knopfstil JE EIGENSCHAFT
+  // zusammen (`useMergeSemantic`). Ersetzte eine Bibliotheksversion den Kontextstil ganz,
+  // verlören alle Knöpfe mit eigenem `style` den Boden still — dieser Fall würde rot.
+  it('ein eigener Stil OHNE minWidth behält den Boden', () => {
+    localStorage.setItem(SPEICHER_SCHLUESSEL, 'handschuh');
+    render(
+      <ThemeModeProvider>
+        <Button style={{ marginLeft: 8 }}>OK</Button>
+      </ThemeModeProvider>,
+    );
+    const knopf = screen.getByRole('button', { name: 'OK' });
+    expect(knopf.style.minWidth).toBe('72px');
+    expect(knopf.style.marginLeft).toBe('8px');
+  });
+
   it('ein eigener Stil am Knopf schlägt den Boden (die benannte Ausnahme bleibt möglich)', () => {
     localStorage.setItem(SPEICHER_SCHLUESSEL, 'handschuh');
     render(
