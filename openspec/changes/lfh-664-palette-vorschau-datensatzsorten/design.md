@@ -37,7 +37,8 @@ Vorgabewert ist 10 s. Die Listenfächer hängen am SSE-Fan-out.
 - Kein Einzel-GET im Backend, kein neuer Query-Key.
 - Keine Berichtigungshinweise im ETB („berichtigt durch Nr. …“): sie brauchen den
   Berichtigungsindex über die ganze Liste, und die Palette hat nur einen Eintrag.
-- Keine Gefahrenmatrix in der Vorschau (eigener Abruf, Tabelle, zu breit für 640 px).
+- Keine volle 13×5-Gefahrenmatrix in der Vorschau. Sie zeigt nur die bewerteten Gefahren
+  (Entscheidung 5a).
 - Kein Grundriss, kein Material und keine Bewegungen in der UHS-Vorschau.
 - Kein Tippziel für Touch; das bleibt LFH-665.
 - `PersonVorschau` wird nicht auf die neue Datenregel umgestellt. Sie nutzt ein
@@ -116,7 +117,7 @@ dafür wiederverwendet, soweit sie passen.
 | Fahrzeug, Personal | `kraefte/FahrzeugVorschau.tsx`, `kraefte/PersonalVorschau.tsx` | neu; `statusDarstellung` beider Seiten zieht nach `kraefte/mittelStatus.ts`, die Seiten importieren von dort |
 | Einheit | `kraefte/EinheitVorschau.tsx` | neu; Status über `einheitStatusAnzeige` |
 | UHS | `pages/uhs/UhsVorschau.tsx` | neu; Typ, Status, Standort, Notiz, Verortung |
-| Gefahrengebiet | `pages/gefahren/GefahrengebietVorschau.tsx` | neu; Name, höchste Warnstufe als Wort, Zahl der Zonen |
+| Gefahrengebiet | `pages/gefahren/GefahrenMatrixAuszug.tsx` + `GefahrengebietVorschau.tsx` | neu; Name, höchste Warnstufe als Wort, Zahl der Zonen, Matrixauszug (5a) |
 
 Die Karten von Meldung und Auftrag mit einem neuen Nur-Lesen-Modus zu versehen, ist nicht
 nötig. Ohne `darfSchreiben` und Callbacks rendern sie heute schon keine Aktion; ein Test
@@ -131,9 +132,32 @@ das Fach der Palette. Bei einem Abschnittstreffer ist es nur dann warm, wenn die
 Einheiten geholt hat. Sonst kostet es einen Abruf. Die Alternative wäre, die Stärke
 wegzulassen. Dann zeigte die Vorschau weniger als die Seite, die sie ankündigt.
 
-**Gefahrengebiet:** Der Datensatz trägt nur Name, höchste Warnstufe und Zonen. „Keine
-erfundenen Daten“ verbietet das Auffüllen. Die Warnstufe steht als Wort, wie auf der Karte.
-„keine“ heißt „keine Stufe gesetzt“, nicht „unbewertet“ (CLAUDE.md, LFH-357).
+**Gefahrengebiet:** Der Datensatz trägt nur Name, höchste Warnstufe und Zonen. Die Warnstufe
+steht als Wort, wie auf der Karte. „keine“ heißt „keine Stufe gesetzt“, nicht „unbewertet“
+(CLAUDE.md, LFH-357).
+
+### 5a. Gefahrengebiet: Matrixauszug statt voller Matrix (Entscheidung des Auftraggebers, 24.09.2026)
+
+Wer ein Gefahrengebiet abruft, will seine Gefahren sehen. Die Vorschau zeigt deshalb einen
+**Auszug der Gefahrenmatrix**: nur die Gefahrentypen (Zeilen), die mindestens eine Zelle über
+„keine“ tragen, mit allen fünf Schutzobjekten als Spalten. Gibt es keine solche Zeile, steht
+dort „Keine Gefahren bewertet.“ statt einer leeren Tabelle.
+
+- **Daten:** `einsatzKeys.gefahrenmatrix(einsatzId, gebietId)` mit `ladeMatrix`, also dasselbe
+  Fach wie `GefahrenPage` (live über das Ereignis `gefahr`). Dafür wird die Abfrage der Seite
+  als Optionsfunktion exportiert und von beiden genutzt. Es ist der einzige zusätzliche Abruf
+  dieser Sorte; die Palette lädt die Matrix nicht.
+- **Zelle:** Fläche und Balken aus denselben Helfern wie die volle Matrix
+  (`flaechenFarbe`, `zellBalkenStil`, `warnstufeBalkenFarbe`), dazu das Kürzel aus
+  `warnstufeFlaeche` als Text und ein zugänglicher Name „<Gefahr> × <Schutzobjekt>: <Stufe>“.
+  Ungültige Paare tragen „n. a.“ wie in der Matrix. Keine Dropdowns, keine Knöpfe: Die
+  Vorschau liest nur.
+- **Kopf:** `SPALTENKOPF` (Symbol + Kurzwort) wird aus `GefahrenMatrix.tsx` exportiert statt
+  kopiert. Breite: Gefahr-Spalte plus fünf schmale Zellen passen in 640 px.
+- **Verworfen: `GefahrenMatrix` mit `darfSchreiben={false}` einbetten.** Sie zeigt dann 13
+  Zeilen mit gesperrten Knöpfen. Das ist genau das Bild, das der Auftraggeber nicht will.
+- **Verworfen: eine Liste „Brand · Menschen · Hoch“.** Sie verliert die Matrixgestalt, die
+  Einsatzkräfte von der Fachseite kennen.
 
 ### 6. Gestaltung: Neuentwurf, nicht das Vorbild `PersonVorschau`
 
@@ -178,6 +202,9 @@ Koordinatensprung keine Vorschau tragen. Eine Liste der erwarteten Arten je Quel
 exhaustiver `Record<DatensatzQuelle, …>`, damit eine neue Quelle den Typcheck bricht.
 
 ## Risks / Trade-offs
+
+- [Die Gefahrengebiet-Vorschau kostet einen Abruf der Matrix] → Gewollt (5a). Das Fach
+  teilt sie mit der Gefahrenseite, dort ist sie oft schon warm.
 
 - [Die Vorschau eines Abschnitts oder eines Volltext-ETB-Treffers kostet einen Abruf] →
   Hingenommen, beide mit kleinem Umfang. Die Spec verlangt „kein Abruf“ nur für einen bereits

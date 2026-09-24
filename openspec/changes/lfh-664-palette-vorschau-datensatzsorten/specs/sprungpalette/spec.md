@@ -30,6 +30,14 @@ ETB-Sammeltreffer „Alle Einträge zu …“ und der Koordinatensprung.
 - **WHEN** ein Fahrzeug als Treffer markiert ist und → gedrückt wird
 - **THEN** zeigt die Palette Funkrufname, Status mit Wort, Fahrzeugtyp, Kennzeichen und Trägerorganisation, ohne Statuswahl
 
+#### Scenario: Gefahrengebiet mit bewerteten Gefahren
+- **WHEN** ein Gefahrengebiet als Treffer markiert ist, dessen Matrix Bewertungen über „keine“ trägt, und → gedrückt wird
+- **THEN** zeigt die Palette Name und höchste Warnstufe des Gebiets und eine Gefahrenmatrix nur mit den Gefahren, die mindestens eine solche Bewertung haben; jede Zelle nennt ihre Warnstufe mit Kürzel, nicht allein über Farbe
+
+#### Scenario: Gefahrengebiet ohne bewertete Gefahren
+- **WHEN** ein Gefahrengebiet ohne Bewertung über „keine“ in der Vorschau geöffnet wird
+- **THEN** steht statt der Matrix der Satz, dass keine Gefahren bewertet sind
+
 #### Scenario: Marke an jeder Datensatzzeile
 - **WHEN** nacheinander ein Treffer jeder der zwölf Datensatzsorten markiert wird
 - **THEN** trägt jede dieser Zeilen die →-Marke
@@ -41,7 +49,9 @@ ETB-Sammeltreffer „Alle Einträge zu …“ und der Koordinatensprung.
 ### Requirement: Die Vorschau liest den Stand der Trefferliste
 Die Vorschau SHALL denselben Datenstand zeigen, aus dem der Treffer entstanden ist. Ist
 dieser Stand bereits geladen, MUST das Öffnen der Vorschau ohne zusätzlichen Abruf beim
-Server auskommen. Ändert sich der Datensatz während der offenen Vorschau durch eine
+Server auskommen. Ausgenommen sind Angaben, die die Trefferliste nicht trägt: die
+Gefahrenmatrix eines Gefahrengebiets, die Stärke eines Einsatzabschnitts und ein ETB-Eintrag
+aus der Volltextsuche; sie kommen aus demselben Datenstand wie auf ihrer Fachseite. Ändert sich der Datensatz während der offenen Vorschau durch eine
 Live-Aktualisierung, MUST die Vorschau den neuen Stand zeigen.
 
 #### Scenario: Kein zusätzlicher Abruf
