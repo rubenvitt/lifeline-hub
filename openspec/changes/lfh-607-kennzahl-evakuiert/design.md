@@ -71,16 +71,23 @@ ermittelt je Platz den ranghöchsten Kandidaten, unabhängig von der Eingabereih
 
 ### D3 — Rohdaten bekommen den Zustand der Evakuierungskennzahl, nicht die Bezirke
 
-`Rohdaten.evakuierung: EvakuierungKennzahlZustand` wird von der Seite aus
-`useEvakuierungKennzahl({ einsatzId, benutzer, overrides: overridesQuery.data })` befüllt.
-`baueLagebild` baut daraus die Zelle. Die Seite leitet den `kennzahlZustand['Evakuiert']` aus
-demselben Zustand ab (`laden`→`laden`, `fehler`→`fehler`, sonst `daten`).
+`Rohdaten.evakuierung: EvakuierungStand` wird von der Seite aus
+`useEvakuierungKennzahl({ einsatzId, benutzer, overrides, bereit })` über `evakuierungStand`
+befüllt. `baueLagebild` baut daraus die Zelle. Die Seite leitet den
+`kennzahlZustand['Evakuiert']` aus demselben Stand ab (`evakuierungDatenzustand`: `laden` bleibt
+`laden`, `fehler` bleibt `fehler`, alles andere ist `daten`).
 
 - *Warum der Hook und nicht die Bezirke:* Der Hook trägt die Rechteprüfung und die
   Fehler-vor-Altdaten-Regel. Zwei Stellen, die das nachbauen, liefen auseinander.
-- *Overrides noch nicht geladen:* Der Hook ist dann `aus`, bis sie da sind. Die Seite wertet
-  `aus` erst nach geladenen Overrides als „kein Zugriff“. Vorher gilt der Zustand `laden`,
-  sonst stünde beim Kaltstart kurz der Hinweis „kein Zugriff“.
+- *Solange Freigaben unbekannt sind:* Der Hook bekommt einen optionalen Parameter `bereit`
+  (Vorgabe `true`). Die Seite setzt ihn erst, wenn Benutzer und Modul-Overrides geladen sind.
+  Bis dahin liefert der Hook `laden` und ruft **nichts ab**. Ohne Overrides hielte
+  `darfZaehlerZeigen` ein ausgeblendetes Modul für sichtbar. Der Abruf endete dann im 403, und
+  „kein Zugriff“ blitzte beim Kaltstart kurz auf. Ein erster Entwurf hatte stattdessen einen
+  Merker in `evakuierungStand` vorgesehen. Den Abruf verhinderte er nicht, das hat der
+  Seitentest gezeigt.
+- *Identität:* Der Hook gibt seinen Zustand per `useMemo` identitätsstabil zurück. Das
+  `useMemo` des Lagebilds greift sonst bei keinem Render.
 
 ### D4 — Wert und Notiz aus EINER Formatierung
 

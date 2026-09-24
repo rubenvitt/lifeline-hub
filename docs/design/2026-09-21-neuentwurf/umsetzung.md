@@ -41,9 +41,10 @@ Shell-Rahmen · neue Bausteine · neu gedachte Screens.
    er dort nur bei festgelegtem Pegel — das Band hat vier Kernplätze und zwei Lageplätze, die
    bewusste Entscheidungen am Einsatz belegen (Spec
    `docs/superpowers/specs/2026-09-23-lfh-640-lagebezogene-kennzahlreihe-design.md`). Der erwartete
-   Höchststand seit LFH-628 (Zusatz in der Kennzahl, Marke im Überblick). Bekannte Lücken:
-   Evakuiert (Datenquelle seit LFH-639, Lageplatz B seit LFH-640, Einbau LFH-607),
-   Fortschritt je Abschnitt, Abschnittsfarbe, FMS-Status/„Seit“/Rückmeldung je Einheit,
+   Höchststand seit LFH-628 (Zusatz in der Kennzahl, Marke im Überblick). „Evakuiert N · von
+   M geplant“ steht seit LFH-607 auf Lageplatz B, sobald ein Evakuierungsbezirk angeordnet ist
+   (Datenquelle LFH-639, Change `openspec/changes/lfh-607-kennzahl-evakuiert/`). Bekannte
+   Lücken: Fortschritt je Abschnitt, Abschnittsfarbe, FMS-Status/„Seit“/Rückmeldung je Einheit,
    „keine Rückmeldung“, ETB-Lesemarke „seit Ihrer letzten Sichtung“, ETB-Gesamtzahl und
    Tagesbilanz-Summen (serverseitig), Folgeauftrag-Verweis am ETB-Eintrag (geschlossen
    mit LFH-636), Funktion des Nutzers (nur Sachgebiete vorhanden), Satellit-Basemap,
