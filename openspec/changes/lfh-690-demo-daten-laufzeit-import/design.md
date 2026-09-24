@@ -467,3 +467,17 @@ Keine, die den Bau blockiert. Beim Bau zu messen und hier nachzutragen: (a) wie
 `schwaerzung_registry` eine Tabelle mit `einsatz_id` ohne FK entdeckt (D4), (b) welches
 Feld `erinnerung/repo.rs` als „nicht mehr fällig“ liest (D10), (c) die Dauer des
 Neu-Imports (D11).
+
+**Ergebnis (a), gemessen in Block 2 (Task 2.2):** `entdecke_einsatz_scoped` im Testmodul
+von `src/einsatz/schwaerzung_registry.rs` nimmt jede Tabelle mit einer **Spalte** namens
+`einsatz_id` in die Menge S auf; ob die Spalte ein Fremdschlüssel ist, prüft sie nicht.
+`demo_import` wird dadurch trotz fehlendem FK entdeckt. Danach zieht die CASCADE-Hülle eine
+zweite Tabelle nach, die der Plan nicht nannte: `demo_herkunft` hängt über
+`import_id … ON DELETE CASCADE` an `demo_import` und liegt damit ebenfalls in S. Der rote
+Lauf nach dem Anlegen von `0121` nannte beide Tabellen (`nur entdeckt: ["demo_herkunft",
+"demo_import"]`). Beide stehen jetzt in der Registry, alle Spalten `retain`:
+`demo_import` mit `Scoping::EinsatzId`, `demo_herkunft` mit
+`Scoping::UeberParent { fk: "import_id", parent: "demo_import" }`. Da keine Spalte `Scrub`
+trägt, erzeugt `scrubbe_aus_registry` für die beiden Tabellen kein Statement. Der Guard
+`stammdaten_teilbaum_nie_einsatz_scoped` bleibt grün, weil `demo_herkunft` keinen FK auf
+`fahrzeug`/`personal`/`material` hat.
