@@ -409,3 +409,69 @@ dem Querlauf, nicht der Kartenfläche.
 **Und die vier Knöpfe der Platzkarte sind weiterhin die einzige Klein-Angabe des Bündels.** Sie
 fallen mit einer Änderung an `SCHRITT_Y`, nicht mit einem Frontend-Umbau — C6 hat daran nichts
 geändert und nichts hinzugefügt.
+
+# Nachtrag 24.09.2026 — LFH-359 + LFH-379 (Platzkarte in den Berührungsstufen)
+
+Dieses Dokument ist eingefrorenes Archiv. Die Zeilen oben bleiben stehen, wie sie
+geschrieben wurden. Dieser Nachtrag löst die offene Zeile „1, 2 · Der Trefflächen-Deckel der
+Platzkarte hängt an `SCHRITT_Y = 120`“ ein und korrigiert zwei Aussagen:
+„sie fallen mit einer Änderung an `SCHRITT_Y`, nicht mit einem Frontend-Umbau“ und „in keiner
+Stufe passt eine Aktionszeile auf voller Höhe, deshalb dauerhafte Ausnahme“.
+
+**Was sich geändert hat.** Die Karte bleibt 140 × 116 px groß. Das Raster, `raster_position`
+und die gespeicherten Layouts bleiben unberührt. Geändert hat sich die **Form** je
+Dichtestufe (`platzBedienform` in `pages/uhs/Grundriss.tsx`):
+
+- **`kompakt`**: Die Knopfzeile bleibt. Ihre 24 px sind der Gate-3-Boden dieser Stufe
+  (A1-Spec: „kompakt ≥ 24 px“), keine Unterschreitung. Neben „zurückweisen“ steht der volle
+  `marginSM` (4 × 24 + 3 × 7 = 117 ≤ 124).
+- **`komfortabel` / `handschuh`**: Es gibt keine Knopfzeile. Die ganze Karte ist das eine Ziel
+  und öffnet das Aktionsmenü. Die Einträge messen 48 bzw. 72 px. Das Argument „alles ins
+  Dropdown scheitert, weil der Auslöser selbst ein Knopf ist“ galt nur für einen Knopf **in**
+  der Karte.
+
+Entschieden hat der Auftraggeber am 24.09.2026: In den Berührungsstufen öffnet jeder Tipp das
+Menü, und Zuweisen braucht dort zwei Tipps statt einem. Herleitung:
+`openspec/changes/lfh-359-uhs-platzkarte-beruehrungsstufen/design.md`.
+
+## Die 15 Kriterien, verdiktet für LFH-359
+
+| #  | Verdikt | Beleg / Zielticket |
+| -- | ------- | ------------------ |
+| 1 · Treffläche | **erfüllt, jetzt auch über die Größe** | `kompakt`: 24 px = Boden der Stufe. Berührungsstufen: Karte 140 × 116 px, jeder Menüeintrag ≥ 48 bzw. ≥ 72 px. Das ist im Browser gemessen, nicht gerechnet (`e2e/uhs-grundriss-touch.spec.ts`, „Berührungsstufe …“). Gemessen wird erst nach der Einblendbewegung, weil die mit `scaleY(0.8)` beginnt. Davor stünden 38,4 statt 48 px da. |
+| 2 · Handschuh-Modus | **erfüllt** | Keine Knopfzeile mehr, die ab `komfortabel` abgeschnitten und auf rund 31 px gestaucht war (LFH-379). Ein belegter Platz hat im Handschuh acht Einträge, rund 600 px. Bei 1024 × 900 passte das weder über noch unter die Karte, und das Menü stand oben aus dem Fenster (Bildschirmfoto im Umsetzungsverlauf). Jetzt `shiftY` plus Höhengrenze mit eigenem Scroll. e2e: „alle Menüeinträge liegen im Fenster“, die Mutationsprobe ohne `shiftY` ist rot. |
+| 3 · Rückmeldung vor der Serverantwort | **erfüllt, unverändert** | Die Belegungswege sind dieselben Mutationen mit optimistischem Update. |
+| 4 · Kritische Aktion hat eine zweite Handlung | **erfüllt, unverändert** | „zurückweisen“ ist ein Menüeintrag hinter dem Trenner, als `danger` ausgezeichnet. Wer ihn antippt, hat vorher schon einmal auf die Karte getippt. |
+| 5 · Kontrast in beiden Modi | **erfüllt** | Kein neuer Farbwert. Das Menü ist antds Dropdown im Theme. |
+| 6 · Kein Status allein über Farbe | **erfüllt, unverändert** | Tags „belegt“ und Verfügbarkeit bleiben auf der Karte. |
+| 7 · Eine Farbe = eine Bedeutung | **erfüllt** | Rot nur an „zurückweisen“ und „Platz löschen“, beide im Gefahrblock hinter dem Trenner. AK 4 von LFH-379 (kein bündiger `danger`-Knopf) ist damit per Bauform erfüllt. |
+| 8 · Helligkeits-/Kontrastregler | **offen, unverändert** | Folge-Task aus A0. |
+| 9 · Kritische Anzeigen im Blickfeld | **erfüllt** | Das Menü darf die Karte überdecken, aber nie aus dem Fenster laufen. |
+| 10 · Alarmbudget | **nicht anwendbar** | Der Grundriss erzeugt keine Alarme. |
+| 11 · Warnverhalten | **erfüllt, unverändert** | Kein Blinken, kein Ton. |
+| 12 · Kein Sprung unter dem Cursor | **erfüllt für diesen Umbau** | Die Kartengröße ist in jeder Stufe gleich (e2e misst 140 × 116). Das Menü liegt im Portal über der Fläche. |
+| 13 · Fokus nie verdeckt | **teilweise erfüllt, besser als vorher** | Die Karte ist in der Kartenform fokussierbar (`role="button"`, `tabIndex`). Enter öffnet das Menü mit dem Fokus auf dem ersten Eintrag, Esc gibt ihn an die Karte zurück (e2e). Offen bleibt aus dem Bestand die Sichtbarkeit beim Durchtabben der absolut positionierten Karten, siehe die Zeile „13“ oben. |
+| 14 · Tabellenseite vollständig | **nicht anwendbar** | Die Fläche wird verortet, nicht verglichen. |
+| 15a · Erfassungsmaske — Zuweisungsdialog | **erfüllt, unverändert** | Derselbe `ErfassungsModal`, erreicht über den Menüeintrag. |
+| **1b · der Riegel gegen Fehlauslösung** | **erfüllt, in zwei Formen** | Zeilenform: Der `click`-Riegel an der Aktionszeile bleibt. Kartenform: Es braucht keinen Riegel, weil das Popup im React-Baum neben der Karte hängt und nicht in ihr. Vitest: „löst mit einer Menüwahl weder die Zuweisung aus noch öffnet es das Menü erneut“. e2e: Layout-Zug und Personen-Zug öffnen kein Menü. |
+
+**0 Zeilen ohne Verdikt.**
+
+### Offene Zeilen
+
+| Zeile | offen woran | Ziel |
+| --- | --- | --- |
+| 1, 2 | ~~Trefflächen-Deckel an `SCHRITT_Y`~~ | **eingelöst durch LFH-359/LFH-379** |
+| 8 | kein Helligkeitsregler | Folge-Task aus A0, unverändert |
+| 13 | Fokus-Sichtbarkeit beim Durchtabben der Platzkarten | unverändert aus dem Bestand |
+
+## Was dieser Nachtrag nicht beweist
+
+- **Die e2e-Läufe fanden unter sehr hoher Maschinenlast statt** (Lastmittel bis 281 durch
+  parallele Sitzungen). Im Sammellauf sind wechselnde Grundriss-Specs gerissen, und zwar in
+  jedem Lauf andere: `dnd`, `menue-belegung`, `person-scroll`, der Warteliste-Scrolltest. Einzeln
+  mit einem Worker liefen alle grün, zweimal bzw. dreimal hintereinander. Das ist dieselbe
+  bekannte Lastempfindlichkeit wie unter LFH-398, kein Regress dieses Umbaus. Den Nachweis in
+  Ruhe liefert `check-all.sh`.
+- **Ein Tipp ist in Playwright ein synthetischer Touch-Tap.** Ob ein Handschuh auf einem
+  echten Tablet die 72-px-Einträge trifft, ist gerechnet (MIL-STD-1472F), nicht erprobt.

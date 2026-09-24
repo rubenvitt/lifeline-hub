@@ -33,10 +33,10 @@
 ## 5. Doku-Nachzug
 
 - [x] 5.1 `CLAUDE.md:506` und `AGENTS.md:196/582` so fassen, dass die Ausnahme der Platzkarte nicht mehr „an `SCHRITT_Y` gebunden“ ist. Sie ist die Zeilenform in `kompakt` (24 px = Boden), die Berührungsstufen tragen die Kartenform (LFH-359). Der Rest des Absatzes bleibt unverändert. Belegt ist das mit einem Grep auf `SCHRITT_Y` danach: Übrig bleiben nur Stellen, die die Kartengröße begründen, keine, die eine Trefffläche begründen.
-- [ ] 5.2 `docs/leitlinien/bedien-leitlinie-herleitungen.md:32/257` fortschreiben: Ausnahme, gedeckelter Abstand und das Entfallen von `aktionsabstand`. In `docs/superpowers/specs/2026-07-30-uhs-grundriss-pruefliste.md` (eingefrorenes Archiv) kommt nur ein datierter Nachtrag „eingelöst durch LFH-359/LFH-379“ an die offenen Zeilen, der alte Text bleibt stehen.
+- [x] 5.2 `docs/leitlinien/bedien-leitlinie-herleitungen.md:32/257` fortschreiben: Ausnahme, gedeckelter Abstand und das Entfallen von `aktionsabstand`. In `docs/superpowers/specs/2026-07-30-uhs-grundriss-pruefliste.md` (eingefrorenes Archiv) kommt nur ein datierter Nachtrag „eingelöst durch LFH-359/LFH-379“ an die offenen Zeilen, der alte Text bleibt stehen.
 
 ## 6. Abschluss
 
 - [ ] 6.1 `./scripts/check-all.sh` vollständig grün, ohne `| tail`. Mit `prettier --write` bis zum Fixpunkt formatieren.
-- [ ] 6.2 Prüfliste Einsatztauglichkeit (15 Kriterien) für den umgebauten Grundriss als Nachtrag an `2026-07-30-uhs-grundriss-pruefliste.md`. Jede Zeile trägt ein Verdikt.
-- [ ] 6.3 Im Browser sichtprüfen, in `komfortabel` und `handschuh`: Das Menü steht an der Karte, der Layout-Zug im Bearbeiten-Modus läuft, und das Ziehen einer Person aus der Karte öffnet kein Menü. Belegt ist das per Screenshot.
+- [x] 6.2 Prüfliste Einsatztauglichkeit (15 Kriterien) für den umgebauten Grundriss als Nachtrag an `2026-07-30-uhs-grundriss-pruefliste.md`. Jede Zeile trägt ein Verdikt.
+- [x] 6.3 Im Browser sichtprüfen, in `komfortabel` und `handschuh`: Das Menü steht an der Karte, der Layout-Zug im Bearbeiten-Modus läuft, und das Ziehen einer Person aus der Karte öffnet kein Menü. Belegt ist das per Screenshot. (Gemacht mit Playwright-Bildschirmfotos in allen drei Stufen. Dabei wurde das Menü gefunden, das im Handschuh aus dem Fenster lief, siehe design.md, Menühöhe. Layout- und Personen-Zug sind als e2e-Test gepinnt, nicht nur angesehen.)
