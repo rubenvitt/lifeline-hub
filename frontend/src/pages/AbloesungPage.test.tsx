@@ -377,6 +377,138 @@ describe('AbloesungPage (LFH-635)', () => {
       expect(sammelbanner()!.parentElement).toBe(zeile);
     });
 
+    // ── LFH-660: eine fremde Änderung von Rhythmus/Beginn ordnet nicht unter dem Cursor um ──
+    // Gezeigt: 1 überfällig, 4 planmäßig (2 h), 3 planmäßig (4 h). Fremd wird 3 auf
+    // „seit 30 min überfällig" gezogen — die Server-Ordnung stellte sie über 4.
+    const vier = () => schicht({ id: 4, faellig_at: inMinuten(120) });
+    const dreiVorgezogen = () =>
+      schicht({
+        id: 3,
+        faellig_at: inMinuten(-30),
+        rhythmus_minuten: 30,
+        rhythmus_quelle: 'einheit',
+      });
+
+    it('eine fremde Rhythmusänderung verschiebt keine Karte, bis das Banner bedient wird (LFH-660)', async () => {
+      laufendLiefert([eins(), vier(), drei()]);
+      const { client } = renderPage();
+      await screen.findAllByRole('article');
+      expect(kartenNamen()).toEqual([
+        'Schicht Florian 1',
+        'Schicht Florian 4',
+        'Schicht Florian 3',
+      ]);
+
+      laufendLiefert([dreiVorgezogen(), eins(), vier()]);
+      await client.invalidateQueries();
+
+      await waitFor(() => expect(sammelbanner()).not.toBeNull());
+      // Kriterium 9: die fällige Karte, die unter einer planmäßigen gehalten wird, wird genannt.
+      expect(sammelbanner()).toHaveTextContent(
+        'Reihenfolge geändert, 1 fällige Schicht rückt nach oben',
+      );
+      expect(kartenNamen()).toEqual([
+        'Schicht Florian 1',
+        'Schicht Florian 4',
+        'Schicht Florian 3',
+      ]);
+      // Folge eingefroren, Inhalt frisch: die Karte trägt ihre neue Einstufung schon jetzt.
+      expect(screen.getByRole('article', { name: 'Schicht Florian 3' })).toHaveAttribute(
+        'data-einstufung',
+        'ueberfaellig',
+      );
+      expect(screen.getByText('3 laufend · 2 fällig')).toBeInTheDocument();
+
+      await userEvent.click(
+        within(sammelbanner() as HTMLElement).getByRole('button', { name: 'anzeigen' }),
+      );
+      expect(kartenNamen()).toEqual([
+        'Schicht Florian 3',
+        'Schicht Florian 1',
+        'Schicht Florian 4',
+      ]);
+      expect(sammelbanner()).toBeNull();
+    });
+
+    it('eine fremde Änderung, die die Folge nicht berührt, zeigt kein Banner', async () => {
+      laufendLiefert([eins(), vier(), drei()]);
+      const { client } = renderPage();
+      await screen.findAllByRole('article');
+      laufendLiefert([eins(), schicht({ id: 4, faellig_at: inMinuten(150) }), drei()]);
+      await client.invalidateQueries();
+      await waitFor(() =>
+        expect(
+          within(screen.getByRole('article', { name: 'Schicht Florian 4' })).getByText(
+            /^in 2 h 2\d min$/,
+          ),
+        ).toBeInTheDocument(),
+      );
+      expect(sammelbanner()).toBeNull();
+    });
+
+    it('die eigene Rhythmusänderung ordnet ihre Karte sofort ein, ohne Banner', async () => {
+      laufendLiefert([eins(), vier(), drei()]);
+      aendereSchicht.mockImplementation(() => {
+        laufendLiefert([dreiVorgezogen(), eins(), vier()]);
+        return Promise.resolve(dreiVorgezogen());
+      });
+      renderPage();
+      await screen.findAllByRole('article');
+      await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu Florian 3' }));
+      const menu = document.querySelector(
+        '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+      ) as HTMLElement;
+      await userEvent.click(within(menu).getByText('Rhythmus ändern'));
+      const dialog = await screen.findByRole('dialog');
+      const feld = within(dialog).getByLabelText('Rhythmus (Stunden)');
+      await userEvent.clear(feld);
+      await userEvent.type(feld, '0.5');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+
+      await waitFor(() =>
+        expect(kartenNamen()).toEqual([
+          'Schicht Florian 3',
+          'Schicht Florian 1',
+          'Schicht Florian 4',
+        ]),
+      );
+      expect(sammelbanner()).toBeNull();
+    });
+
+    it('die eigene Vorgabe ordnet die Schichten ihres Abschnitts ein, eine fremde Umordnung anderswo bleibt', async () => {
+      // 5 liegt in einem anderen Abschnitt; ihre fremde Umordnung wartet weiter auf das Banner.
+      const fuenf = (m: number) => schicht({ id: 5, abschnitt_id: 8, faellig_at: inMinuten(m) });
+      laufendLiefert([eins(), vier(), drei(), fuenf(300)]);
+      const { client } = renderPage();
+      await screen.findAllByRole('article');
+      laufendLiefert([fuenf(-5), eins(), vier(), drei()]);
+      await client.invalidateQueries();
+      await waitFor(() => expect(sammelbanner()).not.toBeNull());
+
+      setzeAbloesungVorgabe.mockImplementation(() => {
+        laufendLiefert([fuenf(-5), dreiVorgezogen(), eins(), vier()]);
+        return Promise.resolve([]);
+      });
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Rhythmus-Vorgabe Deichwache Nord ändern' }),
+      );
+      const dialog = await screen.findByRole('dialog');
+      const feld = within(dialog).getByLabelText('Rhythmus (Stunden)');
+      await userEvent.clear(feld);
+      await userEvent.type(feld, '0.5');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+
+      await waitFor(() =>
+        expect(kartenNamen()).toEqual([
+          'Schicht Florian 3',
+          'Schicht Florian 1',
+          'Schicht Florian 4',
+          'Schicht Florian 5',
+        ]),
+      );
+      expect(sammelbanner()).toHaveTextContent('Reihenfolge geändert');
+    });
+
     it('ein Ansichtswechsel gibt die zurückgehaltenen frei', async () => {
       const { client } = renderPage();
       await screen.findAllByRole('article');
