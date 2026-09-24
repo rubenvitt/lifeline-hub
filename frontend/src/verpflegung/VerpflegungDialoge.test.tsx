@@ -399,8 +399,10 @@ describe('ZeitfensterDialog — bearbeiten', () => {
     ).toBeInTheDocument();
     expect(within(dialog).getByLabelText('Einsatzkräfte (EP)')).toHaveValue('180');
     expect(within(dialog).getByLabelText('Betreute (EP)')).toHaveValue('70');
-    // Der Beginn des Zeitfensters geht als Wire in den Hook — unverändert, wie gespeichert.
-    await waitFor(() => expect(letzterAufruf().vonAt).toBe('2026-09-24 10:00:00'));
+    // Der Beginn des Zeitfensters geht als Wire in den Hook — wie gespeichert, schon im ersten
+    // Render (sonst ginge eine Kopfzahl-Anfrage „jetzt" hinaus).
+    expect(vorschlag.aufrufe.map((x) => x.vonAt)).not.toContain(undefined);
+    expect(letzterAufruf().vonAt).toBe('2026-09-24 10:00:00');
   });
 
   it('schickt nur die Änderung; unverändert wird nichts gesendet und der Dialog schließt', async () => {

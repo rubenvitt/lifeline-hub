@@ -224,7 +224,14 @@ export function ZeitfensterDialog({
   // den Zeitraum nicht ändert — nie ein je Render neu gerechnetes „jetzt".
   const zeitraum = Form.useWatch('zeitraum', form) as [Dayjs | null, Dayjs | null] | undefined;
   const beginn = zeitraum?.[0];
-  const vonAt = beginn && beginn.isValid() ? alsBackendZeit(beginn) : undefined;
+  // Im ersten Render ist `useWatch` noch leer — beim Bearbeiten gilt bis dahin der gespeicherte
+  // Beginn, sonst ginge eine Kopfzahl-Anfrage „jetzt" hinaus und der Hinweis spränge kurz um.
+  const vonAt =
+    beginn && beginn.isValid()
+      ? alsBackendZeit(beginn)
+      : zeitraum === undefined && vorher
+        ? normalisiert(vorher.von_at)
+        : undefined;
   const vorschlag = useBedarfsvorschlag({ einsatzId, vonAt, benutzer, overrides, jetzt });
 
   // Eigener Merker „hat die Person das Feld angefasst?" statt `isFieldTouched`: auch eine
