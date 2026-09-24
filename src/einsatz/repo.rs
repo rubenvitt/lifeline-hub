@@ -605,6 +605,9 @@ pub async fn faellige_purge(
 /// `geschwaerzt_at`-Tombstone und schreibt einen System-ETB-Audit — alles in EINER
 /// Transaktion (partieller Scrub rollt zurück). Das operative Skelett (Einsatz-Struktur,
 /// ETB, Zähler/registrier_nr, Führungs-Doku, anonymisierte Triage) bleibt erhalten.
+/// Chat- und Erinnerungs-Freitexte werden seit LFH-290 mitgeschwärzt; ins ETB oder in
+/// einen Auftrag heraufgestufte Chat-Nachrichten bleiben als Kopie in der Führungs-Doku
+/// stehen (ETB-Politik, `etb_eintrag.inhalt`/`auftrag.auftrag_text` sind Retain).
 ///
 /// Idempotent: der `geschwaerzt_at IS NULL`-Guard liefert `false`, wenn der Einsatz
 /// schon geschwärzt (oder nicht soft-gelöscht/abgeschlossen) ist — kein Doppel-Scrub.
@@ -656,14 +659,14 @@ pub async fn schwaerze_einsatz(
         etb_startwert,
         "PII-Schwärzung durchgeführt (Aufbewahrungsfrist + Karenz abgelaufen). \
          Direkte Personenidentifikatoren (Namen, Kontakt, Adresse, Meldebild/Einsatzort, \
-         Foto-/Datei-Anhänge, personenbezogene Notizen sowie Schadens-/Lage-/Gefahren-Freitexte) \
-         wurden unwiderruflich entfernt. Erhalten bleiben das operative Skelett (Einsatz-Struktur, \
-         Zähler/registrier_nr, operative Objekte), die Führungs-Dokumentation (ETB, Meldungen, \
-         Aufträge, Lage-/Befehlsberichte — im ETB rechtsverbindlich gesnapshottet) und \
+         Foto-/Datei-Anhänge, personenbezogene Notizen, Schadens-/Lage-/Gefahren-Freitexte \
+         sowie Chat-Kanäle, Chat-Nachrichten und Erinnerungen) wurden unwiderruflich entfernt. \
+         Erhalten bleiben das operative Skelett (Einsatz-Struktur, Zähler/registrier_nr, \
+         operative Objekte), die Führungs-Dokumentation (ETB, Meldungen, Aufträge, \
+         Lage-/Befehlsberichte — im ETB rechtsverbindlich gesnapshottet; ins ETB oder in einen \
+         Auftrag heraufgestufte Chat-Nachrichten stehen dort weiter im Wortlaut) und \
          anonymisierte Triage-/Statuskategorien (ohne Personenbezug) für die gesetzliche/ \
-         statistische Aufbewahrung; sowie — bis zum ausstehenden Scrub-Follow-up (LFH-229) — \
-         operative Kommunikations-Freitexte (Chat-Nachrichten, Erinnerungen), die noch \
-         Personenbezug tragen können.",
+         statistische Aufbewahrung.",
     )
     .await?;
 
@@ -1218,6 +1221,177 @@ mod tests {
         assert_eq!(
             ab_err, None,
             "Abschnitt-Erreichbarkeit (PII) muss NULL sein — bestehende Lücke geschlossen"
+        );
+    }
+
+    /// Bereitet einen schwärzbaren Einsatz vor (abgeschlossen + soft-gelöscht).
+    async fn schwaerzbarer_einsatz(pool: &SqlitePool) -> (i64, i64) {
+        let leit = benutzer_anlegen(pool, "leit").await;
+        let einsatz = test_anlegen(pool, "Lage", None, leit).await.unwrap();
+        abschliessen(pool, einsatz.id, leit).await.unwrap();
+        sqlx::query("UPDATE einsatz SET geloescht_at = ? WHERE id = ?")
+            .bind("2026-01-01 00:00:00")
+            .bind(einsatz.id)
+            .execute(pool)
+            .await
+            .unwrap();
+        (einsatz.id, leit)
+    }
+
+    #[tokio::test]
+    async fn schwaerzung_entfernt_chat_und_erinnerungs_freitexte() {
+        // LFH-290: Chat- und Erinnerungs-Freitexte tragen Personenbezug („Fam. Müller,
+        // Tel. 0170 …“) und standen bis dahin als RETAIN v1 in der Registry. Sie werden
+        // jetzt entfernt — auch in soft-gelöschten Nachrichten, deren Inhalt stehen blieb.
+        // Die Struktur (ids, kanal_id, faellig_at, status) bleibt; ein Chat-Anhang geht
+        // mit seiner Verknüpfung vollständig weg.
+        let pool = crate::db::test_pool().await;
+        let (eid, leit) = schwaerzbarer_einsatz(&pool).await;
+        let kanal_id: i64 = sqlx::query_scalar(
+            "INSERT INTO chat_kanal (einsatz_id, name, beschreibung, erstellt_von_id) \
+             VALUES (?, 'Absprache Fam. Müller', 'Kontakt Tochter 0170 111', ?) RETURNING id",
+        )
+        .bind(eid)
+        .bind(leit)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let mut nachricht_ids = Vec::new();
+        for (inhalt, geloescht) in [
+            ("Herr Schmidt, Hauptstr. 5, sitzt fest", None),
+            (
+                "Frau Meyer, Tel. 0151 222 — versehentlich gepostet",
+                Some("2026-01-01 01:00:00"),
+            ),
+            ("Foto Familie Weber anbei", None),
+        ] {
+            let id: i64 = sqlx::query_scalar(
+                "INSERT INTO chat_nachricht (einsatz_id, kanal_id, autor_id, inhalt, geloescht_at) \
+                 VALUES (?, ?, ?, ?, ?) RETURNING id",
+            )
+            .bind(eid)
+            .bind(kanal_id)
+            .bind(leit)
+            .bind(inhalt)
+            .bind(geloescht)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            nachricht_ids.push(id);
+        }
+        let anhang_id: i64 = sqlx::query_scalar(
+            "INSERT INTO anhang (einsatz_id, dateiname, mime, groesse, sha256, daten, hochgeladen_von) \
+             VALUES (?, 'weber.jpg', 'image/jpeg', 3, 'deadbeef', ?, ?) RETURNING id",
+        )
+        .bind(eid)
+        .bind(b"ABC".as_slice())
+        .bind(leit)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query("INSERT INTO chat_nachricht_anhang (nachricht_id, anhang_id) VALUES (?, ?)")
+            .bind(nachricht_ids[2])
+            .bind(anhang_id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let erinnerung_id: i64 = sqlx::query_scalar(
+            "INSERT INTO erinnerung (einsatz_id, titel, beschreibung, faellig_at, \
+                empfaenger_funktion, status, erstellt_von_id) \
+             VALUES (?, 'Rückruf Frau Meyer', 'Tel. 0151 222, Tochter vermisst', \
+                '2026-01-01 12:00:00', 'Herr Müller (S2)', 'offen', ?) RETURNING id",
+        )
+        .bind(eid)
+        .bind(leit)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        assert!(schwaerze_einsatz(&pool, eid, "2026-02-01 00:00:00")
+            .await
+            .unwrap());
+
+        let kanal: (i64, i64, String, Option<String>) = sqlx::query_as(
+            "SELECT id, einsatz_id, name, beschreibung FROM chat_kanal WHERE id = ?",
+        )
+        .bind(kanal_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            kanal,
+            (kanal_id, eid, SCHWAERZUNG_PLATZHALTER.to_string(), None),
+            "Kanal: Name Platzhalter, Beschreibung NULL, Struktur bleibt"
+        );
+
+        let nachrichten: Vec<(i64, i64, String, Option<String>)> = sqlx::query_as(
+            "SELECT id, kanal_id, inhalt, geloescht_at FROM chat_nachricht \
+             WHERE einsatz_id = ? ORDER BY id",
+        )
+        .bind(eid)
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            nachrichten,
+            vec![
+                (
+                    nachricht_ids[0],
+                    kanal_id,
+                    SCHWAERZUNG_PLATZHALTER.to_string(),
+                    None
+                ),
+                (
+                    nachricht_ids[1],
+                    kanal_id,
+                    SCHWAERZUNG_PLATZHALTER.to_string(),
+                    Some("2026-01-01 01:00:00".to_string())
+                ),
+                (
+                    nachricht_ids[2],
+                    kanal_id,
+                    SCHWAERZUNG_PLATZHALTER.to_string(),
+                    None
+                ),
+            ],
+            "jede Nachricht (auch die soft-gelöschte) trägt den Platzhalter"
+        );
+
+        let erinnerung: (i64, String, Option<String>, Option<String>, String, String) =
+            sqlx::query_as(
+                "SELECT id, titel, beschreibung, empfaenger_funktion, faellig_at, status \
+                 FROM erinnerung WHERE id = ?",
+            )
+            .bind(erinnerung_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            erinnerung,
+            (
+                erinnerung_id,
+                SCHWAERZUNG_PLATZHALTER.to_string(),
+                None,
+                None,
+                "2026-01-01 12:00:00".to_string(),
+                "offen".to_string()
+            ),
+            "Erinnerung: Titel Platzhalter, Beschreibung und Empfänger NULL, Termin/Status bleiben"
+        );
+
+        let anhaenge: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM anhang WHERE einsatz_id = ?")
+            .bind(eid)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        let verknuepfungen: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM chat_nachricht_anhang")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            (anhaenge, verknuepfungen),
+            (0, 0),
+            "Chat-Anhang samt Verknüpfung weg"
         );
     }
 

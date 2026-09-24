@@ -138,10 +138,6 @@ const G_TRIAGE: &str =
      bleibt pro Zeile nur registrier_nr + Kategorie + Zeitstempel → anonymisiertes Statistik-Skelett";
 const G_TIER: &str =
     "Reine Tierbeschreibung (kein Personenbezug; Halter-Direktdaten werden gescrubbt)";
-const G_CHAT: &str =
-    "Chat-Führungskommunikation, RETAIN v1 (Scrub-Follow-up getaggt) — im ETB koppelbar";
-const G_ERINNERUNG: &str =
-    "Erinnerungs-/Wiedervorlage-Freitext, RETAIN v1 (Scrub-Follow-up getaggt) — operativ";
 const G_ABGLEICH: &str =
     "Vermisst-/Gefunden-Abgleich-Verknüpfung (Struktur; die verknüpften Personen-Zeilen \
      werden selbst gescrubbt)";
@@ -1387,7 +1383,12 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("erstellt_at", G_ZEIT),
         ],
     },
-    // ---------- Chat / Erinnerungen (RETAIN v1, Scrub-Follow-up getaggt) ----------
+    // ---------- Chat / Erinnerungen (Freitexte gescrubbt, LFH-290) ----------
+    // Chat- und Erinnerungs-Freitexte tragen Personenbezug („Fam. Müller, Tel. …“) und
+    // werden entfernt — auch in soft-gelöschten Nachrichten (`geloescht_at` ist nur ein
+    // Tombstone, der Inhalt blieb stehen). Heraufgestufte Nachrichten liegen als KOPIE in
+    // `etb_eintrag.inhalt` (G_ETB) bzw. `auftrag.auftrag_text` (G_FUEHRUNG) und bleiben
+    // dort als Führungsdokumentation stehen (ETB-Politik, Präzedenz LFH-632/E9).
     TabellenRegel {
         tabelle: "chat_kanal",
         scoping: Scoping::EinsatzId,
@@ -1395,8 +1396,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
-            retain("name", G_CHAT),
-            retain("beschreibung", G_CHAT),
+            scrub("name", Strategie::Platzhalter), // NOT NULL
+            scrub("beschreibung", Strategie::NullSetzen),
             retain("erstellt_von_id", G_FK),
             retain("erstellt_at", G_ZEIT),
             retain("archiviert_at", G_ZEIT),
@@ -1411,7 +1412,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("einsatz_id", G_SCOPE),
             retain("kanal_id", G_FK),
             retain("autor_id", G_FK),
-            retain("inhalt", G_CHAT),
+            scrub("inhalt", Strategie::Platzhalter), // NOT NULL
             retain("erstellt_at", G_ZEIT),
             retain("bearbeitet_at", G_ZEIT),
             retain("geloescht_at", G_ZEIT),
@@ -1422,7 +1423,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
         ],
     },
     TabellenRegel {
-        // Junction; CASCADE von anhang/chat_nachricht räumt sie. Kein Scrub nötig.
+        // Junction; CASCADE von anhang/chat_nachricht räumt sie. Kein Scrub nötig: `anhang`
+        // ist ZeileLoeschen, die Verknüpfung geht per CASCADE mit (belegt in
+        // `repo::tests::schwaerzung_entfernt_chat_und_erinnerungs_freitexte`).
         tabelle: "chat_nachricht_anhang",
         scoping: Scoping::UeberParent {
             fk: "nachricht_id",
@@ -1438,11 +1441,13 @@ pub const TABELLEN: &[TabellenRegel] = &[
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
-            retain("titel", G_ERINNERUNG),
-            retain("beschreibung", G_ERINNERUNG),
+            scrub("titel", Strategie::Platzhalter), // NOT NULL
+            scrub("beschreibung", Strategie::NullSetzen),
             retain("faellig_at", G_ZEIT),
             retain("intervall_minuten", G_KONFIG),
-            retain("empfaenger_funktion", G_OP_LABEL),
+            // Freitext-Empfänger (migrations/0044: „noch kein FK“), kann einen Personennamen
+            // tragen („Herr Müller“) — kein reines Funktionslabel (LFH-290).
+            scrub("empfaenger_funktion", Strategie::NullSetzen),
             retain("bezug_typ", G_POLY),
             retain("bezug_id", G_POLY),
             retain("quelle", G_ENUM),
