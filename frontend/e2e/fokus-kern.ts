@@ -25,6 +25,12 @@ export interface Verdeckungsbefund {
    * Schirm decken (Maske eines Dialogs), zählen hier nicht — sie berühren jedes Ziel.
    */
   stoppsBeruehrt: number;
+  /**
+   * Davon die Stopps an der stehenden KOPFZEILE einer Tabelle (`.ant-table-sticky-holder`).
+   * `stoppsBeruehrt` zählt jede stehende Fläche — auch die fixierte erste Spalte, die in jeder
+   * Zeile steht — und kann deshalb nicht belegen, dass ein Lauf die Kopfzeile erreicht hat.
+   */
+  stoppsAnTabellenkopf: number;
 }
 
 /**
@@ -64,6 +70,7 @@ export async function pruefeFokusVerdeckung(
   let stoppsInTabelle = 0;
   let stoppsGesamt = 0;
   let stoppsBeruehrt = 0;
+  let stoppsAnTabellenkopf = 0;
   let fixierteKandidaten = 0;
   const besuchteZiele = new Set<string>();
 
@@ -75,12 +82,12 @@ export async function pruefeFokusVerdeckung(
         return null;
       }
       // Der innere Combobox-/Zahleneingabe-Input ist kleiner als das sichtbare Fokusziel.
-      // Radio und Checkbox (LFH-677): antd setzt deren `input` auf 0 × 0 — ohne die Hülle
-      // fiele der Stopp unten als „keine Fläche" still aus der Zählung.
+      // Radio-Knopf (LFH-677): antd setzt dessen `input` auf 0 × 0 — ohne die Hülle fiele der
+      // Stopp unten als „keine Fläche" still aus der Zählung. Normales Radio und Checkbox
+      // brauchen das nicht: ihr `input` deckt Kreis bzw. Kästchen.
       const ziel =
         fokus.closest(
-          '.ant-select, .ant-input-number, .ant-input-affix-wrapper, ' +
-            '.ant-radio-button-wrapper, .ant-radio-wrapper, .ant-checkbox-wrapper',
+          '.ant-select, .ant-input-number, .ant-input-affix-wrapper, .ant-radio-button-wrapper',
         ) ?? fokus;
       const zr = ziel.getBoundingClientRect();
       if (zr.width === 0 || zr.height === 0) {
@@ -90,6 +97,7 @@ export async function pruefeFokusVerdeckung(
           kandidaten: 0,
           kennung: null,
           beruehrt: false,
+          anTabellenkopf: false,
         };
       }
 
@@ -107,6 +115,7 @@ export async function pruefeFokusVerdeckung(
 
       let beschreibung: string | null = null;
       let beruehrt = false;
+      let anTabellenkopf = false;
       for (const el of kandidaten) {
         const kr = el.getBoundingClientRect();
         const schirmfuellend = kr.width >= innerWidth - 1 && kr.height >= innerHeight - 1;
@@ -120,6 +129,7 @@ export async function pruefeFokusVerdeckung(
           zr.bottom >= kr.top - 2
         ) {
           beruehrt = true;
+          if (el.matches('.ant-table-sticky-holder')) anTabellenkopf = true;
         }
         const umschliesst =
           zr.left >= kr.left - 0.5 &&
@@ -141,6 +151,7 @@ export async function pruefeFokusVerdeckung(
         kandidaten: kandidaten.length,
         kennung: fokus.getAttribute('data-e2e-fokus'),
         beruehrt,
+        anTabellenkopf,
       };
     });
 
@@ -148,6 +159,7 @@ export async function pruefeFokusVerdeckung(
     stoppsGesamt += 1;
     if (schritt.inTabelle) stoppsInTabelle += 1;
     if (schritt.beruehrt) stoppsBeruehrt += 1;
+    if (schritt.anTabellenkopf) stoppsAnTabellenkopf += 1;
     fixierteKandidaten = Math.max(fixierteKandidaten, schritt.kandidaten);
     if (schritt.beschreibung) verdeckt.push(schritt.beschreibung);
     if (schritt.kennung) besuchteZiele.add(schritt.kennung);
@@ -160,5 +172,6 @@ export async function pruefeFokusVerdeckung(
     fixierteKandidaten,
     besuchteZiele: [...besuchteZiele],
     stoppsBeruehrt,
+    stoppsAnTabellenkopf,
   };
 }

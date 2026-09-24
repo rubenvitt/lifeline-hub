@@ -20,6 +20,9 @@ import { seitenrinne } from './tokens';
 import { navDrawerBreite } from './tokens';
 // Eigene Zeile (LFH-677), aus demselben Grund.
 import { antdKomponenten, farbenDunkel } from './tokens';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 /** `ThemeConfig['token']` ist optional getypt — hier nicht wegcasten, sondern
  *  laut scheitern, wenn `antdToken` nichts liefert. */
@@ -169,25 +172,28 @@ describe('Navigations-Drawer (LFH-329 · B1/H11)', () => {
 /**
  * Der gewählte Radio-Knopf (Knopfform) schreibt seinen TEXT in antds `colorPrimary` — am Tag
  * `bedien` auf Weiß, gemessen 6,59 : 1 und damit unter dem Tagesboden 7 : 1 (LFH-677,
- * `e2e/betreuung-pruefliste.spec.ts`). Blauer Bedien-TEXT nimmt `bedienText` (LFH-650), und
- * zwar nur am Radio: global umgelegt träfe `colorPrimary` auch jede Knopffläche.
+ * `e2e/betreuung-pruefliste.spec.ts`). Blauer Bedien-TEXT nimmt `bedienText` (LFH-650).
+ *
+ * Die Regel sitzt in `sprache.css` und trifft NUR den Text. Ein Komponenten-Token
+ * `Radio.colorPrimary` war der erste Anlauf und ist verworfen (Review LFH-677): antd rechnet
+ * daraus auch die gefüllte Scheibe des normalen Radios, die Fläche des Knopfstils `solid` und
+ * die Hover-Fläche — nachts stand der weiße Punkt dann auf `#8ec2f0` bei rund 1,9 : 1.
  */
 describe('Radio-Knopf: Text in bedienText (LFH-677)', () => {
-  it.each([
-    ['hell', farbenHell],
-    ['dunkel', farbenDunkel],
-  ] as const)(
-    'Modus %s: gewählt und unter dem Zeiger in bedienText, nicht in bedien',
-    (_, farben) => {
-      const radio = antdKomponenten(farben).Radio;
-      expect(radio?.colorPrimary).toBe(farben.bedienText);
-      expect(radio?.colorPrimaryHover).toBe(farben.bedienText);
-      expect(farben.bedienText).not.toBe(farben.bedien);
-    },
-  );
+  const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'sprache.css'), 'utf8');
 
-  it('lässt die übrigen Komponenten auf bedien', () => {
-    // Die Umstellung ist am Radio gescopt — ein globales `colorPrimary` bliebe unverändert.
-    expect(antdToken(farbenHell)?.colorPrimary).toBe(farbenHell.bedien);
+  it('der gewählte Knopf und der Knopf unter dem Zeiger lesen --lfh-bedien-text', () => {
+    const regel = /([^{}]*)\{\s*color:\s*var\(--lfh-bedien-text\);\s*\}/.exec(css);
+    expect(regel, 'Regel mit color: var(--lfh-bedien-text)').not.toBeNull();
+    const selektoren = regel![1];
+    expect(selektoren).toContain('.ant-radio-button-wrapper-checked');
+    expect(selektoren).toContain(':hover');
+    // Gesperrte Knöpfe behalten antds Sperrfarbe.
+    expect(selektoren).toContain(':not(.ant-radio-button-wrapper-disabled)');
+  });
+
+  it('kein Komponenten-Token für das Radio — der färbte auch Scheibe und Flächen', () => {
+    expect(antdKomponenten(farbenHell).Radio).toBeUndefined();
+    expect(antdKomponenten(farbenDunkel).Radio).toBeUndefined();
   });
 });

@@ -38,7 +38,8 @@ import { kontrast, randKontrast } from './kontrast-kern';
  *
  * DER GEWÄHLTE RADIO-KNOPF („geschlossen", „geschätzt", „gezählt") ist tragend. Er stand am
  * Tag in `bedien` auf Weiß bei 6,59 : 1 — im ersten Lauf dieses Specs gemessen und in
- * LFH-677 behoben: `antdKomponenten` gibt dem Radio `bedienText` (`theme/tokens.ts`).
+ * LFH-677 behoben: `theme/sprache.css` setzt den TEXT des gewählten Knopfs und des Knopfs
+ * unter dem Zeiger auf `--lfh-bedien-text` (Regel aus LFH-650), Rand und Flächen bleiben.
  *
  * DREI BENANNTE AUSNAHMEN — Eigenschaften geteilter Rollen, nicht dieser Seite; bis dahin gilt
  * die absolute Untergrenze 4,5 : 1 aus Kriterium 5, der Zielwert steht in jeder Meldung:
@@ -48,8 +49,9 @@ import { kontrast, randKontrast } from './kontrast-kern';
  *    Bezirkskarte), die Feldhilfen der Dialoge (`.ant-form-item-extra`), Platzhalter und der
  *    Ortspfad im Seitenkopf bis auf sein letztes Glied;
  *  · WEISS AUF `bedien` in jedem Primärknopf → LFH-661, nur am Tag;
- *  · ROT ALS TEXT — der Menüeintrag „Stornieren" und der rote Knopf im Storno-Dialog →
- *    LFH-693, nur am Tag.
+ *  · ROT AM TAG → LFH-693, zwei Paare, getrennt geführt: der Menüeintrag „Stornieren"
+ *    (roter Text auf der Menüfläche) und der gefüllte rote Knopf im Storno-Dialog (Weiß auf
+ *    `alarm`, in der LFH-634-Prüfliste Befund S3).
  * Jeder andere Text — Bezeichnungen, „≈ 212 · von 380 geplant", „keine Meldung · von ≈ 640
  * geplant" (Karte), Etiketten, Kopfzahlen, der Leermeldungs-Hinweis, Feldbeschriftungen —
  * trägt den vollen Boden. FALLEN DIE AUSNAHMEN, wenn LFH-643/661/693 landen.
@@ -57,16 +59,16 @@ import { kontrast, randKontrast } from './kontrast-kern';
  * MUTATIONSPROBE (24.09.2026, lokal gefahren, nicht committet): `achtungText` → `achtung` und
  * `alarmText` → `alarm` in `components/instrument/statusFlaeche.ts` — der Taglauf wird an
  * allen fünf benannten Etiketten rot („angeordnet", „läuft", „fast voll" 6,02 : 1; „voll",
- * „überbelegt" 5,52 : 1) und an denselben Wortlauten im Textbaum. Der Radio-Eintrag aus
- * `antdKomponenten` entfernt → „geschlossen", „geschätzt", „gezählt" rot mit 6,59 : 1.
- * Danach zurückgesetzt.
+ * „überbelegt" 5,52 : 1) und an denselben Wortlauten im Textbaum. Die Radio-Regel in
+ * `sprache.css` entfernt → „geschlossen", „geschätzt", „gezählt" rot mit 6,59 : 1. Danach
+ * zurückgesetzt.
  *
  * ═══ KRITERIUM 13 — Fokus nie verdeckt (WCAG 2.4.11) ════════════════════════════════════
  *
  * TABELLE: zwanzig gesäte Stellen, Seite halb gescrollt, Durchlauf VORWÄRTS UND RÜCKWÄRTS.
  * Vorwärts rollt der Browser jedes Ziel an den unteren Rand; unter die OBEN stehende
  * Kopfzeile gerät es so nie. Erst der Rückwärtslauf legt die Ziele an den oberen Rand, an
- * die stehende Kopfzeile der `KatalogTabelle` — `stoppsBeruehrt` belegt, dass das auch
+ * die stehende Kopfzeile der `KatalogTabelle` — `stoppsAnTabellenkopf` belegt, dass das auch
  * wirklich geschah. Gemessen im Fükw (1366 × 600, kompakt) und bei 390 px im Handschuh-Betrieb,
  * wo zusätzlich die fixierte Kennungsspalte neben den Aktionsknöpfen steht.
  *
@@ -103,8 +105,10 @@ const TERTIAER = [
   // Feldetiketten der Bezirkskarte („Evakuiert", „Stand", „Abschnitt").
   '.lfh-augenbraue',
   // Kopf der Stellentabelle — antds Tabellenkopf läuft in `schwach` (wie in
-  // `dokumente.spec.ts` als geerbte Rolle geführt).
-  '.ant-table-thead th',
+  // `dokumente.spec.ts` als geerbte Rolle geführt). Die Kopfzelle IST der Träger: sie hält
+  // den Titel als eigenen Textknoten (bzw. im Titel-`span` der sortierbaren Spalte) und
+  // sonst nur `aria-hidden`-Zeichen für Sortierung und Filter.
+  '.ant-table-thead > tr > th',
   '.ant-form-item-extra',
   '.ant-select-placeholder',
   '.lfh-seitenkopf__pfad li:not(:last-child)',
@@ -266,7 +270,8 @@ interface Textknoten {
   text: string;
   tertiaer: boolean;
   primaer: boolean;
-  gefahr: boolean;
+  rotText: boolean;
+  weissAufAlarm: boolean;
 }
 
 /** Jedes SICHTBARE Element unter `wurzel` mit eigenem Text (Muster Verpflegung). */
@@ -274,7 +279,13 @@ async function textknoten(wurzel: Locator): Promise<Textknoten[]> {
   const funde = await wurzel.evaluate((w, tertiaer) => {
     for (const alt of document.querySelectorAll('[data-kontrastprobe]'))
       alt.removeAttribute('data-kontrastprobe');
-    const liste: { text: string; tertiaer: boolean; primaer: boolean; gefahr: boolean }[] = [];
+    const liste: {
+      text: string;
+      tertiaer: boolean;
+      primaer: boolean;
+      rotText: boolean;
+      weissAufAlarm: boolean;
+    }[] = [];
     for (const el of [w, ...w.querySelectorAll('*')]) {
       if (el.closest('[aria-hidden="true"]')) continue;
       if (!el.checkVisibility()) continue;
@@ -289,7 +300,8 @@ async function textknoten(wurzel: Locator): Promise<Textknoten[]> {
         text: eigen,
         tertiaer: el.closest(tertiaer) != null,
         primaer: el.closest('.ant-btn-primary') != null,
-        gefahr: el.closest('.ant-dropdown-menu-item-danger, .ant-btn-dangerous') != null,
+        rotText: el.closest('.ant-dropdown-menu-item-danger') != null,
+        weissAufAlarm: el.closest('.ant-btn-dangerous.ant-btn-primary') != null,
       });
     }
     return liste;
@@ -397,15 +409,17 @@ for (const modus of ['light', 'dark'] as const) {
       await expect(async () => {
         await kontrast(knoten[0].ziel);
       }).toPass({ timeout: 10_000 });
-      for (const { ziel, text, tertiaer, primaer, gefahr } of knoten) {
+      for (const { ziel, text, tertiaer, primaer, rotText, weissAufAlarm } of knoten) {
         const m = await kontrast(ziel);
         const ausnahme = tertiaer
           ? 'Tertiärtext → LFH-643'
-          : tag && gefahr
-            ? 'Rot am Tag → LFH-693'
-            : tag && primaer
-              ? 'Weiß auf bedien → LFH-661'
-              : null;
+          : tag && rotText
+            ? 'Rot als Text → LFH-693'
+            : tag && weissAufAlarm
+              ? 'Weiß auf alarm → LFH-693'
+              : tag && primaer
+                ? 'Weiß auf bedien → LFH-661'
+                : null;
         const schranke = ausnahme ? BODEN : TEXT[modus];
         const kontext = `${modus}, ${flaeche}, „${text}": ${m.verhaeltnis.toFixed(2)} : 1 (Ziel ≥ ${TEXT[modus]}, Schranke ≥ ${schranke}${ausnahme ? `, ${ausnahme}` : ''}) ${JSON.stringify(m)}`;
         messwerte.push({ modus, flaeche, art: 'text', wortlaut: text, ausnahme, ...m });
@@ -528,7 +542,7 @@ for (const modus of ['light', 'dark'] as const) {
       ['Evakuierungsbezirk anlegen', 'Bezeichnung'],
       ['Stand melden: Uferstraße 12–40', 'Zeitpunkt'],
       // Der GEWÄHLTE Radio-Knopf: am Tag lag er in `bedien` bei 6,59 : 1 — seit LFH-677
-      // läuft er über `bedienText` (`antdKomponenten`, `theme/tokens.ts`), tragend.
+      // läuft sein Text über `--lfh-bedien-text` (`theme/sprache.css`), tragend.
       ['Stelle bearbeiten', 'geschlossen'],
       ['Evakuierungsbezirk anlegen', 'geschätzt'],
       ['Stand melden: Uferstraße 12–40', 'gezählt'],
@@ -561,8 +575,8 @@ for (const modus of ['light', 'dark'] as const) {
       ],
     ] as const)
       pruefeGesehen(flaeche, ausnahme, false);
-    // Am Tag unter einer Ausnahme, nachts tragend: Rot als Text (LFH-693) und Weiß auf
-    // `bedien` im Primärknopf (LFH-661).
+    // Am Tag unter einer Ausnahme, nachts tragend: Rot als Text und Weiß auf `alarm`
+    // (LFH-693), Weiß auf `bedien` im Primärknopf (LFH-661).
     for (const [flaeche, nurTagsAusnahme] of [
       ['Zeilenmenü', 'Stornieren'],
       ['Stornieren', 'Stornieren'],
@@ -621,7 +635,8 @@ for (const [viewport, dichte] of [
       const befund = await pruefeFokusVerdeckung(page, 140, taste);
       berichte.push(
         `${taste}: ${befund.stoppsGesamt} Stopps, davon ${befund.stoppsInTabelle} in der Tabelle, ` +
-          `${befund.stoppsBeruehrt} berühren eine stehende Fläche, ${befund.fixierteKandidaten} fixierte Kandidaten, ` +
+          `${befund.stoppsBeruehrt} berühren eine stehende Fläche, davon ${befund.stoppsAnTabellenkopf} die Kopfzeile, ` +
+          `${befund.fixierteKandidaten} fixierte Kandidaten, ` +
           `${befund.verdeckt.length} verdeckt${befund.verdeckt.length ? `\n  ${befund.verdeckt.join('\n  ')}` : ''}`,
       );
       expect
@@ -637,8 +652,8 @@ for (const [viewport, dichte] of [
       if (taste === 'Shift+Tab')
         expect
           .soft(
-            befund.stoppsBeruehrt,
-            'Vorbedingung: rückwärts gerät mindestens ein Ziel an eine stehende Fläche',
+            befund.stoppsAnTabellenkopf,
+            'Vorbedingung: rückwärts gerät mindestens ein Ziel an die stehende Kopfzeile',
           )
           .toBeGreaterThan(0);
     }
@@ -761,9 +776,8 @@ for (const fall of DIALOGE) {
         if (el instanceof HTMLInputElement && el.type === 'hidden') continue;
         // Aus einer Radiogruppe mit Wahl läuft der Browser nur das gewählte Radio an.
         if (el instanceof HTMLInputElement && el.type === 'radio' && !el.checked) continue;
-        // Radio und Checkbox tragen ein 0 × 0-`input`; sichtbar ist ihre Hülle (wie im Kern).
-        const flaeche =
-          el.closest('.ant-radio-button-wrapper, .ant-radio-wrapper, .ant-checkbox-wrapper') ?? el;
+        // Der Radio-Knopf trägt ein 0 × 0-`input`; sichtbar ist seine Hülle (wie im Kern).
+        const flaeche = el.closest('.ant-radio-button-wrapper') ?? el;
         if (!flaeche.checkVisibility()) continue;
         const r = flaeche.getBoundingClientRect();
         if (r.width === 0 || r.height === 0) continue;
