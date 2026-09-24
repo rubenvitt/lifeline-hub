@@ -58,6 +58,7 @@ export const EINSATZ_KEYS = {
   dokumente: 'einsatz-dokumente',
   abloesungen: 'einsatz-abloesungen',
   betreuung: 'einsatz-betreuung',
+  verpflegung: 'einsatz-verpflegung',
   // Nicht live über SSE getrieben (siehe NICHT_LIVE_KEYS + Guard-Test):
   einsatz: 'einsatz',
   einstellungen: 'einsatz-einstellungen',
@@ -177,6 +178,10 @@ export const EINSATZ_STREAM_EVENTS = {
   // Betreuung live (LFH-639): Bezirke, Stellen und ihre Meldereihen hängen unter EINEM Prefix,
   // damit ein Ereignis Übersicht und Kopfzahl trifft. Nutzlast nur Kennungen.
   betreuung: [EINSATZ_KEYS.betreuung],
+  // Verpflegung live (LFH-634, design.md D6): Zeitfenster samt Deckung und Ausgaben unter EINEM
+  // Prefix. Kein Fan-out von `nachforderung`: das DTO trägt nur die Kennung, aufgelöste Namen
+  // hängen an der Nachforderungs-Query und deren eigenem Ereignis.
+  verpflegung: [EINSATZ_KEYS.verpflegung],
 } as const satisfies Record<string, readonly EinsatzKey[]>;
 
 export type EinsatzStreamEvent = keyof typeof EINSATZ_STREAM_EVENTS;
@@ -331,6 +336,8 @@ export const einsatzKeys = {
   betreuung: (einsatzId: number) => [EINSATZ_KEYS.betreuung, einsatzId] as const,
   betreuungKopfzahl: (einsatzId: number, zeitpunkt?: string) =>
     [EINSATZ_KEYS.betreuung, einsatzId, 'kopfzahl', zeitpunkt ?? 'jetzt'] as const,
+  // Verpflegung (LFH-634): ein Abruf trägt alle Zeitfenster samt Deckung und Ausgaben.
+  verpflegung: (einsatzId: number) => [EINSATZ_KEYS.verpflegung, einsatzId] as const,
   /** Historie der Lagebesprechungen als Sub-Key unter DEMSELBEN Prefix (Spec 9.3). */
   stabLagebesprechungen: (einsatzId: number) =>
     [EINSATZ_KEYS.stab, einsatzId, 'lagebesprechungen'] as const,

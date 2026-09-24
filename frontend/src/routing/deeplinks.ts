@@ -262,6 +262,11 @@ export function abloesungPfad(einsatzId: number): string {
   return einsatzModulPfad(einsatzId, 'abloesung');
 }
 
+/** Verpflegungs-Modul (LFH-634): Zeitfenster mit Bedarf, Ausgaben und Deckung. */
+export function verpflegungPfad(einsatzId: number): string {
+  return einsatzModulPfad(einsatzId, 'verpflegung');
+}
+
 /** Fachmodul „Wetter & Pegel" (LFH-633): Pegel mit Verlauf, DWD-Warnungen, Vorhersage. */
 export function wetterPegelPfad(einsatzId: number): string {
   return einsatzModulPfad(einsatzId, 'wetter-pegel');
@@ -452,6 +457,73 @@ export function einsatzabschnittePfad(
 
 export function meldungenPfad(einsatzId: number, opts: { meldung?: number } = {}): string {
   return mitQuery(einsatzModulPfad(einsatzId, 'meldungen'), { meldung: opts.meldung });
+}
+
+/**
+ * Vorbelegung der Nachforderungs-Erfassung (LFH-634, D9) — z. B. „Nachfordern" aus einer
+ * Unterdeckung der Verpflegung. Keine Personenangaben: die Werte sind Bezeichnungen und Zahlen.
+ */
+export interface NachforderungVorbelegung {
+  art: string;
+  bezeichnung: string;
+  /** Positive Ganzzahl. */
+  anzahl: number;
+  begruendung?: string;
+}
+
+/**
+ * Nachforderungsseite. `?neu=1` öffnet die Erfassung; eine `vorbelegung` setzt `neu=1`
+ * selbst und hängt `art`, `bezeichnung`, `anzahl` und `begruendung` an (kodiert über
+ * `mitQuery`, Freitext darf `&` und `=` tragen). Die Seite räumt alles nach dem Lesen
+ * (apply-then-clean).
+ */
+export function nachforderungenPfad(
+  einsatzId: number,
+  opts: { neu?: boolean; vorbelegung?: NachforderungVorbelegung } = {},
+): string {
+  const v = opts.vorbelegung;
+  return mitQuery(einsatzModulPfad(einsatzId, 'nachforderungen'), {
+    neu: opts.neu || v ? 1 : undefined,
+    art: v?.art,
+    bezeichnung: v?.bezeichnung,
+    anzahl: v?.anzahl,
+    begruendung: v?.begruendung,
+  });
+}
+
+/** Die Query-Schlüssel der Vorbelegung — die Seite räumt genau diese (plus `neu`). */
+export const NACHFORDERUNG_VORBELEGUNG_PARAMS = [
+  'art',
+  'bezeichnung',
+  'anzahl',
+  'begruendung',
+] as const;
+
+/**
+ * Liest die Vorbelegung aus `?art=…&bezeichnung=…&anzahl=…&begruendung=…` zurück.
+ *
+ * Wie `parsePlatzierenAuftrag`: Unbrauchbares wird GANZ verworfen, nicht halb übernommen —
+ * eine Erfassung mit Art „Verpflegung", aber ohne die Fehlmenge sähe vorbelegt aus und
+ * forderte das Falsche nach. `anzahl` muss eine positive Ganzzahl in Dezimalschreibweise
+ * sein; `Number()` allein nähme auch `1e2` und ` 5` an. `art` und `bezeichnung` dürfen
+ * nicht leer sein (dieselbe Regel wie die Pflichtfelder des Formulars), `begruendung` ist
+ * optional und fällt leer weg.
+ *
+ * `neu` liest dieser Parser bewusst NICHT: das ist Sache der Seite, und ein
+ * `get('neu')`-Leser in dieser Datei wäre für `schnellaktionen.guard.test.ts` keinem Modul
+ * zuordenbar.
+ */
+export function parseNachforderungVorbelegung(
+  params: URLSearchParams,
+): NachforderungVorbelegung | null {
+  const art = params.get('art')?.trim();
+  const bezeichnung = params.get('bezeichnung')?.trim();
+  const roheAnzahl = params.get('anzahl');
+  if (!art || !bezeichnung || roheAnzahl == null || !/^[1-9]\d*$/.test(roheAnzahl)) return null;
+  const anzahl = Number(roheAnzahl);
+  if (!Number.isSafeInteger(anzahl)) return null;
+  const begruendung = params.get('begruendung')?.trim();
+  return begruendung ? { art, bezeichnung, anzahl, begruendung } : { art, bezeichnung, anzahl };
 }
 
 export function auftraegePfad(einsatzId: number, opts: { auftrag?: number } = {}): string {

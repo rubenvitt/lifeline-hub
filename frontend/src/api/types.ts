@@ -547,6 +547,66 @@ export interface BelegungsmeldungEingabe {
   zeitpunkt_at?: string;
 }
 
+// ============================== LFH-634 Verpflegung ==============================
+/** Übersicht `GET …/verpflegung`: alle Zeitfenster nach Beginn. */
+export type Verpflegung = S['VerpflegungAnzeige'];
+/** Zeitfenster samt Bedarf, ausgegebener Menge, Fehlmenge und Ausgaben (design.md D2). */
+export type VerpflegungZeitfenster = S['ZeitfensterAnzeige'];
+/** Eine Ausgabe; von der Nachforderung trägt sie nur `nachforderung_id` (design.md D4). */
+export type VerpflegungAusgabe = S['AusgabeAnzeige'];
+/** Antwort auf Erfassen/Zurücknehmen: `ausgabe_id` ist die betroffene Ausgabe — ein
+ *  Rückgängig nimmt diese Kennung, `zeitfenster` trägt die nachgerechnete Deckung. */
+export type VerpflegungAusgabeErgebnis = S['AusgabeErgebnis'];
+export type VerpflegungBedarf = S['Bedarf'];
+/** Gesamt plus je Kostform — Form von `ausgegeben` und `fehlmenge`. */
+export type Portionen = S['Portionen'];
+/** Die fünf festen Kostformen als Teilmenge (design.md D1). */
+export type Sonderkost = S['Sonderkost'];
+export type Kostform = keyof Sonderkost;
+
+/**
+ * LFH-120: kein Backend-Schema — `sonderkost` in den Eingabe-Bodies (`SonderkostEingabe` in
+ * `src/verpflegung/mod.rs`). Jedes Feld optional; beim PATCH ersetzen gesetzte Felder, fehlende
+ * bleiben stehen.
+ */
+export type SonderkostEingabe = Partial<Sonderkost>;
+
+/**
+ * LFH-120: kein Backend-Schema — Eingabe-Body von `POST …/verpflegung/zeitfenster`
+ * (`ZeitfensterAnlegen` in `src/routes/verpflegung.rs`). Zeiten als UTC `YYYY-MM-DD HH:mm:ss`
+ * oder ISO mit Zone; `bis_at` muss nach `von_at` liegen (sonst 422).
+ */
+export interface ZeitfensterEingabe {
+  bezeichnung: string;
+  von_at: string;
+  bis_at: string;
+  bedarf_kraefte: number;
+  bedarf_betreute: number;
+  bedarf_weitere?: number;
+  sonderkost?: SonderkostEingabe;
+}
+
+/**
+ * LFH-120: kein Backend-Schema — Eingabe-Body von `PATCH …/verpflegung/zeitfenster/{id}`
+ * (`ZeitfensterAendern`). Zweiwertig: Schlüssel fehlt = unverändert, es gibt kein `null`.
+ * Wertgleichheit schreibt weder ETB-Eintrag noch Ereignis.
+ */
+export type ZeitfensterPatch = Partial<ZeitfensterEingabe>;
+
+/**
+ * LFH-120: kein Backend-Schema — Eingabe-Body von `POST …/verpflegung/zeitfenster/{id}/ausgaben`
+ * (`AusgabeErfassen`). Ohne `zeitpunkt_at` gilt „jetzt"; `menge` > 0; die Sonderkost ist
+ * Teilmenge der Menge (sonst 422). Eine fremde `nachforderung_id` ist 404.
+ */
+export interface AusgabeEingabe {
+  menge: number;
+  zeitpunkt_at?: string;
+  ort?: string;
+  sonderkost?: SonderkostEingabe;
+  nachforderung_id?: number;
+  bemerkung?: string;
+}
+
 // ============================== LFH-51 Terminierte Erinnerungen ==============================
 export type Erinnerung = S['ErinnerungAnzeige'];
 

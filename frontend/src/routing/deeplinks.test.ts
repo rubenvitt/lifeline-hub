@@ -24,6 +24,7 @@ import {
   dokumentePfad,
   abloesungPfad,
   betreuungPfad,
+  verpflegungPfad,
   wetterPegelPfad,
   pegelZielPfad,
   etbPfad,
@@ -35,6 +36,8 @@ import {
   parseFahrzeugeAnsicht,
   einsatzabschnittePfad,
   meldungenPfad,
+  nachforderungenPfad,
+  parseNachforderungVorbelegung,
   auftraegePfad,
   gefahrenPfad,
   lagekartePfad,
@@ -283,6 +286,10 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
     expect(abloesungPfad(E)).toBe('/einsaetze/5/abloesung');
   });
 
+  it('verpflegungPfad trifft die Registry-Route (LFH-634)', () => {
+    expect(verpflegungPfad(E)).toBe('/einsaetze/5/verpflegung');
+  });
+
   it('betreuungPfad ohne Selektion trifft die Registry-Route (LFH-639)', () => {
     expect(betreuungPfad(E)).toBe('/einsaetze/5/betreuung');
     expect(betreuungPfad(E, {})).toBe('/einsaetze/5/betreuung');
@@ -484,5 +491,81 @@ describe('einsatzEinstellungenPfad (LFH-345 · C10, H15/M15)', () => {
     expect(einsatzEinstellungenPfad(E, EINSTELLUNGEN_SEKTIONEN[0].key)).toBe(
       einsatzEinstellungenPfad(E),
     );
+  });
+});
+
+describe('deeplinks — Nachforderung mit Vorbelegung (LFH-634)', () => {
+  // Die Werte aus D9: typographische Anführungszeichen, Halbgeviertstrich, Doppelpunkt —
+  // dazu `&`, `=` und `+`, die unkodiert Parameter zerschneiden bzw. zu Leerzeichen würden.
+  const vorbelegung = {
+    art: 'Verpflegung',
+    bezeichnung: 'Essensportionen ‚Mittag‘ 12:00–13:30 & Getränke = 1+1',
+    anzahl: 20,
+    begruendung: 'Unterdeckung Verpflegung ‚Mittag‘: Bedarf 250, ausgegeben 230.',
+  };
+
+  /** Zerlegt den gebauten Pfad so, wie der Router ihn der Seite gibt. */
+  const params = (pfad: string) => new URLSearchParams(pfad.split('?')[1] ?? '');
+
+  it('nachforderungenPfad ohne Optionen ist der bare Modulpfad', () => {
+    expect(nachforderungenPfad(E)).toBe('/einsaetze/5/nachforderungen');
+    expect(nachforderungenPfad(E, { neu: true })).toBe('/einsaetze/5/nachforderungen?neu=1');
+  });
+
+  it('eine Vorbelegung setzt neu=1 und übersteht den Round-Trip durch URLSearchParams', () => {
+    const pfad = nachforderungenPfad(E, { vorbelegung });
+    expect(pfad.startsWith('/einsaetze/5/nachforderungen?neu=1&')).toBe(true);
+    const p = params(pfad);
+    expect(p.get('neu')).toBe('1');
+    expect(parseNachforderungVorbelegung(p)).toEqual(vorbelegung);
+  });
+
+  it('die Begründung ist optional', () => {
+    const ohne = { art: vorbelegung.art, bezeichnung: vorbelegung.bezeichnung, anzahl: 20 };
+    const p = params(nachforderungenPfad(E, { vorbelegung: ohne }));
+    expect(p.has('begruendung')).toBe(false);
+    expect(parseNachforderungVorbelegung(p)).toEqual(ohne);
+  });
+
+  it.each(['0', '-3', 'abc', '1.5', '1e2', ' 5', ''])(
+    'Anzahl %j verwirft die GANZE Vorbelegung',
+    (anzahl) => {
+      const p = params(nachforderungenPfad(E, { vorbelegung }));
+      p.set('anzahl', anzahl);
+      expect(parseNachforderungVorbelegung(p)).toBeNull();
+    },
+  );
+
+  it('fehlende Anzahl verwirft die ganze Vorbelegung', () => {
+    const p = params(nachforderungenPfad(E, { vorbelegung }));
+    p.delete('anzahl');
+    expect(parseNachforderungVorbelegung(p)).toBeNull();
+  });
+
+  it.each(['art', 'bezeichnung'])(
+    'leere oder fehlende %s verwirft die ganze Vorbelegung',
+    (feld) => {
+      const leer = params(nachforderungenPfad(E, { vorbelegung }));
+      leer.set(feld, '   ');
+      expect(parseNachforderungVorbelegung(leer)).toBeNull();
+      const fehlt = params(nachforderungenPfad(E, { vorbelegung }));
+      fehlt.delete(feld);
+      expect(parseNachforderungVorbelegung(fehlt)).toBeNull();
+    },
+  );
+
+  it('eine leere Begründung fällt weg, statt als leerer Text vorzubelegen', () => {
+    const p = params(nachforderungenPfad(E, { vorbelegung }));
+    p.set('begruendung', '  ');
+    expect(parseNachforderungVorbelegung(p)).toEqual({
+      art: 'Verpflegung',
+      bezeichnung: vorbelegung.bezeichnung,
+      anzahl: 20,
+    });
+  });
+
+  it('ohne Parameter gibt es keine Vorbelegung', () => {
+    expect(parseNachforderungVorbelegung(new URLSearchParams('neu=1'))).toBeNull();
+    expect(parseNachforderungVorbelegung(new URLSearchParams())).toBeNull();
   });
 });

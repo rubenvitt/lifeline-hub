@@ -25,17 +25,24 @@ pub fn formatiere(praefix: Option<&str>, jahr: i32, lfd: i64) -> String {
 /// sie unbekannt, gilt [`ZEITZONE_VORGABE`] — Letzteres mit Warnung, denn die Validierung
 /// der Einstellung prüft nur „nicht leer“ und ein Tippfehler fiele sonst still auf Berlin.
 pub fn jahr_in_zone(jetzt: DateTime<Utc>, zeitzone: Option<&str>) -> i32 {
-    let tz = match zeitzone {
+    jetzt.with_timezone(&zone_oder_vorgabe(zeitzone)).year()
+}
+
+/// Die Org-Zeitzone als [`Tz`] (IANA-Name). Fehlt sie oder ist sie unbekannt, gilt
+/// [`ZEITZONE_VORGABE`] — Letzteres mit Warnung, weil ein Tippfehler in der Einstellung
+/// sonst still auf Berlin fiele. Geteilt von der Einsatznummer und den ETB-Texten der
+/// Verpflegung (LFH-634), damit beide dieselbe Rückfallregel haben.
+pub fn zone_oder_vorgabe(zeitzone: Option<&str>) -> Tz {
+    match zeitzone {
         None => ZEITZONE_VORGABE,
         Some(name) => name.trim().parse::<Tz>().unwrap_or_else(|_| {
             tracing::warn!(
                 zeitzone = name,
-                "Unbekannte Org-Zeitzone; Jahr der Einsatznummer nach Europe/Berlin"
+                "Unbekannte Org-Zeitzone; es gilt Europe/Berlin"
             );
             ZEITZONE_VORGABE
         }),
-    };
-    jetzt.with_timezone(&tz).year()
+    }
 }
 
 #[cfg(test)]

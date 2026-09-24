@@ -3,9 +3,11 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App as AntApp } from 'antd';
-import { MemoryRouter, Routes, Route } from 'react-router';
+import { MemoryRouter, Routes, Route, useLocation } from 'react-router';
 import NachforderungenPage from './NachforderungenPage';
 import { AuthProvider } from '../auth/AuthContext';
+import { ladeEinsatz } from '../api/einsaetze';
+import { nachforderungenPfad } from '../routing/deeplinks';
 import type { Nachforderung } from '../api/types';
 
 vi.mock('../api/einsaetze', () => ({
@@ -53,15 +55,29 @@ const nf = (over: Partial<Nachforderung> = {}): Nachforderung => ({
   ...over,
 });
 
-function renderPage() {
+/** Spiegelt die aktuelle Adresse, damit ein Test das Räumen der URL sehen kann. */
+function OrtSonde() {
+  const ort = useLocation();
+  return <output data-testid="ort">{ort.pathname + ort.search}</output>;
+}
+
+function renderPage(url = '/einsaetze/1/nachforderungen') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
       <AntApp>
         <AuthProvider>
-          <MemoryRouter initialEntries={['/einsaetze/1/nachforderungen']}>
+          <MemoryRouter initialEntries={[url]}>
             <Routes>
-              <Route path="/einsaetze/:id/nachforderungen" element={<NachforderungenPage />} />
+              <Route
+                path="/einsaetze/:id/nachforderungen"
+                element={
+                  <>
+                    <NachforderungenPage />
+                    <OrtSonde />
+                  </>
+                }
+              />
             </Routes>
           </MemoryRouter>
         </AuthProvider>
@@ -185,5 +201,95 @@ describe('NachforderungenPage', () => {
     expect(
       screen.getByText('Eingetroffen', { selector: '[data-lfh="status-chip"] span' }),
     ).toBeInTheDocument();
+  });
+
+  describe('Vorbelegung per Deeplink (LFH-634)', () => {
+    const vorbelegung = {
+      art: 'Verpflegung',
+      bezeichnung: 'Essensportionen \u201aMittag\u2018 12:00\u201313:30',
+      anzahl: 20,
+      begruendung: 'Unterdeckung Verpflegung \u201aMittag\u2018: Bedarf 250, ausgegeben 230.',
+    };
+    const deeplink = nachforderungenPfad(1, { vorbelegung });
+
+    const begruendungFeld = () => screen.getByLabelText('Begründung / Lagebezug');
+
+    it('öffnet die Erfassung vorbelegt und räumt die Adresse', async () => {
+      renderPage(deeplink);
+      expect(await screen.findByLabelText('Art')).toHaveValue('Verpflegung');
+      expect(screen.getByLabelText('Bezeichnung')).toHaveValue(vorbelegung.bezeichnung);
+      expect(screen.getByLabelText('Anzahl')).toHaveValue('20');
+      expect(begruendungFeld()).toHaveValue(vorbelegung.begruendung);
+      await waitFor(() =>
+        expect(screen.getByTestId('ort')).toHaveTextContent(/^\/einsaetze\/1\/nachforderungen$/),
+      );
+    });
+
+    it('ein Neuladen mit der geräumten Adresse öffnet nichts', async () => {
+      const erster = renderPage(deeplink);
+      await screen.findByLabelText('Art');
+      await waitFor(() => expect(screen.getByTestId('ort').textContent).not.toContain('?'));
+      const geraeumt = screen.getByTestId('ort').textContent ?? '';
+      erster.unmount();
+
+      renderPage(geraeumt);
+      await screen.findByText('2 RTW zur Verstärkung');
+      expect(screen.queryByLabelText('Art')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Nachforderung anlegen/ })).toBeInTheDocument();
+    });
+
+    it('eine unbrauchbare Vorbelegung wird ganz verworfen, die Erfassung öffnet leer', async () => {
+      // Art ist brauchbar, die Anzahl nicht — die Art darf trotzdem NICHT übernommen werden.
+      renderPage(deeplink.replace('anzahl=20', 'anzahl=0'));
+      expect(await screen.findByLabelText('Art')).toHaveValue('');
+      expect(screen.getByLabelText('Bezeichnung')).toHaveValue('');
+      expect(screen.getByLabelText('Anzahl')).toHaveValue('');
+      expect(begruendungFeld()).toHaveValue('');
+      await waitFor(() =>
+        expect(screen.getByTestId('ort')).toHaveTextContent(/^\/einsaetze\/1\/nachforderungen$/),
+      );
+    });
+
+    it('nach dem Absetzen füllt sich die Erfassung NICHT erneut mit der Vorbelegung', async () => {
+      legeNachforderungAn.mockResolvedValue(nf());
+      renderPage(deeplink);
+      expect(await screen.findByLabelText('Art')).toHaveValue('Verpflegung');
+      await userEvent.click(screen.getByRole('button', { name: 'Nachforderung absetzen' }));
+      await waitFor(() =>
+        expect(legeNachforderungAn).toHaveBeenCalledWith(
+          1,
+          expect.objectContaining({ art: 'Verpflegung', anzahl: 20 }),
+        ),
+      );
+      // Eine wieder vorbelegte Maske stünde einen Druck vor der Dublette.
+      await waitFor(() => expect(screen.getByLabelText('Art')).toHaveValue(''));
+      expect(screen.getByLabelText('Anzahl')).toHaveValue('');
+      expect(begruendungFeld()).toHaveValue('');
+    });
+
+    it('Schließen und erneutes Öffnen zeigt eine leere Erfassung', async () => {
+      renderPage(deeplink);
+      expect(await screen.findByLabelText('Art')).toHaveValue('Verpflegung');
+      await userEvent.click(screen.getByRole('button', { name: 'Formular schließen' }));
+      await waitFor(() => expect(screen.queryByLabelText('Art')).not.toBeInTheDocument());
+      await userEvent.click(screen.getByRole('button', { name: /Nachforderung anlegen/ }));
+      expect(await screen.findByLabelText('Art')).toHaveValue('');
+      expect(screen.getByLabelText('Anzahl')).toHaveValue('');
+    });
+
+    it('ohne Schreibrecht öffnet nichts, die Adresse wird trotzdem geräumt', async () => {
+      vi.mocked(ladeEinsatz).mockResolvedValueOnce({
+        id: 1,
+        bezeichnung: 'Lage',
+        status: 'aktiv',
+        meine_rolle: 'beobachter',
+      } as Awaited<ReturnType<typeof ladeEinsatz>>);
+      renderPage(deeplink);
+      await screen.findByText('2 RTW zur Verstärkung');
+      await waitFor(() =>
+        expect(screen.getByTestId('ort')).toHaveTextContent(/^\/einsaetze\/1\/nachforderungen$/),
+      );
+      expect(screen.queryByLabelText('Art')).not.toBeInTheDocument();
+    });
   });
 });

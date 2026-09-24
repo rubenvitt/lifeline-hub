@@ -1,7 +1,7 @@
 import { Alert, App, Breadcrumb, Button, Input, Modal, Spin } from 'antd';
 import { CloseOutlined, PlusOutlined, UpOutlined } from '@ant-design/icons';
-import { useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { useEffect, useState } from 'react';
+import { Link, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
@@ -20,6 +20,11 @@ import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import NachforderungListe from '../nachforderungen/NachforderungListe';
 import NachforderungFormular from '../nachforderungen/NachforderungFormular';
 import EinsatzSeite from '../components/EinsatzSeite';
+import {
+  NACHFORDERUNG_VORBELEGUNG_PARAMS,
+  parseNachforderungVorbelegung,
+  type NachforderungVorbelegung,
+} from '../routing/deeplinks';
 import { Paneel, Segmentleiste, useRollen } from '../components/instrument';
 
 /** Schlüssel-Zeitstempel der Abgeschlossen-Ansicht: Eintreffen ODER Ablehnung. */
@@ -38,6 +43,14 @@ export default function NachforderungenPage() {
   const [ansicht, setAnsicht] = useState<'offen' | 'abgeschlossen'>('offen');
   // Inline-Erfassen-Formular (LFH-112): per Kopf-Button auf-/zugeklappt, kein Drawer/Sidebar.
   const [formOffen, setFormOffen] = useState(false);
+  // Vorbelegung aus `?neu=1&art=…` (LFH-634, D9). Lebt nur, solange die Erfassung offen ist:
+  // wer schließt und neu öffnet, bekommt die leere Maske, nicht den alten Auftrag.
+  const [vorbelegung, setVorbelegung] = useState<NachforderungVorbelegung | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const schliesseFormular = () => {
+    setFormOffen(false);
+    setVorbelegung(null);
+  };
   // Ablehnen-Dialog: Grund (optional) wird erhoben, bevor abgelehnt wird.
   const [ablehnenId, setAblehnenId] = useState<number | null>(null);
   const [ablehnenGrund, setAblehnenGrund] = useState('');
@@ -110,6 +123,37 @@ export default function NachforderungenPage() {
     },
     onError: fehler,
   });
+  const darfSchreibenRoh = darfImEinsatzSchreiben(einsatzQuery.data, benutzer);
+
+  /**
+   * Erfassung per Deeplink (LFH-634, D9): `?neu=1` öffnet sie, eine Vorbelegung
+   * (`art`/`bezeichnung`/`anzahl`/`begruendung`) füllt sie. Apply-then-clean wie der
+   * Platzier-Auftrag in `LagekartePage.tsx`: erst anwenden, dann räumen, `replace` statt
+   * eines neuen Verlaufseintrags, und `searchParams` wird kopiert statt in-place mutiert.
+   * Ein stehengebliebener Auftrag öffnete das Formular sonst bei jedem Neuladen.
+   *
+   * Der Lade-Riegel steht VOR dem Räumen: `darfImEinsatzSchreiben` liefert für einen noch
+   * nicht geladenen Einsatz `false`. Ohne Riegel räumte der erste Commit den Parameter und
+   * der Deeplink wäre bei F5 oder aus einem neuen Tab still verloren.
+   *
+   * Eine unbrauchbare Vorbelegung wird ganz verworfen (`parseNachforderungVorbelegung`),
+   * die Erfassung öffnet dann leer. Ohne Schreibrecht öffnet nichts — geräumt wird trotzdem.
+   */
+  useEffect(() => {
+    const neu = searchParams.get('neu') === '1';
+    const hatVorbelegung = NACHFORDERUNG_VORBELEGUNG_PARAMS.some((k) => searchParams.has(k));
+    if (!neu && !hatVorbelegung) return;
+    if (einsatzQuery.isLoading) return;
+    if (darfSchreibenRoh) {
+      setVorbelegung(parseNachforderungVorbelegung(searchParams));
+      setFormOffen(true);
+    }
+    const naechste = new URLSearchParams(searchParams);
+    naechste.delete('neu');
+    for (const k of NACHFORDERUNG_VORBELEGUNG_PARAMS) naechste.delete(k);
+    setSearchParams(naechste, { replace: true });
+  }, [searchParams, setSearchParams, einsatzQuery.isLoading, darfSchreibenRoh]);
+
   const ablehnenBestaetigen = () => {
     if (ablehnenId != null) {
       ablehnenMutation.mutate({ nfId: ablehnenId, grund: ablehnenGrund.trim() || undefined });
@@ -181,7 +225,7 @@ export default function NachforderungenPage() {
           <Button
             type="primary"
             icon={formOffen ? <UpOutlined /> : <PlusOutlined />}
-            onClick={() => setFormOffen((o) => !o)}
+            onClick={() => (formOffen ? schliesseFormular() : setFormOffen(true))}
           >
             {formOffen ? 'Formular schließen' : 'Nachforderung anlegen'}
           </Button>
@@ -197,13 +241,14 @@ export default function NachforderungenPage() {
             <Button
               type="text"
               icon={<CloseOutlined />}
-              onClick={() => setFormOffen(false)}
+              onClick={schliesseFormular}
               aria-label="Formular schließen"
             />
           }
         >
           <NachforderungFormular
             card={false}
+            vorbelegung={vorbelegung}
             senden={anlegenMutation.isPending}
             // mutateAsync: die Erfassungshülle darf die Felder nur leeren, wenn die
             // Nachforderung wirklich angekommen ist (LFH-332/B4).

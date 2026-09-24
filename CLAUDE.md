@@ -436,6 +436,26 @@ Lücken-Filter fällt dabei). Ein Filterwert „patienten“ existiert bewusst n
 Patient eine Darstellung ist und kein Status. Die Entscheidung je Entwurfsmodul steht in
 `docs/design/2026-09-21-neuentwurf/umsetzung.md`.
 
+**Verpflegung ist ein Fachmodul mit eigenen Zeitfenstern, nicht mit Schichten** (LFH-634,
+`pages/VerpflegungPage.tsx`, Backend `src/verpflegung/`). Die Schicht aus LFH-635 hängt an
+einer Einheit, eine einsatzweite Schicht gibt es nicht. Verpflegung führt deshalb eigene
+Zeitfenster (Bezeichnung, von, bis). **Der Bedarf in EP wird erfasst, nicht live gerechnet.**
+Personalstärke (`verdichte`) und Kopfzahl „in Betreuung“ (LFH-639) sind nur überschreibbare
+Vorschläge beim Anlegen. Ein live gerechneter Bedarf verschöbe still die Unterdeckung
+vergangener Zeitfenster, denn Dispositionen werden hart gelöscht. Ein Vorschlag aus einer
+Quelle, die nichts liefert, bleibt leer, nicht 0. „Nichts gemeldet“ heißt in Betreuung: keine
+Stelle trägt `belegt`. `stellen` führt auch Stellen ohne Meldung. Eine Quelle ohne Modulzugang
+(ausgeblendet, gesperrt, 403) entfällt still. **Sonderkost ist eine Teilmenge der EP, kein
+Zuschlag**, mit fünf festen Kostformen als Spalten und DB-CHECK. **Nachschub hat eine
+Wahrheit, die Nachforderung**: Eine Ausgabe verweist höchstens per `nachforderung_id` darauf,
+ohne hineingejointe Felder, sonst läse ein Verpflegungs-Leser Nachforderungsdaten ohne Recht.
+„Nachfordern“ springt vorbelegt (`nachforderungenPfad(…, { vorbelegung })`, apply-then-clean).
+Fehlmenge und Deckung rechnet der Server, die zeitabhängige Einstufung
+(`verpflegung/deckung.ts`) nur der Client. „Unterdeckung“ gilt erst ab Beginn, davor „offen“.
+Ins ETB kommen nur Zeitfenster und Bedarf, keine Ausgaben, der Zeitraum steht in der
+Org-Zeitzone. **Einen Modulzähler gibt es bewusst nicht**, der Entwurf zeigt keinen. S4 führt
+Verpflegung statt Fahrzeuge. Offline-Erfassung ist LFH-688.
+
 **Eine benannte Ausnahme: der Navigations-Drawer** (LFH-329/B1, `einsatz/EinsatzLayout.tsx`
 mit `einsatz/ModulAkkordeon.tsx`). Unterhalb `lg` liegt der Einsatz-Navigationsrahmen in einem
 Drawer statt inline. Er zeigt **Navigation, keine Entität** — kein Datensatz, kein Formular,
@@ -1031,7 +1051,10 @@ Alltag wichtigsten:
   nicht eine Domänen-Achse. Nach LFH-358 stand sie bei 15; seither kamen `hochwasserKlasse`
   (LFH-77) und `odlStufe` (LFH-78, Entscheidung 4 in
   `openspec/changes/archive/2026-09-21-lfh-78-fachebene-odl/design.md`) und
-  `luftqualitaetIndex` (LFH-79) dazu — **Stand 22.09.2026: 18**. Der Neuentwurf hat **keine**
+  `luftqualitaetIndex` (LFH-79) dazu — Stand 22.09.2026: 18. Seither kamen unter anderem
+  `abschnittLagezustand` (LFH-608), `abloesungEinstufung` (LFH-635), `betreuungsstelleStatus`
+  und `raeumungszustand` (LFH-639) sowie `verpflegungDeckung` (LFH-634) dazu — **Stand
+  24.09.2026: 24** (`ALLE_MAPS` in `statusFarben.test.ts`). Der Neuentwurf hat **keine**
   Karte hinzugefügt: ETB-Typfarben und Warnstufen-Balken sind eigene Paletten
   (`etbTypFarbe`/`warnstufeBalkenFarbe`), keine `StatusDarstellung`. Jede weitere Karte bleibt
   eine eigene Entscheidung, die im Ticket begründet wird.

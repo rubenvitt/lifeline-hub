@@ -231,6 +231,41 @@ export interface components {
             /** Format: int64 */
             ueberfaellig: number;
         };
+        /** @description Eine Ausgabe gegen ein Zeitfenster. Von der Nachforderung trägt sie NUR die Kennung. */
+        AusgabeAnzeige: {
+            bemerkung?: string | null;
+            erfasst_at: string;
+            /** Format: int64 */
+            id: number;
+            /** Format: int64 */
+            menge: number;
+            /**
+             * Format: int64
+             * @description Verweis auf eine Nachforderung desselben Einsatzes — nur die Kennung, keine Angaben
+             *     der Nachforderung.
+             */
+            nachforderung_id?: number | null;
+            ort?: string | null;
+            sonderkost: components["schemas"]["Sonderkost"];
+            /** Format: int64 */
+            zeitfenster_id: number;
+            /**
+             * @description UTC ohne Zonenkennung (`YYYY-MM-DD HH:MM:SS`). Darf außerhalb des Zeitfensters liegen
+             *     (Anlieferung vor Beginn).
+             */
+            zeitpunkt_at: string;
+            /** @description Gesetzt, wenn die Ausgabe zurückgenommen ist; sie zählt dann nicht mehr mit. */
+            zurueckgenommen_at?: string | null;
+        };
+        /**
+         * @description Antwort auf „Ausgabe erfassen“ und „Ausgabe zurücknehmen“: die Kennung der Ausgabe (für
+         *     „Rückgängig“) und das Zeitfenster danach.
+         */
+        AusgabeErgebnis: {
+            /** Format: int64 */
+            ausgabe_id: number;
+            zeitfenster: components["schemas"]["ZeitfensterAnzeige"];
+        };
         /** @enum {string} */
         Ausmass: "gering" | "mittel" | "gross" | "katastrophal";
         /** @description Öffentliche Darstellung eines Providers für die Login-UI (`GET /api/auth/providers`). */
@@ -253,6 +288,19 @@ export interface components {
          * @enum {string}
          */
         BasemapModus: "online" | "offline" | "blind";
+        /** @description Erfasster Bedarf eines Zeitfensters. `gesamt` ist die Summe der drei Teile. */
+        Bedarf: {
+            /** Format: int64 */
+            betreute: number;
+            /** Format: int64 */
+            gesamt: number;
+            /** Format: int64 */
+            kraefte: number;
+            /** @description Teilmenge von `gesamt`; der Rest ist Normalkost. */
+            sonderkost: components["schemas"]["Sonderkost"];
+            /** Format: int64 */
+            weitere: number;
+        };
         /** @description Ein gefüllter Abschnitt (so persistiert als JSON-Array-Element). */
         BefehlAbschnitt: {
             schluessel: string;
@@ -1867,7 +1915,7 @@ export interface components {
          *     die Emitter routen über `as_str()`, das Frontend filtert exakt auf diese Wire-Tags.
          * @enum {string}
          */
-        LiveEvent: "uhs" | "schaden" | "fahrzeug" | "material" | "tier" | "lage_zone" | "freies_zeichen" | "gefahr" | "einheit" | "abschnitt" | "person" | "personal" | "lagebericht" | "chat" | "erinnerung" | "auftrag" | "nachforderung" | "meldung" | "bereitstellungsraum" | "karte_bild" | "etb" | "befehl" | "stab" | "dokument" | "abloesung" | "betreuung" | "karten_ansicht" | "lage_snapshot" | "sofortmeldung" | "lagged";
+        LiveEvent: "uhs" | "schaden" | "fahrzeug" | "material" | "tier" | "lage_zone" | "freies_zeichen" | "gefahr" | "einheit" | "abschnitt" | "person" | "personal" | "lagebericht" | "chat" | "erinnerung" | "auftrag" | "nachforderung" | "meldung" | "bereitstellungsraum" | "karte_bild" | "etb" | "befehl" | "stab" | "dokument" | "abloesung" | "betreuung" | "verpflegung" | "karten_ansicht" | "lage_snapshot" | "sofortmeldung" | "lagged";
         /** @description Öffentliche Material-Darstellung (ohne `org_id`). */
         MaterialAnzeige: {
             angelegt_at: string;
@@ -2569,6 +2617,12 @@ export interface components {
          * @enum {string}
          */
         PlatzTyp: "wartebereich" | "behandlungsplatz" | "bett" | "intensivplatz" | "trage" | "transport_bereitstellung" | "sonstige";
+        /** @description Eine Portionenzahl gesamt und je Kostform — die Form von `ausgegeben` und `fehlmenge`. */
+        Portionen: {
+            /** Format: int64 */
+            gesamt: number;
+            sonderkost: components["schemas"]["Sonderkost"];
+        };
         /**
          * @description Geteilte Priorität für Auftrag/Meldung/Nachforderung (Schema-Anker für die OpenAPI-Union,
          *     LFH-120; TS: `AuftragPrioritaet`/`MeldungPrioritaet`/`NachforderungPrioritaet`). Wire == `prioritaet`.
@@ -2718,6 +2772,22 @@ export interface components {
          * @enum {string}
          */
         Sichtungskategorie: "sk1" | "sk2" | "sk3" | "sk4" | "tot" | "unverletzt";
+        /**
+         * @description Anzahl EP je Kostform, ohne Personenbezug. Der Satz der Kostformen ist fest; der Rest bis
+         *     zur Gesamtzahl ist Normalkost.
+         */
+        Sonderkost: {
+            /** Format: int64 */
+            diaet_allergenarm: number;
+            /** Format: int64 */
+            ohne_schwein: number;
+            /** Format: int64 */
+            saeugling_kleinkind: number;
+            /** Format: int64 */
+            vegan: number;
+            /** Format: int64 */
+            vegetarisch: number;
+        };
         /**
          * @description Spezies-Enum. String = CHECK-Constraint. `etb_label` ist die pseudonyme
          *     Anzeige in der ETB-Spur (z. B. "Hund").
@@ -2999,6 +3069,11 @@ export interface components {
          * @enum {string}
          */
         Verfuegbarkeit: "frei" | "defekt" | "aufbereitung" | "gesperrt" | "reserviert";
+        /** @description Die eine Lesequelle der Modulseite (`GET …/verpflegung`). */
+        VerpflegungAnzeige: {
+            /** @description Nach Beginn geordnet. */
+            zeitfenster: components["schemas"]["ZeitfensterAnzeige"][];
+        };
         /**
          * @description Eine im karten_dir vorhandene, aber noch nicht registrierte MBTiles-Datei — Kandidat für den
          *     lokalen Import gebauter Region-Packs (LFH-199, ohne Download/Hosting).
@@ -3129,6 +3204,27 @@ export interface components {
              */
             daten?: components["schemas"]["WetterWarnung"][] | null;
             zustand: components["schemas"]["WetterTeilZustand"];
+        };
+        /** @description Ein Zeitfenster mit Deckung und allen Ausgaben (auch zurückgenommenen). */
+        ZeitfensterAnzeige: {
+            angelegt_at: string;
+            /** @description Nach Zeitpunkt, zurückgenommene mit `zurueckgenommen_at`. */
+            ausgaben: components["schemas"]["AusgabeAnzeige"][];
+            /** @description Summe der nicht zurückgenommenen Ausgaben. */
+            ausgegeben: components["schemas"]["Portionen"];
+            bedarf: components["schemas"]["Bedarf"];
+            bezeichnung: string;
+            /** @description Ende, UTC ohne Zonenkennung; liegt immer nach `von_at`. */
+            bis_at: string;
+            /** Format: int64 */
+            einsatz_id: number;
+            /** @description Je `max(0, bedarf − ausgegeben)`, gesamt und je Kostform. */
+            fehlmenge: components["schemas"]["Portionen"];
+            geaendert_at?: string | null;
+            /** Format: int64 */
+            id: number;
+            /** @description Beginn, UTC ohne Zonenkennung. */
+            von_at: string;
         };
         /**
          * @description Zeitformat (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `zeitformat`

@@ -58,7 +58,9 @@ export const SACHGEBIETE: readonly SachgebietEintrag[] = [
     label: 'Versorgung',
     aufgaben: 'Einsatzmittel und Verbrauchsgüter anfordern, Verpflegung und Materialerhaltung',
     seite: 58,
-    werkzeuge: ['nachforderungen', 'material', 'fahrzeuge'],
+    // Verpflegung statt Fahrzeuge (LFH-634): die Zeile trägt höchstens drei Werkzeuge, und
+    // die Verpflegung ist wörtlich Aufgabe von S4 („Verpflegung und Materialerhaltung").
+    werkzeuge: ['nachforderungen', 'verpflegung', 'material'],
   },
   {
     sachgebiet: 's5',

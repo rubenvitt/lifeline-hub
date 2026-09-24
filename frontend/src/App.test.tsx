@@ -278,6 +278,22 @@ describe('App-Routing', () => {
     expect(screen.queryByText(/🚧/)).not.toBeInTheDocument();
   });
 
+  it('verpflegung-Route rendert die VerpflegungPage statt Stub (LFH-634)', async () => {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
+      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+      http.get('/api/einsaetze/7/verpflegung', () => HttpResponse.json({ zeitfenster: [] })),
+    );
+    renderApp('/einsaetze/7/verpflegung');
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { level: 1, name: 'Verpflegung' })).toBeInTheDocument(),
+    );
+    // Der Stub trägt denselben Titel — unterschieden wird am Platzhalter selbst.
+    expect(screen.queryByText(/🚧/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Dieser Bereich ist geplant/)).not.toBeInTheDocument();
+  });
+
   it('fahrzeuge-Route rendert die echte FahrzeugePage statt Stub', async () => {
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json(admin)),

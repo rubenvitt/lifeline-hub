@@ -1,8 +1,10 @@
 import { Col, Form, Input, InputNumber, Row } from 'antd';
+import { useEffect } from 'react';
 import { Paneel } from '../components/instrument';
 import { Select } from '../components/Select';
 import { ErfassungsFormular } from '../components/Erfassung';
 import type { AdressatKategorie, NachforderungPrioritaet, NeueNachforderung } from '../api/types';
+import type { NachforderungVorbelegung } from '../routing/deeplinks';
 
 const { TextArea } = Input;
 
@@ -39,6 +41,7 @@ export default function NachforderungFormular({
   senden,
   onAnlegen,
   card = true,
+  vorbelegung,
 }: {
   senden: boolean;
   /**
@@ -50,8 +53,31 @@ export default function NachforderungFormular({
   /** Umschließendes Paneel mit Titel rendern. `false` für Inline-Einbettung, wo der
    *  Container den Titel schon liefert (vermeidet doppelte Überschrift, LFH-112). */
   card?: boolean;
+  /**
+   * Vorbelegung aus einem Deeplink (LFH-634, D9 — „Nachfordern" aus der Verpflegung).
+   *
+   * Bewusst NICHT über `initialValues`: die Erfassungshülle setzt nach jedem Absetzen per
+   * `resetFields()` auf die Startwerte zurück, und dieses Formular bleibt danach offen
+   * (Serie). Als Startwert stünde dieselbe Nachforderung nach dem Absetzen sofort wieder
+   * vorbelegt da — einen Druck vor der Dublette. `setFieldsValue` beim Öffnen ist das
+   * Vorbelegen, das die Erfassungs-Norm vom Zurücksetzen ausnimmt; danach führt jeder
+   * Reset auf die leere Maske.
+   */
+  vorbelegung?: NachforderungVorbelegung | null;
 }) {
   const [form] = Form.useForm<FormWerte>();
+
+  // Läuft nach dem Einhängen des `<Form>` (Kind-Effekte vor Eltern-Effekten) und nur,
+  // wenn der Aufrufer eine NEUE Vorbelegung reicht — die Seite hält sie identitätsstabil.
+  useEffect(() => {
+    if (!vorbelegung) return;
+    form.setFieldsValue({
+      art: vorbelegung.art,
+      bezeichnung: vorbelegung.bezeichnung,
+      anzahl: vorbelegung.anzahl,
+      begruendung: vorbelegung.begruendung ?? '',
+    });
+  }, [form, vorbelegung]);
 
   // Das `return` ist tragend: die Hülle wartet auf diese Zusage (LFH-332/B4).
   const absenden = (w: FormWerte) => {
@@ -136,7 +162,10 @@ export default function NachforderungFormular({
         </Col>
         <Col xs={24} sm={12}>
           <Form.Item name="begruendung" label="Begründung / Lagebezug">
-            <TextArea rows={1} />
+            {/* Wächst bis vier Zeilen: eine Vorbelegung aus der Verpflegung (LFH-634) trägt
+                Bedarf, Ausgabe und fehlende Sonderkost — in einer festen Zeile war die Hälfte
+                davon nicht zu sehen. */}
+            <TextArea autoSize={{ minRows: 1, maxRows: 4 }} />
           </Form.Item>
         </Col>
       </Row>

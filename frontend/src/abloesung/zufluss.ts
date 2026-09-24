@@ -54,6 +54,11 @@
  * `Datensicht` und `etb/zeitachseModell.ts`. Sie verlässt dabei auch den gezeigten Stand:
  * bringt eine fremde Rücknahme sie zurück, ist sie wieder Zuwachs.
  *
+ * GENERISCH ÜBER DEN SORTIERSCHLÜSSEL (LFH-634): Die Verpflegung nimmt dieselbe Schleuse für
+ * ihre Zeitfenster, Schlüssel dort `von_at` (Server: `ORDER BY von_at, id`). Die `…Nach`-
+ * Varianten nehmen den Schlüssel als Zugriff; `teileZufluss`/`nachgefuehrt`/`freigegeben` sind
+ * die Ablösungs-Belegung mit der Fälligkeit.
+ *
  * NULL GEZEIGTE KARTEN HALTEN NICHTS ZURÜCK: ohne Karte steht kein Cursor über einer Karte,
  * und ein Leerzustand „Keine laufenden Schichten" neben einem Banner „1 neue Schicht" wäre
  * ein Widerspruch (dieselbe Falle, die `Datensicht` beim Einfrieren der leeren Ladeansicht
@@ -75,11 +80,21 @@ export interface Zuflussstand {
 
 export const LEERER_ZUFLUSSSTAND: Zuflussstand = { gezeigt: null, eigene: new Set() };
 
-export interface Zuflussteilung {
+/** Was die Schleuse von einem Eintrag braucht: seine Kennung. */
+interface MitId {
+  id: number;
+}
+
+/** Sortierschlüssel eines Eintrags als Wire-String (lexikographisch sortierbar, wie in SQLite). */
+export type Sortierschluessel<T> = (eintrag: T) => string;
+
+const FAELLIGKEIT: Sortierschluessel<Abloesung> = (s) => s.faellig_at;
+
+export interface Zuflussteilung<T = Abloesung> {
   /** Die gerenderte Liste, in der gezeigten (eingefrorenen) Folge, mit frischem Inhalt. */
-  sichtbar: Abloesung[];
+  sichtbar: T[];
   /** Fremde Neuzugänge hinter dem Banner. */
-  zurueckgehalten: Abloesung[];
+  zurueckgehalten: T[];
   /** Die Server-Ordnung der sichtbaren Karten weicht von der gezeigten ab. */
   umgeordnet: boolean;
 }
@@ -88,12 +103,20 @@ export interface Zuflussteilung {
  * Teilt die laufenden Schichten (Server-Ordnung) in gezeigte und zurückgehaltene und ordnet
  * die gezeigten nach ihrem eingefrorenen Schlüssel.
  */
-export function teileZufluss(laufende: readonly Abloesung[], stand: Zuflussstand): Zuflussteilung {
+export function teileZuflussNach<T extends MitId>(
+  laufende: readonly T[],
+  stand: Zuflussstand,
+  schluesselVon: Sortierschluessel<T>,
+): Zuflussteilung<T> {
   const { gezeigt, eigene } = stand;
-  const alles = { sichtbar: [...laufende], zurueckgehalten: [], umgeordnet: false };
+  const alles: Zuflussteilung<T> = {
+    sichtbar: [...laufende],
+    zurueckgehalten: [],
+    umgeordnet: false,
+  };
   if (gezeigt == null) return alles;
-  const server: Abloesung[] = [];
-  const zurueckgehalten: Abloesung[] = [];
+  const server: T[] = [];
+  const zurueckgehalten: T[] = [];
   for (const s of laufende) {
     if (gezeigt.has(s.id) || eigene.has(s.id)) server.push(s);
     else zurueckgehalten.push(s);
@@ -103,7 +126,7 @@ export function teileZufluss(laufende: readonly Abloesung[], stand: Zuflussstand
   // seiner Liste: bei gleicher eingefrorener Fälligkeit (in derselben Sekunde begonnene
   // Schichten, im Browser gemessen) fiele ein stabiles Sortieren sonst auf die NEUE Folge
   // zurück, und die fremd vorgezogene Karte spränge doch.
-  const schluessel = (s: Abloesung) => gezeigt.get(s.id) ?? s.faellig_at;
+  const schluessel = (s: T) => gezeigt.get(s.id) ?? schluesselVon(s);
   const sichtbar = [...server].sort((a, b) => {
     const ka = schluessel(a);
     const kb = schluessel(b);
@@ -111,6 +134,11 @@ export function teileZufluss(laufende: readonly Abloesung[], stand: Zuflussstand
   });
   const umgeordnet = sichtbar.some((s, i) => s.id !== server[i].id);
   return { sichtbar, zurueckgehalten, umgeordnet };
+}
+
+/** Ablösung: Sortierschlüssel ist die Fälligkeit. */
+export function teileZufluss(laufende: readonly Abloesung[], stand: Zuflussstand): Zuflussteilung {
+  return teileZuflussNach(laufende, stand, FAELLIGKEIT);
 }
 
 /**
@@ -121,14 +149,15 @@ export function teileZufluss(laufende: readonly Abloesung[], stand: Zuflussstand
  * diesen Riegel liefe er in eine Schleife. Deshalb vergleicht er auch die SCHLÜSSEL, nicht nur
  * die Ids.
  */
-export function nachgefuehrt(
+export function nachgefuehrtNach<T extends MitId>(
   stand: Zuflussstand,
-  sichtbar: readonly Abloesung[],
+  sichtbar: readonly T[],
   umgeordnet: boolean,
+  schluesselVon: Sortierschluessel<T>,
 ): Zuflussstand | null {
   const alt = stand.gezeigt;
   const gezeigt = new Map(
-    sichtbar.map((s) => [s.id, (umgeordnet && alt?.get(s.id)) || s.faellig_at] as const),
+    sichtbar.map((s) => [s.id, (umgeordnet && alt?.get(s.id)) || schluesselVon(s)] as const),
   );
   const eigene = new Set([...stand.eigene].filter((id) => !gezeigt.has(id)));
   const gleich =
@@ -139,9 +168,27 @@ export function nachgefuehrt(
   return gleich ? null : { gezeigt, eigene };
 }
 
+/** Ablösung: Sortierschlüssel ist die Fälligkeit. */
+export function nachgefuehrt(
+  stand: Zuflussstand,
+  sichtbar: readonly Abloesung[],
+  umgeordnet: boolean,
+): Zuflussstand | null {
+  return nachgefuehrtNach(stand, sichtbar, umgeordnet, FAELLIGKEIT);
+}
+
 /** Banner bedient oder Ansicht gewechselt: die volle Menge wird gezeigt, nach frischer Folge. */
+export function freigegebenNach<T extends MitId>(
+  stand: Zuflussstand,
+  laufende: readonly T[],
+  schluesselVon: Sortierschluessel<T>,
+): Zuflussstand {
+  return { gezeigt: new Map(laufende.map((s) => [s.id, schluesselVon(s)])), eigene: stand.eigene };
+}
+
+/** Ablösung: Sortierschlüssel ist die Fälligkeit. */
 export function freigegeben(stand: Zuflussstand, laufende: readonly Abloesung[]): Zuflussstand {
-  return { gezeigt: new Map(laufende.map((s) => [s.id, s.faellig_at])), eigene: stand.eigene };
+  return freigegebenNach(stand, laufende, FAELLIGKEIT);
 }
 
 /**

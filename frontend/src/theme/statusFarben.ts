@@ -483,6 +483,21 @@ export const abloesungEinstufung: Record<AbloesungEinstufung, StatusDarstellung>
 };
 
 /**
+ * Deckung eines Verpflegungszeitfensters (LFH-634, design.md D3). Die Einstufung rechnet
+ * `verpflegung/deckung.ts` im Client gegen die Uhr — das Backend liefert nur die Fehlmenge.
+ * „offen" ist `neutral`, nicht `achtung`: eine Fehlmenge vor Beginn ist Planungsstand, kein
+ * Befund; die Zahl steht trotzdem immer daneben. „Unterdeckung" ist erst nach Beginn `alarm`.
+ * Das Wort trägt den zweiten Kanal (WCAG 1.4.1).
+ */
+export type VerpflegungDeckung = 'gedeckt' | 'offen' | 'unterdeckung';
+
+export const verpflegungDeckung: Record<VerpflegungDeckung, StatusDarstellung> = {
+  gedeckt: { rolle: 'normal', label: 'gedeckt' },
+  offen: { rolle: 'neutral', label: 'offen' },
+  unterdeckung: { rolle: 'alarm', label: 'Unterdeckung' },
+};
+
+/**
  * Räumungszustand eines Evakuierungsbezirks (LFH-639, design.md D8). „angeordnet" und
  * „läuft" teilen sich `achtung` — beide sind Handlungsbedarf, die Räumung ist nicht
  * abgeschlossen; unterschieden wird über das Pflichtwort. „geräumt" ist der erreichte

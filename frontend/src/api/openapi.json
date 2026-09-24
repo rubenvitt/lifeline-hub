@@ -643,6 +643,86 @@
           }
         }
       },
+      "AusgabeAnzeige": {
+        "type": "object",
+        "description": "Eine Ausgabe gegen ein Zeitfenster. Von der Nachforderung trägt sie NUR die Kennung.",
+        "required": [
+          "id",
+          "zeitfenster_id",
+          "zeitpunkt_at",
+          "menge",
+          "sonderkost",
+          "erfasst_at"
+        ],
+        "properties": {
+          "bemerkung": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "erfasst_at": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "menge": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nachforderung_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Verweis auf eine Nachforderung desselben Einsatzes — nur die Kennung, keine Angaben\nder Nachforderung."
+          },
+          "ort": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sonderkost": {
+            "$ref": "#/components/schemas/Sonderkost"
+          },
+          "zeitfenster_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "zeitpunkt_at": {
+            "type": "string",
+            "description": "UTC ohne Zonenkennung (`YYYY-MM-DD HH:MM:SS`). Darf außerhalb des Zeitfensters liegen\n(Anlieferung vor Beginn)."
+          },
+          "zurueckgenommen_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Gesetzt, wenn die Ausgabe zurückgenommen ist; sie zählt dann nicht mehr mit."
+          }
+        }
+      },
+      "AusgabeErgebnis": {
+        "type": "object",
+        "description": "Antwort auf „Ausgabe erfassen“ und „Ausgabe zurücknehmen“: die Kennung der Ausgabe (für\n„Rückgängig“) und das Zeitfenster danach.",
+        "required": [
+          "ausgabe_id",
+          "zeitfenster"
+        ],
+        "properties": {
+          "ausgabe_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "zeitfenster": {
+            "$ref": "#/components/schemas/ZeitfensterAnzeige"
+          }
+        }
+      },
       "Ausmass": {
         "type": "string",
         "enum": [
@@ -696,6 +776,39 @@
           "offline",
           "blind"
         ]
+      },
+      "Bedarf": {
+        "type": "object",
+        "description": "Erfasster Bedarf eines Zeitfensters. `gesamt` ist die Summe der drei Teile.",
+        "required": [
+          "kraefte",
+          "betreute",
+          "weitere",
+          "gesamt",
+          "sonderkost"
+        ],
+        "properties": {
+          "betreute": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "gesamt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "kraefte": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sonderkost": {
+            "$ref": "#/components/schemas/Sonderkost",
+            "description": "Teilmenge von `gesamt`; der Rest ist Normalkost."
+          },
+          "weitere": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
       },
       "BefehlAbschnitt": {
         "type": "object",
@@ -5081,6 +5194,7 @@
           "dokument",
           "abloesung",
           "betreuung",
+          "verpflegung",
           "karten_ansicht",
           "lage_snapshot",
           "sofortmeldung",
@@ -6958,6 +7072,23 @@
           "sonstige"
         ]
       },
+      "Portionen": {
+        "type": "object",
+        "description": "Eine Portionenzahl gesamt und je Kostform — die Form von `ausgegeben` und `fehlmenge`.",
+        "required": [
+          "gesamt",
+          "sonderkost"
+        ],
+        "properties": {
+          "gesamt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sonderkost": {
+            "$ref": "#/components/schemas/Sonderkost"
+          }
+        }
+      },
       "Prioritaet": {
         "type": "string",
         "description": "Geteilte Priorität für Auftrag/Meldung/Nachforderung (Schema-Anker für die OpenAPI-Union,\nLFH-120; TS: `AuftragPrioritaet`/`MeldungPrioritaet`/`NachforderungPrioritaet`). Wire == `prioritaet`.",
@@ -7354,6 +7485,39 @@
           "tot",
           "unverletzt"
         ]
+      },
+      "Sonderkost": {
+        "type": "object",
+        "description": "Anzahl EP je Kostform, ohne Personenbezug. Der Satz der Kostformen ist fest; der Rest bis\nzur Gesamtzahl ist Normalkost.",
+        "required": [
+          "vegetarisch",
+          "vegan",
+          "ohne_schwein",
+          "diaet_allergenarm",
+          "saeugling_kleinkind"
+        ],
+        "properties": {
+          "diaet_allergenarm": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ohne_schwein": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "saeugling_kleinkind": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "vegan": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "vegetarisch": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
       },
       "Spezies": {
         "type": "string",
@@ -8086,6 +8250,22 @@
           "reserviert"
         ]
       },
+      "VerpflegungAnzeige": {
+        "type": "object",
+        "description": "Die eine Lesequelle der Modulseite (`GET …/verpflegung`).",
+        "required": [
+          "zeitfenster"
+        ],
+        "properties": {
+          "zeitfenster": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ZeitfensterAnzeige"
+            },
+            "description": "Nach Beginn geordnet."
+          }
+        }
+      },
       "VorhandeneKarte": {
         "type": "object",
         "description": "Eine im karten_dir vorhandene, aber noch nicht registrierte MBTiles-Datei — Kandidat für den\nlokalen Import gebauter Region-Packs (LFH-199, ohne Download/Hosting).",
@@ -8389,6 +8569,70 @@
           },
           "zustand": {
             "$ref": "#/components/schemas/WetterTeilZustand"
+          }
+        }
+      },
+      "ZeitfensterAnzeige": {
+        "type": "object",
+        "description": "Ein Zeitfenster mit Deckung und allen Ausgaben (auch zurückgenommenen).",
+        "required": [
+          "id",
+          "einsatz_id",
+          "bezeichnung",
+          "von_at",
+          "bis_at",
+          "bedarf",
+          "ausgegeben",
+          "fehlmenge",
+          "ausgaben",
+          "angelegt_at"
+        ],
+        "properties": {
+          "angelegt_at": {
+            "type": "string"
+          },
+          "ausgaben": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AusgabeAnzeige"
+            },
+            "description": "Nach Zeitpunkt, zurückgenommene mit `zurueckgenommen_at`."
+          },
+          "ausgegeben": {
+            "$ref": "#/components/schemas/Portionen",
+            "description": "Summe der nicht zurückgenommenen Ausgaben."
+          },
+          "bedarf": {
+            "$ref": "#/components/schemas/Bedarf"
+          },
+          "bezeichnung": {
+            "type": "string"
+          },
+          "bis_at": {
+            "type": "string",
+            "description": "Ende, UTC ohne Zonenkennung; liegt immer nach `von_at`."
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "fehlmenge": {
+            "$ref": "#/components/schemas/Portionen",
+            "description": "Je `max(0, bedarf − ausgegeben)`, gesamt und je Kostform."
+          },
+          "geaendert_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "von_at": {
+            "type": "string",
+            "description": "Beginn, UTC ohne Zonenkennung."
           }
         }
       },
