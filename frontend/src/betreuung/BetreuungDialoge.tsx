@@ -609,9 +609,11 @@ const STATUS_FOLGE: readonly BetreuungsstelleStatus[] = [
  * Zahl, die D4 verbietet. Erst die Meldung, dann der Status; zwei Aufrufe, zwei Tatsachen.
  *
  * Scheitert der zweite Aufruf, darf ein neuer Versuch die 0 NICHT noch einmal melden — sonst
- * stünde sie doppelt im Einsatztagebuch. Der Merker lebt so lange wie der Dialog. Er bleibt
- * auch neben der aktuellen Belegung nötig: zwischen gelungener Leermeldung und dem Refetch
- * steht noch die alte Zahl da, ein schneller zweiter Klick meldete die 0 sonst erneut.
+ * stünde sie doppelt im Einsatztagebuch. Der Merker hält deshalb die Belegungsmeldung fest,
+ * gegen die geleert wurde (LFH-681): bis der Refetch kommt, steht sie noch da, und ein zweiter
+ * Klick überspringt die 0. Ein Merker für den ganzen Dialog reichte nicht mehr, seit die
+ * Belegung live nachkommt — meldete danach jemand anderes wieder Personen, kündigte der Haken
+ * „Belegung 0 melden" an, übersprang sie aber, und jeder Versuch endete im 422.
  */
 export function StelleBearbeitenDialog({
   stelle,
@@ -631,7 +633,7 @@ export function StelleBearbeitenDialog({
 }) {
   const [form] = Form.useForm<StelleBearbeitenWerte>();
   const [beimOeffnen] = useState(stelle);
-  const leerGemeldet = useRef(false);
+  const geleertGegen = useRef<number | null>(null);
   const status = Form.useWatch('status', form);
   const belegt = stelle.belegung?.belegt ?? 0;
   // Nötig genau dann, wenn der PATCH das Schließen trägt (dreiseitig: selbst gewählt UND noch
@@ -662,9 +664,10 @@ export function StelleBearbeitenDialog({
       onErfassen={async (w) => {
         const patch = stellePatchDreiseitig(beimOeffnen, stelle, w);
         if (Object.keys(patch).length === 0) return;
-        if (brauchtLeermeldung && w.leermeldung && !leerGemeldet.current) {
+        const meldung = stelle.belegung?.id ?? null;
+        if (brauchtLeermeldung && w.leermeldung && geleertGegen.current !== meldung) {
           await onLeermeldung();
-          leerGemeldet.current = true;
+          geleertGegen.current = meldung;
         }
         await onErfassen(patch);
       }}

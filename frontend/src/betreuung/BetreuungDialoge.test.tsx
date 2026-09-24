@@ -547,6 +547,49 @@ describe('StelleBearbeitenDialog — Schließen einer belegten Stelle (design.md
     );
   });
 
+  it('LFH-681: kommt nach der eigenen Leermeldung eine NEUE Belegung, wird wieder geleert — nicht übersprungen', async () => {
+    const onErfassen = vi
+      .fn()
+      .mockRejectedValueOnce(new ApiError(503, 'Dienst nicht erreichbar'))
+      .mockResolvedValue(undefined);
+    const onLeermeldung = vi.fn().mockResolvedValue(undefined);
+    const dialogMit = (s: Betreuungsstelle) => (
+      <StelleBearbeitenDialog
+        stelle={s}
+        abschnitte={ABSCHNITTE}
+        laeuft={false}
+        fehler={null}
+        onErfassen={onErfassen}
+        onLeermeldung={onLeermeldung}
+        onSchliessen={() => {}}
+      />
+    );
+    const { rerender } = renderMitProviders(dialogMit(belegt));
+    const dialog = await screen.findByRole('dialog', { name: 'Stelle bearbeiten: Turnhalle Ost' });
+    await waehle(dialog, 'geschlossen');
+    await userEvent.click(await within(dialog).findByRole('checkbox', { name: /Belegung 0/ }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
+    expect(onLeermeldung).toHaveBeenCalledTimes(1);
+    // Refetch: die eigene 0 steht da …
+    rerender(
+      dialogMit(stelle({ belegung: { id: 41, belegt: 0, zeitpunkt_at: '2026-09-23 11:00:00' } })),
+    );
+    await waitFor(() => expect(within(dialog).queryByRole('checkbox')).toBeNull());
+    // … dann meldet jemand anderes 3 Personen.
+    rerender(
+      dialogMit(stelle({ belegung: { id: 42, belegt: 3, zeitpunkt_at: '2026-09-23 11:05:00' } })),
+    );
+    const haken = await within(dialog).findByRole('checkbox', { name: /Belegung 0/ });
+    if (!(haken as HTMLInputElement).checked) await userEvent.click(haken);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(2));
+    expect(onLeermeldung).toHaveBeenCalledTimes(2);
+    expect(onLeermeldung.mock.invocationCallOrder[1]).toBeLessThan(
+      onErfassen.mock.invocationCallOrder[1],
+    );
+  });
+
   it('LFH-681: hat jemand die Stelle inzwischen geschlossen, gibt es weder Leermeldung noch PATCH', async () => {
     const onErfassen = vi.fn().mockResolvedValue(undefined);
     const onLeermeldung = vi.fn();
