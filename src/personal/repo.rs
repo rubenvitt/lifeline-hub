@@ -1,7 +1,7 @@
 use super::{Personal, PersonalAnzeige, PersonalVorschlaege, QualifikationRef};
 use crate::error::AppError;
 use crate::katalog::{DIENSTSTATUS_AUSSER_DIENST, DIENSTSTATUS_IN_DIENST};
-use sqlx::SqlitePool;
+use sqlx::{SqliteConnection, SqlitePool};
 
 /// Spaltenliste für `SELECT` in der Reihenfolge von `Personal` (FromRow).
 const SPALTEN: &str = "id, org_id, benutzer_id, name, personalnummer, traegerorganisation, \
@@ -45,8 +45,9 @@ fn unique_conflict<T>(e: sqlx::Error) -> Result<T, AppError> {
 /// Validiert den optionalen Benutzer-Link: Konto muss zur Org gehören
 /// (`Validation`) und darf nicht schon mit einer anderen Person verknüpft sein
 /// (`Conflict`). `eigene_id` schließt die zu aktualisierende Person aus.
+/// Auf der Verbindung, damit [`anlegen_tx`] in einer offenen Transaktion prüft (LFH-690).
 async fn pruefe_benutzer_link(
-    pool: &SqlitePool,
+    conn: &mut SqliteConnection,
     org_id: i64,
     benutzer_id: i64,
     eigene_id: Option<i64>,
@@ -55,7 +56,7 @@ async fn pruefe_benutzer_link(
         sqlx::query_scalar("SELECT 1 FROM benutzer WHERE id = ? AND org_id = ?")
             .bind(benutzer_id)
             .bind(org_id)
-            .fetch_optional(pool)
+            .fetch_optional(&mut *conn)
             .await?;
     if gehoert.is_none() {
         return Err(AppError::Validation(
@@ -69,7 +70,7 @@ async fn pruefe_benutzer_link(
     .bind(org_id)
     .bind(eigene_id)
     .bind(eigene_id)
-    .fetch_optional(pool)
+    .fetch_optional(&mut *conn)
     .await?;
     if belegt.is_some() {
         return Err(AppError::Conflict(
@@ -108,13 +109,19 @@ async fn setze_qualifikationen(
 }
 
 /// Lädt eine Person der eigenen Org (roh); `NotFound` bei fremder/unbekannter id.
-pub async fn laden(pool: &SqlitePool, org_id: i64, id: i64) -> Result<Personal, AppError> {
+/// Executor-generisch (Pool oder offene Verbindung), damit [`anlegen_tx`] den frisch
+/// angelegten Datensatz in derselben Transaktion zurücklesen kann (LFH-690).
+pub async fn laden(
+    executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
+    org_id: i64,
+    id: i64,
+) -> Result<Personal, AppError> {
     sqlx::query_as::<_, Personal>(sqlx::AssertSqlSafe(format!(
         "SELECT {SPALTEN} FROM personal WHERE id = ? AND org_id = ?"
     )))
     .bind(id)
     .bind(org_id)
-    .fetch_optional(pool)
+    .fetch_optional(executor)
     .await?
     .ok_or(AppError::NotFound)
 }
@@ -228,16 +235,37 @@ pub async fn vorschlaege(pool: &SqlitePool, org_id: i64) -> Result<PersonalVorsc
 
 /// Legt eine Person an (mit optionaler Qualifikations-Zuordnung). Validiert den
 /// Benutzer-Link; Personalnummer-Dublette → `Conflict`.
+///
+/// Pool-Hülle um [`anlegen_tx`] in einer `write_retry!`-Transaktion. Bis LFH-690 lief die
+/// Link-Prüfung vor einem deferred `pool.begin()`; seit sie mit in die Transaktion gewandert
+/// ist, liest die Transaktion zuerst und schreibt dann. Unter einem deferred `BEGIN` wäre
+/// das ein Lock-Upgrade, das SQLite bei fremdem Writer sofort mit `SQLITE_BUSY` abweist
+/// (siehe `crate::tx`). `BEGIN IMMEDIATE` holt die Schreibsperre vorab.
 pub async fn anlegen(
     pool: &SqlitePool,
     org_id: i64,
     daten: PersonalDaten<'_>,
     qualifikation_ids: &[i64],
 ) -> Result<Personal, AppError> {
+    crate::write_retry!(pool, |conn| {
+        anlegen_tx(&mut *conn, org_id, &daten, qualifikation_ids).await
+    })
+}
+
+/// Legt eine Person auf einer offenen Verbindung/Transaktion an, samt Link-Prüfung und
+/// Qualifikations-Zuordnung, und liest sie dort zurück (LFH-690, Demo-Import in EINER
+/// Transaktion). Öffnet und committet selbst nichts — die Atomarität von Insert und
+/// Zuordnung liefert der Aufrufer. `Validation`/`Conflict` für den Benutzer-Link,
+/// Personalnummer-Dublette → `Conflict`.
+pub async fn anlegen_tx(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    daten: &PersonalDaten<'_>,
+    qualifikation_ids: &[i64],
+) -> Result<Personal, AppError> {
     if let Some(bid) = daten.benutzer_id {
-        pruefe_benutzer_link(pool, org_id, bid, None).await?;
+        pruefe_benutzer_link(&mut *conn, org_id, bid, None).await?;
     }
-    let mut tx = pool.begin().await?;
     let ergebnis = sqlx::query_scalar::<_, i64>(
         "INSERT INTO personal \
             (org_id, benutzer_id, name, personalnummer, traegerorganisation, telefon, \
@@ -252,16 +280,15 @@ pub async fn anlegen(
     .bind(daten.telefon)
     .bind(daten.staerke_position)
     .bind(daten.bemerkung)
-    .fetch_one(&mut *tx)
+    .fetch_one(&mut *conn)
     .await;
 
     let id = match ergebnis {
         Ok(id) => id,
         Err(e) => return unique_conflict(e),
     };
-    setze_qualifikationen(&mut tx, org_id, id, qualifikation_ids).await?;
-    tx.commit().await?;
-    laden(pool, org_id, id).await
+    setze_qualifikationen(&mut *conn, org_id, id, qualifikation_ids).await?;
+    laden(&mut *conn, org_id, id).await
 }
 
 /// Teil-Patch der editierbaren Stammfelder (LFH-306, Tri-State): die äußere `Option` sagt
@@ -305,7 +332,9 @@ pub async fn patche(
     // Nur prüfen, wenn ein Konto GESETZT werden soll — `Some(None)` (Link lösen) und
     // absent brauchen keine Prüfung.
     if let Some(Some(bid)) = patch.benutzer_id {
-        pruefe_benutzer_link(pool, org_id, bid, Some(id)).await?;
+        // Wie bisher vor der Transaktion; die geliehene Verbindung geht am Ende der
+        // Anweisung zurück an den Pool, bevor `begin` eine nimmt.
+        pruefe_benutzer_link(&mut *pool.acquire().await?, org_id, bid, Some(id)).await?;
     }
     let mut tx = pool.begin().await?;
     let ergebnis = sqlx::query(
@@ -366,7 +395,7 @@ pub async fn aktualisiere(
     // Existenz/Org sicherstellen (sonst NotFound statt stiller No-Op).
     laden(pool, org_id, id).await?;
     if let Some(bid) = daten.benutzer_id {
-        pruefe_benutzer_link(pool, org_id, bid, Some(id)).await?;
+        pruefe_benutzer_link(&mut *pool.acquire().await?, org_id, bid, Some(id)).await?;
     }
     let mut tx = pool.begin().await?;
     let ergebnis = sqlx::query(
