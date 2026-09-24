@@ -502,8 +502,9 @@ Alltag wichtigsten:
   `ConfigProvider`**, nicht `componentSize` und keine punktuellen Größen-Props. **Neues
   punktuelles `size="small"` auf interaktiven Elementen ist verboten**, erzwungen von
   `components/dichte.guard.test.ts` mit einer Schuldmenge `OFFEN`, die nur schrumpfen darf
-  (Stand: nur noch die geprüfte Dauerausnahme, die vier Knöpfe der UHS-Platzkarte in
-  `pages/uhs/Grundriss.tsx`, gebunden an `SCHRITT_Y = 120`). Wer eine Zeile aus `OFFEN`
+  (Stand: nur noch die vier Knöpfe der UHS-Platzkarte in `pages/uhs/Grundriss.tsx` — seit
+  LFH-359 nur in `kompakt` gerendert, wo 24 px der Boden sind; in den Berührungsstufen ist die
+  Karte selbst das eine Ziel mit Aktionsmenü, `platzBedienform`). Wer eine Zeile aus `OFFEN`
   streicht, tut es im selben Commit wie den Fix und prüft `aktionsabstand.guard.test.ts` mit.
   `Card`/`Descriptions`/`Space`/`Liste` dürfen klein bleiben (Abstandsmaß, keine Trefffläche)
   und gehören nicht in `OFFEN`. `controlHeight` = **30/48/72**, `controlHeightSM` = **24/48/72**.

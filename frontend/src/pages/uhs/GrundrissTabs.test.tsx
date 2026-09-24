@@ -177,7 +177,9 @@ const personenMitBelegung: Person[] = [
  * die App in keiner Stufe mit Knopfzeile erreicht. Diese Datei prüft die Knopfzeile des Fükw.
  */
 function kompakt(ui: ReactElement) {
-  return <ConfigProvider theme={{ token: antdToken(farbenDunkel, 'kompakt') }}>{ui}</ConfigProvider>;
+  return (
+    <ConfigProvider theme={{ token: antdToken(farbenDunkel, 'kompakt') }}>{ui}</ConfigProvider>
+  );
 }
 
 describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
@@ -185,9 +187,7 @@ describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
     const { listePersonen } = await import('../../api/einsatzPerson');
     vi.mocked(listePersonen).mockResolvedValue(personenOhneBelegung);
     setzeViewportBreite(1280);
-    renderMitProviders(
-        kompakt(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />),
-      );
+    renderMitProviders(kompakt(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />));
 
     // Beide Seitenspalten UND die Fläche gleichzeitig im Baum — das ist die Aussage
     // „nebeneinander", die unter lg nicht mehr gilt.
@@ -206,9 +206,7 @@ describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
     const { listePersonen } = await import('../../api/einsatzPerson');
     vi.mocked(listePersonen).mockResolvedValue(personenOhneBelegung);
     setzeViewportBreite(800); // < lg (992)
-    renderMitProviders(
-        kompakt(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />),
-      );
+    renderMitProviders(kompakt(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />));
 
     const reiter = await screen.findByRole('tablist');
     expect(within(reiter).getByRole('tab', { name: 'Fläche' })).toHaveAttribute(
@@ -223,9 +221,7 @@ describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
     const { listePersonen } = await import('../../api/einsatzPerson');
     vi.mocked(listePersonen).mockResolvedValue(personenOhneBelegung);
     setzeViewportBreite(800);
-    renderMitProviders(
-        kompakt(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />),
-      );
+    renderMitProviders(kompakt(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />));
 
     await screen.findByRole('tablist');
     // Ohne diese Zusicherung wäre ein verborgener zweiter Zweig eine unbemerkte Rückkehr
@@ -286,9 +282,7 @@ describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
       erfasst_von: 1,
     });
     setzeViewportBreite(800);
-    renderMitProviders(
-        kompakt(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />),
-      );
+    renderMitProviders(kompakt(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />));
     await userEvent.click(await screen.findByRole('tab', { name: 'Fläche' }));
 
     await userEvent.click(await screen.findByRole('button', { name: /Platzaktionen zu Bett 1/ }));
@@ -338,9 +332,7 @@ describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
       }),
     );
     setzeViewportBreite(800);
-    renderMitProviders(
-        kompakt(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />),
-      );
+    renderMitProviders(kompakt(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />));
     await userEvent.click(await screen.findByRole('tab', { name: 'Fläche' }));
     expect(await screen.findByText('belegt')).toBeInTheDocument();
 
@@ -364,9 +356,7 @@ describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
     const { listePersonen } = await import('../../api/einsatzPerson');
     vi.mocked(listePersonen).mockResolvedValue(personenOhneBelegung);
     setzeViewportBreite(1280);
-    renderMitProviders(
-        kompakt(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />),
-      );
+    renderMitProviders(kompakt(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />));
 
     await userEvent.click(await screen.findByRole('button', { name: /Platzaktionen zu Bett 1/ }));
     const menue = offenesMenue();
@@ -423,9 +413,7 @@ describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
     const { listePersonen } = await import('../../api/einsatzPerson');
     vi.mocked(listePersonen).mockResolvedValue(personenOhneBelegung);
     setzeViewportBreite(800);
-    renderMitProviders(
-        kompakt(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />),
-      );
+    renderMitProviders(kompakt(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />));
     await userEvent.click(await screen.findByRole('tab', { name: 'Wartebereich' }));
 
     await userEvent.click(
@@ -443,9 +431,7 @@ describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
     const { listePersonen } = await import('../../api/einsatzPerson');
     vi.mocked(listePersonen).mockResolvedValue(personenOhneBelegung);
     setzeViewportBreite(1280);
-    renderMitProviders(
-        kompakt(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt />),
-      );
+    renderMitProviders(kompakt(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt />));
 
     // AUF DIE ZEILE warten, nicht auf den Spaltentitel — der steht sofort, auch bevor die
     // Personen-Query aufgelöst hat. Gemessen: mit `findByText('Wartebereich (Eingang)')`
@@ -462,9 +448,7 @@ describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
     const { listePersonen } = await import('../../api/einsatzPerson');
     vi.mocked(listePersonen).mockResolvedValue(personenOhneBelegung);
     setzeViewportBreite(800);
-    renderMitProviders(
-        kompakt(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />),
-      );
+    renderMitProviders(kompakt(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />));
 
     // jsdom rechnet kein Layout — prüfbar ist der INLINE-STYLE, nicht ein Pixelwert.
     // Die 240 px sassen NIE am Rahmen selbst, sondern an den inneren Wrapper-Divs der

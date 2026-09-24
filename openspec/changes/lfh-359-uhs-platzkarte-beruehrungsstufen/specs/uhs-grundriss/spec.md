@@ -46,7 +46,8 @@ der Karte sein. Ein Tipp, ein Klick oder Enter auf der Karte MUST das Aktionsmen
 startet die Leertaste weiter den Tastatur-Zug des Layouts. Die Karte MUST keine Knopfzeile tragen, und in ihr darf kein
 weiteres Klickziel verschachtelt liegen. Der zugängliche Name der Karte MUST die Bezeichnung des
 Platzes nennen. Die Karte MUST in beiden Achsen mindestens die Steuerhöhe der Stufe messen, also
-48 bzw. 72 px, und jeder Menüeintrag ebenso.
+48 bzw. 72 px, und jeder Menüeintrag ebenso. Jeder Menüeintrag MUST vollständig im sichtbaren
+Fenster liegen, auch wenn das Menü dafür die Karte überdeckt oder selbst scrollen muss.
 
 #### Scenario: Tipp auf unbelegten Platz
 - **WHEN** in „komfortabel“ auf einen unbelegten Platz getippt wird
@@ -67,6 +68,10 @@ Platzes nennen. Die Karte MUST in beiden Achsen mindestens die Steuerhöhe der S
 #### Scenario: Trefffläche
 - **WHEN** das Menü einer Karte in „Handschuh“ geöffnet ist
 - **THEN** misst die Karte mindestens 72 × 72 px und jeder Menüeintrag mindestens 72 px in der Höhe
+
+#### Scenario: Langes Menü im Handschuh
+- **WHEN** das Menü eines belegten Platzes in „Handschuh“ bei 1024 × 900 px geöffnet wird
+- **THEN** liegen alle acht Einträge vollständig im Fenster, und ein Tipp auf den obersten öffnet den Verbleib-Dialog
 
 #### Scenario: Menüwahl löst nichts zusätzlich aus
 - **WHEN** im Menü eines unbelegten Platzes „als defekt markieren“ gewählt wird

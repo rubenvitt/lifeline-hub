@@ -27,12 +27,12 @@
 ## 4. Guards und e2e
 
 - [x] 4.1 Die Begründung des `OFFEN`-Eintrags in `components/dichte.guard.test.ts` neu schreiben (siehe design.md, Entscheidung 4). Der Guard muss grün bleiben.
-- [ ] 4.2 `e2e/uhs-grundriss-touch.spec.ts`: Der Mobil-Test tippt auf die Karte, wählt „Patient zuweisen“ im Menü und nimmt den Rückweg über die Karte und dann „Zurück in den Wartebereich“. Der Kommentar zum „Tipp auf den Titel“ entfällt. Neu dazu kommt ein Messtest für `komfortabel` und `handschuh` (Dichte über localStorage `lifeline-hub.dichte`). Er misst per `boundingBox()`, dass die Karte ≥ Stufe ist, öffnet das Menü **per Tipp** und misst jeden `menuitem` ≥ Stufe. Gegenprobe: Die Karte enthält keinen `button`. Beides muss in `pnpm e2e` für diese Datei grün sein.
-- [ ] 4.3 `e2e/uhs-grundriss-menue-belegung.spec.ts` und `uhs-grundriss-dnd.spec.ts` laufen in `kompakt`. Beide ohne Änderung laufen lassen und grün belegen.
+- [x] 4.2 `e2e/uhs-grundriss-touch.spec.ts`: Der Mobil-Test tippt auf die Karte, wählt „Patient zuweisen“ im Menü und nimmt den Rückweg über die Karte und dann „Zurück in den Wartebereich“. Der Kommentar zum „Tipp auf den Titel“ entfällt. Neu dazu kommt ein Messtest für `komfortabel` und `handschuh` (Dichte über localStorage `lifeline-hub.dichte`). Er misst per `boundingBox()`, dass die Karte ≥ Stufe ist, öffnet das Menü **per Tipp** und misst jeden `menuitem` ≥ Stufe. Gegenprobe: Die Karte enthält keinen `button`. Beides muss in `pnpm e2e` für diese Datei grün sein.
+- [x] 4.3 `e2e/uhs-grundriss-menue-belegung.spec.ts` und `uhs-grundriss-dnd.spec.ts` laufen in `kompakt`. Beide ohne Änderung laufen lassen und grün belegen.
 
 ## 5. Doku-Nachzug
 
-- [ ] 5.1 `CLAUDE.md:506` und `AGENTS.md:196/582` so fassen, dass die Ausnahme der Platzkarte nicht mehr „an `SCHRITT_Y` gebunden“ ist. Sie ist die Zeilenform in `kompakt` (24 px = Boden), die Berührungsstufen tragen die Kartenform (LFH-359). Der Rest des Absatzes bleibt unverändert. Belegt ist das mit einem Grep auf `SCHRITT_Y` danach: Übrig bleiben nur Stellen, die die Kartengröße begründen, keine, die eine Trefffläche begründen.
+- [x] 5.1 `CLAUDE.md:506` und `AGENTS.md:196/582` so fassen, dass die Ausnahme der Platzkarte nicht mehr „an `SCHRITT_Y` gebunden“ ist. Sie ist die Zeilenform in `kompakt` (24 px = Boden), die Berührungsstufen tragen die Kartenform (LFH-359). Der Rest des Absatzes bleibt unverändert. Belegt ist das mit einem Grep auf `SCHRITT_Y` danach: Übrig bleiben nur Stellen, die die Kartengröße begründen, keine, die eine Trefffläche begründen.
 - [ ] 5.2 `docs/leitlinien/bedien-leitlinie-herleitungen.md:32/257` fortschreiben: Ausnahme, gedeckelter Abstand und das Entfallen von `aktionsabstand`. In `docs/superpowers/specs/2026-07-30-uhs-grundriss-pruefliste.md` (eingefrorenes Archiv) kommt nur ein datierter Nachtrag „eingelöst durch LFH-359/LFH-379“ an die offenen Zeilen, der alte Text bleibt stehen.
 
 ## 6. Abschluss

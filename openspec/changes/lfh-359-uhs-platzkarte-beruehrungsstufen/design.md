@@ -115,6 +115,13 @@ hängt.
   sind: „Verbleib / Entlassung erfassen“ und „Person öffnen“ oben, „zurückweisen“ als
   `danger` hinter dem Trenner. Reihenfolge und Inhalt stehen in der Spec. „Platz löschen“ steht
   mit „zurückweisen“ im selben Gefahrblock.
+- **Menühöhe (bei der Umsetzung gemessen):** Ein belegter Platz trägt im Handschuh acht
+  Einträge à 72 px, zusammen rund 600 px. Bei 1024 × 900 ist das mehr, als unter oder über
+  der Karte Platz hat. antds Vorgabe für `bottomLeft` klappt nur um (`adjustY`). Passt keine
+  Seite, steht das Menü nach oben aus dem Fenster, und gerade die Primäraktion ist dann nicht
+  erreichbar (Bildschirmfoto im Verlauf). Deshalb `autoAdjustOverflow={{ adjustY, shiftY }}`,
+  dazu am Menü `maxHeight: calc(100dvh − 16px)` mit eigenem Scroll für niedrigere Fenster.
+  e2e: „alle Menüeinträge liegen im Fenster“. Die Mutationsprobe ohne `shiftY` ist rot.
 - **Personenmarke:** In der Kartenform bekommt `PersonenkarteDrag` kein `onOeffnen`. Ein Tipp
   auf die Marke steigt dann zur Karte auf und öffnet das Menü. Der Zug bleibt: dnd-kit
   unterdrückt nach einer Bewegung von 5 px den Klick, ein Zug öffnet also kein Menü.

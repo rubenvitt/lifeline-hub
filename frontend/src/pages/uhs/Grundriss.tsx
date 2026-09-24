@@ -721,9 +721,20 @@ function PlatzKarte({
   if (!kartenMenue) return knoten;
   // Kartenform mit Menü: die Karte selbst ist der Auslöser. Die Einträge messen
   // `controlHeight` (antds `paddingBlock` im Dropdown leitet sich daraus ab), also 48 / 72.
+  //
+  // HÖHE, gemessen bei 1024 × 900 im Handschuh: ein belegter Platz trägt acht Einträge,
+  // rund 600 px — mehr, als unter ODER über der Karte Platz hat. antds Vorgabe für
+  // `bottomLeft` klappt nur um (`adjustY`); passt keine Seite, stand das Menü nach oben
+  // aus dem Fenster, und gerade die Primäraktion oben war nicht erreichbar. `shiftY`
+  // schiebt es stattdessen ins Fenster (es darf die Karte dabei überdecken), und die
+  // Höhengrenze mit eigenem Scroll fängt Fenster ab, die selbst dafür zu niedrig sind.
   return (
     <Dropdown
-      menu={menu}
+      menu={{
+        ...menu,
+        style: { maxHeight: 'calc(100dvh - 16px)', overflowY: 'auto' },
+      }}
+      autoAdjustOverflow={{ adjustY: true, shiftY: true }}
       trigger={['click']}
       open={menueOffen}
       onOpenChange={(offen) => setMenueOffen(offen)}

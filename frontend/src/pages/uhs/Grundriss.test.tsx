@@ -6,7 +6,12 @@ import { http, HttpResponse } from 'msw';
 import { MemoryRouter } from 'react-router';
 import { server } from '../../test/server';
 import { App as AntApp, ConfigProvider } from 'antd';
-import Grundriss, { PLATZ_KARTE_BREITE, PLATZ_KARTE_HOEHE, platzBedienform, platzMenueEintraege } from './Grundriss';
+import Grundriss, {
+  PLATZ_KARTE_BREITE,
+  PLATZ_KARTE_HOEHE,
+  platzBedienform,
+  platzMenueEintraege,
+} from './Grundriss';
 import { antdToken, farbenDunkel, type Dichte } from '../../theme/tokens';
 import type { Person, PersonDetail, UhsBelegung, UhsDetail, UhsPlatz } from '../../api/types';
 import { einsatzKeys } from '../../api/queryKeys';
@@ -1067,9 +1072,9 @@ describe('Grundriss – Bedienform der Platzkarte je Dichtestufe (LFH-359/LFH-37
     // ist 24 (A1 Gate 3).
     const t = tokenFuer('kompakt');
     expect(t.controlHeightSM).toBeGreaterThanOrEqual(24);
-    expect(4 * t.controlHeightSM + 3 * (form.form === 'zeile' ? form.abstand : 0)).toBeLessThanOrEqual(
-      INNENBREITE,
-    );
+    expect(
+      4 * t.controlHeightSM + 3 * (form.form === 'zeile' ? form.abstand : 0),
+    ).toBeLessThanOrEqual(INNENBREITE);
   });
 
   it('macht in komfortabel und Handschuh die ganze Karte zum Bedienziel', () => {
@@ -1146,7 +1151,12 @@ describe('Grundriss – Inhalt des Platzmenüs (LFH-359)', () => {
       expect(folge(items)).toEqual(['zuweisen', '—', ...VERF]);
     });
     it('belegt: Wartebereich vor den Verfügbarkeiten, keine Patientenaktionen (die sind Knöpfe)', () => {
-      const items = platzMenueEintraege({ ...grund, form: 'zeile', belegt: true, wartebereich: true });
+      const items = platzMenueEintraege({
+        ...grund,
+        form: 'zeile',
+        belegt: true,
+        wartebereich: true,
+      });
       expect(folge(items)).toEqual(['wartebereich', ...VERF]);
     });
     it('Bearbeiten-Modus: Löschen hinter dem Trenner, als Gefahr', () => {
@@ -1163,7 +1173,12 @@ describe('Grundriss – Inhalt des Platzmenüs (LFH-359)', () => {
     });
 
     it('belegt: Verbleib oben, dann Person und Wartebereich, zurückweisen hinter dem Trenner', () => {
-      const items = platzMenueEintraege({ ...grund, form: 'karte', belegt: true, wartebereich: true });
+      const items = platzMenueEintraege({
+        ...grund,
+        form: 'karte',
+        belegt: true,
+        wartebereich: true,
+      });
       expect(folge(items)).toEqual([
         'verbleib',
         'person',
