@@ -13,7 +13,9 @@ Umsetzung.
 
 - [x] 2.1 `e2e/palette-oeffnung.spec.ts`: Dichte-Test öffnet die Vorschau per Klick aufs Ziel und misst dessen Box in allen drei Stufen (Höhe, Breite, bündig rechts, volle Zeilenhöhe).
 - [x] 2.2 Neuer Tablet-Test (`hasTouch`, 1024 × 768, Handschuh): Tipp aufs Ziel öffnet die Vorschau, Tipp aufs Label die Person.
+- [x] 2.3 Handschirm-Test (`hasTouch`, 390 × 844, Handschuh): kein waagerechter Überlauf in Zeile und Liste, Ziel ganz im Blick, ≥ 72 px, tippbar.
 
 ## 3. Doku
 
 - [x] 3.1 CLAUDE.md, Absatz Sprungpalette: das Tippziel eintragen.
+- [x] 3.2 Delta: auch die LFH-664-Anforderung „Jede Datensatzsorte hat eine Vorschau“ als MODIFIED mit vollem Text, statt eines Querverweises (Review-Befund).

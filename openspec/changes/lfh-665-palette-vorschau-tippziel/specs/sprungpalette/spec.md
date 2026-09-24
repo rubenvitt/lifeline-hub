@@ -6,9 +6,8 @@
 Die Fußzeile der Palette SHALL den Hinweis für den neuen Tab tragen (macOS: `⌘↵`, sonst
 `Strg+↵`). Innerhalb eines Einsatzes SHALL sie zusätzlich den Hinweis `→ Vorschau` tragen.
 Jede Zeile mit Vorschau MUST das Vorschau-Ziel zeigen, auch wenn sie nicht markiert ist; es
-ist die Zeilenmarke für die Vorschau und tritt an die Stelle der `→`-Marke aus LFH-645. Wo
-LFH-664 von der →-Marke einer markierten Zeile spricht, ist dieses Ziel gemeint. Neben dem
-Ziel MUST keine zweite →-Marke stehen. Die Fußzeile MUST für ⇧↵ keinen Hinweis tragen.
+ist die Zeilenmarke für die Vorschau und tritt an die Stelle der `→`-Marke aus LFH-645.
+Neben dem Ziel MUST keine zweite →-Marke stehen. Die Fußzeile MUST für ⇧↵ keinen Hinweis tragen.
 Solange die Vorschau offen ist, MUST die Fußzeile die dort gültigen Wege nennen: öffnen,
 neuer Tab und zurück.
 
@@ -23,6 +22,54 @@ neuer Tab und zurück.
 #### Scenario: Kein Vorschauhinweis außerhalb eines Einsatzes
 - **WHEN** die Palette auf der Einsatzauswahl geöffnet wird
 - **THEN** nennt die Fußzeile den neuen Tab, aber keine Vorschau
+
+### Requirement: Jede Datensatzsorte hat eine Vorschau
+Die Palette SHALL für jeden Datensatztreffer eine Lese-Vorschau anbieten, nicht nur für
+Personen. Das gilt für ETB-Eintrag, Meldung, Auftrag, Fahrzeug, Personal, Einheit, Schaden,
+Unfallhilfsstelle, Lagebericht, Gefahrengebiet und Einsatzabschnitt. Jede dieser Zeilen MUST
+das Vorschau-Ziel tragen, markiert oder nicht, und → MUST unter den Bedingungen aus LFH-645
+(Cursor am Textende, keine Auswahl) ihre Vorschau öffnen. Rückweg, Öffnen aus der Vorschau
+und Fußzeile gelten für jede Sorte wie für die Person.
+
+Die Vorschau MUST den Status des Datensatzes mit Wort zeigen, nicht allein über Farbe, und
+die Angaben, die seine Fachseite zum Lesen zeigt. Angaben, für die es keine Datenquelle
+gibt, MUST sie weglassen, statt einen Platzhalter zu zeigen. Sie MUST nur lesen: Sie trägt
+keine Aktion, die einen Datensatz verändert.
+
+Zeilen ohne Datensatz tragen weiterhin keine Vorschau. Dazu gehören Module, Aktionen, der
+ETB-Sammeltreffer „Alle Einträge zu …“ und der Koordinatensprung.
+
+#### Scenario: ETB-Eintrag
+- **WHEN** ein ETB-Eintrag als Treffer markiert ist, der Cursor am Textende steht und → gedrückt wird
+- **THEN** zeigt die Palette Nummer, Ereigniszeit, Typ, von/an, Meldeweg, Verfasser und den Inhalt dieses Eintrags
+
+#### Scenario: Berichtigung verweist auf den Grundeintrag
+- **WHEN** die Vorschau eines ETB-Eintrags geöffnet wird, der einen älteren Eintrag berichtigt
+- **THEN** sagt sie, dass er einen älteren Eintrag berichtigt, und trägt einen Verweis auf diesen Grundeintrag
+
+#### Scenario: Meldung
+- **WHEN** eine Meldung als Treffer markiert ist und → gedrückt wird
+- **THEN** zeigt die Palette Nummer, Status, Priorität, Absender und Empfänger, Inhalt und Bestätigungsstand der Meldung, ohne Knöpfe zum Sichten, Bestätigen oder Erledigen
+
+#### Scenario: Fahrzeug
+- **WHEN** ein Fahrzeug als Treffer markiert ist und → gedrückt wird
+- **THEN** zeigt die Palette Funkrufname, Status mit Wort, Fahrzeugtyp, Kennzeichen und Trägerorganisation, ohne Statuswahl
+
+#### Scenario: Gefahrengebiet mit bewerteten Gefahren
+- **WHEN** ein Gefahrengebiet als Treffer markiert ist, dessen Matrix Bewertungen über „keine“ trägt, und → gedrückt wird
+- **THEN** zeigt die Palette Name und höchste Warnstufe des Gebiets und eine Gefahrenmatrix nur mit den Gefahren, die mindestens eine solche Bewertung haben; jede Zelle nennt ihre Warnstufe mit Kürzel, nicht allein über Farbe
+
+#### Scenario: Gefahrengebiet ohne bewertete Gefahren
+- **WHEN** ein Gefahrengebiet ohne Bewertung über „keine“ in der Vorschau geöffnet wird
+- **THEN** steht statt der Matrix der Satz, dass keine Gefahren bewertet sind
+
+#### Scenario: Ziel an jeder Datensatzzeile
+- **WHEN** Treffer jeder der zwölf Datensatzsorten in der Liste stehen
+- **THEN** trägt jede dieser Zeilen das Vorschau-Ziel
+
+#### Scenario: Sammeltreffer ohne Vorschau
+- **WHEN** der ETB-Sammeltreffer „Alle Einträge zu …“ markiert ist und → gedrückt wird
+- **THEN** bleibt die Trefferliste stehen und die Zeile trägt kein Vorschau-Ziel
 
 ## ADDED Requirements
 

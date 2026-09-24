@@ -326,14 +326,15 @@ export function CommandPalette({
   }
 
   /**
-   * Das Tippziel (LFH-665): derselbe Zustand wie nach →. Der Fokus steht dann schon im
-   * Suchfeld (`mousedown` am Ziel ist abgefangen); geholt wird er nur, wenn er es NICHT tut —
-   * ein Fokus im Tipp-Handler holte auf dem Tablet sonst ungefragt die Bildschirmtastatur.
+   * Das Tippziel (LFH-665): derselbe Zustand wie nach →. Im Normalfall steht der Fokus schon
+   * im Suchfeld (`mousedown` am Ziel ist abgefangen), dann ist `focus()` wirkungslos. Stand er
+   * woanders, holt `focus()` ihn zurück, weil ↵ (öffnen) und Esc/← (zurück) nur von dort bzw.
+   * aus der Palette heraus wirken. Der Preis ist benannt: auf einem Tablet, dessen
+   * Bildschirmtastatur ausgeblendet war, kann sie dabei erscheinen. Die Tastaturwege gehen vor.
    */
   function oeffneVorschau(b: Befehl) {
     setVorschau(b);
-    const feld = inputRef.current?.input;
-    if (feld && document.activeElement !== feld) inputRef.current?.focus();
+    inputRef.current?.focus();
   }
 
   function zurueckZurListe() {

@@ -105,8 +105,13 @@ describe('vorschauZielStil', () => {
     for (const stufe of ['kompakt', 'handschuh'] as const) {
       const t = tokenFuer(stufe);
       const stil = vorschauZielStil(t);
-      expect(stil.marginInlineEnd, stufe).toBe(-t.paddingSM);
-      expect(stil.marginBlock, stufe).toBe(-t.paddingXS);
+      // Gegen die Polsterung der ZEILE gerechnet, nicht gegen eine eigene Konstante: ändert
+      // `palettenZeilenStil` seine Polsterung, bricht die Bündigkeit — und dieser Test mit.
+      const [oben, rechts] = palettenZeilenStil({ ...t, marginSM: t.paddingSM })
+        .padding.split(' ')
+        .map((w) => Number.parseFloat(w));
+      expect(stil.marginInlineEnd, stufe).toBe(-rechts);
+      expect(stil.marginBlock, stufe).toBe(-oben);
       expect(stil.alignSelf, stufe).toBe('stretch');
       expect(stil.boxSizing, stufe).toBe('border-box');
     }

@@ -299,6 +299,52 @@ test.describe('Tablet', () => {
 });
 
 /**
+ * Der engste Fall (LFH-665, Review-Befund): Handschirm 390 px in der Stufe Handschuh. Das Ziel
+ * belegt dort 72 px, daneben stehen Kontext (`nowrap`), ↵-Marke und Abstände. Das Label darf
+ * umbrechen (`minWidth: 0`), die Zeile aber nicht über ihre Box hinausragen, und das Ziel muss
+ * ganz im Blick und tippbar bleiben. `gate1-ueberlauf.spec.ts` fährt keine Palette mit einer
+ * Vorschau-Zeile, deshalb steht die Messung hier.
+ */
+test.describe('Handschirm', () => {
+  test.use({ hasTouch: true, viewport: { width: 390, height: 844 } });
+
+  test('bei 390 px in Stufe Handschuh läuft die Zeile nicht über und das Ziel bleibt tippbar', async ({
+    page,
+  }) => {
+    await anmelden(page);
+    const einsatzId = await einsatzAnlegen(page, `E2E Vorschau Schmal ${Date.now()}`);
+    const kennung = await personErfassen(page, einsatzId);
+    await zumModul(page, einsatzId, 'etb');
+    await page.evaluate(([s, w]) => window.localStorage.setItem(s, w), [
+      DICHTE_SCHLUESSEL,
+      'handschuh',
+    ] as const);
+    await page.reload();
+    await expect(page.locator('html')).toHaveAttribute('data-dichte', 'handschuh');
+    await expect(page.locator('header').first()).toBeVisible();
+
+    await suche(page, kennung);
+    const zeile = personOption(page, kennung);
+    const ziel = vorschauZiel(zeile);
+    await expect(ziel).toBeInViewport({ ratio: 1 });
+    const zBox = (await ziel.boundingBox())!;
+    expect(zBox.width, 'Breite des Ziels').toBeGreaterThanOrEqual(BODEN.handschuh - 0.5);
+    expect(zBox.height, 'Höhe des Ziels').toBeGreaterThanOrEqual(BODEN.handschuh - 0.5);
+    // Kein waagerechter Überlauf — weder in der Zeile noch in der Liste.
+    const ueberlauf = await zeile.evaluate((el) => ({
+      zeile: el.scrollWidth - el.clientWidth,
+      liste:
+        el.closest('[role="listbox"]')!.scrollWidth - el.closest('[role="listbox"]')!.clientWidth,
+    }));
+    expect(ueberlauf.zeile, 'Überlauf der Zeile').toBeLessThanOrEqual(0);
+    expect(ueberlauf.liste, 'Überlauf der Liste').toBeLessThanOrEqual(0);
+
+    await ziel.tap();
+    await expect(page.getByRole('region', { name: /^Vorschau:/ })).toBeVisible();
+  });
+});
+
+/**
  * Vorschauen der übrigen Datensatzsorten (LFH-664). Geseedet wird hier über die API, nicht
  * über die Oberfläche: eine Meldung mit erteiltem Auftrag entstünde sonst erst nach zwei
  * Formularen, und keins davon ist Gegenstand dieses Tests.

@@ -24,9 +24,11 @@ und Handschuhweg zu 42+ Befehlen, gedacht für Führungs-Tablet und mobil. Wer d
 
 ### Modified Capabilities
 
-- `sprungpalette` — die Anforderung „Fußzeile und Zeilenmarke kündigen die Wege an“ aus
-  LFH-645 (`openspec/changes/lfh-645-palette-vorschau-neuer-tab/`) wird geändert, eine
-  Anforderung für das Tippziel kommt hinzu. Die Fähigkeit liegt noch nicht in
+- `sprungpalette` — zwei Anforderungen werden geändert: „Fußzeile und Zeilenmarke kündigen
+  die Wege an“ aus LFH-645 (`openspec/changes/lfh-645-palette-vorschau-neuer-tab/`) und
+  „Jede Datensatzsorte hat eine Vorschau“ aus LFH-664
+  (`openspec/changes/lfh-664-palette-vorschau-datensatzsorten/`), beide, weil sie die
+  `→`-Marke an der markierten Zeile verlangen. Eine Anforderung für das Tippziel kommt hinzu. Die Fähigkeit liegt noch nicht in
   `openspec/specs/`; **Archivreihenfolge: LFH-645, dann LFH-664, dann dieser Change.**
 
 ## Impact

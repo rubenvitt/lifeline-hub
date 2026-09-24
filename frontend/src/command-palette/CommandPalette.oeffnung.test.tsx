@@ -372,6 +372,9 @@ describe('CommandPalette · Tippziel für die Vorschau (LFH-665)', () => {
     // Der Klick schlägt NICHT zur Zeile durch.
     expect(aus).not.toHaveBeenCalled();
     expect(schliesse).not.toHaveBeenCalled();
+    // Nur die Gegenprobe „der Klick wirft den Fokus nicht aus dem Feld": ein synthetischer
+    // Klick verschiebt in jsdom nie den Fokus. Getragen wird die Fokus-Zusicherung vom
+    // `mousedown`-Test unten und vom `toBeFocused()` im Browser (`palette-oeffnung.spec.ts`).
     expect(feld).toHaveFocus();
   });
 

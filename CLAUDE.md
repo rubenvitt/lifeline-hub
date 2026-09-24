@@ -539,9 +539,8 @@ Alltag wichtigsten:
   `stopPropagation`. Der Boden kommt aus `vorschauZielStil` (`zeilenStil.ts`): `controlHeight`
   in Höhe und Breite, bündig an der Zeilenkante über die volle Zeilenhöhe. Die Zeile ist
   content-box, darum zieht sich das Ziel um genau ihre Polsterung heraus. „⇧↵ im Panel“ aus
-  dem Neuentwurf ist entfallen, ⇧↵
-  ist frei, und es gibt keine neue Drawer-Fläche. `Befehl.ziel` ist die Marke,
-  `ausfuehren(oeffnung?)` reicht `'neuerTab'` bis `navigate`. Navigationszeilen entstehen nur
+  dem Neuentwurf ist entfallen, ⇧↵ ist frei, und es gibt keine neue Drawer-Fläche.
+  `Befehl.ziel` ist die Marke, `ausfuehren(oeffnung?)` reicht `'neuerTab'` bis `navigate`. Navigationszeilen entstehen nur
   über `sprungZu` (`command-palette/typen.ts`), die Guards in `befehle.test.ts` und
   `datensaetze.test.ts` prüfen das Durchreichen je Zeile. Die Fehlerrichtung ist sonst still:
   „neuer Tab“ öffnet dann hier. Eine Zeile ohne Ziel bleibt bei Strg/⌘+↵ wirkungslos, es gibt
