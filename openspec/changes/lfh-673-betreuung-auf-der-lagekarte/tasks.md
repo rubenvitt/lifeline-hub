@@ -27,7 +27,7 @@ Gruppen 4–6 bringen die Bezirksfläche. Gruppe 7 schließt beide ab.
 ## 3. Stelle: Einstieg in der Betreuungsseite
 
 - [x] 3.1 `betreuung/StellenBlock.tsx`: „Auf Karte verorten“ an nicht verorteten Stellen, nur mit Schreibrecht, Ziel `lagekartePfad(e, {platzieren: {typ: 'betreuungsstelle', id}})`. Die Zeilenaktionen werden nach der Rechteprüfung gezählt, ab drei kommt die Aktion ins `weitere`-Menü. Verifiziert durch `StellenBlock`-Tests: Das Ziel stimmt, ohne Schreibrecht und bei verorteter Stelle fehlt der Einstieg
-- [ ] 3.2 Browser-Durchstich Stelle (Vite + Backend mit Testdaten): Stelle anlegen → „Auf Karte verorten“ → Klick in die Karte → Marker sichtbar → Auswahl → „Im Fachmodul öffnen“ → Stelle ausgewählt. Zweiter Browser im selben Einsatz sieht den Marker ohne Reload. Nutzer ohne Modul Betreuung sieht die Sperrzeile. Verifiziert durch Screenshots im Durchstich
+- [x] 3.2 Browser-Durchstich Stelle (Vite + Backend mit Testdaten): Stelle anlegen → „Auf Karte verorten“ → Klick in die Karte → Marker sichtbar → Auswahl → „Im Fachmodul öffnen“ → Stelle ausgewählt. Zweiter Browser im selben Einsatz sieht den Marker ohne Reload. Nutzer ohne Modul Betreuung sieht die Sperrzeile. Verifiziert durch Screenshots im Durchstich — umgesetzt als `e2e/lagekarte-betreuung.spec.ts` (Anmeldung über die Test-Harness, Sichtbelege unter `test-results/`)
 
 ## 4. Bezirk: Zonentyp und Rebuild im Backend
 
@@ -49,7 +49,7 @@ Gruppen 4–6 bringen die Bezirksfläche. Gruppe 7 schließt beide ab.
 
 - [x] 6.1 `betreuung/EvakuierungBlock.tsx`: Je Bezirk „Auf Karte zeigen“ bei `flaechen > 0` (Ziel `lagekartePfad(e, {evakuierungsbezirk: id})`) als Eintrag im gebündelten Menü, auch ohne Schreibrecht; ohne Fläche kein Eintrag. Kein eigener Hinweis „keine Fläche“: der Plan-Modus trägt höchstens drei Sekundärfelder, und die sind belegt (beim Umsetzen gefunden, Spec angepasst). Verifiziert durch Tests beider Zustände, des Ziels und des Menüs ohne Schreibrecht
 - [x] 6.2 Lage-Snapshot: `SnapshotDaten.betreuungsstellen`/`evakuierungsbezirke` aus `betreuung::repo::uebersicht`, beide in `REDIGIERBARE_MODUL_FELDER` mit Modul `betreuung`, Guard-Liste in `tests/lage_snapshot.rs` ergänzen. Verifiziert durch `tests/lage_snapshot.rs`: Quellen-Guard grün, Abruf ohne Modulrecht enthält beide Felder nicht, verortete Stelle mit Koordinate im Snapshot
-- [ ] 6.3 Browser-Durchstich Bezirk: Bezirk anlegen → auf der Karte zwei Evakuierungsbezirk-Flächen zeichnen → im Inspector zuordnen → Beschriftung mit „Räumung: angeordnet“ → Räumung auf „läuft“ setzen, Beschriftung folgt live → „Auf Karte zeigen“ aus der Betreuungsseite wählt eine Fläche → Bezirk stornieren, die Flächen bleiben als „nicht zugeordnet“. Nutzer ohne Modul sieht die Fläche nur mit Typwort. Verifiziert durch Screenshots in Nacht- und Tagmodus
+- [x] 6.3 Browser-Durchstich Bezirk: Bezirk anlegen → auf der Karte zwei Evakuierungsbezirk-Flächen zeichnen → im Inspector zuordnen → Beschriftung mit „Räumung: angeordnet“ → Räumung auf „läuft“ setzen, Beschriftung folgt live → „Auf Karte zeigen“ aus der Betreuungsseite wählt eine Fläche → Bezirk stornieren, die Flächen bleiben als „nicht zugeordnet“. Nutzer ohne Modul sieht die Fläche nur mit Typwort. Verifiziert durch Screenshots in Nacht- und Tagmodus — ebenfalls in `e2e/lagekarte-betreuung.spec.ts`; Zuordnen im Inspector ist dort per API vorbereitet, der Inspector-Weg steht in `ZonenInspector.test.tsx`
 
 ## 7. Abschluss
 
