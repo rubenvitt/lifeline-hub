@@ -276,10 +276,13 @@ In einem `write_retry!`:
 Der Savepoint erkennt „wird noch referenziert“ über die Datenbank selbst und nicht über
 eine handgepflegte Liste von Verweistabellen. Eine künftige Migration mit einem neuen
 Verweis auf `fahrzeug` ist damit ohne Nachtrag abgedeckt. Die Kehrseite: Ein künftiger
-Verweis mit `ON DELETE CASCADE` auf eine Stammdatentabelle ließe das Löschen gelingen und
-räumte dabei fremde Zeilen still mit ab. Ein Guard-Test (`pragma_foreign_key_list` über
-alle Tabellen) pinnt deshalb, dass kein Fremdschlüssel auf `fahrzeug`, `personal` oder
-`material` kaskadiert. Die heutige Messung sagt null.
+Verweis mit `ON DELETE CASCADE`, `SET NULL` oder `SET DEFAULT` auf eine Stammdatentabelle
+ließe das Löschen gelingen und räumte dabei fremde Zeilen still mit ab oder änderte sie.
+Ein aufgeschobener Fremdschlüssel meldete den Fehler erst beim COMMIT, der Savepoint griffe
+dann nicht. Ein Guard-Test (`pragma_foreign_key_list` über alle Tabellen) pinnt deshalb:
+kein Fremdschlüssel auf `fahrzeug`/`personal`/`material` mit einer anderen ON-DELETE-Aktion
+als `NO ACTION`/`RESTRICT` und kein `DEFERRABLE`. Die heutige Messung: vier eingehende
+Fremdschlüssel, alle `NO ACTION`.
 
 Nach dem Commit geht `lagged` auf den Kanal des entfernten Einsatzes. Das ist das
 vorhandene Kontrollereignis, es braucht keine neue Variante. Offene Tabs laden neu und

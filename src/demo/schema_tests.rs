@@ -90,19 +90,29 @@ async fn eingehende_stammdaten_fks(pool: &SqlitePool) -> Vec<StammdatenFk> {
     .unwrap()
 }
 
-/// Was der Löschweg aus D7 nicht verträgt: ein kaskadierender Fremdschlüssel auf eine
-/// Stammdatentabelle (das Löschen einer Demo-Stammdatenzeile gelänge dann und räumte fremde
-/// Zeilen still mit ab) und ein aufgeschobener Fremdschlüssel irgendwo im Schema (der
-/// FK-Fehler käme erst beim COMMIT, der Savepoint je Zeile griffe nicht).
+/// ON-DELETE-Aktionen, bei denen das Löschen einer noch verwiesenen Zeile SCHEITERT. Nur darauf
+/// baut der Savepoint-Löschweg aus D7 (SQLite-Code 787 → „behalten“).
+const LOESCHEN_SCHEITERT: [&str; 2] = ["NO ACTION", "RESTRICT"];
+
+/// Was der Löschweg aus D7 nicht verträgt: ein Fremdschlüssel auf eine Stammdatentabelle mit
+/// einer anderen ON-DELETE-Aktion als `NO ACTION`/`RESTRICT` und ein aufgeschobener
+/// Fremdschlüssel irgendwo im Schema. Mit `CASCADE`, `SET NULL` oder `SET DEFAULT` gelänge das
+/// Löschen einer noch verwiesenen Demo-Stammdatenzeile und löschte oder änderte dabei still
+/// eine Zeile eines fremden, echten Einsatzes. Mit einem aufgeschobenen Fremdschlüssel käme der
+/// Fehler erst beim COMMIT, und der Savepoint je Zeile griffe nicht.
 async fn loeschweg_verstoesse(pool: &SqlitePool) -> Vec<String> {
     let mut verstoesse: Vec<String> = eingehende_stammdaten_fks(pool)
         .await
         .into_iter()
-        .filter(|fk| fk.on_delete.eq_ignore_ascii_case("CASCADE"))
+        .filter(|fk| {
+            !LOESCHEN_SCHEITERT
+                .iter()
+                .any(|aktion| fk.on_delete.eq_ignore_ascii_case(aktion))
+        })
         .map(|fk| {
             format!(
-                "{}.{} → {} ON DELETE CASCADE",
-                fk.tabelle, fk.spalte, fk.ziel
+                "{}.{} → {} ON DELETE {} (erlaubt: NO ACTION, RESTRICT)",
+                fk.tabelle, fk.spalte, fk.ziel, fk.on_delete
             )
         })
         .collect();
@@ -122,12 +132,15 @@ async fn loeschweg_verstoesse(pool: &SqlitePool) -> Vec<String> {
     verstoesse
 }
 
-/// LFH-690 D7: Kein Fremdschlüssel auf `fahrzeug`/`personal`/`material` kaskadiert, und
-/// keiner im Schema ist aufgeschoben. Nur dann erkennt der Savepoint je Stammdatenzeile „wird
-/// noch verwiesen“ zuverlässig über SQLite-Code 787, ohne handgepflegte Verweisliste.
+/// LFH-690 D7: Jeder Fremdschlüssel auf `fahrzeug`/`personal`/`material` trägt `ON DELETE
+/// NO ACTION` oder `RESTRICT` (kein `CASCADE`, `SET NULL`, `SET DEFAULT`), und keiner im Schema
+/// ist aufgeschoben. Nur dann scheitert das Löschen einer noch verwiesenen Stammdatenzeile, und
+/// der Savepoint je Zeile erkennt „wird noch verwiesen“ zuverlässig über SQLite-Code 787, ohne
+/// handgepflegte Verweisliste.
 ///
 /// Die Positivkontrolle darunter hält den Guard ehrlich: fände die Abfrage gar keine
 /// eingehenden Fremdschlüssel (Tippfehler im Tabellennamen, Quoting), bliebe er für immer grün.
+/// Umgekehrt färbte eine abweichende Schreibweise der Aktion im PRAGMA den Guard rot, nicht grün.
 #[tokio::test]
 async fn kein_fk_kaskadiert_in_stammdaten() {
     let pool = crate::db::test_pool().await;
@@ -137,7 +150,7 @@ async fn kein_fk_kaskadiert_in_stammdaten() {
         assert!(
             eingehend.iter().any(|fk| fk.ziel == ziel),
             "Positivkontrolle: kein eingehender Fremdschlüssel auf {ziel} gefunden — \
-             die Abfrage sieht das Schema nicht: {eingehend:?}"
+             die Abfrage sieht das Schema nicht, der Guard prüfte ins Leere: {eingehend:?}"
         );
     }
 
