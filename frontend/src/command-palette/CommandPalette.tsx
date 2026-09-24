@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent, MouseEvent } from 'react';
 import { Button, Modal, Input, theme, type InputRef } from 'antd';
-import { TbArrowLeft, TbSearch } from 'react-icons/tb';
+import { TbArrowLeft, TbChevronRight, TbSearch } from 'react-icons/tb';
 import { augenbraueStil, useModusFarben } from '../components/rahmenStil';
 import Tastenkuerzel from '../components/Tastenkuerzel';
 import { schrift } from '../theme/tokens';
@@ -28,7 +28,7 @@ import {
   type PaletteModus,
 } from './typen';
 import { Vorschau } from './Vorschau';
-import { palettenZeilenStil } from './zeilenStil';
+import { palettenZeilenStil, vorschauZielStil } from './zeilenStil';
 
 /**
  * Frist der Meldung nach aussen. Wert und Bauform wörtlich aus `etb/EtbFilterleiste.tsx`
@@ -124,7 +124,7 @@ interface Props {
   /**
    * Kann es hier eine Vorschau geben (LFH-645)? Nur im Einsatz — ausserhalb gibt es keine
    * Datensätze. Steuert allein den FUSSHINWEIS; ob eine Zeile eine Vorschau hat, sagt die
-   * Zeile selbst (`Befehl.vorschau`) und ihre →-Marke.
+   * Zeile selbst (`Befehl.vorschau`) und ihr Vorschau-Ziel (LFH-665).
    */
   vorschauVerfuegbar?: boolean;
   /** Für die Plattformweiche des Kürzels; Vorgabe `navigator.userAgent`. */
@@ -325,6 +325,17 @@ export function CommandPalette({
     b.ausfuehren('neuerTab');
   }
 
+  /**
+   * Das Tippziel (LFH-665): derselbe Zustand wie nach →. Der Fokus steht dann schon im
+   * Suchfeld (`mousedown` am Ziel ist abgefangen); geholt wird er nur, wenn er es NICHT tut —
+   * ein Fokus im Tipp-Handler holte auf dem Tablet sonst ungefragt die Bildschirmtastatur.
+   */
+  function oeffneVorschau(b: Befehl) {
+    setVorschau(b);
+    const feld = inputRef.current?.input;
+    if (feld && document.activeElement !== feld) inputRef.current?.focus();
+  }
+
   function zurueckZurListe() {
     setVorschau(null);
     inputRef.current?.focus();
@@ -479,20 +490,46 @@ export function CommandPalette({
           </span>
         )}
         {b.kuerzel && <Tastenkuerzel>{b.kuerzel}</Tastenkuerzel>}
-        {/* Die →-Marke (LFH-645) sagt ZEILENGENAU, dass → hier eine Vorschau öffnet — der
-            Fußhinweis kann das nicht, er steht statisch (ein je Zeile wechselnder Hinweis
-            änderte die Zeilenzahl der Fußzeile und liesse die Palette springen). */}
-        {istAktiv && b.vorschau && (
-          <Tastenkuerzel aria-hidden style={{ color: farben.schwach }}>
-            →
-          </Tastenkuerzel>
-        )}
         {/* Die Enter-Marke steht NUR an der aktiven Zeile (Entwurf): sie sagt, was Enter
             gerade auslöst. Satz, kein Ziel — `aria-hidden`, der Weg steht in der Fußzeile. */}
         {istAktiv && !b.kuerzel && (
           <Tastenkuerzel aria-hidden style={{ color: farben.schwach }}>
             ↵
           </Tastenkuerzel>
+        )}
+        {/*
+         * DAS VORSCHAU-ZIEL (LFH-665) ist die zeilengenaue Aussage „hier gibt es eine
+         * Vorschau" und zugleich der Weg hinein für Finger und Maus. Es ersetzt die frühere
+         * →-Marke aus LFH-645 — zwei Pfeile nebeneinander sagten dasselbe zweimal.
+         *
+         * An JEDER Zeile mit Vorschau, nicht nur an der markierten: auf Touch gibt es kein
+         * Hover, und ein Ziel, das erst nach dem Zeigen erschiene, sähe niemand vor dem Tipp.
+         * Die markierte Zeile färbt es in Bedienfarbe wie ihre Ikone — dort öffnet auch →.
+         *
+         * KEIN `Button`: ein fokussierbarer Knopf zöge beim Klick den Fokus aus der Combobox,
+         * ↵ und Esc gingen danach ins Leere. Deshalb ein handgebautes Ziel (Boden aus
+         * `vorschauZielStil`), `mousedown` abgefangen, und `aria-hidden`: die Kinder einer
+         * Option sind ohnehin präsentational, und der zugängliche Weg ist →. Der Klick endet
+         * hier (`stopPropagation`) und öffnet nie zugleich den Datensatz — auch nicht mit
+         * Strg/⌘, das Ziel hat nur diese eine Bedeutung.
+         */}
+        {b.vorschau && (
+          <span
+            aria-hidden="true"
+            data-lfh="palette-vorschau-ziel"
+            title="Vorschau (→)"
+            onMouseDown={(e: MouseEvent) => e.preventDefault()}
+            onClick={(e: MouseEvent) => {
+              e.stopPropagation();
+              oeffneVorschau(b);
+            }}
+            style={{
+              ...vorschauZielStil(token),
+              color: istAktiv ? token.colorPrimary : farben.schwach,
+            }}
+          >
+            <TbChevronRight size={16} />
+          </span>
         )}
       </div>
     );
@@ -708,8 +745,8 @@ export function CommandPalette({
          * „⇧↵ im Panel" aus dem Entwurf ist ENTSCHIEDEN und entfallen (LFH-645, Raycast-
          * Muster): Strg/⌘+↵ öffnet im neuen Tab, → zeigt die Vorschau IN der Palette, ⇧↵
          * bleibt frei. Die Hinweise stehen STATISCH — „neuer Tab" gilt für fast jede Zeile,
-         * „→ Vorschau" nur im Einsatz (Muster Koordinate); ob die markierte Zeile eine
-         * Vorschau hat, sagt ihre →-Marke. Ein je Zeile wechselnder Hinweis änderte die
+         * „→ Vorschau" nur im Einsatz (Muster Koordinate); ob eine Zeile eine Vorschau hat,
+         * sagt ihr Vorschau-Ziel (LFH-665). Ein je Zeile wechselnder Hinweis änderte die
          * Zeilenzahl dieser umbrechenden Fußzeile und liesse die Palette beim Pfeilen springen.
          * In der Vorschau gilt die Präfixlegende nicht; dort stehen die drei gültigen Wege.
          */}
