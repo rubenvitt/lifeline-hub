@@ -124,10 +124,20 @@ pub(crate) async fn anlegen_tx(
     // COALESCE statt eines zweiten INSERT-Zweigs: `einsatzart` und `begonnen_at`
     // sind NOT NULL mit DB-Default. Ein explizit gebundenes NULL überschriebe den
     // Default und verletzte die Bedingung — COALESCE lässt den Default greifen.
+    //
+    // Die ID wird ausdrücklich vergeben (LFH-690, design.md D6): über allen bestehenden
+    // Einsätzen UND über jeder ID, die ein Demo-Import je getragen hat. `demo_import`
+    // behält die ID nach dem Entfernen als Sperre; ohne sie bekäme der nächste echte
+    // Einsatz die ID des gelöschten Demo-Einsatzes, und Offline-Queues oder offene Tabs
+    // schrieben still in ihn. Das gilt für JEDE Anlage, instanzweit (IDs sind nicht je Org).
+    // Ohne Demo-Historie ist das Ergebnis `MAX(id)+1` — dieselbe Vergabe wie SQLites eigene
+    // für `INTEGER PRIMARY KEY` ohne AUTOINCREMENT. Rennfrei unter BEGIN IMMEDIATE.
     let einsatz_id: i64 = sqlx::query_scalar(
-        "INSERT INTO einsatz (org_id, bezeichnung, stichwort, einsatzart, begonnen_at, \
+        "INSERT INTO einsatz (id, org_id, bezeichnung, stichwort, einsatzart, begonnen_at, \
                               einsatznummer_intern, nummer_jahr, nummer_lfd, angelegt_at) \
-         VALUES (?, ?, ?, COALESCE(?, 'realeinsatz'), COALESCE(?, datetime('now')), ?, \
+         VALUES ((SELECT MAX(COALESCE((SELECT MAX(id) FROM einsatz), 0), \
+                             COALESCE((SELECT MAX(einsatz_id) FROM demo_import), 0)) + 1), \
+                 ?, ?, ?, COALESCE(?, 'realeinsatz'), COALESCE(?, datetime('now')), ?, \
                  ?, ?, datetime('now')) RETURNING id",
     )
     .bind(org_id)
@@ -1572,6 +1582,84 @@ mod tests {
         let fremd_benutzer = benutzer_laden(&pool, fremd).await;
         let fuer_fremd = liste_fuer(&pool, &fremd_benutzer).await.unwrap();
         assert!(fuer_fremd.is_empty());
+    }
+
+    /// Legt einen Einsatz mit fester ID per SQL an — die ID-Vergabe von [`anlegen_tx`]
+    /// soll hier gegen einen bekannten Höchstwert laufen, nicht gegen die eigene.
+    async fn einsatz_mit_id(pool: &SqlitePool, id: i64) {
+        sqlx::query("INSERT INTO einsatz (id, org_id, bezeichnung) VALUES (?, 1, 'Bestand')")
+            .bind(id)
+            .execute(pool)
+            .await
+            .unwrap();
+    }
+
+    /// Kopf eines (entfernten) Demo-Imports per SQL — `einsatz_id` ohne FK, wie in der
+    /// Historie nach dem Entfernen (LFH-690 D6).
+    async fn demo_historie(pool: &SqlitePool, einsatz_id: i64) {
+        sqlx::query(
+            "INSERT INTO demo_import (org_id, einsatz_id, entfernt_at, bericht) \
+             VALUES (1, ?, datetime('now'), '{}')",
+        )
+        .bind(einsatz_id)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
+    /// LFH-690 D6: Die ID eines entfernten Demo-Einsatzes wird nie wiedervergeben. Höchste
+    /// Einsatz-ID 5, Demo-Historie mit ID 7 → der neue Einsatz bekommt 8, nicht 6. Die Sperre
+    /// hebt nur an: liegt die Historie darunter, gilt wieder der Höchstwert der Einsätze.
+    #[tokio::test]
+    async fn anlegen_ueberspringt_die_id_eines_entfernten_demo_einsatzes() {
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        einsatz_mit_id(&pool, 5).await;
+        demo_historie(&pool, 7).await;
+
+        let neu = test_anlegen(&pool, "Echter Einsatz", None, leit)
+            .await
+            .unwrap();
+        assert_eq!(
+            neu.id, 8,
+            "über der gesperrten Demo-ID 7, nicht MAX(id)+1 = 6"
+        );
+
+        let danach = test_anlegen(&pool, "Nächster", None, leit).await.unwrap();
+        assert_eq!(
+            danach.id, 9,
+            "Historie unter dem Höchstwert erzeugt keine Lücke"
+        );
+    }
+
+    /// LFH-690 D6: Ohne Demo-Historie ist die Vergabe dieselbe wie SQLites eigene
+    /// (`MAX(rowid)+1`) — für Bestandsinstanzen ändert sich nichts. Läuft direkt über
+    /// [`anlegen_tx`] auf einer Transaktion des Aufrufers.
+    #[tokio::test]
+    async fn anlegen_tx_ohne_demo_historie_vergibt_ohne_luecke() {
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        einsatz_mit_id(&pool, 5).await;
+
+        let mut tx = pool.begin().await.unwrap();
+        let id = anlegen_tx(
+            &mut tx,
+            &NeuerEinsatzDaten {
+                bezeichnung: "Echter Einsatz",
+                stichwort: None,
+                einsatzart: None,
+                begonnen_at: None,
+            },
+            leit,
+            Utc::now(),
+        )
+        .await
+        .unwrap();
+        tx.commit().await.unwrap();
+
+        assert_eq!(id, 6);
+        let rolle = rolle_von(&pool, id, leit).await.unwrap();
+        assert_eq!(rolle, Some(EinsatzRolle::Einsatzleitung));
     }
 
     #[tokio::test]
