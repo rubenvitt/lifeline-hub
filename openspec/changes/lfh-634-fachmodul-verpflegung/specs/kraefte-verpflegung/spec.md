@@ -141,7 +141,8 @@ Einsatzkräfte mit der aktuellen Personalstärke des Einsatzes, die Betreuten mi
 „in Betreuung“ zum Beginn des Zeitfensters. Der Bedarf wird gespeichert und danach nicht
 mehr aus den Quellen nachgerechnet. Jeder Vorschlag MUST sichtbar beschriftet und
 überschreibbar sein. Liefert eine Quelle nichts, MUST das Feld leer bleiben statt 0 zu
-zeigen. Eine Quelle, deren Modul der Person nicht zugänglich ist, MUST ohne Fehler
+zeigen. Eine Quelle, deren Modul der Person nicht zugänglich ist (ausgeblendet, per Rolle
+gesperrt oder vom Server mit 403 abgelehnt), MUST ohne Fehler und ohne Wiederholungsversuch
 entfallen.
 
 #### Scenario: Vorschlag aus beiden Quellen
@@ -199,12 +200,17 @@ Nachforderungen der Person zugänglich ist.
 
 Anlegen, Ändern und Löschen eines Zeitfensters MUST in derselben Transaktion einen
 System-Eintrag im ETB schreiben, der Bezeichnung, Zeitraum und Gesamtbedarf nennt (bei
-Änderung auch den vorherigen Gesamtbedarf). Das Erfassen und Zurücknehmen einer Ausgabe
+Änderung auch den vorherigen Gesamtbedarf). Der Zeitraum MUST in der Zeitzone der
+Organisation stehen, nicht in UTC. Das Erfassen und Zurücknehmen einer Ausgabe
 MUST keinen ETB-Eintrag schreiben.
 
 #### Scenario: Bedarf geändert
 - **WHEN** der Gesamtbedarf des Zeitfensters „Mittag“ von 250 auf 270 geändert wird
 - **THEN** enthält das ETB einen System-Eintrag, der „Mittag“, den Zeitraum, 270 EP und den vorherigen Wert 250 nennt
+
+#### Scenario: Zeitraum in Ortszeit
+- **WHEN** die Organisation die Zeitzone Europe/Berlin führt und ein Zeitfenster am 24.09. von 10:00 bis 11:30 UTC angelegt wird
+- **THEN** nennt der ETB-Eintrag den Zeitraum 24.09. 12:00–13:30
 
 #### Scenario: Ausgabe ohne ETB
 - **WHEN** eine Ausgabe erfasst oder zurückgenommen wird
@@ -232,7 +238,7 @@ Zeilenaktionen weglassen.
 
 #### Scenario: Abgeschlossener Einsatz
 - **WHEN** in einem abgeschlossenen Einsatz ein Zeitfenster angelegt wird
-- **THEN** lehnt das System ab und legt nichts an
+- **THEN** antwortet das System mit 409 und legt nichts an
 
 ### Requirement: Live-Verteilung
 

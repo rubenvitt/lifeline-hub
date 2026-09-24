@@ -61,7 +61,7 @@ mit weicher Rücknahme, Rücknahme mit roter Rückfrage).
   der Rückweg aus C8 sprechen dagegen.
 - Kein Modulzähler, keine Marke im Überblick, kein Hinweis in der AlarmZentrale.
   Unterdeckung ist ein Zustand auf der Seite, kein Alarmereignis.
-- Keine Offline-Queue in v1 (Folgeticket).
+- Keine Offline-Queue in v1 (Folgeticket LFH-688).
 - Keine Bearbeitung einer Ausgabe. Eine Korrektur heißt zurücknehmen und neu erfassen.
 
 ## Decisions
@@ -133,7 +133,13 @@ Backend liefert **keine** Einstufung. Anders als bei der Ablösung (D5/D8 dort) 
 keinen Zähler und keine Marke, die eine zweite Rechenstelle bräuchten. Eine Einstufung im
 DTO wäre zwischen zwei Abrufen veraltet und eine zweite Wahrheit.
 
-Grenzfälle, die die Funktion testet:
+Alle Wire-Zeitpunkte (`von_at`, `bis_at`, `zeitpunkt_at`) sind UTC ohne Zonenkennung. Das
+Frontend liest sie ausschließlich über `dayjs.utc(s)`, wie `abloesung/einstufung.ts`, und
+schreibt sie aus dem `RangePicker` ebenso als UTC zurück. `dayjs(s)` läse Ortszeit und
+verschöbe still um den Zonenversatz. Das betrifft die Einstufung, die Trennung
+„vergangen“, den Parameter `zeitpunkt` der Kopfzahl und die Dialogwerte.
+
+Grenzfälle, die die Funktion gegen **absolute** Zeitpunkte testet, nicht als Round-Trip:
 - genau `jetzt == von`: begonnen
 - Fehlmenge nur in einer Kostform: nicht gedeckt
 - Überdeckung: gedeckt
@@ -189,17 +195,28 @@ der Nachforderungsliste und nur, wenn das Modul sichtbar ist. Ohne Zugang zeigt 
 Funktion ist privat in `stab/repo.rs`. Sie schließt ein Zeitfenster von wenigen
 Millisekunden zwischen Prüfung und Commit beim Einsatzabschluss. Keines der beiden jüngeren
 Module nimmt sie, und eine öffentliche Kopie nur für Verpflegung wäre eine dritte Bauform.
-Ein späterer Querschnitts-Nachzug kann sie für alle drei heben.
+Ein späterer Querschnitts-Nachzug kann sie für alle drei heben. Ein abgeschlossener Einsatz
+antwortet deshalb wie überall mit **409** (`berechtigung::fordere_aktiv` → `Conflict`).
 
 ### D5 — ETB
 
 | Anlass | Weg | Wortlaut (Beispiel) |
 |---|---|---|
-| Zeitfenster angelegt | `system_audit_tx` | „Verpflegung ‚Mittag' 12:00–13:30 angelegt: Bedarf 250 EP (180 Kräfte, 70 Betreute), davon 15 Sonderkost.“ |
-| Zeitfenster geändert | `system_audit_tx` | „Verpflegung ‚Mittag' 12:00–13:30 geändert: Bedarf 270 EP (vorher 250).“ Nennt nur, was sich geändert hat. |
-| Zeitfenster gelöscht | `system_audit_tx` | „Verpflegung ‚Mittag' 12:00–13:30 gelöscht.“ |
+| Zeitfenster angelegt | `system_audit_tx` | „Verpflegung ‚Mittag' 24.09. 12:00–13:30 angelegt: Bedarf 250 EP (180 Kräfte, 70 Betreute), davon 15 Sonderkost.“ |
+| Zeitfenster geändert | `system_audit_tx` | „Verpflegung ‚Mittag' 24.09. 12:00–13:30 geändert: Bedarf 270 EP (vorher 250).“ Nennt nur, was sich geändert hat. |
+| Zeitfenster gelöscht | `system_audit_tx` | „Verpflegung ‚Mittag' 24.09. 12:00–13:30 gelöscht.“ |
 | Ausgabe erfasst oder zurückgenommen | — | kein Eintrag (Entscheidung des Auftraggebers, 24.09.2026) |
 
+- **Uhrzeiten im ETB-Text stehen in der Zeitzone der Organisation.** Der Server rechnet
+  sonst in UTC, und eine beweissichernde Unterlage nennte still die falsche Uhrzeit. Die
+  Ablösung umgeht das, indem ihre ETB-Texte gar keine Uhrzeit nennen. Für Verpflegung reicht
+  das nicht: „Mittag“ gibt es an jedem Einsatztag, und erst Datum und Zeitraum machen den
+  Eintrag eindeutig. Die Zone kommt aus `org_einstellungen.zeitzone`, bei fehlendem oder
+  ungültigem Wert gilt `einsatz::nummer::ZEITZONE_VORGABE` (Europe/Berlin), derselbe Weg wie
+  `jahr_in_zone`. Sie wird vor der Transaktion geladen. Formatiert wird
+  `TT.MM. HH:MM–HH:MM`, bei einem Zeitraum über Mitternacht mit beiden Daten. Eine reine
+  Funktion `zeitraum_text(von, bis, tz)` trägt Tests beidseits der Sommerzeitgrenze
+  (29.03. und 25.10.) gegen absolute Zeitpunkte.
 - Der `startwert` wird vor der Transaktion geladen, wie in `abloesung/repo.rs:413`.
 - Die Route publiziert nach dem Commit zuerst das ETB-Ereignis, dann `verpflegung`.
 - Ein PATCH, der nichts ändert (Wertgleichheit), schreibt weder Eintrag noch Ereignis.
@@ -280,16 +297,25 @@ Die Vorschläge baut ein reiner Hook `useBedarfsvorschlag(einsatzId, vonAt)`.
 
 **Einsatzkräfte**
 - Grundlage ist `verdichte(personal, [], []).staerke.gesamt`.
-- Die Query läuft nur, wenn das Modul `personal` sichtbar ist.
+- Die Query läuft nur, wenn das Modul `personal` bedienbar ist.
 - Eine leere Liste ergibt keinen Vorschlag.
 - Beschriftung: „Vorschlag: Personal im Einsatz, Stand HH:MM“.
 
 **Betreute**
 - Grundlage ist `ladeBelegungKopfzahl(einsatzId, vonAt)`.
-- Die Query läuft nur, wenn das Modul `betreuung` sichtbar ist.
+- Die Query läuft nur, wenn das Modul `betreuung` bedienbar ist.
 - `stellen.length === 0` ergibt keinen Vorschlag, mit dem Hinweis „keine Belegung gemeldet“.
 - `stellen_ohne_meldung > 0` ergibt „Untergrenze, n Stellen ohne Meldung“.
 - Liegt `vonAt` nach jetzt, heißt der Hinweis „Stand jetzt, nicht zum Beginn“.
+
+**„Bedienbar“ heißt sichtbar und nicht per Rolle gesperrt.** Maßgeblich ist die Freigabe-Prüfung
+aus `modulRegistry.ts`, die `istModulSichtbar` und `istModulGesperrt` bündelt.
+`istModulSichtbar` allein reicht nicht, denn der Server antwortet auch bei einer
+Rollensperre mit 403. Kommt trotzdem ein 403, etwa weil sich ein Override während der
+Sitzung ändert, gilt die Quelle als leer: keine Fehleranzeige, `retry: false`, kein
+Vorschlag. Ein Hook-Test lässt die Quelle 403 liefern. Dieselbe Regel gilt für die
+Nachforderungsliste, also für die Namensauflösung an der Ausgabe und für das Select im
+Ausgabe-Dialog.
 
 **Wann vorbelegt wird**
 - Nur beim **Anlegen**.

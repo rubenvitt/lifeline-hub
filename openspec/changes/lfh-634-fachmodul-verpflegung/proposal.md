@@ -42,7 +42,7 @@ nicht), LFH-639 stellt die Kopfzahl „in Betreuung“ zu einem Zeitpunkt bereit
 - Neues Live-Ereignis `verpflegung`, Codegen der Response-Typen, Schwärzungsregel,
   Registry-Eintrag, `MODUL_KEYS`/`PFAD_KEY`/Marker, Vertragskarte für die Deckung.
 - **Kein Modulzähler** (der Entwurf zeigt keinen; `umsetzung.md` vergibt Zähler nur bei
-  belegter Bedeutung) und **keine Offline-Queue** in v1 (Folgeticket).
+  belegter Bedeutung) und **keine Offline-Queue** in v1 (Folgeticket LFH-688).
 - **Prüfliste Einsatztauglichkeit** für die neue Seite.
 
 ## Capabilities
@@ -77,4 +77,4 @@ nicht), LFH-639 stellt die Kopfzahl „in Betreuung“ zu einem Zeitpunkt bereit
   `src/live/mod.rs` (Gate-Pin), Schwärzungs-Registry-Tests, `liveEvent.contract.test.ts`,
   `queryKeys`-Guards, `statusFarben.test.ts` (Kartenzahl 23 → 24), `sprungmarken.test.ts`,
   `sachgebiete.test.ts`, e2e `gate1-ueberlauf` und `gate3-trefflaeche`.
-- **Folgeticket:** Offline-Fähigkeit der Ausgaben-Erfassung.
+- **Folgeticket:** Offline-Fähigkeit der Ausgaben-Erfassung (LFH-688).
