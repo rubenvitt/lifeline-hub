@@ -34,21 +34,21 @@ und `betreuung` (LFH-639).
 
 ## 5. Frontend: Seite
 
-- [ ] 5.1 `verpflegung/VerpflegungDialoge.tsx`: „Zeitfenster anlegen/bearbeiten“ und „Ausgabe erfassen“ auf `ErfassungsModal` nach D7, außerdem die Rücknahme-Rückfrage als `Modal` mit rotem Knopf. Verifiziert durch Dialog-Tests:
+- [x] 5.1 `verpflegung/VerpflegungDialoge.tsx`: „Zeitfenster anlegen/bearbeiten“ und „Ausgabe erfassen“ auf `ErfassungsModal` nach D7, außerdem die Rücknahme-Rückfrage als `Modal` mit rotem Knopf. Verifiziert durch Dialog-Tests:
   - Feldbudget 4 bzw. 3 sichtbar, beim Aufklappen steigt die Zahl
   - kein `.ant-modal-footer`, der Knopf liegt im `<form>`
   - Vorschläge stehen vorbelegt, beim Bearbeiten als Hinweis ohne Überschreiben
   - Sonderkost über der Menge zeigt den 422-Grund am Dialog
   - Rücknahme mit `ant-btn-dangerous`, Abbrechen sendet nichts
-- [ ] 5.2 `verpflegung/ZeitfensterKarte.tsx`: Kopf, `StatusTag` aus `verpflegungDeckung`, Randfarbe, Kennzahlzeile, Aufgliederung, Sonderkost-Zeilen und Ausgaben als `Zeitachseneintrag`; Aktionen nach LFH-365 gebündelt (Zeilenkennung im zugänglichen Namen), „Nachfordern“ nur bei Fehlmenge und sichtbarem Modul, aufgelöster Nachforderungsname nur bei sichtbarem Modul. Verifiziert durch Karten-Tests:
+- [x] 5.2 `verpflegung/ZeitfensterKarte.tsx`: Kopf, `StatusTag` aus `verpflegungDeckung`, Randfarbe, Kennzahlzeile, Aufgliederung, Sonderkost-Zeilen und Ausgaben als `Zeitachseneintrag`; Aktionen nach LFH-365 gebündelt (Zeilenkennung im zugänglichen Namen), „Nachfordern“ nur bei Fehlmenge und sichtbarem Modul, aufgelöster Nachforderungsname nur bei sichtbarem Modul. Verifiziert durch Karten-Tests:
   - „Unterdeckung“ mit Wort und `data-`-Marke, ohne `animation`
   - „offen“ ohne Alarm
   - Sonderkost-Fehlmenge wird genannt
   - zurückgenommene Ausgabe mit Wort
   - ohne Schreibrecht keine Aktionen
   - ohne Modul Nachforderungen kein „Nachfordern“ und „Nachforderung #n“ statt Name
-- [ ] 5.3 `pages/VerpflegungPage.tsx`: `EinsatzSeite` mit Kopf-Meta und Primäraktion, `Segmentleiste` „laufend & anstehend“/„vergangen“, Leerzustand, `RechteHinweis`, `zeigeRueckgaengig` nach dem Erfassen und `Sammelbanner` für fremde neue Zeitfenster. Die Uhr läuft über `useJetzt`. Verifiziert durch Page-Tests zu „Anzeige im Modul“, „Rechte und Modulsichtbarkeit“ (Oberflächenteil) und „Live-Verteilung“ (Sammelbanner statt Einschieben). Außerdem: Rückgängig ruft die Rücknahme, und ein Übergang über `von` wechselt die Einstufung.
-- [ ] 5.4 `stab/sachgebiete.ts`: S4 bekommt `['nachforderungen', 'verpflegung', 'material']`. Verifiziert durch `sachgebiete.test.ts` mit einem Pin auf die S4-Zeile.
+- [x] 5.3 `pages/VerpflegungPage.tsx`: `EinsatzSeite` mit Kopf-Meta und Primäraktion, `Segmentleiste` „laufend & anstehend“/„vergangen“, Leerzustand, `RechteHinweis`, `zeigeRueckgaengig` nach dem Erfassen und `Sammelbanner` für fremde neue Zeitfenster. Die Uhr läuft über `useJetzt`. Verifiziert durch Page-Tests zu „Anzeige im Modul“, „Rechte und Modulsichtbarkeit“ (Oberflächenteil) und „Live-Verteilung“ (Sammelbanner statt Einschieben). Außerdem: Rückgängig ruft die Rücknahme, und ein Übergang über `von` wechselt die Einstufung.
+- [x] 5.4 `stab/sachgebiete.ts`: S4 bekommt `['nachforderungen', 'verpflegung', 'material']`. Verifiziert durch `sachgebiete.test.ts` mit einem Pin auf die S4-Zeile.
 
 ## 6. Nachweise und Abschluss
 
@@ -56,6 +56,6 @@ und `betreuung` (LFH-639).
 - [ ] 6.2 Kontrast: `e2e/verpflegung-kontrast.spec.ts` nach dem Muster von `abloesung-kontrast.spec.ts` mit Messkern `e2e/kontrast-kern.ts`. Gemessen wird jeder Text der Karten und Dialoge in Tag- und Nachtmodus, gegen den Grund, auf dem er wirklich steht (LFH-618, Regel 3). Der kritische Fall ist „Unterdeckung“ auf der Alarmfläche im Tagmodus über `alarmText` (Regel 1). Dazu Karten- und Etikettrand. Verifiziert durch einen grünen Spec-Lauf und eine Mutationsprobe (Alarmfläche auf `alarm` → rot).
 - [ ] 6.3 Browser-Sichtprüfung in Tag und Nacht: Anlegen mit Vorschlägen, Ausgabe mit Rückgängig, Unterdeckung, Nachfordern-Sprung, ETB-Einträge. Screenshots gehen in die Prüfliste.
 - [ ] 6.4 Prüfliste Einsatztauglichkeit `docs/superpowers/specs/2026-09-24-lfh-634-pruefliste.md` nach dem Muster von LFH-635: alle 15 Kriterien mit Verdikt und Beleg.
-- [ ] 6.5 CLAUDE.md: Absatz zum Modul Verpflegung (Zeitfenster statt Schicht; Bedarf erfasst, nicht gerechnet; Nachschub nur über Nachforderung; Vertragskarte 24; Modulzähler bewusst keiner). Den Stand „Stand 22.09.2026: 18“ im Vertragskarten-Absatz nachziehen. Verifiziert durch Lesen des Diffs.
+- [x] 6.5 CLAUDE.md: Absatz zum Modul Verpflegung (Zeitfenster statt Schicht; Bedarf erfasst, nicht gerechnet; Nachschub nur über Nachforderung; Vertragskarte 24; Modulzähler bewusst keiner). Den Stand „Stand 22.09.2026: 18“ im Vertragskarten-Absatz nachziehen. Verifiziert durch Lesen des Diffs.
 - [x] 6.6 Folgeticket „Offline-Fähigkeit der Verpflegungs-Ausgaben“ angelegt: LFH-688, im Proposal und Design nachgetragen.
 - [ ] 6.7 Vor dem Merge: `git fetch`, `scripts/check-migrationen.sh` (ggf. `--umnummerieren`), dann `./scripts/check-all.sh` grün. Verifiziert durch das Log des Laufs.
