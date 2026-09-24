@@ -296,6 +296,17 @@ async fn statuscodes_400() {
             &aus,
             r#"{"menge":5,"sonderkost":{"diaet_allergenarm":-2}}"#,
         ),
+        // Obergrenze je Zahlfeld (Review LFH-634): ohne sie lief die Summe zweier Ausgaben
+        // über und verfälschte die Deckung dauerhaft.
+        ("POST", &aus, r#"{"menge":100001}"#),
+        ("POST", &aus, r#"{"menge":9223372036854775807}"#),
+        ("POST", &aus, r#"{"menge":5,"sonderkost":{"vegan":100001}}"#),
+        (
+            "POST",
+            &neu,
+            r#"{"bezeichnung":"X","von_at":"2026-09-24T10:00:00Z","bis_at":"2026-09-24T11:00:00Z","bedarf_kraefte":100001,"bedarf_betreute":0}"#,
+        ),
+        ("PATCH", &patch, r#"{"bedarf_weitere":9223372036854775807}"#),
     ] {
         let (s, j) = anfrage(&app, methode, uri, &admin, Some(body)).await;
         assert_eq!(s, StatusCode::BAD_REQUEST, "{methode} {body}: {j:?}");
@@ -739,4 +750,76 @@ async fn live_ereignis_nur_an_leser_mit_modulrecht() {
             "{kanarienvogel:?} gehört nicht in den Broadcast: {daten:?}"
         );
     }
+}
+
+#[tokio::test]
+async fn ausgabe_ohne_zeitpunkt_gilt_zur_erfassung() {
+    // Spec „Zeitpunkt fehlt“: der Vorgabewert entsteht in der Route, nicht im Repo.
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let zid = zeitfenster(&app, &admin, e, MITTAG).await;
+    let vorher = chrono::Utc::now() - chrono::Duration::seconds(1);
+    for body in [r#"{"menge":7}"#, r#"{"menge":7,"zeitpunkt_at":"  "}"#] {
+        let a = ausgabe(&app, &admin, e, zid, body).await;
+        let aid = a["ausgabe_id"].as_i64().unwrap();
+        let zp = a["zeitfenster"]["ausgaben"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|x| x["id"].as_i64() == Some(aid))
+            .unwrap()["zeitpunkt_at"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        let t = chrono::NaiveDateTime::parse_from_str(&zp, "%Y-%m-%d %H:%M:%S")
+            .unwrap()
+            .and_utc();
+        let nachher = chrono::Utc::now() + chrono::Duration::seconds(1);
+        assert!(
+            vorher <= t && t <= nachher,
+            "{body}: {zp} liegt nicht bei jetzt"
+        );
+    }
+}
+
+#[tokio::test]
+async fn leerlauf_patch_publiziert_kein_ereignis() {
+    // D5: ein PATCH ohne Wertänderung schreibt weder ETB noch Live-Ereignis.
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let zid = zeitfenster(&app, &admin, e, MITTAG).await;
+    let (_, u) = anfrage(&app, "GET", &pfad(e), &admin, None).await;
+    let bez = u["zeitfenster"][0]["bezeichnung"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let feed = live_oeffnen(&app, &admin, e).await;
+    let (s, _) = anfrage(
+        &app,
+        "PATCH",
+        &format!("{}/zeitfenster/{zid}", pfad(e)),
+        &admin,
+        Some(&format!(r#"{{"bezeichnung":"{bez}"}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    // Ein Ereignis, das sicher kommt — sonst bewiese ein leerer Feed nichts.
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/personen"),
+        &admin,
+        Some(r#"{"name":"Muster","vorname":"Max"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+    let text = sse_anfang_lesen(feed.into_body(), 400).await;
+    assert!(text.contains("event: person"), "Feed läuft: {text:?}");
+    assert!(
+        !text.contains("event: verpflegung"),
+        "Leerlauf-PATCH darf nichts publizieren: {text:?}"
+    );
 }

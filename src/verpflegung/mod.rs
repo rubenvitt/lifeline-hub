@@ -97,6 +97,11 @@ impl Sonderkost {
                     "sonderkost.{feld} darf nicht negativ sein, war {n}"
                 )));
             }
+            if n > MAX_EP {
+                return Err(AppError::Validation(format!(
+                    "sonderkost.{feld} darf höchstens {MAX_EP} sein, war {n}"
+                )));
+            }
         }
         Ok(())
     }
@@ -218,6 +223,13 @@ pub struct AusgabeErgebnis {
 
 /// Drahtformat der Zeitpunkte: UTC ohne Zonenkennung.
 pub const DRAHT: &str = "%Y-%m-%d %H:%M:%S";
+
+/// Obergrenze je Zahlfeld in EP (Bedarfsteil, Menge, Kostform). Eine Verpflegungslage mit mehr
+/// als 100 000 Portionen in EINEM Zeitfenster oder EINER Ausgabe gibt es nicht; ohne Grenze
+/// ließ die Summe zweier Ausgaben mit `i64::MAX` die Deckung überlaufen (Review LFH-634) —
+/// im Release still negativ, im Debug-Build ein Panic bei jedem Abruf. Das Feld scheitert für
+/// sich, also 400.
+pub const MAX_EP: i64 = 100_000;
 
 /// Liest einen Zeitpunkt im Drahtformat. Als Rundreise: chrono nimmt beim Parsen auch
 /// ungepolsterte Felder an, die als Text falsch sortierten. Unlesbar → 400.

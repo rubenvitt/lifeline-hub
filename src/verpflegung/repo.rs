@@ -318,6 +318,12 @@ fn anzahl_pruefen(feld: &str, n: i64) -> Result<(), AppError> {
             "{feld} darf nicht negativ sein, war {n}"
         )));
     }
+    if n > super::MAX_EP {
+        return Err(AppError::Validation(format!(
+            "{feld} darf höchstens {} sein, war {n}",
+            super::MAX_EP
+        )));
+    }
     Ok(())
 }
 
@@ -590,6 +596,7 @@ pub async fn ausgabe_erfassen_tx(
             eingabe.menge
         )));
     }
+    anzahl_pruefen("menge", eingabe.menge)?;
     let sonderkost = eingabe.sonderkost.ueber(&Sonderkost::default());
     sonderkost.pruefen()?;
     // 422 — der Zusammenhang
