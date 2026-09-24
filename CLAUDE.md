@@ -507,6 +507,11 @@ Alltag wichtigsten:
   streicht, tut es im selben Commit wie den Fix und prüft `aktionsabstand.guard.test.ts` mit.
   `Card`/`Descriptions`/`Space`/`Liste` dürfen klein bleiben (Abstandsmaß, keine Trefffläche)
   und gehören nicht in `OFFEN`. `controlHeight` = **30/48/72**, `controlHeightSM` = **24/48/72**.
+  **Die Breite eines Knopfs hat einen Boden am Kontext** (LFH-381): `antdKnopf()` in
+  `theme/tokens.ts` gibt über `ConfigProvider button.style` jedem Knopf `minWidth` =
+  `controlHeightSM`, denn antds `paddingInlineSM` ist das Literal 7 und ein „OK" blieb in jeder
+  Stufe ~38 px breit. Ein Boden, keine Polsterung: breite Etiketten bleiben unberührt. Die eine
+  benannte Ausnahme (`minWidth: 0`) ist die Aktionszeile der UHS-Platzkarte; sie fällt mit LFH-379.
   **Ein handgebautes Bedienziel** (`role="option"`-Zeile, `<div onClick>`, Zeilen-`<Link>`,
   Kommandopalette) braucht **zwei** Angaben: `minHeight: token.controlHeight` **plus** `padding`
   aus `token.paddingSM`/`token.padding`, aus aufgelösten Tokens, nie `var(--lfh-*)`, geprüft über
