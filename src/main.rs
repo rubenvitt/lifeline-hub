@@ -1,5 +1,5 @@
 use clap::Parser;
-use lifeline_hub::app::{build_router, AppState};
+use lifeline_hub::app::{build_router_mit, AppState, RouterOptionen};
 use lifeline_hub::backup;
 use lifeline_hub::config::{Command, Config};
 use lifeline_hub::db;
@@ -204,19 +204,34 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         }
     }
 
-    let app = build_router(AppState {
-        pool,
-        live,
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
-        karten_dir,
-        download_client: lifeline_hub::karte::download::download_client(),
-        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
-        karten_service_url: config.karten_service_url.clone(),
-        karten_service_token: config
-            .karten_service_token
-            .as_ref()
-            .map(|t| t.als_str().to_string()),
-    });
+    // Demo-Daten (LFH-690): der Schalter reist als Router-Option, die Routen existieren nur
+    // mit ihm. Er öffnet einen harten Löschweg, deshalb steht er sichtbar im Log.
+    if config.demo_daten {
+        tracing::warn!(
+            "Demo-Daten sind freigeschaltet: --demo-daten (LIFELINE_DEMO_DATEN) ist AKTIV — \
+             der System-Admin kann über /api/demo-daten einen Übungseinsatz samt Stammdaten \
+             importieren, und der harte Löschweg für Demo-Daten ist erreichbar. In einer \
+             Einsatzumgebung gehört der Schalter ausgeschaltet."
+        );
+    }
+    let app = build_router_mit(
+        AppState {
+            pool,
+            live,
+            fachebenen: lifeline_hub::karte::FachebenenState::neu(),
+            karten_dir,
+            download_client: lifeline_hub::karte::download::download_client(),
+            download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
+            karten_service_url: config.karten_service_url.clone(),
+            karten_service_token: config
+                .karten_service_token
+                .as_ref()
+                .map(|t| t.als_str().to_string()),
+        },
+        RouterOptionen {
+            demo_daten: config.demo_daten,
+        },
+    );
 
     if config.tls {
         // CryptoProvider: rustls 0.23 nutzt bei GENAU EINEM kompilierten Provider-Feature dessen
