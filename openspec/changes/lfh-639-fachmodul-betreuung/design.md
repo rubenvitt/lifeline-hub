@@ -358,6 +358,13 @@ leicht übersehen:
   Mindestaktualität erzwingt LFH-639 nicht. Das bleibt eine Frage an LFH-640.
 - [Geschlossene Stelle mit Belegung 0 zählt in der Kopfzahl vor ihrem Schließen mit ihrer
   damaligen Belegung] → Das ist gewollt. Die Kopfzahl zu t ist der damals gemeldete Stand.
+- [Ohne Statushistorie ist offen, welche Stelle zu t betrieben wurde] → Nachzug LFH-679,
+  Heuristik ohne Migration: „ohne Meldung“ zählt nur eine Stelle, die vor t angelegt ist und
+  nicht jetzt geschlossen oder vorbereitet ohne jede nicht zurückgenommene Meldung. Die
+  Summe berührt das nicht. Maßgeblich ist der heutige Status: eine jetzt geschlossene Stelle
+  mit späterer Meldung zählt weiter (Hinweis eher zu oft), eine zu t betriebene, nie gemeldete
+  und später geschlossene fällt weg (Hinweis fehlt). Genau würde es erst mit einer
+  Statushistorie.
 
 ## Migration Plan
 
