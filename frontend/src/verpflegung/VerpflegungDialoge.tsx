@@ -387,7 +387,9 @@ export function AusgabeDialog({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Typography.Paragraph type="secondary" style={{ fontVariantNumeric: 'tabular-nums' }}>
+      {/* Normaltext, nicht `secondary`: die Zeile ist im Dialog die einzige Angabe der Fehlmenge
+          und damit tragend — als Tertiärtext hielt sie nachts nur 4,81 : 1 (Kontrast-Spec). */}
+      <Typography.Paragraph style={{ fontVariantNumeric: 'tabular-nums' }}>
         Bedarf {zf.bedarf.gesamt} · ausgegeben {zf.ausgegeben.gesamt} · fehlt {zf.fehlmenge.gesamt}{' '}
         EP
       </Typography.Paragraph>

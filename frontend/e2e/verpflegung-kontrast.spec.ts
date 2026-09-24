@@ -383,6 +383,8 @@ for (const modus of ['light', 'dark'] as const) {
       'fehlt 8 vegan',
       'fehlt 6 vegan',
       'Bedarf 12 · ausgegeben 4',
+      // Deckungszeile im Dialog „Ausgabe erfassen“: dort die einzige Angabe der Fehlmenge.
+      /^Bedarf \d+ · ausgegeben \d+ · fehlt \d+ EP$/,
       'vegan',
       '30 EP',
       'zurückgenommen',
