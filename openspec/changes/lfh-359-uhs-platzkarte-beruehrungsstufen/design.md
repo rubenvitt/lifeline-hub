@@ -77,8 +77,15 @@ nicht mit Literalen, damit ein Staffelwechsel in `tokens.ts` den Test mitzieht. 
 Bodenwerte stehen aber als Literale im Test, nach dem Muster von `bedienzielStil`.
 
 Die Komponente liest das Token über `theme.useToken()`. Einen `useDichte()`-Zweig gibt es
-nicht: Die Form folgt aus dem, was gerendert wird, nicht aus einem Etikett. In Vitest ohne
-Theme ergibt sich deshalb die Zeilenform, und der Bestand bleibt unverändert grün.
+nicht: Die Form folgt aus dem, was gerendert wird, nicht aus einem Etikett.
+
+**Korrektur bei der Umsetzung:** Hier stand ursprünglich, dass Vitest ohne Theme die
+Zeilenform ergebe. Das stimmt nicht, gemessen. antds Vorgabe `marginSM = 12` ergibt 4 × 24 +
+3 × 12 = 132 > 124, also die Kartenform. Deshalb rendern `Grundriss.test.tsx` und
+`GrundrissTabs.test.tsx` jetzt im App-Theme der Stufe `kompakt`. Das ist ohnehin der Zustand,
+den die App hat. Die Kartentests reichen `komfortabel` herein. `controlHeight` gehört nicht zur
+Signatur von `platzBedienform`, weil die Entscheidung nur an `controlHeightSM` und `marginSM`
+hängt.
 
 ### 3. Aufbau der Kartenform
 
@@ -93,12 +100,15 @@ Theme ergibt sich deshalb die Zeilenform, und der Bestand bleibt unverändert gr
   damit den Layout-Zug. Enter startet diesen Zug ebenfalls, deshalb verzweigt der Handler
   **vor** dem dnd-kit-Listener und reicht Enter im Bearbeiten-Modus nicht weiter. Damit bleibt
   im Bearbeiten-Modus der Tastatur-Zug über die Leertaste erhalten.
-- **Klick-Riegel:** Der Portal-Klick eines Menüeintrags steigt im Komponentenbaum in den
-  Kartenknoten auf und löste dort erneut den Auslöser aus. Das Menü klappte wieder auf, und in
-  der Zeilenform hätte er zugewiesen. Der Riegel sitzt deshalb am Container des Popups:
-  `popupRender={(n) => <div onClick={e => e.stopPropagation()}>{n}</div>}`. Das ist das Muster
-  aus CLAUDE.md, „Riegel am Container, nicht `domEvent.stopPropagation()`“. Der Wurzel-`onClick`
-  für die Zuweisung gilt nur in der Zeilenform.
+- **Klick-Riegel:** In der Kartenform ist er **entfallen**. Das ist eine Korrektur bei der
+  Umsetzung. Das `Dropdown` legt sich hier **um** die Karte. rc-trigger rendert das Popup als
+  Geschwister des Kindes, nicht als dessen Nachfahre. Der Portal-Klick steigt deshalb nicht in
+  die Karte auf, sondern zu ihren Vorfahren, und die tragen keinen `onClick`. Belegt ist das
+  durch den Test „löst mit einer Menüwahl weder die Zuweisung aus noch öffnet es das Menü
+  erneut“. Er ist grün, ohne dass ein Riegel existiert. Ein Riegel, den kein Test rot machen
+  kann, wäre eine Behauptung ohne Beleg. Der Wurzel-`onClick` für die Zuweisung gilt nur in der
+  Zeilenform. Deren Riegel an der Aktionszeile bleibt, weil ihr Dropdown **in** der Karte
+  hängt.
 - **Menüinhalt:** Er wird aus einer reinen Funktion `platzMenueEintraege(...)` abgeleitet, die
   auch die Zeilenform für ihr „…“-Menü nutzt. Beide Formen lesen so dieselbe Liste und dieselben
   Rechte und Sperren. Nur die Kartenform nimmt die Einträge hinzu, die in der Zeilenform Knöpfe
