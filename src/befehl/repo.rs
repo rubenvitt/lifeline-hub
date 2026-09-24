@@ -2,7 +2,7 @@ use super::{leere_abschnitte, vorlage, Abschnitt, STATUS_ENTWURF, STATUS_FREIGEG
 use crate::error::AppError;
 use crate::etb::{self, repo as etb_repo};
 use serde::Serialize;
-use sqlx::SqlitePool;
+use sqlx::{SqliteConnection, SqlitePool};
 use utoipa::ToSchema;
 
 /// Öffentliche Anzeige eines Befehls (Abschnitte aus JSON geparst, Namen aufgelöst).
@@ -105,13 +105,20 @@ pub async fn liste(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<BefehlAnzei
 }
 
 /// Lädt einen Befehl (aufgelöst); `NotFound`, wenn nicht zum Einsatz.
-pub async fn laden(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<BefehlAnzeige, AppError> {
+///
+/// Executor-generisch (Pool oder offene Verbindung): [`anlegen_tx`] und [`freigeben_tx`]
+/// laden auf der Verbindung ihrer Transaktion (LFH-690).
+pub async fn laden(
+    executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
+    einsatz_id: i64,
+    id: i64,
+) -> Result<BefehlAnzeige, AppError> {
     let row = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!(
         "{SELECT} WHERE l.id = ? AND l.einsatz_id = ?"
     )))
     .bind(id)
     .bind(einsatz_id)
-    .fetch_optional(pool)
+    .fetch_optional(executor)
     .await?
     .ok_or(AppError::NotFound)?;
     zu_anzeige(row)
@@ -119,8 +126,33 @@ pub async fn laden(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<Befehl
 
 /// Legt einen Entwurf mit leerem Abschnitts-Skelett der Vorlage an.
 /// Erwartet eine bereits validierte `vorlage` und normalisierten `zeitstand`.
+///
+/// Pool-Hülle um [`anlegen_tx`]: wie bisher ohne eigene Transaktion, Insert und Rücklesen
+/// laufen im Autocommit einer geliehenen Verbindung.
 pub async fn anlegen(
     pool: &SqlitePool,
+    einsatz_id: i64,
+    vorlage_key: &str,
+    titel: &str,
+    zeitstand: &str,
+    ersteller_id: i64,
+) -> Result<BefehlAnzeige, AppError> {
+    let mut conn = pool.acquire().await?;
+    anlegen_tx(
+        &mut conn,
+        einsatz_id,
+        vorlage_key,
+        titel,
+        zeitstand,
+        ersteller_id,
+    )
+    .await
+}
+
+/// Legt einen Entwurf auf einer offenen Verbindung/Transaktion an und lädt ihn dort zurück
+/// (LFH-690, Demo-Import in EINER Transaktion). Öffnet und committet selbst nichts.
+pub async fn anlegen_tx(
+    conn: &mut SqliteConnection,
     einsatz_id: i64,
     vorlage_key: &str,
     titel: &str,
@@ -142,9 +174,9 @@ pub async fn anlegen(
     .bind(STATUS_ENTWURF)
     .bind(skelett)
     .bind(ersteller_id)
-    .fetch_one(pool)
+    .fetch_one(&mut *conn)
     .await?;
-    laden(pool, einsatz_id, id).await
+    laden(&mut *conn, einsatz_id, id).await
 }
 
 /// Partielles Update eines Entwurfs (Titel/Zeitstand/Abschnitte). `NotFound`,
