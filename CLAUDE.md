@@ -416,10 +416,12 @@ wer eine Bedienbarkeit zusichern will, klickt. Und ein e2e-Test, der eine Überd
 Zustand ungetestet, den der Nutzer antrifft — die Umgehung gehört mit dem Fix weg, die
 Vorbedingung („die Leiste steht ausgeklappt da") bleibt stehen, sonst wird die Messung
 still wertlos statt rot. Gemessen wird in `e2e/lagekarte-smoke.spec.ts` mit echten
-Bounding-Boxen bei 1280 px und 1024 px. **Nicht bei 390 px**, und das ist eine Aussage
-statt einer Lücke: die Lagekarten-Sidebar ist fest 300 px breit, dort bliebe für die
-Kartenfläche nichts übrig — eine eigene Frage (Sidebar-Responsivität), kein Teil dieser
-Stapelentscheidung.
+Bounding-Boxen bei 1280 px und 1024 px. **Nicht bei 390 px — das ist heute eine Lücke,
+keine Aussage mehr** (LFH-100). Die frühere Begründung („die Sidebar ist fest 300 px breit,
+für die Kartenfläche bliebe nichts") ist seit dem Neuentwurf überholt: unter `lg` liegt die
+Leiste UNTER der Karte, auf dem Handschirm per Vorgabe zu. Den Querlauf der Lagekarte misst
+seit LFH-100 Gate 1 (`e2e/gate1-ueberlauf.spec.ts`, auch bei 768 und 390 px); die
+Klickbarkeit der gestapelten Bänder bei 390 px ist weiter ungemessen und gehört zu LFH-100.
 
 **Sprungmarken sind keine Module** (LFH-620, `einsatz/sprungmarken.ts`). Führt der
 Entwurf ein „Modul“, dessen Daten ein vorhandenes Modul schon trägt (Entscheidungen =
