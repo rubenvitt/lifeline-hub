@@ -29,9 +29,14 @@ export const sichtungsfarben = {
  * den Werten (`farbenDunkel`).
  *
  * DIESE DATEI IST DIE TS-SEITE DER WAHRHEIT. Die CSS-Seite steht in `rollen.css`
- * als statische Custom Properties — nötig, weil handgeschriebenes CSS die
- * antd-Tokens nicht lesen kann, solange `cssVar` aus ist (Weiche vertagt nach
- * A2/LFH-328). `rollen.guard.test.ts` hält beide Seiten deckungsgleich.
+ * als statische Custom Properties, damit handgeschriebenes CSS nicht an antds
+ * Variablennamen hängt. antd 6 emittiert seine `--ant-*`-Variablen zwar immer, auch
+ * ohne `cssVar` am ConfigProvider (gemessen in LFH-623, `test/antdCssVariablen.ts`;
+ * eine Weiche zum Abschalten gibt es nicht mehr). Sie taugen hier trotzdem nicht als
+ * Quelle: die meisten Rollen (`paneel`, `flaeche3`, `kopf`, die Statusflächen) hat
+ * antd gar nicht, die Namen gehören der Bibliothek und nicht der Gestaltungssprache,
+ * und `rollen.css` begründet im Kopf, warum die Werte schon im ersten Frame stehen
+ * müssen. `rollen.guard.test.ts` hält beide Seiten deckungsgleich.
  *
  * ROT BEDIENT NICHTS. `bedien` ist blau, `marke` ist rot, `alarm` ist rot in
  * anderer Sättigung. Eine rote Bedienfläche bricht die Sprache (LFH-315).

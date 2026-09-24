@@ -63,9 +63,11 @@ const SlashMenu = forwardRef<SlashMenuHandle, Props>(function SlashMenu(
   const [aktiv, setAktiv] = useState(0);
   // Aufgelöste Theme-Tokens (theme.useToken()) statt antd-CSS-Variablen: robust
   // gegenüber dem Theme-Modus. Eine antd-Custom-Property griff hier früher nie und
-  // lief still auf ihren dunklen Fallback — der ConfigProvider setzt `cssVar` nicht,
-  // und dass er es NICHT tut, ist seit A2 (LFH-328) eine begründete Entscheidung:
-  // handgeschriebenes CSS liest `--lfh-*` aus `theme/rollen.css`, TSX liest useToken().
+  // lief still auf ihren dunklen Fallback — das war unter antd 5, dort war `cssVar`
+  // tatsächlich aus (LFH-72, vor dem Sprung auf antd 6 in LFH-159). antd 6 emittiert
+  // `--ant-*` immer, laut LFH-623 aber nur unter der Klasse `css-var-root`, nicht an
+  // `<html>`. Die Regel bleibt deshalb: handgeschriebenes CSS liest `--lfh-*` aus
+  // `theme/rollen.css`, TSX liest useToken(), keines hängt an antds Variablennamen.
   const { token } = theme.useToken();
 
   useEffect(() => setAktiv(0), [filter, offen]);
