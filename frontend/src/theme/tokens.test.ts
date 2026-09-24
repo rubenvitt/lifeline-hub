@@ -18,6 +18,8 @@ import { abstand, antdToken, dichten, farbenHell, flaeche, type Dichte } from '.
 import { seitenrinne } from './tokens';
 // Ebenfalls eigene Zeile, aus demselben Grund wie die Zeile darüber.
 import { navDrawerBreite } from './tokens';
+// Eigene Zeile (LFH-677), aus demselben Grund.
+import { antdKomponenten, farbenDunkel } from './tokens';
 
 /** `ThemeConfig['token']` ist optional getypt — hier nicht wegcasten, sondern
  *  laut scheitern, wenn `antdToken` nichts liefert. */
@@ -161,5 +163,31 @@ describe('Navigations-Drawer (LFH-329 · B1/H11)', () => {
     // Inhaltsbreite) — ein Wegfall, kein Zuzug; `navDrawer` bleibt ausgeschlossen.
     expect(Object.keys(flaeche)).toHaveLength(4);
     expect(flaeche).not.toHaveProperty('navDrawer');
+  });
+});
+
+/**
+ * Der gewählte Radio-Knopf (Knopfform) schreibt seinen TEXT in antds `colorPrimary` — am Tag
+ * `bedien` auf Weiß, gemessen 6,59 : 1 und damit unter dem Tagesboden 7 : 1 (LFH-677,
+ * `e2e/betreuung-pruefliste.spec.ts`). Blauer Bedien-TEXT nimmt `bedienText` (LFH-650), und
+ * zwar nur am Radio: global umgelegt träfe `colorPrimary` auch jede Knopffläche.
+ */
+describe('Radio-Knopf: Text in bedienText (LFH-677)', () => {
+  it.each([
+    ['hell', farbenHell],
+    ['dunkel', farbenDunkel],
+  ] as const)(
+    'Modus %s: gewählt und unter dem Zeiger in bedienText, nicht in bedien',
+    (_, farben) => {
+      const radio = antdKomponenten(farben).Radio;
+      expect(radio?.colorPrimary).toBe(farben.bedienText);
+      expect(radio?.colorPrimaryHover).toBe(farben.bedienText);
+      expect(farben.bedienText).not.toBe(farben.bedien);
+    },
+  );
+
+  it('lässt die übrigen Komponenten auf bedien', () => {
+    // Die Umstellung ist am Radio gescopt — ein globales `colorPrimary` bliebe unverändert.
+    expect(antdToken(farbenHell)?.colorPrimary).toBe(farbenHell.bedien);
   });
 });

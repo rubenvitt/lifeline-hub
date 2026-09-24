@@ -616,6 +616,15 @@ export function antdKomponenten(farben: Farbrollen): NonNullable<ThemeConfig['co
       primaryColor: farben.aufBedien,
       dangerColor: farben.aufBedien,
     },
+    // Der Radio-Knopf (Knopfform) schreibt seinen TEXT in `colorPrimary` — gewählt, und unter
+    // dem Zeiger in `colorPrimaryHover`. Am Tag lag `bedien` auf Weiß bei 6,59 : 1, unter dem
+    // Tagesboden 7 : 1 (LFH-677, gemessen in `e2e/betreuung-pruefliste.spec.ts`). Blauer
+    // Bedien-TEXT nimmt `bedienText` (LFH-650). Nur hier, nicht global: `colorPrimary` färbt
+    // auch jede Knopffläche, und deren Paar Weiß auf `bedien` ist eine eigene Frage (LFH-661).
+    Radio: {
+      colorPrimary: farben.bedienText,
+      colorPrimaryHover: farben.bedienText,
+    },
   };
 }
 
