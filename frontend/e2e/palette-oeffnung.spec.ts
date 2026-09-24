@@ -270,17 +270,23 @@ test('→ zeigt eine Meldung, und ihr Verweis „↗ Auftrag" führt hin und sch
   await expect(paletteInput(page)).toBeHidden();
 });
 
-test('→ zeigt einen ETB-Eintrag, gefunden über seine laufende Nummer', async ({ page }) => {
+/**
+ * Über die VOLLTEXTSUCHE gefunden, nicht über die Nummer: `#1` hätte hinter dem Präfix nur ein
+ * Zeichen und läge unter `DATENSATZ_MINDESTZEICHEN`. Der Volltextweg ist zugleich der
+ * strengere — die Vorschau liest den Eintrag dann KALT über den Nummerncursor nach und prüft
+ * die `id` (Design, Entscheidung 2).
+ */
+test('→ zeigt einen ETB-Eintrag aus der Volltextsuche', async ({ page }) => {
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Vorschau ETB ${Date.now()}`);
-  const eintrag = await apiPost(page, `/api/einsaetze/${einsatzId}/etb`, {
+  await apiPost(page, `/api/einsaetze/${einsatzId}/etb`, {
     typ: 'lage',
     inhalt: 'Wasserstand steigt um zehn Zentimeter je Stunde',
     von: 'Abschnitt Nord',
   });
 
   await zumModul(page, einsatzId, 'personen');
-  await suche(page, `#${eintrag.lfd_nr}`);
+  await suche(page, '#Wasserstand');
   await expect(page.getByRole('option', { name: /Wasserstand steigt/ })).toHaveAttribute(
     'aria-selected',
     'true',
@@ -292,8 +298,8 @@ test('→ zeigt einen ETB-Eintrag, gefunden über seine laufende Nummer', async 
   await expect(
     vorschau.getByText('Wasserstand steigt um zehn Zentimeter je Stunde', { exact: true }),
   ).toBeVisible();
-  await expect(vorschau.getByText('Abschnitt Nord')).toBeVisible();
+  await expect(vorschau.getByText('Abschnitt Nord → —')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(vorschau).toBeHidden();
-  await expect(paletteInput(page)).toHaveValue(`#${eintrag.lfd_nr}`);
+  await expect(paletteInput(page)).toHaveValue('#Wasserstand');
 });
