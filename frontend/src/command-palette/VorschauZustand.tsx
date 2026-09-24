@@ -17,14 +17,17 @@ export const VORSCHAU_UNTER_EBENE = 2;
 /** Die Teilmenge eines Query-Ergebnisses, die die Vorschau braucht. */
 export interface VorschauAbfrage<T> {
   data: T | undefined;
-  isLoading: boolean;
+  /** `status === 'pending'` — noch keine Antwort, ob gerade abgerufen wird oder nicht. */
+  isPending: boolean;
+  /** `'paused'` = ohne Verbindung angehalten (`networkMode: 'online'`, TanStacks Vorgabe). */
+  fetchStatus: 'fetching' | 'paused' | 'idle';
   isError: boolean;
   error: unknown;
   refetch: () => unknown;
 }
 
 /**
- * Laden · Fehler · „nicht mehr vorhanden" · Inhalt — EINMAL für alle Vorschau-Sorten
+ * Laden · ohne Verbindung · Fehler · „nicht mehr vorhanden" · Inhalt — EINMAL für alle Vorschau-Sorten
  * (LFH-664), statt elfmal in jedem Bauteil.
  *
  * Der dritte Zustand ist der Grund für diese Hülle. Die Vorschau liest ihren Datensatz per
@@ -49,7 +52,17 @@ export function VorschauZustand<T>({
   children: (daten: T) => ReactNode;
 }) {
   const wiederholen = () => void abfrage.refetch();
-  if (abfrage.isLoading) {
+  // An `isPending`, NICHT an `isLoading` (Review-Befund): eine kalte Abfrage OHNE NETZ steht
+  // auf `pending` + `paused`, `isLoading` ist dann false und `data` undefined — sie fiele in
+  // den Zweig „nicht mehr vorhanden" und behauptete etwas über einen Datensatz, den es gibt.
+  if (abfrage.isPending) {
+    if (abfrage.fetchStatus === 'paused') {
+      return (
+        <Typography.Paragraph>
+          {sorte} ist ohne Verbindung nicht abrufbar. Die Vorschau lädt, sobald das Netz zurück ist.
+        </Typography.Paragraph>
+      );
+    }
     return (
       <div aria-busy="true" aria-label={`${sorte} wird geladen`}>
         <Spin />

@@ -11,10 +11,9 @@ import {
   Space,
   Spin,
   Tag,
-  Typography,
 } from 'antd';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { Datenfeld, Datenraster, monoStil } from '../components/instrument';
+import { monoStil } from '../components/instrument';
 import { Select } from '../components/Select';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { useState } from 'react';
@@ -34,18 +33,16 @@ import {
 } from '../api/einsatzSchaden';
 import { ApiError, istKonflikt } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
-import { lagekartePfad, parseRouteId, schaedenPfad } from '../routing/deeplinks';
-import KoordinatenAnzeige from '../anzeige/KoordinatenAnzeige';
+import { parseRouteId, schaedenPfad } from '../routing/deeplinks';
 import type { Ausmass, SchadenTyp } from '../api/types';
 import GeschaedigtPicker, { type GeschaedigtWert } from './schaeden/GeschaedigtPicker';
+import SchadenDaten from './schaeden/SchadenDaten';
 import { useEditSitzung, type CasBasis } from '../components/useEditSitzung';
 import {
   ABSCHLUSS_GRUENDE,
-  ABSCHLUSS_LABEL,
   AUSMASS_META,
   STATUS_META,
   TYP_LABEL,
-  geschaedigtAnzeige,
   geschaedigtAusSchaden,
   geschaedigtFelder,
 } from './schaeden/schadenHelfer';
@@ -206,87 +203,43 @@ export default function SchaedenDetailPage() {
 
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
-  // Eine Detail-Zelle: im Edit-Modus ein noStyle-Form.Item, sonst die Read-Anzeige — so bleibt
-  // dasselbe Datenraster stehen, statt die Ansicht gegen ein separates Formular zu tauschen.
-  const zelle = (
-    name: string,
-    input: React.ReactNode,
-    anzeige: React.ReactNode,
-    rules?: object[],
-  ) =>
-    bearbeiten ? (
-      <Form.Item name={name} noStyle rules={rules}>
-        {input}
-      </Form.Item>
-    ) : (
-      anzeige
-    );
+  // Eine Eingabe-Zelle: im Edit-Modus ein noStyle-Form.Item, das `SchadenDaten` an die Stelle
+  // der Anzeige setzt — so bleibt dasselbe Datenraster stehen, statt die Ansicht gegen ein
+  // separates Formular zu tauschen. Die Regeln bleiben hier, am Formular der Seite.
+  const feld = (name: string, input: React.ReactNode, rules?: object[]) => (
+    <Form.Item name={name} noStyle rules={rules}>
+      {input}
+    </Form.Item>
+  );
 
   const detailAnsicht = (
-    <Datenraster spalten={3} beschriftung="Schadensdaten">
-      <Datenfeld label="Typ">
-        {zelle(
-          'typ',
-          <Select style={{ minWidth: 200 }} options={TYP_OPTIONS} />,
-          <Tag>{TYP_LABEL[s.typ]}</Tag>,
-        )}
-      </Datenfeld>
-      <Datenfeld label="Ausmaß">
-        {zelle(
-          'ausmass',
-          <Select style={{ minWidth: 160 }} options={AUSMASS_OPTIONS} />,
-          <StatusTag darstellung={AUSMASS_META[s.ausmass]} />,
-        )}
-      </Datenfeld>
-      <Datenfeld label="Ort">
-        {zelle('ort', <Input placeholder="z. B. Hauptstr. 17 oder L 235 km 12,5" />, s.ort, [
-          { required: true, message: 'Ort ist Pflicht' },
-        ])}
-      </Datenfeld>
-      <Datenfeld label="Beschreibung" breit>
-        {zelle('beschreibung', <Input.TextArea rows={2} />, s.beschreibung || '—')}
-      </Datenfeld>
-      {/**
-       * VERORTUNG (LFH-340 · C5, Befund M39). Bis dahin sagte die Seite kein Wort darüber,
-       * ob dieser Schaden auf der Karte steht — obwohl `lat`/`lon` seit jeher am Datensatz
-       * hängen und die Karte sie setzen kann. Eine Lage, die man nicht verorten kann, weil
-       * niemand sieht, dass sie unverortet ist, ist so gut wie nicht erfasst.
-       *
-       * Die Koordinate wird hier NICHT eingegeben: `SchadenEingabe` kennt kein lat/lon
-       * (nur `SchadenPatch` tut es), und ein Eingabefeld wäre eine Backend-Erweiterung.
-       * Der Weg ist deshalb der Auftrag an die Karte — sie hat die Mechanik bereits.
-       */}
-      <Datenfeld label="Verortung">
-        {s.lat != null && s.lon != null ? (
-          <KoordinatenAnzeige lat={s.lat} lon={s.lon} einsatzId={einsatzId} />
-        ) : (
-          <Space wrap>
-            <Typography.Text type="secondary">nicht verortet</Typography.Text>
-            {darfSchreiben && (
-              <Link to={lagekartePfad(einsatzId, { platzieren: { typ: 'schaden', id: s.id } })}>
-                Auf Karte verorten
-              </Link>
-            )}
-          </Space>
-        )}
-      </Datenfeld>
-      <Datenfeld label="Geschädigt" breit>
-        {zelle(
-          'geschaedigt',
-          <GeschaedigtPicker
-            einsatzId={einsatzId}
-            orgName={einsatz.org_name ?? 'Eigene Organisation'}
-          />,
-          geschaedigtAnzeige(s, einsatzId),
-        )}
-      </Datenfeld>
-      {s.status !== 'offen' && <Datenfeld label="Übergeben an">{s.uebergeben_an || '—'}</Datenfeld>}
-      {s.status === 'abgeschlossen' && (
-        <Datenfeld label="Abschlussgrund">
-          {s.abschluss_grund ? ABSCHLUSS_LABEL[s.abschluss_grund] : '—'}
-        </Datenfeld>
-      )}
-    </Datenraster>
+    <SchadenDaten
+      schaden={s}
+      einsatzId={einsatzId}
+      verortenLink={darfSchreiben}
+      eingabe={
+        bearbeiten
+          ? {
+              typ: feld('typ', <Select style={{ minWidth: 200 }} options={TYP_OPTIONS} />),
+              ausmass: feld(
+                'ausmass',
+                <Select style={{ minWidth: 160 }} options={AUSMASS_OPTIONS} />,
+              ),
+              ort: feld('ort', <Input placeholder="z. B. Hauptstr. 17 oder L 235 km 12,5" />, [
+                { required: true, message: 'Ort ist Pflicht' },
+              ]),
+              beschreibung: feld('beschreibung', <Input.TextArea rows={2} />),
+              geschaedigt: feld(
+                'geschaedigt',
+                <GeschaedigtPicker
+                  einsatzId={einsatzId}
+                  orgName={einsatz.org_name ?? 'Eigene Organisation'}
+                />,
+              ),
+            }
+          : undefined
+      }
+    />
   );
 
   return (

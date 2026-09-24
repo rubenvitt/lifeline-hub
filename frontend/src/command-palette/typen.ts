@@ -114,10 +114,23 @@ export type Oeffnung = 'hier' | 'neuerTab';
  * Der ETB trägt zusätzlich `lfdNr`: kein Fach adressiert einen Eintrag über seine `id`, die
  * Vorschau liest ihn über den Nummerncursor und prüft danach die `id`.
  */
-export type VorschauZiel = { art: VorschauArt; einsatzId: number; id: number };
+export type VorschauZiel =
+  | { art: VorschauArt; einsatzId: number; id: number }
+  | { art: 'etb'; einsatzId: number; id: number; lfdNr: number };
 
 /** Die Sorten, deren Ziel allein aus `einsatzId` und `id` besteht. */
-export type VorschauArt = 'person';
+export type VorschauArt =
+  | 'person'
+  | 'schaden'
+  | 'uhs'
+  | 'meldung'
+  | 'auftrag'
+  | 'fahrzeug'
+  | 'personal'
+  | 'einheit'
+  | 'lagebericht'
+  | 'gefahrengebiet'
+  | 'abschnitt';
 
 /**
  * Ziel und Weg einer Navigationszeile aus EINER Hand (LFH-645) — für alle drei Bauorte

@@ -34,12 +34,12 @@ import {
 } from '../api/lageberichte';
 import type { LageberichtAbschnitt, LageberichtAnzeige } from '../api/types';
 import { vorlage, type AbschnittDef } from '../lageberichte/vorlagen';
+import LageberichtText from '../lageberichte/LageberichtText';
 import {
   AbschnittsAkkordeon,
   befuellungsKette,
   mengeAusKette,
 } from '../lageberichte/AbschnittsAkkordeon';
-import Markdown from '../components/Markdown';
 import MarkdownEditor from '../components/MarkdownEditor';
 import { useEntwurfVerlustschutz } from '../entwurf/useEntwurfVerlustschutz';
 import Einstiegsfokus, { einstiegsAbschnitt } from '../entwurf/Einstiegsfokus';
@@ -508,25 +508,8 @@ function LageberichtDetail() {
             koerperPolster
           >
             <div className="lagebericht-druck">
-              {v?.abschnitte.map((a) => {
-                const text =
-                  bericht.abschnitte.find((x) => x.schluessel === a.schluessel)?.text ?? '';
-                return (
-                  <section key={a.schluessel} style={{ marginBottom: 16 }}>
-                    {/* h3 unter dem Paneel (h2); Satz bleibt der von h5. */}
-                    <Typography.Title level={3} style={{ fontSize: token.fontSizeHeading5 }}>
-                      {a.label}
-                    </Typography.Title>
-                    {text.trim() ? (
-                      <Markdown variante="dokument" unterEbene={3}>
-                        {text}
-                      </Markdown>
-                    ) : (
-                      <Typography.Paragraph>—</Typography.Paragraph>
-                    )}
-                  </section>
-                );
-              })}
+              {/* Unter dem Paneel (h2): Abschnittstitel h3, `#` im Text h4. */}
+              <LageberichtText bericht={bericht} unterEbene={2} />
             </div>
           </Paneel>
         )}

@@ -1291,26 +1291,6 @@ describe('baueDatensatzTreffer — Öffnungsart und Vorschau (LFH-645)', () => {
     gefahrengebiete: 'gefahrengebiet',
     abschnitte: 'abschnitt',
   };
-  /**
-   * Quellen, die in diesem Stand NOCH KEINE Vorschau tragen dürfen — die Menge schrumpft je
-   * Bündel und fällt mit dem letzten weg (tasks.md 4.6). Für sie gilt die Gegenaussage: kein
-   * `vorschau`-Feld. So bleibt der Guard in jedem Zwischenstand eine echte Aussage.
-   */
-  const NOCH_OHNE_VORSCHAU = new Set<DatensatzQuelle>([
-    'schaeden',
-    'uhs',
-    'meldungen',
-    'auftraege',
-    'fahrzeuge',
-    'personal',
-    'einheiten',
-    'etbNummer',
-    'etbText',
-    'lageberichte',
-    'gefahrengebiete',
-    'abschnitte',
-  ]);
-
   /** Je Quelle EIN Datensatz mit eigener id — die id sagt, aus welcher Quelle der Treffer kommt. */
   function trefferJeQuelle(): Map<number, { quelle: DatensatzQuelle; befehl: Befehl }> {
     const textTreffer = baueDatensatzTreffer(
@@ -1369,10 +1349,6 @@ describe('baueDatensatzTreffer — Öffnungsart und Vorschau (LFH-645)', () => {
       101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113,
     ]);
     for (const [id, { quelle, befehl }] of je) {
-      if (NOCH_OHNE_VORSCHAU.has(quelle)) {
-        expect(befehl.vorschau, quelle).toBeUndefined();
-        continue;
-      }
       const art = ERWARTETE_ART[quelle];
       const erwartet =
         art === 'etb'

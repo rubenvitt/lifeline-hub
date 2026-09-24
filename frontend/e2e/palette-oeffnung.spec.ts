@@ -222,3 +222,73 @@ test('„Zurück" in der Vorschau hält den Dichte-Boden in allen drei Stufen', 
     await expect(paletteInput(page)).toBeHidden();
   }
 });
+
+/**
+ * Vorschauen der übrigen Datensatzsorten (LFH-664). Geseedet wird hier über die API, nicht
+ * über die Oberfläche: eine Meldung mit erteiltem Auftrag entstünde sonst erst nach zwei
+ * Formularen, und keins davon ist Gegenstand dieses Tests.
+ */
+async function apiPost(page: Page, pfad: string, data: unknown) {
+  const antwort = await page.request.post(pfad, { data });
+  expect(antwort.ok(), await antwort.text()).toBe(true);
+  return antwort.json();
+}
+
+test('→ zeigt eine Meldung, und ihr Verweis „↗ Auftrag" führt hin und schliesst die Palette', async ({
+  page,
+}) => {
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Vorschau Meldung ${Date.now()}`);
+  const basis = `/api/einsaetze/${einsatzId}`;
+  const meldung = await apiPost(page, `${basis}/meldungen`, {
+    absender: 'Florian Nordwache',
+    meldeweg: 'funk',
+    inhalt: 'Deich am Pegel hält, Sickerstelle beobachtet',
+    ereigniszeit: new Date().toISOString(),
+  });
+  await apiPost(page, `${basis}/meldungen/${meldung.id}/auftrag`, {
+    auftrag_text: 'Sickerstelle sichern',
+    empfaenger: [{ funktion_text: 'EL' }],
+  });
+
+  await zumModul(page, einsatzId, 'etb');
+  await suche(page, 'Nordwache');
+  const zeile = page.getByRole('option', { name: /Florian Nordwache/ });
+  await expect(zeile).toHaveAttribute('aria-selected', 'true');
+  await page.keyboard.press('ArrowRight');
+
+  const vorschau = page.getByRole('region', { name: /^Vorschau:/ });
+  await expect(vorschau.getByText('Deich am Pegel hält, Sickerstelle beobachtet')).toBeVisible();
+  // Nur lesen: die Triage-Knöpfe der Meldungskarte stehen in der Vorschau nicht.
+  await expect(vorschau.getByRole('button', { name: 'Sichten' })).toHaveCount(0);
+
+  // Geklickt, nicht nur `toBeVisible` — nur der Klick belegt, dass der Weg trägt (CLAUDE.md).
+  await vorschau.getByRole('link', { name: /Auftrag/ }).click();
+  await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/auftraege\\?auftrag=\\d+`));
+  await expect(paletteInput(page)).toBeHidden();
+});
+
+test('→ zeigt einen ETB-Eintrag, gefunden über seine laufende Nummer', async ({ page }) => {
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Vorschau ETB ${Date.now()}`);
+  const eintrag = await apiPost(page, `/api/einsaetze/${einsatzId}/etb`, {
+    typ: 'lage',
+    inhalt: 'Wasserstand steigt um zehn Zentimeter je Stunde',
+    von: 'Abschnitt Nord',
+  });
+
+  await zumModul(page, einsatzId, 'personen');
+  await suche(page, `#${eintrag.lfd_nr}`);
+  await expect(page.getByRole('option', { name: /Wasserstand steigt/ })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  await page.keyboard.press('ArrowRight');
+
+  const vorschau = page.getByRole('region', { name: /^Vorschau:/ });
+  await expect(vorschau.getByText('Wasserstand steigt um zehn Zentimeter je Stunde')).toBeVisible();
+  await expect(vorschau.getByText('Abschnitt Nord')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(vorschau).toBeHidden();
+  await expect(paletteInput(page)).toHaveValue(`#${eintrag.lfd_nr}`);
+});
