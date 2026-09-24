@@ -39,6 +39,22 @@ describe('SACHGEBIETE', () => {
     }
   });
 
+  /**
+   * S4 „Versorgung“ führt Verpflegung (LFH-634, Spec „Stab-Werkzeug S4“). Die Zeile trägt
+   * höchstens drei Werkzeuge — Fahrzeuge weicht dafür. Literal, damit ein stiller Tausch auffällt.
+   */
+  it('S4 führt Nachforderungen, Verpflegung und Material', () => {
+    expect(SACHGEBIETE.find((s) => s.sachgebiet === 's4')!.werkzeuge).toEqual([
+      'nachforderungen',
+      'verpflegung',
+      'material',
+    ]);
+  });
+
+  it('führt höchstens drei Werkzeuge je Zeile', () => {
+    for (const s of SACHGEBIETE) expect(s.werkzeuge.length, s.kuerzel).toBeLessThanOrEqual(3);
+  });
+
   it('S5 hat im Bestand kein Werkzeug (Spec 2.2: 0 Treffer im Repo)', () => {
     expect(SACHGEBIETE.find((s) => s.sachgebiet === 's5')!.werkzeuge).toEqual([]);
   });
