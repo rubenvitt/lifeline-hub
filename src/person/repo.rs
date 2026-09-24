@@ -10,7 +10,8 @@ const SELECT_ALLE: &str = "\
            aktuelle_sichtung, aktuelle_sichtung_at, aktueller_verbleib, \
            aktuelle_uhs_id, aktueller_platz_id, \
            zustand, antreff_lat, antreff_lon, vermisst_seit, \
-           aktuelle_verbleib_art, aktuelles_verbleib_ziel, aktueller_verbleib_status \
+           aktuelle_verbleib_art, aktuelles_verbleib_ziel, aktueller_verbleib_status, \
+           aktuelle_verbleib_betreuungsstelle_id \
     FROM einsatz_person";
 
 /// Eingabedaten beim Anlegen. Strings bereits getrimmt (Handler-Aufgabe);
@@ -390,6 +391,31 @@ pub async fn storniere(
         return Err(AppError::NotFound);
     }
     Ok(())
+}
+
+/// „davon namentlich“ je Betreuungsstelle (LFH-674, design.md D4): Zahl der nicht
+/// stornierten Personen, deren JÜNGSTER Verbleib `notunterkunft` mit Verweis auf die Stelle
+/// ist, als `(stelle_id, anzahl)` nur für Stellen mit mindestens einer Person.
+///
+/// Liest den Verbleib-Cache an der Person, in dem „jüngster Verbleib“ schon aufgelöst ist.
+/// Steht bewusst NICHT in `betreuung::repo::uebersicht`: deren zweiter Konsument ist der
+/// gesicherte Lagestand, und eine Personenzahl darf dort weder landen noch in eine Summe
+/// eingehen. Ob der Lesende die Zahl sehen darf, entscheidet die Route.
+pub async fn namentlich_je_stelle(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+) -> Result<Vec<(i64, i64)>, AppError> {
+    Ok(sqlx::query_as(
+        "SELECT aktuelle_verbleib_betreuungsstelle_id, COUNT(*) FROM einsatz_person \
+         WHERE einsatz_id = ? AND storniert_at IS NULL \
+           AND aktuelle_verbleib_art = 'notunterkunft' \
+           AND aktuelle_verbleib_betreuungsstelle_id IS NOT NULL \
+         GROUP BY aktuelle_verbleib_betreuungsstelle_id \
+         ORDER BY aktuelle_verbleib_betreuungsstelle_id",
+    )
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?)
 }
 
 #[cfg(test)]
@@ -806,5 +832,81 @@ mod tests {
             detail.aktueller_verbleib.is_none(),
             "kein Verbleib = vor Ort"
         );
+    }
+
+    /// LFH-674, Spec-Szenario „Zählung an der Stelle“: drei mit Stelle 7, einer davon
+    /// storniert, ein vierter zuletzt entlassen → 2. Eine Stelle ohne Person fehlt.
+    #[tokio::test]
+    async fn namentlich_je_stelle_zaehlt_juengsten_verbleib_ohne_stornierte() {
+        use crate::person::verbleib_repo::{erfassen, VerbleibDaten};
+        let pool = test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let stelle = |bez: &'static str| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_scalar::<_, i64>(
+                    "INSERT INTO betreuungsstelle (einsatz_id, bezeichnung, art, angelegt_von_id) \
+                     VALUES (?, ?, 'notunterkunft', ?) RETURNING id",
+                )
+                .bind(e)
+                .bind(bez)
+                .bind(b)
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+            }
+        };
+        let nord = stelle("Nord").await;
+        let _leer = stelle("Leer").await;
+        let nu = |id| VerbleibDaten {
+            art: "notunterkunft",
+            transportmittel: None,
+            ziel: None,
+            status: None,
+            notiz: None,
+            betreuungsstelle_id: Some(id),
+        };
+        let mut personen = Vec::new();
+        for _ in 0..4 {
+            let p = anlegen(&pool, e, b, leere_daten()).await.unwrap();
+            erfassen(&pool, e, p.id, nu(nord), "Notunterkunft", b)
+                .await
+                .unwrap();
+            personen.push(p.id);
+        }
+        storniere(&pool, e, personen[2], b).await.unwrap();
+        erfassen(
+            &pool,
+            e,
+            personen[3],
+            VerbleibDaten {
+                art: "entlassung",
+                betreuungsstelle_id: None,
+                ..nu(nord)
+            },
+            "entlassen",
+            b,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(
+            namentlich_je_stelle(&pool, e).await.unwrap(),
+            vec![(nord, 2)],
+            "stornierte und weiterverbrachte Personen zählen nicht; leere Stelle fehlt"
+        );
+        assert!(namentlich_je_stelle(&pool, 999).await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn verweis_im_cache_fehlt_ohne_wert_in_der_anzeige() {
+        let pool = test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let p = anlegen(&pool, e, b, leere_daten()).await.unwrap();
+        let json = serde_json::to_value(laden(&pool, e, p.id).await.unwrap()).unwrap();
+        assert!(!json
+            .as_object()
+            .unwrap()
+            .contains_key("aktuelle_verbleib_betreuungsstelle_id"));
     }
 }

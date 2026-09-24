@@ -5,6 +5,7 @@ import {
   kennzahlTeile,
   kennzahlText,
   mengeText,
+  namentlichText,
   personenZahl,
 } from './betreuungText';
 import { evakuierungKennzahl } from './evakuierungKennzahl';
@@ -201,5 +202,24 @@ describe('betreuungText (LFH-639)', () => {
         }).evakuiert,
       ).toBe('700');
     });
+  });
+});
+
+describe('namentlichText (LFH-674, design.md D7)', () => {
+  it('„davon namentlich n" neben einer gemeldeten Belegung', () => {
+    expect(namentlichText(2, true)).toBe('davon namentlich 2');
+  });
+
+  it('ohne Belegungsmeldung entfällt „davon" — es gibt keine Menge, von der es ein Teil wäre', () => {
+    expect(namentlichText(2, false)).toBe('namentlich 2');
+  });
+
+  it('bei 0 oder ohne Auskunft steht nichts', () => {
+    expect(namentlichText(0, true)).toBeNull();
+    expect(namentlichText(undefined, true)).toBeNull();
+  });
+
+  it('große Zahlen tragen den Tausendertrenner wie jede Personenzahl', () => {
+    expect(namentlichText(1320, true)).toBe(`davon namentlich ${personenZahl(1320)}`);
   });
 });

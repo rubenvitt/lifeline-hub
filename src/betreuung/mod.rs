@@ -350,6 +350,20 @@ pub struct BetreuungsstelleAnzeige {
 pub struct BetreuungUebersicht {
     pub bezirke: Vec<EvakuierungsbezirkAnzeige>,
     pub stellen: Vec<BetreuungsstelleAnzeige>,
+    /// „davon namentlich“ (LFH-674): je Stelle die Zahl der Personen, deren jüngster Verbleib
+    /// `notunterkunft` an dieser Stelle ist — nur Stellen mit mindestens einer Person. Fehlt
+    /// ganz, wenn der Lesende das Modul Personen nicht sehen darf (nicht „0“). Gefüllt NUR in
+    /// der Route: `repo::uebersicht` speist auch den gesicherten Lagestand. Die Zahl geht in
+    /// keine Belegung, Kopfzahl oder Summe ein — führend ist die Mengenmeldung.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub namentlich: Option<Vec<StelleNamentlich>>,
+}
+
+/// Namentlich zugeordnete Personen an einer Stelle (LFH-674), Teil von [`BetreuungUebersicht`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct StelleNamentlich {
+    pub stelle_id: i64,
+    pub anzahl: i64,
 }
 
 /// Belegung einer Stelle zum Stichtag der Kopfzahl.

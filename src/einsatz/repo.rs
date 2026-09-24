@@ -1121,6 +1121,41 @@ mod tests {
         .execute(&pool)
         .await
         .unwrap();
+        // LFH-674: eine zweite Person mit Notunterkunft an einer Stelle — der Verweis ist eine
+        // Kennung und bleibt, das Ziel (Stellenname als Freitext) wird leer.
+        let stelle: i64 = sqlx::query_scalar(
+            "INSERT INTO betreuungsstelle (einsatz_id, bezeichnung, art, angelegt_von_id) \
+             VALUES (?, 'NU Turnhalle Nord', 'notunterkunft', ?) RETURNING id",
+        )
+        .bind(einsatz.id)
+        .bind(leit)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let person2: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_person (einsatz_id, registrier_nr, status, aktuelle_verbleib_art, \
+                aktuelles_verbleib_ziel, aktuelle_verbleib_betreuungsstelle_id, erfasst_von, \
+                geaendert_von) \
+             VALUES (?, 2, 'betroffen', 'notunterkunft', 'NU Turnhalle Nord', ?, ?, ?) RETURNING id",
+        )
+        .bind(einsatz.id)
+        .bind(stelle)
+        .bind(leit)
+        .bind(leit)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO person_verbleib (einsatz_id, person_id, art, ziel, betreuungsstelle_id, \
+                erfasst_von) VALUES (?, ?, 'notunterkunft', 'NU Turnhalle Nord', ?, ?)",
+        )
+        .bind(einsatz.id)
+        .bind(person2)
+        .bind(stelle)
+        .bind(leit)
+        .execute(&pool)
+        .await
+        .unwrap();
 
         assert!(schwaerze_einsatz(&pool, einsatz.id, "2026-02-01 00:00:00")
             .await
@@ -1138,7 +1173,7 @@ mod tests {
         ) = sqlx::query_as(
             "SELECT zustand, antreff_lat, antreff_lon, aktuelles_verbleib_ziel, \
                     aktuelle_verbleib_art, aktueller_verbleib_status, vermisst_seit \
-             FROM einsatz_person WHERE einsatz_id = ?",
+             FROM einsatz_person WHERE einsatz_id = ? AND registrier_nr = 1",
         )
         .bind(einsatz.id)
         .fetch_one(&pool)
@@ -1156,6 +1191,32 @@ mod tests {
                 Some("2026-01-01 06:00:00".into()),
             ),
             "Zustand, Koordinate und Ziel leer; Art, Status und vermisst_seit erhalten"
+        );
+
+        let cache: (Option<String>, Option<i64>) = sqlx::query_as(
+            "SELECT aktuelles_verbleib_ziel, aktuelle_verbleib_betreuungsstelle_id \
+             FROM einsatz_person WHERE id = ?",
+        )
+        .bind(person2)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            cache,
+            (None, Some(stelle)),
+            "Cache: Ziel leer, Verweis bleibt"
+        );
+        let ereignis: (Option<String>, Option<i64>) = sqlx::query_as(
+            "SELECT ziel, betreuungsstelle_id FROM person_verbleib WHERE person_id = ?",
+        )
+        .bind(person2)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            ereignis,
+            (None, Some(stelle)),
+            "Ereignis: Ziel leer, Verweis bleibt"
         );
     }
 
