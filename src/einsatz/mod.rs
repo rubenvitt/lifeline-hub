@@ -199,6 +199,9 @@ pub struct Einsatz {
     /// Read-only abgeleitet (LFH-640): mindestens ein maßgeblicher Pegel festgelegt. Auslöser
     /// der Lagekennzahl `pegel`, siehe [`lagekennzahl::ableiten`].
     pub pegel_festgelegt: bool,
+    /// Read-only abgeleitet (LFH-607): mindestens ein aktiver Evakuierungsbezirk. Auslöser
+    /// der Lagekennzahl `evakuiert`, siehe [`lagekennzahl::ableiten`].
+    pub evakuierung_angeordnet: bool,
 }
 
 impl Einsatz {
@@ -246,7 +249,10 @@ impl Einsatz {
             meine_fuehrungsstelle,
             meine_sachgebiete,
             meine_funktion,
-            lagekennzahlen: lagekennzahl::ableiten(self.pegel_festgelegt),
+            lagekennzahlen: lagekennzahl::ableiten(
+                self.pegel_festgelegt,
+                self.evakuierung_angeordnet,
+            ),
         }
     }
 }
@@ -300,8 +306,8 @@ pub struct EinsatzAnzeige {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub meine_funktion: Option<String>,
     /// Aktive lagebezogene Kennzahlen (LFH-640): welche Lageplätze des Kennzahlenbands im
-    /// Lage-Dashboard belegt sind. Gesetzt nur durch bewusste Entscheidungen (heute: Pegel
-    /// festgelegt), nie durch Messwerte.
+    /// Lage-Dashboard belegt sind. Gesetzt nur durch bewusste Entscheidungen (Pegel festgelegt,
+    /// Evakuierung angeordnet), nie durch Messwerte.
     ///
     /// **Leer ist `[]`, nie `absent`** — wie `meine_sachgebiete` an zwei Stellen gebaut, deshalb
     /// `#[schema(required)]` und kein `skip_serializing_if`.
@@ -363,6 +369,7 @@ mod tests {
             org_id: 1,
             org_name: "Orga".into(),
             pegel_festgelegt: false,
+            evakuierung_angeordnet: false,
             bezeichnung: "Lage".into(),
             stichwort: None,
             status: EinsatzStatus::Aktiv,
