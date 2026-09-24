@@ -53,7 +53,7 @@ Gruppen 4–6 bringen die Bezirksfläche. Gruppe 7 schließt beide ab.
 
 ## 7. Abschluss
 
-- [ ] 7.1 e2e: Layer-Map in `e2e/lagekarte-betroffene.spec.ts` um `betreuungsstelle` ergänzen, `lagekarte-smoke.spec.ts` und `lagekarte-marker-plaketten.spec.ts` laufen grün. Verifiziert durch `pnpm e2e` für die drei Specs
+- [x] 7.1 e2e: Layer-Map in `e2e/lagekarte-betroffene.spec.ts` um `betreuungsstelle` ergänzen, `lagekarte-smoke.spec.ts` und `lagekarte-marker-plaketten.spec.ts` laufen grün. Verifiziert durch `pnpm e2e` für die drei Specs
 - [x] 7.2 Prüfliste Einsatztauglichkeit (15 Kriterien) für die Lagekarte (Marker, Ebene, Fläche, Inspector) und die Betreuungsseite (Einstiege) als `docs/superpowers/specs/2026-09-24-lfh-673-pruefliste.md` (Ablageort wie LFH-639/640/642), jede Zeile mit Verdikt. Verifiziert durch die Datei ohne „nicht geprüft“
 - [x] 7.3 CLAUDE.md-Nachzug: ein Absatz zur Karte (Ebene hinter der Modulsperre, Verortung ohne ETB aber live, Zonentyp mit Zuordnung n : 1, Storno löst) mit Verweis auf dieses Change-Verzeichnis. Verifiziert durch den Diff
-- [ ] 7.4 `scripts/check-migrationen.sh` nach `git fetch` und `./scripts/check-all.sh` komplett grün. Verifiziert durch den Exit-Code 0 beider Läufe (ohne `| tail`)
+- [x] 7.4 `scripts/check-migrationen.sh` nach `git fetch` und `./scripts/check-all.sh` komplett grün. Verifiziert durch den Exit-Code 0 beider Läufe (ohne `| tail`)
