@@ -6,7 +6,11 @@ edition = "2021"
 [dependencies]
 axum = { version = "0.8", features = ["multipart"] }
 tokio = { version = "1", features = ["full"] }
-sqlx = { version = "0.9", features = ["runtime-tokio", "sqlite", "migrate"] }
+# `sqlite-deserialize` nur für `db::test_pool` (CI-Laufzeit): das migrierte Schema wird einmal
+# je Testprozess gebaut und danach als Abbild in jede frische `:memory:`-DB eingespielt, statt je
+# Test alle Migrationen neu zu fahren. Das Feature schaltet nur API frei, am Laufzeitverhalten des
+# Servers ändert es nichts.
+sqlx = { version = "0.9", features = ["runtime-tokio", "sqlite", "migrate", "sqlite-deserialize"] }
 # `bundled` kompiliert SQLite als C-Amalgamation ins Binary. Folge: ein SQLite-CVE ist
 # NUR per Crate-Bump + Rebuild + Redeploy zu schließen — kein System-Update erreicht diese
 # Kopie. Welche Version drinsteckt und wie der Patch-Pfad läuft: siehe
@@ -174,4 +178,15 @@ opt-level = 3
 [profile.dev.package.flate2]
 opt-level = 3
 [profile.dev.package.miniz_oxide]
+opt-level = 3
+
+# Argon2 ist absichtlich rechenteuer, und im unoptimierten Dev-Build um ein Vielfaches mehr:
+# gemessen 517 ms je Hash und 490 ms je Prüfung gegen 29 ms / 27 ms mit opt-level 3 (Faktor
+# ~18). Jeder Integrationstest zahlt beides (`bootstrap_admin` hasht, der Login prüft), das
+# waren ~1 s reine Rüstzeit je Test und der Löwenanteil der Rust-Suite in der CI. Verfahren
+# und Parameter (`Argon2::default()`, OWASP) bleiben unverändert; der Release-Build ist ohnehin
+# optimiert, diese Zeilen wirken nur auf Debug-Builds (Tests, Dev-Stack, e2e-Backend).
+[profile.dev.package.argon2]
+opt-level = 3
+[profile.dev.package.blake2]
 opt-level = 3

@@ -45,19 +45,58 @@ pub async fn migrate(pool: &SqlitePool) -> Result<(), sqlx::migrate::MigrateErro
 
 /// In-Memory-Pool für Tests (eine Verbindung, damit dieselbe DB geteilt wird),
 /// inklusive eingespielter Migrationen.
+///
+/// **Migriert wird einmal je Testprozess, nicht je Test.** Das Einspielen aller Migrationen
+/// kostete gemessen ~460 ms im Debug-Build, bei rund 1700 Aufrufen je Lauf ein zweistelliger
+/// Minutenanteil der Rust-Suite. Der erste Aufruf migriert deshalb eine Vorlage und hält sie als
+/// Abbild (`sqlite3_serialize`); jeder Aufruf spielt dieses Abbild per `sqlite3_deserialize` in
+/// eine FRISCHE `:memory:`-Verbindung ein (~5 ms). Die DB ist danach dieselbe wie vorher —
+/// dieselbe Art (`:memory:`, kein WAL, eine Verbindung), dasselbe Schema, dieselbe
+/// `_sqlx_migrations`-Tabelle —, und jeder Test bekommt seine eigene Kopie, geteilt wird nur
+/// das unveränderliche Abbild.
+///
+/// Wer eine Migration selbst prüfen will, nimmt [`migrate`] auf einem eigenen Pool, nicht
+/// diese Funktion: hier läuft die Migrationskette nur beim ersten Aufruf.
 pub async fn test_pool() -> SqlitePool {
+    static VORLAGE: tokio::sync::OnceCell<Vec<u8>> = tokio::sync::OnceCell::const_new();
+
+    let vorlage = VORLAGE
+        .get_or_init(|| async {
+            let pool = leerer_test_pool().await;
+            migrate(&pool).await.expect("Migrationen einspielen");
+            let mut conn = pool.acquire().await.expect("Vorlagen-Verbindung");
+            let abbild = conn.serialize(None).await.expect("Vorlage serialisieren");
+            abbild.to_vec()
+        })
+        .await;
+
+    let pool = leerer_test_pool().await;
+    {
+        let mut conn = pool.acquire().await.expect("Test-Verbindung");
+        let abbild =
+            sqlx::sqlite::SqliteOwnedBuf::try_from(vorlage.as_slice()).expect("Abbild kopieren");
+        conn.deserialize(None, abbild, false)
+            .await
+            .expect("Vorlage einspielen");
+    }
+    pool
+}
+
+/// Die leere Hülle von [`test_pool`]: eine `:memory:`-Verbindung mit Foreign Keys.
+///
+/// `max_connections(1)` ist tragend: jede weitere Verbindung auf `:memory:` wäre eine
+/// EIGENE, leere Datenbank. `foreign_keys` ist eine Verbindungs-Einstellung und überlebt das
+/// Einspielen des Abbilds.
+async fn leerer_test_pool() -> SqlitePool {
     let options = SqliteConnectOptions::new()
         .filename(":memory:")
         .foreign_keys(true);
 
-    let pool = SqlitePoolOptions::new()
+    SqlitePoolOptions::new()
         .max_connections(1)
         .connect_with(options)
         .await
-        .expect("In-Memory-Pool");
-
-    migrate(&pool).await.expect("Migrationen einspielen");
-    pool
+        .expect("In-Memory-Pool")
 }
 
 /// Datei-basierter SQLite-Pool mit Produktions-Parität (WAL, mehrere Verbindungen,
@@ -245,6 +284,65 @@ mod tests {
             .fetch_all(&pool)
             .await
             .expect("die eingeschobene Migration ist angewendet");
+    }
+
+    /// Das Abbild in [`test_pool`] muss DIESELBE Datenbank liefern, die eine frische Migration
+    /// erzeugt — sonst prüften alle DB-Tests gegen ein Schema, das es in Produktion nicht gibt.
+    /// Verglichen wird der vollständige Schema-Text (Tabellen, Indizes, Trigger, FTS-Schatten)
+    /// plus die Migrationsbuchhaltung.
+    #[tokio::test]
+    async fn test_pool_gleicht_einer_frisch_migrierten_db() {
+        async fn schema(pool: &SqlitePool) -> Vec<(String, String, Option<String>)> {
+            sqlx::query_as(
+                "SELECT type, name, sql FROM sqlite_master \
+                 WHERE name NOT LIKE 'sqlite_%' ORDER BY type, name",
+            )
+            .fetch_all(pool)
+            .await
+            .unwrap()
+        }
+        async fn migrationen(pool: &SqlitePool) -> Vec<(i64, Vec<u8>)> {
+            sqlx::query_as("SELECT version, checksum FROM _sqlx_migrations ORDER BY version")
+                .fetch_all(pool)
+                .await
+                .unwrap()
+        }
+
+        let frisch = leerer_test_pool().await;
+        migrate(&frisch).await.unwrap();
+        let aus_vorlage = test_pool().await;
+
+        assert_eq!(schema(&aus_vorlage).await, schema(&frisch).await);
+        let m = migrationen(&aus_vorlage).await;
+        assert_eq!(m, migrationen(&frisch).await);
+        assert_eq!(m.len(), sqlx::migrate!("./migrations").iter().count());
+    }
+
+    /// Jeder Aufruf ist eine EIGENE Datenbank: geteilt wird nur das Abbild, nie der Inhalt.
+    /// Und `foreign_keys` ist eine Verbindungs-Einstellung — sie muss das Einspielen überleben,
+    /// sonst liefen alle FK-Prüfungen der Suite still ins Leere.
+    #[tokio::test]
+    async fn test_pool_ist_je_aufruf_isoliert_und_prueft_foreign_keys() {
+        let a = test_pool().await;
+        let b = test_pool().await;
+        sqlx::query("INSERT INTO app_meta (key, value) VALUES ('nur_in_a', 'x')")
+            .execute(&a)
+            .await
+            .unwrap();
+        let in_b: i64 = sqlx::query_scalar("SELECT count(*) FROM app_meta WHERE key = 'nur_in_a'")
+            .fetch_one(&b)
+            .await
+            .unwrap();
+        assert_eq!(
+            in_b, 0,
+            "Schreiben in einen Test-Pool darf den nächsten nicht erreichen"
+        );
+
+        let fk: i64 = sqlx::query_scalar("PRAGMA foreign_keys")
+            .fetch_one(&b)
+            .await
+            .unwrap();
+        assert_eq!(fk, 1);
     }
 
     #[tokio::test]

@@ -84,9 +84,18 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Plattenplatz schaffen
+      # Nur bei Bedarf: das Löschen kostete gemessen 1:20–1:40 je Job, und zwar auf dem
+      # kritischen Pfad. Die heutigen Runner bringen 145 GB mit, davon ~87 GB frei (gemessen am
+      # 24.09.2026, Lauf 35991775703) — das Aufräumen stammt aus der Zeit der ~14-GB-Runner.
+      # Die Schwelle hält den alten Weg für den Fall, dass ein Runner-Image wieder knapp wird.
+      - name: Plattenplatz schaffen (nur bei Bedarf)
         run: |
           df -h /
+          frei_gb="$(df --output=avail -BG / | tail -1 | tr -dc '0-9')"
+          if [ "$frei_gb" -ge 40 ]; then
+            echo "Genug Platz (${frei_gb} GB frei) — kein Aufräumen nötig."
+            exit 0
+          fi
           sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/share/boost "$AGENT_TOOLSDIRECTORY/CodeQL"
           df -h /
       - name: System-Werkzeuge für die nativen Crates
@@ -138,9 +147,18 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Plattenplatz schaffen
+      # Nur bei Bedarf: das Löschen kostete gemessen 1:20–1:40 je Job, und zwar auf dem
+      # kritischen Pfad. Die heutigen Runner bringen 145 GB mit, davon ~87 GB frei (gemessen am
+      # 24.09.2026, Lauf 35991775703) — das Aufräumen stammt aus der Zeit der ~14-GB-Runner.
+      # Die Schwelle hält den alten Weg für den Fall, dass ein Runner-Image wieder knapp wird.
+      - name: Plattenplatz schaffen (nur bei Bedarf)
         run: |
           df -h /
+          frei_gb="$(df --output=avail -BG / | tail -1 | tr -dc '0-9')"
+          if [ "$frei_gb" -ge 40 ]; then
+            echo "Genug Platz (${frei_gb} GB frei) — kein Aufräumen nötig."
+            exit 0
+          fi
           sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/share/boost "$AGENT_TOOLSDIRECTORY/CodeQL"
           df -h /
       - name: System-Werkzeuge für die nativen Crates
@@ -168,9 +186,18 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Plattenplatz schaffen
+      # Nur bei Bedarf: das Löschen kostete gemessen 1:20–1:40 je Job, und zwar auf dem
+      # kritischen Pfad. Die heutigen Runner bringen 145 GB mit, davon ~87 GB frei (gemessen am
+      # 24.09.2026, Lauf 35991775703) — das Aufräumen stammt aus der Zeit der ~14-GB-Runner.
+      # Die Schwelle hält den alten Weg für den Fall, dass ein Runner-Image wieder knapp wird.
+      - name: Plattenplatz schaffen (nur bei Bedarf)
         run: |
           df -h /
+          frei_gb="$(df --output=avail -BG / | tail -1 | tr -dc '0-9')"
+          if [ "$frei_gb" -ge 40 ]; then
+            echo "Genug Platz (${frei_gb} GB frei) — kein Aufräumen nötig."
+            exit 0
+          fi
           sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/share/boost "$AGENT_TOOLSDIRECTORY/CodeQL"
           df -h /
       - name: System-Werkzeuge für die nativen Crates

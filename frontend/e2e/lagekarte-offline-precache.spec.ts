@@ -120,6 +120,16 @@ test('Lagekarte: der maplibre-Worker kommt offline aus dem Service-Worker-Precac
   //     nur zufällig im Bundle liegt.
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page);
+  // Erst warten, bis der Service Worker aktiv ist, DANN die Lagekarte laden. `registerType:
+  // 'prompt'` setzt weder `skipWaiting` noch `clientsClaim`: eine Seite wird nur kontrolliert,
+  // wenn sie NACH der Aktivierung navigiert wurde. Ohne dieses Warten entschied ein Wettlauf
+  // zwischen Precache-Installation (~4,7 MB) und Login über das Ergebnis — nach dem schnelleren
+  // Argon2 im Debug-Build unter 2-vCPU-Last gemessen 1 von 6 Läufen „nicht zuständig", obwohl der
+  // Service Worker korrekt arbeitete. Warten statt `clientsClaim` im Bundle: das Verhalten der
+  // App (Aktualisierung erst auf Nachfrage) ist hier Prüfgegenstand, nicht Stellschraube.
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.ready;
+  });
   await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
   await expect(page.getByTestId('kartenflaeche')).toBeVisible();
   await expect(page.locator('canvas.maplibregl-canvas')).toHaveCount(1);
