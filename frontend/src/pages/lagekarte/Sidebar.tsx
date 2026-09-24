@@ -539,6 +539,11 @@ export default function Sidebar(props: SidebarProps) {
   if (!nvSucheZeigen && nvSuche !== '') setNvSuche('');
   const nvBegriff = nvSuche.trim();
   const nvTreffer = filtereNichtVerortet(nichtVerortet, nvBegriff, platzierungZiel);
+  // Gezählt werden nur ECHTE Treffer: die angeheftete Zeile des laufenden Ziels steht auch
+  // ohne Treffer da, und mitgezählt behauptete „1 von 5" einen Treffer, den es nicht gibt.
+  const nvTrefferzahl = nvBegriff
+    ? filtereNichtVerortet(nichtVerortet, nvBegriff, null).length
+    : nichtVerortet.length;
   // Entwurfswert der numerischen Mittelpunkt-Eingabe im Bild-Platzier-Modus.
   const [bildMitte, setBildMitte] = useState<LatLon | null>(null);
   /**
@@ -694,25 +699,30 @@ export default function Sidebar(props: SidebarProps) {
                   onChange={(ev) => setNvSuche(ev.target.value)}
                 />
                 {/* Die Trefferzahl ist die ZWEITE Angabe: der Kopf zählt weiter alle nicht
-                    verorteten Objekte, sonst verlöre die Warnzahl ihre Aussage. */}
-                {nvBegriff !== '' && nvTreffer.length > 0 && (
-                  <div
-                    role="status"
-                    style={{
-                      ...monoStil(11),
-                      color: rollen.gedaempft,
-                      marginBlockStart: token.marginXXS,
-                    }}
-                  >
-                    {`${nvTreffer.length} von ${nichtVerortet.length}`}
-                  </div>
-                )}
+                    verorteten Objekte, sonst verlöre die Warnzahl ihre Aussage.
+                    Die Region STEHT mit dem Feld, auch wenn sie schweigt: eine Live-Region
+                    meldet nur Änderungen an Inhalt, der schon da war (Regel der Sprungpalette).
+                    Sie trägt auch „0 von N" — die Leermeldung darunter hat keine Rolle, und
+                    der Fokus bleibt im Feld; ohne diese Zeile hörte ein Vorleser nie, dass die
+                    Suche alles weggefiltert hat. */}
+                <div
+                  role="status"
+                  style={{
+                    ...monoStil(11),
+                    color: rollen.gedaempft,
+                    ...(nvBegriff ? { marginBlockStart: token.marginXXS } : {}),
+                  }}
+                >
+                  {nvBegriff ? `${nvTrefferzahl} von ${nichtVerortet.length}` : ''}
+                </div>
               </div>
             )}
             {/* Dritter Zustand neben „Alles verortet" und der Liste: die Suche hat alles
                 weggefiltert. Eigener Wortlaut, weil „Alles verortet" hier eine falsche
                 Lagebeurteilung wäre. Keine Primäraktion — der Ausweg ist das Leeren am
-                Feld unmittelbar darüber. */}
+                Feld unmittelbar darüber. Steht das laufende Platzierungsziel als einzige
+                Zeile da, bleibt sie ohne Leermeldung: beides nebeneinander widerspräche sich,
+                und „0 von N" sagt schon, dass sie kein Treffer ist. */}
             {nvTreffer.length === 0 ? (
               <SeitenLeer titel={`Keine Treffer für „${nvBegriff}"`} />
             ) : (

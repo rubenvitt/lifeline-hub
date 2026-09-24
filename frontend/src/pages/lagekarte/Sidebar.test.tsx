@@ -1155,8 +1155,18 @@ describe('Sidebar „Nicht verortet": Suche (LFH-360)', () => {
     expect(screen.getByRole('status')).toHaveTextContent('1 von 5');
   });
 
-  it('ohne Suchbegriff keine Trefferzeile', () => {
+  /**
+   * Eine Live-Region meldet nur Änderungen an Inhalt, der schon DA war — erschiene sie erst
+   * mit dem ersten Treffer, hörte ein Vorleser den ersten Stand nicht (dieselbe Regel wie die
+   * Leerzustands-Region der Sprungpalette, Review-Befund 7 dort).
+   */
+  it('die Trefferzeile steht mit dem Feld, ohne Suchbegriff leer', () => {
     renderMitProviders(<Sidebar {...basisProps} nichtVerortet={fuenf} />);
+    expect(screen.getByRole('status')).toHaveTextContent(/^$/);
+  });
+
+  it('ohne Feld auch keine Trefferzeile', () => {
+    renderMitProviders(<Sidebar {...basisProps} nichtVerortet={fuenf.slice(0, 4)} />);
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
@@ -1164,6 +1174,8 @@ describe('Sidebar „Nicht verortet": Suche (LFH-360)', () => {
     renderMitProviders(<Sidebar {...basisProps} nichtVerortet={fuenf} />);
     await userEvent.type(feld()!, 'xyz');
     expect(screen.getByText('Keine Treffer für „xyz"')).toBeInTheDocument();
+    // Auch der Vorleser erfährt es: die Fokusstelle bleibt im Feld, die Region sagt es an.
+    expect(screen.getByRole('status')).toHaveTextContent('0 von 5');
     expect(screen.queryByText('Alles verortet')).not.toBeInTheDocument();
     // Der Ausweg ist das Leeren am Feld — die Meldung bringt keinen eigenen Knopf mit.
     expect(screen.queryByRole('button', { name: /Treffer/ })).not.toBeInTheDocument();
@@ -1212,6 +1224,20 @@ describe('Sidebar „Nicht verortet": Suche (LFH-360)', () => {
     expect(screen.getByText('UHS: UHS Nord')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
     expect(onPlatzierenAbbrechen).toHaveBeenCalled();
+    // Gezählt werden nur echte Treffer: zwei Zeilen stehen, eine davon trifft.
+    expect(screen.getByRole('status')).toHaveTextContent('1 von 5');
+  });
+
+  it('trifft nichts außer dem laufenden Ziel: „0 von N", die Zeile steht, keine Leermeldung', async () => {
+    renderMitProviders(
+      <Sidebar {...basisProps} nichtVerortet={fuenf} platzierungZiel={{ typ: 'uhs', id: 1 }} />,
+    );
+    await userEvent.type(feld()!, 'xyz');
+    expect(screen.getByRole('status')).toHaveTextContent('0 von 5');
+    expect(screen.getByText('UHS: UHS Nord')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Abbrechen' })).toBeInTheDocument();
+    // Eine Leermeldung neben einer stehenden Zeile widerspräche sich selbst.
+    expect(screen.queryByText('Keine Treffer für „xyz"')).not.toBeInTheDocument();
   });
 });
 
