@@ -13,6 +13,8 @@ import {
   vermisstNotiz,
   baueLagebild,
   einsatzdauer,
+  evakuierungDatenzustand,
+  evakuierungStand,
   kennzahlReihe,
   reihenWechsel,
   lagebildZeit,
@@ -50,8 +52,12 @@ const roh = (over: Partial<Rohdaten> = {}): Rohdaten => ({
   auftraege: [],
   meldungen: [],
   pegel: [],
+  evakuierung: { zustand: 'daten', kennzahl: null },
   ...over,
 });
+
+/** Schmales geschütztes Leerzeichen (Tausendertrenner) — als Literal, nicht zurückgelesen. */
+const T = '\u202f';
 
 describe('einsatzdauer', () => {
   it('rechnet Stunden und Minuten seit Beginn', () => {
@@ -133,8 +139,25 @@ describe('kennzahlReihe (LFH-640)', () => {
     ]);
   });
 
+  it('Evakuierung angeordnet: „Evakuiert" steht auf Platz 3, Platz 1 trägt seine Füllung (LFH-607)', () => {
+    expect(kennzahlReihe(['evakuiert'])).toEqual([
+      'Verbleib offen',
+      'Betroffene',
+      'Evakuiert',
+      'Kräfte',
+      'Vermisste',
+      'Einsatzdauer',
+    ]);
+  });
+
+  it('Hochwasser mit Pegel und Evakuierung ergibt die Reihe aus Entwurf S3 — in jeder Reihenfolge', () => {
+    const s3 = ['Pegel', 'Betroffene', 'Evakuiert', 'Kräfte', 'Vermisste', 'Einsatzdauer'];
+    expect(kennzahlReihe(['pegel', 'evakuiert'])).toEqual(s3);
+    expect(kennzahlReihe(['evakuiert', 'pegel'])).toEqual(s3);
+  });
+
   it('für jede Eingabe: sechs Plätze, der Kern auf den Indizes 1, 3, 4 und 5', () => {
-    for (const aktiv of [[], ['pegel']] as const) {
+    for (const aktiv of [[], ['pegel'], ['evakuiert'], ['pegel', 'evakuiert']] as const) {
       const reihe = kennzahlReihe(aktiv);
       expect(reihe).toHaveLength(6);
       for (const [i, etikett] of Object.entries(KERN)) expect(reihe[Number(i)]).toBe(etikett);
@@ -146,6 +169,15 @@ describe('kennzahlReihe (LFH-640)', () => {
     const nachher = kennzahlReihe(['pegel']);
     const geaendert = vorher.flatMap((e, i) => (e === nachher[i] ? [] : [i]));
     expect(geaendert).toEqual([0]);
+  });
+
+  it('Heimatplatz: „evakuiert" ändert in JEDER Ausgangslage genau Platz 3 (Kriterium 9)', () => {
+    for (const ohne of [[], ['pegel']] as const) {
+      const vorher = kennzahlReihe(ohne);
+      const nachher = kennzahlReihe([...ohne, 'evakuiert']);
+      const geaendert = vorher.flatMap((e, i) => (e === nachher[i] ? [] : [i]));
+      expect(geaendert, `ausgehend von [${ohne.join(', ')}]`).toEqual([2]);
+    }
   });
 
   it('die Reihenfolge der Auslöser am Einsatz ändert nichts', () => {
@@ -160,6 +192,9 @@ describe('reihenWechsel', () => {
     );
     expect(reihenWechsel(kennzahlReihe(['pegel']), kennzahlReihe([]))).toBe(
       'Verbleib offen statt Pegel',
+    );
+    expect(reihenWechsel(kennzahlReihe(['pegel']), kennzahlReihe(['pegel', 'evakuiert']))).toBe(
+      'Evakuiert statt Schäden offen',
     );
   });
 
@@ -364,5 +399,81 @@ describe('Vermisste seit über 4 h (LFH-613)', () => {
   it('vermisstNotiz: ohne Vermisste der Leerwortlaut', () => {
     expect(vermisstNotiz(0, 0)).toBe('keine offenen Fälle');
     expect(vermisstNotiz(2, 0)).toBe('als vermisst erfasst');
+  });
+});
+
+describe('Kennzahl „Evakuiert" (LFH-607)', () => {
+  const mitEvakuierung = { ...roh().einsatz, lagekennzahlen: ['evakuiert'] } as EinsatzAnzeige;
+  const zelle = (evakuierung: Rohdaten['evakuierung']) =>
+    baueLagebild(roh({ einsatz: mitEvakuierung, evakuierung }), JETZT, BERLIN).kennzahlen[2];
+
+  it('zwei gemeldete Bezirke: N als Wert, „von M geplant" als Notiz, Ziel Betreuung, kein Ton', () => {
+    const k = zelle({
+      zustand: 'daten',
+      kennzahl: { evakuiert: 1320, geplant: 1850, bezirke: 2, ohneMeldung: 0, geschaetzt: false },
+    });
+    expect(k).toMatchObject({
+      etikett: 'Evakuiert',
+      wert: `1${T}320`,
+      notiz: `von 1${T}850 geplant`,
+      ton: 'neutral',
+      route: 'betreuung',
+    });
+    expect(k.ohneZiel).toBeFalsy();
+  });
+
+  it('ein Bezirk ohne Meldung steht in der Notiz, geschätzt trägt ≈', () => {
+    expect(
+      zelle({
+        zustand: 'daten',
+        kennzahl: { evakuiert: 600, geplant: 1850, bezirke: 2, ohneMeldung: 1, geschaetzt: true },
+      }),
+    ).toMatchObject({ wert: '≈ 600', notiz: `von 1${T}850 geplant · 1 ohne Meldung` });
+  });
+
+  it('noch keine Meldung: Wert „—", nie 0', () => {
+    const k = zelle({
+      zustand: 'daten',
+      kennzahl: { evakuiert: null, geplant: 640, bezirke: 1, ohneMeldung: 1, geschaetzt: false },
+    });
+    expect(k.wert).toBe('—');
+    expect(k.notiz).toBe('von 640 geplant · 1 ohne Meldung');
+  });
+
+  it('Auslöser und Quelle laufen auseinander: „—" mit „keine geplante Evakuierung"', () => {
+    expect(zelle({ zustand: 'daten', kennzahl: null })).toMatchObject({
+      wert: '—',
+      notiz: 'keine geplante Evakuierung',
+    });
+  });
+
+  it('kein Zugriff auf Betreuung: das Etikett bleibt, ohne Zahl, ohne Ziel, Grund benannt', () => {
+    const k = zelle({ zustand: 'kein-zugriff' });
+    expect(k).toMatchObject({
+      etikett: 'Evakuiert',
+      wert: '—',
+      notiz: 'Modul Betreuung nicht freigegeben',
+      ton: 'neutral',
+      ohneZiel: true,
+    });
+  });
+
+  it('evakuierungStand: „aus" (Hook bereit, Modul nicht frei) heißt „kein Zugriff"', () => {
+    expect(evakuierungStand({ zustand: 'aus' })).toEqual({ zustand: 'kein-zugriff' });
+    expect(evakuierungStand({ zustand: 'laden' })).toEqual({ zustand: 'laden' });
+    expect(evakuierungStand({ zustand: 'fehler', fehler: new Error('x') })).toEqual({
+      zustand: 'fehler',
+    });
+    expect(evakuierungStand({ zustand: 'daten', kennzahl: null })).toEqual({
+      zustand: 'daten',
+      kennzahl: null,
+    });
+  });
+
+  it('evakuierungDatenzustand: laden und fehler reichen durch, alles andere sind Daten', () => {
+    expect(evakuierungDatenzustand({ zustand: 'laden' })).toBe('laden');
+    expect(evakuierungDatenzustand({ zustand: 'fehler' })).toBe('fehler');
+    expect(evakuierungDatenzustand({ zustand: 'kein-zugriff' })).toBe('daten');
+    expect(evakuierungDatenzustand({ zustand: 'daten', kennzahl: null })).toBe('daten');
   });
 });

@@ -4,9 +4,14 @@
  * `pegel/pegelKennzahl.ts`.
  *
  * EINE Quelle für drei Leser: die Modulseite, den Modulzähler (`useModulZaehler.ts`) und die
- * künftige Dashboard-Zelle (LFH-640/LFH-607, über `useEvakuierungKennzahl`). Die Datei liegt
+ * Zelle „Evakuiert" im Lage-Dashboard (LFH-607, über `useEvakuierungKennzahl`). Die Datei liegt
  * deshalb unter `betreuung/` und nicht unter einer Seite: eine Seite, die aus dem Verzeichnis
  * einer anderen importiert, wäre eine neue Querabhängigkeit.
+ *
+ * Das Prädikat von {@link istAktiverBezirk} steht wortgleich im Backend, als Auslöser der
+ * Lagekennzahl `evakuiert` (`src/einsatz/repo.rs`, `lagekennzahl::ableiten`). Wer es hier
+ * ändert, ändert es dort mit — sonst steht „Evakuiert" auf dem Platz und die Kennzahl daneben
+ * ist leer.
  *
  * DIE FUNKTION BEKOMMT NUR DATEN. „Keine Kennzahl" (`null`) heißt: es gibt keine geplante
  * Evakuierung. Ein fehlgeschlagener Abruf ist etwas anderes und darf nie so aussehen — diese
