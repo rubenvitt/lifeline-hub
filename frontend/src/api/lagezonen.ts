@@ -21,6 +21,8 @@ export interface ZonePatch {
   gefahrengebiet_id?: number | null;
   /** Verschieben/Freigeben (LFH-320): Ziel-Ansicht oder `null` = auf alle Ansichten. */
   ansicht_id?: number | null;
+  /** Bezirks-Zuordnung (LFH-673), nur an Zonen vom Typ `evakuierungsbezirk`; `null` löst. */
+  evakuierungsbezirk_id?: number | null;
 }
 
 export function listeZonen(einsatzId: number): Promise<LageZone[]> {

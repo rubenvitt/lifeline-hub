@@ -30,6 +30,7 @@ const bezirk = (over: Partial<Evakuierungsbezirk> = {}): Evakuierungsbezirk => (
   bezeichnung: 'Uferstraße 12–40',
   plan_personen: 640,
   plan_erhebung: 'geschaetzt',
+  flaechen: 0,
   raeumung: 'angeordnet',
   angelegt_at: '2026-09-23 08:00:00',
   ...over,

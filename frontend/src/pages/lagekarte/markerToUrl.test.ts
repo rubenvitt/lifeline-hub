@@ -36,6 +36,11 @@ describe('markerToUrl (LFH-25) — Inspector-Deeplinks je Marker-Typ', () => {
     });
     expect(markerToUrl(marker, E)).toBe('/einsaetze/7/meldungen?meldung=42');
   });
+  it('betreuungsstelle → Betreuungsseite mit ?stelle= (LFH-673)', () => {
+    expect(markerToUrl(m({ typ: 'betreuungsstelle', id: 4 }), E)).toBe(
+      '/einsaetze/7/betreuung?stelle=4',
+    );
+  });
   it('person → Item-Route der Personen-Detailseite (LFH-648), nicht die Einsatzdaten', () => {
     // Vorher fiel `person` still in den `default`-Zweig — der Typcheck warnte nicht.
     expect(markerToUrl(m({ typ: 'person', id: 11 }), E)).toBe('/einsaetze/7/personen/11');

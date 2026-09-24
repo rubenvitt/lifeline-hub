@@ -1870,6 +1870,176 @@ mod tests {
         );
     }
 
+    // --- Migration 0119: lage_zone-Rebuild für den Zonentyp 'evakuierungsbezirk' (LFH-673) ---
+    //
+    // Der erste Rebuild von lage_zone. Geprüft an einer Zone, die VOR dem Rebuild existiert
+    // (auf der leeren test_pool()-DB ist die Tabelle bei 0119 leer, ein Kopierfehler bliebe
+    // dort unsichtbar): sie übersteht Umbau samt gefahrengebiet_id (0041) und ansicht_id (0095),
+    // die Indizes sind die alten plus der neue, kein FK hängt, und der neue Typ ist einfügbar.
+    #[tokio::test]
+    async fn migration_0119_lage_zone_rebuild_erhaelt_zeilen_und_indizes() {
+        use sqlx::migrate::Migrator;
+        use std::borrow::Cow;
+
+        let alle: Vec<_> = sqlx::migrate!("./migrations").iter().cloned().collect();
+        let bis = |version: i64| Migrator {
+            migrations: Cow::Owned(
+                alle.iter()
+                    .filter(|m| m.version <= version)
+                    .cloned()
+                    .collect(),
+            ),
+            ..Migrator::DEFAULT
+        };
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(
+                SqliteConnectOptions::new()
+                    .filename(":memory:")
+                    .foreign_keys(true),
+            )
+            .await
+            .unwrap();
+        bis(118).run(&pool).await.expect("Migrationen bis 0118");
+
+        let indizes = || async {
+            sqlx::query_scalar::<_, String>(
+                "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'lage_zone' \
+                 AND sql IS NOT NULL ORDER BY name",
+            )
+            .fetch_all(&pool)
+            .await
+            .unwrap()
+        };
+        let vorher = indizes().await;
+
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let b: i64 = sqlx::query_scalar(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1, 'L', 'l', 'h') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let e: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let g: i64 = sqlx::query_scalar(
+            "INSERT INTO gefahrengebiet (einsatz_id, erstellt_von) VALUES (?, ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let a: i64 = sqlx::query_scalar(
+            "INSERT INTO karten_ansicht (einsatz_id, name) VALUES (?, 'Nord') RETURNING id",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let geo = r#"{"type":"Polygon","coordinates":[[[8,50],[8.1,50],[8.1,50.1],[8,50]]]}"#;
+        let z: i64 = sqlx::query_scalar(
+            "INSERT INTO lage_zone (einsatz_id, typ, geometrie_typ, geometrie, label, notiz, \
+                erstellt_von, gefahrengebiet_id, ansicht_id) \
+             VALUES (?, 'gefahrengebiet', 'Polygon', ?, 'Chlorwolke', 'Wind West', ?, ?, ?) \
+             RETURNING id",
+        )
+        .bind(e)
+        .bind(geo)
+        .bind(b)
+        .bind(g)
+        .bind(a)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let vor_dem_umbau: (
+            String,
+            String,
+            String,
+            Option<String>,
+            Option<String>,
+            i64,
+            Option<i64>,
+            Option<i64>,
+            String,
+        ) = sqlx::query_as(
+            "SELECT typ, geometrie_typ, geometrie, label, notiz, erstellt_von, \
+                        gefahrengebiet_id, ansicht_id, erstellt_at FROM lage_zone WHERE id = ?",
+        )
+        .bind(z)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        bis(119)
+            .run(&pool)
+            .await
+            .expect("0119 läuft auf einer DB mit Bestand");
+
+        let nach_dem_umbau: (
+            String,
+            String,
+            String,
+            Option<String>,
+            Option<String>,
+            i64,
+            Option<i64>,
+            Option<i64>,
+            String,
+        ) = sqlx::query_as(
+            "SELECT typ, geometrie_typ, geometrie, label, notiz, erstellt_von, \
+                        gefahrengebiet_id, ansicht_id, erstellt_at FROM lage_zone WHERE id = ?",
+        )
+        .bind(z)
+        .fetch_one(&pool)
+        .await
+        .expect("die Zone behält ihre id");
+        assert_eq!(
+            nach_dem_umbau, vor_dem_umbau,
+            "Zeile übersteht den Rebuild unverändert"
+        );
+
+        let mut erwartet = vorher.clone();
+        erwartet.push("idx_lage_zone_evakuierungsbezirk".to_string());
+        erwartet.sort();
+        assert_eq!(indizes().await, erwartet, "alte Indizes plus der neue");
+
+        let fk: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM pragma_foreign_key_check()")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(fk, 0, "kein hängender Fremdschlüssel nach dem Rebuild");
+
+        sqlx::query(
+            "INSERT INTO lage_zone (einsatz_id, typ, geometrie_typ, geometrie, erstellt_von) \
+             VALUES (?, 'evakuierungsbezirk', 'Polygon', ?, ?)",
+        )
+        .bind(e)
+        .bind(geo)
+        .bind(b)
+        .execute(&pool)
+        .await
+        .expect("der neue Typ steht im CHECK");
+        let unbekannt = sqlx::query(
+            "INSERT INTO lage_zone (einsatz_id, typ, geometrie_typ, geometrie, erstellt_von) \
+             VALUES (?, 'quatsch', 'Polygon', ?, ?)",
+        )
+        .bind(e)
+        .bind(geo)
+        .bind(b)
+        .execute(&pool)
+        .await;
+        assert!(unbekannt.is_err(), "der CHECK lehnt weiter Unbekanntes ab");
+    }
+
     // Deckt den Sicherheitsnetz-Zweig von 0082 ab (UPDATE 'bereitstellungsraum' → 'sonstige'
     // VOR dem Copy). Auf der leeren test_pool()-DB ist uhs bei 0082 leer, der Zweig greift
     // dort nie — würde man ihn entfernen, bliebe die Suite grün, während eine reale DB mit

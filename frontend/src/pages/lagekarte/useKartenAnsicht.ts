@@ -32,6 +32,7 @@ const LAYER_KEYS: (keyof LayerSichtbar)[] = [
   'lagemeldung',
   'freies_zeichen',
   'person',
+  'betreuungsstelle',
 ];
 /** Layer-Default beim Seed/ohne gespeicherten Wert: alle Ebenen an (heutiges Verhalten) —
  *  AUSSER „Betroffene" (LFH-648): Vorgabe aus. Weil `leseLayer` den Default unter jeden
@@ -49,6 +50,8 @@ const LAYER_DEFAULT: LayerSichtbar = {
   lagemeldung: true,
   freies_zeichen: true,
   person: false,
+  // LFH-673: an wie die UHS — wenige Lageobjekte; die Modulsperre greift an der Quelle.
+  betreuungsstelle: true,
 };
 
 /** Kanonischer Konfigurations-Stand einer Kartenansicht (View-Config, ohne Kamera). */

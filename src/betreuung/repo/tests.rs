@@ -121,6 +121,13 @@ async fn bezirk_aendern(w: &Welt, id: i64, a: BezirkAenderung) -> Result<Geschri
 }
 
 async fn bezirk_stornieren(w: &Welt, id: i64) -> Result<Geschrieben, AppError> {
+    bezirk_stornieren_mit_zonen(w, id).await.map(|(g, _)| g)
+}
+
+async fn bezirk_stornieren_mit_zonen(
+    w: &Welt,
+    id: i64,
+) -> Result<(Geschrieben, Vec<i64>), AppError> {
     write_retry!(&w.pool, |conn| {
         bezirk_stornieren_tx(conn, w.e, id, w.b, STARTWERT).await
     })
@@ -562,7 +569,8 @@ async fn unveraenderte_werte_schreiben_keinen_etb_eintrag() {
         g,
         Geschrieben {
             id,
-            etb_ids: vec![]
+            etb_ids: vec![],
+            still_geaendert: false,
         }
     );
     assert_eq!(etb(&w.pool, w.e).await.len(), vorher);
@@ -1255,6 +1263,7 @@ async fn stelle_aendern_leerlauf_und_je_achse_ein_eintrag() {
             status: Some(Status::Vorbereitet),
             standort: Some(Some("Ostring 5".into())),
             notiz: Some(None),
+            ..Default::default()
         },
     )
     .await
@@ -1290,6 +1299,207 @@ async fn stelle_aendern_leerlauf_und_je_achse_ein_eintrag() {
     let s = stelle_laden(&w.pool, w.e, id).await.unwrap();
     assert_eq!(s.kapazitaet_personen, Some(200));
     assert_eq!(s.status, Status::InBetrieb);
+}
+
+// ── LFH-673: Koordinate einer Betreuungsstelle ─────────────────────────────────────────────
+
+fn verortung(lat: Option<f64>, lon: Option<f64>) -> StelleAenderung {
+    StelleAenderung {
+        lat: Some(lat),
+        lon: Some(lon),
+        ..Default::default()
+    }
+}
+
+#[tokio::test]
+async fn stelle_verorten_speichert_ohne_etb_und_meldet_wirksam() {
+    let w = welt().await;
+    let id = stelle(&w, "NU Turnhalle Nord", Some(150)).await;
+    let n = etb(&w.pool, w.e).await.len();
+
+    let g = stelle_aendern(&w, id, verortung(Some(51.93), Some(8.87)))
+        .await
+        .unwrap();
+    assert!(g.etb_ids.is_empty(), "Verortung schreibt kein ETB");
+    assert!(g.still_geaendert, "Verortung muss live verteilt werden");
+    assert_eq!(etb(&w.pool, w.e).await.len(), n);
+    let s = stelle_laden(&w.pool, w.e, id).await.unwrap();
+    assert_eq!((s.lat, s.lon), (Some(51.93), Some(8.87)));
+    assert!(s.geaendert_at.is_some());
+}
+
+#[tokio::test]
+async fn gleiche_koordinate_ist_leerlauf() {
+    let w = welt().await;
+    let id = stelle(&w, "NU Turnhalle Nord", None).await;
+    stelle_aendern(&w, id, verortung(Some(51.93), Some(8.87)))
+        .await
+        .unwrap();
+    let g = stelle_aendern(&w, id, verortung(Some(51.93), Some(8.87)))
+        .await
+        .unwrap();
+    assert!(g.etb_ids.is_empty());
+    assert!(
+        !g.still_geaendert,
+        "unveränderte Koordinate ist kein Ereignis"
+    );
+}
+
+#[tokio::test]
+async fn stammdaten_ohne_koordinate_sind_nicht_still() {
+    let w = welt().await;
+    let id = stelle(&w, "NU Turnhalle Nord", Some(150)).await;
+    let g = stelle_aendern(
+        &w,
+        id,
+        StelleAenderung {
+            kapazitaet_personen: Some(Some(200)),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(g.etb_ids.len(), 1);
+    assert!(!g.still_geaendert);
+}
+
+#[tokio::test]
+async fn koordinate_mit_kapazitaet_nennt_nur_die_kapazitaet() {
+    let w = welt().await;
+    let id = stelle(&w, "NU Turnhalle Nord", Some(150)).await;
+    let n = etb(&w.pool, w.e).await.len();
+    let g = stelle_aendern(
+        &w,
+        id,
+        StelleAenderung {
+            kapazitaet_personen: Some(Some(200)),
+            lat: Some(Some(51.93)),
+            lon: Some(Some(8.87)),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(g.etb_ids.len(), 1);
+    let etb = etb(&w.pool, w.e).await;
+    let text = &etb[n].2;
+    assert!(text.contains("Kapazität 200"), "{text}");
+    assert!(
+        !text.contains("51") && !text.contains("8,87") && !text.contains("8.87"),
+        "{text}"
+    );
+}
+
+#[tokio::test]
+async fn halbes_paar_oder_bereich_ist_422_und_aendert_nichts() {
+    let w = welt().await;
+    let id = stelle(&w, "NU Turnhalle Nord", None).await;
+    let nur_lat = StelleAenderung {
+        lat: Some(Some(51.93)),
+        ..Default::default()
+    };
+    assert_eq!(
+        status(stelle_aendern(&w, id, nur_lat).await),
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    for (la, lo) in [(91.0, 8.0), (-90.5, 8.0), (51.0, 180.5), (51.0, -181.0)] {
+        assert_eq!(
+            status(stelle_aendern(&w, id, verortung(Some(la), Some(lo))).await),
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "{la}/{lo}"
+        );
+    }
+    let s = stelle_laden(&w.pool, w.e, id).await.unwrap();
+    assert_eq!((s.lat, s.lon), (None, None));
+
+    // Paar gegen den Bestand: nur lon auf null bei verorteter Stelle zerreißt das Paar.
+    stelle_aendern(&w, id, verortung(Some(51.93), Some(8.87)))
+        .await
+        .unwrap();
+    let nur_lon_weg = StelleAenderung {
+        lon: Some(None),
+        ..Default::default()
+    };
+    assert_eq!(
+        status(stelle_aendern(&w, id, nur_lon_weg).await),
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    // Nur lat ändern, lon bleibt aus dem Bestand: gültiges Paar.
+    let nur_lat_neu = StelleAenderung {
+        lat: Some(Some(52.0)),
+        ..Default::default()
+    };
+    stelle_aendern(&w, id, nur_lat_neu).await.unwrap();
+    let s = stelle_laden(&w.pool, w.e, id).await.unwrap();
+    assert_eq!((s.lat, s.lon), (Some(52.0), Some(8.87)));
+}
+
+#[tokio::test]
+async fn verortung_entfernen() {
+    let w = welt().await;
+    let id = stelle(&w, "NU Turnhalle Nord", None).await;
+    stelle_aendern(&w, id, verortung(Some(51.93), Some(8.87)))
+        .await
+        .unwrap();
+    let g = stelle_aendern(&w, id, verortung(None, None)).await.unwrap();
+    assert!(g.still_geaendert);
+    let s = stelle_laden(&w.pool, w.e, id).await.unwrap();
+    assert_eq!((s.lat, s.lon), (None, None));
+    let v = serde_json::to_value(&s).unwrap();
+    let o = v.as_object().unwrap();
+    assert!(!o.contains_key("lat") && !o.contains_key("lon"), "{v}");
+}
+
+#[tokio::test]
+async fn verortete_stelle_traegt_beide_felder_auf_dem_draht() {
+    let w = welt().await;
+    let id = stelle(&w, "NU Turnhalle Nord", None).await;
+    let v = serde_json::to_value(stelle_laden(&w.pool, w.e, id).await.unwrap()).unwrap();
+    assert!(!v.as_object().unwrap().contains_key("lat"), "{v}");
+    stelle_aendern(&w, id, verortung(Some(51.93), Some(8.87)))
+        .await
+        .unwrap();
+    let u = uebersicht(&w.pool, w.e).await.unwrap();
+    let v = serde_json::to_value(&u.stellen[0]).unwrap();
+    assert_eq!(v["lat"], serde_json::json!(51.93));
+    assert_eq!(v["lon"], serde_json::json!(8.87));
+}
+
+#[tokio::test]
+async fn verortung_laesst_fremde_aenderung_stehen() {
+    let w = welt().await;
+    let id = stelle(&w, "NU Turnhalle Nord", Some(150)).await;
+    // A: Status und Kapazität.
+    stelle_aendern(
+        &w,
+        id,
+        StelleAenderung {
+            kapazitaet_personen: Some(Some(200)),
+            status: Some(Status::InBetrieb),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    // B: nur die Koordinate.
+    stelle_aendern(&w, id, verortung(Some(51.93), Some(8.87)))
+        .await
+        .unwrap();
+    let s = stelle_laden(&w.pool, w.e, id).await.unwrap();
+    assert_eq!(s.kapazitaet_personen, Some(200));
+    assert_eq!(s.status, Status::InBetrieb);
+    assert_eq!((s.lat, s.lon), (Some(51.93), Some(8.87)));
+}
+
+#[tokio::test]
+async fn stornierte_stelle_verorten_ist_409() {
+    let w = welt().await;
+    let id = stelle(&w, "NU Turnhalle Nord", None).await;
+    stelle_stornieren(&w, id).await.unwrap();
+    assert_eq!(
+        status(stelle_aendern(&w, id, verortung(Some(51.93), Some(8.87))).await),
+        StatusCode::CONFLICT
+    );
 }
 
 // ── Requirement: Belegung melden ───────────────────────────────────────────────────────────
@@ -1637,4 +1847,75 @@ async fn ruecknahme_nach_wiederoeffnen_gelingt() {
 
     belegung_zurueck(&w, leer.meldung_id).await.unwrap();
     assert_eq!(aktuelle_belegung(&w, id).await, Some(40));
+}
+
+// ── LFH-673: Bezirksflächen ─────────────────────────────────────────────────────────────────
+
+/// Legt eine Zone vom Typ `evakuierungsbezirk` an, optional einem Bezirk zugeordnet.
+async fn bezirksflaeche(w: &Welt, bezirk: Option<i64>) -> i64 {
+    sqlx::query_scalar(
+        "INSERT INTO lage_zone (einsatz_id, typ, geometrie_typ, geometrie, erstellt_von, \
+            evakuierungsbezirk_id) \
+         VALUES (?, 'evakuierungsbezirk', 'Polygon', \
+            '{\"type\":\"Polygon\",\"coordinates\":[[[8,50],[8.1,50],[8.1,50.1],[8,50]]]}', ?, ?) \
+         RETURNING id",
+    )
+    .bind(w.e)
+    .bind(w.b)
+    .bind(bezirk)
+    .fetch_one(&w.pool)
+    .await
+    .unwrap()
+}
+
+#[tokio::test]
+async fn flaechen_zaehlt_die_zugeordneten_zonen() {
+    let w = welt().await;
+    let ufer = bezirk(&w, "Uferstraße 12–40", 640).await;
+    let hafen = bezirk(&w, "Hafenviertel", 120).await;
+    assert_eq!(bezirk_laden(&w.pool, w.e, ufer).await.unwrap().flaechen, 0);
+    bezirksflaeche(&w, Some(ufer)).await;
+    bezirksflaeche(&w, Some(ufer)).await;
+    bezirksflaeche(&w, None).await;
+    let u = uebersicht(&w.pool, w.e).await.unwrap();
+    let flaechen = |id: i64| u.bezirke.iter().find(|b| b.id == id).unwrap().flaechen;
+    assert_eq!(flaechen(ufer), 2);
+    assert_eq!(flaechen(hafen), 0);
+    let v = serde_json::to_value(bezirk_laden(&w.pool, w.e, hafen).await.unwrap()).unwrap();
+    assert_eq!(
+        v["flaechen"], 0,
+        "0 steht auf dem Draht, nicht weggelassen: {v}"
+    );
+}
+
+#[tokio::test]
+async fn storno_loest_die_flaechen_und_laesst_sie_stehen() {
+    let w = welt().await;
+    let ufer = bezirk(&w, "Uferstraße 12–40", 640).await;
+    let a = bezirksflaeche(&w, Some(ufer)).await;
+    let b = bezirksflaeche(&w, Some(ufer)).await;
+    let fremd = bezirksflaeche(&w, None).await;
+
+    let (_, geloest) = bezirk_stornieren_mit_zonen(&w, ufer).await.unwrap();
+    let mut geloest = geloest;
+    geloest.sort();
+    assert_eq!(geloest, vec![a, b]);
+
+    let zonen: Vec<(i64, String, Option<i64>)> = sqlx::query_as(
+        "SELECT id, typ, evakuierungsbezirk_id FROM lage_zone WHERE einsatz_id = ? ORDER BY id",
+    )
+    .bind(w.e)
+    .fetch_all(&w.pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        zonen,
+        vec![
+            (a, "evakuierungsbezirk".into(), None),
+            (b, "evakuierungsbezirk".into(), None),
+            (fremd, "evakuierungsbezirk".into(), None),
+        ],
+        "die Flächen bleiben als nicht zugeordnete Bezirksflächen"
+    );
+    assert_eq!(bezirk_laden(&w.pool, w.e, ufer).await.unwrap().flaechen, 0);
 }

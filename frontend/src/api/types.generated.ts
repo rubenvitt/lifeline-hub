@@ -426,6 +426,14 @@ export interface components {
              * @description Fehlt bei unbekannter Kapazität; dann gibt es auch keine Zahl freier Plätze.
              */
             kapazitaet_personen?: number | null;
+            /**
+             * Format: double
+             * @description Koordinate auf der Lagekarte (LFH-673). Beide fehlen = nicht verortet; die App hält
+             *     sie als Paar.
+             */
+            lat?: number | null;
+            /** Format: double */
+            lon?: number | null;
             notiz?: string | null;
             standort?: string | null;
             status: components["schemas"]["BetreuungsstelleStatus"];
@@ -1337,6 +1345,13 @@ export interface components {
             bezeichnung: string;
             /** Format: int64 */
             einsatz_id: number;
+            /**
+             * Format: int64
+             * @description Zahl der Zonen vom Typ `evakuierungsbezirk`, die diesem Bezirk zugeordnet sind
+             *     (LFH-673). Immer gesetzt, 0 ohne Fläche — die Betreuungsseite bietet „Auf Karte
+             *     zeigen" nur bei > 0 an und braucht dafür keine Zonenliste (die hängt am Modul Lagekarte).
+             */
+            flaechen: number;
             geaendert_at?: string | null;
             /** Format: int64 */
             id: number;
@@ -1721,6 +1736,13 @@ export interface components {
             erstellt_at: string;
             /** Format: int64 */
             erstellt_von: number;
+            /**
+             * Format: int64
+             * @description Zugeordneter Evakuierungsbezirk (LFH-673), nur an Zonen vom Typ `evakuierungsbezirk`.
+             *     NUR die Kennung: Bezeichnung und Räumungszustand hängen am Modul Betreuung und kommen
+             *     aus dessen Übersicht — die Zonenliste liest jeder Karten-Leser.
+             */
+            evakuierungsbezirk_id?: number | null;
             farbe?: string | null;
             geaendert_at: string;
             /** Format: int64 */
@@ -1737,7 +1759,7 @@ export interface components {
          * @description Zonen-Typ (Schema-Anker für die OpenAPI-Union, LFH-120; TS: `ZoneTyp`). Wire == `typ`.
          * @enum {string}
          */
-        LageZoneTyp: "gefahrengebiet" | "absperrbereich" | "absperrgrenze" | "sperrgebiet" | "freie_skizze";
+        LageZoneTyp: "gefahrengebiet" | "absperrbereich" | "absperrgrenze" | "sperrgebiet" | "freie_skizze" | "evakuierungsbezirk";
         /** @description Ein gefüllter Abschnitt (so persistiert als JSON-Array-Element). */
         LageberichtAbschnitt: {
             schluessel: string;

@@ -408,3 +408,81 @@ describe('ZonenInspector — Zonenwechsel (LFH-349/H43)', () => {
     expect(gewaehlt(screen.getByRole('combobox', { name: 'Zonen-Typ' }))).toBe('Gefahrengebiet');
   });
 });
+
+describe('ZonenInspector — Evakuierungsbezirk (LFH-673)', () => {
+  const bezirksZone: LageZone = {
+    ...basisZone,
+    id: 7,
+    typ: 'evakuierungsbezirk',
+    gefahrengebiet_id: null,
+    evakuierungsbezirk_id: 5,
+  };
+  const UFER = {
+    id: 5,
+    einsatz_id: 1,
+    bezeichnung: 'Uferstraße 12–40',
+    plan_personen: 640,
+    plan_erhebung: 'geschaetzt' as const,
+    raeumung: 'laeuft' as const,
+    flaechen: 1,
+    angelegt_at: '2026-09-24 08:00:00',
+    stand: { id: 1, evakuiert: 480, erhebung: 'gezaehlt' as const, zeitpunkt_at: '' },
+  };
+  const HAFEN = { ...UFER, id: 6, bezeichnung: 'Hafenviertel', flaechen: 0, stand: undefined };
+
+  function mitBezirk(
+    opts: { zone?: LageZone; darfSchreiben?: boolean; betreuungFrei?: boolean } = {},
+  ) {
+    const onAendern = vi.fn<ZonenInspectorProps['onAendern']>(() => Promise.resolve());
+    renderMitProviders(
+      <ZonenInspector
+        zone={opts.zone ?? bezirksZone}
+        gebiete={[]}
+        darfSchreiben={opts.darfSchreiben ?? true}
+        onSchliessen={() => {}}
+        onAendern={onAendern}
+        onMatrixOeffnen={vi.fn()}
+        onLoeschen={vi.fn()}
+        ansichten={[]}
+        bezirke={[UFER, HAFEN]}
+        betreuungFrei={opts.betreuungFrei ?? true}
+        bezirkPfad={(id) => `/einsaetze/1/betreuung?bezirk=${id}`}
+      />,
+    );
+    return { onAendern };
+  }
+
+  it('zeigt Räumung und Stand des zugeordneten Bezirks und springt ins Modul', () => {
+    mitBezirk();
+    expect(screen.getByText('läuft')).toBeInTheDocument();
+    expect(screen.getByText(/480 · von/)).toBeInTheDocument();
+    const sprung = screen.getByRole('link', { name: 'Betreuung zu Uferstraße 12–40' });
+    expect(sprung).toHaveAttribute('href', '/einsaetze/1/betreuung?bezirk=5');
+  });
+
+  it('Auswahl eines anderen Bezirks und „nicht zugeordnet" schicken den PATCH', async () => {
+    const { onAendern } = mitBezirk();
+    const feld = screen.getByLabelText('Gehört zu Evakuierungsbezirk');
+    await userEvent.click(feld);
+    await userEvent.click(await screen.findByTitle('Hafenviertel'));
+    await waitFor(() => expect(onAendern).toHaveBeenCalledWith({ evakuierungsbezirk_id: 6 }));
+    await userEvent.click(feld);
+    await userEvent.click(await screen.findByTitle('nicht zugeordnet'));
+    await waitFor(() =>
+      expect(onAendern).toHaveBeenLastCalledWith({ evakuierungsbezirk_id: null }),
+    );
+  });
+
+  it('ohne Modulrecht: keine Auswahl, keine Bezirksangaben, nur der Grund', () => {
+    mitBezirk({ betreuungFrei: false });
+    expect(screen.queryByLabelText('Gehört zu Evakuierungsbezirk')).toBeNull();
+    expect(screen.queryByText('Uferstraße 12–40')).toBeNull();
+    expect(screen.queryByText('läuft')).toBeNull();
+    expect(screen.getByText(/nur mit Zugriff auf das Modul Betreuung/)).toBeInTheDocument();
+  });
+
+  it('an anderen Zonentypen erscheint nichts vom Bezirk', () => {
+    mitBezirk({ zone: { ...basisZone, typ: 'absperrbereich', gefahrengebiet_id: null } });
+    expect(screen.queryByLabelText('Gehört zu Evakuierungsbezirk')).toBeNull();
+  });
+});

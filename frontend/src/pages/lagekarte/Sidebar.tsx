@@ -30,6 +30,7 @@ import {
   ebenenZeilen,
   type EbenenZeile,
   type PersonenEbenenAngabe,
+  type BetreuungEbenenAngabe,
 } from './leistenDaten';
 import Sichtungslegende from './Sichtungslegende';
 import './lagekarte.css';
@@ -61,13 +62,17 @@ export interface LayerSichtbar {
   /** Ebene „Betroffene" (LFH-648). Der Schalter ist die Wahl, NICHT die Zugriffsgrenze —
    *  gezeichnet wird nur bei freigegebenem Modul „Personen" (`personenZugriff`). */
   person: boolean;
+  /** Ebene „Betreuungsstellen" (LFH-673). Wie `person` ist der Schalter die Wahl, die
+   *  Zugriffsgrenze ist die Datenquelle (`betreuungEbene.ts`). */
+  betreuungsstelle: boolean;
 }
 
 /** Platzierbare Punkt-Typen (Fläche/Abschnitt läuft über onAbschnittZeichnenStart).
  *  `person` (Betroffene, LFH-613) kommt nur über den Deeplink-Auftrag von der Detailseite —
  *  die Lagekarte führt Personen zwar als Ebene (LFH-648), aber nicht in „Nicht verortet":
  *  die Koordinaten-Lücke zeigt die Betroffenen-Seite. */
-export type PlatzierenPunktTyp = 'uhs' | 'schaden' | 'einheit' | 'fahrzeug' | 'fuehrung' | 'person';
+export type PlatzierenPunktTyp =
+  'uhs' | 'schaden' | 'einheit' | 'fahrzeug' | 'fuehrung' | 'person' | 'betreuungsstelle';
 
 const NICHT_VERORTET_LABEL: Record<NichtVerortet['typ'], string> = {
   uhs: 'UHS',
@@ -76,6 +81,7 @@ const NICHT_VERORTET_LABEL: Record<NichtVerortet['typ'], string> = {
   fahrzeug: 'Fahrzeug',
   fuehrung: 'Personal', // LFH-276: beliebiges disponiertes Personal, nicht nur Führung
   abschnitt: 'Abschnitt',
+  betreuungsstelle: 'Betreuungsstelle',
 };
 
 /** Platzierungsziel → exclude-Tag (typ:id) für die Ort-Vorschau (Selbst-Ausschluss).
@@ -87,6 +93,8 @@ export function ortVorschauExclude(
   if (!ziel) return undefined;
   if (ziel.typ === 'einsatzort') return `einsatzort:${einsatzId}`; // Marker-id = echte Einsatz-ID, nicht 0
   // Sidebar-Typen → Backend-Marker-Typ-Tags. 'fuehrung' = Personal-Führung → 'personal'.
+  // Keine Betreuungsstelle (LFH-673): die Peilung prüft nur den Einsatz-Lesezugriff und darf
+  // deshalb keine Stellen kennen — es gibt nichts auszuschließen (wie `person`).
   const map: Record<string, string> = {
     uhs: 'uhs',
     schaden: 'schaden',
@@ -161,6 +169,9 @@ export interface SidebarProps {
    * von `verortet`, die Zahl kommt deshalb von hier. Fehlt die Angabe, gibt es keine Zeile.
    */
   personen?: PersonenEbenenAngabe;
+  /** Ebene „Betreuungsstellen" (LFH-673): nur die Zugriffsgrenze — die Marker zählen in
+   *  `verortet` mit, wie die UHS. */
+  betreuung?: BetreuungEbenenAngabe;
   /**
    * Gewählte Kartengrundlage. Gewählt wird sie in der Segmentleiste über der Karte; das
    * Paneel „Kartengrundlage" trägt nur, was dort keinen Platz hat (Karten-Design, Hinweise).
@@ -497,6 +508,7 @@ export default function Sidebar(props: SidebarProps) {
     props.layer,
     sektionFehler.nichtVerortet != null,
     props.personen,
+    props.betreuung,
   );
   const zeigeSichtungslegende = props.layer.person && props.personen?.zugriff === 'frei';
 

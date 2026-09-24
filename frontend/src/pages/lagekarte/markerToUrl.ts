@@ -9,6 +9,7 @@ import {
   meldungenPfad,
   einsatzdatenPfad,
   personDetailPfad,
+  betreuungPfad,
 } from '../../routing/deeplinks';
 
 /**
@@ -37,6 +38,9 @@ export function markerToUrl(marker: KarteMarker, einsatzId: number): string {
     // Betroffene (LFH-648): Vollseiten-Detail → Item-Route, nicht `personenPfad(?person=)`.
     case 'person':
       return personDetailPfad(einsatzId, marker.id);
+    // Betreuungsstelle (LFH-673): keine Detailroute, Auswahl per `?stelle=` (LFH-639 D7).
+    case 'betreuungsstelle':
+      return betreuungPfad(einsatzId, { stelle: marker.id });
     case 'lagemeldung':
       return meldungenPfad(
         einsatzId,

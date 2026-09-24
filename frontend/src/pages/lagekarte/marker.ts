@@ -1,6 +1,7 @@
 import type { GlobalToken } from 'antd';
 import { rollenFarbe } from '../../theme/statusFarben';
 import type {
+  Betreuungsstelle,
   Einheit,
   EinsatzAnzeige,
   EinsatzFahrzeug,
@@ -17,6 +18,7 @@ import {
   grundzeichenAkzeptiert,
   schadenTz,
   uhsTz,
+  betreuungsstelleTz,
   type TzProps,
 } from './taktischesZeichen';
 import type { GeoJsonGeometry } from './geo';
@@ -31,6 +33,10 @@ export type MarkerTyp =
   | 'abschnitt'
   | 'lagemeldung'
   | 'freies_zeichen'
+  /** Betreuungsstelle (LFH-673). Erzeugt `baueBetreuungMarker`; läuft wie die UHS in
+   *  `alleVerortet` und „Nicht verortet", aber nur bei Lesezugriff auf das Modul Betreuung
+   *  (`betreuungEbene.ts`). */
+  | 'betreuungsstelle'
   /** Betroffene (LFH-613). Erzeugt ausschließlich `personenMarker` — auf der Betroffenen-Seite
    *  und seit LFH-648 als Ebene „Betroffene" der Lagekarte. Dort laufen sie als eigene Liste
    *  `personenVerortet` NEBEN `alleVerortet` (Startausschnitt/Kopfzahl ohne Personen) und
@@ -83,7 +89,7 @@ export interface KarteMarker {
 }
 
 export interface NichtVerortet {
-  typ: 'uhs' | 'schaden' | 'einheit' | 'fahrzeug' | 'fuehrung' | 'abschnitt';
+  typ: 'uhs' | 'schaden' | 'einheit' | 'fahrzeug' | 'fuehrung' | 'abschnitt' | 'betreuungsstelle';
   id: number;
   label: string;
 }
@@ -166,6 +172,39 @@ export function baueMarker(
     }
   }
 
+  return { verortet, nichtVerortet };
+}
+
+/**
+ * Betreuungsstellen (LFH-673): verortete als Marker, unverortete in „Nicht verortet".
+ * Stornierte fallen heraus — die Übersicht liefert sie ohnehin nicht, aber ein eingefrorener
+ * Stand oder ein künftiger Aufrufer soll keine Fehlanlage als Ort zeigen. Rolle `bedien` wie
+ * die UHS: Rot bedient nichts, und eine neue Rolle wird nicht erfunden (design.md D8); das
+ * Zeichen und die eigene Ebene unterscheiden die Stelle von der UHS.
+ */
+export function baueBetreuungMarker(
+  stellen: readonly Betreuungsstelle[],
+  token: GlobalToken,
+): { verortet: KarteMarker[]; nichtVerortet: NichtVerortet[] } {
+  const verortet: KarteMarker[] = [];
+  const nichtVerortet: NichtVerortet[] = [];
+  for (const s of stellen) {
+    if (s.storniert_at) continue;
+    if (s.lat != null && s.lon != null) {
+      verortet.push({
+        schluessel: `betreuungsstelle-${s.id}`,
+        typ: 'betreuungsstelle',
+        id: s.id,
+        lat: s.lat,
+        lon: s.lon,
+        label: s.bezeichnung,
+        farbe: rollenFarbe(UHS_ROLLE, token),
+        tz: betreuungsstelleTz(),
+      });
+    } else {
+      nichtVerortet.push({ typ: 'betreuungsstelle', id: s.id, label: s.bezeichnung });
+    }
+  }
   return { verortet, nichtVerortet };
 }
 

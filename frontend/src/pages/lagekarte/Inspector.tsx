@@ -92,6 +92,10 @@ function inspectorExclude(m: KarteMarker, einsatzId: number): string | undefined
     // den Einsatz-Lesezugriff und darf deshalb keine Personen kennen) → nichts auszuschließen.
     case 'person':
       return undefined;
+    // Betreuungsstellen (LFH-673) aus demselben Grund nicht: die Peilung kennt nur, was jeder
+    // Einsatz-Leser sehen darf, und die Stellen hängen am Modul Betreuung.
+    case 'betreuungsstelle':
+      return undefined;
   }
 }
 

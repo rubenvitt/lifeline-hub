@@ -403,6 +403,7 @@ fn serde_wire_gleich_as_str() {
         Absperrgrenze,
         Sperrgebiet,
         FreieSkizze,
+        Evakuierungsbezirk,
     });
 
     // auth

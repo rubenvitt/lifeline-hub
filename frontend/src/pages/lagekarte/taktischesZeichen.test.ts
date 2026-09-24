@@ -6,6 +6,7 @@ import {
   einsatzortTz,
   schadenTz,
   uhsTz,
+  betreuungsstelleTz,
   grundzeichenAusFahrzeugtyp,
   organisationAusText,
   fachaufgabeAusFahrzeugtyp,
@@ -280,6 +281,13 @@ describe('schadenTz', () => {
   });
   it('Fallback-Farbe bei unbekanntem Ausmaß', () => {
     expect(schadenTz('unbekannt' as never).farbe).toBe('#8c8c8c');
+  });
+});
+
+describe('betreuungsstelleTz', () => {
+  it('ist Stelle + Fachaufgabe Betreuung (LFH-673), und das Overlay ist zulässig', () => {
+    expect(betreuungsstelleTz()).toEqual({ grundzeichen: 'stelle', fachaufgabe: 'betreuung' });
+    expect(grundzeichenAkzeptiert('stelle', 'fachaufgabe')).toBe(true);
   });
 });
 

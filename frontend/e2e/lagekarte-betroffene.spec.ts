@@ -159,6 +159,7 @@ test('Betroffene: eigene Cluster-Quelle, Kräfte bleiben einzeln, ohne Modulzugr
       lagemeldung: true,
       freies_zeichen: true,
       person: true,
+      betreuungsstelle: true,
     },
   });
   // Ohne `system_rolle`/`org_rolle` fällt das Backend auf „keiner"/„keine" zurück — ein

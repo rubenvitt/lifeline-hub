@@ -208,6 +208,12 @@ struct SnapshotDaten {
     lagemeldungen: Vec<crate::meldung::LageMeldungAnzeige>,
     /// Nur Metadaten/ID-Referenz — die BLOB-Bytes bleiben live (kein 5-MB-Grundriss je Stand).
     bilder: Vec<crate::karte_hintergrundbild::HintergrundbildAnzeige>,
+    /// Betreuungsstellen mit Koordinate (LFH-673) — Marker im Rückblick. Am Modul Betreuung
+    /// gegatet (`REDIGIERBARE_MODUL_FELDER`).
+    betreuungsstellen: Vec<crate::betreuung::BetreuungsstelleAnzeige>,
+    /// Evakuierungsbezirke (LFH-673) — Bezeichnung und Räumungszustand beschriften die
+    /// Bezirksflächen in `zonen`. Ebenfalls am Modul Betreuung gegatet.
+    evakuierungsbezirke: Vec<crate::betreuung::EvakuierungsbezirkAnzeige>,
 }
 
 /// Capture: friert das volle Lagebild eines Einsatzes in EIN JSON-Dokument ein (LFH-321, C).
@@ -234,6 +240,10 @@ pub async fn erzeuge(
     let stand_at: String = sqlx::query_scalar("SELECT datetime('now')")
         .fetch_one(pool)
         .await?;
+
+    // Eine Abfrage für beide Betreuungsfelder: dieselbe Übersicht wie die Modulseite, also
+    // nur nicht stornierte Stellen und Bezirke (LFH-673).
+    let betreuung = crate::betreuung::repo::uebersicht(pool, einsatz_id).await?;
 
     let daten = SnapshotDaten {
         version: 1,
@@ -263,6 +273,8 @@ pub async fn erzeuge(
         gefahrengebiete: crate::gefahr::repo::gebiete_liste(pool, einsatz_id).await?,
         lagemeldungen: crate::meldung::repo::liste_lage_meldungen(pool, einsatz_id).await?,
         bilder: crate::karte_hintergrundbild::repo::liste(pool, einsatz_id, None).await?,
+        betreuungsstellen: betreuung.stellen,
+        evakuierungsbezirke: betreuung.bezirke,
     };
 
     let daten_value = serde_json::to_value(&daten)

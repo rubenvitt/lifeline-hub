@@ -26,7 +26,7 @@ import { evakuierungKennzahl } from './evakuierungKennzahl';
  * Zeilen mit eigenen Nummern.
  */
 
-export type BezirkAktion = 'plangroesse' | 'raeumung' | 'stornieren';
+export type BezirkAktion = 'karte' | 'plangroesse' | 'raeumung' | 'stornieren';
 
 const spalten = spaltenFuer<Evakuierungsbezirk>()([
   {
@@ -73,6 +73,21 @@ const MENUE: readonly (MenueEintrag & { key: BezirkAktion })[] = [
   { key: 'stornieren', label: 'Stornieren', gefahr: true },
 ];
 
+/**
+ * Menü einer Bezirkskarte (LFH-673): „Auf Karte zeigen" zuerst, sobald der Bezirk eine Fläche
+ * hat — auch OHNE Schreibrecht, denn ein Sprung ist Lesen (LFH-616). Die Handlungen folgen
+ * nur mit Schreibrecht. Ohne Fläche fehlt der Eintrag; ein eigenes Feld „keine Fläche" hat
+ * der Plan-Modus nicht (höchstens drei Sekundärfelder, alle belegt). Rein und exportiert.
+ */
+export function bezirkMenue(
+  b: Pick<Evakuierungsbezirk, 'flaechen'>,
+  darfSchreiben: boolean,
+): readonly (MenueEintrag & { key: BezirkAktion })[] {
+  const karte: (MenueEintrag & { key: BezirkAktion })[] =
+    b.flaechen > 0 ? [{ key: 'karte', label: 'Auf Karte zeigen' }] : [];
+  return darfSchreiben ? [...karte, ...MENUE] : karte;
+}
+
 export default function EvakuierungBlock({
   bezirke,
   ladend,
@@ -108,13 +123,13 @@ export default function EvakuierungBlock({
             onKlick: onStandMelden,
           }
         : undefined,
-      weitere: darfSchreiben
-        ? {
-            eintraege: () => MENUE,
-            zugaenglicherName: (b) => `Aktionen zu Bezirk ${b.bezeichnung}`,
-            onWahl: (key, b) => onAktion(key as BezirkAktion, b),
-          }
-        : undefined,
+      // Ohne Schreibrecht bleibt nur der Sprung auf die Karte; ohne Fläche gibt es dann
+      // keinen Auslöser (das Primitiv baut keinen für ein leeres Menü).
+      weitere: {
+        eintraege: (b) => bezirkMenue(b, darfSchreiben),
+        zugaenglicherName: (b) => `Aktionen zu Bezirk ${b.bezeichnung}`,
+        onWahl: (key, b) => onAktion(key as BezirkAktion, b),
+      },
     }),
     [darfSchreiben, onStandMelden, onAktion],
   );

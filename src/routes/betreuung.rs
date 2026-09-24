@@ -101,9 +101,11 @@ fn publiziere(state: &AppState, einsatz_id: i64, etb_ids: &[i64], objekt: Objekt
 
 /// Wie [`publiziere`], aber nur nach einer wirksamen Änderung (Leerlauf-Riegel: ein PATCH
 /// ohne neuen Wert schreibt keinen ETB-Eintrag und soll auch niemanden neu laden lassen).
-fn publiziere_wirksam(state: &AppState, einsatz_id: i64, etb_ids: &[i64], objekt: Objekt) {
-    if !etb_ids.is_empty() {
-        publiziere(state, einsatz_id, etb_ids, objekt);
+/// Wirksam ist auch eine Änderung ohne ETB-Eintrag — die Verortung einer Stelle
+/// (`still_geaendert`, LFH-673 design.md D3).
+fn publiziere_wirksam(state: &AppState, einsatz_id: i64, g: &repo::Geschrieben, objekt: Objekt) {
+    if !g.etb_ids.is_empty() || g.still_geaendert {
+        publiziere(state, einsatz_id, &g.etb_ids, objekt);
     }
 }
 
@@ -240,7 +242,7 @@ pub async fn bezirk_aendern(
     let g = crate::write_retry!(&state.pool, |conn| {
         repo::bezirk_aendern_tx(conn, einsatz_id, bid, benutzer_id, startwert, &eingabe).await
     })?;
-    publiziere_wirksam(&state, einsatz_id, &g.etb_ids, Objekt::Bezirk(g.id));
+    publiziere_wirksam(&state, einsatz_id, &g, Objekt::Bezirk(g.id));
     Ok(Json(
         repo::bezirk_laden(&state.pool, einsatz_id, g.id).await?,
     ))
@@ -256,10 +258,14 @@ pub async fn bezirk_stornieren(
     let einsatz_id = ctx.einsatz.id;
     let startwert = startwert(&state, einsatz_id).await?;
     let benutzer_id = ctx.benutzer.id;
-    let g = crate::write_retry!(&state.pool, |conn| {
+    let (g, geloeste_zonen) = crate::write_retry!(&state.pool, |conn| {
         repo::bezirk_stornieren_tx(conn, einsatz_id, bid, benutzer_id, startwert).await
     })?;
     publiziere(&state, einsatz_id, &g.etb_ids, Objekt::Bezirk(g.id));
+    // LFH-673: die Karte zeichnet die gelösten Flächen jetzt ohne Bezirk.
+    for zid in geloeste_zonen {
+        super::lage_zone::sse_zone(&state, einsatz_id, zid);
+    }
     Ok(Json(
         repo::bezirk_laden(&state.pool, einsatz_id, g.id).await?,
     ))
@@ -384,6 +390,15 @@ pub struct StelleAendern {
     standort: Option<Option<String>>,
     #[serde(default, deserialize_with = "support::deserialize_optional_field")]
     notiz: Option<Option<String>>,
+    /// Koordinate auf der Lagekarte (LFH-673), tri-state je Wert: fehlt = unverändert,
+    /// `null` = entfernen. Halbes Paar oder Wert außerhalb des Bereichs → **422**, wie an der
+    /// UHS (`einsatz_uhs.rs`, von CLAUDE.md als legitimes 422 geführt): das Paar ist ein
+    /// Zusammenhang zweier Felder. Bewusste Abweichung von der 400-Linie für Feldfehler
+    /// dieses Moduls (LFH-639 D3), damit alle Verortungswege gleich antworten.
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    lat: Option<Option<f64>>,
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    lon: Option<Option<f64>>,
 }
 
 /// PATCH /api/einsaetze/{id}/betreuung/stellen/{sid}
@@ -402,13 +417,15 @@ pub async fn stelle_aendern(
         status: enum_opt(req.status)?,
         standort: req.standort,
         notiz: req.notiz,
+        lat: req.lat,
+        lon: req.lon,
     };
     let startwert = startwert(&state, einsatz_id).await?;
     let benutzer_id = ctx.benutzer.id;
     let g = crate::write_retry!(&state.pool, |conn| {
         repo::stelle_aendern_tx(conn, einsatz_id, sid, benutzer_id, startwert, &eingabe).await
     })?;
-    publiziere_wirksam(&state, einsatz_id, &g.etb_ids, Objekt::Stelle(g.id));
+    publiziere_wirksam(&state, einsatz_id, &g, Objekt::Stelle(g.id));
     Ok(Json(
         repo::stelle_laden(&state.pool, einsatz_id, g.id).await?,
     ))
