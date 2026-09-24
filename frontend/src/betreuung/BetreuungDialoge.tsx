@@ -216,6 +216,20 @@ const zeitRegel = {
       : Promise.resolve(),
 };
 
+/**
+ * Obergrenze je Personenzahl, gespiegelt aus `betreuung::MAX_PERSONEN` (LFH-680) — darüber
+ * antwortet der Server 400. Als Regel, NICHT als `max` am `InputNumber`: das klemmt einen zu
+ * großen Wert beim Verlassen still auf die Grenze, und eine Personenzahl darf sich nicht
+ * ungesehen ändern.
+ */
+const MAX_PERSONEN = 1_000_000;
+
+const hoechstensRegel = {
+  type: 'number' as const,
+  max: MAX_PERSONEN,
+  message: `Höchstens ${personenZahl(MAX_PERSONEN)} Personen`,
+};
+
 function erhebungFeld(name: string, label: string) {
   return (
     <Form.Item name={name} label={label} rules={[{ required: true }]}>
@@ -231,7 +245,10 @@ function personenFeld(name: string, label: string, min: number, pflicht: boolean
     <Form.Item
       name={name}
       label={label}
-      rules={pflicht ? [{ required: true, message: 'Bitte eine Anzahl angeben' }] : []}
+      rules={[
+        ...(pflicht ? [{ required: true, message: 'Bitte eine Anzahl angeben' }] : []),
+        hoechstensRegel,
+      ]}
     >
       <InputNumber min={min} precision={0} style={{ width: '100%' }} />
     </Form.Item>
@@ -520,6 +537,7 @@ export function StelleAnlegenDialog({
         name="kapazitaet_personen"
         label="Kapazität (Personen)"
         extra="Leer: keine Kapazität — dann wird keine Zahl freier Plätze ausgewiesen."
+        rules={[hoechstensRegel]}
       >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
@@ -650,6 +668,7 @@ export function StelleBearbeitenDialog({
         name="kapazitaet_personen"
         label="Kapazität (Personen)"
         extra="Leer: keine Kapazität — dann wird keine Zahl freier Plätze ausgewiesen."
+        rules={[hoechstensRegel]}
       >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>

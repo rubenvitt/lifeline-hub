@@ -421,6 +421,8 @@ async fn zeitpunkt_knapp_in_der_zukunft_ist_toleriert() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let bid = bezirk(&app, &admin, e, "Uferstraße 12–40").await;
+    let sid = stelle(&app, &admin, e, "Turnhalle Ost").await;
+    let vorher = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     // 30 s Uhrenversatz liegt innerhalb der Toleranz von 60 s
     let (s, j) = anfrage(
         &app,
@@ -431,6 +433,114 @@ async fn zeitpunkt_knapp_in_der_zukunft_ist_toleriert() {
             r#"{{"evakuiert":10,"erhebung":"gezaehlt","zeitpunkt_at":"{}"}}"#,
             in_sekunden(30)
         )),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{j:?}");
+    let (s, m) = anfrage(
+        &app,
+        "POST",
+        &format!("{}/stellen/{sid}/belegungen", pfad(e)),
+        &admin,
+        Some(&format!(
+            r#"{{"belegt":7,"zeitpunkt_at":"{}"}}"#,
+            in_sekunden(30)
+        )),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{m:?}");
+    // LFH-680: gespeichert wird min(zeitpunkt, jetzt) — die Meldung zählt sofort in der
+    // Kopfzahl „jetzt“, statt bis zu 60 s darin zu fehlen, während sie schon „aktuell“ ist.
+    let nachher = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let gespeichert = m["stelle"]["belegung"]["zeitpunkt_at"].as_str().unwrap();
+    assert!(
+        vorher.as_str() <= gespeichert && gespeichert <= nachher.as_str(),
+        "{vorher} ≤ {gespeichert} ≤ {nachher}"
+    );
+    let (s, k) = anfrage(&app, "GET", &format!("{}/belegung", pfad(e)), &admin, None).await;
+    assert_eq!(s, StatusCode::OK, "{k:?}");
+    assert_eq!(k["summe"], 7, "{k:?}");
+    let (_, u) = anfrage(&app, "GET", &pfad(e), &admin, None).await;
+    let stand = u["bezirke"][0]["stand"]["zeitpunkt_at"].as_str().unwrap();
+    assert!(stand <= nachher.as_str(), "{stand} ≤ {nachher}");
+}
+
+#[tokio::test]
+async fn personenzahlen_haben_eine_obergrenze() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let bid = bezirk(&app, &admin, e, "Uferstraße 12–40").await;
+    let sid = stelle(&app, &admin, e, "Turnhalle Ost").await;
+
+    // Eine über der Grenze und das absurde Maximum sind 400 — auf jedem Schreibweg.
+    for zu_viel in ["1000001", "9223372036854775807"] {
+        for (methode, url, body) in [
+            (
+                "POST",
+                format!("{}/bezirke", pfad(e)),
+                format!(
+                    r#"{{"bezeichnung":"A","plan_personen":{zu_viel},"plan_erhebung":"gezaehlt"}}"#
+                ),
+            ),
+            (
+                "PATCH",
+                format!("{}/bezirke/{bid}", pfad(e)),
+                format!(r#"{{"plan_personen":{zu_viel}}}"#),
+            ),
+            (
+                "POST",
+                format!("{}/bezirke/{bid}/staende", pfad(e)),
+                format!(r#"{{"evakuiert":{zu_viel},"erhebung":"gezaehlt"}}"#),
+            ),
+            (
+                "POST",
+                format!("{}/stellen", pfad(e)),
+                format!(
+                    r#"{{"bezeichnung":"B","art":"notunterkunft","kapazitaet_personen":{zu_viel}}}"#
+                ),
+            ),
+            (
+                "PATCH",
+                format!("{}/stellen/{sid}", pfad(e)),
+                format!(r#"{{"kapazitaet_personen":{zu_viel}}}"#),
+            ),
+            (
+                "POST",
+                format!("{}/stellen/{sid}/belegungen", pfad(e)),
+                format!(r#"{{"belegt":{zu_viel}}}"#),
+            ),
+        ] {
+            let (s, j) = anfrage(&app, methode, &url, &admin, Some(&body)).await;
+            assert_eq!(s, StatusCode::BAD_REQUEST, "{methode} {url} {body} → {j:?}");
+        }
+    }
+    let (_, u) = anfrage(&app, "GET", &pfad(e), &admin, None).await;
+    assert_eq!(u["bezirke"].as_array().unwrap().len(), 1, "{u:?}");
+    assert_eq!(u["bezirke"][0]["plan_personen"], 640);
+    assert!(!u["bezirke"][0].as_object().unwrap().contains_key("stand"));
+    assert_eq!(u["stellen"].as_array().unwrap().len(), 1, "{u:?}");
+    assert_eq!(u["stellen"][0]["kapazitaet_personen"], 150);
+    assert!(!u["stellen"][0]
+        .as_object()
+        .unwrap()
+        .contains_key("belegung"));
+
+    // Die Grenze selbst ist erlaubt.
+    let (s, j) = anfrage(
+        &app,
+        "PATCH",
+        &format!("{}/bezirke/{bid}", pfad(e)),
+        &admin,
+        Some(r#"{"plan_personen":1000000}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j:?}");
+    let (s, j) = anfrage(
+        &app,
+        "POST",
+        &format!("{}/stellen/{sid}/belegungen", pfad(e)),
+        &admin,
+        Some(r#"{"belegt":1000000}"#),
     )
     .await;
     assert_eq!(s, StatusCode::CREATED, "{j:?}");

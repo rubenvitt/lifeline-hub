@@ -247,6 +247,62 @@ describe('BelegungMeldenDialog', () => {
   });
 });
 
+describe('Obergrenze der Personenzahlen (LFH-680)', () => {
+  it('Belegung über 1 000 000: Grund am Feld, nichts gesendet, der Wert bleibt stehen', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(
+      <BelegungMeldenDialog
+        stelle={stelle()}
+        laeuft={false}
+        fehler={null}
+        onErfassen={onErfassen}
+        onSchliessen={() => {}}
+      />,
+    );
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Belegung melden: Turnhalle Ost',
+    });
+    const feld = within(dialog).getByLabelText('Belegt (Personen)');
+    await userEvent.type(feld, '1000001');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Melden' }));
+    expect(await within(dialog).findByText(/Höchstens 1\s000\s000 Personen/)).toBeInTheDocument();
+    // Kein `max` am InputNumber: das klemmte beim Verlassen still auf 1 000 000, und eine
+    // Personenzahl, die sich still ändert, wäre schlimmer als die Ablehnung.
+    expect(feld).toHaveValue('1000001');
+    expect(onErfassen).not.toHaveBeenCalled();
+  });
+
+  it('die Grenze selbst geht durch; Kapazität hat dieselbe Grenze', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(
+      <StelleAnlegenDialog
+        abschnitte={ABSCHNITTE}
+        laeuft={false}
+        fehler={null}
+        onErfassen={onErfassen}
+        onSchliessen={() => {}}
+      />,
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Betreuungsstelle anlegen' });
+    await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Messehalle');
+    const kapazitaet = within(dialog).getByLabelText('Kapazität (Personen)');
+    await userEvent.type(kapazitaet, '1000001');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    expect(await within(dialog).findByText(/Höchstens 1\s000\s000 Personen/)).toBeInTheDocument();
+    expect(onErfassen).not.toHaveBeenCalled();
+    await userEvent.clear(kapazitaet);
+    await userEvent.type(kapazitaet, '1000000');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await waitFor(() =>
+      expect(onErfassen).toHaveBeenCalledWith({
+        bezeichnung: 'Messehalle',
+        art: 'betreuungsstelle',
+        kapazitaet_personen: 1000000,
+      }),
+    );
+  });
+});
+
 describe('BezirkAnlegenDialog', () => {
   it('Bezeichnung, Plangröße, Erhebung sichtbar; Abschnitt, Sammelstelle, Notiz eingeklappt', async () => {
     const onErfassen = vi.fn().mockResolvedValue(undefined);

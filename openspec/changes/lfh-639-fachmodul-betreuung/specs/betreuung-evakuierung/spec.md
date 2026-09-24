@@ -128,6 +128,10 @@ dürfen.
 - **WHEN** eine Meldung mit negativer Anzahl oder mit einem Zeitpunkt in der Zukunft eingeht
 - **THEN** antwortet das System mit 400 und speichert nichts
 
+#### Scenario: Zeitpunkt knapp in der Zukunft
+- **WHEN** eine Meldung mit einem Zeitpunkt bis 60 s nach der Serverzeit eingeht
+- **THEN** nimmt das System sie an und speichert als Zeitpunkt die Serverzeit, nicht den übermittelten Wert
+
 #### Scenario: Meldung an storniertem Bezirk
 - **WHEN** für einen stornierten Bezirk ein Stand gemeldet wird
 - **THEN** antwortet das System mit 409 und speichert nichts
@@ -226,6 +230,20 @@ zurücknehmen lassen.
 - **WHEN** für eine geschlossene Stelle eine Belegung gemeldet oder eine Belegungsmeldung zurückgenommen wird
 - **THEN** antwortet das System mit 422 und ändert nichts
 
+### Requirement: Obergrenze der Personenzahlen
+
+Plangröße, Stand „evakuiert“, Kapazität und Belegung MUST höchstens 1 000 000 betragen,
+beim Anlegen wie beim Fortschreiben. Ein größerer Wert MUST mit 400 abgelehnt werden, ohne
+dass etwas gespeichert wird.
+
+#### Scenario: Belegung über der Obergrenze
+- **WHEN** für eine Stelle eine Belegung von 1 000 001 gemeldet wird
+- **THEN** antwortet das System mit 400 und speichert nichts
+
+#### Scenario: Die Obergrenze selbst
+- **WHEN** eine Plangröße von 1 000 000 gesetzt wird
+- **THEN** nimmt das System sie an
+
 ### Requirement: Kopfzahl in Betreuung zu einem Zeitpunkt
 
 Das System SHALL für einen Einsatz und einen Zeitpunkt t (Vorgabe: jetzt) die Kopfzahl „in
@@ -241,6 +259,10 @@ summiert werden. Die Antwort MUST keinen Personenbezug enthalten.
 #### Scenario: Stelle ohne Meldung
 - **WHEN** eine Stelle vor t keine Belegungsmeldung hat
 - **THEN** ist sie ohne Anzahl ausgewiesen und die Summe enthält sie nicht
+
+#### Scenario: Meldung mit Uhrenversatz zählt sofort
+- **WHEN** eine Belegung mit einem Zeitpunkt 30 s nach der Serverzeit gemeldet und direkt danach die Kopfzahl ohne Zeitpunkt abgefragt wird
+- **THEN** ist die Meldung in der Kopfzahl enthalten
 
 #### Scenario: Ungültiger Zeitpunkt
 - **WHEN** der Zeitpunkt nicht als Datum mit Uhrzeit lesbar ist
