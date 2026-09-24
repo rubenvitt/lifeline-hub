@@ -216,7 +216,9 @@ namentlich n“** rechnet die Route `…/betreuung` und **nicht** `repo::uebersi
 speist auch den gesicherten Lagestand. Ohne Personenrecht **fehlt** das Feld. Die Zahl geht in
 keine Belegung, Kopfzahl oder Summe ein, führend bleibt die Mengenmeldung. Live nachgeführt
 wird sie über `EINSATZ_STREAM_EVENTS.person → betreuung`, ein zweites Server-Ereignis gibt es
-nicht. `betreuungsstelle` ist seitdem **kein Leaf** mehr, ein Rebuild braucht den FK-Schalter.
+nicht. Das kostet je Personen-Ereignis ein `GET …/betreuung` auf **jeder** Einsatzseite, weil
+`useModulZaehler` die Query dort hält. Das ist bewusst angenommen: Ein `betreuung`-Ereignis
+erreichte auch Lesende ohne Personenrecht und verriete ihnen den Takt der Zuordnungen. `betreuungsstelle` ist seitdem **kein Leaf** mehr, ein Rebuild braucht den FK-Schalter.
 Herleitung: `openspec/changes/lfh-674-verbleib-notunterkunft-betreuungsstelle/design.md`.
 
 **Sichtung ist eine eigene fachliche Farbachse am selben zentralen Ort**, keine A0-Rolle.

@@ -18,6 +18,7 @@ import {
   sichtbareVerbleibFelder,
   stellenOptionen,
   verbleibBody,
+  zielNachArtwechsel,
   zielNachStellenwahl,
   type VerbleibFormWerte,
 } from './verbleibErfassungKern';
@@ -107,16 +108,39 @@ export default function VerbleibErfassung({
       laeuft={mutation.isPending}
       onErfassen={async (werte) => {
         // `art` ist Pflicht (Regel am Feld) — ohne sie läuft `onFinish` nicht.
-        await mutation.mutateAsync(verbleibBody({ ...werte, art: werte.art! }));
+        await mutation.mutateAsync(verbleibBody({ ...werte, art: werte.art! }, felder.stelle));
       }}
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
       <Form.Item label="Art" name="art" rules={[{ required: true, message: 'Art wählen' }]}>
-        <Select options={VERBLEIB_ART_OPTIONEN} />
+        <Select
+          options={VERBLEIB_ART_OPTIONEN}
+          onChange={(neueArt: VerbleibFormWerte['art']) => {
+            const ziel = zielNachArtwechsel({
+              art: neueArt,
+              ziel: form.getFieldValue('ziel'),
+              gewaehlt: gewaehlt.current,
+            });
+            if (neueArt !== 'notunterkunft' && gewaehlt.current) {
+              form.setFieldsValue({ ziel, betreuungsstelle_id: undefined });
+              gewaehlt.current = undefined;
+            }
+          }}
+        />
       </Form.Item>
       {felder.stelle && (
-        <Form.Item label="Betreuungsstelle (optional)" name="betreuungsstelle_id">
+        <Form.Item
+          label="Betreuungsstelle (optional)"
+          name="betreuungsstelle_id"
+          // Nur ein 403 heißt „keine Auswahl" (dann steht das Feld gar nicht da). Jeder andere
+          // Fehler ist ein Ausfall der Quelle und sagt sich, statt ein leeres Feld zu zeigen.
+          extra={
+            betreuungQuery.isError
+              ? 'Stellen konnten nicht geladen werden — Ziel als Freitext eintragen.'
+              : undefined
+          }
+        >
           <Select
             allowClear
             placeholder={betreuungQuery.isPending ? 'Stellen werden geladen …' : 'Stelle wählen'}

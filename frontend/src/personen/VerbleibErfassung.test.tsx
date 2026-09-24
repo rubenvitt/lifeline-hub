@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Betreuungsstelle, ModulOverrides } from '../api/types';
 import { server } from '../test/server';
+import { einsatzKeys } from '../api/queryKeys';
 import { renderMitProviders } from '../test/utils';
 import VerbleibErfassung from './VerbleibErfassung';
 
@@ -174,29 +175,88 @@ describe('VerbleibErfassung — Betreuungsstelle (LFH-674)', () => {
     expect(gesendet[0]).toMatchObject({ art: 'transport', status: 'abtransportiert' });
   });
 
-  it('ohne Modul Betreuung: kein Abruf und keine Auswahl, Freitext bleibt', async () => {
-    const user = userEvent.setup();
-    overrides = {
-      betreuung: { einsatz_id: 1, modul_key: 'betreuung', sichtbar: false, benoetigte_rolle: null },
-    };
-    zeige();
-    await waehle(user, 'Art', 'Notunterkunft');
-    expect(screen.getByLabelText('Ziel')).toBeInTheDocument();
-    expect(screen.queryByRole('combobox', { name: 'Betreuungsstelle (optional)' })).toBeNull();
-    expect(betreuungAbrufe).toBe(0);
-  });
+  /**
+   * Widerlegbar gemacht (Review): Solange die Overrides NICHT geladen sind, fehlt die Auswahl
+   * ohnehin (Rechte offen = „ausgeblendet"). Die Abwesenheit sagt also erst etwas, wenn die
+   * Overrides nachweislich im Cache stehen — und der Gegenfall mit freiem Modul zeigt, dass
+   * dieselbe Stelle des Tests die Auswahl sonst findet.
+   */
+  it.each([
+    ['frei', {}, true],
+    [
+      'ausgeblendet',
+      { betreuung: { einsatz_id: 1, modul_key: 'betreuung', sichtbar: false } },
+      false,
+    ],
+  ] as const)(
+    'Modul Betreuung %s: Auswahl erst nach geladenen Rechten entschieden',
+    async (_, o, erwartet) => {
+      const user = userEvent.setup();
+      overrides = o as ModulOverrides;
+      const { client } = zeige();
+      await waehle(user, 'Art', 'Notunterkunft');
+      await waitFor(() =>
+        expect(client.getQueryState(einsatzKeys.modulOverrides(1))?.status).toBe('success'),
+      );
+      if (erwartet) {
+        expect(
+          await screen.findByRole('combobox', { name: 'Betreuungsstelle (optional)' }),
+        ).toBeInTheDocument();
+        await waitFor(() => expect(betreuungAbrufe).toBe(1));
+      } else {
+        expect(screen.queryByRole('combobox', { name: 'Betreuungsstelle (optional)' })).toBeNull();
+        expect(betreuungAbrufe).toBe(0);
+        expect(screen.getByLabelText('Ziel')).toBeInTheDocument();
+      }
+    },
+  );
 
-  it('ein 403 der Betreuung ist „keine Auswahl", kein Fehler', async () => {
+  /**
+   * Das 403 wird angehalten: vorher steht die Auswahl (Client sagt „frei"), danach ist sie
+   * weg — ohne Fehlermeldung. Ohne das Anhalten wäre „fehlt" schon vor der Antwort wahr.
+   */
+  it('ein 403 der Betreuung nimmt die Auswahl weg, ohne Fehler zu melden', async () => {
     const user = userEvent.setup();
+    let freigeben!: () => void;
+    const gehalten = new Promise<void>((r) => (freigeben = r));
     server.use(
-      http.get('/api/einsaetze/1/betreuung', () => new HttpResponse(null, { status: 403 })),
+      http.get('/api/einsaetze/1/betreuung', async () => {
+        await gehalten;
+        return new HttpResponse(null, { status: 403 });
+      }),
     );
     zeige();
     await waehle(user, 'Art', 'Notunterkunft');
+    expect(
+      await screen.findByRole('combobox', { name: 'Betreuungsstelle (optional)' }),
+    ).toBeInTheDocument();
+    freigeben();
     await waitFor(() =>
       expect(screen.queryByRole('combobox', { name: 'Betreuungsstelle (optional)' })).toBeNull(),
     );
+    expect(screen.queryByText(/konnten nicht geladen werden/)).toBeNull();
     expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('ein anderer Fehler der Betreuung ist ein Ausfall und sagt sich am Feld', async () => {
+    const user = userEvent.setup();
+    server.use(
+      http.get('/api/einsaetze/1/betreuung', () => new HttpResponse(null, { status: 500 })),
+    );
+    zeige();
+    await waehle(user, 'Art', 'Notunterkunft');
+    expect(await screen.findByText(/Stellen konnten nicht geladen werden/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Ziel')).toBeInTheDocument();
+  });
+
+  it('Artwechsel weg von der Notunterkunft leert eine unveränderte Vorbelegung', async () => {
+    const user = userEvent.setup();
+    zeige();
+    await waehle(user, 'Art', 'Notunterkunft');
+    await waehle(user, 'Betreuungsstelle (optional)', 'NU Turnhalle Nord');
+    expect(screen.getByLabelText('Ziel')).toHaveValue('NU Turnhalle Nord');
+    await waehle(user, 'Art', 'Transport');
+    expect(screen.getByLabelText('Ziel')).toHaveValue('');
   });
 
   it('eine Ablehnung steht im Dialog, die Felder bleiben stehen', async () => {

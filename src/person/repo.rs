@@ -395,7 +395,7 @@ pub async fn storniere(
 
 /// „davon namentlich“ je Betreuungsstelle (LFH-674, design.md D4): Zahl der nicht
 /// stornierten Personen, deren JÜNGSTER Verbleib `notunterkunft` mit Verweis auf die Stelle
-/// ist, als `(stelle_id, anzahl)` nur für Stellen mit mindestens einer Person.
+/// ist, als `(stelle_id, anzahl)` nur für nicht stornierte Stellen mit mindestens einer Person.
 ///
 /// Liest den Verbleib-Cache an der Person, in dem „jüngster Verbleib“ schon aufgelöst ist.
 /// Steht bewusst NICHT in `betreuung::repo::uebersicht`: deren zweiter Konsument ist der
@@ -405,13 +405,16 @@ pub async fn namentlich_je_stelle(
     pool: &SqlitePool,
     einsatz_id: i64,
 ) -> Result<Vec<(i64, i64)>, AppError> {
+    // Der Join hält die Zusage „je nicht stornierter Stelle“ serverseitig, statt sie der
+    // Oberfläche zu überlassen (die stornierte Stellen nur mangels Zeile nicht zeigt).
     Ok(sqlx::query_as(
-        "SELECT aktuelle_verbleib_betreuungsstelle_id, COUNT(*) FROM einsatz_person \
-         WHERE einsatz_id = ? AND storniert_at IS NULL \
-           AND aktuelle_verbleib_art = 'notunterkunft' \
-           AND aktuelle_verbleib_betreuungsstelle_id IS NOT NULL \
-         GROUP BY aktuelle_verbleib_betreuungsstelle_id \
-         ORDER BY aktuelle_verbleib_betreuungsstelle_id",
+        "SELECT p.aktuelle_verbleib_betreuungsstelle_id, COUNT(*) FROM einsatz_person p \
+         JOIN betreuungsstelle s ON s.id = p.aktuelle_verbleib_betreuungsstelle_id \
+              AND s.einsatz_id = p.einsatz_id AND s.storniert_at IS NULL \
+         WHERE p.einsatz_id = ? AND p.storniert_at IS NULL \
+           AND p.aktuelle_verbleib_art = 'notunterkunft' \
+         GROUP BY p.aktuelle_verbleib_betreuungsstelle_id \
+         ORDER BY p.aktuelle_verbleib_betreuungsstelle_id",
     )
     .bind(einsatz_id)
     .fetch_all(pool)
@@ -895,6 +898,15 @@ mod tests {
             vec![(nord, 2)],
             "stornierte und weiterverbrachte Personen zählen nicht; leere Stelle fehlt"
         );
+        // Eine stornierte Stelle fällt ganz heraus, obwohl der Verweis stehen bleibt.
+        sqlx::query(
+            "UPDATE betreuungsstelle SET storniert_at = '2026-09-24 12:00:00' WHERE id = ?",
+        )
+        .bind(nord)
+        .execute(&pool)
+        .await
+        .unwrap();
+        assert!(namentlich_je_stelle(&pool, e).await.unwrap().is_empty());
         assert!(namentlich_je_stelle(&pool, 999).await.unwrap().is_empty());
     }
 

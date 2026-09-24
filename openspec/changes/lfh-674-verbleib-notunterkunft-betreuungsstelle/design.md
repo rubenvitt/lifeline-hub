@@ -142,9 +142,7 @@ GROUP BY 1
   für den Lesenden gelingt. Das ist dieselbe Rangfolge-Auswertung wie in `erlaubte_module`,
   nur für einen Key. Gelingt sie nicht, bleibt das Feld weg und steht nicht auf 0.
 - Die Liste führt nur Stellen mit `anzahl ≥ 1`. Fehlt eine Stelle in einer vorhandenen
-  Liste, heißt das 0. Fehlt die Liste, heißt das „nicht auskunftsfähig“. Stornierte Stellen
-  fallen im Frontend heraus, weil `stellen` sie nicht führt. Die Abfrage filtert sie nicht
-  eigens, eine Zahl ohne Zeile wird nie angezeigt.
+  Liste, heißt das 0. Fehlt die Liste, heißt das „nicht auskunftsfähig“.
 - Ein `Vec` statt einer Map, weil die zwei `Record<>`-Maps des Codegens handgepflegt sind
   (CLAUDE.md, Typ-Codegen).
 - **Gegenprobe „nie summieren“:** `kopfzahl`, `StelleMeldungAnzeige` und der Lagestand
@@ -152,6 +150,13 @@ GROUP BY 1
   im Bestand: Die Kopfzahl-Summe ändert sich nicht, und das Lagestand-Dokument enthält kein
   `namentlich`. Im Frontend pinnt ein Test, dass die Summenzeile des `StellenBlock` nur
   `belegung.belegt` addiert.
+- **Was der Lagestand-Test NICHT belegt** (Review): `lage_snapshot` übernimmt aus der
+  Übersicht nur `stellen` und `bezirke`. Wanderte die Zählung als eigenes Feld in
+  `repo::uebersicht`, bliebe der Test grün. Er fängt nur eine Zahl, die jemand an
+  `BetreuungsstelleAnzeige` hängt. Die Trennung „Route, nicht Repo“ hält deshalb dieser
+  Absatz und der Kommentar am Repo, nicht der Test.
+- Stornierte Stellen fallen **serverseitig** heraus (Join auf `storniert_at IS NULL`), nicht
+  erst dadurch, dass die Oberfläche keine Zeile für sie hat.
 
 ### D5 — Live über den Client-Fan-out, nicht über ein zweites Server-Ereignis
 
@@ -163,10 +168,19 @@ In `EINSATZ_STREAM_EVENTS` bekommt `person` zusätzlich `EINSATZ_KEYS.betreuung`
 - Das Personen-Ereignis erreicht nur Lesende mit Personenrecht (Post-Filter, LFH-227). Das
   sind genau die, die die Zahl sehen. Wer nur Betreuung lesen darf, bekommt weder Ereignis
   noch Zahl.
-- Kosten: Jedes Personen-Ereignis invalidiert die Betreuungsübersicht. Neu geladen wird
-  nur, wo eine Betreuungsseite geöffnet ist (aktiver Observer). Die Lagekarte hat eine
-  Betreuungs-Query, lädt also bei einem Personen-Ereignis zusätzlich die Übersicht. Das ist
-  eine Anfrage auf eine indizierte Einsatzmenge und wird in Kauf genommen.
+- **Kosten, im Review korrigiert:** Die Übersicht hat auf JEDER Einsatzseite einen aktiven
+  Observer, denn `einsatz/useModulZaehler.ts` hält `einsatzKeys.betreuung` für den
+  Evakuierungs-Zähler im Rahmen. Jedes Personen-Ereignis (Anlegen, Sichtung, Verbleib, Notiz,
+  Storno) löst deshalb bei jedem Client mit Personen- UND Betreuungsrecht ein
+  `GET …/betreuung` aus, ohne Entprellung. Das ist dieselbe Größenordnung wie der schon
+  bestehende Fan-out `person → modulZaehler` (auch ein GET je Ereignis und Client), also etwa
+  eine Anfrage mehr je Ereignis auf eine kleine, indizierte Einsatzmenge. Das wird bewusst in
+  Kauf genommen.
+- **Verworfen: ein eigenes `betreuung`-Ereignis nur bei Verbleib und Storno.** Es wäre
+  schmaler, erreichte aber auch Lesende, die nur Betreuung sehen dürfen. Die sähen dann ein
+  Ereignis ohne sichtbare Änderung und könnten aus dessen Takt ablesen, wann jemand namentlich
+  einer Stelle zugeordnet wurde. Wird die Last messbar, ist das die nächste Stufe, dann mit
+  einem Ereignis, das nur Personenleser bekommen.
 
 ### D6 — Verbleib-Dialog auf `ErfassungsModal`, Felder je Art
 
@@ -179,9 +193,15 @@ Der Dialog zieht auf `components/Erfassung.tsx` (`ErfassungsModal`, `onErfassen`
 | `notunterkunft` | Betreuungsstelle (nur mit Zugriff), Ziel |
 | `entlassung`, `vor_ort`, `verstorben` | Ziel |
 
-- Die Notiz rückt in „Weitere Angaben“ (Collapse, `forceRender`). Damit sind höchstens drei
-  Felder sichtbar (Feldbudget Modal ≤ ~3), vorher waren es vier. Das Feldbudget-Muster
-  prüft „≤ 3 sichtbar“ und die zweite Hälfte „Aufklappen → Zahl steigt“.
+- Die Notiz rückt in „Weitere Angaben“ (Collapse **ohne** `forceRender`: sie hat keine
+  Vorbelegung, zugeklappt geht also nichts verloren, und ein einmal aufgeklapptes Panel bleibt
+  eingehängt). Damit sind höchstens drei Felder sichtbar (Feldbudget Modal ≤ ~3), vorher waren
+  es vier. Der Test prüft „3 sichtbar“ und die zweite Hälfte „Aufklappen → Zahl steigt“. Mit
+  `forceRender` stünde die Notiz immer im DOM, und die Zählung wäre nicht widerlegbar.
+- Der Dialog ist eine eigene Komponente `personen/VerbleibErfassung.tsx`, der reine Kern liegt in
+  `personen/verbleibErfassungKern.ts`. **Das Suffix ist Pflicht**, gemessen beim Umsetzen: Unter
+  dem Namen `verbleibErfassung.ts` traf der Import `./VerbleibErfassung` auf macOS still die
+  Kerndatei („Element type is invalid“). Das ist dieselbe Falle wie bei LFH-347.
 - **Die Stellen-Auswahl** ist ein `Select` über die nicht stornierten Stellen der
   Betreuungsübersicht. Ist sie geschlossen, steht „· geschlossen“ im Label, und sie ist
   wählbar. Die Wahl belegt `ziel` mit der Bezeichnung vor (`setFieldValue`), **aber nur,
@@ -224,9 +244,9 @@ erweitert.
   und das Modul Betreuung schreibt die Bezeichnung selbst ins ETB.
 - **Die Vorbelegung veraltet, wenn die Stelle umbenannt wird.** → Das Ziel ist der Text zum
   Zeitpunkt der Erfassung, so wie ein ETB-Eintrag. Der Verweis bleibt richtig.
-- **Personen-Ereignisse laden die Betreuungsübersicht öfter.** → Nur bei aktiven
-  Observern. Wird es messbar teuer, kommt ein serverseitiges `betreuung`-Ereignis in einem
-  eigenen Ticket.
+- **Personen-Ereignisse laden die Betreuungsübersicht öfter**, und zwar auf jeder
+  Einsatzseite (D5). → Bewusst angenommen, gleiche Größenordnung wie `person → modulZaehler`.
+  Wird es messbar teuer, kommt ein Ereignis nur für Personenleser in einem eigenen Ticket.
 - **Das Rennen zwischen Prüfung und Storno der Stelle** (D2). → Es ist harmlos, weil die
   Zählung stornierte Stellen nicht zeigt.
 

@@ -71,10 +71,30 @@ export function zielNachStellenwahl(a: {
 }
 
 /**
- * Request-Body. Felder, die für die gewählte Art nicht sichtbar sind, gehen nicht mit — ein
- * nach dem Artwechsel liegengebliebener Stellen-Verweis wäre sonst ein 422.
+ * Ziel nach einem Artwechsel. Wer von der Notunterkunft mit gewählter Stelle auf eine andere
+ * Art wechselt, hätte sonst den Stellennamen als Transportziel im Feld — sichtbar, aber eine
+ * Einladung zum Fehler (Review LFH-674). Geleert wird nur die UNVERÄNDERTE Vorbelegung.
  */
-export function verbleibBody(w: VerbleibFormWerte & { art: VerbleibArt }): VerbleibEingabe {
+export function zielNachArtwechsel(a: {
+  art: VerbleibArt | undefined;
+  ziel: string | undefined;
+  gewaehlt: Betreuungsstelle | undefined;
+}): string | undefined {
+  if (a.art === 'notunterkunft' || !a.gewaehlt) return a.ziel;
+  return a.ziel === a.gewaehlt.bezeichnung ? undefined : a.ziel;
+}
+
+/**
+ * Request-Body. Felder, die nicht sichtbar sind, gehen nicht mit: ein nach dem Artwechsel
+ * liegengebliebener Stellen-Verweis wäre ein 422, einer nach verlorenem Betreuungszugriff ein
+ * 403 — beides Ablehnungen, die die Person im Dialog nicht beheben kann. antd hält den Wert
+ * eines ausgeblendeten Feldes im Speicher (`preserve`), deshalb entscheidet `stelleSichtbar`,
+ * nicht das Vorhandensein des Werts.
+ */
+export function verbleibBody(
+  w: VerbleibFormWerte & { art: VerbleibArt },
+  stelleSichtbar: boolean,
+): VerbleibEingabe {
   const body: VerbleibEingabe = {
     art: w.art,
     ziel: w.ziel ?? null,
@@ -82,7 +102,7 @@ export function verbleibBody(w: VerbleibFormWerte & { art: VerbleibArt }): Verbl
     status: w.art === 'transport' ? 'abtransportiert' : null,
     notiz: w.notiz ?? null,
   };
-  if (w.art === 'notunterkunft' && w.betreuungsstelle_id != null) {
+  if (stelleSichtbar && w.art === 'notunterkunft' && w.betreuungsstelle_id != null) {
     body.betreuungsstelle_id = w.betreuungsstelle_id;
   }
   return body;

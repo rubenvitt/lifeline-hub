@@ -4,6 +4,7 @@ import {
   sichtbareVerbleibFelder,
   stellenOptionen,
   verbleibBody,
+  zielNachArtwechsel,
   zielNachStellenwahl,
 } from './verbleibErfassungKern';
 
@@ -110,7 +111,10 @@ describe('zielNachStellenwahl (Vorbelegung, Entscheidung 24.09.2026)', () => {
 describe('verbleibBody', () => {
   it('schickt die Stelle nur bei Notunterkunft mit', () => {
     expect(
-      verbleibBody({ art: 'notunterkunft', betreuungsstelle_id: 7, ziel: 'NU Turnhalle Nord' }),
+      verbleibBody(
+        { art: 'notunterkunft', betreuungsstelle_id: 7, ziel: 'NU Turnhalle Nord' },
+        true,
+      ),
     ).toEqual({
       art: 'notunterkunft',
       ziel: 'NU Turnhalle Nord',
@@ -122,13 +126,45 @@ describe('verbleibBody', () => {
   });
 
   it('lässt eine liegengebliebene Stelle nach einem Artwechsel weg (sonst 422)', () => {
-    const body = verbleibBody({ art: 'transport', betreuungsstelle_id: 7, ziel: 'KH Mitte' });
+    const body = verbleibBody(
+      { art: 'transport', betreuungsstelle_id: 7, ziel: 'KH Mitte' },
+      false,
+    );
     expect(body).not.toHaveProperty('betreuungsstelle_id');
     expect(body.status).toBe('abtransportiert');
   });
 
   it('lässt ein liegengebliebenes Transportmittel außerhalb des Transports weg', () => {
-    expect(verbleibBody({ art: 'entlassung', transportmittel: 'RTW' }).transportmittel).toBeNull();
-    expect(verbleibBody({ art: 'transport', transportmittel: 'RTW' }).transportmittel).toBe('RTW');
+    expect(
+      verbleibBody({ art: 'entlassung', transportmittel: 'RTW' }, false).transportmittel,
+    ).toBeNull();
+    expect(verbleibBody({ art: 'transport', transportmittel: 'RTW' }, false).transportmittel).toBe(
+      'RTW',
+    );
+  });
+
+  it('lässt den Verweis weg, wenn das Stellenfeld nicht (mehr) sichtbar ist (sonst 403)', () => {
+    // Kippt der Betreuungszugriff mitten im Dialog, bleibt der Wert im Formularspeicher stehen.
+    expect(
+      verbleibBody({ art: 'notunterkunft', betreuungsstelle_id: 7 }, false),
+    ).not.toHaveProperty('betreuungsstelle_id');
+  });
+});
+
+describe('zielNachArtwechsel', () => {
+  it('leert eine unveränderte Stellen-Vorbelegung beim Wechsel weg von der Notunterkunft', () => {
+    expect(
+      zielNachArtwechsel({ art: 'transport', ziel: 'NU Turnhalle Nord', gewaehlt: nord }),
+    ).toBe(undefined);
+  });
+
+  it('lässt eigenen Text und die Notunterkunft selbst unberührt', () => {
+    expect(zielNachArtwechsel({ art: 'transport', ziel: 'KH Mitte', gewaehlt: nord })).toBe(
+      'KH Mitte',
+    );
+    expect(
+      zielNachArtwechsel({ art: 'notunterkunft', ziel: 'NU Turnhalle Nord', gewaehlt: nord }),
+    ).toBe('NU Turnhalle Nord');
+    expect(zielNachArtwechsel({ art: 'transport', ziel: 'X', gewaehlt: undefined })).toBe('X');
   });
 });
