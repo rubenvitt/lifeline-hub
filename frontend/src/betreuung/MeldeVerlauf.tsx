@@ -1,6 +1,6 @@
 import { App, Button, Modal, Skeleton, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ladeBelegungVerlauf,
   ladeStandVerlauf,
@@ -90,6 +90,17 @@ export default function MeldeVerlauf({
   );
 
   const [ziel, setZiel] = useState<VerlaufZeile | null>(null);
+  const wurzel = useRef<HTMLDivElement>(null);
+  // Nach einer gelungenen Rücknahme verschwindet der Knopf, der die Rückfrage öffnete; antd
+  // gäbe den Fokus an ihn zurück und landete auf <body>. Der Verlauf nimmt ihn stattdessen —
+  // als State, weil er `focusTriggerAfterClose` im selben Render abschalten muss.
+  const [fokusZurueck, setFokusZurueck] = useState(false);
+  // Sofort beim Schließen, nicht erst in `afterClose`: das feuert erst am Ende der
+  // Zoom-Animation (in jsdom nie). `afterClose` holt ihn im Browser ein zweites Mal, falls
+  // die Animation ihn verschoben hat.
+  useEffect(() => {
+    if (ziel == null && fokusZurueck) wurzel.current?.focus();
+  }, [ziel, fokusZurueck]);
   const invalidiere = () => {
     void qc.invalidateQueries({ queryKey: einsatzKeys.betreuung(einsatzId) });
     void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
@@ -102,6 +113,7 @@ export default function MeldeVerlauf({
     },
     onSuccess: () => {
       invalidiere();
+      setFokusZurueck(true);
       setZiel(null);
       message.success('Meldung zurückgenommen');
     },
@@ -113,6 +125,7 @@ export default function MeldeVerlauf({
     // react-query hält `error` bis zum nächsten `mutate()` — ein alter Grund wanderte sonst in
     // eine neue Rückfrage.
     ruecknahme.reset();
+    setFokusZurueck(false);
     setZiel(z);
   };
 
@@ -136,7 +149,10 @@ export default function MeldeVerlauf({
     );
   } else if (abfrage.isPending) {
     koerper = (
-      <div aria-busy="true" aria-label="Verlauf wird geladen" style={polster}>
+      <div aria-busy="true" style={polster}>
+        {/* Der Zustand in WORTEN (Spec): ein Skelett allein sagt Sehenden wie Vorlesenden
+            nichts, und ein `aria-label` an einem rollenlosen `div` wird nicht vorgelesen. */}
+        <Typography.Text type="secondary">Verlauf wird geladen …</Typography.Text>
         <Skeleton active title={false} paragraph={{ rows: 2 }} />
       </div>
     );
@@ -204,7 +220,7 @@ export default function MeldeVerlauf({
   }
 
   return (
-    <div data-lfh="melde-verlauf">
+    <div data-lfh="melde-verlauf" ref={wurzel} tabIndex={-1} style={{ outline: 'none' }}>
       {sperrHinweis && (
         <Typography.Text
           type="secondary"
@@ -225,7 +241,19 @@ export default function MeldeVerlauf({
         onOk={() => {
           if (ziel) ruecknahme.mutate(ziel.id);
         }}
-        onCancel={() => setZiel(null)}
+        // Solange die Rücknahme läuft, führt KEIN Weg hinaus: ein Fehlschlag danach hätte
+        // weder Dialog noch Toast und ginge still verloren (H14/LFH-535).
+        onCancel={() => {
+          if (!ruecknahme.isPending) setZiel(null);
+        }}
+        cancelButtonProps={{ disabled: ruecknahme.isPending }}
+        closable={!ruecknahme.isPending}
+        keyboard={!ruecknahme.isPending}
+        mask={{ closable: !ruecknahme.isPending }}
+        focusTriggerAfterClose={!fokusZurueck}
+        afterClose={() => {
+          if (fokusZurueck) wurzel.current?.focus();
+        }}
         destroyOnHidden
       >
         {ziel && (

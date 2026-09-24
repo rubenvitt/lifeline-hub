@@ -131,6 +131,12 @@ describe('MeldeVerlauf · Zustände', () => {
     expect(within(alarm).getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
   });
 
+  it('der Ladezustand steht in Worten da, nicht nur als Skelett', async () => {
+    server.use(http.get(`${B}/bezirke/5/staende`, () => new Promise<Response>(() => {})));
+    renderMitProviders(<MeldeVerlauf einsatzId={7} art="bezirk" objektId={5} darfZuruecknehmen />);
+    expect(await screen.findByText('Verlauf wird geladen …')).toBeVisible();
+  });
+
   it('eine leere Reihe sagt „Noch keine Meldung.“', async () => {
     liefere('/stellen/9/belegungen', []);
     renderMitProviders(<MeldeVerlauf einsatzId={7} art="stelle" objektId={9} darfZuruecknehmen />);
@@ -231,7 +237,7 @@ describe('MeldeVerlauf · Zurücknehmen', () => {
     await userEvent.click(screen.getByRole('button', { name: /^Meldung 480 von/ }));
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toHaveTextContent(
-      'Das ist der aktuelle Stand. Danach gilt die vorherige Meldung.',
+      'Das ist der aktuelle Stand. Er wird danach aus den übrigen Meldungen bestimmt.',
     );
     const ok = within(dialog).getByRole('button', { name: 'Zurücknehmen' });
     expect(ok).toHaveClass('ant-btn-dangerous');
@@ -292,5 +298,45 @@ describe('MeldeVerlauf · Zurücknehmen', () => {
       expect(screen.getAllByRole('dialog').some((d) => d.textContent?.includes('480'))).toBe(true),
     );
     await waitFor(() => expect(screen.queryByText('Alter Grund')).not.toBeInTheDocument());
+  });
+
+  it('solange die Rücknahme läuft, lässt sich die Rückfrage nicht schließen', async () => {
+    liefere('/bezirke/5/staende', STAENDE);
+    let antworte: (r: Response) => void = () => {};
+    server.use(
+      http.post(
+        `${B}/staende/:id/zuruecknehmen`,
+        () => new Promise<Response>((fertig) => (antworte = fertig)),
+      ),
+    );
+    renderMitProviders(<MeldeVerlauf einsatzId={7} art="bezirk" objektId={5} darfZuruecknehmen />);
+    await screen.findByText('480 evakuiert (gezählt)');
+    await userEvent.click(screen.getByRole('button', { name: /^Meldung 300 von/ }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Zurücknehmen' }));
+    // Abbrechen ist gesperrt, Escape wirkt nicht: sonst ginge ein Fehlschlag danach still verloren.
+    await waitFor(() =>
+      expect(within(dialog).getByRole('button', { name: 'Abbrechen' })).toBeDisabled(),
+    );
+    await userEvent.keyboard('{Escape}');
+    antworte(HttpResponse.json({ error: 'Stelle ist geschlossen' }, { status: 422 }));
+    expect(await within(dialog).findByText('Stelle ist geschlossen')).toBeInTheDocument();
+    expect(dialog.closest('.ant-zoom-leave')).toBeNull();
+  });
+
+  it('nach der Rücknahme liegt der Fokus im Verlauf, nicht auf <body>', async () => {
+    liefere('/bezirke/5/staende', STAENDE);
+    faengeRuecknahme('/staende/:id/zuruecknehmen', () =>
+      HttpResponse.json({ meldung_id: 4, bezirk: {} }),
+    );
+    const { container } = renderMitProviders(
+      <MeldeVerlauf einsatzId={7} art="bezirk" objektId={5} darfZuruecknehmen />,
+    );
+    await screen.findByText('480 evakuiert (gezählt)');
+    await userEvent.click(screen.getByRole('button', { name: /^Meldung 300 von/ }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Zurücknehmen' }));
+    const wurzel = container.querySelector('[data-lfh="melde-verlauf"]');
+    await waitFor(() => expect(document.activeElement).toBe(wurzel));
   });
 });

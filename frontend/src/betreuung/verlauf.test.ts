@@ -88,13 +88,13 @@ describe('Wortlaut', () => {
 
   it('die Rückfrage sagt, ob die Meldung den Stand trägt — ohne eine neue Zahl vorherzusagen', () => {
     expect(rueckfrageHinweis('bezirk', true)).toBe(
-      'Das ist der aktuelle Stand. Danach gilt die vorherige Meldung.',
+      'Das ist der aktuelle Stand. Er wird danach aus den übrigen Meldungen bestimmt.',
     );
     expect(rueckfrageHinweis('bezirk', false)).toBe(
       'Der aktuelle Stand ändert sich dadurch nicht.',
     );
     expect(rueckfrageHinweis('stelle', true)).toBe(
-      'Das ist die aktuelle Belegung. Danach gilt die vorherige Meldung.',
+      'Das ist die aktuelle Belegung. Sie wird danach aus den übrigen Meldungen bestimmt.',
     );
     expect(rueckfrageHinweis('stelle', false)).toBe(
       'Die aktuelle Belegung ändert sich dadurch nicht.',

@@ -584,6 +584,11 @@ describe('pruefeKartenplan()', () => {
       ),
     ).toHaveLength(1);
     expect(pruefeKartenplan({ spalten, karte, aufklappen }, 'Fahrzeuge')).toEqual([]);
+    // Ein Eigenbau gibt `karte.render` roh zurück — dort liefe `aufklappen` still ins Leere.
+    const eigen = { art: 'eigen' as const, render: () => null };
+    expect(
+      meldung(pruefeKartenplan({ spalten, karte: eigen, aufklappen }, 'Fahrzeuge'), 'aufklappen'),
+    ).toHaveLength(1);
   });
 
   /**
@@ -1075,6 +1080,22 @@ describe('Datensicht · Aufklappbereich (LFH-676)', () => {
       if (zu) expect(zu).not.toBeVisible();
     },
   );
+
+  it('tabelle: die Aufklappspalte steht HINTER der Kennung und ist nicht angeheftet', () => {
+    // rc-table übernimmt `fixed` der Nachbarspalte; an Position 0 stünde der beschriftete
+    // Auslöser neben der fixierten Kennung ebenfalls fest — zwei angeheftete Spalten bei 390 px.
+    const { container } = rendere({
+      form: 'tabelle',
+      aufklappen: aufklappenMit((f) => `Reihe von ${f.funkrufname}`),
+    });
+    const zellen = container.querySelectorAll('tr[data-row-key="1"] > td');
+    expect(zellen[0]).toHaveTextContent('Florian 1');
+    expect(within(zellen[1] as HTMLElement).getByRole('button')).toHaveAccessibleName(
+      'Verlauf zu Florian 1',
+    );
+    expect(zellen[1]).not.toHaveClass('ant-table-cell-fix-left');
+    expect(zellen[1]).not.toHaveClass('ant-table-cell-fix-start');
+  });
 
   it('karte: der Inhalt steht in einer Region, auf die der Auslöser zeigt', async () => {
     rendere({ form: 'karte', aufklappen: aufklappenMit((f) => `Reihe von ${f.funkrufname}`) });

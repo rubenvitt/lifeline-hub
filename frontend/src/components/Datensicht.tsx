@@ -1,4 +1,4 @@
-import { Button, Checkbox, Dropdown, Popconfirm, Space, Typography, theme } from 'antd';
+import { Button, Checkbox, Dropdown, Popconfirm, Space, Table, Typography, theme } from 'antd';
 import type { Key, ReactNode } from 'react';
 import type { MenuProps, TableColumnType } from 'antd';
 import { DownOutlined, MoreOutlined, RightOutlined } from '@ant-design/icons';
@@ -487,6 +487,11 @@ export const TIEFE_DECKEL = 3;
 
 // ── Reine Funktionen: hier wohnt die Drift, deshalb exportiert ────────────────────────
 
+/** Zeilenschlüssel als ID-Baustein: ohne Leerraum, damit eine IDREF-Liste nicht zerfällt. */
+function idTeil(k: Key): string {
+  return encodeURIComponent(String(k));
+}
+
 /** Läuft den vollen `dataIndex`-Pfad; `undefined` ohne auflösbaren Bezug. */
 function pfadWert<T>(spalte: DatensichtSpalte<T>, zeile: T): unknown {
   const bezug = spalte.dataIndex;
@@ -768,6 +773,11 @@ export function pruefeKartenplan<T extends object, K extends string>(
   // Zwei Aufklappwege an derselben Tabelle: antd kennt nur EINE Aufklappzeile je Zeile.
   if (aufklappen && aufklappzeile) {
     befunde.push('aufklappen und aufklappzeile schließen sich aus.');
+  }
+  // Ein Eigenbau gibt `karte.render(...)` roh zurück: Auslöser und Bereich entstehen nur im
+  // Plan-Modus. Ein Opt-in, das still nichts tut, wäre von einem kaputten nicht zu unterscheiden.
+  if (aufklappen && karte.art === 'eigen') {
+    befunde.push("aufklappen und karte.art 'eigen' schließen sich aus (Eigenbau rendert roh).");
   }
   return befunde;
 }
@@ -1114,7 +1124,8 @@ export default function Datensicht<T extends object, const K extends string>(
     [],
   );
   // IDs für `aria-controls`/`aria-labelledby` im Kartenzweig. `useId` liefert Doppelpunkte,
-  // die in einer ID erlaubt sind; die Zeilenkennung hängt als String dahinter.
+  // die in einer ID erlaubt sind; die Zeilenkennung hängt kodiert dahinter — ein Schlüssel mit
+  // Leerzeichen (ein Funkrufname) zerbräche sonst die IDREF-Liste von `aria-labelledby`.
   const idPraefix = useId();
   const aufklappAusloeser = (zeile: T, mitRegion: boolean): ReactNode => {
     if (!aufklappen) return null;
@@ -1123,9 +1134,9 @@ export default function Datensicht<T extends object, const K extends string>(
     return (
       <Button
         type="link"
-        id={mitRegion ? `${idPraefix}-auf-${k}` : undefined}
+        id={mitRegion ? `${idPraefix}-auf-${idTeil(k)}` : undefined}
         aria-expanded={offen}
-        aria-controls={mitRegion && offen ? `${idPraefix}-bereich-${k}` : undefined}
+        aria-controls={mitRegion && offen ? `${idPraefix}-bereich-${idTeil(k)}` : undefined}
         aria-label={aufklappen.zugaenglicherName(zeile)}
         onClick={(e) => {
           // Die Tabelle darf den Klick nicht zusätzlich als Zeilenklick lesen.
@@ -1486,7 +1497,22 @@ export default function Datensicht<T extends object, const K extends string>(
 
   const tabelle = (
     <KatalogTabelle<T>
-      columns={antdSpalten}
+      columns={
+        aufklappen
+          ? /*
+             * Die Aufklappspalte HINTER die Kennung, nicht an Position 0: rc-table übernimmt
+             * `fixed` von der Spalte an der Einfügestelle (`useColumns`, „Check if expand
+             * column need to fixed"), und Spalte 0 fixiert `KatalogTabelle`. Vorne stünden bei
+             * 390 px zwei angeheftete Spalten, der beschriftete Auslöser ist breiter als antds
+             * Symbol. Die Konstante ist ein Platzhalter, keine Spalte mit eigenem Typ.
+             */
+            [
+              antdSpalten[0],
+              Table.EXPAND_COLUMN as (typeof antdSpalten)[number],
+              ...antdSpalten.slice(1),
+            ]
+          : antdSpalten
+      }
       dataSource={[...sichtbareZeilen]}
       rowKey={(zeile) => schluessel(zeile)}
       loading={ladend}
@@ -1717,9 +1743,9 @@ export default function Datensicht<T extends object, const K extends string>(
                 {aufklappAusloeser(zeile, true)}
                 {aufgeklappt.includes(schluessel(zeile)) && (
                   <div
-                    id={`${idPraefix}-bereich-${schluessel(zeile)}`}
+                    id={`${idPraefix}-bereich-${idTeil(schluessel(zeile))}`}
                     role="region"
-                    aria-labelledby={`${idPraefix}-auf-${schluessel(zeile)}`}
+                    aria-labelledby={`${idPraefix}-auf-${idTeil(schluessel(zeile))}`}
                   >
                     {aufklappen.inhalt(zeile)}
                   </div>

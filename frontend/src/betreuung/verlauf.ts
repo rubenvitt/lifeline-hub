@@ -87,7 +87,11 @@ export function ruecknahmeName(z: Pick<VerlaufZeile, 'anzahl'>, zeit: string): s
 export function rueckfrageHinweis(art: BetreuungVerlaufArt, aktuell: boolean): string {
   const was = art === 'bezirk' ? 'aktuelle Stand' : 'aktuelle Belegung';
   if (aktuell) {
-    return `Das ist ${art === 'bezirk' ? 'der' : 'die'} ${was}. Danach gilt die vorherige Meldung.`;
+    // Nicht „danach gilt die vorherige Meldung“: ist es die einzige nicht zurückgenommene,
+    // gibt es keine — der Bezirk steht dann ohne Stand da.
+    return art === 'bezirk'
+      ? `Das ist der ${was}. Er wird danach aus den übrigen Meldungen bestimmt.`
+      : `Das ist die ${was}. Sie wird danach aus den übrigen Meldungen bestimmt.`;
   }
   return `${art === 'bezirk' ? 'Der' : 'Die'} ${was} ändert sich dadurch nicht.`;
 }
