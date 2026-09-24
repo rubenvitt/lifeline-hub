@@ -13,7 +13,7 @@ import Datensicht, {
 import StatusTag from '../components/StatusTag';
 import Bereichskopf from '../kommunikation/Bereichskopf';
 import { auslastung, betreuungsstelleStatus } from '../theme/statusFarben';
-import { ART_LABEL, freiePlaetze, personenZahl } from './betreuungText';
+import { ART_LABEL, freiePlaetze, personenZahl, volleStellenSegment } from './betreuungText';
 
 /**
  * Block „Betreuungsstellen" der Betreuungsseite (LFH-639, design.md D7).
@@ -26,6 +26,11 @@ import { ART_LABEL, freiePlaetze, personenZahl } from './betreuungText';
  * Die Auslastung („fast voll", „voll", „überbelegt") erscheint als `StatusTag` neben der
  * Belegung — Farbe nur am Rand, das Wort ist der zweite Kanal (D8, WCAG 1.4.1). Unter 90 % gibt
  * es kein Wort und deshalb auch keine Farbe.
+ *
+ * VOLLE STELLEN IM BLICKFELD (LFH-678): Blockkopf und Seitenkopf nennen „n voll" (voll und
+ * überbelegt, `volleStellen`), weil diese Tabelle ab etwa vier Bezirkskarten unter der Falz
+ * liegt. Die Vorgabesortierung bleibt die Anlagereihenfolge: nach Auslastung sortiert, sprängen
+ * die Zeilen bei jeder Belegungsmeldung unter dem Cursor (Bedien-Leitlinie, Live-Updates).
  *
  * Zeilenaktionen: „Belegung melden" direkt, „Bearbeiten" und „Stornieren" gebündelt im Menü
  * (LFH-365). An einer Stelle ohne Koordinate steht dort zuerst „Auf Karte verorten" (LFH-673):
@@ -240,7 +245,7 @@ export default function StellenBlock({
         meta={
           ladend || stellen.length === 0
             ? undefined
-            : `${kopfzahl}${ohne > 0 ? ` · ${personenZahl(ohne)} ohne Meldung` : ''}`
+            : `${kopfzahl}${volleStellenSegment(stellen)}${ohne > 0 ? ` · ${personenZahl(ohne)} ohne Meldung` : ''}`
         }
         dataUpdatedAt={dataUpdatedAt}
         // Sekundär und im Block, nicht im Kopf: die EINE Primäraktion der Seite ist
