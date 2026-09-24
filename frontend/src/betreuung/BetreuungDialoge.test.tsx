@@ -328,24 +328,60 @@ describe('RaeumungDialog', () => {
     await waitFor(() => expect(onErfassen).toHaveBeenCalledWith({ raeumung: 'geraeumt' }));
   });
 
+  const raeumungDialog = (
+    b: Evakuierungsbezirk,
+    onErfassen: () => Promise<unknown>,
+    onSchliessen = () => {},
+  ) => (
+    <RaeumungDialog
+      bezirk={b}
+      laeuft={false}
+      fehler={null}
+      onErfassen={onErfassen}
+      onSchliessen={onSchliessen}
+    />
+  );
+
+  it('LFH-681: unberührt folgt das Radio dem Live-Stand — Speichern dreht einen fremden Wechsel NICHT zurück', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    const onSchliessen = vi.fn();
+    const { rerender } = renderMitProviders(
+      raeumungDialog(bezirk({ raeumung: 'angeordnet' }), onErfassen, onSchliessen),
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Räumung: Uferstraße 12–40' });
+    rerender(raeumungDialog(bezirk({ raeumung: 'geraeumt' }), onErfassen, onSchliessen));
+    await waitFor(() =>
+      expect(within(dialog).getByRole('radio', { name: 'geräumt' })).toBeChecked(),
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(onSchliessen).toHaveBeenCalled());
+    expect(onErfassen).not.toHaveBeenCalled();
+  });
+
   it('LFH-681: zurück auf den Stand beim Öffnen, nachdem ein Live-Refetch ihn geändert hat, geht als PATCH raus', async () => {
     const onErfassen = vi.fn().mockResolvedValue(undefined);
-    const dialogMit = (b: Evakuierungsbezirk) => (
-      <RaeumungDialog
-        bezirk={b}
-        laeuft={false}
-        fehler={null}
-        onErfassen={onErfassen}
-        onSchliessen={() => {}}
-      />
+    const { rerender } = renderMitProviders(
+      raeumungDialog(bezirk({ raeumung: 'angeordnet' }), onErfassen),
     );
-    const { rerender } = renderMitProviders(dialogMit(bezirk({ raeumung: 'angeordnet' })));
     const dialog = await screen.findByRole('dialog', { name: 'Räumung: Uferstraße 12–40' });
-    // Fremd auf „läuft" gesetzt, der Dialog bleibt offen und zeigt weiter „angeordnet".
-    rerender(dialogMit(bezirk({ raeumung: 'laeuft' })));
-    expect(within(dialog).getByRole('radio', { name: 'angeordnet' })).toBeChecked();
+    rerender(raeumungDialog(bezirk({ raeumung: 'laeuft' }), onErfassen));
+    await waitFor(() => expect(within(dialog).getByRole('radio', { name: 'läuft' })).toBeChecked());
+    await waehle(dialog, 'angeordnet');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(onErfassen).toHaveBeenCalledWith({ raeumung: 'angeordnet' }));
+  });
+
+  it('LFH-681: eine eigene Wahl bleibt stehen, wenn der Live-Stand wechselt (Gegenstück)', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    const { rerender } = renderMitProviders(
+      raeumungDialog(bezirk({ raeumung: 'angeordnet' }), onErfassen),
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Räumung: Uferstraße 12–40' });
+    await waehle(dialog, 'geräumt');
+    rerender(raeumungDialog(bezirk({ raeumung: 'laeuft' }), onErfassen));
+    expect(within(dialog).getByRole('radio', { name: 'geräumt' })).toBeChecked();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(onErfassen).toHaveBeenCalledWith({ raeumung: 'geraeumt' }));
   });
 
   it('LFH-681: steht der gewählte Zustand schon auf dem Server, geht kein PATCH raus', async () => {

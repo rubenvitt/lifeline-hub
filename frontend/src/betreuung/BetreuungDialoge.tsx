@@ -11,7 +11,7 @@ import {
 } from 'antd';
 import { Typography } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
-import { useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type {
   Betreuungsstelle,
   BetreuungsstelleArt,
@@ -62,7 +62,8 @@ import {
  * Öffnen ein (`initialValues` greift nur beim Einhängen), der Vergleich läuft gegen beide:
  * - Räumung hat EIN Feld, und es ist die Absicht selbst → Vergleich gegen den aktuellen Stand.
  *   Gegen den Stand beim Öffnen ginge „zurück auf angeordnet" nach einem fremden Wechsel als
- *   leerer PATCH still verloren.
+ *   leerer PATCH still verloren. Dazu folgt das UNBERÜHRTE Radio dem Live-Stand — sonst
+ *   schriebe ein Speichern ohne Berührung den alten Zustand über den fremden zurück.
  * - Die Mehrfeld-Dialoge vergleichen DREISEITIG (`…PatchDreiseitig`): ein Schlüssel geht nur
  *   raus, wenn die Person ihn geändert hat UND er vom aktuellen Stand abweicht. Gegen den
  *   aktuellen Stand allein trüge jedes unberührte Feld seinen alten Wert hinaus und
@@ -451,7 +452,12 @@ interface RaeumungWerte {
 
 /**
  * Räumungszustand setzen. Umkehrbar (jeder Zustand ist wieder wählbar) — keine Rückfrage.
- * Verglichen wird gegen den AKTUELLEN Zustand (LFH-681): das eine Feld ist die Absicht.
+ *
+ * LIVE (LFH-681): verglichen wird gegen den AKTUELLEN Zustand, und das Radio folgt ihm, solange
+ * die Person es nicht berührt hat. Beides gehört zusammen: „unberührt" und „bewusst zurück auf
+ * den angezeigten Zustand" sind sonst nicht zu unterscheiden — ein Klick auf das schon gewählte
+ * Radio löst keinen Wechsel aus —, und ein gewohnheitsmäßiges Speichern drehte eine fremd
+ * gemeldete Räumung samt ETB-Eintrag zurück. Eine eigene Wahl bleibt stehen (Riegel wie C7).
  */
 export function RaeumungDialog({
   bezirk,
@@ -466,6 +472,13 @@ export function RaeumungDialog({
 }) {
   const [form] = Form.useForm<RaeumungWerte>();
   const [beimOeffnen] = useState(bezirk);
+  const gesehen = useRef(bezirk.raeumung);
+  useEffect(() => {
+    // Nur auf einen WECHSEL reagieren: beim Einhängen trägt `initialValues` den Wert schon.
+    if (gesehen.current === bezirk.raeumung) return;
+    gesehen.current = bezirk.raeumung;
+    if (!form.isFieldTouched('raeumung')) form.setFieldsValue({ raeumung: bezirk.raeumung });
+  }, [form, bezirk.raeumung]);
   return (
     <ErfassungsModal<RaeumungWerte>
       offen

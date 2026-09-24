@@ -642,7 +642,7 @@ describe('BetreuungPage (LFH-639)', () => {
         client.setQueryData(einsatzKeys.betreuung(1), daten);
       });
 
-    it('Räumung zurück auf den Stand beim Öffnen: der PATCH geht raus, statt still zu entfallen', async () => {
+    it('Räumung: der Dialog zeigt den Live-Stand, zurück auf den alten geht als PATCH raus', async () => {
       api.aendereBezirk.mockResolvedValue(UFER);
       const { client } = renderPage();
       await userEvent.click(
@@ -652,8 +652,12 @@ describe('BetreuungPage (LFH-639)', () => {
         within(await offenesMenue()).getByRole('menuitem', { name: /Räumung setzen/ }),
       );
       const dialog = await dialogMit('Räumung: Uferstraße 12–40');
-      // Fremd auf „geräumt" gesetzt; die Person bestätigt „läuft", wie der Dialog es zeigt.
+      // Fremd auf „geräumt" gesetzt: der Dialog zeigt es, die Person wählt zurück auf „läuft".
       liveStand(client, { ...MIT_DATEN, bezirke: [{ ...UFER, raeumung: 'geraeumt' }, HAFEN] });
+      await waitFor(() =>
+        expect(within(dialog).getByRole('radio', { name: 'geräumt' })).toBeChecked(),
+      );
+      await userEvent.click(within(dialog).getByRole('radio', { name: 'läuft' }).closest('label')!);
       await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
       await waitFor(() =>
         expect(api.aendereBezirk).toHaveBeenCalledWith(1, 5, { raeumung: 'laeuft' }),
