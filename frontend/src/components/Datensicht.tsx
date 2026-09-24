@@ -472,7 +472,7 @@ export interface DatensichtProps<T extends object, K extends string> {
    * ausgeschlossener Name verschwindet. Nur im Tabellenzweig; schließt `baum` aus.
    *
    * Nur noch für den Bestand (Besatzung der Fahrzeugseite). Neues nimmt {@link aufklappen},
-   * das beschriftet ist und in beiden Zweigen läuft.
+   * das beschriftet ist und in beiden Zweigen läuft. Umstellung und Streichen: LFH-697.
    */
   aufklappzeile?: (zeile: T) => ReactNode;
   /** Beschrifteter Aufklappbereich in beiden Zweigen (LFH-676); schließt `baum` und `aufklappzeile` aus. */

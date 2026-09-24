@@ -126,8 +126,8 @@ aufklappen?: {
   Knopf, der „Aktionen zu …“ heißt.
 - **Verworfen:** `aufklappzeile` selbst auf ein Objekt umstellen. Das träfe die
   Besatzungs-Aufklappzeile der Fahrzeugseite mitten in einem Betreuungs-Ticket. Die
-  Umstellung und das Streichen von `aufklappzeile` werden als Nachzug auf dem Board
-  angelegt, damit es nicht dauerhaft zwei Aufklappwege gibt.
+  Umstellung und das Streichen von `aufklappzeile` stehen als Nachzug LFH-697 auf dem Board,
+  damit es nicht dauerhaft zwei Aufklappwege gibt.
 
 ### D4 — Laden beim Aufklappen, Schlüssel unter dem Präfix `betreuung`
 

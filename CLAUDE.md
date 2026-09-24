@@ -206,6 +206,21 @@ Setzen der Zuordnung ohne Modulrecht ist 403, Storno löst die Flächen im selbe
 `0119` ist der erste Rebuild von `lage_zone`. Herleitung:
 `openspec/changes/lfh-673-betreuung-auf-der-lagekarte/design.md`.
 
+**Meldeverlauf der Betreuung (LFH-676).** `GET …/bezirke/{bid}/staende` und
+`…/stellen/{sid}/belegungen` liefern die ganze Reihe samt zurückgenommener Meldungen, in der
+Ordnung von `juengste_meldung!` (`meldereihenfolge!` in `src/betreuung/repo.rs`). `aktuell`
+kommt aus dem **Zeiger** am Objekt, nie aus einer zweiten Rechnung, auch nicht im Client. Ein
+fremdes Objekt ist 404, bevor die Reihe gelesen wird, sonst sähe „fremd“ aus wie „ohne
+Meldung“. **Nachgetragen heißt im Verlauf ≥ 60 s zwischen Zeitpunkt und Erfassung**
+(`istNachgetragen`, dieselbe Schwelle wie das ⧖ im ETB). Die Nachtragung im Sinn von
+LFH-639 D5 („vor dem damals aktuellen“) ist nicht gespeichert. Die Rücknahme aus dem
+Verlauf ist unumkehrbar und hat deshalb eine Rückfrage. Sie läuft über eine **eigene**
+Mutation in `betreuung/MeldeVerlauf.tsx`: die der Seite melden über `SeitenHinweise`, der
+Grund stünde sonst doppelt. Der Aufklappweg ist `Datensicht.aufklappen`: beschriftet, mit
+Zeilenkennung im Namen, in Karte **und** Tabelle mit einem Zustand, Inhalt erst beim
+Aufklappen gerendert. Die Bestands-Prop `aufklappzeile` (antds 16-px-Symbol, nur Tabelle)
+verschwindet mit LFH-697. Herleitung: `openspec/changes/lfh-676-betreuung-meldeverlauf/design.md`.
+
 **Sichtung ist eine eigene fachliche Farbachse am selben zentralen Ort**, keine A0-Rolle.
 `SichtungsTag` zeigt die feste Kennzeichnung aus `tokens.ts` als umrandetes Farbfeld:
 SK I rot, II gelb, III grün, IV blau, Tote schwarz; „unverletzt“ ohne erfundene Fachfarbe
