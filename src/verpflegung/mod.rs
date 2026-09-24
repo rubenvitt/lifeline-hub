@@ -34,9 +34,11 @@ pub mod repo;
 
 // ── Sonderkost ──────────────────────────────────────────────────────────────────────────────
 
-/// Anzahl EP je Kostform. Der Satz der Kostformen ist fest (design.md D1) — eine sechste
-/// Kostform ist eine additive Spalte und ein Feld mehr hier, im generierten Typ damit
-/// exhaustiv sichtbar. Der Rest bis zur Gesamtzahl ist Normalkost.
+/// Anzahl EP je Kostform, ohne Personenbezug. Der Satz der Kostformen ist fest; der Rest bis
+/// zur Gesamtzahl ist Normalkost.
+//
+// Eine sechste Kostform ist eine additive Spalte und ein Feld mehr hier, im generierten Typ
+// damit exhaustiv sichtbar (design.md D1).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, ToSchema)]
 pub struct Sonderkost {
     pub vegetarisch: i64,
@@ -165,7 +167,8 @@ pub struct AusgabeAnzeige {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bemerkung: Option<String>,
     pub sonderkost: Sonderkost,
-    /// Verweis auf eine Nachforderung desselben Einsatzes — nur die Kennung (design.md D4).
+    /// Verweis auf eine Nachforderung desselben Einsatzes — nur die Kennung, keine Angaben
+    /// der Nachforderung.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub nachforderung_id: Option<i64>,
     /// Gesetzt, wenn die Ausgabe zurückgenommen ist; sie zählt dann nicht mehr mit.
