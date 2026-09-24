@@ -82,8 +82,9 @@ describe('OfflineDownloadUrlModal — Hülle (LFH-346/A6)', () => {
    * LFH-376 — die Zusicherung, wegen der die Maske auf der Hülle steht (Befund H69
    * aus LFH-332/B4): Enter in einem einzeiligen Feld sendet ab. Die Strukturprobe
    * oben (Knopf im `<form>`) ist nur die Ursache; dieser Test belegt die Wirkung.
-   * Getippt wird die Attribution ZUERST, weil sie eine Textarea ist und Enter dort
-   * umbricht — der Absende-Weg läuft über die URL.
+   * Die Attribution ist Pflicht und muss vor dem Enter stehen; sie wird ZUERST
+   * getippt, weil der Absende-Weg nicht über sie laufen kann — sie ist eine
+   * Textarea, Enter bricht dort um. Abgesendet wird aus der URL.
    */
   it('Enter im URL-Feld startet den Download', async () => {
     const gesendet = vi.fn();
