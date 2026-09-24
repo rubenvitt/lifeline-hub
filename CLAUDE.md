@@ -148,9 +148,12 @@ umkehrt, steht das am Absatz selbst mit „Neuentwurf 22.09.2026".
 - **Keine erfundenen Daten.** Was der Entwurf zeigt, aber keine Datenquelle hat, wird
   weggelassen — nicht als Platzhalter gebaut — und steht im ClickUp-Epic „Neuentwurf
   Instrumententafel – Datenlücken des Designs" (LFH-606…LFH-617, z. B. Evakuiert 607,
-  FMS-Status je Einheit 609, Koordinate an der Person 613). Bei Evakuiert ist die Datenquelle
-  seit LFH-639 da; eingetragen wird sie mit LFH-607 auf Lageplatz B (LFH-640). Die Auslassung
-  trägt ihr Ticket im Code-Kommentar und wird im Test als **Abwesenheit** gepinnt. **Eingelöst ist der Pegel (LFH-606):** er steht auf Platz 1
+  FMS-Status je Einheit 609, Koordinate an der Person 613). Die Auslassung trägt ihr Ticket
+  im Code-Kommentar und wird im Test als **Abwesenheit** gepinnt. **Eingelöst ist Evakuiert
+  (LFH-607):** Lageplatz B zeigt „Evakuiert N · von M geplant“, sobald ein Evakuierungsbezirk
+  aktiv ist (nicht storniert, nicht aufgehoben — dasselbe Prädikat wie `istAktiverBezirk`,
+  als Auslöser `evakuiert` am Einsatz); ohne Zugriff auf das Modul Betreuung bleibt die Zelle
+  stehen, ohne Zahl und ohne Link (Change `openspec/changes/lfh-607-kennzahl-evakuiert/`). **Eingelöst ist der Pegel (LFH-606):** er steht auf Platz 1
   des Kennzahlenbands, „Höchste Warnstufe" ist dafür raus (Entscheidung 22.09.2026; die
   Warnstufe bleibt im Seitenkopf-Hinweis und in der Gefahrenmatrix). **Seit LFH-640 nur bei
   festgelegtem Pegel:** das Band hat immer sechs Plätze, vier Kernplätze und zwei Lageplätze;

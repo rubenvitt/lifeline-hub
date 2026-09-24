@@ -55,7 +55,8 @@
  * `docs/superpowers/specs/2026-09-23-lfh-640-lagebezogene-kennzahlreihe-design.md`) hat das
  * Band sechs Plätze: Kern auf 2/4/5/6 (Betroffene, Kräfte, Vermisste, Einsatzdauer),
  * Lageplätze auf 1 und 3. Platz 1 zeigt den Pegel, wenn einer festgelegt ist, sonst
- * „Verbleib offen"; Platz 3 zeigt „Schäden offen" (LFH-607 trägt dort „Evakuiert" ein).
+ * „Verbleib offen"; Platz 3 zeigt „Evakuiert", wenn eine Evakuierung angeordnet ist (LFH-607),
+ * sonst „Schäden offen".
  * Das ERSETZT die LFH-606-Festlegung „ohne Pegel bleibt der Platz belegt": beim MANV war
  * „kein Pegel festgelegt" eine Aufforderung ins Leere. Festgelegt wird weiter in den
  * Einsatz-Einstellungen und im Fachebenen-Inspektor der Lagekarte.
@@ -65,10 +66,13 @@
  * Zuschnitt: kommt während der Betrachtung ein neuer an, tauscht die Reihe nicht unter dem
  * Blick, sondern ein Sammelbanner bietet ihn an („übernehmen").
  *
- * Noch nicht im Band: Evakuiert. Die Datenquelle gibt es seit LFH-639
- * (`betreuung/useEvakuierungKennzahl.ts`, gegatet wie der Modulzähler); den Platz hat LFH-640
- * festgelegt (Lageplatz B, siehe oben), eingetragen wird sie mit LFH-607. Der erwartete
- * Höchststand am Leitpegel (LFH-628) steht als Teil der Pegel-Notiz („Prognose 7,10 m bis
+ * „Evakuiert N · von M geplant" (LFH-607) liest die Betreuungs-Übersicht über
+ * `betreuung/useEvakuierungKennzahl.ts` — dieselbe Abfrage wie Modulseite und Modulzähler,
+ * gegatet wie der Zähler. Der PLATZ hängt trotzdem am Einsatz (`lagekennzahlen`), nicht an
+ * dieser Abfrage und nicht am Modulrecht: wer Betreuung nicht sehen darf, sieht auf Platz 3
+ * „Evakuiert" ohne Zahl und ohne Link, mit dem Grund — nie eine andere Kennzahl, sonst hinge
+ * die Reihe am Rollenzuschnitt und an einer zweiten, nicht live gehaltenen Abfrage. Der
+ * erwartete Höchststand am Leitpegel (LFH-628) steht als Teil der Pegel-Notiz („Prognose 7,10 m bis
  * 18:00"), solange sein Zeitpunkt aussteht — die Ableitung liegt in `pegel/pegelKennzahl.ts`.
  * „Transportiert / offen" im Sichtungsfuß und die Notiz „n seit über 4 h" an „Vermisste"
  * gibt es seit LFH-613 (strukturierter Verbleib, `vermisst_seit`); die Notiz zieht mit dem
@@ -88,6 +92,7 @@ import { TbAlertTriangle } from 'react-icons/tb';
 import { einsatzKeys } from '../../api/queryKeys';
 import {
   auftraegePfad,
+  betreuungPfad,
   einsatzModulPfad,
   etbPfad,
   gefahrenPfad,
@@ -134,18 +139,23 @@ import { warnstufeKennzahl } from '../../theme/statusFarben';
 import {
   KENNZAHL_PLAETZE,
   baueLagebild,
+  evakuierungDatenzustand,
+  evakuierungStand,
   kennzahlReihe,
   lagebildZeit,
   reihenWechsel,
   standText,
   warnstufeTon,
   type Datenzustand,
+  type EvakuierungStand,
   type KennzahlEtikett,
 } from './lagebild';
 import { sichtungsZeilen, verdichteGefahrenmatrix } from './lageVerdichtung';
 import { STROM_ABRUF, stromAuswahl, wassermarkeNachziehen } from './meldungsstrom';
 import { GefahrenmatrixPaneel, MeldungsstromPaneel, SichtungsPaneel } from './LagePaneele';
 import { transportBilanz } from '../../personen/personenBilanz';
+import { useEvakuierungKennzahl } from '../../betreuung/useEvakuierungKennzahl';
+import { darfZaehlerZeigen } from '../../einsatz/useModulZaehler';
 
 /** Verdichtet mehrere Queries auf einen Zustand. Fehler schlägt Laden: ein halb geladener
  *  Block mit einem toten Teil darf nicht so aussehen, als wäre er vollständig. */
@@ -255,7 +265,7 @@ export default function LageDashboardPage() {
   // LFH-633: die Pegel-Kennzahl führt auf „Wetter & Pegel", wenn das Modul für diese Person
   // frei ist — sonst auf die Pflege. Bis die Overrides da sind, gilt die Pflege: ein Link auf
   // ein womöglich ausgeblendetes Modul wäre ein Sprung ins Leere.
-  const { benutzer } = useAuth();
+  const { benutzer, laedt: authLaedt } = useAuth();
   const overridesQuery = useQuery({
     queryKey: einsatzKeys.modulOverrides(einsatzId),
     queryFn: () => ladeModulOverrides(einsatzId),
@@ -264,6 +274,28 @@ export default function LageDashboardPage() {
     einsatzId,
     overridesQuery.isSuccess && istKeyFreigegeben('wetter-pegel', benutzer, overridesQuery.data),
   );
+  // LFH-607: „Evakuiert N · von M geplant" aus der Betreuungs-Übersicht. Erst `bereit`, wenn
+  // Benutzer und Modul-Overrides FESTSTEHEN: vorher kein Abruf (bei ausgeblendetem Modul ein
+  // 403), kein kurz aufblitzendes „nicht freigegeben" und kein Link. Scheitert der
+  // Overrides-Abruf, bleibt das Recht unbekannt — die Zelle zeigt dann „Stand unbekannt" und
+  // fragt nicht trotzdem nach.
+  const freigabenBekannt = !authLaedt && overridesQuery.isSuccess;
+  const evakuierungZustand = useEvakuierungKennzahl({
+    einsatzId,
+    benutzer,
+    overrides: overridesQuery.data,
+    bereit: freigabenBekannt,
+  });
+  const freigabenFehler = overridesQuery.isError;
+  const evakuierung = useMemo(
+    (): EvakuierungStand =>
+      freigabenFehler ? { zustand: 'fehler' } : evakuierungStand(evakuierungZustand),
+    [freigabenFehler, evakuierungZustand],
+  );
+  const evakuierungZiel =
+    freigabenBekannt && darfZaehlerZeigen('betreuung', benutzer, overridesQuery.data)
+      ? betreuungPfad(einsatzId)
+      : undefined;
 
   const einsatz = einsatzQuery.data;
 
@@ -323,6 +355,8 @@ export default function LageDashboardPage() {
         meldungen: meldungenQuery.data ?? [],
         pegel: pegelQuery.data ?? [],
         pegelZiel,
+        evakuierung,
+        evakuierungZiel,
       },
       jetzt,
       konv,
@@ -347,6 +381,8 @@ export default function LageDashboardPage() {
     meldungenQuery.data,
     pegelQuery.data,
     pegelZiel,
+    evakuierung,
+    evakuierungZiel,
   ]);
 
   // ── Meldungsstrom: Wassermarke statt Einschieben (Festlegung 6) ──────────────────────
@@ -399,6 +435,7 @@ export default function LageDashboardPage() {
     Betroffene: zBetroffene,
     Kräfte: zKraefte,
     Vermisste: zBetroffene,
+    Evakuiert: evakuierungDatenzustand(evakuierung),
     'Schäden offen': zustandVon(schaedenQuery),
     Einsatzdauer: zustandVon(einsatzQuery),
   };
@@ -517,7 +554,9 @@ export default function LageDashboardPage() {
                   notiz={k.notiz}
                   ton={k.ton}
                   zustand={alsKennzahlZustand(kennzahlZustand[k.etikett])}
-                  ziel={k.zielPfad ?? einsatzModulPfad(einsatzId, k.route)}
+                  ziel={
+                    k.ohneZiel ? undefined : (k.zielPfad ?? einsatzModulPfad(einsatzId, k.route))
+                  }
                 />
               ))}
         </Kennzahlenband>
