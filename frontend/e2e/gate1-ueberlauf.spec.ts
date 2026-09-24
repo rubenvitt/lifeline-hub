@@ -571,6 +571,36 @@ test('Gate 1: keine tragende Route läuft auf 1366, 1024 oder 390 px waagerecht 
       'Stelle',
     );
     await post(`betreuung/stellen/${stelle.id}/belegungen`, { belegt: 1420 }, 'Belegung');
+
+    // LFH-634: ein LAUFENDES Zeitfenster (Beginn vor einer Stunde, Ende in drei — sonst stünde
+    // die Karte unter „vergangen" und der Anker fehlte) mit langer Bezeichnung, belegter
+    // Sonderkost und einer Ausgabe mit langem, mehrwortigem Ort samt Bemerkung: die
+    // Ausgabezeile (`120 EP · Ort · Sonderkost`) ist die breiteste Zeile der Karte. Namen OHNE
+    // den Modulnamen (die Palette durchsucht Module und Datensätze gemeinsam).
+    const jetzt = Date.now();
+    const zeitfenster = await post(
+      'verpflegung/zeitfenster',
+      {
+        bezeichnung: 'Mittagessen Deichverteidigung Nordwestring Kilometer 4,7 bis 6,2',
+        von_at: new Date(jetzt - 3_600_000).toISOString(),
+        bis_at: new Date(jetzt + 3 * 3_600_000).toISOString(),
+        bedarf_kraefte: 180,
+        bedarf_betreute: 240,
+        bedarf_weitere: 35,
+        sonderkost: { vegetarisch: 40, vegan: 12, diaet_allergenarm: 6, saeugling_kleinkind: 4 },
+      },
+      'Zeitfenster',
+    );
+    await post(
+      `verpflegung/zeitfenster/${zeitfenster.id}/ausgaben`,
+      {
+        menge: 120,
+        ort: 'Ausgabestelle Mehrzweckhalle Gesamtschule Musterstadt-Nordwest, Eingang Deichweg',
+        sonderkost: { vegetarisch: 20, vegan: 4 },
+        bemerkung: 'Anlieferung durch Feldküche Ortsverband Musterstadt-Nordwest, Rest folgt',
+      },
+      'Ausgabe',
+    );
   }
   // LFH-633: Wetter per Stub — sonst ginge das Backend an Bright Sky, sobald der Einsatz
   // einen Ort hat. Langer Gemeindename als Querlauf-Stoff; die Pegel bleiben echt (leer).
@@ -707,6 +737,15 @@ test('Gate 1: keine tragende Route läuft auf 1366, 1024 oder 390 px waagerecht 
         p
           .getByRole('region', { name: 'Evakuierungsbezirke' })
           .getByText('Uferstraße 12–40 und Deichweg 1–9 zwischen Schleuse und Pumpwerk Nordwest'),
+    },
+    {
+      // LFH-634: Datenanker ist die Karte des gesäten Zeitfensters. Ihr zugänglicher Name
+      // trägt hinter der Bezeichnung den Zeitraum in der Anzeigezone — Präfix statt Wortlaut.
+      pfad: `/einsaetze/${einsatzId}/verpflegung`,
+      anker: (p: Page) =>
+        p.getByRole('article', {
+          name: /^Zeitfenster Mittagessen Deichverteidigung Nordwestring Kilometer 4,7 bis 6,2 /,
+        }),
     },
   ];
 

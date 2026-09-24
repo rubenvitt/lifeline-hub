@@ -1404,6 +1404,160 @@ test('Betreuung: Karten- und Zeilenaktionen folgen der Dichte-Staffel 30 / 48 / 
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
+// ── Verpflegung (LFH-634) ─────────────────────────────────────────────────────────────
+//
+// Die Karte (`verpflegung/ZeitfensterKarte.tsx`) trägt KEIN handgebautes Bedienziel: „Ausgabe
+// erfassen", der Dreipunkt-Auslöser, „Bedarf bearbeiten" und „Zurücknehmen" an der
+// Ausgabenzeile sind antd-`Button` und erben `controlHeight`. Gemessen wird trotzdem, weil
+// beide Aktionsorte eigene Flex-Hüllen sind (Aktionszeile der Karte, Aktionsspalte des
+// `Zeitachseneintrag`) — ein `align-items`/Schrumpfen dort drückte die Knöpfe unter den Boden,
+// ohne dass eine Größen-Prop im Quelltext stünde.
+//
+// ZWEI Karten, damit BEIDE Aktionsformen stehen (LFH-365, gezählt nach der Rechteprüfung):
+//  - „Frühstück Deich": Fehlmenge, begonnen, KEINE Ausgabe → erfassen · bearbeiten · löschen
+//    (+ nachfordern, sobald die Modul-Overrides geladen sind) — drei oder mehr, also Menü.
+//    Bewusst OHNE gültige Ausgabe: sonst hinge die dritte Aktion allein an „Nachfordern" und
+//    damit an einer Abfrage, die nach dem ersten Bild eintrifft; die Knopfzahl wäre dann vom
+//    Zeitpunkt der Messung abhängig.
+//  - „Mittag Deich": gedeckt durch ZWEI gültige Ausgaben → erfassen · „Bedarf bearbeiten" als
+//    zweiter Knopf, dazu zwei „Zurücknehmen" (eine Schleife über die Zeilen, nicht ein Knoten).
+// Namen OHNE den Modulnamen (die Palette durchsucht Module und Datensätze gemeinsam), und
+// jeder Namens-Regex endet mit dem Leerzeichen vor dem Zeitraum der Kennung.
+
+test('Verpflegung: Kartenaktionen folgen der Dichte-Staffel 30 / 48 / 72 px', async ({ page }) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Essen`);
+
+  const post = async (pfad: string, data: unknown, was: string) => {
+    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/verpflegung/${pfad}`, {
+      data,
+    });
+    expect(
+      antwort.ok(),
+      `Seeding ${was}: ${antwort.status()} ${await antwort.text()}`,
+    ).toBeTruthy();
+    return (await antwort.json()) as { id: number };
+  };
+  const jetzt = Date.now();
+  const zeit = (minuten: number) => new Date(jetzt + minuten * 60_000).toISOString();
+  await post(
+    'zeitfenster',
+    {
+      bezeichnung: 'Frühstück Deich',
+      von_at: zeit(-30),
+      bis_at: zeit(90),
+      bedarf_kraefte: 60,
+      bedarf_betreute: 20,
+    },
+    'Zeitfenster Frühstück',
+  );
+  const mittag = await post(
+    'zeitfenster',
+    {
+      bezeichnung: 'Mittag Deich',
+      von_at: zeit(-10),
+      bis_at: zeit(110),
+      bedarf_kraefte: 30,
+      bedarf_betreute: 10,
+    },
+    'Zeitfenster Mittag',
+  );
+  for (const minuten of [-8, -4]) {
+    await post(
+      `zeitfenster/${mittag.id}/ausgaben`,
+      { menge: 20, zeitpunkt_at: zeit(minuten), ort: 'Feldküche Nord' },
+      'Ausgabe',
+    );
+  }
+
+  const gemessen: string[] = [];
+  for (const { dichte, soll } of STAFFEL) {
+    await page.goto(`/einsaetze/${einsatzId}/verpflegung`);
+    await stelleDichte(page, dichte);
+
+    const fruehstueck = page.getByRole('article', { name: /^Zeitfenster Frühstück Deich / });
+    const mittagKarte = page.getByRole('article', { name: /^Zeitfenster Mittag Deich / });
+    await expect(page.locator('[data-lfh="verpflegung-karte"]')).toHaveCount(2);
+    await expect(fruehstueck).toHaveAttribute('data-einstufung', 'unterdeckung');
+    await expect(mittagKarte).toHaveAttribute('data-einstufung', 'gedeckt');
+
+    const erfassen = page.getByRole('button', { name: /^Ausgabe erfassen zu \S.* / });
+    const menue = fruehstueck.getByRole('button', {
+      name: /^Aktionen zu Zeitfenster Frühstück Deich /,
+    });
+    const bearbeiten = mittagKarte.getByRole('button', {
+      name: /^Bedarf bearbeiten zu Mittag Deich /,
+    });
+    const zuruecknehmen = mittagKarte.getByRole('button', {
+      name: /^Zurücknehmen: Ausgabe 20 EP um \d\d:\d\d zu Mittag Deich /,
+    });
+    // GENAUE Zahlen vor der Messung (Muster Betreuung): `alleHaltenStufe` prüft nur eine
+    // Untergrenze. Ohne diese Zeilen bliebe grün, wenn die gedeckte Karte doch ein Menü trüge
+    // oder die Menü-Karte ihre Aktionen zusätzlich als Knöpfe zeigte.
+    await expect(erfassen).toHaveCount(2);
+    await expect(menue).toHaveCount(1);
+    await expect(fruehstueck.getByRole('button', { name: /^Bedarf bearbeiten zu / })).toHaveCount(
+      0,
+    );
+    await expect(bearbeiten).toHaveCount(1);
+    await expect(mittagKarte.getByRole('button', { name: /^Aktionen zu / })).toHaveCount(0);
+    await expect(zuruecknehmen).toHaveCount(2);
+
+    const primaer = await alleHaltenStufe(erfassen, soll, `Ausgabe erfassen (${dichte})`, 2);
+    const dreipunkt = await haeltStufe(menue, soll, `Dreipunkt (${dichte})`);
+    const zweiter = await haeltStufe(bearbeiten, soll, `Bedarf bearbeiten (${dichte})`);
+    const zurueck = await alleHaltenStufe(zuruecknehmen, soll, `Zurücknehmen (${dichte})`, 2);
+    const kopf = await haeltStufe(
+      page
+        .locator('[data-lfh="seitenkopf-aktionen"]')
+        .getByRole('button', { name: 'Zeitfenster anlegen', exact: true }),
+      soll,
+      `Kopfaktion (${dichte})`,
+    );
+
+    // Abstand Kartenaktion ↔ Nachbar: im Handschuh-Betrieb ≥ 16 px (MIL-STD-1472F Fig. 24
+    // [abgeleitet], Prüfliste Kriterium 2). Waagerecht in der Aktionszeile wie bei Ablösung;
+    // „Zurücknehmen" gegen JEDES andere Bedienziel der Karte (die zweite Ausgabe darunter,
+    // „Ausgabe erfassen" in der Aktionszeile).
+    const luecke = async (links: Locator, rechts: Locator) => {
+      const l = (await links.boundingBox())!;
+      const r = (await rechts.boundingBox())!;
+      return Math.round(r.x - (l.x + l.width));
+    };
+    const lueckeMenue = await luecke(
+      fruehstueck.getByRole('button', { name: /^Ausgabe erfassen zu / }),
+      menue,
+    );
+    const lueckeKnopf = await luecke(
+      mittagKarte.getByRole('button', { name: /^Ausgabe erfassen zu / }),
+      bearbeiten,
+    );
+    const lueckeZurueck = Math.round(await abstandZuNachbarn(mittagKarte, zuruecknehmen.first()));
+    if (dichte === 'handschuh') {
+      expect(
+        lueckeMenue,
+        `Abstand „Ausgabe erfassen" ↔ Dreipunkt (handschuh, gemessen ${lueckeMenue}px)`,
+      ).toBeGreaterThanOrEqual(16);
+      expect(
+        lueckeKnopf,
+        `Abstand „Ausgabe erfassen" ↔ „Bedarf bearbeiten" (handschuh, gemessen ${lueckeKnopf}px)`,
+      ).toBeGreaterThanOrEqual(16);
+      expect(
+        lueckeZurueck,
+        `Abstand „Zurücknehmen" ↔ nächstes Ziel der Karte (handschuh, gemessen ${lueckeZurueck}px)`,
+      ).toBeGreaterThanOrEqual(16);
+    }
+    gemessen.push(
+      `${dichte} (Soll ≥ ${soll}): Ausgabe erfassen ${primaer}, Dreipunkt ${dreipunkt}, ` +
+        `Bedarf bearbeiten ${zweiter}, Zurücknehmen ${zurueck}, Kopf ${kopf}, ` +
+        `Abstand Menü ${lueckeMenue}, Abstand Knopf ${lueckeKnopf}, Abstand Zurücknehmen ${lueckeZurueck}`,
+    );
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
 // ─── Betroffene (LFH-650, Nachzug zur LFH-613-Prüfliste, Tabellen 1, 3 und 4, Nr. 1 · 2) ──
 //
 // Vier Flächen, alle mit denselben Helfern wie oben:
