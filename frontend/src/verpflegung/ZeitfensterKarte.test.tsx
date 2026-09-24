@@ -222,14 +222,14 @@ describe('ZeitfensterKarte — Aktionen (LFH-365)', () => {
     expect(screen.queryByRole('button', { name: /^Aktionen zu/ })).toBeNull();
   });
 
-  it('Fehlmenge nur in einer Kostform bietet kein Nachfordern an (Anzahl 0 wäre unbrauchbar)', () => {
-    zeige(
-      zeitfenster({
-        ausgegeben: { gesamt: 250, sonderkost: KEINE_SONDERKOST },
-        fehlmenge: { gesamt: 0, sonderkost: { ...KEINE_SONDERKOST, vegan: 3 } },
-      }),
-    );
-    expect(screen.queryByRole('button', { name: /Nachfordern/ })).toBeNull();
-    expect(screen.queryByRole('button', { name: /^Aktionen zu/ })).toBeNull();
+  it('Fehlmenge nur in einer Kostform bietet Nachfordern an (Spec: Fehlmenge je Kostform)', async () => {
+    const zf = zeitfenster({
+      ausgegeben: { gesamt: 250, sonderkost: KEINE_SONDERKOST },
+      fehlmenge: { gesamt: 0, sonderkost: { ...KEINE_SONDERKOST, vegan: 3 } },
+    });
+    const { props } = zeige(zf);
+    const menue = await oeffneMenue();
+    await userEvent.click(within(menue).getByText('Nachfordern'));
+    expect(props.onNachfordern).toHaveBeenCalledWith(zf);
   });
 });

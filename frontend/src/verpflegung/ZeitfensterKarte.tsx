@@ -19,6 +19,7 @@ import { deckungEinstufung } from './deckung';
 import {
   KOSTFORM_LABEL,
   belegteKostformen,
+  nachforderungsAnzahl,
   sonderkostText,
   uhrzeit,
   zeitfensterKennung,
@@ -105,7 +106,7 @@ export default function ZeitfensterKarte({
         onBearbeiten && { key: 'bearbeiten', label: 'Bedarf bearbeiten' },
         onNachfordern &&
           nachforderungenFrei &&
-          zf.fehlmenge.gesamt > 0 && { key: 'nachfordern', label: 'Nachfordern' },
+          nachforderungsAnzahl(zf) > 0 && { key: 'nachfordern', label: 'Nachfordern' },
         onLoeschen && !hatGueltigeAusgabe && { key: 'loeschen', label: 'Löschen', danger: true },
       ].filter(Boolean) as Aktion[])
     : [];

@@ -89,19 +89,35 @@ export function sonderkostText(sk: Sonderkost): string {
 }
 
 /**
- * Vorbelegung der Nachforderung aus einer Fehlmenge (design.md D9). `null` ohne Fehlmenge
- * GESAMT: eine Fehlmenge nur in einer Kostform ergäbe Anzahl 0, und die verwirft
- * `parseNachforderungVorbelegung` ganz — der Sprung öffnete dann eine leere Erfassung.
+ * Anzahl, die eine Nachforderung für dieses Zeitfenster anfordert: die Gesamtfehlmenge, bei
+ * einer Fehlmenge nur in Kostformen (Gesamtmenge gedeckt, aber z. B. 3 vegan fehlen) deren
+ * Summe. Sonderkost ist eine Teilmenge der EP (Spec), die fehlenden Kostformen stecken also in
+ * der Gesamtfehlmenge, wenn es eine gibt. 0 heißt: nichts nachzufordern.
+ */
+export function nachforderungsAnzahl(zf: VerpflegungZeitfenster): number {
+  const sonderkost = KOSTFORMEN.reduce((s, k) => s + zf.fehlmenge.sonderkost[k], 0);
+  return Math.max(zf.fehlmenge.gesamt, sonderkost);
+}
+
+/**
+ * Vorbelegung der Nachforderung aus einer Fehlmenge (design.md D9). `null` ohne jede
+ * Fehlmenge. Fehlende Sonderkost steht in der Begründung — sonst ginge sie auf dem Weg in die
+ * Nachforderung verloren, obwohl die Karte sie als Unterdeckung zeigt.
  */
 export function nachforderungVorbelegung(
   zf: VerpflegungZeitfenster,
   konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
 ): NachforderungVorbelegung | null {
-  if (zf.fehlmenge.gesamt <= 0) return null;
+  const anzahl = nachforderungsAnzahl(zf);
+  if (anzahl <= 0) return null;
+  const fehlend = KOSTFORMEN.filter((k) => zf.fehlmenge.sonderkost[k] > 0).map(
+    (k) => `${zf.fehlmenge.sonderkost[k]} ${KOSTFORM_LABEL[k]}`,
+  );
+  const sonderkost = fehlend.length > 0 ? ` Es fehlt Sonderkost: ${fehlend.join(', ')}.` : '';
   return {
     art: 'Verpflegung',
     bezeichnung: `Essensportionen ${zitat(zf.bezeichnung)} ${uhrzeitenText(zf, konv)}`,
-    anzahl: zf.fehlmenge.gesamt,
-    begruendung: `Unterdeckung Verpflegung ${zitat(zf.bezeichnung)}: Bedarf ${zf.bedarf.gesamt}, ausgegeben ${zf.ausgegeben.gesamt}.`,
+    anzahl,
+    begruendung: `Unterdeckung Verpflegung ${zitat(zf.bezeichnung)}: Bedarf ${zf.bedarf.gesamt}, ausgegeben ${zf.ausgegeben.gesamt}.${sonderkost}`,
   };
 }

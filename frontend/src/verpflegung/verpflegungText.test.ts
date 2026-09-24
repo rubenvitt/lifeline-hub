@@ -85,11 +85,42 @@ describe('nachforderungVorbelegung (design.md D9)', () => {
     expect(parseNachforderungVorbelegung(params)).toStrictEqual(v);
   });
 
-  it('ohne Fehlmenge gesamt keine Vorbelegung — auch wenn nur Sonderkost fehlt', () => {
+  it('ohne jede Fehlmenge keine Vorbelegung', () => {
     expect(
       nachforderungVorbelegung(
-        zeitfenster({ fehlmenge: { gesamt: 0, sonderkost: { ...KEINE_SONDERKOST, vegan: 3 } } }),
+        zeitfenster({ fehlmenge: { gesamt: 0, sonderkost: KEINE_SONDERKOST } }),
       ),
     ).toBeNull();
+  });
+
+  it('Fehlmenge nur in einer Kostform: Anzahl ist die fehlende Sonderkost, Begründung nennt sie', () => {
+    expect(
+      nachforderungVorbelegung(
+        zeitfenster({
+          ausgegeben: { gesamt: 250, sonderkost: KEINE_SONDERKOST },
+          fehlmenge: { gesamt: 0, sonderkost: { ...KEINE_SONDERKOST, vegan: 3 } },
+        }),
+        BERLIN,
+      ),
+    ).toStrictEqual({
+      art: 'Verpflegung',
+      bezeichnung: 'Essensportionen ‚Mittag‘ 12:00–13:30',
+      anzahl: 3,
+      begruendung:
+        'Unterdeckung Verpflegung ‚Mittag‘: Bedarf 250, ausgegeben 250. Es fehlt Sonderkost: 3 vegan.',
+    });
+  });
+
+  it('Fehlmenge gesamt und in Kostformen: Anzahl ist die Gesamtfehlmenge, Sonderkost in der Begründung', () => {
+    const v = nachforderungVorbelegung(
+      zeitfenster({
+        fehlmenge: { gesamt: 20, sonderkost: { ...KEINE_SONDERKOST, vegan: 3, vegetarisch: 2 } },
+      }),
+      BERLIN,
+    )!;
+    expect(v.anzahl).toBe(20);
+    expect(v.begruendung).toBe(
+      'Unterdeckung Verpflegung ‚Mittag‘: Bedarf 250, ausgegeben 230. Es fehlt Sonderkost: 2 vegetarisch, 3 vegan.',
+    );
   });
 });

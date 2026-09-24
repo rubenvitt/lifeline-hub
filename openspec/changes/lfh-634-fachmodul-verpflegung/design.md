@@ -344,6 +344,12 @@ Ausgabe-Dialog.
   | Anzahl | die Fehlmenge |
   | Begründung | „Unterdeckung Verpflegung ‚Mittag': Bedarf 250, ausgegeben 230.“ |
 
+- **Auch eine Fehlmenge nur in Kostformen bietet „Nachfordern“ an** (Review, 24.09.2026). Die
+  Anzahl ist dann die Summe der fehlenden Kostformen, sonst die Gesamtfehlmenge. Sonderkost
+  ist eine Teilmenge, die fehlenden Kostformen stecken also schon darin. Die Begründung nennt
+  sie ausdrücklich („Es fehlt Sonderkost: 3 vegan.“). Sonst zeigte die Karte eine
+  Unterdeckung, für die es keinen Weg zur Nachforderung gibt, und die Sonderkost ginge beim
+  Übergang in die Nachforderung verloren.
 - Keine Personenangaben in der URL: Die Werte sind Mahlzeitname und Zahlen.
 
 ### D10 — Registry, Stab, Schwärzung
