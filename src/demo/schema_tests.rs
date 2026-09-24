@@ -66,3 +66,85 @@ async fn zweiter_aktiver_import_je_org_scheitert_am_partiellen_index() {
         .unwrap();
     assert_eq!(historie, 2, "der entfernte Kopf bleibt als Historie stehen");
 }
+
+/// Ein Fremdschlüssel, der auf eine Stammdatentabelle zeigt.
+#[derive(Debug, sqlx::FromRow)]
+struct StammdatenFk {
+    tabelle: String,
+    spalte: String,
+    ziel: String,
+    on_delete: String,
+}
+
+/// Alle Fremdschlüssel aller Tabellen, die auf `fahrzeug`, `personal` oder `material` zeigen.
+async fn eingehende_stammdaten_fks(pool: &SqlitePool) -> Vec<StammdatenFk> {
+    sqlx::query_as(
+        "SELECT m.name AS tabelle, f.\"from\" AS spalte, lower(f.\"table\") AS ziel, \
+                f.on_delete AS on_delete \
+         FROM sqlite_master m, pragma_foreign_key_list(m.name) f \
+         WHERE m.type = 'table' AND lower(f.\"table\") IN ('fahrzeug', 'personal', 'material') \
+         ORDER BY ziel, m.name, f.\"from\"",
+    )
+    .fetch_all(pool)
+    .await
+    .unwrap()
+}
+
+/// Was der Löschweg aus D7 nicht verträgt: ein kaskadierender Fremdschlüssel auf eine
+/// Stammdatentabelle (das Löschen einer Demo-Stammdatenzeile gelänge dann und räumte fremde
+/// Zeilen still mit ab) und ein aufgeschobener Fremdschlüssel irgendwo im Schema (der
+/// FK-Fehler käme erst beim COMMIT, der Savepoint je Zeile griffe nicht).
+async fn loeschweg_verstoesse(pool: &SqlitePool) -> Vec<String> {
+    let mut verstoesse: Vec<String> = eingehende_stammdaten_fks(pool)
+        .await
+        .into_iter()
+        .filter(|fk| fk.on_delete.eq_ignore_ascii_case("CASCADE"))
+        .map(|fk| {
+            format!(
+                "{}.{} → {} ON DELETE CASCADE",
+                fk.tabelle, fk.spalte, fk.ziel
+            )
+        })
+        .collect();
+    // LIKE ist für ASCII ohne Groß-/Kleinschreibung. Das Schlüsselwort darf deshalb auch in
+    // keinem DDL-Kommentar stehen: `sqlite_master.sql` bewahrt Kommentare im CREATE auf.
+    let aufgeschoben: Vec<String> = sqlx::query_scalar(
+        "SELECT name FROM sqlite_master WHERE sql LIKE '%deferrable%' ORDER BY name",
+    )
+    .fetch_all(pool)
+    .await
+    .unwrap();
+    verstoesse.extend(
+        aufgeschoben
+            .into_iter()
+            .map(|name| format!("{name}: aufgeschobener Fremdschlüssel im Schema")),
+    );
+    verstoesse
+}
+
+/// LFH-690 D7: Kein Fremdschlüssel auf `fahrzeug`/`personal`/`material` kaskadiert, und
+/// keiner im Schema ist aufgeschoben. Nur dann erkennt der Savepoint je Stammdatenzeile „wird
+/// noch verwiesen“ zuverlässig über SQLite-Code 787, ohne handgepflegte Verweisliste.
+///
+/// Die Positivkontrolle darunter hält den Guard ehrlich: fände die Abfrage gar keine
+/// eingehenden Fremdschlüssel (Tippfehler im Tabellennamen, Quoting), bliebe er für immer grün.
+#[tokio::test]
+async fn kein_fk_kaskadiert_in_stammdaten() {
+    let pool = crate::db::test_pool().await;
+
+    let eingehend = eingehende_stammdaten_fks(&pool).await;
+    for ziel in ["fahrzeug", "personal", "material"] {
+        assert!(
+            eingehend.iter().any(|fk| fk.ziel == ziel),
+            "Positivkontrolle: kein eingehender Fremdschlüssel auf {ziel} gefunden — \
+             die Abfrage sieht das Schema nicht: {eingehend:?}"
+        );
+    }
+
+    let verstoesse = loeschweg_verstoesse(&pool).await;
+    assert!(
+        verstoesse.is_empty(),
+        "Der Demo-Löschweg (D7) verträgt diese Fremdschlüssel nicht:\n  {}",
+        verstoesse.join("\n  ")
+    );
+}
