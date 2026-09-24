@@ -15,7 +15,7 @@ import type { VorschauZiel } from './typen';
 
 /**
  * Der Inhalt der Palettenvorschau (LFH-645, Taste →; alle Datensatzsorten seit LFH-664) — je
- * Sorte das Lese-Bauteil, das auch ausserhalb der Palette steht oder dessen Inhalt mit der
+ * Sorte das Lese-Bauteil, das auch außerhalb der Palette steht oder dessen Inhalt mit der
  * Fachseite geteilt ist. Die Palette selbst kennt keine Sorte; sie rendert, was hier
  * herauskommt, in ihrer Vorschau-Region.
  *

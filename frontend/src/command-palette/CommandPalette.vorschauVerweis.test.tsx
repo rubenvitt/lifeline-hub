@@ -1,6 +1,6 @@
 // frontend/src/command-palette/CommandPalette.vorschauVerweis.test.tsx
 //
-// Verweise in der Vorschau schliessen die Palette (LFH-664, Spec „Verweise in der Vorschau
+// Verweise in der Vorschau schließen die Palette (LFH-664, Spec „Verweise in der Vorschau
 // schließen die Palette"). Eine Meldungsvorschau trägt „↗ Auftrag", eine Auftragsvorschau
 // „↗ ETB-Eintrag" — ohne Riegel navigierte die App UNTER der offenen Palette weg.
 import { describe, it, expect, vi } from 'vitest';
@@ -41,7 +41,7 @@ async function inDerVorschau() {
 }
 
 describe('CommandPalette · Verweise in der Vorschau (LFH-664)', () => {
-  it('ein Klick auf einen Verweis schliesst die Palette', async () => {
+  it('ein Klick auf einen Verweis schließt die Palette', async () => {
     const schliesse = await inDerVorschau();
     await userEvent.click(screen.getByRole('link', { name: '↗ Auftrag' }));
     expect(schliesse).toHaveBeenCalledTimes(1);

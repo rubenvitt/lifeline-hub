@@ -1272,7 +1272,7 @@ describe('baueDatensatzTreffer — Öffnungsart und Vorschau (LFH-645)', () => {
   /**
    * DER VORSCHAU-GUARD (LFH-664) — positiv und vollständig: jede Datensatzquelle hat einen
    * Eintrag, der Record ist exhaustiv über `DatensatzQuelle`, eine neue Quelle bricht also den
-   * Typcheck, statt ohne Vorschau durchzurutschen. `null` heisst „trägt keine Vorschau" und
+   * Typcheck, statt ohne Vorschau durchzurutschen. `null` heißt „trägt keine Vorschau" und
    * steht allein beim Sammeltreffer (`etbAnzahl`) — er ist der Weg zu allen, kein Datensatz.
    */
   const ERWARTETE_ART: Record<DatensatzQuelle, string | null> = {

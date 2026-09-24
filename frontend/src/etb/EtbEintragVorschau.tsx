@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router';
 import type { EtbEintragAnzeige } from '../api/types';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { formatUhrzeit } from '../anzeige/format';
@@ -12,6 +13,8 @@ import { etbTyp, etbTypFarbe } from '../theme/statusFarben';
 import EtbBacklinkBadges from './EtbBacklinkBadges';
 import { MELDEWEG_LABEL } from './EtbZeitachse';
 import { istNachgetragen } from './typFarben';
+import { verweisStil } from './zeitachseModell';
+import { etbPfad } from '../routing/deeplinks';
 import { verfasserText } from './verfasser';
 
 /**
@@ -30,9 +33,13 @@ import { verfasserText } from './verfasser';
  *
  * ── WAS FEHLT, MIT ABSICHT ───────────────────────────────────────────────────────────
  *
- * Keine Berichtigungshinweise („berichtigt durch Nr. …", „Grundeintrag anzeigen"): sie
- * brauchen den Berichtigungsindex über die ganze Liste, die Vorschau hat einen Eintrag
- * (Design, Non-Goals). Keine Aktionen (Berichtigen, Wiedervorlage, Auftrag erteilen) — die
+ * Die Berichtigung in RÜCKRICHTUNG fehlt („berichtigt durch Nr. …" am Grundeintrag): sie
+ * braucht den Berichtigungsindex über die ganze Liste, die Vorschau hat einen Eintrag, und die
+ * ETB-API filtert nicht nach `berichtigt_eintrag_id` (Design, Non-Goals; Nachzug LFH-689).
+ * Die VORWÄRTSRICHTUNG steht dagegen da: eine Berichtigung trägt `berichtigt_eintrag_id` selbst
+ * und verweist ohne weiteren Abruf auf ihren Grundeintrag — dessen Nummer kennt der Datensatz
+ * nicht, der Satz heißt deshalb „berichtigt einen älteren Eintrag" wie der Rückfall der
+ * Zeitachse. Keine Aktionen (Berichtigen, Wiedervorlage, Auftrag erteilen) — die
  * Vorschau liest nur. Leere optionale Angaben (von/an, Meldeweg, Veranlassung) stehen nicht
  * als Platzhalter da, sondern fehlen.
  *
@@ -105,6 +112,18 @@ function EintragInhalt({
         {e.meldeweg && <Datenfeld label="Meldeweg">{MELDEWEG_LABEL[e.meldeweg]}</Datenfeld>}
         {e.veranlassung && <Datenfeld label="Veranlassung">{e.veranlassung}</Datenfeld>}
         <Datenfeld label="Verfasser">{verfasserText(e)}</Datenfeld>
+        {e.berichtigt_eintrag_id != null && (
+          <Datenfeld label="Berichtigung" breit>
+            {/* Blau, nicht rot: Rot bedient nichts (LFH-315) — wie der Verweis der Zeitachse. */}
+            berichtigt einen älteren Eintrag —{' '}
+            <Link
+              to={etbPfad(einsatzId, { eintrag: e.berichtigt_eintrag_id })}
+              style={verweisStil(token)}
+            >
+              Grundeintrag anzeigen<span aria-hidden="true"> ↗</span>
+            </Link>
+          </Datenfeld>
+        )}
         {istNachgetragen(e.ereigniszeit, e.received_at) && (
           <Datenfeld label="Erfasst">
             <span style={{ color: rollen.text2 }}>

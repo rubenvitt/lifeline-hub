@@ -234,7 +234,7 @@ async function apiPost(page: Page, pfad: string, data: unknown) {
   return antwort.json();
 }
 
-test('→ zeigt eine Meldung, und ihr Verweis „↗ Auftrag" führt hin und schliesst die Palette', async ({
+test('→ zeigt eine Meldung, und ihr Verweis „↗ Auftrag" führt hin und schließt die Palette', async ({
   page,
 }) => {
   await anmelden(page);
@@ -248,7 +248,7 @@ test('→ zeigt eine Meldung, und ihr Verweis „↗ Auftrag" führt hin und sch
   });
   await apiPost(page, `${basis}/meldungen/${meldung.id}/auftrag`, {
     auftrag_text: 'Sickerstelle sichern',
-    empfaenger: [{ funktion_text: 'EL' }],
+    empfaenger: [{ empfaenger_typ: 'funktion', funktion_text: 'EL' }],
   });
 
   await zumModul(page, einsatzId, 'etb');
@@ -258,7 +258,9 @@ test('→ zeigt eine Meldung, und ihr Verweis „↗ Auftrag" führt hin und sch
   await page.keyboard.press('ArrowRight');
 
   const vorschau = page.getByRole('region', { name: /^Vorschau:/ });
-  await expect(vorschau.getByText('Deich am Pegel hält, Sickerstelle beobachtet')).toBeVisible();
+  await expect(
+    vorschau.getByText('Deich am Pegel hält, Sickerstelle beobachtet', { exact: true }),
+  ).toBeVisible();
   // Nur lesen: die Triage-Knöpfe der Meldungskarte stehen in der Vorschau nicht.
   await expect(vorschau.getByRole('button', { name: 'Sichten' })).toHaveCount(0);
 
@@ -286,7 +288,10 @@ test('→ zeigt einen ETB-Eintrag, gefunden über seine laufende Nummer', async 
   await page.keyboard.press('ArrowRight');
 
   const vorschau = page.getByRole('region', { name: /^Vorschau:/ });
-  await expect(vorschau.getByText('Wasserstand steigt um zehn Zentimeter je Stunde')).toBeVisible();
+  // `exact`: der Kopf der Vorschau trägt dieselben Worte im Label („#n · Wasserstand …").
+  await expect(
+    vorschau.getByText('Wasserstand steigt um zehn Zentimeter je Stunde', { exact: true }),
+  ).toBeVisible();
   await expect(vorschau.getByText('Abschnitt Nord')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(vorschau).toBeHidden();

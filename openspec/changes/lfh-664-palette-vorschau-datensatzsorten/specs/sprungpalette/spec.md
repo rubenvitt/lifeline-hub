@@ -22,6 +22,10 @@ ETB-Sammeltreffer „Alle Einträge zu …“ und der Koordinatensprung.
 - **WHEN** ein ETB-Eintrag als Treffer markiert ist, der Cursor am Textende steht und → gedrückt wird
 - **THEN** zeigt die Palette Nummer, Ereigniszeit, Typ, von/an, Meldeweg, Verfasser und den Inhalt dieses Eintrags
 
+#### Scenario: Berichtigung verweist auf den Grundeintrag
+- **WHEN** die Vorschau eines ETB-Eintrags geöffnet wird, der einen älteren Eintrag berichtigt
+- **THEN** sagt sie, dass er einen älteren Eintrag berichtigt, und trägt einen Verweis auf diesen Grundeintrag
+
 #### Scenario: Meldung
 - **WHEN** eine Meldung als Treffer markiert ist und → gedrückt wird
 - **THEN** zeigt die Palette Nummer, Status, Priorität, Absender und Empfänger, Inhalt und Bestätigungsstand der Meldung, ohne Knöpfe zum Sichten, Bestätigen oder Erledigen

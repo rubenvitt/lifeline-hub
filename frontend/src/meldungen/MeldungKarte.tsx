@@ -25,9 +25,8 @@ export interface BearbeiterOption {
   anzeigename: string;
 }
 
-// Modul-spezifische Labels (kein gemeinsames Primitiv). Exportiert, damit die Palettenvorschau
-// sie nicht kopiert (LFH-664) — sie rendert ohnehin diese Karte.
-export const ART_LABEL: Record<string, string> = {
+// Modul-spezifische Labels (kein gemeinsames Primitiv) — bleiben lokal.
+const ART_LABEL: Record<string, string> = {
   lagemeldung: 'Lagemeldung',
   sofortmeldung: 'Sofortmeldung',
   rueckmeldung: 'Rückmeldung',
@@ -35,7 +34,7 @@ export const ART_LABEL: Record<string, string> = {
   anfrage: 'Anfrage',
   sonstige: 'Sonstige',
 };
-export const WEG_LABEL: Record<string, string> = {
+const WEG_LABEL: Record<string, string> = {
   funk: 'Funk',
   telefon: 'Telefon',
   persoenlich: 'Persönlich',

@@ -597,12 +597,12 @@ export function CommandPalette({
            * „Zurück" ist ein antd-`Button` und erbt damit `controlHeight` — kein handgebautes
            * Bedienziel, das die zwei Angaben aus LFH-365 schuldete.
            */
-          // Ein VERWEIS in der Vorschau („↗ Auftrag" an einer Meldung) schliesst die Palette
+          // Ein VERWEIS in der Vorschau („↗ Auftrag" an einer Meldung) schließt die Palette
           // (LFH-664). Die Navigation übernimmt der Link selbst — der Riegel lauscht in der
           // Bubble-Phase, also NACH dessen `onClick`. Er sitzt am Container und nicht an jedem
           // Link: so gilt er für jede Sorte, und die Karten der Fachmodule brauchen keine
           // Palettenkenntnis. Ohne ihn wechselte die App unter der offenen Palette die Seite.
-          // Ein Modifier-Klick öffnet im neuen Tab und schliesst ebenfalls — wie Strg/⌘+↵.
+          // Ein Modifier-Klick öffnet im neuen Tab und schließt ebenfalls — wie Strg/⌘+↵.
           <div
             role="region"
             aria-label={`Vorschau: ${vorschau.label}`}

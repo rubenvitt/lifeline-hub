@@ -8,7 +8,7 @@ import { SeitenFehler, SeitenStandVeraltet } from '../components/SeitenZustand';
  * `unterEbene` von `components/Markdown.tsx`.
  *
  * Die Palette ist ein Dialog ohne eigene Gliederung, ihre Vorschau-Kopfzeile ist ein `<span>`.
- * 2 heisst: `#` im Text wird `h3`; der Lagebericht setzt seine Abschnittstitel als `h3`, sein
+ * 2 heißt: `#` im Text wird `h3`; der Lagebericht setzt seine Abschnittstitel als `h3`, sein
  * Text rückt entsprechend nach. EINE Konstante für ETB-Inhalt und Lagebericht, damit die beiden
  * Sorten in derselben Region nicht auf verschiedenen Ebenen beginnen.
  */

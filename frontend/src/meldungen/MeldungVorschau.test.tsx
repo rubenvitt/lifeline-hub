@@ -125,12 +125,17 @@ describe('MeldungVorschau (LFH-664)', () => {
     expect(screen.queryByText('Andere Meldung')).not.toBeInTheDocument();
   });
 
+  /**
+   * 30 s alt, also ZWISCHEN den beiden Frischen (Review-Befund): für die Palette
+   * (`FRISCH_MS` = 60 s) frisch, für die globale Vorgabe (10 s) nicht. Mit „jetzt" bliebe der
+   * Test auch grün, wenn die Vorschau die Frische der Palette nicht teilte.
+   */
   it('liest aus dem warmen Listenfach der Palette, ohne neu abzurufen', () => {
     const zaehler = { n: 0 };
     meldungenHandler([], zaehler);
     const client = new QueryClient();
     const abfrage = datensatzAbfrage.meldungen(5);
-    client.setQueryData(abfrage.queryKey, [meldung()]);
+    client.setQueryData(abfrage.queryKey, [meldung()], { updatedAt: Date.now() - 30_000 });
 
     renderMitProviders(<MeldungVorschau einsatzId={5} id={21} />, { client });
 

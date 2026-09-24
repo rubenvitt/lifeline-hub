@@ -35,8 +35,11 @@ Vorgabewert ist 10 s. Die Listenfächer hängen am SSE-Fan-out.
 
 **Non-Goals:**
 - Kein Einzel-GET im Backend, kein neuer Query-Key.
-- Keine Berichtigungshinweise im ETB („berichtigt durch Nr. …“): sie brauchen den
-  Berichtigungsindex über die ganze Liste, und die Palette hat nur einen Eintrag.
+- Kein Hinweis „berichtigt durch Nr. …“ am berichtigten Grundeintrag: er braucht den
+  Berichtigungsindex über die ganze Liste, die Palette hat nur einen Eintrag, und die ETB-API
+  filtert nicht nach `berichtigt_eintrag_id` (Nachzug LFH-689). Die Vorwärtsrichtung
+  („berichtigt einen älteren Eintrag — Grundeintrag anzeigen“) steht dagegen in der Vorschau,
+  weil die Berichtigung `berichtigt_eintrag_id` selbst trägt (Review-Befund).
 - Keine volle 13×5-Gefahrenmatrix in der Vorschau. Sie zeigt nur die bewerteten Gefahren
   (Entscheidung 5a).
 - Kein Grundriss, kein Material und keine Bewegungen in der UHS-Vorschau.

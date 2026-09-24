@@ -43,6 +43,9 @@ export default function AbschnittDaten({
           <span style={{ color: rollen.gedaempft }}>nicht beurteilt</span>
         )}
       </Datenfeld>
+      {/* Fortschritt VOR dem Abschnittsauftrag, anders als im früheren `Descriptions` (eine
+          Spalte): der Auftrag ist ein breites Feld, zwischen Lagezustand und Fortschritt
+          risse er ein Loch in die zweispaltige Zeile. Bewusste Umstellung (LFH-664). */}
       <Datenfeld label="Fortschritt" mono={a.fortschritt != null}>
         {a.fortschritt != null ? (
           `${a.fortschritt} %`
