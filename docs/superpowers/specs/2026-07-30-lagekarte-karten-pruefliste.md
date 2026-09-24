@@ -117,6 +117,10 @@ gefunden wird.
 > `AnsichtSwitcher.tsx` über den TS-Syntaxbaum (Kommentare zählen nicht) auf feste Abstände
 > in Stilobjekten und an `Space`/`Flex`/`Row`, mit Selbsttest; was er nicht sieht (Wert aus
 > einer Variablen, Spread aus einer fremden Datei, CSS), steht in seinem Dateikopf.
+> **Bewusst ausgelassen:** die Inspectors, die im Abschnitt „Ausgewählt" hängen
+> (`FachebenenInspector` mit `marginBottom: 8`, `Inspector`/`KartenDetailCard` mit `gap: 3`),
+> und die Bänder über der Karte (`SnapshotLeiste`). Das sind Abstände im Inneren eigener
+> Bausteine, keine Kartenabstände der Leiste. Sie stehen als **LFH-703** auf dem Board.
 
 ---
 

@@ -138,7 +138,7 @@ describe('Abstände der Kartenleiste (LFH-377)', () => {
       '// marginBottom: 12 im Kommentar zählt nicht',
       "const a = { marginBottom: 12, padding: '0 4px', gap: -2 };",
       'const b = { margin: 0, padding: token.padding, marginTop: token.marginSM, fontSize: 12 };',
-      'const c = <Space size={4}><Space.Compact size="small" /></Space>;',
+      'const c = <Space size={4}><Space.Compact size={t.marginXS} /></Space>;',
       'const d = { padding: `${t.paddingXS}px ${t.padding}px`, paddingTop: `0 ${x}px 4px` };',
       'const e = { gap, rowGap: offen ? 12 : 0, columnGap: (6 as const), marginLeft: t.marginXS };',
       'const f = <><Flex gap={8} /><Row gutter={[t.margin, 8]} /><Flex gap={t.margin} /></>;',
