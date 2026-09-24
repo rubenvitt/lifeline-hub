@@ -304,7 +304,10 @@ Die Vorschläge baut ein reiner Hook `useBedarfsvorschlag(einsatzId, vonAt)`.
 **Betreute**
 - Grundlage ist `ladeBelegungKopfzahl(einsatzId, vonAt)`.
 - Die Query läuft nur, wenn das Modul `betreuung` bedienbar ist.
-- `stellen.length === 0` ergibt keinen Vorschlag, mit dem Hinweis „keine Belegung gemeldet“.
+- Hat keine Stelle einen Wert in `belegt`, gibt es keinen Vorschlag, mit dem Hinweis „keine
+  Belegung gemeldet“. `stellen` enthält auch Stellen ohne Meldung (`betreuung/repo.rs`); die
+  Bedingung `stellen.length === 0` hätte bei „Stellen da, keine gemeldet“ 0 vorbelegt. Eine
+  gemeldete Belegung 0 ergibt dagegen den Vorschlag 0.
 - `stellen_ohne_meldung > 0` ergibt „Untergrenze, n Stellen ohne Meldung“.
 - Liegt `vonAt` nach jetzt, heißt der Hinweis „Stand jetzt, nicht zum Beginn“.
 
