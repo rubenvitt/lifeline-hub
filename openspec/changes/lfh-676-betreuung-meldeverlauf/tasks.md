@@ -26,13 +26,13 @@
 
 ## 5. Nachweise im Browser
 
-- [ ] 5.1 `e2e/gate3-trefflaeche.spec.ts`, Abschnitt Betreuung: Verlaufsauslöser (Karte und Tabelle) und „Zurücknehmen“ tragen die Staffelhöhe; verifiziert durch grünen Lauf
-- [ ] 5.2 `e2e/gate1-ueberlauf.spec.ts`, Betreuungsroute: mit aufgeklapptem Verlauf in Karte und Tabelle kein waagerechter Überlauf des Rumpfs; verifiziert durch grünen Lauf
-- [ ] 5.3 Handprobe im Dev-Stack: Bezirk mit drei Meldungen inkl. Nachtragung, ältere Meldung aus dem Verlauf zurücknehmen, ETB zeigt „bleibt N“; zweiter Browser sieht die Rücknahme im offenen Verlauf ohne Neuladen
+- [x] 5.1 `e2e/gate3-trefflaeche.spec.ts`, Abschnitt Betreuung: Verlaufsauslöser (Karte und Tabelle) und „Zurücknehmen“ tragen die Staffelhöhe; verifiziert durch grünen Lauf
+- [x] 5.2 `e2e/gate1-ueberlauf.spec.ts`, Betreuungsroute: mit aufgeklapptem Verlauf in Karte und Tabelle kein waagerechter Überlauf des Rumpfs; verifiziert durch grünen Lauf
+- [x] 5.3 Handprobe im Dev-Stack: Bezirk mit drei Meldungen inkl. Nachtragung, ältere Meldung aus dem Verlauf zurücknehmen, ETB zeigt „bleibt N“; zweiter Browser sieht die Rücknahme im offenen Verlauf ohne Neuladen
 
 ## 6. Abschluss
 
-- [ ] 6.1 Prüfliste Einsatztauglichkeit (15 Kriterien) für die geänderte Betreuungsseite als `openspec/changes/lfh-676-betreuung-meldeverlauf/pruefliste.md`, jede Zeile mit Verdikt; Kriterium 12 mit der Begründung aus design.md „Risks“
+- [x] 6.1 Prüfliste Einsatztauglichkeit (15 Kriterien) für die geänderte Betreuungsseite als `openspec/changes/lfh-676-betreuung-meldeverlauf/pruefliste.md`, jede Zeile mit Verdikt; Kriterium 12 mit der Begründung aus design.md „Risks“
 - [x] 6.2 Nachzug auf dem Entwicklungsboard anlegen (Skill `clickup-task-anlegen`): `FahrzeugePage` auf `aufklappen` umstellen und `aufklappzeile` streichen; Ticketnummer im Dateikopf von `Datensicht.tsx` und in design.md D3 nachtragen
-- [ ] 6.3 CLAUDE.md: Absatz zum Betreuungsverlauf (Lesen über die Reihe, `aktuell` aus dem Zeiger, Nachtragung = ETB-Schwelle, Rückfrage mit Grund im Dialog, `aufklappen` als Aufklappweg der `Datensicht`)
+- [x] 6.3 CLAUDE.md: Absatz zum Betreuungsverlauf (Lesen über die Reihe, `aktuell` aus dem Zeiger, Nachtragung = ETB-Schwelle, Rückfrage mit Grund im Dialog, `aufklappen` als Aufklappweg der `Datensicht`)
 - [ ] 6.4 `./scripts/check-all.sh` vollständig grün

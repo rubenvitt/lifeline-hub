@@ -49,7 +49,8 @@ import {
  * zweite wäre eine Doppelung. Den Wortlaut des Fehlers teilt der Verlauf mit dem Baustein.
  *
  * RÜCKNAHME (D6): unumkehrbar, es gibt keine Route, die eine Rücknahme aufhebt — deshalb eine
- * Rückfrage (LFH-363), als `Modal` mit eigenem State außerhalb der Eintrags-`map` (LFH-365).
+ * Rückfrage (LFH-363) mit rotem Bestätigungsknopf, als `Modal` mit eigenem State außerhalb der
+ * Eintrags-`map` (LFH-365). Der Auslöser selbst bleibt neutral (Vorbild Verpflegung).
  * Ein Fehler bleibt IM Dialog (LFH-535), nicht im Toast; die Mutation gehört dem Verlauf und
  * nicht der Seite, damit derselbe Grund nicht zusätzlich über der Seite erscheint.
  */
@@ -201,8 +202,10 @@ export default function MeldeVerlauf({
               verfasser={z.erfasst_von}
               aktionen={
                 darfZuruecknehmen && !zurueck ? (
+                  // Neutral wie „Zurücknehmen“ an der Ausgabenzeile der Verpflegung (LFH-634):
+                  // rot ist erst der Bestätigungsknopf der Rückfrage — drei rote Knöpfe
+                  // untereinander machten aus einer Liste eine Alarmfläche.
                   <Button
-                    danger
                     aria-label={ruecknahmeName(z, formatZeitKurz(z.zeitpunkt_at, konventionen))}
                     onClick={() => oeffne(z)}
                   >

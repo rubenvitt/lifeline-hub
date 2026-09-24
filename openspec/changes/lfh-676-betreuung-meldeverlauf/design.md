@@ -112,11 +112,16 @@ aufklappen?: {
   **nicht** gegen „eine Primäraktion + `weitere`“. Aufklappen ändert nichts, es ist Lesen wie
   ein Sprung (LFH-616). Der Plan-Modus bleibt bei Titel + Status + höchstens drei
   Sekundärfeldern + einer Primäraktion.
-- **Tabellenzweig:** `expandable.expandIcon` rendert denselben beschrifteten Knopf statt des
-  16-px-Symbols von antd, mit kontrollierten `expandedRowKeys` aus demselben Zustand. Das
-  Symbol hätte zwei Mängel. Sein Name aus der Locale ist in jeder Zeile gleich (Regel aus
-  LFH-369: die Zeilenkennung gehört in den zugänglichen Namen). Seine Trefffläche liegt fest
-  bei etwa 16 px, die Dichte-Staffel verlangt aber 30/48/72.
+- **Tabellenzweig:** Derselbe beschriftete Knopf steht **in der Kennungszelle** unter dem
+  Kennungstext, mit kontrollierten `expandedRowKeys` aus demselben Zustand und
+  `showExpandColumn: false`. Eine eigene Aufklappspalte gibt es nicht. antds 16-px-Symbol
+  hätte zwei Mängel: Sein Name aus der Locale ist in jeder Zeile gleich (Regel aus LFH-369:
+  die Zeilenkennung gehört in den zugänglichen Namen), und seine Trefffläche liegt fest bei
+  etwa 16 px, die Dichte-Staffel verlangt aber 30/48/72. **Ort gemessen, nicht gewählt**
+  (Umsetzung, 24.09.2026): Eine eigene Spalte an Position 0 übernimmt in rc-table `fixed` von
+  der fixierten Kennung (`useColumns`), dann stünden bei 390 px zwei angeheftete Spalten.
+  Hinter der Kennung glitt sie in Gate 1 bei 390 px beim waagerechten Scrollen unter die
+  Kennung, und der Klick landete auf deren `<strong>`. Die Kennungszelle ist immer sichtbar.
 - **Beide Knöpfe sind antd-`Button`** und erben `controlHeight` (keine zwei Angaben nach
   LFH-365 nötig).
 - **Ausschlüsse im DEV-Befund** (`pruefeKartenplan`): `aufklappen` schließt `baum` und

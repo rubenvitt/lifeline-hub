@@ -1081,20 +1081,19 @@ describe('Datensicht · Aufklappbereich (LFH-676)', () => {
     },
   );
 
-  it('tabelle: die Aufklappspalte steht HINTER der Kennung und ist nicht angeheftet', () => {
-    // rc-table übernimmt `fixed` der Nachbarspalte; an Position 0 stünde der beschriftete
-    // Auslöser neben der fixierten Kennung ebenfalls fest — zwei angeheftete Spalten bei 390 px.
+  it('tabelle: der Auslöser sitzt in der angehefteten Kennungszelle, ohne eigene Aufklappspalte', () => {
+    // Gemessen in Gate 1 bei 390 px: eine eigene Spalte HINTER der fixierten Kennung glitt beim
+    // waagerechten Scrollen unter sie und war nicht mehr klickbar; VOR ihr stünden zwei
+    // angeheftete Spalten. In der Kennungszelle ist er immer erreichbar und kostet keine Breite.
     const { container } = rendere({
       form: 'tabelle',
       aufklappen: aufklappenMit((f) => `Reihe von ${f.funkrufname}`),
     });
-    const zellen = container.querySelectorAll('tr[data-row-key="1"] > td');
-    expect(zellen[0]).toHaveTextContent('Florian 1');
-    expect(within(zellen[1] as HTMLElement).getByRole('button')).toHaveAccessibleName(
-      'Verlauf zu Florian 1',
-    );
-    expect(zellen[1]).not.toHaveClass('ant-table-cell-fix-left');
-    expect(zellen[1]).not.toHaveClass('ant-table-cell-fix-start');
+    const kennung = container.querySelector('tr[data-row-key="1"] > td') as HTMLElement;
+    expect(kennung).toHaveTextContent('Florian 1');
+    expect(within(kennung).getByRole('button')).toHaveAccessibleName('Verlauf zu Florian 1');
+    expect(kennung.className).toMatch(/ant-table-cell-fix-(left|start)/);
+    expect(container.querySelector('.ant-table-row-expand-icon-cell')).toBeNull();
   });
 
   it('karte: der Inhalt steht in einer Region, auf die der Auslöser zeigt', async () => {

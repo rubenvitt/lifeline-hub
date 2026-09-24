@@ -218,7 +218,9 @@ Verlauf ist unumkehrbar und hat deshalb eine Rückfrage. Sie läuft über eine *
 Mutation in `betreuung/MeldeVerlauf.tsx`: die der Seite melden über `SeitenHinweise`, der
 Grund stünde sonst doppelt. Der Aufklappweg ist `Datensicht.aufklappen`: beschriftet, mit
 Zeilenkennung im Namen, in Karte **und** Tabelle mit einem Zustand, Inhalt erst beim
-Aufklappen gerendert. Die Bestands-Prop `aufklappzeile` (antds 16-px-Symbol, nur Tabelle)
+Aufklappen gerendert. In der Tabelle steht der Auslöser in der fixierten Kennungszelle,
+ohne eigene Aufklappspalte: hinter der Kennung glitt eine solche Spalte bei 390 px unter sie
+(Gate 1, gemessen), an Position 0 erbte sie deren `fixed`. Die Bestands-Prop `aufklappzeile` (antds 16-px-Symbol, nur Tabelle)
 verschwindet mit LFH-697. Herleitung: `openspec/changes/lfh-676-betreuung-meldeverlauf/design.md`.
 
 **Sichtung ist eine eigene fachliche Farbachse am selben zentralen Ort**, keine A0-Rolle.

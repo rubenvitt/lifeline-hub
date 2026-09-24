@@ -1,4 +1,4 @@
-import { Button, Checkbox, Dropdown, Popconfirm, Space, Table, Typography, theme } from 'antd';
+import { Button, Checkbox, Dropdown, Popconfirm, Space, Typography, theme } from 'antd';
 import type { Key, ReactNode } from 'react';
 import type { MenuProps, TableColumnType } from 'antd';
 import { DownOutlined, MoreOutlined, RightOutlined } from '@ant-design/icons';
@@ -1495,24 +1495,50 @@ export default function Datensicht<T extends object, const K extends string>(
     [gezeigteSpalten, aktiveSortierung, karte, token.controlHeight],
   );
 
+  /**
+   * Mit `aufklappen` trägt die KENNUNGSZELLE den Auslöser, unter dem Kennungstext — keine
+   * eigene Aufklappspalte. Gemessen in Gate 1 bei 390 px (LFH-676): eine Spalte hinter der
+   * fixierten Kennung glitt beim waagerechten Scrollen unter sie und war nicht mehr
+   * klickbar; an Position 0 übernähme sie `fixed` von der Kennung (rc-table `useColumns`), und
+   * zwei angeheftete Spalten fräßen die schmale Breite. Die Kennungszelle ist immer sichtbar,
+   * und der Auslöser steht dort wie in der Karte: unter dem, was die Zeile benennt.
+   */
+  const ersteSpalte = gezeigteSpalten[0];
+  const tabellenSpalten: KatalogSpalte<T>[] =
+    aufklappen && antdSpalten.length > 0 && ersteSpalte
+      ? [
+          {
+            ...antdSpalten[0],
+            render: (wert: unknown, zeile: T, index: number) => {
+              const basis = antdSpalten[0].render;
+              // Der Titel-Link (oben gebaut) ersetzt das Spalten-`render`; sonst die Zelle wie
+              // überall über `zelle`, die eine RenderedCell auspackt.
+              const inhalt =
+                basis && basis !== ersteSpalte.render
+                  ? (basis(wert, zeile, index) as ReactNode)
+                  : zelle(ersteSpalte, zeile, index);
+              return (
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'flex-start',
+                    gap: token.marginXXS,
+                  }}
+                >
+                  {inhalt}
+                  {aufklappAusloeser(zeile, false)}
+                </div>
+              );
+            },
+          },
+          ...antdSpalten.slice(1),
+        ]
+      : antdSpalten;
+
   const tabelle = (
     <KatalogTabelle<T>
-      columns={
-        aufklappen
-          ? /*
-             * Die Aufklappspalte HINTER die Kennung, nicht an Position 0: rc-table übernimmt
-             * `fixed` von der Spalte an der Einfügestelle (`useColumns`, „Check if expand
-             * column need to fixed"), und Spalte 0 fixiert `KatalogTabelle`. Vorne stünden bei
-             * 390 px zwei angeheftete Spalten, der beschriftete Auslöser ist breiter als antds
-             * Symbol. Die Konstante ist ein Platzhalter, keine Spalte mit eigenem Typ.
-             */
-            [
-              antdSpalten[0],
-              Table.EXPAND_COLUMN as (typeof antdSpalten)[number],
-              ...antdSpalten.slice(1),
-            ]
-          : antdSpalten
-      }
+      columns={tabellenSpalten}
       dataSource={[...sichtbareZeilen]}
       rowKey={(zeile) => schluessel(zeile)}
       loading={ladend}
@@ -1589,9 +1615,9 @@ export default function Datensicht<T extends object, const K extends string>(
             ? {
                 expandedRowKeys: [...aufgeklappt],
                 expandedRowRender: (zeile) => aufklappen.inhalt(zeile),
-                // Der beschriftete Auslöser statt antds Symbol; er schaltet den Zustand der
-                // Sicht selbst, `onExpand` bleibt deshalb ungenutzt.
-                expandIcon: ({ record }) => aufklappAusloeser(record, false),
+                // KEINE eigene Aufklappspalte: der beschriftete Auslöser steht in der
+                // Kennungszelle (`tabellenSpalten`) und schaltet den Zustand der Sicht selbst.
+                showExpandColumn: false,
               }
             : aufklappzeile
               ? { expandedRowRender: (zeile) => aufklappzeile(zeile) }
@@ -1738,22 +1764,21 @@ export default function Datensicht<T extends object, const K extends string>(
                 ))}
               </div>
             )}
-            {aufklappen && (
-              <div>
-                {aufklappAusloeser(zeile, true)}
-                {aufgeklappt.includes(schluessel(zeile)) && (
-                  <div
-                    id={`${idPraefix}-bereich-${idTeil(schluessel(zeile))}`}
-                    role="region"
-                    aria-labelledby={`${idPraefix}-auf-${idTeil(schluessel(zeile))}`}
-                  >
-                    {aufklappen.inhalt(zeile)}
-                  </div>
-                )}
-              </div>
-            )}
+            {aufklappen && <div>{aufklappAusloeser(zeile, true)}</div>}
           </div>
         </ListenEintrag>
+        {/* Der Bereich steht UNTER der Karte in voller Breite, nicht in ihrer Inhaltsspalte:
+            dort zöge er die Aktionsleiste von `ListenEintrag` in die senkrechte Mitte und nähme
+            einer Zeitachse bei 390 px die Breite der Aktionen weg. */}
+        {aufklappen && aufgeklappt.includes(schluessel(zeile)) && (
+          <div
+            id={`${idPraefix}-bereich-${idTeil(schluessel(zeile))}`}
+            role="region"
+            aria-labelledby={`${idPraefix}-auf-${idTeil(schluessel(zeile))}`}
+          >
+            {aufklappen.inhalt(zeile)}
+          </div>
+        )}
       </div>
     );
   };
