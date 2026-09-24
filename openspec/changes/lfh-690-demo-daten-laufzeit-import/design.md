@@ -484,3 +484,36 @@ Lauf nach dem Anlegen von `0121` nannte beide Tabellen (`nur entdeckt: ["demo_he
 trägt, erzeugt `scrubbe_aus_registry` für die beiden Tabellen kein Statement. Der Guard
 `stammdaten_teilbaum_nie_einsatz_scoped` bleibt grün, weil `demo_herkunft` keinen FK auf
 `fahrzeug`/`personal`/`material` hat.
+
+**Ergebnis (b), gemessen in Block 3b (Task 3.5):** Der Scheduler-Takt
+(`erinnerung::scheduler::tick_einmal`, `src/erinnerung/scheduler.rs:33`) liest ausschließlich
+`erinnerung::repo::faellige_zum_ausloesen` (`src/erinnerung/repo.rs:199`). Ausgelöst wird eine
+Zeile nur, wenn **alle drei** Bedingungen gelten: `status = 'offen'`, `faellig_at <= jetzt` und
+`zuletzt_ausgeloest_at IS NULL OR zuletzt_ausgeloest_at < faellig_at`. Jede der beiden
+Varianten aus D10 genügt also: `status` erledigt/quittiert oder `zuletzt_ausgeloest_at >=
+faellig_at`. Einfacher ist erledigt. Es ist der Zustand, den auch `schliesse_offene_auto_tx`
+beim Bestätigen einer Meldung schreibt. **Lücke für den Import:** `anlegen_tx` legt immer
+`offen` an, und `status_setzen` (`:141`) sowie `markiere_ausgeloest` (`:219`) nehmen nur den
+Pool. Der Import braucht für eine vergangene Erinnerung also ein `status_setzen_tx` (oder einen
+eigenen `_tx`-Split). Das ist nicht Teil von 3.5.
+
+Die übrigen Alarme hängen am selben Takt und an derselben Tabelle. Einen eigenen Timer gibt es
+nicht, Quelle ist immer eine `erinnerung`-Zeile:
+- **Eskalation einer Sofortmeldung:** nur über eine Auto-Frist mit `bezug_typ='meldung'`
+  (`scheduler.rs:52`) und danach `meldung::repo::setze_eskaliert` (`src/meldung/repo.rs:475`),
+  das zusätzlich `bestaetigung_pflicht = 1`, `eskaliert = 0`, abgelaufene
+  `bestaetigung_frist_at` und fehlende Quittung verlangt. Die Auto-Frist entsteht nur im
+  Handler (`routes/meldung.rs:180`, `stelle_meldung_auto_frist_sicher`, ebenfalls mit
+  Quittungs-Guard) und nicht in `meldung::repo::anlegen_tx`. Eine bestätigt angelegte
+  Sofortmeldung erzeugt im Import also weder Erinnerung noch Eskalation.
+- **Auftrags-Quittierfrist:** ebenfalls nur im Handler (`routes/auftrag.rs:124`,
+  `anlegen_aus_frist`), nicht in `auftrag::repo::anlegen_tx`.
+- **Ablösung (LFH-635):** `abloesung::repo::setze_fristen_tx` (`src/abloesung/repo.rs:280`)
+  setzt die Frist „Ablösung fällig“ **unbedingt** auf `faellig_at = beginn + rhythmus`. Nur die
+  Vorwarnung wird geschlossen, wenn sie schon hinter `jetzt` liegt. Eine Schicht, deren
+  Fälligkeit beim Import in der Vergangenheit liegt, löst beim ersten Takt aus (`scheduler.rs:89`,
+  Event `abloesung`). Das Szenario braucht deshalb Schichten, deren Fälligkeit nach „jetzt“ liegt.
+- **Überfällige Rückmeldung (LFH-610):** kein Scheduler-Pfad. `faellig_at` wird beim Lesen in
+  `GET …/meldungen/rueckmeldungen` berechnet (`routes/meldung.rs:547`,
+  `effektive_rueckmeldung_frist_min`) und steht nur als Zustand im Meldebild. Die in D10
+  vorgesehene „knapp nicht abgelaufene“ Frist ist dafür nicht nötig.
