@@ -4,14 +4,18 @@
 //! **Nur mit Schalter.** Die Routen existieren ausschließlich mit `--demo-daten`
 //! (`app::RouterOptionen`); ohne ihn antwortet `/api/demo-daten` wie ein unbekannter Pfad.
 //!
-//! Dieses Modul trägt vorerst nur die Antwortformen. Der Bericht wird später als JSON am
-//! Import-Kopf gespeichert, deshalb sind die Typen auch `Deserialize`.
+//! Dieses Modul trägt die Antwortformen und den Löschweg [`entfernen::entfernen_tx`]. Der
+//! Bericht liegt als JSON am Import-Kopf, deshalb sind die Typen auch `Deserialize`.
 //!
 //! Spec: `openspec/changes/lfh-690-demo-daten-laufzeit-import/`
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+pub mod entfernen;
+
+#[cfg(test)]
+mod entfernen_tests;
 #[cfg(test)]
 mod schema_tests;
 
