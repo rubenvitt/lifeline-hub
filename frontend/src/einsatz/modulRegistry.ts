@@ -28,6 +28,7 @@ import {
   TbBuildingWarehouse,
   TbFiles,
   TbArrowsExchange,
+  TbToolsKitchen2,
   TbHomeHeart,
   TbCloudStorm,
 } from 'react-icons/tb';
@@ -225,6 +226,19 @@ export const modulRegistry: ModulEintrag[] = [
     route: 'material',
     status: 'fertig',
     beschreibung: 'Material und Verbrauchsgüter im Einsatz.',
+  },
+  {
+    // LFH-634: Bedarf und Ausgabe von Essensportionen je Zeitfenster, Unterdeckung als
+    // Zustand auf der Seite. Bewusst KEIN Zähler (design.md, Non-Goals): Unterdeckung ist
+    // kein Alarmereignis. Reihenfolge wie `MODUL_KEYS` im Backend (`src/einsatz/modul.rs`).
+    key: 'verpflegung',
+    kategorie: 'kraefte',
+    label: 'Verpflegung',
+    icon: TbToolsKitchen2,
+    route: 'verpflegung',
+    status: 'fertig',
+    beschreibung:
+      'Zeitfenster mit Bedarf und Ausgabe von Essensportionen, Sonderkost, Unterdeckung.',
   },
   {
     key: 'bereitstellungsraeume',

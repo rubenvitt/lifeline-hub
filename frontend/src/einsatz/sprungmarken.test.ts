@@ -83,6 +83,7 @@ describe('Sprungmarken (LFH-620)', () => {
       'fahrzeuge',
       '↗fms-tableau',
       'material',
+      'verpflegung',
       'bereitstellungsraeume',
       'abloesung',
     ]);

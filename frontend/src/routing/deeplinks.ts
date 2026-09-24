@@ -262,6 +262,11 @@ export function abloesungPfad(einsatzId: number): string {
   return einsatzModulPfad(einsatzId, 'abloesung');
 }
 
+/** Verpflegungs-Modul (LFH-634): Zeitfenster mit Bedarf, Ausgaben und Deckung. */
+export function verpflegungPfad(einsatzId: number): string {
+  return einsatzModulPfad(einsatzId, 'verpflegung');
+}
+
 /** Fachmodul „Wetter & Pegel" (LFH-633): Pegel mit Verlauf, DWD-Warnungen, Vorhersage. */
 export function wetterPegelPfad(einsatzId: number): string {
   return einsatzModulPfad(einsatzId, 'wetter-pegel');

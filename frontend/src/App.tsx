@@ -41,6 +41,7 @@ import DokumentePage from './pages/DokumentePage';
 import StabPage from './pages/StabPage';
 import AbloesungPage from './pages/AbloesungPage';
 import BetreuungPage from './pages/BetreuungPage';
+import VerpflegungPage from './pages/VerpflegungPage';
 import WetterPegelPage from './pages/WetterPegelPage';
 import SchaedenDetailPage from './pages/SchaedenDetailPage';
 import PersonenDetailPage from './pages/PersonenDetailPage';
@@ -95,6 +96,7 @@ const MODUL_ELEMENTE: Record<string, ReactElement> = {
   'einsatz-einstellungen': <EinsatzEinstellungenPage />,
   fahrzeuge: <FahrzeugePage />,
   material: <MaterialPage />,
+  verpflegung: <VerpflegungPage />,
   personal: <PersonalPage />,
   einheiten: <EinheitenPage />,
   einsatzabschnitte: <EinsatzabschnittePage />,

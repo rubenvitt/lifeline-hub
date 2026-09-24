@@ -24,6 +24,7 @@ import {
   dokumentePfad,
   abloesungPfad,
   betreuungPfad,
+  verpflegungPfad,
   wetterPegelPfad,
   pegelZielPfad,
   etbPfad,
@@ -269,6 +270,10 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
   });
   it('abloesungPfad (LFH-635)', () => {
     expect(abloesungPfad(E)).toBe('/einsaetze/5/abloesung');
+  });
+
+  it('verpflegungPfad trifft die Registry-Route (LFH-634)', () => {
+    expect(verpflegungPfad(E)).toBe('/einsaetze/5/verpflegung');
   });
 
   it('betreuungPfad ohne Selektion trifft die Registry-Route (LFH-639)', () => {
