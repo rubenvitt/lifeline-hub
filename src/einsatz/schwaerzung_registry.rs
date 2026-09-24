@@ -11,6 +11,13 @@
 //!    (`einsatz_id` + transitive `ON DELETE CASCADE`-Hülle ab `einsatz`) und bricht ROT,
 //!    sobald eine Spalte/Tabelle **un**klassifiziert ist. Eine neue PII-Spalte kann also
 //!    nicht mehr still durchrutschen.
+//!
+//!    Die Entdeckung trägt eine Vorbedingung, die GUARD 5 (LFH-291) erzwingt: **Jede
+//!    FK-Kante nach S kommt aus S oder steht begründet auf der Allowlist**
+//!    (`FREMDKANTEN_ALLOWLIST` im `tests`-Modul, startet leer). Ohne sie fiele eine neue
+//!    Tabelle ohne `einsatz_id`, die per `ON DELETE SET NULL` oder ohne ON-DELETE-Angabe
+//!    auf eine Tabelle in S zeigt, aus der CASCADE-Hülle heraus — GUARD 1 fragte ihre
+//!    Spalten nie ab, ihre PII überlebte die Schwärzung still.
 //! 3. [`scrubbe_aus_registry`] treibt den tatsächlichen Scrub **data-driven** aus den
 //!    `Scrub`-Einträgen → kein Drift zwischen Guard und Scrub möglich (die Statements
 //!    entstehen aus denselben compile-time-Konstanten, die der Guard prüft).
@@ -1651,6 +1658,11 @@ mod tests {
     /// `{einsatz}` ∪ `{Tabellen mit einsatz_id}` ∪ transitive Hülle über
     /// `ON DELETE CASCADE`-FKs ab S. Der benutzer/organisation/personal-Stammdaten-
     /// Teilbaum bleibt außen vor (kein CASCADE-FK, der auf einsatz zeigt).
+    ///
+    /// Die Hülle folgt NUR `CASCADE`. Dass sie damit nichts verliert, ist eine
+    /// Vorbedingung, die GUARD 5 (`guard5_keine_fk_kante_von_aussen_nach_s`, LFH-291)
+    /// erzwingt: jede FK-Kante nach S kommt aus S oder steht begründet auf
+    /// `FREMDKANTEN_ALLOWLIST` — unabhängig von ihrem `on_delete`.
     async fn entdecke_einsatz_scoped(pool: &SqlitePool) -> BTreeSet<String> {
         let alle = alle_tabellen(pool).await;
         let mut s: BTreeSet<String> = BTreeSet::new();
@@ -1785,6 +1797,220 @@ mod tests {
                  die CASCADE-Hülle würde sie irreversibel schwärzen!"
             );
         }
+    }
+
+    // ---------- GUARD 5 (LFH-291): FK-Kanten von außerhalb S nach S ----------
+
+    /// Begründete Ausnahmen zu GUARD 5, Format `(tabelle, grund)`: Tabellen AUSSERHALB von
+    /// S, deren FK-Kante nach S legitim ist, weil ihre Zeilen nicht einsatz-eigen sind und
+    /// deshalb NICHT geschwärzt werden (z. B. eine Stammdaten-Tabelle mit
+    /// `REFERENCES einsatz ON DELETE SET NULL`). Die Liste startet LEER, weil der Bestand
+    /// keine einzige solche Kante hat (gemessen über alle Migrationen). Ein Eintrag ohne
+    /// Querkante gilt selbst als Verstoß (`guard5_allowlist_hat_keine_toten_eintraege`),
+    /// sonst veraltet die Liste still.
+    const FREMDKANTEN_ALLOWLIST: &[(&str, &str)] = &[];
+
+    /// Eine FK-Kante aus einer Tabelle außerhalb von S auf eine Tabelle in S.
+    #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+    struct FremdKante {
+        tabelle: String,
+        spalte: String,
+        parent: String,
+        on_delete: String,
+    }
+
+    /// Befund für GUARD 5 (reine Funktion über das Schema): jede FK-Kante aus einer
+    /// Tabelle AUSSERHALB von `s` auf eine Tabelle IN `s` — unabhängig von `on_delete`
+    /// (`SET NULL`, `NO ACTION`, `RESTRICT`, …), abzüglich der Tabellen auf `allowlist`.
+    async fn fremde_fk_auf_scoped(
+        pool: &SqlitePool,
+        s: &BTreeSet<String>,
+        allowlist: &[(&str, &str)],
+    ) -> Vec<FremdKante> {
+        let mut befund: Vec<FremdKante> = Vec::new();
+        for t in alle_tabellen(pool).await {
+            if s.contains(&t) || allowlist.iter().any(|(erlaubt, _)| *erlaubt == t) {
+                continue;
+            }
+            for (spalte, parent, on_delete) in fk_kanten_von(pool, &t).await {
+                if s.contains(&parent) {
+                    befund.push(FremdKante {
+                        tabelle: t.clone(),
+                        spalte,
+                        parent,
+                        on_delete,
+                    });
+                }
+            }
+        }
+        befund.sort();
+        befund
+    }
+
+    /// Ausgehende FKs einer Tabelle als `(spalte, referenzierte_tabelle, on_delete)`.
+    /// SQLite meldet eine fehlende ON-DELETE-Angabe als `"NO ACTION"`.
+    async fn fk_kanten_von(pool: &SqlitePool, tabelle: &str) -> Vec<(String, String, String)> {
+        let sql = format!("PRAGMA foreign_key_list('{tabelle}')");
+        sqlx::query(sqlx::AssertSqlSafe(sql))
+            .fetch_all(pool)
+            .await
+            .unwrap()
+            .iter()
+            .map(|r| {
+                (
+                    r.get::<String, _>("from"),
+                    r.get::<String, _>("table"),
+                    r.get::<String, _>("on_delete"),
+                )
+            })
+            .collect()
+    }
+
+    /// Allowlist-Einträge, die im UNGEFILTERTEN Befund keine Querkante haben (tot).
+    /// Gegen den ungefilterten Befund, sonst sähe jeder wirksame Eintrag tot aus.
+    fn tote_allowlist_eintraege<'a>(
+        ungefiltert: &[FremdKante],
+        allowlist: &[(&'a str, &'a str)],
+    ) -> Vec<&'a str> {
+        allowlist
+            .iter()
+            .filter(|(tabelle, _)| !ungefiltert.iter().any(|k| k.tabelle == *tabelle))
+            .map(|(tabelle, _)| *tabelle)
+            .collect()
+    }
+
+    /// GUARD 5 (LFH-291): Die Menge S entsteht über `einsatz_id` und die
+    /// `ON DELETE CASCADE`-Hülle. Eine NEUE Tabelle ohne `einsatz_id`, die per `SET NULL`
+    /// oder ohne ON-DELETE-Angabe auf eine Tabelle in S zeigt, fiele aus S heraus — GUARD 1
+    /// fragte ihre Spalten nie ab, ihre PII überlebte die Schwärzung still. Deshalb muss
+    /// JEDE FK-Kante nach S aus S kommen oder begründet auf der Allowlist stehen.
+    #[tokio::test]
+    async fn guard5_keine_fk_kante_von_aussen_nach_s() {
+        let pool = crate::db::test_pool().await;
+        let s = entdecke_einsatz_scoped(&pool).await;
+        let befund = fremde_fk_auf_scoped(&pool, &s, FREMDKANTEN_ALLOWLIST).await;
+        assert!(
+            befund.is_empty(),
+            "FK-Kanten von außerhalb der einsatz-scoped Menge S nach S ({}). Die Zeilen \
+             dieser Tabellen hängen an einem Einsatz, liegen aber nicht in S und würden \
+             NICHT geschwärzt. Auswege: (1) eine einsatz_id-Spalte ergänzen, (2) den FK auf \
+             ON DELETE CASCADE umstellen (dann entdeckt die Hülle die Tabelle, GUARD 1/3 \
+             verlangen die Klassifikation) oder (3) die Tabelle mit Begründung auf \
+             FREMDKANTEN_ALLOWLIST setzen (nicht einsatz-eigen, wird nicht geschwärzt):\n{}",
+            befund.len(),
+            befund
+                .iter()
+                .map(|k| format!(
+                    "  {}.{} → {} (ON DELETE {})",
+                    k.tabelle, k.spalte, k.parent, k.on_delete
+                ))
+                .collect::<Vec<_>>()
+                .join("\n"),
+        );
+    }
+
+    /// Wächter zu GUARD 5: kein toter Allowlist-Eintrag.
+    #[tokio::test]
+    async fn guard5_allowlist_hat_keine_toten_eintraege() {
+        let pool = crate::db::test_pool().await;
+        let s = entdecke_einsatz_scoped(&pool).await;
+        let ungefiltert = fremde_fk_auf_scoped(&pool, &s, &[]).await;
+        let tot = tote_allowlist_eintraege(&ungefiltert, FREMDKANTEN_ALLOWLIST);
+        assert!(
+            tot.is_empty(),
+            "Tote FREMDKANTEN_ALLOWLIST-Einträge (keine FK-Kante mehr nach S) — streichen: \
+             {tot:?}"
+        );
+    }
+
+    /// Legt im (je Test eigenen) Pool vier Sondentabellen an: zwei Lecks, die GUARD 5
+    /// melden muss, und zwei Kontrollen, die er NICHT melden darf.
+    async fn lege_fremdkanten_sonden_an(pool: &SqlitePool) {
+        for ddl in [
+            // (a) SET NULL auf einen einsatz-scoped Parent OHNE einsatz_id (uhs_platz liegt
+            //     nur über den CASCADE-FK auf uhs in S).
+            "CREATE TABLE lfh291_sonde_set_null (
+                 id INTEGER PRIMARY KEY,
+                 platz_id INTEGER REFERENCES uhs_platz(id) ON DELETE SET NULL,
+                 freitext TEXT
+             )",
+            // (b) FK ohne ON-DELETE-Angabe (NO ACTION) auf einsatz_person.
+            "CREATE TABLE lfh291_sonde_no_action (
+                 id INTEGER PRIMARY KEY,
+                 person_id INTEGER REFERENCES einsatz_person(id),
+                 freitext TEXT
+             )",
+            // Kontrolle 1: FK auf eine Tabelle AUSSERHALB von S — keine Querkante.
+            "CREATE TABLE lfh291_sonde_extern (
+                 id INTEGER PRIMARY KEY,
+                 benutzer_id INTEGER REFERENCES benutzer(id) ON DELETE SET NULL
+             )",
+            // Kontrolle 2: CASCADE-FK nach S — die Hülle nimmt die Tabelle in S auf, sie
+            //     ist damit kein Fremder mehr.
+            "CREATE TABLE lfh291_sonde_cascade (
+                 id INTEGER PRIMARY KEY,
+                 person_id INTEGER NOT NULL REFERENCES einsatz_person(id) ON DELETE CASCADE
+             )",
+        ] {
+            sqlx::query(ddl).execute(pool).await.unwrap();
+        }
+    }
+
+    /// AK LFH-291: SET NULL auf einen Parent ohne einsatz_id und ein FK ohne ON-DELETE-
+    /// Angabe werden beide gemeldet; FKs nach außen und CASCADE-Kinder nicht.
+    #[tokio::test]
+    async fn guard5_meldet_set_null_und_no_action_kanten_synthetisch() {
+        let pool = crate::db::test_pool().await;
+        lege_fremdkanten_sonden_an(&pool).await;
+        let s = entdecke_einsatz_scoped(&pool).await;
+        assert!(s.contains("uhs_platz") && s.contains("einsatz_person"));
+        assert!(!s.contains("lfh291_sonde_set_null"));
+        assert!(!s.contains("lfh291_sonde_no_action"));
+        assert!(!s.contains("lfh291_sonde_extern"));
+        assert!(
+            s.contains("lfh291_sonde_cascade"),
+            "Kontrolle: das CASCADE-Kind gehört zu S"
+        );
+
+        let befund = fremde_fk_auf_scoped(&pool, &s, &[]).await;
+        let erwartet = vec![
+            FremdKante {
+                tabelle: "lfh291_sonde_no_action".into(),
+                spalte: "person_id".into(),
+                parent: "einsatz_person".into(),
+                on_delete: "NO ACTION".into(),
+            },
+            FremdKante {
+                tabelle: "lfh291_sonde_set_null".into(),
+                spalte: "platz_id".into(),
+                parent: "uhs_platz".into(),
+                on_delete: "SET NULL".into(),
+            },
+        ];
+        assert_eq!(befund, erwartet, "genau die zwei Lecks, keine Kontrolle");
+    }
+
+    /// Allowlist filtert ihre Tabelle aus dem Befund; ein Eintrag ohne Querkante ist tot.
+    #[tokio::test]
+    async fn guard5_allowlist_filtert_und_toter_eintrag_wird_gemeldet_synthetisch() {
+        let pool = crate::db::test_pool().await;
+        lege_fremdkanten_sonden_an(&pool).await;
+        let s = entdecke_einsatz_scoped(&pool).await;
+        let allowlist: &[(&str, &str)] = &[
+            ("lfh291_sonde_set_null", "Sonde: begründete Ausnahme"),
+            ("lfh291_sonde_extern", "Sonde: hat keine Kante nach S"),
+        ];
+
+        let gefiltert = fremde_fk_auf_scoped(&pool, &s, allowlist).await;
+        let tabellen: Vec<&str> = gefiltert.iter().map(|k| k.tabelle.as_str()).collect();
+        assert_eq!(tabellen, vec!["lfh291_sonde_no_action"]);
+
+        let ungefiltert = fremde_fk_auf_scoped(&pool, &s, &[]).await;
+        assert_eq!(
+            tote_allowlist_eintraege(&ungefiltert, allowlist),
+            vec!["lfh291_sonde_extern"],
+            "der Eintrag mit Querkante ist lebendig, der ohne tot"
+        );
     }
 
     /// Kohärenz: `ZeileLoeschen` gilt (wenn überhaupt) für ALLE Spalten der Tabelle —
