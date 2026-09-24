@@ -202,7 +202,9 @@ for (const kontext of KONTEXTE) {
     expect(aenderung.ok(), `fremde Änderung: ${aenderung.status()}`).toBeTruthy();
 
     await expect(banner).toBeVisible();
-    await expect(banner).toContainText('Reihenfolge geändert, 1 fällige Schicht rückt nach oben');
+    await expect(banner).toContainText(
+      'Reihenfolge geändert, 1 fällige Schicht steht weiter unten',
+    );
     // Folge eingefroren, Inhalt frisch: die mittlere Karte trägt schon ihre neue Einstufung.
     await expect(mitte).toHaveAttribute('data-einstufung', 'vorwarnung');
 

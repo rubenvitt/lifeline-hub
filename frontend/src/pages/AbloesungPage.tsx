@@ -246,26 +246,38 @@ export default function AbloesungPage() {
       abloesungId: number;
       body: Parameters<typeof aendereSchicht>[2];
     }) => aendereSchicht(einsatzId, abloesungId, body),
-    // Rhythmus oder Beginn verschieben die Fälligkeit: die eigene Karte rückt sofort an ihren
-    // Platz. Erst nach dem Refetch — sonst stünde sie mit altem Inhalt am neuen Platz, und das
-    // Banner meldete bis dahin eine Umordnung, die es nicht gibt.
+    // Rhythmus oder Beginn verschieben die Fälligkeit: die eigene Karte rückt an ihren Platz,
+    // und zwar erst NACH dem Refetch — vorher stünde sie mit altem Inhalt am neuen Platz. Trifft
+    // der Live-Refetch vor der eigenen Antwort ein, meldet das Banner diese eine Rundreise lang
+    // „Reihenfolge geändert" (kurzer, benannter Rest; die Höhe der Werkzeugzeile ändert sich
+    // dabei nicht). Scheitert der Refetch, wird nichts eingeordnet, und der nächste Abruf zeigt
+    // die eigene Änderung wie eine fremde hinter dem Banner.
     onSuccess: async (a, { body }) => {
       message.success('Schicht geändert');
-      await invalidiere();
-      if (body.rhythmus_minuten !== undefined || body.beginn_at !== undefined) {
-        ordneEin((s) => s.id === a.id);
+      if (body.rhythmus_minuten === undefined && body.beginn_at === undefined) {
+        void invalidiere();
+        return;
       }
+      await invalidiere();
+      ordneEin((s) => s.id === a.id);
     },
   });
   const vorgabeMut = useMutation({
     mutationFn: ({ abschnittId, minuten }: { abschnittId: number; minuten: number | null }) =>
       setzeAbloesungVorgabe(einsatzId, abschnittId, minuten),
-    // Die Vorgabe wirkt auf die Schichten ihres Abschnitts, die der Vorgabe folgen; die Antwort
-    // trägt keine Schichten, also nach dem Refetch einordnen.
-    onSuccess: async (_, { abschnittId }) => {
+    // Eine neu gesetzte Vorgabe schreibt der Server nur in die Schichten ihres Abschnitts, die
+    // ihr folgen (`rhythmus_quelle = 'abschnitt'`); eine entfernte lässt jede Schicht stehen.
+    // Genau diese werden eingeordnet — eine fremd umgeordnete Schicht mit eigenem Rhythmus im
+    // selben Abschnitt bleibt eingefroren. Die Antwort trägt keine Schichten, also nach dem
+    // Refetch (Rennen und Fehlerpfad wie bei `aendernMut`).
+    onSuccess: async (_, { abschnittId, minuten }) => {
       message.success('Rhythmus-Vorgabe gespeichert');
+      if (minuten == null) {
+        void invalidiere();
+        return;
+      }
       await invalidiere();
-      ordneEin((s) => s.abschnitt_id === abschnittId);
+      ordneEin((s) => s.abschnitt_id === abschnittId && s.rhythmus_quelle === 'abschnitt');
     },
   });
 

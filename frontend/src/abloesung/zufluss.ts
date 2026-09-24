@@ -39,13 +39,14 @@
  * - mit dem Banner und mit dem Ansichtswechsel (`freigegeben`), zusammen mit den
  *   zurückgehaltenen Neuzugängen;
  * - mit einer EIGENEN Änderung (`eingeordnet`), aber nur für die Karten, die sie betrifft:
- *   die eigene Rhythmusänderung ordnet diese eine Karte ein, die eigene Vorgabe die Schichten
- *   ihres Abschnitts. Zurückgehaltene fremde Neuzugänge bleiben dabei zurückgehalten.
+ *   die eigene Rhythmusänderung ordnet diese eine Karte ein, eine eigene neu gesetzte Vorgabe
+ *   die Schichten ihres Abschnitts, die ihr folgen (`rhythmus_quelle = 'abschnitt'`, nur die
+ *   schreibt der Server um). Zurückgehaltene fremde Neuzugänge bleiben dabei zurückgehalten.
  *
  * KRITERIUM 9 GEGEN KRITERIUM 12: Die Zeit allein ordnet nie um — die Einstufung ist monoton in
  * der Fälligkeit, und nach ihr sortiert der Server. Eine fällige Karte kann also nur durch eine
- * fremde Änderung unter einer planmäßigen stehen, und genau dann steht das Banner. Es nennt sie
- * („1 fällige Schicht rückt nach oben"), und die Karte selbst trägt ihre frische Einstufung
+ * fremde Änderung unter einer milder eingestuften stehen, und genau dann steht das Banner. Es
+ * nennt sie („1 fällige Schicht steht weiter unten"), und die Karte selbst trägt ihre frische Einstufung
  * (Fläche, Rand, Wort). Unten gehalten wird sie also nie still, nur bis zum nächsten Klick.
  *
  * WAS SOFORT WEGFÄLLT: Entfallene (ein fremder Vollzug verschiebt die abgelöste Schicht nach
@@ -59,7 +60,7 @@
  * dokumentiert).
  */
 import type { Dayjs } from 'dayjs';
-import type { Abloesung } from '../api/types';
+import type { Abloesung, AbloesungEinstufung } from '../api/types';
 import { einstufungVon, zaehleFaellige } from './einstufung';
 
 export interface Zuflussstand {
@@ -154,13 +155,24 @@ export function eingeordnet(stand: Zuflussstand, schichten: readonly Abloesung[]
   return { ...stand, gezeigt };
 }
 
-/** Fällige Karten, über denen in der gezeigten Folge eine planmäßige steht. */
+const DRINGLICHKEIT: Record<AbloesungEinstufung, number> = {
+  planmaessig: 0,
+  vorwarnung: 1,
+  ueberfaellig: 2,
+};
+
+/**
+ * Fällige Karten, über denen in der gezeigten Folge eine MILDER eingestufte steht — eine
+ * überfällige unter einer in der Vorwarnzeit zählt also mit, zwei Vorwarnungen untereinander
+ * nicht.
+ */
 function faelligUntenGehalten(folge: readonly Abloesung[], jetzt: Dayjs): number {
-  let planmaessigDarueber = false;
+  let mildesteDarueber = Infinity;
   let n = 0;
   for (const s of folge) {
-    if (einstufungVon(s.faellig_at, jetzt) === 'planmaessig') planmaessigDarueber = true;
-    else if (planmaessigDarueber) n += 1;
+    const stufe = DRINGLICHKEIT[einstufungVon(s.faellig_at, jetzt)];
+    if (stufe > 0 && mildesteDarueber < stufe) n += 1;
+    mildesteDarueber = Math.min(mildesteDarueber, stufe);
   }
   return n;
 }
@@ -169,7 +181,7 @@ function faelligUntenGehalten(folge: readonly Abloesung[], jetzt: Dayjs): number
  * Wortlaut des Banners. Eine zurückgehaltene Schicht kann fällig sein (fremde Rücknahme
  * eines alten Vollzugs, zurückdatierter Beginn) — dann nennt das Banner sie, damit sie nicht
  * still dahinter wartet (Prüfliste Kriterium 9). Dasselbe gilt für eine fällige Karte, die die
- * eingefrorene Folge unter einer planmäßigen hält (`umgeordnet`: die gezeigte Folge, wenn sie
+ * eingefrorene Folge unter einer milder eingestuften hält (`umgeordnet`: die gezeigte Folge, wenn sie
  * von der Server-Ordnung abweicht, sonst `null`).
  */
 export function zuflussText(
@@ -189,7 +201,7 @@ export function zuflussText(
     teile.push(
       k === 0
         ? 'Reihenfolge geändert'
-        : `Reihenfolge geändert, ${k === 1 ? '1 fällige Schicht rückt' : `${k} fällige Schichten rücken`} nach oben`,
+        : `Reihenfolge geändert, ${k === 1 ? '1 fällige Schicht steht' : `${k} fällige Schichten stehen`} weiter unten`,
     );
   }
   return teile.join(' · ');

@@ -224,8 +224,22 @@ describe('zuflussText', () => {
     // Folge wie gezeigt: planmäßig 18:00 über der fremd vorgezogenen, jetzt fälligen 11:50.
     const gezeigt = [schicht(1, '2026-09-22 18:00:00'), schicht(2, '2026-09-22 11:50:00')];
     expect(zuflussText([], jetzt, gezeigt)).toBe(
-      'Reihenfolge geändert, 1 fällige Schicht rückt nach oben',
+      'Reihenfolge geändert, 1 fällige Schicht steht weiter unten',
     );
+    // Auch eine überfällige unter einer in der Vorwarnzeit steht zu tief (strenger unter milder).
+    expect(
+      zuflussText([], jetzt, [
+        schicht(1, '2026-09-22 12:20:00'),
+        schicht(2, '2026-09-22 11:50:00'),
+      ]),
+    ).toBe('Reihenfolge geändert, 1 fällige Schicht steht weiter unten');
+    // Zwei Vorwarnungen untereinander: keine steht zu tief.
+    expect(
+      zuflussText([], jetzt, [
+        schicht(1, '2026-09-22 12:25:00'),
+        schicht(2, '2026-09-22 12:20:00'),
+      ]),
+    ).toBe('Reihenfolge geändert');
     // Rückt keine fällige nach oben, steht nur die Umordnung da.
     expect(zuflussText([], jetzt, [schicht(1, '2026-09-22 18:00:00'), schicht(2)])).toBe(
       'Reihenfolge geändert',

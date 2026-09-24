@@ -378,15 +378,17 @@ describe('AbloesungPage (LFH-635)', () => {
     });
 
     // ── LFH-660: eine fremde Änderung von Rhythmus/Beginn ordnet nicht unter dem Cursor um ──
-    // Gezeigt: 1 überfällig, 4 planmäßig (2 h), 3 planmäßig (4 h). Fremd wird 3 auf
-    // „seit 30 min überfällig" gezogen — die Server-Ordnung stellte sie über 4.
-    const vier = () => schicht({ id: 4, faellig_at: inMinuten(120) });
+    // Gezeigt: 1 überfällig, 4 planmäßig (2 h, eigener Rhythmus), 3 planmäßig (4 h, folgt der
+    // Vorgabe). Fremd wird 3 auf „seit 30 min überfällig" gezogen — die Server-Ordnung
+    // stellte sie über 4.
+    const vier = (m = 120) =>
+      schicht({ id: 4, faellig_at: inMinuten(m), rhythmus_quelle: 'einheit' });
     const dreiVorgezogen = () =>
       schicht({
         id: 3,
         faellig_at: inMinuten(-30),
         rhythmus_minuten: 30,
-        rhythmus_quelle: 'einheit',
+        rhythmus_quelle: 'abschnitt',
       });
 
     it('eine fremde Rhythmusänderung verschiebt keine Karte, bis das Banner bedient wird (LFH-660)', async () => {
@@ -405,7 +407,7 @@ describe('AbloesungPage (LFH-635)', () => {
       await waitFor(() => expect(sammelbanner()).not.toBeNull());
       // Kriterium 9: die fällige Karte, die unter einer planmäßigen gehalten wird, wird genannt.
       expect(sammelbanner()).toHaveTextContent(
-        'Reihenfolge geändert, 1 fällige Schicht rückt nach oben',
+        'Reihenfolge geändert, 1 fällige Schicht steht weiter unten',
       );
       expect(kartenNamen()).toEqual([
         'Schicht Florian 1',
@@ -446,14 +448,17 @@ describe('AbloesungPage (LFH-635)', () => {
       expect(sammelbanner()).toBeNull();
     });
 
-    it('die eigene Rhythmusänderung ordnet ihre Karte sofort ein, ohne Banner', async () => {
+    it('die eigene Rhythmusänderung ordnet ihre Karte sofort ein; ein zurückgehaltener fremder Neuzugang bleibt zurück', async () => {
       laufendLiefert([eins(), vier(), drei()]);
       aendereSchicht.mockImplementation(() => {
-        laufendLiefert([dreiVorgezogen(), eins(), vier()]);
+        laufendLiefert([fremd(), dreiVorgezogen(), eins(), vier()]);
         return Promise.resolve(dreiVorgezogen());
       });
-      renderPage();
+      const { client } = renderPage();
       await screen.findAllByRole('article');
+      laufendLiefert([fremd(), eins(), vier(), drei()]);
+      await client.invalidateQueries();
+      await waitFor(() => expect(sammelbanner()).not.toBeNull());
       await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu Florian 3' }));
       const menu = document.querySelector(
         '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
@@ -472,21 +477,24 @@ describe('AbloesungPage (LFH-635)', () => {
           'Schicht Florian 4',
         ]),
       );
-      expect(sammelbanner()).toBeNull();
+      // Keine Umordnung gemeldet — nur der fremde Neuzugang wartet weiter.
+      expect(sammelbanner()).toHaveTextContent(/^1 neue Schicht, davon 1 fällig/);
+      expect(sammelbanner()).not.toHaveTextContent('Reihenfolge');
     });
 
-    it('die eigene Vorgabe ordnet die Schichten ihres Abschnitts ein, eine fremde Umordnung anderswo bleibt', async () => {
-      // 5 liegt in einem anderen Abschnitt; ihre fremde Umordnung wartet weiter auf das Banner.
-      const fuenf = (m: number) => schicht({ id: 5, abschnitt_id: 8, faellig_at: inMinuten(m) });
-      laufendLiefert([eins(), vier(), drei(), fuenf(300)]);
+    it('die eigene Vorgabe ordnet nur die Schichten ein, die ihr folgen — eine fremd umgeordnete mit eigenem Rhythmus bleibt', async () => {
+      // Der Server schreibt bei einer Vorgabe nur Schichten mit `rhythmus_quelle = 'abschnitt'`
+      // um (`abloesung/repo.rs::vorgabe_setzen`). 4 hat einen eigenen Rhythmus und wurde FREMD
+      // vorgezogen; die eigene Vorgabe darf sie nicht mit auftauen.
+      laufendLiefert([eins(), vier(), drei()]);
       const { client } = renderPage();
       await screen.findAllByRole('article');
-      laufendLiefert([fuenf(-5), eins(), vier(), drei()]);
+      laufendLiefert([vier(-20), eins(), drei()]);
       await client.invalidateQueries();
       await waitFor(() => expect(sammelbanner()).not.toBeNull());
 
       setzeAbloesungVorgabe.mockImplementation(() => {
-        laufendLiefert([fuenf(-5), dreiVorgezogen(), eins(), vier()]);
+        laufendLiefert([dreiVorgezogen(), vier(-20), eins()]);
         return Promise.resolve([]);
       });
       await userEvent.click(
@@ -503,7 +511,6 @@ describe('AbloesungPage (LFH-635)', () => {
           'Schicht Florian 3',
           'Schicht Florian 1',
           'Schicht Florian 4',
-          'Schicht Florian 5',
         ]),
       );
       expect(sammelbanner()).toHaveTextContent('Reihenfolge geändert');
