@@ -530,7 +530,7 @@ fn stab_sachgebiet_wire() {
 /// Frontend bildet die Werte in `pages/lage-dashboard/lagebild.ts` exhaustiv auf Plätze ab.
 #[test]
 fn einsatz_lagekennzahl_wire() {
-    enum_wire_as_str!(lifeline_hub::einsatz::lagekennzahl::Lagekennzahl { Pegel });
+    enum_wire_as_str!(lifeline_hub::einsatz::lagekennzahl::Lagekennzahl { Pegel, Evakuiert });
 }
 
 #[test]

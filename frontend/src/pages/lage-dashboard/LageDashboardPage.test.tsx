@@ -242,6 +242,14 @@ interface Daten {
   /** Aktive Lagekennzahlen am Einsatz (LFH-640), zur Anfragezeit gelesen — ein Test kann sie
    *  zwischen zwei Abrufen ändern. Vorgabe: die des Fixtures (`['pegel']`). */
   lagekennzahlen?: string[];
+  /** Evakuierungsbezirke der Betreuungs-Übersicht (LFH-607) und ein erzwungener Fehlerstatus. */
+  bezirke?: unknown[];
+  betreuungStatus?: number;
+  /** Zählt die Abrufe der Betreuungs-Übersicht (ohne Modulrecht: keiner). */
+  betreuungAbrufe?: { n: number };
+  /** Overrides-Abruf hängt bzw. scheitert (LFH-607: Freigaben unbekannt). */
+  overridesLaedt?: boolean;
+  overridesStatus?: number;
 }
 
 function mockEndpunkte(d: Daten) {
@@ -281,10 +289,18 @@ function mockEndpunkte(d: Daten) {
     http.get('/api/einsaetze/1/pegel', () =>
       d.pegelStatus ? new HttpResponse(null, { status: d.pegelStatus }) : json(d.pegel),
     ),
+    http.get('/api/einsaetze/1/betreuung', () => {
+      if (d.betreuungAbrufe) d.betreuungAbrufe.n += 1;
+      return d.betreuungStatus
+        ? new HttpResponse(null, { status: d.betreuungStatus })
+        : HttpResponse.json({ bezirke: d.bezirke ?? [], stellen: [] });
+    }),
     // LFH-633: ohne diesen Handler scheiterte die Abfrage in jedem Test, und die Kennzahl
     // bliebe auf der Pflege stehen — die href-Aussagen belegten dann nur den Fehlerpfad.
-    http.get('/api/einsaetze/1/modul-overrides', () => {
+    http.get('/api/einsaetze/1/modul-overrides', async () => {
+      if (d.overridesLaedt) await delay('infinite');
       if (d.overridesGeliefert) d.overridesGeliefert.n += 1;
+      if (d.overridesStatus) return new HttpResponse(null, { status: d.overridesStatus });
       return HttpResponse.json(d.overrides ?? {});
     }),
   );
@@ -332,6 +348,32 @@ const REIHE_OHNE_AUSLOESER = [
   'Vermisste',
   'Einsatzdauer',
 ];
+
+/** Reihe eines Hochwassers mit Pegel und Evakuierung — Entwurf S3 (LFH-607). */
+const REIHE_S3 = ['Pegel', 'Betroffene', 'Evakuiert', 'Kräfte', 'Vermisste', 'Einsatzdauer'];
+
+/** Ein aktiver Evakuierungsbezirk der Übersicht (LFH-639), nur mit den gelesenen Feldern. */
+const bezirk = (plan: number, stand: number | null) => ({
+  id: Math.floor(Math.random() * 1e9),
+  einsatz_id: 1,
+  bezeichnung: `Bezirk ${plan}`,
+  plan_personen: plan,
+  plan_erhebung: 'gezaehlt',
+  raeumung: 'angeordnet',
+  ...(stand == null
+    ? {}
+    : {
+        stand: {
+          id: Math.floor(Math.random() * 1e9),
+          evakuiert: stand,
+          erhebung: 'gezaehlt',
+          zeitpunkt_at: '2026-06-11 09:00:00',
+        },
+      }),
+});
+
+/** Schmales geschütztes Leerzeichen (Tausendertrenner) — als Literal. */
+const T = '\u202f';
 
 /** Die Etiketten des Bands in Reihenfolge. */
 function etiketten(): (string | null | undefined)[] {
@@ -731,6 +773,137 @@ describe('LageDashboardPage — Kennzahlenband', () => {
     expect(zelle).toHaveAttribute('href', '/einsaetze/1/einstellungen/pegel');
   });
 
+  describe('Evakuiert (LFH-607)', () => {
+    it('Hochwasser mit Pegel und Evakuierung: Reihe aus S3, „Evakuiert" auf Platz 3 mit N und M', async () => {
+      mockEndpunkte({
+        lagekennzahlen: ['pegel', 'evakuiert'],
+        bezirke: [bezirk(640, 600), bezirk(1210, 720)],
+      });
+      render();
+      const zelle = await kennzahlGeladen('Evakuiert');
+      expect(etiketten()).toEqual(REIHE_S3);
+      await waitFor(() =>
+        expect(zelle.querySelector('[data-lfh="kennzahl-wert"]')?.textContent).toBe(`1${T}320`),
+      );
+      // `toHaveTextContent` faltet das schmale Leerzeichen zu einem normalen — deshalb roh.
+      expect(zelle.textContent).toContain(`von 1${T}850 geplant`);
+      expect(zelle).toHaveAttribute('href', '/einsaetze/1/betreuung');
+      expect(zelle.getAttribute('data-ton')).toBe('neutral');
+    });
+
+    it('ohne Standmeldung „—", nie 0', async () => {
+      mockEndpunkte({ lagekennzahlen: ['evakuiert'], bezirke: [bezirk(640, null)] });
+      render();
+      const zelle = await kennzahlGeladen('Evakuiert');
+      await waitFor(() => expect(zelle).toHaveTextContent('von 640 geplant · 1 ohne Meldung'));
+      expect(zelle.querySelector('[data-lfh="kennzahl-wert"]')?.textContent).toBe('—');
+    });
+
+    it('FEHLER SIEHT NICHT AUS WIE LEER: ein gescheiterter Betreuungsabruf zeigt „?", Nachbarn bleiben lesbar', async () => {
+      mockEndpunkte({
+        lagekennzahlen: ['evakuiert'],
+        personen: [person('sk1')],
+        betreuungStatus: 500,
+      });
+      render();
+      await kennzahlGeladen('Evakuiert');
+      await waitFor(() => expect(kennzahl('Evakuiert')).toHaveTextContent('Stand unbekannt'));
+      expect(kennzahl('Evakuiert')).not.toHaveTextContent('keine geplante Evakuierung');
+      expect(kennzahl('Betroffene')).toHaveTextContent('1');
+      expect(kennzahl('Betroffene')).not.toHaveTextContent('Stand unbekannt');
+    });
+
+    it('Modul Betreuung ausgeblendet: der Platz bleibt „Evakuiert", ohne Zahl, ohne Link, ohne Abruf', async () => {
+      const betreuungAbrufe = { n: 0 };
+      const overridesGeliefert = { n: 0 };
+      mockEndpunkte({
+        lagekennzahlen: ['evakuiert'],
+        bezirke: [bezirk(640, 600)],
+        betreuungAbrufe,
+        overridesGeliefert,
+        overrides: {
+          betreuung: {
+            einsatz_id: 1,
+            modul_key: 'betreuung',
+            sichtbar: false,
+            benoetigte_rolle: null,
+            geaendert_at: null,
+          },
+        },
+      });
+      render();
+      await kennzahlGeladen('Betroffene');
+      await waitFor(() => expect(overridesGeliefert.n).toBeGreaterThan(0));
+      await waitFor(() =>
+        expect(kennzahl('Evakuiert')).toHaveTextContent('Modul Betreuung nicht freigegeben'),
+      );
+      const zelle = kennzahl('Evakuiert');
+      expect(etiketten()[2]).toBe('Evakuiert');
+      expect(zelle.tagName).not.toBe('A');
+      expect(zelle.querySelector('[data-lfh="kennzahl-wert"]')?.textContent).toBe('—');
+      expect(betreuungAbrufe.n).toBe(0);
+    });
+
+    it('solange die Freigaben unbekannt sind: kein Abruf und KEIN Link — ein Sprung ins Leere wäre möglich', async () => {
+      const betreuungAbrufe = { n: 0 };
+      mockEndpunkte({
+        lagekennzahlen: ['evakuiert'],
+        bezirke: [bezirk(640, 600)],
+        betreuungAbrufe,
+        overridesLaedt: true,
+      });
+      render();
+      await kennzahlGeladen('Betroffene');
+      const zelle = kennzahl('Evakuiert');
+      expect(zelle).toHaveTextContent('wird abgerufen');
+      expect(zelle.tagName).not.toBe('A');
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 20));
+      });
+      expect(betreuungAbrufe.n).toBe(0);
+    });
+
+    it('scheitert der Overrides-Abruf, bleibt das Recht unbekannt: „Stand unbekannt", kein Abruf, kein Link', async () => {
+      const betreuungAbrufe = { n: 0 };
+      const overridesGeliefert = { n: 0 };
+      mockEndpunkte({
+        lagekennzahlen: ['evakuiert'],
+        bezirke: [bezirk(640, 600)],
+        betreuungAbrufe,
+        overridesGeliefert,
+        overridesStatus: 500,
+      });
+      render();
+      await kennzahlGeladen('Betroffene');
+      await waitFor(() => expect(kennzahl('Evakuiert')).toHaveTextContent('Stand unbekannt'));
+      expect(kennzahl('Evakuiert').tagName).not.toBe('A');
+      expect(betreuungAbrufe.n).toBe(0);
+    });
+
+    it('eine fremde Anordnung beim erneuten Abruf wird gehalten: Banner „Evakuiert statt Schäden offen"', async () => {
+      const daten: Daten = { lagekennzahlen: ['pegel'], bezirke: [bezirk(640, 600)] };
+      mockEndpunkte(daten);
+      const { client } = render();
+      await kennzahlGeladen('Schäden offen');
+      expect(etiketten()).toEqual(REIHE_MIT_PEGEL);
+
+      daten.lagekennzahlen = ['pegel', 'evakuiert'];
+      await act(() => client.invalidateQueries({ queryKey: einsatzKeys.einsatz(1) }));
+      const banner = await screen.findByText(
+        'Kennzahlreihe geändert: Evakuiert statt Schäden offen',
+      );
+      // Kriterium 9: der Platz tauscht nicht unter dem Blick.
+      expect(etiketten()).toEqual(REIHE_MIT_PEGEL);
+
+      await userEvent.click(
+        within(banner.closest('[data-lfh="sammelbanner"]') as HTMLElement).getByRole('button', {
+          name: 'übernehmen',
+        }),
+      );
+      await waitFor(() => expect(etiketten()).toEqual(REIHE_S3));
+    });
+  });
+
   it('Deep-Link: Klick auf „Betroffene" führt ins Personen-Modul', async () => {
     mockEndpunkte({ personen: [person('sk1')] });
     render();
@@ -999,6 +1172,8 @@ describe('LageDashboardPage — Meldungsstrom', () => {
         HttpResponse.json([1, 2, 3, 4, 5, 6, 7].map((n) => etb(n, { id: 2000 + n }))),
       ),
       http.get('/api/einsaetze/2/gefahrengebiete/:gid/matrix', () => HttpResponse.json([])),
+      // Die Betreuungs-Übersicht ist ein Objekt, keine Liste (LFH-607).
+      http.get('/api/einsaetze/2/betreuung', () => HttpResponse.json({ bezirke: [], stellen: [] })),
       http.get('/api/einsaetze/2/:modul', () => HttpResponse.json([])),
     );
     function Wechsel() {
@@ -1031,6 +1206,8 @@ describe('LageDashboardPage — Meldungsstrom', () => {
         HttpResponse.json({ ...einsatz, id: 2, lagekennzahlen: zweiter }),
       ),
       http.get('/api/einsaetze/2/gefahrengebiete/:gid/matrix', () => HttpResponse.json([])),
+      // Die Betreuungs-Übersicht ist ein Objekt, keine Liste (LFH-607).
+      http.get('/api/einsaetze/2/betreuung', () => HttpResponse.json({ bezirke: [], stellen: [] })),
       http.get('/api/einsaetze/2/:modul', () => HttpResponse.json([])),
     );
     function Wechsel() {

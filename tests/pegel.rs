@@ -1059,3 +1059,39 @@ async fn pegel_festlegen_schaltet_die_lagekennzahl_am_einsatz() {
         (serde_json::json!([]), serde_json::json!([]))
     );
 }
+
+/// Pegel und Evakuierung zusammen (LFH-607): beide Auslöser, in Enum-Reihenfolge — so ergibt
+/// sich die Reihe aus Entwurf S3 (Pegel auf Platz 1, Evakuiert auf Platz 3).
+#[tokio::test]
+async fn pegel_und_evakuierung_schalten_beide_lagekennzahlen() {
+    let u = setup_pegel().await;
+    let admin = login_cookie(&u.app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&u.app, &admin).await;
+
+    let (status, b) = anfrage(
+        &u.app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/betreuung/bezirke"),
+        &admin,
+        Some(
+            r#"{"bezeichnung":"Uferstraße 12–40","plan_personen":640,"plan_erhebung":"gezaehlt"}"#,
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{b:?}");
+    let (status, _) = anfrage(
+        &u.app,
+        "POST",
+        &pfad(einsatz),
+        &admin,
+        Some(&format!(r#"{{"station_uuid":"{A}","name":"Köln"}}"#)),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+
+    let beide = serde_json::json!(["pegel", "evakuiert"]);
+    assert_eq!(
+        lagekennzahlen(&u, &admin, einsatz).await,
+        (beide.clone(), beide)
+    );
+}

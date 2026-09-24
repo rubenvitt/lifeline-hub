@@ -144,4 +144,22 @@ describe('useEvakuierungKennzahl', () => {
     expect(abrufe.anzahl).toBe(0);
     expect(result.current).toEqual({ zustand: 'aus' });
   });
+
+  it('`bereit: false` (Freigaben noch unbekannt) → `laden` OHNE Abruf, danach entscheidet das Recht (LFH-607)', async () => {
+    // Ohne diesen Riegel liefe der Abruf, bevor die Overrides da sind — bei ausgeblendetem
+    // Modul ein 403, den der Zähler gerade vermeiden soll.
+    const abrufe = zaehleAbrufe(() => HttpResponse.json({ bezirke: [], stellen: [] }));
+    const { result, rerender } = renderHook(
+      ({ bereit }: { bereit: boolean }) =>
+        useEvakuierungKennzahl({ einsatzId: 7, benutzer, bereit }),
+      { wrapper: wrapper(neuerQueryClient()), initialProps: { bereit: false } },
+    );
+    await new Promise((r) => setTimeout(r, 20));
+    expect(abrufe.anzahl).toBe(0);
+    expect(result.current).toEqual({ zustand: 'laden' });
+
+    rerender({ bereit: true });
+    await waitFor(() => expect(result.current.zustand).toBe('daten'));
+    expect(abrufe.anzahl).toBe(1);
+  });
 });

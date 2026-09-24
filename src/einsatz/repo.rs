@@ -137,6 +137,9 @@ pub(crate) async fn anlegen_zum(
 
 /// Lädt einen Einsatz; `AppError::NotFound`, wenn er nicht existiert.
 pub async fn laden(pool: &SqlitePool, einsatz_id: i64) -> Result<Einsatz, AppError> {
+    // Die beiden EXISTS-Spalten sind die Auslöser der Lagekennzahlen (LFH-640/LFH-607); sie
+    // stehen wortgleich auch in `liste_fuer`, das Bezirksprädikat wie `istAktiverBezirk` im
+    // Frontend — siehe `lagekennzahl::ableiten`.
     sqlx::query_as::<_, Einsatz>(
         "SELECT e.id, e.org_id, e.bezeichnung, e.stichwort, e.status, e.begonnen_at, \
                 e.abgeschlossen_at, e.abgeschlossen_von, e.einsatzart, e.einsatznummer_intern, \
@@ -144,7 +147,10 @@ pub async fn laden(pool: &SqlitePool, einsatz_id: i64) -> Result<Einsatz, AppErr
                 e.meldende_stelle, e.sachverhalt, e.anzahl_betroffene_initial, \
                 e.retention_bis, e.geloescht_at, e.naechste_lagebesprechung_at, \
                 o.name AS org_name, \
-                EXISTS (SELECT 1 FROM einsatz_pegel p WHERE p.einsatz_id = e.id) AS pegel_festgelegt \
+                EXISTS (SELECT 1 FROM einsatz_pegel p WHERE p.einsatz_id = e.id) AS pegel_festgelegt, \
+                EXISTS (SELECT 1 FROM evakuierungsbezirk b WHERE b.einsatz_id = e.id \
+                        AND b.storniert_at IS NULL AND b.raeumung <> 'aufgehoben') \
+                    AS evakuierung_angeordnet \
          FROM einsatz e \
          LEFT JOIN organisation o ON o.id = e.org_id \
          WHERE e.id = ?",
@@ -224,8 +230,10 @@ pub async fn liste_fuer(
         meine_rolle: Option<String>,
         meine_fuehrungsstelle: Option<String>,
         pegel_festgelegt: bool,
+        evakuierung_angeordnet: bool,
     }
 
+    // EXISTS-Spalten wortgleich zu `laden` (Auslöser der Lagekennzahlen, `lagekennzahl::ableiten`).
     let rows = sqlx::query_as::<_, Row>(
         "SELECT e.id, e.org_id, o.name AS org_name, e.bezeichnung, e.stichwort, e.status, e.begonnen_at, \
                 e.abgeschlossen_at, e.abgeschlossen_von, e.einsatzart, e.einsatznummer_intern, \
@@ -233,7 +241,10 @@ pub async fn liste_fuer(
                 e.meldende_stelle, e.sachverhalt, e.anzahl_betroffene_initial, \
                 e.retention_bis, e.geloescht_at, e.naechste_lagebesprechung_at, \
                 m.einsatz_rolle AS meine_rolle, m.fuehrungsstelle AS meine_fuehrungsstelle, \
-                EXISTS (SELECT 1 FROM einsatz_pegel p WHERE p.einsatz_id = e.id) AS pegel_festgelegt \
+                EXISTS (SELECT 1 FROM einsatz_pegel p WHERE p.einsatz_id = e.id) AS pegel_festgelegt, \
+                EXISTS (SELECT 1 FROM evakuierungsbezirk b WHERE b.einsatz_id = e.id \
+                        AND b.storniert_at IS NULL AND b.raeumung <> 'aufgehoben') \
+                    AS evakuierung_angeordnet \
          FROM einsatz e \
          LEFT JOIN organisation o ON o.id = e.org_id \
          LEFT JOIN einsatz_mitgliedschaft m \
@@ -302,7 +313,10 @@ pub async fn liste_fuer(
                 // Eintrag wird also nicht mehr gebraucht — das spart das Klonen des Vec.
                 meine_sachgebiete,
                 meine_funktion,
-                lagekennzahlen: super::lagekennzahl::ableiten(r.pegel_festgelegt),
+                lagekennzahlen: super::lagekennzahl::ableiten(
+                    r.pegel_festgelegt,
+                    r.evakuierung_angeordnet,
+                ),
             }
         })
         .collect())

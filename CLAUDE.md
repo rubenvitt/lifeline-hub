@@ -148,9 +148,12 @@ umkehrt, steht das am Absatz selbst mit „Neuentwurf 22.09.2026".
 - **Keine erfundenen Daten.** Was der Entwurf zeigt, aber keine Datenquelle hat, wird
   weggelassen — nicht als Platzhalter gebaut — und steht im ClickUp-Epic „Neuentwurf
   Instrumententafel – Datenlücken des Designs" (LFH-606…LFH-617, z. B. Evakuiert 607,
-  FMS-Status je Einheit 609, Koordinate an der Person 613). Bei Evakuiert ist die Datenquelle
-  seit LFH-639 da; eingetragen wird sie mit LFH-607 auf Lageplatz B (LFH-640). Die Auslassung
-  trägt ihr Ticket im Code-Kommentar und wird im Test als **Abwesenheit** gepinnt. **Eingelöst ist der Pegel (LFH-606):** er steht auf Platz 1
+  FMS-Status je Einheit 609, Koordinate an der Person 613). Die Auslassung trägt ihr Ticket
+  im Code-Kommentar und wird im Test als **Abwesenheit** gepinnt. **Eingelöst ist Evakuiert
+  (LFH-607):** Lageplatz B zeigt „Evakuiert N · von M geplant“, sobald ein Evakuierungsbezirk
+  aktiv ist (nicht storniert, nicht aufgehoben — dasselbe Prädikat wie `istAktiverBezirk`,
+  als Auslöser `evakuiert` am Einsatz); ohne Zugriff auf das Modul Betreuung bleibt die Zelle
+  stehen, ohne Zahl und ohne Link (Change `openspec/changes/lfh-607-kennzahl-evakuiert/`). **Eingelöst ist der Pegel (LFH-606):** er steht auf Platz 1
   des Kennzahlenbands, „Höchste Warnstufe" ist dafür raus (Entscheidung 22.09.2026; die
   Warnstufe bleibt im Seitenkopf-Hinweis und in der Gefahrenmatrix). **Seit LFH-640 nur bei
   festgelegtem Pegel:** das Band hat immer sechs Plätze, vier Kernplätze und zwei Lageplätze;
@@ -524,6 +527,17 @@ Alltag wichtigsten:
   neue Vorschausorte bekommt einen Eintrag in `VorschauZiel` und einen Zweig in
   `command-palette/Vorschau.tsx` (exhaustiv). Ihr Inhalt ist ein Lese-Bauteil, das auch außerhalb
   der Palette steht (Vorbild `personen/PersonVorschau.tsx`, geteilt mit `PersonDetailDrawer`).
+  **Seit LFH-664 hat jede Datensatzsorte eine Vorschau**, und ihr Ziel steht in der
+  Quellentabelle von `datensaetze.ts` (Baustein `vorschau` neben `label`/`ziel`), nicht in
+  `befehlFuer`. **Datenregel:** die Vorschau liest das Listenfach der Palette mit `select` auf
+  die `id`, über die geteilten Optionen in `command-palette/datensatzAbfrage.ts` — derselbe
+  Schlüssel, dieselbe `queryFn`, dieselbe Frische (`FRISCH_MS`). Weicht einer davon ab, lädt
+  die Vorschau still ein zweites Fach oder holt beim Öffnen neu. Kein Detailfach: `schaden`
+  und `uhsDetail` sind nicht live. Der ETB liest über den Nummerncursor (`lfdNr` im Ziel) und
+  zeigt nur einen Eintrag mit derselben `id` — bei einer Nummernlücke liefert der Cursor
+  sonst still den nächstälteren. Findet `select` nichts, sagt `VorschauZustand` „… ist nicht
+  mehr vorhanden." statt leer zu bleiben. Ein Verweis in der Vorschau schließt die Palette
+  (Riegel am Container der Region), sonst navigiert die App unter ihr weg.
 - **Datensatz-Aktionen werden gebündelt, nicht aufgereiht** (LFH-365 · B5e). Ab drei Aktionen
   an einer Zeile oder Karte, **gezählt nach der Rechteprüfung**: ein `Dropdown` mit
   `menu={{ items }}`, `trigger={['click']}`, `autoFocus` und icon-only `<Button type="text">`,

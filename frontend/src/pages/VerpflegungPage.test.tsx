@@ -369,6 +369,26 @@ describe('VerpflegungPage (LFH-634)', () => {
       expect(sammelbanner()).toBeNull();
     });
 
+    it('ein fremd vorgezogener Beginn ordnet nicht unter dem Cursor um (Muster LFH-660)', async () => {
+      const { client } = renderPage();
+      await screen.findAllByRole('article');
+      expect(kartenNamen()).toEqual(['Mittag', 'Abend']);
+
+      // Eine andere Person zieht „Abend" vor „Mittag" — die Server-Ordnung dreht sich.
+      liefert([fruehstueck(), { ...abend(), von_at: um(-60), bis_at: um(120) }, mittag()]);
+      await client.invalidateQueries();
+
+      await waitFor(() => expect(sammelbanner()).not.toBeNull());
+      expect(sammelbanner()).toHaveTextContent('Reihenfolge geändert');
+      expect(kartenNamen()).toEqual(['Mittag', 'Abend']);
+
+      await userEvent.click(
+        within(sammelbanner() as HTMLElement).getByRole('button', { name: 'anzeigen' }),
+      );
+      expect(kartenNamen()).toEqual(['Abend', 'Mittag']);
+      expect(sammelbanner()).toBeNull();
+    });
+
     it('geänderte Mengen an bestehenden Karten erscheinen sofort, ohne Banner', async () => {
       const { client } = renderPage();
       await screen.findAllByRole('article');

@@ -27,6 +27,7 @@ import {
 import { rhythmusText, zaehleFaellige } from '../abloesung/einstufung';
 import { useUhr } from '../abloesung/useUhr';
 import {
+  eingeordnet,
   freigegeben,
   LEERER_ZUFLUSSSTAND,
   nachgefuehrt,
@@ -68,7 +69,9 @@ type Rhythmusziel =
  * nicht „welche von diesen ist die richtige?", und die Ordnung ist die Fälligkeit, die der
  * Server festlegt. Neue Schichten landen deshalb an ihrem Fälligkeitsplatz, auch OBERHALB
  * einer gezeigten Karte. Fremde Neuzugänge warten darum hinter dem Sammelbanner, eigene
- * stehen sofort (LFH-647, Regeln in `abloesung/zufluss.ts`).
+ * stehen sofort (LFH-647). Die Folge der gezeigten Karten ist eingefroren, ihr Inhalt frisch:
+ * eine fremde Änderung von Rhythmus oder Beginn ordnet erst mit dem Banner um, eine eigene
+ * sofort (LFH-660). Regeln in `abloesung/zufluss.ts`.
  *
  * DAS BANNER NIMMT KEINE EIGENE ZEILE. Es steht in der Segmentzeile, die immer gerendert wird
  * und deren Höhe es nicht ändert (`nowrap`, gleiche Steuerhöhe, Text mit Auslassung) — ein
@@ -137,12 +140,12 @@ export default function AbloesungPage() {
   // Server ab.
   const zufluss: Zuflussstand =
     zuflussZustand.einsatzId === einsatzId ? zuflussZustand : LEERER_ZUFLUSSSTAND;
-  const { sichtbar, zurueckgehalten } = teileZufluss(laufende, zufluss);
+  const { sichtbar, zurueckgehalten, umgeordnet } = teileZufluss(laufende, zufluss);
   // Nachführen IM RENDER (Zustandsangleich an die Daten, Muster `EtbZeitachse`), nicht im
   // Effekt: ein Effekt ließe einen Bildaufbau mit veraltetem Stand durch. `nachgefuehrt`
   // liefert `null`, wenn nichts zu tun ist — das ist der Riegel gegen die Schleife.
   if (laufendQuery.data) {
-    const neu = nachgefuehrt(zufluss, sichtbar);
+    const neu = nachgefuehrt(zufluss, sichtbar, umgeordnet);
     if (neu || zuflussZustand.einsatzId !== einsatzId) {
       setZuflussZustand({ einsatzId, ...(neu ?? zufluss) });
     }
@@ -152,6 +155,15 @@ export default function AbloesungPage() {
       const basis = z.einsatzId === einsatzId ? z : { einsatzId, ...LEERER_ZUFLUSSSTAND };
       return { ...basis, eigene: new Set([...basis.eigene, id]) };
     });
+  // Eine eigene Änderung ordnet ihre Karten sofort ein (LFH-660). Gerufen NACH dem Refetch,
+  // mit dessen Daten: der Render-Stand `laufende` ist zu diesem Zeitpunkt veraltet.
+  const ordneEin = (auswahl: (s: Abloesung) => boolean) => {
+    const frisch =
+      qc.getQueryData<Abloesung[]>(einsatzKeys.abloesungListe(einsatzId, 'laufend')) ?? [];
+    setZuflussZustand((z) =>
+      z.einsatzId === einsatzId ? { einsatzId, ...eingeordnet(z, frisch.filter(auswahl)) } : z,
+    );
+  };
   // Funktional: eine gerade eingereihte Vormerkung (`merkeEigene`) darf die Freigabe nicht
   // überschreiben.
   const gibFrei = () =>
@@ -234,17 +246,38 @@ export default function AbloesungPage() {
       abloesungId: number;
       body: Parameters<typeof aendereSchicht>[2];
     }) => aendereSchicht(einsatzId, abloesungId, body),
-    onSuccess: () => {
-      invalidiere();
+    // Rhythmus oder Beginn verschieben die Fälligkeit: die eigene Karte rückt an ihren Platz,
+    // und zwar erst NACH dem Refetch — vorher stünde sie mit altem Inhalt am neuen Platz. Trifft
+    // der Live-Refetch vor der eigenen Antwort ein, meldet das Banner diese eine Rundreise lang
+    // „Reihenfolge geändert" (kurzer, benannter Rest; die Höhe der Werkzeugzeile ändert sich
+    // dabei nicht). Scheitert der Refetch, wird nichts eingeordnet, und der nächste Abruf zeigt
+    // die eigene Änderung wie eine fremde hinter dem Banner.
+    onSuccess: async (a, { body }) => {
       message.success('Schicht geändert');
+      if (body.rhythmus_minuten === undefined && body.beginn_at === undefined) {
+        void invalidiere();
+        return;
+      }
+      await invalidiere();
+      ordneEin((s) => s.id === a.id);
     },
   });
   const vorgabeMut = useMutation({
     mutationFn: ({ abschnittId, minuten }: { abschnittId: number; minuten: number | null }) =>
       setzeAbloesungVorgabe(einsatzId, abschnittId, minuten),
-    onSuccess: () => {
-      invalidiere();
+    // Eine neu gesetzte Vorgabe schreibt der Server nur in die Schichten ihres Abschnitts, die
+    // ihr folgen (`rhythmus_quelle = 'abschnitt'`); eine entfernte lässt jede Schicht stehen.
+    // Genau diese werden eingeordnet — eine fremd umgeordnete Schicht mit eigenem Rhythmus im
+    // selben Abschnitt bleibt eingefroren. Die Antwort trägt keine Schichten, also nach dem
+    // Refetch (Rennen und Fehlerpfad wie bei `aendernMut`).
+    onSuccess: async (_, { abschnittId, minuten }) => {
       message.success('Rhythmus-Vorgabe gespeichert');
+      if (minuten == null) {
+        void invalidiere();
+        return;
+      }
+      await invalidiere();
+      ordneEin((s) => s.abschnitt_id === abschnittId && s.rhythmus_quelle === 'abschnitt');
     },
   });
 
@@ -261,6 +294,7 @@ export default function AbloesungPage() {
   const einsatz = einsatzQuery.data;
   const faellig = zaehleFaellige(laufende, jetzt);
   const liste = ansicht === 'laufend' ? sichtbar : (abgeloestQuery.data ?? []);
+  const bannerText = zuflussText(zurueckgehalten, jetzt, umgeordnet ? sichtbar : null);
   const listenQuery = ansicht === 'laufend' ? laufendQuery : abgeloestQuery;
   const oeffneBeginnen = () => {
     beginnenMut.reset();
@@ -315,13 +349,13 @@ export default function AbloesungPage() {
           ]}
           style={{ flex: 'none' }}
         />
-        {ansicht === 'laufend' && zurueckgehalten.length > 0 && (
+        {ansicht === 'laufend' && (zurueckgehalten.length > 0 || umgeordnet) && (
           <Sammelbanner
             aktion={{ label: 'anzeigen', onKlick: gibFrei }}
             style={{ flex: '1 1 0', minWidth: 0, flexWrap: 'nowrap', paddingBlock: 0 }}
           >
             <span
-              title={zuflussText(zurueckgehalten, jetzt)}
+              title={bannerText}
               style={{
                 display: 'block',
                 overflow: 'hidden',
@@ -329,7 +363,7 @@ export default function AbloesungPage() {
                 whiteSpace: 'nowrap',
               }}
             >
-              {zuflussText(zurueckgehalten, jetzt)}
+              {bannerText}
             </span>
           </Sammelbanner>
         )}

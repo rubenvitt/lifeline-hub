@@ -3,10 +3,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import {
-  freigegeben,
+  freigegebenNach,
   LEERER_ZUFLUSSSTAND,
-  nachgefuehrt,
-  teileZufluss,
+  nachgefuehrtNach,
+  teileZuflussNach,
+  type Sortierschluessel,
   type Zuflussstand,
 } from '../abloesung/zufluss';
 import { useUhr } from '../abloesung/useUhr';
@@ -57,17 +58,33 @@ export function verpflegungRechteText(status: EinsatzStatus): string {
     : 'Nur Einsatzleitung und Führungspersonal können Zeitfenster anlegen und Ausgaben erfassen.';
 }
 
-/** „1 neues Zeitfenster, davon 1 mit Unterdeckung" — der Wortlaut des Sammelbanners. */
+/**
+ * Sortierschlüssel der Zeitfenster für die Zufluss-Schleuse: der Beginn, wie der Server ordnet
+ * (`ORDER BY von_at, id`). Verschiebt eine andere Person den Beginn, bleibt die gezeigte Folge
+ * stehen, bis das Banner bedient wird (Muster LFH-660).
+ */
+const BEGINN: Sortierschluessel<VerpflegungZeitfenster> = (zf) => zf.von_at;
+
+/**
+ * „1 neues Zeitfenster, davon 1 mit Unterdeckung" — der Wortlaut des Sammelbanners; bei einer
+ * fremden Umordnung zusätzlich „Reihenfolge geändert".
+ */
 export function zuflussText(
   zurueckgehalten: readonly VerpflegungZeitfenster[],
   jetzt: Parameters<typeof deckungEinstufung>[1],
+  umgeordnet = false,
 ): string {
+  const teile: string[] = [];
   const n = zurueckgehalten.length;
-  const basis = n === 1 ? '1 neues Zeitfenster' : `${n} neue Zeitfenster`;
-  const unter = zurueckgehalten.filter(
-    (zf) => deckungEinstufung(zf, jetzt) === 'unterdeckung',
-  ).length;
-  return unter > 0 ? `${basis}, davon ${unter} mit Unterdeckung` : basis;
+  if (n > 0) {
+    const basis = n === 1 ? '1 neues Zeitfenster' : `${n} neue Zeitfenster`;
+    const unter = zurueckgehalten.filter(
+      (zf) => deckungEinstufung(zf, jetzt) === 'unterdeckung',
+    ).length;
+    teile.push(unter > 0 ? `${basis}, davon ${unter} mit Unterdeckung` : basis);
+  }
+  if (umgeordnet) teile.push('Reihenfolge geändert');
+  return teile.join(' · ');
 }
 
 type Ansicht = 'laufend' | 'vergangen';
@@ -167,7 +184,8 @@ export default function VerpflegungPage() {
   // ── Live-Zufluss ────────────────────────────────────────────────────────────────────
   const zufluss: Zuflussstand =
     zuflussZustand.einsatzId === einsatzId ? zuflussZustand : LEERER_ZUFLUSSSTAND;
-  const geteilt = teileZufluss(alle, zufluss);
+  const geteilt = teileZuflussNach(alle, zufluss, BEGINN);
+  const umgeordnet = geteilt.umgeordnet;
   const inAnsicht = (zf: VerpflegungZeitfenster) =>
     istVergangen(zf, jetzt) === (ansicht === 'vergangen');
   let sichtbar = geteilt.sichtbar;
@@ -182,7 +200,7 @@ export default function VerpflegungPage() {
   // Nachführen IM RENDER (Muster Ablösung): `nachgefuehrt` liefert `null`, wenn nichts zu tun
   // ist — der Riegel gegen die Schleife.
   if (verpflegungQuery.data) {
-    const neu = nachgefuehrt(zufluss, sichtbar);
+    const neu = nachgefuehrtNach(zufluss, sichtbar, umgeordnet, BEGINN);
     if (neu || zuflussZustand.einsatzId !== einsatzId) {
       setZuflussZustand({ einsatzId, ...(neu ?? zufluss) });
     }
@@ -195,7 +213,7 @@ export default function VerpflegungPage() {
   const gibFrei = () =>
     setZuflussZustand((z) => ({
       einsatzId,
-      ...freigegeben(z.einsatzId === einsatzId ? z : LEERER_ZUFLUSSSTAND, alle),
+      ...freigegebenNach(z.einsatzId === einsatzId ? z : LEERER_ZUFLUSSSTAND, alle, BEGINN),
     }));
 
   // ── Mutationen ──────────────────────────────────────────────────────────────────────
@@ -342,13 +360,13 @@ export default function VerpflegungPage() {
           ]}
           style={{ flex: 'none' }}
         />
-        {zurueckgehalten.length > 0 && (
+        {(zurueckgehalten.length > 0 || umgeordnet) && (
           <Sammelbanner
             aktion={{ label: 'anzeigen', onKlick: gibFrei }}
             style={{ flex: '1 1 0', minWidth: 0, flexWrap: 'nowrap', paddingBlock: 0 }}
           >
             <span
-              title={zuflussText(zurueckgehalten, jetzt)}
+              title={zuflussText(zurueckgehalten, jetzt, umgeordnet)}
               style={{
                 display: 'block',
                 overflow: 'hidden',
@@ -356,7 +374,7 @@ export default function VerpflegungPage() {
                 whiteSpace: 'nowrap',
               }}
             >
-              {zuflussText(zurueckgehalten, jetzt)}
+              {zuflussText(zurueckgehalten, jetzt, umgeordnet)}
             </span>
           </Sammelbanner>
         )}

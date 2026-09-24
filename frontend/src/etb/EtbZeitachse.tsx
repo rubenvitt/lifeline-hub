@@ -74,7 +74,8 @@ interface Props {
   leerText?: ReactNode;
 }
 
-const MELDEWEG_LABEL = Object.fromEntries(
+/** Anzeigewort je Meldeweg — auch die Palettenvorschau liest es von hier (LFH-664). */
+export const MELDEWEG_LABEL = Object.fromEntries(
   MELDEWEG_OPTIONEN.map((o) => [o.value, o.label]),
 ) as Record<MeldeWeg, string>;
 
