@@ -237,14 +237,16 @@ summiert werden. Die Antwort MUST keinen Personenbezug enthalten.
 Als Stelle ohne Meldung MUST nur eine Stelle gelten, die zu t betrieben sein konnte (LFH-679):
 Eine nach t angelegte Stelle MUST fehlen, ebenso eine Stelle, die jetzt geschlossen oder
 vorbereitet ist und nie eine nicht zurückgenommene Meldung hatte. Eine Stelle mit Meldung ≤ t
-MUST unabhängig davon mitzählen, auch wenn die Meldung vor ihrer Anlage liegt.
+MUST unabhängig davon mitzählen, auch wenn die Meldung vor ihrer Anlage liegt. Maßgeblich ist
+mangels Statushistorie der heutige Status; eine Stelle, die zu t in Betrieb war, nie gemeldet
+hat und später geschlossen wurde, fällt deshalb ebenfalls weg.
 
 #### Scenario: Kopfzahl zum Schichtbeginn
 - **WHEN** „Turnhalle Ost“ um 12:00 mit 60 und um 14:00 mit 89 gemeldet ist und „Weserstadion“ um 13:00 mit 84, und die Kopfzahl für 13:30 abgefragt wird
 - **THEN** liefert das System 60 für „Turnhalle Ost“, 84 für „Weserstadion“ und die Summe 144
 
 #### Scenario: Stelle ohne Meldung
-- **WHEN** eine Stelle in Betrieb vor t angelegt ist und vor t keine Belegungsmeldung hat
+- **WHEN** eine vor t angelegte Stelle, die nicht unter den Ausschluss fällt, vor t keine Belegungsmeldung hat
 - **THEN** ist sie ohne Anzahl ausgewiesen und die Summe enthält sie nicht
 
 #### Scenario: Stelle nach dem Stichtag angelegt

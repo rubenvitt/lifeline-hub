@@ -349,9 +349,13 @@ pub async fn stelle_laden(
 /// konnte. Weg fallen Stellen, die erst nach dem Stichtag angelegt wurden, und Stellen, die
 /// jetzt `geschlossen` oder `vorbereitet` sind und nie eine (nicht zurückgenommene) Meldung
 /// hatten — dort war nach allem, was bekannt ist, nie jemand. Eine Statushistorie gibt es
-/// nicht; eine jetzt geschlossene Stelle MIT späterer Meldung bleibt deshalb „ohne Meldung“,
-/// denn sie kann zum Stichtag schon betrieben worden sein. Der Fehler geht so in die
-/// vorsichtige Richtung: der Hinweis „Untergrenze“ steht eher zu oft als zu selten.
+/// nicht, der Status ist der HEUTIGE: dieselbe Abfrage für ein vergangenes t kann deshalb
+/// später anders ausfallen. Zwei Unschärfen folgen daraus, bewusst in verschiedene Richtungen:
+/// Eine jetzt geschlossene Stelle MIT späterer Meldung bleibt „ohne Meldung“, denn sie kann zum
+/// Stichtag schon betrieben worden sein (Hinweis „Untergrenze“ eher zu oft). Eine Stelle, die
+/// zu t in Betrieb war, nie gemeldet hat und später geschlossen wurde, fällt dagegen weg (der
+/// Hinweis fehlt dann) — der Preis dafür, nie belegte Stellen nicht mitzuzählen, ohne dass es
+/// eine Migration gibt.
 /// Eine Stelle MIT Meldung ≤ Stichtag zählt immer, auch vor ihrem `angelegt_at` — eine
 /// Meldung darf nachgetragen früher liegen als die Erfassung der Stelle, und ihre Zahl ist
 /// eine Tatsache. Die Summe hängt deshalb nicht an dieser Eingrenzung.

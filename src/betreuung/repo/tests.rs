@@ -1808,7 +1808,7 @@ async fn kopfzahl_zaehlt_eine_jetzt_geschlossene_stelle_mit_spaeterer_meldung_we
     stelle_status(&w, zu, Status::InBetrieb).await.unwrap();
     belegung(&w, zu, 0, "2026-09-23 15:00:00").await.unwrap();
     stelle_status(&w, zu, Status::Geschlossen).await.unwrap();
-    // Dasselbe für eine wieder auf „vorbereitet“ gesetzte Stelle.
+    // Dasselbe für eine noch vorbereitete Stelle, die nach t gemeldet hat.
     let zurueckgestellt = stelle(&w, "Schule Nord", None).await;
     belegung(&w, zurueckgestellt, 12, "2026-09-23 15:00:00")
         .await
