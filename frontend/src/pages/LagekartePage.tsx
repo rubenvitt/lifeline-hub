@@ -191,6 +191,7 @@ export default function LagekartePage() {
     personenZugriff,
     personenVerortet,
     personenFehler,
+    betreuungZugriff,
   } = useLagekarteDaten({ einsatzId, zeigeZonen: layer.zone, aktiveAnsichtId, quelle });
 
   // Ebene „Betroffene" (LFH-648): gezeichnet nur bei eingeschaltetem Schalter UND freiem
@@ -888,6 +889,7 @@ export default function LagekartePage() {
           anzahl: personenVerortet.length,
           fehler: personenFehler,
         }}
+        betreuung={{ zugriff: betreuungZugriff }}
         basemap={basemap}
         grundlageWahl={istSchmal ? grundlageWahl : undefined}
         onMarkerWaehlen={onMarkerWaehlen}

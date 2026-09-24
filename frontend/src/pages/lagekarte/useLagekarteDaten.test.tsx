@@ -33,6 +33,8 @@ beforeEach(() => {
   server.use(
     http.get('/api/einsaetze/5/modul-overrides', () => HttpResponse.json({})),
     http.get('/api/einsaetze/5/personen', () => HttpResponse.json([])),
+    // Ebene „Betreuungsstellen" (LFH-673): dieselbe Lage — ohne Benutzer ist das Modul frei.
+    http.get('/api/einsaetze/5/betreuung', () => HttpResponse.json({ bezirke: [], stellen: [] })),
   );
 });
 
@@ -550,5 +552,168 @@ describe('useLagekarteDaten Betroffene (LFH-648)', () => {
     await waitFor(() => expect(result.current.ladt).toBe(false));
     await new Promise((r) => setTimeout(r, 50));
     expect(result.current.personenZugriff).toBe('ausgeblendet');
+  });
+});
+
+describe('useLagekarteDaten Betreuungsstellen (LFH-673)', () => {
+  const STELLE = {
+    id: 21,
+    einsatz_id: 5,
+    bezeichnung: 'NU Turnhalle Nord',
+    art: 'notunterkunft',
+    status: 'in_betrieb',
+    lat: 50.02,
+    lon: 8.51,
+    angelegt_at: '2026-09-24 08:00:00',
+  };
+  const UNVERORTET = {
+    ...STELLE,
+    id: 22,
+    bezeichnung: 'AS Rathaus',
+    lat: undefined,
+    lon: undefined,
+  };
+
+  /** Alle Live-Quellen gesund; Overrides und Betreuung je Fall. Liefert den Abrufzähler. */
+  function handler(overrides: Record<string, unknown>, betreuung: () => Response) {
+    const zaehler = { betreuung: 0 };
+    server.use(
+      http.get('/api/einsaetze/5', () =>
+        HttpResponse.json({ id: 5, bezeichnung: 'T', status: 'aktiv' }),
+      ),
+      http.get('/api/organisation', () =>
+        HttpResponse.json({ id: 1, name: 'Org', tz_organisation: null }),
+      ),
+      http.get('/api/karte/config', () =>
+        HttpResponse.json({
+          online_styles: [],
+          offline_verfuegbar: false,
+          offline_tiles_url: null,
+          offline_attribution: null,
+          offline_regionen: [],
+          karten_bau_verfuegbar: false,
+        }),
+      ),
+      http.get('/api/einsaetze/5/einstellungen', () =>
+        HttpResponse.json({ einsatz_id: 5, org_defaults: { org_id: 1 } }),
+      ),
+      ...[
+        '/api/einsaetze/5/uhs',
+        '/api/einsaetze/5/schaeden',
+        '/api/einsaetze/5/einheiten',
+        '/api/einsaetze/5/fahrzeuge',
+        '/api/einsaetze/5/abschnitte',
+        '/api/einsaetze/5/zonen',
+        '/api/einsaetze/5/freie-zeichen',
+        '/api/einsaetze/5/gefahrengebiete',
+        '/api/einsaetze/5/lage/meldungen',
+        '/api/einsaetze/5/karte/fuehrungskraefte',
+      ].map((pfad) => http.get(pfad, () => HttpResponse.json([]))),
+      http.get('/api/einsaetze/5/meldungen/rueckmeldungen', () =>
+        HttpResponse.json(RUECKMELDUNGEN),
+      ),
+      http.get('/api/einsaetze/5/modul-overrides', () => HttpResponse.json(overrides)),
+      http.get('/api/einsaetze/5/betreuung', () => {
+        zaehler.betreuung += 1;
+        return betreuung();
+      }),
+    );
+    return zaehler;
+  }
+
+  function render() {
+    return renderHook(() => useLagekarteDaten({ einsatzId: 5, zeigeZonen: true }), {
+      wrapper: wrapper(),
+    });
+  }
+
+  it('frei: verortete Stelle in `alleVerortet`, unverortete in „Nicht verortet", Rohdaten fürs Raster', async () => {
+    handler({}, () => HttpResponse.json({ bezirke: [], stellen: [STELLE, UNVERORTET] }));
+    const { result } = render();
+    await waitFor(() =>
+      expect(result.current.alleVerortet.some((m) => m.typ === 'betreuungsstelle')).toBe(true),
+    );
+    expect(result.current.betreuungZugriff).toBe('frei');
+    expect(result.current.alleVerortet.find((m) => m.typ === 'betreuungsstelle')).toMatchObject({
+      schluessel: 'betreuungsstelle-21',
+      label: 'NU Turnhalle Nord',
+    });
+    expect(result.current.nichtVerortetAlle).toContainEqual({
+      typ: 'betreuungsstelle',
+      id: 22,
+      label: 'AS Rathaus',
+    });
+    expect(result.current.rohdaten.betreuungsstellen).toHaveLength(2);
+    expect(result.current.fehlerhafteQuellen).toEqual([]);
+  });
+
+  it('Rollensperre im Client: „gesperrt" und KEIN Request an …/betreuung', async () => {
+    // Auth ohne Benutzer — eine Führungskraft-Schranke sperrt also.
+    const z = handler(
+      {
+        betreuung: {
+          einsatz_id: 5,
+          modul_key: 'betreuung',
+          sichtbar: true,
+          benoetigte_rolle: 'fuehrungskraft',
+        },
+      },
+      () => HttpResponse.json({ bezirke: [], stellen: [STELLE] }),
+    );
+    const { result } = render();
+    await waitFor(() => expect(result.current.betreuungZugriff).toBe('gesperrt'));
+    await waitFor(() => expect(result.current.ladt).toBe(false));
+    expect(result.current.alleVerortet.some((m) => m.typ === 'betreuungsstelle')).toBe(false);
+    expect(z.betreuung).toBe(0);
+  });
+
+  it('Server lehnt mit 403 ab: „gesperrt", keine Marker, KEIN Ausfall', async () => {
+    handler({}, () => new HttpResponse(null, { status: 403 }));
+    const { result } = render();
+    await waitFor(() => expect(result.current.betreuungZugriff).toBe('gesperrt'));
+    expect(result.current.alleVerortet.some((m) => m.typ === 'betreuungsstelle')).toBe(false);
+    expect(result.current.fehlerhafteQuellen).toEqual([]);
+  });
+
+  it('echter Ausfall (500) bei freiem Modul: „Betreuungsstellen" steht im Ausfall', async () => {
+    handler({}, () => new HttpResponse(null, { status: 500 }));
+    const { result } = render();
+    await waitFor(() => expect(result.current.fehlerhafteQuellen).toEqual(['Betreuungsstellen']));
+    expect(result.current.betreuungZugriff).toBe('frei');
+    expect(result.current.nichtVerortetAlle.some((m) => m.typ === 'betreuungsstelle')).toBe(false);
+  });
+
+  it('Historien-Modus: Stellen kommen aus dem Dokument, kein Live-Request', async () => {
+    const z = handler({}, () => HttpResponse.json({ bezirke: [], stellen: [] }));
+    const doc = dokument('keine');
+    ladeLageSnapshot.mockResolvedValue({
+      ...doc,
+      daten: { ...doc.daten, betreuungsstellen: [STELLE] },
+    });
+    const { result } = renderHook(
+      () =>
+        useLagekarteDaten({ einsatzId: 5, zeigeZonen: true, quelle: { typ: 'snapshot', id: 9 } }),
+      { wrapper: wrapper() },
+    );
+    await waitFor(() =>
+      expect(result.current.alleVerortet.some((m) => m.schluessel === 'betreuungsstelle-21')).toBe(
+        true,
+      ),
+    );
+    expect(z.betreuung).toBe(0);
+  });
+
+  it('Historien-Modus mit altem Dokument ohne Feld: keine Stellen, kein Fehler', async () => {
+    handler({}, () => HttpResponse.json({ bezirke: [], stellen: [] }));
+    ladeLageSnapshot.mockResolvedValue(dokument('keine'));
+    const { result } = renderHook(
+      () =>
+        useLagekarteDaten({ einsatzId: 5, zeigeZonen: true, quelle: { typ: 'snapshot', id: 9 } }),
+      { wrapper: wrapper() },
+    );
+    await waitFor(() => expect(result.current.ladt).toBe(false));
+    await waitFor(() => expect(result.current.betreuungZugriff).toBe('frei'));
+    expect(result.current.alleVerortet.some((m) => m.typ === 'betreuungsstelle')).toBe(false);
+    expect(result.current.fehlerhafteQuellen).toEqual([]);
   });
 });

@@ -62,8 +62,9 @@ const PLAKETTEN_RANG: Partial<Record<MarkerTyp, number>> = {
   einheit: 2,
   abschnitt: 3,
   uhs: 4,
-  schaden: 5,
-  freies_zeichen: 6,
+  betreuungsstelle: 5,
+  schaden: 6,
+  freies_zeichen: 7,
 };
 
 /** Der Name auf der Plakette — oder keiner, wo das label keiner ist (LFH-622). */

@@ -90,6 +90,9 @@ describe('Personen-Cluster nach Sichtung (LFH-650)', () => {
     ]);
     expect(JSON.stringify(segs).toLowerCase()).not.toContain('#be185d');
     expect(Object.values(CLUSTER_TYP_FARBE)).not.toContain('#be185d');
+    // LFH-673: Betreuungsstellen tragen ein eigenes Cyan, abgesetzt vom UHS-Blau.
+    expect(CLUSTER_TYP_FARBE.betreuungsstelle).toBe('#0891b2');
+    expect(CLUSTER_TYP_FARBE.betreuungsstelle).not.toBe(CLUSTER_TYP_FARBE.uhs);
   });
 
   it('nennt die dringlichste Sichtung — SK I schlägt alles, „ohne" nur allein', () => {

@@ -526,7 +526,7 @@ export function parseKartenzentrum(wert: string | null | undefined): Kartenzentr
  * steht, muss die Karte auch aus einem Fremd-Link heraus platzieren können. Wer den Typ
  * erweitert, prüft `pages/LagekartePage.tsx` mit — dort wird der Wert zurückgelesen.
  */
-export type PlatzierenZielTyp = 'schaden' | 'uhs' | 'person';
+export type PlatzierenZielTyp = 'schaden' | 'uhs' | 'person' | 'betreuungsstelle';
 
 /** Exhaustiv: ein neuer Zieltyp bricht den Typcheck, statt im Parser still zu fehlen. */
 const PLATZIEREN_ZIEL_ERLAUBT: Record<PlatzierenZielTyp, true> = {
@@ -534,6 +534,8 @@ const PLATZIEREN_ZIEL_ERLAUBT: Record<PlatzierenZielTyp, true> = {
   uhs: true,
   // Fundort-Koordinate einer Person (LFH-613, „Auf Lagekarte verorten" der Detailseite).
   person: true,
+  // Betreuungsstelle (LFH-673, „Auf Karte verorten" der Betreuungsseite).
+  betreuungsstelle: true,
 };
 
 /**

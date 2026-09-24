@@ -188,8 +188,16 @@ Lagekarte hängen, nicht am Modul Betreuung. „Auf Karte zeigen“ erscheint nu
   `LayerSichtbar`, `LAYER_DEFAULT` (sichtbar), `OBJEKTART`, `CLUSTER_TYP_FARBE`,
   `Inspector`-Switch, `PLATZIEREN_ZIEL_ERLAUBT`. Außerdem die nicht exhaustiven Stellen
   aus dem Scope-Bericht (`LAYER_KEYS`, `EBENEN`, `TYP_REIHENFOLGE`, Plaketten-Rang,
-  `markerToUrl`, `NichtVerortet['typ']`, `NICHT_VERORTET_LABEL`, `ortVorschauExclude` mit
-  Backend-Tag in `src/geocoding/marker.rs`, `snapshotDaten.ts`).
+  `markerToUrl`, `NichtVerortet['typ']`, `NICHT_VERORTET_LABEL`, `ortVorschauExclude`,
+  `snapshotDaten.ts`).
+- **Nicht in der Peilung der Ort-Vorschau.** `src/geocoding/marker.rs` prüft nur den
+  Einsatz-Lesezugriff. Stünde die Stelle dort als Bezugspunkt, nannte die Vorschau ihren
+  Namen auch Personen ohne das Modul Betreuung. Die Stelle bleibt deshalb draußen, wie die
+  Betroffenen (LFH-648). `ortVorschauExclude`/`inspectorExclude` liefern für sie
+  `undefined`, weil es nichts auszuschließen gibt. (Beim Umsetzen gefunden, 24.09.2026.)
+- **Startausschnitt und Kopfzahl** zählen die Stellen mit, wie die UHS. Anders als bei den
+  Betroffenen: Stellen sind wenige Lageobjekte. Dass der Startausschnitt einer Person ohne
+  Modulrecht sie nicht kennt, wird hingenommen.
 - **Zeichen:** `{grundzeichen: 'stelle', fachaufgabe: 'betreuung'}` für alle vier Arten.
   Die Art steht in der Unterzeile. Eine eigene Zeichenvariante je Einrichtungsstufe gibt
   der Katalog nicht her.

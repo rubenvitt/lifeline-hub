@@ -369,6 +369,7 @@ function basisHandler(
     // überall im Ausfallbanner.
     http.get('/api/einsaetze/1/modul-overrides', () => HttpResponse.json({})),
     http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/betreuung', () => HttpResponse.json({ bezirke: [], stellen: [] })),
     http.get('/api/organisation', () =>
       HttpResponse.json({ id: 1, name: 'Org', tz_organisation: null }),
     ),
@@ -1288,6 +1289,28 @@ describe('LagekartePage', () => {
     ]);
     renderSeiteMitSonde('/einsaetze/1/lagekarte?platzieren=schaden:10');
 
+    await waitFor(() =>
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('platzieren'),
+    );
+    expect(screen.queryByText(/Klick auf die Karte setzt die Koordinate/)).not.toBeInTheDocument();
+  });
+
+  it('Deeplink ?platzieren=betreuungsstelle: startet den Platzier-Modus und räumt (LFH-673)', async () => {
+    basisHandler();
+    renderSeiteMitSonde('/einsaetze/1/lagekarte?platzieren=betreuungsstelle:4');
+    expect(await screen.findByText(/Klick auf die Karte setzt die Koordinate/)).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('platzieren'),
+    );
+  });
+
+  it('Deeplink ?platzieren=betreuungsstelle: ein Beobachter kommt nicht in den Modus (LFH-673)', async () => {
+    basisHandler([
+      http.get('/api/einsaetze/1', () =>
+        HttpResponse.json({ ...EINSATZ, meine_rolle: 'beobachter' }),
+      ),
+    ]);
+    renderSeiteMitSonde('/einsaetze/1/lagekarte?platzieren=betreuungsstelle:4');
     await waitFor(() =>
       expect(screen.getByTestId('location-search')).not.toHaveTextContent('platzieren'),
     );

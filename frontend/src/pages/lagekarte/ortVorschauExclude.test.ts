@@ -10,6 +10,9 @@ describe('ortVorschauExclude', () => {
     expect(ortVorschauExclude({ typ: 'fuehrung', id: 7 }, 1)).toBe('personal:7');
   });
 
+  it('betreuungsstelle → nichts auszuschließen, die Peilung kennt keine Stellen (LFH-673)', () => {
+    expect(ortVorschauExclude({ typ: 'betreuungsstelle', id: 3 }, 1)).toBeUndefined();
+  });
   it('uhs → uhs:<id>', () => {
     expect(ortVorschauExclude({ typ: 'uhs', id: 3 }, 1)).toBe('uhs:3');
   });

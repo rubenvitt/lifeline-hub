@@ -38,6 +38,12 @@ const einsatzPersonApi = vi.hoisted(() => ({
 }));
 vi.mock('../../api/einsatzPerson', () => einsatzPersonApi);
 
+// Betreuungsstelle verorten (LFH-673): der Platzier-Auftrag `betreuungsstelle` PATCHt die Stelle.
+const betreuungApi = vi.hoisted(() => ({
+  aendereStelle: vi.fn(() => Promise.resolve({ id: 4 })),
+}));
+vi.mock('../../api/betreuung', () => betreuungApi);
+
 function wrapper() {
   const client = neuerQueryClient();
   return ({ children }: { children: ReactNode }) => (
@@ -794,5 +800,64 @@ describe('useKartenInteraktion — Messen (LFH-616)', () => {
     act(() => result.current.onMessenBeenden());
     expect(result.current.messForm).toBeNull();
     expect(result.current.exklusiverModusAktiv).toBe(false);
+  });
+});
+
+describe('useKartenInteraktion — Betreuungsstelle (LFH-673)', () => {
+  function mitClient() {
+    const client = neuerQueryClient();
+    const invalidiert = vi.spyOn(client, 'invalidateQueries');
+    const erfolg = vi.fn();
+    const r = renderHook(
+      () =>
+        useKartenInteraktion({
+          einsatzId: 1,
+          einsatz: undefined,
+          darfSchreiben: true,
+          waehlbar: [],
+          fehler: vi.fn(),
+          erfolg,
+        }),
+      {
+        wrapper: ({ children }: { children: ReactNode }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+    return { ...r, invalidiert, erfolg };
+  }
+
+  it('Platzier-Auftrag: Klick PATCHt NUR das Koordinatenpaar und invalidiert die Betreuung', async () => {
+    betreuungApi.aendereStelle.mockClear();
+    const { result, invalidiert, erfolg } = mitClient();
+    act(() => result.current.onPlatzierenStart({ typ: 'betreuungsstelle', id: 4 }));
+    act(() => result.current.onKarteKlick({ lng: 8.87, lat: 51.93 }));
+    await waitFor(() => expect(betreuungApi.aendereStelle).toHaveBeenCalledTimes(1));
+    expect(betreuungApi.aendereStelle).toHaveBeenCalledWith(1, 4, { lat: 51.93, lon: 8.87 });
+    await waitFor(() => expect(erfolg).toHaveBeenCalledWith('Objekt verortet'));
+    const keys = invalidiert.mock.calls.map((c) => c[0]?.queryKey);
+    expect(keys).toContainEqual(['einsatz-betreuung', 1]);
+  });
+
+  it('Verortung löschen schickt null/null und invalidiert die Betreuung', async () => {
+    betreuungApi.aendereStelle.mockClear();
+    const { result, invalidiert } = mitClient();
+    act(() =>
+      result.current.loescheVerortung({
+        schluessel: 'betreuungsstelle-4',
+        typ: 'betreuungsstelle',
+        id: 4,
+        lat: 51.93,
+        lon: 8.87,
+        label: 'NU Turnhalle Nord',
+        farbe: '#000',
+      }),
+    );
+    await waitFor(() => expect(betreuungApi.aendereStelle).toHaveBeenCalledTimes(1));
+    expect(betreuungApi.aendereStelle).toHaveBeenCalledWith(1, 4, { lat: null, lon: null });
+    await waitFor(() => {
+      const keys = invalidiert.mock.calls.map((c) => c[0]?.queryKey);
+      expect(keys).toContainEqual(['einsatz-betreuung', 1]);
+    });
   });
 });

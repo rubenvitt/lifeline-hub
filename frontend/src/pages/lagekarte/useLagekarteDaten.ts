@@ -5,6 +5,7 @@ import { einsatzKeys, globalKeys } from '../../api/queryKeys';
 import { ladeEinsatz, ladeEinstellungen, ladeModulOverrides } from '../../api/einsaetze';
 import { ApiError } from '../../api/client';
 import { listePersonen } from '../../api/einsatzPerson';
+import { ladeBetreuung } from '../../api/betreuung';
 import { modulRegistry } from '../../einsatz/modulRegistry';
 import { personenMarker } from '../../personen/personenKarte';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
@@ -28,6 +29,7 @@ import {
   baueTaktischeMarker,
   baueLageMeldungMarker,
   baueFreieZeichenMarker,
+  baueBetreuungMarker,
   type KarteMarker,
 } from './marker';
 import { parsePolygon, parseGeometry, polygonZentroid } from './geo';
@@ -37,6 +39,7 @@ import { zonenPlakette, type ZoneFeature } from './kartenLayer';
 import { rollenwerte } from '../../components/instrument';
 import type { SnapshotDaten, Standquelle } from './snapshotDaten';
 import { personenZugriffVon } from './personenEbene';
+import { betreuungZugriffVon } from './betreuungEbene';
 
 /** Name der Personen-Quelle im Ausfallhinweis — die Seite filtert sie für Kopfzahl und
  *  „Nicht verortet" heraus, die Personen nie enthalten (LFH-648). */
@@ -44,6 +47,8 @@ export const QUELLE_BETROFFENE = 'Betroffene';
 
 /** Registry-Eintrag des Moduls „Personen" — die Frage „darf diese Ebene laden" hängt daran. */
 const PERSONEN_MODUL = modulRegistry.find((m) => m.key === 'personen');
+/** Registry-Eintrag des Moduls „Betreuung" (LFH-673) — Grenze der Ebene „Betreuungsstellen". */
+const BETREUUNG_MODUL = modulRegistry.find((m) => m.key === 'betreuung');
 
 interface LagekarteDatenArgs {
   einsatzId: number;
@@ -188,6 +193,32 @@ export function useLagekarteDaten({
   });
   // Nur bei freiem Modul: ein 403 ist „gesperrt" (Zustand der Zeile), kein Ausfall.
   const personenFehler = personenZugriff === 'frei' && personenQuery.isError;
+  // Ebene „Betreuungsstellen" (LFH-673): dieselbe Grenze wie bei „Betroffene" — die Query
+  // läuft erst, wenn die Overrides feststehen und das Modul im Client frei ist; ein 403 kippt
+  // auf „gesperrt" (Zeile mit Grund), nie auf einen Quellenfehler. Das Fach ist die Übersicht
+  // der Modulseite (`einsatzKeys.betreuung`), live invalidiert vom `betreuung`-Event, das nur
+  // Leser mit Modulrecht bekommen. Im Historien-Modus kommen die Stellen aus dem Dokument.
+  const betreuungVorab = betreuungZugriffVon({
+    rechteBekannt: overridesQuery.isFetched,
+    modul: BETREUUNG_MODUL,
+    benutzer,
+    overrides: overridesQuery.data,
+    abgelehnt: false,
+  });
+  const betreuungQuery = useQuery({
+    queryKey: einsatzKeys.betreuung(einsatzId),
+    queryFn: () => ladeBetreuung(einsatzId),
+    enabled: liveAn && betreuungVorab === 'frei',
+  });
+  const betreuungZugriff = betreuungZugriffVon({
+    rechteBekannt: overridesQuery.isFetched,
+    modul: BETREUUNG_MODUL,
+    benutzer,
+    overrides: overridesQuery.data,
+    abgelehnt: betreuungQuery.error instanceof ApiError && betreuungQuery.error.status === 403,
+  });
+  // Nur bei freiem Modul: ein 403 ist „gesperrt", kein Ausfall.
+  const betreuungFehler = liveAn && betreuungZugriff === 'frei' && betreuungQuery.isError;
   const orgQuery = useQuery({
     queryKey: globalKeys.organisation(),
     queryFn: ladeOrganisation,
@@ -215,6 +246,16 @@ export function useLagekarteDaten({
   const gebieteRoh = istSnapshot ? snap?.gefahrengebiete : gebieteQuery.data;
   const lageMeldungenRoh = istSnapshot ? snap?.lagemeldungen : lageMeldungenQuery.data;
   const fkRoh = istSnapshot ? snap?.fuehrungskraefte : fkQuery.data;
+  // Ohne Modulrecht leer, auch wenn ein früherer Abruf noch im Cache steht; nach einem Fehler
+  // ebenso (react-query lässt `data` stehen — ein stiller Altstand).
+  const stellenRoh =
+    betreuungZugriff !== 'frei'
+      ? undefined
+      : istSnapshot
+        ? snap?.betreuungsstellen
+        : betreuungQuery.isError
+          ? undefined
+          : betreuungQuery.data?.stellen;
   // Global-Scope-Freeze (Advisor): Org-TZ-Default aus dem Dokument, NICHT der Live-Query — sonst
   // schriebe eine Org-Umbenennung den historischen Stand um.
   const orgDefault = (istSnapshot ? snap?.org_default : orgQuery.data?.tz_organisation) ?? null;
@@ -237,9 +278,18 @@ export function useLagekarteDaten({
     [freieZeichenRoh, aktiveAnsichtId],
   );
 
-  const { verortet, nichtVerortet } = useMemo(
+  const { verortet: basisVerortet, nichtVerortet: basisNichtVerortet } = useMemo(
     () => baueMarker(einsatz, uhsRoh ?? [], schaedenRoh ?? [], token),
     [einsatz, uhsRoh, schaedenRoh, token],
+  );
+  const stellen = useMemo(() => baueBetreuungMarker(stellenRoh ?? [], token), [stellenRoh, token]);
+  const verortet = useMemo(
+    () => [...basisVerortet, ...stellen.verortet],
+    [basisVerortet, stellen.verortet],
+  );
+  const nichtVerortet = useMemo(
+    () => [...basisNichtVerortet, ...stellen.nichtVerortet],
+    [basisNichtVerortet, stellen.nichtVerortet],
   );
 
   const taktisch = useMemo(
@@ -368,6 +418,9 @@ export function useLagekarteDaten({
       ['Gefahrengebiete', gebieteQuery.isError],
       ['Lagemeldungen', lageMeldungenQuery.isError],
       ['Personal', fkQuery.isError],
+      // Betreuungsstellen stehen in Kopfzahl und „Nicht verortet" wie die UHS — ihr Ausfall
+      // ist ein Ausfall des Lagebilds. Ein 403 ist es nicht (`betreuungFehler`).
+      ['Betreuungsstellen', betreuungFehler],
       [QUELLE_BETROFFENE, personenFehler],
     ];
     return katalog.filter(([, kaputt]) => kaputt).map(([name]) => name);
@@ -385,6 +438,7 @@ export function useLagekarteDaten({
     gebieteQuery.isError,
     lageMeldungenQuery.isError,
     fkQuery.isError,
+    betreuungFehler,
     personenFehler,
   ]);
 
@@ -408,8 +462,10 @@ export function useLagekarteDaten({
     ]) {
       if (q.isError) void q.refetch();
     }
-    // Personen nur bei freiem Modul — ein 403 ist kein Ausfall und wird nicht wiederholt.
+    // Personen und Betreuung nur bei freiem Modul — ein 403 ist kein Ausfall und wird nicht
+    // wiederholt.
     if (personenFehler) void personenQuery.refetch();
+    if (betreuungFehler) void betreuungQuery.refetch();
   };
 
   const lageMeldungMarker = useMemo(
@@ -471,7 +527,11 @@ export function useLagekarteDaten({
         abschnitteQuery.isLoading ||
         freieZeichenQuery.isLoading ||
         lageMeldungenQuery.isLoading ||
-        fkQuery.isLoading,
+        fkQuery.isLoading ||
+        // Vor feststehenden Rechten weiß niemand, ob Stellen kommen (LFH-673) — sie speisen
+        // den Startausschnitt wie die UHS.
+        !overridesQuery.isFetched ||
+        betreuungQuery.isLoading,
     // Namen der Lagebild-Quellen, deren Abruf scheiterte (LFH-331 · B3) — leer = vollständig.
     // Die Kürzung für die Anzeige liegt bewusst NICHT hier: sie ist Darstellung, und ein Hook,
     // der schon kürzt, nähme der Seite die Wahl (und dem Test die Zählbarkeit).
@@ -496,6 +556,7 @@ export function useLagekarteDaten({
       uhs: uhsRoh ?? [],
       schaeden: schaedenRoh ?? [],
       abschnitte: abschnitteRoh ?? [],
+      betreuungsstellen: stellenRoh ?? [],
       // Nur ein erfolgreicher Live-Abruf; nach Fehler bleibt `data` in react-query stehen und
       // wäre ein stiller Altstand.
       rueckmeldungen:
@@ -507,6 +568,9 @@ export function useLagekarteDaten({
     zonenFeatures,
     alleVerortet,
     nichtVerortetAlle,
+    // Ebene „Betreuungsstellen" (LFH-673): Zugriffszustand für die Zeile; die Marker stehen
+    // in `verortet`/`alleVerortet`/`nichtVerortetAlle` wie die UHS.
+    betreuungZugriff,
     // Ebene „Betroffene" (LFH-648): Zugriffszustand für Zeile/Legende, Marker getrennt.
     personenZugriff,
     personenVerortet,
