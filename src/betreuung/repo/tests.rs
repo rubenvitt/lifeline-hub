@@ -207,6 +207,18 @@ async fn stelle_stornieren(w: &Welt, id: i64) -> Result<Geschrieben, AppError> {
     })
 }
 
+/// Setzt den Anlagezeitpunkt einer Stelle. Angelegt wird zur echten Uhrzeit, die Stichtage der
+/// Kopfzahl-Tests liegen aber fest am 23.09.2026 — ohne diesen Griff stünde jede Stelle NACH
+/// dem Stichtag und fiele aus der Kopfzahl (LFH-679).
+async fn angelegt_um(w: &Welt, id: i64, t: &str) {
+    sqlx::query("UPDATE betreuungsstelle SET angelegt_at = ? WHERE id = ?")
+        .bind(t)
+        .bind(id)
+        .execute(&w.pool)
+        .await
+        .unwrap();
+}
+
 async fn belegung(
     w: &Welt,
     stelle_id: i64,
@@ -1662,6 +1674,9 @@ async fn kopfzahl_zum_schichtbeginn() {
         .await
         .unwrap();
     stelle_stornieren(&w, storniert).await.unwrap();
+    for id in [turnhalle, stadion, leer, storniert] {
+        angelegt_um(&w, id, "2026-09-23 08:00:00").await;
+    }
 
     let k = kopfzahl(&w.pool, w.e, "2026-09-23 13:30:00").await.unwrap();
     assert_eq!(k.zeitpunkt_at, "2026-09-23 13:30:00");
@@ -1692,10 +1707,122 @@ async fn kopfzahl_zum_schichtbeginn() {
 #[tokio::test]
 async fn kopfzahl_ohne_meldungen_summiert_nichts() {
     let w = welt().await;
-    stelle(&w, "Turnhalle Ost", Some(150)).await;
+    let id = stelle(&w, "Turnhalle Ost", Some(150)).await;
+    stelle_status(&w, id, Status::InBetrieb).await.unwrap();
+    angelegt_um(&w, id, "2026-09-23 08:00:00").await;
     let k = kopfzahl(&w.pool, w.e, "2026-09-23 13:30:00").await.unwrap();
     assert_eq!((k.summe, k.stellen_ohne_meldung), (0, 1));
     assert_eq!(k.stellen[0].belegt, None);
+}
+
+// ── LFH-679: „ohne Meldung“ nur für Stellen, die zum Stichtag betrieben sein konnten ────────
+
+/// (Bezeichnung, belegt) je ausgewiesener Stelle.
+fn je_stelle(k: &BelegungKopfzahl) -> Vec<(&str, Option<i64>)> {
+    k.stellen
+        .iter()
+        .map(|s| (s.bezeichnung.as_str(), s.belegt))
+        .collect()
+}
+
+#[tokio::test]
+async fn kopfzahl_zaehlt_eine_stelle_ohne_meldung_erst_ab_ihrer_anlage() {
+    let w = welt().await;
+    let spaet = stelle(&w, "Turnhalle Ost", Some(150)).await;
+    stelle_status(&w, spaet, Status::InBetrieb).await.unwrap();
+    angelegt_um(&w, spaet, "2026-09-23 14:00:00").await;
+
+    // Vor der Anlage gab es die Stelle nicht — sie ist kein „ohne Meldung“.
+    let k = kopfzahl(&w.pool, w.e, "2026-09-23 13:30:00").await.unwrap();
+    assert_eq!((k.summe, k.stellen_ohne_meldung), (0, 0));
+    assert!(k.stellen.is_empty());
+
+    // Genau ab der Anlage (≤ t) zählt sie.
+    let k = kopfzahl(&w.pool, w.e, "2026-09-23 14:00:00").await.unwrap();
+    assert_eq!(k.stellen_ohne_meldung, 1);
+    assert_eq!(je_stelle(&k), [("Turnhalle Ost", None)]);
+}
+
+#[tokio::test]
+async fn kopfzahl_behaelt_eine_nachgetragene_meldung_vor_der_anlage() {
+    // Eine Meldung darf vor `angelegt_at` liegen (die Stelle wurde nachträglich erfasst). Ihre
+    // Zahl ist eine Tatsache und bleibt in der Summe — die Eingrenzung trifft nur Stellen
+    // OHNE Meldung.
+    let w = welt().await;
+    let id = stelle(&w, "Turnhalle Ost", Some(150)).await;
+    stelle_status(&w, id, Status::InBetrieb).await.unwrap();
+    angelegt_um(&w, id, "2026-09-23 14:00:00").await;
+    belegung(&w, id, 60, "2026-09-23 12:00:00").await.unwrap();
+
+    let k = kopfzahl(&w.pool, w.e, "2026-09-23 13:30:00").await.unwrap();
+    assert_eq!((k.summe, k.stellen_ohne_meldung), (60, 0));
+    assert_eq!(je_stelle(&k), [("Turnhalle Ost", Some(60))]);
+}
+
+#[tokio::test]
+async fn kopfzahl_laesst_nie_belegte_geschlossene_und_vorbereitete_stellen_weg() {
+    let w = welt().await;
+    // Nie belegt und geschlossen: zu keinem Zeitpunkt war dort jemand gemeldet.
+    let zu = stelle(&w, "Gemeindehaus", None).await;
+    stelle_status(&w, zu, Status::InBetrieb).await.unwrap();
+    stelle_status(&w, zu, Status::Geschlossen).await.unwrap();
+    // Nie belegt und nur vorbereitet: nicht in Betrieb, niemand gemeldet.
+    let vorbereitet = stelle(&w, "Schule Nord", None).await;
+    // Die einzige Meldung zurückgenommen, dann geschlossen: ebenfalls nie belegt.
+    let zurueck = stelle(&w, "Sporthalle", None).await;
+    stelle_status(&w, zurueck, Status::InBetrieb).await.unwrap();
+    let m = belegung(&w, zurueck, 5, "2026-09-23 12:00:00")
+        .await
+        .unwrap();
+    belegung_zurueck(&w, m.meldung_id).await.unwrap();
+    stelle_status(&w, zurueck, Status::Geschlossen)
+        .await
+        .unwrap();
+    // In Betrieb ohne Meldung: das ist das Signal „Untergrenze“.
+    let offen = stelle(&w, "Turnhalle Ost", Some(150)).await;
+    stelle_status(&w, offen, Status::InBetrieb).await.unwrap();
+    // Vor t leer gemeldet und danach geschlossen: bleibt mit seiner gemeldeten 0 stehen.
+    let leer = stelle(&w, "Anlaufstelle Markt", None).await;
+    stelle_status(&w, leer, Status::InBetrieb).await.unwrap();
+    belegung(&w, leer, 0, "2026-09-23 12:00:00").await.unwrap();
+    stelle_status(&w, leer, Status::Geschlossen).await.unwrap();
+    for id in [zu, vorbereitet, zurueck, offen, leer] {
+        angelegt_um(&w, id, "2026-09-23 08:00:00").await;
+    }
+
+    let k = kopfzahl(&w.pool, w.e, "2026-09-23 13:30:00").await.unwrap();
+    assert_eq!((k.summe, k.stellen_ohne_meldung), (0, 1));
+    assert_eq!(
+        je_stelle(&k),
+        [("Turnhalle Ost", None), ("Anlaufstelle Markt", Some(0))]
+    );
+}
+
+#[tokio::test]
+async fn kopfzahl_zaehlt_eine_jetzt_geschlossene_stelle_mit_spaeterer_meldung_weiter_mit() {
+    // Ohne Statushistorie ist unbekannt, ob die Stelle zu t schon betrieben wurde. Sie hat
+    // NACH t gemeldet, war also irgendwann in Betrieb — im Zweifel bleibt der Hinweis
+    // „Untergrenze“ stehen, statt eine unvollständige Summe als vollständig auszugeben.
+    let w = welt().await;
+    let zu = stelle(&w, "Turnhalle Ost", Some(150)).await;
+    stelle_status(&w, zu, Status::InBetrieb).await.unwrap();
+    belegung(&w, zu, 0, "2026-09-23 15:00:00").await.unwrap();
+    stelle_status(&w, zu, Status::Geschlossen).await.unwrap();
+    // Dasselbe für eine wieder auf „vorbereitet“ gesetzte Stelle.
+    let zurueckgestellt = stelle(&w, "Schule Nord", None).await;
+    belegung(&w, zurueckgestellt, 12, "2026-09-23 15:00:00")
+        .await
+        .unwrap();
+    for id in [zu, zurueckgestellt] {
+        angelegt_um(&w, id, "2026-09-23 08:00:00").await;
+    }
+
+    let k = kopfzahl(&w.pool, w.e, "2026-09-23 13:30:00").await.unwrap();
+    assert_eq!((k.summe, k.stellen_ohne_meldung), (0, 2));
+    assert_eq!(
+        je_stelle(&k),
+        [("Turnhalle Ost", None), ("Schule Nord", None)]
+    );
 }
 
 #[tokio::test]
