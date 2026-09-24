@@ -1,7 +1,9 @@
 import { screen } from '@testing-library/react';
+import { QueryClient } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
 import { server } from '../../test/server';
+import { datensatzAbfrage } from '../../command-palette/datensatzAbfrage';
 import { renderMitProviders } from '../../test/utils';
 import type { Uhs } from '../../api/types';
 import UhsVorschau from './UhsVorschau';
@@ -72,5 +74,29 @@ describe('UhsVorschau (LFH-664)', () => {
     await screen.findByText('UHS Sporthalle');
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+  });
+
+  /**
+   * Spec „Kein zusätzlicher Abruf": das Fach der Palette ist warm, 30 s alt — also ZWISCHEN
+   * der Frische der Palette (60 s) und der globalen Vorgabe (10 s). Nur so wird der Test rot,
+   * wenn die Vorschau die Frische der Palette nicht teilt.
+   */
+  it('holt bei warmem Fach der Palette nicht neu', () => {
+    let abrufe = 0;
+    server.use(
+      http.get('/api/einsaetze/5/uhs', () => {
+        abrufe += 1;
+        return HttpResponse.json([]);
+      }),
+    );
+    const client = new QueryClient();
+    const abfrage = datensatzAbfrage.uhs(5);
+    client.setQueryData(abfrage.queryKey, [uhs()], { updatedAt: Date.now() - 30_000 });
+    renderMitProviders(<UhsVorschau einsatzId={5} id={4} />, { client });
+
+    // Synchron: stünde der Inhalt erst nach einem Abruf da, fände `getBy` ihn hier nicht.
+    expect(screen.getByText('UHS Sporthalle')).toBeInTheDocument();
+    expect(client.isFetching({ queryKey: abfrage.queryKey, exact: true })).toBe(0);
+    expect(abrufe).toBe(0);
   });
 });

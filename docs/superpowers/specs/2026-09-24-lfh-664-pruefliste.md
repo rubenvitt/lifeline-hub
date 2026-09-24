@@ -22,12 +22,12 @@ Gerechnetes und aus Quelltext Geschlossenes trägt **[abgeleitet]**.
 
 | Nachweis | Ergebnis |
 | --- | --- |
-| Vitest je Bauteil (`*Vorschau.test.tsx`, `GefahrenMatrixAuszug.test.tsx`) | Inhalt, Status mit Wort, „nicht mehr vorhanden“, nur lesen (keine Knöpfe/Auswahl), bei allen Listensorten „warmes Fach → kein Abruf“ |
+| Vitest je Bauteil (`*Vorschau.test.tsx`, `GefahrenMatrixAuszug.test.tsx`) | Inhalt, Status mit Wort, „nicht mehr vorhanden“, nur lesen (keine Knöpfe/Auswahl), „warmes Fach → kein Abruf“ bei allen elf Sorten; bei ETB, Meldung, Personal, Einheit und UHS mit einem 30 s alten Fach, das nur mit der Frische der Palette (60 s) als frisch gilt |
 | `VorschauZustand.test.tsx` | Laden, ohne Verbindung (nicht „nicht mehr vorhanden“), Fehler mit Wiederholen, veralteter Stand mit Hinweis |
 | Guard `datensaetze.test.ts` | Jede der 13 Datensatzquellen trägt ihr Ziel mit Sorte, Einsatz und id (ETB mit `lfdNr`), der Sammeltreffer keins. Mutationsprobe: ein entfernter `vorschau`-Baustein (UHS) färbt ihn rot |
 | `datensatzAbfrage.test.ts` | Schlüssel byte-gleich gegen Literale, Frische `FRISCH_MS` |
 | `CommandPalette.vorschauVerweis.test.tsx` | Verweis schließt die Palette; Text/„Zurück“ nicht; Esc vom fokussierten Verweis führt eine Ebene zurück |
-| e2e `palette-oeffnung.spec.ts` (2 neue Fälle) | Meldung: → zeigt Inhalt ohne „Sichten“, Klick auf „↗ Auftrag“ landet auf den Aufträgen, Palette zu. ETB per `#n`: → zeigt Inhalt und „von“, Esc zurück mit Begriff |
+| e2e `palette-oeffnung.spec.ts` (2 neue Fälle) | Meldung: → zeigt Inhalt ohne „Sichten“, Klick auf „↗ Auftrag“ landet auf den Aufträgen, Palette zu. ETB über die Volltextsuche (`#Wasserstand`): → lädt den Eintrag kalt über den Nummerncursor nach und zeigt Inhalt und „von → an“, Esc zurück mit Begriff |
 | Seitentests | `SchaedenDetailPage`, `LageberichtDetailPage`, `EinsatzabschnittePage`, `FahrzeugePage`, `PersonalPage`, `GefahrenPage` grün; in `EinsatzabschnittePage.test.tsx` nur der Anker einer Abfrage von `tr` auf `datenfeld` umgestellt |
 
 ## Kriterien — gemeinsam für alle elf Vorschauen

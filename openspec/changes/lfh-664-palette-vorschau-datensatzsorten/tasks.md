@@ -40,7 +40,7 @@ rote Test, dann die Umsetzung. Ein Commit je Bündel (2, 3, 4) war geplant; sieh
 
 ## 5. Nachweis, Doku, Abschluss
 
-- [x] 5.1 `e2e/palette-oeffnung.spec.ts` um einen Fall ergänzen: Eine Meldung suchen, mit → die Vorschau öffnen, Inhalt sehen, auf „↗ Auftrag“ klicken. Die App steht dann auf den Aufträgen, die Palette ist zu. Dazu ein ETB-Eintrag per Nummer mit Vorschau. Prüfen mit `pnpm e2e` für die Spec.
+- [x] 5.1 `e2e/palette-oeffnung.spec.ts` um einen Fall ergänzen: Eine Meldung suchen, mit → die Vorschau öffnen, Inhalt sehen, auf „↗ Auftrag“ klicken. Die App steht dann auf den Aufträgen, die Palette ist zu. Dazu ein ETB-Eintrag mit Vorschau — umgesetzt über die Volltextsuche, weil `#1` hinter dem Präfix unter `DATENSATZ_MINDESTZEICHEN` liegt. Prüfen mit `pnpm e2e` für die Spec.
 - [x] 5.2 Prüfliste `docs/superpowers/specs/2026-09-24-lfh-664-pruefliste.md` nach dem Muster von LFH-645: gemeinsame Zeilen einmal, je Sorte ein Block mit den abweichenden Zeilen (5, 6, 9), 15 Verdikte je Block. Prüfen: keine Zeile ohne Verdikt, jede offene Zeile mit Zielticket.
 - [x] 5.3 CLAUDE.md, Absatz Sprungpalette: Datenregel der Vorschau (Palettenfach mit `select`, geteilte Abrufoptionen, ETB über Nummernfach mit Id-Prüfung, Verweis schließt die Palette). Prüfen per Diff-Review.
 - [x] 5.4 `./scripts/check-all.sh` grün. Prüfen: Ausgabe des Gates. — Stand 24.09.2026: Schritte 1–6 grün (Vitest 5757/5757). Schritt 7 im ersten Lauf 237/239: der ETB-Fall scheiterte an `#1` unter `DATENSATZ_MINDESTZEICHEN` (auf Volltextsuche umgestellt, danach `palette-oeffnung.spec.ts` 19/19 grün), `dokumente.spec.ts` „Tastaturweg“ ist lastbedingt flaky — im Wechsel gegen einen Basis-Worktree auf `origin/alpha` je 1/8 rot bei Load 45–80, keine Regression. Schritte 8–10 einzeln grün.
