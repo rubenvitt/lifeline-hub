@@ -9,7 +9,6 @@ import {
   legeBezirkAn,
   legeStelleAn,
   meldeBelegung,
-  meldeStand,
   nimmBelegungZurueck,
   nimmStandZurueck,
   storniereBezirk,
@@ -50,6 +49,7 @@ import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
+import { erfasseBelegungOfflineFaehig, erfasseStandOfflineFaehig } from '../offline/schreiben';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 
 /** Grund der fehlenden Schreibberechtigung als ganzer Satz (C10/M16). */
@@ -217,11 +217,24 @@ export default function BetreuungPage() {
     resetStandZurueck();
     resetBelegungZurueck();
   };
+  // Stand- und Belegungsmeldungen kommen vom Handschirm, oft ohne Netz (LFH-675): ohne
+  // Verbindung werden sie mit dem Erfassungszeitpunkt vorgemerkt und später gesendet.
+  // „Vorgemerkt" ist ein Erfolg ohne Rückweg — eine `meldung_id` gibt es noch nicht; der
+  // Dialog schließt, weil der Wortlaut in IndexedDB liegt (design.md D8).
   const standMut = useMutation({
-    mutationFn: ({ bezirkId, body }: { bezirkId: number; body: StandmeldungEingabe }) =>
-      meldeStand(einsatzId, bezirkId, body),
+    mutationFn: ({ bezirk, body }: { bezirk: Evakuierungsbezirk; body: StandmeldungEingabe }) => {
+      if (!benutzer) throw new Error('Nicht angemeldet');
+      return erfasseStandOfflineFaehig(benutzer.id, einsatzId, bezirk, body);
+    },
     onMutate: raeumeRuecknahmeFehler,
-    onSuccess: (r, { body }) => {
+    onSuccess: (ergebnis, { bezirk, body }) => {
+      if (ergebnis.zustand === 'vorgemerkt') {
+        message.warning(
+          `Offline vorgemerkt — Standmeldung ${bezirk.bezeichnung} wird bei Verbindung gesendet`,
+        );
+        return;
+      }
+      const r = ergebnis.daten;
       invalidiere();
       zeigeRueckgaengig(
         message,
@@ -263,10 +276,19 @@ export default function BetreuungPage() {
     },
   });
   const belegungMut = useMutation({
-    mutationFn: ({ stelleId, body }: { stelleId: number; body: BelegungsmeldungEingabe }) =>
-      meldeBelegung(einsatzId, stelleId, body),
+    mutationFn: ({ stelle, body }: { stelle: Betreuungsstelle; body: BelegungsmeldungEingabe }) => {
+      if (!benutzer) throw new Error('Nicht angemeldet');
+      return erfasseBelegungOfflineFaehig(benutzer.id, einsatzId, stelle, body);
+    },
     onMutate: raeumeRuecknahmeFehler,
-    onSuccess: (r, { body }) => {
+    onSuccess: (ergebnis, { stelle, body }) => {
+      if (ergebnis.zustand === 'vorgemerkt') {
+        message.warning(
+          `Offline vorgemerkt — Belegungsmeldung ${stelle.bezeichnung} wird bei Verbindung gesendet`,
+        );
+        return;
+      }
+      const r = ergebnis.daten;
       invalidiere();
       zeigeRueckgaengig(
         message,
@@ -470,7 +492,7 @@ export default function BetreuungPage() {
           bezirk={dialog.bezirk}
           laeuft={standMut.isPending}
           fehler={standMut.error}
-          onErfassen={(body) => standMut.mutateAsync({ bezirkId: dialog.bezirk.id, body })}
+          onErfassen={(body) => standMut.mutateAsync({ bezirk: dialog.bezirk, body })}
           onSchliessen={schliessen}
         />
       )}
@@ -513,7 +535,7 @@ export default function BetreuungPage() {
           stelle={dialog.stelle}
           laeuft={belegungMut.isPending}
           fehler={belegungMut.error}
-          onErfassen={(body) => belegungMut.mutateAsync({ stelleId: dialog.stelle.id, body })}
+          onErfassen={(body) => belegungMut.mutateAsync({ stelle: dialog.stelle, body })}
           onSchliessen={schliessen}
         />
       )}

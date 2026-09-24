@@ -206,6 +206,17 @@ Setzen der Zuordnung ohne Modulrecht ist 403, Storno löst die Flächen im selbe
 `0119` ist der erste Rebuild von `lage_zone`. Herleitung:
 `openspec/changes/lfh-673-betreuung-auf-der-lagekarte/design.md`.
 
+**Stand- und Belegungsmeldungen sind offline-fähig (LFH-675).** Sie laufen über die
+Offline-Queue (`offline/schreiben.ts`, Arten `stand`/`belegung`) mit `client_id`, eindeutig
+je Einsatz und Meldereihe (`0121`). Der Replay-Lookup läuft **vor** jeder Zustandsprüfung,
+einmal vorab und einmal in der `BEGIN IMMEDIATE`-Transaktion. Eine gespeicherte Meldung kommt
+deshalb auch am stornierten Bezirk, an der geschlossenen Stelle und nach Einsatzende zurück
+(`EinsatzSchreibfreigabe`), ohne ETB-Eintrag und ohne Live-Ereignis. Ein Schlüssel an einem
+anderen Objekt ist 422. **Den Erfassungszeitpunkt trägt nur die vorgemerkte Kopie**, online
+gilt die Serveruhr. Sonst stempelte der Flush die Sendezeit, oder eine vorgehende Tablet-Uhr
+machte Online-Meldungen zu 400. Anlegen, Ändern, Rücknahmen und die Leermeldung bleiben
+online. Herleitung: `openspec/changes/lfh-675-betreuung-meldungen-offline/design.md`.
+
 **Sichtung ist eine eigene fachliche Farbachse am selben zentralen Ort**, keine A0-Rolle.
 `SichtungsTag` zeigt die feste Kennzeichnung aus `tokens.ts` als umrandetes Farbfeld:
 SK I rot, II gelb, III grün, IV blau, Tote schwarz; „unverletzt“ ohne erfundene Fachfarbe
