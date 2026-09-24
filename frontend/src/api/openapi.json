@@ -1013,7 +1013,7 @@
           "stellen_ohne_meldung": {
             "type": "integer",
             "format": "int64",
-            "description": "Zahl der Stellen, die bis zum Stichtag keine Meldung haben."
+            "description": "Zahl der Stellen, die bis zum Stichtag keine Meldung haben. Mitgezählt wird nur, wer zum\nStichtag betrieben sein konnte: nicht nach ihm angelegt und nicht jetzt geschlossen oder\nvorbereitet ohne jede Meldung (LFH-679). Solche Stellen fehlen auch in `stellen`."
           },
           "summe": {
             "type": "integer",

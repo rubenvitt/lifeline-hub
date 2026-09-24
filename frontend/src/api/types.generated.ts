@@ -367,7 +367,9 @@ export interface components {
             stellen: components["schemas"]["BelegungKopfzahlStelle"][];
             /**
              * Format: int64
-             * @description Zahl der Stellen, die bis zum Stichtag keine Meldung haben.
+             * @description Zahl der Stellen, die bis zum Stichtag keine Meldung haben. Mitgezählt wird nur, wer zum
+             *     Stichtag betrieben sein konnte: nicht nach ihm angelegt und nicht jetzt geschlossen oder
+             *     vorbereitet ohne jede Meldung (LFH-679). Solche Stellen fehlen auch in `stellen`.
              */
             stellen_ohne_meldung: number;
             /**

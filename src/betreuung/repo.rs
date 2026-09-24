@@ -349,6 +349,21 @@ pub async fn stelle_laden(
 /// stornierter Stelle die aktuelle Meldung mit Zeitpunkt ≤ Stichtag. Stellen ohne solche
 /// Meldung stehen ohne Anzahl in der Liste und gehen nicht in die Summe ein. Ein unlesbarer
 /// Stichtag ist 400.
+///
+/// **Welche Stelle „ohne Meldung“ ist** (LFH-679): nur eine, die zum Stichtag betrieben sein
+/// konnte. Weg fallen Stellen, die erst nach dem Stichtag angelegt wurden, und Stellen, die
+/// jetzt `geschlossen` oder `vorbereitet` sind und nie eine (nicht zurückgenommene) Meldung
+/// hatten — dort war nach allem, was bekannt ist, nie jemand. Eine Statushistorie gibt es
+/// nicht, der Status ist der HEUTIGE: dieselbe Abfrage für ein vergangenes t kann deshalb
+/// später anders ausfallen. Zwei Unschärfen folgen daraus, bewusst in verschiedene Richtungen:
+/// Eine jetzt geschlossene Stelle MIT späterer Meldung bleibt „ohne Meldung“, denn sie kann zum
+/// Stichtag schon betrieben worden sein (Hinweis „Untergrenze“ eher zu oft). Eine Stelle, die
+/// zu t in Betrieb war, nie gemeldet hat und später geschlossen wurde, fällt dagegen weg (der
+/// Hinweis fehlt dann) — der Preis dafür, nie belegte Stellen nicht mitzuzählen, ohne dass es
+/// eine Migration gibt.
+/// Eine Stelle MIT Meldung ≤ Stichtag zählt immer, auch vor ihrem `angelegt_at` — eine
+/// Meldung darf nachgetragen früher liegen als die Erfassung der Stelle, und ihre Zahl ist
+/// eine Tatsache. Die Summe hängt deshalb nicht an dieser Eingrenzung.
 pub async fn kopfzahl(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -362,10 +377,17 @@ pub async fn kopfzahl(
              SELECT id FROM betreuungsstelle_belegung \
              WHERE stelle_id = s.id AND zeitpunkt_at <= ? AND ",
         juengste_meldung!(),
-        ") WHERE s.einsatz_id = ? AND s.storniert_at IS NULL ORDER BY s.id"
+        ") WHERE s.einsatz_id = ? AND s.storniert_at IS NULL \
+           AND (m.id IS NOT NULL \
+                OR (s.angelegt_at <= ? \
+                    AND NOT (s.status IN (?, ?) AND s.belegung_id IS NULL))) \
+         ORDER BY s.id"
     ))
     .bind(zeitpunkt_at)
     .bind(einsatz_id)
+    .bind(zeitpunkt_at)
+    .bind(BetreuungsstelleStatus::Geschlossen.as_str())
+    .bind(BetreuungsstelleStatus::Vorbereitet.as_str())
     .fetch_all(pool)
     .await?;
     let stellen: Vec<BelegungKopfzahlStelle> = zeilen
