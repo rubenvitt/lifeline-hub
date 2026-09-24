@@ -26,7 +26,7 @@ Gruppen 4–6 bringen die Bezirksfläche. Gruppe 7 schließt beide ab.
 
 ## 3. Stelle: Einstieg in der Betreuungsseite
 
-- [ ] 3.1 `betreuung/StellenBlock.tsx`: „Auf Karte verorten“ an nicht verorteten Stellen, nur mit Schreibrecht, Ziel `lagekartePfad(e, {platzieren: {typ: 'betreuungsstelle', id}})`. Die Zeilenaktionen werden nach der Rechteprüfung gezählt, ab drei kommt die Aktion ins `weitere`-Menü. Verifiziert durch `StellenBlock`-Tests: Das Ziel stimmt, ohne Schreibrecht und bei verorteter Stelle fehlt der Einstieg
+- [x] 3.1 `betreuung/StellenBlock.tsx`: „Auf Karte verorten“ an nicht verorteten Stellen, nur mit Schreibrecht, Ziel `lagekartePfad(e, {platzieren: {typ: 'betreuungsstelle', id}})`. Die Zeilenaktionen werden nach der Rechteprüfung gezählt, ab drei kommt die Aktion ins `weitere`-Menü. Verifiziert durch `StellenBlock`-Tests: Das Ziel stimmt, ohne Schreibrecht und bei verorteter Stelle fehlt der Einstieg
 - [ ] 3.2 Browser-Durchstich Stelle (Vite + Backend mit Testdaten): Stelle anlegen → „Auf Karte verorten“ → Klick in die Karte → Marker sichtbar → Auswahl → „Im Fachmodul öffnen“ → Stelle ausgewählt. Zweiter Browser im selben Einsatz sieht den Marker ohne Reload. Nutzer ohne Modul Betreuung sieht die Sperrzeile. Verifiziert durch Screenshots im Durchstich
 
 ## 4. Bezirk: Zonentyp und Rebuild im Backend

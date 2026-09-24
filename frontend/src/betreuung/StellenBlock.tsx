@@ -28,18 +28,28 @@ import { ART_LABEL, freiePlaetze, personenZahl } from './betreuungText';
  * es kein Wort und deshalb auch keine Farbe.
  *
  * Zeilenaktionen: „Belegung melden" direkt, „Bearbeiten" und „Stornieren" gebündelt im Menü
- * (LFH-365). Die Menge bleibt auch an einer geschlossenen Stelle ein Menü, obwohl dort „Belegung
+ * (LFH-365). An einer Stelle ohne Koordinate steht dort zuerst „Auf Karte verorten" (LFH-673):
+ * ein Sprung in den Platziermodus der Lagekarte, keine vierte Knopfreihe — dass das Menü damit
+ * je Zeile verschieden lang ist, ändert seine Form nicht. Die Menge bleibt auch an einer geschlossenen Stelle ein Menü, obwohl dort „Belegung
  * melden" entfällt (der Server nimmt keine Meldung an, 422): die Regel „unter drei kein Menü"
  * zählt NACH der Rechteprüfung, nicht nach dem Zustand der Zeile — sonst wechselte die Form der
  * Aktionsspalte mit jedem Statuswechsel. Ohne Schreibrecht entfällt die Spalte ganz.
  */
 
-export type StelleAktion = 'bearbeiten' | 'stornieren';
+export type StelleAktion = 'verorten' | 'bearbeiten' | 'stornieren';
 
 const MENUE: readonly (MenueEintrag & { key: StelleAktion })[] = [
   { key: 'bearbeiten', label: 'Bearbeiten (Status, Kapazität)' },
   { key: 'stornieren', label: 'Stornieren', gefahr: true },
 ];
+
+/** Menü einer Zeile: unverortet zuerst „Auf Karte verorten" (LFH-673). Rein und exportiert. */
+export function stellenMenue(
+  s: Pick<Betreuungsstelle, 'lat' | 'lon'>,
+): readonly (MenueEintrag & { key: StelleAktion })[] {
+  const verortet = s.lat != null && s.lon != null;
+  return verortet ? MENUE : [{ key: 'verorten', label: 'Auf Karte verorten' }, ...MENUE];
+}
 
 const ARTEN = Object.keys(ART_LABEL) as BetreuungsstelleArt[];
 const STATUS = Object.keys(betreuungsstelleStatus) as BetreuungsstelleStatus[];
@@ -156,7 +166,7 @@ const stellenSpalten = (
                   trigger={['click']}
                   autoFocus
                   menu={{
-                    items: menueEintraege(MENUE),
+                    items: menueEintraege(stellenMenue(s)),
                     onClick: ({ key }) => onAktion(key as StelleAktion, s),
                   }}
                 >
