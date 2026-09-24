@@ -1067,6 +1067,14 @@ describe('Grundriss – Kartenform in den Berührungsstufen (LFH-359)', () => {
     });
     await within(karte).findByText(/R-005/);
     expect(karte).toHaveAttribute('aria-expanded', 'false');
+
+    // Und es bleibt zu, wenn die Belegung zurückspringt (zweites Live-Update, Rollback
+    // nach 409): der gemerkte Zustand „frei" darf das Menü nicht von selbst wieder öffnen.
+    act(() => {
+      client.setQueryData<Person[]>(einsatzKeys.personen(1), [wartend()]);
+    });
+    await waitFor(() => expect(within(karte).queryByText(/R-005/)).not.toBeInTheDocument());
+    expect(karte).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('bietet im Bearbeiten-Modus Verfügbarkeiten und Löschen, aber kein Zuweisen', async () => {

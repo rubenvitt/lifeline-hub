@@ -491,6 +491,11 @@ function PlatzKarte({
   const beschreibungsId = useId();
   const belegungsSchluessel = belegtVon ? `belegt:${belegtVon.id}` : 'frei';
   const [offenBei, setOffenBei] = useState<string | null>(null);
+  // Den gemerkten Zustand beim Wechsel VERWERFEN, nicht nur vergleichen: sonst öffnete ein
+  // Rücksprung auf den alten Zustand (zweites Live-Update, Rollback nach 409) das Menü von
+  // selbst wieder (gemessen, Test „schließt ein offenes Menü …"). Zurückgesetzt wird
+  // während des Renderns (Reacts Muster für abgeleiteten Zustand), nicht per Effekt.
+  if (offenBei !== null && offenBei !== belegungsSchluessel) setOffenBei(null);
   const menueOffen = offenBei === belegungsSchluessel;
   const setMenueOffen = (offen: boolean) => setOffenBei(offen ? belegungsSchluessel : null);
   // Läuft ein Zug (dnd-kit), gehört die Tastatur ihm: das Enter, das einen Tastatur-Zug
