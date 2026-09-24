@@ -12,6 +12,9 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+#[cfg(test)]
+mod schema_tests;
+
 /// Stand der Demo-Daten einer Organisation — die eine Antwort aller Demo-Endpunkte.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct DemoDatenStatus {
