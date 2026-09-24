@@ -1,5 +1,5 @@
 use crate::error::AppError;
-use sqlx::SqlitePool;
+use sqlx::{SqliteConnection, SqlitePool};
 
 use super::{meldungsart_gueltig, prioritaet_gueltig, LageMeldungAnzeige, MeldungAnzeige};
 
@@ -74,6 +74,21 @@ pub async fn anlegen(
     daten: MeldungDaten<'_>,
 ) -> Result<MeldungAnzeige, AppError> {
     anlegen_mit_client_id(pool, einsatz_id, erfasser_id, None, daten).await
+}
+
+/// Legt eine Meldung samt ETB-Eintrag auf einer offenen Verbindung/Transaktion an, ohne
+/// `client_id`-Idempotenz (LFH-690, Demo-Import in EINER Transaktion). Öffnet und committet
+/// selbst nichts. Einsatz- und Org-Einstellungen (Nummern-Startwerte, Auto-ETB) liest sie
+/// über dieselbe Verbindung — so findet sie auch einen Einsatz, den dieselbe Transaktion
+/// gerade angelegt hat, und fällt nicht still auf die Einstellungen von Org 0 zurück.
+/// Liefert die neue `meldung_id`.
+pub async fn anlegen_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    erfasser_id: i64,
+    daten: &MeldungDaten<'_>,
+) -> Result<i64, AppError> {
+    anlegen_mit_client_id_tx(conn, einsatz_id, erfasser_id, None, daten).await
 }
 
 /// Offline-/Timeout-fähige Variante (LFH-334/B6). Ein stabiler
@@ -190,6 +205,13 @@ where
     Ok(true)
 }
 
+/// Pool-Hülle um [`anlegen_mit_client_id_tx`] in einer `write_retry!`-Transaktion. Bis
+/// LFH-690 lagen die Einstellungs-Lesezugriffe vor einem deferred `pool.begin()`; seit sie
+/// in der Transaktion liegen, liest die Transaktion zuerst und schreibt dann. Unter einem
+/// deferred `BEGIN` wäre das ein Lock-Upgrade, das SQLite bei fremdem Writer sofort mit
+/// `SQLITE_BUSY` abweist (siehe `crate::tx`). `BEGIN IMMEDIATE` holt die Schreibsperre
+/// vorab. Ein Unique-Verstoß auf `client_id` rollt wie bisher die ganze Meldung+ETB-Tx
+/// zurück, bevor [`anlegen_idempotent`] den Gewinner über den Pool liest.
 async fn anlegen_mit_client_id(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -197,6 +219,25 @@ async fn anlegen_mit_client_id(
     client_id: Option<&str>,
     daten: MeldungDaten<'_>,
 ) -> Result<MeldungAnzeige, AppError> {
+    let meldung_id = crate::write_retry!(pool, |conn| {
+        anlegen_mit_client_id_tx(&mut *conn, einsatz_id, erfasser_id, client_id, &daten).await
+    })?;
+    // `eingang_at` ist der Erfassungszeitpunkt = „jetzt" für die frisch erzeugte Meldung;
+    // ist_ueberfaellig ist hier ohnehin false (Frist liegt in der Zukunft).
+    laden(pool, meldung_id, daten.eingang_at).await
+}
+
+/// Rumpf der Meldungsanlage auf einer offenen Verbindung/Transaktion: Validierung,
+/// Einstellungen (über dieselbe Verbindung), Insert mit atomarer `lfd_nr` und — bei
+/// aktivem Auto-ETB — der gekoppelte ETB-Eintrag mit beidseitigem Backlink. Liefert die
+/// neue `meldung_id`.
+async fn anlegen_mit_client_id_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    erfasser_id: i64,
+    client_id: Option<&str>,
+    daten: &MeldungDaten<'_>,
+) -> Result<i64, AppError> {
     // Enum-Invariante auch im Release durchsetzen (LFH-259/F34): debug_assert wäre
     // wegkompiliert → ein interner Aufrufer könnte still ungültige Werte persistieren.
     if !prioritaet_gueltig(daten.prioritaet) {
@@ -208,16 +249,15 @@ async fn anlegen_mit_client_id(
     if !super::richtung_gueltig(daten.richtung) {
         return Err(AppError::Validation("Ungültige Richtung".into()));
     }
-    let einst = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id).await?;
+    let einst = crate::einsatz::einstellungen::laden_oder_default(&mut *conn, einsatz_id).await?;
     let org_id: Option<i64> = sqlx::query_scalar("SELECT org_id FROM einsatz WHERE id = ?")
         .bind(einsatz_id)
-        .fetch_optional(pool)
+        .fetch_optional(&mut *conn)
         .await?;
     let org_einst =
-        crate::org::einstellungen::laden_oder_default(pool, org_id.unwrap_or(0)).await?;
+        crate::org::einstellungen::laden_oder_default(&mut *conn, org_id.unwrap_or(0)).await?;
     let etb_startwert = einst.etb_startwert();
     let meldung_startwert = einst.meldung_startwert();
-    let mut tx = pool.begin().await?;
 
     // lfd_nr atomar je Einsatz (Muster etb/repo.rs); erste Nummer = Startwert aus Einstellungen.
     let meldung_id: i64 = sqlx::query_scalar(
@@ -247,7 +287,7 @@ async fn anlegen_mit_client_id(
     .bind(daten.einheit_id)
     .bind(daten.abschnitt_id)
     .bind(einsatz_id)
-    .fetch_one(&mut *tx)
+    .fetch_one(&mut *conn)
     .await?;
 
     // ETB-Meldung (Pattern B) im selben Commit. Nachrichtenvordruck-Felder mappen
@@ -256,7 +296,7 @@ async fn anlegen_mit_client_id(
     // ETB-Folgeeintrag; etb_meldung_id bleibt NULL.
     if crate::einsatz::effektiv::effektiv_auto_etb_aktiv(&einst, &org_einst) {
         let etb_id = crate::etb::repo::anlegen_tx(
-            &mut tx,
+            &mut *conn,
             einsatz_id,
             erfasser_id,
             etb_startwert,
@@ -276,19 +316,16 @@ async fn anlegen_mit_client_id(
         sqlx::query("UPDATE etb_eintrag SET meldung_id = ? WHERE id = ?")
             .bind(meldung_id)
             .bind(etb_id)
-            .execute(&mut *tx)
+            .execute(&mut *conn)
             .await?;
         sqlx::query("UPDATE meldung SET etb_meldung_id = ? WHERE id = ?")
             .bind(etb_id)
             .bind(meldung_id)
-            .execute(&mut *tx)
+            .execute(&mut *conn)
             .await?;
     }
 
-    tx.commit().await?;
-    // `eingang_at` ist der Erfassungszeitpunkt = „jetzt" für die frisch erzeugte Meldung;
-    // ist_ueberfaellig ist hier ohnehin false (Frist liegt in der Zukunft).
-    laden(pool, meldung_id, daten.eingang_at).await
+    Ok(meldung_id)
 }
 
 /// Listet Meldungen eines Einsatzes (optional Status-Filter). Sortierung:
@@ -1734,6 +1771,78 @@ mod tests {
         assert_eq!(nur_extern.len(), 1);
         assert_eq!(nur_extern[0].richtung, Richtung::Extern);
         assert_eq!(nur_extern[0].inhalt, "extern-m");
+    }
+
+    /// LFH-690: `anlegen_tx` liest die Auto-ETB-Einstellung der EIGENEN Org, auch wenn der
+    /// Einsatz in derselben, noch offenen Transaktion entstanden ist. Ein Pool-Lesezugriff
+    /// sähe den Einsatz nicht (Datei/WAL: eigener Snapshot), fiele mit `unwrap_or(0)` still
+    /// auf Org 0 zurück, deren Vorgabe Auto-ETB AN ist, und schriebe einen ETB-Eintrag.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn anlegen_tx_liest_auto_etb_der_eigenen_org() {
+        let (_dir, pool) = crate::db::test_pool_datei().await;
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (7, 'Orga 7')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let b: i64 = sqlx::query_scalar(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (7,'Leit','leit','h') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        crate::org::einstellungen::speichern(
+            &pool,
+            7,
+            b,
+            crate::org::einstellungen::OrgEinstellungenDaten {
+                auto_etb_eintraege: Some(0),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        // Vorbedingung: die Rückfall-Org 0 hätte Auto-ETB an, sonst trennte der Test nicht.
+        let org0 = crate::org::einstellungen::laden_oder_default(&pool, 0)
+            .await
+            .unwrap();
+        assert!(crate::einsatz::effektiv::effektiv_auto_etb_aktiv(
+            &crate::einsatz::einstellungen::laden_oder_default(&pool, -1)
+                .await
+                .unwrap(),
+            &org0
+        ));
+
+        let (e, m) = crate::write_retry!(&pool, |conn| {
+            let e: i64 = sqlx::query_scalar(
+                "INSERT INTO einsatz (org_id, bezeichnung) VALUES (7, 'Lage') RETURNING id",
+            )
+            .fetch_one(&mut *conn)
+            .await?;
+            let m = anlegen_tx(
+                &mut *conn,
+                e,
+                b,
+                &daten("X", "2026-06-12 09:00:00", "2026-06-12 09:00:00"),
+            )
+            .await?;
+            Ok((e, m))
+        })
+        .unwrap();
+
+        let etb: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ?")
+            .bind(e)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(etb, 0, "Org 7 hat Auto-ETB aus → kein ETB-Eintrag");
+        let backlink: Option<i64> =
+            sqlx::query_scalar("SELECT etb_meldung_id FROM meldung WHERE id = ?")
+                .bind(m)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(backlink, None);
     }
 
     #[tokio::test]
