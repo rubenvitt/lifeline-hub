@@ -45,15 +45,23 @@ export interface Zuflussstand {
 
 export const LEERER_ZUFLUSSSTAND: Zuflussstand = { gezeigt: null, eigene: new Set() };
 
-/** Teilt die laufenden Schichten (Server-Ordnung) in gezeigte und zurückgehaltene. */
-export function teileZufluss(
-  laufende: readonly Abloesung[],
+/** Was die Schleuse von einem Eintrag braucht: nur seine Kennung. */
+interface MitId {
+  id: number;
+}
+
+/**
+ * Teilt die laufenden Schichten (Server-Ordnung) in gezeigte und zurückgehaltene. Generisch
+ * über die Kennung — die Verpflegung (LFH-634) nimmt dieselbe Schleuse für ihre Zeitfenster.
+ */
+export function teileZufluss<T extends MitId>(
+  laufende: readonly T[],
   stand: Zuflussstand,
-): { sichtbar: Abloesung[]; zurueckgehalten: Abloesung[] } {
+): { sichtbar: T[]; zurueckgehalten: T[] } {
   const { gezeigt, eigene } = stand;
   if (gezeigt == null) return { sichtbar: [...laufende], zurueckgehalten: [] };
-  const sichtbar: Abloesung[] = [];
-  const zurueckgehalten: Abloesung[] = [];
+  const sichtbar: T[] = [];
+  const zurueckgehalten: T[] = [];
   for (const s of laufende) {
     if (gezeigt.has(s.id) || eigene.has(s.id)) sichtbar.push(s);
     else zurueckgehalten.push(s);
@@ -67,10 +75,7 @@ export function teileZufluss(
  * verlassen die Vormerkung. `null`, wenn sich nichts ändert — der Aufrufer setzt den Zustand
  * im Render nach, und ohne diesen Riegel liefe er in eine Schleife.
  */
-export function nachgefuehrt(
-  stand: Zuflussstand,
-  sichtbar: readonly Abloesung[],
-): Zuflussstand | null {
+export function nachgefuehrt(stand: Zuflussstand, sichtbar: readonly MitId[]): Zuflussstand | null {
   const gezeigt = new Set(sichtbar.map((s) => s.id));
   const eigene = new Set([...stand.eigene].filter((id) => !gezeigt.has(id)));
   const gleich =
@@ -82,7 +87,7 @@ export function nachgefuehrt(
 }
 
 /** Banner bedient oder Ansicht gewechselt: die volle Menge wird gezeigt. */
-export function freigegeben(stand: Zuflussstand, laufende: readonly Abloesung[]): Zuflussstand {
+export function freigegeben(stand: Zuflussstand, laufende: readonly MitId[]): Zuflussstand {
   return { gezeigt: new Set(laufende.map((s) => s.id)), eigene: stand.eigene };
 }
 
