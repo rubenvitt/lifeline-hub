@@ -134,8 +134,10 @@ etwas. Die Aktion liegt als Wert im bestehenden Store `schreibaktionen`. Neue In
 nicht, die IndexedDB-Version bleibt also gleich.
 
 `useOfflineSync.verarbeiteEinsatz` bekommt statt des heutigen `else` (unausgesprochen
-„Meldung“) einen **exhaustiven** `switch` über `aktion.art` mit `never`-Zweig. Eine neue
-Variante bricht dann den Typcheck und landet nicht still im Meldungszweig. Nach dem Senden:
+„Meldung“) eine **exhaustive** `if`-Kette über `aktion.art` mit `never`-Zweig. Eine neue
+Variante bricht dann den Typcheck und landet nicht still im Meldungszweig. Ein `switch` wäre
+falsch: Die Schleife bricht bei Benutzerwechsel und Unmount per `break` ab, und ein `break`
+im `switch` verließe nur diesen. Die Abbruch-Riegel liefen dann still ins Leere. Nach dem Senden:
 `schreibaktionEntfernen`, dann Invalidierung von `einsatzKeys.betreuung` (der Präfix umfasst
 die Kopfzahl) und `einsatzKeys.etb`, also dieselben zwei Keys wie `invalidiere` auf der Seite.
 `OfflineRecoveryDrawer.aktionsTitel` benennt die Arten „Standmeldung“ und
@@ -158,10 +160,18 @@ Schema, ohne den Eintrag wäre sie rot.
 
 ## Risks / Trade-offs
 
-- [Tablet-Uhr geht vor, und der Flush folgt schneller, als die Abweichung groß ist] → Die
-  vorgemerkte Meldung liegt in der Zukunft, der Server lehnt mit 400 ab, sie steht im Drawer
-  und lässt sich wiederholen. Das ist ein seltener Randfall mit sichtbarem Ausgang und kein
-  stiller Verlust.
+- [Die Geräteuhr geht vor] → Abgelehnt wird nur, wenn der Vorlauf größer ist als die
+  Ausfalldauer plus 60 s Toleranz. Betroffen sind also kurze Ausfälle an Geräten, deren Uhr
+  deutlich falsch geht. Der Server antwortet dann mit 400, die Meldung steht im Drawer, und
+  „Erneut versuchen“ gelingt, sobald genug Zeit vergangen ist. Das ist kein stiller Verlust,
+  aber Handarbeit. Wie oft Geräte im Einsatz so weit abweichen, ist nicht gemessen. Eine
+  Korrektur über die Serveruhr (Versatz aus dem `Date`-Header) ist LFH-705.
+- [Ein Tab mit altem Bundle flusht die gemeinsame Queue] → Er kennt die Arten `stand` und
+  `belegung` nicht, und sein `else`-Zweig schickt die Aktion als Meldung. Der Server lehnt sie
+  mit 400 ab (`absender`/`inhalt` fehlen), bevor irgendetwas geschrieben ist. Die Aktion liegt
+  dann mit irreführendem Grund unter „abgelehnt“, „Erneut versuchen“ im neuen Tab sendet sie
+  richtig. Es gibt keine Dublette und keinen Verlust. Eine Schema-Version schlösse das nicht:
+  Das alte Bundle öffnete die höhere Version gar nicht erst und verlöre damit die ganze Queue.
 - [Die Stelle wird geschlossen, während eine Belegungsmeldung vorgemerkt ist] → Die Meldung
   ist keine Dublette, der Server lehnt sie mit 422 ab, und sie erscheint im Drawer. Das ist
   gewollt: Eine Belegung an einer geschlossenen Stelle verbietet D4 aus LFH-639.

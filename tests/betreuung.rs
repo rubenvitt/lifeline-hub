@@ -1312,3 +1312,97 @@ async fn replay_verteilt_kein_live_ereignis() {
         "ein Replay verteilt nichts"
     );
 }
+
+/// Die zwei Spec-Szenarien „Replay nach Zustandswechsel“ dort, wo der Client sie erlebt: am
+/// stornierten Bezirk 201 statt 409, an der geschlossenen Stelle 201 statt 422 — und eine
+/// NEUE Meldung an beiden bleibt abgelehnt.
+#[tokio::test]
+async fn replay_am_stornierten_bezirk_und_an_der_geschlossenen_stelle() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+
+    let bid = bezirk(&app, &admin, e, "Uferstraße").await;
+    let url_stand = format!("{}/bezirke/{bid}/staende", pfad(e));
+    let (s, erst) = anfrage(
+        &app,
+        "POST",
+        &url_stand,
+        &admin,
+        Some(&stand_body(40, "a7")),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("{}/bezirke/{bid}/stornieren", pfad(e)),
+        &admin,
+        Some("{}"),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, wieder) = anfrage(
+        &app,
+        "POST",
+        &url_stand,
+        &admin,
+        Some(&stand_body(40, "a7")),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{wieder:?}");
+    assert_eq!(wieder["meldung_id"], erst["meldung_id"]);
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &url_stand,
+        &admin,
+        Some(&stand_body(1, "a7-neu")),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT);
+
+    let sid = stelle(&app, &admin, e, "Turnhalle Ost").await;
+    let url_beleg = format!("{}/stellen/{sid}/belegungen", pfad(e));
+    let (s, erst) = anfrage(
+        &app,
+        "POST",
+        &url_beleg,
+        &admin,
+        Some(&belegung_body(0, "b7")),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+    let (s, _) = anfrage(
+        &app,
+        "PATCH",
+        &format!("{}/stellen/{sid}", pfad(e)),
+        &admin,
+        Some(r#"{"status":"geschlossen"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, wieder) = anfrage(
+        &app,
+        "POST",
+        &url_beleg,
+        &admin,
+        Some(&belegung_body(0, "b7")),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{wieder:?}");
+    assert_eq!(wieder["meldung_id"], erst["meldung_id"]);
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &url_beleg,
+        &admin,
+        Some(&belegung_body(3, "b7-neu")),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+
+    let etb = etb_eintraege(&app, &admin, e).await;
+    assert_eq!(treffer(&etb, "meldung", &["Uferstraße", "40"]).len(), 1);
+    assert_eq!(treffer(&etb, "meldung", &["Turnhalle Ost"]).len(), 1);
+}
