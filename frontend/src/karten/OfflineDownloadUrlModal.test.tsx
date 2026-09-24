@@ -78,6 +78,58 @@ describe('OfflineDownloadUrlModal — Hülle (LFH-346/A6)', () => {
     await waitFor(() => expect(geschlossen).toHaveBeenCalledTimes(1));
   });
 
+  /**
+   * LFH-376 — die Zusicherung, wegen der die Maske auf der Hülle steht (Befund H69
+   * aus LFH-332/B4): Enter in einem einzeiligen Feld sendet ab. Die Strukturprobe
+   * oben (Knopf im `<form>`) ist nur die Ursache; dieser Test belegt die Wirkung.
+   * Getippt wird die Attribution ZUERST, weil sie eine Textarea ist und Enter dort
+   * umbricht — der Absende-Weg läuft über die URL.
+   */
+  it('Enter im URL-Feld startet den Download', async () => {
+    const gesendet = vi.fn();
+    handler(gesendet);
+    const nutzer = userEvent.setup();
+    renderMitProviders(<Harness />);
+
+    const name = await screen.findByLabelText('Name');
+    await waitFor(() => expect(document.activeElement).toBe(name));
+    await nutzer.type(screen.getByLabelText('Attribution / Lizenz'), '© OSM (ODbL)');
+    await nutzer.type(name, 'Deutschland');
+    await nutzer.type(screen.getByLabelText('URL'), 'https://example.test/de.mbtiles{Enter}');
+
+    await waitFor(() => expect(gesendet).toHaveBeenCalledTimes(1));
+    expect(gesendet.mock.calls[0][0]).toMatchObject({
+      name: 'Deutschland',
+      url: 'https://example.test/de.mbtiles',
+      lizenz: '© OSM (ODbL)',
+    });
+  });
+
+  /**
+   * Die Gegenprobe: in der Textarea bricht Enter um und sendet NICHT ab. Belegt wird
+   * das über den Knopf danach — genau EIN Request, und er trägt den Umbruch. Ein
+   * „nicht aufgerufen" direkt nach dem Tippen wäre zu früh gefragt: die Prüfung der
+   * Hülle läuft asynchron, ein Absenden durch Enter käme erst danach an.
+   */
+  it('Enter in der Attribution bricht um und sendet nicht ab', async () => {
+    const gesendet = vi.fn();
+    handler(gesendet);
+    const nutzer = userEvent.setup();
+    renderMitProviders(<Harness />);
+
+    const name = await screen.findByLabelText('Name');
+    await waitFor(() => expect(document.activeElement).toBe(name));
+    await nutzer.type(name, 'Deutschland');
+    await nutzer.type(screen.getByLabelText('URL'), 'https://example.test/de.mbtiles');
+    await nutzer.type(screen.getByLabelText('Attribution / Lizenz'), '© OSM{Enter}ODbL');
+    expect(screen.getByLabelText('Attribution / Lizenz')).toHaveValue('© OSM\nODbL');
+    await nutzer.click(screen.getByRole('button', { name: 'Download starten' }));
+
+    await waitFor(() => expect(gesendet).toHaveBeenCalled());
+    expect(gesendet).toHaveBeenCalledTimes(1);
+    expect(gesendet.mock.calls[0][0]).toMatchObject({ lizenz: '© OSM\nODbL' });
+  });
+
   it('Abbrechen leert die Felder — der zweite Aufruf startet leer', async () => {
     handler();
     const nutzer = userEvent.setup();
