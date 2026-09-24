@@ -885,6 +885,112 @@ mod tests {
             .all(|s| s.belegung.as_ref().map(|m| m.belegt) == Some(89)));
     }
 
+    /// LFH-634, Spec-Szenario „Einsatz schwärzen“: Ort und Bemerkung der Ausgabe leer; Menge,
+    /// Sonderkost, Zeitpunkt, Nachforderungsverweis und das Zeitfenster samt Bezeichnung und
+    /// Bedarf unverändert.
+    #[tokio::test]
+    async fn schwaerzung_verpflegung_leert_ort_und_bemerkung_und_haelt_mengen() {
+        use crate::verpflegung::repo as v;
+        use crate::verpflegung::SonderkostEingabe;
+
+        let pool = crate::db::test_pool().await;
+        sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let nutzer: i64 = sqlx::query_scalar(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1,'Leit','leit','h') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let e: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung, status, abgeschlossen_at, abgeschlossen_von, \
+                retention_bis, geloescht_at) \
+             VALUES (1,'Hochwasser','abgeschlossen','2026-01-01 00:00:00', ?, \
+                '2026-02-01 00:00:00','2026-02-15 00:00:00') RETURNING id",
+        )
+        .bind(nutzer)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let nachforderung: i64 = sqlx::query_scalar(
+            "INSERT INTO nachforderung (einsatz_id, art, bezeichnung, anzahl, adressat_kategorie, \
+                angefordert_at, erstellt_von_id) \
+             VALUES (?, 'Verpflegung', 'Verpflegung 60 EP', 60, 'leitstelle', \
+                '2026-01-01 09:00:00', ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(nutzer)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let sonderkost = SonderkostEingabe {
+            diaet_allergenarm: Some(1),
+            ..SonderkostEingabe::default()
+        };
+
+        let mut tx = pool.begin().await.unwrap();
+        let zf = v::zeitfenster_anlegen_tx(
+            &mut tx,
+            e,
+            nutzer,
+            1,
+            crate::einsatz::nummer::ZEITZONE_VORGABE,
+            &v::ZeitfensterEingabe {
+                bezeichnung: "Mittag".into(),
+                von_at: "2026-01-01 10:00:00".into(),
+                bis_at: "2026-01-01 11:30:00".into(),
+                bedarf_kraefte: 180,
+                bedarf_betreute: 70,
+                bedarf_weitere: 0,
+                sonderkost,
+            },
+        )
+        .await
+        .unwrap();
+        v::ausgabe_erfassen_tx(
+            &mut tx,
+            e,
+            zf.id,
+            nutzer,
+            &v::AusgabeEingabe {
+                zeitpunkt_at: "2026-01-01 10:40:00".into(),
+                menge: 60,
+                ort: Some("Hof Familie Meyer, Deichstraße 4".into()),
+                bemerkung: Some("für Frau Meyer glutenfrei".into()),
+                sonderkost,
+                nachforderung_id: Some(nachforderung),
+            },
+        )
+        .await
+        .unwrap();
+        tx.commit().await.unwrap();
+        let vorher = v::zeitfenster_laden(&pool, e, zf.id).await.unwrap();
+
+        assert!(
+            super::repo::schwaerze_einsatz(&pool, e, "2026-06-01 12:00:00")
+                .await
+                .unwrap()
+        );
+
+        let nachher = v::zeitfenster_laden(&pool, e, zf.id).await.unwrap();
+        let a = &nachher.ausgaben[0];
+        assert_eq!((a.ort.as_deref(), a.bemerkung.as_deref()), (None, None));
+        assert_eq!(a.menge, 60);
+        assert_eq!(a.sonderkost.diaet_allergenarm, 1);
+        assert_eq!(a.zeitpunkt_at, "2026-01-01 10:40:00");
+        assert_eq!(a.nachforderung_id, Some(nachforderung), "Verweis bleibt");
+        // Das Zeitfenster samt Deckung ist unverändert — bis auf die geleerten Freitexte.
+        let mut erwartet = vorher.clone();
+        erwartet.ausgaben[0].ort = None;
+        erwartet.ausgaben[0].bemerkung = None;
+        assert_eq!(nachher, erwartet);
+        assert_eq!(nachher.bezeichnung, "Mittag");
+        assert_eq!(nachher.bedarf.gesamt, 250);
+    }
+
     #[tokio::test]
     async fn soft_geloescht_vor_karenz_wird_nicht_geschwaerzt() {
         // Phase B greift erst nach KARENZ_TAGE. Direkt nach dem Soft-Delete (gleicher

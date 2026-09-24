@@ -926,6 +926,58 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("zurueckgenommen_von_id", G_FK),
         ],
     },
+    // LFH-634: Verpflegung. Mengen, keine Personen — Bedarfe, Mengen, Sonderkost-Anzahlen und
+    // Zeitpunkte bleiben als Statistik-Skelett (Spec „Schwärzung“). Die Bezeichnung eines
+    // Zeitfensters ist der Mahlzeitname („Mittag“) und bleibt; Ort und Bemerkung einer Ausgabe
+    // können eine Adresse oder einen Namen tragen („Hof Familie Meyer“) → NULL. Die ETB-Texte
+    // nennen weder Ort noch Bemerkung (design.md D5), der Scrub läuft also nicht ins Leere.
+    TabellenRegel {
+        tabelle: "verpflegung_zeitfenster",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            retain("bezeichnung", G_OP_LABEL),
+            retain("von_at", G_ZEIT),
+            retain("bis_at", G_ZEIT),
+            retain("bedarf_kraefte", G_ZAEHLER),
+            retain("bedarf_betreute", G_ZAEHLER),
+            retain("bedarf_weitere", G_ZAEHLER),
+            retain("sk_vegetarisch", G_ZAEHLER),
+            retain("sk_vegan", G_ZAEHLER),
+            retain("sk_ohne_schwein", G_ZAEHLER),
+            retain("sk_diaet_allergenarm", G_ZAEHLER),
+            retain("sk_saeugling_kleinkind", G_ZAEHLER),
+            retain("angelegt_von_id", G_FK),
+            retain("angelegt_at", G_ZEIT),
+            retain("geaendert_at", G_ZEIT),
+        ],
+    },
+    TabellenRegel {
+        tabelle: "verpflegung_ausgabe",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            retain("zeitfenster_id", G_FK),
+            retain("zeitpunkt_at", G_ZEIT),
+            retain("menge", G_ZAEHLER),
+            scrub("ort", Strategie::NullSetzen),
+            scrub("bemerkung", Strategie::NullSetzen),
+            retain("sk_vegetarisch", G_ZAEHLER),
+            retain("sk_vegan", G_ZAEHLER),
+            retain("sk_ohne_schwein", G_ZAEHLER),
+            retain("sk_diaet_allergenarm", G_ZAEHLER),
+            retain("sk_saeugling_kleinkind", G_ZAEHLER),
+            retain("nachforderung_id", G_FK),
+            retain("zurueckgenommen_at", G_ZEIT),
+            retain("zurueckgenommen_von_id", G_FK),
+            retain("erfasst_von_id", G_FK),
+            retain("erfasst_at", G_ZEIT),
+        ],
+    },
     // LFH-46: abgeschlossene Lagebesprechungen. `entschluss` bleibt RETAIN (G_FUEHRUNG) —
     // dieselbe Klassifikation wie `lagebericht.abschnitte` und `befehl`, deren Inhalt derselbe
     // Entschluss der Einsatzleitung ist. Ein Alleingang auf Scrub für genau eine der drei
