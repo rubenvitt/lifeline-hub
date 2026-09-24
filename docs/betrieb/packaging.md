@@ -152,20 +152,29 @@ und spricht die API unter derselben Adresse an, unter der es geladen wurde. Die
 Server-URL ist also die Adresse, die man auf dem Tablet oder Laptop im Browser
 öffnet.
 
-**Empfohlen ist `https://` mit einem festen Hostnamen**, etwa `https://elw.local:8443`
-(`--tls` samt `--tls-hostname`, siehe [betrieb-tls.md](../betrieb-tls.md)). Klartext-HTTP
-über eine LAN-IP funktioniert zwar, dort fehlt dem Browser aber der sichere Kontext:
+**Empfohlen ist `https://` mit einem festen Hostnamen**, etwa `https://elw.local:8443`,
+gestartet mit `--bind 0.0.0.0:8443 --tls --tls-hostname elw.local` (`--tls` ändert den
+Port nicht, der kommt allein aus `--bind`; Einzelheiten in [betrieb-tls.md](../betrieb-tls.md)).
+Zwei Voraussetzungen bringt die Anwendung dabei nicht selbst mit:
+
+- **Der Name muss auflösbar sein.** Die Binary kündigt sich nicht per mDNS an; `elw.local`
+  kommt vom Betriebssystem des ELW-Rechners (Bonjour, Avahi) oder aus dem lokalen DNS.
+- **Das Zertifikat muss auf jedem Gerät vertraut sein** (mkcert-Root-CA ausrollen oder ein
+  eigenes Zertifikat der Organisation). Wer die Zertifikatswarnung nur wegklickt, bekommt
+  dieselben Einschränkungen wie bei Klartext-HTTP.
+
+Klartext-HTTP funktioniert zwar, egal ob über eine IP oder einen Hostnamen, dort fehlt dem
+Browser aber der sichere Kontext:
 
 - kein Service Worker, also kein Offline-Precache und keine Installation als PWA,
 - keine Passkeys (WebAuthn verlangt zusätzlich einen Hostnamen statt einer IP, siehe
-  [betrieb-webauthn.md](../betrieb-webauthn.md)),
-- keine Eigenposition auf der Karte (Geolocation).
+  [betrieb-webauthn.md](../betrieb-webauthn.md)).
 
 Die Adresse sollte außerdem **stabil** bleiben. Die Offline-Warteschlange, lokal gemerkte
-Einstellungen (etwa die Bediendichte) und eine installierte PWA hängen an der Adresse, mit der das Gerät die Seite geöffnet
-hat. Wer erst über die IP und später über den Hostnamen arbeitet, hat zwei getrennte
-Stände, und was offline in der Warteschlange lag, erscheint unter der neuen Adresse
-nicht.
+Einstellungen (etwa die Bediendichte) und eine installierte PWA hängen an der Adresse, mit
+der das Gerät die Seite geöffnet hat. Wer erst über die IP und später über den Hostnamen
+arbeitet, hat zwei getrennte Stände, und was offline in der Warteschlange lag, erscheint
+unter der neuen Adresse nicht.
 
 > **Hinweis:** Die Binary wird auf einem Entwickler-/Build-Rechner mit Node.js und
 > Rust gebaut und dann als fertige Datei auf den ELW-Rechner kopiert. Auf dem

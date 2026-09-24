@@ -396,7 +396,9 @@ Platz hat.
 `pages/lagekarte/KartenFuss.tsx`). Zeichnen-Steuerung (`bottom: 16`, mittig) und
 Zeitachsen-/Snapshot-Leiste (`bottom: 12`, volle Breite) lagen beide absolut auf `zIndex: 5`
 über der Lagekarte. Bei Gleichstand gewinnt die spätere DOM-Position — die Leiste verdeckte
-im **Default-Zustand** (`lfh:lagekarte:zeitachse-eingeklappt` ungesetzt, also ausgeklappt)
+im **Default-Zustand** (`lfh:lagekarte:zeitachse-eingeklappt` ungesetzt, damals also
+ausgeklappt; seit dem Neuentwurf gilt das nur ab `xl`, darunter startet sie eingeklappt —
+`SnapshotLeiste.tsx`, `startEingeklappt`)
 „Abschließen"/„Abbrechen" vollständig; aus dem Zeichenmodus kam man nur über Tastatur oder
 Reload heraus. Der Fix ist **ein gemeinsamer, absolut positionierter Rahmen mit den Bändern
 als Flow-Geschwistern in einer Spalte**, nicht ein höherer `zIndex`: der hätte den Klick
