@@ -955,3 +955,137 @@ async fn verortung_halbes_paar_oder_bereich_ist_422() {
     let (s, _) = anfrage(&app, "PATCH", &url, &admin, Some(r#"{"lat":"x","lon":8}"#)).await;
     assert_eq!(s, StatusCode::BAD_REQUEST);
 }
+
+// ── Lagekennzahl `evakuiert` am Einsatz (LFH-607) ──────────────────────────────────────────
+
+/// `lagekennzahlen` des Einsatzes aus Detail- UND Listenantwort. Das Feld wird an zwei Stellen
+/// gebaut (`Einsatz::anzeige`, `repo::liste_fuer`) — geprüft wird beides, und das
+/// Vorhandensein per `contains_key`: ein fehlender Key sähe per Index wie `null` aus.
+async fn lagekennzahlen(app: &axum::Router, cookie: &str, einsatz: i64) -> (Value, Value) {
+    let (s, detail) = anfrage(
+        app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}"),
+        cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{detail:?}");
+    assert!(
+        detail.as_object().unwrap().contains_key("lagekennzahlen"),
+        "Detail: nie absent, leer ist []: {detail:?}"
+    );
+    let (s, liste) = anfrage(app, "GET", "/api/einsaetze", cookie, None).await;
+    assert_eq!(s, StatusCode::OK, "{liste:?}");
+    let zeile = liste
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|e| e["id"].as_i64() == Some(einsatz))
+        .expect("Einsatz in der Liste")
+        .clone();
+    assert!(
+        zeile.as_object().unwrap().contains_key("lagekennzahlen"),
+        "Liste: nie absent, leer ist []: {zeile:?}"
+    );
+    (
+        detail["lagekennzahlen"].clone(),
+        zeile["lagekennzahlen"].clone(),
+    )
+}
+
+async fn raeumung(app: &axum::Router, cookie: &str, einsatz: i64, bid: i64, zustand: &str) {
+    let (s, b) = anfrage(
+        app,
+        "PATCH",
+        &format!("{}/bezirke/{bid}", pfad(einsatz)),
+        cookie,
+        Some(&format!(r#"{{"raeumung":"{zustand}"}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "Räumung {zustand}: {b:?}");
+}
+
+/// Der Auslöser folgt den aktiven Bezirken — dieselbe Definition wie `istAktiverBezirk` im
+/// Frontend: nicht storniert, Räumung nicht `aufgehoben`. Standmeldungen ändern ihn nie
+/// (Messwert, keine Entscheidung; Prüfliste Kriterium 9).
+#[tokio::test]
+async fn bezirk_schaltet_die_lagekennzahl_am_einsatz() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let anderer = einsatz_anlegen(&app, &admin).await;
+    let leer = serde_json::json!([]);
+    let evakuiert = serde_json::json!(["evakuiert"]);
+    let ist = |p: (Value, Value), soll: &Value, schritt: &str| {
+        assert_eq!(&p.0, soll, "Detail nach „{schritt}“");
+        assert_eq!(&p.1, soll, "Liste nach „{schritt}“");
+    };
+
+    ist(lagekennzahlen(&app, &admin, e).await, &leer, "ohne Bezirk");
+
+    let bid = bezirk(&app, &admin, e, "Uferstraße 12–40").await;
+    ist(
+        lagekennzahlen(&app, &admin, e).await,
+        &evakuiert,
+        "angelegt",
+    );
+    ist(
+        lagekennzahlen(&app, &admin, anderer).await,
+        &leer,
+        "anderer Einsatz",
+    );
+
+    // Stand melden und zurücknehmen: kein Wechsel.
+    let (s, m) = anfrage(
+        &app,
+        "POST",
+        &format!("{}/bezirke/{bid}/staende", pfad(e)),
+        &admin,
+        Some(r#"{"evakuiert":0,"erhebung":"gezaehlt"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{m:?}");
+    ist(lagekennzahlen(&app, &admin, e).await, &evakuiert, "Stand 0");
+    let mid = m["meldung_id"].as_i64().unwrap();
+    let (s, r) = anfrage(
+        &app,
+        "POST",
+        &format!("{}/staende/{mid}/zuruecknehmen", pfad(e)),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{r:?}");
+    ist(
+        lagekennzahlen(&app, &admin, e).await,
+        &evakuiert,
+        "Rücknahme",
+    );
+
+    // Geräumt ist das Ergebnis, nicht das Ende.
+    raeumung(&app, &admin, e, bid, "geraeumt").await;
+    ist(lagekennzahlen(&app, &admin, e).await, &evakuiert, "geräumt");
+
+    // Aufheben nimmt die Anordnung zurück.
+    raeumung(&app, &admin, e, bid, "aufgehoben").await;
+    ist(lagekennzahlen(&app, &admin, e).await, &leer, "aufgehoben");
+
+    // Ein zweiter Bezirk schaltet wieder, Stornieren (Fehlanlage) nimmt ihn zurück.
+    let zweiter = bezirk(&app, &admin, e, "Deichweg").await;
+    ist(
+        lagekennzahlen(&app, &admin, e).await,
+        &evakuiert,
+        "zweiter angelegt",
+    );
+    let (s, b) = anfrage(
+        &app,
+        "POST",
+        &format!("{}/bezirke/{zweiter}/stornieren", pfad(e)),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{b:?}");
+    ist(lagekennzahlen(&app, &admin, e).await, &leer, "storniert");
+}

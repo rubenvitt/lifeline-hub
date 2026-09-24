@@ -63,57 +63,10 @@ import {
   kategorieEtikett,
   kategorieVon,
 } from '../kraefte/statusAchse';
-import { einsatzStatus, statusKategorie, type StatusDarstellung } from '../theme/statusFarben';
+import { einsatzStatus, statusKategorie } from '../theme/statusFarben';
 import { abstand } from '../theme/tokens';
 import StatusTag from '../components/StatusTag';
-
-/**
- * Statusanzeige eines disponierten Fahrzeugs — und zugleich die GRENZE des
- * Statusfarb-Vertrags (LFH-328/A2, Spec §1.3).
- *
- * Die Anzeige hat zwei Achsen, und nur eine davon kann der Vertrag tragen:
- *
- * 1. **DB-Achse** — `status_farbe` ist mandantengepflegter Freitext aus den
- *    Stammdaten-Tabs. Das Backend (`src/routes/fahrzeug_status.rs`) trimmt ihn und
- *    prüft sonst NICHTS: kein Enum, kein Hex-Format. Ein getypter `Record` kann das
- *    nicht einfangen. Diese Achse bleibt deshalb unangetastet — wer sie „aufräumt",
- *    nimmt dem Mandanten seine gepflegte Farbe weg. (Dass sie gegen die A0-Rollen
- *    validiert werden sollte, ist ein eigener Befund, Spec §5 Nr. 1.)
- * 2. **Fallback-Achse** — früher `KATEGORIE_FALLBACK`, byte-identisch in dieser und
- *    der Nachbarseite dupliziert. Sie kommt jetzt aus `statusKategorie`.
- *
- * ABWEICHUNG VOM PLANWORTLAUT, bewusst: der Plan sagt „`status_farbe ?? …` bleibt
- * stehen", gemeint als „die DB-Achse bleibt". Aus dem `??` einen Zweig zu machen
- * erhält genau das — und vermeidet den Fehler, den `StatusTag` selbst dokumentiert:
- * antds `color`-Prop rendert einen NICHT-Preset-Wert als Vollfläche mit erzwungen
- * weißem Text. Die Rollenfarbe dort hineinzureichen (`rollenFarbe(...)` liefert Hex,
- * nie einen Preset-Namen) hätte aus jedem Fallback-Tag — dem Normalfall, solange kein
- * Mandant eine Farbe pflegt — eine gefüllte Fläche gemacht, im Dunkelmodus mit weißer
- * Schrift auf aufgehelltem Rot.
- *
- * ── DIE DB-ACHSE VERLIERT MIT LFH-339 · C4 IHRE FLÄCHE, NICHT IHRE FARBE ──────────
- *
- * A2 liess die DB-Achse auf antds `color` stehen; die Sorge dort war ausdrücklich der
- * VERLUST der gepflegten Farbe („wer sie aufräumt, nimmt dem Mandanten seine Farbe
- * weg"), nicht die Fläche als solche. Die Zielform-Spec §4b entscheidet die Fläche
- * inzwischen eigens und mit derselben Vertragsgrenze als Begründung: `status_farbe` ist
- * ungeprüfter Freitext, Kontrast (WCAG 1.4.11) ist dort NICHT zugesichert — auf einer
- * grossen Fläche mit erzwungen weissem Text ist das eine Lesbarkeitszusage, die niemand
- * geben kann; auf Rand und Text trägt dieselbe Farbe keine Textlesbarkeit.
- *
- * Der Zweig fällt deshalb: die Mandantenfarbe geht über `StatusTag`s `farbe`-Prop auf
- * Rand und Text und bleibt damit erhalten. Das ist KEIN Zurückdrehen von A2, sondern
- * dessen Sorge eingelöst — und es hält die beiden Zweige der Seite bei EINER
- * Darstellung: der Auslöser aus `components/StatusWahl.tsx` trägt dasselbe Etikett wie
- * diese Anzeige, und zwei Formen für denselben Status wären ein Unterschied ohne
- * Bedeutung.
- */
-export function statusDarstellung(ef: EinsatzFahrzeug): StatusDarstellung {
-  // Ohne Status bleibt es beim neutralen Wortlaut des Bestands — ein „—" sagt in einer
-  // Statusspalte weniger, und die Zeile muss von hier aus einen Status BEKOMMEN können.
-  if (!ef.status_label || !ef.status_kategorie) return { rolle: 'neutral', label: 'kein Status' };
-  return { ...statusKategorie[ef.status_kategorie], label: ef.status_label };
-}
+import { fahrzeugStatusDarstellung } from '../kraefte/mittelStatus';
 
 /**
  * Ist-Besatzungsstärke aus den Stärke-Positionen der zugeordneten Kräfte (clientseitig
@@ -640,7 +593,7 @@ export default function FahrzeugePage() {
       // Test es merkt — genau die Divergenz, gegen die der gemeinsame Deskriptor gebaut ist.
       render: (_, ef) => (
         <StatusWahl
-          darstellung={statusDarstellung(ef)}
+          darstellung={fahrzeugStatusDarstellung(ef)}
           darfSchreiben={darfSchreiben}
           {...statusBedienungVon(ef)}
         />
@@ -843,7 +796,7 @@ export default function FahrzeugePage() {
                 // Deskriptor. Seit LFH-339 · C4 tragen beide Zweige damit dieselbe Darstellung
                 // UND denselben Bedienweg; die Mandantenfarbe geht über `statusBedienung.farbe`
                 // mit und steht auf Rand und Text, nie auf der Fläche.
-                status: (ef) => statusDarstellung(ef),
+                status: (ef) => fahrzeugStatusDarstellung(ef),
                 // Der Bedienweg sitzt hier und NICHT im `aktion`-Slot: der ist mit „Entfernen"
                 // belegt, und `Datensicht` sichert genau eine Primäraktion zu (Zielform-Spec §5).
                 statusBedienung: (ef) => (darfSchreiben ? statusBedienungVon(ef) : null),

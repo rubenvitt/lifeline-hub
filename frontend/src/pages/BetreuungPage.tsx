@@ -147,12 +147,22 @@ export default function BetreuungPage() {
     void qc.invalidateQueries({ queryKey: einsatzKeys.betreuung(einsatzId) });
     void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
   }, [qc, einsatzId]);
+  /**
+   * Nach einer Bezirksänderung zusätzlich den Einsatz (LFH-607): Anlegen, Räumung und
+   * Stornieren können die Lagekennzahl `evakuiert` kippen, und der Einsatz-Key ist nicht live
+   * (`NICHT_LIVE_KEYS`) — ohne diese Zeile sähe die festlegende Person den neuen Zuschnitt des
+   * Lage-Dashboards erst beim nächsten Fokus. Stand- und Stellenmeldungen kippen ihn nie.
+   */
+  const invalidiereBezirk = useCallback(() => {
+    invalidiere();
+    void qc.invalidateQueries({ queryKey: einsatzKeys.einsatz(einsatzId) });
+  }, [invalidiere, qc, einsatzId]);
 
   // ── Evakuierungsbezirke ─────────────────────────────────────────────────────────────
   const bezirkAnlegenMut = useMutation({
     mutationFn: (body: EvakuierungsbezirkEingabe) => legeBezirkAn(einsatzId, body),
     onSuccess: (b) => {
-      invalidiere();
+      invalidiereBezirk();
       message.success(`Evakuierungsbezirk ${b.bezeichnung} angelegt`);
     },
   });
@@ -160,14 +170,14 @@ export default function BetreuungPage() {
     mutationFn: ({ bezirkId, patch }: { bezirkId: number; patch: EvakuierungsbezirkPatch }) =>
       aendereBezirk(einsatzId, bezirkId, patch),
     onSuccess: (b) => {
-      invalidiere();
+      invalidiereBezirk();
       message.success(`Bezirk ${b.bezeichnung} gespeichert`);
     },
   });
   const bezirkStornierenMut = useMutation({
     mutationFn: (bezirkId: number) => storniereBezirk(einsatzId, bezirkId),
     onSuccess: (b) => {
-      invalidiere();
+      invalidiereBezirk();
       setDialog(null);
       message.success(`Bezirk ${b.bezeichnung} storniert`);
     },

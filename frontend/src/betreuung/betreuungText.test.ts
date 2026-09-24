@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   evakuiertText,
   freiePlaetze,
+  kennzahlTeile,
   kennzahlText,
   mengeText,
   personenZahl,
@@ -139,5 +140,66 @@ describe('betreuungText (LFH-639)', () => {
       },
     ]);
     expect(kennzahlText(gezaehlt)).toBe(`keine Meldung · von 1${T}850 geplant · 1 ohne Meldung`);
+  });
+
+  // LFH-607: Dashboard-Zelle und Blockkopf lesen EINE Formatierung. Die Zelle zeigt N als Wert
+  // und den Rest als Notiz; ohne Meldung ist N `null` (die Zelle setzt „—", nie 0).
+  describe('kennzahlTeile (LFH-607)', () => {
+    it('gezählt: N als Wert, „von M geplant" als Notiz', () => {
+      expect(
+        kennzahlTeile({
+          evakuiert: 1320,
+          geplant: 1850,
+          bezirke: 2,
+          ohneMeldung: 0,
+          geschaetzt: false,
+        }),
+      ).toEqual({ evakuiert: `1${T}320`, notiz: `von 1${T}850 geplant` });
+    });
+
+    it('geschätzt mit N: ≈ an N, Bezirke ohne Meldung in der Notiz', () => {
+      expect(
+        kennzahlTeile({
+          evakuiert: 600,
+          geplant: 1850,
+          bezirke: 2,
+          ohneMeldung: 1,
+          geschaetzt: true,
+        }),
+      ).toEqual({ evakuiert: '≈ 600', notiz: `von 1${T}850 geplant · 1 ohne Meldung` });
+    });
+
+    it('ohne jede Meldung: N ist null, nie 0; ≈ wandert an M', () => {
+      expect(
+        kennzahlTeile({
+          evakuiert: null,
+          geplant: 640,
+          bezirke: 1,
+          ohneMeldung: 1,
+          geschaetzt: true,
+        }),
+      ).toEqual({ evakuiert: null, notiz: 'von ≈ 640 geplant · 1 ohne Meldung' });
+      expect(
+        kennzahlTeile({
+          evakuiert: null,
+          geplant: 640,
+          bezirke: 1,
+          ohneMeldung: 1,
+          geschaetzt: false,
+        }),
+      ).toEqual({ evakuiert: null, notiz: 'von 640 geplant · 1 ohne Meldung' });
+    });
+
+    it('Evakuierte über Plan werden nicht gedeckelt', () => {
+      expect(
+        kennzahlTeile({
+          evakuiert: 700,
+          geplant: 640,
+          bezirke: 1,
+          ohneMeldung: 0,
+          geschaetzt: false,
+        }).evakuiert,
+      ).toBe('700');
+    });
   });
 });

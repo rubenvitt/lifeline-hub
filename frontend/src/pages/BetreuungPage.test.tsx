@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App as AntApp } from 'antd';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import BetreuungPage from './BetreuungPage';
+import { ladeEinsatz } from '../api/einsaetze';
 import { AuthProvider } from '../auth/AuthContext';
 import { ApiError } from '../api/client';
 import type { BetreuungUebersicht, Betreuungsstelle, Evakuierungsbezirk } from '../api/types';
@@ -119,6 +120,18 @@ function renderPage(pfad = '/einsaetze/1/betreuung') {
 function LagekarteSonde() {
   const ort = useLocation();
   return <div data-testid="lagekarte-ziel">{ort.pathname + ort.search}</div>;
+}
+
+/**
+ * Einsatz-Abrufe seit dem ersten (LFH-607). Eine Bezirksänderung kann den Auslöser der
+ * Lagekennzahl `evakuiert` kippen — sie muss den Einsatz neu abrufen lassen, sonst sähe die
+ * festlegende Person den neuen Zuschnitt des Lage-Dashboards erst beim nächsten Fokus.
+ */
+async function einsatzAbrufeNach(aktion: () => Promise<void>): Promise<() => number> {
+  await waitFor(() => expect(vi.mocked(ladeEinsatz)).toHaveBeenCalled());
+  const vorher = vi.mocked(ladeEinsatz).mock.calls.length;
+  await aktion();
+  return () => vi.mocked(ladeEinsatz).mock.calls.length - vorher;
 }
 
 const karteVon = (titel: string) =>
@@ -309,13 +322,20 @@ describe('BetreuungPage (LFH-639)', () => {
       );
       const dialog = await dialogMit('Stand melden: Uferstraße 12–40');
       await userEvent.type(within(dialog).getByLabelText('Evakuiert (Personen)'), '500');
-      await userEvent.click(within(dialog).getByRole('button', { name: 'Melden' }));
-      await waitFor(() =>
-        expect(api.meldeStand).toHaveBeenCalledWith(1, 5, { evakuiert: 500, erhebung: 'gezaehlt' }),
-      );
-      await userEvent.click(await screen.findByRole('button', { name: /Rückgängig/ }));
-      await waitFor(() => expect(api.nimmStandZurueck).toHaveBeenCalledWith(1, 77));
+      const neu = await einsatzAbrufeNach(async () => {
+        await userEvent.click(within(dialog).getByRole('button', { name: 'Melden' }));
+        await waitFor(() =>
+          expect(api.meldeStand).toHaveBeenCalledWith(1, 5, {
+            evakuiert: 500,
+            erhebung: 'gezaehlt',
+          }),
+        );
+        await userEvent.click(await screen.findByRole('button', { name: /Rückgängig/ }));
+        await waitFor(() => expect(api.nimmStandZurueck).toHaveBeenCalledWith(1, 77));
+      });
       expect(api.nimmStandZurueck).not.toHaveBeenCalledWith(1, 55);
+      // LFH-607: eine Standmeldung ist ein Messwert, keine Entscheidung — der Einsatz bleibt.
+      expect(neu()).toBe(0);
     });
 
     it('eine zweite Meldung ersetzt den stehenden Toast — ein Rückweg, der zur jüngsten gehört', async () => {
@@ -524,8 +544,12 @@ describe('BetreuungPage (LFH-639)', () => {
     const dialog = await dialogMit('Bezirk Uferstraße 12–40 stornieren?');
     const ok = within(dialog).getByRole('button', { name: 'Stornieren' });
     expect(ok).toHaveClass('ant-btn-dangerous');
-    await userEvent.click(ok);
-    await waitFor(() => expect(api.storniereBezirk).toHaveBeenCalledWith(1, 5));
+    const neu = await einsatzAbrufeNach(async () => {
+      await userEvent.click(ok);
+      await waitFor(() => expect(api.storniereBezirk).toHaveBeenCalledWith(1, 5));
+    });
+    // LFH-607: Stornieren kann die Lagekennzahl `evakuiert` wegnehmen.
+    await waitFor(() => expect(neu()).toBeGreaterThan(0));
   });
 
   it('Bezirk anlegen aus dem Kopf: Dialog, POST mit den Feldern', async () => {
@@ -536,14 +560,18 @@ describe('BetreuungPage (LFH-639)', () => {
     const dialog = await dialogMit('Evakuierungsbezirk anlegen');
     await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Deichweg 1–9');
     await userEvent.type(within(dialog).getByLabelText('Plangröße (Personen)'), '120');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
-    await waitFor(() =>
-      expect(api.legeBezirkAn).toHaveBeenCalledWith(1, {
-        bezeichnung: 'Deichweg 1–9',
-        plan_personen: 120,
-        plan_erhebung: 'geschaetzt',
-      }),
-    );
+    const neu = await einsatzAbrufeNach(async () => {
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+      await waitFor(() =>
+        expect(api.legeBezirkAn).toHaveBeenCalledWith(1, {
+          bezeichnung: 'Deichweg 1–9',
+          plan_personen: 120,
+          plan_erhebung: 'geschaetzt',
+        }),
+      );
+    });
+    // LFH-607: Anlegen IST die Anordnung — der Einsatz trägt danach `evakuiert`.
+    await waitFor(() => expect(neu()).toBeGreaterThan(0));
   });
 
   it('Menü „Räumung setzen" öffnet den Räumungsdialog und schickt den neuen Zustand', async () => {
@@ -557,9 +585,13 @@ describe('BetreuungPage (LFH-639)', () => {
     );
     const dialog = await dialogMit('Räumung: Uferstraße 12–40');
     await userEvent.click(within(dialog).getByRole('radio', { name: 'geräumt' }).closest('label')!);
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
-    await waitFor(() =>
-      expect(api.aendereBezirk).toHaveBeenCalledWith(1, 5, { raeumung: 'geraeumt' }),
-    );
+    const neu = await einsatzAbrufeNach(async () => {
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+      await waitFor(() =>
+        expect(api.aendereBezirk).toHaveBeenCalledWith(1, 5, { raeumung: 'geraeumt' }),
+      );
+    });
+    // LFH-607: „aufgehoben" nähme die Lagekennzahl weg; jede Bezirksänderung fragt nach.
+    await waitFor(() => expect(neu()).toBeGreaterThan(0));
   });
 });

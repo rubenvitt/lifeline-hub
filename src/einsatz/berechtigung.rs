@@ -324,6 +324,7 @@ mod tests {
             org_id: 1,
             org_name: "Orga".into(),
             pegel_festgelegt: false,
+            evakuierung_angeordnet: false,
             bezeichnung: "Lage".into(),
             stichwort: None,
             status,

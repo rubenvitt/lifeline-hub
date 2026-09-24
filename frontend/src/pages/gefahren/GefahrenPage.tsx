@@ -9,7 +9,6 @@ import {
   benenneGefahrengebiet,
   gefahrengebietName,
   ladeGefahrengebiete,
-  ladeMatrix,
   setzeBewertung,
 } from '../../api/gefahren';
 import { ladeEinsatz } from '../../api/einsaetze';
@@ -18,6 +17,7 @@ import { useAuth } from '../../auth/AuthContext';
 import { useViewport } from '../../components/useViewport';
 import { lagekartePfad, parseRouteId } from '../../routing/deeplinks';
 import { warnstufeKarte } from '../../theme/statusFarben';
+import { gefahrenMatrixAbfrage } from './gefahrenMatrixAbfrage';
 import StatusTag from '../../components/StatusTag';
 import GefahrenMatrix, { zellSchluessel } from './GefahrenMatrix';
 import { Liste, ListenEintrag } from '../../components/Liste';
@@ -115,8 +115,8 @@ export default function GefahrenPage() {
   }, [gebieteQuery.isSuccess, gebiete, gewaehlt, searchParams, setSearchParams]);
 
   const matrixQuery = useQuery({
-    queryKey: einsatzKeys.gefahrenmatrix(einsatzId, gewaehlt),
-    queryFn: () => ladeMatrix(einsatzId, gewaehlt as number),
+    // Dieselben Optionen wie die Gefahrengebiet-Vorschau der Sprungpalette (LFH-664).
+    ...gefahrenMatrixAbfrage(einsatzId, gewaehlt),
     enabled: gewaehlt != null,
   });
 

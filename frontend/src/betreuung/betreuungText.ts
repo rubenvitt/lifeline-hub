@@ -45,19 +45,30 @@ export function evakuiertText(
 }
 
 /**
- * Die Kennzahl „Evakuiert N · von M geplant" als Text — für den Blockkopf der Seite und das
- * Lagebild (LFH-607). Ist ein beteiligter Stand oder eine Plangröße geschätzt, trägt die
- * Kennzahl ein „≈" (Spec „Kennzahl"): vor N, solange es ein N gibt; ohne jede Meldung vor M —
- * dann kann nur die Plangröße geschätzt sein, und ohne das Zeichen wirkte sie gezählt. Bezirke
- * ohne Meldung stehen dahinter, statt als 0 in N zu verschwinden.
+ * Die Kennzahl „Evakuiert N · von M geplant" in ihren zwei Teilen — N und der Rest. Die
+ * Dashboard-Zelle (LFH-607) setzt N als Wert und den Rest als Notiz, der Blockkopf der Seite
+ * setzt beides in eine Zeile ({@link kennzahlText}). EINE Formatierung für beide Leser.
+ *
+ * Ist ein beteiligter Stand oder eine Plangröße geschätzt, trägt die Kennzahl ein „≈" (Spec
+ * „Kennzahl"): vor N, solange es ein N gibt; ohne jede Meldung vor M — dann kann nur die
+ * Plangröße geschätzt sein, und ohne das Zeichen wirkte sie gezählt. `evakuiert` ist dann
+ * `null`: „nichts gemeldet" ist nicht „niemand evakuiert", der Aufrufer setzt sein eigenes
+ * Wort statt einer 0. Bezirke ohne Meldung stehen in der Notiz, statt als 0 in N zu
+ * verschwinden.
  */
+export function kennzahlTeile(k: EvakuierungKennzahl): { evakuiert: string | null; notiz: string } {
+  const ca = k.geschaetzt ? '≈ ' : '';
+  const n = k.evakuiert == null ? null : `${ca}${personenZahl(k.evakuiert)}`;
+  const m = n == null ? `${ca}${personenZahl(k.geplant)}` : personenZahl(k.geplant);
+  const ohne = k.ohneMeldung > 0 ? ` · ${personenZahl(k.ohneMeldung)} ohne Meldung` : '';
+  return { evakuiert: n, notiz: `von ${m} geplant${ohne}` };
+}
+
+/** Die Kennzahl als eine Zeile für den Blockkopf der Seite; ohne Meldung „keine Meldung". */
 export function kennzahlText(k: EvakuierungKennzahl | null): string {
   if (k == null) return 'keine geplante Evakuierung';
-  const ca = k.geschaetzt ? '≈ ' : '';
-  const n = k.evakuiert == null ? 'keine Meldung' : `${ca}${personenZahl(k.evakuiert)}`;
-  const m = k.evakuiert == null ? `${ca}${personenZahl(k.geplant)}` : personenZahl(k.geplant);
-  const ohne = k.ohneMeldung > 0 ? ` · ${personenZahl(k.ohneMeldung)} ohne Meldung` : '';
-  return `${n} · von ${m} geplant${ohne}`;
+  const { evakuiert, notiz } = kennzahlTeile(k);
+  return `${evakuiert ?? 'keine Meldung'} · ${notiz}`;
 }
 
 /** Freie Plätze — `null` ohne Kapazität (Spec: „keine Zahl freier Plätze") oder ohne Meldung. */

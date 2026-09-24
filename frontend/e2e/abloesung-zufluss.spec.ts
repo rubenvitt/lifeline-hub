@@ -39,6 +39,18 @@ async function anmelden(page: Page) {
   await expect(page).toHaveURL(/\/einsaetze/);
 }
 
+/**
+ * Die Schriften kommen über `@font-face` (`theme/schriften.css`) und tauschen nach dem Laden die
+ * Zeilenmaße. Unter Last (volles Gate) lag der Tausch gemessen zwischen Vorher- und
+ * Nachher-Messung: Karte 2 stand vorher bei y=491, nachher bei 490 — ein Befund über die Schrift,
+ * nicht über die Schleuse. Gemessen wird deshalb erst mit geladenen Schriften.
+ */
+async function schriftenGeladen(page: Page) {
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+  });
+}
+
 async function stelleDichte(page: Page, dichte: string) {
   await page.evaluate(([schluessel, wert]) => window.localStorage.setItem(schluessel, wert), [
     DICHTE_SCHLUESSEL,
@@ -85,6 +97,7 @@ for (const kontext of KONTEXTE) {
     const banner = page.locator('[data-lfh="sammelbanner"]');
     await expect(karten).toHaveCount(2);
     await expect(banner).toHaveCount(0);
+    await schriftenGeladen(page);
 
     const vorher = {
       erste: await karten.first().getAttribute('aria-label'),
@@ -133,6 +146,102 @@ for (const kontext of KONTEXTE) {
       description:
         `${kontext.name}/${kontext.dichte}: Zeile ${vorher.zeile} → ${nachher.zeile} px, ` +
         `oberste Karte y ${vorher.oben} → ${nachher.oben}`,
+    });
+  });
+}
+
+/**
+ * LFH-660: eine FREMDE Rhythmusänderung ordnet vorhandene Karten nicht unter dem Cursor um.
+ *
+ * DIE GEÄNDERTE KARTE STEHT IN DER MITTE. Drei Schichten mit 6 h, die mittlere wird fremd auf
+ * 30 min gesetzt — die Server-Ordnung stellte sie nach OBEN. Stünde sie unten, fiele weder ein
+ * Umordnen noch ein Höhensprung ihres frischen Inhalts auf die Karten darunter auf. Gemessen
+ * wird deshalb die Oberkante JEDER Karte, nicht nur der ersten: „Inhalt frisch" darf die
+ * geänderte Karte nicht höher machen, sonst rutschte die untere trotz eingefrorener Folge.
+ */
+for (const kontext of KONTEXTE) {
+  test(`Ablösung (${kontext.name}, ${kontext.dichte}): fremde Rhythmusänderung ordnet erst mit dem Banner um`, async ({
+    page,
+  }) => {
+    test.setTimeout(60_000);
+    await page.setViewportSize(kontext.viewport);
+    await anmelden(page);
+
+    const neu = await page.request.post('/api/einsaetze', {
+      data: { bezeichnung: `E2E Umordnung ${kontext.name} ${Date.now()}` },
+    });
+    expect(neu.ok(), `Seeding Einsatz: ${neu.status()}`).toBeTruthy();
+    const einsatzId = ((await neu.json()) as { id: number }).id;
+    const post = async (pfad: string, data: unknown, was: string) => {
+      const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/${pfad}`, { data });
+      expect(
+        antwort.ok(),
+        `Seeding ${was}: ${antwort.status()} ${await antwort.text()}`,
+      ).toBeTruthy();
+      return (await antwort.json()) as { id: number };
+    };
+    const abschnitt = await post('abschnitte', { name: 'Deichwache Nord' }, 'Abschnitt');
+    const schichten: number[] = [];
+    for (const name of ['Florian Nord 1', 'Florian Nord 2', 'Florian Nord 3']) {
+      const einheit = await post('einheiten', { name, abschnitt_id: abschnitt.id }, name);
+      schichten.push(
+        (await post('abloesungen', { einheit_id: einheit.id, rhythmus_minuten: 360 }, name)).id,
+      );
+    }
+
+    await page.goto(`/einsaetze/${einsatzId}/abloesung`);
+    await stelleDichte(page, kontext.dichte);
+
+    const karten = page.locator('[data-lfh="abloesung-karte"]');
+    const banner = page.locator('[data-lfh="sammelbanner"]');
+    await expect(karten).toHaveCount(3);
+    await expect(banner).toHaveCount(0);
+    await schriftenGeladen(page);
+    const namen = () => karten.evaluateAll((ks) => ks.map((k) => k.getAttribute('aria-label')));
+    const oberkanten = () =>
+      karten.evaluateAll((ks) => ks.map((k) => k.getBoundingClientRect().top));
+    const vorher = { namen: await namen(), oben: await oberkanten() };
+    expect(vorher.namen).toEqual([
+      'Schicht Florian Nord 1',
+      'Schicht Florian Nord 2',
+      'Schicht Florian Nord 3',
+    ]);
+
+    // Fremd geändert, am Frontend vorbei: 30 min Rhythmus → fällig vor den beiden anderen.
+    const mitte = karten.nth(1);
+    const aenderung = await page.request.patch(
+      `/api/einsaetze/${einsatzId}/abloesungen/${schichten[1]}`,
+      { data: { rhythmus_minuten: 30 } },
+    );
+    expect(aenderung.ok(), `fremde Änderung: ${aenderung.status()}`).toBeTruthy();
+
+    await expect(banner).toBeVisible();
+    await expect(banner).toContainText(
+      'Reihenfolge geändert, 1 fällige Schicht steht weiter unten',
+    );
+    // Folge eingefroren, Inhalt frisch: die mittlere Karte trägt schon ihre neue Einstufung.
+    await expect(mitte).toHaveAttribute('data-einstufung', 'vorwarnung');
+
+    const nachher = { namen: await namen(), oben: await oberkanten() };
+    expect(nachher.namen, 'keine Karte hat ihren Platz gewechselt').toEqual(vorher.namen);
+    vorher.oben.forEach((y, i) =>
+      expect(
+        Math.abs(nachher.oben[i] - y),
+        `Karte ${i + 1}: vorher y=${y}, mit Banner y=${nachher.oben[i]}`,
+      ).toBeLessThanOrEqual(SUBPIXEL),
+    );
+    const breite = await page.evaluate(() => document.documentElement.scrollWidth);
+    expect(breite, 'kein waagerechter Überlauf').toBeLessThanOrEqual(kontext.viewport.width);
+
+    await banner.getByRole('button', { name: 'anzeigen' }).click();
+    await expect(karten.first()).toHaveAttribute('aria-label', 'Schicht Florian Nord 2');
+    await expect(banner).toHaveCount(0);
+
+    test.info().annotations.push({
+      type: 'messwert',
+      description:
+        `${kontext.name}/${kontext.dichte}: Oberkanten ${vorher.oben.join('/')} → ` +
+        `${nachher.oben.join('/')}`,
     });
   });
 }

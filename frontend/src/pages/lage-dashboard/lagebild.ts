@@ -41,6 +41,9 @@ import type { KennzahlTon } from '../../components/instrument';
 import { einsatzEinstellungenPfad } from '../../routing/deeplinks';
 import { pegelKennzahl } from '../../pegel/pegelKennzahl';
 import { transportBilanz } from '../../personen/personenBilanz';
+import type { EvakuierungKennzahl } from '../../betreuung/evakuierungKennzahl';
+import type { EvakuierungKennzahlZustand } from '../../betreuung/useEvakuierungKennzahl';
+import { kennzahlTeile } from '../../betreuung/betreuungText';
 import {
   neuesterLagebericht,
   verdichteGefahrengebiete,
@@ -62,6 +65,7 @@ export const KENNZAHL_ETIKETTEN = [
   'Pegel',
   'Verbleib offen',
   'Betroffene',
+  'Evakuiert',
   'Schäden offen',
   'Kräfte',
   'Vermisste',
@@ -87,14 +91,19 @@ type Lageplatz = 'A' | 'B';
  * Plätze statt einem. Konkurrieren zwei aktive Kandidaten um einen Platz, gewinnt der
  * kleinere Rang.
  *
- * Der `Record` über `Lagekennzahl` ist Absicht: bringt der Typ-Codegen eine neue Variante
- * (LFH-607: `evakuiert`, Platz B), bricht diese Datei den Build, statt sie still zu übergehen.
+ * Der `Record` über `Lagekennzahl` ist Absicht: bringt der Typ-Codegen eine neue Variante,
+ * bricht diese Datei den Build, statt sie still zu übergehen.
+ *
+ * „Evakuiert" (LFH-607) ist aktiv, sobald eine Evakuierung angeordnet ist — ein aktiver
+ * Evakuierungsbezirk samt Plangröße (`src/einsatz/lagekennzahl.rs`), nie abhängig von der
+ * Zahl der Evakuierten.
  */
 const LAGEKENNZAHL: Record<
   Lagekennzahl,
   { etikett: KennzahlEtikett; platz: Lageplatz; rang: number }
 > = {
   pegel: { etikett: 'Pegel', platz: 'A', rang: 0 },
+  evakuiert: { etikett: 'Evakuiert', platz: 'B', rang: 0 },
 };
 
 /**
@@ -150,6 +159,11 @@ export interface Kennzahl {
    * über `einsatzEinstellungenPfad`). Hat Vorrang vor {@link Kennzahl.route}.
    */
   zielPfad?: string;
+  /**
+   * Die Zelle führt nirgends hin — ihr Modul ist für die Person nicht frei oder das steht noch
+   * nicht fest (LFH-607, „Evakuiert"). Ein Link wäre ein Sprung ins Leere.
+   */
+  ohneZiel?: boolean;
 }
 
 /** Der Führungsstand unter den drei Paneelen: was vorher eigene Kacheln hatte. */
@@ -264,6 +278,66 @@ export function vermisstNotiz(vermisst: number, lang: number): string {
   return lang > 0 ? `${lang} seit über 4 h` : 'als vermisst erfasst';
 }
 
+/**
+ * Was die Seite über die Evakuierung weiß (LFH-607). Anders als die übrigen Quellen hat diese
+ * vier Fälle, weil ihr Abruf am Modulrecht hängt ({@link evakuierungStand}):
+ *
+ *  - `laden` / `fehler` — der Zustand IHRER Abfrage; die Zelle zeigt „····" bzw. „?", die
+ *    übrigen Kennzahlen bleiben lesbar.
+ *  - `kein-zugriff` — das Modul Betreuung ist für die Person ausgeblendet oder gesperrt, es
+ *    wird nicht abgerufen. Die Zelle BLEIBT auf ihrem Platz (Kriterium 9: die Reihe hängt
+ *    allein am Einsatz, nie am Rollenzuschnitt) und benennt den Grund statt einer Zahl.
+ *  - `daten` — die Kennzahl, oder `null`, wenn die Übersicht keinen aktiven Bezirk hat,
+ *    während der (nicht live gehaltene) Einsatz den Auslöser noch trägt.
+ */
+export type EvakuierungStand =
+  | { zustand: 'laden' }
+  | { zustand: 'fehler' }
+  | { zustand: 'kein-zugriff' }
+  | { zustand: 'daten'; kennzahl: EvakuierungKennzahl | null };
+
+/**
+ * Hook-Zustand → {@link EvakuierungStand}. `aus` heißt „kein Zugriff": der Hook meldet es erst,
+ * wenn die Seite ihn `bereit` gemeldet hat, also Benutzer und Modul-Overrides feststehen —
+ * vorher liefert er `laden`. Rein.
+ */
+export function evakuierungStand(z: EvakuierungKennzahlZustand): EvakuierungStand {
+  switch (z.zustand) {
+    case 'aus':
+      return { zustand: 'kein-zugriff' };
+    case 'laden':
+      return { zustand: 'laden' };
+    case 'fehler':
+      return { zustand: 'fehler' };
+    case 'daten':
+      return { zustand: 'daten', kennzahl: z.kennzahl };
+  }
+}
+
+/** Datenzustand der Zelle „Evakuiert": `laden`/`fehler` reichen durch, sonst Daten. Rein. */
+export function evakuierungDatenzustand(e: EvakuierungStand): Datenzustand {
+  return e.zustand === 'laden' || e.zustand === 'fehler' ? e.zustand : 'daten';
+}
+
+/** Wert und Notiz der Zelle „Evakuiert" aus dem Stand. Rein. */
+function evakuiertZelle(e: EvakuierungStand): Pick<Kennzahl, 'wert' | 'notiz'> {
+  switch (e.zustand) {
+    // Bei `laden`/`fehler` zeichnet die Kennzahl ihren Zustand selbst („····" / „?").
+    case 'laden':
+    case 'fehler':
+      return { wert: '', notiz: '' };
+    case 'kein-zugriff':
+      return { wert: '—', notiz: 'Modul Betreuung nicht freigegeben' };
+    case 'daten': {
+      if (e.kennzahl == null) return { wert: '—', notiz: 'keine geplante Evakuierung' };
+      // EINE Formatierung mit dem Blockkopf der Modulseite (`betreuungText.ts`). Ohne jede
+      // Meldung „—" statt 0: „nichts gemeldet" ist nicht „niemand evakuiert".
+      const { evakuiert, notiz } = kennzahlTeile(e.kennzahl);
+      return { wert: evakuiert ?? '—', notiz };
+    }
+  }
+}
+
 export interface Rohdaten {
   einsatz: EinsatzAnzeige;
   personen: Person[];
@@ -286,6 +360,14 @@ export interface Rohdaten {
    * Entscheidung trifft die Seite — diese Datei kennt weder Benutzer noch Overrides.
    */
   pegelZiel?: string;
+  /** Stand der Evakuierungskennzahl (LFH-607), siehe {@link evakuierungStand}. */
+  evakuierung: EvakuierungStand;
+  /**
+   * Ziel der Zelle „Evakuiert": die Modulseite Betreuung — aber nur, wenn feststeht, dass sie
+   * für die Person frei ist. Ohne Angabe führt die Zelle nirgends hin, auch beim Laden: bis die
+   * Freigaben da sind, könnte das Modul ausgeblendet sein (dieselbe Vorsicht wie `pegelZiel`).
+   */
+  evakuierungZiel?: string;
 }
 
 /**
@@ -362,6 +444,16 @@ export function baueLagebild(
       notiz: vermisstNotiz(betroffene.vermisst, lang),
       ton: betroffene.vermisst > 0 ? 'alarm' : 'neutral',
       route: 'personen',
+    },
+    Evakuiert: {
+      // Kein Ton: für „Evakuiert" ist keine Schwelle festgelegt. Mehr Evakuierte als geplant
+      // ist eine Aussage über die Plangröße, keine Alarmlage.
+      etikett: 'Evakuiert',
+      ...evakuiertZelle(r.evakuierung),
+      ton: 'neutral',
+      route: 'betreuung',
+      zielPfad: r.evakuierungZiel,
+      ohneZiel: r.evakuierungZiel == null,
     },
     'Schäden offen': {
       etikett: 'Schäden offen',

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Button, Dropdown, Space, Table, Tooltip, Typography, theme } from 'antd';
 import { TbBuildingCommunity, TbPaw, TbPlant2, TbShieldHalf, TbUsers } from 'react-icons/tb';
 import type { IconType } from 'react-icons';
-import type { TableColumnsType } from 'antd';
+import type { GlobalToken, TableColumnsType } from 'antd';
 import type { GefahrBewertung, Gefahrentyp, Schutzobjekt, Warnstufe } from '../../api/types';
 import type { BewertungEingabe } from '../../api/gefahren';
 import { flaechenFarbe, warnstufeBalkenFarbe, warnstufeFlaeche } from '../../theme/statusFarben';
@@ -23,8 +23,9 @@ interface Zellkennung {
 
 /** Symbol + Kurzform je Schutzobjekt. Der Kopf trug vorher das volle Wort und war mit
  *  ~85 px nie breitenbestimmend — die Zelle ist es. Das Symbol ist deshalb Gewinn an
- *  Lesbarkeit, nicht an Breite; das Kurzwort bleibt als zweiter Kanal daneben stehen. */
-const SPALTENKOPF: Record<Schutzobjekt, { icon: IconType; kurz: string }> = {
+ *  Lesbarkeit, nicht an Breite; das Kurzwort bleibt als zweiter Kanal daneben stehen.
+ *  Exportiert für den Matrixauszug der Palettenvorschau (LFH-664) — derselbe Kopf, keine Kopie. */
+export const SPALTENKOPF: Record<Schutzobjekt, { icon: IconType; kurz: string }> = {
   menschen: { icon: TbUsers, kurz: 'Mensch' },
   tiere: { icon: TbPaw, kurz: 'Tier' },
   umwelt: { icon: TbPlant2, kurz: 'Umwelt' },
@@ -38,6 +39,25 @@ const SPALTENKOPF: Record<Schutzobjekt, { icon: IconType; kurz: string }> = {
 /** Balken einer Matrixzelle — rein; ohne Warnstufe kein Balken. */
 export function zellBalkenStil(farbe: string | null): { boxShadow?: string } {
   return farbe == null ? {} : { boxShadow: `inset 0 -3px 0 0 ${farbe}` };
+}
+
+/**
+ * Fläche + Balken einer Matrixzelle zur Warnstufe — EINE Stelle für die volle Matrix und den
+ * Auszug der Palettenvorschau (LFH-664), damit beide dieselbe Zelle zeigen.
+ *
+ * Warnstufenbalken des Neuentwurfs (Gefahrenmatrix-Balken, umsetzung.md Palette „Warnstufe"):
+ * 3 px unten, als Innenschatten — null Layout, die Zeilenhöhe springt beim Umbewerten nicht.
+ * Der Balken trägt die Skala niedrig → akut in eigenen Tönen, die Fläche darunter die zwei
+ * Intensitäten aus dem Flächenvertrag; der zweite Kanal bleibt das Kürzel in der Zelle.
+ */
+export function zellFlaechenStil(
+  stufe: Warnstufe,
+  token: GlobalToken,
+): { backgroundColor: string; boxShadow?: string } {
+  return {
+    backgroundColor: flaechenFarbe(stufe, token),
+    ...zellBalkenStil(warnstufeBalkenFarbe(stufe, token)),
+  };
 }
 
 export function zellSchluessel(typ: Gefahrentyp, objekt: Schutzobjekt): string {
@@ -116,13 +136,8 @@ export default function GefahrenMatrix({
           return {
             'data-warnstufe': stufe,
             style: {
-              backgroundColor: flaechenFarbe(stufe, token),
-              // Warnstufenbalken des Neuentwurfs (Gefahrenmatrix-Balken, umsetzung.md
-              // Palette „Warnstufe"): 3 px unten, als Innenschatten — null Layout, die
-              // Zeilenhöhe springt beim Umbewerten nicht. Der Balken trägt die Skala
-              // niedrig → akut in eigenen Tönen, die Fläche darunter die zwei Intensitäten
-              // aus dem Flächenvertrag; der zweite Kanal bleibt das Kürzel im Knopf.
-              ...zellBalkenStil(warnstufeBalkenFarbe(stufe, token)),
+              // Fläche + Warnstufenbalken — Begründung an `zellFlaechenStil`.
+              ...zellFlaechenStil(stufe, token),
               textAlign: 'center' as const,
             },
           };

@@ -40,45 +40,10 @@ import {
   kategorieEtikett,
   kategorieVon,
 } from '../kraefte/statusAchse';
-import { einsatzStatus, statusKategorie, type StatusDarstellung } from '../theme/statusFarben';
+import { einsatzStatus, statusKategorie } from '../theme/statusFarben';
 import { abstand } from '../theme/tokens';
 import StatusTag from '../components/StatusTag';
-
-/**
- * Statusanzeige eines disponierten Einsatzpersonals — und zugleich die GRENZE des
- * Statusfarb-Vertrags (LFH-328/A2, Spec §1.3).
- *
- * Die Anzeige hat zwei Achsen, und nur eine davon kann der Vertrag tragen:
- *
- * 1. **DB-Achse** — `status_farbe` ist mandantengepflegter Freitext aus den
- *    Stammdaten-Tabs. Das Backend (`src/routes/personal_status.rs`) trimmt ihn und
- *    prüft sonst NICHTS: kein Enum, kein Hex-Format. Ein getypter `Record` kann das
- *    nicht einfangen. Diese Achse bleibt deshalb unangetastet — wer sie „aufräumt",
- *    nimmt dem Mandanten seine gepflegte Farbe weg. (Dass sie gegen die A0-Rollen
- *    validiert werden sollte, ist ein eigener Befund, Spec §5 Nr. 1.)
- * 2. **Fallback-Achse** — früher `KATEGORIE_FALLBACK`, byte-identisch in dieser und
- *    der Nachbarseite dupliziert. Sie kommt jetzt aus `statusKategorie`.
- *
- * ABWEICHUNG VOM PLANWORTLAUT, bewusst: der Plan sagt „`status_farbe ?? …` bleibt
- * stehen", gemeint als „die DB-Achse bleibt". Aus dem `??` einen Zweig zu machen
- * erhält genau das — und vermeidet den Fehler, den `StatusTag` selbst dokumentiert:
- * antds `color`-Prop rendert einen NICHT-Preset-Wert als Vollfläche mit erzwungen
- * weißem Text. Die Rollenfarbe dort hineinzureichen (`rollenFarbe(...)` liefert Hex,
- * nie einen Preset-Namen) hätte aus jedem Fallback-Tag — dem Normalfall, solange kein
- * Mandant eine Farbe pflegt — eine gefüllte Fläche gemacht, im Dunkelmodus mit weißer
- * Schrift auf aufgehelltem Rot.
- *
- * ── DIE DB-ACHSE VERLIERT MIT LFH-339 · C4 IHRE FLÄCHE, NICHT IHRE FARBE ──────────
- *
- * Gleichlautend zu `FahrzeugePage.tsx`, wo die Herleitung ausführlich steht: A2s Sorge
- * war der VERLUST der gepflegten Farbe, nicht die Fläche. Die Zielform-Spec §4b
- * entscheidet die Fläche eigens — `status_farbe` ist ungeprüfter Freitext, Kontrast
- * (WCAG 1.4.11) ist nicht zugesichert. Die Farbe geht deshalb auf Rand und Text.
- */
-export function statusDarstellung(ep: EinsatzPersonal): StatusDarstellung {
-  if (!ep.status_label || !ep.status_kategorie) return { rolle: 'neutral', label: 'kein Status' };
-  return { ...statusKategorie[ep.status_kategorie], label: ep.status_label };
-}
+import { personalStatusDarstellung } from '../kraefte/mittelStatus';
 
 export default function PersonalPage() {
   const { id } = useParams();
@@ -425,7 +390,7 @@ export default function PersonalPage() {
       // Deskriptor GANZ gespreizt — Herleitung siehe `FahrzeugePage.tsx`.
       render: (_, ep) => (
         <StatusWahl
-          darstellung={statusDarstellung(ep)}
+          darstellung={personalStatusDarstellung(ep)}
           darfSchreiben={darfSchreiben}
           {...statusBedienungVon(ep)}
         />
@@ -576,7 +541,7 @@ export default function PersonalPage() {
             karte={{
               art: 'plan',
               titel: { spalte: 'name' },
-              status: (ep) => statusDarstellung(ep),
+              status: (ep) => personalStatusDarstellung(ep),
               // Der Bedienweg sitzt am Status-, nicht am Aktions-Slot: der ist mit „Entfernen"
               // belegt, und `Datensicht` sichert genau eine Primäraktion zu (Zielform-Spec §5).
               statusBedienung: (ep) => (darfSchreiben ? statusBedienungVon(ep) : null),

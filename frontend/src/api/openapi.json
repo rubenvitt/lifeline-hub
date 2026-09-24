@@ -2324,7 +2324,7 @@
             "items": {
               "$ref": "#/components/schemas/Lagekennzahl"
             },
-            "description": "Aktive lagebezogene Kennzahlen (LFH-640): welche Lageplätze des Kennzahlenbands im\nLage-Dashboard belegt sind. Gesetzt nur durch bewusste Entscheidungen (heute: Pegel\nfestgelegt), nie durch Messwerte.\n\n**Leer ist `[]`, nie `absent`** — wie `meine_sachgebiete` an zwei Stellen gebaut, deshalb\n`#[schema(required)]` und kein `skip_serializing_if`."
+            "description": "Aktive lagebezogene Kennzahlen (LFH-640): welche Lageplätze des Kennzahlenbands im\nLage-Dashboard belegt sind. Gesetzt nur durch bewusste Entscheidungen (Pegel festgelegt,\nEvakuierung angeordnet), nie durch Messwerte.\n\n**Leer ist `[]`, nie `absent`** — wie `meine_sachgebiete` an zwei Stellen gebaut, deshalb\n`#[schema(required)]` und kein `skip_serializing_if`."
           },
           "leitstellen_nr": {
             "type": [
@@ -5003,9 +5003,10 @@
       },
       "Lagekennzahl": {
         "type": "string",
-        "description": "Eine aktive lagebezogene Kennzahl. Wire == `as_str()`.\n\nDie Plätze und Füllkennzahlen stehen im Frontend (`pages/lage-dashboard/lagebild.ts`);\nhier steht nur, welche Auslöser gesetzt sind. LFH-607 ergänzt `Evakuiert`.",
+        "description": "Eine aktive lagebezogene Kennzahl. Wire == `as_str()`.\n\nDie Plätze und Füllkennzahlen stehen im Frontend (`pages/lage-dashboard/lagebild.ts`);\nhier steht nur, welche Auslöser gesetzt sind. Die Reihenfolge der Varianten ist die\nReihenfolge der Ausgabe von [`ableiten`].",
         "enum": [
-          "pegel"
+          "pegel",
+          "evakuiert"
         ]
       },
       "LetzteRueckmeldung": {
