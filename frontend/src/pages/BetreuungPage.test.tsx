@@ -241,6 +241,45 @@ describe('BetreuungPage (LFH-639)', () => {
     expect(screen.queryByText(/0 untergebracht/)).toBeNull();
   });
 
+  it('volle Stellen im Blickfeld: „n voll" im Seitenkopf und im Blockkopf, „fast voll" zählt nicht (LFH-678)', async () => {
+    api.ladeBetreuung.mockResolvedValue({
+      bezirke: [UFER],
+      stellen: [
+        TURNHALLE,
+        STADION, // fast voll — zählt nicht
+        stelle({
+          id: 12,
+          bezeichnung: 'Halle Süd',
+          kapazitaet_personen: 80,
+          belegung: { id: 32, belegt: 80, zeitpunkt_at: '2026-09-23 10:00:00' },
+        }),
+        stelle({
+          id: 13,
+          bezeichnung: 'Gemeindehaus',
+          kapazitaet_personen: 40,
+          belegung: { id: 33, belegt: 52, zeitpunkt_at: '2026-09-23 10:00:00' },
+        }),
+        SCHULE,
+      ],
+    });
+    renderPage();
+    await screen.findByText('Halle Süd');
+    // Seitenkopf: die einzige Zeile, die auch mit vielen Bezirkskarten über der Falz steht.
+    expect(screen.getByText('1 Bezirk · 5 Betreuungsstellen · 2 voll')).toBeInTheDocument();
+    // Blockkopf: dieselbe Zahl neben der Summe.
+    expect(screen.getByText('361 untergebracht · 2 voll · 1 ohne Meldung')).toBeInTheDocument();
+    // Die Zeilen tragen weiter ihr eigenes Wort — der Kopf fasst nur zusammen.
+    expect(within(zeileVon('Halle Süd')).getByText('voll')).toBeInTheDocument();
+    expect(within(zeileVon('Gemeindehaus')).getByText('überbelegt')).toBeInTheDocument();
+  });
+
+  it('ohne volle Stelle kein „0 voll" — weder im Seitenkopf noch im Blockkopf (LFH-678)', async () => {
+    renderPage();
+    await screen.findByText('Turnhalle Ost');
+    expect(screen.getByText('2 Bezirke · 3 Betreuungsstellen')).toBeInTheDocument();
+    expect(screen.queryByText(/\bvoll\b.*·|· \d+ voll/)).toBeNull();
+  });
+
   it('genau EINE Primäraktion im Kopf; „Betreuungsstelle anlegen" steht sekundär im Block', async () => {
     renderPage();
     await screen.findByText('Uferstraße 12–40');

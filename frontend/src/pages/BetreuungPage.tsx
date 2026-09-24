@@ -41,7 +41,7 @@ import {
   StelleBearbeitenDialog,
   StornierenDialog,
 } from '../betreuung/BetreuungDialoge';
-import { personenZahl } from '../betreuung/betreuungText';
+import { personenZahl, volleStellenSegment } from '../betreuung/betreuungText';
 import EvakuierungBlock, { type BezirkAktion } from '../betreuung/EvakuierungBlock';
 import StellenBlock, { type StelleAktion } from '../betreuung/StellenBlock';
 import { scrolleZurZeile } from '../components/Datensicht';
@@ -368,9 +368,11 @@ export default function BetreuungPage() {
   return (
     <EinsatzSeite
       titel="Betreuung"
+      // „n voll" auch HIER, nicht nur im Blockkopf der Stellen (LFH-678): der Seitenkopf ist die
+      // einzige Zeile, die mit vielen Bezirkskarten noch über der Falz steht (Kriterium 9).
       meta={
         betreuungQuery.data
-          ? `${bezirke.length} ${bezirke.length === 1 ? 'Bezirk' : 'Bezirke'} · ${stellen.length} ${stellen.length === 1 ? 'Betreuungsstelle' : 'Betreuungsstellen'}`
+          ? `${bezirke.length} ${bezirke.length === 1 ? 'Bezirk' : 'Bezirke'} · ${stellen.length} ${stellen.length === 1 ? 'Betreuungsstelle' : 'Betreuungsstellen'}${volleStellenSegment(stellen)}`
           : undefined
       }
       dataUpdatedAt={betreuungQuery.dataUpdatedAt}
