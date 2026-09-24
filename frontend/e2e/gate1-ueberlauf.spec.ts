@@ -739,6 +739,19 @@ test('Gate 1: keine tragende Route läuft auf 1366, 1024 oder 390 px waagerecht 
           .getByText('Uferstraße 12–40 und Deichweg 1–9 zwischen Schleuse und Pumpwerk Nordwest'),
     },
     {
+      // LFH-676: dieselbe Seite mit AUFGEKLAPPTEM Verlauf an Karte und Zeile. Die Zeitachse im
+      // Aufklappbereich der Karte und die Aufklappzeile der Tabelle dürfen den Rumpf nicht
+      // verbreitern; der beschriftete Auslöser macht die erste Tabellenspalte breiter als
+      // antds 16-px-Symbol. Anker ist der Eintrag der Belegungsreihe — er steht erst, wenn
+      // BEIDE Bereiche offen und geladen sind (die Stelle wird als zweite aufgeklappt).
+      pfad: `/einsaetze/${einsatzId}/betreuung`,
+      vorbereiten: async (p: Page) => {
+        await p.getByRole('button', { name: /^Verlauf zu Bezirk / }).click();
+        await p.getByRole('button', { name: /^Verlauf zu Stelle / }).click();
+      },
+      anker: (p: Page) => p.getByText(/1.420 untergebracht/),
+    },
+    {
       // LFH-634: Datenanker ist die Karte des gesäten Zeitfensters. Ihr zugänglicher Name
       // trägt hinter der Bezeichnung den Zeitraum in der Anzeigezone — Präfix statt Wortlaut.
       pfad: `/einsaetze/${einsatzId}/verpflegung`,

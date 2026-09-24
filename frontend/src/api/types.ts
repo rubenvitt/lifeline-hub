@@ -461,6 +461,10 @@ export type BelegungKopfzahlStelle = S['BelegungKopfzahlStelle'];
 export type BezirkMeldung = S['BezirkMeldungAnzeige'];
 /** Wie {@link BezirkMeldung}, für Belegungsmeldungen einer Stelle. */
 export type StelleMeldung = S['StelleMeldungAnzeige'];
+/** Eine Standmeldung im Verlauf eines Bezirks (LFH-676), zurückgenommene eingeschlossen. */
+export type StandVerlaufEintrag = S['StandVerlaufEintrag'];
+/** Eine Belegungsmeldung im Verlauf einer Stelle (LFH-676). */
+export type BelegungVerlaufEintrag = S['BelegungVerlaufEintrag'];
 
 /**
  * LFH-120: kein Backend-Schema — Eingabe-Body von `POST …/betreuung/bezirke`

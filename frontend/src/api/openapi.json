@@ -1058,6 +1058,56 @@
           }
         }
       },
+      "BelegungVerlaufEintrag": {
+        "type": "object",
+        "description": "Eine Belegungsmeldung im Verlauf einer Stelle (LFH-676), gebaut wie\n[`StandVerlaufEintrag`].",
+        "required": [
+          "id",
+          "belegt",
+          "zeitpunkt_at",
+          "erfasst_at",
+          "erfasst_von",
+          "aktuell"
+        ],
+        "properties": {
+          "aktuell": {
+            "type": "boolean",
+            "description": "Diese Meldung ist die aktuelle Belegung der Stelle."
+          },
+          "belegt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "erfasst_at": {
+            "type": "string",
+            "description": "Wann die Meldung erfasst wurde, UTC ohne Zonenkennung."
+          },
+          "erfasst_von": {
+            "type": "string",
+            "description": "Anzeigename der erfassenden Person."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "zeitpunkt_at": {
+            "type": "string",
+            "description": "Zeitpunkt der Meldung, UTC ohne Zonenkennung (`YYYY-MM-DD HH:MM:SS`)."
+          },
+          "zurueckgenommen_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "zurueckgenommen_von": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
       "BelegungsArt": {
         "type": "string",
         "description": "Art eines Belegungs-Events. String = CHECK in\n`migrations/0029_person_uhs_belegung.sql`. Append-only.",
@@ -7692,6 +7742,62 @@
           "unterfuehrer",
           "mannschaft"
         ]
+      },
+      "StandVerlaufEintrag": {
+        "type": "object",
+        "description": "Eine Standmeldung im Verlauf eines Bezirks (LFH-676), zurückgenommene eingeschlossen.\n`aktuell` kommt aus dem Zeiger des Bezirks — keine zweite Definition von „aktuell“.",
+        "required": [
+          "id",
+          "evakuiert",
+          "erhebung",
+          "zeitpunkt_at",
+          "erfasst_at",
+          "erfasst_von",
+          "aktuell"
+        ],
+        "properties": {
+          "aktuell": {
+            "type": "boolean",
+            "description": "Diese Meldung ist der aktuelle Stand des Bezirks."
+          },
+          "erfasst_at": {
+            "type": "string",
+            "description": "Wann die Meldung erfasst wurde, UTC ohne Zonenkennung. Liegt sie ≥ 60 s nach\n`zeitpunkt_at`, zeigt die App sie als nachgetragen (dieselbe Schwelle wie im ETB)."
+          },
+          "erfasst_von": {
+            "type": "string",
+            "description": "Anzeigename der erfassenden Person."
+          },
+          "erhebung": {
+            "$ref": "#/components/schemas/Erhebung"
+          },
+          "evakuiert": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "zeitpunkt_at": {
+            "type": "string",
+            "description": "Zeitpunkt der Meldung, UTC ohne Zonenkennung (`YYYY-MM-DD HH:MM:SS`)."
+          },
+          "zurueckgenommen_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Fehlt, solange die Meldung nicht zurückgenommen ist."
+          },
+          "zurueckgenommen_von": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Anzeigename der zurücknehmenden Person; fehlt wie `zurueckgenommen_at`."
+          }
+        }
       },
       "StatusAnteil": {
         "type": "object",

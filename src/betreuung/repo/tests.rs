@@ -1919,3 +1919,161 @@ async fn storno_loest_die_flaechen_und_laesst_sie_stehen() {
     );
     assert_eq!(bezirk_laden(&w.pool, w.e, ufer).await.unwrap().flaechen, 0);
 }
+
+// ── LFH-676: Meldereihen lesen (Verlauf) ────────────────────────────────────────────────────
+
+/// `(evakuiert, aktuell, zurückgenommen?)` je Eintrag, in Lieferreihenfolge.
+fn stand_kurz(v: &[crate::betreuung::StandVerlaufEintrag]) -> Vec<(i64, bool, bool)> {
+    v.iter()
+        .map(|m| (m.evakuiert, m.aktuell, m.zurueckgenommen_at.is_some()))
+        .collect()
+}
+
+#[tokio::test]
+async fn stand_verlauf_ordnet_nach_zeitpunkt_und_markiert_aktuell_und_ruecknahme() {
+    let w = welt().await;
+    let ufer = bezirk(&w, "Uferstraße 12–40", 640).await;
+    let m212 = stand(&w, ufer, 212, Erhebung::Geschaetzt, "2026-09-23 10:00:00")
+        .await
+        .unwrap();
+    stand(&w, ufer, 480, Erhebung::Gezaehlt, "2026-09-23 11:00:00")
+        .await
+        .unwrap();
+    // Nachgetragen: Zeitpunkt vor der aktuellen Meldung, erfasst danach.
+    stand(&w, ufer, 300, Erhebung::Gezaehlt, "2026-09-23 10:30:00")
+        .await
+        .unwrap();
+    stand_zurueck(&w, m212.meldung_id).await.unwrap();
+
+    let v = stand_verlauf(&w.pool, w.e, ufer).await.unwrap();
+    assert_eq!(
+        stand_kurz(&v),
+        vec![(480, true, false), (300, false, false), (212, false, true)]
+    );
+    assert_eq!(v[0].erhebung, Erhebung::Gezaehlt);
+    assert_eq!(v[2].erhebung, Erhebung::Geschaetzt);
+    assert_eq!(v[1].zeitpunkt_at, "2026-09-23 10:30:00");
+    assert!(v.iter().all(|m| m.erfasst_von == "Leitung"));
+    assert!(v.iter().all(|m| !m.erfasst_at.is_empty()));
+    assert_eq!(v[2].id, m212.meldung_id);
+    assert_eq!(v[2].zurueckgenommen_von.as_deref(), Some("Leitung"));
+    assert_eq!(v[0].zurueckgenommen_von, None);
+}
+
+#[tokio::test]
+async fn stand_verlauf_aktuell_ist_der_zeiger_auch_nach_ruecknahme_der_aktuellen() {
+    let w = welt().await;
+    let ufer = bezirk(&w, "Uferstraße", 640).await;
+    stand(&w, ufer, 212, Erhebung::Gezaehlt, "2026-09-23 10:00:00")
+        .await
+        .unwrap();
+    let m480 = stand(&w, ufer, 480, Erhebung::Gezaehlt, "2026-09-23 11:00:00")
+        .await
+        .unwrap();
+    stand_zurueck(&w, m480.meldung_id).await.unwrap();
+
+    let v = stand_verlauf(&w.pool, w.e, ufer).await.unwrap();
+    assert_eq!(stand_kurz(&v), vec![(480, false, true), (212, true, false)]);
+    // Der erste nicht zurückgenommene Eintrag ist der aktuelle — dieselbe Ordnung wie
+    // `juengste_meldung!`, und genau er trägt die Marke.
+    let erster = v.iter().find(|m| m.zurueckgenommen_at.is_none()).unwrap();
+    assert!(erster.aktuell);
+    assert_eq!(v.iter().filter(|m| m.aktuell).count(), 1);
+    assert_eq!(aktueller_stand(&w, ufer).await, Some(212));
+}
+
+#[tokio::test]
+async fn stand_verlauf_gleicher_zeitpunkt_spaetere_erfassung_zuerst() {
+    let w = welt().await;
+    let ufer = bezirk(&w, "Uferstraße", 640).await;
+    stand(&w, ufer, 100, Erhebung::Gezaehlt, "2026-09-23 10:00:00")
+        .await
+        .unwrap();
+    stand(&w, ufer, 150, Erhebung::Gezaehlt, "2026-09-23 10:00:00")
+        .await
+        .unwrap();
+    let v = stand_verlauf(&w.pool, w.e, ufer).await.unwrap();
+    assert_eq!(
+        stand_kurz(&v),
+        vec![(150, true, false), (100, false, false)]
+    );
+}
+
+#[tokio::test]
+async fn stand_verlauf_leer_ohne_meldung_und_auch_fuer_stornierten_bezirk() {
+    let w = welt().await;
+    let leer = bezirk(&w, "Hafen", 100).await;
+    assert!(stand_verlauf(&w.pool, w.e, leer).await.unwrap().is_empty());
+
+    let ufer = bezirk(&w, "Uferstraße", 640).await;
+    stand(&w, ufer, 212, Erhebung::Gezaehlt, "2026-09-23 10:00:00")
+        .await
+        .unwrap();
+    bezirk_stornieren(&w, ufer).await.unwrap();
+    let v = stand_verlauf(&w.pool, w.e, ufer).await.unwrap();
+    assert_eq!(stand_kurz(&v), vec![(212, true, false)]);
+}
+
+#[tokio::test]
+async fn stand_verlauf_fremder_oder_unbekannter_bezirk_ist_404() {
+    let w = welt().await;
+    let ufer = bezirk(&w, "Uferstraße", 640).await;
+    stand(&w, ufer, 212, Erhebung::Gezaehlt, "2026-09-23 10:00:00")
+        .await
+        .unwrap();
+    assert_eq!(
+        status(stand_verlauf(&w.pool, w.e2, ufer).await),
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        status(stand_verlauf(&w.pool, w.e, 99_999).await),
+        StatusCode::NOT_FOUND
+    );
+}
+
+#[tokio::test]
+async fn belegung_verlauf_ordnung_aktuell_geschlossen_und_fremd() {
+    let w = welt().await;
+    let ost = stelle(&w, "Turnhalle Ost", Some(150)).await;
+    stelle_status(&w, ost, Status::InBetrieb).await.unwrap();
+    belegung(&w, ost, 60, "2026-09-23 10:00:00").await.unwrap();
+    let m89 = belegung(&w, ost, 89, "2026-09-23 11:00:00").await.unwrap();
+
+    let v = belegung_verlauf(&w.pool, w.e, ost).await.unwrap();
+    let kurz: Vec<(i64, bool)> = v.iter().map(|m| (m.belegt, m.aktuell)).collect();
+    assert_eq!(kurz, vec![(89, true), (60, false)]);
+    assert_eq!(v[0].id, m89.meldung_id);
+    assert_eq!(v[0].erfasst_von, "Leitung");
+
+    // Leermeldung, dann schließen: die Reihe bleibt lesbar.
+    belegung(&w, ost, 0, "2026-09-23 12:00:00").await.unwrap();
+    stelle_status(&w, ost, Status::Geschlossen).await.unwrap();
+    assert_eq!(belegung_verlauf(&w.pool, w.e, ost).await.unwrap().len(), 3);
+
+    assert_eq!(
+        status(belegung_verlauf(&w.pool, w.e2, ost).await),
+        StatusCode::NOT_FOUND
+    );
+}
+
+#[tokio::test]
+async fn verlauf_eintrag_laesst_ruecknahmefelder_auf_dem_draht_weg() {
+    let w = welt().await;
+    let ufer = bezirk(&w, "Uferstraße", 640).await;
+    let m = stand(&w, ufer, 212, Erhebung::Gezaehlt, "2026-09-23 10:00:00")
+        .await
+        .unwrap();
+    stand(&w, ufer, 480, Erhebung::Gezaehlt, "2026-09-23 11:00:00")
+        .await
+        .unwrap();
+    stand_zurueck(&w, m.meldung_id).await.unwrap();
+    let v = serde_json::to_value(stand_verlauf(&w.pool, w.e, ufer).await.unwrap()).unwrap();
+    let offen = v[0].as_object().unwrap();
+    assert!(!offen.contains_key("zurueckgenommen_at"), "{v}");
+    assert!(!offen.contains_key("zurueckgenommen_von"), "{v}");
+    assert_eq!(offen["aktuell"], true);
+    let zurueck = v[1].as_object().unwrap();
+    assert!(zurueck.contains_key("zurueckgenommen_at"), "{v}");
+    assert_eq!(zurueck["zurueckgenommen_von"], "Leitung");
+    assert_eq!(zurueck["erhebung"], "gezaehlt");
+}

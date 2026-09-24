@@ -158,9 +158,12 @@ Die Typfarben sind die des ETB, denn Meldung und Berichtigung sind genau die ETB
 zugehörigen Einträge. Eine neue Statusfarbkarte entsteht nicht (`ALLE_MAPS` bleibt bei 24).
 Den zweiten Kanal tragen jeweils die Wörter.
 
-Zustände des Bereichs über `PaneelZustand`: „Verlauf wird geladen …“, „Verlauf konnte nicht
-geladen werden“ (mit Grund) und „Noch keine Meldung“. Der Fehlerzustand hat Vorrang vor
-Altdaten.
+Zustände des Bereichs: „Verlauf wird geladen“ (Skelett mit `aria-busy`), „Verlauf konnte
+nicht geladen werden“ (`role="alert"`, „Erneut abrufen“) und „Noch keine Meldung.“ Der
+Fehlerzustand hat Vorrang vor Altdaten. **Nicht über `PaneelZustand`** (Umsetzung,
+24.09.2026): dessen Leerzustand verlangt eine eigene Aktion, und die steht im Verlauf schon
+daneben („Stand melden“ an der Karte, „Belegung melden“ in der Zeile). Den Wortlaut des
+Fehlerzweigs übernimmt der Verlauf aus dem Baustein.
 
 ### D6 — Rücknahme mit Rückfrage, Grund im Dialog
 
@@ -177,9 +180,12 @@ Altdaten.
   Grund steht darin, kein Fehler-Toast. Beim Öffnen läuft `mutation.reset()`, damit ein alter
   Grund nicht in eine neue Rückfrage wandert. Ein Erfolg schließt das Modal und quittiert per
   Toast „Meldung zurückgenommen“.
-- **Mutation:** Die Seite hat die Mutationen `nimmStandZurueck`/`nimmBelegungZurueck` schon
-  (für den Rückgängig-Toast). Der Verlauf nutzt dieselben Mutationen, keine zweite Kopie.
-  Deren `onSuccess` invalidiert `betreuung` und `etb`.
+- **Mutation:** Der Verlauf führt eine **eigene** Mutation über dieselben API-Funktionen
+  `nimmStandZurueck`/`nimmBelegungZurueck` (Umsetzung, 24.09.2026, Abweichung vom ersten
+  Plan). Die Mutationen der Seite melden ihren Fehler über `SeitenHinweise` über der Seite, weil
+  der Rückgängig-Toast keinen Dialog hat. Liefe die Rücknahme aus dem Verlauf über sie, stünde
+  derselbe Grund im Dialog UND über der Seite. `onSuccess` und `onError` invalidieren
+  `betreuung` und `etb` wie dort; ein 422 heißt oft, dass die Reihe veraltet ist.
 - **Geschlossene Stelle:** keine Auslöser, stattdessen **eine** Zeile über der Reihe:
   „Die Stelle ist geschlossen. Zurücknehmen geht erst, wenn sie wieder in Betrieb ist.“ Das
   sind die zwei Zuschnitte aus LFH-346: kein Auslöser pro Zeile, aber der Grund steht da.

@@ -33,6 +33,8 @@ const api = vi.hoisted(() => ({
   meldeBelegung: vi.fn(),
   nimmBelegungZurueck: vi.fn(),
   ladeBelegungKopfzahl: vi.fn(),
+  ladeStandVerlauf: vi.fn(),
+  ladeBelegungVerlauf: vi.fn(),
 }));
 vi.mock('../api/betreuung', () => api);
 
@@ -593,5 +595,67 @@ describe('BetreuungPage (LFH-639)', () => {
     });
     // LFH-607: „aufgehoben" nähme die Lagekennzahl weg; jede Bezirksänderung fragt nach.
     await waitFor(() => expect(neu()).toBeGreaterThan(0));
+  });
+
+  // ── Verlauf (LFH-676) ─────────────────────────────────────────────────────────────
+  it('Verlauf: Auslöser an jeder Karte und Zeile, auch ohne Schreibrecht, Abruf erst beim Aufklappen', async () => {
+    einsatz.wert = { ...einsatz.wert, meine_rolle: 'beobachter' };
+    api.ladeStandVerlauf.mockResolvedValue([
+      {
+        id: 55,
+        evakuiert: 480,
+        erhebung: 'gezaehlt',
+        zeitpunkt_at: '2026-09-23 10:15:00',
+        erfasst_at: '2026-09-23 10:15:00',
+        erfasst_von: 'Leitung',
+        aktuell: true,
+      },
+    ]);
+    api.ladeBelegungVerlauf.mockResolvedValue([]);
+    renderPage();
+    const bezirkKnopf = await screen.findByRole('button', {
+      name: 'Verlauf zu Bezirk Uferstraße 12–40',
+    });
+    expect(
+      screen.getByRole('button', { name: 'Verlauf zu Bezirk Hafenviertel' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Verlauf zu Stelle Turnhalle Ost' }),
+    ).toBeInTheDocument();
+    expect(api.ladeStandVerlauf).not.toHaveBeenCalled();
+    expect(api.ladeBelegungVerlauf).not.toHaveBeenCalled();
+
+    await userEvent.click(bezirkKnopf);
+    expect(await screen.findByText('480 evakuiert (gezählt)')).toBeInTheDocument();
+    expect(api.ladeStandVerlauf).toHaveBeenCalledWith(1, 5);
+    expect(api.ladeBelegungVerlauf).not.toHaveBeenCalled();
+    // Ohne Schreibrecht kein Auslöser „Zurücknehmen".
+    expect(screen.queryByRole('button', { name: /zurücknehmen$/ })).toBeNull();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Verlauf zu Stelle Turnhalle Ost' }));
+    await waitFor(() => expect(api.ladeBelegungVerlauf).toHaveBeenCalledWith(1, 8));
+  });
+
+  it('Verlauf einer geschlossenen Stelle: Hinweis statt Auslöser (LFH-676)', async () => {
+    api.ladeBetreuung.mockResolvedValue({
+      bezirke: [],
+      stellen: [{ ...TURNHALLE, status: 'geschlossen' }],
+    });
+    api.ladeBelegungVerlauf.mockResolvedValue([
+      {
+        id: 30,
+        belegt: 89,
+        zeitpunkt_at: '2026-09-23 10:00:00',
+        erfasst_at: '2026-09-23 10:00:00',
+        erfasst_von: 'Leitung',
+        aktuell: true,
+      },
+    ]);
+    renderPage();
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Verlauf zu Stelle Turnhalle Ost' }),
+    );
+    expect(await screen.findByText(/Die Stelle ist geschlossen/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /zurücknehmen$/ })).toBeNull();
   });
 });

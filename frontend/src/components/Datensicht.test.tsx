@@ -560,6 +560,32 @@ describe('pruefeKartenplan()', () => {
     expect(meldung(befunde, 'gruppen')).toHaveLength(1);
   });
 
+  it('meldet aufklappen zusammen mit baum und mit aufklappzeile (LFH-676)', () => {
+    const baum = { kinder: 'kinder' as never, aufgeklappt: [], onAufgeklappt: () => {} };
+    const ohneFilterSpalten = spalten.filter((s) => s.filter == null);
+    const aufklappen = {
+      etikett: 'Verlauf',
+      zugaenglicherName: (f: Fahrzeug) => `Verlauf zu ${f.funkrufname}`,
+      inhalt: () => 'Verlauf',
+    };
+    expect(
+      meldung(
+        pruefeKartenplan({ spalten: ohneFilterSpalten, karte, baum, aufklappen }, 'Meldebild'),
+        'aufklappen',
+      ),
+    ).toHaveLength(1);
+    expect(
+      meldung(
+        pruefeKartenplan(
+          { spalten, karte, aufklappen, aufklappzeile: () => 'Besatzung' },
+          'Fahrzeuge',
+        ),
+        'aufklappen',
+      ),
+    ).toHaveLength(1);
+    expect(pruefeKartenplan({ spalten, karte, aufklappen }, 'Fahrzeuge')).toEqual([]);
+  });
+
   /**
    * Seit LFH-338 · C3 klappt im Baummodus die ganze Zeile auf. Damit ist der Zeilenklick
    * belegt — ein zusätzliches `onZeileKlick` wäre eine zweite Wirkung auf demselben Klick,
@@ -1001,6 +1027,84 @@ describe('Datensicht · Kartenzweig', () => {
     const { container } = rendere({ daten: [], leerText: 'Noch keine Fahrzeuge disponiert' });
     expect(screen.getByText('Noch keine Fahrzeuge disponiert')).toBeInTheDocument();
     expect(container.querySelector('.ant-empty')).toBeNull();
+  });
+});
+
+describe('Datensicht · Aufklappbereich (LFH-676)', () => {
+  /**
+   * Ein beschrifteter Auslöser mit der Zeilenkennung im Namen, in BEIDEN Zweigen gleich —
+   * statt des 16-px-Symbols von antd, dessen Name aus der Locale in jeder Zeile gleich ist.
+   * Der Inhalt entsteht erst beim Aufklappen: der Betreuungsverlauf lädt beim Mount.
+   */
+  const aufklappenMit = (inhalt: (f: Fahrzeug) => ReactElement | string) => ({
+    etikett: 'Verlauf',
+    zugaenglicherName: (f: Fahrzeug) => `Verlauf zu ${f.funkrufname}`,
+    inhalt,
+  });
+
+  it.each(['karte', 'tabelle'] as const)(
+    '%s: beschrifteter Auslöser je Zeile, aria-expanded wechselt, Inhalt erst beim Aufklappen',
+    async (form) => {
+      const inhalt = vi.fn((f: Fahrzeug) => <p>Reihe von {f.funkrufname}</p>);
+      rendere({ form, aufklappen: aufklappenMit(inhalt) });
+
+      const knopf = screen.getByRole('button', { name: 'Verlauf zu Florian 1' });
+      expect(knopf).toHaveTextContent('Verlauf');
+      expect(knopf).toHaveAttribute('aria-expanded', 'false');
+      expect(screen.getAllByRole('button', { name: /^Verlauf zu / })).toHaveLength(3);
+      expect(screen.queryByText('Reihe von Florian 1')).not.toBeInTheDocument();
+      expect(inhalt).not.toHaveBeenCalled();
+
+      await userEvent.click(knopf);
+      expect(screen.getByRole('button', { name: 'Verlauf zu Florian 1' })).toHaveAttribute(
+        'aria-expanded',
+        'true',
+      );
+      expect(screen.getByText('Reihe von Florian 1')).toBeInTheDocument();
+      // Nur die aufgeklappte Zeile baut ihren Inhalt.
+      expect(inhalt.mock.calls.every(([f]) => f.id === 1)).toBe(true);
+      expect(screen.queryByText('Reihe von Rotkreuz 2')).not.toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole('button', { name: 'Verlauf zu Florian 1' }));
+      expect(screen.getByRole('button', { name: 'Verlauf zu Florian 1' })).toHaveAttribute(
+        'aria-expanded',
+        'false',
+      );
+      // Die Karte hängt den Inhalt ab, antds Tabelle blendet die Aufklappzeile nur aus.
+      const zu = screen.queryByText('Reihe von Florian 1');
+      if (zu) expect(zu).not.toBeVisible();
+    },
+  );
+
+  it('karte: der Inhalt steht in einer Region, auf die der Auslöser zeigt', async () => {
+    rendere({ form: 'karte', aufklappen: aufklappenMit((f) => `Reihe von ${f.funkrufname}`) });
+    const knopf = screen.getByRole('button', { name: 'Verlauf zu Rotkreuz 2' });
+    await userEvent.click(knopf);
+    const region = screen.getByRole('region', { name: 'Verlauf zu Rotkreuz 2' });
+    expect(knopf.getAttribute('aria-controls')).toBe(region.id);
+    expect(region).toHaveTextContent('Reihe von Rotkreuz 2');
+  });
+
+  it('der Aufklappzustand überlebt den Wechsel zwischen Karte und Tabelle', async () => {
+    const props = { aufklappen: aufklappenMit((f: Fahrzeug) => `Reihe von ${f.funkrufname}`) };
+    const { rerender } = rendere({ form: 'karte', ...props });
+    await userEvent.click(screen.getByRole('button', { name: 'Verlauf zu Florian 3' }));
+    rerender(
+      <Datensicht<Fahrzeug, FahrzeugKey>
+        bezeichnung="Fahrzeuge im Einsatz"
+        spalten={spalten}
+        daten={DREI}
+        zeilenSchluessel="id"
+        karte={karte}
+        form="tabelle"
+        {...props}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Verlauf zu Florian 3' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    expect(screen.getByText('Reihe von Florian 3')).toBeInTheDocument();
   });
 });
 

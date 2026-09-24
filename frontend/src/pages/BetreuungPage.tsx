@@ -409,6 +409,7 @@ export default function BetreuungPage() {
         <>
           {veraltet && <SeitenStandVeraltet onWiederholen={() => void betreuungQuery.refetch()} />}
           <EvakuierungBlock
+            einsatzId={einsatzId}
             bezirke={bezirke}
             ladend={ladend}
             darfSchreiben={darfSchreiben}
@@ -417,6 +418,7 @@ export default function BetreuungPage() {
             onAktion={bezirkAktion}
           />
           <StellenBlock
+            einsatzId={einsatzId}
             stellen={stellen}
             ladend={ladend}
             darfSchreiben={darfSchreiben}

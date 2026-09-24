@@ -383,6 +383,50 @@ pub struct StelleMeldungAnzeige {
     pub stelle: BetreuungsstelleAnzeige,
 }
 
+/// Eine Standmeldung im Verlauf eines Bezirks (LFH-676), zurückgenommene eingeschlossen.
+/// `aktuell` kommt aus dem Zeiger des Bezirks — keine zweite Definition von „aktuell“.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct StandVerlaufEintrag {
+    pub id: i64,
+    pub evakuiert: i64,
+    pub erhebung: Erhebung,
+    /// Zeitpunkt der Meldung, UTC ohne Zonenkennung (`YYYY-MM-DD HH:MM:SS`).
+    pub zeitpunkt_at: String,
+    /// Wann die Meldung erfasst wurde, UTC ohne Zonenkennung. Liegt sie ≥ 60 s nach
+    /// `zeitpunkt_at`, zeigt die App sie als nachgetragen (dieselbe Schwelle wie im ETB).
+    pub erfasst_at: String,
+    /// Anzeigename der erfassenden Person.
+    pub erfasst_von: String,
+    /// Diese Meldung ist der aktuelle Stand des Bezirks.
+    pub aktuell: bool,
+    /// Fehlt, solange die Meldung nicht zurückgenommen ist.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub zurueckgenommen_at: Option<String>,
+    /// Anzeigename der zurücknehmenden Person; fehlt wie `zurueckgenommen_at`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub zurueckgenommen_von: Option<String>,
+}
+
+/// Eine Belegungsmeldung im Verlauf einer Stelle (LFH-676), gebaut wie
+/// [`StandVerlaufEintrag`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct BelegungVerlaufEintrag {
+    pub id: i64,
+    pub belegt: i64,
+    /// Zeitpunkt der Meldung, UTC ohne Zonenkennung (`YYYY-MM-DD HH:MM:SS`).
+    pub zeitpunkt_at: String,
+    /// Wann die Meldung erfasst wurde, UTC ohne Zonenkennung.
+    pub erfasst_at: String,
+    /// Anzeigename der erfassenden Person.
+    pub erfasst_von: String,
+    /// Diese Meldung ist die aktuelle Belegung der Stelle.
+    pub aktuell: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub zurueckgenommen_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub zurueckgenommen_von: Option<String>,
+}
+
 /// Kopfzahl „in Betreuung“ zu einem Zeitpunkt (Verpflegung, LFH-634). Ohne Personenbezug.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct BelegungKopfzahl {

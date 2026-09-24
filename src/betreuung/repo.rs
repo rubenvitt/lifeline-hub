@@ -119,7 +119,20 @@ pub struct Gemeldet {
 /// Als Makro, damit `concat!` daraus ein `&'static str` baut (sqlx 0.9).
 macro_rules! juengste_meldung {
     () => {
-        "zurueckgenommen_at IS NULL ORDER BY zeitpunkt_at DESC, id DESC LIMIT 1"
+        concat!(
+            "zurueckgenommen_at IS NULL ",
+            meldereihenfolge!(),
+            " LIMIT 1"
+        )
+    };
+}
+
+/// Die Ordnung, in der „aktuell“ bestimmt wird: jüngster Zeitpunkt zuerst, bei Gleichstand die
+/// später erfasste. Der Verlauf (LFH-676) liest die Reihe in genau dieser Ordnung — der erste
+/// nicht zurückgenommene Eintrag ist damit immer der aktuelle.
+macro_rules! meldereihenfolge {
+    () => {
+        "ORDER BY zeitpunkt_at DESC, id DESC"
     };
 }
 
@@ -380,6 +393,128 @@ pub async fn kopfzahl(
         stellen_ohne_meldung: stellen.iter().filter(|s| s.belegt.is_none()).count() as i64,
         stellen,
     })
+}
+
+// ── Verlauf (LFH-676) ───────────────────────────────────────────────────────────────────────
+
+#[derive(sqlx::FromRow)]
+struct StandVerlaufZeile {
+    id: i64,
+    evakuiert: i64,
+    erhebung: String,
+    zeitpunkt_at: String,
+    erfasst_at: String,
+    erfasst_von: String,
+    aktuell: bool,
+    zurueckgenommen_at: Option<String>,
+    zurueckgenommen_von: Option<String>,
+}
+
+#[derive(sqlx::FromRow)]
+struct BelegungVerlaufZeile {
+    id: i64,
+    belegt: i64,
+    zeitpunkt_at: String,
+    erfasst_at: String,
+    erfasst_von: String,
+    aktuell: bool,
+    zurueckgenommen_at: Option<String>,
+    zurueckgenommen_von: Option<String>,
+}
+
+/// Die ganze Standreihe eines Bezirks, zurückgenommene eingeschlossen, in der Ordnung von
+/// [`meldereihenfolge!`]. `aktuell` ist der Vergleich mit dem Zeiger `stand_id` — nicht eine
+/// zweite Rechnung. Auch ein stornierter Bezirk liefert seine Reihe (Lesen ist keine
+/// Lebenszyklus-Aktion); ein Bezirk außerhalb des Einsatzes ist `NotFound`, damit „fremd“ nicht
+/// wie „ohne Meldung“ aussieht.
+///
+/// Die Namen kommen über Unterabfragen statt über einen Join: so bleibt `evakuierung_stand` die
+/// einzige Tabelle im `FROM`, und `meldereihenfolge!` trifft ohne Tabellenpräfix eindeutig.
+pub async fn stand_verlauf(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    bezirk_id: i64,
+) -> Result<Vec<super::StandVerlaufEintrag>, AppError> {
+    let zeiger: Option<(Option<i64>,)> =
+        sqlx::query_as("SELECT stand_id FROM evakuierungsbezirk WHERE id = ? AND einsatz_id = ?")
+            .bind(bezirk_id)
+            .bind(einsatz_id)
+            .fetch_optional(pool)
+            .await?;
+    let (stand_id,) = zeiger.ok_or(AppError::NotFound)?;
+    sqlx::query_as::<_, StandVerlaufZeile>(concat!(
+        "SELECT id, evakuiert, erhebung, zeitpunkt_at, erfasst_at, \
+                (SELECT anzeigename FROM benutzer WHERE benutzer.id = erfasst_von_id) \
+                    AS erfasst_von, \
+                id IS ? AS aktuell, zurueckgenommen_at, \
+                (SELECT anzeigename FROM benutzer WHERE benutzer.id = zurueckgenommen_von_id) \
+                    AS zurueckgenommen_von \
+         FROM evakuierung_stand WHERE bezirk_id = ? AND einsatz_id = ? ",
+        meldereihenfolge!()
+    ))
+    .bind(stand_id)
+    .bind(bezirk_id)
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?
+    .into_iter()
+    .map(|z| {
+        Ok(super::StandVerlaufEintrag {
+            id: z.id,
+            evakuiert: z.evakuiert,
+            erhebung: aus_db(z.erhebung)?,
+            zeitpunkt_at: z.zeitpunkt_at,
+            erfasst_at: z.erfasst_at,
+            erfasst_von: z.erfasst_von,
+            aktuell: z.aktuell,
+            zurueckgenommen_at: z.zurueckgenommen_at,
+            zurueckgenommen_von: z.zurueckgenommen_von,
+        })
+    })
+    .collect()
+}
+
+/// Die ganze Belegungsreihe einer Stelle, gebaut wie [`stand_verlauf`]. Auch eine geschlossene
+/// oder stornierte Stelle liefert ihre Reihe.
+pub async fn belegung_verlauf(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    stelle_id: i64,
+) -> Result<Vec<super::BelegungVerlaufEintrag>, AppError> {
+    let zeiger: Option<(Option<i64>,)> =
+        sqlx::query_as("SELECT belegung_id FROM betreuungsstelle WHERE id = ? AND einsatz_id = ?")
+            .bind(stelle_id)
+            .bind(einsatz_id)
+            .fetch_optional(pool)
+            .await?;
+    let (belegung_id,) = zeiger.ok_or(AppError::NotFound)?;
+    Ok(sqlx::query_as::<_, BelegungVerlaufZeile>(concat!(
+        "SELECT id, belegt, zeitpunkt_at, erfasst_at, \
+                (SELECT anzeigename FROM benutzer WHERE benutzer.id = erfasst_von_id) \
+                    AS erfasst_von, \
+                id IS ? AS aktuell, zurueckgenommen_at, \
+                (SELECT anzeigename FROM benutzer WHERE benutzer.id = zurueckgenommen_von_id) \
+                    AS zurueckgenommen_von \
+         FROM betreuungsstelle_belegung WHERE stelle_id = ? AND einsatz_id = ? ",
+        meldereihenfolge!()
+    ))
+    .bind(belegung_id)
+    .bind(stelle_id)
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?
+    .into_iter()
+    .map(|z| super::BelegungVerlaufEintrag {
+        id: z.id,
+        belegt: z.belegt,
+        zeitpunkt_at: z.zeitpunkt_at,
+        erfasst_at: z.erfasst_at,
+        erfasst_von: z.erfasst_von,
+        aktuell: z.aktuell,
+        zurueckgenommen_at: z.zurueckgenommen_at,
+        zurueckgenommen_von: z.zurueckgenommen_von,
+    })
+    .collect())
 }
 
 // ── Feldprüfungen (400) ─────────────────────────────────────────────────────────────────────

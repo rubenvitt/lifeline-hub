@@ -1,6 +1,7 @@
 import { apiGet, apiSend } from './client';
 import type {
   BelegungKopfzahl,
+  BelegungVerlaufEintrag,
   BelegungsmeldungEingabe,
   BetreuungUebersicht,
   Betreuungsstelle,
@@ -10,6 +11,7 @@ import type {
   Evakuierungsbezirk,
   EvakuierungsbezirkEingabe,
   EvakuierungsbezirkPatch,
+  StandVerlaufEintrag,
   StandmeldungEingabe,
   StelleMeldung,
 } from './types';
@@ -38,6 +40,25 @@ export function ladeBelegungKopfzahl(
 ): Promise<BelegungKopfzahl> {
   const query = zeitpunkt ? `?zeitpunkt=${encodeURIComponent(zeitpunkt)}` : '';
   return apiGet<BelegungKopfzahl>(`${basis(einsatzId)}/belegung${query}`);
+}
+
+/**
+ * Standreihe eines Bezirks samt zurückgenommener Meldungen (LFH-676), in der Ordnung, in der
+ * der Server „aktuell“ bestimmt (jüngster Zeitpunkt zuerst). Fremder/unbekannter Bezirk: 404.
+ */
+export function ladeStandVerlauf(
+  einsatzId: number,
+  bezirkId: number,
+): Promise<StandVerlaufEintrag[]> {
+  return apiGet<StandVerlaufEintrag[]>(`${basis(einsatzId)}/bezirke/${bezirkId}/staende`);
+}
+
+/** Belegungsreihe einer Stelle (LFH-676), wie {@link ladeStandVerlauf}. */
+export function ladeBelegungVerlauf(
+  einsatzId: number,
+  stelleId: number,
+): Promise<BelegungVerlaufEintrag[]> {
+  return apiGet<BelegungVerlaufEintrag[]>(`${basis(einsatzId)}/stellen/${stelleId}/belegungen`);
 }
 
 export function legeBezirkAn(

@@ -1,11 +1,12 @@
 import { Button, Checkbox, Dropdown, Popconfirm, Space, Typography, theme } from 'antd';
 import type { Key, ReactNode } from 'react';
 import type { MenuProps, TableColumnType } from 'antd';
-import { MoreOutlined } from '@ant-design/icons';
+import { DownOutlined, MoreOutlined, RightOutlined } from '@ant-design/icons';
 import {
   isValidElement,
   useCallback,
   useEffect,
+  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -55,9 +56,11 @@ import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
  *   · `form: 'karte'` gilt für Module, die heute schon kartenbasiert gelesen werden
  *     (Befehle, Lageberichte). Dort ist die Tabelle der Befund, nicht der Zielzustand.
  *
- * Was die Karte NICHT kann, ist an der Aufrufstelle sichtbar statt still: `aufklappzeile`
- * läuft nur im Tabellenzweig, und eine Spalte ohne Platz im Kartenplan erscheint dort
- * nicht. Der Funktionsverlust unter `md` ist damit lesbar, nicht überraschend.
+ * Was die Karte NICHT kann, ist an der Aufrufstelle sichtbar statt still: die
+ * Bestands-`aufklappzeile` läuft nur im Tabellenzweig, und eine Spalte ohne Platz im
+ * Kartenplan erscheint dort nicht. Der Funktionsverlust unter `md` ist damit lesbar, nicht
+ * überraschend. Der beschriftete Aufklappbereich `aufklappen` (LFH-676) läuft dagegen in
+ * BEIDEN Zweigen, mit einem Zustand für beide.
  *
  * ── FÜNF ZUSICHERUNGEN, sie gehören dem Primitiv ────────────────────────────────
  *
@@ -373,6 +376,27 @@ export type KinderFeld<T> = {
   [K in keyof T]-?: NonNullable<T[K]> extends readonly T[] ? K & string : never;
 }[keyof T];
 
+/**
+ * Beschrifteter Aufklappbereich je Zeile (LFH-676), in BEIDEN Zweigen gleich.
+ *
+ * Der Auslöser ist ein antd-`Button` mit sichtbarem `etikett`, `aria-expanded` und der
+ * Zeilenkennung im zugänglichen Namen — nicht antds 16-px-Aufklappsymbol, dessen Name aus der
+ * Locale in jeder Zeile gleich ist (LFH-369) und dessen Trefffläche die Dichte-Staffel
+ * unterschreitet. Aufklappen ist LESEN: der Auslöser zählt nicht gegen „eine Primäraktion +
+ * `weitere`“ (LFH-616, ein Sprung ist keine Handlung).
+ *
+ * `inhalt` wird erst beim Aufklappen gerendert — ein Inhalt, der beim Mount lädt, lädt damit
+ * nur für die aufgeklappte Zeile. Der Aufklappzustand gehört der Sicht und überlebt den
+ * Wechsel zwischen Karte und Tabelle.
+ */
+export interface Aufklappbereich<T> {
+  /** Sichtbares Etikett des Auslösers („Verlauf“). */
+  etikett: string;
+  /** Zugänglicher Name MIT Zeilenkennung („Verlauf zu Bezirk Uferstraße“). */
+  zugaenglicherName: (zeile: T) => string;
+  inhalt: (zeile: T) => ReactNode;
+}
+
 /** Rekursive Sicht. EIN Prop, damit Feldname und Aufklappzustand nicht getrennt setzbar sind. */
 export interface BaumSicht<T> {
   kinder: KinderFeld<T>;
@@ -422,7 +446,7 @@ export interface DatensichtProps<T extends object, K extends string> {
   /** Freitextsuche über alle Spalten mit `suchText`. Im Baummodus verboten. */
   suche?: { platzhalter: string };
   gruppen?: Gruppierung<T>;
-  /** Baumsicht. Schließt `suche`, Spaltenfilter, `gruppen` und `aufklappzeile` aus. */
+  /** Baumsicht. Schließt `suche`, Spaltenfilter, `gruppen`, `aufklappzeile` und `aufklappen` aus. */
   baum?: BaumSicht<T>;
   /** Default `'sammelbanner'`. */
   zufluss?: Zufluss;
@@ -446,8 +470,13 @@ export interface DatensichtProps<T extends object, K extends string> {
    * Antd-Aufklappzeile. Allowlist statt durchgereichtem `expandable`: ein per Subtraktion
    * definierter Durchlass wächst mit jedem fremden Prop mit und verrottet still, wenn ein
    * ausgeschlossener Name verschwindet. Nur im Tabellenzweig; schließt `baum` aus.
+   *
+   * Nur noch für den Bestand (Besatzung der Fahrzeugseite). Neues nimmt {@link aufklappen},
+   * das beschriftet ist und in beiden Zweigen läuft.
    */
   aufklappzeile?: (zeile: T) => ReactNode;
+  /** Beschrifteter Aufklappbereich in beiden Zweigen (LFH-676); schließt `baum` und `aufklappzeile` aus. */
+  aufklappen?: Aufklappbereich<T>;
 }
 
 // ── Konstanten ───────────────────────────────────────────────────────────────────────
@@ -674,11 +703,18 @@ export function sichtbareSpalten<T, K extends string>(args: {
 export function pruefeKartenplan<T extends object, K extends string>(
   props: Pick<
     DatensichtProps<T, K>,
-    'spalten' | 'karte' | 'suche' | 'baum' | 'gruppen' | 'aufklappzeile' | 'onZeileKlick'
+    | 'spalten'
+    | 'karte'
+    | 'suche'
+    | 'baum'
+    | 'gruppen'
+    | 'aufklappzeile'
+    | 'aufklappen'
+    | 'onZeileKlick'
   >,
   bezeichnung: string,
 ): string[] {
-  const { spalten, karte, suche, baum, gruppen, aufklappzeile, onZeileKlick } = props;
+  const { spalten, karte, suche, baum, gruppen, aufklappzeile, aufklappen, onZeileKlick } = props;
   const befunde: string[] = [];
   const bekannt = new Map<string, DatensichtSpalte<T, K>>();
   for (const spalte of spalten) {
@@ -723,10 +759,15 @@ export function pruefeKartenplan<T extends object, K extends string>(
     }
     if (gruppen) befunde.push('gruppen und baum schließen sich aus.');
     if (aufklappzeile) befunde.push('aufklappzeile und baum schließen sich aus.');
+    if (aufklappen) befunde.push('aufklappen und baum schließen sich aus.');
     // Im Baummodus klappt die ganze Zeile auf (LFH-338 · C3). Ein zusätzliches
     // `onZeileKlick` wäre eine zweite Wirkung auf demselben Klick, und welche einträte,
     // hinge an der Reihenfolge im DOM.
     if (onZeileKlick) befunde.push('onZeileKlick und baum schließen sich aus.');
+  }
+  // Zwei Aufklappwege an derselben Tabelle: antd kennt nur EINE Aufklappzeile je Zeile.
+  if (aufklappen && aufklappzeile) {
+    befunde.push('aufklappen und aufklappzeile schließen sich aus.');
   }
   return befunde;
 }
@@ -881,6 +922,7 @@ export default function Datensicht<T extends object, const K extends string>(
     onZeileKlick,
     werkzeuge,
     aufklappzeile,
+    aufklappen,
   } = props;
 
   const { token } = theme.useToken();
@@ -1063,6 +1105,46 @@ export default function Datensicht<T extends object, const K extends string>(
     [zeilenSchluessel],
   );
 
+  // ── Aufklappbereich (LFH-676) ─────────────────────────────────────────────────────
+  // EIN Zustand für beide Zweige: ein Wechsel zwischen Karte und Tabelle behält, was offen ist.
+  const [aufgeklappt, setAufgeklappt] = useState<readonly Key[]>([]);
+  const umschalten = useCallback(
+    (k: Key) =>
+      setAufgeklappt((jetzt) => (jetzt.includes(k) ? jetzt.filter((x) => x !== k) : [...jetzt, k])),
+    [],
+  );
+  // IDs für `aria-controls`/`aria-labelledby` im Kartenzweig. `useId` liefert Doppelpunkte,
+  // die in einer ID erlaubt sind; die Zeilenkennung hängt als String dahinter.
+  const idPraefix = useId();
+  const aufklappAusloeser = (zeile: T, mitRegion: boolean): ReactNode => {
+    if (!aufklappen) return null;
+    const k = schluessel(zeile);
+    const offen = aufgeklappt.includes(k);
+    return (
+      <Button
+        type="link"
+        id={mitRegion ? `${idPraefix}-auf-${k}` : undefined}
+        aria-expanded={offen}
+        aria-controls={mitRegion && offen ? `${idPraefix}-bereich-${k}` : undefined}
+        aria-label={aufklappen.zugaenglicherName(zeile)}
+        onClick={(e) => {
+          // Die Tabelle darf den Klick nicht zusätzlich als Zeilenklick lesen.
+          e.stopPropagation();
+          umschalten(k);
+        }}
+        icon={
+          // antds Ikone bringt `role="img"` mit englischem Namen mit — die Hülle nimmt sie aus
+          // dem Vorlesebaum (CLAUDE.md, „Ein Emoji ist keine Ikone").
+          <span aria-hidden="true" style={{ display: 'inline-flex' }}>
+            {offen ? <DownOutlined /> : <RightOutlined />}
+          </span>
+        }
+      >
+        {aufklappen.etikett}
+      </Button>
+    );
+  };
+
   const { sichtbareZeilen, zufluessig } = useMemo(() => {
     if (!gefroren) return { sichtbareZeilen: zeilen, zufluessig: 0 };
     const nachSchluessel = new Map(zeilen.map((z) => [schluessel(z), z]));
@@ -1189,10 +1271,10 @@ export default function Datensicht<T extends object, const K extends string>(
   const befunde = useMemo(
     () =>
       pruefeKartenplan(
-        { spalten, karte, suche, baum, gruppen, aufklappzeile, onZeileKlick },
+        { spalten, karte, suche, baum, gruppen, aufklappzeile, aufklappen, onZeileKlick },
         bezeichnung,
       ),
-    [spalten, karte, suche, baum, gruppen, aufklappzeile, onZeileKlick, bezeichnung],
+    [spalten, karte, suche, baum, gruppen, aufklappzeile, aufklappen, onZeileKlick, bezeichnung],
   );
   const befundSchluessel = befunde.join(' | ');
   useEffect(() => {
@@ -1477,9 +1559,17 @@ export default function Datensicht<T extends object, const K extends string>(
               // (siehe `pruefeKartenplan`).
               expandRowByClick: true,
             }
-          : aufklappzeile
-            ? { expandedRowRender: (zeile) => aufklappzeile(zeile) }
-            : undefined
+          : aufklappen
+            ? {
+                expandedRowKeys: [...aufgeklappt],
+                expandedRowRender: (zeile) => aufklappen.inhalt(zeile),
+                // Der beschriftete Auslöser statt antds Symbol; er schaltet den Zustand der
+                // Sicht selbst, `onExpand` bleibt deshalb ungenutzt.
+                expandIcon: ({ record }) => aufklappAusloeser(record, false),
+              }
+            : aufklappzeile
+              ? { expandedRowRender: (zeile) => aufklappzeile(zeile) }
+              : undefined
       }
     />
   );
@@ -1620,6 +1710,20 @@ export default function Datensicht<T extends object, const K extends string>(
                     </span>
                   </span>
                 ))}
+              </div>
+            )}
+            {aufklappen && (
+              <div>
+                {aufklappAusloeser(zeile, true)}
+                {aufgeklappt.includes(schluessel(zeile)) && (
+                  <div
+                    id={`${idPraefix}-bereich-${schluessel(zeile)}`}
+                    role="region"
+                    aria-labelledby={`${idPraefix}-auf-${schluessel(zeile)}`}
+                  >
+                    {aufklappen.inhalt(zeile)}
+                  </div>
+                )}
               </div>
             )}
           </div>

@@ -14,6 +14,7 @@ import StatusTag from '../components/StatusTag';
 import Bereichskopf from '../kommunikation/Bereichskopf';
 import { auslastung, betreuungsstelleStatus } from '../theme/statusFarben';
 import { ART_LABEL, freiePlaetze, personenZahl } from './betreuungText';
+import MeldeVerlauf from './MeldeVerlauf';
 
 /**
  * Block „Betreuungsstellen" der Betreuungsseite (LFH-639, design.md D7).
@@ -34,9 +35,20 @@ import { ART_LABEL, freiePlaetze, personenZahl } from './betreuungText';
  * melden" entfällt (der Server nimmt keine Meldung an, 422): die Regel „unter drei kein Menü"
  * zählt NACH der Rechteprüfung, nicht nach dem Zustand der Zeile — sonst wechselte die Form der
  * Aktionsspalte mit jedem Statuswechsel. Ohne Schreibrecht entfällt die Spalte ganz.
+ *
+ * VERLAUF (LFH-676): beschrifteter Aufklappbereich „Verlauf“ je Zeile, auch ohne
+ * Schreibrecht; die Belegungsreihe lädt erst beim Aufklappen.
  */
 
 export type StelleAktion = 'verorten' | 'bearbeiten' | 'stornieren';
+
+/**
+ * Warum an einer geschlossenen Stelle nichts zurückgenommen werden kann (D4 aus LFH-639:
+ * sonst stünde sie „geschlossen und belegt“ da, der Server lehnt mit 422 ab). Steht EINMAL im
+ * Verlauf statt n gesperrter Knöpfe (LFH-346, zwei Zuschnitte).
+ */
+export const GESCHLOSSEN_HINWEIS =
+  'Die Stelle ist geschlossen. Zurücknehmen geht erst, wenn sie wieder in Betrieb ist.';
 
 const MENUE: readonly (MenueEintrag & { key: StelleAktion })[] = [
   { key: 'bearbeiten', label: 'Bearbeiten (Status, Kapazität)' },
@@ -201,6 +213,7 @@ const KARTE: Kartenplan<Betreuungsstelle, StelleSpalte> = {
 };
 
 export default function StellenBlock({
+  einsatzId,
   stellen,
   ladend,
   darfSchreiben,
@@ -210,6 +223,7 @@ export default function StellenBlock({
   onBelegungMelden,
   onAktion,
 }: {
+  einsatzId: number;
   stellen: readonly Betreuungsstelle[];
   ladend: boolean;
   darfSchreiben: boolean;
@@ -224,6 +238,26 @@ export default function StellenBlock({
   const spalten = useMemo(
     () => stellenSpalten(darfSchreiben, onBelegungMelden, onAktion),
     [darfSchreiben, onBelegungMelden, onAktion],
+  );
+  const aufklappen = useMemo(
+    () => ({
+      etikett: 'Verlauf',
+      zugaenglicherName: (s: Betreuungsstelle) => `Verlauf zu Stelle ${s.bezeichnung}`,
+      inhalt: (s: Betreuungsstelle) => {
+        const geschlossen = s.status === 'geschlossen';
+        return (
+          <MeldeVerlauf
+            einsatzId={einsatzId}
+            art="stelle"
+            objektId={s.id}
+            darfZuruecknehmen={darfSchreiben && !geschlossen}
+            // Ohne Schreibrecht nennt der Rechtehinweis über der Seite den Grund.
+            sperrHinweis={darfSchreiben && geschlossen ? GESCHLOSSEN_HINWEIS : undefined}
+          />
+        );
+      },
+    }),
+    [einsatzId, darfSchreiben],
   );
   const gemeldet = stellen.filter((s) => s.belegung != null);
   const summe = gemeldet.reduce((n, s) => n + s.belegung!.belegt, 0);
@@ -261,6 +295,7 @@ export default function StellenBlock({
         ladend={ladend}
         leerText="Keine Betreuungsstellen"
         karte={KARTE}
+        aufklappen={aufklappen}
         zeilenKlasse={(s) => (s.id === hervorgehoben ? HERVORGEHOBEN : undefined)}
       />
     </div>
