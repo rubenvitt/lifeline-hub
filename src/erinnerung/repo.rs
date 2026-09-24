@@ -35,13 +35,20 @@ const ANZEIGE_SELECT: &str =
 
 /// Lädt eine Erinnerung als Anzeige. `NotFound`, wenn sie nicht existiert.
 /// Bind-Reihenfolge: zuerst `jetzt` (computed column), dann `id` (WHERE).
-pub async fn laden(pool: &SqlitePool, id: i64, jetzt: &str) -> Result<ErinnerungAnzeige, AppError> {
+///
+/// Executor-generisch (Pool oder offene Verbindung): [`anlegen_tx`] lädt auf der
+/// Verbindung seiner Transaktion (LFH-690).
+pub async fn laden(
+    executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
+    id: i64,
+    jetzt: &str,
+) -> Result<ErinnerungAnzeige, AppError> {
     sqlx::query_as::<_, ErinnerungAnzeige>(sqlx::AssertSqlSafe(format!(
         "{ANZEIGE_SELECT} WHERE e.id = ?"
     )))
     .bind(jetzt)
     .bind(id)
-    .fetch_optional(pool)
+    .fetch_optional(executor)
     .await?
     .ok_or(AppError::NotFound)
 }
@@ -69,11 +76,29 @@ pub async fn liste(
 }
 
 /// Legt eine manuelle Erinnerung an und liefert sie als Anzeige.
+///
+/// Pool-Hülle um [`anlegen_tx`]: wie bisher ohne eigene Transaktion, Insert und Rücklesen
+/// laufen im Autocommit einer geliehenen Verbindung.
 pub async fn anlegen(
     pool: &SqlitePool,
     einsatz_id: i64,
     ersteller_id: i64,
     daten: ErinnerungDaten<'_>,
+    jetzt: &str,
+) -> Result<ErinnerungAnzeige, AppError> {
+    let mut conn = pool.acquire().await?;
+    anlegen_tx(&mut conn, einsatz_id, ersteller_id, &daten, jetzt).await
+}
+
+/// Legt eine manuelle Erinnerung (Status `offen`) auf einer offenen Verbindung/Transaktion an
+/// und lädt sie dort zurück (LFH-690, Demo-Import in EINER Transaktion). Öffnet und committet
+/// selbst nichts. Die Bezugsprüfung (both-or-neither, Existenz im Einsatz) liegt im Handler
+/// (`routes/erinnerung.rs`) und ist hier nicht enthalten.
+pub async fn anlegen_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    ersteller_id: i64,
+    daten: &ErinnerungDaten<'_>,
     jetzt: &str,
 ) -> Result<ErinnerungAnzeige, AppError> {
     let id: i64 = sqlx::query_scalar(
@@ -91,9 +116,9 @@ pub async fn anlegen(
     .bind(daten.bezug_typ)
     .bind(daten.bezug_id)
     .bind(ersteller_id)
-    .fetch_one(pool)
+    .fetch_one(&mut *conn)
     .await?;
-    laden(pool, id, jetzt).await
+    laden(&mut *conn, id, jetzt).await
 }
 
 /// Prüft, ob eine Erinnerung zum Einsatz gehört (Cross-Einsatz-Schutz).
