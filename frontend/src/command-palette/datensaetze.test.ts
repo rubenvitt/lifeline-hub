@@ -8,7 +8,7 @@ import {
   type DatensatzKontext,
 } from './datensaetze';
 import { filtereBefehle, ordneTreffer, praefixStufe, type Treffer } from './fuzzy';
-import type { Befehl, PaletteModus } from './typen';
+import type { Befehl, DatensatzQuelle, PaletteModus } from './typen';
 import type {
   Auftrag,
   BenutzerAnzeige,
@@ -1269,10 +1269,124 @@ describe('baueDatensatzTreffer — Öffnungsart und Vorschau (LFH-645)', () => {
     expect(navigate).toHaveBeenCalledWith(p.befehl.ziel);
   });
 
-  it('nur die Person trägt eine Vorschau — mit Einsatz und id', () => {
-    const t = trefferAllerArten();
-    const mitVorschau = t.filter((x) => x.befehl.vorschau);
-    expect(mitVorschau.map((x) => x.befehl.id)).toEqual(['datensatz:personen:11']);
-    expect(mitVorschau[0].befehl.vorschau).toEqual({ art: 'person', einsatzId: 5, id: 11 });
+  /**
+   * DER VORSCHAU-GUARD (LFH-664) — positiv und vollständig: jede Datensatzquelle hat einen
+   * Eintrag, der Record ist exhaustiv über `DatensatzQuelle`, eine neue Quelle bricht also den
+   * Typcheck, statt ohne Vorschau durchzurutschen. `null` heisst „trägt keine Vorschau" und
+   * steht allein beim Sammeltreffer (`etbAnzahl`) — er ist der Weg zu allen, kein Datensatz.
+   */
+  const ERWARTETE_ART: Record<DatensatzQuelle, string | null> = {
+    personen: 'person',
+    schaeden: 'schaden',
+    uhs: 'uhs',
+    meldungen: 'meldung',
+    auftraege: 'auftrag',
+    fahrzeuge: 'fahrzeug',
+    personal: 'personal',
+    einheiten: 'einheit',
+    etbNummer: 'etb',
+    etbText: 'etb',
+    etbAnzahl: null,
+    lageberichte: 'lagebericht',
+    gefahrengebiete: 'gefahrengebiet',
+    abschnitte: 'abschnitt',
+  };
+  /**
+   * Quellen, die in diesem Stand NOCH KEINE Vorschau tragen dürfen — die Menge schrumpft je
+   * Bündel und fällt mit dem letzten weg (tasks.md 4.6). Für sie gilt die Gegenaussage: kein
+   * `vorschau`-Feld. So bleibt der Guard in jedem Zwischenstand eine echte Aussage.
+   */
+  const NOCH_OHNE_VORSCHAU = new Set<DatensatzQuelle>([
+    'schaeden',
+    'uhs',
+    'meldungen',
+    'auftraege',
+    'fahrzeuge',
+    'personal',
+    'einheiten',
+    'etbNummer',
+    'etbText',
+    'lageberichte',
+    'gefahrengebiete',
+    'abschnitte',
+  ]);
+
+  /** Je Quelle EIN Datensatz mit eigener id — die id sagt, aus welcher Quelle der Treffer kommt. */
+  function trefferJeQuelle(): Map<number, { quelle: DatensatzQuelle; befehl: Befehl }> {
+    const textTreffer = baueDatensatzTreffer(
+      kontext({
+        suche: 'flor',
+        quellen: {
+          personen: [person({ id: 101, name: 'Florian' })],
+          schaeden: [schaden({ id: 102, ort: 'Florianstr' })],
+          uhs: [uhs({ id: 103, bezeichnung: 'Florian-Platz' })],
+          meldungen: [meldung({ id: 104, lfd_nr: 4, absender: 'Florian 2' })],
+          auftraege: [auftrag({ id: 105, lfd_nr: 5, auftrag_text: 'Florian erkunden' })],
+          fahrzeuge: [fahrzeug({ id: 106, funkrufname: 'Florian 1' })],
+          personal: [personal({ id: 107, name: 'Florian' })],
+          einheiten: [einheit({ id: 108, name: 'Florian SEG' })],
+          etbText: [etb({ id: 110, lfd_nr: 10, inhalt: 'Florian ist da' })],
+          etbAnzahl: { anzahl: 3 },
+          lageberichte: [lagebericht({ id: 111, titel: 'Florian-Lage' })],
+          gefahrengebiete: [gebiet({ id: 112, label: 'Florian-Gebiet' })],
+          abschnitte: [abschnitt({ id: 113, name: 'Florian Süd' })],
+        },
+      }),
+    );
+    // Der Zahlenzweig antwortet nur auf eine Nummer — eigener Aufruf.
+    const nummerTreffer = baueDatensatzTreffer(
+      kontext({ suche: '9', quellen: { etbNummer: [etb({ id: 109, lfd_nr: 9 })] } }),
+    );
+    const quelleVon: Record<number, DatensatzQuelle> = {
+      101: 'personen',
+      102: 'schaeden',
+      103: 'uhs',
+      104: 'meldungen',
+      105: 'auftraege',
+      106: 'fahrzeuge',
+      107: 'personal',
+      108: 'einheiten',
+      109: 'etbNummer',
+      110: 'etbText',
+      111: 'lageberichte',
+      112: 'gefahrengebiete',
+      113: 'abschnitte',
+    };
+    const je = new Map<number, { quelle: DatensatzQuelle; befehl: Befehl }>();
+    for (const { befehl } of [...textTreffer, ...nummerTreffer]) {
+      const m = /^datensatz:[^:]+:(\d+)$/.exec(befehl.id);
+      if (!m) continue;
+      const id = Number(m[1]);
+      je.set(id, { quelle: quelleVon[id], befehl });
+    }
+    return je;
+  }
+
+  it('jede Datensatzquelle trägt ihre Vorschau mit Sorte, Einsatz und id', () => {
+    const je = trefferJeQuelle();
+    // Alle dreizehn Einzeldatensätze sind angekommen — sonst prüfte der Guard weniger.
+    expect([...je.keys()].sort()).toEqual([
+      101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113,
+    ]);
+    for (const [id, { quelle, befehl }] of je) {
+      if (NOCH_OHNE_VORSCHAU.has(quelle)) {
+        expect(befehl.vorschau, quelle).toBeUndefined();
+        continue;
+      }
+      const art = ERWARTETE_ART[quelle];
+      const erwartet =
+        art === 'etb'
+          ? { art, einsatzId: 5, id, lfdNr: id === 109 ? 9 : 10 }
+          : { art, einsatzId: 5, id };
+      expect(befehl.vorschau, quelle).toEqual(erwartet);
+    }
+  });
+
+  // Die Gegenaussage für den Koordinatensprung steht in `koordinatenSprung.test.ts`.
+  it('der ETB-Sammeltreffer trägt keine Vorschau', () => {
+    const sammel = trefferAllerArten().find((x) => x.befehl.id === 'datensatz:etb:suche');
+    expect(sammel).toBeDefined();
+    expect(sammel!.befehl.vorschau).toBeUndefined();
+    expect(ERWARTETE_ART.etbAnzahl).toBeNull();
   });
 });

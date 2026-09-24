@@ -34,6 +34,7 @@ import {
   type DatensatzQuelle,
   type Oeffnung,
   type PaletteModus,
+  type VorschauZiel,
 } from './typen';
 import type {
   Auftrag,
@@ -185,6 +186,8 @@ interface Kandidat {
   nummer: number | null;
   basisLabel: string;
   ziel: string;
+  /** Lese-Vorschau (Taste →); fehlt bei einer Quelle ohne Vorschau. */
+  vorschau?: VorschauZiel;
 }
 
 type Zweig = 'zahl' | 'text' | 'beide';
@@ -211,6 +214,11 @@ function baueQuelle<T>(
     nummer?: (x: T) => number | null | undefined;
     label: (x: T) => string;
     ziel: (einsatzId: number, x: T) => string;
+    /**
+     * Das Vorschauziel (LFH-664) — in DERSELBEN Tabelle wie Beschriftung und Sprungziel,
+     * damit die Zuordnung je Quelle an einer Stelle steht und nicht in `befehlFuer`.
+     */
+    vorschau?: (einsatzId: number, x: T) => VorschauZiel;
   },
   extra: { sorte?: Nummernsorte; serverGefiltert?: boolean } = {},
 ): Quelle {
@@ -229,6 +237,7 @@ function baueQuelle<T>(
       nummer: f.nummer?.(x) ?? null,
       basisLabel: f.label(x),
       ziel: f.ziel(einsatzId, x),
+      vorschau: f.vorschau?.(einsatzId, x),
     })),
   };
 }
@@ -265,6 +274,7 @@ function quellen(k: DatensatzKontext): Quelle[] {
         nummer: (p) => p.registrier_nr,
         label: personLabel,
         ziel: (id, p) => personDetailPfad(id, p.id),
+        vorschau: (einsatzId, p) => ({ art: 'person', einsatzId, id: p.id }),
       },
       { sorte: 'person' },
     ),
@@ -459,7 +469,7 @@ export function baueDatensatzTreffer(k: DatensatzKontext): Treffer[] {
 
   const alsTreffer = (kand: Kandidat, stufe: 0 | 1 | 2 | 3): Treffer => {
     gesehen.add(schluessel(kand));
-    return { befehl: befehlFuer(kand, k.einsatzId, k.navigate), score: UNBEWERTET, stufe };
+    return { befehl: befehlFuer(kand, k.navigate), score: UNBEWERTET, stufe };
   };
 
   if (zahl) {
@@ -704,11 +714,7 @@ export function sichtbareDatensaetze(
  * Die Ikone kommt aus der `modulRegistry`, die Modulherkunft ebenso: eine zweite
  * Namensquelle fällt niemandem auf, weil beide Seiten plausibel aussehen (Befund M14).
  */
-function befehlFuer(
-  kand: Kandidat,
-  einsatzId: number,
-  navigate: DatensatzKontext['navigate'],
-): Befehl {
+function befehlFuer(kand: Kandidat, navigate: DatensatzKontext['navigate']): Befehl {
   const m = modulRegistry.find((x) => x.key === kand.modulKey);
   return {
     id: schluessel(kand),
@@ -720,10 +726,8 @@ function befehlFuer(
     schlagworte: [m?.label ?? kand.modulKey],
     icon: m?.icon,
     ...sprungZu(kand.ziel, navigate),
-    // Die Vorschau in der Palette (LFH-645, Taste →) trägt heute allein die Person — ihr
-    // Inhalt liegt als `PersonVorschau` schon vor. Die übrigen Sorten sind Folgearbeit.
-    ...(kand.modulKey === QUELLE_MODUL.personen
-      ? { vorschau: { art: 'person' as const, einsatzId, id: kand.id } }
-      : {}),
+    // Die Vorschau in der Palette (LFH-645, Taste →). Welche Sorte sie zeigt, sagt die
+    // Quellentabelle (`quellen`), nicht diese Stelle (LFH-664).
+    ...(kand.vorschau ? { vorschau: kand.vorschau } : {}),
   };
 }

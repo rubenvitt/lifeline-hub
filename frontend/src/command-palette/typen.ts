@@ -103,12 +103,21 @@ export interface Befehl {
 export type Oeffnung = 'hier' | 'neuerTab';
 
 /**
- * Was die Vorschau zeigt (LFH-645). Eine DISKRIMINIERTE Union als Datum, keine
- * Render-Funktion: `Vorschau.tsx` bildet `art` exhaustiv ab, eine neue Sorte bricht dort den
- * Typcheck statt still zu fehlen. Heute trägt sie allein die Person; die übrigen
- * Datensatzsorten sind Folgearbeit.
+ * Was die Vorschau zeigt (LFH-645, alle Datensatzsorten seit LFH-664). Eine DISKRIMINIERTE
+ * Union als Datum, keine Render-Funktion: `Vorschau.tsx` bildet `art` exhaustiv ab, eine neue
+ * Sorte bricht dort den Typcheck statt still zu fehlen.
+ *
+ * Das Ziel trägt nur Kennungen, nie den geladenen Datensatz: das Bauteil liest ihn aus dem
+ * Fach der Trefferliste (`datensatzAbfrage.ts`) und bleibt damit live. Ein mitgegebener
+ * Datensatz wäre beim Öffnen eingefroren.
+ *
+ * Der ETB trägt zusätzlich `lfdNr`: kein Fach adressiert einen Eintrag über seine `id`, die
+ * Vorschau liest ihn über den Nummerncursor und prüft danach die `id`.
  */
-export type VorschauZiel = { art: 'person'; einsatzId: number; id: number };
+export type VorschauZiel = { art: VorschauArt; einsatzId: number; id: number };
+
+/** Die Sorten, deren Ziel allein aus `einsatzId` und `id` besteht. */
+export type VorschauArt = 'person';
 
 /**
  * Ziel und Weg einer Navigationszeile aus EINER Hand (LFH-645) — für alle drei Bauorte
