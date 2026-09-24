@@ -40,7 +40,7 @@ const ALLE_MAPS = Object.fromEntries(
 ) as Record<string, Record<string, sf.StatusDarstellung>>;
 
 describe('Statusfarb-Vertrag', () => {
-  it('deckt alle dreiundzwanzig Vertragskarten ab — eine weitere Map rutscht nicht still durch', () => {
+  it('deckt alle vierundzwanzig Vertragskarten ab — eine weitere Map rutscht nicht still durch', () => {
     // „Karten", nicht „Enums": `dringlichkeit` ist über eine {@link Statusrolle} geschlüsselt
     // und damit die eine Karte, die keine Domänen-Achse beschriftet, sondern die Stufe selbst.
     // Beide Zugänge von LFH-358 stehen hier — sie lagen bis dahin AUSSERHALB und liefen damit
@@ -67,6 +67,7 @@ describe('Statusfarb-Vertrag', () => {
       'uhsStatus',
       'uhsTyp',
       'verfuegbarkeit',
+      'verpflegungDeckung',
       'warnstufeKarte',
       'warnstufeKennzahl',
     ]);
@@ -177,7 +178,7 @@ describe('Warnstufe als Fläche (LFH-368 · B5h)', () => {
     // `StatusDarstellung` hineinzubiegen hätte den Kanal-Vertrag verwässert.
     expect(Object.keys(ALLE_MAPS)).not.toContain('warnstufeFlaeche');
     expect(Object.keys(ALLE_MAPS)).not.toContain('sichtung');
-    expect(Object.keys(ALLE_MAPS)).toHaveLength(23);
+    expect(Object.keys(ALLE_MAPS)).toHaveLength(24);
   });
 });
 
@@ -206,6 +207,19 @@ describe('abloesungEinstufung (LFH-635)', () => {
       label: 'Ablösung bald fällig',
     });
     expect(sf.abloesungEinstufung.ueberfaellig).toEqual({ rolle: 'alarm', label: 'überfällig' });
+  });
+});
+
+describe('verpflegungDeckung (LFH-634, design.md D3)', () => {
+  // Byte-Pin gegen handgeschriebene Literale: das Wort ist der zweite Kanal (WCAG 1.4.1).
+  it('bildet die drei Einstufungen auf Rolle und Wort ab', () => {
+    expect(sf.verpflegungDeckung.gedeckt).toEqual({ rolle: 'normal', label: 'gedeckt' });
+    expect(sf.verpflegungDeckung.offen).toEqual({ rolle: 'neutral', label: 'offen' });
+    expect(sf.verpflegungDeckung.unterdeckung).toEqual({ rolle: 'alarm', label: 'Unterdeckung' });
+  });
+
+  it('führt genau die drei Einstufungen', () => {
+    expect(Object.keys(sf.verpflegungDeckung).sort()).toEqual(['gedeckt', 'offen', 'unterdeckung']);
   });
 });
 

@@ -31,6 +31,8 @@ describe('EINSATZ_KEYS', () => {
     expect(EINSATZ_KEYS.abloesungen).toBe('einsatz-abloesungen');
     // LFH-639: handgeschriebenes Literal, nicht über EINSATZ_KEYS.
     expect(EINSATZ_KEYS.betreuung).toBe('einsatz-betreuung');
+    // LFH-634: handgeschriebenes Literal, nicht über EINSATZ_KEYS.
+    expect(EINSATZ_KEYS.verpflegung).toBe('einsatz-verpflegung');
   });
 });
 
@@ -96,6 +98,8 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
     expect(EINSATZ_STREAM_EVENTS.schaden).toEqual([EINSATZ_KEYS.schaeden]);
     expect(EINSATZ_STREAM_EVENTS.tier).toEqual([EINSATZ_KEYS.tiere]);
     expect(EINSATZ_STREAM_EVENTS.karte_bild).toEqual([EINSATZ_KEYS.kartenbilder]);
+    // LFH-634 (design.md D6): das DTO trägt keine Nachforderungsdaten, also kein Fan-out.
+    expect(EINSATZ_STREAM_EVENTS.verpflegung).toEqual([EINSATZ_KEYS.verpflegung]);
   });
 
   it('bildet die Cross-Modul-Fan-outs korrekt ab', () => {
@@ -271,6 +275,8 @@ describe('einsatzKeys (Factory-Output)', () => {
     // Ohne Stichtag („jetzt“) ein fester Platzhalter statt eines sekundengenauen Zeitstempels —
     // sonst entstünde bei jedem Rendern ein neuer Key und damit ein neuer Abruf.
     expect(einsatzKeys.betreuungKopfzahl(1)).toEqual(['einsatz-betreuung', 1, 'kopfzahl', 'jetzt']);
+    // LFH-634: Verpflegungs-Prefix als Literal gepinnt.
+    expect(einsatzKeys.verpflegung(1)).toEqual(['einsatz-verpflegung', 1]);
     expect(einsatzKeys.etbListe(1, { typ: 'x' })).toEqual(['etb', 1, { typ: 'x' }]);
     // LFH-611: Lesemarke UNTER dem ETB-Prefix — das `etb`-Ereignis invalidiert sie mit.
     expect(einsatzKeys.etbLesemarke(1)).toEqual(['etb', 1, 'lesemarke']);
