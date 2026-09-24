@@ -35,6 +35,7 @@ pub enum LiveEvent {
     Dokument,
     Abloesung,
     Betreuung,
+    Verpflegung,
     KartenAnsicht,
     LageSnapshot,
     Sofortmeldung,
@@ -44,7 +45,7 @@ pub enum LiveEvent {
 impl LiveEvent {
     /// Alle Varianten in kanonischer Reihenfolge — Anker für den Wire-Kontrakt-Guard
     /// (`tests/enum_wire_kontrakt.rs`) und die Exhaustiveness-Prüfung.
-    pub const ALLE: [LiveEvent; 30] = [
+    pub const ALLE: [LiveEvent; 31] = [
         LiveEvent::Uhs,
         LiveEvent::Schaden,
         LiveEvent::Fahrzeug,
@@ -71,6 +72,7 @@ impl LiveEvent {
         LiveEvent::Dokument,
         LiveEvent::Abloesung,
         LiveEvent::Betreuung,
+        LiveEvent::Verpflegung,
         LiveEvent::KartenAnsicht,
         LiveEvent::LageSnapshot,
         LiveEvent::Sofortmeldung,
@@ -108,6 +110,7 @@ impl LiveEvent {
             LiveEvent::Dokument => "dokument",
             LiveEvent::Abloesung => "abloesung",
             LiveEvent::Betreuung => "betreuung",
+            LiveEvent::Verpflegung => "verpflegung",
             LiveEvent::KartenAnsicht => "karten_ansicht",
             LiveEvent::LageSnapshot => "lage_snapshot",
             LiveEvent::Sofortmeldung => "sofortmeldung",
@@ -192,6 +195,12 @@ impl LiveEvent {
             // Frontend über `EINSATZ_STREAM_EVENTS.abschnitt` (design.md D6), ohne dass ein
             // Abschnitts-Leser von Bezirken erführe. Der ETB-Nachweis läuft über `etb`.
             LiveEvent::Betreuung => &["betreuung"],
+            // Nur `verpflegung`: Zeitfenster und Ausgaben sind Datenobjekte des
+            // Verpflegungsmoduls (LFH-634). NICHT `nachforderungen`, obwohl eine Ausgabe auf
+            // eine Nachforderung verweist: das DTO trägt davon nur die Kennung, die Namen löst
+            // die Oberfläche aus der Nachforderungs-Query auf, und die frischt deren eigenes
+            // Ereignis auf (design.md D6). Der ETB-Nachweis läuft über `etb`.
+            LiveEvent::Verpflegung => &["verpflegung"],
             // Die Kartenansicht-Konfiguration lebt auf der Lage-Karte; wer `lagekarte`
             // sehen darf, darf ihre Änderung erfahren (Cache-Invalidierung des Switchers).
             LiveEvent::KartenAnsicht => &["lagekarte"],
@@ -555,6 +564,7 @@ mod tests {
             (LiveEvent::Dokument, &["dokumente"]),
             (LiveEvent::Abloesung, &["abloesung"]),
             (LiveEvent::Betreuung, &["betreuung"]),
+            (LiveEvent::Verpflegung, &["verpflegung"]),
             (LiveEvent::KartenAnsicht, &["lagekarte"]),
             (LiveEvent::LageSnapshot, &["lagekarte"]),
             (LiveEvent::Sofortmeldung, &["meldungen"]),

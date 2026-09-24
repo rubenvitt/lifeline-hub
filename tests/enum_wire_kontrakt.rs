@@ -708,6 +708,7 @@ fn live_event_wire() {
         Dokument => "dokument",
         Abloesung => "abloesung",
         Betreuung => "betreuung",
+        Verpflegung => "verpflegung",
         KartenAnsicht => "karten_ansicht",
         LageSnapshot => "lage_snapshot",
         Sofortmeldung => "sofortmeldung",

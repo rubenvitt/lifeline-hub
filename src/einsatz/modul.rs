@@ -9,7 +9,7 @@
 
 /// Alle gültigen Modul-Keys (Spiegel der Frontend-`modulRegistry`-`key`-Werte).
 /// Reihenfolge wie in der FE-Registry (Kategorie für Kategorie) — rein dokumentarisch.
-pub const MODUL_KEYS: [&str; 30] = [
+pub const MODUL_KEYS: [&str; 31] = [
     // Führung (Neuentwurf 21.09.2026: Überblick als Startseite, Aufträge hierher verschoben)
     "ueberblick",
     "einsatzdaten",
@@ -23,6 +23,7 @@ pub const MODUL_KEYS: [&str; 30] = [
     "personal",
     "fahrzeuge",
     "material",
+    "verpflegung",
     "bereitstellungsraeume",
     "abloesung",
     // Erfassung
@@ -123,6 +124,7 @@ modul_marker! {
     Dokumente => "dokumente",
     Abloesung => "abloesung",
     Betreuung => "betreuung",
+    Verpflegung => "verpflegung",
     WetterPegel => "wetter-pegel",
 }
 
@@ -139,6 +141,7 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     ("/api/einsaetze/{id}/dokumente", Some("dokumente")),
     ("/api/einsaetze/{id}/abloesungen", Some("abloesung")),
     ("/api/einsaetze/{id}/betreuung", Some("betreuung")),
+    ("/api/einsaetze/{id}/verpflegung", Some("verpflegung")),
     // Wetter & Pegel (LFH-633): nur der Wetter-Endpunkt ist am Modul gegatet. Der
     // Pegelverlauf liegt unter dem modul-losen Pegel-Präfix unten.
     ("/api/einsaetze/{id}/wetter", Some("wetter-pegel")),
@@ -246,6 +249,7 @@ mod tests {
         assert_eq!(Dokumente::KEY, Some("dokumente"));
         assert_eq!(Abloesung::KEY, Some("abloesung"));
         assert_eq!(Betreuung::KEY, Some("betreuung"));
+        assert_eq!(Verpflegung::KEY, Some("verpflegung"));
         assert_eq!(WetterPegel::KEY, Some("wetter-pegel"));
         assert_eq!(OhneModul::KEY, None);
     }
@@ -270,6 +274,11 @@ mod tests {
         assert_eq!(
             key_fuer_pfad("/api/einsaetze/{id}/betreuung/stellen/{sid}/belegungen"),
             Some(Some("betreuung"))
+        );
+        // Verpflegung (LFH-634): Zeitfenster und Ausgaben hängen unter einem Präfix.
+        assert_eq!(
+            key_fuer_pfad("/api/einsaetze/{id}/verpflegung/ausgaben/{aid}/zuruecknehmen"),
+            Some(Some("verpflegung"))
         );
         // Modul-lose Route: registriert, aber kein Key.
         assert_eq!(key_fuer_pfad("/api/einsaetze/{id}/anhaenge"), Some(None));

@@ -386,6 +386,28 @@ pub fn build_router(state: AppState) -> Router {
             "/api/einsaetze/{id}/betreuung/belegungen/{mid}/zuruecknehmen",
             post(routes::betreuung::belegung_zuruecknehmen),
         )
+        // Verpflegung (LFH-634): Zeitfenster mit Bedarf, Ausgaben dagegen.
+        .route(
+            "/api/einsaetze/{id}/verpflegung",
+            get(routes::verpflegung::uebersicht),
+        )
+        .route(
+            "/api/einsaetze/{id}/verpflegung/zeitfenster",
+            post(routes::verpflegung::zeitfenster_anlegen),
+        )
+        .route(
+            "/api/einsaetze/{id}/verpflegung/zeitfenster/{zid}",
+            patch(routes::verpflegung::zeitfenster_aendern)
+                .delete(routes::verpflegung::zeitfenster_loeschen),
+        )
+        .route(
+            "/api/einsaetze/{id}/verpflegung/zeitfenster/{zid}/ausgaben",
+            post(routes::verpflegung::ausgabe_erfassen),
+        )
+        .route(
+            "/api/einsaetze/{id}/verpflegung/ausgaben/{aid}/zuruecknehmen",
+            post(routes::verpflegung::ausgabe_zuruecknehmen),
+        )
         .route("/api/einsaetze/{id}/stab", get(routes::stab::laden))
         .route(
             "/api/einsaetze/{id}/stab/besetzung/{sachgebiet}",
