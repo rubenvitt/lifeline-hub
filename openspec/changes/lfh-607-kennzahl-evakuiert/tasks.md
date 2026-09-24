@@ -25,8 +25,8 @@ Test, dann der Code. Vorbild für jeden Schritt ist der Pegel-Auslöser aus LFH-
 
 ## 4. Verifikation
 
-- [ ] 4.1 Gates: `./scripts/check-all.sh` grün (Formatierung, Lint mit `--max-warnings 0`, Codegen, `cargo test --workspace`, Vitest, e2e). Verifiziert durch den Exit-Code des Skripts
-- [ ] 4.2 Im Browser gegen den Dev-Stack: Einsatz ohne Bezirk → Platz 3 „Schäden offen“. Bezirk anlegen, zurück zum Dashboard → „Evakuiert“ ohne Banner, Wert „—“. Stand melden → Zahl erscheint ohne Platzwechsel. Bezirk aufheben → zurück zu „Schäden offen“. Verifiziert durch Screenshots je Schritt
+- [x] 4.1 Gates: `./scripts/check-all.sh` grün (Formatierung, Lint mit `--max-warnings 0`, Codegen, `cargo test --workspace`, Vitest, e2e). Verifiziert durch den Exit-Code des Skripts
+- [x] 4.2 Im Browser gegen den Dev-Stack: Einsatz ohne Bezirk → Platz 3 „Schäden offen“. Bezirk anlegen, zurück zum Dashboard → „Evakuiert“ ohne Banner, Wert „—“. Stand melden → Zahl erscheint ohne Platzwechsel. Bezirk aufheben → zurück zu „Schäden offen“. Verifiziert durch Screenshots je Schritt (Ergebnis und Befund zu Kriterium 12 in `pruefliste.md`, Folgefehler LFH-691)
 
 ## 5. Prüfliste Einsatztauglichkeit (Kennzahlenband, Platz 3)
 
