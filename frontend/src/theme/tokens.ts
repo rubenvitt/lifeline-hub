@@ -601,21 +601,76 @@ export const seedTreu: MappingAlgorithm = (seed, abgeleitet) => ({
   colorSuccess: seed.colorSuccess,
 });
 
+/** antds fester Innenabstand der Schalterspur (`switch/style/index.js`: „Fixed value"). */
+const SWITCH_SPURPOLSTER = 2;
+
 /**
- * Komponenten-Tokens, die aus den Rollen folgen.
+ * Die Maße des Kippschalters aus der Dichte-Staffel (LFH-380).
+ *
+ * antd leitet den `Switch` NICHT aus `controlHeight` ab, sondern aus der Schrift:
+ * `prepareComponentToken` in `antd/es/switch/style/index.js` rechnet
+ * `trackHeight = fontSize × lineHeight`, und antds `lineHeight` ist `(fontSize + 8) / fontSize`
+ * (`theme/themes/shared/genFontSizes.js`) — die Spur ist also `fontSize + 8`. Mit 13,5 / 15 /
+ * 15 px Grundschrift stand der Schalter damit bei 21,5 / 23 / 23 px (am Tablet gemessen: 23) —
+ * im Handschuh bei einem Drittel des Bodens, und selbst kompakt unter den 24 px aus Gate 1.
+ *
+ * Boden ist `kleineZeilenhoehe` (24 / 48 / 72), nicht `zeilenhoehe` (30 / 48 / 72): Gate 3
+ * verlangt in der kurzen Achse genau die kleine Steuerhöhe, und ein 30-px-Schalter machte
+ * den Fükw-Alltag schwerer, ohne dass eine Anforderung es verlangt. Kompakt wächst damit
+ * nur von 21,5 auf 24 px; komfortabel und Handschuh treffen dieselbe Höhe wie die
+ * Steuerelemente neben ihnen.
+ *
+ * Der GANZE abhängige Satz, nicht nur die Spur: antd rechnet Griff, Mindestbreite und
+ * Innenränder in derselben Funktion aus der Schrift, und ein überschriebener
+ * Komponententoken zieht die übrigen NICHT nach — wer nur `trackHeight` setzt, bekommt
+ * einen 18-px-Griff in einer 72-px-Spur. Die Formeln sind antds eigene, nur mit der Spur
+ * als Eingang statt der Schrift; das Seitenverhältnis bleibt damit das gewohnte (Breite
+ * ≈ 2 × Höhe), und die Gesamtfläche wächst mit: 24 × 48 · 48 × 96 · 72 × 144.
+ *
+ * Die kleine Schaltervariante (`…SM`-Tokens) bleibt unberührt: `dichte.guard.test.ts`
+ * sperrt die Größen-Prop am `Switch`, und keine Stelle setzt eine Vorgabegröße per
+ * `componentSize`.
+ *
+ * Rein und exportiert, damit die Rechnung ohne Render über die Stufen prüfbar ist (jsdom
+ * rechnet kein Layout). Bauform nach `segmentedMasse` aus LFH-370 (seit LFH-392 mit ihrem
+ * einzigen Aufrufer entfallen).
+ */
+export function switchMasse(stufe: Pick<Dichtestufe, 'kleineZeilenhoehe'>) {
+  const trackHeight = stufe.kleineZeilenhoehe;
+  const handleSize = trackHeight - 2 * SWITCH_SPURPOLSTER;
+  return {
+    trackHeight,
+    trackPadding: SWITCH_SPURPOLSTER,
+    handleSize,
+    trackMinWidth: 2 * handleSize + 4 * SWITCH_SPURPOLSTER,
+    innerMinMargin: handleSize / 2,
+    innerMaxMargin: handleSize + 3 * SWITCH_SPURPOLSTER,
+  };
+}
+
+/**
+ * Komponenten-Tokens, die aus den Rollen und der Dichte-Stufe folgen.
  *
  * `aufBedien` gehört an den KNOPF, nicht an antds `colorTextLightSolid`: dieser globale
  * Token färbt auch Tooltip (auf `colorBgSpotlight`), Avatar, Badge, Bildvorschau-Maske,
  * die Layout-Kopfzeile und rund fünfzehn weitere Stellen (gezählt in
  * `antd/es/…/style`). #08090b dort wäre nachts dunkel auf dunkel. Am Knopf: #08090b auf
  * `bedien` 6,19 : 1, auf `alarm` 7,18 : 1; Weiß auf `bedien` hätte nur 3,22.
+ *
+ * Die Dichte ist PFLICHT, anders als bei {@link antdToken}: eine Vorgabe `kompakt` ließe
+ * den Schalter bei einem vergessenen Argument still auf der kompakten Stufe stehen, und
+ * nichts würde rot (Herleitung bei {@link switchMasse}).
  */
-export function antdKomponenten(farben: Farbrollen): NonNullable<ThemeConfig['components']> {
+export function antdKomponenten(
+  farben: Farbrollen,
+  dichte: Dichte,
+): NonNullable<ThemeConfig['components']> {
   return {
     Button: {
       primaryColor: farben.aufBedien,
       dangerColor: farben.aufBedien,
     },
+    Switch: switchMasse(dichten[dichte]),
   };
 }
 

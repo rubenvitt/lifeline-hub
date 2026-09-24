@@ -6,6 +6,8 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
  * Gemessen werden drei Stellen, an denen die Dichte-Staffel bis in die Pixel durchschlagen
  * muss: die Modulzeilen im INLINE-Rahmen, die Kategorie-Ziele der IconRail und die
  * Aktionsknöpfe einer Bestätigungsblase. Alles auf derselben Route, ein Seitenaufruf.
+ * Dazu seit LFH-380 der Kippschalter (`Switch`) auf einer eigenen Route, Herleitung am
+ * Test unten.
  *
  * ── WARUM EINE EIGENE DATEI UND NICHT `dichte.spec.ts` ──────────────────────────────
  *
@@ -312,5 +314,54 @@ for (const { dichte, soll } of STAFFEL) {
     // nicht klicken.
     await blase.getByRole('button', { name: 'Abbrechen', exact: true }).click();
     await expect(blase).toHaveCount(0);
+  });
+}
+
+/**
+ * Der Kippschalter selbst, nicht nur seine Zeile (LFH-380).
+ *
+ * antd rechnet die Schalterhöhe aus der Schrift statt aus `controlHeight` — ohne die Ableitung
+ * gemessen 23 px im Tablet-Durchgang und ebenso im Handschuh, ein Drittel des Bodens. LFH-370 hatte
+ * die ZEILE um den Schalter gehoben (`zeilenzielStil`), das Steuerelement blieb darunter.
+ * Die Ableitung steht in `theme/tokens.ts` (`switchMasse`) und hängt global an
+ * `antdKomponenten` — gemessen wird deshalb ein beliebiger Schalter der App, hier der der
+ * Anmeldeverfahren, weil er ohne Seeding immer im Baum steht: der Passwort-Weg ist
+ * garantiert und gesperrt. Gesperrt ändert an der Geometrie nichts.
+ *
+ * ZWEI Achsen: die Höhe gegen die Staffel, die Breite gegen das Doppelte. Ein Schalter ist
+ * ein Kippschalter, seine kurze Achse ist die Höhe — aber eine Spur, die nur in der Höhe
+ * wächst, trüge einen Griff, der breiter ist als die Hälfte der Spur, und kippte nicht mehr
+ * sichtbar. Die Breite belegt, dass der abhängige Token-Satz mitgekommen ist.
+ *
+ * Kein `drawerIstNichtImBaum`: die Admin-Route hat keine IconRail, die Probe wäre dort per
+ * Konstruktion rot.
+ */
+for (const { dichte, soll } of STAFFEL) {
+  test(`Führungs-Tablet, Stufe ${dichte}: der Kippschalter selbst hält ${soll} px`, async ({
+    page,
+  }) => {
+    await anmelden(page);
+    await page.setViewportSize(TABLET);
+    await page.goto('/admin/einstellungen/anmeldung');
+    if (dichte === 'handschuh') {
+      // Gespeicherte Wahl schlägt die Zeigerart (LFH-361), wirksam erst nach dem Neuladen.
+      await page.evaluate(([schluessel, wert]) => window.localStorage.setItem(schluessel, wert), [
+        DICHTE_SCHLUESSEL,
+        dichte,
+      ] as const);
+      await page.reload();
+    }
+    await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+
+    const schalter = page.getByRole('switch', { name: 'Anmeldeverfahren: Passwort', exact: true });
+    const breite = await haeltTreffflaeche(schalter, soll, 'Kippschalter „Passwort"');
+    expect(
+      breite,
+      `Kippschalter „Passwort" (gemessen ${breite}px breit, Soll ≥ ${2 * soll})`,
+    ).toBeGreaterThanOrEqual(2 * soll - SUBPIXEL);
+    test.info().annotations.push({
+      type: 'messwert',
+      description: `Kippschalter in ${dichte}: ${breite}px breit`,
+    });
   });
 }

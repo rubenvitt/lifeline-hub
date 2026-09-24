@@ -19,7 +19,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { theme } from 'antd';
+import { Switch, theme } from 'antd';
 import { ThemeModeProvider, useDichte } from './ThemeModeProvider';
 import { dichten, type Dichte } from './tokens';
 import { setzeViewportZurueck, setzeZeigerGrob } from '../test/viewport';
@@ -236,5 +236,44 @@ describe('Nachtbetrieb als Vorgabe (Neuentwurf „Instrumententafel", 21.09.2026
     localStorage.setItem('lifeline-hub.theme', 'kaputt');
     zeigeSonde();
     expect(document.documentElement.dataset.theme).toBe('dark');
+  });
+});
+
+/**
+ * Der Kippschalter bekommt seine Maße über die GLOBALE Stelle (LFH-380).
+ *
+ * `tokens.test.ts` beweist eine RECHNUNG, nicht dass antd die Tokennamen honoriert. Genau
+ * daran scheiterte beim Segmented (LFH-370) der naheliegende interne Name, der wirkungslos
+ * durchging. Gemessen wird deshalb der von cssinjs erzeugte CSS-Text, verankert an der
+ * `css-var-…`-Klasse GENAU dieses Schalters — ohne die Verankerung färbte ein Schalter aus
+ * einem früheren Test derselben Datei den Nachweis grün.
+ *
+ * Drei Werte statt einem: die Spurhöhe allein belegte nicht, dass der abhängige Satz
+ * mitkommt (Griff und Mindestbreite rechnet antd aus der Schrift, nicht aus der Spur).
+ */
+describe('Switch folgt der Staffel bis in den CSS-Text (LFH-380)', () => {
+  function regelFuer(schalter: HTMLElement): string {
+    const scope = [...schalter.classList].find((k) => k.startsWith('css-var-'));
+    expect(scope, 'antd vergibt dem Schalter eine Variablen-Klasse').toBeTruthy();
+    // `innerHTML`, NICHT `textContent`: der Testfilter aus LFH-623 (`test/antdCssVariablen.ts`)
+    // streicht die Custom-Property-Deklarationen aus antds Stilen, und `textContent` zeigte
+    // hier deshalb in JEDEM Fall eine leere Regel — die Zusicherung wäre nie grün geworden,
+    // auch nicht mit korrekter Verdrahtung. Der `innerHTML`-Getter gibt den ungefilterten Text
+    // zurück (dort als tragend begründet).
+    const css = [...document.querySelectorAll('style')].map((s) => s.innerHTML).join('');
+    return css.match(new RegExp(`\\.${scope}\\.ant-switch\\{([^}]*)\\}`))?.[1] ?? '';
+  }
+
+  it('auf handschuh trägt der Schalter 72 × 144 mit 68-px-Griff', () => {
+    localStorage.setItem(SPEICHER_SCHLUESSEL, 'handschuh');
+    render(
+      <ThemeModeProvider>
+        <Switch aria-label="Probe" />
+      </ThemeModeProvider>,
+    );
+    const regel = regelFuer(screen.getByRole('switch', { name: 'Probe' }));
+    expect(regel, 'Spurhöhe').toContain('--ant-switch-track-height:72px');
+    expect(regel, 'Griff').toContain('--ant-switch-handle-size:68px');
+    expect(regel, 'Mindestbreite').toContain('--ant-switch-track-min-width:144px');
   });
 });

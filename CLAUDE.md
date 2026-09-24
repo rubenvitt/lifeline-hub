@@ -507,6 +507,17 @@ Alltag wichtigsten:
   streicht, tut es im selben Commit wie den Fix und prüft `aktionsabstand.guard.test.ts` mit.
   `Card`/`Descriptions`/`Space`/`Liste` dürfen klein bleiben (Abstandsmaß, keine Trefffläche)
   und gehören nicht in `OFFEN`. `controlHeight` = **30/48/72**, `controlHeightSM` = **24/48/72**.
+  **Nicht jede antd-Komponente liest die Steuerhöhe** (LFH-380): der `Switch` rechnet seine
+  Höhe aus der Schrift (`fontSize × lineHeight` = `fontSize + 8`, also 21,5/23/23 px). `switchMasse` in
+  `theme/tokens.ts` bindet ihn über `antdKomponenten(farben, dichte)` an `controlHeightSM`
+  (24 × 48 · 48 × 96 · 72 × 144) und setzt den **ganzen** abhängigen Satz (Griff,
+  Mindestbreite, Innenränder), weil antd die übrigen aus der Schrift weiterrechnet. Wer eine
+  weitere Komponente so nachzieht, belegt die Durchleitung am CSS-Text der `css-var-…`-Klasse
+  und liest dort **`innerHTML`**, nicht `textContent`: der Testfilter aus LFH-623 streicht die
+  Variablen aus dem Text, die Regel stünde sonst immer leer da. Ein mitwachsender Schalter
+  sprengt eine **feste** Breite: in der 300-px-Lagekarten-Leiste bricht die Schalterzeile
+  deshalb um (`leistenZeileStil`/`namensteilStil` in `pages/lagekarte/Sidebar.tsx`, gemessen
+  in `e2e/lagekarte-leiste-dichte.spec.ts`), statt Namen auf „…" zu kürzen.
   **Ein handgebautes Bedienziel** (`role="option"`-Zeile, `<div onClick>`, Zeilen-`<Link>`,
   Kommandopalette) braucht **zwei** Angaben: `minHeight: token.controlHeight` **plus** `padding`
   aus `token.paddingSM`/`token.padding`, aus aufgelösten Tokens, nie `var(--lfh-*)`, geprüft über
