@@ -401,7 +401,9 @@ pub struct BelegungKopfzahl {
     /// ist die Summe eine Untergrenze; bei 0 Stellen mit Meldung heißt `summe = 0` „nichts
     /// gemeldet“, nicht „niemand in Betreuung“.
     pub summe: i64,
-    /// Zahl der Stellen, die bis zum Stichtag keine Meldung haben.
+    /// Zahl der Stellen, die bis zum Stichtag keine Meldung haben. Mitgezählt wird nur, wer zum
+    /// Stichtag betrieben sein konnte: nicht nach ihm angelegt und nicht jetzt geschlossen oder
+    /// vorbereitet ohne jede Meldung (LFH-679). Solche Stellen fehlen auch in `stellen`.
     pub stellen_ohne_meldung: i64,
     pub stellen: Vec<BelegungKopfzahlStelle>,
 }

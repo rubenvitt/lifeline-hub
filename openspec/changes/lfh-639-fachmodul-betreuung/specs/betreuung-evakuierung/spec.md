@@ -252,13 +252,32 @@ Belegungsmeldung mit dem jüngsten Zeitpunkt ≤ t samt diesem Meldezeitpunkt, d
 über alle Stellen. Stellen ohne Meldung ≤ t MUST ohne Anzahl ausgewiesen und nicht als 0
 summiert werden. Die Antwort MUST keinen Personenbezug enthalten.
 
+Als Stelle ohne Meldung MUST nur eine Stelle gelten, die zu t betrieben sein konnte (LFH-679):
+Eine nach t angelegte Stelle MUST fehlen, ebenso eine Stelle, die jetzt geschlossen oder
+vorbereitet ist und nie eine nicht zurückgenommene Meldung hatte. Eine Stelle mit Meldung ≤ t
+MUST unabhängig davon mitzählen, auch wenn die Meldung vor ihrer Anlage liegt. Maßgeblich ist
+mangels Statushistorie der heutige Status; eine Stelle, die zu t in Betrieb war, nie gemeldet
+hat und später geschlossen wurde, fällt deshalb ebenfalls weg.
+
 #### Scenario: Kopfzahl zum Schichtbeginn
 - **WHEN** „Turnhalle Ost“ um 12:00 mit 60 und um 14:00 mit 89 gemeldet ist und „Weserstadion“ um 13:00 mit 84, und die Kopfzahl für 13:30 abgefragt wird
 - **THEN** liefert das System 60 für „Turnhalle Ost“, 84 für „Weserstadion“ und die Summe 144
 
 #### Scenario: Stelle ohne Meldung
-- **WHEN** eine Stelle vor t keine Belegungsmeldung hat
+- **WHEN** eine vor t angelegte Stelle, die nicht unter den Ausschluss fällt, vor t keine Belegungsmeldung hat
 - **THEN** ist sie ohne Anzahl ausgewiesen und die Summe enthält sie nicht
+
+#### Scenario: Stelle nach dem Stichtag angelegt
+- **WHEN** eine Stelle ohne Meldung ≤ t erst nach t angelegt wurde
+- **THEN** fehlt sie in der Antwort und zählt nicht als Stelle ohne Meldung
+
+#### Scenario: Nie belegte geschlossene oder vorbereitete Stelle
+- **WHEN** eine Stelle jetzt geschlossen oder vorbereitet ist und nie eine nicht zurückgenommene Meldung hatte
+- **THEN** fehlt sie in der Antwort und zählt nicht als Stelle ohne Meldung
+
+#### Scenario: Geschlossene Stelle mit späterer Meldung
+- **WHEN** eine jetzt geschlossene Stelle erst nach t gemeldet hat
+- **THEN** zählt sie als Stelle ohne Meldung, weil ohne Statushistorie offen ist, ob sie zu t schon betrieben wurde
 
 #### Scenario: Meldung mit Uhrenversatz zählt sofort
 - **WHEN** eine Belegung mit einem Zeitpunkt 30 s nach der Serverzeit gemeldet und direkt danach die Kopfzahl ohne Zeitpunkt abgefragt wird

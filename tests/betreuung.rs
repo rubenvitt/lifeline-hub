@@ -231,7 +231,10 @@ async fn stelle_belegung_kopfzahl_und_ruecknahme() {
     .await;
     assert_eq!(s, StatusCode::OK, "{k:?}");
     assert_eq!(k["summe"], 0);
-    assert_eq!(k["stellen_ohne_meldung"], 1);
+    // Der Stichtag liegt vor der Anlage der Stelle (sie entsteht zur echten Uhrzeit): es gab
+    // sie noch nicht, also ist sie auch nicht „ohne Meldung“ (LFH-679).
+    assert_eq!(k["stellen_ohne_meldung"], 0);
+    assert_eq!(k["stellen"].as_array().unwrap().len(), 0);
     // Ohne Stichtag: jetzt
     let (s, k) = anfrage(&app, "GET", &format!("{}/belegung", pfad(e)), &admin, None).await;
     assert_eq!(s, StatusCode::OK, "{k:?}");
@@ -251,6 +254,11 @@ async fn stelle_belegung_kopfzahl_und_ruecknahme() {
         !r["stelle"].as_object().unwrap().contains_key("belegung"),
         "{r:?}"
     );
+    // Jetzt ist die Stelle in Betrieb und ohne Meldung: sie zählt, die Summe ist 0.
+    let (s, k) = anfrage(&app, "GET", &format!("{}/belegung", pfad(e)), &admin, None).await;
+    assert_eq!(s, StatusCode::OK, "{k:?}");
+    assert_eq!(k["summe"], 0);
+    assert_eq!(k["stellen_ohne_meldung"], 1);
 
     // Stornieren nimmt die Stelle aus der Übersicht
     let (s, st) = anfrage(
