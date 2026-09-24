@@ -1395,6 +1395,192 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn schwaerzung_nullt_sprechgruppen_hinweis_nur_einsatz_lokal() {
+        // LFH-140: `sprechgruppe.hinweis` ist ein Freitext-Zettel („Ansprechpartner Herr
+        // Müller …“) und wird genullt — aber NUR an einsatz-lokalen Sprechgruppen. Der
+        // org-weite Katalog (einsatz_id NULL) gehört keinem Einsatz und bleibt unberührt;
+        // `bezeichnung` ist Funkgruppen-Label (G_OP_LABEL) und bleibt überall.
+        let pool = crate::db::test_pool().await;
+        let (eid, _) = schwaerzbarer_einsatz(&pool).await;
+        let org_id: i64 = sqlx::query_scalar("SELECT org_id FROM einsatz WHERE id = ?")
+            .bind(eid)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        let lokal: i64 = sqlx::query_scalar(
+            "INSERT INTO sprechgruppe (org_id, einsatz_id, bezeichnung, betriebsart, hinweis) \
+             VALUES (?, ?, 'TMO_EINSATZ_1', 'TMO', 'Ansprechpartner Herr Müller 0170 111') \
+             RETURNING id",
+        )
+        .bind(org_id)
+        .bind(eid)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let katalog: i64 = sqlx::query_scalar(
+            "INSERT INTO sprechgruppe (org_id, einsatz_id, bezeichnung, betriebsart, hinweis) \
+             VALUES (?, NULL, 'TMO_KATALOG', 'TMO', 'Nur für Großlagen') RETURNING id",
+        )
+        .bind(org_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        assert!(schwaerze_einsatz(&pool, eid, "2026-02-01 00:00:00")
+            .await
+            .unwrap());
+
+        let lies = |id: i64| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_as::<_, (String, Option<String>)>(
+                    "SELECT bezeichnung, hinweis FROM sprechgruppe WHERE id = ?",
+                )
+                .bind(id)
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+            }
+        };
+        assert_eq!(
+            lies(lokal).await,
+            ("TMO_EINSATZ_1".to_string(), None),
+            "einsatz-lokal: Hinweis NULL, Bezeichnung bleibt"
+        );
+        assert_eq!(
+            lies(katalog).await,
+            (
+                "TMO_KATALOG".to_string(),
+                Some("Nur für Großlagen".to_string())
+            ),
+            "Gegenprobe org-weiter Katalog: Hinweis bleibt"
+        );
+    }
+
+    #[tokio::test]
+    async fn schwaerzung_nullt_alle_abschnitts_freitexte_und_haelt_die_labels() {
+        // LFH-140, AK „kein Freitext überlebt“: bemerkung, erreichbarkeit und (LFH-608)
+        // abschnittsauftrag werden NULL. Retain bleiben name, kurzbezeichnung, der
+        // Kommunikationsmittel-Schlüssel und die eingefrorenen Alt-Spalten
+        // sprechgruppe_tmo/_dmo — Letzteres ist die Entscheidung des Auftraggebers
+        // (Funkgruppen-Label, konsistent mit `sprechgruppe.bezeichnung`).
+        let pool = crate::db::test_pool().await;
+        let (eid, _) = schwaerzbarer_einsatz(&pool).await;
+        let aid: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatzabschnitt (einsatz_id, name, kurzbezeichnung, bemerkung, \
+                kommunikationsmittel, erreichbarkeit, abschnittsauftrag, \
+                sprechgruppe_tmo, sprechgruppe_dmo) \
+             VALUES (?, 'Nord', 'EA-N', 'Fam. Weber evakuiert', 'festnetz', '0170 98765', \
+                'Evakuierung Uferstraße 3, Familie Schulz', 'TMO_NORD', 'DMO_NORD') \
+             RETURNING id",
+        )
+        .bind(eid)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        assert!(schwaerze_einsatz(&pool, eid, "2026-02-01 00:00:00")
+            .await
+            .unwrap());
+
+        #[allow(clippy::type_complexity)]
+        let zeile: (
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            String,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+        ) = sqlx::query_as(
+            "SELECT bemerkung, erreichbarkeit, abschnittsauftrag, \
+                    name, kurzbezeichnung, kommunikationsmittel, sprechgruppe_tmo, sprechgruppe_dmo \
+             FROM einsatzabschnitt WHERE id = ?",
+        )
+        .bind(aid)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            zeile,
+            (
+                None,
+                None,
+                None,
+                "Nord".to_string(),
+                Some("EA-N".to_string()),
+                Some("festnetz".to_string()),
+                Some("TMO_NORD".to_string()),
+                Some("DMO_NORD".to_string()),
+            ),
+            "Freitexte NULL; Name, Kürzel, Kommunikationsmittel und TMO/DMO bleiben"
+        );
+    }
+
+    #[tokio::test]
+    async fn schwaerzung_ersetzt_den_namen_der_kartenansicht() {
+        // LFH-283: der Ansichts-Name kann PII tragen („Lage Fam. Müller“) → Platzhalter
+        // (NOT NULL); die Konfiguration (Zentrum, Zoom) bleibt.
+        let pool = crate::db::test_pool().await;
+        let (eid, leit) = schwaerzbarer_einsatz(&pool).await;
+        let ansicht: i64 = sqlx::query_scalar(
+            "INSERT INTO karten_ansicht (einsatz_id, name, zentrum_lat, zoom, erstellt_von) \
+             VALUES (?, 'Lage Fam. Müller', 52.1, 14.0, ?) RETURNING id",
+        )
+        .bind(eid)
+        .bind(leit)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        assert!(schwaerze_einsatz(&pool, eid, "2026-02-01 00:00:00")
+            .await
+            .unwrap());
+
+        let (name, lat, zoom): (String, Option<f64>, Option<f64>) =
+            sqlx::query_as("SELECT name, zentrum_lat, zoom FROM karten_ansicht WHERE id = ?")
+                .bind(ansicht)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            (name.as_str(), lat, zoom),
+            (SCHWAERZUNG_PLATZHALTER, Some(52.1), Some(14.0))
+        );
+    }
+
+    #[tokio::test]
+    async fn schwaerzung_loescht_den_lage_snapshot() {
+        // LFH-283: ein Lage-Snapshot friert das volle Lagebild samt PII ein (`daten`) und
+        // hat keine ETB-Kopplung → die ganze Zeile geht weg.
+        let pool = crate::db::test_pool().await;
+        let (eid, leit) = schwaerzbarer_einsatz(&pool).await;
+        sqlx::query(
+            "INSERT INTO lage_snapshot (einsatz_id, bezeichnung, notiz, stand_at, daten, erstellt_von) \
+             VALUES (?, 'Stand 14 Uhr', 'Fam. Müller noch im Haus', '2026-01-01 14:00:00', \
+                '{\"personen\":[\"Müller\"]}', ?)",
+        )
+        .bind(eid)
+        .bind(leit)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        assert!(schwaerze_einsatz(&pool, eid, "2026-02-01 00:00:00")
+            .await
+            .unwrap());
+
+        let anzahl: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM lage_snapshot WHERE einsatz_id = ?")
+                .bind(eid)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(anzahl, 0, "Snapshot-Zeile samt Lagebild weg");
+    }
+
     /// Setzt die Org-Retention-Dauer direkt in der DB (reiner Repo-Test).
     async fn setze_org_dauer(pool: &SqlitePool, org_id: i64, bid: i64, tage: i64) {
         crate::org::einstellungen::speichern(

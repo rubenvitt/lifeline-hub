@@ -592,6 +592,10 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("typ", G_ENUM),
             retain("geometrie_typ", G_ENUM),
             retain("geometrie", G_GEO),
+            // Das Label überlebt im System-ETB-Wortlaut („Gefahrengebiet «…» eingerichtet“,
+            // `routes/lage_zone.rs::etb_text`) — ETB-Politik G_ETB, Präzedenz LFH-632/E9
+            // (Dokumenttitel). Entscheidung des Auftraggebers zu LFH-283: dokumentieren und
+            // pinnen (`tests/gefahr.rs::schwaerzung_nullt_zonen_und_gebietslabel_und_haelt_den_etb_wortlaut`).
             scrub("label", Strategie::NullSetzen),
             retain("farbe", G_ENUM),
             scrub("notiz", Strategie::NullSetzen),
@@ -613,6 +617,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
+            // Wie `lage_zone.label`: das Gebietslabel steht im System-ETB des
+            // Warnstufenwechsels („Gefahr «…» in «Label» …“, `routes/gefahr.rs`) und bleibt
+            // dort (G_ETB, Präzedenz LFH-632/E9) — gepinnt im selben Test.
             scrub("label", Strategie::NullSetzen),
             retain("erstellt_von", G_FK),
             retain("erstellt_at", G_ZEIT),
@@ -662,8 +669,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
     },
     // ---------- Operative Struktur: Abschnitte / Einheiten / Räume / UHS / Funk ----------
     // Bezeichnungen/Namen operativer Objekte = Skelett (RETAIN). Nullable Freitext-Zettel
-    // (notiz/bemerkung/hinweis/standort/erreichbarkeit/kommunikationsmittel) können
-    // Betroffenen-PII enthalten → konservativ NULL + REVIEW-Tag (LFH-229).
+    // (notiz/bemerkung/hinweis/standort/erreichbarkeit/abschnittsauftrag) können
+    // Betroffenen-PII enthalten → konservativ NULL + REVIEW-Tag (LFH-229). Der Schlüssel
+    // `kommunikationsmittel` ist KEIN Freitext und bleibt (RETAIN, siehe unten).
     TabellenRegel {
         tabelle: "einsatzabschnitt",
         scoping: Scoping::EinsatzId,
@@ -680,10 +688,17 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("flaeche_geojson", G_GEO),
             retain("tz_fachaufgabe", G_ENUM),
             retain("tz_organisation", G_ENUM),
+            // Seit 0073 eingefrorene Alt-Spalten (read-only Reserve, kein Schreibweg mehr):
+            // Funkgruppen-Label, identisch mit `sprechgruppe.bezeichnung` (ebenfalls
+            // G_OP_LABEL). RETAIN ist die Entscheidung des Auftraggebers zu LFH-140 — sie hier
+            // zu nullen und die Bezeichnung im Katalog stehen zu lassen, wäre inkonsistent.
+            // Gepinnt in `repo::tests::schwaerzung_nullt_alle_abschnitts_freitexte_und_haelt_die_labels`.
             retain("sprechgruppe_tmo", G_OP_LABEL),
             retain("sprechgruppe_dmo", G_OP_LABEL),
             // kommunikationsmittel = Kommunikationsart-Schlüssel (digitalfunk/mobil/festnetz),
-            // kein Personenbezug (LFH-108, Feld-Autor) → RETAIN.
+            // kein Personenbezug (LFH-108, Feld-Autor) → RETAIN. Dass nur diese drei Schlüssel
+            // hineinkommen, erzwingt seit LFH-140 `routes::support::pruefe_kommunikationsmittel`
+            // an POST/PATCH (unbekannt → 400).
             retain(
                 "kommunikationsmittel",
                 "Kommunikationsart-Schlüssel (digitalfunk/mobil/…), kein Personenbezug (LFH-108)",
@@ -719,7 +734,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("soll_mannschaft", G_ZAEHLER),
             scrub("bemerkung", Strategie::NullSetzen), // REVIEW: operativer Freitext-Zettel
             // Funk-Felder (LFH-108, Migration 0086_einheit_funk): kommunikationsmittel =
-            // Kategorie-Schlüssel (RETAIN), erreichbarkeit = mögliche Rufnummer der Führung (Scrub).
+            // Kategorie-Schlüssel (RETAIN, Wertemenge per Handler-Precheck erzwungen, LFH-140),
+            // erreichbarkeit = mögliche Rufnummer der Führung (Scrub).
             retain(
                 "kommunikationsmittel",
                 "Kommunikationsart-Schlüssel (digitalfunk/mobil/…), kein Personenbezug (LFH-108)",
