@@ -61,7 +61,7 @@ nicht), LFH-639 stellt die Kopfzahl „in Betreuung“ zu einem Zeitpunkt bereit
 ## Impact
 
 - **Datenbank:** neue Migration mit den Tabellen `verpflegung_zeitfenster` und
-  `verpflegung_ausgabe`. Nummer vorläufig `0118`; vor dem Merge mit
+  `verpflegung_ausgabe`. Nummer `0120` (nach LFH-673 von `0118` nachgezogen); vor dem Merge mit
   `scripts/check-migrationen.sh` gegen `origin/alpha` geprüft.
 - **Backend:** neues Modul `src/verpflegung/`, Routen in `src/routes/verpflegung.rs`.
   Berührt werden `src/einsatz/modul.rs`, `src/live/mod.rs`, `src/einsatz/schwaerzung_registry.rs`,

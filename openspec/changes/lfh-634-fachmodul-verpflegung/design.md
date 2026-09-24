@@ -111,7 +111,8 @@ INDEX (zeitfenster_id)
 - **Freitext:** `bezeichnung` (Zeitfenster) bleibt, `ort` und `bemerkung` (Ausgabe) werden
   geschwärzt. Die Bezeichnung ist der Mahlzeitname („Mittag“), die Ausgabe dagegen kann eine
   Adresse oder einen Namen tragen.
-- **Migrationsnummer:** vorläufig `0118`. Unmittelbar vor dem Merge wird sie mit
+- **Migrationsnummer:** `0120`. Sie war zuerst `0118`; LFH-673 hat auf `alpha` `0118` und `0119`
+  belegt, deshalb wurde sie mit `--umnummerieren` nachgezogen. Unmittelbar vor dem Merge wird sie mit
   `scripts/check-migrationen.sh` gegen `origin/alpha` geprüft und bei Bedarf mit
   `--umnummerieren` verschoben (LFH-658).
 
