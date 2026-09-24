@@ -92,6 +92,7 @@ import { TbAlertTriangle } from 'react-icons/tb';
 import { einsatzKeys } from '../../api/queryKeys';
 import {
   auftraegePfad,
+  betreuungPfad,
   einsatzModulPfad,
   etbPfad,
   gefahrenPfad,
@@ -146,6 +147,7 @@ import {
   standText,
   warnstufeTon,
   type Datenzustand,
+  type EvakuierungStand,
   type KennzahlEtikett,
 } from './lagebild';
 import { sichtungsZeilen, verdichteGefahrenmatrix } from './lageVerdichtung';
@@ -153,6 +155,7 @@ import { STROM_ABRUF, stromAuswahl, wassermarkeNachziehen } from './meldungsstro
 import { GefahrenmatrixPaneel, MeldungsstromPaneel, SichtungsPaneel } from './LagePaneele';
 import { transportBilanz } from '../../personen/personenBilanz';
 import { useEvakuierungKennzahl } from '../../betreuung/useEvakuierungKennzahl';
+import { darfZaehlerZeigen } from '../../einsatz/useModulZaehler';
 
 /** Verdichtet mehrere Queries auf einen Zustand. Fehler schlägt Laden: ein halb geladener
  *  Block mit einem toten Teil darf nicht so aussehen, als wäre er vollständig. */
@@ -272,15 +275,27 @@ export default function LageDashboardPage() {
     overridesQuery.isSuccess && istKeyFreigegeben('wetter-pegel', benutzer, overridesQuery.data),
   );
   // LFH-607: „Evakuiert N · von M geplant" aus der Betreuungs-Übersicht. Erst `bereit`, wenn
-  // Benutzer und Modul-Overrides feststehen: vorher kein Abruf (bei ausgeblendetem Modul ein
-  // 403) und kein kurz aufblitzendes „nicht freigegeben".
+  // Benutzer und Modul-Overrides FESTSTEHEN: vorher kein Abruf (bei ausgeblendetem Modul ein
+  // 403), kein kurz aufblitzendes „nicht freigegeben" und kein Link. Scheitert der
+  // Overrides-Abruf, bleibt das Recht unbekannt — die Zelle zeigt dann „Stand unbekannt" und
+  // fragt nicht trotzdem nach.
+  const freigabenBekannt = !authLaedt && overridesQuery.isSuccess;
   const evakuierungZustand = useEvakuierungKennzahl({
     einsatzId,
     benutzer,
     overrides: overridesQuery.data,
-    bereit: !authLaedt && !overridesQuery.isPending,
+    bereit: freigabenBekannt,
   });
-  const evakuierung = useMemo(() => evakuierungStand(evakuierungZustand), [evakuierungZustand]);
+  const freigabenFehler = overridesQuery.isError;
+  const evakuierung = useMemo(
+    (): EvakuierungStand =>
+      freigabenFehler ? { zustand: 'fehler' } : evakuierungStand(evakuierungZustand),
+    [freigabenFehler, evakuierungZustand],
+  );
+  const evakuierungZiel =
+    freigabenBekannt && darfZaehlerZeigen('betreuung', benutzer, overridesQuery.data)
+      ? betreuungPfad(einsatzId)
+      : undefined;
 
   const einsatz = einsatzQuery.data;
 
@@ -341,6 +356,7 @@ export default function LageDashboardPage() {
         pegel: pegelQuery.data ?? [],
         pegelZiel,
         evakuierung,
+        evakuierungZiel,
       },
       jetzt,
       konv,
@@ -366,6 +382,7 @@ export default function LageDashboardPage() {
     pegelQuery.data,
     pegelZiel,
     evakuierung,
+    evakuierungZiel,
   ]);
 
   // ── Meldungsstrom: Wassermarke statt Einschieben (Festlegung 6) ──────────────────────

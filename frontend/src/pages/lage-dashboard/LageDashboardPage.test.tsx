@@ -247,6 +247,9 @@ interface Daten {
   betreuungStatus?: number;
   /** Zählt die Abrufe der Betreuungs-Übersicht (ohne Modulrecht: keiner). */
   betreuungAbrufe?: { n: number };
+  /** Overrides-Abruf hängt bzw. scheitert (LFH-607: Freigaben unbekannt). */
+  overridesLaedt?: boolean;
+  overridesStatus?: number;
 }
 
 function mockEndpunkte(d: Daten) {
@@ -294,8 +297,10 @@ function mockEndpunkte(d: Daten) {
     }),
     // LFH-633: ohne diesen Handler scheiterte die Abfrage in jedem Test, und die Kennzahl
     // bliebe auf der Pflege stehen — die href-Aussagen belegten dann nur den Fehlerpfad.
-    http.get('/api/einsaetze/1/modul-overrides', () => {
+    http.get('/api/einsaetze/1/modul-overrides', async () => {
+      if (d.overridesLaedt) await delay('infinite');
       if (d.overridesGeliefert) d.overridesGeliefert.n += 1;
+      if (d.overridesStatus) return new HttpResponse(null, { status: d.overridesStatus });
       return HttpResponse.json(d.overrides ?? {});
     }),
   );
@@ -836,6 +841,42 @@ describe('LageDashboardPage — Kennzahlenband', () => {
       expect(etiketten()[2]).toBe('Evakuiert');
       expect(zelle.tagName).not.toBe('A');
       expect(zelle.querySelector('[data-lfh="kennzahl-wert"]')?.textContent).toBe('—');
+      expect(betreuungAbrufe.n).toBe(0);
+    });
+
+    it('solange die Freigaben unbekannt sind: kein Abruf und KEIN Link — ein Sprung ins Leere wäre möglich', async () => {
+      const betreuungAbrufe = { n: 0 };
+      mockEndpunkte({
+        lagekennzahlen: ['evakuiert'],
+        bezirke: [bezirk(640, 600)],
+        betreuungAbrufe,
+        overridesLaedt: true,
+      });
+      render();
+      await kennzahlGeladen('Betroffene');
+      const zelle = kennzahl('Evakuiert');
+      expect(zelle).toHaveTextContent('wird abgerufen');
+      expect(zelle.tagName).not.toBe('A');
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 20));
+      });
+      expect(betreuungAbrufe.n).toBe(0);
+    });
+
+    it('scheitert der Overrides-Abruf, bleibt das Recht unbekannt: „Stand unbekannt", kein Abruf, kein Link', async () => {
+      const betreuungAbrufe = { n: 0 };
+      const overridesGeliefert = { n: 0 };
+      mockEndpunkte({
+        lagekennzahlen: ['evakuiert'],
+        bezirke: [bezirk(640, 600)],
+        betreuungAbrufe,
+        overridesGeliefert,
+        overridesStatus: 500,
+      });
+      render();
+      await kennzahlGeladen('Betroffene');
+      await waitFor(() => expect(kennzahl('Evakuiert')).toHaveTextContent('Stand unbekannt'));
+      expect(kennzahl('Evakuiert').tagName).not.toBe('A');
       expect(betreuungAbrufe.n).toBe(0);
     });
 

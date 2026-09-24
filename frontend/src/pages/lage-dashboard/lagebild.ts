@@ -160,8 +160,8 @@ export interface Kennzahl {
    */
   zielPfad?: string;
   /**
-   * Die Zelle führt nirgends hin — ihr Modul ist für die Person nicht frei (LFH-607:
-   * „Evakuiert" ohne Zugriff auf Betreuung). Ein Link wäre ein Sprung ins Leere.
+   * Die Zelle führt nirgends hin — ihr Modul ist für die Person nicht frei oder das steht noch
+   * nicht fest (LFH-607, „Evakuiert"). Ein Link wäre ein Sprung ins Leere.
    */
   ohneZiel?: boolean;
 }
@@ -319,15 +319,15 @@ export function evakuierungDatenzustand(e: EvakuierungStand): Datenzustand {
   return e.zustand === 'laden' || e.zustand === 'fehler' ? e.zustand : 'daten';
 }
 
-/** Wert, Notiz und Ziel der Zelle „Evakuiert" aus dem Stand. Rein. */
-function evakuiertZelle(e: EvakuierungStand): Pick<Kennzahl, 'wert' | 'notiz' | 'ohneZiel'> {
+/** Wert und Notiz der Zelle „Evakuiert" aus dem Stand. Rein. */
+function evakuiertZelle(e: EvakuierungStand): Pick<Kennzahl, 'wert' | 'notiz'> {
   switch (e.zustand) {
     // Bei `laden`/`fehler` zeichnet die Kennzahl ihren Zustand selbst („····" / „?").
     case 'laden':
     case 'fehler':
       return { wert: '', notiz: '' };
     case 'kein-zugriff':
-      return { wert: '—', notiz: 'Modul Betreuung nicht freigegeben', ohneZiel: true };
+      return { wert: '—', notiz: 'Modul Betreuung nicht freigegeben' };
     case 'daten': {
       if (e.kennzahl == null) return { wert: '—', notiz: 'keine geplante Evakuierung' };
       // EINE Formatierung mit dem Blockkopf der Modulseite (`betreuungText.ts`). Ohne jede
@@ -362,6 +362,12 @@ export interface Rohdaten {
   pegelZiel?: string;
   /** Stand der Evakuierungskennzahl (LFH-607), siehe {@link evakuierungStand}. */
   evakuierung: EvakuierungStand;
+  /**
+   * Ziel der Zelle „Evakuiert": die Modulseite Betreuung — aber nur, wenn feststeht, dass sie
+   * für die Person frei ist. Ohne Angabe führt die Zelle nirgends hin, auch beim Laden: bis die
+   * Freigaben da sind, könnte das Modul ausgeblendet sein (dieselbe Vorsicht wie `pegelZiel`).
+   */
+  evakuierungZiel?: string;
 }
 
 /**
@@ -446,6 +452,8 @@ export function baueLagebild(
       ...evakuiertZelle(r.evakuierung),
       ton: 'neutral',
       route: 'betreuung',
+      zielPfad: r.evakuierungZiel,
+      ohneZiel: r.evakuierungZiel == null,
     },
     'Schäden offen': {
       etikett: 'Schäden offen',

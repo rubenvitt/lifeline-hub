@@ -404,8 +404,14 @@ describe('Vermisste seit über 4 h (LFH-613)', () => {
 
 describe('Kennzahl „Evakuiert" (LFH-607)', () => {
   const mitEvakuierung = { ...roh().einsatz, lagekennzahlen: ['evakuiert'] } as EinsatzAnzeige;
-  const zelle = (evakuierung: Rohdaten['evakuierung']) =>
-    baueLagebild(roh({ einsatz: mitEvakuierung, evakuierung }), JETZT, BERLIN).kennzahlen[2];
+  const ZIEL = '/einsaetze/1/betreuung';
+  // `null` = die Seite gibt kein Ziel (ein explizites `undefined` löste den Vorgabewert aus).
+  const zelle = (evakuierung: Rohdaten['evakuierung'], ziel: string | null = ZIEL) =>
+    baueLagebild(
+      roh({ einsatz: mitEvakuierung, evakuierung, evakuierungZiel: ziel ?? undefined }),
+      JETZT,
+      BERLIN,
+    ).kennzahlen[2];
 
   it('zwei gemeldete Bezirke: N als Wert, „von M geplant" als Notiz, Ziel Betreuung, kein Ton', () => {
     const k = zelle({
@@ -417,9 +423,16 @@ describe('Kennzahl „Evakuiert" (LFH-607)', () => {
       wert: `1${T}320`,
       notiz: `von 1${T}850 geplant`,
       ton: 'neutral',
-      route: 'betreuung',
+      zielPfad: ZIEL,
     });
     expect(k.ohneZiel).toBeFalsy();
+  });
+
+  it('ohne bestätigtes Modulrecht kein Ziel — auch nicht beim Laden (Sprung ins Leere)', () => {
+    // Die Seite gibt das Ziel erst, wenn die Freigaben feststehen (wie `pegelZiel`).
+    expect(zelle({ zustand: 'laden' }, null).ohneZiel).toBe(true);
+    expect(zelle({ zustand: 'fehler' }, null).ohneZiel).toBe(true);
+    expect(zelle({ zustand: 'laden' }, ZIEL)).toMatchObject({ zielPfad: ZIEL });
   });
 
   it('ein Bezirk ohne Meldung steht in der Notiz, geschätzt trägt ≈', () => {
@@ -448,7 +461,7 @@ describe('Kennzahl „Evakuiert" (LFH-607)', () => {
   });
 
   it('kein Zugriff auf Betreuung: das Etikett bleibt, ohne Zahl, ohne Ziel, Grund benannt', () => {
-    const k = zelle({ zustand: 'kein-zugriff' });
+    const k = zelle({ zustand: 'kein-zugriff' }, null);
     expect(k).toMatchObject({
       etikett: 'Evakuiert',
       wert: '—',

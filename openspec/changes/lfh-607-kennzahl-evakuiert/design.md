@@ -88,6 +88,15 @@ befüllt. `baueLagebild` baut daraus die Zelle. Die Seite leitet den
   Seitentest gezeigt.
 - *Identität:* Der Hook gibt seinen Zustand per `useMemo` identitätsstabil zurück. Das
   `useMemo` des Lagebilds greift sonst bei keinem Render.
+- *Freigaben stehen fest* heißt: Der Benutzer ist geladen **und** der Overrides-Abruf war
+  **erfolgreich**. Scheitert der Overrides-Abruf, bleibt das Recht unbekannt. Die Zelle
+  zeigt dann „Stand unbekannt“ und ruft nicht trotzdem ab. Nur ein fehlender Ausfall der
+  Overrides macht aus dem Zustand „ausgeblendet“ ein „sichtbar“. Das hat das Review
+  gefunden.
+- *Ziel* (`Rohdaten.evakuierungZiel`) bekommt die Zelle nur bei bestätigtem Recht, gebaut über
+  `betreuungPfad`. Beim Laden ist die Zelle kein Link, genau wie `pegelZiel` erst mit den
+  Freigaben auf die Modulseite zeigt. Sonst wäre die Ladezelle für eine Person ohne Zugriff
+  ein Sprung ins Leere (Review).
 
 ### D4 — Wert und Notiz aus EINER Formatierung
 
