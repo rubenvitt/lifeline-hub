@@ -81,6 +81,16 @@ const AKTIONSZEILE_BREITE = PLATZ_KARTE_BREITE - 2 * PLATZ_KARTE_RAND - 2 * PLAT
 /** Höhe des Aktionsstreifens im 100-px-Innenraum (Rechnung im Dateikopf unten). */
 const AKTIONSZEILE_HOEHE = 24;
 
+/**
+ * Überlaufregel des Kartenmenüs (LFH-359): umklappen UND ins Fenster schieben. antds Typ
+ * `AdjustOverflow` kennt nur `adjustX`/`adjustY`, zur Laufzeit reicht `getOverflowOptions`
+ * (`antd/es/_util/placements.js`) das Objekt aber per Spread an rc-trigger durch, und dort
+ * wirkt `shiftY` (im Browser belegt: ohne `shiftY` ist der e2e-Test „alle Menüeinträge
+ * liegen im Fenster" rot). Als Konstante statt Literal, weil die Excess-Property-Prüfung
+ * sonst an genau dieser Lücke im Typ anschlägt.
+ */
+const MENUE_UEBERLAUF: { adjustY: 1; shiftY: true } = { adjustY: 1, shiftY: true };
+
 /** Voll ausgebaute Zeile: Transport, zurückweisen, „als frei", Platzaktionen. */
 const AKTIONEN_MAX = 4;
 
@@ -734,7 +744,7 @@ function PlatzKarte({
         ...menu,
         style: { maxHeight: 'calc(100dvh - 16px)', overflowY: 'auto' },
       }}
-      autoAdjustOverflow={{ adjustY: true, shiftY: true }}
+      autoAdjustOverflow={MENUE_UEBERLAUF}
       // Fokus beim Öffnen auf den ersten Eintrag (gemessen): `menu.autoFocus` allein ließ ihn
       // nach Enter auf der Karte stehen, erst das `autoFocus` am Dropdown setzt ihn ins Menü.
       autoFocus
