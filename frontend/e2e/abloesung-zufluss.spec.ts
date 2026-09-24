@@ -39,6 +39,18 @@ async function anmelden(page: Page) {
   await expect(page).toHaveURL(/\/einsaetze/);
 }
 
+/**
+ * Die Schriften kommen über `@font-face` (`theme/schriften.css`) und tauschen nach dem Laden die
+ * Zeilenmaße. Unter Last (volles Gate) lag der Tausch gemessen zwischen Vorher- und
+ * Nachher-Messung: Karte 2 stand vorher bei y=491, nachher bei 490 — ein Befund über die Schrift,
+ * nicht über die Schleuse. Gemessen wird deshalb erst mit geladenen Schriften.
+ */
+async function schriftenGeladen(page: Page) {
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+  });
+}
+
 async function stelleDichte(page: Page, dichte: string) {
   await page.evaluate(([schluessel, wert]) => window.localStorage.setItem(schluessel, wert), [
     DICHTE_SCHLUESSEL,
@@ -85,6 +97,7 @@ for (const kontext of KONTEXTE) {
     const banner = page.locator('[data-lfh="sammelbanner"]');
     await expect(karten).toHaveCount(2);
     await expect(banner).toHaveCount(0);
+    await schriftenGeladen(page);
 
     const vorher = {
       erste: await karten.first().getAttribute('aria-label'),
@@ -183,6 +196,7 @@ for (const kontext of KONTEXTE) {
     const banner = page.locator('[data-lfh="sammelbanner"]');
     await expect(karten).toHaveCount(3);
     await expect(banner).toHaveCount(0);
+    await schriftenGeladen(page);
     const namen = () => karten.evaluateAll((ks) => ks.map((k) => k.getAttribute('aria-label')));
     const oberkanten = () =>
       karten.evaluateAll((ks) => ks.map((k) => k.getBoundingClientRect().top));
