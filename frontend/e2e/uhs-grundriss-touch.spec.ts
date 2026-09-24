@@ -544,6 +544,19 @@ test.describe('UHS-Grundriss unter Touch', () => {
       }
       // Ein Tipp hat NUR das Menü geöffnet, keinen Zuweisungsdialog.
       await expect(page.getByRole('dialog')).toHaveCount(0);
+
+      // Tastaturweg (Spec „Tastatur"): Esc schließt, Enter auf der fokussierten Karte öffnet
+      // erneut, und der Fokus steht dann auf dem ERSTEN Eintrag — gemessen: ohne das
+      // `autoFocus` am Dropdown bliebe er auf der Karte (`menu.autoFocus` allein reicht nicht).
+      // Ein zweites Enter löst den Eintrag aus.
+      await page.keyboard.press('Escape');
+      await expect(karte).toHaveAttribute('aria-expanded', 'false');
+      await karte.focus();
+      await page.keyboard.press('Enter');
+      await expect(karte).toHaveAttribute('aria-expanded', 'true');
+      await expect(eintraege.first()).toBeFocused();
+      await page.keyboard.press('Enter');
+      await expect(page.getByRole('dialog')).toContainText('Patient zuweisen');
     });
   }
 

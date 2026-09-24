@@ -735,6 +735,9 @@ function PlatzKarte({
         style: { maxHeight: 'calc(100dvh - 16px)', overflowY: 'auto' },
       }}
       autoAdjustOverflow={{ adjustY: true, shiftY: true }}
+      // Fokus beim Öffnen auf den ersten Eintrag (gemessen): `menu.autoFocus` allein ließ ihn
+      // nach Enter auf der Karte stehen, erst das `autoFocus` am Dropdown setzt ihn ins Menü.
+      autoFocus
       trigger={['click']}
       open={menueOffen}
       onOpenChange={(offen) => setMenueOffen(offen)}
