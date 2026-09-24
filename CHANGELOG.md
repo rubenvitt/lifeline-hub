@@ -1,3 +1,53 @@
+## [1.0.0-alpha.42](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.41...v1.0.0-alpha.42) (2026-09-24)
+
+### Wichtige Änderungen
+
+Diese Version bringt umfangreiche Datenbankänderungen durch mehrere Migrationen:
+
+- **Migration 0118**: Neue Tabellen für das Fachmodul Verpflegung (Zeitfenster und Ausgaben) sowie Koordinaten für Betreuungsstellen
+- **Migration 0119**: Evakuierungsbezirke als neuer Zonentyp auf der Lagekarte mit Verknüpfung zu den Evakuierungsbezirken der Betreuung
+- **Migration 0120**: Konsolidierung nach Alpha-Merge
+
+Ein Datenbankbackup vor dem Update wird empfohlen.
+
+### Lagekarte
+
+- Betreuungsstellen können jetzt auf der Lagekarte verortet werden – die Stellen erscheinen als Marker in der Betroffenen-Ebene und lassen sich aus dem Modul Betreuung heraus platzieren
+- Evakuierungsbezirke werden als eigener Zonentyp auf der Lagekarte dargestellt – Flächen mit Beschriftung "Name · Räumung: ..." in Siena-Braun
+- Aus dem Modul Betreuung heraus kann direkt zu Stellen und Evakuierungsbezirken auf der Karte gesprungen werden ("Auf Karte zeigen")
+- Unverortete Betreuungsstellen zeigen den Menüeintrag "Auf Karte verorten", der direkt in den Platziermodus der Lagekarte führt
+- Die Darstellung von Betreuungsstellen und Evakuierungsbezirken ist nur bei Lesezugriff auf das Modul Betreuung sichtbar
+- Deeplinks für Betreuungsstellen (`?stelle=`) und Evakuierungsbezirke (`?evakuierungsbezirk=`) ermöglichen den direkten Sprung zu Elementen auf der Karte
+- Beim Stornieren von Betreuungsstellen werden zugeordnete Kartenflächen automatisch entfernt
+
+### Kräfte und Mittel
+
+**Neues Fachmodul Verpflegung** zur Planung und Überwachung der Verpflegungsversorgung:
+
+- Zeitfenster für geplante Verpflegung mit Bezeichnung, Zeitraum, Bedarf (Einsatzkräfte/Betreute/Gesamt) und Kostformen (Standard, vegetarisch, vegan, halal, koscher)
+- Erfassung ausgegebener Portionen mit Ort, Zeitpunkt, Menge und Kostformen sowie optionaler Bemerkung
+- Automatische Deckungsüberwachung: Anzeige von Bedarf, bereits Ausgegebenem und Fehlmengen – sowohl gesamt als auch je Kostform
+- Einstufung der Versorgungslage: "Gedeckt" (ab Beginn gedeckt), "Offen" (noch nicht erreicht), "Unterdeckung" (Beginn erreicht, Fehlmenge vorhanden)
+- Segmentierung der Zeitfenster in "laufend & anstehend" und "vergangen"
+- Bedarfsvorschläge auf Basis der aktuellen Einsatzkräfte (aus dem Personalmodul) und Betreuungszahlen (aus dem Betreuungsmodul)
+- Direkte Nachforderung aus der Verpflegung heraus mit vorausgefüllter Begründung bei Unterdeckung
+- Ausgaben können zurückgenommen werden (z.B. bei Fehleingaben)
+- Kennzahlen im Seitenkopf: Anzahl Zeitfenster und Anzahl mit Unterdeckung
+- Das Modul ist über die Stab-Ansicht als S4-Werkzeug "Verpflegung" erreichbar (ersetzt "Fahrzeuge" in der S4-Zeile)
+
+### Kommunikation
+
+- Nachforderungen können jetzt über Deeplinks mit Vorbelegung geöffnet werden – wird vom Verpflegungsmodul bei Unterdeckung genutzt
+- Das Begründungsfeld bei Nachforderungen wächst jetzt auf bis zu vier Zeilen, damit längere Texte vollständig sichtbar sind
+
+### Betrieb und Installation
+
+- Lage-Snapshots erfassen jetzt auch verortete Betreuungsstellen und Evakuierungsbezirke
+- Schwärzung: Koordinaten von Betreuungsstellen bleiben erhalten, Ort und Bemerkung bei Verpflegungsausgaben werden entfernt
+- Rechteprüfung: Zuordnung von Evakuierungsbezirken zu Zonen erfordert Schreibzugriff auf das Modul Betreuung
+- Live-Updates: Änderungen an Verpflegungsdaten, Betreuungsstellen-Verortungen und Evakuierungsbezirks-Zuordnungen werden in Echtzeit an alle Clients verteilt
+- Zeitangaben in ETB-Einträgen zur Verpflegung verwenden die Zeitzone der Organisation
+
 ## [1.0.0-alpha.41](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.40...v1.0.0-alpha.41) (2026-09-24)
 
 ### Lage-Dashboard
