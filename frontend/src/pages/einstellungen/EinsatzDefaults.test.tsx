@@ -1,5 +1,5 @@
 import { QueryClient } from '@tanstack/react-query';
-import { screen, fireEvent, waitFor } from '@testing-library/react';
+import { screen, fireEvent, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { renderMitProviders } from '../../test/utils';
@@ -203,6 +203,11 @@ describe('EinsatzDefaults', () => {
     await screen.findByText('Aufbewahrung');
     expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
     expect(screen.getByLabelText('Aufbewahrungs-Dauer (Tage)')).toBeDisabled();
+    // LFH-383: die gesperrte Modulzeile nennt ihren Grund selbst, nicht nur der Seitenkopf.
+    const zeile = screen
+      .getByRole('combobox', { name: 'Benötigte Rolle: ETB' })
+      .closest('[data-modul-zeile]') as HTMLElement;
+    expect(within(zeile).getByText('nur Admins')).toBeInTheDocument();
   });
 });
 

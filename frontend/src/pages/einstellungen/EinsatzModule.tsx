@@ -23,6 +23,10 @@ function orgRollenHinweis(
   return undefined;
 }
 
+/** Satz des `RechteHinweis` — zugleich die lange Begründung an jeder gesperrten Zeile. */
+const RECHTE_TEXT =
+  'Nur die Einsatzleitung oder ein System-Admin darf die Modul-Sichtbarkeit dieses Einsatzes ändern — die Werte stehen hier zum Nachlesen.';
+
 /**
  * Sektion `…/einstellungen/module` (LFH-345 · C10, Befund H15) — Modul-Sichtbarkeit und
  * Rollen-Schranke je Modul.
@@ -97,7 +101,7 @@ export default function EinsatzModule() {
       <SeitenHinweise
         fehler={overrideMutation.error}
         rechteFehlt={daten.istAktiv && !darfModuleVerwalten}
-        rechteText="Nur die Einsatzleitung oder ein System-Admin darf die Modul-Sichtbarkeit dieses Einsatzes ändern — die Werte stehen hier zum Nachlesen."
+        rechteText={RECHTE_TEXT}
       />
       <Formularpaneel
         titel="Modul-Sichtbarkeit & Berechtigungen"
@@ -133,6 +137,17 @@ export default function EinsatzModule() {
               }),
           }}
           darfVerwalten={darfModuleVerwalten}
+          // Zwei Ursachen, zwei Wörter (LFH-383): `darfEinsatzLeiten` verlangt einen aktiven
+          // Einsatz, ein abgeschlossener sperrt also auch die Einsatzleitung. Ein Rollenwort
+          // an der Zeile widerspräche dann dem Seitenbanner „Einsatz abgeschlossen".
+          rechteGrund={
+            daten.istAktiv
+              ? { kurz: 'nur Einsatzleitung', lang: RECHTE_TEXT }
+              : {
+                  kurz: 'Einsatz abgeschlossen',
+                  lang: 'Der Einsatz ist abgeschlossen — seine Einstellungen sind eingefroren.',
+                }
+          }
           // Nur die schreibende Zeile ist gesperrt (H15), nur die gescheiterte markiert (H14).
           laeuftKey={overrideMutation.isPending ? overrideMutation.variables.modulKey : null}
           fehlerKey={overrideMutation.isError ? overrideMutation.variables.modulKey : null}
