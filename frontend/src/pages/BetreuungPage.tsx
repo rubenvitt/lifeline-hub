@@ -301,6 +301,11 @@ export default function BetreuungPage() {
   );
   const bezirkAktion = useCallback(
     (aktion: BezirkAktion, bezirk: Evakuierungsbezirk) => {
+      // LFH-673: Sprung auf die Karte; dort wählt die Seite eine Fläche und räumt den Parameter.
+      if (aktion === 'karte') {
+        navigate(lagekartePfad(einsatzId, { evakuierungsbezirk: bezirk.id }));
+        return;
+      }
       if (aktion === 'stornieren') {
         resetBezirkStornieren();
         setDialog({ art: 'bezirkStornieren', bezirk });
@@ -309,7 +314,7 @@ export default function BetreuungPage() {
       resetBezirkAendern();
       setDialog({ art: aktion === 'raeumung' ? 'raeumung' : 'bezirkBearbeiten', bezirk });
     },
-    [resetBezirkAendern, resetBezirkStornieren],
+    [resetBezirkAendern, resetBezirkStornieren, navigate, einsatzId],
   );
   const stelleAktion = useCallback(
     (aktion: StelleAktion, stelle: Betreuungsstelle) => {

@@ -716,4 +716,77 @@ describe('useLagekarteDaten Betreuungsstellen (LFH-673)', () => {
     expect(result.current.alleVerortet.some((m) => m.typ === 'betreuungsstelle')).toBe(false);
     expect(result.current.fehlerhafteQuellen).toEqual([]);
   });
+
+  it('Bezirksfläche: beschriftet mit Bezirk und Räumung — live wie im Rückblick', async () => {
+    const BEZIRK = {
+      id: 31,
+      einsatz_id: 5,
+      bezeichnung: 'Uferstraße 12–40',
+      plan_personen: 640,
+      plan_erhebung: 'geschaetzt',
+      raeumung: 'laeuft',
+      flaechen: 1,
+      angelegt_at: '',
+    };
+    const ZONE = {
+      id: 41,
+      einsatz_id: 5,
+      typ: 'evakuierungsbezirk',
+      geometrie_typ: 'Polygon',
+      geometrie: '{"type":"Polygon","coordinates":[[[8.6,50.1],[8.7,50.1],[8.7,50.2],[8.6,50.1]]]}',
+      label: null,
+      evakuierungsbezirk_id: 31,
+    };
+    handler({}, () => HttpResponse.json({ bezirke: [BEZIRK], stellen: [] }));
+    server.use(http.get('/api/einsaetze/5/zonen', () => HttpResponse.json([ZONE])));
+    const live = render();
+    await waitFor(() =>
+      expect(live.result.current.zonenFeatures[0]?.label).toBe('Uferstraße 12–40 · Räumung: läuft'),
+    );
+    expect(live.result.current.bezirke).toHaveLength(1);
+
+    const doc = dokument('keine');
+    ladeLageSnapshot.mockResolvedValue({
+      ...doc,
+      daten: {
+        ...doc.daten,
+        zonen: [ZONE],
+        evakuierungsbezirke: [{ ...BEZIRK, raeumung: 'geraeumt' }],
+      },
+    });
+    const rueck = renderHook(
+      () =>
+        useLagekarteDaten({ einsatzId: 5, zeigeZonen: true, quelle: { typ: 'snapshot', id: 9 } }),
+      { wrapper: wrapper() },
+    );
+    await waitFor(() =>
+      expect(rueck.result.current.zonenFeatures[0]?.label).toBe(
+        'Uferstraße 12–40 · Räumung: geräumt',
+      ),
+    );
+  });
+
+  it('Bezirksfläche ohne Modulrecht: nur das Typwort, keine Bezirksangaben', async () => {
+    handler({}, () => new HttpResponse(null, { status: 403 }));
+    server.use(
+      http.get('/api/einsaetze/5/zonen', () =>
+        HttpResponse.json([
+          {
+            id: 41,
+            einsatz_id: 5,
+            typ: 'evakuierungsbezirk',
+            geometrie_typ: 'Polygon',
+            geometrie:
+              '{"type":"Polygon","coordinates":[[[8.6,50.1],[8.7,50.1],[8.7,50.2],[8.6,50.1]]]}',
+            label: null,
+            evakuierungsbezirk_id: 31,
+          },
+        ]),
+      ),
+    );
+    const { result } = render();
+    await waitFor(() => expect(result.current.betreuungZugriff).toBe('gesperrt'));
+    await waitFor(() => expect(result.current.zonenFeatures[0]?.label).toBe('Evakuierungsbezirk'));
+    expect(result.current.bezirke).toEqual([]);
+  });
 });

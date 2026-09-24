@@ -127,6 +127,8 @@ macro_rules! bezirk_select {
     () => {
         "SELECT b.id, b.einsatz_id, b.abschnitt_id, a.name AS abschnitt_name, b.bezeichnung, \
                 b.plan_personen, b.plan_erhebung, b.raeumung, b.sammelstelle, b.notiz, \
+                (SELECT COUNT(*) FROM lage_zone z WHERE z.evakuierungsbezirk_id = b.id) \
+                    AS flaechen, \
                 st.id AS stand_id, st.evakuiert AS stand_evakuiert, \
                 st.erhebung AS stand_erhebung, st.zeitpunkt_at AS stand_zeitpunkt_at, \
                 b.storniert_at, b.angelegt_at, b.geaendert_at \
@@ -165,6 +167,7 @@ struct BezirkZeile {
     raeumung: String,
     sammelstelle: Option<String>,
     notiz: Option<String>,
+    flaechen: i64,
     stand_id: Option<i64>,
     stand_evakuiert: Option<i64>,
     stand_erhebung: Option<String>,
@@ -205,6 +208,7 @@ impl TryFrom<BezirkZeile> for EvakuierungsbezirkAnzeige {
             raeumung: aus_db(z.raeumung)?,
             sammelstelle: z.sammelstelle,
             notiz: z.notiz,
+            flaechen: z.flaechen,
             stand,
             storniert_at: z.storniert_at,
             angelegt_at: z.angelegt_at,
@@ -869,7 +873,7 @@ pub async fn bezirk_stornieren_tx(
     id: i64,
     benutzer_id: i64,
     startwert: i64,
-) -> Result<Geschrieben, AppError> {
+) -> Result<(Geschrieben, Vec<i64>), AppError> {
     let roh = bezirk_roh_tx(conn, einsatz_id, id).await?;
     bezirk_lebt(&roh)?;
     sqlx::query(
@@ -880,6 +884,19 @@ pub async fn bezirk_stornieren_tx(
     .bind(id)
     .execute(&mut *conn)
     .await?;
+    // LFH-673 (design.md D6): die Flächen verlieren ihren Verweis im SELBEN Vorgang und
+    // bleiben als nicht zugeordnete Bezirksflächen stehen. Stehenlassen und beim Lesen filtern
+    // hätte jede lesende Stelle (Karte, Snapshot, `flaechen`) mit einem Filter belastet — ein
+    // vergessener zeigte eine Fehlanlage als lebende Fläche. Kein eigener ETB-Eintrag: der
+    // Storno ist der Vorgang. Die ids gehen an die Route, die je Zone `lage_zone` verteilt.
+    let geloest: Vec<i64> = sqlx::query_scalar(
+        "UPDATE lage_zone SET evakuierungsbezirk_id = NULL, geaendert_at = datetime('now') \
+         WHERE einsatz_id = ? AND evakuierungsbezirk_id = ? RETURNING id",
+    )
+    .bind(einsatz_id)
+    .bind(id)
+    .fetch_all(&mut *conn)
+    .await?;
     let etb_id = crate::etb::system_audit_tx(
         conn,
         einsatz_id,
@@ -888,11 +905,14 @@ pub async fn bezirk_stornieren_tx(
         &etb_text::bezirk_storniert(&roh.bezeichnung),
     )
     .await?;
-    Ok(Geschrieben {
-        id,
-        etb_ids: vec![etb_id],
-        still_geaendert: false,
-    })
+    Ok((
+        Geschrieben {
+            id,
+            etb_ids: vec![etb_id],
+            still_geaendert: false,
+        },
+        geloest,
+    ))
 }
 
 /// Meldet einen Stand „evakuiert“. ETB-Meldung mit Vorwert, Erhebung und Plangröße, deren

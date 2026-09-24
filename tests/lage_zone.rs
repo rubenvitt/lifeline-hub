@@ -1014,3 +1014,310 @@ async fn patch_verschiebt_zwischen_ansichten() {
         "auf alle Ansichten freigegeben (NULL/absent): {v:?}"
     );
 }
+
+// ---------- LFH-673: Zonentyp Evakuierungsbezirk und Zuordnung zum Bezirk ----------
+
+async fn bezirk_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, bezeichnung: &str) -> i64 {
+    let (s, j) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/betreuung/bezirke"),
+        cookie,
+        Some(
+            &json!({"bezeichnung": bezeichnung, "plan_personen": 640, "plan_erhebung": "geschaetzt"})
+                .to_string(),
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "Bezirk: {j:?}");
+    j["id"].as_i64().unwrap()
+}
+
+async fn bezirksflaeche(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    bezirk: Option<i64>,
+) -> (StatusCode, Value) {
+    let mut body = json!({"typ":"evakuierungsbezirk","geometrie_typ":"Polygon","geometrie":POLY});
+    if let Some(b) = bezirk {
+        body["evakuierungsbezirk_id"] = json!(b);
+    }
+    anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/zonen"),
+        cookie,
+        Some(&body.to_string()),
+    )
+    .await
+}
+
+async fn flaechen(app: &axum::Router, cookie: &str, einsatz: i64, bezirk: i64) -> i64 {
+    let (_, u) = anfrage(
+        app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/betreuung"),
+        cookie,
+        None,
+    )
+    .await;
+    u["bezirke"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|b| b["id"] == bezirk)
+        .unwrap()["flaechen"]
+        .as_i64()
+        .unwrap()
+}
+
+#[tokio::test]
+async fn evakuierungsbezirk_ist_flaeche_mit_eigenem_etb_wort() {
+    let (app, _) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (s, z) = bezirksflaeche(&app, &admin, e, None).await;
+    assert_eq!(s, StatusCode::CREATED, "{z:?}");
+    assert_eq!(z["typ"], "evakuierungsbezirk");
+    assert!(
+        !z.as_object().unwrap().contains_key("evakuierungsbezirk_id"),
+        "ohne Zuordnung fehlt der Schlüssel: {z:?}"
+    );
+    assert!(system_etb_inhalte(&app, &admin, e)
+        .await
+        .iter()
+        .any(|t| t.starts_with("Evakuierungsbezirk") && t.contains("eingerichtet")));
+
+    let (s, j) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/zonen"),
+        &admin,
+        Some(
+            &json!({"typ":"evakuierungsbezirk","geometrie_typ":"LineString","geometrie":LINE})
+                .to_string(),
+        ),
+    )
+    .await;
+    assert_eq!(
+        s,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "Linie als Bezirk: {j:?}"
+    );
+}
+
+#[tokio::test]
+async fn zwei_teilflaechen_an_einem_bezirk_und_flaechen_zaehlt_mit() {
+    let (app, live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let ufer = bezirk_anlegen(&app, &admin, e, "Uferstraße 12–40").await;
+
+    let mut rx = live.abonniere(e);
+    let (s, a) = bezirksflaeche(&app, &admin, e, Some(ufer)).await;
+    assert_eq!(s, StatusCode::CREATED, "{a:?}");
+    assert_eq!(a["evakuierungsbezirk_id"], ufer);
+    let n = recv_until_tag(&mut rx, "betreuung", Duration::from_secs(1)).await;
+    let v: Value = serde_json::from_str(&n.data).unwrap();
+    assert_eq!(
+        v["bezirk_id"], ufer,
+        "Zuordnung beim Anlegen meldet den Bezirk"
+    );
+
+    // Zweite Fläche erst ohne, dann per PATCH zugeordnet.
+    let (_, b) = bezirksflaeche(&app, &admin, e, None).await;
+    let b_id = b["id"].as_i64().unwrap();
+    let (s, b) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{e}/zonen/{b_id}"),
+        &admin,
+        Some(&json!({"evakuierungsbezirk_id": ufer}).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{b:?}");
+    assert_eq!(b["evakuierungsbezirk_id"], ufer);
+    assert_eq!(flaechen(&app, &admin, e, ufer).await, 2);
+
+    // `null` löst; die Zone bleibt.
+    let (s, b) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{e}/zonen/{b_id}"),
+        &admin,
+        Some(&json!({"evakuierungsbezirk_id": null}).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert!(!b.as_object().unwrap().contains_key("evakuierungsbezirk_id"));
+    assert_eq!(b["typ"], "evakuierungsbezirk");
+    assert_eq!(flaechen(&app, &admin, e, ufer).await, 1);
+
+    // Aufheben einer zugeordneten Fläche meldet den Bezirk.
+    let a_id = a["id"].as_i64().unwrap();
+    let mut rx = live.abonniere(e);
+    let (s, _) = anfrage(
+        &app,
+        "DELETE",
+        &format!("/api/einsaetze/{e}/zonen/{a_id}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let n = recv_until_tag(&mut rx, "betreuung", Duration::from_secs(1)).await;
+    let v: Value = serde_json::from_str(&n.data).unwrap();
+    assert_eq!(v["bezirk_id"], ufer);
+    assert_eq!(flaechen(&app, &admin, e, ufer).await, 0);
+}
+
+#[tokio::test]
+async fn typwechsel_weg_vom_bezirk_loescht_die_zuordnung() {
+    let (app, live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let ufer = bezirk_anlegen(&app, &admin, e, "Uferstraße 12–40").await;
+    let (_, z) = bezirksflaeche(&app, &admin, e, Some(ufer)).await;
+    let zid = z["id"].as_i64().unwrap();
+    let mut rx = live.abonniere(e);
+    let (s, z) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{e}/zonen/{zid}"),
+        &admin,
+        Some(&json!({"typ": "absperrbereich"}).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{z:?}");
+    assert!(!z.as_object().unwrap().contains_key("evakuierungsbezirk_id"));
+    let n = recv_until_tag(&mut rx, "betreuung", Duration::from_secs(1)).await;
+    let v: Value = serde_json::from_str(&n.data).unwrap();
+    assert_eq!(
+        v["bezirk_id"], ufer,
+        "impliziter Wegfall meldet den alten Bezirk"
+    );
+    assert_eq!(flaechen(&app, &admin, e, ufer).await, 0);
+}
+
+#[tokio::test]
+async fn zuordnung_statuscodes_422_404_409() {
+    let (app, _) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let e2 = einsatz_anlegen(&app, &admin).await;
+    let ufer = bezirk_anlegen(&app, &admin, e, "Uferstraße 12–40").await;
+    let fremd = bezirk_anlegen(&app, &admin, e2, "Fremdbezirk").await;
+
+    // 422: Zone anderen Typs.
+    let (s, j) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/zonen"),
+        &admin,
+        Some(
+            &json!({"typ":"sperrgebiet","geometrie_typ":"Polygon","geometrie":POLY,
+                    "evakuierungsbezirk_id": ufer})
+            .to_string(),
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{j:?}");
+    let sperr = zone_anlegen(&app, &admin, e, "Sperre", None).await;
+    let (s, _) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{e}/zonen/{sperr}"),
+        &admin,
+        Some(&json!({"evakuierungsbezirk_id": ufer}).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+
+    // 404: Bezirk eines anderen Einsatzes bzw. unbekannt.
+    let (s, _) = bezirksflaeche(&app, &admin, e, Some(fremd)).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    let (s, _) = bezirksflaeche(&app, &admin, e, Some(999_999)).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+
+    // 409: stornierter Bezirk.
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/betreuung/bezirke/{ufer}/stornieren"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, _) = bezirksflaeche(&app, &admin, e, Some(ufer)).await;
+    assert_eq!(s, StatusCode::CONFLICT);
+}
+
+#[tokio::test]
+async fn zuordnung_ohne_modul_betreuung_ist_403_loesen_bleibt_erlaubt() {
+    let (app, _) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let ufer = bezirk_anlegen(&app, &admin, e, "Uferstraße 12–40").await;
+    let (_, z) = bezirksflaeche(&app, &admin, e, Some(ufer)).await;
+    let zid = z["id"].as_i64().unwrap();
+
+    let fid = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    common::rolle_setzen(&app, &admin, e, fid, "fuehrungspersonal").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    // Betreuung nur für Führungskräfte der Organisation.
+    let (s, j) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{e}/modul-overrides/betreuung"),
+        &admin,
+        Some(r#"{"sichtbar":true,"benoetigte_rolle":"fuehrungskraft"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "Override: {j:?}");
+    let (s, _) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/betreuung"),
+        &frieda,
+        None,
+    )
+    .await;
+    assert_eq!(
+        s,
+        StatusCode::FORBIDDEN,
+        "Vorbedingung: Frieda ohne Modulrecht"
+    );
+
+    // Setzen: 403, auch wenn der Bezirk existiert — sonst ließen sich ids abtasten.
+    let (s, j) = bezirksflaeche(&app, &frieda, e, Some(ufer)).await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "{j:?}");
+    let (s, _) = bezirksflaeche(&app, &frieda, e, Some(999_999)).await;
+    assert_eq!(
+        s,
+        StatusCode::FORBIDDEN,
+        "unbekannte id verrät sich nicht als 404"
+    );
+    // Die Zonenliste zeigt Frieda nur die Kennung, keine Bezirksangaben.
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/zonen"),
+        &frieda,
+        None,
+    )
+    .await;
+    let text = liste.to_string();
+    assert!(!text.contains("Uferstraße"), "{text}");
+    // Lösen legt nichts offen und bleibt erlaubt.
+    let (s, j) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{e}/zonen/{zid}"),
+        &frieda,
+        Some(&json!({"evakuierungsbezirk_id": null}).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j:?}");
+}

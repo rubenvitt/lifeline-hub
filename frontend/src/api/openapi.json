@@ -3649,6 +3649,7 @@
           "plan_personen",
           "plan_erhebung",
           "raeumung",
+          "flaechen",
           "angelegt_at"
         ],
         "properties": {
@@ -3674,6 +3675,11 @@
           "einsatz_id": {
             "type": "integer",
             "format": "int64"
+          },
+          "flaechen": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Zahl der Zonen vom Typ `evakuierungsbezirk`, die diesem Bezirk zugeordnet sind\n(LFH-673). Immer gesetzt, 0 ohne Fläche — die Betreuungsseite bietet „Auf Karte\nzeigen\" nur bei > 0 an und braucht dafür keine Zonenliste (die hängt am Modul Lagekarte)."
           },
           "geaendert_at": {
             "type": [
@@ -4752,6 +4758,14 @@
             "type": "integer",
             "format": "int64"
           },
+          "evakuierungsbezirk_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Zugeordneter Evakuierungsbezirk (LFH-673), nur an Zonen vom Typ `evakuierungsbezirk`.\nNUR die Kennung: Bezeichnung und Räumungszustand hängen am Modul Betreuung und kommen\naus dessen Übersicht — die Zonenliste liest jeder Karten-Leser."
+          },
           "farbe": {
             "type": [
               "string",
@@ -4803,7 +4817,8 @@
           "absperrbereich",
           "absperrgrenze",
           "sperrgebiet",
-          "freie_skizze"
+          "freie_skizze",
+          "evakuierungsbezirk"
         ]
       },
       "LageberichtAbschnitt": {

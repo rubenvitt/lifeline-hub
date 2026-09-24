@@ -1,6 +1,7 @@
 import type {
   Betreuungsstelle,
   EinsatzAnzeige,
+  Evakuierungsbezirk,
   Uhs,
   Schaden,
   Einheit,
@@ -45,4 +46,7 @@ export interface SnapshotDaten {
    *  Server lässt es für Personen ohne Modul „Betreuung" weg — beides heißt „keine", nicht
    *  Fehler. */
   betreuungsstellen?: Betreuungsstelle[];
+  /** Evakuierungsbezirke (LFH-673) für Beschriftung und Inspector der Bezirksflächen —
+   *  optional aus denselben Gründen wie `betreuungsstellen`. */
+  evakuierungsbezirke?: Evakuierungsbezirk[];
 }

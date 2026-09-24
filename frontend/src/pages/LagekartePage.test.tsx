@@ -1182,6 +1182,48 @@ describe('LagekartePage', () => {
     expect(await screen.findByLabelText('Gehört zu Gefahrengebiet')).toBeInTheDocument();
   });
 
+  it('Deeplink ?evakuierungsbezirk= wählt eine Fläche des Bezirks, beschriftet und räumt (LFH-673)', async () => {
+    const ZONE_EB = {
+      id: 8,
+      einsatz_id: 1,
+      typ: 'evakuierungsbezirk',
+      geometrie_typ: 'Polygon',
+      geometrie: '{"type":"Polygon","coordinates":[[[8.6,50.1],[8.7,50.1],[8.7,50.2],[8.6,50.1]]]}',
+      label: null,
+      farbe: null,
+      notiz: null,
+      gefahrengebiet_id: null,
+      evakuierungsbezirk_id: 5,
+      erstellt_von: 1,
+      erstellt_at: '',
+      geaendert_at: '',
+    };
+    const UFER = {
+      id: 5,
+      einsatz_id: 1,
+      bezeichnung: 'Uferstraße 12–40',
+      plan_personen: 640,
+      plan_erhebung: 'geschaetzt',
+      raeumung: 'laeuft',
+      flaechen: 1,
+      angelegt_at: '',
+    };
+    basisHandler([
+      http.get('/api/einsaetze/1/zonen', () => HttpResponse.json([ZONE_EB])),
+      http.get('/api/einsaetze/1/betreuung', () =>
+        HttpResponse.json({ bezirke: [UFER], stellen: [] }),
+      ),
+    ]);
+    renderSeiteMitSonde('/einsaetze/1/lagekarte?evakuierungsbezirk=5');
+    expect(await screen.findByLabelText('Gehört zu Evakuierungsbezirk')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('link', { name: 'Betreuung zu Uferstraße 12–40' }),
+    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('evakuierungsbezirk'),
+    );
+  });
+
   it('Reverse-Deeplink ?gefahrengebiet=: räumt den Param aus der URL (apply-then-clean) und die Selektion bleibt bestehen (LFH-155)', async () => {
     const ZONE_GG = {
       id: 7,

@@ -12,6 +12,7 @@ import { useRollen } from '../components/instrument';
 import { ladeKarteConfig } from '../api/karte';
 import { globalKeys } from '../api/queryKeys';
 import {
+  betreuungPfad,
   gefahrenPfad,
   parseKartenzentrum,
   parsePlatzierenAuftrag,
@@ -178,6 +179,7 @@ export default function LagekartePage() {
     ladt,
     markerLaden,
     gebiete,
+    bezirke,
     fehlerhafteQuellen,
     neuLaden,
     verortet,
@@ -494,6 +496,23 @@ export default function LagekartePage() {
     setSearchParams(naechste, { replace: true });
   }, [zonen, searchParams, setSearchParams, setZoneAuswahl, setFlyToZiel]);
 
+  // Bezirksfläche (LFH-673): ?evakuierungsbezirk=<id> von der Betreuungsseite — dasselbe
+  // apply-then-clean wie `?gefahrengebiet=` darüber, auch mit derselben Wartebedingung (die
+  // Betreuungsseite bietet den Sprung nur bei mindestens einer Fläche an).
+  useEffect(() => {
+    const ziel = parseRouteId(searchParams.get('evakuierungsbezirk') ?? undefined);
+    if (ziel == null) return;
+    const zone = zonen.find((z) => z.evakuierungsbezirk_id === ziel);
+    if (!zone) return;
+    setZoneAuswahl(zone.id);
+    const poly = parsePolygon(zone.geometrie);
+    const zentroid = poly ? polygonZentroid(poly) : null;
+    if (zentroid) setFlyToZiel({ lng: zentroid[0], lat: zentroid[1] });
+    const naechste = new URLSearchParams(searchParams);
+    naechste.delete('evakuierungsbezirk');
+    setSearchParams(naechste, { replace: true });
+  }, [zonen, searchParams, setSearchParams, setZoneAuswahl, setFlyToZiel]);
+
   /**
    * Platzier-Auftrag von außen (LFH-340 · C5): `?platzieren=schaden:5` schickt die Karte in
    * den Platzier-Modus für genau dieses Objekt — der nächste Klick setzt seine Koordinate.
@@ -624,6 +643,9 @@ export default function LagekartePage() {
             onMatrixOeffnen={(gid) => navigate(gefahrenPfad(einsatzId, { gefahrengebiet: gid }))}
             onLoeschen={() => zoneLoeschen(ausgewaehlteZone.id)}
             ansichten={ansichten ?? []}
+            bezirke={bezirke}
+            betreuungFrei={betreuungZugriff === 'frei'}
+            bezirkPfad={(bid) => betreuungPfad(einsatzId, { bezirk: bid })}
           />
         )}
       </>

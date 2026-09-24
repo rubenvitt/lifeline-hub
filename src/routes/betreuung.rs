@@ -258,10 +258,18 @@ pub async fn bezirk_stornieren(
     let einsatz_id = ctx.einsatz.id;
     let startwert = startwert(&state, einsatz_id).await?;
     let benutzer_id = ctx.benutzer.id;
-    let g = crate::write_retry!(&state.pool, |conn| {
+    let (g, geloeste_zonen) = crate::write_retry!(&state.pool, |conn| {
         repo::bezirk_stornieren_tx(conn, einsatz_id, bid, benutzer_id, startwert).await
     })?;
     publiziere(&state, einsatz_id, &g.etb_ids, Objekt::Bezirk(g.id));
+    // LFH-673: die Karte zeichnet die gelösten Flächen jetzt ohne Bezirk.
+    for zid in geloeste_zonen {
+        state.live.publiziere_event(
+            einsatz_id,
+            LiveEvent::LageZone,
+            serde_json::json!({ "einsatz_id": einsatz_id, "zone_id": zid }).to_string(),
+        );
+    }
     Ok(Json(
         repo::bezirk_laden(&state.pool, einsatz_id, g.id).await?,
     ))

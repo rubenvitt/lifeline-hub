@@ -1,6 +1,6 @@
 import type { GlobalToken } from 'antd';
-import { rollenFarbe, warnstufeKarte } from '../../theme/statusFarben';
-import type { Warnstufe, ZoneTyp } from '../../api/types';
+import { raeumungszustand, rollenFarbe, warnstufeKarte } from '../../theme/statusFarben';
+import type { Evakuierungsbezirk, Warnstufe, ZoneTyp } from '../../api/types';
 
 export interface ZoneStil {
   fillColor: string;
@@ -23,6 +23,15 @@ const STILE: Record<Exclude<ZoneTyp, 'freie_skizze'>, ZoneStil> = {
   absperrbereich: { fillColor: '#fa8c16', fillOpacity: 0.2, lineColor: '#fa8c16', lineWidth: 2 },
   absperrgrenze: { fillColor: '#cf1322', fillOpacity: 0, lineColor: '#cf1322', lineWidth: 4 },
   sperrgebiet: { fillColor: '#8c8c8c', fillOpacity: 0.3, lineColor: '#595959', lineWidth: 2 },
+  // LFH-673 (design.md D9): kein Rot (Gefahr), kein Orange (Absperrbereich), kein Grau
+  // (Sperrgebiet) — ein Räumungsbezirk ist ein Auftrag, keine Gefahrenfläche. Der
+  // Räumungszustand steht als Text in der Beschriftung, nicht in der Farbe.
+  evakuierungsbezirk: {
+    fillColor: '#722ed1',
+    fillOpacity: 0.15,
+    lineColor: '#722ed1',
+    lineWidth: 2,
+  },
 };
 
 const FREIE_SKIZZE_FALLBACK = '#1677ff';
@@ -50,6 +59,8 @@ export const ZONE_TYPEN: ZoneTypInfo[] = [
   { typ: 'absperrgrenze', label: 'Absperrgrenze', geometrie: 'LineString' },
   { typ: 'sperrgebiet', label: 'Sperrgebiet', geometrie: 'Polygon' },
   { typ: 'freie_skizze', label: 'Freie Skizze', geometrie: 'beides' },
+  // LFH-673: Fläche eines Evakuierungsbezirks; zugeordnet wird im Zonen-Inspector.
+  { typ: 'evakuierungsbezirk', label: 'Evakuierungsbezirk', geometrie: 'Polygon' },
 ];
 
 /** Sprechendes Label eines Typs (für Inspector/Legende). */
@@ -116,6 +127,27 @@ export function zonenBeschriftung(
   if (warnstufe === null) return name;
   const stufe = stufenWort(warnstufe);
   return name ? `${name} · ${stufe}` : stufe;
+}
+
+/**
+ * Beschriftung einer Bezirksfläche (LFH-673, design.md D9) — Muster „NAME · STUFE" wie oben.
+ *
+ * Der Name ist der Zonenname, sonst die Bezeichnung des Bezirks, sonst das Typwort. Den
+ * Räumungszustand trägt der TEXT, nicht die Farbe (zweiter Kanal zuerst); das Wort kommt aus
+ * {@link raeumungszustand}, derselben Quelle wie auf der Betreuungsseite.
+ *
+ * `bezirk = null` heißt: nicht zugeordnet ODER nicht lesbar (kein Modulrecht, Betreuung lädt
+ * noch). Beides zeigt nur Name bzw. Typwort — ein Bezirksname oder Zustand stünde sonst bei
+ * Personen, die das Modul nicht lesen dürfen, auf der Karte.
+ */
+export function bezirkBeschriftung(
+  label: string | null | undefined,
+  bezirk: Pick<Evakuierungsbezirk, 'bezeichnung' | 'raeumung'> | null,
+): string {
+  const eigen = label?.trim();
+  if (!bezirk) return eigen || 'Evakuierungsbezirk';
+  const name = eigen || bezirk.bezeichnung;
+  return `${name} · Räumung: ${raeumungszustand[bezirk.raeumung].label}`;
 }
 
 /**

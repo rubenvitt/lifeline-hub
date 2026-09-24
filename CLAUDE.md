@@ -187,6 +187,22 @@ nicht. Der Fortschritt ist eine **manuelle Einschätzung** (leer ≠ 0 %); die Z
 wiegt. Die Überblickszeile trägt die Werte des obersten Abschnitts selbst und meldet einen
 schlechter beurteilten Unterabschnitt eigens („UA kritisch“).
 
+**Betreuung auf der Lagekarte (LFH-673).** Betreuungsstellen sind eine Marker-Ebene wie die
+UHS, stehen in `alleVerortet` und „Nicht verortet" und werden über `?platzieren=betreuungsstelle:<id>`
+platziert. Die Ebene hängt an der Modulfreigabe Betreuung, und zwar an der **Datenquelle**
+(`pages/lagekarte/betreuungEbene.ts`, Muster der Betroffenen): Ohne Recht gibt es keinen
+Abruf und eine Sperrzeile, ein 403 ist kein Quellenfehler. Die **Ort-Vorschau kennt keine
+Stellen**, weil ihre Peilung (`src/geocoding/marker.rs`) nur den Einsatz-Lesezugriff prüft.
+Ein Bezugspunkt dort nennte den Namen auch ohne Modulrecht. Die Verortung läuft über den
+Stellen-PATCH, schreibt **kein ETB** (LFH-639 D5), wird aber live verteilt. Träger ist
+`Geschrieben::still_geaendert`, denn ohne diese Marke schnitte der Leerlauf-Riegel einen reinen
+Karten-PATCH still ab. Evakuierungsbezirke sind der Zonentyp `evakuierungsbezirk` mit
+`lage_zone.evakuierungsbezirk_id` (n : 1, Vorbild Gefahrengebiet). Die Zone trägt nur die
+Kennung, Bezeichnung und Räumungszustand kommen aus der gesperrten Betreuungs-Query.
+Setzen der Zuordnung ohne Modulrecht ist 403, Storno löst die Flächen im selben Vorgang.
+`0119` ist der erste Rebuild von `lage_zone`. Herleitung:
+`openspec/changes/lfh-673-betreuung-auf-der-lagekarte/design.md`.
+
 **Sichtung ist eine eigene fachliche Farbachse am selben zentralen Ort**, keine A0-Rolle.
 `SichtungsTag` zeigt die feste Kennzeichnung aus `tokens.ts` als umrandetes Farbfeld:
 SK I rot, II gelb, III grün, IV blau, Tote schwarz; „unverletzt“ ohne erfundene Fachfarbe

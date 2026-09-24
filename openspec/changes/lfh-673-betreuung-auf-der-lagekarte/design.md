@@ -180,7 +180,9 @@ Unterabfrage in `bezirk_select!`
 (`(SELECT COUNT(*) FROM lage_zone z WHERE z.evakuierungsbezirk_id = b.id)`). Die
 Betreuungsseite braucht damit keine Zonen-Query, und die Zonen-Query würde am Modul
 Lagekarte hängen, nicht am Modul Betreuung. „Auf Karte zeigen“ erscheint nur bei
-`flaechen > 0`.
+`flaechen > 0`, und zwar als Eintrag im gebündelten Menü der Bezirkskarte, auch für
+Lesende. Ein eigenes Feld „keine Fläche“ gibt es nicht: der Plan-Modus trägt höchstens drei
+Sekundärfelder (Evakuiert, Stand, Abschnitt), und keins davon ist entbehrlicher.
 
 ### D8 — Frontend-Kette für den Marker
 

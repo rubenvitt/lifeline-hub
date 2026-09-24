@@ -1,19 +1,30 @@
-import { Button, Input, Popconfirm, Space, Typography } from 'antd';
+import { Button, Input, Popconfirm, Space, Typography, theme } from 'antd';
+import { Link } from 'react-router';
 import { Select } from '../../components/Select';
 import { useEffect, useId, useRef, useState } from 'react';
 import FeldLabel from '../../components/FeldLabel';
 import GeoKennzahlen, { KennzahlZeile } from '../../components/GeoKennzahlen';
-import type { Gefahrengebiet, KartenAnsicht, LageZone, ZoneTyp } from '../../api/types';
+import type {
+  Evakuierungsbezirk,
+  Gefahrengebiet,
+  KartenAnsicht,
+  LageZone,
+  ZoneTyp,
+} from '../../api/types';
 import { gefahrengebietName } from '../../api/gefahren';
 import { ZONE_TYPEN, zoneTypLabel, zoneStil } from './zonenStil';
 import StatusTag from '../../components/StatusTag';
-import { warnstufeKarte } from '../../theme/statusFarben';
+import { raeumungszustand, warnstufeKarte } from '../../theme/statusFarben';
+import { Datenfeld, Datenraster } from '../../components/instrument';
+import { evakuiertText } from '../../betreuung/betreuungText';
 import { parseGeometry, geoKennzahlen } from './geo';
 import KartenDetailCard from './KartenDetailCard';
 import AnsichtZuordnung from './AnsichtZuordnung';
 
 /** Sentinel im Dropdown für „in neues Gefahrengebiet abspalten". */
 const NEU = -1;
+/** Sentinel im Bezirks-Dropdown für „nicht zugeordnet" (LFH-673). */
+const KEIN_BEZIRK = -1;
 
 export interface ZonenInspectorProps {
   zone: LageZone;
@@ -28,11 +39,19 @@ export interface ZonenInspectorProps {
     notiz?: string | null;
     gefahrengebiet_id?: number | null;
     ansicht_id?: number | null;
+    evakuierungsbezirk_id?: number | null;
   }) => Promise<void>;
   onMatrixOeffnen: (gefahrengebietId: number) => void;
   onLoeschen: () => void;
   /** Ansichts-Zuordnung (B/LFH-320). */
   ansichten: KartenAnsicht[];
+  /** Evakuierungsbezirke (LFH-673) — leer ohne Lesezugriff auf das Modul Betreuung. */
+  bezirke?: Evakuierungsbezirk[];
+  /** Darf der Benutzer das Modul Betreuung lesen? Ohne Recht keine Zuordnung und keine
+   *  Bezirksangaben — der Server lehnt das Setzen dann ohnehin mit 403 ab. */
+  betreuungFrei?: boolean;
+  /** Ziel des Sprungs „Im Fachmodul öffnen" zu einem Bezirk (`betreuungPfad(?bezirk=)`). */
+  bezirkPfad?: (bezirkId: number) => string;
 }
 
 export default function ZonenInspector({
@@ -44,8 +63,13 @@ export default function ZonenInspector({
   onMatrixOeffnen,
   onLoeschen,
   ansichten,
+  bezirke = [],
+  betreuungFrei = false,
+  bezirkPfad,
 }: ZonenInspectorProps) {
+  const { token } = theme.useToken();
   const gebietId = useId();
+  const bezirkFeldId = useId();
   const [entwurf, setEntwurf] = useState(() => ({
     typ: zone.typ,
     label: zone.label ?? '',
@@ -53,6 +77,7 @@ export default function ZonenInspector({
     notiz: zone.notiz ?? '',
     gefahrengebiet_id: zone.gefahrengebiet_id,
     ansicht_id: zone.ansicht_id,
+    evakuierungsbezirk_id: zone.evakuierungsbezirk_id ?? null,
   }));
   const [speicherStatus, setSpeicherStatus] = useState<
     'idle' | 'speichert' | 'gespeichert' | 'fehler'
@@ -77,6 +102,7 @@ export default function ZonenInspector({
       notiz: zone.notiz ?? '',
       gefahrengebiet_id: zone.gefahrengebiet_id,
       ansicht_id: zone.ansicht_id,
+      evakuierungsbezirk_id: zone.evakuierungsbezirk_id ?? null,
     });
     setSpeicherStatus('idle');
   }, [
@@ -87,6 +113,7 @@ export default function ZonenInspector({
     zone.notiz,
     zone.gefahrengebiet_id,
     zone.ansicht_id,
+    zone.evakuierungsbezirk_id,
   ]);
 
   async function speichern(patch: Parameters<ZonenInspectorProps['onAendern']>[0]) {
@@ -109,6 +136,18 @@ export default function ZonenInspector({
   const aktuellHatWarnstufen = (aktuellesGebiet?.hoechste_warnstufe ?? 'keine') !== 'keine';
   // Geometrie-Kennzahlen rein clientseitig aus der GeoJSON-Geometrie (LFH-146).
   const kennzahlen = geoKennzahlen(parseGeometry(zone.geometrie));
+
+  // Bezirksfläche (LFH-673): der zugeordnete Bezirk, sofern lesbar.
+  const istBezirksflaeche = entwurf.typ === 'evakuierungsbezirk';
+  const aktuellerBezirk =
+    istBezirksflaeche && betreuungFrei
+      ? (bezirke.find((b) => b.id === entwurf.evakuierungsbezirk_id) ?? null)
+      : null;
+  const bezirkZuordnen = (ziel: number) => {
+    const evakuierungsbezirk_id = ziel === KEIN_BEZIRK ? null : ziel;
+    setEntwurf((alt) => ({ ...alt, evakuierungsbezirk_id }));
+    void speichern({ evakuierungsbezirk_id });
+  };
 
   const umhaengen = (ziel: number) => {
     const gefahrengebiet_id = ziel === NEU ? null : ziel;
@@ -219,6 +258,66 @@ export default function ZonenInspector({
               <Button block onClick={() => onMatrixOeffnen(entwurf.gefahrengebiet_id as number)}>
                 Gefahrenmatrix bearbeiten
               </Button>
+            )}
+          </>
+        )}
+
+        {istBezirksflaeche && !betreuungFrei && (
+          <Typography.Text type="secondary">
+            Zuordnung zu einem Evakuierungsbezirk nur mit Zugriff auf das Modul Betreuung
+          </Typography.Text>
+        )}
+        {istBezirksflaeche && betreuungFrei && darfSchreiben && (
+          <FeldLabel text="Gehört zu Evakuierungsbezirk" htmlFor={bezirkFeldId}>
+            <Select<number>
+              id={bezirkFeldId}
+              style={{ width: '100%' }}
+              value={entwurf.evakuierungsbezirk_id ?? KEIN_BEZIRK}
+              disabled={gesperrt}
+              options={[
+                { value: KEIN_BEZIRK, label: 'nicht zugeordnet' },
+                ...bezirke.map((b) => ({ value: b.id, label: b.bezeichnung })),
+              ]}
+              onChange={(v) => bezirkZuordnen(v)}
+            />
+          </FeldLabel>
+        )}
+        {istBezirksflaeche && betreuungFrei && !darfSchreiben && !aktuellerBezirk && (
+          <Typography.Text type="secondary">keinem Evakuierungsbezirk zugeordnet</Typography.Text>
+        )}
+        {aktuellerBezirk && (
+          <>
+            <Datenraster
+              beschriftung={`Evakuierungsbezirk ${aktuellerBezirk.bezeichnung}`}
+              spalten={1}
+            >
+              {!darfSchreiben && (
+                <Datenfeld label="Bezirk">{aktuellerBezirk.bezeichnung}</Datenfeld>
+              )}
+              <Datenfeld label="Räumung">
+                <StatusTag darstellung={raeumungszustand[aktuellerBezirk.raeumung]} />
+              </Datenfeld>
+              <Datenfeld label="Evakuiert" mono>
+                {evakuiertText(aktuellerBezirk)}
+              </Datenfeld>
+            </Datenraster>
+            {bezirkPfad && (
+              // Ein Sprung ist keine Handlung (LFH-616): eigene Zeile, der zugängliche Name
+              // trägt den Bezirk, das ↗ ist Deeplink-Zeichen und steht `aria-hidden`.
+              <div
+                data-lfh="inspector-sprung"
+                style={{ display: 'flex', flexWrap: 'wrap', gap: token.marginXS }}
+              >
+                <Link
+                  to={bezirkPfad(aktuellerBezirk.id)}
+                  aria-label={`Betreuung zu ${aktuellerBezirk.bezeichnung}`}
+                  style={{ display: 'block', flex: '1 1 auto' }}
+                >
+                  <Button block>
+                    Im Fachmodul öffnen<span aria-hidden="true">↗</span>
+                  </Button>
+                </Link>
+              </div>
             )}
           </>
         )}

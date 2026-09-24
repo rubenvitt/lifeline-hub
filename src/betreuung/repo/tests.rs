@@ -121,6 +121,13 @@ async fn bezirk_aendern(w: &Welt, id: i64, a: BezirkAenderung) -> Result<Geschri
 }
 
 async fn bezirk_stornieren(w: &Welt, id: i64) -> Result<Geschrieben, AppError> {
+    bezirk_stornieren_mit_zonen(w, id).await.map(|(g, _)| g)
+}
+
+async fn bezirk_stornieren_mit_zonen(
+    w: &Welt,
+    id: i64,
+) -> Result<(Geschrieben, Vec<i64>), AppError> {
     write_retry!(&w.pool, |conn| {
         bezirk_stornieren_tx(conn, w.e, id, w.b, STARTWERT).await
     })
@@ -1840,4 +1847,75 @@ async fn ruecknahme_nach_wiederoeffnen_gelingt() {
 
     belegung_zurueck(&w, leer.meldung_id).await.unwrap();
     assert_eq!(aktuelle_belegung(&w, id).await, Some(40));
+}
+
+// ── LFH-673: Bezirksflächen ─────────────────────────────────────────────────────────────────
+
+/// Legt eine Zone vom Typ `evakuierungsbezirk` an, optional einem Bezirk zugeordnet.
+async fn bezirksflaeche(w: &Welt, bezirk: Option<i64>) -> i64 {
+    sqlx::query_scalar(
+        "INSERT INTO lage_zone (einsatz_id, typ, geometrie_typ, geometrie, erstellt_von, \
+            evakuierungsbezirk_id) \
+         VALUES (?, 'evakuierungsbezirk', 'Polygon', \
+            '{\"type\":\"Polygon\",\"coordinates\":[[[8,50],[8.1,50],[8.1,50.1],[8,50]]]}', ?, ?) \
+         RETURNING id",
+    )
+    .bind(w.e)
+    .bind(w.b)
+    .bind(bezirk)
+    .fetch_one(&w.pool)
+    .await
+    .unwrap()
+}
+
+#[tokio::test]
+async fn flaechen_zaehlt_die_zugeordneten_zonen() {
+    let w = welt().await;
+    let ufer = bezirk(&w, "Uferstraße 12–40", 640).await;
+    let hafen = bezirk(&w, "Hafenviertel", 120).await;
+    assert_eq!(bezirk_laden(&w.pool, w.e, ufer).await.unwrap().flaechen, 0);
+    bezirksflaeche(&w, Some(ufer)).await;
+    bezirksflaeche(&w, Some(ufer)).await;
+    bezirksflaeche(&w, None).await;
+    let u = uebersicht(&w.pool, w.e).await.unwrap();
+    let flaechen = |id: i64| u.bezirke.iter().find(|b| b.id == id).unwrap().flaechen;
+    assert_eq!(flaechen(ufer), 2);
+    assert_eq!(flaechen(hafen), 0);
+    let v = serde_json::to_value(bezirk_laden(&w.pool, w.e, hafen).await.unwrap()).unwrap();
+    assert_eq!(
+        v["flaechen"], 0,
+        "0 steht auf dem Draht, nicht weggelassen: {v}"
+    );
+}
+
+#[tokio::test]
+async fn storno_loest_die_flaechen_und_laesst_sie_stehen() {
+    let w = welt().await;
+    let ufer = bezirk(&w, "Uferstraße 12–40", 640).await;
+    let a = bezirksflaeche(&w, Some(ufer)).await;
+    let b = bezirksflaeche(&w, Some(ufer)).await;
+    let fremd = bezirksflaeche(&w, None).await;
+
+    let (_, geloest) = bezirk_stornieren_mit_zonen(&w, ufer).await.unwrap();
+    let mut geloest = geloest;
+    geloest.sort();
+    assert_eq!(geloest, vec![a, b]);
+
+    let zonen: Vec<(i64, String, Option<i64>)> = sqlx::query_as(
+        "SELECT id, typ, evakuierungsbezirk_id FROM lage_zone WHERE einsatz_id = ? ORDER BY id",
+    )
+    .bind(w.e)
+    .fetch_all(&w.pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        zonen,
+        vec![
+            (a, "evakuierungsbezirk".into(), None),
+            (b, "evakuierungsbezirk".into(), None),
+            (fremd, "evakuierungsbezirk".into(), None),
+        ],
+        "die Flächen bleiben als nicht zugeordnete Bezirksflächen"
+    );
+    assert_eq!(bezirk_laden(&w.pool, w.e, ufer).await.unwrap().flaechen, 0);
 }

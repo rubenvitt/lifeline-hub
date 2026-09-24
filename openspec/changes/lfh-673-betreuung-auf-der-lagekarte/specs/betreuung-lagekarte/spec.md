@@ -212,7 +212,8 @@ erhalten bleiben. Die Änderung MUST live an die Karte verteilt werden.
 ### Requirement: Bezirk und Fläche in beide Richtungen verbunden
 
 Die Anzeige eines Evakuierungsbezirks SHALL die Zahl der ihm zugeordneten Zonen tragen.
-Die Betreuungsseite MUST je Bezirk mit mindestens einer Zone „Auf Karte zeigen“ anbieten.
+Die Betreuungsseite MUST je Bezirk mit mindestens einer Zone „Auf Karte zeigen“ anbieten,
+auch Personen ohne Schreibrecht (ein Sprung ist Lesen).
 Die Adresse `/einsaetze/<id>/lagekarte?evakuierungsbezirk=<bezirk-id>` MUST eine Zone dieses
 Bezirks auswählen, die Karte dorthin führen und den Parameter danach entfernen. Die
 Auswahl einer zugeordneten Zone MUST für Personen mit Lesezugriff auf das Modul Bezirk,
@@ -226,7 +227,7 @@ Karte MUST für diese Personen den Räumungszustand als Text tragen.
 
 #### Scenario: Bezirk ohne Fläche
 - **WHEN** ein Bezirk keine zugeordnete Zone hat
-- **THEN** bietet die Betreuungsseite an ihm kein „Auf Karte zeigen“ an, sondern nennt, dass keine Fläche gezeichnet ist
+- **THEN** bietet die Betreuungsseite an ihm kein „Auf Karte zeigen“ an
 
 #### Scenario: Aus der Karte ins Modul
 - **WHEN** eine zugeordnete Zone ausgewählt und der Sprung ins Modul gewählt wird

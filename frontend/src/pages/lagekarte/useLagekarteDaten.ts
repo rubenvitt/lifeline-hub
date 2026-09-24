@@ -34,7 +34,7 @@ import {
 } from './marker';
 import { parsePolygon, parseGeometry, polygonZentroid } from './geo';
 import { baueTzProps } from './taktischesZeichen';
-import { zoneStil, gefahrengebietStil, zonenBeschriftung } from './zonenStil';
+import { zoneStil, gefahrengebietStil, zonenBeschriftung, bezirkBeschriftung } from './zonenStil';
 import { zonenPlakette, type ZoneFeature } from './kartenLayer';
 import { rollenwerte } from '../../components/instrument';
 import type { SnapshotDaten, Standquelle } from './snapshotDaten';
@@ -256,6 +256,16 @@ export function useLagekarteDaten({
         : betreuungQuery.isError
           ? undefined
           : betreuungQuery.data?.stellen;
+  // Bezirke (LFH-673) hinter derselben Grenze: ihre Bezeichnung und ihr Räumungszustand
+  // beschriften die Bezirksflächen, die jeder Karten-Leser sieht.
+  const bezirkeRoh =
+    betreuungZugriff !== 'frei'
+      ? undefined
+      : istSnapshot
+        ? snap?.evakuierungsbezirke
+        : betreuungQuery.isError
+          ? undefined
+          : betreuungQuery.data?.bezirke;
   // Global-Scope-Freeze (Advisor): Org-TZ-Default aus dem Dokument, NICHT der Live-Query — sonst
   // schriebe eine Org-Umbenennung den historischen Stand um.
   const orgDefault = (istSnapshot ? snap?.org_default : orgQuery.data?.tz_organisation) ?? null;
@@ -344,6 +354,12 @@ export function useLagekarteDaten({
     return m;
   }, [gebieteRoh]);
 
+  const bezirkNachId = useMemo(() => {
+    const m = new Map<number, NonNullable<typeof bezirkeRoh>[number]>();
+    (bezirkeRoh ?? []).forEach((b) => m.set(b.id, b));
+    return m;
+  }, [bezirkeRoh]);
+
   // Beschriftungsplakette aus den Rollen des aktiven Modus (Neuentwurf S5).
   const plakette = useMemo(() => zonenPlakette(rollenwerte(token)), [token]);
 
@@ -365,10 +381,16 @@ export function useLagekarteDaten({
           gebietId != null
             ? gefahrengebietStil(warnstufe ?? 'keine', token)
             : zoneStil(z.typ, z.farbe);
-        const beschriftung = zonenBeschriftung(
-          z.label,
-          gebietId != null ? (warnstufe ?? 'unbekannt') : null,
-        );
+        // Bezirksfläche (LFH-673): Name und Räumungszustand nur, wenn der Bezirk lesbar ist.
+        const beschriftung =
+          z.typ === 'evakuierungsbezirk'
+            ? bezirkBeschriftung(
+                z.label,
+                z.evakuierungsbezirk_id != null
+                  ? (bezirkNachId.get(z.evakuierungsbezirk_id) ?? null)
+                  : null,
+              )
+            : zonenBeschriftung(z.label, gebietId != null ? (warnstufe ?? 'unbekannt') : null);
         return [
           {
             id: z.id,
@@ -381,7 +403,7 @@ export function useLagekarteDaten({
           },
         ];
       }),
-    [zonen, zeigeZonen, gebietWarnstufe, token, plakette],
+    [zonen, zeigeZonen, gebietWarnstufe, bezirkNachId, token, plakette],
   );
 
   // Benannter Quellenkatalog (LFH-331 · B3): Query-Zustand → der Name, unter dem eine
@@ -544,6 +566,8 @@ export function useLagekarteDaten({
     // Ansichts-gefiltert (B/LFH-320): nur Objekte der aktiven Ansicht + ansichtslose.
     zonen,
     gebiete: gebieteRoh ?? [],
+    // Evakuierungsbezirke (LFH-673) für den Zonen-Inspector — leer ohne Modulrecht.
+    bezirke: bezirkeRoh ?? [],
     // Ansichts-gefilterte freie Zeichen für den Inspector-Lookup (Etappe 4, LFH-170).
     freieZeichen,
     // Rohlisten für das Datenraster im Paneel „Ausgewählt" (Neuentwurf S5): die Marker tragen

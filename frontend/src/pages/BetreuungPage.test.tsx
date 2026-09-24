@@ -48,6 +48,7 @@ const bezirk = (over: Partial<Evakuierungsbezirk> & { id: number }): Evakuierung
   plan_personen: 640,
   plan_erhebung: 'geschaetzt',
   raeumung: 'angeordnet',
+  flaechen: 0,
   angelegt_at: '2026-09-23 08:00:00',
   ...over,
 });
@@ -441,6 +442,66 @@ describe('BetreuungPage (LFH-639)', () => {
     expect(await screen.findByTestId('lagekarte-ziel')).toHaveTextContent(
       '/einsaetze/1/lagekarte?platzieren=betreuungsstelle%3A8',
     );
+  });
+
+  it('„Auf Karte zeigen" am Bezirk mit Fläche führt zur Fläche (LFH-673)', async () => {
+    api.ladeBetreuung.mockResolvedValue({
+      bezirke: [{ ...UFER, flaechen: 2 }, HAFEN],
+      stellen: [],
+    });
+    renderPage();
+    // Ohne Fläche: kein Eintrag.
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Aktionen zu Bezirk Hafenviertel' }),
+    );
+    expect(
+      within(await offenesMenue()).queryByRole('menuitem', { name: /Auf Karte zeigen/ }),
+    ).toBeNull();
+    await userEvent.keyboard('{Escape}');
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Aktionen zu Bezirk Uferstraße 12–40' }),
+    );
+    await waitFor(() => {
+      const offen = document.querySelectorAll(
+        '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+      );
+      expect(
+        within(offen[offen.length - 1] as HTMLElement).getByRole('menuitem', {
+          name: /Auf Karte zeigen/,
+        }),
+      ).toBeTruthy();
+    });
+    const offen = document.querySelectorAll(
+      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+    );
+    await userEvent.click(
+      within(offen[offen.length - 1] as HTMLElement).getByRole('menuitem', {
+        name: /Auf Karte zeigen/,
+      }),
+    );
+    expect(await screen.findByTestId('lagekarte-ziel')).toHaveTextContent(
+      '/einsaetze/1/lagekarte?evakuierungsbezirk=5',
+    );
+  });
+
+  it('ohne Schreibrecht: am Bezirk mit Fläche nur „Auf Karte zeigen", ohne Fläche kein Menü (LFH-673)', async () => {
+    einsatz.wert = { ...einsatz.wert, meine_rolle: 'beobachter' };
+    api.ladeBetreuung.mockResolvedValue({
+      bezirke: [{ ...UFER, flaechen: 1 }, HAFEN],
+      stellen: [],
+    });
+    renderPage();
+    await screen.findByText('Hafenviertel');
+    expect(screen.queryByRole('button', { name: 'Aktionen zu Bezirk Hafenviertel' })).toBeNull();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Aktionen zu Bezirk Uferstraße 12–40' }),
+    );
+    const menue = await offenesMenue();
+    expect(
+      within(menue)
+        .getAllByRole('menuitem')
+        .map((m) => m.textContent),
+    ).toEqual(['Auf Karte zeigen']);
   });
 
   it('ohne Schreibrecht gibt es keinen Einstieg „Auf Karte verorten" (LFH-673)', async () => {

@@ -598,6 +598,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("gefahrengebiet_id", G_FK),
             // Ansichts-Zugehörigkeit (LFH-320): FK auf karten_ansicht, kein Personenbezug.
             retain("ansicht_id", G_FK),
+            // LFH-673: Verweis auf den Evakuierungsbezirk — dessen Bezeichnung schwärzt der
+            // Block `evakuierungsbezirk`, der Verweis selbst trägt nichts.
+            retain("evakuierungsbezirk_id", G_FK),
         ],
     },
     TabellenRegel {

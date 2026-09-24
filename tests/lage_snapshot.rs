@@ -225,6 +225,8 @@ async fn snapshot_hat_alle_quellen_und_friert_org_default_ein() {
         "gefahrengebiete",
         "lagemeldungen",
         "bilder",
+        "betreuungsstellen",
+        "evakuierungsbezirke",
     ] {
         assert!(
             snap.daten[key].is_array(),
@@ -486,5 +488,98 @@ async fn snapshot_dokument_redigiert_gesperrtes_modul_fuer_den_leser() {
     assert!(
         dok["daten"].get("einsatz").is_some(),
         "lagekarte-natives einsatz bleibt: {dok}"
+    );
+}
+
+// ---------- LFH-673: Betreuungsstellen und Bezirke im Stand ----------
+
+#[tokio::test]
+async fn snapshot_friert_betreuung_ein_und_redigiert_sie_ohne_modulrecht() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let benutzer_id: i64 =
+        sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = 'admin'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    let (s, stelle) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/betreuung/stellen"),
+        &admin,
+        Some(r#"{"bezeichnung":"NU Turnhalle Nord","art":"notunterkunft"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{stelle:?}");
+    let sid = stelle["id"].as_i64().unwrap();
+    let (s, _) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{e}/betreuung/stellen/{sid}"),
+        &admin,
+        Some(r#"{"lat":51.93,"lon":8.87}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/betreuung/bezirke"),
+        &admin,
+        Some(r#"{"bezeichnung":"Uferstraße 12–40","plan_personen":640,"plan_erhebung":"geschaetzt"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+
+    let snap = repo::erzeuge(&pool, e, benutzer_id, Some("S"), None)
+        .await
+        .unwrap();
+    assert_eq!(snap.daten["betreuungsstellen"][0]["lat"], 51.93);
+    assert_eq!(
+        snap.daten["evakuierungsbezirke"][0]["bezeichnung"],
+        "Uferstraße 12–40"
+    );
+
+    // Ein Leser ohne Modul Betreuung bekommt beide Felder leer.
+    let leser_id = benutzer_anlegen(&app, &admin, "leser2", "keine").await;
+    rolle_setzen(&app, &admin, e, leser_id, "beobachter").await;
+    let leser = login_cookie(&app, "leser2", "leser2pw1").await;
+    let (s, _) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{e}/modul-overrides/betreuung"),
+        &admin,
+        Some(r#"{"sichtbar":true,"benoetigte_rolle":"fuehrungskraft"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let pfad = format!("/api/einsaetze/{e}/lage-snapshots/{}", snap.id);
+    let (s, dok) = anfrage(&app, "GET", &pfad, &leser, None).await;
+    assert_eq!(s, StatusCode::OK, "{dok:?}");
+    assert!(
+        dok["daten"]["betreuungsstellen"]
+            .as_array()
+            .unwrap()
+            .is_empty(),
+        "{dok}"
+    );
+    assert!(
+        dok["daten"]["evakuierungsbezirke"]
+            .as_array()
+            .unwrap()
+            .is_empty(),
+        "{dok}"
+    );
+    let text = dok.to_string();
+    assert!(
+        !text.contains("Turnhalle") && !text.contains("Uferstraße"),
+        "{text}"
+    );
+    // Der Admin sieht beides weiter.
+    let (_, dok) = anfrage(&app, "GET", &pfad, &admin, None).await;
+    assert_eq!(
+        dok["daten"]["betreuungsstellen"].as_array().unwrap().len(),
+        1
     );
 }

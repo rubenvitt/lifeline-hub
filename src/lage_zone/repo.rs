@@ -13,6 +13,9 @@ pub struct ZoneNeu<'a> {
     pub notiz: Option<&'a str>,
     /// Ansichts-Zugehörigkeit (LFH-320): `None` = auf allen Ansichten sichtbar.
     pub ansicht_id: Option<i64>,
+    /// Zugeordneter Evakuierungsbezirk (LFH-673). Der Handler hat Typ, Einsatz, Lebenszyklus
+    /// und Modulrecht geprüft; hier wird nur geschrieben.
+    pub evakuierungsbezirk_id: Option<i64>,
     pub erstellt_von: i64,
 }
 
@@ -27,11 +30,16 @@ pub struct ZonePatch<'a> {
     /// Verschieben/Freigeben (LFH-320): `None` = unverändert, `Some(None)` = auf alle
     /// Ansichten (NULL), `Some(Some(x))` = auf Ansicht x.
     pub ansicht_id: Option<Option<i64>>,
+    /// Bezirks-Zuordnung (LFH-673): `None` = unverändert, `Some(None)` = lösen,
+    /// `Some(Some(x))` = zuordnen. Wechselt die Zone weg vom Typ `evakuierungsbezirk`, fällt
+    /// die Zuordnung unabhängig davon (wie beim Gefahrengebiet).
+    pub evakuierungsbezirk_id: Option<Option<i64>>,
 }
 
 const SELECT_ALLE: &str = "\
     SELECT id, einsatz_id, typ, geometrie_typ, geometrie, label, farbe, notiz, \
-           gefahrengebiet_id, ansicht_id, erstellt_von, erstellt_at, geaendert_at \
+           gefahrengebiet_id, ansicht_id, evakuierungsbezirk_id, erstellt_von, erstellt_at, \
+           geaendert_at \
     FROM lage_zone";
 
 #[derive(sqlx::FromRow)]
@@ -47,6 +55,7 @@ struct Row {
     notiz: Option<String>,
     gefahrengebiet_id: Option<i64>,
     ansicht_id: Option<i64>,
+    evakuierungsbezirk_id: Option<i64>,
     erstellt_von: i64,
     erstellt_at: String,
     geaendert_at: String,
@@ -64,6 +73,7 @@ fn zu_anzeige(r: Row) -> LageZoneAnzeige {
         notiz: r.notiz,
         gefahrengebiet_id: r.gefahrengebiet_id,
         ansicht_id: r.ansicht_id,
+        evakuierungsbezirk_id: r.evakuierungsbezirk_id,
         erstellt_von: r.erstellt_von,
         erstellt_at: r.erstellt_at,
         geaendert_at: r.geaendert_at,
@@ -152,13 +162,17 @@ pub async fn anlegen_tx(
     };
     let id = sqlx::query_scalar::<_, i64>(
         "INSERT INTO lage_zone \
-            (einsatz_id, typ, geometrie_typ, geometrie, label, farbe, notiz, gefahrengebiet_id, ansicht_id, erstellt_von) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+            (einsatz_id, typ, geometrie_typ, geometrie, label, farbe, notiz, gefahrengebiet_id, ansicht_id, \
+             evakuierungsbezirk_id, erstellt_von) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(einsatz_id).bind(daten.typ).bind(daten.geometrie_typ).bind(daten.geometrie)
     .bind(daten.label).bind(daten.farbe).bind(daten.notiz).bind(gebiet_id)
     // ansicht_id NUR in der Zone (LFH-320) — die Gefahrengebiet-Gruppe oben ist ansichtslos.
-    .bind(daten.ansicht_id).bind(daten.erstellt_von)
+    .bind(daten.ansicht_id)
+    // Nur an Bezirksflächen (LFH-673); an jedem anderen Typ bleibt die Spalte leer.
+    .bind(if daten.typ == "evakuierungsbezirk" { daten.evakuierungsbezirk_id } else { None })
+    .bind(daten.erstellt_von)
     .fetch_one(&mut *conn).await?;
     Ok(id)
 }
@@ -223,6 +237,17 @@ pub async fn aktualisiere(
         }
     };
 
+    // Bezirks-Zuordnung (LFH-673): Effektivwert wie `ziel_gebiet` — ein anderer Typ trägt nie
+    // einen Bezirk, sonst gewinnt der Patch, sonst bleibt der Bestand.
+    let ziel_bezirk: Option<i64> = if neuer_typ != "evakuierungsbezirk" {
+        None
+    } else {
+        match daten.evakuierungsbezirk_id {
+            Some(v) => v,
+            None => vorher.evakuierungsbezirk_id,
+        }
+    };
+
     let betroffen = sqlx::query(
         "UPDATE lage_zone SET \
             typ   = CASE WHEN ? THEN ? ELSE typ END, \
@@ -231,6 +256,7 @@ pub async fn aktualisiere(
             notiz = CASE WHEN ? THEN ? ELSE notiz END, \
             gefahrengebiet_id = ?, \
             ansicht_id = CASE WHEN ? THEN ? ELSE ansicht_id END, \
+            evakuierungsbezirk_id = ?, \
             geaendert_at = datetime('now') \
          WHERE id = ? AND einsatz_id = ?",
     )
@@ -246,6 +272,7 @@ pub async fn aktualisiere(
     .bind(ziel_gebiet)
     .bind(daten.ansicht_id.is_some())
     .bind(daten.ansicht_id.flatten())
+    .bind(ziel_bezirk)
     .bind(id)
     .bind(einsatz_id)
     .execute(&mut *tx)
@@ -265,31 +292,47 @@ pub async fn aktualisiere(
     laden(pool, einsatz_id, id).await
 }
 
-/// Hard-Delete INNERHALB einer offenen Transaktion (F06/LFH-244 Tier-A). Liefert die
-/// `gefahrengebiet_id` der gelöschten Zone (für das Aufräumen der ggf. verwaisten Gruppe
+/// Hard-Delete INNERHALB einer offenen Transaktion (F06/LFH-244 Tier-A). Liefert
+/// [`Aufgeloest`] — u. a. die `gefahrengebiet_id` der gelöschten Zone (für das Aufräumen der ggf. verwaisten Gruppe
 /// NACH dem Commit — das läuft auf dem Pool und darf nicht in dieselbe Tx, sonst Deadlock
 /// gegen den eigenen Write-Lock). `NotFound`, falls nichts gelöscht wurde (fremd/inexistent).
 pub async fn loese_auf_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     id: i64,
-) -> Result<Option<i64>, AppError> {
-    let gebiet_id = sqlx::query_scalar::<_, Option<i64>>(
-        "DELETE FROM lage_zone WHERE id = ? AND einsatz_id = ? RETURNING gefahrengebiet_id",
-    )
-    .bind(id)
-    .bind(einsatz_id)
-    .fetch_optional(&mut *conn)
-    .await?
-    .ok_or(AppError::NotFound)?;
-    Ok(gebiet_id)
+) -> Result<Aufgeloest, AppError> {
+    let (gefahrengebiet_id, evakuierungsbezirk_id) =
+        sqlx::query_as::<_, (Option<i64>, Option<i64>)>(
+            "DELETE FROM lage_zone WHERE id = ? AND einsatz_id = ? \
+             RETURNING gefahrengebiet_id, evakuierungsbezirk_id",
+        )
+        .bind(id)
+        .bind(einsatz_id)
+        .fetch_optional(&mut *conn)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    Ok(Aufgeloest {
+        gefahrengebiet_id,
+        evakuierungsbezirk_id,
+    })
+}
+
+/// Was an einer gelöschten Zone hing — für die Nacharbeit NACH dem Commit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Aufgeloest {
+    /// Gefahrengebiet-Gruppe (Aufräumen einer ggf. verwaisten Gruppe).
+    pub gefahrengebiet_id: Option<i64>,
+    /// Evakuierungsbezirk (LFH-673): dessen Flächenzahl hat sich geändert → Live-Ereignis.
+    pub evakuierungsbezirk_id: Option<i64>,
 }
 
 /// Pool-Wrapper: Hard-Delete (eigene Tx) + Aufräumen der verwaisten Gruppe. `NotFound`,
 /// falls nicht zum Einsatz. Delegiert an [`loese_auf_tx`].
 pub async fn loese_auf(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<(), AppError> {
     let mut conn = pool.acquire().await?;
-    let gebiet_id = loese_auf_tx(&mut conn, einsatz_id, id).await?;
+    let gebiet_id = loese_auf_tx(&mut conn, einsatz_id, id)
+        .await?
+        .gefahrengebiet_id;
     drop(conn);
     if let Some(g) = gebiet_id {
         crate::gefahr::repo::gebiet_aufraeumen_wenn_leer(pool, g).await?;
@@ -342,6 +385,7 @@ mod tests {
                 farbe: None,
                 notiz: None,
                 ansicht_id: None,
+                evakuierungsbezirk_id: None,
                 erstellt_von: von,
             },
         )
@@ -370,6 +414,7 @@ mod tests {
                 farbe: Some("#00ff00"),
                 notiz: None,
                 ansicht_id: None,
+                evakuierungsbezirk_id: None,
                 erstellt_von: von,
             },
         )
@@ -393,6 +438,7 @@ mod tests {
                 farbe: None,
                 notiz: Some("Notiz bleibt"),
                 ansicht_id: None,
+                evakuierungsbezirk_id: None,
                 erstellt_von: von,
             },
         )
@@ -433,6 +479,7 @@ mod tests {
                 farbe: None,
                 notiz: None,
                 ansicht_id: None,
+                evakuierungsbezirk_id: None,
                 erstellt_von: von,
             },
         )
@@ -449,6 +496,7 @@ mod tests {
                 farbe: None,
                 notiz: None,
                 ansicht_id: None,
+                evakuierungsbezirk_id: None,
                 erstellt_von: von,
             },
         )
@@ -491,6 +539,7 @@ mod tests {
                 farbe: None,
                 notiz: None,
                 ansicht_id: None,
+                evakuierungsbezirk_id: None,
                 erstellt_von: von,
             },
         )
@@ -518,6 +567,7 @@ mod tests {
                 farbe: None,
                 notiz: None,
                 ansicht_id: None,
+                evakuierungsbezirk_id: None,
                 erstellt_von: von,
             },
         )
@@ -557,6 +607,7 @@ mod tests {
                 farbe: None,
                 notiz: None,
                 ansicht_id: None,
+                evakuierungsbezirk_id: None,
                 erstellt_von: von,
             },
         )

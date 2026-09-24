@@ -475,10 +475,14 @@ export function lagekartePfad(
     snapshot?: number;
     platzieren?: { typ: PlatzierenZielTyp; id: number };
     zentrum?: Kartenzentrum;
+    evakuierungsbezirk?: number;
   } = {},
 ): string {
   return mitQuery(einsatzModulPfad(einsatzId, 'lagekarte'), {
     gefahrengebiet: opts.gefahrengebiet,
+    // Bezirksfläche (LFH-673): die Karte wählt eine Zone dieses Bezirks, fliegt hin und räumt
+    // den Parameter — dasselbe Muster wie `gefahrengebiet`.
+    evakuierungsbezirk: opts.evakuierungsbezirk,
     ansicht: opts.ansicht,
     // Historien-Modus (C/LFH-321): ?snapshot=<id> zeigt den eingefrorenen Stand (schreibgeschützt).
     snapshot: opts.snapshot,
