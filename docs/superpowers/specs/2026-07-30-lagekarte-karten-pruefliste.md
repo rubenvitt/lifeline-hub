@@ -115,7 +115,8 @@ gefunden wird.
 > Aktionsauslöser, also zwischen zwei Trefflächen. Nachweis über die **Quelle**:
 > `pages/lagekarte/leistenAbstand.guard.test.ts` scannt `Sidebar.tsx`, `KlappPaneel.tsx` und
 > `AnsichtSwitcher.tsx` über den TS-Syntaxbaum (Kommentare zählen nicht) auf feste Abstände
-> und `<Space size={Zahl}>`, mit Selbsttest.
+> in Stilobjekten und an `Space`/`Flex`/`Row`, mit Selbsttest; was er nicht sieht (Wert aus
+> einer Variablen, Spread aus einer fremden Datei, CSS), steht in seinem Dateikopf.
 
 ---
 

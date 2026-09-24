@@ -114,7 +114,7 @@ export default function AnsichtSwitcher({
   }
 
   return (
-    // Kein Außenabstand: der Switcher steht im gepolsterten Paneel „Ansicht", dessen
+    // Kein Außenabstand: der Switcher steht im gepolsterten Paneel „Kartenansicht", dessen
     // Polsterung den Abstand zur Haarlinie trägt. Das frühere `marginBottom` stammte aus dem
     // Kartenstapel der alten Leiste und legte sich dort zusätzlich darauf (LFH-377).
     <div>
