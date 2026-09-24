@@ -38,7 +38,7 @@ import { kontrast, randKontrast } from './kontrast-kern';
  *
  * DER GEWÄHLTE RADIO-KNOPF („geschlossen", „geschätzt", „gezählt") ist tragend. Er stand am
  * Tag in `bedien` auf Weiß bei 6,59 : 1 — im ersten Lauf dieses Specs gemessen und in
- * LFH-677 behoben: `theme/sprache.css` setzt den TEXT des gewählten Knopfs und des Knopfs
+ * LFH-677 behoben: `src/index.css` setzt den TEXT des gewählten Knopfs und des Knopfs
  * unter dem Zeiger auf `--lfh-bedien-text` (Regel aus LFH-650), Rand und Flächen bleiben.
  *
  * DREI BENANNTE AUSNAHMEN — Eigenschaften geteilter Rollen, nicht dieser Seite; bis dahin gilt
@@ -60,7 +60,7 @@ import { kontrast, randKontrast } from './kontrast-kern';
  * `alarmText` → `alarm` in `components/instrument/statusFlaeche.ts` — der Taglauf wird an
  * allen fünf benannten Etiketten rot („angeordnet", „läuft", „fast voll" 6,02 : 1; „voll",
  * „überbelegt" 5,52 : 1) und an denselben Wortlauten im Textbaum. Die Radio-Regel in
- * `sprache.css` entfernt → „geschlossen", „geschätzt", „gezählt" rot mit 6,59 : 1. Danach
+ * `index.css` entfernt → „geschlossen", „geschätzt", „gezählt" rot mit 6,59 : 1. Danach
  * zurückgesetzt.
  *
  * ═══ KRITERIUM 13 — Fokus nie verdeckt (WCAG 2.4.11) ════════════════════════════════════
@@ -542,7 +542,7 @@ for (const modus of ['light', 'dark'] as const) {
       ['Evakuierungsbezirk anlegen', 'Bezeichnung'],
       ['Stand melden: Uferstraße 12–40', 'Zeitpunkt'],
       // Der GEWÄHLTE Radio-Knopf: am Tag lag er in `bedien` bei 6,59 : 1 — seit LFH-677
-      // läuft sein Text über `--lfh-bedien-text` (`theme/sprache.css`), tragend.
+      // läuft sein Text über `--lfh-bedien-text` (`src/index.css`), tragend.
       ['Stelle bearbeiten', 'geschlossen'],
       ['Evakuierungsbezirk anlegen', 'geschätzt'],
       ['Stand melden: Uferstraße 12–40', 'gezählt'],

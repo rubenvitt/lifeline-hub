@@ -224,7 +224,8 @@ abgelehnt — `SichtungsTag`/`sichtungsfarben` bleiben BBK.
 Bedien-TEXT nimmt `rollen.bedienText`, nicht antds `colorLink` — der Linkton trug auf einer
 Lückenzeile 5,93 (Tag) / 4,50 (Nacht). Dasselbe gilt für den Radio-Knopf (LFH-677): antd schreibt
 seinen Text gewählt und unter dem Zeiger in `colorPrimary`, am Tag 6,59 auf Weiß.
-`sprache.css` setzt NUR diesen Text auf `--lfh-bedien-text`. Ein Komponenten-Token
+`index.css` (global geladen) setzt NUR diesen Text auf `--lfh-bedien-text`, nur im Stil
+`outline`. Ein Komponenten-Token
 `Radio.colorPrimary` färbte auch Scheibe und Flächen und ist deshalb verworfen. Personen-Marker tragen eine unsichtbare Trefferzone mit
 dem Durchmesser `controlHeight` (`KarteMarker.trefferDurchmesser`) und außen 2 px Schwarz um den
 weißen Rand (Weiß + Schwarz halten gegen jeden Grund ≥ 4,58); die Lagekarte setzt beides nicht.

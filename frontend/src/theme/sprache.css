@@ -226,17 +226,6 @@
   font-family: var(--lfh-schrift-zahl);
   font-variant-numeric: tabular-nums;
 }
-/* Radio-Knopf (Knopfform): Text in `bedienText` (LFH-677, Regel aus LFH-650). antd schreibt
-   den Text des gewählten Knopfs und jedes Knopfs unter dem Zeiger in `colorPrimary` —
-   am Tag `bedien` auf Weiß, gemessen 6,59 : 1 unter dem Tagesboden 7 : 1. Nur der TEXT:
-   Rand, Scheibe und Flächen bleiben auf `bedien` (ein Komponenten-Token hätte sie mitgefärbt).
-   `.ant-radio-group` davor hebt die Spezifität über antds (0,3,0) — sonst entschiede die
-   Einfügereihenfolge der CSS-in-JS-Stile. */
-.ant-radio-group .ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled),
-.ant-radio-group .ant-radio-button-wrapper:not(.ant-radio-button-wrapper-disabled):hover {
-  color: var(--lfh-bedien-text);
-}
-
 /* Freiraum unter der stehenden Kopfzeile (LFH-677, WCAG 2.4.11). Rückwärts getabbt rollt
    der Browser das Fokusziel an den oberen Rand — ohne diesen Rand genau unter die Kopfzeile.
    `scroll-margin` wirkt am Element, das in die Sicht gerollt wird, also am Ziel selbst:
