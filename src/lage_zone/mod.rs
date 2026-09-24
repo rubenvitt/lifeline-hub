@@ -12,6 +12,9 @@ pub enum LageZoneTyp {
     Absperrgrenze,
     Sperrgebiet,
     FreieSkizze,
+    /// Fläche eines Evakuierungsbezirks (LFH-673). Nur Polygon; optional einem Bezirk des
+    /// Fachmoduls Betreuung zugeordnet (`evakuierungsbezirk_id`, n : 1).
+    Evakuierungsbezirk,
 }
 impl LageZoneTyp {
     pub fn as_str(&self) -> &'static str {
@@ -21,6 +24,7 @@ impl LageZoneTyp {
             LageZoneTyp::Absperrgrenze => "absperrgrenze",
             LageZoneTyp::Sperrgebiet => "sperrgebiet",
             LageZoneTyp::FreieSkizze => "freie_skizze",
+            LageZoneTyp::Evakuierungsbezirk => "evakuierungsbezirk",
         }
     }
     pub fn parse(s: &str) -> Option<LageZoneTyp> {
@@ -30,6 +34,7 @@ impl LageZoneTyp {
             "absperrgrenze" => Some(LageZoneTyp::Absperrgrenze),
             "sperrgebiet" => Some(LageZoneTyp::Sperrgebiet),
             "freie_skizze" => Some(LageZoneTyp::FreieSkizze),
+            "evakuierungsbezirk" => Some(LageZoneTyp::Evakuierungsbezirk),
             _ => None,
         }
     }
@@ -80,6 +85,11 @@ pub struct LageZoneAnzeige {
     /// Ansichts-Zugehörigkeit (LFH-320): `None` = auf allen Ansichten sichtbar.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ansicht_id: Option<i64>,
+    /// Zugeordneter Evakuierungsbezirk (LFH-673), nur an Zonen vom Typ `evakuierungsbezirk`.
+    /// NUR die Kennung: Bezeichnung und Räumungszustand hängen am Modul Betreuung und kommen
+    /// aus dessen Übersicht — die Zonenliste liest jeder Karten-Leser.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub evakuierungsbezirk_id: Option<i64>,
     pub erstellt_von: i64,
     pub erstellt_at: String,
     pub geaendert_at: String,
@@ -93,6 +103,7 @@ pub fn typ_label(typ: &str) -> &'static str {
         "absperrgrenze" => "Absperrgrenze",
         "sperrgebiet" => "Sperrgebiet",
         "freie_skizze" => "Freie Skizze",
+        "evakuierungsbezirk" => "Evakuierungsbezirk",
         _ => "Zone",
     }
 }
@@ -104,9 +115,30 @@ pub fn geometrie_klasse_passt(typ: &str, geometrie_typ: &str) -> bool {
     match geometrie_typ {
         "Polygon" => matches!(
             typ,
-            "gefahrengebiet" | "absperrbereich" | "sperrgebiet" | "freie_skizze"
+            "gefahrengebiet"
+                | "absperrbereich"
+                | "sperrgebiet"
+                | "freie_skizze"
+                | "evakuierungsbezirk"
         ),
         "LineString" => matches!(typ, "absperrgrenze" | "freie_skizze"),
         _ => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// LFH-673: der Bezirk ist eine Fläche — keine Linie, und das Typwort steht im ETB.
+    #[test]
+    fn evakuierungsbezirk_nur_als_flaeche_mit_eigenem_typwort() {
+        assert!(geometrie_klasse_passt("evakuierungsbezirk", "Polygon"));
+        assert!(!geometrie_klasse_passt("evakuierungsbezirk", "LineString"));
+        assert_eq!(typ_label("evakuierungsbezirk"), "Evakuierungsbezirk");
+        assert_eq!(
+            LageZoneTyp::parse("evakuierungsbezirk"),
+            Some(LageZoneTyp::Evakuierungsbezirk)
+        );
     }
 }

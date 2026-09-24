@@ -1,4 +1,5 @@
 import type {
+  Betreuungsstelle,
   Einheit,
   Einsatzabschnitt,
   EinsatzFahrzeug,
@@ -11,6 +12,8 @@ import type {
 import type { OnlineStyle } from '../../api/karte';
 import type { Farbrollen } from '../../theme/tokens';
 import {
+  auslastung,
+  betreuungsstelleStatus,
   schadenAusmass,
   schadenStatus,
   statusKategorie,
@@ -24,6 +27,8 @@ import type { KarteMarker, MarkerTyp } from './marker';
 import type { BasemapModus } from './basemapStil';
 import type { LayerSichtbar } from './Sidebar';
 import { PERSONEN_SPERRGRUND, type PersonenZugriff } from './personenEbene';
+import { BETREUUNG_SPERRGRUND, type BetreuungZugriff } from './betreuungEbene';
+import { ART_LABEL, personenZahl } from '../../betreuung/betreuungText';
 
 /**
  * Reine Ableitungen der rechten Kartenleiste (Neuentwurf S5 „Karte führt, Daten folgen").
@@ -34,8 +39,9 @@ import { PERSONEN_SPERRGRUND, type PersonenZugriff } from './personenEbene';
 
 // ── Ebenen ─────────────────────────────────────────────────────────────────────────────
 
-/** Reihenfolge und Wortlaut der Ebenen-Zeilen — die zehn Schalter von vor LFH-648 plus
- *  „Betroffene" (LFH-648) am Ende: die einzige Ebene mit Vorgabe aus und Zugriffsgrenze. */
+/** Reihenfolge und Wortlaut der Ebenen-Zeilen — die zehn Schalter von vor LFH-648, dazu
+ *  „Betreuungsstellen" (LFH-673) neben der UHS und „Betroffene" (LFH-648) am Ende. Beide
+ *  tragen eine Zugriffsgrenze; „Betroffene" ist die einzige Ebene mit Vorgabe aus. */
 export const EBENEN: readonly { key: keyof LayerSichtbar; name: string }[] = [
   { key: 'einsatzort', name: 'Einsatzort' },
   { key: 'einheit', name: 'Einheiten' },
@@ -44,6 +50,7 @@ export const EBENEN: readonly { key: keyof LayerSichtbar; name: string }[] = [
   { key: 'abschnitt', name: 'Abschnitte' },
   { key: 'zone', name: 'Zonen' },
   { key: 'uhs', name: 'UHS' },
+  { key: 'betreuungsstelle', name: 'Betreuungsstellen' },
   { key: 'schaden', name: 'Schäden' },
   { key: 'lagemeldung', name: 'Lagemeldungen' },
   { key: 'freies_zeichen', name: 'Taktische Zeichen' },
@@ -101,6 +108,12 @@ export interface PersonenEbenenAngabe {
   fehler?: boolean;
 }
 
+/** Zugriffsangabe der Ebene „Betreuungsstellen" (LFH-673). Die Marker stehen in
+ *  `alleVerortet` wie die UHS — gezählt wird dort; von außen kommt nur die Grenze. */
+export interface BetreuungEbenenAngabe {
+  zugriff: BetreuungZugriff;
+}
+
 /**
  * Die Zeilen des Paneels „Ebenen".
  *
@@ -118,11 +131,20 @@ export function ebenenZeilen(
   layer: LayerSichtbar,
   quellenFehler: boolean,
   personen: PersonenEbenenAngabe = { zugriff: 'ausgeblendet', anzahl: 0 },
+  betreuung: BetreuungEbenenAngabe = { zugriff: 'ausgeblendet' },
 ): EbenenZeile[] {
   const zaehlung = new Map<MarkerTyp, number>();
   for (const m of verortet) zaehlung.set(m.typ, (zaehlung.get(m.typ) ?? 0) + 1);
   return EBENEN.flatMap(({ key, name }): EbenenZeile[] => {
     if (key === 'person') return personenZeile(name, layer.person, quellenFehler, personen);
+    // Dieselbe Regel wie „Betroffene": ausgeblendet → keine Zeile, gesperrt → Grund statt
+    // Zahl, nie „an". Die Zahl kommt hier aus `alleVerortet`, wie bei der UHS.
+    if (key === 'betreuungsstelle') {
+      if (betreuung.zugriff === 'ausgeblendet') return [];
+      if (betreuung.zugriff === 'gesperrt') {
+        return [{ key, name, anzahl: null, sichtbar: false, sperrgrund: BETREUUNG_SPERRGRUND }];
+      }
+    }
     const n = key === 'zone' ? zonenAnzahl : (zaehlung.get(key) ?? 0);
     return [{ key, name, anzahl: quellenFehler ? '—' : n, sichtbar: layer[key] }];
   });
@@ -170,6 +192,8 @@ export interface AuswahlRoh {
   uhs: readonly Uhs[];
   schaeden: readonly Schaden[];
   abschnitte: readonly Einsatzabschnitt[];
+  /** Betreuungsstellen (LFH-673) — leer ohne Modulrecht. */
+  betreuungsstellen: readonly Betreuungsstelle[];
   /**
    * Letzte Rückmeldung je Einheit (LFH-610). Optional und bewusst ohne Leerwert: fehlt sie
    * (lädt, 403 ohne Leserecht auf „Meldungen", Fehler, Historien-Modus), zeigt das Paneel
@@ -185,6 +209,7 @@ export const LEERE_ROHDATEN: AuswahlRoh = {
   uhs: [],
   schaeden: [],
   abschnitte: [],
+  betreuungsstellen: [],
 };
 
 /** Ein Feld des Datenrasters: Augenbraue + Wert, optional mit Statusrolle (getönter Chip). */
@@ -208,6 +233,7 @@ export const OBJEKTART: Record<MarkerTyp, string> = {
   freies_zeichen: 'Taktisches Zeichen',
   // Nur auf der Betroffenen-Karte (LFH-613); die Lagekarte führt Personen nicht als Ebene.
   person: 'Person',
+  betreuungsstelle: 'Betreuungsstelle',
 };
 
 /** Stärke in BOS-Schreibweise `F/UF/M//Σ` (wie `StaerkeAnzeige`), „—" ohne Angabe. */
@@ -236,6 +262,11 @@ export function auswahlUnterzeile(marker: KarteMarker, roh: AuswahlRoh): string 
       case 'uhs': {
         const u = roh.uhs.find((x) => x.id === marker.id);
         return u ? uhsTyp[u.typ]?.label : undefined;
+      }
+      // Die Einrichtungsstufe — das Zeichen ist für alle vier dasselbe (design.md D8).
+      case 'betreuungsstelle': {
+        const s = roh.betreuungsstellen.find((x) => x.id === marker.id);
+        return s ? ART_LABEL[s.art] : undefined;
       }
       default:
         return undefined;
@@ -311,6 +342,25 @@ export function auswahlRaster(
       return [
         { label: 'Status', wert: st?.label ?? u.status, rolle: st?.rolle, mono: false },
         { label: 'Abschnitt', wert: abschnittName(u.abschnitt_id), mono: false },
+      ];
+    }
+    case 'betreuungsstelle': {
+      const s = roh.betreuungsstellen.find((x) => x.id === marker.id);
+      if (!s) return [];
+      const st = betreuungsstelleStatus[s.status];
+      const belegt = s.belegung?.belegt;
+      const kap = s.kapazitaet_personen;
+      // „89 / 150" — ohne Meldung „—" (keine Meldung ist nicht 0), ohne Kapazität nur die Zahl.
+      const belegung =
+        belegt == null
+          ? '—'
+          : kap == null
+            ? personenZahl(belegt)
+            : `${personenZahl(belegt)} / ${personenZahl(kap)}`;
+      return [
+        { label: 'Status', wert: st?.label ?? s.status, rolle: st?.rolle, mono: false },
+        { label: 'Belegung', wert: belegung, rolle: auslastung(belegt, kap)?.rolle },
+        { label: 'Abschnitt', wert: abschnittName(s.abschnitt_id), mono: false },
       ];
     }
     case 'schaden': {

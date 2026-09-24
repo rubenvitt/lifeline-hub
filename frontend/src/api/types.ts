@@ -532,6 +532,9 @@ export interface BetreuungsstellePatch {
   status?: BetreuungsstelleStatus;
   standort?: string | null;
   notiz?: string | null;
+  /** Koordinate (LFH-673): als Paar senden; `null`/`null` entfernt die Verortung. */
+  lat?: number | null;
+  lon?: number | null;
 }
 
 /**

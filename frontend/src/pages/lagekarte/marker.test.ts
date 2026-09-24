@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { theme } from 'antd';
 import {
   baueMarker,
+  baueBetreuungMarker,
   baueTaktischeMarker,
   baueLageMeldungMarker,
   baueFreieZeichenMarker,
@@ -9,7 +10,14 @@ import {
   type TaktischeQuelle,
 } from './marker';
 import { rollenFarbe } from '../../theme/statusFarben';
-import type { EinsatzAnzeige, FreiesZeichen, LageMeldung, Schaden, Uhs } from '../../api/types';
+import type {
+  Betreuungsstelle,
+  EinsatzAnzeige,
+  FreiesZeichen,
+  LageMeldung,
+  Schaden,
+  Uhs,
+} from '../../api/types';
 
 /** `baueMarker` ist reine Ableitung ohne Render — der Token kommt deshalb direkt aus antd.
  *  Welcher Token es ist, ist egal: Erwartung und Code lesen denselben, geprüft wird die
@@ -175,6 +183,52 @@ function lageMeldung(partial: Partial<LageMeldung>): LageMeldung {
     ...partial,
   };
 }
+
+function stelle(partial: Partial<Betreuungsstelle>): Betreuungsstelle {
+  return {
+    id: 3,
+    einsatz_id: 1,
+    bezeichnung: 'NU Turnhalle Nord',
+    art: 'notunterkunft',
+    status: 'in_betrieb',
+    angelegt_at: '2026-09-24 08:00:00',
+    ...partial,
+  };
+}
+
+describe('baueBetreuungMarker (LFH-673)', () => {
+  it('verortete Stelle wird Marker mit Zeichen Stelle/Betreuung und Bedienrolle', () => {
+    const { verortet, nichtVerortet } = baueBetreuungMarker(
+      [stelle({ lat: 51.93, lon: 8.87 })],
+      token,
+    );
+    expect(nichtVerortet).toEqual([]);
+    expect(verortet).toEqual([
+      {
+        schluessel: 'betreuungsstelle-3',
+        typ: 'betreuungsstelle',
+        id: 3,
+        lat: 51.93,
+        lon: 8.87,
+        label: 'NU Turnhalle Nord',
+        farbe: rollenFarbe('bedien', token),
+        tz: { grundzeichen: 'stelle', fachaufgabe: 'betreuung' },
+      },
+    ]);
+  });
+  it('unverortete Stelle steht in „Nicht verortet", stornierte nirgends', () => {
+    const { verortet, nichtVerortet } = baueBetreuungMarker(
+      [
+        stelle({ id: 4, bezeichnung: 'AS Rathaus' }),
+        stelle({ id: 5, lat: 1, lon: 2, storniert_at: '2026-09-24 09:00:00' }),
+        stelle({ id: 6, storniert_at: '2026-09-24 09:00:00' }),
+      ],
+      token,
+    );
+    expect(verortet).toEqual([]);
+    expect(nichtVerortet).toEqual([{ typ: 'betreuungsstelle', id: 4, label: 'AS Rathaus' }]);
+  });
+});
 
 describe('baueLageMeldungMarker', () => {
   it('erzeugt Marker nur für verortete Lagemeldungen, mit Herkunfts-Info', () => {

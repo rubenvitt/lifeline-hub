@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { theme } from 'antd';
-import { gefahrengebietStil, zoneStil, zonenBeschriftung, ZONE_TYPEN } from './zonenStil';
+import {
+  bezirkBeschriftung,
+  gefahrengebietStil,
+  zoneStil,
+  zonenBeschriftung,
+  ZONE_TYPEN,
+} from './zonenStil';
 import { rollenFarbe, warnstufeKarte } from '../../theme/statusFarben';
 import type { Warnstufe } from '../../api/types';
 
@@ -119,5 +125,44 @@ describe('zonenBeschriftung', () => {
   it('bleibt mit `unbekannt` von allen fünf echten Stufen unterscheidbar', () => {
     const texte = [...ALLE, 'unbekannt' as const].map((s) => zonenBeschriftung('Werk', s));
     expect(new Set(texte).size).toBe(6);
+  });
+});
+
+describe('Evakuierungsbezirk (LFH-673)', () => {
+  it('eigener Stil, nur Fläche, im Zeichen-Katalog', () => {
+    expect(zoneStil('evakuierungsbezirk', null)).toEqual({
+      fillColor: '#a0522d',
+      fillOpacity: 0.15,
+      lineColor: '#a0522d',
+      lineWidth: 2,
+    });
+    // Nicht der Abschnittston (`kartenLayer.ts`) und nicht Hochwasser-Petrol (`fachebenen.ts`)
+    // — beide lagen im ersten Entwurf gleich bzw. daneben.
+    expect(zoneStil('evakuierungsbezirk', null).lineColor).not.toBe('#722ed1');
+    expect(zoneStil('evakuierungsbezirk', null).lineColor).not.toBe('#08979c');
+    const typ = ZONE_TYPEN.find((t) => t.typ === 'evakuierungsbezirk')!;
+    expect(typ).toEqual({
+      typ: 'evakuierungsbezirk',
+      label: 'Evakuierungsbezirk',
+      geometrie: 'Polygon',
+    });
+    // Unterscheidbar von den Gefahren-/Absperrflächen.
+    for (const andere of ['gefahrengebiet', 'absperrbereich', 'sperrgebiet'] as const) {
+      expect(zoneStil(andere, null).fillColor).not.toBe('#a0522d');
+    }
+  });
+
+  it('Beschriftung: Zonenname, sonst Bezirk, darunter der Räumungszustand als Wort', () => {
+    const bezirk = { bezeichnung: 'Uferstraße 12–40', raeumung: 'laeuft' as const };
+    expect(bezirkBeschriftung(null, bezirk)).toBe('Uferstraße 12–40 · Räumung: läuft');
+    expect(bezirkBeschriftung('Nordufer', bezirk)).toBe('Nordufer · Räumung: läuft');
+    expect(bezirkBeschriftung('  ', { ...bezirk, raeumung: 'geraeumt' })).toBe(
+      'Uferstraße 12–40 · Räumung: geräumt',
+    );
+  });
+
+  it('ohne Zuordnung oder ohne Modulrecht: nur Name bzw. Typwort, kein Zustand', () => {
+    expect(bezirkBeschriftung(null, null)).toBe('Evakuierungsbezirk');
+    expect(bezirkBeschriftung('Nordufer', null)).toBe('Nordufer');
   });
 });

@@ -66,6 +66,9 @@ const REDIGIERBARE_MODUL_FELDER: &[(&str, &str)] = &[
     ("abschnitte", "einsatzabschnitte"),
     ("gefahrengebiete", "gefahrenzonen"),
     ("lagemeldungen", "lagemeldungen"),
+    // LFH-673: Stellen und Bezirke hängen am Modul Betreuung (`EinsatzLesezugriff<Betreuung>`).
+    ("betreuungsstellen", "betreuung"),
+    ("evakuierungsbezirke", "betreuung"),
 ];
 
 /// Redigiert das eingefrorene `daten`-Dokument auf die Per-Layer-Autorisierung des Lesers —

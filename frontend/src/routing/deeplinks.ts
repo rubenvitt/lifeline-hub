@@ -547,10 +547,14 @@ export function lagekartePfad(
     snapshot?: number;
     platzieren?: { typ: PlatzierenZielTyp; id: number };
     zentrum?: Kartenzentrum;
+    evakuierungsbezirk?: number;
   } = {},
 ): string {
   return mitQuery(einsatzModulPfad(einsatzId, 'lagekarte'), {
     gefahrengebiet: opts.gefahrengebiet,
+    // Bezirksfläche (LFH-673): die Karte wählt eine Zone dieses Bezirks, fliegt hin und räumt
+    // den Parameter — dasselbe Muster wie `gefahrengebiet`.
+    evakuierungsbezirk: opts.evakuierungsbezirk,
     ansicht: opts.ansicht,
     // Historien-Modus (C/LFH-321): ?snapshot=<id> zeigt den eingefrorenen Stand (schreibgeschützt).
     snapshot: opts.snapshot,
@@ -598,7 +602,7 @@ export function parseKartenzentrum(wert: string | null | undefined): Kartenzentr
  * steht, muss die Karte auch aus einem Fremd-Link heraus platzieren können. Wer den Typ
  * erweitert, prüft `pages/LagekartePage.tsx` mit — dort wird der Wert zurückgelesen.
  */
-export type PlatzierenZielTyp = 'schaden' | 'uhs' | 'person';
+export type PlatzierenZielTyp = 'schaden' | 'uhs' | 'person' | 'betreuungsstelle';
 
 /** Exhaustiv: ein neuer Zieltyp bricht den Typcheck, statt im Parser still zu fehlen. */
 const PLATZIEREN_ZIEL_ERLAUBT: Record<PlatzierenZielTyp, true> = {
@@ -606,6 +610,8 @@ const PLATZIEREN_ZIEL_ERLAUBT: Record<PlatzierenZielTyp, true> = {
   uhs: true,
   // Fundort-Koordinate einer Person (LFH-613, „Auf Lagekarte verorten" der Detailseite).
   person: true,
+  // Betreuungsstelle (LFH-673, „Auf Karte verorten" der Betreuungsseite).
+  betreuungsstelle: true,
 };
 
 /**

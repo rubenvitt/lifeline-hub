@@ -352,6 +352,7 @@ fn optionale_felder_fehlen_auf_dem_draht() {
         raeumung: Raeumungszustand::Angeordnet,
         sammelstelle: None,
         notiz: None,
+        flaechen: 0,
         stand: None,
         storniert_at: None,
         angelegt_at: "2026-09-23 10:00:00".into(),

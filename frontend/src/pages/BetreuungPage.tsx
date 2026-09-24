@@ -1,7 +1,7 @@
 import { App, Breadcrumb, Button } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import {
   aendereBezirk,
   aendereStelle,
@@ -18,6 +18,7 @@ import {
 import { ladeEinsatz } from '../api/einsaetze';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { einsatzKeys } from '../api/queryKeys';
+import { lagekartePfad } from '../routing/deeplinks';
 import type {
   BelegungsmeldungEingabe,
   Betreuungsstelle,
@@ -96,6 +97,7 @@ type Hervorhebung = { art: 'bezirk' | 'stelle'; id: number } | null;
 export default function BetreuungPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
+  const navigate = useNavigate();
   const { benutzer } = useAuth();
   const { message } = App.useApp();
   const qc = useQueryClient();
@@ -309,6 +311,11 @@ export default function BetreuungPage() {
   );
   const bezirkAktion = useCallback(
     (aktion: BezirkAktion, bezirk: Evakuierungsbezirk) => {
+      // LFH-673: Sprung auf die Karte; dort wählt die Seite eine Fläche und räumt den Parameter.
+      if (aktion === 'karte') {
+        navigate(lagekartePfad(einsatzId, { evakuierungsbezirk: bezirk.id }));
+        return;
+      }
       if (aktion === 'stornieren') {
         resetBezirkStornieren();
         setDialog({ art: 'bezirkStornieren', bezirk });
@@ -317,10 +324,17 @@ export default function BetreuungPage() {
       resetBezirkAendern();
       setDialog({ art: aktion === 'raeumung' ? 'raeumung' : 'bezirkBearbeiten', bezirk });
     },
-    [resetBezirkAendern, resetBezirkStornieren],
+    [resetBezirkAendern, resetBezirkStornieren, navigate, einsatzId],
   );
   const stelleAktion = useCallback(
     (aktion: StelleAktion, stelle: Betreuungsstelle) => {
+      // LFH-673: Sprung in den Platziermodus der Lagekarte; dort räumt die Karte den Auftrag.
+      if (aktion === 'verorten') {
+        navigate(
+          lagekartePfad(einsatzId, { platzieren: { typ: 'betreuungsstelle', id: stelle.id } }),
+        );
+        return;
+      }
       if (aktion === 'stornieren') {
         resetStelleStornieren();
         setDialog({ art: 'stelleStornieren', stelle });
@@ -330,7 +344,7 @@ export default function BetreuungPage() {
       resetLeermeldung();
       setDialog({ art: 'stelleBearbeiten', stelle });
     },
-    [resetStelleAendern, resetLeermeldung, resetStelleStornieren],
+    [resetStelleAendern, resetLeermeldung, resetStelleStornieren, navigate, einsatzId],
   );
 
   if (einsatzQuery.isLoading) return <SeitenSkeleton />;

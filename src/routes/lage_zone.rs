@@ -20,11 +20,59 @@ use axum::Json;
 use serde::Deserialize;
 
 /// SSE-Notify (Lage-Karte): eine Zone hat sich geändert. Event-Tag `lage_zone`.
-fn sse_zone(state: &AppState, einsatz_id: i64, zid: i64) {
+pub(crate) fn sse_zone(state: &AppState, einsatz_id: i64, zid: i64) {
     let data = serde_json::json!({ "einsatz_id": einsatz_id, "zone_id": zid }).to_string();
     state
         .live
         .publiziere_event(einsatz_id, LiveEvent::LageZone, data);
+}
+
+/// SSE-Notify an das Modul Betreuung (LFH-673): die Flächenzahl eines Bezirks hat sich
+/// geändert. Eigenes Ereignis statt der Frontend-Zuordnung `lage_zone → betreuung`, denn
+/// `lage_zone` erreicht nur Leser von Lagekarte/Gefahren — wer nur die Betreuung liest, sähe
+/// `flaechen` sonst nie nachziehen. Nutzlast nur Kennungen, wie in `routes/betreuung.rs`.
+fn sse_bezirk(state: &AppState, einsatz_id: i64, bezirk_id: i64) {
+    let data = serde_json::json!({ "einsatz_id": einsatz_id, "bezirk_id": bezirk_id }).to_string();
+    state
+        .live
+        .publiziere_event(einsatz_id, LiveEvent::Betreuung, data);
+}
+
+/// Prüft eine Bezirks-Zuordnung (LFH-673, design.md D4/D5). Reihenfolge = Codes:
+/// - Zone anderen Typs → **422** (Zusammenhang: Typ × Zuordnung, wie beim Gefahrengebiet);
+/// - kein Zugriff auf das Modul Betreuung → **403** (sonst ließen sich fremde Bezirks-ids per
+///   404/409 abtasten);
+/// - Bezirk fehlt oder gehört zu einem anderen Einsatz → **404**;
+/// - Bezirk storniert → **409** (Lebenszyklus, kein CAS — die Zonen-Route hat keinen
+///   Überschreiben-Dialog).
+async fn pruefe_bezirk_zuordnung(
+    state: &AppState,
+    einsatz: &crate::einsatz::Einsatz,
+    benutzer: &crate::auth::Benutzer,
+    typ: &str,
+    bezirk_id: i64,
+) -> Result<(), AppError> {
+    if typ != "evakuierungsbezirk" {
+        return Err(AppError::UnprocessableEntity(
+            "Bezirks-Zuordnung nur an Zonen vom Typ evakuierungsbezirk".into(),
+        ));
+    }
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz.id,
+        einsatz.org_id,
+        "betreuung",
+        benutzer,
+    )
+    .await?;
+    let bezirk = crate::betreuung::repo::bezirk_laden(&state.pool, einsatz.id, bezirk_id).await?;
+    if bezirk.storniert_at.is_some() {
+        return Err(AppError::Conflict(format!(
+            "Evakuierungsbezirk ‚{}‘ ist storniert",
+            bezirk.bezeichnung
+        )));
+    }
+    Ok(())
 }
 
 /// ETB-Wortlaut: «<Typ-Label> «Label» <verb>» bzw. ohne Label «<Typ-Label> <verb>».
@@ -71,6 +119,9 @@ pub struct ZoneBody {
     /// Ansichts-Zugehörigkeit (LFH-320): das FE sendet die aktive Ansicht; absent/NULL =
     /// auf allen Ansichten sichtbar.
     pub ansicht_id: Option<i64>,
+    /// Evakuierungsbezirk (LFH-673), nur bei `typ = evakuierungsbezirk`; absent/NULL = nicht
+    /// zugeordnet. Geprüft von [`pruefe_bezirk_zuordnung`].
+    pub evakuierungsbezirk_id: Option<i64>,
 }
 
 /// Validiert typ/geometrie_typ/geometrie (statt DB-CHECK→500). Statuscodes nach der
@@ -129,6 +180,9 @@ pub async fn anlegen(
     fordere_aktiv(&einsatz)?;
 
     let geometrie = validiere_neu(&body)?;
+    if let Some(bid) = body.evakuierungsbezirk_id {
+        pruefe_bezirk_zuordnung(&state, &einsatz, &benutzer, &body.typ, bid).await?;
+    }
 
     let label = trimme(body.label.clone());
     let notiz = trimme(body.notiz.clone());
@@ -157,6 +211,7 @@ pub async fn anlegen(
                 farbe: farbe.as_deref(),
                 notiz: notiz.as_deref(),
                 ansicht_id: body.ansicht_id,
+                evakuierungsbezirk_id: body.evakuierungsbezirk_id,
                 erstellt_von: benutzer.id,
             },
         )
@@ -173,6 +228,9 @@ pub async fn anlegen(
         Ok(z)
     })?;
     sse_zone(&state, einsatz_id, z.id);
+    if let Some(bid) = z.evakuierungsbezirk_id {
+        sse_bezirk(&state, einsatz_id, bid);
+    }
     Ok((StatusCode::CREATED, Json(z)))
 }
 
@@ -202,6 +260,9 @@ pub struct ZonePatchBody {
     /// Verschieben/Freigeben (LFH-320): absent = unverändert, `null` = auf alle Ansichten.
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub ansicht_id: Option<Option<i64>>,
+    /// Bezirks-Zuordnung (LFH-673): absent = unverändert, `null` = lösen, Zahl = zuordnen.
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub evakuierungsbezirk_id: Option<Option<i64>>,
 }
 
 /// PATCH /api/einsaetze/{id}/zonen/{zid} — label/typ/farbe/notiz. Geometrie NICHT änderbar.
@@ -274,6 +335,12 @@ pub async fn aktualisieren(
         None => None,             // unverändert
     };
 
+    // Bezirks-Zuordnung (LFH-673). Nur das SETZEN wird geprüft: Lösen (`null`) und der
+    // Wegfall beim Typwechsel legen keine Bezirksangabe offen.
+    if let Some(Some(bid)) = body.evakuierungsbezirk_id {
+        pruefe_bezirk_zuordnung(&state, &einsatz, &benutzer, &neuer_typ, bid).await?;
+    }
+
     let z = zone_repo::aktualisiere(
         &state.pool,
         einsatz_id,
@@ -292,6 +359,7 @@ pub async fn aktualisieren(
                 .map(|o| o.as_deref().map(str::trim).filter(|s| !s.is_empty())),
             gefahrengebiet_id: gebiet_patch,
             ansicht_id: body.ansicht_id,
+            evakuierungsbezirk_id: body.evakuierungsbezirk_id,
         },
     )
     .await?;
@@ -310,6 +378,16 @@ pub async fn aktualisieren(
     }
 
     sse_zone(&state, einsatz_id, zid);
+
+    // Bezirks-Zuordnung geändert (auch implizit per Typwechsel) → beide Bezirke zählen neu.
+    if vorher.evakuierungsbezirk_id != z.evakuierungsbezirk_id {
+        for bid in [vorher.evakuierungsbezirk_id, z.evakuierungsbezirk_id]
+            .into_iter()
+            .flatten()
+        {
+            sse_bezirk(&state, einsatz_id, bid);
+        }
+    }
 
     // Merge/Split hat die Gebiete-Liste verändert → zusätzlich gefahr-Event (Design-Spec).
     if gebiet_patch.is_some() {
@@ -355,14 +433,17 @@ pub async fn aufloesen(
     let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
         .await?
         .etb_startwert();
-    let gebiet_id = crate::write_retry!(&state.pool, |conn| {
-        let gebiet_id = zone_repo::loese_auf_tx(conn, einsatz_id, zid).await?;
+    let weg = crate::write_retry!(&state.pool, |conn| {
+        let weg = zone_repo::loese_auf_tx(conn, einsatz_id, zid).await?;
         crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text).await?;
-        Ok(gebiet_id)
+        Ok(weg)
     })?;
-    if let Some(g) = gebiet_id {
+    if let Some(g) = weg.gefahrengebiet_id {
         crate::gefahr::repo::gebiet_aufraeumen_wenn_leer(&state.pool, g).await?;
     }
     sse_zone(&state, einsatz_id, zid);
+    if let Some(bid) = weg.evakuierungsbezirk_id {
+        sse_bezirk(&state, einsatz_id, bid);
+    }
     Ok(StatusCode::NO_CONTENT)
 }

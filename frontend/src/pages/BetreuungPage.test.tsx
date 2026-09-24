@@ -3,7 +3,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App as AntApp } from 'antd';
-import { MemoryRouter, Route, Routes } from 'react-router';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import BetreuungPage from './BetreuungPage';
 import { ladeEinsatz } from '../api/einsaetze';
 import { AuthProvider } from '../auth/AuthContext';
@@ -49,6 +49,7 @@ const bezirk = (over: Partial<Evakuierungsbezirk> & { id: number }): Evakuierung
   plan_personen: 640,
   plan_erhebung: 'geschaetzt',
   raeumung: 'angeordnet',
+  flaechen: 0,
   angelegt_at: '2026-09-23 08:00:00',
   ...over,
 });
@@ -106,12 +107,19 @@ function renderPage(pfad = '/einsaetze/1/betreuung') {
           <MemoryRouter initialEntries={[pfad]}>
             <Routes>
               <Route path="/einsaetze/:id/betreuung" element={<BetreuungPage />} />
+              <Route path="/einsaetze/:id/lagekarte" element={<LagekarteSonde />} />
             </Routes>
           </MemoryRouter>
         </AuthProvider>
       </AntApp>
     </QueryClientProvider>,
   );
+}
+
+/** Ziel des Sprungs „Auf Karte verorten" (LFH-673): zeigt die angesteuerte Adresse. */
+function LagekarteSonde() {
+  const ort = useLocation();
+  return <div data-testid="lagekarte-ziel">{ort.pathname + ort.search}</div>;
 }
 
 /**
@@ -418,6 +426,111 @@ describe('BetreuungPage (LFH-639)', () => {
       await waitFor(() => expect(screen.queryByText(TITEL)).toBeNull());
       expect(screen.queryByText('Stand-Rücknahme abgelehnt')).toBeNull();
     });
+  });
+
+  it('„Auf Karte verorten" nur an unverorteter Stelle, führt in den Platziermodus (LFH-673)', async () => {
+    api.ladeBetreuung.mockResolvedValue({
+      bezirke: [],
+      stellen: [TURNHALLE, { ...SCHULE, lat: 51.9, lon: 8.8 }],
+    });
+    renderPage();
+    // Verortet: kein Eintrag.
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Aktionen zu Stelle Schule Nord' }),
+    );
+    expect(
+      within(await offenesMenue()).queryByRole('menuitem', { name: /Auf Karte verorten/ }),
+    ).toBeNull();
+    await userEvent.keyboard('{Escape}');
+    // Unverortet: Eintrag, Sprung mit Platzier-Auftrag.
+    await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu Stelle Turnhalle Ost' }));
+    await waitFor(() => {
+      const offen = document.querySelectorAll(
+        '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+      );
+      const menue = offen[offen.length - 1] as HTMLElement;
+      expect(within(menue).getByRole('menuitem', { name: /Auf Karte verorten/ })).toBeTruthy();
+    });
+    const offen = document.querySelectorAll(
+      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+    );
+    await userEvent.click(
+      within(offen[offen.length - 1] as HTMLElement).getByRole('menuitem', {
+        name: /Auf Karte verorten/,
+      }),
+    );
+    expect(await screen.findByTestId('lagekarte-ziel')).toHaveTextContent(
+      '/einsaetze/1/lagekarte?platzieren=betreuungsstelle%3A8',
+    );
+  });
+
+  it('„Auf Karte zeigen" am Bezirk mit Fläche führt zur Fläche (LFH-673)', async () => {
+    api.ladeBetreuung.mockResolvedValue({
+      bezirke: [{ ...UFER, flaechen: 2 }, HAFEN],
+      stellen: [],
+    });
+    renderPage();
+    // Ohne Fläche: kein Eintrag.
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Aktionen zu Bezirk Hafenviertel' }),
+    );
+    expect(
+      within(await offenesMenue()).queryByRole('menuitem', { name: /Auf Karte zeigen/ }),
+    ).toBeNull();
+    await userEvent.keyboard('{Escape}');
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Aktionen zu Bezirk Uferstraße 12–40' }),
+    );
+    await waitFor(() => {
+      const offen = document.querySelectorAll(
+        '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+      );
+      expect(
+        within(offen[offen.length - 1] as HTMLElement).getByRole('menuitem', {
+          name: /Auf Karte zeigen/,
+        }),
+      ).toBeTruthy();
+    });
+    const offen = document.querySelectorAll(
+      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+    );
+    await userEvent.click(
+      within(offen[offen.length - 1] as HTMLElement).getByRole('menuitem', {
+        name: /Auf Karte zeigen/,
+      }),
+    );
+    expect(await screen.findByTestId('lagekarte-ziel')).toHaveTextContent(
+      '/einsaetze/1/lagekarte?evakuierungsbezirk=5',
+    );
+  });
+
+  it('ohne Schreibrecht: am Bezirk mit Fläche nur „Auf Karte zeigen", ohne Fläche kein Menü (LFH-673)', async () => {
+    einsatz.wert = { ...einsatz.wert, meine_rolle: 'beobachter' };
+    api.ladeBetreuung.mockResolvedValue({
+      bezirke: [{ ...UFER, flaechen: 1 }, HAFEN],
+      stellen: [],
+    });
+    renderPage();
+    await screen.findByText('Hafenviertel');
+    expect(screen.queryByRole('button', { name: 'Aktionen zu Bezirk Hafenviertel' })).toBeNull();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Aktionen zu Bezirk Uferstraße 12–40' }),
+    );
+    const menue = await offenesMenue();
+    expect(
+      within(menue)
+        .getAllByRole('menuitem')
+        .map((m) => m.textContent),
+    ).toEqual(['Auf Karte zeigen']);
+  });
+
+  it('ohne Schreibrecht gibt es keinen Einstieg „Auf Karte verorten" (LFH-673)', async () => {
+    einsatz.wert = { ...einsatz.wert, meine_rolle: 'beobachter' };
+    api.ladeBetreuung.mockResolvedValue({ bezirke: [], stellen: [TURNHALLE] });
+    renderPage();
+    await screen.findByText('Turnhalle Ost');
+    expect(screen.queryByRole('button', { name: 'Aktionen zu Stelle Turnhalle Ost' })).toBeNull();
+    expect(screen.queryByText(/Auf Karte verorten/)).toBeNull();
   });
 
   it('Stornieren über das Menü: eigener Dialog mit rotem Knopf, dann POST', async () => {

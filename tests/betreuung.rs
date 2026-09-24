@@ -865,6 +865,97 @@ async fn live_ereignis_nur_an_leser_mit_modulrecht() {
     }
 }
 
+// ── LFH-673: Verortung einer Stelle ─────────────────────────────────────────────────────────
+
+/// Ein PATCH nur mit Koordinate speichert, schreibt KEIN ETB und wird trotzdem live verteilt;
+/// derselbe PATCH noch einmal ist Leerlauf und verteilt nichts. Ohne die eigene Achse am
+/// Leerlauf-Riegel käme der erste mit 200 zurück, ohne etwas zu speichern (design.md D3).
+#[tokio::test]
+async fn verortung_speichert_ohne_etb_und_ist_live() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let sid = stelle(&app, &admin, e, "NU Turnhalle Nord").await;
+    let vorher = etb_eintraege(&app, &admin, e).await.len();
+    let url = format!("{}/stellen/{sid}", pfad(e));
+
+    let feed = live_oeffnen(&app, &admin, e).await;
+    let (s, j) = anfrage(
+        &app,
+        "PATCH",
+        &url,
+        &admin,
+        Some(r#"{"lat":51.93,"lon":8.87}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j:?}");
+    assert_eq!(j["lat"], 51.93);
+    assert_eq!(j["lon"], 8.87);
+    let bei_admin = sse_anfang_lesen(feed.into_body(), 400).await;
+    assert!(
+        bei_admin.contains("event: betreuung")
+            && bei_admin.contains(&format!(r#""stelle_id":{sid}"#)),
+        "Verortung wird live verteilt: {bei_admin:?}"
+    );
+    assert_eq!(
+        etb_eintraege(&app, &admin, e).await.len(),
+        vorher,
+        "kein ETB-Eintrag"
+    );
+    let (_, u) = anfrage(&app, "GET", &pfad(e), &admin, None).await;
+    assert_eq!(u["stellen"][0]["lat"], 51.93, "{u:?}");
+
+    // Derselbe PATCH noch einmal: Leerlauf, kein Ereignis.
+    let feed = live_oeffnen(&app, &admin, e).await;
+    let (s, _) = anfrage(
+        &app,
+        "PATCH",
+        &url,
+        &admin,
+        Some(r#"{"lat":51.93,"lon":8.87}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let bei_admin = sse_anfang_lesen(feed.into_body(), 400).await;
+    assert!(
+        !bei_admin.contains("event: betreuung"),
+        "unveränderte Koordinate verteilt nichts: {bei_admin:?}"
+    );
+
+    // Entfernen: beide Schlüssel fehlen auf dem Draht.
+    let (s, j) = anfrage(
+        &app,
+        "PATCH",
+        &url,
+        &admin,
+        Some(r#"{"lat":null,"lon":null}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j:?}");
+    let o = j.as_object().unwrap();
+    assert!(!o.contains_key("lat") && !o.contains_key("lon"), "{j:?}");
+}
+
+#[tokio::test]
+async fn verortung_halbes_paar_oder_bereich_ist_422() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let sid = stelle(&app, &admin, e, "NU Turnhalle Nord").await;
+    let url = format!("{}/stellen/{sid}", pfad(e));
+    for body in [
+        r#"{"lat":51.93}"#,
+        r#"{"lat":91,"lon":8}"#,
+        r#"{"lat":51,"lon":-181}"#,
+    ] {
+        let (s, j) = anfrage(&app, "PATCH", &url, &admin, Some(body)).await;
+        assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{body} → {j:?}");
+    }
+    // Falscher Feldtyp scheitert isoliert am Feld → 400.
+    let (s, _) = anfrage(&app, "PATCH", &url, &admin, Some(r#"{"lat":"x","lon":8}"#)).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+}
+
 // ── Lagekennzahl `evakuiert` am Einsatz (LFH-607) ──────────────────────────────────────────
 
 /// `lagekennzahlen` des Einsatzes aus Detail- UND Listenantwort. Das Feld wird an zwei Stellen

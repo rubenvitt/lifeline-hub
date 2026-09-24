@@ -7,6 +7,7 @@ import { verorteEinheit } from '../../api/einheiten';
 import { verorteFahrzeug } from '../../api/einsatzFahrzeuge';
 import { verortePerson } from '../../api/einsatzPersonal';
 import { aktualisierePerson } from '../../api/einsatzPerson';
+import { aendereStelle } from '../../api/betreuung';
 import { zeichneAbschnitt } from '../../api/einsatzabschnitte';
 import { legeZoneAn, aktualisiereZone, loescheZone, type ZonePatch } from '../../api/lagezonen';
 import {
@@ -262,6 +263,10 @@ export function useKartenInteraktion({
           antreff_lat: p.lat,
           antreff_lon: p.lon,
         });
+      } else if (platzierungZiel.typ === 'betreuungsstelle') {
+        // Betreuungsstelle (LFH-673): NUR das Koordinatenpaar — der PATCH ist tri-state, ein
+        // fehlender Schlüssel bleibt unverändert.
+        await aendereStelle(einsatzId, platzierungZiel.id, { lat: p.lat, lon: p.lon });
       } else if (platzierungZiel.typ === 'einsatzort' && einsatz) {
         await aktualisiereEinsatz(einsatzId, kopfMitKoordinate(einsatz, p.lat, p.lon));
       }
@@ -280,6 +285,9 @@ export function useKartenInteraktion({
       if (ziel?.typ === 'person') {
         qc.invalidateQueries({ queryKey: einsatzKeys.personen(einsatzId) });
         qc.invalidateQueries({ queryKey: einsatzKeys.person(einsatzId, ziel.id) });
+      }
+      if (ziel?.typ === 'betreuungsstelle') {
+        qc.invalidateQueries({ queryKey: einsatzKeys.betreuung(einsatzId) });
       }
       dispatch({ t: 'beenden', arten: ['platzieren'] });
     },
@@ -365,6 +373,12 @@ export function useKartenInteraktion({
     } else if (marker.typ === 'abschnitt') {
       zeichneAbschnitt(einsatzId, marker.id, { flaeche_geojson: null })
         .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.abschnitte(einsatzId) }))
+        .catch(fehler);
+    } else if (marker.typ === 'betreuungsstelle') {
+      // LFH-673: nur das Paar; die Stelle bleibt, nur ihr Kartenpunkt geht. Umkehrbar über
+      // „Auf Karte verorten" der Betreuungsseite, deshalb ohne Rückfrage (LFH-363).
+      aendereStelle(einsatzId, marker.id, { lat: null, lon: null })
+        .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.betreuung(einsatzId) }))
         .catch(fehler);
     } else if (marker.typ === 'person') {
       // Betroffene (LFH-648): NUR die zwei Koordinatenfelder, wie im Platzier-Zweig — die

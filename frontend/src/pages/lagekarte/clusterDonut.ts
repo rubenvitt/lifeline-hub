@@ -26,6 +26,8 @@ export const CLUSTER_TYP_FARBE: Record<Exclude<ClusterTyp, 'person'>, string> = 
   schaden: '#ea580c', // orange
   lagemeldung: '#d48806', // amber
   freies_zeichen: '#4f46e5', // indigo
+  // LFH-673: nicht rot/orange/amber (Gefahr/Schaden/Meldung) und abgesetzt vom UHS-Blau.
+  betreuungsstelle: '#0891b2', // cyan
 };
 
 /**
@@ -66,6 +68,7 @@ const TYP_REIHENFOLGE: Exclude<ClusterTyp, 'person'>[] = [
   'fuehrung',
   'abschnitt',
   'uhs',
+  'betreuungsstelle',
   'schaden',
   'lagemeldung',
   'freies_zeichen',

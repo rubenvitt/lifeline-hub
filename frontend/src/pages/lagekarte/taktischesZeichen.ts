@@ -194,3 +194,10 @@ const UHS_TZ: Record<UhsTyp, TzProps> = {
 export function uhsTz(typ: UhsTyp): TzProps {
   return UHS_TZ[typ];
 }
+
+/** Betreuungsstelle (LFH-673): Grundzeichen „stelle" + Fachaufgabe „betreuung" nach DV 102 —
+ *  für alle vier Einrichtungsstufen dasselbe Zeichen; der Katalog kennt keine Variante je
+ *  Stufe, die Art steht deshalb in der Unterzeile des Inspectors. */
+export function betreuungsstelleTz(): TzProps {
+  return { grundzeichen: 'stelle', fachaufgabe: 'betreuung' };
+}

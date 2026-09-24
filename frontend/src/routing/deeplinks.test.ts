@@ -242,6 +242,20 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
     expect(wert).toBe('person:42');
     expect(parsePlatzierenAuftrag(wert)).toEqual({ typ: 'person', id: 42 });
   });
+  it('der Platzier-Auftrag „betreuungsstelle“ überlebt den Weg durch die URL (LFH-673)', () => {
+    const pfad = lagekartePfad(E, { platzieren: { typ: 'betreuungsstelle', id: 7 } });
+    const wert = new URL(pfad, 'http://x').searchParams.get('platzieren');
+    expect(wert).toBe('betreuungsstelle:7');
+    expect(parsePlatzierenAuftrag(wert)).toEqual({ typ: 'betreuungsstelle', id: 7 });
+    expect(parsePlatzierenAuftrag('betreuungsstelle:abc')).toBeNull();
+    expect(parsePlatzierenAuftrag('betreuungsstelle:0')).toBeNull();
+  });
+  it('lagekartePfad trägt ?evakuierungsbezirk= (LFH-673)', () => {
+    const pfad = lagekartePfad(E, { evakuierungsbezirk: 5 });
+    expect(new URL(pfad, 'http://x').searchParams.get('evakuierungsbezirk')).toBe('5');
+    expect(parseRouteId('5')).toBe(5);
+    expect(parseRouteId('abc')).toBeNull();
+  });
   it('Hin- und Rückweg passen zusammen', () => {
     // Die belastbare Aussage über das Paar: der Builder erzeugt, was der Parser liest.
     const pfad = lagekartePfad(E, { platzieren: { typ: 'uhs', id: 12 } });

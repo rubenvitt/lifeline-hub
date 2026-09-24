@@ -1,6 +1,6 @@
 import type { GlobalToken } from 'antd';
-import { rollenFarbe, warnstufeKarte } from '../../theme/statusFarben';
-import type { Warnstufe, ZoneTyp } from '../../api/types';
+import { raeumungszustand, rollenFarbe, warnstufeKarte } from '../../theme/statusFarben';
+import type { Evakuierungsbezirk, Warnstufe, ZoneTyp } from '../../api/types';
 
 export interface ZoneStil {
   fillColor: string;
@@ -23,6 +23,18 @@ const STILE: Record<Exclude<ZoneTyp, 'freie_skizze'>, ZoneStil> = {
   absperrbereich: { fillColor: '#fa8c16', fillOpacity: 0.2, lineColor: '#fa8c16', lineWidth: 2 },
   absperrgrenze: { fillColor: '#cf1322', fillOpacity: 0, lineColor: '#cf1322', lineWidth: 4 },
   sperrgebiet: { fillColor: '#8c8c8c', fillOpacity: 0.3, lineColor: '#595959', lineWidth: 2 },
+  // LFH-673 (design.md D9, Entscheidung 24.09.2026): Siena-Braun, der einzige noch freie
+  // Farbton der Karte. NICHT Violett — `#722ed1` ist exakt der Stil der Abschnittsflächen
+  // (`kartenLayer.ts`) —, NICHT Petrol (Fachebene Hochwasser), kein Rot/Orange/Grau der
+  // Gefahren- und Sperrflächen. Linie gegen beide Blindkarten-Gründe gerechnet: 3,36 : 1
+  // nachts (`#0f1115`), 4,58 : 1 tags (`#e8e8e8`), also ≥ 3 : 1 (WCAG 1.4.11). Den
+  // Räumungszustand trägt die Beschriftung, nicht die Farbe.
+  evakuierungsbezirk: {
+    fillColor: '#a0522d',
+    fillOpacity: 0.15,
+    lineColor: '#a0522d',
+    lineWidth: 2,
+  },
 };
 
 const FREIE_SKIZZE_FALLBACK = '#1677ff';
@@ -50,6 +62,8 @@ export const ZONE_TYPEN: ZoneTypInfo[] = [
   { typ: 'absperrgrenze', label: 'Absperrgrenze', geometrie: 'LineString' },
   { typ: 'sperrgebiet', label: 'Sperrgebiet', geometrie: 'Polygon' },
   { typ: 'freie_skizze', label: 'Freie Skizze', geometrie: 'beides' },
+  // LFH-673: Fläche eines Evakuierungsbezirks; zugeordnet wird im Zonen-Inspector.
+  { typ: 'evakuierungsbezirk', label: 'Evakuierungsbezirk', geometrie: 'Polygon' },
 ];
 
 /** Sprechendes Label eines Typs (für Inspector/Legende). */
@@ -116,6 +130,27 @@ export function zonenBeschriftung(
   if (warnstufe === null) return name;
   const stufe = stufenWort(warnstufe);
   return name ? `${name} · ${stufe}` : stufe;
+}
+
+/**
+ * Beschriftung einer Bezirksfläche (LFH-673, design.md D9) — Muster „NAME · STUFE" wie oben.
+ *
+ * Der Name ist der Zonenname, sonst die Bezeichnung des Bezirks, sonst das Typwort. Den
+ * Räumungszustand trägt der TEXT, nicht die Farbe (zweiter Kanal zuerst); das Wort kommt aus
+ * {@link raeumungszustand}, derselben Quelle wie auf der Betreuungsseite.
+ *
+ * `bezirk = null` heißt: nicht zugeordnet ODER nicht lesbar (kein Modulrecht, Betreuung lädt
+ * noch). Beides zeigt nur Name bzw. Typwort — ein Bezirksname oder Zustand stünde sonst bei
+ * Personen, die das Modul nicht lesen dürfen, auf der Karte.
+ */
+export function bezirkBeschriftung(
+  label: string | null | undefined,
+  bezirk: Pick<Evakuierungsbezirk, 'bezeichnung' | 'raeumung'> | null,
+): string {
+  const eigen = label?.trim();
+  if (!bezirk) return eigen || 'Evakuierungsbezirk';
+  const name = eigen || bezirk.bezeichnung;
+  return `${name} · Räumung: ${raeumungszustand[bezirk.raeumung].label}`;
 }
 
 /**

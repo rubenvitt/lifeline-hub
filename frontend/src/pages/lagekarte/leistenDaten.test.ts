@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import type { Einheit, Einsatzabschnitt, EinsatzFahrzeug, Schaden, Uhs } from '../../api/types';
+import type {
+  Betreuungsstelle,
+  Einheit,
+  Einsatzabschnitt,
+  EinsatzFahrzeug,
+  Schaden,
+  Uhs,
+} from '../../api/types';
 import { farbenDunkel } from '../../theme/tokens';
 import type { KarteMarker } from './marker';
 import type { LayerSichtbar } from './Sidebar';
@@ -31,6 +38,7 @@ const ALLE_AN: LayerSichtbar = {
   lagemeldung: true,
   freies_zeichen: true,
   person: true,
+  betreuungsstelle: true,
 };
 
 const marker = (typ: KarteMarker['typ'], id = 1, label = 'X'): KarteMarker => ({
@@ -44,7 +52,7 @@ const marker = (typ: KarteMarker['typ'], id = 1, label = 'X'): KarteMarker => ({
 });
 
 describe('ebenenZeilen', () => {
-  it('führt dieselben elf Schalter wie die Ebenen der Karte, jeden genau einmal', () => {
+  it('führt dieselben zwölf Schalter wie die Ebenen der Karte, jeden genau einmal', () => {
     const keys = EBENEN.map((e) => e.key).sort();
     expect(keys).toEqual((Object.keys(ALLE_AN) as (keyof LayerSichtbar)[]).sort());
   });
@@ -126,6 +134,32 @@ describe('ebenenZeilen', () => {
     expect(zeilen.map((z) => z.key)).not.toContain('person');
   });
 
+  // Ebene „Betreuungsstellen" (LFH-673): dieselbe Zugriffsregel, die Zahl aus den Markern.
+  it('„Betreuungsstellen" ohne Angabe: keine Zeile (Vorgabe „ausgeblendet")', () => {
+    const zeilen = ebenenZeilen([marker('betreuungsstelle')], 0, ALLE_AN, false);
+    expect(zeilen.map((z) => z.key)).not.toContain('betreuungsstelle');
+  });
+
+  it('„Betreuungsstellen" frei: Zeile neben der UHS, gezählt aus den verorteten Markern', () => {
+    const zeilen = ebenenZeilen(
+      [marker('betreuungsstelle', 1), marker('betreuungsstelle', 2)],
+      0,
+      ALLE_AN,
+      false,
+      undefined,
+      { zugriff: 'frei' },
+    );
+    const i = zeilen.findIndex((z) => z.key === 'betreuungsstelle');
+    expect(zeilen[i]).toMatchObject({ name: 'Betreuungsstellen', anzahl: 2, sichtbar: true });
+    expect(zeilen[i - 1].key).toBe('uhs');
+  });
+
+  it('„Betreuungsstellen" gesperrt: Grund, keine Zahl, nie „an"', () => {
+    const zeilen = ebenenZeilen([], 0, ALLE_AN, false, undefined, { zugriff: 'gesperrt' });
+    const z = zeilen.find((x) => x.key === 'betreuungsstelle')!;
+    expect(z).toMatchObject({ anzahl: null, sichtbar: false, sperrgrund: 'Keine Berechtigung' });
+  });
+
   it('trägt den Schaltzustand je Ebene', () => {
     const zeilen = ebenenZeilen([], 0, { ...ALLE_AN, schaden: false }, false);
     expect(zeilen.find((z) => z.key === 'schaden')!.sichtbar).toBe(false);
@@ -198,6 +232,49 @@ const ROH: AuswahlRoh = {
 };
 
 const zeit = (s: string | null | undefined) => `Z(${s})`;
+
+const STELLE = {
+  id: 7,
+  art: 'notunterkunft',
+  status: 'in_betrieb',
+  abschnitt_id: 4,
+  kapazitaet_personen: 150,
+  belegung: { id: 1, belegt: 140, zeitpunkt_at: '2026-09-24 10:00:00' },
+} as unknown as Betreuungsstelle;
+
+describe('auswahlRaster — Betreuungsstelle (LFH-673)', () => {
+  const roh: AuswahlRoh = { ...ROH, betreuungsstellen: [STELLE] };
+  it('Status, Belegung „belegt / Kapazität" mit Auslastung, Abschnitt', () => {
+    const raster = auswahlRaster(marker('betreuungsstelle', 7), roh, zeit);
+    expect(raster.map((f) => [f.label, f.wert])).toEqual([
+      ['Status', 'in Betrieb'],
+      ['Belegung', '140 / 150'],
+      ['Abschnitt', 'Nord'],
+    ]);
+    expect(raster[0].rolle).toBe('normal');
+    expect(raster[1].rolle).toBe('achtung'); // ≥ 90 % „fast voll"
+  });
+  it('ohne Meldung „—" statt 0, ohne Kapazität nur die Zahl', () => {
+    const ohne = { ...STELLE, belegung: undefined } as Betreuungsstelle;
+    expect(
+      auswahlRaster(marker('betreuungsstelle', 7), { ...roh, betreuungsstellen: [ohne] }, zeit)[1]
+        .wert,
+    ).toBe('—');
+    const ohneKap = { ...STELLE, kapazitaet_personen: undefined } as Betreuungsstelle;
+    const f = auswahlRaster(
+      marker('betreuungsstelle', 7),
+      { ...roh, betreuungsstellen: [ohneKap] },
+      zeit,
+    )[1];
+    expect(f.wert).toBe('140');
+    expect(f.rolle).toBeUndefined();
+  });
+  it('Unterzeile nennt die Einrichtungsstufe', () => {
+    expect(auswahlUnterzeile(marker('betreuungsstelle', 7), roh)).toBe(
+      'Betreuungsstelle · Notunterkunft',
+    );
+  });
+});
 
 describe('auswahlRaster', () => {
   it('Einheit: Stärke in BOS-Schreibweise, Status mit Code, Seit, Abschnitt, Führer (LFH-609)', () => {

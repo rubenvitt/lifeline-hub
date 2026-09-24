@@ -294,6 +294,10 @@ pub struct EvakuierungsbezirkAnzeige {
     pub sammelstelle: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub notiz: Option<String>,
+    /// Zahl der Zonen vom Typ `evakuierungsbezirk`, die diesem Bezirk zugeordnet sind
+    /// (LFH-673). Immer gesetzt, 0 ohne Fläche — die Betreuungsseite bietet „Auf Karte
+    /// zeigen" nur bei > 0 an und braucht dafür keine Zonenliste (die hängt am Modul Lagekarte).
+    pub flaechen: i64,
     /// Fehlt, solange keine (nicht zurückgenommene) Standmeldung vorliegt — „keine Meldung“
     /// ist nicht „0 evakuiert“.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -324,6 +328,12 @@ pub struct BetreuungsstelleAnzeige {
     pub standort: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub notiz: Option<String>,
+    /// Koordinate auf der Lagekarte (LFH-673). Beide fehlen = nicht verortet; die App hält
+    /// sie als Paar.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lat: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lon: Option<f64>,
     /// Fehlt, solange keine (nicht zurückgenommene) Belegungsmeldung vorliegt.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub belegung: Option<BelegungsmeldungAnzeige>,

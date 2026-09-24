@@ -763,6 +763,9 @@ mod tests {
                 1,
                 &b::StelleAenderung {
                     status: Some(BetreuungsstelleStatus::InBetrieb),
+                    // LFH-673: die Koordinate ist Geo-Skelett (G_GEO) und bleibt stehen.
+                    lat: Some(Some(51.93)),
+                    lon: Some(Some(8.87)),
                     ..Default::default()
                 },
             )
@@ -842,6 +845,18 @@ mod tests {
         assert_eq!(bezirk_zeilen.len(), 2);
         assert_eq!(stellen_zeilen.len(), 2);
         assert_eq!(bezeichnungen.len(), 2, "je Bezirk ein eigener Platzhalter");
+        let koordinaten: Vec<(Option<f64>, Option<f64>)> = sqlx::query_as(
+            "SELECT lat, lon FROM betreuungsstelle WHERE einsatz_id = ? ORDER BY id",
+        )
+        .bind(e)
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            koordinaten,
+            vec![(Some(51.93), Some(8.87)); 2],
+            "Koordinate bleibt als Geo-Skelett (LFH-673)"
+        );
 
         // Meldereihen unverändert: Anzahlen, Erhebung, Zeitpunkte, Zeiger
         let staende: Vec<(i64, String, String)> = sqlx::query_as(
