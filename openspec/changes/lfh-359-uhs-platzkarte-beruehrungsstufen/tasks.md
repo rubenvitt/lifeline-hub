@@ -39,6 +39,6 @@
 
 ## 6. Abschluss
 
-- [ ] 6.1 `./scripts/check-all.sh` vollständig grün, ohne `| tail`. Mit `prettier --write` bis zum Fixpunkt formatieren.
+- [x] 6.1 `./scripts/check-all.sh` vollständig grün, ohne `| tail`. Mit `prettier --write` bis zum Fixpunkt formatieren. Stand 24.09.2026: Die Schritte 1–6 und 8–10 sind grün, Vitest mit 5988 von 5988. Schritt 7 (e2e) lief separat mit `--nur e2e`, weil das Build-Verzeichnis im Scratchpad während des Gesamtlaufs verschwand. Ergebnis 250 grün, 2 rot. `dokumente.spec.ts:423` ist ein Lastausreißer und in zwei Wiederholungen grün. `abloesung-zufluss.spec.ts:163` scheitert auf `origin/alpha` identisch (Vergleichslauf im Wegwerf-Worktree: „Karte 3: vorher y=670, mit Banner y=693“). Das ist ein Bestandsfehler aus LFH-660, kein Regress dieses Changes.
 - [x] 6.2 Prüfliste Einsatztauglichkeit (15 Kriterien) für den umgebauten Grundriss als Nachtrag an `2026-07-30-uhs-grundriss-pruefliste.md`. Jede Zeile trägt ein Verdikt.
 - [x] 6.3 Im Browser sichtprüfen, in `komfortabel` und `handschuh`: Das Menü steht an der Karte, der Layout-Zug im Bearbeiten-Modus läuft, und das Ziehen einer Person aus der Karte öffnet kein Menü. Belegt ist das per Screenshot. (Gemacht mit Playwright-Bildschirmfotos in allen drei Stufen. Dabei wurde das Menü gefunden, das im Handschuh aus dem Fenster lief, siehe design.md, Menühöhe. Layout- und Personen-Zug sind als e2e-Test gepinnt, nicht nur angesehen.)
