@@ -34,6 +34,7 @@ import {
   type DatensatzQuelle,
   type Oeffnung,
   type PaletteModus,
+  type VorschauZiel,
 } from './typen';
 import type {
   Auftrag,
@@ -185,6 +186,8 @@ interface Kandidat {
   nummer: number | null;
   basisLabel: string;
   ziel: string;
+  /** Lese-Vorschau (Taste →); fehlt bei einer Quelle ohne Vorschau. */
+  vorschau?: VorschauZiel;
 }
 
 type Zweig = 'zahl' | 'text' | 'beide';
@@ -211,6 +214,11 @@ function baueQuelle<T>(
     nummer?: (x: T) => number | null | undefined;
     label: (x: T) => string;
     ziel: (einsatzId: number, x: T) => string;
+    /**
+     * Das Vorschauziel (LFH-664) — in DERSELBEN Tabelle wie Beschriftung und Sprungziel,
+     * damit die Zuordnung je Quelle an einer Stelle steht und nicht in `befehlFuer`.
+     */
+    vorschau?: (einsatzId: number, x: T) => VorschauZiel;
   },
   extra: { sorte?: Nummernsorte; serverGefiltert?: boolean } = {},
 ): Quelle {
@@ -229,6 +237,7 @@ function baueQuelle<T>(
       nummer: f.nummer?.(x) ?? null,
       basisLabel: f.label(x),
       ziel: f.ziel(einsatzId, x),
+      vorschau: f.vorschau?.(einsatzId, x),
     })),
   };
 }
@@ -265,6 +274,7 @@ function quellen(k: DatensatzKontext): Quelle[] {
         nummer: (p) => p.registrier_nr,
         label: personLabel,
         ziel: (id, p) => personDetailPfad(id, p.id),
+        vorschau: (einsatzId, p) => ({ art: 'person', einsatzId, id: p.id }),
       },
       { sorte: 'person' },
     ),
@@ -275,6 +285,7 @@ function quellen(k: DatensatzKontext): Quelle[] {
       nummer: (x) => x.lfd_nr,
       label: etbLabel,
       ziel: (id, x) => etbPfad(id, { eintrag: x.id }),
+      vorschau: etbVorschau,
     }),
     baueQuelle(
       'etbText',
@@ -285,6 +296,7 @@ function quellen(k: DatensatzKontext): Quelle[] {
         id: (x) => x.id,
         label: etbLabel,
         ziel: (id, x) => etbPfad(id, { eintrag: x.id }),
+        vorschau: etbVorschau,
       },
       { serverGefiltert: true },
     ),
@@ -298,6 +310,7 @@ function quellen(k: DatensatzKontext): Quelle[] {
         nummer: (s) => s.registrier_nr,
         label: schadenLabel,
         ziel: (id, s) => schadenDetailPfad(id, s.id),
+        vorschau: (einsatzId, s) => ({ art: 'schaden', einsatzId, id: s.id }),
       },
       { sorte: 'schaden' },
     ),
@@ -305,12 +318,14 @@ function quellen(k: DatensatzKontext): Quelle[] {
       id: (u) => u.id,
       label: uhsLabel,
       ziel: (id, u) => uhsDetailPfad(id, u.id),
+      vorschau: (einsatzId, u) => ({ art: 'uhs', einsatzId, id: u.id }),
     }),
     baueQuelle('meldungen', 'beide', q.meldungen, e, {
       id: (m) => m.id,
       nummer: (m) => m.lfd_nr,
       label: meldungLabel,
       ziel: (id, m) => meldungenPfad(id, { meldung: m.id }),
+      vorschau: (einsatzId, m) => ({ art: 'meldung', einsatzId, id: m.id }),
     }),
     baueQuelle('auftraege', 'beide', q.auftraege, e, {
       id: (a) => a.id,
@@ -319,22 +334,26 @@ function quellen(k: DatensatzKontext): Quelle[] {
       nummer: (a) => a.lfd_nr ?? null,
       label: auftragZeile,
       ziel: (id, a) => auftraegePfad(id, { auftrag: a.id }),
+      vorschau: (einsatzId, a) => ({ art: 'auftrag', einsatzId, id: a.id }),
     }),
     baueQuelle('fahrzeuge', 'text', q.fahrzeuge, e, {
       id: (f) => f.id,
       // Der Funkrufname trägt NUR das Fahrzeug — Personal und Einheit haben `name`.
       label: (f) => f.funkrufname,
       ziel: (id, f) => fahrzeugePfad(id, { fahrzeug: f.id }),
+      vorschau: (einsatzId, f) => ({ art: 'fahrzeug', einsatzId, id: f.id }),
     }),
     baueQuelle('personal', 'text', q.personal, e, {
       id: (p) => p.id,
       label: (p) => p.name,
       ziel: (id, p) => personalPfad(id, { personal: p.id }),
+      vorschau: (einsatzId, p) => ({ art: 'personal', einsatzId, id: p.id }),
     }),
     baueQuelle('einheiten', 'text', q.einheiten, e, {
       id: (x) => x.id,
       label: (x) => x.name,
       ziel: (id, x) => einheitDetailPfad(id, x.id),
+      vorschau: (einsatzId, x) => ({ art: 'einheit', einsatzId, id: x.id }),
     }),
     // LFH-619. Hinten in der Tabelle, weil nach Führungsunterlagen seltener gesucht wird als
     // nach Personen und Kräften — die Stufe ordnet ohnehin davor.
@@ -352,6 +371,7 @@ function quellen(k: DatensatzKontext): Quelle[] {
         id: (b) => b.id,
         label: (b) => b.titel,
         ziel: (id, b) => lageberichtDetailPfad(id, b.id),
+        vorschau: (einsatzId, b) => ({ art: 'lagebericht', einsatzId, id: b.id }),
       },
     ),
     baueQuelle('gefahrengebiete', 'text', q.gefahrengebiete, e, {
@@ -360,13 +380,24 @@ function quellen(k: DatensatzKontext): Quelle[] {
       // „Gefahrengebiet #3", hier also auch.
       label: (g) => gefahrengebietName(g.label, g.id),
       ziel: (id, g) => gefahrenPfad(id, { gefahrengebiet: g.id }),
+      vorschau: (einsatzId, g) => ({ art: 'gefahrengebiet', einsatzId, id: g.id }),
     }),
     baueQuelle('abschnitte', 'text', q.abschnitte, e, {
       id: (a) => a.id,
       label: (a) => a.name,
       ziel: (id, a) => einsatzabschnittePfad(id, { abschnitt: a.id }),
+      vorschau: (einsatzId, a) => ({ art: 'abschnitt', einsatzId, id: a.id }),
     }),
   ];
+}
+
+/**
+ * Vorschauziel eines ETB-Eintrags (LFH-664) — mit `lfdNr`, weil kein Fach einen Eintrag über
+ * seine `id` adressiert: die Vorschau liest ihn über den Nummerncursor und prüft die `id`.
+ * Beide ETB-Quellen (Nummer und Volltext) teilen es, der Datensatz trägt die Nummer ja immer.
+ */
+function etbVorschau(einsatzId: number, x: EtbEintragAnzeige): VorschauZiel {
+  return { art: 'etb', einsatzId, id: x.id, lfdNr: x.lfd_nr };
 }
 
 /** ETB-Zeile: laufende Nummer plus gekürzter Inhalt, Form wie `meldungLabel`. */
@@ -459,7 +490,7 @@ export function baueDatensatzTreffer(k: DatensatzKontext): Treffer[] {
 
   const alsTreffer = (kand: Kandidat, stufe: 0 | 1 | 2 | 3): Treffer => {
     gesehen.add(schluessel(kand));
-    return { befehl: befehlFuer(kand, k.einsatzId, k.navigate), score: UNBEWERTET, stufe };
+    return { befehl: befehlFuer(kand, k.navigate), score: UNBEWERTET, stufe };
   };
 
   if (zahl) {
@@ -704,11 +735,7 @@ export function sichtbareDatensaetze(
  * Die Ikone kommt aus der `modulRegistry`, die Modulherkunft ebenso: eine zweite
  * Namensquelle fällt niemandem auf, weil beide Seiten plausibel aussehen (Befund M14).
  */
-function befehlFuer(
-  kand: Kandidat,
-  einsatzId: number,
-  navigate: DatensatzKontext['navigate'],
-): Befehl {
+function befehlFuer(kand: Kandidat, navigate: DatensatzKontext['navigate']): Befehl {
   const m = modulRegistry.find((x) => x.key === kand.modulKey);
   return {
     id: schluessel(kand),
@@ -720,10 +747,8 @@ function befehlFuer(
     schlagworte: [m?.label ?? kand.modulKey],
     icon: m?.icon,
     ...sprungZu(kand.ziel, navigate),
-    // Die Vorschau in der Palette (LFH-645, Taste →) trägt heute allein die Person — ihr
-    // Inhalt liegt als `PersonVorschau` schon vor. Die übrigen Sorten sind Folgearbeit.
-    ...(kand.modulKey === QUELLE_MODUL.personen
-      ? { vorschau: { art: 'person' as const, einsatzId, id: kand.id } }
-      : {}),
+    // Die Vorschau in der Palette (LFH-645, Taste →). Welche Sorte sie zeigt, sagt die
+    // Quellentabelle (`quellen`), nicht diese Stelle (LFH-664).
+    ...(kand.vorschau ? { vorschau: kand.vorschau } : {}),
   };
 }

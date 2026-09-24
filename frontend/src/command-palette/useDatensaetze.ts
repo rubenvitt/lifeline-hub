@@ -4,18 +4,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
 import { einsatzKeys } from '../api/queryKeys';
 import { ladeModulOverrides } from '../api/einsaetze';
-import { listePersonen } from '../api/einsatzPerson';
-import { listeSchaeden } from '../api/einsatzSchaden';
-import { listeUhs } from '../api/einsatzUhs';
-import { listeMeldungen } from '../api/meldungen';
-import { listeAuftraege } from '../api/auftraege';
-import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
-import { listeEinsatzPersonal } from '../api/einsatzPersonal';
-import { listeEinheiten } from '../api/einheiten';
 import { listeEtb, zaehleEtb } from '../api/etb';
-import { listeLageberichte } from '../api/lageberichte';
-import { ladeGefahrengebiete } from '../api/gefahren';
-import { listeAbschnitte } from '../api/einsatzabschnitte';
+import { datensatzAbfrage, ETB_SUCH_GC_MS, etbNummerAbfrage, FRISCH_MS } from './datensatzAbfrage';
 import { istModulFreigegeben, modulRegistry } from '../einsatz/modulRegistry';
 import {
   baueDatensatzTreffer,
@@ -41,8 +31,9 @@ import {
  * ALLES IST LAZY, und das ist keine Sparsamkeit, sondern die Bedingung dafür, dass die
  * Palette überhaupt eine Datenquelle bekommen darf: sie rendert ihren Inhalt erst beim
  * Öffnen (`{offen && <PaletteHost/>}` in `CommandPaletteProvider.tsx`), jede hier angehängte
- * Query feuert also im Moment des Tastendrucks. Warm sind ohne Zutun nur `meldungen` und
- * `auftraege` (die Modulzähler im `EinsatzLayout`); auf jeder anderen Modulseite wären es
+ * Query feuert also im Moment des Tastendrucks. Warm ist ohne Zutun nur, was die aktuelle
+ * Seite selbst geladen hat — die Modulzähler im `EinsatzLayout` laufen seit LFH-612 über ein
+ * eigenes Fach (`einsatzKeys.modulZaehler`) und wärmen keine Liste mehr vor. Sonst wären es
  * bis zu vierzehn kalte Abrufe für eine Palette, die vielleicht nur „Dunkel" sucht.
  *
  * MUSTER ist `pages/ChatPage.tsx` (Sachbezug-Picker, dort mit derselben Begründung:
@@ -69,27 +60,11 @@ import {
  * Abruf läuft über die Clients in `api/*.ts`, jeder Schlüssel über `api/queryKeys.ts`.
  */
 
-/**
- * Wie lange eine geholte Liste als frisch gilt.
- *
- * Deutlich über dem globalen Vorgabewert (10 s, `api/queryClient.ts`), und das ist keine
- * Nachlässigkeit: diese Fächer hängen am SSE-Fan-out (`EINSATZ_STREAM_EVENTS`), eine
- * Änderung erreicht sie also über die Invalidierung und nicht über das Ablaufen der Frist.
- * Ohne die längere Frist holte jedes Öffnen der Palette bis zu zwölf Listen neu, obwohl die
- * Modulseite daneben dieselben Daten gerade anzeigt.
- */
-const FRISCH_MS = 60_000;
+// `FRISCH_MS` und `ETB_SUCH_GC_MS` stehen seit LFH-664 in `datensatzAbfrage.ts` — die
+// Vorschau je Sorte liest dieselben Fächer mit derselben Frische (Begründung dort).
 
 /** Trefferdeckel des ETB-Volltextzweigs — geht als `limit` MIT in den Request (5 statt 100). */
 const ETB_TEXT_DECKEL = 5;
-
-/**
- * Aufräumfrist der ETB-Suchfächer. Anders als die acht Listen bekommt der ETB JE SUCHBEGRIFF
- * ein eigenes Fach; ohne kurze Frist sammelte eine Suchsitzung sie über die Vorgabe von fünf
- * Minuten an. Die Frist gilt nur hier — die geteilten Listenfächer gehören auch anderen
- * Seiten, ein kurzes `gcTime` von der Palette aus räumte ihnen den Cache weg.
- */
-const ETB_SUCH_GC_MS = 30_000;
 
 export interface DatensatzAbruf {
   /** Aus dem Pfad gezogen; `null` ausserhalb eines Einsatzes. */
@@ -132,15 +107,8 @@ export function etbSuchSchluessel(einsatzId: number, q: string) {
   return einsatzKeys.etbListe(einsatzId, { q, limit: ETB_TEXT_DECKEL });
 }
 
-/**
- * Cache-Fach des ETB-Zahlenzweigs. Ein Eintrag, ein Request: `before_lfd_nr` filtert strikt
- * `lfd_nr <` bei `ORDER BY lfd_nr DESC`, `n + 1` liefert also genau den Eintrag n — sofern es
- * ihn gibt. Ob die Antwort wirklich die gesuchte Nummer trägt, prüft der reine Kern
- * (`baueDatensatzTreffer`); bei einer Nummernlücke liefert der Cursor den nächstälteren.
- */
-export function etbNummerSchluessel(einsatzId: number, nummer: number) {
-  return einsatzKeys.etbListe(einsatzId, { before_lfd_nr: nummer + 1, limit: 1 });
-}
+/** Cache-Fach des ETB-Zahlenzweigs — seit LFH-664 in `datensatzAbfrage.ts`, hier weitergereicht. */
+export { etbNummerSchluessel } from './datensatzAbfrage';
 
 /**
  * Cache-Fach der ETB-Zählung (LFH-619). Unter dem ETB-Prefix, damit jedes `etb`-Live-Ereignis
@@ -219,71 +187,49 @@ export function useDatensaetze({ einsatzId, modus, suche }: DatensatzAbruf): Dat
    * Deshalb auch kein Filterargument in den Abrufen: ein `?status=…` wäre ein eigenes Fach.
    */
   const personenQuery = useQuery({
-    queryKey: einsatzKeys.personen(id),
-    queryFn: () => listePersonen(id),
+    ...datensatzAbfrage.personen(id),
     enabled: darfLaden('personen'),
-    staleTime: FRISCH_MS,
   });
   const schaedenQuery = useQuery({
-    queryKey: einsatzKeys.schaeden(id),
-    queryFn: () => listeSchaeden(id),
+    ...datensatzAbfrage.schaeden(id),
     enabled: darfLaden('schaeden'),
-    staleTime: FRISCH_MS,
   });
   const uhsQuery = useQuery({
-    queryKey: einsatzKeys.uhs(id),
-    queryFn: () => listeUhs(id),
+    ...datensatzAbfrage.uhs(id),
     enabled: darfLaden('uhs'),
-    staleTime: FRISCH_MS,
   });
   const meldungenQuery = useQuery({
-    queryKey: einsatzKeys.meldungen(id),
-    queryFn: () => listeMeldungen(id),
+    ...datensatzAbfrage.meldungen(id),
     enabled: darfLaden('meldungen'),
-    staleTime: FRISCH_MS,
   });
   const auftraegeQuery = useQuery({
-    queryKey: einsatzKeys.auftraege(id),
-    queryFn: () => listeAuftraege(id),
+    ...datensatzAbfrage.auftraege(id),
     enabled: darfLaden('auftraege'),
-    staleTime: FRISCH_MS,
   });
   const fahrzeugeQuery = useQuery({
-    queryKey: einsatzKeys.fahrzeuge(id),
-    queryFn: () => listeEinsatzFahrzeuge(id),
+    ...datensatzAbfrage.fahrzeuge(id),
     enabled: darfLaden('fahrzeuge'),
-    staleTime: FRISCH_MS,
   });
   const personalQuery = useQuery({
-    queryKey: einsatzKeys.personal(id),
-    queryFn: () => listeEinsatzPersonal(id),
+    ...datensatzAbfrage.personal(id),
     enabled: darfLaden('personal'),
-    staleTime: FRISCH_MS,
   });
   const einheitenQuery = useQuery({
-    queryKey: einsatzKeys.einheiten(id),
-    queryFn: () => listeEinheiten(id),
+    ...datensatzAbfrage.einheiten(id),
     enabled: darfLaden('einheiten'),
-    staleTime: FRISCH_MS,
   });
   // LFH-619 — dieselben geteilten Fächer wie Lageberichte-, Gefahren- und Abschnittsseite.
   const lageberichteQuery = useQuery({
-    queryKey: einsatzKeys.lageberichte(id),
-    queryFn: () => listeLageberichte(id),
+    ...datensatzAbfrage.lageberichte(id),
     enabled: darfLaden('lageberichte'),
-    staleTime: FRISCH_MS,
   });
   const gefahrengebieteQuery = useQuery({
-    queryKey: einsatzKeys.gefahrengebiete(id),
-    queryFn: () => ladeGefahrengebiete(id),
+    ...datensatzAbfrage.gefahrengebiete(id),
     enabled: darfLaden('gefahrengebiete'),
-    staleTime: FRISCH_MS,
   });
   const abschnitteQuery = useQuery({
-    queryKey: einsatzKeys.abschnitte(id),
-    queryFn: () => listeAbschnitte(id),
+    ...datensatzAbfrage.abschnitte(id),
     enabled: darfLaden('abschnitte'),
-    staleTime: FRISCH_MS,
   });
 
   /**
@@ -309,11 +255,8 @@ export function useDatensaetze({ einsatzId, modus, suche }: DatensatzAbruf): Dat
   const nummerGesucht = zahl !== null && zahl.sorte === null ? zahl.nummer : null;
 
   const etbNummerQuery = useQuery({
-    queryKey: etbNummerSchluessel(id, nummerGesucht ?? 0),
-    queryFn: () => listeEtb(id, { before_lfd_nr: nummerGesucht! + 1, limit: 1 }),
+    ...etbNummerAbfrage(id, nummerGesucht ?? 0),
     enabled: darfLaden('etbNummer') && nummerGesucht !== null,
-    staleTime: FRISCH_MS,
-    gcTime: ETB_SUCH_GC_MS,
   });
   const etbTextQuery = useQuery({
     queryKey: etbSuchSchluessel(id, rest),

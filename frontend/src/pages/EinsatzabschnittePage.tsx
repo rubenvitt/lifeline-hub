@@ -3,7 +3,6 @@ import {
   App,
   Breadcrumb,
   Button,
-  Descriptions,
   Form,
   Input,
   InputNumber,
@@ -34,9 +33,7 @@ import {
 import { ApiError } from '../api/client';
 import type { AbschnittLagezustand, Einheit, Einsatzabschnitt } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
-import FunkErreichbarkeit, {
-  KOMMUNIKATIONSMITTEL_OPTIONEN,
-} from '../components/FunkErreichbarkeit';
+import { KOMMUNIKATIONSMITTEL_OPTIONEN } from '../components/FunkErreichbarkeit';
 import { Liste, ListenEintrag } from '../components/Liste';
 import {
   SeitenFehler,
@@ -52,6 +49,7 @@ import { Augenbraue, Paneel, monoStil, useRollen } from '../components/instrumen
 import { useViewport } from '../components/useViewport';
 import { abschnittStaerken, nachfahrenInkl } from './einsatzabschnitte/abschnittStaerke';
 import AbschnittKnoten from './einsatzabschnitte/AbschnittKnoten';
+import AbschnittDaten from './einsatzabschnitte/AbschnittDaten';
 import StatusTag from '../components/StatusTag';
 import { abschnittLagezustand, einsatzStatus } from '../theme/statusFarben';
 
@@ -553,57 +551,7 @@ export default function EinsatzabschnittePage() {
             </Form>
           ) : aktuell ? (
             <>
-              <Descriptions column={1} size="small" bordered>
-                {aktuell.kurzbezeichnung && (
-                  <Descriptions.Item label="Kurzbezeichnung">
-                    {aktuell.kurzbezeichnung}
-                  </Descriptions.Item>
-                )}
-                <Descriptions.Item label="Abschnittsleiter">
-                  {aktuell.leiter_name ?? '—'}
-                </Descriptions.Item>
-                {/* Die fehlende Beurteilung steht als WORT da, nicht als leere Zelle: sonst
-                    ist „noch nicht beurteilt“ von „vergessen anzuzeigen“ nicht zu trennen. */}
-                <Descriptions.Item label="Lagezustand">
-                  {aktuell.lagezustand ? (
-                    <StatusTag
-                      darstellung={abschnittLagezustand[aktuell.lagezustand]}
-                      darstellungsart="rand"
-                    />
-                  ) : (
-                    <span style={{ color: rollen.gedaempft }}>nicht beurteilt</span>
-                  )}
-                </Descriptions.Item>
-                {aktuell.abschnittsauftrag && (
-                  <Descriptions.Item label="Abschnittsauftrag">
-                    {aktuell.abschnittsauftrag}
-                  </Descriptions.Item>
-                )}
-                <Descriptions.Item label="Fortschritt">
-                  {aktuell.fortschritt != null ? (
-                    <span style={monoStil(13)}>{aktuell.fortschritt} %</span>
-                  ) : (
-                    <span style={{ color: rollen.gedaempft }}>nicht eingeschätzt</span>
-                  )}
-                </Descriptions.Item>
-                <Descriptions.Item label="Funk / Erreichbarkeit">
-                  <FunkErreichbarkeit
-                    sprechgruppen={aktuell.sprechgruppen}
-                    kommunikationsmittel={aktuell.kommunikationsmittel}
-                    erreichbarkeit={aktuell.erreichbarkeit}
-                    leerText="keine Funk-Angaben"
-                  />
-                </Descriptions.Item>
-                <Descriptions.Item label="Stärke (F/UF/M//Σ)">
-                  <StaerkeAnzeige wert={staerken.eigene} />
-                </Descriptions.Item>
-                <Descriptions.Item label="Stärke inkl. Unterabschnitte (F/UF/M//Σ)">
-                  <StaerkeAnzeige wert={staerken.inklUnter} />
-                </Descriptions.Item>
-                {aktuell.bemerkung && (
-                  <Descriptions.Item label="Bemerkung">{aktuell.bemerkung}</Descriptions.Item>
-                )}
-              </Descriptions>
+              <AbschnittDaten abschnitt={aktuell} staerken={staerken} />
 
               {darfSchreiben && (
                 <Space size="middle" style={{ marginTop: 12 }}>

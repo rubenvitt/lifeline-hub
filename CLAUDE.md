@@ -507,6 +507,17 @@ Alltag wichtigsten:
   neue Vorschausorte bekommt einen Eintrag in `VorschauZiel` und einen Zweig in
   `command-palette/Vorschau.tsx` (exhaustiv). Ihr Inhalt ist ein Lese-Bauteil, das auch außerhalb
   der Palette steht (Vorbild `personen/PersonVorschau.tsx`, geteilt mit `PersonDetailDrawer`).
+  **Seit LFH-664 hat jede Datensatzsorte eine Vorschau**, und ihr Ziel steht in der
+  Quellentabelle von `datensaetze.ts` (Baustein `vorschau` neben `label`/`ziel`), nicht in
+  `befehlFuer`. **Datenregel:** die Vorschau liest das Listenfach der Palette mit `select` auf
+  die `id`, über die geteilten Optionen in `command-palette/datensatzAbfrage.ts` — derselbe
+  Schlüssel, dieselbe `queryFn`, dieselbe Frische (`FRISCH_MS`). Weicht einer davon ab, lädt
+  die Vorschau still ein zweites Fach oder holt beim Öffnen neu. Kein Detailfach: `schaden`
+  und `uhsDetail` sind nicht live. Der ETB liest über den Nummerncursor (`lfdNr` im Ziel) und
+  zeigt nur einen Eintrag mit derselben `id` — bei einer Nummernlücke liefert der Cursor
+  sonst still den nächstälteren. Findet `select` nichts, sagt `VorschauZustand` „… ist nicht
+  mehr vorhanden." statt leer zu bleiben. Ein Verweis in der Vorschau schließt die Palette
+  (Riegel am Container der Region), sonst navigiert die App unter ihr weg.
 - **Datensatz-Aktionen werden gebündelt, nicht aufgereiht** (LFH-365 · B5e). Ab drei Aktionen
   an einer Zeile oder Karte, **gezählt nach der Rechteprüfung**: ein `Dropdown` mit
   `menu={{ items }}`, `trigger={['click']}`, `autoFocus` und icon-only `<Button type="text">`,

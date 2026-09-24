@@ -233,8 +233,13 @@ describe('EinsatzabschnittePage', () => {
     renderPage();
     await userEvent.click(await screen.findByText('Nord'));
 
-    const eigene = screen.getByText('Stärke (F/UF/M//Σ)').closest('tr')!;
-    const inkl = screen.getByText('Stärke inkl. Unterabschnitte (F/UF/M//Σ)').closest('tr')!;
+    // Seit LFH-664 ein Datenraster statt `Descriptions`: die Zeile ist das Datenfeld.
+    const eigene = screen
+      .getByText('Stärke (F/UF/M//Σ)')
+      .closest<HTMLElement>('[data-lfh="datenfeld"]')!;
+    const inkl = screen
+      .getByText('Stärke inkl. Unterabschnitte (F/UF/M//Σ)')
+      .closest<HTMLElement>('[data-lfh="datenfeld"]')!;
     expect(eigene).not.toBe(inkl);
     expect(within(eigene).getByText('1/2/3//6')).toBeInTheDocument();
     expect(within(inkl).getByText('1/3/4//8')).toBeInTheDocument();
