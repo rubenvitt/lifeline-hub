@@ -551,7 +551,8 @@ test.describe('UHS-Grundriss unter Touch', () => {
       // Ein zweites Enter löst den Eintrag aus.
       await page.keyboard.press('Escape');
       await expect(karte).toHaveAttribute('aria-expanded', 'false');
-      await karte.focus();
+      // Esc gibt den Fokus an die Karte zurück (rc-dropdown), ohne dass der Test nachhilft.
+      await expect(karte).toBeFocused();
       await page.keyboard.press('Enter');
       await expect(karte).toHaveAttribute('aria-expanded', 'true');
       await expect(eintraege.first()).toBeFocused();
@@ -654,6 +655,11 @@ test.describe('UHS-Grundriss unter Touch', () => {
     await page.evaluate(() => window.localStorage.setItem('lifeline-hub.dichte', 'handschuh'));
     await page.reload();
     await expect(bett1(page)).toContainText(personName);
+
+    // Kein Ziel IN der belegten Karte: dnd-kit setzt an der ziehbaren Personenmarke auch bei
+    // `disabled` `role="button"` und `tabIndex` — die Kartenform nimmt beides zurück.
+    await expect(bett1(page).getByRole('button')).toHaveCount(0);
+    await expect(bett1(page).locator('[tabindex]:not([tabindex="-1"])')).toHaveCount(0);
 
     await bett1(page).tap();
     const popup = page.locator('.ant-dropdown:not(.ant-dropdown-hidden)');

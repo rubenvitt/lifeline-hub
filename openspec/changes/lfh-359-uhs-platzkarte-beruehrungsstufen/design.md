@@ -91,7 +91,7 @@ hängt.
 
 - **Auslöser:** antd `Dropdown` mit kontrolliertem `open`, `trigger={['click']}` und
   `menu.autoFocus`, um den Kartenknoten gelegt. Der Knoten trägt `role="button"`,
-  `tabIndex={0}`, `aria-haspopup="menu"`, `aria-expanded` und `aria-label={`Aktionen zu Platz
+  `tabIndex={0}`, `aria-haspopup="menu"`, `aria-expanded` und `aria-label={`Aktionen zu
   ${bezeichnung}`}`. Im Bearbeiten-Modus liefert dnd-kit selbst `role`/`tabIndex`. Unsere
   Angaben werden **nach** dem Spread gesetzt, damit Name und Popup-Auszeichnung gewinnen.
 - **Tastatur:** Ein eigener `onKeyDown` öffnet das Menü bei Enter, außerhalb des
@@ -122,6 +122,14 @@ hängt.
   erreichbar (Bildschirmfoto im Verlauf). Deshalb `autoAdjustOverflow={{ adjustY, shiftY }}`,
   dazu am Menü `maxHeight: calc(100dvh − 16px)` mit eigenem Scroll für niedrigere Fenster.
   e2e: „alle Menüeinträge liegen im Fenster“. Die Mutationsprobe ohne `shiftY` ist rot.
+- **Nachträge aus dem Review:** Die Personenmarke nimmt in der Kartenform dnd-kits
+  `role="button"` und `tabIndex` zurück (`keinZiel`). dnd-kit setzt beides auch bei
+  `disabled`, sonst stünde ein fokussierbarer Knopf im Knopf. Der Tastatur-Zug der Person
+  entfällt damit in der Kartenform, den Rückweg trägt „Zurück in den Wartebereich“. Solange ein
+  Zug läuft (`useDndContext().active`), öffnet Enter das Menü nicht, denn dnd-kit legt mit Enter
+  an `document` ab. Das offene Menü gehört zu dem Belegungszustand, in dem es geöffnet wurde,
+  und schließt, wenn ein Live-Update ihn ändert (abgeleitet, kein Effekt). Die Zustandsstreifen
+  hängen als `aria-describedby` an der Karte.
 - **Personenmarke:** In der Kartenform bekommt `PersonenkarteDrag` kein `onOeffnen`. Ein Tipp
   auf die Marke steigt dann zur Karte auf und öffnet das Menü. Der Zug bleibt: dnd-kit
   unterdrückt nach einer Bewegung von 5 px den Klick, ein Zug öffnet also kein Menü.

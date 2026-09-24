@@ -29,6 +29,7 @@ import {
   DndContext,
   DragOverlay,
   useDraggable,
+  useDndContext,
   useDroppable,
   type DragEndEvent,
   type DragStartEvent,
@@ -38,7 +39,7 @@ import {
   PointerSensor,
 } from '@dnd-kit/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import {
   aenderePersonBelegung,
   aktualisierePlatz,
@@ -119,6 +120,11 @@ const AKTIONEN_MAX = 4;
  * montiert ein `ConfigProvider` ohne unser Theme. Nur so ist die Entscheidung über alle
  * Stufen prüfbar. Die Komponente liest aufgelöste Tokens, kein Dichte-Etikett: die Form
  * folgt aus dem, was gerendert würde.
+ *
+ * TESTFALLE (gemessen): ohne App-Theme — das nackte `ConfigProvider` aus `test/utils.tsx` —
+ * ist antds `marginSM` 12, also 4 × 24 + 3 × 12 = 132 > 124 und damit die KARTENFORM. Wer in
+ * Vitest die Knopfzeile erwartet, rendert im App-Theme `kompakt`
+ * (`antdToken(farbenDunkel, 'kompakt')`, Muster in `Grundriss.test.tsx`).
  */
 export type PlatzBedienform = { form: 'zeile'; abstand: number } | { form: 'karte' };
 export function platzBedienform(token: {
@@ -359,11 +365,21 @@ function PersonenkarteDrag({
   disabled,
   kompakt,
   onOeffnen,
+  keinZiel,
 }: {
   person: Person;
   disabled: boolean;
   kompakt?: boolean;
   onOeffnen?: (personId: number) => void;
+  /**
+   * Die Marke liegt in einem Auslöser, der selbst das Ziel ist (Kartenform, LFH-359). dnd-kits
+   * `useDraggable` setzt `role="button"` und `tabIndex` auch bei `disabled` — ohne diese
+   * Rücknahme stünde ein fokussierbarer Knopf IM Knopf (axe `nested-interactive`), mit
+   * Schreibrecht startete Enter/Leertaste darauf einen Tastatur-Zug der Person. Die
+   * Zeiger-Listener bleiben: der Zug per Maus/Finger ist weiter ein Zusatzweg; den
+   * Tastaturweg zurück trägt der Menüeintrag „Zurück in den Wartebereich".
+   */
+  keinZiel?: boolean;
 }) {
   // Kein Inline-`transform`: die gezogene Karte rendert als DragOverlay (Portal, s. u.).
   // Würde der Originalknoten hier transformiert, vergrößerte er die scroll-bare Region
@@ -385,6 +401,16 @@ function PersonenkarteDrag({
       ref={setNodeRef}
       {...attributes}
       {...listeners}
+      {...(keinZiel
+        ? {
+            role: undefined,
+            tabIndex: -1,
+            'aria-disabled': undefined,
+            'aria-pressed': undefined,
+            'aria-roledescription': undefined,
+            'aria-describedby': undefined,
+          }
+        : {})}
       style={style}
       onClick={onOeffnen ? () => onOeffnen(person.id) : undefined}
     >
@@ -455,7 +481,22 @@ function PlatzKarte({
   const karte = bedienform.form === 'karte';
   // Kontrolliert, weil drei Wege öffnen (Klick über den Auslöser, Enter/Leertaste über
   // `aufTaste`) und die Menüwahl selbst schließt. Nur in der Kartenform benutzt.
-  const [menueOffen, setMenueOffen] = useState(false);
+  // Gemerkt wird, in WELCHEM Belegungszustand das Menü geöffnet wurde: ändert ein
+  // Live-Update die Belegung, bauten sich die Einträge unter dem Finger um (aus „Patient
+  // zuweisen" würde „Verbleib …", hinten erschiene das `danger` „zurückweisen") — dieselbe
+  // Lage, gegen die LFH-457 gebaut ist. Das Menü ist dann zu, abgeleitet statt per Effekt.
+  // Der Kartenknopf trägt ein `aria-label`; seine Kinder sind damit präsentational, und ein
+  // Screenreader hörte nur „Aktionen zu Bett 1" ohne Belegung und Verfügbarkeit. Die beiden
+  // Zustandsstreifen hängen deshalb als Beschreibung daran.
+  const beschreibungsId = useId();
+  const belegungsSchluessel = belegtVon ? `belegt:${belegtVon.id}` : 'frei';
+  const [offenBei, setOffenBei] = useState<string | null>(null);
+  const menueOffen = offenBei === belegungsSchluessel;
+  const setMenueOffen = (offen: boolean) => setOffenBei(offen ? belegungsSchluessel : null);
+  // Läuft ein Zug (dnd-kit), gehört die Tastatur ihm: das Enter, das einen Tastatur-Zug
+  // ablegt, beendet dnd-kit an `document` — Reacts Handler an der Karte läuft vorher und
+  // öffnete sonst zusätzlich das Menü.
+  const zugLaeuft = useDndContext().active !== null;
   const setRef = (n: HTMLDivElement | null) => {
     setDragRef(n);
     setDropRef(n);
@@ -573,7 +614,7 @@ function PlatzKarte({
   // durchgereicht, sonst liefen Menü und Zug gleichzeitig los.
   const aufTaste = (e: React.KeyboardEvent<HTMLDivElement>) => {
     const oeffnet = e.key === 'Enter' || (e.key === ' ' && !bearbeitbar);
-    if (kartenAktion && oeffnet && e.target === e.currentTarget) {
+    if (kartenAktion && oeffnet && !zugLaeuft && e.target === e.currentTarget) {
       e.preventDefault();
       kartenAktion();
       return;
@@ -588,6 +629,7 @@ function PlatzKarte({
           ? `Aktionen zu ${platz.bezeichnung}`
           : `${platz.bezeichnung}: Person öffnen`,
         ...(kartenMenue ? { 'aria-haspopup': 'menu' as const, 'aria-expanded': menueOffen } : {}),
+        'aria-describedby': `${beschreibungsId}-status ${beschreibungsId}-belegung`,
         onKeyDown: aufTaste,
         // Im Menü-Fall öffnet der Dropdown-Auslöser selbst; ein eigener onClick daneben
         // riefe dasselbe zweimal.
@@ -623,7 +665,10 @@ function PlatzKarte({
         {platz.bezeichnung}
       </Typography.Text>
       {/* Status-Tags: eine Zeile, kein Umbruch (feste Höhe). */}
-      <div style={{ height: 24, overflow: 'hidden', whiteSpace: 'nowrap' }}>
+      <div
+        id={`${beschreibungsId}-status`}
+        style={{ height: 24, overflow: 'hidden', whiteSpace: 'nowrap' }}
+      >
         {zeigeVerfTag && <StatusTag darstellung={verfuegbarkeitVertrag[platz.verfuegbarkeit]} />}
         {belegtVon && <StatusChip ton="bedien" wort="belegt" />}
       </div>
@@ -639,13 +684,14 @@ function PlatzKarte({
           verschachtelt im Auslöser wäre sie genau das Ziel, das die Berührungsstufen
           verbieten. Ihr Klick steigt zur Karte auf und öffnet das Menü mit „Person
           öffnen"; der Zug bleibt, dnd-kit unterdrückt nach 5 px Bewegung den Klick. */}
-      <div style={{ height: 24, overflow: 'hidden' }}>
+      <div id={`${beschreibungsId}-belegung`} style={{ height: 24, overflow: 'hidden' }}>
         {belegtVon && (
           <PersonenkarteDrag
             person={belegtVon}
             disabled={schreibgeschuetzt || belegungLaeuft || bearbeitbar}
             kompakt
             onOeffnen={karte ? undefined : onOeffnen}
+            keinZiel={karte}
           />
         )}
       </div>

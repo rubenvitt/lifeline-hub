@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, onTestFinished } from 'vitest';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -992,7 +992,81 @@ describe('Grundriss – Kartenform in den Berührungsstufen (LFH-359)', () => {
     await waitFor(() => menueZu());
     karte.focus();
     await userEvent.keyboard(' ');
-    expect(eintraege()[0]).toContain('Patient zuweisen');
+    // Am AUSLÖSER gelesen, nicht am Portal: das alte Portal stünde in jsdom nach Esc noch
+    // sichtbar im Baum (kein `transitionend`), eine Prüfung der Einträge wäre hier blind.
+    expect(karte).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  /**
+   * Im Bearbeiten-Modus gehört die Leertaste dem Tastatur-Zug des Layouts (dnd-kits
+   * KeyboardSensor). Und das Enter, das einen laufenden Zug ABLEGT, darf nicht zusätzlich das
+   * Menü öffnen — dnd-kit beendet den Zug an `document`, Reacts Handler an der Karte läuft
+   * vorher und sähe sonst ein gewöhnliches Enter.
+   */
+  it('lässt im Bearbeiten-Modus die Leertaste dem Zug und öffnet beim Ablegen kein Menü', async () => {
+    // dnd-kits KeyboardSensor ruft beim Start `scrollIntoView`, das jsdom nicht kennt.
+    const vorher = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = () => {};
+    onTestFinished(() => {
+      Element.prototype.scrollIntoView = vorher;
+    });
+    renderGrundriss(unbelegt(), [wartend()], false, 'komfortabel');
+    await userEvent.click(await screen.findByRole('button', { name: 'Plätze bearbeiten' }));
+    const karte = await screen.findByRole('button', { name: 'Aktionen zu Bett 1' });
+    karte.focus();
+    await userEvent.keyboard(' ');
+    expect(karte).toHaveAttribute('aria-expanded', 'false');
+    await userEvent.keyboard('{Enter}');
+    expect(karte).toHaveAttribute('aria-expanded', 'false');
+    // Gegenprobe: ohne laufenden Zug öffnet Enter auch im Bearbeiten-Modus das Menü.
+    karte.focus();
+    await userEvent.keyboard('{Enter}');
+    expect(karte).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  /**
+   * Spec „kein weiteres Klickziel verschachtelt" — an einer BELEGTEN Karte, denn nur dort
+   * steckt die ziehbare Personenmarke darin. dnd-kits `useDraggable` setzt `role="button"`
+   * und `tabIndex` auch bei `disabled`; eine unbelegte Karte sähe diesen Fall nie.
+   */
+  it('trägt auch bei belegtem Platz kein fokussierbares Ziel in der Karte', async () => {
+    renderGrundriss(unbelegt(), [belegtePerson()], false, 'komfortabel');
+    const karte = await screen.findByRole('button', { name: 'Aktionen zu Bett 1' });
+    await within(karte).findByText(/R-007/);
+    expect(within(karte).queryAllByRole('button')).toHaveLength(0);
+    expect(karte.querySelectorAll('[tabindex]:not([tabindex="-1"])')).toHaveLength(0);
+    // Die Kinder eines benannten Knopfs sind präsentational — Belegung und Person hängen
+    // deshalb als Beschreibung am Kartenknopf.
+    expect(karte).toHaveAccessibleDescription(/belegt.*R-007/);
+  });
+
+  it('trägt auch ohne Schreibrecht kein fokussierbares Ziel in der belegten Karte', async () => {
+    renderGrundriss(unbelegt(), [belegtePerson()], true, 'komfortabel');
+    const karte = await screen.findByRole('button', { name: 'Bett 1: Person öffnen' });
+    await within(karte).findByText(/R-007/);
+    expect(within(karte).queryAllByRole('button')).toHaveLength(0);
+    expect(karte.querySelectorAll('[tabindex]:not([tabindex="-1"])')).toHaveLength(0);
+  });
+
+  /**
+   * Ein Live-Update, das die Belegung ändert, baut die Einträge um: aus „Patient zuweisen"
+   * würde „Verbleib / Entlassung erfassen", und hinten erschiene das `danger` „zurückweisen"
+   * — unter dem Finger, dieselbe Lage, gegen die LFH-457 gebaut ist. Das offene Menü gehört
+   * zu dem Zustand, in dem es geöffnet wurde, und schließt, wenn der sich ändert.
+   */
+  it('schließt ein offenes Menü, wenn sich die Belegung des Platzes live ändert', async () => {
+    const { client } = renderGrundriss(unbelegt(), [wartend()], false, 'komfortabel');
+    const karte = await screen.findByRole('button', { name: 'Aktionen zu Bett 1' });
+    await userEvent.click(karte);
+    expect(karte).toHaveAttribute('aria-expanded', 'true');
+
+    act(() => {
+      client.setQueryData<Person[]>(einsatzKeys.personen(1), [
+        { ...wartend(), aktuelle_uhs_id: 1, aktueller_platz_id: 10 },
+      ]);
+    });
+    await within(karte).findByText(/R-005/);
+    expect(karte).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('bietet im Bearbeiten-Modus Verfügbarkeiten und Löschen, aber kein Zuweisen', async () => {

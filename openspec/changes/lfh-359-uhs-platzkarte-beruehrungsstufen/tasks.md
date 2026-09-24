@@ -11,17 +11,19 @@
 
 ## 3. PlatzKarte umbauen
 
-- [x] 3.1 Die Zeilenform auf `platzBedienform` und `platzMenueEintraege` umstellen, ohne Änderung an DOM und Verhalten. Belegt ist das, wenn der gesamte Bestand von `Grundriss.test.tsx` unverändert grün bleibt, dort ohne Theme, also in der Zeilenform.
-- [x] 3.2 Die Kartenform bauen: `Dropdown` mit kontrolliertem `open` um den Kartenknoten, Auszeichnung mit `role`/`tabIndex`/`aria-haspopup`/`aria-expanded`/`aria-label` nach dem dnd-kit-Spread, Tastaturweiche für Enter und Leertaste (im Bearbeiten-Modus nur Enter), Riegel über `popupRender`, keine Aktionszeile, `PersonenkarteDrag` ohne `onOeffnen`. Ohne Schreibrecht öffnet der Tipp bei belegtem Platz direkt die Detailansicht, ein unbelegter Platz ist kein Ziel. Tests zuerst, in einem neuen `describe`-Block mit einem `ConfigProvider` mit `antdToken(…, 'komfortabel')`:
+- [x] 3.1 Die Zeilenform auf `platzBedienform` und `platzMenueEintraege` umstellen, ohne Änderung an DOM und Verhalten. Belegt ist das, wenn der gesamte Bestand von `Grundriss.test.tsx` und `GrundrissTabs.test.tsx` grün bleibt. Korrektur: Die Dateien laufen dafür im App-Theme `kompakt`. Ohne Theme ergibt antds `marginSM` von 12 die Kartenform (4 × 24 + 3 × 12 = 132 > 124).
+- [x] 3.2 Die Kartenform bauen: `Dropdown` mit kontrolliertem `open` um den Kartenknoten, Auszeichnung mit `role`/`tabIndex`/`aria-haspopup`/`aria-expanded`/`aria-label` nach dem dnd-kit-Spread, Tastaturweiche für Enter und Leertaste (im Bearbeiten-Modus nur Enter, und kein Öffnen, solange ein Zug läuft), keine Aktionszeile, Personenmarke ohne `role` und `tabIndex`, Zustandsstreifen als `aria-describedby`, Menü schließt bei einer Live-Änderung der Belegung, `PersonenkarteDrag` ohne `onOeffnen`. Ohne Schreibrecht öffnet der Tipp bei belegtem Platz direkt die Detailansicht, ein unbelegter Platz ist kein Ziel. Tests zuerst, in einem neuen `describe`-Block mit einem `ConfigProvider` mit `antdToken(…, 'komfortabel')`:
   - Tipp auf unbelegt öffnet das Menü und keinen Zuweisungsdialog, „Patient zuweisen“ öffnet danach den Dialog.
   - Tipp auf belegt öffnet das Menü, „Person öffnen“ öffnet den Drawer.
   - Eine Menüwahl löst weder die Zuweisung aus noch öffnet sie das Menü erneut.
-  - Enter und Leertaste öffnen das Menü, im Bearbeiten-Modus nur Enter.
+  - Enter und Leertaste öffnen das Menü (geprüft am `aria-expanded` des Auslösers). Im Bearbeiten-Modus startet die Leertaste den Zug, und das Enter zum Ablegen öffnet kein Menü.
+  - Auch eine belegte Karte enthält kein fokussierbares Ziel, mit und ohne Schreibrecht.
+  - Eine Live-Änderung der Belegung schließt ein offenes Menü.
   - Ohne Schreibrecht: belegt → Drawer, unbelegt → kein `role`.
   - Keine Knöpfe in der Karte.
   - Laufende Belegung: gesperrte Einträge.
 
-  Mutationsproben: Mit anklickbarer Personenmarke und mit abgeschalteter Tastaturweiche wird jeweils ein Test rot. Der `popupRender`-Riegel ist entfallen (siehe design.md, Klick-Riegel). Die Sperren bei laufender Belegung prüft der Test der reinen Funktion (2.2).
+  Mutationsproben, jede färbt einen Test rot: eine anklickbare Personenmarke, eine abgeschaltete Tastaturweiche, eine fehlende Zug-Sperre, eine fehlende `keinZiel`-Rücknahme. Der `popupRender`-Riegel ist entfallen (siehe design.md, Klick-Riegel). Die Sperren bei laufender Belegung prüft der Test der reinen Funktion (2.2).
 - [x] 3.3 Den Dateikopf von `Grundriss.tsx` fortschreiben. Die Rechnung 100/102/108 bleibt als Herleitung stehen, der Nachtrag LFH-359 kommt dazu: Kartenform in den Berührungsstufen, Zeilenform nur in `kompakt` mit 24 px als Boden, `aktionsabstand` entfallen. Die Kommentare an `Personenkarte` und am Menü, die „an SCHRITT_Y gedeckelt“ als Grund für einen fehlenden Knopf nennen, werden angepasst. Belegt ist das per Lesen im Diff und damit, dass Gate 4 (`dichte.guard.test.ts`) grün bleibt, denn Kommentare dürfen das Prop-Literal nicht ausschreiben.
 
 ## 4. Guards und e2e
