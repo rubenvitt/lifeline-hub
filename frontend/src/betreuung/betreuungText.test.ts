@@ -5,7 +5,7 @@ import {
   kennzahlTeile,
   kennzahlText,
   mengeText,
-  namentlichText,
+  namentlichTeile,
   personenZahl,
   volleStellen,
 } from './betreuungText';
@@ -222,21 +222,21 @@ describe('betreuungText (LFH-639)', () => {
   });
 });
 
-describe('namentlichText (LFH-674, design.md D7)', () => {
+describe('namentlichTeile (LFH-674, design.md D7)', () => {
   it('„davon namentlich n" neben einer gemeldeten Belegung', () => {
-    expect(namentlichText(2, true)).toBe('davon namentlich 2');
+    expect(namentlichTeile(2, true)).toEqual({ wort: 'davon namentlich', zahl: '2' });
   });
 
   it('ohne Belegungsmeldung entfällt „davon" — es gibt keine Menge, von der es ein Teil wäre', () => {
-    expect(namentlichText(2, false)).toBe('namentlich 2');
+    expect(namentlichTeile(2, false)).toEqual({ wort: 'namentlich', zahl: '2' });
   });
 
   it('bei 0 oder ohne Auskunft steht nichts', () => {
-    expect(namentlichText(0, true)).toBeNull();
-    expect(namentlichText(undefined, true)).toBeNull();
+    expect(namentlichTeile(0, true)).toBeNull();
+    expect(namentlichTeile(undefined, true)).toBeNull();
   });
 
   it('große Zahlen tragen den Tausendertrenner wie jede Personenzahl', () => {
-    expect(namentlichText(1320, true)).toBe(`davon namentlich ${personenZahl(1320)}`);
+    expect(namentlichTeile(1320, true)?.zahl).toBe(personenZahl(1320));
   });
 });

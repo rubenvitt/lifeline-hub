@@ -18,9 +18,9 @@ Begründung). Aus Quelltext Geschlossenes trägt **[abgeleitet]**.
 
 | Nachweis | Ergebnis |
 | --- | --- |
-| `personen/VerbleibErfassung.test.tsx` (10 Tests) | Hülle ohne `.ant-modal-footer`, Knopf im `<form>`; Transport: genau 3 Felder, nach „Weitere Angaben“ mehr; Stellenwahl belegt „Ziel“ vor, eigener Text bleibt, unveränderte Vorbelegung wird beim Wechsel ersetzt; Artwechsel schickt keinen Verweis; ohne Modul Betreuung weder Abruf noch Auswahl; 403 ist keine Fehlermeldung; Ablehnung steht im Dialog, Felder bleiben |
+| `personen/VerbleibErfassung.test.tsx` (13 Tests) | Hülle ohne `.ant-modal-footer`, Knopf im `<form>`; Transport: genau 3 Felder, nach „Weitere Angaben“ mehr; Stellenwahl belegt „Ziel“ vor, eigener Text bleibt, unveränderte Vorbelegung wird beim Wechsel ersetzt und beim Artwechsel geleert; Artwechsel schickt keinen Verweis; Modul frei/ausgeblendet erst nach geladenen Rechten entschieden; angehaltenes 403 nimmt die Auswahl weg, ohne Fehler; ein 500 sagt sich am Feld; Ablehnung steht im Dialog, Felder bleiben. Mutationsproben (Abruf ohne Recht, 403 ignoriert) machen die Rechtegrenzen-Tests rot |
 | `personen/verbleibErfassungKern.test.ts` | Felder je Art, Optionen (storniert fehlt, „· geschlossen“ wählbar), Vorbelegungsregel, Body |
-| `pages/BetreuungPage.test.tsx` „davon namentlich“ (3 Tests) | Text in der Zelle, ohne Meldung ohne „davon“; Kopfsumme und „frei“ unverändert; ohne `namentlich` in der Antwort nirgends Text |
+| `pages/BetreuungPage.test.tsx` „davon namentlich“ (3 Tests) | Text in der Zelle, Zahl in Mono, ohne Meldung ohne „davon“; Kopfsumme und „frei“ unverändert; ohne `namentlich` in der Antwort nirgends Text |
 | `tests/verbleib_betreuungsstelle.rs` (9 Tests) | Prüfkette 422 → 403 → 404 → 409, geschlossen 201; kein Stellenname in Kurzform und ETB; Zahl nur mit Personenrecht; Kopfzahl und Belegung unverändert; Lagestand ohne Zahl |
 | Browser-Durchstich | siehe unten |
 
@@ -48,4 +48,19 @@ Begründung). Aus Quelltext Geschlossenes trägt **[abgeleitet]**.
 
 ## Browser-Durchstich
 
-_wird nach dem Lauf eingetragen_
+`frontend/e2e/verbleib-betreuungsstelle.spec.ts`, Chromium, 1366 × 768, echtes Backend über die
+Test-Harness. Beide Fälle sind grün, sowohl im e2e-Bündel von `check-all.sh` als auch einzeln.
+
+| Fall | Ergebnis | Sichtbeleg (`test-results/…`) |
+| --- | --- | --- |
+| Notunterkunft mit Stelle | Stelle „NU Turnhalle Nord“ gewählt, „Ziel“ steht vorbelegt auf dem Namen. Nach „Erfassen“ zeigt die Personenseite „Notunterkunft → NU Turnhalle Nord“. Eine **zweite, vorher geöffnete** Betreuungsseite zeigt ohne Neuladen „40 · davon namentlich 1“, der Kopf bleibt bei „40 untergebracht“ | `dialog-stelle-gewaehlt.png`, `betreuung-davon-namentlich.png` |
+| Ohne Modul Betreuung (Führungspersonal, Modul ausgeblendet) | Bei „Notunterkunft“ gibt es keine Stellenauswahl, das Freitext-Ziel steht da | `dialog-ohne-betreuung.png` |
+
+**Nachgezogen aus dem Sichtbeleg:** Die Zahl in „davon namentlich n“ stand zuerst in der
+Proportionalschrift. Seitdem läuft sie Mono mit `tabular-nums` (`monoStil`), das Wort bleibt in
+der Textschrift. `BetreuungPage.test.tsx` pinnt den Stil.
+
+**Beifund im e2e-Bündel (kein Befund dieser Änderung):** `e2e/abloesung-zufluss.spec.ts:163`
+(„Ablösung (mobil, komfortabel) …“) scheiterte einmal an einer Kartenverschiebung um 23 px.
+Einzeln lief die Datei in 3 Wiederholungen mit 18 von 18 Tests grün. Das deutet auf einen Flake
+unter Last (~120–270) hin.

@@ -242,10 +242,16 @@ describe('BetreuungPage (LFH-639)', () => {
       await screen.findByText('Turnhalle Ost');
       const turnhalle = zeileVon('Turnhalle Ost');
       expect(within(turnhalle).getByText('89')).toBeInTheDocument();
-      expect(within(turnhalle).getByText('· davon namentlich 2')).toBeInTheDocument();
-      expect(within(zeileVon('Schule Nord')).getByText('· namentlich 3')).toBeInTheDocument();
+      const hinweis = (zeile: HTMLElement) =>
+        zeile.querySelector<HTMLElement>('[data-lfh="stelle-namentlich"]');
+      expect(hinweis(turnhalle)).toHaveTextContent('· davon namentlich 2');
+      // Die Zahl läuft Mono (Neuentwurf: Zahlen immer Mono mit tabular-nums), das Wort nicht.
+      expect(within(hinweis(turnhalle)!).getByText('2')).toHaveStyle({
+        fontVariantNumeric: 'tabular-nums',
+      });
+      expect(hinweis(zeileVon('Schule Nord'))).toHaveTextContent('· namentlich 3');
       // Stelle ohne Eintrag in der Liste: 0 → kein Text.
-      expect(within(zeileVon('Weserstadion')).queryByText(/namentlich/)).toBeNull();
+      expect(hinweis(zeileVon('Weserstadion'))).toBeNull();
     });
 
     it('geht in keine Summe ein — Kopf und „frei" lesen nur die Belegung', async () => {

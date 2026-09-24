@@ -223,7 +223,8 @@ In `betreuung/StellenBlock.tsx` steht die Zahl in der Zelle „belegt“ hinter 
 „40 belegt · davon namentlich 2“. Ohne Belegungsmeldung steht „keine Meldung ·
 namentlich 2“. „davon“ entfällt dort, weil es keine Menge gibt, von der die Zahl ein Teil
 wäre. Bei 0 oder fehlender Liste steht nichts. Die Zahl ist Mono mit `tabular-nums` (Regel
-„Zahlen laufen immer Mono“). Sie ist Text und kein Bedienziel. Die Summenzeile unter der
+„Zahlen laufen immer Mono“), das Wort nicht. Deshalb liefert `namentlichTeile` Wort und Zahl
+getrennt. Sie ist Text und kein Bedienziel. Die Summenzeile unter der
 Tabelle bleibt unverändert.
 
 ### D8 — Schwärzung

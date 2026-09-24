@@ -1,6 +1,6 @@
 import { Button, Dropdown, Space, Typography, theme } from 'antd';
 import { MoreOutlined } from '@ant-design/icons';
-import { useMemo } from 'react';
+import { useMemo, type CSSProperties } from 'react';
 import type {
   Betreuungsstelle,
   BetreuungsstelleArt,
@@ -16,12 +16,13 @@ import Datensicht, {
   type MenueEintrag,
 } from '../components/Datensicht';
 import StatusTag from '../components/StatusTag';
+import { monoStil } from '../components/instrument';
 import Bereichskopf from '../kommunikation/Bereichskopf';
 import { auslastung, betreuungsstelleStatus } from '../theme/statusFarben';
 import {
   ART_LABEL,
   freiePlaetze,
-  namentlichText,
+  namentlichTeile,
   personenZahl,
   volleStellenSegment,
 } from './betreuungText';
@@ -82,6 +83,8 @@ const stellenSpalten = (
   onBelegungMelden: (s: Betreuungsstelle) => void,
   onAktion: (aktion: StelleAktion, s: Betreuungsstelle) => void,
   namentlich: ReadonlyMap<number, number> | undefined,
+  /** Mono-Stil der Zahl in „davon namentlich n" — Zahlen laufen immer Mono (Neuentwurf). */
+  zahlStil: CSSProperties,
 ) =>
   spaltenFuer<Betreuungsstelle>()([
     {
@@ -126,10 +129,10 @@ const stellenSpalten = (
       zahl: true,
       sortWert: (s) => s.belegung?.belegt,
       render: (_, s) => {
-        const zusatz = namentlichText(namentlich?.get(s.id), s.belegung != null);
+        const zusatz = namentlichTeile(namentlich?.get(s.id), s.belegung != null);
         const hinweis = zusatz && (
           <Typography.Text type="secondary" data-lfh="stelle-namentlich">
-            · {zusatz}
+            · {zusatz.wort} <span style={zahlStil}>{zusatz.zahl}</span>
           </Typography.Text>
         );
         if (!s.belegung) {
@@ -265,8 +268,15 @@ export default function StellenBlock({
     [namentlich],
   );
   const spalten = useMemo(
-    () => stellenSpalten(darfSchreiben, onBelegungMelden, onAktion, namentlichJeStelle),
-    [darfSchreiben, onBelegungMelden, onAktion, namentlichJeStelle],
+    () =>
+      stellenSpalten(
+        darfSchreiben,
+        onBelegungMelden,
+        onAktion,
+        namentlichJeStelle,
+        monoStil(token.fontSize),
+      ),
+    [darfSchreiben, onBelegungMelden, onAktion, namentlichJeStelle, token.fontSize],
   );
   const gemeldet = stellen.filter((s) => s.belegung != null);
   const summe = gemeldet.reduce((n, s) => n + s.belegung!.belegt, 0);

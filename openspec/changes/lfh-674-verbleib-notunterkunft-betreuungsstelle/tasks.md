@@ -21,7 +21,7 @@ der Abschluss. Das Frontend baut auf den generierten Typen aus 3.4 auf.
 
 - [x] 3.1 `schwaerzung_registry.rs`: `retain(…, G_FK)` für `person_verbleib.betreuungsstelle_id` und `einsatz_person.aktuelle_verbleib_betreuungsstelle_id`. Verifiziert durch den Klassifizierungstest der Registry (erst rot, dann grün) und die Erweiterung von `schwaerzung_nullt_lagedaten_der_person_und_behaelt_die_kategorien`: Verweis bleibt, Ziel leer
 - [x] 3.2 `StelleNamentlich` und die neuen Felder in `src/api_doc.rs` registrieren, falls nötig. Verifiziert durch `tests/enum_wire_kontrakt.rs` (Inventar-Guard grün, kein neues Enum)
-- [ ] 3.3 `cargo fmt --all` und `cargo test --workspace`. Verifiziert durch den grünen Lauf
+- [x] 3.3 `cargo fmt --all` und `cargo test --workspace`. Verifiziert durch den grünen Lauf
 - [x] 3.4 `scripts/check-typ-codegen.sh`. `openapi.json` und `types.generated.ts` werden mitcommittet, `VerbleibEingabe` (handgepflegt in `api/types.ts` bzw. `api/einsatzPerson.ts`) bekommt `betreuungsstelle_id`. Verifiziert durch das grüne Skript samt `tsc`
 
 ## 4. Frontend: Verbleib-Dialog
@@ -33,11 +33,11 @@ der Abschluss. Das Frontend baut auf den generierten Typen aus 3.4 auf.
 ## 5. Frontend: Anzeige an der Stelle
 
 - [x] 5.1 `betreuung/StellenBlock.tsx`: Die Zelle „belegt“ zeigt nach design.md D7 „· davon namentlich n“ bzw. ohne Meldung „keine Meldung · namentlich n“, in Mono mit `tabular-nums`. Bei 0 oder fehlender Liste steht nichts. Die Summenzeile addiert nur `belegung.belegt`. Verifiziert durch `StellenBlock`- bzw. `BetreuungPage`-Tests: Zahl erscheint; ohne `namentlich` in der Antwort kein Text (Abwesenheit gepinnt); Summe mit namentlich zugeordneten Personen unverändert
-- [ ] 5.2 `pnpm lint`, Vitest und `prettier --check`. Verifiziert durch die grünen Läufe
+- [x] 5.2 `pnpm lint`, Vitest und `prettier --check`. Verifiziert durch die grünen Läufe
 
 ## 6. Abschluss
 
-- [ ] 6.1 Browser-Durchstich mit Vite und Backend: Stelle „NU Turnhalle Nord“ anlegen, Belegung 40 melden, bei einer Person „Verbleib erfassen“ → Notunterkunft → Stelle wählen → Ziel ist vorbelegt → erfassen. Die Personenseite zeigt „Notunterkunft → NU Turnhalle Nord“, die Betreuungsseite in einem zweiten Tab ohne Reload „40 belegt · davon namentlich 1“. Mit einem Benutzer ohne Modul Betreuung fehlt die Auswahl. Verifiziert durch Screenshots
-- [ ] 6.2 Prüfliste Einsatztauglichkeit (15 Kriterien) für den umgebauten Verbleib-Dialog und die Stellenzelle, als Abschnitt in dieser `design.md` oder in einer eigenen Prüfliste. Jede Zeile trägt ein Verdikt. Verifiziert durch die ausgefüllte Liste
+- [x] 6.1 Browser-Durchstich mit Vite und Backend: Stelle „NU Turnhalle Nord“ anlegen, Belegung 40 melden, bei einer Person „Verbleib erfassen“ → Notunterkunft → Stelle wählen → Ziel ist vorbelegt → erfassen. Die Personenseite zeigt „Notunterkunft → NU Turnhalle Nord“, die Betreuungsseite in einem zweiten Tab ohne Reload „40 belegt · davon namentlich 1“. Mit einem Benutzer ohne Modul Betreuung fehlt die Auswahl. Verifiziert durch Screenshots
+- [x] 6.2 Prüfliste Einsatztauglichkeit (15 Kriterien) für den umgebauten Verbleib-Dialog und die Stellenzelle, als Abschnitt in dieser `design.md` oder in einer eigenen Prüfliste. Jede Zeile trägt ein Verdikt. Verifiziert durch die ausgefüllte Liste
 - [x] 6.3 CLAUDE.md: kurzer Absatz unter „Betreuung auf der Lagekarte“ bzw. „Verpflegung“ zur Personenverknüpfung (Kennung statt Name, „davon namentlich“ nie summiert, Zählung in der Route wegen des Lagestands). Verifiziert durch den Diff
-- [ ] 6.4 `scripts/check-migrationen.sh` nach `git fetch` und `./scripts/check-all.sh`. Verifiziert durch den grünen Lauf, danach Review (`superpowers:requesting-code-review`) und PR gegen `alpha`
+- [x] 6.4 `scripts/check-migrationen.sh` nach `git fetch` und `./scripts/check-all.sh`. Verifiziert durch den grünen Lauf, danach Review (`superpowers:requesting-code-review`) und PR gegen `alpha`
