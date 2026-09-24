@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Dropdown, Input, Modal, Radio, Space, Typography } from 'antd';
+import { Button, Dropdown, Input, Modal, Radio, Space, Typography, theme } from 'antd';
 import { Select } from '../../components/Select';
 import {
   DeleteOutlined,
@@ -43,6 +43,7 @@ export default function AnsichtSwitcher({
   onStandard,
   onLoeschen,
 }: AnsichtSwitcherProps) {
+  const { token } = theme.useToken();
   const [nameDialog, setNameDialog] = useState<NameDialog>(null);
   const [nameWert, setNameWert] = useState('');
   const [loeschDialog, setLoeschDialog] = useState<boolean>(false);
@@ -113,11 +114,14 @@ export default function AnsichtSwitcher({
   }
 
   return (
-    <div style={{ marginBottom: 12 }}>
+    // Kein Außenabstand: der Switcher steht im gepolsterten Paneel „Ansicht", dessen
+    // Polsterung den Abstand zur Haarlinie trägt. Das frühere `marginBottom` stammte aus dem
+    // Kartenstapel der alten Leiste und legte sich dort zusätzlich darauf (LFH-377).
+    <div>
       <Typography.Text type="secondary" style={{ fontSize: 12 }}>
         Ansicht
       </Typography.Text>
-      <Space.Compact block style={{ marginTop: 4 }}>
+      <Space.Compact block style={{ marginTop: token.marginXS }}>
         <Select<number>
           style={{ flex: 1 }}
           value={aktive?.id}
@@ -127,7 +131,7 @@ export default function AnsichtSwitcher({
           options={ansichten.map((a) => ({
             value: a.id,
             label: (
-              <Space size={4}>
+              <Space size={token.marginXS}>
                 {a.ist_standard && <StarFilled style={{ color: '#faad14' }} />}
                 {a.name}
               </Space>

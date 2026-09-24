@@ -99,6 +99,24 @@ nachrechnen kann. Das ist Tokenisierung (A2-Linie), nicht Dichte. Als **LFH-377*
 Begründung steht zusätzlich im Dateikopf von `Sidebar.tsx`, damit sie beim nächsten Zugriff
 gefunden wird.
 
+> **Nachtrag 24.09.2026 (LFH-377, erledigt).** Den Kartenstapel hat der Neuentwurf S5
+> (22.09.2026) abgelöst: die Leiste trennt ihre Abschnitte mit Haarlinien
+> (`KlappPaneel`/`LeistenAbschnitt`) und polstert sie mit `token.padding`; der Absatz im
+> Dateikopf ist mit dem Stapel entfallen. Übrig waren ein Nachzügler aus dem alten Stapel —
+> `AnsichtSwitcher` trug `marginBottom: 12` **in** einem schon gepolsterten Paneel, der Abstand
+> unter dem Auswahlfeld lag damit bei Polsterung plus 12 px; entfernt, die Polsterung trägt ihn
+> allein — und die Abstände der Bild-Zeile (6/4 px → `paddingSM`/`marginSM`/`marginXS`).
+> **Die Breite bleibt fest 300 px** (`LEISTE_BREITE`), bewusst: Polsterung und Zeilenabstand
+> wachsen mit der Dichte, die Leiste nicht. Im Browser gemessen (1100 × 800, zwei Bilder): die
+> Bild-Zeile ist in **kompakt** 277 px breit (Schalter 43 · Name 190 · Auslöser 30, Abstand
+> 7), in **Handschuh** 247 px (Schalter 46 · Name 97 · Auslöser 72, Abstand 16), in beiden
+> Stufen ohne Überlauf (`scrollWidth` = `clientWidth`). Der Name kürzt im Handschuh-Betrieb mit
+> Tooltip; die 20 px, die der feste Abstand ihm ließe, stünden dort zwischen Stift und
+> Aktionsauslöser, also zwischen zwei Trefflächen. Nachweis über die **Quelle**:
+> `pages/lagekarte/leistenAbstand.guard.test.ts` scannt `Sidebar.tsx`, `KlappPaneel.tsx` und
+> `AnsichtSwitcher.tsx` über den TS-Syntaxbaum (Kommentare zählen nicht) auf feste Abstände
+> und `<Space size={Zahl}>`, mit Selbsttest.
+
 ---
 
 ## Was diese Prüfliste nicht beweist
