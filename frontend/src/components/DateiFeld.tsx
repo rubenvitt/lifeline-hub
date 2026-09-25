@@ -62,7 +62,16 @@ export default function DateiFeld({ accept, name = 'datei', onDateiWahl }: Props
           onDateiWahl?.(file);
         }}
       >
-        <Button ref={dateiKnopf} icon={<UploadOutlined />}>
+        <Button
+          ref={dateiKnopf}
+          icon={
+            // `aria-hidden`-Hülle: der Icon-Knoten brächte `role="img"` mit englischem Namen
+            // („upload“) in den zugänglichen Namen des Knopfs.
+            <span aria-hidden="true">
+              <UploadOutlined />
+            </span>
+          }
+        >
           Datei wählen
         </Button>
       </Upload>

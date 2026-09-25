@@ -20,9 +20,13 @@ interface PaneelZustandProps {
   /** Paneeltitel — benennt den Ladezustand für Vorlesende („Meldungen wird geladen"). */
   titel: string;
   leerText: string;
-  /** Beschriftung der Aktion im Leerzustand („Meldung erfassen"). */
-  leerAktion: string;
-  onLeerAktion: () => void;
+  /**
+   * Beschriftung der Aktion im Leerzustand („Meldung erfassen"). Fehlt sie, steht nur der
+   * Satz da — für Personen OHNE Schreibrecht, denen eine Aktion ins Leere führte (LFH-21);
+   * wer schreiben darf, bekommt immer einen Ausweg.
+   */
+  leerAktion?: string;
+  onLeerAktion?: () => void;
   onNeuladen: () => void;
   children: ReactNode;
 }
@@ -83,9 +87,11 @@ export default function PaneelZustand({
         style={{ ...polster, display: 'flex', flexDirection: 'column', gap: token.marginXS }}
       >
         <span style={{ color: rollen.gedaempft, fontSize: 12 }}>{leerText}</span>
-        <span>
-          <Button onClick={onLeerAktion}>{leerAktion}</Button>
-        </span>
+        {leerAktion != null && onLeerAktion != null && (
+          <span>
+            <Button onClick={onLeerAktion}>{leerAktion}</Button>
+          </span>
+        )}
       </div>
     );
   }
