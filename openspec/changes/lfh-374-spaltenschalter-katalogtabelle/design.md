@@ -139,6 +139,27 @@ offenen Punkte) je einen Verweis. Das Verdikt steht in der neuen Prüfliste. Der
 `KatalogTabelle` ersetzt den Absatz „Kein Spaltenschalter …“ durch die Opt-in-Regel. Der
 CLAUDE.md-Absatz „Tabelle nur, wenn verglichen wird“ nennt den zweiten Träger.
 
+### D9 — Eine weggefallene Spalte lässt sich von Hand zurückholen (beim Apply gefunden)
+Gemessen am Bestand: `sichtbareSpalten` blendete eine Spalte aus, sobald sie per Hand ODER
+per Breite verborgen war, und es gab keinen Weg, der die Breite überstimmt. Das Menü zeigte
+die weggefallene Spalte trotzdem **mit Häkchen**, weil es `!aus.includes(key)` las statt der
+wirklichen Sichtbarkeit. Ein Klick darauf änderte sichtbar nichts. Die Behauptung aus
+LFH-342 („vom Spaltenschalter gezählt und einblendbar“) stimmte also nicht, und das betrifft
+jede `Datensicht` mit `abBreite`.
+
+Behoben im geteilten Modul (Entscheidung des Auftraggebers, 25.09.2026):
+- `sichtbareSpalten` nimmt eine zweite Handwahl `eingeblendet`. Eine Spalte mit
+  unterschrittener Breite ist verborgen, **außer** sie steht dort. Die Handauswahl
+  `verborgen` gewinnt immer.
+- Das Häkchen im Schalter zeigt die **wirkliche** Sichtbarkeit, aus derselben Funktion.
+- Ein Klick auf eine sichtbare Spalte trägt sie in `aus` ein und nimmt sie aus `an`. Ein
+  Klick auf eine verborgene Spalte nimmt sie aus `aus`, und fällt sie per Breite weg, kommt
+  sie in `an`.
+- `Datensicht` hält `an` als eigenen, unkontrollierten Zustand. Die kontrollierte API
+  `spaltenAus`/`onSpaltenAus` bleibt unverändert. `KatalogTabelle` macht es genauso.
+- Ohne `onAn` (reine Seitenvariante des exportierten Schalters) bleibt eine weggefallene
+  Spalte ohne Häkchen. Der Schalter behauptet dann nichts, was er nicht einlösen kann.
+
 ## Risks / Trade-offs
 
 - [Ein Konsument setzt `abBreite` und vergisst das Opt-in] → DEV-Warnung (D3) und

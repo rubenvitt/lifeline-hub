@@ -2,7 +2,8 @@
 
 ## 1. Geteiltes Modul für Zählung und Schalter
 
-- [ ] 1.1 `components/SpaltenSchalter.tsx` anlegen mit dem Typ `SchaltbareSpalte` und den dorthin verschobenen Funktionen `sichtbareSpalten`, `waehlbareSpalten`, `hatWaehlbareSpalten`, `etikettVon` sowie der Komponente `SpaltenSchalter` (D1). `Datensicht.tsx` importiert von dort und exportiert weiter, das Warn-Präfix von `etikettVon` wird neutral. Vorher greppen, dass kein Test das Präfix pinnt. Belegen mit unverändert grünen Tests `Datensicht.test.tsx` und `Datensicht.tastaturaktionen.test.tsx`, dazu `tsc` ohne Zyklus.
+- [x] 1.1 `components/SpaltenSchalter.tsx` anlegen mit dem Typ `SchaltbareSpalte` und den dorthin verschobenen Funktionen `sichtbareSpalten`, `waehlbareSpalten`, `hatWaehlbareSpalten`, `etikettVon` sowie der Komponente `SpaltenSchalter` (D1). `Datensicht.tsx` importiert von dort und exportiert weiter, das Warn-Präfix von `etikettVon` wird neutral. Vorher greppen, dass kein Test das Präfix pinnt. Belegen mit unverändert grünen Tests `Datensicht.test.tsx` und `Datensicht.tastaturaktionen.test.tsx`, dazu `tsc` ohne Zyklus.
+- [x] 1.2 D9 per TDD umsetzen. Tests zuerst: (a) In `SpaltenSchalter.test.tsx` gilt für `sichtbareSpalten` mit `eingeblendet`: Breite plus `eingeblendet` ergibt sichtbar, und `verborgen` gewinnt über `eingeblendet`. (b) In `Datensicht.test.tsx` steht eine Spalte bei unterschrittener Breite im Menü ohne Häkchen, ein Klick holt sie zurück, und der Zähler sinkt. Rot belegen, dann `sichtbareSpalten`, `SpaltenSchalter` (Häkchen aus der wirklichen Sichtbarkeit, `an`/`onAn`) und `Datensicht` (eigener Zustand `an`) umsetzen.
 
 ## 2. Opt-in an KatalogTabelle
 
