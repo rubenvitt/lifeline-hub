@@ -50,7 +50,7 @@ durchrutschen. Jeder `_tx`-Split ist ein eigener Commit.
 
 ## 7. Nachweis und Abschluss
 
-- [ ] 7.1 Prüfliste Einsatztauglichkeit `openspec/changes/lfh-690-demo-daten-laufzeit-import/pruefliste.md`: alle 15 Kriterien mit Verdikt und Beleg, gemessen im Browser gegen einen Dev-Stack mit `--demo-daten` (Fükw 1366, Tablet 1024, mobil 390). Verifiziert dadurch, dass keine Zeile „nicht geprüft“ trägt
+- [x] 7.1 Prüfliste Einsatztauglichkeit `openspec/changes/lfh-690-demo-daten-laufzeit-import/pruefliste.md`: alle 15 Kriterien mit Verdikt und Beleg, gemessen im Browser gegen einen Dev-Stack mit `--demo-daten` (Fükw 1366, Tablet 1024, mobil 390). Verifiziert dadurch, dass keine Zeile „nicht geprüft“ trägt
 - [x] 7.2 CLAUDE.md: kurzer Absatz „Demo-Daten (LFH-690)“ mit den tragenden Entscheidungen (bedingte Registrierung, Marke, Savepoint-Löschweg, ID-Sperre, Szenariouhr) und dem Verweis auf dieses design.md. Verifiziert durch den Diff
-- [ ] 7.3 Nachzüge im Entwicklungsboard anlegen (`clickup-task-anlegen`): Demo-Marke an Stammdaten in Katalogen/Auswahllisten, org-weites Live-Ereignis für Einsatzliste und Stammdaten, Endlos-Reconnect des Live-Hooks bei 404, dazu was die Prüfliste offen lässt. Verifiziert durch die Ticketnummern in der Abschlussmeldung
+- [x] 7.3 Nachzüge im Entwicklungsboard anlegen (`clickup-task-anlegen`): Demo-Marke an Stammdaten in Katalogen/Auswahllisten, org-weites Live-Ereignis für Einsatzliste und Stammdaten, Endlos-Reconnect des Live-Hooks bei 404, dazu was die Prüfliste offen lässt. Verifiziert durch die Ticketnummern in der Abschlussmeldung
 - [ ] 7.4 Vor dem PR: `git fetch` + `scripts/check-migrationen.sh` (bei Bedarf `--umnummerieren`), dann `./scripts/check-all.sh` ohne `| tail`. Zusätzlich `cargo test --no-default-features --test demo_daten`. Verifiziert durch Exit-Code 0 beider Läufe

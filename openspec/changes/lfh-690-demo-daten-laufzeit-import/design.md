@@ -464,8 +464,10 @@ Change-Verzeichnis. `docs/superpowers/` ist eingefrorenes Archiv.
 - **[Andere Clients sehen den Import verzögert]** → kein org-weiter Kanal, Nachzug.
 - **[Szenario veraltet mit dem Schema]** → D12 entdeckt Tabellen, und der
   Import→Entfernen→Import-Test läuft in jedem `cargo test`.
-- **[Migrationsnummer]** → `0121` ist beim Planen frei. Direkt vor dem PR laufen
-  `git fetch` und `scripts/check-migrationen.sh`, bei Bedarf `--umnummerieren`.
+- **[Migrationsnummer]** → `0121` war beim Planen frei. Beim Merge von alpha am 25.09.2026
+  lagen dort `0121`/`0122` (LFH-674/LFH-675), die Migration ist per
+  `scripts/check-migrationen.sh --umnummerieren` auf `0123` umgelegt. Direkt vor dem PR
+  erneut `git fetch` und `scripts/check-migrationen.sh`.
 
 ## Migration Plan
 
