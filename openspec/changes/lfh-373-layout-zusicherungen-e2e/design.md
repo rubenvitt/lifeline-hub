@@ -341,6 +341,13 @@ Zufall. Mutationsprobe: Ohne die Bilanz-Sperre ist er deterministisch rot (0,208
 eigene Meta-Zeile ebenfalls (0,192). Der CLS-Kern meldet seitdem je Quelle auch die Lage
 vorher → nachher, sonst hätte der rote Lauf nicht verraten, welcher Nachbar geschoben hat.
 
+Der Review der beiden Fixes fand zwei Lücken, beide behoben und in Vitest belegt (vorher
+rot): `isLoading` wird für jeden neuen Query-Schlüssel wieder wahr, also bei jedem
+Filterwechsel und beim Wiederverbinden nach einem Offline-Start. Die Bilanz hängt deshalb an
+einem Riegel, der je Einsatz einmal aufgeht. Und die Meta-Gruppe durfte zunächst nicht
+umbrechen, eine lange Meta (Meldebild mit Filter, rund 54 Zeichen) wäre bei 390 px quer
+übergelaufen. Jetzt bricht die Gruppe um, ihre beiden Teile nicht.
+
 Die übrigen drei roten Tests des Gate-Laufs (`dokumente.spec.ts` Tastaturweg,
 `lagekarte-betroffene`, `lagekarte-betreuung`) laufen isoliert grün. Der Dokumente-Test
 scheitert unter paralleler Last am `filechooser`-Ereignis. Er wird gerade in LFH-632 gehärtet,

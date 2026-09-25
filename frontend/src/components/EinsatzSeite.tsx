@@ -315,13 +315,17 @@ export default function EinsatzSeite({
               className="lfh-seitenkopf__meta"
               style={{
                 display: 'inline-flex',
+                flexWrap: 'wrap',
                 alignItems: 'baseline',
                 columnGap: token.marginXS * 3,
-                whiteSpace: 'nowrap',
+                rowGap: 2,
+                minWidth: 0,
               }}
             >
+              {/* Die Gruppe bricht um, ihre Teile nicht: eine lange Meta (Meldebild mit
+                  Filter, rund 54 Zeichen) liefe bei 390 px sonst quer über die Seite. */}
               {meta && <span style={seitenMetaStil(farben)}>{meta}</span>}
-              <span style={{ color: farben.gedaempft }}>
+              <span style={{ color: farben.gedaempft, whiteSpace: 'nowrap' }}>
                 {/* Führt die Seite einen Datenstand (auch `0` vor dem ersten Abruf), hält der
                     Kopf seinen Platz frei — sonst bräche er beim Eintreffen um. */}
                 <Datenstand

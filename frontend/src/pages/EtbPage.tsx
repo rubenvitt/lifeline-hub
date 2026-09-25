@@ -183,6 +183,18 @@ export default function EtbPage() {
       letzteSeite.length === SEITENGROESSE ? letzteSeite[letzteSeite.length - 1].lfd_nr : undefined,
   });
 
+  // Riegel für die Bilanz unter `xl` (LFH-373): sie erscheint erst, wenn die Liste zum ersten
+  // Mal steht — stand sie vorher da, schoben die eintreffenden Zeilen sie aus dem Bild. Danach
+  // bleibt sie. `isLoading` allein hinge an jedem neuen Query-Schlüssel: die Bilanz verschwände
+  // bei jedem Filterwechsel, und beim Wiederverbinden nach einem Offline-Start genau dann, wenn
+  // der Puffer gesendet wird (Review). `isLoading` statt `isPending`, weil ein offline
+  // pausierter Abruf nicht lädt — dann trägt die Bilanz den Puffer. Je Einsatz, damit ein
+  // Wechsel des Einsatzes im selben Baum die Sperre neu setzt. Zustand statt Ref: die
+  // Ableitung während des Renderns ist das React-Muster für „Wert aus früherem Render".
+  const [bilanzFreiFuer, setBilanzFreiFuer] = useState<number | null>(null);
+  if (!etbQuery.isLoading && bilanzFreiFuer !== einsatzId) setBilanzFreiFuer(einsatzId);
+  const bilanzFrei = bilanzFreiFuer === einsatzId || !etbQuery.isLoading;
+
   // Exakte Zählung über DENSELBEN Filter wie die Liste (LFH-612) — Kopf und Bilanz. Unter
   // dem `etb`-Prefix, das `etb`-Live-Ereignis zieht sie mit.
   const zaehlerQuery = useQuery({
@@ -659,9 +671,8 @@ export default function EtbPage() {
             nicht dazwischen, damit die angepinnte Erfassung am Fuß der Zeitachse bleibt.
             Darunter erscheint sie erst, wenn die Liste steht (LFH-373, gemessen): stand sie
             schon, schoben die eintreffenden Zeilen sie aus dem Bild (CLS 0,22 bei 390 px).
-            `isLoading` und nicht `isPending`: offline pausiert der Abruf, und die Bilanz trägt
-            dann den Puffer — genau dort, wo er am meisten zählt. */}
-        {(breit || !etbQuery.isLoading) && (
+            Der Riegel `bilanzFrei` (oben) geht je Einsatz EINMAL auf. */}
+        {(breit || bilanzFrei) && (
           <aside
             aria-label="Bilanz des Tagebuchs"
             style={

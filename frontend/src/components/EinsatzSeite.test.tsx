@@ -160,7 +160,14 @@ describe('EinsatzSeite', () => {
     expect(gruppe).not.toBeNull();
     expect(gruppe).toHaveTextContent('8 Einträge');
     expect(gruppe.querySelector('[data-lfh="datenstand-platzhalter"]')).not.toBeNull();
-    expect(gruppe.style.whiteSpace).toBe('nowrap');
+    // Die Gruppe selbst DARF umbrechen, nur ihre Teile nicht (Review): eine lange Meta
+    // („3 von 12 Einheiten · Stärke 1/3/18//22 von 4/12/60//76", Meldebild mit Filter) liefe
+    // bei 390 px sonst quer über die Seite.
+    expect(gruppe.style.flexWrap).toBe('wrap');
+    expect(gruppe.style.minWidth).toBe('0px');
+    for (const teil of Array.from(gruppe.children) as HTMLElement[]) {
+      expect(teil.style.whiteSpace).toBe('nowrap');
+    }
     // Vitest fährt mit `css: false` — die Regel wird am Quelltext gepinnt.
     const regel = seiteCss.match(/@media\s*\(max-width:\s*767\.98px\)\s*\{([^}]*\{[^}]*\})/);
     expect(regel, 'EinsatzSeite.css trägt die Schmal-Regel').not.toBeNull();

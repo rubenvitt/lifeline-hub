@@ -425,8 +425,9 @@ verdeckten Streifen und rollte bei jedem Fokus dort die Seite ans Ende. Unter `m
 auf eigener Zeile (`Schnellerfassungszeile gestapelt`, im DOM zuerst, kein CSS-`order`), die
 Feldzeile rollt waagerecht mit „Feld" vorn, „Werte behalten" steht in der Hinweiszeile, und
 Eingaben in der Leiste fokussieren mit `preventScroll` (`MetaChip`, nicht `autoFocus`). Unter `xl` erscheint die Bilanz erst, wenn die Liste
-steht (`isLoading`, damit sie offline den Puffer trägt): stand sie vor den Zeilen da, schoben diese
-sie aus dem Bild. Den Rennfall erzwingt der Test mit verzögerten Antworten, abgewartet trat er nur
+zum ersten Mal steht, danach bleibt sie (Riegel `bilanzFrei` je Einsatz; `isLoading` allein ließe
+sie bei jedem Filterwechsel verschwinden): stand sie vor den Zeilen da, schoben diese sie aus dem
+Bild. Den Rennfall erzwingt der Test mit verzögerten Antworten, abgewartet trat er nur
 in jedem fünften bis achten Lauf auf.
 **Kopfzahl und Bilanz zählt der Server, über DENSELBEN Filter wie die Liste** (LFH-612,
 `GET …/etb/zaehler`, gemeinsame Bedingung `etb/repo.rs:filter_bedingung`): ohne Filter „412

@@ -966,6 +966,32 @@ describe('EtbPage – Zeitachse (Neuentwurf S4)', () => {
     expect(screen.getByRole('complementary', { name: 'Bilanz des Tagebuchs' })).toBeInTheDocument();
   });
 
+  /**
+   * Die Sperre gilt dem ERSTEN Laden, nicht jedem (LFH-373, Review): der Filter steckt im
+   * Query-Schlüssel, jeder neue Filter ist also wieder `isLoading`. Hinge die Bilanz daran,
+   * verschwände sie unter `xl` bei jedem Typklick und jedem Suchwort — und beim Wiederverbinden
+   * nach einem Offline-Start genau in dem Moment, in dem der Puffer gesendet wird.
+   */
+  it('behält die Bilanz unter xl beim Filterwechsel, während die neue Liste lädt', async () => {
+    setzeViewportBreite(800);
+    let freigeben: () => void = () => {};
+    const zweite = new Promise<void>((r) => {
+      freigeben = r;
+    });
+    setup('/einsaetze/7/etb', [
+      http.get('/api/einsaetze/7/etb', async ({ request }) => {
+        if (new URL(request.url).searchParams.get('typ')) await zweite;
+        return HttpResponse.json([eintrag]);
+      }),
+    ]);
+    await screen.findByText('Erste Meldung');
+    const segmente = screen.getByRole('radiogroup', { name: 'Einträge nach Typ filtern' });
+    await userEvent.click(within(segmente).getByRole('radio', { name: 'Anordnung' }));
+    // Die neue Liste hängt noch — die Bilanz bleibt trotzdem stehen.
+    expect(screen.getByRole('complementary', { name: 'Bilanz des Tagebuchs' })).toBeInTheDocument();
+    freigeben();
+  });
+
   it('zeigt die Bilanz ab xl sofort, auch während die Liste lädt', async () => {
     setzeViewportBreite(1366);
     let freigeben: () => void = () => {};
