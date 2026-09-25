@@ -1,0 +1,71 @@
+import { useCallback } from 'react';
+import { Button, Form, Upload, type UploadFile } from 'antd';
+import { UploadOutlined } from '@ant-design/icons';
+import { UPLOAD_MAX_GROESSE } from '../api/upload';
+
+/** Wortgleich mit der Server-Absage (`src/anhang/mod.rs`, `pruefe_groesse`): eine Absage, ein
+ *  Wortlaut — gleich, ob der Dialog sie vorab gibt oder der Server. */
+const ZU_GROSS = `Datei ist zu groß (${UPLOAD_MAX_GROESSE / 1024 / 1024} MiB erlaubt)`;
+
+interface Props {
+  /** Dateiauswahl vorfiltern (`DOKUMENT_ACCEPT`, `ERFASSUNG_ACCEPT`); der Server prüft ohnehin. */
+  accept: string;
+  /** Formularfeld, Vorgabe `datei`. */
+  name?: string;
+  /** Meldet eine neue Dateiwahl — nicht das Entfernen (Titel-Übernahme der Ablage). */
+  onDateiWahl?: (datei: UploadFile) => void;
+}
+
+/**
+ * Dateifeld einer Erfassungsmaske (LFH-21; vorher im `DokumentAblegenModal`, „dieselbe Eingabe
+ * wird nicht zweimal gebaut“, M20). Eine Datei, keine Übertragung beim Wählen
+ * (`beforeUpload={() => false}`: gesendet wird mit dem Formular), Pflicht, und die Größe wird
+ * VORAB geprüft, damit niemand 25 MiB über Mobilfunk schickt, nur um die Absage zu lesen.
+ *
+ * Fokus: die Erfassungshülle fokussiert das erste `<input>` — hier ist das rc-uploads
+ * `<input type="file">` mit `display: none`, im Browser nicht fokussierbar (jsdom merkt das
+ * nicht). Der Callback-Ref am Knopf fokussiert deshalb per `requestAnimationFrame`, also NACH
+ * dem Effekt der Hülle.
+ */
+export default function DateiFeld({ accept, name = 'datei', onDateiWahl }: Props) {
+  const dateiKnopf = useCallback((knopf: HTMLButtonElement | null) => {
+    if (knopf) requestAnimationFrame(() => knopf.focus());
+  }, []);
+  return (
+    <Form.Item
+      name={name}
+      label="Datei"
+      valuePropName="fileList"
+      getValueFromEvent={(e: { fileList?: UploadFile[] } | UploadFile[]) =>
+        Array.isArray(e) ? e : e?.fileList
+      }
+      rules={[
+        { required: true, message: 'Bitte eine Datei wählen' },
+        {
+          // Vorab statt nach 25 MiB Upload: der Server lehnt dieselbe Grenze mit `>` ab.
+          validator: (_, liste?: UploadFile[]) => {
+            const groesse = liste?.[0]?.originFileObj?.size ?? liste?.[0]?.size ?? 0;
+            return groesse > UPLOAD_MAX_GROESSE
+              ? Promise.reject(new Error(ZU_GROSS))
+              : Promise.resolve();
+          },
+        },
+      ]}
+    >
+      <Upload
+        beforeUpload={() => false}
+        maxCount={1}
+        accept={accept}
+        onChange={({ file }) => {
+          // Das Entfernen einer Datei ist keine Dateiwahl.
+          if (file.status === 'removed') return;
+          onDateiWahl?.(file);
+        }}
+      >
+        <Button ref={dateiKnopf} icon={<UploadOutlined />}>
+          Datei wählen
+        </Button>
+      </Upload>
+    </Form.Item>
+  );
+}

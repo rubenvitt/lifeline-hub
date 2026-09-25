@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { App, Breadcrumb, Button, Popconfirm, Space, Typography, theme } from 'antd';
+import { App, Breadcrumb, Button, Popconfirm, Space, Typography } from 'antd';
 import { DeleteOutlined } from '@ant-design/icons';
 import { einsatzKeys } from '../api/queryKeys';
 import { ladeEinsatz } from '../api/einsaetze';
@@ -19,6 +19,7 @@ import { formatGroesse } from '../karten/formatGroesse';
 import { einsatzStatus } from '../theme/statusFarben';
 import { DOKUMENT_KATEGORIEN, DOKUMENT_KATEGORIE_REIHENFOLGE } from '../dokumente/kategorien';
 import DokumentAblegenModal from '../dokumente/DokumentAblegenModal';
+import DownloadAnker from '../components/DownloadAnker';
 
 /**
  * Dokumentenablage eines Einsatzes (LFH-632), strukturgleich zu `SchaedenPage`.
@@ -39,7 +40,8 @@ import DokumentAblegenModal from '../dokumente/DokumentAblegenModal';
  * Datensicht hätte also nichts zu entscheiden; eine Zeile, deren Klick eine Datei zieht,
  * wäre ohnehin eine Überraschung.
  *
- * Der Anker trägt die Höhe aus `controlHeight` selbst (`DownloadAnker`): ein Inline-`<a>`
+ * Der Anker trägt die Höhe aus `controlHeight` selbst (`components/DownloadAnker`, seit LFH-21
+ * geteilt mit den Schaden-Anhängen): ein Inline-`<a>`
  * erbt keine Steuerhöhe (gemessen 17 px, LFH-396). Die Bauform (`inline-flex` + `minHeight`)
  * ist die des Titel-Links, den das Primitiv bei gesetztem `ziel` selbst rendert.
  *
@@ -57,24 +59,6 @@ const rechteText = (status: EinsatzStatus) =>
   status !== 'aktiv'
     ? 'Der Einsatz ist abgeschlossen — die Dokumente stehen nur noch zum Nachlesen bereit.'
     : 'Nur Einsatzleitung und Führungspersonal können Dokumente ablegen und entfernen — zum Nachlesen und Herunterladen stehen sie hier bereit.';
-
-function DownloadAnker({ einsatzId, dokument }: { einsatzId: number; dokument: Dokument }) {
-  const { token } = theme.useToken();
-  return (
-    <a
-      href={dokumentDownloadPfad(einsatzId, dokument.id)}
-      download={dokument.dateiname}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        minHeight: token.controlHeight,
-        fontWeight: token.fontWeightStrong,
-      }}
-    >
-      {dokument.titel}
-    </a>
-  );
-}
 
 function bezugText(d: Dokument): string | null {
   return (
@@ -101,7 +85,13 @@ const dokumentSpalten = (
       immerSichtbar: true,
       sortWert: (d) => d.titel,
       suchText: (d) => `${d.titel} ${d.dateiname}`,
-      render: (_, d) => <DownloadAnker einsatzId={einsatzId} dokument={d} />,
+      render: (_, d) => (
+        <DownloadAnker
+          href={dokumentDownloadPfad(einsatzId, d.id)}
+          dateiname={d.dateiname}
+          text={d.titel}
+        />
+      ),
     },
     {
       title: 'Kategorie',
