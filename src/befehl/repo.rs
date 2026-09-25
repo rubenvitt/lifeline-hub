@@ -184,11 +184,26 @@ pub async fn anlegen_tx(
 
 /// Partielles Update eines Entwurfs (Titel/Zeitstand/Abschnitte). `NotFound`,
 /// wenn nicht zum Einsatz. Der Entwurfs-Status wird vom Handler geprüft.
+///
+/// Pool-Hülle um [`aktualisiere_tx`]: wie bisher ohne eigene Transaktion, UPDATE und
+/// Rücklesen laufen im Autocommit einer geliehenen Verbindung.
 pub async fn aktualisiere(
     pool: &SqlitePool,
     einsatz_id: i64,
     id: i64,
     patch: BefehlPatch<'_>,
+) -> Result<BefehlAnzeige, AppError> {
+    let mut conn = pool.acquire().await?;
+    aktualisiere_tx(&mut conn, einsatz_id, id, &patch).await
+}
+
+/// Wie [`aktualisiere`], auf einer offenen Verbindung/Transaktion (LFH-690: der Demo-Import
+/// befüllt den Entwurf vor der Freigabe in EINER Transaktion). Öffnet und committet nichts.
+pub async fn aktualisiere_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    id: i64,
+    patch: &BefehlPatch<'_>,
 ) -> Result<BefehlAnzeige, AppError> {
     let abschnitte_json = match patch.abschnitte {
         Some(a) => Some(serde_json::to_string(a).map_err(|e| AppError::Internal(e.to_string()))?),
@@ -211,13 +226,13 @@ pub async fn aktualisiere(
     .bind(id)
     .bind(einsatz_id)
     .bind(STATUS_ENTWURF)
-    .execute(pool)
+    .execute(&mut *conn)
     .await?
     .rows_affected();
     if betroffen == 0 {
         return Err(AppError::NotFound);
     }
-    laden(pool, einsatz_id, id).await
+    laden(&mut *conn, einsatz_id, id).await
 }
 
 /// Gibt einen Entwurf frei: schreibt **in einer Transaktion** den gerenderten
