@@ -60,6 +60,16 @@ export interface FachebenenSichtbar {
   autobahn: boolean;
 }
 
+// ============================== LFH-690 Demo-Daten ==============================
+/** Stand der Demo-Daten der eigenen Organisation — die eine Antwort aller vier Endpunkte.
+ *  `import` fehlt ohne aktiven Import, `bericht` fehlt, solange nie importiert wurde. */
+export type DemoDatenStatus = S['DemoDatenStatus'];
+export type DemoImportKopf = S['DemoImportKopf'];
+export type DemoBericht = S['DemoBericht'];
+export type DemoBerichtZeile = S['DemoBerichtZeile'];
+export type DemoStammdatenArt = S['DemoStammdatenArt'];
+export type DemoVorgang = S['DemoVorgang'];
+
 // ============================== Admin — Org-weite Einstellungen ==============================
 export type OrgEinstellungen = S['OrgEinstellungenAnzeige'];
 

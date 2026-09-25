@@ -41,4 +41,14 @@ export const server = setupServer(
    * Tests der Zähler überschreiben per `server.use()`.
    */
   http.get('/api/einsaetze/:einsatzId/modul-zaehler', () => HttpResponse.json({})),
+  /**
+   * Status der Demo-Daten (LFH-690) — 404 als Default. Das ist der ECHTE Serverzustand ohne
+   * `--demo-daten`: die Routen sind dann gar nicht registriert (design.md D1/D2), und das
+   * Frontend liest genau daraus „nicht freigeschaltet“. Die Einsatzliste und die Verwaltung
+   * fragen ihn für jeden System-Admin ab; ohne diesen Handler fielen deren Tests an
+   * `onUnhandledRequest: 'error'`. Tests der Freischaltung überschreiben per `server.use()`.
+   */
+  http.get('/api/demo-daten', () =>
+    HttpResponse.json({ error: 'Nicht gefunden' }, { status: 404 }),
+  ),
 );
