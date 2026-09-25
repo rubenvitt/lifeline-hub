@@ -24,9 +24,9 @@ import { expect, test, type Page } from '@playwright/test';
  *
  * WAS NACHWEIS 2 BEWEIST UND WAS NICHT: gemessen wird „der Inhalt liegt vollständig innerhalb
  * des Druck-Wurzelknotens bei der nutzbaren Breite von A4 hoch" (Herleitung an
- * {@link A4_DRUCKBREITE}). NICHT gemessen wird die Seitenhöhe, der Umbruch über mehrere
- * Blätter und die Wiederholung der Kopfzeile je Blatt — das sind Fragen von `@page` und
- * `break-inside`, und die stellt dieses Paket nicht.
+ * {@link A4_DRUCKBREITE}). NICHT gemessen werden hier die Seitenhöhe und der Umbruch über
+ * mehrere Blätter. Die Voraussetzung der Kopfwiederholung je Blatt (Kopf und Körper in EINER
+ * Tabelle) belegt NACHWEIS 2b weiter unten.
  *
  * MUTATIONSPROBE ZU NACHWEIS 2, protokolliert weil eine Zusicherung ohne Gegenprobe eine
  * Behauptung ist (Beweisform aus `katalogtabelle-schmal.spec.ts:90-98`):
@@ -37,11 +37,11 @@ import { expect, test, type Page } from '@playwright/test';
  *    also nachweislich an einer einzelnen Regel und ist nicht durch (a) mitgemeint.
  * Beide Male zurückgedreht und byte-gleich verglichen.
  *
- * WARUM NICHT `handleDrucken()`: der Knopf setzt `printPending` und ein Effekt ruft
- * `window.print()` (`KraefteuebersichtPage.tsx`, `handleDrucken`). Ein modaler Druckdialog im
- * Headless-Chromium ist kein Nachweis, sondern ein Aufhänger. `emulateMedia` liefert das
- * Layout, und das Aufklappen erledigen die Symbole aus Nachweis 1 — derselbe Weg, den ein
- * Benutzer nimmt.
+ * WARUM NACHWEIS 2 NICHT ÜBER DEN KNOPF: ein echter Druckdialog im Headless-Chromium ist
+ * kein Nachweis, sondern ein Aufhänger. `emulateMedia` liefert das Layout, und das Aufklappen
+ * erledigen die Symbole aus Nachweis 1 — derselbe Weg, den ein Benutzer nimmt. Den Knopf
+ * („Drucken / als PDF" → `useDrucken` → `window.print()`) prüft NACHWEIS 2b mit einem Stub
+ * für `window.print`.
  *
  * WARUM `page.request`-Seeding: ein frischer Einsatz hat 0 Kräfte, und ein Meldebild ohne
  * Zeilen hat keinen Baum, keinen Bildlaufweg und keine letzte Spaltenzelle — jede Messung
