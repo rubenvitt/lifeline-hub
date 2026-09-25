@@ -6,7 +6,7 @@ Code. „Verifiziert“ heißt, der genannte Test läuft grün **und** war vorhe
 ## 1. Schema und Schwärzung
 
 - [x] 1.1 `scripts/check-migrationen.sh` gegen frisches `origin/alpha` laufen lassen und die nächste freie Nummer bestätigen (Stand Entwurf: `0121`). Verifiziert, wenn das Skript die Nummer als frei meldet.
-- [x] 1.2 `migrations/0121_betreuung_client_id.sql`: `ADD COLUMN client_id TEXT` an `evakuierung_stand` und `betreuungsstelle_belegung`, je ein partieller UNIQUE-Index `(einsatz_id, client_id) WHERE client_id IS NOT NULL` (D1). Verifiziert mit einem `db`-Test nach dem Muster `etb_client_id_migration_partieller_unique`: mehrere NULL erlaubt, dieselbe `client_id` im selben Einsatz verletzt UNIQUE, in einem anderen Einsatz nicht.
+- [x] 1.2 `migrations/0122_betreuung_client_id.sql`: `ADD COLUMN client_id TEXT` an `evakuierung_stand` und `betreuungsstelle_belegung`, je ein partieller UNIQUE-Index `(einsatz_id, client_id) WHERE client_id IS NOT NULL` (D1). Verifiziert mit einem `db`-Test nach dem Muster `etb_client_id_migration_partieller_unique`: mehrere NULL erlaubt, dieselbe `client_id` im selben Einsatz verletzt UNIQUE, in einem anderen Einsatz nicht.
 - [x] 1.3 `src/einsatz/schwaerzung_registry.rs`: `retain("client_id", G_IDEMPOTENZ)` in beiden Tabellenregeln (D9). Verifiziert, wenn die Vollständigkeits-Tests der Registry grün sind. Sie sind nach 1.2 ohne den Eintrag rot.
 
 ## 2. Repo: idempotentes Melden

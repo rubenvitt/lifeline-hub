@@ -223,7 +223,7 @@ Herleitung: `openspec/changes/lfh-674-verbleib-notunterkunft-betreuungsstelle/de
 
 **Stand- und Belegungsmeldungen sind offline-fähig (LFH-675).** Sie laufen über die
 Offline-Queue (`offline/schreiben.ts`, Arten `stand`/`belegung`) mit `client_id`, eindeutig
-je Einsatz und Meldereihe (`0121`). Der Replay-Lookup läuft **vor** jeder Zustandsprüfung,
+je Einsatz und Meldereihe (`0122`). Der Replay-Lookup läuft **vor** jeder Zustandsprüfung,
 einmal vorab und einmal in der `BEGIN IMMEDIATE`-Transaktion. Eine gespeicherte Meldung kommt
 deshalb auch am stornierten Bezirk, an der geschlossenen Stelle und nach Einsatzende zurück
 (`EinsatzSchreibfreigabe`), ohne ETB-Eintrag und ohne Live-Ereignis. Ein Schlüssel an einem

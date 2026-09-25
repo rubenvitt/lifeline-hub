@@ -41,7 +41,7 @@ Motivation: siehe proposal.md. Der Bestand, auf dem die Änderung aufsetzt:
 
 ### D1 — Schema: `client_id` je Meldetabelle, eindeutig je Einsatz
 
-`0121_betreuung_client_id.sql`: `ALTER TABLE … ADD COLUMN client_id TEXT` an beiden
+`0122_betreuung_client_id.sql`: `ALTER TABLE … ADD COLUMN client_id TEXT` an beiden
 Tabellen, dazu je `CREATE UNIQUE INDEX … ON <tabelle>(einsatz_id, client_id) WHERE client_id
 IS NOT NULL`. NULL bleibt für Aufrufe ohne Schlüssel erlaubt, auch für die Leermeldung.
 

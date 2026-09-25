@@ -52,7 +52,7 @@ _keine_
 
 ## Impact
 
-- **Datenbank:** neue Migration `0121_betreuung_client_id.sql` (zwei `ADD COLUMN`, zwei
+- **Datenbank:** neue Migration `0122_betreuung_client_id.sql` (zwei `ADD COLUMN`, zwei
   partielle UNIQUE-Indizes). Keine Rebuild-Migration.
 - **Backend:** `src/betreuung/repo.rs` (`stand_melden_tx`, `belegung_melden_tx` mit
   Replay-Zweig), `src/routes/betreuung.rs` (Request-DTOs, Gate `EinsatzSchreibfreigabe`,
