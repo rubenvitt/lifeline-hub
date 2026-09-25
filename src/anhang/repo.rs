@@ -885,17 +885,32 @@ mod tests {
     async fn linker_stand_erkennt_schaden_linker() {
         let pool = crate::db::test_pool().await;
         let (von, einsatz) = setup(&pool).await;
-        let a = anhang_mit_zeit(&pool, einsatz, von, "dach.jpg", "2026-01-01 00:00:00").await;
-        als_schaden(&pool, einsatz, von, a, false).await;
+        let lebend = anhang_mit_zeit(&pool, einsatz, von, "dach.jpg", "2026-01-01 00:00:00").await;
+        let entfernt = anhang_mit_zeit(&pool, einsatz, von, "alt.jpg", "2026-01-01 00:00:00").await;
+        als_schaden(&pool, einsatz, von, lebend, false).await;
+        als_schaden(&pool, einsatz, von, entfernt, true).await;
 
-        let s = linker_stand(&pool, a).await.unwrap();
-        assert_eq!(s.modul.map(|l| l.tabelle), Some("einsatz_schaden_anhang"));
-        assert!(s.ist_modul_gebunden());
-        assert!(!s.ist_ungebunden(), "nie „ungebunden“ im Sinne von D12");
-        assert!(
-            s.generischer_download_gesperrt(),
-            "Schaden-Anhang nur über die Schadensroute ladbar"
-        );
+        // Auch ein ENTFERNTER (soft-gelöschter) Linker bindet: die Datei ist Beweisstück bis
+        // zur Schwärzung und darf über keinen Weg ladbar werden (Spec „Anhang entfernen“).
+        // Ein Filter auf lebende Linker in `linker_stand` machte sie für die ablegende Person
+        // generisch ladbar (D12) — Review C2 zu LFH-21.
+        for (a, fall) in [(lebend, "lebend"), (entfernt, "entfernt")] {
+            let s = linker_stand(&pool, a).await.unwrap();
+            assert_eq!(
+                s.modul.map(|l| l.tabelle),
+                Some("einsatz_schaden_anhang"),
+                "{fall}"
+            );
+            assert!(s.ist_modul_gebunden(), "{fall}");
+            assert!(
+                !s.ist_ungebunden(),
+                "{fall}: nie „ungebunden“ im Sinne von D12"
+            );
+            assert!(
+                s.generischer_download_gesperrt(),
+                "{fall}: Schaden-Anhang nur über die Schadensroute ladbar"
+            );
+        }
     }
 
     #[tokio::test]

@@ -1085,6 +1085,47 @@ async fn schaden_anhang_nicht_an_chat_verknuepfbar() {
     );
 }
 
+/// Review C2 zu LFH-21: eine ENTFERNTE Schaden-Datei bleibt Beweisstück — über die
+/// Schadensroute 404, generisch weiter gesperrt (Download 404, DELETE 422), und zwar für die
+/// Person, die sie abgelegt und entfernt hat (D12). Die Datei selbst bleibt gespeichert.
+#[tokio::test]
+async fn entfernte_schaden_datei_bleibt_generisch_gesperrt() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let aid = schaden_anhang(&pool, einsatz).await;
+    let (sid, lid): (i64, i64) =
+        sqlx::query_as("SELECT schaden_id, id FROM einsatz_schaden_anhang WHERE anhang_id = ?")
+            .bind(aid)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    let schaden_pfad = format!("/api/einsaetze/{einsatz}/schaeden/{sid}/anhaenge/{lid}");
+
+    let (s, _) = anfrage(&app, "DELETE", &schaden_pfad, &admin, None).await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "über die Schadensroute entfernt");
+
+    let (s, _) = anfrage(&app, "GET", &format!("{schaden_pfad}/datei"), &admin, None).await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "Schadensroute: entfernt ist weg");
+    let (s, _, _) = download(&app, einsatz, aid, &admin).await;
+    assert_eq!(
+        s,
+        StatusCode::NOT_FOUND,
+        "generischer Download bleibt gesperrt"
+    );
+    assert_eq!(
+        delete_anhang(&app, einsatz, aid, &admin).await,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "generischer DELETE bleibt gesperrt"
+    );
+    let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM anhang WHERE id = ?")
+        .bind(aid)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(n, 1, "die Datei bleibt bis zur Schwärzung gespeichert");
+}
+
 /// Review C1 zu LFH-117, Gegenprobe Chat: ein ungebundener Anhang ist über die generische
 /// Route nur für die hochladende Person erreichbar — vor dem Senden. Ist er an eine Nachricht
 /// gebunden, gelten die Chat-Regeln wie bisher, auch für andere.
