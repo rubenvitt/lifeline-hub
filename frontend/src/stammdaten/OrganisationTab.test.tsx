@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { server } from '../test/server';
@@ -189,6 +189,25 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
     renderTab();
     const bild = await screen.findByRole('img', { name: 'Logo von DRK' });
     expect(bild).toHaveAttribute('src', '/api/organisation/logo?v=abc123');
+  });
+
+  /**
+   * Ein Logo, das nicht lädt (Datei weg, Abruf gescheitert), stand als kaputter Bildrahmen
+   * da. Wie im Druckkopf fällt das Bild weg — hier aber mit Hinweis, weil die Verwaltung der
+   * Ort ist, an dem man es behebt. Hochladen/Ersetzen und Entfernen bleiben bedienbar.
+   */
+  it('nimmt ein Logo, das nicht lädt, weg und sagt es', async () => {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/organisation', () => HttpResponse.json(MIT_LOGO)),
+    );
+    renderTab();
+    const bild = await screen.findByRole('img', { name: 'Logo von DRK' });
+    fireEvent.error(bild);
+    expect(screen.queryByRole('img', { name: 'Logo von DRK' })).toBeNull();
+    expect(screen.getByText(/Das hinterlegte Logo lässt sich nicht anzeigen/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Logo ersetzen' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Logo entfernen' })).toBeEnabled();
   });
 
   it('lädt ein PNG als Multipart-Feld `datei` hoch und invalidiert die Organisation', async () => {

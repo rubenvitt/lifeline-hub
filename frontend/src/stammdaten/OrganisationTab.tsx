@@ -133,6 +133,9 @@ export default function OrganisationTab() {
   // ── Logo (LFH-22, design.md D9) ──────────────────────────────────────────────
   const logo = orgQuery.data?.logo ?? null;
   const [vorpruefung, setVorpruefung] = useState<string | null>(null);
+  // Ein Logo, das nicht lädt, fällt weg statt als kaputter Bildrahmen zu stehen (wie im
+  // Druckkopf). Gemerkt je sha256: ein ersetztes Logo bekommt einen neuen Versuch.
+  const [kaputtesLogo, setKaputtesLogo] = useState<string | null>(null);
   const [entfernenOffen, setEntfernenOffen] = useState(false);
   const logoHoch = useMutation({
     mutationFn: ladeOrgLogoHoch,
@@ -212,11 +215,20 @@ export default function OrganisationTab() {
         style={{ marginBlockEnd: token.marginLG }}
       >
         <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
-          {logo ? (
+          {logo && kaputtesLogo === logo.sha256 ? (
+            // Anders als im Druckkopf mit Hinweis: hier ist der Ort, an dem man es behebt.
+            <Alert
+              type="warning"
+              showIcon
+              title="Das hinterlegte Logo lässt sich nicht anzeigen."
+              description="Auf Ausdrucken fehlt es, bis es ersetzt oder entfernt ist."
+            />
+          ) : logo ? (
             <img
               src={orgLogoPfad(logo.sha256)}
               alt={`Logo von ${orgQuery.data?.name ?? 'der Organisation'}`}
               style={{ maxHeight: 64, maxWidth: 240, objectFit: 'contain' }}
+              onError={() => setKaputtesLogo(logo.sha256)}
             />
           ) : (
             <Typography.Text type="secondary">
