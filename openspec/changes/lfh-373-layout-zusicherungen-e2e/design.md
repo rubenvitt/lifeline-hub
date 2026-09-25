@@ -188,8 +188,10 @@ unberührt. Hebel in dieser Reihenfolge, nach jedem wird gemessen:
    Platzhalter („/ für Typ, Felder & Bausteine · @ für Einheit“). Der
    **Tastaturvertrag** (`ENTER_HINWEIS`) steht dort aber nicht, und CLAUDE.md
    (Erfassungs-Norm, Nacharbeit LFH-335) trennt beide Aussagen ausdrücklich. Die Form ist
-   eine Entscheidung am Checkpoint: (a) einzeilige Kurzform nur mit dem Vertrag
-   („↵ senden · ⇧↵ neue Zeile“), (b) die Zeile entfällt unter `md` ganz. Empfohlen ist (a).
+   am Checkpoint (25.09.2026) entschieden: **einzeilige Kurzform nur mit dem Vertrag**
+   („↵ senden · ⇧↵ neue Zeile“). Verworfen ist, die Zeile unter `md` ganz entfallen zu
+   lassen, weil der Vertrag dann auf dem Gerät fehlte, auf dem Enter auf der
+   Bildschirmtastatur am ehesten überrascht.
 
 **Sind alle Hebel gezogen und der Deckel hält noch nicht, wird zurückgefragt**, nicht
 still gesenkt.
