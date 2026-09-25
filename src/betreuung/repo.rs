@@ -434,6 +434,17 @@ fn plan_pruefen(plan: i64) -> Result<(), AppError> {
             "plan_personen muss mindestens 1 sein, war {plan}"
         )));
     }
+    hoechstens("plan_personen", plan)
+}
+
+/// Obergrenze aller Personenzahlen ([`super::MAX_PERSONEN`], LFH-680).
+fn hoechstens(feld: &str, n: i64) -> Result<(), AppError> {
+    if n > super::MAX_PERSONEN {
+        return Err(AppError::Validation(format!(
+            "{feld} darf höchstens {} sein, war {n}",
+            super::MAX_PERSONEN
+        )));
+    }
     Ok(())
 }
 
@@ -464,7 +475,8 @@ fn kapazitaet_pruefen(kapazitaet: Option<i64>) -> Result<(), AppError> {
         Some(k) if k < 1 => Err(AppError::Validation(format!(
             "kapazitaet_personen muss mindestens 1 sein, war {k}"
         ))),
-        _ => Ok(()),
+        Some(k) => hoechstens("kapazitaet_personen", k),
+        None => Ok(()),
     }
 }
 
@@ -474,7 +486,7 @@ fn anzahl_pruefen(feld: &str, n: i64) -> Result<(), AppError> {
             "{feld} darf nicht negativ sein, war {n}"
         )));
     }
-    Ok(())
+    hoechstens(feld, n)
 }
 
 /// Der Zeitpunkt muss im Drahtformat vorliegen; die Route hat ihn normalisiert und gegen die

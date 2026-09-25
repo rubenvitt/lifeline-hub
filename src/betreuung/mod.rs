@@ -250,6 +250,15 @@ impl TryFrom<String> for BetreuungsstelleStatus {
     }
 }
 
+/// Obergrenze je Personenzahl: Plangröße, Stand „evakuiert“, Kapazität, Belegung (LFH-680).
+/// Die größten Evakuierungen in Deutschland lagen bei einigen Zehntausend Menschen (Frankfurt
+/// 2017: rund 60 000); eine Million in EINEM Bezirk oder EINER Stelle liegt eine
+/// Größenordnung darüber und hält trotzdem jede Summe fern vom Überlauf: ohne Grenze lief die
+/// `summe` der Kopfzahl über (Debug-Build: Panic im Handler, Release: still negativ), und
+/// jenseits von 2^53 zählt eine JS-Number nicht mehr genau. Das Feld scheitert für sich,
+/// also **400** — Vorbild `verpflegung::MAX_EP`.
+pub const MAX_PERSONEN: i64 = 1_000_000;
+
 /// Liest einen Enum-Wert aus einer Eingabe. Ein unbekannter Wert scheitert am Feld für sich
 /// und ist deshalb **400** (CLAUDE.md „Statuscode-Konvention“, `src/error.rs`), nicht 422.
 pub fn enum_wert<T: TryFrom<String, Error = String>>(s: &str) -> Result<T, AppError> {

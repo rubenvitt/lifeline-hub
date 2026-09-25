@@ -60,8 +60,10 @@ fn draht(t: DateTime<Utc>) -> String {
 }
 
 /// Meldezeitpunkt: fehlt/leer → `jetzt`, sonst normalisiert (400 bei Unlesbarem) und höchstens
-/// [`ZUKUNFT_TOLERANZ_SEKUNDEN`] nach `jetzt` (sonst 400). `jetzt` ist injiziert, damit die
-/// Grenze ohne Uhr prüfbar ist.
+/// [`ZUKUNFT_TOLERANZ_SEKUNDEN`] nach `jetzt` (sonst 400). Gespeichert wird `min(zeitpunkt,
+/// jetzt)` (LFH-680, design.md D2): die Toleranz fängt Uhrenversatz ab, übernimmt ihn aber
+/// nicht — sonst wäre eine Meldung sofort „aktuell“ und fehlte bis zu 60 s in der Kopfzahl
+/// „jetzt“. `jetzt` ist injiziert, damit die Grenze ohne Uhr prüfbar ist.
 fn meldezeitpunkt(eingabe: Option<&str>, jetzt: DateTime<Utc>) -> Result<String, AppError> {
     let zeit = match eingabe.map(str::trim) {
         Some(s) if !s.is_empty() => crate::etb::normalisiere_zeit(s)?,
@@ -75,7 +77,7 @@ fn meldezeitpunkt(eingabe: Option<&str>, jetzt: DateTime<Utc>) -> Result<String,
             "Zeitpunkt {zeit} liegt in der Zukunft (Toleranz {ZUKUNFT_TOLERANZ_SEKUNDEN} s)"
         )));
     }
-    Ok(zeit)
+    Ok(draht(t.min(jetzt)))
 }
 
 /// Worauf ein Live-Ereignis zeigt. Nur die Kennung geht auf den Draht.
@@ -535,11 +537,17 @@ mod tests {
     }
 
     #[test]
-    fn zukunft_bis_60_s_toleriert_ab_61_s_400() {
+    fn zukunft_bis_60_s_toleriert_und_auf_jetzt_geklemmt_ab_61_s_400() {
         let jetzt = t("2026-09-23 12:00:00");
+        // LFH-680: toleriert heißt nicht übernommen. Gespeichert wird `jetzt`, sonst wäre die
+        // Meldung sofort „aktuell“, fehlte aber bis zu 60 s in der Kopfzahl „jetzt“.
         assert_eq!(
             meldezeitpunkt(Some("2026-09-23 12:01:00"), jetzt).unwrap(),
-            "2026-09-23 12:01:00"
+            "2026-09-23 12:00:00"
+        );
+        assert_eq!(
+            meldezeitpunkt(Some("2026-09-23 12:00:01"), jetzt).unwrap(),
+            "2026-09-23 12:00:00"
         );
         assert_eq!(
             meldezeitpunkt(Some("2026-09-23 12:01:01"), jetzt)
