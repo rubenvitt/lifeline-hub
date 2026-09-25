@@ -11,3 +11,14 @@
 .lfh-seitenkopf__pfad .ant-breadcrumb ol > li:last-child:not(.ant-breadcrumb-separator) {
   display: none;
 }
+
+/* Meta und Datenstand auf schmalem Schirm auf eigener Zeile (LFH-373, gemessen bei 390 px).
+   In der Titelzeile schob die spät eintreffende Meta („8 Einträge") den Stand in eine neue
+   Zeile, und alles darunter rückte 22 px. Die eigene Zeile hält der unsichtbare Platzhalter
+   des Datenstands vom ersten Bild an. Die Schwelle ist antds `md` (768), dieselbe, die
+   `theme/rollen.css` abfragt. */
+@media (max-width: 767.98px) {
+  .lfh-seitenkopf__meta {
+    flex-basis: 100%;
+  }
+}

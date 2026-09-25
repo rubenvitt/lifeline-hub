@@ -304,10 +304,33 @@ export default function EinsatzSeite({
           <Typography.Title level={1} style={seitentitelStil(farben)}>
             {titel}
           </Typography.Title>
-          {meta && <span style={seitenMetaStil(farben)}>{meta}</span>}
-          <span style={{ color: farben.gedaempft }}>
-            <Datenstand dataUpdatedAt={dataUpdatedAt} />
-          </span>
+          {/* Meta und Datenstand sind EINE Gruppe, die unter `md` eine eigene Zeile hat
+              (`EinsatzSeite.css`, LFH-373, gemessen bei 390 px): stand die Meta in der
+              Titelzeile, schob ihr spätes Eintreffen „Stand" in eine neue Zeile und alles
+              darunter 22 px nach unten. Die eigene Zeile hält der Datenstand-Platzhalter,
+              die Meta wächst darin. Per CSS, nicht per `useViewport`: dessen erstes Bild ist
+              bewusst breit und wäre selbst ein Sprung. */}
+          {(meta || dataUpdatedAt !== undefined) && (
+            <span
+              className="lfh-seitenkopf__meta"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'baseline',
+                columnGap: token.marginXS * 3,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {meta && <span style={seitenMetaStil(farben)}>{meta}</span>}
+              <span style={{ color: farben.gedaempft }}>
+                {/* Führt die Seite einen Datenstand (auch `0` vor dem ersten Abruf), hält der
+                    Kopf seinen Platz frei — sonst bräche er beim Eintreffen um. */}
+                <Datenstand
+                  dataUpdatedAt={dataUpdatedAt}
+                  platzHalten={dataUpdatedAt !== undefined}
+                />
+              </span>
+            </span>
+          )}
         </div>
         {/* Die Marke macht die Zusicherung von außen prüfbar (LFH-340 · C5): „genau eine
             Primäraktion IM KOPF" ist ohne sie nur global zählbar, und eine Seite mit einem

@@ -143,6 +143,56 @@ describe('EinsatzSeite', () => {
     expect(screen.getByText('Stand 14:07')).toBeInTheDocument();
   });
 
+  // LFH-373: eine Seite, die einen Datenstand führt, reicht vor dem ersten Abruf `0` durch
+  // (`query.dataUpdatedAt`). Dann steht der Platzhalter — eine Seite ohne Datenstand bekommt
+  // keinen, sonst trüge jeder Kopf eine Lücke.
+  // LFH-373 (gemessen): bei 390 px erschien die Meta („8 Einträge") in der Titelzeile und
+  // schob „Stand" in eine neue Zeile — alles darunter rückte 22 px. Meta und Stand sind
+  // deshalb EINE Gruppe, die unter `md` eine eigene Zeile hat: die hält der Platzhalter, und
+  // die Meta wächst darin, statt etwas umzubrechen.
+  it('fasst Meta und Datenstand zu einer Gruppe, die unter md eine eigene Zeile hat', () => {
+    const { container } = renderMitProviders(
+      <EinsatzSeite titel="Liste" meta="8 Einträge" dataUpdatedAt={0}>
+        <div>Inhalt</div>
+      </EinsatzSeite>,
+    );
+    const gruppe = container.querySelector('.lfh-seitenkopf__meta') as HTMLElement;
+    expect(gruppe).not.toBeNull();
+    expect(gruppe).toHaveTextContent('8 Einträge');
+    expect(gruppe.querySelector('[data-lfh="datenstand-platzhalter"]')).not.toBeNull();
+    expect(gruppe.style.whiteSpace).toBe('nowrap');
+    // Vitest fährt mit `css: false` — die Regel wird am Quelltext gepinnt.
+    const regel = seiteCss.match(/@media\s*\(max-width:\s*767\.98px\)\s*\{([^}]*\{[^}]*\})/);
+    expect(regel, 'EinsatzSeite.css trägt die Schmal-Regel').not.toBeNull();
+    expect(regel![1]).toContain('.lfh-seitenkopf__meta');
+    expect(regel![1]).toMatch(/flex-basis:\s*100%/);
+  });
+
+  it('rendert ohne Meta und ohne Datenstand keine leere Gruppe', () => {
+    const { container } = renderMitProviders(
+      <EinsatzSeite titel="Liste">
+        <div>Inhalt</div>
+      </EinsatzSeite>,
+    );
+    expect(container.querySelector('.lfh-seitenkopf__meta')).toBeNull();
+  });
+
+  it('hält den Platz für den Datenstand frei, solange die Seite noch lädt', () => {
+    const { container, unmount } = renderMitProviders(
+      <EinsatzSeite titel="Liste" dataUpdatedAt={0}>
+        <div>Inhalt</div>
+      </EinsatzSeite>,
+    );
+    expect(container.querySelector('[data-lfh="datenstand-platzhalter"]')).not.toBeNull();
+    unmount();
+    const ohne = renderMitProviders(
+      <EinsatzSeite titel="Liste">
+        <div>Inhalt</div>
+      </EinsatzSeite>,
+    );
+    expect(ohne.container.querySelector('[data-lfh="datenstand-platzhalter"]')).toBeNull();
+  });
+
   /**
    * Die EINE Regel, die „Schäden › Schäden" verhindert: der letzte Pfadeintrag (der
    * Seitenname) wird ausgeblendet, weil der Titel ihn direkt danach trägt. Vitest fährt mit

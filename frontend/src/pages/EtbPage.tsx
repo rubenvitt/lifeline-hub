@@ -656,30 +656,36 @@ export default function EtbPage() {
         </div>
 
         {/* Seitenleiste ab `xl` rechts (Entwurf S4), darunter UNTER der Zeitachsenspalte —
-            nicht dazwischen, damit die angepinnte Erfassung am Fuß der Zeitachse bleibt. */}
-        <aside
-          aria-label="Bilanz des Tagebuchs"
-          style={
-            breit
-              ? {
-                  flex: `0 0 ${LEISTE_BREITE}px`,
-                  width: LEISTE_BREITE,
-                  position: 'sticky',
-                  top: token.margin,
-                }
-              : undefined
-          }
-        >
-          <EtbBilanz
-            einsatzId={einsatzId}
-            eintraege={eintraege}
-            zaehler={zaehlerQuery.data}
-            zaehlerFehler={zaehlerQuery.isError}
-            filterAktiv={filterAktiv}
-            puffer={puffer}
-            unbestimmt={!etbQuery.isSuccess}
-          />
-        </aside>
+            nicht dazwischen, damit die angepinnte Erfassung am Fuß der Zeitachse bleibt.
+            Darunter erscheint sie erst, wenn die Liste steht (LFH-373, gemessen): stand sie
+            schon, schoben die eintreffenden Zeilen sie aus dem Bild (CLS 0,22 bei 390 px).
+            `isLoading` und nicht `isPending`: offline pausiert der Abruf, und die Bilanz trägt
+            dann den Puffer — genau dort, wo er am meisten zählt. */}
+        {(breit || !etbQuery.isLoading) && (
+          <aside
+            aria-label="Bilanz des Tagebuchs"
+            style={
+              breit
+                ? {
+                    flex: `0 0 ${LEISTE_BREITE}px`,
+                    width: LEISTE_BREITE,
+                    position: 'sticky',
+                    top: token.margin,
+                  }
+                : undefined
+            }
+          >
+            <EtbBilanz
+              einsatzId={einsatzId}
+              eintraege={eintraege}
+              zaehler={zaehlerQuery.data}
+              zaehlerFehler={zaehlerQuery.isError}
+              filterAktiv={filterAktiv}
+              puffer={puffer}
+              unbestimmt={!etbQuery.isSuccess}
+            />
+          </aside>
+        )}
       </div>
 
       {darfSchreiben && (

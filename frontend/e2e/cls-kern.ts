@@ -78,7 +78,11 @@ export async function beobachteShifts(page: Page) {
         const shift = eintrag as PerformanceEntry & {
           value: number;
           hadRecentInput: boolean;
-          sources?: { node: Node | null }[];
+          sources?: {
+            node: Node | null;
+            previousRect: DOMRectReadOnly;
+            currentRect: DOMRectReadOnly;
+          }[];
         };
         // `hadRecentInput`: Verschiebungen innerhalb von 500 ms nach einer Nutzereingabe
         // sind erwartete Folgen der Bedienung und zählen in keiner CLS-Definition mit.
@@ -87,7 +91,12 @@ export async function beobachteShifts(page: Page) {
         zustand.eintraege.push({
           wert: shift.value,
           zeit: Math.round(shift.startTime),
-          quellen: (shift.sources ?? []).map((q) => beschreibe(q.node)),
+          // Lage vorher → nachher (y/Höhe): ohne sie sagt ein roter Test nur WAS sich bewegt
+          // hat, nicht WIE WEIT — und damit nicht, welcher Nachbar es geschoben hat.
+          quellen: (shift.sources ?? []).map(
+            (q) =>
+              `${beschreibe(q.node)} y${Math.round(q.previousRect.y)}→${Math.round(q.currentRect.y)} h${Math.round(q.previousRect.height)}→${Math.round(q.currentRect.height)}`,
+          ),
         });
       }
     });

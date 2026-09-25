@@ -941,6 +941,50 @@ describe('EtbPage – Zeitachse (Neuentwurf S4)', () => {
     expect(feld).toHaveValue('Angefangener Eintrag');
   });
 
+  /**
+   * LFH-373 (gemessen, `e2e/leisten-flaeche.spec.ts` „Laden ohne Sprung"): unter `xl` steht die
+   * Bilanz UNTER der Zeitachse. Stand sie schon da, während die Liste noch lud, schoben die
+   * eintreffenden Zeilen sie um mehr als ihre Höhe nach unten (CLS 0,22 bei 390 px). Sie
+   * erscheint deshalb erst, wenn die Liste steht — ab `xl` steht sie daneben und darf sofort.
+   */
+  it('zeigt die Bilanz unter xl erst, wenn die Liste steht', async () => {
+    setzeViewportBreite(800);
+    let freigeben: () => void = () => {};
+    const liste = new Promise<void>((r) => {
+      freigeben = r;
+    });
+    setup('/einsaetze/7/etb', [
+      http.get('/api/einsaetze/7/etb', async () => {
+        await liste;
+        return HttpResponse.json([eintrag]);
+      }),
+    ]);
+    await screen.findByPlaceholderText(/Inhalt/);
+    expect(screen.queryByRole('complementary', { name: 'Bilanz des Tagebuchs' })).toBeNull();
+    freigeben();
+    await screen.findByText('Erste Meldung');
+    expect(screen.getByRole('complementary', { name: 'Bilanz des Tagebuchs' })).toBeInTheDocument();
+  });
+
+  it('zeigt die Bilanz ab xl sofort, auch während die Liste lädt', async () => {
+    setzeViewportBreite(1366);
+    let freigeben: () => void = () => {};
+    const liste = new Promise<void>((r) => {
+      freigeben = r;
+    });
+    setup('/einsaetze/7/etb', [
+      http.get('/api/einsaetze/7/etb', async () => {
+        await liste;
+        return HttpResponse.json([eintrag]);
+      }),
+    ]);
+    expect(
+      await screen.findByRole('complementary', { name: 'Bilanz des Tagebuchs' }),
+    ).toBeInTheDocument();
+    freigeben();
+    await screen.findByText('Erste Meldung');
+  });
+
   it('zeigt die Bilanz aus der Serverzählung und den Puffer „übertragen"', async () => {
     setzeViewportBreite(1366);
     setup('/einsaetze/7/etb', [

@@ -119,7 +119,9 @@ umkehrt, steht das am Absatz selbst mit „Neuentwurf 22.09.2026".
   des aktiven Modus für TSX, weil antd `paneel`, `flaeche3` & Co. nicht kennt).
 - **Seitenkopf 44 px** in `components/EinsatzSeite.tsx` (`SEITENKOPF_HOEHE`, Boden, der mit der
   Staffel wächst): `titel` 14/600 als `h1` (Paneele gliedern darunter ab `h2`) · `meta` Mono · `aktionen` rechts (Primär blau gefüllt,
-  sekundär umrandet). **Markdown-Inhalt hängt sich in diese Gliederung ein, nicht daneben**
+  sekundär umrandet). **Meta und Datenstand sind eine Gruppe mit eigener Zeile unter `md`**, und der
+  Datenstand hält vor dem ersten Abruf seine Breite als stummen Platzhalter (LFH-373, gemessen:
+  sonst brach die spät eintreffende Meta den Kopf bei 390 px um, und alles darunter rückte 22 px). **Markdown-Inhalt hängt sich in diese Gliederung ein, nicht daneben**
   (LFH-621): `components/Markdown.tsx` und `MarkdownEditor` tragen die Pflicht-Prop
   `unterEbene` — die Ebene der nächsten Überschrift über dem Text, `#` wird die Stufe darunter,
   `h6` ist der Boden. Kein fester Versatz: der frühere Versatz 3 ließ `###` und tiefer auch
@@ -422,7 +424,10 @@ Fokusabstand trägt `scroll-margin-block-end` an ALLEN Zielen von Seitenkopf und
 verdeckten Streifen und rollte bei jedem Fokus dort die Seite ans Ende. Unter `md` steht das Feld
 auf eigener Zeile (`Schnellerfassungszeile gestapelt`, im DOM zuerst, kein CSS-`order`), die
 Feldzeile rollt waagerecht mit „Feld" vorn, „Werte behalten" steht in der Hinweiszeile, und
-Eingaben in der Leiste fokussieren mit `preventScroll` (`MetaChip`, nicht `autoFocus`).
+Eingaben in der Leiste fokussieren mit `preventScroll` (`MetaChip`, nicht `autoFocus`). Unter `xl` erscheint die Bilanz erst, wenn die Liste
+steht (`isLoading`, damit sie offline den Puffer trägt): stand sie vor den Zeilen da, schoben diese
+sie aus dem Bild. Den Rennfall erzwingt der Test mit verzögerten Antworten, abgewartet trat er nur
+in jedem fünften bis achten Lauf auf.
 **Kopfzahl und Bilanz zählt der Server, über DENSELBEN Filter wie die Liste** (LFH-612,
 `GET …/etb/zaehler`, gemeinsame Bedingung `etb/repo.rs:filter_bedingung`): ohne Filter „412
 Einträge" und „Bilanz", mit Filter „7 Treffer" und „Bilanz im Filter". Eine feste Tagesgrenze

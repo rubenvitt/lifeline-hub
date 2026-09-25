@@ -419,6 +419,13 @@ async function matrixEinsatz(
  * Der Beobachter lebt je Dokument (`cls-kern.ts`); `stelleDichte` lädt neu, gemessen wird also
  * genau das Laden in der gewählten Stufe. VORBEDINGUNG je Route ist ein Inhaltsanker — ohne
  * ihn wäre „kein Sprung" auch für eine Seite wahr, die noch im Ladezustand steht.
+ *
+ * DAS RENNEN WIRD ERZWUNGEN, nicht abgewartet (gemessen im Gate-Lauf 25.09.2026): im ETB sprang
+ * die Seite nur, wenn Liste oder Zählung NACH dem ersten Bild eintrafen — in einem von fünf bis
+ * acht Läufen. Dann schoben die Zeilen die Bilanz aus dem Bild (0,22) oder die Meta brach den
+ * Seitenkopf um (0,19). Der Durchgang `verzoegert` hält beide Antworten 1,5 s zurück; ohne ihn
+ * wäre der Test grün durch Zufall. Die Verzögerung greift nur auf die API-Pfade, nie auf das
+ * Dokument (`/einsaetze/…/etb` ist auch die Seitenadresse).
  */
 test('Laden ohne Sprung (LFH-373): ETB, Lagekarte und Gefahrenmatrix auf dem Handschirm', async ({
   page,
@@ -444,6 +451,7 @@ test('Laden ohne Sprung (LFH-373): ETB, Lagekarte und Gefahrenmatrix auf dem Han
     {
       name: 'ETB',
       pfad: `/einsaetze/${matrixId}/etb`,
+      verzoegern: /\/api\/einsaetze\/\d+\/etb(\?|$|\/zaehler)/,
       anker: async () =>
         // 8 gesäte Meldungen + 2 Systemeinträge der beiden angelegten Gefahrengebiete.
         expect(
@@ -470,16 +478,25 @@ test('Laden ohne Sprung (LFH-373): ETB, Lagekarte und Gefahrenmatrix auf dem Han
   ];
   const gemessen: string[] = [];
   for (const route of ROUTEN) {
+    const verzoegern = 'verzoegern' in route ? route.verzoegern : undefined;
     for (const dichte of ['kompakt', 'handschuh'] as const) {
-      await page.goto(route.pfad);
-      await stelleDichte(page, dichte);
-      await route.anker();
-      await schriftenGeladen(page);
-      const messung = await ruheShifts(page);
-      gemessen.push(`${route.name}/${dichte}: ${bericht(messung)}`);
-      expect(messung.summe, `${route.name}/${dichte}: ${bericht(messung)}`).toBeLessThanOrEqual(
-        CLS_GUT,
-      );
+      for (const lauf of verzoegern ? (['direkt', 'verzoegert'] as const) : (['direkt'] as const)) {
+        await page.goto(route.pfad);
+        if (lauf === 'verzoegert') {
+          await page.route(verzoegern!, async (anfrage) => {
+            await new Promise((fertig) => setTimeout(fertig, 1500));
+            await anfrage.continue().catch(() => {});
+          });
+        }
+        await stelleDichte(page, dichte);
+        await route.anker();
+        await schriftenGeladen(page);
+        const messung = await ruheShifts(page);
+        await page.unrouteAll({ behavior: 'ignoreErrors' });
+        const name = `${route.name}/${dichte}${lauf === 'verzoegert' ? '/verzögert' : ''}`;
+        gemessen.push(`${name}: ${bericht(messung)}`);
+        expect(messung.summe, `${name}: ${bericht(messung)}`).toBeLessThanOrEqual(CLS_GUT);
+      }
     }
   }
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });

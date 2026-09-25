@@ -313,6 +313,34 @@ Kopf-Freiraum“ überlebte zuerst. Das Ziel lag nur halb unter der Kopfzeile, u
 zählt nach WCAG 2.4.11 nur vollständige Verdeckung. Der Personenlisten-Nachweis prüft
 seitdem zusätzlich den Mittelpunkt und wird ohne die Regel rot.
 
+### Nachtrag aus dem Gate-Lauf (25.09.2026): das Laden-Rennen im ETB
+
+Der volle Gate-Lauf fand „Laden ohne Sprung“ im ETB rot (CLS 0,197). Isoliert trat das in
+einem von fünf bis acht Läufen auf. Es ist also kein Last-Flake, sondern ein Rennen zwischen
+drei Antworten: Einsatz, Liste und Zählung. Mit 1,5 s Verzögerung per `page.route` auf Liste
+und Zählung lässt es sich deterministisch nachstellen. Dabei zeigten sich zwei Ursachen,
+beide schon auf `alpha` vorhanden:
+- **Bilanz unter der Liste (unter `xl`).** Stand sie vor den Zeilen da, schoben die Zeilen sie
+  aus dem Bild (0,22). Sie erscheint jetzt erst, wenn die Liste steht. Die Bedingung ist
+  `isLoading`, nicht `isPending`: offline pausiert der Abruf, und dann trägt die Bilanz den
+  Puffer.
+- **Meta und Datenstand im Seitenkopf.** Bei 390 px erschien „8 Einträge“ in der Titelzeile
+  und schob „Stand“ in eine neue Zeile (0,19 im Handschuh-Betrieb). Meta und Datenstand sind
+  jetzt eine Gruppe, die unter `md` eine eigene Zeile hat (CSS, nicht `useViewport`, dessen
+  erstes Bild bewusst breit ist). Der Datenstand hält seine Breite als unsichtbarer, stummer
+  Platzhalter „Stand 00:00“, der in Mono mit Tabellenziffern genau so breit ist wie jede
+  Uhrzeit. Das gilt für jede `EinsatzSeite`, die einen Datenstand führt.
+
+Der Durchgang `verzoegert` gehört jetzt fest zum Test. Ohne ihn wäre der Test grün durch
+Zufall. Mutationsprobe: Ohne die Bilanz-Sperre ist er deterministisch rot (0,208), ohne die
+eigene Meta-Zeile ebenfalls (0,192). Der CLS-Kern meldet seitdem je Quelle auch die Lage
+vorher → nachher, sonst hätte der rote Lauf nicht verraten, welcher Nachbar geschoben hat.
+
+Die übrigen drei roten Tests des Gate-Laufs (`dokumente.spec.ts` Tastaturweg,
+`lagekarte-betroffene`, `lagekarte-betreuung`) laufen isoliert grün. Der Dokumente-Test
+scheitert unter paralleler Last am `filechooser`-Ereignis. Er wird gerade in LFH-632 gehärtet,
+und dieser Change fasst Dokumente nicht an.
+
 ## Risks / Trade-offs
 
 - [Laufzeit von `check-all.sh` Schritt 7 steigt: drei Stufen × mehrere Breiten ×
