@@ -45,18 +45,22 @@ export function useDrucken(): Drucken {
       return;
     }
     if (!organisation.isSuccess) return;
-    erledigt.current = anforderung;
+    // `window.print()` NIE direkt aus dem Effekt: es feuert `beforeprint` synchron, und im
+    // Passiv-Effekt steht React noch im Commit-Kontext — das `flushSync` der Listener
+    // (Druckkopf: Druckzeit, KatalogTabelle: Druckform) rendert dort nicht, das Blatt trüge
+    // den Stand vom Seitenaufbau. Deshalb immer erst nach einem Takt Aufschub.
+    //
     // Das Logo im Druckkopf muss dekodiert sein, bevor das Druckbild einfriert — ein
     // nicht geladenes Bild fehlt dort, oder es steht ein leerer Rahmen. Ein Fehler zählt
-    // als „ohne Logo drucken" (der Druckkopf nimmt das Bild dann weg); danach ein Takt
-    // Aufschub, damit dessen Fehlerereignis sicher verarbeitet ist.
+    // als „ohne Logo drucken" (der Druckkopf nimmt das Bild dann weg); der Takt Aufschub
+    // stellt dann zugleich sicher, dass dessen Fehlerereignis verarbeitet ist.
+    //
+    // `erledigt` wird erst beim Drucken gesetzt, nicht beim Einplanen: fällt der Effekt
+    // dazwischen neu an (eine Abhängigkeit kippt), räumt das Aufräumen den alten Lauf ab,
+    // und der neue plant die noch offene Anforderung erneut ein, statt sie still zu verlieren.
     const logos = Array.from(
       document.querySelectorAll<HTMLImageElement>('[data-lfh="druckkopf"] img'),
     );
-    if (logos.length === 0) {
-      window.print();
-      return;
-    }
     let abgebrochen = false;
     void Promise.all(
       logos.map((bild) =>
@@ -65,7 +69,9 @@ export function useDrucken(): Drucken {
     )
       .then(() => new Promise((weiter) => setTimeout(weiter, 0)))
       .then(() => {
-        if (!abgebrochen) window.print();
+        if (abgebrochen) return;
+        erledigt.current = anforderung;
+        window.print();
       });
     return () => {
       abgebrochen = true;

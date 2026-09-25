@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { server } from '../test/server';
 import { neuerQueryClient, renderMitProviders } from '../test/utils';
+import { erzeugeQueryClient } from '../api/queryClient';
 import { einsatzKeys } from '../api/queryKeys';
 import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
 import EtbDruckPage from './EtbDruckPage';
@@ -61,18 +62,24 @@ function tagebuch(alle: ReturnType<typeof eintrag>[]) {
   );
 }
 
-function rendere(suche = '') {
+/**
+ * Anzeigezone der Tests: Asia/Tokyo, bewusst NICHT die Gate-Zone. `check-all.sh` und die CI
+ * setzen `TZ=Europe/Berlin`; mit Berlin als Org-Zone wäre jede Zeitaussage auch dann grün,
+ * wenn die Seite die Org-Zone verlöre und in Maschinenzeit formatierte (Review Welle B).
+ */
+const ZONE = 'Asia/Tokyo';
+
+function rendere(suche = '', client = neuerQueryClient()) {
   server.use(
     http.get('/api/einsaetze/7', () => HttpResponse.json(EINSATZ)),
     http.get('/api/einsaetze/7/einstellungen', () =>
-      HttpResponse.json({ einsatz_id: 7, zeitzone: 'Europe/Berlin', org_defaults: { org_id: 1 } }),
+      HttpResponse.json({ einsatz_id: 7, zeitzone: ZONE, org_defaults: { org_id: 1 } }),
     ),
     http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json([{ id: 3, name: '1. Zug' }])),
   );
-  const client = neuerQueryClient();
   client.setQueryData(einsatzKeys.einstellungen(7), {
     einsatz_id: 7,
-    zeitzone: 'Europe/Berlin',
+    zeitzone: ZONE,
     org_defaults: { org_id: 1 },
   });
   return renderMitProviders(
@@ -155,7 +162,7 @@ describe('EtbDruckPage', () => {
   it('setzt einen Nachtrag an seine Nummer, mit Ereigniszeit und „nachgetragen um"', async () => {
     tagebuch([
       eintrag(11),
-      // 07:15Z = 09:15 MESZ, erfasst 08:40Z = 10:40 MESZ.
+      // 07:15Z = 16:15 in Tokio, erfasst 08:40Z = 17:40 (Berlin wäre 09:15/10:40).
       eintrag(12, { ereigniszeit: '2026-09-25 07:15:00', received_at: '2026-09-25 08:40:00' }),
       eintrag(13),
     ]);
@@ -163,17 +170,69 @@ describe('EtbDruckPage', () => {
     await fertig();
     expect(nummern()).toEqual([11, 12, 13]);
     const zeile = within(zeileNr(12));
-    expect(zeile.getByText('25.09.2026 09:15')).toBeInTheDocument();
-    expect(zeile.getByText('nachgetragen um 10:40')).toBeInTheDocument();
+    expect(zeile.getByText('25.09.2026 16:15')).toBeInTheDocument();
+    expect(zeile.getByText('nachgetragen um 17:40')).toBeInTheDocument();
     // Gegenaussage: ein pünktlich erfasster Eintrag trägt keinen Nachtrag.
     expect(within(zeileNr(11)).queryByText(/nachgetragen/)).toBeNull();
   });
 
-  it('zeigt Zeiten in der Org-Zone, nicht in UTC', async () => {
+  it('zeigt Zeiten in der Org-Zone, nicht in UTC und nicht in Maschinenzeit', async () => {
     tagebuch([eintrag(1, { ereigniszeit: '2026-09-25 06:00:00' })]);
     rendere();
     await fertig();
-    expect(within(zeileNr(1)).getByText('25.09.2026 08:00')).toBeInTheDocument();
+    // 06:00Z = 15:00 in Tokio; UTC wäre 06:00, die Gate-Zone Berlin 08:00.
+    expect(within(zeileNr(1)).getByText('25.09.2026 15:00')).toBeInTheDocument();
+  });
+
+  /**
+   * Spec „Unbrauchbarer Filter in der Adresse": ein unbekannter Typ fällt GANZ weg — er wird
+   * weder an den Server gereicht noch im Kopf als Auswahl genannt. Auf Seitenebene belegt,
+   * nicht am Parser (der Parser-Fall steht in `deeplinks.test.ts` bei `parseEtbFilter`).
+   */
+  it('verwirft einen unbekannten Typ aus der Adresse: kein `typ` am Server, „vollständiges Tagebuch" im Kopf', async () => {
+    const typen: (string | null)[] = [];
+    server.use(
+      http.get('/api/einsaetze/7/etb', ({ request }) => {
+        typen.push(new URL(request.url).searchParams.get('typ'));
+        return HttpResponse.json([eintrag(1)]);
+      }),
+    );
+    rendere('?typ=quatsch');
+    await fertig();
+    expect(typen.length).toBeGreaterThan(0);
+    expect(
+      typen.every((t) => t === null),
+      `typ am Server: ${typen.join(',')}`,
+    ).toBe(true);
+    const kopf = within(document.querySelector<HTMLElement>('[data-lfh="druckkopf"]')!);
+    expect(kopf.getByText('vollständiges Tagebuch')).toBeInTheDocument();
+    expect(kopf.queryByText(/quatsch/)).toBeNull();
+  });
+
+  /**
+   * Wer die Druckansicht verlässt und innerhalb der Cache-Frist (5 min) wieder öffnet,
+   * bekommt den AKTUELLEN Stand, nicht den Schnappschuss des letzten Besuchs. Schnappschuss
+   * heißt: keine stille Ergänzung einer OFFENEN Ansicht — nicht: alte Daten beim Öffnen.
+   *
+   * NICHT mit `neuerQueryClient()`: dessen `gcTime: 0` räumt den Eintrag beim Verlassen
+   * weg, und der Test wäre auch ohne den Fix grün. Hier gilt die Vorgabe des Betriebs.
+   */
+  it('lädt beim erneuten Öffnen neu, statt den Stand des letzten Besuchs zu zeigen', async () => {
+    const alle = [eintrag(1), eintrag(2)];
+    tagebuch(alle);
+    const client = erzeugeQueryClient({
+      queries: { retry: false },
+      mutations: { retry: false },
+    });
+    const erster = rendere('', client);
+    await fertig();
+    expect(nummern()).toEqual([1, 2]);
+    erster.unmount();
+
+    alle.push(eintrag(3));
+    rendere('', client);
+    await waitFor(() => expect(nummern()).toEqual([1, 2, 3]));
+    await fertig();
   });
 
   it('zeigt Berichtigungen in beiden Richtungen', async () => {

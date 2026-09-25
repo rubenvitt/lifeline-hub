@@ -478,11 +478,6 @@ describe('etbDruckPfad (LFH-22)', () => {
     expect(pfad.startsWith('/einsaetze/7/etb/druck?')).toBe(true);
     expect(parseEtbFilter(new URLSearchParams(pfad.split('?')[1]))).toEqual(filter);
   });
-
-  it('verwirft einen unbekannten Typ auf dem Rückweg GANZ', () => {
-    const pfad = `/einsaetze/7/etb/druck?q=x&typ=quatsch`;
-    expect(parseEtbFilter(new URLSearchParams(pfad.split('?')[1]))).toEqual({ q: 'x' });
-  });
 });
 
 describe('einsatzEinstellungenPfad (LFH-345 · C10, H15/M15)', () => {

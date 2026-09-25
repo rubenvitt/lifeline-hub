@@ -3,7 +3,9 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
-import { renderMitProviders } from '../../test/utils';
+import { neuerQueryClient, renderMitProviders } from '../../test/utils';
+import { EinsatzAnzeigeProvider } from '../../anzeige/AnzeigeKonventionenContext';
+import { einsatzKeys } from '../../api/queryKeys';
 import DruckKnopf from './DruckKnopf';
 import Druckkopf from './Druckkopf';
 
@@ -99,6 +101,58 @@ describe('useDrucken / DruckKnopf', () => {
     renderMitProviders(<DruckKnopf gesperrt />);
     await new Promise((fertig) => setTimeout(fertig, 20));
     expect(screen.getByRole('button', { name: 'Drucken / als PDF' })).toBeDisabled();
+  });
+
+  /**
+   * Der Druckkopf erneuert „Gedruckt" bei `beforeprint` per `flushSync`. Ruft der Hook
+   * `window.print()` DIREKT im Passiv-Effekt, läuft `beforeprint` im Commit-Kontext von
+   * React: `flushSync` rendert dort nicht, und das Blatt trüge die Zeit vom Seitenaufbau.
+   * Der Mock verhält sich wie der Browser — `beforeprint` synchron, dann das Druckbild —
+   * und liest den Kopf IN diesem Moment. Nachher zu lesen belegte nichts: `act` hätte das
+   * liegengebliebene Update bis dahin nachgeholt.
+   */
+  it('druckt über den Knopf ohne Logo die frische Druckzeit, nicht die vom Seitenaufbau', async () => {
+    server.use(
+      http.get('/api/organisation', () => HttpResponse.json(ORG)),
+      http.get('/api/einsaetze/1/einstellungen', () =>
+        HttpResponse.json({ einsatz_id: 1, zeitzone: 'Asia/Tokyo', org_defaults: { org_id: 1 } }),
+      ),
+    );
+    // Nur `Date` fälschen: der Aufschub vor dem Druck und `waitFor` brauchen echte Timer.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(new Date('2026-07-16T12:30:00Z'));
+      const client = neuerQueryClient();
+      client.setQueryData(einsatzKeys.einstellungen(1), {
+        einsatz_id: 1,
+        zeitzone: 'Asia/Tokyo',
+        org_defaults: { org_id: 1 },
+      });
+      let aufPapier: string | null = null;
+      drucke.mockImplementation(() => {
+        window.dispatchEvent(new Event('beforeprint'));
+        aufPapier = document.querySelector('[data-lfh="druckkopf"]')!.textContent;
+      });
+      renderMitProviders(
+        <EinsatzAnzeigeProvider einsatzId={1}>
+          <Druckkopf dokumentart="Befehl" einsatz={{ bezeichnung: 'Übung' }} sichtbarkeit="druck" />
+          <DruckKnopf />
+        </EinsatzAnzeigeProvider>,
+        { client },
+      );
+      await screen.findByText(ORG.name);
+      expect(document.querySelector('[data-lfh="druckkopf"]')!.textContent).toContain(
+        '162130JUL2026',
+      );
+
+      // Stunden später: 15:45 UTC = 00:45 am Folgetag in Tokio.
+      vi.setSystemTime(new Date('2026-07-16T15:45:00Z'));
+      await userEvent.click(screen.getByRole('button', { name: 'Drucken / als PDF' }));
+      await waitFor(() => expect(drucke).toHaveBeenCalledTimes(1));
+      expect(aufPapier).toContain('170045JUL2026');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   describe('mit Logo (LFH-22, 3.9)', () => {

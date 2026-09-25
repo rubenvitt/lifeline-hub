@@ -111,6 +111,46 @@ describe('Druckkopf', () => {
     expect(within(kopf()).getByText('162130JUL2026')).toBeInTheDocument();
   });
 
+  /**
+   * Zwischen Öffnen der Seite und Strg+P können Stunden liegen: `beforeprint` erneuert den
+   * Druckzeitpunkt. Geprüft SYNCHRON direkt nach dem Ereignis und OHNE `act`/`fireEvent` —
+   * der Browser friert das Druckbild unmittelbar nach den Listenern ein. Ohne `flushSync`
+   * im Listener stünde das Update hier noch aus (Mutationsprobe).
+   */
+  it('erneuert den Druckzeitpunkt bei beforeprint, synchron vor dem Druckbild', async () => {
+    mitOrganisation();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-07-16T12:30:00Z'));
+    const client = neuerQueryClient();
+    client.setQueryData(einsatzKeys.einstellungen(1), {
+      einsatz_id: 1,
+      zeitzone: 'Asia/Tokyo',
+      org_defaults: { org_id: 1 },
+    });
+    server.use(
+      http.get('/api/einsaetze/1/einstellungen', () =>
+        HttpResponse.json({ einsatz_id: 1, zeitzone: 'Asia/Tokyo', org_defaults: { org_id: 1 } }),
+      ),
+    );
+    renderMitProviders(
+      <EinsatzAnzeigeProvider einsatzId={1}>
+        <Druckkopf
+          dokumentart="Lagebericht"
+          einsatz={{ bezeichnung: 'Übung' }}
+          sichtbarkeit="druck"
+        />
+      </EinsatzAnzeigeProvider>,
+      { client },
+    );
+    await screen.findByText('DRK Kreisverband Musterstadt');
+    expect(within(kopf()).getByText('162130JUL2026')).toBeInTheDocument();
+
+    // 15:45 UTC = 00:45 am Folgetag in Tokio.
+    vi.setSystemTime(new Date('2026-07-16T15:45:00Z'));
+    window.dispatchEvent(new Event('beforeprint'));
+    expect(within(kopf()).getByText('170045JUL2026')).toBeInTheDocument();
+  });
+
   it('ist bei sichtbarkeit="druck" am Bildschirm per Klasse verborgen, bei "immer" nicht', async () => {
     mitOrganisation();
     const { unmount } = renderMitProviders(

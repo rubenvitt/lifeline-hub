@@ -70,10 +70,15 @@ export default function EtbDruckPage() {
       setGeladen(0);
       return ladeEtbVollstaendig(einsatzId, filter, { onFortschritt: setGeladen });
     },
-    // Ein Druckbeleg ist ein Schnappschuss (NICHT_LIVE_KEYS): kein stilles Nachladen.
+    // Ein Druckbeleg ist ein Schnappschuss (NICHT_LIVE_KEYS): kein stilles Nachladen einer
+    // OFFENEN Ansicht.
     staleTime: Infinity,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
+    // Aber beim ÖFFNEN der Stand von jetzt: ohne diese Zeile lieferte ein erneuter Besuch
+    // innerhalb der Cache-Frist (5 min) den Schnappschuss des letzten Besuchs, sofort
+    // druckbar (Review Welle B). Während des Ladens sperrt `isFetching` den Knopf.
+    refetchOnMount: 'always',
     // Ein gescheiterter Abruf wird nicht still wiederholt — die Person entscheidet.
     retry: false,
   });
