@@ -49,6 +49,9 @@ describe('DownloadAnker', () => {
     expect(a).toHaveTextContent('dach.jpg');
     expect(a).toHaveTextContent('2.0 MB');
     expect(a).toHaveTextContent('Leitung · 12:30');
+    // Review C2: das aria-label ersetzt den Inhalt im Namen — die Zusatzzeile bleibt als
+    // Beschreibung erreichbar.
+    expect(a).toHaveAccessibleDescription('Leitung · 12:30');
   });
 
   it('zeigt statt des Dateinamens einen eigenen Text, wenn er gesetzt ist', () => {

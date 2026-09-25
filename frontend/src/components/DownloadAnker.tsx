@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useId, type ReactNode } from 'react';
 import { useRollen } from './instrument/rollenwerte';
 import { formatGroesse } from '../karten/formatGroesse';
 
@@ -61,11 +61,17 @@ export default function DownloadAnker({
   zugaenglicherName,
 }: Props) {
   const { token, rollen } = useRollen();
+  // Das `aria-label` ersetzt den Inhalt im zugänglichen Namen; die Zusatzzeile (wer, wann)
+  // bleibt über `aria-describedby` erreichbar (Review C2). Ohne `aria-label` steht sie ohnehin
+  // im Namen — eine Beschreibung dazu wäre doppelt.
+  const zusatzId = useId();
+  const beschrieben = zugaenglicherName != null && zusatz != null;
   return (
     <a
       href={href}
       download={dateiname}
       aria-label={zugaenglicherName}
+      aria-describedby={beschrieben ? zusatzId : undefined}
       style={{ ...downloadAnkerStil(token), color: rollen.bedienText }}
     >
       <span>
@@ -79,6 +85,7 @@ export default function DownloadAnker({
       </span>
       {zusatz != null && (
         <span
+          id={zusatzId}
           style={{
             fontWeight: 'normal',
             fontSize: token.fontSizeSM,
