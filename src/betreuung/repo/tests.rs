@@ -140,10 +140,22 @@ async fn stand(
     erhebung: Erhebung,
     zeitpunkt_at: &str,
 ) -> Result<Gemeldet, AppError> {
+    stand_mit_schluessel(w, bezirk_id, evakuiert, erhebung, zeitpunkt_at, None).await
+}
+
+async fn stand_mit_schluessel(
+    w: &Welt,
+    bezirk_id: i64,
+    evakuiert: i64,
+    erhebung: Erhebung,
+    zeitpunkt_at: &str,
+    client_id: Option<&str>,
+) -> Result<Gemeldet, AppError> {
     let eingabe = StandEingabe {
         evakuiert,
         erhebung,
         zeitpunkt_at: zeitpunkt_at.into(),
+        client_id: client_id.map(Into::into),
     };
     write_retry!(&w.pool, |conn| {
         stand_melden_tx(conn, w.e, bezirk_id, w.b, STARTWERT, &eingabe).await
@@ -225,9 +237,20 @@ async fn belegung(
     belegt: i64,
     zeitpunkt_at: &str,
 ) -> Result<Gemeldet, AppError> {
+    belegung_mit_schluessel(w, stelle_id, belegt, zeitpunkt_at, None).await
+}
+
+async fn belegung_mit_schluessel(
+    w: &Welt,
+    stelle_id: i64,
+    belegt: i64,
+    zeitpunkt_at: &str,
+    client_id: Option<&str>,
+) -> Result<Gemeldet, AppError> {
     let eingabe = BelegungEingabe {
         belegt,
         zeitpunkt_at: zeitpunkt_at.into(),
+        client_id: client_id.map(Into::into),
     };
     write_retry!(&w.pool, |conn| {
         belegung_melden_tx(conn, w.e, stelle_id, w.b, STARTWERT, &eingabe).await
@@ -2045,6 +2068,289 @@ async fn storno_loest_die_flaechen_und_laesst_sie_stehen() {
         "die Flächen bleiben als nicht zugeordnete Bezirksflächen"
     );
     assert_eq!(bezirk_laden(&w.pool, w.e, ufer).await.unwrap().flaechen, 0);
+}
+
+// ── Requirement: Offline-Erfassung von Stand- und Belegungsmeldungen (LFH-675) ──────────────
+
+async fn zaehle_stand_schluessel(w: &Welt, client_id: &str) -> i64 {
+    sqlx::query_scalar("SELECT COUNT(*) FROM evakuierung_stand WHERE client_id = ?")
+        .bind(client_id)
+        .fetch_one(&w.pool)
+        .await
+        .unwrap()
+}
+
+async fn zaehle_belegung_schluessel(w: &Welt, client_id: &str) -> i64 {
+    sqlx::query_scalar("SELECT COUNT(*) FROM betreuungsstelle_belegung WHERE client_id = ?")
+        .bind(client_id)
+        .fetch_one(&w.pool)
+        .await
+        .unwrap()
+}
+
+#[tokio::test]
+async fn stand_replay_schreibt_weder_zeile_noch_etb() {
+    let w = welt().await;
+    let id = bezirk(&w, "Uferstraße 12–40", 640).await;
+    let erst = stand_mit_schluessel(
+        &w,
+        id,
+        480,
+        Erhebung::Gezaehlt,
+        "2026-09-24 10:00:00",
+        Some("a1"),
+    )
+    .await
+    .unwrap();
+    assert!(erst.neu);
+    let n_etb = etb(&w.pool, w.e).await.len();
+
+    // Ein Replay trägt denselben Schlüssel — Zeitpunkt und Zahl sind für den Ausgang egal.
+    let wieder = stand_mit_schluessel(
+        &w,
+        id,
+        480,
+        Erhebung::Gezaehlt,
+        "2026-09-24 10:05:00",
+        Some("a1"),
+    )
+    .await
+    .unwrap();
+    assert!(!wieder.neu);
+    assert_eq!(
+        (wieder.meldung_id, wieder.objekt_id, wieder.etb_id),
+        (erst.meldung_id, erst.objekt_id, erst.etb_id)
+    );
+    assert_eq!(zaehle_stand_schluessel(&w, "a1").await, 1);
+    assert_eq!(etb(&w.pool, w.e).await.len(), n_etb);
+    assert_eq!(aktueller_stand(&w, id).await, Some(480));
+}
+
+#[tokio::test]
+async fn stand_replay_am_stornierten_bezirk_liefert_die_meldung() {
+    let w = welt().await;
+    let id = bezirk(&w, "Uferstraße 12–40", 640).await;
+    let erst = stand_mit_schluessel(
+        &w,
+        id,
+        212,
+        Erhebung::Gezaehlt,
+        "2026-09-24 10:00:00",
+        Some("a2"),
+    )
+    .await
+    .unwrap();
+    bezirk_stornieren(&w, id).await.unwrap();
+    let n_etb = etb(&w.pool, w.e).await.len();
+    let wieder = stand_mit_schluessel(
+        &w,
+        id,
+        212,
+        Erhebung::Gezaehlt,
+        "2026-09-24 10:00:00",
+        Some("a2"),
+    )
+    .await
+    .unwrap();
+    assert!(!wieder.neu);
+    assert_eq!(wieder.meldung_id, erst.meldung_id);
+    assert_eq!(etb(&w.pool, w.e).await.len(), n_etb);
+    // Gegenprobe: ein NEUER Schlüssel am stornierten Bezirk bleibt 409.
+    assert_eq!(
+        status(
+            stand_mit_schluessel(
+                &w,
+                id,
+                1,
+                Erhebung::Gezaehlt,
+                "2026-09-24 10:00:00",
+                Some("a2x")
+            )
+            .await
+        ),
+        StatusCode::CONFLICT
+    );
+}
+
+#[tokio::test]
+async fn stand_schluessel_eines_anderen_bezirks_ist_422_und_speichert_nichts() {
+    let w = welt().await;
+    let a = bezirk(&w, "Uferstraße", 640).await;
+    let b = bezirk(&w, "Deichweg", 120).await;
+    stand_mit_schluessel(
+        &w,
+        a,
+        10,
+        Erhebung::Gezaehlt,
+        "2026-09-24 10:00:00",
+        Some("a3"),
+    )
+    .await
+    .unwrap();
+    let n_etb = etb(&w.pool, w.e).await.len();
+    assert_eq!(
+        status(
+            stand_mit_schluessel(
+                &w,
+                b,
+                10,
+                Erhebung::Gezaehlt,
+                "2026-09-24 10:00:00",
+                Some("a3")
+            )
+            .await
+        ),
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    assert_eq!(aktueller_stand(&w, b).await, None);
+    assert_eq!(etb(&w.pool, w.e).await.len(), n_etb);
+}
+
+#[tokio::test]
+async fn schluessel_lookup_ist_einsatzgebunden() {
+    let w = welt().await;
+    let id = bezirk(&w, "Uferstraße", 640).await;
+    let sid = stelle(&w, "Turnhalle Ost", Some(150)).await;
+    let s = stand_mit_schluessel(
+        &w,
+        id,
+        10,
+        Erhebung::Gezaehlt,
+        "2026-09-24 10:00:00",
+        Some("a4"),
+    )
+    .await
+    .unwrap();
+    let b = belegung_mit_schluessel(&w, sid, 10, "2026-09-24 10:00:00", Some("b4"))
+        .await
+        .unwrap();
+    // Der Lookup findet eine gespeicherte Meldung — für ihn ist sie nie „neu“.
+    assert_eq!(
+        stand_nach_client_id(&w.pool, w.e, "a4").await.unwrap(),
+        Some(Gemeldet { neu: false, ..s })
+    );
+    assert_eq!(
+        belegung_nach_client_id(&w.pool, w.e, "b4").await.unwrap(),
+        Some(Gemeldet { neu: false, ..b })
+    );
+    assert_eq!(
+        stand_nach_client_id(&w.pool, w.e2, "a4").await.unwrap(),
+        None
+    );
+    assert_eq!(
+        belegung_nach_client_id(&w.pool, w.e2, "b4").await.unwrap(),
+        None
+    );
+    // Getrennte Reihen: der Stand-Schlüssel ist keine Belegung.
+    assert_eq!(
+        belegung_nach_client_id(&w.pool, w.e, "a4").await.unwrap(),
+        None
+    );
+}
+
+#[tokio::test]
+async fn belegung_replay_schreibt_weder_zeile_noch_etb() {
+    let w = welt().await;
+    let id = stelle(&w, "Turnhalle Ost", Some(150)).await;
+    let erst = belegung_mit_schluessel(&w, id, 37, "2026-09-24 10:00:00", Some("b1"))
+        .await
+        .unwrap();
+    assert!(erst.neu);
+    let n_etb = etb(&w.pool, w.e).await.len();
+    let wieder = belegung_mit_schluessel(&w, id, 37, "2026-09-24 10:00:00", Some("b1"))
+        .await
+        .unwrap();
+    assert!(!wieder.neu);
+    assert_eq!(wieder, Gemeldet { neu: false, ..erst });
+    assert_eq!(zaehle_belegung_schluessel(&w, "b1").await, 1);
+    assert_eq!(etb(&w.pool, w.e).await.len(), n_etb);
+    assert_eq!(aktuelle_belegung(&w, id).await, Some(37));
+}
+
+#[tokio::test]
+async fn belegung_replay_an_geschlossener_stelle_liefert_die_meldung() {
+    let w = welt().await;
+    let id = stelle(&w, "Turnhalle Ost", Some(150)).await;
+    let erst = belegung_mit_schluessel(&w, id, 0, "2026-09-24 10:00:00", Some("b2"))
+        .await
+        .unwrap();
+    stelle_status(&w, id, Status::Geschlossen).await.unwrap();
+    let wieder = belegung_mit_schluessel(&w, id, 0, "2026-09-24 10:00:00", Some("b2"))
+        .await
+        .unwrap();
+    assert_eq!(wieder.meldung_id, erst.meldung_id);
+    assert!(!wieder.neu);
+    // Eine NEUE Meldung an der geschlossenen Stelle bleibt 422 (LFH-639 D4).
+    assert_eq!(
+        status(belegung_mit_schluessel(&w, id, 5, "2026-09-24 10:10:00", Some("b2x")).await),
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    assert_eq!(zaehle_belegung_schluessel(&w, "b2x").await, 0);
+}
+
+#[tokio::test]
+async fn belegung_schluessel_einer_anderen_stelle_ist_422() {
+    let w = welt().await;
+    let a = stelle(&w, "Turnhalle Ost", Some(150)).await;
+    let b = stelle(&w, "Weserstadion", None).await;
+    belegung_mit_schluessel(&w, a, 12, "2026-09-24 10:00:00", Some("b3"))
+        .await
+        .unwrap();
+    assert_eq!(
+        status(belegung_mit_schluessel(&w, b, 12, "2026-09-24 10:00:00", Some("b3")).await),
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    assert_eq!(aktuelle_belegung(&w, b).await, None);
+}
+
+/// Der Beleg aus dem Ticket: weil jede Meldung eine ABSOLUTE Zahl trägt, ist weder eine
+/// verspätet gesendete ältere Meldung noch ihr Replay gefährlich. Die ältere wird Nachtrag,
+/// ihr Replay ist wirkungslos — ein Delta hätte an beiden Stellen doppelt gezählt.
+#[tokio::test]
+async fn verspaetete_offline_meldung_und_ihr_replay_lassen_den_stand_stehen() {
+    let w = welt().await;
+    let id = bezirk(&w, "Uferstraße 12–40", 640).await;
+    // online um 10:15
+    stand(&w, id, 480, Erhebung::Gezaehlt, "2026-09-24 10:15:00")
+        .await
+        .unwrap();
+    // offline um 10:00 erfasst, erst jetzt gesendet — und danach noch einmal
+    let alt = stand_mit_schluessel(
+        &w,
+        id,
+        200,
+        Erhebung::Gezaehlt,
+        "2026-09-24 10:00:00",
+        Some("s-alt"),
+    )
+    .await
+    .unwrap();
+    let n_etb = etb(&w.pool, w.e).await.len();
+    stand_mit_schluessel(
+        &w,
+        id,
+        200,
+        Erhebung::Gezaehlt,
+        "2026-09-24 10:00:00",
+        Some("s-alt"),
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(aktueller_stand(&w, id).await, Some(480));
+    assert_eq!(zaehle_stand_schluessel(&w, "s-alt").await, 1);
+    assert_eq!(etb(&w.pool, w.e).await.len(), n_etb);
+    let eintrag = etb(&w.pool, w.e)
+        .await
+        .into_iter()
+        .find(|e| e.0 == alt.etb_id)
+        .unwrap();
+    assert!(
+        eintrag.2.contains("nachgetragen") && eintrag.2.contains("bleibt 480"),
+        "{}",
+        eintrag.2
+    );
+    assert_eq!(eintrag.4, "2026-09-24 10:00:00");
 }
 
 // ── LFH-676: Meldereihen lesen (Verlauf) ────────────────────────────────────────────────────

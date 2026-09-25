@@ -237,6 +237,17 @@ ohne eigene Aufklappspalte: hinter der Kennung glitt eine solche Spalte bei 390 
 (Gate 1, gemessen), an Position 0 erbte sie deren `fixed`. Die Bestands-Prop `aufklappzeile` (antds 16-px-Symbol, nur Tabelle)
 verschwindet mit LFH-697. Herleitung: `openspec/changes/lfh-676-betreuung-meldeverlauf/design.md`.
 
+**Stand- und Belegungsmeldungen sind offline-fähig (LFH-675).** Sie laufen über die
+Offline-Queue (`offline/schreiben.ts`, Arten `stand`/`belegung`) mit `client_id`, eindeutig
+je Einsatz und Meldereihe (`0122`). Der Replay-Lookup läuft **vor** jeder Zustandsprüfung,
+einmal vorab und einmal in der `BEGIN IMMEDIATE`-Transaktion. Eine gespeicherte Meldung kommt
+deshalb auch am stornierten Bezirk, an der geschlossenen Stelle und nach Einsatzende zurück
+(`EinsatzSchreibfreigabe`), ohne ETB-Eintrag und ohne Live-Ereignis. Ein Schlüssel an einem
+anderen Objekt ist 422. **Den Erfassungszeitpunkt trägt nur die vorgemerkte Kopie**, online
+gilt die Serveruhr. Sonst stempelte der Flush die Sendezeit, oder eine vorgehende Tablet-Uhr
+machte Online-Meldungen zu 400. Anlegen, Ändern, Rücknahmen und die Leermeldung bleiben
+online. Herleitung: `openspec/changes/lfh-675-betreuung-meldungen-offline/design.md`.
+
 **Sichtung ist eine eigene fachliche Farbachse am selben zentralen Ort**, keine A0-Rolle.
 `SichtungsTag` zeigt die feste Kennzeichnung aus `tokens.ts` als umrandetes Farbfeld:
 SK I rot, II gelb, III grün, IV blau, Tote schwarz; „unverletzt“ ohne erfundene Fachfarbe
@@ -253,7 +264,11 @@ abgelehnt — `SichtungsTag`/`sichtungsfarben` bleiben BBK.
 
 **Nachzug LFH-650 (gemessen, Prüfliste `2026-09-22-lfh-613-pruefliste.md`):** Blauer
 Bedien-TEXT nimmt `rollen.bedienText`, nicht antds `colorLink` — der Linkton trug auf einer
-Lückenzeile 5,93 (Tag) / 4,50 (Nacht). Personen-Marker tragen eine unsichtbare Trefferzone mit
+Lückenzeile 5,93 (Tag) / 4,50 (Nacht). Dasselbe gilt für den Radio-Knopf (LFH-677): antd schreibt
+seinen Text gewählt und unter dem Zeiger in `colorPrimary`, am Tag 6,59 auf Weiß.
+`index.css` (global geladen) setzt NUR diesen Text auf `--lfh-bedien-text`, nur im Stil
+`outline`. Ein Komponenten-Token
+`Radio.colorPrimary` färbte auch Scheibe und Flächen und ist deshalb verworfen. Personen-Marker tragen eine unsichtbare Trefferzone mit
 dem Durchmesser `controlHeight` (`KarteMarker.trefferDurchmesser`) und außen 2 px Schwarz um den
 weißen Rand (Weiß + Schwarz halten gegen jeden Grund ≥ 4,58); die Lagekarte setzt beides nicht.
 Personen-Cluster zeigen ihren Ring nach Sichtung und im Kern das Kürzel der dringlichsten
@@ -532,6 +547,12 @@ Alltag wichtigsten:
   ist am Spaltentyp deshalb gesperrt. Die begründete Ausnahme ist **eingelöst und begrenzt**:
   Dateikopf von `Datensicht.tsx` plus Abschnitt AK3b in
   `docs/superpowers/specs/2026-06-22-drawer-nutzung-reduzieren-design.md`.
+  **Die stehende Kopfzeile hält Freiraum** (LFH-677, WCAG 2.4.11): rückwärts getabbt rollt der
+  Browser das Ziel an den oberen Rand, und im Fükw lagen 30-px-Knöpfe dort vollständig hinter
+  der Kopfzeile. `KatalogTabelle` misst die Kopfzeile (`setzeKopfFreiraum`), `sprache.css`
+  setzt `scroll-margin-top` an jedes Ziel im Tabellenkörper. Ein Fokus-Nachweis unter einer
+  stehenden Kopfzeile läuft deshalb auch mit `Shift+Tab` (`fokus-kern.ts`, Parameter `taste`),
+  vorwärts rollt der Browser Ziele an den unteren Rand und damit nicht darunter.
 - **Dichte-Staffel 30 / 48 / 72 px** (kompakt aus LFH-352 · komfortabel = Material 48 dp ·
   Handschuh = 72 px ≙ 19,05 mm, MIL-STD-1472F Fig. 12). Träger ist ein **Dichte-Token am
   `ConfigProvider`**, nicht `componentSize` und keine punktuellen Größen-Props. **Neues

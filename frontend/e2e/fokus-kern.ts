@@ -18,10 +18,28 @@ export interface Verdeckungsbefund {
   stoppsGesamt: number;
   fixierteKandidaten: number;
   besuchteZiele: string[];
+  /**
+   * Stopps, deren Rechteck einen `sticky|fixed`-Knoten mindestens BERÜHRT (LFH-677, 2 px Spiel). Ein
+   * Vorbedingungs-Zähler wie `stoppsInTabelle`: ohne ihn kann ein Durchlauf „0 verdeckt"
+   * melden, obwohl nie ein Ziel in die Nähe der stehenden Fläche kam. Knoten, die den ganzen
+   * Schirm decken (Maske eines Dialogs), zählen hier nicht — sie berühren jedes Ziel.
+   */
+  stoppsBeruehrt: number;
+  /**
+   * Davon die Stopps an der stehenden KOPFZEILE einer Tabelle (`.ant-table-sticky-holder`).
+   * `stoppsBeruehrt` zählt jede stehende Fläche — auch die fixierte erste Spalte, die in jeder
+   * Zeile steht — und kann deshalb nicht belegen, dass ein Lauf die Kopfzeile erreicht hat.
+   */
+  stoppsAnTabellenkopf: number;
 }
 
 /**
  * Läuft `schritte` Tabulatorschritte und meldet jedes vollständig verdeckte Fokusziel.
+ *
+ * RICHTUNG (LFH-677): `taste` ist per Vorgabe `Tab`. Vorwärts rollt der Browser ein Ziel an
+ * den UNTEREN Rand des Schirms — unter eine OBEN stehende Kopfzeile gerät es so nie. Wer die
+ * Kopfzeile prüfen will, läuft zusätzlich mit `Shift+Tab`: dann rollt das Ziel an den oberen
+ * Rand, genau unter die stehende Fläche.
  *
  * GEMESSEN WIRD GEGEN JEDEN KNOTEN MIT `position: sticky|fixed`, nicht gegen einen benannten
  * Selektor: der Kopfhalter heißt bei antd `.ant-table-sticky-holder`, die fixierte Spalte
@@ -46,26 +64,41 @@ export interface Verdeckungsbefund {
 export async function pruefeFokusVerdeckung(
   page: Page,
   schritte: number,
+  taste: 'Tab' | 'Shift+Tab' = 'Tab',
 ): Promise<Verdeckungsbefund> {
   const verdeckt: string[] = [];
   let stoppsInTabelle = 0;
   let stoppsGesamt = 0;
+  let stoppsBeruehrt = 0;
+  let stoppsAnTabellenkopf = 0;
   let fixierteKandidaten = 0;
   const besuchteZiele = new Set<string>();
 
   for (let i = 0; i < schritte; i += 1) {
-    await page.keyboard.press('Tab');
+    await page.keyboard.press(taste);
     const schritt = await page.evaluate(() => {
       const fokus = document.activeElement;
       if (fokus == null || fokus === document.body || fokus === document.documentElement) {
         return null;
       }
       // Der innere Combobox-/Zahleneingabe-Input ist kleiner als das sichtbare Fokusziel.
+      // Radio-Knopf (LFH-677): antd setzt dessen `input` auf 0 × 0 — ohne die Hülle fiele der
+      // Stopp unten als „keine Fläche" still aus der Zählung. Normales Radio und Checkbox
+      // brauchen das nicht: ihr `input` deckt Kreis bzw. Kästchen.
       const ziel =
-        fokus.closest('.ant-select, .ant-input-number, .ant-input-affix-wrapper') ?? fokus;
+        fokus.closest(
+          '.ant-select, .ant-input-number, .ant-input-affix-wrapper, .ant-radio-button-wrapper',
+        ) ?? fokus;
       const zr = ziel.getBoundingClientRect();
       if (zr.width === 0 || zr.height === 0) {
-        return { beschreibung: null, inTabelle: false, kandidaten: 0, kennung: null };
+        return {
+          beschreibung: null,
+          inTabelle: false,
+          kandidaten: 0,
+          kennung: null,
+          beruehrt: false,
+          anTabellenkopf: false,
+        };
       }
 
       const kandidaten = Array.from(document.querySelectorAll('body *')).filter((el) => {
@@ -81,33 +114,52 @@ export async function pruefeFokusVerdeckung(
       const punktGehoertZiel = amPunkt != null && (amPunkt === ziel || ziel.contains(amPunkt));
 
       let beschreibung: string | null = null;
+      let beruehrt = false;
+      let anTabellenkopf = false;
       for (const el of kandidaten) {
         const kr = el.getBoundingClientRect();
+        const schirmfuellend = kr.width >= innerWidth - 1 && kr.height >= innerHeight - 1;
+        // BERÜHREN zählt mit (2 px Spiel): ein Ziel, das der Browser dank `scroll-margin`
+        // bündig UNTER die Kopfzeile rollt, war an ihr — überlappen tut es gerade nicht.
+        if (
+          !schirmfuellend &&
+          zr.left <= kr.right + 2 &&
+          zr.right >= kr.left - 2 &&
+          zr.top <= kr.bottom + 2 &&
+          zr.bottom >= kr.top - 2
+        ) {
+          beruehrt = true;
+          if (el.matches('.ant-table-sticky-holder')) anTabellenkopf = true;
+        }
         const umschliesst =
           zr.left >= kr.left - 0.5 &&
           zr.right <= kr.right + 0.5 &&
           zr.top >= kr.top - 0.5 &&
           zr.bottom <= kr.bottom + 0.5;
-        if (!umschliesst || punktGehoertZiel) continue;
+        if (!umschliesst || punktGehoertZiel || beschreibung != null) continue;
         beschreibung =
           `${ziel.tagName.toLowerCase()}[${(ziel.getAttribute('aria-label') ?? ziel.textContent ?? '').trim().slice(0, 30)}] ` +
           `bei (${Math.round(zr.x)},${Math.round(zr.y)}) ${Math.round(zr.width)}×${Math.round(zr.height)} ` +
           `vollständig hinter ${el.tagName.toLowerCase()}.${String(el.className).slice(0, 40)} ` +
           `(${getComputedStyle(el).position}); am Mittelpunkt liegt ` +
           `${amPunkt == null ? 'nichts' : `${amPunkt.tagName.toLowerCase()}.${String(amPunkt.className).slice(0, 30)}`}`;
-        break;
+        // Kein `break`: die Überlappung weiterer Kandidaten zählt mit, der Befund bleibt der erste.
       }
       return {
         beschreibung,
         inTabelle: ziel.closest('.ant-table') != null,
         kandidaten: kandidaten.length,
         kennung: fokus.getAttribute('data-e2e-fokus'),
+        beruehrt,
+        anTabellenkopf,
       };
     });
 
     if (schritt == null) continue;
     stoppsGesamt += 1;
     if (schritt.inTabelle) stoppsInTabelle += 1;
+    if (schritt.beruehrt) stoppsBeruehrt += 1;
+    if (schritt.anTabellenkopf) stoppsAnTabellenkopf += 1;
     fixierteKandidaten = Math.max(fixierteKandidaten, schritt.kandidaten);
     if (schritt.beschreibung) verdeckt.push(schritt.beschreibung);
     if (schritt.kennung) besuchteZiele.add(schritt.kennung);
@@ -119,5 +171,7 @@ export async function pruefeFokusVerdeckung(
     stoppsGesamt,
     fixierteKandidaten,
     besuchteZiele: [...besuchteZiele],
+    stoppsBeruehrt,
+    stoppsAnTabellenkopf,
   };
 }
