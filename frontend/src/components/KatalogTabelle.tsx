@@ -1,6 +1,14 @@
 import { ConfigProvider, Input, Table, type InputRef, type TableProps } from 'antd';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
+import type { TastaturAktionen } from '../command-palette/typen';
+import {
+  hatWaehlbareSpalten,
+  sichtbareSpalten,
+  SpaltenSchalter,
+  type SchaltbareSpalte,
+} from './SpaltenSchalter';
+import { useViewport, type AbBreitePunkt } from './useViewport';
 import type { Farbrollen } from '../theme/tokens';
 import { useRollen } from './instrument/rollenwerte';
 // Kopfzellen-Typografie und die Mono-Spalten liegen als Klassen in der Gestaltungssprache
@@ -59,9 +67,9 @@ import '../theme/sprache.css';
  * Haken, der weniger liefert als der Rohwert, ist damit eine bewusste Verengung. Gepinnt von
  * `KatalogTabelle.test.tsx` mit einer Spalte, deren Haken den `dataIndex`-Wert VERDECKT.
  *
- * `Datensicht` bleibt der Weg für die grössere Kür (Spaltenschalter, Kartenzweig, Gruppen);
- * es reicht seine eigenen Spalten OHNE `suchText` hier herein und ist von diesem Haken
- * unberührt.
+ * `Datensicht` bleibt der Weg für die grössere Kür (Kartenzweig, Gruppen, eigene Sortier- und
+ * Filterachse); es reicht seine eigenen Spalten OHNE `suchText` hier herein und ist von diesem
+ * Haken unberührt.
  *
  * **Blätterung — ab {@link BLAETTER_SCHWELLE} Zeilen, sonst nicht.** Antds Default wäre
  * zehn Zeilen und blätterte damit fast jede Aufrufstelle. Die Schwelle rechnet gegen
@@ -70,9 +78,22 @@ import '../theme/sprache.css';
  * Aus demselben Grund ist `hideOnSinglePage` nicht der Mechanismus. Ein übergebenes
  * `pagination` gewinnt immer (`??`, nicht `||` — sonst verlöre ein gesetztes `false`).
  *
- * Kein Spaltenschalter: die Tabellen hier tragen höchstens sieben Spalten, alle sichtbar.
- * Die vierte Gate-2-Anforderung bleibt für diese Familie „nicht anwendbar" — den Schalter
- * für breite Einsatzflächen trägt `Datensicht` (LFH-330 · B2), nicht dieses Primitiv.
+ * **Spaltenschalter — opt-in seit LFH-374.** Kriterium 14 verlangt einen umschaltbaren
+ * Spaltensatz mit Zähler ausgeblendeter Spalten. Bis LFH-374 trug ihn nur `Datensicht`, und
+ * dieser Kopf erklärte ihn für die Katalogfamilie pauschal für „nicht anwendbar" (höchstens
+ * sieben Spalten, alle sichtbar) — eine Ausnahme, die ihre eigene Obergrenze schon erreicht
+ * hatte (LFH-346-Prüfliste: „sieben von sieben"). Jetzt gilt:
+ *
+ * · Mit `spaltenSchalter` steht der Schalter in der Werkzeugzeile. Zählung und Menü kommen
+ *   aus `SpaltenSchalter.tsx`, DERSELBEN Quelle wie in `Datensicht` — Handauswahl und
+ *   `abBreite` laufen durch eine Funktion, der Zähler kann nicht lügen. Heute schalten ihn die
+ *   beiden Kartenverwaltungen ein.
+ * · Ohne `spaltenSchalter` bleibt die Ausnahme stehen, aber nur, solange ihre Bedingung hält:
+ *   alle Spalten sichtbar. Deshalb wirkt `abBreite` ohne Opt-in nicht (und meldet sich in
+ *   DEV), und antds `responsive`/`hidden` sind am Spaltentyp und per Guard gesperrt. Wer einer
+ *   Katalogtabelle eine Spalte nehmen will, nimmt das Opt-in dazu.
+ * · `Datensicht` setzt das Prop NIE: es rendert seinen Schalter selbst und reicht die Spalten
+ *   ohne `abBreite` herein. Zwei Schalter mit zwei Zuständen wären der Fehlerfall.
  *
  * ── DREI ZUSTÄNDE — UND DIE LADEUNTERDRÜCKUNG LEBT HIER (LFH-331 · B3, D4) ───────
  *
@@ -106,7 +127,9 @@ import '../theme/sprache.css';
  *   Das ist gemessenes antd-Verhalten, kein zugesicherter Vertrag — es steht deshalb als
  *   Pin in `KatalogTabelle.test.tsx` und bricht sichtbar bei einem antd-Bump.
  */
-export type KatalogSpalte<T> = NonNullable<TableProps<T>['columns']>[number] & {
+export type KatalogSpalte<T> = OhneAntdAusblendung<
+  NonNullable<TableProps<T>['columns']>[number]
+> & {
   /**
    * Beitrag dieser Spalte zur Freitextsuche. Gleiche Signatur und gleicher Name wie
    * `DatensichtSpalte.suchText` (`components/Datensicht.tsx`) — EIN Begriff, zwei Träger.
@@ -138,7 +161,31 @@ export type KatalogSpalte<T> = NonNullable<TableProps<T>['columns']>[number] & {
    * `lfh-zahl-spalte` an Kopf- und Datenzelle gehängt; die Schrift steht in `sprache.css`.
    */
   zahl?: boolean;
+  /**
+   * Klartext für den Spaltenschalter, wenn `title` kein String ist. Gleicher Name wie an
+   * `DatensichtSpalte` — EIN Begriff, zwei Träger (LFH-374).
+   */
+  etikett?: string;
+  /** Im Spaltenschalter nicht abwählbar (Aktionsspalte). Spalte 0 ist es immer. */
+  immerSichtbar?: boolean;
+  /**
+   * Erst ab dieser Breite sichtbar — darunter fällt die Spalte weg und der Schalter zählt
+   * sie mit. Wirkt NUR mit `spaltenSchalter`: ohne Zähler wäre das eine stille Ausblendung,
+   * genau der Fehler, gegen den Kriterium 14 steht. Ohne Opt-in bleibt es wirkungslos und
+   * meldet sich in DEV (LFH-374 · D3).
+   */
+  abBreite?: AbBreitePunkt;
 };
+
+/**
+ * antds eigene Ausblendwege (`responsive`, `hidden`) sind gesperrt: sie verbärgen Spalten,
+ * die der Spaltenzähler nicht kennt (LFH-374 · D4, Muster `AntdErbe` in `Datensicht`).
+ * DISTRIBUTIV, weil antds Spaltentyp eine Union aus Blattspalte und Spaltengruppe ist — ein
+ * plumpes `Omit` faltete sie zusammen. Die Sperre greift an Objektliteralen; eine als
+ * `TableColumnsType<T>` annotierte Liste bleibt zuweisbar, dort hält der Guard in
+ * `katalogTabelle.guard.test.ts` die beiden Felder fern.
+ */
+type OhneAntdAusblendung<C> = C extends unknown ? Omit<C, 'responsive' | 'hidden'> : never;
 
 /**
  * Die Tabellen-Tokens des Neuentwurfs — rein und exportiert, damit die Zuordnung ohne
@@ -187,6 +234,14 @@ export type KatalogTabelleProps<T> = Omit<
    * siehe Dateikopf.
    */
   suche?: { platzhalter: string };
+  /**
+   * Schaltet den Spaltenschalter mit Zähler ein (LFH-374, Kriterium 14). OPT-IN: ohne dieses
+   * Prop bleibt jede Spalte sichtbar und `abBreite` wirkungslos. `bezeichnung` steht im
+   * zugänglichen Namen des Knopfs („Spalten · 2 ausgeblendet — Online-Quellen"), damit zwei
+   * Schalter auf einer Seite unterscheidbar bleiben. `Datensicht` setzt es NIE — es rendert
+   * seinen eigenen Schalter (Guard in `katalogTabelle.guard.test.ts`).
+   */
+  spaltenSchalter?: { bezeichnung: string };
 };
 
 /** Ab dieser Zeilenzahl blättert das Primitiv von selbst. */
@@ -374,6 +429,41 @@ function istLadend(loading: TableProps['loading']): boolean {
   return loading.spinning ?? true;
 }
 
+/** Eine Schalterspalte mit Rückverweis auf ihre Position in der übergebenen Garnitur. */
+type IndizierteSpalte = SchaltbareSpalte & { index: number };
+
+/**
+ * Übersetzt die Spalten in die Form, die {@link sichtbareSpalten} liest (LFH-374 · D2).
+ *
+ * Der Schalter braucht String-Schlüssel. Eine Spalte ohne String-`key` bekommt bei Opt-in
+ * einen Ersatzschlüssel und gilt als `immerSichtbar` — so kann der Zähler sie nie als
+ * „ausgeblendet" führen, ohne dass sie im Menü wählbar wäre; gemeldet wird sie trotzdem.
+ * Ohne Opt-in bleibt `abBreite` außen vor (D3), die Liste dient dann nur der Registrierung.
+ */
+function schaltbareFassung<T>(
+  spalten: readonly KatalogSpalte<T>[],
+  optIn: boolean,
+): { schaltbar: IndizierteSpalte[]; ohneSchluessel: string[] } {
+  const ohneSchluessel: string[] = [];
+  const schaltbar = spalten.map((spalte, index): IndizierteSpalte => {
+    const hatSchluessel = typeof spalte.key === 'string';
+    if (!hatSchluessel && optIn && index !== 0 && !spalte.immerSichtbar) {
+      const name =
+        spalte.etikett ?? (typeof spalte.title === 'string' ? spalte.title : `#${index}`);
+      ohneSchluessel.push(`„${name}"`);
+    }
+    return {
+      key: hatSchluessel ? (spalte.key as string) : `__ohne-key-${index}`,
+      etikett: spalte.etikett,
+      title: spalte.title,
+      immerSichtbar: spalte.immerSichtbar || !hatSchluessel,
+      abBreite: optIn ? spalte.abBreite : undefined,
+      index,
+    };
+  });
+  return { schaltbar, ohneSchluessel };
+}
+
 export default function KatalogTabelle<T extends object>({
   columns,
   dataSource,
@@ -381,19 +471,96 @@ export default function KatalogTabelle<T extends object>({
   loading,
   locale,
   suche,
+  spaltenSchalter,
   ...rest
 }: KatalogTabelleProps<T>) {
   const [suchbegriff, setSuchbegriff] = useState('');
   const { token, rollen, dunkel } = useRollen();
+  const { abBreite } = useViewport();
   const feldRef = useRef<InputRef>(null);
   const werkzeugWurzel = useRef<HTMLDivElement>(null);
   useSlashKuerzel(suche != null, () => feldRef.current?.focus());
+
+  // ── Spaltenschalter (LFH-374) ─────────────────────────────────────────────────────
+  // Zählung und Schalter kommen aus `SpaltenSchalter.tsx` — dieselbe Funktion, die auch
+  // `Datensicht` liest. Hier wohnt nur der Zustand dieses Trägers.
+  const [spaltenAus, setSpaltenAus] = useState<readonly string[]>([]);
+  const [spaltenAn, setSpaltenAn] = useState<readonly string[]>([]);
+  const [spaltenOffen, setSpaltenOffen] = useState(false);
+  const { schaltbar, ohneSchluessel } = useMemo(
+    () => schaltbareFassung(columns ?? [], spaltenSchalter != null),
+    [columns, spaltenSchalter],
+  );
+  const schalterDa = spaltenSchalter != null && hatWaehlbareSpalten(schaltbar);
+
+  // Verschwindet der Schalter, feuert antd KEIN `onOpenChange(false)` — die kontrollierte
+  // Offen-Achse bliebe auf `true` und klappte beim Wiederauftauchen ungefragt auf. Dieselbe
+  // gemessene Falle wie in `Datensicht` (LFH-391 · B4).
+  useEffect(() => {
+    if (!schalterDa) setSpaltenOffen(false);
+  }, [schalterDa]);
+
+  // Als Zeichenkette in die Deps: die Spaltenliste der Aufrufer ist je Render neu gebaut, ein
+  // Array hier meldete dieselbe Spalte bei jedem Render erneut.
+  const ohneSchluesselText = ohneSchluessel.join(', ');
+  useEffect(() => {
+    if (!import.meta.env.DEV || ohneSchluesselText === '') return;
+    console.warn(
+      `[KatalogTabelle] Spalte(n) ${ohneSchluesselText} ohne String-key — der ` +
+        'Spaltenschalter braucht ihn, sie bleiben deshalb immer sichtbar.',
+    );
+  }, [ohneSchluesselText]);
+
+  const abBreiteOhneSchalter = spaltenSchalter == null && (columns ?? []).some((s) => s.abBreite);
+  useEffect(() => {
+    if (!import.meta.env.DEV || !abBreiteOhneSchalter) return;
+    console.warn(
+      '[KatalogTabelle] Eine Spalte trägt abBreite, die Tabelle aber keinen spaltenSchalter — ' +
+        'ohne Zähler wäre das eine stille Ausblendung, abBreite bleibt deshalb wirkungslos.',
+    );
+  }, [abBreiteOhneSchalter]);
+
+  const filterZuruecksetzen = useCallback(() => setSuchbegriff(''), []);
+  const oeffneSpalten = useCallback(() => setSpaltenOffen(true), []);
+  // Nur melden, was die Werkzeugzeile auch hält — ein Befehl auf einen nicht vorhandenen
+  // Schalter wäre ein Befehl ohne Wirkung. `hatWaehlbareSpalten` ist dieselbe Wahrheit, die
+  // der Schalter selbst liest.
+  const tastaturAktionen: TastaturAktionen = {
+    ...(suche != null ? { 'filter-zuruecksetzen': filterZuruecksetzen } : {}),
+    ...(schalterDa ? { spalten: oeffneSpalten } : {}),
+  };
   useTastaturEbene({
     name: 'Katalogtabelle-Filter',
     wurzel: werkzeugWurzel,
-    aktionen: { 'filter-zuruecksetzen': () => setSuchbegriff('') },
-    aktiv: suche != null,
+    aktionen: tastaturAktionen,
+    aktiv: suche != null || schalterDa,
   });
+
+  /**
+   * Die WIRKLICH gezeigte Garnitur. Ohne Opt-in unverändert (und `abBreite` wirkungslos);
+   * mit Opt-in durch {@link sichtbareSpalten}, das Spalte 0 nie entfernt — die fixierte
+   * Kennung bleibt damit die Kennung. Die drei Schalterfelder werden vor antd herausgelöst.
+   */
+  const gezeigteSpalten = useMemo(() => {
+    if (!columns) return columns;
+    let auswahl: readonly KatalogSpalte<T>[] = columns;
+    if (spaltenSchalter != null) {
+      const { spalten } = sichtbareSpalten({
+        spalten: schaltbar,
+        verborgen: new Set(spaltenAus),
+        eingeblendet: new Set(spaltenAn),
+        abBreite,
+      });
+      auswahl = spalten.map((s) => columns[s.index]);
+    }
+    return auswahl.map((spalte) => {
+      const { etikett, immerSichtbar, abBreite: _ab, ...antd } = spalte;
+      void etikett;
+      void immerSichtbar;
+      void _ab;
+      return antd as KatalogSpalte<T>;
+    });
+  }, [columns, spaltenSchalter, schaltbar, spaltenAus, spaltenAn, abBreite]);
 
   /**
    * Fixiert wird die ERSTE Spalte, nicht eine per Prop benannte: in allen Aufrufstellen
@@ -405,13 +572,13 @@ export default function KatalogTabelle<T extends object>({
   const fixierteSpalten = useMemo(() => {
     // Mono-Spalten (`zahl`) bekommen ihre Klasse, bevor fixiert wird — eine Optik-Zutat,
     // die an der Spaltenfolge und damit an der Fixierregel darunter nichts ändert.
-    const gestaltet = columns?.map((s) =>
+    const gestaltet = gezeigteSpalten?.map((s) =>
       s.zahl ? { ...s, className: [s.className, 'lfh-zahl-spalte'].filter(Boolean).join(' ') } : s,
     );
     const erste = gestaltet?.[0];
     if (!gestaltet || !erste || erste.fixed !== undefined || 'children' in erste) return gestaltet;
     return [{ ...erste, fixed: 'left' as const }, ...gestaltet.slice(1)];
-  }, [columns]);
+  }, [gezeigteSpalten]);
 
   /**
    * DIE EINE benannte Quelle der gerenderten Zeilen.
@@ -488,21 +655,46 @@ export default function KatalogTabelle<T extends object>({
 
   return (
     <>
-      {suche != null && (
+      {(suche != null || schalterDa) && (
         // Die Werkzeugzeile liegt AUSSERHALB von `.ant-table`: `katalogtabelle-schmal.spec.ts`
         // misst `scrollWidth` am Tabellenwurzelknoten gegen 390 px, eine Leiste darin zählte
-        // in dieses Maß hinein und machte die Messung stumpf.
-        <div ref={werkzeugWurzel} data-lfh="katalog-werkzeuge" style={{ marginBlockEnd: 8 }}>
-          <Input.Search
-            ref={feldRef}
-            allowClear
-            placeholder={suche.platzhalter}
-            value={suchbegriff}
-            onChange={(e) => setSuchbegriff(e.target.value)}
-            // Kein `size`-Prop (E8): die Höhe kommt aus `controlHeight` und zieht mit der
-            // Dichtestufe mit. Fluide Breite statt fester Zahl.
-            style={{ width: '100%', maxWidth: 220 }}
-          />
+        // in dieses Maß hinein und machte die Messung stumpf. Umbrechende Flex-Zeile mit
+        // `gap`: Suche und Schalter stehen sonst bündig aneinander.
+        <div
+          ref={werkzeugWurzel}
+          data-lfh="katalog-werkzeuge"
+          style={{
+            marginBlockEnd: 8,
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            gap: token.paddingXS,
+          }}
+        >
+          {suche != null && (
+            <Input.Search
+              ref={feldRef}
+              allowClear
+              placeholder={suche.platzhalter}
+              value={suchbegriff}
+              onChange={(e) => setSuchbegriff(e.target.value)}
+              // Kein `size`-Prop (E8): die Höhe kommt aus `controlHeight` und zieht mit der
+              // Dichtestufe mit. Fluide Breite statt fester Zahl.
+              style={{ width: '100%', maxWidth: 220 }}
+            />
+          )}
+          {schalterDa && (
+            <SpaltenSchalter
+              bezeichnung={spaltenSchalter.bezeichnung}
+              spalten={schaltbar}
+              aus={spaltenAus}
+              onAus={setSpaltenAus}
+              an={spaltenAn}
+              onAn={setSpaltenAn}
+              offen={spaltenOffen}
+              onOffen={setSpaltenOffen}
+            />
+          )}
         </div>
       )}
       {/* Geschachtelter Provider nur für die Tabellen-Tokens: er erbt Algorithmus, Rollen und
