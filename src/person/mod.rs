@@ -577,3 +577,48 @@ mod tests {
         assert!(AbgleichStatus::parse("unsinn").is_none());
     }
 }
+
+// ── System-ETB-Wortlaute (LFH-690) ──────────────────────────────────────────────────
+// Reine Textbausteine: Handler und Demo-Import rufen dieselbe Funktion, damit ein
+// importierter Einsatz dieselben ETB-Texte trägt wie ein echter.
+
+/// System-ETB beim Erfassen einer Person: «Person R-001 erfasst».
+pub fn etb_text_erfasst(registrier_nr: i64) -> String {
+    format!("Person {} erfasst", registrier_anzeige(registrier_nr))
+}
+
+/// System-ETB der Erst-Sichtung beim Anlegen: «Person R-001: Sichtung SK II».
+pub fn etb_text_sichtung(registrier_nr: i64, kategorie: Sichtungskategorie) -> String {
+    format!(
+        "Person {}: Sichtung {}",
+        registrier_anzeige(registrier_nr),
+        kategorie.etb_label()
+    )
+}
+
+/// System-ETB des UHS-Eintritts beim Anlegen (ohne Platz, also in die Inbox).
+pub fn etb_text_uhs_aufnahme(registrier_nr: i64, uhs_bezeichnung: &str) -> String {
+    format!(
+        "Person {}: Aufnahme in {} (Inbox)",
+        registrier_anzeige(registrier_nr),
+        uhs_bezeichnung,
+    )
+}
+
+#[cfg(test)]
+mod etb_text_tests {
+    use super::*;
+
+    #[test]
+    fn erfasst_sichtung_und_uhs_aufnahme() {
+        assert_eq!(etb_text_erfasst(1), "Person R-001 erfasst");
+        assert_eq!(
+            etb_text_sichtung(42, Sichtungskategorie::parse("sk2").unwrap()),
+            "Person R-042: Sichtung SK II"
+        );
+        assert_eq!(
+            etb_text_uhs_aufnahme(7, "BHP 50"),
+            "Person R-007: Aufnahme in BHP 50 (Inbox)"
+        );
+    }
+}
