@@ -10,6 +10,7 @@ import { VORSCHAU_UNTER_EBENE, VorschauZustand } from '../command-palette/Vorsch
 import Markdown from '../components/Markdown';
 import { Datenfeld, Datenraster, monoStil, useRollen } from '../components/instrument';
 import { etbTyp, etbTypFarbe } from '../theme/statusFarben';
+import EtbAnhaenge from './EtbAnhaenge';
 import EtbBacklinkBadges from './EtbBacklinkBadges';
 import { MELDEWEG_LABEL } from './EtbZeitachse';
 import { istNachgetragen } from './typFarben';
@@ -138,6 +139,8 @@ function EintragInhalt({
       </Markdown>
       {/* Rendert nichts ohne Verknüpfung. */}
       <EtbBacklinkBadges eintrag={e} einsatzId={einsatzId} />
+      {/* Dasselbe Bauteil wie in der Zeitachse (LFH-117); rendert nichts ohne Anhang. */}
+      <EtbAnhaenge eintrag={e} einsatzId={einsatzId} />
     </div>
   );
 }

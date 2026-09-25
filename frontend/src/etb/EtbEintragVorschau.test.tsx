@@ -116,6 +116,29 @@ describe('EtbEintragVorschau (LFH-664)', () => {
     expect(screen.queryAllByRole('button')).toHaveLength(0);
   });
 
+  it('zeigt die Anhänge des Eintrags als Download-Verweise (LFH-117)', async () => {
+    etbHandler([
+      eintrag({
+        anhaenge: [
+          {
+            id: 9,
+            einsatz_id: 5,
+            dateiname: 'fax.pdf',
+            mime: 'application/pdf',
+            groesse: 2048,
+            hochgeladen_von: 1,
+            erstellt_at: '2026-05-23 10:00:00',
+          },
+        ],
+      }),
+    ]);
+    renderMitProviders(<EtbEintragVorschau einsatzId={5} id={40} lfdNr={12} />);
+
+    expect(
+      await screen.findByRole('link', { name: 'fax.pdf, 2.0 KB, Anhang zu Nr. 12 herunterladen' }),
+    ).toHaveAttribute('href', '/api/einsaetze/5/etb/40/anhaenge/9');
+  });
+
   it('trägt keine Bedienelemente', async () => {
     etbHandler([eintrag()]);
     renderMitProviders(<EtbEintragVorschau einsatzId={5} id={40} lfdNr={12} />);
