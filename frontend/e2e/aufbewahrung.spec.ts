@@ -15,6 +15,10 @@ import { kontrast, randKontrast } from './kontrast-kern';
  * Tombstones werden dort per `node:sqlite` gesetzt, genau wie die Integrationstests es mit
  * `sqlx` tun. Alles andere — Anlegen, Abschließen, Frist — läuft über die API.
  *
+ * Der echte Purge-Lauf läuft im e2e-Backend mit (erster Tick beim Start, dann alle 600 s) und
+ * kann gesetzte Zustände weiterschalten. Die Kontrastmessung setzt sie deshalb vor jeder
+ * Anzeige neu und misst erst den gesetzten Stand (`uebersichtImGesetztenStand`).
+ *
  * ── WAS GEKLICKT WIRD ───────────────────────────────────────────────────────────────────
  *
  * Menüeintrag, Tabellenzeile, Kopfaktion „Wiederherstellen", Absenden im Dialog: jeder Schritt
@@ -168,17 +172,39 @@ test.describe('Aufbewahrung (LFH-23)', () => {
         schwaerzung_ausstehend: await abgeschlossen(page, `Kontrast aus ${stempel}`, utc(-40)),
         geschwaerzt: await abgeschlossen(page, `Kontrast schwarz ${stempel}`, utc(-70)),
       };
-      tombstones(faelle.vorgemerkt.id, { frist: utc(-6), geloescht: utc(-5), geschwaerzt: null });
-      tombstones(faelle.schwaerzung_ausstehend.id, {
-        frist: utc(-40),
-        geloescht: utc(-35),
-        geschwaerzt: null,
-      });
-      tombstones(faelle.geschwaerzt.id, {
-        frist: utc(-70),
-        geloescht: utc(-65),
-        geschwaerzt: utc(-30),
-      });
+      /*
+       * Die Zustände werden VOR JEDER Anzeige neu gesetzt: das e2e-Backend fährt den echten
+       * Purge-Lauf (erster Tick beim Start, dann alle 600 s). Fiele ein Tick zwischen
+       * Anlegen und Messen, würde aus `faellig` `vorgemerkt` und aus
+       * `schwaerzung_ausstehend` `geschwaerzt` — ohne Codeänderung. Die Etikettprüfung
+       * setzt deshalb erneut und lädt neu, bis der gesetzte Stand gemessen wird.
+       */
+      const zustaendeSetzen = () => {
+        tombstones(faelle.faellig.id, { frist: utc(-1), geloescht: null, geschwaerzt: null });
+        tombstones(faelle.vorgemerkt.id, { frist: utc(-6), geloescht: utc(-5), geschwaerzt: null });
+        tombstones(faelle.schwaerzung_ausstehend.id, {
+          frist: utc(-40),
+          geloescht: utc(-35),
+          geschwaerzt: null,
+        });
+        tombstones(faelle.geschwaerzt.id, {
+          frist: utc(-70),
+          geloescht: utc(-65),
+          geschwaerzt: utc(-30),
+        });
+      };
+      /** Übersicht öffnen und sicherstellen, dass jede Zeile den gesetzten Zustand zeigt. */
+      const uebersichtImGesetztenStand = async () => {
+        await expect(async () => {
+          zustaendeSetzen();
+          await page.goto('/admin/aufbewahrung');
+          for (const [zustand, f] of Object.entries(faelle) as [keyof typeof woerter, Angelegt][]) {
+            await expect(zeile(page, f.nummer).locator('.ant-tag')).toHaveText(woerter[zustand], {
+              timeout: 3_000,
+            });
+          }
+        }).toPass({ timeout: 30_000 });
+      };
       const woerter = {
         ohne_frist: 'ohne Frist',
         frist_laeuft: 'Frist läuft',
@@ -190,7 +216,7 @@ test.describe('Aufbewahrung (LFH-23)', () => {
 
       await page.evaluate((m) => localStorage.setItem('lifeline-hub.theme', m), modus);
       await page.setViewportSize({ width: 1280, height: 800 });
-      await page.goto('/admin/aufbewahrung');
+      await uebersichtImGesetztenStand();
       await expect(page.locator('html')).toHaveAttribute('data-theme', modus);
       const messwerte: Record<string, unknown> = {};
       for (const [zustand, f] of Object.entries(faelle) as [keyof typeof woerter, Angelegt][]) {
@@ -225,7 +251,7 @@ test.describe('Aufbewahrung (LFH-23)', () => {
       // Durchstich 1280 und 390: Übersicht und Akte, ohne waagerechten Seitenüberlauf.
       for (const breite of [1280, 390]) {
         await page.setViewportSize({ width: breite, height: breite === 390 ? 844 : 800 });
-        await page.goto('/admin/aufbewahrung');
+        await uebersichtImGesetztenStand();
         await expect(zeile(page, faelle.vorgemerkt.nummer)).toBeVisible();
         // Der Zustand steht neben der fixierten Nummer und ist auch am Handschirm ohne
         // Querscrollen im Blick (Kriterium 9) — `toBeInViewport`, nicht `toBeVisible`.
