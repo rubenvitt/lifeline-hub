@@ -2,7 +2,7 @@
 
 use axum::body::{to_bytes, Body};
 use axum::http::{header, Request, StatusCode};
-use lifeline_hub::app::{build_router, AppState};
+use lifeline_hub::app::{build_router, build_router_mit, AppState, RouterOptionen};
 use lifeline_hub::auth::bootstrap::bootstrap_admin;
 use lifeline_hub::db;
 use lifeline_hub::live::LiveHub;
@@ -29,7 +29,42 @@ pub async fn setup_mit_pool_und_live() -> (axum::Router, sqlx::SqlitePool, LiveH
         .await
         .unwrap();
     let live = LiveHub::new();
-    let router = build_router(AppState {
+    let router = build_router(test_state(&pool, &live));
+    (router, pool, live)
+}
+
+/// Wie [`setup_mit_pool`], aber mit gesetzten Router-Optionen (LFH-690: `demo_daten`).
+/// Die Optionen reisen am Router, nicht im `AppState` — ein Test kann „aus“ und „an“ damit
+/// im selben Binary nebeneinander prüfen.
+pub async fn setup_mit_optionen(opt: RouterOptionen) -> (axum::Router, sqlx::SqlitePool) {
+    let (router, pool, _live) = setup_mit_optionen_und_live(opt).await;
+    (router, pool)
+}
+
+/// Wie [`setup_mit_optionen`], stellt zusätzlich den geteilten LiveHub bereit (LFH-690: das
+/// `lagged`-Signal nach Entfernen und Neu-Import).
+pub async fn setup_mit_optionen_und_live(
+    opt: RouterOptionen,
+) -> (axum::Router, sqlx::SqlitePool, LiveHub) {
+    setup_mit_optionen_auf(db::test_pool().await, opt).await
+}
+
+/// Wie [`setup_mit_optionen_und_live`], aber auf einem mitgebrachten Pool — etwa
+/// `db::test_pool_datei()` für Messungen mit Produktions-Parität (WAL, mehrere Verbindungen).
+pub async fn setup_mit_optionen_auf(
+    pool: sqlx::SqlitePool,
+    opt: RouterOptionen,
+) -> (axum::Router, sqlx::SqlitePool, LiveHub) {
+    bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
+        .await
+        .unwrap();
+    let live = LiveHub::new();
+    let router = build_router_mit(test_state(&pool, &live), opt);
+    (router, pool, live)
+}
+
+fn test_state(pool: &sqlx::SqlitePool, live: &LiveHub) -> AppState {
+    AppState {
         pool: pool.clone(),
         live: live.clone(),
         karten_dir: std::env::temp_dir(),
@@ -38,8 +73,7 @@ pub async fn setup_mit_pool_und_live() -> (axum::Router, sqlx::SqlitePool, LiveH
         download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
         karten_service_url: None,
         karten_service_token: None,
-    });
-    (router, pool, live)
+    }
 }
 
 /// Legt eine ZWEITE Organisation samt Benutzer an — die Voraussetzung für jeden

@@ -165,6 +165,15 @@ interface EinsatzSeiteProps {
   breite?: SeitenBreite;
   /** Arbeitsfläche bis zum Fensterende; children folgen darunter im Dokumentfluss. */
   fensterInhalt?: { inhalt: ReactNode; mindestHoehe?: number };
+  /**
+   * Angepinnter Seitenfuß (LFH-373). Steht als LETZTES Kind der Seitenwurzel, hinter dem
+   * Inhalt und nicht darin: ein `position: sticky; bottom: 0` kann nie über die Oberkante
+   * seines Elternblocks steigen. Im Inhalt hing die ETB-Erfassung bei 390 px im
+   * Handschuh-Betrieb unter einem 489 px hohen Kopf fest und ragte ganz oben auf der Seite
+   * 61 px unter das Fenster; als Kind der Wurzel beginnt ihr Elternblock mit dem Seitenkopf.
+   * Die Polsterung trägt der Fuß selbst (die Wurzel hat keine).
+   */
+  fuss?: ReactNode;
   children: ReactNode;
 }
 
@@ -216,6 +225,7 @@ export default function EinsatzSeite({
   dataUpdatedAt,
   breite = 'voll',
   fensterInhalt,
+  fuss,
   children,
 }: EinsatzSeiteProps) {
   const { token } = theme.useToken();
@@ -294,10 +304,37 @@ export default function EinsatzSeite({
           <Typography.Title level={1} style={seitentitelStil(farben)}>
             {titel}
           </Typography.Title>
-          {meta && <span style={seitenMetaStil(farben)}>{meta}</span>}
-          <span style={{ color: farben.gedaempft }}>
-            <Datenstand dataUpdatedAt={dataUpdatedAt} />
-          </span>
+          {/* Meta und Datenstand sind EINE Gruppe, die unter `md` eine eigene Zeile hat
+              (`EinsatzSeite.css`, LFH-373, gemessen bei 390 px): stand die Meta in der
+              Titelzeile, schob ihr spätes Eintreffen „Stand" in eine neue Zeile und alles
+              darunter 22 px nach unten. Die eigene Zeile hält der Datenstand-Platzhalter,
+              die Meta wächst darin. Per CSS, nicht per `useViewport`: dessen erstes Bild ist
+              bewusst breit und wäre selbst ein Sprung. */}
+          {(meta || dataUpdatedAt !== undefined) && (
+            <span
+              className="lfh-seitenkopf__meta"
+              style={{
+                display: 'inline-flex',
+                flexWrap: 'wrap',
+                alignItems: 'baseline',
+                columnGap: token.marginXS * 3,
+                rowGap: 2,
+                minWidth: 0,
+              }}
+            >
+              {/* Die Gruppe bricht um, ihre Teile nicht: eine lange Meta (Meldebild mit
+                  Filter, rund 54 Zeichen) liefe bei 390 px sonst quer über die Seite. */}
+              {meta && <span style={seitenMetaStil(farben)}>{meta}</span>}
+              <span style={{ color: farben.gedaempft, whiteSpace: 'nowrap' }}>
+                {/* Führt die Seite einen Datenstand (auch `0` vor dem ersten Abruf), hält der
+                    Kopf seinen Platz frei — sonst bräche er beim Eintreffen um. */}
+                <Datenstand
+                  dataUpdatedAt={dataUpdatedAt}
+                  platzHalten={dataUpdatedAt !== undefined}
+                />
+              </span>
+            </span>
+          )}
         </div>
         {/* Die Marke macht die Zusicherung von außen prüfbar (LFH-340 · C5): „genau eine
             Primäraktion IM KOPF" ist ohne sie nur global zählbar, und eine Seite mit einem
@@ -343,6 +380,7 @@ export default function EinsatzSeite({
       <div data-lfh="seiten-inhalt" style={koerperStil}>
         {children}
       </div>
+      {fuss}
     </div>
   );
 }

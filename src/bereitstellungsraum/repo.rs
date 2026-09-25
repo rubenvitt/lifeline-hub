@@ -80,11 +80,27 @@ pub async fn laden_tx(
 
 /// Legt einen BR im Status `geplant` an. UNIQUE(einsatz_id, bezeichnung) →
 /// `Conflict` (409) bei Duplikat.
+///
+/// Pool-Hülle um [`anlegen_tx`]: wie bisher ohne eigene Transaktion, Insert und Rücklesen
+/// laufen im Autocommit einer geliehenen Verbindung.
 pub async fn anlegen(
     pool: &SqlitePool,
     einsatz_id: i64,
     erfasser_id: i64,
     daten: NeueDaten<'_>,
+) -> Result<BrAnzeige, AppError> {
+    let mut conn = pool.acquire().await?;
+    anlegen_tx(&mut conn, einsatz_id, erfasser_id, &daten).await
+}
+
+/// Legt einen BR auf einer offenen Verbindung/Transaktion an und lädt ihn dort zurück
+/// (LFH-690, Demo-Import in EINER Transaktion). Öffnet und committet selbst nichts.
+/// UNIQUE(einsatz_id, bezeichnung) → `Conflict` (409) wie in der Pool-Hülle.
+pub async fn anlegen_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    erfasser_id: i64,
+    daten: &NeueDaten<'_>,
 ) -> Result<BrAnzeige, AppError> {
     let ergebnis = sqlx::query_scalar::<_, i64>(
         "INSERT INTO bereitstellungsraum \
@@ -99,7 +115,7 @@ pub async fn anlegen(
     .bind(daten.notiz)
     .bind(erfasser_id)
     .bind(erfasser_id)
-    .fetch_one(pool)
+    .fetch_one(&mut *conn)
     .await;
     let id = match ergebnis {
         Ok(id) => id,
@@ -111,7 +127,7 @@ pub async fn anlegen(
         }
         Err(e) => return Err(e.into()),
     };
-    laden(pool, einsatz_id, id).await
+    laden_tx(conn, einsatz_id, id).await
 }
 
 /// Aktualisiert BR-Stammfelder (NICHT Status). `Some(None)` setzt ein Feld

@@ -1902,6 +1902,145 @@
           }
         }
       },
+      "DemoBericht": {
+        "type": "object",
+        "description": "Ergebnis eines Imports oder eines Entfernens, je Stammdatenart.",
+        "required": [
+          "vorgang",
+          "zeitpunkt",
+          "je_art"
+        ],
+        "properties": {
+          "je_art": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DemoBerichtZeile"
+            }
+          },
+          "vorgang": {
+            "$ref": "#/components/schemas/DemoVorgang"
+          },
+          "zeitpunkt": {
+            "type": "string",
+            "description": "UTC ohne Zonenkennung (`YYYY-MM-DD HH:MM:SS`)."
+          }
+        }
+      },
+      "DemoBerichtZeile": {
+        "type": "object",
+        "description": "Zahlen einer Stammdatenart. Beim Import zählen `angelegt` und `mitbenutzt`, beim\nEntfernen `entfernt` und `behalten`; die übrigen stehen auf 0.",
+        "required": [
+          "art",
+          "angelegt",
+          "mitbenutzt",
+          "entfernt",
+          "behalten"
+        ],
+        "properties": {
+          "angelegt": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Neu angelegt und mit der Demo-Marke versehen."
+          },
+          "art": {
+            "$ref": "#/components/schemas/DemoStammdatenArt"
+          },
+          "behalten": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Beim Entfernen stehen gelassen, weil noch anderswo verwiesen; die Marke fällt."
+          },
+          "entfernt": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Beim Entfernen gelöscht."
+          },
+          "mitbenutzt": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Vorhandener Datensatz derselben Kennung, unverändert mitbenutzt."
+          }
+        }
+      },
+      "DemoDatenStatus": {
+        "type": "object",
+        "description": "Stand der Demo-Daten einer Organisation — die eine Antwort aller Demo-Endpunkte.",
+        "required": [
+          "importiert"
+        ],
+        "properties": {
+          "bericht": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/DemoBericht",
+                "description": "Bericht des letzten Vorgangs (Import oder Entfernen); fehlt, wenn es keinen gab."
+              }
+            ]
+          },
+          "import": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/DemoImportKopf",
+                "description": "Der aktive Import; fehlt, wenn keiner besteht."
+              }
+            ]
+          },
+          "importiert": {
+            "type": "boolean",
+            "description": "Ob für die Organisation ein aktiver Import besteht."
+          }
+        }
+      },
+      "DemoImportKopf": {
+        "type": "object",
+        "description": "Kopf eines aktiven Imports.",
+        "required": [
+          "id",
+          "importiert_at",
+          "einsatz_id",
+          "einsatz_bezeichnung"
+        ],
+        "properties": {
+          "einsatz_bezeichnung": {
+            "type": "string"
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "importiert_at": {
+            "type": "string",
+            "description": "UTC ohne Zonenkennung (`YYYY-MM-DD HH:MM:SS`)."
+          }
+        }
+      },
+      "DemoStammdatenArt": {
+        "type": "string",
+        "description": "Stammdatenart im Bericht. Wire == `as_str()`.",
+        "enum": [
+          "fahrzeug",
+          "personal",
+          "material"
+        ]
+      },
+      "DemoVorgang": {
+        "type": "string",
+        "description": "Vorgang, den ein Bericht beschreibt. Wire == `as_str()`.",
+        "enum": [
+          "importiert",
+          "entfernt"
+        ]
+      },
       "Dienststatus": {
         "type": "string",
         "description": "Dienststatus im Stamm (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `dienststatus`.",

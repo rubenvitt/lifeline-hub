@@ -10,18 +10,36 @@ import { KartenFuss, bandStil, fussStil, FUSS_ABSTAND } from './KartenFuss';
  */
 describe('KartenFuss — Rahmen', () => {
   it('stapelt seine Bänder als Spalte am unteren Kartenrand', () => {
-    expect(fussStil.display).toBe('flex');
-    expect(fussStil.flexDirection).toBe('column');
-    expect(fussStil.position).toBe('absolute');
-    expect(fussStil.bottom).toBe(FUSS_ABSTAND);
-    expect(fussStil.left).toBe(FUSS_ABSTAND);
-    expect(fussStil.right).toBe(FUSS_ABSTAND);
-    expect(fussStil.gap).toBe(FUSS_ABSTAND);
+    const stil = fussStil(32);
+    expect(stil.display).toBe('flex');
+    expect(stil.flexDirection).toBe('column');
+    expect(stil.position).toBe('absolute');
+    expect(stil.bottom).toBe(FUSS_ABSTAND);
+    expect(stil.left).toBe(FUSS_ABSTAND);
+    expect(stil.gap).toBe(FUSS_ABSTAND);
   });
+
+  /**
+   * LFH-373: der Fuß endet rechts VOR der Knopfspalte. Gemessen vor dem Fix: bei 390 px im
+   * Handschuh-Betrieb lagen drei Kartenknöpfe vollständig unter dem Zeitachsenband. Die Zahl
+   * ist Rand des Knopfblocks + Kante + Abstand; als Literale, damit die Zusicherung nicht die
+   * Rechnung gegen sich selbst prüft. Ob sich die beiden im Browser wirklich nicht
+   * überschneiden, misst `e2e/fokus-verdeckung.spec.ts` (Lagekarte).
+   */
+  it.each([
+    [32, 56],
+    [48, 72],
+    [72, 96],
+  ])(
+    'lässt bei Knopfkante %i rechts %i px frei — die Knopfspalte gehört nicht dem Fuß',
+    (kante, rechts) => {
+      expect(fussStil(kante).right).toBe(rechts);
+    },
+  );
 
   it('lässt die Karte darunter bedienbar — der Rahmen selbst nimmt keine Zeiger an', () => {
     // Die Gegenzeile dazu steht in `bandStil`: ohne sie wäre jedes Band sichtbar und tot.
-    expect(fussStil.pointerEvents).toBe('none');
+    expect(fussStil(32).pointerEvents).toBe('none');
   });
 
   it('rendert seine Bänder als Flow-Geschwister in der übergebenen Reihenfolge', () => {

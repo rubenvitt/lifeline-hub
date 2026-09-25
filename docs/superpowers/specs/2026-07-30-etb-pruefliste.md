@@ -48,8 +48,8 @@ Grep):
 | --- | --- | --- |
 | 12, 3 | Sammelbanner statt eingeschobener Live-Einträge; optimistische Updates | **B6 (LFH-334)** — Ticket existiert |
 | 8 | kein Helligkeitsregler in der Anwendung | Folge-Task aus A0, dort ausdrücklich weiterverwiesen |
-| 2 | Dichtestufe wird nicht aus dem Einsatzkontext abgeleitet | B5-Restpunkt (LFH-333) |
-| 2, 12, 13 | Layout-Nachweise, die jsdom nicht führen kann: Zeilenhöhe im Handschuh, Chip-Leiste bei ~390 px, Fokus hinter dem angepinnten Kopf | **LFH-373** — es ist der erste Dichte-e2e-Nachweis des Repos und deshalb ein eigener Task |
+| 2 | Dichtestufe wird nicht aus dem Einsatzkontext abgeleitet | B5-Restpunkt (LFH-333), seit 25.09.2026 **LFH-724** |
+| 2, 12, 13 | ~~Layout-Nachweise, die jsdom nicht führen kann: Zeilenhöhe im Handschuh, Chip-Leiste bei ~390 px, Fokus hinter dem angepinnten Kopf~~ — gemessen und behoben 25.09.2026, siehe „Nachtrag LFH-373“ unten | **LFH-373** |
 | 14 | Spaltenschalter mit Zähler fehlt (`KatalogTabelle` statt `Datensicht`) | **LFH-374** — Bestand, nicht von B5e verursacht. **Eingelöst durch LFH-342, seit dem Neuentwurf (Zeitachse) gegenstandslos** |
 | 5 | ~~vier hartkodierte Farbwerte im angepinnten Erfassungskopf~~ — erledigt 24.09.2026, durch den Neuentwurf (`69ff7321`) abgelöst, Rollen `kopf`/`linie-stark` | **LFH-375** |
 
@@ -59,6 +59,22 @@ Verweises ins Leere — ein Ziel, das keines ist, liest sich wie erledigte Planu
 schlechter als ein offen benannter Rest.
 
 ---
+
+## Nachtrag LFH-373 (Messung, 25.09.2026)
+
+Die Zeilen 2, 12 und 13 standen hier seit dem 30.07. offen, weil jsdom kein Layout rechnet.
+LFH-373 hat sie im Browser gemessen. Drei Befunde darunter waren **rot**, sie sind im selben
+Ticket behoben. Seit dem Neuentwurf (22.09.2026) ist das ETB eine Zeitachse, und die
+Erfassung ist ein angepinnter **Fuß** statt eines Kopfes. Die Aussagen oben zu `EtbTabelle`,
+Aktionsspalte und „einziges `position: sticky` des Frontends“ sind damit überholt.
+Maßgeblich für diese drei Zeilen ist ab jetzt dieser Abschnitt.
+
+| # | Verdikt | Messung / Nachweis |
+| -- | ------- | ------------------ |
+| 2 · Handschuh-Modus | **erfüllt** (die Stufenableitung aus dem Einsatzkontext → **LFH-724**) | `e2e/gate3-trefflaeche.spec.ts`, „ETB (LFH-373)“. Die Stufe wird über localStorage umgeschaltet, mit `data-dichte`-Wache. Gemessen in kompakt / komfortabel / handschuh: Slash-Optionen 35,5 / 48 / 72 px, Zeilenauslöser „Aktionen zu Eintrag N“ (kurze Achse) 30 / 48 / 72, Einträge des Zeilenmenüs 30 / 48 / 72 (Boden `controlHeightSM` 24 / 48 / 72). Die Gegenprobe kompakt < handschuh gilt je Zielsorte. |
+| 12 · Kein Sprung unter dem Cursor | **erfüllt nach Fix** (das Sammelbanner bleibt **LFH-334**) | `e2e/leisten-flaeche.spec.ts`. Die Erfassungsleiste belegt ≤ 50 % der Fensterhöhe und steht ganz oben auf der Seite vollständig im Fenster. Gemessen bei 390 × 844: 216 / 295 / 413 px (26 / 35 / 49 %; seit „Werte behalten“ in der Hinweiszeile steht). Bei 1024 × 768 und 1366 × 768: 225 / 282 / 364 px. Drei gesetzte Felder bei 390 px im Handschuh-Betrieb: Die Seite rollt nicht, die Zeitachse steht, die Leiste wächst von 413 auf 415 px. Das Laden auf dem Handschirm erreicht CLS 0,0015 / 0,0033, **mit erzwungen verspäteter Liste und Zählung** 0,0025 / 0,0044. Dieser Durchgang ist Teil des Tests: Im Gate-Lauf sprang die Seite nur, wenn eine der beiden Antworten nach dem ersten Bild kam, in einem von fünf bis acht Läufen. Dann schoben die Zeilen die Bilanz aus dem Bild (0,22), oder die Meta „8 Einträge“ brach den Seitenkopf um (0,19). **Behoben:** Unter `xl` erscheint die Bilanz erst, wenn die Liste steht. Meta und Datenstand bilden im Seitenkopf eine Gruppe mit eigener Zeile unter `md`, und der Datenstand hält seine Breite als unsichtbarer Platzhalter. Beides gilt für jede `EinsatzSeite`, die einen Datenstand führt. **Vorher gemessen:** Die Leiste belegte 497 px (59 %), bei 390 × 600 sogar 83 %. Sie hing unter dem 489 px hohen Kopf fest und ragte ganz oben 61 px unter das Fenster. Jeder Chip kostete eine Reihe (drei Chips 578 px). Fokus und Autofokus in der Leiste rollten die Seite um bis zu 2593 px. **Behoben:** Das Feld steht auf dem Handschirm auf eigener Zeile, „Vorschau“ sitzt neben „Erfassen“, Hinweiszeile und Platzhalter sind auf dem Handschirm Kurzformen (der volle Platzhalter brach unter den Linux-Schriften der CI in eine zweite Zeile und riss den Deckel, 435 px), die Leiste ist als `EinsatzSeite.fuss` eingehängt, die Feldzeile rollt waagerecht, und der Fokus setzt `preventScroll`. |
+| 13 · Fokus nie verdeckt | **erfüllt nach Fix** | `e2e/fokus-verdeckung.spec.ts`, „ETB (LFH-373)“. Tab-Durchlauf über 15 Zeilenauslöser bei 390 × 600 und 1366 × 520, in kompakt und handschuh: 0 vollständig verdeckt, freier Streifen zur Leiste ≥ 7 bzw. ≥ 16 px. **Vorher gemessen:** Jeder zweite bis jeder Auslöser lag vollständig hinter der Leiste. **Behoben:** `scroll-margin-block-end` an allen Zielen von Seitenkopf und Inhalt, die Höhe misst `components/fokusabstandUnten.ts`. Seit dem Review gehören auch die Bilanz-Links in den Lauf, die unter `xl` unter der Zeitachse stehen. Eine Scrollport-Regel wie auf der Befehlsseite wäre falsch, weil sie jeden Fokus in der Leiste ans Seitenende rollte (Design D4). |
+
 
 ## Was diese Prüfliste nicht beweist
 

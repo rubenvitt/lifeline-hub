@@ -1,8 +1,11 @@
-use super::{leere_abschnitte, vorlage, Abschnitt, STATUS_ENTWURF, STATUS_FREIGEGEBEN};
+use super::{
+    leere_abschnitte, render_snapshot, validiere_freigabe, vorlage, Abschnitt, STATUS_ENTWURF,
+    STATUS_FREIGEGEBEN,
+};
 use crate::error::AppError;
 use crate::etb::{self, repo as etb_repo};
 use serde::Serialize;
-use sqlx::SqlitePool;
+use sqlx::{SqliteConnection, SqlitePool};
 use utoipa::ToSchema;
 
 /// Öffentliche Anzeige eines Befehls (Abschnitte aus JSON geparst, Namen aufgelöst).
@@ -105,13 +108,20 @@ pub async fn liste(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<BefehlAnzei
 }
 
 /// Lädt einen Befehl (aufgelöst); `NotFound`, wenn nicht zum Einsatz.
-pub async fn laden(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<BefehlAnzeige, AppError> {
+///
+/// Executor-generisch (Pool oder offene Verbindung): [`anlegen_tx`] und [`freigeben_tx`]
+/// laden auf der Verbindung ihrer Transaktion (LFH-690).
+pub async fn laden(
+    executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
+    einsatz_id: i64,
+    id: i64,
+) -> Result<BefehlAnzeige, AppError> {
     let row = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!(
         "{SELECT} WHERE l.id = ? AND l.einsatz_id = ?"
     )))
     .bind(id)
     .bind(einsatz_id)
-    .fetch_optional(pool)
+    .fetch_optional(executor)
     .await?
     .ok_or(AppError::NotFound)?;
     zu_anzeige(row)
@@ -119,8 +129,33 @@ pub async fn laden(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<Befehl
 
 /// Legt einen Entwurf mit leerem Abschnitts-Skelett der Vorlage an.
 /// Erwartet eine bereits validierte `vorlage` und normalisierten `zeitstand`.
+///
+/// Pool-Hülle um [`anlegen_tx`]: wie bisher ohne eigene Transaktion, Insert und Rücklesen
+/// laufen im Autocommit einer geliehenen Verbindung.
 pub async fn anlegen(
     pool: &SqlitePool,
+    einsatz_id: i64,
+    vorlage_key: &str,
+    titel: &str,
+    zeitstand: &str,
+    ersteller_id: i64,
+) -> Result<BefehlAnzeige, AppError> {
+    let mut conn = pool.acquire().await?;
+    anlegen_tx(
+        &mut conn,
+        einsatz_id,
+        vorlage_key,
+        titel,
+        zeitstand,
+        ersteller_id,
+    )
+    .await
+}
+
+/// Legt einen Entwurf auf einer offenen Verbindung/Transaktion an und lädt ihn dort zurück
+/// (LFH-690, Demo-Import in EINER Transaktion). Öffnet und committet selbst nichts.
+pub async fn anlegen_tx(
+    conn: &mut SqliteConnection,
     einsatz_id: i64,
     vorlage_key: &str,
     titel: &str,
@@ -142,18 +177,33 @@ pub async fn anlegen(
     .bind(STATUS_ENTWURF)
     .bind(skelett)
     .bind(ersteller_id)
-    .fetch_one(pool)
+    .fetch_one(&mut *conn)
     .await?;
-    laden(pool, einsatz_id, id).await
+    laden(&mut *conn, einsatz_id, id).await
 }
 
 /// Partielles Update eines Entwurfs (Titel/Zeitstand/Abschnitte). `NotFound`,
 /// wenn nicht zum Einsatz. Der Entwurfs-Status wird vom Handler geprüft.
+///
+/// Pool-Hülle um [`aktualisiere_tx`]: wie bisher ohne eigene Transaktion, UPDATE und
+/// Rücklesen laufen im Autocommit einer geliehenen Verbindung.
 pub async fn aktualisiere(
     pool: &SqlitePool,
     einsatz_id: i64,
     id: i64,
     patch: BefehlPatch<'_>,
+) -> Result<BefehlAnzeige, AppError> {
+    let mut conn = pool.acquire().await?;
+    aktualisiere_tx(&mut conn, einsatz_id, id, &patch).await
+}
+
+/// Wie [`aktualisiere`], auf einer offenen Verbindung/Transaktion (LFH-690: der Demo-Import
+/// befüllt den Entwurf vor der Freigabe in EINER Transaktion). Öffnet und committet nichts.
+pub async fn aktualisiere_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    id: i64,
+    patch: &BefehlPatch<'_>,
 ) -> Result<BefehlAnzeige, AppError> {
     let abschnitte_json = match patch.abschnitte {
         Some(a) => Some(serde_json::to_string(a).map_err(|e| AppError::Internal(e.to_string()))?),
@@ -176,20 +226,25 @@ pub async fn aktualisiere(
     .bind(id)
     .bind(einsatz_id)
     .bind(STATUS_ENTWURF)
-    .execute(pool)
+    .execute(&mut *conn)
     .await?
     .rows_affected();
     if betroffen == 0 {
         return Err(AppError::NotFound);
     }
-    laden(pool, einsatz_id, id).await
+    laden(&mut *conn, einsatz_id, id).await
 }
 
 /// Gibt einen Entwurf frei: schreibt **in einer Transaktion** den gerenderten
 /// Snapshot als etb_eintrag (typ='anordnung', ereigniszeit=zeitstand), verknüpft beide
-/// Seiten und setzt den Befehl auf `freigegeben` (danach immutable). Render +
-/// Validierung erledigt der Handler. `zeitstand` ist bereits normalisiert.
+/// Seiten und setzt den Befehl auf `freigegeben` (danach immutable). `render` und
+/// `zeitstand` bringt der Aufrufer mit; Validierung und Rendering aus dem Datensatz macht
+/// [`freigeben_gerendert`] bzw. [`freigeben_tx`]. `zeitstand` ist bereits normalisiert.
 /// `UnprocessableEntity`, wenn der Befehl nicht (mehr) im Entwurf ist.
+///
+/// Pool-Hülle um [`snapshot_freigeben_tx`] in `write_retry!` (`BEGIN IMMEDIATE`): der Rumpf
+/// liest zuerst die Einstellungen und schreibt dann. Scheitert die Status-Bedingung, fällt
+/// die Transaktion samt eben angelegtem ETB-Eintrag zurück, es bleibt kein verwaister Snapshot.
 pub async fn freigeben(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -198,14 +253,85 @@ pub async fn freigeben(
     render: &str,
     zeitstand: &str,
 ) -> Result<BefehlAnzeige, AppError> {
-    let etb_startwert = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id)
+    crate::write_retry!(pool, |conn| {
+        snapshot_freigeben_tx(conn, einsatz_id, id, freigeber_id, render, zeitstand).await?;
+        Ok(())
+    })?;
+    laden(pool, einsatz_id, id).await
+}
+
+/// Freigabe aus dem gespeicherten Entwurf, wie der Handler sie braucht: Pool-Hülle um
+/// [`freigeben_tx`] in `write_retry!`. Lesen, Prüfen, Rendern und Schreiben laufen damit in
+/// EINER Transaktion; die Anzeige kommt aus derselben Transaktion zurück.
+pub async fn freigeben_gerendert(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    id: i64,
+    freigeber_id: i64,
+) -> Result<BefehlAnzeige, AppError> {
+    crate::write_retry!(pool, |conn| {
+        freigeben_tx(conn, einsatz_id, id, freigeber_id).await
+    })
+}
+
+/// Gibt einen Entwurf auf einer offenen Transaktion frei (LFH-690: Handler und Demo-Import
+/// teilen diesen Weg). Lädt den Befehl auf der Verbindung, prüft den Entwurfs-Status,
+/// validiert die Abschnitte ([`validiere_freigabe`](super::validiere_freigabe)), rendert den
+/// Snapshot ([`render_snapshot`](super::render_snapshot)) mit dem gespeicherten `zeitstand`
+/// und schreibt ihn über [`snapshot_freigeben_tx`]. Liefert die frische Anzeige.
+///
+/// Öffnet und committet nichts. Bei `Err` kann die Verbindung schon den ETB-Eintrag tragen:
+/// der Aufrufer muss die Transaktion dann zurückrollen (`write_retry!` tut das von selbst).
+///
+/// `NotFound`, wenn der Befehl nicht zum Einsatz gehört; `UnprocessableEntity`, wenn er
+/// schon freigegeben ist oder die Validierung scheitert.
+pub async fn freigeben_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    id: i64,
+    freigeber_id: i64,
+) -> Result<BefehlAnzeige, AppError> {
+    let befehl = laden(&mut *conn, einsatz_id, id).await?;
+    if befehl.status != STATUS_ENTWURF {
+        return Err(AppError::UnprocessableEntity(
+            "Befehl ist bereits freigegeben".into(),
+        ));
+    }
+    let v = vorlage(&befehl.vorlage).ok_or(AppError::Internal("Vorlage verschwunden".into()))?;
+    validiere_freigabe(v, &befehl.abschnitte)?;
+    let render = render_snapshot(v, &befehl.titel, &befehl.zeitstand, &befehl.abschnitte);
+    snapshot_freigeben_tx(
+        &mut *conn,
+        einsatz_id,
+        id,
+        freigeber_id,
+        &render,
+        &befehl.zeitstand,
+    )
+    .await?;
+    laden(&mut *conn, einsatz_id, id).await
+}
+
+/// Schreibt den fertig gerenderten Snapshot ins ETB, verknüpft beide Seiten und setzt den
+/// Befehl auf `freigegeben`, alles auf der übergebenen Verbindung. Der ETB-Startwert kommt
+/// aus den Einstellungen, gelesen auf derselben Verbindung (LFH-690: über den Pool sähe ein
+/// Import die Einstellungen seines eigenen, noch offenen Einsatzes nicht und fiele still auf
+/// den Vorgabewert zurück). Liefert die id des ETB-Eintrags.
+async fn snapshot_freigeben_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    id: i64,
+    freigeber_id: i64,
+    render: &str,
+    zeitstand: &str,
+) -> Result<i64, AppError> {
+    let etb_startwert = crate::einsatz::einstellungen::laden_oder_default(&mut *conn, einsatz_id)
         .await?
         .etb_startwert();
-    let mut tx = pool.begin().await?;
 
     // 1. ETB-Snapshot anlegen (server-autoritative lfd_nr, Startwert aus Einstellungen).
     let etb_id = etb_repo::anlegen_tx(
-        &mut *tx,
+        &mut *conn,
         einsatz_id,
         freigeber_id,
         etb_startwert,
@@ -227,7 +353,7 @@ pub async fn freigeben(
     sqlx::query("UPDATE etb_eintrag SET befehl_id = ? WHERE id = ?")
         .bind(id)
         .bind(etb_id)
-        .execute(&mut *tx)
+        .execute(&mut *conn)
         .await?;
 
     // 3. Befehl freigeben — nur wenn noch Entwurf (verhindert Doppel-Freigabe).
@@ -242,20 +368,17 @@ pub async fn freigeben(
     .bind(id)
     .bind(einsatz_id)
     .bind(STATUS_ENTWURF)
-    .execute(&mut *tx)
+    .execute(&mut *conn)
     .await?
     .rows_affected();
 
     if betroffen == 0 {
-        // Rollback verwirft den eben angelegten ETB-Eintrag → kein verwaister Snapshot.
-        tx.rollback().await?;
+        // Der Aufrufer rollt zurück und verwirft damit den eben angelegten ETB-Eintrag.
         return Err(AppError::UnprocessableEntity(
             "Befehl ist nicht (mehr) im Entwurf".into(),
         ));
     }
-
-    tx.commit().await?;
-    laden(pool, einsatz_id, id).await
+    Ok(etb_id)
 }
 
 /// Legt aus einem **freigegebenen** Befehl eine neue Entwurfs-Version an
@@ -566,6 +689,134 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(anzahl2, 1);
+    }
+
+    /// LFH-690: Einsatz, Einstellungen (ETB-Startwert 100), Entwurf und Freigabe in EINER
+    /// Transaktion. Über den Pool gelesen fänden die Einstellungen den noch nicht committeten
+    /// Einsatz nicht, und der Snapshot bekäme still die Vorgabe-Nummer 1.
+    #[tokio::test]
+    async fn freigeben_tx_liest_startwert_und_entwurf_auf_der_verbindung() {
+        let (_dir, pool) = crate::db::test_pool_datei().await;
+        let (_, ersteller) = setup(&pool).await;
+        let (einsatz, frei, lfd_nr, inhalt) = crate::write_retry!(&pool, |conn| {
+            let einsatz: i64 = sqlx::query_scalar(
+                "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Import') RETURNING id",
+            )
+            .fetch_one(&mut *conn)
+            .await?;
+            sqlx::query(
+                "INSERT INTO einsatz_einstellungen (einsatz_id, etb_nummer_start) VALUES (?, 100)",
+            )
+            .bind(einsatz)
+            .execute(&mut *conn)
+            .await?;
+            let b = anlegen_tx(
+                &mut *conn,
+                einsatz,
+                "befehl_lad",
+                "Befehl 10:00",
+                "2026-06-02 10:00:00",
+                ersteller,
+            )
+            .await?;
+            let gefuellt: Vec<Abschnitt> = vorlage("befehl_lad")
+                .unwrap()
+                .abschnitte
+                .iter()
+                .map(|d| Abschnitt {
+                    schluessel: d.schluessel.into(),
+                    text: "Inhalt".into(),
+                })
+                .collect();
+            sqlx::query("UPDATE befehl SET abschnitte = ? WHERE id = ?")
+                .bind(serde_json::to_string(&gefuellt).unwrap())
+                .bind(b.id)
+                .execute(&mut *conn)
+                .await?;
+            let frei = freigeben_tx(&mut *conn, einsatz, b.id, ersteller).await?;
+            let (lfd_nr, inhalt): (i64, String) =
+                sqlx::query_as("SELECT lfd_nr, inhalt FROM etb_eintrag WHERE id = ?")
+                    .bind(frei.etb_eintrag_id)
+                    .fetch_one(&mut *conn)
+                    .await?;
+            Ok((einsatz, frei, lfd_nr, inhalt))
+        })
+        .unwrap();
+        assert_eq!(frei.status, STATUS_FREIGEGEBEN);
+        assert_eq!(frei.freigegeben_von_id, Some(ersteller));
+        assert_eq!(
+            lfd_nr, 100,
+            "Startwert aus den Einstellungen derselben Transaktion"
+        );
+        assert_eq!(
+            inhalt,
+            "# Befehl 10:00\n\n_Zeitstand: 2026-06-02 10:00:00_\n\n## Lage\nInhalt\n\n## Auftrag\nInhalt\n\n## Durchführung\nInhalt\n"
+        );
+        assert_eq!(laden(&pool, einsatz, frei.id).await.unwrap(), frei);
+    }
+
+    /// Zweite Freigabe über `freigeben_tx` scheitert an der Status-Prüfung mit dem Wortlaut
+    /// des Handlers, und die Hülle hinterlässt keinen zweiten Snapshot.
+    #[tokio::test]
+    async fn freigeben_gerendert_zweimal_ist_422_ohne_zweiten_snapshot() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, ersteller) = setup(&pool).await;
+        let b = anlegen(
+            &pool,
+            einsatz,
+            "befehl_lad",
+            "X",
+            "2026-06-02 10:00:00",
+            ersteller,
+        )
+        .await
+        .unwrap();
+        let err = freigeben_gerendert(&pool, einsatz, b.id, ersteller)
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(&err, AppError::UnprocessableEntity(m) if m == "Der Befehl ist leer und kann nicht freigegeben werden"),
+            "{err:?}"
+        );
+        let gefuellt: Vec<Abschnitt> = vorlage("befehl_lad")
+            .unwrap()
+            .abschnitte
+            .iter()
+            .map(|d| Abschnitt {
+                schluessel: d.schluessel.into(),
+                text: "A".into(),
+            })
+            .collect();
+        aktualisiere(
+            &pool,
+            einsatz,
+            b.id,
+            BefehlPatch {
+                titel: None,
+                zeitstand: None,
+                abschnitte: Some(&gefuellt),
+            },
+        )
+        .await
+        .unwrap();
+        freigeben_gerendert(&pool, einsatz, b.id, ersteller)
+            .await
+            .unwrap();
+        let err = freigeben_gerendert(&pool, einsatz, b.id, ersteller)
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(&err, AppError::UnprocessableEntity(m) if m == "Befehl ist bereits freigegeben"),
+            "{err:?}"
+        );
+        let n: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ? AND typ = 'anordnung'",
+        )
+        .bind(einsatz)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(n, 1);
     }
 
     #[tokio::test]

@@ -224,3 +224,52 @@ mod tests {
             .all(|(_, k, _, _)| ist_gueltige_kategorie(k)));
     }
 }
+
+// ── System-ETB-Wortlaute (LFH-690) ──────────────────────────────────────────────────
+// Reine Textbausteine: Handler und Demo-Import rufen dieselbe Funktion, damit ein
+// importierter Einsatz dieselben ETB-Texte trägt wie ein echter.
+
+/// System-ETB beim Disponieren eines Fahrzeugs (Stamm oder Ad-hoc).
+pub fn etb_text_disponiert(funkrufname: &str) -> String {
+    format!("Fahrzeug «{}» disponiert", funkrufname)
+}
+
+/// System-ETB beim Statuswechsel (FMS) eines disponierten Fahrzeugs. Ein fehlendes
+/// Status-Label steht als «—».
+pub fn etb_text_status_wechsel(funkrufname: &str, alt: Option<&str>, neu: Option<&str>) -> String {
+    format!(
+        "Fahrzeug «{}»: Status «{}» → «{}»",
+        funkrufname,
+        alt.unwrap_or("—"),
+        neu.unwrap_or("—")
+    )
+}
+
+#[cfg(test)]
+mod etb_text_tests {
+    use super::*;
+
+    #[test]
+    fn disponiert_und_status_wechsel() {
+        assert_eq!(
+            etb_text_disponiert("Florian 1/46-1"),
+            "Fahrzeug «Florian 1/46-1» disponiert"
+        );
+        assert_eq!(
+            etb_text_status_wechsel(
+                "Florian 1/46-1",
+                Some("2 – frei auf Wache"),
+                Some("3 – Einsatz übernommen")
+            ),
+            "Fahrzeug «Florian 1/46-1»: Status «2 – frei auf Wache» → «3 – Einsatz übernommen»"
+        );
+        assert_eq!(
+            etb_text_status_wechsel("Florian 1/46-1", None, Some("4")),
+            "Fahrzeug «Florian 1/46-1»: Status «—» → «4»"
+        );
+        assert_eq!(
+            etb_text_status_wechsel("F", Some("4"), None),
+            "Fahrzeug «F»: Status «4» → «—»"
+        );
+    }
+}

@@ -145,23 +145,33 @@ pub async fn laden(
 }
 
 /// Prüft, ob ein Abschnitt zum Einsatz gehört (für Parent-Validierung). `NotFound` sonst.
-async fn pruefe_parent(pool: &SqlitePool, einsatz_id: i64, parent_id: i64) -> Result<(), AppError> {
+/// Executor-generisch: [`anlegen_tx`] prüft auf der offenen Verbindung (LFH-690).
+async fn pruefe_parent(
+    executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
+    einsatz_id: i64,
+    parent_id: i64,
+) -> Result<(), AppError> {
     let treffer: Option<i64> =
         sqlx::query_scalar("SELECT 1 FROM einsatzabschnitt WHERE id = ? AND einsatz_id = ?")
             .bind(parent_id)
             .bind(einsatz_id)
-            .fetch_optional(pool)
+            .fetch_optional(executor)
             .await?;
     treffer.map(|_| ()).ok_or(AppError::NotFound)
 }
 
 /// Prüft, ob `leiter_id` eine disponierte Person *desselben* Einsatzes ist.
-async fn pruefe_leiter(pool: &SqlitePool, einsatz_id: i64, leiter_id: i64) -> Result<(), AppError> {
+/// Executor-generisch: [`anlegen_tx`] prüft auf der offenen Verbindung (LFH-690).
+async fn pruefe_leiter(
+    executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
+    einsatz_id: i64,
+    leiter_id: i64,
+) -> Result<(), AppError> {
     let treffer: Option<i64> =
         sqlx::query_scalar("SELECT 1 FROM einsatz_personal WHERE id = ? AND einsatz_id = ?")
             .bind(leiter_id)
             .bind(einsatz_id)
-            .fetch_optional(pool)
+            .fetch_optional(executor)
             .await?;
     treffer.map(|_| ()).ok_or_else(|| {
         AppError::Validation(
@@ -200,39 +210,54 @@ async fn waere_zyklus(
     Ok(false)
 }
 
-/// Validiert parent (selber Einsatz, zyklenfrei) und leiter (disponierte Person).
-/// `self_id = None` beim Anlegen (kein Knoten zum Vergleichen).
+/// Validiert parent (selber Einsatz) und leiter (disponierte Person) beim Anlegen, auf der
+/// Verbindung des Aufrufers (LFH-690: so sieht die Prüfung auch Zeilen derselben offenen
+/// Transaktion). Eine Zyklenprüfung entfällt: ein Knoten, den es noch nicht gibt, kann
+/// nicht eigener Vorfahr werden. Beim Umhängen prüft [`validiere_patch`] den Zyklus.
 async fn validiere(
-    pool: &SqlitePool,
+    conn: &mut SqliteConnection,
     einsatz_id: i64,
-    self_id: Option<i64>,
     daten: &AbschnittDaten<'_>,
 ) -> Result<(), AppError> {
     if let Some(parent) = daten.ueber_abschnitt_id {
-        pruefe_parent(pool, einsatz_id, parent).await?;
-        if let Some(sid) = self_id {
-            if waere_zyklus(pool, sid, parent).await? {
-                return Err(AppError::Validation(
-                    "Abschnitt darf nicht eigener Vorfahr werden".into(),
-                ));
-            }
-        }
+        pruefe_parent(&mut *conn, einsatz_id, parent).await?;
     }
     if let Some(leiter) = daten.leiter_id {
-        pruefe_leiter(pool, einsatz_id, leiter).await?;
+        pruefe_leiter(&mut *conn, einsatz_id, leiter).await?;
     }
     Ok(())
 }
 
 /// Legt einen Abschnitt an (nach Validierung). Liefert die aufgelöste Anzeige.
+///
+/// Pool-Hülle um [`anlegen_tx`]: wie bisher ohne eigene Transaktion, Prüfungen und Insert
+/// laufen im Autocommit einer geliehenen Verbindung. Die Anzeige wird danach über den Pool
+/// geladen, nachdem die Verbindung zurückgegeben ist.
 pub async fn anlegen(
     pool: &SqlitePool,
     einsatz_id: i64,
     daten: AbschnittDaten<'_>,
 ) -> Result<EinsatzabschnittAnzeige, AppError> {
-    validiere(pool, einsatz_id, None, &daten).await?;
+    let id = {
+        let mut conn = pool.acquire().await?;
+        anlegen_tx(&mut conn, einsatz_id, &daten).await?
+    };
+    laden(pool, einsatz_id, id).await
+}
+
+/// Legt einen Abschnitt auf einer offenen Verbindung/Transaktion an, samt Prüfung von
+/// Parent, Leiter und Kurzbezeichnung auf derselben Verbindung (LFH-690, Demo-Import in
+/// EINER Transaktion). Öffnet und committet selbst nichts. Liefert die neue `id`, nicht
+/// die Anzeige: deren Anreicherung (Sprechgruppen) liest über den Pool, und der Import
+/// braucht sie nicht.
+pub async fn anlegen_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    daten: &AbschnittDaten<'_>,
+) -> Result<i64, AppError> {
+    validiere(&mut *conn, einsatz_id, daten).await?;
     if let Some(kurz) = daten.kurzbezeichnung {
-        pruefe_kurzbezeichnung_frei(pool, einsatz_id, None, kurz).await?;
+        pruefe_kurzbezeichnung_frei(&mut *conn, einsatz_id, None, kurz).await?;
     }
     let id = sqlx::query_scalar::<_, i64>(
         "INSERT INTO einsatzabschnitt \
@@ -253,9 +278,9 @@ pub async fn anlegen(
     .bind(daten.lagezustand.map(|l| l.as_str()))
     .bind(daten.abschnittsauftrag)
     .bind(daten.fortschritt)
-    .fetch_one(pool)
+    .fetch_one(&mut *conn)
     .await?;
-    laden(pool, einsatz_id, id).await
+    Ok(id)
 }
 
 /// Teil-Patch der editierbaren Felder (LFH-306, Tri-State): äußere `Option` = „im Patch
@@ -306,8 +331,9 @@ async fn validiere_patch(
 /// Ob ein Kürzel im Einsatz noch frei ist (ohne den Abschnitt selbst). Groß-/Klein-
 /// schreibung zählt nicht, wie im UNIQUE-Index (`0104`). Der Index ist das eigentliche
 /// Netz (UNIQUE → 409, LFH-245); die Vorprüfung liefert nur die sprechende Meldung.
+/// Executor-generisch: [`anlegen_tx`] prüft auf der offenen Verbindung (LFH-690).
 async fn pruefe_kurzbezeichnung_frei(
-    pool: &SqlitePool,
+    executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
     einsatz_id: i64,
     self_id: Option<i64>,
     kurz: &str,
@@ -320,7 +346,7 @@ async fn pruefe_kurzbezeichnung_frei(
     .bind(einsatz_id)
     .bind(kurz)
     .bind(self_id)
-    .fetch_optional(pool)
+    .fetch_optional(executor)
     .await?;
     match belegt {
         Some(name) => Err(AppError::Conflict(format!(
@@ -683,6 +709,23 @@ mod tests {
             Some("mobil"),
             "unberührt"
         );
+    }
+
+    /// LFH-690: Ober- und Unterabschnitt entstehen in EINER Transaktion. Die Parent-Prüfung
+    /// muss den noch nicht committeten Oberabschnitt sehen. Über den Pool (Datei/WAL: eigener
+    /// Snapshot) endete sie in `NotFound`.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn unterabschnitt_auf_abschnitt_aus_derselben_transaktion() {
+        let (_dir, pool) = crate::db::test_pool_datei().await;
+        let einsatz = setup(&pool).await;
+        let (ober, unter) = crate::write_retry!(&pool, |conn| {
+            let ober = anlegen_tx(&mut *conn, einsatz, &daten("Nord", None, None)).await?;
+            let unter = anlegen_tx(&mut *conn, einsatz, &daten("Nord 1", Some(ober), None)).await?;
+            Ok((ober, unter))
+        })
+        .unwrap();
+        let a = laden(&pool, einsatz, unter).await.unwrap();
+        assert_eq!(a.ueber_abschnitt_id, Some(ober));
     }
 
     #[tokio::test]

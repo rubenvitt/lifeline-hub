@@ -4,7 +4,12 @@ import userEvent from '@testing-library/user-event';
 import { ConfigProvider } from 'antd';
 import { renderMitProviders } from '../../test/utils';
 import { antdToken, farbenHell, type Dichte } from '../../theme/tokens';
-import GefahrenMatrix, { type GefahrenMatrixProps, zellBalkenStil } from './GefahrenMatrix';
+import GefahrenMatrix, {
+  SPALTEN_FREIRAUM,
+  setzeSpaltenFreiraum,
+  type GefahrenMatrixProps,
+  zellBalkenStil,
+} from './GefahrenMatrix';
 import type { GefahrBewertung } from '../../api/types';
 
 const zelle = (over: Partial<GefahrBewertung>): GefahrBewertung => ({
@@ -297,9 +302,9 @@ describe('GefahrenMatrix', () => {
  * `etb/SlashMenu.test.tsx:92-122` (LFH-365 · B5e).
  *
  * WAS ER BELEGT UND WAS NICHT: die ABSICHT, nicht das Pixel. jsdom rechnet kein Layout;
- * die tatsächlich gerenderte Trefffläche misst erst Playwright mit `boundingBox()` und
- * steht als Zeile 1/2 der Prüfliste offen (LFH-373). Wer hier mehr hineinliest, liest
- * falsch.
+ * die tatsächlich gerenderte Trefffläche misst Playwright mit `boundingBox()`
+ * (`e2e/gate3-trefflaeche.spec.ts`, „Gefahrenmatrix (LFH-373)", kurze Achse aller 58 Zellen).
+ * Wer hier mehr hineinliest, liest falsch.
  *
  * NICHT `renderMitProviders`: `test/utils.tsx` mountet ein nacktes `ConfigProvider` ohne
  * Theme, jeder Token wäre dort eine antd-Vorgabe und die Zusicherung eine Attrappe.
@@ -357,5 +362,62 @@ describe('GefahrenMatrix — Warnstufenbalken (Neuentwurf)', () => {
     const leer = container.querySelector<HTMLElement>('td[data-warnstufe="keine"]');
     expect(leer).not.toBeNull();
     expect(leer!.style.boxShadow).toBe('');
+  });
+});
+
+describe('GefahrenMatrix — Fokusabstand zur fixierten Spalte (LFH-373)', () => {
+  /**
+   * Der Scrollcontainer der Matrix hält beim Fokus-Scroll die Breite der fixierten Spalte
+   * frei (`scroll-padding-inline-start`, `gefahrenMatrix.css`), sonst tabbt eine Zelle beim
+   * Zeilenwechsel vollständig darunter — gemessen in `e2e/fokus-verdeckung.spec.ts`.
+   *
+   * GEMESSEN, NICHT AUS DER KONSTANTE: die Spalte ist mit `max-content` breiter als ihre
+   * bevorzugten 180 px, sobald die Dichte steigt. Ein erster Fix las die Konstante und blieb
+   * im Browser bei 1024 px/`handschuh` rot. Geprüft wird hier die Messfunktion selbst.
+   */
+  it('setzeSpaltenFreiraum schreibt die gemessene Breite der fixierten Kopfzelle', () => {
+    const wurzel = document.createElement('div');
+    const kopf = document.createElement('th');
+    kopf.className = 'ant-table-cell ant-table-cell-fix-start';
+    Object.defineProperty(kopf, 'offsetWidth', { value: 254 });
+    wurzel.append(kopf);
+    setzeSpaltenFreiraum(wurzel);
+    expect(wurzel.style.getPropertyValue(SPALTEN_FREIRAUM)).toBe('254px');
+  });
+
+  it('ohne fixierte Spalte ist der Freiraum 0 — nicht ein alter Wert', () => {
+    const wurzel = document.createElement('div');
+    wurzel.style.setProperty(SPALTEN_FREIRAUM, '254px');
+    setzeSpaltenFreiraum(wurzel);
+    expect(wurzel.style.getPropertyValue(SPALTEN_FREIRAUM)).toBe('0px');
+  });
+
+  it('die gerenderte Matrix trägt Klasse und Freiraum an der Tabellenwurzel', () => {
+    const { container } = render(
+      <ConfigProvider theme={{ token: antdToken(farbenHell, 'kompakt') }}>
+        {matrixElement()}
+      </ConfigProvider>,
+    );
+    const wurzel = container.querySelector<HTMLElement>('.ant-table-wrapper.gefahren-matrix');
+    expect(wurzel, 'die Matrix trägt ihre Klasse').not.toBeNull();
+    expect(wurzel!.style.getPropertyValue(SPALTEN_FREIRAUM)).toMatch(/^\d+px$/);
+  });
+
+  /**
+   * Rückwärts getabbt rollt der Browser eine Zelle an den OBEREN Rand — unter die stehende
+   * Kopfzeile (gemessen: vollständig verdeckt bei 390 × 400). Die Matrix nimmt dafür dieselbe
+   * Mechanik wie `KatalogTabelle` (LFH-677): gemessene Kopfhöhe als `--lfh-tabellenkopf-hoehe`
+   * an der Tabellenwurzel, `scroll-margin-top` an den Zielen. jsdom misst 0 px — geprüft wird,
+   * dass die Variable überhaupt gesetzt wird, nicht ihr Wert.
+   */
+  it('setzt den Kopf-Freiraum an der Tabellenwurzel', () => {
+    const { container } = render(
+      <ConfigProvider theme={{ token: antdToken(farbenHell, 'kompakt') }}>
+        {matrixElement()}
+      </ConfigProvider>,
+    );
+    const wurzel = container.querySelector<HTMLElement>('.ant-table-wrapper.gefahren-matrix');
+    expect(wurzel).not.toBeNull();
+    expect(wurzel!.style.getPropertyValue('--lfh-tabellenkopf-hoehe')).toMatch(/^\d+px$/);
   });
 });

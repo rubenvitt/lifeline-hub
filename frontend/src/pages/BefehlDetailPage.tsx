@@ -1,7 +1,7 @@
 import { App, Breadcrumb, Button, Form, Input, Space, Spin, Typography, theme } from 'antd';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
@@ -26,50 +26,9 @@ import EinsatzSeite from '../components/EinsatzSeite';
 import Druckkopf from '../components/druck/Druckkopf';
 import DruckKnopf from '../components/druck/DruckKnopf';
 import { Paneel, monoStil } from '../components/instrument';
+import { FOKUSABSTAND_BEFEHL, useFokusabstandUnten } from '../components/fokusabstandUnten';
 import './befehlPrint.css';
 import './befehlAktionsleiste.css';
-
-/**
- * Hält `--lfh-befehl-fokusabstand` an der GEMESSENEN Höhe der verankerten Aktionsleiste
- * (LFH-465; Bauform aus `EinheitDetailPage.tsx:37`, LFH-446).
- *
- * Warum gemessen und nicht als Festwert: Dichtestufe (30/48/72 px) und umgebrochene
- * Knopfreihe verändern die Höhe um mehr als das Doppelte (gemessen 78 px in `kompakt`,
- * 184 px in `handschuh`) — ein Festwert wäre in einer der Stufen daneben, und die Felder
- * darüber parkten beim nativen Fokus-Scroll wieder hinter der Leiste.
- *
- * Träger ist das WURZELELEMENT, nicht das `<form>` wie bei der Einheit und auch nicht die
- * Seitenwurzel: die Regel dazu ist `scroll-padding-block-end` am Scrollport, und der
- * Scrollport ist hier das Dokument. Ein `closest('form')` fände ohnehin nichts — die Leiste
- * liegt ausserhalb des Formulars, weil sie mit „Drucken"/„Fortschreiben" auch Aktionen des
- * freigegebenen Zweigs trägt, in dem es gar kein `<Form>` gibt; der Beobachter wäre dann ein
- * stilles No-op.
- *
- * Die Aufräumfunktion nimmt die Eigenschaft beim Verlassen wieder weg — und DIESE Zusicherung
- * ist geprüft statt geerbt: anders als bei LFH-446, wo der Träger das mit-unmountende `<form>`
- * war, überlebt das Wurzelelement die Route. Bliebe der Abzug stehen, verschöbe er den
- * Fokus-Scroll auf jeder folgenden schmalen Route um eine Leistenhöhe, die es dort nicht gibt:
- * kein sichtbarer Fehler, keine Meldung. `e2e/befehl-aktionsleiste.spec.ts` misst es am
- * abgehängten Baum, nicht an der gewechselten URL — React räumt eine Runde SPÄTER auf als der
- * Router navigiert, und ein Blick direkt nach dem URL-Wechsel liest noch den alten Wert
- * (gemessen: 85 px).
- */
-function beobachteAktionsleiste(leiste: HTMLDivElement | null, abstand: number) {
-  if (!leiste) return;
-  const wurzel = document.documentElement;
-  const aktualisiere = () =>
-    wurzel.style.setProperty(
-      '--lfh-befehl-fokusabstand',
-      `${leiste.getBoundingClientRect().height + abstand}px`,
-    );
-  aktualisiere();
-  const beobachter = new ResizeObserver(aktualisiere);
-  beobachter.observe(leiste);
-  return () => {
-    beobachter.disconnect();
-    wurzel.style.removeProperty('--lfh-befehl-fokusabstand');
-  };
-}
 
 export default function BefehlDetailPage() {
   const { befehlId } = useParams();
@@ -92,15 +51,12 @@ function BefehlDetail() {
   // (LFH-465). Begründung der Schwelle: `befehle/aktionsleiste.ts`.
   const verankert = !abBreite(AKTIONSLEISTE_AB);
   /**
-   * `useCallback`, nicht inline: der Editor rendert über `onValuesChange` bei JEDEM
-   * Tastenanschlag neu, und ein Inline-Ref bekäme jedes Mal eine neue Identität — React
-   * risse die Aufräumfunktion durch und baute den ResizeObserver samt CSS-Eigenschaft
-   * pro Zeichen neu auf. Kein Leck und kein Flackern, aber Arbeit für nichts.
+   * Fokusabstand zur verankerten Aktionsleiste (LFH-465; Messung seit LFH-373 geteilt mit dem
+   * ETB, `components/fokusabstandUnten.ts`, Regel in `befehlAktionsleiste.css`). Träger ist das Wurzelelement, weil der Scrollport das
+   * Dokument ist — die Leiste liegt außerhalb des Formulars, ein `closest('form')` fände im
+   * freigegebenen Zweig nichts.
    */
-  const leisteRef = useCallback(
-    (el: HTMLDivElement | null) => beobachteAktionsleiste(el, token.marginSM),
-    [token.marginSM],
-  );
+  const leisteRef = useFokusabstandUnten(token.marginSM, FOKUSABSTAND_BEFEHL);
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [form] = Form.useForm<Record<string, string>>();

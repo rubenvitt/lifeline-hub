@@ -11,7 +11,7 @@ use crate::live::LiveEvent;
 /// Modul-Key dieses Route-Moduls (LFH-132).
 const MODUL_KEY: &str = "auftraege";
 use crate::befehl::repo::{self as befehl_repo, BefehlAnzeige, BefehlPatch};
-use crate::befehl::{self, render_snapshot, validiere_freigabe, vorlage, Abschnitt};
+use crate::befehl::{self, vorlage, Abschnitt};
 use crate::error::AppError;
 use crate::etb::normalisiere_zeit;
 use axum::extract::State;
@@ -219,25 +219,10 @@ pub async fn freigeben(
     .await?;
     fordere_aktiv(&einsatz)?;
 
-    let befehl = befehl_repo::laden(&state.pool, einsatz_id, bid).await?;
-    if befehl.status != befehl::STATUS_ENTWURF {
-        return Err(AppError::UnprocessableEntity(
-            "Befehl ist bereits freigegeben".into(),
-        ));
-    }
-    let v = vorlage(&befehl.vorlage).ok_or(AppError::Internal("Vorlage verschwunden".into()))?;
-    validiere_freigabe(v, &befehl.abschnitte)?;
-    let render = render_snapshot(v, &befehl.titel, &befehl.zeitstand, &befehl.abschnitte);
-
-    let anzeige = befehl_repo::freigeben(
-        &state.pool,
-        einsatz_id,
-        bid,
-        benutzer.id,
-        &render,
-        &befehl.zeitstand,
-    )
-    .await?;
+    // Laden, Status prüfen, validieren, rendern und schreiben in EINER Transaktion, auf
+    // demselben Weg wie der Demo-Import (LFH-690).
+    let anzeige =
+        befehl_repo::freigeben_gerendert(&state.pool, einsatz_id, bid, benutzer.id).await?;
 
     if let Some(etb_id) = anzeige.etb_eintrag_id {
         state.live.publiziere(einsatz_id, etb_id);

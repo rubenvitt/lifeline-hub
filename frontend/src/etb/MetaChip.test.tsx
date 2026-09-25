@@ -237,4 +237,46 @@ describe('MetaChip', () => {
     await userEvent.click(eintrag);
     expect(onCommit).toHaveBeenCalledWith('von', 'Florian 1');
   });
+
+  /**
+   * LFH-373: die Chip-Eingabe steht in der angepinnten Erfassungsleiste am Seitenfuß. Reacts
+   * `autoFocus` ruft `focus()` OHNE Optionen — und der native Fokus rollte die Seite: gemessen
+   * bei 390 px im Handschuh-Betrieb um 467 px, sobald „An" gesetzt wurde. Wer oben im
+   * Tagebuch las, verlor seine Stelle. Der Fokus kommt deshalb mit `preventScroll`.
+   */
+  it.each([
+    ['von', ['ELW 1', 'Leitstelle']],
+    ['von', undefined],
+    ['veranlassung', undefined],
+    ['meldeweg', undefined],
+    ['ereigniszeit', undefined],
+  ] as const)('%s (Vorschläge: %s): fokussiert ohne die Seite zu rollen', (feld, optionen) => {
+    const fokus = vi.spyOn(HTMLElement.prototype, 'focus');
+    renderMitProviders(
+      <MetaChip
+        feld={feld}
+        editing
+        wert={undefined}
+        optionen={optionen ? [...optionen] : undefined}
+        onCommit={vi.fn()}
+        onCancel={vi.fn()}
+        onRemove={vi.fn()}
+        onEdit={vi.fn()}
+      />,
+    );
+    const beschriftung = {
+      von: 'Von',
+      veranlassung: 'Veranlassung',
+      meldeweg: 'Meldeweg',
+      ereigniszeit: 'Ereigniszeit',
+    }[feld];
+    const eingabe = screen.getByLabelText(beschriftung);
+    expect(eingabe).toHaveFocus();
+    const aufrufe = fokus.mock.calls;
+    expect(aufrufe.length).toBeGreaterThan(0);
+    expect(
+      aufrufe.every(([opt]) => (opt as FocusOptions | undefined)?.preventScroll === true),
+    ).toBe(true);
+    fokus.mockRestore();
+  });
 });

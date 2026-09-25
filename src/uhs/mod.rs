@@ -403,3 +403,42 @@ mod tests {
         assert!(!darf_uebergehen("geplant", "quatsch"));
     }
 }
+
+// ── System-ETB-Wortlaute (LFH-690) ──────────────────────────────────────────────────
+// Reine Textbausteine: Handler und Demo-Import rufen dieselbe Funktion, damit ein
+// importierter Einsatz dieselben ETB-Texte trägt wie ein echter.
+
+/// System-ETB beim Statuswechsel einer UHS. Nur `aktiv` („in Betrieb genommen“, mit Typ) und
+/// `aufgeloest` sind lagerelevant; jeder andere Zielstatus liefert `None` (kein ETB-Eintrag).
+pub fn etb_text_status(bezeichnung: &str, typ: UhsTyp, neuer_status: &str) -> Option<String> {
+    match neuer_status {
+        "aktiv" => Some(format!(
+            "{} ({}) in Betrieb genommen",
+            bezeichnung,
+            typ.anzeige_label()
+        )),
+        "aufgeloest" => Some(format!("{} aufgelöst", bezeichnung)),
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod etb_text_tests {
+    use super::*;
+
+    #[test]
+    fn status_aktiv_aufgeloest_und_ohne_eintrag() {
+        assert_eq!(
+            etb_text_status("BHP 50", UhsTyp::Behandlungsplatz, "aktiv").as_deref(),
+            Some("BHP 50 (Behandlungsplatz) in Betrieb genommen")
+        );
+        assert_eq!(
+            etb_text_status("BHP 50", UhsTyp::Behandlungsplatz, "aufgeloest").as_deref(),
+            Some("BHP 50 aufgelöst")
+        );
+        assert_eq!(
+            etb_text_status("BHP 50", UhsTyp::Behandlungsplatz, "geplant"),
+            None
+        );
+    }
+}

@@ -119,7 +119,9 @@ umkehrt, steht das am Absatz selbst mit „Neuentwurf 22.09.2026".
   des aktiven Modus für TSX, weil antd `paneel`, `flaeche3` & Co. nicht kennt).
 - **Seitenkopf 44 px** in `components/EinsatzSeite.tsx` (`SEITENKOPF_HOEHE`, Boden, der mit der
   Staffel wächst): `titel` 14/600 als `h1` (Paneele gliedern darunter ab `h2`) · `meta` Mono · `aktionen` rechts (Primär blau gefüllt,
-  sekundär umrandet). **Markdown-Inhalt hängt sich in diese Gliederung ein, nicht daneben**
+  sekundär umrandet). **Meta und Datenstand sind eine Gruppe mit eigener Zeile unter `md`**, und der
+  Datenstand hält vor dem ersten Abruf seine Breite als stummen Platzhalter (LFH-373, gemessen:
+  sonst brach die spät eintreffende Meta den Kopf bei 390 px um, und alles darunter rückte 22 px). **Markdown-Inhalt hängt sich in diese Gliederung ein, nicht daneben**
   (LFH-621): `components/Markdown.tsx` und `MarkdownEditor` tragen die Pflicht-Prop
   `unterEbene` — die Ebene der nächsten Überschrift über dem Text, `#` wird die Stufe darunter,
   `h6` ist der Boden. Kein fester Versatz: der frühere Versatz 3 ließ `###` und tiefer auch
@@ -409,6 +411,25 @@ die **neunzehnte** Konsumentin, LFH-330/AP8), ebenso die **Lagemeldungen**
 Schirm rechts eine Seitenleiste „Bilanz" (`etb/EtbBilanz.tsx`) — **nicht** „Tagesbilanz" wie
 im Entwurf — und die Erfassung **unten** am Fuß der Zeitachse (`.etb-erfassung-sticky` in
 `index.css`, Grund `kopf`).
+**Die angepinnte Erfassung ist gemessen, nicht angenommen** (LFH-373, `e2e/leisten-flaeche.spec.ts`,
+`fokus-verdeckung.spec.ts`): ≤ 50 % der Fensterhöhe und ganz oben vollständig im Bild, in
+allen drei Stufen. Dafür hängt sie **auf jeder Breite als `fuss` an der Wurzel von
+`EinsatzSeite`**, nicht in der Zeitachsenspalte — ein `sticky; bottom: 0` steigt nie über die
+Oberkante seines Elternblocks (gemessen: unter einem 489 px hohen Kopf ragte sie 61 px unter das
+Fenster); ab `xl` endet sie per Außenrand vor der Bilanz. An zwei Stellen je nach Breite hinge
+sie nicht: ein Wechsel über `xl` hängte sie neu ein und verlor den Text einer Berichtigung. Den
+Fokusabstand trägt `scroll-margin-block-end` an ALLEN Zielen von Seitenkopf und Inhalt
+(`--lfh-etb-fokusabstand`, gemessen von `components/fokusabstandUnten.ts`), **nicht**
+`scroll-padding` am Dokument wie auf der Befehlsseite: das zählte die Ziele IN der Leiste zum
+verdeckten Streifen und rollte bei jedem Fokus dort die Seite ans Ende. Unter `md` steht das Feld
+auf eigener Zeile (`Schnellerfassungszeile gestapelt`, im DOM zuerst, kein CSS-`order`), die
+Feldzeile rollt waagerecht mit „Feld" vorn, „Werte behalten" steht in der Hinweiszeile, der Platzhalter hat eine Kurzform (der volle brach unter
+Linux-Schriften um und riss den Deckel), und
+Eingaben in der Leiste fokussieren mit `preventScroll` (`MetaChip`, nicht `autoFocus`). Unter `xl` erscheint die Bilanz erst, wenn die Liste
+zum ersten Mal steht, danach bleibt sie (Riegel `bilanzFrei` je Einsatz; `isLoading` allein ließe
+sie bei jedem Filterwechsel verschwinden): stand sie vor den Zeilen da, schoben diese sie aus dem
+Bild. Den Rennfall erzwingt der Test mit verzögerten Antworten, abgewartet trat er nur
+in jedem fünften bis achten Lauf auf.
 **Kopfzahl und Bilanz zählt der Server, über DENSELBEN Filter wie die Liste** (LFH-612,
 `GET …/etb/zaehler`, gemeinsame Bedingung `etb/repo.rs:filter_bedingung`): ohne Filter „412
 Einträge" und „Bilanz", mit Filter „7 Treffer" und „Bilanz im Filter". Eine feste Tagesgrenze
@@ -469,7 +490,17 @@ keine Aussage mehr** (LFH-100). Die frühere Begründung („die Sidebar ist fes
 für die Kartenfläche bliebe nichts") ist seit dem Neuentwurf überholt: unter `lg` liegt die
 Leiste UNTER der Karte, auf dem Handschirm per Vorgabe zu. Den Querlauf der Lagekarte misst
 seit LFH-100 Gate 1 (`e2e/gate1-ueberlauf.spec.ts`, auch bei 768 und 390 px); die
-Klickbarkeit der gestapelten Bänder bei 390 px ist weiter ungemessen und gehört zu LFH-100.
+Klickbarkeit der ZEICHENSTEUERUNG im Zeichenmodus bei 390 px ist weiter ungemessen und gehört
+zu LFH-100.
+**Der Fuß endet rechts vor der Knopfspalte** (LFH-373, `fussStil(knopfKante)`): Knopfblock oben
+rechts und Fuß lagen beide auf `zIndex: 5`, und bei 390 px im Handschuh-Betrieb lagen drei
+Kartenknöpfe VOLLSTÄNDIG unter dem Zeitachsenband, per Zeiger und Tastatur unerreichbar.
+Abhilfe nach demselben Grundsatz wie oben: eine Aufteilung der Breite, kein `zIndex`. Gemessen
+bei 390 (mit und ohne Leiste) und 1024 px in `fokus-verdeckung.spec.ts` (Box-Schnitt,
+Trefferprobe je Knopf, Kern mit Kartenaufbauten als Zusatzkandidaten). Der Preis: bei 1440 px
+trägt die Zeitachse zwei Reihen statt einer (Entscheidung 25.09.2026). Absolut positionierte
+Aufbauten sieht `e2e/fokus-kern.ts` nur über `zusatzKandidaten` — ohne sie ist ein Lauf über
+eine Karte grün durch Konstruktion.
 
 **Sprungmarken sind keine Module** (LFH-620, `einsatz/sprungmarken.ts`). Führt der
 Entwurf ein „Modul“, dessen Daten ein vorhandenes Modul schon trägt (Entscheidungen =
@@ -1950,6 +1981,45 @@ auflösen ließe es sich nur, indem man eine eingespielte Migration umbenennt. E
 Schemaänderung geht deshalb über `alpha`. Freigaben laufen als Merge-Commit, nicht als
 Squash: Nach einem Squash bleibt die Abzweigung alt, und jede frühere Migration erschiene
 wieder als eingeschoben.
+
+## Backend — Demo-Daten zur Laufzeit (LFH-690)
+
+**Ein System-Admin spielt eine Übungslage im laufenden Betrieb ein, entfernt sie oder
+importiert sie neu** (`src/demo/`, `src/routes/demo_daten.rs`, Verwaltung „Demo-Daten“). Der
+Schalter heißt `--demo-daten` bzw. `LIFELINE_DEMO_DATEN=true` und steht per Vorgabe auf aus.
+Der Dev-Seed ist dafür **nicht** die Grundlage, weil er feste Konten mit Passwort anlegt und
+die Organisation mandantenblind sucht.
+- **404 ohne Schalter kommt aus der Registrierung, nicht aus einer Prüfung.** Die Routen
+  existieren nur bei `RouterOptionen { demo_daten: true }` (`build_router_mit`,
+  `build_router` hat die Vorgabe aus). Eine Prüfung im Handler käme erst nach `AdminUser`
+  (401/403), und ein Guard-Extractor verriete den Pfad über 405. Ein OnceLock ließe „aus“
+  und „an“ nicht im selben Test-Binary prüfen. Das Frontend erfährt die Freischaltung aus
+  `GET /api/demo-daten` selbst, 404 heißt aus (`admin/useDemoDaten.ts`). Eine zweite Quelle
+  gibt es nicht.
+- **Ein Import ist eine Transaktion über die Betriebsfunktionen.** Rohes SQL ginge an
+  Nummernkreisen, Snapshots und System-ETB vorbei. Dafür wurden zahlreiche Fach-Repos
+  mechanisch in `…_tx(conn)` und eine unveränderte Pool-Hülle geteilt, und die
+  System-ETB-Texte der Handler sind reine Funktionen im Fachmodul. **Eine Pool-Funktion unter
+  einer offenen `BEGIN IMMEDIATE` endet nach rund 20 s in 503, und ihre Lesezugriffe sehen die
+  eigenen Zeilen nicht.** Wer dem Drehbuch einen Schritt hinzufügt, nimmt deshalb nur
+  `_tx`-Funktionen.
+- **Der Löschweg erreicht strukturell nur Demo-Daten.** Die Einsatz-ID kommt ausschließlich
+  aus `demo_import`, und `org_id` steht in jedem WHERE. Die Stammdaten löscht er je Zeile
+  im `SAVEPOINT`. Scheitert eine Zeile am Fremdschlüssel (787), bleibt sie stehen und verliert
+  ihre Marke. Das trägt nur, solange **jeder** Fremdschlüssel auf
+  `fahrzeug`/`personal`/`material` `NO ACTION`/`RESTRICT` ist und nichts `DEFERRABLE`
+  (`src/demo/schema_tests.rs`). Ein `CASCADE` oder `SET NULL` dort ließe das Löschen still
+  fremde Zeilen ändern. Das ETB echter Einsätze schützt in der DB **nur** diese WHERE-Bindung,
+  einen Append-only-Trigger gibt es nicht.
+- **Einsatz-IDs werden nie wiederverwendet.** `einsatz::repo::anlegen_tx` vergibt die ID
+  oberhalb von `MAX(einsatz.id)` und aller in `demo_import.einsatz_id` gesperrten IDs.
+  `einsatz` hat kein `AUTOINCREMENT`. Sonst schriebe eine Offline-Queue des entfernten
+  Demo-Einsatzes in einen echten.
+- **Die Szenariouhr setzt `received_at = ereigniszeit`, und zwar nur am Demo-Einsatz.**
+  Deshalb fehlt dort das ⧖. Nie eine FTS-Spalte per UPDATE ändern. Beim Import entsteht kein
+  Alarm: Vergangene Erinnerungen sind erledigt, und es gibt keine Auto-Frist und keine
+  Ablösungsschicht.
+- **Herleitung, Messwerte und Prüfliste:** `openspec/changes/lfh-690-demo-daten-laufzeit-import/`.
 
 ## Backend — ClamAV-Upload-Scan (Default-AN, LFH-114/LFH-224)
 

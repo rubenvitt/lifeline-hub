@@ -454,8 +454,13 @@ export function setzeKopfFreiraum(wurzel: HTMLElement): void {
  * Hält {@link KOPF_FREIRAUM} aktuell. Beobachtet wird die WURZEL, nicht die Kopfzeile: die
  * Kopfzeile kann nach dem ersten Bild erst entstehen oder ausgetauscht werden (Laden,
  * Spaltenwechsel), und jede solche Änderung ändert auch die Größe der Wurzel.
+ *
+ * Exportiert seit LFH-373: die Gefahrenmatrix ist bewusst keine `KatalogTabelle` (Ausnahme im
+ * Guard), trägt aber dieselbe stehende Kopfzeile und denselben Befund beim Rückwärtstabben.
+ * Den `scroll-margin-top` der Ziele bringt sie selbst mit (`gefahrenMatrix.css`), weil die
+ * Regel in `sprache.css` auf `.lfh-katalog` gescopt ist.
  */
-function useKopfFreiraum(tabelle: RefObject<TableRef | null>): void {
+export function useKopfFreiraum(tabelle: RefObject<TableRef | null>): void {
   useEffect(() => {
     const wurzel = tabelle.current?.nativeElement;
     if (!wurzel) return;

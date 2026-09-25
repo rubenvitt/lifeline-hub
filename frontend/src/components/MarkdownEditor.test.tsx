@@ -175,6 +175,38 @@ describe('MarkdownEditor – toggle-Variante', () => {
     expect(container.querySelector('.markdown-editor__druck')).toBeNull();
   });
 
+  /**
+   * LFH-373: der Aufrufer darf den Umschalter selbst führen. In der ETB-Erfassung stand der
+   * Knopf „Vorschau" auf eigener Zeile unter dem Feld und kostete im Handschuh-Betrieb eine
+   * volle Steuerhöhe der angepinnten Leiste; dort wandert er neben „Erfassen". Ohne die
+   * Eigenschaft bleibt alles, wie es war (Test darüber).
+   */
+  it('mit umschalterAussen: kein eigener Knopf, die Vorschau folgt vorschauOffen', () => {
+    const { container, rerender } = renderMitProviders(
+      <MarkdownEditor
+        unterEbene={3}
+        layout="toggle"
+        value="**fett**"
+        onChange={() => {}}
+        umschalterAussen
+        vorschauOffen={false}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: /vorschau/i })).toBeNull();
+    expect(container.querySelector('.markdown strong')).toBeNull();
+    rerender(
+      <MarkdownEditor
+        unterEbene={3}
+        layout="toggle"
+        value="**fett**"
+        onChange={() => {}}
+        umschalterAussen
+        vorschauOffen
+      />,
+    );
+    expect(container.querySelector('.markdown strong')).toHaveTextContent('fett');
+  });
+
   it('reicht onKeyDown durch', async () => {
     const onKeyDown = vi.fn();
     renderMitProviders(

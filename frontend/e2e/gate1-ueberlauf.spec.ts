@@ -752,15 +752,13 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
         await p.getByRole('button', { name: /^Verlauf zu Bezirk / }).click();
         await p.getByRole('button', { name: /^Verlauf zu Stelle / }).click();
       },
-      // Der Eintrag der Belegungsreihe, nicht bloß der Text: „1 420 untergebracht" steht
-      // auch als Kopfzahl über der Stellen-Tabelle. Sobald der Verlauf geladen war, fand der
-      // nackte Text ZWEI Knoten (strict mode) — rot oder grün je nachdem, ob die Prüfung vor
-      // oder nach dem Laden des Verlaufs griff (gemessen: 3 von 6 Läufen rot).
+      // Eingegrenzt auf den Verlaufseintrag: dieselbe Zahl steht auch als Kopfzahl im Kopf
+      // des Blocks „Betreuungsstellen“ („1 420 untergebracht“). Stand der Verlauf schon, als
+      // `toBeVisible` zum ersten Mal griff, fand der Anker zwei Elemente (strict mode) und lief
+      // in den Timeout; griff es vorher, trug der Anker nur die Kopfzahl und belegte den
+      // aufgeklappten Verlauf gar nicht (in der CI von PR #158 gemessen, LFH-741).
       anker: (p: Page) =>
-        p
-          .getByRole('listitem')
-          .filter({ hasText: 'aktuelle Belegung' })
-          .filter({ hasText: /1.420 untergebracht/ }),
+        p.locator('[data-lfh="verlauf-eintrag"]').getByText(/1.420 untergebracht/),
     },
     {
       // LFH-634: Datenanker ist die Karte des gesäten Zeitfensters. Ihr zugänglicher Name

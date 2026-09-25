@@ -40,9 +40,29 @@ pub struct AppState {
     pub karten_service_token: Option<String>,
 }
 
+/// Schalter, die nur das Routing betreffen (LFH-690, design.md D1).
+///
+/// Bewusst NICHT im `AppState`: ein Feld dort bräche jede der vielen Test-Konstruktionen für
+/// einen Wert, den kein Handler braucht — existiert eine bedingte Route, ist ihr Schalter an.
+/// Und bewusst kein prozessweiter `OnceLock`: der ließe „aus“ und „an“ nicht im selben
+/// Test-Binary prüfen.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct RouterOptionen {
+    /// Registriert die Routen unter `/api/demo-daten` (`--demo-daten`). Ohne den Schalter
+    /// antworten sie wie jeder unbekannte `/api/`-Pfad mit 404, auch angemeldet.
+    pub demo_daten: bool,
+}
+
 /// Baut den Axum-Router mit allen Routen und dem geteilten Zustand. Die Kartenkonfig kommt
 /// zur Laufzeit aus der DB-Registry (kein Karte-Parameter/Extension mehr — LFH-179).
+///
+/// Vorgabe-Optionen, also ohne die bedingten Routen; siehe [`build_router_mit`].
 pub fn build_router(state: AppState) -> Router {
+    build_router_mit(state, RouterOptionen::default())
+}
+
+/// Wie [`build_router`], mit ausdrücklichen [`RouterOptionen`].
+pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
     let router = Router::new()
         .route("/api/health", get(routes::health::health))
         .route("/api/backup", get(routes::backup::download))
@@ -1080,6 +1100,24 @@ pub fn build_router(state: AppState) -> Router {
     // Dev-only: Endpoint existiert physisch nur mit Feature `dev-seeds`.
     #[cfg(feature = "dev-seeds")]
     let router = router.route("/api/dev/users", get(routes::dev::users));
+
+    // Demo-Daten (LFH-690): nur mit `--demo-daten` registriert. Ohne den Schalter fällt der
+    // Pfad in den `/api/`-404-Fallback — kein 401/403/405, das seine Existenz verriete.
+    let router = if opt.demo_daten {
+        router
+            .route(
+                "/api/demo-daten",
+                get(routes::demo_daten::status)
+                    .post(routes::demo_daten::importieren)
+                    .delete(routes::demo_daten::entfernen),
+            )
+            .route(
+                "/api/demo-daten/neu",
+                post(routes::demo_daten::neu_importieren),
+            )
+    } else {
+        router
+    };
 
     let router = router
         .route("/api/karte/config", get(routes::karte::config))

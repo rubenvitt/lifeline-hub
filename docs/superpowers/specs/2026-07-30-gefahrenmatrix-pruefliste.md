@@ -71,11 +71,11 @@ hängt jetzt an derselben Achse wie die Höhe.
 
 | Zeile | offen woran | Ziel |
 | --- | --- | --- |
-| 1, 2 | Pixel-Nachweis der Trefffläche im Handschuh-Betrieb | **LFH-373** — existiert; Umfang um die Gefahrenmatrix erweitern |
+| 1, 2 | ~~Pixel-Nachweis der Trefffläche im Handschuh-Betrieb~~ — gemessen 25.09.2026, siehe „Nachtrag LFH-373“ | **LFH-373** |
 | 15 (und dadurch 1, 2, 13) | die Gebietszeile ist ein `<div onClick>` ohne `role`/`tabIndex` — Trefffläche ja, Tastatur nein | **B7 (LFH-335)** — existiert und zielt thematisch genau dorthin (Befund **N12** „kein fokussierbares Element", plus das Hochziehen von `aufTaste`/`KlickbareZeile` nach `components/`), **nennt aber `components/Liste.tsx`/`ListenEintrag` in keiner seiner Fundstellen** — dort stehen nur `PersonenPage`, `TierePage`, `SchaedenPage`, `EinsaetzePage`. Wer LFH-335 anfasst, trägt die Listenzeile nach; sonst zeigt diese Zeile auf ein Ticket, das ihre Stelle nicht kennt (dieselbe Sorte Vorbehalt wie bei LFH-370 oben) |
-| 12, 13 | Umbruch bei ~390 px (CLS) und Tab-Durchlauf hinter der **neuen** stehenden Kopfzeile | **LFH-373** — dieselbe Sorte, derselbe Messapparat |
+| 12, 13 | ~~Umbruch bei ~390 px (CLS) und Tab-Durchlauf hinter der **neuen** stehenden Kopfzeile~~ — gemessen und behoben 25.09.2026, siehe „Nachtrag LFH-373“ | **LFH-373** |
 | 5 | Kontrast Kürzel-auf-Füllung, beide Modi | **LFH-370 (B5j)** — existiert, **führt aber heute keinen Kontrastpunkt**; er muss ergänzt werden |
-| 2 | Dichtestufe wird nicht aus dem Einsatzkontext abgeleitet | **B5-Restpunkt (LFH-333)** — existiert |
+| 2 | Dichtestufe wird nicht aus dem Einsatzkontext abgeleitet | **B5-Restpunkt (LFH-333)**, seit 25.09.2026 **LFH-724** |
 | 3, 12 | optimistische Updates; wachsende Gebietsliste ohne Sammelbanner | **B6 (LFH-334)** — existiert |
 | 8 | kein Helligkeitsregler in der Anwendung | Folge-Task aus A0, dort ausdrücklich weiterverwiesen |
 
@@ -106,6 +106,21 @@ verworfen, weil ein zweites Ticket für dieselbe Sache das Primitiv doppelt anfa
 Zusicherung dazu gehört an `ListenEintrag`, nicht an je eine Aufrufstelle.
 
 ---
+
+## Nachtrag LFH-373 (Messung, 25.09.2026)
+
+Die Zeilen 1, 2, 12 und 13 zeigten auf LFH-373. LFH-373 hat sie im Browser gemessen. Zeile 13
+war **rot** in beiden Richtungen und ist im selben Ticket behoben. Korrektur am Wortlaut oben:
+Die Gebietszeile ist seit `KlickbareZeile` fokussierbar (`role="button"`). Sie ist damit ein
+Bedienziel für Zeile 1/2 und ein Tab-Stopp für Zeile 13.
+
+| # | Verdikt | Messung / Nachweis |
+| -- | ------- | ------------------ |
+| 1 · Treffläche | **erfüllt** | `e2e/gate3-trefflaeche.spec.ts`, „Gefahrenmatrix (LFH-373)“, bei 1366 × 768 ohne `hasTouch`. Alle **58** Zell-Auslöser (exakt gezählt) halten die kurze Achse, `min(Breite, Höhe)` = 30 / 48 / 72 px. Obergrenze in kompakt: das größte Maß beträgt 38,75 px, liegt also unter 48. Die Gebietszeilen messen 36 / 48 / 72 px. Den Tablet-Nachweis mit 44 px (M51) trägt weiterhin `gefahren-matrix-zelle.spec.ts`. |
+| 2 · Handschuh-Modus | **erfüllt** (die Stufenableitung → **LFH-724**) | Derselbe Test: 72 × 72 px je Zelle im Handschuh-Betrieb, Gegenprobe kompakt < handschuh. |
+| 12 · Kein Sprung unter dem Cursor | **erfüllt** (die wachsende Gebietsliste bleibt **LFH-334**) | `e2e/leisten-flaeche.spec.ts`. Das Laden bei 390 px erreicht CLS 0,0015 / 0,0033 (kompakt / handschuh). Eine live eintreffende Bewertung (`PUT …/matrix/bewertung`) hat CLS 0,0000, die Tabelle bleibt an ihrer Stelle, gemessen bei 390 und 1366 px. Vorbedingung dafür: Die Zelle trägt danach die neue `data-warnstufe`. Die Hypothese, die Titelzeile schiebe sich beim Laden über die Tabelle, ist gemessen widerlegt. |
+| 13 · Fokus nie verdeckt | **erfüllt nach Fix** | `e2e/fokus-verdeckung.spec.ts`, „Gefahrenmatrix (LFH-373)“. Vorwärts **und** rückwärts über alle Zellen, bei 390 × 400 und 1024 × 768, in kompakt und handschuh, jeweils mit waagerechtem Überlauf als Vorbedingung: 0 verdeckt. **Vorher gemessen:** Vorwärts lagen Zellen beim Zeilenwechsel vollständig unter der fixierten Spalte „Gefahr“ (bei 390 px in allen Stufen, bei 1024 px in kompakt und komfortabel, bei 1366 px im Handschuh-Betrieb). Rückwärts lagen sie vollständig unter der stehenden Kopfzeile. **Behoben:** `scroll-padding-inline-start` am Scrollcontainer, in der GEMESSENEN Spaltenbreite. Die 180 px sind mit `max-content` nur eine Mindestbreite, ein erster Fix mit dieser Konstante blieb im Handschuh-Betrieb rot. Dazu kommt der Kopf-Freiraum der Katalogtabellen (`useKopfFreiraum`, `scroll-margin-top`). |
+
 
 ## Was diese Prüfliste nicht beweist
 

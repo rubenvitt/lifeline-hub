@@ -34,6 +34,19 @@ function anzeige(feld: MetaFeld, wert: Wert): string {
   return String(wert);
 }
 
+/**
+ * Fokussiert die Eingabe OHNE die Seite zu rollen (LFH-373). Ersetzt `autoFocus` an den vier
+ * Editoren: React ruft dafür `focus()` ohne Optionen, und die Chip-Eingabe steht in der
+ * angepinnten Erfassungsleiste am Seitenfuß — gemessen rollte der native Fokus die Seite bei
+ * 390 px im Handschuh-Betrieb um 467 px, sobald „An" gesetzt wurde; wer oben im Tagebuch las,
+ * verlor seine Stelle. antd reicht die Optionen bis zum nativen Feld durch
+ * (`@rc-component/input` `triggerFocus`, `@rc-component/select` `SelectInput`). Modulweit,
+ * damit die Ref-Identität stabil bleibt und React sie nur beim Einhängen ruft.
+ */
+function fokusOhneRollen(el: { focus: (optionen?: FocusOptions) => void } | null) {
+  el?.focus({ preventScroll: true });
+}
+
 export default function MetaChip({
   feld,
   editing,
@@ -52,7 +65,7 @@ export default function MetaChip({
       const editor =
         optionen && optionen.length > 0 ? (
           <AutoComplete
-            autoFocus
+            ref={fokusOhneRollen}
             aria-label={d.label}
             style={{ width: 200 }}
             value={text}
@@ -74,7 +87,7 @@ export default function MetaChip({
           />
         ) : (
           <Input
-            autoFocus
+            ref={fokusOhneRollen}
             aria-label={d.label}
             style={{ width: 160 }}
             value={text}
@@ -107,7 +120,7 @@ export default function MetaChip({
     if (d.editor === 'meldeweg') {
       return (
         <Select
-          autoFocus
+          ref={fokusOhneRollen}
           defaultOpen
           aria-label={d.label}
           style={{ width: 160 }}
@@ -125,7 +138,7 @@ export default function MetaChip({
     return (
       <DatePicker
         showTime
-        autoFocus
+        ref={fokusOhneRollen}
         aria-label={d.label}
         defaultValue={dayjs.isDayjs(wert) ? wert : dayjs()}
         onOk={(v) => onCommit(feld, v)}

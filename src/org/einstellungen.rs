@@ -182,8 +182,11 @@ pub struct OrgEinstellungenDaten<'a> {
 
 /// Lädt die Org-Einstellungen; existiert keine Zeile, werden Defaults
 /// (alle `None`) zurückgegeben. Strikt per `org_id` (Org-Isolation).
+///
+/// Executor-generisch (Pool oder offene Verbindung): `meldung::repo::anlegen_tx` liest die
+/// Einstellungen in derselben Transaktion (LFH-690).
 pub async fn laden_oder_default(
-    pool: &SqlitePool,
+    executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
     org_id: i64,
 ) -> Result<OrgEinstellungen, AppError> {
     let row = sqlx::query_as::<_, OrgEinstellungen>(
@@ -195,7 +198,7 @@ pub async fn laden_oder_default(
          FROM org_einstellungen WHERE org_id = ?",
     )
     .bind(org_id)
-    .fetch_optional(pool)
+    .fetch_optional(executor)
     .await?;
     Ok(row.unwrap_or_else(|| OrgEinstellungen::leer(org_id)))
 }

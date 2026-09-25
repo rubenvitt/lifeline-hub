@@ -13,6 +13,7 @@ pub mod cache_db;
 pub mod chat;
 pub mod config;
 pub mod db;
+pub mod demo;
 #[cfg(feature = "dev-seeds")]
 pub mod dev;
 pub mod dokument;

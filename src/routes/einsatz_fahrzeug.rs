@@ -183,7 +183,7 @@ pub async fn disponieren(
             einsatz_id,
             benutzer.id,
             startwert,
-            &format!("Fahrzeug «{}» disponiert", anzeige.funkrufname),
+            &crate::fahrzeug::etb_text_disponiert(&anzeige.funkrufname),
         )
         .await?;
         Ok(anzeige)
@@ -251,16 +251,15 @@ pub async fn aktualisieren(
             .await?;
         let nachher = disposition_repo::laden_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
         if vorher_status_id != nachher.status_id {
-            let alt = vorher_status_label.as_deref().unwrap_or("—");
-            let neu = nachher.status_label.as_deref().unwrap_or("—");
             crate::etb::system_audit_tx(
                 conn,
                 einsatz_id,
                 benutzer.id,
                 startwert,
-                &format!(
-                    "Fahrzeug «{}»: Status «{}» → «{}»",
-                    nachher.funkrufname, alt, neu
+                &crate::fahrzeug::etb_text_status_wechsel(
+                    &nachher.funkrufname,
+                    vorher_status_label.as_deref(),
+                    nachher.status_label.as_deref(),
                 ),
             )
             .await?;

@@ -38,6 +38,7 @@ import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
 import StatusTag from '../components/StatusTag';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { Segmentleiste, useRollen, type SegmentOption } from '../components/instrument';
+import { FOKUSABSTAND_ETB, useFokusabstandUnten } from '../components/fokusabstandUnten';
 import { useViewport } from '../components/useViewport';
 import { einsatzStatus, etbTyp, etbTypFarbe } from '../theme/statusFarben';
 import {
@@ -182,6 +183,18 @@ export default function EtbPage() {
       letzteSeite.length === SEITENGROESSE ? letzteSeite[letzteSeite.length - 1].lfd_nr : undefined,
   });
 
+  // Riegel für die Bilanz unter `xl` (LFH-373): sie erscheint erst, wenn die Liste zum ersten
+  // Mal steht — stand sie vorher da, schoben die eintreffenden Zeilen sie aus dem Bild. Danach
+  // bleibt sie. `isLoading` allein hinge an jedem neuen Query-Schlüssel: die Bilanz verschwände
+  // bei jedem Filterwechsel, und beim Wiederverbinden nach einem Offline-Start genau dann, wenn
+  // der Puffer gesendet wird (Review). `isLoading` statt `isPending`, weil ein offline
+  // pausierter Abruf nicht lädt — dann trägt die Bilanz den Puffer. Je Einsatz, damit ein
+  // Wechsel des Einsatzes im selben Baum die Sperre neu setzt. Zustand statt Ref: die
+  // Ableitung während des Renderns ist das React-Muster für „Wert aus früherem Render".
+  const [bilanzFreiFuer, setBilanzFreiFuer] = useState<number | null>(null);
+  if (!etbQuery.isLoading && bilanzFreiFuer !== einsatzId) setBilanzFreiFuer(einsatzId);
+  const bilanzFrei = bilanzFreiFuer === einsatzId || !etbQuery.isLoading;
+
   // Exakte Zählung über DENSELBEN Filter wie die Liste (LFH-612) — Kopf und Bilanz. Unter
   // dem `etb`-Prefix, das `etb`-Live-Ereignis zieht sie mit.
   const zaehlerQuery = useQuery({
@@ -225,6 +238,10 @@ export default function EtbPage() {
   const zeitachseKopf = useRef<HTMLDivElement>(null);
   const { abBreite } = useViewport();
   const { token, rollen } = useRollen();
+  // Fokusabstand zur angepinnten Erfassungsleiste (WCAG 2.4.11, LFH-373): ohne ihn rollte der
+  // Browser jeden per Tab angesteuerten Zeilenauslöser hinter die Leiste. Verbraucht wird die
+  // Höhe als `scroll-margin` an der Zeitachse (`index.css`), nicht am Dokument.
+  const erfassungRef = useFokusabstandUnten(token.marginSM, FOKUSABSTAND_ETB);
   const { erfassen, ausstehend, abgelehnt, abgelehntVerwerfen } = useEtbErfassung(
     einsatzId,
     benutzer?.id,
@@ -444,6 +461,43 @@ export default function EtbPage() {
     punkt: t === 'alle' ? rollen.schwach : etbTypFarbe(t, token).kante,
   }));
 
+  // Die Erfassung hängt auf JEDER Breite als `fuss` an der Seitenwurzel (LFH-373): in der
+  // Zeitachsenspalte stieg sie nie über deren Oberkante (auf dem Handschirm ragte sie ganz oben
+  // 61 px unter das Fenster), und an zwei Stellen je nach Breite riss ein Wechsel über `xl` sie aus
+  // und hängte sie neu ein — der Text einer laufenden Berichtigung war ohne Rückfrage weg. Ab
+  // `xl` endet sie über den Außenrand vor der Bilanzspalte, wie vorher in der Spalte.
+  const erfassung = darfSchreiben ? (
+    <div
+      ref={erfassungRef}
+      className={
+        breit ? 'etb-erfassung-sticky etb-erfassung-sticky--neben-leiste' : 'etb-erfassung-sticky'
+      }
+      style={breit ? { marginInlineEnd: LEISTE_BREITE + token.marginLG } : undefined}
+    >
+      {berichtigungZu ? (
+        <Schnellerfassung
+          key="berichtigung"
+          erfassen={erfassenMitMeldung}
+          berichtigungZu={berichtigungZu}
+          onBerichtigungAbbrechen={() => setBerichtigungZu(null)}
+          bausteine={bausteineQuery.data ?? []}
+          einsatz={einsatz}
+        />
+      ) : (
+        <EtbEntwurfsTabs
+          key={einsatzId}
+          einsatzId={einsatzId}
+          erfassen={erfassenMitMeldung}
+          bausteine={bausteineQuery.data ?? []}
+          einsatz={einsatz}
+          kontextLaedt={einsatzQuery.isFetching}
+          werteBehalten={werteBehalten}
+          onWerteBehaltenChange={setWerteBehalten}
+        />
+      )}
+    </div>
+  ) : null;
+
   return (
     <EinsatzSeite
       titel="Einsatztagebuch"
@@ -503,6 +557,7 @@ export default function EtbPage() {
           </Space>
         ) : undefined
       }
+      fuss={erfassung}
     >
       <div
         style={{
@@ -624,68 +679,38 @@ export default function EtbPage() {
               </Button>
             </div>
           )}
-
-          {/* Die Erfassung am SEITENFUSS, angepinnt (Begründung an `erfassenMitMeldung`).
-              Sie steht in der Spalte der Zeitachse, nicht unter der Seitenleiste — so bleibt
-              sie beim Blättern im Bild, solange die Zeitachse es ist. */}
-          {darfSchreiben && (
-            <div
-              className={
-                breit
-                  ? 'etb-erfassung-sticky etb-erfassung-sticky--neben-leiste'
-                  : 'etb-erfassung-sticky'
-              }
-            >
-              {berichtigungZu ? (
-                <Schnellerfassung
-                  key="berichtigung"
-                  erfassen={erfassenMitMeldung}
-                  berichtigungZu={berichtigungZu}
-                  onBerichtigungAbbrechen={() => setBerichtigungZu(null)}
-                  bausteine={bausteineQuery.data ?? []}
-                  einsatz={einsatz}
-                />
-              ) : (
-                <EtbEntwurfsTabs
-                  key={einsatzId}
-                  einsatzId={einsatzId}
-                  erfassen={erfassenMitMeldung}
-                  bausteine={bausteineQuery.data ?? []}
-                  einsatz={einsatz}
-                  kontextLaedt={einsatzQuery.isFetching}
-                  werteBehalten={werteBehalten}
-                  onWerteBehaltenChange={setWerteBehalten}
-                />
-              )}
-            </div>
-          )}
         </div>
 
         {/* Seitenleiste ab `xl` rechts (Entwurf S4), darunter UNTER der Zeitachsenspalte —
-            nicht dazwischen, damit die angepinnte Erfassung am Fuß der Zeitachse bleibt. */}
-        <aside
-          aria-label="Bilanz des Tagebuchs"
-          style={
-            breit
-              ? {
-                  flex: `0 0 ${LEISTE_BREITE}px`,
-                  width: LEISTE_BREITE,
-                  position: 'sticky',
-                  top: token.margin,
-                }
-              : undefined
-          }
-        >
-          <EtbBilanz
-            einsatzId={einsatzId}
-            eintraege={eintraege}
-            zaehler={zaehlerQuery.data}
-            zaehlerFehler={zaehlerQuery.isError}
-            filterAktiv={filterAktiv}
-            puffer={puffer}
-            unbestimmt={!etbQuery.isSuccess}
-          />
-        </aside>
+            nicht dazwischen, damit die angepinnte Erfassung am Fuß der Zeitachse bleibt.
+            Darunter erscheint sie erst, wenn die Liste steht (LFH-373, gemessen): stand sie
+            schon, schoben die eintreffenden Zeilen sie aus dem Bild (CLS 0,22 bei 390 px).
+            Der Riegel `bilanzFrei` (oben) geht je Einsatz EINMAL auf. */}
+        {(breit || bilanzFrei) && (
+          <aside
+            aria-label="Bilanz des Tagebuchs"
+            style={
+              breit
+                ? {
+                    flex: `0 0 ${LEISTE_BREITE}px`,
+                    width: LEISTE_BREITE,
+                    position: 'sticky',
+                    top: token.margin,
+                  }
+                : undefined
+            }
+          >
+            <EtbBilanz
+              einsatzId={einsatzId}
+              eintraege={eintraege}
+              zaehler={zaehlerQuery.data}
+              zaehlerFehler={zaehlerQuery.isError}
+              filterAktiv={filterAktiv}
+              puffer={puffer}
+              unbestimmt={!etbQuery.isSuccess}
+            />
+          </aside>
+        )}
       </div>
 
       {darfSchreiben && (

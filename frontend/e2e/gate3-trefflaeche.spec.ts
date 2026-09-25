@@ -1916,3 +1916,343 @@ test('Betroffene Karte: Marker-Trefferzone, Cluster-Donut und Kartenknöpfe folg
   }
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
+
+// ── LFH-373: ETB, Lagekarte, Gefahrenmatrix ─────────────────────────────────────────────
+//
+// Nachzug zu den Prüflisten vom 30.07.2026 (ETB, Lagekarte, Gefahrenmatrix), Zeile 2
+// („Handschuh-Modus"; bei der Matrix auch Zeile 1, Trefffläche der kurzen Achse). Die drei
+// Blöcke folgen der Einladung im Kopf dieser Datei und nehmen `STAFFEL`/`stelleDichte`/
+// `haeltStufe`/`alleHaltenStufe` mit. Neu sind zwei Dinge, beide aus dem Ticket-AK:
+//
+//  - DIE KURZE ACHSE. Ein unbeschriftetes Ziel (Symbolknopf, Ein-Buchstaben-Zelle) muss die
+//    Stufe auf BEIDEN Achsen halten — Gate 3 spricht von der kurzen Achse, und bei der
+//    Matrixzelle ist die Breite gerade die tragende (Prüfliste B5h, Zeile 1: „24 × 24, nicht
+//    24 hoch"). {@link kurzeAchseHaelt} misst `min(Breite, Höhe)`.
+//  - EINE GEGENPROBE, DIE ROT WERDEN KANN. Alle Helfer hier sind Untergrenzen; sie blieben
+//    grün, wenn jedes Ziel in jeder Stufe 72 px mäße — dann hätte die Stufe nichts bewirkt,
+//    und genau davor warnt das AK („ein e2e-Spec, der die Dichtestufe nicht wirklich
+//    umschaltet, ist trivial grün"). Jeder Block sichert deshalb zusätzlich zu: das kleinste
+//    Maß in `kompakt` ist STRENG kleiner als in `handschuh`, und die Matrix hält in `kompakt`
+//    eine OBERgrenze (< 48).
+//
+// Vorab-Messung (24.09.2026, 1366 × 768 bzw. 390 × 844): Slash-Option 35,5 / 72, Zeilen-
+// auslöser 30 / 72, Menüeintrag 30 / 72, „Verortet" 35,5 / 72, Kartenknopf 32 / 72,
+// Matrixzelle 38,75 × 30 / 72 × 72.
+//
+// MUTATIONSPROBE (25.09.2026): die Dichte per Init-Skript auf `kompakt` festgenagelt →
+// ETB-Block ROT an der `data-dichte`-Wache, noch vor jeder Höhe.
+
+/** Boden der Menüeinträge eines `Dropdown`: `controlHeightSM` (24 / 48 / 72), nicht die
+ *  Steuerhöhe — antd gibt Menüeinträgen die kleine Steuerhöhe (Muster `pegel-pruefliste`). */
+const BODEN_MENUE = { kompakt: 24, komfortabel: 48, handschuh: 72 } as const;
+
+/** Boden der Kartenknöpfe: `kartenKnopfKante = max(32, controlHeight)` in
+ *  `KartenUeberlagerung.tsx` — in `kompakt` also 32, nicht 30. Literal, kein Import. */
+const BODEN_KARTE = { kompakt: 32, komfortabel: 48, handschuh: 72 } as const;
+
+/**
+ * Kurze Achse JEDES Knotens einer Menge: `min(Breite, Höhe) ≥ soll`. Zurück kommen das
+ * kleinste Maß (für die Anmerkung und die Gegenprobe) und das größte Maß der LANGEN Achse
+ * (für eine Obergrenze in `kompakt`).
+ */
+async function kurzeAchseHaelt(
+  ziele: Locator,
+  soll: number,
+  name: string,
+  mindestens: number,
+): Promise<{ kleinstes: number; groesstes: number }> {
+  const anzahl = await ziele.count();
+  expect(anzahl, `${name}: mindestens ${mindestens} Knoten erwartet`).toBeGreaterThanOrEqual(
+    mindestens,
+  );
+  let kleinstes = Number.POSITIVE_INFINITY;
+  let groesstes = 0;
+  for (let i = 0; i < anzahl; i += 1) {
+    const kasten = await ziele.nth(i).boundingBox();
+    expect(kasten, `${name} #${i + 1}: kein Kasten messbar`).not.toBeNull();
+    const kurz = Math.min(kasten!.width, kasten!.height);
+    expect(
+      kurz,
+      `${name} #${i + 1} (gemessen ${kasten!.width}×${kasten!.height}px, kurze Achse Soll ≥ ${soll})`,
+    ).toBeGreaterThanOrEqual(soll - SUBPIXEL);
+    kleinstes = Math.min(kleinstes, kurz);
+    groesstes = Math.max(groesstes, kasten!.width, kasten!.height);
+  }
+  return { kleinstes, groesstes };
+}
+
+/**
+ * Höhe eines animiert aufklappenden Menüeintrags, erst wenn der Kasten STEHT (zwei gleiche
+ * Lesungen in Folge). `expect.poll(… ≥ soll)` allein genügt hier nicht: für die Gegenprobe
+ * zählt die Zahl selbst, und ein mitten in der `scaleY`-Animation gelesener Kasten wäre in
+ * `kompakt` zu klein — die Gegenprobe „kompakt < handschuh" wäre dann grün durch zu frühes
+ * Hinsehen.
+ */
+async function ruhigeHoehe(ziel: Locator, name: string): Promise<number> {
+  let vorher = -1;
+  let jetzt = 0;
+  await expect
+    .poll(
+      async () => {
+        vorher = jetzt;
+        jetzt = (await ziel.boundingBox())?.height ?? 0;
+        return jetzt > 0 && jetzt === vorher;
+      },
+      { message: `${name}: der Kasten kommt nicht zur Ruhe`, intervals: [100, 150, 200] },
+    )
+    .toBe(true);
+  return jetzt;
+}
+
+/** Legt die Gegenprobe für eine Zielsorte fest: kompakt STRENG kleiner als handschuh. */
+function gegenprobe(je: Map<string, number>, sorte: string) {
+  const k = je.get(`kompakt ${sorte}`);
+  const h = je.get(`handschuh ${sorte}`);
+  expect(k, `${sorte}: kompakt nicht gemessen`).toBeDefined();
+  expect(h, `${sorte}: handschuh nicht gemessen`).toBeDefined();
+  expect(
+    k!,
+    `${sorte}: die Stufe muss durchschlagen — kompakt ${k} px, handschuh ${h} px`,
+  ).toBeLessThan(h!);
+}
+
+test('ETB (LFH-373): Slash-Menü, Zeilenauslöser und Zeilenmenü folgen der Dichte-Staffel', async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E 373 Nord ${Date.now()}`);
+  for (let n = 1; n <= 3; n += 1) {
+    await anlegen(
+      page,
+      einsatzId,
+      'etb',
+      { typ: 'meldung', inhalt: `Probe ${n}: Lage unverändert`, von: 'ELW 1', an: 'Leitstelle' },
+      `ETB-Eintrag ${n}`,
+    );
+  }
+
+  const gemessen: string[] = [];
+  const je = new Map<string, number>();
+
+  for (const { dichte, soll } of STAFFEL) {
+    await page.goto(`/einsaetze/${einsatzId}/etb`);
+    await stelleDichte(page, dichte);
+    const zeitachse = page.getByRole('region', { name: 'Einsatztagebuch' });
+    await expect(zeitachse.getByTestId('etb-ereigniszeile')).toHaveCount(3);
+
+    // Zeilenauslöser: ein Symbolknopf ohne Beschriftung — kurze Achse.
+    const ausloeser = zeitachse.getByRole('button', { name: /^Aktionen zu Eintrag \d+$/ });
+    const zeile = await kurzeAchseHaelt(ausloeser, soll, `Zeilenauslöser (${dichte})`, 3);
+
+    // Slash-Menü über „Feld" (öffnet deterministisch die Sektion „Felder"). Eingegrenzt auf
+    // `[data-slash-menu]`: die Kommandopalette rendert ebenfalls `role="option"`. JEDE Option,
+    // auch die im internen Bildlauf (Höchsthöhe 280 px) — `boundingBox()` misst sie trotzdem.
+    await page.getByRole('button', { name: 'Feld', exact: true }).click();
+    const optionen = page.locator('[data-slash-menu] [role="option"]');
+    const slash = await alleHaltenStufe(optionen, soll, `Slash-Option (${dichte})`, 5);
+    // Zu über denselben Knopf: „Feld" schaltet um. Escape wirkt nur im Textfeld, und der Fokus
+    // steht hier auf dem Knopf.
+    await page.getByRole('button', { name: 'Feld', exact: true }).click();
+    await expect(page.locator('[data-slash-menu]')).toHaveCount(0);
+
+    // Zeilenmenü: die Einträge sind das Ziel, das nach dem Öffnen getroffen wird.
+    await ausloeser.first().click();
+    const menue = page.locator('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]');
+    await expect(menue).toHaveCount(1);
+    let eintrag = Number.POSITIVE_INFINITY;
+    for (const name of ['Berichtigen', 'Wiedervorlage', 'Auftrag erteilen']) {
+      const item = menue.getByRole('menuitem', { name: new RegExp(name) });
+      await expect(item).toHaveCount(1);
+      const h = await ruhigeHoehe(item, `Menüeintrag ${name} (${dichte})`);
+      expect(
+        h,
+        `Menüeintrag ${name} (${dichte}), Soll ≥ ${BODEN_MENUE[dichte]}`,
+      ).toBeGreaterThanOrEqual(BODEN_MENUE[dichte] - SUBPIXEL);
+      eintrag = Math.min(eintrag, h);
+    }
+    await page.keyboard.press('Escape');
+
+    je.set(`${dichte} Zeilenauslöser`, zeile.kleinstes);
+    je.set(`${dichte} Slash-Option`, slash);
+    je.set(`${dichte} Menüeintrag`, eintrag);
+    gemessen.push(
+      `${dichte}: Zeilenauslöser ${zeile.kleinstes}, Slash ${slash}, Menüeintrag ${eintrag}`,
+    );
+  }
+
+  for (const sorte of ['Zeilenauslöser', 'Slash-Option', 'Menüeintrag']) gegenprobe(je, sorte);
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+test('Lagekarte (LFH-373): „Verortet", Kartenknöpfe und Zeitachse folgen der Dichte-Staffel', async ({
+  page,
+}) => {
+  test.setTimeout(240_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E 373 Ost ${Date.now()}`);
+  const ablagen = ['Ablage Ost 1', 'Ablage Ost 2'];
+  for (const [i, bezeichnung] of ablagen.entries()) {
+    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/uhs`, {
+      data: { typ: 'patientenablage', bezeichnung },
+    });
+    expect(antwort.ok(), `Seeding UHS: ${await antwort.text()}`).toBeTruthy();
+    const { id } = (await antwort.json()) as { id: number };
+    const lage = await page.request.patch(`/api/einsaetze/${einsatzId}/uhs/${id}`, {
+      data: { lat: 49.35 + i / 100, lon: 9.14 },
+    });
+    expect(lage.ok(), `Verortung UHS: ${await lage.text()}`).toBeTruthy();
+  }
+  for (const bezeichnung of ['Stand A', 'Stand B']) {
+    await anlegen(page, einsatzId, 'lage-snapshots', { bezeichnung }, `Stand ${bezeichnung}`);
+  }
+
+  const gemessen: string[] = [];
+  const je = new Map<string, number>();
+
+  // Ab `xl` startet die Zeitachse ausgeklappt; die gemerkte Wahl wird trotzdem gesetzt, damit
+  // ein Nachbarspec im selben Browserprofil sie nicht eingeklappt hinterlässt.
+  await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
+  await page.evaluate(() => localStorage.setItem('lfh:lagekarte:zeitachse-eingeklappt', '0'));
+
+  for (const { dichte, soll } of STAFFEL) {
+    await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
+    await stelleDichte(page, dichte);
+    await expect(page.getByTestId('kartenflaeche').locator('canvas.maplibregl-canvas')).toHaveCount(
+      1,
+      { timeout: 60_000 },
+    );
+
+    // „Verortet": handgebaute Zeilen (`bedienzielStil`). Per exaktem Namen, weil
+    // `getByRole('button')` im Paneel auch den Klappkopf „Verortet" träfe.
+    const leiste = page.locator('[data-lfh="kartenleiste"]');
+    let verortet = Number.POSITIVE_INFINITY;
+    for (const name of ablagen) {
+      verortet = Math.min(
+        verortet,
+        await haeltStufe(
+          leiste.getByRole('button', { name, exact: true }),
+          soll,
+          `Verortet ${name} (${dichte})`,
+        ),
+      );
+    }
+
+    // Kartenknöpfe: Symbolknöpfe, kurze Achse, eigener Boden (32 in kompakt).
+    const knoepfe = page.locator('[data-lfh="karten-knoepfe"]').getByRole('button', {
+      name: /^(Hineinzoomen|Herauszoomen|Nach Norden ausrichten|Messen|Zeichenwerkzeuge)$/,
+    });
+    await expect(knoepfe).toHaveCount(5);
+    const karte = await kurzeAchseHaelt(knoepfe, BODEN_KARTE[dichte], `Kartenknopf (${dichte})`, 5);
+
+    // Zeitachse: beschriftete Knöpfe halten die Höhe, Symbolknöpfe die kurze Achse.
+    const band = page.locator('[data-lfh="zeitachse"]');
+    // Erst zählen, wenn die Stände geladen sind — sonst steht nur „Stand sichern" im Band und
+    // die Mindestzahl schlägt unter Last falsch an (Review LFH-373).
+    await expect(band.getByRole('button', { name: 'Stand B' })).toBeVisible();
+    const beschriftet = band.getByRole('button', {
+      // „Stand sichern" ohne `^`: bis LFH-373 trug der Name das englische Icon-Label vorne
+      // („camera Stand sichern"). Der Name selbst ist in `SnapshotLeiste.test.tsx` gepinnt (Vitest).
+      name: /(Stand sichern|^Aktuell|^Stand A|^Stand B)$/,
+    });
+    const zeitBeschriftet = await alleHaltenStufe(beschriftet, soll, `Zeitachse (${dichte})`, 4);
+    const symbole = band.getByRole('button', { name: /^(Abspielen|Zeitachse ausblenden)$/ });
+    const zeitSymbol = await kurzeAchseHaelt(symbole, soll, `Zeitachse Symbol (${dichte})`, 2);
+
+    je.set(`${dichte} Verortet`, verortet);
+    je.set(`${dichte} Kartenknopf`, karte.kleinstes);
+    je.set(`${dichte} Zeitachse`, zeitBeschriftet);
+    gemessen.push(
+      `${dichte}: Verortet ${verortet}, Kartenknopf ${karte.kleinstes}, ` +
+        `Zeitachse ${zeitBeschriftet}, Zeitachse Symbol ${zeitSymbol.kleinstes}`,
+    );
+  }
+
+  for (const sorte of ['Verortet', 'Kartenknopf', 'Zeitachse']) gegenprobe(je, sorte);
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+test('Gefahrenmatrix (LFH-373): 58 Zellen halten die kurze Achse, die Gebietszeilen die Staffel', async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+  // Fükw OHNE `hasTouch`: mit grobem Zeiger belegte die App ohne gespeicherte Wahl
+  // `komfortabel` vor, und die Wache unten könnte eine halb umgeschaltete Stufe nicht von
+  // einer gewählten unterscheiden. Den Tablet-Nachweis (44 px, M51) trägt weiterhin
+  // `gefahren-matrix-zelle.spec.ts`.
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E 373 Sued ${Date.now()}`);
+  const gebiete = ['Sektor Sued 1', 'Sektor Sued 2'];
+  for (const [i, label] of gebiete.entries()) {
+    const x = 10 + i / 20;
+    await anlegen(
+      page,
+      einsatzId,
+      'zonen',
+      {
+        typ: 'gefahrengebiet',
+        geometrie_typ: 'Polygon',
+        geometrie: JSON.stringify({
+          type: 'Polygon',
+          coordinates: [
+            [
+              [x, 50],
+              [x + 0.01, 50],
+              [x + 0.01, 50.01],
+              [x, 50.01],
+              [x, 50],
+            ],
+          ],
+        }),
+        label,
+      },
+      `Gefahrengebiet ${label}`,
+    );
+  }
+
+  const gemessen: string[] = [];
+  const je = new Map<string, number>();
+  let groesstesKompakt = 0;
+
+  for (const { dichte, soll } of STAFFEL) {
+    await page.goto(`/einsaetze/${einsatzId}/gefahren`);
+    await stelleDichte(page, dichte);
+
+    // 13 Gefahrentypen × 5 Schutzobjekte, davon 7 Paare „nicht anwendbar" (kein Knopf) = 58.
+    // Exakt, nicht „mindestens": die Zellen hängen am Einsatz, die Zahl ist fest.
+    const zellen = page.getByRole('button', { name: /^Bewertung / });
+    await expect(zellen).toHaveCount(58);
+    const zelle = await kurzeAchseHaelt(zellen, soll, `Matrixzelle (${dichte})`, 58);
+    if (dichte === 'kompakt') groesstesKompakt = zelle.groesstes;
+
+    let gebiet = Number.POSITIVE_INFINITY;
+    for (const label of gebiete) {
+      gebiet = Math.min(
+        gebiet,
+        await haeltStufe(
+          page.getByRole('button', { name: new RegExp(label) }),
+          soll,
+          `Gebietszeile ${label} (${dichte})`,
+        ),
+      );
+    }
+
+    je.set(`${dichte} Matrixzelle`, zelle.kleinstes);
+    je.set(`${dichte} Gebietszeile`, gebiet);
+    gemessen.push(
+      `${dichte}: Zelle kurz ${zelle.kleinstes} / lang ${zelle.groesstes}, Gebietszeile ${gebiet}`,
+    );
+  }
+
+  for (const sorte of ['Matrixzelle', 'Gebietszeile']) gegenprobe(je, sorte);
+  // Obergrenze (Prüfliste B5h, Zeile 1): in `kompakt` ist keine Zelle 48 px oder größer —
+  // sonst stünde sie auch ohne Staffel auf komfortabel-Maß, und die Messung oben bewiese nichts.
+  expect(
+    groesstesKompakt,
+    `Matrixzelle in kompakt: größtes Maß ${groesstesKompakt} px, Soll < 48`,
+  ).toBeLessThan(48);
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});

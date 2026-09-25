@@ -31,6 +31,34 @@ export interface Verdeckungsbefund {
    * Zeile steht — und kann deshalb nicht belegen, dass ein Lauf die Kopfzeile erreicht hat.
    */
   stoppsAnTabellenkopf: number;
+  /**
+   * Stopps innerhalb von {@link KernOptionen.region} (LFH-373). Vorbedingungs-Zähler wie
+   * `stoppsInTabelle`: ohne ihn kann ein Lauf an der Kartenspalte vorbeilaufen, und
+   * „0 verdeckt" wäre trivial wahr. Ohne `region` immer 0.
+   */
+  stoppsInRegion: number;
+}
+
+/**
+ * Opt-in-Erweiterung des Kerns (LFH-373). Ohne dieses Argument rechnet der Kern exakt wie
+ * vorher — er ist mit `fokus-verdeckung`, `befehl-aktionsleiste`, `dokumente`,
+ * `pegel-pruefliste` und `betreuung-pruefliste` geteilt, und deren Zusicherungen dürfen sich nicht
+ * still verschieben.
+ */
+export interface KernOptionen {
+  /**
+   * Zusätzliche Verdecker per Selektor, NEBEN den `sticky|fixed`-Knoten. Gebraucht für die
+   * absolut positionierten Kartenaufbauten (Knopfblock, Überlagerung links, Fußbänder):
+   * sie sind `position: absolute` und damit für die Vorgabe unsichtbar — ein Lauf über die
+   * Lagekarte wäre ohne sie grün durch Konstruktion, und `fixierteKandidaten` käme allein von
+   * den angepinnten Füßen der Rail und des Modulpanels.
+   *
+   * BEWUSST eine Liste und nicht „alles mit `position: absolute`": dann würden Canvas,
+   * Marker und antd-Portale (Tooltips, Menüs) zu Kandidaten und lieferten falsche Treffer.
+   */
+  zusatzKandidaten?: string[];
+  /** Selektor einer Region, deren Stopps `stoppsInRegion` zählt. */
+  region?: string;
 }
 
 /**
@@ -65,101 +93,118 @@ export async function pruefeFokusVerdeckung(
   page: Page,
   schritte: number,
   taste: 'Tab' | 'Shift+Tab' = 'Tab',
+  optionen: KernOptionen = {},
 ): Promise<Verdeckungsbefund> {
   const verdeckt: string[] = [];
   let stoppsInTabelle = 0;
   let stoppsGesamt = 0;
   let stoppsBeruehrt = 0;
   let stoppsAnTabellenkopf = 0;
+  let stoppsInRegion = 0;
   let fixierteKandidaten = 0;
   const besuchteZiele = new Set<string>();
 
   for (let i = 0; i < schritte; i += 1) {
     await page.keyboard.press(taste);
-    const schritt = await page.evaluate(() => {
-      const fokus = document.activeElement;
-      if (fokus == null || fokus === document.body || fokus === document.documentElement) {
-        return null;
-      }
-      // Der innere Combobox-/Zahleneingabe-Input ist kleiner als das sichtbare Fokusziel.
-      // Radio-Knopf (LFH-677): antd setzt dessen `input` auf 0 × 0 — ohne die Hülle fiele der
-      // Stopp unten als „keine Fläche" still aus der Zählung. Normales Radio und Checkbox
-      // brauchen das nicht: ihr `input` deckt Kreis bzw. Kästchen.
-      const ziel =
-        fokus.closest(
-          '.ant-select, .ant-input-number, .ant-input-affix-wrapper, .ant-radio-button-wrapper',
-        ) ?? fokus;
-      const zr = ziel.getBoundingClientRect();
-      if (zr.width === 0 || zr.height === 0) {
-        return {
-          beschreibung: null,
-          inTabelle: false,
-          kandidaten: 0,
-          kennung: null,
-          beruehrt: false,
-          anTabellenkopf: false,
-        };
-      }
-
-      const kandidaten = Array.from(document.querySelectorAll('body *')).filter((el) => {
-        const stil = getComputedStyle(el);
-        if (stil.position !== 'sticky' && stil.position !== 'fixed') return false;
-        if (stil.visibility === 'hidden' || stil.display === 'none') return false;
-        return !el.contains(ziel);
-      });
-
-      const mx = zr.x + zr.width / 2;
-      const my = zr.y + zr.height / 2;
-      const amPunkt = document.elementFromPoint(mx, my);
-      const punktGehoertZiel = amPunkt != null && (amPunkt === ziel || ziel.contains(amPunkt));
-
-      let beschreibung: string | null = null;
-      let beruehrt = false;
-      let anTabellenkopf = false;
-      for (const el of kandidaten) {
-        const kr = el.getBoundingClientRect();
-        const schirmfuellend = kr.width >= innerWidth - 1 && kr.height >= innerHeight - 1;
-        // BERÜHREN zählt mit (2 px Spiel): ein Ziel, das der Browser dank `scroll-margin`
-        // bündig UNTER die Kopfzeile rollt, war an ihr — überlappen tut es gerade nicht.
-        if (
-          !schirmfuellend &&
-          zr.left <= kr.right + 2 &&
-          zr.right >= kr.left - 2 &&
-          zr.top <= kr.bottom + 2 &&
-          zr.bottom >= kr.top - 2
-        ) {
-          beruehrt = true;
-          if (el.matches('.ant-table-sticky-holder')) anTabellenkopf = true;
+    const schritt = await page.evaluate(
+      ({ zusatz, region }) => {
+        const fokus = document.activeElement;
+        if (fokus == null || fokus === document.body || fokus === document.documentElement) {
+          return null;
         }
-        const umschliesst =
-          zr.left >= kr.left - 0.5 &&
-          zr.right <= kr.right + 0.5 &&
-          zr.top >= kr.top - 0.5 &&
-          zr.bottom <= kr.bottom + 0.5;
-        if (!umschliesst || punktGehoertZiel || beschreibung != null) continue;
-        beschreibung =
-          `${ziel.tagName.toLowerCase()}[${(ziel.getAttribute('aria-label') ?? ziel.textContent ?? '').trim().slice(0, 30)}] ` +
-          `bei (${Math.round(zr.x)},${Math.round(zr.y)}) ${Math.round(zr.width)}×${Math.round(zr.height)} ` +
-          `vollständig hinter ${el.tagName.toLowerCase()}.${String(el.className).slice(0, 40)} ` +
-          `(${getComputedStyle(el).position}); am Mittelpunkt liegt ` +
-          `${amPunkt == null ? 'nichts' : `${amPunkt.tagName.toLowerCase()}.${String(amPunkt.className).slice(0, 30)}`}`;
-        // Kein `break`: die Überlappung weiterer Kandidaten zählt mit, der Befund bleibt der erste.
-      }
-      return {
-        beschreibung,
-        inTabelle: ziel.closest('.ant-table') != null,
-        kandidaten: kandidaten.length,
-        kennung: fokus.getAttribute('data-e2e-fokus'),
-        beruehrt,
-        anTabellenkopf,
-      };
-    });
+        // Der innere Combobox-/Zahleneingabe-Input ist kleiner als das sichtbare Fokusziel.
+        // Radio-Knopf (LFH-677): antd setzt dessen `input` auf 0 × 0 — ohne die Hülle fiele der
+        // Stopp unten als „keine Fläche" still aus der Zählung. Normales Radio und Checkbox
+        // brauchen das nicht: ihr `input` deckt Kreis bzw. Kästchen.
+        const ziel =
+          fokus.closest(
+            '.ant-select, .ant-input-number, .ant-input-affix-wrapper, .ant-radio-button-wrapper',
+          ) ?? fokus;
+        const zr = ziel.getBoundingClientRect();
+        if (zr.width === 0 || zr.height === 0) {
+          return {
+            beschreibung: null,
+            inTabelle: false,
+            kandidaten: 0,
+            kennung: null,
+            beruehrt: false,
+            anTabellenkopf: false,
+            inRegion: false,
+          };
+        }
+
+        const kandidaten = Array.from(document.querySelectorAll('body *')).filter((el) => {
+          const stil = getComputedStyle(el);
+          if (stil.position !== 'sticky' && stil.position !== 'fixed') return false;
+          if (stil.visibility === 'hidden' || stil.display === 'none') return false;
+          return !el.contains(ziel);
+        });
+        // Opt-in (LFH-373): die benannten Zusatzverdecker, mit denselben Ausschlüssen.
+        for (const sel of zusatz) {
+          for (const el of Array.from(document.querySelectorAll(sel))) {
+            if (kandidaten.includes(el) || el.contains(ziel)) continue;
+            const stil = getComputedStyle(el);
+            if (stil.visibility === 'hidden' || stil.display === 'none') continue;
+            kandidaten.push(el);
+          }
+        }
+
+        const mx = zr.x + zr.width / 2;
+        const my = zr.y + zr.height / 2;
+        const amPunkt = document.elementFromPoint(mx, my);
+        const punktGehoertZiel = amPunkt != null && (amPunkt === ziel || ziel.contains(amPunkt));
+
+        let beschreibung: string | null = null;
+        let beruehrt = false;
+        let anTabellenkopf = false;
+        for (const el of kandidaten) {
+          const kr = el.getBoundingClientRect();
+          const schirmfuellend = kr.width >= innerWidth - 1 && kr.height >= innerHeight - 1;
+          // BERÜHREN zählt mit (2 px Spiel): ein Ziel, das der Browser dank `scroll-margin`
+          // bündig UNTER die Kopfzeile rollt, war an ihr — überlappen tut es gerade nicht.
+          if (
+            !schirmfuellend &&
+            zr.left <= kr.right + 2 &&
+            zr.right >= kr.left - 2 &&
+            zr.top <= kr.bottom + 2 &&
+            zr.bottom >= kr.top - 2
+          ) {
+            beruehrt = true;
+            if (el.matches('.ant-table-sticky-holder')) anTabellenkopf = true;
+          }
+          const umschliesst =
+            zr.left >= kr.left - 0.5 &&
+            zr.right <= kr.right + 0.5 &&
+            zr.top >= kr.top - 0.5 &&
+            zr.bottom <= kr.bottom + 0.5;
+          if (!umschliesst || punktGehoertZiel || beschreibung != null) continue;
+          beschreibung =
+            `${ziel.tagName.toLowerCase()}[${(ziel.getAttribute('aria-label') ?? ziel.textContent ?? '').trim().slice(0, 30)}] ` +
+            `bei (${Math.round(zr.x)},${Math.round(zr.y)}) ${Math.round(zr.width)}×${Math.round(zr.height)} ` +
+            `vollständig hinter ${el.tagName.toLowerCase()}.${String(el.className).slice(0, 40)} ` +
+            `(${getComputedStyle(el).position}); am Mittelpunkt liegt ` +
+            `${amPunkt == null ? 'nichts' : `${amPunkt.tagName.toLowerCase()}.${String(amPunkt.className).slice(0, 30)}`}`;
+          // Kein `break`: die Überlappung weiterer Kandidaten zählt mit, der Befund bleibt der erste.
+        }
+        return {
+          beschreibung,
+          inTabelle: ziel.closest('.ant-table') != null,
+          kandidaten: kandidaten.length,
+          kennung: fokus.getAttribute('data-e2e-fokus'),
+          beruehrt,
+          anTabellenkopf,
+          inRegion: region != null && ziel.closest(region) != null,
+        };
+      },
+      { zusatz: optionen.zusatzKandidaten ?? [], region: optionen.region ?? null },
+    );
 
     if (schritt == null) continue;
     stoppsGesamt += 1;
     if (schritt.inTabelle) stoppsInTabelle += 1;
     if (schritt.beruehrt) stoppsBeruehrt += 1;
     if (schritt.anTabellenkopf) stoppsAnTabellenkopf += 1;
+    if (schritt.inRegion) stoppsInRegion += 1;
     fixierteKandidaten = Math.max(fixierteKandidaten, schritt.kandidaten);
     if (schritt.beschreibung) verdeckt.push(schritt.beschreibung);
     if (schritt.kennung) besuchteZiele.add(schritt.kennung);
@@ -173,5 +218,6 @@ export async function pruefeFokusVerdeckung(
     besuchteZiele: [...besuchteZiele],
     stoppsBeruehrt,
     stoppsAnTabellenkopf,
+    stoppsInRegion,
   };
 }

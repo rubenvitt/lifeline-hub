@@ -43,6 +43,15 @@ interface Props {
    * einen Markdown-Render je Tastenanschlag kostet: die ETB-Schnellerfassung druckt nicht.
    */
   druckfassung?: boolean;
+  /**
+   * Nur `toggle`: der Aufrufer führt den Vorschau-Umschalter selbst (LFH-373). Der eigene
+   * Knopf unter dem Feld entfällt, die Vorschau folgt {@link vorschauOffen}. Gebraucht von der
+   * ETB-Erfassung, wo die eigene Knopfzeile im Handschuh-Betrieb eine volle Steuerhöhe der
+   * angepinnten Leiste kostete.
+   */
+  umschalterAussen?: boolean;
+  /** Nur mit {@link umschalterAussen}: ob die Vorschau offen ist. */
+  vorschauOffen?: boolean;
 }
 
 /**
@@ -66,6 +75,8 @@ const MarkdownEditor = forwardRef<TextAreaRef, Props>(function MarkdownEditor(
     id,
     onKeyDown,
     druckfassung = false,
+    umschalterAussen = false,
+    vorschauOffen: vorschauOffenAussen = false,
   },
   ref,
 ) {
@@ -94,18 +105,21 @@ const MarkdownEditor = forwardRef<TextAreaRef, Props>(function MarkdownEditor(
   );
 
   if (layout === 'toggle') {
+    const offen = umschalterAussen ? vorschauOffenAussen : vorschauOffen;
     return (
       <div className="markdown-editor markdown-editor--toggle">
         {textfeld}
-        <div style={{ marginTop: 4 }}>
-          <Button type="text" icon={<EyeOutlined />} onClick={() => setVorschauOffen((v) => !v)}>
-            Vorschau
-          </Button>
-        </div>
-        {vorschauOffen && <div className="markdown-editor__vorschau">{vorschau}</div>}
+        {!umschalterAussen && (
+          <div style={{ marginTop: 4 }}>
+            <Button type="text" icon={<EyeOutlined />} onClick={() => setVorschauOffen((v) => !v)}>
+              Vorschau
+            </Button>
+          </div>
+        )}
+        {offen && <div className="markdown-editor__vorschau">{vorschau}</div>}
         {/* Genau EINE gerenderte Fassung im Baum: ist die Vorschau offen, trägt sie den Text.
             Leer wie im Lesezweig (`LageberichtText`): „—", kein „Noch nichts zu zeigen". */}
-        {druckfassung && !vorschauOffen && (
+        {druckfassung && !offen && (
           // Nur Papier: `aria-hidden` sagt dem Zugänglichkeitsbaum dasselbe wie das
           // `display: none` am Bildschirm, auch ohne geladenes CSS (Muster Druckkopf).
           <div className="markdown-editor__druck" aria-hidden>

@@ -34,10 +34,7 @@ fn sse_personal(state: &AppState, einsatz_id: i64, ep_id: i64) {
 
 /// Personen-Bezeichnung für ETB-Texte: Name, optional mit Funktion in Klammern.
 fn person_bezeichnung(a: &EinsatzPersonalAnzeige) -> String {
-    match a.funktion.as_deref() {
-        Some(f) if !f.is_empty() => format!("{} ({})", a.name, f),
-        _ => a.name.clone(),
-    }
+    crate::personal::etb_bezeichnung(&a.name, a.funktion.as_deref())
 }
 
 /// Validiert eine optionale Stärke-Position gegen das Enum (leer/None erlaubt).
@@ -161,7 +158,7 @@ pub async fn disponieren(
         &state,
         einsatz_id,
         benutzer.id,
-        &format!("Person «{}» disponiert", person_bezeichnung(&anzeige)),
+        &crate::personal::etb_text_disponiert(&anzeige.name, anzeige.funktion.as_deref()),
     )
     .await?;
     sse_personal(&state, einsatz_id, ep_id);

@@ -262,6 +262,25 @@ export function istRueckmeldungenKey(key: readonly unknown[]): boolean {
   return key[0] === EINSATZ_KEYS.meldungen && key[2] === RUECKMELDUNGEN_SUBKEY;
 }
 
+/** Alle einsatz-scoped Prefixe als Menge — Grundlage von {@link istKeyDesEinsatzes}. */
+const EINSATZ_PREFIXE: ReadonlySet<unknown> = new Set<unknown>(Object.values(EINSATZ_KEYS));
+
+/**
+ * Trifft JEDEN einsatz-scoped Key eines Einsatzes, Listen wie Detail- und Sub-Keys (LFH-690).
+ *
+ * Gebraucht nach Import, Neu-Import und Entfernen der Demo-Daten: der Demo-Einsatz ist danach
+ * weg oder ein anderer, und jeder offene Stand von ihm ist veraltet. Ein Prefix-Match reicht
+ * dafür nicht — die Einsatz-ID steht an Stelle 1 hinter rund sechzig verschiedenen Prefixen.
+ * Gemessen: alle Accessoren von {@link einsatzKeys} tragen `einsatzId` an Stelle 1.
+ *
+ * Nur für `invalidateQueries({ predicate })`. Ein `removeQueries` damit wäre die erste
+ * Mengen-Räumung im Produktivcode und löste die XOR-Auflage aus dem Kopf von
+ * {@link GLOBAL_KEYS} aus.
+ */
+export function istKeyDesEinsatzes(key: readonly unknown[], einsatzId: number): boolean {
+  return EINSATZ_PREFIXE.has(key[0]) && key[1] === einsatzId;
+}
+
 export const einsatzKeys = {
   // Einsatz-Stammdaten
   // einsatzId nullbar: das Command-Palette lädt den Einsatz nur wenn im Einsatzkontext
@@ -428,7 +447,7 @@ export const einsatzKeys = {
 /**
  * Query-Key-Prefixe für alles, was NICHT unter einer `einsatzId` hängt.
  *
- * Name bewusst `GLOBAL_KEYS` und nicht `ORG_KEYS`: drei der 23 Prefixe sind gar nicht
+ * Name bewusst `GLOBAL_KEYS` und nicht `ORG_KEYS`: drei der 24 Prefixe sind gar nicht
  * mandantenbezogen — `admin-karte` und `karte-config` sind instanzweit (eine Kartenkonfiguration
  * pro Installation), `fachebene` bezeichnet externe Fremdquellen
  * (NINA/DWD/PEGELONLINE/HOCHWASSER/KRITIS/AUTOBAHN/ODL).
@@ -454,6 +473,9 @@ export const GLOBAL_KEYS = {
   authProvider: 'auth-provider',
   // Präferenzen des ANGEMELDETEN Benutzers (LFH-391 · Etappe D).
   benutzerEinstellungen: 'benutzer-einstellungen',
+  // Stand der Demo-Daten der eigenen Organisation (LFH-690). Nur für den System-Admin
+  // abgefragt; 404 heißt „nicht freigeschaltet“ (design.md D2).
+  demoDaten: 'demo-daten',
 
   // Stammdaten-Kataloge
   personal: 'personal',
@@ -519,6 +541,7 @@ export const globalKeys = {
   orgEinstellungen: () => [GLOBAL_KEYS.orgEinstellungen] as const,
   orgModulEinstellungen: () => [GLOBAL_KEYS.orgModulEinstellungen] as const,
   authProvider: () => [GLOBAL_KEYS.authProvider] as const,
+  demoDaten: () => [GLOBAL_KEYS.demoDaten] as const,
 
   // Stammdaten-Kataloge ohne Filter
   qualifikationen: () => [GLOBAL_KEYS.qualifikationen] as const,
@@ -559,7 +582,7 @@ export const globalKeys = {
    * — beim Abmelden räumen — scheidet aus, weil es dafür GAR KEINEN Mechanismus gibt
    * (gemessen: kein `qc.clear`/`removeQueries`/`resetQueries` im Produktivcode, `logout()`
    * setzt allein `benutzer` auf `null`); einen einzuführen wäre eine querschnittliche
-   * Entscheidung über alle 23 Prefixe und griffe ausserdem nicht, wenn die Sitzung ohne
+   * Entscheidung über alle 24 Prefixe und griffe ausserdem nicht, wenn die Sitzung ohne
    * Abmeldung endet (401 → Sitzungswache → jemand anders meldet sich an).
    *
    * `null` steht für „niemand angemeldet" und ist ein zulässiges Key-Element wie die `bbox`

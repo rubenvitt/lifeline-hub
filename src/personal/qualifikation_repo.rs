@@ -8,8 +8,11 @@ use sqlx::SqlitePool;
 /// `disposition_repo` verwendet die identische geordnete Subquery — beide MÜSSEN
 /// dieselbe Ausgabe erzeugen (Test `funktion_komposition_identisch` in Task 8).
 /// `None`, wenn die Person keine aktive Qualifikation hat.
+///
+/// Executor-generisch (Pool oder offene Verbindung): `disposition_repo::disponiere_stamm_tx`
+/// liest auf der Verbindung seiner Transaktion (LFH-690).
 pub async fn funktion_text(
-    pool: &SqlitePool,
+    executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
     personal_id: i64,
 ) -> Result<Option<String>, AppError> {
     sqlx::query_scalar::<_, Option<String>>(
@@ -21,7 +24,7 @@ pub async fn funktion_text(
          )",
     )
     .bind(personal_id)
-    .fetch_one(pool)
+    .fetch_one(executor)
     .await
     .map_err(Into::into)
 }
