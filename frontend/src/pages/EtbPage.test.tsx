@@ -1092,3 +1092,36 @@ describe('EtbPage – Zeitachse (Neuentwurf S4)', () => {
     expect(await screen.findAllByText('Offline-Eintrag')).not.toHaveLength(0);
   });
 });
+
+describe('EtbPage – Anhänge an der Erfassung (LFH-117, Review C1)', () => {
+  function dateiEingabe(): HTMLInputElement {
+    const el = document.querySelector<HTMLInputElement>('input[data-lfh="etb-anhang-eingabe"]');
+    if (!el) throw new Error('Dateieingabe fehlt');
+    return el;
+  }
+
+  it('sperrt „Berichtigen", solange ein Entwurf sendet — mit Grund', async () => {
+    setup('/einsaetze/7/etb', [
+      http.post('/api/einsaetze/7/etb/anhaenge', () => new Promise<Response>(() => {})),
+    ]);
+    const user = userEvent.setup();
+    await screen.findByText('Erste Meldung');
+    const feld = await screen.findByPlaceholderText(/Inhalt/);
+    await user.upload(dateiEingabe(), new File(['x'], 'foto.jpg', { type: 'image/jpeg' }));
+    await user.type(feld, 'Foto{Enter}');
+    await screen.findByText('Lädt hoch (1/1) …');
+
+    await user.click(await screen.findByRole('button', { name: /^Aktionen zu Eintrag/ }));
+    const menue = document.querySelector<HTMLElement>(
+      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+    );
+    if (!menue) throw new Error('Menü nicht offen');
+    const punkt = within(menue).getByRole('menuitem', { name: /Berichtigen/ });
+    expect(punkt).toHaveAttribute('aria-disabled', 'true');
+    expect(punkt).toHaveTextContent('erst nach dem Senden');
+    await user.click(punkt);
+    // Die Entwurfs-Reiter stehen weiter — keine Berichtigung hat sie ersetzt.
+    expect(screen.queryByText(/Berichtigung zu Nr\./)).toBeNull();
+    expect(screen.getByText('Lädt hoch (1/1) …')).toBeInTheDocument();
+  });
+});

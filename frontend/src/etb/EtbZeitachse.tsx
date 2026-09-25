@@ -59,6 +59,11 @@ interface Props {
   eigeneBenutzerId?: number | null;
   /** Wenn gesetzt, bietet jeder Eintrag „Berichtigen" an (nicht an einer Berichtigung). */
   onBerichtigen?: (eintrag: EtbEintragAnzeige) => void;
+  /**
+   * Grund, aus dem „Berichtigen" gerade gesperrt ist (LFH-117, Review C1: ein Entwurf sendet
+   * noch). Der Punkt bleibt sichtbar und nennt den Grund — ein fehlender Punkt sagte nicht, warum.
+   */
+  berichtigenGesperrt?: string;
   /** Wenn gesetzt, bietet jeder Eintrag „Wiedervorlage" an (ETB→Erinnerung, LFH-106). */
   onWiedervorlage?: (eintrag: EtbEintragAnzeige) => void;
   /** Wenn gesetzt, bietet jeder Eintrag „Auftrag erteilen" an (ETB→Auftrag, LFH-112). */
@@ -152,6 +157,7 @@ export default function EtbZeitachse({
   sprungMarke,
   eigeneBenutzerId,
   onBerichtigen,
+  berichtigenGesperrt,
   onWiedervorlage,
   onAuftragErteilen,
   onErneutSenden,
@@ -217,7 +223,13 @@ export default function EtbZeitachse({
     const e = z.eintrag;
     const items = [
       ...(onBerichtigen && e.typ !== 'berichtigung'
-        ? [{ key: 'berichtigen', label: 'Berichtigen' }]
+        ? [
+            {
+              key: 'berichtigen',
+              label: berichtigenGesperrt ? `Berichtigen (${berichtigenGesperrt})` : 'Berichtigen',
+              disabled: !!berichtigenGesperrt,
+            },
+          ]
         : []),
       ...(onWiedervorlage ? [{ key: 'wiedervorlage', label: 'Wiedervorlage' }] : []),
       ...(onAuftragErteilen ? [{ key: 'auftrag', label: 'Auftrag erteilen' }] : []),

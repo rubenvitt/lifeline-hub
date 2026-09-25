@@ -72,7 +72,26 @@ interface Props {
    * Schnellerfassung eine eigene bis zum Erfolg (Berichtigung).
    */
   clientId?: string;
+  /**
+   * Sendezustand, optional von außen geführt (LFH-117, Review C1). Nur der aktive Entwurfs-Tab
+   * ist montiert; läge der Zustand hier, stünde nach einem Tabwechsel während eines Uploads
+   * eine frische, ENTSPERRTE Schnellerfassung da — und was man dort tippte, verwarf der noch
+   * laufende Versand still. `EtbEntwurfsTabs` hält ihn deshalb je Entwurf. Fehlt das Paar,
+   * führt die Schnellerfassung ihn selbst (Berichtigung).
+   */
+  versand?: Versand;
+  onVersandChange?: (aenderung: Partial<Versand>) => void;
 }
+
+/** Sendezustand einer Erfassung: läuft ein Versand, wie weit der Upload ist, welcher Grund steht. */
+export interface Versand {
+  sendet: boolean;
+  fortschritt: { n: number; von: number } | null;
+  /** Hinweis an der Dateiliste — bleibt stehen bis zur nächsten Wahl oder zum nächsten Absenden. */
+  hinweis: string | null;
+}
+
+export const VERSAND_RUHE: Versand = { sendet: false, fortschritt: null, hinweis: null };
 
 /**
  * Welche Datei schon oben liegt (LFH-117, design.md D9): bei einem Teilausfall — Datei 1
@@ -184,6 +203,8 @@ export default function Schnellerfassung({
   dateien: dateienVonAussen,
   onDateienChange,
   clientId,
+  versand: versandVonAussen,
+  onVersandChange,
 }: Props) {
   const navigate = useNavigate();
   const { token, rollen } = useRollen();
@@ -201,9 +222,15 @@ export default function Schnellerfassung({
     if (onDateienChange) onDateienChange(neu);
     else setEigeneDateien(neu);
   }
-  /** Hinweis an der Dateiliste — bleibt stehen bis zur nächsten Wahl oder zum nächsten Absenden. */
-  const [anhangHinweis, setAnhangHinweis] = useState<string | null>(null);
-  const [fortschritt, setFortschritt] = useState<{ n: number; von: number } | null>(null);
+  const [eigenerVersand, setEigenerVersand] = useState<Versand>(VERSAND_RUHE);
+  const { sendet, fortschritt, hinweis: anhangHinweis } = versandVonAussen ?? eigenerVersand;
+  /** Funktional gemergt: der laufende Versand schreibt aus einer alten Closure heraus. */
+  function aendereVersand(aenderung: Partial<Versand>) {
+    if (onVersandChange) onVersandChange(aenderung);
+    else setEigenerVersand((v) => ({ ...v, ...aenderung }));
+  }
+  const setAnhangHinweis = (hinweis: string | null) => aendereVersand({ hinweis });
+  const setFortschritt = (f: Versand['fortschritt']) => aendereVersand({ fortschritt: f });
   /** Eigener Schlüssel ohne Aufrufer-id: stabil über Fehlversuche, neu nach jedem Erfolg. */
   const eigeneClientId = useRef<string>(crypto.randomUUID());
   const menuRef = useRef<SlashMenuHandle>(null);
@@ -231,7 +258,6 @@ export default function Schnellerfassung({
     if (editFeld == null) zeile.scrollLeft = 0;
     else if (ziel && zeile.contains(ziel)) rolleWaagerechtInsBild(zeile, ziel);
   }, [editFeld, istSchmal]);
-  const [sendet, setSendet] = useState(false);
 
   const [menuOffen, setMenuOffen] = useState(false);
   const [menuFilter, setMenuFilter] = useState('');
@@ -465,8 +491,7 @@ export default function Schnellerfassung({
     // Die Zeit gilt ab dem Absenden, nicht ab dem Ende des Uploads — sonst verschöbe ein
     // langer Upload Ereigniszeit und `erfasst_lokal_at` (Review LFH-117).
     const jetztIso = new Date().toISOString();
-    setSendet(true);
-    setAnhangHinweis(null);
+    aendereVersand({ sendet: true, hinweis: null });
     try {
       const anhangIds = await ladeAnhaengeHoch();
       setFortschritt(null);
@@ -507,8 +532,7 @@ export default function Schnellerfassung({
       // Wortlaut bleibt im Feld stehen (Erfassungs-Norm, `onErfassen` muss ablehnen).
       // Weiterwerfen hieße hier nur eine unbehandelte Zurückweisung aus `void absenden()`.
     } finally {
-      setSendet(false);
-      setFortschritt(null);
+      aendereVersand({ sendet: false, fortschritt: null });
     }
   }
 

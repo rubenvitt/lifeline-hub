@@ -293,6 +293,22 @@ describe('EtbZeitachse – Aktionsmenü (LFH-365 · B5e)', () => {
     expect(onBerichtigen).toHaveBeenCalledWith(expect.objectContaining({ id: 4 }));
   });
 
+  it('LFH-117: sperrt „Berichtigen" mit sichtbarem Grund, solange ein Entwurf sendet', async () => {
+    const onBerichtigen = vi.fn();
+    renderZeitachse({
+      eintraege: [eintrag({ id: 4, lfd_nr: 17 })],
+      ...alle,
+      onBerichtigen,
+      berichtigenGesperrt: 'erst nach dem Senden',
+    });
+    const menue = await oeffneMenue(17);
+    const punkt = within(menue).getByRole('menuitem', { name: /Berichtigen/ });
+    expect(punkt).toHaveTextContent('Berichtigen (erst nach dem Senden)');
+    expect(punkt).toHaveAttribute('aria-disabled', 'true');
+    await userEvent.click(punkt);
+    expect(onBerichtigen).not.toHaveBeenCalled();
+  });
+
   it('lässt „Berichtigen" an einer Berichtigung weg', async () => {
     renderZeitachse({
       eintraege: [eintrag({ id: 2, lfd_nr: 2, typ: 'berichtigung', berichtigt_eintrag_id: 1 })],

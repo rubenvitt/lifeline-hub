@@ -223,6 +223,12 @@ export default function EtbPage() {
    * verlassen wird.
    */
   const [werteBehalten, setWerteBehalten] = useState(false);
+  /**
+   * Ob ein Entwurf gerade sendet (LFH-117, Review C1). Solange, ist „Berichtigen" gesperrt:
+   * die Berichtigung ersetzt die Entwurfs-Reiter, und ein laufender Upload verlöre dabei
+   * seinen sichtbaren Zustand samt einem möglichen Fehlergrund.
+   */
+  const [entwurfSendet, setEntwurfSendet] = useState(false);
   const [wiedervorlageZu, setWiedervorlageZu] = useState<{
     eintrag: EtbEintragAnzeige;
     termin?: string | null;
@@ -493,6 +499,7 @@ export default function EtbPage() {
           kontextLaedt={einsatzQuery.isFetching}
           werteBehalten={werteBehalten}
           onWerteBehaltenChange={setWerteBehalten}
+          onSendetChange={setEntwurfSendet}
         />
       )}
     </div>
@@ -646,6 +653,7 @@ export default function EtbPage() {
               fehler={etbQuery.isError}
               leerText={leerInhalt}
               onBerichtigen={darfSchreiben ? (e) => setBerichtigungZu(e) : undefined}
+              berichtigenGesperrt={entwurfSendet ? 'erst nach dem Senden' : undefined}
               onWiedervorlage={darfSchreiben ? oeffneWiedervorlage : undefined}
               onAuftragErteilen={darfSchreiben ? (e) => setAuftragZu(e) : undefined}
               onErneutSenden={(p) => void abgelehntErneutSenden(p)}
