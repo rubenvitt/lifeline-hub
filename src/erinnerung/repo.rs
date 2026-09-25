@@ -35,13 +35,20 @@ const ANZEIGE_SELECT: &str =
 
 /// Lädt eine Erinnerung als Anzeige. `NotFound`, wenn sie nicht existiert.
 /// Bind-Reihenfolge: zuerst `jetzt` (computed column), dann `id` (WHERE).
-pub async fn laden(pool: &SqlitePool, id: i64, jetzt: &str) -> Result<ErinnerungAnzeige, AppError> {
+///
+/// Executor-generisch (Pool oder offene Verbindung): [`anlegen_tx`] lädt auf der
+/// Verbindung seiner Transaktion (LFH-690).
+pub async fn laden(
+    executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
+    id: i64,
+    jetzt: &str,
+) -> Result<ErinnerungAnzeige, AppError> {
     sqlx::query_as::<_, ErinnerungAnzeige>(sqlx::AssertSqlSafe(format!(
         "{ANZEIGE_SELECT} WHERE e.id = ?"
     )))
     .bind(jetzt)
     .bind(id)
-    .fetch_optional(pool)
+    .fetch_optional(executor)
     .await?
     .ok_or(AppError::NotFound)
 }
@@ -69,11 +76,29 @@ pub async fn liste(
 }
 
 /// Legt eine manuelle Erinnerung an und liefert sie als Anzeige.
+///
+/// Pool-Hülle um [`anlegen_tx`]: wie bisher ohne eigene Transaktion, Insert und Rücklesen
+/// laufen im Autocommit einer geliehenen Verbindung.
 pub async fn anlegen(
     pool: &SqlitePool,
     einsatz_id: i64,
     ersteller_id: i64,
     daten: ErinnerungDaten<'_>,
+    jetzt: &str,
+) -> Result<ErinnerungAnzeige, AppError> {
+    let mut conn = pool.acquire().await?;
+    anlegen_tx(&mut conn, einsatz_id, ersteller_id, &daten, jetzt).await
+}
+
+/// Legt eine manuelle Erinnerung (Status `offen`) auf einer offenen Verbindung/Transaktion an
+/// und lädt sie dort zurück (LFH-690, Demo-Import in EINER Transaktion). Öffnet und committet
+/// selbst nichts. Die Bezugsprüfung (both-or-neither, Existenz im Einsatz) liegt im Handler
+/// (`routes/erinnerung.rs`) und ist hier nicht enthalten.
+pub async fn anlegen_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    ersteller_id: i64,
+    daten: &ErinnerungDaten<'_>,
     jetzt: &str,
 ) -> Result<ErinnerungAnzeige, AppError> {
     let id: i64 = sqlx::query_scalar(
@@ -91,9 +116,9 @@ pub async fn anlegen(
     .bind(daten.bezug_typ)
     .bind(daten.bezug_id)
     .bind(ersteller_id)
-    .fetch_one(pool)
+    .fetch_one(&mut *conn)
     .await?;
-    laden(pool, id, jetzt).await
+    laden(&mut *conn, id, jetzt).await
 }
 
 /// Prüft, ob eine Erinnerung zum Einsatz gehört (Cross-Einsatz-Schutz).
@@ -113,8 +138,24 @@ pub async fn gehoert_zu_einsatz(
 
 /// Setzt den Status (erledigt/quittiert) und `erledigt_at = jetzt`.
 /// Nur erlaubte Zielstatus; sonst `Validation`.
+///
+/// Pool-Hülle um [`status_setzen_tx`]: wie bisher ohne eigene Transaktion, UPDATE und
+/// Rücklesen laufen im Autocommit einer geliehenen Verbindung.
 pub async fn status_setzen(
     pool: &SqlitePool,
+    id: i64,
+    neuer_status: &str,
+    jetzt: &str,
+) -> Result<ErinnerungAnzeige, AppError> {
+    let mut conn = pool.acquire().await?;
+    status_setzen_tx(&mut conn, id, neuer_status, jetzt).await
+}
+
+/// Wie [`status_setzen`], auf einer offenen Verbindung/Transaktion (LFH-690: der Demo-Import
+/// legt vergangene Erinnerungen in EINER Transaktion als erledigt an, design.md D10).
+/// Öffnet und committet selbst nichts.
+pub async fn status_setzen_tx(
+    conn: &mut SqliteConnection,
     id: i64,
     neuer_status: &str,
     jetzt: &str,
@@ -126,9 +167,9 @@ pub async fn status_setzen(
         .bind(neuer_status)
         .bind(jetzt)
         .bind(id)
-        .execute(pool)
+        .execute(&mut *conn)
         .await?;
-    laden(pool, id, jetzt).await
+    laden(&mut *conn, id, jetzt).await
 }
 
 /// Setzt eine erledigte/quittierte Erinnerung auf `offen` zurück (LFH-343 · C8).

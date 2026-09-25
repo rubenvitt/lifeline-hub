@@ -102,6 +102,48 @@ test('Selbstbeweis: der Messkern meldet eine erfundene Verdeckung', async ({ pag
   ).toBeGreaterThan(0);
 });
 
+test('Selbstbeweis (LFH-373): Zusatzkandidaten machen einen ABSOLUTEN Verdecker sichtbar — ohne sie nicht', async ({
+  page,
+}) => {
+  // Die Kartenaufbauten der Lage- und Personenkarte sind `position: absolute`. Die Vorgabe des
+  // Kerns wertet nur `sticky|fixed` — ein Lauf dort wäre grün durch Konstruktion. Dieser Test
+  // belegt beide Hälften der Opt-in-Erweiterung: mit `zusatzKandidaten` findet der Kern die
+  // Verdeckung, OHNE sie findet er sie nicht. Die zweite Hälfte ist die schärfere: sie zeigt,
+  // dass die Vorgabe die Option nicht still mitenthält, dass also die Bestandsaufrufer
+  // unverändert rechnen.
+  await anmelden(page);
+  await page.setViewportSize({ width: 390, height: 400 });
+
+  const laufMitAttrappe = async (optionen?: { zusatzKandidaten: string[] }) => {
+    await page.goto('/admin/benutzer');
+    await expect(page.locator('tr.ant-table-row').first()).toBeVisible();
+    // Absolut über das GANZE Dokument, nicht über den Schirm: sonst läge ein Ziel nach dem
+    // Bildlauf außerhalb der Attrappe und der Befund hinge an der Scrollposition.
+    await page.evaluate(() => {
+      const hoehe = document.scrollingElement!.scrollHeight;
+      document.body.append(
+        Object.assign(document.createElement('div'), {
+          className: 'e2e-absolut-verdecker',
+          style: `position:absolute;top:0;left:0;width:100%;height:${hoehe}px;background:#000;z-index:2000`,
+        }),
+      );
+    });
+    return pruefeFokusVerdeckung(page, 10, 'Tab', optionen);
+  };
+
+  const ohne = await laufMitAttrappe();
+  const mit = await laufMitAttrappe({ zusatzKandidaten: ['.e2e-absolut-verdecker'] });
+  expect(mit.stoppsGesamt, 'Vorbedingung: der Durchlauf muss irgendwo landen').toBeGreaterThan(0);
+  expect(
+    mit.verdeckt.length,
+    `mit Zusatzkandidat muss der Kern die absolute Attrappe finden (${mit.stoppsGesamt} Stopps)`,
+  ).toBeGreaterThan(0);
+  expect(
+    ohne.verdeckt,
+    'ohne Zusatzkandidat bleibt der absolute Verdecker unsichtbar — die Vorgabe ist unverändert',
+  ).toEqual([]);
+});
+
 test('Katalogtabelle: Tabulaturdurchlauf hinter stehender Kopfzeile und fixierter erster Spalte', async ({
   page,
 }) => {
@@ -570,4 +612,578 @@ test('Modulpanel: der klebende Einsatzdauer-Fuß verdeckt kein fokussiertes Modu
   }
   expect(unterDemFussGestartet, 'mindestens eine Lage beginnt unter dem Fuß').toBeGreaterThan(0);
   expect(befunde, befunde.join('\n')).toEqual([]);
+});
+
+// ── LFH-373 ──────────────────────────────────────────────────────────────────────────────
+//
+// MUTATIONSPROBE (25.09.2026, je Fix einzeln zurückgedreht): ETB ohne Fokusabstand → ROT;
+// Matrix ohne Spalten-Freiraum → ROT; Matrix ohne Kopf-Freiraum → ROT; Kartenfuß über die
+// Knopfspalte → ROT; Kern ignoriert `zusatzKandidaten` → Selbstbeweis ROT; Attrappe über
+// „Herauszoomen" der Personenkarte → ROT; Katalog ohne Kopf-Freiraum → Personenliste ROT —
+// dieser Fall überlebte zuerst (nur halb verdeckt, der Kern zählt vollständig) und hat die
+// Mittelpunkt-Prüfung `mittelpunktUnterKopf` hervorgebracht.
+
+/** Stellt die Dichte über den Weg eines wiederkehrenden Benutzers (localStorage + Neuladen)
+ *  und hält die Wache am `<html>` — Muster `stelleDichte` in `gate3-trefflaeche.spec.ts`. */
+async function stelleDichte(page: Page, dichte: string) {
+  await page.evaluate((wert) => localStorage.setItem('lifeline-hub.dichte', wert), dichte);
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+}
+
+/**
+ * Blendet den Öffnen-Knopf der TanStack-Query-Devtools aus (LFH-373). Er steht nur im
+ * DEV-Build (`main.tsx`, `ReactQueryDevtools`), gegen den die e2e-Suite fährt, als
+ * `position: fixed` unten rechts — auf 390 px lag er gemessen vollständig über einer
+ * Matrixzelle. Ein Verdecker, den es im Betrieb nicht gibt, ist kein Befund über die Seite.
+ * Per Init-Skript, weil `stelleDichte` neu lädt und ein `addStyleTag` dabei verloren ginge.
+ */
+async function ohneDevtoolsKnopf(page: Page) {
+  await page.addInitScript(() => {
+    document.addEventListener('DOMContentLoaded', () => {
+      const stil = document.createElement('style');
+      stil.textContent = '[class*="tsqd-open-btn"] { display: none !important; }';
+      document.head.append(stil);
+    });
+  });
+}
+
+/**
+ * Kleinster freier Streifen zwischen der UNTERKANTE eines angesteuerten Ziels und der
+ * OBERKANTE einer angepinnten Fußleiste, über `schritte` Tabulatorschritte. Gezählt werden
+ * nur Ziele mit `data-e2e-fokus`.
+ *
+ * WARUM NEBEN DEM KERN: der Kern meldet nur VOLLSTÄNDIGE Verdeckung (WCAG 2.4.11 Minimum).
+ * Ein Ziel, das zur Hälfte unter der Leiste steckt, ist dort frei — für die Bedienung aber
+ * nicht. Der Befehls-Spec hat eine verwandte Messung (`kleinsterFreiraum`), die auf dessen
+ * Formularfelder und Leiste zugeschnitten ist und sich deshalb nicht teilen lässt.
+ */
+async function kleinsterStreifen(page: Page, schritte: number, leiste: string): Promise<number> {
+  let kleinster = Number.POSITIVE_INFINITY;
+  for (let i = 0; i < schritte; i += 1) {
+    await page.keyboard.press('Tab');
+    const wert = await page.evaluate((sel) => {
+      const fokus = document.activeElement;
+      const l = document.querySelector(sel);
+      if (fokus == null || l == null || !fokus.hasAttribute('data-e2e-fokus')) return null;
+      return l.getBoundingClientRect().top - fokus.getBoundingClientRect().bottom;
+    }, leiste);
+    if (wert != null) kleinster = Math.min(kleinster, wert);
+  }
+  return kleinster;
+}
+
+/**
+ * ETB (LFH-373, Prüfliste ETB Zeile 13): die angepinnte Erfassungsleiste am Seitenfuß.
+ *
+ * GEMESSEN VOR DEM FIX (24.09.2026): beim Vorwärtstabben rollt der Browser jedes Ziel an den
+ * UNTEREN Rand des Fensters — genau dorthin, wo die Leiste klebt. Jeder zweite bis jeder
+ * Zeilenauslöser lag vollständig hinter ihr, auf beiden Breiten und in beiden Stufen.
+ *
+ * START AM ERSTEN AUSLÖSER, nicht am Dokumentanfang: die Erfassung fokussiert beim Einhängen
+ * ihr Textfeld am Seitenfuß, ein nacktes Tab nach `goto` liefe an der Zeitachse vorbei.
+ *
+ * KLEINE HÖHEN mit Absicht: ohne Bildlaufreserve klebt die Leiste am Seitenende statt über
+ * der Zeitachse, und „0 verdeckt" wäre trivial wahr. Deshalb 600 bzw. 520 px und 16 Einträge.
+ */
+test('ETB (LFH-373): kein Zeilenauslöser verschwindet beim Tabben hinter der Erfassungsleiste', async ({
+  page,
+}) => {
+  test.setTimeout(240_000);
+  await ohneDevtoolsKnopf(page);
+  await anmelden(page);
+  const antwort = await page.request.post('/api/einsaetze', {
+    data: { bezeichnung: `Fokus 373 Nord ${Date.now()}` },
+  });
+  expect(antwort.ok(), await antwort.text()).toBeTruthy();
+  const { id: einsatzId } = (await antwort.json()) as { id: number };
+  const ANZAHL = 16;
+  const ids: number[] = [];
+  for (let n = 1; n <= ANZAHL; n += 1) {
+    const eintrag = await page.request.post(`/api/einsaetze/${einsatzId}/etb`, {
+      data: {
+        typ: 'meldung',
+        inhalt: `Probe ${n}: Lage unverändert`,
+        von: 'ELW 1',
+        an: 'Leitstelle',
+      },
+    });
+    expect(eintrag.ok(), await eintrag.text()).toBeTruthy();
+    ids.push(((await eintrag.json()) as { id: number }).id);
+  }
+  // Zwei Berichtigungen, damit die Bilanz Links trägt (Review LFH-373): unter `xl` steht die
+  // Bilanz UNTER der Zeitachse, und seit die Leiste als Seitenfuß an der Wurzel hängt, klebt sie
+  // auch über der Bilanz — deren Links brauchen denselben Fokusabstand.
+  for (const ziel of ids.slice(0, 2)) {
+    const b = await page.request.post(`/api/einsaetze/${einsatzId}/etb`, {
+      data: {
+        typ: 'berichtigung',
+        inhalt: 'Berichtigung: Uhrzeit korrigiert',
+        berichtigt_eintrag_id: ziel,
+      },
+    });
+    expect(b.ok(), await b.text()).toBeTruthy();
+  }
+  const ZEILEN = ANZAHL + 2;
+
+  const gemessen: string[] = [];
+  const LEISTE = '.etb-erfassung-sticky';
+  for (const flaeche of [
+    { width: 390, height: 600 },
+    { width: 1366, height: 520 },
+  ]) {
+    await page.setViewportSize(flaeche);
+    for (const dichte of ['kompakt', 'handschuh']) {
+      const lauf = `${flaeche.width}×${flaeche.height}/${dichte}`;
+      await page.goto(`/einsaetze/${einsatzId}/etb`);
+      await stelleDichte(page, dichte);
+      const zeitachse = page.getByRole('region', { name: 'Einsatztagebuch' });
+      await expect(zeitachse.getByTestId('etb-ereigniszeile')).toHaveCount(ZEILEN);
+      await expect(page.locator(LEISTE)).toHaveCSS('position', 'sticky');
+
+      const ausloeser = zeitachse.getByRole('button', { name: /^Aktionen zu Eintrag \d+$/ });
+      expect(await ausloeser.count()).toBeGreaterThanOrEqual(ANZAHL);
+      await ausloeser.evaluateAll((els) =>
+        els.forEach((el) => el.setAttribute('data-e2e-fokus', el.getAttribute('aria-label')!)),
+      );
+      // Unter `xl` die Links der Bilanz mit — sie stehen dann unter der Zeitachse.
+      const bilanzLinks = page
+        .getByRole('complementary', { name: 'Bilanz des Tagebuchs' })
+        .getByRole('link');
+      const mitBilanz = flaeche.width < 1200;
+      let bilanzZiele: string[] = [];
+      if (mitBilanz) {
+        await expect.poll(() => bilanzLinks.count()).toBeGreaterThanOrEqual(2);
+        bilanzZiele = await bilanzLinks.evaluateAll((els) =>
+          els.map((el, i) => {
+            const kennung = `bilanz ${i}`;
+            el.setAttribute('data-e2e-fokus', kennung);
+            return kennung;
+          }),
+        );
+      }
+      const SCHRITTE = ZEILEN * 2 + 16;
+      const { reserve, leiste } = await page.evaluate((sel) => {
+        const l = document.querySelector(sel)!.getBoundingClientRect();
+        return {
+          reserve: document.documentElement.scrollHeight - document.documentElement.clientHeight,
+          leiste: Math.round(l.height),
+        };
+      }, LEISTE);
+      expect(
+        reserve,
+        `${lauf}: Vorbedingung — die Bildlaufreserve (${reserve}px) muss die Leiste (${leiste}px) übersteigen`,
+      ).toBeGreaterThan(leiste);
+
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await ausloeser.first().focus();
+      const kern = await pruefeFokusVerdeckung(page, SCHRITTE);
+      expect(
+        kern.besuchteZiele.length,
+        `${lauf}: Vorbedingung — der Durchlauf muss die Zeitachse ablaufen`,
+      ).toBeGreaterThanOrEqual(ANZAHL - 1);
+      for (const ziel of bilanzZiele) {
+        expect(kern.besuchteZiele, `${lauf}: Vorbedingung — ${ziel} besucht`).toContain(ziel);
+      }
+
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await ausloeser.first().focus();
+      const streifen = await kleinsterStreifen(page, SCHRITTE, LEISTE);
+
+      expect(kern.verdeckt, `${lauf}: vollständig verdeckt:\n${kern.verdeckt.join('\n')}`).toEqual(
+        [],
+      );
+      expect(
+        streifen,
+        `${lauf}: kleinster freier Streifen Ziel ↔ Leiste ${streifen}px, Soll > 0`,
+      ).toBeGreaterThan(0);
+      gemessen.push(
+        `${lauf}: Leiste ${leiste}px, ${kern.besuchteZiele.length} Ziele (davon Bilanz ${bilanzZiele.length}), Streifen ≥ ${Math.round(streifen)}px`,
+      );
+    }
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+/** Einsatz mit zwei Gefahrengebieten per API (Karte braucht WebGL, `POST …/zonen` nicht). */
+async function matrixEinsatz(page: Page): Promise<number> {
+  const antwort = await page.request.post('/api/einsaetze', {
+    data: { bezeichnung: `Fokus 373 Sued ${Date.now()}` },
+  });
+  expect(antwort.ok(), await antwort.text()).toBeTruthy();
+  const { id } = (await antwort.json()) as { id: number };
+  for (const [i, label] of ['Sektor Sued 1', 'Sektor Sued 2'].entries()) {
+    const x = 10 + i / 20;
+    const zone = await page.request.post(`/api/einsaetze/${id}/zonen`, {
+      data: {
+        typ: 'gefahrengebiet',
+        geometrie_typ: 'Polygon',
+        geometrie: JSON.stringify({
+          type: 'Polygon',
+          coordinates: [
+            [
+              [x, 50],
+              [x + 0.01, 50],
+              [x + 0.01, 50.01],
+              [x, 50.01],
+              [x, 50],
+            ],
+          ],
+        }),
+        label,
+      },
+    });
+    expect(zone.ok(), await zone.text()).toBeTruthy();
+  }
+  return id;
+}
+
+/**
+ * Gefahrenmatrix (LFH-373, Prüfliste B5h Zeile 13): stehende Kopfzeile und fixierte Spalte
+ * „Gefahr" gegenüber 58 Zell-Auslösern.
+ *
+ * STRUKTURELL ANDERS ALS DIE KATALOGTABELLEN: dort trägt eine Zeile ein, zwei Fokusziele, hier
+ * trägt JEDE Spalte eins. Beim Sprung von der letzten Zelle einer Zeile zur ersten der nächsten
+ * rollt der Tabellencontainer nach links, und der Browser richtet das Ziel am linken Rand des
+ * Scrollports aus — unter der 180 px breiten fixierten Spalte. GEMESSEN VOR DEM FIX
+ * (24.09.2026): vollständig verdeckt bei 390 px in allen Stufen, bei 1024 px in `kompakt`/
+ * `komfortabel`, bei 1366 px in `handschuh`.
+ *
+ * VORBEDINGUNG „die Tabelle läuft waagerecht über": ohne Überlauf rollt nichts, die fixierte
+ * Spalte steht nie vor einem Ziel, und „0 verdeckt" wäre trivial wahr.
+ *
+ * RÜCKWÄRTS eigens: vorwärts rollt ein Ziel an den UNTEREN Rand, unter die OBEN stehende
+ * Kopfzeile gerät es so nie (Kern, Abschnitt RICHTUNG). `Shift+Tab` von der letzten Zelle aus
+ * prüft die Kopfzeile, `stoppsAnTabellenkopf` belegt, dass der Lauf sie erreicht hat.
+ */
+test('Gefahrenmatrix (LFH-373): keine Zelle verschwindet beim Tabben unter der fixierten Spalte oder der Kopfzeile', async ({
+  page,
+}) => {
+  test.setTimeout(240_000);
+  await ohneDevtoolsKnopf(page);
+  await anmelden(page);
+  const einsatzId = await matrixEinsatz(page);
+  const gemessen: string[] = [];
+
+  for (const flaeche of [
+    { width: 390, height: 400 },
+    { width: 1024, height: 768 },
+  ]) {
+    await page.setViewportSize(flaeche);
+    for (const dichte of ['kompakt', 'handschuh']) {
+      const lauf = `${flaeche.width}×${flaeche.height}/${dichte}`;
+      await page.goto(`/einsaetze/${einsatzId}/gefahren`);
+      await stelleDichte(page, dichte);
+      const zellen = page.getByRole('button', { name: /^Bewertung / });
+      await expect(zellen).toHaveCount(58);
+      await zellen.evaluateAll((els) =>
+        els.forEach((el) => el.setAttribute('data-e2e-fokus', el.getAttribute('aria-label')!)),
+      );
+      await expect(page.locator('.ant-table-sticky-holder')).toHaveCSS('position', 'sticky');
+      const huelle = await page
+        .locator('.ant-table-body')
+        .evaluate((el) => ({ sw: el.scrollWidth, cw: el.clientWidth }));
+      expect(
+        huelle.sw,
+        `${lauf}: Vorbedingung — die Matrix muss waagerecht überlaufen (${huelle.sw} ≤ ${huelle.cw})`,
+      ).toBeGreaterThan(huelle.cw);
+
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await zellen.first().focus();
+      const vor = await pruefeFokusVerdeckung(page, 62);
+      // 57: der Kern zählt nach jedem Tab, die Startzelle selbst ist also nie dabei.
+      expect(vor.besuchteZiele.length, `${lauf}: vorwärts alle übrigen 57 Zellen besucht`).toBe(57);
+      expect(vor.verdeckt, `${lauf} vorwärts:\n${vor.verdeckt.join('\n')}`).toEqual([]);
+
+      await zellen.last().focus();
+      const rueck = await pruefeFokusVerdeckung(page, 62, 'Shift+Tab');
+      expect(rueck.besuchteZiele.length, `${lauf}: rückwärts alle übrigen 57 Zellen besucht`).toBe(
+        57,
+      );
+      expect(rueck.verdeckt, `${lauf} rückwärts:\n${rueck.verdeckt.join('\n')}`).toEqual([]);
+      // Vorbedingung (Review LFH-373): auf dem Handschirm rollt die Matrix senkrecht, der
+      // Rückwärtslauf MUSS dort an der stehenden Kopfzeile vorbeikommen — sonst belegt er den
+      // Kopf-Freiraum nicht. Bei 1024 × 768 passt die Matrix in `kompakt` ins Fenster.
+      if (flaeche.width < 768) {
+        expect(
+          rueck.stoppsAnTabellenkopf,
+          `${lauf}: Vorbedingung — rückwärts an der Kopfzeile`,
+        ).toBeGreaterThan(0);
+      }
+
+      gemessen.push(
+        `${lauf}: Überlauf ${huelle.sw}/${huelle.cw}, rückwärts an der Kopfzeile ${rueck.stoppsAnTabellenkopf}`,
+      );
+    }
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+/** Kandidaten der Kartenaufbauten für den Kern (`position: absolute`, Opt-in LFH-373). */
+const KARTEN_AUFBAUTEN = [
+  '[data-lfh="karten-fuss"] > *',
+  '[data-lfh="karten-knoepfe"]',
+  '[data-lfh="karten-ueberlagerung-links"]',
+];
+
+const KARTENKNOEPFE = [
+  'Hineinzoomen',
+  'Herauszoomen',
+  'Nach Norden ausrichten',
+  'Messen',
+  'Zeichenwerkzeuge',
+];
+
+/**
+ * Knopfblock gegen jedes Fußband, als Rechteckschnitt. Liefert die Überschneidungen als Text;
+ * leer heißt: keine.
+ */
+async function knopfblockUeberFuss(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const block = document.querySelector('[data-lfh="karten-knoepfe"]');
+    if (!block) return ['kein Knopfblock im Baum'];
+    const b = block.getBoundingClientRect();
+    return Array.from(document.querySelectorAll('[data-lfh="karten-fuss"] > *'))
+      .map((band) => {
+        const r = band.getBoundingClientRect();
+        const x = Math.min(b.right, r.right) - Math.max(b.left, r.left);
+        const y = Math.min(b.bottom, r.bottom) - Math.max(b.top, r.top);
+        return x > 0.5 && y > 0.5
+          ? `${band.getAttribute('data-lfh') ?? band.className}: ${Math.round(x)}×${Math.round(y)}px`
+          : null;
+      })
+      .filter((t): t is string => t != null);
+  });
+}
+
+/**
+ * Lagekarte (LFH-373, Prüfliste Lagekarte Zeile 13): Knopfblock oben rechts, Überlagerung
+ * links, Fußbänder unten — alle `position: absolute` über der Karte.
+ *
+ * GEMESSEN VOR DEM FIX (24.09.2026): bei 390 px in `handschuh` lagen „Herauszoomen", „Nach
+ * Norden ausrichten" und „Messen" VOLLSTÄNDIG unter dem ausgeklappten Zeitachsenband, bei
+ * 1024 px „Zeichenwerkzeuge" zu 92 %. Beide `zIndex: 5`, der Fuß kommt später im DOM und liegt
+ * oben — die Knöpfe waren damit auch per Zeiger nicht erreichbar, nicht nur per Tastatur.
+ *
+ * DREI BELEGE, weil jeder allein zu wenig sagt: der Kern (mit den Aufbauten als
+ * Zusatzkandidaten — ohne sie wäre dieser Lauf grün durch Konstruktion), der Rechteckschnitt
+ * Knopfblock ↔ Fußband (auch eine Teilüberdeckung, die der Kern bewusst nicht meldet), und
+ * die Trefferprobe je Knopf (`click({ trial: true })`: Playwrights Prüfung, ob der Klick
+ * wirklich beim Knopf ankommt — `toBeVisible()` belegt das nicht, LFH-355).
+ */
+test('Lagekarte (LFH-373): Kartenknöpfe liegen nie unter den Fußbändern', async ({ page }) => {
+  test.setTimeout(300_000);
+  await ohneDevtoolsKnopf(page);
+  await anmelden(page);
+  const antwort = await page.request.post('/api/einsaetze', {
+    data: { bezeichnung: `Fokus 373 Ost ${Date.now()}` },
+  });
+  expect(antwort.ok(), await antwort.text()).toBeTruthy();
+  const { id: einsatzId } = (await antwort.json()) as { id: number };
+  for (const bezeichnung of ['Stand A', 'Stand B']) {
+    const stand = await page.request.post(`/api/einsaetze/${einsatzId}/lage-snapshots`, {
+      data: { bezeichnung },
+    });
+    expect(stand.ok(), await stand.text()).toBeTruthy();
+  }
+
+  const gemessen: string[] = [];
+  for (const lage of [
+    { width: 390, height: 844, leiste: false, dichte: 'kompakt' },
+    { width: 390, height: 844, leiste: false, dichte: 'handschuh' },
+    { width: 390, height: 844, leiste: true, dichte: 'handschuh' },
+    { width: 1024, height: 768, leiste: false, dichte: 'handschuh' },
+  ]) {
+    const lauf = `${lage.width}×${lage.height}${lage.leiste ? ' mit Leiste' : ''}/${lage.dichte}`;
+    await page.setViewportSize({ width: lage.width, height: lage.height });
+    await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
+    await page.evaluate(() => localStorage.setItem('lfh:lagekarte:zeitachse-eingeklappt', '0'));
+    await stelleDichte(page, lage.dichte);
+    await expect(page.getByTestId('kartenflaeche').locator('canvas.maplibregl-canvas')).toHaveCount(
+      1,
+      { timeout: 60_000 },
+    );
+    if (lage.leiste) await page.getByRole('button', { name: 'Leiste einblenden' }).click();
+    // Vorbedingung: die Zeitachse steht ausgeklappt — sonst gäbe es das hohe Band nicht, und
+    // der Test wäre still wertlos statt rot.
+    await expect(page.getByRole('button', { name: 'Zeitachse ausblenden' })).toBeVisible();
+
+    const knoepfe = page.locator('[data-lfh="karten-knoepfe"]');
+    const ueberschnitt = await knopfblockUeberFuss(page);
+    expect(ueberschnitt, `${lauf}: Knopfblock überschneidet Fußband`).toEqual([]);
+
+    for (const name of KARTENKNOEPFE) {
+      await knoepfe
+        .getByRole('button', { name, exact: true })
+        .click({ trial: true, timeout: 5_000 });
+    }
+
+    await knoepfe.getByRole('button', { name: 'Hineinzoomen', exact: true }).focus();
+    const kern = await pruefeFokusVerdeckung(page, 14, 'Tab', {
+      zusatzKandidaten: KARTEN_AUFBAUTEN,
+      region: '[data-lfh="kartenspalte"]',
+    });
+    expect(
+      kern.stoppsInRegion,
+      `${lauf}: Vorbedingung — der Lauf muss durch die Kartenspalte gehen`,
+    ).toBeGreaterThanOrEqual(5);
+    expect(kern.verdeckt, `${lauf}:\n${kern.verdeckt.join('\n')}`).toEqual([]);
+    gemessen.push(`${lauf}: ${kern.stoppsInRegion} Stopps in der Kartenspalte, frei`);
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+/**
+ * Personenkarte (LFH-373, LFH-613-Prüfliste 4 · 13): dieselbe `KartenUeberlagerung` wie die
+ * Lagekarte (Knopfblock oben rechts, Überlagerung links, `position: absolute`), aber OHNE
+ * Kartenfuß. Der Kern bekommt die Aufbauten als Zusatzkandidaten — ohne sie wäre der Lauf
+ * grün durch Konstruktion (Selbstbeweis LFH-373 oben).
+ */
+test('Personenkarte (LFH-373): kein Fokusziel liegt unter den Kartenaufbauten', async ({
+  page,
+}) => {
+  test.setTimeout(240_000);
+  await ohneDevtoolsKnopf(page);
+  await anmelden(page);
+  const antwort = await page.request.post('/api/einsaetze', {
+    data: { bezeichnung: `Fokus 373 West ${Date.now()}` },
+  });
+  expect(antwort.ok(), await antwort.text()).toBeTruthy();
+  const { id: einsatzId } = (await antwort.json()) as { id: number };
+  for (const [i, name] of ['Einzeln West', 'Fern West'].entries()) {
+    const person = await page.request.post(`/api/einsaetze/${einsatzId}/personen`, {
+      data: { name, antreff_lat: 53 + i * 0.3, antreff_lon: 8.8 + i * 0.5 },
+    });
+    expect(person.ok(), await person.text()).toBeTruthy();
+  }
+
+  const gemessen: string[] = [];
+  for (const flaeche of [
+    { width: 390, height: 844 },
+    { width: 1366, height: 768 },
+  ]) {
+    const lauf = `${flaeche.width}×${flaeche.height}/handschuh`;
+    await page.setViewportSize(flaeche);
+    await page.goto(`/einsaetze/${einsatzId}/personen?ansicht=karte`);
+    await stelleDichte(page, 'handschuh');
+    const karte = page.locator('[data-lfh="betroffene-karte"]');
+    await expect(karte.locator('canvas.maplibregl-canvas')).toHaveCount(1, { timeout: 60_000 });
+    const knoepfe = karte.locator('[data-lfh="karten-knoepfe"]');
+    await expect(knoepfe.getByRole('button', { name: 'Hineinzoomen', exact: true })).toBeVisible();
+    for (const name of ['Hineinzoomen', 'Herauszoomen', 'Nach Norden ausrichten']) {
+      await knoepfe
+        .getByRole('button', { name, exact: true })
+        .click({ trial: true, timeout: 5_000 });
+    }
+
+    await knoepfe.getByRole('button', { name: 'Hineinzoomen', exact: true }).focus();
+    const kern = await pruefeFokusVerdeckung(page, 10, 'Tab', {
+      zusatzKandidaten: KARTEN_AUFBAUTEN,
+      region: '[data-lfh="betroffene-karte"]',
+    });
+    expect(
+      kern.stoppsInRegion,
+      `${lauf}: Vorbedingung — der Lauf muss durch die Karte gehen`,
+    ).toBeGreaterThanOrEqual(2);
+    expect(kern.verdeckt, `${lauf}:\n${kern.verdeckt.join('\n')}`).toEqual([]);
+    gemessen.push(`${lauf}: ${kern.stoppsInRegion} Stopps in der Karte, frei`);
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+/**
+ * Rückwärts getabbte Ziele, deren MITTELPUNKT unter einer stehenden Tabellenkopfzeile liegt.
+ *
+ * STRENGER ALS DER KERN, mit Absicht (LFH-373, gemessen): ohne den Kopf-Freiraum der
+ * Katalogtabellen (LFH-677) landete ein Ziel der Personenliste bei y 20…50 unter einer
+ * 35 px hohen Kopfzeile — halb verdeckt, der Mittelpunkt darunter. WCAG 2.4.11 (AA) zählt nur
+ * VOLLSTÄNDIGE Verdeckung, der Kern blieb grün, und die Mutationsprobe „Freiraum-Regel
+ * entfernt" überlebte. Diese Prüfung macht die Regel belegbar.
+ */
+async function mittelpunktUnterKopf(page: Page, schritte: number): Promise<string[]> {
+  const befunde: string[] = [];
+  for (let i = 0; i < schritte; i += 1) {
+    await page.keyboard.press('Shift+Tab');
+    const befund = await page.evaluate(() => {
+      const f = document.activeElement as HTMLElement | null;
+      const kopf = document.querySelector('.ant-table-sticky-holder');
+      if (!f || !kopf || kopf.contains(f) || !f.closest('.ant-table-tbody')) return null;
+      const r = f.getBoundingClientRect();
+      const am = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return am && kopf.contains(am)
+        ? `${(f.getAttribute('aria-label') ?? f.textContent ?? '').trim().slice(0, 24)} bei y ${Math.round(r.top)}`
+        : null;
+    });
+    if (befund) befunde.push(befund);
+  }
+  return befunde;
+}
+
+/**
+ * Personenliste (LFH-373, LFH-613-Prüfliste 1 · 13): Tabellenzweig der `Datensicht` mit
+ * stehender Kopfzeile, ein Tab-Stopp je Zeile. Vorwärts UND rückwärts: nur rückwärts rollt ein
+ * Ziel an den oberen Rand, unter die Kopfzeile (Kern, Abschnitt RICHTUNG). Unter `md` stehen
+ * Karten ohne stehende Kopfzeile — deshalb 1024 und 1366 px.
+ */
+test('Personenliste (LFH-373): kein Fokusziel verschwindet hinter der stehenden Kopfzeile', async ({
+  page,
+}) => {
+  test.setTimeout(240_000);
+  await ohneDevtoolsKnopf(page);
+  await anmelden(page);
+  const antwort = await page.request.post('/api/einsaetze', {
+    data: { bezeichnung: `Fokus 373 Liste ${Date.now()}` },
+  });
+  expect(antwort.ok(), await antwort.text()).toBeTruthy();
+  const { id: einsatzId } = (await antwort.json()) as { id: number };
+  const ANZAHL = 14;
+  for (let n = 1; n <= ANZAHL; n += 1) {
+    const person = await page.request.post(`/api/einsaetze/${einsatzId}/personen`, {
+      data: { name: `Person ${String(n).padStart(2, '0')}` },
+    });
+    expect(person.ok(), await person.text()).toBeTruthy();
+  }
+
+  const gemessen: string[] = [];
+  for (const flaeche of [
+    { width: 1024, height: 600 },
+    { width: 1366, height: 520 },
+  ]) {
+    await page.setViewportSize(flaeche);
+    for (const dichte of ['kompakt', 'handschuh']) {
+      const lauf = `${flaeche.width}×${flaeche.height}/${dichte}`;
+      await page.goto(`/einsaetze/${einsatzId}/personen`);
+      await stelleDichte(page, dichte);
+      const zeilen = page.locator('tr.ant-table-row');
+      await expect(zeilen).toHaveCount(ANZAHL);
+      await expect(page.locator('.ant-table-sticky-holder')).toHaveCSS('position', 'sticky');
+      const reserve = await page.evaluate(
+        () => document.documentElement.scrollHeight - document.documentElement.clientHeight,
+      );
+      expect(reserve, `${lauf}: Vorbedingung — die Seite muss scrollen`).toBeGreaterThan(0);
+
+      await zeilen.first().locator('a, button, [tabindex="0"]').first().focus();
+      const vor = await pruefeFokusVerdeckung(page, ANZAHL * 3);
+      expect(vor.stoppsInTabelle, `${lauf}: vorwärts durch die Tabelle`).toBeGreaterThanOrEqual(
+        ANZAHL - 1,
+      );
+      expect(vor.verdeckt, `${lauf} vorwärts:\n${vor.verdeckt.join('\n')}`).toEqual([]);
+
+      await zeilen.last().locator('a, button, [tabindex="0"]').last().focus();
+      const rueck = await pruefeFokusVerdeckung(page, ANZAHL * 3, 'Shift+Tab');
+      expect(
+        rueck.stoppsAnTabellenkopf,
+        `${lauf}: Vorbedingung — rückwärts muss der Lauf die Kopfzeile erreichen`,
+      ).toBeGreaterThan(0);
+      expect(rueck.verdeckt, `${lauf} rückwärts:\n${rueck.verdeckt.join('\n')}`).toEqual([]);
+
+      await zeilen.last().locator('a, button, [tabindex="0"]').last().focus();
+      const mittelpunkt = await mittelpunktUnterKopf(page, ANZAHL * 3);
+      expect(mittelpunkt, `${lauf}: Mittelpunkt unter der Kopfzeile`).toEqual([]);
+      gemessen.push(
+        `${lauf}: ${vor.stoppsInTabelle} Tabellenstopps vorwärts, ${rueck.stoppsAnTabellenkopf} an der Kopfzeile rückwärts`,
+      );
+    }
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });

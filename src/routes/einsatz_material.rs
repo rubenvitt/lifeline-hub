@@ -160,10 +160,7 @@ pub async fn disponieren(
             einsatz_id,
             benutzer.id,
             startwert,
-            &format!(
-                "Material «{}» (×{}) disponiert",
-                anzeige.bezeichnung, anzeige.menge
-            ),
+            &crate::material::etb_text_disponiert(&anzeige.bezeichnung, anzeige.menge),
         )
         .await?;
         Ok(anzeige)

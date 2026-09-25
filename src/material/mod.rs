@@ -165,3 +165,25 @@ mod tests {
         assert_eq!(a.dienststatus, "in_dienst");
     }
 }
+
+// ── System-ETB-Wortlaute (LFH-690) ──────────────────────────────────────────────────
+// Reine Textbausteine: Handler und Demo-Import rufen dieselbe Funktion, damit ein
+// importierter Einsatz dieselben ETB-Texte trägt wie ein echter.
+
+/// System-ETB beim Disponieren von Material (Stamm oder Ad-hoc), mit Menge.
+pub fn etb_text_disponiert(bezeichnung: &str, menge: i64) -> String {
+    format!("Material «{}» (×{}) disponiert", bezeichnung, menge)
+}
+
+#[cfg(test)]
+mod etb_text_tests {
+    use super::*;
+
+    #[test]
+    fn disponiert_mit_menge() {
+        assert_eq!(
+            etb_text_disponiert("Sandsäcke", 250),
+            "Material «Sandsäcke» (×250) disponiert"
+        );
+    }
+}

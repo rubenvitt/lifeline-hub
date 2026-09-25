@@ -83,3 +83,34 @@ pub struct EinsatzabschnittAnzeige {
     /// Zugeordnete Sprechgruppen (aus Katalogeintrag oder einsatz-lokal).
     pub sprechgruppen: Vec<SprechgruppeAnzeige>,
 }
+
+// ── System-ETB-Wortlaute (LFH-690) ──────────────────────────────────────────────────
+// Reine Textbausteine: Handler und Demo-Import rufen dieselbe Funktion, damit ein
+// importierter Einsatz dieselben ETB-Texte trägt wie ein echter.
+
+/// System-ETB beim Anlegen eines Abschnitts: «Abschnitt «Name» angelegt», mit gesetztem
+/// Lagezustand ergänzt um « (Lage: <Wort>)».
+pub fn etb_text_angelegt(name: &str, lagezustand: Option<AbschnittLagezustand>) -> String {
+    match lagezustand {
+        Some(l) => format!("Abschnitt «{}» angelegt (Lage: {})", name, l.wort()),
+        None => format!("Abschnitt «{}» angelegt", name),
+    }
+}
+
+#[cfg(test)]
+mod etb_text_tests {
+    use super::*;
+
+    #[test]
+    fn angelegt_mit_und_ohne_lagezustand() {
+        assert_eq!(etb_text_angelegt("Nord", None), "Abschnitt «Nord» angelegt");
+        assert_eq!(
+            etb_text_angelegt("Nord", Some(AbschnittLagezustand::Planmaessig)),
+            "Abschnitt «Nord» angelegt (Lage: planmäßig)"
+        );
+        assert_eq!(
+            etb_text_angelegt("UA 2", Some(AbschnittLagezustand::Kritisch)),
+            "Abschnitt «UA 2» angelegt (Lage: kritisch)"
+        );
+    }
+}

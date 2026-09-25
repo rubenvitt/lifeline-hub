@@ -399,6 +399,15 @@ pub struct Config {
     #[arg(long, env = "LIFELINE_TLS", default_value_t = false)]
     pub tls: bool,
 
+    /// Demo-Daten zur Laufzeit importieren und entfernen (LFH-690). **Default AUS.** Nur mit
+    /// diesem Schalter werden die Routen unter `/api/demo-daten` überhaupt registriert; ohne
+    /// ihn antworten sie wie ein unbekannter Pfad (404). Sie öffnen einen harten Löschweg für
+    /// die Demo-Daten und stehen dann nur dem System-Admin offen. Ein aktiver Schalter wird
+    /// beim Serverstart mit einer Warnung protokolliert. Die Umgebungsvariable nimmt nur
+    /// `true`/`false`; `1` bricht den Start ab, statt still als „aus“ zu gelten.
+    #[arg(long, env = "LIFELINE_DEMO_DATEN", default_value_t = false)]
+    pub demo_daten: bool,
+
     /// BYO-Zertifikat (PEM). Nur zusammen mit `--tls-key`. Gesetzt → höchste Präzedenz;
     /// fehlend/ungültig → fail-fast (kein stiller Fallback bei explizitem BYO).
     #[arg(long, env = "LIFELINE_TLS_CERT")]
@@ -544,6 +553,41 @@ mod tests {
             std::env::set_var(k, v);
         }
         config
+    }
+
+    /// Wie [`parse_mit_env`], aber über `try_parse_from`: ein Parse-Fehler kommt als `Err`
+    /// zurück, statt über `process::exit` das ganze Test-Binary zu beenden. Die Umgebung
+    /// wird auch im Fehlerfall wiederhergestellt.
+    fn try_parse_mit_env(k: &str, v: &str, args: &[&str]) -> Result<Config, clap::Error> {
+        let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let gesichert: Vec<(String, String)> = std::env::vars()
+            .filter(|(k, _)| k.starts_with("LIFELINE_"))
+            .collect();
+        for (k, _) in &gesichert {
+            std::env::remove_var(k);
+        }
+        std::env::set_var(k, v);
+        let ergebnis = Config::try_parse_from(args);
+        std::env::remove_var(k);
+        for (k, v) in gesichert {
+            std::env::set_var(k, v);
+        }
+        ergebnis
+    }
+
+    /// LFH-690 (D1): der Demo-Import ist per Vorgabe aus und über Flag oder Env zuschaltbar.
+    /// Die Env nimmt nur `true`/`false` — `1` bricht den Start laut ab, statt still als
+    /// „aus“ gelesen zu werden (dasselbe Verhalten wie `LIFELINE_TLS`).
+    #[test]
+    fn demo_daten_vorgabe_aus_und_zuschaltbar() {
+        assert!(!parse_hermetisch(["lifeline-hub"]).demo_daten);
+        assert!(parse_hermetisch(["lifeline-hub", "--demo-daten"]).demo_daten);
+        assert!(parse_mit_env("LIFELINE_DEMO_DATEN", "true", &["lifeline-hub"]).demo_daten);
+        assert!(!parse_mit_env("LIFELINE_DEMO_DATEN", "false", &["lifeline-hub"]).demo_daten);
+        assert!(
+            try_parse_mit_env("LIFELINE_DEMO_DATEN", "1", &["lifeline-hub"]).is_err(),
+            "LIFELINE_DEMO_DATEN=1 muss ein Parse-Fehler sein, kein stilles Aus"
+        );
     }
 
     /// LFH-83: der KRITIS-Import ist Default-an und auf beiden Wegen abschaltbar.

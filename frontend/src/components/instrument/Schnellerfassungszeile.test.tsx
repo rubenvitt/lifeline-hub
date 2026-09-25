@@ -3,7 +3,10 @@ import { Input } from 'antd';
 import { describe, expect, it } from 'vitest';
 import { renderMitProviders } from '../../test/utils';
 import { dichten, farbenHell } from '../../theme/tokens';
-import Schnellerfassungszeile, { schnellerfassungStil } from './Schnellerfassungszeile';
+import Schnellerfassungszeile, {
+  schnellerfassungStil,
+  zellenStile,
+} from './Schnellerfassungszeile';
 
 describe('Schnellerfassungszeile', () => {
   it('ist nur Hülle: kein eigenes Formular, das Feld des Aufrufers steht darin', () => {
@@ -43,5 +46,46 @@ describe('Schnellerfassungszeile', () => {
       </Schnellerfassungszeile>,
     );
     expect(container.querySelector('[data-lfh="schnellerfassung-praefix"]')).toBeNull();
+  });
+
+  /**
+   * LFH-373, opt-in `gestapelt`: auf schmalem Schirm steht das Feld auf eigener, voller Zeile,
+   * Präfix und Hinweis folgen darunter. Gemessen vorher im ETB bei 390 px: das Feld auf 158
+   * von 366 px eingezwängt, der Platzhalter brach es mehrzeilig. Ohne die Eigenschaft bleibt
+   * alles wie bisher — die Personenseite nutzt dieselbe Hülle.
+   */
+  it('gestapelt: Feld zuerst und volle Breite, Hinweis rechts in der zweiten Zeile', () => {
+    const t = { controlHeight: 30, paddingSM: 12 };
+    const zeile = schnellerfassungStil(farbenHell, t, true);
+    const z = zellenStile(farbenHell, t, true);
+    expect(zeile.flexWrap).toBe('wrap');
+    expect(z.feld).toMatchObject({ flex: '1 1 100%' });
+    // Kein CSS-`order` (Review LFH-373): die sichtbare Folge kommt aus dem DOM, sonst wichen
+    // Tab- und Lesefolge von ihr ab (Typ unten → Feld oben → Vorschau unten).
+    expect(z.feld.order).toBeUndefined();
+    expect(z.hinweis.marginInlineStart).toBe('auto');
+    expect(z.praefix.borderInlineEnd).toBeUndefined();
+  });
+
+  it('ungestapelt: unverändert eine Zeile mit Trennlinie hinter dem Präfix', () => {
+    const t = { controlHeight: 30, paddingSM: 12 };
+    const zeile = schnellerfassungStil(farbenHell, t);
+    const z = zellenStile(farbenHell, t, false);
+    expect(zeile.flexWrap).toBeUndefined();
+    expect(z.feld).toMatchObject({ flex: '1 1 auto' });
+    expect(z.feld.order).toBeUndefined();
+    expect(z.praefix.borderInlineEnd).toBe(`1px solid ${farbenHell.linie}`);
+  });
+
+  it('gestapelt: das Feld steht im DOM VOR Präfix und Hinweis — Tab- und Lesefolge = Sichtfolge', () => {
+    const { container } = renderMitProviders(
+      <Schnellerfassungszeile gestapelt praefix="/meldung" hinweis="Erfassen">
+        <Input aria-label="Eintrag" />
+      </Schnellerfassungszeile>,
+    );
+    const zeile = container.querySelector('.lfh-schnellerfassung')!;
+    const kinder = Array.from(zeile.children);
+    expect(kinder[0].classList.contains('lfh-schnellerfassung__feld')).toBe(true);
+    expect(kinder[1].getAttribute('data-lfh')).toBe('schnellerfassung-praefix');
   });
 });

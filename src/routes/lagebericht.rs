@@ -13,7 +13,7 @@ const MODUL_KEY: &str = "lageberichte";
 use crate::error::AppError;
 use crate::etb::normalisiere_zeit;
 use crate::lagebericht::repo::{self as lagebericht_repo, LageberichtAnzeige, LageberichtPatch};
-use crate::lagebericht::{self, render_snapshot, validiere_freigabe, vorlage, Abschnitt};
+use crate::lagebericht::{self, vorlage, Abschnitt};
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
@@ -221,25 +221,10 @@ pub async fn freigeben(
     .await?;
     fordere_aktiv(&einsatz)?;
 
-    let bericht = lagebericht_repo::laden(&state.pool, einsatz_id, lid).await?;
-    if bericht.status != lagebericht::STATUS_ENTWURF {
-        return Err(AppError::UnprocessableEntity(
-            "Bericht ist bereits freigegeben".into(),
-        ));
-    }
-    let v = vorlage(&bericht.vorlage).ok_or(AppError::Internal("Vorlage verschwunden".into()))?;
-    validiere_freigabe(v, &bericht.abschnitte)?;
-    let render = render_snapshot(v, &bericht.titel, &bericht.zeitstand, &bericht.abschnitte);
-
-    let anzeige = lagebericht_repo::freigeben(
-        &state.pool,
-        einsatz_id,
-        lid,
-        benutzer.id,
-        &render,
-        &bericht.zeitstand,
-    )
-    .await?;
+    // Laden, Status prüfen, validieren, rendern und schreiben in EINER Transaktion, auf
+    // demselben Weg wie der Demo-Import (LFH-690).
+    let anzeige =
+        lagebericht_repo::freigeben_gerendert(&state.pool, einsatz_id, lid, benutzer.id).await?;
 
     if let Some(etb_id) = anzeige.etb_eintrag_id {
         state.live.publiziere(einsatz_id, etb_id);

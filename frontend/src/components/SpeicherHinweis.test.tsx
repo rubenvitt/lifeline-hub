@@ -74,3 +74,31 @@ describe('SeitenHinweise', () => {
     expect(screen.getByText('Serverfehler')).toBeInTheDocument();
   });
 });
+
+describe('fehlerFallback (LFH-690)', () => {
+  it('ersetzt den Standardsatz für einen Fehler, der kein ApiError ist', () => {
+    render(
+      <SeitenHinweise
+        fehler={new TypeError('Failed to fetch')}
+        fehlerTitel="Import fehlgeschlagen"
+        fehlerFallback="Der Server war nicht erreichbar."
+      />,
+    );
+    expect(screen.getByText('Import fehlgeschlagen')).toBeInTheDocument();
+    expect(screen.getByText('Der Server war nicht erreichbar.')).toBeInTheDocument();
+    expect(screen.queryByText('Speichern fehlgeschlagen')).toBeNull();
+  });
+
+  it('lässt die Servermeldung eines ApiError unberührt', () => {
+    render(
+      <SpeicherFehler fehler={new ApiError(409, 'Schon importiert')} fallback="Nicht erreichbar" />,
+    );
+    expect(screen.getByText('Schon importiert')).toBeInTheDocument();
+    expect(screen.queryByText('Nicht erreichbar')).toBeNull();
+  });
+
+  it('ohne Angabe bleibt der Standardsatz (Bestandsaufrufer)', () => {
+    render(<SpeicherFehler fehler={new TypeError('x')} />);
+    expect(screen.getByText('Speichern fehlgeschlagen')).toBeInTheDocument();
+  });
+});

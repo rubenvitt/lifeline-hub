@@ -56,6 +56,7 @@ import BereitstellungsraeumePage from './pages/bereitstellungsraum/Bereitstellun
 import BereitstellungsraeumeDefault from './pages/bereitstellungsraum/BereitstellungsraeumeDefault';
 import BrDetailPage from './pages/bereitstellungsraum/BrDetailPage';
 import AdminLayout from './admin/AdminLayout';
+import DemoDatenPage from './admin/DemoDatenPage';
 import {
   adminGruppen,
   adminBenutzerPfad,
@@ -216,6 +217,9 @@ export const appRouten = createRoutesFromElements(
               </Fragment>
             ))}
             <Route path="benutzer" element={<BenutzerPage />} />
+            {/* Demo-Daten (LFH-690): Sonder-Eintrag wie `benutzer`; die Seite schützt sich
+                selbst (System-Admin UND Status 200, sonst Umleitung auf /einsaetze). */}
+            <Route path="demo-daten" element={<DemoDatenPage />} />
             {/* Detailrouten der Stammdaten (LFH-346 · A7). Sie liegen IM `AdminLayout`,
                   behalten also die Sidebar — eine Detailseite ohne den Verwaltungsrahmen
                   wäre eine Sackgasse ohne Rückweg. Sie stehen NEBEN der `adminGruppen`-

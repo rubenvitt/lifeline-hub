@@ -1543,6 +1543,53 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("gesichtet_at", G_ZEIT),
         ],
     },
+    // ---------- Demo-Daten (LFH-690, design.md D4) ----------
+    // Der Kopf wird über die Spalte `einsatz_id` entdeckt, obwohl sie bewusst KEIN FK ist:
+    // `entdecke_einsatz_scoped` prüft den Spaltennamen, nicht den Fremdschlüssel. Kein Scrub —
+    // der Kopf trägt Struktur, Zeitstempel und einen Mengenbericht, keinen Personenbezug.
+    TabellenRegel {
+        tabelle: "demo_import",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("org_id", G_FK),
+            retain(
+                "einsatz_id",
+                "ID des Demo-Einsatzes, bewusst ohne FK: bleibt nach dem Entfernen als \
+                 ID-Sperre stehen (LFH-690 D6), kein Personenbezug",
+            ),
+            retain("importiert_von", G_FK),
+            retain("importiert_at", G_ZEIT),
+            retain("entfernt_at", G_ZEIT),
+            retain(
+                "bericht",
+                "Mengenbericht des letzten Demo-Vorgangs (JSON mit Zählern je Stammdatenart, \
+                 kein Personenbezug)",
+            ),
+        ],
+    },
+    // Die Marke kommt über die CASCADE-Hülle mit (`import_id` → `demo_import`), nicht über
+    // einen Einsatzbezug: sie zeigt auf Stammdaten der Org, nie auf Einsatzzeilen.
+    TabellenRegel {
+        tabelle: "demo_herkunft",
+        scoping: Scoping::UeberParent {
+            fk: "import_id",
+            parent: "demo_import",
+        },
+        zeilenfilter: None,
+        spalten: &[
+            retain("import_id", G_FK),
+            retain(
+                "tabelle",
+                "Stammdatenart der Marke (CHECK auf fahrzeug/personal/material, kein Personenbezug)",
+            ),
+            retain(
+                "datensatz_id",
+                "Polymorpher Verweis auf die markierte Stammdatenzeile (Struktur, kein Personenbezug)",
+            ),
+        ],
+    },
 ];
 
 /// Sucht die Klassifikation einer Spalte in der Registry (`None`, wenn nicht erfasst).

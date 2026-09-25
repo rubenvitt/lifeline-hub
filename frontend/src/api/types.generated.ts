@@ -712,6 +712,67 @@ export interface components {
             /** Format: int64 */
             ungelesen: number;
         };
+        /** @description Ergebnis eines Imports oder eines Entfernens, je Stammdatenart. */
+        DemoBericht: {
+            je_art: components["schemas"]["DemoBerichtZeile"][];
+            vorgang: components["schemas"]["DemoVorgang"];
+            /** @description UTC ohne Zonenkennung (`YYYY-MM-DD HH:MM:SS`). */
+            zeitpunkt: string;
+        };
+        /**
+         * @description Zahlen einer Stammdatenart. Beim Import zählen `angelegt` und `mitbenutzt`, beim
+         *     Entfernen `entfernt` und `behalten`; die übrigen stehen auf 0.
+         */
+        DemoBerichtZeile: {
+            /**
+             * Format: int64
+             * @description Neu angelegt und mit der Demo-Marke versehen.
+             */
+            angelegt: number;
+            art: components["schemas"]["DemoStammdatenArt"];
+            /**
+             * Format: int64
+             * @description Beim Entfernen stehen gelassen, weil noch anderswo verwiesen; die Marke fällt.
+             */
+            behalten: number;
+            /**
+             * Format: int64
+             * @description Beim Entfernen gelöscht.
+             */
+            entfernt: number;
+            /**
+             * Format: int64
+             * @description Vorhandener Datensatz derselben Kennung, unverändert mitbenutzt.
+             */
+            mitbenutzt: number;
+        };
+        /** @description Stand der Demo-Daten einer Organisation — die eine Antwort aller Demo-Endpunkte. */
+        DemoDatenStatus: {
+            bericht?: null | components["schemas"]["DemoBericht"];
+            import?: null | components["schemas"]["DemoImportKopf"];
+            /** @description Ob für die Organisation ein aktiver Import besteht. */
+            importiert: boolean;
+        };
+        /** @description Kopf eines aktiven Imports. */
+        DemoImportKopf: {
+            einsatz_bezeichnung: string;
+            /** Format: int64 */
+            einsatz_id: number;
+            /** Format: int64 */
+            id: number;
+            /** @description UTC ohne Zonenkennung (`YYYY-MM-DD HH:MM:SS`). */
+            importiert_at: string;
+        };
+        /**
+         * @description Stammdatenart im Bericht. Wire == `as_str()`.
+         * @enum {string}
+         */
+        DemoStammdatenArt: "fahrzeug" | "personal" | "material";
+        /**
+         * @description Vorgang, den ein Bericht beschreibt. Wire == `as_str()`.
+         * @enum {string}
+         */
+        DemoVorgang: "importiert" | "entfernt";
         /**
          * @description Dienststatus im Stamm (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `dienststatus`.
          * @enum {string}

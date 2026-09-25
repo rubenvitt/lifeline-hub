@@ -1,7 +1,7 @@
 import { Alert, Button, Checkbox, Dropdown, Space, Tooltip, Typography } from 'antd';
-import { CloseOutlined, PaperClipOutlined, PlusOutlined } from '@ant-design/icons';
+import { CloseOutlined, EyeOutlined, PaperClipOutlined, PlusOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router';
 import { DOKUMENT_ACCEPT, DOKUMENT_MAX_GROESSE } from '../api/dokumente';
 import { ladeEtbAnhangHoch, type NeuerEintrag } from '../api/etb';
@@ -19,6 +19,7 @@ import { etbTyp } from '../theme/statusFarben';
 import type { BausteinFelder } from './bausteinEinsetzen';
 import MarkdownEditor, { type TextAreaRef } from '../components/MarkdownEditor';
 import { Schnellerfassungszeile, useRollen } from '../components/instrument';
+import { useViewport } from '../components/useViewport';
 import MetaChip from './MetaChip';
 import { useFunkrufnamen } from './funkrufnamen';
 import SlashMenu, { type SlashMenuHandle } from './SlashMenu';
@@ -93,6 +94,23 @@ function fehlerGrund(e: unknown): string {
 const TYP_MENUE = ERFASSBARE_TYPEN.map((t) => ({ key: t, label: etbTyp[t].label }));
 const ENTER_HINWEIS =
   'Enter sendet · Shift+Enter neue Zeile · Mehrzeiler mit Cmd/Strg+Enter senden';
+/**
+ * Kurzform für den Handschirm (LFH-373, Checkpoint 25.09.2026): nur der Tastaturvertrag.
+ * Befehle und `@ Einheit` stehen schon im Platzhalter; der Vertrag stand NUR in der
+ * Hinweiszeile und bleibt deshalb stehen — genau einmal (Erfassungs-Norm, LFH-335).
+ * Cmd/Strg+Enter entfällt: auf einem Handschirm gibt es die Taste nicht.
+ */
+const ENTER_HINWEIS_KURZ = 'Enter sendet · Shift+Enter neue Zeile';
+
+/**
+ * Platzhalter: sagt, WAS in das Feld gehört (der Tastaturvertrag steht in der Hinweiszeile).
+ * Unter `md` die Kurzform (LFH-373, in der CI gemessen): der volle Wortlaut brach in den
+ * Linux-Schriften bei 390 px in eine zweite Zeile, das mitwachsende Feld misst den Platzhalter
+ * mit, und die Leiste riss im Handschuh-Betrieb den 50-%-Deckel (435 von 844 px; unter macOS
+ * blieben 9 px Luft). „/" öffnet Typ, Felder und Bausteine gemeinsam — „Befehle" sagt dasselbe.
+ */
+const PLATZHALTER = 'Inhalt … ( / für Typ, Felder & Bausteine · @ für Einheit )';
+const PLATZHALTER_KURZ = 'Inhalt … ( / für Befehle · @ für Einheit )';
 
 /**
  * Eigener Wortlaut, nicht der aus `components/Erfassung.tsx`: hier gibt es keinen
@@ -121,6 +139,38 @@ export function nurUebernahme(
   return { von: quelle.von, an: quelle.an, meldeweg: quelle.meldeweg };
 }
 
+/**
+ * Rollt eine waagerecht rollende Zeile so, dass `ziel` darin ganz sichtbar ist — NUR
+ * waagerecht, nie das Dokument (LFH-373). Die Chip-Eingabe fokussiert mit `preventScroll`
+ * (`MetaChip`); in der einzeiligen Chip-Zeile unter `md` stünde ein neuer Chip sonst hinter
+ * dem rechten Rand. `scrollIntoView` wäre hier falsch: es rollte auch die Seite.
+ */
+export function rolleWaagerechtInsBild(zeile: HTMLElement, ziel: Element): void {
+  const z = zeile.getBoundingClientRect();
+  const r = ziel.getBoundingClientRect();
+  if (r.right > z.right) zeile.scrollLeft += r.right - z.right;
+  else if (r.left < z.left) zeile.scrollLeft -= z.left - r.left;
+}
+
+/**
+ * Die Chip-Zeile unter der Eingabe (gesetzte Felder, „Feld", „Werte behalten").
+ *
+ * Unter `md` EINZEILIG mit waagerechtem Bildlauf (LFH-373, Vorbild `standLeisteStil` der
+ * Zeitachse): gemessen kostete sonst im Handschuh-Betrieb jeder gesetzte Chip eine eigene
+ * Reihe (+81 px), bei drei Chips belegte die angepinnte Leiste 578 von 844 px. Die Leistenhöhe
+ * hängt damit nicht mehr an der Zahl der Felder. Rein und exportiert, prüfbar ohne Layout.
+ */
+export function chipZeileStil(schmal: boolean, token: { marginXS: number }): CSSProperties {
+  return {
+    display: 'flex',
+    flexWrap: schmal ? 'nowrap' : 'wrap',
+    alignItems: 'center',
+    gap: token.marginXS,
+    marginTop: token.marginXS,
+    ...(schmal ? { overflowX: 'auto', minWidth: 0 } : {}),
+  };
+}
+
 export default function Schnellerfassung({
   erfassen,
   berichtigungZu,
@@ -138,6 +188,11 @@ export default function Schnellerfassung({
   const navigate = useNavigate();
   const { token, rollen } = useRollen();
   const online = useOnline();
+  // Unter `md` steht das Feld auf eigener Zeile (LFH-373): zwischen Typ-Präfix und „Erfassen"
+  // blieb es gemessen auf 158 von 366 px, und die angepinnte Leiste wuchs auf 59 % des Fensters.
+  const { istSchmal } = useViewport();
+  const [vorschauOffen, setVorschauOffen] = useState(false);
+  const chipZeileRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<TextAreaRef>(null);
   const dateiEingabe = useRef<HTMLInputElement>(null);
   const [eigeneDateien, setEigeneDateien] = useState<File[]>([]);
@@ -166,6 +221,16 @@ export default function Schnellerfassung({
         : {}),
   );
   const [editFeld, setEditFeld] = useState<MetaFeld | null>(null);
+  // Einzeilige Chip-Zeile unter `md` (LFH-373): den gerade bearbeiteten Chip waagerecht ins
+  // Bild holen. Die Eingabe hat sich beim Einhängen schon selbst fokussiert (`MetaChip`).
+  // Ist kein Chip in Bearbeitung, steht die Zeile wieder am Anfang, wo „Feld" wartet.
+  useEffect(() => {
+    const zeile = chipZeileRef.current;
+    if (!istSchmal || !zeile) return;
+    const ziel = document.activeElement;
+    if (editFeld == null) zeile.scrollLeft = 0;
+    else if (ziel && zeile.contains(ziel)) rolleWaagerechtInsBild(zeile, ziel);
+  }, [editFeld, istSchmal]);
   const [sendet, setSendet] = useState(false);
 
   const [menuOffen, setMenuOffen] = useState(false);
@@ -489,7 +554,24 @@ export default function Schnellerfassung({
    * „⧖ Nachtrag" steht, weil `/zeit` eine zurückliegende Ereigniszeit setzt und der
    * Eintrag dann als nachgetragen erscheint.
    */
-  const hinweiszeile = (
+  // „Werte behalten": ab `md` rechts in der Chip-Zeile, darunter in der Hinweiszeile (Review
+  // LFH-373) — in der einzeilig rollenden Chip-Zeile lag er sonst hinter dem Bildlauf.
+  const schalter = zeigeSchalter ? (
+    <Tooltip title={UEBERNAHME_ERKLAERUNG}>
+      <Checkbox checked={werteBehalten} onChange={(e) => onWerteBehaltenChange?.(e.target.checked)}>
+        <Typography.Text type="secondary">Werte behalten</Typography.Text>
+      </Checkbox>
+    </Tooltip>
+  ) : null;
+
+  // Unter `md` die Kurzform (LFH-373): die volle Zeile brach auf dem Handschirm auf drei
+  // Zeilen um und trieb die angepinnte Leiste über die Hälfte des Fensters.
+  const hinweiszeile = istSchmal ? (
+    <>
+      <span>{ENTER_HINWEIS_KURZ}</span>
+      {schalter && <span style={{ marginInlineStart: 'auto' }}>{schalter}</span>}
+    </>
+  ) : (
     <>
       {!berichtigungZu && (
         <span style={{ color: rollen.gedaempft }}>{TYP_BEFEHLE.map((t) => `/${t}`).join(' ')}</span>
@@ -502,6 +584,61 @@ export default function Schnellerfassung({
 
   const einheitenTreffer =
     menuModus === 'at' ? filterAtEintraege(menuFilter, funkrufnamen, typ) : null;
+
+  const feldKnopf = (
+    <Button
+      ref={feldKnopfRef}
+      type="dashed"
+      icon={
+        <span aria-hidden="true" style={{ display: 'inline-flex' }}>
+          <PlusOutlined />
+        </span>
+      }
+      onClick={() => {
+        setMenuFilter('');
+        setTriggerStart(-1);
+        setMenuModus('slash');
+        setTypenAnbieten(false);
+        setMenuOffen((o) => !o);
+      }}
+    >
+      Feld
+    </Button>
+  );
+
+  // „Anhang" (LFH-117) steht bei „Feld": ab `md` hinter den Chips, darunter vorn (LFH-373).
+  const anhangTeil = (
+    <>
+      {/* „Anhang" (LFH-117): ein antd-Knopf plus unsichtbare Dateieingabe statt antds
+            `Upload` — der wickelte den Knopf in ein zweites `role="button"` mit eigenem
+            Tabstopp. So bleibt EIN Bedienziel, und die Höhe kommt aus `controlHeight`. */}
+      <Button
+        type="dashed"
+        disabled={!online || sendet}
+        icon={
+          <span aria-hidden="true" style={{ display: 'inline-flex' }}>
+            <PaperClipOutlined />
+          </span>
+        }
+        onClick={() => dateiEingabe.current?.click()}
+      >
+        Anhang
+      </Button>
+      <input
+        ref={dateiEingabe}
+        type="file"
+        multiple
+        hidden
+        accept={DOKUMENT_ACCEPT}
+        data-lfh="etb-anhang-eingabe"
+        onChange={(e) => dateienGewaehlt(e.target.files)}
+      />
+      {/* Zweiter Kanal neben dem Grau (WCAG 1.4.1): der Grund steht als Satz daneben. In
+            `text2`, nicht als `Typography` „secondary": dessen Ton hielt am Tag gemessen nur
+            5,58 : 1 auf dem Grund der Erfassung (Boden 7, e2e `etb-anhang-pruefliste`). */}
+      {!online && <span style={{ color: rollen.text2 }}>{ANHANG_OFFLINE}</span>}
+    </>
+  );
 
   return (
     // `etb-erfassung-card` trägt keine CSS-Regel mehr (den Rahmen zeichnet die
@@ -525,11 +662,29 @@ export default function Schnellerfassung({
 
       <div style={{ position: 'relative' }}>
         <Schnellerfassungszeile
+          gestapelt={istSchmal}
           praefix={praefix}
           hinweis={
-            <Button type="primary" loading={sendet} onClick={() => void absenden()}>
-              {fortschritt ? `Lädt hoch (${fortschritt.n}/${fortschritt.von}) …` : 'Erfassen'}
-            </Button>
+            // „Vorschau" neben „Erfassen" statt auf eigener Zeile unter dem Feld (LFH-373): die
+            // eigene Knopfzeile kostete im Handschuh-Betrieb eine volle Steuerhöhe der
+            // angepinnten Leiste (gemessen 440 px = 57 % des Fükw-Fensters).
+            <div style={{ display: 'flex', alignItems: 'center', gap: token.marginXS }}>
+              <Button
+                type="text"
+                icon={
+                  <span aria-hidden="true" style={{ display: 'inline-flex' }}>
+                    <EyeOutlined />
+                  </span>
+                }
+                aria-pressed={vorschauOffen}
+                onClick={() => setVorschauOffen((v) => !v)}
+              >
+                Vorschau
+              </Button>
+              <Button type="primary" loading={sendet} onClick={() => void absenden()}>
+                {fortschritt ? `Lädt hoch (${fortschritt.n}/${fortschritt.von}) …` : 'Erfassen'}
+              </Button>
+            </div>
           }
           hinweiszeile={hinweiszeile}
         >
@@ -539,8 +694,10 @@ export default function Schnellerfassung({
             unterEbene={1}
             layout="toggle"
             variante="kompakt"
-            placeholder="Inhalt … ( / für Typ, Felder & Bausteine · @ für Einheit )"
+            placeholder={istSchmal ? PLATZHALTER_KURZ : PLATZHALTER}
             autoSize={{ minRows: 1, maxRows: 4 }}
+            umschalterAussen
+            vorschauOffen={vorschauOffen}
             value={inhalt}
             onChange={onInhaltChange}
             onKeyDown={onKeyDown}
@@ -567,16 +724,15 @@ export default function Schnellerfassung({
           die EINSTELLUNG „Werte behalten". Sie steht nicht neben „Erfassen" (die Aktion
           wohnt in der Zeile darüber) und nicht zwischen Aktionen; ein Umschalter in einer
           Knopfreihe gilt als wirkungslos (30.07.2026, `components/Erfassung.tsx`). */}
-      <div
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          gap: token.marginXS,
-          marginTop: token.marginXS,
-        }}
-      >
-        <Space wrap>
+      <div ref={chipZeileRef} style={chipZeileStil(istSchmal, token)}>
+        {/* `flexShrink: 0` unter `md`: als Flex-Kind der einzeiligen Zeile schrumpfte die Gruppe
+            sonst auf die Zeilenbreite, und die Chips brachen ihren Text IN sich um — gemessen
+            wuchs die Leiste mit drei Chips von 373 auf 531 px, trotz einzeiliger Zeile. */}
+        <Space wrap={!istSchmal} style={istSchmal ? { flexShrink: 0 } : undefined}>
+          {/* Unter `md` steht „Feld" VORN (LFH-373): in der einzeilig rollenden Zeile rutschte
+              er sonst hinter die gesetzten Chips aus dem Bild. */}
+          {istSchmal && feldKnopf}
+          {istSchmal && anhangTeil}
           {gesetzteFelder.map((feld) => (
             <MetaChip
               key={`${feld}-${editFeld === feld ? 'edit' : 'view'}`}
@@ -609,69 +765,16 @@ export default function Schnellerfassung({
               onEdit={() => {}}
             />
           )}
-          <Button
-            ref={feldKnopfRef}
-            type="dashed"
-            icon={
-              <span aria-hidden="true" style={{ display: 'inline-flex' }}>
-                <PlusOutlined />
-              </span>
-            }
-            onClick={() => {
-              setMenuFilter('');
-              setTriggerStart(-1);
-              setMenuModus('slash');
-              setTypenAnbieten(false);
-              setMenuOffen((o) => !o);
-            }}
-          >
-            Feld
-          </Button>
-          {/* „Anhang" (LFH-117): ein antd-Knopf plus unsichtbare Dateieingabe statt antds
-              `Upload` — der wickelte den Knopf in ein zweites `role="button"` mit eigenem
-              Tabstopp. So bleibt EIN Bedienziel, und die Höhe kommt aus `controlHeight`. */}
-          <Button
-            type="dashed"
-            disabled={!online || sendet}
-            icon={
-              <span aria-hidden="true" style={{ display: 'inline-flex' }}>
-                <PaperClipOutlined />
-              </span>
-            }
-            onClick={() => dateiEingabe.current?.click()}
-          >
-            Anhang
-          </Button>
-          <input
-            ref={dateiEingabe}
-            type="file"
-            multiple
-            hidden
-            accept={DOKUMENT_ACCEPT}
-            data-lfh="etb-anhang-eingabe"
-            onChange={(e) => dateienGewaehlt(e.target.files)}
-          />
-          {/* Zweiter Kanal neben dem Grau (WCAG 1.4.1): der Grund steht als Satz daneben. In
-              `text2`, nicht als `Typography` „secondary": dessen Ton hielt am Tag gemessen nur
-              5,58 : 1 auf dem Grund der Erfassung (Boden 7, e2e `etb-anhang-pruefliste`). */}
-          {!online && <span style={{ color: rollen.text2 }}>{ANHANG_OFFLINE}</span>}
+          {!istSchmal && feldKnopf}
+          {!istSchmal && anhangTeil}
           {!berichtigungZu && typ === 'lage' && (
             <Button type="link" onClick={() => navigate(`/einsaetze/${einsatz.id}/lageberichte`)}>
               Als strukturierten Lagebericht erfassen →
             </Button>
           )}
         </Space>
-        {zeigeSchalter && (
-          <div style={{ marginInlineStart: 'auto' }}>
-            <Tooltip title={UEBERNAHME_ERKLAERUNG}>
-              <Checkbox
-                checked={werteBehalten}
-                onChange={(e) => onWerteBehaltenChange?.(e.target.checked)}
-              >
-                <Typography.Text type="secondary">Werte behalten</Typography.Text>
-              </Checkbox>
-            </Tooltip>
-          </div>
+        {!istSchmal && zeigeSchalter && (
+          <div style={{ marginInlineStart: 'auto', flexShrink: 0 }}>{schalter}</div>
         )}
       </div>
 

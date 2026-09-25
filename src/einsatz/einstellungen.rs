@@ -294,8 +294,11 @@ pub struct EinstellungenAnzeige {
 
 /// Lädt die Einstellungen eines Einsatzes; existiert keine Zeile, werden Defaults
 /// (alle `None`) zurückgegeben. Der Aufrufer hat den Einsatz bereits geladen (404/Guard).
+///
+/// Executor-generisch (Pool oder offene Verbindung): `meldung::repo::anlegen_tx` liest die
+/// Einstellungen in derselben Transaktion (LFH-690).
 pub async fn laden_oder_default(
-    pool: &SqlitePool,
+    executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
     einsatz_id: i64,
 ) -> Result<EinsatzEinstellungen, AppError> {
     let row = sqlx::query_as::<_, EinsatzEinstellungen>(
@@ -308,7 +311,7 @@ pub async fn laden_oder_default(
          FROM einsatz_einstellungen WHERE einsatz_id = ?",
     )
     .bind(einsatz_id)
-    .fetch_optional(pool)
+    .fetch_optional(executor)
     .await?;
     Ok(row.unwrap_or_else(|| EinsatzEinstellungen::leer(einsatz_id)))
 }

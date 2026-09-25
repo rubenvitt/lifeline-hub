@@ -1,6 +1,7 @@
 import { createRef } from 'react';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { setzeViewportBreite } from '../test/viewport';
 import { http, HttpResponse } from 'msw';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NeuerEintrag } from '../api/etb';
@@ -8,7 +9,7 @@ import type { EinsatzAnzeige, EtbBaustein, EtbEintragAnzeige } from '../api/type
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import MarkdownEditor, { type TextAreaRef } from '../components/MarkdownEditor';
-import Schnellerfassung from './Schnellerfassung';
+import Schnellerfassung, { chipZeileStil, rolleWaagerechtInsBild } from './Schnellerfassung';
 import type { EntwurfWerte } from './entwuerfe/entwurfModell';
 
 // Die Schnellerfassung lädt über useFunkrufnamen immer /fahrzeuge + /einheiten.
@@ -260,6 +261,42 @@ describe('Schnellerfassung', () => {
       'placeholder',
       'Inhalt … ( / für Typ, Felder & Bausteine · @ für Einheit )',
     );
+  });
+
+  /**
+   * LFH-373 (Checkpoint 25.09.2026): unter `md` wird die Hinweiszeile zur einzeiligen
+   * Kurzform mit dem Tastaturvertrag. Befehle und Einheit stehen dort schon im Platzhalter;
+   * der Vertrag stand nur hier und bleibt deshalb — genau einmal. Hintergrund: die angepinnte
+   * Leiste belegte auf dem Handschirm im Handschuh-Betrieb sonst über die Hälfte des Fensters.
+   */
+  it('unter md: Kurzform des Enter-Vertrags, einmal, ohne Befehlsliste', () => {
+    setzeViewportBreite(390);
+    renderMitProviders(<Schnellerfassung {...props()} />);
+    expect(screen.getAllByText('Enter sendet · Shift+Enter neue Zeile')).toHaveLength(1);
+    expect(screen.queryByText(/Mehrzeiler mit Cmd\/Strg\+Enter/)).toBeNull();
+    // Der Platzhalter hat unter `md` ebenfalls eine Kurzform (LFH-373, in der CI gemessen): der
+    // volle Wortlaut brach in den Linux-Schriften bei 390 px in eine zweite Zeile, das
+    // mitwachsende Feld misst den Platzhalter mit, und die Leiste riss im Handschuh-Betrieb den
+    // 50-%-Deckel (435 von 844 px). „Inhalt …" steht weiter vorn, beide Auslöser bleiben.
+    expect(screen.getByPlaceholderText(/^Inhalt …/)).toHaveAttribute(
+      'placeholder',
+      'Inhalt … ( / für Befehle · @ für Einheit )',
+    );
+    expect(screen.queryByText('@ Einheit')).toBeNull();
+  });
+
+  /**
+   * LFH-373: „Vorschau" steht neben „Erfassen" statt auf eigener Zeile unter dem Feld —
+   * genau EIN Umschalter, und er wirkt.
+   */
+  it('Vorschau steht einmal in der Aktionszeile und blendet die Vorschau ein', async () => {
+    const { container } = renderMitProviders(<Schnellerfassung {...props()} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, '**fett**');
+    expect(screen.getAllByRole('button', { name: 'Vorschau' })).toHaveLength(1);
+    expect(container.querySelector('.markdown strong')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Vorschau' }));
+    expect(container.querySelector('.markdown strong')).toHaveTextContent('fett');
   });
 
   it('/ öffnet Menü; Feld „Von" wird als Chip erfasst und mitgesendet', async () => {
@@ -716,5 +753,53 @@ describe('Schnellerfassung – Befehlszeile (Neuentwurf S4)', () => {
     expect(zeile).toHaveTextContent('/zeit ⧖ Nachtrag');
     // Kein „# Koordinate": dafür gibt es keinen Weg in den Eintrag.
     expect(zeile).not.toHaveTextContent('Koordinate');
+  });
+});
+
+describe('Schnellerfassung — Chip-Zeile auf dem Handschirm (LFH-373)', () => {
+  /**
+   * Gemessen vorher: im Handschuh-Betrieb bei 390 px kostete jeder gesetzte Chip eine eigene
+   * Reihe (+81 px), bei drei Chips belegte die angepinnte Leiste 578 von 844 px. Unter `md`
+   * rollt die Zeile deshalb waagerecht; die Pixel misst `e2e/leisten-flaeche.spec.ts`.
+   */
+  it('unter md einzeilig mit waagerechtem Bildlauf, sonst umbrechend', () => {
+    expect(chipZeileStil(true, { marginXS: 4 })).toMatchObject({
+      flexWrap: 'nowrap',
+      overflowX: 'auto',
+      minWidth: 0,
+    });
+    const breit = chipZeileStil(false, { marginXS: 4 });
+    expect(breit.flexWrap).toBe('wrap');
+    expect(breit.overflowX).toBeUndefined();
+  });
+
+  /**
+   * Review LFH-373: in der einzeilig rollenden Chip-Zeile lag „Werte behalten" rechts hinter
+   * dem Bildlauf — nur durch zufälliges Wischen auffindbar. Unter `md` steht der Schalter
+   * deshalb in der Hinweiszeile der Erfassung (innerhalb von `[data-lfh="schnellerfassung"]`),
+   * ab `md` weiter in der Chip-Zeile.
+   */
+  it.each([
+    [390, true],
+    [1366, false],
+  ])('bei %i px steht „Werte behalten" in der Hinweiszeile: %s', (breite, inHinweiszeile) => {
+    setzeViewportBreite(breite);
+    renderMitProviders(
+      <Schnellerfassung {...props({ werteBehalten: false, onWerteBehaltenChange: vi.fn() })} />,
+    );
+    const schalter = screen.getByRole('checkbox', { name: /Werte behalten/ });
+    expect(schalter.closest('[data-lfh="schnellerfassung"]') != null).toBe(inHinweiszeile);
+  });
+
+  it('holt einen Chip hinter dem rechten Rand waagerecht ins Bild, ohne das Dokument zu rollen', () => {
+    const zeile = document.createElement('div');
+    const ziel = document.createElement('input');
+    zeile.getBoundingClientRect = () => ({ left: 0, right: 300 }) as DOMRect;
+    ziel.getBoundingClientRect = () => ({ left: 280, right: 440 }) as DOMRect;
+    const rollen = vi.spyOn(window, 'scrollTo');
+    rolleWaagerechtInsBild(zeile, ziel);
+    expect(zeile.scrollLeft).toBe(140);
+    expect(rollen).not.toHaveBeenCalled();
+    rollen.mockRestore();
   });
 });

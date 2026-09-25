@@ -143,6 +143,74 @@ describe('EinsatzSeite', () => {
     expect(screen.getByText('Stand 14:07')).toBeInTheDocument();
   });
 
+  // LFH-373: eine Seite, die einen Datenstand führt, reicht vor dem ersten Abruf `0` durch
+  // (`query.dataUpdatedAt`). Dann steht der Platzhalter — eine Seite ohne Datenstand bekommt
+  // keinen, sonst trüge jeder Kopf eine Lücke.
+  // LFH-373 (gemessen): bei 390 px erschien die Meta („8 Einträge") in der Titelzeile und
+  // schob „Stand" in eine neue Zeile — alles darunter rückte 22 px. Meta und Stand sind
+  // deshalb EINE Gruppe, die unter `md` eine eigene Zeile hat: die hält der Platzhalter, und
+  // die Meta wächst darin, statt etwas umzubrechen.
+  it('fasst Meta und Datenstand zu einer Gruppe, die unter md eine eigene Zeile hat', () => {
+    const { container } = renderMitProviders(
+      <EinsatzSeite titel="Liste" meta="8 Einträge" dataUpdatedAt={0}>
+        <div>Inhalt</div>
+      </EinsatzSeite>,
+    );
+    const gruppe = container.querySelector('.lfh-seitenkopf__meta') as HTMLElement;
+    expect(gruppe).not.toBeNull();
+    expect(gruppe).toHaveTextContent('8 Einträge');
+    expect(gruppe.querySelector('[data-lfh="datenstand-platzhalter"]')).not.toBeNull();
+    // Die Gruppe selbst DARF umbrechen, nur ihre Teile nicht (Review): eine lange Meta
+    // („3 von 12 Einheiten · Stärke 1/3/18//22 von 4/12/60//76", Meldebild mit Filter) liefe
+    // bei 390 px sonst quer über die Seite.
+    expect(gruppe.style.flexWrap).toBe('wrap');
+    expect(gruppe.style.minWidth).toBe('0px');
+    for (const teil of Array.from(gruppe.children) as HTMLElement[]) {
+      expect(teil.style.whiteSpace).toBe('nowrap');
+    }
+    // Vitest fährt mit `css: false` — die Regel wird am Quelltext gepinnt.
+    const regel = seiteCss.match(/@media\s*\(max-width:\s*767\.98px\)\s*\{([^}]*\{[^}]*\})/);
+    expect(regel, 'EinsatzSeite.css trägt die Schmal-Regel').not.toBeNull();
+    expect(regel![1]).toContain('.lfh-seitenkopf__meta');
+    expect(regel![1]).toMatch(/flex-basis:\s*100%/);
+  });
+
+  // LFH-373, im Gate gemessen (`einsatzauswahl-cls.spec.ts`): ab `md` steht die Gruppe in der
+  // Titelzeile, und die spät eintreffende Meta schob den schon stehenden Platzhalter weit nach
+  // rechts. CLS nimmt die größte Strecke eines Bildes mal der ganzen bewegten Fläche — das
+  // Raster daneben kam so von 0,020 auf 0,068. Der Platzhalter gilt deshalb nur unter `md`.
+  it('blendet den Datenstand-Platzhalter ab md aus', () => {
+    const regel = seiteCss.match(/@media\s*\(min-width:\s*768px\)\s*\{([^}]*\{[^}]*\})/);
+    expect(regel, 'EinsatzSeite.css trägt die Breit-Regel').not.toBeNull();
+    expect(regel![1]).toContain('datenstand-platzhalter');
+    expect(regel![1]).toMatch(/display:\s*none/);
+  });
+
+  it('rendert ohne Meta und ohne Datenstand keine leere Gruppe', () => {
+    const { container } = renderMitProviders(
+      <EinsatzSeite titel="Liste">
+        <div>Inhalt</div>
+      </EinsatzSeite>,
+    );
+    expect(container.querySelector('.lfh-seitenkopf__meta')).toBeNull();
+  });
+
+  it('hält den Platz für den Datenstand frei, solange die Seite noch lädt', () => {
+    const { container, unmount } = renderMitProviders(
+      <EinsatzSeite titel="Liste" dataUpdatedAt={0}>
+        <div>Inhalt</div>
+      </EinsatzSeite>,
+    );
+    expect(container.querySelector('[data-lfh="datenstand-platzhalter"]')).not.toBeNull();
+    unmount();
+    const ohne = renderMitProviders(
+      <EinsatzSeite titel="Liste">
+        <div>Inhalt</div>
+      </EinsatzSeite>,
+    );
+    expect(ohne.container.querySelector('[data-lfh="datenstand-platzhalter"]')).toBeNull();
+  });
+
   /**
    * Die EINE Regel, die „Schäden › Schäden" verhindert: der letzte Pfadeintrag (der
    * Seitenname) wird ausgeblendet, weil der Titel ihn direkt danach trägt. Vitest fährt mit
@@ -322,5 +390,25 @@ describe('EinsatzSeite · Seitenebene der Kommandopalette', () => {
     // das `null` unten nur der Beleg, dass gar nichts auf ist.
     await waitFor(() => expect(document.getElementById('cmd-modul:etb')).not.toBeNull());
     expect(document.getElementById('cmd-tastatur:neue-zeile')).toBeNull();
+  });
+
+  /**
+   * LFH-373: ein angepinnter Seitenfuß steht als LETZTES Kind der Seitenwurzel, nach dem
+   * Inhalt — nicht darin. Ein `position: sticky; bottom: 0` kann nie über die Oberkante
+   * seines Elternblocks steigen; im Inhalt hing die ETB-Erfassung bei 390 px im
+   * Handschuh-Betrieb unter einem 489 px hohen Kopf fest und ragte 61 px unter das Fenster.
+   * Als Kind der Wurzel beginnt ihr Elternblock mit dem Seitenkopf.
+   */
+  it('stellt einen Fuß als letztes Kind der Wurzel hinter den Inhalt', () => {
+    const { container } = renderMitProviders(
+      <EinsatzSeite titel="ETB" fuss={<div data-testid="fuss">Erfassung</div>}>
+        <p>Inhalt</p>
+      </EinsatzSeite>,
+    );
+    const fuss = screen.getByTestId('fuss');
+    const inhalt = container.querySelector('[data-lfh="seiten-inhalt"]')!;
+    expect(inhalt.contains(fuss)).toBe(false);
+    expect(fuss.parentElement).toBe(inhalt.parentElement);
+    expect(inhalt.parentElement!.lastElementChild).toBe(fuss);
   });
 });

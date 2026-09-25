@@ -390,8 +390,9 @@ pub async fn laden(
 /// nackte Existenz-Abfrage: für eine reine Zugehörigkeitsprüfung wäre `laden()` seit
 /// LFH-225/F23 der teuerste denkbare Weg — es zieht die Anreicherung des GANZEN
 /// Einsatzes, um sie sofort wieder zu verwerfen.
+/// Executor-generisch: [`anlegen_tx`] prüft auf der offenen Verbindung (LFH-690).
 async fn pruefe_gehoert_zum_einsatz(
-    pool: &SqlitePool,
+    executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
     einsatz_id: i64,
     id: i64,
 ) -> Result<(), AppError> {
@@ -399,13 +400,15 @@ async fn pruefe_gehoert_zum_einsatz(
         sqlx::query_scalar("SELECT 1 FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?")
             .bind(id)
             .bind(einsatz_id)
-            .fetch_optional(pool)
+            .fetch_optional(executor)
             .await?;
     t.map(|_| ()).ok_or(AppError::NotFound)
 }
 
+/// `NotFound`, falls der Abschnitt nicht zu diesem Einsatz gehört. Executor-generisch:
+/// [`anlegen_tx`] prüft auf der offenen Verbindung (LFH-690).
 async fn pruefe_abschnitt(
-    pool: &SqlitePool,
+    executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
     einsatz_id: i64,
     abschnitt_id: i64,
 ) -> Result<(), AppError> {
@@ -413,7 +416,7 @@ async fn pruefe_abschnitt(
         sqlx::query_scalar("SELECT 1 FROM einsatzabschnitt WHERE id = ? AND einsatz_id = ?")
             .bind(abschnitt_id)
             .bind(einsatz_id)
-            .fetch_optional(pool)
+            .fetch_optional(executor)
             .await?;
     t.map(|_| ()).ok_or(AppError::NotFound)
 }
@@ -446,37 +449,35 @@ async fn waere_zyklus(
     Ok(false)
 }
 
-/// Validiert typ (eigene Org, aktiv), abschnitt (selber Einsatz), parent (selber Einsatz,
-/// zyklenfrei). `self_id = None` beim Anlegen.
+/// Validiert typ (eigene Org), abschnitt (selber Einsatz) und parent (selber Einsatz) beim
+/// Anlegen, auf der Verbindung des Aufrufers (LFH-690: so sieht die Prüfung auch Zeilen
+/// derselben offenen Transaktion). Eine Zyklenprüfung entfällt: eine Einheit, die es noch
+/// nicht gibt, kann nicht eigener Vorfahr werden. Beim Umhängen prüft [`validiere_patch`].
 async fn validiere(
-    pool: &SqlitePool,
+    conn: &mut SqliteConnection,
     einsatz_id: i64,
     org_id: i64,
-    self_id: Option<i64>,
     daten: &EinheitDaten<'_>,
 ) -> Result<(), AppError> {
     if let Some(typ) = daten.typ_id {
-        if !crate::einheit::typ_repo::ist_in_org(pool, org_id, typ).await? {
+        if !crate::einheit::typ_repo::ist_in_org(&mut *conn, org_id, typ).await? {
             return Err(AppError::Validation("Unbekannter Einheitstyp".into()));
         }
     }
     if let Some(abschnitt) = daten.abschnitt_id {
-        pruefe_abschnitt(pool, einsatz_id, abschnitt).await?;
+        pruefe_abschnitt(&mut *conn, einsatz_id, abschnitt).await?;
     }
     if let Some(parent) = daten.ueber_einheit_id {
-        pruefe_gehoert_zum_einsatz(pool, einsatz_id, parent).await?;
-        if let Some(sid) = self_id {
-            if waere_zyklus(pool, sid, parent).await? {
-                return Err(AppError::Validation(
-                    "Einheit darf nicht eigener Vorfahr werden".into(),
-                ));
-            }
-        }
+        pruefe_gehoert_zum_einsatz(&mut *conn, einsatz_id, parent).await?;
     }
     Ok(())
 }
 
 /// Legt eine Einheit an (nach Validierung). `org_id` für die Typ-Prüfung.
+///
+/// Pool-Hülle um [`anlegen_tx`]: wie bisher ohne eigene Transaktion, Prüfungen und Insert
+/// laufen im Autocommit einer geliehenen Verbindung. Die Anzeige wird danach über den Pool
+/// geladen, nachdem die Verbindung zurückgegeben ist.
 pub async fn anlegen(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -484,7 +485,26 @@ pub async fn anlegen(
     daten: EinheitDaten<'_>,
     angelegt_von: i64,
 ) -> Result<EinheitAnzeige, AppError> {
-    validiere(pool, einsatz_id, org_id, None, &daten).await?;
+    let id = {
+        let mut conn = pool.acquire().await?;
+        anlegen_tx(&mut conn, einsatz_id, org_id, &daten, angelegt_von).await?
+    };
+    laden(pool, einsatz_id, id).await
+}
+
+/// Legt eine Einheit auf einer offenen Verbindung/Transaktion an, samt Prüfung von Typ
+/// (eigene Org), Abschnitt und übergeordneter Einheit auf derselben Verbindung (LFH-690,
+/// Demo-Import in EINER Transaktion). Öffnet und committet selbst nichts. Liefert die neue
+/// `id`, nicht die Anzeige: deren Anreicherung (Stärke, Mitglieder, Sprechgruppen) sind
+/// sechs Sammelabfragen über den Pool, und der Import braucht sie nicht.
+pub async fn anlegen_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    org_id: i64,
+    daten: &EinheitDaten<'_>,
+    angelegt_von: i64,
+) -> Result<i64, AppError> {
+    validiere(&mut *conn, einsatz_id, org_id, daten).await?;
     let id = sqlx::query_scalar::<_, i64>(
         "INSERT INTO einsatz_einheit \
             (einsatz_id, abschnitt_id, ueber_einheit_id, typ_id, name, \
@@ -506,9 +526,9 @@ pub async fn anlegen(
     .bind(daten.erreichbarkeit)
     .bind(daten.sortier)
     .bind(angelegt_von)
-    .fetch_one(pool)
+    .fetch_one(&mut *conn)
     .await?;
-    laden(pool, einsatz_id, id).await
+    Ok(id)
 }
 
 /// Teil-Patch der editierbaren Felder (LFH-306, ohne Führer): äußere `Option` = „im Patch
@@ -1053,6 +1073,45 @@ mod tests {
             .await
             .unwrap();
         (einsatz, e.id)
+    }
+
+    /// LFH-690: Abschnitt, Einheit und Untereinheit entstehen in EINER Transaktion. Die
+    /// Prüfungen müssen die noch nicht committeten Zeilen sehen. Über den Pool (Datei/WAL:
+    /// eigener Snapshot) endete die Abschnitt-Prüfung in `NotFound`.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn einheit_auf_abschnitt_aus_derselben_transaktion() {
+        let (_dir, pool) = crate::db::test_pool_datei().await;
+        let (einsatz, b) = setup(&pool).await;
+        let (abschnitt, einheit, trupp) = crate::write_retry!(&pool, |conn| {
+            let abschnitt = crate::einsatzabschnitt::repo::anlegen_tx(
+                &mut *conn,
+                einsatz,
+                &crate::einsatzabschnitt::repo::AbschnittDaten {
+                    name: "Nord",
+                    ueber_abschnitt_id: None,
+                    leiter_id: None,
+                    bemerkung: None,
+                    kommunikationsmittel: None,
+                    erreichbarkeit: None,
+                    sortier: 0,
+                    kurzbezeichnung: None,
+                    lagezustand: None,
+                    abschnittsauftrag: None,
+                    fortschritt: None,
+                },
+            )
+            .await?;
+            let zug = daten("1. Zug", None, Some(abschnitt), None, None);
+            let einheit = anlegen_tx(&mut *conn, einsatz, 1, &zug, b).await?;
+            let trupp = daten("Trupp", None, None, Some(einheit), None);
+            let trupp = anlegen_tx(&mut *conn, einsatz, 1, &trupp, b).await?;
+            Ok((abschnitt, einheit, trupp))
+        })
+        .unwrap();
+        let e = laden(&pool, einsatz, einheit).await.unwrap();
+        assert_eq!(e.abschnitt_id, Some(abschnitt));
+        let t = laden(&pool, einsatz, trupp).await.unwrap();
+        assert_eq!(t.ueber_einheit_id, Some(einheit));
     }
 
     #[tokio::test]

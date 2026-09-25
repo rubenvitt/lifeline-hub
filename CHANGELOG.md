@@ -1,3 +1,37 @@
+## [1.0.0-alpha.47](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.46...v1.0.0-alpha.47) (2026-09-25)
+
+### Wichtige Änderungen
+
+- **Demo-Daten zur Laufzeit**: Über den neuen Schalter `--demo-daten` bzw. die Umgebungsvariable `LIFELINE_DEMO_DATEN=true` wird eine neue Verwaltungssektion für Demo-Daten freigeschaltet. Ohne diesen Schalter bleiben die Endpunkte vollständig unsichtbar. Der Schalter aktiviert einen harten Löschweg für Demo-Daten – beim Start wird eine Warnung ausgegeben.
+
+- **Neue Datenbanktabellen**: Die Migration 0123 legt die Tabellen `demo_import` (Importkopf mit aktiver Import-Sperre je Organisation) und `demo_herkunft` (Herkunftsmarke an Demo-Stammdaten) an.
+
+- **ID-Sperre für Demo-Einsätze**: Einsatz-IDs, die einmal für einen Demo-Einsatz verwendet wurden, werden auch nach dessen Entfernen nicht mehr für echte Einsätze vergeben. Die Historie bleibt als Sperre bestehen.
+
+### Verwaltung
+
+- **Demo-Daten-Verwaltung**: System-Administratoren finden unter „Demo-Daten" eine neue Sektion zur Verwaltung von Demo-Daten. Sie zeigt den aktuellen Stand (nicht importiert, oder importiert am … mit Verweis auf den Demo-Einsatz) und erlaubt das Importieren, Neu-Importieren und Entfernen des Demo-Szenarios. Neu-Importieren und Entfernen stehen nur bei vorhandenem Import zur Verfügung, beide hinter einer Sicherheitsrückfrage.
+
+- **Demo-Hinweis in der Einsatzliste**: System-Administratoren sehen in der Einsatzliste einen Info-Hinweis auf verfügbare Demo-Daten, solange noch kein Demo-Einsatz importiert ist. Der Hinweis steht unter dem Kachelraster und verweist per Knopf auf die Demo-Verwaltung.
+
+- **Spaltenschalter in Kartenverwaltungen**: Die Verwaltungen für Online-Kartenquellen und Offline-Karten zeigen jetzt einen Spaltenschalter mit Zähler in der Werkzeugzeile. Bei kleineren Bildschirmbreiten (unter 992 px) werden die Spalten „URL" und „Attribution" automatisch ausgeblendet und können über das Spaltenmenü wieder eingeblendet werden. Die Aktionsspalte bleibt stets sichtbar.
+
+### Betrieb und Installation
+
+- **Demo-Szenario „Starkregen Musterstadt"**: Das importierte Szenario umfasst einen vollständigen Übungseinsatz mit vier Einsatzabschnitten, fünf Einheiten, acht Fahrzeugen (mit FMS-Status 2, 3, 4, 6), zwölf Personen, acht Meldungen (darunter eine überfällige Rückmeldung und eine bestätigte Sofortmeldung), fünf Aufträgen (drei vollzogen, zwei offen), einer UHS mit sechs Plätzen, einem Bereitstellungsraum, zwölf Betroffenen (verschiedene Sichtungskategorien, acht in der UHS), zwei Gefahrengebieten mit Warnstufen, einem Evakuierungsbezirk mit Standmeldungen, einer Betreuungsstelle mit Belegungen, einem freigegebenen Befehl, einem freigegebenen Lagebericht und drei Erinnerungen. Insgesamt 131 Einsatztagebucheinträge über alle Pflichttypen verteilt.
+
+- **Importverhalten**: Der Import erfolgt atomar in einer Transaktion. Scheitert ein Schritt, bleibt die Datenbank unverändert. Vorhandene Stammdaten derselben Organisation mit gleicher Kennung (Funkrufname, Personalnummer, Bestandsnummer) werden mitbenutzt, ohne die Demo-Herkunftsmarke zu erhalten. Der Import dauert unter Laborbedingungen etwa 40–60 ms.
+
+- **Konfliktbehandlung**: Läuft bereits ein Import für die eigene Organisation, wird ein weiterer Import mit HTTP 409 abgelehnt. Nach einem Fehler (z. B. Netzfehler, Timeout, 409) wird der aktuelle Demo-Stand automatisch neu geladen, um sicherzustellen, dass die Anzeige den tatsächlichen Serverstand widerspiegelt.
+
+### Stabilität und Qualität
+
+- **Test-Stabilisierung**: Mehrere Timing-bedingte Test-Wackler in der Ende-zu-Ende-Testsuite wurden behoben, darunter Wettläufe beim Warten auf Cluster-Marker, beim Anfangsfokus in Dialogen, bei Spaltenschalter-Tests mit aktiven Online-Quellen und bei der Betreuungs-Betroffenen-Ansicht.
+
+- **Lagekarten-Marker**: Lagekarten-Specs warten jetzt aktiv auf das Erscheinen von Cluster-Markern, statt sie einmalig zu lesen. Spaltenschalter-Tests hinterlassen keine aktiven, unerreichbaren Online-Quellen mehr, die nachfolgende Specs stören könnten.
+
+- **Ablösungsschicht-Tests**: Eine Minutengrenze im Live-Zufluss-Test wurde entschärft, um Abrundungseffekte zu vermeiden.
+
 ## [1.0.0-alpha.46](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.45...v1.0.0-alpha.46) (2026-09-25)
 
 ### Wichtige Änderungen

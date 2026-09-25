@@ -3,12 +3,12 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Route, Routes, useLocation } from 'react-router';
-import type { ReactElement } from 'react';
+import { act, type ReactElement } from 'react';
 import { server } from '../test/server';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 import { neuerQueryClient, renderMitProviders as renderMitBasisProviders } from '../test/utils';
 import { einsatzKeys } from '../api/queryKeys';
-import { setzeViewportBreite } from '../test/viewport';
+import { sendeBreitenAenderung, setzeViewportBreite } from '../test/viewport';
 import { AuthProvider } from '../auth/AuthContext';
 import { entwuerfeLaden, entwuerfeLeerenFuerTests } from '../etb/entwuerfe/entwurfStore';
 import { queueLeerenFuerTests } from '../offline/queue';
@@ -920,6 +920,96 @@ describe('EtbPage – Zeitachse (Neuentwurf S4)', () => {
     } finally {
       Element.prototype.scrollIntoView = vorher;
     }
+  });
+
+  /**
+   * LFH-373 (Review): die Erfassung hängt auf JEDER Breite an derselben Stelle im Baum — als
+   * `fuss` der Seitenwurzel. Hing sie ab `xl` in der Zeitachsenspalte und darunter im Fuß, riss
+   * ein Wechsel über `xl` (Tablet drehen, Fenster ziehen) sie aus und hängte sie neu ein; der Text
+   * einer laufenden Berichtigung lebt nur im Zustand und war ohne Rückfrage weg.
+   */
+  it('behält die Erfassung beim Wechsel über xl — derselbe Knoten, derselbe Text', async () => {
+    setzeViewportBreite(1366);
+    setup();
+    await screen.findByText('Erste Meldung');
+    // Die Entwurfs-Reiter laden aus IndexedDB — das Feld erscheint nach der Zeitachse.
+    const feld = await screen.findByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, 'Angefangener Eintrag');
+    act(() => {
+      sendeBreitenAenderung(800);
+    });
+    expect(screen.getByPlaceholderText(/Inhalt/)).toBe(feld);
+    expect(feld).toHaveValue('Angefangener Eintrag');
+  });
+
+  /**
+   * LFH-373 (gemessen, `e2e/leisten-flaeche.spec.ts` „Laden ohne Sprung"): unter `xl` steht die
+   * Bilanz UNTER der Zeitachse. Stand sie schon da, während die Liste noch lud, schoben die
+   * eintreffenden Zeilen sie um mehr als ihre Höhe nach unten (CLS 0,22 bei 390 px). Sie
+   * erscheint deshalb erst, wenn die Liste steht — ab `xl` steht sie daneben und darf sofort.
+   */
+  it('zeigt die Bilanz unter xl erst, wenn die Liste steht', async () => {
+    setzeViewportBreite(800);
+    let freigeben: () => void = () => {};
+    const liste = new Promise<void>((r) => {
+      freigeben = r;
+    });
+    setup('/einsaetze/7/etb', [
+      http.get('/api/einsaetze/7/etb', async () => {
+        await liste;
+        return HttpResponse.json([eintrag]);
+      }),
+    ]);
+    await screen.findByPlaceholderText(/Inhalt/);
+    expect(screen.queryByRole('complementary', { name: 'Bilanz des Tagebuchs' })).toBeNull();
+    freigeben();
+    await screen.findByText('Erste Meldung');
+    expect(screen.getByRole('complementary', { name: 'Bilanz des Tagebuchs' })).toBeInTheDocument();
+  });
+
+  /**
+   * Die Sperre gilt dem ERSTEN Laden, nicht jedem (LFH-373, Review): der Filter steckt im
+   * Query-Schlüssel, jeder neue Filter ist also wieder `isLoading`. Hinge die Bilanz daran,
+   * verschwände sie unter `xl` bei jedem Typklick und jedem Suchwort — und beim Wiederverbinden
+   * nach einem Offline-Start genau in dem Moment, in dem der Puffer gesendet wird.
+   */
+  it('behält die Bilanz unter xl beim Filterwechsel, während die neue Liste lädt', async () => {
+    setzeViewportBreite(800);
+    let freigeben: () => void = () => {};
+    const zweite = new Promise<void>((r) => {
+      freigeben = r;
+    });
+    setup('/einsaetze/7/etb', [
+      http.get('/api/einsaetze/7/etb', async ({ request }) => {
+        if (new URL(request.url).searchParams.get('typ')) await zweite;
+        return HttpResponse.json([eintrag]);
+      }),
+    ]);
+    await screen.findByText('Erste Meldung');
+    const segmente = screen.getByRole('radiogroup', { name: 'Einträge nach Typ filtern' });
+    await userEvent.click(within(segmente).getByRole('radio', { name: 'Anordnung' }));
+    // Die neue Liste hängt noch — die Bilanz bleibt trotzdem stehen.
+    expect(screen.getByRole('complementary', { name: 'Bilanz des Tagebuchs' })).toBeInTheDocument();
+    freigeben();
+  });
+
+  it('zeigt die Bilanz ab xl sofort, auch während die Liste lädt', async () => {
+    setzeViewportBreite(1366);
+    let freigeben: () => void = () => {};
+    const liste = new Promise<void>((r) => {
+      freigeben = r;
+    });
+    setup('/einsaetze/7/etb', [
+      http.get('/api/einsaetze/7/etb', async () => {
+        await liste;
+        return HttpResponse.json([eintrag]);
+      }),
+    ]);
+    expect(
+      await screen.findByRole('complementary', { name: 'Bilanz des Tagebuchs' }),
+    ).toBeInTheDocument();
+    freigeben();
+    await screen.findByText('Erste Meldung');
   });
 
   it('zeigt die Bilanz aus der Serverzählung und den Puffer „übertragen"', async () => {

@@ -641,6 +641,30 @@ fn betreuung_raeumungszustand_wire() {
     } in lifeline_hub::betreuung::Raeumungszustand::ALLE);
 }
 
+/// LFH-690: Vorgang und Stammdatenart des Demo-Berichts. Der Bericht liegt später als JSON am
+/// Import-Kopf — ein geänderter Wire-Wert machte gespeicherte Berichte unlesbar.
+#[test]
+fn demo_bericht_enums_wire() {
+    enum_wire_as_str!(lifeline_hub::demo::DemoVorgang {
+        Importiert,
+        Entfernt,
+    });
+    enum_wire!(lifeline_hub::demo::DemoVorgang {
+        Importiert => "importiert",
+        Entfernt => "entfernt",
+    });
+    enum_wire_as_str!(lifeline_hub::demo::DemoStammdatenArt {
+        Fahrzeug,
+        Personal,
+        Material,
+    });
+    enum_wire!(lifeline_hub::demo::DemoStammdatenArt {
+        Fahrzeug => "fahrzeug",
+        Personal => "personal",
+        Material => "material",
+    });
+}
+
 #[test]
 fn betreuung_betreuungsstelle_art_wire() {
     enum_wire_as_str!(lifeline_hub::betreuung::BetreuungsstelleArt {

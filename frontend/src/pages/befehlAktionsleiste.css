@@ -19,7 +19,7 @@
    von hier. Das ist keine Aussage über ihre Wirksamkeit — wer sie anfasst, misst zuerst.
 
    Die Variable folgt per ResizeObserver der tatsächlichen Leistenhöhe
-   (`beobachteAktionsleiste` in `BefehlDetailPage.tsx`) — die Dichte-Staffel (30/48/72 px)
+   (`components/fokusabstandUnten.ts`, seit LFH-373 gemeinsam mit dem ETB) — die Dichte-Staffel (30/48/72 px)
    und die umgebrochene Knopfreihe verändern sie um mehr als das Doppelte (78 → 184 px
    gemessen), ein Festwert wäre in einer der Stufen daneben.
 
@@ -31,7 +31,16 @@
    verankerte Leiste gar nicht gesetzt wird und der Fallback `0px` verhaltensgleich zum
    Vorgabewert `auto` ist; die Aufräumfunktion nimmt sie beim Verlassen der Route wieder weg
    (e2e-geprüft). Wer hier einen zweiten `:root`-Block einträgt, begründet ebenso — und
-   prüft, dass er sich mit diesem nicht überschreibt. */
+   prüft, dass er sich mit diesem nicht überschreibt.
+
+   LFH-373 hat das geprüft und sich GEGEN eine gemeinsame Scrollport-Regel für das ETB
+   entschieden: `scroll-padding` am Dokument zählt auch die Ziele IN der angepinnten Leiste
+   zum verdeckten Streifen — jeder Fokus in der ETB-Erfassung rollte die Seite gemessen bis
+   ans Ende (0 → 2593 px beim Setzen dreier Felder). Das ETB hält die Zeitachse deshalb über
+   `scroll-margin` an den ZIELEN frei (`index.css`), das hier bleibt, wie es war. Die
+   Befehlsseite zeigt den Sprung NICHT — gemessen am 25.09.2026 bei 390 px in `kompakt` und
+   `handschuh`: Feld oben fokussiert, dann „Entwurf speichern" in der Leiste angeklickt,
+   scrollY blieb 0. */
 :root {
   scroll-padding-block-end: var(--lfh-befehl-fokusabstand, 0px);
 }

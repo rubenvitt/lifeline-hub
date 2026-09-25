@@ -274,3 +274,93 @@ async fn beobachter_liest_aber_schreibt_nicht() {
         StatusCode::FORBIDDEN
     );
 }
+
+/// Charakterisierung der Freigabe (LFH-690): Antwort, ETB-Snapshot und die beiden
+/// 422-Wortlaute sind byte-genau gepinnt. Der Handler rendert seit LFH-690 über
+/// `lagebericht::repo::freigeben_tx` auf der Verbindung; der Snapshot muss derselbe bleiben.
+#[tokio::test]
+async fn freigabe_schreibt_gerenderten_snapshot_byte_genau_ins_etb() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (status, lb) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/lageberichte"),
+        &admin,
+        Some(r#"{"vorlage":"freitext","titel":"Lage 10:00","zeitstand":"2026-06-02 10:00:00"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{lb:?}");
+    let lid = lb["id"].as_i64().unwrap();
+    let u = format!("/api/einsaetze/{einsatz}/lageberichte/{lid}");
+
+    let (s, antwort) = anfrage(&app, "POST", &format!("{u}/freigeben"), &admin, None).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{antwort:?}");
+    assert_eq!(
+        antwort["error"],
+        "Der Bericht ist leer und kann nicht freigegeben werden"
+    );
+
+    let (s, _) = anfrage(
+        &app,
+        "PATCH",
+        &u,
+        &admin,
+        Some(r#"{"abschnitte":[{"schluessel":"text","text":"  Hochwasser steigt. "}]}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+
+    let (s, frei) = anfrage(&app, "POST", &format!("{u}/freigeben"), &admin, None).await;
+    assert_eq!(s, StatusCode::OK, "{frei:?}");
+    assert_eq!(frei["status"], "freigegeben");
+    assert_eq!(frei["id"], lid);
+    assert_eq!(frei["zeitstand"], "2026-06-02 10:00:00");
+    assert!(frei["freigegeben_von_id"].is_i64());
+    assert!(frei["freigegeben_at"].is_string());
+    let etb_id = frei["etb_eintrag_id"].as_i64().expect("etb_eintrag_id");
+
+    let (_, etb) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/etb"),
+        &admin,
+        None,
+    )
+    .await;
+    let lage: Vec<&serde_json::Value> = etb
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|e| e["typ"] == "lage")
+        .collect();
+    assert_eq!(lage.len(), 1);
+    let e = lage[0];
+    assert_eq!(e["id"], etb_id);
+    assert_eq!(e["lagebericht_id"], lid);
+    assert_eq!(e["ereigniszeit"], "2026-06-02 10:00:00");
+    assert_eq!(
+        e["inhalt"],
+        "# Lage 10:00\n\n_Zeitstand: 2026-06-02 10:00:00_\n\n## Bericht\nHochwasser steigt.\n"
+    );
+
+    let (s, antwort) = anfrage(&app, "POST", &format!("{u}/freigeben"), &admin, None).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{antwort:?}");
+    assert_eq!(antwort["error"], "Bericht ist bereits freigegeben");
+    let (_, etb) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/etb"),
+        &admin,
+        None,
+    )
+    .await;
+    let n = etb
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|e| e["typ"] == "lage")
+        .count();
+    assert_eq!(n, 1);
+}
