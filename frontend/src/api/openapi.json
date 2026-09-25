@@ -328,6 +328,18 @@
           }
         }
       },
+      "AufbewahrungZustand": {
+        "type": "string",
+        "description": "Aufbewahrungszustand eines ABGESCHLOSSENEN Einsatzes (LFH-23). Aktive Einsätze haben\nkeinen ([`zustand`] liefert `None`). Genau einer von sechs Werten; die Rangfolge steht an\n[`zustand`]. Wire == [`AufbewahrungZustand::as_str`], gepinnt in\n`tests/enum_wire_kontrakt.rs`.",
+        "enum": [
+          "ohne_frist",
+          "frist_laeuft",
+          "faellig",
+          "vorgemerkt",
+          "schwaerzung_ausstehend",
+          "geschwaerzt"
+        ]
+      },
       "AuftragAnzeige": {
         "type": "object",
         "description": "Anzeige eines Auftrags inkl. abgeleiteter Felder und der Vollzugs-Achse aus\ndem geteilten `kommunikation_status` (per LEFT JOIN). Quittungs-Aggregate\n(`empfaenger_anzahl`, `quittiert_anzahl`) stammen aus `auftrag_empfaenger`.",

@@ -136,6 +136,14 @@ export interface components {
             mime: string;
         };
         /**
+         * @description Aufbewahrungszustand eines ABGESCHLOSSENEN Einsatzes (LFH-23). Aktive Einsätze haben
+         *     keinen ([`zustand`] liefert `None`). Genau einer von sechs Werten; die Rangfolge steht an
+         *     [`zustand`]. Wire == [`AufbewahrungZustand::as_str`], gepinnt in
+         *     `tests/enum_wire_kontrakt.rs`.
+         * @enum {string}
+         */
+        AufbewahrungZustand: "ohne_frist" | "frist_laeuft" | "faellig" | "vorgemerkt" | "schwaerzung_ausstehend" | "geschwaerzt";
+        /**
          * @description Anzeige eines Auftrags inkl. abgeleiteter Felder und der Vollzugs-Achse aus
          *     dem geteilten `kommunikation_status` (per LEFT JOIN). Quittungs-Aggregate
          *     (`empfaenger_anzahl`, `quittiert_anzahl`) stammen aus `auftrag_empfaenger`.
