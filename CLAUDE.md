@@ -438,6 +438,22 @@ nie gegen die Breite des eigenen Containers: der Befund ist in der Contentbreite
 und ein Verhältnis zu einem mitwachsenden Container kann kleiner werden, obwohl der Text mehr
 Platz hat.
 
+**ETB-Anhänge (LFH-117).** `etb_eintrag_anhang` ist der **dritte Linker** auf `anhang`
+(neben Chat und Dokument), `anhang_id UNIQUE`: eine Datei hat genau einen Lebenszyklus.
+**Jeder Linker gehört in drei Stellen:** `LinkerStand` (generischer Download 404, DELETE 422),
+das `NOT EXISTS` in `anhang::repo::sweep_verwaiste` und in `repo::loeschen`. Ein fehlender
+Linker löscht still. **Kreuzsperren:** das ETB verknüpft keine Chat- oder Dokument-Datei (422),
+der Chat keine ETB-Datei (sein 400). Eigene Routen unter dem ETB-Präfix: Upload `POST
+…/etb/anhaenge` mit der **Dokument-Allowlist** (HEIC/TIFF), eine Datei je Anfrage, und
+Download `GET …/etb/{eintrag_id}/anhaenge/{aid}` mit den Lese-Gates und EINER
+Bindungsabfrage. Das Erfassen bindet über `anhang_ids` in derselben Transaktion wie der
+Eintrag (`anlegen_idempotent`, `write_retry!`, Replay ohne Anhangsprüfung). **Append-only:**
+kein Tauschen, kein Entfernen, nur die Schwärzung löscht die Datei, der Eintrag bleibt.
+**Nur der Upload braucht Netz:** ohne Verbindung ist „Anhang" gesperrt, ein Eintrag mit schon
+hochgeladenen Dateien geht mit `anhang_ids` in die Queue. Der Download-Verweis ist blau aus
+`bedienText` und steht in der Hinweiszeile unabhängig von `hatVerknuepfung`. Prüfliste:
+`docs/superpowers/specs/2026-09-24-lfh-117-pruefliste.md`.
+
 **Zwei schwebende Bänder an einem Rand werden gestapelt, nicht gestaffelt** (LFH-355,
 `pages/lagekarte/KartenFuss.tsx`). Zeichnen-Steuerung (`bottom: 16`, mittig) und
 Zeitachsen-/Snapshot-Leiste (`bottom: 12`, volle Breite) lagen beide absolut auf `zIndex: 5`

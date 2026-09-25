@@ -67,12 +67,18 @@ async function hoehe(ziel: Locator): Promise<number> {
   return h;
 }
 
+/** Misst, prüft und schreibt die Zahl als Annotation in den Bericht (Protokoll der Prüfliste). */
 async function kontrastMindestens(ziel: Locator, minimum: number, name: string) {
   await expect(ziel, name).toBeVisible();
+  let gemessen = 0;
   await expect(async () => {
     const m = await kontrast(ziel);
+    gemessen = m.verhaeltnis;
     expect(m.verhaeltnis, `${name}: ${JSON.stringify(m)}`).toBeGreaterThanOrEqual(minimum);
   }).toPass({ timeout: 10_000 });
+  test
+    .info()
+    .annotations.push({ type: 'kontrast', description: `${name}: ${gemessen.toFixed(2)}` });
 }
 
 for (const modus of ['light', 'dark'] as const) {
@@ -140,6 +146,7 @@ test('handschuh: „Anhang", Entfernen und Verweis tragen 72 px', async ({ page 
     ),
   };
   await info.attach('handschuh', { body: await page.screenshot(), contentType: 'image/png' });
+  test.info().annotations.push({ type: 'hoehe', description: JSON.stringify(messungen) });
   for (const [name, h] of Object.entries(messungen)) {
     expect(h, `${name}: ${h}px`).toBeGreaterThanOrEqual(HANDSCHUH);
   }
