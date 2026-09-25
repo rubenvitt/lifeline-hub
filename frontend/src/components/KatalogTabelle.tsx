@@ -11,6 +11,7 @@ import {
 import { useViewport, type AbBreitePunkt } from './useViewport';
 import type { Farbrollen } from '../theme/tokens';
 import { useRollen } from './instrument/rollenwerte';
+import { useDruckModus } from './druck/useDruckModus';
 // Kopfzellen-Typografie und die Mono-Spalten liegen als Klassen in der Gestaltungssprache
 // (`.lfh-katalog …`). Der Import gehört HIERHER, nicht an die Aufrufer: achtzehn
 // Konsumenten, und nur einige montieren `EinsatzSeite` (Muster `SeitenZustand.tsx`).
@@ -527,6 +528,7 @@ export default function KatalogTabelle<T extends object>({
   const feldRef = useRef<InputRef>(null);
   const werkzeugWurzel = useRef<HTMLDivElement>(null);
   const tabelleRef = useRef<TableRef>(null);
+  const druckt = useDruckModus();
   useKopfFreiraum(tabelleRef);
   useSlashKuerzel(suche != null, () => feldRef.current?.focus());
 
@@ -780,7 +782,14 @@ export default function KatalogTabelle<T extends object>({
            * einer Tabelle, die von LFH-523 gar nicht handelt.
            */
           tableLayout={typeof scrollX === 'number' ? 'auto' : undefined}
-          sticky
+          /*
+           * Stehende Kopfzeile am Bildschirm (LFH-330), NICHT im Druck (LFH-71): mit `sticky`
+           * legt rc-table den Kopf in eine eigene Tabelle im Sticky-Halter (`Table.js`,
+           * Zweig `fixHeader || isSticky`) — der Körper, der über die Blätter läuft, trüge
+           * dann kein `thead`, und `thead { display: table-header-group }` aus
+           * `druck/druck.css` wiederholte nichts. Umgeschaltet über `beforeprint`/`afterprint`.
+           */
+          sticky={!druckt}
         />
       </ConfigProvider>
     </>

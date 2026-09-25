@@ -57,6 +57,12 @@ describe('kraefteuebersichtPrint.css — Eigenheiten des Meldebilds bleiben', ()
     );
   });
 
+  it('blendet den Seitenkopf im Druck aus — sonst stünden Titel und Umfang doppelt zum Druckkopf', () => {
+    expect(mit(".kraefte-print-root [data-lfh='seitenkopf']")?.koerper).toMatch(
+      /display:\s*none\s*!important/,
+    );
+  });
+
   it('neutralisiert Bildlaufcontainer, stehende Kopfzeile und fixierte Spalten der Tabelle', () => {
     expect(mit('.kraefte-print-root .ant-table-body')?.koerper).toMatch(
       /overflow:\s*visible\s*!important/,

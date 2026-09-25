@@ -1,4 +1,4 @@
-import { fireEvent, screen } from '@testing-library/react';
+import { act, fireEvent, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { TableColumnsType, TableProps } from 'antd';
@@ -80,6 +80,42 @@ describe('KatalogTabelle', () => {
     const koerper = container.querySelector<HTMLTableElement>('.ant-table-body table');
     expect(koerper).not.toBeNull();
     expect(koerper!.style.width).toBe('max-content');
+  });
+
+  /**
+   * Druck (LFH-71): mit `sticky` legt rc-table den Kopf in eine EIGENE Tabelle im
+   * Sticky-Halter — der Körper, der über die Blätter läuft, hat dann kein `thead`, und die
+   * Regel `thead { display: table-header-group }` wiederholt nichts. Bei `beforeprint` rendert
+   * das Primitiv deshalb ohne `sticky` (EINE Tabelle mit Kopf und Körper), bei `afterprint`
+   * wieder mit. Synchron geprüft, ohne `act`: der Browser friert das Druckbild direkt nach
+   * den Listenern ein (Strg+P und der Knopf über `useDrucken` laufen beide hierüber).
+   */
+  it('legt im Druck Kopf und Körper in EINE Tabelle und stellt danach die stehende Kopfzeile wieder her', () => {
+    const { container } = renderMitProviders(
+      <KatalogTabelle<Zeile>
+        rowKey="id"
+        columns={SPALTEN}
+        dataSource={ZEILEN}
+        pagination={false}
+      />,
+    );
+    const koerperMitKopf = () =>
+      Array.from(container.querySelectorAll('table')).some(
+        (t) => t.querySelector('thead') !== null && t.querySelector('tbody tr') !== null,
+      );
+    // Vorbedingung (LFH-330): am Bildschirm steht der Kopf getrennt im Sticky-Halter.
+    expect(container.querySelector('.ant-table-sticky-holder')).not.toBeNull();
+    expect(koerperMitKopf()).toBe(false);
+
+    window.dispatchEvent(new Event('beforeprint'));
+    expect(container.querySelector('.ant-table-sticky-holder')).toBeNull();
+    expect(koerperMitKopf()).toBe(true);
+
+    act(() => {
+      window.dispatchEvent(new Event('afterprint'));
+    });
+    expect(container.querySelector('.ant-table-sticky-holder')).not.toBeNull();
+    expect(koerperMitKopf()).toBe(false);
   });
 
   it('reicht Bestandsprops durch und überschreibt eine gesetzte Fixierung nicht', () => {

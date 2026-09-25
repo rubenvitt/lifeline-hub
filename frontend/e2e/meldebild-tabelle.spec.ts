@@ -306,16 +306,20 @@ async function druckLage(page: Page) {
  * eine Breite, die nie gedruckt wird.
  *
  * [abgeleitet], Eingaben genannt: A4-Breite 210 mm ÷ 25,4 mm/in × 96 px/in = 793,7 px,
- * minus Chromiums Standardrand von 1 cm je Seite (2 × 37,8 px = 75,6 px) → 718,1 px.
- * Aufgerundet abgeschnitten: 717 px, also die ENGERE Annahme.
+ * minus den Seitenrand aus `@page { margin: 15mm }` in `src/druck/druck.css` (seit LFH-71,
+ * gilt für jeden Ausdruck): 2 × 15 mm = 30 mm ≙ 113,4 px → 680,3 px. Abgerundet: 680 px, die
+ * ENGERE Annahme — dieselbe Zahl wie `NUTZ_BREITE` in `druck-fluss.spec.ts`. Berichtigt
+ * (Review Welle B): hier stand 717 px aus Chromiums Standardrand von 1 cm, der seit dem
+ * eigenen `@page`-Rand nicht mehr gilt; eine Tabelle zwischen 680 und 717 px wäre grün
+ * geblieben und im echten Druck abgeschnitten worden.
  *
  * GEMESSEN, damit niemand die Zahl für Willkür hält: die Mindest-Inhaltsbreite der
  * Meldebild-Tabelle ist 645 px (Druckmedium bei 390 px Sichtfeld, wo `width: 100%` nichts
- * mehr zu verteilen hat). 645 < 717, der Ausdruck passt also mit Reserve. Bei 390 px
- * Sichtfeld ragt er um 255 px heraus — das ist KEIN Druckbefund, sondern die Folge davon,
- * dass 390 px keine Papierbreite ist. Wer diese Zahl „behebt", behebt nichts.
+ * mehr zu verteilen hat). 645 < 680, der Ausdruck passt also — mit nur noch 35 px Reserve.
+ * Bei 390 px Sichtfeld ragt er um 255 px heraus — das ist KEIN Druckbefund, sondern die
+ * Folge davon, dass 390 px keine Papierbreite ist. Wer diese Zahl „behebt", behebt nichts.
  */
-const A4_DRUCKBREITE = 717;
+const A4_DRUCKBREITE = 680;
 
 test('Druckpfad des Meldebilds: die Neutralisierer WIRKEN, und keine Spalte ragt aus dem Druck-Wurzelknoten', async ({
   page,
@@ -391,6 +395,121 @@ test('Druckpfad des Meldebilds: die Neutralisierer WIRKEN, und keine Spalte ragt
   // Medium zurückstellen, damit ein Folgeschritt im selben Kontext nicht im Druckmodus
   // weiterläuft.
   await page.emulateMedia({ media: null });
+});
+
+/**
+ * NACHWEIS 2b — der Tabellenkopf steht im Druck in DERSELBEN Tabelle wie der Körper, und der
+ * Seitenkopf fehlt (LFH-71, Review Welle B).
+ *
+ * DER BEFUND: `KatalogTabelle` rendert am Bildschirm mit `sticky`. Dann legt rc-table den Kopf
+ * in eine eigene Tabelle im Sticky-Halter; die Körpertabelle, die über die Blätter läuft, hat
+ * kein `thead`, und `thead { display: table-header-group }` aus `druck.css` wiederholte
+ * nichts — ab Blatt 2 standen die Spalten unbeschriftet da. Das Primitiv schaltet `sticky`
+ * jetzt bei `beforeprint` ab und bei `afterprint` wieder an (`useDruckModus`).
+ *
+ * WARUM DAS EREIGNIS VON HAND: weder `emulateMedia` noch `page.pdf()` feuern `beforeprint`.
+ * Geprüft werden deshalb beide Wege, auf denen es im Betrieb kommt:
+ *  - der KNOPF: `window.print` wird durch einen Stub ersetzt, der wie der Browser `beforeprint`
+ *    synchron feuert (und keinen modalen Dialog öffnet). Das belegt zugleich, dass
+ *    `useDrucken` den Druck außerhalb des React-Effekts auslöst — aus dem Effekt heraus
+ *    rendert das `flushSync` des Listeners nicht, und der Kopf stünde weiter im Halter;
+ *  - Strg+P: der Browser feuert `beforeprint` selbst, hier per `dispatchEvent`.
+ * Nach `afterprint` steht die Kopfzeile wieder im Halter (LFH-330 am Bildschirm unverändert).
+ *
+ * NICHT BELEGT: die Wiederholung selbst auf dem PDF-Blatt — der PDF-Text ist komprimiert
+ * (siehe `druck-fluss.spec.ts`). Belegt ist die Voraussetzung, an der sie hing: EINE Tabelle
+ * mit `thead` als `table-header-group` und den Datenzeilen.
+ */
+async function kopfLage(page: Page) {
+  return page.evaluate(() => {
+    const wurzel = document.querySelector('[data-lfh="druckwurzel"]')!;
+    const mitZeilen = Array.from(wurzel.querySelectorAll('table')).filter(
+      (t) => t.querySelector('tbody tr.ant-table-row') !== null,
+    );
+    const kopf = mitZeilen[0]?.querySelector('thead');
+    const seitenkopf = wurzel.querySelector('[data-lfh="seitenkopf"]');
+    const druckkopf = wurzel.querySelector('[data-lfh="druckkopf"]');
+    return {
+      tabellenMitZeilen: mitZeilen.length,
+      koerperHatKopf: kopf != null,
+      kopfDisplay: kopf ? getComputedStyle(kopf).display : 'kein thead',
+      halter: wurzel.querySelector('.ant-table-sticky-holder') != null,
+      seitenkopf: seitenkopf ? getComputedStyle(seitenkopf).display : 'fehlt',
+      druckkopf: druckkopf ? getComputedStyle(druckkopf).display : 'fehlt',
+      zeilen: wurzel.querySelectorAll('tr.ant-table-row').length,
+    };
+  });
+}
+
+test('Druck des Meldebilds: Kopf und Körper in EINER Tabelle, kein Seitenkopf — über den Knopf und über Strg+P', async ({
+  page,
+}) => {
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Meldebild Kopf ${Date.now()}`);
+  await seedeKraefte(page, einsatzId, 8);
+  await page.setViewportSize({ width: A4_DRUCKBREITE, height: 800 });
+  await page.goto(`/einsaetze/${einsatzId}/kraefteuebersicht`);
+  await expect(page.locator('tr.ant-table-row')).toHaveCount(1);
+
+  // Vorbedingung am Bildschirm (LFH-330): Kopf im Halter, Körper ohne `thead`.
+  const schirm = await kopfLage(page);
+  expect(schirm.halter, 'Vorbedingung: stehende Kopfzeile am Bildschirm').toBe(true);
+  expect(schirm.koerperHatKopf, 'Vorbedingung: Körpertabelle ohne eigenen Kopf').toBe(false);
+
+  // ── KNOPF: `window.print` feuert `beforeprint` synchron, wie der Browser, und hält den
+  // DOM-Stand IN DIESEM MOMENT fest — danach friert der Browser das Druckbild ein. Später zu
+  // messen belegte nichts: ein liegengebliebenes Update wäre bis dahin nachgerendert
+  // (gemessen: mit `window.print()` direkt aus dem Effekt blieb die Nachmessung grün).
+  await page.evaluate(() => {
+    const w = window as unknown as { gedruckt: number; halterBeimDruck: boolean[] };
+    w.gedruckt = 0;
+    w.halterBeimDruck = [];
+    window.print = () => {
+      window.dispatchEvent(new Event('beforeprint'));
+      w.halterBeimDruck.push(
+        document.querySelector('[data-lfh="druckwurzel"] .ant-table-sticky-holder') != null,
+      );
+      w.gedruckt += 1;
+    };
+  });
+  await page.getByRole('button', { name: 'Drucken / als PDF' }).click();
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as { gedruckt: number }).gedruckt))
+    .toBe(1);
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { halterBeimDruck: boolean[] }).halterBeimDruck,
+    ),
+    'Knopf: im Moment des Druckbilds steht kein Sticky-Halter mehr',
+  ).toEqual([false]);
+  await page.emulateMedia({ media: 'print' });
+  const knopf = await kopfLage(page);
+  expect(knopf.halter, 'Knopf: kein Sticky-Halter im Druck').toBe(false);
+  expect(knopf.tabellenMitZeilen, 'Knopf: genau eine Tabelle mit Datenzeilen').toBe(1);
+  expect(knopf.koerperHatKopf, 'Knopf: Körpertabelle trägt ihren Kopf').toBe(true);
+  expect(knopf.kopfDisplay, 'Knopf: Kopf wiederholt sich je Blatt').toBe('table-header-group');
+  expect(knopf.zeilen, 'Knopf: „vorbereiten" hat die Mittel aufgeklappt').toBe(9);
+  expect(knopf.seitenkopf, 'Seitenkopf im Druck ausgeblendet').toBe('none');
+  expect(knopf.druckkopf, 'Druckkopf steht auf Papier').not.toBe('none');
+
+  await page.evaluate(() => window.dispatchEvent(new Event('afterprint')));
+  await page.emulateMedia({ media: null });
+  await expect.poll(async () => (await kopfLage(page)).halter).toBe(true);
+
+  // ── Strg+P: der Browser feuert `beforeprint` selbst.
+  await page.evaluate(() => window.dispatchEvent(new Event('beforeprint')));
+  await page.emulateMedia({ media: 'print' });
+  const strgP = await kopfLage(page);
+  expect(strgP.halter, 'Strg+P: kein Sticky-Halter im Druck').toBe(false);
+  expect(strgP.koerperHatKopf, 'Strg+P: Körpertabelle trägt ihren Kopf').toBe(true);
+  expect(strgP.kopfDisplay).toBe('table-header-group');
+  expect(strgP.seitenkopf).toBe('none');
+
+  await page.evaluate(() => window.dispatchEvent(new Event('afterprint')));
+  await page.emulateMedia({ media: null });
+  const danach = await kopfLage(page);
+  expect(danach.halter, 'nach afterprint steht die Kopfzeile wieder (LFH-330)').toBe(true);
+  expect(danach.koerperHatKopf).toBe(false);
 });
 
 /**
