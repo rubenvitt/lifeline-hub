@@ -1,4 +1,4 @@
-import { Button, Checkbox, Dropdown, Popconfirm, Space, Typography, theme } from 'antd';
+import { Button, Dropdown, Popconfirm, Space, Typography, theme } from 'antd';
 import type { Key, ReactNode } from 'react';
 import type { MenuProps, TableColumnType } from 'antd';
 import { DownOutlined, MoreOutlined, RightOutlined } from '@ant-design/icons';
@@ -21,6 +21,17 @@ import StatusWahl, { type StatusBedienung } from './StatusWahl';
 import Augenbraue from './instrument/Augenbraue';
 import { monoStil, rollenwerte } from './instrument/rollenwerte';
 import { useViewport, type AbBreitePunkt } from './useViewport';
+import {
+  etikettVon,
+  hatWaehlbareSpalten,
+  sichtbareSpalten,
+  SpaltenSchalter,
+} from './SpaltenSchalter';
+
+// Zählung und Schalter wohnen seit LFH-374 in `SpaltenSchalter.tsx` (zweiter Träger:
+// `KatalogTabelle`). Der Weiterexport hält die Bestandsimporte stabil; neue Aufrufer
+// importieren direkt von dort.
+export { etikettVon, hatWaehlbareSpalten, sichtbareSpalten, SpaltenSchalter };
 import type { StatusDarstellung } from '../theme/statusFarben';
 import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
 
@@ -524,19 +535,6 @@ export function zelle<T>(spalte: DatensichtSpalte<T>, zeile: T, index: number): 
   return ergebnis as ReactNode;
 }
 
-/** `etikett ?? title` (nur wenn `title` ein String ist), sonst `undefined` + DEV-Warnung. */
-export function etikettVon<T>(spalte: DatensichtSpalte<T>): string | undefined {
-  if (spalte.etikett != null) return spalte.etikett;
-  if (typeof spalte.title === 'string') return spalte.title;
-  if (import.meta.env.DEV) {
-    console.warn(
-      `[Datensicht] Spalte "${spalte.key}" hat kein etikett und keinen String-title. ` +
-        'Karte, Spaltenschalter und Sortierauswahl brauchen einen Klartext — `etikett` setzen.',
-    );
-  }
-  return undefined;
-}
-
 /**
  * Sortiert Text so, wie eine Einsatzkraft ihn liest: „Florian 2" vor „Florian 10".
  *
@@ -668,37 +666,6 @@ export function scrolleZurZeile(schluessel: Key): void {
   ziel?.scrollIntoView?.({ block: 'center' });
 }
 
-/** Sichtbare Spalten + Zähler — EINE Wahrheit aus Handauswahl UND `abBreite`. */
-export function sichtbareSpalten<T, K extends string>(args: {
-  spalten: readonly DatensichtSpalte<T, K>[];
-  verborgen: ReadonlySet<K>;
-  abBreite: (punkt: AbBreitePunkt) => boolean;
-}): { spalten: readonly DatensichtSpalte<T, K>[]; anzahlVerborgen: number } {
-  const { spalten, verborgen, abBreite } = args;
-  const sichtbar: DatensichtSpalte<T, K>[] = [];
-  let anzahlVerborgen = 0;
-  spalten.forEach((spalte, index) => {
-    /**
-     * INDEX 0 IST NIE ENTFERNBAR. `KatalogTabelle` fixiert, was als Spalte 0 ANKOMMT,
-     * nicht eine benannte. Fällt Spalte 0 weg, wird still eine ANDERE Spalte die fixierte
-     * Kennung — kein Fehler, kein roter Test, nur eine falsche Fixierung. `immerSichtbar`
-     * allein genügt dafür nicht: es ist ein Flag, das jemand vergisst.
-     */
-    if (index === 0 || spalte.immerSichtbar) {
-      sichtbar.push(spalte);
-      return;
-    }
-    // BEIDE Gründe in EINEM Zähler, und eine doppelt verborgene Spalte nur einmal —
-    // ein Zähler, der „0 ausgeblendet" meldet, verfehlt das Kriterium, für das er da ist.
-    if (verborgen.has(spalte.key) || (spalte.abBreite != null && !abBreite(spalte.abBreite))) {
-      anzahlVerborgen += 1;
-      return;
-    }
-    sichtbar.push(spalte);
-  });
-  return { spalten: sichtbar, anzahlVerborgen };
-}
-
 /**
  * Mängelliste des Kartenplans gegen das Spaltenregister; leeres Array = in Ordnung.
  * `Datensicht` ruft sie im DEV-Effekt und gibt sie an `console.warn` mit Präfix
@@ -780,116 +747,6 @@ export function pruefeKartenplan<T extends object, K extends string>(
     befunde.push("aufklappen und karte.art 'eigen' schließen sich aus (Eigenbau rendert roh).");
   }
   return befunde;
-}
-
-/** Die abwählbaren Spalten: alles außer der Kennungsspalte und den `immerSichtbar`-Spalten. */
-function waehlbareSpalten<T, K extends string>(
-  spalten: readonly DatensichtSpalte<T, K>[],
-): readonly DatensichtSpalte<T, K>[] {
-  return spalten.filter((s, i) => i !== 0 && !s.immerSichtbar);
-}
-
-/**
- * Gibt es überhaupt etwas zu schalten? EINE Wahrheit für zwei Leser (LFH-391 · B4).
- *
- * Der Schalter selbst rendert bei `false` gar nichts — und die Kommandopalette darf dann
- * auch keinen Befehl „Spalten" anbieten, der auf einen nicht vorhandenen Schalter zeigt.
- * Rechnete jede Seite das für sich, wäre das derselbe Fehlermodus wie beim Spaltenzähler:
- * eine Angabe, die lügen kann, verfehlt genau das Kriterium, für das sie existiert.
- */
-export function hatWaehlbareSpalten<T, K extends string>(
-  spalten: readonly DatensichtSpalte<T, K>[],
-): boolean {
-  return waehlbareSpalten(spalten).length > 0;
-}
-
-/** Der Schalter für Seiten, die ihn EINMAL über mehreren Sichten zeigen. */
-export function SpaltenSchalter<T, K extends string>(props: {
-  bezeichnung: string;
-  spalten: readonly DatensichtSpalte<T, K>[];
-  aus: readonly K[];
-  onAus: (schluessel: K[]) => void;
-  /**
-   * Optionale KONTROLLIERTE Offen-Achse. Ohne beide Props bleibt das Dropdown unkontrolliert
-   * wie bisher — der Export ist für Seiten gedacht, die den Schalter selbst platzieren, und
-   * ein Pflicht-Prop wäre eine Vertragsänderung ohne Gegenstand (gemessen: kein externer
-   * Aufrufer). Gebraucht wird sie, weil die Kommandopalette den Schalter von AUSSEN öffnet:
-   * `trigger={['click']}` allein hat keinen Weg hinein.
-   */
-  offen?: boolean;
-  onOffen?: (offen: boolean) => void;
-}): ReactNode {
-  const { bezeichnung, spalten, aus, onAus, offen, onOffen } = props;
-  // Der Schalter stellt die Breitenfrage SELBST, statt den Zähler übergeben zu bekommen:
-  // sonst gäbe es zwei Stellen, an denen „wie viele sind ausgeblendet" gerechnet wird, und
-  // die Seiten-Variante (ein Schalter über mehreren Sichten) driftete von der internen weg.
-  const { abBreite } = useViewport();
-  const { anzahlVerborgen } = sichtbareSpalten({ spalten, verborgen: new Set(aus), abBreite });
-  const waehlbar = waehlbareSpalten(spalten);
-  // Bewusst über {@link hatWaehlbareSpalten} statt über `waehlbar.length` — es ist genau die
-  // Funktion, die auch die Palette liest. Wer die Bedingung hier ändert, sieht die zweite
-  // Seite im selben Aufruf.
-  if (!hatWaehlbareSpalten(spalten)) return null;
-
-  const umschalten = (schluessel: K) =>
-    onAus(aus.includes(schluessel) ? aus.filter((k) => k !== schluessel) : [...aus, schluessel]);
-
-  /**
-   * Der Zähler steht als TEXT im Namen, nicht als Zähl-Abzeichen: ein antd-`Badge` mit
-   * `count` und ohne `color` rendert auf `token.colorError` — Rot für einen Spaltenzähler
-   * bricht „Rot bedient nichts" und Kriterium 7.
-   *
-   * Und er zählt BEIDE Ursachen (Handauswahl UND `abBreite`) aus {@link sichtbareSpalten},
-   * nicht bloß `aus.length`: ein Zähler, der „1 ausgeblendet" meldet, während zwei Spalten
-   * fehlen, verfehlt genau das Kriterium (14), für das er existiert.
-   */
-  const beschriftung =
-    anzahlVerborgen === 0 ? 'Spalten' : `Spalten · ${anzahlVerborgen} ausgeblendet`;
-
-  return (
-    <Dropdown
-      trigger={['click']}
-      // `undefined` lässt rc-trigger in seinem unkontrollierten Zweig — die Achse ist
-      // additiv, kein Bruch für Aufrufer ohne die Props.
-      open={offen}
-      onOpenChange={onOffen}
-      /*
-       * Der Fokus muss beim Öffnen IN das Menü wandern. Ohne `autoFocus` bleibt er am Knopf,
-       * die Pfeiltasten heben keinen Eintrag hervor, und die Eingabetaste schließt das Menü
-       * wieder — gemessen: nach `ArrowDown` stand `document.activeElement` weiter auf dem
-       * Knopf und `.ant-dropdown-menu-item-active` bei 0.
-       */
-      autoFocus
-      menu={{
-        /*
-         * Umgeschaltet wird am MENÜEINTRAG, nicht am Kontrollkästchen: rc-menu ruft `onClick`
-         * auf beiden Wegen auf — Mausklick und Eingabe-/Leertaste auf dem hervorgehobenen
-         * Eintrag. Hing der Umschalter allein am `onChange` des Kästchens, gab es nur einen
-         * Mausweg; die Tastatur konnte den Schalter öffnen, aber keine Spalte umschalten
-         * (WCAG 2.1.1). Der Nachweis liegt in `frontend/e2e/datensicht-schmal.spec.ts` und
-         * nicht in Vitest: jsdom liefert kein Fokusverhalten für ein Portal-Menü.
-         */
-        onClick: ({ key }) => umschalten(key as K),
-        items: waehlbar.map((spalte) => ({
-          key: spalte.key,
-          label:
-            (
-              /*
-               * Das Kästchen ist ANZEIGE, kein zweiter Umschalter: mit eigenem `onChange` würde
-               * ein Mausklick darauf zusätzlich das `onClick` des Eintrags auslösen und die
-               * Umschaltung im selben Atemzug zurücknehmen.
-               */
-              <Checkbox checked={!aus.includes(spalte.key)}>
-                {etikettVon(spalte) ?? spalte.key}
-              </Checkbox>
-            ),
-        })),
-      }}
-    >
-      {/* Kein `size`-Prop: die Höhe kommt aus `controlHeight` und zieht mit der Dichte mit. */}
-      <Button aria-label={`${beschriftung} — ${bezeichnung}`}>{beschriftung}</Button>
-    </Dropdown>
-  );
 }
 
 // ── Zustand ──────────────────────────────────────────────────────────────────────────
@@ -1023,6 +880,19 @@ export default function Datensicht<T extends object, const K extends string>(
     [spaltenAus, onSpaltenAus, nachBenutzeraktion],
   );
 
+  // Die zweite Handwahl (LFH-374 · D9): per Breite weggefallene, von Hand zurückgeholte
+  // Spalten. Bewusst unkontrolliert — die kontrollierte Achse `spaltenAus` bleibt, wie sie
+  // war, und hat heute keinen Konsumenten, der auch diese Hälfte bräuchte (gemessen).
+  const [spaltenAn, setSpaltenAn] = useState<readonly K[]>([]);
+  const setzeSpaltenAn = useCallback(
+    (k: K[]) => {
+      setSpaltenAn(k);
+      // Aus demselben Grund wie oben: die freigegebenen Zeilen sind die Antwort auf den Klick.
+      nachBenutzeraktion();
+    },
+    [nachBenutzeraktion],
+  );
+
   const [suchbegriff, setSuchbegriff] = useState('');
   const [filterWerte, setFilterWerte] = useState<Record<string, readonly string[]>>({});
   const filterZuruecksetzen = useCallback(() => {
@@ -1070,9 +940,10 @@ export default function Datensicht<T extends object, const K extends string>(
   // ── Spaltensichtbarkeit ───────────────────────────────────────────────────────────
   // Steht VOR der Zeilenmenge, weil die wirksamen Filter davon abhängen (siehe unten).
   const verborgen = useMemo(() => new Set(aktiveSpaltenAus), [aktiveSpaltenAus]);
+  const eingeblendet = useMemo(() => new Set(spaltenAn), [spaltenAn]);
   const { spalten: gezeigteSpalten } = useMemo(
-    () => sichtbareSpalten({ spalten, verborgen, abBreite }),
-    [spalten, verborgen, abBreite],
+    () => sichtbareSpalten({ spalten, verborgen, eingeblendet, abBreite }),
+    [spalten, verborgen, eingeblendet, abBreite],
   );
 
   /**
@@ -1401,6 +1272,8 @@ export default function Datensicht<T extends object, const K extends string>(
             spalten={spalten}
             aus={aktiveSpaltenAus}
             onAus={setzeSpaltenAus}
+            an={spaltenAn}
+            onAn={setzeSpaltenAn}
             offen={spaltenOffen}
             onOffen={setSpaltenOffen}
           />

@@ -182,7 +182,9 @@ describe('etikettVon()', () => {
     // Funktionsvariante unabgedeckt und `etikettVon` gäbe still ein Objekt als „Text".
     const spion = vi.spyOn(console, 'warn').mockImplementation(() => {});
     expect(etikettVon({ key: 'a', title: () => <b>Funkrufname</b> })).toBeUndefined();
-    expect(spion.mock.calls.filter((c) => String(c[0]).includes('[Datensicht]'))).toHaveLength(1);
+    expect(spion.mock.calls.filter((c) => String(c[0]).includes('[Spaltenschalter]'))).toHaveLength(
+      1,
+    );
     spion.mockRestore();
   });
 
@@ -1195,6 +1197,51 @@ describe('Datensicht · Tabellenzweig', () => {
       'Träger',
     ]);
     expect(screen.getByRole('button', { name: /Spalten · 1 ausgeblendet/ })).toBeInTheDocument();
+  });
+
+  it('zeigt genau EINEN Spaltenschalter, obwohl das Primitiv darunter selbst einen kann', () => {
+    /**
+     * `KatalogTabelle` trägt seit LFH-374 einen eigenen Schalter als Opt-in. `Datensicht`
+     * rendert durch sie und bringt seinen Schalter selbst mit — setzte es zusätzlich
+     * `spaltenSchalter`, stünden zwei Knöpfe mit zwei Zuständen da (D5). Der Guard in
+     * `katalogTabelle.guard.test.ts` hält das Attribut aus der Quelle, dieser Fall das Bild.
+     */
+    rendere({ form: 'tabelle' });
+    expect(screen.getAllByRole('button', { name: /^Spalten/ })).toHaveLength(1);
+  });
+
+  it('eine per Breite weggefallene Spalte steht OHNE Häkchen im Menü und lässt sich zurückholen', async () => {
+    /**
+     * LFH-374 · D9, gemessen am Bestand: das Häkchen las `!aus.includes(key)` statt der
+     * wirklichen Sichtbarkeit. „Besatzung" (`abBreite: 'xl'`) fehlte bei 1024 px in der
+     * Tabelle, stand im Menü aber ANGEHAKT da, und ein Klick änderte sichtbar nichts — die
+     * Behauptung „einblendbar" aus LFH-342 hielt nicht.
+     */
+    const { container } = rendere();
+    const kopf = () =>
+      [...container.querySelectorAll('th.ant-table-cell')].map((z) => z.textContent);
+    expect(kopf()).not.toContain('Besatzung');
+
+    await userEvent.click(screen.getByRole('button', { name: /Spalten · 1 ausgeblendet/ }));
+    const besatzung = await screen.findByRole('checkbox', { name: 'Besatzung' });
+    expect(besatzung).not.toBeChecked();
+
+    await userEvent.click(besatzung);
+    expect(kopf()).toContain('Besatzung');
+    const knopf = screen.getByRole('button', { name: /^Spalten —/ });
+
+    // Neu öffnen und im OFFENEN Overlay greifen: der Klick auf den Eintrag schließt das Menü,
+    // und das abgehende Overlay (`ant-slide-up-leave`, jsdom feuert kein `transitionend`)
+    // zeigt eingefrorenen Inhalt — dort stünde das Häkchen noch auf dem Stand VOR dem Klick.
+    await userEvent.click(knopf);
+    const menue = await waitFor(() => {
+      const m = document.querySelector<HTMLElement>(
+        '.ant-dropdown:not(.ant-dropdown-hidden):not(.ant-slide-up-leave) [role="menu"]',
+      );
+      expect(m).not.toBeNull();
+      return m!;
+    });
+    expect(within(menue).getByRole('checkbox', { name: 'Besatzung' })).toBeChecked();
   });
 
   it('Suche und Sortierung wirken auf die Zeilenmenge, nicht nur auf die Anzeige', async () => {

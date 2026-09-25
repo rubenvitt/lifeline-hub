@@ -1,15 +1,5 @@
-import {
-  App,
-  Button,
-  Dropdown,
-  Popconfirm,
-  Progress,
-  Space,
-  Tag,
-  Typography,
-  type TableColumnsType,
-} from 'antd';
-import KatalogTabelle from '../components/KatalogTabelle';
+import { App, Button, Dropdown, Popconfirm, Progress, Space, Tag, Typography } from 'antd';
+import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { DownOutlined, LoadingOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -158,7 +148,7 @@ export default function OfflineKartenVerwaltung() {
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Neu laden fehlgeschlagen'),
   });
 
-  const spalten: TableColumnsType<OfflineKarte> = [
+  const spalten: KatalogSpalte<OfflineKarte>[] = [
     {
       title: 'Name',
       dataIndex: 'name',
@@ -314,12 +304,18 @@ export default function OfflineKartenVerwaltung() {
       ellipsis: { showTitle: true },
       onCell: () => ({ style: { maxWidth: 200 } }),
       render: (l: string | null) => l ?? '—',
+      // LFH-374: gekappter Freitext mit der schwächsten Vergleichsaussage — fällt unter `lg`
+      // weg und wird vom Spaltenschalter mitgezählt (Begründung der Schwelle am Gegenstück
+      // in `OnlineQuellenVerwaltung.tsx`).
+      abBreite: 'lg',
     },
     ...(istAdmin
       ? ([
           {
             title: 'Aktionen',
             key: 'aktionen',
+            // Die Zeilenaktionen sind kein Vergleichsgegenstand — nicht abwählbar.
+            immerSichtbar: true,
             render: (_, k: OfflineKarte) => {
               // Läuft ein Download (Neu-Zeile 'laedt' ODER In-Place-Reload einer 'bereit'-Zeile)?
               // Dann nur Abbrechen anbieten, keine Aktivieren/Update/Löschen-Aktionen.
@@ -363,7 +359,7 @@ export default function OfflineKartenVerwaltung() {
               );
             },
           },
-        ] as TableColumnsType<OfflineKarte>)
+        ] as KatalogSpalte<OfflineKarte>[])
       : []),
   ];
 
@@ -427,6 +423,9 @@ export default function OfflineKartenVerwaltung() {
           // nichts bei — Absicht, siehe Statusspalte. Der Platzhalter nennt die beiden Felder,
           // nach denen tatsächlich getippt wird.
           suche={{ platzhalter: 'Name oder Attribution' }}
+          // Kriterium 14 (LFH-374): umschaltbarer Spaltensatz mit Zähler. Name ist Spalte 0
+          // und damit nie abwählbar, Aktionen sind `immerSichtbar`.
+          spaltenSchalter={{ bezeichnung: 'Offline-Karten' }}
         />
       )}
       <OfflineRegionPicker offen={pickerOffen} onClose={() => setPickerOffen(false)} />
