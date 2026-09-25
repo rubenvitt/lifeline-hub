@@ -447,7 +447,7 @@ describe('EtbEntwurfsTabs', () => {
     expect(erfassen.mock.calls[0][0].client_id).toBe(entwurfsId);
   });
 
-  it('LFH-117: der sendende Entwurf lässt sich nicht schliessen', async () => {
+  it('LFH-117: der sendende Entwurf lässt sich nicht schließen', async () => {
     const upload = haengenderUpload();
     renderMitProviders(<EtbEntwurfsTabs {...props()} />);
     await screen.findByPlaceholderText(/Inhalt/);
@@ -461,7 +461,7 @@ describe('EtbEntwurfsTabs', () => {
 
     const knoten = (tab: HTMLElement) => tab.closest('.ant-tabs-tab') as HTMLElement;
     expect(knoten(ersterTab).querySelector('.ant-tabs-tab-remove')).toBeNull();
-    // Der andere Entwurf bleibt schliessbar — gesperrt ist nur, was gerade sendet.
+    // Der andere Entwurf bleibt schließbar — gesperrt ist nur, was gerade sendet.
     expect(knoten(zweiterTab).querySelector('.ant-tabs-tab-remove')).not.toBeNull();
 
     await act(async () => upload.freigeben());

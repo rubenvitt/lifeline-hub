@@ -478,7 +478,7 @@ dem Absenden, nicht ab dem Ende des Uploads, und die **Entwurfs-id ist die `clie
 **Der Sendezustand gehört dem Entwurf, nicht der Montierung** (Review C1): `EtbEntwurfsTabs`
 hält ihn je Entwurf (`Versand`), weil nur der aktive Tab montiert ist — sonst stand nach einem
 Tabwechsel eine entsperrte Erfassung da, deren Eingaben der laufende Versand still verwarf.
-Ein sendender Entwurf trägt kein Schliesskreuz, und „Berichtigen" ist gesperrt, solange einer
+Ein sendender Entwurf trägt kein Schließkreuz, und „Berichtigen" ist gesperrt, solange einer
 sendet (die Berichtigung ersetzt die Reiter ganz). Die gewählten **Dateien liegen in
 `EtbPage`** (`useEntwurfsDateien`), aus demselben Grund wie „Werte behalten". Höchstzahl 10
 und Dubletten (Name + Größe + `lastModified`) prüft schon die Dateiwahl. **Ein ungebundener

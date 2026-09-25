@@ -236,8 +236,9 @@ dem Senden gelten die Chat-Regeln unverändert. Gebundene Anhänge sind nicht be
 - **Die Folge für den Chat:** Ein Anhang, dessen Nachricht hart gelöscht wurde, ist wieder
   ungebunden und damit nur noch für die hochladende Person ladbar. Weich gelöschte
   Nachrichten sperren ohnehin (LFH-116).
-- Tests: `tests/etb_anhang.rs::ungebundener_etb_upload_ist_generisch_nur_fuer_die_hochladende_person`
-  und `tests/anhang.rs::chat_anhang_vor_dem_senden_nur_fuer_die_hochladende_danach_fuer_alle`.
+- Tests: `tests/etb_anhang.rs::ungebundener_etb_upload_ist_generisch_nur_fuer_die_hochladende_person`,
+  `tests/etb_anhang.rs::fremder_ungebundener_upload_laesst_sich_nicht_binden` und
+  `tests/anhang.rs::chat_anhang_vor_dem_senden_nur_fuer_die_hochladende_danach_fuer_alle`.
 
 ## Risks / Trade-offs
 

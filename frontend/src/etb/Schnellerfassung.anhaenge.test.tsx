@@ -417,7 +417,7 @@ describe('Schnellerfassung – Sendezustand (LFH-117, Review)', () => {
    * und wurde nach dem Erfolg still geleert. Geprüft wird die GANZE Erfassung, mit einer
    * ausdrücklichen Ausnahmeliste: ein neues Bedienelement rutscht so nicht durch.
    */
-  it('sperrt während des Absendens JEDES Bedienelement der Erfassung ausser „Vorschau"', async () => {
+  it('sperrt während des Absendens JEDES Bedienelement der Erfassung außer „Vorschau"', async () => {
     let freigeben: (a: Anhang) => void = () => {};
     hochladen.mockImplementationOnce(() => new Promise((r) => (freigeben = r)));
     const p = props({

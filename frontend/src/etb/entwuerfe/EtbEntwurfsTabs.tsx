@@ -108,7 +108,7 @@ export default function EtbEntwurfsTabs({
     (targetKey: React.MouseEvent | React.KeyboardEvent | string, action: 'add' | 'remove') => {
       if (action === 'add') neuerEntwurf(werteBehalten ? uebernahme : {});
       else if (typeof targetKey === 'string') {
-        // Ein sendender Entwurf trägt kein Schliesskreuz; der Riegel hier hält auch den
+        // Ein sendender Entwurf trägt kein Schließkreuz; der Riegel hier hält auch den
         // Tastaturweg (Entf auf dem Reiter) — sonst entstünde ein verworfener Eintrag doch.
         if (versandJe[targetKey]?.sendet) return;
         dateienVerwerfen(targetKey);
@@ -130,7 +130,7 @@ export default function EtbEntwurfsTabs({
   const items = entwuerfe.map((e) => ({
     key: e.id,
     label: entwurfLabel(e),
-    // Solange er sendet, lässt sich ein Entwurf nicht schliessen: der Versand liefe trotzdem
+    // Solange er sendet, lässt sich ein Entwurf nicht schließen: der Versand liefe trotzdem
     // durch, und ein verworfener Entwurf stünde danach als Eintrag im Tagebuch.
     closable: !versandJe[e.id]?.sendet,
     children:
