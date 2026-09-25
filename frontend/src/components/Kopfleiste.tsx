@@ -13,6 +13,7 @@ import { useAuth } from '../auth/AuthContext';
 import { abonniereLiveStatus, leseLiveStatus } from '../live/liveStatusStore';
 import type { LiveVerbindungsStatus } from '../live/useEinsatzLiveStream';
 import { useOfflineQueueZaehler } from '../offline/useOfflineQueueZaehler';
+import { useOnline } from '../offline/useOnline';
 import type { OfflineQueueZaehler } from '../offline/queue';
 import { einsaetzePfad } from '../routing/deeplinks';
 import { farbenDunkel, rahmenFarben, schrift } from '../theme/tokens';
@@ -295,24 +296,6 @@ export const SYNC_DARSTELLUNG: Record<Exclude<SyncZustand, 'ruhe'>, SyncDarstell
     getrennt: false,
   },
 };
-
-/** `navigator.onLine` als reaktiver Wert. */
-function useOnline(): boolean {
-  const [online, setOnline] = useState(() =>
-    typeof navigator === 'undefined' ? true : navigator.onLine,
-  );
-  useEffect(() => {
-    const an = () => setOnline(true);
-    const aus = () => setOnline(false);
-    window.addEventListener('online', an);
-    window.addEventListener('offline', aus);
-    return () => {
-      window.removeEventListener('online', an);
-      window.removeEventListener('offline', aus);
-    };
-  }, []);
-  return online;
-}
 
 /**
  * SYNC-Anzeige: Antennen-Ikone + Wort (Mono 11). Eine ANZEIGE, kein Bedienziel — die
