@@ -53,7 +53,7 @@ darauf auf, Gruppe 9 schließt ab.
 
 ## 8. Ende-zu-Ende
 
-- [ ] 8.1 `e2e/etb-anhang.spec.ts`: Datei wählen → Text tippen → Enter → Eintrag erscheint mit Anhang-Verweis → Klick lädt die Datei (Download-Ereignis, Name stimmt); zweiter Einsatz: der Pfad mit Eintrag- und Anhang-ID aus dem ersten antwortet 404; generischer `/anhaenge/{aid}` antwortet 404; offline (`context.setOffline(true)`) ist „Anhang“ gesperrt und ein Text-Eintrag landet als ausstehend. Bedienbarkeit per Klick belegt, nicht per `toBeVisible()`. Verifiziert durch `pnpm e2e --grep etb-anhang`
+- [x] 8.1 `e2e/etb-anhang.spec.ts`: Datei wählen → Text tippen → Enter → Eintrag erscheint mit Anhang-Verweis → Klick lädt die Datei (Download-Ereignis, Name stimmt); zweiter Einsatz: der Pfad mit Eintrag- und Anhang-ID aus dem ersten antwortet 404; generischer `/anhaenge/{aid}` antwortet 404; offline (`context.setOffline(true)`) ist „Anhang“ gesperrt und ein Text-Eintrag landet als ausstehend. Bedienbarkeit per Klick belegt, nicht per `toBeVisible()`. Verifiziert durch `pnpm e2e --grep etb-anhang`
 - [ ] 8.2 Browser-Sichtprüfung in Tag und Nacht, Fükw (1366 px) und Tablet in Stufe „Handschuh“: Knopf, Dateiliste, Hinweis offline, Upload-Fortschritt mit einer ~20-MiB-Datei, Anhang-Verweise in Zeitachse und Vorschau, iPhone-HEIC. Verifiziert durch Screenshots in der Prüfliste
 
 ## 9. Abschluss
