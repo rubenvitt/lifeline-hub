@@ -849,6 +849,9 @@ impl Ablauf<'_> {
                         evakuiert,
                         erhebung,
                         zeitpunkt_at: zeit.to_string(),
+                        // Der Import hat keine Offline-Queue, also keinen Idempotenzschlüssel
+                        // (LFH-675): ohne ihn schreibt jede Meldung eine eigene Zeile.
+                        client_id: None,
                     },
                 )
                 .await?;
@@ -903,6 +906,7 @@ impl Ablauf<'_> {
                     &crate::betreuung::repo::BelegungEingabe {
                         belegt,
                         zeitpunkt_at: zeit.to_string(),
+                        client_id: None,
                     },
                 )
                 .await?;
