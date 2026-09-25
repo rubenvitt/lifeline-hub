@@ -333,3 +333,114 @@ describe('Schnellerfassung – Absenden mit Anhängen (LFH-117)', () => {
     });
   });
 });
+
+describe('Schnellerfassung – Sendezustand (LFH-117, Review)', () => {
+  it('nimmt die Erfassungszeit beim Absenden, nicht nach dem Upload', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(new Date('2026-09-25T10:00:00Z'));
+      let freigeben: (a: Anhang) => void = () => {};
+      hochladen.mockImplementationOnce(() => new Promise((r) => (freigeben = r)));
+      const p = props();
+      const { container } = renderMitProviders(<Schnellerfassung {...p} />);
+      await waehle(container, datei('a.jpg'));
+      await userEvent.type(feld(), 'Foto{Enter}');
+      await screen.findByText('Lädt hoch (1/1) …');
+      // Der Upload dauert fünf Minuten.
+      vi.setSystemTime(new Date('2026-09-25T10:05:00Z'));
+      await act(async () => freigeben(anzeige(1, 'a.jpg')));
+      await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+      const e = vi.mocked(p.erfassen).mock.calls[0][0];
+      expect(e.erfasst_lokal_at).toBe('2026-09-25T10:00:00.000Z');
+      expect(e.ereigniszeit).toBe('2026-09-25 10:00:00');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('sperrt Text und „Anhang" während des Absendens — nichts wird still verworfen', async () => {
+    let freigeben: (a: Anhang) => void = () => {};
+    hochladen.mockImplementationOnce(() => new Promise((r) => (freigeben = r)));
+    const p = props();
+    const { container } = renderMitProviders(<Schnellerfassung {...p} />);
+    await waehle(container, datei('a.jpg'));
+    await userEvent.type(feld(), 'Foto{Enter}');
+    await screen.findByText('Lädt hoch (1/1) …');
+
+    expect(feld()).toHaveAttribute('readonly');
+    expect(screen.getByRole('button', { name: 'Anhang' })).toBeDisabled();
+    await userEvent.type(feld(), ' und mehr');
+    expect(feld()).toHaveValue('Foto');
+
+    await act(async () => freigeben(anzeige(1, 'a.jpg')));
+    await waitFor(() => expect(feld()).not.toHaveAttribute('readonly'));
+    expect(screen.getByRole('button', { name: 'Anhang' })).toBeEnabled();
+  });
+
+  it('schickt die client_id des Aufrufers', async () => {
+    const p = props({ clientId: 'entwurf-7' });
+    renderMitProviders(<Schnellerfassung {...p} />);
+    await userEvent.type(feld(), 'Lage{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(p.erfassen).mock.calls[0][0].client_id).toBe('entwurf-7');
+  });
+
+  it('hält ohne Aufrufer-id eine eigene client_id bis zum Erfolg und nimmt danach eine neue', async () => {
+    const p = props({
+      erfassen: vi
+        .fn<(e: NeuerEintrag) => Promise<void>>()
+        .mockRejectedValueOnce(new Error('abgelehnt'))
+        .mockResolvedValue(undefined),
+    });
+    renderMitProviders(<Schnellerfassung {...p} />);
+    await userEvent.type(feld(), 'Eins{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    const knopf = screen.getByRole('button', { name: /Erfassen$/ });
+    await waitFor(() => expect(knopf).not.toHaveClass('ant-btn-loading'));
+    fireEvent.click(knopf);
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(feld()).toHaveValue(''));
+    await userEvent.type(feld(), 'Zwei{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(3));
+
+    const ids = vi.mocked(p.erfassen).mock.calls.map((c) => c[0].client_id);
+    expect(ids[0]).toBeTruthy();
+    expect(ids[1]).toBe(ids[0]);
+    expect(ids[2]).not.toBe(ids[0]);
+  });
+
+  it('lässt eine laufende Berichtigung nicht abbrechen', async () => {
+    let freigeben: () => void = () => {};
+    const p = props({
+      erfassen: vi
+        .fn<(e: NeuerEintrag) => Promise<void>>()
+        .mockImplementation(() => new Promise<void>((r) => (freigeben = r))),
+      berichtigungZu: {
+        id: 5,
+        lfd_nr: 5,
+        typ: 'meldung',
+        inhalt: 'Original',
+        von: null,
+        an: null,
+        meldeweg: null,
+        veranlassung: null,
+        erfasser_id: 1,
+        erfasser_name: 'Max',
+        ereigniszeit: '2026-05-23 10:00:00',
+        received_at: '2026-05-23 10:00:01',
+        erfasst_lokal_at: null,
+        berichtigt_eintrag_id: null,
+        lagebericht_id: null,
+        auftrag_id: null,
+        befehl_id: null,
+        folgeauftraege: [],
+        anhaenge: [],
+      },
+    });
+    renderMitProviders(<Schnellerfassung {...p} />);
+    await userEvent.type(feld(), 'Richtig ist{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole('button', { name: 'Abbrechen' })).toBeDisabled();
+    await act(async () => freigeben());
+  });
+});

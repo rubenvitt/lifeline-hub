@@ -64,6 +64,13 @@ interface Props {
    */
   dateien?: File[];
   onDateienChange?: (dateien: File[]) => void;
+  /**
+   * Idempotenzschlüssel dieses Entwurfs (LFH-117, Review). `EtbEntwurfsTabs` reicht die
+   * Entwurfs-id: sie überlebt den Remount beim Tabwechsel, und ein zweites Absenden desselben
+   * Entwurfs, während das erste noch läuft, dedupliziert der Server. Fehlt sie, hält die
+   * Schnellerfassung eine eigene bis zum Erfolg (Berichtigung).
+   */
+  clientId?: string;
 }
 
 /**
@@ -126,6 +133,7 @@ export default function Schnellerfassung({
   onWerteBehaltenChange,
   dateien: dateienVonAussen,
   onDateienChange,
+  clientId,
 }: Props) {
   const navigate = useNavigate();
   const { token, rollen } = useRollen();
@@ -141,6 +149,8 @@ export default function Schnellerfassung({
   /** Hinweis an der Dateiliste — bleibt stehen bis zur nächsten Wahl oder zum nächsten Absenden. */
   const [anhangHinweis, setAnhangHinweis] = useState<string | null>(null);
   const [fortschritt, setFortschritt] = useState<{ n: number; von: number } | null>(null);
+  /** Eigener Schlüssel ohne Aufrufer-id: stabil über Fehlversuche, neu nach jedem Erfolg. */
+  const eigeneClientId = useRef<string>(crypto.randomUUID());
   const menuRef = useRef<SlashMenuHandle>(null);
   const feldKnopfRef = useRef<HTMLButtonElement>(null);
 
@@ -387,6 +397,9 @@ export default function Schnellerfassung({
       );
       return;
     }
+    // Die Zeit gilt ab dem Absenden, nicht ab dem Ende des Uploads — sonst verschöbe ein
+    // langer Upload Ereigniszeit und `erfasst_lokal_at` (Review LFH-117).
+    const jetztIso = new Date().toISOString();
     setSendet(true);
     setAnhangHinweis(null);
     try {
@@ -399,8 +412,9 @@ export default function Schnellerfassung({
           typ,
           metadaten,
           berichtigungZuId: berichtigungZu ? berichtigungZu.id : undefined,
-          jetztIso: new Date().toISOString(),
+          jetztIso,
         }),
+        client_id: clientId ?? eigeneClientId.current,
         ...(anhangIds.length > 0 ? { anhang_ids: anhangIds } : {}),
       };
       try {
@@ -409,6 +423,7 @@ export default function Schnellerfassung({
         for (const d of dateien) hochgeladeneIds.delete(d);
         throw e;
       }
+      eigeneClientId.current = crypto.randomUUID();
       setInhalt('');
       // Die Dateiliste geht immer — auch mit „Werte behalten": eine Datei gehört zu genau
       // einem Eintrag (`nurUebernahme` kennt keine Dateien).
@@ -499,7 +514,12 @@ export default function Schnellerfassung({
           showIcon
           style={{ marginBottom: token.marginSM }}
           title={`Berichtigung zu Nr. ${berichtigungZu.lfd_nr}`}
-          action={<Button onClick={onBerichtigungAbbrechen}>Abbrechen</Button>}
+          action={
+            // Gesperrt, solange sie gesendet wird: der Versand liefe sonst trotzdem durch.
+            <Button disabled={sendet} onClick={onBerichtigungAbbrechen}>
+              Abbrechen
+            </Button>
+          }
         />
       )}
 
@@ -524,6 +544,7 @@ export default function Schnellerfassung({
             value={inhalt}
             onChange={onInhaltChange}
             onKeyDown={onKeyDown}
+            readOnly={sendet}
           />
         </Schnellerfassungszeile>
         <SlashMenu
@@ -611,7 +632,7 @@ export default function Schnellerfassung({
               Tabstopp. So bleibt EIN Bedienziel, und die Höhe kommt aus `controlHeight`. */}
           <Button
             type="dashed"
-            disabled={!online}
+            disabled={!online || sendet}
             icon={
               <span aria-hidden="true" style={{ display: 'inline-flex' }}>
                 <PaperClipOutlined />

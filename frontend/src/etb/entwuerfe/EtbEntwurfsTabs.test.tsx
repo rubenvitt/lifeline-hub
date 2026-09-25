@@ -353,4 +353,30 @@ describe('EtbEntwurfsTabs', () => {
     );
     expect(screen.queryByText(/foto-c\.jpg/)).toBeNull();
   });
+
+  it('LFH-117: schickt die Entwurfs-id als client_id — auch nach einem Tabwechsel während des Sendens', async () => {
+    const erfassen = vi
+      .fn<(e: NeuerEintrag) => Promise<void>>()
+      .mockImplementation(() => new Promise<void>(() => {}));
+    renderMitProviders(<EtbEntwurfsTabs {...props({ erfassen })} />);
+    await screen.findByPlaceholderText(/Inhalt/);
+    const ersterTab = screen.getAllByRole('tab')[0];
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Meldung{Enter}');
+    await waitFor(() => expect(erfassen).toHaveBeenCalledTimes(1));
+
+    // Wegwechseln und zurück: die Schnellerfassung montiert neu, der Versand läuft noch.
+    await userEvent.click(screen.getByRole('button', { name: /add|hinzu/i }));
+    await waitFor(() =>
+      expect(screen.getAllByRole('tab', { name: /Neuer Eintrag|Meldung/ })).toHaveLength(2),
+    );
+    await userEvent.click(ersterTab);
+    await waitFor(() => expect(screen.getByPlaceholderText(/Inhalt/)).toHaveValue('Meldung'));
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), '{Enter}');
+    await waitFor(() => expect(erfassen).toHaveBeenCalledTimes(2));
+
+    const [erster, zweiter] = erfassen.mock.calls.map((c) => c[0].client_id);
+    const [entwurf] = (await entwuerfeLaden(7)).filter((e) => e.inhalt === 'Meldung');
+    expect(erster).toBe(entwurf.id);
+    expect(zweiter).toBe(erster);
+  });
 });

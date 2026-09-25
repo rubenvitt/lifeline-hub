@@ -119,6 +119,9 @@ export default function EtbEntwurfsTabs({
           onWerteChange={(w) => entwurfAktualisieren(e.id, w)}
           werteBehalten={werteBehalten}
           onWerteBehaltenChange={onWerteBehaltenChange}
+          // Die Entwurfs-id ist der Idempotenzschlüssel: sie überlebt den Remount beim
+          // Tabwechsel, ein zweites Absenden während des ersten dedupliziert der Server.
+          clientId={e.id}
           dateien={dateienJe[e.id] ?? KEINE_DATEIEN}
           onDateienChange={(d) => setDateienJe((alt) => ({ ...alt, [e.id]: d }))}
         />

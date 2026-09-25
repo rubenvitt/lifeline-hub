@@ -35,6 +35,12 @@ interface Props {
   /** Von antd Form.Item gesetzt (für Label-Verknüpfung). */
   id?: string;
   onKeyDown?: (e: KeyboardEvent<HTMLTextAreaElement>) => void;
+  /**
+   * Sperrt die Eingabe, ohne den Fokus zu nehmen (`readOnly`, nicht `disabled`): die
+   * ETB-Schnellerfassung hält so den Wortlaut fest, während ein Versand läuft — was in der
+   * Zeit getippt würde, löschte das Leeren nach dem Erfolg still (LFH-117).
+   */
+  readOnly?: boolean;
 }
 
 /**
@@ -57,6 +63,7 @@ const MarkdownEditor = forwardRef<TextAreaRef, Props>(function MarkdownEditor(
     rows,
     id,
     onKeyDown,
+    readOnly,
   },
   ref,
 ) {
@@ -73,6 +80,7 @@ const MarkdownEditor = forwardRef<TextAreaRef, Props>(function MarkdownEditor(
       rows={rows}
       onChange={(e) => onChange?.(e.target.value)}
       onKeyDown={onKeyDown}
+      readOnly={readOnly}
     />
   );
 

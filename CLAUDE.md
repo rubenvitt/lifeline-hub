@@ -450,7 +450,11 @@ Bindungsabfrage. Das Erfassen bindet über `anhang_ids` in derselben Transaktion
 Eintrag (`anlegen_idempotent`, `write_retry!`, Replay ohne Anhangsprüfung). **Append-only:**
 kein Tauschen, kein Entfernen, nur die Schwärzung löscht die Datei, der Eintrag bleibt.
 **Nur der Upload braucht Netz:** ohne Verbindung ist „Anhang" gesperrt, ein Eintrag mit schon
-hochgeladenen Dateien geht mit `anhang_ids` in die Queue. Der Download-Verweis ist blau aus
+hochgeladenen Dateien geht mit `anhang_ids` in die Queue. **Während des Sendens** sind Text
+(`MarkdownEditor readOnly`) und „Anhang" gesperrt, die Erfassungszeit gilt ab dem Absenden,
+nicht ab dem Ende des Uploads, und die **Entwurfs-id ist die `client_id`**: sie überlebt den
+Remount beim Tabwechsel, ein zweites Absenden desselben Entwurfs dedupliziert der Server.
+Der Download-Verweis ist blau aus
 `bedienText` und steht in der Hinweiszeile unabhängig von `hatVerknuepfung`. Prüfliste:
 `docs/superpowers/specs/2026-09-24-lfh-117-pruefliste.md`.
 
