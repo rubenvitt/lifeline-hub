@@ -407,7 +407,7 @@ pub async fn personal_zuordnen(
             einsatz_id,
             benutzer.id,
             startwert,
-            &format!("Einheit «{}»: «{}» zugeordnet", einheit, person),
+            &crate::einheit::etb_text_personal_zugeordnet(&einheit, &person),
         )
         .await?;
         Ok(())
