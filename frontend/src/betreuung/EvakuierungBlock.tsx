@@ -12,6 +12,7 @@ import Bereichskopf from '../kommunikation/Bereichskopf';
 import { raeumungszustand } from '../theme/statusFarben';
 import { evakuiertText, kennzahlText } from './betreuungText';
 import { evakuierungKennzahl } from './evakuierungKennzahl';
+import MeldeVerlauf from './MeldeVerlauf';
 
 /**
  * Block „Evakuierung" der Betreuungsseite (LFH-639, design.md D7).
@@ -20,6 +21,10 @@ import { evakuierungKennzahl } from './evakuierungKennzahl';
  * ist mit diesem Bezirk?"), nicht verglichen. Titel = Bezeichnung, Status = Räumungszustand,
  * drei Sekundärfelder: „N · von M geplant", Stand-Zeit, Abschnitt. Genau EINE Primäraktion
  * („Stand melden"), alles Weitere gebündelt im Menü (`weitere`, LFH-365).
+ *
+ * VERLAUF (LFH-676): ein beschrifteter Aufklappbereich „Verlauf“ an jeder Karte, auch ohne
+ * Schreibrecht — Lesen ist keine Handlung und zählt nicht gegen die eine Primäraktion. Die
+ * Standreihe lädt erst beim Aufklappen.
  *
  * Der Zeilenschlüssel trägt ein Präfix (`bezirk-5`): `scrolleZurZeile` sucht über
  * `[data-row-key]` UND die Kartenmarke, und die Stellen-Tabelle derselben Seite hat eigene
@@ -89,6 +94,7 @@ export function bezirkMenue(
 }
 
 export default function EvakuierungBlock({
+  einsatzId,
   bezirke,
   ladend,
   darfSchreiben,
@@ -97,6 +103,7 @@ export default function EvakuierungBlock({
   onStandMelden,
   onAktion,
 }: {
+  einsatzId: number;
   bezirke: readonly Evakuierungsbezirk[];
   ladend: boolean;
   darfSchreiben: boolean;
@@ -133,6 +140,21 @@ export default function EvakuierungBlock({
     }),
     [darfSchreiben, onStandMelden, onAktion],
   );
+  const aufklappen = useMemo(
+    () => ({
+      etikett: 'Verlauf',
+      zugaenglicherName: (b: Evakuierungsbezirk) => `Verlauf zu Bezirk ${b.bezeichnung}`,
+      inhalt: (b: Evakuierungsbezirk) => (
+        <MeldeVerlauf
+          einsatzId={einsatzId}
+          art="bezirk"
+          objektId={b.id}
+          darfZuruecknehmen={darfSchreiben}
+        />
+      ),
+    }),
+    [einsatzId, darfSchreiben],
+  );
 
   return (
     <div style={{ marginBottom: token.marginLG }}>
@@ -151,6 +173,7 @@ export default function EvakuierungBlock({
         ladend={ladend}
         leerText="Keine Evakuierungsbezirke. Mit „Evakuierungsbezirk anlegen“ wird eine Räumung mit ihrer Plangröße erfasst."
         karte={karte}
+        aufklappen={aufklappen}
         zeilenKlasse={(b) => (b.id === hervorgehoben ? HERVORGEHOBEN : undefined)}
       />
     </div>

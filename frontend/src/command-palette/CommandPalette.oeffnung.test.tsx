@@ -57,6 +57,10 @@ function palette(befehle: Befehl[], extra: Partial<Parameters<typeof CommandPale
 
 const fuss = () => document.querySelector('[data-lfh="palette-fuss"]') as HTMLElement;
 const vorschauRegion = () => screen.queryByRole('region', { name: /^Vorschau/ });
+const vorschauZiel = (zeile: string) =>
+  screen
+    .getByRole('option', { name: zeile })
+    .querySelector<HTMLElement>('[data-lfh="palette-vorschau-ziel"]');
 
 describe('CommandPalette · Strg/⌘+↵ neuer Tab (LFH-645)', () => {
   it('öffnet eine Zeile mit Ziel im neuen Tab und schliesst', () => {
@@ -313,20 +317,32 @@ describe('CommandPalette · Fußzeile und Zeilenmarke (LFH-645)', () => {
     expect(fuss()).not.toHaveTextContent('Panel');
   });
 
-  it('die markierte Zeile mit Vorschau trägt eine →-Marke, eine Modulzeile nicht', async () => {
+  /**
+   * Seit LFH-665 ist die Vorschau-Marke das TIPPZIEL selbst, und es steht an JEDER Zeile mit
+   * Vorschau — auf Touch gibt es kein Hover, ein Ziel, das erst an der markierten Zeile
+   * erschiene, sähe niemand vor dem Tipp. Die frühere `kbd`-→-Marke ist entfallen: zwei
+   * Pfeile nebeneinander sagten dasselbe zweimal.
+   */
+  it('jede Zeile mit Vorschau trägt das Vorschau-Ziel, eine Modulzeile nicht', async () => {
     const u = userEvent.setup();
     // Startansicht: `datensaetze` vor `module` — die Person ist die erste, markierte Zeile.
     palette([person(), modul()]);
-    const marke = (name: string) =>
-      Array.from(screen.getByRole('option', { name }).querySelectorAll('kbd')).some(
-        (k) => k.textContent === '→',
-      );
-    expect(marke('Florian Mustermann')).toBe(true);
+    expect(vorschauZiel('Florian Mustermann')).not.toBeNull();
+    expect(vorschauZiel('ETB')).toBeNull();
     await u.keyboard('{ArrowDown}');
     expect(screen.getByRole('option', { name: 'ETB' })).toHaveAttribute('aria-selected', 'true');
-    expect(marke('ETB')).toBe(false);
-    // Die Marke hängt an der AKTIVEN Zeile, wie die ↵-Marke daneben.
-    expect(marke('Florian Mustermann')).toBe(false);
+    // Auch nicht markiert bleibt das Ziel stehen.
+    expect(vorschauZiel('Florian Mustermann')).not.toBeNull();
+    expect(vorschauZiel('ETB')).toBeNull();
+  });
+
+  it('keine Zeile trägt daneben noch eine →-Marke — kein zweiter Pfeil', () => {
+    palette([person(), modul()]);
+    const pfeile = screen
+      .getAllByRole('option')
+      .flatMap((o) => Array.from(o.querySelectorAll('kbd')))
+      .filter((k) => k.textContent === '→');
+    expect(pfeile).toHaveLength(0);
   });
 
   it('nennt in der Vorschau die dort gültigen Wege', async () => {
@@ -338,5 +354,84 @@ describe('CommandPalette · Fußzeile und Zeilenmarke (LFH-645)', () => {
     expect(fuss()).toHaveTextContent('zurück');
     // Die Präfixlegende gilt in der Vorschau nicht — sie hat dort keine Liste zu filtern.
     expect(fuss()).not.toHaveTextContent('sucht im Einsatztagebuch');
+  });
+});
+
+/**
+ * Das Tippziel (LFH-665): der Weg in die Vorschau für Finger und Maus. Geprüft als PAAR — ein
+ * Tipp aufs Ziel öffnet die Vorschau, ein Tipp auf die übrige Zeile öffnet den Datensatz wie
+ * bisher. Die eine Hälfte allein wäre auch dann grün, wenn das Ziel die Zeile verdrängte.
+ */
+describe('CommandPalette · Tippziel für die Vorschau (LFH-665)', () => {
+  it('ein Klick aufs Ziel öffnet die Vorschau statt des Datensatzes', () => {
+    const aus = vi.fn();
+    const { schliesse, feld } = palette([person(aus), modul()]);
+    fireEvent.click(vorschauZiel('Florian Mustermann')!);
+    expect(vorschauRegion()).toHaveAccessibleName('Vorschau: Florian Mustermann');
+    expect(screen.getByTestId('vorschau-inhalt')).toHaveTextContent('person 11');
+    // Der Klick schlägt NICHT zur Zeile durch.
+    expect(aus).not.toHaveBeenCalled();
+    expect(schliesse).not.toHaveBeenCalled();
+    // Nur die Gegenprobe „der Klick wirft den Fokus nicht aus dem Feld": ein synthetischer
+    // Klick verschiebt in jsdom nie den Fokus. Getragen wird die Fokus-Zusicherung vom
+    // `mousedown`-Test unten und vom `toBeFocused()` im Browser (`palette-oeffnung.spec.ts`).
+    expect(feld).toHaveFocus();
+  });
+
+  it('ein Klick auf die übrige Zeile öffnet weiter den Datensatz', () => {
+    const aus = vi.fn();
+    const { schliesse } = palette([person(aus)]);
+    fireEvent.click(screen.getByText('Florian Mustermann'));
+    expect(aus).toHaveBeenCalledTimes(1);
+    expect(schliesse).toHaveBeenCalledTimes(1);
+    expect(vorschauRegion()).toBeNull();
+  });
+
+  it('öffnet die Vorschau auch an einer NICHT markierten Zeile', async () => {
+    const u = userEvent.setup();
+    const aus = vi.fn();
+    const zweite: Befehl = {
+      ...person(aus),
+      id: 'datensatz:personen:12',
+      label: 'Erika Musterfrau',
+      vorschau: { art: 'person', einsatzId: 5, id: 12 },
+    };
+    palette([person(), zweite]);
+    // Die erste Person ist markiert; getippt wird auf die zweite, ohne vorher zu zeigen.
+    expect(screen.getByRole('option', { name: 'Florian Mustermann' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    await u.click(vorschauZiel('Erika Musterfrau')!);
+    expect(vorschauRegion()).toHaveAccessibleName('Vorschau: Erika Musterfrau');
+    expect(aus).not.toHaveBeenCalled();
+  });
+
+  it('ein Strg/⌘-Klick aufs Ziel bleibt die Vorschau, kein neuer Tab', () => {
+    const aus = vi.fn();
+    palette([person(aus)]);
+    fireEvent.click(vorschauZiel('Florian Mustermann')!, { ctrlKey: true });
+    expect(vorschauRegion()).not.toBeNull();
+    expect(aus).not.toHaveBeenCalled();
+  });
+
+  /**
+   * Der Fokus bleibt im Suchfeld: `mousedown` auf dem Ziel wird abgefangen. Sonst verlöre die
+   * Combobox den Fokus, und ↵ (öffnen) und Esc (zurück) gingen nach dem Tipp ins Leere.
+   */
+  it('nimmt dem Suchfeld beim Drücken nicht den Fokus', () => {
+    palette([person()]);
+    const ereignis = fireEvent.mouseDown(vorschauZiel('Florian Mustermann')!);
+    // `fireEvent` liefert `false`, wenn `preventDefault` gerufen wurde.
+    expect(ereignis).toBe(false);
+  });
+
+  it('der zugängliche Name der Zeile bleibt ihr Label', () => {
+    palette([person()]);
+    // Das Ziel ist `aria-hidden`: der zugängliche Weg in die Vorschau bleibt →, und die
+    // Option darf keinen zweiten Namensteil bekommen (Kinder einer Option sind ohnehin
+    // präsentational).
+    expect(vorschauZiel('Florian Mustermann')).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByRole('option', { name: 'Florian Mustermann' })).toBeInTheDocument();
   });
 });

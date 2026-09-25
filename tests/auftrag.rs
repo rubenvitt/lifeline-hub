@@ -878,6 +878,68 @@ async fn quittieren_schliesst_frist_erinnerung_erst_beim_letzten_empfaenger() {
     );
 }
 
+/// LFH-371: der Gleichstand ist auch jenseits der Anzeigegrenze der Karte (drei Chips)
+/// erreichbar. Die Karte bot dem vierten und fünften Empfänger keinen Knopf, wenn die
+/// ersten drei quittiert waren; der Server zählt über ALLE Empfänger. Quittiert werden
+/// die ersten drei zuerst — genau die Konstellation, in der die Karte vorher verstummte —,
+/// und die Erinnerung schließt erst beim fünften.
+#[tokio::test]
+async fn frist_erinnerung_schliesst_erst_beim_fuenften_von_fuenf_empfaengern() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let empfaenger: Vec<_> = (1..=5)
+        .map(|n| serde_json::json!({ "empfaenger_typ": "funktion", "funktion_text": format!("EA {n}") }))
+        .collect();
+    let body = serde_json::json!({
+        "auftrag_text": "Deich sichern",
+        "frist_at": "2099-12-31 00:00:00",
+        "empfaenger": empfaenger,
+    })
+    .to_string();
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/auftraege"),
+        &admin,
+        Some(&body),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    let auftrag_id = json["id"].as_i64().unwrap();
+    let ids: Vec<i64> = json["empfaenger"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|x| x["id"].as_i64().unwrap())
+        .collect();
+    assert_eq!(
+        ids.len(),
+        5,
+        "alle fünf Empfänger kommen zurück, kein LIMIT"
+    );
+
+    for (i, empf) in ids.iter().enumerate() {
+        let (s, d) = anfrage(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{e}/auftraege/{auftrag_id}/empfaenger/{empf}/quittieren"),
+            &admin,
+            None,
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK);
+        assert_eq!(d["quittiert_anzahl"].as_i64(), Some(i as i64 + 1));
+        let erwartet = if i + 1 < ids.len() { 1 } else { 0 };
+        assert_eq!(
+            offene_auftrag_frist_erinnerungen(&pool, auftrag_id).await,
+            erwartet,
+            "nach {} von 5 Quittungen",
+            i + 1
+        );
+    }
+}
+
 /// Rücknahme von „In Bearbeitung" (LFH-343 · C8, Befund H50).
 ///
 /// Die Direktaktion ohne Rückfrage braucht einen Rückweg, den der Server annimmt —

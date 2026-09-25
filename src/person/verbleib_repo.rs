@@ -17,6 +17,10 @@ pub struct VerbleibAnzeige {
     pub notiz: Option<String>,
     pub zeitpunkt_at: String,
     pub erfasst_von: i64,
+    /// Betreuungsstelle eines Notunterkunft-Verbleibs (LFH-674). Nur die Kennung: den Namen
+    /// liest, wer das Modul Betreuung sehen darf, aus dessen Übersicht.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub betreuungsstelle_id: Option<i64>,
 }
 
 /// Eingabedaten beim Erfassen; Strings bereits getrimmt (Handler). `art`/`status`
@@ -28,16 +32,19 @@ pub struct VerbleibDaten<'a> {
     pub ziel: Option<&'a str>,
     pub status: Option<&'a str>,
     pub notiz: Option<&'a str>,
+    /// Nur bei `notunterkunft`; Art, Rechte und Einsatzzugehörigkeit prüft der Handler.
+    pub betreuungsstelle_id: Option<i64>,
 }
 
 const SELECT_VERBLEIB: &str = "\
     SELECT id, einsatz_id, person_id, art, transportmittel, ziel, status, notiz, \
-           zeitpunkt_at, erfasst_von \
+           zeitpunkt_at, erfasst_von, betreuungsstelle_id \
     FROM person_verbleib";
 
 /// Erfasst ein Verbleib-Ereignis append-only und aktualisiert den Verbleib-Cache an der
 /// Person in DERSELBEN Transaktion: die Kurzform `aktueller_verbleib` (vom Handler berechnet)
-/// und — seit LFH-613 — Art, Ziel und Status als eigene Spalten. Der neue Eintrag ist per
+/// und — seit LFH-613 — Art, Ziel und Status als eigene Spalten, seit LFH-674 auch den Verweis
+/// auf die Betreuungsstelle. Der neue Eintrag ist per
 /// Definition der jüngste (`zeitpunkt_at` = jetzt, höchste id), der Cache spiegelt also
 /// genau das Ereignis, das `liste_je_person` zuoberst liefert.
 pub async fn erfassen(
@@ -51,8 +58,9 @@ pub async fn erfassen(
     let mut tx = pool.begin().await?;
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO person_verbleib \
-            (einsatz_id, person_id, art, transportmittel, ziel, status, notiz, erfasst_von) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+            (einsatz_id, person_id, art, transportmittel, ziel, status, notiz, erfasst_von, \
+             betreuungsstelle_id) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(einsatz_id)
     .bind(person_id)
@@ -62,17 +70,20 @@ pub async fn erfassen(
     .bind(daten.status)
     .bind(daten.notiz)
     .bind(erfasst_von)
+    .bind(daten.betreuungsstelle_id)
     .fetch_one(&mut *tx)
     .await?;
     sqlx::query(
         "UPDATE einsatz_person SET aktueller_verbleib = ?1, aktuelle_verbleib_art = ?2, \
-            aktuelles_verbleib_ziel = ?3, aktueller_verbleib_status = ?4 \
-         WHERE id = ?5 AND einsatz_id = ?6",
+            aktuelles_verbleib_ziel = ?3, aktueller_verbleib_status = ?4, \
+            aktuelle_verbleib_betreuungsstelle_id = ?5 \
+         WHERE id = ?6 AND einsatz_id = ?7",
     )
     .bind(kurzform)
     .bind(daten.art)
     .bind(daten.ziel)
     .bind(daten.status)
+    .bind(daten.betreuungsstelle_id)
     .bind(person_id)
     .bind(einsatz_id)
     .execute(&mut *tx)
@@ -154,7 +165,85 @@ mod tests {
             ziel,
             status: None,
             notiz: None,
+            betreuungsstelle_id: None,
         }
+    }
+
+    async fn stelle_anlegen(pool: &SqlitePool, e: i64, b: i64, bezeichnung: &str) -> i64 {
+        sqlx::query_scalar(
+            "INSERT INTO betreuungsstelle (einsatz_id, bezeichnung, art, angelegt_von_id) \
+             VALUES (?, ?, 'notunterkunft', ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(bezeichnung)
+        .bind(b)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    /// LFH-674: Der Verweis auf die Betreuungsstelle geht ins Ereignis UND in den Cache der
+    /// Person; ein späterer Verbleib ohne Verweis leert den Cache, der Verlauf behält ihn.
+    #[tokio::test]
+    async fn erfassen_pflegt_verweis_auf_betreuungsstelle() {
+        let pool = test_pool().await;
+        let (b, e, p) = setup(&pool).await;
+        let stelle = stelle_anlegen(&pool, e, b, "NU Turnhalle Nord").await;
+        let cache = |pool: SqlitePool| async move {
+            sqlx::query_scalar::<_, Option<i64>>(
+                "SELECT aktuelle_verbleib_betreuungsstelle_id FROM einsatz_person WHERE id = ?",
+            )
+            .bind(p)
+            .fetch_one(&pool)
+            .await
+            .unwrap()
+        };
+        let erstes = erfassen(
+            &pool,
+            e,
+            p,
+            VerbleibDaten {
+                betreuungsstelle_id: Some(stelle),
+                ..daten("notunterkunft", Some("NU Turnhalle Nord"))
+            },
+            "Notunterkunft → NU Turnhalle Nord",
+            b,
+        )
+        .await
+        .unwrap();
+        assert_eq!(erstes.betreuungsstelle_id, Some(stelle));
+        assert_eq!(cache(pool.clone()).await, Some(stelle));
+
+        erfassen(&pool, e, p, daten("entlassung", None), "entlassen", b)
+            .await
+            .unwrap();
+        assert_eq!(
+            cache(pool.clone()).await,
+            None,
+            "Verweis bleibt nicht stehen"
+        );
+        let verlauf = liste_je_person(&pool, e, p).await.unwrap();
+        assert_eq!(verlauf[0].betreuungsstelle_id, None);
+        assert_eq!(
+            verlauf[1].betreuungsstelle_id,
+            Some(stelle),
+            "Verlauf behält den Verweis"
+        );
+    }
+
+    /// Ohne Verweis fehlt das Feld in der Anzeige (Norm LFH-265), statt `null` zu tragen.
+    #[tokio::test]
+    async fn anzeige_ohne_verweis_laesst_feld_weg() {
+        let pool = test_pool().await;
+        let (b, e, p) = setup(&pool).await;
+        let v = erfassen(&pool, e, p, daten("vor_ort", None), "vor Ort", b)
+            .await
+            .unwrap();
+        let json = serde_json::to_value(&v).unwrap();
+        assert!(!json
+            .as_object()
+            .unwrap()
+            .contains_key("betreuungsstelle_id"));
     }
 
     #[tokio::test]

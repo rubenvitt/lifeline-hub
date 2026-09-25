@@ -1,3 +1,112 @@
+## [1.0.0-alpha.46](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.45...v1.0.0-alpha.46) (2026-09-25)
+
+### Wichtige Änderungen
+
+Beim Export von Einsatzdaten (Archivierung, Datenübergabe) werden nun auch Freitexte in Chat-Kanälen, Chat-Nachrichten und Erinnerungen anonymisiert. Die Struktur (Zeitpunkte, Verfasser, Status) bleibt dabei erhalten.
+
+### Betreuung
+
+Für Betreuungsbezirke und -stellen steht jetzt ein Meldeverlauf zur Verfügung, der alle Stand- und Belegungsmeldungen chronologisch anzeigt – einschließlich nachgetragener und zurückgenommener Einträge. In der Datensicht lässt sich der Verlauf per Aufklappbereich ein- und ausblenden. Meldungen können einzeln zurückgenommen werden; eine Rückfrage schützt vor versehentlichen Änderungen.
+
+### Datenschutz und Archivierung
+
+Die DSGVO-konforme Schwärzung von Einsatzdaten wurde umfassend erweitert:
+
+- **Chat und Erinnerungen**: Kanalnamen, Nachrichteninhalte, Erinnerungstitel und -beschreibungen sowie Empfängerfunktionen werden beim Export anonymisiert. Gelöschte Nachrichten und Nachrichten mit Anhängen werden ebenfalls berücksichtigt.
+
+- **Lagekarte und Einsatzabschnitte**: Freitextfelder wie Abschnittsbemerkungen, Erreichbarkeit, Abschnittsaufträge, Hinweise zu Sprechgruppen, Kartennamen und Lage-Snapshots werden geschwärzt. Strukturierte Daten wie Kurzbezeichnungen, Labels und Kommunikationsmittel (Digitalfunk, Mobil, Festnetz) bleiben erhalten.
+
+- **Zonen und Gefahrengebiete**: Nutzer-Labels werden entfernt, während die geografischen Geometrien und die zugehörigen Einsatztagebuch-Einträge erhalten bleiben.
+
+- **Technische Absicherung**: Ein automatisierter Wächter prüft bei Datenmodell-Änderungen, dass keine personenbezogenen Daten durch neue Verknüpfungen versehentlich der Schwärzung entgehen. Kommunikationsmittel-Eingaben werden auf die zulässigen Werte geprüft.
+
+## [1.0.0-alpha.45](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.44...v1.0.0-alpha.45) (2026-09-25)
+
+### Lagekarte
+
+- **Verbesserte Bedienbarkeit auf Touch-Geräten**: Schalter (Kippschalter) in der Lagekarten-Seitenleiste passen sich nun an die gewählte Dichte-Stufe (Kompakt/Normal/Komfortabel) an. Auf Führungs-Tablets sind die Schalter jetzt in allen Stufen ausreichend groß für die Bedienung mit Handschuhen (24–72 px statt bisher einheitlich 23 px).
+
+- **Optimierte Darstellung der Seitenleiste**: Die Bildnamens-Zeilen in der Lagekarten-Seitenleiste brechen nun bei langen Namen korrekt um, sodass bei komfortabler Dichte nichts mehr aus der 300-px-Leiste ragt. Der Bildname erhält mindestens 100 px Breite, bevor die Zeile umbricht.
+
+- **Barrierefreiheit**: Alle Schalter für Fachebenen (z. B. Wetterwarnungen, Energieanlagen) verfügen nun über zugängliche Namen für Screenreader und andere Hilfstechnologien.
+
+## [1.0.0-alpha.44](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.43...v1.0.0-alpha.44) (2026-09-25)
+
+### Wichtige Änderungen
+
+- Neue Datenbank-Migrationen für Betreuungsstellen und Verbleibserfassung – Automatische Migration beim ersten Start dieser Version
+
+### Betroffenenerfassung
+
+- Beim Verbleib „Notunterkunft" kann nun eine konkrete Betreuungsstelle angegeben werden, um nachzuvollziehen, wo Betroffene untergebracht sind
+- Die Betreuungsübersicht zeigt bei entsprechender Berechtigung, wie viele Personen namentlich erfasst sind
+
+### Betreuung und Unterbringung
+
+- Stand- und Belegungsmeldungen können jetzt offline erfasst werden – bei unterbrochener Verbindung werden sie vorgemerkt und automatisch übertragen, sobald das Netz wieder steht
+- Bereits gespeicherte Meldungen werden beim erneuten Senden erkannt und nicht doppelt eingetragen
+- Dialoge zeigen immer den aktuellen Datenstand, auch wenn während der Bearbeitung neue Meldungen von anderen Geräten eintreffen
+- Personenzahlen (Plangröße, Kapazität, Belegung, Evakuierte) sind auf maximal 1.000.000 begrenzt, um versehentliche Zahlendreher abzufangen
+- Meldezeitpunkte aus der Zukunft (z. B. durch falsch gestellte Geräteuhr) werden auf die aktuelle Zeit korrigiert, damit die Kopfzahlen korrekt berechnet werden
+- Bereits erfolgte Leermeldungen können nicht mehr versehentlich doppelt abgesetzt werden
+- Der Räumungsstatus folgt automatisch neuen Meldungen, solange er nicht aktiv geändert wurde
+- Betreuungsstellen können auch nach Schließung noch als Verbleib gewählt werden, für bereits untergebrachte Personen
+- Kontrast-Verbesserungen: ausgewählte Optionen (z. B. „geschlossen", „geschätzt", „gezählt") sind nun auch bei Tageslicht besser lesbar
+
+### Unterbringung – Platzverwaltung
+
+- Die Platzkarte in Unterbringungsstellen kann auf Touchgeräten (Tablet, Handschuh-Modus) jetzt über ein Aktionsmenü bedient werden – ein Antippen der Karte öffnet alle Funktionen (Zuweisen, Freigeben, Umbetten, Bearbeiten) in einem Menü
+- Das Menü bleibt auch bei kleinen Bildschirmen vollständig im sichtbaren Bereich und kann per Tastatur bedient werden (Enter öffnet, Escape schließt)
+- Nach Datenaktualisierungen schließt sich ein offenes Menü automatisch
+
+### Lagekarte
+
+- Ab fünf nicht verorteten Objekten erscheint ein Suchfeld über der Liste, um schnell bestimmte Einheiten, Fahrzeuge oder Personen zu finden
+- Die Suchfilterung arbeitet live und zeigt die Trefferzahl an
+- Abstände und Schaltflächen passen sich jetzt durchgängig an die gewählte Dichtestufe (kompakt/komfortabel/handschuh) an
+
+### Kommunikation – Aufträge und Befehle
+
+- Aufträge mit mehr als drei Empfängern können nun vollständig quittiert werden – bisher waren Empfänger ab dem vierten nicht mehr erreichbar
+- Die Anzeige unterscheidet klar zwischen quittierten und offenen Empfängern
+
+### Bedienung und Barrierefreiheit
+
+- Kleine Schaltflächen (z. B. „OK" in Bestätigungsdialogen) wachsen nun auch in der Breite mit der Dichtestufe, nicht mehr nur in der Höhe
+- Tabellenüberschriften verdecken keine fokussierten Bedienelemente mehr beim Rückwärts-Tabben durch eine Tabelle
+- Die Sprungpalette (Schnellnavigation mit Strg+K) zeigt ein Vorschau-Symbol, das auch per Toucheingabe erreichbar ist
+
+### Verwaltung
+
+- Modulzeilen in den Einstellungen zeigen jetzt, warum ein Modul nicht ausgeblendet werden kann (z. B. „nur Einsatzleitung", „nur Admins", „Einsatz abgeschlossen")
+
+### Betrieb und Installation
+
+- Dokumentation zum Betrieb im Einsatz-LAN ergänzt: Hinweise zu HTTPS-Einrichtung mit festem Hostnamen für stabile Offline-Funktionalität, Einschränkungen bei Klartext-HTTP über IP-Adresse (kein Service Worker, keine Passkeys)
+
+## [1.0.0-alpha.43](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.42...v1.0.0-alpha.43) (2026-09-25)
+
+### Betroffene und Schäden
+
+**Betreuungsstellen: Volle Stellen im Blickfeld**  
+Die Anzahl voller Betreuungsstellen wird jetzt im Seitenkopf und im Blockkopf „Betreuungsstellen" angezeigt. Bisher stand die Auslastung „voll" oder „überbelegt" nur in der Stellentabelle, die bei mehreren Bezirkskarten oft unter der Falz liegt. Die neue Anzeige „· n voll" erscheint in der Meta-Zeile des Seitenkopfs – der einzigen Zeile, die immer sichtbar bleibt.
+
+**Kopfzahl „ohne Meldung" berücksichtigt jetzt den Betriebsstatus**  
+Die Berechnung der Betreuungsstellen ohne Meldung wurde korrigiert: Es werden nur noch Stellen gezählt, die zum Stichtag auch tatsächlich betrieben wurden. Bisher wurden auch Stellen mitgezählt, die erst nach dem Stichtag angelegt oder zum Stichtag bereits geschlossen waren. Der Hinweis „Untergrenze" in der Verpflegungsplanung erscheint dadurch seltener.
+
+### Lagekarte
+
+**Karten-Dialoge lassen sich mit Enter abschicken**  
+In beiden Karten-Dialogen (Kartenquelle hinzufügen, Attribution bearbeiten) kann die Eingabe jetzt mit Enter im URL-Feld abgeschickt werden. Bisher musste der Absende-Button geklickt werden.
+
+### Betrieb und Installation
+
+**Deutlich schnellere Test-Ausführung**  
+Die Ausführungszeit der Rust-Tests wurde erheblich reduziert: Datenbankmigrationen werden nur einmal je Testlauf statt bei jedem einzelnen Test durchgeführt. Die Passwort-Hashing-Geschwindigkeit in Debug-Builds wurde optimiert. Lokal verringert sich die reine Testzeit von über 7 Minuten auf unter 2 Minuten.
+
+**Zuverlässigerer Offline-Test für Lagekarte**  
+Der automatisierte Test für die Offline-Verfügbarkeit der Lagekarte wartet jetzt auf die vollständige Aktivierung des Service Workers, bevor die Funktionalität geprüft wird. Dies verhindert gelegentliche Fehlschläge bei schnellen Systemen.
+
 ## [1.0.0-alpha.42](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.41...v1.0.0-alpha.42) (2026-09-24)
 
 ### Wichtige Änderungen

@@ -54,21 +54,20 @@ Listeneinträge und die hart verdrahteten vier Pixel der Bild-Zeile.
 | 11 · Warnverhalten | **erfüllt** | Kein Blinken, kein Ton im Umfang. Der Historien-Banner ist ein statischer Alert; das Einklappen der Zeitachse stoppt eine laufende Wiedergabe ausdrücklich, damit die Karte nicht weiterschaltet, während die Pause-Taste unsichtbar ist |
 | 12 · Kein Sprung unter dem Cursor | **teilweise erfüllt, eine benannte Bewegung** | **Erledigt:** die Bild-Zeile wird schmaler und ruhiger — aus drei Icon-Knöpfen in einer 300 px breiten Leiste wird ein Auslöser, und die vier hart verdrahteten Pixel zwischen dem harmlosen und dem roten Knopf verschwinden mitsamt ihrem `<Space>`. **Benannt und in Kauf genommen:** die schwebende Zeitachse wird auf höheren Dichtestufen höher (Umbruch über `flexWrap`), was am unteren Kartenrand Fläche kostet. Das ist der gewollte Effekt aus Zeile 2 und über den Einklapp-Weg abwählbar; wie viel es bei ~390 px ausmacht, ist **nicht gemessen** — jsdom rechnet kein Layout. **Offen, Bestand:** Marker fahren über den SSE-Fan-out direkt in die Karte, ohne Sammelbanner → **B6 (LFH-334)** |
 | 13 · Fokus nie verdeckt | **offen** | Die Lagekarte trägt vier `position: absolute`-Aufbauten mit `zIndex: 5` (Zeitachse, Historien-Banner, Detail-Karte, Zeichensteuerung). Sie liegen über der **Kartenfläche**, nicht über der Sidebar, und die Karte selbst hat keine Tab-Stopps — das spricht dagegen, dass ein Fokusziel dahinter landet. Belegt ist es nicht, und in jsdom ist es nicht belegbar → **LFH-373** |
-| 14 · Tabellenseite vollständig | **teilweise erfüllt → LFH-374** | Beide Verwaltungen laufen über `KatalogTabelle` (LFH-329/B1): Scrollcontainer, stehende Kopfzeile, fixierte erste Spalte als **menschenlesbare** Kennung (Name der Karte bzw. der Quelle, nie die DB-`id`) ✓. Keine Auflösung in Karten ✓ — beides sind Vergleichsansichten („welche Karte liegt hier, welche Quelle ist aktiv?"). Freitextsuche mit benanntem Platzhalter ✓, Filter auf „aktiv" ✓. **Offen:** ein **umschaltbarer Spaltensatz mit Zähler ausgeblendeter Spalten** fehlt — beide nutzen `KatalogTabelle`, nicht `Datensicht`. Bestand, nicht von B5f verursacht, und dieselbe Lage wie beim ETB (LFH-365, Zeile 14) |
-| 15 · Erfassungsmaske vollständig | **offen — ein Neubefund aus dem Scope, hier bewusst nicht behoben** | `karten/OnlineQuelleFormModal.tsx:103` und `karten/OfflineDownloadUrlModal.tsx:56` sind handgebaute `<Modal>` + `<Form>` mit `onOk={() => form.submit()}`: der Absende-Knopf liegt **außerhalb** des Formulars, **Enter ist dort tot**. Das ist wörtlich der Befund H69 aus LFH-332/B4, für den `components/Erfassung.tsx` gebaut wurde. Beide Dateien liegen im Verzeichnis-Bündel, aber B5f fasst **keine von beiden** an — die Norm „verbindlich für neue und für ohnehin Angefasstes" greift also nicht, und ein Umbau zweier Dialoge samt ihrer Tests wäre ein anderer Task mit anderem Risiko. Als Nachzug getickt, nicht stillschweigend liegengelassen |
+| 14 · Tabellenseite vollständig | **teilweise erfüllt → LFH-374** (Nachtrag 25.09.2026: **eingelöst durch LFH-374**, Verdikt „erfüllt“ in `openspec/changes/lfh-374-spaltenschalter-katalogtabelle/pruefliste.md`) | Beide Verwaltungen laufen über `KatalogTabelle` (LFH-329/B1): Scrollcontainer, stehende Kopfzeile, fixierte erste Spalte als **menschenlesbare** Kennung (Name der Karte bzw. der Quelle, nie die DB-`id`) ✓. Keine Auflösung in Karten ✓ — beides sind Vergleichsansichten („welche Karte liegt hier, welche Quelle ist aktiv?"). Freitextsuche mit benanntem Platzhalter ✓, Filter auf „aktiv" ✓. **Offen:** ein **umschaltbarer Spaltensatz mit Zähler ausgeblendeter Spalten** fehlt — beide nutzen `KatalogTabelle`, nicht `Datensicht`. Bestand, nicht von B5f verursacht, und dieselbe Lage wie beim ETB (LFH-365, Zeile 14) |
+| 15 · Erfassungsmaske vollständig | **erfüllt** (Nachtrag 24.09.2026, LFH-376) | Beim Anlegen dieser Liste waren `karten/OnlineQuelleFormModal.tsx` und `karten/OfflineDownloadUrlModal.tsx` handgebaute `<Modal>` + `<Form>` mit `onOk={() => form.submit()}`: der Absende-Knopf lag **außerhalb** des Formulars, **Enter war dort tot** — wörtlich Befund H69 aus LFH-332/B4. B5f fasste keine der beiden Dateien an und hat den Befund deshalb als Nachzug getickt. **Umgestellt hat sie LFH-346/A6** (`2fbb4887`, 25.08.2026): beide tragen `ErfassungsModal`, `onErfassen` läuft über `mutateAsync`, der Reset-Effekt des Aufrufers ist weg. `serie`/`uebernahme` sind bewusst nicht gesetzt (seltene Admin-Vorgänge, kein Erfassungsstrom). **Was fehlte, war der Beleg der Wirkung**, nicht nur der Struktur: LFH-376 ergänzt je Dialog einen Test „Enter im URL-Feld sendet ab“ und die Gegenprobe „Enter in der Attribution bricht um“. Mutationsprobe: der Absende-Knopf der Hülle zurück auf `htmlType="button"` + `onClick={() => form.submit()}` (das alte Muster) färbt **genau** die beiden Enter-Tests rot, der Klickweg und die Gegenproben bleiben grün |
 
-**0 Zeilen ohne Verdikt.** 9 erfüllt, 3 teilweise, 3 offen — jede offene mit Ziel:
+**0 Zeilen ohne Verdikt.** 10 erfüllt, 3 teilweise, 2 offen (Stand 24.09.2026; beim Anlegen 9/3/3, Zeile 15 hat LFH-376 geschlossen) — jede offene mit Ziel:
 
 | Zeile | offen woran | Ziel |
 | --- | --- | --- |
 | 12, 3 | Sammelbanner statt eingeschobener Live-Marker; optimistische Updates | **B6 (LFH-334)** — Ticket existiert |
 | 8 | kein Helligkeitsregler in der Anwendung | Folge-Task aus A0, dort ausdrücklich weiterverwiesen |
 | 2 | Dichtestufe wird nicht aus dem Einsatzkontext abgeleitet | B5-Restpunkt (LFH-333) |
-| 15 | zwei Karten-Dialoge mit totem Enter (H69) | **LFH-376** — als B4-Nachzug angelegt |
 | 2, 12, 13 | Layout-Nachweise, die jsdom nicht führen kann: Höhe im Handschuh, Zeitachse bei ~390 px, Fokus hinter den schwebenden Aufbauten | **LFH-373** — derselbe Task wie beim ETB; sein Umfang ist heute ETB-formuliert und gehört um die Lagekarte erweitert |
-| 14 | Spaltenschalter mit Zähler fehlt (`KatalogTabelle` statt `Datensicht`) | **LFH-374** — ebenfalls ETB-formuliert, gilt für beide Kartenverwaltungen genauso |
+| 14 | Spaltenschalter mit Zähler fehlt (`KatalogTabelle` statt `Datensicht`) | **LFH-374** — ebenfalls ETB-formuliert, gilt für beide Kartenverwaltungen genauso. **Eingelöst (25.09.2026):** Opt-in `spaltenSchalter` an `KatalogTabelle`, siehe `openspec/changes/lfh-374-spaltenschalter-katalogtabelle/pruefliste.md` |
 
-Alle sechs Zeilen zeigen auf eine Nummer, die es gibt. **LFH-373 und LFH-374 sind geerbt, nicht
+Alle fünf Zeilen zeigen auf eine Nummer, die es gibt. **LFH-373 und LFH-374 sind geerbt, nicht
 neu:** LFH-365 hat sie für das Einsatztagebuch angelegt, und beide Restpunkte sind hier
 wortgleich dieselben — der erste Dichte-e2e-Nachweis des Repos und der fehlende Spaltenschalter
 in `KatalogTabelle`. Ein zweiter Task für denselben Rest wäre eine Dublette; was fehlt, ist die
@@ -98,6 +97,29 @@ und wäre eine reine Sichtänderung an der meistgenutzten Fläche der Anwendung,
 nachrechnen kann. Das ist Tokenisierung (A2-Linie), nicht Dichte. Als **LFH-377** getickt; die
 Begründung steht zusätzlich im Dateikopf von `Sidebar.tsx`, damit sie beim nächsten Zugriff
 gefunden wird.
+
+> **Nachtrag 24.09.2026 (LFH-377, erledigt).** Den Kartenstapel hat der Neuentwurf S5
+> (22.09.2026) abgelöst: die Leiste trennt ihre Abschnitte mit Haarlinien
+> (`KlappPaneel`/`LeistenAbschnitt`) und polstert sie mit `token.padding`; der Absatz im
+> Dateikopf ist mit dem Stapel entfallen. Übrig waren ein Nachzügler aus dem alten Stapel —
+> `AnsichtSwitcher` trug `marginBottom: 12` **in** einem schon gepolsterten Paneel, der Abstand
+> unter dem Auswahlfeld lag damit bei Polsterung plus 12 px; entfernt, die Polsterung trägt ihn
+> allein — und die Abstände der Bild-Zeile (6/4 px → `paddingSM`/`marginSM`/`marginXS`).
+> **Die Breite bleibt fest 300 px** (`LEISTE_BREITE`), bewusst: Polsterung und Zeilenabstand
+> wachsen mit der Dichte, die Leiste nicht. Im Browser gemessen (1100 × 800, zwei Bilder): die
+> Bild-Zeile ist in **kompakt** 277 px breit (Schalter 43 · Name 190 · Auslöser 30, Abstand
+> 7), in **Handschuh** 247 px (Schalter 46 · Name 97 · Auslöser 72, Abstand 16), in beiden
+> Stufen ohne Überlauf (`scrollWidth` = `clientWidth`). Der Name kürzt im Handschuh-Betrieb mit
+> Tooltip; die 20 px, die der feste Abstand ihm ließe, stünden dort zwischen Stift und
+> Aktionsauslöser, also zwischen zwei Trefflächen. Nachweis über die **Quelle**:
+> `pages/lagekarte/leistenAbstand.guard.test.ts` scannt `Sidebar.tsx`, `KlappPaneel.tsx` und
+> `AnsichtSwitcher.tsx` über den TS-Syntaxbaum (Kommentare zählen nicht) auf feste Abstände
+> in Stilobjekten und an `Space`/`Flex`/`Row`, mit Selbsttest; was er nicht sieht (Wert aus
+> einer Variablen, Spread aus einer fremden Datei, CSS), steht in seinem Dateikopf.
+> **Bewusst ausgelassen:** die Inspectors, die im Abschnitt „Ausgewählt" hängen
+> (`FachebenenInspector` mit `marginBottom: 8`, `Inspector`/`KartenDetailCard` mit `gap: 3`),
+> und die Bänder über der Karte (`SnapshotLeiste`). Das sind Abstände im Inneren eigener
+> Bausteine, keine Kartenabstände der Leiste. Sie stehen als **LFH-703** auf dem Board.
 
 ---
 

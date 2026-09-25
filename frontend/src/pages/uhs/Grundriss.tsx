@@ -10,6 +10,7 @@ import {
   Tooltip,
   Typography,
   theme,
+  type MenuProps,
 } from 'antd';
 import { Select } from '../../components/Select';
 import {
@@ -22,11 +23,13 @@ import {
   SyncOutlined,
   ToolOutlined,
   UserAddOutlined,
+  UserOutlined,
 } from '@ant-design/icons';
 import {
   DndContext,
   DragOverlay,
   useDraggable,
+  useDndContext,
   useDroppable,
   type DragEndEvent,
   type DragStartEvent,
@@ -36,7 +39,7 @@ import {
   PointerSensor,
 } from '@dnd-kit/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import {
   aenderePersonBelegung,
   aktualisierePlatz,
@@ -65,55 +68,186 @@ import { useViewport } from '../../components/useViewport';
 // Feste Karten-Höhe. Muss unter dem Raster-Zeilenabstand (raster_position SCHRITT_Y=120
 // im Backend) bleiben, damit absolut platzierte Karten einander nicht überlappen, und
 // groß genug für den Worst Case (2-zeiliger Titel + Tag + Belegung + Aktionszeile).
-const PLATZ_KARTE_HOEHE = 116;
+export const PLATZ_KARTE_HOEHE = 116;
 
 // Feste Karten-Breite — dieselbe Bindung wie die Höhe, nur an der anderen Achse:
 // `raster_position` setzt SCHRITT_X = 160, die 20 px Luft je Seite sind der Spaltengraben.
-const PLATZ_KARTE_BREITE = 140;
+export const PLATZ_KARTE_BREITE = 140;
 const PLATZ_KARTE_RAND = 2;
 const PLATZ_KARTE_POLSTER = 6;
 
 /** Innenbreite der Aktionszeile: 140 − 2×2 Rand − 2×6 Polsterung = 124 px. */
 const AKTIONSZEILE_BREITE = PLATZ_KARTE_BREITE - 2 * PLATZ_KARTE_RAND - 2 * PLATZ_KARTE_POLSTER;
 
+/** Höhe des Aktionsstreifens im 100-px-Innenraum (Rechnung im Dateikopf unten). */
+const AKTIONSZEILE_HOEHE = 24;
+
+/**
+ * Überlaufregel des Kartenmenüs (LFH-359): umklappen UND ins Fenster schieben. antds Typ
+ * `AdjustOverflow` kennt nur `adjustX`/`adjustY`, zur Laufzeit reicht `getOverflowOptions`
+ * (`antd/es/_util/placements.js`) das Objekt aber per Spread an rc-trigger durch, und dort
+ * wirkt `shiftY` (im Browser belegt: ohne `shiftY` ist der e2e-Test „alle Menüeinträge
+ * liegen im Fenster" rot). Als Konstante statt Literal, weil die Excess-Property-Prüfung
+ * sonst an genau dieser Lücke im Typ anschlägt.
+ */
+const MENUE_UEBERLAUF: { adjustY: 1; shiftY: true } = { adjustY: 1, shiftY: true };
+
 /** Voll ausgebaute Zeile: Transport, zurückweisen, „als frei", Platzaktionen. */
 const AKTIONEN_MAX = 4;
 
 /**
- * Abstand zwischen den Knöpfen der Aktionszeile (LFH-378 · B5l).
+ * Bedienform der Platzkarte (LFH-359 + LFH-379): Knopfzeile oder die ganze Karte als EIN Ziel.
  *
- * Der `danger`-Knopf „zurückweisen" steht neben neutralen Aktionen; LFH-363 verlangt dort
- * mindestens `token.marginSM`. Der Wert wird aber GEDECKELT, und das ist gemessen, nicht
- * vorsichtshalber: antd gibt einem icon-only-Knopf `width: controlHeightSM` (24 / 48 / 72),
- * und als Flex-Items ohne `flex-shrink: 0` schrumpfen die Knöpfe auf diese 124 px. Ab
- * `komfortabel` brauchen vier Knöpfe allein 192 px — jede Lücke ginge dann direkt von der
- * Trefffläche ab, ein ungedeckeltes `marginSM` machte die Ziele also KLEINER. Gerechnet
- * wird mit der vollen Zeile: ein Abstand, der mit der Knopfzahl springt, wäre von Karte zu
- * Karte verschieden.
+ * Die Karte hat feste 124 × 100 px Innenraum (Rechnung unten), die Aktionszeile davon einen
+ * 24 px hohen Streifen. Eine Zeile gibt es nur, wenn BEIDES passt:
+ *   * Höhe: die kleinen Knöpfe (`controlHeightSM`, 24 / 48 / 72) stehen im 24-px-Streifen.
+ *   * Breite: vier icon-only-Knöpfe (antd gibt ihnen `width: controlHeightSM`) plus drei
+ *     Lücken von VOLLEM `marginSM` passen in 124 px. Die Lücke geht ungedeckelt ein, weil
+ *     „zurückweisen" als `danger`-Knopf mindestens `marginSM` Abstand zu seinen neutralen
+ *     Nachbarn braucht (LFH-363). Passt der nicht, gibt es keine Zeile.
+ * Beides gilt nur in `kompakt` (4 × 24 + 3 × 7 = 117 ≤ 124). Dort sind 24 px auch der
+ * Gate-3-Boden der Stufe (A1-Spec: „kompakt ≥ 24 px"). Ab `komfortabel` reißt schon die Höhe
+ * — und die Breite: vier Knöpfe à 48 px brauchen 192 px, sie schrumpften vorher als
+ * Flex-Items auf rund 31 px (LFH-379). Dort wird die ganze Karte (140 × 116 ≥ 72) das eine
+ * Bedienziel und öffnet das Aktionsmenü. Zwei 72-px-Ziele passen in keiner Achse (2 × 72 >
+ * 116, 2 × 72 > 140), die Kartenform ist also nicht Geschmack, sondern die einzige Form.
  *
- * Die Rechnung ist bewusst eine ABSCHÄTZUNG nach oben und keine Pixelbilanz: drei der vier
- * Knöpfe sind icon-only und damit quadratisch (`width: controlHeightSM`), der vierte ist der
- * Menü-Auslöser mit „…" als Inhalt — der misst `paddingInlineSM × 2 + Textbreite` und damit
- * etwas anderes. Ihn ebenfalls als Quadrat zu zählen überschätzt den Bedarf leicht; das ist
- * die richtige Richtung für einen Deckel, der nichts überlaufen lassen soll. Eine echte
- * Breitenmessung bräuchte Layout, und jsdom rechnet keins.
+ * Ersetzt `aktionsabstand()` aus LFH-378, das `marginSM` als OBERGRENZE nahm (7 / 0 / 0):
+ * es begrenzte den Schaden einer Zeile, die in den Berührungsstufen zu breit war. Diese
+ * Zeile gibt es nicht mehr, ein Deckel daneben wäre tote Logik.
  *
- * Rein und exportiert aus demselben Grund wie `bedienzielStil` in `lagekarte/Sidebar.tsx`:
- * nur so ist die Zusicherung über mehrere Dichtestufen prüfbar, ohne zu rendern — jsdom
- * rechnet kein Layout, und `test/utils.tsx` montiert ein `ConfigProvider` ohne unser Theme.
+ * Rein und exportiert wie `bedienzielStil`: jsdom rechnet kein Layout, und `test/utils.tsx`
+ * montiert ein `ConfigProvider` ohne unser Theme. Nur so ist die Entscheidung über alle
+ * Stufen prüfbar. Die Komponente liest aufgelöste Tokens, kein Dichte-Etikett: die Form
+ * folgt aus dem, was gerendert würde.
  *
- * DASS die Zeile ab `komfortabel` überhaupt überläuft — vier Knöpfe à 48 px brauchen 192 px
- * in einer 124 px breiten Zeile, die Knöpfe schrumpfen auf grob 31 px und verfehlen damit den
- * Trefflächenboden aus Gate 3 —, ist ein EIGENER Befund: **LFH-379**. Weder LFH-367 noch
- * LFH-378 hatten ihn im Umfang, beide bewerten die Höhe der Zeile, nicht ihre Breite. Diese
- * Funktion verkleinert den Schaden (mehr Abstand machte die Ziele kleiner), sie behebt ihn
- * nicht. Wer LFH-379 umsetzt, zieht sie mit oder entfernt sie mit Begründung — ein Deckel,
- * der danach immer 0 liefert, wäre tote Logik.
+ * TESTFALLE (gemessen): ohne App-Theme — das nackte `ConfigProvider` aus `test/utils.tsx` —
+ * ist antds `marginSM` 12, also 4 × 24 + 3 × 12 = 132 > 124 und damit die KARTENFORM. Wer in
+ * Vitest die Knopfzeile erwartet, rendert im App-Theme `kompakt`
+ * (`antdToken(farbenDunkel, 'kompakt')`, Muster in `Grundriss.test.tsx`).
  */
-export function aktionsabstand(token: { marginSM: number; controlHeightSM: number }) {
-  const knoepfe = AKTIONEN_MAX * token.controlHeightSM;
-  const jeLuecke = Math.floor((AKTIONSZEILE_BREITE - knoepfe) / (AKTIONEN_MAX - 1));
-  return Math.max(0, Math.min(token.marginSM, jeLuecke));
+export type PlatzBedienform = { form: 'zeile'; abstand: number } | { form: 'karte' };
+export function platzBedienform(token: {
+  controlHeightSM: number;
+  marginSM: number;
+}): PlatzBedienform {
+  const passtHoehe = token.controlHeightSM <= AKTIONSZEILE_HOEHE;
+  const breite = AKTIONEN_MAX * token.controlHeightSM + (AKTIONEN_MAX - 1) * token.marginSM;
+  const passtBreite = breite <= AKTIONSZEILE_BREITE;
+  return passtHoehe && passtBreite ? { form: 'zeile', abstand: token.marginSM } : { form: 'karte' };
+}
+
+/**
+ * Lage einer Platzkarte, aus der ihr Menü folgt (LFH-359). Setzt Schreibrecht voraus: ohne
+ * gibt es in keiner Form ein Menü (die Zeile rendert es nicht, die Karte öffnet dann direkt
+ * die Person oder ist gar kein Ziel).
+ */
+export interface PlatzMenueLage {
+  form: PlatzBedienform['form'];
+  belegt: boolean;
+  /** Unbelegt, mit Schreibrecht, nicht im Bearbeiten-Modus — die Bedingung des Wurzelklicks. */
+  zuweisbar: boolean;
+  /** Der Rückweg existiert (belegt, mit Schreibrecht; s. `onZurueckInWartebereich`). */
+  wartebereich: boolean;
+  bearbeitbar: boolean;
+  /** Eine Belegung läuft (LFH-457): Bewegungen der Person SPERREN, nichts entfernen. */
+  belegungLaeuft: boolean;
+}
+
+const VERFUEGBARKEIT_EINTRAEGE = [
+  { key: 'frei', label: 'als frei markieren', icon: <CheckCircleOutlined /> },
+  { key: 'defekt', label: 'als defekt markieren', icon: <ToolOutlined /> },
+  { key: 'aufbereitung', label: 'als in Aufbereitung markieren', icon: <SyncOutlined /> },
+  { key: 'gesperrt', label: 'als gesperrt markieren', icon: <LockOutlined /> },
+];
+
+/**
+ * Einträge des Platzmenüs für beide Bedienformen (LFH-359) — EINE Ableitung, damit Rechte
+ * und Sperren nicht in zwei Kopien auseinanderlaufen.
+ *
+ * Zeilenform: das „…"-Menü des Bestands, unverändert. Die Patientenaktionen und „als frei"
+ * sind dort Knöpfe der Zeile. „Patient zuweisen" steht trotzdem im Menü: der Wurzelklick ist
+ * die Berührungsfläche, das Menü der Tastaturweg (LFH-367/B5g).
+ *
+ * Kartenform: die Karte ist das einzige Ziel, also wandert alles hinein — Primäraktion oben
+ * (unbelegt „Patient zuweisen", belegt „Verbleib / Entlassung erfassen"), dann „Person
+ * öffnen" (die Personenmarke ist in dieser Form kein eigenes Ziel) und der Rückweg, dann die
+ * Verfügbarkeiten, und die Gefahr hinter einem Trenner (LFH-365). „zurückweisen" war in der
+ * Zeile ein `danger`-Knopf, der Abstand zu seinen Nachbarn brauchte (LFH-363) — als Eintrag
+ * hinter dem Trenner hat er ihn per Bauform (AK 4 LFH-379).
+ *
+ * Die Icons sind Zierde neben dem Eintragstext, bringen aber ihr englisches `aria-label` in
+ * den zugänglichen Namen mit (gemessen, CLAUDE.md). Tests greifen deshalb per Teilstring.
+ */
+export function platzMenueEintraege(lage: PlatzMenueLage): NonNullable<MenuProps['items']> {
+  const { form, belegt, zuweisbar, wartebereich, bearbeitbar, belegungLaeuft } = lage;
+  const karte = form === 'karte';
+  const trenner = { type: 'divider' as const };
+  const zuweisen = zuweisbar
+    ? [
+        {
+          key: 'zuweisen',
+          label: 'Patient zuweisen',
+          icon: <UserAddOutlined />,
+          disabled: belegungLaeuft,
+        },
+      ]
+    : [];
+  const verbleib =
+    karte && belegt
+      ? [
+          {
+            key: 'verbleib',
+            label: 'Verbleib / Entlassung erfassen',
+            icon: <CarOutlined />,
+            disabled: belegungLaeuft,
+          },
+        ]
+      : [];
+  const person =
+    karte && belegt ? [{ key: 'person', label: 'Person öffnen', icon: <UserOutlined /> }] : [];
+  // Rückweg in den Wartebereich (LFH-341 · H40): der Drag auf `drop-inbox` ist unter `lg`
+  // strukturell weg — das Droppable liegt in einem anderen Reiter, und die Tabs tragen
+  // `destroyOnHidden`.
+  const rueckweg = wartebereich
+    ? [
+        {
+          key: 'wartebereich',
+          label: 'Zurück in den Wartebereich',
+          icon: <RollbackOutlined />,
+          disabled: belegungLaeuft,
+        },
+      ]
+    : [];
+  const gefahr = [
+    ...(karte && belegt
+      ? [
+          {
+            key: 'zurueckweisen',
+            label: 'zurückweisen',
+            icon: <LogoutOutlined />,
+            danger: true,
+            disabled: belegungLaeuft,
+          },
+        ]
+      : []),
+    ...(bearbeitbar
+      ? [{ key: 'storno', label: 'Platz löschen', icon: <DeleteOutlined />, danger: true }]
+      : []),
+  ];
+  const kopf = [...zuweisen, ...verbleib, ...person, ...rueckweg];
+  // Zeilenform: der Trenner steht nur hinter „zuweisen", der Rückweg geht bündig in die
+  // Verfügbarkeiten über — der Bestand, den die Zeilen-Tests pinnen.
+  const kopfMitTrenner = karte
+    ? kopf.length > 0
+      ? [...kopf, trenner]
+      : []
+    : [...zuweisen, ...(zuweisen.length > 0 ? [trenner] : []), ...rueckweg];
+  return [
+    ...kopfMitTrenner,
+    ...VERFUEGBARKEIT_EINTRAEGE,
+    ...(gefahr.length > 0 ? [trenner, ...gefahr] : []),
+  ];
 }
 
 // BEFUND zum kleinen `size`-Prop (LFH-328/A1 Festlegung 4, Gate 4) — hier standen SECHS,
@@ -143,6 +277,19 @@ export function aktionsabstand(token: { marginSM: number; controlHeightSM: numbe
 // bleibt die Ausweichfläche für den Rest. Die vier Angaben stehen als benannte Ausnahme
 // in der Schuldliste von `components/dichte.guard.test.ts`; sie fallen mit einer
 // Änderung an `raster_position`, nicht mit einem Frontend-Umbau.
+//
+// NACHTRAG LFH-359 + LFH-379 (24.09.2026) — der letzte Satz oben ist überholt. Die Rechnung
+// bleibt richtig, aber sie zwingt nicht zur Ausnahme, sondern zu einer ANDEREN FORM je
+// Stufe (`platzBedienform`):
+//   * `kompakt`: Knopfzeile wie bisher. Die kleinen Knöpfe messen dort 24 px, und das IST
+//     der Gate-3-Boden der Stufe (A1-Spec: „kompakt ≥ 24 px"), keine Unterschreitung.
+//   * `komfortabel` / `handschuh`: keine Knopfzeile. Die ganze Karte (140 × 116) ist das
+//     einzige Ziel und öffnet das Aktionsmenü; dessen Einträge messen `controlHeight`. Das
+//     Menü-Argument oben („dessen Auslöser ist selbst ein Knopf") trifft nur einen Knopf IN
+//     der Karte — ist die Karte selbst der Auslöser, braucht es keine Zeile mehr.
+// Die vier Angaben bleiben im Quelltext und damit in der Schuldliste, weil der Guard Quelltext
+// zählt und keine Dichte kennt; gerendert werden sie nur in `kompakt`. Kartengröße,
+// `raster_position` und gespeicherte Layouts sind unberührt.
 //
 // Prop-Literal und Token-Name stehen bewusst nicht ausgeschrieben: Gate 4 zählt beide
 // repo-weit, und ein erklärender Kommentar darf das Gate, das er erklärt, nicht reissen.
@@ -218,11 +365,21 @@ function PersonenkarteDrag({
   disabled,
   kompakt,
   onOeffnen,
+  keinZiel,
 }: {
   person: Person;
   disabled: boolean;
   kompakt?: boolean;
   onOeffnen?: (personId: number) => void;
+  /**
+   * Die Marke liegt in einem Auslöser, der selbst das Ziel ist (Kartenform, LFH-359). dnd-kits
+   * `useDraggable` setzt `role="button"` und `tabIndex` auch bei `disabled` — ohne diese
+   * Rücknahme stünde ein fokussierbarer Knopf IM Knopf (axe `nested-interactive`), mit
+   * Schreibrecht startete Enter/Leertaste darauf einen Tastatur-Zug der Person. Die
+   * Zeiger-Listener bleiben: der Zug per Maus/Finger ist weiter ein Zusatzweg; den
+   * Tastaturweg zurück trägt der Menüeintrag „Zurück in den Wartebereich".
+   */
+  keinZiel?: boolean;
 }) {
   // Kein Inline-`transform`: die gezogene Karte rendert als DragOverlay (Portal, s. u.).
   // Würde der Originalknoten hier transformiert, vergrößerte er die scroll-bare Region
@@ -244,6 +401,16 @@ function PersonenkarteDrag({
       ref={setNodeRef}
       {...attributes}
       {...listeners}
+      {...(keinZiel
+        ? {
+            role: undefined,
+            tabIndex: -1,
+            'aria-disabled': undefined,
+            'aria-pressed': undefined,
+            'aria-roledescription': undefined,
+            'aria-describedby': undefined,
+          }
+        : {})}
       style={style}
       onClick={onOeffnen ? () => onOeffnen(person.id) : undefined}
     >
@@ -310,6 +477,31 @@ function PlatzKarte({
   });
   const { token } = theme.useToken();
   const { rollen } = useRollen();
+  const bedienform = platzBedienform(token);
+  const karte = bedienform.form === 'karte';
+  // Kontrolliert, weil drei Wege öffnen (Klick über den Auslöser, Enter/Leertaste über
+  // `aufTaste`) und die Menüwahl selbst schließt. Nur in der Kartenform benutzt.
+  // Gemerkt wird, in WELCHEM Belegungszustand das Menü geöffnet wurde: ändert ein
+  // Live-Update die Belegung, bauten sich die Einträge unter dem Finger um (aus „Patient
+  // zuweisen" würde „Verbleib …", hinten erschiene das `danger` „zurückweisen") — dieselbe
+  // Lage, gegen die LFH-457 gebaut ist. Das Menü ist dann zu, abgeleitet statt per Effekt.
+  // Der Kartenknopf trägt ein `aria-label`; seine Kinder sind damit präsentational, und ein
+  // Screenreader hörte nur „Aktionen zu Bett 1" ohne Belegung und Verfügbarkeit. Die beiden
+  // Zustandsstreifen hängen deshalb als Beschreibung daran.
+  const beschreibungsId = useId();
+  const belegungsSchluessel = belegtVon ? `belegt:${belegtVon.id}` : 'frei';
+  const [offenBei, setOffenBei] = useState<string | null>(null);
+  // Den gemerkten Zustand beim Wechsel VERWERFEN, nicht nur vergleichen: sonst öffnete ein
+  // Rücksprung auf den alten Zustand (zweites Live-Update, Rollback nach 409) das Menü von
+  // selbst wieder (gemessen, Test „schließt ein offenes Menü …"). Zurückgesetzt wird
+  // während des Renderns (Reacts Muster für abgeleiteten Zustand), nicht per Effekt.
+  if (offenBei !== null && offenBei !== belegungsSchluessel) setOffenBei(null);
+  const menueOffen = offenBei === belegungsSchluessel;
+  const setMenueOffen = (offen: boolean) => setOffenBei(offen ? belegungsSchluessel : null);
+  // Läuft ein Zug (dnd-kit), gehört die Tastatur ihm: das Enter, das einen Tastatur-Zug
+  // ablegt, beendet dnd-kit an `document` — Reacts Handler an der Karte läuft vorher und
+  // öffnete sonst zusätzlich das Menü.
+  const zugLaeuft = useDndContext().active !== null;
   const setRef = (n: HTMLDivElement | null) => {
     setDragRef(n);
     setDropRef(n);
@@ -349,7 +541,7 @@ function PlatzKarte({
     height: PLATZ_KARTE_HOEHE,
     overflow: 'hidden',
     boxSizing: 'border-box',
-    cursor: bearbeitbar ? 'grab' : zuweisbar ? 'pointer' : 'default',
+    cursor: bearbeitbar ? 'grab' : zuweisbar || (karte && belegtVon) ? 'pointer' : 'default',
     // Rand und Polsterung aus den Konstanten, nicht als Literale: `AKTIONSZEILE_BREITE`
     // rechnet mit genau diesen Werten, und eine Kopie hier liesse den Deckel still falsch
     // rechnen, sobald jemand nur eine der beiden Stellen ändert.
@@ -365,73 +557,41 @@ function PlatzKarte({
     borderRadius: 0,
     transform: transform ? `translate(${transform.x}px, ${transform.y}px)` : undefined,
   };
-  // Verfügbarkeits-Optionen immer; „Platz löschen" ist eine Layout-/Setup-Aktion und
-  // bleibt dem Bearbeiten-Modus vorbehalten. Das Menü selbst ist jedoch auch im
-  // Nicht-Edit-Modus verfügbar (Verfügbarkeit ändern gehört zum laufenden Betrieb).
-  const verfItems = [
-    { key: 'frei', label: 'als frei markieren', icon: <CheckCircleOutlined /> },
-    { key: 'defekt', label: 'als defekt markieren', icon: <ToolOutlined /> },
-    { key: 'aufbereitung', label: 'als in Aufbereitung markieren', icon: <SyncOutlined /> },
-    { key: 'gesperrt', label: 'als gesperrt markieren', icon: <LockOutlined /> },
-  ];
-  // „Patient zuweisen" steht auch im Menü — der Wurzelklick ist die Berührungsfläche, das
-  // Menü der Tastaturweg. Im Fükw (Tastatur + Maus, der PRIMÄRE Einsatzkontext) wäre ein
-  // reiner Wurzelklick nicht erreichbar. Ein eigener Knopf auf der Karte scheidet aus: die
-  // Aktionszeile ist an SCHRITT_Y gedeckelt (Rechnung im Dateikopf).
+  // Menüinhalt aus EINER Ableitung für beide Formen (LFH-359): Rechte und Sperren stehen
+  // in `platzMenueEintraege`, nicht in einer zweiten Kopie hier. Verfügbarkeit ändern
+  // gehört zum laufenden Betrieb und steht deshalb auch außerhalb des Bearbeiten-Modus
+  // im Menü; „Platz löschen" bleibt dem Bearbeiten-Modus vorbehalten.
+  const menueEintraege = platzMenueEintraege({
+    form: bedienform.form,
+    belegt: Boolean(belegtVon),
+    zuweisbar,
+    wartebereich: Boolean(onZurueckInWartebereich),
+    bearbeitbar,
+    belegungLaeuft,
+  });
+  const waehle = (key: string) => {
+    if (key === 'zuweisen') onZuweisen();
+    else if (key === 'verbleib') onTransport();
+    else if (key === 'person') {
+      if (belegtVon) onOeffnen(belegtVon.id);
+    } else if (key === 'wartebereich') onZurueckInWartebereich?.();
+    else if (key === 'zurueckweisen') onAustritt();
+    else if (key === 'storno') onStorno();
+    else onVerfuegbarkeit(key as Verfuegbarkeit);
+  };
   const menu = {
-    items: [
-      ...(zuweisbar
-        ? [
-            {
-              key: 'zuweisen',
-              label: 'Patient zuweisen',
-              icon: <UserAddOutlined />,
-              disabled: zuweisenGesperrt,
-            },
-            { type: 'divider' as const },
-          ]
-        : []),
-      // Rückweg in den Wartebereich (LFH-341 · H40): der Drag auf `drop-inbox` ist unter
-      // `lg` strukturell weg — das Droppable liegt in einem anderen Reiter, und die Tabs
-      // tragen `destroyOnHidden` (Begründung am Reiter-Zweig unten; ohne die Prop bliebe
-      // eine einmal besuchte Pane montiert).
-      // Das `icon` ist Zierde neben dem Eintragstext, aber NICHT unsichtbar für die
-      // Vorlesehilfe: ein `@ant-design/icons`-Knoten bringt sein eigenes englisches
-      // `aria-label` mit, das in den zugänglichen Namen einfliesst (gemessen, CLAUDE.md —
-      // der Eintrag heisst „rollback Zurück in den Wartebereich"). Eine `aria-hidden`-Hülle
-      // ist im Menü-Item nicht vorgesehen; die Tests greifen deshalb per TEILSTRING, nie
-      // per exaktem Namen — dieselbe Regel wie bei der Aktionsbündelung.
-      ...(onZurueckInWartebereich
-        ? [
-            {
-              key: 'wartebereich',
-              label: 'Zurück in den Wartebereich',
-              icon: <RollbackOutlined />,
-              disabled: zuweisenGesperrt,
-            },
-          ]
-        : []),
-      ...verfItems,
-      ...(bearbeitbar
-        ? [
-            { type: 'divider' as const },
-            { key: 'storno', label: 'Platz löschen', icon: <DeleteOutlined />, danger: true },
-          ]
-        : []),
-    ],
+    items: menueEintraege,
     autoFocus: true,
-    // Das Dropdown rendert im Portal, sein Klick steigt aber im KOMPONENTEN-Baum auf und
-    // erreicht damit den Wurzel-onClick dieser Karte (der gemessene Fall aus
-    // LFH-365/MetaChip). Der Riegel dagegen sitzt NICHT hier: ein
+    // Zeilenform: Das Dropdown rendert im Portal, sein Klick steigt aber im
+    // KOMPONENTEN-Baum auf und erreichte damit den Wurzel-onClick dieser Karte (der
+    // gemessene Fall aus LFH-365/MetaChip). Der Riegel dagegen sitzt NICHT hier: ein
     // `domEvent.stopPropagation()` in diesem Callback kommt zu spät und hält die
     // Ausbreitung nachweislich nicht auf — mit ihm allein bleibt der Regressionstest rot.
     // Wirksam ist der `click`-Riegel an der Aktionszeile unten, in deren Teilbaum das
     // Dropdown hängt. Wer den Auslöser von dort wegbewegt, muss den Riegel mitnehmen.
     onClick: ({ key }: { key: string }) => {
-      if (key === 'zuweisen') onZuweisen();
-      else if (key === 'wartebereich') onZurueckInWartebereich?.();
-      else if (key === 'storno') onStorno();
-      else onVerfuegbarkeit(key as Verfuegbarkeit);
+      setMenueOffen(false);
+      waehle(key);
     },
   };
   // „frei" und „belegt" widersprechen sich — bei belegtem freien Platz nur „belegt" zeigen.
@@ -441,13 +601,56 @@ function PlatzKarte({
   // role="button" + aria-disabled="true" auf die Karte → der ganze Subtree (inkl. der
   // Aktions-Buttons) gilt als deaktiviert (Screenreader + Tests können nicht klicken).
   const dragProps = bearbeitbar ? { ...attributes, ...listeners } : {};
-  return (
+
+  // ── Kartenform (LFH-359): die ganze Karte ist das eine Ziel ─────────────────────
+  // Ohne Schreibrecht gibt es kein Menü: belegt öffnet der Tipp direkt die Person (ein
+  // Menü mit einem Eintrag wäre ein Umweg, LFH-365 „ohne übrige Aktion kein Auslöser"),
+  // unbelegt ist die Karte gar kein Ziel.
+  const kartenMenue = karte && !schreibgeschuetzt;
+  const kartenPerson = karte && schreibgeschuetzt && belegtVon ? belegtVon : undefined;
+  const kartenAktion = kartenMenue
+    ? () => setMenueOffen(true)
+    : kartenPerson
+      ? () => onOeffnen(kartenPerson.id)
+      : undefined;
+  // Enter öffnet immer. Die Leertaste nur außerhalb des Bearbeiten-Modus: dort startet sie
+  // über dnd-kits KeyboardSensor den Layout-Zug, und der muss per Tastatur erreichbar
+  // bleiben. Enter startet diesen Zug ebenfalls — er wird deshalb NICHT an dnd-kit
+  // durchgereicht, sonst liefen Menü und Zug gleichzeitig los.
+  const aufTaste = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const oeffnet = e.key === 'Enter' || (e.key === ' ' && !bearbeitbar);
+    if (kartenAktion && oeffnet && !zugLaeuft && e.target === e.currentTarget) {
+      e.preventDefault();
+      kartenAktion();
+      return;
+    }
+    listeners?.onKeyDown?.(e);
+  };
+  const kartenZiel = kartenAktion
+    ? {
+        role: 'button',
+        tabIndex: 0,
+        'aria-label': kartenMenue
+          ? `Aktionen zu ${platz.bezeichnung}`
+          : `${platz.bezeichnung}: Person öffnen`,
+        ...(kartenMenue ? { 'aria-haspopup': 'menu' as const, 'aria-expanded': menueOffen } : {}),
+        'aria-describedby': `${beschreibungsId}-status ${beschreibungsId}-belegung`,
+        onKeyDown: aufTaste,
+        // Im Menü-Fall öffnet der Dropdown-Auslöser selbst; ein eigener onClick daneben
+        // riefe dasselbe zweimal.
+        onClick: kartenMenue ? undefined : kartenAktion,
+      }
+    : {};
+
+  const knoten = (
     <div
       ref={setRef}
       data-testid="platz-karte"
       style={style}
       {...dragProps}
-      onClick={zuweisbar && !zuweisenGesperrt ? onZuweisen : undefined}
+      {...(karte
+        ? kartenZiel
+        : { onClick: zuweisbar && !zuweisenGesperrt ? onZuweisen : undefined })}
     >
       {/* Titel: max. 2 Zeilen, dann Ellipsis (voller Name im Tooltip). Feste maxHeight,
           damit ein Umbruch die Karte NICHT vergrößert. */}
@@ -467,7 +670,10 @@ function PlatzKarte({
         {platz.bezeichnung}
       </Typography.Text>
       {/* Status-Tags: eine Zeile, kein Umbruch (feste Höhe). */}
-      <div style={{ height: 24, overflow: 'hidden', whiteSpace: 'nowrap' }}>
+      <div
+        id={`${beschreibungsId}-status`}
+        style={{ height: 24, overflow: 'hidden', whiteSpace: 'nowrap' }}
+      >
         {zeigeVerfTag && <StatusTag darstellung={verfuegbarkeitVertrag[platz.verfuegbarkeit]} />}
         {belegtVon && <StatusChip ton="bedien" wort="belegt" />}
       </div>
@@ -478,91 +684,127 @@ function PlatzKarte({
           Wartebereich — „Zurück in den Wartebereich" im Menü ruft dieselbe Mutation.
           Unter `lg` (Reiter-Weiche) ist der Drag für DIESE Richtung sogar gar keiner
           mehr: Quelle (Platz) und Ziel (`drop-inbox`) liegen dann in verschiedenen
-          Reitern, das Droppable ist nicht im Baum. */}
-      <div style={{ height: 24, overflow: 'hidden' }}>
+          Reitern, das Droppable ist nicht im Baum.
+          In der Kartenform ist die Marke KEIN eigenes Klickziel (LFH-359): 24 px hoch und
+          verschachtelt im Auslöser wäre sie genau das Ziel, das die Berührungsstufen
+          verbieten. Ihr Klick steigt zur Karte auf und öffnet das Menü mit „Person
+          öffnen"; der Zug bleibt, dnd-kit unterdrückt nach 5 px Bewegung den Klick. */}
+      <div id={`${beschreibungsId}-belegung`} style={{ height: 24, overflow: 'hidden' }}>
         {belegtVon && (
           <PersonenkarteDrag
             person={belegtVon}
             disabled={schreibgeschuetzt || belegungLaeuft || bearbeitbar}
             kompakt
-            onOeffnen={onOeffnen}
+            onOeffnen={karte ? undefined : onOeffnen}
+            keinZiel={karte}
           />
         )}
       </div>
-      {/* Aktionszeile UNTER der Belegung als direkte Icon-Buttons (kein Menü); feste Höhe.
+      {/* Aktionszeile UNTER der Belegung als direkte Icon-Buttons; feste Höhe. Nur in der
+          Zeilenform (kompakt): in den Berührungsstufen passt sie weder in die Höhe noch in
+          die Breite der Karte (`platzBedienform`), dort trägt das Kartenmenü ihre Aktionen.
           DER `click`-RIEGEL DER KARTE SITZT HIER — einmal am Container statt an jedem
           Knopf. Die Knöpfe stoppen nur `pointerdown` (gegen den Drag-Start), und das hält
           den nachfolgenden `click` nicht auf. Der Container fängt beides: die direkten
           Knöpfe UND das Dropdown-Menü, dessen Portal-Klick im Komponentenbaum hier
           durchläuft. Ohne diese Zeile öffnete jeder Aktionsklick zusätzlich den
           Zuweisungsdialog — beide Regressionstests werden ohne sie rot (gemessen). */}
-      <div
-        style={{ display: 'flex', gap: aktionsabstand(token), height: 24, alignItems: 'center' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* GESPERRT, nicht entfernt, solange eine Belegung läuft (LFH-457): das optimistische
-            Update setzt die Person sofort auf diese Karte, beide Knöpfe erschienen also
-            mitten in der laufenden Mutation — und beide gehen auf DIESELBE Person und
-            denselben Endpunkt. Vor der Prop-Trennung war das strukturell unmöglich, weil
-            `belegMut.isPending` die ganze Karte als `schreibgeschuetzt` führte; diese Sperre
-            ist der Rest jenes Schutzes, ohne sein Nebenwirkung (das Abhängen). */}
-        {belegtVon && !schreibgeschuetzt && (
-          <>
-            <Tooltip title="Verbleib / Entlassung erfassen">
-              {/* stopPropagation: sonst startet eine kleine Mausbewegung beim Klick einen Drag. */}
+      {bedienform.form === 'zeile' && (
+        <div
+          style={{ display: 'flex', gap: bedienform.abstand, height: 24, alignItems: 'center' }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* GESPERRT, nicht entfernt, solange eine Belegung läuft (LFH-457): das optimistische
+              Update setzt die Person sofort auf diese Karte, beide Knöpfe erschienen also
+              mitten in der laufenden Mutation — und beide gehen auf DIESELBE Person und
+              denselben Endpunkt. Vor der Prop-Trennung war das strukturell unmöglich, weil
+              `belegMut.isPending` die ganze Karte als `schreibgeschuetzt` führte; diese Sperre
+              ist der Rest jenes Schutzes, ohne sein Nebenwirkung (das Abhängen). */}
+          {belegtVon && !schreibgeschuetzt && (
+            <>
+              <Tooltip title="Verbleib / Entlassung erfassen">
+                {/* stopPropagation: sonst startet eine kleine Mausbewegung beim Klick einen Drag. */}
+                <Button
+                  size="small"
+                  aria-label="Verbleib / Entlassung erfassen"
+                  icon={<CarOutlined />}
+                  disabled={belegungLaeuft}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={onTransport}
+                />
+              </Tooltip>
+              <Tooltip title="zurückweisen">
+                <Button
+                  size="small"
+                  danger
+                  aria-label="zurückweisen"
+                  icon={<LogoutOutlined />}
+                  disabled={belegungLaeuft}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={onAustritt}
+                />
+              </Tooltip>
+            </>
+          )}
+          {/* Primäraktion direkt (kein Menü): ein nicht-freier Platz wird per Klick frei
+              gemacht (z. B. Aufbereitung abgeschlossen). Auch im Nicht-Edit-Modus. */}
+          {!schreibgeschuetzt && platz.verfuegbarkeit !== 'frei' && (
+            <Tooltip title="als frei markieren">
               <Button
                 size="small"
-                aria-label="Verbleib / Entlassung erfassen"
-                icon={<CarOutlined />}
-                disabled={belegungLaeuft}
+                aria-label="als frei markieren"
+                icon={<CheckCircleOutlined />}
                 onPointerDown={(e) => e.stopPropagation()}
-                onClick={onTransport}
+                onClick={() => onVerfuegbarkeit('frei')}
               />
             </Tooltip>
-            <Tooltip title="zurückweisen">
+          )}
+          {/* Weitere Platz-Aktionen (Verfügbarkeit, im Edit auch Löschen) — auch Nicht-Edit. */}
+          {!schreibgeschuetzt && (
+            <Dropdown menu={menu} trigger={['click']}>
+              {/* Zeilenkennung im Namen (LFH-378-Folgeauflösung): n Plätze lieferten mit
+                  bloßem „Platzaktionen" n gleichnamige Knöpfe — CLAUDE.md verlangt den
+                  Bezug auf den Datensatz, für Neues UND ohnehin Angefasstes. */}
               <Button
                 size="small"
-                danger
-                aria-label="zurückweisen"
-                icon={<LogoutOutlined />}
-                disabled={belegungLaeuft}
+                type="text"
+                aria-label={`Platzaktionen zu ${platz.bezeichnung}`}
                 onPointerDown={(e) => e.stopPropagation()}
-                onClick={onAustritt}
-              />
-            </Tooltip>
-          </>
-        )}
-        {/* Primäraktion direkt (kein Menü): ein nicht-freier Platz wird per Klick frei
-            gemacht (z. B. Aufbereitung abgeschlossen). Auch im Nicht-Edit-Modus. */}
-        {!schreibgeschuetzt && platz.verfuegbarkeit !== 'frei' && (
-          <Tooltip title="als frei markieren">
-            <Button
-              size="small"
-              aria-label="als frei markieren"
-              icon={<CheckCircleOutlined />}
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={() => onVerfuegbarkeit('frei')}
-            />
-          </Tooltip>
-        )}
-        {/* Weitere Platz-Aktionen (Verfügbarkeit, im Edit auch Löschen) — auch Nicht-Edit. */}
-        {!schreibgeschuetzt && (
-          <Dropdown menu={menu} trigger={['click']}>
-            {/* Zeilenkennung im Namen (LFH-378-Folgeauflösung): n Plätze lieferten mit
-                bloßem „Platzaktionen" n gleichnamige Knöpfe — CLAUDE.md verlangt den
-                Bezug auf den Datensatz, für Neues UND ohnehin Angefasstes. */}
-            <Button
-              size="small"
-              type="text"
-              aria-label={`Platzaktionen zu ${platz.bezeichnung}`}
-              onPointerDown={(e) => e.stopPropagation()}
-            >
-              …
-            </Button>
-          </Dropdown>
-        )}
-      </div>
+              >
+                …
+              </Button>
+            </Dropdown>
+          )}
+        </div>
+      )}
     </div>
+  );
+  if (!kartenMenue) return knoten;
+  // Kartenform mit Menü: die Karte selbst ist der Auslöser. Die Einträge messen
+  // `controlHeight` (antds `paddingBlock` im Dropdown leitet sich daraus ab), also 48 / 72.
+  //
+  // HÖHE, gemessen bei 1024 × 900 im Handschuh: ein belegter Platz trägt acht Einträge,
+  // rund 600 px — mehr, als unter ODER über der Karte Platz hat. antds Vorgabe für
+  // `bottomLeft` klappt nur um (`adjustY`); passt keine Seite, stand das Menü nach oben
+  // aus dem Fenster, und gerade die Primäraktion oben war nicht erreichbar. `shiftY`
+  // schiebt es stattdessen ins Fenster (es darf die Karte dabei überdecken), und die
+  // Höhengrenze mit eigenem Scroll fängt Fenster ab, die selbst dafür zu niedrig sind.
+  return (
+    <Dropdown
+      menu={{
+        ...menu,
+        style: { maxHeight: 'calc(100dvh - 16px)', overflowY: 'auto' },
+      }}
+      autoAdjustOverflow={MENUE_UEBERLAUF}
+      // Fokus beim Öffnen auf den ersten Eintrag (gemessen): `menu.autoFocus` allein ließ ihn
+      // nach Enter auf der Karte stehen, erst das `autoFocus` am Dropdown setzt ihn ins Menü.
+      autoFocus
+      trigger={['click']}
+      open={menueOffen}
+      onOpenChange={(offen) => setMenueOffen(offen)}
+    >
+      {knoten}
+    </Dropdown>
   );
 }
 

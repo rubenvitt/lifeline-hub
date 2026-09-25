@@ -11,6 +11,9 @@ import { etbPfad } from '../routing/deeplinks';
 
 const { Text } = Typography;
 
+/** Höchstzahl quittierter Empfänger-Chips; der Rest steht als „+n ✓" (LFH-371). */
+const QUITTIERT_CHIP_GRENZE = 3;
+
 /** Befehlsschema-Felder für die Read-back-Detailansicht (Reihenfolge = Anzeige). */
 const SCHEMA_FELDER: { key: keyof Auftrag; label: string; zeit?: boolean }[] = [
   { key: 'absicht', label: 'Absicht/Ziel' },
@@ -74,25 +77,12 @@ export default function AuftragKarte({
   // dasselbe graue Etikett wie einer in Bearbeitung. Der linke Rand ist schon vom
   // Überfällig-Alarm belegt; Gefahr gewinnt, das Etikett bleibt davon unberührt.
   const unbearbeitet = !!status.unbearbeitet && !ueberfaellig;
-  const sichtbareEmpf = a.empfaenger.slice(0, 3);
-  const restEmpf = a.empfaenger.length - sichtbareEmpf.length;
   const details = gefuellteFelder(a);
-  // Nur die SICHTBAREN Empfänger bekommen eine Aktion — aus Layoutgründen, damit die
-  // Aktionszeile kurz bleibt. Die Daten wären da: `a.empfaenger` trägt jeden Empfänger
-  // mit `snap_anzeige` (`src/auftrag/repo.rs`/`empfaenger_von` hat kein LIMIT), nur die
-  // ANZEIGE ist auf drei geschnitten.
-  // Damit bleibt eine Lücke, die der Bestand vor LFH-364 genauso hatte (der
-  // `Typography.Link` sass in derselben `slice(0, 3)`): sind die ersten drei quittiert
-  // und ein vierter offen, verschwindet die Zeile und der Auftrag ist nicht mehr voll
-  // quittierbar — womit `empfaenger_anzahl == quittiert_anzahl` in
-  // `src/routes/auftrag.rs` nie wahr wird und die Auto-Erinnerung aus LFH-118 nicht
-  // schliesst. Eigener Task, siehe LFH-371.
-  //
-  // LFH-372/B5k: der Statuschip zeigt nur noch QUITTIERTE Empfänger. Offene standen nach
+  // LFH-372/B5k: der Statuschip zeigt nur QUITTIERTE Empfänger. Offene standen nach
   // LFH-364 doppelt — einmal als Chip, einmal in der Zeile „Quittung offen:" — und
   // kosteten bei drei Empfängern auf `handschuh` eine ganze Kartenzeile. Die Zeile selbst
-  // hängt bewusst NICHT mehr am Schreibrecht, nur noch ihr Knopf: sonst verlöre ein
-  // Beobachter mit dem Chip zugleich den Namen des offenen Empfängers.
+  // hängt bewusst NICHT am Schreibrecht, nur ihr Knopf: sonst verlöre ein Beobachter mit
+  // dem Chip zugleich den Namen des offenen Empfängers.
   const istQuittierungZiel = (empfaengerId: number) =>
     !!quittierungLaeuft &&
     quittierungZiel?.auftragId === a.id &&
@@ -100,8 +90,17 @@ export default function AuftragKarte({
   // Der optimistische Cache markiert das Ziel sofort als quittiert. Solange der Request
   // läuft, bleibt es trotzdem als ladender Aktionsknopf sichtbar; andere Quittierungen
   // sind serialisiert und damit gesperrt.
-  const quittierteEmpf = sichtbareEmpf.filter((e) => e.quittiert_at && !istQuittierungZiel(e.id));
-  const offeneEmpf = sichtbareEmpf.filter((e) => !e.quittiert_at || istQuittierungZiel(e.id));
+  const quittierteEmpf = a.empfaenger.filter((e) => e.quittiert_at && !istQuittierungZiel(e.id));
+  const offeneEmpf = a.empfaenger.filter((e) => !e.quittiert_at || istQuittierungZiel(e.id));
+  // LFH-371: die Anzeigegrenze schneidet nur noch die QUITTIERTEN Chips — Quittiertes ist
+  // Lesestoff und darf hinter „+n" stehen, Offenes ist Arbeit und steht immer da. Vorher
+  // schnitt `slice(0, 3)` die ganze Liste, BEVOR getrennt wurde: waren die ersten drei
+  // quittiert, verschwand die Zeile „Quittung offen:", der vierte Empfänger hatte keinen
+  // Knopf, `empfaenger_anzahl == quittiert_anzahl` in `src/routes/auftrag.rs` wurde nie
+  // wahr und die Auto-Frist-Erinnerung aus LFH-118 schloss nie. Die Zeile wächst mit der
+  // Zahl OFFENER Empfänger und schrumpft mit jeder Quittung.
+  const sichtbareQuittierte = quittierteEmpf.slice(0, QUITTIERT_CHIP_GRENZE);
+  const restQuittierte = quittierteEmpf.length - sichtbareQuittierte.length;
   const darfQuittieren = !!(darfSchreiben && onQuittieren);
 
   const aktionen: ReactNode[] = darfSchreiben
@@ -194,12 +193,13 @@ export default function AuftragKarte({
           {a.empfaenger_anzahl} Empfänger · {a.quittiert_anzahl}/{a.empfaenger_anzahl} quittiert
         </Text>
         <Space size={4} wrap>
-          {quittierteEmpf.map((e) => (
+          {sichtbareQuittierte.map((e) => (
             <StatusChip key={e.id} ton="normal" wort={`${e.snap_anzeige} ✓`} />
           ))}
-          {restEmpf > 0 && (
+          {/* „+n" zählt nur verborgene QUITTIERTE — das ✓ sagt es ohne Farbe (WCAG 1.4.1). */}
+          {restQuittierte > 0 && (
             <Text type="secondary" style={{ fontSize: 12 }}>
-              +{restEmpf}
+              +{restQuittierte} ✓
             </Text>
           )}
         </Space>

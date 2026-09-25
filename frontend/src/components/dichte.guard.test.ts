@@ -148,11 +148,14 @@ const OFFEN: string[] = [
   // ── B5g · UHS-Grundriss (LFH-367) ── TEILWEISE ABGERÄUMT ──────────────────
   // `MaterialTab.tsx` ist raus (1 Stelle): der Lösen-Knopf sass in einer Tabellenzelle,
   // die mit der Dichtestufe wachsen darf. Was bleibt, sind die VIER Knöpfe der
-  // Platzkarte — und die sind kein Ermessen: ihre Höhe hängt an der Backend-Konstante
-  // SCHRITT_Y, die Rechnung steht im Dateikopf von `uhs/Grundriss.tsx` (LFH-328/A2).
-  // Die Karte kann in KEINER Dichtestufe ein Element auf voller Zeilenhöhe tragen —
-  // „alles ins Dropdown" löst es deshalb auch nicht, dessen Auslöser bräuchte sie
-  // ebenfalls. Diese Zeile fällt erst mit einer Änderung an `raster_position`.
+  // Platzkarte. Seit LFH-359/LFH-379 sind sie KEINE Unterschreitung mehr, nur noch ein
+  // Quelltext-Fund: gerendert werden sie ausschließlich in `kompakt`, und dort sind ihre
+  // 24 px der Gate-3-Boden der Stufe (A1-Spec: „kompakt ≥ 24 px"). In `komfortabel` und
+  // `handschuh` trägt die Karte keine Knopfzeile; sie ist selbst das eine Ziel und öffnet
+  // das Aktionsmenü (`platzBedienform`, Dateikopf von `uhs/Grundriss.tsx`). Die Zeile
+  // bleibt hier, weil dieser Guard Quelltext zählt und keine Dichte kennt — sie fiele erst,
+  // wenn die Zeilenform ihre Knöpfe auf voller Steuerhöhe trüge, und die passt nicht in den
+  // festen Innenraum der Karte (Rechnung im Dateikopf).
   '/src/pages/uhs/Grundriss.tsx',
   // ── B5h · Gefahren (LFH-368) ── ABGERÄUMT, 5 Stellen in 2 Dateien.
   // Darunter das rohe `<Table>` selbst (`Table` steht in {@link INTERAKTIV}) und der
@@ -165,7 +168,7 @@ const OFFEN: string[] = [
   // bleibt, sie trägt eine zweistellige Menge und keine Trefffläche.
   //
   // Damit ist die Schuldmenge auf die EINE geprüfte Dauerausnahme geschrumpft: die vier
-  // Knöpfe der UHS-Platzkarte, deren Höhe an der Backend-Konstante SCHRITT_Y hängt.
+  // Knöpfe der UHS-Platzkarte, die seit LFH-359 nur noch in `kompakt` gerendert werden.
   // ── B5j · Rest: Kopfzeile, Profil, Editor, Sonstiges (LFH-370) ────────────
   // ABGERÄUMT: 14 Stellen in 9 Dateien (MarkdownEditor, SprechgruppenPicker, AlarmZentrale,
   // LoginPage, ProfilPage, SchaedenDetailPage, TiereDetailPage, KraefteOhneBrSidebar,

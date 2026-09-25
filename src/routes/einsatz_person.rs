@@ -964,10 +964,20 @@ pub struct VerbleibBody {
     pub ziel: Option<String>,
     pub status: Option<String>,
     pub notiz: Option<String>,
+    /// LFH-674: Betreuungsstelle eines Notunterkunft-Verbleibs. Nur die Kennung — `ziel`
+    /// bleibt, was mitgeschickt wurde (der Client belegt es mit dem Namen vor).
+    pub betreuungsstelle_id: Option<i64>,
 }
 
 /// POST /api/einsaetze/{id}/personen/{pid}/verbleib — Verbleib-Ereignis erfassen.
 /// Schreibberechtigt + aktiv. Cache-Kurzform via `VerbleibArt::kurzform`. Pseudonyme ETB-Spur + SSE.
+///
+/// LFH-674 (design.md D2): ein Verweis auf eine Betreuungsstelle wird in fester Reihenfolge
+/// geprüft — 422 bei anderer Art als `notunterkunft`, 403 ohne Lesezugriff auf das Modul
+/// Betreuung (VOR jedem Lesen der Stelle, sonst verrieten 404/409 ihre Existenz), 404 bei
+/// fremder/unbekannter Stelle, 409 bei stornierter. Eine geschlossene Stelle ist erlaubt
+/// (Entscheidung 24.09.2026: ein Verbleib wird oft nachgetragen). Der Server setzt keinen
+/// Stellennamen in Ziel, Kurzform oder ETB.
 pub async fn verbleib(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
@@ -994,6 +1004,29 @@ pub async fn verbleib(
             return Err(AppError::Validation("Unbekannter Verbleib-Status".into()));
         }
     }
+    if let Some(stelle_id) = body.betreuungsstelle_id {
+        if art != VerbleibArt::Notunterkunft {
+            return Err(AppError::UnprocessableEntity(
+                "Eine Betreuungsstelle gibt es nur beim Verbleib Notunterkunft".into(),
+            ));
+        }
+        fordere_modul_zugriff_laden(
+            &state.pool,
+            einsatz_id,
+            einsatz.org_id,
+            <crate::einsatz::modul::Betreuung as crate::einsatz::modul::ModulMarker>::KEY
+                .expect("Betreuung ist an ein Modul gebunden"),
+            &benutzer,
+        )
+        .await?;
+        let stelle =
+            crate::betreuung::repo::stelle_laden(&state.pool, einsatz_id, stelle_id).await?;
+        if stelle.storniert_at.is_some() {
+            return Err(AppError::Conflict(
+                "Die Betreuungsstelle ist storniert".into(),
+            ));
+        }
+    }
     let person = repo::laden(&state.pool, einsatz_id, person_id).await?;
     if person.storniert_at.is_some() {
         return Err(AppError::Conflict(
@@ -1015,6 +1048,7 @@ pub async fn verbleib(
             ziel: ziel.as_deref(),
             status: body.status.as_deref(),
             notiz: notiz.as_deref(),
+            betreuungsstelle_id: body.betreuungsstelle_id,
         },
         &kurzform,
         benutzer.id,

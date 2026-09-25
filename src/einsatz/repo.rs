@@ -633,6 +633,9 @@ pub async fn faellige_purge(
 /// `geschwaerzt_at`-Tombstone und schreibt einen System-ETB-Audit — alles in EINER
 /// Transaktion (partieller Scrub rollt zurück). Das operative Skelett (Einsatz-Struktur,
 /// ETB, Zähler/registrier_nr, Führungs-Doku, anonymisierte Triage) bleibt erhalten.
+/// Chat- und Erinnerungs-Freitexte werden seit LFH-290 mitgeschwärzt; ins ETB oder in
+/// einen Auftrag heraufgestufte Chat-Nachrichten bleiben als Kopie in der Führungs-Doku
+/// stehen (ETB-Politik, `etb_eintrag.inhalt`/`auftrag.auftrag_text` sind Retain).
 ///
 /// Idempotent: der `geschwaerzt_at IS NULL`-Guard liefert `false`, wenn der Einsatz
 /// schon geschwärzt (oder nicht soft-gelöscht/abgeschlossen) ist — kein Doppel-Scrub.
@@ -684,14 +687,15 @@ pub async fn schwaerze_einsatz(
         etb_startwert,
         "PII-Schwärzung durchgeführt (Aufbewahrungsfrist + Karenz abgelaufen). \
          Direkte Personenidentifikatoren (Namen, Kontakt, Adresse, Meldebild/Einsatzort, \
-         Foto-/Datei-Anhänge, personenbezogene Notizen sowie Schadens-/Lage-/Gefahren-Freitexte) \
-         wurden unwiderruflich entfernt. Erhalten bleiben das operative Skelett (Einsatz-Struktur, \
-         Zähler/registrier_nr, operative Objekte), die Führungs-Dokumentation (ETB, Meldungen, \
-         Aufträge, Lage-/Befehlsberichte — im ETB rechtsverbindlich gesnapshottet) und \
+         Foto-/Datei-Anhänge, personenbezogene Notizen, Schadens-/Lage-/Gefahren-Freitexte \
+         sowie die Freitexte von Chat-Kanälen, Chat-Nachrichten und Erinnerungen) wurden \
+         unwiderruflich entfernt. Erhalten bleiben das operative Skelett (Einsatz-Struktur, \
+         Zähler/registrier_nr, operative Objekte, die Struktur von Chat und Erinnerungen mit \
+         Zeitpunkten, Verfassern und Status), die Führungs-Dokumentation (ETB, Meldungen, Aufträge, \
+         Lage-/Befehlsberichte — im ETB rechtsverbindlich gesnapshottet; ins ETB oder in einen \
+         Auftrag heraufgestufte Chat-Nachrichten stehen dort weiter im Wortlaut) und \
          anonymisierte Triage-/Statuskategorien (ohne Personenbezug) für die gesetzliche/ \
-         statistische Aufbewahrung; sowie — bis zum ausstehenden Scrub-Follow-up (LFH-229) — \
-         operative Kommunikations-Freitexte (Chat-Nachrichten, Erinnerungen), die noch \
-         Personenbezug tragen können.",
+         statistische Aufbewahrung.",
     )
     .await?;
 
@@ -1149,6 +1153,41 @@ mod tests {
         .execute(&pool)
         .await
         .unwrap();
+        // LFH-674: eine zweite Person mit Notunterkunft an einer Stelle — der Verweis ist eine
+        // Kennung und bleibt, das Ziel (Stellenname als Freitext) wird leer.
+        let stelle: i64 = sqlx::query_scalar(
+            "INSERT INTO betreuungsstelle (einsatz_id, bezeichnung, art, angelegt_von_id) \
+             VALUES (?, 'NU Turnhalle Nord', 'notunterkunft', ?) RETURNING id",
+        )
+        .bind(einsatz.id)
+        .bind(leit)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let person2: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_person (einsatz_id, registrier_nr, status, aktuelle_verbleib_art, \
+                aktuelles_verbleib_ziel, aktuelle_verbleib_betreuungsstelle_id, erfasst_von, \
+                geaendert_von) \
+             VALUES (?, 2, 'betroffen', 'notunterkunft', 'NU Turnhalle Nord', ?, ?, ?) RETURNING id",
+        )
+        .bind(einsatz.id)
+        .bind(stelle)
+        .bind(leit)
+        .bind(leit)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO person_verbleib (einsatz_id, person_id, art, ziel, betreuungsstelle_id, \
+                erfasst_von) VALUES (?, ?, 'notunterkunft', 'NU Turnhalle Nord', ?, ?)",
+        )
+        .bind(einsatz.id)
+        .bind(person2)
+        .bind(stelle)
+        .bind(leit)
+        .execute(&pool)
+        .await
+        .unwrap();
 
         assert!(schwaerze_einsatz(&pool, einsatz.id, "2026-02-01 00:00:00")
             .await
@@ -1166,7 +1205,7 @@ mod tests {
         ) = sqlx::query_as(
             "SELECT zustand, antreff_lat, antreff_lon, aktuelles_verbleib_ziel, \
                     aktuelle_verbleib_art, aktueller_verbleib_status, vermisst_seit \
-             FROM einsatz_person WHERE einsatz_id = ?",
+             FROM einsatz_person WHERE einsatz_id = ? AND registrier_nr = 1",
         )
         .bind(einsatz.id)
         .fetch_one(&pool)
@@ -1184,6 +1223,32 @@ mod tests {
                 Some("2026-01-01 06:00:00".into()),
             ),
             "Zustand, Koordinate und Ziel leer; Art, Status und vermisst_seit erhalten"
+        );
+
+        let cache: (Option<String>, Option<i64>) = sqlx::query_as(
+            "SELECT aktuelles_verbleib_ziel, aktuelle_verbleib_betreuungsstelle_id \
+             FROM einsatz_person WHERE id = ?",
+        )
+        .bind(person2)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            cache,
+            (None, Some(stelle)),
+            "Cache: Ziel leer, Verweis bleibt"
+        );
+        let ereignis: (Option<String>, Option<i64>) = sqlx::query_as(
+            "SELECT ziel, betreuungsstelle_id FROM person_verbleib WHERE person_id = ?",
+        )
+        .bind(person2)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            ereignis,
+            (None, Some(stelle)),
+            "Ereignis: Ziel leer, Verweis bleibt"
         );
     }
 
@@ -1247,6 +1312,386 @@ mod tests {
             ab_err, None,
             "Abschnitt-Erreichbarkeit (PII) muss NULL sein — bestehende Lücke geschlossen"
         );
+    }
+
+    /// Bereitet einen schwärzbaren Einsatz vor (abgeschlossen + soft-gelöscht).
+    async fn schwaerzbarer_einsatz(pool: &SqlitePool) -> (i64, i64) {
+        let leit = benutzer_anlegen(pool, "leit").await;
+        let einsatz = test_anlegen(pool, "Lage", None, leit).await.unwrap();
+        abschliessen(pool, einsatz.id, leit).await.unwrap();
+        sqlx::query("UPDATE einsatz SET geloescht_at = ? WHERE id = ?")
+            .bind("2026-01-01 00:00:00")
+            .bind(einsatz.id)
+            .execute(pool)
+            .await
+            .unwrap();
+        (einsatz.id, leit)
+    }
+
+    #[tokio::test]
+    async fn schwaerzung_entfernt_chat_und_erinnerungs_freitexte() {
+        // LFH-290: Chat- und Erinnerungs-Freitexte tragen Personenbezug („Fam. Müller,
+        // Tel. 0170 …“) und standen bis dahin als RETAIN v1 in der Registry. Sie werden
+        // jetzt entfernt — auch in soft-gelöschten Nachrichten, deren Inhalt stehen blieb.
+        // Die Struktur (ids, kanal_id, faellig_at, status) bleibt; ein Chat-Anhang geht
+        // mit seiner Verknüpfung vollständig weg.
+        let pool = crate::db::test_pool().await;
+        let (eid, leit) = schwaerzbarer_einsatz(&pool).await;
+        let kanal_id: i64 = sqlx::query_scalar(
+            "INSERT INTO chat_kanal (einsatz_id, name, beschreibung, erstellt_von_id) \
+             VALUES (?, 'Absprache Fam. Müller', 'Kontakt Tochter 0170 111', ?) RETURNING id",
+        )
+        .bind(eid)
+        .bind(leit)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let mut nachricht_ids = Vec::new();
+        for (inhalt, geloescht) in [
+            ("Herr Schmidt, Hauptstr. 5, sitzt fest", None),
+            (
+                "Frau Meyer, Tel. 0151 222 — versehentlich gepostet",
+                Some("2026-01-01 01:00:00"),
+            ),
+            ("Foto Familie Weber anbei", None),
+        ] {
+            let id: i64 = sqlx::query_scalar(
+                "INSERT INTO chat_nachricht (einsatz_id, kanal_id, autor_id, inhalt, geloescht_at) \
+                 VALUES (?, ?, ?, ?, ?) RETURNING id",
+            )
+            .bind(eid)
+            .bind(kanal_id)
+            .bind(leit)
+            .bind(inhalt)
+            .bind(geloescht)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            nachricht_ids.push(id);
+        }
+        let anhang_id: i64 = sqlx::query_scalar(
+            "INSERT INTO anhang (einsatz_id, dateiname, mime, groesse, sha256, daten, hochgeladen_von) \
+             VALUES (?, 'weber.jpg', 'image/jpeg', 3, 'deadbeef', ?, ?) RETURNING id",
+        )
+        .bind(eid)
+        .bind(b"ABC".as_slice())
+        .bind(leit)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query("INSERT INTO chat_nachricht_anhang (nachricht_id, anhang_id) VALUES (?, ?)")
+            .bind(nachricht_ids[2])
+            .bind(anhang_id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let erinnerung_id: i64 = sqlx::query_scalar(
+            "INSERT INTO erinnerung (einsatz_id, titel, beschreibung, faellig_at, \
+                empfaenger_funktion, status, erstellt_von_id) \
+             VALUES (?, 'Rückruf Frau Meyer', 'Tel. 0151 222, Tochter vermisst', \
+                '2026-01-01 12:00:00', 'Herr Müller (S2)', 'offen', ?) RETURNING id",
+        )
+        .bind(eid)
+        .bind(leit)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        assert!(schwaerze_einsatz(&pool, eid, "2026-02-01 00:00:00")
+            .await
+            .unwrap());
+
+        let kanal: (i64, i64, String, Option<String>) = sqlx::query_as(
+            "SELECT id, einsatz_id, name, beschreibung FROM chat_kanal WHERE id = ?",
+        )
+        .bind(kanal_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            kanal,
+            (kanal_id, eid, SCHWAERZUNG_PLATZHALTER.to_string(), None),
+            "Kanal: Name Platzhalter, Beschreibung NULL, Struktur bleibt"
+        );
+
+        let nachrichten: Vec<(i64, i64, String, Option<String>)> = sqlx::query_as(
+            "SELECT id, kanal_id, inhalt, geloescht_at FROM chat_nachricht \
+             WHERE einsatz_id = ? ORDER BY id",
+        )
+        .bind(eid)
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            nachrichten,
+            vec![
+                (
+                    nachricht_ids[0],
+                    kanal_id,
+                    SCHWAERZUNG_PLATZHALTER.to_string(),
+                    None
+                ),
+                (
+                    nachricht_ids[1],
+                    kanal_id,
+                    SCHWAERZUNG_PLATZHALTER.to_string(),
+                    Some("2026-01-01 01:00:00".to_string())
+                ),
+                (
+                    nachricht_ids[2],
+                    kanal_id,
+                    SCHWAERZUNG_PLATZHALTER.to_string(),
+                    None
+                ),
+            ],
+            "jede Nachricht (auch die soft-gelöschte) trägt den Platzhalter"
+        );
+
+        let erinnerung: (i64, String, Option<String>, Option<String>, String, String) =
+            sqlx::query_as(
+                "SELECT id, titel, beschreibung, empfaenger_funktion, faellig_at, status \
+                 FROM erinnerung WHERE id = ?",
+            )
+            .bind(erinnerung_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            erinnerung,
+            (
+                erinnerung_id,
+                SCHWAERZUNG_PLATZHALTER.to_string(),
+                None,
+                None,
+                "2026-01-01 12:00:00".to_string(),
+                "offen".to_string()
+            ),
+            "Erinnerung: Titel Platzhalter, Beschreibung und Empfänger NULL, Termin/Status bleiben"
+        );
+
+        let anhaenge: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM anhang WHERE einsatz_id = ?")
+            .bind(eid)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        let verknuepfungen: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM chat_nachricht_anhang")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            (anhaenge, verknuepfungen),
+            (0, 0),
+            "Chat-Anhang samt Verknüpfung weg"
+        );
+
+        // Der Audit ist ein bleibender, rechtsverbindlicher ETB-Eintrag: er darf nur
+        // behaupten, was die Registry tut — die FREITEXTE gehen, die Datensätze bleiben.
+        let audit: String = sqlx::query_scalar(
+            "SELECT inhalt FROM etb_eintrag \
+             WHERE einsatz_id = ? AND inhalt LIKE 'PII-Schwärzung durchgeführt%'",
+        )
+        .bind(eid)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert!(
+            audit.contains("Freitexte von Chat-Kanälen, Chat-Nachrichten und Erinnerungen"),
+            "Audit nennt die Chat-/Erinnerungs-Freitexte als entfernt: {audit}"
+        );
+        assert!(
+            audit.contains("die Struktur von Chat und Erinnerungen"),
+            "Audit nennt die erhaltene Struktur: {audit}"
+        );
+        assert!(
+            !audit.contains("sowie Chat-Kanäle, Chat-Nachrichten und Erinnerungen)"),
+            "kein Overclaim, die Datensätze seien entfernt: {audit}"
+        );
+    }
+
+    #[tokio::test]
+    async fn schwaerzung_nullt_sprechgruppen_hinweis_nur_einsatz_lokal() {
+        // LFH-140: `sprechgruppe.hinweis` ist ein Freitext-Zettel („Ansprechpartner Herr
+        // Müller …“) und wird genullt — aber NUR an einsatz-lokalen Sprechgruppen. Der
+        // org-weite Katalog (einsatz_id NULL) gehört keinem Einsatz und bleibt unberührt;
+        // `bezeichnung` ist Funkgruppen-Label (G_OP_LABEL) und bleibt überall.
+        let pool = crate::db::test_pool().await;
+        let (eid, _) = schwaerzbarer_einsatz(&pool).await;
+        let org_id: i64 = sqlx::query_scalar("SELECT org_id FROM einsatz WHERE id = ?")
+            .bind(eid)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        let lokal: i64 = sqlx::query_scalar(
+            "INSERT INTO sprechgruppe (org_id, einsatz_id, bezeichnung, betriebsart, hinweis) \
+             VALUES (?, ?, 'TMO_EINSATZ_1', 'TMO', 'Ansprechpartner Herr Müller 0170 111') \
+             RETURNING id",
+        )
+        .bind(org_id)
+        .bind(eid)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let katalog: i64 = sqlx::query_scalar(
+            "INSERT INTO sprechgruppe (org_id, einsatz_id, bezeichnung, betriebsart, hinweis) \
+             VALUES (?, NULL, 'TMO_KATALOG', 'TMO', 'Nur für Großlagen') RETURNING id",
+        )
+        .bind(org_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        assert!(schwaerze_einsatz(&pool, eid, "2026-02-01 00:00:00")
+            .await
+            .unwrap());
+
+        let lies = |id: i64| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_as::<_, (String, Option<String>)>(
+                    "SELECT bezeichnung, hinweis FROM sprechgruppe WHERE id = ?",
+                )
+                .bind(id)
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+            }
+        };
+        assert_eq!(
+            lies(lokal).await,
+            ("TMO_EINSATZ_1".to_string(), None),
+            "einsatz-lokal: Hinweis NULL, Bezeichnung bleibt"
+        );
+        assert_eq!(
+            lies(katalog).await,
+            (
+                "TMO_KATALOG".to_string(),
+                Some("Nur für Großlagen".to_string())
+            ),
+            "Gegenprobe org-weiter Katalog: Hinweis bleibt"
+        );
+    }
+
+    #[tokio::test]
+    async fn schwaerzung_nullt_alle_abschnitts_freitexte_und_haelt_die_labels() {
+        // LFH-140, AK „kein Freitext überlebt“: bemerkung, erreichbarkeit und (LFH-608)
+        // abschnittsauftrag werden NULL. Retain bleiben name, kurzbezeichnung, der
+        // Kommunikationsmittel-Schlüssel und die eingefrorenen Alt-Spalten
+        // sprechgruppe_tmo/_dmo — Letzteres ist die Entscheidung des Auftraggebers
+        // (Funkgruppen-Label, konsistent mit `sprechgruppe.bezeichnung`).
+        let pool = crate::db::test_pool().await;
+        let (eid, _) = schwaerzbarer_einsatz(&pool).await;
+        let aid: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatzabschnitt (einsatz_id, name, kurzbezeichnung, bemerkung, \
+                kommunikationsmittel, erreichbarkeit, abschnittsauftrag, \
+                sprechgruppe_tmo, sprechgruppe_dmo) \
+             VALUES (?, 'Nord', 'EA-N', 'Fam. Weber evakuiert', 'festnetz', '0170 98765', \
+                'Evakuierung Uferstraße 3, Familie Schulz', 'TMO_NORD', 'DMO_NORD') \
+             RETURNING id",
+        )
+        .bind(eid)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        assert!(schwaerze_einsatz(&pool, eid, "2026-02-01 00:00:00")
+            .await
+            .unwrap());
+
+        #[allow(clippy::type_complexity)]
+        let zeile: (
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            String,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+        ) = sqlx::query_as(
+            "SELECT bemerkung, erreichbarkeit, abschnittsauftrag, \
+                    name, kurzbezeichnung, kommunikationsmittel, sprechgruppe_tmo, sprechgruppe_dmo \
+             FROM einsatzabschnitt WHERE id = ?",
+        )
+        .bind(aid)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            zeile,
+            (
+                None,
+                None,
+                None,
+                "Nord".to_string(),
+                Some("EA-N".to_string()),
+                Some("festnetz".to_string()),
+                Some("TMO_NORD".to_string()),
+                Some("DMO_NORD".to_string()),
+            ),
+            "Freitexte NULL; Name, Kürzel, Kommunikationsmittel und TMO/DMO bleiben"
+        );
+    }
+
+    #[tokio::test]
+    async fn schwaerzung_ersetzt_den_namen_der_kartenansicht() {
+        // LFH-283: der Ansichts-Name kann PII tragen („Lage Fam. Müller“) → Platzhalter
+        // (NOT NULL); die Konfiguration (Zentrum, Zoom) bleibt.
+        let pool = crate::db::test_pool().await;
+        let (eid, leit) = schwaerzbarer_einsatz(&pool).await;
+        let ansicht: i64 = sqlx::query_scalar(
+            "INSERT INTO karten_ansicht (einsatz_id, name, zentrum_lat, zoom, erstellt_von) \
+             VALUES (?, 'Lage Fam. Müller', 52.1, 14.0, ?) RETURNING id",
+        )
+        .bind(eid)
+        .bind(leit)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        assert!(schwaerze_einsatz(&pool, eid, "2026-02-01 00:00:00")
+            .await
+            .unwrap());
+
+        let (name, lat, zoom): (String, Option<f64>, Option<f64>) =
+            sqlx::query_as("SELECT name, zentrum_lat, zoom FROM karten_ansicht WHERE id = ?")
+                .bind(ansicht)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            (name.as_str(), lat, zoom),
+            (SCHWAERZUNG_PLATZHALTER, Some(52.1), Some(14.0))
+        );
+    }
+
+    #[tokio::test]
+    async fn schwaerzung_loescht_den_lage_snapshot() {
+        // LFH-283: ein Lage-Snapshot friert das volle Lagebild samt PII ein (`daten`) und
+        // hat keine ETB-Kopplung → die ganze Zeile geht weg.
+        let pool = crate::db::test_pool().await;
+        let (eid, leit) = schwaerzbarer_einsatz(&pool).await;
+        sqlx::query(
+            "INSERT INTO lage_snapshot (einsatz_id, bezeichnung, notiz, stand_at, daten, erstellt_von) \
+             VALUES (?, 'Stand 14 Uhr', 'Fam. Müller noch im Haus', '2026-01-01 14:00:00', \
+                '{\"personen\":[\"Müller\"]}', ?)",
+        )
+        .bind(eid)
+        .bind(leit)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        assert!(schwaerze_einsatz(&pool, eid, "2026-02-01 00:00:00")
+            .await
+            .unwrap());
+
+        let anzahl: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM lage_snapshot WHERE einsatz_id = ?")
+                .bind(eid)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(anzahl, 0, "Snapshot-Zeile samt Lagebild weg");
     }
 
     /// Setzt die Org-Retention-Dauer direkt in der DB (reiner Repo-Test).

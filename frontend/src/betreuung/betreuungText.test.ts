@@ -5,7 +5,9 @@ import {
   kennzahlTeile,
   kennzahlText,
   mengeText,
+  namentlichTeile,
   personenZahl,
+  volleStellen,
 } from './betreuungText';
 import { evakuierungKennzahl } from './evakuierungKennzahl';
 
@@ -75,6 +77,22 @@ describe('betreuungText (LFH-639)', () => {
         belegung: { id: 1, belegt: 170, zeitpunkt_at: 'x' },
       }),
     ).toBe(-20);
+  });
+
+  it('volle Stellen: „voll" und „überbelegt" zählen, „fast voll" und Stellen ohne Einstufung nicht (LFH-678)', () => {
+    const b = (belegt: number) => ({ id: 1, belegt, zeitpunkt_at: 'x' });
+    expect(volleStellen([])).toBe(0);
+    expect(
+      volleStellen([
+        { kapazitaet_personen: 150, belegung: b(150) }, // voll
+        { kapazitaet_personen: 150, belegung: b(170) }, // überbelegt
+        { kapazitaet_personen: 150, belegung: b(140) }, // fast voll — kein Alarm
+        { kapazitaet_personen: 150, belegung: b(89) },
+        { kapazitaet_personen: 150, belegung: undefined }, // keine Meldung
+        { kapazitaet_personen: undefined, belegung: b(400) }, // ohne Kapazität keine Einstufung
+        { kapazitaet_personen: 0, belegung: b(3) }, // Kapazität 0: `auslastung` stuft nicht ein
+      ]),
+    ).toBe(2);
   });
 
   it('Kennzahltext: ≈ bei geschätztem Anteil, Bezirke ohne Meldung ausgewiesen, keine Kennzahl benannt', () => {
@@ -201,5 +219,24 @@ describe('betreuungText (LFH-639)', () => {
         }).evakuiert,
       ).toBe('700');
     });
+  });
+});
+
+describe('namentlichTeile (LFH-674, design.md D7)', () => {
+  it('„davon namentlich n" neben einer gemeldeten Belegung', () => {
+    expect(namentlichTeile(2, true)).toEqual({ wort: 'davon namentlich', zahl: '2' });
+  });
+
+  it('ohne Belegungsmeldung entfällt „davon" — es gibt keine Menge, von der es ein Teil wäre', () => {
+    expect(namentlichTeile(2, false)).toEqual({ wort: 'namentlich', zahl: '2' });
+  });
+
+  it('bei 0 oder ohne Auskunft steht nichts', () => {
+    expect(namentlichTeile(0, true)).toBeNull();
+    expect(namentlichTeile(undefined, true)).toBeNull();
+  });
+
+  it('große Zahlen tragen den Tausendertrenner wie jede Personenzahl', () => {
+    expect(namentlichTeile(1320, true)?.zahl).toBe(personenZahl(1320));
   });
 });

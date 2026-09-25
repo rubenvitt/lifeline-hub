@@ -457,11 +457,13 @@ test.describe('UHS-Grundriss unter Touch', () => {
       'kein zweiter, verborgener Zweig',
     ).toHaveCount(0);
 
-    // AK 1: der Klickweg aus B5g, hier per echtem Touch-Tap. Getippt wird auf den TITEL
-    // der Karte: die Aktionszeile darunter riegelt `click` ab (sie muss, sonst öffnete
-    // jeder Aktionsklick zusätzlich den Zuweisungsdialog), ein Tap in der Kartenmitte
-    // träfe heute zufällig die leere Belegungszeile — Geometrieglück, keine Absicht.
-    await bett1(page).tap({ position: { x: 60, y: 12 } });
+    // AK 1: der Klickweg, hier per echtem Touch-Tap. Diese Datei läuft mit `hasTouch` und
+    // damit in der Stufe „komfortabel" (Dateikopf) — dort ist die Karte seit LFH-359 das
+    // EINE Bedienziel und öffnet ihr Aktionsmenü; zugewiesen wird über den ersten Eintrag.
+    // Getippt wird auf die Kartenmitte: die Karte hat in dieser Form keine Aktionszeile mehr,
+    // die einen Tipp abfangen könnte.
+    await bett1(page).tap();
+    await page.getByRole('menuitem', { name: /Patient zuweisen/ }).tap();
 
     const dialog = page.getByRole('dialog');
     await expect(dialog).toContainText('Patient zuweisen');
@@ -476,11 +478,203 @@ test.describe('UHS-Grundriss unter Touch', () => {
     await expect(bett1(page), 'der Klickweg hat zugewiesen').toContainText(personName);
 
     // AK 1, Rückweg: unter `lg` ist der Drag zurück in den Wartebereich strukturell weg
-    // (das Droppable liegt in einem anderen Reiter). Der Ersatz ist der Menüeintrag.
-    await bett1(page).locator('button[aria-label^="Platzaktionen"]').tap();
-    await page.getByRole('menuitem', { name: 'Zurück in den Wartebereich' }).tap();
+    // (das Droppable liegt in einem anderen Reiter). Der Ersatz ist der Menüeintrag — in der
+    // Kartenform über einen Tipp auf die Karte selbst.
+    await bett1(page).tap();
+    await page.getByRole('menuitem', { name: /Zurück in den Wartebereich/ }).tap();
     await expect(bett1(page), 'der Platz ist wieder frei').not.toContainText(personName);
     await page.getByRole('tab', { name: 'Wartebereich' }).tap();
     await expect(page.getByTestId('warteliste-scroll').getByText(personName)).toBeVisible();
+  });
+
+  /**
+   * LFH-359 + LFH-379: in den Berührungsstufen ist die Karte das eine Ziel und öffnet das
+   * Aktionsmenü. Gemessen wird die echte `boundingBox()` — Karte UND jeder Menüeintrag halten
+   * die Steuerhöhe der Stufe. Geöffnet wird PER TIPP, nicht über `toBeVisible()` auf einem
+   * Knopf (ein sichtbares Ziel ist noch kein bedienbares, CLAUDE.md zu LFH-355).
+   */
+  for (const [dichte, soll] of [
+    ['komfortabel', 48],
+    ['handschuh', 72],
+  ] as const) {
+    test(`Berührungsstufe ${dichte}: die Karte ist das eine Ziel, Karte und Menüeinträge ≥ ${soll} px`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(TABLET);
+      await setupPatientUndPlatz(page);
+      await page.evaluate(
+        (wert) => window.localStorage.setItem('lifeline-hub.dichte', wert),
+        dichte,
+      );
+      await page.reload();
+      await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+
+      const karte = bett1(page);
+      await expect(karte).toHaveAttribute('role', 'button');
+      await expect(karte).toHaveAttribute('aria-haspopup', 'menu');
+      // Gegenprobe: keine Knopfzeile mehr in der Karte (LFH-379: sie lief über).
+      await expect(karte.getByRole('button')).toHaveCount(0);
+
+      const kasten = await karte.boundingBox();
+      expect(kasten, 'Karte steht im Layout').not.toBeNull();
+      expect(kasten!.width, 'Kartenbreite').toBeGreaterThanOrEqual(soll);
+      expect(kasten!.height, 'Kartenhöhe').toBeGreaterThanOrEqual(soll);
+      // Die Kartengröße ist dichteunabhängig (Spec: Raster und Layout bleiben).
+      expect(Math.round(kasten!.width)).toBe(140);
+      expect(Math.round(kasten!.height)).toBe(116);
+
+      await karte.tap();
+      const menue = page.locator('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]');
+      await expect(menue).toHaveCount(1);
+      const eintraege = menue.getByRole('menuitem');
+      await expect(eintraege.first()).toContainText('Patient zuweisen');
+      const zahl = await eintraege.count();
+      expect(zahl, 'Zuweisen + vier Verfügbarkeiten').toBeGreaterThanOrEqual(5);
+      // ERST NACH DER EINBLENDUNG MESSEN (gemessen): antds `slide-up`-Bewegung startet mit
+      // `scaleY(0.8)`, die `boundingBox()` davor liest 0,8 × die Endhöhe — 38,4 statt 48 und
+      // 57,6 statt 72 px, bei korrekt berechnetem Stil (`paddingBlock` + `lineHeight` =
+      // `controlHeight`). Gewartet wird auf das Ende der Bewegungsklassen am Popup.
+      await expect(page.locator('.ant-dropdown:not(.ant-dropdown-hidden)')).not.toHaveClass(
+        /ant-slide-up-(enter|appear)/,
+      );
+      for (let i = 0; i < zahl; i++) {
+        const k = await eintraege.nth(i).boundingBox();
+        expect(k, `Menüeintrag ${i} steht im Layout`).not.toBeNull();
+        expect(k!.height, `Menüeintrag ${i} (${k!.height} px)`).toBeGreaterThanOrEqual(soll - 0.5);
+      }
+      // Ein Tipp hat NUR das Menü geöffnet, keinen Zuweisungsdialog.
+      await expect(page.getByRole('dialog')).toHaveCount(0);
+
+      // Tastaturweg (Spec „Tastatur"): Esc schließt, Enter auf der fokussierten Karte öffnet
+      // erneut, und der Fokus steht dann auf dem ERSTEN Eintrag — gemessen: ohne das
+      // `autoFocus` am Dropdown bliebe er auf der Karte (`menu.autoFocus` allein reicht nicht).
+      // Ein zweites Enter löst den Eintrag aus.
+      await page.keyboard.press('Escape');
+      await expect(karte).toHaveAttribute('aria-expanded', 'false');
+      // Esc gibt den Fokus an die Karte zurück (rc-dropdown), ohne dass der Test nachhilft.
+      await expect(karte).toBeFocused();
+      await page.keyboard.press('Enter');
+      await expect(karte).toHaveAttribute('aria-expanded', 'true');
+      await expect(eintraege.first()).toBeFocused();
+      await page.keyboard.press('Enter');
+      await expect(page.getByRole('dialog')).toContainText('Patient zuweisen');
+    });
+  }
+
+  /**
+   * Spec „Gesten bleiben Zusatzwege" (LFH-359): in der Kartenform ist die Karte zugleich
+   * Menü-Auslöser, Drop-Ziel und — im Bearbeiten-Modus — Zug-Quelle. Ein Zug darf dabei kein
+   * Menü öffnen: der Klick, der am Ende eines Zuges im Browser noch feuern kann, ginge sonst
+   * an den Auslöser. Gezogen wird mit der Maus (`page.mouse`): die Frage ist, ob der
+   * abschließende `click` den Auslöser erreicht, nicht die Zeigerart.
+   */
+  test('Kartenform (komfortabel): Layout-Zug und Personen-Zug öffnen kein Menü', async ({
+    page,
+  }) => {
+    await page.setViewportSize(TABLET);
+    const { einsatzId, uhsId, personName } = await setupPatientUndPlatz(page);
+    await page.evaluate(() => window.localStorage.setItem('lifeline-hub.dichte', 'komfortabel'));
+    await page.reload();
+    await expect(page.locator('html')).toHaveAttribute('data-dichte', 'komfortabel');
+    const offenesMenue = page.locator('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]');
+
+    // 1) Personen-Zug: erst belegen (per API, der Weg ist nicht die Frage), dann die Marke
+    //    aus der Karte in den Wartebereich ziehen.
+    const personen = (await (
+      await page.request.get(`/api/einsaetze/${einsatzId}/personen`)
+    ).json()) as { id: number; name: string | null }[];
+    const person = personen.find((p) => p.name === personName)!;
+    const detail = (await (
+      await page.request.get(`/api/einsaetze/${einsatzId}/uhs/${uhsId}`)
+    ).json()) as { plaetze: { id: number }[] };
+    await seede(
+      page,
+      `/api/einsaetze/${einsatzId}/personen/${person.id}/uhs-belegung`,
+      { art: 'eintritt', uhs_id: uhsId, platz_id: detail.plaetze[0].id },
+      'Belegung',
+    );
+    await page.reload();
+    const marke = bett1(page).locator('[data-lfh="personenkarte"]');
+    await expect(marke).toContainText(personName);
+
+    const wartebereich = page.getByRole('region', { name: /Wartebereich/ });
+    const von = (await marke.boundingBox())!;
+    const nach = (await wartebereich.boundingBox())!;
+    await page.mouse.move(von.x + von.width / 2, von.y + von.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(nach.x + nach.width / 2, nach.y + nach.height / 2, { steps: 16 });
+    await page.mouse.up();
+    await expect(wartebereich.getByText(personName)).toBeVisible();
+    await expect(bett1(page)).not.toContainText(personName);
+    await expect(offenesMenue, 'der Personen-Zug hat kein Menü geöffnet').toHaveCount(0);
+    await expect(bett1(page)).toHaveAttribute('aria-expanded', 'false');
+
+    // 2) Layout-Zug im Bearbeiten-Modus.
+    await page.getByRole('button', { name: 'Plätze bearbeiten' }).click();
+    const karte = bett1(page);
+    const vorher = (await karte.boundingBox())!;
+    const patch = page.waitForRequest(
+      (r) => r.method() === 'PATCH' && /\/uhs\/\d+\/plaetze\/\d+$/.test(r.url()),
+    );
+    await page.mouse.move(vorher.x + vorher.width / 2, vorher.y + 14);
+    await page.mouse.down();
+    await page.mouse.move(vorher.x + vorher.width / 2 + 120, vorher.y + 14 + 60, { steps: 16 });
+    await page.mouse.up();
+    await patch;
+    await expect(offenesMenue, 'der Layout-Zug hat kein Menü geöffnet').toHaveCount(0);
+    await expect(karte).toHaveAttribute('aria-expanded', 'false');
+
+    // Gegenprobe: ein Klick OHNE Bewegung öffnet das Menü im Bearbeiten-Modus weiterhin.
+    await karte.click();
+    await expect(offenesMenue).toHaveCount(1);
+    await expect(offenesMenue.getByRole('menuitem').last()).toContainText('Platz löschen');
+  });
+
+  /**
+   * Gemessen bei 1024 × 900: ein belegter Platz trägt im Handschuh acht Einträge à 72 px —
+   * mehr, als unter oder über der Karte Platz hat. Mit antds Vorgabe (nur umklappen) stand das
+   * Menü nach oben aus dem Fenster, und die Primäraktion war nicht erreichbar. Zugesichert
+   * wird deshalb: JEDER Eintrag liegt vollständig im Fenster.
+   */
+  test('Handschuh, belegter Platz: alle Menüeinträge liegen im Fenster', async ({ page }) => {
+    await page.setViewportSize(TABLET);
+    const { einsatzId, uhsId, personName } = await setupPatientUndPlatz(page);
+    const personen = (await (
+      await page.request.get(`/api/einsaetze/${einsatzId}/personen`)
+    ).json()) as { id: number; name: string | null }[];
+    const person = personen.find((p) => p.name === personName)!;
+    const detail = (await (
+      await page.request.get(`/api/einsaetze/${einsatzId}/uhs/${uhsId}`)
+    ).json()) as { plaetze: { id: number }[] };
+    await seede(
+      page,
+      `/api/einsaetze/${einsatzId}/personen/${person.id}/uhs-belegung`,
+      { art: 'eintritt', uhs_id: uhsId, platz_id: detail.plaetze[0].id },
+      'Belegung',
+    );
+    await page.evaluate(() => window.localStorage.setItem('lifeline-hub.dichte', 'handschuh'));
+    await page.reload();
+    await expect(bett1(page)).toContainText(personName);
+
+    // Kein Ziel IN der belegten Karte: dnd-kit setzt an der ziehbaren Personenmarke auch bei
+    // `disabled` `role="button"` und `tabIndex` — die Kartenform nimmt beides zurück.
+    await expect(bett1(page).getByRole('button')).toHaveCount(0);
+    await expect(bett1(page).locator('[tabindex]:not([tabindex="-1"])')).toHaveCount(0);
+
+    await bett1(page).tap();
+    const popup = page.locator('.ant-dropdown:not(.ant-dropdown-hidden)');
+    await expect(popup).not.toHaveClass(/ant-slide-up-(enter|appear)/);
+    const eintraege = popup.getByRole('menuitem');
+    await expect(eintraege.first()).toContainText('Verbleib / Entlassung erfassen');
+    const zahl = await eintraege.count();
+    expect(zahl, 'Verbleib, Person, Rückweg, vier Verfügbarkeiten, zurückweisen').toBe(8);
+    for (let i = 0; i < zahl; i++) {
+      await expect(eintraege.nth(i), `Eintrag ${i} liegt im Fenster`).toBeInViewport({
+        ratio: 1,
+      });
+    }
+    // Und bedienbar ist der oberste wirklich: ein Tipp öffnet den Verbleib-Dialog.
+    await eintraege.first().tap();
+    await expect(page.getByRole('dialog')).toContainText('Verbleib');
   });
 });

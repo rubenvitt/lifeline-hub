@@ -13,7 +13,7 @@ const MODUL_KEY: &str = "einsatzabschnitte";
 use crate::einsatzabschnitt::repo::{self as abschnitt_repo, AbschnittDaten, AbschnittPatch};
 use crate::einsatzabschnitt::{AbschnittLagezustand, EinsatzabschnittAnzeige};
 use crate::error::AppError;
-use crate::routes::support::{trimme, trimme_tri};
+use crate::routes::support::{pruefe_kommunikationsmittel, trimme, trimme_tri};
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
@@ -132,6 +132,7 @@ pub async fn anlegen(
     }
     let bemerkung = trimme(body.bemerkung);
     let mittel = trimme(body.kommunikationsmittel);
+    pruefe_kommunikationsmittel(mittel.as_deref())?;
     let erreichbar = trimme(body.erreichbarkeit);
     let kurz = trimme(body.kurzbezeichnung);
     if let Some(k) = &kurz {
@@ -276,6 +277,7 @@ pub async fn aktualisieren(
     };
     let bemerkung = trimme_tri(body.bemerkung);
     let mittel = trimme_tri(body.kommunikationsmittel);
+    pruefe_kommunikationsmittel(mittel.as_ref().and_then(|v| v.as_deref()))?;
     let erreichbar = trimme_tri(body.erreichbarkeit);
     let kurz = trimme_tri(body.kurzbezeichnung);
     if let Some(Some(k)) = &kurz {

@@ -463,6 +463,7 @@ export type Evakuierungsstand = S['EvakuierungsstandAnzeige'];
 export type Betreuungsstelle = S['BetreuungsstelleAnzeige'];
 export type Belegungsmeldung = S['BelegungsmeldungAnzeige'];
 export type BetreuungUebersicht = S['BetreuungUebersicht'];
+export type StelleNamentlich = S['StelleNamentlich'];
 export type BelegungKopfzahl = S['BelegungKopfzahl'];
 export type BelegungKopfzahlStelle = S['BelegungKopfzahlStelle'];
 /** Antwort auf Melden/Zurücknehmen eines Stands: `meldung_id` ist die GEMELDETE bzw.
@@ -471,6 +472,10 @@ export type BelegungKopfzahlStelle = S['BelegungKopfzahlStelle'];
 export type BezirkMeldung = S['BezirkMeldungAnzeige'];
 /** Wie {@link BezirkMeldung}, für Belegungsmeldungen einer Stelle. */
 export type StelleMeldung = S['StelleMeldungAnzeige'];
+/** Eine Standmeldung im Verlauf eines Bezirks (LFH-676), zurückgenommene eingeschlossen. */
+export type StandVerlaufEintrag = S['StandVerlaufEintrag'];
+/** Eine Belegungsmeldung im Verlauf einer Stelle (LFH-676). */
+export type BelegungVerlaufEintrag = S['BelegungVerlaufEintrag'];
 
 /**
  * LFH-120: kein Backend-Schema — Eingabe-Body von `POST …/betreuung/bezirke`
@@ -512,6 +517,8 @@ export interface StandmeldungEingabe {
   evakuiert: number;
   erhebung: Erhebung;
   zeitpunkt_at?: string;
+  /** Idempotenzschlüssel der Offline-Queue (LFH-675); ein Replay liefert die gespeicherte Meldung. */
+  client_id?: string;
 }
 
 /**
@@ -555,6 +562,8 @@ export interface BetreuungsstellePatch {
 export interface BelegungsmeldungEingabe {
   belegt: number;
   zeitpunkt_at?: string;
+  /** Idempotenzschlüssel wie bei {@link StandmeldungEingabe} (LFH-675). */
+  client_id?: string;
 }
 
 // ============================== LFH-634 Verpflegung ==============================

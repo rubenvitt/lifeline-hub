@@ -85,6 +85,10 @@ export const EINSATZ_KEYS = {
 
 export type EinsatzKey = (typeof EINSATZ_KEYS)[keyof typeof EINSATZ_KEYS];
 
+/** Wessen Meldereihe ein Betreuungsverlauf trägt (LFH-676): Standmeldungen eines Bezirks
+ *  oder Belegungsmeldungen einer Stelle. Getyptes Token als Sub-Key, kein Objekt. */
+export type BetreuungVerlaufArt = 'bezirk' | 'stelle';
+
 /**
  * Wire-Event-Name (SSE `type`) → die Query-Key-Prefixe, die das Event invalidiert.
  *
@@ -131,7 +135,10 @@ export const EINSATZ_STREAM_EVENTS = {
   // `person`-Tag beide ID-Räume (betroffene Person vs. einsatz_personal-Disposition),
   // weshalb hier beide Sammlungen hängen mussten — und weshalb das Backend die zwei
   // Module nicht getrennt gaten konnte. Jetzt: betroffene Personen (Modul `personen`).
-  person: [EINSATZ_KEYS.personen, EINSATZ_KEYS.modulZaehler],
+  // LFH-674: die Betreuungsübersicht trägt „davon namentlich n“ je Stelle, und die Zahl
+  // ändert sich mit jedem Verbleib und jedem Storno einer Person. Kein zweites Server-Ereignis:
+  // `person` erreicht nur Leser mit Personenrecht, und nur die sehen die Zahl (design.md D5).
+  person: [EINSATZ_KEYS.personen, EINSATZ_KEYS.modulZaehler, EINSATZ_KEYS.betreuung],
   // Disponiertes Personal (Modul `personal`) — die Zuordnung wirkt zugleich auf
   // Einheiten-/Abschnittsführung und die Führungskräfte-Sicht der Lagekarte.
   personal: [
@@ -355,6 +362,11 @@ export const einsatzKeys = {
   betreuung: (einsatzId: number) => [EINSATZ_KEYS.betreuung, einsatzId] as const,
   betreuungKopfzahl: (einsatzId: number, zeitpunkt?: string) =>
     [EINSATZ_KEYS.betreuung, einsatzId, 'kopfzahl', zeitpunkt ?? 'jetzt'] as const,
+  /** Meldereihe eines Bezirks bzw. einer Stelle (LFH-676), Sub-Key unter dem Betreuungs-
+   *  Prefix: das `betreuung`-Ereignis und die Invalidierung nach jeder eigenen Mutation
+   *  treffen den offenen Verlauf mit, ohne eigenen Eintrag in `EINSATZ_STREAM_EVENTS`. */
+  betreuungVerlauf: (einsatzId: number, art: BetreuungVerlaufArt, id: number) =>
+    [EINSATZ_KEYS.betreuung, einsatzId, 'verlauf', art, id] as const,
   // Verpflegung (LFH-634): ein Abruf trägt alle Zeitfenster samt Deckung und Ausgaben.
   verpflegung: (einsatzId: number) => [EINSATZ_KEYS.verpflegung, einsatzId] as const,
   /** Historie der Lagebesprechungen als Sub-Key unter DEMSELBEN Prefix (Spec 9.3). */

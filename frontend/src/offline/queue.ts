@@ -1,14 +1,27 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import type { NeuerEintrag } from '../api/etb';
 import type { PersonAnlegenEingabe } from '../api/einsatzPerson';
-import type { NeueMeldung, Person } from '../api/types';
+import type {
+  BelegungsmeldungEingabe,
+  NeueMeldung,
+  Person,
+  StandmeldungEingabe,
+} from '../api/types';
 
 /** Ein Ereignis genügt allen React-Verbrauchern zum erneuten Lesen der
  * IndexedDB-Zähler. IndexedDB selbst ist nicht beobachtbar. */
 export const OFFLINE_QUEUE_EVENT = 'lfh:offline-queue-geaendert';
 
+/**
+ * Stand- und Belegungsmeldungen (LFH-675) tragen neben Ziel-ID und Body die `bezeichnung` —
+ * nur für die Anzeige im Wiederherstellungs-Drawer, gesendet wird sie nicht. Neue Varianten
+ * liegen als Wert im bestehenden Store; eine DB-Version braucht es dafür nicht (design.md D7).
+ */
 export type OfflineSchreibaktion =
-  { art: 'person'; daten: PersonAnlegenEingabe } | { art: 'meldung'; daten: NeueMeldung };
+  | { art: 'person'; daten: PersonAnlegenEingabe }
+  | { art: 'meldung'; daten: NeueMeldung }
+  | { art: 'stand'; bezirk_id: number; bezeichnung: string; daten: StandmeldungEingabe }
+  | { art: 'belegung'; stelle_id: number; bezeichnung: string; daten: BelegungsmeldungEingabe };
 
 export interface AusstehendeSchreibaktion {
   id?: number;

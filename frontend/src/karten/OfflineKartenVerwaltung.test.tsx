@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
+import { setzeViewportBreite } from '../test/viewport';
 import { AuthProvider } from '../auth/AuthContext';
 import type { BauJob, OfflineKarte, OfflineKatalogEintrag } from '../api/offlineKarten';
 import OfflineKartenVerwaltung from './OfflineKartenVerwaltung';
@@ -539,5 +540,65 @@ describe('OfflineKartenVerwaltung — Freitext-Spalte (LFH-346 · A4)', () => {
     expect(zelle).toHaveClass('ant-table-cell-ellipsis');
     expect(zelle).toHaveStyle({ maxWidth: '200px' });
     expect(zelle).toHaveAttribute('title', langeLizenz);
+  });
+});
+
+// ── Spaltenschalter mit Zähler (LFH-374, Kriterium 14) ──────────────────────────────
+describe('OfflineKartenVerwaltung · Spaltenschalter', () => {
+  const kopf = (c: HTMLElement) =>
+    Array.from(c.querySelectorAll('th.ant-table-cell')).map((z) => z.textContent);
+
+  /** Das OFFENE Menü — geschlossene und abgehende Portale bleiben im Baum stehen. */
+  const offenesMenue = () =>
+    waitFor(() => {
+      const m = document.querySelector<HTMLElement>(
+        '.ant-dropdown:not(.ant-dropdown-hidden):not(.ant-slide-up-leave) [role="menu"]',
+      );
+      expect(m).not.toBeNull();
+      return m!;
+    });
+
+  it('„Größe" abwählen nimmt die Spalte weg und zählt sie', async () => {
+    mockBasis(admin);
+    const { container } = render();
+    await screen.findByText('Deutschland – Bremen');
+    expect(kopf(container)).toEqual([
+      'Name',
+      'Status',
+      'Größe',
+      'Anzeige',
+      'Attribution',
+      'Aktionen',
+    ]);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Spalten — Offline-Karten' }));
+    const wahl = within(await offenesMenue())
+      .getAllByRole('checkbox')
+      .map((k) => k.closest('li')?.textContent);
+    expect(wahl).toEqual(['Status', 'Größe', 'Anzeige', 'Attribution']);
+
+    await userEvent.click(within(await offenesMenue()).getByRole('checkbox', { name: 'Größe' }));
+    expect(kopf(container)).not.toContain('Größe');
+    expect(
+      screen.getByRole('button', { name: 'Spalten · 1 ausgeblendet — Offline-Karten' }),
+    ).toBeInTheDocument();
+  });
+
+  it('unter lg fällt Attribution weg — und lässt sich von Hand zurückholen', async () => {
+    setzeViewportBreite(800);
+    mockBasis(admin);
+    const { container } = render();
+    await screen.findByText('Deutschland – Bremen');
+    expect(kopf(container)).not.toContain('Attribution');
+    expect(screen.getByRole('button', { name: /^Spalten · 1 ausgeblendet/ })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /^Spalten/ }));
+    const attribution = within(await offenesMenue()).getByRole('checkbox', {
+      name: 'Attribution',
+    });
+    expect(attribution).not.toBeChecked();
+    await userEvent.click(attribution);
+    expect(kopf(container)).toContain('Attribution');
+    expect(screen.getByRole('button', { name: 'Spalten — Offline-Karten' })).toBeInTheDocument();
   });
 });

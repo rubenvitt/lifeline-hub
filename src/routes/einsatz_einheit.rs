@@ -14,7 +14,9 @@ use crate::live::LiveEvent;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
 const MODUL_KEY: &str = "einheiten";
-use crate::routes::support::{deserialize_optional_field, trimme, trimme_tri};
+use crate::routes::support::{
+    deserialize_optional_field, pruefe_kommunikationsmittel, trimme, trimme_tri,
+};
 use crate::staerke::Staerke;
 use axum::extract::State;
 use axum::http::StatusCode;
@@ -154,6 +156,7 @@ pub async fn bilden(
     let bemerkung = trimme(body.bemerkung);
     let funkrufname = trimme(body.funkrufname);
     let kommunikationsmittel = trimme(body.kommunikationsmittel);
+    pruefe_kommunikationsmittel(kommunikationsmittel.as_deref())?;
     let erreichbarkeit = trimme(body.erreichbarkeit);
     let anzeige = einheit_repo::anlegen(
         &state.pool,
@@ -276,6 +279,7 @@ pub async fn aktualisieren(
     let bemerkung = trimme_tri(body.bemerkung);
     let funkrufname = trimme_tri(body.funkrufname);
     let kommunikationsmittel = trimme_tri(body.kommunikationsmittel);
+    pruefe_kommunikationsmittel(kommunikationsmittel.as_ref().and_then(|v| v.as_deref()))?;
     let erreichbarkeit = trimme_tri(body.erreichbarkeit);
 
     // Führerwechsel heißt jetzt „Feld im Patch enthalten UND Wert verschieden". Ein Patch

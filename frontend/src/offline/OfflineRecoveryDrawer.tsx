@@ -23,6 +23,7 @@ import {
   schreibaktionenAbgelehntLaden,
   type AbgelehnteSchreibaktion,
   type AbgelehnterEintrag,
+  type OfflineSchreibaktion,
 } from './queue';
 
 interface OfflineRecoveryDrawerProps {
@@ -32,10 +33,23 @@ interface OfflineRecoveryDrawerProps {
   einsatzId?: number;
 }
 
-function aktionsTitel(art: 'etb' | 'person' | 'meldung'): string {
-  if (art === 'etb') return 'ETB-Eintrag';
-  if (art === 'person') return 'Personenerfassung';
-  return 'Meldung';
+/** Kartentitel einer abgelehnten Schreibaktion; exhaustiv über die Art. Stand- und
+ *  Belegungsmeldungen nennen ihr Objekt — `bezirk_id: 3` im Inhalt sagt niemandem etwas. */
+function aktionsTitel(aktion: OfflineSchreibaktion): string {
+  switch (aktion.art) {
+    case 'person':
+      return 'Abgelehnte Personenerfassung';
+    case 'meldung':
+      return 'Abgelehnte Meldung';
+    case 'stand':
+      return `Abgelehnte Standmeldung: ${aktion.bezeichnung}`;
+    case 'belegung':
+      return `Abgelehnte Belegungsmeldung: ${aktion.bezeichnung}`;
+    default: {
+      const nie: never = aktion;
+      return `Abgelehnte Offline-Aktion ${JSON.stringify(nie)}`;
+    }
+  }
 }
 
 function vollstaendigerInhalt(daten: unknown): ReactNode {
@@ -263,7 +277,7 @@ export default function OfflineRecoveryDrawer({
           eintrag.id == null ? null : (
             <RecoveryCard
               key={`schreiben:${eintrag.id}`}
-              titel={`Abgelehnte ${aktionsTitel(eintrag.aktion.art)}`}
+              titel={aktionsTitel(eintrag.aktion)}
               einsatzId={eintrag.einsatz_id}
               zeitpunkt={eintrag.erstellt_at}
               grund={eintrag.grund}

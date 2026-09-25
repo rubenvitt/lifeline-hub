@@ -182,7 +182,9 @@ describe('etikettVon()', () => {
     // Funktionsvariante unabgedeckt und `etikettVon` gäbe still ein Objekt als „Text".
     const spion = vi.spyOn(console, 'warn').mockImplementation(() => {});
     expect(etikettVon({ key: 'a', title: () => <b>Funkrufname</b> })).toBeUndefined();
-    expect(spion.mock.calls.filter((c) => String(c[0]).includes('[Datensicht]'))).toHaveLength(1);
+    expect(spion.mock.calls.filter((c) => String(c[0]).includes('[Spaltenschalter]'))).toHaveLength(
+      1,
+    );
     spion.mockRestore();
   });
 
@@ -558,6 +560,37 @@ describe('pruefeKartenplan()', () => {
     );
     expect(meldung(befunde, 'aufklappzeile')).toHaveLength(1);
     expect(meldung(befunde, 'gruppen')).toHaveLength(1);
+  });
+
+  it('meldet aufklappen zusammen mit baum und mit aufklappzeile (LFH-676)', () => {
+    const baum = { kinder: 'kinder' as never, aufgeklappt: [], onAufgeklappt: () => {} };
+    const ohneFilterSpalten = spalten.filter((s) => s.filter == null);
+    const aufklappen = {
+      etikett: 'Verlauf',
+      zugaenglicherName: (f: Fahrzeug) => `Verlauf zu ${f.funkrufname}`,
+      inhalt: () => 'Verlauf',
+    };
+    expect(
+      meldung(
+        pruefeKartenplan({ spalten: ohneFilterSpalten, karte, baum, aufklappen }, 'Meldebild'),
+        'aufklappen',
+      ),
+    ).toHaveLength(1);
+    expect(
+      meldung(
+        pruefeKartenplan(
+          { spalten, karte, aufklappen, aufklappzeile: () => 'Besatzung' },
+          'Fahrzeuge',
+        ),
+        'aufklappen',
+      ),
+    ).toHaveLength(1);
+    expect(pruefeKartenplan({ spalten, karte, aufklappen }, 'Fahrzeuge')).toEqual([]);
+    // Ein Eigenbau gibt `karte.render` roh zurück — dort liefe `aufklappen` still ins Leere.
+    const eigen = { art: 'eigen' as const, render: () => null };
+    expect(
+      meldung(pruefeKartenplan({ spalten, karte: eigen, aufklappen }, 'Fahrzeuge'), 'aufklappen'),
+    ).toHaveLength(1);
   });
 
   /**
@@ -1004,6 +1037,99 @@ describe('Datensicht · Kartenzweig', () => {
   });
 });
 
+describe('Datensicht · Aufklappbereich (LFH-676)', () => {
+  /**
+   * Ein beschrifteter Auslöser mit der Zeilenkennung im Namen, in BEIDEN Zweigen gleich —
+   * statt des 16-px-Symbols von antd, dessen Name aus der Locale in jeder Zeile gleich ist.
+   * Der Inhalt entsteht erst beim Aufklappen: der Betreuungsverlauf lädt beim Mount.
+   */
+  const aufklappenMit = (inhalt: (f: Fahrzeug) => ReactElement | string) => ({
+    etikett: 'Verlauf',
+    zugaenglicherName: (f: Fahrzeug) => `Verlauf zu ${f.funkrufname}`,
+    inhalt,
+  });
+
+  it.each(['karte', 'tabelle'] as const)(
+    '%s: beschrifteter Auslöser je Zeile, aria-expanded wechselt, Inhalt erst beim Aufklappen',
+    async (form) => {
+      const inhalt = vi.fn((f: Fahrzeug) => <p>Reihe von {f.funkrufname}</p>);
+      rendere({ form, aufklappen: aufklappenMit(inhalt) });
+
+      const knopf = screen.getByRole('button', { name: 'Verlauf zu Florian 1' });
+      expect(knopf).toHaveTextContent('Verlauf');
+      expect(knopf).toHaveAttribute('aria-expanded', 'false');
+      expect(screen.getAllByRole('button', { name: /^Verlauf zu / })).toHaveLength(3);
+      expect(screen.queryByText('Reihe von Florian 1')).not.toBeInTheDocument();
+      expect(inhalt).not.toHaveBeenCalled();
+
+      await userEvent.click(knopf);
+      expect(screen.getByRole('button', { name: 'Verlauf zu Florian 1' })).toHaveAttribute(
+        'aria-expanded',
+        'true',
+      );
+      expect(screen.getByText('Reihe von Florian 1')).toBeInTheDocument();
+      // Nur die aufgeklappte Zeile baut ihren Inhalt.
+      expect(inhalt.mock.calls.every(([f]) => f.id === 1)).toBe(true);
+      expect(screen.queryByText('Reihe von Rotkreuz 2')).not.toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole('button', { name: 'Verlauf zu Florian 1' }));
+      expect(screen.getByRole('button', { name: 'Verlauf zu Florian 1' })).toHaveAttribute(
+        'aria-expanded',
+        'false',
+      );
+      // Die Karte hängt den Inhalt ab, antds Tabelle blendet die Aufklappzeile nur aus.
+      const zu = screen.queryByText('Reihe von Florian 1');
+      if (zu) expect(zu).not.toBeVisible();
+    },
+  );
+
+  it('tabelle: der Auslöser sitzt in der angehefteten Kennungszelle, ohne eigene Aufklappspalte', () => {
+    // Gemessen in Gate 1 bei 390 px: eine eigene Spalte HINTER der fixierten Kennung glitt beim
+    // waagerechten Scrollen unter sie und war nicht mehr klickbar; VOR ihr stünden zwei
+    // angeheftete Spalten. In der Kennungszelle ist er immer erreichbar und kostet keine Breite.
+    const { container } = rendere({
+      form: 'tabelle',
+      aufklappen: aufklappenMit((f) => `Reihe von ${f.funkrufname}`),
+    });
+    const kennung = container.querySelector('tr[data-row-key="1"] > td') as HTMLElement;
+    expect(kennung).toHaveTextContent('Florian 1');
+    expect(within(kennung).getByRole('button')).toHaveAccessibleName('Verlauf zu Florian 1');
+    expect(kennung.className).toMatch(/ant-table-cell-fix-(left|start)/);
+    expect(container.querySelector('.ant-table-row-expand-icon-cell')).toBeNull();
+  });
+
+  it('karte: der Inhalt steht in einer Region, auf die der Auslöser zeigt', async () => {
+    rendere({ form: 'karte', aufklappen: aufklappenMit((f) => `Reihe von ${f.funkrufname}`) });
+    const knopf = screen.getByRole('button', { name: 'Verlauf zu Rotkreuz 2' });
+    await userEvent.click(knopf);
+    const region = screen.getByRole('region', { name: 'Verlauf zu Rotkreuz 2' });
+    expect(knopf.getAttribute('aria-controls')).toBe(region.id);
+    expect(region).toHaveTextContent('Reihe von Rotkreuz 2');
+  });
+
+  it('der Aufklappzustand überlebt den Wechsel zwischen Karte und Tabelle', async () => {
+    const props = { aufklappen: aufklappenMit((f: Fahrzeug) => `Reihe von ${f.funkrufname}`) };
+    const { rerender } = rendere({ form: 'karte', ...props });
+    await userEvent.click(screen.getByRole('button', { name: 'Verlauf zu Florian 3' }));
+    rerender(
+      <Datensicht<Fahrzeug, FahrzeugKey>
+        bezeichnung="Fahrzeuge im Einsatz"
+        spalten={spalten}
+        daten={DREI}
+        zeilenSchluessel="id"
+        karte={karte}
+        form="tabelle"
+        {...props}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Verlauf zu Florian 3' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    expect(screen.getByText('Reihe von Florian 3')).toBeInTheDocument();
+  });
+});
+
 describe('Datensicht · Tabellenzweig', () => {
   /**
    * LFH-340 · C5. Der Titel-Link und `onZeileKlick` liegen übereinander: ein Klick auf den
@@ -1071,6 +1197,51 @@ describe('Datensicht · Tabellenzweig', () => {
       'Träger',
     ]);
     expect(screen.getByRole('button', { name: /Spalten · 1 ausgeblendet/ })).toBeInTheDocument();
+  });
+
+  it('zeigt genau EINEN Spaltenschalter, obwohl das Primitiv darunter selbst einen kann', () => {
+    /**
+     * `KatalogTabelle` trägt seit LFH-374 einen eigenen Schalter als Opt-in. `Datensicht`
+     * rendert durch sie und bringt seinen Schalter selbst mit — setzte es zusätzlich
+     * `spaltenSchalter`, stünden zwei Knöpfe mit zwei Zuständen da (D5). Der Guard in
+     * `katalogTabelle.guard.test.ts` hält das Attribut aus der Quelle, dieser Fall das Bild.
+     */
+    rendere({ form: 'tabelle' });
+    expect(screen.getAllByRole('button', { name: /^Spalten/ })).toHaveLength(1);
+  });
+
+  it('eine per Breite weggefallene Spalte steht OHNE Häkchen im Menü und lässt sich zurückholen', async () => {
+    /**
+     * LFH-374 · D9, gemessen am Bestand: das Häkchen las `!aus.includes(key)` statt der
+     * wirklichen Sichtbarkeit. „Besatzung" (`abBreite: 'xl'`) fehlte bei 1024 px in der
+     * Tabelle, stand im Menü aber ANGEHAKT da, und ein Klick änderte sichtbar nichts — die
+     * Behauptung „einblendbar" aus LFH-342 hielt nicht.
+     */
+    const { container } = rendere();
+    const kopf = () =>
+      [...container.querySelectorAll('th.ant-table-cell')].map((z) => z.textContent);
+    expect(kopf()).not.toContain('Besatzung');
+
+    await userEvent.click(screen.getByRole('button', { name: /Spalten · 1 ausgeblendet/ }));
+    const besatzung = await screen.findByRole('checkbox', { name: 'Besatzung' });
+    expect(besatzung).not.toBeChecked();
+
+    await userEvent.click(besatzung);
+    expect(kopf()).toContain('Besatzung');
+    const knopf = screen.getByRole('button', { name: /^Spalten —/ });
+
+    // Neu öffnen und im OFFENEN Overlay greifen: der Klick auf den Eintrag schließt das Menü,
+    // und das abgehende Overlay (`ant-slide-up-leave`, jsdom feuert kein `transitionend`)
+    // zeigt eingefrorenen Inhalt — dort stünde das Häkchen noch auf dem Stand VOR dem Klick.
+    await userEvent.click(knopf);
+    const menue = await waitFor(() => {
+      const m = document.querySelector<HTMLElement>(
+        '.ant-dropdown:not(.ant-dropdown-hidden):not(.ant-slide-up-leave) [role="menu"]',
+      );
+      expect(m).not.toBeNull();
+      return m!;
+    });
+    expect(within(menue).getByRole('checkbox', { name: 'Besatzung' })).toBeChecked();
   });
 
   it('Suche und Sortierung wirken auf die Zeilenmenge, nicht nur auf die Anzeige', async () => {

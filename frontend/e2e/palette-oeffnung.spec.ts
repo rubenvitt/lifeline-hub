@@ -70,6 +70,11 @@ function personOption(page: Page, kennung: string): Locator {
   return page.getByRole('option', { name: new RegExp(kennung) });
 }
 
+/** Das Tippziel „Vorschau" rechts in einer Zeile (LFH-665). */
+function vorschauZiel(zeile: Locator): Locator {
+  return zeile.locator('[data-lfh="palette-vorschau-ziel"]');
+}
+
 test('Strg+↵ öffnet eine Person im neuen Tab — kalt, angemeldet, am Datensatz; der alte Tab bleibt', async ({
   page,
   context,
@@ -187,13 +192,22 @@ const DICHTE_SCHLUESSEL = 'lifeline-hub.dichte';
 const BODEN = { kompakt: 30, komfortabel: 48, handschuh: 72 } as const;
 
 /**
- * „Zurück" in der Vorschau ist ein antd-`Button` und soll seine Höhe vom `ConfigProvider`
- * erben. Das ist eine ANNAHME, bis sie gemessen ist (LFH-396: ein Inline-`<a>` erbte gemessen
- * 17 px in jeder Stufe) — deshalb die Messung über alle drei Stufen. Er ist neben Esc/← der
- * einzige Weg zurück, und für Maus und Finger der einzige sichtbare. (Den Weg HINEIN gibt es
- * auf Touch noch nicht — LFH-665.)
+ * Beide sichtbaren Wege der Vorschau, gemessen über alle drei Stufen:
+ *
+ * HINEIN das Tippziel (LFH-665), ein handgebautes Bedienziel mit `vorschauZielStil`. Gemessen
+ * werden Höhe UND Breite gegen den Boden und seine Lage in der Zeile: es endet bündig an deren
+ * rechter Kante und füllt ihre volle Höhe — daneben bleibt kein Streifen, der zur Zeile
+ * gehörte und dort den Datensatz öffnete. Geöffnet wird die Vorschau hier per KLICK auf das
+ * Ziel, nicht per →: der Tastaturweg steht im Test darüber.
+ *
+ * ZURÜCK „Zurück", ein antd-`Button`, der seine Höhe vom `ConfigProvider` erben soll. Das ist
+ * eine ANNAHME, bis sie gemessen ist (LFH-396: ein Inline-`<a>` erbte gemessen 17 px in jeder
+ * Stufe). Er ist neben Esc/← der einzige Weg zurück, und für Maus und Finger der einzige
+ * sichtbare.
  */
-test('„Zurück" in der Vorschau hält den Dichte-Boden in allen drei Stufen', async ({ page }) => {
+test('Vorschau-Ziel und „Zurück" halten den Dichte-Boden in allen drei Stufen', async ({
+  page,
+}) => {
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Vorschau Dichte ${Date.now()}`);
   const kennung = await personErfassen(page, einsatzId);
@@ -209,8 +223,25 @@ test('„Zurück" in der Vorschau hält den Dichte-Boden in allen drei Stufen', 
     await expect(page.locator('header').first()).toBeVisible();
 
     await suche(page, kennung);
-    await expect(personOption(page, kennung)).toHaveAttribute('aria-selected', 'true');
-    await page.keyboard.press('ArrowRight');
+    const zeile = personOption(page, kennung);
+    await expect(zeile).toHaveAttribute('aria-selected', 'true');
+    const ziel = vorschauZiel(zeile);
+    await expect(ziel).toBeVisible();
+    const zBox = (await ziel.boundingBox())!;
+    const zeilenBox = (await zeile.boundingBox())!;
+    expect(zBox.height, `${stufe}: Höhe des Ziels`).toBeGreaterThanOrEqual(boden - 0.5);
+    expect(zBox.width, `${stufe}: Breite des Ziels`).toBeGreaterThanOrEqual(boden - 0.5);
+    // Bündig rechts und über die volle Zeilenhöhe (Toleranz: Subpixel-Rundung).
+    expect(
+      Math.abs(zBox.x + zBox.width - (zeilenBox.x + zeilenBox.width)),
+      `${stufe}: rechte Kante`,
+    ).toBeLessThanOrEqual(1);
+    expect(Math.abs(zBox.y - zeilenBox.y), `${stufe}: Oberkante`).toBeLessThanOrEqual(1);
+    expect(Math.abs(zBox.height - zeilenBox.height), `${stufe}: volle Höhe`).toBeLessThanOrEqual(1);
+    // Die Zeile bleibt die größere Trefffläche: das Ziel ist ein Rand, nicht die Zeile.
+    expect(zBox.width, `${stufe}: Ziel schmaler als die Zeile`).toBeLessThan(zeilenBox.width / 2);
+
+    await ziel.click();
     const zurueck = page
       .getByRole('region', { name: /^Vorschau:/ })
       .getByRole('button', { name: 'Zurück' });
@@ -221,6 +252,96 @@ test('„Zurück" in der Vorschau hält den Dichte-Boden in allen drei Stufen', 
     await page.keyboard.press('Escape');
     await expect(paletteInput(page)).toBeHidden();
   }
+});
+
+/**
+ * Das Akzeptanzkriterium aus LFH-665 als echter TIPP auf dem Führungs-Tablet (1024 × 768,
+ * `hasTouch`, Stufe Handschuh): ein Tipp aufs Ziel öffnet die Vorschau und lässt die Seite
+ * stehen, ein Tipp auf die übrige Zeile öffnet die Person wie bisher. Erst der Tipp belegt die
+ * Treffertrennung — `toBeVisible()` ist kein Beleg für Bedienbarkeit (LFH-355).
+ */
+test.describe('Tablet', () => {
+  test.use({ hasTouch: true, viewport: { width: 1024, height: 768 } });
+
+  test('ein Tipp aufs Vorschau-Ziel öffnet die Vorschau, ein Tipp auf die Zeile die Person', async ({
+    page,
+  }) => {
+    await anmelden(page);
+    const einsatzId = await einsatzAnlegen(page, `E2E Vorschau Tipp ${Date.now()}`);
+    const kennung = await personErfassen(page, einsatzId);
+    await zumModul(page, einsatzId, 'etb');
+    await page.evaluate(([s, w]) => window.localStorage.setItem(s, w), [
+      DICHTE_SCHLUESSEL,
+      'handschuh',
+    ] as const);
+    await page.reload();
+    await expect(page.locator('html')).toHaveAttribute('data-dichte', 'handschuh');
+    await expect(page.locator('header').first()).toBeVisible();
+    const vorher = page.url();
+
+    await suche(page, kennung);
+    const zeile = personOption(page, kennung);
+    await vorschauZiel(zeile).tap();
+    const vorschau = page.getByRole('region', { name: /^Vorschau:/ });
+    await expect(vorschau).toBeVisible();
+    await expect(vorschau.getByText(/Medizinischer Verlauf/)).toBeVisible();
+    expect(page.url()).toBe(vorher);
+    // Der Fokus bleibt im Suchfeld: Esc führt von dort eine Ebene zurück.
+    await expect(paletteInput(page)).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(vorschau).toBeHidden();
+
+    // Die übrige Zeile öffnet wie bisher — getippt auf das Label, links vom Ziel.
+    await zeile.getByText(kennung).tap();
+    await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/personen/\\d+$`));
+    await expect(page.getByRole('heading', { name: `Person ${kennung}` })).toBeVisible();
+  });
+});
+
+/**
+ * Der engste Fall (LFH-665, Review-Befund): Handschirm 390 px in der Stufe Handschuh. Das Ziel
+ * belegt dort 72 px, daneben stehen Kontext (`nowrap`), ↵-Marke und Abstände. Das Label darf
+ * umbrechen (`minWidth: 0`), die Zeile aber nicht über ihre Box hinausragen, und das Ziel muss
+ * ganz im Blick und tippbar bleiben. `gate1-ueberlauf.spec.ts` fährt keine Palette mit einer
+ * Vorschau-Zeile, deshalb steht die Messung hier.
+ */
+test.describe('Handschirm', () => {
+  test.use({ hasTouch: true, viewport: { width: 390, height: 844 } });
+
+  test('bei 390 px in Stufe Handschuh läuft die Zeile nicht über und das Ziel bleibt tippbar', async ({
+    page,
+  }) => {
+    await anmelden(page);
+    const einsatzId = await einsatzAnlegen(page, `E2E Vorschau Schmal ${Date.now()}`);
+    const kennung = await personErfassen(page, einsatzId);
+    await zumModul(page, einsatzId, 'etb');
+    await page.evaluate(([s, w]) => window.localStorage.setItem(s, w), [
+      DICHTE_SCHLUESSEL,
+      'handschuh',
+    ] as const);
+    await page.reload();
+    await expect(page.locator('html')).toHaveAttribute('data-dichte', 'handschuh');
+    await expect(page.locator('header').first()).toBeVisible();
+
+    await suche(page, kennung);
+    const zeile = personOption(page, kennung);
+    const ziel = vorschauZiel(zeile);
+    await expect(ziel).toBeInViewport({ ratio: 1 });
+    const zBox = (await ziel.boundingBox())!;
+    expect(zBox.width, 'Breite des Ziels').toBeGreaterThanOrEqual(BODEN.handschuh - 0.5);
+    expect(zBox.height, 'Höhe des Ziels').toBeGreaterThanOrEqual(BODEN.handschuh - 0.5);
+    // Kein waagerechter Überlauf — weder in der Zeile noch in der Liste.
+    const ueberlauf = await zeile.evaluate((el) => ({
+      zeile: el.scrollWidth - el.clientWidth,
+      liste:
+        el.closest('[role="listbox"]')!.scrollWidth - el.closest('[role="listbox"]')!.clientWidth,
+    }));
+    expect(ueberlauf.zeile, 'Überlauf der Zeile').toBeLessThanOrEqual(0);
+    expect(ueberlauf.liste, 'Überlauf der Liste').toBeLessThanOrEqual(0);
+
+    await ziel.tap();
+    await expect(page.getByRole('region', { name: /^Vorschau:/ })).toBeVisible();
+  });
 });
 
 /**

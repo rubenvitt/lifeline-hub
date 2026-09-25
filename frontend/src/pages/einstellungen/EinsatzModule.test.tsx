@@ -1,4 +1,4 @@
-import { screen, fireEvent, waitFor } from '@testing-library/react';
+import { screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { renderMitProviders } from '../../test/utils';
@@ -144,6 +144,40 @@ describe('EinsatzModule', () => {
 
     expect(await screen.findByText(/Nur die Einsatzleitung/)).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: 'Sichtbar: ETB' })).toBeDisabled();
+  });
+
+  // LFH-383: der Grund steht zusätzlich an jeder gesperrten Zeile — mit dem Wort der Ursache.
+  it('nennt an der Zeile die Rolle als Sperrgrund, solange der Einsatz läuft', async () => {
+    benutzerRolle.wert = 'benutzer';
+    vi.mocked(ladeEinsatz).mockResolvedValue({
+      id: 1,
+      bezeichnung: 'Lage',
+      status: 'aktiv',
+      meine_rolle: 'fuehrungspersonal',
+    } as never);
+
+    rendern();
+
+    const zeile = (await screen.findByText('ETB')).closest('[data-modul-zeile]') as HTMLElement;
+    expect(within(zeile).getByText('nur Einsatzleitung')).toBeInTheDocument();
+  });
+
+  // Die Trennung der zwei Ursachen: `darfEinsatzLeiten` verlangt einen aktiven Einsatz, ein
+  // abgeschlossener sperrt also auch die Einsatzleitung. Ein Rollenwort widerspräche dort dem
+  // Seitenbanner — nur dieser Test unterscheidet die beiden Fälle.
+  it('nennt im abgeschlossenen Einsatz den Abschluss, nicht die Rolle', async () => {
+    vi.mocked(ladeEinsatz).mockResolvedValue({
+      id: 1,
+      bezeichnung: 'Lage',
+      status: 'abgeschlossen',
+      meine_rolle: 'einsatzleitung',
+    } as never);
+
+    rendern();
+
+    const zeile = (await screen.findByText('ETB')).closest('[data-modul-zeile]') as HTMLElement;
+    expect(within(zeile).getByText('Einsatz abgeschlossen')).toBeInTheDocument();
+    expect(within(zeile).queryByText('nur Einsatzleitung')).toBeNull();
   });
 
   it('zeigt bei nicht ladbaren Overrides KEINE Liste — sonst loegen die Bestandswerte', async () => {
