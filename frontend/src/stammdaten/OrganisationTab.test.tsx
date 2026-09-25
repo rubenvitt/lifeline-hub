@@ -75,7 +75,8 @@ describe('OrganisationTab', () => {
   });
 
   /**
-   * Der Speicherfehler steht an der SEITE, nicht im Toast (H14, LFH-345 · C10). Die zweite
+   * Der Speicherfehler steht an der SEITE (seit Review Welle B: an seinem Paneel), nicht im
+   * Toast (H14, LFH-345 · C10). Die zweite
    * Hälfte — er verschwindet beim nächsten Absenden — ist die, die einen stehenbleibenden
    * Alert auffliegen lässt; ohne sie wäre ein Alert, der nie geht, genauso grün.
    */
@@ -96,7 +97,9 @@ describe('OrganisationTab', () => {
     renderTab();
 
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
-    const alert = await screen.findByText('Organisation gesperrt');
+    const alert = await within(
+      screen.getByRole('region', { name: 'Taktische Zeichen' }),
+    ).findByText('Organisation gesperrt');
     // NICHT in antds Message-Queue — die räumt sich nach ~3 s von selbst weg.
     expect(alert.closest('.ant-message')).toBeNull();
 
@@ -163,7 +166,9 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
     const feld = await screen.findByLabelText('Name der Organisation');
     await waitFor(() => expect(feld).toHaveValue('DRK'));
     await userEvent.click(screen.getByRole('button', { name: 'Namen speichern' }));
-    const alert = await screen.findByText('Name ist zu lang (höchstens 120 Zeichen)');
+    const alert = await within(screen.getByRole('region', { name: 'Name' })).findByText(
+      'Name ist zu lang (höchstens 120 Zeichen)',
+    );
     expect(alert.closest('.ant-message')).toBeNull();
   });
 
@@ -263,6 +268,137 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
     await userEvent.click(within(zweiter).getByRole('button', { name: 'Entfernen' }));
     await waitFor(() => expect(geloescht).toBe(1));
     await waitFor(() => expect(invalidiert).toHaveBeenCalledWith({ queryKey: ['organisation'] }));
+  });
+
+  /**
+   * Ein gescheitertes Entfernen hält den Dialog offen — der Grund gehört IN den Dialog, nicht
+   * hinter seine Maske (LFH-535, Bauform `FreigabeDialog`). Und kein Toast: der wäre nach drei
+   * Sekunden weg. Gezählt wird die Message-Queue selbst, nicht nur „im Dialog steht es".
+   */
+  it('zeigt den Grund eines gescheiterten Entfernens im Dialog und räumt ihn beim nächsten Öffnen', async () => {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/organisation', () => HttpResponse.json(MIT_LOGO)),
+      http.delete('/api/organisation/logo', () =>
+        HttpResponse.json({ error: 'Logo gerade in Verwendung' }, { status: 409 }),
+      ),
+    );
+    renderTab();
+    await userEvent.click(await screen.findByRole('button', { name: 'Logo entfernen' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Logo entfernen?' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Entfernen' }));
+    expect(await within(dialog).findByText('Logo gerade in Verwendung')).toBeInTheDocument();
+    expect(within(dialog).getByText('Logo nicht entfernt')).toBeInTheDocument();
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+
+    // Gegenprobe: Abbrechen und neu öffnen — ein frischer Dialog trägt keinen alten Grund.
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Logo entfernen' }));
+    const zweiter = await screen.findByRole('dialog', { name: 'Logo entfernen?' });
+    expect(within(zweiter).queryByText('Logo gerade in Verwendung')).toBeNull();
+  });
+
+  /**
+   * Drei unabhängige Paneele, drei Speicherwege: jeder Fehler steht an SEINEM Paneel. Vorher
+   * zeigte die Seite nur den ersten einer festen Rangfolge — scheiterte erst der Name und
+   * dann das Logo, blieb der Logo-Grund unsichtbar.
+   */
+  it('zeigt jeden Fehler an seinem Paneel, auch wenn zwei Speicherwege nacheinander scheitern', async () => {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/organisation', () =>
+        HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' }),
+      ),
+      http.patch('/api/organisation', () =>
+        HttpResponse.json({ error: 'Name abgelehnt' }, { status: 400 }),
+      ),
+      http.post('/api/organisation/logo', () =>
+        HttpResponse.json({ error: 'Kein gültiges PNG' }, { status: 422 }),
+      ),
+    );
+    renderTab();
+    const feld = await screen.findByLabelText('Name der Organisation');
+    await waitFor(() => expect(feld).toHaveValue('DRK'));
+    await userEvent.click(screen.getByRole('button', { name: 'Namen speichern' }));
+    const namePaneel = screen.getByRole('region', { name: 'Name' });
+    expect(await within(namePaneel).findByText('Name abgelehnt')).toBeInTheDocument();
+
+    const datei = new File([new Uint8Array([1, 2, 3])], 'logo.png', { type: 'image/png' });
+    await userEvent.upload(document.querySelector<HTMLInputElement>('input[type="file"]')!, datei);
+    const logoPaneel = screen.getByRole('region', { name: 'Logo' });
+    expect(await within(logoPaneel).findByText('Kein gültiges PNG')).toBeInTheDocument();
+    // Beide stehen, jeder an seinem Ort — nicht einer von beiden an der Seite.
+    expect(within(namePaneel).getByText('Name abgelehnt')).toBeInTheDocument();
+    expect(within(logoPaneel).queryByText('Name abgelehnt')).toBeNull();
+    expect(within(namePaneel).queryByText('Kein gültiges PNG')).toBeNull();
+    // Und kein zweiter Ort daneben (die frühere Seiten-Kette zeigte den Namensfehler doppelt).
+    expect(screen.getAllByText('Name abgelehnt')).toHaveLength(1);
+    expect(screen.getAllByText('Kein gültiges PNG')).toHaveLength(1);
+  });
+
+  /**
+   * Der Serverstand erreicht das Namensfeld nach dem Speichern wieder (LFH-342 · C7 (2)):
+   * antd setzt `touched` beim Speichern nicht zurück, ein Riegel daran hielt das Feld für den
+   * ganzen Besuch fest. Der schärfere Fall: der Server bleibt beim SELBEN Namen (nur
+   * Leerzeichen getippt) — dann ändert sich der Serverwert gar nicht.
+   */
+  it('übernimmt nach dem Speichern wieder den Serverstand ins Namensfeld (auch bei gleichem Namen)', async () => {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/organisation', () =>
+        HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' }),
+      ),
+      http.patch('/api/organisation', () =>
+        HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' }),
+      ),
+    );
+    renderTab();
+    const feld = await screen.findByLabelText('Name der Organisation');
+    await waitFor(() => expect(feld).toHaveValue('DRK'));
+    await userEvent.type(feld, '   ');
+    expect(feld).toHaveValue('DRK   ');
+    await userEvent.click(screen.getByRole('button', { name: 'Namen speichern' }));
+    await waitFor(() => expect(feld).toHaveValue('DRK'));
+  });
+
+  it('übernimmt nach dem Speichern auch einen fremd geänderten Namen', async () => {
+    let name = 'DRK';
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/organisation', () =>
+        HttpResponse.json({ id: 1, name, tz_organisation: 'hilfsorganisation' }),
+      ),
+      http.patch('/api/organisation', () => {
+        // Ein zweiter Admin hat inzwischen umbenannt; der Server hält danach seinen Stand.
+        name = 'DRK Kreisverband';
+        return HttpResponse.json({ id: 1, name, tz_organisation: 'hilfsorganisation' });
+      }),
+    );
+    renderTab();
+    const feld = await screen.findByLabelText('Name der Organisation');
+    await waitFor(() => expect(feld).toHaveValue('DRK'));
+    await userEvent.type(feld, ' KV');
+    await userEvent.click(screen.getByRole('button', { name: 'Namen speichern' }));
+    await waitFor(() => expect(feld).toHaveValue('DRK Kreisverband'));
+  });
+
+  /** Gegenaussage zum Riegel: WÄHREND jemand tippt, überschreibt ein Refetch das Feld nicht. */
+  it('überschreibt einen angefangenen Namen nicht durch einen Refetch', async () => {
+    let name = 'DRK';
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/organisation', () =>
+        HttpResponse.json({ id: 1, name, tz_organisation: 'hilfsorganisation' }),
+      ),
+    );
+    const { client } = renderTab();
+    const feld = await screen.findByLabelText('Name der Organisation');
+    await waitFor(() => expect(feld).toHaveValue('DRK'));
+    await userEvent.type(feld, ' Nord');
+    name = 'Fremd';
+    await client.invalidateQueries({ queryKey: ['organisation'] });
+    await new Promise((r) => setTimeout(r, 30));
+    expect(feld).toHaveValue('DRK Nord');
   });
 
   it('invalidiert die Organisation auch nach dem Umbenennen', async () => {

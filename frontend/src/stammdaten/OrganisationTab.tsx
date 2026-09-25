@@ -1,7 +1,7 @@
 import { Alert, App, Button, Form, Input, Modal, Space, Typography, Upload, theme } from 'antd';
 import AdminPage from '../components/AdminPage';
 import { Select } from '../components/Select';
-import { SeitenHinweise } from '../components/SpeicherHinweis';
+import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
@@ -87,8 +87,8 @@ export default function OrganisationTab() {
     /**
      * KEIN `onError` mehr (derselbe Befund wie LFH-345 · C10 / H14, eine Datei weiter):
      * nach rund drei Sekunden war der Toast weg, das ausgefüllte Formular stand unverändert
-     * da und wirkte gespeichert. Der Fehler hängt jetzt als Alert an der SEITE
-     * (`speichern.error` im `hinweis`-Slot) und räumt sich beim nächsten Absenden selbst
+     * da und wirkte gespeichert. Der Fehler hängt jetzt als Alert an SEINEM PANEEL
+     * („Taktische Zeichen") und räumt sich beim nächsten Absenden selbst
      * weg — react-query setzt `error` beim Übergang nach `pending` zurück. Der ERFOLG
      * bleibt beim Toast: er quittiert eine abgeschlossene Handlung.
      */
@@ -97,20 +97,32 @@ export default function OrganisationTab() {
   // ── Name (LFH-22, design.md D9) ──────────────────────────────────────────────
   const [nameForm] = Form.useForm<NameWerte>();
   const serverName = orgQuery.data?.name;
+  /**
+   * Hat die Person am Namen getippt, seit er zuletzt gespeichert wurde? Ein EIGENER Merker,
+   * nicht `isFieldTouched` (LFH-342 · C7 (2)): antd setzt `touched` beim Speichern nie zurück,
+   * das Feld folgte dem Serverstand nach der ersten Eingabe für den ganzen Besuch nicht mehr —
+   * ein getrimmter Name blieb mit Leerzeichen stehen, eine fremde Umbenennung kam nicht an
+   * und ein erneutes Speichern schrieb still den alten lokalen Wert zurück.
+   */
+  const [nameGeaendert, setNameGeaendert] = useState(false);
   useEffect(() => {
     // Nur solange niemand tippt: ein Refetch (Fensterfokus) darf einen angefangenen Namen
-    // nicht überschreiben (Lehre aus LFH-342 · C7).
-    if (serverName != null && !nameForm.isFieldTouched('name')) {
+    // nicht überschreiben. `nameGeaendert` steht mit in den Abhängigkeiten: bleibt der
+    // Server beim selben Namen, ändert sich `serverName` nicht, und erst das Zurückfallen
+    // des Merkers bringt ihn ins Feld zurück.
+    if (serverName != null && !nameGeaendert) {
       nameForm.setFieldsValue({ name: serverName });
     }
-  }, [serverName, nameForm]);
+  }, [serverName, nameGeaendert, nameForm]);
   const nameSpeichern = useMutation({
     mutationFn: (werte: NameWerte) => setzeOrgName(werte.name.trim()),
-    onSuccess: () => {
+    onSuccess: (_antwort, werte) => {
+      // Wer während des Speicherns weitertippt, behält seinen Stand.
+      if (nameForm.getFieldValue('name') === werte.name) setNameGeaendert(false);
       message.success('Name gespeichert');
       qc.invalidateQueries({ queryKey: globalKeys.organisation() });
     },
-    // Kein `onError`: der Grund steht an der Seite (H14), siehe `speichern`.
+    // Kein `onError`: der Grund steht am Paneel (H14), siehe `speichern`.
   });
 
   // ── Logo (LFH-22, design.md D9) ──────────────────────────────────────────────
@@ -141,11 +153,10 @@ export default function OrganisationTab() {
       titel="Organisation"
       breite="schmal"
       hinweis={
-        <SeitenHinweise
-          fehler={nameSpeichern.error ?? logoHoch.error ?? logoEntfernen.error ?? speichern.error}
-          rechteFehlt={!istAdmin}
-          rechteText={STAMMDATEN_RECHTE_TEXT}
-        />
+        /* Nur der Rechte-Hinweis gilt für die ganze Seite. Speicherfehler stehen an IHREM
+           Paneel (Review Welle B): drei unabhängige Speicherwege, und eine Kette `a ?? b ?? c`
+           zeigte nur den ersten einer festen Rangfolge — ein späterer Fehler blieb unsichtbar. */
+        <SeitenHinweise rechteFehlt={!istAdmin} rechteText={STAMMDATEN_RECHTE_TEXT} />
       }
     >
       {/* NAME (LFH-22): eigenes `<form>`, damit Enter nur den Namen sendet und der Knopf
@@ -154,6 +165,7 @@ export default function OrganisationTab() {
         form={nameForm}
         layout="vertical"
         disabled={!istAdmin}
+        onValuesChange={() => setNameGeaendert(true)}
         onFinish={(w) => nameSpeichern.mutate(w)}
       >
         <Formularpaneel
@@ -171,6 +183,9 @@ export default function OrganisationTab() {
           >
             <Input />
           </Form.Item>
+          <div style={{ marginBlockEnd: token.marginSM }}>
+            <SpeicherFehler fehler={nameSpeichern.error} />
+          </div>
           <Button htmlType="submit" disabled={!istAdmin} loading={nameSpeichern.isPending}>
             Namen speichern
           </Button>
@@ -205,6 +220,7 @@ export default function OrganisationTab() {
           {vorpruefung && (
             <Alert type="error" showIcon title="Logo nicht übernommen" description={vorpruefung} />
           )}
+          <SpeicherFehler fehler={logoHoch.error} titel="Logo nicht übernommen" />
           {/* `size="middle"`: Rot steht nicht bündig neben Neutralem (LFH-352). */}
           <Space wrap size="middle">
             <Upload
@@ -214,6 +230,9 @@ export default function OrganisationTab() {
               beforeUpload={(datei) => {
                 const grund = logoVorpruefung(datei);
                 setVorpruefung(grund);
+                // Ein alter Server-Grund stünde sonst neben dem neuen Versuch (`mutate`
+                // räumt ihn nur, wenn die Vorprüfung besteht).
+                logoHoch.reset();
                 if (grund === null) logoHoch.mutate(datei);
                 // Nie antds eigenen Upload: der Aufruf läuft über `api/organisation.ts`.
                 return Upload.LIST_IGNORE;
@@ -224,7 +243,16 @@ export default function OrganisationTab() {
               </Button>
             </Upload>
             {logo && (
-              <Button danger disabled={!istAdmin} onClick={() => setEntfernenOffen(true)}>
+              <Button
+                danger
+                disabled={!istAdmin}
+                onClick={() => {
+                  // Ein Grund aus einem früheren Versuch gehört nicht in einen frischen
+                  // Dialog — react-query hält `error` bis zum nächsten `mutate()` (LFH-535).
+                  logoEntfernen.reset();
+                  setEntfernenOffen(true);
+                }}
+              >
                 Logo entfernen
               </Button>
             )}
@@ -240,8 +268,15 @@ export default function OrganisationTab() {
         onOk={() => logoEntfernen.mutate()}
         onCancel={() => setEntfernenOffen(false)}
       >
-        Das Logo wird gelöscht und steht danach auf keinem Ausdruck mehr. Das lässt sich nicht
-        rückgängig machen; ein neues Logo muss erneut hochgeladen werden.
+        {/* Scheitert das Entfernen, bleibt der Dialog offen — der Grund steht deshalb HIER,
+            nicht hinter seiner Maske an der Seite (LFH-535, Bauform `FreigabeDialog`). */}
+        <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
+          <Typography.Paragraph style={{ margin: 0 }}>
+            Das Logo wird gelöscht und steht danach auf keinem Ausdruck mehr. Das lässt sich nicht
+            rückgängig machen; ein neues Logo muss erneut hochgeladen werden.
+          </Typography.Paragraph>
+          <SpeicherFehler fehler={logoEntfernen.error} titel="Logo nicht entfernt" />
+        </Space>
       </Modal>
 
       {/* `disabled` am Formular sperrt die Felder, `disabled` am Knopf den Absendeweg —
@@ -264,6 +299,7 @@ export default function OrganisationTab() {
               loading={orgQuery.isLoading}
             />
           </Form.Item>
+          <SpeicherFehler fehler={speichern.error} />
         </Formularpaneel>
         <div style={speicherLeisteStil(token)}>
           <Button
