@@ -531,9 +531,16 @@ Alltag wichtigsten:
 - **Die Sprungpalette öffnet auf drei Wegen, nach dem Raycast-Muster** (LFH-645): ↵ öffnet,
   **Strg/⌘+↵** (auch Strg/⌘+Klick) öffnet das Ziel im **neuen Browser-Tab**, **→** zeigt am
   Textende eine Lese-Vorschau **in** der Palette. Die Vorschau ersetzt die Liste; Esc/← führen
-  zurück, Begriff und Markierung bleiben. „⇧↵ im Panel“ aus dem Neuentwurf ist entfallen, ⇧↵
-  ist frei, und es gibt keine neue Drawer-Fläche. `Befehl.ziel` ist die Marke,
-  `ausfuehren(oeffnung?)` reicht `'neuerTab'` bis `navigate`. Navigationszeilen entstehen nur
+  zurück, Begriff und Markierung bleiben. **Für Finger und Maus** trägt jede Zeile mit Vorschau
+  rechts ein **Tippziel** (Chevron, LFH-665), an jeder solchen Zeile, nicht nur an der
+  markierten, denn Touch kennt kein Hover. Es ersetzt die frühere `kbd`-→-Marke. Das Ziel ist
+  kein `Button`, weil ein fokussierbarer Knopf der Combobox den Fokus nähme. Es ist ein
+  handgebautes Ziel mit `aria-hidden` und abgefangenem `mousedown`, sein Klick endet per
+  `stopPropagation`. Der Boden kommt aus `vorschauZielStil` (`zeilenStil.ts`): `controlHeight`
+  in Höhe und Breite, bündig an der Zeilenkante über die volle Zeilenhöhe. Die Zeile ist
+  content-box, darum zieht sich das Ziel um genau ihre Polsterung heraus. „⇧↵ im Panel“ aus
+  dem Neuentwurf ist entfallen, ⇧↵ ist frei, und es gibt keine neue Drawer-Fläche.
+  `Befehl.ziel` ist die Marke, `ausfuehren(oeffnung?)` reicht `'neuerTab'` bis `navigate`. Navigationszeilen entstehen nur
   über `sprungZu` (`command-palette/typen.ts`), die Guards in `befehle.test.ts` und
   `datensaetze.test.ts` prüfen das Durchreichen je Zeile. Die Fehlerrichtung ist sonst still:
   „neuer Tab“ öffnet dann hier. Eine Zeile ohne Ziel bleibt bei Strg/⌘+↵ wirkungslos, es gibt

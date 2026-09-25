@@ -24,6 +24,7 @@ import type { Befehl } from './typen';
  */
 vi.mock('./zeilenStil', () => ({
   palettenZeilenStil: () => ({ minHeight: 4242, padding: '1px 2px' }),
+  vorschauZielStil: () => ({ minWidth: 4343, padding: '3px 4px' }),
 }));
 
 const korpus: Befehl[] = [
@@ -92,5 +93,33 @@ describe('CommandPalette · Bedienziel-Boden der Datensatz-Zeile', () => {
       minHeight: '4242px',
       padding: '1px 2px',
     });
+  });
+});
+
+/**
+ * Das Tippziel (LFH-665) nimmt seinen Boden aus `vorschauZielStil` — und aus nichts anderem.
+ * Die Marke kann nur aus der ersetzten Funktion stammen; ein kopierter Wert im JSX fiele hier
+ * auf.
+ */
+describe('CommandPalette · Bedienziel-Boden des Vorschau-Ziels', () => {
+  it('nimmt den Stil aus vorschauZielStil', () => {
+    renderMitProviders(
+      <CommandPalette
+        befehle={[
+          {
+            id: 'datensatz:personen:11',
+            gruppe: 'datensaetze',
+            label: 'Florian Mustermann',
+            vorschau: { art: 'person', einsatzId: 5, id: 11 },
+            ausfuehren: () => {},
+          },
+        ]}
+        schliesse={() => {}}
+      />,
+    );
+    const ziel = screen
+      .getByRole('option', { name: 'Florian Mustermann' })
+      .querySelector('[data-lfh="palette-vorschau-ziel"]');
+    expect(ziel).toHaveStyle({ minWidth: '4343px', padding: '3px 4px' });
   });
 });
