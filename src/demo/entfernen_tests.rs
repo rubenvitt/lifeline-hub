@@ -605,9 +605,12 @@ async fn zweites_entfernen_ist_409() {
 // (f) soft-gelöschter bzw. geschwärzter Demo-Einsatz wird entfernt
 // ---------------------------------------------------------------------------------------------
 
+/// Abschluss mit abgelaufener Aufbewahrungsfrist: `soft_delete_einsatz` prüft die
+/// Fälligkeit seit LFH-23 im UPDATE selbst, ohne Frist merkte er nichts vor.
 async fn abschliessen(pool: &SqlitePool, einsatz_id: i64) {
     sqlx::query(
-        "UPDATE einsatz SET status = 'abgeschlossen', abgeschlossen_at = datetime('now') \
+        "UPDATE einsatz SET status = 'abgeschlossen', abgeschlossen_at = datetime('now'), \
+             retention_bis = '2026-01-01 00:00:00' \
          WHERE id = ?",
     )
     .bind(einsatz_id)

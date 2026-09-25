@@ -452,11 +452,36 @@ pub async fn frist_setzen(
         .await?
         .etb_startwert();
     let mut tx = pool.begin().await?;
-    sqlx::query("UPDATE einsatz SET retention_bis = ? WHERE id = ?")
-        .bind(neue_frist)
-        .bind(einsatz_id)
-        .execute(&mut *tx)
-        .await?;
+    // Bewacht (LFH-23, design.md D6): die Route prüft die Tombstones vorher, aber zwischen
+    // Prüfung und Schreiben kann der Purge-Lauf vormerken. Ohne diesen Riegel stünde dann
+    // eine „geänderte" Frist samt ETB an einem vorgemerkten Einsatz, und die Schwärzung
+    // käme trotzdem (Phase B liest `retention_bis` nicht).
+    let res = sqlx::query(
+        "UPDATE einsatz SET retention_bis = ? \
+         WHERE id = ? AND geloescht_at IS NULL AND geschwaerzt_at IS NULL",
+    )
+    .bind(neue_frist)
+    .bind(einsatz_id)
+    .execute(&mut *tx)
+    .await?;
+    if res.rows_affected() == 0 {
+        let tombstones: Option<(Option<String>, Option<String>)> =
+            sqlx::query_as("SELECT geloescht_at, geschwaerzt_at FROM einsatz WHERE id = ?")
+                .bind(einsatz_id)
+                .fetch_optional(&mut *tx)
+                .await?;
+        let Some((geloescht_at, geschwaerzt_at)) = tombstones else {
+            return Err(AppError::NotFound);
+        };
+        return Err(crate::aufbewahrung::frist_sperre(
+            geloescht_at.as_deref(),
+            geschwaerzt_at.as_deref(),
+            Utc::now(),
+        )
+        .unwrap_or_else(|| {
+            AppError::Internal("Frist-UPDATE ohne Zeile, aber ohne Tombstone".into())
+        }));
+    }
     crate::etb::repo::anlegen_tx(
         &mut tx,
         einsatz_id,
@@ -482,10 +507,12 @@ pub async fn frist_setzen(
 // ---------- Aufbewahrung / Purge (LFH-135) ----------
 
 /// Ermittelt einen gültigen Benutzer als Akteur für System-ETB-Einträge des
-/// Purge-Schedulers (`erfasser_id` ist NOT NULL FK). Bevorzugt, wer den Einsatz
-/// abgeschlossen hat; ersatzweise eine Einsatzleitung. `None`, wenn keiner
-/// auffindbar ist (dann wird der ETB-Audit übersprungen, die Mutation läuft
-/// trotzdem). Läuft auf der übergebenen tx-Verbindung.
+/// Purge-Schedulers (`erfasser_id` ist NOT NULL FK). Reihenfolge (LFH-23): wer den
+/// Einsatz abgeschlossen hat, dann eine Einsatzleitung, dann ein System-Admin der
+/// Organisation DES EINSATZES (aktive vor inaktiven, dann kleinste id — deterministisch,
+/// die Org kommt aus `einsatz.org_id`, nie aus der Zeilenreihenfolge der Organisationen).
+/// `None`, wenn keiner auffindbar ist; dann bricht [`system_audit_tx`] die Mutation ab.
+/// Läuft auf der übergebenen tx-Verbindung.
 async fn ermittle_system_akteur(
     conn: &mut sqlx::SqliteConnection,
     einsatz_id: i64,
@@ -507,12 +534,27 @@ async fn ermittle_system_akteur(
     .bind(EINSATZ_ROLLE_LEITUNG)
     .fetch_optional(&mut *conn)
     .await?;
-    Ok(leit)
+    if leit.is_some() {
+        return Ok(leit);
+    }
+    let admin: Option<i64> = sqlx::query_scalar(
+        "SELECT b.id FROM benutzer b JOIN einsatz e ON e.org_id = b.org_id \
+         WHERE e.id = ? AND b.system_rolle = ? ORDER BY b.aktiv DESC, b.id LIMIT 1",
+    )
+    .bind(einsatz_id)
+    .bind(crate::auth::ROLLE_ADMIN)
+    .fetch_optional(&mut *conn)
+    .await?;
+    Ok(admin)
 }
 
-/// Schreibt einen System-ETB-Audit auf der tx-Verbindung, sofern ein Akteur
-/// auffindbar ist (best effort — fehlt jeder Benutzer, wird nur geloggt). Der
-/// Startwert kommt aus den Einstellungen (Nummernkreis), `inhalt` ist der Audit-Text.
+/// Schreibt einen System-ETB-Audit auf der tx-Verbindung. Der Startwert kommt aus den
+/// Einstellungen (Nummernkreis), `inhalt` ist der Audit-Text.
+///
+/// **Fail-closed (LFH-23):** Ist kein Akteur auffindbar, liefert die Funktion einen Fehler.
+/// Der Aufrufer rollt damit seine Transaktion zurück — Vormerkung bzw. Schwärzung
+/// unterbleiben und werden im nächsten Purge-Lauf erneut versucht. Eine
+/// Aufbewahrungs-Mutation ohne ETB-Eintrag gibt es nicht.
 async fn system_audit_tx(
     conn: &mut sqlx::SqliteConnection,
     einsatz_id: i64,
@@ -520,11 +562,19 @@ async fn system_audit_tx(
     inhalt: &str,
 ) -> Result<(), AppError> {
     let Some(akteur) = ermittle_system_akteur(conn, einsatz_id).await? else {
-        tracing::warn!(
-            einsatz_id,
-            "Purge: kein Benutzer als ETB-Akteur auffindbar — System-Audit übersprungen"
-        );
-        return Ok(());
+        // Die Org steht in der Meldung: sichtbar ist die Blockade NUR im Log (eine Org ohne
+        // jeden Admin hat niemanden, der die Aufbewahrungsübersicht öffnen könnte), und der
+        // Betrieb soll die betroffene Org ohne DB-Abfrage finden.
+        let org_id: Option<i64> = sqlx::query_scalar("SELECT org_id FROM einsatz WHERE id = ?")
+            .bind(einsatz_id)
+            .fetch_optional(&mut *conn)
+            .await?;
+        return Err(AppError::Internal(format!(
+            "Purge: kein Benutzer als ETB-Akteur für Einsatz {einsatz_id} (Org {}) auffindbar \
+             (weder abschließende Person noch Einsatzleitung noch System-Admin der Org) — \
+             Mutation abgebrochen, nächster Lauf versucht es erneut",
+            org_id.map_or_else(|| "?".to_string(), |o| o.to_string())
+        )));
     };
     crate::etb::repo::anlegen_tx(
         conn,
@@ -578,17 +628,22 @@ pub async fn soft_delete_einsatz(
         .await?
         .etb_startwert();
     let mut tx = pool.begin().await?;
+    // Die Fälligkeit wird im UPDATE selbst noch einmal geprüft (LFH-23): eine Frist, die
+    // zwischen Kandidatenliste und diesem Schreibvorgang verlängert wurde, gewinnt.
     let res = sqlx::query(
         "UPDATE einsatz SET geloescht_at = ? \
-         WHERE id = ? AND status = ? AND geloescht_at IS NULL",
+         WHERE id = ? AND status = ? AND geloescht_at IS NULL \
+           AND retention_bis IS NOT NULL AND ? >= retention_bis",
     )
     .bind(jetzt)
     .bind(einsatz_id)
     .bind(STATUS_ABGESCHLOSSEN)
+    .bind(jetzt)
     .execute(&mut *tx)
     .await?;
     if res.rows_affected() == 0 {
-        // Nichts zu tun (schon soft-gelöscht oder nicht abgeschlossen) — kein Audit.
+        // Nichts zu tun (schon soft-gelöscht, nicht abgeschlossen oder nicht mehr fällig)
+        // — kein Audit.
         return Ok(false);
     }
     system_audit_tx(
@@ -601,6 +656,114 @@ pub async fn soft_delete_einsatz(
     .await?;
     tx.commit().await?;
     Ok(true)
+}
+
+/// Hebt die Löschvormerkung eines Einsatzes während der Karenz auf und setzt im selben
+/// Vorgang eine neue Frist (LFH-23, design.md D5). `neue_frist = None` heißt unbegrenzt.
+///
+/// Ohne neue Frist stünde `retention_bis` weiter in der Vergangenheit, und der nächste
+/// Purge-Lauf merkte den Einsatz sofort wieder vor — deshalb ist sie Teil dieses einen
+/// Aufrufs und keine zweite Anfrage. Der Aufrufer prüft, dass die Frist in der Zukunft
+/// liegt, und den Archivzugriff (Org-Admin).
+///
+/// **Ein bewachtes UPDATE** (abgeschlossen, vorgemerkt, nicht geschwärzt, Karenz läuft:
+/// `geloescht_at > jetzt − KARENZ_TAGE`, dieselbe Grenze wie
+/// [`super::retention::karenz_abgelaufen`]) und der ETB-Eintrag des Admins in derselben
+/// Transaktion. Gewinnt eine parallele Schwärzung, findet das UPDATE keine Zeile. Bei 0
+/// Zeilen wird neu gelesen und eingeordnet: geschwärzt oder Karenz abgelaufen → 409
+/// (endgültiger Lebenszyklus-Zustand, kein Rückweg), nicht vorgemerkt → 422 (die Frist
+/// ändert man dort über `PUT …/aufbewahrungsfrist`), aktiv → 409, unbekannt → 404.
+/// Keine Ablehnung schreibt.
+pub async fn wiederherstellen(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    admin_id: i64,
+    admin_org_id: i64,
+    neue_frist: Option<&str>,
+    jetzt: chrono::DateTime<Utc>,
+) -> Result<(), AppError> {
+    let etb_startwert = super::einstellungen::laden_oder_default(pool, einsatz_id)
+        .await?
+        .etb_startwert();
+    // `write_retry!` (BEGIN IMMEDIATE, F09/LFH-240): der Körper liest vor dem Schreiben; in
+    // einer verzögerten Transaktion bräche der Lock-Aufstieg bei jedem parallelen Schreiber
+    // (etwa dem Purge-Lauf) sofort mit SQLITE_BUSY ab. Der Körper ist reine DB-Arbeit und
+    // darf wiederholt werden.
+    let karenz_grenze = super::retention::karenz_grenze(jetzt);
+    crate::write_retry!(pool, |conn| {
+        let vorher: Option<(i64, String, Option<String>, Option<String>)> = sqlx::query_as(
+            "SELECT org_id, status, geloescht_at, geschwaerzt_at FROM einsatz WHERE id = ?",
+        )
+        .bind(einsatz_id)
+        .fetch_optional(&mut *conn)
+        .await?;
+        let Some((org_id, status, geloescht_at, geschwaerzt_at)) = vorher else {
+            return Err(AppError::NotFound);
+        };
+        // Die Org-Grenze hält das Schreiben selbst, nicht nur die Vorprüfung der Route
+        // (Review LFH-23): der Admin einer fremden Org schreibt hier nie.
+        if org_id != admin_org_id {
+            return Err(AppError::Forbidden);
+        }
+        let res = sqlx::query(
+            "UPDATE einsatz SET geloescht_at = NULL, retention_bis = ? \
+             WHERE id = ? AND org_id = ? AND status = ? AND geloescht_at IS NOT NULL \
+               AND geschwaerzt_at IS NULL AND geloescht_at > ?",
+        )
+        .bind(neue_frist)
+        .bind(einsatz_id)
+        .bind(admin_org_id)
+        .bind(STATUS_ABGESCHLOSSEN)
+        .bind(&karenz_grenze)
+        .execute(&mut *conn)
+        .await?;
+        if res.rows_affected() == 0 {
+            return Err(if status != STATUS_ABGESCHLOSSEN {
+                AppError::Conflict("Einsatz ist nicht abgeschlossen".into())
+            } else if geschwaerzt_at.is_some() {
+                AppError::Conflict(
+                    "Einsatz ist bereits geschwärzt — eine Wiederherstellung ist nicht mehr möglich"
+                        .into(),
+                )
+            } else if geloescht_at.is_none() {
+                AppError::UnprocessableEntity(
+                    "Einsatz ist nicht zur Löschung vorgemerkt — die Frist ändert man über die \
+                     Aufbewahrungsfrist"
+                        .into(),
+                )
+            } else {
+                AppError::Conflict(
+                    "Die Karenz ist abgelaufen — eine Wiederherstellung ist nicht mehr möglich"
+                        .into(),
+                )
+            });
+        }
+        let audit = format!(
+            "Löschvormerkung vom {} aufgehoben (Wiederherstellung während der Karenz). \
+             Aufbewahrungsfrist neu: {}",
+            geloescht_at.as_deref().unwrap_or("?"),
+            neue_frist.unwrap_or("unbegrenzt"),
+        );
+        crate::etb::repo::anlegen_tx(
+            &mut *conn,
+            einsatz_id,
+            admin_id,
+            etb_startwert,
+            crate::etb::repo::EintragDaten {
+                typ: crate::etb::TYP_SYSTEM,
+                inhalt: &audit,
+                von: None,
+                an: None,
+                meldeweg: None,
+                veranlassung: None,
+                ereigniszeit: None,
+                erfasst_lokal_at: None,
+                berichtigt_eintrag_id: None,
+            },
+        )
+        .await?;
+        Ok(())
+    })
 }
 
 /// Platzhalter für gescrubbte PII-Felder, die wegen NOT-NULL- bzw. CHECK-Constraints
@@ -2610,5 +2773,340 @@ mod tests {
         assert_eq!(fuer_admin.len(), 1);
         assert_eq!(fuer_admin[0].id, einsatz.id);
         assert_eq!(fuer_admin[0].meine_rolle, None);
+    }
+
+    // ---------- LFH-23: Akteurskette des System-Audits ----------
+
+    /// Abgeschlossener Einsatz ohne `abgeschlossen_von` und ohne Mitgliedschaft in Org `org`.
+    async fn einsatz_ohne_akteur(pool: &SqlitePool, org: i64) -> i64 {
+        sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung, status, abgeschlossen_at) \
+             VALUES (?, 'Ohne Akteur', 'abgeschlossen', '2026-01-01 00:00:00') RETURNING id",
+        )
+        .bind(org)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    /// Legt einen Benutzer in Org `org` an; `admin` setzt `system_rolle = admin`.
+    async fn benutzer_in_org(
+        pool: &SqlitePool,
+        org: i64,
+        name: &str,
+        admin: bool,
+        aktiv: bool,
+    ) -> i64 {
+        sqlx::query_scalar(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash, system_rolle, aktiv) \
+             VALUES (?, ?, ?, 'h', ?, ?) RETURNING id",
+        )
+        .bind(org)
+        .bind(name)
+        .bind(name)
+        .bind(if admin { "admin" } else { "keiner" })
+        .bind(aktiv)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    #[tokio::test]
+    async fn system_akteur_faellt_auf_admin_der_eigenen_org_zurueck() {
+        let pool = crate::db::test_pool().await;
+        sqlx::query(
+            "INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Orga'), (2, 'Fremd')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        // Ein Admin der FREMDEN Org mit kleinerer id darf nie gewählt werden.
+        let _fremd = benutzer_in_org(&pool, 2, "fremdadmin", true, true).await;
+        let _kein_admin = benutzer_in_org(&pool, 1, "helfer", false, true).await;
+        let e = einsatz_ohne_akteur(&pool, 1).await;
+
+        let mut conn = pool.acquire().await.unwrap();
+        assert_eq!(
+            ermittle_system_akteur(&mut conn, e).await.unwrap(),
+            None,
+            "ohne Admin der eigenen Org gibt es keinen Akteur"
+        );
+        drop(conn);
+
+        let inaktiv = benutzer_in_org(&pool, 1, "altadmin", true, false).await;
+        let mut conn = pool.acquire().await.unwrap();
+        assert_eq!(
+            ermittle_system_akteur(&mut conn, e).await.unwrap(),
+            Some(inaktiv),
+            "ein inaktiver Admin ist besser als kein Audit"
+        );
+        drop(conn);
+
+        let aktiv = benutzer_in_org(&pool, 1, "neuadmin", true, true).await;
+        let mut conn = pool.acquire().await.unwrap();
+        assert_eq!(
+            ermittle_system_akteur(&mut conn, e).await.unwrap(),
+            Some(aktiv),
+            "aktive Admins vor inaktiven, auch bei größerer id"
+        );
+    }
+
+    #[tokio::test]
+    async fn system_akteur_bevorzugt_abschliessende_person_und_leitung_vor_admin() {
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let _admin = benutzer_in_org(&pool, 1, "orgadmin", true, true).await;
+        let einsatz = test_anlegen(&pool, "Lage", None, leit).await.unwrap();
+
+        // Aktiv, ohne abgeschlossen_von: die Einsatzleitung gewinnt vor dem Admin.
+        let mut conn = pool.acquire().await.unwrap();
+        assert_eq!(
+            ermittle_system_akteur(&mut conn, einsatz.id).await.unwrap(),
+            Some(leit)
+        );
+        drop(conn);
+
+        // Abgeschlossen von einer DRITTEN Person (weder Leitung noch Admin): sie gewinnt vor
+        // Einsatzleitung und Admin — die erste Stufe der Kette.
+        let abschliesser = benutzer_in_org(&pool, 1, "abschliesser", false, true).await;
+        sqlx::query(
+            "UPDATE einsatz SET status = 'abgeschlossen', abgeschlossen_von = ? WHERE id = ?",
+        )
+        .bind(abschliesser)
+        .bind(einsatz.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+        let mut conn = pool.acquire().await.unwrap();
+        assert_eq!(
+            ermittle_system_akteur(&mut conn, einsatz.id).await.unwrap(),
+            Some(abschliesser)
+        );
+    }
+
+    // ---------- LFH-23: Wiederherstellen während der Karenz ----------
+
+    fn zeit(s: &str) -> chrono::DateTime<Utc> {
+        chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S")
+            .unwrap()
+            .and_utc()
+    }
+
+    /// Abgeschlossener Einsatz mit abgelaufener Frist und den übergebenen Tombstones.
+    async fn archiv_einsatz(
+        pool: &SqlitePool,
+        leit: i64,
+        geloescht: Option<&str>,
+        geschwaerzt: Option<&str>,
+    ) -> i64 {
+        sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung, status, abgeschlossen_at, abgeschlossen_von, \
+                retention_bis, geloescht_at, geschwaerzt_at) \
+             VALUES (1,'Archiv','abgeschlossen','2026-01-01 00:00:00', ?, '2026-05-01 00:00:00', ?, ?) \
+             RETURNING id",
+        )
+        .bind(leit)
+        .bind(geloescht)
+        .bind(geschwaerzt)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    async fn stand(
+        pool: &SqlitePool,
+        id: i64,
+    ) -> (Option<String>, Option<String>, Option<String>, i64) {
+        let (frist, g, s): (Option<String>, Option<String>, Option<String>) = sqlx::query_as(
+            "SELECT retention_bis, geloescht_at, geschwaerzt_at FROM einsatz WHERE id = ?",
+        )
+        .bind(id)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        let etb: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ?")
+            .bind(id)
+            .fetch_one(pool)
+            .await
+            .unwrap();
+        (frist, g, s, etb)
+    }
+
+    #[tokio::test]
+    async fn wiederherstellen_hebt_vormerkung_auf_und_setzt_frist_mit_audit() {
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let admin = benutzer_anlegen(&pool, "admin").await;
+        let e = archiv_einsatz(&pool, leit, Some("2026-06-25 12:00:00"), None).await;
+
+        wiederherstellen(
+            &pool,
+            e,
+            admin,
+            1,
+            Some("2026-09-28 12:00:00"),
+            zeit("2026-06-30 12:00:00"),
+        )
+        .await
+        .unwrap();
+        let (frist, g, s, etb) = stand(&pool, e).await;
+        assert_eq!(frist.as_deref(), Some("2026-09-28 12:00:00"));
+        assert_eq!((g, s, etb), (None, None, 1));
+        let (erfasser, typ, inhalt): (i64, String, String) =
+            sqlx::query_as("SELECT erfasser_id, typ, inhalt FROM etb_eintrag WHERE einsatz_id = ?")
+                .bind(e)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!((erfasser, typ.as_str()), (admin, "system"));
+        assert!(inhalt.contains("2026-06-25 12:00:00"), "{inhalt}");
+        assert!(inhalt.contains("2026-09-28 12:00:00"), "{inhalt}");
+
+        // Unbegrenzt: ein zweiter Einsatz, Frist None.
+        let e2 = archiv_einsatz(&pool, leit, Some("2026-06-25 12:00:00"), None).await;
+        wiederherstellen(&pool, e2, admin, 1, None, zeit("2026-06-30 12:00:00"))
+            .await
+            .unwrap();
+        let (frist, g, _, _) = stand(&pool, e2).await;
+        assert_eq!((frist, g), (None, None));
+        let inhalt: String =
+            sqlx::query_scalar("SELECT inhalt FROM etb_eintrag WHERE einsatz_id = ?")
+                .bind(e2)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert!(inhalt.contains("unbegrenzt"), "{inhalt}");
+    }
+
+    #[tokio::test]
+    async fn wiederherstellen_lehnt_ab_ohne_zu_schreiben() {
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let admin = benutzer_anlegen(&pool, "admin").await;
+        let jetzt = zeit("2026-06-30 12:00:00");
+
+        // Vormerkung genau 30 Tage alt → Karenz abgelaufen (Grenze wie karenz_abgelaufen) → 409.
+        let grenze = archiv_einsatz(&pool, leit, Some("2026-05-31 12:00:00"), None).await;
+        let vorher = stand(&pool, grenze).await;
+        assert!(matches!(
+            wiederherstellen(&pool, grenze, admin, 1, None, jetzt).await,
+            Err(AppError::Conflict(_))
+        ));
+        assert_eq!(stand(&pool, grenze).await, vorher);
+        // Eine Sekunde jünger → noch in der Karenz → gelingt.
+        let knapp = archiv_einsatz(&pool, leit, Some("2026-05-31 12:00:01"), None).await;
+        wiederherstellen(&pool, knapp, admin, 1, None, jetzt)
+            .await
+            .unwrap();
+
+        // Geschwärzt → 409.
+        let schwarz = archiv_einsatz(
+            &pool,
+            leit,
+            Some("2026-06-29 00:00:00"),
+            Some("2026-06-30 00:00:00"),
+        )
+        .await;
+        let vorher = stand(&pool, schwarz).await;
+        assert!(matches!(
+            wiederherstellen(&pool, schwarz, admin, 1, None, jetzt).await,
+            Err(AppError::Conflict(_))
+        ));
+        assert_eq!(stand(&pool, schwarz).await, vorher);
+
+        // Nicht vorgemerkt → 422.
+        let offen = archiv_einsatz(&pool, leit, None, None).await;
+        let vorher = stand(&pool, offen).await;
+        assert!(matches!(
+            wiederherstellen(&pool, offen, admin, 1, None, jetzt).await,
+            Err(AppError::UnprocessableEntity(_))
+        ));
+        assert_eq!(stand(&pool, offen).await, vorher);
+
+        // Unbekannt → 404.
+        assert!(matches!(
+            wiederherstellen(&pool, 999_999, admin, 1, None, jetzt).await,
+            Err(AppError::NotFound)
+        ));
+
+        // Fremde Org → 403, ohne zu schreiben — auch ohne die Vorprüfung der Route.
+        let fremd = archiv_einsatz(&pool, leit, Some("2026-06-29 00:00:00"), None).await;
+        let vorher = stand(&pool, fremd).await;
+        assert!(matches!(
+            wiederherstellen(&pool, fremd, admin, 2, None, jetzt).await,
+            Err(AppError::Forbidden)
+        ));
+        assert_eq!(stand(&pool, fremd).await, vorher);
+    }
+
+    // ---------- LFH-23 Review: bewachte Schreibwege gegen den Purge-Lauf ----------
+
+    #[tokio::test]
+    async fn frist_setzen_schreibt_nicht_an_vorgemerkte_oder_geschwaerzte_einsaetze() {
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        // Vormerkung relativ zu jetzt, damit sie wirklich INNERHALB der Karenz liegt.
+        let gestern = (Utc::now() - chrono::Duration::days(1))
+            .format("%Y-%m-%d %H:%M:%S")
+            .to_string();
+        let vorgemerkt = archiv_einsatz(&pool, leit, Some(&gestern), None).await;
+        let vorher = stand(&pool, vorgemerkt).await;
+        assert!(matches!(
+            frist_setzen(&pool, vorgemerkt, leit, Some("2099-01-01 00:00:00"), "x").await,
+            Err(AppError::UnprocessableEntity(_))
+        ));
+        assert_eq!(
+            stand(&pool, vorgemerkt).await,
+            vorher,
+            "kein Schreibvorgang, kein ETB"
+        );
+
+        // Karenz abgelaufen, noch nicht geschwärzt: 409 wie beim Wiederherstellen.
+        let ausstehend = archiv_einsatz(&pool, leit, Some("2026-01-02 00:00:00"), None).await;
+        let vorher = stand(&pool, ausstehend).await;
+        assert!(matches!(
+            frist_setzen(&pool, ausstehend, leit, Some("2099-01-01 00:00:00"), "x").await,
+            Err(AppError::Conflict(_))
+        ));
+        assert_eq!(stand(&pool, ausstehend).await, vorher);
+
+        let schwarz = archiv_einsatz(
+            &pool,
+            leit,
+            Some("2026-06-25 12:00:00"),
+            Some("2026-07-26 12:00:00"),
+        )
+        .await;
+        let vorher = stand(&pool, schwarz).await;
+        assert!(matches!(
+            frist_setzen(&pool, schwarz, leit, None, "x").await,
+            Err(AppError::Conflict(_))
+        ));
+        assert_eq!(stand(&pool, schwarz).await, vorher);
+    }
+
+    /// Eine zwischen Kandidatenliste und UPDATE verlängerte Frist gewinnt: der Soft-Delete
+    /// prüft `retention_bis` im UPDATE selbst noch einmal.
+    #[tokio::test]
+    async fn soft_delete_prueft_die_frist_im_update_noch_einmal() {
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let e = archiv_einsatz(&pool, leit, None, None).await;
+        assert_eq!(
+            faellige_soft_delete(&pool, "2026-06-01 00:00:00")
+                .await
+                .unwrap(),
+            vec![e]
+        );
+        sqlx::query("UPDATE einsatz SET retention_bis = '2099-01-01 00:00:00' WHERE id = ?")
+            .bind(e)
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert!(!soft_delete_einsatz(&pool, e, "2026-06-01 00:00:00")
+            .await
+            .unwrap());
+        let (_, g, _, etb) = stand(&pool, e).await;
+        assert_eq!((g, etb), (None, 0));
     }
 }

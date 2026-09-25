@@ -40,7 +40,7 @@ const ALLE_MAPS = Object.fromEntries(
 ) as Record<string, Record<string, sf.StatusDarstellung>>;
 
 describe('Statusfarb-Vertrag', () => {
-  it('deckt alle vierundzwanzig Vertragskarten ab — eine weitere Map rutscht nicht still durch', () => {
+  it('deckt alle fünfundzwanzig Vertragskarten ab — eine weitere Map rutscht nicht still durch', () => {
     // „Karten", nicht „Enums": `dringlichkeit` ist über eine {@link Statusrolle} geschlüsselt
     // und damit die eine Karte, die keine Domänen-Achse beschriftet, sondern die Stufe selbst.
     // Beide Zugänge von LFH-358 stehen hier — sie lagen bis dahin AUSSERHALB und liefen damit
@@ -48,6 +48,7 @@ describe('Statusfarb-Vertrag', () => {
     expect(Object.keys(ALLE_MAPS).sort()).toEqual([
       'abloesungEinstufung',
       'abschnittLagezustand',
+      'aufbewahrungZustand',
       'belegungsArt',
       'betreuungsstelleStatus',
       'brStatus',
@@ -178,7 +179,7 @@ describe('Warnstufe als Fläche (LFH-368 · B5h)', () => {
     // `StatusDarstellung` hineinzubiegen hätte den Kanal-Vertrag verwässert.
     expect(Object.keys(ALLE_MAPS)).not.toContain('warnstufeFlaeche');
     expect(Object.keys(ALLE_MAPS)).not.toContain('sichtung');
-    expect(Object.keys(ALLE_MAPS)).toHaveLength(24);
+    expect(Object.keys(ALLE_MAPS)).toHaveLength(25);
   });
 });
 
@@ -207,6 +208,26 @@ describe('abloesungEinstufung (LFH-635)', () => {
       label: 'Ablösung bald fällig',
     });
     expect(sf.abloesungEinstufung.ueberfaellig).toEqual({ rolle: 'alarm', label: 'überfällig' });
+  });
+});
+
+describe('aufbewahrungZustand (LFH-23, design.md D4)', () => {
+  // Byte-Pin gegen handgeschriebene Literale: das Wort ist der zweite Kanal (WCAG 1.4.1).
+  it('bildet die sechs Zustände auf Rolle und Wort ab', () => {
+    expect(sf.aufbewahrungZustand).toEqual({
+      ohne_frist: { rolle: 'neutral', label: 'ohne Frist' },
+      frist_laeuft: { rolle: 'neutral', label: 'Frist läuft' },
+      faellig: { rolle: 'achtung', label: 'fällig' },
+      vorgemerkt: { rolle: 'achtung', label: 'zur Löschung vorgemerkt' },
+      schwaerzung_ausstehend: { rolle: 'alarm', label: 'Schwärzung steht aus' },
+      geschwaerzt: { rolle: 'neutral', label: 'geschwärzt' },
+    });
+  });
+
+  it('kein Zustand ist Bedienblau — Wiederherstellen ist eine Aktion, kein Zustand', () => {
+    for (const d of Object.values(sf.aufbewahrungZustand)) {
+      expect(d.rolle).not.toBe('bedien');
+    }
   });
 });
 

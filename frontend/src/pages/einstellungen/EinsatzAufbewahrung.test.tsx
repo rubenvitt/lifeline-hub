@@ -26,7 +26,12 @@ vi.mock('../../api/einsaetze', () => ({
   speichereEinstellungen: vi.fn(),
 }));
 
+vi.mock('../../api/aufbewahrung', () => ({
+  setzeAufbewahrungsfrist: vi.fn(),
+}));
+
 import { ladeEinsatz, ladeEinstellungen, speichereEinstellungen } from '../../api/einsaetze';
+import { setzeAufbewahrungsfrist } from '../../api/aufbewahrung';
 
 /** Bewusst durchweg NICHT-null: ein Payload-Vergleich gegen lauter null wäre auch dann grün,
  *  wenn der Merge Felder verlöre (fehlender Key liest sich in Vitest wie `undefined`). */
@@ -194,5 +199,36 @@ describe('EinsatzAufbewahrung', () => {
     const knopf = await screen.findByRole('button', { name: 'Speichern' });
     expect(knopf.closest('form')).not.toBeNull();
     expect(knopf).toHaveAttribute('type', 'submit');
+  });
+
+  /**
+   * LFH-23 (tasks.md 6.6): die Frist steht NEBEN dem eingefrorenen Formular. Am
+   * abgeschlossenen Einsatz ist die Dauer gesperrt, die Frist-Aktion für die Einsatzleitung
+   * bedienbar — und ihr PUT trägt keinen Einstellungs-Payload.
+   */
+  it('am abgeschlossenen Einsatz: Dauer gesperrt, Frist für die Einsatzleitung bedienbar', async () => {
+    benutzerRolle.wert = 'keiner';
+    vi.mocked(ladeEinsatz).mockResolvedValue({
+      id: 1,
+      bezeichnung: 'Lage',
+      status: 'abgeschlossen',
+      meine_rolle: 'einsatzleitung',
+      retention_bis: '2030-01-01 00:00:00',
+    } as never);
+    vi.mocked(setzeAufbewahrungsfrist).mockResolvedValue({} as never);
+
+    rendern();
+
+    expect(await screen.findByLabelText('Aufbewahrungs-Dauer (Tage)')).toBeDisabled();
+    const aendern = screen.getByRole('button', { name: 'Frist ändern' });
+    expect(aendern).toBeEnabled();
+    // Das Paneel steht AUSSERHALB des Vollersatz-Formulars.
+    expect(aendern.closest('form')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Frist aufheben' }));
+    await waitFor(() =>
+      expect(setzeAufbewahrungsfrist).toHaveBeenCalledWith(1, { retention_bis: null }),
+    );
+    expect(speichereEinstellungen).not.toHaveBeenCalled();
   });
 });

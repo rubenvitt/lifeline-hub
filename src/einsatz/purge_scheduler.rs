@@ -49,7 +49,7 @@ pub async fn tick_einmal(pool: &SqlitePool, jetzt: DateTime<Utc>) -> usize {
                 match repo::soft_delete_einsatz(pool, id, &jetzt_s).await {
                     Ok(true) => anzahl += 1,
                     Ok(false) => {} // Race: bereits soft-gelöscht.
-                    Err(e) => tracing::warn!(einsatz_id = id, "Purge Phase A fehlgeschlagen: {e}"),
+                    Err(e) => tracing::error!(einsatz_id = id, "Purge Phase A fehlgeschlagen: {e}"),
                 }
             }
         }
@@ -1025,5 +1025,148 @@ mod tests {
                 .await
                 .unwrap();
         assert_eq!(s, None, "vor Ablauf der Karenz nicht geschwärzt");
+    }
+
+    // ---------- LFH-23: Audit ohne stilles Auslassen ----------
+
+    /// Abgeschlossener Einsatz OHNE jeden Akteur: kein `abgeschlossen_von`, keine
+    /// Einsatzleitung, kein Admin in der Org. Org 1 trägt nur einen Nicht-Admin.
+    async fn ohne_akteur(
+        pool: &SqlitePool,
+        retention_bis: &str,
+        geloescht_at: Option<&str>,
+    ) -> i64 {
+        sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1,'Helfer','helfer','h')",
+        )
+        .execute(pool)
+        .await
+        .unwrap();
+        sqlx::query_scalar::<_, i64>(
+            "INSERT INTO einsatz (org_id, bezeichnung, status, abgeschlossen_at, retention_bis, \
+                geloescht_at, einsatzort) \
+             VALUES (1,'Lage','abgeschlossen','2026-01-01 00:00:00', ?, ?, 'Hauptstr 1') RETURNING id",
+        )
+        .bind(retention_bis)
+        .bind(geloescht_at)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    async fn org_admin_anlegen(pool: &SqlitePool) -> i64 {
+        sqlx::query_scalar(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash, system_rolle) \
+             VALUES (1,'Admin','orgadmin','h','admin') RETURNING id",
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    async fn etb_erfasser(pool: &SqlitePool, e: i64) -> Vec<i64> {
+        sqlx::query_scalar(
+            "SELECT erfasser_id FROM etb_eintrag WHERE einsatz_id = ? ORDER BY lfd_nr",
+        )
+        .bind(e)
+        .fetch_all(pool)
+        .await
+        .unwrap()
+    }
+
+    #[tokio::test]
+    async fn phase_a_ohne_akteur_merkt_nicht_vor_und_holt_es_mit_admin_nach() {
+        let pool = crate::db::test_pool().await;
+        let e = ohne_akteur(&pool, "2026-06-01 00:00:00", None).await;
+
+        assert_eq!(tick_einmal(&pool, t("2026-06-02 12:00:00")).await, 0);
+        let g: Option<String> = sqlx::query_scalar("SELECT geloescht_at FROM einsatz WHERE id = ?")
+            .bind(e)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(g, None, "ohne Audit keine Vormerkung");
+        assert!(etb_erfasser(&pool, e).await.is_empty(), "kein ETB-Eintrag");
+        // Sichtbar ist die Blockade nur im Log — die Meldung nennt deshalb Einsatz UND Org.
+        let fehler = repo::soft_delete_einsatz(&pool, e, "2026-06-02 12:05:00")
+            .await
+            .unwrap_err()
+            .to_string();
+        assert!(fehler.contains(&format!("Einsatz {e} (Org 1)")), "{fehler}");
+
+        let admin = org_admin_anlegen(&pool).await;
+        assert_eq!(tick_einmal(&pool, t("2026-06-02 12:10:00")).await, 1);
+        let g: Option<String> = sqlx::query_scalar("SELECT geloescht_at FROM einsatz WHERE id = ?")
+            .bind(e)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(g.as_deref(), Some("2026-06-02 12:10:00"));
+        assert_eq!(
+            etb_erfasser(&pool, e).await,
+            vec![admin],
+            "Audit trägt den Admin"
+        );
+    }
+
+    #[tokio::test]
+    async fn phase_b_ohne_akteur_schwaerzt_nicht_und_holt_es_mit_admin_nach() {
+        let pool = crate::db::test_pool().await;
+        let e = ohne_akteur(&pool, "2026-02-01 00:00:00", Some("2026-02-15 00:00:00")).await;
+
+        assert_eq!(tick_einmal(&pool, t("2026-06-01 12:00:00")).await, 0);
+        let (s, ort): (Option<String>, Option<String>) =
+            sqlx::query_as("SELECT geschwaerzt_at, einsatzort FROM einsatz WHERE id = ?")
+                .bind(e)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(s, None, "ohne Audit keine Schwärzung");
+        assert_eq!(
+            ort.as_deref(),
+            Some("Hauptstr 1"),
+            "PII unverändert (Rollback)"
+        );
+        assert!(etb_erfasser(&pool, e).await.is_empty());
+
+        let admin = org_admin_anlegen(&pool).await;
+        assert_eq!(tick_einmal(&pool, t("2026-06-01 12:10:00")).await, 1);
+        let (s, ort): (Option<String>, Option<String>) =
+            sqlx::query_as("SELECT geschwaerzt_at, einsatzort FROM einsatz WHERE id = ?")
+                .bind(e)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(s.as_deref(), Some("2026-06-01 12:10:00"));
+        assert_eq!(ort, None);
+        assert_eq!(etb_erfasser(&pool, e).await, vec![admin]);
+    }
+
+    /// LFH-23, Anforderung „Karenz“: Phase B liest `retention_bis` nicht. Ein vorgemerkter
+    /// Einsatz, dessen Frist direkt in der DB verlängert wurde, wird nach der Karenz trotzdem
+    /// geschwärzt — maßgeblich ist allein `geloescht_at`.
+    #[tokio::test]
+    async fn karenz_ignoriert_verlaengerte_frist() {
+        let pool = crate::db::test_pool().await;
+        let id = abgeschlossen_mit_frist(&pool, "2026-06-01 00:00:00").await;
+        assert_eq!(tick_einmal(&pool, t("2026-06-02 12:00:00")).await, 1);
+        sqlx::query("UPDATE einsatz SET retention_bis = '2099-01-01 00:00:00' WHERE id = ?")
+            .bind(id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert_eq!(tick_einmal(&pool, t("2026-07-02 12:00:00")).await, 1);
+        let s: Option<String> =
+            sqlx::query_scalar("SELECT geschwaerzt_at FROM einsatz WHERE id = ?")
+                .bind(id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(s.as_deref(), Some("2026-07-02 12:00:00"));
     }
 }

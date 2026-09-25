@@ -7,7 +7,7 @@ import { Navigate, Outlet, useLocation, useNavigate } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
 import { darfVerwaltung } from '../einsatz/schreibrecht';
 import { useViewport } from '../components/useViewport';
-import { adminBenutzer, adminDemoDaten, adminGruppen } from './adminNav';
+import { adminAufbewahrung, adminBenutzer, adminDemoDaten, adminGruppen } from './adminNav';
 import { useDemoDatenStatus } from './useDemoDaten';
 
 const { Sider, Content } = Layout;
@@ -94,6 +94,7 @@ export default function AdminLayout() {
   // Bedingung steht trotzdem ausgeschrieben da.
   const sonderEintraege = [
     ...(istSystemAdmin ? [adminBenutzer] : []),
+    ...(istSystemAdmin ? [adminAufbewahrung] : []),
     ...(istSystemAdmin && demoFreigeschaltet ? [adminDemoDaten] : []),
   ];
   // '/admin/stammdaten/fahrzeuge' → 'stammdaten/fahrzeuge'; '/admin/benutzer' → 'benutzer'.

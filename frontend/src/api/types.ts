@@ -735,3 +735,32 @@ export interface NeueNachforderung {
   /** Ereigniszeit der Anforderung (UTC); leer = jetzt. */
   angefordert_at?: string;
 }
+
+// ============================== LFH-23 Aufbewahrung (Archiv des Org-Admins) ==============================
+/** Aufbewahrungszustand eines abgeschlossenen Einsatzes (sechs Werte, `retention::zustand`). */
+export type AufbewahrungZustand = S['AufbewahrungZustand'];
+/** Zeile der Aufbewahrungsübersicht (`GET /api/aufbewahrung`). */
+export type AufbewahrungEintrag = S['AufbewahrungEintragAnzeige'];
+/** Pseudonyme Archivakte: Kopf, Zustand, Register — nur Retain-Spalten. */
+export type ArchivAkte = S['ArchivAkteAnzeige'];
+export type ArchivKopf = S['ArchivKopfAnzeige'];
+export type ArchivPerson = S['ArchivPersonAnzeige'];
+export type ArchivTier = S['ArchivTierAnzeige'];
+export type ArchivSchaden = S['ArchivSchadenAnzeige'];
+/** ETB-Eintrag der Archivakte im Wortlaut, ohne Anhänge und Rückverweise. */
+export type ArchivEtbEintrag = S['ArchivEtbEintragAnzeige'];
+
+/** Body von `POST /api/aufbewahrung/einsaetze/{id}/wiederherstellen`.
+ *  LFH-120: kein Backend-Schema — Eingabe-Body, FE-lokal. `retention_bis` ist PFLICHT:
+ *  ein Zeitpunkt in der Zukunft (UTC, `YYYY-MM-DD HH:mm:ss`) oder `null` für unbegrenzt. */
+export interface WiederherstellenBody {
+  retention_bis: string | null;
+}
+
+/** Body von `PUT /api/einsaetze/{id}/aufbewahrungsfrist` (LFH-130). `null` hebt die Frist
+ *  auf; eine Verkürzung braucht `bestaetigt: true`, sonst 409.
+ *  LFH-120: kein Backend-Schema — Eingabe-Body, FE-lokal. */
+export interface FristSetzenBody {
+  retention_bis: string | null;
+  bestaetigt?: boolean;
+}

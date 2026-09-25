@@ -15,6 +15,7 @@ import {
 } from './einsatzEinstellungenForm';
 import { speicherLeisteStil } from '../../components/speicherLeiste';
 import { Formularpaneel } from '../../components/instrument';
+import FristPaneel from '../../aufbewahrung/FristPaneel';
 
 /**
  * Sektion `…/einstellungen/aufbewahrung` (LFH-345 · C10) — die Aufbewahrungs-Dauer.
@@ -26,6 +27,12 @@ import { Formularpaneel } from '../../components/instrument';
  * deshalb hier und nicht in einer der größeren Sektionen.
  *
  * Einspaltig — zwei Spalten für ein Feld wären Zierde.
+ *
+ * **Die Frist steht daneben, nicht darin (LFH-23).** Die Dauer ist eine Einstellung und friert
+ * mit dem Abschluss ein; die Frist ist ein Zeitpunkt am Einsatz, den Einsatzleitung und
+ * System-Admin auch danach setzen, verlängern und aufheben. Deshalb steht `FristPaneel` ÜBER
+ * und AUSSERHALB des Vollersatz-`<Form>`: ein Frist-PUT trägt keinen Einstellungs-Payload, und
+ * das `disabled` des Formulars sperrt die Frist-Aktion nicht mit.
  */
 export default function EinsatzAufbewahrung() {
   const { id } = useParams();
@@ -66,6 +73,7 @@ export default function EinsatzAufbewahrung() {
         rechteFehlt={daten.istAktiv && !daten.darfBearbeiten}
         rechteText={RECHTE_TEXT}
       />
+      {daten.einsatz && <FristPaneel einsatzId={einsatzId} einsatz={daten.einsatz} />}
       <Form<FormWerteAufbewahrung>
         form={form}
         layout="vertical"
@@ -75,7 +83,7 @@ export default function EinsatzAufbewahrung() {
       >
         <Formularpaneel
           titel="Aufbewahrung & Archiv"
-          beschreibung="Aufbewahrungs-Dauer in Tagen für diesen Einsatz. Die Frist greift erst beim Abschluss (sie wird daraus als Zeitpunkt berechnet) und wirkt nie auf den laufenden Einsatz. Nach Fristablauf wird der Einsatz zunächst gesperrt und später unwiderruflich von Personendaten bereinigt (ETB und Statistik bleiben erhalten). Leer = keine automatische Frist. Eine spätere Verkürzung einer bereits gesetzten Frist ist gesondert (manuelle Frist) bestätigungspflichtig."
+          beschreibung="Aufbewahrungs-Dauer in Tagen für diesen Einsatz. Beim Abschluss entsteht daraus die Aufbewahrungsfrist (oben), die nie auf den laufenden Einsatz wirkt. Nach Fristablauf wird der Einsatz zunächst gesperrt, zur Löschung vorgemerkt und nach 30 Tagen Karenz unwiderruflich von Personendaten bereinigt (ETB und Statistik bleiben erhalten). Leer = keine automatische Frist. Die Frist selbst ändert man oben — auch nach dem Abschluss; eine Verkürzung fragt vorher nach."
         >
           <Form.Item
             label="Aufbewahrungs-Dauer (Tage)"
