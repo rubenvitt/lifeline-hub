@@ -3,6 +3,8 @@
 import './theme/schriften.css';
 import './theme/rollen.css';
 import './index.css';
+// Druckmechanik aller Druckstücke (LFH-71): greift nur unter `@media print` mit Druckwurzel.
+import './druck/druck.css';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { App as AntApp } from 'antd';

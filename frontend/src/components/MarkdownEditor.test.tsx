@@ -110,7 +110,8 @@ describe('MarkdownEditor – toggle-Variante', () => {
    * hier als DOM-Messung statt als Annahme: das `split`-Layout wickelt sein Textfeld in
    * `.markdown-editor__eingabe`, das `toggle`-Layout NICHT. Eine Druckregel auf
    * `.markdown-editor__eingabe` kann einen Toggle-Abschnitt deshalb nicht leer drucken —
-   * und eine Regel auf `textarea` müsste an `:has(.markdown-editor__vorschau)` hängen.
+   * und eine Regel auf `textarea` braucht eine gerenderte Fassung daneben (offene Vorschau
+   * oder `druckfassung`, siehe unten).
    * Fällt diese Behauptung, ist die Begründung der Druckregeln hinfällig.
    */
   it('wickelt sein Textfeld NICHT in die Eingabespalte (anders als split)', () => {
@@ -127,6 +128,51 @@ describe('MarkdownEditor – toggle-Variante', () => {
     );
     expect(gespalten.querySelectorAll('.markdown-editor__eingabe textarea')).toHaveLength(1);
     expect(gespalten.querySelector('.markdown-editor__vorschau')).not.toBeNull();
+  });
+
+  /**
+   * Druckfassung (LFH-71, Review Welle B): bei geschlossener Vorschau trug im Toggle-Layout
+   * nur das Textfeld den Abschnitt — auf Papier kam die `<textarea>` mit ihrer
+   * Bildschirmhöhe, Markdown als Rohtext, langer Text abgeschnitten. Mit `druckfassung`
+   * steht daneben eine gerenderte Fassung, die nur der Druck zeigt (`lageberichtPrint.css`).
+   * Genau EINE gerenderte Fassung im Baum: ist die Vorschau offen, trägt sie den Text.
+   */
+  it('rendert mit `druckfassung` bei geschlossener Vorschau eine gerenderte Druckfassung', async () => {
+    const { container } = renderMitProviders(
+      <MarkdownEditor
+        unterEbene={1}
+        layout="toggle"
+        druckfassung
+        value={'**fett**\n\nENDE'}
+        onChange={() => {}}
+      />,
+    );
+    const druck = container.querySelector('.markdown-editor__druck');
+    expect(druck, 'keine Druckfassung').not.toBeNull();
+    // Nur Papier: am Bildschirm `display: none` per CSS, für den Zugänglichkeitsbaum
+    // `aria-hidden` — auch dort, wo kein CSS geladen ist (jsdom), wie beim Druckkopf. Sonst
+    // stünden die Überschriften des Abschnitts ein zweites Mal im Vorlesebaum.
+    expect(druck).toHaveAttribute('aria-hidden', 'true');
+    expect(druck!.querySelector('.markdown strong')).toHaveTextContent('fett');
+    expect(druck!.querySelector('.markdown p:last-child')).toHaveTextContent('ENDE');
+
+    await userEvent.click(screen.getByRole('button', { name: /vorschau/i }));
+    expect(container.querySelector('.markdown-editor__druck')).toBeNull();
+    expect(container.querySelectorAll('.markdown strong')).toHaveLength(1);
+  });
+
+  it('setzt einen leeren Abschnitt in der Druckfassung als „—" wie der Lesezweig', () => {
+    const { container } = renderMitProviders(
+      <MarkdownEditor unterEbene={1} layout="toggle" druckfassung value="  " onChange={() => {}} />,
+    );
+    expect(container.querySelector('.markdown-editor__druck')).toHaveTextContent(/^—$/);
+  });
+
+  it('rendert ohne `druckfassung` keine Druckfassung (ETB-Schnellerfassung: Tipp-Pfad)', () => {
+    const { container } = renderMitProviders(
+      <MarkdownEditor unterEbene={1} layout="toggle" value="**fett**" onChange={() => {}} />,
+    );
+    expect(container.querySelector('.markdown-editor__druck')).toBeNull();
   });
 
   /**

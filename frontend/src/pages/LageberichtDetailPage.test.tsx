@@ -11,6 +11,8 @@ import * as lageberichteApi from '../api/lageberichte';
 import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { einsatzKeys } from '../api/queryKeys';
 import { ApiError } from '../api/client';
+import { http, HttpResponse } from 'msw';
+import { server } from '../test/server';
 
 vi.mock('../api/einsaetze');
 vi.mock('../api/lageberichte');
@@ -263,5 +265,109 @@ describe('LageberichtDetailPage — gescheiterte Freigabe (LFH-535)', () => {
 
     await waitFor(() => expect(dialog).not.toHaveClass('ant-zoom-leave'));
     expect(within(dialog).queryByText('Abschnitt „Auftrag" ist leer')).toBeNull();
+  });
+});
+
+/**
+ * ── DRUCKWURZEL (LFH-71) ─────────────────────────────────────────────────────────
+ *
+ * Zwilling des Blocks in `BefehlDetailPage.test.tsx`: `druck/druck.css` blendet im Druck
+ * alles außerhalb der Wurzel per `display: none` aus. Hier steht, dass es genau eine gibt
+ * und dass Abschnittstitel und Editor-Vorschau im Entwurf in ihr liegen.
+ */
+describe('LageberichtDetailPage — Druckwurzel (LFH-71)', () => {
+  beforeEach(() => {
+    vi.mocked(einsaetzeApi.ladeEinsatz).mockResolvedValue({
+      id: 1,
+      status: 'aktiv',
+      meine_rolle: 'einsatzleitung',
+      bezeichnung: 'Übung',
+    } as never);
+  });
+
+  function wurzel(): HTMLElement {
+    const alle = document.querySelectorAll<HTMLElement>('[data-lfh="druckwurzel"]');
+    expect(alle).toHaveLength(1);
+    return alle[0];
+  }
+
+  it('Lesezweig: genau eine Wurzel, Abschnittstitel und Text liegen darin', async () => {
+    vi.mocked(lageberichteApi.ladeLagebericht).mockResolvedValue(
+      bericht({ abschnitte: [{ schluessel: 'auftrag', text: 'Lage halten.' }] }) as never,
+    );
+    renderBei('/einsaetze/1/lageberichte/9');
+    const titel = await screen.findByRole('heading', { name: 'Auftrag' });
+    expect(wurzel()).toContainElement(titel);
+    expect(wurzel()).toContainElement(screen.getByText('Lage halten.'));
+  });
+
+  it('Entwurfszweig: Abschnittstitel und Editor-Vorschau liegen in der Wurzel, der Umschalter wird nicht gedruckt', async () => {
+    vi.mocked(lageberichteApi.ladeLagebericht).mockResolvedValue(
+      bericht({
+        status: 'entwurf',
+        abschnitte: [{ schluessel: 'auftrag', text: 'Lage halten.' }],
+      }) as never,
+    );
+    renderBei('/einsaetze/1/lageberichte/9');
+    const umschalter = await screen.findByRole('checkbox', { name: 'Vorschau neben dem Text' });
+    await userEvent.click(umschalter);
+    // Abschnittstitel = Kopf des Akkordeons (steht außerhalb von `.markdown`).
+    expect(wurzel()).toContainElement(screen.getAllByText('Auftrag')[0]);
+    const vorschauen = document.querySelectorAll('.markdown-editor__vorschau');
+    expect(vorschauen.length).toBeGreaterThan(0);
+    for (const v of vorschauen) expect(wurzel()).toContainElement(v as HTMLElement);
+    // Ein Umschalter ist Bedienung, kein Inhalt (spec „Rahmen und schwebende Ebenen").
+    expect(umschalter.closest('.lagebericht-no-print')).not.toBeNull();
+  });
+});
+
+/**
+ * ── DRUCKKOPF UND DRUCKKNOPF (LFH-22) ───────────────────────────────────────────
+ *
+ * Zwilling des Blocks in `BefehlDetailPage.test.tsx`.
+ */
+describe('LageberichtDetailPage — Druckkopf (LFH-22)', () => {
+  beforeEach(() => {
+    vi.mocked(einsaetzeApi.ladeEinsatz).mockResolvedValue({
+      id: 1,
+      status: 'aktiv',
+      meine_rolle: 'einsatzleitung',
+      bezeichnung: 'Übung',
+    } as never);
+    vi.mocked(lageberichteApi.ladeLagebericht).mockResolvedValue(bericht() as never);
+  });
+
+  it('trägt den Druckkopf in der Wurzel: „Lagebericht – Titel", Stand, am Schirm verborgen', async () => {
+    renderBei('/einsaetze/1/lageberichte/9');
+    await screen.findByRole('link', { name: /ETB-Eintrag/ });
+    const kopf = document.querySelector<HTMLElement>('[data-lfh="druckkopf"]');
+    expect(kopf).not.toBeNull();
+    expect(document.querySelector('[data-lfh="druckwurzel"]')).toContainElement(kopf);
+    expect(kopf).toHaveClass('druckkopf--nur-druck');
+    expect(within(kopf!).getByRole('heading', { level: 1, hidden: true })).toHaveTextContent(
+      'Lagebericht – Lage 1',
+    );
+    expect(within(kopf!).getByText('Freigegeben · Version 1')).toBeInTheDocument();
+  });
+
+  it('ruft window.print erst nach geladener Organisation', async () => {
+    const drucke = vi.spyOn(window, 'print').mockImplementation(() => {});
+    let freigeben!: () => void;
+    const tor = new Promise<void>((fertig) => {
+      freigeben = fertig;
+    });
+    server.use(
+      http.get('/api/organisation', async () => {
+        await tor;
+        return HttpResponse.json({ id: 1, name: 'Testorganisation', tz_organisation: null });
+      }),
+    );
+    renderBei('/einsaetze/1/lageberichte/9');
+    await userEvent.click(await screen.findByRole('button', { name: 'Drucken / als PDF' }));
+    await new Promise((fertig) => setTimeout(fertig, 30));
+    expect(drucke).not.toHaveBeenCalled();
+    freigeben();
+    await waitFor(() => expect(drucke).toHaveBeenCalledTimes(1));
+    drucke.mockRestore();
   });
 });

@@ -49,6 +49,8 @@ import { alsBackendZeit, alsOrtszeit } from '../etb/filterZeit';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { LAGEBERICHT_STATUS, StatusBadge } from '../kommunikation';
 import EinsatzSeite from '../components/EinsatzSeite';
+import Druckkopf from '../components/druck/Druckkopf';
+import DruckKnopf from '../components/druck/DruckKnopf';
 import { Paneel, monoStil } from '../components/instrument';
 import './lageberichtPrint.css';
 
@@ -159,6 +161,8 @@ function LageberichtDetail() {
             Überschriften, und ein Paneel rahmt den Entwurf bewusst nicht (s. u.). */}
         <MarkdownEditor
           layout={vorschauNeben ? 'split' : 'toggle'}
+          // Ohne sie druckte das Toggle-Layout sein Textfeld (LFH-71, `lageberichtPrint.css`).
+          druckfassung
           unterEbene={1}
           variante="dokument"
           autoSize={{ minRows: 6 }}
@@ -329,7 +333,7 @@ function LageberichtDetail() {
   };
 
   return (
-    <div className="lagebericht-print-root">
+    <div className="lagebericht-print-root" data-lfh="druckwurzel">
       <FreigabeDialog
         offen={freigabeWerte !== null}
         titel="Lagebericht freigeben?"
@@ -350,6 +354,22 @@ function LageberichtDetail() {
           Die Aktionsleiste bricht im Kopf selbst um (C8/M73: „Freigeben" bleibt auf 390 px
           erreichbar). Im Druck blendet `lageberichtPrint.css` den Kopf aus, wie vorher die
           Kopfzeile mit `lagebericht-no-print`. */}
+      {/* Der gemeinsame Druckkopf (LFH-22): nur auf Papier, am Schirm trägt der Seitenkopf
+          dieselben Angaben. In der Druckwurzel, weil `druck/druck.css` alles außerhalb
+          ausblendet. */}
+      <Druckkopf
+        dokumentart="Lagebericht"
+        titel={bericht.titel}
+        einsatz={einsatz}
+        sichtbarkeit="druck"
+        zeilen={[
+          {
+            etikett: 'Stand',
+            wert: `${LAGEBERICHT_STATUS[bericht.status].label} · Version ${bericht.version}`,
+          },
+          { etikett: 'Zeitstand', wert: <ZeitAnzeige wert={bericht.zeitstand} /> },
+        ]}
+      />
       <EinsatzSeite
         // Editor: reine Schreibfläche, ausdrücklich in Lesebreite.
         breite="schmal"
@@ -380,7 +400,7 @@ function LageberichtDetail() {
         aktionen={
           <div className="lagebericht-no-print">
             <Space wrap>
-              <Button onClick={() => window.print()}>Drucken / als PDF</Button>
+              <DruckKnopf />
               {!istEntwurf && bericht.etb_eintrag_id != null && (
                 <Link to={etbPfad(einsatzId, { eintrag: bericht.etb_eintrag_id })}>
                   Zum ETB-Eintrag
@@ -480,7 +500,9 @@ function LageberichtDetail() {
                 style={{ width: '100%' }}
               />
             </Form.Item>
+            {/* Umschalter = Bedienung, kein Inhalt: im Druck weg (LFH-71). */}
             <Checkbox
+              className="lagebericht-no-print"
               checked={vorschauNeben}
               onChange={(e) => setVorschauNeben(e.target.checked)}
               style={{ marginBottom: token.margin }}

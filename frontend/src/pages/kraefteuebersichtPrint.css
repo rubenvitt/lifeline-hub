@@ -1,10 +1,3 @@
-/* Gegenstück zu `.kraefte-no-print`: der Kopf des gedruckten Meldeblatts (LFH-338 · C3).
-   Er steht am Schirm nicht, weil dieselben Angaben dort in Breadcrumb, Kopfzeile und
-   Filterleiste stehen — im Ausdruck fehlten sie ersatzlos. */
-.kraefte-nur-print {
-  display: none;
-}
-
 /* Problemzeile des Meldebilds (Neuentwurf S6): eine Einheit mit Ausfall. Die Tönung ist
    Verstärkung, der zweite Kanal ist die Ausfall-Zahl in der Statusspalte.
    An die `td`, nicht an die `tr`: antd färbt die Zellen, ein Hintergrund am `tr` bliebe
@@ -17,27 +10,27 @@
   background-color: var(--lfh-problem-zeile);
 }
 
+/* Ausblenden des App-Rahmens, Druck im normalen Fluss, Papierfarben, Umbruchregeln und die
+   Wiederholung des Tabellenkopfs je Blatt liegen seit LFH-71 für alle Druckstücke in
+   `druck/druck.css`; `.kraefte-print-root` trägt dafür `data-lfh="druckwurzel"`. Hier
+   stehen nur die Eigenheiten des Meldebilds. */
 @media print {
-  body * {
-    visibility: hidden;
-  }
-  .kraefte-print-root,
-  .kraefte-print-root * {
-    visibility: visible;
-  }
-  .kraefte-print-root {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    padding: 0;
-  }
   .kraefte-no-print {
     display: none !important;
   }
 
+  /* Der Seitenkopf (`EinsatzSeite`) ist Bedienung — Titel, Meta, Datenstand, Aktionen. Er
+     liegt in der Druckwurzel, weil die ganze `EinsatzSeite` darin liegt; `druck.css` blendet
+     nur aus, was AUSSERHALB der Wurzel steht. Ohne diese Regel stünden „Meldebild" und der
+     Umfang doppelt auf dem Blatt: einmal im Seitenkopf, einmal im Druckkopf darunter. Wie in
+     `befehlPrint.css` und `lageberichtPrint.css`. */
+  .kraefte-print-root [data-lfh='seitenkopf'] {
+    display: none !important;
+  }
+
   /* ── Neutralisierer für die Tabelle des Primitivs (LFH-330 · B2) ──────────────
-     Bis B2 schaltete dieses Blatt NUR `visibility`. Das genügte, solange das
+     Bis B2 schaltete dieses Blatt NUR `visibility` (seit LFH-71 blendet `druck.css` per
+     `display: none` aus). Das genügte, solange das
      Meldebild ein rohes Tabellenelement ohne Bildlauf war. `KatalogTabelle` setzt
      nun unbedingt einen waagerechten Bildlaufcontainer, eine stehende Kopfzeile
      (zwei getrennte Tabellen plus Sticky-Holder) und `position: sticky` an Spalte 0.
@@ -72,25 +65,22 @@
     display: none !important;
   }
 
-  /* Der Kopf des Meldeblatts — nur hier sichtbar. */
-  .kraefte-nur-print {
-    display: block !important;
-  }
-
   /* ── Mehrseitige Bäume ────────────────────────────────────────────────────────
-     Ein Meldebild mit 40 Kräften geht über mehr als ein Blatt. Ohne diese zwei Regeln
-     stehen die Spaltenköpfe nur auf Blatt 1 — ab Blatt 2 sind „1/0/5//6" und drei
-     Statuszahlen unbeschriftete Spalten —, und eine Zeile kann mitten durch den
-     Blattrand laufen.
+     Ein Meldebild mit 40 Kräften geht über mehr als ein Blatt. Die Wiederholung der
+     Spaltenköpfe je Blatt (`thead { display: table-header-group }`) und das Verbot, eine
+     Zeile durch den Blattrand zu schneiden (`tr { break-inside: avoid }`), gelten seit
+     LFH-71 für jede Druckwurzel und stehen in `druck/druck.css`.
 
-     Beide sind für jsdom unsichtbar (`@media print` wird dort nicht ausgewertet); geprüft
-     wird deshalb der CSS-TEXT, wie beim Neutralisierer-Block darüber. Der Layoutbeweis
-     über mehrere Blätter ist auch in Playwright nicht zu haben — `emulateMedia` liefert
-     das Druck-Layout, aber keine Seitenumbrüche. */
-  .kraefte-print-root thead {
-    display: table-header-group;
-  }
-  .kraefte-print-root tr {
-    break-inside: avoid;
-  }
+     Berichtigt (Review Welle B): die Kopfregel allein wirkte hier NICHT. `KatalogTabelle`
+     rendert am Bildschirm mit `sticky`, und dann legt rc-table den Kopf in eine eigene
+     Tabelle im Sticky-Halter — der Körper, der über die Blätter läuft, hatte kein `thead`.
+     Das Primitiv schaltet `sticky` deshalb bei `beforeprint` ab und bei `afterprint` wieder
+     an (`components/druck/useDruckModus.ts`); dann stehen Kopf und Körper in EINER Tabelle.
+     Die Neutralisierer oben bleiben für einen Druck ohne `beforeprint` (z. B. `page.pdf()`).
+
+     Berichtigt (LFH-71): hier stand, der Layoutbeweis über mehrere Blätter sei „auch in
+     Playwright nicht zu haben". `emulateMedia` liefert tatsächlich keine Seitenumbrüche —
+     `page.pdf()` in Chromium aber sehr wohl ein umbrochenes Dokument, dessen Seiten sich
+     zählen lassen (`e2e/druck-fluss.spec.ts`). Nicht automatisch prüfbar bleiben Firefox und
+     Safari (LFH-729). */
 }

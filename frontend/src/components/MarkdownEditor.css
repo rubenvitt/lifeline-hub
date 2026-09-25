@@ -23,6 +23,13 @@
   margin-bottom: 6px;
 }
 
+/* Druckfassung des toggle-Layouts (Prop `druckfassung`): am Bildschirm nie sichtbar — auch
+   nicht beim Druck ohne Druckwurzel. Sichtbar macht sie allein das Druck-Stylesheet der
+   Seite (`pages/lageberichtPrint.css`), das dort das Textfeld ausblendet. */
+.markdown-editor__druck {
+  display: none;
+}
+
 /* ---------- split: Eingabe links, Vorschau rechts ---------- */
 .markdown-editor--split {
   display: flex;

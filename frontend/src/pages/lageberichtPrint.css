@@ -1,19 +1,10 @@
+/* Druck des Lageberichts — nur die Eigenheiten dieser Seite.
+
+   Ausblenden des App-Rahmens, Druck im normalen Fluss, Papierfarben und Umbruchregeln
+   liegen seit LFH-71 für alle Druckstücke in `druck/druck.css`; die Wurzel
+   `.lagebericht-print-root` trägt dafür `data-lfh="druckwurzel"`. Hier stehen nur noch die
+   Bedienung (`lagebericht-no-print`, Seitenkopf) und der Entwurfsausdruck (M86). */
 @media print {
-  /* Alles ausblenden, außer dem markierten Druckbereich. */
-  body * {
-    visibility: hidden;
-  }
-  .lagebericht-print-root,
-  .lagebericht-print-root * {
-    visibility: visible;
-  }
-  .lagebericht-print-root {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    padding: 0;
-  }
   /* Interaktive Elemente nie drucken. */
   .lagebericht-no-print {
     display: none !important;
@@ -50,14 +41,20 @@
     display: none !important;
   }
 
-  /* Toggle-Layout — die VORGABE der Seite (`vorschauNeben` startet auf `false`): dort
-     ist das Textfeld NICHT in `.markdown-editor__eingabe` gewickelt
-     (`MarkdownEditor.tsx:72`) und bei geschlossener Vorschau der einzige Träger des
-     Abschnittstextes. Es weicht deshalb nur, wenn tatsächlich eine gerenderte Vorschau
-     danebensteht (`:has`) — eine unbedingte Regel auf `textarea` druckte den Abschnitt
-     LEER, und das wäre schlimmer als doppelt. */
-  .lagebericht-print-root .markdown-editor--toggle:has(.markdown-editor__vorschau) textarea {
+  /* Toggle-Layout — die VORGABE der Seite (`vorschauNeben` startet auf `false`): dort ist
+     das Textfeld NICHT in `.markdown-editor__eingabe` gewickelt (`MarkdownEditor.tsx`).
+     Es weicht im Druck IMMER — daneben steht stets eine gerenderte Fassung: bei offener
+     Vorschau die Vorschau, sonst die Druckfassung (`druckfassung`, am Bildschirm
+     `display: none` aus `MarkdownEditor.css`). Berichtigt (Review Welle B): vorher wich das
+     Textfeld nur bei offener Vorschau; in der Vorgabe kam die `<textarea>` aufs Papier,
+     Rohtext in Bildschirmhöhe, langer Text abgeschnitten. Die Seite MUSS `druckfassung`
+     setzen, sonst druckte ein Abschnitt leer — `lageberichtPrint.test.ts` prüft beides. */
+  .lagebericht-print-root .markdown-editor--toggle textarea {
     display: none !important;
+  }
+
+  .lagebericht-print-root .markdown-editor__druck {
+    display: block !important;
   }
 
   /* Beschriftung und Vorschau-Umschalter des Editors sind Bedienung, kein Inhalt —
@@ -66,58 +63,6 @@
   .lagebericht-print-root .markdown-editor__label,
   .lagebericht-print-root .markdown-editor .ant-btn {
     display: none !important;
-  }
-
-  /* Markdown-Inhalte im Druckbereich */
-  .lagebericht-druck .markdown h1,
-  .lagebericht-druck .markdown h2,
-  .lagebericht-druck .markdown h3,
-  .lagebericht-druck .markdown h4,
-  .lagebericht-druck .markdown h5,
-  .lagebericht-druck .markdown h6 {
-    font-weight: 600;
-    margin: 0.75em 0 0.3em;
-    line-height: 1.3;
-    page-break-after: avoid;
-  }
-
-  .lagebericht-druck .markdown ul,
-  .lagebericht-druck .markdown ol {
-    padding-left: 1.5em;
-    margin: 0.4em 0;
-  }
-
-  /* Blöcke nicht über Seitenumbrüche zerreißen */
-  .lagebericht-druck .markdown ul,
-  .lagebericht-druck .markdown ol,
-  .lagebericht-druck .markdown p,
-  .lagebericht-druck .markdown blockquote {
-    page-break-inside: avoid;
-  }
-
-  /* Links im Druck nicht als grelle Farbe anzeigen */
-  .lagebericht-druck .markdown a {
-    color: inherit;
-    text-decoration: underline;
-  }
-
-  /* ---- Papier ist hell (Neuentwurf „Instrumententafel", 21.09.2026) ----
-
-     Seit dem Neuentwurf startet die App im Nachtbetrieb: Text `text` ist fast weiß, die
-     Flächen (`paneel`, `flaeche`) stehen INLINE fast schwarz. Browser drucken Hintergründe
-     per Vorgabe nicht — übrig bliebe weißer Text auf weißem Papier. Deshalb setzt der
-     Druckbereich Schrift und Grund unbedingt auf Papierfarben; `!important` ist Pflicht,
-     weil die Bausteine ihre Farben als Inline-Stil tragen und der sonst gewinnt. Benannte
-     Farben statt Hex: Druck ist kein Rollenwert, und Gate 5 hält `theme/` als einzige
-     Quelle für Rollenfarben. */
-  body {
-    background: white !important;
-  }
-  .lagebericht-print-root,
-  .lagebericht-print-root * {
-    color: black !important;
-    background: transparent !important;
-    box-shadow: none !important;
   }
 
   /* Der Seitenkopf (`EinsatzSeite`) ist Bedienung — Ortspfad, Datenstand, Aktionen. Er
