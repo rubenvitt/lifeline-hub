@@ -87,14 +87,29 @@ pub async fn erfassen(
             ));
         }
         if let Some(anzeige) = repo::laden_nach_client_id(&state.pool, einsatz_id, cid).await? {
+            // Nur DERSELBE Eintrag ist ein Replay (Review C1): zwei Tabs mit demselben Entwurf
+            // senden sonst unter einer client_id verschiedenen Wortlaut, und der zweite bekäme
+            // still den ersten als Erfolg zurück. Abweichung → 409, der Client behält den Text.
+            let gebunden: Vec<i64> = anzeige.anhaenge.iter().map(|a| a.id).collect();
+            if !repo::ist_derselbe_eintrag(
+                anzeige.typ.as_str(),
+                &anzeige.inhalt,
+                &gebunden,
+                &req.typ,
+                &req.inhalt,
+                &req.anhang_ids,
+            ) {
+                return Err(AppError::Conflict(repo::CLIENT_ID_KONFLIKT.into()));
+            }
             return Ok((StatusCode::CREATED, Json(anzeige)));
         }
     }
     fordere_aktiv(&einsatz)?;
 
-    // Anhänge (LFH-117): erst NACH der Replay-Erkennung — ein Replay prüft seine Anhänge nicht,
-    // sie sind ja gebunden. Doppelte IDs gelten als eine (wie im Chat); ob sie existieren und
-    // frei sind, prüft das Repository in derselben Transaktion wie den Insert.
+    // Anhänge (LFH-117): erst NACH der Replay-Erkennung — ein Replay prüft nicht, ob seine
+    // Anhänge frei sind (sie sind ja gebunden), nur ob es dieselben sind. Doppelte IDs gelten
+    // als eine (wie im Chat); ob sie existieren und frei sind, prüft das Repository in
+    // derselben Transaktion wie den Insert.
     let mut anhang_ids = req.anhang_ids;
     anhang_ids.sort_unstable();
     anhang_ids.dedup();

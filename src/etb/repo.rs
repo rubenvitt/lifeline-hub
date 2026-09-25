@@ -107,6 +107,37 @@ pub async fn anlegen(
 /// weggeräumt wurde, steht damit verständlich unter „abgelehnt".
 pub const ANHANG_UNBEKANNT: &str = "Anhang unbekannt oder nicht mehr vorhanden";
 
+/// Wortlaut des 409, wenn eine `client_id` schon für einen Eintrag mit ANDEREM Inhalt steht
+/// (Review C1): zwei Browser-Tabs mit demselben Entwurf. Er steht auch unter „abgelehnt"
+/// der Offline-Queue, sagt deshalb, was mit dem Wortlaut ist und was „Erneut senden" tut.
+pub const CLIENT_ID_KONFLIKT: &str = "client_id bereits für einen anderen Eintrag verwendet: \
+     dieser Wortlaut ist nicht erfasst. Erneut senden legt ihn als eigenen Eintrag an.";
+
+/// Ob ein Wiederholversuch derselben `client_id` wirklich DERSELBE Eintrag ist (Review C1):
+/// gleicher Typ, gleicher Inhalt (getrimmt) und dieselben Anhänge als Menge. Zeitstempel
+/// zählen nicht — `erfasst_lokal_at` entsteht je Absenden neu. Die Anhänge zählen, weil ein
+/// zweiter Tab mit demselben Wortlaut, aber weiteren Fotos sonst still seine Fotos verlöre;
+/// ein echter Wiederholversuch trägt immer dieselben IDs (die Queue speichert sie, der Client
+/// hält hochgeladene Dateien je `File` fest). Reihenfolge und Dubletten zählen nicht.
+pub fn ist_derselbe_eintrag(
+    typ_bestand: &str,
+    inhalt_bestand: &str,
+    anhaenge_bestand: &[i64],
+    typ: &str,
+    inhalt: &str,
+    anhang_ids: &[i64],
+) -> bool {
+    let menge = |ids: &[i64]| {
+        let mut v = ids.to_vec();
+        v.sort_unstable();
+        v.dedup();
+        v
+    };
+    typ_bestand == typ
+        && inhalt_bestand.trim() == inhalt.trim()
+        && menge(anhaenge_bestand) == menge(anhang_ids)
+}
+
 /// Legt einen client-erfassten ETB-Eintrag idempotent an (F03/LFH-261), optional mit
 /// Anhängen (LFH-117).
 ///
@@ -146,6 +177,29 @@ pub async fn anlegen_idempotent(
     let (id, war_neu) = crate::write_retry!(pool, |conn| {
         if let Some(cid) = client_id {
             if let Some(id) = bestehende_client_id(&mut *conn, einsatz_id, cid).await? {
+                // Die Route prüft das schon vor der Transaktion; hier hält es das Rennen
+                // zweier Tabs, die beide an der frühen Prüfung vorbeikamen.
+                let (typ, inhalt): (String, String) =
+                    sqlx::query_as("SELECT typ, inhalt FROM etb_eintrag WHERE id = ?")
+                        .bind(id)
+                        .fetch_one(&mut *conn)
+                        .await?;
+                let gebunden: Vec<i64> = sqlx::query_scalar(
+                    "SELECT anhang_id FROM etb_eintrag_anhang WHERE eintrag_id = ?",
+                )
+                .bind(id)
+                .fetch_all(&mut *conn)
+                .await?;
+                if !ist_derselbe_eintrag(
+                    &typ,
+                    &inhalt,
+                    &gebunden,
+                    daten.typ,
+                    daten.inhalt,
+                    anhang_ids,
+                ) {
+                    return Err(AppError::Conflict(CLIENT_ID_KONFLIKT.into()));
+                }
                 return Ok((id, false));
             }
         }
@@ -771,7 +825,7 @@ mod tests {
             anlegen_idempotent(&p1, einsatz, benutzer, Some("race-1"), &[], daten("A")).await
         });
         let t2 = tokio::spawn(async move {
-            anlegen_idempotent(&p2, einsatz, benutzer, Some("race-1"), &[], daten("B")).await
+            anlegen_idempotent(&p2, einsatz, benutzer, Some("race-1"), &[], daten("A")).await
         });
         let (r1, r2) = tokio::join!(t1, t2);
         let (e1, _) = r1.unwrap().expect("Task 1 idempotent OK");
@@ -837,6 +891,56 @@ mod tests {
                     .unwrap();
             assert_eq!(links, 1, "Runde {runde}: der Anhang hängt einmal");
         }
+    }
+
+    /// Review C1 (WICHTIG 1), Transaktionsebene: dieselbe client_id mit anderem Inhalt, Typ
+    /// oder anderen Anhängen ist ein Konflikt (409), kein Replay — auch wenn die Route ihre
+    /// frühe Prüfung übersprungen hätte (Rennen zweier Tabs).
+    #[tokio::test]
+    async fn gleiche_client_id_mit_anderem_inhalt_ist_konflikt() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let a = freier_anhang(&pool, einsatz, benutzer, "a.jpg").await;
+        let b = freier_anhang(&pool, einsatz, benutzer, "b.jpg").await;
+        let (erst, _) =
+            anlegen_idempotent(&pool, einsatz, benutzer, Some("c-x"), &[a], daten("Tab 1"))
+                .await
+                .unwrap();
+
+        for (anhaenge, d) in [
+            (vec![a], daten("Tab 2")),
+            (
+                vec![a],
+                EintragDaten {
+                    typ: "lage",
+                    ..daten("Tab 1")
+                },
+            ),
+            (vec![a, b], daten("Tab 1")),
+        ] {
+            let r = anlegen_idempotent(&pool, einsatz, benutzer, Some("c-x"), &anhaenge, d).await;
+            assert!(matches!(r, Err(AppError::Conflict(_))), "{r:?}");
+        }
+        assert_eq!(verknuepfte_anhaenge(&pool).await, 1, "b bleibt frei");
+        let eintraege: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM etb_eintrag")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(eintraege, 1);
+
+        // Gleicher Inhalt mit anderem Leerraum: Replay.
+        let (wieder, neu) = anlegen_idempotent(
+            &pool,
+            einsatz,
+            benutzer,
+            Some("c-x"),
+            &[a],
+            daten("  Tab 1 "),
+        )
+        .await
+        .unwrap();
+        assert!(!neu);
+        assert_eq!(wieder.id, erst.id);
     }
 
     #[tokio::test]
@@ -1588,18 +1692,13 @@ mod tests {
                 .await
                 .unwrap();
 
-        // Derselbe Eintrag noch einmal: `a` ist inzwischen gebunden, und eine unbekannte ID
-        // steht dabei. Beides darf den Replay nicht stören — er prüft die Anhänge nicht.
-        let (wieder, neu) = anlegen_idempotent(
-            &pool,
-            einsatz,
-            benutzer,
-            Some("c-3"),
-            &[a, 4711],
-            daten("Foto"),
-        )
-        .await
-        .unwrap();
+        // Derselbe Eintrag noch einmal: `a` ist inzwischen gebunden. Das darf den Replay nicht
+        // stören — er prüft nicht, ob die Anhänge frei sind, nur ob es DIESELBEN sind (Review
+        // C1; andere Anhänge wären ein Konflikt, `gleiche_client_id_mit_anderem_inhalt_…`).
+        let (wieder, neu) =
+            anlegen_idempotent(&pool, einsatz, benutzer, Some("c-3"), &[a], daten("Foto"))
+                .await
+                .unwrap();
         assert!(!neu);
         assert_eq!(wieder.id, erst.id);
         assert_eq!(ids(&wieder), vec![a]);

@@ -746,3 +746,137 @@ async fn fremder_ungebundener_upload_laesst_sich_nicht_binden() {
     assert_eq!(s, StatusCode::CREATED, "{v}");
     assert_eq!(anhang_ids(&v), vec![a]);
 }
+
+// ---------- client_id: Replay nur bei gleichem Inhalt (Review C1, WICHTIG 1) ----------
+
+/// Zwei Browser-Tabs mit demselben Entwurf X: Tab 1 sendet, Tab 2 bearbeitet X weiter und
+/// sendet mit derselben client_id. Der Replay darf dann NICHT den Eintrag aus Tab 1 als
+/// Erfolg zurückgeben — sonst schlösse Tab 2 seinen Entwurf, und der neue Wortlaut wäre weg.
+#[tokio::test]
+async fn gleiche_client_id_mit_anderem_inhalt_ist_409() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", ADMIN_PW).await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+
+    let (s, erst) = erfassen(
+        &app,
+        &admin,
+        einsatz,
+        r#"{"typ":"meldung","inhalt":"Deich hält","client_id":"entwurf-x"}"#,
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{erst}");
+
+    // Inhalt abweichend → 409 mit sprechendem Grund, kein zweiter Eintrag.
+    let (s, v) = erfassen(
+        &app,
+        &admin,
+        einsatz,
+        r#"{"typ":"meldung","inhalt":"Deich bricht","client_id":"entwurf-x"}"#,
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+    assert!(
+        v["error"]
+            .as_str()
+            .unwrap()
+            .contains("client_id bereits für einen anderen Eintrag verwendet"),
+        "{v}"
+    );
+    // Typ abweichend → ebenso.
+    let (s, _) = erfassen(
+        &app,
+        &admin,
+        einsatz,
+        r#"{"typ":"lage","inhalt":"Deich hält","client_id":"entwurf-x"}"#,
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT);
+    assert_eq!(
+        zaehle(
+            &pool,
+            "SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ?",
+            einsatz
+        )
+        .await,
+        1
+    );
+
+    // Gleicher Inhalt (nur Leerraum und Zeitstempel anders) bleibt ein Replay.
+    let (s, wieder) = erfassen(
+        &app,
+        &admin,
+        einsatz,
+        r#"{"typ":"meldung","inhalt":"  Deich hält \n","client_id":"entwurf-x","erfasst_lokal_at":"2026-09-25T10:05:00Z"}"#,
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{wieder}");
+    assert_eq!(wieder["id"], erst["id"]);
+}
+
+/// Anhänge gehören zum Inhalt: dieselben Anhänge in anderer Reihenfolge sind ein Replay,
+/// andere Anhänge ein Konflikt — und die neuen werden dabei nicht gebunden.
+#[tokio::test]
+async fn gleiche_client_id_mit_anderen_anhaengen_ist_409_ohne_bindung() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", ADMIN_PW).await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let a = hochgeladen(&app, einsatz, &admin, "a.jpg").await;
+    let b = hochgeladen(&app, einsatz, &admin, "b.jpg").await;
+    let c = hochgeladen(&app, einsatz, &admin, "c.jpg").await;
+
+    let (s, erst) = erfassen(
+        &app,
+        &admin,
+        einsatz,
+        &format!(r#"{{"typ":"meldung","inhalt":"Fotos","client_id":"x2","anhang_ids":[{a},{b}]}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{erst}");
+
+    let (s, wieder) = erfassen(
+        &app,
+        &admin,
+        einsatz,
+        &format!(
+            r#"{{"typ":"meldung","inhalt":"Fotos","client_id":"x2","anhang_ids":[{b},{a},{a}]}}"#
+        ),
+    )
+    .await;
+    assert_eq!(
+        s,
+        StatusCode::CREATED,
+        "Reihenfolge und Dubletten zählen nicht: {wieder}"
+    );
+    assert_eq!(wieder["id"], erst["id"]);
+
+    let (s, v) = erfassen(
+        &app,
+        &admin,
+        einsatz,
+        &format!(
+            r#"{{"typ":"meldung","inhalt":"Fotos","client_id":"x2","anhang_ids":[{a},{b},{c}]}}"#
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+    assert_eq!(
+        zaehle(
+            &pool,
+            "SELECT COUNT(*) FROM etb_eintrag_anhang WHERE anhang_id = ?",
+            c
+        )
+        .await,
+        0,
+        "der neue Anhang bleibt frei"
+    );
+    assert_eq!(
+        zaehle(
+            &pool,
+            "SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ?",
+            einsatz
+        )
+        .await,
+        1
+    );
+}
