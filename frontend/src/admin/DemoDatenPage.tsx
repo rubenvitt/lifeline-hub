@@ -7,6 +7,7 @@ import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import { Datenfeld, Datenraster, Paneel, useRollen } from '../components/instrument';
 import { entferneDemoDaten, importiereDemoDaten, importiereDemoDatenNeu } from '../api/demoDaten';
+import { istKonflikt } from '../api/client';
 import { globalKeys } from '../api/queryKeys';
 import type {
   DemoBerichtZeile,
@@ -151,6 +152,12 @@ export default function DemoDatenPage() {
       // ihn trotzdem neu, damit Menü und Einsatzliste an derselben Quelle hängen.
       qc.setQueryData(globalKeys.demoDaten(), neu);
       void invalidiereNachDemoVorgang(qc, [altEinsatzId, neu.import?.einsatz_id]);
+    },
+    // Ein 409 heißt, der Stand ist anderswo schon geändert worden (zweiter Tab, zweiter
+    // Admin). Neu laden, damit die Seite nicht weiter den Vorgang anbietet, der gerade
+    // gescheitert ist. Der Alert bleibt stehen: `vorgang.error` hängt nicht an der Abfrage.
+    onError: (e, { altEinsatzId }) => {
+      if (istKonflikt(e)) void invalidiereNachDemoVorgang(qc, [altEinsatzId]);
     },
   });
 

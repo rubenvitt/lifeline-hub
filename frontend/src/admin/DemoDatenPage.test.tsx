@@ -366,6 +366,35 @@ describe('DemoDatenPage — Fehler stehen an der Seite (LFH-345)', () => {
     expect(screen.getByText('24.09.2026 10:00')).toBeInTheDocument();
   });
 
+  it('409: der Stand wird neu geladen, der Alert bleibt stehen', async () => {
+    // Ein 409 heißt: jemand anderes hat den Stand schon geändert (zweiter Tab, zweiter
+    // Admin). Ohne Neuladen böte die Seite weiter genau den Vorgang an, der gerade
+    // gescheitert ist, und ein zweiter Klick liefe in denselben 409.
+    const z = demoServer(IMPORTIERT);
+    let deletes = 0;
+    server.use(
+      http.get('/api/demo-daten', () => {
+        z.get += 1;
+        // Ab dem gescheiterten DELETE liefert der Server den Stand des anderen Tabs.
+        return HttpResponse.json(deletes > 0 ? ENTFERNT : IMPORTIERT);
+      }),
+      http.delete('/api/demo-daten', () => {
+        deletes += 1;
+        return HttpResponse.json({ error: 'Es sind keine Demo-Daten importiert' }, { status: 409 });
+      }),
+    );
+    setup(admin);
+    await userEvent.click(await screen.findByRole('button', { name: 'Entfernen' }));
+    const dialog = await offenerDialog('Demo-Daten entfernen?');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Endgültig entfernen' }));
+    expect(await screen.findByText('Es sind keine Demo-Daten importiert')).toBeInTheDocument();
+    await waitFor(() => expect(z.get).toBe(2));
+    const stand = screen.getByRole('region', { name: 'Stand' });
+    expect(await within(stand).findByText('Nicht importiert')).toBeInTheDocument();
+    expect(screen.getByText('Entfernen fehlgeschlagen')).toBeInTheDocument();
+    expect(screen.getByText('Es sind keine Demo-Daten importiert')).toBeInTheDocument();
+  });
+
   it('der Alert geht beim nächsten Vorgang weg', async () => {
     demoServer(NICHT_IMPORTIERT);
     let erster = true;
