@@ -300,6 +300,52 @@ async fn etb_zeilen(pool: &SqlitePool, e: i64) -> Vec<Etb> {
         .collect()
 }
 
+fn alle_gepflanzten() -> impl Iterator<Item = &'static str> {
+    GEHEIM
+        .iter()
+        .copied()
+        .chain(AUSNAHME_WERTE.iter().map(|(w, _)| *w))
+}
+
+/// Inhalt ALLER Scrub-Spalten aller Registry-Tabellen, eingegrenzt auf den Einsatz genau wie
+/// die Schwärzung (Scoping und Zeilenfilter aus `schwaerzung_registry::TABELLEN`), als ein
+/// Text. Tabellen- und Spaltennamen sind Registry-Konstanten, nie Eingaben.
+async fn scrub_inhalt(pool: &SqlitePool, einsatz_id: i64) -> String {
+    use lifeline_hub::einsatz::schwaerzung_registry::{Klassifikation, Scoping, TABELLEN};
+    let mut text = String::new();
+    for regel in TABELLEN {
+        let basis = match regel.scoping {
+            Scoping::SelbstId => "id = ?".to_string(),
+            Scoping::EinsatzId => "einsatz_id = ?".to_string(),
+            Scoping::UeberParent { fk, parent } => {
+                format!("{fk} IN (SELECT id FROM {parent} WHERE einsatz_id = ?)")
+            }
+        };
+        let bedingung = match regel.zeilenfilter {
+            Some(f) => format!("{basis} AND ({f})"),
+            None => basis,
+        };
+        for spalte in regel.spalten {
+            if !matches!(spalte.klassifikation, Klassifikation::Scrub(_)) {
+                continue;
+            }
+            let werte: Vec<Option<Vec<u8>>> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+                "SELECT CAST({} AS BLOB) FROM {} WHERE {bedingung}",
+                spalte.spalte, regel.tabelle
+            )))
+            .bind(einsatz_id)
+            .fetch_all(pool)
+            .await
+            .unwrap_or_else(|e| panic!("{}.{}: {e}", regel.tabelle, spalte.spalte));
+            for w in werte.into_iter().flatten() {
+                text.push_str(&String::from_utf8_lossy(&w));
+                text.push('\n');
+            }
+        }
+    }
+    text
+}
+
 /// Die Prüfungen, die während der Karenz UND nach der Schwärzung gelten.
 async fn pruefe_skelett(
     app: &axum::Router,
@@ -621,6 +667,17 @@ async fn ak3_person_tier_schaden_ueber_frist_und_karenz() {
         "Vorbedingung: noch nicht geschwärzt"
     );
 
+    // Vorbedingung der Quellzeilen-Prüfung nach der Schwärzung: jeder gepflanzte Wert steht
+    // JETZT in einer Scrub-Spalte, die der Scan liest. Fehlt einer, könnte die spätere
+    // Abwesenheit nicht rot werden (Review LFH-23).
+    let vorher = scrub_inhalt(&pool, e).await;
+    for w in alle_gepflanzten() {
+        assert!(
+            vorher.contains(w),
+            "Vorbedingung: „{w}“ steht vor der Schwärzung in keiner Scrub-Spalte, die der Scan liest"
+        );
+    }
+
     // 5. Schwärzung nach der Karenz, dieselben Prüfungen.
     let geloescht: String = sqlx::query_scalar("SELECT geloescht_at FROM einsatz WHERE id = ?")
         .bind(e)
@@ -643,22 +700,12 @@ async fn ak3_person_tier_schaden_ueber_frist_und_karenz() {
         "Archivakte trägt vor und nach der Schwärzung dieselben Felder"
     );
 
-    // Die Quellzeilen tragen die Werte nicht mehr.
-    let zeilen: String = sqlx::query_scalar(
-        "SELECT COALESCE(p.name,'')||COALESCE(p.vorname,'')||COALESCE(p.melder_kontakt,'')||COALESCE(p.notiz,'') \
-            ||COALESCE(t.halter_kontakt,'')||COALESCE(t.kennzeichnung,'')||COALESCE(t.abschluss_ziel,'') \
-            ||s.ort||s.beschreibung||COALESCE(s.geschaedigt_kontakt,'')||COALESCE(s.uebergeben_an,'') \
-            ||COALESCE(e.einsatzort,'')||COALESCE(e.sachverhalt,'')||COALESCE(e.meldende_stelle,'') \
-         FROM einsatz e JOIN einsatz_person p ON p.einsatz_id = e.id \
-           JOIN einsatz_tier t ON t.einsatz_id = e.id JOIN einsatz_schaden s ON s.einsatz_id = e.id \
-         WHERE e.id = ?",
-    )
-    .bind(e)
-    .fetch_one(&pool)
-    .await
-    .unwrap();
-    for w in GEHEIM.iter().chain(AUSNAHME_WERTE.iter().map(|(w, _)| w)) {
-        assert!(!zeilen.contains(w), "„{w}“ überlebt in der Quellzeile");
+    // Die Quellzeilen tragen die Werte nicht mehr: JEDE Scrub-Spalte JEDER Registry-Tabelle
+    // des Einsatzes wird gelesen, nicht eine Handliste. Dass die Prüfung für jeden Wert rot
+    // werden KANN, belegt die Vorbedingung oben (derselbe Scan fand jeden Wert vorher).
+    let nachher = scrub_inhalt(&pool, e).await;
+    for w in alle_gepflanzten() {
+        assert!(!nachher.contains(w), "„{w}“ überlebt in einer Scrub-Spalte");
     }
 
     // Archiv-ETB (Typ System) mit Frist, Vormerkung und Schwärzung.
