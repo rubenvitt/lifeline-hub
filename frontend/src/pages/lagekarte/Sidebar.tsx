@@ -1,6 +1,7 @@
 import {
   Button,
   Dropdown,
+  Input,
   Modal,
   Radio,
   Slider,
@@ -19,6 +20,7 @@ import {
   FullscreenOutlined,
   LockOutlined,
   MoreOutlined,
+  SearchOutlined,
   UploadOutlined,
 } from '@ant-design/icons';
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
@@ -83,6 +85,39 @@ const NICHT_VERORTET_LABEL: Record<NichtVerortet['typ'], string> = {
   abschnitt: 'Abschnitt',
   betreuungsstelle: 'Betreuungsstelle',
 };
+
+/**
+ * Ab wie vielen Einträgen „Nicht verortet" ein Suchfeld trägt (LFH-360).
+ *
+ * Fünf, weil die Liste in der 300 px breiten Leiste ab dort zu scrollen beginnt — darunter
+ * ist Hinsehen schneller als Tippen, und ein dauerhaft stehendes Feld ließe die Leiste im
+ * Normalfall zuwachsen. Dieselbe Abwägung wie `SUCHE_AB` der Einsatzauswahl, dort acht.
+ */
+export const NICHT_VERORTET_SUCHE_AB = 5;
+
+/**
+ * Filter der Liste „Nicht verortet" (LFH-360): Teilstring, Groß-/Kleinschreibung egal, gegen
+ * die Zeile, wie sie DASTEHT — Typ-Präfix plus Label („Fahrzeug: ELW 1"). Deshalb findet
+ * „einheit" alle Einheiten und „personal" das disponierte Personal, dessen Schlüssel
+ * `fuehrung` nirgends angezeigt wird und folgerichtig nichts trifft.
+ *
+ * Das laufende Platzierungsziel bleibt IMMER stehen: seine Zeile trägt den einzigen
+ * „Abbrechen"-Knopf des Modus (der Hinweis oben nennt ihn nur, Escape beendet nur das
+ * Messwerkzeug). Filterte ein Begriff sie weg, säße die Einsatzkraft im Platzier-Modus fest.
+ */
+export function filtereNichtVerortet(
+  liste: NichtVerortet[],
+  suche: string,
+  ziel: { typ: string; id: number } | null,
+): NichtVerortet[] {
+  const begriff = suche.trim().toLowerCase();
+  if (!begriff) return liste;
+  return liste.filter(
+    (o) =>
+      (ziel?.typ === o.typ && ziel.id === o.id) ||
+      `${NICHT_VERORTET_LABEL[o.typ]}: ${o.label}`.toLowerCase().includes(begriff),
+  );
+}
 
 /** Platzierungsziel → exclude-Tag (typ:id) für die Ort-Vorschau (Selbst-Ausschluss).
  *  Einsatzort-Marker trägt die echte einsatzId, nicht die Dummy-0 aus dem Platzierungs-Ziel. */
@@ -491,6 +526,24 @@ export default function Sidebar(props: SidebarProps) {
   const [zeichenEntwurf, setZeichenEntwurf] = useState<FreiesZeichenUpdate>({
     grundzeichen: 'taktische-formation',
   });
+  // Suche über „Nicht verortet" (LFH-360). Wirksam ist der Begriff nur, solange das Feld
+  // steht: fällt die Liste unter die Schwelle, verschwindet mit dem Feld auch sein
+  // `allowClear` — ein weiterwirkender Filter verschluckte dann Einträge ohne sichtbaren
+  // Grund und ohne Ausweg (Befund M6 der Einsatzauswahl). Zurückgesetzt wird deshalb WÄHREND
+  // des Renderns, nicht im Effekt: React verwirft diesen Durchlauf vor dem Commit und rendert
+  // sofort mit leerem Begriff neu, es gibt also keinen sichtbaren Zwischenstand mit Filter.
+  // Ein zusätzlich abgeleiteter Begriff (`zeigen ? suche : ''`) wäre davon nicht zu
+  // unterscheiden gewesen — per Mutationsprobe gemessen — und steht deshalb nicht da.
+  const [nvSuche, setNvSuche] = useState('');
+  const nvSucheZeigen = nichtVerortet.length >= NICHT_VERORTET_SUCHE_AB;
+  if (!nvSucheZeigen && nvSuche !== '') setNvSuche('');
+  const nvBegriff = nvSuche.trim();
+  const nvTreffer = filtereNichtVerortet(nichtVerortet, nvBegriff, platzierungZiel);
+  // Gezählt werden nur ECHTE Treffer: die angeheftete Zeile des laufenden Ziels steht auch
+  // ohne Treffer da, und mitgezählt behauptete „1 von 5" einen Treffer, den es nicht gibt.
+  const nvTrefferzahl = nvBegriff
+    ? filtereNichtVerortet(nichtVerortet, nvBegriff, null).length
+    : nichtVerortet.length;
   // Entwurfswert der numerischen Mittelpunkt-Eingabe im Bild-Platzier-Modus.
   const [bildMitte, setBildMitte] = useState<LatLon | null>(null);
   /**
@@ -627,44 +680,93 @@ export default function Sidebar(props: SidebarProps) {
         ) : (
           <>
             <VeraltetSlot fehler={sektionFehler.nichtVerortet} />
-            <Liste
-              size="small"
-              dataSource={nichtVerortet}
-              rowKey={(o) => `${o.typ}-${o.id}`}
-              renderItem={(o) => {
-                const aktiv = platzierungZiel?.typ === o.typ && platzierungZiel?.id === o.id;
-                let action: React.ReactNode = null;
-                // Zeilenaktionen sind SEKUNDÄR (umrandet): n Zeilen mit je einem gefüllten
-                // Knopf wären n Primäraktionen nebeneinander — „genau eine Primäraktion" gilt
-                // auch in der Leiste. Gefüllt bleibt nur, was einen laufenden Modus abschließt.
-                if (darfSchreiben) {
-                  if (o.typ === 'abschnitt') {
-                    action = (
-                      <Button onClick={() => props.onAbschnittZeichnenStart(o.id)}>
-                        Fläche zeichnen
-                      </Button>
-                    );
-                  } else if (aktiv) {
-                    action = <Button onClick={props.onPlatzierenAbbrechen}>Abbrechen</Button>;
-                  } else {
-                    // o.typ ist hier auf die Punkt-Typen verengt (abschnitt oben behandelt).
-                    const punktTyp = o.typ;
-                    action = (
-                      <Button onClick={() => props.onPlatzierenStart({ typ: punktTyp, id: o.id })}>
-                        Platzieren
-                      </Button>
-                    );
+            {nvSucheZeigen && (
+              <div style={{ marginBlockEnd: token.marginXS }}>
+                {/* Ein schlichtes Eingabefeld statt der Suchvariante: gefiltert wird live,
+                    deren Suchknopf wäre ein Tab-Ziel ohne Wirkung. Die Ikone steht in einer
+                    `aria-hidden`-Hülle — sie brächte sonst ein englisches „search" als
+                    eigenes Vorleseziel mit. Die Höhe erbt das Feld vom `ConfigProvider`. */}
+                <Input
+                  aria-label="Nicht verortete Objekte durchsuchen"
+                  placeholder="Name oder Typ"
+                  allowClear
+                  prefix={
+                    <span aria-hidden="true" style={{ color: rollen.schwach }}>
+                      <SearchOutlined />
+                    </span>
                   }
-                }
-                return (
-                  <ListenEintrag actions={action ? [action] : []}>
-                    <Typography.Text>
-                      {NICHT_VERORTET_LABEL[o.typ]}: {o.label}
-                    </Typography.Text>
-                  </ListenEintrag>
-                );
-              }}
-            />
+                  value={nvSuche}
+                  onChange={(ev) => setNvSuche(ev.target.value)}
+                />
+                {/* Die Trefferzahl ist die ZWEITE Angabe: der Kopf zählt weiter alle nicht
+                    verorteten Objekte, sonst verlöre die Warnzahl ihre Aussage.
+                    Die Region STEHT mit dem Feld, auch wenn sie schweigt: eine Live-Region
+                    meldet nur Änderungen an Inhalt, der schon da war (Regel der Sprungpalette).
+                    Sie trägt auch „0 von N" — die Leermeldung darunter hat keine Rolle, und
+                    der Fokus bleibt im Feld; ohne diese Zeile hörte ein Vorleser nie, dass die
+                    Suche alles weggefiltert hat. */}
+                <div
+                  role="status"
+                  style={{
+                    ...monoStil(11),
+                    color: rollen.gedaempft,
+                    ...(nvBegriff ? { marginBlockStart: token.marginXXS } : {}),
+                  }}
+                >
+                  {nvBegriff ? `${nvTrefferzahl} von ${nichtVerortet.length}` : ''}
+                </div>
+              </div>
+            )}
+            {/* Dritter Zustand neben „Alles verortet" und der Liste: die Suche hat alles
+                weggefiltert. Eigener Wortlaut, weil „Alles verortet" hier eine falsche
+                Lagebeurteilung wäre. Keine Primäraktion — der Ausweg ist das Leeren am
+                Feld unmittelbar darüber. Steht das laufende Platzierungsziel als einzige
+                Zeile da, bleibt sie ohne Leermeldung: beides nebeneinander widerspräche sich,
+                und „0 von N" sagt schon, dass sie kein Treffer ist. */}
+            {nvTreffer.length === 0 ? (
+              <SeitenLeer titel={`Keine Treffer für „${nvBegriff}"`} />
+            ) : (
+              <Liste
+                size="small"
+                dataSource={nvTreffer}
+                rowKey={(o) => `${o.typ}-${o.id}`}
+                renderItem={(o) => {
+                  const aktiv = platzierungZiel?.typ === o.typ && platzierungZiel?.id === o.id;
+                  let action: React.ReactNode = null;
+                  // Zeilenaktionen sind SEKUNDÄR (umrandet): n Zeilen mit je einem gefüllten
+                  // Knopf wären n Primäraktionen nebeneinander — „genau eine Primäraktion" gilt
+                  // auch in der Leiste. Gefüllt bleibt nur, was einen laufenden Modus abschließt.
+                  if (darfSchreiben) {
+                    if (o.typ === 'abschnitt') {
+                      action = (
+                        <Button onClick={() => props.onAbschnittZeichnenStart(o.id)}>
+                          Fläche zeichnen
+                        </Button>
+                      );
+                    } else if (aktiv) {
+                      action = <Button onClick={props.onPlatzierenAbbrechen}>Abbrechen</Button>;
+                    } else {
+                      // o.typ ist hier auf die Punkt-Typen verengt (abschnitt oben behandelt).
+                      const punktTyp = o.typ;
+                      action = (
+                        <Button
+                          onClick={() => props.onPlatzierenStart({ typ: punktTyp, id: o.id })}
+                        >
+                          Platzieren
+                        </Button>
+                      );
+                    }
+                  }
+                  return (
+                    <ListenEintrag actions={action ? [action] : []}>
+                      <Typography.Text>
+                        {NICHT_VERORTET_LABEL[o.typ]}: {o.label}
+                      </Typography.Text>
+                    </ListenEintrag>
+                  );
+                }}
+              />
+            )}
           </>
         )}
       </KlappPaneel>
