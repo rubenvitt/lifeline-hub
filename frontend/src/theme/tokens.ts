@@ -1,4 +1,4 @@
-import { theme as antdTheme, type ThemeConfig } from 'antd';
+import { theme as antdTheme, type ConfigProviderProps, type ThemeConfig } from 'antd';
 import type { MappingAlgorithm } from 'antd';
 
 /** LFH-455: fachliche Sichtungskennzeichnung, bewusst unabhängig von A0-Statusrollen.
@@ -622,6 +622,43 @@ export function antdKomponenten(farben: Farbrollen): NonNullable<ThemeConfig['co
       dangerColor: farben.aufBedien,
     },
   };
+}
+
+/**
+ * Der Boden der kurzen Achse für JEDEN Knopf (LFH-381): nie schmaler als die kleine
+ * Steuerhöhe der Stufe, also 24 / 48 / 72 — genau der Boden aus A1 Gate 3.
+ *
+ * Die Höhe eines Knopfs folgt der Staffel über `controlHeight`/`controlHeightSM`, seine
+ * Breite aber der BESCHRIFTUNG plus Polsterung. Bei kleinen Knöpfen ist diese Polsterung
+ * antds `paddingInlineSM`, und das ist in `antd/es/button/style/token.js` das Literal
+ * `8 - lineWidth` = 7 — ohne jede Dichte. Ein „OK" in einer Bestätigungsblase blieb damit
+ * rund 38 px breit, während es auf 72 px Höhe wuchs; der Daumen trifft die schmale Achse.
+ *
+ * WARUM EIN BODEN UND NICHT DIE POLSTERUNG: eine an die Staffel gebundene Polsterung
+ * bindet die Breite nicht an die Höhe — ein Ein-Zeichen-Etikett („…", „+") fiele weiter
+ * durch, und jedes breite Etikett wüchse grundlos mit, auch in Reihen mehrerer Knöpfe.
+ * Ein `minWidth` wirkt nur dort, wo der Knopf zu schmal WÄRE, und lässt alle übrigen
+ * unberührt. Er ist dieselbe Regel, die antd selbst für icon-only (`width`) und
+ * Kreisknöpfe (`minWidth`) anlegt, nur für alle Formen.
+ *
+ * GRENZE: als Inline-Stil überstimmt er antds Kreis-`minWidth` (`controlHeight`) — in
+ * `kompakt` fiele ein Kreisknopf mit Text von 30 auf 24 px Mindestbreite, und `FloatButton`
+ * erreicht der Kontext ebenfalls. Heute gibt es keinen Aufrufer von beidem; wer einen
+ * einführt, prüft das.
+ *
+ * WARUM EIN WERT FÜR ALLE GRÖSSEN: der Boden aus Gate 3 hängt an der Stufe, nicht an der
+ * Knopfgröße. In `komfortabel` und `handschuh` fallen kleine und volle Höhe ohnehin
+ * zusammen (Herleitung bei {@link dichten}); in `kompakt` ist ein voller Knopf 30 hoch,
+ * sein Boden in der kurzen Achse bleibt 24.
+ *
+ * WARUM AM KONTEXT UND NICHT IN CSS: der Wert kommt aus derselben Stufe wie die Höhe,
+ * ohne Spiegel in `rollen.css`, und erreicht auch die Knöpfe, die antd selbst baut
+ * (Bestätigungsblase, Modal-Fuß, Filter-Dropdown), weil sie dieselbe `Button`-Komponente
+ * rendern. Ein `style` am einzelnen Knopf schlägt den Kontext — das ist der Weg für eine
+ * benannte Ausnahme (Aktionszeile der UHS-Platzkarte, LFH-379), keiner für Neues.
+ */
+export function antdKnopf(dichte: Dichte = 'kompakt'): NonNullable<ConfigProviderProps['button']> {
+  return { style: { minWidth: dichten[dichte].kleineZeilenhoehe } };
 }
 
 /**

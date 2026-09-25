@@ -68,17 +68,36 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
  * Ein falscher Ausschlussgrund lädt den nächsten Bearbeiter ein, ihn zu übernehmen —
  * deshalb steht hier je Stelle, WAS sie rechnet, und nicht bloß, dass sie ausgenommen sei.
  *
- * Und keine BREITEN-Zusicherung an beschrifteten Knöpfen: `paddingInlineSM` ist in antds
- * `button/style/token.js:50` das Literal `8 - lineWidth` = 7 und hängt an keinem
- * Dichte-Token; der OK-Knopf misst damit rund 38 px Breite in JEDER Stufe, während seine
- * Höhe 24/48/72 folgt. Eine Breiten-Zusicherung pinnte deutschen Wortlaut statt eines
- * Mechanismus und liesse sich mit einem `okText` an EINER Stelle grün machen, während die
- * übrigen Bestätigungsblasen unverändert blieben. Der Bestand stützt die Trennung:
- * `nav-schmal.spec.ts:191/211` misst beide Achsen nur an ICON-ONLY-Knöpfen (dort bindet antd
- * die Breite selbst an `controlHeight`), `datensicht-schmal.spec.ts:154-163` misst an
- * beschrifteten Zielen ausschliesslich die Höhe. Stattdessen wird die Breite gegen den
- * harten Boden aus Gate 1 (24 px, WCAG 2.2 SC 2.5.8 AA) geprüft und der Messwert als
- * Annotation protokolliert; die Systemlücke ist ein eigener Task.
+ * ── DIE BREITE: SEIT LFH-381 DIE STAFFEL, UND ZWAR AM MECHANISMUS ─────────────────
+ *
+ * Bis LFH-381 stand hier die Begründung, warum die Breite beschrifteter Knöpfe NICHT gegen
+ * die Staffel geprüft wird: sie folgte der Beschriftung, nicht der Dichteachse — antds
+ * `paddingInlineSM` ist das Literal `8 - lineWidth` = 7, der OK-Knopf mass rund 38 px in
+ * JEDER Stufe, und geprüft wurde deshalb nur der harte Gate-1-Boden (24 px). Seit LFH-381
+ * trägt jeder Knopf einen Breitenboden am Kontext (`antdKnopf()` in `theme/tokens.ts`,
+ * `minWidth` = kleine Steuerhöhe), und die Breite wird hier gegen dieselbe Stufe geprüft
+ * wie die Höhe.
+ *
+ * Der Einwand von damals gilt weiter und bestimmt die FORM der Zusicherung: eine bloße
+ * Breitenmessung pinnte den Wortlaut, nicht den Mechanismus. Mit einem langen `okText`
+ * wäre der Knopf auch ohne jeden Boden breit genug, und die Messung bliebe grün, während
+ * alle übrigen Bestätigungsblasen zu schmal wären. Geprüft werden deshalb ZWEI Dinge:
+ *  - die URSACHE: `getComputedStyle().minWidth` ist genau die Stufe. Das hängt weder am
+ *    Etikett noch an der Einblendung (`transform` ändert keinen berechneten Stil);
+ *  - die WIRKUNG: die gemessene Breite erreicht die Stufe.
+ * Gegenprobe von Hand, gemessen am 24.09.2026 (LFH-381):
+ *  - Boden aus `ThemeModeProvider` entfernt → beide Durchgänge rot, an der Ursache
+ *    (`min-width` 0px statt 48px/72px).
+ *  - Boden entfernt UND `okText="Kraft entfernen"` an der Personal-Blase (samt Etikett in der
+ *    Schleife unten) → WEITER rot, an derselben Stelle. Eine reine Breitenmessung wäre hier
+ *    grün geworden.
+ *  - Boden drin und langer `okText` → grün.
+ * Der Test fällt also am Mechanismus, nicht am Wortlaut. Der Messwert der Breite steht
+ * weiter als Annotation im Bericht.
+ *
+ * Der Bestand stützt die Unterscheidung nach wie vor: `nav-schmal.spec.ts:191/211` misst
+ * beide Achsen an ICON-ONLY-Knöpfen (dort bindet antd die Breite selbst an `controlHeight`),
+ * `datensicht-schmal.spec.ts:154-163` misst an beschrifteten Zielen die Höhe.
  *
  * BEWUSST KEIN Device-Descriptor und kein zweites Playwright-Projekt — ein `devices['iPad …']`
  * zöge webkit nach, und ein Browser-Download ist im Repo nirgends abgesichert
@@ -96,9 +115,6 @@ const TABLET = { width: 1024, height: 768 };
  * zufällig rot wird, wird abgeschaltet statt befolgt.
  */
 const SUBPIXEL = 0.5;
-
-/** Gate 1: harter Boden JEDER Trefffläche, dichteunabhängig (WCAG 2.2 SC 2.5.8, AA). */
-const BODEN = 24;
 
 /** Gate 3: die Dichte-Staffel. Handgeschriebene Literale — aus dem Token zurückgelesen
  *  prüfte die Zusicherung sich selbst. */
@@ -285,27 +301,26 @@ for (const { dichte, soll } of STAFFEL) {
     // Sichtbare Beschriftungen per `getByRole(..., { name })`, nicht `getByText` — das AK
     // verlangt es, und `getByText` matchte auch `sr-only`/`aria-hidden`. Die Etiketten sind
     // vertraglich: antds `de_DE` liefert „OK" und „Abbrechen".
-    const okBreite = await haeltTreffflaeche(
-      blase.getByRole('button', { name: 'OK', exact: true }),
-      soll,
-      'Bestätigungsknopf „OK"',
-    );
-    await haeltTreffflaeche(
-      blase.getByRole('button', { name: 'Abbrechen', exact: true }),
-      soll,
-      'Bestätigungsknopf „Abbrechen"',
-    );
+    for (const etikett of ['OK', 'Abbrechen']) {
+      const knopf = blase.getByRole('button', { name: etikett, exact: true });
+      const breite = await haeltTreffflaeche(knopf, soll, `Bestätigungsknopf „${etikett}"`);
 
-    // Die Breite folgt der BESCHRIFTUNG, nicht der Dichteachse (Herleitung im Dateikopf).
-    // Geprüft wird deshalb nur der harte Boden — eine ANDERE Aussage als die Staffel.
-    expect(
-      okBreite,
-      `Bestätigungsknopf „OK" (gemessen ${okBreite}px breit, harter Boden ${BODEN})`,
-    ).toBeGreaterThanOrEqual(BODEN - SUBPIXEL);
-    test.info().annotations.push({
-      type: 'messwert',
-      description: `OK-Knopf in ${dichte}: ${okBreite}px breit (Höhe folgt der Staffel, Breite nicht)`,
-    });
+      // Die URSACHE: der Breitenboden ist genau die Stufe (Herleitung im Dateikopf). Ohne
+      // diese Zeile bestünde ein langes Etikett den Test auch ohne jeden Boden.
+      expect(
+        await knopf.evaluate((el) => getComputedStyle(el).minWidth),
+        `Bestätigungsknopf „${etikett}": Breitenboden der Stufe`,
+      ).toBe(`${soll}px`);
+      // Die WIRKUNG: die gemessene Breite erreicht die Stufe.
+      expect(
+        breite,
+        `Bestätigungsknopf „${etikett}" (gemessen ${breite}px breit, Soll ≥ ${soll})`,
+      ).toBeGreaterThanOrEqual(soll - SUBPIXEL);
+      test.info().annotations.push({
+        type: 'messwert',
+        description: `Knopf „${etikett}" in ${dichte}: ${breite}px breit`,
+      });
+    }
 
     // Über „Abbrechen" schliessen, nicht über OK: OK löschte die geseedete Kraft. Nebenbei
     // belegt der Klick, dass der Knopf überhaupt bedienbar ist — ein 0×0-Element liesse sich
