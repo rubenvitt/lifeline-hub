@@ -233,6 +233,37 @@ describe('DemoDatenPage — Status-Abfrage scheitert (Spec „Status-Abfrage sch
     await waitFor(() => expect(gets).toBe(2));
   });
 
+  /**
+   * Das Spec-Szenario nennt „500 oder Netzfehler“ (Branch-Review F5). Ein Netzfehler kommt
+   * nicht als `ApiError` mit Status an, sondern ohne Antwort — gerade dieser Weg darf nicht
+   * wie ein 404 aussehen und auf die Einsatzliste umleiten.
+   */
+  it('Netzfehler: Fehlerbild mit „Erneut abrufen“, keine Aktion, keine Umleitung, kein Menüeintrag', async () => {
+    let gets = 0;
+    server.use(
+      http.get('/api/demo-daten', () => {
+        gets += 1;
+        return HttpResponse.error();
+      }),
+    );
+    setup(admin);
+    expect(
+      await screen.findByText('Der Stand der Demo-Daten konnte nicht geladen werden.'),
+    ).toBeInTheDocument();
+    const wiederholen = screen.getByRole('button', { name: 'Erneut abrufen' });
+    expect(screen.queryByRole('button', { name: 'Importieren' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Neu importieren' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Entfernen' })).toBeNull();
+    expect(screen.queryByText('Einsatzliste')).toBeNull();
+    expect(screen.getByRole('heading', { level: 1, name: 'Demo-Daten' })).toBeInTheDocument();
+    // Ankerpunkt für die Abwesenheit: das Menü steht, nur der Eintrag fehlt.
+    expect(screen.getByRole('menuitem', { name: 'Benutzer' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Demo-Daten' })).toBeNull();
+    expect(gets).toBe(1);
+    await userEvent.click(wiederholen);
+    await waitFor(() => expect(gets).toBe(2));
+  });
+
   it('500: das Menü zeigt keinen Eintrag und kein Fehlerbild', async () => {
     // Entscheidung: der Eintrag hängt an „freigeschaltet“ = Status 200. Bei 500 ist das
     // unbekannt, der Eintrag fehlt also — wie bei 404. Die Sektion selbst bleibt über den
