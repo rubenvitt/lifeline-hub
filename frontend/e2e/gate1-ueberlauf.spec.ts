@@ -752,7 +752,15 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
         await p.getByRole('button', { name: /^Verlauf zu Bezirk / }).click();
         await p.getByRole('button', { name: /^Verlauf zu Stelle / }).click();
       },
-      anker: (p: Page) => p.getByText(/1.420 untergebracht/),
+      // Der Eintrag der Belegungsreihe, nicht bloß der Text: „1 420 untergebracht" steht
+      // auch als Kopfzahl über der Stellen-Tabelle. Sobald der Verlauf geladen war, fand der
+      // nackte Text ZWEI Knoten (strict mode) — rot oder grün je nachdem, ob die Prüfung vor
+      // oder nach dem Laden des Verlaufs griff (gemessen: 3 von 6 Läufen rot).
+      anker: (p: Page) =>
+        p
+          .getByRole('listitem')
+          .filter({ hasText: 'aktuelle Belegung' })
+          .filter({ hasText: /1.420 untergebracht/ }),
     },
     {
       // LFH-634: Datenanker ist die Karte des gesäten Zeitfensters. Ihr zugänglicher Name
