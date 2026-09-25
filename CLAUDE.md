@@ -423,7 +423,8 @@ Fokusabstand trägt `scroll-margin-block-end` an ALLEN Zielen von Seitenkopf und
 `scroll-padding` am Dokument wie auf der Befehlsseite: das zählte die Ziele IN der Leiste zum
 verdeckten Streifen und rollte bei jedem Fokus dort die Seite ans Ende. Unter `md` steht das Feld
 auf eigener Zeile (`Schnellerfassungszeile gestapelt`, im DOM zuerst, kein CSS-`order`), die
-Feldzeile rollt waagerecht mit „Feld" vorn, „Werte behalten" steht in der Hinweiszeile, und
+Feldzeile rollt waagerecht mit „Feld" vorn, „Werte behalten" steht in der Hinweiszeile, der Platzhalter hat eine Kurzform (der volle brach unter
+Linux-Schriften um und riss den Deckel), und
 Eingaben in der Leiste fokussieren mit `preventScroll` (`MetaChip`, nicht `autoFocus`). Unter `xl` erscheint die Bilanz erst, wenn die Liste
 zum ersten Mal steht, danach bleibt sie (Riegel `bilanzFrei` je Einsatz; `isLoading` allein ließe
 sie bei jedem Filterwechsel verschwinden): stand sie vor den Zeilen da, schoben diese sie aus dem

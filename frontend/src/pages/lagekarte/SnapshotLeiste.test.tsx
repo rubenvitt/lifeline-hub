@@ -284,7 +284,10 @@ describe('SnapshotLeiste — Platz im KartenFuss (LFH-355)', () => {
     expect(reihe.querySelectorAll('button').length).toBe(2);
     expect(reihe.style.minWidth).toBe('0px');
     expect(reihe.style.overflowX).toBe('auto');
-    expect(standLeisteStil.flex).toBe('1 1 160px');
+    // 120 statt 160 (LFH-373, in der CI gemessen): unter den Linux-Schriften lag die erste Reihe
+    // bei 1440 px mit 160 px Basis 3 px über dem Band, und der Einklapp-Pfeil rutschte allein in
+    // eine dritte Reihe. Die Stand-Reihe rollt ohnehin — die Basis ist nur ihre Umbruchschwelle.
+    expect(standLeisteStil.flex).toBe('1 1 120px');
   });
 
   it('Startzustand: gemerkte Wahl gewinnt, ohne Wahl eingeklappt nur auf dem Handschirm', () => {

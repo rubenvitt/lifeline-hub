@@ -60,14 +60,19 @@ function merkeEingeklappt(wert: boolean): void {
  * (Nacharbeit Neuentwurf, 22.09.2026): ohne `flex`-Basis und `minWidth: 0` nahm sie als
  * Flex-Kind ihre volle Inhaltsbreite an, brach in eine ZWEITE Zeile um und machte die über
  * der Karte liegende Leiste doppelt so hoch — gemessen bei 1440 × 900 rund 100 statt 50 px.
- * Jetzt schrumpft sie auf den Rest der Zeile und rollt waagerecht; erst unter 160 px Rest
+ * Jetzt schrumpft sie auf den Rest der Zeile und rollt waagerecht; erst unter 120 px Rest
  * bricht sie um. Rein und exportiert, damit die Zusicherung ohne Layout prüfbar ist.
+ *
+ * 120 statt 160 (LFH-373, in der CI gemessen): unter den Linux-Schriften sind Feld und „Stand
+ * sichern" 7 px breiter als unter macOS. Bei 1440 px lag die erste Reihe mit 160 px Basis dann
+ * 3 px über dem Band (783 von 780 px), und der Einklapp-Pfeil rutschte allein in eine dritte
+ * Reihe. Mit 120 px bleiben dort 37 px Luft.
  */
 export const standLeisteStil: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   gap: 6,
-  flex: '1 1 160px',
+  flex: '1 1 120px',
   minWidth: 0,
   overflowX: 'auto',
 };

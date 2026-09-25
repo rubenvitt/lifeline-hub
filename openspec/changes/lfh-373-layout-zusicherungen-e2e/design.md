@@ -353,6 +353,24 @@ Die übrigen drei roten Tests des Gate-Laufs (`dokumente.spec.ts` Tastaturweg,
 scheitert unter paralleler Last am `filechooser`-Ereignis. Er wird gerade in LFH-632 gehärtet,
 und dieser Change fasst Dokumente nicht an.
 
+### Nachtrag aus der CI (25.09.2026): Linux-Schriften
+
+Die CI des PRs (Ubuntu, Playwright-Chromium) fand zwei Kippstellen, die unter macOS 3 bzw. 9 px
+Luft hatten. Nachgestellt wurden sie lokal mit dem Browser in einem Linux-Container
+(`mcr.microsoft.com/playwright:v1.62.0-noble`, `run-server` mit Host-Netz,
+`PW_TEST_CONNECT_WS_ENDPOINT`). Die Tests laufen dabei auf dem Mac, gerendert wird mit den
+Linux-Schriften:
+- **ETB-Platzhalter.** Der volle Wortlaut brach bei 390 px in eine zweite Zeile, und das
+  mitwachsende Feld misst den Platzhalter mit. Folge: 435 statt 413 px, der Deckel war
+  gerissen. Unter `md` gilt jetzt die Kurzform „Inhalt … ( / für Befehle · @ für Einheit )“,
+  analog zur Hinweiszeile. Danach 413 px auf beiden Systemen.
+- **Zeitachse bei 1440 px.** Feld und „Stand sichern“ sind unter Linux 7 px breiter. Die erste
+  Reihe lag mit 160 px Basis der Stand-Reihe 3 px über dem Band, und der Einklapp-Pfeil
+  rutschte allein in eine dritte Reihe. Die Basis ist jetzt 120 px: 37 px Luft, eine Reihe.
+
+Alle LFH-373-Specs laufen im Linux-Browser grün, mit denselben Messwerten wie unter macOS.
+Was bleibt, sind feste Steuerhöhen, kein umbrechender Text.
+
 ## Risks / Trade-offs
 
 - [Laufzeit von `check-all.sh` Schritt 7 steigt: drei Stufen × mehrere Breiten ×

@@ -68,6 +68,16 @@ const ENTER_HINWEIS =
 const ENTER_HINWEIS_KURZ = 'Enter sendet · Shift+Enter neue Zeile';
 
 /**
+ * Platzhalter: sagt, WAS in das Feld gehört (der Tastaturvertrag steht in der Hinweiszeile).
+ * Unter `md` die Kurzform (LFH-373, in der CI gemessen): der volle Wortlaut brach in den
+ * Linux-Schriften bei 390 px in eine zweite Zeile, das mitwachsende Feld misst den Platzhalter
+ * mit, und die Leiste riss im Handschuh-Betrieb den 50-%-Deckel (435 von 844 px; unter macOS
+ * blieben 9 px Luft). „/" öffnet Typ, Felder und Bausteine gemeinsam — „Befehle" sagt dasselbe.
+ */
+const PLATZHALTER = 'Inhalt … ( / für Typ, Felder & Bausteine · @ für Einheit )';
+const PLATZHALTER_KURZ = 'Inhalt … ( / für Befehle · @ für Einheit )';
+
+/**
  * Eigener Wortlaut, nicht der aus `components/Erfassung.tsx`: hier gibt es keinen
  * Knopf „Speichern und nächste", auf den er sich beziehen könnte — im ETB erfasst
  * jedes Absenden in Serie. Genannt werden die Felder, weil `nurUebernahme` genau
@@ -522,7 +532,7 @@ export default function Schnellerfassung({
             unterEbene={1}
             layout="toggle"
             variante="kompakt"
-            placeholder="Inhalt … ( / für Typ, Felder & Bausteine · @ für Einheit )"
+            placeholder={istSchmal ? PLATZHALTER_KURZ : PLATZHALTER}
             autoSize={{ minRows: 1, maxRows: 4 }}
             umschalterAussen
             vorschauOffen={vorschauOffen}

@@ -273,6 +273,14 @@ describe('Schnellerfassung', () => {
     renderMitProviders(<Schnellerfassung {...props()} />);
     expect(screen.getAllByText('Enter sendet · Shift+Enter neue Zeile')).toHaveLength(1);
     expect(screen.queryByText(/Mehrzeiler mit Cmd\/Strg\+Enter/)).toBeNull();
+    // Der Platzhalter hat unter `md` ebenfalls eine Kurzform (LFH-373, in der CI gemessen): der
+    // volle Wortlaut brach in den Linux-Schriften bei 390 px in eine zweite Zeile, das
+    // mitwachsende Feld misst den Platzhalter mit, und die Leiste riss im Handschuh-Betrieb den
+    // 50-%-Deckel (435 von 844 px). „Inhalt …" steht weiter vorn, beide Auslöser bleiben.
+    expect(screen.getByPlaceholderText(/^Inhalt …/)).toHaveAttribute(
+      'placeholder',
+      'Inhalt … ( / für Befehle · @ für Einheit )',
+    );
     expect(screen.queryByText('@ Einheit')).toBeNull();
   });
 
