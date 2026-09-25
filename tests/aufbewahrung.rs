@@ -720,3 +720,27 @@ fn guard_erkennt_zusaetzlichen_schreibweg_und_current_user() {
         "{v:?}"
     );
 }
+
+#[tokio::test]
+async fn fremde_org_darf_nicht_wiederherstellen() {
+    // Der einzige Schreibweg des Namensraums: der Admin einer FREMDEN Org bekommt 403, und es
+    // ändert sich nichts — weder Vormerkung noch Frist noch ETB.
+    let (app, pool) = common::setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let id = abgeschlossen(&app, &admin).await;
+    let frist = vor_tagen(6);
+    let vormerkung = vor_tagen(5);
+    setze(&pool, id, Some(&frist), Some(&vormerkung), None).await;
+    let vorher = etb_anzahl(&pool, id).await;
+    let fremd = fremder_admin(&app, &pool).await;
+    let (s, v) = wiederherstellen(&app, &fremd, id, r#"{"retention_bis":null}"#).await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "{v}");
+    let (f, g): (Option<String>, Option<String>) =
+        sqlx::query_as("SELECT retention_bis, geloescht_at FROM einsatz WHERE id = ?")
+            .bind(id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!((f, g), (Some(frist), Some(vormerkung)), "nichts geändert");
+    assert_eq!(etb_anzahl(&pool, id).await, vorher, "kein ETB-Eintrag");
+}

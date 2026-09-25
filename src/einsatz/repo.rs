@@ -670,6 +670,7 @@ pub async fn wiederherstellen(
     pool: &SqlitePool,
     einsatz_id: i64,
     admin_id: i64,
+    admin_org_id: i64,
     neue_frist: Option<&str>,
     jetzt: chrono::DateTime<Utc>,
 ) -> Result<(), AppError> {
@@ -682,21 +683,28 @@ pub async fn wiederherstellen(
     // darf wiederholt werden.
     let karenz_grenze = super::retention::karenz_grenze(jetzt);
     crate::write_retry!(pool, |conn| {
-        let vorher: Option<(String, Option<String>, Option<String>)> =
-            sqlx::query_as("SELECT status, geloescht_at, geschwaerzt_at FROM einsatz WHERE id = ?")
-                .bind(einsatz_id)
-                .fetch_optional(&mut *conn)
-                .await?;
-        let Some((status, geloescht_at, geschwaerzt_at)) = vorher else {
+        let vorher: Option<(i64, String, Option<String>, Option<String>)> = sqlx::query_as(
+            "SELECT org_id, status, geloescht_at, geschwaerzt_at FROM einsatz WHERE id = ?",
+        )
+        .bind(einsatz_id)
+        .fetch_optional(&mut *conn)
+        .await?;
+        let Some((org_id, status, geloescht_at, geschwaerzt_at)) = vorher else {
             return Err(AppError::NotFound);
         };
+        // Die Org-Grenze hält das Schreiben selbst, nicht nur die Vorprüfung der Route
+        // (Review LFH-23): der Admin einer fremden Org schreibt hier nie.
+        if org_id != admin_org_id {
+            return Err(AppError::Forbidden);
+        }
         let res = sqlx::query(
             "UPDATE einsatz SET geloescht_at = NULL, retention_bis = ? \
-             WHERE id = ? AND status = ? AND geloescht_at IS NOT NULL \
+             WHERE id = ? AND org_id = ? AND status = ? AND geloescht_at IS NOT NULL \
                AND geschwaerzt_at IS NULL AND geloescht_at > ?",
         )
         .bind(neue_frist)
         .bind(einsatz_id)
+        .bind(admin_org_id)
         .bind(STATUS_ABGESCHLOSSEN)
         .bind(&karenz_grenze)
         .execute(&mut *conn)
@@ -2909,6 +2917,7 @@ mod tests {
             &pool,
             e,
             admin,
+            1,
             Some("2026-09-28 12:00:00"),
             zeit("2026-06-30 12:00:00"),
         )
@@ -2929,7 +2938,7 @@ mod tests {
 
         // Unbegrenzt: ein zweiter Einsatz, Frist None.
         let e2 = archiv_einsatz(&pool, leit, Some("2026-06-25 12:00:00"), None).await;
-        wiederherstellen(&pool, e2, admin, None, zeit("2026-06-30 12:00:00"))
+        wiederherstellen(&pool, e2, admin, 1, None, zeit("2026-06-30 12:00:00"))
             .await
             .unwrap();
         let (frist, g, _, _) = stand(&pool, e2).await;
@@ -2954,13 +2963,13 @@ mod tests {
         let grenze = archiv_einsatz(&pool, leit, Some("2026-05-31 12:00:00"), None).await;
         let vorher = stand(&pool, grenze).await;
         assert!(matches!(
-            wiederherstellen(&pool, grenze, admin, None, jetzt).await,
+            wiederherstellen(&pool, grenze, admin, 1, None, jetzt).await,
             Err(AppError::Conflict(_))
         ));
         assert_eq!(stand(&pool, grenze).await, vorher);
         // Eine Sekunde jünger → noch in der Karenz → gelingt.
         let knapp = archiv_einsatz(&pool, leit, Some("2026-05-31 12:00:01"), None).await;
-        wiederherstellen(&pool, knapp, admin, None, jetzt)
+        wiederherstellen(&pool, knapp, admin, 1, None, jetzt)
             .await
             .unwrap();
 
@@ -2974,7 +2983,7 @@ mod tests {
         .await;
         let vorher = stand(&pool, schwarz).await;
         assert!(matches!(
-            wiederherstellen(&pool, schwarz, admin, None, jetzt).await,
+            wiederherstellen(&pool, schwarz, admin, 1, None, jetzt).await,
             Err(AppError::Conflict(_))
         ));
         assert_eq!(stand(&pool, schwarz).await, vorher);
@@ -2983,16 +2992,25 @@ mod tests {
         let offen = archiv_einsatz(&pool, leit, None, None).await;
         let vorher = stand(&pool, offen).await;
         assert!(matches!(
-            wiederherstellen(&pool, offen, admin, None, jetzt).await,
+            wiederherstellen(&pool, offen, admin, 1, None, jetzt).await,
             Err(AppError::UnprocessableEntity(_))
         ));
         assert_eq!(stand(&pool, offen).await, vorher);
 
         // Unbekannt → 404.
         assert!(matches!(
-            wiederherstellen(&pool, 999_999, admin, None, jetzt).await,
+            wiederherstellen(&pool, 999_999, admin, 1, None, jetzt).await,
             Err(AppError::NotFound)
         ));
+
+        // Fremde Org → 403, ohne zu schreiben — auch ohne die Vorprüfung der Route.
+        let fremd = archiv_einsatz(&pool, leit, Some("2026-06-29 00:00:00"), None).await;
+        let vorher = stand(&pool, fremd).await;
+        assert!(matches!(
+            wiederherstellen(&pool, fremd, admin, 2, None, jetzt).await,
+            Err(AppError::Forbidden)
+        ));
+        assert_eq!(stand(&pool, fremd).await, vorher);
     }
 
     // ---------- LFH-23 Review: bewachte Schreibwege gegen den Purge-Lauf ----------

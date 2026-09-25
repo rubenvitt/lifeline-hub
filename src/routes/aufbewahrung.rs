@@ -158,6 +158,7 @@ pub async fn wiederherstellen(
         &state.pool,
         einsatz_id,
         benutzer.id,
+        benutzer.org_id,
         neue_frist.as_deref(),
         jetzt,
     )
