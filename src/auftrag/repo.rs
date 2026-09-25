@@ -518,6 +518,12 @@ pub async fn setze_offen(
 
 /// Meldet Vollzug: Rückmeldetext am Auftrag, Vollzug-Achse → 'vollzogen' und ein
 /// ETB-Folgeeintrag (typ='meldung', gemeinsames auftrag_id). Liefert die ETB-`id`.
+///
+/// Pool-Hülle um [`melde_vollzug_tx`] in `write_retry!` (`BEGIN IMMEDIATE`). Bis LFH-690 lag
+/// der Einstellungs-Lesezugriff vor einem deferred `pool.begin()`; seit er in der
+/// Transaktion liegt, liest sie zuerst und schreibt dann. Unter deferred `BEGIN` wäre das ein
+/// Lock-Upgrade, das SQLite bei fremdem Writer sofort mit `SQLITE_BUSY` abweist
+/// (`crate::tx`); dieselbe Begründung wie bei `meldung`/`personal` (Block 3a).
 pub async fn melde_vollzug(
     pool: &SqlitePool,
     org_id: i64,
@@ -527,17 +533,42 @@ pub async fn melde_vollzug(
     vollzugsmeldung: &str,
     jetzt: &str,
 ) -> Result<i64, AppError> {
-    let etb_startwert = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id)
+    crate::write_retry!(pool, |conn| {
+        melde_vollzug_tx(
+            conn,
+            org_id,
+            einsatz_id,
+            auftrag_id,
+            von_id,
+            vollzugsmeldung,
+            jetzt,
+        )
+        .await
+    })
+}
+
+/// Rumpf von [`melde_vollzug`] auf einer offenen Verbindung/Transaktion (LFH-690, Demo-Import
+/// in EINER Transaktion). Der ETB-Startwert kommt aus den Einstellungen, gelesen auf
+/// derselben Verbindung. Öffnet und committet selbst nichts.
+pub async fn melde_vollzug_tx(
+    conn: &mut sqlx::SqliteConnection,
+    org_id: i64,
+    einsatz_id: i64,
+    auftrag_id: i64,
+    von_id: i64,
+    vollzugsmeldung: &str,
+    jetzt: &str,
+) -> Result<i64, AppError> {
+    let etb_startwert = crate::einsatz::einstellungen::laden_oder_default(&mut *conn, einsatz_id)
         .await?
         .etb_startwert();
-    let mut tx = pool.begin().await?;
     sqlx::query("UPDATE auftrag SET vollzugsmeldung = ? WHERE id = ?")
         .bind(vollzugsmeldung)
         .bind(auftrag_id)
-        .execute(&mut *tx)
+        .execute(&mut *conn)
         .await?;
     let etb_id = crate::etb::repo::anlegen_tx(
-        &mut tx,
+        &mut *conn,
         einsatz_id,
         von_id,
         etb_startwert,
@@ -557,12 +588,12 @@ pub async fn melde_vollzug(
     sqlx::query("UPDATE etb_eintrag SET auftrag_id = ? WHERE id = ?")
         .bind(auftrag_id)
         .bind(etb_id)
-        .execute(&mut *tx)
+        .execute(&mut *conn)
         .await?;
     // Vollzug-Achse im SELBEN Commit wie ETB-Meldung + Rückmeldetext (atomar):
     // ein Teilfehler rollt alles zurück, kein verwaister ETB-Eintrag.
     krepo::setze_vollzug_tx(
-        &mut tx,
+        &mut *conn,
         org_id,
         einsatz_id,
         OBJEKT_AUFTRAG,
@@ -572,7 +603,6 @@ pub async fn melde_vollzug(
         jetzt,
     )
     .await?;
-    tx.commit().await?;
     Ok(etb_id)
 }
 
