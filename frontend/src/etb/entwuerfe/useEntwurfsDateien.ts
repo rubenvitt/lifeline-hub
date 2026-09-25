@@ -6,6 +6,8 @@ export interface EntwurfsDateien {
   je: Record<string, File[]>;
   setzen: (id: string, dateien: File[]) => void;
   verwerfen: (id: string) => void;
+  /** Hängt die Dateien eines Entwurfs an seine neue id (Review C1, neue client_id). */
+  umhaengen: (alt: string, neu: string) => void;
 }
 
 /**
@@ -29,5 +31,13 @@ export function useEntwurfsDateien(): EntwurfsDateien {
       return rest;
     });
   }, []);
-  return useMemo(() => ({ je, setzen, verwerfen }), [je, setzen, verwerfen]);
+  const umhaengen = useCallback((alt: string, neu: string) => {
+    setJe((vorher) => {
+      if (!(alt in vorher)) return vorher;
+      const rest = { ...vorher, [neu]: vorher[alt] };
+      delete rest[alt];
+      return rest;
+    });
+  }, []);
+  return useMemo(() => ({ je, setzen, verwerfen, umhaengen }), [je, setzen, verwerfen, umhaengen]);
 }

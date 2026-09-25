@@ -4,6 +4,7 @@ import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { StrictMode, useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ApiError } from '../../api/client';
 import type { NeuerEintrag } from '../../api/etb';
 import type { EinsatzAnzeige, EtbBaustein } from '../../api/types';
 import { server } from '../../test/server';
@@ -518,5 +519,56 @@ describe('EtbEntwurfsTabs', () => {
     expect(a).toBe(erste);
     expect(b).toBe(zweite);
     expect(b).not.toBe(a);
+  });
+
+  it('LFH-117: ein client_id-Konflikt (409) lässt Wortlaut und Dateien stehen und gibt dem Entwurf eine neue id', async () => {
+    const konflikt =
+      'client_id bereits für einen anderen Eintrag verwendet: dieser Wortlaut ist nicht erfasst.';
+    const erfassen = vi
+      .fn<(e: NeuerEintrag) => Promise<void>>()
+      .mockRejectedValueOnce(new ApiError(409, konflikt))
+      .mockResolvedValue(undefined);
+    server.use(
+      http.post('/api/einsaetze/7/etb/anhaenge', () =>
+        HttpResponse.json(
+          [
+            {
+              id: 41,
+              einsatz_id: 7,
+              dateiname: 'foto.jpg',
+              mime: 'image/jpeg',
+              groesse: 1,
+              hochgeladen_von: 1,
+              erstellt_at: '2026-09-25 10:00:00',
+            },
+          ],
+          { status: 201 },
+        ),
+      ),
+    );
+    renderMitProviders(<EtbEntwurfsTabs {...props({ erfassen })} />);
+    await screen.findByPlaceholderText(/Inhalt/);
+    const alteId = aktiveEntwurfsId();
+    await userEvent.upload(dateiEingabe(), new File(['x'], 'foto.jpg', { type: 'image/jpeg' }));
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Wortlaut aus Tab 2{Enter}');
+    await waitFor(() => expect(erfassen).toHaveBeenCalledTimes(1));
+    expect(erfassen.mock.calls[0][0].client_id).toBe(alteId);
+
+    // Der Hinweis steht AN der Erfassung, nicht nur im Toast.
+    expect(await screen.findByText(new RegExp(konflikt.slice(0, 40)))).toBeInTheDocument();
+    await waitFor(() => expect(aktiveEntwurfsId()).not.toBe(alteId));
+    const neueId = aktiveEntwurfsId();
+    expect(screen.getAllByRole('tab')).toHaveLength(1);
+    expect(screen.getByPlaceholderText(/Inhalt/)).toHaveValue('Wortlaut aus Tab 2');
+    expect(screen.getByRole('list', { name: 'Gewählte Anhänge' })).toHaveTextContent('foto.jpg');
+    await waitFor(async () => expect((await entwuerfeLaden(7)).map((e) => e.id)).toEqual([neueId]));
+
+    // Der nächste Versuch geht mit der NEUEN id raus und kann gelingen.
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /Erfassen$/ })).not.toHaveClass('ant-btn-loading'),
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Erfassen$/ }));
+    await waitFor(() => expect(erfassen).toHaveBeenCalledTimes(2));
+    expect(erfassen.mock.calls[1][0].client_id).toBe(neueId);
   });
 });

@@ -131,6 +131,34 @@ export function useEtbEntwuerfe(
     if (bestand) void entwurfSpeichern(bestand);
   }, []);
 
+  /**
+   * Gibt einem Entwurf eine NEUE id, Inhalt unverändert (Review C1). Die Entwurfs-id ist die
+   * client_id; steht sie schon für einen anderen Eintrag (409, zweiter Browser-Tab), käme der
+   * Entwurf mit ihr nie mehr durch. Liefert die neue id, oder `null`, wenn es den Entwurf
+   * nicht (mehr) gibt.
+   */
+  const entwurfNeuAusweisen = useCallback(
+    async (id: string): Promise<string | null> => {
+      const bestand = entwuerfeRef.current.find((e) => e.id === id);
+      if (!bestand) return null;
+      const neu: EtbEntwurf = {
+        ...bestand,
+        id: crypto.randomUUID(),
+        geaendert_at: new Date().toISOString(),
+      };
+      setEntwuerfe((prev) => prev.map((e) => (e.id === id ? neu : e)));
+      setAktiverId((aktuell) => {
+        if (aktuell !== id) return aktuell;
+        localStorage.setItem(aktivKey(einsatzId), neu.id);
+        return neu.id;
+      });
+      await entwurfEntfernen(id);
+      await entwurfSpeichern(neu);
+      return neu.id;
+    },
+    [einsatzId],
+  );
+
   const entwurfSchliessen = useCallback(
     async (id: string, metadaten: MetadatenWerte = {}) => {
       await entwurfEntfernen(id);
@@ -167,6 +195,7 @@ export function useEtbEntwuerfe(
     entwurfSchliessen,
     entwurfAktualisieren,
     entwurfFesthalten,
+    entwurfNeuAusweisen,
     aktivenSetzen,
   };
 }

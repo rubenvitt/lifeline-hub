@@ -4,6 +4,7 @@ import dayjs from 'dayjs';
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router';
 import { DOKUMENT_ACCEPT, DOKUMENT_MAX_GROESSE } from '../api/dokumente';
+import { ApiError } from '../api/client';
 import { ETB_ANHAENGE_MAX, ladeEtbAnhangHoch, type NeuerEintrag } from '../api/etb';
 import { formatGroesse } from '../karten/formatGroesse';
 import { useOnline } from '../offline/useOnline';
@@ -542,7 +543,21 @@ export default function Schnellerfassung({
       try {
         await erfassen(eintrag);
       } catch (e) {
-        for (const d of dateien) hochgeladeneIds.delete(d);
+        // Die IDs dieses Versuchs nur verwerfen, wenn die Ablehnung an ihnen liegen kann
+        // (400/422: unbekannt, gebunden, zu viele). Bei 403 oder 409 sind die Dateien frei und
+        // unverändert oben — ein zweiter Upload wäre nur Volumen und verwaiste Bytes.
+        if (e instanceof ApiError && (e.status === 400 || e.status === 422)) {
+          for (const d of dateien) hochgeladeneIds.delete(d);
+        }
+        // 409 aus dem Erfassen (Review C1): die client_id steht schon für einen anderen
+        // Eintrag (zweiter Browser-Tab) — oder der Einsatz ist abgeschlossen. Der Wortlaut
+        // bleibt, der Grund steht AN der Erfassung, und der nächste Versuch nimmt einen neuen
+        // Schlüssel; mit dem alten liefe er in denselben Konflikt. Mit Aufrufer-id gibt
+        // `EtbEntwurfsTabs` dem Entwurf eine neue.
+        if (e instanceof ApiError && e.status === 409) {
+          eigeneClientId.current = crypto.randomUUID();
+          setAnhangHinweis(e.message);
+        }
         throw e;
       }
       eigeneClientId.current = crypto.randomUUID();

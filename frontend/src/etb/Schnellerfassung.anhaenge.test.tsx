@@ -2,6 +2,7 @@ import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ApiError } from '../api/client';
 import type { NeuerEintrag } from '../api/etb';
 import { ladeEtbAnhangHoch } from '../api/etb';
 import type { Anhang, EinsatzAnzeige, EtbBaustein, EtbEintragAnzeige } from '../api/types';
@@ -240,7 +241,7 @@ describe('Schnellerfassung – Absenden mit Anhängen (LFH-117)', () => {
     const p = props({
       erfassen: vi
         .fn<(e: NeuerEintrag) => Promise<void>>()
-        .mockRejectedValueOnce(new Error('Anhang unbekannt oder nicht mehr vorhanden'))
+        .mockRejectedValueOnce(new ApiError(400, 'Anhang unbekannt oder nicht mehr vorhanden'))
         .mockResolvedValueOnce(undefined),
     });
     const { container } = renderMitProviders(<Schnellerfassung {...p} />);
@@ -511,6 +512,48 @@ describe('Schnellerfassung – Sendezustand (LFH-117, Review)', () => {
     expect(ids[0]).toBeTruthy();
     expect(ids[1]).toBe(ids[0]);
     expect(ids[2]).not.toBe(ids[0]);
+  });
+
+  it('hält hochgeladene Dateien bei einer Ablehnung ohne Anhangsbezug (403) — kein zweiter Upload', async () => {
+    hochladen.mockResolvedValueOnce(anzeige(1, 'a.jpg'));
+    const p = props({
+      erfassen: vi
+        .fn<(e: NeuerEintrag) => Promise<void>>()
+        .mockRejectedValueOnce(new ApiError(403, 'Keine Berechtigung'))
+        .mockResolvedValueOnce(undefined),
+    });
+    const { container } = renderMitProviders(<Schnellerfassung {...p} />);
+    await waehle(container, datei('a.jpg'));
+    await userEvent.type(feld(), 'Foto{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    const knopf = screen.getByRole('button', { name: /Erfassen$/ });
+    await waitFor(() => expect(knopf).not.toHaveClass('ant-btn-loading'));
+    fireEvent.click(knopf);
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(2));
+    expect(hochladen).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(p.erfassen).mock.calls[1][0].anhang_ids).toEqual([1]);
+  });
+
+  it('nimmt nach einem client_id-Konflikt (409) einen neuen Schlüssel und sagt es an der Erfassung', async () => {
+    const konflikt =
+      'client_id bereits für einen anderen Eintrag verwendet: dieser Wortlaut ist nicht erfasst.';
+    const p = props({
+      erfassen: vi
+        .fn<(e: NeuerEintrag) => Promise<void>>()
+        .mockRejectedValueOnce(new ApiError(409, konflikt))
+        .mockResolvedValueOnce(undefined),
+    });
+    renderMitProviders(<Schnellerfassung {...p} />);
+    await userEvent.type(feld(), 'Text{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText(konflikt)).toBeInTheDocument();
+    expect(feld()).toHaveValue('Text');
+    const knopf = screen.getByRole('button', { name: /Erfassen$/ });
+    await waitFor(() => expect(knopf).not.toHaveClass('ant-btn-loading'));
+    fireEvent.click(knopf);
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(2));
+    const [erste, zweite] = vi.mocked(p.erfassen).mock.calls.map((c) => c[0].client_id);
+    expect(zweite).not.toBe(erste);
   });
 
   it('lässt eine laufende Berichtigung nicht abbrechen', async () => {

@@ -284,7 +284,10 @@ export default function EtbPage() {
    */
   async function abgelehntErneutSenden(puffer: AbgelehnterEintrag) {
     try {
-      await erfassen(puffer.eintrag);
+      // Mit NEUER client_id (Review C1): ein abgelehnter Eintrag ist nie erfasst worden, ein
+      // neuer Schlüssel legt also keine Dublette an. Mit dem alten liefe ein client_id-Konflikt
+      // (409, der Schlüssel steht für einen anderen Eintrag) endlos in dieselbe Ablehnung.
+      await erfassen({ ...puffer.eintrag, client_id: crypto.randomUUID() });
       if (puffer.id != null) await abgelehntVerwerfen(puffer.id);
     } catch (err) {
       message.error(err instanceof ApiError ? err.message : 'Erneut senden fehlgeschlagen');

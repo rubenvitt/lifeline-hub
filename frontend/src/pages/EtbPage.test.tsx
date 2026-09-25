@@ -11,7 +11,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import { sendeBreitenAenderung, setzeViewportBreite } from '../test/viewport';
 import { AuthProvider } from '../auth/AuthContext';
 import { entwuerfeLaden, entwuerfeLeerenFuerTests } from '../etb/entwuerfe/entwurfStore';
-import { queueLeerenFuerTests } from '../offline/queue';
+import { queueEinreihen, queueLeerenFuerTests } from '../offline/queue';
 import EtbPage from './EtbPage';
 import type { EtbEintragAnzeige } from '../api/types';
 
@@ -1141,6 +1141,45 @@ describe('EtbPage – Anhänge an der Erfassung (LFH-117, Review C1)', () => {
     expect(await screen.findByRole('list', { name: 'Gewählte Anhänge' })).toHaveTextContent(
       'foto-b.jpg',
     );
+  });
+
+  /**
+   * Review C1 (WICHTIG 1): ein Eintrag der Offline-Queue, dessen client_id schon für einen
+   * ANDEREN Eintrag steht, landet mit dem Wortlaut des Servers unter „abgelehnt". „Erneut
+   * senden" nimmt einen neuen Schlüssel — mit dem alten liefe er in denselben 409.
+   */
+  it('ein client_id-Konflikt der Queue steht unter „abgelehnt"; „Erneut senden" nimmt einen neuen Schlüssel', async () => {
+    const konflikt =
+      'client_id bereits für einen anderen Eintrag verwendet: dieser Wortlaut ist nicht erfasst.';
+    await queueEinreihen(admin.id, 7, {
+      typ: 'meldung',
+      inhalt: 'Wortlaut aus Tab 2',
+      client_id: 'entwurf-x',
+    });
+    const gesendet: string[] = [];
+    setup('/einsaetze/7/etb', [
+      http.post('/api/einsaetze/7/etb', async ({ request }) => {
+        const body = (await request.json()) as { client_id?: string };
+        gesendet.push(body.client_id ?? '');
+        return body.client_id === 'entwurf-x'
+          ? HttpResponse.json({ error: konflikt }, { status: 409 })
+          : HttpResponse.json(
+              { ...eintrag, id: 9, lfd_nr: 9, inhalt: 'Wortlaut aus Tab 2' },
+              { status: 201 },
+            );
+      }),
+    ]);
+    const user = userEvent.setup();
+    expect(
+      (await screen.findAllByText(/client_id bereits für einen anderen Eintrag/)).length,
+    ).toBeGreaterThan(0);
+    expect(screen.getAllByText('Wortlaut aus Tab 2').length).toBeGreaterThan(0);
+
+    await user.click(await screen.findByRole('button', { name: 'Erneut senden' }));
+    await waitFor(() => expect(gesendet).toHaveLength(2));
+    expect(gesendet[0]).toBe('entwurf-x');
+    expect(gesendet[1]).not.toBe('entwurf-x');
+    expect(gesendet[1]).toBeTruthy();
   });
 
   it('sperrt „Berichtigen", solange ein Entwurf sendet — mit Grund', async () => {

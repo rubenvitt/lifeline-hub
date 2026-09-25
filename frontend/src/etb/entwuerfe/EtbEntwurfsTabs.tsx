@@ -1,6 +1,7 @@
 // frontend/src/etb/entwuerfe/EtbEntwurfsTabs.tsx
 import { Spin, Tabs } from 'antd';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ApiError } from '../../api/client';
 import type { NeuerEintrag } from '../../api/etb';
 import type { EinsatzAnzeige, EtbBaustein } from '../../api/types';
 import Schnellerfassung, { nurUebernahme, VERSAND_RUHE, type Versand } from '../Schnellerfassung';
@@ -50,6 +51,7 @@ export default function EtbEntwurfsTabs({
     entwurfSchliessen,
     entwurfAktualisieren,
     entwurfFesthalten,
+    entwurfNeuAusweisen,
     aktivenSetzen,
   } = useEtbEntwuerfe(einsatzId, einsatz.meine_fuehrungsstelle, kontextLaedt);
 
@@ -88,7 +90,14 @@ export default function EtbEntwurfsTabs({
    * bleiben.
    */
   const [versandJe, setVersandJe] = useState<Record<string, Versand>>({});
-  const versandAendern = useCallback((id: string, aenderung: Partial<Versand>) => {
+  /**
+   * Umgezogene Entwurfs-ids (alt → neu, Review C1): der laufende Versand schreibt seinen
+   * Zustand aus einer alten Closure unter der ALTEN id weiter — nach einem 409 gehört er dem
+   * Entwurf unter seiner neuen.
+   */
+  const umgezogen = useRef(new Map<string, string>());
+  const versandAendern = useCallback((idAlt: string, aenderung: Partial<Versand>) => {
+    const id = umgezogen.current.get(idAlt) ?? idAlt;
     setVersandJe((alt) => {
       const neu = { ...(alt[id] ?? VERSAND_RUHE), ...aenderung };
       const rest = { ...alt };
@@ -138,7 +147,28 @@ export default function EtbEntwurfsTabs({
         <Schnellerfassung
           key={e.id}
           erfassen={async (eintrag) => {
-            await erfassen(eintrag); // wirft bei fachlicher Ablehnung → Entwurf bleibt
+            try {
+              await erfassen(eintrag); // wirft bei fachlicher Ablehnung → Entwurf bleibt
+            } catch (err) {
+              // 409 (Review C1): die Entwurfs-id steht als client_id schon für einen anderen
+              // Eintrag — ein zweiter Browser-Tab hat diesen Entwurf gesendet. Wortlaut und
+              // Dateien bleiben, der Entwurf bekommt eine neue id; mit der alten käme er nie
+              // mehr durch. Den Grund setzt die Schnellerfassung an die Erfassung.
+              if (err instanceof ApiError && err.status === 409) {
+                const neu = await entwurfNeuAusweisen(e.id);
+                if (neu) {
+                  umgezogen.current.set(e.id, neu);
+                  dateien.umhaengen(e.id, neu);
+                  setVersandJe((alt) => {
+                    if (!(e.id in alt)) return alt;
+                    const rest = { ...alt, [neu]: alt[e.id] };
+                    delete rest[e.id];
+                    return rest;
+                  });
+                }
+              }
+              throw err;
+            }
             // Übernahme VOR dem Schliessen setzen: `entwurfSchliessen` montiert die
             // Schnellerfassung neu, und `initialWerte` wird nur beim Mount gelesen.
             // Bei ausgeschaltetem Schalter wird geleert statt nur nicht angewandt —
