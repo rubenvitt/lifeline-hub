@@ -381,6 +381,7 @@ async fn fremde_organisation_ist_403() {
     let id = abgelegt(&app, einsatz, schaden, &admin, "dach.jpg").await;
     fremde_org_anlegen(&pool, "Fremd-Orga", "fremd", "fremdpw1", "fuehrungskraft").await;
     let fremd = login_cookie(&app, "fremd", "fremdpw1").await;
+    let vorher = stand(&pool, einsatz).await;
 
     assert_eq!(
         liste(&app, einsatz, schaden, &fremd).await.0,
@@ -395,6 +396,11 @@ async fn fremde_organisation_ist_403() {
     assert_eq!(
         entfernen(&app, einsatz, schaden, id, &fremd).await,
         StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        stand(&pool, einsatz).await,
+        vorher,
+        "nichts gespeichert, kein ETB"
     );
 }
 
