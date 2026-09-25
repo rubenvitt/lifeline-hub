@@ -2856,6 +2856,24 @@ mod tests {
             ermittle_system_akteur(&mut conn, einsatz.id).await.unwrap(),
             Some(leit)
         );
+        drop(conn);
+
+        // Abgeschlossen von einer DRITTEN Person (weder Leitung noch Admin): sie gewinnt vor
+        // Einsatzleitung und Admin — die erste Stufe der Kette.
+        let abschliesser = benutzer_in_org(&pool, 1, "abschliesser", false, true).await;
+        sqlx::query(
+            "UPDATE einsatz SET status = 'abgeschlossen', abgeschlossen_von = ? WHERE id = ?",
+        )
+        .bind(abschliesser)
+        .bind(einsatz.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+        let mut conn = pool.acquire().await.unwrap();
+        assert_eq!(
+            ermittle_system_akteur(&mut conn, einsatz.id).await.unwrap(),
+            Some(abschliesser)
+        );
     }
 
     // ---------- LFH-23: Wiederherstellen während der Karenz ----------
