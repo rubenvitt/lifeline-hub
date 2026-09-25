@@ -1781,6 +1781,45 @@ Schemaänderung geht deshalb über `alpha`. Freigaben laufen als Merge-Commit, n
 Squash: Nach einem Squash bleibt die Abzweigung alt, und jede frühere Migration erschiene
 wieder als eingeschoben.
 
+## Backend — Demo-Daten zur Laufzeit (LFH-690)
+
+**Ein System-Admin spielt eine Übungslage im laufenden Betrieb ein, entfernt sie oder
+importiert sie neu** (`src/demo/`, `src/routes/demo_daten.rs`, Verwaltung „Demo-Daten“). Der
+Schalter heißt `--demo-daten` bzw. `LIFELINE_DEMO_DATEN=true` und steht per Vorgabe auf aus.
+Der Dev-Seed ist dafür **nicht** die Grundlage, weil er feste Konten mit Passwort anlegt und
+die Organisation mandantenblind sucht.
+- **404 ohne Schalter kommt aus der Registrierung, nicht aus einer Prüfung.** Die Routen
+  existieren nur bei `RouterOptionen { demo_daten: true }` (`build_router_mit`,
+  `build_router` hat die Vorgabe aus). Eine Prüfung im Handler käme erst nach `AdminUser`
+  (401/403), und ein Guard-Extractor verriete den Pfad über 405. Ein OnceLock ließe „aus“
+  und „an“ nicht im selben Test-Binary prüfen. Das Frontend erfährt die Freischaltung aus
+  `GET /api/demo-daten` selbst, 404 heißt aus (`admin/useDemoDaten.ts`). Eine zweite Quelle
+  gibt es nicht.
+- **Ein Import ist eine Transaktion über die Betriebsfunktionen.** Rohes SQL ginge an
+  Nummernkreisen, Snapshots und System-ETB vorbei. Dafür wurden zahlreiche Fach-Repos
+  mechanisch in `…_tx(conn)` und eine unveränderte Pool-Hülle geteilt, und die
+  System-ETB-Texte der Handler sind reine Funktionen im Fachmodul. **Eine Pool-Funktion unter
+  einer offenen `BEGIN IMMEDIATE` endet nach rund 20 s in 503, und ihre Lesezugriffe sehen die
+  eigenen Zeilen nicht.** Wer dem Drehbuch einen Schritt hinzufügt, nimmt deshalb nur
+  `_tx`-Funktionen.
+- **Der Löschweg erreicht strukturell nur Demo-Daten.** Die Einsatz-ID kommt ausschließlich
+  aus `demo_import`, und `org_id` steht in jedem WHERE. Die Stammdaten löscht er je Zeile
+  im `SAVEPOINT`. Scheitert eine Zeile am Fremdschlüssel (787), bleibt sie stehen und verliert
+  ihre Marke. Das trägt nur, solange **jeder** Fremdschlüssel auf
+  `fahrzeug`/`personal`/`material` `NO ACTION`/`RESTRICT` ist und nichts `DEFERRABLE`
+  (`src/demo/schema_tests.rs`). Ein `CASCADE` oder `SET NULL` dort ließe das Löschen still
+  fremde Zeilen ändern. Das ETB echter Einsätze schützt in der DB **nur** diese WHERE-Bindung,
+  einen Append-only-Trigger gibt es nicht.
+- **Einsatz-IDs werden nie wiederverwendet.** `einsatz::repo::anlegen_tx` vergibt die ID
+  oberhalb von `MAX(einsatz.id)` und aller in `demo_import.einsatz_id` gesperrten IDs.
+  `einsatz` hat kein `AUTOINCREMENT`. Sonst schriebe eine Offline-Queue des entfernten
+  Demo-Einsatzes in einen echten.
+- **Die Szenariouhr setzt `received_at = ereigniszeit`, und zwar nur am Demo-Einsatz.**
+  Deshalb fehlt dort das ⧖. Nie eine FTS-Spalte per UPDATE ändern. Beim Import entsteht kein
+  Alarm: Vergangene Erinnerungen sind erledigt, und es gibt keine Auto-Frist und keine
+  Ablösungsschicht.
+- **Herleitung, Messwerte und Prüfliste:** `openspec/changes/lfh-690-demo-daten-laufzeit-import/`.
+
 ## Backend — ClamAV-Upload-Scan (Default-AN, LFH-114/LFH-224)
 
 Der clamd-Virenscan der Uploads (`src/anhang/mod.rs`) hängt am Cargo-Feature `clamav`, das
