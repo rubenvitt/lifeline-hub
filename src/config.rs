@@ -575,6 +575,27 @@ mod tests {
         ergebnis
     }
 
+    /// Jeder Parse in diesen Tests läuft über die drei Helfer oben, also unter `ENV_LOCK`.
+    /// Ein direkter `Config::parse_from` liest das Prozess-Env OHNE Sperre — setzt ein
+    /// paralleler Test gerade `LIFELINE_DEMO_DATEN=1` (ungültig, siehe unten), meldet clap
+    /// den Fehler und beendet mit `process::exit(2)` das GANZE Test-Binary. So in der CI
+    /// gesehen (PR #159, `error: invalid value '1' for '--demo-daten'`), lokal selten.
+    #[test]
+    fn parse_nur_ueber_die_gesperrten_helfer() {
+        let quelle = include_str!("config.rs");
+        let tests = &quelle[quelle.find("mod tests").expect("Testmodul vorhanden")..];
+        // Die Muster zusammengesetzt, sonst zählte der Test seine eigenen Literale mit.
+        let direkt = tests.matches(concat!("Config::", "parse_from(")).count()
+            + tests
+                .matches(concat!("Config::", "try_parse_from("))
+                .count();
+        assert_eq!(
+            direkt, 3,
+            "nur parse_hermetisch/parse_mit_env/try_parse_mit_env dürfen Config parsen — \
+             neue Tests nehmen parse_hermetisch"
+        );
+    }
+
     /// LFH-690 (D1): der Demo-Import ist per Vorgabe aus und über Flag oder Env zuschaltbar.
     /// Die Env nimmt nur `true`/`false` — `1` bricht den Start laut ab, statt still als
     /// „aus“ gelesen zu werden (dasselbe Verhalten wie `LIFELINE_TLS`).
@@ -621,13 +642,13 @@ mod tests {
 
     #[test]
     fn cli_flags_override_defaults() {
-        let config = Config::parse_from(["lifeline-hub", "--bind", "0.0.0.0:9000"]);
+        let config = parse_hermetisch(["lifeline-hub", "--bind", "0.0.0.0:9000"]);
         assert_eq!(config.bind, "0.0.0.0:9000");
     }
 
     #[test]
     fn db_path_flag_overrides_default() {
-        let config = Config::parse_from(["lifeline-hub", "--db-path", "/tmp/test.db"]);
+        let config = parse_hermetisch(["lifeline-hub", "--db-path", "/tmp/test.db"]);
         assert_eq!(config.db_path, "/tmp/test.db");
     }
 
@@ -638,7 +659,7 @@ mod tests {
         assert!(c.tls_mkcert_install, "mkcert-install Default an");
         assert!(c.tls_cert.is_none() && c.tls_key.is_none());
 
-        let c = Config::parse_from([
+        let c = parse_hermetisch([
             "lifeline-hub",
             "--tls",
             "--tls-cert",
@@ -818,7 +839,7 @@ mod tests {
         assert_eq!(config.admin_user, "admin");
         assert!(config.admin_password.is_none());
 
-        let config = Config::parse_from(["lifeline-hub", "--admin-password", "geheim123"]);
+        let config = parse_hermetisch(["lifeline-hub", "--admin-password", "geheim123"]);
         assert_eq!(
             config.admin_password.as_ref().map(|p| p.als_str()),
             Some("geheim123")
@@ -827,7 +848,7 @@ mod tests {
 
     #[test]
     fn admin_password_wird_im_debug_maskiert() {
-        let config = Config::parse_from(["lifeline-hub", "--admin-password", "geheim123"]);
+        let config = parse_hermetisch(["lifeline-hub", "--admin-password", "geheim123"]);
         let ausgabe = format!("{config:?}");
         assert!(
             !ausgabe.contains("geheim123"),
@@ -839,7 +860,7 @@ mod tests {
     #[test]
     fn karten_service_token_wird_im_debug_maskiert() {
         let config =
-            Config::parse_from(["lifeline-hub", "--karten-service-token", "svc-token-geheim"]);
+            parse_hermetisch(["lifeline-hub", "--karten-service-token", "svc-token-geheim"]);
         let ausgabe = format!("{config:?}");
         assert!(
             !ausgabe.contains("svc-token-geheim"),
@@ -859,7 +880,7 @@ mod tests {
 
     #[test]
     fn oidc_client_secret_wird_im_debug_maskiert() {
-        let config = Config::parse_from([
+        let config = parse_hermetisch([
             "lifeline-hub",
             "--oidc-issuer",
             "https://idp.example",
@@ -892,7 +913,7 @@ mod tests {
 
     #[test]
     fn backup_subkommando_wird_geparst() {
-        let config = Config::parse_from(["lifeline-hub", "backup", "--out", "/mnt/usb/b.sqlite"]);
+        let config = parse_hermetisch(["lifeline-hub", "backup", "--out", "/mnt/usb/b.sqlite"]);
         match config.command {
             Some(Command::Backup { out }) => assert_eq!(out, "/mnt/usb/b.sqlite"),
             andere => panic!("erwartete Backup, fand {andere:?}"),
@@ -901,7 +922,7 @@ mod tests {
 
     #[test]
     fn restore_subkommando_mit_force_wird_geparst() {
-        let config = Config::parse_from([
+        let config = parse_hermetisch([
             "lifeline-hub",
             "restore",
             "--from",
@@ -928,7 +949,7 @@ mod tests {
 
     #[test]
     fn server_flags_funktionieren_weiter_mit_subkommando() {
-        let config = Config::parse_from([
+        let config = parse_hermetisch([
             "lifeline-hub",
             "--db-path",
             "/tmp/x.db",
