@@ -54,7 +54,7 @@ nicht an allen Stellen:
   lokal, nur die Neuen lesen aus `cls-kern.ts`.
 - Das Wachsen der Gebietsliste bei einem neuen Gefahrengebiet (LFH-334, bekannt offen).
 - Die Rückwärts-Hypothese an der stehenden Kopfzeile der Matrix ist kein eigenes Ziel.
-  Sie wird gemessen (Aufgabe 5.3), gefixt wird nur, wenn sie rot ist.
+  Sie wird gemessen (Aufgabe 4.3), gefixt wird nur, wenn sie rot ist.
 
 ## Decisions
 
