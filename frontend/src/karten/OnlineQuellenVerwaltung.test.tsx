@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
+import { setzeViewportBreite } from '../test/viewport';
 import { AuthProvider } from '../auth/AuthContext';
 import type { OnlineQuelle } from '../api/onlineQuellen';
 import OnlineQuellenVerwaltung from './OnlineQuellenVerwaltung';
@@ -445,5 +446,68 @@ describe('OnlineQuellenVerwaltung — Freitext-Spalten (LFH-346 · A4)', () => {
     expect(zelle).toHaveClass('ant-table-cell-ellipsis');
     expect(zelle).toHaveStyle({ maxWidth: '200px' });
     expect(zelle).toHaveAttribute('title', langeAttribution);
+  });
+});
+
+// ── Spaltenschalter mit Zähler (LFH-374, Kriterium 14) ──────────────────────────────
+describe('OnlineQuellenVerwaltung · Spaltenschalter', () => {
+  const kopf = (c: HTMLElement) =>
+    Array.from(c.querySelectorAll('th.ant-table-cell')).map((z) => z.textContent);
+
+  /** Das OFFENE Menü — geschlossene und abgehende Portale bleiben im Baum stehen. */
+  const offenesMenue = () =>
+    waitFor(() => {
+      const m = document.querySelector<HTMLElement>(
+        '.ant-dropdown:not(.ant-dropdown-hidden):not(.ant-slide-up-leave) [role="menu"]',
+      );
+      expect(m).not.toBeNull();
+      return m!;
+    });
+
+  it('bei 1024 px stehen alle Spalten, der Schalter heißt „Spalten"', async () => {
+    mockBasis(admin);
+    const { container } = render();
+    await screen.findByText('OpenStreetMap');
+    expect(screen.getByRole('button', { name: 'Spalten — Online-Quellen' })).toBeInTheDocument();
+    expect(kopf(container)).toEqual([
+      'Name',
+      'Typ',
+      'URL',
+      'Attribution',
+      'Sortierung',
+      'Aktiv',
+      'Aktionen',
+    ]);
+  });
+
+  it('unter lg fallen URL und Attribution weg und zählen — zusammen mit der Handauswahl', async () => {
+    setzeViewportBreite(800);
+    mockBasis(admin);
+    const { container } = render();
+    await screen.findByText('OpenStreetMap');
+    expect(kopf(container)).toEqual(['Name', 'Typ', 'Sortierung', 'Aktiv', 'Aktionen']);
+    expect(
+      screen.getByRole('button', { name: 'Spalten · 2 ausgeblendet — Online-Quellen' }),
+    ).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /^Spalten/ }));
+    await userEvent.click(
+      within(await offenesMenue()).getByRole('checkbox', { name: 'Sortierung' }),
+    );
+    expect(kopf(container)).toEqual(['Name', 'Typ', 'Aktiv', 'Aktionen']);
+    expect(
+      screen.getByRole('button', { name: 'Spalten · 3 ausgeblendet — Online-Quellen' }),
+    ).toBeInTheDocument();
+  });
+
+  it('Name und Aktionen stehen nicht zur Wahl', async () => {
+    mockBasis(admin);
+    render();
+    await screen.findByText('OpenStreetMap');
+    await userEvent.click(screen.getByRole('button', { name: /^Spalten/ }));
+    const wahl = within(await offenesMenue())
+      .getAllByRole('checkbox')
+      .map((k) => k.closest('li')?.textContent);
+    expect(wahl).toEqual(['Typ', 'URL', 'Attribution', 'Sortierung', 'Aktiv']);
   });
 });

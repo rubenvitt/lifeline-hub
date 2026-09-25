@@ -19,8 +19,8 @@
 
 ## 4. Kartenverwaltungen
 
-- [ ] 4.1 `OnlineQuellenVerwaltung.tsx`: `spaltenSchalter={{ bezeichnung: 'Online-Quellen' }}`, URL und Attribution `abBreite: 'lg'`, Aktionen `immerSichtbar` (D7). Tests zuerst: Schalter vorhanden, bei 1024 px „Spalten“ mit allen Spalten, unter `lg` „Spalten · 2 ausgeblendet“, zusammen mit abgewählter „Sortierung“ „· 3 ausgeblendet“, Name und Aktionen nicht im Menü. Bestandstests (Sortierung, Aktiv-Filter, Suche) bleiben unverändert grün.
-- [ ] 4.2 `OfflineKartenVerwaltung.tsx`: `spaltenSchalter={{ bezeichnung: 'Offline-Karten' }}`, Attribution `abBreite: 'lg'`, Aktionen `immerSichtbar`. Tests zuerst: „Größe“ abwählen ergibt „· 1 ausgeblendet“ und die Spalte ist weg. Unter `lg` lässt sich „Attribution“ von Hand zurückholen, der Zähler sinkt. Bestandstests (Größen-Sortierung, Status-Filter, Suche, Polling) bleiben unverändert grün.
+- [x] 4.1 `OnlineQuellenVerwaltung.tsx`: `spaltenSchalter={{ bezeichnung: 'Online-Quellen' }}`, URL und Attribution `abBreite: 'lg'`, Aktionen `immerSichtbar` (D7). Tests zuerst: Schalter vorhanden, bei 1024 px „Spalten“ mit allen Spalten, unter `lg` „Spalten · 2 ausgeblendet“, zusammen mit abgewählter „Sortierung“ „· 3 ausgeblendet“, Name und Aktionen nicht im Menü. Bestandstests (Sortierung, Aktiv-Filter, Suche) bleiben unverändert grün.
+- [x] 4.2 `OfflineKartenVerwaltung.tsx`: `spaltenSchalter={{ bezeichnung: 'Offline-Karten' }}`, Attribution `abBreite: 'lg'`, Aktionen `immerSichtbar`. Tests zuerst: „Größe“ abwählen ergibt „· 1 ausgeblendet“ und die Spalte ist weg. Unter `lg` lässt sich „Attribution“ von Hand zurückholen, der Zähler sinkt. Bestandstests (Größen-Sortierung, Status-Filter, Suche, Polling) bleiben unverändert grün.
 - [ ] 4.3 e2e: `/admin/karten/online` und `/admin/karten/offline` bei 390 px zeigen eine Tabelle (keine Karten), die Seite hat keinen waagerechten Überlauf, der Schalter zeigt einen Zähler > 0, und ein Klick darauf öffnet das Menü. Die Spec wird an `katalogtabelle-schmal.spec.ts` angehängt oder in einer eigenen Spec gleicher Bauform abgelegt. Belegen mit `pnpm e2e` für die Spec.
 
 ## 5. Doku, Prüfliste, Gates

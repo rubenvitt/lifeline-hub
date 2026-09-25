@@ -1,5 +1,5 @@
-import { App, Button, Popconfirm, Space, Tag, type TableColumnsType } from 'antd';
-import KatalogTabelle from '../components/KatalogTabelle';
+import { App, Button, Popconfirm, Space, Tag } from 'antd';
+import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
@@ -41,7 +41,7 @@ export default function OnlineQuellenVerwaltung() {
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Löschen fehlgeschlagen'),
   });
 
-  const spalten: TableColumnsType<OnlineQuelle> = [
+  const spalten: KatalogSpalte<OnlineQuelle>[] = [
     {
       title: 'Name',
       dataIndex: 'name',
@@ -101,6 +101,10 @@ export default function OnlineQuellenVerwaltung() {
        */
       ellipsis: { showTitle: true },
       onCell: () => ({ style: { maxWidth: 280 } }),
+      // LFH-374: gekappter Freitext mit der schwächsten Vergleichsaussage — fällt unter `lg`
+      // weg (Tablet hochkant, Handschirm) und wird vom Spaltenschalter mitgezählt. Fükw und
+      // Tablet quer liegen darüber und sehen die Spalte.
+      abBreite: 'lg',
     },
     {
       title: 'Attribution',
@@ -110,6 +114,7 @@ export default function OnlineQuellenVerwaltung() {
       ellipsis: { showTitle: true },
       onCell: () => ({ style: { maxWidth: 200 } }),
       render: (a: string | null) => a ?? '—',
+      abBreite: 'lg',
     },
     {
       title: 'Sortierung',
@@ -152,6 +157,8 @@ export default function OnlineQuellenVerwaltung() {
           {
             title: 'Aktionen',
             key: 'aktionen',
+            // Die Zeilenaktionen sind kein Vergleichsgegenstand — nicht abwählbar.
+            immerSichtbar: true,
             render: (_, q: OnlineQuelle) => (
               // `size="middle"` trennt die destruktive von der neutralen Aktion (LFH-363-Norm,
               // hier für B5f eingelöst): der Vorgabe-Abstand eines `<Space>` ist im Projekt
@@ -177,7 +184,7 @@ export default function OnlineQuellenVerwaltung() {
               </Space>
             ),
           },
-        ] as TableColumnsType<OnlineQuelle>)
+        ] as KatalogSpalte<OnlineQuelle>[])
       : []),
   ];
 
@@ -220,6 +227,9 @@ export default function OnlineQuellenVerwaltung() {
           // tatsächlich getippt wird — die volle Aufzählung würde im 220 px breiten Feld
           // ohnehin abgeschnitten.
           suche={{ platzhalter: 'Name, URL oder Attribution' }}
+          // Kriterium 14 (LFH-374): umschaltbarer Spaltensatz mit Zähler. Name ist Spalte 0
+          // und damit nie abwählbar, Aktionen sind `immerSichtbar`.
+          spaltenSchalter={{ bezeichnung: 'Online-Quellen' }}
         />
       )}
       <OnlineQuelleFormModal
