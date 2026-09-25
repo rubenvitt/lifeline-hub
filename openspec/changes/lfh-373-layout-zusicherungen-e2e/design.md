@@ -152,6 +152,14 @@ Funktion der Knopfkante (`kartenKnopfKante(token)`). Knopfblock und Fußbänder 
 dann bei keiner Höhe mehr überschneiden. Das folgt aus der Breitenaufteilung, nicht aus
 einem `zIndex`, derselbe Grundsatz wie beim Stapeln der Bänder in LFH-355. Wo die
 Personenkarte (`BetroffeneKarte.tsx`) einen Fuß trägt, gilt dieselbe Funktion.
+**Gemessener Preis und Entscheidung (25.09.2026):** Bei 1440 × 900 in `kompakt` bricht die
+Zeitleiste im schmaleren Band in eine zweite Reihe um (73 statt 46 px bei 803 px
+Kartenhöhe). Einzeilig ginge es nur mit Startbreiten, die auf wenige Pixel genau passen und
+mit den Schriften der CI kippen würden. Der Auftraggeber hat zwei Reihen zugelassen.
+`lagekarte-smoke.spec.ts` sichert seither seinen ursprünglichen Befund (die Stand-Reihe
+bricht nicht in eine eigene Zeile) und höchstens zwei Reihen. *Verworfen* waren eine
+Einrückung nur bei Bedarf (Messung statt Aufteilung) und das Streichen der Stand-Anzeige.
+
 *Verworfen:* ein höherer `zIndex` für den Knopfblock. Er würde das Band verdecken, nur
 andersherum.
 *Verworfen:* dem Knopfblock eine Höchsthöhe mit eigenem Bildlauf geben. Dann wären

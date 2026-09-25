@@ -978,3 +978,126 @@ test('Lagekarte (LFH-373): Kartenknöpfe liegen nie unter den Fußbändern', asy
   }
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
+
+/**
+ * Personenkarte (LFH-373, LFH-613-Prüfliste 4 · 13): dieselbe `KartenUeberlagerung` wie die
+ * Lagekarte (Knopfblock oben rechts, Überlagerung links, `position: absolute`), aber OHNE
+ * Kartenfuß. Der Kern bekommt die Aufbauten als Zusatzkandidaten — ohne sie wäre der Lauf
+ * grün durch Konstruktion (Selbstbeweis LFH-373 oben).
+ */
+test('Personenkarte (LFH-373): kein Fokusziel liegt unter den Kartenaufbauten', async ({
+  page,
+}) => {
+  test.setTimeout(240_000);
+  await ohneDevtoolsKnopf(page);
+  await anmelden(page);
+  const antwort = await page.request.post('/api/einsaetze', {
+    data: { bezeichnung: `Fokus 373 West ${Date.now()}` },
+  });
+  expect(antwort.ok(), await antwort.text()).toBeTruthy();
+  const { id: einsatzId } = (await antwort.json()) as { id: number };
+  for (const [i, name] of ['Einzeln West', 'Fern West'].entries()) {
+    const person = await page.request.post(`/api/einsaetze/${einsatzId}/personen`, {
+      data: { name, antreff_lat: 53 + i * 0.3, antreff_lon: 8.8 + i * 0.5 },
+    });
+    expect(person.ok(), await person.text()).toBeTruthy();
+  }
+
+  const gemessen: string[] = [];
+  for (const flaeche of [
+    { width: 390, height: 844 },
+    { width: 1366, height: 768 },
+  ]) {
+    const lauf = `${flaeche.width}×${flaeche.height}/handschuh`;
+    await page.setViewportSize(flaeche);
+    await page.goto(`/einsaetze/${einsatzId}/personen?ansicht=karte`);
+    await stelleDichte(page, 'handschuh');
+    const karte = page.locator('[data-lfh="betroffene-karte"]');
+    await expect(karte.locator('canvas.maplibregl-canvas')).toHaveCount(1);
+    const knoepfe = karte.locator('[data-lfh="karten-knoepfe"]');
+    await expect(knoepfe.getByRole('button', { name: 'Hineinzoomen', exact: true })).toBeVisible();
+    for (const name of ['Hineinzoomen', 'Herauszoomen', 'Nach Norden ausrichten']) {
+      await knoepfe
+        .getByRole('button', { name, exact: true })
+        .click({ trial: true, timeout: 5_000 });
+    }
+
+    await knoepfe.getByRole('button', { name: 'Hineinzoomen', exact: true }).focus();
+    const kern = await pruefeFokusVerdeckung(page, 10, 'Tab', {
+      zusatzKandidaten: KARTEN_AUFBAUTEN,
+      region: '[data-lfh="betroffene-karte"]',
+    });
+    expect(
+      kern.stoppsInRegion,
+      `${lauf}: Vorbedingung — der Lauf muss durch die Karte gehen`,
+    ).toBeGreaterThanOrEqual(2);
+    expect(kern.verdeckt, `${lauf}:\n${kern.verdeckt.join('\n')}`).toEqual([]);
+    gemessen.push(`${lauf}: ${kern.stoppsInRegion} Stopps in der Karte, frei`);
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+/**
+ * Personenliste (LFH-373, LFH-613-Prüfliste 1 · 13): Tabellenzweig der `Datensicht` mit
+ * stehender Kopfzeile, ein Tab-Stopp je Zeile. Vorwärts UND rückwärts: nur rückwärts rollt ein
+ * Ziel an den oberen Rand, unter die Kopfzeile (Kern, Abschnitt RICHTUNG). Unter `md` stehen
+ * Karten ohne stehende Kopfzeile — deshalb 1024 und 1366 px.
+ */
+test('Personenliste (LFH-373): kein Fokusziel verschwindet hinter der stehenden Kopfzeile', async ({
+  page,
+}) => {
+  test.setTimeout(240_000);
+  await ohneDevtoolsKnopf(page);
+  await anmelden(page);
+  const antwort = await page.request.post('/api/einsaetze', {
+    data: { bezeichnung: `Fokus 373 Liste ${Date.now()}` },
+  });
+  expect(antwort.ok(), await antwort.text()).toBeTruthy();
+  const { id: einsatzId } = (await antwort.json()) as { id: number };
+  const ANZAHL = 14;
+  for (let n = 1; n <= ANZAHL; n += 1) {
+    const person = await page.request.post(`/api/einsaetze/${einsatzId}/personen`, {
+      data: { name: `Person ${String(n).padStart(2, '0')}` },
+    });
+    expect(person.ok(), await person.text()).toBeTruthy();
+  }
+
+  const gemessen: string[] = [];
+  for (const flaeche of [
+    { width: 1024, height: 600 },
+    { width: 1366, height: 520 },
+  ]) {
+    await page.setViewportSize(flaeche);
+    for (const dichte of ['kompakt', 'handschuh']) {
+      const lauf = `${flaeche.width}×${flaeche.height}/${dichte}`;
+      await page.goto(`/einsaetze/${einsatzId}/personen`);
+      await stelleDichte(page, dichte);
+      const zeilen = page.locator('tr.ant-table-row');
+      await expect(zeilen).toHaveCount(ANZAHL);
+      await expect(page.locator('.ant-table-sticky-holder')).toHaveCSS('position', 'sticky');
+      const reserve = await page.evaluate(
+        () => document.documentElement.scrollHeight - document.documentElement.clientHeight,
+      );
+      expect(reserve, `${lauf}: Vorbedingung — die Seite muss scrollen`).toBeGreaterThan(0);
+
+      await zeilen.first().locator('a, button, [tabindex="0"]').first().focus();
+      const vor = await pruefeFokusVerdeckung(page, ANZAHL * 3);
+      expect(vor.stoppsInTabelle, `${lauf}: vorwärts durch die Tabelle`).toBeGreaterThanOrEqual(
+        ANZAHL - 1,
+      );
+      expect(vor.verdeckt, `${lauf} vorwärts:\n${vor.verdeckt.join('\n')}`).toEqual([]);
+
+      await zeilen.last().locator('a, button, [tabindex="0"]').last().focus();
+      const rueck = await pruefeFokusVerdeckung(page, ANZAHL * 3, 'Shift+Tab');
+      expect(
+        rueck.stoppsAnTabellenkopf,
+        `${lauf}: Vorbedingung — rückwärts muss der Lauf die Kopfzeile erreichen`,
+      ).toBeGreaterThan(0);
+      expect(rueck.verdeckt, `${lauf} rückwärts:\n${rueck.verdeckt.join('\n')}`).toEqual([]);
+      gemessen.push(
+        `${lauf}: ${vor.stoppsInTabelle} Tabellenstopps vorwärts, ${rueck.stoppsAnTabellenkopf} an der Kopfzeile rückwärts`,
+      );
+    }
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
