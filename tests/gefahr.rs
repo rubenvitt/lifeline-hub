@@ -534,6 +534,15 @@ async fn schwaerzung_nullt_zonen_und_gebietslabel_und_haelt_den_etb_wortlaut() {
             .fetch_one(&pool)
             .await
             .unwrap();
+    // Die Zonennotiz nennt das AK von LFH-283 neben dem Label. Sie wird direkt gesetzt:
+    // gepinnt wird hier der Registry-Scrub, nicht der Schreibweg der Notiz.
+    sqlx::query(
+        "UPDATE lage_zone SET notiz = 'Ansprechpartner Herr Müller, 0170 123' WHERE einsatz_id = ?",
+    )
+    .bind(einsatz)
+    .execute(&pool)
+    .await
+    .unwrap();
 
     let mut tx = pool.begin().await.unwrap();
     lifeline_hub::einsatz::schwaerzung_registry::scrubbe_aus_registry(&mut tx, einsatz)
@@ -541,13 +550,14 @@ async fn schwaerzung_nullt_zonen_und_gebietslabel_und_haelt_den_etb_wortlaut() {
         .unwrap();
     tx.commit().await.unwrap();
 
-    let (label, geometrie): (Option<String>, String) =
-        sqlx::query_as("SELECT label, geometrie FROM lage_zone WHERE einsatz_id = ?")
+    let (label, notiz, geometrie): (Option<String>, Option<String>, String) =
+        sqlx::query_as("SELECT label, notiz, geometrie FROM lage_zone WHERE einsatz_id = ?")
             .bind(einsatz)
             .fetch_one(&pool)
             .await
             .unwrap();
     assert_eq!(label, None, "Zonenlabel genullt");
+    assert_eq!(notiz, None, "Zonennotiz genullt");
     assert_eq!(geometrie, geometrie_vorher, "Geometrie bleibt");
     let gebiet_label: Option<String> =
         sqlx::query_scalar("SELECT label FROM gefahrengebiet WHERE id = ?")

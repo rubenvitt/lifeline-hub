@@ -1665,13 +1665,10 @@ mod tests {
 
     /// Ausgehende FKs einer Tabelle als `(referenzierte_tabelle, on_delete)`.
     async fn fks_von(pool: &SqlitePool, tabelle: &str) -> Vec<(String, String)> {
-        let sql = format!("PRAGMA foreign_key_list('{tabelle}')");
-        sqlx::query(sqlx::AssertSqlSafe(sql))
-            .fetch_all(pool)
+        fk_kanten_von(pool, tabelle)
             .await
-            .unwrap()
-            .iter()
-            .map(|r| (r.get::<String, _>("table"), r.get::<String, _>("on_delete")))
+            .into_iter()
+            .map(|(_, parent, on_delete)| (parent, on_delete))
             .collect()
     }
 
@@ -1822,11 +1819,15 @@ mod tests {
 
     // ---------- GUARD 5 (LFH-291): FK-Kanten von außerhalb S nach S ----------
 
-    /// Begründete Ausnahmen zu GUARD 5, Format `(tabelle, spalte, grund)`: einzelne FK-Kanten
-    /// aus Tabellen AUSSERHALB von S nach S, die legitim sind, weil die Zeilen nicht
-    /// einsatz-eigen sind und deshalb NICHT geschwärzt werden (z. B. eine Stammdaten-Tabelle
-    /// mit `REFERENCES einsatz ON DELETE SET NULL`). Je KANTE, nicht je Tabelle: eine später
-    /// ergänzte zweite Kante derselben Tabelle nach S muss eigens begründet werden. Die Liste startet LEER, weil der Bestand
+    /// Begründete Ausnahmen zu GUARD 5, Format `(tabelle, spalte, grund)`: einzelne
+    /// FK-Kanten aus Tabellen AUSSERHALB von S nach S, die legitim sind, weil die Zeilen
+    /// nicht einsatz-eigen sind und deshalb NICHT geschwärzt werden (z. B. eine
+    /// Stammdaten-Tabelle mit `REFERENCES einsatz ON DELETE SET NULL`). Je KANTE, nicht je
+    /// Tabelle: eine später ergänzte zweite Kante derselben Tabelle nach S muss eigens
+    /// begründet werden. Der Grund ist Pflicht (`guard5_allowlist_hat_keine_toten_eintraege`).
+    ///
+    /// Was GUARD 5 nicht sieht: Verweise ohne deklarierten FK (polymorphe
+    /// `objekt_typ`/`objekt_id`) und die per `_fts` ausgeschlossenen Tabellen. Die Liste startet LEER, weil der Bestand
     /// keine einzige solche Kante hat (gemessen über alle Migrationen). Ein Eintrag ohne
     /// Querkante gilt selbst als Verstoß (`guard5_allowlist_hat_keine_toten_eintraege`),
     /// sonst veraltet die Liste still.
@@ -1923,10 +1924,11 @@ mod tests {
             befund.is_empty(),
             "FK-Kanten von außerhalb der einsatz-scoped Menge S nach S ({}). Die Zeilen \
              dieser Tabellen hängen an einem Einsatz, liegen aber nicht in S und würden \
-             NICHT geschwärzt. Auswege: (1) eine einsatz_id-Spalte ergänzen, (2) den FK auf \
-             ON DELETE CASCADE umstellen (dann entdeckt die Hülle die Tabelle, GUARD 1/3 \
-             verlangen die Klassifikation) oder (3) die Kante mit Begründung auf \
-             FREMDKANTEN_ALLOWLIST setzen, je Kante (nicht einsatz-eigen, wird nicht geschwärzt):\n{}",
+             NICHT geschwärzt. Sind die Zeilen einsatz-eigen: (1) eine einsatz_id-Spalte \
+             ergänzen oder (2) den FK auf ON DELETE CASCADE umstellen (dann entdeckt die \
+             Hülle die Tabelle, GUARD 1/3 verlangen die Klassifikation). Sind sie es NICHT \
+             (Stammdaten): (3) die Kante mit Begründung auf FREMDKANTEN_ALLOWLIST setzen — \
+             (1)/(2) zögen Stammdaten in die unumkehrbare Schwärzung:\n{}",
             befund.len(),
             befund
                 .iter()
@@ -1946,11 +1948,27 @@ mod tests {
         let s = entdecke_einsatz_scoped(&pool).await;
         let ungefiltert = fremde_fk_auf_scoped(&pool, &s, &[]).await;
         let tot = tote_allowlist_eintraege(&ungefiltert, FREMDKANTEN_ALLOWLIST);
+        for (tabelle, spalte, grund) in FREMDKANTEN_ALLOWLIST {
+            assert!(
+                !grund.trim().is_empty(),
+                "FREMDKANTEN_ALLOWLIST-Eintrag {tabelle}.{spalte} ohne Begründung"
+            );
+        }
         assert!(
             tot.is_empty(),
             "Tote FREMDKANTEN_ALLOWLIST-Einträge (keine FK-Kante mehr nach S) — streichen: \
              {tot:?}"
         );
+    }
+
+    /// Beschränkt einen Befund auf die Sondentabellen: die synthetischen Tests sollen auch
+    /// dann grün bleiben, wenn das echte Schema eine begründete Querkante bekommt — die
+    /// Leerheit des echten Schemas prüft `guard5_keine_fk_kante_von_aussen_nach_s`.
+    fn nur_sonden(befund: Vec<FremdKante>) -> Vec<FremdKante> {
+        befund
+            .into_iter()
+            .filter(|k| k.tabelle.starts_with("lfh291_sonde_"))
+            .collect()
     }
 
     /// Legt im (je Test eigenen) Pool vier Sondentabellen an: zwei Lecks, die GUARD 5
@@ -2002,7 +2020,7 @@ mod tests {
             "Kontrolle: das CASCADE-Kind gehört zu S"
         );
 
-        let befund = fremde_fk_auf_scoped(&pool, &s, &[]).await;
+        let befund = nur_sonden(fremde_fk_auf_scoped(&pool, &s, &[]).await);
         let erwartet = vec![
             FremdKante {
                 tabelle: "lfh291_sonde_no_action".into(),
@@ -2063,7 +2081,7 @@ mod tests {
             ),
         ];
 
-        let gefiltert = fremde_fk_auf_scoped(&pool, &s, allowlist).await;
+        let gefiltert = nur_sonden(fremde_fk_auf_scoped(&pool, &s, allowlist).await);
         let kanten: Vec<(&str, &str)> = gefiltert
             .iter()
             .map(|k| (k.tabelle.as_str(), k.spalte.as_str()))

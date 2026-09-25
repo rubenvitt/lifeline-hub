@@ -1,7 +1,11 @@
 import { Space, Tag, Typography } from 'antd';
 import type { Sprechgruppe } from '../api/types';
 
-/** Freitext-Schlüssel → Anzeige-Label für das Kommunikationsmittel (Abschnitt LFH-86, Einheit LFH-108). */
+/**
+ * Schlüssel → Anzeige-Label für das Kommunikationsmittel (Abschnitt LFH-86, Einheit LFH-108).
+ * Die Schlüssel prüft das Backend (`KOMMUNIKATIONSMITTEL` in src/routes/support.rs, LFH-140):
+ * ein neuer Schlüssel hier braucht dort denselben Eintrag, sonst endet das Speichern in 400.
+ */
 export const KOMMUNIKATIONSMITTEL_LABEL: Record<string, string> = {
   digitalfunk: 'Digitalfunk',
   mobil: 'Mobil',
