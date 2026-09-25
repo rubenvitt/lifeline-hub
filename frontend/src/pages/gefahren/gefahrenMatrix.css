@@ -7,8 +7,9 @@
    überläuft (390 px in allen Stufen, 1024 px kompakt/komfortabel, 1366 px handschuh);
    `e2e/fokus-verdeckung.spec.ts` wird ohne sie rot.
 
-   `scroll-padding` am Scrollcontainer, dasselbe Mittel wie der Fokusabstand unten
-   (`index.css`, LFH-465). `.ant-table-body` ist der Container, weil die Tabelle `sticky`
+   `scroll-padding` am Scrollcontainer, dasselbe Mittel wie der Fokusabstand der Befehlsseite
+   (`pages/befehlAktionsleiste.css`, LFH-465). Das ETB nimmt dagegen `scroll-margin` an den Zielen
+   (`index.css`) — dort rollte `scroll-padding` bei Fokus IN der angepinnten Leiste die Seite. `.ant-table-body` ist der Container, weil die Tabelle `sticky`
    trägt; ohne `sticky` wäre es `.ant-table-content`, beide stehen hier, damit ein Umbau am
    Kopf die Regel nicht still wirkungslos macht.
 

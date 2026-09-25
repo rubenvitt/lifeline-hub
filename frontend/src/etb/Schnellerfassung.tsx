@@ -421,10 +421,23 @@ export default function Schnellerfassung({
    * „⧖ Nachtrag" steht, weil `/zeit` eine zurückliegende Ereigniszeit setzt und der
    * Eintrag dann als nachgetragen erscheint.
    */
+  // „Werte behalten": ab `md` rechts in der Chip-Zeile, darunter in der Hinweiszeile (Review
+  // LFH-373) — in der einzeilig rollenden Chip-Zeile lag er sonst hinter dem Bildlauf.
+  const schalter = zeigeSchalter ? (
+    <Tooltip title={UEBERNAHME_ERKLAERUNG}>
+      <Checkbox checked={werteBehalten} onChange={(e) => onWerteBehaltenChange?.(e.target.checked)}>
+        <Typography.Text type="secondary">Werte behalten</Typography.Text>
+      </Checkbox>
+    </Tooltip>
+  ) : null;
+
   // Unter `md` die Kurzform (LFH-373): die volle Zeile brach auf dem Handschirm auf drei
   // Zeilen um und trieb die angepinnte Leiste über die Hälfte des Fensters.
   const hinweiszeile = istSchmal ? (
-    <span>{ENTER_HINWEIS_KURZ}</span>
+    <>
+      <span>{ENTER_HINWEIS_KURZ}</span>
+      {schalter && <span style={{ marginInlineStart: 'auto' }}>{schalter}</span>}
+    </>
   ) : (
     <>
       {!berichtigungZu && (
@@ -585,17 +598,8 @@ export default function Schnellerfassung({
             </Button>
           )}
         </Space>
-        {zeigeSchalter && (
-          <div style={{ marginInlineStart: 'auto', flexShrink: 0 }}>
-            <Tooltip title={UEBERNAHME_ERKLAERUNG}>
-              <Checkbox
-                checked={werteBehalten}
-                onChange={(e) => onWerteBehaltenChange?.(e.target.checked)}
-              >
-                <Typography.Text type="secondary">Werte behalten</Typography.Text>
-              </Checkbox>
-            </Tooltip>
-          </div>
+        {!istSchmal && zeigeSchalter && (
+          <div style={{ marginInlineStart: 'auto', flexShrink: 0 }}>{schalter}</div>
         )}
       </div>
 

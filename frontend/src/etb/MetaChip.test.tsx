@@ -248,6 +248,8 @@ describe('MetaChip', () => {
     ['von', ['ELW 1', 'Leitstelle']],
     ['von', undefined],
     ['veranlassung', undefined],
+    ['meldeweg', undefined],
+    ['ereigniszeit', undefined],
   ] as const)('%s (Vorschläge: %s): fokussiert ohne die Seite zu rollen', (feld, optionen) => {
     const fokus = vi.spyOn(HTMLElement.prototype, 'focus');
     renderMitProviders(
@@ -262,7 +264,13 @@ describe('MetaChip', () => {
         onEdit={vi.fn()}
       />,
     );
-    const eingabe = screen.getByLabelText(feld === 'von' ? 'Von' : 'Veranlassung');
+    const beschriftung = {
+      von: 'Von',
+      veranlassung: 'Veranlassung',
+      meldeweg: 'Meldeweg',
+      ereigniszeit: 'Ereigniszeit',
+    }[feld];
+    const eingabe = screen.getByLabelText(beschriftung);
     expect(eingabe).toHaveFocus();
     const aufrufe = fokus.mock.calls;
     expect(aufrufe.length).toBeGreaterThan(0);

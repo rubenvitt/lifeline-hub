@@ -449,12 +449,18 @@ export default function EtbPage() {
     punkt: t === 'alle' ? rollen.schwach : etbTypFarbe(t, token).kante,
   }));
 
+  // Die Erfassung hängt auf JEDER Breite als `fuss` an der Seitenwurzel (LFH-373): in der
+  // Zeitachsenspalte stieg sie nie über deren Oberkante (auf dem Handschirm ragte sie ganz oben
+  // 61 px unter das Fenster), und an zwei Stellen je nach Breite riss ein Wechsel über `xl` sie aus
+  // und hängte sie neu ein — der Text einer laufenden Berichtigung war ohne Rückfrage weg. Ab
+  // `xl` endet sie über den Außenrand vor der Bilanzspalte, wie vorher in der Spalte.
   const erfassung = darfSchreiben ? (
     <div
       ref={erfassungRef}
       className={
         breit ? 'etb-erfassung-sticky etb-erfassung-sticky--neben-leiste' : 'etb-erfassung-sticky'
       }
+      style={breit ? { marginInlineEnd: LEISTE_BREITE + token.marginLG } : undefined}
     >
       {berichtigungZu ? (
         <Schnellerfassung
@@ -525,7 +531,7 @@ export default function EtbPage() {
           </Space>
         ) : undefined
       }
-      fuss={breit ? undefined : erfassung}
+      fuss={erfassung}
     >
       <div
         style={{
@@ -647,14 +653,6 @@ export default function EtbPage() {
               </Button>
             </div>
           )}
-
-          {/* Die Erfassung am SEITENFUSS, angepinnt (Begründung an `erfassenMitMeldung`). Ab
-              `xl` steht sie in der Spalte der Zeitachse, nicht unter der Seitenleiste — so
-              bleibt sie beim Blättern im Bild, solange die Zeitachse es ist. Darunter hängt
-              sie als `fuss` an der Seitenwurzel (LFH-373, `EinsatzSeite`): in der Spalte
-              konnte sie nicht über deren Oberkante steigen und ragte auf dem Handschirm ganz
-              oben 61 px unter das Fenster. */}
-          {breit && erfassung}
         </div>
 
         {/* Seitenleiste ab `xl` rechts (Entwurf S4), darunter UNTER der Zeitachsenspalte —

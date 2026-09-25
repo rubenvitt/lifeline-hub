@@ -59,7 +59,10 @@ describe('Schnellerfassungszeile', () => {
     const zeile = schnellerfassungStil(farbenHell, t, true);
     const z = zellenStile(farbenHell, t, true);
     expect(zeile.flexWrap).toBe('wrap');
-    expect(z.feld).toMatchObject({ flex: '1 1 100%', order: -1 });
+    expect(z.feld).toMatchObject({ flex: '1 1 100%' });
+    // Kein CSS-`order` (Review LFH-373): die sichtbare Folge kommt aus dem DOM, sonst wichen
+    // Tab- und Lesefolge von ihr ab (Typ unten → Feld oben → Vorschau unten).
+    expect(z.feld.order).toBeUndefined();
     expect(z.hinweis.marginInlineStart).toBe('auto');
     expect(z.praefix.borderInlineEnd).toBeUndefined();
   });
@@ -72,5 +75,17 @@ describe('Schnellerfassungszeile', () => {
     expect(z.feld).toMatchObject({ flex: '1 1 auto' });
     expect(z.feld.order).toBeUndefined();
     expect(z.praefix.borderInlineEnd).toBe(`1px solid ${farbenHell.linie}`);
+  });
+
+  it('gestapelt: das Feld steht im DOM VOR Präfix und Hinweis — Tab- und Lesefolge = Sichtfolge', () => {
+    const { container } = renderMitProviders(
+      <Schnellerfassungszeile gestapelt praefix="/meldung" hinweis="Erfassen">
+        <Input aria-label="Eintrag" />
+      </Schnellerfassungszeile>,
+    );
+    const zeile = container.querySelector('.lfh-schnellerfassung')!;
+    const kinder = Array.from(zeile.children);
+    expect(kinder[0].classList.contains('lfh-schnellerfassung__feld')).toBe(true);
+    expect(kinder[1].getAttribute('data-lfh')).toBe('schnellerfassung-praefix');
   });
 });

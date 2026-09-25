@@ -51,10 +51,10 @@ body {
   border-top: 1px solid var(--lfh-linie-stark);
 }
 
-/* Neben der Seitenleiste (ab `xl`) endet die Leiste an der Zeitachsenspalte: der rechte
-   Außenrand zöge sie sonst unter die Bilanz. */
+/* Neben der Seitenleiste (ab `xl`) endet die Leiste an der Zeitachsenspalte. Seit LFH-373 hängt
+   sie auch dort als Seitenfuß an der Wurzel (`EtbPage`); den rechten Außenrand in Breite der
+   Bilanzspalte setzt deshalb die Seite inline, hier fällt nur die rechte Polsterung weg. */
 .etb-erfassung-sticky--neben-leiste {
-  margin-inline-end: 0;
   padding-inline-end: 0;
 }
 
@@ -94,7 +94,16 @@ body {
    Rücksprung ins Textfeld) rollte die Seite dann weiter, beim Setzen dreier Felder von 0 bis
    2593 px ans Ende. Mit dem Zielrand bleibt die Leiste unberührt. Ein negativer Rand an den
    Leistenkindern hebt die Scrollport-Regel NICHT auf (gemessen, Chromium ignoriert ihn).
-   Die Höhe setzt `components/fokusabstandUnten.ts` aus der gemessenen Leiste. */
-[data-lfh='etb-zeitachse'] * {
+   Die Höhe setzt `components/fokusabstandUnten.ts` aus der gemessenen Leiste.
+
+   ALLE Ziele von Seitenkopf und Inhalt, nicht nur die Zeitachse (Review LFH-373, gemessen):
+   seit die Leiste als Seitenfuß an der Wurzel von `EinsatzSeite` hängt, klebt sie über der
+   ganzen Seite — unter `xl` auch über der Bilanz, und ganz oben über Seitenkopf und Filter. Bei
+   390 × 600 im Handschuh-Betrieb lagen Bilanz-Links, „Einsatz abschließen" und Filterfelder
+   vollständig darunter. Die Leiste selbst steht NEBEN `seiten-inhalt`, ist also ausgenommen.
+   Die Variable gibt es nur, solange das ETB eingehängt ist; auf jeder anderen Seite greift der
+   Rückfall `0px`. */
+[data-lfh='seitenkopf'] *,
+[data-lfh='seiten-inhalt'] * {
   scroll-margin-block-end: var(--lfh-etb-fokusabstand, 0px);
 }

@@ -11,7 +11,7 @@ import { useEffect, useState, type CSSProperties } from 'react';
  *
  * Abhilfe nach dem Muster von `pages/EinheitDetailPage.css` (LFH-446): die Ziele tragen
  * `scroll-margin-block-end` in Höhe des Fußes. Hier im Browser NACHGEMESSEN (die dortige
- * Regel war es nie — so der Kommentar zur Fokusabstand-Regel in `index.css`, LFH-465): ohne die
+ * Regel war es nie — so der Kommentar in `pages/befehlAktionsleiste.css`, LFH-465): ohne die
  * Angabe blieb das Ziel bei drei
  * Ausgangslagen ganz oder teilweise unter dem Fuß, mit ihr in keiner — Chrome rechnet den
  * Rand in die Frage „ist das Ziel sichtbar?" ein und scrollt dann um genau diesen Betrag.

@@ -2149,9 +2149,12 @@ test('Lagekarte (LFH-373): „Verortet", Kartenknöpfe und Zeitachse folgen der 
 
     // Zeitachse: beschriftete Knöpfe halten die Höhe, Symbolknöpfe die kurze Achse.
     const band = page.locator('[data-lfh="zeitachse"]');
+    // Erst zählen, wenn die Stände geladen sind — sonst steht nur „Stand sichern" im Band und
+    // die Mindestzahl schlägt unter Last falsch an (Review LFH-373).
+    await expect(band.getByRole('button', { name: 'Stand B' })).toBeVisible();
     const beschriftet = band.getByRole('button', {
       // „Stand sichern" ohne `^`: bis LFH-373 trug der Name das englische Icon-Label vorne
-      // („camera Stand sichern"). Der Name selbst wird in `leisten-flaeche.spec.ts` gepinnt.
+      // („camera Stand sichern"). Der Name selbst ist in `SnapshotLeiste.test.tsx` gepinnt (Vitest).
       name: /(Stand sichern|^Aktuell|^Stand A|^Stand B)$/,
     });
     const zeitBeschriftet = await alleHaltenStufe(beschriftet, soll, `Zeitachse (${dichte})`, 4);

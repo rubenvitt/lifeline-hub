@@ -44,7 +44,8 @@ export function schnellerfassungStil(
  * Die drei Zellen der Zeile, rein und exportiert (Prüfbarkeit ohne Layout).
  *
  * `gestapelt` (LFH-373, opt-in): das FELD steht zuerst und auf voller Breite, Präfix und
- * Hinweis folgen in einer zweiten Zeile (Präfix links, Hinweis rechts). Gemessen im ETB bei
+ * Hinweis folgen in einer zweiten Zeile (Präfix links, Hinweis rechts). „Zuerst" heißt im DOM,
+ * nicht per CSS-`order`: sonst wichen Tab- und Lesefolge von der Sichtfolge ab (Review). Gemessen im ETB bei
  * 390 px vorher: das Feld zwischen `/meldung` und „Erfassen" auf 158 von 366 px eingezwängt,
  * der Platzhalter brach es auf drei Zeilen — die angepinnte Leiste wuchs auf 59 % der
  * Fensterhöhe. Die Trennlinie hinter dem Präfix entfällt dann, eine Linie über der zweiten
@@ -69,7 +70,7 @@ export function zellenStile(
       color: rollen.bedien,
     },
     feld: gestapelt
-      ? { flex: '1 1 100%', order: -1, minWidth: 0, display: 'flex', alignItems: 'center' }
+      ? { flex: '1 1 100%', minWidth: 0, display: 'flex', alignItems: 'center' }
       : { flex: '1 1 auto', minWidth: 0, display: 'flex', alignItems: 'center' },
     hinweis: {
       ...monoStil(11),
@@ -110,27 +111,31 @@ export default function Schnellerfassungszeile({
 }: SchnellerfassungszeileProps) {
   const { token, rollen } = useRollen();
   const zellen = zellenStile(rollen, token, gestapelt);
+  const feldZelle = (
+    <div
+      className={
+        gestapelt
+          ? 'lfh-schnellerfassung__feld lfh-schnellerfassung__feld--gestapelt'
+          : 'lfh-schnellerfassung__feld'
+      }
+      style={zellen.feld}
+    >
+      {children}
+    </div>
+  );
   return (
     <div
       data-lfh="schnellerfassung"
       style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS, ...style }}
     >
       <div className="lfh-schnellerfassung" style={schnellerfassungStil(rollen, token, gestapelt)}>
+        {gestapelt && feldZelle}
         {praefix != null && (
           <span data-lfh="schnellerfassung-praefix" style={zellen.praefix}>
             {praefix}
           </span>
         )}
-        <div
-          className={
-            gestapelt
-              ? 'lfh-schnellerfassung__feld lfh-schnellerfassung__feld--gestapelt'
-              : 'lfh-schnellerfassung__feld'
-          }
-          style={zellen.feld}
-        >
-          {children}
-        </div>
+        {!gestapelt && feldZelle}
         {hinweis != null && <span style={zellen.hinweis}>{hinweis}</span>}
       </div>
       {hinweiszeile != null && (

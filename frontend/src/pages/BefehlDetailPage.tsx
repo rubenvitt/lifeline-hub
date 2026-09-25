@@ -51,7 +51,7 @@ function BefehlDetail() {
   /**
    * Fokusabstand zur verankerten Aktionsleiste (LFH-465; Messung seit LFH-373 geteilt mit dem
    * ETB, `components/fokusabstandUnten.ts`, Regel in `befehlAktionsleiste.css`). Träger ist das Wurzelelement, weil der Scrollport das
-   * Dokument ist — die Leiste liegt ausserhalb des Formulars, ein `closest('form')` fände im
+   * Dokument ist — die Leiste liegt außerhalb des Formulars, ein `closest('form')` fände im
    * freigegebenen Zweig nichts.
    */
   const leisteRef = useFokusabstandUnten(token.marginSM, FOKUSABSTAND_BEFEHL);

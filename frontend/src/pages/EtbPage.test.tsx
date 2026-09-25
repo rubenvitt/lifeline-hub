@@ -3,12 +3,12 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Route, Routes, useLocation } from 'react-router';
-import type { ReactElement } from 'react';
+import { act, type ReactElement } from 'react';
 import { server } from '../test/server';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 import { neuerQueryClient, renderMitProviders as renderMitBasisProviders } from '../test/utils';
 import { einsatzKeys } from '../api/queryKeys';
-import { setzeViewportBreite } from '../test/viewport';
+import { sendeBreitenAenderung, setzeViewportBreite } from '../test/viewport';
 import { AuthProvider } from '../auth/AuthContext';
 import { entwuerfeLaden, entwuerfeLeerenFuerTests } from '../etb/entwuerfe/entwurfStore';
 import { queueLeerenFuerTests } from '../offline/queue';
@@ -919,6 +919,26 @@ describe('EtbPage – Zeitachse (Neuentwurf S4)', () => {
     } finally {
       Element.prototype.scrollIntoView = vorher;
     }
+  });
+
+  /**
+   * LFH-373 (Review): die Erfassung hängt auf JEDER Breite an derselben Stelle im Baum — als
+   * `fuss` der Seitenwurzel. Hing sie ab `xl` in der Zeitachsenspalte und darunter im Fuß, riss
+   * ein Wechsel über `xl` (Tablet drehen, Fenster ziehen) sie aus und hängte sie neu ein; der Text
+   * einer laufenden Berichtigung lebt nur im Zustand und war ohne Rückfrage weg.
+   */
+  it('behält die Erfassung beim Wechsel über xl — derselbe Knoten, derselbe Text', async () => {
+    setzeViewportBreite(1366);
+    setup();
+    await screen.findByText('Erste Meldung');
+    // Die Entwurfs-Reiter laden aus IndexedDB — das Feld erscheint nach der Zeitachse.
+    const feld = await screen.findByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, 'Angefangener Eintrag');
+    act(() => {
+      sendeBreitenAenderung(800);
+    });
+    expect(screen.getByPlaceholderText(/Inhalt/)).toBe(feld);
+    expect(feld).toHaveValue('Angefangener Eintrag');
   });
 
   it('zeigt die Bilanz aus der Serverzählung und den Puffer „übertragen"', async () => {

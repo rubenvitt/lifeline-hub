@@ -280,6 +280,24 @@ Obergrenze der Gegenprobe (hartkodierte 72 px müssen rot werden) und der Kern o
 `zusatzKandidaten` auf der Karte (muss rot werden, solange der Fix fehlt). Das Ergebnis
 steht im Kopfkommentar der Spec.
 
+### Nachtrag aus dem Review (25.09.2026)
+
+Der Review (vier Dimensionen, adversarial geprüft) fand vier mittelschwere Folgen der Hebel
+4–6. Alle sind behoben und im Browser bzw. in Vitest belegt:
+- **Neueinhängen beim Wechsel über `xl`.** Die Leiste hing je nach Breite an zwei Stellen im
+  Baum. Sie hängt jetzt auf jeder Breite als `fuss`, ab `xl` mit Außenrand vor der Bilanz.
+  Beleg: `EtbPage.test.tsx`, „behält die Erfassung beim Wechsel über xl“. Der Test ist gegen
+  den alten Stand rot.
+- **Fokusabstand nur an der Zeitachse.** Als Seitenfuß klebt die Leiste über der ganzen
+  Seite. Bei 390 × 600 im Handschuh-Betrieb lagen Bilanz-Links, „Einsatz abschließen“ und
+  Filterfelder vollständig darunter. Der `scroll-margin` gilt jetzt für alle Ziele von
+  Seitenkopf und Inhalt. Beleg: ETB-Lauf in `fokus-verdeckung.spec.ts` mit Berichtigungen und
+  Bilanz-Links, vorher rot.
+- **CSS-`order` in der gestapelten Zeile.** Tab- und Lesefolge wichen von der Sichtfolge ab.
+  Das Feld steht jetzt auch im DOM zuerst.
+- **„Werte behalten“ hinter dem waagerechten Bildlauf.** Der Schalter steht unter `md` in der
+  Hinweiszeile.
+
 ### Ergebnis der Mutationsprobe (25.09.2026)
 
 Vierzehn Mutanten, je ein Fix oder eine Wache zurückgedreht. **Zwölf wurden rot**, darunter

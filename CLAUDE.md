@@ -411,16 +411,18 @@ im Entwurf — und die Erfassung **unten** am Fuß der Zeitachse (`.etb-erfassun
 `index.css`, Grund `kopf`).
 **Die angepinnte Erfassung ist gemessen, nicht angenommen** (LFH-373, `e2e/leisten-flaeche.spec.ts`,
 `fokus-verdeckung.spec.ts`): ≤ 50 % der Fensterhöhe und ganz oben vollständig im Bild, in
-allen drei Stufen. Dafür hängt sie **unter `xl` als `fuss` an der Wurzel von `EinsatzSeite`**,
-nicht in der Zeitachsenspalte — ein `sticky; bottom: 0` steigt nie über die Oberkante seines
-Elternblocks (gemessen: unter einem 489 px hohen Kopf ragte sie 61 px unter das Fenster). Den
-Fokusabstand der Zeitachse trägt `scroll-margin-block-end` an den ZIELEN
+allen drei Stufen. Dafür hängt sie **auf jeder Breite als `fuss` an der Wurzel von
+`EinsatzSeite`**, nicht in der Zeitachsenspalte — ein `sticky; bottom: 0` steigt nie über die
+Oberkante seines Elternblocks (gemessen: unter einem 489 px hohen Kopf ragte sie 61 px unter das
+Fenster); ab `xl` endet sie per Außenrand vor der Bilanz. An zwei Stellen je nach Breite hinge
+sie nicht: ein Wechsel über `xl` hängte sie neu ein und verlor den Text einer Berichtigung. Den
+Fokusabstand trägt `scroll-margin-block-end` an ALLEN Zielen von Seitenkopf und Inhalt
 (`--lfh-etb-fokusabstand`, gemessen von `components/fokusabstandUnten.ts`), **nicht**
 `scroll-padding` am Dokument wie auf der Befehlsseite: das zählte die Ziele IN der Leiste zum
 verdeckten Streifen und rollte bei jedem Fokus dort die Seite ans Ende. Unter `md` steht das Feld
-auf eigener Zeile (`Schnellerfassungszeile gestapelt`), die Feldzeile rollt waagerecht mit
-„Feld" vorn, und Eingaben in der Leiste fokussieren mit `preventScroll` (`MetaChip`, nicht
-`autoFocus`).
+auf eigener Zeile (`Schnellerfassungszeile gestapelt`, im DOM zuerst, kein CSS-`order`), die
+Feldzeile rollt waagerecht mit „Feld" vorn, „Werte behalten" steht in der Hinweiszeile, und
+Eingaben in der Leiste fokussieren mit `preventScroll` (`MetaChip`, nicht `autoFocus`).
 **Kopfzahl und Bilanz zählt der Server, über DENSELBEN Filter wie die Liste** (LFH-612,
 `GET …/etb/zaehler`, gemeinsame Bedingung `etb/repo.rs:filter_bedingung`): ohne Filter „412
 Einträge" und „Bilanz", mit Filter „7 Treffer" und „Bilanz im Filter". Eine feste Tagesgrenze

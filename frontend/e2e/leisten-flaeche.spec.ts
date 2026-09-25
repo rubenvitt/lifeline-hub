@@ -209,6 +209,12 @@ test('ETB (LFH-373): drei gesetzte Felder — Leiste ganz im Bild und unter dem 
     });
   const vorher = await lageDerZeilen();
   const kastenVorher = await leistenKasten();
+  // Vorbedingung (Review LFH-373): die Seite MUSS rollen können — sonst bliebe scrollY 0, was
+  // immer Fokus oder Tippen tun, und „nichts springt" wäre trivial wahr.
+  const reserve = await page.evaluate(
+    () => document.documentElement.scrollHeight - document.documentElement.clientHeight,
+  );
+  expect(reserve, 'Vorbedingung: die Seite hat eine Bildlaufreserve').toBeGreaterThan(200);
 
   const leiste = page.locator('.etb-erfassung-sticky');
   for (const [feld, wert] of [

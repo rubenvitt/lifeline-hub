@@ -698,6 +698,7 @@ test('ETB (LFH-373): kein Zeilenauslöser verschwindet beim Tabben hinter der Er
   expect(antwort.ok(), await antwort.text()).toBeTruthy();
   const { id: einsatzId } = (await antwort.json()) as { id: number };
   const ANZAHL = 16;
+  const ids: number[] = [];
   for (let n = 1; n <= ANZAHL; n += 1) {
     const eintrag = await page.request.post(`/api/einsaetze/${einsatzId}/etb`, {
       data: {
@@ -708,7 +709,22 @@ test('ETB (LFH-373): kein Zeilenauslöser verschwindet beim Tabben hinter der Er
       },
     });
     expect(eintrag.ok(), await eintrag.text()).toBeTruthy();
+    ids.push(((await eintrag.json()) as { id: number }).id);
   }
+  // Zwei Berichtigungen, damit die Bilanz Links trägt (Review LFH-373): unter `xl` steht die
+  // Bilanz UNTER der Zeitachse, und seit die Leiste als Seitenfuß an der Wurzel hängt, klebt sie
+  // auch über der Bilanz — deren Links brauchen denselben Fokusabstand.
+  for (const ziel of ids.slice(0, 2)) {
+    const b = await page.request.post(`/api/einsaetze/${einsatzId}/etb`, {
+      data: {
+        typ: 'berichtigung',
+        inhalt: 'Berichtigung: Uhrzeit korrigiert',
+        berichtigt_eintrag_id: ziel,
+      },
+    });
+    expect(b.ok(), await b.text()).toBeTruthy();
+  }
+  const ZEILEN = ANZAHL + 2;
 
   const gemessen: string[] = [];
   const LEISTE = '.etb-erfassung-sticky';
@@ -722,14 +738,31 @@ test('ETB (LFH-373): kein Zeilenauslöser verschwindet beim Tabben hinter der Er
       await page.goto(`/einsaetze/${einsatzId}/etb`);
       await stelleDichte(page, dichte);
       const zeitachse = page.getByRole('region', { name: 'Einsatztagebuch' });
-      await expect(zeitachse.getByTestId('etb-ereigniszeile')).toHaveCount(ANZAHL);
+      await expect(zeitachse.getByTestId('etb-ereigniszeile')).toHaveCount(ZEILEN);
       await expect(page.locator(LEISTE)).toHaveCSS('position', 'sticky');
 
       const ausloeser = zeitachse.getByRole('button', { name: /^Aktionen zu Eintrag \d+$/ });
-      await expect(ausloeser).toHaveCount(ANZAHL);
+      expect(await ausloeser.count()).toBeGreaterThanOrEqual(ANZAHL);
       await ausloeser.evaluateAll((els) =>
         els.forEach((el) => el.setAttribute('data-e2e-fokus', el.getAttribute('aria-label')!)),
       );
+      // Unter `xl` die Links der Bilanz mit — sie stehen dann unter der Zeitachse.
+      const bilanzLinks = page
+        .getByRole('complementary', { name: 'Bilanz des Tagebuchs' })
+        .getByRole('link');
+      const mitBilanz = flaeche.width < 1200;
+      let bilanzZiele: string[] = [];
+      if (mitBilanz) {
+        await expect.poll(() => bilanzLinks.count()).toBeGreaterThanOrEqual(2);
+        bilanzZiele = await bilanzLinks.evaluateAll((els) =>
+          els.map((el, i) => {
+            const kennung = `bilanz ${i}`;
+            el.setAttribute('data-e2e-fokus', kennung);
+            return kennung;
+          }),
+        );
+      }
+      const SCHRITTE = ZEILEN * 2 + 16;
       const { reserve, leiste } = await page.evaluate((sel) => {
         const l = document.querySelector(sel)!.getBoundingClientRect();
         return {
@@ -744,15 +777,18 @@ test('ETB (LFH-373): kein Zeilenauslöser verschwindet beim Tabben hinter der Er
 
       await page.evaluate(() => window.scrollTo(0, 0));
       await ausloeser.first().focus();
-      const kern = await pruefeFokusVerdeckung(page, ANZAHL + 4);
+      const kern = await pruefeFokusVerdeckung(page, SCHRITTE);
       expect(
         kern.besuchteZiele.length,
         `${lauf}: Vorbedingung — der Durchlauf muss die Zeitachse ablaufen`,
       ).toBeGreaterThanOrEqual(ANZAHL - 1);
+      for (const ziel of bilanzZiele) {
+        expect(kern.besuchteZiele, `${lauf}: Vorbedingung — ${ziel} besucht`).toContain(ziel);
+      }
 
       await page.evaluate(() => window.scrollTo(0, 0));
       await ausloeser.first().focus();
-      const streifen = await kleinsterStreifen(page, ANZAHL + 4, LEISTE);
+      const streifen = await kleinsterStreifen(page, SCHRITTE, LEISTE);
 
       expect(kern.verdeckt, `${lauf}: vollständig verdeckt:\n${kern.verdeckt.join('\n')}`).toEqual(
         [],
@@ -762,7 +798,7 @@ test('ETB (LFH-373): kein Zeilenauslöser verschwindet beim Tabben hinter der Er
         `${lauf}: kleinster freier Streifen Ziel ↔ Leiste ${streifen}px, Soll > 0`,
       ).toBeGreaterThan(0);
       gemessen.push(
-        `${lauf}: Leiste ${leiste}px, ${kern.besuchteZiele.length} Auslöser, Streifen ≥ ${Math.round(streifen)}px`,
+        `${lauf}: Leiste ${leiste}px, ${kern.besuchteZiele.length} Ziele (davon Bilanz ${bilanzZiele.length}), Streifen ≥ ${Math.round(streifen)}px`,
       );
     }
   }
@@ -865,6 +901,15 @@ test('Gefahrenmatrix (LFH-373): keine Zelle verschwindet beim Tabben unter der f
         57,
       );
       expect(rueck.verdeckt, `${lauf} rückwärts:\n${rueck.verdeckt.join('\n')}`).toEqual([]);
+      // Vorbedingung (Review LFH-373): auf dem Handschirm rollt die Matrix senkrecht, der
+      // Rückwärtslauf MUSS dort an der stehenden Kopfzeile vorbeikommen — sonst belegt er den
+      // Kopf-Freiraum nicht. Bei 1024 × 768 passt die Matrix in `kompakt` ins Fenster.
+      if (flaeche.width < 768) {
+        expect(
+          rueck.stoppsAnTabellenkopf,
+          `${lauf}: Vorbedingung — rückwärts an der Kopfzeile`,
+        ).toBeGreaterThan(0);
+      }
 
       gemessen.push(
         `${lauf}: Überlauf ${huelle.sw}/${huelle.cw}, rückwärts an der Kopfzeile ${rueck.stoppsAnTabellenkopf}`,
@@ -944,15 +989,16 @@ test('Lagekarte (LFH-373): Kartenknöpfe liegen nie unter den Fußbändern', asy
 
   const gemessen: string[] = [];
   for (const lage of [
-    { width: 390, height: 844, leiste: false },
-    { width: 390, height: 844, leiste: true },
-    { width: 1024, height: 768, leiste: false },
+    { width: 390, height: 844, leiste: false, dichte: 'kompakt' },
+    { width: 390, height: 844, leiste: false, dichte: 'handschuh' },
+    { width: 390, height: 844, leiste: true, dichte: 'handschuh' },
+    { width: 1024, height: 768, leiste: false, dichte: 'handschuh' },
   ]) {
-    const lauf = `${lage.width}×${lage.height}${lage.leiste ? ' mit Leiste' : ''}/handschuh`;
+    const lauf = `${lage.width}×${lage.height}${lage.leiste ? ' mit Leiste' : ''}/${lage.dichte}`;
     await page.setViewportSize({ width: lage.width, height: lage.height });
     await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
     await page.evaluate(() => localStorage.setItem('lfh:lagekarte:zeitachse-eingeklappt', '0'));
-    await stelleDichte(page, 'handschuh');
+    await stelleDichte(page, lage.dichte);
     await expect(page.getByTestId('kartenflaeche').locator('canvas.maplibregl-canvas')).toHaveCount(
       1,
       { timeout: 60_000 },

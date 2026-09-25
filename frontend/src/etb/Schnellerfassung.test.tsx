@@ -764,6 +764,24 @@ describe('Schnellerfassung — Chip-Zeile auf dem Handschirm (LFH-373)', () => {
     expect(breit.overflowX).toBeUndefined();
   });
 
+  /**
+   * Review LFH-373: in der einzeilig rollenden Chip-Zeile lag „Werte behalten" rechts hinter
+   * dem Bildlauf — nur durch zufälliges Wischen auffindbar. Unter `md` steht der Schalter
+   * deshalb in der Hinweiszeile der Erfassung (innerhalb von `[data-lfh="schnellerfassung"]`),
+   * ab `md` weiter in der Chip-Zeile.
+   */
+  it.each([
+    [390, true],
+    [1366, false],
+  ])('bei %i px steht „Werte behalten" in der Hinweiszeile: %s', (breite, inHinweiszeile) => {
+    setzeViewportBreite(breite);
+    renderMitProviders(
+      <Schnellerfassung {...props({ werteBehalten: false, onWerteBehaltenChange: vi.fn() })} />,
+    );
+    const schalter = screen.getByRole('checkbox', { name: /Werte behalten/ });
+    expect(schalter.closest('[data-lfh="schnellerfassung"]') != null).toBe(inHinweiszeile);
+  });
+
   it('holt einen Chip hinter dem rechten Rand waagerecht ins Bild, ohne das Dokument zu rollen', () => {
     const zeile = document.createElement('div');
     const ziel = document.createElement('input');
