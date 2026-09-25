@@ -53,13 +53,25 @@ pub async fn meta(pool: &SqlitePool, org_id: i64) -> Result<Option<OrgLogoAnzeig
     .await?)
 }
 
-/// Die Bytes des Logos; `None` = kein Logo.
-pub async fn daten(pool: &SqlitePool, org_id: i64) -> Result<Option<Vec<u8>>, AppError> {
+/// Was der Abruf ausliefert: Typ, Prüfsumme (ETag) und Bytes aus DERSELBEN Zeile.
+#[derive(Debug, sqlx::FromRow)]
+pub struct LogoInhalt {
+    pub mime: String,
+    pub sha256: String,
+    pub daten: Vec<u8>,
+}
+
+/// Typ, Prüfsumme und Bytes in EINER Abfrage; `None` = kein Logo. Getrennt gelesen lieferte
+/// ein Ersetzen zwischen beiden Abfragen die Bytes des neuen Logos unter Typ und ETag des
+/// alten.
+pub async fn inhalt(pool: &SqlitePool, org_id: i64) -> Result<Option<LogoInhalt>, AppError> {
     Ok(
-        sqlx::query_scalar::<_, Vec<u8>>("SELECT daten FROM org_logo WHERE org_id = ?")
-            .bind(org_id)
-            .fetch_optional(pool)
-            .await?,
+        sqlx::query_as::<_, LogoInhalt>(
+            "SELECT mime, sha256, daten FROM org_logo WHERE org_id = ?",
+        )
+        .bind(org_id)
+        .fetch_optional(pool)
+        .await?,
     )
 }
 
@@ -191,14 +203,37 @@ mod tests {
             crate::anhang::repo::sha256_hex(b"\xFF\xD8\xFFzwei")
         );
         assert_eq!(
-            super::daten(&pool, 1).await.unwrap().unwrap(),
+            super::inhalt(&pool, 1).await.unwrap().unwrap().daten,
             b"\xFF\xD8\xFFzwei".to_vec()
         );
 
         super::entfernen(&pool, 1).await.unwrap();
         assert_eq!(super::meta(&pool, 1).await.unwrap(), None);
-        assert_eq!(super::daten(&pool, 1).await.unwrap(), None);
+        assert!(super::inhalt(&pool, 1).await.unwrap().is_none());
         super::entfernen(&pool, 1).await.unwrap();
+    }
+
+    /// Typ, Prüfsumme und Bytes kommen aus EINER Abfrage (Review Welle B): der Abruf las
+    /// vorher Metadaten und Bytes getrennt, und ein Ersetzen dazwischen lieferte die Bytes
+    /// des neuen Logos unter Typ und ETag des alten.
+    #[tokio::test]
+    async fn inhalt_liefert_typ_pruefsumme_und_bytes_aus_einer_zeile() {
+        let pool = pool_mit_org().await;
+        assert!(super::inhalt(&pool, 1).await.unwrap().is_none());
+        sqlx::query("INSERT INTO benutzer (id, org_id, anzeigename, benutzername, passwort_hash) VALUES (7, 1, 'A', 'a', 'h')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        super::setzen(&pool, 1, "image/jpeg", b"\xFF\xD8\xFFzwei", 7)
+            .await
+            .unwrap();
+        let i = super::inhalt(&pool, 1).await.unwrap().unwrap();
+        assert_eq!(i.mime, "image/jpeg");
+        assert_eq!(
+            i.sha256,
+            crate::anhang::repo::sha256_hex(b"\xFF\xD8\xFFzwei")
+        );
+        assert_eq!(i.daten, b"\xFF\xD8\xFFzwei".to_vec());
     }
 
     /// Löschen der Organisation räumt das Logo mit (ON DELETE CASCADE).

@@ -1076,7 +1076,10 @@ mod tests {
             .unwrap());
 
         assert_eq!(
-            crate::org::logo::daten(&pool, 1).await.unwrap(),
+            crate::org::logo::inhalt(&pool, 1)
+                .await
+                .unwrap()
+                .map(|i| i.daten),
             Some(bytes),
             "Logo-Bytes bleiben"
         );

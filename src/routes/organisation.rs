@@ -161,7 +161,9 @@ pub async fn logo_hochladen(
 
 /// GET /api/organisation/logo — die Bytes des eigenen Logos. Jede angemeldete Person.
 /// Erst die Metadaten ohne BLOB: passt `If-None-Match`, antwortet die Route 304 ohne den
-/// BLOB zu lesen. Kein Logo → 404.
+/// BLOB zu lesen. Sonst Typ, Prüfsumme und Bytes in EINER Abfrage (`logo::inhalt`) — die
+/// Kopfzeilen der Antwort kommen aus derselben Zeile wie die Bytes, auch wenn zwischen
+/// beiden Abfragen ein Ersetzen lag. Kein Logo → 404.
 pub async fn logo_lesen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
@@ -170,36 +172,40 @@ pub async fn logo_lesen(
     let meta = logo::meta(&state.pool, benutzer.org_id)
         .await?
         .ok_or(AppError::NotFound)?;
-    let etag = etag_von(&meta.sha256);
-
-    let mut headers = HeaderMap::new();
-    headers.insert(
-        header::ETAG,
-        HeaderValue::from_str(&etag)
-            .map_err(|e| AppError::Internal(format!("Ungültiger ETag: {e}")))?,
-    );
-    headers.insert(
-        header::CACHE_CONTROL,
-        HeaderValue::from_static(logo::CACHE_CONTROL),
-    );
-    if if_none_match_matcht(&req_headers, &etag) {
-        return Ok((StatusCode::NOT_MODIFIED, headers).into_response());
+    if if_none_match_matcht(&req_headers, &etag_von(&meta.sha256)) {
+        return Ok((StatusCode::NOT_MODIFIED, logo_kopf(&meta.sha256)?).into_response());
     }
 
+    // Zwischen Metadaten und Inhalt kann ein paralleles DELETE liegen → dann 404.
+    let inhalt = logo::inhalt(&state.pool, benutzer.org_id)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    let mut headers = logo_kopf(&inhalt.sha256)?;
     headers.insert(
         header::CONTENT_TYPE,
-        HeaderValue::from_str(&meta.mime)
+        HeaderValue::from_str(&inhalt.mime)
             .map_err(|e| AppError::Internal(format!("Ungültiger Content-Type: {e}")))?,
     );
     headers.insert(
         header::X_CONTENT_TYPE_OPTIONS,
         HeaderValue::from_static("nosniff"),
     );
-    // Zwischen Metadaten und Bytes kann ein paralleles DELETE liegen → dann 404.
-    let daten = logo::daten(&state.pool, benutzer.org_id)
-        .await?
-        .ok_or(AppError::NotFound)?;
-    Ok((headers, daten).into_response())
+    Ok((headers, inhalt.daten).into_response())
+}
+
+/// ETag und `Cache-Control` des Logo-Abrufs — für 304 und 200 aus derselben Prüfsumme.
+fn logo_kopf(sha256: &str) -> Result<HeaderMap, AppError> {
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        header::ETAG,
+        HeaderValue::from_str(&etag_von(sha256))
+            .map_err(|e| AppError::Internal(format!("Ungültiger ETag: {e}")))?,
+    );
+    headers.insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static(logo::CACHE_CONTROL),
+    );
+    Ok(headers)
 }
 
 /// DELETE /api/organisation/logo — Logo entfernen. Nur Admin. 204, auch ohne Logo.
