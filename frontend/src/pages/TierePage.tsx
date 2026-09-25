@@ -29,22 +29,13 @@ import {
 import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { tiereDetailPfad } from '../routing/deeplinks';
-import { TIER_STATUS, filterTiere, type TiereSicht } from './tiere/tierHelfer';
+import { SPEZIES_META, TIER_STATUS, filterTiere, type TiereSicht } from './tiere/tierHelfer';
 import type { Spezies, Tier } from '../api/types';
 import StatusTag from '../components/StatusTag';
 import { einsatzStatus } from '../theme/statusFarben';
 
 const STATUS_META = TIER_STATUS;
 
-const SPEZIES_META: Record<Spezies, string> = {
-  hund: 'Hund',
-  katze: 'Katze',
-  grosstier: 'Großtier',
-  nutzgefluegel: 'Nutzgeflügel',
-  kleintier: 'Kleintier',
-  wildtier: 'Wildtier',
-  sonstige: 'Sonstige',
-};
 const SPEZIES_KEYS = Object.keys(SPEZIES_META) as Spezies[];
 
 /** Status-Sichten: 'alle' = kein Filter; sonst Status-Filter. */

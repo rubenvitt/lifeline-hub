@@ -221,6 +221,8 @@ const NUR_KARTE: string[] = [
  * Anwesenheit des Literals kann es.
  */
 const NUR_TABELLE: string[] = [
+  // LFH-23 (design.md D8): Aufbewahrungsübersicht, Vergleichsfläche in jeder Breite.
+  '/src/aufbewahrung/AufbewahrungUebersicht.tsx',
   // LFH-639 (design.md D7): Betreuungsstellen werden VERGLICHEN („welche hat noch Platz?") —
   // Tabelle in jeder Breite, nicht erst ab `md`.
   '/src/betreuung/StellenBlock.tsx',
@@ -280,6 +282,9 @@ const REITERSCHLUESSEL_OFFEN: string[] = [];
  */
 const KONSUMENTEN = [
   '/src/auftraege/BefehlListe.tsx',
+  // LFH-23 (design.md D8): die Aufbewahrungsübersicht der Verwaltung — verglichen wird
+  // („welcher Einsatz läuft als nächstes ab, welcher ist noch zu retten?"), also Tabelle.
+  '/src/aufbewahrung/AufbewahrungUebersicht.tsx',
   // LFH-639: die Betreuungsseite trägt ZWEI Sichten in zwei Dateien — Bezirke als Karten,
   // Stellen als Tabelle. Getrennte Dateien statt zweier Sichten in einer, damit jede ihre
   // eigene Formbegründung und ihr eigenes Spaltenregister hat.
@@ -867,11 +872,11 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
     // das Band und der Kartenplan wäre nur noch ein Vorschlag.
     expect(KARTEN_EIGENBAU).toHaveLength(0);
     // Drei Kartenmodule (Befehle, Lageberichte, Evakuierungsbezirke seit LFH-639 — die
-    // Lagemeldungen sind seit dem Neuentwurf eine Zeitachse), zwei Vergleichsflächen
-    // (Meldebild, Betreuungsstellen seit LFH-639). Wer einträgt, ohne umzubauen, fällt am
+    // Lagemeldungen sind seit dem Neuentwurf eine Zeitachse), drei Vergleichsflächen
+    // (Meldebild, Betreuungsstellen seit LFH-639, Aufbewahrung seit LFH-23). Wer einträgt, ohne umzubauen, fällt am
     // Anwesenheits-Gegentest oben auf; wer umbaut, ohne einzutragen, an der Formprüfung.
     expect(NUR_KARTE).toHaveLength(3);
-    expect(NUR_TABELLE).toHaveLength(2);
+    expect(NUR_TABELLE).toHaveLength(3);
     // Die vierte ist keine Ausnahme, sondern eine PFLICHT — und sie ist ausdrücklich
     // dateibezogen. Ein zweiter Eintrag braucht dieselbe Herleitung wie das Meldebild
     // (Aggregate stromaufwärts über die Vollmenge), nicht bloß den Verweis hierauf.
@@ -890,7 +895,7 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
     expect(dateien[PRIMITIV]).toContain('KatalogTabelle');
   });
 
-  it('der Scan sieht genau die geplanten Konsumenten (seit LFH-639: zwölf)', () => {
+  it('der Scan sieht genau die geplanten Konsumenten (seit LFH-23: dreizehn)', () => {
     /**
      * Die Gleichheit prüft BEIDE Richtungen: eine Datei, die still aus dem Primitiv
      * herausfällt, verschwindet aus dem Scan und bleibt in {@link KONSUMENTEN} stehen; eine
