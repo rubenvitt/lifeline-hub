@@ -78,6 +78,27 @@ async fn bild(pool: &SqlitePool) -> Vec<(&'static str, Vec<String>)> {
         "einsatz_fahrzeug",
         "einsatz_personal",
         "benutzer",
+        // Block 4.3: die Module des vollständigen Drehbuchs.
+        "einsatz_person",
+        "person_sichtung",
+        "person_uhs_belegung",
+        "uhs",
+        "uhs_platz",
+        "bereitstellungsraum",
+        "evakuierungsbezirk",
+        "evakuierung_stand",
+        "betreuungsstelle",
+        "betreuungsstelle_belegung",
+        "lage_zone",
+        "gefahrengebiet",
+        "gefahr_bewertung",
+        "meldung",
+        "auftrag",
+        "auftrag_empfaenger",
+        "kommunikation_status",
+        "befehl",
+        "lagebericht",
+        "erinnerung",
     ] {
         bild.push((tabelle, zeilen(pool, tabelle, "1 = ?", 1).await));
     }
@@ -141,38 +162,201 @@ fn erwartete_etb() -> Vec<(String, String, String)> {
             .1
     };
 
+    let personal_name = |schluessel: &str| {
+        szenario::PERSONAL
+            .iter()
+            .find(|p| p.schluessel == schluessel)
+            .unwrap()
+            .name
+    };
+    // Befehl und Lagebericht: Skelett der Vorlage, befüllt aus dem Szenario.
+    let befuellt = |schluessel: &[&str], d: &szenario::DokumentVorlage| -> Vec<(String, String)> {
+        schluessel
+            .iter()
+            .map(|k| {
+                let text = d
+                    .abschnitte
+                    .iter()
+                    .find(|(s, _)| s == k)
+                    .map(|(_, t)| t.to_string())
+                    .unwrap_or_default();
+                (k.to_string(), text)
+            })
+            .collect()
+    };
+
     let mut einheiten = BTreeMap::new();
     let mut status: BTreeMap<&str, &str> = BTreeMap::new();
+    let mut uhs = BTreeMap::new();
+    let mut registrier_nr = 0;
+    // Bezirk: (Bezeichnung, Plangröße, letzter Stand); Stelle: (Bezeichnung, Kapazität,
+    // letzte Belegung).
+    let mut bezirke: BTreeMap<&str, (&str, i64, Option<i64>)> = BTreeMap::new();
+    let mut stellen: BTreeMap<&str, (&str, i64, Option<i64>)> = BTreeMap::new();
     let mut erwartet = Vec::new();
     for schritt in DREHBUCH {
         let zeit = zeit_vor(schritt.vor_min);
-        let mut system =
-            |inhalt: String| erwartet.push(("system".to_string(), inhalt, zeit.clone()));
+        let mut eintrag =
+            |typ: &str, inhalt: String| erwartet.push((typ.to_string(), inhalt, zeit.clone()));
         match schritt.vorgang {
-            Vorgang::Abschnitt(v) => system(crate::einsatzabschnitt::etb_text_angelegt(
-                v.name,
-                v.lagezustand,
-            )),
+            Vorgang::PersonalZuEinheit { personal, einheit } => eintrag(
+                "system",
+                crate::einheit::etb_text_personal_zugeordnet(
+                    einheiten[einheit],
+                    personal_name(personal),
+                ),
+            ),
+            Vorgang::Gefahrengebiet(v) => {
+                eintrag(
+                    "system",
+                    crate::lage_zone::etb_text("gefahrengebiet", Some(v.label), "eingerichtet"),
+                );
+                eintrag(
+                    "system",
+                    crate::gefahr::etb_text_bewertung(
+                        v.gefahrentyp,
+                        v.schutzobjekt,
+                        Some(v.label),
+                        0,
+                        v.warnstufe,
+                    ),
+                );
+            }
+            Vorgang::Uhs(v) => {
+                uhs.insert(v.schluessel, v.bezeichnung);
+                eintrag(
+                    "system",
+                    crate::uhs::etb_text_status(v.bezeichnung, v.typ, "aktiv").unwrap(),
+                );
+            }
+            Vorgang::Bereitstellungsraum(v) => eintrag(
+                "system",
+                crate::bereitstellungsraum::etb_text_status(v.bezeichnung, "aktiv").unwrap(),
+            ),
+            Vorgang::Person(v) => {
+                registrier_nr += 1;
+                eintrag("system", crate::person::etb_text_erfasst(registrier_nr));
+                if let Some(k) = v.sichtung {
+                    eintrag("system", crate::person::etb_text_sichtung(registrier_nr, k));
+                }
+                if let Some(u) = v.uhs {
+                    eintrag(
+                        "system",
+                        crate::person::etb_text_uhs_aufnahme(registrier_nr, uhs[u]),
+                    );
+                }
+            }
+            Vorgang::Bezirk(v) => {
+                bezirke.insert(v.schluessel, (v.bezeichnung, v.plan_personen, None));
+                eintrag(
+                    "entscheidung",
+                    crate::betreuung::etb_text::bezirk_angelegt(
+                        v.bezeichnung,
+                        v.plan_personen,
+                        v.plan_erhebung,
+                    ),
+                );
+            }
+            Vorgang::Stand {
+                bezirk,
+                evakuiert,
+                erhebung,
+            } => {
+                let (bez, plan, vorher) = bezirke[bezirk];
+                eintrag(
+                    "meldung",
+                    crate::betreuung::etb_text::stand_gemeldet(
+                        bez, evakuiert, erhebung, vorher, plan,
+                    ),
+                );
+                bezirke.insert(bezirk, (bez, plan, Some(evakuiert)));
+            }
+            Vorgang::Stelle(v) => {
+                stellen.insert(v.schluessel, (v.bezeichnung, v.kapazitaet, None));
+                eintrag(
+                    "system",
+                    crate::betreuung::etb_text::stelle_angelegt(
+                        v.bezeichnung,
+                        v.art,
+                        Some(v.kapazitaet),
+                    ),
+                );
+            }
+            Vorgang::StelleInBetrieb { stelle, .. } => eintrag(
+                "system",
+                crate::betreuung::etb_text::stelle_status(
+                    stellen[stelle].0,
+                    crate::betreuung::BetreuungsstelleStatus::InBetrieb,
+                    crate::betreuung::BetreuungsstelleStatus::Vorbereitet,
+                ),
+            ),
+            Vorgang::Belegung { stelle, belegt } => {
+                let (bez, kap, vorher) = stellen[stelle];
+                eintrag(
+                    "meldung",
+                    crate::betreuung::etb_text::belegung_gemeldet(bez, belegt, vorher, Some(kap)),
+                );
+                stellen.insert(stelle, (bez, kap, Some(belegt)));
+            }
+            Vorgang::Meldung(v) => eintrag("meldung", v.inhalt.to_string()),
+            Vorgang::Auftrag(v) => eintrag("anordnung", v.text.to_string()),
+            Vorgang::AuftragVollzug { meldung, .. } => eintrag("meldung", meldung.to_string()),
+            Vorgang::Befehl(d) => {
+                let v = crate::befehl::vorlage(d.vorlage).unwrap();
+                let schluessel: Vec<&str> = v.abschnitte.iter().map(|a| a.schluessel).collect();
+                let abschnitte: Vec<crate::befehl::Abschnitt> = befuellt(&schluessel, &d)
+                    .into_iter()
+                    .map(|(schluessel, text)| crate::befehl::Abschnitt { schluessel, text })
+                    .collect();
+                eintrag(
+                    "anordnung",
+                    crate::befehl::render_snapshot(v, d.titel, &zeit, &abschnitte),
+                );
+            }
+            Vorgang::Lagebericht(d) => {
+                let v = crate::lagebericht::vorlage(d.vorlage).unwrap();
+                let schluessel: Vec<&str> = v.abschnitte.iter().map(|a| a.schluessel).collect();
+                let abschnitte: Vec<crate::lagebericht::Abschnitt> = befuellt(&schluessel, &d)
+                    .into_iter()
+                    .map(|(schluessel, text)| crate::lagebericht::Abschnitt { schluessel, text })
+                    .collect();
+                eintrag(
+                    "lage",
+                    crate::lagebericht::render_snapshot(v, d.titel, &zeit, &abschnitte),
+                );
+            }
+            Vorgang::Erinnerung(_) | Vorgang::ErinnerungErledigt { .. } => {}
+            Vorgang::Abschnitt(v) => eintrag(
+                "system",
+                crate::einsatzabschnitt::etb_text_angelegt(v.name, v.lagezustand),
+            ),
             Vorgang::Einheit(v) => {
                 einheiten.insert(v.schluessel, v.name);
-                system(crate::einheit::etb_text_gebildet(v.name));
+                eintrag("system", crate::einheit::etb_text_gebildet(v.name));
             }
             Vorgang::FahrzeugDisponieren { fahrzeug } => {
                 status.insert(fahrzeug, erster_gebunden);
-                system(crate::fahrzeug::etb_text_disponiert(funkruf(fahrzeug)));
+                eintrag(
+                    "system",
+                    crate::fahrzeug::etb_text_disponiert(funkruf(fahrzeug)),
+                );
             }
-            Vorgang::FahrzeugZuEinheit { fahrzeug, einheit } => system(
+            Vorgang::FahrzeugZuEinheit { fahrzeug, einheit } => eintrag(
+                "system",
                 crate::einheit::etb_text_fahrzeug_zugeordnet(einheiten[einheit], funkruf(fahrzeug)),
             ),
             Vorgang::FmsStatus { fahrzeug, fms } => {
                 let alt = status[fahrzeug];
                 let neu = fms_label(fms);
                 if alt != neu {
-                    system(crate::fahrzeug::etb_text_status_wechsel(
-                        funkruf(fahrzeug),
-                        Some(alt),
-                        Some(neu),
-                    ));
+                    eintrag(
+                        "system",
+                        crate::fahrzeug::etb_text_status_wechsel(
+                            funkruf(fahrzeug),
+                            Some(alt),
+                            Some(neu),
+                        ),
+                    );
                 }
                 status.insert(fahrzeug, neu);
             }
@@ -184,14 +368,12 @@ fn erwartete_etb() -> Vec<(String, String, String)> {
                 let mut qualis = p.qualifikationen.to_vec();
                 qualis.sort_by_key(|q| quali_sortier(q));
                 let funktion = qualis.join(", ");
-                system(crate::personal::etb_text_disponiert(
-                    p.name,
-                    Some(&funktion),
-                ));
+                eintrag(
+                    "system",
+                    crate::personal::etb_text_disponiert(p.name, Some(&funktion)),
+                );
             }
-            Vorgang::Etb { art, inhalt, .. } => {
-                erwartet.push((art.typ().to_string(), inhalt.to_string(), zeit.clone()))
-            }
+            Vorgang::Etb { art, inhalt, .. } => eintrag(art.typ(), inhalt.to_string()),
         }
     }
     erwartet
@@ -477,7 +659,7 @@ async fn etb_folgt_dem_drehbuch_mit_system_eintraegen_je_vorgang() {
 
     let ist = etb(&pool, erg.einsatz_id).await;
     let erwartet = erwartete_etb();
-    assert_eq!(ist.len(), 55, "Zahl der ETB-Einträge des Rumpfs");
+    assert_eq!(ist.len(), 131, "Zahl der ETB-Einträge des Drehbuchs");
     assert_eq!(
         ist.iter()
             .map(|(_, typ, inhalt, zeit, _)| (typ.clone(), inhalt.clone(), zeit.clone()))
@@ -491,9 +673,14 @@ async fn etb_folgt_dem_drehbuch_mit_system_eintraegen_je_vorgang() {
     );
 
     let je_typ = |typ: &str| ist.iter().filter(|e| e.1 == typ).count();
-    assert_eq!(je_typ("lage"), 4);
-    assert_eq!(je_typ("entscheidung"), 4);
-    assert_eq!(je_typ("system"), 47);
+    // Alle fünf Pflicht-Typen der Spec: Lage 5 + Lagebericht; Entscheidung 5 + Bezirk
+    // angeordnet; Meldung 8 Meldungen + 3 Vollzüge + 2 Stand- + 2 Belegungsmeldungen;
+    // Anordnung 5 Aufträge + Befehl; System aus den Vorgängen.
+    assert_eq!(je_typ("lage"), 6);
+    assert_eq!(je_typ("entscheidung"), 6);
+    assert_eq!(je_typ("meldung"), 15);
+    assert_eq!(je_typ("anordnung"), 6);
+    assert_eq!(je_typ("system"), 98);
 
     // Einzelne Wortlaute als Literal, unabhängig von den Textfunktionen.
     let inhalte: Vec<&str> = ist.iter().map(|e| e.2.as_str()).collect();
@@ -505,9 +692,25 @@ async fn etb_folgt_dem_drehbuch_mit_system_eintraegen_je_vorgang() {
         "Einheit «Rettungsstaffel»: Fahrzeug «Musterstadt 83-2» zugeordnet",
         "Fahrzeug «Musterstadt 85-2»: Status «4 – Am Einsatzort» → «6 – Nicht einsatzbereit»",
         "Person «Max Mustermann (Zugführer, Sprechfunker)» disponiert",
+        "Einheit «Rettungsstaffel»: «Anna Probe» zugeordnet",
+        "Gefahrengebiet «Überflutung Unterstadt» eingerichtet",
+        "Gefahr «Ertrinken» für «Menschen» in «Überflutung Unterstadt» auf Warnstufe «hoch» gesetzt.",
+        "Gefahr «Einsturz» für «Sachwerte» in «Hangrutsch Kirchberg» auf Warnstufe «mittel» gesetzt.",
+        "Bereitstellungsraum Parkplatz Stadion Nord in Betrieb genommen",
+        "Person R-009: Sichtung SK I",
+        "Person R-001: Aufnahme in Turnhalle Musterstadt (Inbox)",
+        "Person R-012 erfasst",
     ] {
         assert!(inhalte.contains(&literal), "fehlt: {literal}");
     }
+    // Der Bezirk schreibt seine Entscheidung ohne fachliches Zeitfeld; der Import stellt sie
+    // auf die Schrittzeit T−228 min (Nachtrag D9), nicht auf `datetime('now')`.
+    let bezirk: Vec<&(i64, String, String, String, String)> = ist
+        .iter()
+        .filter(|e| e.1 == "entscheidung" && e.2.starts_with("Evakuierung Bezirk"))
+        .collect();
+    assert_eq!(bezirk.len(), 1);
+    assert_eq!(bezirk[0].3, "2026-09-25 08:12:00");
 }
 
 /// Szenariouhr (D9): jeder Eintrag trägt als Eingangszeit seine Ereigniszeit, die
@@ -582,6 +785,334 @@ async fn nachbar_einsatz_behaelt_seine_etb_zeiten() {
     assert_eq!(
         zeilen(&pool, "etb_eintrag", "einsatz_id = ?", nachbar).await,
         vorher
+    );
+}
+
+// ---------------------------------------------------------------------------------------------
+// Szenario: Lage, Betroffene und Module (Block 4.3)
+// ---------------------------------------------------------------------------------------------
+
+/// Spec „Überblick zeigt die Lage“: der Einsatz meldet die Lagekennzahl `evakuiert`, aber keine
+/// `pegel`. Gelesen über `einsatz::repo::laden` und `lagekennzahl::ableiten`, dieselbe Ableitung
+/// wie die Einsatzanzeige. Dazu die Abwesenheit selbst: kein maßgeblicher Pegel (Spec: „Einen
+/// maßgeblichen Pegel MUST NOT der Import festlegen“).
+#[tokio::test]
+async fn ueberblick_zeigt_evakuiert_und_keinen_pegel() {
+    let pool = crate::db::test_pool().await;
+    let o = org_mit_admin(&pool, 1).await;
+    let erg = importieren(&pool, &o, jetzt()).await.expect("importieren");
+
+    let e = crate::einsatz::repo::laden(&pool, erg.einsatz_id)
+        .await
+        .unwrap();
+    let kennzahlen =
+        crate::einsatz::lagekennzahl::ableiten(e.pegel_festgelegt, e.evakuierung_angeordnet);
+    assert_eq!(
+        kennzahlen,
+        vec![crate::einsatz::lagekennzahl::Lagekennzahl::Evakuiert]
+    );
+    assert_eq!(
+        anzahl(
+            &pool,
+            "SELECT COUNT(*) FROM einsatz_pegel WHERE einsatz_id = ?",
+            erg.einsatz_id
+        )
+        .await,
+        0,
+        "kein maßgeblicher Pegel"
+    );
+}
+
+/// Spec „Sichtung nach BBK“: jede Kategorie SK I–IV kommt vor, verteilt nach D9 (I ×1, II ×3,
+/// III ×6, IV ×1), dazu eine Person ohne Sichtung. Zwölf Betroffene mit fiktiven Namen.
+#[tokio::test]
+async fn sichtung_nach_bbk() {
+    let pool = crate::db::test_pool().await;
+    let o = org_mit_admin(&pool, 1).await;
+    let erg = importieren(&pool, &o, jetzt()).await.expect("importieren");
+
+    let je_kategorie: Vec<(Option<String>, i64)> = sqlx::query_as(
+        "SELECT aktuelle_sichtung, COUNT(*) FROM einsatz_person WHERE einsatz_id = ? \
+         GROUP BY aktuelle_sichtung ORDER BY aktuelle_sichtung",
+    )
+    .bind(erg.einsatz_id)
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    let s = |x: &str| Some(x.to_string());
+    assert_eq!(
+        je_kategorie,
+        vec![
+            (None, 1),
+            (s("sk1"), 1),
+            (s("sk2"), 3),
+            (s("sk3"), 6),
+            (s("sk4"), 1)
+        ]
+    );
+    // Die Sichtungskette trägt dieselben Kategorien (Erst-Sichtung beim Anlegen).
+    assert_eq!(
+        anzahl(
+            &pool,
+            "SELECT COUNT(*) FROM person_sichtung WHERE einsatz_id = ?",
+            erg.einsatz_id
+        )
+        .await,
+        11
+    );
+    // Registriernummern über den Betriebsweg: 1…12 lückenlos.
+    let nummern: Vec<i64> = sqlx::query_scalar(
+        "SELECT registrier_nr FROM einsatz_person WHERE einsatz_id = ? ORDER BY registrier_nr",
+    )
+    .bind(erg.einsatz_id)
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(nummern, (1..=12).collect::<Vec<i64>>());
+    // Gesichtete sind `betroffen`, die ungesichtete bleibt `erfasst`.
+    let status: Vec<(String, i64)> = sqlx::query_as(
+        "SELECT status, COUNT(*) FROM einsatz_person WHERE einsatz_id = ? \
+         GROUP BY status ORDER BY status",
+    )
+    .bind(erg.einsatz_id)
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        status,
+        vec![("betroffen".to_string(), 11), ("erfasst".to_string(), 1)]
+    );
+}
+
+/// Je Modul der Zustand aus D9, auf Zeilenebene: UHS aktiv mit Plätzen und Belegten, BR aktiv,
+/// Betreuungsstelle in Betrieb mit zwei Belegungsmeldungen, Bezirk mit Plangröße und zwei
+/// Standmeldungen, zwei Gefahrengebiete mit Warnstufe, acht Meldungen, fünf Aufträge, Befehl
+/// und Lagebericht freigegeben, drei Erinnerungen, alles Personal einer Einheit zugeordnet.
+#[tokio::test]
+async fn module_nach_dem_drehbuch() {
+    let pool = crate::db::test_pool().await;
+    let o = org_mit_admin(&pool, 1).await;
+    let erg = importieren(&pool, &o, jetzt()).await.expect("importieren");
+    let e = erg.einsatz_id;
+    let zahl = |sql: &'static str| {
+        let pool = pool.clone();
+        async move { anzahl(&pool, sql, e).await }
+    };
+
+    // UHS
+    let uhs: Vec<(String, String, String)> = sqlx::query_as(
+        "SELECT u.bezeichnung, u.status, a.kurzbezeichnung FROM uhs u \
+         JOIN einsatzabschnitt a ON a.id = u.abschnitt_id WHERE u.einsatz_id = ?",
+    )
+    .bind(e)
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        uhs,
+        vec![(
+            "Turnhalle Musterstadt".to_string(),
+            "aktiv".to_string(),
+            "EA 1.1".to_string()
+        )]
+    );
+    assert_eq!(
+        zahl(
+            "SELECT COUNT(*) FROM uhs_platz p JOIN uhs u ON u.id = p.uhs_id WHERE u.einsatz_id = ?"
+        )
+        .await,
+        6
+    );
+    assert_eq!(
+        zahl("SELECT COUNT(*) FROM person_uhs_belegung WHERE einsatz_id = ? AND art = 'eintritt'")
+            .await,
+        8
+    );
+
+    // Bereitstellungsraum: aktiv, ohne Belegung (siehe Report 4.3).
+    let br: Vec<(String, String)> =
+        sqlx::query_as("SELECT bezeichnung, status FROM bereitstellungsraum WHERE einsatz_id = ?")
+            .bind(e)
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        br,
+        vec![("Parkplatz Stadion Nord".to_string(), "aktiv".to_string())]
+    );
+
+    // Betreuung
+    let stelle: Vec<(String, String, Option<i64>, Option<i64>)> = sqlx::query_as(
+        "SELECT s.bezeichnung, s.status, s.kapazitaet_personen, b.belegt \
+         FROM betreuungsstelle s LEFT JOIN betreuungsstelle_belegung b ON b.id = s.belegung_id \
+         WHERE s.einsatz_id = ?",
+    )
+    .bind(e)
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        stelle,
+        vec![(
+            "Gesamtschule".to_string(),
+            "in_betrieb".to_string(),
+            Some(150),
+            Some(71)
+        )]
+    );
+    assert_eq!(
+        zahl("SELECT COUNT(*) FROM betreuungsstelle_belegung WHERE einsatz_id = ?").await,
+        2
+    );
+    let bezirk: Vec<(String, String, i64, Option<i64>)> = sqlx::query_as(
+        "SELECT b.bezeichnung, b.raeumung, b.plan_personen, s.evakuiert \
+         FROM evakuierungsbezirk b LEFT JOIN evakuierung_stand s ON s.id = b.stand_id \
+         WHERE b.einsatz_id = ?",
+    )
+    .bind(e)
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        bezirk,
+        vec![(
+            "Mühlbachweg 1–40".to_string(),
+            "angeordnet".to_string(),
+            120,
+            Some(96)
+        )]
+    );
+    assert_eq!(
+        zahl("SELECT COUNT(*) FROM evakuierung_stand WHERE einsatz_id = ?").await,
+        2
+    );
+
+    // Gefahrengebiete mit Warnstufe, Geometrie als Polygon.
+    let gebiete: Vec<(String, String, String, String, String)> = sqlx::query_as(
+        "SELECT z.label, z.geometrie_typ, b.gefahrentyp, b.schutzobjekt, b.warnstufe \
+         FROM lage_zone z JOIN gefahr_bewertung b ON b.gefahrengebiet_id = z.gefahrengebiet_id \
+         WHERE z.einsatz_id = ? AND z.typ = 'gefahrengebiet' ORDER BY z.id",
+    )
+    .bind(e)
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    let s = |x: &str| x.to_string();
+    assert_eq!(
+        gebiete,
+        vec![
+            (
+                s("Überflutung Unterstadt"),
+                s("Polygon"),
+                s("ertrinken"),
+                s("menschen"),
+                s("hoch")
+            ),
+            (
+                s("Hangrutsch Kirchberg"),
+                s("Polygon"),
+                s("einsturz"),
+                s("sachwerte"),
+                s("mittel")
+            ),
+        ]
+    );
+
+    // Meldungen: acht, davon fünf Rückmeldungen mit Einheit, eine Sofortmeldung bestätigt.
+    assert_eq!(
+        zahl("SELECT COUNT(*) FROM meldung WHERE einsatz_id = ?").await,
+        8
+    );
+    assert_eq!(
+        zahl("SELECT COUNT(*) FROM meldung WHERE einsatz_id = ? AND einheit_id IS NOT NULL").await,
+        5
+    );
+    assert_eq!(
+        zahl(
+            "SELECT COUNT(*) FROM meldung m JOIN kommunikation_status k \
+             ON k.objekt_typ = 'meldung' AND k.objekt_id = m.id \
+             WHERE m.einsatz_id = ? AND m.meldungsart = 'sofortmeldung' \
+             AND m.bestaetigung_pflicht = 1 AND k.quittiert_at IS NOT NULL"
+        )
+        .await,
+        1,
+        "die Sofortmeldung ist bestätigt"
+    );
+
+    // Nummernkreise über den Betriebsweg (Spec „Demo-Einsatz“): lückenlos ab dem Startwert 1.
+    let meldung_nr: Vec<i64> =
+        sqlx::query_scalar("SELECT lfd_nr FROM meldung WHERE einsatz_id = ? ORDER BY lfd_nr")
+            .bind(e)
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+    assert_eq!(meldung_nr, (1..=8).collect::<Vec<i64>>());
+    let auftrag_nr: Vec<i64> =
+        sqlx::query_scalar("SELECT lfd_nr FROM auftrag WHERE einsatz_id = ? ORDER BY lfd_nr")
+            .bind(e)
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+    assert_eq!(auftrag_nr, (1..=5).collect::<Vec<i64>>());
+
+    // Aufträge: fünf, drei vollzogen, keiner mit Frist.
+    assert_eq!(
+        zahl("SELECT COUNT(*) FROM auftrag WHERE einsatz_id = ?").await,
+        5
+    );
+    assert_eq!(
+        zahl(
+            "SELECT COUNT(*) FROM kommunikation_status WHERE einsatz_id = ? \
+             AND objekt_typ = 'auftrag' AND vollzug_status = 'vollzogen'"
+        )
+        .await,
+        3
+    );
+    assert_eq!(
+        zahl("SELECT COUNT(*) FROM auftrag WHERE einsatz_id = ? AND frist_at IS NOT NULL").await,
+        0
+    );
+
+    // Befehl und Lagebericht freigegeben; der Lagebericht steht auf T−1 h.
+    let befehl: Vec<(String, Option<i64>)> =
+        sqlx::query_as("SELECT status, etb_eintrag_id FROM befehl WHERE einsatz_id = ?")
+            .bind(e)
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+    assert_eq!(befehl.len(), 1);
+    assert_eq!(befehl[0].0, "freigegeben");
+    assert!(befehl[0].1.is_some());
+    let bericht: Vec<(String, String)> =
+        sqlx::query_as("SELECT status, zeitstand FROM lagebericht WHERE einsatz_id = ?")
+            .bind(e)
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+    assert_eq!(bericht, vec![("freigegeben".to_string(), zeit_vor(60))]);
+
+    // Erinnerungen: zwei vergangene erledigt, eine in +20 min offen.
+    let erinnerungen: Vec<(String, String)> = sqlx::query_as(
+        "SELECT status, faellig_at FROM erinnerung WHERE einsatz_id = ? ORDER BY faellig_at",
+    )
+    .bind(e)
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        erinnerungen,
+        vec![
+            (s("erledigt"), zeit_vor(120)),
+            (s("erledigt"), zeit_vor(45)),
+            (s("offen"), zeit_vor(-20)),
+        ]
+    );
+
+    // Personal: alle zwölf Kräfte einer Einheit zugeordnet (Ist-Stärke im Meldebild).
+    assert_eq!(
+        zahl("SELECT COUNT(*) FROM einsatz_personal WHERE einsatz_id = ? AND einheit_id IS NULL")
+            .await,
+        0
     );
 }
 

@@ -14,8 +14,12 @@
 //! Die fachlichen Kennungen sind fest (`DEMO-P-001` …, `DEMO-M-001` …, „Musterstadt …“). Über
 //! sie gleicht der Import mit vorhandenen Stammdaten ab (design.md D8).
 
+use crate::betreuung::{BetreuungsstelleArt, Erhebung};
 use crate::einsatzabschnitt::AbschnittLagezustand;
+use crate::gefahr::Warnstufe;
 use crate::katalog::StatusKategorie;
+use crate::person::Sichtungskategorie;
+use crate::uhs::{PlatzTyp, UhsTyp};
 
 /// Stamm-Fahrzeug des Szenarios. Kennung für den Abgleich ist der Funkrufname.
 #[derive(Debug, Clone, Copy)]
@@ -323,6 +327,144 @@ impl EtbArt {
     }
 }
 
+/// Punkt in WGS84 als `(Länge, Breite)`, in der Reihenfolge von GeoJSON. Alle Punkte des
+/// Szenarios liegen um einen erfundenen Ort in der Mitte Deutschlands; ein realer Ortsbezug ist
+/// nicht beabsichtigt.
+pub type Punkt = (f64, f64);
+
+/// Gefahrengebiet der Lagekarte: eine Lage-Zone vom Typ `gefahrengebiet` (Polygon) samt einer
+/// Bewertung. Die Geometrie prüft der Import mit `lage_zone::validiere_neu` wie der Handler.
+#[derive(Debug, Clone, Copy)]
+pub struct GefahrengebietVorlage {
+    pub label: &'static str,
+    /// Außenring ohne Schlusspunkt; der Import schließt ihn.
+    pub ring: &'static [Punkt],
+    /// Wire-Wert aus `gefahr::Gefahrentyp`.
+    pub gefahrentyp: &'static str,
+    /// Wire-Wert aus `gefahr::Schutzobjekt`; die Kombination besteht
+    /// `gefahr::kombination_gueltig`.
+    pub schutzobjekt: &'static str,
+    pub warnstufe: Warnstufe,
+    pub beschreibung: &'static str,
+}
+
+/// Platz einer UHS mit Position im Grundriss.
+#[derive(Debug, Clone, Copy)]
+pub struct PlatzVorlage {
+    pub typ: PlatzTyp,
+    pub bezeichnung: &'static str,
+    pub pos: (f64, f64),
+}
+
+/// UHS: angelegt, mit Plätzen versehen und in Betrieb genommen (Status `aktiv`).
+#[derive(Debug, Clone, Copy)]
+pub struct UhsVorlage {
+    pub schluessel: &'static str,
+    pub bezeichnung: &'static str,
+    pub typ: UhsTyp,
+    pub abschnitt: &'static str,
+    pub standort: &'static str,
+    pub plaetze: &'static [PlatzVorlage],
+}
+
+/// Bereitstellungsraum: angelegt und in Betrieb genommen (Status `aktiv`).
+#[derive(Debug, Clone, Copy)]
+pub struct BrVorlage {
+    pub bezeichnung: &'static str,
+    pub abschnitt: &'static str,
+    pub standort: &'static str,
+}
+
+/// Betroffene Person, angelegt wie über `POST …/personen`: Status `erfasst`, optional mit
+/// Erst-Sichtung (hebt auf `betroffen`) und UHS-Eintritt (Inbox).
+#[derive(Debug, Clone, Copy)]
+pub struct PersonVorlage {
+    pub vorname: &'static str,
+    pub name: &'static str,
+    /// Wire-Wert aus `person::Geschlecht`.
+    pub geschlecht: &'static str,
+    pub alter_geschaetzt: i64,
+    pub antreff_ort: &'static str,
+    pub antreff: Option<Punkt>,
+    pub zustand: Option<&'static str>,
+    pub sichtung: Option<Sichtungskategorie>,
+    /// Schlüssel einer früher angelegten UHS.
+    pub uhs: Option<&'static str>,
+}
+
+/// Evakuierungsbezirk; das Anlegen ist die Anordnung samt Plangröße (Räumung `angeordnet`).
+#[derive(Debug, Clone, Copy)]
+pub struct BezirkVorlage {
+    pub schluessel: &'static str,
+    pub bezeichnung: &'static str,
+    pub abschnitt: &'static str,
+    pub plan_personen: i64,
+    pub plan_erhebung: Erhebung,
+    pub sammelstelle: &'static str,
+}
+
+/// Betreuungsstelle, angelegt im Status `vorbereitet`.
+#[derive(Debug, Clone, Copy)]
+pub struct StelleVorlage {
+    pub schluessel: &'static str,
+    pub bezeichnung: &'static str,
+    pub art: BetreuungsstelleArt,
+    pub abschnitt: &'static str,
+    pub kapazitaet: i64,
+    pub standort: &'static str,
+}
+
+/// Meldung, angelegt wie über `POST …/meldungen`. `ereigniszeit` und `eingang_at` sind die
+/// Schrittzeit. Eine Sofortmeldung (Art `sofortmeldung` oder Priorität `sofort`) trägt wie im
+/// Handler die Bestätigungspflicht samt Frist; sie muss `bestaetigt` sein (D10).
+#[derive(Debug, Clone, Copy)]
+pub struct MeldungVorlage {
+    pub absender: &'static str,
+    pub empfaenger: Option<&'static str>,
+    /// Wire-Wert aus `etb::MeldeWeg`.
+    pub meldeweg: &'static str,
+    pub inhalt: &'static str,
+    pub meldungsart: &'static str,
+    pub prioritaet: &'static str,
+    pub richtung: &'static str,
+    /// Schlüssel einer früher gebildeten Einheit: strukturierter Absender, macht die Meldung
+    /// zur Rückmeldung dieser Einheit (LFH-610).
+    pub einheit: Option<&'static str>,
+    /// Im selben Schritt bestätigt (Quittung zur Schrittzeit).
+    pub bestaetigt: bool,
+}
+
+/// Auftrag an eine Einheit, erteilt zur Schrittzeit, **ohne** Frist: eine künftige Frist
+/// widerspräche der Spec („nichts in der Zukunft außer höchstens einer Erinnerung“), eine
+/// abgelaufene wäre ein Alarm (D10).
+#[derive(Debug, Clone, Copy)]
+pub struct AuftragVorlage {
+    pub schluessel: &'static str,
+    pub text: &'static str,
+    /// Schlüssel einer früher gebildeten Einheit.
+    pub einheit: &'static str,
+    pub ort: Option<&'static str>,
+}
+
+/// Befehl oder Lagebericht: Entwurf aus der Vorlage, befüllt und freigegeben. `zeitstand` ist
+/// die Schrittzeit; die Freigabe schreibt ihren ETB-Eintrag mit `ereigniszeit = zeitstand`.
+#[derive(Debug, Clone, Copy)]
+pub struct DokumentVorlage {
+    pub vorlage: &'static str,
+    pub titel: &'static str,
+    /// `(Abschnitts-Schlüssel, Text)`; jeder Schlüssel steht in der Vorlage.
+    pub abschnitte: &'static [(&'static str, &'static str)],
+}
+
+/// Manuelle Erinnerung. `faellig_vor_min` wie `Schritt::vor_min`, negativ = in der Zukunft.
+#[derive(Debug, Clone, Copy)]
+pub struct ErinnerungVorlage {
+    pub schluessel: &'static str,
+    pub titel: &'static str,
+    pub beschreibung: &'static str,
+    pub faellig_vor_min: i64,
+}
+
 /// Ein Vorgang des Drehbuchs. Jede Variante entspricht einer Handlung, die im Betrieb ein
 /// Handler ausführt; der Import schreibt dieselben Zeilen und denselben System-ETB-Eintrag
 /// (design.md D5). Schlüssel verweisen auf Stammdaten ([`FAHRZEUGE`], [`PERSONAL`]) oder auf
@@ -350,6 +492,56 @@ pub enum Vorgang {
     FmsStatus { fahrzeug: &'static str, fms: i64 },
     /// Stamm-Personal disponieren (Stärkeposition aus dem Stamm). ETB: „Person «…» disponiert“.
     PersonalDisponieren { personal: &'static str },
+    /// Disponierte Kraft einer Einheit zuordnen (Ist-Stärke). ETB: „Einheit «…»: «…» zugeordnet“.
+    PersonalZuEinheit {
+        personal: &'static str,
+        einheit: &'static str,
+    },
+    /// Gefahrengebiet auf der Lagekarte einrichten und bewerten. ETB: „Gefahrengebiet «…»
+    /// eingerichtet“, dazu die Warnstufe der Bewertung.
+    Gefahrengebiet(GefahrengebietVorlage),
+    /// UHS anlegen, Plätze anlegen, in Betrieb nehmen. ETB: „… in Betrieb genommen“.
+    Uhs(UhsVorlage),
+    /// Bereitstellungsraum anlegen und in Betrieb nehmen. ETB: „Bereitstellungsraum … in
+    /// Betrieb genommen“.
+    Bereitstellungsraum(BrVorlage),
+    /// Betroffene Person erfassen. ETB: „Person R-… erfasst“, Sichtung, UHS-Aufnahme.
+    Person(PersonVorlage),
+    /// Evakuierungsbezirk anlegen. ETB (Entscheidung): „Evakuierung Bezirk … angeordnet …“.
+    Bezirk(BezirkVorlage),
+    /// Standmeldung „evakuiert“ eines Bezirks zur Schrittzeit. ETB (Meldung).
+    Stand {
+        bezirk: &'static str,
+        evakuiert: i64,
+        erhebung: Erhebung,
+    },
+    /// Betreuungsstelle anlegen. ETB: „Betreuungsstelle … angelegt …“.
+    Stelle(StelleVorlage),
+    /// Betreuungsstelle in Betrieb setzen und verorten. ETB: Statuswechsel.
+    StelleInBetrieb {
+        stelle: &'static str,
+        /// Verortung auf der Lagekarte (LFH-673), `(Länge, Breite)`; schreibt kein ETB.
+        lage: Option<Punkt>,
+    },
+    /// Belegungsmeldung einer Betreuungsstelle zur Schrittzeit. ETB (Meldung).
+    Belegung { stelle: &'static str, belegt: i64 },
+    /// Meldung. ETB (Meldung) aus dem Repo, bei aktivem Auto-ETB.
+    Meldung(MeldungVorlage),
+    /// Auftrag erteilen. ETB (Anordnung) aus dem Repo, bei aktivem Auto-ETB.
+    Auftrag(AuftragVorlage),
+    /// Vollzug eines früher erteilten Auftrags melden. ETB (Meldung) mit dem Rückmeldetext.
+    AuftragVollzug {
+        auftrag: &'static str,
+        meldung: &'static str,
+    },
+    /// Befehl anlegen, befüllen und freigeben. ETB (Anordnung): der gerenderte Snapshot.
+    Befehl(DokumentVorlage),
+    /// Lagebericht anlegen, befüllen und freigeben. ETB (Lage): der gerenderte Snapshot.
+    Lagebericht(DokumentVorlage),
+    /// Manuelle Erinnerung anlegen (Status `offen`). Kein ETB.
+    Erinnerung(ErinnerungVorlage),
+    /// Früher angelegte Erinnerung erledigen (Status und Vollzug wie im Handler). Kein ETB.
+    ErinnerungErledigt { erinnerung: &'static str },
     /// Fachlicher ETB-Eintrag, `ereigniszeit` = Schrittzeit.
     Etb {
         art: EtbArt,
@@ -431,11 +623,239 @@ const fn einheit(
     )
 }
 
+const fn personal_zu(vor_min: i64, personal: &'static str, einheit: &'static str) -> Schritt {
+    s(vor_min, Vorgang::PersonalZuEinheit { personal, einheit })
+}
+
+#[allow(clippy::too_many_arguments)]
+const fn person(
+    vor_min: i64,
+    vorname: &'static str,
+    name: &'static str,
+    geschlecht: &'static str,
+    alter_geschaetzt: i64,
+    antreff_ort: &'static str,
+    antreff: Option<Punkt>,
+    zustand: Option<&'static str>,
+    sichtung: Option<Sichtungskategorie>,
+    uhs: Option<&'static str>,
+) -> Schritt {
+    s(
+        vor_min,
+        Vorgang::Person(PersonVorlage {
+            vorname,
+            name,
+            geschlecht,
+            alter_geschaetzt,
+            antreff_ort,
+            antreff,
+            zustand,
+            sichtung,
+            uhs,
+        }),
+    )
+}
+
+const fn rueckmeldung(
+    vor_min: i64,
+    absender: &'static str,
+    einheit: &'static str,
+    inhalt: &'static str,
+) -> Schritt {
+    s(
+        vor_min,
+        Vorgang::Meldung(MeldungVorlage {
+            absender,
+            empfaenger: Some("Einsatzleitung"),
+            meldeweg: "funk",
+            inhalt,
+            meldungsart: crate::meldung::ART_RUECKMELDUNG,
+            prioritaet: crate::meldung::PRIO_NORMAL,
+            richtung: crate::meldung::RICHTUNG_INTERN,
+            einheit: Some(einheit),
+            bestaetigt: false,
+        }),
+    )
+}
+
+const fn lagemeldung(vor_min: i64, absender: &'static str, inhalt: &'static str) -> Schritt {
+    s(
+        vor_min,
+        Vorgang::Meldung(MeldungVorlage {
+            absender,
+            empfaenger: Some("Einsatzleitung"),
+            meldeweg: "telefon",
+            inhalt,
+            meldungsart: crate::meldung::ART_LAGEMELDUNG,
+            prioritaet: crate::meldung::PRIO_NORMAL,
+            richtung: crate::meldung::RICHTUNG_EXTERN,
+            einheit: None,
+            bestaetigt: false,
+        }),
+    )
+}
+
+const fn auftrag(
+    vor_min: i64,
+    schluessel: &'static str,
+    einheit: &'static str,
+    text: &'static str,
+    ort: Option<&'static str>,
+) -> Schritt {
+    s(
+        vor_min,
+        Vorgang::Auftrag(AuftragVorlage {
+            schluessel,
+            text,
+            einheit,
+            ort,
+        }),
+    )
+}
+
+const fn vollzug(vor_min: i64, auftrag: &'static str, meldung: &'static str) -> Schritt {
+    s(vor_min, Vorgang::AuftragVollzug { auftrag, meldung })
+}
+
+const fn erinnerung(
+    vor_min: i64,
+    schluessel: &'static str,
+    titel: &'static str,
+    beschreibung: &'static str,
+    faellig_vor_min: i64,
+) -> Schritt {
+    s(
+        vor_min,
+        Vorgang::Erinnerung(ErinnerungVorlage {
+            schluessel,
+            titel,
+            beschreibung,
+            faellig_vor_min,
+        }),
+    )
+}
+
+const fn erledigt(vor_min: i64, erinnerung: &'static str) -> Schritt {
+    s(vor_min, Vorgang::ErinnerungErledigt { erinnerung })
+}
+
+/// Grundriss der UHS Turnhalle: sechs Plätze in zwei Reihen.
+const UHS_PLAETZE: &[PlatzVorlage] = &[
+    PlatzVorlage {
+        typ: PlatzTyp::Wartebereich,
+        bezeichnung: "Wartebereich",
+        pos: (10.0, 10.0),
+    },
+    PlatzVorlage {
+        typ: PlatzTyp::Behandlungsplatz,
+        bezeichnung: "Behandlungsplatz 1",
+        pos: (170.0, 10.0),
+    },
+    PlatzVorlage {
+        typ: PlatzTyp::Behandlungsplatz,
+        bezeichnung: "Behandlungsplatz 2",
+        pos: (330.0, 10.0),
+    },
+    PlatzVorlage {
+        typ: PlatzTyp::Behandlungsplatz,
+        bezeichnung: "Behandlungsplatz 3",
+        pos: (490.0, 10.0),
+    },
+    PlatzVorlage {
+        typ: PlatzTyp::Trage,
+        bezeichnung: "Trage 1",
+        pos: (10.0, 130.0),
+    },
+    PlatzVorlage {
+        typ: PlatzTyp::TransportBereitstellung,
+        bezeichnung: "Transportbereitstellung",
+        pos: (170.0, 130.0),
+    },
+];
+
+/// Einsatzbefehl (Vorlage LAD) des Szenarios.
+pub const BEFEHL: DokumentVorlage = DokumentVorlage {
+    vorlage: "befehl_lad",
+    titel: "Einsatzbefehl Nr. 1 – Starkregen Musterstadt",
+    abschnitte: &[
+        (
+            "lage",
+            "Starkregen über Musterstadt, der Mühlbach ist in der Unterstadt über die Ufer \
+             getreten. Mit weiteren Betroffenen ist zu rechnen.",
+        ),
+        (
+            "auftrag",
+            "Sanitätsdienstliche Versorgung und Betreuung der Betroffenen, Unterstützung der \
+             Evakuierung in der Unterstadt.",
+        ),
+        (
+            "durchfuehrung",
+            "EA 1 Sanitätsdienst übernimmt Erstversorgung und Transport. EA 2 Betreuung richtet \
+             Betreuungsstellen ein. EA 3 Logistik stellt Material, Verpflegung und Strom sicher.",
+        ),
+    ],
+};
+
+/// Lagebericht (Vorlage „Lagevortrag zur Information“), Zeitstand T−1 h.
+pub const LAGEBERICHT: DokumentVorlage = DokumentVorlage {
+    vorlage: "lagebericht",
+    titel: "Lagebericht 1 – Starkregen Musterstadt",
+    abschnitte: &[
+        (
+            "auftrag",
+            "Sanitätsdienst, Betreuung und Logistik im Übungseinsatz Starkregen Musterstadt.",
+        ),
+        (
+            "gefahren_schadenlage",
+            "Unterstadt überflutet (Warnstufe hoch), Hangrutsch am Kirchberg (Warnstufe \
+             mittel). Mühlbachweg 1–40 wird evakuiert.",
+        ),
+        (
+            "eigene_lage",
+            "Fünf Einheiten im Einsatz, UHS Turnhalle und Betreuungsstelle Gesamtschule in \
+             Betrieb. KTW Musterstadt 85-2 nicht einsatzbereit.",
+        ),
+        (
+            "lageentwicklung",
+            "Aufnahmekapazität der UHS nahezu erschöpft, weitere Betroffene angekündigt.",
+        ),
+        ("fuehrungsprobleme", ""),
+        (
+            "antraege_vorschlaege",
+            "Weitere Sanitätsgruppe über die Leitstelle anfordern.",
+        ),
+        (
+            "zusammenfassung",
+            "Lage in EA 1.1 kritisch, übrige Abschnitte planmäßig.",
+        ),
+    ],
+};
+
+/// Außenring „Überflutung Unterstadt“, `(Länge, Breite)`.
+const RING_UNTERSTADT: &[Punkt] = &[
+    (10.240, 50.950),
+    (10.252, 50.950),
+    (10.254, 50.955),
+    (10.246, 50.958),
+    (10.239, 50.955),
+];
+
+/// Außenring „Hangrutsch Kirchberg“, `(Länge, Breite)`.
+const RING_KIRCHBERG: &[Punkt] = &[
+    (10.262, 50.963),
+    (10.268, 50.963),
+    (10.268, 50.967),
+    (10.262, 50.967),
+];
+
 /// Das Drehbuch in Zeitfolge: `vor_min` fällt (nicht streng), der erste Schritt liegt beim
 /// Einsatzbeginn, der letzte wenige Minuten vor dem Import. Der Import spielt es in dieser
 /// Reihenfolge ab, damit die laufende ETB-Nummer der Zeit folgt (D9).
 ///
 /// Endstand FMS: ELW, RTW 1, GW-San, MTW 4 · RTW 2, LKW 3 · KTW 1 2 · KTW 2 6.
+/// Endstand Kommunikation: acht Meldungen (Rückmeldung Logistiktrupp überfällig, vier
+/// frisch, Sofortmeldung bestätigt), fünf Aufträge (drei vollzogen, zwei offen ohne Frist),
+/// drei Erinnerungen (zwei erledigt, eine in +20 min).
 pub const DREHBUCH: &[Schritt] = &[
     lage(
         300,
@@ -485,6 +905,17 @@ pub const DREHBUCH: &[Schritt] = &[
             sortier: 30,
         },
     ),
+    s(
+        292,
+        Vorgang::Gefahrengebiet(GefahrengebietVorlage {
+            label: "Überflutung Unterstadt",
+            ring: RING_UNTERSTADT,
+            gefahrentyp: "ertrinken",
+            schutzobjekt: "menschen",
+            warnstufe: Warnstufe::Hoch,
+            beschreibung: "Wasserstand in Straßen und Kellern bis 80 cm, starke Strömung",
+        }),
+    ),
     einheit(290, "zug", "Sanitätszug Musterstadt", "Zug", "ea1", 10),
     einheit(290, "rettung", "Rettungsstaffel", "Staffel", "ea1", 20),
     einheit(290, "betreuung", "Betreuungsgruppe", "Gruppe", "ea2", 30),
@@ -506,10 +937,30 @@ pub const DREHBUCH: &[Schritt] = &[
     dispo_personal(278, "notsan1"),
     dispo_personal(278, "rettsan1"),
     dispo_personal(278, "rettsan2"),
+    personal_zu(276, "zugfuehrer", "zug"),
+    personal_zu(276, "notarzt", "rettung"),
+    personal_zu(276, "notsan1", "rettung"),
+    personal_zu(276, "rettsan1", "rettung"),
+    personal_zu(276, "rettsan2", "rettung"),
+    s(275, Vorgang::Befehl(BEFEHL)),
+    auftrag(
+        272,
+        "a_wache",
+        "rettung",
+        "Sanitätswache am Marktplatz einrichten, Erstversorgung der Betroffenen aus der \
+         Unterstadt.",
+        Some("Marktplatz Musterstadt"),
+    ),
     fms(270, "elw", 4),
     fms(270, "rtw1", 4),
     fms(270, "rtw2", 4),
     fms(265, "mtw", 4),
+    lagemeldung(
+        258,
+        "Leitstelle Musterstadt",
+        "Mehrere Notrufe aus der Unterstadt: Keller vollgelaufen, Anwohner im Mühlbachweg \
+         bitten um Hilfe beim Verlassen der Häuser.",
+    ),
     entscheidung(
         250,
         "Unterabschnitt UHS Turnhalle unter EA 1 wird eingerichtet, dazu eine Sanitätsgruppe \
@@ -528,6 +979,17 @@ pub const DREHBUCH: &[Schritt] = &[
             sortier: 11,
         },
     ),
+    s(
+        247,
+        Vorgang::Uhs(UhsVorlage {
+            schluessel: "turnhalle",
+            bezeichnung: "Turnhalle Musterstadt",
+            typ: UhsTyp::Behandlungsplatz,
+            abschnitt: "ea11",
+            standort: "Turnhalle an der Schulstraße",
+            plaetze: UHS_PLAETZE,
+        }),
+    ),
     einheit(246, "uhs", "Sanitätsgruppe UHS", "Gruppe", "ea11", 50),
     dispo_fahrzeug(245, "ktw1"),
     dispo_fahrzeug(245, "ktw2"),
@@ -540,31 +1002,389 @@ pub const DREHBUCH: &[Schritt] = &[
     dispo_personal(243, "san2"),
     dispo_personal(243, "san3"),
     dispo_personal(243, "funker"),
+    personal_zu(242, "gruppenfuehrer_san", "uhs"),
+    personal_zu(242, "san1", "uhs"),
+    personal_zu(242, "gruppenfuehrer_bt", "betreuung"),
+    personal_zu(242, "san3", "betreuung"),
+    personal_zu(242, "truppfuehrer", "logistik"),
+    personal_zu(242, "san2", "logistik"),
+    personal_zu(242, "funker", "zug"),
     fms(240, "gwsan", 4),
+    vollzug(
+        238,
+        "a_wache",
+        "Sanitätswache Marktplatz besetzt, zwei Behandlungsplätze betriebsbereit.",
+    ),
+    auftrag(
+        236,
+        "a_uhs",
+        "uhs",
+        "UHS Turnhalle betriebsbereit machen und Sichtung nach BBK durchführen.",
+        Some("Turnhalle Musterstadt"),
+    ),
+    s(
+        234,
+        Vorgang::Bereitstellungsraum(BrVorlage {
+            bezeichnung: "Parkplatz Stadion Nord",
+            abschnitt: "ea3",
+            standort: "Stadionstraße, Parkplatz Nord",
+        }),
+    ),
+    person(
+        232,
+        "Erika",
+        "Mustermann",
+        "weiblich",
+        64,
+        "Mühlbachweg 3",
+        Some((10.244, 50.953)),
+        Some("Unterkühlt, Prellung am Unterarm"),
+        Some(Sichtungskategorie::Sk3),
+        Some("turnhalle"),
+    ),
     fms(230, "ktw1", 4),
     fms(230, "ktw2", 4),
+    s(
+        228,
+        Vorgang::Bezirk(BezirkVorlage {
+            schluessel: "muehlbachweg",
+            bezeichnung: "Mühlbachweg 1–40",
+            abschnitt: "ea2",
+            plan_personen: 120,
+            plan_erhebung: Erhebung::Geschaetzt,
+            sammelstelle: "Wendeplatz Mühlbachweg",
+        }),
+    ),
+    s(
+        226,
+        Vorgang::Stelle(StelleVorlage {
+            schluessel: "gesamtschule",
+            bezeichnung: "Gesamtschule",
+            art: BetreuungsstelleArt::Betreuungsstelle,
+            abschnitt: "ea2",
+            kapazitaet: 150,
+            standort: "Gesamtschule Musterstadt, Aula und Mensa",
+        }),
+    ),
+    person(
+        225,
+        "Hans",
+        "Beispielmann",
+        "maennlich",
+        71,
+        "Mühlbachweg 8",
+        Some((10.245, 50.954)),
+        Some("Atemnot nach Kälteexposition"),
+        Some(Sichtungskategorie::Sk2),
+        Some("turnhalle"),
+    ),
+    auftrag(
+        222,
+        "a_betreuung",
+        "betreuung",
+        "Betreuungsstelle Gesamtschule einrichten und Aufnahme der Evakuierten vorbereiten.",
+        Some("Gesamtschule Musterstadt"),
+    ),
+    s(
+        220,
+        Vorgang::StelleInBetrieb {
+            stelle: "gesamtschule",
+            lage: Some((10.258, 50.960)),
+        },
+    ),
+    vollzug(
+        216,
+        "a_uhs",
+        "UHS Turnhalle betriebsbereit, Sichtung läuft.",
+    ),
+    person(
+        214,
+        "Gisela",
+        "Musterfrau",
+        "weiblich",
+        58,
+        "Mühlbachweg 12",
+        None,
+        Some("Schnittwunde am Bein"),
+        Some(Sichtungskategorie::Sk3),
+        Some("turnhalle"),
+    ),
+    erinnerung(
+        208,
+        "lagebesprechung",
+        "Lagebesprechung vorbereiten",
+        "Lagekarte und Kräfteübersicht für die Lagebesprechung aktualisieren.",
+        120,
+    ),
+    person(
+        205,
+        "Otto",
+        "Normalverbraucher",
+        "maennlich",
+        45,
+        "Brückenstraße 2",
+        None,
+        Some("Leichte Schürfwunden"),
+        Some(Sichtungskategorie::Sk3),
+        None,
+    ),
+    vollzug(
+        200,
+        "a_betreuung",
+        "Betreuungsstelle Gesamtschule in Betrieb, 150 Plätze vorbereitet.",
+    ),
+    person(
+        190,
+        "Karl",
+        "Exempel",
+        "maennlich",
+        80,
+        "Mühlbachweg 21",
+        Some((10.247, 50.955)),
+        Some("Sturz auf der Treppe, Verdacht auf Hüftfraktur"),
+        Some(Sichtungskategorie::Sk2),
+        Some("turnhalle"),
+    ),
     lage(
         180,
         "Pegel Mühlbach weiter steigend. Die Unterstadt ist in Teilen nur noch mit \
          geländegängigen Fahrzeugen erreichbar.",
     ),
+    lage(
+        178,
+        "Hangrutsch am Kirchberg gemeldet: die Böschung oberhalb der Kirchstraße ist in \
+         Bewegung.",
+    ),
+    s(
+        176,
+        Vorgang::Gefahrengebiet(GefahrengebietVorlage {
+            label: "Hangrutsch Kirchberg",
+            ring: RING_KIRCHBERG,
+            gefahrentyp: "einsturz",
+            schutzobjekt: "sachwerte",
+            warnstufe: Warnstufe::Mittel,
+            beschreibung: "Böschung in Bewegung, Gebäude der Kirchstraße gefährdet",
+        }),
+    ),
+    entscheidung(
+        174,
+        "Kirchberg: der Gefahrenbereich wird abgesperrt, Anwohner der Kirchstraße werden \
+         informiert.",
+    ),
+    person(
+        172,
+        "Frieda",
+        "Probe",
+        "weiblich",
+        34,
+        "Mühlbachweg 27",
+        None,
+        Some("Unterkühlt"),
+        Some(Sichtungskategorie::Sk3),
+        Some("turnhalle"),
+    ),
+    s(
+        170,
+        Vorgang::Stand {
+            bezirk: "muehlbachweg",
+            evakuiert: 45,
+            erhebung: Erhebung::Geschaetzt,
+        },
+    ),
+    person(
+        160,
+        "Paula",
+        "Platzhalter",
+        "weiblich",
+        88,
+        "Mühlbachweg 30",
+        None,
+        Some("Schwerste Verletzungen nach Sturz, abwartende Behandlung"),
+        Some(Sichtungskategorie::Sk4),
+        Some("turnhalle"),
+    ),
+    erinnerung(
+        155,
+        "abloesung",
+        "Ablösung Rettungsstaffel prüfen",
+        "Einsatzdauer der Rettungsstaffel prüfen und Ablösung einplanen.",
+        45,
+    ),
     fms(150, "rtw2", 3),
+    s(
+        148,
+        Vorgang::Belegung {
+            stelle: "gesamtschule",
+            belegt: 38,
+        },
+    ),
+    person(
+        140,
+        "Bernd",
+        "Vorlage",
+        "maennlich",
+        52,
+        "Brückenstraße 9",
+        None,
+        Some("Prellungen"),
+        Some(Sichtungskategorie::Sk3),
+        None,
+    ),
     fms(120, "ktw2", 6),
+    erledigt(119, "lagebesprechung"),
     entscheidung(
         118,
         "KTW Musterstadt 85-2 wegen Wasserschaden an der Elektrik außer Betrieb. Transporte \
          übernimmt RTW Musterstadt 83-2.",
     ),
+    s(
+        112,
+        Vorgang::Meldung(MeldungVorlage {
+            absender: "Rettungsstaffel",
+            empfaenger: Some("Einsatzleitung"),
+            meldeweg: "funk",
+            inhalt: "Kellerabgang Mühlbachweg 34: eine schwer verletzte Person geborgen, \
+                     Transport in die UHS Turnhalle.",
+            meldungsart: crate::meldung::ART_SOFORTMELDUNG,
+            prioritaet: crate::meldung::PRIO_SOFORT,
+            richtung: crate::meldung::RICHTUNG_INTERN,
+            einheit: None,
+            bestaetigt: true,
+        }),
+    ),
+    person(
+        110,
+        "Ida",
+        "Muster",
+        "weiblich",
+        41,
+        "Mühlbachweg 34",
+        Some((10.249, 50.956)),
+        Some("Bewusstlos, Verdacht auf Schädel-Hirn-Trauma"),
+        Some(Sichtungskategorie::Sk1),
+        Some("turnhalle"),
+    ),
+    rueckmeldung(
+        100,
+        "Logistiktrupp",
+        "logistik",
+        "Beleuchtungssatz an der Gesamtschule aufgebaut, Rückkehr zum Bereitstellungsraum.",
+    ),
+    person(
+        95,
+        "Moritz",
+        "Beispiel",
+        "maennlich",
+        9,
+        "Mühlbachweg 36",
+        None,
+        Some("Platzwunde am Kopf, ansprechbar"),
+        Some(Sichtungskategorie::Sk2),
+        Some("turnhalle"),
+    ),
     fms(90, "ktw1", 2),
+    auftrag(
+        85,
+        "a_strom",
+        "logistik",
+        "Stromerzeuger 8 kVA zur UHS Turnhalle verlegen und anschließen.",
+        Some("Turnhalle Musterstadt"),
+    ),
+    person(
+        75,
+        "Luise",
+        "Exempel",
+        "weiblich",
+        27,
+        "Brückenstraße 14",
+        None,
+        Some("Verstauchung Sprunggelenk"),
+        Some(Sichtungskategorie::Sk3),
+        None,
+    ),
+    s(
+        70,
+        Vorgang::Stand {
+            bezirk: "muehlbachweg",
+            evakuiert: 96,
+            erhebung: Erhebung::Gezaehlt,
+        },
+    ),
+    lagemeldung(
+        65,
+        "Leitstelle Musterstadt",
+        "Wetterdienst: Unwetterwarnung für Musterstadt bis in die Abendstunden verlängert.",
+    ),
     lage(
         60,
         "Lage in EA 1.1 kritisch: Aufnahmekapazität der UHS Turnhalle nahezu erschöpft, \
          weitere Betroffene angekündigt.",
     ),
+    s(60, Vorgang::Lagebericht(LAGEBERICHT)),
+    auftrag(
+        55,
+        "a_erkundung",
+        "zug",
+        "Erkundung Kirchberg: Hangbereich oberhalb der Kirchstraße beobachten und \
+         Veränderungen sofort melden.",
+        Some("Kirchstraße"),
+    ),
+    person(
+        50,
+        "Emil",
+        "Unbekannt",
+        "unbekannt",
+        30,
+        "Brückenstraße, Höhe Bushaltestelle",
+        None,
+        None,
+        None,
+        None,
+    ),
+    rueckmeldung(
+        45,
+        "Sanitätszug Musterstadt",
+        "zug",
+        "Einsatzleitwagen am Marktplatz, Verbindung zu allen Einheiten steht.",
+    ),
+    erledigt(44, "abloesung"),
+    s(
+        40,
+        Vorgang::Belegung {
+            stelle: "gesamtschule",
+            belegt: 71,
+        },
+    ),
+    rueckmeldung(
+        35,
+        "Rettungsstaffel",
+        "rettung",
+        "RTW Musterstadt 83-2 mit Patientin auf dem Weg ins Krankenhaus, RTW 83-1 am \
+         Marktplatz.",
+    ),
     entscheidung(
         30,
         "Weitere Sanitätsgruppe über die Leitstelle nachgefordert. Die Betreuung richtet \
          zusätzliche Plätze in der Gesamtschule ein.",
+    ),
+    rueckmeldung(
+        25,
+        "Betreuungsgruppe",
+        "betreuung",
+        "Gesamtschule: 71 Personen in Betreuung, Verpflegung für den Abend angefordert.",
+    ),
+    erinnerung(
+        20,
+        "naechste_lagebesprechung",
+        "Nächste Lagebesprechung",
+        "Lagebesprechung mit allen Abschnittsleitern im Einsatzleitwagen.",
+        -20,
+    ),
+    rueckmeldung(
+        15,
+        "Sanitätsgruppe UHS",
+        "uhs",
+        "UHS Turnhalle: acht Patienten in Behandlung, zwei zum Transport bereit.",
     ),
     lage(
         10,
@@ -591,7 +1411,29 @@ pub fn katalog_bedarf_einsatz() -> Vec<Katalogeintrag> {
             Vorgang::PersonalDisponieren { .. } => Some(Katalogeintrag::PersonalstatusKategorie(
                 StatusKategorie::Gebunden,
             )),
-            Vorgang::Abschnitt(_) | Vorgang::FahrzeugZuEinheit { .. } | Vorgang::Etb { .. } => None,
+            // Die übrigen Vorgänge brauchen keinen Katalogeintrag: Gefahrentyp, Schutzobjekt,
+            // Warnstufe, UHS- und Platztyp, Sichtung, Meldungs- und Betreuungswerte sind feste
+            // Enums im Code, keine Organisationskataloge.
+            Vorgang::Abschnitt(_)
+            | Vorgang::FahrzeugZuEinheit { .. }
+            | Vorgang::PersonalZuEinheit { .. }
+            | Vorgang::Gefahrengebiet(_)
+            | Vorgang::Uhs(_)
+            | Vorgang::Bereitstellungsraum(_)
+            | Vorgang::Person(_)
+            | Vorgang::Bezirk(_)
+            | Vorgang::Stand { .. }
+            | Vorgang::Stelle(_)
+            | Vorgang::StelleInBetrieb { .. }
+            | Vorgang::Belegung { .. }
+            | Vorgang::Meldung(_)
+            | Vorgang::Auftrag(_)
+            | Vorgang::AuftragVollzug { .. }
+            | Vorgang::Befehl(_)
+            | Vorgang::Lagebericht(_)
+            | Vorgang::Erinnerung(_)
+            | Vorgang::ErinnerungErledigt { .. }
+            | Vorgang::Etb { .. } => None,
         };
         if let Some(eintrag) = eintrag {
             if !bedarf.contains(&eintrag) {
@@ -728,8 +1570,80 @@ mod tests {
         let mut einheiten = BTreeSet::new();
         let mut fahrzeuge = BTreeSet::new();
         let mut personal = BTreeSet::new();
+        let mut zugeordnet = BTreeSet::new();
+        let mut uhs = BTreeSet::new();
+        let mut bezirke = BTreeSet::new();
+        let mut stellen = BTreeSet::new();
+        let mut in_betrieb = BTreeSet::new();
+        let mut auftraege = BTreeSet::new();
+        let mut vollzogen = BTreeSet::new();
+        let mut erinnerungen = BTreeSet::new();
+        let mut erledigt = BTreeSet::new();
         for schritt in DREHBUCH {
             match schritt.vorgang {
+                Vorgang::PersonalZuEinheit {
+                    personal: p,
+                    einheit,
+                } => {
+                    assert!(personal.contains(p), "{p} nicht disponiert");
+                    assert!(einheiten.contains(einheit), "{einheit} nicht gebildet");
+                    assert!(zugeordnet.insert(p), "{p} doppelt zugeordnet");
+                }
+                Vorgang::Gefahrengebiet(v) => assert!(v.ring.len() >= 3, "{}", v.label),
+                Vorgang::Uhs(v) => {
+                    assert!(abschnitte.contains(v.abschnitt), "{}", v.abschnitt);
+                    assert!(uhs.insert(v.schluessel), "{} doppelt", v.schluessel);
+                }
+                Vorgang::Bereitstellungsraum(v) => {
+                    assert!(abschnitte.contains(v.abschnitt), "{}", v.abschnitt)
+                }
+                Vorgang::Person(v) => {
+                    if let Some(u) = v.uhs {
+                        assert!(uhs.contains(u), "{u} vor {}", v.name);
+                    }
+                }
+                Vorgang::Bezirk(v) => {
+                    assert!(abschnitte.contains(v.abschnitt), "{}", v.abschnitt);
+                    assert!(bezirke.insert(v.schluessel), "{} doppelt", v.schluessel);
+                }
+                Vorgang::Stand { bezirk, .. } => assert!(bezirke.contains(bezirk), "{bezirk}"),
+                Vorgang::Stelle(v) => {
+                    assert!(abschnitte.contains(v.abschnitt), "{}", v.abschnitt);
+                    assert!(stellen.insert(v.schluessel), "{} doppelt", v.schluessel);
+                }
+                Vorgang::StelleInBetrieb { stelle, .. } => {
+                    assert!(stellen.contains(stelle), "{stelle}");
+                    assert!(in_betrieb.insert(stelle), "{stelle} doppelt in Betrieb");
+                }
+                Vorgang::Belegung { stelle, .. } => {
+                    assert!(in_betrieb.contains(stelle), "{stelle} nicht in Betrieb")
+                }
+                Vorgang::Meldung(v) => {
+                    if let Some(e) = v.einheit {
+                        assert!(einheiten.contains(e), "{e} nicht gebildet");
+                    }
+                }
+                Vorgang::Auftrag(v) => {
+                    assert!(einheiten.contains(v.einheit), "{}", v.einheit);
+                    assert!(auftraege.insert(v.schluessel), "{} doppelt", v.schluessel);
+                }
+                Vorgang::AuftragVollzug { auftrag, meldung } => {
+                    assert!(auftraege.contains(auftrag), "{auftrag} nicht erteilt");
+                    assert!(vollzogen.insert(auftrag), "{auftrag} doppelt vollzogen");
+                    assert!(!meldung.trim().is_empty());
+                }
+                Vorgang::Befehl(_) | Vorgang::Lagebericht(_) => {}
+                Vorgang::Erinnerung(v) => {
+                    assert!(
+                        erinnerungen.insert(v.schluessel),
+                        "{} doppelt",
+                        v.schluessel
+                    )
+                }
+                Vorgang::ErinnerungErledigt { erinnerung } => {
+                    assert!(erinnerungen.contains(erinnerung), "{erinnerung}");
+                    assert!(erledigt.insert(erinnerung), "{erinnerung} doppelt erledigt");
+                }
                 Vorgang::Abschnitt(v) => {
                     if let Some(ueber) = v.ueber {
                         assert!(abschnitte.contains(ueber), "{ueber} vor {}", v.schluessel);
@@ -781,5 +1695,89 @@ mod tests {
             assert!(bedarf.contains(&erwartet), "{erwartet:?} fehlt");
         }
         assert_eq!(bedarf.len(), 10, "jeder Eintrag einmal: {bedarf:?}");
+    }
+
+    /// Fachwerte, die der Handler als 400/422 abwiese, prüft schon der Datentest: gültige
+    /// Gefahren-Kombination, Geschlecht, Meldungs-Enums, Abschnitte der Vorlagen.
+    #[test]
+    fn fachwerte_sind_gueltig() {
+        for schritt in DREHBUCH {
+            match schritt.vorgang {
+                Vorgang::Gefahrengebiet(v) => {
+                    assert!(crate::gefahr::Gefahrentyp::parse(v.gefahrentyp).is_some());
+                    assert!(crate::gefahr::Schutzobjekt::parse(v.schutzobjekt).is_some());
+                    assert!(
+                        crate::gefahr::kombination_gueltig(v.gefahrentyp, v.schutzobjekt),
+                        "{}",
+                        v.label
+                    );
+                }
+                Vorgang::Person(v) => {
+                    assert!(crate::person::Geschlecht::parse(v.geschlecht).is_some());
+                }
+                Vorgang::Meldung(v) => {
+                    assert!(crate::meldung::meldungsart_gueltig(v.meldungsart));
+                    assert!(crate::meldung::prioritaet_gueltig(v.prioritaet));
+                    assert!(crate::meldung::richtung_gueltig(v.richtung));
+                    assert!(crate::etb::MeldeWeg::parse(v.meldeweg).is_some());
+                }
+                Vorgang::Befehl(d) => {
+                    let v = crate::befehl::vorlage(d.vorlage).expect("Befehlsvorlage");
+                    for (k, _) in d.abschnitte {
+                        assert!(v.abschnitte.iter().any(|a| a.schluessel == *k), "{k}");
+                    }
+                }
+                Vorgang::Lagebericht(d) => {
+                    let v = crate::lagebericht::vorlage(d.vorlage).expect("Berichtsvorlage");
+                    for (k, _) in d.abschnitte {
+                        assert!(v.abschnitte.iter().any(|a| a.schluessel == *k), "{k}");
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    /// Alarmbudget (D10) und Zeitachse als Daten: jede Sofortmeldung ist bestätigt, keine
+    /// Erinnerung wird vor ihrer Fälligkeit erledigt, und in der Zukunft liegt genau eine
+    /// Erinnerung, die offen bleibt (Spec „Zeitachse relativ zum Importzeitpunkt“).
+    #[test]
+    fn kein_alarm_und_nur_eine_erinnerung_in_der_zukunft() {
+        let mut faellig = std::collections::BTreeMap::new();
+        let mut erledigt = BTreeSet::new();
+        for schritt in DREHBUCH {
+            match schritt.vorgang {
+                Vorgang::Meldung(v) => {
+                    let sofort = v.meldungsart == crate::meldung::ART_SOFORTMELDUNG
+                        || v.prioritaet == crate::meldung::PRIO_SOFORT;
+                    if sofort {
+                        assert!(v.bestaetigt, "Sofortmeldung unbestätigt: {}", v.inhalt);
+                        assert!(
+                            schritt.vor_min > crate::meldung::BESTAETIGUNG_FRIST_DEFAULT_MIN,
+                            "Frist liegt in der Zukunft"
+                        );
+                    }
+                }
+                Vorgang::Erinnerung(v) => {
+                    faellig.insert(v.schluessel, v.faellig_vor_min);
+                }
+                Vorgang::ErinnerungErledigt { erinnerung } => {
+                    assert!(
+                        schritt.vor_min <= faellig[erinnerung],
+                        "{erinnerung} vor der Fälligkeit erledigt"
+                    );
+                    erledigt.insert(erinnerung);
+                }
+                _ => {}
+            }
+        }
+        let zukunft: Vec<_> = faellig.iter().filter(|(_, v)| **v < 0).collect();
+        assert_eq!(zukunft.len(), 1, "{zukunft:?}");
+        assert!(!erledigt.contains(zukunft[0].0));
+        for (k, v) in &faellig {
+            if *v >= 0 {
+                assert!(erledigt.contains(k), "vergangene Erinnerung {k} offen");
+            }
+        }
     }
 }

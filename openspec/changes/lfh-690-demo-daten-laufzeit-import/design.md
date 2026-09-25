@@ -540,3 +540,38 @@ nicht, Quelle ist immer eine `erinnerung`-Zeile:
 - Den Wert `aktiv` prüfen die Fach-Repos nicht selbst, der Demo-Lookup tut es:
   `personal::repo::setze_qualifikationen` verwirft eine fremde ID still, und
   `einheit::typ_repo::ist_in_org` lässt deaktivierte Typen zu.
+
+**Nachtrag Block 4.3 (D9, D5), gemessen beim Bau des vollständigen Drehbuchs:**
+- **Ein Vorgang ohne fachliches Zeitfeld außerhalb von `system`:**
+  `betreuung::repo::bezirk_anlegen_tx` schreibt „Evakuierung Bezirk … angeordnet“ als
+  `entscheidung` mit `ereigniszeit = NULL`, also `datetime('now')` (`src/betreuung/repo.rs`,
+  `daten(TYP_ENTSCHEIDUNG, …, None, None)`). Die Szenariouhr fasst nur `system` an, und es gibt
+  kein Feld, über das die Schrittzeit hineinkäme. Der Import-Zweig stellt deshalb genau die
+  zurückgegebenen `Geschrieben::etb_ids` auf die Schrittzeit (`UPDATE … WHERE id = ? AND
+  einsatz_id = ?`, `Ablauf::auf_schrittzeit`), `received_at` setzt danach die Uhr. Die
+  Begründung ist die aus D9 für System-Einträge: Der Eintrag entsteht mit „jetzt“-Semantik.
+  Die Uhr selbst bleibt auf `system` beschränkt. Alle übrigen Repo-Einträge tragen ein
+  fachliches Zeitfeld, das der Import auf die Schrittzeit setzt: Meldung `ereigniszeit`,
+  Auftrag `erteilt_at`, Vollzug `jetzt`, Befehl und Lagebericht `zeitstand`, Stand und
+  Belegung `zeitpunkt_at`. Die Räumung bleibt `angeordnet`. Ein Wechsel auf `laeuft` schriebe
+  einen zweiten Eintrag ohne Zeitfeld und ist für die Lagekennzahl nicht nötig.
+- **Aufträge ohne Frist:** Alle fünf Aufträge tragen `frist_at = NULL`, auch die beiden offenen.
+  Eine künftige Frist verstieße gegen die Spec („nichts in der Zukunft außer höchstens einer
+  Erinnerung“), eine abgelaufene wäre ein Alarm (D10). Eine Default-Quittierfrist aus den
+  Einstellungen wendet der Import deshalb bewusst nicht an. Im Betrieb setzt sie der Handler
+  (`validiere_neuen_auftrag`).
+- **Bereitstellungsraum ohne Belegung:** `bereitstellungsraum::belegung_repo::belege` nimmt nur
+  den Pool, prüft den BR über den Pool und öffnet selbst `write_retry!`. Den ETB-Text bildet
+  der Handler aus Pool-Lesezugriffen. Dazu kommt: Alle Demo-Fahrzeuge sind einer Einheit
+  zugeordnet, und eine Fahrzeug-Belegung verlangt `einheit_id IS NULL` (409). Alle Einheiten
+  sind in Abschnitten eingesetzt. Der BR ist deshalb nur `aktiv`.
+- **Verortung:** Weder `einsatzabschnitt::repo::anlegen_tx` noch `uhs::repo::anlegen_tx` nehmen
+  Koordinaten. Die Verortung läuft dort über Pool-PATCHes (`aktualisiere`). Verortet sind
+  deshalb nur die Gefahrengebiete (Polygone), die Betreuungsstelle (über `stelle_aendern_tx`)
+  und einige Betroffene (`antreff_lat/lon`).
+- **Lesen als importierender Admin:** Der Modul-Guard lässt einen System-Admin immer durch
+  (`einsatz::berechtigung::fordere_modul_zugriff`, Admin-Mindest-Guard). Ein per Override
+  ausgeblendetes Modul liefert dem importierenden Admin also kein 403, das hat eine
+  Mutationsprobe bestätigt (`sichtbar = 0` für `betreuung`, der Test blieb grün). Der Lesetest
+  in `tests/demo_daten.rs` belegt deshalb Daten und Zahlen je Modul über die echten Endpunkte,
+  nicht die Sichtbarkeit für andere Rollen.
