@@ -482,10 +482,12 @@ pub async fn frist_setzen(
 // ---------- Aufbewahrung / Purge (LFH-135) ----------
 
 /// Ermittelt einen gültigen Benutzer als Akteur für System-ETB-Einträge des
-/// Purge-Schedulers (`erfasser_id` ist NOT NULL FK). Bevorzugt, wer den Einsatz
-/// abgeschlossen hat; ersatzweise eine Einsatzleitung. `None`, wenn keiner
-/// auffindbar ist (dann wird der ETB-Audit übersprungen, die Mutation läuft
-/// trotzdem). Läuft auf der übergebenen tx-Verbindung.
+/// Purge-Schedulers (`erfasser_id` ist NOT NULL FK). Reihenfolge (LFH-23): wer den
+/// Einsatz abgeschlossen hat, dann eine Einsatzleitung, dann ein System-Admin der
+/// Organisation DES EINSATZES (aktive vor inaktiven, dann kleinste id — deterministisch,
+/// die Org kommt aus `einsatz.org_id`, nie aus der Zeilenreihenfolge der Organisationen).
+/// `None`, wenn keiner auffindbar ist; dann bricht [`system_audit_tx`] die Mutation ab.
+/// Läuft auf der übergebenen tx-Verbindung.
 async fn ermittle_system_akteur(
     conn: &mut sqlx::SqliteConnection,
     einsatz_id: i64,
@@ -507,12 +509,27 @@ async fn ermittle_system_akteur(
     .bind(EINSATZ_ROLLE_LEITUNG)
     .fetch_optional(&mut *conn)
     .await?;
-    Ok(leit)
+    if leit.is_some() {
+        return Ok(leit);
+    }
+    let admin: Option<i64> = sqlx::query_scalar(
+        "SELECT b.id FROM benutzer b JOIN einsatz e ON e.org_id = b.org_id \
+         WHERE e.id = ? AND b.system_rolle = ? ORDER BY b.aktiv DESC, b.id LIMIT 1",
+    )
+    .bind(einsatz_id)
+    .bind(crate::auth::ROLLE_ADMIN)
+    .fetch_optional(&mut *conn)
+    .await?;
+    Ok(admin)
 }
 
-/// Schreibt einen System-ETB-Audit auf der tx-Verbindung, sofern ein Akteur
-/// auffindbar ist (best effort — fehlt jeder Benutzer, wird nur geloggt). Der
-/// Startwert kommt aus den Einstellungen (Nummernkreis), `inhalt` ist der Audit-Text.
+/// Schreibt einen System-ETB-Audit auf der tx-Verbindung. Der Startwert kommt aus den
+/// Einstellungen (Nummernkreis), `inhalt` ist der Audit-Text.
+///
+/// **Fail-closed (LFH-23):** Ist kein Akteur auffindbar, liefert die Funktion einen Fehler.
+/// Der Aufrufer rollt damit seine Transaktion zurück — Vormerkung bzw. Schwärzung
+/// unterbleiben und werden im nächsten Purge-Lauf erneut versucht. Eine
+/// Aufbewahrungs-Mutation ohne ETB-Eintrag gibt es nicht.
 async fn system_audit_tx(
     conn: &mut sqlx::SqliteConnection,
     einsatz_id: i64,
@@ -520,11 +537,11 @@ async fn system_audit_tx(
     inhalt: &str,
 ) -> Result<(), AppError> {
     let Some(akteur) = ermittle_system_akteur(conn, einsatz_id).await? else {
-        tracing::warn!(
-            einsatz_id,
-            "Purge: kein Benutzer als ETB-Akteur auffindbar — System-Audit übersprungen"
-        );
-        return Ok(());
+        return Err(AppError::Internal(format!(
+            "Purge: kein Benutzer als ETB-Akteur für Einsatz {einsatz_id} auffindbar \
+             (weder abschließende Person noch Einsatzleitung noch System-Admin der Org) — \
+             Mutation abgebrochen, nächster Lauf versucht es erneut"
+        )));
     };
     crate::etb::repo::anlegen_tx(
         conn,
@@ -2519,5 +2536,96 @@ mod tests {
         assert_eq!(fuer_admin.len(), 1);
         assert_eq!(fuer_admin[0].id, einsatz.id);
         assert_eq!(fuer_admin[0].meine_rolle, None);
+    }
+
+    // ---------- LFH-23: Akteurskette des System-Audits ----------
+
+    /// Abgeschlossener Einsatz ohne `abgeschlossen_von` und ohne Mitgliedschaft in Org `org`.
+    async fn einsatz_ohne_akteur(pool: &SqlitePool, org: i64) -> i64 {
+        sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung, status, abgeschlossen_at) \
+             VALUES (?, 'Ohne Akteur', 'abgeschlossen', '2026-01-01 00:00:00') RETURNING id",
+        )
+        .bind(org)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    /// Legt einen Benutzer in Org `org` an; `admin` setzt `system_rolle = admin`.
+    async fn benutzer_in_org(
+        pool: &SqlitePool,
+        org: i64,
+        name: &str,
+        admin: bool,
+        aktiv: bool,
+    ) -> i64 {
+        sqlx::query_scalar(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash, system_rolle, aktiv) \
+             VALUES (?, ?, ?, 'h', ?, ?) RETURNING id",
+        )
+        .bind(org)
+        .bind(name)
+        .bind(name)
+        .bind(if admin { "admin" } else { "keiner" })
+        .bind(aktiv)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    #[tokio::test]
+    async fn system_akteur_faellt_auf_admin_der_eigenen_org_zurueck() {
+        let pool = crate::db::test_pool().await;
+        sqlx::query(
+            "INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Orga'), (2, 'Fremd')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        // Ein Admin der FREMDEN Org mit kleinerer id darf nie gewählt werden.
+        let _fremd = benutzer_in_org(&pool, 2, "fremdadmin", true, true).await;
+        let _kein_admin = benutzer_in_org(&pool, 1, "helfer", false, true).await;
+        let e = einsatz_ohne_akteur(&pool, 1).await;
+
+        let mut conn = pool.acquire().await.unwrap();
+        assert_eq!(
+            ermittle_system_akteur(&mut conn, e).await.unwrap(),
+            None,
+            "ohne Admin der eigenen Org gibt es keinen Akteur"
+        );
+        drop(conn);
+
+        let inaktiv = benutzer_in_org(&pool, 1, "altadmin", true, false).await;
+        let mut conn = pool.acquire().await.unwrap();
+        assert_eq!(
+            ermittle_system_akteur(&mut conn, e).await.unwrap(),
+            Some(inaktiv),
+            "ein inaktiver Admin ist besser als kein Audit"
+        );
+        drop(conn);
+
+        let aktiv = benutzer_in_org(&pool, 1, "neuadmin", true, true).await;
+        let mut conn = pool.acquire().await.unwrap();
+        assert_eq!(
+            ermittle_system_akteur(&mut conn, e).await.unwrap(),
+            Some(aktiv),
+            "aktive Admins vor inaktiven, auch bei größerer id"
+        );
+    }
+
+    #[tokio::test]
+    async fn system_akteur_bevorzugt_abschliessende_person_und_leitung_vor_admin() {
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let _admin = benutzer_in_org(&pool, 1, "orgadmin", true, true).await;
+        let einsatz = test_anlegen(&pool, "Lage", None, leit).await.unwrap();
+
+        // Aktiv, ohne abgeschlossen_von: die Einsatzleitung gewinnt vor dem Admin.
+        let mut conn = pool.acquire().await.unwrap();
+        assert_eq!(
+            ermittle_system_akteur(&mut conn, einsatz.id).await.unwrap(),
+            Some(leit)
+        );
     }
 }
