@@ -193,8 +193,14 @@ test('Betroffene: eigene Cluster-Quelle, Kräfte bleiben einzeln, ohne Modulzugr
   expect((await features(page, 'marker-personen')).some((p) => p.cluster)).toBe(true);
   // Die Einheit steht mitten in der Traube und bleibt trotzdem ein Einzel-Feature ihrer
   // eigenen Quelle — kein Personen-Cluster hat sie geschluckt.
+  // Die Kräfte-Quelle füllt sich unabhängig von `marker-personen`; ohne eigenes Warten war sie
+  // unter Last beim Lesen noch leer (`[]`, in der CI von PR #158 gemessen, LFH-741).
+  await expect
+    .poll(async () => (await features(page, 'marker-cluster')).map((p) => p.schluessel), {
+      timeout: 30_000,
+    })
+    .toContain(`einheit-${einheitId}`);
   const kraefte = await features(page, 'marker-cluster');
-  expect(kraefte.map((p) => p.schluessel)).toContain(`einheit-${einheitId}`);
   expect(kraefte.some((p) => p.cluster)).toBe(false);
   expect(personenIn(kraefte)).toBe(0);
   // Legende steht bei eingeschalteter Ebene.
