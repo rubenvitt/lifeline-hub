@@ -72,6 +72,31 @@ export const standLeisteStil: CSSProperties = {
   overflowX: 'auto',
 };
 
+/**
+ * Das Bezeichnungsfeld neben „Stand sichern" (LFH-373). Vorher fest 180 px breit: seit der
+ * Fuß vor der Knopfspalte endet, ist das Band bei 390 px im Handschuh-Betrieb schmaler als
+ * Feld plus Knopf — das nicht umbrechbare `Space.Compact` ragte gemessen über den Bandrand
+ * und fing die Klicks auf die Kartenknöpfe ab. Jetzt bevorzugt 180 px, schrumpfbar.
+ */
+export const sichernFeldStil: CSSProperties = { flex: '0 1 180px', minWidth: 0 };
+
+/**
+ * Der Zeitleisten-Block (Aktuell · Abspielen · Schieber · Stand). Er darf umbrechen: ohne
+ * Umbruch lag seine Mindestbreite (Knöpfe, Schieber ≥ 120, Stand ≥ 96) über der Bandbreite,
+ * und nur das Schrumpfen des Abspielknopfs hielt ihn im Band (LFH-373).
+ */
+export const zeitleisteStil: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  flexWrap: 'wrap',
+  gap: 8,
+  flex: '1 1 260px',
+  minWidth: 0,
+};
+
+/** Der Abspielknopf schrumpft nicht: als Flex-Kind fiel er gemessen auf 16 px Breite (LFH-373). */
+export const abspielenStil: CSSProperties = { flexShrink: 0 };
+
 interface SnapshotLeisteProps {
   einsatzId: number;
   /** „Stand sichern" nur im Live-Modus mit Schreibrecht. */
@@ -244,18 +269,24 @@ export function SnapshotLeiste({
       }}
     >
       {darfSichern && (
-        <Space.Compact>
+        <Space.Compact style={{ minWidth: 0 }}>
           <Input
             placeholder="Bezeichnung (optional)"
             value={bezeichnung}
             onChange={(e) => setBezeichnung(e.target.value)}
             onPressEnter={aufSichern}
-            style={{ width: 180 }}
+            style={sichernFeldStil}
             aria-label="Snapshot-Bezeichnung"
           />
           <Button
             type="primary"
-            icon={<CameraOutlined />}
+            // Hülle `aria-hidden`: das Symbol brachte sonst sein englisches Label „camera" in den
+            // zugänglichen Namen („camera Stand sichern", CLAUDE.md „Ein Emoji ist keine Ikone").
+            icon={
+              <span aria-hidden="true" style={{ display: 'inline-flex' }}>
+                <CameraOutlined />
+              </span>
+            }
             loading={sichertGerade}
             onClick={aufSichern}
           >
@@ -265,7 +296,7 @@ export function SnapshotLeiste({
       )}
 
       {chrono.length > 0 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 260 }}>
+        <div style={zeitleisteStil}>
           <Button type={aktiverSnapshotId == null ? 'primary' : 'default'} onClick={zurueckAktuell}>
             Aktuell
           </Button>
@@ -275,6 +306,7 @@ export function SnapshotLeiste({
               onClick={aufPlayPause}
               disabled={chrono.length < 2}
               aria-label={spielt ? 'Pause' : 'Abspielen'}
+              style={abspielenStil}
             />
           </Tooltip>
           <Slider

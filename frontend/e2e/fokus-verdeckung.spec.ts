@@ -866,3 +866,115 @@ test('Gefahrenmatrix (LFH-373): keine Zelle verschwindet beim Tabben unter der f
   }
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
+
+/** Kandidaten der Kartenaufbauten für den Kern (`position: absolute`, Opt-in LFH-373). */
+const KARTEN_AUFBAUTEN = [
+  '[data-lfh="karten-fuss"] > *',
+  '[data-lfh="karten-knoepfe"]',
+  '[data-lfh="karten-ueberlagerung-links"]',
+];
+
+const KARTENKNOEPFE = [
+  'Hineinzoomen',
+  'Herauszoomen',
+  'Nach Norden ausrichten',
+  'Messen',
+  'Zeichenwerkzeuge',
+];
+
+/**
+ * Knopfblock gegen jedes Fußband, als Rechteckschnitt. Liefert die Überschneidungen als Text;
+ * leer heißt: keine.
+ */
+async function knopfblockUeberFuss(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const block = document.querySelector('[data-lfh="karten-knoepfe"]');
+    if (!block) return ['kein Knopfblock im Baum'];
+    const b = block.getBoundingClientRect();
+    return Array.from(document.querySelectorAll('[data-lfh="karten-fuss"] > *'))
+      .map((band) => {
+        const r = band.getBoundingClientRect();
+        const x = Math.min(b.right, r.right) - Math.max(b.left, r.left);
+        const y = Math.min(b.bottom, r.bottom) - Math.max(b.top, r.top);
+        return x > 0.5 && y > 0.5
+          ? `${band.getAttribute('data-lfh') ?? band.className}: ${Math.round(x)}×${Math.round(y)}px`
+          : null;
+      })
+      .filter((t): t is string => t != null);
+  });
+}
+
+/**
+ * Lagekarte (LFH-373, Prüfliste Lagekarte Zeile 13): Knopfblock oben rechts, Überlagerung
+ * links, Fußbänder unten — alle `position: absolute` über der Karte.
+ *
+ * GEMESSEN VOR DEM FIX (24.09.2026): bei 390 px in `handschuh` lagen „Herauszoomen", „Nach
+ * Norden ausrichten" und „Messen" VOLLSTÄNDIG unter dem ausgeklappten Zeitachsenband, bei
+ * 1024 px „Zeichenwerkzeuge" zu 92 %. Beide `zIndex: 5`, der Fuß kommt später im DOM und liegt
+ * oben — die Knöpfe waren damit auch per Zeiger nicht erreichbar, nicht nur per Tastatur.
+ *
+ * DREI BELEGE, weil jeder allein zu wenig sagt: der Kern (mit den Aufbauten als
+ * Zusatzkandidaten — ohne sie wäre dieser Lauf grün durch Konstruktion), der Rechteckschnitt
+ * Knopfblock ↔ Fußband (auch eine Teilüberdeckung, die der Kern bewusst nicht meldet), und
+ * die Trefferprobe je Knopf (`click({ trial: true })`: Playwrights Prüfung, ob der Klick
+ * wirklich beim Knopf ankommt — `toBeVisible()` belegt das nicht, LFH-355).
+ */
+test('Lagekarte (LFH-373): Kartenknöpfe liegen nie unter den Fußbändern', async ({ page }) => {
+  test.setTimeout(300_000);
+  await ohneDevtoolsKnopf(page);
+  await anmelden(page);
+  const antwort = await page.request.post('/api/einsaetze', {
+    data: { bezeichnung: `Fokus 373 Ost ${Date.now()}` },
+  });
+  expect(antwort.ok(), await antwort.text()).toBeTruthy();
+  const { id: einsatzId } = (await antwort.json()) as { id: number };
+  for (const bezeichnung of ['Stand A', 'Stand B']) {
+    const stand = await page.request.post(`/api/einsaetze/${einsatzId}/lage-snapshots`, {
+      data: { bezeichnung },
+    });
+    expect(stand.ok(), await stand.text()).toBeTruthy();
+  }
+
+  const gemessen: string[] = [];
+  for (const lage of [
+    { width: 390, height: 844, leiste: false },
+    { width: 390, height: 844, leiste: true },
+    { width: 1024, height: 768, leiste: false },
+  ]) {
+    const lauf = `${lage.width}×${lage.height}${lage.leiste ? ' mit Leiste' : ''}/handschuh`;
+    await page.setViewportSize({ width: lage.width, height: lage.height });
+    await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
+    await page.evaluate(() => localStorage.setItem('lfh:lagekarte:zeitachse-eingeklappt', '0'));
+    await stelleDichte(page, 'handschuh');
+    await expect(page.getByTestId('kartenflaeche').locator('canvas.maplibregl-canvas')).toHaveCount(
+      1,
+    );
+    if (lage.leiste) await page.getByRole('button', { name: 'Leiste einblenden' }).click();
+    // Vorbedingung: die Zeitachse steht ausgeklappt — sonst gäbe es das hohe Band nicht, und
+    // der Test wäre still wertlos statt rot.
+    await expect(page.getByRole('button', { name: 'Zeitachse ausblenden' })).toBeVisible();
+
+    const knoepfe = page.locator('[data-lfh="karten-knoepfe"]');
+    const ueberschnitt = await knopfblockUeberFuss(page);
+    expect(ueberschnitt, `${lauf}: Knopfblock überschneidet Fußband`).toEqual([]);
+
+    for (const name of KARTENKNOEPFE) {
+      await knoepfe
+        .getByRole('button', { name, exact: true })
+        .click({ trial: true, timeout: 5_000 });
+    }
+
+    await knoepfe.getByRole('button', { name: 'Hineinzoomen', exact: true }).focus();
+    const kern = await pruefeFokusVerdeckung(page, 14, 'Tab', {
+      zusatzKandidaten: KARTEN_AUFBAUTEN,
+      region: '[data-lfh="kartenspalte"]',
+    });
+    expect(
+      kern.stoppsInRegion,
+      `${lauf}: Vorbedingung — der Lauf muss durch die Kartenspalte gehen`,
+    ).toBeGreaterThanOrEqual(5);
+    expect(kern.verdeckt, `${lauf}:\n${kern.verdeckt.join('\n')}`).toEqual([]);
+    gemessen.push(`${lauf}: ${kern.stoppsInRegion} Stopps in der Kartenspalte, frei`);
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});

@@ -1,4 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
+import { theme } from 'antd';
+import { UEBERLAGERUNG_RAND, kartenKnopfKante } from './KartenUeberlagerung';
 
 /**
  * Abstand der Fußleiste zum Kartenrand und zwischen ihren Bändern (px). Er ist die
@@ -28,22 +30,36 @@ export function bandStil(ausrichtung: BandAusrichtung = 'voll'): CSSProperties {
   };
 }
 
-/** Stil des Fuß-Rahmens selbst. Exportiert, damit die Zusicherungen prüfbar sind. */
-export const fussStil: CSSProperties = {
-  position: 'absolute',
-  left: FUSS_ABSTAND,
-  right: FUSS_ABSTAND,
-  bottom: FUSS_ABSTAND,
-  zIndex: 5,
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'stretch',
-  gap: FUSS_ABSTAND,
-  // Der Rahmen spannt über die volle Kartenbreite, trägt aber selbst nichts. Ohne diese
-  // Zeile schluckte der Leerraum zwischen (und neben) den Bändern jedes Ziehen und Klicken
-  // auf der Karte darunter — die Bänder holen sich die Ereignisse über `bandStil` zurück.
-  pointerEvents: 'none',
-};
+/**
+ * Stil des Fuß-Rahmens selbst. Rein und exportiert, damit die Zusicherungen prüfbar sind.
+ *
+ * RECHTS ENDET DER FUSS VOR DER KNOPFSPALTE (LFH-373). Der Knopfblock oben rechts
+ * (`KartenUeberlagerung`, bis zu fünf Knöpfe) und der Fuß lagen beide auf `zIndex: 5` in
+ * derselben Kartenspalte; der Fuß kam später im DOM und lag oben. Gemessen bei 390 px im
+ * Handschuh-Betrieb: „Herauszoomen", „Nach Norden ausrichten" und „Messen" vollständig unter
+ * dem ausgeklappten Zeitachsenband, bei 1024 px „Zeichenwerkzeuge" zu 92 % — per Tastatur
+ * UND per Zeiger unerreichbar. Die Abhilfe folgt demselben Grundsatz wie die Stapelung
+ * (LFH-355): eine Aufteilung, kein `zIndex`. Die Spalte rechts gehört den Knöpfen, der Rest
+ * dem Fuß; zwei Flächen, die sich die Breite teilen, können sich bei keiner Höhe
+ * überschneiden. Der Preis ist ein um die Knopfspalte schmaleres Band (im Fükw 86 px).
+ */
+export function fussStil(knopfKante: number): CSSProperties {
+  return {
+    position: 'absolute',
+    left: FUSS_ABSTAND,
+    right: UEBERLAGERUNG_RAND + knopfKante + FUSS_ABSTAND,
+    bottom: FUSS_ABSTAND,
+    zIndex: 5,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    gap: FUSS_ABSTAND,
+    // Der Rahmen spannt bis vor die Knopfspalte, trägt aber selbst nichts. Ohne diese
+    // Zeile schluckte der Leerraum zwischen (und neben) den Bändern jedes Ziehen und Klicken
+    // auf der Karte darunter — die Bänder holen sich die Ereignisse über `bandStil` zurück.
+    pointerEvents: 'none',
+  };
+}
 
 /**
  * Gemeinsamer unterer Rand der Lagekarte (LFH-355).
@@ -71,8 +87,9 @@ export const fussStil: CSSProperties = {
  * die Leiste bleibt an ihrem gewohnten Platz am unteren Rand.
  */
 export function KartenFuss({ children }: { children?: ReactNode }) {
+  const { token } = theme.useToken();
   return (
-    <div data-lfh="karten-fuss" style={fussStil}>
+    <div data-lfh="karten-fuss" style={fussStil(kartenKnopfKante(token))}>
       {children}
     </div>
   );
