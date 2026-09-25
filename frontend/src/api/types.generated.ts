@@ -2811,6 +2811,26 @@ export interface components {
         Sachgebiet: "s1" | "s2" | "s3" | "s4" | "s5" | "s6";
         /** @enum {string} */
         SchadenAbschlussGrund: "behoben" | "kein_handlungsbedarf" | "abgewiesen";
+        /**
+         * @description Ein Anhang eines Schadens. `id` ist die **Linker-id** (`einsatz_schaden_anhang.id`),
+         *     nicht `anhang.id` — die Datei ist ohnehin nur über die Schadensroute ladbar, eine
+         *     `anhang_id` auf dem Wire wäre nur ein Anreiz, den gesperrten generischen Weg zu probieren.
+         */
+        SchadenAnhangAnzeige: {
+            abgelegt_at: string;
+            /** Format: int64 */
+            abgelegt_von_id: number;
+            /** @description Anzeigename der ablegenden Person; fehlt, wenn das Konto nicht mehr existiert. */
+            abgelegt_von_name?: string | null;
+            dateiname: string;
+            /** Format: int64 */
+            groesse: number;
+            /** Format: int64 */
+            id: number;
+            mime: string;
+            /** Format: int64 */
+            schaden_id: number;
+        };
         SchadenAnzeige: {
             abschluss_at?: string | null;
             abschluss_grund?: null | components["schemas"]["SchadenAbschlussGrund"];
