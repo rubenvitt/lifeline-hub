@@ -189,8 +189,13 @@ test('Betroffene: eigene Cluster-Quelle, Kräfte bleiben einzeln, ohne Modulzugr
     .poll(async () => personenIn(await features(page, 'marker-personen')), { timeout: 30_000 })
     .toBe(30);
   // … als Cluster, nicht als dreißig lose Punkte (Vorbedingung: sonst prüfte der Test kein
-  // Clustering, sondern nur die Zuordnung).
-  expect((await features(page, 'marker-personen')).some((p) => p.cluster)).toBe(true);
+  // Clustering, sondern nur die Zuordnung). Gewartet, nicht einmal gelesen: unmittelbar nach
+  // dem Sprung kann die Quelle die 30 Punkte schon tragen, aber noch ungeclustert (LFH-741).
+  await expect
+    .poll(async () => (await features(page, 'marker-personen')).some((p) => p.cluster), {
+      timeout: 30_000,
+    })
+    .toBe(true);
   // Die Einheit steht mitten in der Traube und bleibt trotzdem ein Einzel-Feature ihrer
   // eigenen Quelle — kein Personen-Cluster hat sie geschluckt.
   // Die Kräfte-Quelle füllt sich unabhängig von `marker-personen`; ohne eigenes Warten war sie
