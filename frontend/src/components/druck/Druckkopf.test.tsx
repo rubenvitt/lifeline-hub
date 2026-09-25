@@ -207,4 +207,19 @@ describe('Druckkopf', () => {
     fireEvent.error(kopf().querySelector('img')!);
     await waitFor(() => expect(kopf().querySelector('img')).toBeNull());
   });
+
+  it('setzt die Dokumentüberschrift auf Wunsch als h2 (ETB-Druckansicht unter dem Seitenkopf)', async () => {
+    mitOrganisation();
+    renderMitProviders(
+      <Druckkopf
+        dokumentart="Einsatztagebuch"
+        einsatz={{ bezeichnung: 'Übung' }}
+        sichtbarkeit="immer"
+        ebene={2}
+      />,
+    );
+    await screen.findByText('DRK Kreisverband Musterstadt');
+    expect(screen.getByRole('heading', { level: 2, name: 'Einsatztagebuch' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 1 })).toBeNull();
+  });
 });
