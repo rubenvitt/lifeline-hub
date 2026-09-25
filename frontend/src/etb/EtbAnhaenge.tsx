@@ -13,7 +13,7 @@ import { verweisStil } from './zeitachseModell';
  * `IMG_0001.jpg` sonst zwei gleichnamige Verweise lieferten (Regel wie beim Aktionsmenü,
  * LFH-364). Keine Ikone, kein Emoji, kein ↗: ↗ ist die Glyphe für Navigation, ein Download
  * navigiert nicht. Die Mindesthöhe kommt aus `verweisStil` (Boden `controlHeight` der
- * Dichtestufe), wie bei den übrigen Textverweisen der Zeitachse.
+ * Dichtestufe), wie bei den übrigen Textverweisen der Zeitachse; die Farbe aus `bedienText`.
  *
  * Der Verweis zeigt auf die ETB-Route (`etbAnhangPfad`), nie auf die generische — dort
  * antwortet der Server für ETB-Anhänge 404.
@@ -25,9 +25,11 @@ export default function EtbAnhaenge({
   einsatzId: number;
   eintrag: Pick<EtbEintragAnzeige, 'id' | 'lfd_nr' | 'anhaenge'>;
 }) {
-  const { token } = useRollen();
+  const { token, rollen } = useRollen();
   if (eintrag.anhaenge.length === 0) return null;
-  const stil = verweisStil(token);
+  // Blauer Bedien-TEXT nimmt `bedienText`, nicht antds `colorLink` (LFH-650): der Linkton
+  // hielt auf dem Zeitachsengrund gemessen nur 4,82 : 1 in der Nacht (Boden 5).
+  const stil = { ...verweisStil(token), color: rollen.bedienText };
   return (
     <span
       data-lfh="etb-anhaenge"

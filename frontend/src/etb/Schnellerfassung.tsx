@@ -630,8 +630,10 @@ export default function Schnellerfassung({
             data-lfh="etb-anhang-eingabe"
             onChange={(e) => dateienGewaehlt(e.target.files)}
           />
-          {/* Zweiter Kanal neben dem Grau (WCAG 1.4.1): der Grund steht als Satz daneben. */}
-          {!online && <Typography.Text type="secondary">{ANHANG_OFFLINE}</Typography.Text>}
+          {/* Zweiter Kanal neben dem Grau (WCAG 1.4.1): der Grund steht als Satz daneben. In
+              `text2`, nicht als `Typography` „secondary": dessen Ton hielt am Tag gemessen nur
+              5,58 : 1 auf dem Grund der Erfassung (Boden 7, e2e `etb-anhang-pruefliste`). */}
+          {!online && <span style={{ color: rollen.text2 }}>{ANHANG_OFFLINE}</span>}
           {!berichtigungZu && typ === 'lage' && (
             <Button type="link" onClick={() => navigate(`/einsaetze/${einsatz.id}/lageberichte`)}>
               Als strukturierten Lagebericht erfassen →
