@@ -226,6 +226,13 @@
   font-family: var(--lfh-schrift-zahl);
   font-variant-numeric: tabular-nums;
 }
+/* Freiraum unter der stehenden Kopfzeile (LFH-677, WCAG 2.4.11). Rückwärts getabbt rollt
+   der Browser das Fokusziel an den oberen Rand — ohne diesen Rand genau unter die Kopfzeile.
+   `scroll-margin` wirkt am Element, das in die Sicht gerollt wird, also am Ziel selbst:
+   deshalb `*`, nicht die Zeile. Die Höhe misst `KatalogTabelle` (`setzeKopfFreiraum`). */
+.ant-table-wrapper.lfh-katalog .ant-table-tbody * {
+  scroll-margin-top: var(--lfh-tabellenkopf-hoehe, 0px);
+}
 
 /* ── Zählzeile in einer Tabellenzelle (LFH-330 · B2) ───────────────────────
    ADDITIV. Der Werteblock `.lfh-felder` oben ist ein vierspaltiges Raster mit

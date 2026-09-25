@@ -5,9 +5,14 @@ import type { TableColumnsType, TableProps } from 'antd';
 import type { ReactElement } from 'react';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 import { renderMitProviders as renderMitBasisProviders } from '../test/utils';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import KatalogTabelle, {
   BLAETTER_SCHWELLE,
+  KOPF_FREIRAUM,
   fliessBreite,
+  setzeKopfFreiraum,
   type KatalogSpalte,
 } from './KatalogTabelle';
 
@@ -959,5 +964,52 @@ describe('fliessBreite', () => {
   it('kommt mit fehlender Spaltenliste zurecht', () => {
     // `columns` ist an antd optional, und `KatalogTabelle` reicht es ungeprüft weiter.
     expect(fliessBreite<X>(undefined)).toEqual({ x: 'max-content' });
+  });
+});
+
+/**
+ * Freiraum unter der stehenden Kopfzeile (LFH-677, WCAG 2.4.11). Die WIRKUNG ist nur im
+ * Browser messbar (`e2e/betreuung-pruefliste.spec.ts`, Rückwärtslauf) — jsdom rechnet kein
+ * Layout. Hier stehen die zwei Hälften, die ohne Layout prüfbar sind: die Höhe kommt aus der
+ * stehenden Kopfzeile, und die Regel, die sie liest, steht in der Gestaltungssprache.
+ */
+describe('KatalogTabelle — Freiraum unter der stehenden Kopfzeile', () => {
+  it('setzt die Variable auf die Höhe der stehenden Kopfzeile', () => {
+    const wurzel = document.createElement('div');
+    const kopf = document.createElement('div');
+    kopf.className = 'ant-table-header ant-table-sticky-holder';
+    Object.defineProperty(kopf, 'offsetHeight', { value: 39 });
+    wurzel.appendChild(kopf);
+    setzeKopfFreiraum(wurzel);
+    expect(wurzel.style.getPropertyValue(KOPF_FREIRAUM)).toBe('39px');
+  });
+
+  it('ohne stehende Kopfzeile ist der Freiraum 0, nicht ein alter Wert', () => {
+    const wurzel = document.createElement('div');
+    wurzel.style.setProperty(KOPF_FREIRAUM, '39px');
+    setzeKopfFreiraum(wurzel);
+    expect(wurzel.style.getPropertyValue(KOPF_FREIRAUM)).toBe('0px');
+  });
+
+  it('die gerenderte Tabelle trägt die Variable an ihrer Wurzel', () => {
+    const { container } = renderMitProviders(
+      <KatalogTabelle<Zeile> rowKey="id" columns={SPALTEN} dataSource={ZEILEN} />,
+    );
+    const wurzel = container.querySelector<HTMLElement>('.ant-table-wrapper.lfh-katalog');
+    expect(wurzel).not.toBeNull();
+    // jsdom misst 0 — belegt ist, dass der Effekt die Wurzel erreicht, nicht die Zahl.
+    expect(wurzel!.style.getPropertyValue(KOPF_FREIRAUM)).toBe('0px');
+  });
+
+  it('die Regel in der Gestaltungssprache liest die Variable an JEDEM Ziel im Tabellenkörper', () => {
+    // `scroll-margin` wirkt am Element, das in die Sicht gerollt wird — also am Fokusziel
+    // selbst, nicht an der Zeile. Deshalb `*` unter `.ant-table-tbody`.
+    const css = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), '..', 'theme', 'sprache.css'),
+      'utf8',
+    );
+    expect(css).toMatch(
+      /\.ant-table-wrapper\.lfh-katalog \.ant-table-tbody \*\s*\{[^}]*scroll-margin-top:\s*var\(--lfh-tabellenkopf-hoehe/,
+    );
   });
 });
