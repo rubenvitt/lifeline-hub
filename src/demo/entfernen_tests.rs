@@ -8,49 +8,16 @@
 use sqlx::SqlitePool;
 
 use super::entfernen::{entfernen_tx, ist_fk_verletzung};
+use super::test_hilfen::{
+    admin_anlegen, anzahl, einsatz_anlegen, fahrzeug_anlegen, kopf_anlegen, material_anlegen,
+    org_anlegen, personal_anlegen, zeilen,
+};
 use super::{DemoBericht, DemoBerichtZeile, DemoStammdatenArt, DemoVorgang};
 use crate::error::AppError;
 
 // ---------------------------------------------------------------------------------------------
 // Aufbau
 // ---------------------------------------------------------------------------------------------
-
-async fn org_anlegen(pool: &SqlitePool, id: i64) {
-    sqlx::query("INSERT INTO organisation (id, name) VALUES (?, ?)")
-        .bind(id)
-        .bind(format!("Org {id}"))
-        .execute(pool)
-        .await
-        .unwrap();
-}
-
-/// Ein System-Admin der Organisation; liefert die Benutzer-ID.
-async fn admin_anlegen(pool: &SqlitePool, org_id: i64) -> i64 {
-    sqlx::query_scalar(
-        "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash, system_rolle) \
-         VALUES (?, ?, ?, 'x', 'admin') RETURNING id",
-    )
-    .bind(org_id)
-    .bind(format!("Admin {org_id}"))
-    .bind(format!("admin-{org_id}"))
-    .fetch_one(pool)
-    .await
-    .unwrap()
-}
-
-/// Ein Einsatz über den Betriebsweg (`anlegen_tx`, mit ID-Sperre und Mitgliedschaft).
-async fn einsatz_anlegen(pool: &SqlitePool, ersteller_id: i64, bezeichnung: &str) -> i64 {
-    let daten = crate::einsatz::repo::NeuerEinsatzDaten {
-        bezeichnung,
-        stichwort: None,
-        einsatzart: None,
-        begonnen_at: None,
-    };
-    crate::write_retry!(pool, |conn| {
-        crate::einsatz::repo::anlegen_tx(conn, &daten, ersteller_id, chrono::Utc::now()).await
-    })
-    .unwrap()
-}
 
 async fn etb_anlegen(pool: &SqlitePool, einsatz_id: i64, erfasser: i64, lfd: i64) {
     sqlx::query(
@@ -79,39 +46,6 @@ async fn person_anlegen(pool: &SqlitePool, einsatz_id: i64, erfasser: i64, nr: i
     .execute(pool)
     .await
     .unwrap();
-}
-
-async fn fahrzeug_anlegen(pool: &SqlitePool, org_id: i64, funkrufname: &str) -> i64 {
-    sqlx::query_scalar("INSERT INTO fahrzeug (org_id, funkrufname) VALUES (?, ?) RETURNING id")
-        .bind(org_id)
-        .bind(funkrufname)
-        .fetch_one(pool)
-        .await
-        .unwrap()
-}
-
-async fn personal_anlegen(pool: &SqlitePool, org_id: i64, personalnummer: &str) -> i64 {
-    sqlx::query_scalar(
-        "INSERT INTO personal (org_id, name, personalnummer) VALUES (?, ?, ?) RETURNING id",
-    )
-    .bind(org_id)
-    .bind(format!("Name {personalnummer}"))
-    .bind(personalnummer)
-    .fetch_one(pool)
-    .await
-    .unwrap()
-}
-
-async fn material_anlegen(pool: &SqlitePool, org_id: i64, bestandsnummer: &str) -> i64 {
-    sqlx::query_scalar(
-        "INSERT INTO material (org_id, bezeichnung, bestandsnummer) VALUES (?, ?, ?) RETURNING id",
-    )
-    .bind(org_id)
-    .bind(format!("Material {bestandsnummer}"))
-    .bind(bestandsnummer)
-    .fetch_one(pool)
-    .await
-    .unwrap()
 }
 
 /// Legt eine Qualifikation der Organisation an und gibt sie der Person.
@@ -166,17 +100,6 @@ async fn material_disponieren(pool: &SqlitePool, einsatz_id: i64, material_id: i
     .execute(pool)
     .await
     .unwrap();
-}
-
-async fn kopf_anlegen(pool: &SqlitePool, org_id: i64, einsatz_id: i64) -> i64 {
-    sqlx::query_scalar(
-        "INSERT INTO demo_import (org_id, einsatz_id, bericht) VALUES (?, ?, '{}') RETURNING id",
-    )
-    .bind(org_id)
-    .bind(einsatz_id)
-    .fetch_one(pool)
-    .await
-    .unwrap()
 }
 
 async fn markieren(pool: &SqlitePool, import_id: i64, tabelle: &str, datensatz_id: i64) {
@@ -237,33 +160,6 @@ async fn entfernen(pool: &SqlitePool, org_id: i64) -> Result<DemoBericht, AppErr
 // Auslesen
 // ---------------------------------------------------------------------------------------------
 
-/// Alle Zeilen einer Tabelle unter einer Bedingung mit genau einem Parameter, jede Zeile als
-/// Text aus `quote()` aller Spalten, in `rowid`-Reihenfolge. Der Vergleich ist damit
-/// zeilengleich statt bloß gleich viele: eine geänderte Spalte fällt auf, nicht nur eine
-/// fehlende Zeile.
-///
-/// `tabelle` und `bedingung` sind feste Literale aus diesem Testmodul, nie Eingabe.
-async fn zeilen(pool: &SqlitePool, tabelle: &str, bedingung: &str, wert: i64) -> Vec<String> {
-    let spalten: Vec<String> =
-        sqlx::query_scalar("SELECT name FROM pragma_table_info(?) ORDER BY cid")
-            .bind(tabelle)
-            .fetch_all(pool)
-            .await
-            .unwrap();
-    assert!(!spalten.is_empty(), "Tabelle {tabelle} hat keine Spalten");
-    let ausdruck = spalten
-        .iter()
-        .map(|s| format!("quote(\"{s}\")"))
-        .collect::<Vec<_>>()
-        .join(" || '|' || ");
-    let sql = format!("SELECT {ausdruck} FROM \"{tabelle}\" WHERE {bedingung} ORDER BY rowid");
-    sqlx::query_scalar(sqlx::AssertSqlSafe(sql))
-        .bind(wert)
-        .fetch_all(pool)
-        .await
-        .unwrap()
-}
-
 /// Zeilenbild eines Einsatzes samt allem, was an ihm hängt, und der genannten Stammdaten.
 async fn bild_einsatz(pool: &SqlitePool, einsatz_id: i64) -> Vec<(String, Vec<String>)> {
     let mut bild = vec![(
@@ -310,14 +206,6 @@ async fn bild_stammdaten(
             zeilen(pool, "material", "id = ?", material).await,
         ),
     ]
-}
-
-async fn anzahl(pool: &SqlitePool, sql: &'static str, wert: i64) -> i64 {
-    sqlx::query_scalar(sql)
-        .bind(wert)
-        .fetch_one(pool)
-        .await
-        .unwrap()
 }
 
 fn zeile(bericht: &DemoBericht, art: DemoStammdatenArt) -> DemoBerichtZeile {

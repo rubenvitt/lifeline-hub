@@ -517,3 +517,19 @@ nicht, Quelle ist immer eine `erinnerung`-Zeile:
   `GET …/meldungen/rueckmeldungen` berechnet (`routes/meldung.rs:547`,
   `effektive_rueckmeldung_frist_min`) und steht nur als Zustand im Meldebild. Die in D10
   vorgesehene „knapp nicht abgelaufene“ Frist ist dafür nicht nötig.
+
+**Ergebnis (d), Katalogbedarf aus `src/auth/bootstrap.rs`, gemessen in Block 4 (Task 4.1):**
+- Die Stammdaten-Anlage braucht als einzigen Katalog die **Qualifikation**.
+- `fahrzeug.fahrzeugtyp` und `material.kategorie` sind Freitext mit Combobox-Vorschlägen per
+  DISTINCT (`migrations/0007_fahrzeug.sql:8`, `migrations/0018_material.sql:7`). Einen Katalog
+  gibt es dafür nicht. „Materialkategorie über das Label“ (D8) hat also nichts nachzuschlagen,
+  und eine 422 kann hier nicht entstehen.
+- Fahrzeug- und Personalstatus hängen an der Disposition, der Einheitstyp an der Einheit. Alle
+  drei schlägt der Einsatz-Teil nach (`src/demo/katalog.rs`, Bedarf in `src/demo/szenario.rs`).
+  `KATALOG_BEDARF_EINSATZ` ist ein Vorschlag nach D9: FMS 2/3/4/6, Zug/Gruppe/Staffel/Trupp,
+  Personalstatus `gebunden`. Block 4.2 passt ihn an sein Drehbuch an.
+- Eine Org, die `bootstrap_admin` frisch angelegt hat, deckt den ganzen Bedarf ab. Das belegt
+  `demo::stammdaten_tests::frisch_gebootstrappte_org_hat_den_ganzen_katalogbedarf`.
+- Den Wert `aktiv` prüfen die Fach-Repos nicht selbst, der Demo-Lookup tut es:
+  `personal::repo::setze_qualifikationen` verwirft eine fremde ID still, und
+  `einheit::typ_repo::ist_in_org` lässt deaktivierte Typen zu.
