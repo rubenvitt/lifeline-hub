@@ -1333,6 +1333,96 @@ async fn rundlauf_import_entfernen_import() {
     assert!(etb(&pool, erster.einsatz_id).await.is_empty());
 }
 
+// ---------------------------------------------------------------------------------------------
+// Alarmbudget (Task 4.4, D10)
+// ---------------------------------------------------------------------------------------------
+
+/// Task 4.4 (D10, Spec „Zeitachse relativ zum Importzeitpunkt“/Scenario „Kein Alarm nach dem
+/// Import“): Der erste Takt des Erinnerungs-Schedulers nach dem Import darf nichts auslösen —
+/// weder eine Erinnerung, noch eine Meldungs-Eskalation, noch einen Ablösungsalarm — und ein
+/// Live-Abonnent des Demo-Einsatzes bekommt kein Ereignis der drei Alarm-Tags (`erinnerung`,
+/// `sofortmeldung`, `abloesung`). Belegt als Repo-Test in `src/demo/` statt als
+/// Integrationstest: `erinnerung::scheduler::tick_einmal` und `live::LiveHub` sind crate-interne
+/// Bausteine ohne HTTP-Route (die kommt erst in Block 5), und die vorhandenen
+/// Scheduler-Repo-Tests (`erinnerung/scheduler.rs`) rufen sie genauso direkt — ein
+/// Integrationstest müsste denselben Weg über `lifeline_hub::` nachbauen, ohne einen echten
+/// Endpunkt zusätzlich zu prüfen.
+///
+/// `jetzt` ist nahe an der echten Uhr (wie `tests/demo_daten.rs::demo_importieren`), nicht das
+/// feste Test-`JETZT` dieser Datei: Der Test bildet damit genau das Risiko nach, gegen das D10
+/// gebaut ist — Import und erster Scheduler-Takt kurz hintereinander im echten Betrieb.
+///
+/// Der zweite Takt (`jetzt + 25 min`) zeigt, dass der Test den Scheduler wirklich treffen kann:
+/// Von den drei Erinnerungen (`lagebesprechung` T−120 erledigt, `abloesung` T−45 erledigt,
+/// `naechste_lagebesprechung` T+20 offen, siehe `block-4.3-report.md`) wird danach genau die
+/// eine künftige fällig und ausgelöst.
+///
+/// Mutationsprobe (nicht committet): eine der beiden vergangenen Erinnerungen nach dem Import
+/// per `UPDATE erinnerung SET status = 'offen' WHERE titel = 'Lagebesprechung vorbereiten'`
+/// wieder auf offen gesetzt → `ausgeloest` beim ersten Takt wird 1 statt 0, der Test schlägt rot
+/// fehl.
+#[tokio::test]
+async fn scheduler_takt_nach_import_loest_nichts_aus() {
+    let pool = crate::db::test_pool().await;
+    let o = org_mit_admin(&pool, 1).await;
+    let jetzt_uhr = chrono::Utc::now().naive_utc();
+    let erg = importieren(&pool, &o, jetzt_uhr).await.expect("Import");
+
+    let live = crate::live::LiveHub::new();
+    let mut rx = live.abonniere(erg.einsatz_id);
+
+    // Erster Takt, praktisch im selben Moment wie der Import: null Auslösungen.
+    let ausgeloest =
+        crate::erinnerung::scheduler::tick_einmal(&pool, &live, jetzt_uhr.and_utc()).await;
+    assert_eq!(ausgeloest, 0, "kein Alarm auf Vorrat (D10)");
+
+    // Null Eskalationen: keine Meldung des Demo-Einsatzes trägt eskaliert = 1.
+    let eskalierte: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM meldung WHERE einsatz_id = ? AND eskaliert = 1")
+            .bind(erg.einsatz_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(eskalierte, 0, "keine Eskalation");
+
+    // Null Ablösungsalarme: keine Erinnerung mit Ablösungs-Bezug (das Drehbuch legt ohnehin
+    // keine Ablösungsschicht an — der Test prüft es trotzdem eigens, statt sich nur auf
+    // `ausgeloest == 0` zu verlassen).
+    let abloesungsfristen: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM erinnerung WHERE einsatz_id = ? AND bezug_typ IN (?, ?)",
+    )
+    .bind(erg.einsatz_id)
+    .bind(crate::kommunikation::OBJEKT_ABLOESUNG)
+    .bind(crate::kommunikation::OBJEKT_ABLOESUNG_VORWARNUNG)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(abloesungsfristen, 0, "keine Ablösungsfrist im Szenario");
+
+    // Kein empfangenes Live-Ereignis, gleich welchen Tags.
+    let mut empfangen = Vec::new();
+    while let Ok(n) = rx.try_recv() {
+        empfangen.push(n.event.as_str().to_string());
+    }
+    assert!(
+        empfangen.is_empty(),
+        "unerwartete Live-Ereignisse: {empfangen:?}"
+    );
+
+    // Zweiter Takt: der Test kann den Scheduler wirklich treffen — genau die eine künftige
+    // Erinnerung (T+20) löst jetzt aus.
+    let spaeter = jetzt_uhr + chrono::Duration::minutes(25);
+    let ausgeloest =
+        crate::erinnerung::scheduler::tick_einmal(&pool, &live, spaeter.and_utc()).await;
+    assert_eq!(ausgeloest, 1, "die eine künftige Erinnerung (T+20)");
+    let n = rx.recv().await.unwrap();
+    assert_eq!(n.event.as_str(), "erinnerung");
+    assert!(
+        rx.try_recv().is_err(),
+        "kein zweites Ereignis auf demselben Takt"
+    );
+}
+
 /// Die fachlichen ETB-Typen des Rumpfs kommen beide vor (Pflicht-Typen der Spec).
 #[test]
 fn drehbuch_traegt_lage_und_entscheidung() {
