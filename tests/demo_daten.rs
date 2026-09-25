@@ -800,3 +800,164 @@ async fn echter_einsatz_nach_dem_entfernen_hat_eine_groessere_id() {
         "echt {echt} muss über dem Demo-Einsatz {demo_id} liegen"
     );
 }
+
+// ---------------------------------------------------------------------------------------------
+// „DB wie vorher“ (Task 5.2, design.md D12)
+// ---------------------------------------------------------------------------------------------
+
+/// Tabellen, die der Vergleich bewusst auslässt, als Präfix (`sqlite_*`, `etb_eintrag_fts*`)
+/// oder als Name. Begründung je Eintrag in D12 und Spec „Demo-Daten entfernen“:
+/// SQLite-Verwaltung (auch `sqlite_sequence`), Migrationsbuch, die Schattentabellen der
+/// Volltextsuche, Sitzungen und Anmeldeprotokoll, Benutzereinstellungen und der Kopf als
+/// Historie. Das Präfix wird in Rust geprüft, nicht per `LIKE`: dort wäre `_` ein Platzhalter.
+const AUSNAHME_PRAEFIXE: &[&str] = &["sqlite_", "etb_eintrag_fts"];
+const AUSNAHMEN: &[&str] = &[
+    "_sqlx_migrations",
+    "session",
+    "auth_audit",
+    "benutzer_einstellungen",
+    "demo_import",
+];
+
+/// Das Bild aller Nutzdatentabellen: die Tabellenliste aus dem Schema **entdeckt**, nicht
+/// aufgezählt (D12), damit eine künftige Tabelle ohne Nachtrag mitgeprüft wird.
+async fn db_bild(pool: &sqlx::SqlitePool) -> Vec<(String, Vec<String>)> {
+    let tabellen: Vec<String> =
+        sqlx::query_scalar("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
+            .fetch_all(pool)
+            .await
+            .unwrap();
+    let mut bild = Vec::new();
+    for t in tabellen {
+        if AUSNAHME_PRAEFIXE.iter().any(|p| t.starts_with(p)) || AUSNAHMEN.contains(&t.as_str()) {
+            continue;
+        }
+        let zeilen = tabellen_zeilen(pool, &t).await;
+        bild.push((t, zeilen));
+    }
+    bild
+}
+
+/// Ein echter Nachbar-Einsatz mit ETB, Person und disponierten echten Stammdaten, per HTTP.
+/// Dazu je Art eine freie Stammdatenzeile mit der Kennung eines Demo-Datensatzes: der Import
+/// benutzt sie mit („mitbenutzt“), ohne sie zu markieren — die wahrscheinlichste Stelle, an der
+/// ein Import Spuren hinterließe (Disposition, FMS-Status an der Stammdatenzeile).
+async fn nachbar_mit_stammdaten(app: &axum::Router, admin: &str) {
+    let e = common::einsatz_anlegen(app, admin).await;
+    let post = |pfad: String, body: String| async move {
+        let (status, v) = common::anfrage(app, "POST", &pfad, admin, Some(&body)).await;
+        assert!(status.is_success(), "POST {pfad}: {status} {v}");
+        v
+    };
+    let fz = post(
+        "/api/fahrzeuge".into(),
+        r#"{"funkrufname":"Nachbar 44-1","kennzeichen":"XX-NB 1"}"#.into(),
+    )
+    .await;
+    post(
+        format!("/api/einsaetze/{e}/fahrzeuge"),
+        format!(r#"{{"fahrzeug_id":{}}}"#, fz["id"]),
+    )
+    .await;
+    let pers = post(
+        "/api/personal".into(),
+        r#"{"name":"Nachbar Person"}"#.into(),
+    )
+    .await;
+    post(
+        format!("/api/einsaetze/{e}/personal"),
+        format!(r#"{{"personal_id":{}}}"#, pers["id"]),
+    )
+    .await;
+    let mat = post(
+        "/api/material".into(),
+        r#"{"bezeichnung":"Nachbar-Decke","kategorie":"Betreuung"}"#.into(),
+    )
+    .await;
+    post(
+        format!("/api/einsaetze/{e}/material"),
+        format!(r#"{{"material_id":{},"menge":5}}"#, mat["id"]),
+    )
+    .await;
+    post(
+        format!("/api/einsaetze/{e}/etb"),
+        r#"{"typ":"meldung","inhalt":"Lage im Nachbar-Einsatz"}"#.into(),
+    )
+    .await;
+    post(
+        format!("/api/einsaetze/{e}/personen"),
+        r#"{"name":"Muster","vorname":"Max"}"#.into(),
+    )
+    .await;
+
+    // Freie Zeilen mit Demo-Kennung: mitbenutzt statt angelegt.
+    post(
+        "/api/fahrzeuge".into(),
+        r#"{"funkrufname":"Musterstadt 11-1","kennzeichen":"XX-MS 11"}"#.into(),
+    )
+    .await;
+    post(
+        "/api/personal".into(),
+        r#"{"name":"Vorhandene Person","personalnummer":"DEMO-P-001"}"#.into(),
+    )
+    .await;
+    post(
+        "/api/material".into(),
+        r#"{"bezeichnung":"Vorhandenes Material","kategorie":"Betreuung","bestandsnummer":"DEMO-M-001"}"#
+            .into(),
+    )
+    .await;
+}
+
+/// Spec „Demo-Daten entfernen“, Scenario „Stand vor dem Import“ (D12): nach Import und
+/// Entfernen tragen alle Nutzdatentabellen dieselben Zeilen wie vorher. Der Stand „vorher“
+/// entsteht nach Anmeldung und Aufbau; zwischen den Bildern laufen nur die zwei Demo-Aufrufe.
+///
+/// Mutationsprobe (nicht committet, Report Block 5): `LOESCHWEGE` in `src/demo/entfernen.rs`
+/// ohne den Material-Schritt → der Test wird rot und nennt `demo_herkunft` und `material`.
+#[tokio::test]
+async fn import_entfernen_stellt_den_stand_wieder_her() {
+    let (app, pool) = common::setup_mit_optionen(AN).await;
+    let admin = common::login_cookie(&app, "admin", "startpw12").await;
+    nachbar_mit_stammdaten(&app, &admin).await;
+
+    let vorher = db_bild(&pool).await;
+    assert!(
+        vorher.iter().any(|(t, _)| t == "einsatz") && vorher.len() > 50,
+        "Tabellen entdeckt: {}",
+        vorher.len()
+    );
+
+    let (status, importiert) = demo(&app, &admin, "POST", "/api/demo-daten").await;
+    assert_eq!(status, StatusCode::CREATED, "{importiert}");
+    for zeile in importiert["bericht"]["je_art"].as_array().unwrap() {
+        assert_eq!(
+            zeile["mitbenutzt"], 1,
+            "je Art genau die eine freie Zeile: {zeile}"
+        );
+    }
+    let (status, entfernt) = demo(&app, &admin, "DELETE", "/api/demo-daten").await;
+    assert_eq!(status, StatusCode::OK, "{entfernt}");
+    for zeile in entfernt["bericht"]["je_art"].as_array().unwrap() {
+        assert_eq!(zeile["behalten"], 0, "{zeile}");
+    }
+
+    let nachher = db_bild(&pool).await;
+    let namen = |b: &[(String, Vec<String>)]| b.iter().map(|(t, _)| t.clone()).collect::<Vec<_>>();
+    assert_eq!(namen(&nachher), namen(&vorher), "dieselben Tabellen");
+    let abweichend: Vec<String> = vorher
+        .iter()
+        .zip(&nachher)
+        .filter(|((_, v), (_, n))| v != n)
+        .map(|((t, v), (_, n))| {
+            let nur_vorher: Vec<&String> = v.iter().filter(|z| !n.contains(z)).take(3).collect();
+            let nur_nachher: Vec<&String> = n.iter().filter(|z| !v.contains(z)).take(3).collect();
+            format!("{t}: vorher {} / nachher {} Zeilen; nur vorher {nur_vorher:?}; nur nachher {nur_nachher:?}", v.len(), n.len())
+        })
+        .collect();
+    assert!(
+        abweichend.is_empty(),
+        "abweichende Tabellen:\n{}",
+        abweichend.join("\n")
+    );
+}
