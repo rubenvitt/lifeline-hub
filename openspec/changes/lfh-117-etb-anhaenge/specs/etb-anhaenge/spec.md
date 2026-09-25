@@ -136,7 +136,8 @@ generischen Löschweg entfernbar sein. Der Aufräumlauf für verwaiste Dateien S
 gebundenen Anhang nie löschen, gleich wie alt er ist. Ein hochgeladener, noch
 ungebundener Anhang SHALL wie bisher nach der Karenz von 24 Stunden als verwaist gelten.
 Die generischen Routen zum Laden und Löschen SHALL einen ungebundenen Anhang nur für die
-Person bedienen, die ihn hochgeladen hat, und allen anderen mit 404 antworten.
+Person bedienen, die ihn hochgeladen hat, und allen anderen mit 404 antworten. Das
+Erfassen SHALL einen freien Anhang einer anderen Person wie eine unbekannte ID abweisen.
 
 #### Scenario: Chat will eine ETB-Datei verknüpfen
 - **WHEN** eine Chat-Nachricht mit der ID eines ETB-gebundenen Anhangs gesendet wird
@@ -150,6 +151,10 @@ Person bedienen, die ihn hochgeladen hat, und allen anderen mit 404 antworten.
 - **WHEN** eine andere Person als die hochladende einen hochgeladenen, noch nicht erfassten ETB-Anhang über die generische Route lädt oder löscht
 - **THEN** antwortet das System mit 404
 - **AND** die hochladende Person kann ihn über dieselbe Route laden und verwerfen
+
+#### Scenario: Fremder Upload beim Erfassen
+- **WHEN** jemand einen ETB-Eintrag mit der ID eines freien Anhangs erfasst, den eine andere Person hochgeladen hat
+- **THEN** antwortet das System mit 400 und demselben Wortlaut wie für eine unbekannte ID, und es entsteht kein Eintrag
 
 #### Scenario: Aufräumlauf nach Tagen
 - **WHEN** der Aufräumlauf für verwaiste Dateien drei Tage nach dem Erfassen läuft

@@ -149,7 +149,7 @@ pub async fn anlegen_idempotent(
                 return Ok((id, false));
             }
         }
-        pruefe_anhaenge(&mut *conn, einsatz_id, anhang_ids).await?;
+        pruefe_anhaenge(&mut *conn, einsatz_id, erfasser_id, anhang_ids).await?;
         let id = einfuegen(
             &mut *conn,
             einsatz_id,
@@ -174,22 +174,34 @@ pub async fn anlegen_idempotent(
 /// Schritt 2 aus [`anlegen_idempotent`]: jeder genannte Anhang muss im Einsatz existieren
 /// (sonst 400) und darf an KEINEM der drei Linker hängen (sonst 422) — „eine Datei, ein
 /// Lebenszyklus". Erst alle prüfen, dann schreiben: so bindet ein Fehler hinten nichts vorn.
+///
+/// Ein freier Anhang, den eine ANDERE Person hochgeladen hat, gilt als unbekannt (Review C1,
+/// design.md D12): gleiche Antwort, gleicher Wortlaut. Sonst holte man sich einen fremden
+/// Upload über den eigenen Eintrag, oder läse aus 400/201 ab, welche IDs frei herumliegen.
+/// Der Replay (Schritt 1) prüft nichts, und die Offline-Queue sendet nur unter dem Benutzer,
+/// unter dem sie entstand (`fordere_offline_queue_benutzer`) — also unter der Hochladenden.
 async fn pruefe_anhaenge(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
+    erfasser_id: i64,
     anhang_ids: &[i64],
 ) -> Result<(), AppError> {
     for &aid in anhang_ids {
-        let gebunden: Option<bool> = sqlx::query_scalar(
+        let stand: Option<(bool, i64)> = sqlx::query_as(
             "SELECT EXISTS (SELECT 1 FROM etb_eintrag_anhang l WHERE l.anhang_id = a.id) \
                  OR EXISTS (SELECT 1 FROM chat_nachricht_anhang c WHERE c.anhang_id = a.id) \
-                 OR EXISTS (SELECT 1 FROM einsatz_dokument d WHERE d.anhang_id = a.id) \
+                 OR EXISTS (SELECT 1 FROM einsatz_dokument d WHERE d.anhang_id = a.id), \
+                    a.hochgeladen_von \
              FROM anhang a WHERE a.id = ? AND a.einsatz_id = ?",
         )
         .bind(aid)
         .bind(einsatz_id)
         .fetch_optional(&mut *conn)
         .await?;
+        let gebunden = match stand {
+            Some((false, von)) if von != erfasser_id => None,
+            anders => anders.map(|(gebunden, _)| gebunden),
+        };
         match gebunden {
             None => return Err(AppError::Validation(ANHANG_UNBEKANNT.into())),
             Some(true) => {

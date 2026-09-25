@@ -483,7 +483,8 @@ sendet (die Berichtigung ersetzt die Reiter ganz). Die gewählten **Dateien lieg
 `EtbPage`** (`useEntwurfsDateien`), aus demselben Grund wie „Werte behalten". Höchstzahl 10
 und Dubletten (Name + Größe + `lastModified`) prüft schon die Dateiwahl. **Ein ungebundener
 Anhang gehört vorerst der hochladenden Person:** die generischen Routen `GET`/`DELETE
-…/anhaenge/{aid}` antworten allen anderen 404 (design.md D12) — ein vierter Linker, der in
+…/anhaenge/{aid}` antworten allen anderen 404, und das Erfassen behandelt einen fremden freien
+Anhang wie eine unbekannte ID (design.md D12) — ein vierter Linker, der in
 `LinkerStand` fehlte, machte seine Dateien damit für alle anderen unerreichbar.
 Der Download-Verweis ist blau aus
 `bedienText` und steht in der Hinweiszeile unabhängig von `hatVerknuepfung`. Prüfliste:

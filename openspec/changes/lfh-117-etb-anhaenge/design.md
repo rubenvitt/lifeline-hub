@@ -216,6 +216,14 @@ jede schreibende löschbar. Der Flush endete dann mit 400. Wem die Datei gehöre
 erst mit dem Linker fest; bis dahin ist die hochladende Person die einzige, die sie
 braucht. Das trifft den Chat genauso (vor dem Senden) und ist dort ebenso richtig. Nach
 dem Senden gelten die Chat-Regeln unverändert. Gebundene Anhänge sind nicht betroffen.
+- **Dasselbe beim Binden über das ETB.** `pruefe_anhaenge` behandelt einen freien Anhang
+  einer anderen Person wie eine unbekannte ID (400, gleicher Wortlaut). Sonst holte man
+  sich einen fremden Upload über den eigenen Eintrag und die ETB-Route, oder läse aus
+  400/201 ab, welche IDs frei herumliegen. Der Replay prüft keine Anhänge, und die
+  Offline-Queue sendet nur unter dem Benutzer, unter dem sie entstand. **Offen bleibt:** ein
+  gebundener fremder Anhang antwortet weiter 422 statt 400 (er ist schon im Tagebuch, im
+  Chat oder in der Ablage), und der Chat prüft beim Verknüpfen den Hochladenden nicht. Das
+  ist Chat-Code und nicht Teil dieses Changes.
 - **Die Linker sind vollständig gezählt.** `linker_stand` kennt `chat_nachricht_anhang`,
   `einsatz_dokument` und `etb_eintrag_anhang`. Das sind alle drei Tabellen mit
   `REFERENCES anhang(id)` (Migrationen 0052, 0116, 0125). `karte_hintergrundbild` (0075)

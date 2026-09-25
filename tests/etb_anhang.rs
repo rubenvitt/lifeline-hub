@@ -692,3 +692,57 @@ async fn ungebundener_etb_upload_ist_generisch_nur_fuer_die_hochladende_person()
         "die Hochladende verwirft ihre Datei"
     );
 }
+
+/// Gegenstück beim Binden (Review C1, design.md D12): wer einen fremden, noch ungebundenen
+/// Upload in `anhang_ids` nennt, bekommt dieselbe Antwort wie für eine unbekannte ID. Sonst
+/// holte er sich die Datei über den eigenen Eintrag und die ETB-Route — oder erführe aus
+/// 400/201, welche IDs gerade frei herumliegen.
+#[tokio::test]
+async fn fremder_ungebundener_upload_laesst_sich_nicht_binden() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", ADMIN_PW).await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let frieda = fuehrungsperson(&app, &admin, einsatz).await;
+    let a = hochgeladen(&app, einsatz, &admin, "a.jpg").await;
+
+    let (s, v) = erfassen(
+        &app,
+        &frieda,
+        einsatz,
+        &format!(r#"{{"typ":"meldung","inhalt":"x","anhang_ids":[{a}]}}"#),
+    )
+    .await;
+    let (s_unbekannt, v_unbekannt) = erfassen(
+        &app,
+        &frieda,
+        einsatz,
+        r#"{"typ":"meldung","inhalt":"x","anhang_ids":[987654]}"#,
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{v}");
+    assert_eq!(s_unbekannt, StatusCode::BAD_REQUEST);
+    assert_eq!(
+        v["error"], v_unbekannt["error"],
+        "kein Unterschied zu „unbekannt“"
+    );
+    assert_eq!(
+        zaehle(
+            &pool,
+            "SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ? AND inhalt = 'x'",
+            einsatz
+        )
+        .await,
+        0
+    );
+
+    // Die Hochladende bindet ihre Datei weiter.
+    let (s, v) = erfassen(
+        &app,
+        &admin,
+        einsatz,
+        &format!(r#"{{"typ":"meldung","inhalt":"eigen","anhang_ids":[{a}]}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(anhang_ids(&v), vec![a]);
+}
