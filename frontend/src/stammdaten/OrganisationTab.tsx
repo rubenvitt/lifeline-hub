@@ -116,7 +116,12 @@ export default function OrganisationTab() {
   }, [serverName, nameGeaendert, nameForm]);
   const nameSpeichern = useMutation({
     mutationFn: (werte: NameWerte) => setzeOrgName(werte.name.trim()),
-    onSuccess: (_antwort, werte) => {
+    onSuccess: (antwort, werte) => {
+      // ERST den Cache auf die Antwort setzen (sie ist die volle `OrganisationAnzeige`),
+      // DANN den Merker zurücknehmen: sonst übernahm der Sync-Effekt den noch ALTEN Namen
+      // aus dem Cache, bis der Refetch kam — und scheiterte der, blieb er stehen, und ein
+      // zweites „Namen speichern" machte die Umbenennung still rückgängig.
+      qc.setQueryData(globalKeys.organisation(), antwort);
       // Wer während des Speicherns weitertippt, behält seinen Stand.
       if (nameForm.getFieldValue('name') === werte.name) setNameGeaendert(false);
       message.success('Name gespeichert');
@@ -131,7 +136,9 @@ export default function OrganisationTab() {
   const [entfernenOffen, setEntfernenOffen] = useState(false);
   const logoHoch = useMutation({
     mutationFn: ladeOrgLogoHoch,
-    onSuccess: () => {
+    onSuccess: (antwort) => {
+      // Die Antwort trägt das neue Logo; ohne sie stünde bis zum Refetch das alte da.
+      qc.setQueryData(globalKeys.organisation(), antwort);
       message.success('Logo gespeichert');
       qc.invalidateQueries({ queryKey: globalKeys.organisation() });
     },

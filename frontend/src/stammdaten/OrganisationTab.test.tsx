@@ -401,6 +401,96 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
     expect(feld).toHaveValue('DRK Nord');
   });
 
+  /**
+   * Die PATCH-Antwort IST der neue Serverstand (volle `OrganisationAnzeige`). Wird nur
+   * invalidiert, hält der Cache bis zum Refetch den ALTEN Namen — und sobald der Merker
+   * fällt, springt das Feld darauf zurück. Kommt der Refetch nie (hier: er hängt), bleibt
+   * der alte Name stehen. Geprüft wird deshalb der Stand OHNE Refetch, nicht der Endzustand.
+   */
+  it('zeigt nach „Namen speichern" sofort den gespeicherten Namen, auch wenn der Refetch nicht kommt', async () => {
+    let gespeichert = false;
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/organisation', async () => {
+        if (gespeichert) await new Promise(() => {}); // Refetch hängt
+        return HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' });
+      }),
+      http.patch('/api/organisation', () => {
+        gespeichert = true;
+        return HttpResponse.json({ id: 1, name: 'DRK Neu', tz_organisation: 'hilfsorganisation' });
+      }),
+    );
+    renderTab();
+    const feld = await screen.findByLabelText('Name der Organisation');
+    await waitFor(() => expect(feld).toHaveValue('DRK'));
+    await userEvent.clear(feld);
+    await userEvent.type(feld, 'DRK Neu');
+    await userEvent.click(screen.getByRole('button', { name: 'Namen speichern' }));
+    await screen.findByText('Name gespeichert');
+    await new Promise((r) => setTimeout(r, 30));
+    expect(feld).toHaveValue('DRK Neu');
+  });
+
+  /**
+   * Die Folge, wenn das Feld auf den alten Namen zurückspringt und der Refetch scheitert:
+   * ein zweites „Namen speichern" macht die Umbenennung still rückgängig.
+   */
+  it('macht die Umbenennung bei gescheitertem Refetch nicht durch erneutes Speichern rückgängig', async () => {
+    let gespeichert = false;
+    const patches: unknown[] = [];
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/organisation', () =>
+        gespeichert
+          ? HttpResponse.json({ error: 'Interner Serverfehler' }, { status: 500 })
+          : HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' }),
+      ),
+      http.patch('/api/organisation', async ({ request }) => {
+        gespeichert = true;
+        const body = (await request.json()) as { name: string };
+        patches.push(body);
+        return HttpResponse.json({ id: 1, name: body.name, tz_organisation: 'hilfsorganisation' });
+      }),
+    );
+    renderTab();
+    const feld = await screen.findByLabelText('Name der Organisation');
+    await waitFor(() => expect(feld).toHaveValue('DRK'));
+    await userEvent.clear(feld);
+    await userEvent.type(feld, 'DRK Neu');
+    await userEvent.click(screen.getByRole('button', { name: 'Namen speichern' }));
+    await waitFor(() => expect(patches).toHaveLength(1));
+    await new Promise((r) => setTimeout(r, 50));
+    await userEvent.click(screen.getByRole('button', { name: 'Namen speichern' }));
+    await waitFor(() => expect(patches).toHaveLength(2));
+    expect(patches[1]).toEqual({ name: 'DRK Neu' });
+  });
+
+  it('zeigt ein hochgeladenes Logo sofort aus der Antwort, auch wenn der Refetch nicht kommt', async () => {
+    let hochgeladen = false;
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/organisation', async () => {
+        if (hochgeladen) await new Promise(() => {}); // Refetch hängt
+        return HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' });
+      }),
+      http.post('/api/organisation/logo', () => {
+        hochgeladen = true;
+        return HttpResponse.json(MIT_LOGO);
+      }),
+    );
+    renderTab();
+    await screen.findByRole('button', { name: 'Logo hochladen' });
+    const datei = new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], 'logo.png', {
+      type: 'image/png',
+    });
+    await userEvent.upload(document.querySelector<HTMLInputElement>('input[type="file"]')!, datei);
+    await screen.findByText('Logo gespeichert');
+    expect(screen.getByRole('img', { name: 'Logo von DRK' })).toHaveAttribute(
+      'src',
+      '/api/organisation/logo?v=abc123',
+    );
+  });
+
   it('invalidiert die Organisation auch nach dem Umbenennen', async () => {
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json(admin)),
