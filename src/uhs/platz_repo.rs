@@ -1,6 +1,6 @@
 use super::PlatzAnzeige;
 use crate::error::AppError;
-use sqlx::SqlitePool;
+use sqlx::{SqliteConnection, SqlitePool};
 
 const SELECT_ALLE: &str = "\
     SELECT id, uhs_id, typ, bezeichnung, pos_x, pos_y, verfuegbarkeit, \
@@ -38,22 +38,44 @@ pub async fn liste_je_uhs(pool: &SqlitePool, uhs_id: i64) -> Result<Vec<PlatzAnz
 }
 
 /// Lädt einen Platz; `NotFound`, falls nicht zur UHS gehörend.
-pub async fn laden(pool: &SqlitePool, uhs_id: i64, id: i64) -> Result<PlatzAnzeige, AppError> {
+///
+/// Executor-generisch (Pool oder offene Verbindung): [`anlegen_tx`] lädt auf der Verbindung
+/// seiner Transaktion (LFH-690).
+pub async fn laden(
+    executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
+    uhs_id: i64,
+    id: i64,
+) -> Result<PlatzAnzeige, AppError> {
     sqlx::query_as::<_, PlatzAnzeige>(sqlx::AssertSqlSafe(format!(
         "{SELECT_ALLE} WHERE id = ? AND uhs_id = ?"
     )))
     .bind(id)
     .bind(uhs_id)
-    .fetch_optional(pool)
+    .fetch_optional(executor)
     .await?
     .ok_or(AppError::NotFound)
 }
 
 /// Legt einen Platz an. UNIQUE(uhs_id, bezeichnung) → `Conflict` (409) bei Duplikat.
+///
+/// Pool-Hülle um [`anlegen_tx`]: wie bisher ohne eigene Transaktion, Insert und Rücklesen
+/// laufen im Autocommit einer geliehenen Verbindung.
 pub async fn anlegen(
     pool: &SqlitePool,
     uhs_id: i64,
     neu: NeuerPlatz<'_>,
+) -> Result<PlatzAnzeige, AppError> {
+    let mut conn = pool.acquire().await?;
+    anlegen_tx(&mut conn, uhs_id, &neu).await
+}
+
+/// Legt einen Platz auf einer offenen Verbindung/Transaktion an und lädt ihn dort zurück
+/// (LFH-690, Demo-Import in EINER Transaktion). Öffnet und committet selbst nichts.
+/// UNIQUE(uhs_id, bezeichnung) → `Conflict` (409) wie in der Pool-Hülle.
+pub async fn anlegen_tx(
+    conn: &mut SqliteConnection,
+    uhs_id: i64,
+    neu: &NeuerPlatz<'_>,
 ) -> Result<PlatzAnzeige, AppError> {
     let ergebnis = sqlx::query_scalar::<_, i64>(
         "INSERT INTO uhs_platz (uhs_id, typ, bezeichnung, pos_x, pos_y) \
@@ -64,7 +86,7 @@ pub async fn anlegen(
     .bind(neu.bezeichnung)
     .bind(neu.pos_x)
     .bind(neu.pos_y)
-    .fetch_one(pool)
+    .fetch_one(&mut *conn)
     .await;
     let id = match ergebnis {
         Ok(id) => id,
@@ -75,7 +97,7 @@ pub async fn anlegen(
         }
         Err(e) => return Err(e.into()),
     };
-    laden(pool, uhs_id, id).await
+    laden(&mut *conn, uhs_id, id).await
 }
 
 /// Obergrenze für [`anlegen_bulk`]. Steht **hier** und nicht in der Route, weil die

@@ -143,8 +143,11 @@ pub async fn deaktivieren(pool: &SqlitePool, org_id: i64, id: i64) -> Result<(),
 
 /// `id` des ersten aktiven Status einer Kategorie (deterministisch nach `sortier`,
 /// dann `id`); `None`, wenn die Org keinen solchen aktiven Status hat.
+///
+/// Executor-generisch (Pool oder offene Verbindung): `disposition_repo::disponiere_stamm_tx`
+/// liest auf der Verbindung seiner Transaktion (LFH-690).
 pub async fn erster_der_kategorie(
-    pool: &SqlitePool,
+    executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
     org_id: i64,
     kategorie: &str,
 ) -> Result<Option<i64>, AppError> {
@@ -154,7 +157,7 @@ pub async fn erster_der_kategorie(
     )
     .bind(org_id)
     .bind(kategorie)
-    .fetch_optional(pool)
+    .fetch_optional(executor)
     .await
     .map_err(Into::into)
 }

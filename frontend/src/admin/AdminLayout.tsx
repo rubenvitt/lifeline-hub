@@ -7,7 +7,8 @@ import { Navigate, Outlet, useLocation, useNavigate } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
 import { darfVerwaltung } from '../einsatz/schreibrecht';
 import { useViewport } from '../components/useViewport';
-import { adminBenutzer, adminGruppen } from './adminNav';
+import { adminBenutzer, adminDemoDaten, adminGruppen } from './adminNav';
+import { useDemoDatenStatus } from './useDemoDaten';
 
 const { Sider, Content } = Layout;
 
@@ -18,7 +19,8 @@ const { Sider, Content } = Layout;
  * der URL (kein eigener Nav-State). Sitzt unter <AppLayout> (globale Topbar kommt von dort).
  * Gate: `darfVerwaltung` (admin oder fuehrungskraft, seit LFH-328 aus `einsatz/schreibrecht.ts`
  * statt lokaler Kopie) — sonst Redirect zu /einsaetze. Benutzer-Eintrag nur für System-Admins
- * (strengeres Gate der Seite selbst bleibt zusätzlich bestehen).
+ * (strengeres Gate der Seite selbst bleibt zusätzlich bestehen). Der Eintrag „Demo-Daten“
+ * (LFH-690) zusätzlich nur, wenn `GET /api/demo-daten` mit 200 antwortet.
  */
 /**
  * Menü-Key einer Sektion — EINE Quelle für den Eintrag UND den Präfix-Match unten. Zwei
@@ -71,6 +73,8 @@ export default function AdminLayout() {
   const { abBreite } = useViewport();
   const breit = abBreite('lg');
   const [navOffen, setNavOffen] = useState(false);
+  // Demo-Daten (LFH-690): fragt nur für den System-Admin ab (`enabled` im Hook), 404 heißt aus.
+  const { freigeschaltet: demoFreigeschaltet } = useDemoDatenStatus();
 
   if (laedt) {
     return (
@@ -85,6 +89,13 @@ export default function AdminLayout() {
   }
 
   const istSystemAdmin = benutzer?.system_rolle === 'admin';
+  // Die Sonder-Einträge in EINER Liste, damit Menü, Markierung und schmale Bauform nicht
+  // auseinanderlaufen. `demoFreigeschaltet` ist ohnehin nur für den System-Admin wahr, die
+  // Bedingung steht trotzdem ausgeschrieben da.
+  const sonderEintraege = [
+    ...(istSystemAdmin ? [adminBenutzer] : []),
+    ...(istSystemAdmin && demoFreigeschaltet ? [adminDemoDaten] : []),
+  ];
   // '/admin/stammdaten/fahrzeuge' → 'stammdaten/fahrzeuge'; '/admin/benutzer' → 'benutzer'.
   const aktiv = pathname.replace(/^\/admin\/?/, '');
 
@@ -97,11 +108,11 @@ export default function AdminLayout() {
       label: <Augenbraue>{g.label}</Augenbraue>,
       children: g.sektionen.map((s) => ({ key: sektionsKey(g.key, s.key), label: s.label })),
     })),
-    ...(istSystemAdmin ? [{ key: adminBenutzer.key, label: adminBenutzer.label }] : []),
+    ...sonderEintraege.map((e) => ({ key: e.key, label: e.label })),
   ];
   const menuKeys = [
     ...adminGruppen.flatMap((g) => g.sektionen.map((s) => sektionsKey(g.key, s.key))),
-    ...(istSystemAdmin ? [adminBenutzer.key] : []),
+    ...sonderEintraege.map((e) => e.key),
   ];
   const selektiert = markierterKey(menuKeys, aktiv);
 
@@ -150,7 +161,7 @@ export default function AdminLayout() {
       ...adminGruppen.flatMap((g) =>
         g.sektionen.map((sek) => ({ key: sektionsKey(g.key, sek.key), label: sek.label })),
       ),
-      ...(istSystemAdmin ? [{ key: adminBenutzer.key, label: adminBenutzer.label }] : []),
+      ...sonderEintraege.map((e) => ({ key: e.key, label: e.label })),
     ].find((e) => e.key === selektiert)?.label;
     return (
       <div>

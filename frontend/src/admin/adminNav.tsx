@@ -93,6 +93,16 @@ export const adminGruppen: AdminGruppe[] = [
 /** Benutzer-Verwaltung: Sonder-Eintrag (eigene Route, strengeres system_rolle=admin-Gate). */
 export const adminBenutzer = { key: 'benutzer', label: 'Benutzer' } as const;
 
+/**
+ * Demo-Daten (LFH-690, design.md D13): zweiter Sonder-Eintrag neben {@link adminBenutzer}.
+ *
+ * Sichtbar nur für den System-Admin UND nur, wenn `GET /api/demo-daten` mit 200 antwortet
+ * (`useDemoDatenStatus`). Deshalb KEIN Eintrag in {@link adminGruppen}: deren Sektionen sieht
+ * jede Person mit Verwaltungsrecht, und ein Rollenprädikat an `AdminSektion` beträfe alle
+ * sechzehn Sektionen für einen einzigen Fall. Die Seite schützt sich zusätzlich selbst.
+ */
+export const adminDemoDaten = { key: 'demo-daten', label: 'Demo-Daten' } as const;
+
 /** `/admin/<gruppe>/<sektion>`. */
 export function adminSektionPfad(gruppe: string, sektion: string): string {
   return `/admin/${gruppe}/${sektion}`;
@@ -101,6 +111,11 @@ export function adminSektionPfad(gruppe: string, sektion: string): string {
 /** `/admin/benutzer`. */
 export function adminBenutzerPfad(): string {
   return `/admin/${adminBenutzer.key}`;
+}
+
+/** `/admin/demo-daten`. */
+export function adminDemoDatenPfad(): string {
+  return `/admin/${adminDemoDaten.key}`;
 }
 
 /** Erste Sektion einer Gruppe — Ziel des Gruppen-Redirects (`/admin/<gruppe>`). */

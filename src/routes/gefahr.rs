@@ -160,20 +160,13 @@ pub async fn bewerten(
         )
         .await?;
         if z.warnstufe.as_str() != alt {
-            let g = gefahr::gefahrentyp_label(z.gefahrentyp.as_str());
-            let o = gefahr::schutzobjekt_label(z.schutzobjekt.as_str());
-            let gname = gebiet
-                .label
-                .clone()
-                .unwrap_or_else(|| format!("Gefahrengebiet #{gid}"));
-            let text = if z.warnstufe == gefahr::Warnstufe::Keine {
-                format!("Gefahr «{g}» für «{o}» in «{gname}» aufgehoben.")
-            } else {
-                format!(
-                    "Gefahr «{g}» für «{o}» in «{gname}» auf Warnstufe «{}» gesetzt.",
-                    z.warnstufe.as_str()
-                )
-            };
+            let text = gefahr::etb_text_bewertung(
+                z.gefahrentyp.as_str(),
+                z.schutzobjekt.as_str(),
+                gebiet.label.as_deref(),
+                gid,
+                z.warnstufe,
+            );
             crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text).await?;
         }
         Ok(z)

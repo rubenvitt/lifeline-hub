@@ -177,10 +177,7 @@ pub async fn anlegen(
         &state,
         einsatz_id,
         benutzer.id,
-        &match anzeige.lagezustand {
-            Some(l) => format!("Abschnitt «{}» angelegt (Lage: {})", anzeige.name, l.wort()),
-            None => format!("Abschnitt «{}» angelegt", anzeige.name),
-        },
+        &crate::einsatzabschnitt::etb_text_angelegt(&anzeige.name, anzeige.lagezustand),
     )
     .await?;
     sse_abschnitt(&state, einsatz_id, anzeige.id);

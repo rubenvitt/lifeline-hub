@@ -51,8 +51,15 @@ function rendere() {
   return renderMitProviders(<Rahmen />);
 }
 
+/** Der Dialog, NACHDEM sein Anfangsfokus sitzt. Die Hülle fokussiert „Datei wählen“ per
+ *  `requestAnimationFrame`; tippte ein Test vorher, zog der nachlaufende Fokus die Tasten aus
+ *  dem Titelfeld ab — unter Last blieb „Titel“ leer und die Dateiwahl belegte ihn mit dem
+ *  Dateinamen (in der CI von PR #158 rot, lokal 2 von 4 vollen Läufen). */
 async function dialog() {
-  return (await screen.findAllByRole('dialog'))[0];
+  const d = (await screen.findAllByRole('dialog'))[0];
+  const knopf = within(d).getByRole('button', { name: /Datei wählen/ });
+  await vi.waitFor(() => expect(document.activeElement).toBe(knopf));
+  return d;
 }
 
 function dateiInput(d: HTMLElement) {

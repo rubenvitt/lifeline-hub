@@ -190,12 +190,18 @@ pub async fn deaktivieren(pool: &SqlitePool, org_id: i64, id: i64) -> Result<(),
 /// Referenzen gültig (Entscheidung 4), damit das PATCH einer Einheit, deren Typ
 /// inzwischen deaktiviert wurde, nicht fehlschlägt. Die Auswahl *neuer* Typen filtert
 /// das FE über `GET /api/einheit-typen` (nur aktive).
-pub async fn ist_in_org(pool: &SqlitePool, org_id: i64, typ_id: i64) -> Result<bool, AppError> {
+///
+/// Executor-generisch: `einheit::repo::anlegen_tx` prüft auf der offenen Verbindung (LFH-690).
+pub async fn ist_in_org(
+    executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
+    org_id: i64,
+    typ_id: i64,
+) -> Result<bool, AppError> {
     let treffer: Option<i64> =
         sqlx::query_scalar("SELECT 1 FROM einheit_typ WHERE id = ? AND org_id = ?")
             .bind(typ_id)
             .bind(org_id)
-            .fetch_optional(pool)
+            .fetch_optional(executor)
             .await?;
     Ok(treffer.is_some())
 }

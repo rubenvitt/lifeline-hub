@@ -323,17 +323,7 @@ pub async fn status_wechsel(
     // Bezeichnung ändert sich beim Status-Wechsel nicht, daher kein In-Tx-Reload nötig.
     // darf_uebergehen/Belegungs-Vorbedingung prüft `setze_status_tx` in der Tx; SSE erst
     // nach dem Commit (Reinheits-Kontrakt).
-    let etb_text = match body.status.as_str() {
-        "aktiv" => Some(format!(
-            "Bereitstellungsraum {} in Betrieb genommen",
-            vorher.bezeichnung
-        )),
-        "aufgeloest" => Some(format!(
-            "Bereitstellungsraum {} aufgelöst",
-            vorher.bezeichnung
-        )),
-        _ => None,
-    };
+    let etb_text = crate::bereitstellungsraum::etb_text_status(&vorher.bezeichnung, &body.status);
     let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
         .await?
         .etb_startwert();

@@ -8,6 +8,7 @@ pub mod benutzer;
 pub mod benutzer_einstellungen;
 pub mod betreuung;
 pub mod chat;
+pub mod demo_daten;
 #[cfg(feature = "dev-seeds")]
 pub mod dev;
 pub mod dokument;

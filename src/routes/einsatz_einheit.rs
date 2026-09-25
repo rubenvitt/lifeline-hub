@@ -194,7 +194,7 @@ pub async fn bilden(
         &state,
         einsatz_id,
         benutzer.id,
-        &format!("Einheit «{}» gebildet", anzeige.name),
+        &crate::einheit::etb_text_gebildet(&anzeige.name),
     )
     .await?;
     sse_einheit(&state, einsatz_id, anzeige.id);
@@ -411,7 +411,7 @@ pub async fn personal_zuordnen(
             einsatz_id,
             benutzer.id,
             startwert,
-            &format!("Einheit «{}»: «{}» zugeordnet", einheit, person),
+            &crate::einheit::etb_text_personal_zugeordnet(&einheit, &person),
         )
         .await?;
         Ok(())
@@ -469,7 +469,7 @@ pub async fn fahrzeug_zuordnen(
             einsatz_id,
             benutzer.id,
             startwert,
-            &format!("Einheit «{}»: Fahrzeug «{}» zugeordnet", einheit, fz),
+            &crate::einheit::etb_text_fahrzeug_zugeordnet(&einheit, &fz),
         )
         .await?;
         Ok(())

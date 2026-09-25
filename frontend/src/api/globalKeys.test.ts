@@ -24,6 +24,11 @@ describe('globalKeys: Byte-Pin gegen die ersetzten Literale (LFH-307)', () => {
     expect(globalKeys.orgEinstellungen()).toEqual(['org-einstellungen']);
     expect(globalKeys.orgModulEinstellungen()).toEqual(['org-modul-einstellungen']);
     expect(globalKeys.authProvider()).toEqual(['auth-provider']);
+    // LFH-690: NEU, ohne Vorbestand. Das Literal ist trotzdem handgeschrieben: Verwaltung,
+    // Menü und Einsatzliste lesen denselben Status, und die Invalidierung nach Import und
+    // Entfernen trifft ihn über diesen Key. Ein still umbenanntes Fach ließe Menü und
+    // Hinweis nach dem Import auf dem alten Stand stehen, ohne dass etwas rot wird.
+    expect(globalKeys.demoDaten()).toEqual(['demo-daten']);
     // LFH-391 · Etappe D: NEU, deshalb ohne Vorbestand — das Literal ist trotzdem
     // handgeschrieben und nicht aus `GLOBAL_KEYS` gelesen. Der Pin schuetzt hier nicht vor
     // einer Umbenennung des Bestands, sondern vor der stillen Umbenennung DIESES Fachs:
@@ -93,7 +98,7 @@ describe('globalKeys: Byte-Pin gegen die ersetzten Literale (LFH-307)', () => {
     expect(globalKeys.fachebeneKritis(null)).toEqual(['fachebene', 'kritis', null]);
     expect(globalKeys.fachebeneKritis('1,2,3,4')).toEqual(['fachebene', 'kritis', '1,2,3,4']);
     // LFH-81: dieselbe Form wie KRITIS, eigenes Fach je Quelle. Kein neuer Prefix — die
-    // Zählung im Leerlauf-Schutz unten bleibt deshalb bei 23.
+    // Zählung im Leerlauf-Schutz unten blieb deshalb bei 23 (heute 24, s. u.).
     expect(globalKeys.fachebeneEnergie(null)).toEqual(['fachebene', 'energie', null]);
     expect(globalKeys.fachebeneEnergie('1,2,3,4')).toEqual(['fachebene', 'energie', '1,2,3,4']);
     // Der bbox-lose Accessor ist für bbox-Quellen gesperrt, sonst entstünden zwei Fächer
@@ -102,10 +107,11 @@ describe('globalKeys: Byte-Pin gegen die ersetzten Literale (LFH-307)', () => {
     expect(globalKeys.fachebene('energie')).toEqual(['fachebene', 'energie']);
   });
 
-  it('LEERLAUF-SCHUTZ: die Registry hat die gemessenen 23 Prefixe und keine Dubletten', () => {
+  // 23 → 24 mit `demo-daten` (LFH-690, Status der Demo-Daten je Organisation).
+  it('LEERLAUF-SCHUTZ: die Registry hat die gemessenen 24 Prefixe und keine Dubletten', () => {
     const werte = Object.values(GLOBAL_KEYS);
-    expect(werte).toHaveLength(23);
-    expect(new Set(werte).size, 'zwei Properties tragen denselben Wire-String').toBe(23);
+    expect(werte).toHaveLength(24);
+    expect(new Set(werte).size, 'zwei Properties tragen denselben Wire-String').toBe(24);
   });
 
   it('kollidiert nicht mit den einsatz-scoped Prefixen', async () => {

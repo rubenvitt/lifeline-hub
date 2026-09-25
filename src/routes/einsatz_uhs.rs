@@ -365,15 +365,7 @@ pub async fn status_wechsel(
     }
     // ETB-Text aus `vorher` (typ/bezeichnung bleiben beim Status-Wechsel unverändert,
     // also identisch zum Nachzustand). Damit VOR der Tx berechenbar (kein In-Tx-Reload).
-    let typ_label = vorher.typ.anzeige_label();
-    let etb_text = match body.status.as_str() {
-        "aktiv" => Some(format!(
-            "{} ({}) in Betrieb genommen",
-            vorher.bezeichnung, typ_label
-        )),
-        "aufgeloest" => Some(format!("{} aufgelöst", vorher.bezeichnung)),
-        _ => None,
-    };
+    let etb_text = crate::uhs::etb_text_status(&vorher.bezeichnung, vorher.typ, &body.status);
     // F06/LFH-244 Tier-A: Status-UPDATE + (falls lagerelevant) System-ETB-Eintrag atomar
     // in EINER Tx (BEGIN IMMEDIATE + Retry). Startwert nur laden, wenn ein ETB-Eintrag
     // entsteht (Übergänge ohne Spur machen keinen Zusatz-Read). SSE erst nach dem Commit.

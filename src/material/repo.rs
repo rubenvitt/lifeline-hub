@@ -1,6 +1,6 @@
 use super::{Material, DIENSTSTATUS_AUSSER_DIENST, DIENSTSTATUS_IN_DIENST};
 use crate::error::AppError;
-use sqlx::SqlitePool;
+use sqlx::{SqliteConnection, SqlitePool};
 
 /// Spaltenliste für `SELECT` in der Reihenfolge von `Material` (FromRow).
 const SPALTEN: &str = "id, org_id, bezeichnung, kategorie, bestandsnummer, \
@@ -30,13 +30,19 @@ fn bestandsnummer_conflict<T>(e: sqlx::Error) -> Result<T, AppError> {
 }
 
 /// Lädt ein Material der eigenen Org; `NotFound`, falls unbekannt oder fremde Org.
-pub async fn laden(pool: &SqlitePool, org_id: i64, id: i64) -> Result<Material, AppError> {
+/// Executor-generisch (Pool oder offene Verbindung), damit [`anlegen_tx`] den frisch
+/// angelegten Datensatz in derselben Transaktion zurücklesen kann (LFH-690).
+pub async fn laden(
+    executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
+    org_id: i64,
+    id: i64,
+) -> Result<Material, AppError> {
     sqlx::query_as::<_, Material>(sqlx::AssertSqlSafe(format!(
         "SELECT {SPALTEN} FROM material WHERE id = ? AND org_id = ?"
     )))
     .bind(id)
     .bind(org_id)
-    .fetch_optional(pool)
+    .fetch_optional(executor)
     .await?
     .ok_or(AppError::NotFound)
 }
@@ -75,10 +81,24 @@ pub async fn kategorien(pool: &SqlitePool, org_id: i64) -> Result<Vec<String>, A
 }
 
 /// Legt ein Material an. Dublette Bestandsnummer (unter aktiven) → `Conflict`.
+/// Pool-Hülle um [`anlegen_tx`]: wie bisher ohne eigene Transaktion, die Statements laufen
+/// im Autocommit einer geliehenen Verbindung.
 pub async fn anlegen(
     pool: &SqlitePool,
     org_id: i64,
     daten: MaterialDaten<'_>,
+) -> Result<Material, AppError> {
+    let mut conn = pool.acquire().await?;
+    anlegen_tx(&mut conn, org_id, &daten).await
+}
+
+/// Legt ein Material auf einer offenen Verbindung/Transaktion an und liest es dort zurück
+/// (LFH-690, Demo-Import in EINER Transaktion). Öffnet und committet selbst nichts.
+/// Dublette Bestandsnummer (unter aktiven) → `Conflict`.
+pub async fn anlegen_tx(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    daten: &MaterialDaten<'_>,
 ) -> Result<Material, AppError> {
     let ergebnis = sqlx::query_scalar::<_, i64>(
         "INSERT INTO material \
@@ -92,14 +112,14 @@ pub async fn anlegen(
     .bind(daten.traegerorganisation)
     .bind(daten.standort)
     .bind(daten.bemerkung)
-    .fetch_one(pool)
+    .fetch_one(&mut *conn)
     .await;
 
     let id = match ergebnis {
         Ok(id) => id,
         Err(e) => return bestandsnummer_conflict(e),
     };
-    laden(pool, org_id, id).await
+    laden(&mut *conn, org_id, id).await
 }
 
 /// Teil-Patch der editierbaren Stammfelder (LFH-306, Tri-State): die äußere `Option` sagt
