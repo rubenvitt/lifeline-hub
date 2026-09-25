@@ -84,6 +84,27 @@ pub const ERLAUBTE_MIME_DOKUMENT: &[&str] = &[
     "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 ];
 
+/// Allowlist der Erfassungsmodule (LFH-21, design.md D3) — heute Schäden, später Personen,
+/// Tiere, UHS; deshalb modulneutral benannt. Kamerabilder und PDF:
+/// - HEIC/HEIF ist das Standardformat der iPhone-Kamera; ohne sie scheitert das häufigste
+///   Endgerät am Schadensort.
+/// - JPEG/PNG/WebP decken Android-Kameras, Screenshots und Messenger-Weiterleitungen.
+/// - PDF trägt Kostenvoranschlag, Gutachten, Übergabeprotokoll.
+///
+/// Nicht enthalten: Office und Text/CSV (gehören in die Dokumentenablage, kein
+/// Erfassungsnachweis), GIF (keine Kameraquelle), TIFF (Scanformat der Ablage, im Browser
+/// nicht darstellbar). Echte Teilmenge von [`ERLAUBTE_MIME_DOKUMENT`] (Unit-Test). Das
+/// Frontend spiegelt die Liste als `ERFASSUNG_ACCEPT` in `api/upload.ts` — ändern heißt dort
+/// mit ändern.
+pub const ERLAUBTE_MIME_ERFASSUNG: &[&str] = &[
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/heic",
+    "image/heif",
+    "application/pdf",
+];
+
 /// Leitet den MIME-Typ aus der Dateiendung ab (mime_guess) und prüft ihn gegen
 /// die Chat-Allowlist [`ERLAUBTE_MIME`]. Der vom Client gemeldete Content-Type wird bewusst
 /// NICHT als Sicherheitsentscheidung herangezogen (manipulierbar) — die Endung ist hier
@@ -431,6 +452,48 @@ mod tests {
         for m in ERLAUBTE_MIME {
             assert!(ERLAUBTE_MIME_DOKUMENT.contains(m), "{m}");
         }
+    }
+
+    /// LFH-21, design.md D3: die Erfassungs-Allowlist (Schäden, später Personen/Tiere/UHS)
+    /// nimmt Kamerabilder samt HEIC/HEIF und PDF, sonst nichts.
+    #[test]
+    fn erfassung_allowlist_nimmt_kamerabilder_und_pdf() {
+        for (datei, mime) in [
+            ("IMG_0412.HEIC", "image/heic"),
+            ("a.heif", "image/heif"),
+            ("dach.jpg", "image/jpeg"),
+            ("dach.JPEG", "image/jpeg"),
+            ("screen.png", "image/png"),
+            ("weiter.webp", "image/webp"),
+            ("bericht.pdf", "application/pdf"),
+        ] {
+            assert_eq!(
+                ermittle_mime_aus(datei, ERLAUBTE_MIME_ERFASSUNG).unwrap(),
+                mime,
+                "{datei}"
+            );
+        }
+        for datei in [
+            "liste.xlsx",
+            "notiz.txt",
+            "scan.tiff",
+            "anim.gif",
+            "x.csv",
+            "a.exe",
+        ] {
+            assert!(
+                matches!(
+                    ermittle_mime_aus(datei, ERLAUBTE_MIME_ERFASSUNG).unwrap_err(),
+                    AppError::Validation(_)
+                ),
+                "{datei}"
+            );
+        }
+        // Echte Teilmenge der Dokumenten-Liste.
+        for m in ERLAUBTE_MIME_ERFASSUNG {
+            assert!(ERLAUBTE_MIME_DOKUMENT.contains(m), "{m}");
+        }
+        assert!(ERLAUBTE_MIME_ERFASSUNG.len() < ERLAUBTE_MIME_DOKUMENT.len());
     }
 
     #[test]

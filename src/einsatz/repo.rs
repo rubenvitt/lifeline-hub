@@ -1079,6 +1079,127 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn schwaerzung_loescht_schaden_anhaenge_und_haelt_den_etb_nachweis() {
+        // LFH-21, design.md D7: die Registry löscht `anhang` (und per CASCADE den Linker),
+        // `einsatz_schaden_anhang` ist ZeileLoeschen — auch der soft-gelöschte Anhang geht.
+        // Die pseudonymen ETB-Nachweise bleiben (G_ETB), sie nennen keinen Dateinamen.
+        use crate::schaden::anhang::{self as sa, Ablage};
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let einsatz = test_anlegen(&pool, "Lage", None, leit).await.unwrap();
+        let schaden = crate::schaden::repo::anlegen(
+            &pool,
+            einsatz.id,
+            leit,
+            crate::schaden::repo::NeueDaten {
+                typ: "sachschaden",
+                ausmass: "gering",
+                ort: "Hauptstr. 1",
+                beschreibung: None,
+                lat: None,
+                lon: None,
+                geschaedigt_person_id: None,
+                geschaedigt_kontakt: None,
+                geschaedigt_personal_id: None,
+                geschaedigt_organisation_id: None,
+            },
+        )
+        .await
+        .unwrap();
+        let startwert = crate::einsatz::einstellungen::laden_oder_default(&pool, einsatz.id)
+            .await
+            .unwrap()
+            .etb_startwert();
+        let mut etb_ids = Vec::new();
+        let mut linker_ids = Vec::new();
+        for name in ["Müller_Hauswand.jpg", "gutachten.pdf"] {
+            let mime = if name.ends_with(".pdf") {
+                "application/pdf"
+            } else {
+                "image/jpeg"
+            };
+            let (id, etb) = sa::ablegen(
+                &pool,
+                einsatz.id,
+                schaden.id,
+                leit,
+                startwert,
+                &Ablage {
+                    dateiname: name,
+                    mime,
+                    daten: b"ABC",
+                },
+            )
+            .await
+            .unwrap();
+            linker_ids.push(id);
+            etb_ids.push(etb);
+        }
+        etb_ids.push(
+            sa::entfernen(
+                &pool,
+                einsatz.id,
+                schaden.id,
+                linker_ids[1],
+                leit,
+                startwert,
+            )
+            .await
+            .unwrap(),
+        );
+        abschliessen(&pool, einsatz.id, leit).await.unwrap();
+        sqlx::query("UPDATE einsatz SET geloescht_at = ? WHERE id = ?")
+            .bind("2026-01-01 00:00:00")
+            .bind(einsatz.id)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        assert!(schwaerze_einsatz(&pool, einsatz.id, "2026-02-01 00:00:00")
+            .await
+            .unwrap());
+
+        let zaehle = |sql: &'static str| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_scalar::<_, i64>(sql)
+                    .bind(einsatz.id)
+                    .fetch_one(&pool)
+                    .await
+                    .unwrap()
+            }
+        };
+        assert_eq!(
+            zaehle("SELECT COUNT(*) FROM anhang WHERE einsatz_id = ?").await,
+            0,
+            "Dateien weg, auch die entfernte"
+        );
+        assert_eq!(
+            zaehle("SELECT COUNT(*) FROM einsatz_schaden_anhang WHERE einsatz_id = ?").await,
+            0,
+            "Linker-Zeilen weg"
+        );
+        let mut inhalte = Vec::new();
+        for id in etb_ids {
+            let inhalt: String = sqlx::query_scalar("SELECT inhalt FROM etb_eintrag WHERE id = ?")
+                .bind(id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+            inhalte.push(inhalt);
+        }
+        assert_eq!(
+            inhalte,
+            vec![
+                "Schaden S-001: Foto abgelegt",
+                "Schaden S-001: PDF abgelegt",
+                "Schaden S-001: PDF entfernt",
+            ],
+            "die drei pseudonymen Nachweise bleiben"
+        );
+    }
+
     /// LFH-22 (design.md D8): das Logo ist keine Einsatzunterlage. Schwärzen eines
     /// Einsatzes lässt die Logo-Bytes der Organisation unverändert.
     #[tokio::test]
