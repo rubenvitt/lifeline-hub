@@ -95,7 +95,7 @@ test('legt ab, lädt herunter, schreibt den pseudonymen ETB-Nachweis und entfern
   await expect(paneel(page).getByText('Noch keine Fotos oder Dateien')).toBeVisible();
 
   // ── 1 · Ablegen über den Dialog ─────────────────────────────────────────────────────
-  await paneel(page).getByRole('button', { name: 'Datei ablegen' }).first().click();
+  await paneel(page).getByRole('button', { name: 'Datei ablegen' }).click();
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
   await expect(
@@ -152,7 +152,7 @@ test('Tab-Reihenfolge im Ablegen-Dialog: kein zweiter Tab-Stopp um „Datei wäh
   const einsatzId = await einsatzAnlegen(page, `E2E Sturmlage Tab ${Date.now()}`);
   const schadenId = await schadenAnlegen(page, einsatzId);
   await page.goto(`/einsaetze/${einsatzId}/schaeden/${schadenId}`);
-  await paneel(page).getByRole('button', { name: 'Datei ablegen' }).first().focus();
+  await paneel(page).getByRole('button', { name: 'Datei ablegen' }).focus();
   await page.keyboard.press('Enter');
   const dialog = page.getByRole('dialog');
   const dateiKnopf = dialog.locator('button.ant-btn', { hasText: 'Datei wählen' });

@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
+import { ApiError } from '../../api/client';
 import SchadenAnhaenge from './SchadenAnhaenge';
 
 vi.mock('../../api/einsatzSchaden', async (importOriginal) => {
@@ -28,15 +29,20 @@ const anhang = (id: number, dateiname: string, mime = 'image/jpeg') => ({
   abgelegt_at: '2026-09-25 10:30:00',
 });
 
+/** `liste` darf eine Folge sein: der n-te Abruf bekommt den n-ten Stand (der letzte bleibt). */
 function rendere(
-  liste: unknown[] | 'fehler' | 'haengt',
+  liste: unknown[] | unknown[][] | 'fehler' | 'haengt',
   props: { darfSchreiben?: boolean; storniert?: boolean } = {},
 ) {
+  let abruf = 0;
   server.use(
     http.get(PFAD, () => {
       if (liste === 'fehler') return HttpResponse.json({ error: 'kaputt' }, { status: 500 });
       if (liste === 'haengt') return new Promise<never>(() => {});
-      return HttpResponse.json(liste);
+      const folge = Array.isArray(liste[0]) ? (liste as unknown[][]) : [liste as unknown[]];
+      const stand = folge[Math.min(abruf, folge.length - 1)];
+      abruf += 1;
+      return HttpResponse.json(stand);
     }),
   );
   return renderMitProviders(
@@ -128,5 +134,72 @@ describe('SchadenAnhaenge (LFH-21)', () => {
     rendere([anhang(5, 'dach.jpg')]);
     await userEvent.click(await within(paneel()).findByRole('button', { name: 'Datei ablegen' }));
     expect(await screen.findByRole('dialog')).toHaveTextContent('Datei ablegen · Schaden S-003');
+  });
+
+  // ── Review C2 ──────────────────────────────────────────────────────────────────────
+
+  async function bestaetigeEntfernen(name: string) {
+    await userEvent.click(await screen.findByRole('button', { name }));
+    const frage = await screen.findByText('Datei entfernen?');
+    const pop = frage.closest('.ant-popover') as HTMLElement;
+    await userEvent.click(within(pop).getByRole('button', { name: 'Entfernen' }));
+  }
+
+  it('mit Schreibrecht und leer: GENAU ein „Datei ablegen“ (kein zweites gleichnamiges Ziel)', async () => {
+    rendere([]);
+    await within(paneel()).findByText('Noch keine Fotos oder Dateien');
+    expect(within(paneel()).getAllByRole('button', { name: 'Datei ablegen' })).toHaveLength(1);
+  });
+
+  it('zeigt bis zur Serverantwort einen Ladezustand am Entfernen-Knopf der Zeile', async () => {
+    entferne.mockReturnValue(new Promise<never>(() => {}));
+    rendere([anhang(5, 'dach.jpg'), anhang(6, 'gutachten.pdf', 'application/pdf')]);
+    await bestaetigeEntfernen('Datei dach.jpg von Schaden S-003 entfernen');
+    const knopf = screen.getByRole('button', {
+      name: 'Datei dach.jpg von Schaden S-003 entfernen',
+    });
+    await vi.waitFor(() => expect(knopf.className).toMatch(/ant-btn-loading/));
+    // Nur die betroffene Zeile lädt.
+    expect(
+      screen.getByRole('button', { name: 'Datei gutachten.pdf von Schaden S-003 entfernen' })
+        .className,
+    ).not.toMatch(/ant-btn-loading/);
+  });
+
+  it('nennt einen gescheiterten Versuch an der betroffenen Zeile, nicht im Toast', async () => {
+    entferne.mockRejectedValue(new ApiError(409, 'Schaden ist storniert'));
+    rendere([anhang(5, 'dach.jpg'), anhang(6, 'gutachten.pdf', 'application/pdf')]);
+    await bestaetigeEntfernen('Datei dach.jpg von Schaden S-003 entfernen');
+    const alarm = await within(paneel()).findByRole('alert');
+    expect(alarm).toHaveTextContent('Datei dach.jpg nicht entfernt');
+    expect(alarm).toHaveTextContent('Schaden ist storniert');
+    expect(document.querySelector('.ant-message')?.textContent ?? '').not.toMatch(/storniert/);
+    const zeile = (n: string) =>
+      screen
+        .getByRole('link', { name: new RegExp(`^${n}`) })
+        .closest('[data-lfh="schaden-anhang-zeile"]');
+    expect(zeile('dach\\.jpg')).toHaveAttribute('data-fehler');
+    expect(zeile('gutachten\\.pdf')).not.toHaveAttribute('data-fehler');
+  });
+
+  it('setzt den Fokus nach dem Entfernen auf die nächste Zeile', async () => {
+    entferne.mockResolvedValue(undefined);
+    rendere([
+      [anhang(5, 'dach.jpg'), anhang(6, 'gutachten.pdf', 'application/pdf')],
+      [anhang(6, 'gutachten.pdf', 'application/pdf')],
+    ]);
+    await bestaetigeEntfernen('Datei dach.jpg von Schaden S-003 entfernen');
+    await vi.waitFor(() => expect(screen.queryByRole('link', { name: /^dach\.jpg/ })).toBeNull());
+    const naechste = screen.getByRole('link', { name: /^gutachten\.pdf/ });
+    await vi.waitFor(() => expect(document.activeElement).toBe(naechste));
+  });
+
+  it('setzt den Fokus nach dem Entfernen der letzten Datei auf „Datei ablegen“', async () => {
+    entferne.mockResolvedValue(undefined);
+    rendere([[anhang(5, 'dach.jpg')], []]);
+    await bestaetigeEntfernen('Datei dach.jpg von Schaden S-003 entfernen');
+    await within(paneel()).findByText('Noch keine Fotos oder Dateien');
+    const kopf = within(paneel()).getByRole('button', { name: 'Datei ablegen' });
+    await vi.waitFor(() => expect(document.activeElement).toBe(kopf));
   });
 });
