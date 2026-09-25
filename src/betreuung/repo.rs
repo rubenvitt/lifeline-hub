@@ -81,6 +81,8 @@ pub struct StandEingabe {
     pub evakuiert: i64,
     pub erhebung: Erhebung,
     pub zeitpunkt_at: String,
+    /// Idempotenzschlüssel der Offline-Queue (LFH-675), getrimmt, nie leer.
+    pub client_id: Option<String>,
 }
 
 /// Eingabe „Belegung melden“ (Zeitpunkt wie bei [`StandEingabe`]).
@@ -88,6 +90,8 @@ pub struct StandEingabe {
 pub struct BelegungEingabe {
     pub belegt: i64,
     pub zeitpunkt_at: String,
+    /// Idempotenzschlüssel wie bei [`StandEingabe`].
+    pub client_id: Option<String>,
 }
 
 /// Ergebnis eines Schreibvorgangs an Bezirk oder Stelle: die Objekt-ID und die dabei
@@ -109,6 +113,9 @@ pub struct Gemeldet {
     pub meldung_id: i64,
     pub objekt_id: i64,
     pub etb_id: i64,
+    /// `false` beim Replay einer Meldung mit bekannter `client_id` (LFH-675): es wurde nichts
+    /// geschrieben, die Route verteilt deshalb auch nichts live.
+    pub neu: bool,
 }
 
 // ── SQL: die eine Definition von „aktuell“ ──────────────────────────────────────────────────
@@ -954,6 +961,72 @@ pub async fn bezirk_stornieren_tx(
     ))
 }
 
+// ── Idempotenz der Offline-Erfassung (LFH-675) ─────────────────────────────────────────────
+
+/// Die gespeicherte Standmeldung mit dieser `client_id` im Einsatz, als Replay (`neu: false`).
+/// Einsatzgebunden: dieselbe `client_id` in einem anderen Einsatz findet nichts und legt dort
+/// nichts offen. Läuft auf dem Pool (Vorab-Lookup der Route) wie in der Transaktion.
+pub async fn stand_nach_client_id<'e, E: sqlx::SqliteExecutor<'e>>(
+    ex: E,
+    einsatz_id: i64,
+    client_id: &str,
+) -> Result<Option<Gemeldet>, AppError> {
+    let treffer: Option<(i64, i64, i64)> = sqlx::query_as(
+        "SELECT id, bezirk_id, etb_eintrag_id FROM evakuierung_stand \
+         WHERE einsatz_id = ? AND client_id = ?",
+    )
+    .bind(einsatz_id)
+    .bind(client_id)
+    .fetch_optional(ex)
+    .await?;
+    Ok(treffer.map(als_replay))
+}
+
+/// Wie [`stand_nach_client_id`] für Belegungsmeldungen.
+pub async fn belegung_nach_client_id<'e, E: sqlx::SqliteExecutor<'e>>(
+    ex: E,
+    einsatz_id: i64,
+    client_id: &str,
+) -> Result<Option<Gemeldet>, AppError> {
+    let treffer: Option<(i64, i64, i64)> = sqlx::query_as(
+        "SELECT id, stelle_id, etb_eintrag_id FROM betreuungsstelle_belegung \
+         WHERE einsatz_id = ? AND client_id = ?",
+    )
+    .bind(einsatz_id)
+    .bind(client_id)
+    .fetch_optional(ex)
+    .await?;
+    Ok(treffer.map(als_replay))
+}
+
+fn als_replay((meldung_id, objekt_id, etb_id): (i64, i64, i64)) -> Gemeldet {
+    Gemeldet {
+        meldung_id,
+        objekt_id,
+        etb_id,
+        neu: false,
+    }
+}
+
+/// Ein Replay gilt nur für das Objekt, an dem die Meldung gespeichert ist. Ein Schlüssel, der
+/// an einem anderen Bezirk bzw. einer anderen Stelle hängt, ist 422 (design.md D3): jedes Feld
+/// ist für sich gültig, erst der gespeicherte Zusammenhang verbietet die Aktion. Die fremde
+/// Meldung zurückzugeben behauptete den Stand eines Objekts, das der Client nicht adressiert hat.
+pub fn replay_am_objekt(
+    replay: Gemeldet,
+    objekt_id: i64,
+    // mit Artikel („einem anderen Evakuierungsbezirk“) — das Genus unterscheidet sich
+    objekt: &str,
+) -> Result<Gemeldet, AppError> {
+    if replay.objekt_id == objekt_id {
+        Ok(replay)
+    } else {
+        Err(AppError::UnprocessableEntity(format!(
+            "client_id gehört zu einer Meldung an {objekt}"
+        )))
+    }
+}
+
 /// Meldet einen Stand „evakuiert“. ETB-Meldung mit Vorwert, Erhebung und Plangröße, deren
 /// Ereigniszeit der Meldezeitpunkt ist; danach wird der Zeiger über die „aktuell“-Abfrage
 /// bestimmt — eine nachgetragene ältere Meldung lässt ihn stehen. Dieselbe Zahl wie der
@@ -966,6 +1039,15 @@ pub async fn stand_melden_tx(
     startwert: i64,
     eingabe: &StandEingabe,
 ) -> Result<Gemeldet, AppError> {
+    // Replay VOR jeder Zustandsprüfung (design.md D2): eine schon gespeicherte Meldung kommt
+    // auch am inzwischen stornierten Bezirk zurück. Unter `BEGIN IMMEDIATE` ist dieser Lookup
+    // gegen das INSERT unten nicht verschränkbar — zwei gleichzeitige Flushes desselben
+    // Schlüssels ergeben eine Zeile.
+    if let Some(cid) = eingabe.client_id.as_deref() {
+        if let Some(replay) = stand_nach_client_id(&mut *conn, einsatz_id, cid).await? {
+            return replay_am_objekt(replay, bezirk_id, "einem anderen Evakuierungsbezirk");
+        }
+    }
     anzahl_pruefen("evakuiert", eingabe.evakuiert)?;
     zeitpunkt_pruefen(&eingabe.zeitpunkt_at)?;
     let roh = bezirk_roh_tx(conn, einsatz_id, bezirk_id).await?;
@@ -1002,8 +1084,8 @@ pub async fn stand_melden_tx(
     let meldung_id: i64 = sqlx::query_scalar(
         "INSERT INTO evakuierung_stand \
             (bezirk_id, einsatz_id, evakuiert, erhebung, zeitpunkt_at, erfasst_von_id, \
-             etb_eintrag_id) \
-         VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
+             etb_eintrag_id, client_id) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(bezirk_id)
     .bind(einsatz_id)
@@ -1012,6 +1094,7 @@ pub async fn stand_melden_tx(
     .bind(&eingabe.zeitpunkt_at)
     .bind(benutzer_id)
     .bind(etb_id)
+    .bind(eingabe.client_id.as_deref())
     .fetch_one(&mut *conn)
     .await?;
     stand_zeiger_neu_tx(conn, bezirk_id).await?;
@@ -1019,6 +1102,7 @@ pub async fn stand_melden_tx(
         meldung_id,
         objekt_id: bezirk_id,
         etb_id,
+        neu: true,
     })
 }
 
@@ -1073,6 +1157,7 @@ pub async fn stand_zuruecknehmen_tx(
         meldung_id: stand_id,
         objekt_id: bezirk_id,
         etb_id,
+        neu: true,
     })
 }
 
@@ -1281,6 +1366,13 @@ pub async fn belegung_melden_tx(
     startwert: i64,
     eingabe: &BelegungEingabe,
 ) -> Result<Gemeldet, AppError> {
+    // Replay vor jeder Zustandsprüfung, wie bei `stand_melden_tx`: eine gespeicherte Meldung
+    // kommt auch an der inzwischen geschlossenen oder stornierten Stelle zurück.
+    if let Some(cid) = eingabe.client_id.as_deref() {
+        if let Some(replay) = belegung_nach_client_id(&mut *conn, einsatz_id, cid).await? {
+            return replay_am_objekt(replay, stelle_id, "einer anderen Betreuungsstelle");
+        }
+    }
     anzahl_pruefen("belegt", eingabe.belegt)?;
     zeitpunkt_pruefen(&eingabe.zeitpunkt_at)?;
     let roh = stelle_roh_tx(conn, einsatz_id, stelle_id).await?;
@@ -1320,8 +1412,9 @@ pub async fn belegung_melden_tx(
     .await?;
     let meldung_id: i64 = sqlx::query_scalar(
         "INSERT INTO betreuungsstelle_belegung \
-            (stelle_id, einsatz_id, belegt, zeitpunkt_at, erfasst_von_id, etb_eintrag_id) \
-         VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
+            (stelle_id, einsatz_id, belegt, zeitpunkt_at, erfasst_von_id, etb_eintrag_id, \
+             client_id) \
+         VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(stelle_id)
     .bind(einsatz_id)
@@ -1329,6 +1422,7 @@ pub async fn belegung_melden_tx(
     .bind(&eingabe.zeitpunkt_at)
     .bind(benutzer_id)
     .bind(etb_id)
+    .bind(eingabe.client_id.as_deref())
     .fetch_one(&mut *conn)
     .await?;
     belegung_zeiger_neu_tx(conn, stelle_id).await?;
@@ -1336,6 +1430,7 @@ pub async fn belegung_melden_tx(
         meldung_id,
         objekt_id: stelle_id,
         etb_id,
+        neu: true,
     })
 }
 
@@ -1396,6 +1491,7 @@ pub async fn belegung_zuruecknehmen_tx(
         meldung_id: belegung_id,
         objekt_id: stelle_id,
         etb_id,
+        neu: true,
     })
 }
 

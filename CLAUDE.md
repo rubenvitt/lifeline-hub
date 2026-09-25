@@ -221,6 +221,17 @@ nicht. Das kostet je Personen-Ereignis ein `GET …/betreuung` auf **jeder** Ein
 erreichte auch Lesende ohne Personenrecht und verriete ihnen den Takt der Zuordnungen. `betreuungsstelle` ist seitdem **kein Leaf** mehr, ein Rebuild braucht den FK-Schalter.
 Herleitung: `openspec/changes/lfh-674-verbleib-notunterkunft-betreuungsstelle/design.md`.
 
+**Stand- und Belegungsmeldungen sind offline-fähig (LFH-675).** Sie laufen über die
+Offline-Queue (`offline/schreiben.ts`, Arten `stand`/`belegung`) mit `client_id`, eindeutig
+je Einsatz und Meldereihe (`0122`). Der Replay-Lookup läuft **vor** jeder Zustandsprüfung,
+einmal vorab und einmal in der `BEGIN IMMEDIATE`-Transaktion. Eine gespeicherte Meldung kommt
+deshalb auch am stornierten Bezirk, an der geschlossenen Stelle und nach Einsatzende zurück
+(`EinsatzSchreibfreigabe`), ohne ETB-Eintrag und ohne Live-Ereignis. Ein Schlüssel an einem
+anderen Objekt ist 422. **Den Erfassungszeitpunkt trägt nur die vorgemerkte Kopie**, online
+gilt die Serveruhr. Sonst stempelte der Flush die Sendezeit, oder eine vorgehende Tablet-Uhr
+machte Online-Meldungen zu 400. Anlegen, Ändern, Rücknahmen und die Leermeldung bleiben
+online. Herleitung: `openspec/changes/lfh-675-betreuung-meldungen-offline/design.md`.
+
 **Sichtung ist eine eigene fachliche Farbachse am selben zentralen Ort**, keine A0-Rolle.
 `SichtungsTag` zeigt die feste Kennzeichnung aus `tokens.ts` als umrandetes Farbfeld:
 SK I rot, II gelb, III grün, IV blau, Tote schwarz; „unverletzt“ ohne erfundene Fachfarbe

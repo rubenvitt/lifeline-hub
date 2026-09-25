@@ -1,5 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef } from 'react';
+import { meldeBelegung, meldeStand } from '../api/betreuung';
 import { ApiError } from '../api/client';
 import { erfasseEtb } from '../api/etb';
 import { legePersonAn } from '../api/einsatzPerson';
@@ -59,8 +60,15 @@ export function useOfflineSync(benutzerId?: number): void {
             if (!montiert.current || aktiverBenutzer.current !== aktuellerBenutzerId) break;
             await queueEntfernen(aktuellerBenutzerId, element.wert.id!);
             void qc.invalidateQueries({ queryKey: einsatzKeys.etb(element.wert.einsatz_id) });
-          } else if (element.wert.aktion.art === 'person') {
-            const person = await legePersonAn(element.wert.einsatz_id, element.wert.aktion.daten, {
+            continue;
+          }
+          const { aktion } = element.wert;
+          // Exhaustiv über die Art (LFH-675), mit `never` am Ende: eine neue Variante bricht
+          // den Typcheck, statt still im Meldungszweig zu landen — genau dort landete eine
+          // Standmeldung vor diesem Umbau. Bewusst KEIN `switch`: ein `break` darin verließe
+          // nur den `switch`, und die Abbruch-Riegel unten liefen still ins Leere.
+          if (aktion.art === 'person') {
+            const person = await legePersonAn(element.wert.einsatz_id, aktion.daten, {
               offlineQueueBenutzerId: aktuellerBenutzerId,
             });
             if (!montiert.current || aktiverBenutzer.current !== aktuellerBenutzerId) break;
@@ -85,7 +93,7 @@ export function useOfflineSync(benutzerId?: number): void {
             void qc.invalidateQueries({ queryKey: einsatzKeys.etb(element.wert.einsatz_id) });
             // Der Anlege-Request kann zugleich den UHS-Eintritt enthalten (LFH-458).
             // Auch ohne funktionierenden Live-Stream muss die gerade offene UHS nachladen.
-            const uhsId = element.wert.aktion.daten.uhs_id;
+            const uhsId = aktion.daten.uhs_id;
             if (uhsId != null) {
               void qc.invalidateQueries({ queryKey: einsatzKeys.uhs(element.wert.einsatz_id) });
               void qc.invalidateQueries({
@@ -100,17 +108,15 @@ export function useOfflineSync(benutzerId?: number): void {
               daten: person,
               sicht: quittung.sicht,
             });
-          } else {
-            const meldung = await legeMeldungAn(
-              element.wert.einsatz_id,
-              element.wert.aktion.daten,
-              { offlineQueueBenutzerId: aktuellerBenutzerId },
-            );
+          } else if (aktion.art === 'meldung') {
+            const meldung = await legeMeldungAn(element.wert.einsatz_id, aktion.daten, {
+              offlineQueueBenutzerId: aktuellerBenutzerId,
+            });
             if (!montiert.current || aktiverBenutzer.current !== aktuellerBenutzerId) break;
             await schreibaktionEntfernen(aktuellerBenutzerId, element.wert.id!);
             void qc.invalidateQueries({ queryKey: einsatzKeys.meldungen(element.wert.einsatz_id) });
             void qc.invalidateQueries({ queryKey: einsatzKeys.etb(element.wert.einsatz_id) });
-            const clientId = element.wert.aktion.daten.client_id;
+            const clientId = aktion.daten.client_id;
             if (clientId) {
               meldeOfflineSchreibaktionGesendet({
                 art: 'meldung',
@@ -120,6 +126,27 @@ export function useOfflineSync(benutzerId?: number): void {
                 daten: meldung,
               });
             }
+          } else if (aktion.art === 'stand' || aktion.art === 'belegung') {
+            // Stand- und Belegungsmeldungen (LFH-675): die Antwort braucht niemand — die Seite
+            // lädt über dieselben zwei Keys nach wie nach einer Online-Meldung.
+            const optionen = { offlineQueueBenutzerId: aktuellerBenutzerId };
+            if (aktion.art === 'stand') {
+              await meldeStand(element.wert.einsatz_id, aktion.bezirk_id, aktion.daten, optionen);
+            } else {
+              await meldeBelegung(
+                element.wert.einsatz_id,
+                aktion.stelle_id,
+                aktion.daten,
+                optionen,
+              );
+            }
+            if (!montiert.current || aktiverBenutzer.current !== aktuellerBenutzerId) break;
+            await schreibaktionEntfernen(aktuellerBenutzerId, element.wert.id!);
+            void qc.invalidateQueries({ queryKey: einsatzKeys.betreuung(element.wert.einsatz_id) });
+            void qc.invalidateQueries({ queryKey: einsatzKeys.etb(element.wert.einsatz_id) });
+          } else {
+            const nie: never = aktion;
+            throw new Error(`Unbekannte Offline-Schreibaktion ${JSON.stringify(nie)}`);
           }
         } catch (e) {
           if (!montiert.current || aktiverBenutzer.current !== aktuellerBenutzerId) break;
