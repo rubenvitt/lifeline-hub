@@ -196,6 +196,7 @@ export type EinheitStatusQuelle = S['EinheitStatusQuelle'];
 export type StatusWert = S['StatusWert'];
 export type FuehrungskraftKarte = S['FuehrungskraftKarte'];
 export type OrganisationInfo = S['OrganisationAnzeige'];
+export type OrgLogo = S['OrgLogoAnzeige'];
 
 // ============================== E‑2 Personen ==============================
 export type PersonStatus = S['PersonStatus'];

@@ -6419,6 +6419,32 @@
           }
         }
       },
+      "OrgLogoAnzeige": {
+        "type": "object",
+        "description": "Metadaten des Logos ohne Bytes — hängen als `logo` an der `OrganisationAnzeige`.",
+        "required": [
+          "mime",
+          "groesse",
+          "sha256",
+          "geaendert_at"
+        ],
+        "properties": {
+          "geaendert_at": {
+            "type": "string"
+          },
+          "groesse": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "mime": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string",
+            "description": "Hex-sha256 der Bytes; zugleich der ETag des Abrufs und der Cache-Brecher `?v=`."
+          }
+        }
+      },
       "OrgRolle": {
         "type": "string",
         "description": "Org-weite Rolle (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `org_rolle`.",
@@ -6429,7 +6455,7 @@
       },
       "OrganisationAnzeige": {
         "type": "object",
-        "description": "Org-Stammdaten inkl. DV-102-Org-Default (`tz_organisation`).",
+        "description": "Org-Stammdaten inkl. DV-102-Org-Default (`tz_organisation`) und Logo-Metadaten.",
         "required": [
           "id",
           "name"
@@ -6438,6 +6464,17 @@
           "id": {
             "type": "integer",
             "format": "int64"
+          },
+          "logo": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/OrgLogoAnzeige",
+                "description": "Logo der Organisation (LFH-22) ohne Bytes; fehlt, wenn keines hinterlegt ist. Die\nBytes liefert `GET /api/organisation/logo`."
+              }
+            ]
           },
           "name": {
             "type": "string"

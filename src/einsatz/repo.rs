@@ -1047,6 +1047,42 @@ mod tests {
         );
     }
 
+    /// LFH-22 (design.md D8): das Logo ist keine Einsatzunterlage. Schwärzen eines
+    /// Einsatzes lässt die Logo-Bytes der Organisation unverändert.
+    #[tokio::test]
+    async fn schwaerzung_laesst_das_logo_der_organisation_unveraendert() {
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let einsatz = test_anlegen(&pool, "Lage", None, leit).await.unwrap();
+        abschliessen(&pool, einsatz.id, leit).await.unwrap();
+        sqlx::query("UPDATE einsatz SET geloescht_at = ? WHERE id = ?")
+            .bind("2026-01-01 00:00:00")
+            .bind(einsatz.id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let bytes = b"\x89PNG\r\n\x1a\nLogo-Bytes".to_vec();
+        crate::org::logo::setzen(&pool, 1, "image/png", &bytes, leit)
+            .await
+            .unwrap();
+        let vorher = crate::org::logo::meta(&pool, 1).await.unwrap().unwrap();
+
+        assert!(schwaerze_einsatz(&pool, einsatz.id, "2026-02-01 00:00:00")
+            .await
+            .unwrap());
+
+        assert_eq!(
+            crate::org::logo::daten(&pool, 1).await.unwrap(),
+            Some(bytes),
+            "Logo-Bytes bleiben"
+        );
+        assert_eq!(
+            crate::org::logo::meta(&pool, 1).await.unwrap(),
+            Some(vorher),
+            "Metadaten bleiben"
+        );
+    }
+
     #[tokio::test]
     async fn schwaerzung_nullt_freies_zeichen_label_pii() {
         // LFH-170/Review: freies_zeichen.label ist Freitext (kann PII tragen, z. B. „ELW Fam.

@@ -873,6 +873,15 @@ pub fn build_router(state: AppState) -> Router {
             "/api/organisation",
             patch(routes::organisation::aktualisieren),
         )
+        // Logo der Organisation (LFH-22): 1 MiB Nutzlast plus 64 KiB für den Multipart-Rahmen.
+        // Die Größengrenze selbst prüft der Handler (400); das Limit fängt nur Übergrößen ab.
+        .route(
+            "/api/organisation/logo",
+            get(routes::organisation::logo_lesen)
+                .post(routes::organisation::logo_hochladen)
+                .delete(routes::organisation::logo_entfernen)
+                .layer(DefaultBodyLimit::max(1024 * 1024 + 64 * 1024)),
+        )
         .route(
             "/api/org-einstellungen",
             get(routes::org_einstellungen::lesen).put(routes::org_einstellungen::setzen),

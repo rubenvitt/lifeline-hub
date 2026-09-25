@@ -183,6 +183,7 @@ use utoipa::OpenApi;
         crate::routes::karte::OfflineRegionConfig,
         crate::routes::karte::VorhandeneKarte,
         crate::routes::organisation::OrganisationAnzeige,
+        crate::org::logo::OrgLogoAnzeige,
         crate::routes::ort_vorschau::OrtVorschauAntwort,
         crate::routes::ort_vorschau::PeilungAntwort,
         crate::pegel::PegelAnzeige,
