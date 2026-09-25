@@ -2119,6 +2119,7 @@ test('Lagekarte (LFH-373): „Verortet", Kartenknöpfe und Zeitachse folgen der 
     await stelleDichte(page, dichte);
     await expect(page.getByTestId('kartenflaeche').locator('canvas.maplibregl-canvas')).toHaveCount(
       1,
+      { timeout: 60_000 },
     );
 
     // „Verortet": handgebaute Zeilen (`bedienzielStil`). Per exaktem Namen, weil

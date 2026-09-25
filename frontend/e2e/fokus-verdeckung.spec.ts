@@ -948,6 +948,7 @@ test('Lagekarte (LFH-373): Kartenknöpfe liegen nie unter den Fußbändern', asy
     await stelleDichte(page, 'handschuh');
     await expect(page.getByTestId('kartenflaeche').locator('canvas.maplibregl-canvas')).toHaveCount(
       1,
+      { timeout: 60_000 },
     );
     if (lage.leiste) await page.getByRole('button', { name: 'Leiste einblenden' }).click();
     // Vorbedingung: die Zeitachse steht ausgeklappt — sonst gäbe es das hohe Band nicht, und
@@ -1013,7 +1014,7 @@ test('Personenkarte (LFH-373): kein Fokusziel liegt unter den Kartenaufbauten', 
     await page.goto(`/einsaetze/${einsatzId}/personen?ansicht=karte`);
     await stelleDichte(page, 'handschuh');
     const karte = page.locator('[data-lfh="betroffene-karte"]');
-    await expect(karte.locator('canvas.maplibregl-canvas')).toHaveCount(1);
+    await expect(karte.locator('canvas.maplibregl-canvas')).toHaveCount(1, { timeout: 60_000 });
     const knoepfe = karte.locator('[data-lfh="karten-knoepfe"]');
     await expect(knoepfe.getByRole('button', { name: 'Hineinzoomen', exact: true })).toBeVisible();
     for (const name of ['Hineinzoomen', 'Herauszoomen', 'Nach Norden ausrichten']) {

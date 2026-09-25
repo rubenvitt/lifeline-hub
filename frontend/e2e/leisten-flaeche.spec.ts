@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { beobachteShifts, bericht, ruheShifts, setzeShiftsZurueck } from './cls-kern';
 
 /**
  * Prüflisten-Zeile 12 der Bedien-Leitlinie — „kein Sprung, kein Flächenfraß" — für die
@@ -31,6 +32,8 @@ const FLAECHEN = [
 ] as const;
 /** Deckel: höchstens die Hälfte (siehe Kopfkommentar). Literal, keine Rechnung aus Code. */
 const DECKEL = 0.5;
+/** CLS-Grenze „gut", https://web.dev/articles/cls — Literal wie in `einsatzauswahl-cls`. */
+const CLS_GUT = 0.1;
 
 // Login-Helfer aus `kernfluss.spec.ts` kopiert — es gibt (noch) kein geteiltes Login-Modul.
 async function anmelden(page: Page) {
@@ -261,4 +264,262 @@ test('ETB (LFH-373): drei gesetzte Felder — Leiste ganz im Bild und unter dem 
     type: 'messwert',
     description: `Leiste ${Math.round(kastenVorher.hoehe)} → ${Math.round(kastenNachher.hoehe)} px, Unterkante ${Math.round(kastenNachher.unterkante)} von ${kastenNachher.fenster}`,
   });
+});
+
+/**
+ * Lagekarte (LFH-373, Prüfliste Lagekarte Zeile 12 und Zeile 2): die ausgeklappte Zeitachse
+ * belegt höchstens die halbe Kartenhöhe, kein Kind ragt aus dem Band, das Band bleibt in der
+ * Kartenspalte, und „Abspielen" hält die kurze Achse.
+ *
+ * GEMESSEN VOR LFH-373: bei 390 px im Handschuh-Betrieb schrumpfte „Abspielen" als Flex-Kind
+ * auf 17 × 72 px; nach der Einrückung des Fußes vor die Knopfspalte (Gruppe 5) ragte das
+ * Bezeichnungsfeld mit festen 180 px über den Bandrand und fing die Klicks auf die
+ * Kartenknöpfe ab. Behoben über `sichernFeldStil`, `zeitleisteStil`, `abspielenStil`.
+ *
+ * Handschirm mit AUSGEBLENDETER Leiste (die Vorgabe unter `md`). Mit eingeblendeter Leiste
+ * bleibt die Karte nur rund 337 px hoch; dort gilt nicht der Deckel, sondern „Band in der
+ * Kartenspalte, kein Kind über dem Rand" — und die Nicht-Überschneidung mit dem Knopfblock,
+ * die `fokus-verdeckung.spec.ts` misst.
+ */
+test('Lagekarte (LFH-373): die Zeitachse belegt höchstens die halbe Karte und läuft nicht über', async ({
+  page,
+}) => {
+  test.setTimeout(300_000);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `Flaeche 373 Ost ${Date.now()}`);
+  for (const bezeichnung of ['Stand A', 'Stand B']) {
+    const stand = await page.request.post(`/api/einsaetze/${einsatzId}/lage-snapshots`, {
+      data: { bezeichnung },
+    });
+    expect(stand.ok(), await stand.text()).toBeTruthy();
+  }
+  const SOLL = { kompakt: 30, komfortabel: 48, handschuh: 72 } as const;
+  const gemessen: string[] = [];
+  const verstoesse: string[] = [];
+
+  for (const lage of [
+    { name: 'Fükw', width: 1366, height: 768, leiste: false, deckel: true },
+    { name: 'Tablet', width: 1024, height: 768, leiste: false, deckel: true },
+    { name: 'Handschirm', width: 390, height: 844, leiste: false, deckel: true },
+    { name: 'Handschirm mit Leiste', width: 390, height: 844, leiste: true, deckel: false },
+  ]) {
+    await page.setViewportSize({ width: lage.width, height: lage.height });
+    await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
+    await page.evaluate(() => localStorage.setItem('lfh:lagekarte:zeitachse-eingeklappt', '0'));
+    for (const dichte of DICHTEN) {
+      const lauf = `${lage.name}/${dichte}`;
+      await stelleDichte(page, dichte);
+      await expect(
+        page.getByTestId('kartenflaeche').locator('canvas.maplibregl-canvas'),
+      ).toHaveCount(1, { timeout: 60_000 });
+      if (lage.leiste) await page.getByRole('button', { name: 'Leiste einblenden' }).click();
+      const band = page.locator('[data-lfh="zeitachse"]');
+      await expect(band.getByRole('button', { name: 'Stand A' })).toBeVisible();
+      await schriftenGeladen(page);
+
+      const m = await page.evaluate(() => {
+        const b = document.querySelector('[data-lfh="zeitachse"]')!;
+        const r = b.getBoundingClientRect();
+        const k = document.querySelector('[data-lfh="kartenspalte"]')!.getBoundingClientRect();
+        const raus = Array.from(b.querySelectorAll('button, input, .ant-slider'))
+          .map((el) => el.getBoundingClientRect())
+          .filter((e) => e.width > 0 && (e.right > r.right + 0.5 || e.left < r.left - 0.5)).length;
+        return {
+          band: r.height,
+          karte: k.height,
+          raus,
+          inSpalte:
+            r.left >= k.left - 0.5 &&
+            r.right <= k.right + 0.5 &&
+            r.top >= k.top - 0.5 &&
+            r.bottom <= k.bottom + 0.5,
+          ueberlauf: b.scrollWidth - b.clientWidth,
+        };
+      });
+      const anteil = m.band / m.karte;
+      gemessen.push(
+        `${lauf}: ${Math.round(m.band)}/${Math.round(m.karte)} px = ${Math.round(anteil * 100)} %`,
+      );
+      expect(m.raus, `${lauf}: Knöpfe/Felder über den Bandrand`).toBe(0);
+      expect(m.ueberlauf, `${lauf}: das Band läuft waagerecht über`).toBeLessThanOrEqual(1);
+      expect(m.inSpalte, `${lauf}: das Band steht in der Kartenspalte`).toBe(true);
+      if (lage.deckel && anteil > DECKEL) {
+        verstoesse.push(
+          `${lauf}: Band ${Math.round(m.band)} px > ${DECKEL * 100} % von ${Math.round(m.karte)}`,
+        );
+      }
+      const abspielen = (await band.getByRole('button', { name: 'Abspielen' }).boundingBox())!;
+      expect(
+        Math.min(abspielen.width, abspielen.height),
+        `${lauf}: „Abspielen" ${abspielen.width}×${abspielen.height}, kurze Achse Soll ≥ ${SOLL[dichte]}`,
+      ).toBeGreaterThanOrEqual(SOLL[dichte] - 0.5);
+    }
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+  expect(verstoesse, 'Deckel verletzt').toEqual([]);
+});
+
+/** Einsatz mit zwei Gefahrengebieten per API (`POST …/zonen`, ohne WebGL). */
+async function matrixEinsatz(
+  page: Page,
+  bezeichnung: string,
+): Promise<{ id: number; gid: number }> {
+  const id = await einsatzAnlegen(page, bezeichnung);
+  for (const [i, label] of ['Sektor Sprung 1', 'Sektor Sprung 2'].entries()) {
+    const x = 10 + i / 20;
+    const zone = await page.request.post(`/api/einsaetze/${id}/zonen`, {
+      data: {
+        typ: 'gefahrengebiet',
+        geometrie_typ: 'Polygon',
+        geometrie: JSON.stringify({
+          type: 'Polygon',
+          coordinates: [
+            [
+              [x, 50],
+              [x + 0.01, 50],
+              [x + 0.01, 50.01],
+              [x, 50.01],
+              [x, 50],
+            ],
+          ],
+        }),
+        label,
+      },
+    });
+    expect(zone.ok(), await zone.text()).toBeTruthy();
+  }
+  const gebiete = (await (
+    await page.request.get(`/api/einsaetze/${id}/gefahrengebiete`)
+  ).json()) as {
+    id: number;
+    label: string;
+  }[];
+  return { id, gid: gebiete.find((g) => g.label === 'Sektor Sprung 1')!.id };
+}
+
+/**
+ * Laden ohne Sprung (LFH-373, Prüflisten Zeile 12): ETB, Lagekarte und Gefahrenmatrix auf dem
+ * Handschirm. Summe der Verschiebungen OHNE vorherige Eingabe ab dem Laden bis zur Ruhe.
+ *
+ * Der Beobachter lebt je Dokument (`cls-kern.ts`); `stelleDichte` lädt neu, gemessen wird also
+ * genau das Laden in der gewählten Stufe. VORBEDINGUNG je Route ist ein Inhaltsanker — ohne
+ * ihn wäre „kein Sprung" auch für eine Seite wahr, die noch im Ladezustand steht.
+ */
+test('Laden ohne Sprung (LFH-373): ETB, Lagekarte und Gefahrenmatrix auf dem Handschirm', async ({
+  page,
+}) => {
+  test.setTimeout(300_000);
+  await beobachteShifts(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await anmelden(page);
+  const { id: matrixId } = await matrixEinsatz(page, `Flaeche 373 Sprung ${Date.now()}`);
+  for (let n = 1; n <= 8; n += 1) {
+    const eintrag = await page.request.post(`/api/einsaetze/${matrixId}/etb`, {
+      data: {
+        typ: 'meldung',
+        inhalt: `Probe ${n}: Lage unverändert`,
+        von: 'ELW 1',
+        an: 'Leitstelle',
+      },
+    });
+    expect(eintrag.ok(), await eintrag.text()).toBeTruthy();
+  }
+
+  const ROUTEN = [
+    {
+      name: 'ETB',
+      pfad: `/einsaetze/${matrixId}/etb`,
+      anker: async () =>
+        // 8 gesäte Meldungen + 2 Systemeinträge der beiden angelegten Gefahrengebiete.
+        expect(
+          page.getByRole('region', { name: 'Einsatztagebuch' }).getByTestId('etb-ereigniszeile'),
+        ).toHaveCount(10),
+    },
+    {
+      name: 'Lagekarte',
+      pfad: `/einsaetze/${matrixId}/lagekarte`,
+      anker: async () =>
+        expect(page.getByTestId('kartenflaeche').locator('canvas.maplibregl-canvas')).toHaveCount(
+          1,
+          { timeout: 60_000 },
+        ),
+    },
+    {
+      name: 'Gefahrenmatrix',
+      pfad: `/einsaetze/${matrixId}/gefahren`,
+      anker: async () => {
+        await expect(page.getByRole('button', { name: /^Bewertung / })).toHaveCount(58);
+        await expect(page.getByRole('heading', { name: /Sektor Sprung 1/ })).toBeVisible();
+      },
+    },
+  ];
+  const gemessen: string[] = [];
+  for (const route of ROUTEN) {
+    for (const dichte of ['kompakt', 'handschuh'] as const) {
+      await page.goto(route.pfad);
+      await stelleDichte(page, dichte);
+      await route.anker();
+      await schriftenGeladen(page);
+      const messung = await ruheShifts(page);
+      gemessen.push(`${route.name}/${dichte}: ${bericht(messung)}`);
+      expect(messung.summe, `${route.name}/${dichte}: ${bericht(messung)}`).toBeLessThanOrEqual(
+        CLS_GUT,
+      );
+    }
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+/**
+ * Fremdänderung einer Matrixzelle (LFH-373, Prüfliste Gefahrenmatrix Zeile 12): eine Bewertung,
+ * die live eintrifft, färbt die Zelle um, ohne die Tabelle zu verschieben.
+ *
+ * VORBEDINGUNG: die Zelle trägt danach wirklich die neue `data-warnstufe` — sonst wäre „kein
+ * Sprung" auch dann wahr, wenn das Live-Ereignis nie ankam. Gemessen wird ab dem Ruhezustand
+ * (`setzeShiftsZurueck`), die Ladephase zählt nicht mit. Die Änderung kommt über
+ * `page.request` (Präzedenz: `abloesung-zufluss.spec.ts`); dass sie vom selben Benutzer stammt,
+ * ändert am Weg über den Live-Strom und das Nachladen der Matrix nichts.
+ */
+test('Fremdänderung (LFH-373): eine live eintreffende Bewertung verschiebt die Matrix nicht', async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+  await beobachteShifts(page);
+  await anmelden(page);
+  const { id, gid } = await matrixEinsatz(page, `Flaeche 373 Fremd ${Date.now()}`);
+  const gemessen: string[] = [];
+  for (const flaeche of [
+    { width: 390, height: 844 },
+    { width: 1366, height: 768 },
+  ]) {
+    await page.setViewportSize(flaeche);
+    await page.goto(`/einsaetze/${id}/gefahren`);
+    await expect(page.getByRole('button', { name: /^Bewertung / })).toHaveCount(58);
+    await schriftenGeladen(page);
+    await ruheShifts(page);
+    const tabelle = page.locator('.gefahren-matrix');
+    const vorher = (await tabelle.boundingBox())!;
+    await setzeShiftsZurueck(page);
+
+    const stufe = flaeche.width < 768 ? 'akut' : 'hoch';
+    const antwort = await page.request.put(
+      `/api/einsaetze/${id}/gefahrengebiete/${gid}/matrix/bewertung`,
+      { data: { gefahrentyp: 'atemgifte', schutzobjekt: 'menschen', warnstufe: stufe } },
+    );
+    expect(antwort.ok(), await antwort.text()).toBeTruthy();
+    const zelle = page.locator('td', {
+      has: page.getByRole('button', { name: /^Bewertung Atemgifte × Menschen/ }),
+    });
+    await expect(zelle).toHaveAttribute('data-warnstufe', stufe);
+
+    const messung = await ruheShifts(page);
+    const nachher = (await tabelle.boundingBox())!;
+    const lauf = `${flaeche.width}×${flaeche.height}`;
+    gemessen.push(
+      `${lauf}: ${bericht(messung)}, Tabelle ${Math.round(vorher.y)} → ${Math.round(nachher.y)}`,
+    );
+    expect(nachher.y, `${lauf}: die Tabelle steht an derselben Stelle`).toBeCloseTo(vorher.y, 0);
+    expect(messung.summe, `${lauf}: ${bericht(messung)}`).toBeLessThanOrEqual(CLS_GUT);
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
