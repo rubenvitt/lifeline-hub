@@ -1,6 +1,7 @@
 import { createRef } from 'react';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { setzeViewportBreite } from '../test/viewport';
 import { http, HttpResponse } from 'msw';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NeuerEintrag } from '../api/etb';
@@ -259,6 +260,34 @@ describe('Schnellerfassung', () => {
       'placeholder',
       'Inhalt … ( / für Typ, Felder & Bausteine · @ für Einheit )',
     );
+  });
+
+  /**
+   * LFH-373 (Checkpoint 25.09.2026): unter `md` wird die Hinweiszeile zur einzeiligen
+   * Kurzform mit dem Tastaturvertrag. Befehle und Einheit stehen dort schon im Platzhalter;
+   * der Vertrag stand nur hier und bleibt deshalb — genau einmal. Hintergrund: die angepinnte
+   * Leiste belegte auf dem Handschirm im Handschuh-Betrieb sonst über die Hälfte des Fensters.
+   */
+  it('unter md: Kurzform des Enter-Vertrags, einmal, ohne Befehlsliste', () => {
+    setzeViewportBreite(390);
+    renderMitProviders(<Schnellerfassung {...props()} />);
+    expect(screen.getAllByText('Enter sendet · Shift+Enter neue Zeile')).toHaveLength(1);
+    expect(screen.queryByText(/Mehrzeiler mit Cmd\/Strg\+Enter/)).toBeNull();
+    expect(screen.queryByText('@ Einheit')).toBeNull();
+  });
+
+  /**
+   * LFH-373: „Vorschau" steht neben „Erfassen" statt auf eigener Zeile unter dem Feld —
+   * genau EIN Umschalter, und er wirkt.
+   */
+  it('Vorschau steht einmal in der Aktionszeile und blendet die Vorschau ein', async () => {
+    const { container } = renderMitProviders(<Schnellerfassung {...props()} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, '**fett**');
+    expect(screen.getAllByRole('button', { name: 'Vorschau' })).toHaveLength(1);
+    expect(container.querySelector('.markdown strong')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Vorschau' }));
+    expect(container.querySelector('.markdown strong')).toHaveTextContent('fett');
   });
 
   it('/ öffnet Menü; Feld „Von" wird als Chip erfasst und mitgesendet', async () => {

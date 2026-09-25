@@ -1,5 +1,5 @@
 import { Alert, Button, Checkbox, Dropdown, Space, Tooltip, Typography } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
+import { EyeOutlined, PlusOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router';
@@ -16,6 +16,7 @@ import { etbTyp } from '../theme/statusFarben';
 import type { BausteinFelder } from './bausteinEinsetzen';
 import MarkdownEditor, { type TextAreaRef } from '../components/MarkdownEditor';
 import { Schnellerfassungszeile, useRollen } from '../components/instrument';
+import { useViewport } from '../components/useViewport';
 import MetaChip from './MetaChip';
 import { useFunkrufnamen } from './funkrufnamen';
 import SlashMenu, { type SlashMenuHandle } from './SlashMenu';
@@ -58,6 +59,13 @@ interface Props {
 const TYP_MENUE = ERFASSBARE_TYPEN.map((t) => ({ key: t, label: etbTyp[t].label }));
 const ENTER_HINWEIS =
   'Enter sendet · Shift+Enter neue Zeile · Mehrzeiler mit Cmd/Strg+Enter senden';
+/**
+ * Kurzform für den Handschirm (LFH-373, Checkpoint 25.09.2026): nur der Tastaturvertrag.
+ * Befehle und `@ Einheit` stehen schon im Platzhalter; der Vertrag stand NUR in der
+ * Hinweiszeile und bleibt deshalb stehen — genau einmal (Erfassungs-Norm, LFH-335).
+ * Cmd/Strg+Enter entfällt: auf einem Handschirm gibt es die Taste nicht.
+ */
+const ENTER_HINWEIS_KURZ = 'Enter sendet · Shift+Enter neue Zeile';
 
 /**
  * Eigener Wortlaut, nicht der aus `components/Erfassung.tsx`: hier gibt es keinen
@@ -99,6 +107,10 @@ export default function Schnellerfassung({
 }: Props) {
   const navigate = useNavigate();
   const { token, rollen } = useRollen();
+  // Unter `md` steht das Feld auf eigener Zeile (LFH-373): zwischen Typ-Präfix und „Erfassen"
+  // blieb es gemessen auf 158 von 366 px, und die angepinnte Leiste wuchs auf 59 % des Fensters.
+  const { istSchmal } = useViewport();
+  const [vorschauOffen, setVorschauOffen] = useState(false);
   const textRef = useRef<TextAreaRef>(null);
   const menuRef = useRef<SlashMenuHandle>(null);
   const feldKnopfRef = useRef<HTMLButtonElement>(null);
@@ -366,7 +378,11 @@ export default function Schnellerfassung({
    * „⧖ Nachtrag" steht, weil `/zeit` eine zurückliegende Ereigniszeit setzt und der
    * Eintrag dann als nachgetragen erscheint.
    */
-  const hinweiszeile = (
+  // Unter `md` die Kurzform (LFH-373): die volle Zeile brach auf dem Handschirm auf drei
+  // Zeilen um und trieb die angepinnte Leiste über die Hälfte des Fensters.
+  const hinweiszeile = istSchmal ? (
+    <span>{ENTER_HINWEIS_KURZ}</span>
+  ) : (
     <>
       {!berichtigungZu && (
         <span style={{ color: rollen.gedaempft }}>{TYP_BEFEHLE.map((t) => `/${t}`).join(' ')}</span>
@@ -397,11 +413,29 @@ export default function Schnellerfassung({
 
       <div style={{ position: 'relative' }}>
         <Schnellerfassungszeile
+          gestapelt={istSchmal}
           praefix={praefix}
           hinweis={
-            <Button type="primary" loading={sendet} onClick={() => void absenden()}>
-              Erfassen
-            </Button>
+            // „Vorschau" neben „Erfassen" statt auf eigener Zeile unter dem Feld (LFH-373): die
+            // eigene Knopfzeile kostete im Handschuh-Betrieb eine volle Steuerhöhe der
+            // angepinnten Leiste (gemessen 440 px = 57 % des Fükw-Fensters).
+            <div style={{ display: 'flex', alignItems: 'center', gap: token.marginXS }}>
+              <Button
+                type="text"
+                icon={
+                  <span aria-hidden="true" style={{ display: 'inline-flex' }}>
+                    <EyeOutlined />
+                  </span>
+                }
+                aria-pressed={vorschauOffen}
+                onClick={() => setVorschauOffen((v) => !v)}
+              >
+                Vorschau
+              </Button>
+              <Button type="primary" loading={sendet} onClick={() => void absenden()}>
+                Erfassen
+              </Button>
+            </div>
           }
           hinweiszeile={hinweiszeile}
         >
@@ -413,6 +447,8 @@ export default function Schnellerfassung({
             variante="kompakt"
             placeholder="Inhalt … ( / für Typ, Felder & Bausteine · @ für Einheit )"
             autoSize={{ minRows: 1, maxRows: 4 }}
+            umschalterAussen
+            vorschauOffen={vorschauOffen}
             value={inhalt}
             onChange={onInhaltChange}
             onKeyDown={onKeyDown}
