@@ -476,8 +476,9 @@ hochladende Person aber könnte die Datei generisch laden und hart löschen**, d
 den Linker am Soft-Delete und am ETB-Nachweis vorbei mit, und der Sweep löschte sie nach
 24 h. **Abschottungstests laufen deshalb als die ablegende Person** (`admin`, Hilfe
 `common::schaden_anhang`); als jemand anderes wären sie auch ohne Eintrag grün.
-**Kreuzsperren:** das ETB verknüpft keine Chat- oder Dokument-Datei (422),
-der Chat keine ETB-Datei (sein 400). Eigene Routen unter dem ETB-Präfix: Upload `POST
+**Kreuzsperren, beide aus dem Register:** das ETB verknüpft
+keine Chat- und keine modulgebundene Datei (422, Wortlaut aus `gebunden_meldung()`), der Chat
+keine modulgebundene Datei — Dokument, ETB, Schaden, jeder künftige Eintrag (sein 400). Eigene Routen unter dem ETB-Präfix: Upload `POST
 …/etb/anhaenge` mit der **Dokument-Allowlist** (HEIC/TIFF), eine Datei je Anfrage, und
 Download `GET …/etb/{eintrag_id}/anhaenge/{aid}` mit den Lese-Gates und EINER
 Bindungsabfrage. Das Erfassen bindet über `anhang_ids` in derselben Transaktion wie der

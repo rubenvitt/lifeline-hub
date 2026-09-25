@@ -11,8 +11,8 @@ use axum::Json;
 use super::support::anhang_antwort;
 
 /// Ein UNGEBUNDENER Anhang gehört vorerst der Person, die ihn hochgeladen hat (LFH-117,
-/// Review C1, design.md D12): wem er gehören wird — Chat, ETB, Dokumentenablage —, steht erst
-/// mit dem Linker fest, und bis dahin kennt die modul-lose generische Route kein Modul-Gate.
+/// Review C1, design.md D12): wem er gehören wird — dem Chat oder einem modulgebundenen Linker
+/// aus `anhang::repo::MODUL_LINKER` —, steht erst mit dem Linker fest, und bis dahin kennt die modul-lose generische Route kein Modul-Gate.
 /// Ein ETB-Foto, dessen Erfassen vorübergehend scheiterte, läge sonst bis zu 24 h für jede
 /// lesende Person ladbar und für jede schreibende löschbar. Fremde bekommen 404 wie für einen
 /// unbekannten Anhang — die Existenz bleibt verdeckt. Gebundene Anhänge sind nicht betroffen.
@@ -62,9 +62,10 @@ pub async fn hochladen(
 ///
 /// Gatet zusätzlich über [`anhang::repo::linker_stand`] (Aggregation über ALLE Linker):
 /// (LFH-116) hängt der Anhang NUR noch an soft-gelöschten Nachrichten, ist er gesperrt
-/// (404) — der Direkt-Deeplink umgeht sonst die Frontend-Ausblendung; (LFH-632) gehört er
-/// zur Dokumentenablage, ist er nur über die modul-gegatete Dokument-Route ladbar (404);
-/// (LFH-117) hängt er an einem ETB-Eintrag, nur über die ETB-Route (404).
+/// (404) — der Direkt-Deeplink umgeht sonst die Frontend-Ausblendung; hängt er an einem
+/// modulgebundenen Linker (Register `anhang::repo::MODUL_LINKER`: Dokumentenablage, ETB,
+/// Schaden, …), ist er nur über die modul-gegatete Route seines Moduls ladbar (404) — auch
+/// ein dort entfernter.
 /// An einer lebenden Nachricht hängende Anhänge bleiben ladbar (n:m); ein ungebundener nur
 /// für die hochladende Person (Review C1 zu LFH-117).
 pub async fn herunterladen(
@@ -77,9 +78,9 @@ pub async fn herunterladen(
     if !anhang::repo::gehoert_anhang_zu_einsatz(&state.pool, anhang_id, einsatz_id).await? {
         return Err(AppError::NotFound);
     }
-    // LFH-116 + LFH-632: Aggregation über ALLE Linker. Gesperrt, wenn der Anhang zur
-    // Dokumentenablage gehört (nur über die modul-gegatete Route ladbar) oder nur noch an
-    // soft-gelöschten Chat-Nachrichten hängt (Tombstone).
+    // Aggregation über ALLE Linker. Gesperrt, wenn der Anhang an einem modulgebundenen
+    // Linker hängt (Register, nur über die modul-gegatete Route ladbar) oder nur noch an
+    // soft-gelöschten Chat-Nachrichten (Tombstone, LFH-116).
     let linker = anhang::repo::linker_stand(&state.pool, anhang_id).await?;
     if linker.generischer_download_gesperrt() {
         return Err(AppError::NotFound);
