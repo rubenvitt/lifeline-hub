@@ -519,11 +519,9 @@ pub async fn setze_offen(
 /// Meldet Vollzug: Rückmeldetext am Auftrag, Vollzug-Achse → 'vollzogen' und ein
 /// ETB-Folgeeintrag (typ='meldung', gemeinsames auftrag_id). Liefert die ETB-`id`.
 ///
-/// Pool-Hülle um [`melde_vollzug_tx`] in `write_retry!` (`BEGIN IMMEDIATE`). Bis LFH-690 lag
-/// der Einstellungs-Lesezugriff vor einem deferred `pool.begin()`; seit er in der
-/// Transaktion liegt, liest sie zuerst und schreibt dann. Unter deferred `BEGIN` wäre das ein
-/// Lock-Upgrade, das SQLite bei fremdem Writer sofort mit `SQLITE_BUSY` abweist
-/// (`crate::tx`); dieselbe Begründung wie bei `meldung`/`personal` (Block 3a).
+/// Pool-Hülle um [`melde_vollzug_tx`], im Verhalten wie vor dem Split: den ETB-Startwert liest
+/// sie über den Pool, danach öffnet sie ein deferred `pool.begin()`, ruft den Rumpf und
+/// committet. Die erste Anweisung der Transaktion ist ein Schreibzugriff.
 pub async fn melde_vollzug(
     pool: &SqlitePool,
     org_id: i64,
@@ -533,35 +531,40 @@ pub async fn melde_vollzug(
     vollzugsmeldung: &str,
     jetzt: &str,
 ) -> Result<i64, AppError> {
-    crate::write_retry!(pool, |conn| {
-        melde_vollzug_tx(
-            conn,
-            org_id,
-            einsatz_id,
-            auftrag_id,
-            von_id,
-            vollzugsmeldung,
-            jetzt,
-        )
-        .await
-    })
+    let etb_startwert = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id)
+        .await?
+        .etb_startwert();
+    let mut tx = pool.begin().await?;
+    let etb_id = melde_vollzug_tx(
+        &mut tx,
+        org_id,
+        einsatz_id,
+        auftrag_id,
+        von_id,
+        etb_startwert,
+        vollzugsmeldung,
+        jetzt,
+    )
+    .await?;
+    tx.commit().await?;
+    Ok(etb_id)
 }
 
 /// Rumpf von [`melde_vollzug`] auf einer offenen Verbindung/Transaktion (LFH-690, Demo-Import
-/// in EINER Transaktion). Der ETB-Startwert kommt aus den Einstellungen, gelesen auf
-/// derselben Verbindung. Öffnet und committet selbst nichts.
+/// in EINER Transaktion). Den ETB-Startwert bringt der Aufrufer mit, nach dem Muster von
+/// [`anlegen_tx`]; der Import lädt ihn auf seiner eigenen Verbindung. Öffnet und committet
+/// selbst nichts.
+#[allow(clippy::too_many_arguments)]
 pub async fn melde_vollzug_tx(
     conn: &mut sqlx::SqliteConnection,
     org_id: i64,
     einsatz_id: i64,
     auftrag_id: i64,
     von_id: i64,
+    etb_startwert: i64,
     vollzugsmeldung: &str,
     jetzt: &str,
 ) -> Result<i64, AppError> {
-    let etb_startwert = crate::einsatz::einstellungen::laden_oder_default(&mut *conn, einsatz_id)
-        .await?
-        .etb_startwert();
     sqlx::query("UPDATE auftrag SET vollzugsmeldung = ? WHERE id = ?")
         .bind(vollzugsmeldung)
         .bind(auftrag_id)

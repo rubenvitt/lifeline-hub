@@ -1016,6 +1016,7 @@ impl Ablauf<'_> {
                     self.einsatz_id,
                     auftrag_id,
                     self.admin_id,
+                    self.startwert,
                     meldung,
                     zeit,
                 )
