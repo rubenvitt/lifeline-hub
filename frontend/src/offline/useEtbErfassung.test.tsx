@@ -26,6 +26,74 @@ beforeEach(async () => {
   await queueLeerenFuerTests();
 });
 
+describe('useEtbErfassung – Anhänge (LFH-117)', () => {
+  it('reiht einen transient gescheiterten Eintrag samt anhang_ids ein und sendet ihn unverändert', async () => {
+    const gesehen: NeuerEintrag[] = [];
+    let versuch = 0;
+    server.use(
+      http.post('/api/einsaetze/9/etb', async ({ request }) => {
+        gesehen.push((await request.json()) as NeuerEintrag);
+        versuch += 1;
+        return versuch === 1
+          ? HttpResponse.error()
+          : HttpResponse.json({ id: 1, lfd_nr: 1 }, { status: 201 });
+      }),
+    );
+    const { result } = renderHook(() => useEtbErfassung(9, 11), { wrapper });
+
+    // Löst sich OHNE Fehler auf: für die Schnellerfassung ist das Einreihen ein Erfolg.
+    await act(async () => {
+      await result.current.erfassen({ ...eintrag, anhang_ids: [4, 5] });
+    });
+    await waitFor(() => expect(result.current.ausstehend).toHaveLength(1));
+    expect(result.current.ausstehend[0].eintrag.anhang_ids).toEqual([4, 5]);
+
+    await act(async () => {
+      await result.current.flush();
+    });
+    await waitFor(() => expect(result.current.ausstehend).toHaveLength(0));
+    expect(gesehen).toHaveLength(2);
+    expect(gesehen[1].anhang_ids).toEqual([4, 5]);
+    expect(gesehen[1].client_id).toBe(gesehen[0].client_id);
+  });
+
+  it('sendet eine Queue-Zeile ohne anhang_ids (Altbestand) weiter', async () => {
+    const gesehen: NeuerEintrag[] = [];
+    server.use(
+      http.post('/api/einsaetze/9/etb', async ({ request }) => {
+        gesehen.push((await request.json()) as NeuerEintrag);
+        return HttpResponse.json({ id: 1, lfd_nr: 1 }, { status: 201 });
+      }),
+    );
+    await queueEinreihen(11, 9, { ...eintrag, client_id: 'alt-1' });
+    const { result } = renderHook(() => useEtbErfassung(9, 11), { wrapper });
+    await act(async () => {
+      await result.current.flush();
+    });
+    await waitFor(() => expect(result.current.ausstehend).toHaveLength(0));
+    expect(gesehen.at(-1)).toMatchObject({ client_id: 'alt-1', inhalt: 'x' });
+    expect(gesehen.at(-1)).not.toHaveProperty('anhang_ids');
+  });
+
+  it('legt einen beim Flush mit 400 abgelehnten Eintrag mit dem Server-Wortlaut ab', async () => {
+    server.use(
+      http.post('/api/einsaetze/9/etb', () =>
+        HttpResponse.json({ error: 'Anhang unbekannt oder nicht mehr vorhanden' }, { status: 400 }),
+      ),
+    );
+    await queueEinreihen(11, 9, { ...eintrag, client_id: 'spaet-1', anhang_ids: [4] });
+    const { result } = renderHook(() => useEtbErfassung(9, 11), { wrapper });
+    await act(async () => {
+      await result.current.flush();
+    });
+    await waitFor(() => expect(result.current.abgelehnt).toHaveLength(1));
+    expect(result.current.abgelehnt[0]).toMatchObject({
+      eintrag: { inhalt: 'x', anhang_ids: [4] },
+      grund: 'Anhang unbekannt oder nicht mehr vorhanden',
+    });
+  });
+});
+
 describe('useEtbErfassung', () => {
   it('reiht bei Netzwerkfehler ein und sendet beim Flush nach', async () => {
     let versuch = 0;

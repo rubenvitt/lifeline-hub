@@ -20,6 +20,9 @@ export interface EtbEntwurfsTabsProps {
   onWerteBehaltenChange: (b: boolean) => void;
 }
 
+/** Stabile leere Liste: ein frisches `[]` je Render wäre für die Schnellerfassung jedes Mal neu. */
+const KEINE_DATEIEN: File[] = [];
+
 export default function EtbEntwurfsTabs({
   einsatzId,
   erfassen,
@@ -58,12 +61,32 @@ export default function EtbEntwurfsTabs({
    */
   const [uebernahme, setUebernahme] = useState<MetadatenWerte>({});
 
+  /**
+   * Gewählte Anhänge je Entwurf (LFH-117, design.md D9). Nur der aktive Tab ist montiert,
+   * also liegen die Dateien hier und nicht in der Schnellerfassung — sonst gingen sie beim
+   * Tabwechsel verloren. Bewusst NUR im Speicher: der Entwurfsspeicher (IndexedDB) ist JSON,
+   * und eine Datei überlebt einen Reload ohnehin nicht als `File`. Schliesst ein Entwurf,
+   * fällt sein Eintrag weg.
+   */
+  const [dateienJe, setDateienJe] = useState<Record<string, File[]>>({});
+  const dateienVerwerfen = useCallback((id: string) => {
+    setDateienJe((alt) => {
+      if (!(id in alt)) return alt;
+      const rest = { ...alt };
+      delete rest[id];
+      return rest;
+    });
+  }, []);
+
   const onEdit = useCallback(
     (targetKey: React.MouseEvent | React.KeyboardEvent | string, action: 'add' | 'remove') => {
       if (action === 'add') neuerEntwurf(werteBehalten ? uebernahme : {});
-      else if (typeof targetKey === 'string') void entwurfSchliessen(targetKey);
+      else if (typeof targetKey === 'string') {
+        dateienVerwerfen(targetKey);
+        void entwurfSchliessen(targetKey);
+      }
     },
-    [neuerEntwurf, entwurfSchliessen, werteBehalten, uebernahme],
+    [neuerEntwurf, entwurfSchliessen, werteBehalten, uebernahme, dateienVerwerfen],
   );
 
   const items = entwuerfe.map((e) => ({
@@ -82,6 +105,8 @@ export default function EtbEntwurfsTabs({
             // sonst tauchten alte Werte beim Wiedereinschalten wieder auf.
             const naechsteMetadaten = werteBehalten ? nurUebernahme(eintrag) : {};
             setUebernahme(naechsteMetadaten);
+            // Die Dateien sind jetzt am Eintrag — sie gehen mit dem Entwurf (LFH-117).
+            dateienVerwerfen(e.id);
             // Nur ein NEUER Folgeentwurf erhält die Übernahme. Ein bestehender Entwurf
             // bleibt auch mit bewusst leerem An maßgeblich (LFH-461).
             await entwurfSchliessen(e.id, naechsteMetadaten);
@@ -94,6 +119,8 @@ export default function EtbEntwurfsTabs({
           onWerteChange={(w) => entwurfAktualisieren(e.id, w)}
           werteBehalten={werteBehalten}
           onWerteBehaltenChange={onWerteBehaltenChange}
+          dateien={dateienJe[e.id] ?? KEINE_DATEIEN}
+          onDateienChange={(d) => setDateienJe((alt) => ({ ...alt, [e.id]: d }))}
         />
       ) : null,
   }));

@@ -300,4 +300,57 @@ describe('EtbEntwurfsTabs', () => {
       expect(screen.getAllByRole('tab', { name: /Neuer Eintrag/ })).toHaveLength(2),
     );
   });
+
+  // --- LFH-117: Anhänge je Entwurf, nur im Speicher ---
+
+  function dateiEingabe(): HTMLInputElement {
+    const el = document.querySelector<HTMLInputElement>('input[type="file"]');
+    if (!el) throw new Error('Dateieingabe fehlt');
+    return el;
+  }
+
+  it('LFH-117: gewählte Dateien gehören ihrem Entwurf und überleben den Tabwechsel', async () => {
+    renderMitProviders(<EtbEntwurfsTabs {...props()} />);
+    await screen.findByPlaceholderText(/Inhalt/);
+    const ersterTab = screen.getAllByRole('tab')[0];
+    await userEvent.upload(dateiEingabe(), new File(['x'], 'foto-a.jpg', { type: 'image/jpeg' }));
+    expect(screen.getByRole('list', { name: 'Gewählte Anhänge' })).toHaveTextContent('foto-a.jpg');
+
+    await userEvent.click(screen.getByRole('button', { name: /add|hinzu/i }));
+    await waitFor(() =>
+      expect(screen.getAllByRole('tab', { name: /Neuer Eintrag/ })).toHaveLength(2),
+    );
+    expect(screen.queryByRole('list', { name: 'Gewählte Anhänge' })).toBeNull();
+
+    await userEvent.click(ersterTab);
+    expect(await screen.findByRole('list', { name: 'Gewählte Anhänge' })).toHaveTextContent(
+      'foto-a.jpg',
+    );
+  });
+
+  it('LFH-117: der Entwurfsspeicher nimmt keine Dateien auf', async () => {
+    renderMitProviders(<EtbEntwurfsTabs {...props()} />);
+    await screen.findByPlaceholderText(/Inhalt/);
+    await userEvent.upload(dateiEingabe(), new File(['x'], 'foto-b.jpg', { type: 'image/jpeg' }));
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Foto');
+    await waitFor(async () => expect((await entwuerfeLaden(7))[0]?.inhalt).toBe('Foto'));
+    expect(JSON.stringify(await entwuerfeLaden(7))).not.toContain('foto-b.jpg');
+  });
+
+  it('LFH-117: ein geschlossener Entwurf nimmt seine Dateien mit', async () => {
+    renderMitProviders(<EtbEntwurfsTabs {...props()} />);
+    await screen.findByPlaceholderText(/Inhalt/);
+    await userEvent.upload(dateiEingabe(), new File(['x'], 'foto-c.jpg', { type: 'image/jpeg' }));
+    await userEvent.click(screen.getByRole('button', { name: /add|hinzu/i }));
+    await waitFor(() =>
+      expect(screen.getAllByRole('tab', { name: /Neuer Eintrag/ })).toHaveLength(2),
+    );
+    // Den ersten Entwurf schliessen (antds Entfernen-Knopf je Tab).
+    const entfernen = document.querySelectorAll<HTMLElement>('.ant-tabs-tab-remove');
+    await userEvent.click(entfernen[0]);
+    await waitFor(() =>
+      expect(screen.getAllByRole('tab', { name: /Neuer Eintrag/ })).toHaveLength(1),
+    );
+    expect(screen.queryByText(/foto-c\.jpg/)).toBeNull();
+  });
 });

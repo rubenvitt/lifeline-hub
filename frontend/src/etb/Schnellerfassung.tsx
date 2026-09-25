@@ -1,9 +1,12 @@
 import { Alert, Button, Checkbox, Dropdown, Space, Tooltip, Typography } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
+import { CloseOutlined, PaperClipOutlined, PlusOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router';
-import type { NeuerEintrag } from '../api/etb';
+import { DOKUMENT_ACCEPT, DOKUMENT_MAX_GROESSE } from '../api/dokumente';
+import { ladeEtbAnhangHoch, type NeuerEintrag } from '../api/etb';
+import { formatGroesse } from '../karten/formatGroesse';
+import { useOnline } from '../offline/useOnline';
 import type {
   EinsatzAnzeige,
   EtbBaustein,
@@ -53,6 +56,31 @@ interface Props {
   werteBehalten?: boolean;
   /** Fehlt der Callback, rendert die Steuerzeile den Schalter nicht (Berichtigung, Bestandsaufrufer). */
   onWerteBehaltenChange?: (behalten: boolean) => void;
+  /**
+   * Gewählte Anhänge, optional von außen geführt (LFH-117, design.md D9): `EtbEntwurfsTabs`
+   * montiert nur den aktiven Tab und hält die Dateien je Entwurf, damit sie einen Tabwechsel
+   * überleben. Fehlt das Paar, führt die Schnellerfassung die Liste selbst (Berichtigung).
+   * Dateien gehen nie in den Entwurfsspeicher — der ist JSON.
+   */
+  dateien?: File[];
+  onDateienChange?: (dateien: File[]) => void;
+}
+
+/**
+ * Welche Datei schon oben liegt (LFH-117, design.md D9): bei einem Teilausfall — Datei 1
+ * oben, Datei 2 gescheitert — lädt der nächste Versuch nur Datei 2. Auf Modulebene, weil
+ * `EtbEntwurfsTabs` die Schnellerfassung beim Tabwechsel neu montiert; ein `WeakMap` nach
+ * `File` hält keine Datei fest, die niemand mehr kennt. Lehnt der Server den Eintrag
+ * fachlich ab, werden die Zuordnungen dieses Versuchs verworfen: die ID könnte die Ursache
+ * sein (etwa ein inzwischen weggeräumter Anhang).
+ */
+const hochgeladeneIds = new WeakMap<File, number>();
+
+const ANHANG_OFFLINE = 'Anhänge brauchen eine Verbindung. Der Text lässt sich trotzdem erfassen.';
+const ANHANG_ZU_GROSS = `ist zu groß (${DOKUMENT_MAX_GROESSE / 1024 / 1024} MiB erlaubt)`;
+
+function fehlerGrund(e: unknown): string {
+  return e instanceof Error && e.message ? e.message : 'unbekannter Fehler';
 }
 
 const TYP_MENUE = ERFASSBARE_TYPEN.map((t) => ({ key: t, label: etbTyp[t].label }));
@@ -96,10 +124,23 @@ export default function Schnellerfassung({
   onWerteChange,
   werteBehalten = false,
   onWerteBehaltenChange,
+  dateien: dateienVonAussen,
+  onDateienChange,
 }: Props) {
   const navigate = useNavigate();
   const { token, rollen } = useRollen();
+  const online = useOnline();
   const textRef = useRef<TextAreaRef>(null);
+  const dateiEingabe = useRef<HTMLInputElement>(null);
+  const [eigeneDateien, setEigeneDateien] = useState<File[]>([]);
+  const dateien = dateienVonAussen ?? eigeneDateien;
+  function setzeDateien(neu: File[]) {
+    if (onDateienChange) onDateienChange(neu);
+    else setEigeneDateien(neu);
+  }
+  /** Hinweis an der Dateiliste — bleibt stehen bis zur nächsten Wahl oder zum nächsten Absenden. */
+  const [anhangHinweis, setAnhangHinweis] = useState<string | null>(null);
+  const [fortschritt, setFortschritt] = useState<{ n: number; von: number } | null>(null);
   const menuRef = useRef<SlashMenuHandle>(null);
   const feldKnopfRef = useRef<HTMLButtonElement>(null);
 
@@ -293,19 +334,85 @@ export default function Schnellerfassung({
     }
   }
 
+  /** Dateiwahl: über 25 MiB wird schon hier abgewiesen, nicht erst nach dem Upload. */
+  function dateienGewaehlt(liste: FileList | null) {
+    const neu = [...dateien];
+    const zuGross: string[] = [];
+    for (const d of Array.from(liste ?? [])) {
+      if (d.size > DOKUMENT_MAX_GROESSE) zuGross.push(`${d.name} ${ANHANG_ZU_GROSS}`);
+      else if (!neu.includes(d)) neu.push(d);
+    }
+    setAnhangHinweis(zuGross.length > 0 ? zuGross.join(' · ') : null);
+    setzeDateien(neu);
+    // Dieselbe Datei soll sich nach dem Entfernen erneut wählen lassen.
+    if (dateiEingabe.current) dateiEingabe.current.value = '';
+  }
+
+  /**
+   * Lädt die gewählten Dateien nacheinander hoch (eine je Anfrage) und liefert ihre IDs in
+   * Wahlreihenfolge — oder `null`, wenn eine scheitert; dann steht der Grund am Hinweis und
+   * es wird NICHT erfasst.
+   */
+  async function ladeAnhaengeHoch(): Promise<number[] | null> {
+    const ids: number[] = [];
+    for (const [i, d] of dateien.entries()) {
+      let id = hochgeladeneIds.get(d);
+      if (id == null) {
+        setFortschritt({ n: i + 1, von: dateien.length });
+        try {
+          id = (await ladeEtbAnhangHoch(einsatz.id, d)).id;
+        } catch (e) {
+          setAnhangHinweis(
+            `${d.name} konnte nicht hochgeladen werden: ${fehlerGrund(e)}. ` +
+              'Der Eintrag ist nicht erfasst.',
+          );
+          return null;
+        }
+        hochgeladeneIds.set(d, id);
+      }
+      ids.push(id);
+    }
+    return ids;
+  }
+
   async function absenden() {
     if (sendet || inhalt.trim() === '') return;
+    // Nur der UPLOAD braucht Netz (design.md D10). Mit Dateien in der Liste wird ohne
+    // Verbindung abgewiesen, ohne etwas zu leeren — ein Eintrag ohne die gewählten Dateien
+    // wäre eine stille Auslassung.
+    if (dateien.length > 0 && !online) {
+      setAnhangHinweis(
+        'Ohne Verbindung lassen sich keine Anhänge senden. ' +
+          'Entferne sie, um den Text jetzt zu erfassen.',
+      );
+      return;
+    }
     setSendet(true);
+    setAnhangHinweis(null);
     try {
-      const eintrag = baueEintrag({
-        inhalt,
-        typ,
-        metadaten,
-        berichtigungZuId: berichtigungZu ? berichtigungZu.id : undefined,
-        jetztIso: new Date().toISOString(),
-      });
-      await erfassen(eintrag);
+      const anhangIds = await ladeAnhaengeHoch();
+      setFortschritt(null);
+      if (anhangIds == null) return;
+      const eintrag: NeuerEintrag = {
+        ...baueEintrag({
+          inhalt,
+          typ,
+          metadaten,
+          berichtigungZuId: berichtigungZu ? berichtigungZu.id : undefined,
+          jetztIso: new Date().toISOString(),
+        }),
+        ...(anhangIds.length > 0 ? { anhang_ids: anhangIds } : {}),
+      };
+      try {
+        await erfassen(eintrag);
+      } catch (e) {
+        for (const d of dateien) hochgeladeneIds.delete(d);
+        throw e;
+      }
       setInhalt('');
+      // Die Dateiliste geht immer — auch mit „Werte behalten": eine Datei gehört zu genau
+      // einem Eintrag (`nurUebernahme` kennt keine Dateien).
+      setzeDateien([]);
       // Wertübernahme: Von/An/Meldeweg bleiben stehen, alles andere fällt weg. Im
       // Berichtigungsmodus bleibt es beim vollständigen Leeren (dort gibt es auch keinen
       // Schalter). Greift für Aufrufer OHNE Remount; `EtbEntwurfsTabs` remountet und setzt
@@ -321,6 +428,7 @@ export default function Schnellerfassung({
       // Weiterwerfen hieße hier nur eine unbehandelte Zurückweisung aus `void absenden()`.
     } finally {
       setSendet(false);
+      setFortschritt(null);
     }
   }
 
@@ -400,7 +508,7 @@ export default function Schnellerfassung({
           praefix={praefix}
           hinweis={
             <Button type="primary" loading={sendet} onClick={() => void absenden()}>
-              Erfassen
+              {fortschritt ? `Lädt hoch (${fortschritt.n}/${fortschritt.von}) …` : 'Erfassen'}
             </Button>
           }
           hinweiszeile={hinweiszeile}
@@ -498,6 +606,32 @@ export default function Schnellerfassung({
           >
             Feld
           </Button>
+          {/* „Anhang" (LFH-117): ein antd-Knopf plus unsichtbare Dateieingabe statt antds
+              `Upload` — der wickelte den Knopf in ein zweites `role="button"` mit eigenem
+              Tabstopp. So bleibt EIN Bedienziel, und die Höhe kommt aus `controlHeight`. */}
+          <Button
+            type="dashed"
+            disabled={!online}
+            icon={
+              <span aria-hidden="true" style={{ display: 'inline-flex' }}>
+                <PaperClipOutlined />
+              </span>
+            }
+            onClick={() => dateiEingabe.current?.click()}
+          >
+            Anhang
+          </Button>
+          <input
+            ref={dateiEingabe}
+            type="file"
+            multiple
+            hidden
+            accept={DOKUMENT_ACCEPT}
+            data-lfh="etb-anhang-eingabe"
+            onChange={(e) => dateienGewaehlt(e.target.files)}
+          />
+          {/* Zweiter Kanal neben dem Grau (WCAG 1.4.1): der Grund steht als Satz daneben. */}
+          {!online && <Typography.Text type="secondary">{ANHANG_OFFLINE}</Typography.Text>}
           {!berichtigungZu && typ === 'lage' && (
             <Button type="link" onClick={() => navigate(`/einsaetze/${einsatz.id}/lageberichte`)}>
               Als strukturierten Lagebericht erfassen →
@@ -517,6 +651,47 @@ export default function Schnellerfassung({
           </div>
         )}
       </div>
+
+      {dateien.length > 0 && (
+        <ul
+          aria-label="Gewählte Anhänge"
+          data-lfh="etb-anhang-liste"
+          style={{
+            listStyle: 'none',
+            margin: 0,
+            marginTop: token.marginXS,
+            padding: 0,
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: token.marginXS,
+          }}
+        >
+          {dateien.map((d, i) => (
+            <li
+              key={`${d.name}-${i}`}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: token.marginXXS }}
+            >
+              <span>
+                {d.name} · {formatGroesse(d.size)}
+              </span>
+              <Button
+                type="text"
+                disabled={sendet}
+                aria-label={`Anhang ${d.name} entfernen`}
+                icon={
+                  <span aria-hidden="true" style={{ display: 'inline-flex' }}>
+                    <CloseOutlined />
+                  </span>
+                }
+                onClick={() => setzeDateien(dateien.filter((x) => x !== d))}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
+      {anhangHinweis && (
+        <Alert type="error" showIcon style={{ marginTop: token.marginXS }} title={anhangHinweis} />
+      )}
 
       <BausteinPlatzhalterModal
         baustein={bausteinOffen}
