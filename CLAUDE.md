@@ -531,7 +531,8 @@ Alltag wichtigsten:
   `theme/tokens.ts` gibt über `ConfigProvider button.style` jedem Knopf `minWidth` =
   `controlHeightSM`, denn antds `paddingInlineSM` ist das Literal 7 und ein „OK" blieb in jeder
   Stufe ~38 px breit. Ein Boden, keine Polsterung: breite Etiketten bleiben unberührt. Die eine
-  benannte Ausnahme (`minWidth: 0`) ist die Aktionszeile der UHS-Platzkarte; sie fällt mit LFH-379.
+  benannte Ausnahme (`minWidth: 0`, Aktionszeile der UHS-Platzkarte) ist mit LFH-379 gefallen:
+  die Zeile steht nur noch in `kompakt`, und dort ist der Boden das Quadrat, mit dem sie rechnet.
   **Ein handgebautes Bedienziel** (`role="option"`-Zeile, `<div onClick>`, Zeilen-`<Link>`,
   Kommandopalette) braucht **zwei** Angaben: `minHeight: token.controlHeight` **plus** `padding`
   aus `token.paddingSM`/`token.padding`, aus aufgelösten Tokens, nie `var(--lfh-*)`, geprüft über
