@@ -377,6 +377,61 @@ describe('Schnellerfassung – Sendezustand (LFH-117, Review)', () => {
     expect(screen.getByRole('button', { name: 'Anhang' })).toBeEnabled();
   });
 
+  /**
+   * Review C1: gesperrt war nur Text und „Anhang" — Typ, „Feld", die Chips und „Werte
+   * behalten" blieben bedienbar, und was man dort während des Uploads änderte, ging nicht mit
+   * und wurde nach dem Erfolg still geleert. Geprüft wird die GANZE Erfassung, mit einer
+   * ausdrücklichen Ausnahmeliste: ein neues Bedienelement rutscht so nicht durch.
+   */
+  it('sperrt während des Absendens JEDES Bedienelement der Erfassung ausser „Vorschau"', async () => {
+    let freigeben: (a: Anhang) => void = () => {};
+    hochladen.mockImplementationOnce(() => new Promise((r) => (freigeben = r)));
+    const p = props({
+      initialWerte: { inhalt: '', typ: 'meldung', metadaten: { an: 'Florian 1', von: 'Kater 2' } },
+      werteBehalten: false,
+      onWerteBehaltenChange: vi.fn(),
+      bausteine: [{ id: 3, titel: 'Lage', inhalt: 'Text' } as unknown as EtbBaustein],
+    });
+    const { container } = renderMitProviders(<Schnellerfassung {...p} />);
+    await waehle(container, datei('a.jpg'));
+    await userEvent.type(feld(), 'Foto{Enter}');
+    await screen.findByText('Lädt hoch (1/1) …');
+
+    const bereich = container.querySelector<HTMLElement>('[data-lfh="etb-erfassung"]')!;
+    const ausnahmen = new Set(['Vorschau']);
+    const offen: string[] = [];
+    for (const el of bereich.querySelectorAll<HTMLElement>(
+      'button, input, textarea, select, [role="button"], [role="combobox"]',
+    )) {
+      const name =
+        el.getAttribute('aria-label') ?? el.textContent?.trim() ?? el.getAttribute('type') ?? '';
+      if (ausnahmen.has(name)) continue;
+      // „Erfassen" steht im Ladezustand — antd nimmt dann keinen Klick an.
+      if (el.classList.contains('ant-btn-loading')) continue;
+      const gesperrt =
+        (el as HTMLButtonElement).disabled ||
+        el.getAttribute('aria-disabled') === 'true' ||
+        (el as HTMLInputElement).readOnly;
+      if (!gesperrt) offen.push(`${el.tagName.toLowerCase()} „${name}"`);
+    }
+    expect(offen).toEqual([]);
+
+    // Auch der Maus-Schnellweg am Chip-Text öffnet keinen Editor.
+    await userEvent.click(screen.getByText('An: Florian 1'));
+    expect(screen.queryByRole('combobox', { name: 'An' })).toBeNull();
+    expect(screen.queryByRole('textbox', { name: 'An' })).toBeNull();
+
+    await act(async () => freigeben(anzeige(1, 'a.jpg')));
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(p.erfassen).mock.calls[0][0]).toMatchObject({
+      typ: 'meldung',
+      an: 'Florian 1',
+      von: 'Kater 2',
+    });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Feld' })).toBeEnabled());
+    expect(screen.getByRole('button', { name: /Eintragstyp/ })).toBeEnabled();
+  });
+
   it('schickt die client_id des Aufrufers', async () => {
     const p = props({ clientId: 'entwurf-7' });
     renderMitProviders(<Schnellerfassung {...p} />);

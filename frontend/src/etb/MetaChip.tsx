@@ -20,6 +20,8 @@ interface Props {
   onCancel: (feld: MetaFeld) => void;
   onRemove: (feld: MetaFeld) => void;
   onEdit: (feld: MetaFeld) => void;
+  /** Während des Sendens (LFH-117, Review C1): kein Schnellweg, kein Aktionsmenü. */
+  gesperrt?: boolean;
 }
 
 function feldDef(feld: MetaFeld) {
@@ -56,6 +58,7 @@ export default function MetaChip({
   onCancel,
   onRemove,
   onEdit,
+  gesperrt = false,
 }: Props) {
   const d = feldDef(feld);
   const [text, setText] = useState(typeof wert === 'string' ? wert : '');
@@ -170,11 +173,15 @@ export default function MetaChip({
         Geschwisterknoten des Menüs, und es braucht überhaupt kein `stopPropagation`
         mehr.
       */}
-      <span onClick={() => onEdit(feld)} style={{ cursor: 'pointer' }}>
+      <span
+        onClick={gesperrt ? undefined : () => onEdit(feld)}
+        style={{ cursor: gesperrt ? 'default' : 'pointer' }}
+      >
         {d.label}: {anzeige(feld, wert)}
       </span>
       <Dropdown
         trigger={['click']}
+        disabled={gesperrt}
         /*
          * `autoFocus` aus demselben Grund wie am Aktionsmenü der Zeile in `EtbZeitachse.tsx`
          * und in `components/Datensicht.tsx`: ohne ihn bleibt der Fokus am
@@ -204,7 +211,12 @@ export default function MetaChip({
           Dichtestufe mit (30 / 48 / 72 px). Genau das konnte das ~10-px-`closeIcon`
           nicht, das hier vorher stand.
         */}
-        <Button type="text" aria-label={`Aktionen zu ${d.label}`} icon={<MoreOutlined />} />
+        <Button
+          type="text"
+          disabled={gesperrt}
+          aria-label={`Aktionen zu ${d.label}`}
+          icon={<MoreOutlined />}
+        />
       </Dropdown>
     </Tag>
   );

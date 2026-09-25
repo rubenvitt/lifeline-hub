@@ -380,7 +380,14 @@ export default function Schnellerfassung({
     setInhalt(inhalt.slice(0, triggerStart) + inhalt.slice(caret));
   }
 
+  /*
+   * Während des Sendens nimmt die Erfassung keine Änderung an (LFH-117, Review C1): der Eintrag
+   * ist beim Absenden gebildet, was danach an Typ, Feldern oder Baustein geändert würde, ginge
+   * nicht mit und fiele nach dem Erfolg still weg. Die Bedienelemente sind gesperrt; die
+   * frühen Ausstiege hier halten die Wege, die an keinem Knopf hängen (Menü, Modal, Tastatur).
+   */
   function waehleEintrag(e: SlashEintrag) {
+    if (sendet) return;
     entferneTriggerText();
     // Auf JEDEM Weg hinaus, unabhängig davon, wie das Menü aufging.
     setMenuOffen(false);
@@ -400,12 +407,14 @@ export default function Schnellerfassung({
   }
 
   function commitFeld(feld: MetaFeld, wert: string | dayjs.Dayjs | MeldeWeg) {
+    if (sendet) return;
     setMetadaten((m) => ({ ...m, [feld]: wert }));
     setEditFeld(null);
     fokusInsFeld();
   }
 
   function bausteinEinsetzen(felder: BausteinFelder) {
+    if (sendet) return;
     setInhalt(felder.inhalt);
     setMetadaten((m) => ({
       ...m,
@@ -551,11 +560,13 @@ export default function Schnellerfassung({
     <Dropdown
       trigger={['click']}
       autoFocus
+      disabled={sendet}
       menu={{
         items: TYP_MENUE,
         selectable: true,
         selectedKeys: [typ],
         onClick: ({ key }) => {
+          if (sendet) return;
           setTyp(key as EtbTyp);
           fokusInsFeld();
         },
@@ -563,6 +574,7 @@ export default function Schnellerfassung({
     >
       <Button
         type="text"
+        disabled={sendet}
         aria-label={`Eintragstyp /${typ} ändern`}
         style={{ font: 'inherit', color: 'inherit', paddingInline: token.paddingXS }}
       >
@@ -582,7 +594,12 @@ export default function Schnellerfassung({
   // LFH-373) — in der einzeilig rollenden Chip-Zeile lag er sonst hinter dem Bildlauf.
   const schalter = zeigeSchalter ? (
     <Tooltip title={UEBERNAHME_ERKLAERUNG}>
-      <Checkbox checked={werteBehalten} onChange={(e) => onWerteBehaltenChange?.(e.target.checked)}>
+      {/* Gesperrt beim Senden: der laufende Versand hat die Übernahme schon gelesen. */}
+      <Checkbox
+        checked={werteBehalten}
+        disabled={sendet}
+        onChange={(e) => onWerteBehaltenChange?.(e.target.checked)}
+      >
         <Typography.Text type="secondary">Werte behalten</Typography.Text>
       </Checkbox>
     </Tooltip>
@@ -613,6 +630,7 @@ export default function Schnellerfassung({
     <Button
       ref={feldKnopfRef}
       type="dashed"
+      disabled={sendet}
       icon={
         <span aria-hidden="true" style={{ display: 'inline-flex' }}>
           <PlusOutlined />
@@ -653,6 +671,7 @@ export default function Schnellerfassung({
         type="file"
         multiple
         hidden
+        disabled={!online || sendet}
         accept={DOKUMENT_ACCEPT}
         data-lfh="etb-anhang-eingabe"
         onChange={(e) => dateienGewaehlt(e.target.files)}
@@ -769,8 +788,13 @@ export default function Schnellerfassung({
                 setEditFeld(null);
                 fokusInsFeld();
               }}
-              onRemove={(f) => setMetadaten((m) => ({ ...m, [f]: undefined }))}
-              onEdit={(f) => setEditFeld(f)}
+              onRemove={(f) => {
+                if (!sendet) setMetadaten((m) => ({ ...m, [f]: undefined }));
+              }}
+              onEdit={(f) => {
+                if (!sendet) setEditFeld(f);
+              }}
+              gesperrt={sendet}
             />
           ))}
           {editFeld != null && metadaten[editFeld] == null && (
