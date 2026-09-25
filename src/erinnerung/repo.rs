@@ -138,8 +138,24 @@ pub async fn gehoert_zu_einsatz(
 
 /// Setzt den Status (erledigt/quittiert) und `erledigt_at = jetzt`.
 /// Nur erlaubte Zielstatus; sonst `Validation`.
+///
+/// Pool-Hülle um [`status_setzen_tx`]: wie bisher ohne eigene Transaktion, UPDATE und
+/// Rücklesen laufen im Autocommit einer geliehenen Verbindung.
 pub async fn status_setzen(
     pool: &SqlitePool,
+    id: i64,
+    neuer_status: &str,
+    jetzt: &str,
+) -> Result<ErinnerungAnzeige, AppError> {
+    let mut conn = pool.acquire().await?;
+    status_setzen_tx(&mut conn, id, neuer_status, jetzt).await
+}
+
+/// Wie [`status_setzen`], auf einer offenen Verbindung/Transaktion (LFH-690: der Demo-Import
+/// legt vergangene Erinnerungen in EINER Transaktion als erledigt an, design.md D10).
+/// Öffnet und committet selbst nichts.
+pub async fn status_setzen_tx(
+    conn: &mut SqliteConnection,
     id: i64,
     neuer_status: &str,
     jetzt: &str,
@@ -151,9 +167,9 @@ pub async fn status_setzen(
         .bind(neuer_status)
         .bind(jetzt)
         .bind(id)
-        .execute(pool)
+        .execute(&mut *conn)
         .await?;
-    laden(pool, id, jetzt).await
+    laden(&mut *conn, id, jetzt).await
 }
 
 /// Setzt eine erledigte/quittierte Erinnerung auf `offen` zurück (LFH-343 · C8).
