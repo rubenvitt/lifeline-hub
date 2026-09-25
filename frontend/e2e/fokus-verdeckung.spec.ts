@@ -625,6 +625,23 @@ async function stelleDichte(page: Page, dichte: string) {
 }
 
 /**
+ * Blendet den Öffnen-Knopf der TanStack-Query-Devtools aus (LFH-373). Er steht nur im
+ * DEV-Build (`main.tsx`, `ReactQueryDevtools`), gegen den die e2e-Suite fährt, als
+ * `position: fixed` unten rechts — auf 390 px lag er gemessen vollständig über einer
+ * Matrixzelle. Ein Verdecker, den es im Betrieb nicht gibt, ist kein Befund über die Seite.
+ * Per Init-Skript, weil `stelleDichte` neu lädt und ein `addStyleTag` dabei verloren ginge.
+ */
+async function ohneDevtoolsKnopf(page: Page) {
+  await page.addInitScript(() => {
+    document.addEventListener('DOMContentLoaded', () => {
+      const stil = document.createElement('style');
+      stil.textContent = '[class*="tsqd-open-btn"] { display: none !important; }';
+      document.head.append(stil);
+    });
+  });
+}
+
+/**
  * Kleinster freier Streifen zwischen der UNTERKANTE eines angesteuerten Ziels und der
  * OBERKANTE einer angepinnten Fußleiste, über `schritte` Tabulatorschritte. Gezählt werden
  * nur Ziele mit `data-e2e-fokus`.
@@ -666,6 +683,7 @@ test('ETB (LFH-373): kein Zeilenauslöser verschwindet beim Tabben hinter der Er
   page,
 }) => {
   test.setTimeout(240_000);
+  await ohneDevtoolsKnopf(page);
   await anmelden(page);
   const antwort = await page.request.post('/api/einsaetze', {
     data: { bezeichnung: `Fokus 373 Nord ${Date.now()}` },
@@ -738,6 +756,111 @@ test('ETB (LFH-373): kein Zeilenauslöser verschwindet beim Tabben hinter der Er
       ).toBeGreaterThan(0);
       gemessen.push(
         `${lauf}: Leiste ${leiste}px, ${kern.besuchteZiele.length} Auslöser, Streifen ≥ ${Math.round(streifen)}px`,
+      );
+    }
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+/** Einsatz mit zwei Gefahrengebieten per API (Karte braucht WebGL, `POST …/zonen` nicht). */
+async function matrixEinsatz(page: Page): Promise<number> {
+  const antwort = await page.request.post('/api/einsaetze', {
+    data: { bezeichnung: `Fokus 373 Sued ${Date.now()}` },
+  });
+  expect(antwort.ok(), await antwort.text()).toBeTruthy();
+  const { id } = (await antwort.json()) as { id: number };
+  for (const [i, label] of ['Sektor Sued 1', 'Sektor Sued 2'].entries()) {
+    const x = 10 + i / 20;
+    const zone = await page.request.post(`/api/einsaetze/${id}/zonen`, {
+      data: {
+        typ: 'gefahrengebiet',
+        geometrie_typ: 'Polygon',
+        geometrie: JSON.stringify({
+          type: 'Polygon',
+          coordinates: [
+            [
+              [x, 50],
+              [x + 0.01, 50],
+              [x + 0.01, 50.01],
+              [x, 50.01],
+              [x, 50],
+            ],
+          ],
+        }),
+        label,
+      },
+    });
+    expect(zone.ok(), await zone.text()).toBeTruthy();
+  }
+  return id;
+}
+
+/**
+ * Gefahrenmatrix (LFH-373, Prüfliste B5h Zeile 13): stehende Kopfzeile und fixierte Spalte
+ * „Gefahr" gegenüber 58 Zell-Auslösern.
+ *
+ * STRUKTURELL ANDERS ALS DIE KATALOGTABELLEN: dort trägt eine Zeile ein, zwei Fokusziele, hier
+ * trägt JEDE Spalte eins. Beim Sprung von der letzten Zelle einer Zeile zur ersten der nächsten
+ * rollt der Tabellencontainer nach links, und der Browser richtet das Ziel am linken Rand des
+ * Scrollports aus — unter der 180 px breiten fixierten Spalte. GEMESSEN VOR DEM FIX
+ * (24.09.2026): vollständig verdeckt bei 390 px in allen Stufen, bei 1024 px in `kompakt`/
+ * `komfortabel`, bei 1366 px in `handschuh`.
+ *
+ * VORBEDINGUNG „die Tabelle läuft waagerecht über": ohne Überlauf rollt nichts, die fixierte
+ * Spalte steht nie vor einem Ziel, und „0 verdeckt" wäre trivial wahr.
+ *
+ * RÜCKWÄRTS eigens: vorwärts rollt ein Ziel an den UNTEREN Rand, unter die OBEN stehende
+ * Kopfzeile gerät es so nie (Kern, Abschnitt RICHTUNG). `Shift+Tab` von der letzten Zelle aus
+ * prüft die Kopfzeile, `stoppsAnTabellenkopf` belegt, dass der Lauf sie erreicht hat.
+ */
+test('Gefahrenmatrix (LFH-373): keine Zelle verschwindet beim Tabben unter der fixierten Spalte oder der Kopfzeile', async ({
+  page,
+}) => {
+  test.setTimeout(240_000);
+  await ohneDevtoolsKnopf(page);
+  await anmelden(page);
+  const einsatzId = await matrixEinsatz(page);
+  const gemessen: string[] = [];
+
+  for (const flaeche of [
+    { width: 390, height: 400 },
+    { width: 1024, height: 768 },
+  ]) {
+    await page.setViewportSize(flaeche);
+    for (const dichte of ['kompakt', 'handschuh']) {
+      const lauf = `${flaeche.width}×${flaeche.height}/${dichte}`;
+      await page.goto(`/einsaetze/${einsatzId}/gefahren`);
+      await stelleDichte(page, dichte);
+      const zellen = page.getByRole('button', { name: /^Bewertung / });
+      await expect(zellen).toHaveCount(58);
+      await zellen.evaluateAll((els) =>
+        els.forEach((el) => el.setAttribute('data-e2e-fokus', el.getAttribute('aria-label')!)),
+      );
+      await expect(page.locator('.ant-table-sticky-holder')).toHaveCSS('position', 'sticky');
+      const huelle = await page
+        .locator('.ant-table-body')
+        .evaluate((el) => ({ sw: el.scrollWidth, cw: el.clientWidth }));
+      expect(
+        huelle.sw,
+        `${lauf}: Vorbedingung — die Matrix muss waagerecht überlaufen (${huelle.sw} ≤ ${huelle.cw})`,
+      ).toBeGreaterThan(huelle.cw);
+
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await zellen.first().focus();
+      const vor = await pruefeFokusVerdeckung(page, 62);
+      // 57: der Kern zählt nach jedem Tab, die Startzelle selbst ist also nie dabei.
+      expect(vor.besuchteZiele.length, `${lauf}: vorwärts alle übrigen 57 Zellen besucht`).toBe(57);
+      expect(vor.verdeckt, `${lauf} vorwärts:\n${vor.verdeckt.join('\n')}`).toEqual([]);
+
+      await zellen.last().focus();
+      const rueck = await pruefeFokusVerdeckung(page, 62, 'Shift+Tab');
+      expect(rueck.besuchteZiele.length, `${lauf}: rückwärts alle übrigen 57 Zellen besucht`).toBe(
+        57,
+      );
+      expect(rueck.verdeckt, `${lauf} rückwärts:\n${rueck.verdeckt.join('\n')}`).toEqual([]);
+
+      gemessen.push(
+        `${lauf}: Überlauf ${huelle.sw}/${huelle.cw}, rückwärts an der Kopfzeile ${rueck.stoppsAnTabellenkopf}`,
       );
     }
   }

@@ -28,9 +28,9 @@ kein voller `pnpm e2e`-Lauf sie mitnimmt.
 
 ## 4. Zeile 13 · Gefahrenmatrix: Fokus hinter der fixierten Spalte
 
-- [ ] 4.1 Roter Nachweis in `fokus-verdeckung.spec.ts`: 390 × 400 und 1024 × 768 je `kompakt`/`handschuh`, alle 58 Zellen mit `data-e2e-fokus` markiert, Start an der ersten Zelle, Schrittbudget ≥ 62. Vorbedingungen: Tabellenhülle `scrollWidth > clientWidth`, `.ant-table-sticky-holder` sticky, 58 besuchte Zellen. Verifiziert durch einen roten Lauf vor dem Fix (Vorab-Messung: vollständig hinter `td.ant-table-cell-fix`)
-- [ ] 4.2 Konstante `GEFAHR_SPALTE_BREITE` exportieren und in Spaltendefinition und `scroll-padding-inline-start` am Scrollcontainer der Matrix verwenden (design.md D5). Verifiziert dadurch, dass 4.1 grün wird, durch eine Mutationsprobe ohne die Regel (rot) und durch einen Vitest-Pin, dass beide Stellen dieselbe Konstante lesen
-- [ ] 4.3 Rückwärtslauf (`Shift+Tab`) über die Matrix messen. Ist er rot, wird die stehende Kopfzeile analog über einen Scroll-Abstand oben freigehalten und der Test bleibt stehen. Ist er grün, bleibt der Test als Beleg stehen. Verifiziert durch den Test in `fokus-verdeckung.spec.ts` und die Notiz des Ergebnisses im Nachtrag der Prüfliste
+- [x] 4.1 Roter Nachweis in `fokus-verdeckung.spec.ts`: 390 × 400 und 1024 × 768 je `kompakt`/`handschuh`, alle 58 Zellen mit `data-e2e-fokus` markiert, Start an der ersten Zelle, Schrittbudget ≥ 62. Vorbedingungen: Tabellenhülle `scrollWidth > clientWidth`, `.ant-table-sticky-holder` sticky, 58 besuchte Zellen. Verifiziert durch einen roten Lauf vor dem Fix (Vorab-Messung: vollständig hinter `td.ant-table-cell-fix`)
+- [x] 4.2 `scroll-padding-inline-start` am Scrollcontainer der Matrix in der GEMESSENEN Breite der fixierten Spalte (`setzeSpaltenFreiraum`, design.md D5 mit Korrektur: die Konstante 180 war im Handschuh-Betrieb zu schmal). Verifiziert dadurch, dass 4.1 grün wird, durch Vitest auf die Messfunktion (254 px gemessen → 254 px gesetzt; ohne Spalte 0) und eine Mutationsprobe ohne die Regel (rot, 8.1)
+- [x] 4.3 Rückwärtslauf (`Shift+Tab`) über die Matrix messen. **Gemessen rot** (390 × 400: Zellen vollständig unter der Kopfzeile). Fix mit der Mechanik der Katalogtabellen: `useKopfFreiraum` exportiert, `scroll-margin-top` an den Zielen in `gefahrenMatrix.css`. Verifiziert durch den Test in `fokus-verdeckung.spec.ts` und die Notiz des Ergebnisses im Nachtrag der Prüfliste
 
 ## 5. Zeile 13 · Lagekarte, Personenkarte, Personenliste
 

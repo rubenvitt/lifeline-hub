@@ -121,13 +121,25 @@ wirkungslos.
 `e2e/befehl-aktionsleiste.spec.ts` bleibt der Regressionsnachweis für die Befehlsseite.
 Dort ändert sich nur der Name der Variable.
 
-### D5 · Gefahrenmatrix: Scroll-Abstand der fixierten Spalte
+### D5 · Gefahrenmatrix: Scroll-Abstand der fixierten Spalte und der Kopfzeile
 
-Die Tabelle bekommt eine Klasse. Ihr Scrollcontainer (`.ant-table-body`, mit `sticky`
-statt `.ant-table-content`) erhält `scroll-padding-inline-start` in der Breite der
-fixierten Spalte. Die Breite 180 wird als Konstante aus `GefahrenMatrix.tsx` exportiert,
-dieselbe Konstante trägt die Spaltendefinition und die Regel (Inline-Stil oder
-CSS-Variable). So kann die Zahl nicht auseinanderlaufen.
+Die Tabelle bekommt die Klasse `gefahren-matrix`. Ihr Scrollcontainer (`.ant-table-body`,
+wegen `sticky`, vorsorglich auch `.ant-table-content`) erhält `scroll-padding-inline-start`
+in der Breite der fixierten Spalte. Die Breite wird **gemessen**
+(`setzeSpaltenFreiraum`, ResizeObserver auf Wurzel und Kopfzelle).
+
+*Korrektur während der Umsetzung (25.09.2026):* Der erste Stand las die Konstante 180
+(Spaltendefinition und Regel aus derselben Zahl). Er blieb im Browser bei 1024 px in
+`handschuh` rückwärts rot. Mit `scroll={{ x: 'max-content' }}` ist `width: 180` nur eine
+Mindestbreite, im Handschuh-Betrieb wird die Spalte breiter. Gemessen statt gerechnet ist
+dasselbe Prinzip wie beim Kopf-Freiraum der Katalogtabellen.
+
+Aufgabe 4.3 fand die Rückwärts-Hypothese **bestätigt**. Mit `Shift+Tab` lagen Zellen bei
+390 × 400 vollständig unter der stehenden Kopfzeile. Die Matrix nimmt dafür die Mechanik
+der Katalogtabellen (LFH-677): `useKopfFreiraum` (jetzt aus `KatalogTabelle.tsx`
+exportiert) misst die Kopfhöhe, `scroll-margin-top` an den Zielen hält sie frei. Die Regel
+steht in `gefahrenMatrix.css`, weil die in `sprache.css` auf `.lfh-katalog` gescopt ist.
+
 *Verworfen:* die Spalte „Gefahr“ auf schmalem Schirm nicht mehr fixieren. Die Zeilen
 verlören dann ihre Beschriftung, sobald man seitlich scrollt, und das ist der Grund für die
 Fixierung.

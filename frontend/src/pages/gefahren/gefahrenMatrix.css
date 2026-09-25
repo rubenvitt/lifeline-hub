@@ -1,0 +1,30 @@
+/* LFH-373 — der Fokus-Scroll der Matrix hält die fixierte Spalte „Gefahr" frei.
+
+   GEMESSEN, nicht gewählt: jede Spalte der Matrix trägt ein Fokusziel. Beim Tabben von der
+   letzten Zelle einer Zeile zur ersten der nächsten rollt der Scrollcontainer nach links,
+   und der Browser richtet das Ziel am linken Rand des Scrollports aus — unter der fixierten
+   Spalte. Ohne diese Regel lagen Zellen VOLLSTÄNDIG darunter, sobald die Tabelle waagerecht
+   überläuft (390 px in allen Stufen, 1024 px kompakt/komfortabel, 1366 px handschuh);
+   `e2e/fokus-verdeckung.spec.ts` wird ohne sie rot.
+
+   `scroll-padding` am Scrollcontainer, dasselbe Mittel wie der Fokusabstand unten
+   (`index.css`, LFH-465). `.ant-table-body` ist der Container, weil die Tabelle `sticky`
+   trägt; ohne `sticky` wäre es `.ant-table-content`, beide stehen hier, damit ein Umbau am
+   Kopf die Regel nicht still wirkungslos macht.
+
+   Die Breite der Spalte wird GEMESSEN (`setzeSpaltenFreiraum` in `GefahrenMatrix.tsx`): mit
+   `scroll={{ x: 'max-content' }}` sind ihre 180 px nur eine Mindestbreite, im Handschuh-
+   Betrieb wächst sie darüber hinaus — der erste Fix las die Konstante und blieb dort rot. */
+.gefahren-matrix .ant-table-body,
+.gefahren-matrix .ant-table-content {
+  scroll-padding-inline-start: var(--lfh-gefahr-spalte, 0px);
+}
+
+/* Rückwärts getabbt rollt der Browser eine Zelle an den OBEREN Rand — unter die stehende
+   Kopfzeile (gemessen vor dem Fix: vollständig verdeckt bei 390 × 400, `Shift+Tab`). Dieselbe
+   Mechanik wie die Katalogtabellen (LFH-677, `theme/sprache.css`): `scroll-margin-top` am
+   Ziel, die Höhe misst `useKopfFreiraum` aus `components/KatalogTabelle.tsx`. Die Regel dort
+   ist auf `.lfh-katalog` gescopt, deshalb steht sie für die Matrix hier. */
+.gefahren-matrix .ant-table-tbody * {
+  scroll-margin-top: var(--lfh-tabellenkopf-hoehe, 0px);
+}
