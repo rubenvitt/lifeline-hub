@@ -497,6 +497,16 @@ Alltag wichtigsten:
   ist am Spaltentyp deshalb gesperrt. Die begründete Ausnahme ist **eingelöst und begrenzt**:
   Dateikopf von `Datensicht.tsx` plus Abschnitt AK3b in
   `docs/superpowers/specs/2026-06-22-drawer-nutzung-reduzieren-design.md`.
+  **Seit LFH-374 hat der Schalter zwei Träger und eine Quelle.** Zählung und Menü liegen in
+  `components/SpaltenSchalter.tsx` und nicht mehr in `Datensicht` (die Importrichtung
+  `Datensicht → KatalogTabelle` ließe sonst einen Zyklus entstehen). `KatalogTabelle` trägt den
+  Schalter als **Opt-in** `spaltenSchalter={{ bezeichnung }}`. Das tun heute die beiden
+  Kartenverwaltungen. Ohne Opt-in bleiben alle Spalten sichtbar: `abBreite` wirkt dann nicht
+  und meldet sich in DEV, antds `responsive`/`hidden` sind am Typ und per Guard
+  (`katalogTabelle.guard.test.ts`) gesperrt. `Datensicht` setzt das Prop **nie**, sonst stünden
+  zwei Schalter da. Eine per Breite weggefallene Spalte lässt sich von Hand zurückholen
+  (Handwahl `eingeblendet`). Das Häkchen zeigt die wirkliche Sichtbarkeit. Bis LFH-374 stand
+  eine weggefallene Spalte angehakt im Menü, und ein Klick darauf blieb ohne Wirkung.
 - **Dichte-Staffel 30 / 48 / 72 px** (kompakt aus LFH-352 · komfortabel = Material 48 dp ·
   Handschuh = 72 px ≙ 19,05 mm, MIL-STD-1472F Fig. 12). Träger ist ein **Dichte-Token am
   `ConfigProvider`**, nicht `componentSize` und keine punktuellen Größen-Props. **Neues
