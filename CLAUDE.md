@@ -2093,6 +2093,12 @@ Purge-Lauf den Einsatz sofort wieder vor. Bewachtes UPDATE mit derselben Karenzg
 vorgemerkt **422** (der Weg ist der Frist-PUT), Feld fehlt oder unlesbar **400**, Frist
 nicht in der Zukunft **422**. Derselbe Schnitt am Frist-PUT: vorgemerkt 422 („erst
 wiederherstellen"), geschwärzt 409 — geprüft VOR dem frühen Rücksprung „unverändert → 200".
+**Zwei Riegel, die nach Vereinfachung aussehen und es nicht sind:** die Antwort des
+Frist-PUT lässt an einem für die Person gesperrten Einsatz Einsatzort, Koordinate, meldende
+Stelle und Sachverhalt weg (der PUT hat bewusst kein Lesegate), und `soft_delete_einsatz`
+prüft die Fälligkeit im UPDATE noch einmal (`? >= retention_bis`) — eine zwischen
+Kandidatenliste und Schreiben verlängerte Frist gewinnt. `frist_setzen` schreibt ebenso
+bewacht nur an nicht vorgemerkten, nicht geschwärzten Einsätzen.
 **Der Purge-Audit ist fail-closed.** Akteurskette: abschließende Person, Einsatzleitung,
 System-Admin der Org des Einsatzes (aktive vor inaktiven, `ORDER BY id`, Org aus
 `einsatz.org_id`). Ohne Akteur liefert `system_audit_tx` einen Fehler, Vormerkung bzw.
