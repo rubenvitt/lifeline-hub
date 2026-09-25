@@ -57,7 +57,7 @@ kein voller `pnpm e2e`-Lauf sie mitnimmt.
 
 ## 8. Abschluss
 
-- [ ] 8.1 Mutationsproben nach design.md D11 in einem gemeinsamen Lauf, Ergebnis im Kopfkommentar der jeweiligen Spec. Verifiziert durch das JSON-Protokoll: jede tragende Mutation ist rot, das Original grün, die Kopien sind gelöscht
+- [x] 8.1 Mutationsproben nach design.md D11 in einem gemeinsamen Lauf, Ergebnis im Kopfkommentar der jeweiligen Spec. Verifiziert durch das JSON-Protokoll: jede tragende Mutation ist rot, das Original grün, die Kopien sind gelöscht
 - [ ] 8.2 `lint`, `tsc`, Vitest voll, Prettier. Verifiziert durch grüne Läufe ohne `| tail`
 - [ ] 8.3 `scripts/check-all.sh` mit eigenem `CARGO_TARGET_DIR` per `nohup`. Verifiziert durch Exit 0, bei Flakes durch Wiederholung des einzelnen Specs mit Begründung
 - [ ] 8.4 Review (`superpowers:requesting-code-review`) und PR gegen `alpha`

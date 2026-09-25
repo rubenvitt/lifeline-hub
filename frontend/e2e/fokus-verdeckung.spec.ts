@@ -615,6 +615,13 @@ test('Modulpanel: der klebende Einsatzdauer-Fuß verdeckt kein fokussiertes Modu
 });
 
 // ── LFH-373 ──────────────────────────────────────────────────────────────────────────────
+//
+// MUTATIONSPROBE (25.09.2026, je Fix einzeln zurückgedreht): ETB ohne Fokusabstand → ROT;
+// Matrix ohne Spalten-Freiraum → ROT; Matrix ohne Kopf-Freiraum → ROT; Kartenfuß über die
+// Knopfspalte → ROT; Kern ignoriert `zusatzKandidaten` → Selbstbeweis ROT; Attrappe über
+// „Herauszoomen" der Personenkarte → ROT; Katalog ohne Kopf-Freiraum → Personenliste ROT —
+// dieser Fall überlebte zuerst (nur halb verdeckt, der Kern zählt vollständig) und hat die
+// Mittelpunkt-Prüfung `mittelpunktUnterKopf` hervorgebracht.
 
 /** Stellt die Dichte über den Weg eines wiederkehrenden Benutzers (localStorage + Neuladen)
  *  und hält die Wache am `<html>` — Muster `stelleDichte` in `gate3-trefflaeche.spec.ts`. */
@@ -1039,6 +1046,34 @@ test('Personenkarte (LFH-373): kein Fokusziel liegt unter den Kartenaufbauten', 
 });
 
 /**
+ * Rückwärts getabbte Ziele, deren MITTELPUNKT unter einer stehenden Tabellenkopfzeile liegt.
+ *
+ * STRENGER ALS DER KERN, mit Absicht (LFH-373, gemessen): ohne den Kopf-Freiraum der
+ * Katalogtabellen (LFH-677) landete ein Ziel der Personenliste bei y 20…50 unter einer
+ * 35 px hohen Kopfzeile — halb verdeckt, der Mittelpunkt darunter. WCAG 2.4.11 (AA) zählt nur
+ * VOLLSTÄNDIGE Verdeckung, der Kern blieb grün, und die Mutationsprobe „Freiraum-Regel
+ * entfernt" überlebte. Diese Prüfung macht die Regel belegbar.
+ */
+async function mittelpunktUnterKopf(page: Page, schritte: number): Promise<string[]> {
+  const befunde: string[] = [];
+  for (let i = 0; i < schritte; i += 1) {
+    await page.keyboard.press('Shift+Tab');
+    const befund = await page.evaluate(() => {
+      const f = document.activeElement as HTMLElement | null;
+      const kopf = document.querySelector('.ant-table-sticky-holder');
+      if (!f || !kopf || kopf.contains(f) || !f.closest('.ant-table-tbody')) return null;
+      const r = f.getBoundingClientRect();
+      const am = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return am && kopf.contains(am)
+        ? `${(f.getAttribute('aria-label') ?? f.textContent ?? '').trim().slice(0, 24)} bei y ${Math.round(r.top)}`
+        : null;
+    });
+    if (befund) befunde.push(befund);
+  }
+  return befunde;
+}
+
+/**
  * Personenliste (LFH-373, LFH-613-Prüfliste 1 · 13): Tabellenzweig der `Datensicht` mit
  * stehender Kopfzeile, ein Tab-Stopp je Zeile. Vorwärts UND rückwärts: nur rückwärts rollt ein
  * Ziel an den oberen Rand, unter die Kopfzeile (Kern, Abschnitt RICHTUNG). Unter `md` stehen
@@ -1095,6 +1130,10 @@ test('Personenliste (LFH-373): kein Fokusziel verschwindet hinter der stehenden 
         `${lauf}: Vorbedingung — rückwärts muss der Lauf die Kopfzeile erreichen`,
       ).toBeGreaterThan(0);
       expect(rueck.verdeckt, `${lauf} rückwärts:\n${rueck.verdeckt.join('\n')}`).toEqual([]);
+
+      await zeilen.last().locator('a, button, [tabindex="0"]').last().focus();
+      const mittelpunkt = await mittelpunktUnterKopf(page, ANZAHL * 3);
+      expect(mittelpunkt, `${lauf}: Mittelpunkt unter der Kopfzeile`).toEqual([]);
       gemessen.push(
         `${lauf}: ${vor.stoppsInTabelle} Tabellenstopps vorwärts, ${rueck.stoppsAnTabellenkopf} an der Kopfzeile rückwärts`,
       );

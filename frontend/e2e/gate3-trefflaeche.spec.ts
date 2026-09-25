@@ -1938,6 +1938,9 @@ test('Betroffene Karte: Marker-Trefferzone, Cluster-Donut und Kartenknöpfe folg
 // Vorab-Messung (24.09.2026, 1366 × 768 bzw. 390 × 844): Slash-Option 35,5 / 72, Zeilen-
 // auslöser 30 / 72, Menüeintrag 30 / 72, „Verortet" 35,5 / 72, Kartenknopf 32 / 72,
 // Matrixzelle 38,75 × 30 / 72 × 72.
+//
+// MUTATIONSPROBE (25.09.2026): die Dichte per Init-Skript auf `kompakt` festgenagelt →
+// ETB-Block ROT an der `data-dichte`-Wache, noch vor jeder Höhe.
 
 /** Boden der Menüeinträge eines `Dropdown`: `controlHeightSM` (24 / 48 / 72), nicht die
  *  Steuerhöhe — antd gibt Menüeinträgen die kleine Steuerhöhe (Muster `pegel-pruefliste`). */

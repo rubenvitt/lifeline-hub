@@ -280,6 +280,21 @@ Obergrenze der Gegenprobe (hartkodierte 72 px müssen rot werden) und der Kern o
 `zusatzKandidaten` auf der Karte (muss rot werden, solange der Fix fehlt). Das Ergebnis
 steht im Kopfkommentar der Spec.
 
+### Ergebnis der Mutationsprobe (25.09.2026)
+
+Vierzehn Mutanten, je ein Fix oder eine Wache zurückgedreht. **Zwölf wurden rot**, darunter
+alle Fokus-Fixes, der Seitenfuß, die gestapelte Zeile, die einzeilige Feldzeile, die
+Zeitleiste (Umbruch und Nicht-Schrumpfen zusammen) und die Dichte-Wache. **Zwei
+Sicherungen überleben, und das ist gemessen und benannt:**
+- `abspielenStil` allein: Der Umbruch der Zeitleiste hält „Abspielen“ schon breit.
+- `preventScroll` in `MetaChip`: Seit die Leiste ganz im Fenster steht, rollt der native
+  Fokus nicht mehr.
+
+Beide bleiben als billige Sicherungen stehen, Vitest pinnt sie. Die Probe „Katalog ohne
+Kopf-Freiraum“ überlebte zuerst. Das Ziel lag nur halb unter der Kopfzeile, und der Kern
+zählt nach WCAG 2.4.11 nur vollständige Verdeckung. Der Personenlisten-Nachweis prüft
+seitdem zusätzlich den Mittelpunkt und wird ohne die Regel rot.
+
 ## Risks / Trade-offs
 
 - [Laufzeit von `check-all.sh` Schritt 7 steigt: drei Stufen × mehrere Breiten ×

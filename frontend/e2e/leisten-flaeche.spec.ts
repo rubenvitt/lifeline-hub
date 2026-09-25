@@ -21,6 +21,15 @@ import { beobachteShifts, bericht, ruheShifts, setzeShiftsZurueck } from './cls-
  * immer einer Eingabe — dort wird deshalb die GEOMETRIE gemessen (Lage der Zeitachsenzeilen
  * vorher/nachher), nicht CLS. CLS misst nur, was ohne Eingabe geschieht: das Laden und eine
  * Fremdänderung, die live eintrifft.
+ *
+ * MUTATIONSPROBE (25.09.2026, je Fix einzeln zurückgedreht, Test muss rot werden):
+ *  - Leiste zurück in die Zeitachsenspalte (`fuss` entfernt) → Deckel-Test ROT (Überstand).
+ *  - Feld nicht gestapelt → Deckel-Test ROT. Chip-Zeile bricht um → Chip-Test ROT.
+ *  - Zeitleiste ohne Umbruch UND „Abspielen" schrumpft → Zeitachsen-Test ROT.
+ *  - ÜBERLEBT, erklärt: nur `abspielenStil` zurück — der Umbruch der Zeitleiste hält
+ *    „Abspielen" allein breit, `flexShrink: 0` ist eine Sicherung. Nur `preventScroll` in
+ *    `MetaChip` zurück — seit die Leiste als Seitenfuß ganz im Fenster steht, hat der native
+ *    Fokus nichts mehr zu rollen; die Sicherung hält `MetaChip.test.tsx`.
  */
 
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
