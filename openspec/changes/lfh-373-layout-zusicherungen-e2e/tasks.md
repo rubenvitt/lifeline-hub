@@ -4,8 +4,8 @@ Jede Aufgabe entsteht test-first (`superpowers:test-driven-development`). Bei de
 steht zuerst der rote e2e-Nachweis, dann der Fix. Der rote Lauf wird mit seinem
 Fehlertext protokolliert, weil ein Nachweis, der nie rot war, nichts belegt. Alle Läufe
 setzen `CARGO_TARGET_DIR` auf ein eigenes Verzeichnis (geteiltes Target über Worktrees,
-siehe Memory). Die Wegwerf-Spikes `e2e/lfh373-probe*.tmp.spec.ts` werden vor dem ersten
-Commit gelöscht.
+siehe Memory). Die Wegwerf-Spikes liegen im Scratchpad, nicht in `frontend/e2e/`, damit
+kein voller `pnpm e2e`-Lauf sie mitnimmt.
 
 ## 1. Messinfrastruktur
 
@@ -42,9 +42,9 @@ Commit gelöscht.
 ## 6. Zeile 12 · Flächen und Sprünge
 
 - [ ] 6.1 `e2e/leisten-flaeche.spec.ts`, roter Deckel für das ETB: Ruhezustand herstellen, Leistenhöhe ≤ 50 % der Fensterhöhe bei 390 × 844, 1024 × 768, 1366 × 768 in allen drei Stufen. Textfeld auf dem Handschirm so breit wie die Leiste abzüglich Polsterung, `document.documentElement.scrollWidth` ≤ Fensterbreite. Verifiziert durch einen roten Lauf vor den Hebeln (Vorab-Messung: 497/844, 440/768)
-- [ ] 6.2 Hebel aus design.md D8 nacheinander über eine opt-in-Eigenschaft der `Schnellerfassungszeile` bzw. des `MarkdownEditor` ziehen, nach jedem 6.1 messen und aufhören, sobald es grün ist. Verifiziert durch 6.1 grün, das unveränderte Grün der Vitest-Suiten von `Schnellerfassung`, `MarkdownEditor` und `PersonenPage`, eine reine Stilfunktion für den Umbruch mit eigenem Vitest und `etb-chronologie.spec.ts`/`seitenrinne.spec.ts` grün
+- [ ] 6.2 Hebel aus design.md D8 nacheinander über eine opt-in-Eigenschaft der `Schnellerfassungszeile` bzw. des `MarkdownEditor` ziehen, nach jedem 6.1 messen und aufhören, sobald es grün ist. Die Form der Hinweiszeile unter `md` folgt der Checkpoint-Entscheidung. Halten alle Hebel den Deckel nicht, wird zurückgefragt. Verifiziert durch 6.1 grün, das unveränderte Grün der Vitest-Suiten von `Schnellerfassung`, `MarkdownEditor` und `PersonenPage`, eine reine Stilfunktion für den Umbruch mit eigenem Vitest und `etb-chronologie.spec.ts`/`seitenrinne.spec.ts` grün
 - [ ] 6.3 Chip-Umbruch des ETB auf dem Handschirm in `handschuh`: drei Felder setzen, Vorbedingung ≥ 2 Reihen in der Chip-Zeile. y-Lage der Zeitachsenzeilen vorher/nachher gleich (± 0,5 px, nach `document.fonts.ready`), Textfeld `toBeInViewport`. Verifiziert durch den grünen Test und eine Mutationsprobe ohne Umbruch-Vorbedingung, die zeigt, dass die Vorbedingung trägt
-- [ ] 6.4 Zeitachsenband: Deckel ≤ 50 % der Kartenhöhe bei 1366 × 768, 1024 × 768, 390 × 844 (Leiste aus) in allen drei Stufen, kein Kind über den Bandrand, Band in der Kartenspalte, auch bei eingeblendeter Leiste auf dem Handschirm. Erst rot messen (nach 5.2 wird das Band schmaler), dann die Hebel aus design.md D7 der Reihe nach ziehen. Hebel 2 („Abspielen“ `flexShrink: 0`) gehört unabhängig davon dazu. Verifiziert durch den grünen Test, 2.2 grün und die Vitest-Suite von `SnapshotLeiste`
+- [ ] 6.4 Zeitachsenband: Deckel ≤ 50 % der Kartenhöhe bei 1366 × 768, 1024 × 768, 390 × 844 (Leiste aus) in allen drei Stufen, kein Kind über den Bandrand, Band in der Kartenspalte, auch bei eingeblendeter Leiste auf dem Handschirm. Erst rot messen (nach 5.2 wird das Band schmaler), dann die Hebel aus design.md D7 der Reihe nach ziehen. Hebel 2 („Abspielen“ `flexShrink: 0`) gehört unabhängig davon dazu, und zwar samt Umbruch des Zeitleisten-Blocks. Halten alle Hebel den Deckel nicht, wird zurückgefragt. Verifiziert durch den grünen Test, 2.2 grün und die Vitest-Suite von `SnapshotLeiste`
 - [ ] 6.5 CLS beim Laden auf dem Handschirm für ETB, Lagekarte und Gefahrenmatrix über `cls-kern.ts`, mit Inhaltsanker als Vorbedingung, Summe ≤ 0,1. Verifiziert durch den grünen Test. Ist eine Route rot, wird die Ursache per Geometrie belegt und im selben Change gefixt (Hypothese Matrix: Titelzeile kommt nach der Tabelle)
 - [ ] 6.6 Fremdänderung einer Matrixzelle: Ruhezustand, dann `PUT …/matrix/bewertung` per `page.request`, Vorbedingung `data-warnstufe="akut"` an der Zelle, danach Tabellenlage unverändert und Summe ≤ 0,1. Verifiziert durch den grünen Test
 

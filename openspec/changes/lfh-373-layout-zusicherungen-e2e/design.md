@@ -18,6 +18,10 @@ Die Motivation steht in proposal.md unter „Why“. Die Anforderungen stehen in
 | „Abspielen“ Breite × Höhe (390 px) | 16 × 30 | 17 × 72 |
 | Matrix-Hülle `scrollWidth`/`clientWidth` 390 · 1024 · 1366 | 583/342 · 583/433 · 775/775 | 838/312 · 838/388 · 838/730 |
 
+**Nicht gemessen, Hypothesen:** die ETB-Leiste bei 1024 × 768 und die CLS-Summe beim
+Laden aller drei Routen. Beide stehen als MUST in der Spec. Ein roter Befund dort wird im
+Change gefixt (Aufgaben 6.1 und 6.5).
+
 Die e2e-Suite hat Bausteine für diese Arbeit, die vorhandenen Messkerne reichen aber
 nicht an allen Stellen:
 
@@ -150,10 +154,21 @@ hält:
 1. Das Bezeichnungsfeld verliert seine feste Breite von 180 px (`flex: 1 1 120px;
    minWidth: 0`). Das nicht umbrechbare `Space.Compact` ragte sonst über das Band hinaus.
 2. „Abspielen“ bekommt `flexShrink: 0`. Heute schrumpft der Knopf auf 16 px, das ist
-   ein eigener Befund zu Zeile 2 und wird unabhängig vom Deckel gefixt.
+   ein eigener Befund zu Zeile 2 und wird unabhängig vom Deckel gefixt. **Dieser Hebel
+   allein bricht die Breite:** Der Zeitleisten-Block ist eine innere Flex-Zeile ohne
+   Umbruch (`minWidth: 260`, darin „Aktuell“, „Abspielen“, Schieber mit `minWidth: 120`
+   plus Rand und „Live“ mit `minWidth: 96`). Mit einem 72 px breiten Knopf braucht er im
+   Handschuh-Betrieb rund 400 px. Heute stehen 342 px zur Verfügung, nach D6 noch etwa
+   258 px. Deshalb gehört zu Hebel 2 zwingend, dass der Block umbrechen darf: Schieber und
+   „Live“ bilden unter `md` eine eigene Zeile. Das kostet eine Zeile.
 3. Unter `md` wird „Stand sichern“ zu einem Knopf, der die Bezeichnung in einem
    `ErfassungsModal` abfragt (ein Feld, LFH-19 „Modal ≤ 3 Felder“), statt das Feld
-   inline zu führen.
+   inline zu führen. Wegen der zusätzlichen Zeile aus Hebel 2 ist das voraussichtlich
+   Pflicht und keine Reserve.
+
+**Sind alle Hebel gezogen und der Deckel hält noch nicht, wird zurückgefragt.** Der
+Deckel wird dann nicht still gesenkt und nicht eigenmächtig mit weiteren Umbauten
+erkauft.
 
 ### D8 · ETB-Erfassungsleiste: Deckel in Hebelstufen
 
@@ -169,9 +184,15 @@ unberührt. Hebel in dieser Reihenfolge, nach jedem wird gemessen:
    Editor eine Eigenschaft, die den Umschalter nach außen reicht (Render-Prop oder
    gesteuerter Zustand). Die übrigen Aufrufer behalten ihre Zeile. Das spart im Fükw eine
    volle Steuerhöhe und ist der einzige Hebel, der dort auf 50 % führt (440 → etwa 360 px).
-3. Unter `md` entfällt die Hinweiszeile. Ihr Inhalt steht bereits im Platzhalter des
-   Feldes („/ für Typ, Felder & Bausteine · @ für Einheit“), und der Tastaturvertrag steht
-   weiterhin genau einmal im Fükw (CLAUDE.md, Erfassungs-Norm).
+3. Unter `md` wird die Hinweiszeile verkürzt. Befehle und Einheit stehen schon im
+   Platzhalter („/ für Typ, Felder & Bausteine · @ für Einheit“). Der
+   **Tastaturvertrag** (`ENTER_HINWEIS`) steht dort aber nicht, und CLAUDE.md
+   (Erfassungs-Norm, Nacharbeit LFH-335) trennt beide Aussagen ausdrücklich. Die Form ist
+   eine Entscheidung am Checkpoint: (a) einzeilige Kurzform nur mit dem Vertrag
+   („↵ senden · ⇧↵ neue Zeile“), (b) die Zeile entfällt unter `md` ganz. Empfohlen ist (a).
+
+**Sind alle Hebel gezogen und der Deckel hält noch nicht, wird zurückgefragt**, nicht
+still gesenkt.
 
 Der Deckel wird in einem Ruhezustand gemessen, den der Test herstellt: ein Entwurf,
 keine gesetzten Felder, Menüs zu.
