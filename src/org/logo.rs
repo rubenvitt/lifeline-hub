@@ -11,7 +11,7 @@ use sqlx::SqlitePool;
 use utoipa::ToSchema;
 
 /// Höchstgröße eines Logos in Bytes (1 MiB). Deckungsgleich mit dem CHECK der Migration
-/// `0123_org_logo.sql`; das Body-Limit der Route liegt 64 KiB darüber (Multipart-Rahmen).
+/// `0124_org_logo.sql`; das Body-Limit der Route liegt 64 KiB darüber (Multipart-Rahmen).
 pub const MAX_GROESSE: usize = 1024 * 1024;
 
 /// `Cache-Control` des Logo-Abrufs. **Nicht** `ASSET_CACHE_CONTROL` (immutable): die Adresse
