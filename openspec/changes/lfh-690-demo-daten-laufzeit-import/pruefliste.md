@@ -21,7 +21,7 @@ Verzeichnis (`design.md` D13, `specs/demo-daten/spec.md`), Task 7.1 in `tasks.md
 
 **Verdikte:** **erfüllt** (nur mit Beleg: Messung oder Testdatei + Testname) · **offen →
 Zielticket** · **nicht anwendbar** (mit Begründung). Gerechnetes und aus Quelltext
-Geschlossenes trägt **[abgeleitet]**. Platzhalter `LFH-NEU-…` legt der Controller an.
+Geschlossenes trägt **[abgeleitet]**. Alle Zieltickets sind angelegt.
 
 ## Die Nachweise
 
@@ -123,7 +123,7 @@ Nur die Zeilen, die sich von Tabelle 1 unterscheiden. Nr. 3, 6, 7, 8, 10 und 11 
 | 2 | Handschuh-Modus | **erfüllt** | Stufe 5: 72 px in `handschuh`. Zum nächsten Ziel darüber liegen ≥ 94 px [abgeleitet aus den Kästen: Knopf-y 637,4 − Hinweis-y 542,8], darunter steht keines. Die Höhe gehört jetzt dem Knopf, nicht der Textzeile: der Satz steht bei 390 px in drei Zeilen zu 23 px (69 px statt vorher 118), Bildschirmfoto `aus/s5-hinweis-handschuh-390.png` | — |
 | 3 | Rückmeldung | **nicht anwendbar** | Der Hinweis löst nichts aus, der Verweis navigiert nur (kein Direktimport aus der Liste, benannte Abweichung in `EinsaetzePage.tsx`), und zwar ohne Neuladen (Stufe 5) | — |
 | 4 | Zweite Handlung | **nicht anwendbar** | Keine kritische Aktion an dieser Stelle | — |
-| 5 | Kontrast | **offen** | Stufe 5. **Text erfüllt:** Titel und Satz 13,26 (Tag) / 14,18 (Nacht), die Knopfbeschriftung **18,47 / 15,70** (vorher der Link 6,04 am Tag). **Offen, alles am Knopf:** (a) der **Fokusring** (`:focus-visible`, 1 px `colorPrimaryBorder`) 1,76 / 1,45 gegen den Grund, app-weit; (b) die Beschriftung im **Hover** 5,62 am Tag (Nacht 8,49), gemessen gleich an „Neuer Einsatz“ und am „Abbrechen“ des Anlegedialogs (Stufe 5b), also antds `colorPrimaryHover` als Schrift jedes Standardknopfs, app-weit; (c) der **Knopfrand** (`colorBorder`) hält gegen die eigene Fläche 3,95 (Tag) / 3,43 (Nacht), **gegen die Info-Fläche am Tag nur 2,84** (Nacht 3,09). `steuerRahmen` ist gegen die üblichen Gründe abgestimmt, nicht gegen `colorInfoBg`; das ist ein Wert dieser Stelle, kein geerbter. Rand des Hinweises selbst < 3 : 1, nicht tragend (kein Bedienziel) | LFH-737 (a), LFH-652 (b, zu erweitern um den Hover des Standardknopfs), LFH-NEU-hinweis-verweis (c) |
+| 5 | Kontrast | **offen** | Stufe 5. **Text erfüllt:** Titel und Satz 13,26 (Tag) / 14,18 (Nacht), die Knopfbeschriftung **18,47 / 15,70** (vorher der Link 6,04 am Tag). **Offen, alles am Knopf:** (a) der **Fokusring** (`:focus-visible`, 1 px `colorPrimaryBorder`) 1,76 / 1,45 gegen den Grund, app-weit; (b) die Beschriftung im **Hover** 5,62 am Tag (Nacht 8,49), gemessen gleich an „Neuer Einsatz“ und am „Abbrechen“ des Anlegedialogs (Stufe 5b), also antds `colorPrimaryHover` als Schrift jedes Standardknopfs, app-weit; (c) der **Knopfrand** (`colorBorder`) hält gegen die eigene Fläche 3,95 (Tag) / 3,43 (Nacht), **gegen die Info-Fläche am Tag nur 2,84** (Nacht 3,09). `steuerRahmen` ist gegen die üblichen Gründe abgestimmt, nicht gegen `colorInfoBg`; das ist ein Wert dieser Stelle, kein geerbter. Rand des Hinweises selbst < 3 : 1, nicht tragend (kein Bedienziel) | LFH-737 (a), LFH-652 (b, zu erweitern um den Hover des Standardknopfs), LFH-739 (c) |
 | 6 | Kein Status allein über Farbe | **erfüllt** | Stufe 5: der Verweis steht nicht mehr im Satz, sondern in eigener Zeile darunter, als Knopf mit eigener Fläche und Rand; vom Text trennt ihn die Form, nicht die Farbe. Vitest „der Verweis steht als eigenes Bedienziel außerhalb des Satzes, ohne punktuelle Größe“. Vorher unterschied ihn nur die Farbe vom Fließtext (2,20 / 1,58 : 1) | — |
 | 7 | Eine Farbe = eine Bedeutung | **erfüllt** | Info-Blau für eine Bedienaufforderung ohne Gefahr (wie der Sammelbanner), kein Rot. Der Knopf ist ein antd-Standardknopf (`colorText` auf `colorBgContainer`, Rand `colorBorder`), keine zweite Primäraktion; der Seitenkopf der Einsatzliste trägt keine | — |
 | 8 | Helligkeitsregler | **offen** | App-weite Lücke | LFH-397 |
@@ -141,7 +141,7 @@ Nur die Zeilen, die sich von Tabelle 1 unterscheiden. Nr. 3, 6, 7, 8, 10 und 11 
 
 | Zeile | Befund | Zielticket |
 | --- | --- | --- |
-| T3-5 | Rand des Verweis-Knopfs (`colorBorder`) gegen die Info-Fläche am Tag 2,84 : 1 (gegen die eigene Fläche 3,95; Nacht 3,09 / 3,43). Kontrast, Farbkanal und Zeilenhöhe aus dem ursprünglichen Befund sind behoben (Stufe 5) | LFH-NEU-hinweis-verweis |
+| T3-5 | Rand des Verweis-Knopfs (`colorBorder`) gegen die Info-Fläche am Tag 2,84 : 1 (gegen die eigene Fläche 3,95; Nacht 3,09 / 3,43). Kontrast, Farbkanal und Zeilenhöhe aus dem ursprünglichen Befund sind behoben (Stufe 5) | LFH-739 |
 | T1-5, T2-5, T3-5 | Fokusring antds (`colorPrimaryBorder`) 1,45–2,46 : 1 gegen den Grund, app-weit; am Verweis-Knopf 1,76 / 1,45 | LFH-737 |
 | T1-5, T2-5 | geerbte Textrollen am Tag: `schwach` 5,33 / 5,84 | LFH-643 |
 | T1-5, T2-5, T3-5 | geerbte Textrollen am Tag: `colorTextSecondary` 6,37, weiß auf `bedien` 6,59, `colorError` als Knopfschrift 6,78 (Hover 5,12), `colorPrimaryHover` als Schrift des Standardknopfs im Hover 5,62 | LFH-652 |
