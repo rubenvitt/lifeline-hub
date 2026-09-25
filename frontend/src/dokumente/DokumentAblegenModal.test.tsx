@@ -12,7 +12,8 @@ vi.mock('../api/dokumente', async (importOriginal) => {
   const echt = await importOriginal<typeof import('../api/dokumente')>();
   return { ...echt, legeDokumentAb: vi.fn() };
 });
-import { DOKUMENT_MAX_GROESSE, legeDokumentAb } from '../api/dokumente';
+import { legeDokumentAb } from '../api/dokumente';
+import { UPLOAD_MAX_GROESSE } from '../api/upload';
 
 const legeAb = vi.mocked(legeDokumentAb);
 
@@ -231,7 +232,7 @@ describe('DokumentAblegenModal', () => {
   it('weist eine Datei über 25 MiB vor dem Hochladen ab', async () => {
     rendere();
     const d = await dialog();
-    await fuellePflicht(d, pdfMitGroesse(DOKUMENT_MAX_GROESSE + 1));
+    await fuellePflicht(d, pdfMitGroesse(UPLOAD_MAX_GROESSE + 1));
     // Vorbedingung: die Datei ist wirklich angekommen (Titel aus dem Dateinamen) — sonst wäre
     // „nicht abgeschickt" trivial wahr, weil schon die Pflichtregel griffe.
     expect(within(d).getByRole('textbox', { name: 'Titel' })).toHaveValue('Lageplan Nord');
@@ -248,7 +249,7 @@ describe('DokumentAblegenModal', () => {
     legeAb.mockResolvedValue({} as never);
     rendere();
     const d = await dialog();
-    await fuellePflicht(d, pdfMitGroesse(DOKUMENT_MAX_GROESSE));
+    await fuellePflicht(d, pdfMitGroesse(UPLOAD_MAX_GROESSE));
     await userEvent.click(within(d).getByRole('button', { name: 'Ablegen' }));
 
     await vi.waitFor(() => expect(legeAb).toHaveBeenCalledTimes(1));

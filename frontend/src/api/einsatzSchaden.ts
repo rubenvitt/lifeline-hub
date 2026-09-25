@@ -1,5 +1,6 @@
-import type { Schaden, SchadenStatus, SchadenTyp, Ausmass } from './types';
-import { apiGet, apiSend } from './client';
+import type { Schaden, SchadenAnhang, SchadenStatus, SchadenTyp, Ausmass } from './types';
+import { apiGet, apiSend, apiUpload } from './client';
+import { UPLOAD_TIMEOUT_MS } from './upload';
 
 /** Felder beim Anlegen (Typ + Ort + Ausmaß Pflicht; Rest optional). Geschädigt FK XOR Freitext. */
 export interface SchadenEingabe {
@@ -109,4 +110,56 @@ export function storniereSchaden(einsatzId: number, schadenId: number): Promise<
 /** Registriernummer-Anzeige wie im Backend (S-007). */
 export function schadenRegistrierAnzeige(nr: number): string {
   return `S-${String(nr).padStart(3, '0')}`;
+}
+
+// ---------- Fotos und Dateien (LFH-21) ----------
+
+const anhangBasis = (einsatzId: number, schadenId: number) =>
+  `/api/einsaetze/${einsatzId}/schaeden/${schadenId}/anhaenge`;
+
+/** Lebende Anhänge eines Schadens, neueste zuerst. */
+export function listeSchadenAnhaenge(
+  einsatzId: number,
+  schadenId: number,
+): Promise<SchadenAnhang[]> {
+  return apiGet<SchadenAnhang[]>(anhangBasis(einsatzId, schadenId));
+}
+
+/**
+ * Legt EINE Datei am Schaden ab (Feld `datei`, design.md D5). Mehrere Fotos entstehen über
+ * den Serienmodus des Dialogs, jedes mit eigenem ETB-Nachweis. Timeout wie die übrigen
+ * Uploads (25 MiB samt Virenscan über Mobilfunk).
+ */
+export function legeSchadenAnhangAb(
+  einsatzId: number,
+  schadenId: number,
+  datei: File,
+): Promise<SchadenAnhang> {
+  const fd = new FormData();
+  fd.append('datei', datei);
+  return apiUpload<SchadenAnhang>(anhangBasis(einsatzId, schadenId), fd, {
+    timeoutMs: UPLOAD_TIMEOUT_MS,
+  });
+}
+
+/** Entfernt einen Anhang (Soft-Delete mit ETB-Nachweis); `anhangId` ist die Linker-id. */
+export function entferneSchadenAnhang(
+  einsatzId: number,
+  schadenId: number,
+  anhangId: number,
+): Promise<void> {
+  return apiSend<void>(`${anhangBasis(einsatzId, schadenId)}/${anhangId}`, 'DELETE');
+}
+
+/**
+ * Download über die modul-gegatete Schadensroute — nie über `/anhaenge/{aid}` des Einsatzes
+ * (dort 404, die Datei ist modulgebunden). Ein API-Pfad, keine Navigation, deshalb hier und
+ * nicht in `routing/deeplinks.ts` (wie `dokumentDownloadPfad`).
+ */
+export function schadenAnhangDownloadPfad(
+  einsatzId: number,
+  schadenId: number,
+  anhangId: number,
+): string {
+  return `${anhangBasis(einsatzId, schadenId)}/${anhangId}/datei`;
 }
