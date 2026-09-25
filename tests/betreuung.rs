@@ -231,7 +231,10 @@ async fn stelle_belegung_kopfzahl_und_ruecknahme() {
     .await;
     assert_eq!(s, StatusCode::OK, "{k:?}");
     assert_eq!(k["summe"], 0);
-    assert_eq!(k["stellen_ohne_meldung"], 1);
+    // Der Stichtag liegt vor der Anlage der Stelle (sie entsteht zur echten Uhrzeit): es gab
+    // sie noch nicht, also ist sie auch nicht „ohne Meldung“ (LFH-679).
+    assert_eq!(k["stellen_ohne_meldung"], 0);
+    assert_eq!(k["stellen"].as_array().unwrap().len(), 0);
     // Ohne Stichtag: jetzt
     let (s, k) = anfrage(&app, "GET", &format!("{}/belegung", pfad(e)), &admin, None).await;
     assert_eq!(s, StatusCode::OK, "{k:?}");
@@ -251,6 +254,11 @@ async fn stelle_belegung_kopfzahl_und_ruecknahme() {
         !r["stelle"].as_object().unwrap().contains_key("belegung"),
         "{r:?}"
     );
+    // Jetzt ist die Stelle in Betrieb und ohne Meldung: sie zählt, die Summe ist 0.
+    let (s, k) = anfrage(&app, "GET", &format!("{}/belegung", pfad(e)), &admin, None).await;
+    assert_eq!(s, StatusCode::OK, "{k:?}");
+    assert_eq!(k["summe"], 0);
+    assert_eq!(k["stellen_ohne_meldung"], 1);
 
     // Stornieren nimmt die Stelle aus der Übersicht
     let (s, st) = anfrage(
@@ -267,13 +275,28 @@ async fn stelle_belegung_kopfzahl_und_ruecknahme() {
     assert_eq!(u["stellen"].as_array().unwrap().len(), 0);
 }
 
+/// Ein PATCH ohne neuen Wert schreibt kein ETB und verteilt nichts live (Leerlauf-Riegel,
+/// `publiziere_wirksam`). Der Feed ist über beide Leerläufe UND die Gegenprobe offen: genau
+/// EIN `betreuung` und EIN `etb` darin gehören zur Gegenprobe. Stünde dort mehr, hätte ein
+/// Leerlauf publiziert; stünde dort nichts, bewiese der leere Feed nichts (LFH-682).
 #[tokio::test]
 async fn patch_ohne_aenderung_schreibt_nichts() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let bid = bezirk(&app, &admin, e, "Uferstraße 12–40").await;
+    let sid = stelle(&app, &admin, e, "Turnhalle Ost").await;
     let vorher = etb_eintraege(&app, &admin, e).await.len();
+    let feed = live_oeffnen(&app, &admin, e).await;
+    let (s, st) = anfrage(
+        &app,
+        "PATCH",
+        &format!("{}/stellen/{sid}", pfad(e)),
+        &admin,
+        Some(r#"{"art":"notunterkunft","kapazitaet_personen":150,"bezeichnung":"Turnhalle Ost"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{st:?}");
     let (s, b) = anfrage(
         &app,
         "PATCH",
@@ -298,6 +321,24 @@ async fn patch_ohne_aenderung_schreibt_nichts() {
     assert_eq!(b["raeumung"], "geraeumt");
     let etb = etb_eintraege(&app, &admin, e).await;
     assert_eq!(treffer(&etb, "meldung", &["geräumt"]).len(), 1);
+
+    let gelesen = sse_anfang_lesen(feed.into_body(), 400).await;
+    let zeilen = |ereignis: &str| gelesen.lines().filter(|z| *z == ereignis).count();
+    assert_eq!(
+        zeilen("event: betreuung"),
+        1,
+        "nur die Gegenprobe verteilt: {gelesen:?}"
+    );
+    assert_eq!(
+        zeilen("event: etb"),
+        1,
+        "nur die Gegenprobe ruft das ETB: {gelesen:?}"
+    );
+    assert!(
+        gelesen.contains(&format!(r#""bezirk_id":{bid}"#))
+            && !gelesen.contains(&format!(r#""stelle_id":{sid}"#)),
+        "das Ereignis gehört zum Bezirk, nicht zur Stelle: {gelesen:?}"
+    );
 }
 
 // ── Statuscodes ─────────────────────────────────────────────────────────────────────────────
@@ -309,6 +350,9 @@ async fn statuscodes_400() {
     let e = einsatz_anlegen(&app, &admin).await;
     let bid = bezirk(&app, &admin, e, "Uferstraße 12–40").await;
     let sid = stelle(&app, &admin, e, "Turnhalle Ost").await;
+    // Jeder Schreibpfad legt einen ETB-Eintrag an: bleibt die Zahl stehen, hat keine der
+    // abgelehnten Anfragen etwas geschrieben (LFH-682).
+    let etb_vorher = etb_eintraege(&app, &admin, e).await.len();
 
     // Bezirk anlegen
     for body in [
@@ -328,6 +372,12 @@ async fn statuscodes_400() {
         .await;
         assert_eq!(s, StatusCode::BAD_REQUEST, "{body} → {j:?}");
     }
+    let (_, u) = anfrage(&app, "GET", &pfad(e), &admin, None).await;
+    assert_eq!(
+        u["bezirke"].as_array().unwrap().len(),
+        1,
+        "kein Bezirk angelegt: {u:?}"
+    );
     // Bezirk ändern: unbekannte Räumung
     let (s, _) = anfrage(
         &app,
@@ -378,10 +428,17 @@ async fn statuscodes_400() {
         .await;
         assert_eq!(s, StatusCode::BAD_REQUEST, "{body} → {j:?}");
     }
-    // Belegung: Anzahl −1, Zeitpunkt in der Zukunft
+    let (_, u) = anfrage(&app, "GET", &pfad(e), &admin, None).await;
+    assert_eq!(
+        u["stellen"].as_array().unwrap().len(),
+        1,
+        "keine Stelle angelegt: {u:?}"
+    );
+    // Belegung: Anzahl −1, Zeitpunkt in der Zukunft, Zeitpunkt unlesbar
     for body in [
         r#"{"belegt":-1}"#.to_string(),
         format!(r#"{{"belegt":3,"zeitpunkt_at":"{}"}}"#, in_sekunden(3600)),
+        r#"{"belegt":3,"zeitpunkt_at":"gestern"}"#.to_string(),
     ] {
         let (s, j) = anfrage(
             &app,
@@ -393,6 +450,14 @@ async fn statuscodes_400() {
         .await;
         assert_eq!(s, StatusCode::BAD_REQUEST, "{body} → {j:?}");
     }
+    let (_, u) = anfrage(&app, "GET", &pfad(e), &admin, None).await;
+    assert!(
+        !u["stellen"][0]
+            .as_object()
+            .unwrap()
+            .contains_key("belegung"),
+        "keine Belegung gespeichert: {u:?}"
+    );
     // Kopfzahl: unlesbarer Stichtag
     let (s, _) = anfrage(
         &app,
@@ -413,6 +478,12 @@ async fn statuscodes_400() {
     )
     .await;
     assert_eq!(s, StatusCode::BAD_REQUEST);
+
+    assert_eq!(
+        etb_eintraege(&app, &admin, e).await.len(),
+        etb_vorher,
+        "keine abgelehnte Anfrage hat einen ETB-Eintrag geschrieben"
+    );
 }
 
 #[tokio::test]
@@ -421,6 +492,8 @@ async fn zeitpunkt_knapp_in_der_zukunft_ist_toleriert() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let bid = bezirk(&app, &admin, e, "Uferstraße 12–40").await;
+    let sid = stelle(&app, &admin, e, "Turnhalle Ost").await;
+    let vorher = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     // 30 s Uhrenversatz liegt innerhalb der Toleranz von 60 s
     let (s, j) = anfrage(
         &app,
@@ -431,6 +504,114 @@ async fn zeitpunkt_knapp_in_der_zukunft_ist_toleriert() {
             r#"{{"evakuiert":10,"erhebung":"gezaehlt","zeitpunkt_at":"{}"}}"#,
             in_sekunden(30)
         )),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{j:?}");
+    let (s, m) = anfrage(
+        &app,
+        "POST",
+        &format!("{}/stellen/{sid}/belegungen", pfad(e)),
+        &admin,
+        Some(&format!(
+            r#"{{"belegt":7,"zeitpunkt_at":"{}"}}"#,
+            in_sekunden(30)
+        )),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{m:?}");
+    // LFH-680: gespeichert wird min(zeitpunkt, jetzt) — die Meldung zählt sofort in der
+    // Kopfzahl „jetzt“, statt bis zu 60 s darin zu fehlen, während sie schon „aktuell“ ist.
+    let nachher = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let gespeichert = m["stelle"]["belegung"]["zeitpunkt_at"].as_str().unwrap();
+    assert!(
+        vorher.as_str() <= gespeichert && gespeichert <= nachher.as_str(),
+        "{vorher} ≤ {gespeichert} ≤ {nachher}"
+    );
+    let (s, k) = anfrage(&app, "GET", &format!("{}/belegung", pfad(e)), &admin, None).await;
+    assert_eq!(s, StatusCode::OK, "{k:?}");
+    assert_eq!(k["summe"], 7, "{k:?}");
+    let (_, u) = anfrage(&app, "GET", &pfad(e), &admin, None).await;
+    let stand = u["bezirke"][0]["stand"]["zeitpunkt_at"].as_str().unwrap();
+    assert!(stand <= nachher.as_str(), "{stand} ≤ {nachher}");
+}
+
+#[tokio::test]
+async fn personenzahlen_haben_eine_obergrenze() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let bid = bezirk(&app, &admin, e, "Uferstraße 12–40").await;
+    let sid = stelle(&app, &admin, e, "Turnhalle Ost").await;
+
+    // Eine über der Grenze und das absurde Maximum sind 400 — auf jedem Schreibweg.
+    for zu_viel in ["1000001", "9223372036854775807"] {
+        for (methode, url, body) in [
+            (
+                "POST",
+                format!("{}/bezirke", pfad(e)),
+                format!(
+                    r#"{{"bezeichnung":"A","plan_personen":{zu_viel},"plan_erhebung":"gezaehlt"}}"#
+                ),
+            ),
+            (
+                "PATCH",
+                format!("{}/bezirke/{bid}", pfad(e)),
+                format!(r#"{{"plan_personen":{zu_viel}}}"#),
+            ),
+            (
+                "POST",
+                format!("{}/bezirke/{bid}/staende", pfad(e)),
+                format!(r#"{{"evakuiert":{zu_viel},"erhebung":"gezaehlt"}}"#),
+            ),
+            (
+                "POST",
+                format!("{}/stellen", pfad(e)),
+                format!(
+                    r#"{{"bezeichnung":"B","art":"notunterkunft","kapazitaet_personen":{zu_viel}}}"#
+                ),
+            ),
+            (
+                "PATCH",
+                format!("{}/stellen/{sid}", pfad(e)),
+                format!(r#"{{"kapazitaet_personen":{zu_viel}}}"#),
+            ),
+            (
+                "POST",
+                format!("{}/stellen/{sid}/belegungen", pfad(e)),
+                format!(r#"{{"belegt":{zu_viel}}}"#),
+            ),
+        ] {
+            let (s, j) = anfrage(&app, methode, &url, &admin, Some(&body)).await;
+            assert_eq!(s, StatusCode::BAD_REQUEST, "{methode} {url} {body} → {j:?}");
+        }
+    }
+    let (_, u) = anfrage(&app, "GET", &pfad(e), &admin, None).await;
+    assert_eq!(u["bezirke"].as_array().unwrap().len(), 1, "{u:?}");
+    assert_eq!(u["bezirke"][0]["plan_personen"], 640);
+    assert!(!u["bezirke"][0].as_object().unwrap().contains_key("stand"));
+    assert_eq!(u["stellen"].as_array().unwrap().len(), 1, "{u:?}");
+    assert_eq!(u["stellen"][0]["kapazitaet_personen"], 150);
+    assert!(!u["stellen"][0]
+        .as_object()
+        .unwrap()
+        .contains_key("belegung"));
+
+    // Die Grenze selbst ist erlaubt.
+    let (s, j) = anfrage(
+        &app,
+        "PATCH",
+        &format!("{}/bezirke/{bid}", pfad(e)),
+        &admin,
+        Some(r#"{"plan_personen":1000000}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j:?}");
+    let (s, j) = anfrage(
+        &app,
+        "POST",
+        &format!("{}/stellen/{sid}/belegungen", pfad(e)),
+        &admin,
+        Some(r#"{"belegt":1000000}"#),
     )
     .await;
     assert_eq!(s, StatusCode::CREATED, "{j:?}");
@@ -546,7 +727,7 @@ async fn statuscodes_404_409_422() {
     )
     .await;
     assert_eq!(s, StatusCode::OK);
-    let (s, _) = anfrage(
+    let (s, m) = anfrage(
         &app,
         "POST",
         &format!("{}/stellen/{sid}/belegungen", pfad(e)),
@@ -555,6 +736,7 @@ async fn statuscodes_404_409_422() {
     )
     .await;
     assert_eq!(s, StatusCode::CREATED);
+    let belegung_40 = m["meldung_id"].as_i64().unwrap();
     let (s, st) = anfrage(
         &app,
         "PATCH",
@@ -564,6 +746,25 @@ async fn statuscodes_404_409_422() {
     )
     .await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{st:?}");
+
+    // 422: dieselbe Belegungsmeldung zweimal zurücknehmen (LFH-682)
+    let belegung_ruecknahme = format!("{}/belegungen/{belegung_40}/zuruecknehmen", pfad(e));
+    let (s, _) = anfrage(&app, "POST", &belegung_ruecknahme, &admin, None).await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, j) = anfrage(&app, "POST", &belegung_ruecknahme, &admin, None).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{j:?}");
+    // Eine noch nicht zurückgenommene Meldung für den Storno-Fall unten: dort muss die 409
+    // vor jeder 422 greifen, und nur eine offene Meldung trennt die beiden.
+    let (s, m) = anfrage(
+        &app,
+        "POST",
+        &format!("{}/stellen/{sid}/belegungen", pfad(e)),
+        &admin,
+        Some(r#"{"belegt":12}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+    let belegung_12 = m["meldung_id"].as_i64().unwrap();
 
     let (_, m) = anfrage(
         &app,
@@ -604,15 +805,21 @@ async fn statuscodes_404_409_422() {
     )
     .await;
     assert_eq!(s, StatusCode::CONFLICT);
+    // 409: stornierte Stelle — erneut stornieren, ändern, belegen, Belegung zurücknehmen
+    let stelle_stornieren = format!("{}/stellen/{sid}/stornieren", pfad(e));
+    let (s, _) = anfrage(&app, "POST", &stelle_stornieren, &admin, None).await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, _) = anfrage(&app, "POST", &stelle_stornieren, &admin, None).await;
+    assert_eq!(s, StatusCode::CONFLICT);
     let (s, _) = anfrage(
         &app,
-        "POST",
-        &format!("{}/stellen/{sid}/stornieren", pfad(e)),
+        "PATCH",
+        &stelle_patch,
         &admin,
-        None,
+        Some(r#"{"kapazitaet_personen":200}"#),
     )
     .await;
-    assert_eq!(s, StatusCode::OK);
+    assert_eq!(s, StatusCode::CONFLICT);
     let (s, _) = anfrage(
         &app,
         "POST",
@@ -622,6 +829,110 @@ async fn statuscodes_404_409_422() {
     )
     .await;
     assert_eq!(s, StatusCode::CONFLICT);
+    let (s, j) = anfrage(
+        &app,
+        "POST",
+        &format!("{}/belegungen/{belegung_12}/zuruecknehmen", pfad(e)),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{j:?}");
+}
+
+/// Stelle, Belegung und Rücknahmen eines ANDEREN Einsatzes sind über diesen Einsatz nicht
+/// erreichbar (404), und die Anfrage ändert dort nichts. Dazu PATCH an eine unbekannte Stelle.
+#[tokio::test]
+async fn statuscodes_404_fremder_einsatz_und_unbekannte_stelle() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let e2 = einsatz_anlegen(&app, &admin).await;
+
+    let fremde_stelle = stelle(&app, &admin, e2, "Fremdhalle").await;
+    let (s, m) = anfrage(
+        &app,
+        "POST",
+        &format!("{}/stellen/{fremde_stelle}/belegungen", pfad(e2)),
+        &admin,
+        Some(r#"{"belegt":40}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{m:?}");
+    let fremde_belegung = m["meldung_id"].as_i64().unwrap();
+    let fremder_bezirk = bezirk(&app, &admin, e2, "Fremdbezirk").await;
+    let (s, m) = anfrage(
+        &app,
+        "POST",
+        &format!("{}/bezirke/{fremder_bezirk}/staende", pfad(e2)),
+        &admin,
+        Some(r#"{"evakuiert":7,"erhebung":"gezaehlt"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{m:?}");
+    let fremder_stand = m["meldung_id"].as_i64().unwrap();
+    let etb_fremd_vorher = etb_eintraege(&app, &admin, e2).await.len();
+
+    for (methode, suffix, body) in [
+        (
+            "PATCH",
+            format!("stellen/{fremde_stelle}"),
+            Some(r#"{"kapazitaet_personen":200}"#),
+        ),
+        ("POST", format!("stellen/{fremde_stelle}/stornieren"), None),
+        (
+            "POST",
+            format!("stellen/{fremde_stelle}/belegungen"),
+            Some(r#"{"belegt":1}"#),
+        ),
+        (
+            "POST",
+            format!("belegungen/{fremde_belegung}/zuruecknehmen"),
+            None,
+        ),
+        (
+            "POST",
+            format!("staende/{fremder_stand}/zuruecknehmen"),
+            None,
+        ),
+        (
+            "PATCH",
+            "stellen/999999".to_string(),
+            Some(r#"{"kapazitaet_personen":200}"#),
+        ),
+    ] {
+        let (s, j) = anfrage(
+            &app,
+            methode,
+            &format!("{}/{suffix}", pfad(e)),
+            &admin,
+            body,
+        )
+        .await;
+        assert_eq!(s, StatusCode::NOT_FOUND, "{methode} {suffix} → {j:?}");
+        assert!(
+            !j.to_string().contains("Fremd"),
+            "keine Daten des anderen Einsatzes: {j:?}"
+        );
+    }
+
+    // Im anderen Einsatz ist alles, wie es war.
+    let (_, u) = anfrage(&app, "GET", &pfad(e2), &admin, None).await;
+    let st = &u["stellen"][0];
+    assert_eq!(st["id"], fremde_stelle, "nicht storniert: {u:?}");
+    assert_eq!(st["kapazitaet_personen"], 150);
+    assert_eq!(
+        st["belegung"]["belegt"], 40,
+        "Belegung nicht zurückgenommen"
+    );
+    assert_eq!(
+        u["bezirke"][0]["stand"]["evakuiert"], 7,
+        "Stand nicht zurückgenommen"
+    );
+    assert_eq!(
+        etb_eintraege(&app, &admin, e2).await.len(),
+        etb_fremd_vorher
+    );
 }
 
 // ── Rechte ──────────────────────────────────────────────────────────────────────────────────
@@ -842,6 +1153,20 @@ async fn live_ereignis_nur_an_leser_mit_modulrecht() {
     assert!(
         bei_gustav.contains(&format!(r#""bezirk_id":{bid}"#)),
         "Nutzlast trägt die Bezirk-ID: {bei_gustav:?}"
+    );
+    // Die Standmeldung schreibt einen ETB-Eintrag, und der geht als eigener Kurzruf hinaus
+    // (design.md D5) — ohne ihn bliebe das Tagebuch offener Leser stehen (LFH-682). Geprüft
+    // an DIESEM Eintrag: Bezirk und Person rufen das ETB ebenfalls, ein bloßes `event: etb`
+    // stünde auch ohne den Kurzruf der Meldung im Feed.
+    let etb = etb_eintraege(&app, &admin, e).await;
+    let stand_eintrag = treffer(&etb, "meldung", &["Kanarienbezirk", "4711"]);
+    assert_eq!(stand_eintrag.len(), 1, "{etb:?}");
+    let etb_id = stand_eintrag[0]["id"].as_i64().unwrap();
+    // Nur der ETB-Kurzruf trägt `etb_id` (`LiveHub::publiziere`).
+    assert!(
+        bei_gustav.lines().any(|z| z == "event: etb")
+            && bei_gustav.contains(&format!(r#""etb_id":{etb_id}}}"#)),
+        "der ETB-Eintrag der Meldung wird live gerufen: {bei_gustav:?}"
     );
     assert!(
         bei_frieda.contains("event: person"),

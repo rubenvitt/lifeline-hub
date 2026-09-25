@@ -12,7 +12,7 @@ import Grundriss, {
   platzBedienform,
   platzMenueEintraege,
 } from './Grundriss';
-import { antdToken, farbenDunkel, type Dichte } from '../../theme/tokens';
+import { antdKnopf, antdToken, farbenDunkel, type Dichte } from '../../theme/tokens';
 import type { Person, PersonDetail, UhsBelegung, UhsDetail, UhsPlatz } from '../../api/types';
 import { einsatzKeys } from '../../api/queryKeys';
 
@@ -1312,6 +1312,52 @@ describe('Grundriss – Inhalt des Platzmenüs (LFH-359)', () => {
       });
       expect(gesperrt(items)).toEqual(['zuweisen']);
     });
+  });
+});
+
+/**
+ * Der Breitenboden der Knöpfe gilt auch in der Aktionszeile (LFH-381, Ausnahme gefallen mit
+ * LFH-379).
+ *
+ * LFH-381 hatte die vier Knöpfe der Zeile per `minWidth: 0` vom Boden des Kontexts
+ * ausgenommen, weil sie ab `komfortabel` sonst über die 124 px breite Karte hinausliefen. Die
+ * Zeile gibt es seit LFH-379 nur noch in `kompakt`, und dort ist der Boden (24 px) genau das
+ * Quadrat, mit dem `platzBedienform` rechnet: 4 × 24 + 3 × 7 = 117 ≤ 124. Die Ausnahme wäre
+ * tote Logik und ist entfernt; gepinnt wird deshalb, dass alle vier den Boden TRAGEN.
+ */
+describe('Grundriss – Aktionszeile mit Breitenboden (LFH-381/LFH-379)', () => {
+  it('alle vier Knöpfe der Platzkarte tragen in kompakt den Boden des Kontexts', async () => {
+    const p = person({ id: 7, registrier_nr: 7, aktuelle_uhs_id: 1, aktueller_platz_id: 10 });
+    const uhs = uhsDetail({
+      status: 'aktiv',
+      plaetze: [platz({ id: 10, bezeichnung: 'Bett 1', verfuegbarkeit: 'aufbereitung' })],
+    });
+    server.use(http.get('/api/einsaetze/1/personen', () => HttpResponse.json([p])));
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+    render(
+      <MemoryRouter>
+        <QueryClientProvider client={qc}>
+          <ConfigProvider
+            theme={{ token: antdToken(farbenDunkel, 'kompakt') }}
+            button={antdKnopf('kompakt')}
+          >
+            <AntApp>
+              <Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />
+            </AntApp>
+          </ConfigProvider>
+        </QueryClientProvider>
+      </MemoryRouter>,
+    );
+    await screen.findByText(/R-007/);
+    const knoepfe = [
+      screen.getByRole('button', { name: 'Verbleib / Entlassung erfassen' }),
+      screen.getByRole('button', { name: 'zurückweisen' }),
+      screen.getByRole('button', { name: 'als frei markieren' }),
+      screen.getByRole('button', { name: /Platzaktionen zu Bett 1/ }),
+    ];
+    for (const knopf of knoepfe) {
+      expect(knopf.style.minWidth, knopf.getAttribute('aria-label')!).toBe('24px');
+    }
   });
 });
 

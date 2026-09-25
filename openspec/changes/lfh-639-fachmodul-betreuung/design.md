@@ -122,6 +122,14 @@ im ETB, mit `ereigniszeit = zeitpunkt_at`. Ein Zeitpunkt in der Zukunft (mehr al
 Toleranz für Uhrenversatz) ist **400**, weil das Feld für sich unbrauchbar ist. Geparst
 wird mit demselben `zeit()`-Helfer wie in `routes/abloesung.rs`.
 
+**Die Toleranz nimmt den Versatz an, übernimmt ihn aber nicht** (LFH-680). Gespeichert wird
+`min(zeitpunkt, jetzt)`. Ohne das Klemmen war eine Meldung bis 60 s voraus sofort „aktuell“
+(sie hat den jüngsten Zeitpunkt), fehlte aber bis zu 60 s in der Kopfzahl „jetzt“, weil
+deren Stichtag `zeitpunkt_at ≤ jetzt` verlangt. Modulseite und Kopfzahl zeigten dann für
+dieselbe Stelle verschiedene Stände. Die Uhr des Servers ist die Bezugsuhr aller Meldungen,
+ein Gerät, das vorgeht, verschiebt sie nicht. Eine Meldung ohne Versatz ändert sich dadurch
+nicht, eine nachgetragene (Zeitpunkt in der Vergangenheit) ebenso wenig.
+
 **Der Draht trägt UTC ohne Zonenkennung** (`YYYY-MM-DD HH:mm:ss`). Das Frontend schreibt
 über `alsBackendZeit` und liest über dessen Umkehr aus `etb/filterZeit.ts`, nie über
 `dayjs(s)`. Sonst ergibt eine als UTC gelesene Ortszeit entweder ein 400 für „jetzt“
@@ -148,8 +156,14 @@ Aktion verbietet: eine Stelle mit Belegung > 0 schließen, eine geschlossene Ste
 belegen oder an ihr eine Belegung zurücknehmen (sonst entstünde „geschlossen und belegt“), eine bereits zurückgenommene Meldung erneut zurücknehmen (Präzedenz
 `abloesung/repo.rs`: Rücknahme ohne Vollzug → 422). „Geschlossen“ ist nach D4 umkehrbar
 und damit kein Lebensende. **400** gilt für das Feld allein: Anzahl < 0, Plangröße < 1,
-Kapazität < 1, leere Bezeichnung, unbekannter Enum-Wert, Zeitpunkt unlesbar oder in der
-Zukunft. Diese Einordnung steht mit Verweis auf `src/error.rs` und CLAUDE.md
+Kapazität < 1, eine Personenzahl über `MAX_PERSONEN` (1 000 000, LFH-680), leere
+Bezeichnung, unbekannter Enum-Wert, Zeitpunkt unlesbar oder in der Zukunft. Die Obergrenze
+hält die Summe der Kopfzahl vom Überlauf fern (vorher: Panic im Debug-Build, negative Summe
+im Release) und jede Zahl unter 2^53, wo eine JS-Number noch genau zählt. Eine Million in
+einem Bezirk oder einer Stelle liegt eine Größenordnung über den größten Evakuierungen in
+Deutschland. Vorbild ist `verpflegung::MAX_EP`. Die Oberfläche prüft dieselbe Grenze als
+Formularregel und nicht als `max` am `InputNumber`, weil das einen zu großen Wert beim
+Verlassen still auf die Grenze klemmt. Diese Einordnung steht mit Verweis auf `src/error.rs` und CLAUDE.md
 („Statuscode-Konvention“) im Handler-Kommentar.
 
 **Verworfen:** CAS über `basis_stand_id` (so noch in der Scope-Synthese). Der Konflikt
@@ -358,6 +372,13 @@ leicht übersehen:
   Mindestaktualität erzwingt LFH-639 nicht. Das bleibt eine Frage an LFH-640.
 - [Geschlossene Stelle mit Belegung 0 zählt in der Kopfzahl vor ihrem Schließen mit ihrer
   damaligen Belegung] → Das ist gewollt. Die Kopfzahl zu t ist der damals gemeldete Stand.
+- [Ohne Statushistorie ist offen, welche Stelle zu t betrieben wurde] → Nachzug LFH-679,
+  Heuristik ohne Migration: „ohne Meldung“ zählt nur eine Stelle, die vor t angelegt ist und
+  nicht jetzt geschlossen oder vorbereitet ohne jede nicht zurückgenommene Meldung. Die
+  Summe berührt das nicht. Maßgeblich ist der heutige Status: eine jetzt geschlossene Stelle
+  mit späterer Meldung zählt weiter (Hinweis eher zu oft), eine zu t betriebene, nie gemeldete
+  und später geschlossene fällt weg (Hinweis fehlt). Genau würde es erst mit einer
+  Statushistorie.
 
 ## Migration Plan
 

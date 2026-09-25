@@ -143,6 +143,11 @@ export interface VerbleibEingabe {
   ziel?: string | null;
   status?: VerbleibStatus | null;
   notiz?: string | null;
+  /**
+   * LFH-674: Betreuungsstelle, nur bei `art: 'notunterkunft'` (sonst 422) und nur mit
+   * Lesezugriff auf das Modul Betreuung (sonst 403). Der Server kopiert keinen Namen ins Ziel.
+   */
+  betreuungsstelle_id?: number | null;
 }
 export function erfasseVerbleib(
   einsatzId: number,

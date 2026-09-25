@@ -1013,7 +1013,7 @@
           "stellen_ohne_meldung": {
             "type": "integer",
             "format": "int64",
-            "description": "Zahl der Stellen, die bis zum Stichtag keine Meldung haben."
+            "description": "Zahl der Stellen, die bis zum Stichtag keine Meldung haben. Mitgezählt wird nur, wer zum\nStichtag betrieben sein konnte: nicht nach ihm angelegt und nicht jetzt geschlossen oder\nvorbereitet ohne jede Meldung (LFH-679). Solche Stellen fehlen auch in `stellen`."
           },
           "summe": {
             "type": "integer",
@@ -1181,6 +1181,16 @@
             "items": {
               "$ref": "#/components/schemas/EvakuierungsbezirkAnzeige"
             }
+          },
+          "namentlich": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/StelleNamentlich"
+            },
+            "description": "„davon namentlich“ (LFH-674): je Stelle die Zahl der Personen, deren jüngster Verbleib\n`notunterkunft` an dieser Stelle ist — nur Stellen mit mindestens einer Person. Fehlt\nganz, wenn der Lesende das Modul Personen nicht sehen darf (nicht „0“). Gefüllt NUR in\nder Route: `repo::uebersicht` speist auch den gesicherten Lagestand. Die Zahl geht in\nkeine Belegung, Kopfzahl oder Summe ein — führend ist die Mengenmeldung."
           },
           "stellen": {
             "type": "array",
@@ -6674,6 +6684,14 @@
               }
             ]
           },
+          "aktuelle_verbleib_betreuungsstelle_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Betreuungsstelle des jüngsten Verbleibs (LFH-674), nur bei `notunterkunft` gesetzt."
+          },
           "aktueller_platz_id": {
             "type": [
               "integer",
@@ -7783,6 +7801,24 @@
           }
         }
       },
+      "StelleNamentlich": {
+        "type": "object",
+        "description": "Namentlich zugeordnete Personen an einer Stelle (LFH-674), Teil von [`BetreuungUebersicht`].",
+        "required": [
+          "stelle_id",
+          "anzahl"
+        ],
+        "properties": {
+          "anzahl": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "stelle_id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "StichwortVorschlag": {
         "type": "object",
         "description": "Org-weiter Einsatzstichwort-Vorschlag für die Combobox.",
@@ -8170,6 +8206,14 @@
         "properties": {
           "art": {
             "$ref": "#/components/schemas/VerbleibArt"
+          },
+          "betreuungsstelle_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Betreuungsstelle eines Notunterkunft-Verbleibs (LFH-674). Nur die Kennung: den Namen\nliest, wer das Modul Betreuung sehen darf, aus dessen Übersicht."
           },
           "einsatz_id": {
             "type": "integer",

@@ -18,8 +18,10 @@ import {
   StornierenDialog,
   belegungBody,
   bezirkPatch,
+  bezirkPatchDreiseitig,
   standBody,
   stellePatch,
+  stellePatchDreiseitig,
 } from './BetreuungDialoge';
 
 dayjs.extend(utc);
@@ -247,6 +249,62 @@ describe('BelegungMeldenDialog', () => {
   });
 });
 
+describe('Obergrenze der Personenzahlen (LFH-680)', () => {
+  it('Belegung über 1 000 000: Grund am Feld, nichts gesendet, der Wert bleibt stehen', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(
+      <BelegungMeldenDialog
+        stelle={stelle()}
+        laeuft={false}
+        fehler={null}
+        onErfassen={onErfassen}
+        onSchliessen={() => {}}
+      />,
+    );
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Belegung melden: Turnhalle Ost',
+    });
+    const feld = within(dialog).getByLabelText('Belegt (Personen)');
+    await userEvent.type(feld, '1000001');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Melden' }));
+    expect(await within(dialog).findByText(/Höchstens 1\s000\s000 Personen/)).toBeInTheDocument();
+    // Kein `max` am InputNumber: das klemmte beim Verlassen still auf 1 000 000, und eine
+    // Personenzahl, die sich still ändert, wäre schlimmer als die Ablehnung.
+    expect(feld).toHaveValue('1000001');
+    expect(onErfassen).not.toHaveBeenCalled();
+  });
+
+  it('die Grenze selbst geht durch; Kapazität hat dieselbe Grenze', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(
+      <StelleAnlegenDialog
+        abschnitte={ABSCHNITTE}
+        laeuft={false}
+        fehler={null}
+        onErfassen={onErfassen}
+        onSchliessen={() => {}}
+      />,
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Betreuungsstelle anlegen' });
+    await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Messehalle');
+    const kapazitaet = within(dialog).getByLabelText('Kapazität (Personen)');
+    await userEvent.type(kapazitaet, '1000001');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    expect(await within(dialog).findByText(/Höchstens 1\s000\s000 Personen/)).toBeInTheDocument();
+    expect(onErfassen).not.toHaveBeenCalled();
+    await userEvent.clear(kapazitaet);
+    await userEvent.type(kapazitaet, '1000000');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await waitFor(() =>
+      expect(onErfassen).toHaveBeenCalledWith({
+        bezeichnung: 'Messehalle',
+        art: 'betreuungsstelle',
+        kapazitaet_personen: 1000000,
+      }),
+    );
+  });
+});
+
 describe('BezirkAnlegenDialog', () => {
   it('Bezeichnung, Plangröße, Erhebung sichtbar; Abschnitt, Sammelstelle, Notiz eingeklappt', async () => {
     const onErfassen = vi.fn().mockResolvedValue(undefined);
@@ -324,6 +382,138 @@ describe('RaeumungDialog', () => {
     await waehle(dialog, 'geräumt');
     await userEvent.click(pruefeFormStruktur(dialog, 'Speichern'));
     await waitFor(() => expect(onErfassen).toHaveBeenCalledWith({ raeumung: 'geraeumt' }));
+  });
+
+  const raeumungDialog = (
+    b: Evakuierungsbezirk,
+    onErfassen: () => Promise<unknown>,
+    onSchliessen = () => {},
+  ) => (
+    <RaeumungDialog
+      bezirk={b}
+      laeuft={false}
+      fehler={null}
+      onErfassen={onErfassen}
+      onSchliessen={onSchliessen}
+    />
+  );
+
+  it('LFH-681: unberührt folgt das Radio dem Live-Stand — Speichern dreht einen fremden Wechsel NICHT zurück', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    const onSchliessen = vi.fn();
+    const { rerender } = renderMitProviders(
+      raeumungDialog(bezirk({ raeumung: 'angeordnet' }), onErfassen, onSchliessen),
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Räumung: Uferstraße 12–40' });
+    rerender(raeumungDialog(bezirk({ raeumung: 'geraeumt' }), onErfassen, onSchliessen));
+    await waitFor(() =>
+      expect(within(dialog).getByRole('radio', { name: 'geräumt' })).toBeChecked(),
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(onSchliessen).toHaveBeenCalled());
+    expect(onErfassen).not.toHaveBeenCalled();
+  });
+
+  it('LFH-681: zurück auf den Stand beim Öffnen, nachdem ein Live-Refetch ihn geändert hat, geht als PATCH raus', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    const { rerender } = renderMitProviders(
+      raeumungDialog(bezirk({ raeumung: 'angeordnet' }), onErfassen),
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Räumung: Uferstraße 12–40' });
+    rerender(raeumungDialog(bezirk({ raeumung: 'laeuft' }), onErfassen));
+    await waitFor(() => expect(within(dialog).getByRole('radio', { name: 'läuft' })).toBeChecked());
+    await waehle(dialog, 'angeordnet');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(onErfassen).toHaveBeenCalledWith({ raeumung: 'angeordnet' }));
+  });
+
+  it('LFH-681: eine eigene Wahl bleibt stehen, wenn der Live-Stand wechselt (Gegenstück)', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    const { rerender } = renderMitProviders(
+      raeumungDialog(bezirk({ raeumung: 'angeordnet' }), onErfassen),
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Räumung: Uferstraße 12–40' });
+    await waehle(dialog, 'geräumt');
+    rerender(raeumungDialog(bezirk({ raeumung: 'laeuft' }), onErfassen));
+    expect(within(dialog).getByRole('radio', { name: 'geräumt' })).toBeChecked();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(onErfassen).toHaveBeenCalledWith({ raeumung: 'geraeumt' }));
+  });
+
+  it('LFH-681: steht der gewählte Zustand schon auf dem Server, geht kein PATCH raus', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    const onSchliessen = vi.fn();
+    const dialogMit = (b: Evakuierungsbezirk) => (
+      <RaeumungDialog
+        bezirk={b}
+        laeuft={false}
+        fehler={null}
+        onErfassen={onErfassen}
+        onSchliessen={onSchliessen}
+      />
+    );
+    const { rerender } = renderMitProviders(dialogMit(bezirk({ raeumung: 'angeordnet' })));
+    const dialog = await screen.findByRole('dialog', { name: 'Räumung: Uferstraße 12–40' });
+    await waehle(dialog, 'geräumt');
+    rerender(dialogMit(bezirk({ raeumung: 'geraeumt' })));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(onSchliessen).toHaveBeenCalled());
+    expect(onErfassen).not.toHaveBeenCalled();
+  });
+});
+
+describe('LFH-681: Mehrfeld-Dialoge vergleichen dreiseitig', () => {
+  it('bezirkPatchDreiseitig: nur was die Person geändert hat UND vom aktuellen Stand abweicht', () => {
+    const beimOeffnen = bezirk({ notiz: 'Zufahrt Nord', plan_personen: 640 });
+    const aktuell = bezirk({ notiz: 'Zufahrt Süd gesperrt', plan_personen: 700 });
+    const w = {
+      bezeichnung: 'Uferstraße 12–40',
+      plan_personen: 820,
+      plan_erhebung: 'geschaetzt' as const,
+      notiz: 'Zufahrt Nord',
+    };
+    // Die unberührte Notiz trägt den alten Wert — gegen `aktuell` allein ginge sie raus und
+    // überschriebe die fremde Änderung still.
+    expect(bezirkPatch(aktuell, w)).toEqual({ plan_personen: 820, notiz: 'Zufahrt Nord' });
+    expect(bezirkPatchDreiseitig(beimOeffnen, aktuell, w)).toEqual({ plan_personen: 820 });
+    // Geändert, aber fremd schon auf denselben Wert gesetzt → nichts zu senden.
+    expect(bezirkPatchDreiseitig(beimOeffnen, bezirk({ plan_personen: 820 }), w)).toEqual({});
+  });
+
+  it('stellePatchDreiseitig: eine fremd geleerte Kapazität bleibt leer, ein eigener Wechsel geht raus', () => {
+    const beimOeffnen = stelle({ kapazitaet_personen: 150 });
+    const aktuell = stelle({ kapazitaet_personen: null });
+    const w = {
+      bezeichnung: 'Turnhalle Ost',
+      art: 'notunterkunft' as const,
+      status: 'geschlossen' as const,
+      kapazitaet_personen: 150,
+    };
+    expect(stellePatchDreiseitig(beimOeffnen, aktuell, w)).toEqual({ status: 'geschlossen' });
+  });
+
+  it('BezirkBearbeitenDialog: eine fremd geänderte Notiz wird nicht mit dem alten Wert überschrieben', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    const dialogMit = (b: Evakuierungsbezirk) => (
+      <BezirkBearbeitenDialog
+        bezirk={b}
+        abschnitte={ABSCHNITTE}
+        laeuft={false}
+        fehler={null}
+        onErfassen={onErfassen}
+        onSchliessen={() => {}}
+      />
+    );
+    const { rerender } = renderMitProviders(dialogMit(bezirk({ notiz: 'Zufahrt Nord' })));
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Bezirk bearbeiten: Uferstraße 12–40',
+    });
+    rerender(dialogMit(bezirk({ notiz: 'Zufahrt Süd gesperrt' })));
+    const feld = within(dialog).getByLabelText('Plangröße (Personen)');
+    await userEvent.clear(feld);
+    await userEvent.type(feld, '820');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(onErfassen).toHaveBeenCalledWith({ plan_personen: 820 }));
   });
 });
 
@@ -414,6 +604,144 @@ describe('StelleBearbeitenDialog — Schließen einer belegten Stelle (design.md
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(2));
     expect(onLeermeldung).toHaveBeenCalledTimes(1);
+  });
+
+  it('LFH-681: ist die Stelle seit dem Öffnen belegt worden, verlangt das Schließen die Leermeldung', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    const onLeermeldung = vi.fn().mockResolvedValue(undefined);
+    const dialogMit = (s: Betreuungsstelle) => (
+      <StelleBearbeitenDialog
+        stelle={s}
+        abschnitte={ABSCHNITTE}
+        laeuft={false}
+        fehler={null}
+        onErfassen={onErfassen}
+        onLeermeldung={onLeermeldung}
+        onSchliessen={() => {}}
+      />
+    );
+    const { rerender } = renderMitProviders(dialogMit(stelle()));
+    const dialog = await screen.findByRole('dialog', { name: 'Stelle bearbeiten: Turnhalle Ost' });
+    await waehle(dialog, 'geschlossen');
+    expect(within(dialog).queryByRole('checkbox')).toBeNull();
+    // Live-Refetch: inzwischen sind 12 Personen gemeldet.
+    rerender(
+      dialogMit(stelle({ belegung: { id: 32, belegt: 12, zeitpunkt_at: '2026-09-23 11:00:00' } })),
+    );
+    const haken = await within(dialog).findByRole('checkbox', { name: /Belegung 0 melden/ });
+    expect(within(dialog).getByText(/mit 12 Personen belegt/)).toBeInTheDocument();
+    await userEvent.click(haken);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(onErfassen).toHaveBeenCalledWith({ status: 'geschlossen' }));
+    expect(onLeermeldung).toHaveBeenCalledTimes(1);
+    expect(onLeermeldung.mock.invocationCallOrder[0]).toBeLessThan(
+      onErfassen.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('LFH-681: kommt nach der eigenen Leermeldung eine NEUE Belegung, wird wieder geleert — nicht übersprungen', async () => {
+    const onErfassen = vi
+      .fn()
+      .mockRejectedValueOnce(new ApiError(503, 'Dienst nicht erreichbar'))
+      .mockResolvedValue(undefined);
+    const onLeermeldung = vi.fn().mockResolvedValue(undefined);
+    const dialogMit = (s: Betreuungsstelle) => (
+      <StelleBearbeitenDialog
+        stelle={s}
+        abschnitte={ABSCHNITTE}
+        laeuft={false}
+        fehler={null}
+        onErfassen={onErfassen}
+        onLeermeldung={onLeermeldung}
+        onSchliessen={() => {}}
+      />
+    );
+    const { rerender } = renderMitProviders(dialogMit(belegt));
+    const dialog = await screen.findByRole('dialog', { name: 'Stelle bearbeiten: Turnhalle Ost' });
+    await waehle(dialog, 'geschlossen');
+    await userEvent.click(await within(dialog).findByRole('checkbox', { name: /Belegung 0/ }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
+    expect(onLeermeldung).toHaveBeenCalledTimes(1);
+    // Refetch: die eigene 0 steht da …
+    rerender(
+      dialogMit(stelle({ belegung: { id: 41, belegt: 0, zeitpunkt_at: '2026-09-23 11:00:00' } })),
+    );
+    await waitFor(() => expect(within(dialog).queryByRole('checkbox')).toBeNull());
+    // … dann meldet jemand anderes 3 Personen.
+    rerender(
+      dialogMit(stelle({ belegung: { id: 42, belegt: 3, zeitpunkt_at: '2026-09-23 11:05:00' } })),
+    );
+    const haken = await within(dialog).findByRole('checkbox', { name: /Belegung 0/ });
+    if (!(haken as HTMLInputElement).checked) await userEvent.click(haken);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(2));
+    expect(onLeermeldung).toHaveBeenCalledTimes(2);
+    expect(onLeermeldung.mock.invocationCallOrder[1]).toBeLessThan(
+      onErfassen.mock.invocationCallOrder[1],
+    );
+  });
+
+  it('LFH-681: hat jemand die Stelle inzwischen geschlossen, gibt es weder Leermeldung noch PATCH', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    const onLeermeldung = vi.fn();
+    const onSchliessen = vi.fn();
+    const dialogMit = (s: Betreuungsstelle) => (
+      <StelleBearbeitenDialog
+        stelle={s}
+        abschnitte={ABSCHNITTE}
+        laeuft={false}
+        fehler={null}
+        onErfassen={onErfassen}
+        onLeermeldung={onLeermeldung}
+        onSchliessen={onSchliessen}
+      />
+    );
+    const { rerender } = renderMitProviders(dialogMit(belegt));
+    const dialog = await screen.findByRole('dialog', { name: 'Stelle bearbeiten: Turnhalle Ost' });
+    await waehle(dialog, 'geschlossen');
+    await within(dialog).findByRole('checkbox', { name: /Belegung 0 melden/ });
+    rerender(
+      dialogMit(
+        stelle({
+          status: 'geschlossen',
+          belegung: { id: 33, belegt: 0, zeitpunkt_at: '2026-09-23 11:00:00' },
+        }),
+      ),
+    );
+    await waitFor(() => expect(within(dialog).queryByRole('checkbox')).toBeNull());
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(onSchliessen).toHaveBeenCalled());
+    expect(onLeermeldung).not.toHaveBeenCalled();
+    expect(onErfassen).not.toHaveBeenCalled();
+  });
+
+  it('LFH-681: fremd wiedereröffnet und belegt — ein unberührtes „geschlossen" sperrt das Speichern nicht', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    const onLeermeldung = vi.fn();
+    const dialogMit = (s: Betreuungsstelle) => (
+      <StelleBearbeitenDialog
+        stelle={s}
+        abschnitte={ABSCHNITTE}
+        laeuft={false}
+        fehler={null}
+        onErfassen={onErfassen}
+        onLeermeldung={onLeermeldung}
+        onSchliessen={() => {}}
+      />
+    );
+    const { rerender } = renderMitProviders(dialogMit(stelle({ status: 'geschlossen' })));
+    const dialog = await screen.findByRole('dialog', { name: 'Stelle bearbeiten: Turnhalle Ost' });
+    rerender(
+      dialogMit(stelle({ belegung: { id: 34, belegt: 5, zeitpunkt_at: '2026-09-23 11:00:00' } })),
+    );
+    expect(within(dialog).queryByRole('checkbox')).toBeNull();
+    const feld = within(dialog).getByLabelText('Kapazität (Personen)');
+    await userEvent.clear(feld);
+    await userEvent.type(feld, '200');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(onErfassen).toHaveBeenCalledWith({ kapazitaet_personen: 200 }));
+    expect(onLeermeldung).not.toHaveBeenCalled();
   });
 
   it('eine unbelegte Stelle schließt ohne Leermeldung', async () => {

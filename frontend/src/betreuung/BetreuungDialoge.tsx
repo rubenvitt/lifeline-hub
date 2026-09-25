@@ -11,7 +11,7 @@ import {
 } from 'antd';
 import { Typography } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
-import { useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type {
   Betreuungsstelle,
   BetreuungsstelleArt,
@@ -56,6 +56,20 @@ import {
  * PATCH (D5, Leerlauf-Riegel): die Masken schicken nur geänderte Schlüssel. `null` bedeutet
  * „leeren" und entsteht nur, wo vorher ein Wert stand — ein `null` auf ein leeres Feld wäre
  * dieselbe Aussage in einer Form, die der Leser nicht von einer Änderung unterscheiden kann.
+ *
+ * AKTUELLER STAND (LFH-681): die Bearbeiten-Dialoge bekommen den Datensatz so, wie er JETZT im
+ * Cache steht — ein Live-Refetch kommt bei offenem Dialog an. Die Formularwerte frieren beim
+ * Öffnen ein (`initialValues` greift nur beim Einhängen), der Vergleich läuft gegen beide:
+ * - Räumung hat EIN Feld, und es ist die Absicht selbst → Vergleich gegen den aktuellen Stand.
+ *   Gegen den Stand beim Öffnen ginge „zurück auf angeordnet" nach einem fremden Wechsel als
+ *   leerer PATCH still verloren. Dazu folgt das UNBERÜHRTE Radio dem Live-Stand — sonst
+ *   schriebe ein Speichern ohne Berührung den alten Zustand über den fremden zurück.
+ * - Die Mehrfeld-Dialoge vergleichen DREISEITIG (`…PatchDreiseitig`): ein Schlüssel geht nur
+ *   raus, wenn die Person ihn geändert hat UND er vom aktuellen Stand abweicht. Gegen den
+ *   aktuellen Stand allein trüge jedes unberührte Feld seinen alten Wert hinaus und
+ *   überschriebe eine fremde Änderung still — es gibt keinen CAS, der das auffinge.
+ * - Ob eine Leermeldung nötig ist, entscheidet die AKTUELLE Belegung; sonst fehlte der Haken
+ *   an einer inzwischen belegten Stelle, und der Server antwortete mit 422.
  */
 
 const ZEITFORMAT = 'YYYY-MM-DD HH:mm';
@@ -188,6 +202,35 @@ export function stellePatch(vorher: Betreuungsstelle, w: StelleWerte): Betreuung
   return patch;
 }
 
+/**
+ * Nur die Schlüssel, die in BEIDEN Diffs stehen: gegen den Stand beim Öffnen (die Person hat
+ * geändert) und gegen den aktuellen (der Server trägt den Wert noch nicht). Die Werte sind in
+ * beiden gleich — sie kommen aus denselben Formularwerten.
+ */
+function dreiseitig<P extends object>(eigeneAenderung: P, gegenAktuell: P): P {
+  const patch = {} as P;
+  for (const k of Object.keys(gegenAktuell) as (keyof P)[]) {
+    if (k in eigeneAenderung) patch[k] = gegenAktuell[k];
+  }
+  return patch;
+}
+
+export function bezirkPatchDreiseitig(
+  beimOeffnen: Evakuierungsbezirk,
+  aktuell: Evakuierungsbezirk,
+  w: BezirkWerte,
+): EvakuierungsbezirkPatch {
+  return dreiseitig(bezirkPatch(beimOeffnen, w), bezirkPatch(aktuell, w));
+}
+
+export function stellePatchDreiseitig(
+  beimOeffnen: Betreuungsstelle,
+  aktuell: Betreuungsstelle,
+  w: StelleWerte,
+): BetreuungsstellePatch {
+  return dreiseitig(stellePatch(beimOeffnen, w), stellePatch(aktuell, w));
+}
+
 /** Ein leerer PATCH wird nicht gesendet — der Dialog schließt, als wäre gespeichert. */
 function nurWennGeaendert<P extends object>(
   patch: P,
@@ -216,6 +259,20 @@ const zeitRegel = {
       : Promise.resolve(),
 };
 
+/**
+ * Obergrenze je Personenzahl, gespiegelt aus `betreuung::MAX_PERSONEN` (LFH-680) — darüber
+ * antwortet der Server 400. Als Regel, NICHT als `max` am `InputNumber`: das klemmt einen zu
+ * großen Wert beim Verlassen still auf die Grenze, und eine Personenzahl darf sich nicht
+ * ungesehen ändern.
+ */
+const MAX_PERSONEN = 1_000_000;
+
+const hoechstensRegel = {
+  type: 'number' as const,
+  max: MAX_PERSONEN,
+  message: `Höchstens ${personenZahl(MAX_PERSONEN)} Personen`,
+};
+
 function erhebungFeld(name: string, label: string) {
   return (
     <Form.Item name={name} label={label} rules={[{ required: true }]}>
@@ -231,7 +288,10 @@ function personenFeld(name: string, label: string, min: number, pflicht: boolean
     <Form.Item
       name={name}
       label={label}
-      rules={pflicht ? [{ required: true, message: 'Bitte eine Anzahl angeben' }] : []}
+      rules={[
+        ...(pflicht ? [{ required: true, message: 'Bitte eine Anzahl angeben' }] : []),
+        hoechstensRegel,
+      ]}
     >
       <InputNumber min={min} precision={0} style={{ width: '100%' }} />
     </Form.Item>
@@ -348,11 +408,13 @@ export function BezirkBearbeitenDialog({
   onErfassen,
   onSchliessen,
 }: DialogBasis & {
+  /** Der AKTUELLE Stand aus dem Cache — nicht der beim Öffnen (LFH-681). */
   bezirk: Evakuierungsbezirk;
   abschnitte: readonly AbschnittOption[];
   onErfassen: (patch: EvakuierungsbezirkPatch) => Promise<unknown>;
 }) {
   const [form] = Form.useForm<BezirkWerte>();
+  const [beimOeffnen] = useState(bezirk);
   return (
     <ErfassungsModal<BezirkWerte>
       offen
@@ -361,14 +423,16 @@ export function BezirkBearbeitenDialog({
       erfassenText="Speichern"
       laeuft={laeuft}
       initialValues={{
-        bezeichnung: bezirk.bezeichnung,
-        plan_personen: bezirk.plan_personen,
-        plan_erhebung: bezirk.plan_erhebung,
-        abschnitt_id: bezirk.abschnitt_id ?? undefined,
-        sammelstelle: bezirk.sammelstelle ?? undefined,
-        notiz: bezirk.notiz ?? undefined,
+        bezeichnung: beimOeffnen.bezeichnung,
+        plan_personen: beimOeffnen.plan_personen,
+        plan_erhebung: beimOeffnen.plan_erhebung,
+        abschnitt_id: beimOeffnen.abschnitt_id ?? undefined,
+        sammelstelle: beimOeffnen.sammelstelle ?? undefined,
+        notiz: beimOeffnen.notiz ?? undefined,
       }}
-      onErfassen={(w) => nurWennGeaendert(bezirkPatch(bezirk, w), onErfassen)}
+      onErfassen={(w) =>
+        nurWennGeaendert(bezirkPatchDreiseitig(beimOeffnen, bezirk, w), onErfassen)
+      }
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
@@ -403,7 +467,15 @@ interface RaeumungWerte {
   raeumung: Raeumungszustand;
 }
 
-/** Räumungszustand setzen. Umkehrbar (jeder Zustand ist wieder wählbar) — keine Rückfrage. */
+/**
+ * Räumungszustand setzen. Umkehrbar (jeder Zustand ist wieder wählbar) — keine Rückfrage.
+ *
+ * LIVE (LFH-681): verglichen wird gegen den AKTUELLEN Zustand, und das Radio folgt ihm, solange
+ * die Person es nicht berührt hat. Beides gehört zusammen: „unberührt" und „bewusst zurück auf
+ * den angezeigten Zustand" sind sonst nicht zu unterscheiden — ein Klick auf das schon gewählte
+ * Radio löst keinen Wechsel aus —, und ein gewohnheitsmäßiges Speichern drehte eine fremd
+ * gemeldete Räumung samt ETB-Eintrag zurück. Eine eigene Wahl bleibt stehen (Riegel wie C7).
+ */
 export function RaeumungDialog({
   bezirk,
   laeuft,
@@ -411,10 +483,19 @@ export function RaeumungDialog({
   onErfassen,
   onSchliessen,
 }: DialogBasis & {
+  /** Der AKTUELLE Stand aus dem Cache — nicht der beim Öffnen (LFH-681). */
   bezirk: Evakuierungsbezirk;
   onErfassen: (patch: EvakuierungsbezirkPatch) => Promise<unknown>;
 }) {
   const [form] = Form.useForm<RaeumungWerte>();
+  const [beimOeffnen] = useState(bezirk);
+  const gesehen = useRef(bezirk.raeumung);
+  useEffect(() => {
+    // Nur auf einen WECHSEL reagieren: beim Einhängen trägt `initialValues` den Wert schon.
+    if (gesehen.current === bezirk.raeumung) return;
+    gesehen.current = bezirk.raeumung;
+    if (!form.isFieldTouched('raeumung')) form.setFieldsValue({ raeumung: bezirk.raeumung });
+  }, [form, bezirk.raeumung]);
   return (
     <ErfassungsModal<RaeumungWerte>
       offen
@@ -422,7 +503,7 @@ export function RaeumungDialog({
       form={form}
       erfassenText="Speichern"
       laeuft={laeuft}
-      initialValues={{ raeumung: bezirk.raeumung }}
+      initialValues={{ raeumung: beimOeffnen.raeumung }}
       onErfassen={(w) =>
         nurWennGeaendert(w.raeumung !== bezirk.raeumung ? { raeumung: w.raeumung } : {}, onErfassen)
       }
@@ -520,6 +601,7 @@ export function StelleAnlegenDialog({
         name="kapazitaet_personen"
         label="Kapazität (Personen)"
         extra="Leer: keine Kapazität — dann wird keine Zahl freier Plätze ausgewiesen."
+        rules={[hoechstensRegel]}
       >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
@@ -558,7 +640,11 @@ const STATUS_FOLGE: readonly BetreuungsstelleStatus[] = [
  * Zahl, die D4 verbietet. Erst die Meldung, dann der Status; zwei Aufrufe, zwei Tatsachen.
  *
  * Scheitert der zweite Aufruf, darf ein neuer Versuch die 0 NICHT noch einmal melden — sonst
- * stünde sie doppelt im Einsatztagebuch. Der Merker lebt so lange wie der Dialog.
+ * stünde sie doppelt im Einsatztagebuch. Der Merker hält deshalb die Belegungsmeldung fest,
+ * gegen die geleert wurde (LFH-681): bis der Refetch kommt, steht sie noch da, und ein zweiter
+ * Klick überspringt die 0. Ein Merker für den ganzen Dialog reichte nicht mehr, seit die
+ * Belegung live nachkommt — meldete danach jemand anderes wieder Personen, kündigte der Haken
+ * „Belegung 0 melden" an, übersprang sie aber, und jeder Versuch endete im 422.
  */
 export function StelleBearbeitenDialog({
   stelle,
@@ -569,6 +655,7 @@ export function StelleBearbeitenDialog({
   onLeermeldung,
   onSchliessen,
 }: DialogBasis & {
+  /** Der AKTUELLE Stand aus dem Cache — nicht der beim Öffnen (LFH-681). */
   stelle: Betreuungsstelle;
   abschnitte: readonly AbschnittOption[];
   onErfassen: (patch: BetreuungsstellePatch) => Promise<unknown>;
@@ -576,11 +663,18 @@ export function StelleBearbeitenDialog({
   onLeermeldung: () => Promise<unknown>;
 }) {
   const [form] = Form.useForm<StelleBearbeitenWerte>();
-  const leerGemeldet = useRef(false);
+  const [beimOeffnen] = useState(stelle);
+  const geleertGegen = useRef<number | null>(null);
   const status = Form.useWatch('status', form);
   const belegt = stelle.belegung?.belegt ?? 0;
+  // Nötig genau dann, wenn der PATCH das Schließen trägt (dreiseitig: selbst gewählt UND noch
+  // nicht auf dem Server) und die Stelle JETZT belegt ist. Ein unberührtes „geschlossen" einer
+  // fremd wiedereröffneten Stelle geht nicht hinaus und darf das Speichern nicht sperren.
   const brauchtLeermeldung =
-    status === 'geschlossen' && stelle.status !== 'geschlossen' && belegt > 0;
+    status === 'geschlossen' &&
+    beimOeffnen.status !== 'geschlossen' &&
+    stelle.status !== 'geschlossen' &&
+    belegt > 0;
 
   return (
     <ErfassungsModal<StelleBearbeitenWerte>
@@ -590,20 +684,21 @@ export function StelleBearbeitenDialog({
       erfassenText="Speichern"
       laeuft={laeuft}
       initialValues={{
-        status: stelle.status,
-        kapazitaet_personen: stelle.kapazitaet_personen ?? undefined,
-        art: stelle.art,
-        bezeichnung: stelle.bezeichnung,
-        abschnitt_id: stelle.abschnitt_id ?? undefined,
-        standort: stelle.standort ?? undefined,
-        notiz: stelle.notiz ?? undefined,
+        status: beimOeffnen.status,
+        kapazitaet_personen: beimOeffnen.kapazitaet_personen ?? undefined,
+        art: beimOeffnen.art,
+        bezeichnung: beimOeffnen.bezeichnung,
+        abschnitt_id: beimOeffnen.abschnitt_id ?? undefined,
+        standort: beimOeffnen.standort ?? undefined,
+        notiz: beimOeffnen.notiz ?? undefined,
       }}
       onErfassen={async (w) => {
-        const patch = stellePatch(stelle, w);
+        const patch = stellePatchDreiseitig(beimOeffnen, stelle, w);
         if (Object.keys(patch).length === 0) return;
-        if (brauchtLeermeldung && w.leermeldung && !leerGemeldet.current) {
+        const meldung = stelle.belegung?.id ?? null;
+        if (brauchtLeermeldung && w.leermeldung && geleertGegen.current !== meldung) {
           await onLeermeldung();
-          leerGemeldet.current = true;
+          geleertGegen.current = meldung;
         }
         await onErfassen(patch);
       }}
@@ -650,6 +745,7 @@ export function StelleBearbeitenDialog({
         name="kapazitaet_personen"
         label="Kapazität (Personen)"
         extra="Leer: keine Kapazität — dann wird keine Zahl freier Plätze ausgewiesen."
+        rules={[hoechstensRegel]}
       >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
