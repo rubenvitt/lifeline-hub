@@ -230,6 +230,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("aktuelle_verbleib_art", G_TRIAGE),
             scrub("aktuelles_verbleib_ziel", Strategie::NullSetzen),
             retain("aktueller_verbleib_status", G_TRIAGE),
+            // LFH-674: Kennung der Betreuungsstelle, kein Personenbezug (der Name hängt an der
+            // Stelle, das Ziel wird oben gescrubbt).
+            retain("aktuelle_verbleib_betreuungsstelle_id", G_FK),
         ],
     },
     TabellenRegel {
@@ -279,6 +282,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("notiz", Strategie::NullSetzen),
             retain("zeitpunkt_at", G_ZEIT),
             retain("erfasst_von", G_FK),
+            // LFH-674: Kennung der Betreuungsstelle eines Notunterkunft-Verbleibs.
+            retain("betreuungsstelle_id", G_FK),
         ],
     },
     TabellenRegel {

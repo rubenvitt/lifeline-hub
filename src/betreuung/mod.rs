@@ -250,6 +250,15 @@ impl TryFrom<String> for BetreuungsstelleStatus {
     }
 }
 
+/// Obergrenze je Personenzahl: Plangröße, Stand „evakuiert“, Kapazität, Belegung (LFH-680).
+/// Die größten Evakuierungen in Deutschland lagen bei einigen Zehntausend Menschen (Frankfurt
+/// 2017: rund 60 000); eine Million in EINEM Bezirk oder EINER Stelle liegt eine
+/// Größenordnung darüber und hält trotzdem jede Summe fern vom Überlauf: ohne Grenze lief die
+/// `summe` der Kopfzahl über (Debug-Build: Panic im Handler, Release: still negativ), und
+/// jenseits von 2^53 zählt eine JS-Number nicht mehr genau. Das Feld scheitert für sich,
+/// also **400** — Vorbild `verpflegung::MAX_EP`.
+pub const MAX_PERSONEN: i64 = 1_000_000;
+
 /// Liest einen Enum-Wert aus einer Eingabe. Ein unbekannter Wert scheitert am Feld für sich
 /// und ist deshalb **400** (CLAUDE.md „Statuscode-Konvention“, `src/error.rs`), nicht 422.
 pub fn enum_wert<T: TryFrom<String, Error = String>>(s: &str) -> Result<T, AppError> {
@@ -350,6 +359,20 @@ pub struct BetreuungsstelleAnzeige {
 pub struct BetreuungUebersicht {
     pub bezirke: Vec<EvakuierungsbezirkAnzeige>,
     pub stellen: Vec<BetreuungsstelleAnzeige>,
+    /// „davon namentlich“ (LFH-674): je Stelle die Zahl der Personen, deren jüngster Verbleib
+    /// `notunterkunft` an dieser Stelle ist — nur Stellen mit mindestens einer Person. Fehlt
+    /// ganz, wenn der Lesende das Modul Personen nicht sehen darf (nicht „0“). Gefüllt NUR in
+    /// der Route: `repo::uebersicht` speist auch den gesicherten Lagestand. Die Zahl geht in
+    /// keine Belegung, Kopfzahl oder Summe ein — führend ist die Mengenmeldung.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub namentlich: Option<Vec<StelleNamentlich>>,
+}
+
+/// Namentlich zugeordnete Personen an einer Stelle (LFH-674), Teil von [`BetreuungUebersicht`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct StelleNamentlich {
+    pub stelle_id: i64,
+    pub anzahl: i64,
 }
 
 /// Belegung einer Stelle zum Stichtag der Kopfzahl.

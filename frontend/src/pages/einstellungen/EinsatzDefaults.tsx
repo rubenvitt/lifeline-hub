@@ -22,6 +22,10 @@ import {
 } from './orgEinstellungenForm';
 import { Formularpaneel } from '../../components/instrument';
 
+/** Satz des `RechteHinweis` — zugleich die lange Begründung an jeder gesperrten Modulzeile. */
+const RECHTE_TEXT =
+  'Nur Benutzer mit der Systemrolle „Admin“ dürfen die Org-Defaults ändern — die Werte stehen hier zum Nachlesen.';
+
 /**
  * Admin-Sektion `/admin/einstellungen/einsatz` — Aufbewahrung, Nummernkreise, Fristen,
  * Auto-ETB + Modul-Rollen-Default. Edit nur system_rolle=admin. PUT ist Vollersatz → beim
@@ -117,7 +121,7 @@ export default function EinsatzDefaults() {
         <SeitenHinweise
           fehler={speichernMutation.error}
           rechteFehlt={!istAdmin}
-          rechteText="Nur Benutzer mit der Systemrolle „Admin“ dürfen die Org-Defaults ändern — die Werte stehen hier zum Nachlesen."
+          rechteText={RECHTE_TEXT}
         />
       }
     >
@@ -266,6 +270,7 @@ export default function EinsatzDefaults() {
               })
             }
             darfVerwalten={istAdmin}
+            rechteGrund={{ kurz: 'nur Admins', lang: RECHTE_TEXT }}
             // Nur die schreibende Zeile ist gesperrt (H15) und nur die gescheiterte markiert
             // (H14). `variables` traegt die Zeile, die react-query gerade bearbeitet — bzw. die
             // zuletzt gescheiterte, solange `error` steht.

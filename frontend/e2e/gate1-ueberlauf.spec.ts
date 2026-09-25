@@ -190,7 +190,8 @@ test.describe('LFH-460 Kopfzeilen und Bediendichte', () => {
  * jedes Paket wäre grün und die Seite trotzdem breiter als der Schirm.
  *
  * DIE PRÜFBREITEN stammen aus der Bedien-Leitlinie (A1, Gate 1): 1366 px
- * Führungswagen, 1024 px Führungs-Tablet, 390 px mobil.
+ * Führungswagen, 1024 px Führungs-Tablet, 390 px mobil — seit LFH-100 dazu
+ * 768 px Führungs-Tablet hochkant (Begründung an {@link PRUEFBREITEN}).
  *
  * DIE 1-PX-TOLERANZ ist kein Aufweichen: Chromium rundet `scrollWidth` auf
  * ganze Pixel, während Layoutbreiten gebrochen sein dürfen (die Kopfzeilen-
@@ -257,10 +258,19 @@ test.describe('LFH-460 Kopfzeilen und Bediendichte', () => {
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 
-/** Führungswagen · Führungs-Tablet · mobil (A1, Gate 1). */
+/**
+ * Führungswagen · Führungs-Tablet quer · Führungs-Tablet hoch · mobil (A1, Gate 1).
+ *
+ * TABLET HOCH (768 × 1024) seit LFH-100: das Ticket nennt „Tablet (Quer/Hoch)" ausdrücklich,
+ * die Leitlinie führte bis dahin nur die Querlage. 768 px ist genau antds `md`-Grenze —
+ * die Breite, an der `Datensicht` (`form="auto"`) von Karten auf Tabelle wechselt und die
+ * Lagekarte ihre Leiste noch UNTER der Karte trägt (`lg` = 992 px). Eine Tabelle, die dort
+ * zum ersten Mal steht, hat die wenigsten Pixel, die sie je bekommt.
+ */
 const PRUEFBREITEN = [
   { name: 'Fükw', breite: 1366, hoehe: 768 },
   { name: 'Führungs-Tablet', breite: 1024, hoehe: 768 },
+  { name: 'Führungs-Tablet hoch', breite: 768, hoehe: 1024 },
   { name: 'mobil', breite: 390, hoehe: 844 },
 ] as const;
 
@@ -489,24 +499,12 @@ async function ueberlauf(page: Page): Promise<{ ueber: number; schuldige: string
   });
 }
 
-test('Gate 1: keine tragende Route läuft auf 1366, 1024 oder 390 px waagerecht über', async ({
-  page,
-}) => {
-  /**
-   * DREIFACHE ZEITSCHRANKE (30 s → 90 s), und zwar aus einem gemessenen Grund, nicht
-   * vorsorglich: die Erweiterung hebt den Lauf von 12 auf 27 Messungen, jede mit `goto` und
-   * `networkidle`. Einzeln gemessen 24–29 s — also genau AUF der 30-s-Vorgabe aus
-   * `playwright.config.ts:97`. Unter `--repeat-each=5` (sechs Worker auf einem Vite-Dev-Server)
-   * ist einer von acht Läufen in `waitForLoadState` in die Zeitüberschreitung gelaufen; das
-   * volle Sammel-Gate fährt dieselbe Parallelität.
-   *
-   * `test.slow()` statt eines nackten `setTimeout(90_000)`: es ist die benannte
-   * Playwright-Form dafür und bleibt an die Konfiguration gekoppelt, statt eine zweite
-   * absolute Zahl in das Repo zu tragen. Die Route-Zahl zu verkleinern wäre die Alternative —
-   * dann verlöre das Gate aber genau die Abdeckung, um die es hier geht.
-   */
-  test.slow();
-
+/**
+ * Meldet an, legt den Einsatz an und sät den Überlaufstoff aller Routen. Je Prüfbreite
+ * einmal — die Breiten laufen seit LFH-100 als eigene Tests (s. u.), und ein Seeding über
+ * die API kostet gegen die Messungen nichts.
+ */
+async function gate1Vorbereiten(page: Page): Promise<string> {
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Gate1 ${Date.now()}`);
   await seedeUeberlaufstoff(page, einsatzId);
@@ -625,7 +623,17 @@ test('Gate 1: keine tragende Route läuft auf 1366, 1024 oder 390 px waagerecht 
       },
     }),
   );
+  return einsatzId;
+}
 
+type Gate1Route = {
+  pfad: string;
+  anker: (p: Page) => Locator;
+  /** Läuft nach `goto` und VOR der Ankerprüfung, je Breite erneut. */
+  vorbereiten?: (p: Page) => Promise<void>;
+};
+
+function gate1Routen(einsatzId: string): Gate1Route[] {
   // Eine Route je Layoutfamilie: Ebene-1-Shell, Lagebild, Modulseite unter dem
   // Einsatz-Workspace, Verwaltung unter dem Admin-Layout. Die vier hängen an
   // vier verschiedenen Rahmen — eine einzelne Route belegte nur einen davon.
@@ -653,12 +661,7 @@ test('Gate 1: keine tragende Route läuft auf 1366, 1024 oder 390 px waagerecht 
   // 390 px Karten und hätten gar kein `<tr>`, die Befehlsliste in keiner Breite.
   // Der naheliegende „Reparaturgriff" wäre dann, den Anker auf
   // `.ant-layout-content` zu lockern — und der misst wieder nichts (siehe oben).
-  const routen: {
-    pfad: string;
-    anker: (p: Page) => Locator;
-    /** Läuft nach `goto` und VOR der Ankerprüfung, je Breite erneut. */
-    vorbereiten?: (p: Page) => Promise<void>;
-  }[] = [
+  return [
     { pfad: '/einsaetze', anker: (p: Page) => p.locator('[data-testid="einsaetze-raster"]') },
     {
       pfad: `/einsaetze/${einsatzId}/lage-dashboard`,
@@ -747,81 +750,146 @@ test('Gate 1: keine tragende Route läuft auf 1366, 1024 oder 390 px waagerecht 
           name: /^Zeitfenster Mittagessen Deichverteidigung Nordwestring Kilometer 4,7 bis 6,2 /,
         }),
     },
+    {
+      // LFH-100: die Lagekarte stand bis dahin in keinem Überlauf-Gate, obwohl sie die Seite
+      // mit den meisten schwebenden Aufbauten ist (`lagekarte-smoke.spec.ts` misst 1024, 1280
+      // und 1440 px, und nie den Querlauf). Unter `lg` liegt die Leiste UNTER der Karte und
+      // ist auf dem Handschirm per Vorgabe ZU (`LagekartePage.tsx`, `leisteWahl`) — gemessen
+      // wird der Zustand mit OFFENER Leiste, weil das der breitere Rahmen ist.
+      // WAS DIESE ZEILE MISST, ist der RAHMEN: Seitenkopf mit Umschaltknopf, das `<aside>`,
+      // die Kartenspalte mit ihren schwebenden Bändern. Den Leisteninhalt misst sie NICHT —
+      // die Leiste (`Sidebar.tsx`, `data-lfh="kartenleiste"`) trägt `overflowY: 'auto'`, damit
+      // rechnet der Browser auch `overflow-x` als `auto`, und ein zu breiter Eintrag liefe in
+      // ihrem eigenen Bildlauf über, nie in die Wurzel. Der Datenanker (die gesäte Einheit
+      // unter „Nicht verortet", Paneel per Vorgabe offen, `PANEEL_VORGABE`) belegt deshalb nur,
+      // dass die Leiste wirklich offen steht: der Name steht nirgends sonst auf der Seite.
+      // MUTATIONSPROBE (24.09.2026, protokolliert): `minWidth: 900` am `<aside>` unter `lg`
+      // (`LagekartePage.tsx`, Zweig `flex: '0 0 45%'`, also AUSSERHALB des Bildlaufs der
+      // Leiste) → der 390-px-Test meldet genau diese Zeile mit 510 px Überlauf, alle übrigen
+      // Routen bleiben stumm. Zurückgedreht.
+      pfad: `/einsaetze/${einsatzId}/lagekarte`,
+      vorbereiten: async (p: Page) => {
+        await expect(
+          p.getByTestId('kartenflaeche').locator('canvas.maplibregl-canvas'),
+        ).toHaveCount(1);
+        const einblenden = p.getByRole('button', { name: 'Leiste einblenden' });
+        if ((await einblenden.count()) > 0) await einblenden.click();
+      },
+      anker: (p: Page) =>
+        p
+          .getByRole('complementary', { name: 'Kartenleiste' })
+          .getByText('Fachgruppe Wasserschaden/Pumpen Ortsverband Musterstadt-Nordwest')
+          .first(),
+    },
   ];
+}
 
-  // ALLE Kombinationen messen und gesammelt melden, nicht beim ersten Bruch
-  // aussteigen: sonst verdeckt der erste Fund die übrigen elf und man behebt
-  // eine Ursache, ohne zu wissen, wie viele es sind.
-  const verstoesse: string[] = [];
-  const messwerte: string[] = [];
-  const tot: string[] = [];
-  const genutzteFreistellungen = new Set<string>();
-  for (const { pfad, anker, vorbereiten } of routen) {
-    for (const { name, breite, hoehe } of PRUEFBREITEN) {
+/*
+ * JE PRÜFBREITE EIN TEST (LFH-100). Vorher lief ein einziger Test über alle Routen × alle
+ * Breiten, und seine Zeitschranke war schon bei 27 Messungen ausgereizt (einzeln 24–29 s gegen
+ * die 30-s-Vorgabe, unter `--repeat-each=5` eine Zeitüberschreitung in acht Läufen — daher
+ * `test.slow()`). Mit der vierten Breite und der Lagekarte wären es 60 Messungen in einem Test
+ * geworden. Getrennt hat jede Breite ihr eigenes Zeitbudget, und ein Bruch nennt seine Breite
+ * schon im Testnamen. Innerhalb einer Breite wird weiter ALLES gemessen und gesammelt
+ * gemeldet — die Aussage „eine Ursache, wie viele Stellen" bleibt erhalten.
+ *
+ * `mode: 'parallel'` ist nötig, damit die vier Breiten tatsächlich auf verschiedene Worker
+ * gehen: die Konfiguration fährt kein `fullyParallel`, ohne die Zeile liefen die Tests dieser
+ * Datei nacheinander in EINEM Worker (und `--shard` teilt nach Dateien). Unabhängig sind sie:
+ * jede Breite meldet an und legt ihren eigenen Einsatz an (`gate1Vorbereiten`).
+ */
+test.describe('Gate 1', () => {
+  test.describe.configure({ mode: 'parallel' });
+  for (const { name, breite, hoehe } of PRUEFBREITEN) {
+    test(`Gate 1 · ${name} (${breite} px): keine tragende Route läuft waagerecht über`, async ({
+      page,
+    }) => {
+      /**
+       * `test.slow()` statt eines nackten `setTimeout(90_000)`: die benannte Playwright-Form,
+       * an die Konfiguration gekoppelt. 15 Routen je Breite, jede mit `goto` und `networkidle`.
+       */
+      test.slow();
+
+      const einsatzId = await gate1Vorbereiten(page);
+      const routen = gate1Routen(einsatzId);
+
+      // ALLE Routen messen und gesammelt melden, nicht beim ersten Bruch aussteigen: sonst
+      // verdeckt der erste Fund die übrigen, und man behebt eine Ursache, ohne zu wissen, wie
+      // viele es sind.
+      const verstoesse: string[] = [];
+      const messwerte: string[] = [];
+      const tot: string[] = [];
+      const genutzteFreistellungen = new Set<string>();
       await page.setViewportSize({ width: breite, height: hoehe });
-      await page.goto(pfad);
-      // Erst wenn der Rahmen steht, ist die Messung aussagekräftig — sonst
-      // misst man eine halb gefüllte Seite und bekommt grün geschenkt.
-      // `first()`, weil der Verwaltungsbereich sein eigenes Layout in die
-      // Ebene-1-Shell schachtelt und dort zwei Rahmen stehen.
-      await expect(page.locator('.ant-layout-content').first()).toBeVisible();
-      await page.waitForLoadState('networkidle');
-      // Reiter-Umschaltungen o. Ä. NACH dem Laden und VOR dem Anker: sonst prüft der
-      // Anker eine Fläche, die gar nicht im Baum ist.
-      if (vorbereiten) await vorbereiten(page);
-      // …und erst der Anker belegt, dass die GEMEINTE Seite steht. Nach
-      // `networkidle`, damit ein datenabhängiger Anker nicht gegen seinen
-      // eigenen Ladevorgang antritt.
-      await expect(
-        anker(page),
-        `${pfad} bei ${breite}px: die gemeinte Seite ist nicht gerendert`,
-      ).toBeVisible();
+      for (const { pfad, anker, vorbereiten } of routen) {
+        await page.goto(pfad);
+        // Erst wenn der Rahmen steht, ist die Messung aussagekräftig — sonst
+        // misst man eine halb gefüllte Seite und bekommt grün geschenkt.
+        // `first()`, weil der Verwaltungsbereich sein eigenes Layout in die
+        // Ebene-1-Shell schachtelt und dort zwei Rahmen stehen.
+        await expect(page.locator('.ant-layout-content').first()).toBeVisible();
+        await page.waitForLoadState('networkidle');
+        // Reiter-Umschaltungen o. Ä. NACH dem Laden und VOR dem Anker: sonst prüft der
+        // Anker eine Fläche, die gar nicht im Baum ist.
+        if (vorbereiten) await vorbereiten(page);
+        // …und erst der Anker belegt, dass die GEMEINTE Seite steht. Nach
+        // `networkidle`, damit ein datenabhängiger Anker nicht gegen seinen
+        // eigenen Ladevorgang antritt.
+        await expect(
+          anker(page),
+          `${pfad} bei ${breite}px: die gemeinte Seite ist nicht gerendert`,
+        ).toBeVisible();
 
-      const { ueber, schuldige } = await ueberlauf(page);
-      messwerte.push(`${pfad} @${breite}: ${ueber}px`);
+        const { ueber, schuldige } = await ueberlauf(page);
+        messwerte.push(`${pfad} @${breite}: ${ueber}px`);
 
-      // Freistellung greift über das MODUL-SEGMENT des Pfades, nicht über den ganzen
-      // Pfad: der enthält die laufende Einsatz-ID und wäre nicht schreibbar.
-      const frei = BESTAND_OFFEN.find((b) => pfad.endsWith(`/${b.modul}`) && b.breite === breite);
-      if (frei) {
-        genutzteFreistellungen.add(`${frei.modul}@${frei.breite}`);
-        if (ueber <= 1) {
-          tot.push(
-            `${pfad} bei ${breite}px ist BEHOBEN (${ueber}px) — der Eintrag in ` +
-              `BESTAND_OFFEN ist tot und muss samt seiner Zeile im Kopfkommentar weg.`,
-          );
-        } else if (ueber > frei.deckel) {
+        // Freistellung greift über das MODUL-SEGMENT des Pfades, nicht über den ganzen
+        // Pfad: der enthält die laufende Einsatz-ID und wäre nicht schreibbar.
+        const frei = BESTAND_OFFEN.find((b) => pfad.endsWith(`/${b.modul}`) && b.breite === breite);
+        if (frei) {
+          genutzteFreistellungen.add(`${frei.modul}@${frei.breite}`);
+          if (ueber <= 1) {
+            tot.push(
+              `${pfad} bei ${breite}px ist BEHOBEN (${ueber}px) — der Eintrag in ` +
+                `BESTAND_OFFEN ist tot und muss samt seiner Zeile im Kopfkommentar weg.`,
+            );
+          } else if (ueber > frei.deckel) {
+            verstoesse.push(
+              `${pfad} bei ${breite}px (${name}): ${ueber}px über — das ist mehr als der ` +
+                `freigestellte Deckel ${frei.deckel}px (gemessen war ${frei.gemessen}px), also eine ` +
+                `VERSCHLECHTERUNG, kein Bestand\n  ${schuldige.slice(0, 4).join('\n  ')}`,
+            );
+          }
+          continue;
+        }
+
+        if (ueber > 1) {
           verstoesse.push(
-            `${pfad} bei ${breite}px (${name}): ${ueber}px über — das ist mehr als der ` +
-              `freigestellte Deckel ${frei.deckel}px (gemessen war ${frei.gemessen}px), also eine ` +
-              `VERSCHLECHTERUNG, kein Bestand\n  ${schuldige.slice(0, 4).join('\n  ')}`,
+            `${pfad} bei ${breite}px (${name}): ${ueber}px über\n  ${schuldige.slice(0, 4).join('\n  ')}`,
           );
         }
-        continue;
       }
 
-      if (ueber > 1) {
-        verstoesse.push(
-          `${pfad} bei ${breite}px (${name}): ${ueber}px über\n  ${schuldige.slice(0, 4).join('\n  ')}`,
-        );
+      // Ein Eintrag, den keine Route dieser Breite getroffen hat, ist ebenso tot wie ein
+      // behobener — sonst überlebt eine Freistellung das Umbenennen ihrer Route. Einträge auf
+      // einer Breite, die gar keine Prüfbreite ist, meldet JEDER der vier Tests: sie gehören
+      // keinem, und ein Gate, das sie nur zufällig nirgends sähe, hielte sie für lebendig.
+      const pruefbreiten: readonly number[] = PRUEFBREITEN.map((pb) => pb.breite);
+      for (const b of BESTAND_OFFEN) {
+        const hierZustaendig = b.breite === breite || !pruefbreiten.includes(b.breite);
+        if (hierZustaendig && !genutzteFreistellungen.has(`${b.modul}@${b.breite}`)) {
+          tot.push(
+            `BESTAND_OFFEN nennt ${b.modul}@${b.breite}px, aber diese Route × Breite wird gar ` +
+              `nicht gemessen — tote Freistellung.`,
+          );
+        }
       }
-    }
+      expect(tot, `Tote Freistellungen:\n${tot.join('\n')}`).toEqual([]);
+      // Die Messwerte werden protokolliert, nicht nur die Verstöße: ein grüner Lauf ohne
+      // Zahlen belegt „kein Überlauf" und lässt offen, ob überhaupt gemessen wurde. Sichtbar
+      // über `--reporter=list` bzw. im HTML-Bericht (Muster `lage-dashboard-schmal.spec.ts:88-97`).
+      test.info().annotations.push({ type: 'messwert', description: messwerte.join(' · ') });
+      expect(verstoesse, `Gate 1 verletzt:\n${verstoesse.join('\n')}`).toEqual([]);
+    });
   }
-
-  // Ein Eintrag, den keine Route × Breite überhaupt getroffen hat, ist ebenso tot wie ein
-  // behobener — sonst überlebt eine Freistellung das Umbenennen ihrer Route.
-  for (const b of BESTAND_OFFEN) {
-    if (!genutzteFreistellungen.has(`${b.modul}@${b.breite}`)) {
-      tot.push(
-        `BESTAND_OFFEN nennt ${b.modul}@${b.breite}px, aber diese Route × Breite wird gar ` +
-          `nicht gemessen — tote Freistellung.`,
-      );
-    }
-  }
-  expect(tot, `Tote Freistellungen:\n${tot.join('\n')}`).toEqual([]);
-  // Die Messwerte werden protokolliert, nicht nur die Verstöße: ein grüner Lauf ohne
-  // Zahlen belegt „kein Überlauf" und lässt offen, ob überhaupt gemessen wurde. Sichtbar
-  // über `--reporter=list` bzw. im HTML-Bericht (Muster `lage-dashboard-schmal.spec.ts:88-97`).
-  test.info().annotations.push({ type: 'messwert', description: messwerte.join(' · ') });
-  expect(verstoesse, `Gate 1 verletzt:\n${verstoesse.join('\n')}`).toEqual([]);
 });
