@@ -368,7 +368,7 @@ async fn gebundener_anhang_ist_422() {
     // jeden Ort, an dem eine Datei gebunden sein kann.
     assert_eq!(
         v["error"],
-        "Anhang ist bereits gebunden (Chat-Nachricht, Dokumentenablage oder ETB-Eintrag)"
+        "Anhang ist bereits gebunden (Chat-Nachricht, Dokumentenablage, ETB-Eintrag oder Schaden)"
     );
     assert_eq!(
         zaehle(

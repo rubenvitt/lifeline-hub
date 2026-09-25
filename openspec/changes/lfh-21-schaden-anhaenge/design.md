@@ -403,7 +403,7 @@ Vorgang)`.
 ### D7 — Schwärzung: Regel `ZeileLoeschen`, nach `anhang`
 
 Neue `TabellenRegel` für `einsatz_schaden_anhang` mit `Scoping::EinsatzId` und
-`ZeileLoeschen` für alle neun Spalten, in `TABELLEN` **nach** `anhang` (wie
+`ZeileLoeschen` für alle acht Spalten aus D1, in `TABELLEN` **nach** `anhang` (wie
 `einsatz_dokument`), Kommentar nach dessen Muster. Der Kommentar an der `anhang`-Regel
 („CASCADE räumt die Linker … mit“) nennt den vierten Linker. Praktisch räumt schon die
 CASCADE von `anhang` alle Zeilen weg; die Regel macht die Klassifikation explizit und hält

@@ -208,6 +208,11 @@ pub const MODUL_LINKER: &[ModulLinker] = &[
         loesch_meldung: "Anhang gehört zu einem ETB-Eintrag und ist unveränderlich",
         ort: "ETB-Eintrag",
     },
+    ModulLinker {
+        tabelle: "einsatz_schaden_anhang",
+        loesch_meldung: "Anhang gehört zu einem Schaden und wird dort entfernt",
+        ort: "Schaden",
+    },
 ];
 
 /// Positiver SQL-Baustein: „der Anhang `{alias}` hängt an einem modulgebundenen Linker" —
@@ -833,5 +838,110 @@ mod tests {
 
         loeschen(&pool, einsatz, frei).await.unwrap();
         assert!(anzeige_laden(&pool, frei).await.is_err());
+    }
+
+    // --- LFH-21: `einsatz_schaden_anhang` als vierter Linker ---
+
+    /// Hängt einen Anhang an einen frischen Schaden (direkter INSERT); optional soft-gelöscht.
+    async fn als_schaden(
+        pool: &SqlitePool,
+        einsatz_id: i64,
+        von: i64,
+        anhang_id: i64,
+        geloescht: bool,
+    ) {
+        let schaden_id: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_schaden \
+               (einsatz_id, registrier_nr, typ, ausmass, ort, erfasst_von, geaendert_von) \
+             VALUES (?, (SELECT COALESCE(MAX(registrier_nr), 0) + 1 FROM einsatz_schaden \
+                         WHERE einsatz_id = ?), 'sachschaden', 'gering', 'Hauptstr. 1', ?, ?) \
+             RETURNING id",
+        )
+        .bind(einsatz_id)
+        .bind(einsatz_id)
+        .bind(von)
+        .bind(von)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_schaden_anhang \
+               (einsatz_id, schaden_id, anhang_id, abgelegt_von_id, geloescht_at, geloescht_von_id) \
+             VALUES (?, ?, ?, ?, CASE WHEN ? THEN datetime('now') END, CASE WHEN ? THEN ? END)",
+        )
+        .bind(einsatz_id)
+        .bind(schaden_id)
+        .bind(anhang_id)
+        .bind(von)
+        .bind(geloescht)
+        .bind(geloescht)
+        .bind(von)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn linker_stand_erkennt_schaden_linker() {
+        let pool = crate::db::test_pool().await;
+        let (von, einsatz) = setup(&pool).await;
+        let a = anhang_mit_zeit(&pool, einsatz, von, "dach.jpg", "2026-01-01 00:00:00").await;
+        als_schaden(&pool, einsatz, von, a, false).await;
+
+        let s = linker_stand(&pool, a).await.unwrap();
+        assert_eq!(s.modul.map(|l| l.tabelle), Some("einsatz_schaden_anhang"));
+        assert!(s.ist_modul_gebunden());
+        assert!(!s.ist_ungebunden(), "nie „ungebunden“ im Sinne von D12");
+        assert!(
+            s.generischer_download_gesperrt(),
+            "Schaden-Anhang nur über die Schadensroute ladbar"
+        );
+    }
+
+    #[tokio::test]
+    async fn sweep_verwaiste_haelt_schaden_gebundene_anhaenge() {
+        let pool = crate::db::test_pool().await;
+        let (von, einsatz) = setup(&pool).await;
+        let lebend = anhang_mit_zeit(&pool, einsatz, von, "a.jpg", "2026-01-01 00:00:00").await;
+        let entfernt = anhang_mit_zeit(&pool, einsatz, von, "b.jpg", "2026-01-01 00:00:00").await;
+        let frei = anhang_mit_zeit(&pool, einsatz, von, "c.jpg", "2026-01-01 00:00:00").await;
+        als_schaden(&pool, einsatz, von, lebend, false).await;
+        als_schaden(&pool, einsatz, von, entfernt, true).await;
+
+        let geloescht = sweep_verwaiste(&pool, t("2026-06-16 00:00:00"))
+            .await
+            .unwrap();
+
+        assert_eq!(geloescht, 1, "nur der nie gebundene Anhang geht");
+        assert!(anzeige_laden(&pool, lebend).await.is_ok());
+        assert!(
+            anzeige_laden(&pool, entfernt).await.is_ok(),
+            "ein entfernter Schaden-Anhang bleibt als Beweis bis zur Schwärzung"
+        );
+        assert!(anzeige_laden(&pool, frei).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn loeschen_verweigert_schaden_gebundene_anhaenge() {
+        let pool = crate::db::test_pool().await;
+        let (von, einsatz) = setup(&pool).await;
+        let a = anhang_mit_zeit(&pool, einsatz, von, "dach.jpg", "2026-01-01 00:00:00").await;
+        als_schaden(&pool, einsatz, von, a, false).await;
+
+        assert!(matches!(
+            loeschen(&pool, einsatz, a).await.unwrap_err(),
+            AppError::NotFound
+        ));
+        assert!(
+            anzeige_laden(&pool, a).await.is_ok(),
+            "Schaden-Anhang bleibt"
+        );
+        let links: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_schaden_anhang WHERE anhang_id = ?")
+                .bind(a)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(links, 1, "die Verknüpfung bleibt (keine CASCADE)");
     }
 }
