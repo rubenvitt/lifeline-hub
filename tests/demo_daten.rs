@@ -182,8 +182,12 @@ async fn demo_importieren(pool: &sqlx::SqlitePool) -> (i64, chrono::NaiveDateTim
     (erg.einsatz_id, jetzt)
 }
 
-/// Liste eines Lese-Endpunkts des Demo-Einsatzes, als der importierende Admin gelesen. Ein
-/// Modul, das eine Org-Vorgabe ausblendet, antwortet 403 und fällt hier auf.
+/// Liste eines Lese-Endpunkts des Demo-Einsatzes, als der importierende Admin über den echten
+/// GET-Endpunkt gelesen. Belegt wird, dass das Modul Daten trägt und wie viele: Status 200 und
+/// eine Liste, deren Länge der Aufrufer gegen das Drehbuch prüft. Die Sichtbarkeit für andere
+/// Rollen belegt das nicht: Der System-Admin kommt am Modul-Guard immer vorbei
+/// (`einsatz::berechtigung::fordere_modul_zugriff`, Admin-Mindest-Guard). Ein ausgeblendetes
+/// Modul liefert ihm also kein 403 (gemessen per Mutationsprobe, design.md Nachtrag Block 4.3).
 async fn liste(app: &axum::Router, cookie: &str, einsatz: i64, pfad: &str) -> Vec<Value> {
     let (status, v) = common::anfrage(
         app,

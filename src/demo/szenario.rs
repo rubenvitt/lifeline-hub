@@ -327,9 +327,10 @@ impl EtbArt {
     }
 }
 
-/// Punkt in WGS84 als `(Länge, Breite)`, in der Reihenfolge von GeoJSON. Alle Punkte des
-/// Szenarios liegen um einen erfundenen Ort in der Mitte Deutschlands; ein realer Ortsbezug ist
-/// nicht beabsichtigt.
+/// Punkt in WGS84 als `(Länge, Breite)`, in der Reihenfolge von GeoJSON. Die Koordinaten
+/// liegen in der Mitte Deutschlands und damit zwangsläufig über realem Gelände. Der Ort
+/// „Musterstadt“ samt Unterstadt, Kirchberg und Mühlbachweg ist erfunden, ein Bezug zu dem, was
+/// dort tatsächlich liegt, ist nicht beabsichtigt.
 pub type Punkt = (f64, f64);
 
 /// Gefahrengebiet der Lagekarte: eine Lage-Zone vom Typ `gefahrengebiet` (Polygon) samt einer

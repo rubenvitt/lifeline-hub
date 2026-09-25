@@ -555,6 +555,11 @@ nicht, Quelle ist immer eine `erinnerung`-Zeile:
   Auftrag `erteilt_at`, Vollzug `jetzt`, Befehl und Lagebericht `zeitstand`, Stand und
   Belegung `zeitpunkt_at`. Die Räumung bleibt `angeordnet`. Ein Wechsel auf `laeuft` schriebe
   einen zweiten Eintrag ohne Zeitfeld und ist für die Lagekennzahl nicht nötig.
+- **„Überfällig“ hängt an der Rückmeldefrist:** Die überfällige Rückmeldung (Logistiktrupp)
+  liegt bei T−100. Überfällig ist sie nur, solange die effektive Rückmeldefrist (Einsatz ??
+  Org ?? `RUECKMELDUNG_FRIST_DEFAULT_MIN` = 60) unter 100 min liegt. Die Fälligkeit wird beim
+  Lesen berechnet (`routes/meldung.rs::rueckmeldungen`). Setzt eine Org 100 min oder mehr, zeigt
+  das Meldebild keine überfällige Einheit. Die Tests laufen mit der Vorgabe.
 - **Aufträge ohne Frist:** Alle fünf Aufträge tragen `frist_at = NULL`, auch die beiden offenen.
   Eine künftige Frist verstieße gegen die Spec („nichts in der Zukunft außer höchstens einer
   Erinnerung“), eine abgelaufene wäre ein Alarm (D10). Eine Default-Quittierfrist aus den
