@@ -14,6 +14,7 @@
 //! Die fachlichen Kennungen sind fest (`DEMO-P-001` …, `DEMO-M-001` …, „Musterstadt …“). Über
 //! sie gleicht der Import mit vorhandenen Stammdaten ab (design.md D8).
 
+use crate::einsatzabschnitt::AbschnittLagezustand;
 use crate::katalog::StatusKategorie;
 
 /// Stamm-Fahrzeug des Szenarios. Kennung für den Abgleich ist der Funkrufname.
@@ -258,20 +259,348 @@ pub enum Katalogeintrag {
     PersonalstatusKategorie(StatusKategorie),
 }
 
-/// Katalogbedarf des Einsatz-Teils (Block 4.2): FMS gemischt 2 · 3 · 4 · 6 (D9), die
-/// Einheitstypen der fünf Einheiten und der `gebunden`-Status, den die Personal-Disposition
-/// setzt. Block 4.2 passt die Liste an sein Drehbuch an; der Bootstrap-Test prüft sie mit.
-pub const KATALOG_BEDARF_EINSATZ: &[Katalogeintrag] = &[
-    Katalogeintrag::FahrzeugstatusFms(2),
-    Katalogeintrag::FahrzeugstatusFms(3),
-    Katalogeintrag::FahrzeugstatusFms(4),
-    Katalogeintrag::FahrzeugstatusFms(6),
-    Katalogeintrag::Einheitstyp("Zug"),
-    Katalogeintrag::Einheitstyp("Gruppe"),
-    Katalogeintrag::Einheitstyp("Staffel"),
-    Katalogeintrag::Einheitstyp("Trupp"),
-    Katalogeintrag::PersonalstatusKategorie(StatusKategorie::Gebunden),
+// ---------------------------------------------------------------------------------------------
+// Der Einsatz: Kopfdaten und Drehbuch (Block 4.2)
+// ---------------------------------------------------------------------------------------------
+
+/// Bezeichnung des Demo-Einsatzes; beginnt nach der Spec mit „ÜBUNG – “.
+pub const EINSATZ_BEZEICHNUNG: &str = "ÜBUNG – Starkregen Musterstadt";
+
+/// Stichwort des Demo-Einsatzes, als Freitext. D9 nahm ein Stichwort „Unwetter“ aus dem
+/// Bootstrap-Katalog an; die Startliste (`auth/bootstrap.rs`, `STICHWORT_STARTLISTE`) kennt
+/// aber nur B-, MANV-, Sonderlage- und Übungsstichworte. Das Feld `einsatz.stichwort` ist
+/// Freitext (der Katalog liefert nur Combobox-Vorschläge), und die Spec verlangt ein Stichwort
+/// aus dem Bereich Unwetter/Starkregen. Einen Vorschlag legt der Import bewusst nicht an: die
+/// Zeile wäre org-weit, trüge keine Demo-Marke und überlebte das Entfernen.
+pub const EINSATZ_STICHWORT: &str = "Unwetter – Starkregen";
+
+/// Einsatzbeginn in Minuten vor dem Importzeitpunkt (T−5 h, D9). Kein Drehbuch-Schritt liegt
+/// davor.
+pub const BEGINN_VOR_MIN: i64 = 300;
+
+/// Einsatzabschnitt des Drehbuchs. `ueber` ist der Schlüssel eines früher angelegten
+/// Abschnitts (Unterabschnitt).
+#[derive(Debug, Clone, Copy)]
+pub struct AbschnittVorlage {
+    pub schluessel: &'static str,
+    pub name: &'static str,
+    pub kurzbezeichnung: &'static str,
+    pub ueber: Option<&'static str>,
+    pub lagezustand: Option<AbschnittLagezustand>,
+    /// Manuelle Einschätzung in Prozent; leer ≠ 0 % (LFH-608).
+    pub fortschritt: Option<i64>,
+    pub abschnittsauftrag: &'static str,
+    pub sortier: i64,
+}
+
+/// Einheit des Drehbuchs. `typ` ist das Label aus dem Einheitstyp-Katalog, `abschnitt` der
+/// Schlüssel eines früher angelegten Abschnitts.
+#[derive(Debug, Clone, Copy)]
+pub struct EinheitVorlage {
+    pub schluessel: &'static str,
+    pub name: &'static str,
+    pub typ: &'static str,
+    pub abschnitt: &'static str,
+    pub sortier: i64,
+}
+
+/// Typ eines fachlichen ETB-Eintrags. Nur die Typen, die ein Mensch im Betrieb frei erfasst;
+/// Meldung und Anordnung entstehen als Nebenwirkung ihrer Module (Block 4c), System aus den
+/// Vorgängen.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EtbArt {
+    Lage,
+    Entscheidung,
+}
+
+impl EtbArt {
+    /// Wire-Wert in `etb_eintrag.typ`.
+    pub fn typ(&self) -> &'static str {
+        match self {
+            EtbArt::Lage => crate::etb::TYP_LAGE,
+            EtbArt::Entscheidung => crate::etb::TYP_ENTSCHEIDUNG,
+        }
+    }
+}
+
+/// Ein Vorgang des Drehbuchs. Jede Variante entspricht einer Handlung, die im Betrieb ein
+/// Handler ausführt; der Import schreibt dieselben Zeilen und denselben System-ETB-Eintrag
+/// (design.md D5). Schlüssel verweisen auf Stammdaten ([`FAHRZEUGE`], [`PERSONAL`]) oder auf
+/// Objekte, die ein früherer Schritt angelegt hat.
+///
+/// **Ergänzen (Block 4c):** Variante hier anlegen, in [`katalog_bedarf_einsatz`] ihren
+/// Katalogbedarf entscheiden (der `match` dort ist erschöpfend und bricht sonst den Build),
+/// in `import.rs` einen Zweig schreiben und die Schritte in [`DREHBUCH`] einsortieren.
+#[derive(Debug, Clone, Copy)]
+pub enum Vorgang {
+    /// Einsatzabschnitt anlegen. ETB: „Abschnitt «…» angelegt (Lage: …)“.
+    Abschnitt(AbschnittVorlage),
+    /// Einheit bilden. ETB: „Einheit «…» gebildet“.
+    Einheit(EinheitVorlage),
+    /// Stamm-Fahrzeug disponieren; Anfangsstatus ist der erste `gebunden`-Status der Org.
+    /// ETB: „Fahrzeug «…» disponiert“.
+    FahrzeugDisponieren { fahrzeug: &'static str },
+    /// Disponiertes Fahrzeug einer Einheit zuordnen. ETB: „Einheit «…»: Fahrzeug «…» zugeordnet“.
+    FahrzeugZuEinheit {
+        fahrzeug: &'static str,
+        einheit: &'static str,
+    },
+    /// FMS-Status eines disponierten Fahrzeugs setzen, über den `fms_anker` (0–9). ETB nur bei
+    /// einem echten Wechsel: „Fahrzeug «…»: Status «…» → «…»“.
+    FmsStatus { fahrzeug: &'static str, fms: i64 },
+    /// Stamm-Personal disponieren (Stärkeposition aus dem Stamm). ETB: „Person «…» disponiert“.
+    PersonalDisponieren { personal: &'static str },
+    /// Fachlicher ETB-Eintrag, `ereigniszeit` = Schrittzeit.
+    Etb {
+        art: EtbArt,
+        inhalt: &'static str,
+        von: Option<&'static str>,
+    },
+}
+
+/// Ein Schritt des Drehbuchs: Zeitpunkt in Minuten vor dem Import und Vorgang.
+#[derive(Debug, Clone, Copy)]
+pub struct Schritt {
+    pub vor_min: i64,
+    pub vorgang: Vorgang,
+}
+
+const fn s(vor_min: i64, vorgang: Vorgang) -> Schritt {
+    Schritt { vor_min, vorgang }
+}
+
+const fn dispo_fahrzeug(vor_min: i64, fahrzeug: &'static str) -> Schritt {
+    s(vor_min, Vorgang::FahrzeugDisponieren { fahrzeug })
+}
+
+const fn zu_einheit(vor_min: i64, fahrzeug: &'static str, einheit: &'static str) -> Schritt {
+    s(vor_min, Vorgang::FahrzeugZuEinheit { fahrzeug, einheit })
+}
+
+const fn fms(vor_min: i64, fahrzeug: &'static str, fms: i64) -> Schritt {
+    s(vor_min, Vorgang::FmsStatus { fahrzeug, fms })
+}
+
+const fn dispo_personal(vor_min: i64, personal: &'static str) -> Schritt {
+    s(vor_min, Vorgang::PersonalDisponieren { personal })
+}
+
+const fn lage(vor_min: i64, inhalt: &'static str) -> Schritt {
+    s(
+        vor_min,
+        Vorgang::Etb {
+            art: EtbArt::Lage,
+            inhalt,
+            von: None,
+        },
+    )
+}
+
+const fn entscheidung(vor_min: i64, inhalt: &'static str) -> Schritt {
+    s(
+        vor_min,
+        Vorgang::Etb {
+            art: EtbArt::Entscheidung,
+            inhalt,
+            von: Some("Einsatzleitung"),
+        },
+    )
+}
+
+const fn abschnitt(vor_min: i64, vorlage: AbschnittVorlage) -> Schritt {
+    s(vor_min, Vorgang::Abschnitt(vorlage))
+}
+
+const fn einheit(
+    vor_min: i64,
+    schluessel: &'static str,
+    name: &'static str,
+    typ: &'static str,
+    abschnitt: &'static str,
+    sortier: i64,
+) -> Schritt {
+    s(
+        vor_min,
+        Vorgang::Einheit(EinheitVorlage {
+            schluessel,
+            name,
+            typ,
+            abschnitt,
+            sortier,
+        }),
+    )
+}
+
+/// Das Drehbuch in Zeitfolge: `vor_min` fällt (nicht streng), der erste Schritt liegt beim
+/// Einsatzbeginn, der letzte wenige Minuten vor dem Import. Der Import spielt es in dieser
+/// Reihenfolge ab, damit die laufende ETB-Nummer der Zeit folgt (D9).
+///
+/// Endstand FMS: ELW, RTW 1, GW-San, MTW 4 · RTW 2, LKW 3 · KTW 1 2 · KTW 2 6.
+pub const DREHBUCH: &[Schritt] = &[
+    lage(
+        300,
+        "Starkregen über Musterstadt seit den Morgenstunden. Der Mühlbach tritt in der \
+         Unterstadt über die Ufer, erste Keller sind überflutet. Übungseinsatz eröffnet.",
+    ),
+    entscheidung(
+        295,
+        "Einsatzabschnitte Sanitätsdienst, Betreuung und Logistik werden gebildet.",
+    ),
+    abschnitt(
+        294,
+        AbschnittVorlage {
+            schluessel: "ea1",
+            name: "Sanitätsdienst",
+            kurzbezeichnung: "EA 1",
+            ueber: None,
+            lagezustand: Some(AbschnittLagezustand::Angespannt),
+            fortschritt: Some(40),
+            abschnittsauftrag: "Sanitätsdienstliche Versorgung der Betroffenen",
+            sortier: 10,
+        },
+    ),
+    abschnitt(
+        294,
+        AbschnittVorlage {
+            schluessel: "ea2",
+            name: "Betreuung",
+            kurzbezeichnung: "EA 2",
+            ueber: None,
+            lagezustand: Some(AbschnittLagezustand::Planmaessig),
+            fortschritt: None,
+            abschnittsauftrag: "Betreuung und Unterbringung evakuierter Anwohner",
+            sortier: 20,
+        },
+    ),
+    abschnitt(
+        294,
+        AbschnittVorlage {
+            schluessel: "ea3",
+            name: "Logistik",
+            kurzbezeichnung: "EA 3",
+            ueber: None,
+            lagezustand: Some(AbschnittLagezustand::Planmaessig),
+            fortschritt: Some(70),
+            abschnittsauftrag: "Versorgung mit Material, Verpflegung und Strom",
+            sortier: 30,
+        },
+    ),
+    einheit(290, "zug", "Sanitätszug Musterstadt", "Zug", "ea1", 10),
+    einheit(290, "rettung", "Rettungsstaffel", "Staffel", "ea1", 20),
+    einheit(290, "betreuung", "Betreuungsgruppe", "Gruppe", "ea2", 30),
+    einheit(290, "logistik", "Logistiktrupp", "Trupp", "ea3", 40),
+    dispo_fahrzeug(285, "elw"),
+    dispo_fahrzeug(284, "rtw1"),
+    dispo_fahrzeug(284, "rtw2"),
+    dispo_fahrzeug(283, "gwsan"),
+    dispo_fahrzeug(282, "mtw"),
+    dispo_fahrzeug(282, "lkw"),
+    zu_einheit(280, "elw", "zug"),
+    zu_einheit(280, "rtw1", "rettung"),
+    zu_einheit(280, "rtw2", "rettung"),
+    zu_einheit(280, "mtw", "betreuung"),
+    zu_einheit(280, "lkw", "logistik"),
+    dispo_personal(278, "zugfuehrer"),
+    dispo_personal(278, "gruppenfuehrer_san"),
+    dispo_personal(278, "notarzt"),
+    dispo_personal(278, "notsan1"),
+    dispo_personal(278, "rettsan1"),
+    dispo_personal(278, "rettsan2"),
+    fms(270, "elw", 4),
+    fms(270, "rtw1", 4),
+    fms(270, "rtw2", 4),
+    fms(265, "mtw", 4),
+    entscheidung(
+        250,
+        "Unterabschnitt UHS Turnhalle unter EA 1 wird eingerichtet, dazu eine Sanitätsgruppe \
+         für die UHS.",
+    ),
+    abschnitt(
+        248,
+        AbschnittVorlage {
+            schluessel: "ea11",
+            name: "UHS Turnhalle",
+            kurzbezeichnung: "EA 1.1",
+            ueber: Some("ea1"),
+            lagezustand: Some(AbschnittLagezustand::Kritisch),
+            fortschritt: Some(25),
+            abschnittsauftrag: "Sichtung und Erstversorgung in der Turnhalle Musterstadt",
+            sortier: 11,
+        },
+    ),
+    einheit(246, "uhs", "Sanitätsgruppe UHS", "Gruppe", "ea11", 50),
+    dispo_fahrzeug(245, "ktw1"),
+    dispo_fahrzeug(245, "ktw2"),
+    zu_einheit(244, "gwsan", "uhs"),
+    zu_einheit(244, "ktw1", "uhs"),
+    zu_einheit(244, "ktw2", "uhs"),
+    dispo_personal(243, "gruppenfuehrer_bt"),
+    dispo_personal(243, "truppfuehrer"),
+    dispo_personal(243, "san1"),
+    dispo_personal(243, "san2"),
+    dispo_personal(243, "san3"),
+    dispo_personal(243, "funker"),
+    fms(240, "gwsan", 4),
+    fms(230, "ktw1", 4),
+    fms(230, "ktw2", 4),
+    lage(
+        180,
+        "Pegel Mühlbach weiter steigend. Die Unterstadt ist in Teilen nur noch mit \
+         geländegängigen Fahrzeugen erreichbar.",
+    ),
+    fms(150, "rtw2", 3),
+    fms(120, "ktw2", 6),
+    entscheidung(
+        118,
+        "KTW Musterstadt 85-2 wegen Wasserschaden an der Elektrik außer Betrieb. Transporte \
+         übernimmt RTW Musterstadt 83-2.",
+    ),
+    fms(90, "ktw1", 2),
+    lage(
+        60,
+        "Lage in EA 1.1 kritisch: Aufnahmekapazität der UHS Turnhalle nahezu erschöpft, \
+         weitere Betroffene angekündigt.",
+    ),
+    entscheidung(
+        30,
+        "Weitere Sanitätsgruppe über die Leitstelle nachgefordert. Die Betreuung richtet \
+         zusätzliche Plätze in der Gesamtschule ein.",
+    ),
+    lage(
+        10,
+        "Regen lässt nach, Pegel Mühlbach stagniert. Nächste Lagebesprechung ist angesetzt.",
+    ),
 ];
+
+/// Katalogbedarf des Einsatz-Teils, abgeleitet aus dem [`DREHBUCH`], jeder Eintrag einmal, in
+/// der Reihenfolge des ersten Vorkommens.
+///
+/// Der `match` ist bewusst erschöpfend und ohne `_`-Zweig: eine neue [`Vorgang`]-Variante
+/// kompiliert erst, wenn ihr Bedarf entschieden ist. Die Dispositionen verlangen je den ersten
+/// `gebunden`-Status, weil `disponiere_stamm_tx` ihn selbst nachschlägt und ohne ihn still
+/// `NULL` setzte; der Import prüft ihn vorab, damit das eine 422 wird.
+pub fn katalog_bedarf_einsatz() -> Vec<Katalogeintrag> {
+    let mut bedarf = Vec::new();
+    for schritt in DREHBUCH {
+        let eintrag = match schritt.vorgang {
+            Vorgang::Einheit(v) => Some(Katalogeintrag::Einheitstyp(v.typ)),
+            Vorgang::FahrzeugDisponieren { .. } => Some(Katalogeintrag::FahrzeugstatusKategorie(
+                StatusKategorie::Gebunden,
+            )),
+            Vorgang::FmsStatus { fms, .. } => Some(Katalogeintrag::FahrzeugstatusFms(fms)),
+            Vorgang::PersonalDisponieren { .. } => Some(Katalogeintrag::PersonalstatusKategorie(
+                StatusKategorie::Gebunden,
+            )),
+            Vorgang::Abschnitt(_) | Vorgang::FahrzeugZuEinheit { .. } | Vorgang::Etb { .. } => None,
+        };
+        if let Some(eintrag) = eintrag {
+            if !bedarf.contains(&eintrag) {
+                bedarf.push(eintrag);
+            }
+        }
+    }
+    bedarf
+}
 
 /// Katalogbedarf der Stammdaten-Anlage: die Qualifikationen des Personals, jede einmal, in
 /// der Reihenfolge ihres ersten Vorkommens. Fahrzeugtyp und Materialkategorie sind Freitext
@@ -290,9 +619,9 @@ pub fn katalog_bedarf_stammdaten() -> Vec<Katalogeintrag> {
 /// Gesamter Katalogbedarf des Szenarios: Stammdaten, dann Einsatz.
 pub fn katalog_bedarf() -> Vec<Katalogeintrag> {
     let mut bedarf = katalog_bedarf_stammdaten();
-    for eintrag in KATALOG_BEDARF_EINSATZ {
-        if !bedarf.contains(eintrag) {
-            bedarf.push(*eintrag);
+    for eintrag in katalog_bedarf_einsatz() {
+        if !bedarf.contains(&eintrag) {
+            bedarf.push(eintrag);
         }
     }
     bedarf
@@ -370,5 +699,87 @@ mod tests {
                 assert!(labels.contains(q), "{q} fehlt im Bedarf");
             }
         }
+    }
+
+    /// Zeitfolge: `vor_min` fällt nicht streng, der erste Schritt liegt nicht vor dem
+    /// Einsatzbeginn, der letzte vor dem Importzeitpunkt (Spec „Zeitachse relativ zum
+    /// Importzeitpunkt“: nichts in der Zukunft).
+    #[test]
+    fn drehbuch_steht_in_zeitfolge() {
+        assert!(!DREHBUCH.is_empty());
+        for paar in DREHBUCH.windows(2) {
+            assert!(
+                paar[0].vor_min >= paar[1].vor_min,
+                "Zeitfolge verletzt: {:?} vor {:?}",
+                paar[0],
+                paar[1]
+            );
+        }
+        assert!(DREHBUCH[0].vor_min <= BEGINN_VOR_MIN);
+        assert!(DREHBUCH[DREHBUCH.len() - 1].vor_min > 0);
+    }
+
+    /// Jeder Schlüssel, auf den ein Schritt verweist, ist vorher definiert: Stammdaten in den
+    /// Listen oben, Abschnitte und Einheiten in einem früheren Schritt, ein Fahrzeug vor
+    /// Zuordnung und Status disponiert. Jedes Objekt entsteht genau einmal.
+    #[test]
+    fn drehbuch_verweist_nur_auf_frueher_angelegtes() {
+        let mut abschnitte = BTreeSet::new();
+        let mut einheiten = BTreeSet::new();
+        let mut fahrzeuge = BTreeSet::new();
+        let mut personal = BTreeSet::new();
+        for schritt in DREHBUCH {
+            match schritt.vorgang {
+                Vorgang::Abschnitt(v) => {
+                    if let Some(ueber) = v.ueber {
+                        assert!(abschnitte.contains(ueber), "{ueber} vor {}", v.schluessel);
+                    }
+                    assert!(abschnitte.insert(v.schluessel), "{} doppelt", v.schluessel);
+                }
+                Vorgang::Einheit(v) => {
+                    assert!(abschnitte.contains(v.abschnitt), "{}", v.abschnitt);
+                    assert!(einheiten.insert(v.schluessel), "{} doppelt", v.schluessel);
+                }
+                Vorgang::FahrzeugDisponieren { fahrzeug } => {
+                    assert!(FAHRZEUGE.iter().any(|f| f.schluessel == fahrzeug));
+                    assert!(fahrzeuge.insert(fahrzeug), "{fahrzeug} doppelt disponiert");
+                }
+                Vorgang::FahrzeugZuEinheit { fahrzeug, einheit } => {
+                    assert!(fahrzeuge.contains(fahrzeug), "{fahrzeug} nicht disponiert");
+                    assert!(einheiten.contains(einheit), "{einheit} nicht gebildet");
+                }
+                Vorgang::FmsStatus { fahrzeug, fms } => {
+                    assert!(fahrzeuge.contains(fahrzeug), "{fahrzeug} nicht disponiert");
+                    assert!((0..=9).contains(&fms), "FMS {fms}");
+                }
+                Vorgang::PersonalDisponieren { personal: p } => {
+                    assert!(PERSONAL.iter().any(|v| v.schluessel == p));
+                    assert!(personal.insert(p), "{p} doppelt disponiert");
+                }
+                Vorgang::Etb { inhalt, .. } => assert!(!inhalt.trim().is_empty()),
+            }
+        }
+    }
+
+    /// Der Einsatz-Bedarf folgt dem Drehbuch: jeder Einheitstyp und jeder FMS-Anker, der
+    /// vorkommt, dazu die beiden `gebunden`-Kategorien der Dispositionen.
+    #[test]
+    fn einsatz_bedarf_folgt_dem_drehbuch() {
+        let bedarf = katalog_bedarf_einsatz();
+        for erwartet in [
+            Katalogeintrag::Einheitstyp("Zug"),
+            Katalogeintrag::Einheitstyp("Staffel"),
+            Katalogeintrag::Einheitstyp("Gruppe"),
+            Katalogeintrag::Einheitstyp("Trupp"),
+            Katalogeintrag::FahrzeugstatusFms(2),
+            Katalogeintrag::FahrzeugstatusFms(3),
+            Katalogeintrag::FahrzeugstatusFms(4),
+            Katalogeintrag::FahrzeugstatusFms(6),
+            Katalogeintrag::FahrzeugstatusKategorie(StatusKategorie::Gebunden),
+            Katalogeintrag::PersonalstatusKategorie(StatusKategorie::Gebunden),
+        ] {
+            assert!(bedarf.contains(&erwartet), "{erwartet:?} fehlt");
+        }
+        assert_eq!(bedarf.len(), 10, "jeder Eintrag einmal: {bedarf:?}");
     }
 }

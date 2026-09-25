@@ -12,6 +12,61 @@ pub(super) async fn org_anlegen(pool: &SqlitePool, id: i64) {
         .unwrap();
 }
 
+/// Die Kataloge einer Org, wie `bootstrap_admin` sie für eine neue Org anlegt.
+pub(super) async fn kataloge_seeden(pool: &SqlitePool, org_id: i64) {
+    for (label, kategorie, fms_anker, sortier) in crate::fahrzeug::STATUS_STARTLISTE {
+        sqlx::query(
+            "INSERT INTO fahrzeug_status (org_id, label, kategorie, fms_anker, sortier) \
+             VALUES (?, ?, ?, ?, ?)",
+        )
+        .bind(org_id)
+        .bind(label)
+        .bind(kategorie)
+        .bind(fms_anker)
+        .bind(sortier)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+    for (label, sortier) in crate::personal::QUALIFIKATION_STARTLISTE {
+        sqlx::query("INSERT INTO qualifikation (org_id, label, sortier) VALUES (?, ?, ?)")
+            .bind(org_id)
+            .bind(label)
+            .bind(sortier)
+            .execute(pool)
+            .await
+            .unwrap();
+    }
+    for (label, kategorie, sortier) in crate::personal::PERSONAL_STATUS_STARTLISTE {
+        sqlx::query(
+            "INSERT INTO personal_status (org_id, label, kategorie, sortier) VALUES (?, ?, ?, ?)",
+        )
+        .bind(org_id)
+        .bind(label)
+        .bind(kategorie)
+        .bind(sortier)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+    for (label, f, u, m, sortier) in crate::einheit::EINHEIT_TYP_STARTLISTE {
+        sqlx::query(
+            "INSERT INTO einheit_typ \
+                (org_id, label, soll_fuehrer, soll_unterfuehrer, soll_mannschaft, sortier) \
+             VALUES (?, ?, ?, ?, ?, ?)",
+        )
+        .bind(org_id)
+        .bind(label)
+        .bind(f)
+        .bind(u)
+        .bind(m)
+        .bind(sortier)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+}
+
 /// Ein System-Admin der Organisation; liefert die Benutzer-ID.
 pub(super) async fn admin_anlegen(pool: &SqlitePool, org_id: i64) -> i64 {
     sqlx::query_scalar(

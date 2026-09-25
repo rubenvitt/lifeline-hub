@@ -4,9 +4,10 @@
 //! **Nur mit Schalter.** Die Routen existieren ausschließlich mit `--demo-daten`
 //! (`app::RouterOptionen`); ohne ihn antwortet `/api/demo-daten` wie ein unbekannter Pfad.
 //!
-//! Dieses Modul trägt die Antwortformen, den Löschweg [`entfernen::entfernen_tx`], die
-//! Stammdaten-Anlage [`stammdaten::stammdaten_importieren_tx`] mit dem Katalog-Lookup
-//! [`katalog`] und das Szenario als reine Daten ([`szenario`]). Der Bericht liegt als JSON am
+//! Dieses Modul trägt die Antwortformen, den Import [`import::importieren_tx`], den Löschweg
+//! [`entfernen::entfernen_tx`], die Stammdaten-Anlage
+//! [`stammdaten::stammdaten_importieren_tx`] mit dem Katalog-Lookup [`katalog`] und das
+//! Szenario samt Drehbuch als reine Daten ([`szenario`]). Der Bericht liegt als JSON am
 //! Import-Kopf, deshalb sind die Typen auch `Deserialize`.
 //!
 //! Spec: `openspec/changes/lfh-690-demo-daten-laufzeit-import/`
@@ -15,12 +16,15 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 pub mod entfernen;
+pub mod import;
 pub mod katalog;
 pub mod stammdaten;
 pub mod szenario;
 
 #[cfg(test)]
 mod entfernen_tests;
+#[cfg(test)]
+mod import_tests;
 #[cfg(test)]
 mod schema_tests;
 #[cfg(test)]

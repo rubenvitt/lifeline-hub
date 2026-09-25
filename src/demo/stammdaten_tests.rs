@@ -12,8 +12,8 @@ use super::katalog::{self, Katalog};
 use super::stammdaten::{stammdaten_importieren_tx, StammdatenErgebnis};
 use super::szenario::{self, Katalogeintrag};
 use super::test_hilfen::{
-    admin_anlegen, anzahl, einsatz_anlegen, fahrzeug_anlegen, kopf_anlegen, material_anlegen,
-    org_anlegen, personal_anlegen, zeilen,
+    admin_anlegen, anzahl, einsatz_anlegen, fahrzeug_anlegen, kataloge_seeden, kopf_anlegen,
+    material_anlegen, org_anlegen, personal_anlegen, zeilen,
 };
 use super::{DemoBerichtZeile, DemoStammdatenArt};
 use crate::error::AppError;
@@ -22,61 +22,6 @@ use crate::katalog::StatusKategorie;
 // ---------------------------------------------------------------------------------------------
 // Aufbau
 // ---------------------------------------------------------------------------------------------
-
-/// Die Kataloge einer Org, wie `bootstrap_admin` sie für eine neue Org anlegt.
-async fn kataloge_seeden(pool: &SqlitePool, org_id: i64) {
-    for (label, kategorie, fms_anker, sortier) in crate::fahrzeug::STATUS_STARTLISTE {
-        sqlx::query(
-            "INSERT INTO fahrzeug_status (org_id, label, kategorie, fms_anker, sortier) \
-             VALUES (?, ?, ?, ?, ?)",
-        )
-        .bind(org_id)
-        .bind(label)
-        .bind(kategorie)
-        .bind(fms_anker)
-        .bind(sortier)
-        .execute(pool)
-        .await
-        .unwrap();
-    }
-    for (label, sortier) in crate::personal::QUALIFIKATION_STARTLISTE {
-        sqlx::query("INSERT INTO qualifikation (org_id, label, sortier) VALUES (?, ?, ?)")
-            .bind(org_id)
-            .bind(label)
-            .bind(sortier)
-            .execute(pool)
-            .await
-            .unwrap();
-    }
-    for (label, kategorie, sortier) in crate::personal::PERSONAL_STATUS_STARTLISTE {
-        sqlx::query(
-            "INSERT INTO personal_status (org_id, label, kategorie, sortier) VALUES (?, ?, ?, ?)",
-        )
-        .bind(org_id)
-        .bind(label)
-        .bind(kategorie)
-        .bind(sortier)
-        .execute(pool)
-        .await
-        .unwrap();
-    }
-    for (label, f, u, m, sortier) in crate::einheit::EINHEIT_TYP_STARTLISTE {
-        sqlx::query(
-            "INSERT INTO einheit_typ \
-                (org_id, label, soll_fuehrer, soll_unterfuehrer, soll_mannschaft, sortier) \
-             VALUES (?, ?, ?, ?, ?, ?)",
-        )
-        .bind(org_id)
-        .bind(label)
-        .bind(f)
-        .bind(u)
-        .bind(m)
-        .bind(sortier)
-        .execute(pool)
-        .await
-        .unwrap();
-    }
-}
 
 /// Eine Org mit Katalogen, Admin, Platzhalter-Einsatz und aktivem Import-Kopf.
 struct Aufbau {
@@ -403,27 +348,69 @@ async fn vorhandenes_fahrzeug_in_dienst_wird_mitbenutzt_unveraendert_und_unmarki
     );
 }
 
+/// Je Art ein außer Dienst gestellter Namensvetter (gleiche Kennung): er wird nicht
+/// mitbenutzt, bleibt zeilengleich und ohne Marke, und daneben entsteht eine neue, markierte
+/// Zeile. Je Art einzeln, weil jede Art ihren eigenen Abgleich trägt: fehlte das
+/// `dienststatus`-Prädikat nur bei einer, bliebe ein Test über eine andere Art grün.
 #[tokio::test]
 async fn ausser_dienst_gestellter_namensvetter_bleibt_und_ein_neues_entsteht() {
     let pool = crate::db::test_pool().await;
     let a = aufbau(&pool, 1).await;
-    let alt = fahrzeug_anlegen(&pool, a.org, "Musterstadt 83-1").await;
-    sqlx::query("UPDATE fahrzeug SET dienststatus = 'ausser_dienst' WHERE id = ?")
-        .bind(alt)
-        .execute(&pool)
-        .await
-        .unwrap();
-    let vorher = zeilen(&pool, "fahrzeug", "id = ?", alt).await;
+    let alt_fahrzeug = fahrzeug_anlegen(&pool, a.org, "Musterstadt 83-1").await;
+    let alt_personal = personal_anlegen(&pool, a.org, "DEMO-P-001").await;
+    let alt_material = material_anlegen(&pool, a.org, "DEMO-M-001").await;
+    for (sql, id) in [
+        (
+            "UPDATE fahrzeug SET dienststatus = 'ausser_dienst' WHERE id = ?",
+            alt_fahrzeug,
+        ),
+        (
+            "UPDATE personal SET dienststatus = 'ausser_dienst' WHERE id = ?",
+            alt_personal,
+        ),
+        (
+            "UPDATE material SET dienststatus = 'ausser_dienst' WHERE id = ?",
+            alt_material,
+        ),
+    ] {
+        sqlx::query(sql).bind(id).execute(&pool).await.unwrap();
+    }
+    let vorher = [
+        zeilen(&pool, "fahrzeug", "id = ?", alt_fahrzeug).await,
+        zeilen(&pool, "personal", "id = ?", alt_personal).await,
+        zeilen(&pool, "material", "id = ?", alt_material).await,
+    ];
 
     let erg = importieren(&pool, a.org, a.kopf)
         .await
         .expect("importieren");
 
-    let neu = erg.fahrzeug("rtw1").unwrap();
-    assert_ne!(neu, alt, "der außer Dienst gestellte wird nicht mitbenutzt");
-    assert_eq!(zeilen(&pool, "fahrzeug", "id = ?", alt).await, vorher);
-    assert_eq!(marke(&pool, "fahrzeug", alt).await, None);
-    assert_eq!(marke(&pool, "fahrzeug", neu).await, Some(a.kopf));
+    let neu = [
+        ("fahrzeug", alt_fahrzeug, erg.fahrzeug("rtw1").unwrap()),
+        (
+            "personal",
+            alt_personal,
+            erg.personal("zugfuehrer").unwrap(),
+        ),
+        (
+            "material",
+            alt_material,
+            erg.material("stromerzeuger").unwrap(),
+        ),
+    ];
+    for ((tabelle, alt, neu), vorher) in neu.into_iter().zip(vorher) {
+        assert_ne!(
+            neu, alt,
+            "{tabelle}: der außer Dienst gestellte wird nicht mitbenutzt"
+        );
+        assert_eq!(
+            zeilen(&pool, tabelle, "id = ?", alt).await,
+            vorher,
+            "{tabelle}"
+        );
+        assert_eq!(marke(&pool, tabelle, alt).await, None, "{tabelle}");
+        assert_eq!(marke(&pool, tabelle, neu).await, Some(a.kopf), "{tabelle}");
+    }
     erwarte_bericht(
         &erg,
         [

@@ -529,6 +529,12 @@ nicht, Quelle ist immer eine `erinnerung`-Zeile:
   drei schlägt der Einsatz-Teil nach (`src/demo/katalog.rs`, Bedarf in `src/demo/szenario.rs`).
   `KATALOG_BEDARF_EINSATZ` ist ein Vorschlag nach D9: FMS 2/3/4/6, Zug/Gruppe/Staffel/Trupp,
   Personalstatus `gebunden`. Block 4.2 passt ihn an sein Drehbuch an.
+  **Nachtrag Block 4.2:** Die feste Liste ist durch `szenario::katalog_bedarf_einsatz()`
+  ersetzt. Die Funktion leitet den Bedarf per erschöpfendem `match` aus dem `DREHBUCH` ab:
+  Einheitstypen, FMS-Anker und je Disposition den ersten `gebunden`-Status (Fahrzeug und
+  Personal). Das Stichwort „Unwetter“ aus D9 steht nicht in der Bootstrap-Startliste
+  (`STICHWORT_STARTLISTE`, nur B-, MANV-, Sonderlage- und Übungsstichworte). Der Einsatz trägt
+  deshalb den Freitext „Unwetter – Starkregen“ (`szenario::EINSATZ_STICHWORT`).
 - Eine Org, die `bootstrap_admin` frisch angelegt hat, deckt den ganzen Bedarf ab. Das belegt
   `demo::stammdaten_tests::frisch_gebootstrappte_org_hat_den_ganzen_katalogbedarf`.
 - Den Wert `aktiv` prüfen die Fach-Repos nicht selbst, der Demo-Lookup tut es:
