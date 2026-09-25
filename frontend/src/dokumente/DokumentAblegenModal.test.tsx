@@ -132,6 +132,12 @@ describe('DokumentAblegenModal', () => {
   it('überschreibt einen schon getippten Titel NICHT', async () => {
     rendere();
     const d = await dialog();
+    // Erst den Einstiegsfokus abwarten (LFH-373, in der CI zweimal rot): der Dialog setzt ihn
+    // per `requestAnimationFrame` auf „Datei wählen". Auf einem langsamen Runner feuerte das
+    // MITTEN im Tippen, die restlichen Zeichen gingen an den Knopf, der Titel blieb leer — und
+    // die Dateiwahl füllte ihn dann zu Recht mit dem Dateinamen.
+    const knopf = within(d).getByRole('button', { name: /Datei wählen/ });
+    await vi.waitFor(() => expect(document.activeElement).toBe(knopf));
     await userEvent.type(within(d).getByRole('textbox', { name: 'Titel' }), 'Eigener Titel');
     await userEvent.upload(dateiInput(d), pdf());
     expect(within(d).getByRole('textbox', { name: 'Titel' })).toHaveValue('Eigener Titel');
