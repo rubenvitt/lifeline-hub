@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { flushSync } from 'react-dom';
 import { useQuery } from '@tanstack/react-query';
 import { theme } from 'antd';
-import { ladeOrganisation } from '../../api/organisation';
+import { ladeOrganisation, orgLogoPfad } from '../../api/organisation';
 import { globalKeys } from '../../api/queryKeys';
 import { useAuth } from '../../auth/AuthContext';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
@@ -63,6 +63,10 @@ export default function Druckkopf({
     queryFn: ladeOrganisation,
   });
   const [jetzt, setJetzt] = useState(() => new Date());
+  // Ein Logo, das nicht lädt, fällt weg (kein leerer Bildrahmen auf dem Blatt). Gemerkt je
+  // sha256: ein ersetztes Logo bekommt einen neuen Versuch.
+  const [kaputtesLogo, setKaputtesLogo] = useState<string | null>(null);
+  const logo = organisation.data?.logo;
 
   useEffect(() => {
     const vorDruck = () => flushSync(() => setJetzt(new Date()));
@@ -91,8 +95,24 @@ export default function Druckkopf({
       aria-hidden={sichtbarkeit === 'druck' ? true : undefined}
       style={{ marginBlockEnd: token.marginLG }}
     >
-      <div className="druckkopf__org" style={{ fontWeight: 600 }}>
-        {organisation.data?.name}
+      <div
+        className="druckkopf__org"
+        style={{ display: 'flex', alignItems: 'center', gap: token.marginSM, fontWeight: 600 }}
+      >
+        {/* Nur mit hinterlegtem Logo — sonst weder Bild noch Platzhalter. `?v=<sha256>`, damit
+            ein ersetztes Logo nicht aus dem Bildspeicher kommt. `alt=""`: der Name steht
+            daneben, das Bild wiederholt ihn nur. `useDrucken` wartet vor dem Druck auf
+            `decode()` dieses Knotens. */}
+        {logo && kaputtesLogo !== logo.sha256 && (
+          <img
+            className="druckkopf__logo"
+            src={orgLogoPfad(logo.sha256)}
+            alt=""
+            style={{ maxHeight: 48, maxWidth: 200, objectFit: 'contain' }}
+            onError={() => flushSync(() => setKaputtesLogo(logo.sha256))}
+          />
+        )}
+        <span>{organisation.data?.name}</span>
       </div>
       <h1 className="druckkopf__titel" style={{ fontSize: token.fontSizeHeading4, margin: 0 }}>
         {titel ? `${dokumentart} – ${titel}` : dokumentart}

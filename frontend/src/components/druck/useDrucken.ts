@@ -46,7 +46,30 @@ export function useDrucken(): Drucken {
     }
     if (!organisation.isSuccess) return;
     erledigt.current = anforderung;
-    window.print();
+    // Das Logo im Druckkopf muss dekodiert sein, bevor das Druckbild einfriert — ein
+    // nicht geladenes Bild fehlt dort, oder es steht ein leerer Rahmen. Ein Fehler zählt
+    // als „ohne Logo drucken" (der Druckkopf nimmt das Bild dann weg); danach ein Takt
+    // Aufschub, damit dessen Fehlerereignis sicher verarbeitet ist.
+    const logos = Array.from(
+      document.querySelectorAll<HTMLImageElement>('[data-lfh="druckkopf"] img'),
+    );
+    if (logos.length === 0) {
+      window.print();
+      return;
+    }
+    let abgebrochen = false;
+    void Promise.all(
+      logos.map((bild) =>
+        typeof bild.decode === 'function' ? bild.decode().catch(() => undefined) : undefined,
+      ),
+    )
+      .then(() => new Promise((weiter) => setTimeout(weiter, 0)))
+      .then(() => {
+        if (!abgebrochen) window.print();
+      });
+    return () => {
+      abgebrochen = true;
+    };
   }, [anforderung, organisation.isSuccess, organisation.isError]);
 
   const drucken = useCallback(() => setAnforderung((n) => n + 1), []);

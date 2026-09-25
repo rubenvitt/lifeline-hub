@@ -5,6 +5,7 @@ import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
 import DruckKnopf from './DruckKnopf';
+import Druckkopf from './Druckkopf';
 
 /**
  * Drucken erst mit geladenem Kopf (LFH-22, design.md D2). Ohne Sperre druckte der erste
@@ -98,5 +99,59 @@ describe('useDrucken / DruckKnopf', () => {
     renderMitProviders(<DruckKnopf gesperrt />);
     await new Promise((fertig) => setTimeout(fertig, 20));
     expect(screen.getByRole('button', { name: 'Drucken / als PDF' })).toBeDisabled();
+  });
+
+  describe('mit Logo (LFH-22, 3.9)', () => {
+    const MIT_LOGO = {
+      ...ORG,
+      logo: { mime: 'image/png', groesse: 10, sha256: 'f00d', geaendert_at: '2026-09-25 08:00:00' },
+    };
+    let decode: ReturnType<typeof vi.fn>;
+    const original = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'decode');
+
+    beforeEach(() => {
+      decode = vi.fn();
+      Object.defineProperty(HTMLImageElement.prototype, 'decode', {
+        configurable: true,
+        value: decode,
+      });
+      server.use(http.get('/api/organisation', () => HttpResponse.json(MIT_LOGO)));
+    });
+
+    afterEach(() => {
+      if (original) Object.defineProperty(HTMLImageElement.prototype, 'decode', original);
+      else delete (HTMLImageElement.prototype as { decode?: unknown }).decode;
+    });
+
+    function seite() {
+      return renderMitProviders(
+        <>
+          <Druckkopf dokumentart="Befehl" einsatz={{ bezeichnung: 'Übung' }} sichtbarkeit="druck" />
+          <DruckKnopf />
+        </>,
+      );
+    }
+
+    it('ruft window.print erst, wenn das Logo dekodiert ist', async () => {
+      let fertig!: () => void;
+      decode.mockReturnValue(new Promise<void>((r) => (fertig = r)));
+      seite();
+      await waitFor(() => expect(document.querySelector('.druckkopf__logo')).not.toBeNull());
+      await userEvent.click(screen.getByRole('button', { name: 'Drucken / als PDF' }));
+      await new Promise((r) => setTimeout(r, 30));
+      expect(drucke).not.toHaveBeenCalled();
+      fertig();
+      await waitFor(() => expect(drucke).toHaveBeenCalledTimes(1));
+    });
+
+    it('druckt bei einem Dekodierfehler trotzdem genau einmal — ohne Logo statt gar nicht', async () => {
+      decode.mockRejectedValue(new Error('kaputt'));
+      seite();
+      await waitFor(() => expect(document.querySelector('.druckkopf__logo')).not.toBeNull());
+      await userEvent.click(screen.getByRole('button', { name: 'Drucken / als PDF' }));
+      await waitFor(() => expect(drucke).toHaveBeenCalledTimes(1));
+      await new Promise((r) => setTimeout(r, 30));
+      expect(drucke).toHaveBeenCalledTimes(1);
+    });
   });
 });

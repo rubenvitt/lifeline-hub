@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
 import { neuerQueryClient, renderMitProviders } from '../../test/utils';
@@ -146,5 +146,65 @@ describe('Druckkopf', () => {
     expect(css).toMatch(
       /@media screen\s*\{\s*\.druckkopf--nur-druck\s*\{\s*display:\s*none\s*;?\s*\}/,
     );
+  });
+
+  it('zeigt ohne Logo kein Bild und keinen Rahmen', async () => {
+    mitOrganisation();
+    renderMitProviders(
+      <Druckkopf dokumentart="Befehl" einsatz={{ bezeichnung: 'Übung' }} sichtbarkeit="druck" />,
+    );
+    await screen.findByText('DRK Kreisverband Musterstadt');
+    expect(kopf().querySelector('img')).toBeNull();
+    expect(kopf().querySelector('.druckkopf__logo')).toBeNull();
+  });
+
+  it('zeigt ein hinterlegtes Logo mit dem sha256 als Cache-Brecher', async () => {
+    server.use(
+      http.get('/api/organisation', () =>
+        HttpResponse.json({
+          id: 1,
+          name: 'DRK Kreisverband Musterstadt',
+          tz_organisation: null,
+          logo: {
+            mime: 'image/png',
+            groesse: 10,
+            sha256: 'f00d',
+            geaendert_at: '2026-09-25 08:00:00',
+          },
+        }),
+      ),
+    );
+    renderMitProviders(
+      <Druckkopf dokumentart="Befehl" einsatz={{ bezeichnung: 'Übung' }} sichtbarkeit="druck" />,
+    );
+    await screen.findByText('DRK Kreisverband Musterstadt');
+    const bild = kopf().querySelector('img');
+    expect(bild).not.toBeNull();
+    expect(bild).toHaveAttribute('src', '/api/organisation/logo?v=f00d');
+    expect(bild).toHaveClass('druckkopf__logo');
+  });
+
+  it('nimmt ein Logo, das nicht lädt, weg — kein leerer Bildrahmen auf dem Blatt', async () => {
+    server.use(
+      http.get('/api/organisation', () =>
+        HttpResponse.json({
+          id: 1,
+          name: 'DRK Kreisverband Musterstadt',
+          tz_organisation: null,
+          logo: {
+            mime: 'image/png',
+            groesse: 10,
+            sha256: 'f00d',
+            geaendert_at: '2026-09-25 08:00:00',
+          },
+        }),
+      ),
+    );
+    renderMitProviders(
+      <Druckkopf dokumentart="Befehl" einsatz={{ bezeichnung: 'Übung' }} sichtbarkeit="druck" />,
+    );
+    await screen.findByText('DRK Kreisverband Musterstadt');
+    fireEvent.error(kopf().querySelector('img')!);
+    await waitFor(() => expect(kopf().querySelector('img')).toBeNull());
   });
 });
