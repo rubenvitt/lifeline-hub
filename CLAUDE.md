@@ -471,10 +471,20 @@ Bindungsabfrage. Das Erfassen bindet über `anhang_ids` in derselben Transaktion
 Eintrag (`anlegen_idempotent`, `write_retry!`, Replay ohne Anhangsprüfung). **Append-only:**
 kein Tauschen, kein Entfernen, nur die Schwärzung löscht die Datei, der Eintrag bleibt.
 **Nur der Upload braucht Netz:** ohne Verbindung ist „Anhang" gesperrt, ein Eintrag mit schon
-hochgeladenen Dateien geht mit `anhang_ids` in die Queue. **Während des Sendens** sind Text
-(`MarkdownEditor readOnly`) und „Anhang" gesperrt, die Erfassungszeit gilt ab dem Absenden,
-nicht ab dem Ende des Uploads, und die **Entwurfs-id ist die `client_id`**: sie überlebt den
-Remount beim Tabwechsel, ein zweites Absenden desselben Entwurfs dedupliziert der Server.
+hochgeladenen Dateien geht mit `anhang_ids` in die Queue. **Während des Sendens** ist die
+ganze Erfassung gesperrt (Text `readOnly`, Typ, „Feld", Chips, „Werte behalten", „Anhang";
+der Test prüft die Erfassung als Ganzes gegen eine Ausnahmeliste), die Erfassungszeit gilt ab
+dem Absenden, nicht ab dem Ende des Uploads, und die **Entwurfs-id ist die `client_id`**.
+**Der Sendezustand gehört dem Entwurf, nicht der Montierung** (Review C1): `EtbEntwurfsTabs`
+hält ihn je Entwurf (`Versand`), weil nur der aktive Tab montiert ist — sonst stand nach einem
+Tabwechsel eine entsperrte Erfassung da, deren Eingaben der laufende Versand still verwarf.
+Ein sendender Entwurf trägt kein Schliesskreuz, und „Berichtigen" ist gesperrt, solange einer
+sendet (die Berichtigung ersetzt die Reiter ganz). Die gewählten **Dateien liegen in
+`EtbPage`** (`useEntwurfsDateien`), aus demselben Grund wie „Werte behalten". Höchstzahl 10
+und Dubletten (Name + Größe + `lastModified`) prüft schon die Dateiwahl. **Ein ungebundener
+Anhang gehört vorerst der hochladenden Person:** die generischen Routen `GET`/`DELETE
+…/anhaenge/{aid}` antworten allen anderen 404 (design.md D12) — ein vierter Linker, der in
+`LinkerStand` fehlte, machte seine Dateien damit für alle anderen unerreichbar.
 Der Download-Verweis ist blau aus
 `bedienText` und steht in der Hinweiszeile unabhängig von `hatVerknuepfung`. Prüfliste:
 `docs/superpowers/specs/2026-09-24-lfh-117-pruefliste.md`.

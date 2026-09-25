@@ -211,6 +211,22 @@ impl LinkerStand {
     pub fn generischer_download_gesperrt(&self) -> bool {
         self.ist_dokument() || self.ist_etb() || (self.chat_gesamt > 0 && self.chat_lebend == 0)
     }
+
+    /// An KEINEM Linker gebunden: hochgeladen, aber (noch) nicht gesendet oder erfasst. Die
+    /// generische Route bedient einen solchen Anhang nur für die hochladende Person
+    /// (LFH-117, Review C1) — wem er gehören wird, steht erst mit dem Linker fest.
+    pub fn ist_ungebunden(&self) -> bool {
+        self.chat_gesamt == 0 && self.dokument_gesamt == 0 && self.etb_gesamt == 0
+    }
+}
+
+/// Wer den Anhang hochgeladen hat (`None`: unbekannt).
+pub async fn hochgeladen_von(pool: &SqlitePool, anhang_id: i64) -> Result<Option<i64>, AppError> {
+    sqlx::query_scalar("SELECT hochgeladen_von FROM anhang WHERE id = ?")
+        .bind(anhang_id)
+        .fetch_optional(pool)
+        .await
+        .map_err(Into::into)
 }
 
 /// Aggregiert die Linker eines Anhangs. Ein unbekannter Anhang liefert lauter Nullen —
@@ -530,6 +546,34 @@ mod tests {
             s.generischer_download_gesperrt(),
             "Dokument-Anhang nur über die Modul-Route"
         );
+    }
+
+    #[test]
+    fn ungebunden_heisst_an_keinem_der_drei_linker() {
+        let null = LinkerStand {
+            chat_gesamt: 0,
+            chat_lebend: 0,
+            dokument_gesamt: 0,
+            etb_gesamt: 0,
+        };
+        assert!(null.ist_ungebunden());
+        // Auch ein toter Chat-Linker bindet: der Tombstone sperrt dann ohnehin (LFH-116).
+        for gebunden in [
+            LinkerStand {
+                chat_gesamt: 1,
+                ..null
+            },
+            LinkerStand {
+                dokument_gesamt: 1,
+                ..null
+            },
+            LinkerStand {
+                etb_gesamt: 1,
+                ..null
+            },
+        ] {
+            assert!(!gebunden.ist_ungebunden(), "{gebunden:?}");
+        }
     }
 
     #[test]

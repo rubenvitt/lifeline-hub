@@ -992,3 +992,43 @@ async fn etb_anhang_nicht_an_chat_verknuepfbar() {
         "keine Nachricht, keine Verknüpfung"
     );
 }
+
+/// Review C1 zu LFH-117, Gegenprobe Chat: ein ungebundener Anhang ist über die generische
+/// Route nur für die hochladende Person erreichbar — vor dem Senden. Ist er an eine Nachricht
+/// gebunden, gelten die Chat-Regeln wie bisher, auch für andere.
+#[tokio::test]
+async fn chat_anhang_vor_dem_senden_nur_fuer_die_hochladende_danach_fuer_alle() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let kid = default_kanal(&app, einsatz, &admin).await;
+    let fid = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    rolle_setzen(&app, &admin, einsatz, fid, "fuehrungspersonal").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+
+    let (_, up) = upload(
+        &app,
+        einsatz,
+        &admin,
+        "lage.pdf",
+        "application/pdf",
+        b"%PDF",
+    )
+    .await;
+    let aid = up[0]["id"].as_i64().unwrap();
+
+    let (s, _, _) = download(&app, einsatz, aid, &admin).await;
+    assert_eq!(s, StatusCode::OK, "Hochladende vor dem Senden");
+    let (s, _, _) = download(&app, einsatz, aid, &frieda).await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "andere vor dem Senden");
+    assert_eq!(
+        delete_anhang(&app, einsatz, aid, &frieda).await,
+        StatusCode::NOT_FOUND,
+        "andere dürfen einen fremden Entwurfsanhang nicht verwerfen"
+    );
+
+    nachricht_senden(&app, einsatz, kid, &admin, &[aid]).await;
+    let (s, _, bytes) = download(&app, einsatz, aid, &frieda).await;
+    assert_eq!(s, StatusCode::OK, "nach dem Senden gelten die Chat-Regeln");
+    assert_eq!(bytes, b"%PDF");
+}

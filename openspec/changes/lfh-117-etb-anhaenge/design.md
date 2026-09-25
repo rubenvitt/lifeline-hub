@@ -204,6 +204,33 @@ als eigenes Teil in `hinweisZeile`, bedingt auf `anhaenge.length > 0`, **nicht**
 `hatVerknuepfung`. Anhänge sind keine Kopplung, und diese Bedingung steuert
 `EtbBacklinkBadges`. `EtbEintragVorschau` zeigt dasselbe Bauteil.
 
+**D12: Ein ungebundener Anhang gehört vorerst der Person, die ihn hochgeladen hat.**
+(Nachtrag nach dem Review C1, Entscheidung des Orchestrators.) Die generischen Routen
+`GET` und `DELETE /api/einsaetze/{id}/anhaenge/{aid}` bedienen einen Anhang, der an
+**keinem** Linker hängt, nur für `anhang.hochgeladen_von == benutzer.id`. Alle anderen
+bekommen 404 wie für einen unbekannten Anhang, die Existenz bleibt verdeckt. Grund: Ein
+ETB-Upload ist bis zum Erfassen ungebunden, und nach einem vorübergehend gescheiterten
+Erfassen (D10) bleibt er es bis zu 24 h. In dieser Zeit war er über die modul-lose Route
+für jede lesende Person ladbar, auch bei gesperrtem Modul ETB (fortlaufende IDs), und für
+jede schreibende löschbar. Der Flush endete dann mit 400. Wem die Datei gehören wird, steht
+erst mit dem Linker fest; bis dahin ist die hochladende Person die einzige, die sie
+braucht. Das trifft den Chat genauso (vor dem Senden) und ist dort ebenso richtig. Nach
+dem Senden gelten die Chat-Regeln unverändert. Gebundene Anhänge sind nicht betroffen.
+- **Die Linker sind vollständig gezählt.** `linker_stand` kennt `chat_nachricht_anhang`,
+  `einsatz_dokument` und `etb_eintrag_anhang`. Das sind alle drei Tabellen mit
+  `REFERENCES anhang(id)` (Migrationen 0052, 0116, 0125). `karte_hintergrundbild` (0075)
+  hält seine Bytes in einer eigenen Tabelle und verweist nicht auf `anhang`. Ein vierter
+  Linker, der dort fehlte, würde seine Dateien für alle außer der hochladenden Person
+  unerreichbar machen. Wer einen Linker ergänzt, ergänzt `linker_stand` mit.
+- **Verworfen: eine Spalte `anhang.herkunft`** („chat“/„etb“) mit Modul-Gate je Herkunft.
+  Sie bräuchte eine Migration und einen Parameter durch `hochladen_multipart` und schlösse
+  trotzdem nur die Modulfrage, nicht das Löschen fremder Entwürfe.
+- **Die Folge für den Chat:** Ein Anhang, dessen Nachricht hart gelöscht wurde, ist wieder
+  ungebunden und damit nur noch für die hochladende Person ladbar. Weich gelöschte
+  Nachrichten sperren ohnehin (LFH-116).
+- Tests: `tests/etb_anhang.rs::ungebundener_etb_upload_ist_generisch_nur_fuer_die_hochladende_person`
+  und `tests/anhang.rs::chat_anhang_vor_dem_senden_nur_fuer_die_hochladende_danach_fuer_alle`.
+
 ## Risks / Trade-offs
 
 - [Ein Queue-Eintrag wartet länger als 24 h] → Er wird mit verständlichem Grund abgelehnt,

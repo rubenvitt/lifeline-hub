@@ -658,3 +658,37 @@ async fn freier_anhang_ist_ueber_die_etb_route_nicht_ladbar() {
     let (s, _, _) = download(&app, &pfad(einsatz, eintrag, frei), &admin, None).await;
     assert_eq!(s, StatusCode::NOT_FOUND);
 }
+
+// ------------- Ungebundene ETB-Uploads über die generische Route (Review C1) -------------
+
+/// Ein hochgeladener, noch nicht gebundener ETB-Anhang ist über die modul-lose generische
+/// Route nur für die hochladende Person erreichbar (design.md D12). Sonst könnte eine Person
+/// mit gesperrtem ETB-Modul die Fotos im Fenster bis zum Binden laden (IDs sind fortlaufend)
+/// und jede schreibende Person sie löschen. Fremde bekommen 404 — die Existenz bleibt verdeckt.
+#[tokio::test]
+async fn ungebundener_etb_upload_ist_generisch_nur_fuer_die_hochladende_person() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", ADMIN_PW).await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let frieda = fuehrungsperson(&app, &admin, einsatz).await;
+    let erika = beobachterin(&app, &admin, einsatz).await;
+    let a = hochgeladen(&app, einsatz, &admin, "a.jpg").await;
+    let generisch = format!("/api/einsaetze/{einsatz}/anhaenge/{a}");
+
+    let (s, _, _) = download(&app, &generisch, &frieda, None).await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "fremde Führungsperson");
+    let (s, _, _) = download(&app, &generisch, &erika, None).await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "fremde Beobachterin");
+    let (s, _) = anfrage(&app, "DELETE", &generisch, &frieda, None).await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "fremdes Löschen");
+
+    let (s, _, bytes) = download(&app, &generisch, &admin, None).await;
+    assert_eq!(s, StatusCode::OK, "die Hochladende lädt ihre Datei");
+    assert_eq!(bytes, b"JPEGDATEN");
+    let (s, _) = anfrage(&app, "DELETE", &generisch, &admin, None).await;
+    assert_eq!(
+        s,
+        StatusCode::NO_CONTENT,
+        "die Hochladende verwirft ihre Datei"
+    );
+}
