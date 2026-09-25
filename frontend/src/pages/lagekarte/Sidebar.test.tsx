@@ -6,7 +6,9 @@ import Sidebar, {
   bedienzielStil,
   ebenenZeileStil,
   filtereNichtVerortet,
+  leistenZeileStil,
   loeschDialogBild,
+  namensteilStil,
   NICHT_VERORTET_SUCHE_AB,
 } from './Sidebar';
 import type { NichtVerortet } from './marker';
@@ -415,21 +417,14 @@ describe('Sidebar Bild-Hintergründe', () => {
   it('schaltet die Autobahn-Ebene über ihren eigenen Schalter (LFH-80)', () => {
     const onFachebeneToggle = vi.fn();
     renderMitProviders(<Sidebar {...basisProps} onFachebeneToggle={onFachebeneToggle} />);
-    const toggle = screen
-      .getByText('Autobahn-Lage (BAB)')
-      .closest('.ant-space')
-      ?.querySelector('button[role="switch"]');
-    expect(toggle).toBeTruthy();
-    fireEvent.click(toggle as Element);
+    // Über den Namen am Schalter selbst (LFH-380) — nicht über die antd-Hülle der Zeile.
+    fireEvent.click(screen.getByRole('switch', { name: 'Autobahn-Lage (BAB)' }));
     expect(onFachebeneToggle).toHaveBeenCalledWith('autobahn', true);
   });
 
-  // Zeile einer Fachebene: äußere Space-Zeile um Schalter, Label und Hinweis.
+  // Zeile einer Fachebene: die Zeile um Schalter, Label und Hinweis (`data-fachebene`).
   const fachebenenZeile = (label: string) =>
-    screen
-      .getByText(label)
-      .closest('.ant-space')!
-      .parentElement!.closest<HTMLElement>('.ant-space')!;
+    screen.getByText(label).closest<HTMLElement>('[data-fachebene]')!;
 
   it('zeigt den Zoom-Hinweis an der Energie-Zeile, auch wenn KRITIS aus ist (LFH-81)', () => {
     renderMitProviders(
@@ -837,6 +832,31 @@ describe('Sidebar: Bedienziel-Boden der klickbaren Listeneinträge', () => {
   it('trägt neben der Höhe eine mitziehende Polsterung', () => {
     expect(bedienzielStil(tokenFuer('kompakt')).padding).toBe('7px 11px');
     expect(bedienzielStil(tokenFuer('handschuh')).padding).toBe('16px 26px');
+  });
+});
+
+/**
+ * Schalterzeilen der Leiste dürfen umbrechen (LFH-380).
+ *
+ * Der Kippschalter ist im Handschuh 144 px breit, die Leiste 300 px. Ob der Umbruch GREIFT,
+ * misst `e2e/lagekarte-leiste-dichte.spec.ts` (jsdom rechnet kein Layout). Hier stehen die
+ * zwei Voraussetzungen, ohne die er nie greifen könnte — beide als Literale.
+ */
+describe('Sidebar: Umbruchregel der Schalterzeilen (LFH-380)', () => {
+  const tokenFuer = (stufe: keyof typeof dichten) => ({
+    controlHeight: dichten[stufe].zeilenhoehe,
+    marginXS: dichten[stufe].abstand.xs,
+  });
+
+  it('die Zeile bricht um, statt über die Leiste hinauszulaufen', () => {
+    expect(leistenZeileStil(tokenFuer('handschuh')).flexWrap).toBe('wrap');
+  });
+
+  it('der Namensteil reserviert Name plus ein Bedienziel der Stufe, bei Basis 0', () => {
+    // Basis 0: sonst entschiede die Inhaltsbreite über den Umbruch, nicht der Boden.
+    expect(namensteilStil(tokenFuer('kompakt')).flex).toBe('1 1 0');
+    expect(namensteilStil(tokenFuer('kompakt')).minWidth).toBe('calc(6em + 30px)');
+    expect(namensteilStil(tokenFuer('handschuh')).minWidth).toBe('calc(6em + 72px)');
   });
 });
 

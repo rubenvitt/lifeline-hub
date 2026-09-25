@@ -554,6 +554,17 @@ Alltag wichtigsten:
   Stufe ~38 px breit. Ein Boden, keine Polsterung: breite Etiketten bleiben unberührt. Die eine
   benannte Ausnahme (`minWidth: 0`, Aktionszeile der UHS-Platzkarte) ist mit LFH-379 gefallen:
   die Zeile steht nur noch in `kompakt`, und dort ist der Boden das Quadrat, mit dem sie rechnet.
+  **Nicht jede antd-Komponente liest die Steuerhöhe** (LFH-380): der `Switch` rechnet seine
+  Höhe aus der Schrift (`fontSize × lineHeight` = `fontSize + 8`, also 21,5/23/23 px). `switchMasse` in
+  `theme/tokens.ts` bindet ihn über `antdKomponenten(farben, dichte)` an `controlHeightSM`
+  (24 × 48 · 48 × 96 · 72 × 144) und setzt den **ganzen** abhängigen Satz (Griff,
+  Mindestbreite, Innenränder), weil antd die übrigen aus der Schrift weiterrechnet. Wer eine
+  weitere Komponente so nachzieht, belegt die Durchleitung am CSS-Text der `css-var-…`-Klasse
+  und liest dort **`innerHTML`**, nicht `textContent`: der Testfilter aus LFH-623 streicht die
+  Variablen aus dem Text, die Regel stünde sonst immer leer da. Ein mitwachsender Schalter
+  sprengt eine **feste** Breite: in der 300-px-Lagekarten-Leiste bricht die Schalterzeile
+  deshalb um (`leistenZeileStil`/`namensteilStil` in `pages/lagekarte/Sidebar.tsx`, gemessen
+  in `e2e/lagekarte-leiste-dichte.spec.ts`), statt Namen auf „…" zu kürzen.
   **Ein handgebautes Bedienziel** (`role="option"`-Zeile, `<div onClick>`, Zeilen-`<Link>`,
   Kommandopalette) braucht **zwei** Angaben: `minHeight: token.controlHeight` **plus** `padding`
   aus `token.paddingSM`/`token.padding`, aus aufgelösten Tokens, nie `var(--lfh-*)`, geprüft über

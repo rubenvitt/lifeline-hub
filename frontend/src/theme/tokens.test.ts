@@ -18,8 +18,10 @@ import { abstand, antdToken, dichten, farbenHell, flaeche, type Dichte } from '.
 import { seitenrinne } from './tokens';
 // Ebenfalls eigene Zeile, aus demselben Grund wie die Zeile darüber.
 import { navDrawerBreite } from './tokens';
+// Ebenfalls eigene Zeile (LFH-380).
+import { antdKomponenten, switchMasse } from './tokens';
 // Eigene Zeile (LFH-677), aus demselben Grund.
-import { antdKomponenten, farbenDunkel } from './tokens';
+import { farbenDunkel } from './tokens';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -170,6 +172,56 @@ describe('Navigations-Drawer (LFH-329 · B1/H11)', () => {
 });
 
 /**
+ * Der Kippschalter folgt der Staffel (LFH-380).
+ *
+ * antd rechnet die Schalterhöhe NICHT aus `controlHeight`, sondern aus der Schrift
+ * (`switch/style/index.js`, `prepareComponentToken`: `fontSize × lineHeight`) — gemessen
+ * 21,5 / 23 / 23 px, im Handschuh ein Drittel des Bodens. Die Böden stehen hier als
+ * LITERALE, nicht aus `dichten` zurückgelesen — sonst prüfte die Zusicherung den Token
+ * gegen sich selbst. Kein Render: jsdom rechnet kein Layout, und `test/utils.tsx` montiert
+ * ein nacktes `ConfigProvider`. Ob antd die Namen honoriert, belegt der Durchleitungs-Test
+ * in `ThemeModeProvider.test.tsx`.
+ */
+describe('Switch-Maße (LFH-380)', () => {
+  const STUFEN: Dichte[] = ['kompakt', 'komfortabel', 'handschuh'];
+
+  it('hebt den Schalter je Stufe auf den Gate-3-Boden: 24×48 · 48×96 · 72×144', () => {
+    const kasten = (d: Dichte) => {
+      const m = switchMasse(dichten[d]);
+      return { hoehe: m.trackHeight, breite: m.trackMinWidth };
+    };
+    expect(kasten('kompakt')).toEqual({ hoehe: 24, breite: 48 });
+    expect(kasten('komfortabel')).toEqual({ hoehe: 48, breite: 96 });
+    expect(kasten('handschuh')).toEqual({ hoehe: 72, breite: 144 });
+  });
+
+  it('zieht den abhängigen Satz mit — der Griff füllt die Spur in jeder Stufe', () => {
+    // antd leitet Griff, Mindestbreite und Innenränder in `prepareComponentToken` aus der
+    // SCHRIFT ab, und ein überschriebener Komponententoken rechnet die übrigen nicht nach.
+    // Wer nur `trackHeight` setzt, bekommt einen 18-px-Griff in einer 72-px-Spur.
+    for (const d of STUFEN) {
+      const m = switchMasse(dichten[d]);
+      expect(m.handleSize + 2 * m.trackPadding, d).toBe(m.trackHeight);
+      expect(m.trackMinWidth, d).toBe(2 * m.handleSize + 4 * m.trackPadding);
+      expect(m.innerMinMargin, d).toBe(m.handleSize / 2);
+      expect(m.innerMaxMargin, d).toBe(m.handleSize + 3 * m.trackPadding);
+    }
+  });
+
+  it('lässt den Innenabstand der Spur bei antds festen 2 px', () => {
+    for (const d of STUFEN) expect(switchMasse(dichten[d]).trackPadding, d).toBe(2);
+  });
+
+  it('antdKomponenten trägt die Maße der GEWÄHLTEN Stufe, nicht die kompakte', () => {
+    // Die Rechnung allein belegt nicht, dass sie an der globalen Stelle hängt. Ein
+    // vergessener Dichte-Parameter ließe den Schalter still auf kompakt stehen.
+    expect(antdKomponenten(farbenHell, 'kompakt').Switch).toMatchObject({ trackHeight: 24 });
+    expect(antdKomponenten(farbenHell, 'komfortabel').Switch).toMatchObject({ trackHeight: 48 });
+    expect(antdKomponenten(farbenHell, 'handschuh').Switch).toMatchObject({ trackHeight: 72 });
+  });
+});
+
+/**
  * Der gewählte Radio-Knopf (Knopfform) schreibt seinen TEXT in antds `colorPrimary` — am Tag
  * `bedien` auf Weiß, gemessen 6,59 : 1 und damit unter dem Tagesboden 7 : 1 (LFH-677,
  * `e2e/betreuung-pruefliste.spec.ts`). Blauer Bedien-TEXT nimmt `bedienText` (LFH-650).
@@ -200,7 +252,7 @@ describe('Radio-Knopf: Text in bedienText (LFH-677)', () => {
   });
 
   it('kein Komponenten-Token für das Radio — der färbte auch Scheibe und Flächen', () => {
-    expect(antdKomponenten(farbenHell).Radio).toBeUndefined();
-    expect(antdKomponenten(farbenDunkel).Radio).toBeUndefined();
+    expect(antdKomponenten(farbenHell, 'kompakt').Radio).toBeUndefined();
+    expect(antdKomponenten(farbenDunkel, 'kompakt').Radio).toBeUndefined();
   });
 });

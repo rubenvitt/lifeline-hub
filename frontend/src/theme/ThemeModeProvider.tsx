@@ -172,7 +172,9 @@ export function ThemeModeProvider({ children }: { children: ReactNode }) {
           // Nachts hält `antdAlgorithmus` die Signalfarben auf ihrem Rollenwert — ohne
           // die zweite Stufe rechnete `darkAlgorithm` sie um (#4d94d6 → #4481b9).
           algorithm: antdAlgorithmus(effektiv === 'dark'),
-          components: antdKomponenten(effektiv === 'dark' ? farbenDunkel : farbenHell),
+          // Die Dichte auch hier (LFH-380): antds Switch rechnet seine Maße aus der
+          // Schrift statt aus `controlHeight` und folgte der Staffel sonst nicht.
+          components: antdKomponenten(effektiv === 'dark' ? farbenDunkel : farbenHell, dichte),
         }}
       >
         {children}
