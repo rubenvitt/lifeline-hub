@@ -980,7 +980,9 @@ describe('EtbPage – Zeitachse (Neuentwurf S4)', () => {
     expect(await within(leiste).findByText('Zählung nicht verfügbar.')).toBeInTheDocument();
     const kopf = document.querySelector('[data-lfh="seitenkopf"]')!;
     expect(kopf).not.toHaveTextContent(/\d+ (Einträge|Eintrag|Treffer)/);
-    expect(screen.getByPlaceholderText(/Inhalt/)).toBeEnabled();
+    // `findBy`: die Erfassung steht erst, wenn die Entwürfe aus der IndexedDB geladen sind —
+    // unter Last kam die Zählung früher an, und ein `getBy` fand das Feld noch nicht.
+    expect(await screen.findByPlaceholderText(/Inhalt/)).toBeEnabled();
   });
 
   it('meldet einen offline gepufferten Eintrag im Puffer als ausstehend', async () => {
