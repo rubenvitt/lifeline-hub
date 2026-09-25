@@ -4,6 +4,8 @@ import {
   EINSATZ_KEYS,
   EINSATZ_STREAM_EVENTS,
   einsatzKeys,
+  globalKeys,
+  istKeyDesEinsatzes,
   istRueckmeldungenKey,
 } from './queryKeys';
 
@@ -323,5 +325,31 @@ describe('istRueckmeldungenKey (LFH-610)', () => {
       7,
       'rueckmeldungen',
     ]);
+  });
+});
+
+describe('istKeyDesEinsatzes (LFH-690)', () => {
+  it('trifft jeden einsatz-scoped Key des einen Einsatzes, auch Detail- und Sub-Keys', () => {
+    for (const key of [
+      einsatzKeys.einsatz(7),
+      einsatzKeys.etb(7),
+      einsatzKeys.person(7, 3),
+      einsatzKeys.meldungenRueckmeldungen(7),
+      einsatzKeys.fahrzeuge(7),
+      einsatzKeys.modulOverrides(7),
+    ]) {
+      expect(istKeyDesEinsatzes(key, 7), JSON.stringify(key)).toBe(true);
+    }
+  });
+
+  it('lässt einen anderen Einsatz und die globalen Kataloge stehen (Gegenaussage)', () => {
+    expect(istKeyDesEinsatzes(einsatzKeys.etb(8), 7)).toBe(false);
+    expect(istKeyDesEinsatzes(einsatzKeys.einsatz(null), 7)).toBe(false);
+    // `personalListe` trägt an Stelle 1 einen Filter, keine ID — und `personal` heißt als
+    // globaler Prefix anders als `einsatz-personal`. Getroffen wird nur über den Prefix.
+    expect(istKeyDesEinsatzes(globalKeys.personalListe('alle'), 7)).toBe(false);
+    expect(istKeyDesEinsatzes(globalKeys.einsaetze(), 7)).toBe(false);
+    // Ein fremder Prefix mit passender ID: kein Registry-Key, also kein Treffer.
+    expect(istKeyDesEinsatzes(['irgendwas', 7], 7)).toBe(false);
   });
 });

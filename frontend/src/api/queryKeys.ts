@@ -248,6 +248,25 @@ export function istRueckmeldungenKey(key: readonly unknown[]): boolean {
   return key[0] === EINSATZ_KEYS.meldungen && key[2] === RUECKMELDUNGEN_SUBKEY;
 }
 
+/** Alle einsatz-scoped Prefixe als Menge — Grundlage von {@link istKeyDesEinsatzes}. */
+const EINSATZ_PREFIXE: ReadonlySet<unknown> = new Set<unknown>(Object.values(EINSATZ_KEYS));
+
+/**
+ * Trifft JEDEN einsatz-scoped Key eines Einsatzes, Listen wie Detail- und Sub-Keys (LFH-690).
+ *
+ * Gebraucht nach Import, Neu-Import und Entfernen der Demo-Daten: der Demo-Einsatz ist danach
+ * weg oder ein anderer, und jeder offene Stand von ihm ist veraltet. Ein Prefix-Match reicht
+ * dafür nicht — die Einsatz-ID steht an Stelle 1 hinter rund sechzig verschiedenen Prefixen.
+ * Gemessen: alle Accessoren von {@link einsatzKeys} tragen `einsatzId` an Stelle 1.
+ *
+ * Nur für `invalidateQueries({ predicate })`. Ein `removeQueries` damit wäre die erste
+ * Mengen-Räumung im Produktivcode und löste die XOR-Auflage aus dem Kopf von
+ * {@link GLOBAL_KEYS} aus.
+ */
+export function istKeyDesEinsatzes(key: readonly unknown[], einsatzId: number): boolean {
+  return EINSATZ_PREFIXE.has(key[0]) && key[1] === einsatzId;
+}
+
 export const einsatzKeys = {
   // Einsatz-Stammdaten
   // einsatzId nullbar: das Command-Palette lädt den Einsatz nur wenn im Einsatzkontext
