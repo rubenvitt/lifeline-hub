@@ -310,10 +310,25 @@ test('Lagekarte: startet auf dem Einsatzort; die Zeitachse deckt die Karte nicht
 
   const zeitachse = page.locator('[data-lfh="zeitachse"]');
   await expect(zeitachse.getByRole('button', { name: 'Stand vor Ort' })).toBeVisible();
-  const hoehe = (await zeitachse.boundingBox())!.height;
+  const band = (await zeitachse.boundingBox())!;
   const zeile = (await page.getByRole('button', { name: 'Aktuell' }).boundingBox())!.height;
-  // Eine Zeile = höchstes Steuerelement plus die Polsterung des Bands (2 × 8 px) und Rand.
-  expect(hoehe, `Zeitachse ${hoehe}px hoch bei ${zeile}px Zeilenhöhe`).toBeLessThan(zeile * 2);
+  // Der ursprüngliche Befund (22.09.2026): die Stand-Reihe brach als Flex-Kind in eine EIGENE
+  // Zeile um und verdoppelte das Band. Gesichert wird deshalb, dass sie in der ersten Reihe
+  // steht. Die frühere Zusage „das ganze Band bleibt einzeilig" ist mit LFH-373 bewusst
+  // aufgegeben (Entscheidung 25.09.2026): der Fuß endet seither vor der Knopfspalte, damit
+  // Kartenknöpfe und Zeitachse sich bei keiner Höhe überlagern — das kostet bei 1440 px die
+  // Breite für eine Reihe, und die Zeitleiste darf in eine zweite umbrechen (gemessen 73 statt
+  // 46 px). Mehr als zwei Reihen wären ein neuer Befund.
+  const staende = (await zeitachse.locator('[data-lfh="zeitachse-staende"]').boundingBox())!;
+  expect(
+    staende.y - band.y,
+    `die Stand-Reihe steht in der ersten Reihe des Bands (${staende.y - band.y}px unter der Oberkante)`,
+  ).toBeLessThan(zeile);
+  // Zwei Reihen = zwei Steuerhöhen plus Fuge (12 px) und Polsterung des Bands (2 × 8 px).
+  expect(
+    band.height,
+    `Zeitachse ${band.height}px hoch bei ${zeile}px Zeilenhöhe — höchstens zwei Reihen`,
+  ).toBeLessThanOrEqual(zeile * 2 + 12 + 16 + 1);
 
   // Unter `xl` ist die Karte eng (1024 px: Modulpanel, Karte und Leiste nebeneinander) — dort
   // startet die Zeitachse ohne gemerkte Wahl eingeklappt, statt drei Zeilen Karte zu decken.

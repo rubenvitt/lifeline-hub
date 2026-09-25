@@ -1,13 +1,57 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import { Button, Dropdown, Space, Table, Tooltip, Typography, theme } from 'antd';
 import { TbBuildingCommunity, TbPaw, TbPlant2, TbShieldHalf, TbUsers } from 'react-icons/tb';
 import type { IconType } from 'react-icons';
-import type { GlobalToken, TableColumnsType } from 'antd';
+import type { GlobalToken, TableColumnsType, TableRef } from 'antd';
 import type { GefahrBewertung, Gefahrentyp, Schutzobjekt, Warnstufe } from '../../api/types';
 import type { BewertungEingabe } from '../../api/gefahren';
 import { flaechenFarbe, warnstufeBalkenFarbe, warnstufeFlaeche } from '../../theme/statusFarben';
 import { GEFAHRENTYPEN, SCHUTZOBJEKTE, WARNSTUFEN, kombinationGueltig } from './gefahrenSchema';
 import GefahrenZelleDetails from './GefahrenZelleDetails';
+import { useKopfFreiraum } from '../../components/KatalogTabelle';
+import './gefahrenMatrix.css';
+
+/** Bevorzugte Breite der fixierten Spalte „Gefahr". Mit `scroll={{ x: 'max-content' }}` ist
+ *  sie eine MINDESTbreite: im Handschuh-Betrieb wächst die Spalte mit Polsterung und
+ *  Beschriftung darüber hinaus — deshalb wird der Fokusabstand gemessen, nicht hieraus gelesen. */
+const GEFAHR_SPALTE_BREITE = 180;
+
+/** CSS-Variable des Fokusabstands zur fixierten Spalte (`gefahrenMatrix.css`). */
+export const SPALTEN_FREIRAUM = '--lfh-gefahr-spalte';
+
+/**
+ * Schreibt die GEMESSENE Breite der fixierten Spalte als {@link SPALTEN_FREIRAUM} an die
+ * Tabellenwurzel (LFH-373, WCAG 2.4.11).
+ *
+ * DER BEFUND: jede Spalte der Matrix trägt ein Fokusziel. Beim Tabben in eine weiter links
+ * liegende Zelle rollt der Scrollcontainer nach links und richtet das Ziel am linken Rand des
+ * Scrollports aus — unter der fixierten Spalte. Gemessen vollständig verdeckt bei 390 px in
+ * allen Stufen, bei 1024 px in `kompakt`/`komfortabel`, bei 1366 px in `handschuh`.
+ *
+ * GEMESSEN statt aus {@link GEFAHR_SPALTE_BREITE}: der erste Fix las die Konstante und blieb
+ * bei 1024 px in `handschuh` rückwärts rot — die Spalte war dort breiter als ihre 180 px.
+ * Muster: `setzeKopfFreiraum` in `components/KatalogTabelle.tsx` (LFH-677).
+ */
+export function setzeSpaltenFreiraum(wurzel: HTMLElement): void {
+  const spalte = wurzel.querySelector<HTMLElement>('th.ant-table-cell-fix-start');
+  wurzel.style.setProperty(SPALTEN_FREIRAUM, `${spalte?.offsetWidth ?? 0}px`);
+}
+
+/** Hält {@link SPALTEN_FREIRAUM} aktuell. Beobachtet werden Wurzel UND Kopfzelle: die Spalte
+ *  wächst mit der Dichte, ohne dass sich die Breite der Wurzel ändern muss. */
+function useSpaltenFreiraum(tabelle: RefObject<TableRef | null>): void {
+  useEffect(() => {
+    const wurzel = tabelle.current?.nativeElement;
+    if (!wurzel) return;
+    const aktualisiere = () => setzeSpaltenFreiraum(wurzel);
+    aktualisiere();
+    const beobachter = new ResizeObserver(aktualisiere);
+    beobachter.observe(wurzel);
+    const kopfzelle = wurzel.querySelector('th.ant-table-cell-fix-start');
+    if (kopfzelle) beobachter.observe(kopfzelle);
+    return () => beobachter.disconnect();
+  }, [tabelle]);
+}
 
 interface ZeilenDaten {
   typ: Gefahrentyp;
@@ -99,6 +143,11 @@ export default function GefahrenMatrix({
   onDetailsSpeichern,
 }: GefahrenMatrixProps) {
   const { token } = theme.useToken();
+  // Freiraum unter der stehenden Kopfzeile beim Rückwärtstabben (LFH-373, Mechanik LFH-677).
+  const tabelleRef = useRef<TableRef>(null);
+  useKopfFreiraum(tabelleRef);
+  // Freiraum neben der fixierten Spalte beim Tabben nach links (LFH-373).
+  useSpaltenFreiraum(tabelleRef);
   /**
    * Im Zustand steht die KENNUNG der Zelle, nicht ihr Datensatz.
    *
@@ -118,7 +167,13 @@ export default function GefahrenMatrix({
     matrix.find((m) => m.gefahrentyp === typ && m.schutzobjekt === objekt);
 
   const spalten: TableColumnsType<ZeilenDaten> = [
-    { title: 'Gefahr', dataIndex: 'label', key: 'label', fixed: 'left', width: 180 },
+    {
+      title: 'Gefahr',
+      dataIndex: 'label',
+      key: 'label',
+      fixed: 'left',
+      width: GEFAHR_SPALTE_BREITE,
+    },
     ...SCHUTZOBJEKTE.map((obj) => {
       const { icon: Icon, kurz } = SPALTENKOPF[obj.wert];
       return {
@@ -242,6 +297,8 @@ export default function GefahrenMatrix({
         // Handschirm schon.
         sticky
         scroll={{ x: 'max-content' }}
+        ref={tabelleRef}
+        className="gefahren-matrix"
       />
       <GefahrenZelleDetails
         offen={detailKennung !== null}

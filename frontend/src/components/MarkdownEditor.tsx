@@ -35,6 +35,15 @@ interface Props {
   /** Von antd Form.Item gesetzt (für Label-Verknüpfung). */
   id?: string;
   onKeyDown?: (e: KeyboardEvent<HTMLTextAreaElement>) => void;
+  /**
+   * Nur `toggle`: der Aufrufer führt den Vorschau-Umschalter selbst (LFH-373). Der eigene
+   * Knopf unter dem Feld entfällt, die Vorschau folgt {@link vorschauOffen}. Gebraucht von der
+   * ETB-Erfassung, wo die eigene Knopfzeile im Handschuh-Betrieb eine volle Steuerhöhe der
+   * angepinnten Leiste kostete.
+   */
+  umschalterAussen?: boolean;
+  /** Nur mit {@link umschalterAussen}: ob die Vorschau offen ist. */
+  vorschauOffen?: boolean;
 }
 
 /**
@@ -57,6 +66,8 @@ const MarkdownEditor = forwardRef<TextAreaRef, Props>(function MarkdownEditor(
     rows,
     id,
     onKeyDown,
+    umschalterAussen = false,
+    vorschauOffen: vorschauOffenAussen = false,
   },
   ref,
 ) {
@@ -85,15 +96,18 @@ const MarkdownEditor = forwardRef<TextAreaRef, Props>(function MarkdownEditor(
   );
 
   if (layout === 'toggle') {
+    const offen = umschalterAussen ? vorschauOffenAussen : vorschauOffen;
     return (
       <div className="markdown-editor markdown-editor--toggle">
         {textfeld}
-        <div style={{ marginTop: 4 }}>
-          <Button type="text" icon={<EyeOutlined />} onClick={() => setVorschauOffen((v) => !v)}>
-            Vorschau
-          </Button>
-        </div>
-        {vorschauOffen && <div className="markdown-editor__vorschau">{vorschau}</div>}
+        {!umschalterAussen && (
+          <div style={{ marginTop: 4 }}>
+            <Button type="text" icon={<EyeOutlined />} onClick={() => setVorschauOffen((v) => !v)}>
+              Vorschau
+            </Button>
+          </div>
+        )}
+        {offen && <div className="markdown-editor__vorschau">{vorschau}</div>}
       </div>
     );
   }

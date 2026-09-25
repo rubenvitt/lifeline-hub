@@ -1,0 +1,398 @@
+# Design
+
+## Context
+
+Die Motivation steht in proposal.md unter „Why“. Die Anforderungen stehen in
+`specs/einsatztauglichkeit-layout/spec.md`. Hier geht es um das Vorgehen.
+
+**Vorab-Messung (24./25.09.2026, Wegwerf-Spikes, Playwright-Chromium, Maschinenlast
+120–180):**
+
+| Messung | kompakt | handschuh |
+|---|---|---|
+| ETB-Erfassungsleiste 390 × 844 / 390 × 600 / 1366 × 768 | 298 / 298 / 259 px | 497 / 497 / 440 px |
+| davon Reiterzeile · Karte (390 px) | 38 · 225 | 90 · 372 |
+| Textfeld-Breite bei 390 px (zwischen Präfix und „Erfassen“) | — | 124 px |
+| Zeitachsenband 390 × 844 ohne Leiste: Band / Karte | 130 / 695 | 256 / 612 |
+| Knopfblock 390 × 844 ohne Leiste: oben · Höhe | 161 · 166 | 244 · 366 (Unterkante 610, Band ab 576) |
+| „Abspielen“ Breite × Höhe (390 px) | 16 × 30 | 17 × 72 |
+| Matrix-Hülle `scrollWidth`/`clientWidth` 390 · 1024 · 1366 | 583/342 · 583/433 · 775/775 | 838/312 · 838/388 · 838/730 |
+
+**Nicht gemessen, Hypothesen:** die ETB-Leiste bei 1024 × 768 und die CLS-Summe beim
+Laden aller drei Routen. Beide stehen als MUST in der Spec. Ein roter Befund dort wird im
+Change gefixt (Aufgaben 6.1 und 6.5).
+
+Die e2e-Suite hat Bausteine für diese Arbeit, die vorhandenen Messkerne reichen aber
+nicht an allen Stellen:
+
+- `e2e/gate3-trefflaeche.spec.ts` stellt `STAFFEL`, `stelleDichte` (localStorage plus
+  Neuladen plus `data-dichte`-Wache), `haeltStufe` und `alleHaltenStufe`. Beide Helfer
+  prüfen nur Untergrenzen und nur die Höhe.
+- `e2e/fokus-kern.ts` (`pruefeFokusVerdeckung`) wertet ausschließlich `position: sticky|fixed`
+  als Verdecker. Die Kartenaufbauten sind `absolute`. Ein Lauf über die Lagekarte wäre
+  deshalb durch Konstruktion grün, und der Zähler `fixierteKandidaten` würde von den
+  angepinnten Füßen der Rail und des Modulpanels gefüllt. Der Kern ist mit
+  `fokus-verdeckung`, `befehl-aktionsleiste`, `dokumente` und `pegel-pruefliste` geteilt.
+- Der CLS-Beobachter liegt dreimal lokal vor (`einsatzauswahl-cls`, `pegel-pruefliste`,
+  `betroffene-layout`).
+- `:root { scroll-padding-block-end: var(--lfh-befehl-fokusabstand, 0px) }` in
+  `pages/befehlAktionsleiste.css` ist die einzige Fokusabstand-Regel. Ein zweiter
+  `:root`-Block mit derselben Eigenschaft würde sie überschreiben.
+
+## Goals / Non-Goals
+
+**Goals:**
+- Jede Zusicherung der Spec kann im e2e rot werden: Dichte-Wache, Gegenprobe in `kompakt`
+  und Vorbedingungszähler (Bildlaufreserve, Überlauf der Tabelle, besuchte Ziele).
+- Die Fixes folgen aus dem Layout und nicht aus einer geratenen Zahl. Wo eine Zahl nötig
+  ist, kommt sie aus einer exportierten Konstante oder einer gemessenen Höhe.
+- Die geteilten Kerne ändern ihr Verhalten für Bestandsaufrufer nicht.
+
+**Non-Goals:**
+- Die Stufenableitung aus dem Einsatzkontext (LFH-724).
+- Die zwei übrigen CLS-Kopien (`pegel-pruefliste`, `betroffene-layout`). Sie bleiben
+  lokal, nur die Neuen lesen aus `cls-kern.ts`.
+- Das Wachsen der Gebietsliste bei einem neuen Gefahrengebiet (LFH-334, bekannt offen).
+- Die Rückwärts-Hypothese an der stehenden Kopfzeile der Matrix ist kein eigenes Ziel.
+  Sie wird gemessen (Aufgabe 4.3), gefixt wird nur, wenn sie rot ist.
+
+## Decisions
+
+### D1 · Ablage der Nachweise
+
+Zeile 2 kommt als neue Blöcke in `gate3-trefflaeche.spec.ts`. Der Kopfkommentar lädt
+dazu ein, die Helfer liegen dort, und die Datei hat kein `hasTouch` auf Dateiebene, sodass
+alle drei Stufen auf einem Kontext laufen. Zeile 13 kommt in `fokus-verdeckung.spec.ts`,
+weil dort der Selbstbeweis des Kerns liegt. Für Zeile 12 entsteht eine neue Datei
+`e2e/leisten-flaeche.spec.ts`: Deckel, Umbruch und CLS sind eine eigene Frage, und die
+Datei braucht keinen der Fokus-Helfer.
+`gefahren-matrix-zelle.spec.ts` bleibt unverändert. Es belegt M51 am Tablet (44 px mit
+`hasTouch`) und ist kein Staffel-Nachweis.
+
+*Verworfen:* eine eigene Datei je Fläche. Das ergäbe drei weitere Kopien von
+`anmelden`/`stelleDichte`, gegen die Einladung im gate3-Kopf.
+
+### D2 · Messhelfer für die kurze Achse
+
+`gate3-trefflaeche.spec.ts` bekommt eine Variante von `alleHaltenStufe`, die
+`min(Breite, Höhe)` prüft und das größte Maß zurückgibt. Die Gegenprobe braucht nämlich
+eine **Obergrenze** in `kompakt`: Eine reine Untergrenze bliebe grün, wenn jedes Ziel in
+jeder Stufe 72 px mäße. Die Böden stehen als Literale im Test, darunter der Kartenknopf
+mit 32 in `kompakt` und die Menüeinträge mit 24 in `kompakt`.
+
+### D3 · `fokus-kern.ts` opt-in für absolute Aufbauten
+
+`pruefeFokusVerdeckung(page, schritte, optionen?)` mit
+`optionen.zusatzKandidaten: string[]` (Selektoren) und `optionen.region?: string`
+(Selektor, zählt `stoppsInRegion`). Ohne `optionen` bleibt das Verhalten unverändert. Das
+belegen die Bestandsspecs, die ohne Änderung grün bleiben. Die Kandidaten der Karte stehen
+als explizite Liste da (`[data-lfh="karten-fuss"] > *`, `[data-lfh="karten-knoepfe"]`,
+`[data-lfh="karten-ueberlagerung-links"]`).
+*Verworfen:* „alles mit `position: absolute`“. Dann würden Canvas, Marker und
+antd-Portale zu Kandidaten und lieferten falsche Treffer.
+
+Ein neuer Selbstbeweis legt eine absolute Attrappe über einen Kartenknopf und verlangt
+genau einen Treffer. Ohne `zusatzKandidaten` muss derselbe Lauf null Treffer liefern.
+Das belegt, dass die Option wirkt und dass die Vorgabe sie nicht still enthält.
+
+**Teilverdeckung:** Der Kern meldet nur vollständige Verdeckung, und das ist WCAG 2.4.11
+(AA). Für die angepinnten Leisten (ETB) kommt zusätzlich ein Freistreifen dazu:
+Unterkante des Ziels gegen Oberkante der Leiste. Liegt dafür in
+`befehl-aktionsleiste.spec.ts` ein allgemeiner Helfer, zieht er als reiner Move mit nach
+`fokus-kern.ts`, damit keine zweite Kopie entsteht.
+
+**Startpunkt:** Jeder Durchlauf fokussiert sein erstes Ziel ausdrücklich mit
+`locator.focus()`. Das ETB fokussiert beim Einhängen das Textfeld am Seitenfuß, ein nacktes
+Tab nach `goto` liefe also an der Zeitachse vorbei.
+
+### D4 · Fokusabstand unten: geteilte Messung, Regel je Seite
+
+Ein Hook `useFokusabstandUnten(abstand, variable)` misst die angepinnte Leiste per
+`ResizeObserver` und schreibt ihre Höhe als CSS-Variable an `<html>`. Beim Aushängen räumt
+er sie weg. Befehlsseite und ETB teilen die Messung, aber **nicht** die Regel:
+
+- Die **Befehlsseite** behält `:root { scroll-padding-block-end: var(--lfh-befehl-fokusabstand) }`
+  (`befehlAktionsleiste.css`, LFH-465). `scroll-margin` an ihren Formularfeldern blieb dort
+  gemessen wirkungslos.
+- Das **ETB** hält die Zeitachse über `scroll-margin-block-end: var(--lfh-etb-fokusabstand)`
+  an den **Zielen** frei (`[data-lfh='etb-zeitachse'] *`, `index.css`).
+
+*Korrektur während der Umsetzung (25.09.2026):* Der erste Stand war eine gemeinsame
+Scrollport-Regel für beide Seiten. Sie machte den ETB-Fokusnachweis grün, zählte aber auch
+die Ziele **in** der Leiste zum verdeckten Streifen. Jeder Fokus in der Erfassung („Feld“,
+Chip-Eingabe, Rücksprung ins Textfeld) rollte die Seite dann weiter, beim Setzen dreier
+Felder von 0 bis 2593 px. Ein negativer `scroll-margin` an den Leistenkindern hob das nicht
+auf (gemessen, Chromium ignoriert ihn). Mit dem Rand am Ziel bleibt die Leiste unberührt,
+und der ETB-Fokusnachweis ist ebenso grün.
+
+*Verworfen:* ein zweiter `:root`-Block. Er hätte den Block der Befehlsseite überschrieben.
+
+### D5 · Gefahrenmatrix: Scroll-Abstand der fixierten Spalte und der Kopfzeile
+
+Die Tabelle bekommt die Klasse `gefahren-matrix`. Ihr Scrollcontainer (`.ant-table-body`,
+wegen `sticky`, vorsorglich auch `.ant-table-content`) erhält `scroll-padding-inline-start`
+in der Breite der fixierten Spalte. Die Breite wird **gemessen**
+(`setzeSpaltenFreiraum`, ResizeObserver auf Wurzel und Kopfzelle).
+
+*Korrektur während der Umsetzung (25.09.2026):* Der erste Stand las die Konstante 180
+(Spaltendefinition und Regel aus derselben Zahl). Er blieb im Browser bei 1024 px in
+`handschuh` rückwärts rot. Mit `scroll={{ x: 'max-content' }}` ist `width: 180` nur eine
+Mindestbreite, im Handschuh-Betrieb wird die Spalte breiter. Gemessen statt gerechnet ist
+dasselbe Prinzip wie beim Kopf-Freiraum der Katalogtabellen.
+
+Aufgabe 4.3 fand die Rückwärts-Hypothese **bestätigt**. Mit `Shift+Tab` lagen Zellen bei
+390 × 400 vollständig unter der stehenden Kopfzeile. Die Matrix nimmt dafür die Mechanik
+der Katalogtabellen (LFH-677): `useKopfFreiraum` (jetzt aus `KatalogTabelle.tsx`
+exportiert) misst die Kopfhöhe, `scroll-margin-top` an den Zielen hält sie frei. Die Regel
+steht in `gefahrenMatrix.css`, weil die in `sprache.css` auf `.lfh-katalog` gescopt ist.
+
+*Verworfen:* die Spalte „Gefahr“ auf schmalem Schirm nicht mehr fixieren. Die Zeilen
+verlören dann ihre Beschriftung, sobald man seitlich scrollt, und das ist der Grund für die
+Fixierung.
+
+### D6 · Lagekarte: Knopfspalte und Fuß teilen sich die Breite
+
+Der Fußrahmen endet rechts vor der Knopfspalte:
+`right = FUSS_ABSTAND + knopfKante + FUSS_ABSTAND`. Damit wird `fussStil` zu einer reinen
+Funktion der Knopfkante (`kartenKnopfKante(token)`). Knopfblock und Fußbänder können sich
+dann bei keiner Höhe mehr überschneiden. Das folgt aus der Breitenaufteilung, nicht aus
+einem `zIndex`, derselbe Grundsatz wie beim Stapeln der Bänder in LFH-355. Wo die
+Personenkarte (`BetroffeneKarte.tsx`) einen Fuß trägt, gilt dieselbe Funktion.
+**Gemessener Preis und Entscheidung (25.09.2026):** Bei 1440 × 900 in `kompakt` bricht die
+Zeitleiste im schmaleren Band in eine zweite Reihe um (73 statt 46 px bei 803 px
+Kartenhöhe). Einzeilig ginge es nur mit Startbreiten, die auf wenige Pixel genau passen und
+mit den Schriften der CI kippen würden. Der Auftraggeber hat zwei Reihen zugelassen.
+`lagekarte-smoke.spec.ts` sichert seither seinen ursprünglichen Befund (die Stand-Reihe
+bricht nicht in eine eigene Zeile) und höchstens zwei Reihen. *Verworfen* waren eine
+Einrückung nur bei Bedarf (Messung statt Aufteilung) und das Streichen der Stand-Anzeige.
+
+*Verworfen:* ein höherer `zIndex` für den Knopfblock. Er würde das Band verdecken, nur
+andersherum.
+*Verworfen:* dem Knopfblock eine Höchsthöhe mit eigenem Bildlauf geben. Dann wären
+Kartenknöpfe versteckt, gerade im Handschuh-Betrieb.
+
+### D7 · Zeitachsenband: Deckel in Hebelstufen
+
+Das schmalere Band aus D6 bricht öfter um. Die Hebel werden in dieser Reihenfolge
+gezogen, und nach jedem wird gemessen. Aufgehört wird, sobald der Deckel in allen Stufen
+hält:
+
+1. Das Bezeichnungsfeld verliert seine feste Breite von 180 px (`flex: 1 1 120px;
+   minWidth: 0`). Das nicht umbrechbare `Space.Compact` ragte sonst über das Band hinaus.
+2. „Abspielen“ bekommt `flexShrink: 0`. Heute schrumpft der Knopf auf 16 px, das ist
+   ein eigener Befund zu Zeile 2 und wird unabhängig vom Deckel gefixt. **Dieser Hebel
+   allein bricht die Breite:** Der Zeitleisten-Block ist eine innere Flex-Zeile ohne
+   Umbruch (`minWidth: 260`, darin „Aktuell“, „Abspielen“, Schieber mit `minWidth: 120`
+   plus Rand und „Live“ mit `minWidth: 96`). Mit einem 72 px breiten Knopf braucht er im
+   Handschuh-Betrieb rund 400 px. Heute stehen 342 px zur Verfügung, nach D6 noch etwa
+   258 px. Deshalb gehört zu Hebel 2 zwingend, dass der Block umbrechen darf: Schieber und
+   „Live“ bilden unter `md` eine eigene Zeile. Das kostet eine Zeile.
+3. Unter `md` wird „Stand sichern“ zu einem Knopf, der die Bezeichnung in einem
+   `ErfassungsModal` abfragt (ein Feld, LFH-19 „Modal ≤ 3 Felder“), statt das Feld
+   inline zu führen. Wegen der zusätzlichen Zeile aus Hebel 2 ist das voraussichtlich
+   Pflicht und keine Reserve.
+
+**Sind alle Hebel gezogen und der Deckel hält noch nicht, wird zurückgefragt.** Der
+Deckel wird dann nicht still gesenkt und nicht eigenmächtig mit weiteren Umbauten
+erkauft.
+
+### D8 · ETB-Erfassungsleiste: Deckel in Hebelstufen
+
+Die `Schnellerfassungszeile` wird auch von der Personenseite benutzt. Die Umbrüche kommen
+deshalb über eine **opt-in-Eigenschaft**, die das ETB setzt. Die Personenseite bleibt
+unberührt. Hebel in dieser Reihenfolge, nach jedem wird gemessen:
+
+1. Unter `md` steht das Textfeld auf eigener, voller Breite. Typ-Präfix und „Erfassen“
+   folgen in einer Zeile darunter. Heute ist das Feld auf 124 px eingezwängt, und der
+   Platzhalter bricht es auf 133 px Höhe.
+2. Der Umschalter „Vorschau“ des `MarkdownEditor` (`layout="toggle"`) wandert aus der
+   eigenen Zeile unter dem Feld in die Aktionszeile neben „Erfassen“. Dafür bekommt der
+   Editor eine Eigenschaft, die den Umschalter nach außen reicht (Render-Prop oder
+   gesteuerter Zustand). Die übrigen Aufrufer behalten ihre Zeile. Das spart im Fükw eine
+   volle Steuerhöhe und ist der einzige Hebel, der dort auf 50 % führt (440 → etwa 360 px).
+3. Unter `md` wird die Hinweiszeile verkürzt. Befehle und Einheit stehen schon im
+   Platzhalter („/ für Typ, Felder & Bausteine · @ für Einheit“). Der
+   **Tastaturvertrag** (`ENTER_HINWEIS`) steht dort aber nicht, und CLAUDE.md
+   (Erfassungs-Norm, Nacharbeit LFH-335) trennt beide Aussagen ausdrücklich. Die Form ist
+   am Checkpoint (25.09.2026) entschieden: **einzeilige Kurzform nur mit dem Vertrag**
+   („↵ senden · ⇧↵ neue Zeile“). Verworfen ist, die Zeile unter `md` ganz entfallen zu
+   lassen, weil der Vertrag dann auf dem Gerät fehlte, auf dem Enter auf der
+   Bildschirmtastatur am ehesten überrascht.
+
+**Sind alle Hebel gezogen und der Deckel hält noch nicht, wird zurückgefragt**, nicht
+still gesenkt.
+
+Der Deckel wird in einem Ruhezustand gemessen, den der Test herstellt: ein Entwurf,
+keine gesetzten Felder, Menüs zu.
+
+*Nachtrag aus der Umsetzung (25.09.2026, Entscheidung des Auftraggebers):* Die Hebel 1–3
+hielten die Höhe, zwei weitere Messungen zeigten aber mehr:
+
+4. **Seitenfuß statt Spalte.** Ein `position: sticky; bottom: 0` kann nie über die
+   Oberkante seines Elternblocks steigen. Die Zeitachsenspalte beginnt auf dem Handschirm
+   im Handschuh-Betrieb erst bei y = 489, und die Leiste ragte ganz oben 61 px unter das
+   Fenster, obwohl ihre Höhe den Deckel hielt. Unter `xl` hängt sie deshalb über die neue
+   Eigenschaft `fuss` an der Wurzel von `EinsatzSeite`, deren Elternblock mit dem Seitenkopf
+   beginnt. Ab `xl` bleibt sie neben der Bilanz in der Spalte.
+5. **Einzeilige Feldzeile unter `md`.** Jeder gesetzte Chip kostete eine eigene Reihe
+   (+81 px, drei Chips 578 px = 68 %). Die Zeile rollt jetzt waagerecht (Vorbild
+   `standLeisteStil`), „Feld“ steht vorn, und nach dem Setzen rollt die Zeile an den Anfang
+   zurück. Die Chip-Gruppe darf nicht schrumpfen, sonst brachen die Chips ihren Text in sich
+   um (373 → 531 px).
+6. **Fokus ohne Rollen.** Die Chip-Eingaben fokussierten per `autoFocus`, und React ruft
+   dabei `focus()` ohne Optionen. Der native Fokus rollte die Seite um bis zu 467 px. Jetzt
+   `focus({ preventScroll: true })` über einen Callback-Ref (`MetaChip`).
+
+Ein scheinbarer Sprung von 390 px beim ersten Klick auf „Feld“ war ein Werkzeug-Artefakt:
+Playwrights `click()` rollt ein Ziel in einer angepinnten Leiste vorab „ins Bild“. Die
+Nachweise klicken deshalb per Maus an die Koordinate (`klickeWieEinMensch`).
+
+### D9 · CLS
+
+`beobachteShifts`, `leseShifts`, `setzeShiftsZurueck` und `ruheShifts` ziehen als reiner
+Move aus `einsatzauswahl-cls.spec.ts` nach `e2e/cls-kern.ts`. `einsatzauswahl-cls` bleibt
+grün und belegt damit den Move. Gemessen wird ohne `hadRecentInput`, nach
+`document.fonts.ready`, dazu je Messung eine Vorbedingung (Zelle trägt die neue
+`data-warnstufe`, 58 Zellen stehen), sonst wäre „kein Sprung“ trivial wahr. Für den
+Chip-Umbruch des ETB ist CLS blind, weil er einer Eingabe folgt. Dort wird die Geometrie
+gemessen: die y-Lage der Zeitachsenzeilen vor und nach dem Umbruch.
+
+### D10 · Prüflisten und Verweise
+
+Die Juli-Prüflisten (ETB, Lagekarte, Gefahrenmatrix) bleiben als Dokument ihres Stands
+erhalten. Jede bekommt einen datierten Abschnitt „Nachtrag LFH-373 (Messung,
+TT.MM.2026)“ mit einem Verdikt je betroffener Zeile, der Messgröße und der Spec-Datei.
+Dasselbe gilt für die LFH-613-Prüfliste (1·13, 4·13) und die LFH-342-Prüfliste
+(Zeile 12 wird von „erfüllt“ korrigiert, Zeile 13 aufgelöst). Die sechs Verweise auf die
+Stufenableitung werden auf LFH-724 umgeschrieben. Zum Schluss steht
+`grep -rn "LFH-373" docs frontend openspec CLAUDE.md`, und jeder Treffer braucht ein
+Verdikt oder einen neuen Verweis. CLAUDE.md verliert zwei überholte Aussagen: dass die
+Lagekarte bei 390 px nicht messbar sei, und die implizite Annahme im LFH-355-Absatz. Dazu
+kommen zwei Zeilen zu den neuen Mechanismen (Fokusabstand unten, Knopfspalte).
+
+### D11 · Mutationsprobe je neuem Nachweis
+
+Nach dem Muster aus LFH-396 wird je neuem Test mindestens eine Mutation gefahren:
+Kopien `*-mut*.tmp.spec.ts` per Skript, ein gemeinsamer Lauf mit `--reporter=json`, die
+Kopien werden danach gelöscht. Die tragenden Mutationen sind der jeweils zurückgedrehte
+Fix (muss rot werden), die festgenagelte Dichte (die Wache muss rot werden), die
+Obergrenze der Gegenprobe (hartkodierte 72 px müssen rot werden) und der Kern ohne
+`zusatzKandidaten` auf der Karte (muss rot werden, solange der Fix fehlt). Das Ergebnis
+steht im Kopfkommentar der Spec.
+
+### Nachtrag aus dem Review (25.09.2026)
+
+Der Review (vier Dimensionen, adversarial geprüft) fand vier mittelschwere Folgen der Hebel
+4–6. Alle sind behoben und im Browser bzw. in Vitest belegt:
+- **Neueinhängen beim Wechsel über `xl`.** Die Leiste hing je nach Breite an zwei Stellen im
+  Baum. Sie hängt jetzt auf jeder Breite als `fuss`, ab `xl` mit Außenrand vor der Bilanz.
+  Beleg: `EtbPage.test.tsx`, „behält die Erfassung beim Wechsel über xl“. Der Test ist gegen
+  den alten Stand rot.
+- **Fokusabstand nur an der Zeitachse.** Als Seitenfuß klebt die Leiste über der ganzen
+  Seite. Bei 390 × 600 im Handschuh-Betrieb lagen Bilanz-Links, „Einsatz abschließen“ und
+  Filterfelder vollständig darunter. Der `scroll-margin` gilt jetzt für alle Ziele von
+  Seitenkopf und Inhalt. Beleg: ETB-Lauf in `fokus-verdeckung.spec.ts` mit Berichtigungen und
+  Bilanz-Links, vorher rot.
+- **CSS-`order` in der gestapelten Zeile.** Tab- und Lesefolge wichen von der Sichtfolge ab.
+  Das Feld steht jetzt auch im DOM zuerst.
+- **„Werte behalten“ hinter dem waagerechten Bildlauf.** Der Schalter steht unter `md` in der
+  Hinweiszeile.
+
+### Ergebnis der Mutationsprobe (25.09.2026)
+
+Vierzehn Mutanten, je ein Fix oder eine Wache zurückgedreht. **Zwölf wurden rot**, darunter
+alle Fokus-Fixes, der Seitenfuß, die gestapelte Zeile, die einzeilige Feldzeile, die
+Zeitleiste (Umbruch und Nicht-Schrumpfen zusammen) und die Dichte-Wache. **Zwei
+Sicherungen überleben, und das ist gemessen und benannt:**
+- `abspielenStil` allein: Der Umbruch der Zeitleiste hält „Abspielen“ schon breit.
+- `preventScroll` in `MetaChip`: Seit die Leiste ganz im Fenster steht, rollt der native
+  Fokus nicht mehr.
+
+Beide bleiben als billige Sicherungen stehen, Vitest pinnt sie. Die Probe „Katalog ohne
+Kopf-Freiraum“ überlebte zuerst. Das Ziel lag nur halb unter der Kopfzeile, und der Kern
+zählt nach WCAG 2.4.11 nur vollständige Verdeckung. Der Personenlisten-Nachweis prüft
+seitdem zusätzlich den Mittelpunkt und wird ohne die Regel rot.
+
+### Nachtrag aus dem Gate-Lauf (25.09.2026): das Laden-Rennen im ETB
+
+Der volle Gate-Lauf fand „Laden ohne Sprung“ im ETB rot (CLS 0,197). Isoliert trat das in
+einem von fünf bis acht Läufen auf. Es ist also kein Last-Flake, sondern ein Rennen zwischen
+drei Antworten: Einsatz, Liste und Zählung. Mit 1,5 s Verzögerung per `page.route` auf Liste
+und Zählung lässt es sich deterministisch nachstellen. Dabei zeigten sich zwei Ursachen,
+beide schon auf `alpha` vorhanden:
+- **Bilanz unter der Liste (unter `xl`).** Stand sie vor den Zeilen da, schoben die Zeilen sie
+  aus dem Bild (0,22). Sie erscheint jetzt erst, wenn die Liste steht. Die Bedingung ist
+  `isLoading`, nicht `isPending`: offline pausiert der Abruf, und dann trägt die Bilanz den
+  Puffer.
+- **Meta und Datenstand im Seitenkopf.** Bei 390 px erschien „8 Einträge“ in der Titelzeile
+  und schob „Stand“ in eine neue Zeile (0,19 im Handschuh-Betrieb). Meta und Datenstand sind
+  jetzt eine Gruppe, die unter `md` eine eigene Zeile hat (CSS, nicht `useViewport`, dessen
+  erstes Bild bewusst breit ist). Der Datenstand hält seine Breite als unsichtbarer, stummer
+  Platzhalter „Stand 00:00“, der in Mono mit Tabellenziffern genau so breit ist wie jede
+  Uhrzeit. Das gilt für jede `EinsatzSeite`, die einen Datenstand führt, **und nur unter
+  `md`**: Ab `md` steht die Gruppe in der Titelzeile, und die spät eintreffende Meta schob den
+  stehenden Platzhalter weit seitwärts. CLS nimmt die größte Strecke eines Bildes mal der
+  ganzen bewegten Fläche, und der Ladewechsel der Einsatzauswahl stieg so von 0,020 auf 0,068
+  (im zweiten Gate-Lauf gemessen, `einsatzauswahl-cls.spec.ts`). Ab `md` blendet
+  `EinsatzSeite.css` den Platzhalter deshalb aus.
+
+Der Durchgang `verzoegert` gehört jetzt fest zum Test. Ohne ihn wäre der Test grün durch
+Zufall. Mutationsprobe: Ohne die Bilanz-Sperre ist er deterministisch rot (0,208), ohne die
+eigene Meta-Zeile ebenfalls (0,192). Der CLS-Kern meldet seitdem je Quelle auch die Lage
+vorher → nachher, sonst hätte der rote Lauf nicht verraten, welcher Nachbar geschoben hat.
+
+Der Review der beiden Fixes fand zwei Lücken, beide behoben und in Vitest belegt (vorher
+rot): `isLoading` wird für jeden neuen Query-Schlüssel wieder wahr, also bei jedem
+Filterwechsel und beim Wiederverbinden nach einem Offline-Start. Die Bilanz hängt deshalb an
+einem Riegel, der je Einsatz einmal aufgeht. Und die Meta-Gruppe durfte zunächst nicht
+umbrechen, eine lange Meta (Meldebild mit Filter, rund 54 Zeichen) wäre bei 390 px quer
+übergelaufen. Jetzt bricht die Gruppe um, ihre beiden Teile nicht.
+
+Die übrigen drei roten Tests des Gate-Laufs (`dokumente.spec.ts` Tastaturweg,
+`lagekarte-betroffene`, `lagekarte-betreuung`) laufen isoliert grün. Der Dokumente-Test
+scheitert unter paralleler Last am `filechooser`-Ereignis. Er wird gerade in LFH-632 gehärtet,
+und dieser Change fasst Dokumente nicht an.
+
+### Nachtrag aus der CI (25.09.2026): Linux-Schriften
+
+Die CI des PRs (Ubuntu, Playwright-Chromium) fand zwei Kippstellen, die unter macOS 3 bzw. 9 px
+Luft hatten. Nachgestellt wurden sie lokal mit dem Browser in einem Linux-Container
+(`mcr.microsoft.com/playwright:v1.62.0-noble`, `run-server` mit Host-Netz,
+`PW_TEST_CONNECT_WS_ENDPOINT`). Die Tests laufen dabei auf dem Mac, gerendert wird mit den
+Linux-Schriften:
+- **ETB-Platzhalter.** Der volle Wortlaut brach bei 390 px in eine zweite Zeile, und das
+  mitwachsende Feld misst den Platzhalter mit. Folge: 435 statt 413 px, der Deckel war
+  gerissen. Unter `md` gilt jetzt die Kurzform „Inhalt … ( / für Befehle · @ für Einheit )“,
+  analog zur Hinweiszeile. Danach 413 px auf beiden Systemen.
+- **Zeitachse bei 1440 px.** Feld und „Stand sichern“ sind unter Linux 7 px breiter. Die erste
+  Reihe lag mit 160 px Basis der Stand-Reihe 3 px über dem Band, und der Einklapp-Pfeil
+  rutschte allein in eine dritte Reihe. Die Basis ist jetzt 120 px: 37 px Luft, eine Reihe.
+
+Alle LFH-373-Specs laufen im Linux-Browser grün, mit denselben Messwerten wie unter macOS.
+Was bleibt, sind feste Steuerhöhen, kein umbrechender Text.
+
+## Risks / Trade-offs
+
+- [Laufzeit von `check-all.sh` Schritt 7 steigt: drei Stufen × mehrere Breiten ×
+  Tab-Läufe] → Seiten werden je Test einmal geseedet und die Stufen im selben Kontext
+  umgeschaltet. Tab-Läufe starten gezielt beim ersten Ziel, nicht am Dokumentanfang.
+- [Flakes unter Last: Schriftentausch, Menüanimation, langsamer Kaltstart von Vite] →
+  `document.fonts.ready` vor Positionsvergleichen, `expect.poll` auf eingeschwungene
+  Kästen, Inhaltsanker statt `networkidle` (die Einsatzroute hält SSE offen).
+- [D8 greift in `Schnellerfassung` ein, deren Vitest-Suite Struktur und Tastaturwege
+  prüft] → die Hebel sind opt-in, die bestehenden Tests müssen unverändert grün bleiben.
+  Neue Struktur wird als reine Stilfunktion geprüft (Muster `bedienzielStil`).
+- [D6 macht das Zeitachsenband in jeder Breite um die Knopfspalte schmaler, im Fükw 86 px]
+  → gemessen und hingenommen. Die Alternative ist eine Überlagerung, die Knöpfe unbedienbar
+  macht.
+- [D7 Hebel 3 ändert die Bedienung auf dem Handschirm: „Stand sichern“ braucht einen
+  Klick mehr] → nur unter `md` und nur, wenn Hebel 1 und 2 nicht reichen.
+- [Ein Deckel von 50 % ist eine gesetzte Zahl, keine Norm] → er steht in der Spec, im
+  Test als Literal mit Herleitung und in der Prüfliste. Wer ihn ändert, ändert alle drei.
+
+## Migration Plan
+
+Reine Frontend- und Teständerung ohne Datenmigration. Das Rollback läuft über den
+Revert der Commits. Einzige Verhaltensänderung für Bestehendes: Die Variable der
+Befehlsseite heißt `--lfh-fokusabstand-unten` statt `--lfh-befehl-fokusabstand`. Beide
+Seiten wechseln im selben Commit.

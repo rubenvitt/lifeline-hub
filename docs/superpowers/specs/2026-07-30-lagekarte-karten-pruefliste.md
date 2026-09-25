@@ -63,8 +63,8 @@ Listeneinträge und die hart verdrahteten vier Pixel der Bild-Zeile.
 | --- | --- | --- |
 | 12, 3 | Sammelbanner statt eingeschobener Live-Marker; optimistische Updates | **B6 (LFH-334)** — Ticket existiert |
 | 8 | kein Helligkeitsregler in der Anwendung | Folge-Task aus A0, dort ausdrücklich weiterverwiesen |
-| 2 | Dichtestufe wird nicht aus dem Einsatzkontext abgeleitet | B5-Restpunkt (LFH-333) |
-| 2, 12, 13 | Layout-Nachweise, die jsdom nicht führen kann: Höhe im Handschuh, Zeitachse bei ~390 px, Fokus hinter den schwebenden Aufbauten | **LFH-373** — derselbe Task wie beim ETB; sein Umfang ist heute ETB-formuliert und gehört um die Lagekarte erweitert |
+| 2 | Dichtestufe wird nicht aus dem Einsatzkontext abgeleitet | B5-Restpunkt (LFH-333), seit 25.09.2026 **LFH-724** |
+| 2, 12, 13 | ~~Layout-Nachweise, die jsdom nicht führen kann: Höhe im Handschuh, Zeitachse bei ~390 px, Fokus hinter den schwebenden Aufbauten~~ — gemessen und behoben 25.09.2026, siehe „Nachtrag LFH-373“ | **LFH-373** |
 | 14 | Spaltenschalter mit Zähler fehlt (`KatalogTabelle` statt `Datensicht`) | **LFH-374** — ebenfalls ETB-formuliert, gilt für beide Kartenverwaltungen genauso. **Eingelöst (25.09.2026):** Opt-in `spaltenSchalter` an `KatalogTabelle`, siehe `openspec/changes/lfh-374-spaltenschalter-katalogtabelle/pruefliste.md` |
 
 Alle fünf Zeilen zeigen auf eine Nummer, die es gibt. **LFH-373 und LFH-374 sind geerbt, nicht
@@ -122,6 +122,25 @@ gefunden wird.
 > Bausteine, keine Kartenabstände der Leiste. Sie stehen als **LFH-703** auf dem Board.
 
 ---
+
+## Nachtrag LFH-373 (Messung, 25.09.2026)
+
+Die Zeilen 2, 12 und 13 standen hier seit dem 30.07. offen. LFH-373 hat sie im Browser
+gemessen, zwei Befunde waren **rot** und sind im selben Ticket behoben. Korrekturen am
+Wortlaut oben:
+- Der Historien-Banner steht inzwischen im Fluss, der Inspector sitzt in der Leiste.
+- Zeichensteuerung und Zeitachse sind Bänder im `KartenFuss` (LFH-355).
+- Die „Verortet“-Einträge sind seit `KlickbareZeile` fokussierbar (`role="button"`), sie
+  gehören also in den Tab-Durchlauf.
+- Die Lagekarte ist auch bei 390 px messbar: Die Leiste liegt dort unter der Karte und lässt
+  sich ausblenden.
+
+| # | Verdikt | Messung / Nachweis |
+| -- | ------- | ------------------ |
+| 2 · Handschuh-Modus | **erfüllt nach Fix** (die Stufenableitung → **LFH-724**) | `e2e/gate3-trefflaeche.spec.ts`, „Lagekarte (LFH-373)“, bei 1366 × 768: „Verortet“ 35,5 / 48 / 72 px, Kartenknöpfe (kurze Achse, Boden 32 / 48 / 72) 32 / 48 / 72, Knöpfe der Zeitachse 30 / 48 / 72; Gegenprobe kompakt < handschuh. „Abspielen“ bei 390 px in `e2e/leisten-flaeche.spec.ts`. **Vorher gemessen:** „Abspielen“ schrumpfte als Flex-Kind auf 16–17 px Breite. **Behoben:** `abspielenStil` (`flexShrink: 0`). |
+| 12 · Kein Sprung unter dem Cursor | **erfüllt nach Fix** | `e2e/leisten-flaeche.spec.ts`. Die ausgeklappte Zeitachse belegt ≤ 50 % der Kartenhöhe: Fükw 13 / 22 / 30 %, Tablet 19 / 31 / 49 %, Handschirm ohne Leiste 23 / 31 / 46 %. Kein Knopf ragt über den Bandrand, das Band bleibt in der Kartenspalte. Mit eingeblendeter Leiste auf dem Handschirm deckt das Band 41 / 56 / 84 % der dann nur 337–382 px hohen Karte. Dort gilt bewusst kein Deckel, nur „in der Spalte, ohne Überlauf, ohne Überschneidung“. Das Laden auf dem Handschirm erreicht CLS 0,0015 / 0,0033. **Entscheidung 25.09.2026:** Bei 1440 × 900 darf die Zeitachse zwei Reihen tragen (73 statt 46 px). Das ist der Preis der Aufteilung aus Zeile 13, `lagekarte-smoke.spec.ts` ist entsprechend angepasst. Offen zu beobachten: 49 % am Tablet im Handschuh-Betrieb liegen nah am Deckel und können mit den Schriften der CI kippen. |
+| 13 · Fokus nie verdeckt | **erfüllt nach Fix** | `e2e/fokus-verdeckung.spec.ts`, „Lagekarte (LFH-373)“, bei 390 × 844 mit und ohne Leiste und bei 1024 × 768, handschuh. Der Kern läuft mit den Kartenaufbauten als Zusatzkandidaten (Opt-in, Selbstbeweis im selben Spec): 12 Stopps in der Kartenspalte, 0 verdeckt. Der Rechteckschnitt Knopfblock ↔ Fußband ergibt 0, die Trefferprobe `click({ trial: true })` greift an jedem Kartenknopf. **Vorher gemessen:** Bei 390 px lagen „Herauszoomen“, „Nach Norden ausrichten“ und „Messen“ **vollständig** unter dem Zeitachsenband, auch per Zeiger unerreichbar. Bei 1024 px lag „Zeichenwerkzeuge“ zu 92 % darunter. **Behoben:** Der Fuß endet vor der Knopfspalte (`fussStil(knopfKante)`, Aufteilung statt `zIndex`). Das Bezeichnungsfeld hat keine feste Breite mehr, und die Zeitleiste bricht um. |
+
 
 ## Was diese Prüfliste nicht beweist
 

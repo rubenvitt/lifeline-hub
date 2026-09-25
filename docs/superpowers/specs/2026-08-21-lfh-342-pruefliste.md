@@ -31,7 +31,7 @@ mitbewertet: `etb/Schnellerfassung.tsx`, `etb/MetaChip.tsx`, `etb/SlashMenu.tsx`
 | #  | Verdikt | Beleg / Zielticket |
 | -- | ------- | ------------------ |
 | 1 · Treffläche | **erfüllt** | Unverändert gegenüber B5e: kein Element im Umfang trägt eine Klein-Angabe, alle erben `controlHeight` (30 / 48 / 72 px). C7 fügt vier Auslöser hinzu, alle ohne `size`-Prop: die vier Schnellwahl-Knöpfe der Wiedervorlage, „Erneut senden" und „Verwerfen" an einer abgelehnten Zeile. Der Kartenzweig baut seine Zeile selbst, seine Aktionen sind aber dieselben antd-`Button` wie im Tabellenzweig — dieselbe Funktion `zeilenAktionen`, damit die Zweige nicht auseinanderlaufen. **Grenze unverändert:** `test/utils.tsx` mountet ein nacktes `ConfigProvider`, Höhenmessungen in Vitest ergäben antd-Vorgaben; die Staffel misst `e2e/datensicht-schmal.spec.ts` am Primitiv |
-| 2 · Handschuh-Modus | **teilweise erfüllt, unverändert** | Die Stufe greift auf der ganzen Seite. Offen bleibt dasselbe wie in B5e: die Ableitung der Stufe aus dem Einsatzkontext hängt an `localStorage['lifeline-hub.dichte']` (B5-Restpunkt), und die gerenderte Zeilenhöhe der ETB-Fläche ist nur im Browser messbar → **LFH-373**. C7 verschlechtert nichts und misst es auch nicht neu: die neue e2e-Spec prüft Breiten, nicht Höhen |
+| 2 · Handschuh-Modus | **teilweise erfüllt, unverändert** | Die Stufe greift auf der ganzen Seite. Offen bleibt dasselbe wie in B5e: die Ableitung der Stufe aus dem Einsatzkontext hängt an `localStorage['lifeline-hub.dichte']` (B5-Restpunkt → **LFH-724**), und die gerenderte Zeilenhöhe der ETB-Fläche ist nur im Browser messbar → **LFH-373** (gemessen, siehe Nachtrag). C7 verschlechtert nichts und misst es auch nicht neu: die neue e2e-Spec prüft Breiten, nicht Höhen |
 | 3 · Rückmeldung vor der Serverantwort | **erfüllt, verbessert** | Bestand unverändert (`isPending` an Abschluss, Nachladen, Auftragsmodal; `ladend` bis an die Chronologie). **Neu:** ein gepufferter Eintrag ist jetzt selbst die Rückmeldung — er steht als Zeile mit dem Etikett „wird gesendet …" in der Chronologie, statt nur in einem Banner darüber. Das ist die Rückmeldung an dem Ort, an dem der Erfasser das Ergebnis erwartet. Optimistische Updates gibt es weiterhin nicht → **B6 (LFH-334)**. **Neu am Befehlsentwurf:** der stille Autosave meldet sich nicht per Toast (eine Meldung alle 30 s wäre eine Alarmquelle nach EEMUA 191), sondern über den Zeitstempel „zuletzt gespeichert HH:MM" neben dem Knopf — der Fehlerfall dagegen meldet sich sehr wohl |
 | 4 · Kritische Aktion hat eine zweite Handlung | **erfüllt** | Das Tagebuch bleibt append-only. **Neu bewertet — „Verwerfen" an einer abgelehnten Zeile ist unumkehrbar** und trägt trotzdem keine Rückfrage: der Eintrag wurde vom Server bereits **abgelehnt und nicht gespeichert**, verworfen wird also eine gescheiterte Sendung, nicht ein Datensatz. Die Umkehrung steht als „Erneut senden" unmittelbar daneben, und beide stehen offen statt in einem Menü — eine Ablehnung verlangt eine Entscheidung. Nach der Trennlinie aus LFH-363 wäre eine zusätzliche Rückfrage hier Reibung ohne Schutzwirkung. **Neu am Befehlsentwurf:** der Verlust-Fall, den N18 beschreibt, ist die kritische Stelle — der Schutz ist der Autosave selbst plus `beforeunload` |
 | 5 · Kontrast in beiden Modi | **erfüllt für C7, ein Bestandsbefund unverändert** | C7 führt **keinen** Farbwert ein. Die Marken der gepufferten Zeilen kommen aus `StatusTag` mit den Rollen `achtung` (ausstehend) und `alarm` (abgelehnt), also aus `theme/statusFarben.ts`; die gestrichelte Zeilenmarkierung nimmt `colorSplit`/`colorBorder` aus dem Token, keinen Hexwert. `theme/gate5.guard.test.ts` ist grün. **Bestandsbefund unverändert:** `.etb-erfassung-sticky` (`index.css:51-66`) hält vier hartkodierte Werte → **LFH-375** |
@@ -50,11 +50,31 @@ mitbewertet: `etb/Schnellerfassung.tsx`, `etb/MetaChip.tsx`, `etb/SlashMenu.tsx`
 
 | Zeile | offen woran | Ziel |
 | --- | --- | --- |
-| 2, 12, 13 | Dichtestufe aus dem Einsatzkontext; gerenderte Zeilenhöhe und Fokusverdeckung am sticky Kopf | **LFH-373** — Ticket existiert |
+| 2 | Dichtestufe aus dem Einsatzkontext | **LFH-724** (umgehängt 25.09.2026, vorher LFH-373) |
+| 2, 12, 13 | ~~gerenderte Zeilenhöhe und Fokusverdeckung am sticky Kopf~~ — gemessen und behoben, siehe „Nachtrag LFH-373“ unten | **LFH-373** |
 | 8 | kein Helligkeitsregler in der Anwendung | **LFH-397**, app-weit |
 | 5 | vier Hexwerte in `.etb-erfassung-sticky` | **LFH-375** — Ticket existiert |
 
 ---
+
+## Nachtrag LFH-373 (Messung, 25.09.2026)
+
+Die Zeilen 2, 12 und 13 oben stützen sich auf Artefakte, die es seit dem Neuentwurf
+(22.09.2026) nicht mehr gibt: die `Datensicht` mit ihrer Zusicherung 5 und
+`EtbTabelle.test.tsx`. Das ETB ist eine Zeitachse, und die Erfassung ist ein angepinnter
+**Fuß**. Das „erfüllt“ der Zeile 12 ist deshalb **nicht mehr belegt**, es wird hiermit
+ersetzt. Die aktuellen Verdikte samt Messwerten stehen im Nachtrag der B5e-Prüfliste
+(`2026-07-30-etb-pruefliste.md`, „Nachtrag LFH-373“). Kurzfassung:
+
+- **Zeile 2:** erfüllt. Slash-Menü, Zeilenauslöser und Zeilenmenü messen 72 px im
+  Handschuh-Betrieb (`gate3-trefflaeche.spec.ts`). Die Stufenableitung liegt bei **LFH-724**.
+- **Zeile 12:** erfüllt nach Fix. Die Erfassungsleiste belegt ≤ 50 % des Fensters und steht
+  ganz oben vollständig im Bild. Gesetzte Felder lassen weder die Leiste wachsen noch die
+  Seite springen (`leisten-flaeche.spec.ts`). Der Sammelbanner-Teil bleibt bei LFH-334.
+- **Zeile 13:** erfüllt nach Fix. Vorher lag beim Tabben jeder zweite bis jeder
+  Zeilenauslöser vollständig hinter der Leiste, jetzt keiner (`fokus-verdeckung.spec.ts`).
+  Das „einzige `position: sticky` des Frontends“ stimmt ebenfalls nicht mehr: Rail- und
+  Modulpanel-Fuß, die Bilanz und die Befehlsleiste sind ebenfalls angepinnt.
 
 ## Die begründete Ausnahme: warum die Chronologie unter `md` Karten wird
 

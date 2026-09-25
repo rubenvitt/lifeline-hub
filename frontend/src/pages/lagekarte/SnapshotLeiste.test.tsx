@@ -18,7 +18,15 @@ vi.mock('../../api/lageSnapshot', () => ({
   ladeLageSnapshot: (...a: unknown[]) => ladeLageSnapshot(...a),
 }));
 
-import { SnapshotLeiste, ANZEIGE_MS, standLeisteStil, startEingeklappt } from './SnapshotLeiste';
+import {
+  SnapshotLeiste,
+  ANZEIGE_MS,
+  abspielenStil,
+  sichernFeldStil,
+  standLeisteStil,
+  startEingeklappt,
+  zeitleisteStil,
+} from './SnapshotLeiste';
 import { setzeViewportBreite } from '../../test/viewport';
 
 type Snap = Record<string, unknown>;
@@ -276,7 +284,10 @@ describe('SnapshotLeiste — Platz im KartenFuss (LFH-355)', () => {
     expect(reihe.querySelectorAll('button').length).toBe(2);
     expect(reihe.style.minWidth).toBe('0px');
     expect(reihe.style.overflowX).toBe('auto');
-    expect(standLeisteStil.flex).toBe('1 1 160px');
+    // 120 statt 160 (LFH-373, in der CI gemessen): unter den Linux-Schriften lag die erste Reihe
+    // bei 1440 px mit 160 px Basis 3 px über dem Band, und der Einklapp-Pfeil rutschte allein in
+    // eine dritte Reihe. Die Stand-Reihe rollt ohnehin — die Basis ist nur ihre Umbruchschwelle.
+    expect(standLeisteStil.flex).toBe('1 1 120px');
   });
 
   it('Startzustand: gemerkte Wahl gewinnt, ohne Wahl eingeklappt nur auf dem Handschirm', () => {
@@ -302,5 +313,34 @@ describe('SnapshotLeiste — Platz im KartenFuss (LFH-355)', () => {
     setzeViewportBreite(390);
     renderLeiste([snapshot()], { darfSichern: true });
     expect(screen.getByRole('button', { name: /Stand sichern/ })).toBeInTheDocument();
+  });
+});
+
+describe('SnapshotLeiste — Umbruch statt Überlauf (LFH-373)', () => {
+  /**
+   * Seit der Fuß vor der Knopfspalte endet (LFH-373, `KartenFuss.fussStil`), ist das Band
+   * schmaler. Gemessen: das Bezeichnungsfeld mit FESTEN 180 px ragte bei 390 px im
+   * Handschuh-Betrieb aus dem Band heraus und fing die Klicks auf die Kartenknöpfe ab; der
+   * Abspielknopf schrumpfte als Flex-Kind auf 16 px. Geprüft wird die Struktur, aus der die
+   * Zusicherung folgt; die Pixel misst `e2e/leisten-flaeche.spec.ts`.
+   */
+  it('das Bezeichnungsfeld darf schrumpfen und hat keine feste Breite mehr', () => {
+    expect(sichernFeldStil.width).toBeUndefined();
+    expect(sichernFeldStil.minWidth).toBe(0);
+    expect(sichernFeldStil.flex).toBe('0 1 180px');
+  });
+
+  it('die Zeitleiste bricht um, statt über den Bandrand zu laufen', () => {
+    expect(zeitleisteStil.flexWrap).toBe('wrap');
+    expect(zeitleisteStil.minWidth).toBe(0);
+  });
+
+  it('der Abspielknopf schrumpft nicht unter seine Kante', () => {
+    expect(abspielenStil.flexShrink).toBe(0);
+  });
+
+  it('„Stand sichern" heißt so — ohne das englische Symbol-Label „camera" davor', () => {
+    renderLeiste([snapshot()], { darfSichern: true });
+    expect(screen.getByRole('button', { name: 'Stand sichern' })).toBeInTheDocument();
   });
 });

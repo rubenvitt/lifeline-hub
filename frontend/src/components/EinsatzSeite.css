@@ -11,3 +11,26 @@
 .lfh-seitenkopf__pfad .ant-breadcrumb ol > li:last-child:not(.ant-breadcrumb-separator) {
   display: none;
 }
+
+/* Meta und Datenstand auf schmalem Schirm auf eigener Zeile (LFH-373, gemessen bei 390 px).
+   In der Titelzeile schob die spät eintreffende Meta („8 Einträge") den Stand in eine neue
+   Zeile, und alles darunter rückte 22 px. Die eigene Zeile hält der unsichtbare Platzhalter
+   des Datenstands vom ersten Bild an. Die Schwelle ist antds `md` (768), dieselbe, die
+   `theme/rollen.css` abfragt. */
+@media (max-width: 767.98px) {
+  .lfh-seitenkopf__meta {
+    flex-basis: 100%;
+  }
+}
+
+/* Der Datenstand-Platzhalter gilt nur dort, wo er eine Zeile hält: unter `md` (oben). Ab `md`
+   steht die Gruppe in der Titelzeile, und die spät eintreffende Meta schob den schon stehenden
+   Platzhalter weit nach rechts. CLS rechnet die größte Strecke eines Bildes mal der ganzen
+   bewegten Fläche, im Gate hob das den Ladewechsel der Einsatzauswahl von 0,020 auf 0,068
+   (`e2e/einsatzauswahl-cls.spec.ts`). Ab `md` erscheint der Stand deshalb wie zuvor erst mit
+   den Daten, am Ende der Zeile, wo er nichts schiebt. */
+@media (min-width: 768px) {
+  .lfh-seitenkopf__meta [data-lfh='datenstand-platzhalter'] {
+    display: none;
+  }
+}
