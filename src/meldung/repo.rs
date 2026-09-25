@@ -437,35 +437,49 @@ pub async fn bestaetige(
     jetzt: &str,
 ) -> Result<bool, AppError> {
     let frisch = crate::write_retry!(pool, |conn| {
-        let frisch = crate::kommunikation::repo::quittiere_einmalig_tx(
-            conn,
-            org_id,
-            einsatz_id,
-            crate::kommunikation::OBJEKT_MELDUNG,
-            meldung_id,
-            von_id,
-            jetzt,
-        )
-        .await?;
-        if !frisch {
-            return Ok(false);
-        }
-        crate::erinnerung::repo::schliesse_offene_auto_tx(
-            conn,
-            crate::kommunikation::OBJEKT_MELDUNG,
-            meldung_id,
-            jetzt,
-        )
-        .await?;
-        // Eskalations-Residuum loeschen: nach Bestaetigung ist die Meldung nicht mehr
-        // `eskaliert`. Quittung, Reminder-Abschluss und dieses Flag teilen einen Commit.
-        sqlx::query("UPDATE meldung SET eskaliert = 0 WHERE id = ?")
-            .bind(meldung_id)
-            .execute(&mut *conn)
-            .await?;
-        Ok(true)
+        bestaetige_tx(conn, org_id, einsatz_id, meldung_id, von_id, jetzt).await
     })?;
     Ok(frisch)
+}
+
+/// Rumpf von [`bestaetige`] auf einer offenen Verbindung/Transaktion (LFH-690: der
+/// Demo-Import legt seine Sofortmeldung in EINER Transaktion bestätigt an, design.md D5).
+/// Öffnet und committet selbst nichts; die Pool-Hülle fährt ihn in `write_retry!`.
+pub async fn bestaetige_tx(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    einsatz_id: i64,
+    meldung_id: i64,
+    von_id: i64,
+    jetzt: &str,
+) -> Result<bool, AppError> {
+    let frisch = crate::kommunikation::repo::quittiere_einmalig_tx(
+        conn,
+        org_id,
+        einsatz_id,
+        crate::kommunikation::OBJEKT_MELDUNG,
+        meldung_id,
+        von_id,
+        jetzt,
+    )
+    .await?;
+    if !frisch {
+        return Ok(false);
+    }
+    crate::erinnerung::repo::schliesse_offene_auto_tx(
+        conn,
+        crate::kommunikation::OBJEKT_MELDUNG,
+        meldung_id,
+        jetzt,
+    )
+    .await?;
+    // Eskalations-Residuum loeschen: nach Bestaetigung ist die Meldung nicht mehr
+    // `eskaliert`. Quittung, Reminder-Abschluss und dieses Flag teilen einen Commit.
+    sqlx::query("UPDATE meldung SET eskaliert = 0 WHERE id = ?")
+        .bind(meldung_id)
+        .execute(&mut *conn)
+        .await?;
+    Ok(true)
 }
 
 /// Setzt das Eskalations-Flag — aber NUR wenn die Meldung bestätigungspflichtig, ihre Frist
