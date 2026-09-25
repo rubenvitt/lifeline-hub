@@ -1084,9 +1084,12 @@ export default function Sidebar(props: SidebarProps) {
             return (
               <div
                 key={b.id}
-                style={{ borderBottom: `1px solid ${rollen.flaeche3}`, paddingBottom: 6 }}
+                style={{
+                  borderBottom: `1px solid ${rollen.flaeche3}`,
+                  paddingBottom: token.paddingSM,
+                }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: token.paddingSM }}>
                   <Switch
                     checked={b.sichtbar}
                     aria-label={b.name}
@@ -1202,14 +1205,20 @@ export default function Sidebar(props: SidebarProps) {
                       Auf der Karte: Ecken = Größe (Seitenverhältnis), Kanten = frei strecken, ↻ =
                       drehen, Mitte = verschieben. Oder Mittelpunkt numerisch:
                     </Typography.Text>
-                    <div style={{ marginTop: 6 }}>
+                    <div style={{ marginTop: token.marginSM }}>
                       <KoordinatenEingabe
                         value={bildMitte ?? props.bildPlatzierZentrum}
                         onChange={setBildMitte}
                         einsatzId={props.einsatzId}
                       />
                     </div>
-                    <Space style={{ marginTop: 6, width: '100%', justifyContent: 'space-between' }}>
+                    <Space
+                      style={{
+                        marginTop: token.marginSM,
+                        width: '100%',
+                        justifyContent: 'space-between',
+                      }}
+                    >
                       <Button
                         disabled={!bildMitte}
                         onClick={() => {
@@ -1297,7 +1306,7 @@ export default function Sidebar(props: SidebarProps) {
             <div>
               <Typography.Text
                 type="secondary"
-                style={{ fontSize: 12, display: 'block', marginBottom: 4 }}
+                style={{ fontSize: 12, display: 'block', marginBottom: token.marginXS }}
               >
                 Karten-Design
               </Typography.Text>
