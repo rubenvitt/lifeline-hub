@@ -1338,24 +1338,34 @@ async fn rundlauf_import_entfernen_import() {
 // ---------------------------------------------------------------------------------------------
 
 /// Task 4.4 (D10, Spec „Zeitachse relativ zum Importzeitpunkt“/Scenario „Kein Alarm nach dem
-/// Import“): Der erste Takt des Erinnerungs-Schedulers nach dem Import darf nichts auslösen —
-/// weder eine Erinnerung, noch eine Meldungs-Eskalation, noch einen Ablösungsalarm — und ein
-/// Live-Abonnent des Demo-Einsatzes bekommt kein Ereignis der drei Alarm-Tags (`erinnerung`,
-/// `sofortmeldung`, `abloesung`). Belegt als Repo-Test in `src/demo/` statt als
-/// Integrationstest: `erinnerung::scheduler::tick_einmal` und `live::LiveHub` sind crate-interne
-/// Bausteine ohne HTTP-Route (die kommt erst in Block 5), und die vorhandenen
-/// Scheduler-Repo-Tests (`erinnerung/scheduler.rs`) rufen sie genauso direkt — ein
-/// Integrationstest müsste denselben Weg über `lifeline_hub::` nachbauen, ohne einen echten
-/// Endpunkt zusätzlich zu prüfen.
+/// Import“): Der erste Takt des Erinnerungs-Schedulers nach dem Import darf nichts auslösen.
+/// Belegt als Repo-Test in `src/demo/` statt als Integrationstest:
+/// `erinnerung::scheduler::tick_einmal` und `live::LiveHub` sind crate-interne Bausteine ohne
+/// HTTP-Route (die kommt erst in Block 5), und die vorhandenen Scheduler-Repo-Tests
+/// (`erinnerung/scheduler.rs`) rufen sie genauso direkt — ein Integrationstest müsste denselben
+/// Weg über `lifeline_hub::` nachbauen, ohne einen echten Endpunkt zusätzlich zu prüfen.
+///
+/// **Tragend sind zwei Zusicherungen, dazu die Gegenprobe:** `ausgeloest == 0` beim ersten Takt
+/// — das trifft auf die zwei vergangenen, ERLEDIGT angelegten Erinnerungen
+/// (`lagebesprechung` T−120, `abloesung` T−45; die dritte, `naechste_lagebesprechung` T+20, ist
+/// offen, aber noch nicht fällig) — und der leere Live-Kanal (kein Ereignis irgendeines Tags
+/// beim abonnierten Demo-Einsatz). Die Gegenprobe ist der zweite Takt (`jetzt + 25 min`): Er
+/// löst die eine künftige Erinnerung tatsächlich aus und zeigt damit, dass der Test den
+/// Scheduler wirklich treffen kann, statt nur an ihm vorbeizulaufen (siehe
+/// `block-4.3-report.md` für die drei Erinnerungen).
+///
+/// Die Eskalations- und Ablösungs-Zählungen daneben (`meldung.eskaliert = 1`,
+/// `erinnerung.bezug_typ ∈ {abloesung, abloesung_vorwarnung}`) sind mit dem HEUTIGEN Drehbuch
+/// vakuos: D10 legt bewusst keine Auto-Frist-Erinnerung (weder an einer Meldung noch an einem
+/// Auftrag) und keine Ablösungsschicht an, also können sie am aktuellen Szenario gar nicht rot
+/// werden. Sie stehen als Riegel gegen eine künftige Drehbuch-Erweiterung — kommt eine
+/// Auto-Frist oder eine Ablösungsschicht dazu, muss D10 dafür neu geprüft werden, und der Riegel
+/// macht ein Versäumnis dabei sichtbar statt es stillschweigend durchzulassen —, nicht als
+/// eigenständiger Beleg für D10 heute.
 ///
 /// `jetzt` ist nahe an der echten Uhr (wie `tests/demo_daten.rs::demo_importieren`), nicht das
 /// feste Test-`JETZT` dieser Datei: Der Test bildet damit genau das Risiko nach, gegen das D10
 /// gebaut ist — Import und erster Scheduler-Takt kurz hintereinander im echten Betrieb.
-///
-/// Der zweite Takt (`jetzt + 25 min`) zeigt, dass der Test den Scheduler wirklich treffen kann:
-/// Von den drei Erinnerungen (`lagebesprechung` T−120 erledigt, `abloesung` T−45 erledigt,
-/// `naechste_lagebesprechung` T+20 offen, siehe `block-4.3-report.md`) wird danach genau die
-/// eine künftige fällig und ausgelöst.
 ///
 /// Mutationsprobe (nicht committet): eine der beiden vergangenen Erinnerungen nach dem Import
 /// per `UPDATE erinnerung SET status = 'offen' WHERE titel = 'Lagebesprechung vorbereiten'`
@@ -1376,7 +1386,10 @@ async fn scheduler_takt_nach_import_loest_nichts_aus() {
         crate::erinnerung::scheduler::tick_einmal(&pool, &live, jetzt_uhr.and_utc()).await;
     assert_eq!(ausgeloest, 0, "kein Alarm auf Vorrat (D10)");
 
-    // Null Eskalationen: keine Meldung des Demo-Einsatzes trägt eskaliert = 1.
+    // Riegel gegen eine künftige Drehbuch-Erweiterung, mit dem HEUTIGEN Drehbuch vakuos: D10
+    // legt bewusst keine Auto-Frist-Erinnerung an, also gibt es keine Meldung mit eskaliert = 1
+    // — diese Zählung kann am aktuellen Szenario gar nicht rot werden, sie hält nur fest, was
+    // eine spätere Erweiterung nicht unbemerkt brechen darf. Tragend ist `ausgeloest == 0` oben.
     let eskalierte: i64 =
         sqlx::query_scalar("SELECT COUNT(*) FROM meldung WHERE einsatz_id = ? AND eskaliert = 1")
             .bind(erg.einsatz_id)
@@ -1385,9 +1398,9 @@ async fn scheduler_takt_nach_import_loest_nichts_aus() {
             .unwrap();
     assert_eq!(eskalierte, 0, "keine Eskalation");
 
-    // Null Ablösungsalarme: keine Erinnerung mit Ablösungs-Bezug (das Drehbuch legt ohnehin
-    // keine Ablösungsschicht an — der Test prüft es trotzdem eigens, statt sich nur auf
-    // `ausgeloest == 0` zu verlassen).
+    // Derselbe Riegel für Ablösungsalarme: D10 legt bewusst keine Ablösungsschicht an, also ist
+    // auch diese Zählung mit dem heutigen Drehbuch vakuos (kann nicht rot werden) — Riegel
+    // gegen eine künftige Erweiterung, nicht eigenständiger Beleg für D10 heute.
     let abloesungsfristen: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM erinnerung WHERE einsatz_id = ? AND bezug_typ IN (?, ?)",
     )
