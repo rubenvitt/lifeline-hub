@@ -27,4 +27,4 @@
 
 - [x] 5.1 `pruefliste.md` in diesem Change-Ordner mit 15 Zeilen für beide Kartenverwaltungen, jede mit Verdikt. Zeile 14 bekommt „erfüllt“ mit Testverweisen. Belegen, indem keine Zeile ohne Verdikt bleibt und jede offene Zeile ein Zielticket nennt.
 - [x] 5.2 Zeile 14 der Alt-Prüflisten mit Vorwärtsverweis ergänzen: `2026-07-30-lagekarte-karten-pruefliste.md` bekommt „→ eingelöst durch LFH-374, siehe `openspec/changes/lfh-374-…/pruefliste.md`“, `2026-07-30-etb-pruefliste.md` bekommt „→ eingelöst durch LFH-342, seit dem Neuentwurf (Zeitachse) gegenstandslos“, jeweils in der Kriterienzeile und in der Tabelle der offenen Punkte. CLAUDE.md, Absatz „Tabelle nur, wenn verglichen wird“: `KatalogTabelle` als zweiter Träger mit Opt-in, eine Zählwahrheit in `SpaltenSchalter.tsx`. Belegen mit einem Diff-Review.
-- [ ] 5.3 `./scripts/check-all.sh` grün (Ausgabe festhalten), dazu `openspec validate lfh-374-spaltenschalter-katalogtabelle --strict`.
+- [x] 5.3 `./scripts/check-all.sh` grün (Ausgabe festhalten), dazu `openspec validate lfh-374-spaltenschalter-katalogtabelle --strict`.

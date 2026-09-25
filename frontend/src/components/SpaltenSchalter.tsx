@@ -209,6 +209,12 @@ export function SpaltenSchalter<K extends string>(props: {
         onClick: ({ key }) => umschalten(key as K),
         items: waehlbar.map((spalte) => ({
           key: spalte.key,
+          /*
+           * Ohne `onAn` lässt sich eine per Breite weggefallene Spalte nicht zurückholen.
+           * Gesperrt statt klickbar: ein Eintrag, der auf Klick still nichts tut, wäre von
+           * einem kaputten nicht zu unterscheiden. Heute trägt jeder Aufrufer `onAn`.
+           */
+          disabled: !onAn && !sichtbar.has(spalte.key) && !aus.includes(spalte.key),
           label:
             (
               /*

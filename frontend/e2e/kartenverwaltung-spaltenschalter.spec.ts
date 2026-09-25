@@ -8,9 +8,9 @@ import { expect, test, type Page } from '@playwright/test';
 // drückt nichts breit, und der Schalter lässt sich mit einem echten Klick bedienen
 // (`toBeVisible()` ist kein Beleg für Klickbarkeit, CLAUDE.md/LFH-355).
 //
-// Gemessen wird wie in `katalogtabelle-schmal.spec.ts` nur DOM, das das Primitiv selbst
-// erzeugt (`.ant-table`, `[data-lfh="katalog-werkzeuge"]`) — die seitenweite Aussage gehört
-// `gate1-ueberlauf.spec.ts`.
+// Gemessen werden das DOM des Primitivs (`.ant-table`, `[data-lfh="katalog-werkzeuge"]`) UND
+// die Seite als Ganzes (`documentElement.scrollWidth`): `gate1-ueberlauf.spec.ts` führt diese
+// zwei Routen nicht, die seitenweite Aussage stünde sonst nirgends.
 
 const BREITE = 390;
 const ADMIN = 'admin';
@@ -39,6 +39,10 @@ async function breitenPruefen(page: Page) {
       .evaluate((el) => el.scrollWidth);
     expect(breite, `${selektor} drückt die Seite breit (${breite} px)`).toBeLessThanOrEqual(BREITE);
   }
+  const seite = await page.evaluate(() => document.documentElement.scrollWidth);
+  expect(seite, `die Seite scrollt waagerecht (${seite} px)`).toBeLessThanOrEqual(BREITE);
+  // Fixiert steht die menschenlesbare Kennung, nie eine andere Spalte.
+  await expect(page.locator('th.ant-table-cell-fix-start')).toHaveText(['Name']);
 }
 
 test('Online-Quellen bei 390 px: Tabelle, Zähler für URL und Attribution, einblendbar', async ({

@@ -94,6 +94,12 @@ import '../theme/sprache.css';
  *   Katalogtabelle eine Spalte nehmen will, nimmt das Opt-in dazu.
  * · `Datensicht` setzt das Prop NIE: es rendert seinen Schalter selbst und reicht die Spalten
  *   ohne `abBreite` herein. Zwei Schalter mit zwei Zuständen wären der Fehlerfall.
+ * · **Was man nicht sieht, wirkt nicht** — auch hier, aber aus der Bibliothek statt aus eigenem
+ *   Code: antd hält den unkontrollierten Filter- und Sortierzustand nur für Spalten, die noch
+ *   übergeben werden. Wer eine gefilterte Spalte ausblendet, bekommt die ungefilterte Menge
+ *   zurück — dieselbe Regel, die `Datensicht` ausdrücklich fährt. Gepinnt in
+ *   `OnlineQuellenVerwaltung.test.tsx` („ein ausgeblendeter Aktiv-Filter siebt nicht"), weil
+ *   ein antd-Sprung sie sonst still ändern könnte.
  *
  * ── DREI ZUSTÄNDE — UND DIE LADEUNTERDRÜCKUNG LEBT HIER (LFH-331 · B3, D4) ───────
  *

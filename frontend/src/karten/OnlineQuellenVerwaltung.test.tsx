@@ -500,6 +500,41 @@ describe('OnlineQuellenVerwaltung · Spaltenschalter', () => {
     ).toBeInTheDocument();
   });
 
+  it('was man nicht sieht, wirkt nicht: ein ausgeblendeter Aktiv-Filter siebt nicht', async () => {
+    /**
+     * Gepinntes antd-Verhalten (antd 6, `table/hooks/useFilter`: der unkontrollierte
+     * Filterzustand gilt nur für Spalten, die noch übergeben werden). Das ist dieselbe Regel,
+     * die `Datensicht` ausdrücklich fährt — hier entsteht sie aus der Bibliothek, deshalb steht
+     * sie als Pin da: kippt ein antd-Sprung sie, bliebe sonst eine gefilterte Liste ohne
+     * sichtbaren Grund und ohne Rückweg stehen.
+     */
+    const inaktiv: OnlineQuelle = {
+      ...quelle,
+      id: 2,
+      name: 'Basemap.de',
+      url: 'https://basemap.de/style.json',
+      aktiv: false,
+    };
+    mockBasis(admin, [quelle, inaktiv]);
+    const { container } = render();
+    await screen.findByText('OpenStreetMap');
+    const zeilen = () => container.querySelectorAll('tr.ant-table-row');
+
+    await userEvent.click(container.querySelector<HTMLElement>('.ant-table-filter-trigger')!);
+    const filter = await waitFor(() => {
+      const m = document.querySelector<HTMLElement>('.ant-table-filter-dropdown');
+      expect(m).not.toBeNull();
+      return m!;
+    });
+    await userEvent.click(within(filter).getByText('inaktiv'));
+    await userEvent.click(within(filter).getByRole('button', { name: 'OK' }));
+    await waitFor(() => expect(zeilen()).toHaveLength(1));
+
+    await userEvent.click(screen.getByRole('button', { name: /^Spalten/ }));
+    await userEvent.click(within(await offenesMenue()).getByRole('checkbox', { name: 'Aktiv' }));
+    await waitFor(() => expect(zeilen()).toHaveLength(2));
+  });
+
   it('Name und Aktionen stehen nicht zur Wahl', async () => {
     mockBasis(admin);
     render();

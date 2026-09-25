@@ -5,7 +5,7 @@ import type { ReactElement } from 'react';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 import type { TastaturAktionen } from '../command-palette/typen';
 import { renderMitProviders as renderBasis } from '../test/utils';
-import { setzeViewportBreite } from '../test/viewport';
+import { sendeBreitenAenderung, setzeViewportBreite } from '../test/viewport';
 import KatalogTabelle, { type KatalogSpalte, type KatalogTabelleProps } from './KatalogTabelle';
 
 /**
@@ -109,7 +109,7 @@ describe('KatalogTabelle · Spaltenschalter (LFH-374)', () => {
     ).toBeInTheDocument();
   });
 
-  it('Breite und Handauswahl laufen in EINEN Zähler, doppelt verborgen zählt einmal', async () => {
+  it('Breite und Handauswahl laufen in EINEN Zähler', async () => {
     setzeViewportBreite(800);
     const { container } = renderBasis(tabelle(MIT_SCHALTER));
     expect(kopf(container)).toEqual(['Name', 'Typ', 'Aktionen']);
@@ -118,6 +118,21 @@ describe('KatalogTabelle · Spaltenschalter (LFH-374)', () => {
     await userEvent.click(screen.getByRole('button', { name: /^Spalten/ }));
     await userEvent.click(within(await offenesMenue()).getByRole('checkbox', { name: 'Typ' }));
     expect(screen.getByRole('button', { name: /^Spalten · 3 ausgeblendet/ })).toBeInTheDocument();
+  });
+
+  it('eine per Hand abgewählte Spalte, die danach auch per Breite wegfällt, zählt einmal', async () => {
+    const { container } = renderBasis(tabelle(MIT_SCHALTER));
+    await userEvent.click(screen.getByRole('button', { name: /^Spalten/ }));
+    await userEvent.click(within(await offenesMenue()).getByRole('checkbox', { name: 'URL' }));
+    expect(screen.getByRole('button', { name: /^Spalten · 1 ausgeblendet/ })).toBeInTheDocument();
+
+    // Jetzt fällt das Fenster unter `lg`: URL wäre ZUSÄTZLICH breitenbedingt weg, Attribution
+    // kommt neu hinzu. Richtig ist 2, nicht 3.
+    act(() => {
+      sendeBreitenAenderung(800);
+    });
+    expect(kopf(container)).toEqual(['Name', 'Typ', 'Aktionen']);
+    expect(screen.getByRole('button', { name: /^Spalten · 2 ausgeblendet/ })).toBeInTheDocument();
   });
 
   it('eine per Breite weggefallene Spalte lässt sich von Hand zurückholen', async () => {

@@ -675,6 +675,12 @@ describe('Freistellungen tragen ihre Begründung (LFH-368 · B5h)', () => {
  *
  * Doppelpunkt-Form wie die Ordnungsmuster: `overflow: 'hidden'` trifft nicht (dort steht das
  * Wort als Wert, nicht als Schlüssel).
+ *
+ * BLINDE FLECKEN, gemessen und benannt: der Scan liest nur die achtzehn Konsumentendateien.
+ * Eine Spaltenliste, die in eine Hilfsdatei ausgelagert ist (Muster
+ * `personen/personenSpalten.tsx`), sieht er nicht — und eine Typassertion
+ * (`[…] as KatalogSpalte<X>[]`, so an den Aktionsspalten beider Kartenverwaltungen) hebelt die
+ * Typsperre aus. Wer eine Spaltenliste auslagert, nimmt die Datei hier mit auf.
  */
 const AUSBLEND_MUSTER = /\b(?:responsive|hidden)\s*:/g;
 

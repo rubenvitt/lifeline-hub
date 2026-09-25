@@ -36,8 +36,8 @@ MUST dann gezeigt werden.
 - **THEN** heißt der Schalter „Spalten · 3 ausgeblendet“
 
 #### Scenario: Doppelt verborgen zählt einmal
-- **WHEN** unterhalb von `lg` die ohnehin weggefallene Spalte „Attribution“ zusätzlich per Hand abgewählt wird
-- **THEN** steigt der Zähler nicht
+- **WHEN** „URL“ ab der Breite `lg` per Hand abgewählt ist und das Fenster danach unter `lg` fällt, sodass „URL“ zusätzlich breitenbedingt wegfiele
+- **THEN** zählt „URL“ weiterhin einmal, und der Schalter heißt „Spalten · 2 ausgeblendet“ (URL und Attribution), nicht „· 3“
 
 #### Scenario: Breitenabhängig weggefallene Spalte von Hand zurückholen
 - **WHEN** die Offline-Karten-Verwaltung unterhalb von `lg` steht und „Attribution“ im Schalter angewählt wird
