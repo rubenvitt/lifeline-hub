@@ -154,15 +154,15 @@ pub async fn gehoert_anhang_zu_einsatz(
 /// `rows_affected() == 0` ist „unbekannt" von „gebunden" nicht zu trennen, ohne eine zweite
 /// Abfrage, die das Rennen wieder öffnete. Im Rennfall antwortet die Route also 404.
 ///
-/// **Dasselbe gilt für ETB-Anhänge** (LFH-117, zweites `NOT EXISTS`): sie sind bis zur
-/// Schwärzung unveränderlich wie der Eintrag; die CASCADE von `etb_eintrag_anhang` nähme
-/// sonst still die Verknüpfung mit, und der Eintrag verlöre seine Datei.
+/// **Dasselbe gilt für jeden modulgebundenen Linker** ([`MODUL_LINKER`]): ETB-Anhänge
+/// (LFH-117) sind bis zur Schwärzung unveränderlich wie der Eintrag, Schaden-Anhänge (LFH-21)
+/// werden am Schaden mit Nachweis entfernt; die CASCADE nähme sonst still die Verknüpfung
+/// mit. Der Chat steht nicht im Riegel — seine Verknüpfungen räumt die CASCADE bewusst.
 pub async fn loeschen(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<(), AppError> {
-    let betroffen = sqlx::query(
-        "DELETE FROM anhang WHERE id = ? AND einsatz_id = ? \
-           AND NOT EXISTS (SELECT 1 FROM einsatz_dokument d WHERE d.anhang_id = anhang.id) \
-           AND NOT EXISTS (SELECT 1 FROM etb_eintrag_anhang l WHERE l.anhang_id = anhang.id)",
-    )
+    let betroffen = sqlx::query(sqlx::AssertSqlSafe(format!(
+        "DELETE FROM anhang WHERE id = ? AND einsatz_id = ? AND NOT {}",
+        modul_gebunden_sql("anhang")
+    )))
     .bind(id)
     .bind(einsatz_id)
     .execute(pool)
@@ -174,49 +174,116 @@ pub async fn loeschen(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<(),
     Ok(())
 }
 
-/// Wer einen Anhang referenziert — über ALLE Linker aggregiert (LFH-116 → LFH-632).
-/// Vorher lag diese Frage chat-lokal in `chat::repo` und kannte nur einen Linker.
+/// Ein **modulgebundener** Linker auf `anhang` (LFH-21, design.md D2): die Datei gehört einem
+/// Fachmodul, ist nur über dessen Route ladbar, generisch nicht löschbar, für den Sweep nie
+/// verwaist und an keinen zweiten Linker bindbar. Jede Tabelle trägt eine Spalte `anhang_id`.
+#[derive(Debug, PartialEq, Eq)]
+pub struct ModulLinker {
+    /// Tabellenname des Linkers (Compile-Zeit-Konstante, geht in SQL-Texte).
+    pub tabelle: &'static str,
+    /// Meldung des generischen DELETE (422) für eine Datei dieses Linkers.
+    pub loesch_meldung: &'static str,
+    /// Kurzname für die Bindungsmeldung des ETB ([`gebunden_meldung`]).
+    pub ort: &'static str,
+}
+
+/// **Das Register der modulgebundenen Linker** (LFH-21). Ein neuer Linker auf `anhang`
+/// braucht hier genau einen Eintrag; daraus beziehen alle Stellen, die jeden Linker kennen
+/// müssen, ihre Bedingung: [`LinkerStand`]/[`linker_stand`], [`sweep_verwaiste`],
+/// [`loeschen`], `chat::repo::anlegen_mit_anhaengen` und `etb::repo::pruefe_anhaenge`. Der
+/// Guard `jeder_fremdschluessel_auf_anhang_ist_registriert` vergleicht die Liste mit allen
+/// Fremdschlüsseln auf `anhang` und wird rot, sobald eine Tabelle fehlt.
+///
+/// Der Chat (`chat_nachricht_anhang`) steht bewusst NICHT hier: n : m, Tombstone-Regel, und
+/// der generische Upload/Download ist sein Weg. Die Reihenfolge ist die der Meldung in
+/// [`gebunden_meldung`].
+pub const MODUL_LINKER: &[ModulLinker] = &[
+    ModulLinker {
+        tabelle: "einsatz_dokument",
+        loesch_meldung: "Anhang gehört zur Dokumentenablage und wird dort entfernt",
+        ort: "Dokumentenablage",
+    },
+    ModulLinker {
+        tabelle: "etb_eintrag_anhang",
+        loesch_meldung: "Anhang gehört zu einem ETB-Eintrag und ist unveränderlich",
+        ort: "ETB-Eintrag",
+    },
+];
+
+/// Positiver SQL-Baustein: „der Anhang `{alias}` hängt an einem modulgebundenen Linker" —
+/// `(EXISTS (SELECT 1 FROM einsatz_dokument x WHERE x.anhang_id = {alias}.id) OR …)`. Die
+/// Aufrufer negieren (`NOT …`) oder verodern ihn; eine Negation als Baustein passte nicht in
+/// `etb::repo::pruefe_anhaenge`, das die Bindung als WERT neben `hochgeladen_von` liest.
+///
+/// Der Text entsteht aus Compile-Zeit-Konstanten (Register und Alias-Literal des Aufrufers);
+/// kein Eingabewert gelangt hinein. Aufrufer reichen ihn über `sqlx::AssertSqlSafe` weiter.
+pub fn modul_gebunden_sql(alias: &str) -> String {
+    let teile: Vec<String> = MODUL_LINKER
+        .iter()
+        .map(|l| {
+            format!(
+                "EXISTS (SELECT 1 FROM {} x WHERE x.anhang_id = {alias}.id)",
+                l.tabelle
+            )
+        })
+        .collect();
+    format!("({})", teile.join(" OR "))
+}
+
+/// Die 422-Meldung „bereits gebunden" des ETB (`etb::repo::pruefe_anhaenge`), aus dem Chat
+/// und den `ort`-Namen des Registers gebaut — ein neuer Linker erweitert sie ohne Handarbeit.
+pub fn gebunden_meldung() -> String {
+    let mut orte: Vec<&str> = vec!["Chat-Nachricht"];
+    orte.extend(MODUL_LINKER.iter().map(|l| l.ort));
+    let letzter = orte.pop().unwrap_or_default();
+    let liste = if orte.is_empty() {
+        letzter.to_string()
+    } else {
+        format!("{} oder {letzter}", orte.join(", "))
+    };
+    format!("Anhang ist bereits gebunden ({liste})")
+}
+
+/// Tabelle des Chat-Linkers — die eine Ausnahme neben [`MODUL_LINKER`].
+pub const CHAT_LINKER: &str = "chat_nachricht_anhang";
+
+/// Wer einen Anhang referenziert — über ALLE Linker aggregiert (LFH-116 → LFH-632 → LFH-21).
+/// Vorher lag diese Frage chat-lokal in `chat::repo` und kannte nur einen Linker; seit LFH-21
+/// kommen die modulgebundenen Linker aus dem Register [`MODUL_LINKER`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct LinkerStand {
     /// Verknüpfungen über `chat_nachricht_anhang`.
     pub chat_gesamt: i64,
     /// Davon an nicht soft-gelöschten Nachrichten.
     pub chat_lebend: i64,
-    /// Verknüpfungen über `einsatz_dokument` (0 oder 1, `anhang_id UNIQUE`), gelöscht oder nicht.
-    pub dokument_gesamt: i64,
-    /// Verknüpfungen über `etb_eintrag_anhang` (0 oder 1, `anhang_id UNIQUE`, LFH-117).
-    pub etb_gesamt: i64,
+    /// Der modulgebundene Linker, an dem der Anhang hängt (gelöscht oder nicht) — `None`,
+    /// wenn an keinem. Jeder dieser Linker hält `anhang_id UNIQUE`, also höchstens einer.
+    pub modul: Option<&'static ModulLinker>,
 }
 
 impl LinkerStand {
-    /// Der Anhang gehört zur Dokumentenablage (LFH-632).
-    pub fn ist_dokument(&self) -> bool {
-        self.dokument_gesamt > 0
-    }
-
-    /// Der Anhang gehört zu einem ETB-Eintrag (LFH-117) und ist bis zur Schwärzung
-    /// unveränderlich wie der Eintrag selbst.
-    pub fn ist_etb(&self) -> bool {
-        self.etb_gesamt > 0
+    /// Der Anhang gehört einem Fachmodul (Dokumentenablage, ETB-Eintrag, Schaden …): nur
+    /// über dessen Route erreichbar, generisch nicht löschbar.
+    pub fn ist_modul_gebunden(&self) -> bool {
+        self.modul.is_some()
     }
 
     /// Ob der **generische** Download (`GET /anhaenge/{aid}`) gesperrt ist:
-    /// (a) ein Dokument-Anhang ist nur über die modul-gegatete Dokument-Route ladbar —
-    ///     die generische Route ist modul-los (`PFAD_KEY … None`) und wäre sonst ein Bypass
-    ///     für ein ausgeblendetes Dokumente-Modul und für soft-gelöschte Dokumente;
+    /// (a) ein modulgebundener Anhang ist nur über die modul-gegatete Route seines Moduls
+    ///     ladbar — die generische Route ist modul-los (`PFAD_KEY … None`) und wäre sonst ein
+    ///     Bypass für ein ausgeblendetes Modul und für soft-gelöschte Einträge (LFH-632,
+    ///     LFH-117, LFH-21);
     /// (b) Chat-Tombstone (LFH-116): an ≥ 1 Nachricht verknüpft und ALLE tragen den
-    ///     Tombstone. Ein verwaister Anhang (Upload→Senden) bleibt ladbar;
-    /// (c) ein ETB-Anhang (LFH-117) ist nur über die ETB-Route ladbar — aus demselben Grund
-    ///     wie (a): sonst umginge die modul-lose Route das Modul-Gate „etb".
+    ///     Tombstone. Ein verwaister Anhang (Upload→Senden) bleibt ladbar.
     pub fn generischer_download_gesperrt(&self) -> bool {
-        self.ist_dokument() || self.ist_etb() || (self.chat_gesamt > 0 && self.chat_lebend == 0)
+        self.ist_modul_gebunden() || (self.chat_gesamt > 0 && self.chat_lebend == 0)
     }
 
     /// An KEINEM Linker gebunden: hochgeladen, aber (noch) nicht gesendet oder erfasst. Die
     /// generische Route bedient einen solchen Anhang nur für die hochladende Person
     /// (LFH-117, Review C1) — wem er gehören wird, steht erst mit dem Linker fest.
     pub fn ist_ungebunden(&self) -> bool {
-        self.chat_gesamt == 0 && self.dokument_gesamt == 0 && self.etb_gesamt == 0
+        self.chat_gesamt == 0 && self.modul.is_none()
     }
 }
 
@@ -229,57 +296,68 @@ pub async fn hochgeladen_von(pool: &SqlitePool, anhang_id: i64) -> Result<Option
         .map_err(Into::into)
 }
 
-/// Aggregiert die Linker eines Anhangs. Ein unbekannter Anhang liefert lauter Nullen —
-/// die Existenz prüft der Aufrufer vorher (`gehoert_anhang_zu_einsatz`).
+/// Aggregiert die Linker eines Anhangs in EINER Abfrage: Chat gesamt/lebend und je
+/// Registereintrag ([`MODUL_LINKER`]) eine Zählung. Ein unbekannter Anhang liefert lauter
+/// Nullen — die Existenz prüft der Aufrufer vorher (`gehoert_anhang_zu_einsatz`).
 pub async fn linker_stand(pool: &SqlitePool, anhang_id: i64) -> Result<LinkerStand, AppError> {
-    let (chat_gesamt, chat_lebend, dokument_gesamt, etb_gesamt): (i64, i64, i64, i64) =
-        sqlx::query_as(
-            "SELECT \
-               (SELECT COUNT(*) FROM chat_nachricht_anhang WHERE anhang_id = ?1), \
-               (SELECT COUNT(*) FROM chat_nachricht_anhang cna \
-                  JOIN chat_nachricht n ON n.id = cna.nachricht_id \
-                 WHERE cna.anhang_id = ?1 AND n.geloescht_at IS NULL), \
-               (SELECT COUNT(*) FROM einsatz_dokument WHERE anhang_id = ?1), \
-               (SELECT COUNT(*) FROM etb_eintrag_anhang WHERE anhang_id = ?1)",
-        )
-        .bind(anhang_id)
-        .fetch_one(pool)
-        .await?;
+    use sqlx::Row;
+    let modul_zaehler: String = MODUL_LINKER
+        .iter()
+        .map(|l| {
+            format!(
+                ", (SELECT COUNT(*) FROM {} WHERE anhang_id = ?1)",
+                l.tabelle
+            )
+        })
+        .collect();
+    let zeile = sqlx::query(sqlx::AssertSqlSafe(format!(
+        "SELECT \
+           (SELECT COUNT(*) FROM chat_nachricht_anhang WHERE anhang_id = ?1), \
+           (SELECT COUNT(*) FROM chat_nachricht_anhang cna \
+              JOIN chat_nachricht n ON n.id = cna.nachricht_id \
+             WHERE cna.anhang_id = ?1 AND n.geloescht_at IS NULL)\
+           {modul_zaehler}"
+    )))
+    .bind(anhang_id)
+    .fetch_one(pool)
+    .await?;
+    let mut modul = None;
+    for (i, linker) in MODUL_LINKER.iter().enumerate() {
+        if zeile.try_get::<i64, _>(2 + i)? > 0 {
+            modul = Some(linker);
+            break;
+        }
+    }
     Ok(LinkerStand {
-        chat_gesamt,
-        chat_lebend,
-        dokument_gesamt,
-        etb_gesamt,
+        chat_gesamt: zeile.try_get(0)?,
+        chat_lebend: zeile.try_get(1)?,
+        modul,
     })
 }
 
-/// Löscht „verwaiste" Anhänge — an KEINEN Linker gebunden (weder `chat_nachricht_anhang`
-/// noch `einsatz_dokument` noch `etb_eintrag_anhang`), z. B. hochgeladen aber nie gesendet
-/// oder nie erfasst —, deren Upload länger als
+/// Löscht „verwaiste" Anhänge — an KEINEN Linker gebunden (weder am Chat noch an einem
+/// Eintrag von [`MODUL_LINKER`]), z. B. hochgeladen aber nie gesendet oder nie erfasst —, deren Upload länger als
 /// [`VERWAISTE_KARENZ_STUNDEN`] zurückliegt. Gegen monotones BLOB-Wachstum (LFH-250).
 /// Injiziertes `jetzt` = deterministisch testbar; der `WHERE`-Guard macht wiederholte Läufe
 /// idempotent. Liefert die Anzahl gelöschter Anhänge.
 ///
-/// **Jeder Linker gehört in dieses `NOT EXISTS`** — heute drei: Chat (LFH-102), Dokument
-/// (LFH-632), ETB (LFH-117). Ein fehlender Linker macht keinen Fehler, sondern löscht dort
-/// gebundene Dateien nach der Karenz still — die Tests
-/// `sweep_verwaiste_haelt_dokument_gebundene_anhaenge` und
-/// `sweep_verwaiste_haelt_etb_gebundene_anhaenge` pinnen das.
+/// **Jeder Linker gehört in diese Bedingung** — der Chat (LFH-102) als eigenes `NOT EXISTS`,
+/// alle modulgebundenen über das Register ([`MODUL_LINKER`], LFH-21). Ein fehlender Linker
+/// macht keinen Fehler, sondern löscht dort gebundene Dateien nach der Karenz still — die
+/// Tests `sweep_verwaiste_haelt_{dokument,etb,schaden}_gebundene_anhaenge` pinnen das.
 /// Ein soft-gelöschtes Dokument ist bewusst KEIN Orphan (Beweissicherung, LFH-632 E1).
 pub async fn sweep_verwaiste(pool: &SqlitePool, jetzt: DateTime<Utc>) -> Result<u64, AppError> {
     let grenze = (jetzt - Duration::hours(VERWAISTE_KARENZ_STUNDEN))
         .format("%Y-%m-%d %H:%M:%S")
         .to_string();
-    let betroffen = sqlx::query(
+    let betroffen = sqlx::query(sqlx::AssertSqlSafe(format!(
         "DELETE FROM anhang \
          WHERE erstellt_at < ? \
            AND NOT EXISTS \
                (SELECT 1 FROM chat_nachricht_anhang cna WHERE cna.anhang_id = anhang.id) \
-           AND NOT EXISTS \
-               (SELECT 1 FROM einsatz_dokument d WHERE d.anhang_id = anhang.id) \
-           AND NOT EXISTS \
-               (SELECT 1 FROM etb_eintrag_anhang l WHERE l.anhang_id = anhang.id)",
-    )
+           AND NOT {}",
+        modul_gebunden_sql("anhang")
+    )))
     .bind(grenze)
     .execute(pool)
     .await?
@@ -532,16 +610,16 @@ mod tests {
         als_dokument(&pool, einsatz, von, dok, false).await;
 
         let s = linker_stand(&pool, frei).await.unwrap();
-        assert_eq!((s.chat_gesamt, s.chat_lebend, s.dokument_gesamt), (0, 0, 0));
-        assert!(!s.ist_dokument());
+        assert_eq!((s.chat_gesamt, s.chat_lebend, s.modul), (0, 0, None));
+        assert!(!s.ist_modul_gebunden());
         assert!(
             !s.generischer_download_gesperrt(),
             "verwaist bleibt ladbar (Upload→Senden)"
         );
 
         let s = linker_stand(&pool, dok).await.unwrap();
-        assert_eq!(s.dokument_gesamt, 1);
-        assert!(s.ist_dokument());
+        assert_eq!(s.modul.map(|l| l.tabelle), Some("einsatz_dokument"));
+        assert!(s.ist_modul_gebunden());
         assert!(
             s.generischer_download_gesperrt(),
             "Dokument-Anhang nur über die Modul-Route"
@@ -549,29 +627,24 @@ mod tests {
     }
 
     #[test]
-    fn ungebunden_heisst_an_keinem_der_drei_linker() {
+    fn ungebunden_heisst_an_keinem_linker() {
         let null = LinkerStand {
             chat_gesamt: 0,
             chat_lebend: 0,
-            dokument_gesamt: 0,
-            etb_gesamt: 0,
+            modul: None,
         };
         assert!(null.ist_ungebunden());
         // Auch ein toter Chat-Linker bindet: der Tombstone sperrt dann ohnehin (LFH-116).
-        for gebunden in [
-            LinkerStand {
-                chat_gesamt: 1,
-                ..null
-            },
-            LinkerStand {
-                dokument_gesamt: 1,
-                ..null
-            },
-            LinkerStand {
-                etb_gesamt: 1,
-                ..null
-            },
-        ] {
+        let mut gebundene = vec![LinkerStand {
+            chat_gesamt: 1,
+            ..null
+        }];
+        // Jeder Registereintrag bindet (Dokument, ETB, …).
+        gebundene.extend(MODUL_LINKER.iter().map(|l| LinkerStand {
+            modul: Some(l),
+            ..null
+        }));
+        for gebunden in gebundene {
             assert!(!gebunden.ist_ungebunden(), "{gebunden:?}");
         }
     }
@@ -581,35 +654,94 @@ mod tests {
         let nur_tot = LinkerStand {
             chat_gesamt: 2,
             chat_lebend: 0,
-            dokument_gesamt: 0,
-            etb_gesamt: 0,
+            modul: None,
         };
         let einer_lebt = LinkerStand {
             chat_gesamt: 2,
             chat_lebend: 1,
-            dokument_gesamt: 0,
-            etb_gesamt: 0,
-        };
-        // Dokument hat Vorrang: auch eine lebende Chat-Verknüpfung öffnet den generischen
-        // Download nicht (LFH-632).
-        let dokument_und_lebender_chat = LinkerStand {
-            chat_gesamt: 1,
-            chat_lebend: 1,
-            dokument_gesamt: 1,
-            etb_gesamt: 0,
-        };
-        // Dasselbe für das ETB (LFH-117): die Kreuzsperren verhindern den Zustand, aber die
-        // Sperre darf nicht davon abhängen, dass es sie gibt.
-        let etb_und_lebender_chat = LinkerStand {
-            chat_gesamt: 1,
-            chat_lebend: 1,
-            dokument_gesamt: 0,
-            etb_gesamt: 1,
+            modul: None,
         };
         assert!(nur_tot.generischer_download_gesperrt());
         assert!(!einer_lebt.generischer_download_gesperrt());
-        assert!(dokument_und_lebender_chat.generischer_download_gesperrt());
-        assert!(etb_und_lebender_chat.generischer_download_gesperrt());
+        // Ein modulgebundener Linker hat Vorrang: auch eine lebende Chat-Verknüpfung öffnet
+        // den generischen Download nicht (Dokument LFH-632, ETB LFH-117, …). Die Kreuzsperren
+        // verhindern den Zustand, aber die Sperre darf nicht davon abhängen, dass es sie gibt.
+        for l in MODUL_LINKER {
+            let modul_und_lebender_chat = LinkerStand {
+                chat_gesamt: 1,
+                chat_lebend: 1,
+                modul: Some(l),
+            };
+            assert!(
+                modul_und_lebender_chat.generischer_download_gesperrt(),
+                "{}",
+                l.tabelle
+            );
+        }
+    }
+
+    #[test]
+    fn gebunden_meldung_nennt_chat_und_jeden_registereintrag() {
+        let m = gebunden_meldung();
+        assert!(
+            m.starts_with("Anhang ist bereits gebunden (Chat-Nachricht, "),
+            "{m}"
+        );
+        for l in MODUL_LINKER {
+            assert!(m.contains(l.ort), "{m} nennt {} nicht", l.ort);
+        }
+    }
+
+    #[test]
+    fn modul_gebunden_sql_verodert_jeden_registereintrag() {
+        let sql = modul_gebunden_sql("a");
+        assert!(sql.starts_with('(') && sql.ends_with(')'), "{sql}");
+        for l in MODUL_LINKER {
+            assert!(
+                sql.contains(&format!("FROM {} x WHERE x.anhang_id = a.id", l.tabelle)),
+                "{sql}"
+            );
+        }
+        assert_eq!(sql.matches(" OR ").count(), MODUL_LINKER.len() - 1);
+    }
+
+    /// LFH-21, design.md D2: jede Tabelle mit einem Fremdschlüssel auf `anhang` ist entweder
+    /// der Chat-Linker oder steht im Register. Ein neuer Linker ohne Registereintrag gälte
+    /// sonst als „ungebunden": der Sweep löschte seine Dateien nach der Karenz, und die
+    /// hochladende Person könnte sie über die generische Route laden und hart löschen (D12).
+    ///
+    /// **Grenze:** gesehen werden nur DEKLARIERTE Fremdschlüssel (`REFERENCES anhang`). Eine
+    /// Tabelle, die `anhang.id` ohne `REFERENCES` speichert, entgeht dem Guard — dieselbe
+    /// Grenze wie beim Schwärzungs-Guard.
+    #[tokio::test]
+    async fn jeder_fremdschluessel_auf_anhang_ist_registriert() {
+        let pool = crate::db::test_pool().await;
+        let zeilen: Vec<(String, String)> = sqlx::query_as(
+            "SELECT m.name, f.\"from\" FROM sqlite_master m, pragma_foreign_key_list(m.name) f \
+             WHERE m.type = 'table' AND f.\"table\" = 'anhang' ORDER BY m.name",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        let mut in_db: Vec<&str> = zeilen.iter().map(|(t, _)| t.as_str()).collect();
+        in_db.dedup();
+        let mut erwartet: Vec<&str> = MODUL_LINKER.iter().map(|l| l.tabelle).collect();
+        erwartet.push(CHAT_LINKER);
+        erwartet.sort_unstable();
+        assert_eq!(
+            in_db, erwartet,
+            "Tabellen mit FK auf anhang ≠ {{chat_nachricht_anhang}} ∪ MODUL_LINKER — \
+             ein neuer Linker gehört ins Register (anhang::repo::MODUL_LINKER)"
+        );
+        for l in MODUL_LINKER {
+            assert!(
+                zeilen
+                    .iter()
+                    .any(|(t, spalte)| t == l.tabelle && spalte == "anhang_id"),
+                "{} verweist nicht über eine Spalte anhang_id auf anhang",
+                l.tabelle
+            );
+        }
     }
 
     // --- LFH-117: `etb_eintrag_anhang` als dritter Linker ---
@@ -645,13 +777,13 @@ mod tests {
         als_etb(&pool, einsatz, von, etb).await;
 
         let s = linker_stand(&pool, frei).await.unwrap();
-        assert_eq!(s.etb_gesamt, 0);
-        assert!(!s.ist_etb());
+        assert_eq!(s.modul, None);
+        assert!(!s.ist_modul_gebunden());
         assert!(!s.generischer_download_gesperrt());
 
         let s = linker_stand(&pool, etb).await.unwrap();
-        assert_eq!(s.etb_gesamt, 1);
-        assert!(s.ist_etb());
+        assert_eq!(s.modul.map(|l| l.tabelle), Some("etb_eintrag_anhang"));
+        assert!(s.ist_modul_gebunden());
         assert!(
             s.generischer_download_gesperrt(),
             "ETB-Anhang nur über die ETB-Route ladbar"

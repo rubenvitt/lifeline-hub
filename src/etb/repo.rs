@@ -226,7 +226,7 @@ pub async fn anlegen_idempotent(
 }
 
 /// Schritt 2 aus [`anlegen_idempotent`]: jeder genannte Anhang muss im Einsatz existieren
-/// (sonst 400) und darf an KEINEM der drei Linker hängen (sonst 422) — „eine Datei, ein
+/// (sonst 400) und darf an KEINEM Linker hängen — Chat oder Register (sonst 422) — „eine Datei, ein
 /// Lebenszyklus". Erst alle prüfen, dann schreiben: so bindet ein Fehler hinten nichts vorn.
 ///
 /// Ein freier Anhang, den eine ANDERE Person hochgeladen hat, gilt als unbekannt (Review C1,
@@ -241,16 +241,16 @@ async fn pruefe_anhaenge(
     anhang_ids: &[i64],
 ) -> Result<(), AppError> {
     for &aid in anhang_ids {
-        // Eine der FÜNF Stellen, die jeden Linker auf `anhang` kennen müssen (CLAUDE.md
-        // „ETB-Anhänge", design.md D12): ein neuer Linker fehlte hier sonst, und das ETB bände
-        // dessen Dateien ein zweites Mal.
-        let stand: Option<(bool, i64)> = sqlx::query_as(
-            "SELECT EXISTS (SELECT 1 FROM etb_eintrag_anhang l WHERE l.anhang_id = a.id) \
-                 OR EXISTS (SELECT 1 FROM chat_nachricht_anhang c WHERE c.anhang_id = a.id) \
-                 OR EXISTS (SELECT 1 FROM einsatz_dokument d WHERE d.anhang_id = a.id), \
+        // Die Bindung kommt aus dem Linker-Register `anhang::repo::MODUL_LINKER` (CLAUDE.md
+        // „ETB-Anhänge", LFH-21) plus dem Chat: ein neuer Linker braucht dort einen Eintrag,
+        // sonst bände das ETB dessen Dateien ein zweites Mal — der Registerguard macht das rot.
+        let stand: Option<(bool, i64)> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
+            "SELECT EXISTS (SELECT 1 FROM chat_nachricht_anhang c WHERE c.anhang_id = a.id) \
+                 OR {}, \
                     a.hochgeladen_von \
              FROM anhang a WHERE a.id = ? AND a.einsatz_id = ?",
-        )
+            crate::anhang::repo::modul_gebunden_sql("a")
+        )))
         .bind(aid)
         .bind(einsatz_id)
         .fetch_optional(&mut *conn)
@@ -263,9 +263,7 @@ async fn pruefe_anhaenge(
             None => return Err(AppError::Validation(ANHANG_UNBEKANNT.into())),
             Some(true) => {
                 return Err(AppError::UnprocessableEntity(
-                    "Anhang ist bereits an einen ETB-Eintrag, eine Chat-Nachricht oder ein \
-                     Dokument gebunden"
-                        .into(),
+                    crate::anhang::repo::gebunden_meldung(),
                 ))
             }
             Some(false) => {}

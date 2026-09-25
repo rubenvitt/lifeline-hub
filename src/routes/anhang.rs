@@ -93,9 +93,9 @@ pub async fn herunterladen(
 /// DELETE /api/einsaetze/{id}/anhaenge/{aid} — Anhang hart löschen (Freigabepfad, LFH-250).
 /// Schreibrecht + aktiver Einsatz; die Ownership erzwingt die einsatz-gescopte Query
 /// (fremder Anhang → NotFound). Der `ON DELETE CASCADE`-FK räumt die
-/// `chat_nachricht_anhang`-Verknüpfungen mit. Dokument-gebundene Anhänge (LFH-632) werden
-/// mit 422 abgewiesen — sie entfernt die Dokumentenablage (Soft-Delete mit ETB-Nachweis).
-/// ETB-gebundene (LFH-117) ebenso — sie gehen nur mit der Schwärzung. Einen ungebundenen
+/// `chat_nachricht_anhang`-Verknüpfungen mit. Modulgebundene Anhänge (Dokument LFH-632, ETB
+/// LFH-117, Schaden LFH-21) werden mit 422 abgewiesen, Wortlaut aus dem Linker-Register —
+/// sie entfernt ihr Modul, ETB-Anhänge gehen nur mit der Schwärzung. Einen ungebundenen
 /// Anhang verwirft nur, wer ihn hochgeladen hat (Review C1, sonst 404).
 pub async fn loeschen(
     State(state): State<AppState>,
@@ -106,20 +106,13 @@ pub async fn loeschen(
     if !anhang::repo::gehoert_anhang_zu_einsatz(&state.pool, anhang_id, einsatz_id).await? {
         return Err(AppError::NotFound);
     }
-    // LFH-632: ein Dokument-Anhang wird über die Dokumentenablage entfernt (Soft-Delete mit
-    // ETB-Nachweis). Der generische Hard-Delete hätte beides umgangen → Zustand verbietet es.
-    // LFH-117: ein ETB-Anhang ist unveränderlich wie sein Eintrag; es gibt keinen Löschweg
-    // außer der Schwärzung des Einsatzes.
+    // Ein modulgebundener Anhang (Register `anhang::repo::MODUL_LINKER`) wird in seinem
+    // Modul entfernt oder gar nicht: Dokumentenablage und Schaden mit Soft-Delete und
+    // ETB-Nachweis (LFH-632, LFH-21), der ETB-Eintrag nie außer mit der Schwärzung
+    // (LFH-117). Der generische Hard-Delete hätte das umgangen → der Zustand verbietet es.
     let linker = anhang::repo::linker_stand(&state.pool, anhang_id).await?;
-    if linker.ist_dokument() {
-        return Err(AppError::UnprocessableEntity(
-            "Anhang gehört zur Dokumentenablage und wird dort entfernt".into(),
-        ));
-    }
-    if linker.ist_etb() {
-        return Err(AppError::UnprocessableEntity(
-            "Anhang gehört zu einem ETB-Eintrag und ist unveränderlich".into(),
-        ));
+    if let Some(modul) = linker.modul {
+        return Err(AppError::UnprocessableEntity(modul.loesch_meldung.into()));
     }
     fordere_hochladende_bei_ungebunden(&state.pool, &linker, anhang_id, ctx.benutzer.id).await?;
     anhang::repo::loeschen(&state.pool, einsatz_id, anhang_id).await?;

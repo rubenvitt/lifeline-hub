@@ -362,8 +362,14 @@ async fn gebundener_anhang_ist_422() {
 
     let (erst, _) = erfassen(&app, &admin, einsatz, &body).await;
     assert_eq!(erst, StatusCode::CREATED);
-    let (zweit, _) = erfassen(&app, &admin, einsatz, &body).await;
+    let (zweit, v) = erfassen(&app, &admin, einsatz, &body).await;
     assert_eq!(zweit, StatusCode::UNPROCESSABLE_ENTITY);
+    // LFH-21: der Wortlaut entsteht aus dem Linker-Register (`gebunden_meldung()`) und nennt
+    // jeden Ort, an dem eine Datei gebunden sein kann.
+    assert_eq!(
+        v["error"],
+        "Anhang ist bereits gebunden (Chat-Nachricht, Dokumentenablage oder ETB-Eintrag)"
+    );
     assert_eq!(
         zaehle(
             &pool,
