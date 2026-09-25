@@ -18,7 +18,7 @@ import { listeEinheiten } from '../api/einheiten';
 import { ApiError } from '../api/client';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { EtbEintragAnzeige, NeuerAuftrag } from '../api/types';
-import { etbPfad, parseEtbFilter, parseRouteId } from '../routing/deeplinks';
+import { etbDruckPfad, etbPfad, parseEtbFilter, parseRouteId } from '../routing/deeplinks';
 import { SeitenFehler, SeitenLeer, SeitenSkeleton } from '../components/SeitenZustand';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import EtbZeitachse from '../etb/EtbZeitachse';
@@ -456,6 +456,20 @@ export default function EtbPage() {
       dataUpdatedAt={etbQuery.dataUpdatedAt}
       aktionen={
         <>
+          {/* Einstieg in die Druckansicht (LFH-22). Er ÖFFNET und sendet nichts ab, gehört
+              also in den Kopf (LFH-346 · C11) — sekundär, „genau eine Primäraktion" bleibt.
+              Ein Link mit Knopfgestalt: Strg/⌘+Klick öffnet einen neuen Tab. Der AKTIVE
+              Filter geht mit, sonst druckte die Person eine andere Auswahl als die sichtbare. */}
+          <Button
+            href={etbDruckPfad(einsatzId, filter)}
+            onClick={(e) => {
+              if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+              e.preventDefault();
+              navigate(etbDruckPfad(einsatzId, filter));
+            }}
+          >
+            Drucken / als PDF
+          </Button>
           {/* Der Typfilter als Segmentleiste (Entwurf S4). Er schreibt in denselben
               URL-Filter wie die Leiste darunter (`etbPfad`/`parseEtbFilter`) — das
               gewählte Segment wird aus der URL GELESEN, Zurück/Vor stimmen also. */}

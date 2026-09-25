@@ -28,6 +28,12 @@ export interface DruckkopfProps {
    * (ETB-Druckansicht, die ihr Papier vorab zeigt).
    */
   sichtbarkeit: 'druck' | 'immer';
+  /**
+   * Ebene der Dokumentüberschrift; Vorgabe `h1`. Die ETB-Druckansicht zeigt den Kopf auch
+   * am Bildschirm unter dem Seitenkopf, der schon das `h1` trägt — dort `2`, damit die
+   * Seite nicht zwei `h1` hat. Auf Papier ist der Seitenkopf ausgeblendet.
+   */
+  ebene?: 1 | 2;
 }
 
 /**
@@ -54,7 +60,9 @@ export default function Druckkopf({
   einsatz,
   zeilen = [],
   sichtbarkeit,
+  ebene = 1,
 }: DruckkopfProps) {
+  const Ueberschrift = ebene === 1 ? 'h1' : 'h2';
   const { token } = theme.useToken();
   const { benutzer } = useAuth();
   const { konventionen } = useAnzeigeKonventionen();
@@ -114,9 +122,12 @@ export default function Druckkopf({
         )}
         <span>{organisation.data?.name}</span>
       </div>
-      <h1 className="druckkopf__titel" style={{ fontSize: token.fontSizeHeading4, margin: 0 }}>
+      <Ueberschrift
+        className="druckkopf__titel"
+        style={{ fontSize: token.fontSizeHeading4, margin: 0 }}
+      >
         {titel ? `${dokumentart} – ${titel}` : dokumentart}
-      </h1>
+      </Ueberschrift>
       <dl
         className="druckkopf__angaben"
         style={{

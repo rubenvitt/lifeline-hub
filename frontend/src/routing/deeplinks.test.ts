@@ -28,6 +28,7 @@ import {
   wetterPegelPfad,
   pegelZielPfad,
   etbPfad,
+  etbDruckPfad,
   parseEtbFilter,
   parsePersonenSicht,
   personalPfad,
@@ -457,6 +458,30 @@ describe('etbPfad mit Filterachse (LFH-342 · C7)', () => {
     // Trägt die Gegenaussage zu `filterAktiv` in `EtbPage`: ohne Parameter ist kein
     // Filter gesetzt, und der leer-OHNE-Filter-Zweig aus B3 greift.
     expect(parseEtbFilter(new URLSearchParams(''))).toEqual({});
+  });
+});
+
+describe('etbDruckPfad (LFH-22)', () => {
+  it('zeigt ohne Filter auf die Druckansicht des Tagebuchs', () => {
+    expect(etbDruckPfad(7, {})).toBe('/einsaetze/7/etb/druck');
+  });
+
+  it('trägt den Filter durch URLSearchParams hin und zurück — auch mit & = und Leerzeichen', () => {
+    const filter = {
+      q: 'Brücke & Damm = gesperrt',
+      typ: 'meldung' as const,
+      von: '2026-08-21 06:00:00',
+      bis: '2026-08-21 10:00:00',
+      einheit_id: 12,
+    };
+    const pfad = etbDruckPfad(7, filter);
+    expect(pfad.startsWith('/einsaetze/7/etb/druck?')).toBe(true);
+    expect(parseEtbFilter(new URLSearchParams(pfad.split('?')[1]))).toEqual(filter);
+  });
+
+  it('verwirft einen unbekannten Typ auf dem Rückweg GANZ', () => {
+    const pfad = `/einsaetze/7/etb/druck?q=x&typ=quatsch`;
+    expect(parseEtbFilter(new URLSearchParams(pfad.split('?')[1]))).toEqual({ q: 'x' });
   });
 });
 
