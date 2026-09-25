@@ -43,7 +43,8 @@ pub async fn hochladen(
 /// Gatet zusätzlich über [`anhang::repo::linker_stand`] (Aggregation über ALLE Linker):
 /// (LFH-116) hängt der Anhang NUR noch an soft-gelöschten Nachrichten, ist er gesperrt
 /// (404) — der Direkt-Deeplink umgeht sonst die Frontend-Ausblendung; (LFH-632) gehört er
-/// zur Dokumentenablage, ist er nur über die modul-gegatete Dokument-Route ladbar (404).
+/// zur Dokumentenablage, ist er nur über die modul-gegatete Dokument-Route ladbar (404);
+/// (LFH-117) hängt er an einem ETB-Eintrag, nur über die ETB-Route (404).
 /// Verwaiste oder an einer lebenden Nachricht hängende Anhänge bleiben ladbar (n:m).
 pub async fn herunterladen(
     State(state): State<AppState>,
@@ -74,6 +75,7 @@ pub async fn herunterladen(
 /// (fremder Anhang → NotFound). Der `ON DELETE CASCADE`-FK räumt die
 /// `chat_nachricht_anhang`-Verknüpfungen mit. Dokument-gebundene Anhänge (LFH-632) werden
 /// mit 422 abgewiesen — sie entfernt die Dokumentenablage (Soft-Delete mit ETB-Nachweis).
+/// ETB-gebundene (LFH-117) ebenso — sie gehen nur mit der Schwärzung.
 pub async fn loeschen(
     State(state): State<AppState>,
     _ctx: EinsatzSchreibzugriff,
@@ -85,12 +87,17 @@ pub async fn loeschen(
     }
     // LFH-632: ein Dokument-Anhang wird über die Dokumentenablage entfernt (Soft-Delete mit
     // ETB-Nachweis). Der generische Hard-Delete hätte beides umgangen → Zustand verbietet es.
-    if anhang::repo::linker_stand(&state.pool, anhang_id)
-        .await?
-        .ist_dokument()
-    {
+    // LFH-117: ein ETB-Anhang ist unveränderlich wie sein Eintrag; es gibt keinen Löschweg
+    // außer der Schwärzung des Einsatzes.
+    let linker = anhang::repo::linker_stand(&state.pool, anhang_id).await?;
+    if linker.ist_dokument() {
         return Err(AppError::UnprocessableEntity(
             "Anhang gehört zur Dokumentenablage und wird dort entfernt".into(),
+        ));
+    }
+    if linker.ist_etb() {
+        return Err(AppError::UnprocessableEntity(
+            "Anhang gehört zu einem ETB-Eintrag und ist unveränderlich".into(),
         ));
     }
     anhang::repo::loeschen(&state.pool, einsatz_id, anhang_id).await?;

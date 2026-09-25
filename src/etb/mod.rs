@@ -257,6 +257,12 @@ pub struct EtbEintragAnzeige {
     /// Seite mit einer gebündelten Abfrage nach.
     #[sqlx(skip)]
     pub folgeauftraege: Vec<FolgeauftragVerweis>,
+    /// Die Dateien, die dieser Eintrag trägt (LFH-117): Metadaten ohne Bytes, aufsteigend nach
+    /// `id`, leer statt fehlend. Laden über `GET …/etb/{eintrag_id}/anhaenge/{aid}`.
+    // Nicht Teil des SELECT: `repo::laden`/`repo::abfrage` füllen die Liste je Seite mit einer
+    // gebündelten Abfrage nach, wie `folgeauftraege`.
+    #[sqlx(skip)]
+    pub anhaenge: Vec<crate::anhang::AnhangAnzeige>,
 }
 
 /// Verweis auf einen Folgeauftrag eines ETB-Eintrags (LFH-636): genug für einen Deeplink

@@ -287,11 +287,13 @@ pub async fn anlegen_mit_anhaengen(
 ) -> Result<ChatNachrichtAnzeige, AppError> {
     let id = crate::write_retry!(pool, |conn| {
         for &aid in anhang_ids {
-            // Dokument-Anhänge (LFH-632) sind nicht verknüpfbar: sie gehören der
-            // Dokumentenablage, ein zweiter Linker würde deren Lösch-/Rechte-Semantik aushebeln.
+            // Dokument-Anhänge (LFH-632) und ETB-Anhänge (LFH-117) sind nicht verknüpfbar: sie
+            // gehören der Dokumentenablage bzw. einem Eintrag, ein zweiter Linker würde deren
+            // Lösch-/Rechte-Semantik aushebeln („eine Datei, ein Lebenszyklus").
             let treffer: Option<i64> = sqlx::query_scalar(
                 "SELECT 1 FROM anhang a WHERE a.id = ? AND a.einsatz_id = ? \
-                   AND NOT EXISTS (SELECT 1 FROM einsatz_dokument d WHERE d.anhang_id = a.id)",
+                   AND NOT EXISTS (SELECT 1 FROM einsatz_dokument d WHERE d.anhang_id = a.id) \
+                   AND NOT EXISTS (SELECT 1 FROM etb_eintrag_anhang l WHERE l.anhang_id = a.id)",
             )
             .bind(aid)
             .bind(einsatz_id)

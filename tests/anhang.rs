@@ -881,3 +881,114 @@ async fn dokument_anhang_nicht_an_chat_verknuepfbar() {
             .unwrap();
     assert_eq!(n, 0, "keine Verknüpfung entstanden");
 }
+
+// --- LFH-117: `etb_eintrag_anhang` als dritter Linker auf `anhang` ---
+
+/// Legt per direktem SQL einen Anhang an, hängt ihn an einen frischen ETB-Eintrag und liefert
+/// die `anhang.id`.
+async fn etb_anhang(pool: &sqlx::SqlitePool, einsatz: i64) -> i64 {
+    let von: i64 = sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = 'admin'")
+        .fetch_one(pool)
+        .await
+        .unwrap();
+    let aid: i64 = sqlx::query_scalar(
+        "INSERT INTO anhang (einsatz_id, dateiname, mime, groesse, sha256, daten, hochgeladen_von) \
+         VALUES (?, 'foto.jpg', 'image/jpeg', 3, 'deadbeef', ?, ?) RETURNING id",
+    )
+    .bind(einsatz)
+    .bind(b"ABC".as_slice())
+    .bind(von)
+    .fetch_one(pool)
+    .await
+    .unwrap();
+    let etb_id: i64 = sqlx::query_scalar(
+        "INSERT INTO etb_eintrag (einsatz_id, lfd_nr, typ, inhalt, erfasser_id, ereigniszeit) \
+         VALUES (?, (SELECT COALESCE(MAX(lfd_nr), 0) + 1 FROM etb_eintrag WHERE einsatz_id = ?), \
+                 'meldung', 'Foto', ?, datetime('now')) RETURNING id",
+    )
+    .bind(einsatz)
+    .bind(einsatz)
+    .bind(von)
+    .fetch_one(pool)
+    .await
+    .unwrap();
+    sqlx::query("INSERT INTO etb_eintrag_anhang (eintrag_id, anhang_id) VALUES (?, ?)")
+        .bind(etb_id)
+        .bind(aid)
+        .execute(pool)
+        .await
+        .unwrap();
+    aid
+}
+
+/// LFH-117: Ein ETB-Anhang ist über die generische, modul-lose Route nicht ladbar — sonst
+/// umginge sie das Modul-Gate „etb".
+#[tokio::test]
+async fn etb_anhang_generischer_download_ist_404() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let aid = etb_anhang(&pool, einsatz).await;
+
+    let (s, _, _) = download(&app, einsatz, aid, &admin).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+}
+
+/// LFH-117: Der generische Hard-Delete verweigert einen ETB-Anhang (422) — er ist bis zur
+/// Schwärzung unveränderlich wie der Eintrag.
+#[tokio::test]
+async fn etb_anhang_generisches_loeschen_ist_422() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let aid = etb_anhang(&pool, einsatz).await;
+
+    assert_eq!(
+        delete_anhang(&app, einsatz, aid, &admin).await,
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    let (datei, link): (i64, i64) = sqlx::query_as(
+        "SELECT (SELECT COUNT(*) FROM anhang WHERE id = ?1), \
+                (SELECT COUNT(*) FROM etb_eintrag_anhang WHERE anhang_id = ?1)",
+    )
+    .bind(aid)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!((datei, link), (1, 1), "Datei und Verknüpfung bleiben");
+}
+
+/// LFH-117: Ein ETB-Anhang lässt sich nicht an eine Chat-Nachricht hängen — der Chat behält
+/// seinen Wortlaut „Unbekannter oder fremder Anhang" (400), wie beim Dokument-Anhang.
+#[tokio::test]
+async fn etb_anhang_nicht_an_chat_verknuepfbar() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let kid = default_kanal(&app, einsatz, &admin).await;
+    let aid = etb_anhang(&pool, einsatz).await;
+
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/chat/kanaele/{kid}/nachrichten"),
+        &admin,
+        Some(&format!(r#"{{"inhalt":"x","anhang_ids":[{aid}]}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    let (nachrichten, links): (i64, i64) = sqlx::query_as(
+        "SELECT (SELECT COUNT(*) FROM chat_nachricht WHERE einsatz_id = ?1 AND inhalt = 'x'), \
+                (SELECT COUNT(*) FROM chat_nachricht_anhang WHERE anhang_id = ?2)",
+    )
+    .bind(einsatz)
+    .bind(aid)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        (nachrichten, links),
+        (0, 0),
+        "keine Nachricht, keine Verknüpfung"
+    );
+}
