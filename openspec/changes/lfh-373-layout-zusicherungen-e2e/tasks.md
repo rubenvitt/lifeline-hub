@@ -50,10 +50,10 @@ kein voller `pnpm e2e`-Lauf sie mitnimmt.
 
 ## 7. Prüflisten, Verweise, Doku
 
-- [ ] 7.1 Nachtrag „LFH-373 (Messung)“ in `2026-07-30-etb-pruefliste.md`, `…-lagekarte-karten-pruefliste.md` und `…-gefahrenmatrix-pruefliste.md` mit Verdikt je Zeile (1, 2, 12, 13), Messgröße und Spec-Datei, einschließlich der Korrekturen „Verortet ist fokussierbar“ und „Gebietszeile ist fokussierbar“. Verifiziert durch Lesen gegen die Testnamen: jedes „erfüllt“ nennt einen existierenden Test
-- [ ] 7.2 `2026-08-21-lfh-342-pruefliste.md`: Zeile 12 von „erfüllt“ korrigieren (Stütze `Datensicht`/`EtbTabelle.test.tsx` gibt es nicht mehr), Zeile 13 auflösen. `2026-09-22-lfh-613-pruefliste.md`: 1·13 und 4·13 mit Verdikt. Verifiziert durch `grep -n "LFH-373"` in beiden Dateien: nur noch Verdikte, keine offenen Verweise
-- [ ] 7.3 Die Verweise auf die Stufenableitung in den Prüflisten von LFH-342, -343, -345, -346, -347 und -348 auf LFH-724 umschreiben. Verifiziert durch `grep -rn "LFH-373" docs frontend openspec CLAUDE.md`: jeder Rest ist ein Verdikt dieses Tickets oder historischer Text mit Verweis auf den Nachtrag
-- [ ] 7.4 CLAUDE.md: den Satz „Nicht bei 390 px … Sidebar fest 300 px“ im LFH-355-Absatz durch den gemessenen Stand ersetzen, eine knappe Zeile zu `--lfh-fokusabstand-unten` (gemeinsame Regel statt seitenlokalem `:root`), eine Zeile zur Knopfspalte des Kartenfußes. Verifiziert durch Lesen und `check-fmt.sh` (Prettier)
+- [x] 7.1 Nachtrag „LFH-373 (Messung)“ in `2026-07-30-etb-pruefliste.md`, `…-lagekarte-karten-pruefliste.md` und `…-gefahrenmatrix-pruefliste.md` mit Verdikt je Zeile (1, 2, 12, 13), Messgröße und Spec-Datei, einschließlich der Korrekturen „Verortet ist fokussierbar“ und „Gebietszeile ist fokussierbar“. Verifiziert durch Lesen gegen die Testnamen: jedes „erfüllt“ nennt einen existierenden Test
+- [x] 7.2 `2026-08-21-lfh-342-pruefliste.md`: Zeile 12 von „erfüllt“ korrigieren (Stütze `Datensicht`/`EtbTabelle.test.tsx` gibt es nicht mehr), Zeile 13 auflösen. `2026-09-22-lfh-613-pruefliste.md`: 1·13 und 4·13 mit Verdikt. Verifiziert durch `grep -n "LFH-373"` in beiden Dateien: nur noch Verdikte, keine offenen Verweise
+- [x] 7.3 Die Verweise auf die Stufenableitung in den Prüflisten von LFH-342, -343, -345, -346, -347 und -348 auf LFH-724 umschreiben. Verifiziert durch `grep -rn "LFH-373" docs frontend openspec CLAUDE.md`: jeder Rest ist ein Verdikt dieses Tickets oder historischer Text mit Verweis auf den Nachtrag
+- [x] 7.4 CLAUDE.md: den Satz „Nicht bei 390 px … Sidebar fest 300 px“ im LFH-355-Absatz durch den gemessenen Stand ersetzen, eine knappe Zeile zu `--lfh-fokusabstand-unten` (gemeinsame Regel statt seitenlokalem `:root`), eine Zeile zur Knopfspalte des Kartenfußes. Verifiziert durch Lesen und `check-fmt.sh` (Prettier)
 
 ## 8. Abschluss
 

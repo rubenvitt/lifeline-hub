@@ -302,9 +302,9 @@ describe('GefahrenMatrix', () => {
  * `etb/SlashMenu.test.tsx:92-122` (LFH-365 · B5e).
  *
  * WAS ER BELEGT UND WAS NICHT: die ABSICHT, nicht das Pixel. jsdom rechnet kein Layout;
- * die tatsächlich gerenderte Trefffläche misst erst Playwright mit `boundingBox()` und
- * steht als Zeile 1/2 der Prüfliste offen (LFH-373). Wer hier mehr hineinliest, liest
- * falsch.
+ * die tatsächlich gerenderte Trefffläche misst Playwright mit `boundingBox()`
+ * (`e2e/gate3-trefflaeche.spec.ts`, „Gefahrenmatrix (LFH-373)", kurze Achse aller 58 Zellen).
+ * Wer hier mehr hineinliest, liest falsch.
  *
  * NICHT `renderMitProviders`: `test/utils.tsx` mountet ein nacktes `ConfigProvider` ohne
  * Theme, jeder Token wäre dort eine antd-Vorgabe und die Zusicherung eine Attrappe.

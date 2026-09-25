@@ -409,6 +409,18 @@ die **neunzehnte** Konsumentin, LFH-330/AP8), ebenso die **Lagemeldungen**
 Schirm rechts eine Seitenleiste „Bilanz" (`etb/EtbBilanz.tsx`) — **nicht** „Tagesbilanz" wie
 im Entwurf — und die Erfassung **unten** am Fuß der Zeitachse (`.etb-erfassung-sticky` in
 `index.css`, Grund `kopf`).
+**Die angepinnte Erfassung ist gemessen, nicht angenommen** (LFH-373, `e2e/leisten-flaeche.spec.ts`,
+`fokus-verdeckung.spec.ts`): ≤ 50 % der Fensterhöhe und ganz oben vollständig im Bild, in
+allen drei Stufen. Dafür hängt sie **unter `xl` als `fuss` an der Wurzel von `EinsatzSeite`**,
+nicht in der Zeitachsenspalte — ein `sticky; bottom: 0` steigt nie über die Oberkante seines
+Elternblocks (gemessen: unter einem 489 px hohen Kopf ragte sie 61 px unter das Fenster). Den
+Fokusabstand der Zeitachse trägt `scroll-margin-block-end` an den ZIELEN
+(`--lfh-etb-fokusabstand`, gemessen von `components/fokusabstandUnten.ts`), **nicht**
+`scroll-padding` am Dokument wie auf der Befehlsseite: das zählte die Ziele IN der Leiste zum
+verdeckten Streifen und rollte bei jedem Fokus dort die Seite ans Ende. Unter `md` steht das Feld
+auf eigener Zeile (`Schnellerfassungszeile gestapelt`), die Feldzeile rollt waagerecht mit
+„Feld" vorn, und Eingaben in der Leiste fokussieren mit `preventScroll` (`MetaChip`, nicht
+`autoFocus`).
 **Kopfzahl und Bilanz zählt der Server, über DENSELBEN Filter wie die Liste** (LFH-612,
 `GET …/etb/zaehler`, gemeinsame Bedingung `etb/repo.rs:filter_bedingung`): ohne Filter „412
 Einträge" und „Bilanz", mit Filter „7 Treffer" und „Bilanz im Filter". Eine feste Tagesgrenze
@@ -469,7 +481,17 @@ keine Aussage mehr** (LFH-100). Die frühere Begründung („die Sidebar ist fes
 für die Kartenfläche bliebe nichts") ist seit dem Neuentwurf überholt: unter `lg` liegt die
 Leiste UNTER der Karte, auf dem Handschirm per Vorgabe zu. Den Querlauf der Lagekarte misst
 seit LFH-100 Gate 1 (`e2e/gate1-ueberlauf.spec.ts`, auch bei 768 und 390 px); die
-Klickbarkeit der gestapelten Bänder bei 390 px ist weiter ungemessen und gehört zu LFH-100.
+Klickbarkeit der ZEICHENSTEUERUNG im Zeichenmodus bei 390 px ist weiter ungemessen und gehört
+zu LFH-100.
+**Der Fuß endet rechts vor der Knopfspalte** (LFH-373, `fussStil(knopfKante)`): Knopfblock oben
+rechts und Fuß lagen beide auf `zIndex: 5`, und bei 390 px im Handschuh-Betrieb lagen drei
+Kartenknöpfe VOLLSTÄNDIG unter dem Zeitachsenband, per Zeiger und Tastatur unerreichbar.
+Abhilfe nach demselben Grundsatz wie oben: eine Aufteilung der Breite, kein `zIndex`. Gemessen
+bei 390 (mit und ohne Leiste) und 1024 px in `fokus-verdeckung.spec.ts` (Box-Schnitt,
+Trefferprobe je Knopf, Kern mit Kartenaufbauten als Zusatzkandidaten). Der Preis: bei 1440 px
+trägt die Zeitachse zwei Reihen statt einer (Entscheidung 25.09.2026). Absolut positionierte
+Aufbauten sieht `e2e/fokus-kern.ts` nur über `zusatzKandidaten` — ohne sie ist ein Lauf über
+eine Karte grün durch Konstruktion.
 
 **Sprungmarken sind keine Module** (LFH-620, `einsatz/sprungmarken.ts`). Führt der
 Entwurf ein „Modul“, dessen Daten ein vorhandenes Modul schon trägt (Entscheidungen =
