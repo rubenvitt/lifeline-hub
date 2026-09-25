@@ -542,8 +542,9 @@ Alltag wichtigsten:
   `ConfigProvider`**, nicht `componentSize` und keine punktuellen Größen-Props. **Neues
   punktuelles `size="small"` auf interaktiven Elementen ist verboten**, erzwungen von
   `components/dichte.guard.test.ts` mit einer Schuldmenge `OFFEN`, die nur schrumpfen darf
-  (Stand: nur noch die geprüfte Dauerausnahme, die vier Knöpfe der UHS-Platzkarte in
-  `pages/uhs/Grundriss.tsx`, gebunden an `SCHRITT_Y = 120`). Wer eine Zeile aus `OFFEN`
+  (Stand: nur noch die vier Knöpfe der UHS-Platzkarte in `pages/uhs/Grundriss.tsx` — seit
+  LFH-359 nur in `kompakt` gerendert, wo 24 px der Boden sind; in den Berührungsstufen ist die
+  Karte selbst das eine Ziel mit Aktionsmenü, `platzBedienform`). Wer eine Zeile aus `OFFEN`
   streicht, tut es im selben Commit wie den Fix und prüft `aktionsabstand.guard.test.ts` mit.
   `Card`/`Descriptions`/`Space`/`Liste` dürfen klein bleiben (Abstandsmaß, keine Trefffläche)
   und gehören nicht in `OFFEN`. `controlHeight` = **30/48/72**, `controlHeightSM` = **24/48/72**.
@@ -551,7 +552,8 @@ Alltag wichtigsten:
   `theme/tokens.ts` gibt über `ConfigProvider button.style` jedem Knopf `minWidth` =
   `controlHeightSM`, denn antds `paddingInlineSM` ist das Literal 7 und ein „OK" blieb in jeder
   Stufe ~38 px breit. Ein Boden, keine Polsterung: breite Etiketten bleiben unberührt. Die eine
-  benannte Ausnahme (`minWidth: 0`) ist die Aktionszeile der UHS-Platzkarte; sie fällt mit LFH-379.
+  benannte Ausnahme (`minWidth: 0`, Aktionszeile der UHS-Platzkarte) ist mit LFH-379 gefallen:
+  die Zeile steht nur noch in `kompakt`, und dort ist der Boden das Quadrat, mit dem sie rechnet.
   **Ein handgebautes Bedienziel** (`role="option"`-Zeile, `<div onClick>`, Zeilen-`<Link>`,
   Kommandopalette) braucht **zwei** Angaben: `minHeight: token.controlHeight` **plus** `padding`
   aus `token.paddingSM`/`token.padding`, aus aufgelösten Tokens, nie `var(--lfh-*)`, geprüft über
