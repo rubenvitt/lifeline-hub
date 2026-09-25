@@ -38,9 +38,9 @@ durchrutschen. Jeder `_tx`-Split ist ein eigener Commit.
 
 ## 5. Routen, Neu-Import, Live
 
-- [ ] 5.1 `src/routes/demo_daten.rs`: GET/POST/DELETE und POST `/neu` über `write_retry!`, `AdminUser`, Org aus `benutzer.org_id`, Statuscodes nach D3. `lagged` nach Entfernen und Neu-Import auf den Kanal des alten Demo-Einsatzes. Verifiziert durch `tests/demo_daten.rs`: Status-Paar vorher/nachher, 409-Paare, **Import → Entfernen → Import gegen das migrierte Schema mit identischem Bericht**, Neu-Import ersetzt den Einsatz, Neu-Import mit erzwungenem Importfehler lässt den alten Stand stehen, zwei Organisationen mit je einem Admin (Fremd-Org-Admin per SQL) bleiben getrennt, ein vor dem Entfernen abonnierter Live-Strom erhält `lagged`, ein nach dem Entfernen angelegter echter Einsatz hat eine größere ID. Dazu `cargo test --test json_extractor_guard --test path_extractor_guard --test org_scope_guard`
-- [ ] 5.2 Test „DB wie vorher“ nach D12 (Tabellen aus dem Schema entdeckt, benannte Ausnahmen). Verifiziert durch den grünen Test und eine Mutationsprobe (Entfernen ohne den Material-Schritt → rot)
-- [ ] 5.3 Dauer des Neu-Imports messen (D11(c)) und in design.md nachtragen. Verifiziert durch die eingetragene Zahl
+- [x] 5.1 `src/routes/demo_daten.rs`: GET/POST/DELETE und POST `/neu` über `write_retry!`, `AdminUser`, Org aus `benutzer.org_id`, Statuscodes nach D3. `lagged` nach Entfernen und Neu-Import auf den Kanal des alten Demo-Einsatzes. Verifiziert durch `tests/demo_daten.rs`: Status-Paar vorher/nachher, 409-Paare, **Import → Entfernen → Import gegen das migrierte Schema mit identischem Bericht**, Neu-Import ersetzt den Einsatz, Neu-Import mit erzwungenem Importfehler lässt den alten Stand stehen, zwei Organisationen mit je einem Admin (Fremd-Org-Admin per SQL) bleiben getrennt, ein vor dem Entfernen abonnierter Live-Strom erhält `lagged`, ein nach dem Entfernen angelegter echter Einsatz hat eine größere ID. Dazu `cargo test --test json_extractor_guard --test path_extractor_guard --test org_scope_guard`
+- [x] 5.2 Test „DB wie vorher“ nach D12 (Tabellen aus dem Schema entdeckt, benannte Ausnahmen). Verifiziert durch den grünen Test und eine Mutationsprobe (Entfernen ohne den Material-Schritt → rot)
+- [x] 5.3 Dauer des Neu-Imports messen (D11(c)) und in design.md nachtragen. Verifiziert durch die eingetragene Zahl
 
 ## 6. Frontend
 
