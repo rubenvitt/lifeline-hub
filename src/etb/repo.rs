@@ -722,17 +722,13 @@ mod tests {
         assert_eq!(count, 2, "ohne client_id kein Dedup");
     }
 
-    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn anlegen_idempotent_ist_exactly_once_unter_nebenlaeufigkeit() {
-        // Zwei Tabs flushen dieselbe client_id parallel. Je nach Interleaving greift der
-        // Schnell-SELECT ODER der UNIQUE-Race-Recovery-Zweig (SELECT-Miss → INSERT-Konflikt
-        // → Re-SELECT); das ERGEBNIS ist in beiden Faellen exactly-once: EIN Eintrag, beide
-        // Aufrufe liefern dieselbe id. WAL + busy_timeout verhindern SQLITE_BUSY-Flakiness.
+    /// Datei-DB mit WAL und mehreren Verbindungen: der Test-Pool hat EINE Verbindung und
+    /// serialisierte zwei Aufrufe schon vor der Transaktion — die Nebenläufigkeit, um die es
+    /// geht, entstünde gar nicht.
+    async fn nebenlaeufiger_pool(dir: &tempfile::TempDir) -> SqlitePool {
         use std::time::Duration;
-        let dir = tempfile::tempdir().unwrap();
-        let pfad = dir.path().join("race.db");
         let opts = sqlx::sqlite::SqliteConnectOptions::new()
-            .filename(&pfad)
+            .filename(dir.path().join("race.db"))
             .create_if_missing(true)
             .foreign_keys(true)
             .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal)
@@ -743,6 +739,18 @@ mod tests {
             .await
             .unwrap();
         crate::db::migrate(&pool).await.unwrap();
+        pool
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn anlegen_idempotent_ist_exactly_once_unter_nebenlaeufigkeit() {
+        // Zwei Tabs flushen dieselbe client_id parallel. `write_retry!` öffnet die Transaktion
+        // mit `BEGIN IMMEDIATE` und serialisiert damit die Schreiber: wer zweitens drankommt,
+        // findet die client_id in Schritt 1 und bekommt den Bestand. Einen Zweig auf die
+        // UNIQUE-Verletzung gibt es nicht mehr (design.md D3), der Index bleibt nur als Netz.
+        // Das Ergebnis ist exactly-once: EIN Eintrag, beide Aufrufe liefern dieselbe id.
+        let dir = tempfile::tempdir().unwrap();
+        let pool = nebenlaeufiger_pool(&dir).await;
         let (benutzer, einsatz) = setup(&pool).await;
 
         let p1 = pool.clone();
@@ -771,6 +779,52 @@ mod tests {
             count, 1,
             "exactly-once: kein Duplikat trotz Nebenlaeufigkeit"
         );
+    }
+
+    /// Zusage aus tasks.md 3.2 mit Anhang (Review C1): zwei gleichzeitige Anfragen derselben
+    /// `client_id` tragen denselben freien Anhang. Die zweite darf NICHT an der Anhangsprüfung
+    /// scheitern (422, weil `a` inzwischen gebunden ist) — sie ist ein Replay und bekommt den
+    /// Bestand samt Anhang. Mehrere Durchläufe, damit beide Reihenfolgen vorkommen.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn gleichzeitiger_replay_mit_anhang_liefert_beiden_den_bestand() {
+        let dir = tempfile::tempdir().unwrap();
+        let pool = nebenlaeufiger_pool(&dir).await;
+        let (benutzer, einsatz) = setup(&pool).await;
+
+        for runde in 0..20 {
+            let a = freier_anhang(&pool, einsatz, benutzer, "foto.jpg").await;
+            let cid = format!("race-anhang-{runde}");
+            let (p1, p2) = (pool.clone(), pool.clone());
+            let (c1, c2) = (cid.clone(), cid.clone());
+            let t1 = tokio::spawn(async move {
+                anlegen_idempotent(&p1, einsatz, benutzer, Some(&c1), &[a], daten("Foto")).await
+            });
+            let t2 = tokio::spawn(async move {
+                anlegen_idempotent(&p2, einsatz, benutzer, Some(&c2), &[a], daten("Foto")).await
+            });
+            let (r1, r2) = tokio::join!(t1, t2);
+            let (e1, neu1) = r1.unwrap().expect("Aufruf 1 liefert den Eintrag");
+            let (e2, neu2) = r2.unwrap().expect("Aufruf 2 liefert den Eintrag");
+            assert_eq!(e1.id, e2.id, "Runde {runde}: derselbe Eintrag");
+            assert!(neu1 ^ neu2, "Runde {runde}: genau einer legt an");
+            assert_eq!(ids(&e1), vec![a], "Runde {runde}");
+            assert_eq!(ids(&e2), vec![a], "Runde {runde}");
+
+            let eintraege: i64 =
+                sqlx::query_scalar("SELECT COUNT(*) FROM etb_eintrag WHERE client_id = ?")
+                    .bind(&cid)
+                    .fetch_one(&pool)
+                    .await
+                    .unwrap();
+            assert_eq!(eintraege, 1, "Runde {runde}: genau ein Eintrag");
+            let links: i64 =
+                sqlx::query_scalar("SELECT COUNT(*) FROM etb_eintrag_anhang WHERE anhang_id = ?")
+                    .bind(a)
+                    .fetch_one(&pool)
+                    .await
+                    .unwrap();
+            assert_eq!(links, 1, "Runde {runde}: der Anhang hängt einmal");
+        }
     }
 
     #[tokio::test]
