@@ -475,6 +475,70 @@ describe('DemoDatenPage — Netzfehler beim Vorgang', () => {
   });
 });
 
+/**
+ * Branch-Review F4 (LFH-690): nicht nur ein 409 lässt den Stand der Seite veralten. `apiSend`
+ * bricht nach 15 s ab, der Server kann unter Konkurrenz länger brauchen und trotzdem
+ * committen — nach einem Netzfehler kann der Vorgang also durchgegangen sein. Nach JEDEM
+ * Fehler wird deshalb der Stand neu geladen, und mit ihm die übrigen D13-Fächer.
+ */
+describe('DemoDatenPage — nach jedem Fehler wird neu geladen (D13)', () => {
+  function clientMit(keys: (readonly unknown[])[]) {
+    const client = erzeugeQueryClient({
+      queries: { retry: false, gcTime: Infinity },
+      mutations: { retry: false },
+    });
+    for (const k of keys) client.setQueryData(k, []);
+    return client;
+  }
+  const invalidiert = (client: QueryClient, key: readonly unknown[]) =>
+    client.getQueryState(key)?.isInvalidated;
+
+  it('Netzfehler beim Import, der Server hat doch committet: die Seite zeigt den neuen Stand', async () => {
+    const z = demoServer(NICHT_IMPORTIERT);
+    let stand: DemoDatenStatus = NICHT_IMPORTIERT;
+    server.use(
+      http.get('/api/demo-daten', () => {
+        z.get += 1;
+        return HttpResponse.json(stand);
+      }),
+      http.post('/api/demo-daten', () => {
+        // Die Antwort geht verloren, die Transaktion stand schon.
+        stand = IMPORTIERT;
+        return HttpResponse.error();
+      }),
+    );
+    const client = clientMit([globalKeys.einsaetze(), globalKeys.fahrzeugeListe('alle')]);
+    setup(admin, adminDemoDatenPfad(), client);
+    await userEvent.click(await screen.findByRole('button', { name: 'Importieren' }));
+    expect(await screen.findByText('Import fehlgeschlagen')).toBeInTheDocument();
+    await waitFor(() => expect(z.get).toBe(2));
+    const standPaneel = screen.getByRole('region', { name: 'Stand' });
+    expect(await within(standPaneel).findByText('Importiert')).toBeInTheDocument();
+    expect(invalidiert(client, globalKeys.einsaetze())).toBe(true);
+    expect(invalidiert(client, globalKeys.fahrzeugeListe('alle'))).toBe(true);
+    // Der Grund bleibt stehen: `vorgang.error` hängt nicht an der Abfrage.
+    expect(screen.getByText('Import fehlgeschlagen')).toBeInTheDocument();
+  });
+
+  it('500 beim Entfernen: Stand neu geladen, Abfragen des alten Demo-Einsatzes invalidiert', async () => {
+    const z = demoServer(IMPORTIERT);
+    server.use(
+      http.delete('/api/demo-daten', () =>
+        HttpResponse.json({ error: 'Datenbank belegt' }, { status: 500 }),
+      ),
+    );
+    const client = clientMit([einsatzKeys.etb(41), einsatzKeys.etb(99)]);
+    setup(admin, adminDemoDatenPfad(), client);
+    await userEvent.click(await screen.findByRole('button', { name: 'Entfernen' }));
+    const dialog = await offenerDialog('Demo-Daten entfernen?');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Endgültig entfernen' }));
+    expect(await screen.findByText('Datenbank belegt')).toBeInTheDocument();
+    await waitFor(() => expect(z.get).toBe(2));
+    expect(invalidiert(client, einsatzKeys.etb(41))).toBe(true);
+    expect(invalidiert(client, einsatzKeys.etb(99))).toBe(false);
+  });
+});
+
 describe('DemoDatenPage — Riegel gegen doppeltes Senden', () => {
   it('zwei Klicks im selben Takt senden genau einen POST', async () => {
     demoServer(NICHT_IMPORTIERT);

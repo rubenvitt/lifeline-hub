@@ -7,7 +7,6 @@ import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import { Datenfeld, Datenraster, Paneel, useRollen } from '../components/instrument';
 import { entferneDemoDaten, importiereDemoDaten, importiereDemoDatenNeu } from '../api/demoDaten';
-import { istKonflikt } from '../api/client';
 import { globalKeys } from '../api/queryKeys';
 import type {
   DemoBerichtZeile,
@@ -159,11 +158,16 @@ export default function DemoDatenPage() {
       qc.setQueryData(globalKeys.demoDaten(), neu);
       void invalidiereNachDemoVorgang(qc, [altEinsatzId, neu.import?.einsatz_id]);
     },
-    // Ein 409 heißt, der Stand ist anderswo schon geändert worden (zweiter Tab, zweiter
-    // Admin). Neu laden, damit die Seite nicht weiter den Vorgang anbietet, der gerade
-    // gescheitert ist. Der Alert bleibt stehen: `vorgang.error` hängt nicht an der Abfrage.
-    onError: (e, { altEinsatzId }) => {
-      if (istKonflikt(e)) void invalidiereNachDemoVorgang(qc, [altEinsatzId]);
+    // Nach JEDEM Fehler neu laden, nicht nur nach einem 409 (Branch-Review F4). Ein 409 heißt,
+    // der Stand ist anderswo schon geändert worden (zweiter Tab, zweiter Admin); ohne Neuladen
+    // böte die Seite weiter den Vorgang an, der gerade gescheitert ist. Nach einem Netzfehler
+    // oder Timeout ist offen, ob der Vorgang durchging: `apiSend` bricht nach 15 s ab, der
+    // Server kann unter Konkurrenz länger brauchen und trotzdem committen. Darum dieselben
+    // D13-Fächer wie nach einem Erfolg; einen neuen Demo-Einsatz kennt die Seite dann nicht,
+    // Abfragen von ihm liegen aber auch noch keine im Cache. Der Alert bleibt stehen:
+    // `vorgang.error` hängt nicht an der Abfrage.
+    onError: (_e, { altEinsatzId }) => {
+      void invalidiereNachDemoVorgang(qc, [altEinsatzId]);
     },
   });
 
