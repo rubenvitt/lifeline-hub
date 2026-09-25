@@ -1204,6 +1204,55 @@ async fn deaktivierter_einheitstyp_ist_422_und_schreibt_nichts() {
     );
 }
 
+/// Task 4.5 (Atomarität, Spec „Import ist atomar“/Scenario „Abbruch mitten im Import“): ein
+/// Fehler, der erst NACH etlichen Schreibungen entsteht, rollt den gesamten Import zurück.
+/// Ein deaktivierter Katalogeintrag (Vorschlag aus dem Brief) taugt dafür nicht — der scheitert
+/// schon in `katalog::aufloesen_tx`, bevor überhaupt geschrieben wurde (siehe
+/// `deaktivierter_einheitstyp_ist_422_und_schreibt_nichts` oben). Stattdessen ein
+/// `TEMP TRIGGER` auf `lagebericht`, dem Muster von
+/// `entfernen_tests::anderer_fehler_bricht_den_ganzen_vorgang_ab` folgend: Der Lagebericht
+/// (`s(60, Vorgang::Lagebericht(LAGEBERICHT))`) ist die einzige Stelle im Drehbuch, die dort
+/// schreibt, und liegt bei T−60 von T−292 (frühester Schritt) bis T−10 (letzter Schritt) —
+/// also spät, NACHDEM Einsatz, Kopf, alle Stammdaten, beide Gefahrengebiete, UHS, BR, Betreuung,
+/// der Befehl, mehrere Meldungen/Aufträge und zwei Erinnerungen längst geschrieben sind. Der
+/// Nachweis, dass der Fehler wirklich aus diesem späten Schritt stammt (und nicht aus einem viel
+/// früheren gleichnamigen Trigger-Text), ist der Meldungswortlaut selbst — ein
+/// Autocommit-freier Beleg, wie im Brief vorgesehen. `test_pool()` hält genau eine Verbindung
+/// (`max_connections(1)`), auf der auch `write_retry!` seine Transaktion öffnet: das TEMP
+/// TRIGGER der vorbereitenden `execute(&pool)`-Anweisung bleibt für die Dauer des Tests auf
+/// derselben Verbindung sichtbar (wie im entfernen_tests-Vorbild).
+#[tokio::test]
+async fn fehler_spaet_im_drehbuch_bricht_den_import_atomar_ab() {
+    let pool = crate::db::test_pool().await;
+    let o = org_mit_admin(&pool, 1).await;
+    sqlx::query(
+        "CREATE TEMP TRIGGER lagebericht_nicht_anlegen BEFORE INSERT ON lagebericht \
+         BEGIN SELECT RAISE(ABORT, 'Testfehler: Lagebericht'); END",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let vorher = bild(&pool).await;
+
+    let ergebnis = importieren(&pool, &o, jetzt()).await;
+    match &ergebnis {
+        Err(AppError::Database(e)) => assert!(
+            e.to_string().contains("Testfehler: Lagebericht"),
+            "Fehler stammt nicht aus dem späten Schritt: {e}"
+        ),
+        andere => {
+            panic!("erwartet: Datenbankfehler aus dem Lagebericht-Trigger, bekommen: {andere:?}")
+        }
+    }
+
+    assert_eq!(
+        bild(&pool).await,
+        vorher,
+        "nach dem Abbruch: kein Demo-Einsatz, keine Demo-Stammdaten, kein Kopf"
+    );
+}
+
 /// Der Admin muss zur Organisation gehören, in die importiert wird: sonst landete der Einsatz
 /// in seiner Org, Kopf und Stammdaten in der anderen.
 #[tokio::test]
