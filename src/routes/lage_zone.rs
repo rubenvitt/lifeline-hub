@@ -12,7 +12,8 @@ use crate::live::LiveEvent;
 const MODUL_KEY: &str = "lagekarte";
 use crate::error::AppError;
 use crate::lage_zone::repo::{self as zone_repo, ZoneNeu, ZonePatch};
-use crate::lage_zone::{self, LageZoneAnzeige};
+// ETB-Wortlaut der Zone: der Baustein liegt seit LFH-690 im Fachmodul (Demo-Import).
+use crate::lage_zone::{self, etb_text, LageZoneAnzeige};
 use crate::routes::support::{deserialize_optional_field, trimme, AnsichtFilter};
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
@@ -73,14 +74,6 @@ async fn pruefe_bezirk_zuordnung(
         )));
     }
     Ok(())
-}
-
-/// ETB-Wortlaut: «<Typ-Label> «Label» <verb>» bzw. ohne Label «<Typ-Label> <verb>».
-fn etb_text(typ: &str, label: Option<&str>, verb: &str) -> String {
-    match label {
-        Some(l) => format!("{} «{}» {}", lage_zone::typ_label(typ), l, verb),
-        None => format!("{} {}", lage_zone::typ_label(typ), verb),
-    }
 }
 
 /// GET /api/einsaetze/{id}/zonen — Liste aller Zonen. Nur Lesezugriff.

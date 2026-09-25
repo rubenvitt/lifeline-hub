@@ -142,3 +142,34 @@ mod tests {
         );
     }
 }
+
+// ── System-ETB-Wortlaute (LFH-690) ──────────────────────────────────────────────────
+// Reine Textbausteine: Handler und Demo-Import rufen dieselbe Funktion, damit ein
+// importierter Einsatz dieselben ETB-Texte trägt wie ein echter.
+
+/// ETB-Wortlaut einer Lage-Zone: «<Typ-Label> «Label» <verb>» bzw. ohne Label
+/// «<Typ-Label> <verb>». Verben im Betrieb: „eingerichtet“ (Anlegen), „geändert“,
+/// „aufgehoben“.
+pub fn etb_text(typ: &str, label: Option<&str>, verb: &str) -> String {
+    match label {
+        Some(l) => format!("{} «{}» {}", typ_label(typ), l, verb),
+        None => format!("{} {}", typ_label(typ), verb),
+    }
+}
+
+#[cfg(test)]
+mod etb_text_tests {
+    use super::*;
+
+    #[test]
+    fn eingerichtet_mit_und_ohne_label() {
+        assert_eq!(
+            etb_text("gefahrengebiet", Some("Deich Nord"), "eingerichtet"),
+            "Gefahrengebiet «Deich Nord» eingerichtet"
+        );
+        assert_eq!(
+            etb_text("absperrbereich", None, "aufgehoben"),
+            "Absperrbereich aufgehoben"
+        );
+    }
+}
