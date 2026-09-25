@@ -9,6 +9,16 @@ import type { Dokument, DokumentKategorie } from './types';
  */
 export const DOKUMENT_MAX_GROESSE = 25 * 1024 * 1024;
 
+/**
+ * Dateiauswahl der Dokument-Allowlist (`ERLAUBTE_MIME_DOKUMENT` in `src/anhang/mod.rs`:
+ * Chat-Liste plus HEIC/HEIF und TIFF). Geteilt von `DokumentAblegenModal` und der
+ * ETB-Schnellerfassung (LFH-117), deren Upload dieselbe Liste nimmt — eine Kopie liefe beim
+ * nächsten Dateityp still auseinander. Der Server prüft ohnehin; das hier filtert nur den
+ * Dateidialog vor.
+ */
+export const DOKUMENT_ACCEPT =
+  '.pdf,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif,.tif,.tiff,.txt,.csv,.docx,.xlsx,.pptx';
+
 /** 25 MiB + clamd-Scan über eine Mobilfunkstrecke: 15 s reichen nicht (LFH-632). */
 export const DOKUMENT_UPLOAD_TIMEOUT_MS = 120_000;
 

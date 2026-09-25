@@ -24,7 +24,7 @@ darauf auf, Gruppe 9 schließt ab.
 - [x] 3.2 TDD: der bisherige Race-Zweig auf die UNIQUE-Verletzung ist durch die Prüfung in der Transaktion ersetzt. Der bestehende Idempotenztest (Doppel-Flush) bleibt grün, dazu ein Test mit zwei gleichzeitigen `anlegen_idempotent` derselben `client_id` → genau ein Eintrag. Verifiziert durch die Tests
 - [x] 3.3 `EtbEintragAnzeige.anhaenge: Vec<AnhangAnzeige>` mit `#[sqlx(skip)]`. TDD für `anhaenge_nachladen` nach dem Muster von `folgeauftraege_nachladen`: Eintrag ohne Anhang → leer; zwei Anhänge aufsteigend nach id; Cursor-Seite trägt vollständige Listen. Aufruf in `laden` und `abfrage`. Verifiziert durch die Repo-Tests
 - [x] 3.4 `routes/etb.rs::NeuerEintrag.anhang_ids: Vec<i64>` mit `#[serde(default)]`, sortiert und dedupliziert, mehr als 10 → 400 (benannte Konstante). Routentests in `tests/etb.rs`: Erfassen mit zwei Anhängen → 201 und `anhaenge` in der Antwort; Liste trägt den Schlüssel `anhaenge` auch bei `[]` (Presence per `contains_key`); fremder Anhang → 400; gebundener → 422 (Testpaar); leerer Inhalt mit Anhang → 400; 11 Anhänge → 400; Berichtigung mit Anhang → 201, Grundeintrag ohne; Replay nach Commit → 201, gleicher Eintrag samt Anhängen, und der Live-Strom liefert genau ein `etb`-Ereignis. Verifiziert durch die Tests
-- [ ] 3.5 Codegen: `scripts/check-typ-codegen.sh`, `openapi.json` und `types.generated.ts` mitcommitten (`anhaenge` als required am `EtbEintragAnzeige`). Verifiziert durch das grüne Skript und `tsc`
+- [x] 3.5 Codegen: `scripts/check-typ-codegen.sh`, `openapi.json` und `types.generated.ts` mitcommitten (`anhaenge` als required am `EtbEintragAnzeige`). Verifiziert durch das grüne Skript und `tsc`
 
 ## 4. Backend: Upload- und Download-Route
 
@@ -39,7 +39,7 @@ darauf auf, Gruppe 9 schließt ab.
 
 ## 6. Frontend: API und Anzeige
 
-- [ ] 6.1 `api/etb.ts`: `NeuerEintrag.anhang_ids?: number[]`, `ladeEtbAnhangHoch(einsatzId, datei)` (eine Datei, Timeout 120 s), `etbAnhangPfad(einsatzId, eintragId, anhangId)`. `api/dokumente.ts` exportiert die `accept`-Konstante, `DokumentAblegenModal` nimmt sie. Fixtures von `EtbEintragAnzeige` um `anhaenge: []` ergänzen. Verifiziert durch einen Test des Pfad-Builders und `tsc` grün
+- [x] 6.1 `api/etb.ts`: `NeuerEintrag.anhang_ids?: number[]`, `ladeEtbAnhangHoch(einsatzId, datei)` (eine Datei, Timeout 120 s), `etbAnhangPfad(einsatzId, eintragId, anhangId)`. `api/dokumente.ts` exportiert die `accept`-Konstante, `DokumentAblegenModal` nimmt sie. Fixtures von `EtbEintragAnzeige` um `anhaenge: []` ergänzen. Verifiziert durch einen Test des Pfad-Builders und `tsc` grün
 - [ ] 6.2 TDD `etb/EtbAnhaenge.tsx` nach design.md D11: je Anhang ein Link auf `etbAnhangPfad` mit `download`, sichtbar „Name · Größe“ (`formatGroesse`), zugänglicher Name mit „Anhang zu Nr. <lfd_nr>“; zwei Einträge mit gleichem Dateinamen → verschiedene Namen; ohne Anhang → nichts; kein `role="img"` im Link. Die Mindesthöhe über `verweisStil` wird an der reinen Stilfunktion geprüft (Boden aus `controlHeight`), nicht im Vitest-Layout. Verifiziert durch die Tests
 - [ ] 6.3 TDD Zeitachse: Eintrag mit Anhang ohne Kopplung zeigt die Anhänge in der Hinweiszeile (Falle aus LFH-636: nicht an `hatVerknuepfung` hängen); Eintrag ohne Anhang unverändert. Ausstehende Zeile mit `anhang_ids` nennt „2 Anhänge“. `EtbEintragVorschau` zeigt dasselbe Bauteil. Verifiziert durch Tests in `EtbZeitachse.test.tsx` und `EtbEintragVorschau.test.tsx`
 

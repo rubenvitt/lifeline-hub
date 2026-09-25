@@ -72,6 +72,7 @@ const eintrag = {
   erfasst_lokal_at: null,
   berichtigt_eintrag_id: null,
   folgeauftraege: [],
+  anhaenge: [],
 };
 
 /**

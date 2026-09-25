@@ -49,6 +49,7 @@ function eintrag(over: Partial<EtbEintragAnzeige> = {}): EtbEintragAnzeige {
     auftrag_id: null,
     befehl_id: null,
     folgeauftraege: [],
+    anhaenge: [],
     ...over,
   };
 }

@@ -125,6 +125,7 @@ const etb = (id: number, ereigniszeit: string, typ = 'entscheidung') =>
     inhalt: `E${id}`,
     erfasser_name: 'Vitt',
     folgeauftraege: [],
+    anhaenge: [],
   }) as unknown as EtbEintragAnzeige;
 
 describe('zeitpunkt', () => {

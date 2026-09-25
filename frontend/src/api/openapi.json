@@ -3596,7 +3596,8 @@
           "erfasser_name",
           "ereigniszeit",
           "received_at",
-          "folgeauftraege"
+          "folgeauftraege",
+          "anhaenge"
         ],
         "properties": {
           "an": {
@@ -3604,6 +3605,13 @@
               "string",
               "null"
             ]
+          },
+          "anhaenge": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AnhangAnzeige"
+            },
+            "description": "Die Dateien, die dieser Eintrag trägt (LFH-117): Metadaten ohne Bytes, aufsteigend nach\n`id`, leer statt fehlend. Laden über `GET …/etb/{eintrag_id}/anhaenge/{aid}`."
           },
           "auftrag_id": {
             "type": [
