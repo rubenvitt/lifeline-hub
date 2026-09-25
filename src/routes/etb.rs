@@ -14,8 +14,9 @@ const MODUL_KEY: &str = "etb";
 use crate::etb::lesemarke::{self, EtbLesemarkeAnzeige};
 use crate::etb::zaehler::EtbZaehlerAnzeige;
 use crate::etb::{normalisiere_zeit, repo, EtbEintragAnzeige, EtbTyp, MeldeWeg};
-use axum::extract::{Query, State};
+use axum::extract::{Multipart, Query, State};
 use axum::http::{HeaderMap, StatusCode};
+use axum::response::Response;
 use axum::Json;
 use serde::Deserialize;
 
@@ -36,7 +37,15 @@ pub struct NeuerEintrag {
     /// Ein erneutes Senden desselben Eintrags (Retry nach verlorener Antwort, Doppel-Flush
     /// aus zwei Tabs) dedupliziert idempotent gegen `UNIQUE(einsatz_id, client_id)`.
     pub client_id: Option<String>,
+    /// Zuvor über `POST …/etb/anhaenge` hochgeladene, noch ungebundene Dateien (LFH-117).
+    /// Fehlt das Feld (ältere Clients, Queue-Zeilen vor LFH-117), trägt der Eintrag keine.
+    #[serde(default)]
+    pub anhang_ids: Vec<i64>,
 }
+
+/// Höchstzahl verschiedener Anhänge je Eintrag (LFH-117, design.md D4; vom Auftraggeber am
+/// 25.09.2026 als Annahme bestätigt). Darüber ist die Liste für sich unbrauchbar → 400.
+pub const MAX_ANHAENGE_JE_EINTRAG: usize = 10;
 
 /// Trimmt einen optionalen String und verwirft ihn, wenn er leer ist.
 fn bereinige(feld: Option<String>) -> Option<String> {
@@ -78,10 +87,37 @@ pub async fn erfassen(
             ));
         }
         if let Some(anzeige) = repo::laden_nach_client_id(&state.pool, einsatz_id, cid).await? {
+            // Nur DERSELBE Eintrag ist ein Replay (Review C1): zwei Tabs mit demselben Entwurf
+            // senden sonst unter einer client_id verschiedenen Wortlaut, und der zweite bekäme
+            // still den ersten als Erfolg zurück. Abweichung → 409, der Client behält den Text.
+            let gebunden: Vec<i64> = anzeige.anhaenge.iter().map(|a| a.id).collect();
+            if !repo::ist_derselbe_eintrag(
+                anzeige.typ.as_str(),
+                &anzeige.inhalt,
+                &gebunden,
+                &req.typ,
+                &req.inhalt,
+                &req.anhang_ids,
+            ) {
+                return Err(AppError::Conflict(repo::CLIENT_ID_KONFLIKT.into()));
+            }
             return Ok((StatusCode::CREATED, Json(anzeige)));
         }
     }
     fordere_aktiv(&einsatz)?;
+
+    // Anhänge (LFH-117): erst NACH der Replay-Erkennung — ein Replay prüft nicht, ob seine
+    // Anhänge frei sind (sie sind ja gebunden), nur ob es dieselben sind. Doppelte IDs gelten
+    // als eine (wie im Chat); ob sie existieren und frei sind, prüft das Repository in
+    // derselben Transaktion wie den Insert.
+    let mut anhang_ids = req.anhang_ids;
+    anhang_ids.sort_unstable();
+    anhang_ids.dedup();
+    if anhang_ids.len() > MAX_ANHAENGE_JE_EINTRAG {
+        return Err(AppError::Validation(format!(
+            "Höchstens {MAX_ANHAENGE_JE_EINTRAG} Anhänge je Eintrag"
+        )));
+    }
 
     // Typ validieren; System ist nicht client-erfassbar.
     let typ = EtbTyp::parse(&req.typ)
@@ -140,6 +176,7 @@ pub async fn erfassen(
         einsatz_id,
         benutzer.id,
         client_id.as_deref(),
+        &anhang_ids,
         repo::EintragDaten {
             typ: typ.as_str(),
             inhalt,
@@ -164,6 +201,64 @@ pub async fn erfassen(
     }
 
     Ok((StatusCode::CREATED, Json(anzeige)))
+}
+
+/// POST /api/einsaetze/{id}/etb/anhaenge — Datei für einen ETB-Eintrag hochladen (LFH-117).
+///
+/// Dieselben Gates wie [`erfassen`]: Schreibrecht, Modul „etb", aktiver Einsatz. Die Datei
+/// ist danach ungebunden, bis ein Erfassen sie mit `anhang_ids` nennt; bleibt das aus, nimmt
+/// sie der Aufräumlauf nach der Karenz. Allowlist ist die der Dokumentenablage (HEIC/HEIF für
+/// iPhone-Fotos, TIFF für Scans) — der generische Upload bleibt bei der Chat-Liste. Schleife,
+/// Größe und Virenscan teilt die Route mit ihm (`anhang::hochladen_multipart`). Der Client
+/// schickt eine Datei je Anfrage; das Body-Limit (26 MiB) sitzt in `app.rs` an der Route.
+pub async fn anhang_hochladen(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    PfadParam(einsatz_id): PfadParam<i64>,
+    mut multipart: Multipart,
+) -> Result<(StatusCode, Json<Vec<crate::anhang::AnhangAnzeige>>), AppError> {
+    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
+    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
+    fordere_schreibrecht(rolle)?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
+    fordere_aktiv(&einsatz)?;
+    let angelegt = crate::anhang::hochladen_multipart(
+        &state.pool,
+        einsatz_id,
+        benutzer.id,
+        &mut multipart,
+        crate::anhang::ERLAUBTE_MIME_DOKUMENT,
+    )
+    .await?;
+    Ok((StatusCode::CREATED, Json(angelegt)))
+}
+
+/// GET /api/einsaetze/{id}/etb/{eintrag_id}/anhaenge/{aid} — Anhang eines Eintrags laden
+/// (LFH-117, design.md D6).
+///
+/// Gates wie die Leserouten ([`fordere_lese_gates`]: Lesezugriff inklusive Beobachter, Modul
+/// „etb"; ein abgeschlossener Einsatz bleibt lesbar). Die Bindung prüft EINE Abfrage
+/// ([`repo::anhang_am_eintrag`]); kein Treffer ist 404. Die Eintrags-ID im Pfad bindet den
+/// Link an genau einen Eintrag. Die Antwort (ETag/304, `Content-Disposition`) teilt die Route
+/// mit dem generischen und dem Dokument-Download.
+pub async fn anhang_herunterladen(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    PfadParam((einsatz_id, eintrag_id, anhang_id)): PfadParam<(i64, i64, i64)>,
+    req_headers: HeaderMap,
+) -> Result<Response, AppError> {
+    fordere_lese_gates(&state, &benutzer, einsatz_id).await?;
+    if !repo::anhang_am_eintrag(&state.pool, einsatz_id, eintrag_id, anhang_id).await? {
+        return Err(AppError::NotFound);
+    }
+    crate::routes::support::anhang_antwort(&state.pool, anhang_id, &req_headers).await
 }
 
 /// POST /api/einsaetze/{id}/etb/{eintrag_id}/auftrag — aus einem ETB-Eintrag direkt einen

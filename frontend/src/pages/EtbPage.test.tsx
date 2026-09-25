@@ -11,7 +11,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import { sendeBreitenAenderung, setzeViewportBreite } from '../test/viewport';
 import { AuthProvider } from '../auth/AuthContext';
 import { entwuerfeLaden, entwuerfeLeerenFuerTests } from '../etb/entwuerfe/entwurfStore';
-import { queueLeerenFuerTests } from '../offline/queue';
+import { queueEinreihen, queueLeerenFuerTests } from '../offline/queue';
 import EtbPage from './EtbPage';
 import type { EtbEintragAnzeige } from '../api/types';
 
@@ -72,6 +72,7 @@ const eintrag = {
   erfasst_lokal_at: null,
   berichtigt_eintrag_id: null,
   folgeauftraege: [],
+  anhaenge: [],
 };
 
 /**
@@ -1069,7 +1070,9 @@ describe('EtbPage – Zeitachse (Neuentwurf S4)', () => {
     expect(await within(leiste).findByText('Zählung nicht verfügbar.')).toBeInTheDocument();
     const kopf = document.querySelector('[data-lfh="seitenkopf"]')!;
     expect(kopf).not.toHaveTextContent(/\d+ (Einträge|Eintrag|Treffer)/);
-    expect(screen.getByPlaceholderText(/Inhalt/)).toBeEnabled();
+    // `findBy`: die Erfassung steht erst, wenn die Entwürfe aus der IndexedDB geladen sind —
+    // unter Last kam die Zählung früher an, und ein `getBy` fand das Feld noch nicht.
+    expect(await screen.findByPlaceholderText(/Inhalt/)).toBeEnabled();
   });
 
   it('meldet einen offline gepufferten Eintrag im Puffer als ausstehend', async () => {
@@ -1087,6 +1090,121 @@ describe('EtbPage – Zeitachse (Neuentwurf S4)', () => {
     );
     // Und der gepufferte Eintrag steht als eigene Zeile in der Zeitachse.
     expect(await screen.findAllByText('Offline-Eintrag')).not.toHaveLength(0);
+  });
+});
+
+describe('EtbPage – Anhänge an der Erfassung (LFH-117, Review C1)', () => {
+  function dateiEingabe(): HTMLInputElement {
+    const el = document.querySelector<HTMLInputElement>('input[data-lfh="etb-anhang-eingabe"]');
+    if (!el) throw new Error('Dateieingabe fehlt');
+    return el;
+  }
+
+  it('eine abgebrochene Berichtigung lässt die gewählten Dateien der Entwürfe stehen', async () => {
+    setup();
+    const user = userEvent.setup();
+    await screen.findByText('Erste Meldung');
+    const feld = await screen.findByPlaceholderText(/Inhalt/);
+    await user.type(feld, 'Zwei Fotos vom Deich');
+    await user.upload(dateiEingabe(), new File(['x'], 'foto-a.jpg', { type: 'image/jpeg' }));
+    expect(screen.getByRole('list', { name: 'Gewählte Anhänge' })).toHaveTextContent('foto-a.jpg');
+    await waitFor(async () =>
+      expect((await entwuerfeLaden(7))[0]?.inhalt).toBe('Zwei Fotos vom Deich'),
+    );
+
+    await waehleZeilenaktion(user, 'Berichtigen');
+    await screen.findByText(/Berichtigung zu Nr\./);
+    await user.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    await waitFor(() => expect(screen.queryByText(/Berichtigung zu Nr\./)).toBeNull());
+
+    expect(await screen.findByPlaceholderText(/Inhalt/)).toHaveValue('Zwei Fotos vom Deich');
+    expect(await screen.findByRole('list', { name: 'Gewählte Anhänge' })).toHaveTextContent(
+      'foto-a.jpg',
+    );
+  });
+
+  it('hält auch einen Entwurf, der nur Dateien trägt, über die Berichtigung', async () => {
+    setup();
+    const user = userEvent.setup();
+    await screen.findByText('Erste Meldung');
+    await screen.findByPlaceholderText(/Inhalt/);
+    await user.upload(dateiEingabe(), new File(['x'], 'foto-b.jpg', { type: 'image/jpeg' }));
+    // Ein Entwurf ohne Text läge sonst nur im Speicher: nach dem Abbrechen käme ein neuer mit
+    // neuer id, und die Dateien hingen an keinem Reiter mehr.
+    await waitFor(async () => expect(await entwuerfeLaden(7)).toHaveLength(1));
+
+    await waehleZeilenaktion(user, 'Berichtigen');
+    await screen.findByText(/Berichtigung zu Nr\./);
+    await user.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    await waitFor(() => expect(screen.queryByText(/Berichtigung zu Nr\./)).toBeNull());
+
+    expect(await screen.findByRole('list', { name: 'Gewählte Anhänge' })).toHaveTextContent(
+      'foto-b.jpg',
+    );
+  });
+
+  /**
+   * Review C1 (WICHTIG 1): ein Eintrag der Offline-Queue, dessen client_id schon für einen
+   * ANDEREN Eintrag steht, landet mit dem Wortlaut des Servers unter „abgelehnt". „Erneut
+   * senden" nimmt einen neuen Schlüssel — mit dem alten liefe er in denselben 409.
+   */
+  it('ein client_id-Konflikt der Queue steht unter „abgelehnt"; „Erneut senden" nimmt einen neuen Schlüssel', async () => {
+    const konflikt =
+      'client_id bereits für einen anderen Eintrag verwendet: dieser Wortlaut ist nicht erfasst.';
+    await queueEinreihen(admin.id, 7, {
+      typ: 'meldung',
+      inhalt: 'Wortlaut aus Tab 2',
+      client_id: 'entwurf-x',
+    });
+    const gesendet: string[] = [];
+    setup('/einsaetze/7/etb', [
+      http.post('/api/einsaetze/7/etb', async ({ request }) => {
+        const body = (await request.json()) as { client_id?: string };
+        gesendet.push(body.client_id ?? '');
+        return body.client_id === 'entwurf-x'
+          ? HttpResponse.json({ error: konflikt }, { status: 409 })
+          : HttpResponse.json(
+              { ...eintrag, id: 9, lfd_nr: 9, inhalt: 'Wortlaut aus Tab 2' },
+              { status: 201 },
+            );
+      }),
+    ]);
+    const user = userEvent.setup();
+    expect(
+      (await screen.findAllByText(/client_id bereits für einen anderen Eintrag/)).length,
+    ).toBeGreaterThan(0);
+    expect(screen.getAllByText('Wortlaut aus Tab 2').length).toBeGreaterThan(0);
+
+    await user.click(await screen.findByRole('button', { name: 'Erneut senden' }));
+    await waitFor(() => expect(gesendet).toHaveLength(2));
+    expect(gesendet[0]).toBe('entwurf-x');
+    expect(gesendet[1]).not.toBe('entwurf-x');
+    expect(gesendet[1]).toBeTruthy();
+  });
+
+  it('sperrt „Berichtigen", solange ein Entwurf sendet — mit Grund', async () => {
+    setup('/einsaetze/7/etb', [
+      http.post('/api/einsaetze/7/etb/anhaenge', () => new Promise<Response>(() => {})),
+    ]);
+    const user = userEvent.setup();
+    await screen.findByText('Erste Meldung');
+    const feld = await screen.findByPlaceholderText(/Inhalt/);
+    await user.upload(dateiEingabe(), new File(['x'], 'foto.jpg', { type: 'image/jpeg' }));
+    await user.type(feld, 'Foto{Enter}');
+    await screen.findByText('Lädt hoch (1/1) …');
+
+    await user.click(await screen.findByRole('button', { name: /^Aktionen zu Eintrag/ }));
+    const menue = document.querySelector<HTMLElement>(
+      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+    );
+    if (!menue) throw new Error('Menü nicht offen');
+    const punkt = within(menue).getByRole('menuitem', { name: /Berichtigen/ });
+    expect(punkt).toHaveAttribute('aria-disabled', 'true');
+    expect(punkt).toHaveTextContent('erst nach dem Senden');
+    await user.click(punkt);
+    // Die Entwurfs-Reiter stehen weiter — keine Berichtigung hat sie ersetzt.
+    expect(screen.queryByText(/Berichtigung zu Nr\./)).toBeNull();
+    expect(screen.getByText('Lädt hoch (1/1) …')).toBeInTheDocument();
   });
 });
 

@@ -190,6 +190,18 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/etb/{eintrag_id}/auftrag",
             post(routes::etb::auftrag_erteilen),
         )
+        // ETB-Anhänge (LFH-117): Upload mit Body-Limit wie die übrigen Datei-Routen (der
+        // Default von 2 MiB kappte still), Download mit dem Asset-Concurrency-Cap.
+        .route(
+            "/api/einsaetze/{id}/etb/anhaenge",
+            post(routes::etb::anhang_hochladen).layer(DefaultBodyLimit::max(26 * 1024 * 1024)),
+        )
+        .route(
+            "/api/einsaetze/{id}/etb/{eintrag_id}/anhaenge/{aid}",
+            get(routes::etb::anhang_herunterladen).layer(ConcurrencyLimitLayer::new(
+                MAX_GLEICHZEITIGE_ASSET_DOWNLOADS,
+            )),
+        )
         .route(
             "/api/einsaetze/{id}/chat/kanaele",
             get(routes::chat::kanaele_liste),

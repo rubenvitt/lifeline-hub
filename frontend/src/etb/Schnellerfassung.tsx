@@ -1,9 +1,13 @@
 import { Alert, Button, Checkbox, Dropdown, Space, Tooltip, Typography } from 'antd';
-import { EyeOutlined, PlusOutlined } from '@ant-design/icons';
+import { CloseOutlined, EyeOutlined, PaperClipOutlined, PlusOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router';
-import type { NeuerEintrag } from '../api/etb';
+import { DOKUMENT_ACCEPT, DOKUMENT_MAX_GROESSE } from '../api/dokumente';
+import { ApiError } from '../api/client';
+import { ETB_ANHAENGE_MAX, ladeEtbAnhangHoch, type NeuerEintrag } from '../api/etb';
+import { formatGroesse } from '../karten/formatGroesse';
+import { useOnline } from '../offline/useOnline';
 import type {
   EinsatzAnzeige,
   EtbBaustein,
@@ -54,6 +58,68 @@ interface Props {
   werteBehalten?: boolean;
   /** Fehlt der Callback, rendert die Steuerzeile den Schalter nicht (Berichtigung, Bestandsaufrufer). */
   onWerteBehaltenChange?: (behalten: boolean) => void;
+  /**
+   * Gewählte Anhänge, optional von außen geführt (LFH-117, design.md D9): `EtbEntwurfsTabs`
+   * montiert nur den aktiven Tab und hält die Dateien je Entwurf, damit sie einen Tabwechsel
+   * überleben. Fehlt das Paar, führt die Schnellerfassung die Liste selbst (Berichtigung).
+   * Dateien gehen nie in den Entwurfsspeicher — der ist JSON.
+   */
+  dateien?: File[];
+  onDateienChange?: (dateien: File[]) => void;
+  /**
+   * Idempotenzschlüssel dieses Entwurfs (LFH-117, Review). `EtbEntwurfsTabs` reicht die
+   * Entwurfs-id: sie überlebt den Remount beim Tabwechsel, und ein zweites Absenden desselben
+   * Entwurfs, während das erste noch läuft, dedupliziert der Server. Fehlt sie, hält die
+   * Schnellerfassung eine eigene bis zum Erfolg (Berichtigung).
+   */
+  clientId?: string;
+  /**
+   * Sendezustand, optional von außen geführt (LFH-117, Review C1). Nur der aktive Entwurfs-Tab
+   * ist montiert; läge der Zustand hier, stünde nach einem Tabwechsel während eines Uploads
+   * eine frische, ENTSPERRTE Schnellerfassung da — und was man dort tippte, verwarf der noch
+   * laufende Versand still. `EtbEntwurfsTabs` hält ihn deshalb je Entwurf. Fehlt das Paar,
+   * führt die Schnellerfassung ihn selbst (Berichtigung).
+   */
+  versand?: Versand;
+  onVersandChange?: (aenderung: Partial<Versand>) => void;
+}
+
+/** Sendezustand einer Erfassung: läuft ein Versand, wie weit der Upload ist, welcher Grund steht. */
+export interface Versand {
+  sendet: boolean;
+  fortschritt: { n: number; von: number } | null;
+  /** Hinweis an der Dateiliste — bleibt stehen bis zur nächsten Wahl oder zum nächsten Absenden. */
+  hinweis: string | null;
+}
+
+export const VERSAND_RUHE: Versand = { sendet: false, fortschritt: null, hinweis: null };
+
+/**
+ * Welche Datei schon oben liegt (LFH-117, design.md D9): bei einem Teilausfall — Datei 1
+ * oben, Datei 2 gescheitert — lädt der nächste Versuch nur Datei 2. Auf Modulebene, weil
+ * `EtbEntwurfsTabs` die Schnellerfassung beim Tabwechsel neu montiert; ein `WeakMap` nach
+ * `File` hält keine Datei fest, die niemand mehr kennt. Lehnt der Server den Eintrag
+ * fachlich ab, werden die Zuordnungen dieses Versuchs verworfen: die ID könnte die Ursache
+ * sein (etwa ein inzwischen weggeräumter Anhang).
+ */
+const hochgeladeneIds = new WeakMap<File, number>();
+
+const ANHANG_OFFLINE = 'Anhänge brauchen eine Verbindung. Der Text lässt sich trotzdem erfassen.';
+const ANHANG_ZU_GROSS = `ist zu groß (${DOKUMENT_MAX_GROESSE / 1024 / 1024} MiB erlaubt)`;
+const ANHANG_GRENZE = `Höchstens ${ETB_ANHAENGE_MAX} Anhänge je Eintrag.`;
+
+/**
+ * Dieselbe Datei, neu gewählt (LFH-117, Review C1): jede Dateiwahl liefert NEUE `File`-Objekte,
+ * ein Vergleich der Identität griff also nie. Name, Größe und Änderungszeit trennen zwei
+ * Dateien hinreichend — ein Foto zweimal am Eintrag liesse sich wegen der Unveränderlichkeit
+ * nicht mehr entfernen.
+ */
+function gleicheDatei(a: File, b: File): boolean {
+  return a.name === b.name && a.size === b.size && a.lastModified === b.lastModified;
+}
+
+function fehlerGrund(e: unknown): string {
+  return e instanceof Error && e.message ? e.message : 'unbekannter Fehler';
 }
 
 const TYP_MENUE = ERFASSBARE_TYPEN.map((t) => ({ key: t, label: etbTyp[t].label }));
@@ -146,15 +212,39 @@ export default function Schnellerfassung({
   onWerteChange,
   werteBehalten = false,
   onWerteBehaltenChange,
+  dateien: dateienVonAussen,
+  onDateienChange,
+  clientId,
+  versand: versandVonAussen,
+  onVersandChange,
 }: Props) {
   const navigate = useNavigate();
   const { token, rollen } = useRollen();
+  const online = useOnline();
   // Unter `md` steht das Feld auf eigener Zeile (LFH-373): zwischen Typ-Präfix und „Erfassen"
   // blieb es gemessen auf 158 von 366 px, und die angepinnte Leiste wuchs auf 59 % des Fensters.
   const { istSchmal } = useViewport();
   const [vorschauOffen, setVorschauOffen] = useState(false);
   const chipZeileRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<TextAreaRef>(null);
+  const dateiEingabe = useRef<HTMLInputElement>(null);
+  const [eigeneDateien, setEigeneDateien] = useState<File[]>([]);
+  const dateien = dateienVonAussen ?? eigeneDateien;
+  function setzeDateien(neu: File[]) {
+    if (onDateienChange) onDateienChange(neu);
+    else setEigeneDateien(neu);
+  }
+  const [eigenerVersand, setEigenerVersand] = useState<Versand>(VERSAND_RUHE);
+  const { sendet, fortschritt, hinweis: anhangHinweis } = versandVonAussen ?? eigenerVersand;
+  /** Funktional gemergt: der laufende Versand schreibt aus einer alten Closure heraus. */
+  function aendereVersand(aenderung: Partial<Versand>) {
+    if (onVersandChange) onVersandChange(aenderung);
+    else setEigenerVersand((v) => ({ ...v, ...aenderung }));
+  }
+  const setAnhangHinweis = (hinweis: string | null) => aendereVersand({ hinweis });
+  const setFortschritt = (f: Versand['fortschritt']) => aendereVersand({ fortschritt: f });
+  /** Eigener Schlüssel ohne Aufrufer-id: stabil über Fehlversuche, neu nach jedem Erfolg. */
+  const eigeneClientId = useRef<string>(crypto.randomUUID());
   const menuRef = useRef<SlashMenuHandle>(null);
   const feldKnopfRef = useRef<HTMLButtonElement>(null);
 
@@ -180,7 +270,6 @@ export default function Schnellerfassung({
     if (editFeld == null) zeile.scrollLeft = 0;
     else if (ziel && zeile.contains(ziel)) rolleWaagerechtInsBild(zeile, ziel);
   }, [editFeld, istSchmal]);
-  const [sendet, setSendet] = useState(false);
 
   const [menuOffen, setMenuOffen] = useState(false);
   const [menuFilter, setMenuFilter] = useState('');
@@ -303,7 +392,14 @@ export default function Schnellerfassung({
     setInhalt(inhalt.slice(0, triggerStart) + inhalt.slice(caret));
   }
 
+  /*
+   * Während des Sendens nimmt die Erfassung keine Änderung an (LFH-117, Review C1): der Eintrag
+   * ist beim Absenden gebildet, was danach an Typ, Feldern oder Baustein geändert würde, ginge
+   * nicht mit und fiele nach dem Erfolg still weg. Die Bedienelemente sind gesperrt; die
+   * frühen Ausstiege hier halten die Wege, die an keinem Knopf hängen (Menü, Modal, Tastatur).
+   */
   function waehleEintrag(e: SlashEintrag) {
+    if (sendet) return;
     entferneTriggerText();
     // Auf JEDEM Weg hinaus, unabhängig davon, wie das Menü aufging.
     setMenuOffen(false);
@@ -323,12 +419,14 @@ export default function Schnellerfassung({
   }
 
   function commitFeld(feld: MetaFeld, wert: string | dayjs.Dayjs | MeldeWeg) {
+    if (sendet) return;
     setMetadaten((m) => ({ ...m, [feld]: wert }));
     setEditFeld(null);
     fokusInsFeld();
   }
 
   function bausteinEinsetzen(felder: BausteinFelder) {
+    if (sendet) return;
     setInhalt(felder.inhalt);
     setMetadaten((m) => ({
       ...m,
@@ -358,19 +456,115 @@ export default function Schnellerfassung({
     }
   }
 
+  /**
+   * Dateiwahl: über 25 MiB, über der Höchstzahl und doppelt Gewähltes wird schon hier
+   * abgewiesen, jeweils mit Grund — nicht erst nach dem Upload.
+   */
+  function dateienGewaehlt(liste: FileList | null) {
+    const neu = [...dateien];
+    const gruende: string[] = [];
+    for (const d of Array.from(liste ?? [])) {
+      if (d.size > DOKUMENT_MAX_GROESSE) gruende.push(`${d.name} ${ANHANG_ZU_GROSS}`);
+      else if (neu.some((x) => gleicheDatei(x, d))) gruende.push(`${d.name} ist schon gewählt`);
+      else if (neu.length >= ETB_ANHAENGE_MAX)
+        gruende.push(`${d.name}: höchstens ${ETB_ANHAENGE_MAX} Anhänge je Eintrag`);
+      else neu.push(d);
+    }
+    setAnhangHinweis(gruende.length > 0 ? gruende.join(' · ') : null);
+    setzeDateien(neu);
+    // Dieselbe Datei soll sich nach dem Entfernen erneut wählen lassen.
+    if (dateiEingabe.current) dateiEingabe.current.value = '';
+  }
+
+  /**
+   * Lädt die gewählten Dateien nacheinander hoch (eine je Anfrage) und liefert ihre IDs in
+   * Wahlreihenfolge — oder `null`, wenn eine scheitert; dann steht der Grund am Hinweis und
+   * es wird NICHT erfasst.
+   */
+  async function ladeAnhaengeHoch(): Promise<number[] | null> {
+    const ids: number[] = [];
+    for (const [i, d] of dateien.entries()) {
+      let id = hochgeladeneIds.get(d);
+      if (id == null) {
+        setFortschritt({ n: i + 1, von: dateien.length });
+        try {
+          id = (await ladeEtbAnhangHoch(einsatz.id, d)).id;
+        } catch (e) {
+          setAnhangHinweis(
+            `${d.name} konnte nicht hochgeladen werden: ${fehlerGrund(e)}. ` +
+              'Der Eintrag ist nicht erfasst.',
+          );
+          return null;
+        }
+        hochgeladeneIds.set(d, id);
+      }
+      ids.push(id);
+    }
+    return ids;
+  }
+
   async function absenden() {
     if (sendet || inhalt.trim() === '') return;
-    setSendet(true);
+    // Nur der UPLOAD braucht Netz (design.md D10). Mit Dateien in der Liste wird ohne
+    // Verbindung abgewiesen, ohne etwas zu leeren — ein Eintrag ohne die gewählten Dateien
+    // wäre eine stille Auslassung.
+    // Über der Höchstzahl gar nicht erst hochladen: das Erfassen scheiterte danach mit 400,
+    // und alle Dateien lägen bis zum Aufräumlauf verwaist oben.
+    if (dateien.length > ETB_ANHAENGE_MAX) {
+      setAnhangHinweis(`${ANHANG_GRENZE} Entferne ${dateien.length - ETB_ANHAENGE_MAX}.`);
+      return;
+    }
+    if (dateien.length > 0 && !online) {
+      setAnhangHinweis(
+        'Ohne Verbindung lassen sich keine Anhänge senden. ' +
+          'Entferne sie, um den Text jetzt zu erfassen.',
+      );
+      return;
+    }
+    // Die Zeit gilt ab dem Absenden, nicht ab dem Ende des Uploads — sonst verschöbe ein
+    // langer Upload Ereigniszeit und `erfasst_lokal_at` (Review LFH-117).
+    const jetztIso = new Date().toISOString();
+    aendereVersand({ sendet: true, hinweis: null });
     try {
-      const eintrag = baueEintrag({
-        inhalt,
-        typ,
-        metadaten,
-        berichtigungZuId: berichtigungZu ? berichtigungZu.id : undefined,
-        jetztIso: new Date().toISOString(),
-      });
-      await erfassen(eintrag);
+      const anhangIds = await ladeAnhaengeHoch();
+      setFortschritt(null);
+      if (anhangIds == null) return;
+      const eintrag: NeuerEintrag = {
+        ...baueEintrag({
+          inhalt,
+          typ,
+          metadaten,
+          berichtigungZuId: berichtigungZu ? berichtigungZu.id : undefined,
+          jetztIso,
+        }),
+        client_id: clientId ?? eigeneClientId.current,
+        ...(anhangIds.length > 0 ? { anhang_ids: anhangIds } : {}),
+      };
+      try {
+        await erfassen(eintrag);
+      } catch (e) {
+        // Die IDs dieses Versuchs nur verwerfen, wenn die Ablehnung an ihnen liegen kann
+        // (400/422: unbekannt, gebunden, zu viele). Bei 403 oder 409 sind die Dateien frei und
+        // unverändert oben — ein zweiter Upload wäre nur Volumen und verwaiste Bytes.
+        if (e instanceof ApiError && (e.status === 400 || e.status === 422)) {
+          for (const d of dateien) hochgeladeneIds.delete(d);
+        }
+        // 409 aus dem Erfassen (Review C1): die client_id steht schon für einen anderen
+        // Eintrag (zweiter Browser-Tab) — oder der Einsatz ist abgeschlossen. Der Wortlaut
+        // bleibt, der Grund steht AN der Erfassung, und der nächste Versuch nimmt einen neuen
+        // Schlüssel; mit dem alten liefe er in denselben Konflikt. Mit Aufrufer-id gibt
+        // `EtbEntwurfsTabs` dem Entwurf eine neue.
+        if (e instanceof ApiError && e.status === 409) {
+          eigeneClientId.current = crypto.randomUUID();
+          setAnhangHinweis(e.message);
+        }
+        throw e;
+      }
+      eigeneClientId.current = crypto.randomUUID();
       setInhalt('');
+      // Die Dateiliste geht immer — auch mit „Werte behalten": eine Datei gehört zu genau
+      // einem Eintrag (`nurUebernahme` kennt keine Dateien).
+      setzeDateien([]);
       // Wertübernahme: Von/An/Meldeweg bleiben stehen, alles andere fällt weg. Im
       // Berichtigungsmodus bleibt es beim vollständigen Leeren (dort gibt es auch keinen
       // Schalter). Greift für Aufrufer OHNE Remount; `EtbEntwurfsTabs` remountet und setzt
@@ -385,7 +579,7 @@ export default function Schnellerfassung({
       // Wortlaut bleibt im Feld stehen (Erfassungs-Norm, `onErfassen` muss ablehnen).
       // Weiterwerfen hieße hier nur eine unbehandelte Zurückweisung aus `void absenden()`.
     } finally {
-      setSendet(false);
+      aendereVersand({ sendet: false, fortschritt: null });
     }
   }
 
@@ -404,11 +598,13 @@ export default function Schnellerfassung({
     <Dropdown
       trigger={['click']}
       autoFocus
+      disabled={sendet}
       menu={{
         items: TYP_MENUE,
         selectable: true,
         selectedKeys: [typ],
         onClick: ({ key }) => {
+          if (sendet) return;
           setTyp(key as EtbTyp);
           fokusInsFeld();
         },
@@ -416,6 +612,7 @@ export default function Schnellerfassung({
     >
       <Button
         type="text"
+        disabled={sendet}
         aria-label={`Eintragstyp /${typ} ändern`}
         style={{ font: 'inherit', color: 'inherit', paddingInline: token.paddingXS }}
       >
@@ -435,7 +632,12 @@ export default function Schnellerfassung({
   // LFH-373) — in der einzeilig rollenden Chip-Zeile lag er sonst hinter dem Bildlauf.
   const schalter = zeigeSchalter ? (
     <Tooltip title={UEBERNAHME_ERKLAERUNG}>
-      <Checkbox checked={werteBehalten} onChange={(e) => onWerteBehaltenChange?.(e.target.checked)}>
+      {/* Gesperrt beim Senden: der laufende Versand hat die Übernahme schon gelesen. */}
+      <Checkbox
+        checked={werteBehalten}
+        disabled={sendet}
+        onChange={(e) => onWerteBehaltenChange?.(e.target.checked)}
+      >
         <Typography.Text type="secondary">Werte behalten</Typography.Text>
       </Checkbox>
     </Tooltip>
@@ -466,6 +668,7 @@ export default function Schnellerfassung({
     <Button
       ref={feldKnopfRef}
       type="dashed"
+      disabled={sendet}
       icon={
         <span aria-hidden="true" style={{ display: 'inline-flex' }}>
           <PlusOutlined />
@@ -483,6 +686,43 @@ export default function Schnellerfassung({
     </Button>
   );
 
+  // „Anhang" (LFH-117) steht bei „Feld": ab `md` hinter den Chips, darunter vorn (LFH-373).
+  const anGrenze = dateien.length >= ETB_ANHAENGE_MAX;
+  const anhangTeil = (
+    <>
+      {/* „Anhang" (LFH-117): ein antd-Knopf plus unsichtbare Dateieingabe statt antds
+            `Upload` — der wickelte den Knopf in ein zweites `role="button"` mit eigenem
+            Tabstopp. So bleibt EIN Bedienziel, und die Höhe kommt aus `controlHeight`. */}
+      <Button
+        type="dashed"
+        disabled={!online || sendet || anGrenze}
+        icon={
+          <span aria-hidden="true" style={{ display: 'inline-flex' }}>
+            <PaperClipOutlined />
+          </span>
+        }
+        onClick={() => dateiEingabe.current?.click()}
+      >
+        Anhang
+      </Button>
+      <input
+        ref={dateiEingabe}
+        type="file"
+        multiple
+        hidden
+        disabled={!online || sendet}
+        accept={DOKUMENT_ACCEPT}
+        data-lfh="etb-anhang-eingabe"
+        onChange={(e) => dateienGewaehlt(e.target.files)}
+      />
+      {/* Zweiter Kanal neben dem Grau (WCAG 1.4.1): der Grund steht als Satz daneben. In
+            `text2`, nicht als `Typography` „secondary": dessen Ton hielt am Tag gemessen nur
+            5,58 : 1 auf dem Grund der Erfassung (Boden 7, e2e `etb-anhang-pruefliste`). */}
+      {!online && <span style={{ color: rollen.text2 }}>{ANHANG_OFFLINE}</span>}
+      {online && anGrenze && <span style={{ color: rollen.text2 }}>{ANHANG_GRENZE}</span>}
+    </>
+  );
+
   return (
     // `etb-erfassung-card` trägt keine CSS-Regel mehr (den Rahmen zeichnet die
     // Schnellerfassungszeile), bleibt aber stehen: `e2e/seitenrinne.spec.ts` misst an ihr,
@@ -494,7 +734,12 @@ export default function Schnellerfassung({
           showIcon
           style={{ marginBottom: token.marginSM }}
           title={`Berichtigung zu Nr. ${berichtigungZu.lfd_nr}`}
-          action={<Button onClick={onBerichtigungAbbrechen}>Abbrechen</Button>}
+          action={
+            // Gesperrt, solange sie gesendet wird: der Versand liefe sonst trotzdem durch.
+            <Button disabled={sendet} onClick={onBerichtigungAbbrechen}>
+              Abbrechen
+            </Button>
+          }
         />
       )}
 
@@ -520,7 +765,7 @@ export default function Schnellerfassung({
                 Vorschau
               </Button>
               <Button type="primary" loading={sendet} onClick={() => void absenden()}>
-                Erfassen
+                {fortschritt ? `Lädt hoch (${fortschritt.n}/${fortschritt.von}) …` : 'Erfassen'}
               </Button>
             </div>
           }
@@ -539,6 +784,7 @@ export default function Schnellerfassung({
             value={inhalt}
             onChange={onInhaltChange}
             onKeyDown={onKeyDown}
+            readOnly={sendet}
           />
         </Schnellerfassungszeile>
         <SlashMenu
@@ -569,6 +815,7 @@ export default function Schnellerfassung({
           {/* Unter `md` steht „Feld" VORN (LFH-373): in der einzeilig rollenden Zeile rutschte
               er sonst hinter die gesetzten Chips aus dem Bild. */}
           {istSchmal && feldKnopf}
+          {istSchmal && anhangTeil}
           {gesetzteFelder.map((feld) => (
             <MetaChip
               key={`${feld}-${editFeld === feld ? 'edit' : 'view'}`}
@@ -581,8 +828,13 @@ export default function Schnellerfassung({
                 setEditFeld(null);
                 fokusInsFeld();
               }}
-              onRemove={(f) => setMetadaten((m) => ({ ...m, [f]: undefined }))}
-              onEdit={(f) => setEditFeld(f)}
+              onRemove={(f) => {
+                if (!sendet) setMetadaten((m) => ({ ...m, [f]: undefined }));
+              }}
+              onEdit={(f) => {
+                if (!sendet) setEditFeld(f);
+              }}
+              gesperrt={sendet}
             />
           ))}
           {editFeld != null && metadaten[editFeld] == null && (
@@ -602,8 +854,15 @@ export default function Schnellerfassung({
             />
           )}
           {!istSchmal && feldKnopf}
+          {!istSchmal && anhangTeil}
           {!berichtigungZu && typ === 'lage' && (
-            <Button type="link" onClick={() => navigate(`/einsaetze/${einsatz.id}/lageberichte`)}>
+            // Gesperrt beim Senden: der Sprung hängte die Erfassung ab, der Versand liefe
+            // unsichtbar weiter und ein Upload-Fehler stünde nirgends (Review C1).
+            <Button
+              type="link"
+              disabled={sendet}
+              onClick={() => navigate(`/einsaetze/${einsatz.id}/lageberichte`)}
+            >
               Als strukturierten Lagebericht erfassen →
             </Button>
           )}
@@ -612,6 +871,51 @@ export default function Schnellerfassung({
           <div style={{ marginInlineStart: 'auto', flexShrink: 0 }}>{schalter}</div>
         )}
       </div>
+
+      {dateien.length > 0 && (
+        <ul
+          aria-label="Gewählte Anhänge"
+          data-lfh="etb-anhang-liste"
+          style={{
+            listStyle: 'none',
+            margin: 0,
+            marginTop: token.marginXS,
+            padding: 0,
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: token.marginXS,
+          }}
+        >
+          {dateien.map((d, i) => (
+            <li
+              key={`${d.name}-${i}`}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: token.marginXXS }}
+            >
+              <span>
+                {d.name} · {formatGroesse(d.size)}
+              </span>
+              <Button
+                type="text"
+                disabled={sendet}
+                aria-label={
+                  dateien.filter((x) => x.name === d.name).length > 1
+                    ? `Anhang ${i + 1}, ${d.name} entfernen`
+                    : `Anhang ${d.name} entfernen`
+                }
+                icon={
+                  <span aria-hidden="true" style={{ display: 'inline-flex' }}>
+                    <CloseOutlined />
+                  </span>
+                }
+                onClick={() => setzeDateien(dateien.filter((x) => x !== d))}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
+      {anhangHinweis && (
+        <Alert type="error" showIcon style={{ marginTop: token.marginXS }} title={anhangHinweis} />
+      )}
 
       <BausteinPlatzhalterModal
         baustein={bausteinOffen}

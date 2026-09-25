@@ -1,9 +1,10 @@
 // frontend/src/etb/entwuerfe/EtbEntwurfsTabs.test.tsx
 import { http, HttpResponse } from 'msw';
-import { screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { StrictMode, useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ApiError } from '../../api/client';
 import type { NeuerEintrag } from '../../api/etb';
 import type { EinsatzAnzeige, EtbBaustein } from '../../api/types';
 import { server } from '../../test/server';
@@ -299,5 +300,275 @@ describe('EtbEntwurfsTabs', () => {
     await waitFor(() =>
       expect(screen.getAllByRole('tab', { name: /Neuer Eintrag/ })).toHaveLength(2),
     );
+  });
+
+  // --- LFH-117: Anhänge je Entwurf, nur im Speicher ---
+
+  function dateiEingabe(): HTMLInputElement {
+    const el = document.querySelector<HTMLInputElement>('input[type="file"]');
+    if (!el) throw new Error('Dateieingabe fehlt');
+    return el;
+  }
+
+  it('LFH-117: gewählte Dateien gehören ihrem Entwurf und überleben den Tabwechsel', async () => {
+    renderMitProviders(<EtbEntwurfsTabs {...props()} />);
+    await screen.findByPlaceholderText(/Inhalt/);
+    const ersterTab = screen.getAllByRole('tab')[0];
+    await userEvent.upload(dateiEingabe(), new File(['x'], 'foto-a.jpg', { type: 'image/jpeg' }));
+    expect(screen.getByRole('list', { name: 'Gewählte Anhänge' })).toHaveTextContent('foto-a.jpg');
+
+    await userEvent.click(screen.getByRole('button', { name: /add|hinzu/i }));
+    await waitFor(() =>
+      expect(screen.getAllByRole('tab', { name: /Neuer Eintrag/ })).toHaveLength(2),
+    );
+    expect(screen.queryByRole('list', { name: 'Gewählte Anhänge' })).toBeNull();
+
+    await userEvent.click(ersterTab);
+    expect(await screen.findByRole('list', { name: 'Gewählte Anhänge' })).toHaveTextContent(
+      'foto-a.jpg',
+    );
+  });
+
+  it('LFH-117: der Entwurfsspeicher nimmt keine Dateien auf', async () => {
+    renderMitProviders(<EtbEntwurfsTabs {...props()} />);
+    await screen.findByPlaceholderText(/Inhalt/);
+    await userEvent.upload(dateiEingabe(), new File(['x'], 'foto-b.jpg', { type: 'image/jpeg' }));
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Foto');
+    await waitFor(async () => expect((await entwuerfeLaden(7))[0]?.inhalt).toBe('Foto'));
+    expect(JSON.stringify(await entwuerfeLaden(7))).not.toContain('foto-b.jpg');
+  });
+
+  it('LFH-117: ein geschlossener Entwurf nimmt seine Dateien mit', async () => {
+    renderMitProviders(<EtbEntwurfsTabs {...props()} />);
+    await screen.findByPlaceholderText(/Inhalt/);
+    await userEvent.upload(dateiEingabe(), new File(['x'], 'foto-c.jpg', { type: 'image/jpeg' }));
+    await userEvent.click(screen.getByRole('button', { name: /add|hinzu/i }));
+    await waitFor(() =>
+      expect(screen.getAllByRole('tab', { name: /Neuer Eintrag/ })).toHaveLength(2),
+    );
+    // Den ersten Entwurf schliessen (antds Entfernen-Knopf je Tab).
+    const entfernen = document.querySelectorAll<HTMLElement>('.ant-tabs-tab-remove');
+    await userEvent.click(entfernen[0]);
+    await waitFor(() =>
+      expect(screen.getAllByRole('tab', { name: /Neuer Eintrag/ })).toHaveLength(1),
+    );
+    expect(screen.queryByText(/foto-c\.jpg/)).toBeNull();
+  });
+
+  // --- LFH-117 (Review C1): der Sendezustand gehört dem Entwurf, nicht der Montierung ---
+
+  /** Ein Upload, der hängt, bis der Test ihn freigibt (oder scheitern lässt). */
+  function haengenderUpload() {
+    const s: { freigeben: () => void; scheitern: () => void } = {
+      freigeben: () => {},
+      scheitern: () => {},
+    };
+    server.use(
+      http.post(
+        '/api/einsaetze/7/etb/anhaenge',
+        () =>
+          new Promise<Response>((r) => {
+            s.freigeben = () =>
+              r(
+                HttpResponse.json(
+                  [
+                    {
+                      id: 41,
+                      einsatz_id: 7,
+                      dateiname: 'foto.jpg',
+                      mime: 'image/jpeg',
+                      groesse: 1,
+                      hochgeladen_von: 1,
+                      erstellt_at: '2026-09-25 10:00:00',
+                    },
+                  ],
+                  { status: 201 },
+                ),
+              );
+            s.scheitern = () => r(HttpResponse.json({ error: 'Speicher voll' }, { status: 507 }));
+          }),
+      ),
+    );
+    return s;
+  }
+
+  function aktiveEntwurfsId(): string | null {
+    return document.querySelector('.ant-tabs-tab-active')?.getAttribute('data-node-key') ?? null;
+  }
+
+  async function zweitenTabOeffnen() {
+    await userEvent.click(screen.getByRole('button', { name: /add|hinzu/i }));
+    await waitFor(() => expect(screen.getAllByRole('tab')).toHaveLength(2));
+  }
+
+  it('LFH-117: ein Tabwechsel während des Sendens hebt die Sperre nicht auf — kein zweites Absenden', async () => {
+    const upload = haengenderUpload();
+    const erfassen = vi.fn<(e: NeuerEintrag) => Promise<void>>().mockResolvedValue(undefined);
+    renderMitProviders(<EtbEntwurfsTabs {...props({ erfassen })} />);
+    await screen.findByPlaceholderText(/Inhalt/);
+    const ersterTab = screen.getAllByRole('tab')[0];
+    await userEvent.upload(dateiEingabe(), new File(['x'], 'foto.jpg', { type: 'image/jpeg' }));
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Foto{Enter}');
+    await screen.findByText('Lädt hoch (1/1) …');
+
+    // Wegwechseln und zurück: die Schnellerfassung montiert neu, der Versand läuft noch.
+    await zweitenTabOeffnen();
+    await userEvent.click(ersterTab);
+    const feld = await screen.findByPlaceholderText(/Inhalt/);
+    expect(feld).toHaveValue('Foto');
+    expect(feld).toHaveAttribute('readonly');
+    expect(screen.getByText('Lädt hoch (1/1) …')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Anhang' })).toBeDisabled();
+    await userEvent.type(feld, ' mehr{Enter}');
+    expect(feld).toHaveValue('Foto');
+
+    await act(async () => upload.freigeben());
+    await waitFor(() => expect(erfassen).toHaveBeenCalledTimes(1));
+    expect(erfassen.mock.calls[0][0]).toMatchObject({ inhalt: 'Foto', anhang_ids: [41] });
+  });
+
+  it('LFH-117: auch ohne Anhang sendet die Rückkehr in den Tab kein zweites Mal', async () => {
+    const erfassen = vi
+      .fn<(e: NeuerEintrag) => Promise<void>>()
+      .mockImplementation(() => new Promise<void>(() => {}));
+    renderMitProviders(<EtbEntwurfsTabs {...props({ erfassen })} />);
+    await screen.findByPlaceholderText(/Inhalt/);
+    const ersterTab = screen.getAllByRole('tab')[0];
+    const entwurfsId = aktiveEntwurfsId();
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Meldung{Enter}');
+    await waitFor(() => expect(erfassen).toHaveBeenCalledTimes(1));
+
+    await zweitenTabOeffnen();
+    await userEvent.click(ersterTab);
+    const feld = await screen.findByPlaceholderText(/Inhalt/);
+    expect(feld).toHaveAttribute('readonly');
+    await userEvent.type(feld, '{Enter}');
+    fireEvent.click(screen.getByRole('button', { name: /Erfassen$/ }));
+    expect(erfassen).toHaveBeenCalledTimes(1);
+    expect(erfassen.mock.calls[0][0].client_id).toBe(entwurfsId);
+  });
+
+  it('LFH-117: der sendende Entwurf lässt sich nicht schließen', async () => {
+    const upload = haengenderUpload();
+    renderMitProviders(<EtbEntwurfsTabs {...props()} />);
+    await screen.findByPlaceholderText(/Inhalt/);
+    await zweitenTabOeffnen();
+    const [ersterTab, zweiterTab] = screen.getAllByRole('tab');
+    await userEvent.click(ersterTab);
+    await screen.findByPlaceholderText(/Inhalt/);
+    await userEvent.upload(dateiEingabe(), new File(['x'], 'foto.jpg', { type: 'image/jpeg' }));
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Foto{Enter}');
+    await screen.findByText('Lädt hoch (1/1) …');
+
+    const knoten = (tab: HTMLElement) => tab.closest('.ant-tabs-tab') as HTMLElement;
+    expect(knoten(ersterTab).querySelector('.ant-tabs-tab-remove')).toBeNull();
+    // Der andere Entwurf bleibt schließbar — gesperrt ist nur, was gerade sendet.
+    expect(knoten(zweiterTab).querySelector('.ant-tabs-tab-remove')).not.toBeNull();
+
+    await act(async () => upload.freigeben());
+    await waitFor(() => expect(screen.getAllByRole('tab')).toHaveLength(1));
+  });
+
+  it('LFH-117: ein Upload-Fehler bleibt nach dem Tabwechsel mit Grund stehen', async () => {
+    const upload = haengenderUpload();
+    const erfassen = vi.fn<(e: NeuerEintrag) => Promise<void>>().mockResolvedValue(undefined);
+    renderMitProviders(<EtbEntwurfsTabs {...props({ erfassen })} />);
+    await screen.findByPlaceholderText(/Inhalt/);
+    const ersterTab = screen.getAllByRole('tab')[0];
+    await userEvent.upload(dateiEingabe(), new File(['x'], 'foto.jpg', { type: 'image/jpeg' }));
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Foto{Enter}');
+    await screen.findByText('Lädt hoch (1/1) …');
+    await zweitenTabOeffnen();
+
+    await act(async () => upload.scheitern());
+    await userEvent.click(ersterTab);
+    expect(
+      await screen.findByText(/foto\.jpg konnte nicht hochgeladen werden/),
+    ).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/Inhalt/)).not.toHaveAttribute('readonly');
+    expect(screen.getByRole('list', { name: 'Gewählte Anhänge' })).toHaveTextContent('foto.jpg');
+    expect(erfassen).not.toHaveBeenCalled();
+  });
+
+  it('LFH-117: meldet an den Aufrufer, solange ein Entwurf sendet', async () => {
+    const upload = haengenderUpload();
+    const onSendetChange = vi.fn();
+    renderMitProviders(<EtbEntwurfsTabs {...props({ onSendetChange })} />);
+    await screen.findByPlaceholderText(/Inhalt/);
+    await userEvent.upload(dateiEingabe(), new File(['x'], 'foto.jpg', { type: 'image/jpeg' }));
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Foto{Enter}');
+    await waitFor(() => expect(onSendetChange).toHaveBeenLastCalledWith(true));
+    await act(async () => upload.freigeben());
+    await waitFor(() => expect(onSendetChange).toHaveBeenLastCalledWith(false));
+  });
+
+  it('LFH-117: nach einem Erfolg geht der nächste Eintrag mit der id des NEUEN Entwurfs raus', async () => {
+    const erfassen = vi.fn<(e: NeuerEintrag) => Promise<void>>().mockResolvedValue(undefined);
+    renderMitProviders(<EtbEntwurfsTabs {...props({ erfassen })} />);
+    await screen.findByPlaceholderText(/Inhalt/);
+    const erste = aktiveEntwurfsId();
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Eins{Enter}');
+    await waitFor(() => expect(erfassen).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(aktiveEntwurfsId()).not.toBe(erste));
+    const zweite = aktiveEntwurfsId();
+    await waitFor(() => expect(screen.getByPlaceholderText(/Inhalt/)).toHaveValue(''));
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Zwei{Enter}');
+    await waitFor(() => expect(erfassen).toHaveBeenCalledTimes(2));
+
+    const [a, b] = erfassen.mock.calls.map((c) => c[0].client_id);
+    expect(a).toBe(erste);
+    expect(b).toBe(zweite);
+    expect(b).not.toBe(a);
+  });
+
+  it('LFH-117: ein client_id-Konflikt (409) lässt Wortlaut und Dateien stehen und gibt dem Entwurf eine neue id', async () => {
+    const konflikt =
+      'client_id bereits für einen anderen Eintrag verwendet: dieser Wortlaut ist nicht erfasst.';
+    const erfassen = vi
+      .fn<(e: NeuerEintrag) => Promise<void>>()
+      .mockRejectedValueOnce(new ApiError(409, konflikt))
+      .mockResolvedValue(undefined);
+    server.use(
+      http.post('/api/einsaetze/7/etb/anhaenge', () =>
+        HttpResponse.json(
+          [
+            {
+              id: 41,
+              einsatz_id: 7,
+              dateiname: 'foto.jpg',
+              mime: 'image/jpeg',
+              groesse: 1,
+              hochgeladen_von: 1,
+              erstellt_at: '2026-09-25 10:00:00',
+            },
+          ],
+          { status: 201 },
+        ),
+      ),
+    );
+    renderMitProviders(<EtbEntwurfsTabs {...props({ erfassen })} />);
+    await screen.findByPlaceholderText(/Inhalt/);
+    const alteId = aktiveEntwurfsId();
+    await userEvent.upload(dateiEingabe(), new File(['x'], 'foto.jpg', { type: 'image/jpeg' }));
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Wortlaut aus Tab 2{Enter}');
+    await waitFor(() => expect(erfassen).toHaveBeenCalledTimes(1));
+    expect(erfassen.mock.calls[0][0].client_id).toBe(alteId);
+
+    // Der Hinweis steht AN der Erfassung, nicht nur im Toast.
+    expect(await screen.findByText(new RegExp(konflikt.slice(0, 40)))).toBeInTheDocument();
+    await waitFor(() => expect(aktiveEntwurfsId()).not.toBe(alteId));
+    const neueId = aktiveEntwurfsId();
+    expect(screen.getAllByRole('tab')).toHaveLength(1);
+    expect(screen.getByPlaceholderText(/Inhalt/)).toHaveValue('Wortlaut aus Tab 2');
+    expect(screen.getByRole('list', { name: 'Gewählte Anhänge' })).toHaveTextContent('foto.jpg');
+    await waitFor(async () => expect((await entwuerfeLaden(7)).map((e) => e.id)).toEqual([neueId]));
+
+    // Der nächste Versuch geht mit der NEUEN id raus und kann gelingen.
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /Erfassen$/ })).not.toHaveClass('ant-btn-loading'),
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Erfassen$/ }));
+    await waitFor(() => expect(erfassen).toHaveBeenCalledTimes(2));
+    expect(erfassen.mock.calls[1][0].client_id).toBe(neueId);
   });
 });

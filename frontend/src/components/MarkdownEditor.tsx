@@ -36,6 +36,12 @@ interface Props {
   id?: string;
   onKeyDown?: (e: KeyboardEvent<HTMLTextAreaElement>) => void;
   /**
+   * Sperrt die Eingabe, ohne den Fokus zu nehmen (`readOnly`, nicht `disabled`): die
+   * ETB-Schnellerfassung hält so den Wortlaut fest, während ein Versand läuft — was in der
+   * Zeit getippt würde, löschte das Leeren nach dem Erfolg still (LFH-117).
+   */
+  readOnly?: boolean;
+  /**
    * Nur `toggle`: rendert bei geschlossener Vorschau zusätzlich eine gerenderte Fassung, die
    * ausschließlich der Druck zeigt (`.markdown-editor__druck`, am Bildschirm `display: none`).
    * Ohne sie trüge dort nur das Textfeld den Text — auf Papier eine `<textarea>` in
@@ -74,6 +80,7 @@ const MarkdownEditor = forwardRef<TextAreaRef, Props>(function MarkdownEditor(
     rows,
     id,
     onKeyDown,
+    readOnly,
     druckfassung = false,
     umschalterAussen = false,
     vorschauOffen: vorschauOffenAussen = false,
@@ -93,6 +100,7 @@ const MarkdownEditor = forwardRef<TextAreaRef, Props>(function MarkdownEditor(
       rows={rows}
       onChange={(e) => onChange?.(e.target.value)}
       onKeyDown={onKeyDown}
+      readOnly={readOnly}
     />
   );
 

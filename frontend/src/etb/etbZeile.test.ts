@@ -20,6 +20,7 @@ const E = (id: number): EtbEintragAnzeige =>
     erfasst_lokal_at: null,
     berichtigt_eintrag_id: null,
     folgeauftraege: [],
+    anhaenge: [],
   }) as unknown as EtbEintragAnzeige;
 
 const A = (id?: number): AusstehenderEintrag => ({

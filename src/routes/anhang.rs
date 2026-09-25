@@ -10,6 +10,26 @@ use axum::Json;
 
 use super::support::anhang_antwort;
 
+/// Ein UNGEBUNDENER Anhang gehört vorerst der Person, die ihn hochgeladen hat (LFH-117,
+/// Review C1, design.md D12): wem er gehören wird — Chat, ETB, Dokumentenablage —, steht erst
+/// mit dem Linker fest, und bis dahin kennt die modul-lose generische Route kein Modul-Gate.
+/// Ein ETB-Foto, dessen Erfassen vorübergehend scheiterte, läge sonst bis zu 24 h für jede
+/// lesende Person ladbar und für jede schreibende löschbar. Fremde bekommen 404 wie für einen
+/// unbekannten Anhang — die Existenz bleibt verdeckt. Gebundene Anhänge sind nicht betroffen.
+async fn fordere_hochladende_bei_ungebunden(
+    pool: &sqlx::SqlitePool,
+    linker: &anhang::repo::LinkerStand,
+    anhang_id: i64,
+    benutzer_id: i64,
+) -> Result<(), AppError> {
+    if linker.ist_ungebunden()
+        && anhang::repo::hochgeladen_von(pool, anhang_id).await? != Some(benutzer_id)
+    {
+        return Err(AppError::NotFound);
+    }
+    Ok(())
+}
+
 /// POST /api/einsaetze/{id}/anhaenge — generischer Datei-Upload (multipart).
 /// Schreibrecht + aktiver Einsatz. Jedes Datei-Feld wird einzeln validiert
 /// (Größe, MIME aus Endung), den AV-Scan-Seam (scan-vor-persist) durchlaufen und
@@ -23,46 +43,16 @@ pub async fn hochladen(
     // fordere_schreibrecht + fordere_aktiv erledigt der Extractor.
     let einsatz_id = ctx.einsatz.id;
 
-    // Best-Effort pro Feld (vorbestehendes LFH-102-Muster, keine umschließende Transaktion):
-    // scheitert ein späteres Feld (MIME/Größe oder AV-Fund, LFH-114), bleiben die bereits
-    // persistierten sauberen BLOBs verwaist zurück. Bewusst toleriert — es landet KEIN
-    // gefundener Schadcode in der DB (scan-vor-persist pro Feld), und verwaiste Anhänge werden
-    // vom selben Einsatz-Lebenszyklus (DSGVO-Schwärzung) eingesammelt wie „hochgeladen-nicht-
-    // gesendet". Atomarität (Tx über alle Felder) wäre ein eigener Task, nicht Teil von LFH-114.
-    let mut angelegt = Vec::new();
-    while let Some(feld) = multipart
-        .next_field()
-        .await
-        .map_err(|e| AppError::Validation(format!("Multipart-Fehler: {e}")))?
-    {
-        // Nur echte Datei-Felder (mit Dateiname) verarbeiten; sonstige überspringen.
-        let Some(dateiname) = feld.file_name().map(str::to_string) else {
-            continue;
-        };
-        let mime = anhang::ermittle_mime(&dateiname)?;
-        let daten = feld
-            .bytes()
-            .await
-            .map_err(|e| AppError::Validation(format!("Datei lesen fehlgeschlagen: {e}")))?;
-        anhang::pruefe_groesse(daten.len())?;
-        // AV-Scan (LFH-114): scan-vor-persist gegen clamd (config-getrieben, Default
-        // fail-closed). Ohne konfigurierten clamd ein No-op.
-        anhang::scan(anhang::scan_config(), &daten).await?;
-        let a = anhang::repo::anlegen(
-            &state.pool,
-            einsatz_id,
-            ctx.benutzer.id,
-            &dateiname,
-            &mime,
-            &daten,
-        )
-        .await?;
-        angelegt.push(a);
-    }
-
-    if angelegt.is_empty() {
-        return Err(AppError::Validation("Keine Datei im Upload".into()));
-    }
+    // Schleife, Prüfungen und Persistieren: geteilt mit dem ETB-Upload (LFH-117), hier mit
+    // der Chat-Allowlist.
+    let angelegt = anhang::hochladen_multipart(
+        &state.pool,
+        einsatz_id,
+        ctx.benutzer.id,
+        &mut multipart,
+        anhang::ERLAUBTE_MIME,
+    )
+    .await?;
     Ok((StatusCode::CREATED, Json(angelegt)))
 }
 
@@ -73,11 +63,13 @@ pub async fn hochladen(
 /// Gatet zusätzlich über [`anhang::repo::linker_stand`] (Aggregation über ALLE Linker):
 /// (LFH-116) hängt der Anhang NUR noch an soft-gelöschten Nachrichten, ist er gesperrt
 /// (404) — der Direkt-Deeplink umgeht sonst die Frontend-Ausblendung; (LFH-632) gehört er
-/// zur Dokumentenablage, ist er nur über die modul-gegatete Dokument-Route ladbar (404).
-/// Verwaiste oder an einer lebenden Nachricht hängende Anhänge bleiben ladbar (n:m).
+/// zur Dokumentenablage, ist er nur über die modul-gegatete Dokument-Route ladbar (404);
+/// (LFH-117) hängt er an einem ETB-Eintrag, nur über die ETB-Route (404).
+/// An einer lebenden Nachricht hängende Anhänge bleiben ladbar (n:m); ein ungebundener nur
+/// für die hochladende Person (Review C1 zu LFH-117).
 pub async fn herunterladen(
     State(state): State<AppState>,
-    _ctx: EinsatzLesezugriff,
+    ctx: EinsatzLesezugriff,
     PfadParam((einsatz_id, anhang_id)): PfadParam<(i64, i64)>,
     req_headers: HeaderMap,
 ) -> Result<Response, AppError> {
@@ -88,12 +80,11 @@ pub async fn herunterladen(
     // LFH-116 + LFH-632: Aggregation über ALLE Linker. Gesperrt, wenn der Anhang zur
     // Dokumentenablage gehört (nur über die modul-gegatete Route ladbar) oder nur noch an
     // soft-gelöschten Chat-Nachrichten hängt (Tombstone).
-    if anhang::repo::linker_stand(&state.pool, anhang_id)
-        .await?
-        .generischer_download_gesperrt()
-    {
+    let linker = anhang::repo::linker_stand(&state.pool, anhang_id).await?;
+    if linker.generischer_download_gesperrt() {
         return Err(AppError::NotFound);
     }
+    fordere_hochladende_bei_ungebunden(&state.pool, &linker, anhang_id, ctx.benutzer.id).await?;
 
     // Cache-Kurzschluss (LFH-258) + Header-Sequenz: geteilt mit dem Dokument-Download.
     anhang_antwort(&state.pool, anhang_id, &req_headers).await
@@ -104,9 +95,11 @@ pub async fn herunterladen(
 /// (fremder Anhang → NotFound). Der `ON DELETE CASCADE`-FK räumt die
 /// `chat_nachricht_anhang`-Verknüpfungen mit. Dokument-gebundene Anhänge (LFH-632) werden
 /// mit 422 abgewiesen — sie entfernt die Dokumentenablage (Soft-Delete mit ETB-Nachweis).
+/// ETB-gebundene (LFH-117) ebenso — sie gehen nur mit der Schwärzung. Einen ungebundenen
+/// Anhang verwirft nur, wer ihn hochgeladen hat (Review C1, sonst 404).
 pub async fn loeschen(
     State(state): State<AppState>,
-    _ctx: EinsatzSchreibzugriff,
+    ctx: EinsatzSchreibzugriff,
     PfadParam((einsatz_id, anhang_id)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
     // Ownership zuerst (fremd/unbekannt → 404), dann die Linker-Frage.
@@ -115,14 +108,20 @@ pub async fn loeschen(
     }
     // LFH-632: ein Dokument-Anhang wird über die Dokumentenablage entfernt (Soft-Delete mit
     // ETB-Nachweis). Der generische Hard-Delete hätte beides umgangen → Zustand verbietet es.
-    if anhang::repo::linker_stand(&state.pool, anhang_id)
-        .await?
-        .ist_dokument()
-    {
+    // LFH-117: ein ETB-Anhang ist unveränderlich wie sein Eintrag; es gibt keinen Löschweg
+    // außer der Schwärzung des Einsatzes.
+    let linker = anhang::repo::linker_stand(&state.pool, anhang_id).await?;
+    if linker.ist_dokument() {
         return Err(AppError::UnprocessableEntity(
             "Anhang gehört zur Dokumentenablage und wird dort entfernt".into(),
         ));
     }
+    if linker.ist_etb() {
+        return Err(AppError::UnprocessableEntity(
+            "Anhang gehört zu einem ETB-Eintrag und ist unveränderlich".into(),
+        ));
+    }
+    fordere_hochladende_bei_ungebunden(&state.pool, &linker, anhang_id, ctx.benutzer.id).await?;
     anhang::repo::loeschen(&state.pool, einsatz_id, anhang_id).await?;
     Ok(StatusCode::NO_CONTENT)
 }

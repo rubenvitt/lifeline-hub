@@ -1230,6 +1230,97 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn schwaerzung_loescht_etb_anhang_und_haelt_den_eintrag() {
+        // LFH-117, design.md D8: die Datei geht (anhang ist ZeileLoeschen), die Verknüpfung
+        // per CASCADE mit, der Eintrag bleibt mit Inhalt und Nummer (G_ETB) und trägt danach
+        // `anhaenge: []`. Die Bindungsabfrage des ETB-Downloads trifft nichts mehr → 404.
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let einsatz = test_anlegen(&pool, "Lage", None, leit).await.unwrap();
+        let foto = crate::anhang::repo::anlegen(
+            &pool,
+            einsatz.id,
+            leit,
+            "Familie Müller.jpg",
+            "image/jpeg",
+            b"JPEG",
+        )
+        .await
+        .unwrap();
+        let inhalt = "Foto der Schadenstelle";
+        let (eintrag, _) = crate::etb::repo::anlegen_idempotent(
+            &pool,
+            einsatz.id,
+            leit,
+            None,
+            &[foto.id],
+            crate::etb::repo::EintragDaten {
+                typ: "meldung",
+                inhalt,
+                von: None,
+                an: None,
+                meldeweg: None,
+                veranlassung: None,
+                ereigniszeit: None,
+                erfasst_lokal_at: None,
+                berichtigt_eintrag_id: None,
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            eintrag.anhaenge.len(),
+            1,
+            "Vorbedingung: Foto hängt am Eintrag"
+        );
+        abschliessen(&pool, einsatz.id, leit).await.unwrap();
+        sqlx::query("UPDATE einsatz SET geloescht_at = ? WHERE id = ?")
+            .bind("2026-01-01 00:00:00")
+            .bind(einsatz.id)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        assert!(schwaerze_einsatz(&pool, einsatz.id, "2026-02-01 00:00:00")
+            .await
+            .unwrap());
+
+        let (dateien, links): (i64, i64) = sqlx::query_as(
+            "SELECT (SELECT COUNT(*) FROM anhang WHERE id = ?1), \
+                    (SELECT COUNT(*) FROM etb_eintrag_anhang WHERE anhang_id = ?1)",
+        )
+        .bind(foto.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!((dateien, links), (0, 0), "Datei und Verknüpfung weg");
+
+        let liste = crate::etb::repo::abfrage(
+            &pool,
+            einsatz.id,
+            &crate::etb::repo::EtbFilter {
+                limit: 100,
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        let danach = liste
+            .iter()
+            .find(|e| e.id == eintrag.id)
+            .expect("der Eintrag bleibt");
+        assert_eq!(danach.inhalt, inhalt, "Inhalt unverändert (G_ETB)");
+        assert_eq!(danach.lfd_nr, eintrag.lfd_nr, "Nummer unverändert");
+        assert!(danach.anhaenge.is_empty(), "anhaenge: []");
+        assert!(
+            !crate::etb::repo::anhang_am_eintrag(&pool, einsatz.id, eintrag.id, foto.id)
+                .await
+                .unwrap(),
+            "der frühere Download-Pfad findet nichts mehr (Route antwortet 404)"
+        );
+    }
+
+    #[tokio::test]
     async fn schwaerzung_nullt_freies_zeichen_label_pii() {
         // LFH-170/Review: freies_zeichen.label ist Freitext (kann PII tragen, z. B. „ELW Fam.
         // Müller"). Es MUSS von schwaerze_einsatz genullt werden (wie karte_hintergrundbild.name);

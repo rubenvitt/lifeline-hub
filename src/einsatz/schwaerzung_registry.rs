@@ -520,7 +520,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
     },
     TabellenRegel {
         // Ganze Zeile löschen: `daten` (BLOB NOT NULL) sind Fotos/Dateien Betroffener,
-        // KEIN Kartografie-Skelett. CASCADE räumt chat_nachricht_anhang mit.
+        // KEIN Kartografie-Skelett. CASCADE räumt die Linker chat_nachricht_anhang,
+        // einsatz_dokument (s. u.) und etb_eintrag_anhang (LFH-117) mit.
         tabelle: "anhang",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
@@ -1458,6 +1459,20 @@ pub const TABELLEN: &[TabellenRegel] = &[
         },
         zeilenfilter: None,
         spalten: &[retain("nachricht_id", G_FK), retain("anhang_id", G_FK)],
+    },
+    TabellenRegel {
+        // LFH-117: Junction (dritter Linker auf `anhang`); CASCADE von anhang/etb_eintrag
+        // räumt sie. Kein Scrub nötig: `anhang` ist ZeileLoeschen, die Verknüpfung geht per
+        // CASCADE mit, der Eintrag selbst bleibt (G_ETB). Der Dateiname steht in keinem
+        // ETB-Text — die Erfassung schreibt ihn nicht in `inhalt`. Belegt in
+        // `einsatz::repo::tests::schwaerzung_loescht_etb_anhang_und_haelt_den_eintrag`.
+        tabelle: "etb_eintrag_anhang",
+        scoping: Scoping::UeberParent {
+            fk: "eintrag_id",
+            parent: "etb_eintrag",
+        },
+        zeilenfilter: None,
+        spalten: &[retain("eintrag_id", G_FK), retain("anhang_id", G_FK)],
     },
     TabellenRegel {
         tabelle: "erinnerung",

@@ -1,4 +1,5 @@
 import type {
+  Anhang,
   Auftrag,
   EtbAnzahl,
   EtbEintragAnzeige,
@@ -8,7 +9,8 @@ import type {
   MeldeWeg,
   NeuerAuftrag,
 } from './types';
-import { apiGet, apiSend, type ApiSendOptionen } from './client';
+import { apiGet, apiSend, apiUpload, type ApiSendOptionen } from './client';
+import { DOKUMENT_UPLOAD_TIMEOUT_MS } from './dokumente';
 
 export const SEITENGROESSE = 100;
 
@@ -81,6 +83,40 @@ export interface NeuerEintrag {
   /** Client-generierte Idempotenz-UUID (F03/LFH-261). Stabil über Online-Direktsenden
    *  UND Offline-Enqueue+Flush, damit ein Retry keine Dublette erzeugt. */
   client_id?: string;
+  /** Zuvor über {@link ladeEtbAnhangHoch} hochgeladene Dateien (LFH-117). Fährt in der
+   *  Offline-Queue als JSON mit: nur der UPLOAD braucht Netz, das Erfassen danach nicht. */
+  anhang_ids?: number[];
+}
+
+/**
+ * Höchstzahl der Anhänge je Eintrag (LFH-117, design.md D4) — Spiegel von
+ * `MAX_ANHAENGE_JE_EINTRAG` in `src/routes/etb.rs`. Die Erfassung prüft sie schon bei der
+ * Wahl: sonst liefe erst der Upload aller Dateien, und das Erfassen scheiterte danach mit 400.
+ */
+export const ETB_ANHAENGE_MAX = 10;
+
+/**
+ * Lädt EINE Datei für einen ETB-Eintrag hoch (LFH-117, design.md D2) und liefert ihre
+ * Anzeige. Eine Datei je Anfrage: das Body-Limit gilt für die ganze Anfrage, und ein
+ * gescheiterter Upload soll die schon oben liegenden nicht mitnehmen. Timeout wie die
+ * Dokumentenablage (25 MiB samt Virenscan über Mobilfunk).
+ */
+export async function ladeEtbAnhangHoch(einsatzId: number, datei: File): Promise<Anhang> {
+  const fd = new FormData();
+  fd.append('datei', datei);
+  const angelegt = await apiUpload<Anhang[]>(`/api/einsaetze/${einsatzId}/etb/anhaenge`, fd, {
+    timeoutMs: DOKUMENT_UPLOAD_TIMEOUT_MS,
+  });
+  return angelegt[0];
+}
+
+/**
+ * Download-Pfad eines ETB-Anhangs (LFH-117, design.md D6) — ein API-Pfad, keine
+ * Navigation, deshalb hier und nicht in `routing/deeplinks.ts` (wie `dokumentDownloadPfad`).
+ * Die generische Route `/anhaenge/{aid}` antwortet für ETB-Anhänge 404.
+ */
+export function etbAnhangPfad(einsatzId: number, eintragId: number, anhangId: number): string {
+  return `/api/einsaetze/${einsatzId}/etb/${eintragId}/anhaenge/${anhangId}`;
 }
 
 export function erfasseEtb(
