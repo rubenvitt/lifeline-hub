@@ -167,6 +167,25 @@ pub async fn aufbewahrungsfrist_setzen(
         fordere_einsatzleitung(rolle)?;
     }
 
+    // LFH-23 (design.md D6): an einem geschwärzten Einsatz gibt es nichts mehr zu fristen
+    // (409, endgültiger Lebenszyklus-Zustand), an einem vorgemerkten ist das
+    // Wiederherstellen der Weg (422, umkehrbar — keine zweite 409-Bedeutung). Die Prüfung
+    // steht VOR dem frühen Rücksprung bei unveränderter Frist und vor der
+    // Verkürzungsprüfung: sonst antwortete ein unveränderter PUT hier mit 200, und die
+    // Schwärzung käme trotzdem (Phase B liest `retention_bis` nicht).
+    let (geloescht_at, geschwaerzt_at) =
+        crate::aufbewahrung::repo::tombstones(&state.pool, id).await?;
+    if geschwaerzt_at.is_some() {
+        return Err(AppError::Conflict(
+            "Einsatz ist geschwärzt — die Aufbewahrungsfrist ist nicht mehr änderbar".into(),
+        ));
+    }
+    if geloescht_at.is_some() {
+        return Err(AppError::UnprocessableEntity(
+            "Einsatz ist zur Löschung vorgemerkt – erst wiederherstellen".into(),
+        ));
+    }
+
     // Neue Frist normalisieren; leer/None = aufheben.
     let neue_frist = match req
         .retention_bis
