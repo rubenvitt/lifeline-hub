@@ -697,15 +697,29 @@ describe('Demo-Daten-Hinweis (LFH-690)', () => {
     return { zaehler, setze: (s: typeof antwort) => (stand = s) };
   }
 
-  function rendern(me: Record<string, unknown>, einsaetze: unknown[] = [einsatz()]) {
+  function rendern(
+    me: Record<string, unknown>,
+    einsaetze: unknown[] = [einsatz()],
+    liste?: () => Promise<void>,
+  ) {
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json(me)),
-      http.get('/api/einsaetze', () => HttpResponse.json(einsaetze)),
+      http.get('/api/einsaetze', async () => {
+        await liste?.();
+        return HttpResponse.json(einsaetze);
+      }),
     );
-    return renderMitProviders(<EinsaetzePage />);
+    return renderMitProviders(
+      <Routes>
+        <Route path="/" element={<EinsaetzePage />} />
+        <Route path="/admin/demo-daten" element={<div>Ziel: Demo-Daten-Sektion</div>} />
+      </Routes>,
+    );
   }
 
   const hinweisLink = () => screen.queryByRole('link', { name: /Demo-Daten/ });
+  const folgtAuf = (vorher: Node, nachher: Node) =>
+    (vorher.compareDocumentPosition(nachher) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
 
   it('System-Admin + 200 + nicht importiert: Hinweis mit Link auf /admin/demo-daten', async () => {
     demoStatus({ importiert: false });
@@ -715,8 +729,40 @@ describe('Demo-Daten-Hinweis (LFH-690)', () => {
     const alert = link.closest('[role="alert"]');
     expect(alert).not.toBeNull();
     expect(alert).toHaveClass('ant-alert-info');
-    // Ein Sprung, kein Direktimport: im Hinweis steht kein Knopf.
+    // Ein Sprung, kein Direktimport: im Hinweis steht kein Knopf-Element, nur ein Verweis.
     expect(alert!.querySelector('button')).toBeNull();
+  });
+
+  /**
+   * Prüfliste T3-12 (LFH-690): die Status-Abfrage kam regelmäßig nach der Einsatzliste an,
+   * der Hinweis erschien dann ÜBER dem schon gezeichneten Raster und schob es um 118–266 px
+   * (CLS bis 0,21). Er steht deshalb unter allem, was die Liste zeichnet — auch unter den
+   * abgeschlossenen Einsätzen, die ebenso verschoben würden.
+   */
+  it('der Hinweis steht unter dem Raster und unter den abgeschlossenen Einsätzen', async () => {
+    demoStatus({ importiert: false });
+    rendern(admin, [einsatz(), einsatz({ id: 8, bezeichnung: 'Alt', status: 'abgeschlossen' })]);
+    const link = await screen.findByRole('link', { name: /Demo-Daten/ });
+    const alert = link.closest('[role="alert"]')!;
+    expect(folgtAuf(screen.getByTestId('einsaetze-raster'), alert)).toBe(true);
+    expect(folgtAuf(screen.getByText('Alt'), alert)).toBe(true);
+  });
+
+  /**
+   * Die Gegenrichtung: stünde der Hinweis schon da, während die Liste noch lädt, schöbe der
+   * Wechsel Skelett → Kacheln (andere Reihenzahl, dazu der Leerzustand darüber) ihn selbst.
+   */
+  it('der Hinweis wartet auf die Einsatzliste, auch wenn der Status zuerst da ist', async () => {
+    const { zaehler } = demoStatus({ importiert: false });
+    let freigeben: () => void = () => {};
+    const liste = new Promise<void>((r) => (freigeben = r));
+    rendern(admin, [einsatz()], () => liste);
+    await waitFor(() => expect(zaehler.get).toBe(1));
+    expect(screen.getByTestId('einsaetze-raster')).toHaveAttribute('aria-busy', 'true');
+    await new Promise((r) => setTimeout(r, 50));
+    expect(hinweisLink()).toBeNull();
+    freigeben();
+    expect(await screen.findByRole('link', { name: /Demo-Daten/ })).toBeInTheDocument();
   });
 
   it('der Hinweis steht NEBEN dem Leerzustand, nicht in ihm (LFH-331 · AK3)', async () => {
@@ -725,6 +771,8 @@ describe('Demo-Daten-Hinweis (LFH-690)', () => {
     const link = await screen.findByRole('link', { name: /Demo-Daten/ });
     const leer = screen.getByText('Keine Einsätze').parentElement!;
     expect(leer.contains(link)).toBe(false);
+    // Unter dem Leerzustand, nicht darüber: sonst schöbe er ihn beim späten Eintreffen.
+    expect(folgtAuf(leer, link)).toBe(true);
     // Der Leerknoten bleibt aktionslos.
     expect(leer.querySelector('button, a')).toBeNull();
   });

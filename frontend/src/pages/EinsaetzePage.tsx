@@ -147,9 +147,18 @@ export default function EinsaetzePage() {
    *
    * BENANNTE ABWEICHUNG vom Ticket, das den Leerzustand vorschlägt: der ist seit LFH-331 · AK3
    * aktionslos gepinnt und rechnet je Benutzer, „nicht importiert“ ist dagegen eine Aussage
-   * über die Organisation. Der Hinweis steht deshalb im `hinweis`-Slot über dem Raster und
-   * springt in die Verwaltung — ein Direktimport von hier wäre eine zweite Stelle für einen
-   * unumkehrbaren Vorgang.
+   * über die Organisation. Der Hinweis springt in die Verwaltung — ein Direktimport von hier
+   * wäre eine zweite Stelle für einen unumkehrbaren Vorgang.
+   *
+   * ORT: UNTER allem, was die Einsatzliste zeichnet, nicht im `hinweis`-Slot darüber
+   * (Prüfliste T3-12, gemessen). Die Status-Abfrage kommt regelmäßig NACH der Liste an; über
+   * dem Raster schob der Hinweis es dann um 118–266 px, CLS 0,12 auf dem Tablet in
+   * `handschuh` und 0,17–0,21 mobil (Soll ≤ 0,1). Unter dem Raster liegt nichts, das springen
+   * könnte, und ein Element, das neu erscheint, zählt selbst nicht als Verschiebung. Die
+   * andere Lösung, den Inhalt erst nach beiden Abfragen zu zeichnen, hielte die Einsatzliste
+   * für eine Aufforderung ohne Eile an einer zweiten Abfrage fest. Aus demselben Grund wartet
+   * der Hinweis auf die Liste (`!isPending`): stünde er schon unter den Skeletten, schöbe ihn
+   * der Wechsel Skelett → Kacheln (andere Reihenzahl, Leerzustand darüber) selbst.
    */
   const demo = useDemoDatenStatus();
   const demoHinweis =
@@ -349,8 +358,6 @@ export default function EinsaetzePage() {
     <EinsatzSeite
       titel="Einsätze"
       meta={isPending ? undefined : einsaetzeMeta(aktive.length, abgeschlossene.length)}
-      hinweis={demoHinweis}
-
       dataUpdatedAt={einsaetzeAktualisiertAt}
     >
       {/* Leer und anlegeberechtigt schließen sich NICHT aus: vorher lief der
@@ -426,6 +433,12 @@ export default function EinsaetzePage() {
           <div style={rasterStil(flaeche.kachelMinKlein, abstand.md)}>
             {abgeschlossene.map((e: EinsatzAnzeige) => renderKarte(e, true))}
           </div>
+        </div>
+      )}
+
+      {!isPending && demoHinweis && (
+        <div data-lfh="demo-hinweis" style={{ marginTop: abstand.lg }}>
+          {demoHinweis}
         </div>
       )}
 
