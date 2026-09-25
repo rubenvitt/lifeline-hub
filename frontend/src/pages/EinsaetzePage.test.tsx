@@ -724,13 +724,39 @@ describe('Demo-Daten-Hinweis (LFH-690)', () => {
   it('System-Admin + 200 + nicht importiert: Hinweis mit Link auf /admin/demo-daten', async () => {
     demoStatus({ importiert: false });
     rendern(admin);
-    const link = await screen.findByRole('link', { name: /Demo-Daten/ });
+    const link = await screen.findByRole('link', { name: 'Zu den Demo-Daten' });
     expect(link).toHaveAttribute('href', '/admin/demo-daten');
     const alert = link.closest('[role="alert"]');
     expect(alert).not.toBeNull();
     expect(alert).toHaveClass('ant-alert-info');
     // Ein Sprung, kein Direktimport: im Hinweis steht kein Knopf-Element, nur ein Verweis.
     expect(alert!.querySelector('button')).toBeNull();
+  });
+
+  /**
+   * Prüfliste T3-5/T3-6/T3-2 (LFH-690): im Satz trennte den Verweis nur die Farbe vom Text
+   * (WCAG 1.4.1), am Tag hielt er 6,04 : 1, und sein `minHeight` riss die Textzeile in
+   * `handschuh` auf 72 px. Jetzt ist er ein eigenes Bedienziel in Knopfform außerhalb des
+   * Satzes, das Höhe und Polsterung vom `ConfigProvider` erbt — ohne punktuelles `size`.
+   */
+  it('der Verweis steht als eigenes Bedienziel außerhalb des Satzes, ohne punktuelle Größe', async () => {
+    demoStatus({ importiert: false });
+    rendern(admin);
+    const link = await screen.findByRole('link', { name: 'Zu den Demo-Daten' });
+    expect(link).toHaveClass('ant-btn');
+    expect(link).not.toHaveClass('ant-btn-sm');
+    expect(link).not.toHaveClass('ant-btn-lg');
+    const satz = screen.getByText(/Übungseinsatz samt Stammdaten/);
+    expect(satz.contains(link)).toBe(false);
+    expect(link.contains(satz)).toBe(false);
+  });
+
+  it('ein Klick auf den Verweis navigiert in der App, ohne Seitenwechsel des Browsers', async () => {
+    demoStatus({ importiert: false });
+    rendern(admin);
+    const link = await screen.findByRole('link', { name: 'Zu den Demo-Daten' });
+    await userEvent.click(link);
+    expect(await screen.findByText('Ziel: Demo-Daten-Sektion')).toBeInTheDocument();
   });
 
   /**

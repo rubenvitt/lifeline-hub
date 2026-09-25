@@ -2,7 +2,7 @@ import { Alert, App, AutoComplete, Button, DatePicker, Form, Input, Tag, theme }
 import { EnvironmentOutlined, PlusOutlined } from '@ant-design/icons';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useEffect, useState, type CSSProperties } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useLinkClickHandler, useNavigate } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Einsatzart, EinsatzAnzeige } from '../api/types';
 import { ApiError } from '../api/client';
@@ -32,7 +32,6 @@ import { monoStil, useRollen } from '../components/instrument';
 import { einsaetzeMeta, kachelKennung } from './einsatzKachelKern';
 import { adminDemoDatenPfad } from '../admin/adminNav';
 import { useDemoDatenStatus } from '../admin/useDemoDaten';
-import { verweisStil } from '../etb/zeitachseModell';
 
 /** Werte des Anlegedialogs (`begonnen_at` als Dayjs aus dem `DatePicker`). */
 interface AnlegeWerte {
@@ -161,6 +160,8 @@ export default function EinsaetzePage() {
    * der Wechsel Skelett → Kacheln (andere Reihenzahl, Leerzustand darüber) selbst.
    */
   const demo = useDemoDatenStatus();
+  const demoPfad = adminDemoDatenPfad();
+  const zuDenDemoDaten = useLinkClickHandler<HTMLElement>(demoPfad);
   const demoHinweis =
     demo.freigeschaltet && demo.status?.importiert === false ? (
       <Alert
@@ -169,14 +170,25 @@ export default function EinsaetzePage() {
         title="Demo-Daten sind freigeschaltet und noch nicht importiert."
         description={
           <>
-            Ein Übungseinsatz samt Stammdaten für Vorführung und Schulung lässt sich in der
-            Verwaltung anlegen:{' '}
-            <Link
-              to={adminDemoDatenPfad()}
-              style={{ ...verweisStil(token), color: rollen.bedienText }}
-            >
-              Demo-Daten
-            </Link>
+            <div>
+              Ein Übungseinsatz samt Stammdaten für Vorführung und Schulung lässt sich in der
+              Verwaltung anlegen.
+            </div>
+            {/* Der Verweis ist ein eigenes Bedienziel unter dem Satz, nicht Teil davon
+                (Prüfliste T3-5/T3-6/T3-2, gemessen): im Satz trennte ihn nur die Farbe vom
+                Text (2,20 / 1,58 : 1, WCAG 1.4.1), `bedienText` hielt auf der Info-Fläche am
+                Tag 6,04 : 1, und `minHeight` ohne Polsterung riss die Textzeile in
+                `handschuh` auf 72 px. Als antd-`Button` erbt er Höhe und Polsterung vom
+                `ConfigProvider` (kein punktuelles `size`) und trägt `colorText` auf eigener
+                Fläche. Mit `href` bleibt er ein `<a>` (Rolle Link, Strg/⌘-Klick öffnet
+                einen Tab); `useLinkClickHandler` navigiert beim schlichten Klick in der App
+                statt mit einem Seitenneuladen. Nicht der `action`-Slot: dort stünde der Knopf
+                neben dem Text und drückte ihn bei 390 px auf die halbe Breite. */}
+            <div style={{ marginTop: token.marginSM }}>
+              <Button href={demoPfad} onClick={zuDenDemoDaten}>
+                Zu den Demo-Daten
+              </Button>
+            </div>
           </>
         }
       />
