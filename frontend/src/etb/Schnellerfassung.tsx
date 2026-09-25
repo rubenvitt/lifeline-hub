@@ -4,7 +4,7 @@ import dayjs from 'dayjs';
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router';
 import { DOKUMENT_ACCEPT, DOKUMENT_MAX_GROESSE } from '../api/dokumente';
-import { ladeEtbAnhangHoch, type NeuerEintrag } from '../api/etb';
+import { ETB_ANHAENGE_MAX, ladeEtbAnhangHoch, type NeuerEintrag } from '../api/etb';
 import { formatGroesse } from '../karten/formatGroesse';
 import { useOnline } from '../offline/useOnline';
 import type {
@@ -105,6 +105,17 @@ const hochgeladeneIds = new WeakMap<File, number>();
 
 const ANHANG_OFFLINE = 'Anhänge brauchen eine Verbindung. Der Text lässt sich trotzdem erfassen.';
 const ANHANG_ZU_GROSS = `ist zu groß (${DOKUMENT_MAX_GROESSE / 1024 / 1024} MiB erlaubt)`;
+const ANHANG_GRENZE = `Höchstens ${ETB_ANHAENGE_MAX} Anhänge je Eintrag.`;
+
+/**
+ * Dieselbe Datei, neu gewählt (LFH-117, Review C1): jede Dateiwahl liefert NEUE `File`-Objekte,
+ * ein Vergleich der Identität griff also nie. Name, Größe und Änderungszeit trennen zwei
+ * Dateien hinreichend — ein Foto zweimal am Eintrag liesse sich wegen der Unveränderlichkeit
+ * nicht mehr entfernen.
+ */
+function gleicheDatei(a: File, b: File): boolean {
+  return a.name === b.name && a.size === b.size && a.lastModified === b.lastModified;
+}
 
 function fehlerGrund(e: unknown): string {
   return e instanceof Error && e.message ? e.message : 'unbekannter Fehler';
@@ -444,15 +455,21 @@ export default function Schnellerfassung({
     }
   }
 
-  /** Dateiwahl: über 25 MiB wird schon hier abgewiesen, nicht erst nach dem Upload. */
+  /**
+   * Dateiwahl: über 25 MiB, über der Höchstzahl und doppelt Gewähltes wird schon hier
+   * abgewiesen, jeweils mit Grund — nicht erst nach dem Upload.
+   */
   function dateienGewaehlt(liste: FileList | null) {
     const neu = [...dateien];
-    const zuGross: string[] = [];
+    const gruende: string[] = [];
     for (const d of Array.from(liste ?? [])) {
-      if (d.size > DOKUMENT_MAX_GROESSE) zuGross.push(`${d.name} ${ANHANG_ZU_GROSS}`);
-      else if (!neu.includes(d)) neu.push(d);
+      if (d.size > DOKUMENT_MAX_GROESSE) gruende.push(`${d.name} ${ANHANG_ZU_GROSS}`);
+      else if (neu.some((x) => gleicheDatei(x, d))) gruende.push(`${d.name} ist schon gewählt`);
+      else if (neu.length >= ETB_ANHAENGE_MAX)
+        gruende.push(`${d.name}: höchstens ${ETB_ANHAENGE_MAX} Anhänge je Eintrag`);
+      else neu.push(d);
     }
-    setAnhangHinweis(zuGross.length > 0 ? zuGross.join(' · ') : null);
+    setAnhangHinweis(gruende.length > 0 ? gruende.join(' · ') : null);
     setzeDateien(neu);
     // Dieselbe Datei soll sich nach dem Entfernen erneut wählen lassen.
     if (dateiEingabe.current) dateiEingabe.current.value = '';
@@ -490,6 +507,12 @@ export default function Schnellerfassung({
     // Nur der UPLOAD braucht Netz (design.md D10). Mit Dateien in der Liste wird ohne
     // Verbindung abgewiesen, ohne etwas zu leeren — ein Eintrag ohne die gewählten Dateien
     // wäre eine stille Auslassung.
+    // Über der Höchstzahl gar nicht erst hochladen: das Erfassen scheiterte danach mit 400,
+    // und alle Dateien lägen bis zum Aufräumlauf verwaist oben.
+    if (dateien.length > ETB_ANHAENGE_MAX) {
+      setAnhangHinweis(`${ANHANG_GRENZE} Entferne ${dateien.length - ETB_ANHAENGE_MAX}.`);
+      return;
+    }
     if (dateien.length > 0 && !online) {
       setAnhangHinweis(
         'Ohne Verbindung lassen sich keine Anhänge senden. ' +
@@ -649,6 +672,7 @@ export default function Schnellerfassung({
   );
 
   // „Anhang" (LFH-117) steht bei „Feld": ab `md` hinter den Chips, darunter vorn (LFH-373).
+  const anGrenze = dateien.length >= ETB_ANHAENGE_MAX;
   const anhangTeil = (
     <>
       {/* „Anhang" (LFH-117): ein antd-Knopf plus unsichtbare Dateieingabe statt antds
@@ -656,7 +680,7 @@ export default function Schnellerfassung({
             Tabstopp. So bleibt EIN Bedienziel, und die Höhe kommt aus `controlHeight`. */}
       <Button
         type="dashed"
-        disabled={!online || sendet}
+        disabled={!online || sendet || anGrenze}
         icon={
           <span aria-hidden="true" style={{ display: 'inline-flex' }}>
             <PaperClipOutlined />
@@ -680,6 +704,7 @@ export default function Schnellerfassung({
             `text2`, nicht als `Typography` „secondary": dessen Ton hielt am Tag gemessen nur
             5,58 : 1 auf dem Grund der Erfassung (Boden 7, e2e `etb-anhang-pruefliste`). */}
       {!online && <span style={{ color: rollen.text2 }}>{ANHANG_OFFLINE}</span>}
+      {online && anGrenze && <span style={{ color: rollen.text2 }}>{ANHANG_GRENZE}</span>}
     </>
   );
 
@@ -851,7 +876,11 @@ export default function Schnellerfassung({
               <Button
                 type="text"
                 disabled={sendet}
-                aria-label={`Anhang ${d.name} entfernen`}
+                aria-label={
+                  dateien.filter((x) => x.name === d.name).length > 1
+                    ? `Anhang ${i + 1}, ${d.name} entfernen`
+                    : `Anhang ${d.name} entfernen`
+                }
                 icon={
                   <span aria-hidden="true" style={{ display: 'inline-flex' }}>
                     <CloseOutlined />

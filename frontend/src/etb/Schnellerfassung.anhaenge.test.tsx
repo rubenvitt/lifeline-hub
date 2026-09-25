@@ -49,8 +49,10 @@ function props(over: Partial<React.ComponentProps<typeof Schnellerfassung>> = {}
   };
 }
 
-function datei(name: string, groesse?: number): File {
-  const f = new File(['abc'], name, { type: 'image/jpeg' });
+function datei(name: string, groesse?: number, lastModified = 1_700_000_000_000): File {
+  // `lastModified` fest: jsdom stempelt sonst `Date.now()`, und die Dublettenprüfung
+  // (Name + Größe + lastModified) hinge an der Uhr.
+  const f = new File(['abc'], name, { type: 'image/jpeg', lastModified });
   if (groesse != null) Object.defineProperty(f, 'size', { value: groesse });
   return f;
 }
@@ -120,6 +122,38 @@ describe('Schnellerfassung – Anhang wählen (LFH-117)', () => {
     expect(screen.getByText(/riesig\.jpg ist zu groß \(25 MiB erlaubt\)/)).toBeInTheDocument();
     expect(within(liste()).queryByText(/riesig/)).toBeNull();
     expect(within(liste()).getByText('klein.jpg · 3 B')).toBeInTheDocument();
+  });
+
+  it('nimmt höchstens 10 Anhänge an, sagt warum und sperrt „Anhang" an der Grenze', async () => {
+    const { container } = renderMitProviders(<Schnellerfassung {...props()} />);
+    const elf = Array.from({ length: 11 }, (_, i) => datei(`f${i + 1}.jpg`));
+    await waehle(container, ...elf);
+    expect(within(liste()).getAllByRole('listitem')).toHaveLength(10);
+    expect(within(liste()).queryByText(/f11\.jpg/)).toBeNull();
+    expect(screen.getByText(/f11\.jpg: höchstens 10 Anhänge je Eintrag/)).toBeInTheDocument();
+    // Zweiter Kanal neben dem Grau: der Grund steht als Satz am Knopf.
+    expect(screen.getByRole('button', { name: 'Anhang' })).toBeDisabled();
+    expect(screen.getByText('Höchstens 10 Anhänge je Eintrag.')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Anhang f1.jpg entfernen' }));
+    expect(screen.getByRole('button', { name: 'Anhang' })).toBeEnabled();
+    expect(screen.queryByText('Höchstens 10 Anhänge je Eintrag.')).toBeNull();
+  });
+
+  it('nimmt dieselbe Datei nur einmal — Name, Größe und Änderungszeit entscheiden', async () => {
+    const { container } = renderMitProviders(<Schnellerfassung {...props()} />);
+    await waehle(container, datei('a.jpg'));
+    // Eine neue Wahl liefert ein NEUES File-Objekt derselben Datei.
+    await waehle(container, datei('a.jpg'));
+    expect(within(liste()).getAllByRole('listitem')).toHaveLength(1);
+    expect(screen.getByText(/a\.jpg ist schon gewählt/)).toBeInTheDocument();
+
+    // Gegenprobe: gleicher Name, gleiche Größe, andere Änderungszeit — eine andere Datei.
+    await waehle(container, datei('a.jpg', undefined, 1_700_000_999_000));
+    expect(within(liste()).getAllByRole('listitem')).toHaveLength(2);
+    // Gleichnamige Einträge sind für Vorlesende nur über die Position zu unterscheiden.
+    expect(screen.getByRole('button', { name: 'Anhang 1, a.jpg entfernen' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Anhang 2, a.jpg entfernen' })).toBeInTheDocument();
   });
 
   it('sperrt „Anhang" ohne Netz und sagt sichtbar warum — der Text geht trotzdem', async () => {
@@ -430,6 +464,19 @@ describe('Schnellerfassung – Sendezustand (LFH-117, Review)', () => {
     });
     await waitFor(() => expect(screen.getByRole('button', { name: 'Feld' })).toBeEnabled());
     expect(screen.getByRole('button', { name: /Eintragstyp/ })).toBeEnabled();
+  });
+
+  it('lädt nichts hoch, wenn die Liste über der Grenze liegt', async () => {
+    const elf = Array.from({ length: 11 }, (_, i) => datei(`f${i + 1}.jpg`));
+    const p = props({ dateien: elf, onDateienChange: vi.fn() });
+    renderMitProviders(<Schnellerfassung {...p} />);
+    await userEvent.type(feld(), 'Fotos{Enter}');
+    expect(
+      await screen.findByText('Höchstens 10 Anhänge je Eintrag. Entferne 1.'),
+    ).toBeInTheDocument();
+    expect(hochladen).not.toHaveBeenCalled();
+    expect(p.erfassen).not.toHaveBeenCalled();
+    expect(feld()).toHaveValue('Fotos');
   });
 
   it('schickt die client_id des Aufrufers', async () => {

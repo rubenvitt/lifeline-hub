@@ -89,6 +89,13 @@ export interface NeuerEintrag {
 }
 
 /**
+ * Höchstzahl der Anhänge je Eintrag (LFH-117, design.md D4) — Spiegel von
+ * `MAX_ANHAENGE_JE_EINTRAG` in `src/routes/etb.rs`. Die Erfassung prüft sie schon bei der
+ * Wahl: sonst liefe erst der Upload aller Dateien, und das Erfassen scheiterte danach mit 400.
+ */
+export const ETB_ANHAENGE_MAX = 10;
+
+/**
  * Lädt EINE Datei für einen ETB-Eintrag hoch (LFH-117, design.md D2) und liefert ihre
  * Anzeige. Eine Datei je Anfrage: das Body-Limit gilt für die ganze Anfrage, und ein
  * gescheiterter Upload soll die schon oben liegenden nicht mitnehmen. Timeout wie die
