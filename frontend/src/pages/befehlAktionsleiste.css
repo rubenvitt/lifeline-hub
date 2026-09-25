@@ -37,9 +37,10 @@
    entschieden: `scroll-padding` am Dokument zählt auch die Ziele IN der angepinnten Leiste
    zum verdeckten Streifen — jeder Fokus in der ETB-Erfassung rollte die Seite gemessen bis
    ans Ende (0 → 2593 px beim Setzen dreier Felder). Das ETB hält die Zeitachse deshalb über
-   `scroll-margin` an den ZIELEN frei (`index.css`), das hier bleibt, wie es war. Ob die
-   Befehlsseite denselben Sprung beim Klick in ihre Leiste zeigt, ist nicht gemessen — siehe
-   das Folgeticket im Nachtrag der Prüfliste. */
+   `scroll-margin` an den ZIELEN frei (`index.css`), das hier bleibt, wie es war. Die
+   Befehlsseite zeigt den Sprung NICHT — gemessen am 25.09.2026 bei 390 px in `kompakt` und
+   `handschuh`: Feld oben fokussiert, dann „Entwurf speichern" in der Leiste angeklickt,
+   scrollY blieb 0. */
 :root {
   scroll-padding-block-end: var(--lfh-befehl-fokusabstand, 0px);
 }
