@@ -272,6 +272,8 @@ In einem `write_retry!`:
    Fehler brechen den ganzen Vorgang ab.
 4. Kopf `entfernt_at = now`, Bericht setzen. `demo_herkunft` fällt per CASCADE nicht, weil
    der Kopf bleibt: Die Zeilen werden in Schritt 3 einzeln gelöscht.
+   Der Kopf wird auch dann geschlossen, wenn er auf keinen Einsatz der eigenen Organisation
+   zeigt und Schritt 2 nichts löscht, denn ein offener Kopf sperrte jeden weiteren Import.
 
 Der Savepoint erkennt „wird noch referenziert“ über die Datenbank selbst und nicht über
 eine handgepflegte Liste von Verweistabellen. Eine künftige Migration mit einem neuen

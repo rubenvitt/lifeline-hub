@@ -37,13 +37,30 @@ pub async fn setup_mit_pool_und_live() -> (axum::Router, sqlx::SqlitePool, LiveH
 /// Die Optionen reisen am Router, nicht im `AppState` — ein Test kann „aus“ und „an“ damit
 /// im selben Binary nebeneinander prüfen.
 pub async fn setup_mit_optionen(opt: RouterOptionen) -> (axum::Router, sqlx::SqlitePool) {
-    let pool = db::test_pool().await;
+    let (router, pool, _live) = setup_mit_optionen_und_live(opt).await;
+    (router, pool)
+}
+
+/// Wie [`setup_mit_optionen`], stellt zusätzlich den geteilten LiveHub bereit (LFH-690: das
+/// `lagged`-Signal nach Entfernen und Neu-Import).
+pub async fn setup_mit_optionen_und_live(
+    opt: RouterOptionen,
+) -> (axum::Router, sqlx::SqlitePool, LiveHub) {
+    setup_mit_optionen_auf(db::test_pool().await, opt).await
+}
+
+/// Wie [`setup_mit_optionen_und_live`], aber auf einem mitgebrachten Pool — etwa
+/// `db::test_pool_datei()` für Messungen mit Produktions-Parität (WAL, mehrere Verbindungen).
+pub async fn setup_mit_optionen_auf(
+    pool: sqlx::SqlitePool,
+    opt: RouterOptionen,
+) -> (axum::Router, sqlx::SqlitePool, LiveHub) {
     bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
         .await
         .unwrap();
     let live = LiveHub::new();
     let router = build_router_mit(test_state(&pool, &live), opt);
-    (router, pool)
+    (router, pool, live)
 }
 
 fn test_state(pool: &sqlx::SqlitePool, live: &LiveHub) -> AppState {

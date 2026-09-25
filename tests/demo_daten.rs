@@ -135,22 +135,29 @@ async fn mit_freischaltung_admin_status_nicht_importiert() {
     assert!(!o.contains_key("bericht"), "bericht muss ABSENT sein: {v}");
 }
 
-/// Mit Freischaltung: die schreibenden Endpunkte sind bis Block 5 Platzhalter und melden
-/// 422 im Envelope — kein Stub darf still „Erfolg“ melden.
+/// Mit Freischaltung: die schreibenden Endpunkte tragen die echten Codes aus D3. Ohne
+/// aktiven Import ist Entfernen 409, Import 201 und Neu-Import 200; der Rumpf ist in jedem
+/// Fall der Status im Envelope-freien DTO, beim Fehler der `{error}`-Envelope.
 #[tokio::test]
-async fn mit_freischaltung_schreibende_endpunkte_sind_noch_422() {
+async fn mit_freischaltung_schreibende_endpunkte_tragen_die_codes_aus_d3() {
     let (app, _pool) = common::setup_mit_optionen(RouterOptionen { demo_daten: true }).await;
     let admin = common::login_cookie(&app, "admin", "startpw12").await;
 
-    for (methode, pfad) in ENDPUNKTE.iter().filter(|(m, _)| *m != "GET") {
-        let (status, v) = common::anfrage(&app, methode, pfad, &admin, None).await;
-        assert_eq!(
-            status,
-            StatusCode::UNPROCESSABLE_ENTITY,
-            "{methode} {pfad}: {v}"
-        );
-        assert!(v["error"].is_string(), "{methode} {pfad}: {v}");
-    }
+    let (status, v) = common::anfrage(&app, "DELETE", "/api/demo-daten", &admin, None).await;
+    assert_eq!(status, StatusCode::CONFLICT, "DELETE ohne Import: {v}");
+    assert!(v["error"].is_string(), "{v}");
+
+    let (status, v) = common::anfrage(&app, "POST", "/api/demo-daten", &admin, None).await;
+    assert_eq!(status, StatusCode::CREATED, "POST: {v}");
+    assert_eq!(v["importiert"], Value::Bool(true), "{v}");
+
+    let (status, v) = common::anfrage(&app, "POST", "/api/demo-daten/neu", &admin, None).await;
+    assert_eq!(status, StatusCode::OK, "POST /neu: {v}");
+    assert_eq!(v["importiert"], Value::Bool(true), "{v}");
+
+    let (status, v) = common::anfrage(&app, "DELETE", "/api/demo-daten", &admin, None).await;
+    assert_eq!(status, StatusCode::OK, "DELETE: {v}");
+    assert_eq!(v["importiert"], Value::Bool(false), "{v}");
 }
 
 /// `build_router` ist die Vorgabe „aus“: ohne Optionen gibt es keinen Demo-Pfad.
@@ -162,10 +169,11 @@ async fn build_router_ohne_optionen_hat_keinen_demo_pfad() {
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
 
-/// Importiert direkt über `importieren_tx` gegen den Pool des Test-States (die HTTP-Route
-/// kommt in Block 5). `write_retry!` ist außerhalb des Crates nicht nutzbar (seine Helfer in
-/// `tx` sind crate-privat); `BEGIN IMMEDIATE` plus Commit ist derselbe Transaktionsmodus ohne
-/// Retry, und in diesem Test schreibt niemand nebenher. `jetzt` ist die echte Uhr, damit die
+/// Importiert direkt über `importieren_tx` gegen den Pool des Test-States, ohne die HTTP-Route:
+/// der Lesetest braucht einen Router ohne Demo-Freischaltung nicht anders als mit ihr, und so
+/// hängt er nicht an den Routen. `write_retry!` ist außerhalb des Crates nicht nutzbar (seine
+/// Helfer in `tx` sind crate-privat); `BEGIN IMMEDIATE` plus Commit ist derselbe
+/// Transaktionsmodus ohne Retry, und in diesem Test schreibt niemand nebenher. `jetzt` ist die echte Uhr, damit die
 /// Lese-Endpunkte „überfällig“ gegen ihre eigene Zeit rechnen.
 async fn demo_importieren(pool: &sqlx::SqlitePool) -> (i64, chrono::NaiveDateTime) {
     let (org, admin_id): (i64, i64) =
@@ -308,5 +316,487 @@ async fn import_ist_je_modul_ueber_die_lese_endpunkte_sichtbar() {
     assert_eq!(
         liste(&app, &admin, e, "/lageberichte").await[0]["status"],
         "freigegeben"
+    );
+}
+
+// ---------------------------------------------------------------------------------------------
+// Routen, Neu-Import, Live (Task 5.1, design.md D3, D7, D11)
+// ---------------------------------------------------------------------------------------------
+
+const AN: RouterOptionen = RouterOptionen { demo_daten: true };
+
+/// Einen Demo-Endpunkt aufrufen; liefert `(Status, Body)`.
+async fn demo(app: &axum::Router, cookie: &str, methode: &str, pfad: &str) -> (StatusCode, Value) {
+    common::anfrage(app, methode, pfad, cookie, None).await
+}
+
+/// Der Status über GET. Jede Schreibantwort muss ihm gleichen: sie trägt den neuen Stand, damit
+/// das Frontend ohne zweiten Abruf weiß, wo es steht (D3).
+async fn status_lesen(app: &axum::Router, cookie: &str) -> Value {
+    let (status, v) = demo(app, cookie, "GET", "/api/demo-daten").await;
+    assert_eq!(status, StatusCode::OK, "{v}");
+    v
+}
+
+fn einsatz_id(status: &Value) -> i64 {
+    status["import"]["einsatz_id"]
+        .as_i64()
+        .unwrap_or_else(|| panic!("kein aktiver Import: {status}"))
+}
+
+async fn aktive_koepfe(pool: &sqlx::SqlitePool, org_id: i64) -> i64 {
+    sqlx::query_scalar("SELECT COUNT(*) FROM demo_import WHERE org_id = ? AND entfernt_at IS NULL")
+        .bind(org_id)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+}
+
+async fn einsatz_existiert(pool: &sqlx::SqlitePool, id: i64) -> bool {
+    sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM einsatz WHERE id = ?")
+        .bind(id)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+        == 1
+}
+
+async fn org_von(pool: &sqlx::SqlitePool, benutzername: &str) -> i64 {
+    sqlx::query_scalar("SELECT org_id FROM benutzer WHERE benutzername = ?")
+        .bind(benutzername)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+}
+
+/// Wartet kurz auf die nächste Nachricht eines Live-Empfängers. `None`, wenn keine kommt.
+async fn naechste(
+    rx: &mut tokio::sync::broadcast::Receiver<lifeline_hub::live::LiveNachricht>,
+) -> Option<lifeline_hub::live::LiveNachricht> {
+    tokio::time::timeout(std::time::Duration::from_millis(200), rx.recv())
+        .await
+        .ok()
+        .and_then(|r| r.ok())
+}
+
+/// Spec „Status der Demo-Daten“ (beide Szenarien) und die 409-Paare aus D3: vorher „nicht
+/// importiert“ ohne Bericht, nach dem Import Kopf und Bericht mit „angelegt“, ein zweiter Import
+/// ist 409, nach dem Entfernen „nicht importiert“ mit dem Bericht des Entfernens, ein zweites
+/// Entfernen ist 409. Jede Schreibantwort gleicht dem GET danach, und ein 409 ändert nichts.
+#[tokio::test]
+async fn status_vorher_nachher_und_409_paare() {
+    let (app, pool) = common::setup_mit_optionen(AN).await;
+    let admin = common::login_cookie(&app, "admin", "startpw12").await;
+
+    let vorher = status_lesen(&app, &admin).await;
+    assert_eq!(vorher, serde_json::json!({ "importiert": false }));
+
+    let (status, importiert) = demo(&app, &admin, "POST", "/api/demo-daten").await;
+    assert_eq!(status, StatusCode::CREATED, "{importiert}");
+    assert_eq!(importiert, status_lesen(&app, &admin).await);
+    assert_eq!(importiert["importiert"], true);
+    let e = einsatz_id(&importiert);
+    assert!(einsatz_existiert(&pool, e).await);
+    assert_eq!(
+        importiert["import"]["einsatz_bezeichnung"],
+        "ÜBUNG – Starkregen Musterstadt"
+    );
+    assert!(importiert["import"]["id"].is_i64(), "{importiert}");
+    assert!(
+        importiert["import"]["importiert_at"].is_string(),
+        "{importiert}"
+    );
+    assert_eq!(importiert["bericht"]["vorgang"], "importiert");
+    let je_art = importiert["bericht"]["je_art"].as_array().unwrap();
+    assert_eq!(je_art.len(), 3, "{importiert}");
+    for zeile in je_art {
+        assert!(zeile["angelegt"].as_i64().unwrap() > 0, "{zeile}");
+    }
+
+    // Zweiter Import: 409, und der Stand bleibt.
+    let (status, v) = demo(&app, &admin, "POST", "/api/demo-daten").await;
+    assert_eq!(status, StatusCode::CONFLICT, "{v}");
+    assert!(v["error"].is_string(), "{v}");
+    assert_eq!(status_lesen(&app, &admin).await, importiert);
+
+    let (status, entfernt) = demo(&app, &admin, "DELETE", "/api/demo-daten").await;
+    assert_eq!(status, StatusCode::OK, "{entfernt}");
+    assert_eq!(entfernt, status_lesen(&app, &admin).await);
+    assert_eq!(entfernt["importiert"], false);
+    assert!(
+        !entfernt.as_object().unwrap().contains_key("import"),
+        "import muss ABSENT sein: {entfernt}"
+    );
+    assert_eq!(entfernt["bericht"]["vorgang"], "entfernt");
+    for zeile in entfernt["bericht"]["je_art"].as_array().unwrap() {
+        assert!(zeile["entfernt"].as_i64().unwrap() > 0, "{zeile}");
+        assert_eq!(zeile["behalten"], 0, "{zeile}");
+    }
+    assert!(!einsatz_existiert(&pool, e).await);
+
+    // Zweites Entfernen: 409, und der Bericht des Entfernens bleibt stehen.
+    let (status, v) = demo(&app, &admin, "DELETE", "/api/demo-daten").await;
+    assert_eq!(status, StatusCode::CONFLICT, "{v}");
+    assert!(v["error"].is_string(), "{v}");
+    assert_eq!(status_lesen(&app, &admin).await, entfernt);
+}
+
+/// Spec „Neu importieren“, Scenario „Import, Entfernen, Import gegen das aktuelle Schema“:
+/// gegen die voll migrierte Test-DB gelingen alle drei Schritte über HTTP, und der zweite
+/// Import meldet dieselben Zahlen wie der erste. `zeitpunkt` folgt der Uhr und bleibt außen vor.
+#[tokio::test]
+async fn import_entfernen_import_meldet_dieselben_zahlen() {
+    let (app, pool) = common::setup_mit_optionen(AN).await;
+    let admin = common::login_cookie(&app, "admin", "startpw12").await;
+    let org = org_von(&pool, "admin").await;
+
+    let (s1, erster) = demo(&app, &admin, "POST", "/api/demo-daten").await;
+    assert_eq!(s1, StatusCode::CREATED, "{erster}");
+    let (s2, entfernt) = demo(&app, &admin, "DELETE", "/api/demo-daten").await;
+    assert_eq!(s2, StatusCode::OK, "{entfernt}");
+    let (s3, zweiter) = demo(&app, &admin, "POST", "/api/demo-daten").await;
+    assert_eq!(s3, StatusCode::CREATED, "{zweiter}");
+
+    assert_eq!(zweiter["bericht"]["vorgang"], "importiert");
+    assert_eq!(zweiter["bericht"]["je_art"], erster["bericht"]["je_art"]);
+    assert_ne!(zweiter["import"]["id"], erster["import"]["id"]);
+    assert!(einsatz_id(&zweiter) > einsatz_id(&erster), "ID-Sperre (D6)");
+    assert!(!einsatz_existiert(&pool, einsatz_id(&erster)).await);
+    assert_eq!(aktive_koepfe(&pool, org).await, 1);
+}
+
+/// Spec „Neu importieren“, Scenario „Neu importieren ersetzt den Stand“, und „Invalidierung
+/// nach Import und Entfernen“: danach besteht genau ein aktiver Import mit einem neuen
+/// Demo-Einsatz, der alte existiert nicht mehr (auch nicht über die API), und ein vorher
+/// abonnierter Live-Strom des alten Einsatzes erhält `lagged`.
+#[tokio::test]
+async fn neu_import_ersetzt_den_einsatz_und_sendet_lagged() {
+    let (app, pool, live) = common::setup_mit_optionen_und_live(AN).await;
+    let admin = common::login_cookie(&app, "admin", "startpw12").await;
+    let org = org_von(&pool, "admin").await;
+
+    let (_, erster) = demo(&app, &admin, "POST", "/api/demo-daten").await;
+    let alt = einsatz_id(&erster);
+    let mut rx = live.abonniere(alt);
+
+    let (status, neu) = demo(&app, &admin, "POST", "/api/demo-daten/neu").await;
+    assert_eq!(status, StatusCode::OK, "{neu}");
+    assert_eq!(neu, status_lesen(&app, &admin).await);
+    assert_eq!(neu["importiert"], true);
+    assert_eq!(neu["bericht"]["vorgang"], "importiert");
+    assert_eq!(neu["bericht"]["je_art"], erster["bericht"]["je_art"]);
+    let e = einsatz_id(&neu);
+    assert!(e > alt, "neuer Demo-Einsatz über der gesperrten ID");
+    assert_ne!(neu["import"]["id"], erster["import"]["id"]);
+    assert_eq!(aktive_koepfe(&pool, org).await, 1);
+    assert!(!einsatz_existiert(&pool, alt).await);
+    let (status, _) =
+        common::anfrage(&app, "GET", &format!("/api/einsaetze/{alt}"), &admin, None).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+
+    let n = naechste(&mut rx).await.expect("lagged auf dem alten Kanal");
+    assert_eq!(n.event, lifeline_hub::live::LiveEvent::Lagged);
+    assert_eq!(n.data, "resync");
+    assert!(naechste(&mut rx).await.is_none(), "genau ein Signal");
+}
+
+/// Spec „Neu importieren“: ohne aktiven Import läuft der Vorgang wie ein erstmaliger Import
+/// (200 statt 201, weil `/neu` keinen neuen Kopf „erzeugt“, sondern den Stand setzt, D3).
+#[tokio::test]
+async fn neu_import_ohne_aktiven_import_importiert() {
+    let (app, pool) = common::setup_mit_optionen(AN).await;
+    let admin = common::login_cookie(&app, "admin", "startpw12").await;
+    let org = org_von(&pool, "admin").await;
+
+    let (status, v) = demo(&app, &admin, "POST", "/api/demo-daten/neu").await;
+    assert_eq!(status, StatusCode::OK, "{v}");
+    assert_eq!(v, status_lesen(&app, &admin).await);
+    assert_eq!(v["importiert"], true);
+    assert!(einsatz_existiert(&pool, einsatz_id(&v)).await);
+    assert_eq!(aktive_koepfe(&pool, org).await, 1);
+}
+
+/// Alle Zeilen einer Tabelle, jede als Text aus `quote()` aller Spalten, in `rowid`-Folge.
+/// Zeilengleich statt bloß gleich viele: eine geänderte Spalte fällt auf.
+async fn tabellen_zeilen(pool: &sqlx::SqlitePool, tabelle: &str) -> Vec<String> {
+    let spalten: Vec<String> =
+        sqlx::query_scalar("SELECT name FROM pragma_table_info(?) ORDER BY cid")
+            .bind(tabelle)
+            .fetch_all(pool)
+            .await
+            .unwrap();
+    assert!(!spalten.is_empty(), "Tabelle {tabelle} hat keine Spalten");
+    let ausdruck = spalten
+        .iter()
+        .map(|s| format!("quote(\"{s}\")"))
+        .collect::<Vec<_>>()
+        .join(" || '|' || ");
+    // `tabelle` kommt aus `sqlite_master` bzw. aus festen Literalen dieser Datei, nie aus
+    // einer Eingabe.
+    let sql = format!("SELECT {ausdruck} FROM \"{tabelle}\" ORDER BY rowid");
+    sqlx::query_scalar(sqlx::AssertSqlSafe(sql))
+        .fetch_all(pool)
+        .await
+        .unwrap()
+}
+
+/// Die Zeilen der Demo-Verwaltung und aller Einsätze, zeilengleich.
+async fn demo_stand(pool: &sqlx::SqlitePool) -> Vec<(String, Vec<String>)> {
+    let mut stand = Vec::new();
+    for t in [
+        "demo_import",
+        "demo_herkunft",
+        "einsatz",
+        "fahrzeug",
+        "personal",
+        "material",
+    ] {
+        stand.push((t.to_string(), tabellen_zeilen(pool, t).await));
+    }
+    stand
+}
+
+/// Spec „Neu importieren“: scheitert der Import, bleibt der bisherige Demo-Stand erhalten
+/// (D11, ein `write_retry!` um Entfernen und Import). Der Fehler kommt spät im Drehbuch aus
+/// einem Trigger auf `lagebericht` — nach dem Entfernen und nach Einsatz, Kopf und Stammdaten
+/// des neuen Imports. Der Trigger ist ein normaler (kein TEMP-)Trigger, weil er für jede
+/// Verbindung des Pools gelten muss; der Test legt ihn erst nach dem ersten Import an und
+/// entfernt ihn danach. Die Gegenprobe ohne Trigger zeigt, dass er die Ursache war.
+#[tokio::test]
+async fn neu_import_mit_importfehler_laesst_den_alten_stand_stehen() {
+    let (app, pool, live) = common::setup_mit_optionen_und_live(AN).await;
+    let admin = common::login_cookie(&app, "admin", "startpw12").await;
+
+    let (_, erster) = demo(&app, &admin, "POST", "/api/demo-daten").await;
+    let alt = einsatz_id(&erster);
+    let mut rx = live.abonniere(alt);
+
+    sqlx::query(
+        "CREATE TRIGGER test_lagebericht_nicht_anlegen BEFORE INSERT ON lagebericht \
+         BEGIN SELECT RAISE(ABORT, 'Testfehler: Lagebericht'); END",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    let vorher = demo_stand(&pool).await;
+
+    let (status, v) = demo(&app, &admin, "POST", "/api/demo-daten/neu").await;
+    // Der Trigger-Abbruch ist kein fachlicher Fall aus D3, sondern ein unerwarteter
+    // DB-Fehler: 500 mit Envelope (gemessen). Tragend ist der unveränderte Stand darunter.
+    assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR, "{v}");
+    assert!(v["error"].is_string(), "{v}");
+
+    assert_eq!(
+        demo_stand(&pool).await,
+        vorher,
+        "alter Stand bleibt zeilengleich"
+    );
+    assert_eq!(status_lesen(&app, &admin).await, erster);
+    assert!(einsatz_existiert(&pool, alt).await);
+    assert!(
+        naechste(&mut rx).await.is_none(),
+        "kein lagged nach Rollback"
+    );
+
+    sqlx::query("DROP TRIGGER test_lagebericht_nicht_anlegen")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (status, v) = demo(&app, &admin, "POST", "/api/demo-daten/neu").await;
+    assert_eq!(status, StatusCode::OK, "Gegenprobe ohne Trigger: {v}");
+    assert!(!einsatz_existiert(&pool, alt).await);
+}
+
+/// Legt eine zweite Organisation mit eigenem System-Admin per SQL an (bootstrap läuft nur
+/// einmal) und seedet ihre Kataloge wie `bootstrap_admin`. Liefert `(org_id, cookie)`.
+async fn zweite_org_mit_admin(app: &axum::Router, pool: &sqlx::SqlitePool) -> (i64, String) {
+    let org: i64 = sqlx::query_scalar(
+        "INSERT INTO organisation (name, tz_organisation) \
+         VALUES ('Org B', 'hilfsorganisation') RETURNING id",
+    )
+    .fetch_one(pool)
+    .await
+    .unwrap();
+    let hash = lifeline_hub::auth::password::hash("adminbpw12").unwrap();
+    sqlx::query(
+        "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash, system_rolle) \
+         VALUES (?, 'Admin B', 'admin-b', ?, 'admin')",
+    )
+    .bind(org)
+    .bind(&hash)
+    .execute(pool)
+    .await
+    .unwrap();
+    for (label, kategorie, fms_anker, sortier) in lifeline_hub::fahrzeug::STATUS_STARTLISTE {
+        sqlx::query(
+            "INSERT INTO fahrzeug_status (org_id, label, kategorie, fms_anker, sortier) \
+             VALUES (?, ?, ?, ?, ?)",
+        )
+        .bind(org)
+        .bind(label)
+        .bind(kategorie)
+        .bind(fms_anker)
+        .bind(sortier)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+    for (label, sortier) in lifeline_hub::personal::QUALIFIKATION_STARTLISTE {
+        sqlx::query("INSERT INTO qualifikation (org_id, label, sortier) VALUES (?, ?, ?)")
+            .bind(org)
+            .bind(label)
+            .bind(sortier)
+            .execute(pool)
+            .await
+            .unwrap();
+    }
+    for (label, kategorie, sortier) in lifeline_hub::personal::PERSONAL_STATUS_STARTLISTE {
+        sqlx::query(
+            "INSERT INTO personal_status (org_id, label, kategorie, sortier) VALUES (?, ?, ?, ?)",
+        )
+        .bind(org)
+        .bind(label)
+        .bind(kategorie)
+        .bind(sortier)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+    for (label, f, u, m, sortier) in lifeline_hub::einheit::EINHEIT_TYP_STARTLISTE {
+        sqlx::query(
+            "INSERT INTO einheit_typ \
+                (org_id, label, soll_fuehrer, soll_unterfuehrer, soll_mannschaft, sortier) \
+             VALUES (?, ?, ?, ?, ?, ?)",
+        )
+        .bind(org)
+        .bind(label)
+        .bind(f)
+        .bind(u)
+        .bind(m)
+        .bind(sortier)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+    let cookie = common::login_cookie(app, "admin-b", "adminbpw12").await;
+    (org, cookie)
+}
+
+/// Spec „Nur der System-Admin, nur die eigene Organisation“, Scenario „Zwei Organisationen“:
+/// Status, Import und Entfernen beziehen sich immer auf die Org des Admins. B importiert,
+/// während A schon importiert hat; der Einsatz entsteht in B, jeder Status zeigt nur den
+/// eigenen Import, und Entfernen durch B lässt A samt Live-Kanal unberührt.
+#[tokio::test]
+async fn zwei_organisationen_bleiben_getrennt() {
+    let (app, pool, live) = common::setup_mit_optionen_und_live(AN).await;
+    let admin_a = common::login_cookie(&app, "admin", "startpw12").await;
+    let org_a = org_von(&pool, "admin").await;
+    let (org_b, admin_b) = zweite_org_mit_admin(&app, &pool).await;
+    assert_ne!(org_a, org_b);
+
+    let (status, a) = demo(&app, &admin_a, "POST", "/api/demo-daten").await;
+    assert_eq!(status, StatusCode::CREATED, "{a}");
+    assert_eq!(
+        status_lesen(&app, &admin_b).await,
+        serde_json::json!({ "importiert": false }),
+        "B sieht den Import von A nicht"
+    );
+    // B hat nichts zu entfernen, auch wenn A importiert hat.
+    let (status, v) = demo(&app, &admin_b, "DELETE", "/api/demo-daten").await;
+    assert_eq!(status, StatusCode::CONFLICT, "{v}");
+
+    let (status, b) = demo(&app, &admin_b, "POST", "/api/demo-daten").await;
+    assert_eq!(
+        status,
+        StatusCode::CREATED,
+        "B importiert trotz aktivem Import von A: {b}"
+    );
+    let (e_a, e_b) = (einsatz_id(&a), einsatz_id(&b));
+    assert_ne!(e_a, e_b);
+    let org_des_einsatzes = |id: i64| {
+        let pool = pool.clone();
+        async move {
+            sqlx::query_scalar::<_, i64>("SELECT org_id FROM einsatz WHERE id = ?")
+                .bind(id)
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+        }
+    };
+    assert_eq!(org_des_einsatzes(e_a).await, org_a);
+    assert_eq!(org_des_einsatzes(e_b).await, org_b);
+    assert_eq!(status_lesen(&app, &admin_a).await, a);
+    assert_eq!(status_lesen(&app, &admin_b).await, b);
+
+    let mut rx_a = live.abonniere(e_a);
+    let mut rx_b = live.abonniere(e_b);
+    let (status, v) = demo(&app, &admin_b, "DELETE", "/api/demo-daten").await;
+    assert_eq!(status, StatusCode::OK, "{v}");
+    assert_eq!(v["importiert"], false);
+    assert!(!einsatz_existiert(&pool, e_b).await);
+    assert!(einsatz_existiert(&pool, e_a).await, "A bleibt");
+    assert_eq!(
+        status_lesen(&app, &admin_a).await,
+        a,
+        "Status von A unverändert"
+    );
+    assert_eq!(aktive_koepfe(&pool, org_a).await, 1);
+    assert_eq!(
+        naechste(&mut rx_b).await.map(|n| n.event),
+        Some(lifeline_hub::live::LiveEvent::Lagged)
+    );
+    assert!(naechste(&mut rx_a).await.is_none(), "A bekommt kein Signal");
+}
+
+/// Spec „Invalidierung nach Import und Entfernen“, Scenario „Offener Tab beim Entfernen“: ein
+/// vor dem Entfernen abonnierter Live-Strom des Demo-Einsatzes erhält das
+/// Resynchronisations-Signal, das vorhandene Kontrollereignis `lagged` (D7). Ein Strom eines
+/// anderen Einsatzes bekommt nichts.
+#[tokio::test]
+async fn entfernen_sendet_lagged_an_den_kanal_des_demo_einsatzes() {
+    let (app, _pool, live) = common::setup_mit_optionen_und_live(AN).await;
+    let admin = common::login_cookie(&app, "admin", "startpw12").await;
+    let nachbar = common::einsatz_anlegen(&app, &admin).await;
+
+    let (_, v) = demo(&app, &admin, "POST", "/api/demo-daten").await;
+    let e = einsatz_id(&v);
+    let mut rx = live.abonniere(e);
+    let mut rx_nachbar = live.abonniere(nachbar);
+
+    let (status, v) = demo(&app, &admin, "DELETE", "/api/demo-daten").await;
+    assert_eq!(status, StatusCode::OK, "{v}");
+
+    let n = naechste(&mut rx).await.expect("lagged nach dem Entfernen");
+    assert_eq!(n.event, lifeline_hub::live::LiveEvent::Lagged);
+    assert_eq!(n.data, "resync");
+    assert!(naechste(&mut rx).await.is_none(), "genau ein Signal");
+    assert!(naechste(&mut rx_nachbar).await.is_none());
+}
+
+/// Spec „Keine Wiederverwendung der Einsatz-ID“, Scenario „Echter Einsatz nach dem Entfernen“:
+/// der Demo-Einsatz ist der jüngste (frische DB, kein anderer Einsatz), wird entfernt, und der
+/// danach über `POST /api/einsaetze` angelegte echte Einsatz liegt über seiner ID.
+#[tokio::test]
+async fn echter_einsatz_nach_dem_entfernen_hat_eine_groessere_id() {
+    let (app, pool) = common::setup_mit_optionen(AN).await;
+    let admin = common::login_cookie(&app, "admin", "startpw12").await;
+
+    let (_, v) = demo(&app, &admin, "POST", "/api/demo-daten").await;
+    let demo_id = einsatz_id(&v);
+    let hoechste: i64 = sqlx::query_scalar("SELECT MAX(id) FROM einsatz")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        hoechste, demo_id,
+        "Vorbedingung: Demo-Einsatz ist der jüngste"
+    );
+
+    let (status, _) = demo(&app, &admin, "DELETE", "/api/demo-daten").await;
+    assert_eq!(status, StatusCode::OK);
+    let echt = common::einsatz_anlegen(&app, &admin).await;
+    assert!(
+        echt > demo_id,
+        "echt {echt} muss über dem Demo-Einsatz {demo_id} liegen"
     );
 }
