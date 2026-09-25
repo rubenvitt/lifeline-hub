@@ -102,6 +102,48 @@ test('Selbstbeweis: der Messkern meldet eine erfundene Verdeckung', async ({ pag
   ).toBeGreaterThan(0);
 });
 
+test('Selbstbeweis (LFH-373): Zusatzkandidaten machen einen ABSOLUTEN Verdecker sichtbar — ohne sie nicht', async ({
+  page,
+}) => {
+  // Die Kartenaufbauten der Lage- und Personenkarte sind `position: absolute`. Die Vorgabe des
+  // Kerns wertet nur `sticky|fixed` — ein Lauf dort wäre grün durch Konstruktion. Dieser Test
+  // belegt beide Hälften der Opt-in-Erweiterung: mit `zusatzKandidaten` findet der Kern die
+  // Verdeckung, OHNE sie findet er sie nicht. Die zweite Hälfte ist die schärfere: sie zeigt,
+  // dass die Vorgabe die Option nicht still mitenthält, dass also die Bestandsaufrufer
+  // unverändert rechnen.
+  await anmelden(page);
+  await page.setViewportSize({ width: 390, height: 400 });
+
+  const laufMitAttrappe = async (optionen?: { zusatzKandidaten: string[] }) => {
+    await page.goto('/admin/benutzer');
+    await expect(page.locator('tr.ant-table-row').first()).toBeVisible();
+    // Absolut über das GANZE Dokument, nicht über den Schirm: sonst läge ein Ziel nach dem
+    // Bildlauf außerhalb der Attrappe und der Befund hinge an der Scrollposition.
+    await page.evaluate(() => {
+      const hoehe = document.scrollingElement!.scrollHeight;
+      document.body.append(
+        Object.assign(document.createElement('div'), {
+          className: 'e2e-absolut-verdecker',
+          style: `position:absolute;top:0;left:0;width:100%;height:${hoehe}px;background:#000;z-index:2000`,
+        }),
+      );
+    });
+    return pruefeFokusVerdeckung(page, 10, 'Tab', optionen);
+  };
+
+  const ohne = await laufMitAttrappe();
+  const mit = await laufMitAttrappe({ zusatzKandidaten: ['.e2e-absolut-verdecker'] });
+  expect(mit.stoppsGesamt, 'Vorbedingung: der Durchlauf muss irgendwo landen').toBeGreaterThan(0);
+  expect(
+    mit.verdeckt.length,
+    `mit Zusatzkandidat muss der Kern die absolute Attrappe finden (${mit.stoppsGesamt} Stopps)`,
+  ).toBeGreaterThan(0);
+  expect(
+    ohne.verdeckt,
+    'ohne Zusatzkandidat bleibt der absolute Verdecker unsichtbar — die Vorgabe ist unverändert',
+  ).toEqual([]);
+});
+
 test('Katalogtabelle: Tabulaturdurchlauf hinter stehender Kopfzeile und fixierter erster Spalte', async ({
   page,
 }) => {

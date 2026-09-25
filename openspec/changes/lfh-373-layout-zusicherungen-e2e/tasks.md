@@ -9,9 +9,9 @@ kein voller `pnpm e2e`-Lauf sie mitnimmt.
 
 ## 1. Messinfrastruktur
 
-- [ ] 1.1 `e2e/cls-kern.ts`: `beobachteShifts`/`leseShifts`/`setzeShiftsZurueck`/`ruheShifts` als reinen Move aus `einsatzauswahl-cls.spec.ts` heben, dort importieren. Verifiziert dadurch, dass `einsatzauswahl-cls.spec.ts` unverändert grün ist und `git diff` in der Spec nur Import und entfernte Definitionen zeigt
-- [ ] 1.2 `e2e/fokus-kern.ts`: optionales drittes Argument `{ zusatzKandidaten?: string[]; region?: string }` mit Zähler `stoppsInRegion` (design.md D3). Liegt in `befehl-aktionsleiste.spec.ts` ein allgemeiner Freistreifen-Helfer, zieht er als reiner Move mit. Verifiziert dadurch, dass `fokus-verdeckung`, `befehl-aktionsleiste`, `dokumente` und `pegel-pruefliste` unverändert grün sind
-- [ ] 1.3 Selbstbeweis in `fokus-verdeckung.spec.ts`: absolute Attrappe über einem Knopf, ein Lauf mit `zusatzKandidaten` meldet genau einen Treffer, derselbe Lauf ohne Option meldet null. Verifiziert durch den grünen Test und eine Mutationsprobe, in der der Kern die Option ignoriert (rot)
+- [x] 1.1 `e2e/cls-kern.ts`: `beobachteShifts`/`leseShifts`/`setzeShiftsZurueck`/`ruheShifts` als reinen Move aus `einsatzauswahl-cls.spec.ts` heben, dort importieren. Verifiziert dadurch, dass `einsatzauswahl-cls.spec.ts` unverändert grün ist und `git diff` in der Spec nur Import und entfernte Definitionen zeigt
+- [x] 1.2 `e2e/fokus-kern.ts`: optionales drittes Argument `{ zusatzKandidaten?: string[]; region?: string }` mit Zähler `stoppsInRegion` (design.md D3). Liegt in `befehl-aktionsleiste.spec.ts` ein allgemeiner Freistreifen-Helfer, zieht er als reiner Move mit. Verifiziert dadurch, dass `fokus-verdeckung`, `befehl-aktionsleiste`, `dokumente` und `pegel-pruefliste` unverändert grün sind
+- [x] 1.3 Selbstbeweis in `fokus-verdeckung.spec.ts`: absolute Attrappe über einem Knopf, ein Lauf mit `zusatzKandidaten` meldet genau einen Treffer, derselbe Lauf ohne Option meldet null. Verifiziert durch den grünen Test und eine Mutationsprobe, in der der Kern die Option ignoriert (rot)
 - [ ] 1.4 `gate3-trefflaeche.spec.ts`: Helfer für die kurze Achse (`min(Breite, Höhe)` je Knoten, gibt kleinstes und größtes Maß zurück) nach design.md D2. Verifiziert durch seine Nutzung in 2.3 und eine Mutationsprobe mit Messung nur der Höhe (bleibt bei 2.3 nicht grün, wenn eine Zelle schmaler ist)
 
 ## 2. Zeile 2 · Trefffläche je Stufe
