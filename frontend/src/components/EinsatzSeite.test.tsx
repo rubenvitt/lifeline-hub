@@ -323,4 +323,24 @@ describe('EinsatzSeite · Seitenebene der Kommandopalette', () => {
     await waitFor(() => expect(document.getElementById('cmd-modul:etb')).not.toBeNull());
     expect(document.getElementById('cmd-tastatur:neue-zeile')).toBeNull();
   });
+
+  /**
+   * LFH-373: ein angepinnter Seitenfuß steht als LETZTES Kind der Seitenwurzel, nach dem
+   * Inhalt — nicht darin. Ein `position: sticky; bottom: 0` kann nie über die Oberkante
+   * seines Elternblocks steigen; im Inhalt hing die ETB-Erfassung bei 390 px im
+   * Handschuh-Betrieb unter einem 489 px hohen Kopf fest und ragte 61 px unter das Fenster.
+   * Als Kind der Wurzel beginnt ihr Elternblock mit dem Seitenkopf.
+   */
+  it('stellt einen Fuß als letztes Kind der Wurzel hinter den Inhalt', () => {
+    const { container } = renderMitProviders(
+      <EinsatzSeite titel="ETB" fuss={<div data-testid="fuss">Erfassung</div>}>
+        <p>Inhalt</p>
+      </EinsatzSeite>,
+    );
+    const fuss = screen.getByTestId('fuss');
+    const inhalt = container.querySelector('[data-lfh="seiten-inhalt"]')!;
+    expect(inhalt.contains(fuss)).toBe(false);
+    expect(fuss.parentElement).toBe(inhalt.parentElement);
+    expect(inhalt.parentElement!.lastElementChild).toBe(fuss);
+  });
 });

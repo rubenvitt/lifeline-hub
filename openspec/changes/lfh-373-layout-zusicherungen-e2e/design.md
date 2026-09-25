@@ -105,21 +105,27 @@ Unterkante des Ziels gegen Oberkante der Leiste. Liegt dafür in
 `locator.focus()`. Das ETB fokussiert beim Einhängen das Textfeld am Seitenfuß, ein nacktes
 Tab nach `goto` liefe also an der Zeitachse vorbei.
 
-### D4 · Fokusabstand unten, gemeinsam für Befehl und ETB
+### D4 · Fokusabstand unten: geteilte Messung, Regel je Seite
 
-Aus der seitenlokalen Regel wird **eine** globale Regel,
-`:root { scroll-padding-block-end: var(--lfh-fokusabstand-unten, 0px) }`, und ein Hook
-`useFokusabstandUnten(ref)`. Der Hook beobachtet die Höhe der angepinnten Leiste per
-`ResizeObserver`, setzt die Variable und räumt sie beim Aushängen weg. `BefehlDetailPage`
-und `EtbPage` nutzen ihn. Da nie beide Seiten gleichzeitig eingehängt sind, gibt es keinen
-Streit um die Variable.
-*Verworfen:* ein zweiter `:root`-Block in einer ETB-CSS-Datei. Er würde den Block der
-Befehlsseite still überschreiben, weil beide dieselbe Eigenschaft setzen.
-`befehlAktionsleiste.css:26-34` verlangt, genau das zu prüfen.
-*Verworfen:* `scroll-margin` an den Zielen. In LFH-465 blieb das im Browser gemessen
-wirkungslos.
-`e2e/befehl-aktionsleiste.spec.ts` bleibt der Regressionsnachweis für die Befehlsseite.
-Dort ändert sich nur der Name der Variable.
+Ein Hook `useFokusabstandUnten(abstand, variable)` misst die angepinnte Leiste per
+`ResizeObserver` und schreibt ihre Höhe als CSS-Variable an `<html>`. Beim Aushängen räumt
+er sie weg. Befehlsseite und ETB teilen die Messung, aber **nicht** die Regel:
+
+- Die **Befehlsseite** behält `:root { scroll-padding-block-end: var(--lfh-befehl-fokusabstand) }`
+  (`befehlAktionsleiste.css`, LFH-465). `scroll-margin` an ihren Formularfeldern blieb dort
+  gemessen wirkungslos.
+- Das **ETB** hält die Zeitachse über `scroll-margin-block-end: var(--lfh-etb-fokusabstand)`
+  an den **Zielen** frei (`[data-lfh='etb-zeitachse'] *`, `index.css`).
+
+*Korrektur während der Umsetzung (25.09.2026):* Der erste Stand war eine gemeinsame
+Scrollport-Regel für beide Seiten. Sie machte den ETB-Fokusnachweis grün, zählte aber auch
+die Ziele **in** der Leiste zum verdeckten Streifen. Jeder Fokus in der Erfassung („Feld“,
+Chip-Eingabe, Rücksprung ins Textfeld) rollte die Seite dann weiter, beim Setzen dreier
+Felder von 0 bis 2593 px. Ein negativer `scroll-margin` an den Leistenkindern hob das nicht
+auf (gemessen, Chromium ignoriert ihn). Mit dem Rand am Ziel bleibt die Leiste unberührt,
+und der ETB-Fokusnachweis ist ebenso grün.
+
+*Verworfen:* ein zweiter `:root`-Block. Er hätte den Block der Befehlsseite überschrieben.
 
 ### D5 · Gefahrenmatrix: Scroll-Abstand der fixierten Spalte und der Kopfzeile
 
@@ -218,6 +224,28 @@ still gesenkt.
 
 Der Deckel wird in einem Ruhezustand gemessen, den der Test herstellt: ein Entwurf,
 keine gesetzten Felder, Menüs zu.
+
+*Nachtrag aus der Umsetzung (25.09.2026, Entscheidung des Auftraggebers):* Die Hebel 1–3
+hielten die Höhe, zwei weitere Messungen zeigten aber mehr:
+
+4. **Seitenfuß statt Spalte.** Ein `position: sticky; bottom: 0` kann nie über die
+   Oberkante seines Elternblocks steigen. Die Zeitachsenspalte beginnt auf dem Handschirm
+   im Handschuh-Betrieb erst bei y = 489, und die Leiste ragte ganz oben 61 px unter das
+   Fenster, obwohl ihre Höhe den Deckel hielt. Unter `xl` hängt sie deshalb über die neue
+   Eigenschaft `fuss` an der Wurzel von `EinsatzSeite`, deren Elternblock mit dem Seitenkopf
+   beginnt. Ab `xl` bleibt sie neben der Bilanz in der Spalte.
+5. **Einzeilige Feldzeile unter `md`.** Jeder gesetzte Chip kostete eine eigene Reihe
+   (+81 px, drei Chips 578 px = 68 %). Die Zeile rollt jetzt waagerecht (Vorbild
+   `standLeisteStil`), „Feld“ steht vorn, und nach dem Setzen rollt die Zeile an den Anfang
+   zurück. Die Chip-Gruppe darf nicht schrumpfen, sonst brachen die Chips ihren Text in sich
+   um (373 → 531 px).
+6. **Fokus ohne Rollen.** Die Chip-Eingaben fokussierten per `autoFocus`, und React ruft
+   dabei `focus()` ohne Optionen. Der native Fokus rollte die Seite um bis zu 467 px. Jetzt
+   `focus({ preventScroll: true })` über einen Callback-Ref (`MetaChip`).
+
+Ein scheinbarer Sprung von 390 px beim ersten Klick auf „Feld“ war ein Werkzeug-Artefakt:
+Playwrights `click()` rollt ein Ziel in einer angepinnten Leiste vorab „ins Bild“. Die
+Nachweise klicken deshalb per Maus an die Koordinate (`klickeWieEinMensch`).
 
 ### D9 · CLS
 

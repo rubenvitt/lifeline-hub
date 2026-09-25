@@ -449,6 +449,37 @@ export default function EtbPage() {
     punkt: t === 'alle' ? rollen.schwach : etbTypFarbe(t, token).kante,
   }));
 
+  const erfassung = darfSchreiben ? (
+    <div
+      ref={erfassungRef}
+      className={
+        breit ? 'etb-erfassung-sticky etb-erfassung-sticky--neben-leiste' : 'etb-erfassung-sticky'
+      }
+    >
+      {berichtigungZu ? (
+        <Schnellerfassung
+          key="berichtigung"
+          erfassen={erfassenMitMeldung}
+          berichtigungZu={berichtigungZu}
+          onBerichtigungAbbrechen={() => setBerichtigungZu(null)}
+          bausteine={bausteineQuery.data ?? []}
+          einsatz={einsatz}
+        />
+      ) : (
+        <EtbEntwurfsTabs
+          key={einsatzId}
+          einsatzId={einsatzId}
+          erfassen={erfassenMitMeldung}
+          bausteine={bausteineQuery.data ?? []}
+          einsatz={einsatz}
+          kontextLaedt={einsatzQuery.isFetching}
+          werteBehalten={werteBehalten}
+          onWerteBehaltenChange={setWerteBehalten}
+        />
+      )}
+    </div>
+  ) : null;
+
   return (
     <EinsatzSeite
       titel="Einsatztagebuch"
@@ -494,6 +525,7 @@ export default function EtbPage() {
           </Space>
         ) : undefined
       }
+      fuss={breit ? undefined : erfassung}
     >
       <div
         style={{
@@ -616,41 +648,13 @@ export default function EtbPage() {
             </div>
           )}
 
-          {/* Die Erfassung am SEITENFUSS, angepinnt (Begründung an `erfassenMitMeldung`).
-              Sie steht in der Spalte der Zeitachse, nicht unter der Seitenleiste — so bleibt
-              sie beim Blättern im Bild, solange die Zeitachse es ist. */}
-          {darfSchreiben && (
-            <div
-              ref={erfassungRef}
-              className={
-                breit
-                  ? 'etb-erfassung-sticky etb-erfassung-sticky--neben-leiste'
-                  : 'etb-erfassung-sticky'
-              }
-            >
-              {berichtigungZu ? (
-                <Schnellerfassung
-                  key="berichtigung"
-                  erfassen={erfassenMitMeldung}
-                  berichtigungZu={berichtigungZu}
-                  onBerichtigungAbbrechen={() => setBerichtigungZu(null)}
-                  bausteine={bausteineQuery.data ?? []}
-                  einsatz={einsatz}
-                />
-              ) : (
-                <EtbEntwurfsTabs
-                  key={einsatzId}
-                  einsatzId={einsatzId}
-                  erfassen={erfassenMitMeldung}
-                  bausteine={bausteineQuery.data ?? []}
-                  einsatz={einsatz}
-                  kontextLaedt={einsatzQuery.isFetching}
-                  werteBehalten={werteBehalten}
-                  onWerteBehaltenChange={setWerteBehalten}
-                />
-              )}
-            </div>
-          )}
+          {/* Die Erfassung am SEITENFUSS, angepinnt (Begründung an `erfassenMitMeldung`). Ab
+              `xl` steht sie in der Spalte der Zeitachse, nicht unter der Seitenleiste — so
+              bleibt sie beim Blättern im Bild, solange die Zeitachse es ist. Darunter hängt
+              sie als `fuss` an der Seitenwurzel (LFH-373, `EinsatzSeite`): in der Spalte
+              konnte sie nicht über deren Oberkante steigen und ragte auf dem Handschirm ganz
+              oben 61 px unter das Fenster. */}
+          {breit && erfassung}
         </div>
 
         {/* Seitenleiste ab `xl` rechts (Entwurf S4), darunter UNTER der Zeitachsenspalte —

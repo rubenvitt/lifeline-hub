@@ -70,18 +70,21 @@ Bildlauf hat.
 ### Requirement: Die Erfassungsleiste des ETB lässt die Zeitachse sichtbar
 
 Die angepinnte Erfassungsleiste des ETB MUST im Ruhezustand (leerer Entwurf, keine Felder
-gesetzt, Menüs geschlossen) höchstens die Hälfte der Fensterhöhe belegen. Das gilt auf
-Handschirm, Führungs-Tablet und Fükw in allen drei Dichtestufen. Das Textfeld MUST auf dem
-Handschirm die volle Breite der Leiste nutzen. Die Leiste MUST dabei weder waagerecht
-überlaufen noch das Dokument waagerecht verbreitern.
+gesetzt, Menüs geschlossen) höchstens die Hälfte der Fensterhöhe belegen und schon ganz oben
+auf der Seite vollständig im Fenster stehen. Das gilt auf Handschirm, Führungs-Tablet und
+Fükw in allen drei Dichtestufen. Das Textfeld MUST auf dem Handschirm die volle Breite der
+Leiste nutzen. Gesetzte Felder MUST auf dem Handschirm die Höhe der Leiste nicht vergrößern:
+die Feldzeile rollt dort waagerecht, und der Weg zu weiteren Feldern bleibt sichtbar. Weder
+ein Fokus in der Leiste noch Tippen darin MUST die Seite rollen. Die Leiste MUST dabei weder
+waagerecht überlaufen noch das Dokument waagerecht verbreitern.
 
 #### Scenario: Handschirm im Handschuh-Betrieb
-- **WHEN** das ETB bei 390 × 844 in `handschuh` geöffnet ist
-- **THEN** ist die Erfassungsleiste höchstens 422 px hoch, das Textfeld ist so breit wie die Leiste abzüglich ihrer Polsterung, und das Dokument ist nicht breiter als 390 px
+- **WHEN** das ETB bei 390 × 844 in `handschuh` geöffnet ist und die Seite ganz oben steht
+- **THEN** ist die Erfassungsleiste höchstens 422 px hoch und steht vollständig im Fenster, das Textfeld ist so breit wie die Leiste abzüglich ihrer Polsterung, und das Dokument ist nicht breiter als 390 px
 
-#### Scenario: Gesetzte Felder brechen um statt zu verschieben
-- **WHEN** auf dem Handschirm drei Felder gesetzt werden und die Chip-Zeile dadurch umbricht
-- **THEN** bleiben die Einträge der Zeitachse an ihrer Stelle, und das Textfeld bleibt im sichtbaren Bereich
+#### Scenario: Drei gesetzte Felder
+- **WHEN** auf dem Handschirm im Handschuh-Betrieb ganz oben auf der Seite drei Felder gesetzt werden
+- **THEN** rollt die Seite nicht, die Einträge der Zeitachse bleiben an ihrer Stelle, die Leiste wächst um höchstens 2 px, steht vollständig im Fenster, und die Feldzeile rollt waagerecht
 
 ### Requirement: Das Zeitachsenband der Lagekarte lässt die Karte sichtbar
 

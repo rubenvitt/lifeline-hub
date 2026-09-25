@@ -1,7 +1,7 @@
 import { Alert, Button, Checkbox, Dropdown, Space, Tooltip, Typography } from 'antd';
 import { EyeOutlined, PlusOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router';
 import type { NeuerEintrag } from '../api/etb';
 import type {
@@ -94,6 +94,38 @@ export function nurUebernahme(
   return { von: quelle.von, an: quelle.an, meldeweg: quelle.meldeweg };
 }
 
+/**
+ * Rollt eine waagerecht rollende Zeile so, dass `ziel` darin ganz sichtbar ist — NUR
+ * waagerecht, nie das Dokument (LFH-373). Die Chip-Eingabe fokussiert mit `preventScroll`
+ * (`MetaChip`); in der einzeiligen Chip-Zeile unter `md` stünde ein neuer Chip sonst hinter
+ * dem rechten Rand. `scrollIntoView` wäre hier falsch: es rollte auch die Seite.
+ */
+export function rolleWaagerechtInsBild(zeile: HTMLElement, ziel: Element): void {
+  const z = zeile.getBoundingClientRect();
+  const r = ziel.getBoundingClientRect();
+  if (r.right > z.right) zeile.scrollLeft += r.right - z.right;
+  else if (r.left < z.left) zeile.scrollLeft -= z.left - r.left;
+}
+
+/**
+ * Die Chip-Zeile unter der Eingabe (gesetzte Felder, „Feld", „Werte behalten").
+ *
+ * Unter `md` EINZEILIG mit waagerechtem Bildlauf (LFH-373, Vorbild `standLeisteStil` der
+ * Zeitachse): gemessen kostete sonst im Handschuh-Betrieb jeder gesetzte Chip eine eigene
+ * Reihe (+81 px), bei drei Chips belegte die angepinnte Leiste 578 von 844 px. Die Leistenhöhe
+ * hängt damit nicht mehr an der Zahl der Felder. Rein und exportiert, prüfbar ohne Layout.
+ */
+export function chipZeileStil(schmal: boolean, token: { marginXS: number }): CSSProperties {
+  return {
+    display: 'flex',
+    flexWrap: schmal ? 'nowrap' : 'wrap',
+    alignItems: 'center',
+    gap: token.marginXS,
+    marginTop: token.marginXS,
+    ...(schmal ? { overflowX: 'auto', minWidth: 0 } : {}),
+  };
+}
+
 export default function Schnellerfassung({
   erfassen,
   berichtigungZu,
@@ -111,6 +143,7 @@ export default function Schnellerfassung({
   // blieb es gemessen auf 158 von 366 px, und die angepinnte Leiste wuchs auf 59 % des Fensters.
   const { istSchmal } = useViewport();
   const [vorschauOffen, setVorschauOffen] = useState(false);
+  const chipZeileRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<TextAreaRef>(null);
   const menuRef = useRef<SlashMenuHandle>(null);
   const feldKnopfRef = useRef<HTMLButtonElement>(null);
@@ -127,6 +160,16 @@ export default function Schnellerfassung({
         : {}),
   );
   const [editFeld, setEditFeld] = useState<MetaFeld | null>(null);
+  // Einzeilige Chip-Zeile unter `md` (LFH-373): den gerade bearbeiteten Chip waagerecht ins
+  // Bild holen. Die Eingabe hat sich beim Einhängen schon selbst fokussiert (`MetaChip`).
+  // Ist kein Chip in Bearbeitung, steht die Zeile wieder am Anfang, wo „Feld" wartet.
+  useEffect(() => {
+    const zeile = chipZeileRef.current;
+    if (!istSchmal || !zeile) return;
+    const ziel = document.activeElement;
+    if (editFeld == null) zeile.scrollLeft = 0;
+    else if (ziel && zeile.contains(ziel)) rolleWaagerechtInsBild(zeile, ziel);
+  }, [editFeld, istSchmal]);
   const [sendet, setSendet] = useState(false);
 
   const [menuOffen, setMenuOffen] = useState(false);
@@ -396,6 +439,27 @@ export default function Schnellerfassung({
   const einheitenTreffer =
     menuModus === 'at' ? filterAtEintraege(menuFilter, funkrufnamen, typ) : null;
 
+  const feldKnopf = (
+    <Button
+      ref={feldKnopfRef}
+      type="dashed"
+      icon={
+        <span aria-hidden="true" style={{ display: 'inline-flex' }}>
+          <PlusOutlined />
+        </span>
+      }
+      onClick={() => {
+        setMenuFilter('');
+        setTriggerStart(-1);
+        setMenuModus('slash');
+        setTypenAnbieten(false);
+        setMenuOffen((o) => !o);
+      }}
+    >
+      Feld
+    </Button>
+  );
+
   return (
     // `etb-erfassung-card` trägt keine CSS-Regel mehr (den Rahmen zeichnet die
     // Schnellerfassungszeile), bleibt aber stehen: `e2e/seitenrinne.spec.ts` misst an ihr,
@@ -474,16 +538,14 @@ export default function Schnellerfassung({
           die EINSTELLUNG „Werte behalten". Sie steht nicht neben „Erfassen" (die Aktion
           wohnt in der Zeile darüber) und nicht zwischen Aktionen; ein Umschalter in einer
           Knopfreihe gilt als wirkungslos (30.07.2026, `components/Erfassung.tsx`). */}
-      <div
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          gap: token.marginXS,
-          marginTop: token.marginXS,
-        }}
-      >
-        <Space wrap>
+      <div ref={chipZeileRef} style={chipZeileStil(istSchmal, token)}>
+        {/* `flexShrink: 0` unter `md`: als Flex-Kind der einzeiligen Zeile schrumpfte die Gruppe
+            sonst auf die Zeilenbreite, und die Chips brachen ihren Text IN sich um — gemessen
+            wuchs die Leiste mit drei Chips von 373 auf 531 px, trotz einzeiliger Zeile. */}
+        <Space wrap={!istSchmal} style={istSchmal ? { flexShrink: 0 } : undefined}>
+          {/* Unter `md` steht „Feld" VORN (LFH-373): in der einzeilig rollenden Zeile rutschte
+              er sonst hinter die gesetzten Chips aus dem Bild. */}
+          {istSchmal && feldKnopf}
           {gesetzteFelder.map((feld) => (
             <MetaChip
               key={`${feld}-${editFeld === feld ? 'edit' : 'view'}`}
@@ -516,24 +578,7 @@ export default function Schnellerfassung({
               onEdit={() => {}}
             />
           )}
-          <Button
-            ref={feldKnopfRef}
-            type="dashed"
-            icon={
-              <span aria-hidden="true" style={{ display: 'inline-flex' }}>
-                <PlusOutlined />
-              </span>
-            }
-            onClick={() => {
-              setMenuFilter('');
-              setTriggerStart(-1);
-              setMenuModus('slash');
-              setTypenAnbieten(false);
-              setMenuOffen((o) => !o);
-            }}
-          >
-            Feld
-          </Button>
+          {!istSchmal && feldKnopf}
           {!berichtigungZu && typ === 'lage' && (
             <Button type="link" onClick={() => navigate(`/einsaetze/${einsatz.id}/lageberichte`)}>
               Als strukturierten Lagebericht erfassen →
@@ -541,7 +586,7 @@ export default function Schnellerfassung({
           )}
         </Space>
         {zeigeSchalter && (
-          <div style={{ marginInlineStart: 'auto' }}>
+          <div style={{ marginInlineStart: 'auto', flexShrink: 0 }}>
             <Tooltip title={UEBERNAHME_ERKLAERUNG}>
               <Checkbox
                 checked={werteBehalten}

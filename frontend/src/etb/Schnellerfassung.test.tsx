@@ -9,7 +9,7 @@ import type { EinsatzAnzeige, EtbBaustein, EtbEintragAnzeige } from '../api/type
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import MarkdownEditor, { type TextAreaRef } from '../components/MarkdownEditor';
-import Schnellerfassung from './Schnellerfassung';
+import Schnellerfassung, { chipZeileStil, rolleWaagerechtInsBild } from './Schnellerfassung';
 import type { EntwurfWerte } from './entwuerfe/entwurfModell';
 
 // Die Schnellerfassung lädt über useFunkrufnamen immer /fahrzeuge + /einheiten.
@@ -744,5 +744,35 @@ describe('Schnellerfassung – Befehlszeile (Neuentwurf S4)', () => {
     expect(zeile).toHaveTextContent('/zeit ⧖ Nachtrag');
     // Kein „# Koordinate": dafür gibt es keinen Weg in den Eintrag.
     expect(zeile).not.toHaveTextContent('Koordinate');
+  });
+});
+
+describe('Schnellerfassung — Chip-Zeile auf dem Handschirm (LFH-373)', () => {
+  /**
+   * Gemessen vorher: im Handschuh-Betrieb bei 390 px kostete jeder gesetzte Chip eine eigene
+   * Reihe (+81 px), bei drei Chips belegte die angepinnte Leiste 578 von 844 px. Unter `md`
+   * rollt die Zeile deshalb waagerecht; die Pixel misst `e2e/leisten-flaeche.spec.ts`.
+   */
+  it('unter md einzeilig mit waagerechtem Bildlauf, sonst umbrechend', () => {
+    expect(chipZeileStil(true, { marginXS: 4 })).toMatchObject({
+      flexWrap: 'nowrap',
+      overflowX: 'auto',
+      minWidth: 0,
+    });
+    const breit = chipZeileStil(false, { marginXS: 4 });
+    expect(breit.flexWrap).toBe('wrap');
+    expect(breit.overflowX).toBeUndefined();
+  });
+
+  it('holt einen Chip hinter dem rechten Rand waagerecht ins Bild, ohne das Dokument zu rollen', () => {
+    const zeile = document.createElement('div');
+    const ziel = document.createElement('input');
+    zeile.getBoundingClientRect = () => ({ left: 0, right: 300 }) as DOMRect;
+    ziel.getBoundingClientRect = () => ({ left: 280, right: 440 }) as DOMRect;
+    const rollen = vi.spyOn(window, 'scrollTo');
+    rolleWaagerechtInsBild(zeile, ziel);
+    expect(zeile.scrollLeft).toBe(140);
+    expect(rollen).not.toHaveBeenCalled();
+    rollen.mockRestore();
   });
 });

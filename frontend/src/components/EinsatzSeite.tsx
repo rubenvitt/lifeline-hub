@@ -165,6 +165,15 @@ interface EinsatzSeiteProps {
   breite?: SeitenBreite;
   /** Arbeitsfläche bis zum Fensterende; children folgen darunter im Dokumentfluss. */
   fensterInhalt?: { inhalt: ReactNode; mindestHoehe?: number };
+  /**
+   * Angepinnter Seitenfuß (LFH-373). Steht als LETZTES Kind der Seitenwurzel, hinter dem
+   * Inhalt und nicht darin: ein `position: sticky; bottom: 0` kann nie über die Oberkante
+   * seines Elternblocks steigen. Im Inhalt hing die ETB-Erfassung bei 390 px im
+   * Handschuh-Betrieb unter einem 489 px hohen Kopf fest und ragte ganz oben auf der Seite
+   * 61 px unter das Fenster; als Kind der Wurzel beginnt ihr Elternblock mit dem Seitenkopf.
+   * Die Polsterung trägt der Fuß selbst (die Wurzel hat keine).
+   */
+  fuss?: ReactNode;
   children: ReactNode;
 }
 
@@ -216,6 +225,7 @@ export default function EinsatzSeite({
   dataUpdatedAt,
   breite = 'voll',
   fensterInhalt,
+  fuss,
   children,
 }: EinsatzSeiteProps) {
   const { token } = theme.useToken();
@@ -343,6 +353,7 @@ export default function EinsatzSeite({
       <div data-lfh="seiten-inhalt" style={koerperStil}>
         {children}
       </div>
+      {fuss}
     </div>
   );
 }
