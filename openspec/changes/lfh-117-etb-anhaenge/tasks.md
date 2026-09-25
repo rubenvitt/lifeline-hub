@@ -8,15 +8,15 @@ darauf auf, Gruppe 9 schließt ab.
 
 ## 1. Datenbank
 
-- [ ] 1.1 `git fetch`, dann die nächste freie Nummer mit `scripts/check-migrationen.sh` gegen `origin/alpha` ermitteln (heute 0121). Migration `<nr>_etb_eintrag_anhang.sql` nach design.md D1 anlegen: beide FKs `ON DELETE CASCADE`, `anhang_id UNIQUE`, `PRIMARY KEY (eintrag_id, anhang_id)`, Kopfkommentar „dritter Linker auf `anhang`“ mit Begründung für CASCADE. Verifiziert durch `scripts/check-migrationen.sh` grün und `cargo test --lib db` (`migrationsnummern_sind_eindeutig`)
-- [ ] 1.2 Schwärzungsregel: roter Guard zuerst (`jede_einsatz_scoped_spalte_ist_klassifiziert` bzw. der CASCADE-Hüllen-Guard wird mit der neuen Tabelle rot), dann `TabellenRegel` für `etb_eintrag_anhang` (`UeberParent { fk: "eintrag_id", parent: "etb_eintrag" }`, `retain` G_FK für beide Spalten, Kommentar nach dem Muster von `chat_nachricht_anhang`). Verifiziert durch den grünen Guard
+- [x] 1.1 `git fetch`, dann die nächste freie Nummer mit `scripts/check-migrationen.sh` gegen `origin/alpha` ermitteln (heute 0121). Migration `<nr>_etb_eintrag_anhang.sql` nach design.md D1 anlegen: beide FKs `ON DELETE CASCADE`, `anhang_id UNIQUE`, `PRIMARY KEY (eintrag_id, anhang_id)`, Kopfkommentar „dritter Linker auf `anhang`“ mit Begründung für CASCADE. Verifiziert durch `scripts/check-migrationen.sh` grün und `cargo test --lib db` (`migrationsnummern_sind_eindeutig`). *Umgesetzt als `0124`: der offene PR zu LFH-22 belegt `0123`.*
+- [x] 1.2 Schwärzungsregel: roter Guard zuerst (`jede_einsatz_scoped_spalte_ist_klassifiziert` bzw. der CASCADE-Hüllen-Guard wird mit der neuen Tabelle rot), dann `TabellenRegel` für `etb_eintrag_anhang` (`UeberParent { fk: "eintrag_id", parent: "etb_eintrag" }`, `retain` G_FK für beide Spalten, Kommentar nach dem Muster von `chat_nachricht_anhang`). Verifiziert durch den grünen Guard
 
 ## 2. Anhang-Unterbau: dritter Linker
 
-- [ ] 2.1 TDD in `src/anhang/repo.rs`: `linker_stand` zählt `etb_gesamt`. Ein ETB-gebundener Anhang liefert `ist_etb()` und `generischer_download_gesperrt()`, ein freier nicht. Die bestehenden `LinkerStand`-Literale (`generischer_download_gesperrt_folgt_dem_chat_tombstone`) bekommen das Feld, dazu ein Fall „ETB + lebender Chat → gesperrt“. Verifiziert durch die Repo-Tests
-- [ ] 2.2 TDD: `sweep_verwaiste_haelt_etb_gebundene_anhaenge` (alter ETB-gebundener Anhang bleibt, gleich alter freier geht). Dann das dritte `NOT EXISTS` und die Doku-Zeile „Jeder Linker gehört in dieses NOT EXISTS“ auf drei Linker gebracht. Verifiziert durch den Test, der ohne das `NOT EXISTS` rot ist
-- [ ] 2.3 TDD: `loeschen_verweigert_etb_gebundene_anhaenge` (NotFound, Datei und Verknüpfung bleiben, ein freier Anhang desselben Einsatzes wird gelöscht). Dann das zweite `NOT EXISTS` in `repo::loeschen`. Verifiziert durch den Test
-- [ ] 2.4 Geteilten Multipart-Helfer aus `routes/anhang.rs::hochladen` nach `src/anhang/` ziehen (Allowlist als Parameter, Verhalten unverändert). Verifiziert dadurch, dass die bestehenden Upload-Tests in `tests/anhang.rs` ohne Änderung grün bleiben
+- [x] 2.1 TDD in `src/anhang/repo.rs`: `linker_stand` zählt `etb_gesamt`. Ein ETB-gebundener Anhang liefert `ist_etb()` und `generischer_download_gesperrt()`, ein freier nicht. Die bestehenden `LinkerStand`-Literale (`generischer_download_gesperrt_folgt_dem_chat_tombstone`) bekommen das Feld, dazu ein Fall „ETB + lebender Chat → gesperrt“. Verifiziert durch die Repo-Tests
+- [x] 2.2 TDD: `sweep_verwaiste_haelt_etb_gebundene_anhaenge` (alter ETB-gebundener Anhang bleibt, gleich alter freier geht). Dann das dritte `NOT EXISTS` und die Doku-Zeile „Jeder Linker gehört in dieses NOT EXISTS“ auf drei Linker gebracht. Verifiziert durch den Test, der ohne das `NOT EXISTS` rot ist
+- [x] 2.3 TDD: `loeschen_verweigert_etb_gebundene_anhaenge` (NotFound, Datei und Verknüpfung bleiben, ein freier Anhang desselben Einsatzes wird gelöscht). Dann das zweite `NOT EXISTS` in `repo::loeschen`. Verifiziert durch den Test
+- [x] 2.4 Geteilten Multipart-Helfer aus `routes/anhang.rs::hochladen` nach `src/anhang/` ziehen (Allowlist als Parameter, Verhalten unverändert). Verifiziert dadurch, dass die bestehenden Upload-Tests in `tests/anhang.rs` ohne Änderung grün bleiben
 
 ## 3. Backend: Erfassen mit Anhängen
 

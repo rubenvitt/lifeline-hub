@@ -153,10 +153,15 @@ pub async fn gehoert_anhang_zu_einsatz(
 /// liefert `NotFound`, nicht 422: über DIESEN Pfad ist die Zeile nicht löschbar, und aus
 /// `rows_affected() == 0` ist „unbekannt" von „gebunden" nicht zu trennen, ohne eine zweite
 /// Abfrage, die das Rennen wieder öffnete. Im Rennfall antwortet die Route also 404.
+///
+/// **Dasselbe gilt für ETB-Anhänge** (LFH-117, zweites `NOT EXISTS`): sie sind bis zur
+/// Schwärzung unveränderlich wie der Eintrag; die CASCADE von `etb_eintrag_anhang` nähme
+/// sonst still die Verknüpfung mit, und der Eintrag verlöre seine Datei.
 pub async fn loeschen(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<(), AppError> {
     let betroffen = sqlx::query(
         "DELETE FROM anhang WHERE id = ? AND einsatz_id = ? \
-           AND NOT EXISTS (SELECT 1 FROM einsatz_dokument d WHERE d.anhang_id = anhang.id)",
+           AND NOT EXISTS (SELECT 1 FROM einsatz_dokument d WHERE d.anhang_id = anhang.id) \
+           AND NOT EXISTS (SELECT 1 FROM etb_eintrag_anhang l WHERE l.anhang_id = anhang.id)",
     )
     .bind(id)
     .bind(einsatz_id)
@@ -179,6 +184,8 @@ pub struct LinkerStand {
     pub chat_lebend: i64,
     /// Verknüpfungen über `einsatz_dokument` (0 oder 1, `anhang_id UNIQUE`), gelöscht oder nicht.
     pub dokument_gesamt: i64,
+    /// Verknüpfungen über `etb_eintrag_anhang` (0 oder 1, `anhang_id UNIQUE`, LFH-117).
+    pub etb_gesamt: i64,
 }
 
 impl LinkerStand {
@@ -187,47 +194,61 @@ impl LinkerStand {
         self.dokument_gesamt > 0
     }
 
+    /// Der Anhang gehört zu einem ETB-Eintrag (LFH-117) und ist bis zur Schwärzung
+    /// unveränderlich wie der Eintrag selbst.
+    pub fn ist_etb(&self) -> bool {
+        self.etb_gesamt > 0
+    }
+
     /// Ob der **generische** Download (`GET /anhaenge/{aid}`) gesperrt ist:
     /// (a) ein Dokument-Anhang ist nur über die modul-gegatete Dokument-Route ladbar —
     ///     die generische Route ist modul-los (`PFAD_KEY … None`) und wäre sonst ein Bypass
     ///     für ein ausgeblendetes Dokumente-Modul und für soft-gelöschte Dokumente;
     /// (b) Chat-Tombstone (LFH-116): an ≥ 1 Nachricht verknüpft und ALLE tragen den
-    ///     Tombstone. Ein verwaister Anhang (Upload→Senden) bleibt ladbar.
+    ///     Tombstone. Ein verwaister Anhang (Upload→Senden) bleibt ladbar;
+    /// (c) ein ETB-Anhang (LFH-117) ist nur über die ETB-Route ladbar — aus demselben Grund
+    ///     wie (a): sonst umginge die modul-lose Route das Modul-Gate „etb".
     pub fn generischer_download_gesperrt(&self) -> bool {
-        self.ist_dokument() || (self.chat_gesamt > 0 && self.chat_lebend == 0)
+        self.ist_dokument() || self.ist_etb() || (self.chat_gesamt > 0 && self.chat_lebend == 0)
     }
 }
 
 /// Aggregiert die Linker eines Anhangs. Ein unbekannter Anhang liefert lauter Nullen —
 /// die Existenz prüft der Aufrufer vorher (`gehoert_anhang_zu_einsatz`).
 pub async fn linker_stand(pool: &SqlitePool, anhang_id: i64) -> Result<LinkerStand, AppError> {
-    let (chat_gesamt, chat_lebend, dokument_gesamt): (i64, i64, i64) = sqlx::query_as(
-        "SELECT \
-           (SELECT COUNT(*) FROM chat_nachricht_anhang WHERE anhang_id = ?1), \
-           (SELECT COUNT(*) FROM chat_nachricht_anhang cna \
-              JOIN chat_nachricht n ON n.id = cna.nachricht_id \
-             WHERE cna.anhang_id = ?1 AND n.geloescht_at IS NULL), \
-           (SELECT COUNT(*) FROM einsatz_dokument WHERE anhang_id = ?1)",
-    )
-    .bind(anhang_id)
-    .fetch_one(pool)
-    .await?;
+    let (chat_gesamt, chat_lebend, dokument_gesamt, etb_gesamt): (i64, i64, i64, i64) =
+        sqlx::query_as(
+            "SELECT \
+               (SELECT COUNT(*) FROM chat_nachricht_anhang WHERE anhang_id = ?1), \
+               (SELECT COUNT(*) FROM chat_nachricht_anhang cna \
+                  JOIN chat_nachricht n ON n.id = cna.nachricht_id \
+                 WHERE cna.anhang_id = ?1 AND n.geloescht_at IS NULL), \
+               (SELECT COUNT(*) FROM einsatz_dokument WHERE anhang_id = ?1), \
+               (SELECT COUNT(*) FROM etb_eintrag_anhang WHERE anhang_id = ?1)",
+        )
+        .bind(anhang_id)
+        .fetch_one(pool)
+        .await?;
     Ok(LinkerStand {
         chat_gesamt,
         chat_lebend,
         dokument_gesamt,
+        etb_gesamt,
     })
 }
 
 /// Löscht „verwaiste" Anhänge — an KEINEN Linker gebunden (weder `chat_nachricht_anhang`
-/// noch `einsatz_dokument`), z. B. hochgeladen aber nie gesendet —, deren Upload länger als
+/// noch `einsatz_dokument` noch `etb_eintrag_anhang`), z. B. hochgeladen aber nie gesendet
+/// oder nie erfasst —, deren Upload länger als
 /// [`VERWAISTE_KARENZ_STUNDEN`] zurückliegt. Gegen monotones BLOB-Wachstum (LFH-250).
 /// Injiziertes `jetzt` = deterministisch testbar; der `WHERE`-Guard macht wiederholte Läufe
 /// idempotent. Liefert die Anzahl gelöschter Anhänge.
 ///
-/// **Jeder Linker gehört in dieses `NOT EXISTS`** (LFH-632 hat den zweiten ergänzt). Ein
-/// fehlender Linker macht keinen Fehler, sondern löscht dort gebundene Dateien nach der
-/// Karenz still — der Test `sweep_verwaiste_haelt_dokument_gebundene_anhaenge` pinnt das.
+/// **Jeder Linker gehört in dieses `NOT EXISTS`** — heute drei: Chat (LFH-102), Dokument
+/// (LFH-632), ETB (LFH-117). Ein fehlender Linker macht keinen Fehler, sondern löscht dort
+/// gebundene Dateien nach der Karenz still — die Tests
+/// `sweep_verwaiste_haelt_dokument_gebundene_anhaenge` und
+/// `sweep_verwaiste_haelt_etb_gebundene_anhaenge` pinnen das.
 /// Ein soft-gelöschtes Dokument ist bewusst KEIN Orphan (Beweissicherung, LFH-632 E1).
 pub async fn sweep_verwaiste(pool: &SqlitePool, jetzt: DateTime<Utc>) -> Result<u64, AppError> {
     let grenze = (jetzt - Duration::hours(VERWAISTE_KARENZ_STUNDEN))
@@ -239,7 +260,9 @@ pub async fn sweep_verwaiste(pool: &SqlitePool, jetzt: DateTime<Utc>) -> Result<
            AND NOT EXISTS \
                (SELECT 1 FROM chat_nachricht_anhang cna WHERE cna.anhang_id = anhang.id) \
            AND NOT EXISTS \
-               (SELECT 1 FROM einsatz_dokument d WHERE d.anhang_id = anhang.id)",
+               (SELECT 1 FROM einsatz_dokument d WHERE d.anhang_id = anhang.id) \
+           AND NOT EXISTS \
+               (SELECT 1 FROM etb_eintrag_anhang l WHERE l.anhang_id = anhang.id)",
     )
     .bind(grenze)
     .execute(pool)
@@ -515,11 +538,13 @@ mod tests {
             chat_gesamt: 2,
             chat_lebend: 0,
             dokument_gesamt: 0,
+            etb_gesamt: 0,
         };
         let einer_lebt = LinkerStand {
             chat_gesamt: 2,
             chat_lebend: 1,
             dokument_gesamt: 0,
+            etb_gesamt: 0,
         };
         // Dokument hat Vorrang: auch eine lebende Chat-Verknüpfung öffnet den generischen
         // Download nicht (LFH-632).
@@ -527,9 +552,110 @@ mod tests {
             chat_gesamt: 1,
             chat_lebend: 1,
             dokument_gesamt: 1,
+            etb_gesamt: 0,
+        };
+        // Dasselbe für das ETB (LFH-117): die Kreuzsperren verhindern den Zustand, aber die
+        // Sperre darf nicht davon abhängen, dass es sie gibt.
+        let etb_und_lebender_chat = LinkerStand {
+            chat_gesamt: 1,
+            chat_lebend: 1,
+            dokument_gesamt: 0,
+            etb_gesamt: 1,
         };
         assert!(nur_tot.generischer_download_gesperrt());
         assert!(!einer_lebt.generischer_download_gesperrt());
         assert!(dokument_und_lebender_chat.generischer_download_gesperrt());
+        assert!(etb_und_lebender_chat.generischer_download_gesperrt());
+    }
+
+    // --- LFH-117: `etb_eintrag_anhang` als dritter Linker ---
+
+    /// Hängt einen Anhang an einen frischen ETB-Eintrag (direkter INSERT).
+    async fn als_etb(pool: &SqlitePool, einsatz_id: i64, von: i64, anhang_id: i64) -> i64 {
+        let etb_id: i64 = sqlx::query_scalar(
+            "INSERT INTO etb_eintrag (einsatz_id, lfd_nr, typ, inhalt, erfasser_id, ereigniszeit) \
+             VALUES (?, (SELECT COALESCE(MAX(lfd_nr), 0) + 1 FROM etb_eintrag WHERE einsatz_id = ?), \
+                     'meldung', 'Foto der Schadenstelle', ?, datetime('now')) RETURNING id",
+        )
+        .bind(einsatz_id)
+        .bind(einsatz_id)
+        .bind(von)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        sqlx::query("INSERT INTO etb_eintrag_anhang (eintrag_id, anhang_id) VALUES (?, ?)")
+            .bind(etb_id)
+            .bind(anhang_id)
+            .execute(pool)
+            .await
+            .unwrap();
+        etb_id
+    }
+
+    #[tokio::test]
+    async fn linker_stand_zaehlt_den_etb_linker() {
+        let pool = crate::db::test_pool().await;
+        let (von, einsatz) = setup(&pool).await;
+        let frei = anhang_mit_zeit(&pool, einsatz, von, "a.jpg", "2026-01-01 00:00:00").await;
+        let etb = anhang_mit_zeit(&pool, einsatz, von, "b.jpg", "2026-01-01 00:00:00").await;
+        als_etb(&pool, einsatz, von, etb).await;
+
+        let s = linker_stand(&pool, frei).await.unwrap();
+        assert_eq!(s.etb_gesamt, 0);
+        assert!(!s.ist_etb());
+        assert!(!s.generischer_download_gesperrt());
+
+        let s = linker_stand(&pool, etb).await.unwrap();
+        assert_eq!(s.etb_gesamt, 1);
+        assert!(s.ist_etb());
+        assert!(
+            s.generischer_download_gesperrt(),
+            "ETB-Anhang nur über die ETB-Route ladbar"
+        );
+    }
+
+    #[tokio::test]
+    async fn sweep_verwaiste_haelt_etb_gebundene_anhaenge() {
+        let pool = crate::db::test_pool().await;
+        let (von, einsatz) = setup(&pool).await;
+        let etb = anhang_mit_zeit(&pool, einsatz, von, "foto.jpg", "2026-01-01 00:00:00").await;
+        let frei = anhang_mit_zeit(&pool, einsatz, von, "frei.jpg", "2026-01-01 00:00:00").await;
+        als_etb(&pool, einsatz, von, etb).await;
+
+        let geloescht = sweep_verwaiste(&pool, t("2026-06-16 00:00:00"))
+            .await
+            .unwrap();
+
+        assert_eq!(geloescht, 1, "nur der nie gebundene Anhang geht");
+        assert!(
+            anzeige_laden(&pool, etb).await.is_ok(),
+            "ein ETB-Anhang ist kein Orphan, gleich wie alt"
+        );
+        assert!(anzeige_laden(&pool, frei).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn loeschen_verweigert_etb_gebundene_anhaenge() {
+        let pool = crate::db::test_pool().await;
+        let (von, einsatz) = setup(&pool).await;
+        let frei = anhang_mit_zeit(&pool, einsatz, von, "a.jpg", "2026-01-01 00:00:00").await;
+        let etb = anhang_mit_zeit(&pool, einsatz, von, "b.jpg", "2026-01-01 00:00:00").await;
+        als_etb(&pool, einsatz, von, etb).await;
+
+        assert!(matches!(
+            loeschen(&pool, einsatz, etb).await.unwrap_err(),
+            AppError::NotFound
+        ));
+        assert!(anzeige_laden(&pool, etb).await.is_ok(), "ETB-Anhang bleibt");
+        let links: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM etb_eintrag_anhang WHERE anhang_id = ?")
+                .bind(etb)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(links, 1, "die Verknüpfung bleibt (keine CASCADE)");
+
+        loeschen(&pool, einsatz, frei).await.unwrap();
+        assert!(anzeige_laden(&pool, frei).await.is_err());
     }
 }

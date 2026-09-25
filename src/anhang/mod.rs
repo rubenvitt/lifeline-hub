@@ -107,6 +107,58 @@ pub fn ermittle_mime_aus(dateiname: &str, erlaubt: &[&str]) -> Result<String, Ap
     Ok(mime.to_string())
 }
 
+/// Liest alle Datei-Felder eines Multipart-Uploads, prüft je Feld Endung gegen `erlaubt`,
+/// Größe und Virenscan (scan-vor-persist) und legt jede Datei als ungebundenen Anhang des
+/// Einsatzes an. Felder ohne Dateiname werden übersprungen; kommt keine Datei an, ist das
+/// 400 „Keine Datei im Upload".
+///
+/// **Der eine Upload-Pfad für zwei Routen** (LFH-117): der generische Upload
+/// (`routes::anhang::hochladen`, [`ERLAUBTE_MIME`]) und der ETB-Upload
+/// (`routes::etb::anhang_hochladen`, [`ERLAUBTE_MIME_DOKUMENT`]) unterscheiden sich nur in
+/// den Gates davor und in der Allowlist. Eine kopierte Schleife wäre die Stelle, an der die
+/// beiden bei der nächsten Prüfung (Content-Sniffing) still auseinanderliefen.
+///
+/// Best-Effort pro Feld (vorbestehendes LFH-102-Muster, keine umschließende Transaktion):
+/// scheitert ein späteres Feld (MIME/Größe oder AV-Fund, LFH-114), bleiben die bereits
+/// persistierten sauberen BLOBs verwaist zurück. Bewusst toleriert — es landet KEIN
+/// gefundener Schadcode in der DB (scan-vor-persist pro Feld), und verwaiste Anhänge nimmt
+/// der Aufräumlauf nach der Karenz ([`repo::sweep_verwaiste`]). Atomarität (Tx über alle
+/// Felder) wäre ein eigener Task, nicht Teil von LFH-114.
+pub async fn hochladen_multipart(
+    pool: &sqlx::SqlitePool,
+    einsatz_id: i64,
+    hochgeladen_von: i64,
+    multipart: &mut axum::extract::Multipart,
+    erlaubt: &[&str],
+) -> Result<Vec<AnhangAnzeige>, AppError> {
+    let mut angelegt = Vec::new();
+    while let Some(feld) = multipart
+        .next_field()
+        .await
+        .map_err(|e| AppError::Validation(format!("Multipart-Fehler: {e}")))?
+    {
+        // Nur echte Datei-Felder (mit Dateiname) verarbeiten; sonstige überspringen.
+        let Some(dateiname) = feld.file_name().map(str::to_string) else {
+            continue;
+        };
+        let mime = ermittle_mime_aus(&dateiname, erlaubt)?;
+        let daten = feld
+            .bytes()
+            .await
+            .map_err(|e| AppError::Validation(format!("Datei lesen fehlgeschlagen: {e}")))?;
+        pruefe_groesse(daten.len())?;
+        // AV-Scan (LFH-114): scan-vor-persist gegen clamd (config-getrieben, Default
+        // fail-closed). Ohne konfigurierten clamd ein No-op.
+        scan(scan_config(), &daten).await?;
+        let a = repo::anlegen(pool, einsatz_id, hochgeladen_von, &dateiname, &mime, &daten).await?;
+        angelegt.push(a);
+    }
+    if angelegt.is_empty() {
+        return Err(AppError::Validation("Keine Datei im Upload".into()));
+    }
+    Ok(angelegt)
+}
+
 /// Baut einen sicheren `Content-Disposition`-Wert: reiner ASCII-Fallback plus
 /// RFC-5987 `filename*` mit prozent-kodiertem UTF-8, damit Dateinamen mit
 /// Umlauten korrekt ankommen, ohne dass `HeaderValue::from_str` scheitert.
