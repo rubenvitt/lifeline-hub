@@ -660,9 +660,10 @@ pub async fn schwaerze_einsatz(
         "PII-Schwärzung durchgeführt (Aufbewahrungsfrist + Karenz abgelaufen). \
          Direkte Personenidentifikatoren (Namen, Kontakt, Adresse, Meldebild/Einsatzort, \
          Foto-/Datei-Anhänge, personenbezogene Notizen, Schadens-/Lage-/Gefahren-Freitexte \
-         sowie Chat-Kanäle, Chat-Nachrichten und Erinnerungen) wurden unwiderruflich entfernt. \
-         Erhalten bleiben das operative Skelett (Einsatz-Struktur, Zähler/registrier_nr, \
-         operative Objekte), die Führungs-Dokumentation (ETB, Meldungen, Aufträge, \
+         sowie die Freitexte von Chat-Kanälen, Chat-Nachrichten und Erinnerungen) wurden \
+         unwiderruflich entfernt. Erhalten bleiben das operative Skelett (Einsatz-Struktur, \
+         Zähler/registrier_nr, operative Objekte, die Struktur von Chat und Erinnerungen mit \
+         Zeitpunkten, Verfassern und Status), die Führungs-Dokumentation (ETB, Meldungen, Aufträge, \
          Lage-/Befehlsberichte — im ETB rechtsverbindlich gesnapshottet; ins ETB oder in einen \
          Auftrag heraufgestufte Chat-Nachrichten stehen dort weiter im Wortlaut) und \
          anonymisierte Triage-/Statuskategorien (ohne Personenbezug) für die gesetzliche/ \
@@ -1392,6 +1393,29 @@ mod tests {
             (anhaenge, verknuepfungen),
             (0, 0),
             "Chat-Anhang samt Verknüpfung weg"
+        );
+
+        // Der Audit ist ein bleibender, rechtsverbindlicher ETB-Eintrag: er darf nur
+        // behaupten, was die Registry tut — die FREITEXTE gehen, die Datensätze bleiben.
+        let audit: String = sqlx::query_scalar(
+            "SELECT inhalt FROM etb_eintrag \
+             WHERE einsatz_id = ? AND inhalt LIKE 'PII-Schwärzung durchgeführt%'",
+        )
+        .bind(eid)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert!(
+            audit.contains("Freitexte von Chat-Kanälen, Chat-Nachrichten und Erinnerungen"),
+            "Audit nennt die Chat-/Erinnerungs-Freitexte als entfernt: {audit}"
+        );
+        assert!(
+            audit.contains("die Struktur von Chat und Erinnerungen"),
+            "Audit nennt die erhaltene Struktur: {audit}"
+        );
+        assert!(
+            !audit.contains("sowie Chat-Kanäle, Chat-Nachrichten und Erinnerungen)"),
+            "kein Overclaim, die Datensätze seien entfernt: {audit}"
         );
     }
 

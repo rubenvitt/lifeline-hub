@@ -1822,14 +1822,15 @@ mod tests {
 
     // ---------- GUARD 5 (LFH-291): FK-Kanten von außerhalb S nach S ----------
 
-    /// Begründete Ausnahmen zu GUARD 5, Format `(tabelle, grund)`: Tabellen AUSSERHALB von
-    /// S, deren FK-Kante nach S legitim ist, weil ihre Zeilen nicht einsatz-eigen sind und
-    /// deshalb NICHT geschwärzt werden (z. B. eine Stammdaten-Tabelle mit
-    /// `REFERENCES einsatz ON DELETE SET NULL`). Die Liste startet LEER, weil der Bestand
+    /// Begründete Ausnahmen zu GUARD 5, Format `(tabelle, spalte, grund)`: einzelne FK-Kanten
+    /// aus Tabellen AUSSERHALB von S nach S, die legitim sind, weil die Zeilen nicht
+    /// einsatz-eigen sind und deshalb NICHT geschwärzt werden (z. B. eine Stammdaten-Tabelle
+    /// mit `REFERENCES einsatz ON DELETE SET NULL`). Je KANTE, nicht je Tabelle: eine später
+    /// ergänzte zweite Kante derselben Tabelle nach S muss eigens begründet werden. Die Liste startet LEER, weil der Bestand
     /// keine einzige solche Kante hat (gemessen über alle Migrationen). Ein Eintrag ohne
     /// Querkante gilt selbst als Verstoß (`guard5_allowlist_hat_keine_toten_eintraege`),
     /// sonst veraltet die Liste still.
-    const FREMDKANTEN_ALLOWLIST: &[(&str, &str)] = &[];
+    const FREMDKANTEN_ALLOWLIST: &[(&str, &str, &str)] = &[];
 
     /// Eine FK-Kante aus einer Tabelle außerhalb von S auf eine Tabelle in S.
     #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -1842,19 +1843,22 @@ mod tests {
 
     /// Befund für GUARD 5 (reine Funktion über das Schema): jede FK-Kante aus einer
     /// Tabelle AUSSERHALB von `s` auf eine Tabelle IN `s` — unabhängig von `on_delete`
-    /// (`SET NULL`, `NO ACTION`, `RESTRICT`, …), abzüglich der Tabellen auf `allowlist`.
+    /// (`SET NULL`, `NO ACTION`, `RESTRICT`, …), abzüglich der Kanten auf `allowlist`.
     async fn fremde_fk_auf_scoped(
         pool: &SqlitePool,
         s: &BTreeSet<String>,
-        allowlist: &[(&str, &str)],
+        allowlist: &[(&str, &str, &str)],
     ) -> Vec<FremdKante> {
         let mut befund: Vec<FremdKante> = Vec::new();
         for t in alle_tabellen(pool).await {
-            if s.contains(&t) || allowlist.iter().any(|(erlaubt, _)| *erlaubt == t) {
+            if s.contains(&t) {
                 continue;
             }
             for (spalte, parent, on_delete) in fk_kanten_von(pool, &t).await {
-                if s.contains(&parent) {
+                let begruendet = allowlist
+                    .iter()
+                    .any(|(tabelle, sp, _)| *tabelle == t && *sp == spalte);
+                if s.contains(&parent) && !begruendet {
                     befund.push(FremdKante {
                         tabelle: t.clone(),
                         spalte,
@@ -1887,16 +1891,21 @@ mod tests {
             .collect()
     }
 
-    /// Allowlist-Einträge, die im UNGEFILTERTEN Befund keine Querkante haben (tot).
+    /// Allowlist-Einträge, deren `(tabelle, spalte)` im UNGEFILTERTEN Befund keine
+    /// Querkante hat (tot).
     /// Gegen den ungefilterten Befund, sonst sähe jeder wirksame Eintrag tot aus.
     fn tote_allowlist_eintraege<'a>(
         ungefiltert: &[FremdKante],
-        allowlist: &[(&'a str, &'a str)],
-    ) -> Vec<&'a str> {
+        allowlist: &[(&'a str, &'a str, &'a str)],
+    ) -> Vec<(&'a str, &'a str)> {
         allowlist
             .iter()
-            .filter(|(tabelle, _)| !ungefiltert.iter().any(|k| k.tabelle == *tabelle))
-            .map(|(tabelle, _)| *tabelle)
+            .filter(|(tabelle, spalte, _)| {
+                !ungefiltert
+                    .iter()
+                    .any(|k| k.tabelle == *tabelle && k.spalte == *spalte)
+            })
+            .map(|(tabelle, spalte, _)| (*tabelle, *spalte))
             .collect()
     }
 
@@ -1916,8 +1925,8 @@ mod tests {
              dieser Tabellen hängen an einem Einsatz, liegen aber nicht in S und würden \
              NICHT geschwärzt. Auswege: (1) eine einsatz_id-Spalte ergänzen, (2) den FK auf \
              ON DELETE CASCADE umstellen (dann entdeckt die Hülle die Tabelle, GUARD 1/3 \
-             verlangen die Klassifikation) oder (3) die Tabelle mit Begründung auf \
-             FREMDKANTEN_ALLOWLIST setzen (nicht einsatz-eigen, wird nicht geschwärzt):\n{}",
+             verlangen die Klassifikation) oder (3) die Kante mit Begründung auf \
+             FREMDKANTEN_ALLOWLIST setzen, je Kante (nicht einsatz-eigen, wird nicht geschwärzt):\n{}",
             befund.len(),
             befund
                 .iter()
@@ -2011,26 +2020,71 @@ mod tests {
         assert_eq!(befund, erwartet, "genau die zwei Lecks, keine Kontrolle");
     }
 
-    /// Allowlist filtert ihre Tabelle aus dem Befund; ein Eintrag ohne Querkante ist tot.
+    /// Die Allowlist filtert je KANTE, nicht je Tabelle: eine später ergänzte zweite
+    /// Kante derselben Tabelle nach S bleibt sichtbar. Ein Eintrag ohne passende
+    /// Querkante (fremde Tabelle oder falsche Spalte) ist tot.
     #[tokio::test]
-    async fn guard5_allowlist_filtert_und_toter_eintrag_wird_gemeldet_synthetisch() {
+    async fn guard5_allowlist_filtert_je_kante_und_toter_eintrag_wird_gemeldet_synthetisch() {
         let pool = crate::db::test_pool().await;
         lege_fremdkanten_sonden_an(&pool).await;
+        // Zwei Kanten nach S an EINER Tabelle: nur die erste ist begründet.
+        sqlx::query(
+            "CREATE TABLE lfh291_sonde_zwei_kanten (
+                 id INTEGER PRIMARY KEY,
+                 platz_id INTEGER REFERENCES uhs_platz(id) ON DELETE SET NULL,
+                 person_id INTEGER REFERENCES einsatz_person(id) ON DELETE SET NULL,
+                 freitext TEXT
+             )",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
         let s = entdecke_einsatz_scoped(&pool).await;
-        let allowlist: &[(&str, &str)] = &[
-            ("lfh291_sonde_set_null", "Sonde: begründete Ausnahme"),
-            ("lfh291_sonde_extern", "Sonde: hat keine Kante nach S"),
+        let allowlist: &[(&str, &str, &str)] = &[
+            (
+                "lfh291_sonde_set_null",
+                "platz_id",
+                "Sonde: begründete Ausnahme",
+            ),
+            (
+                "lfh291_sonde_zwei_kanten",
+                "platz_id",
+                "Sonde: nur diese Kante",
+            ),
+            (
+                "lfh291_sonde_extern",
+                "benutzer_id",
+                "Sonde: hat keine Kante nach S",
+            ),
+            (
+                "lfh291_sonde_no_action",
+                "gibt_es_nicht",
+                "Sonde: falsche Spalte",
+            ),
         ];
 
         let gefiltert = fremde_fk_auf_scoped(&pool, &s, allowlist).await;
-        let tabellen: Vec<&str> = gefiltert.iter().map(|k| k.tabelle.as_str()).collect();
-        assert_eq!(tabellen, vec!["lfh291_sonde_no_action"]);
+        let kanten: Vec<(&str, &str)> = gefiltert
+            .iter()
+            .map(|k| (k.tabelle.as_str(), k.spalte.as_str()))
+            .collect();
+        assert_eq!(
+            kanten,
+            vec![
+                ("lfh291_sonde_no_action", "person_id"),
+                ("lfh291_sonde_zwei_kanten", "person_id"),
+            ],
+            "die unbegründete zweite Kante derselben Tabelle bleibt gemeldet"
+        );
 
         let ungefiltert = fremde_fk_auf_scoped(&pool, &s, &[]).await;
         assert_eq!(
             tote_allowlist_eintraege(&ungefiltert, allowlist),
-            vec!["lfh291_sonde_extern"],
-            "der Eintrag mit Querkante ist lebendig, der ohne tot"
+            vec![
+                ("lfh291_sonde_extern", "benutzer_id"),
+                ("lfh291_sonde_no_action", "gibt_es_nicht"),
+            ],
+            "Einträge mit passender Querkante leben, die übrigen sind tot"
         );
     }
 
