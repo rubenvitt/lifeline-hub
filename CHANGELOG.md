@@ -1,3 +1,59 @@
+## [1.0.0-alpha.48](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.47...v1.0.0-alpha.48) (2026-09-25)
+
+### Wichtige Änderungen
+
+- **Neue Datenbanktabellen**: Mit diesem Release werden neue Datenbanktabellen für das Organisationslogo (`org_logo`) und für Anhänge im Einsatztagebuch (`etb_eintrag_anhang`) eingeführt. Die Datenbankmigrationen werden beim ersten Start automatisch ausgeführt.
+
+### Einsatztagebuch
+
+- **Fotos und Dokumente anhängen**: Einsatztagebuch-Einträge können jetzt mit bis zu 10 Dateien (Fotos, PDFs, Office-Dokumente) versehen werden. Die Dateien werden direkt beim Erfassen hochgeladen und erscheinen in der Zeitachse mit Download-Link.
+
+- **Druckansicht**: Das Einsatztagebuch kann jetzt über einen neuen "Drucken / als PDF"-Link ausgedruckt werden. Die Druckansicht zeigt alle Einträge der aktuellen Filterauswahl in einer übersichtlichen Tabelle mit Organisationslogo und Druckkopf. Berichtigungen werden in beide Richtungen dargestellt.
+
+- **Verbesserte Offline-Unterstützung**: Während eines laufenden Hochladevorgangs bleibt die Erfassung gesperrt, auch wenn zwischen Tabs gewechselt wird. Ohne Internetverbindung ist die Anhang-Funktion deaktiviert, Texteinträge können weiterhin erfasst werden.
+
+- **Datenschutz bei Anhängen**: Hochgeladene Dateien, die noch nicht an einen Eintrag gebunden sind, können nur von der Person eingesehen werden, die sie hochgeladen hat.
+
+### Lagekarte
+
+- **Bessere Bedienbarkeit auf kleinen Bildschirmen**: Die Zeitachse nutzt den verfügbaren Platz besser aus und verdeckt keine Kartenknöpfe mehr. Beim Durchblättern mit der Tastatur werden fokussierte Elemente nicht mehr von der Zeitachse überlagert.
+
+### Kräfte und Mittel
+
+- **Verbesserte Druckdarstellung**: Die Tabellenkopfzeile wird jetzt beim Ausdruck auf jeder Seite wiederholt. Der Seitenkopf wurde entfernt, um Dopplungen mit dem Druckkopf zu vermeiden.
+
+### Führung und Dokumentation
+
+- **Überarbeiteter Druck für alle Browser**: Lageberichte, Befehle und das Meldebild drucken jetzt in Firefox, Safari und Chromium korrekt über mehrere Seiten. Die Druckausgabe erfolgt direkt über den Browser, nicht mehr über den Server.
+
+- **Lagebericht-Entwurf vollständig druckbar**: Auch wenn die Vorschau nicht eingeschaltet ist, wird der Lagebericht-Entwurf jetzt vollständig als formatierter Text gedruckt, nicht mehr als Rohtext-Eingabefeld.
+
+- **Gemeinsamer Druckkopf**: Alle Druckstücke zeigen jetzt einen einheitlichen Kopf mit Organisationslogo, Dokumentart, Einsatznummer, Ersteller und Druckzeitpunkt in der eingestellten Zeitzone.
+
+- **Drucken erst mit vollständigen Daten**: Der Druckdialog öffnet sich erst, wenn alle benötigten Daten (z.B. Organisationsname) geladen sind. Bei Ladefehlern bleibt der Druckknopf gesperrt und zeigt den Grund an.
+
+### Verwaltung
+
+- **Organisationsname und Logo**: In der Verwaltung unter "Organisation" können Administratoren jetzt den Namen der Organisation ändern und ein Logo (PNG oder JPEG, maximal 1 MB) hochladen. Das Logo erscheint auf allen Druckstücken neben dem Organisationsnamen.
+
+### Bedienung und Barrierefreiheit
+
+- **Verbesserte Touch-Bedienung auf Mobilgeräten**: Die Erfassungsleiste im Einsatztagebuch nutzt auf Smartphones den Platz besser aus und belegt höchstens die halbe Bildschirmhöhe. Metadatenfelder lassen sich jetzt waagerecht durchscrollen, statt untereinander zu stapeln.
+
+- **Fokusführung optimiert**: Beim Durchblättern mit der Tastatur werden fokussierte Elemente nicht mehr von angepinnten Leisten oder fixierten Spalten überdeckt. Dies betrifft Einsatztagebuch, Gefahrenmatrix und Befehlsseite.
+
+- **Ruhigeres Laden**: Spät eintreffende Daten verschieben bereits angezeigte Inhalte nicht mehr (Cumulative Layout Shift reduziert). Das betrifft insbesondere das Einsatztagebuch, die Lagekarte und die Einsatzauswahl.
+
+### Fehlerbehebungen
+
+- **Stabile Namensänderung**: Nach dem Speichern des Organisationsnamens wird der neue Name sofort angezeigt, auch wenn die Bestätigung vom Server verzögert eintrifft oder fehlschlägt.
+
+- **Druckkopf präzisiert**: Der Druckkopf zeigt jetzt "Gedruckt von" statt "Erstellt von", um klarzustellen, dass die druckende Person gemeint ist, nicht die Urheberschaft des Dokuments.
+
+- **Schutz vor Datenverlust**: Im Einsatztagebuch werden eingetippte Texte und gewählte Dateien nicht mehr stillschweigend verworfen, wenn während eines Hochladevorgangs Änderungen vorgenommen oder zwischen Tabs gewechselt wird. Bei widersprüchlichen Einträgen (z.B. zwei Browser-Tabs mit demselben Entwurf) erhält der zweite Tab eine klare Fehlermeldung statt eines unerwarteten Verhaltens.
+
+- **Konfigurationstests robuster**: Ein seltener Fehler, bei dem Konfigurationstests in der Entwicklung das gesamte Test-Binary beendeten, wurde behoben.
+
 ## [1.0.0-alpha.47](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.46...v1.0.0-alpha.47) (2026-09-25)
 
 ### Wichtige Änderungen

@@ -1966,7 +1966,7 @@ dependencies = [
 
 [[package]]
 name = "lifeline-hub"
-version = "1.0.0-alpha.47"
+version = "1.0.0-alpha.48"
 dependencies = [
  "anyhow",
  "argon2",
