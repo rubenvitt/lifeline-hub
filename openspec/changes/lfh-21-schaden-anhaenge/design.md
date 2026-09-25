@@ -442,15 +442,23 @@ Lücke der Bestandsrouten ist ein **Nebenbefund** (Folgeticket), nicht Teil dies
 - **Zeile:** Download-Anker (Dateiname, Größe über `karten/formatGroesse`,
   `abgelegt von · Zeit`) als nativer `<a href download>` auf die modulgebundene Route — der
   Anker wird aus `DokumentePage` (`DownloadAnker`) in ein geteiltes
-  `components/DownloadAnker.tsx` gehoben, mit `minHeight: controlHeight` und `padding` über
-  eine reine, exportierte Stilfunktion (handgebautes Bedienziel, zwei Angaben nach
-  LFH-365). Der zugängliche Name trägt die Zeilenkennung („dach.jpg, 2,0 MB, Datei von
-  Schaden S-003 herunterladen“), wie `EtbAnhaenge` es für Einträge tut. `EtbAnhaenge`
+  `components/DownloadAnker.tsx` gehoben, mit `minHeight: controlHeight` und Polsterung über
+  eine reine, exportierte Stilfunktion (`downloadAnkerStil`; handgebautes Bedienziel, zwei
+  Angaben nach LFH-365). **Bewusste Abweichung von der LFH-365-Regel** („padding aus
+  `paddingSM`/`padding`“): die Polsterung ist `paddingXS` und nur `paddingBlock` — der Anker
+  steht in Tabellenzellen und Listenzeilen, die selbst polstern; `paddingSM` höbe jede Zeile
+  im Fükw über die Staffel. Den Boden trägt `minHeight`, die Polsterung zieht mit der Dichte
+  mit (Stiltest mit Literalen). **Farben aus den Rollen** statt antds Linkfarbe: Name
+  `bedienText` (LFH-650), Größe und Zusatzzeile `text2`; das gilt auch für die
+  Dokumentenablage, die denselben Anker nutzt. Der zugängliche Name trägt die Zeilenkennung
+  („dach.jpg, 2,0 MB, Datei von Schaden S-003 herunterladen“), wie `EtbAnhaenge` es für
+  Einträge tut; die Zusatzzeile (wer, wann) bleibt über `aria-describedby` erreichbar. `EtbAnhaenge`
   bleibt bei `verweisStil` (Textverweis in der Zeitachse, eine andere Bauform).
 - **Ablegen:** Knopf „Datei ablegen“ im Paneelkopf (öffnet, sendet nicht → Kopf-Slot ist
   richtig), nur mit Schreibrecht und nicht storniert. Dialog auf `ErfassungsModal` mit
   `serie`; das Dateifeld (antd `Upload` mit `beforeUpload={() => false}`, `maxCount={1}`,
-  Vorab-Größenprüfung mit dem Server-Wortlaut, `accept`-Prop) wird aus
+  Vorab-Größenprüfung mit dem Server-Wortlaut, `accept`-Prop, `onDateiWahl` für die
+  Titel-Übernahme der Ablage — meldet eine Wahl, nicht das Entfernen) wird aus
   `DokumentAblegenModal` in `components/DateiFeld.tsx` gehoben („dieselbe Eingabe wird nicht
   zweimal gebaut“, M20). Die Bauform bleibt antds `Upload`, damit
   `DokumentAblegenModal.test.tsx` unverändert grün bleibt; den von LFH-117 gemessenen

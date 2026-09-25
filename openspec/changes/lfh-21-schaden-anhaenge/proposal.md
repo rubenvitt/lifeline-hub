@@ -117,6 +117,9 @@ gilt unverändert und umfasst die Schaden-Dateien, ohne dass ihr Wortlaut sich �
     Schaden-Dateien ohne Wirkung, weil der Chat gebundene Dateien ohnehin abweist).
   - Anhänge in der ETB-Druckansicht → **LFH-744** (besteht; Schaden-Dateien stehen nicht
     am ETB-Eintrag, nur ihr pseudonymer Nachweis).
-  - **Neu anzulegen:** Anhänge an Personen (Lese-Audit je Download und CHECK-Rebuild von
-    `person_zugriff_audit`), Anhänge an Tieren, Anhänge an UHS, Bildvorschau/Thumbnails,
-    Nebenbefund „Bestehende Schadensrouten verteilen kein ETB-Live-Ereignis“.
+  - **Angelegt (26.09.2026):** Anhänge an Personen mit Lese-Audit je Download und
+    CHECK-Rebuild von `person_zugriff_audit` → **LFH-757**; Anhänge an Tieren und an UHS
+    (je ein Ticket, ID noch nicht gemeldet); Bildvorschau/Thumbnails → **LFH-759**;
+    ETB-Live-Ereignis der bestehenden Schadensrouten samt Anhang-Zufluss als Sammelbanner
+    (Prüfliste Kriterium 12) → **LFH-760**; Nebenbefund „UeberblickPage-Test kippt kurz nach
+    Mitternacht“ (ID noch nicht gemeldet).
