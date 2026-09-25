@@ -92,7 +92,7 @@ Material der Organisation. Ein vorhandener Datensatz derselben Organisation mit 
 Kennung ist beim Fahrzeug der Funkrufname, beim Personal die Personalnummer und beim
 Material die Bestandsnummer. Ein Name ist beim Personal nie die Kennung. Ein mitbenutzter
 Datensatz MUST unverändert bleiben. Kataloge (Fahrzeug- und Personalstatus, Einheitstypen,
-Qualifikationen, Materialkategorien) MUST nur mitbenutzt werden, und zwar nur aktive
+Qualifikationen) MUST nur mitbenutzt werden, und zwar nur aktive
 Einträge. Fehlt ein benötigter Katalogeintrag, MUST der Import mit 422 abbrechen, den
 fehlenden Eintrag nennen und nichts anlegen. Der Import MUST NOT ein Benutzerkonto anlegen
 und MUST NOT eine Zuordnung zwischen Personal und Benutzerkonto setzen.

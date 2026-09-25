@@ -302,8 +302,9 @@ hier gebaut.
   reale Organisation nach. Ein Zusammenstoß mit echten Daten ist damit unwahrscheinlich,
   bleibt aber abgedeckt.
 - Kataloge nur mitbenutzen, und nur aktive Einträge. FMS-Status über `fms_anker` (stabil),
-  Einheitstyp, Qualifikation und Materialkategorie über das Label, sonst über die
-  Kategorie (`erster_der_kategorie_tx`). Fehlt ein Eintrag, antwortet das System mit 422
+  Einheitstyp und Qualifikation über das Label, sonst über die Kategorie
+  (`erster_der_kategorie_tx`). Materialkategorie und Fahrzeugtyp sind Freitext, kein Katalog
+  (Ergebnis (d)). Fehlt ein Eintrag, antwortet das System mit 422
   „Katalogeintrag fehlt: Einheitstyp «Sanitätsgruppe»“. Neu angelegte Katalogzeilen würden
   per `NO ACTION` von echten Einsätzen festgehalten und machten das Entfernen unsauber
   (Entscheidung Auftraggeber, 24.09.2026). Welche Einträge das Szenario braucht, wird beim
