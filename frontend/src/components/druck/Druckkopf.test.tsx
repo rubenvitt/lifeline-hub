@@ -9,7 +9,7 @@ import Druckkopf from './Druckkopf';
 
 /**
  * Der gemeinsame Druckkopf (LFH-22, design.md D2). Er macht ein Blatt ohne Bildschirm
- * zuordenbar: Organisation, Dokument, Einsatz, Stand/Auswahl, Ersteller, Druckzeitpunkt.
+ * zuordenbar: Organisation, Dokument, Einsatz, Stand/Auswahl, druckende Person, Druckzeitpunkt.
  */
 
 const BENUTZER = {
@@ -38,7 +38,7 @@ function kopf(): HTMLElement {
 }
 
 describe('Druckkopf', () => {
-  it('nennt Organisation, Dokument als h1, Einsatz mit Nummer, Zeilen und Ersteller', async () => {
+  it('nennt Organisation, Dokument als h1, Einsatz mit Nummer, Zeilen und druckende Person', async () => {
     mitOrganisation();
     renderMitProviders(
       <Druckkopf
@@ -60,8 +60,12 @@ describe('Druckkopf', () => {
     expect(k.getByText('Hochwasser Nord (E-2026-0007)')).toBeInTheDocument();
     expect(k.getByText('freigegeben, Version 2')).toBeInTheDocument();
     expect(k.getByText('Abschnitt: Nord')).toBeInTheDocument();
-    expect(await k.findByText('Erika Einsatzleiterin')).toBeInTheDocument();
-    expect(k.getByText('Gedruckt')).toBeInTheDocument();
+    // Die Person ist die DRUCKENDE (Spec „Gemeinsamer Druckkopf"), nicht die Urheberin des
+    // Dokuments — „Erstellt von" läse sich auf Befehl und Lagebericht als Urheberschaft.
+    const person = await k.findByText('Erika Einsatzleiterin');
+    expect(person.previousElementSibling).toHaveTextContent(/^Gedruckt von$/);
+    expect(k.getByText('Gedruckt am')).toBeInTheDocument();
+    expect(k.queryByText(/Erstellt/)).toBeNull();
   });
 
   it('setzt ohne Einsatznummer keine leere Klammer', async () => {

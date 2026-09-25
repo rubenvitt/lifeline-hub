@@ -122,8 +122,8 @@ ETB-Druckansicht sichtbar sein.
 #### Scenario: Meldebild mit Auswahl
 
 - **WHEN** ein gefiltertes Meldebild gedruckt wird
-- **THEN** nennt der Druckkopf Organisation, „Meldebild“, Einsatz, Stand, Auswahl, Ersteller
-  und Druckzeitpunkt
+- **THEN** nennt der Druckkopf Organisation, „Meldebild“, Einsatz, Stand, Auswahl, die
+  druckende Person („Gedruckt von“) und den Druckzeitpunkt („Gedruckt am“)
 
 #### Scenario: Organisation ohne Logo
 

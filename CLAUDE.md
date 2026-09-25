@@ -1518,13 +1518,16 @@ Herleitung: `openspec/changes/lfh-22-druck-export/design.md`.
   CSS-Zeichenkette in ein `<style>`, eine Escape-Fläche ohne Gewinn. Zuordenbar macht das
   Blatt der Druckkopf.
 - **Druckkopf und `useDrucken`.** `components/druck/Druckkopf.tsx` (Organisation mit Logo,
-  Dokument als `h1`, Einsatz mit Nummer, Stand/Auswahl, Ersteller, Druckzeitpunkt in der
+  Dokument als `h1`, Einsatz mit Nummer, Stand/Auswahl, „Gedruckt von" — die druckende
+  Person, nicht die Urheberin; „Erstellt von" las sich als Urheberschaft —, „Gedruckt am" in der
   Anzeigezone, bei `beforeprint` erneuert) steht IN der Wurzel. `sichtbarkeit="druck"` =
   nur Papier (Klasse plus `aria-hidden`), `"immer"` nur auf der ETB-Druckansicht (dort
   `ebene={2}`, weil der Seitenkopf das `h1` trägt). Druckknöpfe sind `DruckKnopf`
   (`useDrucken`): der Dialog öffnet erst, wenn die Organisation geladen und das Logo
-  `decode()`t ist — ein Logo-Fehler druckt ohne Logo statt gar nicht; bei gescheiterter
-  Organisation steht der Knopf gesperrt mit „Erneut laden". Kein `window.print()` direkt —
+  `decode()`t ist — höchstens `LOGO_FRIST_MS` (3 s); Logo-Fehler oder Fristablauf drucken
+  ohne Logo statt gar nicht. Bereit heißt „Daten da" (`data !== undefined`), nicht „letzter
+  Abruf gelungen": ein gescheiterter Hintergrund-Refetch (TanStack v5: `isError` bei
+  stehenden Daten) sperrt nichts. Nur ohne Daten steht der Knopf gesperrt mit „Erneut laden". Kein `window.print()` direkt —
   und in `useDrucken` **nie aus dem Passiv-Effekt heraus**, sondern nach einem Takt
   Aufschub: `print()` feuert `beforeprint` synchron, im Effekt steht React im
   Commit-Kontext, und das `flushSync` der Listener rendert dort nicht (gemessen: das Blatt

@@ -134,7 +134,8 @@ Selektor und gilt für jeden Ausdruck (benannte Ausnahme, gepinnt in `druck.test
 
 `components/druck/Druckkopf.tsx` rendert Organisation (Name, Logo), Dokumentart und -titel
 als `h1`, Einsatzbezeichnung mit `einsatznummer_intern`, Stand oder Auswahl (als Zeilen vom
-Aufrufer), Ersteller (`benutzer.anzeigename`) und Druckzeitpunkt. Zeiten laufen über
+Aufrufer), die druckende Person (`benutzer.anzeigename`, Etikett „Gedruckt von“ — nicht
+„Erstellt von“, das sich als Urheberschaft läse) und Druckzeitpunkt („Gedruckt am“). Zeiten laufen über
 `useAnzeigeKonventionen()` und `taktischeDtgVoll`. Die Prop `sichtbarkeit: 'druck' | 'immer'`
 steuert, ob der Kopf auch am Bildschirm steht. Das nutzt nur die ETB-Druckansicht; auf den
 übrigen Seiten stehen dieselben Angaben schon in Seitenkopf und Leisten. Seine Regeln

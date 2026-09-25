@@ -69,7 +69,7 @@ wählen, in der Druckvorschau prüfen und als PDF speichern:
       Umschalter „Vorschau neben dem Text", offene Meldungen erscheinen nicht; der Text beginnt
       oben auf Seite 1 und nutzt die volle Breite.
 - [ ] **Druckkopf auf Seite 1:** Organisationsname und Logo, Dokumentart mit Titel, Einsatz
-      mit Einsatznummer, Stand bzw. Auswahl, „Erstellt von", „Gedruckt" mit Uhrzeit der
+      mit Einsatznummer, Stand bzw. Auswahl, „Gedruckt von" (die druckende Person), „Gedruckt am" mit Uhrzeit der
       Organisation.
 - [ ] **Umbruch:** Ein Abschnittstitel steht nicht allein am Seitenende; Absätze und
       Tabellenzeilen sind nicht zerrissen; der Tabellenkopf (Meldebild, ETB) wiederholt sich
@@ -119,7 +119,7 @@ Belege (PDF oder Bildschirmfoto je Browser und Druckstück) gehören hier unter 
 | 6   | Kein Status allein über Farbe         | **erfüllt**         | Stand im Druckkopf als Wort („Freigegeben · Version 2"). |
 | 7   | Eine Farbe = eine Bedeutung           | **erfüllt**         | Keine neuen Farbträger. |
 | 8   | Helligkeitsregler                     | **offen → LFH-397** | App-weit. |
-| 9   | Kritische Anzeigen im Blickfeld       | **erfüllt**         | Der Druckkopf macht jedes Blatt zuordenbar (Organisation, Dokument, Einsatz, Stand, Ersteller, Druckzeit). |
+| 9   | Kritische Anzeigen im Blickfeld       | **erfüllt**         | Der Druckkopf macht jedes Blatt zuordenbar (Organisation, Dokument, Einsatz, Stand, druckende Person, Druckzeit). |
 | 10  | Alarmbudget                           | **nicht anwendbar** | — |
 | 11  | Warnverhalten                         | **erfüllt**         | — |
 | 12  | Kein Sprung unter dem Cursor          | **erfüllt**         | Der Druckkopf ist am Schirm `display: none` und `aria-hidden`, er verschiebt nichts. |

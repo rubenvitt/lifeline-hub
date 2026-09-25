@@ -89,8 +89,11 @@ export default function Druckkopf({
       wert: nummer ? `${einsatz.bezeichnung} (${nummer})` : einsatz.bezeichnung,
     },
     ...zeilen,
-    { etikett: 'Erstellt von', wert: benutzer?.anzeigename ?? '—' },
-    { etikett: 'Gedruckt', wert: taktischeDtgVoll(jetzt.toISOString(), konventionen) },
+    // Die DRUCKENDE Person (Spec „Gemeinsamer Druckkopf"), nicht die Urheberin: „Erstellt
+    // von" las sich auf Befehl und Lagebericht als Urheberschaft des Dokuments. Zwei Zeilen
+    // statt „Gedruckt: DTG · Name": die DTG bleibt ein eigener, maschinenlesbarer Wert.
+    { etikett: 'Gedruckt von', wert: benutzer?.anzeigename ?? '—' },
+    { etikett: 'Gedruckt am', wert: taktischeDtgVoll(jetzt.toISOString(), konventionen) },
   ];
 
   return (

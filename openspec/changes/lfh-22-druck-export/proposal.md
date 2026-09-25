@@ -21,7 +21,7 @@ Organisation, und deren Name lässt sich nur beim ersten Start per Konfiguration
   Tabellenzeilen und Codeblöcke werden nicht zerrissen. Tabellenköpfe wiederholen sich je
   Seite. Die Regeln gelten im Lese- **und** im Entwurfszweig.
 - **Gemeinsamer Druckkopf:** Ein Druckkopf trägt Organisation (Name, Logo),
-  Dokumenttitel, Einsatz (Bezeichnung, Einsatznummer), Stand bzw. Auswahl, Ersteller und
+  Dokumenttitel, Einsatz (Bezeichnung, Einsatznummer), Stand bzw. Auswahl, druckende Person und
   Druckzeitpunkt. Meldebild, Befehl und Lagebericht stellen darauf um; der Meldebild-eigene
   Kopf entfällt. Eine Seitenzählung im Seitenfuß kommt dort, wo der Browser sie trägt.
 - **ETB-Druckansicht (LFH-22):** Eigene Ansicht des Einsatztagebuchs für Papier und PDF

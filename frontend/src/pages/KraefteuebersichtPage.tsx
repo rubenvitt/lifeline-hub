@@ -877,7 +877,7 @@ export default function KraefteuebersichtPage() {
         }
       >
         {/* ── DRUCKKOPF (LFH-338 · C3, Befund H4; seit LFH-22 der gemeinsame) ──────────────
-          Einsatz, Stand, Ersteller und Auswahl — ohne diese Angaben ist ein Meldeblatt nicht
+          Einsatz, Stand, druckende Person und Auswahl — ohne diese Angaben ist ein Meldeblatt nicht
           zuordenbar. Am Schirm verborgen: dort stehen sie in Seitenkopf und Filterleiste. Der
           Stand ist der ÄLTESTE erfolgreiche Listenabruf, nicht die Druckzeit. */}
         <Druckkopf

@@ -838,7 +838,7 @@ describe('KraefteuebersichtPage — Druck', () => {
     return kopf!;
   }
 
-  it('trägt den gemeinsamen Druckkopf: „Meldebild", Einsatz, Stand als DTG, Umfang und Ersteller', async () => {
+  it('trägt den gemeinsamen Druckkopf: „Meldebild", Einsatz, Stand als DTG, Umfang und druckende Person', async () => {
     mitEinheit();
     setup();
     const kopf = await druckkopf();
@@ -850,7 +850,7 @@ describe('KraefteuebersichtPage — Druck', () => {
     expect(within(kopf).getByText('Stand')).toBeInTheDocument();
     const stand = within(kopf).getByText('Stand').nextElementSibling as HTMLElement;
     expect(stand.textContent).toMatch(/^\d{6}[A-ZÄÖÜ]{3}\d{4}$/);
-    expect(within(kopf).getByText('Erstellt von')).toBeInTheDocument();
+    expect(within(kopf).getByText('Gedruckt von')).toBeInTheDocument();
     expect(await within(kopf).findByText(/Einheit · Stärke/)).toBeInTheDocument();
     // Der alte Meldeblatt-Kopf ist weg — sonst stünde der Einsatz doppelt auf dem Blatt.
     expect(screen.queryByTestId('kraefte-druckkopf')).toBeNull();

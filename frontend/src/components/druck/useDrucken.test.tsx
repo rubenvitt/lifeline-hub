@@ -133,7 +133,7 @@ describe('useDrucken / DruckKnopf', () => {
   });
 
   /**
-   * Der Druckkopf erneuert „Gedruckt" bei `beforeprint` per `flushSync`. Ruft der Hook
+   * Der Druckkopf erneuert „Gedruckt am" bei `beforeprint` per `flushSync`. Ruft der Hook
    * `window.print()` DIREKT im Passiv-Effekt, läuft `beforeprint` im Commit-Kontext von
    * React: `flushSync` rendert dort nicht, und das Blatt trüge die Zeit vom Seitenaufbau.
    * Der Mock verhält sich wie der Browser — `beforeprint` synchron, dann das Druckbild —
