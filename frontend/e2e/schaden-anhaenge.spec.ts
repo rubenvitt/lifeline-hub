@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { kontrast, pruefe } from './kontrast-kern';
 
 /**
  * Fotos und Dateien an einem Schaden im Browser (LFH-21).
@@ -29,7 +30,9 @@ const STAFFEL = [
 const JPG = Buffer.from('\xff\xd8\xff\xe0 e2e schaden', 'binary');
 
 // Login-/Anlege-Helfer kopiert — es gibt (noch) kein geteiltes e2e-Hilfsmodul.
-async function anmelden(page: Page) {
+async function anmelden(page: Page, modus?: 'light' | 'dark') {
+  // Der Modus muss VOR dem ersten Laden stehen — der Bootstrap in `index.html` liest ihn.
+  if (modus) await page.addInitScript((m) => localStorage.setItem('lifeline-hub.theme', m), modus);
   await page.goto('/login');
   await page.getByLabel('Benutzername').fill(ADMIN);
   await page.getByLabel('Passwort').fill(PW);
@@ -213,3 +216,38 @@ test.describe('Dichte-Staffel: Download-Anker und Entfernen am Schaden', () => {
     });
   }
 });
+
+// Kriterium 5: Tag ≥ 7, Nacht ≥ 5 — als Literale (Muster `hellmodus-kontrast`).
+const KONTRAST_ZIEL = { light: 7, dark: 5 } as const;
+
+for (const modus of ['light', 'dark'] as const) {
+  test(`Kontrast ${modus}: Anker, Nebenangaben und Leerzustand`, async ({ page }, testInfo) => {
+    test.setTimeout(60_000);
+    await page.setViewportSize(FUEKW);
+    await anmelden(page, modus);
+    const einsatzId = await einsatzAnlegen(page, `E2E Sturmlage Kontrast ${modus} ${Date.now()}`);
+    const schadenId = await schadenAnlegen(page, einsatzId);
+    await seedeAnhang(page, einsatzId, schadenId, 'dach.jpg');
+    await page.goto(`/einsaetze/${einsatzId}/schaeden/${schadenId}`);
+    await expect(page.locator('html')).toHaveAttribute('data-theme', modus);
+    await page.mouse.move(0, 0);
+
+    const anker = paneel(page).getByRole('link', { name: /^dach\.jpg, / });
+    await expect(anker).toBeVisible();
+    const ziele: Record<string, Locator> = {
+      'Dateiname (bedienText)': anker.locator('[data-lfh="download-anker-name"]'),
+      'Größe (text2)': anker.getByText(/B$/),
+      'abgelegt von · Zeit (text2)': anker.getByText(/^Administrator · /),
+    };
+    const werte: string[] = [];
+    for (const [name, ziel] of Object.entries(ziele)) {
+      await pruefe(ziel, KONTRAST_ZIEL[modus], `${modus}/${name}`);
+      werte.push(`${name}: ${(await kontrast(ziel)).verhaeltnis.toFixed(2)}`);
+    }
+    console.log(`[LFH-21] Kontrast ${modus}: ${werte.join(' · ')}`);
+    await testInfo.attach(`Kontrast ${modus}`, {
+      body: werte.join('\n'),
+      contentType: 'text/plain',
+    });
+  });
+}

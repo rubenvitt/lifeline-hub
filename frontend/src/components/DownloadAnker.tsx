@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { theme } from 'antd';
+import { useRollen } from './instrument/rollenwerte';
 import { formatGroesse } from '../karten/formatGroesse';
 
 /**
@@ -9,6 +9,9 @@ import { formatGroesse } from '../karten/formatGroesse';
  * Anker steht in Tabellenzellen und Listenzeilen, die selbst polstern; mit `paddingSM` wüchse
  * jede Zeile im Fükw über die Staffel hinaus. Rein und exportiert, damit der Boden ohne Render
  * über die Dichtestufen prüfbar ist.
+ *
+ * Farben aus den Rollen, nicht aus antds Linkfarbe: blauer Bedien-TEXT nimmt `bedienText`
+ * (LFH-650, der Linkton hielt den Boden nicht überall), die Nebenangaben `text2`.
  */
 export function downloadAnkerStil(token: {
   controlHeight: number;
@@ -57,18 +60,18 @@ export default function DownloadAnker({
   zusatz,
   zugaenglicherName,
 }: Props) {
-  const { token } = theme.useToken();
+  const { token, rollen } = useRollen();
   return (
     <a
       href={href}
       download={dateiname}
       aria-label={zugaenglicherName}
-      style={downloadAnkerStil(token)}
+      style={{ ...downloadAnkerStil(token), color: rollen.bedienText }}
     >
       <span>
-        {text ?? dateiname}
+        <span data-lfh="download-anker-name">{text ?? dateiname}</span>
         {groesse != null && (
-          <span style={{ fontWeight: 'normal', color: token.colorTextSecondary }}>
+          <span style={{ fontWeight: 'normal', color: rollen.text2 }}>
             {' · '}
             {formatGroesse(groesse)}
           </span>
@@ -79,7 +82,7 @@ export default function DownloadAnker({
           style={{
             fontWeight: 'normal',
             fontSize: token.fontSizeSM,
-            color: token.colorTextSecondary,
+            color: rollen.text2,
           }}
         >
           {zusatz}
