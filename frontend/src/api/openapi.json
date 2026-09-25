@@ -328,6 +328,426 @@
           }
         }
       },
+      "ArchivAkteAnzeige": {
+        "type": "object",
+        "description": "Die pseudonyme Archivakte (`GET /api/aufbewahrung/einsaetze/{id}`). Vor und nach der\nSchwärzung dieselben Felder, weil jede Angabe aus einer Retain-Spalte stammt.",
+        "required": [
+          "kopf",
+          "zustand",
+          "personen",
+          "tiere",
+          "schaeden"
+        ],
+        "properties": {
+          "karenz_ende": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kopf": {
+            "$ref": "#/components/schemas/ArchivKopfAnzeige"
+          },
+          "personen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ArchivPersonAnzeige"
+            }
+          },
+          "schaeden": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ArchivSchadenAnzeige"
+            }
+          },
+          "tiere": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ArchivTierAnzeige"
+            }
+          },
+          "zustand": {
+            "$ref": "#/components/schemas/AufbewahrungZustand"
+          }
+        }
+      },
+      "ArchivEtbEintragAnzeige": {
+        "type": "object",
+        "description": "Ein ETB-Eintrag der Archivakte im Wortlaut — ohne Anhänge und ohne Rückverweise auf\nAufträge, Befehle, Lageberichte, Meldungen und Nachforderungen (deren Ziele sind im\nArchiv nicht lesbar).",
+        "required": [
+          "id",
+          "lfd_nr",
+          "typ",
+          "inhalt",
+          "erfasser_id",
+          "erfasser_name",
+          "ereigniszeit",
+          "received_at"
+        ],
+        "properties": {
+          "an": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "berichtigt_eintrag_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Verweis auf den berichtigten Eintrag (nur bei `typ = berichtigung`)."
+          },
+          "ereigniszeit": {
+            "type": "string"
+          },
+          "erfasser_funktion": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "erfasser_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "erfasser_name": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "inhalt": {
+            "type": "string"
+          },
+          "lfd_nr": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "meldeweg": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/MeldeWeg"
+              }
+            ]
+          },
+          "received_at": {
+            "type": "string"
+          },
+          "typ": {
+            "$ref": "#/components/schemas/EtbTyp"
+          },
+          "veranlassung": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "von": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "ArchivKopfAnzeige": {
+        "type": "object",
+        "description": "Einsatzkopf der Archivakte — nur Retain-Spalten ([`projektion::KOPF`]).",
+        "required": [
+          "id",
+          "bezeichnung",
+          "einsatzart",
+          "begonnen_at"
+        ],
+        "properties": {
+          "abgeschlossen_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "anzahl_betroffene_initial": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "begonnen_at": {
+            "type": "string"
+          },
+          "bezeichnung": {
+            "type": "string"
+          },
+          "einsatzart": {
+            "$ref": "#/components/schemas/Einsatzart"
+          },
+          "einsatznummer_intern": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "geloescht_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "geschwaerzt_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "leitstellen_nr": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "retention_bis": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "stichwort": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "ArchivPersonAnzeige": {
+        "type": "object",
+        "description": "Registereintrag einer Person — Registriernummer und Kategorien, kein Name, kein Ort.",
+        "required": [
+          "registrier_nr",
+          "registrier_anzeige",
+          "status",
+          "erfasst_at"
+        ],
+        "properties": {
+          "aktuelle_sichtung": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Sichtungskategorie"
+              }
+            ]
+          },
+          "aktuelle_verbleib_art": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/VerbleibArt"
+              }
+            ]
+          },
+          "aktueller_verbleib_status": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/VerbleibStatus"
+              }
+            ]
+          },
+          "erfasst_at": {
+            "type": "string"
+          },
+          "registrier_anzeige": {
+            "type": "string",
+            "description": "Anzeigeform, z. B. `R-042`."
+          },
+          "registrier_nr": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PersonStatus"
+          },
+          "storniert_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "ArchivSchadenAnzeige": {
+        "type": "object",
+        "description": "Registereintrag eines Schadens — Registriernummer, Typ, Ausmaß, Status.",
+        "required": [
+          "registrier_nr",
+          "registrier_anzeige",
+          "typ",
+          "ausmass",
+          "status",
+          "erfasst_at"
+        ],
+        "properties": {
+          "abschluss_grund": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SchadenAbschlussGrund"
+              }
+            ]
+          },
+          "ausmass": {
+            "$ref": "#/components/schemas/Ausmass"
+          },
+          "erfasst_at": {
+            "type": "string"
+          },
+          "registrier_anzeige": {
+            "type": "string",
+            "description": "Anzeigeform, z. B. `S-003`."
+          },
+          "registrier_nr": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SchadenStatus"
+          },
+          "storniert_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "typ": {
+            "$ref": "#/components/schemas/SchadenTyp"
+          }
+        }
+      },
+      "ArchivTierAnzeige": {
+        "type": "object",
+        "description": "Registereintrag eines Tiers — Registriernummer, Tierart, Status.",
+        "required": [
+          "registrier_nr",
+          "registrier_anzeige",
+          "spezies",
+          "status",
+          "erfasst_at"
+        ],
+        "properties": {
+          "abschluss_grund": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AbschlussGrund"
+              }
+            ]
+          },
+          "erfasst_at": {
+            "type": "string"
+          },
+          "registrier_anzeige": {
+            "type": "string",
+            "description": "Anzeigeform, z. B. `T-007`."
+          },
+          "registrier_nr": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "spezies": {
+            "$ref": "#/components/schemas/Spezies"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TierStatus"
+          },
+          "storniert_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "AufbewahrungEintragAnzeige": {
+        "type": "object",
+        "description": "Eine Zeile der Aufbewahrungsübersicht (`GET /api/aufbewahrung`). Keine\npersonenbezogene Spalte: Einsatzort, Sachverhalt und meldende Stelle fehlen.",
+        "required": [
+          "einsatz_id",
+          "bezeichnung",
+          "zustand"
+        ],
+        "properties": {
+          "abgeschlossen_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bezeichnung": {
+            "type": "string"
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "einsatznummer_intern": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "geloescht_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Zeitpunkt der Löschvormerkung (Beginn der Karenz)."
+          },
+          "geschwaerzt_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "karenz_ende": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Ende der Karenz (`geloescht_at` + 30 Tage); fehlt ohne Vormerkung."
+          },
+          "retention_bis": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Aufbewahrungsfrist (UTC, DB-Format); fehlt = keine Frist."
+          },
+          "zustand": {
+            "$ref": "#/components/schemas/AufbewahrungZustand"
+          }
+        }
+      },
       "AufbewahrungZustand": {
         "type": "string",
         "description": "Aufbewahrungszustand eines ABGESCHLOSSENEN Einsatzes (LFH-23). Aktive Einsätze haben\nkeinen ([`zustand`] liefert `None`). Genau einer von sechs Werten; die Rangfolge steht an\n[`zustand`]. Wire == [`AufbewahrungZustand::as_str`], gepinnt in\n`tests/enum_wire_kontrakt.rs`.",

@@ -136,6 +136,120 @@ export interface components {
             mime: string;
         };
         /**
+         * @description Die pseudonyme Archivakte (`GET /api/aufbewahrung/einsaetze/{id}`). Vor und nach der
+         *     Schwärzung dieselben Felder, weil jede Angabe aus einer Retain-Spalte stammt.
+         */
+        ArchivAkteAnzeige: {
+            karenz_ende?: string | null;
+            kopf: components["schemas"]["ArchivKopfAnzeige"];
+            personen: components["schemas"]["ArchivPersonAnzeige"][];
+            schaeden: components["schemas"]["ArchivSchadenAnzeige"][];
+            tiere: components["schemas"]["ArchivTierAnzeige"][];
+            zustand: components["schemas"]["AufbewahrungZustand"];
+        };
+        /**
+         * @description Ein ETB-Eintrag der Archivakte im Wortlaut — ohne Anhänge und ohne Rückverweise auf
+         *     Aufträge, Befehle, Lageberichte, Meldungen und Nachforderungen (deren Ziele sind im
+         *     Archiv nicht lesbar).
+         */
+        ArchivEtbEintragAnzeige: {
+            an?: string | null;
+            /**
+             * Format: int64
+             * @description Verweis auf den berichtigten Eintrag (nur bei `typ = berichtigung`).
+             */
+            berichtigt_eintrag_id?: number | null;
+            ereigniszeit: string;
+            erfasser_funktion?: string | null;
+            /** Format: int64 */
+            erfasser_id: number;
+            erfasser_name: string;
+            /** Format: int64 */
+            id: number;
+            inhalt: string;
+            /** Format: int64 */
+            lfd_nr: number;
+            meldeweg?: null | components["schemas"]["MeldeWeg"];
+            received_at: string;
+            typ: components["schemas"]["EtbTyp"];
+            veranlassung?: string | null;
+            von?: string | null;
+        };
+        /** @description Einsatzkopf der Archivakte — nur Retain-Spalten ([`projektion::KOPF`]). */
+        ArchivKopfAnzeige: {
+            abgeschlossen_at?: string | null;
+            /** Format: int64 */
+            anzahl_betroffene_initial?: number | null;
+            begonnen_at: string;
+            bezeichnung: string;
+            einsatzart: components["schemas"]["Einsatzart"];
+            einsatznummer_intern?: string | null;
+            geloescht_at?: string | null;
+            geschwaerzt_at?: string | null;
+            /** Format: int64 */
+            id: number;
+            leitstellen_nr?: string | null;
+            retention_bis?: string | null;
+            stichwort?: string | null;
+        };
+        /** @description Registereintrag einer Person — Registriernummer und Kategorien, kein Name, kein Ort. */
+        ArchivPersonAnzeige: {
+            aktuelle_sichtung?: null | components["schemas"]["Sichtungskategorie"];
+            aktuelle_verbleib_art?: null | components["schemas"]["VerbleibArt"];
+            aktueller_verbleib_status?: null | components["schemas"]["VerbleibStatus"];
+            erfasst_at: string;
+            /** @description Anzeigeform, z. B. `R-042`. */
+            registrier_anzeige: string;
+            /** Format: int64 */
+            registrier_nr: number;
+            status: components["schemas"]["PersonStatus"];
+            storniert_at?: string | null;
+        };
+        /** @description Registereintrag eines Schadens — Registriernummer, Typ, Ausmaß, Status. */
+        ArchivSchadenAnzeige: {
+            abschluss_grund?: null | components["schemas"]["SchadenAbschlussGrund"];
+            ausmass: components["schemas"]["Ausmass"];
+            erfasst_at: string;
+            /** @description Anzeigeform, z. B. `S-003`. */
+            registrier_anzeige: string;
+            /** Format: int64 */
+            registrier_nr: number;
+            status: components["schemas"]["SchadenStatus"];
+            storniert_at?: string | null;
+            typ: components["schemas"]["SchadenTyp"];
+        };
+        /** @description Registereintrag eines Tiers — Registriernummer, Tierart, Status. */
+        ArchivTierAnzeige: {
+            abschluss_grund?: null | components["schemas"]["AbschlussGrund"];
+            erfasst_at: string;
+            /** @description Anzeigeform, z. B. `T-007`. */
+            registrier_anzeige: string;
+            /** Format: int64 */
+            registrier_nr: number;
+            spezies: components["schemas"]["Spezies"];
+            status: components["schemas"]["TierStatus"];
+            storniert_at?: string | null;
+        };
+        /**
+         * @description Eine Zeile der Aufbewahrungsübersicht (`GET /api/aufbewahrung`). Keine
+         *     personenbezogene Spalte: Einsatzort, Sachverhalt und meldende Stelle fehlen.
+         */
+        AufbewahrungEintragAnzeige: {
+            abgeschlossen_at?: string | null;
+            bezeichnung: string;
+            /** Format: int64 */
+            einsatz_id: number;
+            einsatznummer_intern?: string | null;
+            /** @description Zeitpunkt der Löschvormerkung (Beginn der Karenz). */
+            geloescht_at?: string | null;
+            geschwaerzt_at?: string | null;
+            /** @description Ende der Karenz (`geloescht_at` + 30 Tage); fehlt ohne Vormerkung. */
+            karenz_ende?: string | null;
+            /** @description Aufbewahrungsfrist (UTC, DB-Format); fehlt = keine Frist. */
+            retention_bis?: string | null;
+            zustand: components["schemas"]["AufbewahrungZustand"];
+        };
+        /**
          * @description Aufbewahrungszustand eines ABGESCHLOSSENEN Einsatzes (LFH-23). Aktive Einsätze haben
          *     keinen ([`zustand`] liefert `None`). Genau einer von sechs Werten; die Rangfolge steht an
          *     [`zustand`]. Wire == [`AufbewahrungZustand::as_str`], gepinnt in

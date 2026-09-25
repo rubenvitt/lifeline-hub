@@ -15,6 +15,13 @@ use utoipa::OpenApi;
     info(version = "1"),
     components(schemas(
         crate::anhang::AnhangAnzeige,
+        crate::aufbewahrung::ArchivAkteAnzeige,
+        crate::aufbewahrung::ArchivEtbEintragAnzeige,
+        crate::aufbewahrung::ArchivKopfAnzeige,
+        crate::aufbewahrung::ArchivPersonAnzeige,
+        crate::aufbewahrung::ArchivSchadenAnzeige,
+        crate::aufbewahrung::ArchivTierAnzeige,
+        crate::aufbewahrung::AufbewahrungEintragAnzeige,
         crate::auftrag::AuftragAnzeige,
         crate::auftrag::AuftragBearbeitungsstatus,
         crate::auftrag::AuftragDetail,

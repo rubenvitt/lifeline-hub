@@ -620,6 +620,100 @@ pub async fn soft_delete_einsatz(
     Ok(true)
 }
 
+/// Hebt die Löschvormerkung eines Einsatzes während der Karenz auf und setzt im selben
+/// Vorgang eine neue Frist (LFH-23, design.md D5). `neue_frist = None` heißt unbegrenzt.
+///
+/// Ohne neue Frist stünde `retention_bis` weiter in der Vergangenheit, und der nächste
+/// Purge-Lauf merkte den Einsatz sofort wieder vor — deshalb ist sie Teil dieses einen
+/// Aufrufs und keine zweite Anfrage. Der Aufrufer prüft, dass die Frist in der Zukunft
+/// liegt, und den Archivzugriff (Org-Admin).
+///
+/// **Ein bewachtes UPDATE** (abgeschlossen, vorgemerkt, nicht geschwärzt, Karenz läuft:
+/// `geloescht_at > jetzt − KARENZ_TAGE`, dieselbe Grenze wie
+/// [`super::retention::karenz_abgelaufen`]) und der ETB-Eintrag des Admins in derselben
+/// Transaktion. Gewinnt eine parallele Schwärzung, findet das UPDATE keine Zeile. Bei 0
+/// Zeilen wird neu gelesen und eingeordnet: geschwärzt oder Karenz abgelaufen → 409
+/// (endgültiger Lebenszyklus-Zustand, kein Rückweg), nicht vorgemerkt → 422 (die Frist
+/// ändert man dort über `PUT …/aufbewahrungsfrist`), aktiv → 409, unbekannt → 404.
+/// Keine Ablehnung schreibt.
+pub async fn wiederherstellen(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    admin_id: i64,
+    neue_frist: Option<&str>,
+    jetzt: chrono::DateTime<Utc>,
+) -> Result<(), AppError> {
+    let etb_startwert = super::einstellungen::laden_oder_default(pool, einsatz_id)
+        .await?
+        .etb_startwert();
+    let mut tx = pool.begin().await?;
+    let vorher: Option<(String, Option<String>, Option<String>)> =
+        sqlx::query_as("SELECT status, geloescht_at, geschwaerzt_at FROM einsatz WHERE id = ?")
+            .bind(einsatz_id)
+            .fetch_optional(&mut *tx)
+            .await?;
+    let Some((status, geloescht_at, geschwaerzt_at)) = vorher else {
+        return Err(AppError::NotFound);
+    };
+    let res = sqlx::query(
+        "UPDATE einsatz SET geloescht_at = NULL, retention_bis = ? \
+         WHERE id = ? AND status = ? AND geloescht_at IS NOT NULL \
+           AND geschwaerzt_at IS NULL AND geloescht_at > ?",
+    )
+    .bind(neue_frist)
+    .bind(einsatz_id)
+    .bind(STATUS_ABGESCHLOSSEN)
+    .bind(super::retention::karenz_grenze(jetzt))
+    .execute(&mut *tx)
+    .await?;
+    if res.rows_affected() == 0 {
+        return Err(if status != STATUS_ABGESCHLOSSEN {
+            AppError::Conflict("Einsatz ist nicht abgeschlossen".into())
+        } else if geschwaerzt_at.is_some() {
+            AppError::Conflict(
+                "Einsatz ist bereits geschwärzt — eine Wiederherstellung ist nicht mehr möglich"
+                    .into(),
+            )
+        } else if geloescht_at.is_none() {
+            AppError::UnprocessableEntity(
+                "Einsatz ist nicht zur Löschung vorgemerkt — die Frist ändert man über die \
+                 Aufbewahrungsfrist"
+                    .into(),
+            )
+        } else {
+            AppError::Conflict(
+                "Die Karenz ist abgelaufen — eine Wiederherstellung ist nicht mehr möglich".into(),
+            )
+        });
+    }
+    let audit = format!(
+        "Löschvormerkung vom {} aufgehoben (Wiederherstellung während der Karenz). \
+         Aufbewahrungsfrist neu: {}",
+        geloescht_at.as_deref().unwrap_or("?"),
+        neue_frist.unwrap_or("unbegrenzt"),
+    );
+    crate::etb::repo::anlegen_tx(
+        &mut tx,
+        einsatz_id,
+        admin_id,
+        etb_startwert,
+        crate::etb::repo::EintragDaten {
+            typ: crate::etb::TYP_SYSTEM,
+            inhalt: &audit,
+            von: None,
+            an: None,
+            meldeweg: None,
+            veranlassung: None,
+            ereigniszeit: None,
+            erfasst_lokal_at: None,
+            berichtigt_eintrag_id: None,
+        },
+    )
+    .await?;
+    tx.commit().await?;
+    Ok(())
+}
+
 /// Platzhalter für gescrubbte PII-Felder, die wegen NOT-NULL- bzw. CHECK-Constraints
 /// nicht auf NULL gesetzt werden dürfen (verlaufsnotiz.text, einsatz_personal.snap_name,
 /// einsatz_schaden.uebergeben_an bei status='uebergeben').
@@ -2627,5 +2721,150 @@ mod tests {
             ermittle_system_akteur(&mut conn, einsatz.id).await.unwrap(),
             Some(leit)
         );
+    }
+
+    // ---------- LFH-23: Wiederherstellen während der Karenz ----------
+
+    fn zeit(s: &str) -> chrono::DateTime<Utc> {
+        chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S")
+            .unwrap()
+            .and_utc()
+    }
+
+    /// Abgeschlossener Einsatz mit abgelaufener Frist und den übergebenen Tombstones.
+    async fn archiv_einsatz(
+        pool: &SqlitePool,
+        leit: i64,
+        geloescht: Option<&str>,
+        geschwaerzt: Option<&str>,
+    ) -> i64 {
+        sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung, status, abgeschlossen_at, abgeschlossen_von, \
+                retention_bis, geloescht_at, geschwaerzt_at) \
+             VALUES (1,'Archiv','abgeschlossen','2026-01-01 00:00:00', ?, '2026-05-01 00:00:00', ?, ?) \
+             RETURNING id",
+        )
+        .bind(leit)
+        .bind(geloescht)
+        .bind(geschwaerzt)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    async fn stand(
+        pool: &SqlitePool,
+        id: i64,
+    ) -> (Option<String>, Option<String>, Option<String>, i64) {
+        let (frist, g, s): (Option<String>, Option<String>, Option<String>) = sqlx::query_as(
+            "SELECT retention_bis, geloescht_at, geschwaerzt_at FROM einsatz WHERE id = ?",
+        )
+        .bind(id)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        let etb: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ?")
+            .bind(id)
+            .fetch_one(pool)
+            .await
+            .unwrap();
+        (frist, g, s, etb)
+    }
+
+    #[tokio::test]
+    async fn wiederherstellen_hebt_vormerkung_auf_und_setzt_frist_mit_audit() {
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let admin = benutzer_anlegen(&pool, "admin").await;
+        let e = archiv_einsatz(&pool, leit, Some("2026-06-25 12:00:00"), None).await;
+
+        wiederherstellen(
+            &pool,
+            e,
+            admin,
+            Some("2026-09-28 12:00:00"),
+            zeit("2026-06-30 12:00:00"),
+        )
+        .await
+        .unwrap();
+        let (frist, g, s, etb) = stand(&pool, e).await;
+        assert_eq!(frist.as_deref(), Some("2026-09-28 12:00:00"));
+        assert_eq!((g, s, etb), (None, None, 1));
+        let (erfasser, typ, inhalt): (i64, String, String) =
+            sqlx::query_as("SELECT erfasser_id, typ, inhalt FROM etb_eintrag WHERE einsatz_id = ?")
+                .bind(e)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!((erfasser, typ.as_str()), (admin, "system"));
+        assert!(inhalt.contains("2026-06-25 12:00:00"), "{inhalt}");
+        assert!(inhalt.contains("2026-09-28 12:00:00"), "{inhalt}");
+
+        // Unbegrenzt: ein zweiter Einsatz, Frist None.
+        let e2 = archiv_einsatz(&pool, leit, Some("2026-06-25 12:00:00"), None).await;
+        wiederherstellen(&pool, e2, admin, None, zeit("2026-06-30 12:00:00"))
+            .await
+            .unwrap();
+        let (frist, g, _, _) = stand(&pool, e2).await;
+        assert_eq!((frist, g), (None, None));
+        let inhalt: String =
+            sqlx::query_scalar("SELECT inhalt FROM etb_eintrag WHERE einsatz_id = ?")
+                .bind(e2)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert!(inhalt.contains("unbegrenzt"), "{inhalt}");
+    }
+
+    #[tokio::test]
+    async fn wiederherstellen_lehnt_ab_ohne_zu_schreiben() {
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let admin = benutzer_anlegen(&pool, "admin").await;
+        let jetzt = zeit("2026-06-30 12:00:00");
+
+        // Vormerkung genau 30 Tage alt → Karenz abgelaufen (Grenze wie karenz_abgelaufen) → 409.
+        let grenze = archiv_einsatz(&pool, leit, Some("2026-05-31 12:00:00"), None).await;
+        let vorher = stand(&pool, grenze).await;
+        assert!(matches!(
+            wiederherstellen(&pool, grenze, admin, None, jetzt).await,
+            Err(AppError::Conflict(_))
+        ));
+        assert_eq!(stand(&pool, grenze).await, vorher);
+        // Eine Sekunde jünger → noch in der Karenz → gelingt.
+        let knapp = archiv_einsatz(&pool, leit, Some("2026-05-31 12:00:01"), None).await;
+        wiederherstellen(&pool, knapp, admin, None, jetzt)
+            .await
+            .unwrap();
+
+        // Geschwärzt → 409.
+        let schwarz = archiv_einsatz(
+            &pool,
+            leit,
+            Some("2026-06-29 00:00:00"),
+            Some("2026-06-30 00:00:00"),
+        )
+        .await;
+        let vorher = stand(&pool, schwarz).await;
+        assert!(matches!(
+            wiederherstellen(&pool, schwarz, admin, None, jetzt).await,
+            Err(AppError::Conflict(_))
+        ));
+        assert_eq!(stand(&pool, schwarz).await, vorher);
+
+        // Nicht vorgemerkt → 422.
+        let offen = archiv_einsatz(&pool, leit, None, None).await;
+        let vorher = stand(&pool, offen).await;
+        assert!(matches!(
+            wiederherstellen(&pool, offen, admin, None, jetzt).await,
+            Err(AppError::UnprocessableEntity(_))
+        ));
+        assert_eq!(stand(&pool, offen).await, vorher);
+
+        // Unbekannt → 404.
+        assert!(matches!(
+            wiederherstellen(&pool, 999_999, admin, None, jetzt).await,
+            Err(AppError::NotFound)
+        ));
     }
 }

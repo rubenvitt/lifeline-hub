@@ -888,6 +888,22 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/gefahrengebiete/{gid}/matrix/bewertung",
             put(routes::gefahr::bewerten),
         )
+        // Archiv-Namensraum der Aufbewahrung (LFH-23): nur System-Admin der eigenen Org,
+        // nur lesend bis auf das Wiederherstellen. Die Lesesperre der regulären
+        // Einsatz-Routen bleibt davon unberührt (Guard in tests/aufbewahrung.rs).
+        .route("/api/aufbewahrung", get(routes::aufbewahrung::uebersicht))
+        .route(
+            "/api/aufbewahrung/einsaetze/{id}",
+            get(routes::aufbewahrung::akte),
+        )
+        .route(
+            "/api/aufbewahrung/einsaetze/{id}/etb",
+            get(routes::aufbewahrung::etb),
+        )
+        .route(
+            "/api/aufbewahrung/einsaetze/{id}/wiederherstellen",
+            post(routes::aufbewahrung::wiederherstellen),
+        )
         .route("/api/organisation", get(routes::organisation::lesen))
         .route(
             "/api/organisation",
