@@ -198,3 +198,34 @@ mod tests {
         }
     }
 }
+
+// ── System-ETB-Wortlaute (LFH-690) ──────────────────────────────────────────────────
+// Reine Textbausteine: Handler und Demo-Import rufen dieselbe Funktion, damit ein
+// importierter Einsatz dieselben ETB-Texte trägt wie ein echter.
+
+/// System-ETB beim Bilden einer Einheit.
+pub fn etb_text_gebildet(name: &str) -> String {
+    format!("Einheit «{}» gebildet", name)
+}
+
+/// System-ETB, wenn ein disponiertes Fahrzeug einer Einheit zugeordnet wird.
+pub fn etb_text_fahrzeug_zugeordnet(einheit: &str, funkrufname: &str) -> String {
+    format!(
+        "Einheit «{}»: Fahrzeug «{}» zugeordnet",
+        einheit, funkrufname
+    )
+}
+
+#[cfg(test)]
+mod etb_text_tests {
+    use super::*;
+
+    #[test]
+    fn gebildet_und_fahrzeug_zugeordnet() {
+        assert_eq!(etb_text_gebildet("1. Zug"), "Einheit «1. Zug» gebildet");
+        assert_eq!(
+            etb_text_fahrzeug_zugeordnet("1. Zug", "Florian 1/46-1"),
+            "Einheit «1. Zug»: Fahrzeug «Florian 1/46-1» zugeordnet"
+        );
+    }
+}
