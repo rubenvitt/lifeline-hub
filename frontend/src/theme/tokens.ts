@@ -1,4 +1,4 @@
-import { theme as antdTheme, type ThemeConfig } from 'antd';
+import { theme as antdTheme, type ConfigProviderProps, type ThemeConfig } from 'antd';
 import type { MappingAlgorithm } from 'antd';
 
 /** LFH-455: fachliche Sichtungskennzeichnung, bewusst unabhängig von A0-Statusrollen.
@@ -29,9 +29,14 @@ export const sichtungsfarben = {
  * den Werten (`farbenDunkel`).
  *
  * DIESE DATEI IST DIE TS-SEITE DER WAHRHEIT. Die CSS-Seite steht in `rollen.css`
- * als statische Custom Properties — nötig, weil handgeschriebenes CSS die
- * antd-Tokens nicht lesen kann, solange `cssVar` aus ist (Weiche vertagt nach
- * A2/LFH-328). `rollen.guard.test.ts` hält beide Seiten deckungsgleich.
+ * als statische Custom Properties, damit handgeschriebenes CSS nicht an antds
+ * Variablennamen hängt. antd 6 emittiert seine `--ant-*`-Variablen zwar immer, auch
+ * ohne `cssVar` am ConfigProvider (gemessen in LFH-623, `test/antdCssVariablen.ts`;
+ * eine Weiche zum Abschalten gibt es nicht mehr). Sie taugen hier trotzdem nicht als
+ * Quelle: die meisten Rollen (`paneel`, `flaeche3`, `kopf`, die Statusflächen) hat
+ * antd gar nicht, die Namen gehören der Bibliothek und nicht der Gestaltungssprache,
+ * und `rollen.css` begründet im Kopf, warum die Werte schon im ersten Frame stehen
+ * müssen. `rollen.guard.test.ts` hält beide Seiten deckungsgleich.
  *
  * ROT BEDIENT NICHTS. `bedien` ist blau, `marke` ist rot, `alarm` ist rot in
  * anderer Sättigung. Eine rote Bedienfläche bricht die Sprache (LFH-315).
@@ -672,6 +677,43 @@ export function antdKomponenten(
     },
     Switch: switchMasse(dichten[dichte]),
   };
+}
+
+/**
+ * Der Boden der kurzen Achse für JEDEN Knopf (LFH-381): nie schmaler als die kleine
+ * Steuerhöhe der Stufe, also 24 / 48 / 72 — genau der Boden aus A1 Gate 3.
+ *
+ * Die Höhe eines Knopfs folgt der Staffel über `controlHeight`/`controlHeightSM`, seine
+ * Breite aber der BESCHRIFTUNG plus Polsterung. Bei kleinen Knöpfen ist diese Polsterung
+ * antds `paddingInlineSM`, und das ist in `antd/es/button/style/token.js` das Literal
+ * `8 - lineWidth` = 7 — ohne jede Dichte. Ein „OK" in einer Bestätigungsblase blieb damit
+ * rund 38 px breit, während es auf 72 px Höhe wuchs; der Daumen trifft die schmale Achse.
+ *
+ * WARUM EIN BODEN UND NICHT DIE POLSTERUNG: eine an die Staffel gebundene Polsterung
+ * bindet die Breite nicht an die Höhe — ein Ein-Zeichen-Etikett („…", „+") fiele weiter
+ * durch, und jedes breite Etikett wüchse grundlos mit, auch in Reihen mehrerer Knöpfe.
+ * Ein `minWidth` wirkt nur dort, wo der Knopf zu schmal WÄRE, und lässt alle übrigen
+ * unberührt. Er ist dieselbe Regel, die antd selbst für icon-only (`width`) und
+ * Kreisknöpfe (`minWidth`) anlegt, nur für alle Formen.
+ *
+ * GRENZE: als Inline-Stil überstimmt er antds Kreis-`minWidth` (`controlHeight`) — in
+ * `kompakt` fiele ein Kreisknopf mit Text von 30 auf 24 px Mindestbreite, und `FloatButton`
+ * erreicht der Kontext ebenfalls. Heute gibt es keinen Aufrufer von beidem; wer einen
+ * einführt, prüft das.
+ *
+ * WARUM EIN WERT FÜR ALLE GRÖSSEN: der Boden aus Gate 3 hängt an der Stufe, nicht an der
+ * Knopfgröße. In `komfortabel` und `handschuh` fallen kleine und volle Höhe ohnehin
+ * zusammen (Herleitung bei {@link dichten}); in `kompakt` ist ein voller Knopf 30 hoch,
+ * sein Boden in der kurzen Achse bleibt 24.
+ *
+ * WARUM AM KONTEXT UND NICHT IN CSS: der Wert kommt aus derselben Stufe wie die Höhe,
+ * ohne Spiegel in `rollen.css`, und erreicht auch die Knöpfe, die antd selbst baut
+ * (Bestätigungsblase, Modal-Fuß, Filter-Dropdown), weil sie dieselbe `Button`-Komponente
+ * rendern. Ein `style` am einzelnen Knopf schlägt den Kontext — das ist der Weg für eine
+ * benannte Ausnahme (Aktionszeile der UHS-Platzkarte, LFH-379), keiner für Neues.
+ */
+export function antdKnopf(dichte: Dichte = 'kompakt'): NonNullable<ConfigProviderProps['button']> {
+  return { style: { minWidth: dichten[dichte].kleineZeilenhoehe } };
 }
 
 /**

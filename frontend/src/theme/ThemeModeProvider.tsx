@@ -4,6 +4,7 @@ import { ConfigProvider } from 'antd';
 import deDE from 'antd/locale/de_DE';
 import {
   antdAlgorithmus,
+  antdKnopf,
   antdKomponenten,
   antdToken,
   farbenDunkel,
@@ -137,6 +138,8 @@ export function ThemeModeProvider({ children }: { children: ReactNode }) {
     document.documentElement.dataset.dichte = dichte;
   }, [dichte]);
 
+  const knopf = useMemo(() => antdKnopf(dichte), [dichte]);
+
   const wert = useMemo<ThemeModeWert>(
     () => ({ modus, effektiv, setModus, dichte, setDichte }),
     [modus, effektiv, setModus, dichte, setDichte],
@@ -146,6 +149,9 @@ export function ThemeModeProvider({ children }: { children: ReactNode }) {
     <ThemeModeContext.Provider value={wert}>
       <ConfigProvider
         locale={deDE}
+        // Der Boden der kurzen Achse (LFH-381): die Höhe folgt der Staffel über die Tokens,
+        // die Breite eines beschrifteten Knopfs nur über diesen Kontext-Stil.
+        button={knopf}
         theme={{
           // Die Farbrollen kommen je Modus aus derselben Quelle wie `rollen.css`
           // (LFH-352 · A0). Der antd-Algorithmus bleibt darunter: er leitet die

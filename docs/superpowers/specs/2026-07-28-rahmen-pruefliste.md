@@ -120,6 +120,9 @@ ohne die Lücke zuzudecken:
   `paddingInlineSM` ist ein Literal). Der OK-Knopf einer Bestätigungsblase bleibt rund 38 px breit
   in jeder Stufe. Verdikt: **offen → LFH-381** (Systemlösung ist ein Komponenten-Token oder ein
   `minWidth` am kleinen Knopf, nicht ein `okText` je Aufrufstelle).
+  **Nachtrag 24.09.2026 — erledigt mit LFH-381:** `minWidth` = `controlHeightSM` am Kontext
+  (`antdKnopf()` in `theme/tokens.ts`); `e2e/trefflaeche-tablet.spec.ts` prüft die Breite jetzt
+  gegen die Staffel, und zwar am berechneten `min-width`, nicht am Wortlaut.
 - Der **Switch** folgt der Staffel ebenfalls nicht: antd rechnet seine Höhe aus der Schrift
   (`fontSize × lineHeight`), gemessen 21 / 24 / 24 px. B5j hat die ZEILE um den Schalter auf den
   Boden gehoben, das Steuerelement selbst bleibt darunter. Verdikt: **offen → LFH-380**.

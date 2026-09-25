@@ -5,9 +5,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
 import { MemoryRouter } from 'react-router';
 import { server } from '../../test/server';
-import { App as AntApp } from 'antd';
+import { App as AntApp, ConfigProvider } from 'antd';
 import Grundriss, { aktionsabstand } from './Grundriss';
-import { dichten } from '../../theme/tokens';
+import { antdKnopf, dichten } from '../../theme/tokens';
 import type { Person, PersonDetail, UhsBelegung, UhsDetail, UhsPlatz } from '../../api/types';
 import { einsatzKeys } from '../../api/queryKeys';
 
@@ -890,6 +890,47 @@ describe('Grundriss – Aktionszeilen-Abstand der Platzkarte (LFH-378)', () => {
    */
   it('nimmt marginSM als Obergrenze, nicht als Sollwert', () => {
     expect(aktionsabstand({ marginSM: 3, controlHeightSM: 24 })).toBe(3);
+  });
+});
+
+/**
+ * Die benannte Ausnahme vom Breitenboden (LFH-381, fällt mit LFH-379).
+ *
+ * Der Kontext gibt jedem Knopf `minWidth` = kleine Steuerhöhe. In der 124 px breiten
+ * Aktionszeile liefen vier Knöpfe ab `komfortabel` damit über die Karte hinaus, und die
+ * schneidet ab — der Menü-Auslöser verschwände. Geprüft wird deshalb unter einem Kontext
+ * MIT Boden (Handschuh): ohne die Ausnahme trügen alle vier Knöpfe hier `72px`.
+ */
+describe('Grundriss – Aktionszeile ohne Breitenboden (LFH-381)', () => {
+  it('alle vier Knöpfe der Platzkarte schlagen den Boden des Kontexts', async () => {
+    const p = person({ id: 7, registrier_nr: 7, aktuelle_uhs_id: 1, aktueller_platz_id: 10 });
+    const uhs = uhsDetail({
+      status: 'aktiv',
+      plaetze: [platz({ id: 10, bezeichnung: 'Bett 1', verfuegbarkeit: 'aufbereitung' })],
+    });
+    server.use(http.get('/api/einsaetze/1/personen', () => HttpResponse.json([p])));
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+    render(
+      <MemoryRouter>
+        <QueryClientProvider client={qc}>
+          <ConfigProvider button={antdKnopf('handschuh')}>
+            <AntApp>
+              <Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />
+            </AntApp>
+          </ConfigProvider>
+        </QueryClientProvider>
+      </MemoryRouter>,
+    );
+    await screen.findByText(/R-007/);
+    const knoepfe = [
+      screen.getByRole('button', { name: 'Verbleib / Entlassung erfassen' }),
+      screen.getByRole('button', { name: 'zurückweisen' }),
+      screen.getByRole('button', { name: 'als frei markieren' }),
+      screen.getByRole('button', { name: /Platzaktionen zu Bett 1/ }),
+    ];
+    for (const knopf of knoepfe) {
+      expect(knopf.style.minWidth, knopf.getAttribute('aria-label')!).toBe('0px');
+    }
   });
 });
 

@@ -19,7 +19,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Switch, theme } from 'antd';
+import { Button, Popconfirm, Switch, theme } from 'antd';
 import { ThemeModeProvider, useDichte } from './ThemeModeProvider';
 import { dichten, type Dichte } from './tokens';
 import { setzeViewportZurueck, setzeZeigerGrob } from '../test/viewport';
@@ -236,6 +236,75 @@ describe('Nachtbetrieb als Vorgabe (Neuentwurf „Instrumententafel", 21.09.2026
     localStorage.setItem('lifeline-hub.theme', 'kaputt');
     zeigeSonde();
     expect(document.documentElement.dataset.theme).toBe('dark');
+  });
+});
+
+/**
+ * Die kurze Achse eines beschrifteten Knopfs (LFH-381).
+ *
+ * Die HÖHE eines kleinen Knopfs folgt der Staffel seit LFH-361 (`controlHeightSM`), seine
+ * BREITE hing an antds `paddingInlineSM` — einem Literal (`8 - lineWidth` = 7), das keine
+ * Dichte kennt. Ein „OK" blieb damit rund 38 px breit, während es 72 px hoch wurde. Der
+ * Träger ist ein Boden am Kontext (`button.style.minWidth`) und nicht die Polsterung: die
+ * bände die Breite nicht an die Höhe, ein Ein-Zeichen-Etikett fiele weiter durch, und
+ * breite Etiketten wüchsen grundlos mit.
+ *
+ * Geprüft wird die VERDRAHTUNG im Provider, nicht eine Hilfsfunktion: ein Test nur auf
+ * `antdKnopf()` bliebe grün, wenn die `button`-Prop am ConfigProvider fehlte. Die Werte
+ * stehen als Literale da — aus `dichten` gelesen prüfte die Zusicherung sich selbst.
+ */
+describe('Bediendichte — die kurze Achse beschrifteter Knöpfe (LFH-381)', () => {
+  const BODEN = { kompakt: '24px', komfortabel: '48px', handschuh: '72px' } as const;
+
+  for (const s of STUFEN) {
+    it(`Stufe ${s}: ein kleiner Knopf mit kurzem Etikett ist mindestens ${BODEN[s]} breit`, () => {
+      localStorage.setItem(SPEICHER_SCHLUESSEL, s);
+      render(
+        <ThemeModeProvider>
+          <Button size="small">OK</Button>
+        </ThemeModeProvider>,
+      );
+      expect(screen.getByRole('button', { name: 'OK' }).style.minWidth).toBe(BODEN[s]);
+    });
+  }
+
+  it('der Boden erreicht auch die Knöpfe, die antd selbst baut (Bestätigungsblase im Portal)', async () => {
+    localStorage.setItem(SPEICHER_SCHLUESSEL, 'handschuh');
+    render(
+      <ThemeModeProvider>
+        <Popconfirm title="Wirklich?">
+          <Button>Entfernen</Button>
+        </Popconfirm>
+      </ThemeModeProvider>,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Entfernen' }));
+    expect((await screen.findByRole('button', { name: 'OK' })).style.minWidth).toBe('72px');
+    expect(screen.getByRole('button', { name: 'Abbrechen' }).style.minWidth).toBe('72px');
+  });
+
+  // Das Gegenstück zur Ausnahme darunter: antd führt Kontext- und Knopfstil JE EIGENSCHAFT
+  // zusammen (`useMergeSemantic`). Ersetzte eine Bibliotheksversion den Kontextstil ganz,
+  // verlören alle Knöpfe mit eigenem `style` den Boden still — dieser Fall würde rot.
+  it('ein eigener Stil OHNE minWidth behält den Boden', () => {
+    localStorage.setItem(SPEICHER_SCHLUESSEL, 'handschuh');
+    render(
+      <ThemeModeProvider>
+        <Button style={{ marginLeft: 8 }}>OK</Button>
+      </ThemeModeProvider>,
+    );
+    const knopf = screen.getByRole('button', { name: 'OK' });
+    expect(knopf.style.minWidth).toBe('72px');
+    expect(knopf.style.marginLeft).toBe('8px');
+  });
+
+  it('ein eigener Stil am Knopf schlägt den Boden (die benannte Ausnahme bleibt möglich)', () => {
+    localStorage.setItem(SPEICHER_SCHLUESSEL, 'handschuh');
+    render(
+      <ThemeModeProvider>
+        <Button style={{ minWidth: 0 }}>OK</Button>
+      </ThemeModeProvider>,
+    );
+    expect(screen.getByRole('button', { name: 'OK' }).style.minWidth).toBe('0px');
   });
 });
 

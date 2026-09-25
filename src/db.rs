@@ -3039,4 +3039,47 @@ mod tests {
             .await
             .expect("mehrere NULL-Zahlenpaare bleiben erlaubt (Altbestand)");
     }
+
+    // --- Migration 0121: Verweis Verbleib → Betreuungsstelle (LFH-674) ---
+    //
+    // Zwei ADD COLUMN mit FK; betreuungsstelle ist danach kein Leaf mehr. Gemessen wird auf
+    // der voll migrierten Vorlage: beide Spalten zeigen mit SET NULL auf die Stelle, der
+    // partielle Index existiert, und der FK-Check ist leer.
+    #[tokio::test]
+    async fn migration_0121_verbleib_verweist_auf_betreuungsstelle() {
+        let pool = test_pool().await;
+        for (tabelle, spalte) in [
+            ("person_verbleib", "betreuungsstelle_id"),
+            ("einsatz_person", "aktuelle_verbleib_betreuungsstelle_id"),
+        ] {
+            let fk: Vec<(String, String, String)> = sqlx::query_as(
+                "SELECT \"table\", \"to\", on_delete FROM pragma_foreign_key_list(?) \
+                 WHERE \"from\" = ?",
+            )
+            .bind(tabelle)
+            .bind(spalte)
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+            assert_eq!(
+                fk,
+                vec![("betreuungsstelle".into(), "id".into(), "SET NULL".into())],
+                "{tabelle}.{spalte} verweist mit SET NULL auf betreuungsstelle"
+            );
+        }
+        let index: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' \
+             AND name = 'idx_einsatz_person_verbleib_stelle'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(index, 1, "partieller Index für die Zählung je Stelle");
+        let fk_verletzungen: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM pragma_foreign_key_check")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(fk_verletzungen, 0);
+    }
 }
