@@ -89,13 +89,19 @@ trägt die Mechanik, nur unter `@media print` und nur, wenn eine Wurzel existier
 - **Gemeinsame Umbruchregeln unter der Wurzel:** `h1–h6 { break-after: avoid }`;
   `p, ul, ol, blockquote, pre, tr, img, figure { break-inside: avoid }`;
   `thead { display: table-header-group }`. Da sie an der Wurzel und nicht an
-  `.X-druck .markdown` hängen, gelten sie auch im Entwurfszweig (Editor-Vorschau) und für
-  den Abschnittstitel. Schreibweise `break-*` statt `page-break-*`.
+  `.X-druck .markdown` hängen, gelten sie auch im Entwurfszweig (Editor-Vorschau bzw.
+  Druckfassung). Der Abschnittstitel ist nur im Lesezweig eine Überschrift; im Entwurf ist
+  er der Akkordeonkopf (Lagebericht) bzw. das Feldetikett (Befehl), deshalb stehen
+  `.ant-collapse-header` und `.ant-form-item-label` mit in der `break-after`-Regel
+  (Nachtrag Review Welle B). Codeblöcke (`.markdown pre`) brechen im Druck um
+  (`white-space: pre-wrap`, `overflow: visible`), statt rechts abgeschnitten zu werden.
+  Schreibweise `break-*` statt `page-break-*`.
 - **Papierfarben** (`color: black`, `background: transparent`, `box-shadow: none`, jeweils
   `!important`) wandern aus den drei Dateien hierher.
 
 Die drei Seiten-Stylesheets behalten nur ihre Eigenheiten: Entwurfsregeln (M86: Eingabespalte,
-Toggle-`:has`, Akkordeon `-panel-inactive`, Editor-Beschriftung), `.X-no-print`, Seitenkopf
+Toggle-Layout: Textfeld weg, Druckfassung sichtbar, Akkordeon `-panel-inactive`,
+Editor-Beschriftung), `.X-no-print`, Seitenkopf
 ausblenden, Tabellen-Neutralisierer des Meldebilds. `visibility: hidden`, `position: absolute`
 und die doppelten Farb- und Umbruchregeln fallen dort weg. Der falsche Kommentar in
 `kraefteuebersichtPrint.css:86-89` („in Playwright nicht zu haben") wird berichtigt.
@@ -107,7 +113,22 @@ das absolute Muster behalten** scheidet aus, weil alle drei Browser gefordert si
 
 `:has()` und komplexe Selektoren in `:not()` tragen Chromium ≥ 105, Safari ≥ 15.4 und
 Firefox ≥ 121. Ohne Wurzel auf der Seite greift keine der Regeln, und Strg+P druckt den
-Bildschirm wie heute.
+Bildschirm wie heute — bis auf Seitenrand und Seitenzählung: `@page` hängt an keinem
+Selektor und gilt für jeden Ausdruck (benannte Ausnahme, gepinnt in `druck.test.ts`).
+
+**Nachtrag Review Welle B — zwei Fälle, die CSS allein nicht löst:**
+
+- *Lagebericht-Entwurf in der Vorgabe* („Vorschau neben dem Text" aus, Toggle-Layout mit
+  geschlossener Vorschau): dort trug nur die `<textarea>` den Text und kam so aufs Papier —
+  Rohtext in Bildschirmhöhe, lange Abschnitte abgeschnitten. `MarkdownEditor` rendert mit
+  der Prop `druckfassung` bei geschlossener Vorschau eine gerenderte Fassung, die nur der
+  Druck zeigt; `lageberichtPrint.css` nimmt das Textfeld im Toggle-Layout immer weg. Opt-in,
+  weil jede Fassung einen Markdown-Render je Anschlag kostet (ETB-Schnellerfassung).
+- *Tabellenkopf des Meldebilds*: `KatalogTabelle` rendert mit `sticky`, und dann legt
+  rc-table den Kopf in eine eigene Tabelle im Sticky-Halter — die Körpertabelle hatte kein
+  `thead`, die Kopfwiederholung griff nicht. Das Primitiv rendert zwischen `beforeprint` und
+  `afterprint` ohne `sticky` (`useDruckModus`, `flushSync`); am Bildschirm bleibt die
+  stehende Kopfzeile (LFH-330).
 
 ### D2 — Druckkopf als Baustein, Drucken erst mit geladenem Kopf
 
@@ -127,6 +148,10 @@ aus dem Bildspeicher des Browsers kommt.
 `useDrucken()` liefert `drucken()`: Es wartet, bis die Organisationsabfrage erfolgreich war
 und das Logo `decode()`t ist (ein Fehler dabei gilt als „ohne Logo drucken"), und ruft dann
 `window.print()`. Die drei Druckknöpfe und der Meldebild-Effekt (`printPending`) laufen darüber.
+`window.print()` läuft dabei **nie direkt im Passiv-Effekt**, sondern nach einem Takt
+Aufschub (Nachtrag Review Welle B): es feuert `beforeprint` synchron, und im Effekt steht
+React im Commit-Kontext — das `flushSync` der Listener (Druckzeit im Kopf, Druckform der
+Tabelle) rendert dort nicht, das Blatt trug sonst die Zeit vom Seitenaufbau.
 Ohne diese Sperre druckt der erste Aufruf ohne Namen oder mit einem leeren Bildrahmen, weil
 ein nicht geladenes Bild im Druckbild fehlt.
 
@@ -172,6 +197,9 @@ Stand = Ladezeitpunkt + höchste `lfd_nr` der ersten Seite.
 **Query:** `einsatzKeys.etbDruck(einsatzId, filter)`, eingetragen in `NICHT_LIVE_KEYS` mit der
 Begründung „ein Druckbeleg ist ein Schnappschuss; er ändert sich nicht unter der Hand"
 (`staleTime: Infinity`, kein Refetch bei Fokus oder Reconnect). „Neu laden" ruft `refetch`.
+Beim Öffnen wird dagegen immer frisch geladen (`refetchOnMount: 'always'`, Nachtrag Review
+Welle B): Schnappschuss heißt „keine stille Ergänzung einer offenen Ansicht", nicht „der
+Stand des letzten Besuchs aus dem Cache".
 Fortschritt über einen State neben der Query, nicht im Cache.
 
 *Verworfen:* ein eigener Endpunkt `GET …/etb/druck`. Er hätte eine einzige Transaktion und

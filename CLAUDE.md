@@ -1491,15 +1491,19 @@ Herleitung: `openspec/changes/lfh-22-druck-export/design.md`.
 
 - **Eine Druckwurzel, ein Stylesheet.** Ein Druckstück markiert seine Wurzel mit
   `data-lfh="druckwurzel"`, mehr nicht; `druck/druck.css` (global in `main.tsx`) trägt die
-  Mechanik, nur unter `@media print` und nur mit Wurzel auf der Seite. Alles außerhalb
+  Mechanik, nur unter `@media print` und nur mit Wurzel auf der Seite — bis auf `@page`
+  (Seitenrand, Seitenzählung): das hängt an keinem Selektor und gilt für jeden Ausdruck,
+  eine benannte, in `druck.test.ts` gepinnte Ausnahme. Alles außerhalb
   von Wurzel, Vorfahren und Nachfahren wird **`display: none`** — auch jedes Portal
   (Dialog, `message`, Menü, Drawer), ohne Markenliste. **Nie wieder `visibility: hidden`
   plus `position: absolute`**: unsichtbare Knoten behalten ihren Platz, und Firefox und
   Safari schneiden einen absolut positionierten Druckbereich nach Seite 1 ab. Vorfahren
   werden neutralisiert (Flex, `100vh`, Polsterung, Bildlauf), die Wurzel steht im Fluss.
-  Papierfarben und Umbruchregeln (`h1–h6` bleiben beim Text; `p, ul, ol, blockquote, pre,
-  tr, img, figure` reißen nicht; `thead` wiederholt sich) hängen an der Wurzel und gelten
-  damit auch im Entwurfszweig. Die Seiten-Stylesheets (`*Print.css`) tragen nur noch ihre
+  Papierfarben und Umbruchregeln (`h1–h6` bleiben beim Text, im Entwurf auch der
+  Abschnittstitel als `.ant-collapse-header`/`.ant-form-item-label` — dort ist er keine
+  Überschrift; `p, ul, ol, blockquote, pre, tr, img, figure` reißen nicht; `thead`
+  wiederholt sich; Codeblöcke brechen um) hängen an der Wurzel und gelten damit auch im
+  Entwurfszweig. Die Seiten-Stylesheets (`*Print.css`) tragen nur noch ihre
   Eigenheiten (M86-Entwurfsregeln, `*-no-print`, Seitenkopf, Tabellen-Neutralisierer) und
   pinnen per Gegenaussage, dass die Mechanik dort NICHT wieder auftaucht. Genau **eine**
   Wurzel je Seite; was außerhalb steht, fehlt auf Papier.
@@ -1520,7 +1524,22 @@ Herleitung: `openspec/changes/lfh-22-druck-export/design.md`.
   `ebene={2}`, weil der Seitenkopf das `h1` trägt). Druckknöpfe sind `DruckKnopf`
   (`useDrucken`): der Dialog öffnet erst, wenn die Organisation geladen und das Logo
   `decode()`t ist — ein Logo-Fehler druckt ohne Logo statt gar nicht; bei gescheiterter
-  Organisation steht der Knopf gesperrt mit „Erneut laden". Kein `window.print()` direkt.
+  Organisation steht der Knopf gesperrt mit „Erneut laden". Kein `window.print()` direkt —
+  und in `useDrucken` **nie aus dem Passiv-Effekt heraus**, sondern nach einem Takt
+  Aufschub: `print()` feuert `beforeprint` synchron, im Effekt steht React im
+  Commit-Kontext, und das `flushSync` der Listener rendert dort nicht (gemessen: das Blatt
+  trug die Druckzeit vom Seitenaufbau). Ein Test dafür liest den Kopf IM gemockten
+  `print`, nie danach — `act` holt das liegengebliebene Update sonst nach.
+- **Was CSS allein nicht drucken kann, schaltet `beforeprint`/`afterprint` um**
+  (`components/druck/useDruckModus.ts`, `flushSync`). Einziger Nutzer heute:
+  `KatalogTabelle` rendert im Druck ohne `sticky` — mit `sticky` legt rc-table den Kopf in
+  eine eigene Tabelle im Sticky-Halter, die Körpertabelle hat kein `thead`, und die
+  Kopfwiederholung greift nicht. Am Bildschirm bleibt die stehende Kopfzeile (LFH-330).
+  `emulateMedia` und `page.pdf()` feuern kein `beforeprint`; e2e löst es selbst aus.
+- **Ein Editor druckt nie seine `<textarea>`.** Das Toggle-Layout des `MarkdownEditor`
+  (Vorgabe des Lagebericht-Entwurfs) trägt mit `druckfassung` eine gerenderte Fassung, die
+  nur der Druck zeigt; das Seiten-Stylesheet nimmt das Textfeld immer weg. Opt-in, weil sie
+  einen Markdown-Render je Anschlag kostet.
 - **ETB-Druck ist die benannte Tabellen-Ausnahme** (`pages/EtbDruckPage.tsx`,
   `etb/EtbDruckTabelle.tsx`): die Papierform des Tagebuchs als schlichtes `<table>`, weder
   `KatalogTabelle` noch `Datensicht`, ohne Sortierung/Filter/Spaltenschalter, **aufsteigend
@@ -1530,7 +1549,9 @@ Herleitung: `openspec/changes/lfh-22-druck-export/design.md`.
   Gates. Drucken ist gesperrt, bis alles da ist; ein Teilausdruck ist ausgeschlossen. Bei
   aktivem Filter holt ein Berichtigungs-Durchgang „berichtigt durch Nr. m" auch von
   außerhalb der Auswahl. Der Query-Key `einsatzKeys.etbDruck` ist **nicht live**
-  (`NICHT_LIVE_KEYS`, eigener Prefix außerhalb `etb`): ein Druckbeleg ist ein Schnappschuss.
+  (`NICHT_LIVE_KEYS`, eigener Prefix außerhalb `etb`): ein Druckbeleg ist ein Schnappschuss
+  — der offenen Ansicht. Beim Öffnen lädt sie immer frisch (`refetchOnMount: 'always'`),
+  sonst käme innerhalb der Cache-Frist der Stand des letzten Besuchs.
 - **Org-Branding:** Name (`PATCH /api/organisation`, beide Felder optional) und Logo
   (`org_logo`, `GET|POST|DELETE /api/organisation/logo`, PNG/JPEG am Inhalt, ≤ 1 MiB,
   Virenscan, `Cache-Control: private, no-cache` + ETag, `?v=<sha256>` als Cache-Brecher)

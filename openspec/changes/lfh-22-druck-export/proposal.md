@@ -38,9 +38,15 @@ Organisation, und deren Name lässt sich nur beim ersten Start per Konfiguration
 - **Prüfliste Einsatztauglichkeit** für die ETB-Druckansicht und die umgebauten
   Druckansichten.
 
-**Nicht-Ziele (Folgetickets):** Einsatzbericht als neue Vorlage, Druck der Modul-Listen
-(Personen, Tiere, Schäden), Oberfläche für die vorhandenen CSV-Exporte, serverseitig
-erzeugte oder automatisch abgelegte PDFs, Anschrift im Branding, Audit von Druckvorgängen.
+**Nicht-Ziele (Folgetickets):** Einsatzbericht als neue Vorlage (**LFH-726**), Druck der
+Modul-Listen (Personen, Tiere, Schäden) samt Frage nach Audit (**LFH-727**), Oberfläche für
+die vorhandenen CSV-Exporte (**LFH-728**), serverseitig erzeugte oder automatisch abgelegte
+PDFs, Anschrift im Branding, Audit von Druckvorgängen.
+
+**Benannte Reste mit Zielticket:** Druck in Firefox und WebKit automatisch prüfen, dazu Logo
+und Seitenzählung im PDF belegen (**LFH-729**); Kontrast der ETB-Druckansicht am Bildschirm
+messen (**LFH-730**); im Entwurfsdruck stehen Titel und Zeitstand noch als Eingabefelder
+(**LFH-731**).
 
 ## Capabilities
 
