@@ -11,6 +11,13 @@
 //!    (`einsatz_id` + transitive `ON DELETE CASCADE`-Hülle ab `einsatz`) und bricht ROT,
 //!    sobald eine Spalte/Tabelle **un**klassifiziert ist. Eine neue PII-Spalte kann also
 //!    nicht mehr still durchrutschen.
+//!
+//!    Die Entdeckung trägt eine Vorbedingung, die GUARD 5 (LFH-291) erzwingt: **Jede
+//!    FK-Kante nach S kommt aus S oder steht begründet auf der Allowlist**
+//!    (`FREMDKANTEN_ALLOWLIST` im `tests`-Modul, startet leer). Ohne sie fiele eine neue
+//!    Tabelle ohne `einsatz_id`, die per `ON DELETE SET NULL` oder ohne ON-DELETE-Angabe
+//!    auf eine Tabelle in S zeigt, aus der CASCADE-Hülle heraus — GUARD 1 fragte ihre
+//!    Spalten nie ab, ihre PII überlebte die Schwärzung still.
 //! 3. [`scrubbe_aus_registry`] treibt den tatsächlichen Scrub **data-driven** aus den
 //!    `Scrub`-Einträgen → kein Drift zwischen Guard und Scrub möglich (die Statements
 //!    entstehen aus denselben compile-time-Konstanten, die der Guard prüft).
@@ -131,10 +138,6 @@ const G_TRIAGE: &str =
      bleibt pro Zeile nur registrier_nr + Kategorie + Zeitstempel → anonymisiertes Statistik-Skelett";
 const G_TIER: &str =
     "Reine Tierbeschreibung (kein Personenbezug; Halter-Direktdaten werden gescrubbt)";
-const G_CHAT: &str =
-    "Chat-Führungskommunikation, RETAIN v1 (Scrub-Follow-up getaggt) — im ETB koppelbar";
-const G_ERINNERUNG: &str =
-    "Erinnerungs-/Wiedervorlage-Freitext, RETAIN v1 (Scrub-Follow-up getaggt) — operativ";
 const G_ABGLEICH: &str =
     "Vermisst-/Gefunden-Abgleich-Verknüpfung (Struktur; die verknüpften Personen-Zeilen \
      werden selbst gescrubbt)";
@@ -594,6 +597,10 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("typ", G_ENUM),
             retain("geometrie_typ", G_ENUM),
             retain("geometrie", G_GEO),
+            // Das Label überlebt im System-ETB-Wortlaut („Gefahrengebiet «…» eingerichtet“,
+            // `routes/lage_zone.rs::etb_text`) — ETB-Politik G_ETB, Präzedenz LFH-632/E9
+            // (Dokumenttitel). Entscheidung des Auftraggebers zu LFH-283: dokumentieren und
+            // pinnen (`tests/gefahr.rs::schwaerzung_nullt_zonen_und_gebietslabel_und_haelt_den_etb_wortlaut`).
             scrub("label", Strategie::NullSetzen),
             retain("farbe", G_ENUM),
             scrub("notiz", Strategie::NullSetzen),
@@ -615,6 +622,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
+            // Wie `lage_zone.label`: das Gebietslabel steht im System-ETB des
+            // Warnstufenwechsels („Gefahr «…» in «Label» …“, `routes/gefahr.rs`) und bleibt
+            // dort (G_ETB, Präzedenz LFH-632/E9) — gepinnt im selben Test.
             scrub("label", Strategie::NullSetzen),
             retain("erstellt_von", G_FK),
             retain("erstellt_at", G_ZEIT),
@@ -664,8 +674,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
     },
     // ---------- Operative Struktur: Abschnitte / Einheiten / Räume / UHS / Funk ----------
     // Bezeichnungen/Namen operativer Objekte = Skelett (RETAIN). Nullable Freitext-Zettel
-    // (notiz/bemerkung/hinweis/standort/erreichbarkeit/kommunikationsmittel) können
-    // Betroffenen-PII enthalten → konservativ NULL + REVIEW-Tag (LFH-229).
+    // (notiz/bemerkung/hinweis/standort/erreichbarkeit/abschnittsauftrag) können
+    // Betroffenen-PII enthalten → konservativ NULL + REVIEW-Tag (LFH-229). Der Schlüssel
+    // `kommunikationsmittel` ist KEIN Freitext und bleibt (RETAIN, siehe unten).
     TabellenRegel {
         tabelle: "einsatzabschnitt",
         scoping: Scoping::EinsatzId,
@@ -682,10 +693,17 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("flaeche_geojson", G_GEO),
             retain("tz_fachaufgabe", G_ENUM),
             retain("tz_organisation", G_ENUM),
+            // Seit 0073 eingefrorene Alt-Spalten (read-only Reserve, kein Schreibweg mehr):
+            // Funkgruppen-Label, identisch mit `sprechgruppe.bezeichnung` (ebenfalls
+            // G_OP_LABEL). RETAIN ist die Entscheidung des Auftraggebers zu LFH-140 — sie hier
+            // zu nullen und die Bezeichnung im Katalog stehen zu lassen, wäre inkonsistent.
+            // Gepinnt in `repo::tests::schwaerzung_nullt_alle_abschnitts_freitexte_und_haelt_die_labels`.
             retain("sprechgruppe_tmo", G_OP_LABEL),
             retain("sprechgruppe_dmo", G_OP_LABEL),
             // kommunikationsmittel = Kommunikationsart-Schlüssel (digitalfunk/mobil/festnetz),
-            // kein Personenbezug (LFH-108, Feld-Autor) → RETAIN.
+            // kein Personenbezug (LFH-108, Feld-Autor) → RETAIN. Dass nur diese drei Schlüssel
+            // hineinkommen, erzwingt seit LFH-140 `routes::support::pruefe_kommunikationsmittel`
+            // an POST/PATCH (unbekannt → 400).
             retain(
                 "kommunikationsmittel",
                 "Kommunikationsart-Schlüssel (digitalfunk/mobil/…), kein Personenbezug (LFH-108)",
@@ -721,7 +739,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("soll_mannschaft", G_ZAEHLER),
             scrub("bemerkung", Strategie::NullSetzen), // REVIEW: operativer Freitext-Zettel
             // Funk-Felder (LFH-108, Migration 0086_einheit_funk): kommunikationsmittel =
-            // Kategorie-Schlüssel (RETAIN), erreichbarkeit = mögliche Rufnummer der Führung (Scrub).
+            // Kategorie-Schlüssel (RETAIN, Wertemenge per Handler-Precheck erzwungen, LFH-140),
+            // erreichbarkeit = mögliche Rufnummer der Führung (Scrub).
             retain(
                 "kommunikationsmittel",
                 "Kommunikationsart-Schlüssel (digitalfunk/mobil/…), kein Personenbezug (LFH-108)",
@@ -1389,7 +1408,12 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("erstellt_at", G_ZEIT),
         ],
     },
-    // ---------- Chat / Erinnerungen (RETAIN v1, Scrub-Follow-up getaggt) ----------
+    // ---------- Chat / Erinnerungen (Freitexte gescrubbt, LFH-290) ----------
+    // Chat- und Erinnerungs-Freitexte tragen Personenbezug („Fam. Müller, Tel. …“) und
+    // werden entfernt — auch in soft-gelöschten Nachrichten (`geloescht_at` ist nur ein
+    // Tombstone, der Inhalt blieb stehen). Heraufgestufte Nachrichten liegen als KOPIE in
+    // `etb_eintrag.inhalt` (G_ETB) bzw. `auftrag.auftrag_text` (G_FUEHRUNG) und bleiben
+    // dort als Führungsdokumentation stehen (ETB-Politik, Präzedenz LFH-632/E9).
     TabellenRegel {
         tabelle: "chat_kanal",
         scoping: Scoping::EinsatzId,
@@ -1397,8 +1421,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
-            retain("name", G_CHAT),
-            retain("beschreibung", G_CHAT),
+            scrub("name", Strategie::Platzhalter), // NOT NULL
+            scrub("beschreibung", Strategie::NullSetzen),
             retain("erstellt_von_id", G_FK),
             retain("erstellt_at", G_ZEIT),
             retain("archiviert_at", G_ZEIT),
@@ -1413,7 +1437,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("einsatz_id", G_SCOPE),
             retain("kanal_id", G_FK),
             retain("autor_id", G_FK),
-            retain("inhalt", G_CHAT),
+            scrub("inhalt", Strategie::Platzhalter), // NOT NULL
             retain("erstellt_at", G_ZEIT),
             retain("bearbeitet_at", G_ZEIT),
             retain("geloescht_at", G_ZEIT),
@@ -1424,7 +1448,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
         ],
     },
     TabellenRegel {
-        // Junction; CASCADE von anhang/chat_nachricht räumt sie. Kein Scrub nötig.
+        // Junction; CASCADE von anhang/chat_nachricht räumt sie. Kein Scrub nötig: `anhang`
+        // ist ZeileLoeschen, die Verknüpfung geht per CASCADE mit (belegt in
+        // `repo::tests::schwaerzung_entfernt_chat_und_erinnerungs_freitexte`).
         tabelle: "chat_nachricht_anhang",
         scoping: Scoping::UeberParent {
             fk: "nachricht_id",
@@ -1440,11 +1466,13 @@ pub const TABELLEN: &[TabellenRegel] = &[
         spalten: &[
             retain("id", G_PK),
             retain("einsatz_id", G_SCOPE),
-            retain("titel", G_ERINNERUNG),
-            retain("beschreibung", G_ERINNERUNG),
+            scrub("titel", Strategie::Platzhalter), // NOT NULL
+            scrub("beschreibung", Strategie::NullSetzen),
             retain("faellig_at", G_ZEIT),
             retain("intervall_minuten", G_KONFIG),
-            retain("empfaenger_funktion", G_OP_LABEL),
+            // Freitext-Empfänger (migrations/0044: „noch kein FK“), kann einen Personennamen
+            // tragen („Herr Müller“) — kein reines Funktionslabel (LFH-290).
+            scrub("empfaenger_funktion", Strategie::NullSetzen),
             retain("bezug_typ", G_POLY),
             retain("bezug_id", G_POLY),
             retain("quelle", G_ENUM),
@@ -1646,13 +1674,10 @@ mod tests {
 
     /// Ausgehende FKs einer Tabelle als `(referenzierte_tabelle, on_delete)`.
     async fn fks_von(pool: &SqlitePool, tabelle: &str) -> Vec<(String, String)> {
-        let sql = format!("PRAGMA foreign_key_list('{tabelle}')");
-        sqlx::query(sqlx::AssertSqlSafe(sql))
-            .fetch_all(pool)
+        fk_kanten_von(pool, tabelle)
             .await
-            .unwrap()
-            .iter()
-            .map(|r| (r.get::<String, _>("table"), r.get::<String, _>("on_delete")))
+            .into_iter()
+            .map(|(_, parent, on_delete)| (parent, on_delete))
             .collect()
     }
 
@@ -1660,6 +1685,11 @@ mod tests {
     /// `{einsatz}` ∪ `{Tabellen mit einsatz_id}` ∪ transitive Hülle über
     /// `ON DELETE CASCADE`-FKs ab S. Der benutzer/organisation/personal-Stammdaten-
     /// Teilbaum bleibt außen vor (kein CASCADE-FK, der auf einsatz zeigt).
+    ///
+    /// Die Hülle folgt NUR `CASCADE`. Dass sie damit nichts verliert, ist eine
+    /// Vorbedingung, die GUARD 5 (`guard5_keine_fk_kante_von_aussen_nach_s`, LFH-291)
+    /// erzwingt: jede FK-Kante nach S kommt aus S oder steht begründet auf
+    /// `FREMDKANTEN_ALLOWLIST` — unabhängig von ihrem `on_delete`.
     async fn entdecke_einsatz_scoped(pool: &SqlitePool) -> BTreeSet<String> {
         let alle = alle_tabellen(pool).await;
         let mut s: BTreeSet<String> = BTreeSet::new();
@@ -1794,6 +1824,295 @@ mod tests {
                  die CASCADE-Hülle würde sie irreversibel schwärzen!"
             );
         }
+    }
+
+    // ---------- GUARD 5 (LFH-291): FK-Kanten von außerhalb S nach S ----------
+
+    /// Begründete Ausnahmen zu GUARD 5, Format `(tabelle, spalte, grund)`: einzelne
+    /// FK-Kanten aus Tabellen AUSSERHALB von S nach S, die legitim sind, weil die Zeilen
+    /// nicht einsatz-eigen sind und deshalb NICHT geschwärzt werden (z. B. eine
+    /// Stammdaten-Tabelle mit `REFERENCES einsatz ON DELETE SET NULL`). Je KANTE, nicht je
+    /// Tabelle: eine später ergänzte zweite Kante derselben Tabelle nach S muss eigens
+    /// begründet werden. Der Grund ist Pflicht (`guard5_allowlist_hat_keine_toten_eintraege`).
+    ///
+    /// Was GUARD 5 nicht sieht: Verweise ohne deklarierten FK (polymorphe
+    /// `objekt_typ`/`objekt_id`) und die per `_fts` ausgeschlossenen Tabellen. Die Liste startet LEER, weil der Bestand
+    /// keine einzige solche Kante hat (gemessen über alle Migrationen). Ein Eintrag ohne
+    /// Querkante gilt selbst als Verstoß (`guard5_allowlist_hat_keine_toten_eintraege`),
+    /// sonst veraltet die Liste still.
+    const FREMDKANTEN_ALLOWLIST: &[(&str, &str, &str)] = &[];
+
+    /// Eine FK-Kante aus einer Tabelle außerhalb von S auf eine Tabelle in S.
+    #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+    struct FremdKante {
+        tabelle: String,
+        spalte: String,
+        parent: String,
+        on_delete: String,
+    }
+
+    /// Befund für GUARD 5 (reine Funktion über das Schema): jede FK-Kante aus einer
+    /// Tabelle AUSSERHALB von `s` auf eine Tabelle IN `s` — unabhängig von `on_delete`
+    /// (`SET NULL`, `NO ACTION`, `RESTRICT`, …), abzüglich der Kanten auf `allowlist`.
+    async fn fremde_fk_auf_scoped(
+        pool: &SqlitePool,
+        s: &BTreeSet<String>,
+        allowlist: &[(&str, &str, &str)],
+    ) -> Vec<FremdKante> {
+        let mut befund: Vec<FremdKante> = Vec::new();
+        for t in alle_tabellen(pool).await {
+            if s.contains(&t) {
+                continue;
+            }
+            for (spalte, parent, on_delete) in fk_kanten_von(pool, &t).await {
+                let begruendet = allowlist
+                    .iter()
+                    .any(|(tabelle, sp, _)| *tabelle == t && *sp == spalte);
+                if s.contains(&parent) && !begruendet {
+                    befund.push(FremdKante {
+                        tabelle: t.clone(),
+                        spalte,
+                        parent,
+                        on_delete,
+                    });
+                }
+            }
+        }
+        befund.sort();
+        befund
+    }
+
+    /// Ausgehende FKs einer Tabelle als `(spalte, referenzierte_tabelle, on_delete)`.
+    /// SQLite meldet eine fehlende ON-DELETE-Angabe als `"NO ACTION"`.
+    async fn fk_kanten_von(pool: &SqlitePool, tabelle: &str) -> Vec<(String, String, String)> {
+        let sql = format!("PRAGMA foreign_key_list('{tabelle}')");
+        sqlx::query(sqlx::AssertSqlSafe(sql))
+            .fetch_all(pool)
+            .await
+            .unwrap()
+            .iter()
+            .map(|r| {
+                (
+                    r.get::<String, _>("from"),
+                    r.get::<String, _>("table"),
+                    r.get::<String, _>("on_delete"),
+                )
+            })
+            .collect()
+    }
+
+    /// Allowlist-Einträge, deren `(tabelle, spalte)` im UNGEFILTERTEN Befund keine
+    /// Querkante hat (tot).
+    /// Gegen den ungefilterten Befund, sonst sähe jeder wirksame Eintrag tot aus.
+    fn tote_allowlist_eintraege<'a>(
+        ungefiltert: &[FremdKante],
+        allowlist: &[(&'a str, &'a str, &'a str)],
+    ) -> Vec<(&'a str, &'a str)> {
+        allowlist
+            .iter()
+            .filter(|(tabelle, spalte, _)| {
+                !ungefiltert
+                    .iter()
+                    .any(|k| k.tabelle == *tabelle && k.spalte == *spalte)
+            })
+            .map(|(tabelle, spalte, _)| (*tabelle, *spalte))
+            .collect()
+    }
+
+    /// GUARD 5 (LFH-291): Die Menge S entsteht über `einsatz_id` und die
+    /// `ON DELETE CASCADE`-Hülle. Eine NEUE Tabelle ohne `einsatz_id`, die per `SET NULL`
+    /// oder ohne ON-DELETE-Angabe auf eine Tabelle in S zeigt, fiele aus S heraus — GUARD 1
+    /// fragte ihre Spalten nie ab, ihre PII überlebte die Schwärzung still. Deshalb muss
+    /// JEDE FK-Kante nach S aus S kommen oder begründet auf der Allowlist stehen.
+    #[tokio::test]
+    async fn guard5_keine_fk_kante_von_aussen_nach_s() {
+        let pool = crate::db::test_pool().await;
+        let s = entdecke_einsatz_scoped(&pool).await;
+        let befund = fremde_fk_auf_scoped(&pool, &s, FREMDKANTEN_ALLOWLIST).await;
+        assert!(
+            befund.is_empty(),
+            "FK-Kanten von außerhalb der einsatz-scoped Menge S nach S ({}). Die Zeilen \
+             dieser Tabellen hängen an einem Einsatz, liegen aber nicht in S und würden \
+             NICHT geschwärzt. Sind die Zeilen einsatz-eigen: (1) eine einsatz_id-Spalte \
+             ergänzen oder (2) den FK auf ON DELETE CASCADE umstellen (dann entdeckt die \
+             Hülle die Tabelle, GUARD 1/3 verlangen die Klassifikation). Sind sie es NICHT \
+             (Stammdaten): (3) die Kante mit Begründung auf FREMDKANTEN_ALLOWLIST setzen — \
+             (1)/(2) zögen Stammdaten in die unumkehrbare Schwärzung:\n{}",
+            befund.len(),
+            befund
+                .iter()
+                .map(|k| format!(
+                    "  {}.{} → {} (ON DELETE {})",
+                    k.tabelle, k.spalte, k.parent, k.on_delete
+                ))
+                .collect::<Vec<_>>()
+                .join("\n"),
+        );
+    }
+
+    /// Wächter zu GUARD 5: kein toter Allowlist-Eintrag.
+    #[tokio::test]
+    async fn guard5_allowlist_hat_keine_toten_eintraege() {
+        let pool = crate::db::test_pool().await;
+        let s = entdecke_einsatz_scoped(&pool).await;
+        let ungefiltert = fremde_fk_auf_scoped(&pool, &s, &[]).await;
+        let tot = tote_allowlist_eintraege(&ungefiltert, FREMDKANTEN_ALLOWLIST);
+        for (tabelle, spalte, grund) in FREMDKANTEN_ALLOWLIST {
+            assert!(
+                !grund.trim().is_empty(),
+                "FREMDKANTEN_ALLOWLIST-Eintrag {tabelle}.{spalte} ohne Begründung"
+            );
+        }
+        assert!(
+            tot.is_empty(),
+            "Tote FREMDKANTEN_ALLOWLIST-Einträge (keine FK-Kante mehr nach S) — streichen: \
+             {tot:?}"
+        );
+    }
+
+    /// Beschränkt einen Befund auf die Sondentabellen: die synthetischen Tests sollen auch
+    /// dann grün bleiben, wenn das echte Schema eine begründete Querkante bekommt — die
+    /// Leerheit des echten Schemas prüft `guard5_keine_fk_kante_von_aussen_nach_s`.
+    fn nur_sonden(befund: Vec<FremdKante>) -> Vec<FremdKante> {
+        befund
+            .into_iter()
+            .filter(|k| k.tabelle.starts_with("lfh291_sonde_"))
+            .collect()
+    }
+
+    /// Legt im (je Test eigenen) Pool vier Sondentabellen an: zwei Lecks, die GUARD 5
+    /// melden muss, und zwei Kontrollen, die er NICHT melden darf.
+    async fn lege_fremdkanten_sonden_an(pool: &SqlitePool) {
+        for ddl in [
+            // (a) SET NULL auf einen einsatz-scoped Parent OHNE einsatz_id (uhs_platz liegt
+            //     nur über den CASCADE-FK auf uhs in S).
+            "CREATE TABLE lfh291_sonde_set_null (
+                 id INTEGER PRIMARY KEY,
+                 platz_id INTEGER REFERENCES uhs_platz(id) ON DELETE SET NULL,
+                 freitext TEXT
+             )",
+            // (b) FK ohne ON-DELETE-Angabe (NO ACTION) auf einsatz_person.
+            "CREATE TABLE lfh291_sonde_no_action (
+                 id INTEGER PRIMARY KEY,
+                 person_id INTEGER REFERENCES einsatz_person(id),
+                 freitext TEXT
+             )",
+            // Kontrolle 1: FK auf eine Tabelle AUSSERHALB von S — keine Querkante.
+            "CREATE TABLE lfh291_sonde_extern (
+                 id INTEGER PRIMARY KEY,
+                 benutzer_id INTEGER REFERENCES benutzer(id) ON DELETE SET NULL
+             )",
+            // Kontrolle 2: CASCADE-FK nach S — die Hülle nimmt die Tabelle in S auf, sie
+            //     ist damit kein Fremder mehr.
+            "CREATE TABLE lfh291_sonde_cascade (
+                 id INTEGER PRIMARY KEY,
+                 person_id INTEGER NOT NULL REFERENCES einsatz_person(id) ON DELETE CASCADE
+             )",
+        ] {
+            sqlx::query(ddl).execute(pool).await.unwrap();
+        }
+    }
+
+    /// AK LFH-291: SET NULL auf einen Parent ohne einsatz_id und ein FK ohne ON-DELETE-
+    /// Angabe werden beide gemeldet; FKs nach außen und CASCADE-Kinder nicht.
+    #[tokio::test]
+    async fn guard5_meldet_set_null_und_no_action_kanten_synthetisch() {
+        let pool = crate::db::test_pool().await;
+        lege_fremdkanten_sonden_an(&pool).await;
+        let s = entdecke_einsatz_scoped(&pool).await;
+        assert!(s.contains("uhs_platz") && s.contains("einsatz_person"));
+        assert!(!s.contains("lfh291_sonde_set_null"));
+        assert!(!s.contains("lfh291_sonde_no_action"));
+        assert!(!s.contains("lfh291_sonde_extern"));
+        assert!(
+            s.contains("lfh291_sonde_cascade"),
+            "Kontrolle: das CASCADE-Kind gehört zu S"
+        );
+
+        let befund = nur_sonden(fremde_fk_auf_scoped(&pool, &s, &[]).await);
+        let erwartet = vec![
+            FremdKante {
+                tabelle: "lfh291_sonde_no_action".into(),
+                spalte: "person_id".into(),
+                parent: "einsatz_person".into(),
+                on_delete: "NO ACTION".into(),
+            },
+            FremdKante {
+                tabelle: "lfh291_sonde_set_null".into(),
+                spalte: "platz_id".into(),
+                parent: "uhs_platz".into(),
+                on_delete: "SET NULL".into(),
+            },
+        ];
+        assert_eq!(befund, erwartet, "genau die zwei Lecks, keine Kontrolle");
+    }
+
+    /// Die Allowlist filtert je KANTE, nicht je Tabelle: eine später ergänzte zweite
+    /// Kante derselben Tabelle nach S bleibt sichtbar. Ein Eintrag ohne passende
+    /// Querkante (fremde Tabelle oder falsche Spalte) ist tot.
+    #[tokio::test]
+    async fn guard5_allowlist_filtert_je_kante_und_toter_eintrag_wird_gemeldet_synthetisch() {
+        let pool = crate::db::test_pool().await;
+        lege_fremdkanten_sonden_an(&pool).await;
+        // Zwei Kanten nach S an EINER Tabelle: nur die erste ist begründet.
+        sqlx::query(
+            "CREATE TABLE lfh291_sonde_zwei_kanten (
+                 id INTEGER PRIMARY KEY,
+                 platz_id INTEGER REFERENCES uhs_platz(id) ON DELETE SET NULL,
+                 person_id INTEGER REFERENCES einsatz_person(id) ON DELETE SET NULL,
+                 freitext TEXT
+             )",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        let s = entdecke_einsatz_scoped(&pool).await;
+        let allowlist: &[(&str, &str, &str)] = &[
+            (
+                "lfh291_sonde_set_null",
+                "platz_id",
+                "Sonde: begründete Ausnahme",
+            ),
+            (
+                "lfh291_sonde_zwei_kanten",
+                "platz_id",
+                "Sonde: nur diese Kante",
+            ),
+            (
+                "lfh291_sonde_extern",
+                "benutzer_id",
+                "Sonde: hat keine Kante nach S",
+            ),
+            (
+                "lfh291_sonde_no_action",
+                "gibt_es_nicht",
+                "Sonde: falsche Spalte",
+            ),
+        ];
+
+        let gefiltert = nur_sonden(fremde_fk_auf_scoped(&pool, &s, allowlist).await);
+        let kanten: Vec<(&str, &str)> = gefiltert
+            .iter()
+            .map(|k| (k.tabelle.as_str(), k.spalte.as_str()))
+            .collect();
+        assert_eq!(
+            kanten,
+            vec![
+                ("lfh291_sonde_no_action", "person_id"),
+                ("lfh291_sonde_zwei_kanten", "person_id"),
+            ],
+            "die unbegründete zweite Kante derselben Tabelle bleibt gemeldet"
+        );
+
+        let ungefiltert = fremde_fk_auf_scoped(&pool, &s, &[]).await;
+        assert_eq!(
+            tote_allowlist_eintraege(&ungefiltert, allowlist),
+            vec![
+                ("lfh291_sonde_extern", "benutzer_id"),
+                ("lfh291_sonde_no_action", "gibt_es_nicht"),
+            ],
+            "Einträge mit passender Querkante leben, die übrigen sind tot"
+        );
     }
 
     /// Kohärenz: `ZeileLoeschen` gilt (wenn überhaupt) für ALLE Spalten der Tabelle —

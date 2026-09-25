@@ -124,6 +124,26 @@ pub async fn anhang_antwort(
     Ok((headers, daten).into_response())
 }
 
+/// Die Schlüssel, die `kommunikationsmittel` an Einsatzabschnitt (LFH-86) und Einheit
+/// (LFH-108) tragen darf — dieselben drei, die die Oberfläche als Auswahl anbietet
+/// (`frontend/src/components/FunkErreichbarkeit.tsx`, `KOMMUNIKATIONSMITTEL_LABEL`).
+pub const KOMMUNIKATIONSMITTEL: &[&str] = &["digitalfunk", "mobil", "festnetz"];
+
+/// Handler-Precheck für `kommunikationsmittel` (LFH-140): ein unbekannter Wert ist 400
+/// (das Feld ist für sich unbrauchbar, LFH-267). Die Schwärzungs-Registry hält die Spalte
+/// als Retain („Schlüssel, kein Personenbezug“) — ohne diese Prüfung könnte ein direkter
+/// API-Schreiber dort eine Rufnummer ablegen, die die Schwärzung überlebt. Nimmt den
+/// bereits getrimmten Wert; `None` (fehlend/leer) bleibt erlaubt.
+pub fn pruefe_kommunikationsmittel(wert: Option<&str>) -> Result<(), AppError> {
+    match wert {
+        Some(w) if !KOMMUNIKATIONSMITTEL.contains(&w) => Err(AppError::Validation(format!(
+            "Unbekanntes Kommunikationsmittel «{w}» (erlaubt: {})",
+            KOMMUNIKATIONSMITTEL.join(", ")
+        ))),
+        _ => Ok(()),
+    }
+}
+
 /// Trimmt einen optionalen String und macht ihn bei leerem Ergebnis zu `None`
 /// (leerer/Whitespace-only-Input zählt als „nicht gesetzt").
 pub fn trimme(s: Option<String>) -> Option<String> {

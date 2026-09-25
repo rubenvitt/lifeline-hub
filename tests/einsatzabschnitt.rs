@@ -512,3 +512,96 @@ async fn patch_leerer_name_ist_400_absenter_laesst_namen_stehen() {
     assert_eq!(json["name"], "Nord");
     assert_eq!(json["sortier"], 9);
 }
+
+// ---------- LFH-140: kommunikationsmittel ist ein Schlüssel, kein Freitext ----------
+
+/// Die Registry hält `kommunikationsmittel` als Retain („Schlüssel, kein Personenbezug“).
+/// Das stimmt nur, wenn die Route nichts außer den drei Schlüsseln der Oberfläche annimmt
+/// (`FunkErreichbarkeit.tsx`) — ein direkter API-Schreiber könnte sonst eine Rufnummer
+/// hineinschreiben, die die Schwärzung überlebt. Unbekannt → 400 (LFH-267), leer/fehlend
+/// bleibt erlaubt.
+#[tokio::test]
+async fn kommunikationsmittel_unbekannt_ist_400_bei_post_und_patch() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let basis = format!("/api/einsaetze/{einsatz}/abschnitte");
+
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        &basis,
+        &admin,
+        Some(r#"{"name":"Nord","kommunikationsmittel":"Herr Müller 0170 111"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{json}");
+    assert!(json["error"]
+        .as_str()
+        .unwrap()
+        .contains("Kommunikationsmittel"));
+
+    // Gegenprobe: gültiger Schlüssel, fehlendes Feld und Leerstring sind erlaubt.
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        &basis,
+        &admin,
+        Some(r#"{"name":"Nord","kommunikationsmittel":"mobil"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+    assert_eq!(json["kommunikationsmittel"], "mobil");
+    let a = json["id"].as_i64().unwrap();
+    for body in [
+        r#"{"name":"Süd"}"#,
+        r#"{"name":"Ost","kommunikationsmittel":"  "}"#,
+    ] {
+        let (s, json) = anfrage(&app, "POST", &basis, &admin, Some(body)).await;
+        assert_eq!(s, StatusCode::CREATED, "{body}");
+        assert!(json["kommunikationsmittel"].is_null(), "{body}");
+    }
+
+    let pfad = format!("{basis}/{a}");
+    let (s, _) = anfrage(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(r#"{"kommunikationsmittel":"tetra privat"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    let (_, json) = anfrage(&app, "GET", &basis, &admin, None).await;
+    let nord = json
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|x| x["id"] == a)
+        .unwrap();
+    assert_eq!(
+        nord["kommunikationsmittel"], "mobil",
+        "abgelehnt heißt unverändert"
+    );
+
+    let (s, json) = anfrage(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(r#"{"kommunikationsmittel":"festnetz"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(json["kommunikationsmittel"], "festnetz");
+    let (s, json) = anfrage(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(r#"{"kommunikationsmittel":null}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert!(json["kommunikationsmittel"].is_null());
+}
