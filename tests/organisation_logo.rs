@@ -267,6 +267,29 @@ async fn genau_1_mib_angenommen_ein_byte_mehr_ist_400() {
     );
 }
 
+/// Eine Datei deutlich über dem Body-Limit der Route (1 MiB + 64 KiB) ist ebenfalls 400,
+/// nicht 413: die Spec verlangt für „über 1 MiB" 400, und der realistische Fall ist ein
+/// großes Foto direkt an die API — die Vorprüfung im Client schützt nur die Oberfläche.
+#[tokio::test]
+async fn zwei_mib_ueber_dem_body_limit_ist_400_und_das_logo_bleibt() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (status, _) = hochladen(&app, &admin, &png()).await;
+    assert_eq!(status, StatusCode::OK);
+
+    let (status, json) = hochladen(&app, &admin, &png_mit_groesse(2 * MIB)).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{json:?}");
+    assert!(
+        json["error"].is_string(),
+        "Fehler im {{error}}-Format: {json:?}"
+    );
+    assert_eq!(
+        org(&app, &admin).await["logo"]["groesse"],
+        png().len(),
+        "das bisherige Logo bleibt"
+    );
+}
+
 /// Die Fund-Entscheidung des gemeinsamen Scan-Seams ist 422. Nur auf Einheitsebene
 /// belegt: ohne laufenden clamd lässt sich ein Fund über die Route nicht auslösen. Dass
 /// die Route den Seam überhaupt durchläuft, belegt `tests/organisation_logo_scan.rs` (503).
