@@ -46,7 +46,8 @@ Tag):
   nie gegeneinander verrechnet.
 - **Keine Offline-Erfassung** und damit auch keine `client_id`-Spalte. Eine Spalte ohne
   Queue wäre ein Vertrag, den kein Test prüfen kann. Der Nachzug fügt sie per
-  `ADD COLUMN` mit partiellem UNIQUE hinzu.
+  `ADD COLUMN` mit partiellem UNIQUE hinzu. (Eingelöst durch LFH-675:
+  `openspec/changes/lfh-675-betreuung-meldungen-offline/`.)
 - Keine Verlaufsansicht der Meldereihen, keine Zuordnung Bezirk → aufnehmende Stelle, keine
   Verbleibenden als eigene Menge, kein Alarm „Stelle voll“, keine Schnellaktion in der
   Kommandopalette.

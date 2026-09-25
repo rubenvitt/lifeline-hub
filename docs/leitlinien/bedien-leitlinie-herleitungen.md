@@ -28,12 +28,17 @@ wächst „Stornieren" auf bis zu 72 px und steht bündig neben drei gleich hohe
 Aktionen — beide Dateien mussten im selben Commit in den Bereich von
 `components/aktionsabstand.guard.test.ts`. Wer eine Zeile aus `OFFEN` streicht, prüft den
 zweiten Guard mit.
-**Eine Ausnahme ist geprüft und dauerhaft** (LFH-367/B5g): die vier Knöpfe der UHS-Platzkarte
-hängen an der Backend-Konstante `SCHRITT_Y = 120` aus `raster_position`. Der Innenraum von
-100 px trägt in **keiner** Dichtestufe eine Aktionszeile auf voller Höhe — auch „alles ins
-Dropdown" löst es nicht, dessen Auslöser ist selbst ein Knopf. B5g hat deshalb den **Bedienweg**
-geändert statt der Grösse (Klick auf die ganze Karte, 140 × 116 px, statt Ziehen); die Zeile
-fällt erst mit einer Änderung an `raster_position`. Der Guard scannt **JSX-Tags mit
+**Eine Ausnahme war geprüft und dauerhaft, seit LFH-359/LFH-379 ist sie eine Form je Stufe**: die
+vier Knöpfe der UHS-Platzkarte hängen an der festen Kartengröße (140 × 116, gebunden an
+`SCHRITT_X = 160`/`SCHRITT_Y = 120` aus `raster_position`). Der Innenraum von 100 px trägt in **keiner**
+Dichtestufe eine Aktionszeile auf voller Höhe (LFH-367/B5g). Das zwingt aber nicht zur Ausnahme,
+sondern zu einer anderen **Form**: `platzBedienform` in `uhs/Grundriss.tsx` wählt aus den
+aufgelösten Tokens die Knopfzeile nur in `kompakt` (24 px sind dort der Gate-3-Boden), in
+`komfortabel`/`handschuh` ist die ganze Karte das **eine** Ziel und öffnet das Aktionsmenü (Einträge
+in `controlHeight`). „Alles ins Dropdown“ scheiterte nur, solange der Auslöser ein Knopf **in** der
+Karte war. Die `OFFEN`-Zeile bleibt, weil der Guard Quelltext zählt und keine Dichte kennt;
+Kartengröße und gespeicherte Layouts sind unberührt. Herleitung:
+`openspec/changes/lfh-359-uhs-platzkarte-beruehrungsstufen/design.md`. Der Guard scannt **JSX-Tags mit
 Klammertiefe, nicht per Regex**: `<Button\b[^>]*size="small"` ist mehrzeiligen Elementen blind
 (gemessen 61 statt 82) und verliert einen Treffer schon, wenn eine Pfeilfunktion vor der Prop
 steht — ein Gate, das einen Zeilenumbruch für Fortschritt hält. Was er **nicht** sieht, steht in
@@ -246,14 +251,11 @@ darüber steht. LFH-367/B5g hatte dasselbe `Popconfirm` noch **gehärtet statt e
 bewusst, weil das Entfernen einer bestehenden Rückfrage eine Bedienentscheidung ist und nicht
 ins AK eines Härtungs-Tickets gehört. Wer eine Rückfrage anfasst, entscheidet also zuerst die
 Umkehrbarkeit; `okButtonProps` ist die Antwort auf die zweite Frage, nicht auf die erste.
-**Ein gedeckelter Abstand ist kein fehlender Abstand** (ebenfalls LFH-378): die Aktionszeile
-der UHS-Platzkarte nimmt `token.marginSM` **als Obergrenze**, nicht als Sollwert
-(`aktionsabstand()` in `uhs/Grundriss.tsx`, rein und exportiert nach dem Muster von
-`bedienzielStil`). Grund, gemessen: antd gibt einem icon-only-Knopf `width: controlHeightSM`
-(24 / 48 / 72), und als Flex-Items ohne `flex-shrink: 0` schrumpfen die Knöpfe auf die 124 px
-Innenbreite der Karte. Ab `komfortabel` brauchen vier Knöpfe allein 192 px — dort ginge **jede
-Lücke direkt von der Trefffläche ab**, ein ungedeckeltes `marginSM` machte die Ziele also
-kleiner statt besser. Die Karte ist breitenseitig an `SCHRITT_X = 160` gebunden wie ihre Höhe
-an `SCHRITT_Y = 120` (`uhs/platz_repo.rs`, `raster_position`); das ist dieselbe Ausnahme, nur
-an der anderen Achse. Der Ergebniswert ist **7 / 0 / 0** — die Ungleichheit über zwei Stufen
-ist das, was einen dichteblinden Festwert auffliegen lässt.
+**Ein gedeckelter Abstand war die Übergangslösung** (LFH-378, abgelöst durch LFH-359/LFH-379):
+`aktionsabstand()` nahm `token.marginSM` als **Obergrenze** (7 / 0 / 0), weil die vier
+icon-only-Knöpfe (`width: controlHeightSM`, 24 / 48 / 72) ab `komfortabel` schon ohne Lücke breiter
+waren als die 124 px Innenbreite und als Flex-Items auf rund 31 px schrumpften — jede Lücke ging
+dort von der Trefffläche ab. Heute gibt es diese Zeile in den Berührungsstufen nicht mehr, und
+`platzBedienform` baut eine Zeile nur, wenn der **volle** `marginSM` neben „zurückweisen“
+hineinpasst (4 × 24 + 3 × 7 = 117 ≤ 124); ein Deckel daneben wäre tote Logik. Die Ungleichheit über
+zwei Stufen (Zeile gegen Karte) ist weiter das, was einen dichteblinden Festwert auffliegen lässt.

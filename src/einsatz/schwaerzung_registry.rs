@@ -884,6 +884,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("id", G_PK),
             retain("bezirk_id", G_FK),
             retain("einsatz_id", G_SCOPE),
+            // LFH-675: technische UUID der Offline-Queue, kein Personenbezug.
+            retain("client_id", G_IDEMPOTENZ),
             retain("evakuiert", G_ZAEHLER),
             retain("erhebung", G_ENUM),
             retain("zeitpunkt_at", G_ZEIT),
@@ -928,6 +930,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("id", G_PK),
             retain("stelle_id", G_FK),
             retain("einsatz_id", G_SCOPE),
+            // LFH-675: technische UUID der Offline-Queue, kein Personenbezug.
+            retain("client_id", G_IDEMPOTENZ),
             retain("belegt", G_ZAEHLER),
             retain("zeitpunkt_at", G_ZEIT),
             retain("erfasst_at", G_ZEIT),

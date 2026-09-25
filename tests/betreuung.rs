@@ -1414,3 +1414,320 @@ async fn bezirk_schaltet_die_lagekennzahl_am_einsatz() {
     assert_eq!(s, StatusCode::OK, "{b:?}");
     ist(lagekennzahlen(&app, &admin, e).await, &leer, "storniert");
 }
+
+// ── Offline-Erfassung (LFH-675) ─────────────────────────────────────────────────────────────
+
+fn stand_body(evakuiert: i64, client_id: &str) -> String {
+    serde_json::json!({ "evakuiert": evakuiert, "erhebung": "gezaehlt", "client_id": client_id })
+        .to_string()
+}
+
+fn belegung_body(belegt: i64, client_id: &str) -> String {
+    serde_json::json!({ "belegt": belegt, "client_id": client_id }).to_string()
+}
+
+/// Replay derselben Meldung: 201, dieselbe Meldungskennung, genau ein ETB-Eintrag — für
+/// Stand und Belegung. Der Replay trägt bewusst eine andere Zahl: maßgeblich ist der Schlüssel.
+#[tokio::test]
+async fn replay_liefert_die_bestehende_meldung_ohne_zweiten_etb_eintrag() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let bid = bezirk(&app, &admin, e, "Uferstraße 12–40").await;
+    let sid = stelle(&app, &admin, e, "Turnhalle Ost").await;
+
+    let url_stand = format!("{}/bezirke/{bid}/staende", pfad(e));
+    let (s, erst) = anfrage(
+        &app,
+        "POST",
+        &url_stand,
+        &admin,
+        Some(&stand_body(480, "a1")),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{erst:?}");
+    let (s, wieder) = anfrage(&app, "POST", &url_stand, &admin, Some(&stand_body(9, "a1"))).await;
+    assert_eq!(s, StatusCode::CREATED, "{wieder:?}");
+    assert_eq!(wieder["meldung_id"], erst["meldung_id"]);
+    assert_eq!(wieder["bezirk"]["stand"]["evakuiert"], 480);
+
+    let url_beleg = format!("{}/stellen/{sid}/belegungen", pfad(e));
+    let (s, erst_b) = anfrage(
+        &app,
+        "POST",
+        &url_beleg,
+        &admin,
+        Some(&belegung_body(37, "b1")),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{erst_b:?}");
+    let (s, wieder_b) = anfrage(
+        &app,
+        "POST",
+        &url_beleg,
+        &admin,
+        Some(&belegung_body(37, "b1")),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{wieder_b:?}");
+    assert_eq!(wieder_b["meldung_id"], erst_b["meldung_id"]);
+
+    let etb = etb_eintraege(&app, &admin, e).await;
+    assert_eq!(treffer(&etb, "meldung", &["Uferstraße", "480"]).len(), 1);
+    assert_eq!(treffer(&etb, "meldung", &["Turnhalle Ost", "37"]).len(), 1);
+}
+
+/// Ein leerer Schlüssel ist keiner (zwei Meldungen), ein zu langer ist 400 und speichert nichts.
+#[tokio::test]
+async fn client_id_leer_oder_zu_lang() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let bid = bezirk(&app, &admin, e, "Uferstraße").await;
+    let url = format!("{}/bezirke/{bid}/staende", pfad(e));
+
+    let (s, a) = anfrage(&app, "POST", &url, &admin, Some(&stand_body(1, "  "))).await;
+    assert_eq!(s, StatusCode::CREATED);
+    let (s, b) = anfrage(&app, "POST", &url, &admin, Some(&stand_body(2, "  "))).await;
+    assert_eq!(s, StatusCode::CREATED);
+    assert_ne!(
+        a["meldung_id"], b["meldung_id"],
+        "leer heißt: kein Schlüssel"
+    );
+
+    let lang = "x".repeat(65);
+    let (s, _) = anfrage(&app, "POST", &url, &admin, Some(&stand_body(3, &lang))).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    let url_b = format!(
+        "{}/stellen/{}/belegungen",
+        pfad(e),
+        stelle(&app, &admin, e, "Halle").await
+    );
+    let (s, _) = anfrage(&app, "POST", &url_b, &admin, Some(&belegung_body(3, &lang))).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    let etb = etb_eintraege(&app, &admin, e).await;
+    assert!(treffer(&etb, "meldung", &["Halle"]).is_empty());
+    assert_eq!(treffer(&etb, "meldung", &["Uferstraße"]).len(), 2);
+}
+
+/// Nach Einsatzabschluss kommt eine gespeicherte Meldung als Replay zurück; eine neue bleibt
+/// gesperrt. Ein Schlüssel eines anderen Bezirks ist 422.
+#[tokio::test]
+async fn replay_nach_abschluss_und_schluessel_eines_anderen_bezirks() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let a = bezirk(&app, &admin, e, "Uferstraße").await;
+    let b = bezirk(&app, &admin, e, "Deichweg").await;
+    let url_a = format!("{}/bezirke/{a}/staende", pfad(e));
+    let url_b = format!("{}/bezirke/{b}/staende", pfad(e));
+    let (s, erst) = anfrage(&app, "POST", &url_a, &admin, Some(&stand_body(12, "a3"))).await;
+    assert_eq!(s, StatusCode::CREATED);
+
+    let (s, _) = anfrage(&app, "POST", &url_b, &admin, Some(&stand_body(12, "a3"))).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/abschliessen"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, wieder) = anfrage(&app, "POST", &url_a, &admin, Some(&stand_body(12, "a3"))).await;
+    assert_eq!(s, StatusCode::CREATED, "{wieder:?}");
+    assert_eq!(wieder["meldung_id"], erst["meldung_id"]);
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &url_a,
+        &admin,
+        Some(&stand_body(13, "a3-neu")),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "echter Insert bleibt gesperrt");
+}
+
+/// Die Gates laufen VOR dem Replay-Lookup: ein Beobachter bekommt auch mit einem bekannten
+/// Schlüssel 403 und keine Daten; ein fremder Queue-Besitzer 412.
+#[tokio::test]
+async fn gates_vor_dem_replay() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let sid = stelle(&app, &admin, e, "Turnhalle Ost").await;
+    let url = format!("{}/stellen/{sid}/belegungen", pfad(e));
+    let (s, _) = anfrage(&app, "POST", &url, &admin, Some(&belegung_body(37, "b5"))).await;
+    assert_eq!(s, StatusCode::CREATED);
+
+    let beob = benutzer_anlegen(&app, &admin, "beobachter", "keine").await;
+    rolle_setzen(&app, &admin, e, beob, "beobachter").await;
+    let beob_cookie = login_cookie(&app, "beobachter", "beobachterpw1").await;
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        &url,
+        &beob_cookie,
+        Some(&belegung_body(37, "b5")),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+    assert!(json.get("meldung_id").is_none(), "{json:?}");
+
+    let (s, _) = anfrage_mit_offline_queue_benutzer(
+        &app,
+        "POST",
+        &url,
+        &admin,
+        Some(&belegung_body(37, "b5")),
+        i64::MAX,
+    )
+    .await;
+    assert_eq!(s, StatusCode::PRECONDITION_FAILED);
+    let (s, _) = anfrage_mit_offline_queue_benutzer(
+        &app,
+        "POST",
+        &format!(
+            "{}/bezirke/{}/staende",
+            pfad(e),
+            bezirk(&app, &admin, e, "Ufer").await
+        ),
+        &admin,
+        Some(&stand_body(1, "a5")),
+        i64::MAX,
+    )
+    .await;
+    assert_eq!(s, StatusCode::PRECONDITION_FAILED);
+}
+
+/// Eine Erstmeldung verteilt ETB- und Modul-Ereignis, ihr Replay nichts (design.md D5).
+#[tokio::test]
+async fn replay_verteilt_kein_live_ereignis() {
+    use lifeline_hub::live::LiveEvent;
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let bid = bezirk(&app, &admin, e, "Uferstraße").await;
+    let url = format!("{}/bezirke/{bid}/staende", pfad(e));
+    let mut events = live.abonniere(e);
+
+    let (s, _) = anfrage(&app, "POST", &url, &admin, Some(&stand_body(5, "a6"))).await;
+    assert_eq!(s, StatusCode::CREATED);
+    let mut empfangen = Vec::new();
+    for _ in 0..2 {
+        empfangen.push(
+            tokio::time::timeout(std::time::Duration::from_secs(1), events.recv())
+                .await
+                .expect("Erstmeldung verteilt live")
+                .unwrap()
+                .event,
+        );
+    }
+    assert!(empfangen.contains(&LiveEvent::Etb));
+    assert!(empfangen.contains(&LiveEvent::Betreuung));
+
+    let (s, _) = anfrage(&app, "POST", &url, &admin, Some(&stand_body(5, "a6"))).await;
+    assert_eq!(s, StatusCode::CREATED);
+    assert!(
+        tokio::time::timeout(std::time::Duration::from_millis(150), events.recv())
+            .await
+            .is_err(),
+        "ein Replay verteilt nichts"
+    );
+}
+
+/// Die zwei Spec-Szenarien „Replay nach Zustandswechsel“ dort, wo der Client sie erlebt: am
+/// stornierten Bezirk 201 statt 409, an der geschlossenen Stelle 201 statt 422 — und eine
+/// NEUE Meldung an beiden bleibt abgelehnt.
+#[tokio::test]
+async fn replay_am_stornierten_bezirk_und_an_der_geschlossenen_stelle() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+
+    let bid = bezirk(&app, &admin, e, "Uferstraße").await;
+    let url_stand = format!("{}/bezirke/{bid}/staende", pfad(e));
+    let (s, erst) = anfrage(
+        &app,
+        "POST",
+        &url_stand,
+        &admin,
+        Some(&stand_body(40, "a7")),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("{}/bezirke/{bid}/stornieren", pfad(e)),
+        &admin,
+        Some("{}"),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, wieder) = anfrage(
+        &app,
+        "POST",
+        &url_stand,
+        &admin,
+        Some(&stand_body(40, "a7")),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{wieder:?}");
+    assert_eq!(wieder["meldung_id"], erst["meldung_id"]);
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &url_stand,
+        &admin,
+        Some(&stand_body(1, "a7-neu")),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT);
+
+    let sid = stelle(&app, &admin, e, "Turnhalle Ost").await;
+    let url_beleg = format!("{}/stellen/{sid}/belegungen", pfad(e));
+    let (s, erst) = anfrage(
+        &app,
+        "POST",
+        &url_beleg,
+        &admin,
+        Some(&belegung_body(0, "b7")),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+    let (s, _) = anfrage(
+        &app,
+        "PATCH",
+        &format!("{}/stellen/{sid}", pfad(e)),
+        &admin,
+        Some(r#"{"status":"geschlossen"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, wieder) = anfrage(
+        &app,
+        "POST",
+        &url_beleg,
+        &admin,
+        Some(&belegung_body(0, "b7")),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{wieder:?}");
+    assert_eq!(wieder["meldung_id"], erst["meldung_id"]);
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &url_beleg,
+        &admin,
+        Some(&belegung_body(3, "b7-neu")),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+
+    let etb = etb_eintraege(&app, &admin, e).await;
+    assert_eq!(treffer(&etb, "meldung", &["Uferstraße", "40"]).len(), 1);
+    assert_eq!(treffer(&etb, "meldung", &["Turnhalle Ost"]).len(), 1);
+}

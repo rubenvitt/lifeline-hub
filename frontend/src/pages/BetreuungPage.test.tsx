@@ -7,9 +7,12 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import BetreuungPage from './BetreuungPage';
 import { ladeEinsatz } from '../api/einsaetze';
 import { AuthProvider } from '../auth/AuthContext';
+import { http, HttpResponse } from 'msw';
 import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import type { BetreuungUebersicht, Betreuungsstelle, Evakuierungsbezirk } from '../api/types';
+import { queueLeerenFuerTests, schreibaktionenLaden } from '../offline/queue';
+import { server } from '../test/server';
 
 const einsatz = vi.hoisted(() => ({
   wert: { id: 1, bezeichnung: 'Hochwasser', status: 'aktiv', meine_rolle: 'einsatzleitung' },
@@ -99,7 +102,24 @@ const MIT_DATEN: BetreuungUebersicht = {
   stellen: [TURNHALLE, STADION, SCHULE],
 };
 
+/** Angemeldet als Benutzer 1: Stand- und Belegungsmeldungen laufen offline-fähig über die
+ *  Queue, und die gehört einem Benutzer (LFH-675). */
+const BENUTZER_ID = 1;
+
 function renderPage(pfad = '/einsaetze/1/betreuung') {
+  server.use(
+    http.get('/api/auth/me', () =>
+      HttpResponse.json({
+        id: BENUTZER_ID,
+        anzeigename: 'Leitung',
+        benutzername: 'leitung',
+        system_rolle: 'keiner',
+        org_rolle: 'keine',
+        aktiv: true,
+        erstellt_at: '2026-09-23 08:00:00',
+      }),
+    ),
+  );
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const ergebnis = render(
     <QueryClientProvider client={client}>
@@ -409,10 +429,12 @@ describe('BetreuungPage (LFH-639)', () => {
       const neu = await einsatzAbrufeNach(async () => {
         await userEvent.click(within(dialog).getByRole('button', { name: 'Melden' }));
         await waitFor(() =>
-          expect(api.meldeStand).toHaveBeenCalledWith(1, 5, {
-            evakuiert: 500,
-            erhebung: 'gezaehlt',
-          }),
+          expect(api.meldeStand).toHaveBeenCalledWith(
+            1,
+            5,
+            { evakuiert: 500, erhebung: 'gezaehlt', client_id: expect.any(String) },
+            { offlineQueueBenutzerId: BENUTZER_ID },
+          ),
         );
         await userEvent.click(await screen.findByRole('button', { name: /Rückgängig/ }));
         await waitFor(() => expect(api.nimmStandZurueck).toHaveBeenCalledWith(1, 77));
@@ -442,7 +464,14 @@ describe('BetreuungPage (LFH-639)', () => {
       dialog = await dialogMit('Belegung melden: Turnhalle Ost');
       await userEvent.type(within(dialog).getByLabelText('Belegt (Personen)'), '95');
       await userEvent.click(within(dialog).getByRole('button', { name: 'Melden' }));
-      await waitFor(() => expect(api.meldeBelegung).toHaveBeenCalledWith(1, 8, { belegt: 95 }));
+      await waitFor(() =>
+        expect(api.meldeBelegung).toHaveBeenCalledWith(
+          1,
+          8,
+          { belegt: 95, client_id: expect.any(String) },
+          { offlineQueueBenutzerId: BENUTZER_ID },
+        ),
+      );
       await waitFor(() =>
         expect(screen.getByText(/Belegung Turnhalle Ost gemeldet/)).toBeInTheDocument(),
       );
@@ -451,6 +480,51 @@ describe('BetreuungPage (LFH-639)', () => {
       await userEvent.click(rueckwege[0]);
       await waitFor(() => expect(api.nimmBelegungZurueck).toHaveBeenCalledWith(1, 91));
       expect(api.nimmStandZurueck).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Melden ohne Verbindung (LFH-675)', () => {
+    afterEach(async () => {
+      Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
+      await queueLeerenFuerTests();
+    });
+
+    it('offline: Belegung wird vorgemerkt — Hinweis statt Rückgängig, Dialog schließt', async () => {
+      await queueLeerenFuerTests();
+      Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
+      renderPage();
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'Belegung melden für Turnhalle Ost' }),
+      );
+      const dialog = await dialogMit('Belegung melden: Turnhalle Ost');
+      await userEvent.type(within(dialog).getByLabelText('Belegt (Personen)'), '95');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Melden' }));
+
+      expect(await screen.findByText(/Offline vorgemerkt/)).toBeInTheDocument();
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      expect(screen.queryByRole('button', { name: /Rückgängig/ })).toBeNull();
+      expect(api.meldeBelegung).not.toHaveBeenCalled();
+      const [zeile] = await schreibaktionenLaden(BENUTZER_ID, 1);
+      expect(zeile.aktion).toMatchObject({
+        art: 'belegung',
+        stelle_id: 8,
+        bezeichnung: 'Turnhalle Ost',
+        daten: { belegt: 95, zeitpunkt_at: expect.any(String) },
+      });
+    });
+
+    it('online: gesendet ohne Zeitpunkt — die Serveruhr gilt, Rückgängig bleibt', async () => {
+      api.meldeStand.mockResolvedValue({ meldung_id: 77, bezirk: UFER });
+      renderPage();
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'Stand melden für Bezirk Uferstraße 12–40' }),
+      );
+      const dialog = await dialogMit('Stand melden: Uferstraße 12–40');
+      await userEvent.type(within(dialog).getByLabelText('Evakuiert (Personen)'), '500');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Melden' }));
+      expect(await screen.findByRole('button', { name: /Rückgängig/ })).toBeInTheDocument();
+      expect(api.meldeStand.mock.calls[0][2]).not.toHaveProperty('zeitpunkt_at');
+      expect(screen.queryByText(/Offline vorgemerkt/)).toBeNull();
     });
   });
 
@@ -476,7 +550,14 @@ describe('BetreuungPage (LFH-639)', () => {
       const dialog = await dialogMit('Belegung melden: Turnhalle Ost');
       await userEvent.type(within(dialog).getByLabelText('Belegt (Personen)'), '95');
       await userEvent.click(within(dialog).getByRole('button', { name: 'Melden' }));
-      await waitFor(() => expect(api.meldeBelegung).toHaveBeenCalledWith(1, 8, { belegt: 95 }));
+      await waitFor(() =>
+        expect(api.meldeBelegung).toHaveBeenCalledWith(
+          1,
+          8,
+          { belegt: 95, client_id: expect.any(String) },
+          { offlineQueueBenutzerId: BENUTZER_ID },
+        ),
+      );
     }
 
     beforeEach(() => {

@@ -710,7 +710,8 @@ export function antdKomponenten(
  * ohne Spiegel in `rollen.css`, und erreicht auch die Knöpfe, die antd selbst baut
  * (Bestätigungsblase, Modal-Fuß, Filter-Dropdown), weil sie dieselbe `Button`-Komponente
  * rendern. Ein `style` am einzelnen Knopf schlägt den Kontext — das ist der Weg für eine
- * benannte Ausnahme (Aktionszeile der UHS-Platzkarte, LFH-379), keiner für Neues.
+ * benannte Ausnahme, keiner für Neues. Die einzige bisherige (Aktionszeile der UHS-Platzkarte)
+ * ist mit LFH-379 gefallen: die Zeile steht nur noch in `kompakt`, wo der Boden passt.
  */
 export function antdKnopf(dichte: Dichte = 'kompakt'): NonNullable<ConfigProviderProps['button']> {
   return { style: { minWidth: dichten[dichte].kleineZeilenhoehe } };

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, onTestFinished } from 'vitest';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -6,8 +6,13 @@ import { http, HttpResponse } from 'msw';
 import { MemoryRouter } from 'react-router';
 import { server } from '../../test/server';
 import { App as AntApp, ConfigProvider } from 'antd';
-import Grundriss, { aktionsabstand } from './Grundriss';
-import { antdKnopf, dichten } from '../../theme/tokens';
+import Grundriss, {
+  PLATZ_KARTE_BREITE,
+  PLATZ_KARTE_HOEHE,
+  platzBedienform,
+  platzMenueEintraege,
+} from './Grundriss';
+import { antdKnopf, antdToken, farbenDunkel, type Dichte } from '../../theme/tokens';
 import type { Person, PersonDetail, UhsBelegung, UhsDetail, UhsPlatz } from '../../api/types';
 import { einsatzKeys } from '../../api/queryKeys';
 
@@ -79,7 +84,18 @@ function uhsDetail(over: Partial<UhsDetail>): UhsDetail {
   };
 }
 
-function renderGrundriss(uhs: UhsDetail, personen: Person[], schreibgeschuetzt = false) {
+/**
+ * Rendert mit dem App-Theme der gewählten Dichtestufe (LFH-359). Die Platzkarte liest ihre
+ * Bedienform aus den aufgelösten Tokens (`platzBedienform`); antds Vorgaben ohne Theme
+ * (`marginSM` 12) ergäben die Kartenform — einen Zustand, den die App in `kompakt` nie hat.
+ * Vorgabe ist deshalb `kompakt`, die Tests der Kartenform reichen `komfortabel` herein.
+ */
+function renderGrundriss(
+  uhs: UhsDetail,
+  personen: Person[],
+  schreibgeschuetzt = false,
+  dichte: Dichte = 'kompakt',
+) {
   server.use(http.get('/api/einsaetze/1/personen', () => HttpResponse.json(personen)));
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
   const ergebnis = render(
@@ -87,9 +103,11 @@ function renderGrundriss(uhs: UhsDetail, personen: Person[], schreibgeschuetzt =
     // läuft Grundriss immer unter einer Route.
     <MemoryRouter>
       <QueryClientProvider client={qc}>
-        <AntApp>
-          <Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={schreibgeschuetzt} />
-        </AntApp>
+        <ConfigProvider theme={{ token: antdToken(farbenDunkel, dichte) }}>
+          <AntApp>
+            <Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={schreibgeschuetzt} />
+          </AntApp>
+        </ConfigProvider>
       </QueryClientProvider>
     </MemoryRouter>,
   );
@@ -605,7 +623,8 @@ describe('Grundriss – Platzzuweisung ohne Drag (LFH-367/B5g)', () => {
   it('bietet den Zuweisungsweg auch über das Platzaktionen-Menü an', async () => {
     // Der Wurzelklick ist die grosse Berührungsfläche; im Fükw (Tastatur+Maus) ist das
     // Menü der Weg dorthin, weil ein `div onClick` keinen Tastaturzugang hat. Ein eigener
-    // Knopf auf der Karte scheidet aus — sie ist an SCHRITT_Y gedeckelt (s. Dateikopf).
+    // Knopf auf der Karte scheidet aus — die Zeile trägt mit vier Knöpfen ihre volle Breite
+    // (`platzBedienform`, Dateikopf). In den Berührungsstufen steht er ohnehin im Kartenmenü.
     //
     // DER NAME SAGT BEWUSST NICHT „Tastaturweg": gefahren wird hier mit der Maus. Der Weg
     // ist für die Tastatur gedacht, aber ein antd-Dropdown mit `trigger={['click']}` ist
@@ -831,78 +850,483 @@ describe('Grundriss – Patient-Detail-Drawer (Klick)', () => {
 });
 
 /**
- * Aktionszeile der Platzkarte — der Abstand zwischen dem `danger`-Knopf „zurückweisen"
- * und seinen neutralen Nachbarn (LFH-378 · B5l, Befund 3 aus dem Review zu LFH-367).
- *
- * ── WARUM GEDECKELT UND NICHT SCHLICHT `token.marginSM` ─────────────────────────
- *
- * Der Befund wollte `gap: 4` gegen `token.marginSM` (7 / 11 / 16) tauschen. Die Rechnung
- * im Ticket rechnete mit „vier Knöpfen à 24 px" — das gilt aber nur in der KOMPAKTEN
- * Stufe. Nachgemessen am 31.07.2026: antd gibt einem icon-only-Knopf `width:
- * controlHeightSM` (`button/style/index.js`, `genSizeSmallButtonStyle`), also 24 / 48 / 72.
- * Die Knöpfe sind Flex-Items ohne `flex-shrink: 0` und schrumpfen deshalb auf den
- * Innenraum der Karte. Ab `komfortabel` brauchen allein vier Knöpfe 4 × 48 = 192 px in
- * einer 124 px breiten Zeile — die Zeile ist schon OHNE Lücke überfüllt, und jede Lücke
- * nimmt den Knöpfen zusätzlich Trefffläche weg. Ein ungedeckeltes `marginSM` wäre
- * nominell regelkonform und in der Bedienung schlechter.
- *
- * Deshalb: so viel Abstand wie hineinpasst, höchstens `marginSM`. Der Boden aus LFH-363
- * wird damit im Fükw (kompakt, der PRIMÄRE Einsatzkontext) erfüllt; darüber ist die Zeile
- * breitenseitig an `SCHRITT_X = 160` gebunden, wie ihre Höhe an `SCHRITT_Y = 120`.
- *
- * ── WARUM EINE REINE FUNKTION UND NICHT DAS DOM ─────────────────────────────────
- *
- * `test/utils.tsx` montiert ein nacktes `ConfigProvider` OHNE unser Theme, und jsdom
- * rechnet ohnehin kein Layout — ein gemessener Pixel belegte hier nichts. Geprüft wird der
- * PROP-WERT je Dichtestufe, gegen LITERALE: aus dem Token zurückgelesen prüfte die
- * Behauptung den Token gegen sich selbst.
+ * Kartenform der Platzkarte in den Berührungsstufen (LFH-359 + LFH-379). Gerendert mit dem
+ * App-Theme der Stufe `komfortabel`: dort wählt `platzBedienform` die Karte als EINZIGES Ziel,
+ * ein Tipp öffnet das Aktionsmenü. Die Trefffläche selbst misst Playwright
+ * (`uhs-grundriss-touch.spec.ts`) — jsdom rechnet kein Layout.
  */
-describe('Grundriss – Aktionszeilen-Abstand der Platzkarte (LFH-378)', () => {
-  const tokenFuer = (stufe: keyof typeof dichten) => ({
-    marginSM: dichten[stufe].abstand.sm,
-    controlHeightSM: dichten[stufe].kleineZeilenhoehe,
+describe('Grundriss – Kartenform in den Berührungsstufen (LFH-359)', () => {
+  function offenesMenue(): HTMLElement {
+    const offen = document.querySelector('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]');
+    if (!offen) throw new Error('kein offenes Dropdown-Menü im Baum');
+    return offen as HTMLElement;
+  }
+  const keinOffenesMenue = () =>
+    document.querySelector('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]') === null;
+  /**
+   * „Das Menü ist zu" wird am AUSLÖSER gelesen (`aria-expanded`), nicht am Portal: antd hängt
+   * `ant-dropdown-hidden` erst am Ende der Ausblend-Animation an, und jsdom feuert kein
+   * `transitionend` — das Portal sähe dort offen aus (gemessen).
+   */
+  const menueZu = (name = 'Aktionen zu Bett 1') =>
+    expect(screen.getByRole('button', { name })).toHaveAttribute('aria-expanded', 'false');
+  /** Die Menüeinträge in Reihenfolge, per Teilstring greifbar (Icons bringen ihr
+   *  englisches aria-label mit, s. `platzMenueEintraege`). */
+  const eintraege = () =>
+    within(offenesMenue())
+      .getAllByRole('menuitem')
+      .map((e) => e.textContent ?? '');
+
+  const unbelegt = () =>
+    uhsDetail({ status: 'aktiv', plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
+  const belegtePerson = () =>
+    person({ id: 7, registrier_nr: 7, aktuelle_uhs_id: 1, aktueller_platz_id: 10 });
+  const wartend = () => person({ id: 5, registrier_nr: 5, aktuelle_uhs_id: null });
+
+  it('trägt keine Knöpfe in der Karte, die Karte selbst ist der Auslöser', async () => {
+    renderGrundriss(unbelegt(), [wartend()], false, 'komfortabel');
+    const karte = await screen.findByRole('button', { name: 'Aktionen zu Bett 1' });
+    expect(karte).toBe(screen.getByTestId('platz-karte'));
+    expect(karte).toHaveAttribute('aria-haspopup', 'menu');
+    expect(within(karte).queryAllByRole('button')).toHaveLength(0);
+    // Gegenprobe: die Knöpfe der Zeilenform gibt es nirgends.
+    expect(screen.queryByRole('button', { name: /Platzaktionen zu/ })).not.toBeInTheDocument();
   });
 
-  it('trägt in der kompakten Stufe den Boden aus marginSM', () => {
-    // 4 × 24 = 96 px Knöpfe in 124 px Zeile → 9 px je Lücke übrig, marginSM = 7 passt.
-    expect(aktionsabstand(tokenFuer('kompakt'))).toBe(7);
+  it('öffnet beim Tipp auf einen unbelegten Platz das Menü, nicht den Zuweisungsdialog', async () => {
+    renderGrundriss(unbelegt(), [wartend()], false, 'komfortabel');
+    await userEvent.click(await screen.findByRole('button', { name: 'Aktionen zu Bett 1' }));
+
+    expect(eintraege()[0]).toContain('Patient zuweisen');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Aktionen zu Bett 1' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+
+    // Zweiter Tipp: „Patient zuweisen" öffnet den Dialog, das Menü geht zu.
+    await userEvent.click(within(offenesMenue()).getByText('Patient zuweisen'));
+    expect(await screen.findByRole('combobox', { name: 'Patient' })).toBeInTheDocument();
+    menueZu();
   });
 
-  it('fällt auf 0, wo die Knöpfe die Zeile schon allein füllen', () => {
-    // 4 × 48 = 192 bzw. 4 × 72 = 288 px in 124 px — jede Lücke ginge von der Trefffläche ab.
-    expect(aktionsabstand(tokenFuer('komfortabel'))).toBe(0);
-    expect(aktionsabstand(tokenFuer('handschuh'))).toBe(0);
+  it('führt beim belegten Platz Verbleib oben, Person und Rückweg, zurückweisen zuletzt', async () => {
+    renderGrundriss(unbelegt(), [belegtePerson()], false, 'komfortabel');
+    await userEvent.click(await screen.findByRole('button', { name: 'Aktionen zu Bett 1' }));
+
+    const namen = eintraege();
+    expect(namen[0]).toContain('Verbleib / Entlassung erfassen');
+    expect(namen[1]).toContain('Person öffnen');
+    expect(namen[2]).toContain('Zurück in den Wartebereich');
+    expect(namen[namen.length - 1]).toContain('zurückweisen');
+    expect(
+      within(offenesMenue()).getByRole('menuitem', { name: /zurückweisen/ }).className,
+    ).toContain('danger');
+  });
+
+  it('öffnet über „Person öffnen" den Detail-Drawer', async () => {
+    const p = belegtePerson();
+    server.use(
+      http.get('/api/einsaetze/1/personen/7', () =>
+        HttpResponse.json({ ...p, sichtungen: [], notizen: [], verbleib: [], abgleiche: [] }),
+      ),
+    );
+    renderGrundriss(unbelegt(), [p], false, 'komfortabel');
+    await userEvent.click(await screen.findByRole('button', { name: 'Aktionen zu Bett 1' }));
+    await userEvent.click(within(offenesMenue()).getByText('Person öffnen'));
+    expect(await screen.findByText('Medizinischer Verlauf (neueste zuerst)')).toBeInTheDocument();
+  });
+
+  it('öffnet über „Verbleib / Entlassung erfassen" den Verbleib-Dialog', async () => {
+    renderGrundriss(unbelegt(), [belegtePerson()], false, 'komfortabel');
+    await userEvent.click(await screen.findByRole('button', { name: 'Aktionen zu Bett 1' }));
+    await userEvent.click(within(offenesMenue()).getByText('Verbleib / Entlassung erfassen'));
+    expect(await screen.findByRole('textbox', { name: /Ziel/ })).toBeInTheDocument();
   });
 
   /**
-   * Die eigentliche Aussage: der Wert hängt an der Dichte. Ein dichteblinder Festwert
-   * (`gap: 4`, oder auch ein hart gesetztes `7`) bestünde die Literal-Prüfungen oben
-   * teilweise — erst die UNGLEICHHEIT über zwei Stufen lässt ihn auffliegen.
+   * Ein Tipp auf die Personenmarke der Karte ist in dieser Form KEIN eigener Weg: er steigt
+   * zur Karte auf und öffnet das Menü (verschachtelte 24-px-Ziele verbieten die Stufen).
    */
-  it('ist über zwei Dichtestufen ungleich, statt auf einem Festwert zu kleben', () => {
-    expect(aktionsabstand(tokenFuer('kompakt'))).not.toBe(aktionsabstand(tokenFuer('komfortabel')));
+  it('öffnet beim Tipp auf die Personenmarke das Menü, nicht direkt den Drawer', async () => {
+    renderGrundriss(unbelegt(), [belegtePerson()], false, 'komfortabel');
+    await userEvent.click(await screen.findByText(/R-007/));
+    expect(eintraege()[0]).toContain('Verbleib / Entlassung erfassen');
+    // Der Drawer ist ein `dialog` und stünde sofort im Baum (sein Inhalt lädt erst danach —
+    // eine Textprüfung auf den Inhalt wäre blind, gemessen per Mutationsprobe).
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('löst mit einer Menüwahl weder die Zuweisung aus noch öffnet es das Menü erneut', async () => {
+    const uhs = uhsDetail({
+      status: 'aktiv',
+      plaetze: [platz({ id: 10, bezeichnung: 'Bett 1', verfuegbarkeit: 'frei' })],
+    });
+    let gesendet: unknown = null;
+    server.use(
+      http.post('/api/einsaetze/1/uhs/1/plaetze/10/verfuegbarkeit', async ({ request }) => {
+        gesendet = await request.json();
+        return HttpResponse.json({});
+      }),
+    );
+    // MIT zuweisbarer Person: sonst zeigte ein fälschlich ausgelöster Zuweisungsweg nur
+    // eine Meldung statt eines Dialogs, und die Prüfung darauf wäre blind.
+    renderGrundriss(uhs, [wartend()], false, 'komfortabel');
+    await userEvent.click(await screen.findByRole('button', { name: 'Aktionen zu Bett 1' }));
+    await userEvent.click(within(offenesMenue()).getByText('als defekt markieren'));
+
+    await waitFor(() => expect(gesendet).not.toBeNull());
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    menueZu();
+  });
+
+  it('öffnet das Menü mit Enter und mit der Leertaste', async () => {
+    renderGrundriss(unbelegt(), [wartend()], false, 'komfortabel');
+    const karte = await screen.findByRole('button', { name: 'Aktionen zu Bett 1' });
+    karte.focus();
+    await userEvent.keyboard('{Enter}');
+    expect(eintraege()[0]).toContain('Patient zuweisen');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => menueZu());
+    karte.focus();
+    await userEvent.keyboard(' ');
+    // Am AUSLÖSER gelesen, nicht am Portal: das alte Portal stünde in jsdom nach Esc noch
+    // sichtbar im Baum (kein `transitionend`), eine Prüfung der Einträge wäre hier blind.
+    expect(karte).toHaveAttribute('aria-expanded', 'true');
   });
 
   /**
-   * Und der Deckel greift wirklich am Token, nicht an einer Kopie der Zahl: ein künstlich
-   * kleiner `marginSM` bei kompakter Knopfhöhe muss durchschlagen. Ohne `Math.min` gäbe
-   * die Funktion hier den Platz zurück (9), nicht die Vorgabe (3).
+   * Im Bearbeiten-Modus gehört die Leertaste dem Tastatur-Zug des Layouts (dnd-kits
+   * KeyboardSensor). Und das Enter, das einen laufenden Zug ABLEGT, darf nicht zusätzlich das
+   * Menü öffnen — dnd-kit beendet den Zug an `document`, Reacts Handler an der Karte läuft
+   * vorher und sähe sonst ein gewöhnliches Enter.
    */
-  it('nimmt marginSM als Obergrenze, nicht als Sollwert', () => {
-    expect(aktionsabstand({ marginSM: 3, controlHeightSM: 24 })).toBe(3);
+  it('lässt im Bearbeiten-Modus die Leertaste dem Zug und öffnet beim Ablegen kein Menü', async () => {
+    // dnd-kits KeyboardSensor ruft beim Start `scrollIntoView`, das jsdom nicht kennt.
+    const vorher = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = () => {};
+    onTestFinished(() => {
+      Element.prototype.scrollIntoView = vorher;
+    });
+    renderGrundriss(unbelegt(), [wartend()], false, 'komfortabel');
+    await userEvent.click(await screen.findByRole('button', { name: 'Plätze bearbeiten' }));
+    const karte = await screen.findByRole('button', { name: 'Aktionen zu Bett 1' });
+    karte.focus();
+    await userEvent.keyboard(' ');
+    expect(karte).toHaveAttribute('aria-expanded', 'false');
+    await userEvent.keyboard('{Enter}');
+    expect(karte).toHaveAttribute('aria-expanded', 'false');
+    // Gegenprobe: ohne laufenden Zug öffnet Enter auch im Bearbeiten-Modus das Menü.
+    karte.focus();
+    await userEvent.keyboard('{Enter}');
+    expect(karte).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  /**
+   * Spec „kein weiteres Klickziel verschachtelt" — an einer BELEGTEN Karte, denn nur dort
+   * steckt die ziehbare Personenmarke darin. dnd-kits `useDraggable` setzt `role="button"`
+   * und `tabIndex` auch bei `disabled`; eine unbelegte Karte sähe diesen Fall nie.
+   */
+  it('trägt auch bei belegtem Platz kein fokussierbares Ziel in der Karte', async () => {
+    renderGrundriss(unbelegt(), [belegtePerson()], false, 'komfortabel');
+    const karte = await screen.findByRole('button', { name: 'Aktionen zu Bett 1' });
+    await within(karte).findByText(/R-007/);
+    expect(within(karte).queryAllByRole('button')).toHaveLength(0);
+    expect(karte.querySelectorAll('[tabindex]:not([tabindex="-1"])')).toHaveLength(0);
+    // Die Kinder eines benannten Knopfs sind präsentational — Belegung und Person hängen
+    // deshalb als Beschreibung am Kartenknopf.
+    expect(karte).toHaveAccessibleDescription(/belegt.*R-007/);
+  });
+
+  it('trägt auch ohne Schreibrecht kein fokussierbares Ziel in der belegten Karte', async () => {
+    renderGrundriss(unbelegt(), [belegtePerson()], true, 'komfortabel');
+    const karte = await screen.findByRole('button', { name: 'Bett 1: Person öffnen' });
+    await within(karte).findByText(/R-007/);
+    expect(within(karte).queryAllByRole('button')).toHaveLength(0);
+    expect(karte.querySelectorAll('[tabindex]:not([tabindex="-1"])')).toHaveLength(0);
+  });
+
+  /**
+   * Ein Live-Update, das die Belegung ändert, baut die Einträge um: aus „Patient zuweisen"
+   * würde „Verbleib / Entlassung erfassen", und hinten erschiene das `danger` „zurückweisen"
+   * — unter dem Finger, dieselbe Lage, gegen die LFH-457 gebaut ist. Das offene Menü gehört
+   * zu dem Zustand, in dem es geöffnet wurde, und schließt, wenn der sich ändert.
+   */
+  it('schließt ein offenes Menü, wenn sich die Belegung des Platzes live ändert', async () => {
+    const { client } = renderGrundriss(unbelegt(), [wartend()], false, 'komfortabel');
+    const karte = await screen.findByRole('button', { name: 'Aktionen zu Bett 1' });
+    await userEvent.click(karte);
+    expect(karte).toHaveAttribute('aria-expanded', 'true');
+
+    act(() => {
+      client.setQueryData<Person[]>(einsatzKeys.personen(1), [
+        { ...wartend(), aktuelle_uhs_id: 1, aktueller_platz_id: 10 },
+      ]);
+    });
+    await within(karte).findByText(/R-005/);
+    expect(karte).toHaveAttribute('aria-expanded', 'false');
+
+    // Und es bleibt zu, wenn die Belegung zurückspringt (zweites Live-Update, Rollback
+    // nach 409): der gemerkte Zustand „frei" darf das Menü nicht von selbst wieder öffnen.
+    act(() => {
+      client.setQueryData<Person[]>(einsatzKeys.personen(1), [wartend()]);
+    });
+    await waitFor(() => expect(within(karte).queryByText(/R-005/)).not.toBeInTheDocument());
+    expect(karte).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('bietet im Bearbeiten-Modus Verfügbarkeiten und Löschen, aber kein Zuweisen', async () => {
+    renderGrundriss(unbelegt(), [wartend()], false, 'komfortabel');
+    await userEvent.click(await screen.findByRole('button', { name: 'Plätze bearbeiten' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Aktionen zu Bett 1' }));
+
+    const namen = eintraege();
+    expect(namen.some((n) => n.includes('Patient zuweisen'))).toBe(false);
+    expect(namen.some((n) => n.includes('als defekt markieren'))).toBe(true);
+    expect(namen[namen.length - 1]).toContain('Platz löschen');
+  });
+
+  it('öffnet ohne Schreibrecht beim belegten Platz direkt die Person, ohne Menü', async () => {
+    const p = belegtePerson();
+    server.use(
+      http.get('/api/einsaetze/1/personen/7', () =>
+        HttpResponse.json({ ...p, sichtungen: [], notizen: [], verbleib: [], abgleiche: [] }),
+      ),
+    );
+    renderGrundriss(unbelegt(), [p], true, 'komfortabel');
+    const karte = await screen.findByRole('button', { name: 'Bett 1: Person öffnen' });
+    expect(karte).not.toHaveAttribute('aria-haspopup');
+    await userEvent.click(karte);
+    expect(await screen.findByText('Medizinischer Verlauf (neueste zuerst)')).toBeInTheDocument();
+    expect(keinOffenesMenue()).toBe(true);
+  });
+
+  it('macht ohne Schreibrecht einen unbelegten Platz zu keinem Ziel', async () => {
+    renderGrundriss(unbelegt(), [], true, 'komfortabel');
+    const karte = await screen.findByTestId('platz-karte');
+    expect(karte).not.toHaveAttribute('role');
+    expect(karte).not.toHaveAttribute('tabindex');
+    await userEvent.click(karte);
+    expect(keinOffenesMenue()).toBe(true);
   });
 });
 
 /**
- * Die benannte Ausnahme vom Breitenboden (LFH-381, fällt mit LFH-379).
+ * Bedienform der Platzkarte je Dichtestufe (LFH-359 + LFH-379; Vorgänger LFH-378 · B5l).
  *
- * Der Kontext gibt jedem Knopf `minWidth` = kleine Steuerhöhe. In der 124 px breiten
- * Aktionszeile liefen vier Knöpfe ab `komfortabel` damit über die Karte hinaus, und die
- * schneidet ab — der Menü-Auslöser verschwände. Geprüft wird deshalb unter einem Kontext
- * MIT Boden (Handschuh): ohne die Ausnahme trügen alle vier Knöpfe hier `72px`.
+ * Die Karte ist fest 140 × 116 px (Innenraum 124 × 100), weil `raster_position` im Backend
+ * die Felder vergibt. Eine Aktionszeile aus vier Knöpfen trägt sie nur, solange die Knöpfe in
+ * die 24 px hohe Zeile UND samt dem vollen `marginSM` neben „zurückweisen" (LFH-363) in die
+ * 124 px Breite passen. Das gilt nur in `kompakt`: 4 × 24 + 3 × 7 = 117. Ab `komfortabel`
+ * reißt schon die Höhe (48 > 24) — und die Breite (4 × 48 = 192), das war LFH-379. Dort wird
+ * die ganze Karte das eine Bedienziel und öffnet ein Menü.
+ *
+ * Der Deckel aus LFH-378 (`aktionsabstand`, Ergebnis 7 / 0 / 0) ist entfallen: er schützte
+ * eine Zeile, die zu breit war, und die gibt es nicht mehr. In der Zeilenform ist der Abstand
+ * schlicht `marginSM`, und die Zeilenform gibt es nur, wenn der hineinpasst.
+ *
+ * ── WARUM EINE REINE FUNKTION UND NICHT DAS DOM ─────────────────────────────────
+ *
+ * `test/utils.tsx` montiert ein nacktes `ConfigProvider` OHNE unser Theme, und jsdom rechnet
+ * kein Layout. Geprüft wird deshalb die Entscheidung je Stufe, mit den Tokens aus
+ * `antdToken(…, stufe)` (ein Staffelwechsel in `tokens.ts` zieht den Test mit) gegen
+ * LITERALE Böden (sonst prüfte der Token sich selbst).
  */
-describe('Grundriss – Aktionszeile ohne Breitenboden (LFH-381)', () => {
-  it('alle vier Knöpfe der Platzkarte schlagen den Boden des Kontexts', async () => {
+describe('Grundriss – Bedienform der Platzkarte je Dichtestufe (LFH-359/LFH-379)', () => {
+  const tokenFuer = (stufe: Dichte) => {
+    const t = antdToken(farbenDunkel, stufe)!;
+    return {
+      controlHeight: t.controlHeight!,
+      controlHeightSM: t.controlHeightSM!,
+      marginSM: t.marginSM!,
+    };
+  };
+  /** Innenbreite der Karte: 140 − 2 × 2 Rand − 2 × 6 Polsterung. */
+  const INNENBREITE = 124;
+
+  it('trägt in kompakt die Knopfzeile mit vollem marginSM, und sie passt in die Karte', () => {
+    const form = platzBedienform(tokenFuer('kompakt'));
+    expect(form).toEqual({ form: 'zeile', abstand: 7 });
+    // AK 1 LFH-379: Knopfbreiten + Lücken ≤ Innenbreite. Die Knöpfe sind icon-only und
+    // damit `controlHeightSM` breit (antd `genSizeSmallButtonStyle`), der Boden in kompakt
+    // ist 24 (A1 Gate 3).
+    const t = tokenFuer('kompakt');
+    expect(t.controlHeightSM).toBeGreaterThanOrEqual(24);
+    expect(
+      4 * t.controlHeightSM + 3 * (form.form === 'zeile' ? form.abstand : 0),
+    ).toBeLessThanOrEqual(INNENBREITE);
+  });
+
+  it('macht in komfortabel und Handschuh die ganze Karte zum Bedienziel', () => {
+    expect(platzBedienform(tokenFuer('komfortabel'))).toEqual({ form: 'karte' });
+    expect(platzBedienform(tokenFuer('handschuh'))).toEqual({ form: 'karte' });
+  });
+
+  /** AK 2 LFH-379: ein dichteblinder Festwert flöge erst an der Ungleichheit auf. */
+  it('ist über zwei Dichtestufen ungleich, statt auf einem Festwert zu kleben', () => {
+    expect(platzBedienform(tokenFuer('kompakt'))).not.toEqual(
+      platzBedienform(tokenFuer('komfortabel')),
+    );
+  });
+
+  /**
+   * Die Lücke geht UNGEDECKELT ein: passt der volle `marginSM` neben „zurückweisen" nicht,
+   * gibt es keine Zeile (AK 4 LFH-379, Trennlinie LFH-363). Mit Deckel (der Weg aus LFH-378)
+   * käme hier `zeile` mit einer kleineren Lücke heraus.
+   */
+  it('baut keine Zeile, in der die Lücke neben dem Gefahrknopf gekürzt werden müsste', () => {
+    // 4 × 24 + 3 × 10 = 126 > 124.
+    expect(platzBedienform({ controlHeightSM: 24, marginSM: 10 })).toEqual({
+      form: 'karte',
+    });
+  });
+
+  it('baut keine Zeile, deren Knöpfe höher sind als die 24-px-Aktionszeile', () => {
+    // Schmal genug (4 × 26 + 3 × 2 = 110), aber 26 > 24.
+    expect(platzBedienform({ controlHeightSM: 26, marginSM: 2 })).toEqual({
+      form: 'karte',
+    });
+  });
+
+  it('trägt als Kartenziel in jeder Stufe mindestens die volle Steuerhöhe in beiden Achsen', () => {
+    // Literale Böden der Staffel (A1 Festlegung 4): 30 / 48 / 72. Die Kartenmaße kommen aus
+    // der Komponente — wer die Karte verkleinert, soll hier auffliegen, nicht an einer Kopie.
+    for (const [stufe, boden] of [
+      ['kompakt', 30],
+      ['komfortabel', 48],
+      ['handschuh', 72],
+    ] as const) {
+      expect(tokenFuer(stufe).controlHeight, stufe).toBe(boden);
+      expect(PLATZ_KARTE_BREITE, stufe).toBeGreaterThanOrEqual(boden);
+      expect(PLATZ_KARTE_HOEHE, stufe).toBeGreaterThanOrEqual(boden);
+    }
+  });
+});
+
+/**
+ * Inhalt des Platzmenüs (LFH-359). EINE reine Ableitung für beide Formen: die Zeilenform
+ * behält ihr „…"-Menü unverändert, die Kartenform nimmt die Knöpfe der Zeile als Einträge
+ * mit auf — Primäraktion oben, Gefahr hinter dem Trenner (LFH-365). Geprüft wird die
+ * Schlüsselfolge (Trenner als „—") und die Sperren; die Beschriftung prüfen die
+ * Render-Tests der Kartenform.
+ */
+describe('Grundriss – Inhalt des Platzmenüs (LFH-359)', () => {
+  const grund = {
+    belegt: false,
+    zuweisbar: false,
+    wartebereich: false,
+    bearbeitbar: false,
+    belegungLaeuft: false,
+  };
+  type Eintrag = { key?: unknown; type?: string; disabled?: boolean; danger?: boolean } | null;
+  const folge = (items: Eintrag[]) => items.map((i) => (i?.type === 'divider' ? '—' : i?.key));
+  const gesperrt = (items: Eintrag[]) =>
+    items.filter((i) => i?.disabled).map((i) => i?.key as string);
+  const gefahr = (items: Eintrag[]) => items.filter((i) => i?.danger).map((i) => i?.key as string);
+  const VERF = ['frei', 'defekt', 'aufbereitung', 'gesperrt'];
+
+  describe('Zeilenform (kompakt) — der Bestand, gepinnt', () => {
+    it('unbelegt im Betrieb: Zuweisen, Trenner, Verfügbarkeiten', () => {
+      const items = platzMenueEintraege({ ...grund, form: 'zeile', zuweisbar: true });
+      expect(folge(items)).toEqual(['zuweisen', '—', ...VERF]);
+    });
+    it('belegt: Wartebereich vor den Verfügbarkeiten, keine Patientenaktionen (die sind Knöpfe)', () => {
+      const items = platzMenueEintraege({
+        ...grund,
+        form: 'zeile',
+        belegt: true,
+        wartebereich: true,
+      });
+      expect(folge(items)).toEqual(['wartebereich', ...VERF]);
+    });
+    it('Bearbeiten-Modus: Löschen hinter dem Trenner, als Gefahr', () => {
+      const items = platzMenueEintraege({ ...grund, form: 'zeile', bearbeitbar: true });
+      expect(folge(items)).toEqual([...VERF, '—', 'storno']);
+      expect(gefahr(items)).toEqual(['storno']);
+    });
+  });
+
+  describe('Kartenform (komfortabel/Handschuh)', () => {
+    it('unbelegt: „Patient zuweisen" steht oben', () => {
+      const items = platzMenueEintraege({ ...grund, form: 'karte', zuweisbar: true });
+      expect(folge(items)).toEqual(['zuweisen', '—', ...VERF]);
+    });
+
+    it('belegt: Verbleib oben, dann Person und Wartebereich, zurückweisen hinter dem Trenner', () => {
+      const items = platzMenueEintraege({
+        ...grund,
+        form: 'karte',
+        belegt: true,
+        wartebereich: true,
+      });
+      expect(folge(items)).toEqual([
+        'verbleib',
+        'person',
+        'wartebereich',
+        '—',
+        ...VERF,
+        '—',
+        'zurueckweisen',
+      ]);
+      expect(gefahr(items)).toEqual(['zurueckweisen']);
+    });
+
+    it('Bearbeiten-Modus, unbelegt: Verfügbarkeiten und Löschen, kein Zuweisen', () => {
+      const items = platzMenueEintraege({ ...grund, form: 'karte', bearbeitbar: true });
+      expect(folge(items)).toEqual([...VERF, '—', 'storno']);
+    });
+
+    it('Bearbeiten-Modus, belegt: beide Gefahraktionen im selben Block', () => {
+      const items = platzMenueEintraege({
+        ...grund,
+        form: 'karte',
+        belegt: true,
+        wartebereich: true,
+        bearbeitbar: true,
+      });
+      expect(folge(items).slice(-3)).toEqual(['—', 'zurueckweisen', 'storno']);
+      expect(gefahr(items)).toEqual(['zurueckweisen', 'storno']);
+    });
+
+    /**
+     * LFH-457: sperren statt entfernen. Gesperrt ist, was eine zweite Bewegung derselben
+     * Person anstößt; „Person öffnen" und die Verfügbarkeiten bleiben frei.
+     */
+    it('sperrt bei laufender Belegung die Bewegungen der Person, entfernt aber nichts', () => {
+      const lage = { ...grund, form: 'karte' as const, belegt: true, wartebereich: true };
+      const frei = platzMenueEintraege(lage);
+      const laufend = platzMenueEintraege({ ...lage, belegungLaeuft: true });
+      expect(folge(laufend)).toEqual(folge(frei));
+      expect(gesperrt(laufend)).toEqual(['verbleib', 'wartebereich', 'zurueckweisen']);
+      expect(gesperrt(frei)).toEqual([]);
+    });
+
+    it('sperrt bei laufender Belegung auch das Zuweisen eines freien Platzes', () => {
+      const items = platzMenueEintraege({
+        ...grund,
+        form: 'karte',
+        zuweisbar: true,
+        belegungLaeuft: true,
+      });
+      expect(gesperrt(items)).toEqual(['zuweisen']);
+    });
+  });
+});
+
+/**
+ * Der Breitenboden der Knöpfe gilt auch in der Aktionszeile (LFH-381, Ausnahme gefallen mit
+ * LFH-379).
+ *
+ * LFH-381 hatte die vier Knöpfe der Zeile per `minWidth: 0` vom Boden des Kontexts
+ * ausgenommen, weil sie ab `komfortabel` sonst über die 124 px breite Karte hinausliefen. Die
+ * Zeile gibt es seit LFH-379 nur noch in `kompakt`, und dort ist der Boden (24 px) genau das
+ * Quadrat, mit dem `platzBedienform` rechnet: 4 × 24 + 3 × 7 = 117 ≤ 124. Die Ausnahme wäre
+ * tote Logik und ist entfernt; gepinnt wird deshalb, dass alle vier den Boden TRAGEN.
+ */
+describe('Grundriss – Aktionszeile mit Breitenboden (LFH-381/LFH-379)', () => {
+  it('alle vier Knöpfe der Platzkarte tragen in kompakt den Boden des Kontexts', async () => {
     const p = person({ id: 7, registrier_nr: 7, aktuelle_uhs_id: 1, aktueller_platz_id: 10 });
     const uhs = uhsDetail({
       status: 'aktiv',
@@ -913,7 +1337,10 @@ describe('Grundriss – Aktionszeile ohne Breitenboden (LFH-381)', () => {
     render(
       <MemoryRouter>
         <QueryClientProvider client={qc}>
-          <ConfigProvider button={antdKnopf('handschuh')}>
+          <ConfigProvider
+            theme={{ token: antdToken(farbenDunkel, 'kompakt') }}
+            button={antdKnopf('kompakt')}
+          >
             <AntApp>
               <Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />
             </AntApp>
@@ -929,7 +1356,7 @@ describe('Grundriss – Aktionszeile ohne Breitenboden (LFH-381)', () => {
       screen.getByRole('button', { name: /Platzaktionen zu Bett 1/ }),
     ];
     for (const knopf of knoepfe) {
-      expect(knopf.style.minWidth, knopf.getAttribute('aria-label')!).toBe('0px');
+      expect(knopf.style.minWidth, knopf.getAttribute('aria-label')!).toBe('24px');
     }
   });
 });

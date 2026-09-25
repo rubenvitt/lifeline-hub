@@ -503,6 +503,8 @@ export interface StandmeldungEingabe {
   evakuiert: number;
   erhebung: Erhebung;
   zeitpunkt_at?: string;
+  /** Idempotenzschlüssel der Offline-Queue (LFH-675); ein Replay liefert die gespeicherte Meldung. */
+  client_id?: string;
 }
 
 /**
@@ -546,6 +548,8 @@ export interface BetreuungsstellePatch {
 export interface BelegungsmeldungEingabe {
   belegt: number;
   zeitpunkt_at?: string;
+  /** Idempotenzschlüssel wie bei {@link StandmeldungEingabe} (LFH-675). */
+  client_id?: string;
 }
 
 // ============================== LFH-634 Verpflegung ==============================

@@ -3,20 +3,24 @@
 //!
 //! Gates strukturell über `EinsatzLesezugriff<Betreuung>` (alle Einsatzmitglieder inkl.
 //! Beobachter) bzw. `EinsatzSchreibzugriff<Betreuung>` (Schreibrecht, aktiver Einsatz, Modul).
+//! Die zwei Melde-Routen nehmen `EinsatzSchreibfreigabe<Betreuung>` und prüfen den aktiven
+//! Einsatz selbst, NACH dem Replay-Lookup ihrer `client_id` (LFH-675, design.md D2): eine
+//! offline erfasste und schon gespeicherte Meldung kommt auch nach Einsatzende zurück.
 //! Bodies nur über `JsonBody`, Sub-IDs nur über `PfadParam`.
 //!
 //! **Statuscodes** nach der Konvention in `src/error.rs` (CLAUDE.md „Statuscode-Konvention“,
 //! design.md D3):
 //! - **400** — das Feld für sich: fehlendes Pflichtfeld, unbekannter Enum-Wert, leere
 //!   Bezeichnung, Plangröße/Kapazität < 1, Anzahl < 0, Zeitpunkt unlesbar oder mehr als
-//!   [`ZUKUNFT_TOLERANZ_SEKUNDEN`] in der Zukunft.
+//!   [`ZUKUNFT_TOLERANZ_SEKUNDEN`] in der Zukunft, `client_id` länger als 64 Zeichen.
 //! - **404** — fremdes oder unbekanntes Objekt, Abschnitt eines anderen Einsatzes.
 //! - **409** — nur der Lebenszyklus (storniert) und die doppelte Bezeichnung. Es gibt KEIN
 //!   CAS und damit keinen Überschreiben-Dialog: die zweite 409-Quelle aus LFH-299/300 kann
 //!   hier nicht entstehen.
 //! - **422** — ein umkehrbarer Zustand verbietet die Aktion: belegte Stelle schließen,
 //!   geschlossene Stelle belegen, Belegungsmeldung an geschlossener Stelle zurücknehmen,
-//!   bereits zurückgenommene Meldung erneut zurücknehmen.
+//!   bereits zurückgenommene Meldung erneut zurücknehmen, `client_id` einer Meldung an einem
+//!   anderen Bezirk bzw. einer anderen Stelle (LFH-675).
 //!
 //! Die fachlichen Prüfungen liegen im Repo; die Route liest JSON, Enums und Zeitpunkte und
 //! öffnet die Transaktion. Zeiten werden hier normalisiert (`etb::normalisiere_zeit`), nie im
@@ -28,7 +32,7 @@
 //! wirksame Änderung (Leerlauf-Riegel im Repo, leere `etb_ids`) publiziert nichts.
 
 use axum::extract::{Query, State};
-use axum::http::StatusCode;
+use axum::http::{HeaderMap, StatusCode};
 use axum::Json;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use serde::Deserialize;
@@ -42,7 +46,7 @@ use crate::betreuung::{
     enum_wert, BelegungKopfzahl, BetreuungUebersicht, BetreuungsstelleAnzeige,
     BezirkMeldungAnzeige, EvakuierungsbezirkAnzeige, StelleMeldungAnzeige, StelleNamentlich,
 };
-use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
+use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibfreigabe, EinsatzSchreibzugriff};
 use crate::einsatz::modul::Betreuung;
 use crate::error::AppError;
 use crate::extract::{JsonBody, PfadParam};
@@ -296,42 +300,103 @@ pub async fn bezirk_stornieren(
     ))
 }
 
+/// Höchstlänge einer `client_id` — wie bei Meldung und Person (`routes/meldung.rs`).
+const CLIENT_ID_MAX: usize = 64;
+
+/// Idempotenzschlüssel der Offline-Queue (LFH-675): getrimmt, leer heißt fehlend, zu lang ist
+/// für sich unbrauchbar → 400.
+fn client_id(roh: Option<&str>) -> Result<Option<String>, AppError> {
+    match roh.map(str::trim).filter(|s| !s.is_empty()) {
+        Some(cid) if cid.len() > CLIENT_ID_MAX => Err(AppError::Validation(format!(
+            "client_id zu lang (max. {CLIENT_ID_MAX} Zeichen)"
+        ))),
+        cid => Ok(cid.map(str::to_owned)),
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub struct StandMelden {
     evakuiert: i64,
     /// `gezaehlt` | `geschaetzt`.
     erhebung: String,
-    /// Fehlt = jetzt.
+    /// Fehlt = jetzt. Eine offline vorgemerkte Meldung trägt hier ihren Erfassungszeitpunkt
+    /// (design.md D6), sonst stempelte der Flush die Sendezeit.
     #[serde(default)]
     zeitpunkt_at: Option<String>,
+    /// Idempotenzschlüssel der Offline-Queue (LFH-675).
+    #[serde(default)]
+    client_id: Option<String>,
 }
 
 /// POST /api/einsaetze/{id}/betreuung/bezirke/{bid}/staende
+///
+/// Mit `client_id` idempotent (LFH-675): ein Replay liefert die gespeicherte Meldung (201),
+/// ohne Zeile, ETB-Eintrag oder Live-Ereignis — auch am inzwischen stornierten Bezirk und nach
+/// Einsatzende. Ein Schlüssel, der an einem anderen Bezirk hängt, ist 422.
 pub async fn stand_melden(
     State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Betreuung>,
+    ctx: EinsatzSchreibfreigabe<Betreuung>,
+    headers: HeaderMap,
     PfadParam((_eid, bid)): PfadParam<(i64, i64)>,
     JsonBody(req): JsonBody<StandMelden>,
 ) -> Result<(StatusCode, Json<BezirkMeldungAnzeige>), AppError> {
     let einsatz_id = ctx.einsatz.id;
+    support::fordere_offline_queue_benutzer(&headers, ctx.benutzer.id)?;
+    let client_id = client_id(req.client_id.as_deref())?;
+    // Vorab-Lookup nach den Gates, vor der Aktiv-Prüfung und der Validierung: der Replay
+    // bewertet den Body nicht, maßgeblich ist allein der Schlüssel (Muster `routes/meldung.rs`).
+    if let Some(cid) = client_id.as_deref() {
+        if let Some(replay) = repo::stand_nach_client_id(&state.pool, einsatz_id, cid).await? {
+            let m = repo::replay_am_objekt(replay, bid, "einem anderen Evakuierungsbezirk")?;
+            return Ok((
+                StatusCode::CREATED,
+                Json(bezirk_meldung(&state, einsatz_id, m).await?),
+            ));
+        }
+    }
+    ctx.fordere_aktiv()?;
     let eingabe = StandEingabe {
         evakuiert: req.evakuiert,
         erhebung: enum_wert(&req.erhebung)?,
         zeitpunkt_at: meldezeitpunkt(req.zeitpunkt_at.as_deref(), Utc::now())?,
+        client_id,
     };
     let startwert = startwert(&state, einsatz_id).await?;
     let benutzer_id = ctx.benutzer.id;
+    // Die Transaktion sucht den Schlüssel noch einmal: zwei Flushes, die beide am Vorab-Lookup
+    // vorbeikamen, entscheidet `BEGIN IMMEDIATE` — der zweite ist dann ein Replay (`neu: false`).
     let m = crate::write_retry!(&state.pool, |conn| {
         repo::stand_melden_tx(conn, einsatz_id, bid, benutzer_id, startwert, &eingabe).await
     })?;
-    publiziere(&state, einsatz_id, &[m.etb_id], Objekt::Bezirk(m.objekt_id));
+    if m.neu {
+        publiziere(&state, einsatz_id, &[m.etb_id], Objekt::Bezirk(m.objekt_id));
+    }
     Ok((
         StatusCode::CREATED,
-        Json(BezirkMeldungAnzeige {
-            meldung_id: m.meldung_id,
-            bezirk: repo::bezirk_laden(&state.pool, einsatz_id, m.objekt_id).await?,
-        }),
+        Json(bezirk_meldung(&state, einsatz_id, m).await?),
     ))
+}
+
+async fn bezirk_meldung(
+    state: &AppState,
+    einsatz_id: i64,
+    m: repo::Gemeldet,
+) -> Result<BezirkMeldungAnzeige, AppError> {
+    Ok(BezirkMeldungAnzeige {
+        meldung_id: m.meldung_id,
+        bezirk: repo::bezirk_laden(&state.pool, einsatz_id, m.objekt_id).await?,
+    })
+}
+
+async fn stelle_meldung(
+    state: &AppState,
+    einsatz_id: i64,
+    m: repo::Gemeldet,
+) -> Result<StelleMeldungAnzeige, AppError> {
+    Ok(StelleMeldungAnzeige {
+        meldung_id: m.meldung_id,
+        stelle: repo::stelle_laden(&state.pool, einsatz_id, m.objekt_id).await?,
+    })
 }
 
 /// POST /api/einsaetze/{id}/betreuung/staende/{sid}/zuruecknehmen
@@ -477,35 +542,54 @@ pub async fn stelle_stornieren(
 #[derive(Debug, Deserialize)]
 pub struct BelegungMelden {
     belegt: i64,
-    /// Fehlt = jetzt.
+    /// Fehlt = jetzt; offline vorgemerkt: der Erfassungszeitpunkt (wie [`StandMelden`]).
     #[serde(default)]
     zeitpunkt_at: Option<String>,
+    /// Idempotenzschlüssel der Offline-Queue (LFH-675).
+    #[serde(default)]
+    client_id: Option<String>,
 }
 
 /// POST /api/einsaetze/{id}/betreuung/stellen/{sid}/belegungen
+///
+/// Idempotent wie [`stand_melden`]: ein Replay kommt auch an der inzwischen geschlossenen
+/// Stelle zurück; eine NEUE Meldung dort bleibt 422.
 pub async fn belegung_melden(
     State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Betreuung>,
+    ctx: EinsatzSchreibfreigabe<Betreuung>,
+    headers: HeaderMap,
     PfadParam((_eid, sid)): PfadParam<(i64, i64)>,
     JsonBody(req): JsonBody<BelegungMelden>,
 ) -> Result<(StatusCode, Json<StelleMeldungAnzeige>), AppError> {
     let einsatz_id = ctx.einsatz.id;
+    support::fordere_offline_queue_benutzer(&headers, ctx.benutzer.id)?;
+    let client_id = client_id(req.client_id.as_deref())?;
+    if let Some(cid) = client_id.as_deref() {
+        if let Some(replay) = repo::belegung_nach_client_id(&state.pool, einsatz_id, cid).await? {
+            let m = repo::replay_am_objekt(replay, sid, "einer anderen Betreuungsstelle")?;
+            return Ok((
+                StatusCode::CREATED,
+                Json(stelle_meldung(&state, einsatz_id, m).await?),
+            ));
+        }
+    }
+    ctx.fordere_aktiv()?;
     let eingabe = BelegungEingabe {
         belegt: req.belegt,
         zeitpunkt_at: meldezeitpunkt(req.zeitpunkt_at.as_deref(), Utc::now())?,
+        client_id,
     };
     let startwert = startwert(&state, einsatz_id).await?;
     let benutzer_id = ctx.benutzer.id;
     let m = crate::write_retry!(&state.pool, |conn| {
         repo::belegung_melden_tx(conn, einsatz_id, sid, benutzer_id, startwert, &eingabe).await
     })?;
-    publiziere(&state, einsatz_id, &[m.etb_id], Objekt::Stelle(m.objekt_id));
+    if m.neu {
+        publiziere(&state, einsatz_id, &[m.etb_id], Objekt::Stelle(m.objekt_id));
+    }
     Ok((
         StatusCode::CREATED,
-        Json(StelleMeldungAnzeige {
-            meldung_id: m.meldung_id,
-            stelle: repo::stelle_laden(&state.pool, einsatz_id, m.objekt_id).await?,
-        }),
+        Json(stelle_meldung(&state, einsatz_id, m).await?),
     ))
 }
 

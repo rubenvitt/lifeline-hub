@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
 import type { PropsWithChildren } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { meldeBelegung, meldeStand } from '../api/betreuung';
 import { ApiError, NetzFehler } from '../api/client';
 import { erfasseEtb } from '../api/etb';
 import { legePersonAn } from '../api/einsatzPerson';
@@ -24,6 +25,7 @@ import { useOfflineSync } from './useOfflineSync';
 vi.mock('../api/etb', () => ({ erfasseEtb: vi.fn() }));
 vi.mock('../api/einsatzPerson', () => ({ legePersonAn: vi.fn() }));
 vi.mock('../api/meldungen', () => ({ legeMeldungAn: vi.fn() }));
+vi.mock('../api/betreuung', () => ({ meldeStand: vi.fn(), meldeBelegung: vi.fn() }));
 
 const BENUTZER_A = 11;
 const BENUTZER_B = 22;
@@ -346,5 +348,71 @@ describe('globaler benutzergebundener Offline-Flush (LFH-334)', () => {
 
     await waitFor(() => expect(legePersonAn).toHaveBeenCalledOnce());
     expect(client.getQueryData(einsatzKeys.personen(7))).toBeUndefined();
+  });
+});
+
+describe('Stand- und Belegungsmeldungen in der Offline-Queue (LFH-675)', () => {
+  const stand = {
+    art: 'stand' as const,
+    bezirk_id: 3,
+    bezeichnung: 'Uferstraße',
+    daten: {
+      evakuiert: 200,
+      erhebung: 'gezaehlt' as const,
+      zeitpunkt_at: '2026-09-24 10:00:00',
+      client_id: 'stand-1',
+    },
+  };
+  const belegung = {
+    art: 'belegung' as const,
+    stelle_id: 4,
+    bezeichnung: 'Turnhalle Ost',
+    daten: { belegt: 37, zeitpunkt_at: '2026-09-24 10:01:00', client_id: 'beleg-1' },
+  };
+
+  it('sendet beide mit dem Queue-Besitzer, entfernt sie und invalidiert Betreuung und ETB', async () => {
+    const { client, Wrapper } = wrapperFuer();
+    client.setQueryData(einsatzKeys.betreuung(7), {});
+    client.setQueryData(einsatzKeys.betreuungKopfzahl(7), {});
+    client.setQueryData(einsatzKeys.etb(7), []);
+    vi.mocked(meldeStand).mockResolvedValue({} as Awaited<ReturnType<typeof meldeStand>>);
+    vi.mocked(meldeBelegung).mockResolvedValue({} as Awaited<ReturnType<typeof meldeBelegung>>);
+    await schreibaktionEinreihen(BENUTZER_A, 7, stand);
+    await schreibaktionEinreihen(BENUTZER_A, 7, belegung);
+
+    renderHook(() => useOfflineSync(BENUTZER_A), { wrapper: Wrapper });
+    await waitFor(async () =>
+      expect(await queueZaehlerLaden(BENUTZER_A, 7)).toMatchObject({ ausstehend: 0, abgelehnt: 0 }),
+    );
+    expect(meldeStand).toHaveBeenCalledExactlyOnceWith(7, 3, stand.daten, {
+      offlineQueueBenutzerId: BENUTZER_A,
+    });
+    expect(meldeBelegung).toHaveBeenCalledExactlyOnceWith(7, 4, belegung.daten, {
+      offlineQueueBenutzerId: BENUTZER_A,
+    });
+    expect(legeMeldungAn).not.toHaveBeenCalled();
+    expect(client.getQueryState(einsatzKeys.betreuung(7))?.isInvalidated).toBe(true);
+    expect(client.getQueryState(einsatzKeys.betreuungKopfzahl(7))?.isInvalidated).toBe(true);
+    expect(client.getQueryState(einsatzKeys.etb(7))?.isInvalidated).toBe(true);
+  });
+
+  it('legt eine fachlich abgelehnte Meldung unter „abgelehnt“ ab', async () => {
+    vi.mocked(meldeBelegung).mockRejectedValue(new ApiError(422, 'Stelle geschlossen'));
+    await schreibaktionEinreihen(BENUTZER_A, 7, belegung);
+    renderHook(() => useOfflineSync(BENUTZER_A), { wrapper: wrapperFuer().Wrapper });
+    await waitFor(async () =>
+      expect(await queueZaehlerLaden(BENUTZER_A, 7)).toMatchObject({ ausstehend: 0, abgelehnt: 1 }),
+    );
+  });
+
+  it('lässt sie bei einem transienten Fehler stehen', async () => {
+    vi.mocked(meldeStand).mockRejectedValue(new NetzFehler());
+    await schreibaktionEinreihen(BENUTZER_A, 7, stand);
+    const { unmount } = renderHook(() => useOfflineSync(BENUTZER_A), {
+      wrapper: wrapperFuer().Wrapper,
+    });
+    await waitFor(() => expect(meldeStand).toHaveBeenCalled());
+    expect(await queueZaehlerLaden(BENUTZER_A, 7)).toMatchObject({ ausstehend: 1, abgelehnt: 0 });
+    unmount();
   });
 });

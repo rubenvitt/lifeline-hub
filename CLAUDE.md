@@ -221,6 +221,17 @@ nicht. Das kostet je Personen-Ereignis ein `GET …/betreuung` auf **jeder** Ein
 erreichte auch Lesende ohne Personenrecht und verriete ihnen den Takt der Zuordnungen. `betreuungsstelle` ist seitdem **kein Leaf** mehr, ein Rebuild braucht den FK-Schalter.
 Herleitung: `openspec/changes/lfh-674-verbleib-notunterkunft-betreuungsstelle/design.md`.
 
+**Stand- und Belegungsmeldungen sind offline-fähig (LFH-675).** Sie laufen über die
+Offline-Queue (`offline/schreiben.ts`, Arten `stand`/`belegung`) mit `client_id`, eindeutig
+je Einsatz und Meldereihe (`0122`). Der Replay-Lookup läuft **vor** jeder Zustandsprüfung,
+einmal vorab und einmal in der `BEGIN IMMEDIATE`-Transaktion. Eine gespeicherte Meldung kommt
+deshalb auch am stornierten Bezirk, an der geschlossenen Stelle und nach Einsatzende zurück
+(`EinsatzSchreibfreigabe`), ohne ETB-Eintrag und ohne Live-Ereignis. Ein Schlüssel an einem
+anderen Objekt ist 422. **Den Erfassungszeitpunkt trägt nur die vorgemerkte Kopie**, online
+gilt die Serveruhr. Sonst stempelte der Flush die Sendezeit, oder eine vorgehende Tablet-Uhr
+machte Online-Meldungen zu 400. Anlegen, Ändern, Rücknahmen und die Leermeldung bleiben
+online. Herleitung: `openspec/changes/lfh-675-betreuung-meldungen-offline/design.md`.
+
 **Sichtung ist eine eigene fachliche Farbachse am selben zentralen Ort**, keine A0-Rolle.
 `SichtungsTag` zeigt die feste Kennzeichnung aus `tokens.ts` als umrandetes Farbfeld:
 SK I rot, II gelb, III grün, IV blau, Tote schwarz; „unverletzt“ ohne erfundene Fachfarbe
@@ -531,8 +542,9 @@ Alltag wichtigsten:
   `ConfigProvider`**, nicht `componentSize` und keine punktuellen Größen-Props. **Neues
   punktuelles `size="small"` auf interaktiven Elementen ist verboten**, erzwungen von
   `components/dichte.guard.test.ts` mit einer Schuldmenge `OFFEN`, die nur schrumpfen darf
-  (Stand: nur noch die geprüfte Dauerausnahme, die vier Knöpfe der UHS-Platzkarte in
-  `pages/uhs/Grundriss.tsx`, gebunden an `SCHRITT_Y = 120`). Wer eine Zeile aus `OFFEN`
+  (Stand: nur noch die vier Knöpfe der UHS-Platzkarte in `pages/uhs/Grundriss.tsx` — seit
+  LFH-359 nur in `kompakt` gerendert, wo 24 px der Boden sind; in den Berührungsstufen ist die
+  Karte selbst das eine Ziel mit Aktionsmenü, `platzBedienform`). Wer eine Zeile aus `OFFEN`
   streicht, tut es im selben Commit wie den Fix und prüft `aktionsabstand.guard.test.ts` mit.
   `Card`/`Descriptions`/`Space`/`Liste` dürfen klein bleiben (Abstandsmaß, keine Trefffläche)
   und gehören nicht in `OFFEN`. `controlHeight` = **30/48/72**, `controlHeightSM` = **24/48/72**.
@@ -540,7 +552,8 @@ Alltag wichtigsten:
   `theme/tokens.ts` gibt über `ConfigProvider button.style` jedem Knopf `minWidth` =
   `controlHeightSM`, denn antds `paddingInlineSM` ist das Literal 7 und ein „OK" blieb in jeder
   Stufe ~38 px breit. Ein Boden, keine Polsterung: breite Etiketten bleiben unberührt. Die eine
-  benannte Ausnahme (`minWidth: 0`) ist die Aktionszeile der UHS-Platzkarte; sie fällt mit LFH-379.
+  benannte Ausnahme (`minWidth: 0`, Aktionszeile der UHS-Platzkarte) ist mit LFH-379 gefallen:
+  die Zeile steht nur noch in `kompakt`, und dort ist der Boden das Quadrat, mit dem sie rechnet.
   **Nicht jede antd-Komponente liest die Steuerhöhe** (LFH-380): der `Switch` rechnet seine
   Höhe aus der Schrift (`fontSize × lineHeight` = `fontSize + 8`, also 21,5/23/23 px). `switchMasse` in
   `theme/tokens.ts` bindet ihn über `antdKomponenten(farben, dichte)` an `controlHeightSM`
