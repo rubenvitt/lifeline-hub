@@ -15,7 +15,8 @@ import { expect, test, type Page } from '@playwright/test';
  * fixierten Tabelle bedienbar sein — auch auf 390 px.
  *
  * NACHWEIS 2 — der Druckpfad durch den Bildlaufcontainer. `pages/kraefteuebersichtPrint.css`
- * schaltete bis B2 nur `visibility`; `KatalogTabelle` bringt seit B1 einen waagerechten
+ * schaltete bis B2 nur `visibility` (seit LFH-71 blendet `druck/druck.css` per `display: none`
+ * aus); `KatalogTabelle` bringt seit B1 einen waagerechten
  * Bildlaufcontainer, eine stehende Kopfzeile (zwei getrennte Tabellen plus Halter) und
  * `position: sticky` an Spalte 0 mit. Bündel IV hat die Neutralisierer geschrieben und per
  * TEXT-Prüfung belegt, dass sie dastehen — nicht, dass sie wirken. Der Unterschied ist
@@ -258,10 +259,13 @@ test('Meldebild bei 390 px: das Aufklapp-Symbol lebt in der fixierten Spalte, kl
 /**
  * Computed-Style- und Geometriewerte des Meldebilds im aktuellen Medium.
  *
- * Alles über `evaluate` und `getBoundingClientRect`, NICHT über `toBeVisible`: unter
- * `@media print` setzt `kraefteuebersichtPrint.css` `body * { visibility: hidden }`, und
- * Playwrights Sichtbarkeitsprüfung scheiterte dann an jedem Knoten außerhalb der
- * Druckwurzel — ein Werkzeugfehler, der wie ein Befund aussieht.
+ * Alles über `evaluate` und `getBoundingClientRect`, NICHT über `toBeVisible`: die
+ * Aussagen unten sind Computed-Style-Werte (`overflow`, `position`, `display`), und
+ * `toBeVisible` sagt über sie nichts. Seit LFH-71 blendet `druck/druck.css` alles außerhalb
+ * der Druckwurzel per `display: none` aus (vorher `body * { visibility: hidden }` in
+ * `kraefteuebersichtPrint.css`); die Messung liest nur Knoten INNERHALB der Wurzel und ist
+ * von der Umstellung deshalb nicht berührt — die Neutralisierer der Tabelle stehen
+ * unverändert in `kraefteuebersichtPrint.css`.
  */
 async function druckLage(page: Page) {
   return page.evaluate(() => {

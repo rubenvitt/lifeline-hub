@@ -15,6 +15,7 @@ import { describe, expect, it } from 'vitest';
  * kein Layout, lädt diese Datei nicht und kennt kein `@media print`.
  */
 const DATEI = 'befehlPrint.css';
+const SEITE = 'BefehlDetailPage.tsx';
 const hier = dirname(fileURLToPath(import.meta.url));
 const roh = readFileSync(join(hier, DATEI), 'utf8');
 /** Kommentare tragen Klassennamen — sie färbten jede Selektor-Behauptung trivial grün. */
@@ -111,7 +112,6 @@ describe('befehlPrint.css — Entwurfsausdruck (M86)', () => {
   it('behaelt die Bestandszusicherungen des Druckbereichs', () => {
     const bestand = regeln();
     expect(bestand.some((r) => r.selektor.includes('.befehl-no-print') && versteckt(r))).toBe(true);
-    expect(bestand.some((r) => r.selektor.includes('.befehl-druck .markdown'))).toBe(true);
   });
 
   it('pinnt die Voraussetzung: der Befehl kennt nur split und kein Akkordeon', () => {
@@ -127,23 +127,44 @@ describe('befehlPrint.css — Entwurfsausdruck (M86)', () => {
   });
 });
 
-describe('befehlPrint.css — Papier ist hell (Neuentwurf)', () => {
-  it('setzt Schrift und Grund im Druckbereich unbedingt auf Papierfarben', () => {
-    // Nachtbetrieb ist Vorgabe: ohne diese Regel druckte fast weißer Text auf weißes
-    // Papier. `!important` ist tragend, weil die Bausteine Farben INLINE setzen.
-    const regel = regeln().find(
-      (r) => einzeln(r).includes('.befehl-print-root *') && /color:/.test(r.koerper),
-    );
-    expect(regel, 'keine Farbregel für den Druckbereich').toBeDefined();
-    expect(regel!.koerper).toMatch(/color:\s*black\s*!important/);
-    expect(regel!.koerper).toMatch(/background:\s*transparent\s*!important/);
-  });
-
+describe('befehlPrint.css — Seitenkopf', () => {
   it('blendet den Seitenkopf im Druck aus', () => {
     const regel = regeln().find((r) =>
       einzeln(r).includes(".befehl-print-root [data-lfh='seitenkopf']"),
     );
     expect(regel, 'Seitenkopf wird mitgedruckt').toBeDefined();
     expect(versteckt(regel!)).toBe(true);
+  });
+});
+
+describe('befehlPrint.css — die Mechanik liegt in `druck/druck.css` (LFH-71)', () => {
+  // Die GEGENAUSSAGE zum alten Muster: `body * { visibility: hidden }` plus ein absolut
+  // positionierter Druckbereich druckte in Firefox und Safari nur die erste Seite, und jeder
+  // unsichtbare Knoten belegte weiter Platz. Ausblenden, Fluss, Papierfarben und Umbruch
+  // regelt jetzt EINE Datei für alle Druckstücke; eine zweite Fassung hier liefe still
+  // auseinander.
+  it('blendet nichts per visibility aus', () => {
+    expect(css).not.toMatch(/visibility\s*:/);
+  });
+
+  it('nimmt den Druckbereich nicht aus dem Fluss', () => {
+    expect(css).not.toMatch(/position:\s*absolute/);
+  });
+
+  it('setzt keine zweite Farbregel', () => {
+    for (const r of regeln()) {
+      expect(r.koerper, `Farbregel in befehlPrint.css: ${r.selektor}`).not.toMatch(
+        /(^|;)\s*(color|background)\s*:/,
+      );
+    }
+  });
+
+  it('setzt keine zweite Umbruchregel', () => {
+    expect(css).not.toMatch(/break-(after|before|inside)\s*:/);
+  });
+
+  it('setzt die Druckwurzel-Marke an `.befehl-print-root`', () => {
+    const seite = readFileSync(join(dirname(fileURLToPath(import.meta.url)), SEITE), 'utf8');
+    expect(seite).toMatch(/className="befehl-print-root"\s+data-lfh="druckwurzel"/);
   });
 });

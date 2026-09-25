@@ -329,7 +329,7 @@ function LageberichtDetail() {
   };
 
   return (
-    <div className="lagebericht-print-root">
+    <div className="lagebericht-print-root" data-lfh="druckwurzel">
       <FreigabeDialog
         offen={freigabeWerte !== null}
         titel="Lagebericht freigeben?"
@@ -480,7 +480,9 @@ function LageberichtDetail() {
                 style={{ width: '100%' }}
               />
             </Form.Item>
+            {/* Umschalter = Bedienung, kein Inhalt: im Druck weg (LFH-71). */}
             <Checkbox
+              className="lagebericht-no-print"
               checked={vorschauNeben}
               onChange={(e) => setVorschauNeben(e.target.checked)}
               style={{ marginBottom: token.margin }}

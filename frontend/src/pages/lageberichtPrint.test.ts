@@ -18,6 +18,7 @@ import { describe, expect, it } from 'vitest';
  * und kennt kein `@media print`. Der Text ist die Wahrheit, die im Browser ankommt.
  */
 const DATEI = 'lageberichtPrint.css';
+const SEITE = 'LageberichtDetailPage.tsx';
 const roh = readFileSync(join(dirname(fileURLToPath(import.meta.url)), DATEI), 'utf8');
 /** Kommentare tragen hier Klassennamen und Selektorbruchstücke — sie würden jede
  *  Selektor-Behauptung unten trivial grün färben. */
@@ -163,27 +164,47 @@ describe('lageberichtPrint.css — Entwurfsausdruck (M86)', () => {
     expect(bestand.some((r) => r.selektor.includes('.lagebericht-no-print') && versteckt(r))).toBe(
       true,
     );
-    expect(bestand.some((r) => r.selektor.includes('.lagebericht-druck .markdown'))).toBe(true);
   });
 });
 
-describe('lageberichtPrint.css — Papier ist hell (Neuentwurf)', () => {
-  it('setzt Schrift und Grund im Druckbereich unbedingt auf Papierfarben', () => {
-    // Nachtbetrieb ist Vorgabe: ohne diese Regel druckte fast weißer Text auf weißes
-    // Papier. `!important` ist tragend, weil die Bausteine Farben INLINE setzen.
-    const regel = regeln().find(
-      (r) => einzeln(r).includes('.lagebericht-print-root *') && /color:/.test(r.koerper),
-    );
-    expect(regel, 'keine Farbregel für den Druckbereich').toBeDefined();
-    expect(regel!.koerper).toMatch(/color:\s*black\s*!important/);
-    expect(regel!.koerper).toMatch(/background:\s*transparent\s*!important/);
-  });
-
+describe('lageberichtPrint.css — Seitenkopf', () => {
   it('blendet den Seitenkopf im Druck aus', () => {
     const regel = regeln().find((r) =>
       einzeln(r).includes(".lagebericht-print-root [data-lfh='seitenkopf']"),
     );
     expect(regel, 'Seitenkopf wird mitgedruckt').toBeDefined();
     expect(versteckt(regel!)).toBe(true);
+  });
+});
+
+describe('lageberichtPrint.css — die Mechanik liegt in `druck/druck.css` (LFH-71)', () => {
+  // Die GEGENAUSSAGE zum alten Muster: `body * { visibility: hidden }` plus ein absolut
+  // positionierter Druckbereich druckte in Firefox und Safari nur die erste Seite, und jeder
+  // unsichtbare Knoten belegte weiter Platz. Ausblenden, Fluss, Papierfarben und Umbruch
+  // regelt jetzt EINE Datei für alle Druckstücke; eine zweite Fassung hier liefe still
+  // auseinander.
+  it('blendet nichts per visibility aus', () => {
+    expect(css).not.toMatch(/visibility\s*:/);
+  });
+
+  it('nimmt den Druckbereich nicht aus dem Fluss', () => {
+    expect(css).not.toMatch(/position:\s*absolute/);
+  });
+
+  it('setzt keine zweite Farbregel', () => {
+    for (const r of regeln()) {
+      expect(r.koerper, `Farbregel in lageberichtPrint.css: ${r.selektor}`).not.toMatch(
+        /(^|;)\s*(color|background)\s*:/,
+      );
+    }
+  });
+
+  it('setzt keine zweite Umbruchregel', () => {
+    expect(css).not.toMatch(/break-(after|before|inside)\s*:/);
+  });
+
+  it('setzt die Druckwurzel-Marke an `.lagebericht-print-root`', () => {
+    const seite = readFileSync(join(dirname(fileURLToPath(import.meta.url)), SEITE), 'utf8');
+    expect(seite).toMatch(/className="lagebericht-print-root"\s+data-lfh="druckwurzel"/);
   });
 });

@@ -884,3 +884,43 @@ describe('BefehlDetailPage — gescheiterte Freigabe (LFH-535)', () => {
     expect(within(dialog).queryByText('Abschnitt „Auftrag" ist leer')).toBeNull();
   });
 });
+
+/**
+ * ── DRUCKWURZEL (LFH-71) ─────────────────────────────────────────────────────────
+ *
+ * `druck/druck.css` blendet im Druck ALLES aus, was nicht in der Druckwurzel liegt
+ * (`display: none`). Was außerhalb steht, fehlt also auf Papier — der Guard hier hält fest,
+ * dass die Seite genau EINE Wurzel trägt und die gedruckten Teile in ihr liegen. Ob die
+ * Regeln wirken, misst `e2e/druck-fluss.spec.ts`; jsdom kennt kein `@media print`.
+ */
+describe('BefehlDetailPage — Druckwurzel (LFH-71)', () => {
+  function wurzel(): HTMLElement {
+    const alle = document.querySelectorAll<HTMLElement>('[data-lfh="druckwurzel"]');
+    expect(alle).toHaveLength(1);
+    return alle[0];
+  }
+
+  it('Lesezweig: genau eine Wurzel, Abschnittstitel und Text liegen darin', async () => {
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue({
+      ...befehl('freigegeben'),
+      abschnitte: [{ schluessel: 'lage', text: 'Die Lage ist ruhig.' }],
+    } as never);
+    renderAt(7);
+    const titel = await screen.findByRole('heading', { name: 'Lage' });
+    expect(wurzel()).toContainElement(titel);
+    expect(wurzel()).toContainElement(screen.getByText('Die Lage ist ruhig.'));
+  });
+
+  it('Entwurfszweig: genau eine Wurzel, jede Editor-Vorschau liegt darin', async () => {
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue({
+      ...befehl('entwurf'),
+      abschnitte: [{ schluessel: 'lage', text: 'Die Lage ist ruhig.' }],
+    } as never);
+    renderAt(7);
+    await screen.findByLabelText('Lage');
+    const vorschauen = document.querySelectorAll('.markdown-editor__vorschau');
+    expect(vorschauen.length).toBeGreaterThan(0);
+    for (const v of vorschauen) expect(wurzel()).toContainElement(v as HTMLElement);
+    expect(wurzel()).toContainElement(screen.getByLabelText('Lage'));
+  });
+});

@@ -358,7 +358,7 @@ function BefehlDetail() {
   );
 
   return (
-    <div className="befehl-print-root">
+    <div className="befehl-print-root" data-lfh="druckwurzel">
       <EntwurfNavigationSchutz
         ungespeichert={schutz.ungespeichert && istEntwurf && darfSchreiben}
         // EINE Quelle (LFH-495): `speichertGerade` deckt Autosave UND Knopf ab, seit beide

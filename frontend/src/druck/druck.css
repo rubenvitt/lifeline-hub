@@ -1,0 +1,129 @@
+/* Gemeinsame Druckmechanik (LFH-71, Change `lfh-22-druck-export`, design.md D1/D3).
+   ============================================================================
+   Ein Druckstück markiert seine Wurzel mit `data-lfh="druckwurzel"` — mehr braucht es
+   nicht. Alle Regeln unten greifen nur unter `@media print` und nur, wenn eine Wurzel auf
+   der Seite steht (`:has`). Ohne Wurzel druckt Strg+P den Bildschirm wie vorher.
+
+   WARUM `display: none` UND NICHT `visibility: hidden`: das alte Muster (alles unsichtbar,
+   Druckbereich `position: absolute`) ließ jeden unsichtbaren Knoten seinen Platz behalten
+   und nahm den Druckbereich aus dem Fluss. Firefox und Safari schneiden einen absolut
+   positionierten Bereich nach der ersten Seite ab (LFH-71). Hier steht der Druckbereich im
+   normalen Fluss, und alles andere ist wirklich weg.
+
+   Die generische Ausblende-Regel trifft Kopfleiste, Rail, Modulpanel, Hinweisbanner UND
+   jedes Portal unter `body` (Dialog, `message`, Menü, Drawer), ohne dass jede Stelle eine
+   Marke tragen muss — eine Markenliste veraltete beim nächsten Rahmenteil still.
+
+   `:has()` und komplexe Selektoren in `:not()`: Chromium ≥ 105, Safari ≥ 15.4,
+   Firefox ≥ 121.
+
+   Seiteneigenheiten (Entwurfsregeln M86, `*-no-print`, Seitenkopf, Tabellen-Neutralisierer
+   des Meldebilds) bleiben in den Seiten-Stylesheets. Geprüft wird diese Datei als Quelltext
+   in `druck.test.ts`, ihre Wirkung in `e2e/druck-fluss.spec.ts`. */
+
+@media print {
+  /* Seitenrand und Seitenzählung (D3). Randfelder zeichnet Chromium (ab 131); in Firefox
+     und Safari bleibt das Feld leer, dort kann die Kopf-/Fußzeile des Browsers die
+     Seitenzahl liefern. KEIN freier Text (Org-Name, Einsatz): er müsste als CSS-Zeichenkette
+     in ein `<style>` gesetzt werden — eine Escape-Fläche ohne Gewinn. Die Zuordnung trägt
+     der Druckkopf auf Seite 1. `margin: 15mm` ist die Rechengrundlage der e2e-Maße. */
+  @page {
+    margin: 15mm;
+
+    @bottom-right {
+      content: 'Seite ' counter(page) ' von ' counter(pages);
+      font-size: 9pt;
+    }
+  }
+
+  /* Alles, was weder Wurzel noch Vorfahr noch Nachfahr der Wurzel ist, belegt keinen Platz. */
+  body:has([data-lfh='druckwurzel'])
+    *:not(:has([data-lfh='druckwurzel'])):not([data-lfh='druckwurzel']):not(
+      [data-lfh='druckwurzel'] *
+    ) {
+    display: none !important;
+  }
+
+  /* Vorfahren der Wurzel (inklusive `html` und `body`): Flex-Layout, `min-height: 100vh`,
+     die Content-Polsterung und jeder Bildlaufcontainer fallen weg. Sonst begänne der Druck
+     nicht oben auf der Seite, und ein `overflow: hidden` schnitte ihn ab. Papier ist hell:
+     der Grund wird hier weiß, weil der Nachtbetrieb ihn sonst dunkel setzte. */
+  :has([data-lfh='druckwurzel']) {
+    position: static !important;
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    min-height: 0 !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    width: auto !important;
+    max-width: none !important;
+    background: white !important;
+  }
+
+  /* Die Wurzel steht im Fluss und nutzt die volle Seitenbreite. */
+  [data-lfh='druckwurzel'] {
+    position: static !important;
+    display: block !important;
+    width: auto !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* `EinsatzSeite` begrenzt den Inhalt am Bildschirm auf eine Lesebreite (inline). */
+  [data-lfh='druckwurzel'] [data-lfh='seiten-inhalt'] {
+    max-width: none !important;
+  }
+
+  /* ---- Papier ist hell (Neuentwurf „Instrumententafel", 21.09.2026) ----
+     Nachtbetrieb ist Vorgabe: Text `text` ist fast weiß, die Flächen stehen INLINE fast
+     schwarz. Browser drucken Hintergründe per Vorgabe nicht — übrig bliebe weißer Text auf
+     weißem Papier. `!important` ist Pflicht, weil die Bausteine ihre Farben inline tragen.
+     Benannte Farben statt Hex: Druck ist kein Rollenwert, Gate 5 hält `theme/` als einzige
+     Quelle für Rollenfarben. */
+  [data-lfh='druckwurzel'],
+  [data-lfh='druckwurzel'] * {
+    color: black !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  /* ---- Umbruchregeln ----
+     An der Wurzel, nicht an `.X-druck .markdown`: so gelten sie im Lese- UND im
+     Entwurfszweig (Editor-Vorschau) und auch für den Abschnittstitel, der außerhalb von
+     `.markdown` steht. */
+  [data-lfh='druckwurzel'] :is(h1, h2, h3, h4, h5, h6) {
+    break-after: avoid;
+  }
+
+  [data-lfh='druckwurzel'] :is(p, ul, ol, blockquote, pre, tr, img, figure) {
+    break-inside: avoid;
+  }
+
+  [data-lfh='druckwurzel'] thead {
+    display: table-header-group;
+  }
+
+  [data-lfh='druckwurzel'] img {
+    max-width: 100%;
+  }
+
+  /* Markdown im Druck: Satz der Überschriften und Listen, Links ohne grelle Farbe. Vorher
+     je Seite doppelt in `lageberichtPrint.css` und `befehlPrint.css`. */
+  [data-lfh='druckwurzel'] .markdown :is(h1, h2, h3, h4, h5, h6) {
+    font-weight: 600;
+    margin: 0.75em 0 0.3em;
+    line-height: 1.3;
+  }
+
+  [data-lfh='druckwurzel'] .markdown :is(ul, ol) {
+    padding-left: 1.5em;
+    margin: 0.4em 0;
+  }
+
+  [data-lfh='druckwurzel'] .markdown a {
+    text-decoration: underline;
+  }
+}

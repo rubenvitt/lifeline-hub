@@ -265,3 +265,56 @@ describe('LageberichtDetailPage — gescheiterte Freigabe (LFH-535)', () => {
     expect(within(dialog).queryByText('Abschnitt „Auftrag" ist leer')).toBeNull();
   });
 });
+
+/**
+ * ── DRUCKWURZEL (LFH-71) ─────────────────────────────────────────────────────────
+ *
+ * Zwilling des Blocks in `BefehlDetailPage.test.tsx`: `druck/druck.css` blendet im Druck
+ * alles außerhalb der Wurzel per `display: none` aus. Hier steht, dass es genau eine gibt
+ * und dass Abschnittstitel und Editor-Vorschau im Entwurf in ihr liegen.
+ */
+describe('LageberichtDetailPage — Druckwurzel (LFH-71)', () => {
+  beforeEach(() => {
+    vi.mocked(einsaetzeApi.ladeEinsatz).mockResolvedValue({
+      id: 1,
+      status: 'aktiv',
+      meine_rolle: 'einsatzleitung',
+      bezeichnung: 'Übung',
+    } as never);
+  });
+
+  function wurzel(): HTMLElement {
+    const alle = document.querySelectorAll<HTMLElement>('[data-lfh="druckwurzel"]');
+    expect(alle).toHaveLength(1);
+    return alle[0];
+  }
+
+  it('Lesezweig: genau eine Wurzel, Abschnittstitel und Text liegen darin', async () => {
+    vi.mocked(lageberichteApi.ladeLagebericht).mockResolvedValue(
+      bericht({ abschnitte: [{ schluessel: 'auftrag', text: 'Lage halten.' }] }) as never,
+    );
+    renderBei('/einsaetze/1/lageberichte/9');
+    const titel = await screen.findByRole('heading', { name: 'Auftrag' });
+    expect(wurzel()).toContainElement(titel);
+    expect(wurzel()).toContainElement(screen.getByText('Lage halten.'));
+  });
+
+  it('Entwurfszweig: Abschnittstitel und Editor-Vorschau liegen in der Wurzel, der Umschalter wird nicht gedruckt', async () => {
+    vi.mocked(lageberichteApi.ladeLagebericht).mockResolvedValue(
+      bericht({
+        status: 'entwurf',
+        abschnitte: [{ schluessel: 'auftrag', text: 'Lage halten.' }],
+      }) as never,
+    );
+    renderBei('/einsaetze/1/lageberichte/9');
+    const umschalter = await screen.findByRole('checkbox', { name: 'Vorschau neben dem Text' });
+    await userEvent.click(umschalter);
+    // Abschnittstitel = Kopf des Akkordeons (steht außerhalb von `.markdown`).
+    expect(wurzel()).toContainElement(screen.getAllByText('Auftrag')[0]);
+    const vorschauen = document.querySelectorAll('.markdown-editor__vorschau');
+    expect(vorschauen.length).toBeGreaterThan(0);
+    for (const v of vorschauen) expect(wurzel()).toContainElement(v as HTMLElement);
+    // Ein Umschalter ist Bedienung, kein Inhalt (spec „Rahmen und schwebende Ebenen").
+    expect(umschalter.closest('.lagebericht-no-print')).not.toBeNull();
+  });
+});

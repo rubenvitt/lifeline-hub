@@ -858,8 +858,22 @@ describe('KraefteuebersichtPage — Druck', () => {
     const schirmblock = css.slice(0, css.indexOf('@media print'));
     expect(schirmblock).toMatch(/\.kraefte-nur-print\s*\{[^}]*display:\s*none/);
     expect(druckblock).toMatch(/\.kraefte-nur-print\s*\{[^}]*display:\s*block/);
-    expect(druckblock).toMatch(/thead\s*\{[^}]*display:\s*table-header-group/);
-    expect(druckblock).toMatch(/tr\s*\{[^}]*break-inside:\s*avoid/);
+    // Kopfwiederholung und Zeilenschutz gelten seit LFH-71 für JEDE Druckwurzel und stehen
+    // in `druck/druck.css` — das Meldebild trägt die Marke (Test unten).
+    const gemeinsam = readFileSync(join(hier, '..', 'druck', 'druck.css'), 'utf-8');
+    expect(gemeinsam).toMatch(/\] thead\s*\{[^}]*display:\s*table-header-group/);
+    expect(gemeinsam).toMatch(/\btr\b[^{]*\{[^}]*break-inside:\s*avoid/);
+  });
+
+  it('trägt genau eine Druckwurzel, und Druckkopf und Raster liegen darin (LFH-71)', async () => {
+    // `druck/druck.css` blendet im Druck alles außerhalb der Wurzel per `display: none` aus.
+    mitEinheit();
+    const { container } = setup();
+    await screen.findByText('1. Zug');
+    const wurzeln = container.querySelectorAll<HTMLElement>('[data-lfh="druckwurzel"]');
+    expect(wurzeln).toHaveLength(1);
+    expect(wurzeln[0]).toContainElement(screen.getByTestId('kraefte-druckkopf'));
+    expect(wurzeln[0]).toContainElement(container.querySelector('table'));
   });
 });
 

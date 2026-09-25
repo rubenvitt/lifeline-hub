@@ -844,7 +844,7 @@ export default function KraefteuebersichtPage() {
   return (
     // `kraefte-print-root` bleibt die ÄUSSERE Hülle: `kraefteuebersichtPrint.css` hängt daran,
     // und `EinsatzSeite` nimmt kein `className` entgegen.
-    <div className="kraefte-print-root">
+    <div className="kraefte-print-root" data-lfh="druckwurzel">
       <EinsatzSeite
         titel="Meldebild"
         meta={meta}
