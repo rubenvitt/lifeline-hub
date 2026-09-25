@@ -427,6 +427,7 @@ export default function BetreuungPage() {
           />
           <StellenBlock
             stellen={stellen}
+            namentlich={betreuungQuery.data?.namentlich}
             ladend={ladend}
             darfSchreiben={darfSchreiben}
             hervorgehoben={hervorhebung?.art === 'stelle' ? hervorhebung.id : null}

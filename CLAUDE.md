@@ -206,6 +206,21 @@ Setzen der Zuordnung ohne Modulrecht ist 403, Storno löst die Flächen im selbe
 `0119` ist der erste Rebuild von `lage_zone`. Herleitung:
 `openspec/changes/lfh-673-betreuung-auf-der-lagekarte/design.md`.
 
+**Verbleib „Notunterkunft“ → Betreuungsstelle (LFH-674).** Der Verbleib trägt nur die
+**Kennung** der Stelle (`person_verbleib.betreuungsstelle_id`, Cache
+`einsatz_person.aktuelle_verbleib_betreuungsstelle_id`, `0121`). Den Namen belegt der
+**Client** sichtbar und änderbar im Ziel vor. Der Server kopiert keinen Stellennamen in Ziel,
+Kurzform oder ETB. Die Prüfkette ist 422 (andere Art) → 403 (kein Betreuungsrecht, **vor** jedem
+Lesen der Stelle) → 404 → 409 (storniert). Eine geschlossene Stelle ist erlaubt. **„davon
+namentlich n“** rechnet die Route `…/betreuung` und **nicht** `repo::uebersicht`, denn die
+speist auch den gesicherten Lagestand. Ohne Personenrecht **fehlt** das Feld. Die Zahl geht in
+keine Belegung, Kopfzahl oder Summe ein, führend bleibt die Mengenmeldung. Live nachgeführt
+wird sie über `EINSATZ_STREAM_EVENTS.person → betreuung`, ein zweites Server-Ereignis gibt es
+nicht. Das kostet je Personen-Ereignis ein `GET …/betreuung` auf **jeder** Einsatzseite, weil
+`useModulZaehler` die Query dort hält. Das ist bewusst angenommen: Ein `betreuung`-Ereignis
+erreichte auch Lesende ohne Personenrecht und verriete ihnen den Takt der Zuordnungen. `betreuungsstelle` ist seitdem **kein Leaf** mehr, ein Rebuild braucht den FK-Schalter.
+Herleitung: `openspec/changes/lfh-674-verbleib-notunterkunft-betreuungsstelle/design.md`.
+
 **Sichtung ist eine eigene fachliche Farbachse am selben zentralen Ort**, keine A0-Rolle.
 `SichtungsTag` zeigt die feste Kennzeichnung aus `tokens.ts` als umrandetes Farbfeld:
 SK I rot, II gelb, III grün, IV blau, Tote schwarz; „unverletzt“ ohne erfundene Fachfarbe

@@ -40,7 +40,7 @@ use crate::betreuung::repo::{
 };
 use crate::betreuung::{
     enum_wert, BelegungKopfzahl, BetreuungUebersicht, BetreuungsstelleAnzeige,
-    BezirkMeldungAnzeige, EvakuierungsbezirkAnzeige, StelleMeldungAnzeige,
+    BezirkMeldungAnzeige, EvakuierungsbezirkAnzeige, StelleMeldungAnzeige, StelleNamentlich,
 };
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
 use crate::einsatz::modul::Betreuung;
@@ -125,11 +125,34 @@ fn enum_opt<T: TryFrom<String, Error = String>>(s: Option<String>) -> Result<Opt
 
 /// GET /api/einsaetze/{id}/betreuung — nicht stornierte Bezirke und Stellen mit aktueller
 /// Meldung. Die eine Quelle für Modulseite, Modulzähler und Kennzahl.
+///
+/// LFH-674 (design.md D4): „davon namentlich“ je Stelle steht nur für Lesende, die zusätzlich
+/// das Modul Personen sehen dürfen — dieselbe Rangfolge-Auswertung wie der Modulzähler, nur
+/// für einen Key. Ohne dieses Recht fehlt das Feld, statt 0 zu behaupten. Die Zahl wird hier
+/// gerechnet und nicht in `repo::uebersicht`, weil deren zweiter Konsument der gesicherte
+/// Lagestand ist.
 pub async fn uebersicht(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Betreuung>,
 ) -> Result<Json<BetreuungUebersicht>, AppError> {
-    Ok(Json(repo::uebersicht(&state.pool, ctx.einsatz.id).await?))
+    let mut uebersicht = repo::uebersicht(&state.pool, ctx.einsatz.id).await?;
+    // Ein 403 heißt „keine Auskunft“; jeder andere Fehler (DB) bleibt ein Fehler, statt still
+    // als fehlendes Recht durchzugehen.
+    let personen_erlaubt = match ctx.fordere_modul_zugriff(&state.pool, "personen").await {
+        Ok(()) => true,
+        Err(AppError::Forbidden) => false,
+        Err(e) => return Err(e),
+    };
+    if personen_erlaubt {
+        uebersicht.namentlich = Some(
+            crate::person::repo::namentlich_je_stelle(&state.pool, ctx.einsatz.id)
+                .await?
+                .into_iter()
+                .map(|(stelle_id, anzahl)| StelleNamentlich { stelle_id, anzahl })
+                .collect(),
+        );
+    }
+    Ok(Json(uebersicht))
 }
 
 #[derive(Debug, Deserialize)]

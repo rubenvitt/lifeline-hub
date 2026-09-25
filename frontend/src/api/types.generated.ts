@@ -455,6 +455,14 @@ export interface components {
          */
         BetreuungUebersicht: {
             bezirke: components["schemas"]["EvakuierungsbezirkAnzeige"][];
+            /**
+             * @description „davon namentlich“ (LFH-674): je Stelle die Zahl der Personen, deren jüngster Verbleib
+             *     `notunterkunft` an dieser Stelle ist — nur Stellen mit mindestens einer Person. Fehlt
+             *     ganz, wenn der Lesende das Modul Personen nicht sehen darf (nicht „0“). Gefüllt NUR in
+             *     der Route: `repo::uebersicht` speist auch den gesicherten Lagestand. Die Zahl geht in
+             *     keine Belegung, Kopfzahl oder Summe ein — führend ist die Mengenmeldung.
+             */
+            namentlich?: components["schemas"]["StelleNamentlich"][] | null;
             stellen: components["schemas"]["BetreuungsstelleAnzeige"][];
         };
         /** @description Öffentliche Darstellung einer Betreuungsstelle mit ihrer aktuellen Belegung. */
@@ -2501,6 +2509,11 @@ export interface components {
             /** Format: int64 */
             aktuelle_uhs_id?: number | null;
             aktuelle_verbleib_art?: null | components["schemas"]["VerbleibArt"];
+            /**
+             * Format: int64
+             * @description Betreuungsstelle des jüngsten Verbleibs (LFH-674), nur bei `notunterkunft` gesetzt.
+             */
+            aktuelle_verbleib_betreuungsstelle_id?: number | null;
             /** Format: int64 */
             aktueller_platz_id?: number | null;
             aktueller_verbleib?: string | null;
@@ -2906,6 +2919,13 @@ export interface components {
             meldung_id: number;
             stelle: components["schemas"]["BetreuungsstelleAnzeige"];
         };
+        /** @description Namentlich zugeordnete Personen an einer Stelle (LFH-674), Teil von [`BetreuungUebersicht`]. */
+        StelleNamentlich: {
+            /** Format: int64 */
+            anzahl: number;
+            /** Format: int64 */
+            stelle_id: number;
+        };
         /** @description Org-weiter Einsatzstichwort-Vorschlag für die Combobox. */
         StichwortVorschlag: {
             /** Format: int64 */
@@ -3037,6 +3057,12 @@ export interface components {
         /** @description Ein Verbleib-Ereignis (1:1 zu `person_verbleib`). */
         VerbleibAnzeige: {
             art: components["schemas"]["VerbleibArt"];
+            /**
+             * Format: int64
+             * @description Betreuungsstelle eines Notunterkunft-Verbleibs (LFH-674). Nur die Kennung: den Namen
+             *     liest, wer das Modul Betreuung sehen darf, aus dessen Übersicht.
+             */
+            betreuungsstelle_id?: number | null;
             /** Format: int64 */
             einsatz_id: number;
             /** Format: int64 */

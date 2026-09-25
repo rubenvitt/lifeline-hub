@@ -41,7 +41,6 @@ import {
   aktualisierePerson,
   entscheideAbgleich,
   erfasseSichtung,
-  erfasseVerbleib,
   ladePerson,
   ladePersonAudit,
   legeNotizAn,
@@ -64,6 +63,7 @@ import EinsatzSeite from '../components/EinsatzSeite';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import { useEditSitzung, type CasBasis } from '../components/useEditSitzung';
 import PersonVerlauf from '../personen/PersonVerlauf';
+import VerbleibErfassung from '../personen/VerbleibErfassung';
 import KatalogTabelle from '../components/KatalogTabelle';
 import type {
   Person,
@@ -74,7 +74,6 @@ import type {
   Sichtungskategorie,
   Spezies,
   Tier,
-  VerbleibArt,
 } from '../api/types';
 import {
   lagekartePfad,
@@ -385,35 +384,8 @@ export default function PersonenDetailPage() {
     onError: fehler,
   });
 
-  // E-2: Verbleib
+  // E-2: Verbleib (Dialog seit LFH-674 in `personen/VerbleibErfassung.tsx`)
   const [verbleibOffen, setVerbleibOffen] = useState(false);
-  const [verbleibForm] = Form.useForm<{
-    art: VerbleibArt;
-    ziel?: string;
-    transportmittel?: string;
-    notiz?: string;
-  }>();
-  const verbleibMutation = useMutation({
-    mutationFn: (v: {
-      art: VerbleibArt;
-      ziel?: string;
-      transportmittel?: string;
-      notiz?: string;
-    }) =>
-      erfasseVerbleib(einsatzId, personId, {
-        art: v.art,
-        ziel: v.ziel ?? null,
-        transportmittel: v.transportmittel ?? null,
-        status: v.art === 'transport' ? 'abtransportiert' : null,
-        notiz: v.notiz ?? null,
-      }),
-    onSuccess: () => {
-      invalidateDetail();
-      setVerbleibOffen(false);
-      verbleibForm.resetFields();
-    },
-    onError: fehler,
-  });
 
   // LFH-152: UHS-Zuweisung von der Personen-Seite (Gegenrichtung zum Grundriss). art spiegelt
   // die belegMut-Logik des Grundrisses: bereits belegt → wechsel, sonst eintritt. Austragen = austritt.
@@ -1290,41 +1262,14 @@ export default function PersonenDetailPage() {
         </Form>
       </Modal>
 
-      <Modal
-        open={verbleibOffen}
-        title="Verbleib erfassen"
-        okText="Erfassen"
-        confirmLoading={verbleibMutation.isPending}
-        onOk={() => verbleibForm.submit()}
-        onCancel={() => {
-          setVerbleibOffen(false);
-          verbleibForm.resetFields();
-        }}
-        destroyOnHidden
-      >
-        <Form form={verbleibForm} layout="vertical" onFinish={verbleibMutation.mutate}>
-          <Form.Item label="Art" name="art" rules={[{ required: true }]}>
-            <Select
-              options={[
-                { value: 'transport', label: 'Transport' },
-                { value: 'notunterkunft', label: 'Notunterkunft' },
-                { value: 'entlassung', label: 'Entlassung vor Ort' },
-                { value: 'vor_ort', label: 'verbleibt vor Ort' },
-                { value: 'verstorben', label: 'Verbleib des Leichnams' },
-              ]}
-            />
-          </Form.Item>
-          <Form.Item label="Ziel (z. B. Krankenhaus, Freitext)" name="ziel">
-            <Input />
-          </Form.Item>
-          <Form.Item label="Transportmittel (RTW/KTW …)" name="transportmittel">
-            <Input />
-          </Form.Item>
-          <Form.Item label="Notiz" name="notiz">
-            <Input.TextArea rows={2} />
-          </Form.Item>
-        </Form>
-      </Modal>
+      {verbleibOffen && (
+        <VerbleibErfassung
+          einsatzId={einsatzId}
+          personId={personId}
+          onErfasst={invalidateDetail}
+          onSchliessen={() => setVerbleibOffen(false)}
+        />
+      )}
 
       <Modal
         open={uhsModalOffen}

@@ -300,7 +300,12 @@ pub async fn uebersicht(
     .into_iter()
     .map(BetreuungsstelleAnzeige::try_from)
     .collect::<Result<Vec<_>, _>>()?;
-    Ok(BetreuungUebersicht { bezirke, stellen })
+    Ok(BetreuungUebersicht {
+        bezirke,
+        stellen,
+        // Personenbezogene Zahl: setzt nur die Route, nach Prüfung des Personenrechts.
+        namentlich: None,
+    })
 }
 
 /// Lädt einen Bezirk, auch einen stornierten (`storniert_at` gesetzt). `NotFound`, wenn er

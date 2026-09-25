@@ -452,6 +452,9 @@ pub struct PersonAnzeige {
     pub aktuelles_verbleib_ziel: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub aktueller_verbleib_status: Option<VerbleibStatus>,
+    /// Betreuungsstelle des jüngsten Verbleibs (LFH-674), nur bei `notunterkunft` gesetzt.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub aktuelle_verbleib_betreuungsstelle_id: Option<i64>,
 }
 
 #[cfg(test)]

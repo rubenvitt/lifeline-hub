@@ -229,6 +229,49 @@ describe('BetreuungPage (LFH-639)', () => {
     expect(screen.getByText('229 untergebracht · 1 ohne Meldung')).toBeInTheDocument();
   });
 
+  describe('„davon namentlich" (LFH-674, design.md D7)', () => {
+    const MIT_NAMENTLICH: BetreuungUebersicht = {
+      ...MIT_DATEN,
+      namentlich: [
+        { stelle_id: TURNHALLE.id, anzahl: 2 },
+        { stelle_id: SCHULE.id, anzahl: 3 },
+      ],
+    };
+
+    it('steht in der Zelle „belegt" hinter der Belegung, ohne Meldung ohne „davon"', async () => {
+      api.ladeBetreuung.mockResolvedValue(MIT_NAMENTLICH);
+      renderPage();
+      await screen.findByText('Turnhalle Ost');
+      const turnhalle = zeileVon('Turnhalle Ost');
+      expect(within(turnhalle).getByText('89')).toBeInTheDocument();
+      const hinweis = (zeile: HTMLElement) =>
+        zeile.querySelector<HTMLElement>('[data-lfh="stelle-namentlich"]');
+      expect(hinweis(turnhalle)).toHaveTextContent('· davon namentlich 2');
+      // Die Zahl läuft Mono (Neuentwurf: Zahlen immer Mono mit tabular-nums), das Wort nicht.
+      expect(within(hinweis(turnhalle)!).getByText('2')).toHaveStyle({
+        fontVariantNumeric: 'tabular-nums',
+      });
+      expect(hinweis(zeileVon('Schule Nord'))).toHaveTextContent('· namentlich 3');
+      // Stelle ohne Eintrag in der Liste: 0 → kein Text.
+      expect(hinweis(zeileVon('Weserstadion'))).toBeNull();
+    });
+
+    it('geht in keine Summe ein — Kopf und „frei" lesen nur die Belegung', async () => {
+      api.ladeBetreuung.mockResolvedValue(MIT_NAMENTLICH);
+      renderPage();
+      await screen.findByText('Turnhalle Ost');
+      expect(screen.getByText('229 untergebracht · 1 ohne Meldung')).toBeInTheDocument();
+      expect(within(zeileVon('Turnhalle Ost')).getByText('61')).toBeInTheDocument();
+    });
+
+    it('fehlt `namentlich` in der Antwort (kein Personenrecht), steht nirgends etwas', async () => {
+      renderPage();
+      await screen.findByText('Turnhalle Ost');
+      expect(document.querySelector('[data-lfh="stelle-namentlich"]')).toBeNull();
+      expect(screen.queryByText(/namentlich/)).toBeNull();
+    });
+  });
+
   it('Kopf Betreuungsstellen ohne jede Meldung: „keine Meldung", nicht „0 untergebracht"', async () => {
     // Spec (Kopfzahl): „nichts gemeldet" ist nicht „niemand in Betreuung".
     api.ladeBetreuung.mockResolvedValue({
