@@ -117,38 +117,12 @@ pub struct ZoneBody {
     pub evakuierungsbezirk_id: Option<i64>,
 }
 
-/// Validiert typ/geometrie_typ/geometrie (statt DB-CHECK→500). Statuscodes nach der
-/// Konvention aus CLAUDE.md: ein unbekannter Enum-Wert scheitert am Feld selbst → 400;
-/// unpassende Typ-Geometrie-Kombination und kaputtes/abweichendes GeoJSON bewerten den
-/// Zusammenhang → 422.
-/// Liefert die zu speichernde Geometrie-String-Form zurück (= der validierte Eingabe-String).
+/// Validiert typ/geometrie_typ/geometrie (statt DB-CHECK→500) über
+/// [`lage_zone::validiere_neu`], die reine Prüfung im Fachmodul (LFH-690: der Demo-Import
+/// ruft dieselbe). Liefert die zu speichernde Geometrie-String-Form zurück (= der validierte
+/// Eingabe-String).
 fn validiere_neu(body: &ZoneBody) -> Result<String, AppError> {
-    if lage_zone::LageZoneTyp::parse(&body.typ).is_none() {
-        return Err(AppError::Validation(format!(
-            "Unbekannter Zonen-Typ: {}",
-            body.typ
-        )));
-    }
-    if lage_zone::GeometrieTyp::parse(&body.geometrie_typ).is_none() {
-        return Err(AppError::Validation(format!(
-            "Unbekannter Geometrie-Typ: {}",
-            body.geometrie_typ
-        )));
-    }
-    if !lage_zone::geometrie_klasse_passt(&body.typ, &body.geometrie_typ) {
-        return Err(AppError::UnprocessableEntity(format!(
-            "Typ {} ist mit Geometrie {} nicht zulässig",
-            body.typ, body.geometrie_typ
-        )));
-    }
-    // geometrie muss gültiges JSON und vom angegebenen geometrie_typ sein.
-    let v: serde_json::Value = serde_json::from_str(&body.geometrie)
-        .map_err(|_| AppError::UnprocessableEntity("geometrie ist kein gültiges JSON".into()))?;
-    if v.get("type").and_then(|t| t.as_str()) != Some(body.geometrie_typ.as_str()) {
-        return Err(AppError::UnprocessableEntity(
-            "geometrie.type passt nicht zu geometrie_typ".into(),
-        ));
-    }
+    lage_zone::validiere_neu(&body.typ, &body.geometrie_typ, &body.geometrie)?;
     Ok(body.geometrie.clone())
 }
 

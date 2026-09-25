@@ -126,6 +126,48 @@ pub fn geometrie_klasse_passt(typ: &str, geometrie_typ: &str) -> bool {
     }
 }
 
+/// Prüft die Eingaben einer neuen Zone (statt DB-CHECK→500), rein und ohne Datenbank.
+/// Statuscodes nach der Konvention aus CLAUDE.md: ein unbekannter Enum-Wert scheitert am Feld
+/// selbst → 400; unpassende Typ-Geometrie-Kombination und kaputtes/abweichendes GeoJSON
+/// bewerten den Zusammenhang → 422.
+///
+/// Handler (`routes/lage_zone.rs`) und Demo-Import (LFH-690) rufen dieselbe Funktion, damit
+/// ein Szenariofehler als Testfehler auffällt und nicht erst auf der Karte (design.md D5).
+pub fn validiere_neu(
+    typ: &str,
+    geometrie_typ: &str,
+    geometrie: &str,
+) -> Result<(), crate::error::AppError> {
+    use crate::error::AppError;
+    if LageZoneTyp::parse(typ).is_none() {
+        return Err(AppError::Validation(format!(
+            "Unbekannter Zonen-Typ: {}",
+            typ
+        )));
+    }
+    if GeometrieTyp::parse(geometrie_typ).is_none() {
+        return Err(AppError::Validation(format!(
+            "Unbekannter Geometrie-Typ: {}",
+            geometrie_typ
+        )));
+    }
+    if !geometrie_klasse_passt(typ, geometrie_typ) {
+        return Err(AppError::UnprocessableEntity(format!(
+            "Typ {} ist mit Geometrie {} nicht zulässig",
+            typ, geometrie_typ
+        )));
+    }
+    // geometrie muss gültiges JSON und vom angegebenen geometrie_typ sein.
+    let v: serde_json::Value = serde_json::from_str(geometrie)
+        .map_err(|_| AppError::UnprocessableEntity("geometrie ist kein gültiges JSON".into()))?;
+    if v.get("type").and_then(|t| t.as_str()) != Some(geometrie_typ) {
+        return Err(AppError::UnprocessableEntity(
+            "geometrie.type passt nicht zu geometrie_typ".into(),
+        ));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -140,6 +182,29 @@ mod tests {
             LageZoneTyp::parse("evakuierungsbezirk"),
             Some(LageZoneTyp::Evakuierungsbezirk)
         );
+    }
+
+    /// Die reine Prüfung aus dem Handler, Wortlaut und Code je Fall (LFH-690).
+    #[test]
+    fn validiere_neu_feld_400_zusammenhang_422() {
+        let poly =
+            r#"{"type":"Polygon","coordinates":[[[9.0,51.0],[9.1,51.0],[9.1,51.1],[9.0,51.0]]]}"#;
+        assert!(validiere_neu("gefahrengebiet", "Polygon", poly).is_ok());
+        let fall = |t: &str, g: &str, geo: &str| {
+            let e = validiere_neu(t, g, geo).unwrap_err();
+            (e.status().as_u16(), e.to_string())
+        };
+        assert_eq!(fall("unsinn", "Polygon", poly).0, 400);
+        assert_eq!(fall("gefahrengebiet", "Punkt", poly).0, 400);
+        let (code, text) = fall("absperrgrenze", "Polygon", poly);
+        assert_eq!(code, 422);
+        assert!(text.contains("Typ absperrgrenze ist mit Geometrie Polygon nicht zulässig"));
+        let (code, text) = fall("gefahrengebiet", "Polygon", "{kaputt");
+        assert_eq!(code, 422);
+        assert!(text.contains("geometrie ist kein gültiges JSON"));
+        let (code, text) = fall("gefahrengebiet", "Polygon", r#"{"type":"LineString"}"#);
+        assert_eq!(code, 422);
+        assert!(text.contains("geometrie.type passt nicht zu geometrie_typ"));
     }
 }
 
