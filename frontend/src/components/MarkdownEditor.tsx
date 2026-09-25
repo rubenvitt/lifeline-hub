@@ -106,7 +106,9 @@ const MarkdownEditor = forwardRef<TextAreaRef, Props>(function MarkdownEditor(
         {/* Genau EINE gerenderte Fassung im Baum: ist die Vorschau offen, trägt sie den Text.
             Leer wie im Lesezweig (`LageberichtText`): „—", kein „Noch nichts zu zeigen". */}
         {druckfassung && !vorschauOffen && (
-          <div className="markdown-editor__druck">
+          // Nur Papier: `aria-hidden` sagt dem Zugänglichkeitsbaum dasselbe wie das
+          // `display: none` am Bildschirm, auch ohne geladenes CSS (Muster Druckkopf).
+          <div className="markdown-editor__druck" aria-hidden>
             {value.trim() ? (
               <Markdown variante={variante} unterEbene={unterEbene}>
                 {value}

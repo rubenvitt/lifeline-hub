@@ -149,6 +149,10 @@ describe('MarkdownEditor – toggle-Variante', () => {
     );
     const druck = container.querySelector('.markdown-editor__druck');
     expect(druck, 'keine Druckfassung').not.toBeNull();
+    // Nur Papier: am Bildschirm `display: none` per CSS, für den Zugänglichkeitsbaum
+    // `aria-hidden` — auch dort, wo kein CSS geladen ist (jsdom), wie beim Druckkopf. Sonst
+    // stünden die Überschriften des Abschnitts ein zweites Mal im Vorlesebaum.
+    expect(druck).toHaveAttribute('aria-hidden', 'true');
     expect(druck!.querySelector('.markdown strong')).toHaveTextContent('fett');
     expect(druck!.querySelector('.markdown p:last-child')).toHaveTextContent('ENDE');
 
