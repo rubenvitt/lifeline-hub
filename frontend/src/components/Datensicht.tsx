@@ -19,7 +19,7 @@ import { Select } from './Select';
 import StatusTag from './StatusTag';
 import StatusWahl, { type StatusBedienung } from './StatusWahl';
 import Augenbraue from './instrument/Augenbraue';
-import { monoStil } from './instrument/rollenwerte';
+import { monoStil, rollenwerte } from './instrument/rollenwerte';
 import { useViewport, type AbBreitePunkt } from './useViewport';
 import type { StatusDarstellung } from '../theme/statusFarben';
 import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
@@ -1138,6 +1138,10 @@ export default function Datensicht<T extends object, const K extends string>(
         aria-expanded={offen}
         aria-controls={mitRegion && offen ? `${idPraefix}-bereich-${idTeil(k)}` : undefined}
         aria-label={aufklappen.zugaenglicherName(zeile)}
+        // `bedienText` statt antds `colorLink` (LFH-650): der Linkton trug gemessen am Tag
+        // 5,51–6,59 : 1 und nachts 4,55–4,82 : 1, unter 7 bzw. 5 : 1
+        // (`e2e/betreuung-pruefliste.spec.ts`). Blauer TEXT nimmt die Textrolle.
+        style={{ color: rollenwerte(token).bedienText }}
         onClick={(e) => {
           // Die Tabelle darf den Klick nicht zusätzlich als Zeilenklick lesen.
           e.stopPropagation();
