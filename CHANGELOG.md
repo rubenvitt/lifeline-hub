@@ -1,3 +1,57 @@
+## [1.0.0-alpha.44](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.43...v1.0.0-alpha.44) (2026-09-25)
+
+### Wichtige Änderungen
+
+- Neue Datenbank-Migrationen für Betreuungsstellen und Verbleibserfassung – Automatische Migration beim ersten Start dieser Version
+
+### Betroffenenerfassung
+
+- Beim Verbleib „Notunterkunft" kann nun eine konkrete Betreuungsstelle angegeben werden, um nachzuvollziehen, wo Betroffene untergebracht sind
+- Die Betreuungsübersicht zeigt bei entsprechender Berechtigung, wie viele Personen namentlich erfasst sind
+
+### Betreuung und Unterbringung
+
+- Stand- und Belegungsmeldungen können jetzt offline erfasst werden – bei unterbrochener Verbindung werden sie vorgemerkt und automatisch übertragen, sobald das Netz wieder steht
+- Bereits gespeicherte Meldungen werden beim erneuten Senden erkannt und nicht doppelt eingetragen
+- Dialoge zeigen immer den aktuellen Datenstand, auch wenn während der Bearbeitung neue Meldungen von anderen Geräten eintreffen
+- Personenzahlen (Plangröße, Kapazität, Belegung, Evakuierte) sind auf maximal 1.000.000 begrenzt, um versehentliche Zahlendreher abzufangen
+- Meldezeitpunkte aus der Zukunft (z. B. durch falsch gestellte Geräteuhr) werden auf die aktuelle Zeit korrigiert, damit die Kopfzahlen korrekt berechnet werden
+- Bereits erfolgte Leermeldungen können nicht mehr versehentlich doppelt abgesetzt werden
+- Der Räumungsstatus folgt automatisch neuen Meldungen, solange er nicht aktiv geändert wurde
+- Betreuungsstellen können auch nach Schließung noch als Verbleib gewählt werden, für bereits untergebrachte Personen
+- Kontrast-Verbesserungen: ausgewählte Optionen (z. B. „geschlossen", „geschätzt", „gezählt") sind nun auch bei Tageslicht besser lesbar
+
+### Unterbringung – Platzverwaltung
+
+- Die Platzkarte in Unterbringungsstellen kann auf Touchgeräten (Tablet, Handschuh-Modus) jetzt über ein Aktionsmenü bedient werden – ein Antippen der Karte öffnet alle Funktionen (Zuweisen, Freigeben, Umbetten, Bearbeiten) in einem Menü
+- Das Menü bleibt auch bei kleinen Bildschirmen vollständig im sichtbaren Bereich und kann per Tastatur bedient werden (Enter öffnet, Escape schließt)
+- Nach Datenaktualisierungen schließt sich ein offenes Menü automatisch
+
+### Lagekarte
+
+- Ab fünf nicht verorteten Objekten erscheint ein Suchfeld über der Liste, um schnell bestimmte Einheiten, Fahrzeuge oder Personen zu finden
+- Die Suchfilterung arbeitet live und zeigt die Trefferzahl an
+- Abstände und Schaltflächen passen sich jetzt durchgängig an die gewählte Dichtestufe (kompakt/komfortabel/handschuh) an
+
+### Kommunikation – Aufträge und Befehle
+
+- Aufträge mit mehr als drei Empfängern können nun vollständig quittiert werden – bisher waren Empfänger ab dem vierten nicht mehr erreichbar
+- Die Anzeige unterscheidet klar zwischen quittierten und offenen Empfängern
+
+### Bedienung und Barrierefreiheit
+
+- Kleine Schaltflächen (z. B. „OK" in Bestätigungsdialogen) wachsen nun auch in der Breite mit der Dichtestufe, nicht mehr nur in der Höhe
+- Tabellenüberschriften verdecken keine fokussierten Bedienelemente mehr beim Rückwärts-Tabben durch eine Tabelle
+- Die Sprungpalette (Schnellnavigation mit Strg+K) zeigt ein Vorschau-Symbol, das auch per Toucheingabe erreichbar ist
+
+### Verwaltung
+
+- Modulzeilen in den Einstellungen zeigen jetzt, warum ein Modul nicht ausgeblendet werden kann (z. B. „nur Einsatzleitung", „nur Admins", „Einsatz abgeschlossen")
+
+### Betrieb und Installation
+
+- Dokumentation zum Betrieb im Einsatz-LAN ergänzt: Hinweise zu HTTPS-Einrichtung mit festem Hostnamen für stabile Offline-Funktionalität, Einschränkungen bei Klartext-HTTP über IP-Adresse (kein Service Worker, keine Passkeys)
+
 ## [1.0.0-alpha.43](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.42...v1.0.0-alpha.43) (2026-09-25)
 
 ### Betroffene und Schäden
