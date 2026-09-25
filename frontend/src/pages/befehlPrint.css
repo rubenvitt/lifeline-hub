@@ -23,7 +23,8 @@
      Akkordeon-Regel: `BefehlDetailPage.tsx` verdrahtet `layout="split"` fest und reiht
      die Abschnitte als schlichte `Form.Item`-Liste ohne `Collapse`. Eine Regel, die
      nichts trifft, behauptete eine Deckung, die es nicht gibt — wer hier ein
-     Toggle-Layout einführt, holt die `:has`-Regel aus `lageberichtPrint.css` mit. Der
+     Toggle-Layout einführt, holt die Toggle-Regeln aus `lageberichtPrint.css` mit und setzt
+     `druckfassung` am Editor. Der
      Test dieser Datei pinnt beide Voraussetzungen. */
   .befehl-print-root .markdown-editor--split .markdown-editor__eingabe {
     display: none !important;

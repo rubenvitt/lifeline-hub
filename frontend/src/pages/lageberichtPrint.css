@@ -41,14 +41,20 @@
     display: none !important;
   }
 
-  /* Toggle-Layout — die VORGABE der Seite (`vorschauNeben` startet auf `false`): dort
-     ist das Textfeld NICHT in `.markdown-editor__eingabe` gewickelt
-     (`MarkdownEditor.tsx:72`) und bei geschlossener Vorschau der einzige Träger des
-     Abschnittstextes. Es weicht deshalb nur, wenn tatsächlich eine gerenderte Vorschau
-     danebensteht (`:has`) — eine unbedingte Regel auf `textarea` druckte den Abschnitt
-     LEER, und das wäre schlimmer als doppelt. */
-  .lagebericht-print-root .markdown-editor--toggle:has(.markdown-editor__vorschau) textarea {
+  /* Toggle-Layout — die VORGABE der Seite (`vorschauNeben` startet auf `false`): dort ist
+     das Textfeld NICHT in `.markdown-editor__eingabe` gewickelt (`MarkdownEditor.tsx`).
+     Es weicht im Druck IMMER — daneben steht stets eine gerenderte Fassung: bei offener
+     Vorschau die Vorschau, sonst die Druckfassung (`druckfassung`, am Bildschirm
+     `display: none` aus `MarkdownEditor.css`). Berichtigt (Review Welle B): vorher wich das
+     Textfeld nur bei offener Vorschau; in der Vorgabe kam die `<textarea>` aufs Papier,
+     Rohtext in Bildschirmhöhe, langer Text abgeschnitten. Die Seite MUSS `druckfassung`
+     setzen, sonst druckte ein Abschnitt leer — `lageberichtPrint.test.ts` prüft beides. */
+  .lagebericht-print-root .markdown-editor--toggle textarea {
     display: none !important;
+  }
+
+  .lagebericht-print-root .markdown-editor__druck {
+    display: block !important;
   }
 
   /* Beschriftung und Vorschau-Umschalter des Editors sind Bedienung, kein Inhalt —

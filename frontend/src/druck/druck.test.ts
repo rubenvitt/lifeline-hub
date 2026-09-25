@@ -132,12 +132,28 @@ describe('druck.css — Aufbau', () => {
     }
   });
 
-  it('bindet jede Druckregel an eine vorhandene Druckwurzel — ohne Wurzel druckt Strg+P wie bisher', () => {
+  it('bindet jede Druckregel bis auf `@page` an eine vorhandene Druckwurzel', () => {
     for (const r of druckRegeln) {
       for (const s of einzeln(r.selektor)) {
         expect(s.includes(WURZEL), `ungebundener Selektor: ${s}`).toBe(true);
       }
     }
+  });
+
+  /**
+   * `@page` hängt an keinem Selektor und gilt für JEDEN Ausdruck der App, auch ohne Wurzel
+   * (Review Welle B: der Test oben filterte `@page` still heraus und hieß „ohne Wurzel
+   * druckt Strg+P wie bisher"). Das ist die benannte Ausnahme: ohne Wurzel ändern sich
+   * genau Seitenrand und Seitenzählung, sonst nichts. Kommt etwas dazu, wird es hier rot.
+   */
+  it('die Ausnahme `@page` trägt nur Seitenrand und Seitenzählung', () => {
+    const seitenRegeln = regeln.filter((r) => r.kontext.some((k) => k.startsWith('@page')));
+    expect(seitenRegeln.map((r) => r.kontext.join(' > ')).sort()).toEqual([
+      '@media print > @page',
+      '@media print > @page > @bottom-right',
+    ]);
+    const eigen = seitenRegeln.find((r) => letztes(r.kontext) === '@page')!;
+    expect(eigen.koerper).toMatch(/^margin:\s*15mm;?$/);
   });
 
   it('fasst `visibility` nirgends an — unsichtbare Knoten belegen weiter Platz', () => {
@@ -209,6 +225,29 @@ describe('druck.css — Umbruchregeln unter der Wurzel', () => {
     for (const h of ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']) {
       expect(sel, `${h} fehlt`).toMatch(new RegExp(`\\b${h}\\b`));
     }
+  });
+
+  /**
+   * Im ENTWURF ist der Abschnittstitel keine Überschrift: beim Lagebericht der Kopf des
+   * Akkordeons (`.ant-collapse-header`), beim Befehl das Feldetikett (`.ant-form-item-label`).
+   * Eine Regel nur an h1–h6 ließe dort einen Titel allein am Seitenende stehen.
+   */
+  it('hält auch den Abschnittstitel des Entwurfs bei seinem Text', () => {
+    const sel = mitDeklaration(/break-after:\s*avoid/);
+    expect(sel).toContain('.ant-collapse-header');
+    expect(sel).toContain('.ant-form-item-label');
+  });
+
+  /**
+   * `.markdown pre` trägt am Bildschirm `overflow-x: auto` bei `white-space: pre`. Auf Papier
+   * gibt es keinen Bildlauf: eine lange Codezeile wäre rechts abgeschnitten. Schon ein um vier
+   * Leerzeichen eingerückter Absatz im Lagebericht wird zum Codeblock.
+   */
+  it('bricht Codeblöcke im Druck um, statt sie abzuschneiden', () => {
+    const r = regelFuer(`${WURZEL} .markdown pre`);
+    expect(r, 'keine pre-Regel').toBeDefined();
+    expect(r!.koerper).toMatch(/overflow:\s*visible\s*!important/);
+    expect(r!.koerper).toMatch(/white-space:\s*pre-wrap\s*!important/);
   });
 
   it('zerreißt Absätze, Listen, Zitate, Code, Zeilen, Bilder und Abbildungen nicht', () => {

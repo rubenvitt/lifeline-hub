@@ -35,6 +35,14 @@ interface Props {
   /** Von antd Form.Item gesetzt (für Label-Verknüpfung). */
   id?: string;
   onKeyDown?: (e: KeyboardEvent<HTMLTextAreaElement>) => void;
+  /**
+   * Nur `toggle`: rendert bei geschlossener Vorschau zusätzlich eine gerenderte Fassung, die
+   * ausschließlich der Druck zeigt (`.markdown-editor__druck`, am Bildschirm `display: none`).
+   * Ohne sie trüge dort nur das Textfeld den Text — auf Papier eine `<textarea>` in
+   * Bildschirmhöhe mit Rohtext, langer Text abgeschnitten (LFH-71). Opt-in, weil jede Fassung
+   * einen Markdown-Render je Tastenanschlag kostet: die ETB-Schnellerfassung druckt nicht.
+   */
+  druckfassung?: boolean;
 }
 
 /**
@@ -57,6 +65,7 @@ const MarkdownEditor = forwardRef<TextAreaRef, Props>(function MarkdownEditor(
     rows,
     id,
     onKeyDown,
+    druckfassung = false,
   },
   ref,
 ) {
@@ -94,6 +103,19 @@ const MarkdownEditor = forwardRef<TextAreaRef, Props>(function MarkdownEditor(
           </Button>
         </div>
         {vorschauOffen && <div className="markdown-editor__vorschau">{vorschau}</div>}
+        {/* Genau EINE gerenderte Fassung im Baum: ist die Vorschau offen, trägt sie den Text.
+            Leer wie im Lesezweig (`LageberichtText`): „—", kein „Noch nichts zu zeigen". */}
+        {druckfassung && !vorschauOffen && (
+          <div className="markdown-editor__druck">
+            {value.trim() ? (
+              <Markdown variante={variante} unterEbene={unterEbene}>
+                {value}
+              </Markdown>
+            ) : (
+              <Typography.Paragraph>—</Typography.Paragraph>
+            )}
+          </div>
+        )}
       </div>
     );
   }

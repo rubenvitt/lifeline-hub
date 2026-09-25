@@ -145,7 +145,7 @@ async function lageberichtSaeen(
   return id;
 }
 
-async function befehlSaeen(page: Page, einsatzId: string): Promise<number> {
+async function befehlSaeen(page: Page, einsatzId: string, freigeben = true): Promise<number> {
   const neu = await mitWiederholung(() =>
     page.request.post(`/api/einsaetze/${einsatzId}/befehle`, {
       data: { vorlage: 'befehl_lad', titel: 'Befehl Druckprobe' },
@@ -165,6 +165,7 @@ async function befehlSaeen(page: Page, einsatzId: string): Promise<number> {
     }),
   );
   expect(patch.ok(), await patch.text()).toBe(true);
+  if (!freigeben) return id;
   const frei = await mitWiederholung(() =>
     page.request.post(`/api/einsaetze/${einsatzId}/befehle/${id}/freigeben`),
   );
@@ -190,10 +191,21 @@ async function druckLage(page: Page) {
       return el ? getComputedStyle(el).display : 'fehlt';
     };
     // Die Endmarke als TEXTKNOTEN im gerenderten Markdown — nicht im Textfeld des Editors,
-    // das im Druck ausgeblendet ist und den Wert nur als Eigenschaft trägt.
-    const knoten = Array.from(wurzel.querySelectorAll('.markdown p')).find((p) =>
-      p.textContent?.includes(endmarke),
+    // das im Druck ausgeblendet ist und den Wert nur als Eigenschaft trägt. Nur ein
+    // DARGESTELLTER Knoten zählt (`getClientRects`): eine verborgene Druckfassung oder
+    // Vorschau trüge den Text auch, aber nicht aufs Papier.
+    const knoten = Array.from(wurzel.querySelectorAll('.markdown p')).find(
+      (p) => p.textContent?.includes(endmarke) && p.getClientRects().length > 0,
     ) as HTMLElement | undefined;
+    // Ein Textfeld im Druck ist Rohtext in Bildschirmhöhe — abgeschnitten, sobald der Text
+    // länger ist als das Feld (Review Welle B, Lagebericht-Entwurf in der Vorgabe).
+    // `getClientRects`, nicht `display` des Felds: im Split-Layout weicht die ganze
+    // Eingabespalte, das Feld selbst behält sein `display`.
+    const textfelder = Array.from(wurzel.querySelectorAll('textarea')).filter(
+      (t) => t.getClientRects().length > 0,
+    ).length;
+    // Abschnittstitel des Entwurfs: Akkordeonkopf (Lagebericht) bzw. Feldetikett (Befehl).
+    const titel = wurzel.querySelector('.ant-collapse-header, .ant-form-item-label');
     return {
       wurzelAnzahl: wurzeln.length,
       wurzelPosition: getComputedStyle(wurzel).position,
@@ -204,6 +216,8 @@ async function druckLage(page: Page) {
       modulpanel: anzeige('[data-lfh="modul-panel"]'),
       meldung: anzeige('.ant-message'),
       endmarkeOben: knoten ? knoten.getBoundingClientRect().top + window.scrollY : -1,
+      textfelder,
+      titelUmbruch: titel ? getComputedStyle(titel).breakAfter : 'kein Entwurfstitel',
     };
   }, ENDMARKE);
 }
@@ -242,6 +256,12 @@ async function pruefeDruckImFluss(page: Page, fall: string) {
   // Die Marke erst NACH den Layoutaussagen: am alten Stand fehlt sie ohnehin, und die
   // Mutationsprobe soll an der Mechanik rot werden, nicht an der fehlenden Marke.
   expect(rahmen.wurzelAnzahl, `${fall}: genau eine Druckwurzel`).toBe(1);
+  expect(rahmen.textfelder, `${fall}: kein Eingabefeld für Abschnittstext auf Papier`).toBe(0);
+  if (rahmen.titelUmbruch !== 'kein Entwurfstitel') {
+    // Belegt die KASKADE (die Regel greift am Entwurfstitel), nicht den Umbruch selbst —
+    // den zeigt nur das Blatt (Handprüfung, LFH-729).
+    expect(rahmen.titelUmbruch, `${fall}: Abschnittstitel bleibt bei seinem Text`).toBe('avoid');
+  }
 
   // (2) UMFANG — auf Papierbreite, weil die Zeilenzahl an der Breite hängt.
   await page.setViewportSize({ width: NUTZ_BREITE, height: 900 });
@@ -287,7 +307,15 @@ test('Lagebericht (freigegeben) druckt im normalen Fluss über mehrere Seiten', 
   await pruefeDruckImFluss(page, 'Lagebericht lesend');
 });
 
-test('Lagebericht (Entwurf) druckt im normalen Fluss, eine offene Meldung erscheint nicht', async ({
+/**
+ * Die VORGABE der Entwurfsseite: „Vorschau neben dem Text" ist aus, die Editoren stehen im
+ * Toggle-Layout mit geschlossener Vorschau. Review Welle B: genau dieser Zustand druckte die
+ * `<textarea>` (Rohtext in Bildschirmhöhe, der letzte Abschnitt abgeschnitten); der Test
+ * hakte vorher „Vorschau neben dem Text" an und prüfte nur das Split-Layout. Diskriminierend
+ * ist die Endmarke des LETZTEN (zugeklappten) Abschnitts als dargestellter Markdown-Absatz
+ * jenseits der ersten Seite, und kein sichtbares Textfeld im Druck.
+ */
+test('Lagebericht (Entwurf, Vorgabe ohne Vorschau) druckt jeden Abschnitt vollständig als Markdown', async ({
   page,
 }) => {
   await anmelden(page);
@@ -295,13 +323,41 @@ test('Lagebericht (Entwurf) druckt im normalen Fluss, eine offene Meldung ersche
   const id = await lageberichtSaeen(page, einsatzId, false);
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(`/einsaetze/${einsatzId}/lageberichte/${id}`);
-  // Split-Layout: die gerenderte Vorschau trägt den Text, die Eingabe weicht im Druck.
-  await page.getByRole('checkbox', { name: 'Vorschau neben dem Text' }).check();
-  await expect(page.locator('.markdown p', { hasText: ENDMARKE })).toBeAttached();
+  // Vorbedingung: die Vorgabe steht — kein Haken, keine Eingabespalte.
+  await expect(page.getByRole('checkbox', { name: 'Vorschau neben dem Text' })).not.toBeChecked();
+  await expect(page.locator('.markdown-editor--split')).toHaveCount(0);
+  await expect(page.locator('.markdown-editor--toggle').first()).toBeAttached();
   // Eine echte schwebende Ebene: der Erfolgs-Toast nach dem Speichern.
   await page.getByRole('button', { name: 'Entwurf speichern' }).click();
   await expect(page.locator('.ant-message-notice')).toBeVisible();
-  await pruefeDruckImFluss(page, 'Lagebericht Entwurf');
+  await pruefeDruckImFluss(page, 'Lagebericht Entwurf (Vorgabe)');
+});
+
+test('Lagebericht (Entwurf, Vorschau neben dem Text) druckt im normalen Fluss', async ({
+  page,
+}) => {
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Druckfluss LB-Split ${Date.now()}`);
+  const id = await lageberichtSaeen(page, einsatzId, false);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(`/einsaetze/${einsatzId}/lageberichte/${id}`);
+  // Split-Layout: die gerenderte Vorschau trägt den Text, die Eingabe weicht im Druck.
+  await page.getByRole('checkbox', { name: 'Vorschau neben dem Text' }).check();
+  await expect(page.locator('.markdown p', { hasText: ENDMARKE })).toBeAttached();
+  await pruefeDruckImFluss(page, 'Lagebericht Entwurf (Split)');
+});
+
+test('Befehl (Entwurf) druckt im normalen Fluss, Abschnittstitel bleibt beim Text', async ({
+  page,
+}) => {
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Druckfluss Befehl-Entwurf ${Date.now()}`);
+  const id = await befehlSaeen(page, einsatzId, false);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(`/einsaetze/${einsatzId}/auftraege/befehle/${id}`);
+  await expect(page.locator('.markdown p', { hasText: ENDMARKE })).toBeAttached();
+  await expect(page.locator('.ant-form-item-label').first()).toBeAttached();
+  await pruefeDruckImFluss(page, 'Befehl Entwurf');
 });
 
 test('Befehl (freigegeben) druckt im normalen Fluss über mehrere Seiten', async ({ page }) => {

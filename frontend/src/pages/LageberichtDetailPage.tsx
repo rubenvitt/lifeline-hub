@@ -161,6 +161,8 @@ function LageberichtDetail() {
             Überschriften, und ein Paneel rahmt den Entwurf bewusst nicht (s. u.). */}
         <MarkdownEditor
           layout={vorschauNeben ? 'split' : 'toggle'}
+          // Ohne sie druckte das Toggle-Layout sein Textfeld (LFH-71, `lageberichtPrint.css`).
+          druckfassung
           unterEbene={1}
           variante="dokument"
           autoSize={{ minRows: 6 }}

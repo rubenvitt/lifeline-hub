@@ -2,7 +2,9 @@
    ============================================================================
    Ein Druckstück markiert seine Wurzel mit `data-lfh="druckwurzel"` — mehr braucht es
    nicht. Alle Regeln unten greifen nur unter `@media print` und nur, wenn eine Wurzel auf
-   der Seite steht (`:has`). Ohne Wurzel druckt Strg+P den Bildschirm wie vorher.
+   der Seite steht (`:has`). Ohne Wurzel druckt Strg+P den Bildschirm wie vorher — bis auf
+   Seitenrand und Seitenzählung: `@page` hängt an keinem Selektor und gilt für jeden
+   Ausdruck der App (benannte Ausnahme, gepinnt in `druck.test.ts`).
 
    WARUM `display: none` UND NICHT `visibility: hidden`: das alte Muster (alles unsichtbar,
    Druckbereich `position: absolute`) ließ jeden unsichtbaren Knoten seinen Platz behalten
@@ -101,9 +103,12 @@
 
   /* ---- Umbruchregeln ----
      An der Wurzel, nicht an `.X-druck .markdown`: so gelten sie im Lese- UND im
-     Entwurfszweig (Editor-Vorschau) und auch für den Abschnittstitel, der außerhalb von
-     `.markdown` steht. */
-  [data-lfh='druckwurzel'] :is(h1, h2, h3, h4, h5, h6) {
+     Entwurfszweig (Editor-Vorschau bzw. Druckfassung des Editors).
+     Der Abschnittstitel ist nur im LESEZWEIG eine Überschrift (`h3`). Im Entwurf ist er beim
+     Lagebericht der Kopf des Akkordeons (`.ant-collapse-header`), beim Befehl das
+     Feldetikett (`.ant-form-item-label`, im senkrechten Formular ein eigenes Element über dem
+     Feld) — beide stehen deshalb mit in der Liste. */
+  [data-lfh='druckwurzel'] :is(h1, h2, h3, h4, h5, h6, .ant-collapse-header, .ant-form-item-label) {
     break-after: avoid;
   }
 
@@ -134,5 +139,14 @@
 
   [data-lfh='druckwurzel'] .markdown a {
     text-decoration: underline;
+  }
+
+  /* Codeblöcke: am Bildschirm `overflow-x: auto` bei `white-space: pre` (`Markdown.css`).
+     Papier hat keinen Bildlauf — eine lange Zeile wäre rechts abgeschnitten. Schon ein um
+     vier Leerzeichen eingerückter Absatz wird zum Codeblock. */
+  [data-lfh='druckwurzel'] .markdown pre {
+    overflow: visible !important;
+    white-space: pre-wrap !important;
+    overflow-wrap: anywhere;
   }
 }

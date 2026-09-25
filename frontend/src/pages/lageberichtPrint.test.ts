@@ -106,19 +106,24 @@ describe('lageberichtPrint.css — Entwurfsausdruck (M86)', () => {
     expect(treffer[0].selektor.endsWith('.markdown-editor__eingabe')).toBe(true);
   });
 
-  it('versteckt die Eingabe NIE unbedingt — sonst druckt ein Abschnitt leer', () => {
-    // Die Gegenaussage zur Regel darüber, und die eigentliche Falle des Tickets: im
-    // `toggle`-Layout (der VORGABE der Seite) ist das Textfeld nicht in
-    // `.markdown-editor__eingabe` gewickelt und bei geschlossener Vorschau der einzige
-    // Träger des Abschnittstextes. Jede versteckende Regel muss deshalb an einen
-    // Beleg gebunden sein, dass eine gerenderte Vorschau danebensteht.
+  it('versteckt die Eingabe nur dort, wo eine gerenderte Fassung danebensteht', () => {
+    // Die Gegenaussage zur Regel darüber: im `toggle`-Layout (der VORGABE der Seite) ist das
+    // Textfeld nicht in `.markdown-editor__eingabe` gewickelt. Seit Review Welle B steht dort
+    // IMMER eine gerenderte Fassung daneben — bei offener Vorschau die Vorschau, sonst die
+    // Druckfassung (`druckfassung` am Editor, `MarkdownEditor.test.tsx`). Jede versteckende
+    // Regel ist deshalb an `split` oder `toggle` gebunden, und die Seite MUSS die
+    // Druckfassung anfordern — sonst druckte ein Toggle-Abschnitt leer.
     for (const r of eingabeRegeln().filter(versteckt)) {
       expect(
         r.selektor.includes('.markdown-editor--split') ||
-          r.selektor.includes(':has(.markdown-editor__vorschau)'),
-        `unbedingte Eingabe-Ausblendung in ${DATEI}: ${r.selektor}`,
+          r.selektor.includes('.markdown-editor--toggle'),
+        `ungebundene Eingabe-Ausblendung in ${DATEI}: ${r.selektor}`,
       ).toBe(true);
     }
+    const seite = readFileSync(join(dirname(fileURLToPath(import.meta.url)), SEITE), 'utf8');
+    expect(seite, 'Toggle-Editor ohne Druckfassung — der Abschnitt druckte leer').toMatch(
+      /<MarkdownEditor[^>]*\bdruckfassung\b/,
+    );
     // Und der Editor wird nirgends als GANZES versteckt (das träfe die Vorschau mit).
     for (const r of regeln().filter(versteckt)) {
       for (const s of einzeln(r)) {
@@ -127,13 +132,26 @@ describe('lageberichtPrint.css — Entwurfsausdruck (M86)', () => {
     }
   });
 
-  it('nimmt dem toggle-Layout das Textfeld nur bei offener Vorschau', () => {
-    const treffer = regeln().filter(
-      (r) => r.selektor.includes('.markdown-editor--toggle') && versteckt(r),
+  /**
+   * Review Welle B (LFH-71): die frühere Regel nahm das Textfeld nur bei OFFENER Vorschau
+   * weg (`:has(.markdown-editor__vorschau)`). In der Vorgabe — Vorschau zu — kam die
+   * `<textarea>` aufs Papier: Rohtext, Bildschirmhöhe, langer Text abgeschnitten.
+   */
+  it('nimmt dem toggle-Layout das Textfeld immer und zeigt die Druckfassung', () => {
+    const textfeld = regeln().filter(
+      (r) =>
+        r.selektor.includes('.markdown-editor--toggle') &&
+        r.selektor.includes('textarea') &&
+        versteckt(r),
     );
-    expect(treffer, 'keine Toggle-Regel — offene Vorschau druckt doppelt').toHaveLength(1);
-    expect(treffer[0].selektor).toContain(':has(.markdown-editor__vorschau)');
-    expect(treffer[0].selektor).toContain('textarea');
+    expect(textfeld, 'Textfeld des Toggle-Layouts im Druck').toHaveLength(1);
+    expect(textfeld[0].selektor).not.toContain(':has(');
+
+    const fassung = regeln().find((r) =>
+      einzeln(r).includes('.lagebericht-print-root .markdown-editor__druck'),
+    );
+    expect(fassung, 'Druckfassung bleibt im Druck verborgen').toBeDefined();
+    expect(fassung!.koerper).toMatch(/display:\s*block\s*!important/);
   });
 
   it('druckt auch die zugeklappten Akkordeon-Abschnitte', () => {
