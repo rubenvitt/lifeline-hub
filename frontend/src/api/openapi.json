@@ -1013,7 +1013,7 @@
           "stellen_ohne_meldung": {
             "type": "integer",
             "format": "int64",
-            "description": "Zahl der Stellen, die bis zum Stichtag keine Meldung haben."
+            "description": "Zahl der Stellen, die bis zum Stichtag keine Meldung haben. Mitgezählt wird nur, wer zum\nStichtag betrieben sein konnte: nicht nach ihm angelegt und nicht jetzt geschlossen oder\nvorbereitet ohne jede Meldung (LFH-679). Solche Stellen fehlen auch in `stellen`."
           },
           "summe": {
             "type": "integer",
@@ -1055,6 +1055,56 @@
               "null"
             ],
             "description": "Zeitpunkt der maßgeblichen Meldung."
+          }
+        }
+      },
+      "BelegungVerlaufEintrag": {
+        "type": "object",
+        "description": "Eine Belegungsmeldung im Verlauf einer Stelle (LFH-676), gebaut wie\n[`StandVerlaufEintrag`].",
+        "required": [
+          "id",
+          "belegt",
+          "zeitpunkt_at",
+          "erfasst_at",
+          "erfasst_von",
+          "aktuell"
+        ],
+        "properties": {
+          "aktuell": {
+            "type": "boolean",
+            "description": "Diese Meldung ist die aktuelle Belegung der Stelle."
+          },
+          "belegt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "erfasst_at": {
+            "type": "string",
+            "description": "Wann die Meldung erfasst wurde, UTC ohne Zonenkennung."
+          },
+          "erfasst_von": {
+            "type": "string",
+            "description": "Anzeigename der erfassenden Person."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "zeitpunkt_at": {
+            "type": "string",
+            "description": "Zeitpunkt der Meldung, UTC ohne Zonenkennung (`YYYY-MM-DD HH:MM:SS`)."
+          },
+          "zurueckgenommen_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "zurueckgenommen_von": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
@@ -1181,6 +1231,16 @@
             "items": {
               "$ref": "#/components/schemas/EvakuierungsbezirkAnzeige"
             }
+          },
+          "namentlich": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/StelleNamentlich"
+            },
+            "description": "„davon namentlich“ (LFH-674): je Stelle die Zahl der Personen, deren jüngster Verbleib\n`notunterkunft` an dieser Stelle ist — nur Stellen mit mindestens einer Person. Fehlt\nganz, wenn der Lesende das Modul Personen nicht sehen darf (nicht „0“). Gefüllt NUR in\nder Route: `repo::uebersicht` speist auch den gesicherten Lagestand. Die Zahl geht in\nkeine Belegung, Kopfzahl oder Summe ein — führend ist die Mengenmeldung."
           },
           "stellen": {
             "type": "array",
@@ -6674,6 +6734,14 @@
               }
             ]
           },
+          "aktuelle_verbleib_betreuungsstelle_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Betreuungsstelle des jüngsten Verbleibs (LFH-674), nur bei `notunterkunft` gesetzt."
+          },
           "aktueller_platz_id": {
             "type": [
               "integer",
@@ -7693,6 +7761,62 @@
           "mannschaft"
         ]
       },
+      "StandVerlaufEintrag": {
+        "type": "object",
+        "description": "Eine Standmeldung im Verlauf eines Bezirks (LFH-676), zurückgenommene eingeschlossen.\n`aktuell` kommt aus dem Zeiger des Bezirks — keine zweite Definition von „aktuell“.",
+        "required": [
+          "id",
+          "evakuiert",
+          "erhebung",
+          "zeitpunkt_at",
+          "erfasst_at",
+          "erfasst_von",
+          "aktuell"
+        ],
+        "properties": {
+          "aktuell": {
+            "type": "boolean",
+            "description": "Diese Meldung ist der aktuelle Stand des Bezirks."
+          },
+          "erfasst_at": {
+            "type": "string",
+            "description": "Wann die Meldung erfasst wurde, UTC ohne Zonenkennung. Liegt sie ≥ 60 s nach\n`zeitpunkt_at`, zeigt die App sie als nachgetragen (dieselbe Schwelle wie im ETB)."
+          },
+          "erfasst_von": {
+            "type": "string",
+            "description": "Anzeigename der erfassenden Person."
+          },
+          "erhebung": {
+            "$ref": "#/components/schemas/Erhebung"
+          },
+          "evakuiert": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "zeitpunkt_at": {
+            "type": "string",
+            "description": "Zeitpunkt der Meldung, UTC ohne Zonenkennung (`YYYY-MM-DD HH:MM:SS`)."
+          },
+          "zurueckgenommen_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Fehlt, solange die Meldung nicht zurückgenommen ist."
+          },
+          "zurueckgenommen_von": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Anzeigename der zurücknehmenden Person; fehlt wie `zurueckgenommen_at`."
+          }
+        }
+      },
       "StatusAnteil": {
         "type": "object",
         "description": "Anteil eines Status an einer gemischten Einheit; `status: None` = Fahrzeuge ohne Status.",
@@ -7780,6 +7904,24 @@
           },
           "stelle": {
             "$ref": "#/components/schemas/BetreuungsstelleAnzeige"
+          }
+        }
+      },
+      "StelleNamentlich": {
+        "type": "object",
+        "description": "Namentlich zugeordnete Personen an einer Stelle (LFH-674), Teil von [`BetreuungUebersicht`].",
+        "required": [
+          "stelle_id",
+          "anzahl"
+        ],
+        "properties": {
+          "anzahl": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "stelle_id": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
@@ -8170,6 +8312,14 @@
         "properties": {
           "art": {
             "$ref": "#/components/schemas/VerbleibArt"
+          },
+          "betreuungsstelle_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Betreuungsstelle eines Notunterkunft-Verbleibs (LFH-674). Nur die Kennung: den Namen\nliest, wer das Modul Betreuung sehen darf, aus dessen Übersicht."
           },
           "einsatz_id": {
             "type": "integer",

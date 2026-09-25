@@ -733,6 +733,7 @@ mod tests {
                     evakuiert: 212,
                     erhebung: Erhebung::Gezaehlt,
                     zeitpunkt_at: "2026-01-01 09:30:00".into(),
+                    client_id: None,
                 },
             )
             .await
@@ -780,6 +781,7 @@ mod tests {
                 &b::BelegungEingabe {
                     belegt: 89,
                     zeitpunkt_at: "2026-01-01 10:00:00".into(),
+                    client_id: None,
                 },
             )
             .await

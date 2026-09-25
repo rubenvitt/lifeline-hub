@@ -6,6 +6,8 @@ import {
   aendereStelle,
   ladeBelegungKopfzahl,
   ladeBetreuung,
+  ladeBelegungVerlauf,
+  ladeStandVerlauf,
   legeBezirkAn,
   legeStelleAn,
   meldeBelegung,
@@ -58,6 +60,16 @@ describe('api/betreuung — Pfade und Methoden der zwölf Endpunkte', () => {
     expect(a.map((x) => [x.methode, x.pfad, x.query])).toEqual([
       ['GET', B, ''],
       ['GET', `${B}/belegung`, ''],
+    ]);
+  });
+
+  it('liest die Meldereihen eines Bezirks und einer Stelle (LFH-676)', async () => {
+    const a = faengeAnfragen();
+    await ladeStandVerlauf(7, 5);
+    await ladeBelegungVerlauf(7, 9);
+    expect(a.map((x) => [x.methode, x.pfad, x.query])).toEqual([
+      ['GET', `${B}/bezirke/5/staende`, ''],
+      ['GET', `${B}/stellen/9/belegungen`, ''],
     ]);
   });
 

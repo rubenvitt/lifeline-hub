@@ -67,3 +67,17 @@ body {
 .etb-erfassung-sticky .markdown-editor__vorschau {
   max-height: 28vh;
 }
+
+/* Radio-Knopf (Knopfform): Text in `bedienText` (LFH-677, Regel aus LFH-650). antd schreibt
+   den Text des gewählten Knopfs und jedes Knopfs unter dem Zeiger in `colorPrimary` — am Tag
+   `bedien` auf Weiß, gemessen 6,59 : 1 unter dem Tagesboden 7 : 1. Nur der TEXT: Rand,
+   Scheibe und Flächen bleiben auf `bedien` (ein Komponenten-Token hätte sie mitgefärbt).
+   HIER und nicht in `theme/sprache.css`: die Regel gilt app-weit, `sprache.css` lädt aber nur
+   mit den Bausteinen, die es importieren (der Prod-Build teilt CSS je Chunk).
+   Nur `-outline`: im Stil `solid` steht der Text auf satter `bedien`-Fläche, dort wäre
+   `bedienText` unlesbar. `.ant-radio-group-outline` davor hebt die Spezifität über antds
+   (0,3,0) — sonst entschiede die Einfügereihenfolge der CSS-in-JS-Stile. */
+.ant-radio-group-outline .ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled),
+.ant-radio-group-outline .ant-radio-button-wrapper:not(.ant-radio-button-wrapper-disabled):hover {
+  color: var(--lfh-bedien-text);
+}

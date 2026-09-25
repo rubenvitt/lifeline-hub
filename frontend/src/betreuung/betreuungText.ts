@@ -27,6 +27,22 @@ export function personenZahl(n: number): string {
   return vorzeichen + ziffern.replace(/\B(?=(\d{3})+(?!\d))/g, TRENNER);
 }
 
+/**
+ * „davon namentlich n" an einer Stelle (LFH-674, design.md D7): Personen, die einzeln mit
+ * Verbleib „Notunterkunft" hierher verbracht wurden. Ein HINWEIS neben der Mengenmeldung, nie
+ * ein Summand — führend ist die Belegung. Ohne Belegungsmeldung entfällt „davon", weil es keine
+ * Menge gibt, von der die Zahl ein Teil wäre. Bei 0 oder ohne Auskunft (kein Personenrecht:
+ * das Feld fehlt in der Antwort) steht nichts. Wort und Zahl kommen getrennt zurück, weil die
+ * Zahl Mono mit `tabular-nums` läuft und das Wort nicht.
+ */
+export function namentlichTeile(
+  anzahl: number | undefined,
+  gemeldet: boolean,
+): { wort: string; zahl: string } | null {
+  if (!anzahl) return null;
+  return { wort: gemeldet ? 'davon namentlich' : 'namentlich', zahl: personenZahl(anzahl) };
+}
+
 /** „≈ 640" bei geschätzt, sonst „640". Das Zeichen ist der zweite Kanal der Erhebungsart. */
 export function mengeText(n: number, erhebung: Erhebung): string {
   return erhebung === 'geschaetzt' ? `≈ ${personenZahl(n)}` : personenZahl(n);

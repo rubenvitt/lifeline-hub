@@ -1655,11 +1655,7 @@ describe('LagekartePage · bbox-Pfad für bbox-abhängige Ebenen (LFH-81)', () =
     // Seit dem Neuentwurf (22.09.2026) startet das Fachebenen-Paneel der rechten Leiste
     // eingeklappt — erst aufklappen, dann liegt der Schalter im Baum.
     await user.click(await screen.findByRole('button', { name: 'Fachebenen (extern)' }));
-    const schalter = (await screen.findByText('Energieanlagen'))
-      .closest('.ant-space')
-      ?.querySelector('button[role="switch"]');
-    expect(schalter).toBeTruthy();
-    await user.click(schalter as Element);
+    await user.click(await screen.findByRole('switch', { name: 'Energieanlagen' }));
 
     // Die tragende Aussage: der Ausschnitt hängt nicht mehr an KRITIS. Mit der alten
     // Bedingung (`fachebenenSichtbar.kritis`) stünde hier weiter „aus".

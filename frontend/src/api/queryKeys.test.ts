@@ -40,10 +40,14 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
   // F01/LFH-227: `person` und `personal` sind getrennte Wire-Events. Vorher trug EIN
   // `person`-Tag beide ID-Räume (betroffene Person vs. einsatz_personal-Disposition) und
   // musste deshalb ×5 fan-outen; getrennt kann das Backend die Module getrennt gaten.
-  it('bildet person nur auf die Personen-Registrierung ab', () => {
+  // LFH-674: … plus die Betreuungsübersicht, denn „davon namentlich n“ hängt am Verbleib der
+  // Personen. Das Personen-Ereignis erreicht nur Leser mit Personenrecht — genau die, die die
+  // Zahl sehen (design.md D5).
+  it('bildet person auf die Personen-Registrierung und die Betreuungsübersicht ab', () => {
     expect(EINSATZ_STREAM_EVENTS.person).toEqual([
       EINSATZ_KEYS.personen,
       EINSATZ_KEYS.modulZaehler,
+      EINSATZ_KEYS.betreuung,
     ]);
   });
 
@@ -275,6 +279,22 @@ describe('einsatzKeys (Factory-Output)', () => {
     // Ohne Stichtag („jetzt“) ein fester Platzhalter statt eines sekundengenauen Zeitstempels —
     // sonst entstünde bei jedem Rendern ein neuer Key und damit ein neuer Abruf.
     expect(einsatzKeys.betreuungKopfzahl(1)).toEqual(['einsatz-betreuung', 1, 'kopfzahl', 'jetzt']);
+    // LFH-676: Verlauf UNTER dem Betreuungs-Prefix — das `betreuung`-Ereignis und die
+    // Invalidierung nach jeder eigenen Mutation treffen ihn ohne eigenen Event-Eintrag.
+    expect(einsatzKeys.betreuungVerlauf(1, 'bezirk', 5)).toEqual([
+      'einsatz-betreuung',
+      1,
+      'verlauf',
+      'bezirk',
+      5,
+    ]);
+    expect(einsatzKeys.betreuungVerlauf(1, 'stelle', 9)).toEqual([
+      'einsatz-betreuung',
+      1,
+      'verlauf',
+      'stelle',
+      9,
+    ]);
     // LFH-634: Verpflegungs-Prefix als Literal gepinnt.
     expect(einsatzKeys.verpflegung(1)).toEqual(['einsatz-verpflegung', 1]);
     expect(einsatzKeys.etbListe(1, { typ: 'x' })).toEqual(['etb', 1, { typ: 'x' }]);

@@ -89,6 +89,23 @@ const auftrag = (over: Partial<Auftrag> = {}): Auftrag => ({
   ...over,
 });
 
+/** Ein Funktions-Empfänger; `quittiert` ist der Zeitstempel oder `null` für offen. */
+const empf = (id: number, anzeige: string, quittiert: string | null) => ({
+  id,
+  auftrag_id: 1,
+  empfaenger_typ: 'funktion' as const,
+  abschnitt_id: null,
+  einheit_id: null,
+  person_id: null,
+  fahrzeug_id: null,
+  funktion_text: anzeige,
+  extern_kategorie: null,
+  extern_bezeichnung: null,
+  snap_anzeige: anzeige,
+  quittiert_at: quittiert,
+  quittiert_von_id: null,
+});
+
 /** Macht den aktuellen Query-String im DOM sichtbar (für apply-then-clean-Assertions). */
 function LocationProbe() {
   return <span data-testid="loc-search">{useLocation().search}</span>;
@@ -267,21 +284,6 @@ describe('AuftraegePage', () => {
   // etwas belegen: dass mehrere offene Empfänger unterscheidbar bleiben, und dass ein
   // bereits quittierter Empfänger gar keine Aktion mehr trägt.
   it('trennt die Quittungs-Aktionen mehrerer Empfänger über den zugänglichen Namen', async () => {
-    const empf = (id: number, anzeige: string, quittiert: string | null) => ({
-      id,
-      auftrag_id: 1,
-      empfaenger_typ: 'funktion' as const,
-      abschnitt_id: null,
-      einheit_id: null,
-      person_id: null,
-      fahrzeug_id: null,
-      funktion_text: anzeige,
-      extern_kategorie: null,
-      extern_bezeichnung: null,
-      snap_anzeige: anzeige,
-      quittiert_at: quittiert,
-      quittiert_von_id: null,
-    });
     listeAuftraege.mockResolvedValue([
       auftrag({
         empfaenger_anzahl: 3,
@@ -314,6 +316,85 @@ describe('AuftraegePage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Empfang für EA Süd quittieren' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Bestätigen' }));
     await waitFor(() => expect(quittiereEmpfaenger).toHaveBeenCalledWith(1, 1, 2));
+  });
+
+  // LFH-371: die Anzeigegrenze von drei Empfängern schnitt die Liste, BEVOR zwischen
+  // quittiert und offen getrennt wurde. Waren die ersten drei quittiert, verschwand die
+  // Zeile „Quittung offen:" ganz — der vierte und fünfte Empfänger hatten keinen Knopf,
+  // `empfaenger_anzahl == quittiert_anzahl` wurde nie wahr und die Auto-Frist-Erinnerung
+  // aus LFH-118 schloss nie. Genau diese Konstellation ist der Ausfall.
+  it('macht Empfänger jenseits der ersten drei quittierbar', async () => {
+    const q = '2026-06-11 10:00:00';
+    listeAuftraege.mockResolvedValue([
+      auftrag({
+        empfaenger_anzahl: 5,
+        quittiert_anzahl: 3,
+        empfaenger: [
+          empf(1, 'EA Nord', q),
+          empf(2, 'EA Süd', q),
+          empf(3, 'EA West', q),
+          empf(4, 'Florian 4', null),
+          empf(5, 'Florian 5', null),
+        ],
+      }),
+    ]);
+    quittiereEmpfaenger.mockResolvedValue(auftrag());
+    renderPage();
+    await screen.findByText('Deich sichern');
+
+    expect(screen.getByText('Quittung offen:')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /quittieren$/ })).toHaveLength(2);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Empfang für Florian 4 quittieren' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Bestätigen' }));
+    await waitFor(() => expect(quittiereEmpfaenger).toHaveBeenCalledWith(1, 1, 4));
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Empfang für Florian 5 quittieren' }),
+    );
+    // Der erste Popconfirm bleibt bis zum Ende seiner Animation im Baum — der zweite
+    // „Bestätigen" ist der jüngste.
+    await waitFor(() =>
+      expect(screen.getAllByRole('button', { name: 'Bestätigen' }).length).toBeGreaterThan(0),
+    );
+    const bestaetigen = screen.getAllByRole('button', { name: 'Bestätigen' });
+    await userEvent.click(bestaetigen[bestaetigen.length - 1]);
+    await waitFor(() => expect(quittiereEmpfaenger).toHaveBeenCalledWith(1, 1, 5));
+  });
+
+  // Die Grenze gilt weiter — aber nur für die Statusanzeige. Quittiertes ist Lesestoff
+  // und darf hinter „+n" verschwinden, Offenes ist Arbeit und nie.
+  it('begrenzt nur die quittierten Chips, nie die offenen Empfänger', async () => {
+    const q = '2026-06-11 10:00:00';
+    listeAuftraege.mockResolvedValue([
+      auftrag({
+        empfaenger_anzahl: 6,
+        quittiert_anzahl: 4,
+        empfaenger: [
+          empf(1, 'Florian 1', null),
+          empf(2, 'EA Nord', q),
+          empf(3, 'EA Süd', q),
+          empf(4, 'EA West', q),
+          empf(5, 'EA Ost', q),
+          empf(6, 'Florian 6', null),
+        ],
+      }),
+    ]);
+    renderPage();
+    await screen.findByText('Deich sichern');
+
+    // Drei Chips mit dem zweiten Kanal ✓ (WCAG 1.4.1), der vierte Quittierte steckt in „+1".
+    // `^[^+]` hält „+1 ✓" aus der Chipzählung heraus.
+    expect(screen.getAllByText(/^[^+].* ✓$/)).toHaveLength(3);
+    expect(screen.queryByText('EA Ost ✓')).not.toBeInTheDocument();
+    expect(screen.getByText('+1 ✓')).toBeInTheDocument();
+    // Beide offenen stehen mit Knopf da — der erste vor der Grenze, der letzte dahinter.
+    expect(
+      screen.getByRole('button', { name: 'Empfang für Florian 1 quittieren' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Empfang für Florian 6 quittieren' }),
+    ).toBeInTheDocument();
   });
 
   it('nennt offene Empfänger auch ohne Schreibrecht, nur ohne Quittungs-Knopf', async () => {

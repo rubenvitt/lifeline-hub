@@ -1,4 +1,4 @@
-import { theme as antdTheme, type ThemeConfig } from 'antd';
+import { theme as antdTheme, type ConfigProviderProps, type ThemeConfig } from 'antd';
 import type { MappingAlgorithm } from 'antd';
 
 /** LFH-455: fachliche Sichtungskennzeichnung, bewusst unabhängig von A0-Statusrollen.
@@ -29,9 +29,14 @@ export const sichtungsfarben = {
  * den Werten (`farbenDunkel`).
  *
  * DIESE DATEI IST DIE TS-SEITE DER WAHRHEIT. Die CSS-Seite steht in `rollen.css`
- * als statische Custom Properties — nötig, weil handgeschriebenes CSS die
- * antd-Tokens nicht lesen kann, solange `cssVar` aus ist (Weiche vertagt nach
- * A2/LFH-328). `rollen.guard.test.ts` hält beide Seiten deckungsgleich.
+ * als statische Custom Properties, damit handgeschriebenes CSS nicht an antds
+ * Variablennamen hängt. antd 6 emittiert seine `--ant-*`-Variablen zwar immer, auch
+ * ohne `cssVar` am ConfigProvider (gemessen in LFH-623, `test/antdCssVariablen.ts`;
+ * eine Weiche zum Abschalten gibt es nicht mehr). Sie taugen hier trotzdem nicht als
+ * Quelle: die meisten Rollen (`paneel`, `flaeche3`, `kopf`, die Statusflächen) hat
+ * antd gar nicht, die Namen gehören der Bibliothek und nicht der Gestaltungssprache,
+ * und `rollen.css` begründet im Kopf, warum die Werte schon im ersten Frame stehen
+ * müssen. `rollen.guard.test.ts` hält beide Seiten deckungsgleich.
  *
  * ROT BEDIENT NICHTS. `bedien` ist blau, `marke` ist rot, `alarm` ist rot in
  * anderer Sättigung. Eine rote Bedienfläche bricht die Sprache (LFH-315).
@@ -601,22 +606,115 @@ export const seedTreu: MappingAlgorithm = (seed, abgeleitet) => ({
   colorSuccess: seed.colorSuccess,
 });
 
+/** antds fester Innenabstand der Schalterspur (`switch/style/index.js`: „Fixed value"). */
+const SWITCH_SPURPOLSTER = 2;
+
 /**
- * Komponenten-Tokens, die aus den Rollen folgen.
+ * Die Maße des Kippschalters aus der Dichte-Staffel (LFH-380).
+ *
+ * antd leitet den `Switch` NICHT aus `controlHeight` ab, sondern aus der Schrift:
+ * `prepareComponentToken` in `antd/es/switch/style/index.js` rechnet
+ * `trackHeight = fontSize × lineHeight`, und antds `lineHeight` ist `(fontSize + 8) / fontSize`
+ * (`theme/themes/shared/genFontSizes.js`) — die Spur ist also `fontSize + 8`. Mit 13,5 / 15 /
+ * 15 px Grundschrift stand der Schalter damit bei 21,5 / 23 / 23 px (am Tablet gemessen: 23) —
+ * im Handschuh bei einem Drittel des Bodens, und selbst kompakt unter den 24 px aus Gate 1.
+ *
+ * Boden ist `kleineZeilenhoehe` (24 / 48 / 72), nicht `zeilenhoehe` (30 / 48 / 72): Gate 3
+ * verlangt in der kurzen Achse genau die kleine Steuerhöhe, und ein 30-px-Schalter machte
+ * den Fükw-Alltag schwerer, ohne dass eine Anforderung es verlangt. Kompakt wächst damit
+ * nur von 21,5 auf 24 px; komfortabel und Handschuh treffen dieselbe Höhe wie die
+ * Steuerelemente neben ihnen.
+ *
+ * Der GANZE abhängige Satz, nicht nur die Spur: antd rechnet Griff, Mindestbreite und
+ * Innenränder in derselben Funktion aus der Schrift, und ein überschriebener
+ * Komponententoken zieht die übrigen NICHT nach — wer nur `trackHeight` setzt, bekommt
+ * einen 18-px-Griff in einer 72-px-Spur. Die Formeln sind antds eigene, nur mit der Spur
+ * als Eingang statt der Schrift; das Seitenverhältnis bleibt damit das gewohnte (Breite
+ * ≈ 2 × Höhe), und die Gesamtfläche wächst mit: 24 × 48 · 48 × 96 · 72 × 144.
+ *
+ * Die kleine Schaltervariante (`…SM`-Tokens) bleibt unberührt: `dichte.guard.test.ts`
+ * sperrt die Größen-Prop am `Switch`, und keine Stelle setzt eine Vorgabegröße per
+ * `componentSize`.
+ *
+ * Rein und exportiert, damit die Rechnung ohne Render über die Stufen prüfbar ist (jsdom
+ * rechnet kein Layout). Bauform nach `segmentedMasse` aus LFH-370 (seit LFH-392 mit ihrem
+ * einzigen Aufrufer entfallen).
+ */
+export function switchMasse(stufe: Pick<Dichtestufe, 'kleineZeilenhoehe'>) {
+  const trackHeight = stufe.kleineZeilenhoehe;
+  const handleSize = trackHeight - 2 * SWITCH_SPURPOLSTER;
+  return {
+    trackHeight,
+    trackPadding: SWITCH_SPURPOLSTER,
+    handleSize,
+    trackMinWidth: 2 * handleSize + 4 * SWITCH_SPURPOLSTER,
+    innerMinMargin: handleSize / 2,
+    innerMaxMargin: handleSize + 3 * SWITCH_SPURPOLSTER,
+  };
+}
+
+/**
+ * Komponenten-Tokens, die aus den Rollen und der Dichte-Stufe folgen.
  *
  * `aufBedien` gehört an den KNOPF, nicht an antds `colorTextLightSolid`: dieser globale
  * Token färbt auch Tooltip (auf `colorBgSpotlight`), Avatar, Badge, Bildvorschau-Maske,
  * die Layout-Kopfzeile und rund fünfzehn weitere Stellen (gezählt in
  * `antd/es/…/style`). #08090b dort wäre nachts dunkel auf dunkel. Am Knopf: #08090b auf
  * `bedien` 6,19 : 1, auf `alarm` 7,18 : 1; Weiß auf `bedien` hätte nur 3,22.
+ *
+ * Die Dichte ist PFLICHT, anders als bei {@link antdToken}: eine Vorgabe `kompakt` ließe
+ * den Schalter bei einem vergessenen Argument still auf der kompakten Stufe stehen, und
+ * nichts würde rot (Herleitung bei {@link switchMasse}).
  */
-export function antdKomponenten(farben: Farbrollen): NonNullable<ThemeConfig['components']> {
+export function antdKomponenten(
+  farben: Farbrollen,
+  dichte: Dichte,
+): NonNullable<ThemeConfig['components']> {
   return {
     Button: {
       primaryColor: farben.aufBedien,
       dangerColor: farben.aufBedien,
     },
+    Switch: switchMasse(dichten[dichte]),
   };
+}
+
+/**
+ * Der Boden der kurzen Achse für JEDEN Knopf (LFH-381): nie schmaler als die kleine
+ * Steuerhöhe der Stufe, also 24 / 48 / 72 — genau der Boden aus A1 Gate 3.
+ *
+ * Die Höhe eines Knopfs folgt der Staffel über `controlHeight`/`controlHeightSM`, seine
+ * Breite aber der BESCHRIFTUNG plus Polsterung. Bei kleinen Knöpfen ist diese Polsterung
+ * antds `paddingInlineSM`, und das ist in `antd/es/button/style/token.js` das Literal
+ * `8 - lineWidth` = 7 — ohne jede Dichte. Ein „OK" in einer Bestätigungsblase blieb damit
+ * rund 38 px breit, während es auf 72 px Höhe wuchs; der Daumen trifft die schmale Achse.
+ *
+ * WARUM EIN BODEN UND NICHT DIE POLSTERUNG: eine an die Staffel gebundene Polsterung
+ * bindet die Breite nicht an die Höhe — ein Ein-Zeichen-Etikett („…", „+") fiele weiter
+ * durch, und jedes breite Etikett wüchse grundlos mit, auch in Reihen mehrerer Knöpfe.
+ * Ein `minWidth` wirkt nur dort, wo der Knopf zu schmal WÄRE, und lässt alle übrigen
+ * unberührt. Er ist dieselbe Regel, die antd selbst für icon-only (`width`) und
+ * Kreisknöpfe (`minWidth`) anlegt, nur für alle Formen.
+ *
+ * GRENZE: als Inline-Stil überstimmt er antds Kreis-`minWidth` (`controlHeight`) — in
+ * `kompakt` fiele ein Kreisknopf mit Text von 30 auf 24 px Mindestbreite, und `FloatButton`
+ * erreicht der Kontext ebenfalls. Heute gibt es keinen Aufrufer von beidem; wer einen
+ * einführt, prüft das.
+ *
+ * WARUM EIN WERT FÜR ALLE GRÖSSEN: der Boden aus Gate 3 hängt an der Stufe, nicht an der
+ * Knopfgröße. In `komfortabel` und `handschuh` fallen kleine und volle Höhe ohnehin
+ * zusammen (Herleitung bei {@link dichten}); in `kompakt` ist ein voller Knopf 30 hoch,
+ * sein Boden in der kurzen Achse bleibt 24.
+ *
+ * WARUM AM KONTEXT UND NICHT IN CSS: der Wert kommt aus derselben Stufe wie die Höhe,
+ * ohne Spiegel in `rollen.css`, und erreicht auch die Knöpfe, die antd selbst baut
+ * (Bestätigungsblase, Modal-Fuß, Filter-Dropdown), weil sie dieselbe `Button`-Komponente
+ * rendern. Ein `style` am einzelnen Knopf schlägt den Kontext — das ist der Weg für eine
+ * benannte Ausnahme, keiner für Neues. Die einzige bisherige (Aktionszeile der UHS-Platzkarte)
+ * ist mit LFH-379 gefallen: die Zeile steht nur noch in `kompakt`, wo der Boden passt.
+ */
+export function antdKnopf(dichte: Dichte = 'kompakt'): NonNullable<ConfigProviderProps['button']> {
+  return { style: { minWidth: dichten[dichte].kleineZeilenhoehe } };
 }
 
 /**

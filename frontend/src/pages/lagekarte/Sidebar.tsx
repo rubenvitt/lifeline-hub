@@ -1,6 +1,7 @@
 import {
   Button,
   Dropdown,
+  Input,
   Modal,
   Radio,
   Slider,
@@ -19,6 +20,7 @@ import {
   FullscreenOutlined,
   LockOutlined,
   MoreOutlined,
+  SearchOutlined,
   UploadOutlined,
 } from '@ant-design/icons';
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
@@ -83,6 +85,39 @@ const NICHT_VERORTET_LABEL: Record<NichtVerortet['typ'], string> = {
   abschnitt: 'Abschnitt',
   betreuungsstelle: 'Betreuungsstelle',
 };
+
+/**
+ * Ab wie vielen Einträgen „Nicht verortet" ein Suchfeld trägt (LFH-360).
+ *
+ * Fünf, weil die Liste in der 300 px breiten Leiste ab dort zu scrollen beginnt — darunter
+ * ist Hinsehen schneller als Tippen, und ein dauerhaft stehendes Feld ließe die Leiste im
+ * Normalfall zuwachsen. Dieselbe Abwägung wie `SUCHE_AB` der Einsatzauswahl, dort acht.
+ */
+export const NICHT_VERORTET_SUCHE_AB = 5;
+
+/**
+ * Filter der Liste „Nicht verortet" (LFH-360): Teilstring, Groß-/Kleinschreibung egal, gegen
+ * die Zeile, wie sie DASTEHT — Typ-Präfix plus Label („Fahrzeug: ELW 1"). Deshalb findet
+ * „einheit" alle Einheiten und „personal" das disponierte Personal, dessen Schlüssel
+ * `fuehrung` nirgends angezeigt wird und folgerichtig nichts trifft.
+ *
+ * Das laufende Platzierungsziel bleibt IMMER stehen: seine Zeile trägt den einzigen
+ * „Abbrechen"-Knopf des Modus (der Hinweis oben nennt ihn nur, Escape beendet nur das
+ * Messwerkzeug). Filterte ein Begriff sie weg, säße die Einsatzkraft im Platzier-Modus fest.
+ */
+export function filtereNichtVerortet(
+  liste: NichtVerortet[],
+  suche: string,
+  ziel: { typ: string; id: number } | null,
+): NichtVerortet[] {
+  const begriff = suche.trim().toLowerCase();
+  if (!begriff) return liste;
+  return liste.filter(
+    (o) =>
+      (ziel?.typ === o.typ && ziel.id === o.id) ||
+      `${NICHT_VERORTET_LABEL[o.typ]}: ${o.label}`.toLowerCase().includes(begriff),
+  );
+}
 
 /** Platzierungsziel → exclude-Tag (typ:id) für die Ort-Vorschau (Selbst-Ausschluss).
  *  Einsatzort-Marker trägt die echte einsatzId, nicht die Dummy-0 aus dem Platzierungs-Ziel. */
@@ -466,6 +501,51 @@ export function bedienzielStil(token: {
 }
 
 /**
+ * Eine Schalter-Zeile der Leiste, die UMBRECHEN darf (LFH-380).
+ *
+ * Seit der Kippschalter der Staffel folgt, ist er im Handschuh 144 px breit. Die Leiste hat
+ * 300 px, nach der Polsterung des Klapppaneels bleiben gemessen 247 — eine starre Zeile ließ
+ * dem Bildnamen daneben 19 px („…"), und „Wetterwarnungen" ragte 16 px aus der Leiste.
+ * Zusammen mit {@link namensteilStil} rückt der Namensteil deshalb in eine eigene Zeile,
+ * sobald neben dem Schalter kein Platz für ihn bleibt; in kompakt und komfortabel bleibt es
+ * eine Zeile. Das folgt aus dem Layout, nicht aus einer Stufenabfrage.
+ *
+ * Rein und exportiert wie {@link bedienzielStil}. Der Umbruch selbst ist in jsdom nicht
+ * prüfbar; der Nachweis liegt in `e2e/lagekarte-leiste-dichte.spec.ts`.
+ */
+export function leistenZeileStil(token: { marginXS: number }) {
+  return {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'flex-start',
+    gap: token.marginXS,
+  } as const;
+}
+
+/**
+ * Der Namensteil einer {@link leistenZeileStil}-Zeile — der Name UND was ihm rechts folgt
+ * (Aktionsmenü, Statuswort), als EINE Umbrucheinheit.
+ *
+ * Einheit statt zweier Teile, und das ist gemessen: brachen Name und Aktionen getrennt um,
+ * rutschte in komfortabel das Aktionsmenü allein in eine zweite Zeile, obwohl vorher alles
+ * in eine passte. So entscheidet genau eine Frage, ob der Teil neben den Schalter passt.
+ *
+ * Basis 0 plus Mindestbreite: ein Flex-Element bricht um, sobald seine Mindestbreite nicht
+ * mehr neben die Vorgänger passt, und füllt sonst den Rest. Der Boden ist `6em` Name plus
+ * ein Bedienziel der Stufe (`controlHeight` — ein Icon-Knopf ist so breit wie hoch). Die
+ * Schrift-Einheit wandert mit der Stufe, keine Pixelzahl bildet die Leistenbreite nach.
+ */
+export function namensteilStil(token: { controlHeight: number; marginXS: number }) {
+  return {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: token.marginXS,
+    flex: '1 1 0',
+    minWidth: `calc(6em + ${token.controlHeight}px)`,
+  } as const;
+}
+
+/**
  * Rechte Leiste der Lagekarte (Neuentwurf S5 „Karte führt, Daten folgen"), 300 px ab `lg`.
  *
  * Oben die zwei festen Abschnitte des Entwurfs — **Ebenen** (Farbfeld · Name · Anzahl, Klick
@@ -491,6 +571,24 @@ export default function Sidebar(props: SidebarProps) {
   const [zeichenEntwurf, setZeichenEntwurf] = useState<FreiesZeichenUpdate>({
     grundzeichen: 'taktische-formation',
   });
+  // Suche über „Nicht verortet" (LFH-360). Wirksam ist der Begriff nur, solange das Feld
+  // steht: fällt die Liste unter die Schwelle, verschwindet mit dem Feld auch sein
+  // `allowClear` — ein weiterwirkender Filter verschluckte dann Einträge ohne sichtbaren
+  // Grund und ohne Ausweg (Befund M6 der Einsatzauswahl). Zurückgesetzt wird deshalb WÄHREND
+  // des Renderns, nicht im Effekt: React verwirft diesen Durchlauf vor dem Commit und rendert
+  // sofort mit leerem Begriff neu, es gibt also keinen sichtbaren Zwischenstand mit Filter.
+  // Ein zusätzlich abgeleiteter Begriff (`zeigen ? suche : ''`) wäre davon nicht zu
+  // unterscheiden gewesen — per Mutationsprobe gemessen — und steht deshalb nicht da.
+  const [nvSuche, setNvSuche] = useState('');
+  const nvSucheZeigen = nichtVerortet.length >= NICHT_VERORTET_SUCHE_AB;
+  if (!nvSucheZeigen && nvSuche !== '') setNvSuche('');
+  const nvBegriff = nvSuche.trim();
+  const nvTreffer = filtereNichtVerortet(nichtVerortet, nvBegriff, platzierungZiel);
+  // Gezählt werden nur ECHTE Treffer: die angeheftete Zeile des laufenden Ziels steht auch
+  // ohne Treffer da, und mitgezählt behauptete „1 von 5" einen Treffer, den es nicht gibt.
+  const nvTrefferzahl = nvBegriff
+    ? filtereNichtVerortet(nichtVerortet, nvBegriff, null).length
+    : nichtVerortet.length;
   // Entwurfswert der numerischen Mittelpunkt-Eingabe im Bild-Platzier-Modus.
   const [bildMitte, setBildMitte] = useState<LatLon | null>(null);
   /**
@@ -627,44 +725,93 @@ export default function Sidebar(props: SidebarProps) {
         ) : (
           <>
             <VeraltetSlot fehler={sektionFehler.nichtVerortet} />
-            <Liste
-              size="small"
-              dataSource={nichtVerortet}
-              rowKey={(o) => `${o.typ}-${o.id}`}
-              renderItem={(o) => {
-                const aktiv = platzierungZiel?.typ === o.typ && platzierungZiel?.id === o.id;
-                let action: React.ReactNode = null;
-                // Zeilenaktionen sind SEKUNDÄR (umrandet): n Zeilen mit je einem gefüllten
-                // Knopf wären n Primäraktionen nebeneinander — „genau eine Primäraktion" gilt
-                // auch in der Leiste. Gefüllt bleibt nur, was einen laufenden Modus abschließt.
-                if (darfSchreiben) {
-                  if (o.typ === 'abschnitt') {
-                    action = (
-                      <Button onClick={() => props.onAbschnittZeichnenStart(o.id)}>
-                        Fläche zeichnen
-                      </Button>
-                    );
-                  } else if (aktiv) {
-                    action = <Button onClick={props.onPlatzierenAbbrechen}>Abbrechen</Button>;
-                  } else {
-                    // o.typ ist hier auf die Punkt-Typen verengt (abschnitt oben behandelt).
-                    const punktTyp = o.typ;
-                    action = (
-                      <Button onClick={() => props.onPlatzierenStart({ typ: punktTyp, id: o.id })}>
-                        Platzieren
-                      </Button>
-                    );
+            {nvSucheZeigen && (
+              <div style={{ marginBlockEnd: token.marginXS }}>
+                {/* Ein schlichtes Eingabefeld statt der Suchvariante: gefiltert wird live,
+                    deren Suchknopf wäre ein Tab-Ziel ohne Wirkung. Die Ikone steht in einer
+                    `aria-hidden`-Hülle — sie brächte sonst ein englisches „search" als
+                    eigenes Vorleseziel mit. Die Höhe erbt das Feld vom `ConfigProvider`. */}
+                <Input
+                  aria-label="Nicht verortete Objekte durchsuchen"
+                  placeholder="Name oder Typ"
+                  allowClear
+                  prefix={
+                    <span aria-hidden="true" style={{ color: rollen.schwach }}>
+                      <SearchOutlined />
+                    </span>
                   }
-                }
-                return (
-                  <ListenEintrag actions={action ? [action] : []}>
-                    <Typography.Text>
-                      {NICHT_VERORTET_LABEL[o.typ]}: {o.label}
-                    </Typography.Text>
-                  </ListenEintrag>
-                );
-              }}
-            />
+                  value={nvSuche}
+                  onChange={(ev) => setNvSuche(ev.target.value)}
+                />
+                {/* Die Trefferzahl ist die ZWEITE Angabe: der Kopf zählt weiter alle nicht
+                    verorteten Objekte, sonst verlöre die Warnzahl ihre Aussage.
+                    Die Region STEHT mit dem Feld, auch wenn sie schweigt: eine Live-Region
+                    meldet nur Änderungen an Inhalt, der schon da war (Regel der Sprungpalette).
+                    Sie trägt auch „0 von N" — die Leermeldung darunter hat keine Rolle, und
+                    der Fokus bleibt im Feld; ohne diese Zeile hörte ein Vorleser nie, dass die
+                    Suche alles weggefiltert hat. */}
+                <div
+                  role="status"
+                  style={{
+                    ...monoStil(11),
+                    color: rollen.gedaempft,
+                    ...(nvBegriff ? { marginBlockStart: token.marginXXS } : {}),
+                  }}
+                >
+                  {nvBegriff ? `${nvTrefferzahl} von ${nichtVerortet.length}` : ''}
+                </div>
+              </div>
+            )}
+            {/* Dritter Zustand neben „Alles verortet" und der Liste: die Suche hat alles
+                weggefiltert. Eigener Wortlaut, weil „Alles verortet" hier eine falsche
+                Lagebeurteilung wäre. Keine Primäraktion — der Ausweg ist das Leeren am
+                Feld unmittelbar darüber. Steht das laufende Platzierungsziel als einzige
+                Zeile da, bleibt sie ohne Leermeldung: beides nebeneinander widerspräche sich,
+                und „0 von N" sagt schon, dass sie kein Treffer ist. */}
+            {nvTreffer.length === 0 ? (
+              <SeitenLeer titel={`Keine Treffer für „${nvBegriff}"`} />
+            ) : (
+              <Liste
+                size="small"
+                dataSource={nvTreffer}
+                rowKey={(o) => `${o.typ}-${o.id}`}
+                renderItem={(o) => {
+                  const aktiv = platzierungZiel?.typ === o.typ && platzierungZiel?.id === o.id;
+                  let action: React.ReactNode = null;
+                  // Zeilenaktionen sind SEKUNDÄR (umrandet): n Zeilen mit je einem gefüllten
+                  // Knopf wären n Primäraktionen nebeneinander — „genau eine Primäraktion" gilt
+                  // auch in der Leiste. Gefüllt bleibt nur, was einen laufenden Modus abschließt.
+                  if (darfSchreiben) {
+                    if (o.typ === 'abschnitt') {
+                      action = (
+                        <Button onClick={() => props.onAbschnittZeichnenStart(o.id)}>
+                          Fläche zeichnen
+                        </Button>
+                      );
+                    } else if (aktiv) {
+                      action = <Button onClick={props.onPlatzierenAbbrechen}>Abbrechen</Button>;
+                    } else {
+                      // o.typ ist hier auf die Punkt-Typen verengt (abschnitt oben behandelt).
+                      const punktTyp = o.typ;
+                      action = (
+                        <Button
+                          onClick={() => props.onPlatzierenStart({ typ: punktTyp, id: o.id })}
+                        >
+                          Platzieren
+                        </Button>
+                      );
+                    }
+                  }
+                  return (
+                    <ListenEintrag actions={action ? [action] : []}>
+                      <Typography.Text>
+                        {NICHT_VERORTET_LABEL[o.typ]}: {o.label}
+                      </Typography.Text>
+                    </ListenEintrag>
+                  );
+                }}
+              />
+            )}
           </>
         )}
       </KlappPaneel>
@@ -799,8 +946,10 @@ export default function Sidebar(props: SidebarProps) {
                     </Typography.Text>
                     {/* Serienmodus (LFH-332/M76). Der Schalter steht hier und nicht im Picker,
                         weil er den LAUFENDEN Modus beschreibt und mitten in einer Serie
-                        umgelegt werden können muss. */}
-                    <Space>
+                        umgelegt werden können muss. `wrap`: der Schalter ist im Handschuh
+                        144 px breit (LFH-380), neben dem Wort bliebe die 300-px-Leiste zu
+                        schmal. */}
+                    <Space wrap>
                       <Switch
                         checked={props.zeichenSerie}
                         onChange={props.onZeichenSerieWechsel}
@@ -907,15 +1056,24 @@ export default function Sidebar(props: SidebarProps) {
             const laedt = sichtbar && props.fachebenenLaedt?.[key];
             const zoomHinweis = sichtbar && istBboxAbhaengig(key) && props.zoomZuKlein?.[key];
             return (
-              <Space key={key} style={{ justifyContent: 'space-between', width: '100%' }}>
-                <Space align="start">
-                  <Switch checked={sichtbar} onChange={(v) => props.onFachebeneToggle(key, v)} />
+              <div key={key} data-fachebene={key} style={leistenZeileStil(token)}>
+                {/* Der Name steht am Schalter selbst, wie am Bild-Schalter unten — ohne ihn
+                    las ein Vorleser neun namenlose Schalter. */}
+                <Switch
+                  checked={sichtbar}
+                  aria-label={def.label}
+                  onChange={(v) => props.onFachebeneToggle(key, v)}
+                />
+                {/* Marke, Beschriftung und Statuswort sind EIN Umbruchteil: bricht die Zeile,
+                    geht das Farbquadrat mit seinem Wort, statt allein neben dem Schalter zu
+                    stehen, und das Statuswort bleibt rechts daneben. */}
+                <span style={namensteilStil(token)}>
                   <span style={{ color: def.farbe }} aria-hidden="true">
                     ■
                   </span>
                   {/* Der Geltungsbereich steht als ZEILE, nicht als Tooltip (LFH-80): auf
                       einem Führungs-Tablet gibt es kein Hovern. */}
-                  <span style={{ display: 'inline-flex', flexDirection: 'column' }}>
+                  <span style={{ display: 'inline-flex', flexDirection: 'column', flex: 1 }}>
                     <span>{def.label}</span>
                     {def.geltung && (
                       <Typography.Text type="secondary" style={{ fontSize: 11 }}>
@@ -923,41 +1081,41 @@ export default function Sidebar(props: SidebarProps) {
                       </Typography.Text>
                     )}
                   </span>
-                </Space>
-                {laedt ? (
-                  <Spin size="small" />
-                ) : zoomHinweis ? (
-                  <Tooltip
-                    title={`${def.label}: Objekte werden erst ab einer näheren Zoomstufe geladen`}
-                  >
-                    <Typography.Text type="warning" style={{ fontSize: 11 }}>
-                      näher heranzoomen
-                    </Typography.Text>
-                  </Tooltip>
-                ) : (
-                  <>
-                    {/* `nowrap`: sonst bricht die Marke mitten im Wort (LFH-83). */}
-                    {sichtbar && offline && (
-                      <Tooltip title="Quelle offline — Ebene wird leer angezeigt">
+                  {laedt ? (
+                    <Spin size="small" />
+                  ) : zoomHinweis ? (
+                    <Tooltip
+                      title={`${def.label}: Objekte werden erst ab einer näheren Zoomstufe geladen`}
+                    >
+                      <Typography.Text type="warning" style={{ fontSize: 11 }}>
+                        näher heranzoomen
+                      </Typography.Text>
+                    </Tooltip>
+                  ) : (
+                    <>
+                      {/* `nowrap`: sonst bricht die Marke mitten im Wort (LFH-83). */}
+                      {sichtbar && offline && (
+                        <Tooltip title="Quelle offline — Ebene wird leer angezeigt">
+                          <Typography.Text
+                            type="secondary"
+                            style={{ fontSize: 11, whiteSpace: 'nowrap' }}
+                          >
+                            offline
+                          </Typography.Text>
+                        </Tooltip>
+                      )}
+                      {sichtbar && status === 'leer' && (
                         <Typography.Text
                           type="secondary"
                           style={{ fontSize: 11, whiteSpace: 'nowrap' }}
                         >
-                          offline
+                          keine Daten
                         </Typography.Text>
-                      </Tooltip>
-                    )}
-                    {sichtbar && status === 'leer' && (
-                      <Typography.Text
-                        type="secondary"
-                        style={{ fontSize: 11, whiteSpace: 'nowrap' }}
-                      >
-                        keine Daten
-                      </Typography.Text>
-                    )}
-                  </>
-                )}
-              </Space>
+                      )}
+                    </>
+                  )}
+                </span>
+              </div>
             );
           })}
         </Space>
@@ -982,97 +1140,102 @@ export default function Sidebar(props: SidebarProps) {
             return (
               <div
                 key={b.id}
-                style={{ borderBottom: `1px solid ${rollen.flaeche3}`, paddingBottom: 6 }}
+                style={{
+                  borderBottom: `1px solid ${rollen.flaeche3}`,
+                  paddingBottom: token.paddingSM,
+                }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ ...leistenZeileStil(token), alignItems: 'center' }}>
                   <Switch
                     checked={b.sichtbar}
                     aria-label={b.name}
                     onChange={(v) => props.onBildToggle(b.id, v)}
                     style={{ flexShrink: 0 }}
                   />
-                  <Typography.Text
-                    ellipsis={{ tooltip: b.name }}
-                    editable={
-                      darfSchreiben
-                        ? {
-                            tooltip: 'Umbenennen',
-                            onChange: (val) => {
-                              const t = val.trim();
-                              if (t && t !== b.name) props.onBildUmbenennen(b.id, t);
-                            },
-                          }
-                        : false
-                    }
-                    style={{ flex: 1, minWidth: 0 }}
-                  >
-                    {b.name}
-                  </Typography.Text>
-                  {/* Drei Aktionen an einer Zeile werden gebündelt (LFH-365 · B5e). OHNE
+                  <span style={{ ...namensteilStil(token), alignItems: 'center' }}>
+                    <Typography.Text
+                      ellipsis={{ tooltip: b.name }}
+                      editable={
+                        darfSchreiben
+                          ? {
+                              tooltip: 'Umbenennen',
+                              onChange: (val) => {
+                                const t = val.trim();
+                                if (t && t !== b.name) props.onBildUmbenennen(b.id, t);
+                              },
+                            }
+                          : false
+                      }
+                      style={{ flex: 1, minWidth: 0 }}
+                    >
+                      {b.name}
+                    </Typography.Text>
+                    {/* Drei Aktionen an einer Zeile werden gebündelt (LFH-365 · B5e). OHNE
                       Schreibrecht bleibt genau eine — dann steht der Zentrieren-Knopf direkt
                       da, ein Menü wäre ein Umweg. Beide Fälle sind als Paar getestet. */}
-                  <div style={{ flexShrink: 0 }}>
-                    {darfSchreiben ? (
-                      <Dropdown
-                        trigger={['click']}
-                        // `autoFocus`: ohne ihn klebt der Fokus am Auslöser (Befund an
-                        // `components/Datensicht.tsx`). In jsdom nicht prüfbar.
-                        autoFocus
-                        menu={{
-                          items: [
-                            {
-                              key: 'zentrieren',
-                              icon: <FullscreenOutlined />,
-                              label: 'Auf Bild zentrieren',
+                    <div style={{ flexShrink: 0 }}>
+                      {darfSchreiben ? (
+                        <Dropdown
+                          trigger={['click']}
+                          // `autoFocus`: ohne ihn klebt der Fokus am Auslöser (Befund an
+                          // `components/Datensicht.tsx`). In jsdom nicht prüfbar.
+                          autoFocus
+                          menu={{
+                            items: [
+                              {
+                                key: 'zentrieren',
+                                icon: <FullscreenOutlined />,
+                                label: 'Auf Bild zentrieren',
+                              },
+                              {
+                                key: 'platzieren',
+                                icon: <AimOutlined />,
+                                label: imPlatzieren
+                                  ? 'Platzieren beenden'
+                                  : 'Auf der Karte platzieren',
+                              },
+                              /*
+                               * Die Trennung zwischen destruktiver und harmloser Aktion (AK2): im
+                               * Menü ist sie der Trenner. Er trennt VISUELL; sein Weissraum
+                               * skaliert nicht mit der Dichte (antd rechnet ihn aus `lineWidth`),
+                               * was mitzieht, sind die Zeilenhöhen des Menüs.
+                               */
+                              { type: 'divider' as const },
+                              {
+                                key: 'loeschen',
+                                icon: <DeleteOutlined />,
+                                label: 'Bild entfernen …',
+                                danger: true,
+                              },
+                            ],
+                            // Zuordnung am MENÜ, nicht je Eintrag: ein Riegel hat dann einen Ort.
+                            onClick: ({ key }) => {
+                              if (key === 'zentrieren') props.onBildZentrieren(b.id);
+                              else if (key === 'platzieren') {
+                                if (imPlatzieren) props.onBildPlatzierenFertig();
+                                else props.onBildPlatzieren(b.id);
+                              } else if (key === 'loeschen') setLoeschBildId(b.id);
                             },
-                            {
-                              key: 'platzieren',
-                              icon: <AimOutlined />,
-                              label: imPlatzieren
-                                ? 'Platzieren beenden'
-                                : 'Auf der Karte platzieren',
-                            },
-                            /*
-                             * Die Trennung zwischen destruktiver und harmloser Aktion (AK2): im
-                             * Menü ist sie der Trenner. Er trennt VISUELL; sein Weissraum
-                             * skaliert nicht mit der Dichte (antd rechnet ihn aus `lineWidth`),
-                             * was mitzieht, sind die Zeilenhöhen des Menüs.
-                             */
-                            { type: 'divider' as const },
-                            {
-                              key: 'loeschen',
-                              icon: <DeleteOutlined />,
-                              label: 'Bild entfernen …',
-                              danger: true,
-                            },
-                          ],
-                          // Zuordnung am MENÜ, nicht je Eintrag: ein Riegel hat dann einen Ort.
-                          onClick: ({ key }) => {
-                            if (key === 'zentrieren') props.onBildZentrieren(b.id);
-                            else if (key === 'platzieren') {
-                              if (imPlatzieren) props.onBildPlatzierenFertig();
-                              else props.onBildPlatzieren(b.id);
-                            } else if (key === 'loeschen') setLoeschBildId(b.id);
-                          },
-                        }}
-                      >
-                        {/* Der Name trägt die Bild-Kennung (LFH-364). Kein `size`. */}
-                        <Button
-                          type="text"
-                          icon={<MoreOutlined />}
-                          aria-label={`Aktionen zu ${b.name}`}
-                        />
-                      </Dropdown>
-                    ) : (
-                      <Tooltip title="Auf Bild zentrieren">
-                        <Button
-                          icon={<FullscreenOutlined />}
-                          onClick={() => props.onBildZentrieren(b.id)}
-                          aria-label={`${b.name} zentrieren`}
-                        />
-                      </Tooltip>
-                    )}
-                  </div>
+                          }}
+                        >
+                          {/* Der Name trägt die Bild-Kennung (LFH-364). Kein `size`. */}
+                          <Button
+                            type="text"
+                            icon={<MoreOutlined />}
+                            aria-label={`Aktionen zu ${b.name}`}
+                          />
+                        </Dropdown>
+                      ) : (
+                        <Tooltip title="Auf Bild zentrieren">
+                          <Button
+                            icon={<FullscreenOutlined />}
+                            onClick={() => props.onBildZentrieren(b.id)}
+                            aria-label={`${b.name} zentrieren`}
+                          />
+                        </Tooltip>
+                      )}
+                    </div>
+                  </span>
                 </div>
                 <Slider
                   min={0}
@@ -1100,14 +1263,20 @@ export default function Sidebar(props: SidebarProps) {
                       Auf der Karte: Ecken = Größe (Seitenverhältnis), Kanten = frei strecken, ↻ =
                       drehen, Mitte = verschieben. Oder Mittelpunkt numerisch:
                     </Typography.Text>
-                    <div style={{ marginTop: 6 }}>
+                    <div style={{ marginTop: token.marginSM }}>
                       <KoordinatenEingabe
                         value={bildMitte ?? props.bildPlatzierZentrum}
                         onChange={setBildMitte}
                         einsatzId={props.einsatzId}
                       />
                     </div>
-                    <Space style={{ marginTop: 6, width: '100%', justifyContent: 'space-between' }}>
+                    <Space
+                      style={{
+                        marginTop: token.marginSM,
+                        width: '100%',
+                        justifyContent: 'space-between',
+                      }}
+                    >
                       <Button
                         disabled={!bildMitte}
                         onClick={() => {
@@ -1195,7 +1364,7 @@ export default function Sidebar(props: SidebarProps) {
             <div>
               <Typography.Text
                 type="secondary"
-                style={{ fontSize: 12, display: 'block', marginBottom: 4 }}
+                style={{ fontSize: 12, display: 'block', marginBottom: token.marginXS }}
               >
                 Karten-Design
               </Typography.Text>

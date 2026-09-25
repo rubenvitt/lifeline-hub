@@ -1,11 +1,12 @@
 import { Button, Dropdown, Popconfirm, Space, Typography, theme } from 'antd';
 import type { Key, ReactNode } from 'react';
 import type { MenuProps, TableColumnType } from 'antd';
-import { MoreOutlined } from '@ant-design/icons';
+import { DownOutlined, MoreOutlined, RightOutlined } from '@ant-design/icons';
 import {
   isValidElement,
   useCallback,
   useEffect,
+  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -18,7 +19,7 @@ import { Select } from './Select';
 import StatusTag from './StatusTag';
 import StatusWahl, { type StatusBedienung } from './StatusWahl';
 import Augenbraue from './instrument/Augenbraue';
-import { monoStil } from './instrument/rollenwerte';
+import { monoStil, rollenwerte } from './instrument/rollenwerte';
 import { useViewport, type AbBreitePunkt } from './useViewport';
 import {
   etikettVon,
@@ -66,9 +67,11 @@ import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
  *   · `form: 'karte'` gilt für Module, die heute schon kartenbasiert gelesen werden
  *     (Befehle, Lageberichte). Dort ist die Tabelle der Befund, nicht der Zielzustand.
  *
- * Was die Karte NICHT kann, ist an der Aufrufstelle sichtbar statt still: `aufklappzeile`
- * läuft nur im Tabellenzweig, und eine Spalte ohne Platz im Kartenplan erscheint dort
- * nicht. Der Funktionsverlust unter `md` ist damit lesbar, nicht überraschend.
+ * Was die Karte NICHT kann, ist an der Aufrufstelle sichtbar statt still: die
+ * Bestands-`aufklappzeile` läuft nur im Tabellenzweig, und eine Spalte ohne Platz im
+ * Kartenplan erscheint dort nicht. Der Funktionsverlust unter `md` ist damit lesbar, nicht
+ * überraschend. Der beschriftete Aufklappbereich `aufklappen` (LFH-676) läuft dagegen in
+ * BEIDEN Zweigen, mit einem Zustand für beide.
  *
  * ── FÜNF ZUSICHERUNGEN, sie gehören dem Primitiv ────────────────────────────────
  *
@@ -384,6 +387,27 @@ export type KinderFeld<T> = {
   [K in keyof T]-?: NonNullable<T[K]> extends readonly T[] ? K & string : never;
 }[keyof T];
 
+/**
+ * Beschrifteter Aufklappbereich je Zeile (LFH-676), in BEIDEN Zweigen gleich.
+ *
+ * Der Auslöser ist ein antd-`Button` mit sichtbarem `etikett`, `aria-expanded` und der
+ * Zeilenkennung im zugänglichen Namen — nicht antds 16-px-Aufklappsymbol, dessen Name aus der
+ * Locale in jeder Zeile gleich ist (LFH-369) und dessen Trefffläche die Dichte-Staffel
+ * unterschreitet. Aufklappen ist LESEN: der Auslöser zählt nicht gegen „eine Primäraktion +
+ * `weitere`“ (LFH-616, ein Sprung ist keine Handlung).
+ *
+ * `inhalt` wird erst beim Aufklappen gerendert — ein Inhalt, der beim Mount lädt, lädt damit
+ * nur für die aufgeklappte Zeile. Der Aufklappzustand gehört der Sicht und überlebt den
+ * Wechsel zwischen Karte und Tabelle.
+ */
+export interface Aufklappbereich<T> {
+  /** Sichtbares Etikett des Auslösers („Verlauf“). */
+  etikett: string;
+  /** Zugänglicher Name MIT Zeilenkennung („Verlauf zu Bezirk Uferstraße“). */
+  zugaenglicherName: (zeile: T) => string;
+  inhalt: (zeile: T) => ReactNode;
+}
+
 /** Rekursive Sicht. EIN Prop, damit Feldname und Aufklappzustand nicht getrennt setzbar sind. */
 export interface BaumSicht<T> {
   kinder: KinderFeld<T>;
@@ -433,7 +457,7 @@ export interface DatensichtProps<T extends object, K extends string> {
   /** Freitextsuche über alle Spalten mit `suchText`. Im Baummodus verboten. */
   suche?: { platzhalter: string };
   gruppen?: Gruppierung<T>;
-  /** Baumsicht. Schließt `suche`, Spaltenfilter, `gruppen` und `aufklappzeile` aus. */
+  /** Baumsicht. Schließt `suche`, Spaltenfilter, `gruppen`, `aufklappzeile` und `aufklappen` aus. */
   baum?: BaumSicht<T>;
   /** Default `'sammelbanner'`. */
   zufluss?: Zufluss;
@@ -457,8 +481,13 @@ export interface DatensichtProps<T extends object, K extends string> {
    * Antd-Aufklappzeile. Allowlist statt durchgereichtem `expandable`: ein per Subtraktion
    * definierter Durchlass wächst mit jedem fremden Prop mit und verrottet still, wenn ein
    * ausgeschlossener Name verschwindet. Nur im Tabellenzweig; schließt `baum` aus.
+   *
+   * Nur noch für den Bestand (Besatzung der Fahrzeugseite). Neues nimmt {@link aufklappen},
+   * das beschriftet ist und in beiden Zweigen läuft. Umstellung und Streichen: LFH-697.
    */
   aufklappzeile?: (zeile: T) => ReactNode;
+  /** Beschrifteter Aufklappbereich in beiden Zweigen (LFH-676); schließt `baum` und `aufklappzeile` aus. */
+  aufklappen?: Aufklappbereich<T>;
 }
 
 // ── Konstanten ───────────────────────────────────────────────────────────────────────
@@ -468,6 +497,11 @@ export const MAX_SEKUNDAER = 3;
 export const TIEFE_DECKEL = 3;
 
 // ── Reine Funktionen: hier wohnt die Drift, deshalb exportiert ────────────────────────
+
+/** Zeilenschlüssel als ID-Baustein: ohne Leerraum, damit eine IDREF-Liste nicht zerfällt. */
+function idTeil(k: Key): string {
+  return encodeURIComponent(String(k));
+}
 
 /** Läuft den vollen `dataIndex`-Pfad; `undefined` ohne auflösbaren Bezug. */
 function pfadWert<T>(spalte: DatensichtSpalte<T>, zeile: T): unknown {
@@ -641,11 +675,18 @@ export function scrolleZurZeile(schluessel: Key): void {
 export function pruefeKartenplan<T extends object, K extends string>(
   props: Pick<
     DatensichtProps<T, K>,
-    'spalten' | 'karte' | 'suche' | 'baum' | 'gruppen' | 'aufklappzeile' | 'onZeileKlick'
+    | 'spalten'
+    | 'karte'
+    | 'suche'
+    | 'baum'
+    | 'gruppen'
+    | 'aufklappzeile'
+    | 'aufklappen'
+    | 'onZeileKlick'
   >,
   bezeichnung: string,
 ): string[] {
-  const { spalten, karte, suche, baum, gruppen, aufklappzeile, onZeileKlick } = props;
+  const { spalten, karte, suche, baum, gruppen, aufklappzeile, aufklappen, onZeileKlick } = props;
   const befunde: string[] = [];
   const bekannt = new Map<string, DatensichtSpalte<T, K>>();
   for (const spalte of spalten) {
@@ -690,10 +731,20 @@ export function pruefeKartenplan<T extends object, K extends string>(
     }
     if (gruppen) befunde.push('gruppen und baum schließen sich aus.');
     if (aufklappzeile) befunde.push('aufklappzeile und baum schließen sich aus.');
+    if (aufklappen) befunde.push('aufklappen und baum schließen sich aus.');
     // Im Baummodus klappt die ganze Zeile auf (LFH-338 · C3). Ein zusätzliches
     // `onZeileKlick` wäre eine zweite Wirkung auf demselben Klick, und welche einträte,
     // hinge an der Reihenfolge im DOM.
     if (onZeileKlick) befunde.push('onZeileKlick und baum schließen sich aus.');
+  }
+  // Zwei Aufklappwege an derselben Tabelle: antd kennt nur EINE Aufklappzeile je Zeile.
+  if (aufklappen && aufklappzeile) {
+    befunde.push('aufklappen und aufklappzeile schließen sich aus.');
+  }
+  // Ein Eigenbau gibt `karte.render(...)` roh zurück: Auslöser und Bereich entstehen nur im
+  // Plan-Modus. Ein Opt-in, das still nichts tut, wäre von einem kaputten nicht zu unterscheiden.
+  if (aufklappen && karte.art === 'eigen') {
+    befunde.push("aufklappen und karte.art 'eigen' schließen sich aus (Eigenbau rendert roh).");
   }
   return befunde;
 }
@@ -738,6 +789,7 @@ export default function Datensicht<T extends object, const K extends string>(
     onZeileKlick,
     werkzeuge,
     aufklappzeile,
+    aufklappen,
   } = props;
 
   const { token } = theme.useToken();
@@ -934,6 +986,51 @@ export default function Datensicht<T extends object, const K extends string>(
     [zeilenSchluessel],
   );
 
+  // ── Aufklappbereich (LFH-676) ─────────────────────────────────────────────────────
+  // EIN Zustand für beide Zweige: ein Wechsel zwischen Karte und Tabelle behält, was offen ist.
+  const [aufgeklappt, setAufgeklappt] = useState<readonly Key[]>([]);
+  const umschalten = useCallback(
+    (k: Key) =>
+      setAufgeklappt((jetzt) => (jetzt.includes(k) ? jetzt.filter((x) => x !== k) : [...jetzt, k])),
+    [],
+  );
+  // IDs für `aria-controls`/`aria-labelledby` im Kartenzweig. `useId` liefert Doppelpunkte,
+  // die in einer ID erlaubt sind; die Zeilenkennung hängt kodiert dahinter — ein Schlüssel mit
+  // Leerzeichen (ein Funkrufname) zerbräche sonst die IDREF-Liste von `aria-labelledby`.
+  const idPraefix = useId();
+  const aufklappAusloeser = (zeile: T, mitRegion: boolean): ReactNode => {
+    if (!aufklappen) return null;
+    const k = schluessel(zeile);
+    const offen = aufgeklappt.includes(k);
+    return (
+      <Button
+        type="link"
+        id={mitRegion ? `${idPraefix}-auf-${idTeil(k)}` : undefined}
+        aria-expanded={offen}
+        aria-controls={mitRegion && offen ? `${idPraefix}-bereich-${idTeil(k)}` : undefined}
+        aria-label={aufklappen.zugaenglicherName(zeile)}
+        // `bedienText` statt antds `colorLink` (LFH-650): der Linkton trug gemessen am Tag
+        // 5,51–6,59 : 1 und nachts 4,55–4,82 : 1, unter 7 bzw. 5 : 1
+        // (`e2e/betreuung-pruefliste.spec.ts`). Blauer TEXT nimmt die Textrolle.
+        style={{ color: rollenwerte(token).bedienText }}
+        onClick={(e) => {
+          // Die Tabelle darf den Klick nicht zusätzlich als Zeilenklick lesen.
+          e.stopPropagation();
+          umschalten(k);
+        }}
+        icon={
+          // antds Ikone bringt `role="img"` mit englischem Namen mit — die Hülle nimmt sie aus
+          // dem Vorlesebaum (CLAUDE.md, „Ein Emoji ist keine Ikone").
+          <span aria-hidden="true" style={{ display: 'inline-flex' }}>
+            {offen ? <DownOutlined /> : <RightOutlined />}
+          </span>
+        }
+      >
+        {aufklappen.etikett}
+      </Button>
+    );
+  };
+
   const { sichtbareZeilen, zufluessig } = useMemo(() => {
     if (!gefroren) return { sichtbareZeilen: zeilen, zufluessig: 0 };
     const nachSchluessel = new Map(zeilen.map((z) => [schluessel(z), z]));
@@ -1060,10 +1157,10 @@ export default function Datensicht<T extends object, const K extends string>(
   const befunde = useMemo(
     () =>
       pruefeKartenplan(
-        { spalten, karte, suche, baum, gruppen, aufklappzeile, onZeileKlick },
+        { spalten, karte, suche, baum, gruppen, aufklappzeile, aufklappen, onZeileKlick },
         bezeichnung,
       ),
-    [spalten, karte, suche, baum, gruppen, aufklappzeile, onZeileKlick, bezeichnung],
+    [spalten, karte, suche, baum, gruppen, aufklappzeile, aufklappen, onZeileKlick, bezeichnung],
   );
   const befundSchluessel = befunde.join(' | ');
   useEffect(() => {
@@ -1275,9 +1372,50 @@ export default function Datensicht<T extends object, const K extends string>(
     [gezeigteSpalten, aktiveSortierung, karte, token.controlHeight],
   );
 
+  /**
+   * Mit `aufklappen` trägt die KENNUNGSZELLE den Auslöser, unter dem Kennungstext — keine
+   * eigene Aufklappspalte. Gemessen in Gate 1 bei 390 px (LFH-676): eine Spalte hinter der
+   * fixierten Kennung glitt beim waagerechten Scrollen unter sie und war nicht mehr
+   * klickbar; an Position 0 übernähme sie `fixed` von der Kennung (rc-table `useColumns`), und
+   * zwei angeheftete Spalten fräßen die schmale Breite. Die Kennungszelle ist immer sichtbar,
+   * und der Auslöser steht dort wie in der Karte: unter dem, was die Zeile benennt.
+   */
+  const ersteSpalte = gezeigteSpalten[0];
+  const tabellenSpalten: KatalogSpalte<T>[] =
+    aufklappen && antdSpalten.length > 0 && ersteSpalte
+      ? [
+          {
+            ...antdSpalten[0],
+            render: (wert: unknown, zeile: T, index: number) => {
+              const basis = antdSpalten[0].render;
+              // Der Titel-Link (oben gebaut) ersetzt das Spalten-`render`; sonst die Zelle wie
+              // überall über `zelle`, die eine RenderedCell auspackt.
+              const inhalt =
+                basis && basis !== ersteSpalte.render
+                  ? (basis(wert, zeile, index) as ReactNode)
+                  : zelle(ersteSpalte, zeile, index);
+              return (
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'flex-start',
+                    gap: token.marginXXS,
+                  }}
+                >
+                  {inhalt}
+                  {aufklappAusloeser(zeile, false)}
+                </div>
+              );
+            },
+          },
+          ...antdSpalten.slice(1),
+        ]
+      : antdSpalten;
+
   const tabelle = (
     <KatalogTabelle<T>
-      columns={antdSpalten}
+      columns={tabellenSpalten}
       dataSource={[...sichtbareZeilen]}
       rowKey={(zeile) => schluessel(zeile)}
       loading={ladend}
@@ -1350,9 +1488,17 @@ export default function Datensicht<T extends object, const K extends string>(
               // (siehe `pruefeKartenplan`).
               expandRowByClick: true,
             }
-          : aufklappzeile
-            ? { expandedRowRender: (zeile) => aufklappzeile(zeile) }
-            : undefined
+          : aufklappen
+            ? {
+                expandedRowKeys: [...aufgeklappt],
+                expandedRowRender: (zeile) => aufklappen.inhalt(zeile),
+                // KEINE eigene Aufklappspalte: der beschriftete Auslöser steht in der
+                // Kennungszelle (`tabellenSpalten`) und schaltet den Zustand der Sicht selbst.
+                showExpandColumn: false,
+              }
+            : aufklappzeile
+              ? { expandedRowRender: (zeile) => aufklappzeile(zeile) }
+              : undefined
       }
     />
   );
@@ -1495,8 +1641,21 @@ export default function Datensicht<T extends object, const K extends string>(
                 ))}
               </div>
             )}
+            {aufklappen && <div>{aufklappAusloeser(zeile, true)}</div>}
           </div>
         </ListenEintrag>
+        {/* Der Bereich steht UNTER der Karte in voller Breite, nicht in ihrer Inhaltsspalte:
+            dort zöge er die Aktionsleiste von `ListenEintrag` in die senkrechte Mitte und nähme
+            einer Zeitachse bei 390 px die Breite der Aktionen weg. */}
+        {aufklappen && aufgeklappt.includes(schluessel(zeile)) && (
+          <div
+            id={`${idPraefix}-bereich-${idTeil(schluessel(zeile))}`}
+            role="region"
+            aria-labelledby={`${idPraefix}-auf-${idTeil(schluessel(zeile))}`}
+          >
+            {aufklappen.inhalt(zeile)}
+          </div>
+        )}
       </div>
     );
   };

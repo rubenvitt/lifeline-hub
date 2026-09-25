@@ -1,5 +1,5 @@
-import { ConfigProvider, Input, Table, type InputRef, type TableProps } from 'antd';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ConfigProvider, Input, Table, type InputRef, type TableProps, type TableRef } from 'antd';
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
 import type { TastaturAktionen } from '../command-palette/typen';
 import {
@@ -425,6 +425,47 @@ function useSlashKuerzel(aktiv: boolean, fokussiere: () => void): void {
 }
 
 /**
+ * CSS-Variable für den Freiraum unter der stehenden Kopfzeile (LFH-677). Die Regel, die sie
+ * liest, steht in `theme/sprache.css` (`.lfh-katalog .ant-table-tbody *`).
+ */
+export const KOPF_FREIRAUM = '--lfh-tabellenkopf-hoehe';
+
+/**
+ * Schreibt die Höhe der stehenden Kopfzeile als {@link KOPF_FREIRAUM} an die Tabellenwurzel.
+ *
+ * DER BEFUND (LFH-677, WCAG 2.4.11): die Kopfzeile steht per `sticky` am oberen Rand. Wer
+ * rückwärts tabbt, dem rollt der Browser das Ziel an den oberen Rand — GENAU unter die
+ * Kopfzeile. Gemessen an der Betreuungsseite im Fükw (1366 × 600, kompakt): „Belegung
+ * melden" und der Dreipunkt (30 px hoch) lagen bei y = 0 vollständig hinter der höheren
+ * Kopfzeile. `scroll-margin-top` am Fokusziel hält den Freiraum frei; der Browser rollt dann
+ * so, dass das Ziel UNTER der Kopfzeile steht.
+ *
+ * GEMESSEN statt aus Tokens gerechnet: die Kopfzeile bricht bei schmalen Spalten auf zwei
+ * Zeilen um, und ihre Höhe zieht mit der Dichte-Staffel. Ohne stehende Kopfzeile ist der
+ * Freiraum 0 — nicht ein alter Wert.
+ */
+export function setzeKopfFreiraum(wurzel: HTMLElement): void {
+  const kopf = wurzel.querySelector<HTMLElement>('.ant-table-sticky-holder');
+  wurzel.style.setProperty(KOPF_FREIRAUM, `${kopf?.offsetHeight ?? 0}px`);
+}
+
+/**
+ * Hält {@link KOPF_FREIRAUM} aktuell. Beobachtet wird die WURZEL, nicht die Kopfzeile: die
+ * Kopfzeile kann nach dem ersten Bild erst entstehen oder ausgetauscht werden (Laden,
+ * Spaltenwechsel), und jede solche Änderung ändert auch die Größe der Wurzel.
+ */
+function useKopfFreiraum(tabelle: RefObject<TableRef | null>): void {
+  useEffect(() => {
+    const wurzel = tabelle.current?.nativeElement;
+    if (!wurzel) return;
+    setzeKopfFreiraum(wurzel);
+    const beobachter = new ResizeObserver(() => setzeKopfFreiraum(wurzel));
+    beobachter.observe(wurzel);
+    return () => beobachter.disconnect();
+  }, [tabelle]);
+}
+
+/**
  * Lädt die Tabelle gerade? Bildet {@link https://github.com/ant-design/ant-design | antds}
  * `useSpinProps` nach: ein Objekt ohne `spinning` lädt, ein explizites `spinning: false`
  * nicht. Eine Prüfung auf `loading === true` verfehlte die Objektform still.
@@ -485,6 +526,8 @@ export default function KatalogTabelle<T extends object>({
   const { abBreite } = useViewport();
   const feldRef = useRef<InputRef>(null);
   const werkzeugWurzel = useRef<HTMLDivElement>(null);
+  const tabelleRef = useRef<TableRef>(null);
+  useKopfFreiraum(tabelleRef);
   useSlashKuerzel(suche != null, () => feldRef.current?.focus());
 
   // ── Spaltenschalter (LFH-374) ─────────────────────────────────────────────────────
@@ -709,6 +752,7 @@ export default function KatalogTabelle<T extends object>({
       <ConfigProvider theme={{ components: { Table: tabellenTokens(rollen, dunkel, token) } }}>
         <Table<T>
           {...rest}
+          ref={tabelleRef}
           className={['lfh-katalog', rest.className].filter(Boolean).join(' ')}
           columns={fixierteSpalten}
           dataSource={sichtbareZeilen}
