@@ -1,7 +1,7 @@
 //! Schema-Zusicherungen der Demo-Daten (LFH-690, design.md D4/D7) gegen die voll migrierte DB.
 //!
 //! Hier steht bewusst keine Import-Logik: die Tests prüfen nur, was die Migration
-//! `0121_demo_daten.sql` und das übrige Schema dem späteren Import und Löschweg zusichern.
+//! `0123_demo_daten.sql` und das übrige Schema dem späteren Import und Löschweg zusichern.
 
 use sqlx::SqlitePool;
 

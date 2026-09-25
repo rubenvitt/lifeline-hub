@@ -142,7 +142,7 @@ importiert|entfernt, zeitpunkt, je_art: [{ art: fahrzeug|personal|material, ange
 mitbenutzt, entfernt, behalten }] }`. Optionale Felder tragen `skip_serializing_if`
 (LFH-265). Die Enums bekommen Pins in `tests/enum_wire_kontrakt.rs`.
 
-### D4 — Schema: Kopf plus Stammdaten-Marke, Migration `0121_demo_daten.sql`
+### D4 — Schema: Kopf plus Stammdaten-Marke, Migration `0123_demo_daten.sql`
 
 ```sql
 CREATE TABLE demo_import (

@@ -79,7 +79,7 @@ Sprungpalette, der Pegel und Chat-Nachrichten. Die Gründe stehen in `design.md`
 
 ## Impact
 
-- **Datenbank:** neue Migration `0121_demo_daten.sql` mit zwei Tabellen. Die Nummer wird
+- **Datenbank:** neue Migration `0123_demo_daten.sql` mit zwei Tabellen. Die Nummer wird
   direkt vor dem PR mit `scripts/check-migrationen.sh` gegen `origin/alpha` bestätigt.
   Bestandstabellen bleiben unverändert.
 - **Backend:** neues Modul `src/demo/` (Szenario, Import, Entfernen) und
