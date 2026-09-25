@@ -1,7 +1,12 @@
 import { Button, Dropdown, Space, Typography, theme } from 'antd';
 import { MoreOutlined } from '@ant-design/icons';
-import { useMemo } from 'react';
-import type { Betreuungsstelle, BetreuungsstelleArt, BetreuungsstelleStatus } from '../api/types';
+import { useMemo, type CSSProperties } from 'react';
+import type {
+  Betreuungsstelle,
+  BetreuungsstelleArt,
+  BetreuungsstelleStatus,
+  StelleNamentlich,
+} from '../api/types';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import Datensicht, {
   HERVORGEHOBEN,
@@ -11,9 +16,16 @@ import Datensicht, {
   type MenueEintrag,
 } from '../components/Datensicht';
 import StatusTag from '../components/StatusTag';
+import { monoStil } from '../components/instrument';
 import Bereichskopf from '../kommunikation/Bereichskopf';
 import { auslastung, betreuungsstelleStatus } from '../theme/statusFarben';
-import { ART_LABEL, freiePlaetze, personenZahl, volleStellenSegment } from './betreuungText';
+import {
+  ART_LABEL,
+  freiePlaetze,
+  namentlichTeile,
+  personenZahl,
+  volleStellenSegment,
+} from './betreuungText';
 import MeldeVerlauf from './MeldeVerlauf';
 
 /**
@@ -40,6 +52,11 @@ import MeldeVerlauf from './MeldeVerlauf';
  * melden" entfällt (der Server nimmt keine Meldung an, 422): die Regel „unter drei kein Menü"
  * zählt NACH der Rechteprüfung, nicht nach dem Zustand der Zeile — sonst wechselte die Form der
  * Aktionsspalte mit jedem Statuswechsel. Ohne Schreibrecht entfällt die Spalte ganz.
+ *
+ * „davon namentlich n" (LFH-674, design.md D7) steht in der Zelle „belegt" HINTER der Belegung:
+ * Personen, die einzeln mit Verbleib „Notunterkunft" hierher verbracht wurden. Es ist ein
+ * Hinweis, kein Summand — Sortierung, „frei", Auslastung und die Summe im Kopf lesen nur
+ * `belegung.belegt`. Ohne Personenrecht fehlt `namentlich` in der Antwort, dann steht nichts.
  *
  * VERLAUF (LFH-676): beschrifteter Aufklappbereich „Verlauf“ je Zeile, auch ohne
  * Schreibrecht; die Belegungsreihe lädt erst beim Aufklappen.
@@ -77,6 +94,9 @@ const stellenSpalten = (
   darfSchreiben: boolean,
   onBelegungMelden: (s: Betreuungsstelle) => void,
   onAktion: (aktion: StelleAktion, s: Betreuungsstelle) => void,
+  namentlich: ReadonlyMap<number, number> | undefined,
+  /** Mono-Stil der Zahl in „davon namentlich n" — Zahlen laufen immer Mono (Neuentwurf). */
+  zahlStil: CSSProperties,
 ) =>
   spaltenFuer<Betreuungsstelle>()([
     {
@@ -121,12 +141,26 @@ const stellenSpalten = (
       zahl: true,
       sortWert: (s) => s.belegung?.belegt,
       render: (_, s) => {
-        if (!s.belegung) return <Typography.Text type="secondary">keine Meldung</Typography.Text>;
+        const zusatz = namentlichTeile(namentlich?.get(s.id), s.belegung != null);
+        const hinweis = zusatz && (
+          <Typography.Text type="secondary" data-lfh="stelle-namentlich">
+            · {zusatz.wort} <span style={zahlStil}>{zusatz.zahl}</span>
+          </Typography.Text>
+        );
+        if (!s.belegung) {
+          return (
+            <Space wrap>
+              <Typography.Text type="secondary">keine Meldung</Typography.Text>
+              {hinweis}
+            </Space>
+          );
+        }
         const stufe = auslastung(s.belegung.belegt, s.kapazitaet_personen);
         return (
           <Space wrap>
             <span>{personenZahl(s.belegung.belegt)}</span>
             {stufe && <StatusTag darstellung={stufe} />}
+            {hinweis}
           </Space>
         );
       },
@@ -220,6 +254,7 @@ const KARTE: Kartenplan<Betreuungsstelle, StelleSpalte> = {
 export default function StellenBlock({
   einsatzId,
   stellen,
+  namentlich,
   ladend,
   darfSchreiben,
   hervorgehoben,
@@ -230,6 +265,8 @@ export default function StellenBlock({
 }: {
   einsatzId: number;
   stellen: readonly Betreuungsstelle[];
+  /** „davon namentlich" je Stelle; fehlt ohne Personenrecht (LFH-674). */
+  namentlich?: readonly StelleNamentlich[] | null;
   ladend: boolean;
   darfSchreiben: boolean;
   /** Per Deeplink angesteuerte Stelle (`?stelle=`). */
@@ -240,9 +277,20 @@ export default function StellenBlock({
   onAktion: (aktion: StelleAktion, s: Betreuungsstelle) => void;
 }) {
   const { token } = theme.useToken();
+  const namentlichJeStelle = useMemo(
+    () => (namentlich ? new Map(namentlich.map((n) => [n.stelle_id, n.anzahl])) : undefined),
+    [namentlich],
+  );
   const spalten = useMemo(
-    () => stellenSpalten(darfSchreiben, onBelegungMelden, onAktion),
-    [darfSchreiben, onBelegungMelden, onAktion],
+    () =>
+      stellenSpalten(
+        darfSchreiben,
+        onBelegungMelden,
+        onAktion,
+        namentlichJeStelle,
+        monoStil(token.fontSize),
+      ),
+    [darfSchreiben, onBelegungMelden, onAktion, namentlichJeStelle, token.fontSize],
   );
   const aufklappen = useMemo(
     () => ({

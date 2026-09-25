@@ -93,9 +93,10 @@ const AKTIONEN_MAX = 4;
  *
  * Die Rechnung ist bewusst eine ABSCHÄTZUNG nach oben und keine Pixelbilanz: drei der vier
  * Knöpfe sind icon-only und damit quadratisch (`width: controlHeightSM`), der vierte ist der
- * Menü-Auslöser mit „…" als Inhalt — der misst `paddingInlineSM × 2 + Textbreite` und damit
- * etwas anderes. Ihn ebenfalls als Quadrat zu zählen überschätzt den Bedarf leicht; das ist
- * die richtige Richtung für einen Deckel, der nichts überlaufen lassen soll. Eine echte
+ * Menü-Auslöser mit „…" als Inhalt — der misst Polsterung plus Textbreite und damit
+ * etwas anderes (einen Breitenboden trägt hier keiner der vier, `OHNE_BREITENBODEN`). Ihn
+ * ebenfalls als Quadrat zu zählen überschätzt den Bedarf leicht; das ist die richtige
+ * Richtung für einen Deckel, der nichts überlaufen lassen soll. Eine echte
  * Breitenmessung bräuchte Layout, und jsdom rechnet keins.
  *
  * Rein und exportiert aus demselben Grund wie `bedienzielStil` in `lagekarte/Sidebar.tsx`:
@@ -115,6 +116,21 @@ export function aktionsabstand(token: { marginSM: number; controlHeightSM: numbe
   const jeLuecke = Math.floor((AKTIONSZEILE_BREITE - knoepfe) / (AKTIONEN_MAX - 1));
   return Math.max(0, Math.min(token.marginSM, jeLuecke));
 }
+
+/**
+ * Benannte Ausnahme vom Breitenboden der Knöpfe (LFH-381) — gilt nur für die vier Knöpfe
+ * der Aktionszeile und fällt mit LFH-379.
+ *
+ * `antdKnopf()` (`theme/tokens.ts`) gibt jedem Knopf `minWidth` = kleine Steuerhöhe. Hier
+ * wäre das schädlich, und das ist gerechnet, nicht vorsichtshalber: ab `komfortabel`
+ * brauchen vier Knöpfe à 48 px 192 px in einer 124 px breiten Zeile. Ohne Boden schrumpfen
+ * sie als Flex-Items (zu schmal, LFH-379); MIT Boden schrumpften sie nicht mehr, liefen über
+ * den Kartenrand hinaus, und die Karte schneidet mit `overflow: hidden` ab — der
+ * Menü-Auslöser „Platzaktionen", der Tastaturweg zu den übrigen Aktionen, stünde gar nicht
+ * mehr im sichtbaren Bereich. Ein zu schmales Ziel ist schlechter als ein richtiges, aber
+ * besser als keins. In `kompakt` ändert die Ausnahme nichts (4 × 24 = 96 ≤ 124).
+ */
+const OHNE_BREITENBODEN = { minWidth: 0 } as const;
 
 // BEFUND zum kleinen `size`-Prop (LFH-328/A1 Festlegung 4, Gate 4) — hier standen SECHS,
 // in zwei Gruppen, und die zweite ist kein Ermessen, sondern eine gemessene
@@ -512,6 +528,7 @@ function PlatzKarte({
               {/* stopPropagation: sonst startet eine kleine Mausbewegung beim Klick einen Drag. */}
               <Button
                 size="small"
+                style={OHNE_BREITENBODEN}
                 aria-label="Verbleib / Entlassung erfassen"
                 icon={<CarOutlined />}
                 disabled={belegungLaeuft}
@@ -522,6 +539,7 @@ function PlatzKarte({
             <Tooltip title="zurückweisen">
               <Button
                 size="small"
+                style={OHNE_BREITENBODEN}
                 danger
                 aria-label="zurückweisen"
                 icon={<LogoutOutlined />}
@@ -538,6 +556,7 @@ function PlatzKarte({
           <Tooltip title="als frei markieren">
             <Button
               size="small"
+              style={OHNE_BREITENBODEN}
               aria-label="als frei markieren"
               icon={<CheckCircleOutlined />}
               onPointerDown={(e) => e.stopPropagation()}
@@ -553,6 +572,7 @@ function PlatzKarte({
                 Bezug auf den Datensatz, für Neues UND ohnehin Angefasstes. */}
             <Button
               size="small"
+              style={OHNE_BREITENBODEN}
               type="text"
               aria-label={`Platzaktionen zu ${platz.bezeichnung}`}
               onPointerDown={(e) => e.stopPropagation()}

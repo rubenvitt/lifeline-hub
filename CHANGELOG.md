@@ -1,3 +1,26 @@
+## [1.0.0-alpha.43](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.42...v1.0.0-alpha.43) (2026-09-25)
+
+### Betroffene und Schäden
+
+**Betreuungsstellen: Volle Stellen im Blickfeld**  
+Die Anzahl voller Betreuungsstellen wird jetzt im Seitenkopf und im Blockkopf „Betreuungsstellen" angezeigt. Bisher stand die Auslastung „voll" oder „überbelegt" nur in der Stellentabelle, die bei mehreren Bezirkskarten oft unter der Falz liegt. Die neue Anzeige „· n voll" erscheint in der Meta-Zeile des Seitenkopfs – der einzigen Zeile, die immer sichtbar bleibt.
+
+**Kopfzahl „ohne Meldung" berücksichtigt jetzt den Betriebsstatus**  
+Die Berechnung der Betreuungsstellen ohne Meldung wurde korrigiert: Es werden nur noch Stellen gezählt, die zum Stichtag auch tatsächlich betrieben wurden. Bisher wurden auch Stellen mitgezählt, die erst nach dem Stichtag angelegt oder zum Stichtag bereits geschlossen waren. Der Hinweis „Untergrenze" in der Verpflegungsplanung erscheint dadurch seltener.
+
+### Lagekarte
+
+**Karten-Dialoge lassen sich mit Enter abschicken**  
+In beiden Karten-Dialogen (Kartenquelle hinzufügen, Attribution bearbeiten) kann die Eingabe jetzt mit Enter im URL-Feld abgeschickt werden. Bisher musste der Absende-Button geklickt werden.
+
+### Betrieb und Installation
+
+**Deutlich schnellere Test-Ausführung**  
+Die Ausführungszeit der Rust-Tests wurde erheblich reduziert: Datenbankmigrationen werden nur einmal je Testlauf statt bei jedem einzelnen Test durchgeführt. Die Passwort-Hashing-Geschwindigkeit in Debug-Builds wurde optimiert. Lokal verringert sich die reine Testzeit von über 7 Minuten auf unter 2 Minuten.
+
+**Zuverlässigerer Offline-Test für Lagekarte**  
+Der automatisierte Test für die Offline-Verfügbarkeit der Lagekarte wartet jetzt auf die vollständige Aktivierung des Service Workers, bevor die Funktionalität geprüft wird. Dies verhindert gelegentliche Fehlschläge bei schnellen Systemen.
+
 ## [1.0.0-alpha.42](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.41...v1.0.0-alpha.42) (2026-09-24)
 
 ### Wichtige Änderungen

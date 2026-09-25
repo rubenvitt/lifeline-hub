@@ -453,6 +453,7 @@ export type Evakuierungsstand = S['EvakuierungsstandAnzeige'];
 export type Betreuungsstelle = S['BetreuungsstelleAnzeige'];
 export type Belegungsmeldung = S['BelegungsmeldungAnzeige'];
 export type BetreuungUebersicht = S['BetreuungUebersicht'];
+export type StelleNamentlich = S['StelleNamentlich'];
 export type BelegungKopfzahl = S['BelegungKopfzahl'];
 export type BelegungKopfzahlStelle = S['BelegungKopfzahlStelle'];
 /** Antwort auf Melden/Zurücknehmen eines Stands: `meldung_id` ist die GEMELDETE bzw.

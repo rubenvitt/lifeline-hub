@@ -59,7 +59,11 @@ export function betreuungRechteText(status: EinsatzStatus): string {
     : 'Nur Einsatzleitung und Führungspersonal können Bezirke und Betreuungsstellen anlegen und Meldungen erfassen.';
 }
 
-/** Welcher Dialog offen ist — EINER zur Zeit, jeder frisch montiert (`initialValues`). */
+/**
+ * Welcher Dialog offen ist — EINER zur Zeit, jeder frisch montiert (`initialValues`). Der
+ * Datensatz hier ist der Stand beim Öffnen und dient nur als Rückfall, falls er aus dem Cache
+ * verschwindet (fremd storniert): der Dialog bekommt den AKTUELLEN (LFH-681).
+ */
 type Dialog =
   | { art: 'bezirkAnlegen' }
   | { art: 'bezirkBearbeiten'; bezirk: Evakuierungsbezirk }
@@ -130,6 +134,9 @@ export default function BetreuungPage() {
 
   const bezirke = useMemo(() => betreuungQuery.data?.bezirke ?? [], [betreuungQuery.data]);
   const stellen = useMemo(() => betreuungQuery.data?.stellen ?? [], [betreuungQuery.data]);
+  // Ein Live-Refetch kommt bei offenem Dialog an; die Dialoge rechnen gegen diesen Stand.
+  const aktuellerBezirk = (b: Evakuierungsbezirk) => bezirke.find((x) => x.id === b.id) ?? b;
+  const aktuelleStelle = (s: Betreuungsstelle) => stellen.find((x) => x.id === s.id) ?? s;
 
   // Cross-Modul-Deeplinks (LFH-25): `?bezirk=` / `?stelle=` heben die Zeile hervor.
   useQueryParamSelektion('bezirk', betreuungQuery.isSuccess, (bid) => {
@@ -422,6 +429,7 @@ export default function BetreuungPage() {
           <StellenBlock
             einsatzId={einsatzId}
             stellen={stellen}
+            namentlich={betreuungQuery.data?.namentlich}
             ladend={ladend}
             darfSchreiben={darfSchreiben}
             hervorgehoben={hervorhebung?.art === 'stelle' ? hervorhebung.id : null}
@@ -446,7 +454,7 @@ export default function BetreuungPage() {
       {dialog?.art === 'bezirkBearbeiten' && (
         <BezirkBearbeitenDialog
           key={dialog.bezirk.id}
-          bezirk={dialog.bezirk}
+          bezirk={aktuellerBezirk(dialog.bezirk)}
           abschnitte={abschnitte}
           laeuft={bezirkAendernMut.isPending}
           fehler={bezirkAendernMut.error}
@@ -459,7 +467,7 @@ export default function BetreuungPage() {
       {dialog?.art === 'raeumung' && (
         <RaeumungDialog
           key={dialog.bezirk.id}
-          bezirk={dialog.bezirk}
+          bezirk={aktuellerBezirk(dialog.bezirk)}
           laeuft={bezirkAendernMut.isPending}
           fehler={bezirkAendernMut.error}
           onErfassen={(patch) =>
@@ -471,7 +479,7 @@ export default function BetreuungPage() {
       {dialog?.art === 'stand' && (
         <StandMeldenDialog
           key={dialog.bezirk.id}
-          bezirk={dialog.bezirk}
+          bezirk={aktuellerBezirk(dialog.bezirk)}
           laeuft={standMut.isPending}
           fehler={standMut.error}
           onErfassen={(body) => standMut.mutateAsync({ bezirkId: dialog.bezirk.id, body })}
@@ -500,7 +508,7 @@ export default function BetreuungPage() {
       {dialog?.art === 'stelleBearbeiten' && (
         <StelleBearbeitenDialog
           key={dialog.stelle.id}
-          stelle={dialog.stelle}
+          stelle={aktuelleStelle(dialog.stelle)}
           abschnitte={abschnitte}
           laeuft={stelleAendernMut.isPending || leermeldungMut.isPending}
           fehler={leermeldungMut.error ?? stelleAendernMut.error}
@@ -514,7 +522,7 @@ export default function BetreuungPage() {
       {dialog?.art === 'belegung' && (
         <BelegungMeldenDialog
           key={dialog.stelle.id}
-          stelle={dialog.stelle}
+          stelle={aktuelleStelle(dialog.stelle)}
           laeuft={belegungMut.isPending}
           fehler={belegungMut.error}
           onErfassen={(body) => belegungMut.mutateAsync({ stelleId: dialog.stelle.id, body })}

@@ -38,6 +38,7 @@ use utoipa::OpenApi;
         crate::betreuung::BetreuungsstelleAnzeige,
         crate::betreuung::BetreuungsstelleArt,
         crate::betreuung::BetreuungsstelleStatus,
+        crate::betreuung::StelleNamentlich,
         crate::betreuung::BezirkMeldungAnzeige,
         crate::betreuung::Erhebung,
         crate::betreuung::EvakuierungsbezirkAnzeige,

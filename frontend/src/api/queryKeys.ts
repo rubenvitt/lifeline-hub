@@ -135,7 +135,10 @@ export const EINSATZ_STREAM_EVENTS = {
   // `person`-Tag beide ID-Räume (betroffene Person vs. einsatz_personal-Disposition),
   // weshalb hier beide Sammlungen hängen mussten — und weshalb das Backend die zwei
   // Module nicht getrennt gaten konnte. Jetzt: betroffene Personen (Modul `personen`).
-  person: [EINSATZ_KEYS.personen, EINSATZ_KEYS.modulZaehler],
+  // LFH-674: die Betreuungsübersicht trägt „davon namentlich n“ je Stelle, und die Zahl
+  // ändert sich mit jedem Verbleib und jedem Storno einer Person. Kein zweites Server-Ereignis:
+  // `person` erreicht nur Leser mit Personenrecht, und nur die sehen die Zahl (design.md D5).
+  person: [EINSATZ_KEYS.personen, EINSATZ_KEYS.modulZaehler, EINSATZ_KEYS.betreuung],
   // Disponiertes Personal (Modul `personal`) — die Zuordnung wirkt zugleich auf
   // Einheiten-/Abschnittsführung und die Führungskräfte-Sicht der Lagekarte.
   personal: [

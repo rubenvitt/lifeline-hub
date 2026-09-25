@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { renderHook, waitFor } from '@testing-library/react';
-import { QueryClientProvider, type QueryClient } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { server } from '../test/server';
 import { neuerQueryClient } from '../test/utils';
-import type { BenutzerAnzeige, ModulOverrides } from '../api/types';
+import { einsatzKeys } from '../api/queryKeys';
+import type { BenutzerAnzeige, BetreuungUebersicht, ModulOverrides } from '../api/types';
 import { useEvakuierungKennzahl } from './useEvakuierungKennzahl';
 
 /**
@@ -31,6 +32,29 @@ const benutzer: BenutzerAnzeige = {
 };
 
 const PFAD = '/api/einsaetze/7/betreuung';
+
+const UEBERSICHT: BetreuungUebersicht = {
+  bezirke: [
+    {
+      id: 1,
+      einsatz_id: 7,
+      bezeichnung: 'Uferstraße 12–40',
+      plan_personen: 640,
+      plan_erhebung: 'gezaehlt',
+      raeumung: 'laeuft',
+      flaechen: 0,
+      angelegt_at: '2026-09-23 08:00:00',
+      stand: {
+        id: 5,
+        evakuiert: 600,
+        erhebung: 'gezaehlt',
+        zeitpunkt_at: '2026-09-23 10:00:00',
+      },
+    },
+  ],
+  stellen: [],
+};
+const KENNZAHL = { evakuiert: 600, geplant: 640, bezirke: 1, ohneMeldung: 0, geschaetzt: false };
 
 function wrapper(client: QueryClient) {
   return function Wrapper({ children }: { children: ReactNode }) {
@@ -68,38 +92,34 @@ describe('useEvakuierungKennzahl', () => {
     expect(result.current).not.toHaveProperty('kennzahl');
   });
 
+  it('ein Fehler hat Vorrang vor Altdaten im Cache — keine Kennzahl aus einem Stand, der vielleicht nicht mehr gilt (LFH-682)', async () => {
+    // Plain `QueryClient` statt `neuerQueryClient()`: dessen `gcTime: 0` räumte den per
+    // `setQueryData` gesetzten Eintrag weg, bevor der Hook ihn beobachtet (CLAUDE.md,
+    // Query-Key-Registry) — dann gäbe es keine Altdaten, und der Test prüfte nur den
+    // Fehlerfall ohne Cache, den der Test darüber schon abdeckt.
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(einsatzKeys.betreuung(7), UEBERSICHT);
+    zaehleAbrufe(() => HttpResponse.json({ error: 'kaputt' }, { status: 500 }));
+    const { result } = renderHook(() => useEvakuierungKennzahl({ einsatzId: 7, benutzer }), {
+      wrapper: wrapper(client),
+    });
+    // Vorbedingung: die Altdaten sind wirklich da und wurden gelesen …
+    expect(result.current).toEqual({ zustand: 'daten', kennzahl: KENNZAHL });
+    // … der Neuabruf (Daten sind sofort veraltet, `staleTime` 0) scheitert …
+    await waitFor(() => expect(result.current.zustand).toBe('fehler'));
+    // … und die Daten stehen weiter im Cache. Genau diese Lage entscheidet der Hook.
+    expect(client.getQueryData(einsatzKeys.betreuung(7))).toEqual(UEBERSICHT);
+    expect(result.current).not.toHaveProperty('kennzahl');
+  });
+
   it('lädt zuerst und liefert dann die Kennzahl aus der Übersicht', async () => {
-    zaehleAbrufe(() =>
-      HttpResponse.json({
-        bezirke: [
-          {
-            id: 1,
-            einsatz_id: 7,
-            bezeichnung: 'Uferstraße 12–40',
-            plan_personen: 640,
-            plan_erhebung: 'gezaehlt',
-            raeumung: 'laeuft',
-            angelegt_at: '2026-09-23 08:00:00',
-            stand: {
-              id: 5,
-              evakuiert: 600,
-              erhebung: 'gezaehlt',
-              zeitpunkt_at: '2026-09-23 10:00:00',
-            },
-          },
-        ],
-        stellen: [],
-      }),
-    );
+    zaehleAbrufe(() => HttpResponse.json(UEBERSICHT));
     const { result } = renderHook(() => useEvakuierungKennzahl({ einsatzId: 7, benutzer }), {
       wrapper: wrapper(neuerQueryClient()),
     });
     expect(result.current).toEqual({ zustand: 'laden' });
     await waitFor(() => expect(result.current.zustand).toBe('daten'));
-    expect(result.current).toEqual({
-      zustand: 'daten',
-      kennzahl: { evakuiert: 600, geplant: 640, bezirke: 1, ohneMeldung: 0, geschaetzt: false },
-    });
+    expect(result.current).toEqual({ zustand: 'daten', kennzahl: KENNZAHL });
   });
 
   it('lädt NICHT bei ausgeblendetem Modul — kein Abruf, Zustand `aus` (weder fehler noch null)', async () => {

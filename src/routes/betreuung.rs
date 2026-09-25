@@ -41,7 +41,7 @@ use crate::betreuung::repo::{
 use crate::betreuung::{
     enum_wert, BelegungKopfzahl, BelegungVerlaufEintrag, BetreuungUebersicht,
     BetreuungsstelleAnzeige, BezirkMeldungAnzeige, EvakuierungsbezirkAnzeige, StandVerlaufEintrag,
-    StelleMeldungAnzeige,
+    StelleMeldungAnzeige, StelleNamentlich,
 };
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
 use crate::einsatz::modul::Betreuung;
@@ -61,8 +61,10 @@ fn draht(t: DateTime<Utc>) -> String {
 }
 
 /// Meldezeitpunkt: fehlt/leer → `jetzt`, sonst normalisiert (400 bei Unlesbarem) und höchstens
-/// [`ZUKUNFT_TOLERANZ_SEKUNDEN`] nach `jetzt` (sonst 400). `jetzt` ist injiziert, damit die
-/// Grenze ohne Uhr prüfbar ist.
+/// [`ZUKUNFT_TOLERANZ_SEKUNDEN`] nach `jetzt` (sonst 400). Gespeichert wird `min(zeitpunkt,
+/// jetzt)` (LFH-680, design.md D2): die Toleranz fängt Uhrenversatz ab, übernimmt ihn aber
+/// nicht — sonst wäre eine Meldung sofort „aktuell“ und fehlte bis zu 60 s in der Kopfzahl
+/// „jetzt“. `jetzt` ist injiziert, damit die Grenze ohne Uhr prüfbar ist.
 fn meldezeitpunkt(eingabe: Option<&str>, jetzt: DateTime<Utc>) -> Result<String, AppError> {
     let zeit = match eingabe.map(str::trim) {
         Some(s) if !s.is_empty() => crate::etb::normalisiere_zeit(s)?,
@@ -76,7 +78,7 @@ fn meldezeitpunkt(eingabe: Option<&str>, jetzt: DateTime<Utc>) -> Result<String,
             "Zeitpunkt {zeit} liegt in der Zukunft (Toleranz {ZUKUNFT_TOLERANZ_SEKUNDEN} s)"
         )));
     }
-    Ok(zeit)
+    Ok(draht(t.min(jetzt)))
 }
 
 /// Worauf ein Live-Ereignis zeigt. Nur die Kennung geht auf den Draht.
@@ -126,11 +128,34 @@ fn enum_opt<T: TryFrom<String, Error = String>>(s: Option<String>) -> Result<Opt
 
 /// GET /api/einsaetze/{id}/betreuung — nicht stornierte Bezirke und Stellen mit aktueller
 /// Meldung. Die eine Quelle für Modulseite, Modulzähler und Kennzahl.
+///
+/// LFH-674 (design.md D4): „davon namentlich“ je Stelle steht nur für Lesende, die zusätzlich
+/// das Modul Personen sehen dürfen — dieselbe Rangfolge-Auswertung wie der Modulzähler, nur
+/// für einen Key. Ohne dieses Recht fehlt das Feld, statt 0 zu behaupten. Die Zahl wird hier
+/// gerechnet und nicht in `repo::uebersicht`, weil deren zweiter Konsument der gesicherte
+/// Lagestand ist.
 pub async fn uebersicht(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Betreuung>,
 ) -> Result<Json<BetreuungUebersicht>, AppError> {
-    Ok(Json(repo::uebersicht(&state.pool, ctx.einsatz.id).await?))
+    let mut uebersicht = repo::uebersicht(&state.pool, ctx.einsatz.id).await?;
+    // Ein 403 heißt „keine Auskunft“; jeder andere Fehler (DB) bleibt ein Fehler, statt still
+    // als fehlendes Recht durchzugehen.
+    let personen_erlaubt = match ctx.fordere_modul_zugriff(&state.pool, "personen").await {
+        Ok(()) => true,
+        Err(AppError::Forbidden) => false,
+        Err(e) => return Err(e),
+    };
+    if personen_erlaubt {
+        uebersicht.namentlich = Some(
+            crate::person::repo::namentlich_je_stelle(&state.pool, ctx.einsatz.id)
+                .await?
+                .into_iter()
+                .map(|(stelle_id, anzahl)| StelleNamentlich { stelle_id, anzahl })
+                .collect(),
+        );
+    }
+    Ok(Json(uebersicht))
 }
 
 #[derive(Debug, Deserialize)]
@@ -538,11 +563,17 @@ mod tests {
     }
 
     #[test]
-    fn zukunft_bis_60_s_toleriert_ab_61_s_400() {
+    fn zukunft_bis_60_s_toleriert_und_auf_jetzt_geklemmt_ab_61_s_400() {
         let jetzt = t("2026-09-23 12:00:00");
+        // LFH-680: toleriert heißt nicht übernommen. Gespeichert wird `jetzt`, sonst wäre die
+        // Meldung sofort „aktuell“, fehlte aber bis zu 60 s in der Kopfzahl „jetzt“.
         assert_eq!(
             meldezeitpunkt(Some("2026-09-23 12:01:00"), jetzt).unwrap(),
-            "2026-09-23 12:01:00"
+            "2026-09-23 12:00:00"
+        );
+        assert_eq!(
+            meldezeitpunkt(Some("2026-09-23 12:00:01"), jetzt).unwrap(),
+            "2026-09-23 12:00:00"
         );
         assert_eq!(
             meldezeitpunkt(Some("2026-09-23 12:01:01"), jetzt)
