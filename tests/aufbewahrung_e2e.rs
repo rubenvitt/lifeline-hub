@@ -29,10 +29,16 @@ struct Ausnahme {
     begruendung: &'static str,
 }
 
-/// Vollständige Durchsicht aller ETB-Schreibwege (`etb::system_audit_tx`,
+/// Ergebnis einer vollständigen DURCHSICHT aller ETB-Schreibwege (`etb::system_audit_tx`,
 /// `etb::repo::anlegen_tx`, `routes::etb_system_degradiert` samt Wrappern; 86 direkte
-/// Aufrufstellen in 27 Dateien, Stand LFH-23). Der Nutzerfreitext des ETB selbst
+/// Aufrufstellen in 27 Dateien, Stand LFH-23, nach dem Review der Welle D ein zweites Mal
+/// systematisch gegen jede Scrub-Spalte abgeglichen). Der Nutzerfreitext des ETB selbst
 /// (`routes/etb.rs::erfassen`) ist keine Übernahme und steht nicht hier.
+///
+/// **Die Vollständigkeit ist eine Durchsicht, kein Guard.** Maschinell gehalten sind nur die
+/// drei Werte, die der Ablauf unten pflanzt, und der Selbsttest (Funktion existiert, Spalte ist
+/// Scrub). Eine NEUE Übernahme bemerkt kein Test — wer einen ETB-Text aus einer Scrub-Spalte
+/// baut, trägt ihn hier ein (Folgeticket LFH-752 entscheidet über den Wortlaut).
 const AUSNAHMEN_SYSTEM_ETB: &[Ausnahme] = &[
     // --- vom Ablauf dieses Tests berührt (Wert gepflanzt und gepinnt) ---
     Ausnahme {
@@ -172,13 +178,116 @@ const AUSNAHMEN_SYSTEM_ETB: &[Ausnahme] = &[
         datei: "src/betreuung/repo.rs",
         funktion: "bezirk_anlegen_tx",
         spalte: "evakuierungsbezirk.bezeichnung",
-        begruendung: "Bezeichnung des Evakuierungsbezirks (auch aendern/stornieren/stand_*)",
+        begruendung: "Bezeichnung des Evakuierungsbezirks",
     },
     Ausnahme {
         datei: "src/betreuung/repo.rs",
         funktion: "stelle_anlegen_tx",
         spalte: "betreuungsstelle.bezeichnung",
-        begruendung: "Bezeichnung der Betreuungsstelle (auch aendern/stornieren/belegung_*)",
+        begruendung: "Bezeichnung der Betreuungsstelle",
+    },
+    // --- Nachtrag aus dem Review der Welle D (zweite Durchsicht) ---
+    Ausnahme {
+        datei: "src/routes/einsatz_personal.rs",
+        funktion: "disponieren",
+        spalte: "einsatz_personal.snap_funktion",
+        begruendung: "Funktion ad-hoc externer Kräfte über etb_text_disponiert, „Name (Funktion)“",
+    },
+    Ausnahme {
+        datei: "src/routes/einsatz_personal.rs",
+        funktion: "entfernen",
+        spalte: "einsatz_personal.snap_funktion",
+        begruendung: "Funktion ad-hoc externer Kräfte über person_bezeichnung",
+    },
+    Ausnahme {
+        datei: "src/stab/repo.rs",
+        funktion: "setzen",
+        spalte: "einsatz_stabsfunktion.bezeichnung",
+        begruendung: "Name/Stelle einer externen oder rückwärtigen Besetzung (neu und vorher) über zustand_text",
+    },
+    Ausnahme {
+        datei: "src/stab/repo.rs",
+        funktion: "entfernen",
+        spalte: "einsatz_stabsfunktion.bezeichnung",
+        begruendung: "Name/Stelle der vorherigen externen oder rückwärtigen Besetzung",
+    },
+    Ausnahme {
+        datei: "src/stab/repo.rs",
+        funktion: "setzen",
+        spalte: "einsatz_personal.snap_name",
+        begruendung: "neuer Inhaber über snap_name_von, wenn ad-hoc extern (derselbe Wert wie einsatz_stabsfunktion.snap_name)",
+    },
+    Ausnahme {
+        datei: "src/routes/einsatz_person.rs",
+        funktion: "verbleib",
+        spalte: "einsatz_person.aktuelles_verbleib_ziel",
+        begruendung: "derselbe Wert wie person_verbleib.ziel, gespiegelt in den Cache der Personenzeile",
+    },
+    Ausnahme {
+        datei: "src/routes/einsatz_person.rs",
+        funktion: "verbleib",
+        spalte: "einsatz_person.aktueller_verbleib",
+        begruendung: "Kurzform „Transport → {ziel}“ enthält das Verbleib-Ziel",
+    },
+    Ausnahme {
+        datei: "src/betreuung/repo.rs",
+        funktion: "bezirk_aendern_tx",
+        spalte: "evakuierungsbezirk.bezeichnung",
+        begruendung: "Bezeichnung des Evakuierungsbezirks (bei Umbenennung auch die alte)",
+    },
+    Ausnahme {
+        datei: "src/betreuung/repo.rs",
+        funktion: "bezirk_stornieren_tx",
+        spalte: "evakuierungsbezirk.bezeichnung",
+        begruendung: "Bezeichnung des Evakuierungsbezirks",
+    },
+    Ausnahme {
+        datei: "src/betreuung/repo.rs",
+        funktion: "stand_melden_tx",
+        spalte: "evakuierungsbezirk.bezeichnung",
+        begruendung: "Bezeichnung des Evakuierungsbezirks",
+    },
+    Ausnahme {
+        datei: "src/betreuung/repo.rs",
+        funktion: "stand_zuruecknehmen_tx",
+        spalte: "evakuierungsbezirk.bezeichnung",
+        begruendung: "Bezeichnung des Evakuierungsbezirks",
+    },
+    Ausnahme {
+        datei: "src/betreuung/repo.rs",
+        funktion: "stelle_aendern_tx",
+        spalte: "betreuungsstelle.bezeichnung",
+        begruendung: "Bezeichnung der Betreuungsstelle (bei Umbenennung auch die alte)",
+    },
+    Ausnahme {
+        datei: "src/betreuung/repo.rs",
+        funktion: "stelle_stornieren_tx",
+        spalte: "betreuungsstelle.bezeichnung",
+        begruendung: "Bezeichnung der Betreuungsstelle",
+    },
+    Ausnahme {
+        datei: "src/betreuung/repo.rs",
+        funktion: "belegung_melden_tx",
+        spalte: "betreuungsstelle.bezeichnung",
+        begruendung: "Bezeichnung der Betreuungsstelle",
+    },
+    Ausnahme {
+        datei: "src/betreuung/repo.rs",
+        funktion: "belegung_zuruecknehmen_tx",
+        spalte: "betreuungsstelle.bezeichnung",
+        begruendung: "Bezeichnung der Betreuungsstelle",
+    },
+    Ausnahme {
+        datei: "src/dokument/repo.rs",
+        funktion: "ablegen",
+        spalte: "einsatz_dokument.kategorie",
+        begruendung: "Kategorie als Enum-Label, kein Personenbezug; Scrub nur, weil die Zeile gelöscht wird",
+    },
+    Ausnahme {
+        datei: "src/dokument/repo.rs",
+        funktion: "entfernen",
+        spalte: "einsatz_dokument.kategorie",
+        begruendung: "Kategorie als Enum-Label, kein Personenbezug; Scrub nur, weil die Zeile gelöscht wird",
     },
 ];
 

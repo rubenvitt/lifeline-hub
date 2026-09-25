@@ -2110,7 +2110,9 @@ System-Admin in der Org, und dann kann niemand die Übersicht öffnen.
 Verbleib-Ziel, Namen ad-hoc externer Kräfte, Dokumenttitel, Zonen-Labels u. a.) bleiben als
 Führungsdokumentation im ETB und stehen abschließend in `AUSNAHMEN_SYSTEM_ETB`
 (`tests/aufbewahrung_e2e.rs`, Annahme A2). Eine neue solche Stelle ohne Eintrag ist ein
-Fehler; ob künftige Einträge den Wert weglassen, entscheidet ein eigenes Ticket.
+Fehler — **aber kein Test bemerkt ihn**: die Vollständigkeit ist eine Durchsicht, maschinell
+gehalten sind nur die im Ablauf gepflanzten Werte. Wer einen ETB-Text aus einer Scrub-Spalte
+baut, trägt ihn dort ein; ob künftige Einträge den Wert weglassen, entscheidet LFH-752.
 Frontend: Verwaltung → „Aufbewahrung" (nur System-Admin, `admin/adminNav.tsx`), Akte unter
 `/admin/aufbewahrung/:einsatzId`, Frist-Paneel über dem eingefrorenen Formular der
 Einsatz-Einstellungen. Herleitung: `openspec/changes/lfh-23-retention-rest/design.md`.
