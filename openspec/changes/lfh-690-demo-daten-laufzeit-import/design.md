@@ -593,6 +593,7 @@ Median aus 9 Läufen, drei Durchgänge (`tests/demo_daten.rs::dauer_import_und_n
 | In-Memory-Test-Pool (eine Verbindung, kein WAL) | 44 ms | 49–52 ms |
 | `db::test_pool_datei()` (Datei, WAL, fünf Verbindungen) | 40–42 ms | 56–61 ms |
 
-Der Neu-Import hält die Schreibsperre also rund 60 ms, weil Entfernen und Import in einem
-`write_retry!` laufen. Ein Release-Build wäre schneller, gemessen ist er nicht. Ein Gate ist die
+Weil Entfernen und Import in einem `write_retry!` laufen, hält der Neu-Import die
+Schreibsperre höchstens rund 60 ms. Gemessen ist der ganze HTTP-Umlauf samt Auth, die Sperre
+selbst ist kürzer. Ein Release-Build wäre schneller, gemessen ist er nicht. Ein Gate ist die
 Messung bewusst nicht: Eine Millisekunden-Schranke hinge an der Hardware.

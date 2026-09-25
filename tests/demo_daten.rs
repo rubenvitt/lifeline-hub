@@ -1,8 +1,9 @@
-//! LFH-690: Demo-Daten zur Laufzeit — Freischaltung und Rechte der Endpunkte.
+//! LFH-690: Demo-Daten zur Laufzeit — Freischaltung und Rechte der Endpunkte, die Routen für
+//! Status, Import, Neu-Import und Entfernen samt `lagged`, „DB wie vorher“ und die Messung der
+//! Dauer, alles über HTTP.
 //!
-//! Spec: `openspec/changes/lfh-690-demo-daten-laufzeit-import/specs/demo-daten/spec.md`,
-//! Anforderungen „Freischaltung per Umgebungsvariable“ und „Nur der System-Admin, nur die
-//! eigene Organisation“; Herleitung in `design.md` D1–D3.
+//! Spec: `openspec/changes/lfh-690-demo-daten-laufzeit-import/specs/demo-daten/spec.md`;
+//! Herleitung in `design.md` D1–D3, D7, D11 und D12.
 
 mod common;
 
@@ -540,6 +541,33 @@ async fn tabellen_zeilen(pool: &sqlx::SqlitePool, tabelle: &str) -> Vec<String> 
         .unwrap()
 }
 
+/// Wie [`tabellen_zeilen`], aber nur die Zeilen unter einer Bedingung mit genau einem
+/// Parameter. `bedingung` ist ein festes Literal dieser Datei.
+async fn zeilen_wo(
+    pool: &sqlx::SqlitePool,
+    tabelle: &str,
+    bedingung: &str,
+    wert: i64,
+) -> Vec<String> {
+    let spalten: Vec<String> =
+        sqlx::query_scalar("SELECT name FROM pragma_table_info(?) ORDER BY cid")
+            .bind(tabelle)
+            .fetch_all(pool)
+            .await
+            .unwrap();
+    let ausdruck = spalten
+        .iter()
+        .map(|s| format!("quote(\"{s}\")"))
+        .collect::<Vec<_>>()
+        .join(" || '|' || ");
+    let sql = format!("SELECT {ausdruck} FROM \"{tabelle}\" WHERE {bedingung} ORDER BY rowid");
+    sqlx::query_scalar(sqlx::AssertSqlSafe(sql))
+        .bind(wert)
+        .fetch_all(pool)
+        .await
+        .unwrap()
+}
+
 /// Die Zeilen der Demo-Verwaltung und aller Einsätze, zeilengleich.
 async fn demo_stand(pool: &sqlx::SqlitePool) -> Vec<(String, Vec<String>)> {
     let mut stand = Vec::new();
@@ -728,6 +756,31 @@ async fn zwei_organisationen_bleiben_getrennt() {
     assert_eq!(status_lesen(&app, &admin_a).await, a);
     assert_eq!(status_lesen(&app, &admin_b).await, b);
 
+    // Die Stammdaten jeder Org sind ihre eigenen: beide Orgs starten leer, also legt auch B
+    // alles neu an, statt Fahrzeuge von A über die gleiche Kennung mitzubenutzen.
+    assert_eq!(b["bericht"]["je_art"], a["bericht"]["je_art"]);
+    for zeile in b["bericht"]["je_art"].as_array().unwrap() {
+        assert_eq!(
+            zeile["mitbenutzt"], 0,
+            "B benutzt nichts von A mit: {zeile}"
+        );
+    }
+
+    let kopf_a = a["import"]["id"].as_i64().unwrap();
+    let stand_a = || async {
+        let mut stand = Vec::new();
+        for t in ["fahrzeug", "personal", "material"] {
+            stand.push(zeilen_wo(&pool, t, "org_id = ?", org_a).await);
+        }
+        stand.push(zeilen_wo(&pool, "demo_herkunft", "import_id = ?", kopf_a).await);
+        stand
+    };
+    let vorher_a = stand_a().await;
+    assert!(
+        vorher_a.iter().all(|z| !z.is_empty()),
+        "A hat Stammdaten und Marken"
+    );
+
     let mut rx_a = live.abonniere(e_a);
     let mut rx_b = live.abonniere(e_b);
     let (status, v) = demo(&app, &admin_b, "DELETE", "/api/demo-daten").await;
@@ -746,6 +799,11 @@ async fn zwei_organisationen_bleiben_getrennt() {
         Some(lifeline_hub::live::LiveEvent::Lagged)
     );
     assert!(naechste(&mut rx_a).await.is_none(), "A bekommt kein Signal");
+    assert_eq!(
+        stand_a().await,
+        vorher_a,
+        "Stammdaten und Marken von A zeilengleich"
+    );
 }
 
 /// Spec „Invalidierung nach Import und Entfernen“, Scenario „Offener Tab beim Entfernen“: ein
