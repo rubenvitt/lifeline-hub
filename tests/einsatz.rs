@@ -2199,6 +2199,13 @@ async fn abgelaufene_frist_ohne_tombstone_sperrt_admin_ueberall_403() {
     }
 }
 
+/// UTC im DB-Format, `tage` vor jetzt.
+fn vor_tagen(tage: i64) -> String {
+    (chrono::Utc::now() - chrono::Duration::days(tage))
+        .format("%Y-%m-%d %H:%M:%S")
+        .to_string()
+}
+
 async fn frist_stand(pool: &SqlitePool, id: i64) -> (Option<String>, Option<String>, i64) {
     let (frist, g): (Option<String>, Option<String>) =
         sqlx::query_as("SELECT retention_bis, geloescht_at FROM einsatz WHERE id = ?")
@@ -2219,7 +2226,10 @@ async fn aufbewahrungsfrist_vorgemerkt_ist_422_und_aendert_nichts() {
     let (app, pool) = setup_with_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let id = abgeschlossen_mit(&app, &pool, &admin, "2026-01-01 00:00:00").await;
-    sqlx::query("UPDATE einsatz SET geloescht_at = '2026-01-02 00:00:00' WHERE id = ?")
+    // Echte Vormerkung INNERHALB der Karenz, relativ zu jetzt — ein fester Zeitpunkt läge
+    // irgendwann jenseits der 30 Tage und träfe dann `schwaerzung_ausstehend`.
+    sqlx::query("UPDATE einsatz SET geloescht_at = ? WHERE id = ?")
+        .bind(vor_tagen(1))
         .bind(id)
         .execute(&pool)
         .await
@@ -2250,7 +2260,10 @@ async fn aufbewahrungsfrist_vorgemerkt_unveraendert_ist_auch_422() {
     let (app, pool) = setup_with_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let id = abgeschlossen_mit(&app, &pool, &admin, "2026-01-01 00:00:00").await;
-    sqlx::query("UPDATE einsatz SET geloescht_at = '2026-01-02 00:00:00' WHERE id = ?")
+    // Echte Vormerkung INNERHALB der Karenz, relativ zu jetzt — ein fester Zeitpunkt läge
+    // irgendwann jenseits der 30 Tage und träfe dann `schwaerzung_ausstehend`.
+    sqlx::query("UPDATE einsatz SET geloescht_at = ? WHERE id = ?")
+        .bind(vor_tagen(1))
         .bind(id)
         .execute(&pool)
         .await
@@ -2325,4 +2338,35 @@ async fn aufbewahrungsfrist_antwort_traegt_an_gesperrtem_einsatz_keinen_kopf_pii
     .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(v["einsatzort"], "Marktplatz-GEHEIM");
+}
+
+#[tokio::test]
+async fn aufbewahrungsfrist_nach_karenz_ist_409_und_aendert_nichts() {
+    // Karenz abgelaufen, noch nicht geschwärzt (`schwaerzung_ausstehend`): auch das
+    // Wiederherstellen ist dort 409, ein Hinweis darauf wäre ein Weg, den es nicht mehr gibt.
+    let (app, pool) = setup_with_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let id = abgeschlossen_mit(&app, &pool, &admin, "2026-01-01 00:00:00").await;
+    sqlx::query("UPDATE einsatz SET geloescht_at = ? WHERE id = ?")
+        .bind(vor_tagen(31))
+        .bind(id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let vorher = frist_stand(&pool, id).await;
+    for body in [
+        json!({ "retention_bis": "2099-01-01 00:00:00" }),
+        json!({ "retention_bis": "2026-01-01 00:00:00" }),
+    ] {
+        let (status, v) = frist_setzen(&app, &admin, id, body.clone()).await;
+        assert_eq!(status, StatusCode::CONFLICT, "{body}: {v}");
+        assert!(
+            !v["error"]
+                .as_str()
+                .unwrap_or("")
+                .contains("wiederherstellen"),
+            "kein Verweis auf einen geschlossenen Weg: {v}"
+        );
+    }
+    assert_eq!(frist_stand(&pool, id).await, vorher);
 }

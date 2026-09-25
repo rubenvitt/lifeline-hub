@@ -190,3 +190,33 @@ pub fn fordere_archivzugriff(
     }
     Ok(())
 }
+
+/// Sperre des Frist-PUT an Tombstones (LFH-23, design.md D6) — EINE Stelle für Route und
+/// Repo-Fallback, damit beide dieselbe Linie ziehen:
+/// - geschwärzt → 409 (endgültig),
+/// - vorgemerkt, Karenz abgelaufen (`schwaerzung_ausstehend`) → 409: auch das
+///   Wiederherstellen ist dort 409, ein Verweis darauf zeigte auf einen geschlossenen Weg,
+/// - vorgemerkt, Karenz läuft → 422 mit dem Hinweis auf das Wiederherstellen,
+/// - sonst `None` (die Frist darf gesetzt werden).
+pub fn frist_sperre(
+    geloescht_at: Option<&str>,
+    geschwaerzt_at: Option<&str>,
+    jetzt: chrono::DateTime<chrono::Utc>,
+) -> Option<AppError> {
+    if geschwaerzt_at.is_some() {
+        return Some(AppError::Conflict(
+            "Einsatz ist geschwärzt — die Aufbewahrungsfrist ist nicht mehr änderbar".into(),
+        ));
+    }
+    let geloescht_at = geloescht_at?;
+    if crate::einsatz::retention::karenz_abgelaufen(Some(geloescht_at), jetzt) {
+        return Some(AppError::Conflict(
+            "Die Karenz ist abgelaufen — die Schwärzung steht aus, die Aufbewahrungsfrist ist \
+             nicht mehr änderbar"
+                .into(),
+        ));
+    }
+    Some(AppError::UnprocessableEntity(
+        "Einsatz ist zur Löschung vorgemerkt – erst wiederherstellen".into(),
+    ))
+}

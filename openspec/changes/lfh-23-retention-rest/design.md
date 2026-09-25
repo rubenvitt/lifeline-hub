@@ -259,8 +259,11 @@ in `aufbewahrung::repo`, damit `Einsatz` und seine Test-Literale kein neues Feld
 Die Prüfung steht **vor** dem frühen Rücksprung „Frist unverändert → 200“ und vor der
 Verkürzungsprüfung. Sonst beantwortete ein unveränderter PUT an einem vorgemerkten Einsatz
 die Anfrage mit 200 statt 422. Geschwärzt ergibt **409**, dieselbe
-Lebenszyklus-Begründung wie D5. Vorgemerkt ergibt **422** mit dem Text „Einsatz ist zur
-Löschung vorgemerkt – erst wiederherstellen“. Die Route hat damit keine zweite 409-Bedeutung
+Lebenszyklus-Begründung wie D5. Vorgemerkt innerhalb der Karenz ergibt **422** mit dem Text
+„Einsatz ist zur Löschung vorgemerkt – erst wiederherstellen“. Ist die Karenz abgelaufen
+(`schwaerzung_ausstehend`), ist auch das Wiederherstellen 409, der PUT antwortet dort
+deshalb ebenfalls **409** (Nachtrag aus dem Review; eine Stelle: `aufbewahrung::frist_sperre`,
+genutzt von Route und `frist_setzen`-Fallback). Die Route hat damit keine zweite 409-Bedeutung
 für einen umkehrbaren Zustand (CLAUDE.md, zwei 409-Quellen). Ein Unit-Test in
 `purge_scheduler.rs` pinnt dazu, dass Phase B `retention_bis` nicht liest: Ein vorgemerkter
 Einsatz mit direkt in der DB verlängerter Frist wird nach der Karenz trotzdem geschwärzt.

@@ -58,8 +58,11 @@ ausdrücklich bestätigt werden, sonst antwortet das System mit 409. Als Verkür
 früherer Zeitpunkt oder das erstmalige Setzen einer Frist an einem Einsatz ohne Frist. Eine
 unveränderte Frist MUST ohne Schreibvorgang und ohne ETB-Eintrag bleiben. Jede wirksame
 Änderung MUST einen System-Eintrag im ETB mit altem und neuem Wert schreiben. An einem zur
-Löschung vorgemerkten Einsatz MUST die Änderung mit 422 abgewiesen werden, mit dem Hinweis auf
-das Wiederherstellen. An einem geschwärzten Einsatz MUST sie mit 409 abgewiesen werden.
+Löschung vorgemerkten Einsatz, dessen Karenz noch läuft, MUST die Änderung mit 422 abgewiesen
+werden, mit dem Hinweis auf das Wiederherstellen. Ist die Karenz abgelaufen, der Einsatz aber
+noch nicht geschwärzt, MUST sie mit 409 abgewiesen werden, ohne Hinweis auf das
+Wiederherstellen, denn auch das ist dann ausgeschlossen. An einem geschwärzten Einsatz MUST sie
+mit 409 abgewiesen werden.
 
 #### Scenario: Verlängern ohne Bestätigung
 - **WHEN** die Einsatzleitung die Frist eines abgeschlossenen Einsatzes auf einen späteren Zeitpunkt setzt
@@ -72,6 +75,10 @@ das Wiederherstellen. An einem geschwärzten Einsatz MUST sie mit 409 abgewiesen
 #### Scenario: Vorgemerkter Einsatz
 - **WHEN** an einem zur Löschung vorgemerkten Einsatz die Frist geändert werden soll
 - **THEN** antwortet das System mit 422, und Frist und Vormerkung bleiben unverändert
+
+#### Scenario: Karenz abgelaufen, noch nicht geschwärzt
+- **WHEN** an einem vorgemerkten Einsatz, dessen Karenz abgelaufen ist, die Frist geändert werden soll
+- **THEN** antwortet das System mit 409, und Frist und Vormerkung bleiben unverändert
 
 #### Scenario: Geschwärzter Einsatz
 - **WHEN** an einem geschwärzten Einsatz die Frist geändert werden soll

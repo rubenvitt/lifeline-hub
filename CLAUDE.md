@@ -2091,8 +2091,9 @@ Purge-Lauf den Einsatz sofort wieder vor. Bewachtes UPDATE mit derselben Karenzg
 `karenz_abgelaufen` (`retention::karenz_grenze`, Gleichheit an der Grenze gepinnt). Die
 409/422-Linie: geschwärzt oder Karenz abgelaufen **409** (endgültiger Lebenszyklus), nicht
 vorgemerkt **422** (der Weg ist der Frist-PUT), Feld fehlt oder unlesbar **400**, Frist
-nicht in der Zukunft **422**. Derselbe Schnitt am Frist-PUT: vorgemerkt 422 („erst
-wiederherstellen"), geschwärzt 409 — geprüft VOR dem frühen Rücksprung „unverändert → 200".
+nicht in der Zukunft **422**. Derselbe Schnitt am Frist-PUT: vorgemerkt in der Karenz 422 („erst
+wiederherstellen"), Karenz abgelaufen oder geschwärzt 409 (`aufbewahrung::frist_sperre`, eine
+Stelle für Route und Repo) — geprüft VOR dem frühen Rücksprung „unverändert → 200".
 **Zwei Riegel, die nach Vereinfachung aussehen und es nicht sind:** die Antwort des
 Frist-PUT lässt an einem für die Person gesperrten Einsatz Einsatzort, Koordinate, meldende
 Stelle und Sachverhalt weg (der PUT hat bewusst kein Lesegate), und `soft_delete_einsatz`

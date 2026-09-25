@@ -470,15 +470,17 @@ pub async fn frist_setzen(
                 .bind(einsatz_id)
                 .fetch_optional(&mut *tx)
                 .await?;
-        return Err(match tombstones {
-            None => AppError::NotFound,
-            Some((_, Some(_))) => AppError::Conflict(
-                "Einsatz ist geschwärzt — die Aufbewahrungsfrist ist nicht mehr änderbar".into(),
-            ),
-            Some(_) => AppError::UnprocessableEntity(
-                "Einsatz ist zur Löschung vorgemerkt – erst wiederherstellen".into(),
-            ),
-        });
+        let Some((geloescht_at, geschwaerzt_at)) = tombstones else {
+            return Err(AppError::NotFound);
+        };
+        return Err(crate::aufbewahrung::frist_sperre(
+            geloescht_at.as_deref(),
+            geschwaerzt_at.as_deref(),
+            Utc::now(),
+        )
+        .unwrap_or_else(|| {
+            AppError::Internal("Frist-UPDATE ohne Zeile, aber ohne Tombstone".into())
+        }));
     }
     crate::etb::repo::anlegen_tx(
         &mut tx,
@@ -2999,7 +3001,11 @@ mod tests {
     async fn frist_setzen_schreibt_nicht_an_vorgemerkte_oder_geschwaerzte_einsaetze() {
         let pool = crate::db::test_pool().await;
         let leit = benutzer_anlegen(&pool, "leit").await;
-        let vorgemerkt = archiv_einsatz(&pool, leit, Some("2026-06-25 12:00:00"), None).await;
+        // Vormerkung relativ zu jetzt, damit sie wirklich INNERHALB der Karenz liegt.
+        let gestern = (Utc::now() - chrono::Duration::days(1))
+            .format("%Y-%m-%d %H:%M:%S")
+            .to_string();
+        let vorgemerkt = archiv_einsatz(&pool, leit, Some(&gestern), None).await;
         let vorher = stand(&pool, vorgemerkt).await;
         assert!(matches!(
             frist_setzen(&pool, vorgemerkt, leit, Some("2099-01-01 00:00:00"), "x").await,
@@ -3010,6 +3016,15 @@ mod tests {
             vorher,
             "kein Schreibvorgang, kein ETB"
         );
+
+        // Karenz abgelaufen, noch nicht geschwärzt: 409 wie beim Wiederherstellen.
+        let ausstehend = archiv_einsatz(&pool, leit, Some("2026-01-02 00:00:00"), None).await;
+        let vorher = stand(&pool, ausstehend).await;
+        assert!(matches!(
+            frist_setzen(&pool, ausstehend, leit, Some("2099-01-01 00:00:00"), "x").await,
+            Err(AppError::Conflict(_))
+        ));
+        assert_eq!(stand(&pool, ausstehend).await, vorher);
 
         let schwarz = archiv_einsatz(
             &pool,
