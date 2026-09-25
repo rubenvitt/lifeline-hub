@@ -339,9 +339,10 @@ Schwärzung gehört Welle A.
   Beschreibung in `EinsatzAufbewahrung.tsx` werden angepasst („… außer der
   Aufbewahrungsfrist“, der Satz zur „manuellen Frist“ verweist auf das Paneel).
 - **Zeit**: `retention_bis` ist UTC ohne Zonenkennung. Umrechnung ausschließlich über
-  `etb/filterZeit.ts` (`alsOrtszeit`/`alsBackendZeit`), die nach `components/zeit/` oder
-  `anzeige/` gehoben wird, wenn ein zweiter Aufrufer außerhalb von `etb/` sie importiert. Der
-  bestehende Test beidseits der Sommerzeitgrenzen gilt dann für beide.
+  `etb/filterZeit.ts` (`alsOrtszeit`/`alsBackendZeit`); der bestehende Test beidseits der
+  Sommerzeitgrenzen gilt damit auch hier. **Das Heben des Moduls entfällt in dieser Änderung**
+  (Nachtrag Review): der Auslöser „zweiter Aufrufer außerhalb von `etb/`“ war mit rund 19
+  Fremdaufrufern auf `origin/alpha` längst erfüllt; der Umzug ist ein eigenes Folgeticket.
 - **Query-Keys**: `GLOBAL_KEYS.aufbewahrung = 'aufbewahrung'` unter Mandant/Organisation.
   Accessoren sind `aufbewahrung()` (Prefix und Übersicht), `aufbewahrungAkte(id)` =
   `['aufbewahrung', 'akte', id]` und `aufbewahrungEtb(id, typ)` = `['aufbewahrung', 'etb', id,

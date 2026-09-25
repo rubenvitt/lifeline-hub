@@ -97,3 +97,16 @@ ab, der bisher wirkungslos durchlief (vorgemerkter oder geschwärzter Einsatz).
 - **Keine neuen Abhängigkeiten.**
 - **Verhältnis zu Welle A (LFH-290/291):** unabhängig. Die Registry bleibt Quelle der
   Wahrheit, und der Audit-Text der Schwärzung bleibt hier unangetastet.
+
+## Folgetickets
+
+Aus den Nicht-Zielen und dem Review der Welle D (angelegt 25.09.2026):
+
+- LFH-749 — Fristen je Datenkategorie
+- LFH-750 — endgültige Löschung des Skeletts
+- LFH-751 — Sofort-Schwärzung auf Antrag (Art. 17) je Einsatz und je Person
+- LFH-752 — Wortlaut der System-ETB-Einträge laut `AUSNAHMEN_SYSTEM_ETB` (Annahme A2)
+- LFH-753 — Org-Prüfung des System-Admins am `PUT …/aufbewahrungsfrist` und Verlängerung einer
+  abgelaufenen Frist durch die Einsatzleitung (die Einstellungen liefern dann 403)
+- LFH-754 — Routen-Guard gegen `.nest`/`.merge`/`any`/`on`, Karenzgrenze im Schwärzungs-UPDATE
+- Umzug von `etb/filterZeit.ts` in ein gemeinsames Modul (ohne ID)
