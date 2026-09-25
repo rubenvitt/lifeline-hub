@@ -485,3 +485,90 @@ async fn patch_label_null_loescht_label() {
     assert_eq!(status, StatusCode::OK, "{g2:?}");
     assert!(g2["label"].is_null());
 }
+
+/// LFH-283, Entscheidung „dokumentieren und pinnen“: Zonen- und Gebietslabel werden bei der
+/// Schwärzung genullt (die Geometrie bleibt), der System-ETB-Wortlaut, den die Routen beim
+/// Einrichten und beim Warnstufenwechsel mit dem Label geschrieben haben, bleibt stehen —
+/// ETB-Politik G_ETB, Präzedenz LFH-632/E9 (Dokumenttitel). Der ETB entsteht über die
+/// echten Routen, nicht über eine nachgebaute Formatzeichenkette.
+#[tokio::test]
+async fn schwaerzung_nullt_zonen_und_gebietslabel_und_haelt_den_etb_wortlaut() {
+    let (app, pool) = common::setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let gid = gefahrengebiet_anlegen(&app, &admin, einsatz, "ELW Fam. Müller").await;
+    let (s, _) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/gefahrengebiete/{gid}/matrix/bewertung"),
+        &admin,
+        Some(&bewertung("brand", "menschen", "hoch")),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+
+    let etb_mit_label = || {
+        let pool = pool.clone();
+        async move {
+            sqlx::query_scalar::<_, String>(
+                "SELECT inhalt FROM etb_eintrag \
+                 WHERE einsatz_id = ? AND typ = 'system' AND inhalt LIKE '%Fam. Müller%' \
+                 ORDER BY id",
+            )
+            .bind(einsatz)
+            .fetch_all(&pool)
+            .await
+            .unwrap()
+        }
+    };
+    let vorher = etb_mit_label().await;
+    assert!(
+        vorher.iter().any(|i| i.contains("eingerichtet"))
+            && vorher.iter().any(|i| i
+                == "Gefahr «Brand» für «Menschen» in «ELW Fam. Müller» auf Warnstufe «hoch» gesetzt."),
+        "Vorbedingung: beide Routen schreiben das Label in den ETB: {vorher:?}"
+    );
+    let geometrie_vorher: String =
+        sqlx::query_scalar("SELECT geometrie FROM lage_zone WHERE einsatz_id = ?")
+            .bind(einsatz)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    // Die Zonennotiz nennt das AK von LFH-283 neben dem Label. Sie wird direkt gesetzt:
+    // gepinnt wird hier der Registry-Scrub, nicht der Schreibweg der Notiz.
+    sqlx::query(
+        "UPDATE lage_zone SET notiz = 'Ansprechpartner Herr Müller, 0170 123' WHERE einsatz_id = ?",
+    )
+    .bind(einsatz)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let mut tx = pool.begin().await.unwrap();
+    lifeline_hub::einsatz::schwaerzung_registry::scrubbe_aus_registry(&mut tx, einsatz)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+
+    let (label, notiz, geometrie): (Option<String>, Option<String>, String) =
+        sqlx::query_as("SELECT label, notiz, geometrie FROM lage_zone WHERE einsatz_id = ?")
+            .bind(einsatz)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(label, None, "Zonenlabel genullt");
+    assert_eq!(notiz, None, "Zonennotiz genullt");
+    assert_eq!(geometrie, geometrie_vorher, "Geometrie bleibt");
+    let gebiet_label: Option<String> =
+        sqlx::query_scalar("SELECT label FROM gefahrengebiet WHERE id = ?")
+            .bind(gid)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(gebiet_label, None, "Gebietslabel genullt");
+    assert_eq!(
+        etb_mit_label().await,
+        vorher,
+        "der ETB-Wortlaut mit dem Label bleibt (G_ETB, LFH-632/E9)"
+    );
+}

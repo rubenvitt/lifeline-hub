@@ -1525,3 +1525,75 @@ async fn funkrufname_anlegen_aendern_und_leeren() {
     assert_eq!(s, StatusCode::CREATED);
     assert!(!json.as_object().unwrap().contains_key("funkrufname"));
 }
+
+// ---------- LFH-140: kommunikationsmittel ist ein Schlüssel, kein Freitext ----------
+
+/// Gegenstück zu `tests/einsatzabschnitt.rs`: dieselbe Retain-Begründung gilt für die
+/// Einheit (LFH-108), also dieselbe Prüfung an POST und PATCH.
+#[tokio::test]
+async fn kommunikationsmittel_unbekannt_ist_400_bei_post_und_patch() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let basis = format!("/api/einsaetze/{einsatz}/einheiten");
+
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        &basis,
+        &admin,
+        Some(r#"{"name":"1. Zug","kommunikationsmittel":"Frau Meyer 0151"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{json}");
+    assert!(json["error"]
+        .as_str()
+        .unwrap()
+        .contains("Kommunikationsmittel"));
+
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        &basis,
+        &admin,
+        Some(r#"{"name":"1. Zug","kommunikationsmittel":"digitalfunk"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+    assert_eq!(json["kommunikationsmittel"], "digitalfunk");
+    let e = json["id"].as_i64().unwrap();
+    let (s, json) = anfrage(&app, "POST", &basis, &admin, Some(r#"{"name":"2. Zug"}"#)).await;
+    assert_eq!(s, StatusCode::CREATED);
+    assert!(json["kommunikationsmittel"].is_null());
+
+    let pfad = format!("{basis}/{e}");
+    let (s, _) = anfrage(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(r#"{"kommunikationsmittel":"Funk"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    let (s, json) = anfrage(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(r#"{"kommunikationsmittel":"mobil"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(json["kommunikationsmittel"], "mobil");
+    let (s, json) = anfrage(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(r#"{"kommunikationsmittel":""}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert!(json["kommunikationsmittel"].is_null());
+}
