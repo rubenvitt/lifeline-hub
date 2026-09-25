@@ -961,3 +961,63 @@ async fn import_entfernen_stellt_den_stand_wieder_her() {
         abweichend.join("\n")
     );
 }
+
+// ---------------------------------------------------------------------------------------------
+// Dauer von Import und Neu-Import (Task 5.3, design.md D11(c))
+// ---------------------------------------------------------------------------------------------
+
+const MESSLAEUFE: usize = 9;
+
+fn median_ms(mut werte: Vec<std::time::Duration>) -> f64 {
+    werte.sort();
+    werte[werte.len() / 2].as_secs_f64() * 1000.0
+}
+
+/// Misst je [`MESSLAEUFE`] Läufe `POST /api/demo-daten` (auf leerem Stand) und
+/// `POST /api/demo-daten/neu` (auf aktivem Import) über HTTP, samt Routing und Auth. Die Dauer
+/// von `/neu` ist die obere Schranke dafür, wie lange der Vorgang die Schreibsperre hält (D11).
+async fn messen(app: &axum::Router, admin: &str) -> (f64, f64) {
+    let mut import = Vec::new();
+    for _ in 0..MESSLAEUFE {
+        let t = std::time::Instant::now();
+        let (status, v) = demo(app, admin, "POST", "/api/demo-daten").await;
+        import.push(t.elapsed());
+        assert_eq!(status, StatusCode::CREATED, "{v}");
+        let (status, v) = demo(app, admin, "DELETE", "/api/demo-daten").await;
+        assert_eq!(status, StatusCode::OK, "{v}");
+    }
+    let (status, v) = demo(app, admin, "POST", "/api/demo-daten").await;
+    assert_eq!(status, StatusCode::CREATED, "{v}");
+    let mut neu = Vec::new();
+    for _ in 0..MESSLAEUFE {
+        let t = std::time::Instant::now();
+        let (status, v) = demo(app, admin, "POST", "/api/demo-daten/neu").await;
+        neu.push(t.elapsed());
+        assert_eq!(status, StatusCode::OK, "{v}");
+    }
+    (median_ms(import), median_ms(neu))
+}
+
+/// Messung, kein Gate: eine Millisekunden-Schranke wäre auf geteilter CI-Hardware ein Würfel.
+/// Aufruf: `cargo test --test demo_daten dauer_import_und_neu_import -- --ignored --nocapture`
+/// (`--release` für Produktionsnähe). Gemessen gegen den In-Memory-Test-Pool (eine Verbindung,
+/// kein WAL) und gegen `db::test_pool_datei()` (Datei, WAL, fünf Verbindungen).
+/// Ergebnis: design.md, „Open Questions“, Ergebnis (c).
+#[tokio::test]
+#[ignore = "Messung für design.md D11(c), kein Gate"]
+async fn dauer_import_und_neu_import() {
+    let (app, _pool, _live) = common::setup_mit_optionen_und_live(AN).await;
+    let admin = common::login_cookie(&app, "admin", "startpw12").await;
+    let (import, neu) = messen(&app, &admin).await;
+    eprintln!(
+        "Demo-Dauer In-Memory (Median aus {MESSLAEUFE}): Import {import:.1} ms, Neu-Import {neu:.1} ms"
+    );
+
+    let (_dir, pool) = lifeline_hub::db::test_pool_datei().await;
+    let (app, _pool, _live) = common::setup_mit_optionen_auf(pool, AN).await;
+    let admin = common::login_cookie(&app, "admin", "startpw12").await;
+    let (import, neu) = messen(&app, &admin).await;
+    eprintln!(
+        "Demo-Dauer Datei/WAL (Median aus {MESSLAEUFE}): Import {import:.1} ms, Neu-Import {neu:.1} ms"
+    );
+}

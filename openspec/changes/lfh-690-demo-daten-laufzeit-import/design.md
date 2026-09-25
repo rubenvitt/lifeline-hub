@@ -582,3 +582,17 @@ nicht, Quelle ist immer eine `erinnerung`-Zeile:
   Mutationsprobe bestätigt (`sichtbar = 0` für `betreuung`, der Test blieb grün). Der Lesetest
   in `tests/demo_daten.rs` belegt deshalb Daten und Zahlen je Modul über die echten Endpunkte,
   nicht die Sichtbarkeit für andere Rollen.
+
+**Ergebnis (c), gemessen in Block 5 (Task 5.3):** Import und Neu-Import dauern deutlich unter
+der Sekunde, die D11 annimmt. Gemessen über HTTP samt Routing und Auth, im Debug-Build, je
+Median aus 9 Läufen, drei Durchgänge (`tests/demo_daten.rs::dauer_import_und_neu_import`,
+`#[ignore]`, Aufruf mit `-- --ignored --nocapture`):
+
+| Pool | Import | Neu-Import |
+|---|---|---|
+| In-Memory-Test-Pool (eine Verbindung, kein WAL) | 44 ms | 49–52 ms |
+| `db::test_pool_datei()` (Datei, WAL, fünf Verbindungen) | 40–42 ms | 56–61 ms |
+
+Der Neu-Import hält die Schreibsperre also rund 60 ms, weil Entfernen und Import in einem
+`write_retry!` laufen. Ein Release-Build wäre schneller, gemessen ist er nicht. Ein Gate ist die
+Messung bewusst nicht: Eine Millisekunden-Schranke hinge an der Hardware.
