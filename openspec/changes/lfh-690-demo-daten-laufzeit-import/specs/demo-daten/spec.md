@@ -259,6 +259,10 @@ zweite Auslösung während eines laufenden Vorgangs MUST wirkungslos sein.
 - **WHEN** der Status-Endpunkt mit 404 antwortet
 - **THEN** zeigt die Verwaltung keine Sektion „Demo-Daten“, und die Route leitet weg
 
+#### Scenario: Status-Abfrage scheitert
+- **WHEN** der Status-Endpunkt für den System-Admin mit einem anderen Fehler als 404 antwortet (etwa 500 oder Netzfehler)
+- **THEN** zeigt die Sektion ein Fehlerbild mit „Erneut abrufen“ und keine der Aktionen, statt stillschweigend wegzuleiten
+
 #### Scenario: Führungskraft
 - **WHEN** eine Führungskraft ohne System-Admin-Rolle die Verwaltung öffnet
 - **THEN** sieht sie keine Sektion „Demo-Daten“, und die Route leitet sie weg
