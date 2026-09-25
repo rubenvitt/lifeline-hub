@@ -418,13 +418,20 @@ aktuelle Schema“ ist strukturell erfüllt.
 - `onSuccess`: `globalKeys.einsaetze()`, `demoDaten()`, die Stammdaten-Prefixe (`fahrzeuge`,
   `personal`, `material` samt Vorschlägen) und per Prädikat alle `einsatzKeys` der
   betroffenen Demo-Einsatz-ID invalidieren. Kein `removeQueries` (das löste die
-  XOR-Auflage in `queryKeys.ts` aus).
-- **Einsatzliste:** Ein `Alert type="info"` über dem Raster, nur bei `istSystemAdmin`,
-  Status 200 und `importiert = false`, mit Link auf `/admin/demo-daten`, also Sprung und
+  XOR-Auflage in `queryKeys.ts` aus). **Nach jedem Fehler** dieselben Fächer, nicht nur
+  nach einem 409 (Nachtrag aus dem Branch-Review): nach einem Netzfehler oder Timeout ist
+  offen, ob der Vorgang durchging, denn `apiSend` bricht nach 15 s ab, und der Server kann
+  unter Konkurrenz länger brauchen und trotzdem committen.
+- **Einsatzliste:** Ein `Alert type="info"` **unter** dem Raster, nur bei `istSystemAdmin`,
+  Status 200 und `importiert = false`, mit Verweis auf `/admin/demo-daten`, also Sprung und
   kein Direktimport. Das Ticket schlägt den Leerzustand vor. Der ist aber seit LFH-331/AK3
   aktionslos gepinnt und rechnet je Benutzer. „Nicht importiert“ ist eine Aussage über
   die Organisation. Der Hinweis steht deshalb daneben und nicht im Leerknoten. Das ist eine
-  **benannte Abweichung** vom Ticketwortlaut.
+  **benannte Abweichung** vom Ticketwortlaut. Nachtrag aus der Prüfliste (T3-12, T3-5/6):
+  Über dem Raster schob der spät eintreffende Status das schon gezeichnete Raster (CLS bis
+  0,21). Der Hinweis steht deshalb unter allem, was die Liste zeichnet, und erst, wenn die
+  Liste steht. Der Verweis ist ein eigener antd-`Button` mit `href` unter dem Satz („Zu den
+  Demo-Daten“, `useLinkClickHandler`), kein farbiger Link im Fließtext.
 - **MSW-Default-Handler** in `test/server.ts`: `GET /api/demo-daten` → 404, also der echte
   Serverzustand ohne Freischaltung. Ohne ihn fallen rund 30 Tests der `EinsaetzePage` an
   `onUnhandledRequest: 'error'`.
