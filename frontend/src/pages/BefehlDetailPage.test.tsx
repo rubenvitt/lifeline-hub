@@ -12,6 +12,8 @@ import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { einsatzKeys } from '../api/queryKeys';
 import { setzeViewportBreite } from '../test/viewport';
 import { ApiError } from '../api/client';
+import { http, HttpResponse } from 'msw';
+import { server } from '../test/server';
 
 vi.mock('../api/befehle');
 vi.mock('../api/einsaetze');
@@ -922,5 +924,51 @@ describe('BefehlDetailPage — Druckwurzel (LFH-71)', () => {
     expect(vorschauen.length).toBeGreaterThan(0);
     for (const v of vorschauen) expect(wurzel()).toContainElement(v as HTMLElement);
     expect(wurzel()).toContainElement(screen.getByLabelText('Lage'));
+  });
+});
+
+/**
+ * ── DRUCKKOPF UND DRUCKKNOPF (LFH-22) ───────────────────────────────────────────
+ *
+ * Der gemeinsame Druckkopf steht in der Druckwurzel über dem Inhalt und ist am Bildschirm
+ * per Klasse verborgen (dort trägt der Seitenkopf dieselben Angaben). „Drucken / als PDF"
+ * öffnet den Dialog erst, wenn die Organisation geladen ist — sonst fehlte ihr Name auf
+ * dem Blatt.
+ */
+describe('BefehlDetailPage — Druckkopf (LFH-22)', () => {
+  it('trägt den Druckkopf in der Wurzel: „Befehl – Titel", Stand, am Schirm verborgen', async () => {
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('freigegeben') as never);
+    renderAt(7);
+    await screen.findByRole('button', { name: 'Fortschreiben' });
+    const kopf = document.querySelector<HTMLElement>('[data-lfh="druckkopf"]');
+    expect(kopf).not.toBeNull();
+    expect(document.querySelector('[data-lfh="druckwurzel"]')).toContainElement(kopf);
+    expect(kopf).toHaveClass('druckkopf--nur-druck');
+    expect(within(kopf!).getByRole('heading', { level: 1, hidden: true })).toHaveTextContent(
+      'Befehl – Befehl 1',
+    );
+    expect(within(kopf!).getByText('Freigegeben · Version 1')).toBeInTheDocument();
+  });
+
+  it('ruft window.print erst nach geladener Organisation', async () => {
+    const drucke = vi.spyOn(window, 'print').mockImplementation(() => {});
+    let freigeben!: () => void;
+    const tor = new Promise<void>((fertig) => {
+      freigeben = fertig;
+    });
+    server.use(
+      http.get('/api/organisation', async () => {
+        await tor;
+        return HttpResponse.json({ id: 1, name: 'Testorganisation', tz_organisation: null });
+      }),
+    );
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('freigegeben') as never);
+    renderAt(7);
+    await userEvent.click(await screen.findByRole('button', { name: 'Drucken / als PDF' }));
+    await new Promise((fertig) => setTimeout(fertig, 30));
+    expect(drucke).not.toHaveBeenCalled();
+    freigeben();
+    await waitFor(() => expect(drucke).toHaveBeenCalledTimes(1));
+    drucke.mockRestore();
   });
 });

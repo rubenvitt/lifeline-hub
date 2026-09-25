@@ -23,6 +23,8 @@ import { useViewport } from '../components/useViewport';
 import { AKTIONSLEISTE_AB, aktionsleisteStil } from '../befehle/aktionsleiste';
 import { BEFEHL_STATUS, StatusBadge } from '../kommunikation';
 import EinsatzSeite from '../components/EinsatzSeite';
+import Druckkopf from '../components/druck/Druckkopf';
+import DruckKnopf from '../components/druck/DruckKnopf';
 import { Paneel, monoStil } from '../components/instrument';
 import './befehlPrint.css';
 import './befehlAktionsleiste.css';
@@ -311,7 +313,7 @@ function BefehlDetail() {
       style={aktionsleisteStil(verankert, token)}
     >
       <Space wrap>
-        <Button onClick={() => window.print()}>Drucken / als PDF</Button>
+        <DruckKnopf />
         {!istEntwurf && befehl.etb_eintrag_id != null && (
           <Link to={etbPfad(einsatzId, { eintrag: befehl.etb_eintrag_id })}>Zum ETB-Eintrag</Link>
         )}
@@ -404,6 +406,22 @@ function BefehlDetail() {
         wird im Druck über `befehlPrint.css` ausgeblendet — wie die alte Kopfzeile, die
         `befehl-no-print` trug.
       */}
+      {/* Der gemeinsame Druckkopf (LFH-22): nur auf Papier, am Schirm trägt der Seitenkopf
+          dieselben Angaben. In der Druckwurzel, weil `druck/druck.css` alles außerhalb
+          ausblendet. */}
+      <Druckkopf
+        dokumentart="Befehl"
+        titel={befehl.titel}
+        einsatz={einsatz}
+        sichtbarkeit="druck"
+        zeilen={[
+          {
+            etikett: 'Stand',
+            wert: `${BEFEHL_STATUS[befehl.status].label} · Version ${befehl.version}`,
+          },
+          { etikett: 'Zeitstand', wert: <ZeitAnzeige wert={befehl.zeitstand} /> },
+        ]}
+      />
       <EinsatzSeite
         // Editor: reine Schreibfläche, ausdrücklich in Lesebreite.
         breite="schmal"

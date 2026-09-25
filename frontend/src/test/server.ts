@@ -41,4 +41,13 @@ export const server = setupServer(
    * Tests der Zähler überschreiben per `server.use()`.
    */
   http.get('/api/einsaetze/:einsatzId/modul-zaehler', () => HttpResponse.json({})),
+  /**
+   * Stammdaten der eigenen Organisation (LFH-22) — ohne Logo als Default. Der Druckkopf
+   * (`components/druck/Druckkopf.tsx`) fragt sie beim Mount ab, und er steht auf Befehl,
+   * Lagebericht, Meldebild und ETB-Druck; jede dieser Testflächen müsste den Handler sonst
+   * mitbringen. Eine Organisation mit Namen und ohne Logo ist ein echter Serverzustand.
+   */
+  http.get('/api/organisation', () =>
+    HttpResponse.json({ id: 1, name: 'Testorganisation', tz_organisation: null }),
+  ),
 );

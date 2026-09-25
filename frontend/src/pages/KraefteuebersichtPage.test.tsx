@@ -830,34 +830,51 @@ describe('KraefteuebersichtPage — Druck', () => {
     expect(druckblock).toMatch(/overflow:\s*visible\s*!important/);
   });
 
-  it('trägt Einsatzbezeichnung, taktischen Zeitstand, Ersteller und die Meta-Zeile', async () => {
+  /** Der gemeinsame Druckkopf (LFH-22) — seit dem Umbau statt des eigenen Meldeblatt-Kopfs. */
+  async function druckkopf(): Promise<HTMLElement> {
+    await screen.findByText('1. Zug');
+    const kopf = document.querySelector<HTMLElement>('[data-lfh="druckkopf"]');
+    expect(kopf, 'kein Druckkopf').not.toBeNull();
+    return kopf!;
+  }
+
+  it('trägt den gemeinsamen Druckkopf: „Meldebild", Einsatz, Stand als DTG, Umfang und Ersteller', async () => {
     mitEinheit();
     setup();
-    const kopf = await screen.findByTestId('kraefte-druckkopf');
-    expect(within(kopf).getByText(/Meldebild — Testeinsatz/)).toBeInTheDocument();
-    expect(within(kopf).getByText(/Stand: \d{6}[A-ZÄÖÜ]{3}\d{4}/)).toBeInTheDocument();
-    expect(within(kopf).getByText(/Erstellt von:/)).toBeInTheDocument();
+    const kopf = await druckkopf();
+    expect(within(kopf).getByRole('heading', { level: 1, hidden: true })).toHaveTextContent(
+      'Meldebild',
+    );
+    expect(within(kopf).getByText('Testeinsatz')).toBeInTheDocument();
+    // Der Stand ist der ÄLTESTE erfolgreiche Listenabruf, nicht die Druckzeit.
+    expect(within(kopf).getByText('Stand')).toBeInTheDocument();
+    const stand = within(kopf).getByText('Stand').nextElementSibling as HTMLElement;
+    expect(stand.textContent).toMatch(/^\d{6}[A-ZÄÖÜ]{3}\d{4}$/);
+    expect(within(kopf).getByText('Erstellt von')).toBeInTheDocument();
     expect(await within(kopf).findByText(/Einheit · Stärke/)).toBeInTheDocument();
+    // Der alte Meldeblatt-Kopf ist weg — sonst stünde der Einsatz doppelt auf dem Blatt.
+    expect(screen.queryByTestId('kraefte-druckkopf')).toBeNull();
   });
 
   it('nennt die Auswahl im Druckkopf, sobald gefiltert wird — und sonst nicht', async () => {
     mitEinheit();
     setup();
-    const kopf = await screen.findByTestId('kraefte-druckkopf');
-    expect(within(kopf).queryByText(/^Auswahl:/)).toBeNull();
+    const kopf = await druckkopf();
+    expect(within(kopf).queryByText('Auswahl')).toBeNull();
 
     await waehleAbschnitt('Abschnitt Nord');
 
-    expect(await within(kopf).findByText('Auswahl: Abschnitt: Abschnitt Nord')).toBeInTheDocument();
+    expect(await within(kopf).findByText('Auswahl')).toBeInTheDocument();
+    expect(within(kopf).getByText('Abschnitt: Abschnitt Nord')).toBeInTheDocument();
   });
 
-  it('verbirgt den Druckkopf am Schirm und wiederholt im Druck die Spaltenköpfe', () => {
+  it('verbirgt den Druckkopf am Schirm über die gemeinsame Klasse; kein eigener Meldeblatt-Kopf mehr', async () => {
+    mitEinheit();
+    setup();
+    expect(await druckkopf()).toHaveClass('druckkopf--nur-druck');
     const hier = dirname(fileURLToPath(import.meta.url));
     const css = readFileSync(join(hier, 'kraefteuebersichtPrint.css'), 'utf-8');
-    const druckblock = css.slice(css.indexOf('@media print'));
-    const schirmblock = css.slice(0, css.indexOf('@media print'));
-    expect(schirmblock).toMatch(/\.kraefte-nur-print\s*\{[^}]*display:\s*none/);
-    expect(druckblock).toMatch(/\.kraefte-nur-print\s*\{[^}]*display:\s*block/);
+    expect(css).not.toMatch(/kraefte-nur-print/);
     // Kopfwiederholung und Zeilenschutz gelten seit LFH-71 für JEDE Druckwurzel und stehen
     // in `druck/druck.css` — das Meldebild trägt die Marke (Test unten).
     const gemeinsam = readFileSync(join(hier, '..', 'druck', 'druck.css'), 'utf-8');
@@ -872,7 +889,9 @@ describe('KraefteuebersichtPage — Druck', () => {
     await screen.findByText('1. Zug');
     const wurzeln = container.querySelectorAll<HTMLElement>('[data-lfh="druckwurzel"]');
     expect(wurzeln).toHaveLength(1);
-    expect(wurzeln[0]).toContainElement(screen.getByTestId('kraefte-druckkopf'));
+    expect(wurzeln[0]).toContainElement(
+      document.querySelector<HTMLElement>('[data-lfh="druckkopf"]'),
+    );
     expect(wurzeln[0]).toContainElement(container.querySelector('table'));
   });
 });
@@ -928,7 +947,11 @@ describe('KraefteuebersichtPage — Filterwahrheit', () => {
     await screen.findByText('2 von 2 Kräften');
 
     await waehleAbschnitt('Abschnitt Nord');
-    const marke = await screen.findByText('Abschnitt: Abschnitt Nord');
+    // In der Werkzeugzeile: der (am Schirm verborgene) Druckkopf nennt die Auswahl auch.
+    const werkzeuge = within(
+      document.querySelector<HTMLElement>('[data-lfh="meldebild-werkzeuge"]')!,
+    );
+    const marke = await werkzeuge.findByText('Abschnitt: Abschnitt Nord');
     fireEvent.click(marke.closest('.ant-tag')!.querySelector('.ant-tag-close-icon')!);
     expect(await screen.findByText('2 von 2 Kräften')).toBeInTheDocument();
     expect(screen.queryByText('Abschnitt: Abschnitt Nord')).toBeNull();

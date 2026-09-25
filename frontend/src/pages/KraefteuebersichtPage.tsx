@@ -59,6 +59,8 @@ import { statusKategorie } from '../theme/statusFarben';
 import Datensicht, { spaltenFuer } from '../components/Datensicht';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import EinsatzSeite from '../components/EinsatzSeite';
+import Druckkopf from '../components/druck/Druckkopf';
+import DruckKnopf from '../components/druck/DruckKnopf';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import { StatusChip, StatusZelle, monoStil, useRollen } from '../components/instrument';
 import './kraefteuebersichtPrint.css';
@@ -536,7 +538,6 @@ export default function KraefteuebersichtPage() {
 
   const [filter, setFilter] = useState<FilterWerte>(LEERER_FILTER);
   const [expandedKeys, setExpandedKeys] = useState<React.Key[]>([]);
-  const [printPending, setPrintPending] = useState(false);
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -779,19 +780,6 @@ export default function KraefteuebersichtPage() {
     setFilter(LEERER_FILTER);
   }, [einsatzId]);
 
-  // Erst nach committetem Aufklappen drucken (sonst fehlen die Mittel im Ausdruck).
-  useEffect(() => {
-    if (printPending) {
-      window.print();
-      setPrintPending(false);
-    }
-  }, [printPending]);
-
-  const handleDrucken = () => {
-    setExpandedKeys(aufklappbareSchluessel(raster));
-    setPrintPending(true);
-  };
-
   if (einsatzQuery.isLoading) return <SeitenSkeleton />;
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return (
@@ -888,21 +876,28 @@ export default function KraefteuebersichtPage() {
           </Space>
         }
       >
-        {/* ── NUR IM DRUCK (LFH-338 · C3, Befund H4) ──────────────────────────────────
-          Einsatzbezeichnung, Zeitstand, Ersteller und Auswahl — ohne diese vier Angaben ist
-          ein Meldeblatt nicht zuordenbar. `data-testid`, weil der Knoten am Schirm per CSS
-          verborgen ist und jsdom kein CSS auswertet. */}
-        <div className="kraefte-nur-print" data-testid="kraefte-druckkopf">
-          <div style={{ fontWeight: 600 }}>
-            Meldebild — {einsatz.bezeichnung}
-            {einsatz.einsatznummer_intern ? ` (${einsatz.einsatznummer_intern})` : ''}
-          </div>
-          {/* Der Stand ist der ÄLTESTE erfolgreiche Listenabruf, nicht die Druckzeit. */}
-          <div>Stand: {taktischeDtgVoll(new Date(datenstand || Date.now()).toISOString())}</div>
-          <div>Erstellt von: {benutzer?.anzeigename ?? '—'}</div>
-          <div>{meta}</div>
-          {gefiltert && <div>Auswahl: {chips.map((c) => c.label).join(' · ')}</div>}
-        </div>
+        {/* ── DRUCKKOPF (LFH-338 · C3, Befund H4; seit LFH-22 der gemeinsame) ──────────────
+          Einsatz, Stand, Ersteller und Auswahl — ohne diese Angaben ist ein Meldeblatt nicht
+          zuordenbar. Am Schirm verborgen: dort stehen sie in Seitenkopf und Filterleiste. Der
+          Stand ist der ÄLTESTE erfolgreiche Listenabruf, nicht die Druckzeit. */}
+        <Druckkopf
+          dokumentart="Meldebild"
+          einsatz={einsatz}
+          sichtbarkeit="druck"
+          zeilen={[
+            {
+              etikett: 'Stand',
+              wert: taktischeDtgVoll(
+                new Date(datenstand || Date.now()).toISOString(),
+                konventionen,
+              ),
+            },
+            { etikett: 'Umfang', wert: meta },
+            ...(gefiltert
+              ? [{ etikett: 'Auswahl', wert: chips.map((c) => c.label).join(' · ') }]
+              : []),
+          ]}
+        />
 
         <div style={{ marginBlock: token.marginLG }}>
           <Statusband
@@ -999,7 +994,9 @@ export default function KraefteuebersichtPage() {
               In Lagebericht übernehmen
             </Button>
           )}
-          <Button onClick={handleDrucken}>Drucken / als PDF</Button>
+          {/* Erst nach committetem Aufklappen drucken (sonst fehlen die Mittel im Ausdruck) —
+              `useDrucken` löst den Dialog im Effekt NACH dem Commit aus. */}
+          <DruckKnopf vorbereiten={() => setExpandedKeys(aufklappbareSchluessel(raster))} />
         </div>
 
         {/* Das Raster läuft mit `form="tabelle"` — in JEDER Breite Tabelle (Vergleichsfläche,

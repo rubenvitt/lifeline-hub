@@ -21,6 +21,15 @@
    des Meldebilds) bleiben in den Seiten-Stylesheets. Geprüft wird diese Datei als Quelltext
    in `druck.test.ts`, ihre Wirkung in `e2e/druck-fluss.spec.ts`. */
 
+/* Der Druckkopf (`components/druck/Druckkopf.tsx`) steht auf Befehl, Lagebericht und
+   Meldebild nur auf Papier — am Bildschirm tragen Seitenkopf und Leisten dieselben Angaben.
+   Die ETB-Druckansicht zeigt ihn auch am Bildschirm (`sichtbarkeit="immer"`). */
+@media screen {
+  .druckkopf--nur-druck {
+    display: none;
+  }
+}
+
 @media print {
   /* Seitenrand und Seitenzählung (D3). Randfelder zeichnet Chromium (ab 131); in Firefox
      und Safari bleibt das Feld leer, dort kann die Kopf-/Fußzeile des Browsers die

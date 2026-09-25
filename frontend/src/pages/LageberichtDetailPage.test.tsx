@@ -11,6 +11,8 @@ import * as lageberichteApi from '../api/lageberichte';
 import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { einsatzKeys } from '../api/queryKeys';
 import { ApiError } from '../api/client';
+import { http, HttpResponse } from 'msw';
+import { server } from '../test/server';
 
 vi.mock('../api/einsaetze');
 vi.mock('../api/lageberichte');
@@ -316,5 +318,56 @@ describe('LageberichtDetailPage — Druckwurzel (LFH-71)', () => {
     for (const v of vorschauen) expect(wurzel()).toContainElement(v as HTMLElement);
     // Ein Umschalter ist Bedienung, kein Inhalt (spec „Rahmen und schwebende Ebenen").
     expect(umschalter.closest('.lagebericht-no-print')).not.toBeNull();
+  });
+});
+
+/**
+ * ── DRUCKKOPF UND DRUCKKNOPF (LFH-22) ───────────────────────────────────────────
+ *
+ * Zwilling des Blocks in `BefehlDetailPage.test.tsx`.
+ */
+describe('LageberichtDetailPage — Druckkopf (LFH-22)', () => {
+  beforeEach(() => {
+    vi.mocked(einsaetzeApi.ladeEinsatz).mockResolvedValue({
+      id: 1,
+      status: 'aktiv',
+      meine_rolle: 'einsatzleitung',
+      bezeichnung: 'Übung',
+    } as never);
+    vi.mocked(lageberichteApi.ladeLagebericht).mockResolvedValue(bericht() as never);
+  });
+
+  it('trägt den Druckkopf in der Wurzel: „Lagebericht – Titel", Stand, am Schirm verborgen', async () => {
+    renderBei('/einsaetze/1/lageberichte/9');
+    await screen.findByRole('link', { name: /ETB-Eintrag/ });
+    const kopf = document.querySelector<HTMLElement>('[data-lfh="druckkopf"]');
+    expect(kopf).not.toBeNull();
+    expect(document.querySelector('[data-lfh="druckwurzel"]')).toContainElement(kopf);
+    expect(kopf).toHaveClass('druckkopf--nur-druck');
+    expect(within(kopf!).getByRole('heading', { level: 1, hidden: true })).toHaveTextContent(
+      'Lagebericht – Lage 1',
+    );
+    expect(within(kopf!).getByText('Freigegeben · Version 1')).toBeInTheDocument();
+  });
+
+  it('ruft window.print erst nach geladener Organisation', async () => {
+    const drucke = vi.spyOn(window, 'print').mockImplementation(() => {});
+    let freigeben!: () => void;
+    const tor = new Promise<void>((fertig) => {
+      freigeben = fertig;
+    });
+    server.use(
+      http.get('/api/organisation', async () => {
+        await tor;
+        return HttpResponse.json({ id: 1, name: 'Testorganisation', tz_organisation: null });
+      }),
+    );
+    renderBei('/einsaetze/1/lageberichte/9');
+    await userEvent.click(await screen.findByRole('button', { name: 'Drucken / als PDF' }));
+    await new Promise((fertig) => setTimeout(fertig, 30));
+    expect(drucke).not.toHaveBeenCalled();
+    freigeben();
+    await waitFor(() => expect(drucke).toHaveBeenCalledTimes(1));
+    drucke.mockRestore();
   });
 });

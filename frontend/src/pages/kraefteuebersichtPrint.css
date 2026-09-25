@@ -1,10 +1,3 @@
-/* Gegenstück zu `.kraefte-no-print`: der Kopf des gedruckten Meldeblatts (LFH-338 · C3).
-   Er steht am Schirm nicht, weil dieselben Angaben dort in Breadcrumb, Kopfzeile und
-   Filterleiste stehen — im Ausdruck fehlten sie ersatzlos. */
-.kraefte-nur-print {
-  display: none;
-}
-
 /* Problemzeile des Meldebilds (Neuentwurf S6): eine Einheit mit Ausfall. Die Tönung ist
    Verstärkung, der zweite Kanal ist die Ausfall-Zahl in der Statusspalte.
    An die `td`, nicht an die `tr`: antd färbt die Zellen, ein Hintergrund am `tr` bliebe
@@ -61,11 +54,6 @@
      Spaltenschalter im Ausdruck. */
   .kraefte-print-root [data-lfh='datensicht-werkzeuge'] {
     display: none !important;
-  }
-
-  /* Der Kopf des Meldeblatts — nur hier sichtbar. */
-  .kraefte-nur-print {
-    display: block !important;
   }
 
   /* ── Mehrseitige Bäume ────────────────────────────────────────────────────────
