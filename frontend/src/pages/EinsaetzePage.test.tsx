@@ -673,3 +673,98 @@ describe('Titel-Link der Einsatzkarte — Bedienziel auf der Dichte-Staffel (LFH
     expect(kartenTitelStil(tokenFuer('handschuh')).padding).toBe('16px 0');
   });
 });
+
+/**
+ * Hinweis auf die Demo-Daten (LFH-690, Task 6.3; design.md D13, Spec „Hinweis in der
+ * Einsatzliste“). Jede Abwesenheit steht neben einer Positivprobe und hinter einem
+ * Ankerpunkt (die Abfrage ist gelaufen bzw. die Liste steht) — sonst wäre sie auch dann
+ * grün, wenn der Hinweis nie gebaut würde oder die Abfrage nie feuert.
+ */
+describe('Demo-Daten-Hinweis (LFH-690)', () => {
+  const fuehrungskraft = { ...admin, id: 2, system_rolle: 'keiner', org_rolle: 'fuehrungskraft' };
+
+  function demoStatus(antwort: 'aus' | { importiert: boolean }) {
+    const zaehler = { get: 0 };
+    let stand = antwort;
+    server.use(
+      http.get('/api/demo-daten', () => {
+        zaehler.get += 1;
+        return stand === 'aus'
+          ? HttpResponse.json({ error: 'Nicht gefunden' }, { status: 404 })
+          : HttpResponse.json(stand);
+      }),
+    );
+    return { zaehler, setze: (s: typeof antwort) => (stand = s) };
+  }
+
+  function rendern(me: Record<string, unknown>, einsaetze: unknown[] = [einsatz()]) {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(me)),
+      http.get('/api/einsaetze', () => HttpResponse.json(einsaetze)),
+    );
+    return renderMitProviders(<EinsaetzePage />);
+  }
+
+  const hinweisLink = () => screen.queryByRole('link', { name: /Demo-Daten/ });
+
+  it('System-Admin + 200 + nicht importiert: Hinweis mit Link auf /admin/demo-daten', async () => {
+    demoStatus({ importiert: false });
+    rendern(admin);
+    const link = await screen.findByRole('link', { name: /Demo-Daten/ });
+    expect(link).toHaveAttribute('href', '/admin/demo-daten');
+    const alert = link.closest('[role="alert"]');
+    expect(alert).not.toBeNull();
+    expect(alert).toHaveClass('ant-alert-info');
+    // Ein Sprung, kein Direktimport: im Hinweis steht kein Knopf.
+    expect(alert!.querySelector('button')).toBeNull();
+  });
+
+  it('der Hinweis steht NEBEN dem Leerzustand, nicht in ihm (LFH-331 · AK3)', async () => {
+    demoStatus({ importiert: false });
+    rendern(admin, []);
+    const link = await screen.findByRole('link', { name: /Demo-Daten/ });
+    const leer = screen.getByText('Keine Einsätze').parentElement!;
+    expect(leer.contains(link)).toBe(false);
+    // Der Leerknoten bleibt aktionslos.
+    expect(leer.querySelector('button, a')).toBeNull();
+  });
+
+  it('404: kein Hinweis und keine Fehlermeldung', async () => {
+    const { zaehler } = demoStatus('aus');
+    rendern(admin);
+    await waitFor(() => expect(zaehler.get).toBe(1));
+    expect(await screen.findByText('Hochwasser Nord')).toBeInTheDocument();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(hinweisLink()).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('importiert: kein Hinweis', async () => {
+    const { zaehler } = demoStatus({ importiert: true });
+    rendern(admin);
+    await waitFor(() => expect(zaehler.get).toBe(1));
+    expect(await screen.findByText('Hochwasser Nord')).toBeInTheDocument();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(hinweisLink()).toBeNull();
+  });
+
+  it('andere Rolle: kein Hinweis und keine Anfrage an /api/demo-daten', async () => {
+    const { zaehler } = demoStatus({ importiert: false });
+    rendern(fuehrungskraft);
+    // Ankerpunkt: die Anmeldung ist aufgelöst (Führungskraft sieht die Anlegen-Kachel).
+    expect(await screen.findByRole('button', { name: 'Neuer Einsatz' })).toBeInTheDocument();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(hinweisLink()).toBeNull();
+    expect(zaehler.get).toBe(0);
+  });
+
+  it('nach dem Import verschwindet der Hinweis, sobald der Status neu geladen ist', async () => {
+    const { setze } = demoStatus({ importiert: false });
+    const { client } = rendern(admin);
+    expect(await screen.findByRole('link', { name: /Demo-Daten/ })).toBeInTheDocument();
+    setze({ importiert: true });
+    // Dasselbe Fach, das die Verwaltungssektion nach jedem Vorgang invalidiert.
+    await client.invalidateQueries({ queryKey: globalKeys.demoDaten() });
+    await waitFor(() => expect(hinweisLink()).toBeNull());
+  });
+});

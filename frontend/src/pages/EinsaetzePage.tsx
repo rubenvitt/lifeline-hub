@@ -1,4 +1,4 @@
-import { App, AutoComplete, Button, DatePicker, Form, Input, Tag, theme } from 'antd';
+import { Alert, App, AutoComplete, Button, DatePicker, Form, Input, Tag, theme } from 'antd';
 import { EnvironmentOutlined, PlusOutlined } from '@ant-design/icons';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useEffect, useState, type CSSProperties } from 'react';
@@ -30,6 +30,9 @@ import '../theme/sprache.css';
 import './EinsaetzePage.css';
 import { monoStil, useRollen } from '../components/instrument';
 import { einsaetzeMeta, kachelKennung } from './einsatzKachelKern';
+import { adminDemoDatenPfad } from '../admin/adminNav';
+import { useDemoDatenStatus } from '../admin/useDemoDaten';
+import { verweisStil } from '../etb/zeitachseModell';
 
 /** Werte des Anlegedialogs (`begonnen_at` als Dayjs aus dem `DatePicker`). */
 interface AnlegeWerte {
@@ -136,6 +139,39 @@ export default function EinsaetzePage() {
   const [form] = Form.useForm<AnlegeWerte>();
 
   const darfAnlegen = darfVerwaltung(benutzer);
+
+  /**
+   * Hinweis auf die Demo-Daten (LFH-690, design.md D13): nur für den System-Admin, nur bei
+   * Freischaltung (Status 200) und nur, solange für die Organisation nichts importiert ist.
+   * Die Abfrage läuft ausschließlich für den System-Admin; ein 404 ist kein Fehlerbild.
+   *
+   * BENANNTE ABWEICHUNG vom Ticket, das den Leerzustand vorschlägt: der ist seit LFH-331 · AK3
+   * aktionslos gepinnt und rechnet je Benutzer, „nicht importiert“ ist dagegen eine Aussage
+   * über die Organisation. Der Hinweis steht deshalb im `hinweis`-Slot über dem Raster und
+   * springt in die Verwaltung — ein Direktimport von hier wäre eine zweite Stelle für einen
+   * unumkehrbaren Vorgang.
+   */
+  const demo = useDemoDatenStatus();
+  const demoHinweis =
+    demo.freigeschaltet && demo.status?.importiert === false ? (
+      <Alert
+        type="info"
+        showIcon
+        title="Demo-Daten sind freigeschaltet und noch nicht importiert."
+        description={
+          <>
+            Ein Übungseinsatz samt Stammdaten für Vorführung und Schulung lässt sich in der
+            Verwaltung anlegen:{' '}
+            <Link
+              to={adminDemoDatenPfad()}
+              style={{ ...verweisStil(token), color: rollen.bedienText }}
+            >
+              Demo-Daten
+            </Link>
+          </>
+        }
+      />
+    ) : undefined;
 
   // `isPending` (erster Abruf), NICHT `isFetching`: nach dem Anlegen invalidiert die
   // Mutation die Liste — ein Ladezweig an `isFetching` nähme den Anlegen-Knopf
@@ -313,6 +349,7 @@ export default function EinsaetzePage() {
     <EinsatzSeite
       titel="Einsätze"
       meta={isPending ? undefined : einsaetzeMeta(aktive.length, abgeschlossene.length)}
+      hinweis={demoHinweis}
 
       dataUpdatedAt={einsaetzeAktualisiertAt}
     >
