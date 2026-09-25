@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App as AntApp } from 'antd';
@@ -8,6 +8,7 @@ import BetreuungPage from './BetreuungPage';
 import { ladeEinsatz } from '../api/einsaetze';
 import { AuthProvider } from '../auth/AuthContext';
 import { ApiError } from '../api/client';
+import { einsatzKeys } from '../api/queryKeys';
 import type { BetreuungUebersicht, Betreuungsstelle, Evakuierungsbezirk } from '../api/types';
 
 const einsatz = vi.hoisted(() => ({
@@ -100,7 +101,7 @@ const MIT_DATEN: BetreuungUebersicht = {
 
 function renderPage(pfad = '/einsaetze/1/betreuung') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
+  const ergebnis = render(
     <QueryClientProvider client={client}>
       <AntApp>
         <AuthProvider>
@@ -114,6 +115,7 @@ function renderPage(pfad = '/einsaetze/1/betreuung') {
       </AntApp>
     </QueryClientProvider>,
   );
+  return { ...ergebnis, client };
 }
 
 /** Ziel des Sprungs „Auf Karte verorten" (LFH-673): zeigt die angesteuerte Adresse. */
@@ -632,5 +634,66 @@ describe('BetreuungPage (LFH-639)', () => {
     });
     // LFH-607: „aufgehoben" nähme die Lagekennzahl weg; jede Bezirksänderung fragt nach.
     await waitFor(() => expect(neu()).toBeGreaterThan(0));
+  });
+  describe('Dialoge rechnen gegen die aktuellen Daten (LFH-681)', () => {
+    /** Ein Live-Refetch bei offenem Dialog: der Cache trägt den neuen Serverstand. */
+    const liveStand = (client: QueryClient, daten: BetreuungUebersicht) =>
+      act(() => {
+        client.setQueryData(einsatzKeys.betreuung(1), daten);
+      });
+
+    it('Räumung: der Dialog zeigt den Live-Stand, zurück auf den alten geht als PATCH raus', async () => {
+      api.aendereBezirk.mockResolvedValue(UFER);
+      const { client } = renderPage();
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'Aktionen zu Bezirk Uferstraße 12–40' }),
+      );
+      await userEvent.click(
+        within(await offenesMenue()).getByRole('menuitem', { name: /Räumung setzen/ }),
+      );
+      const dialog = await dialogMit('Räumung: Uferstraße 12–40');
+      // Fremd auf „geräumt" gesetzt: der Dialog zeigt es, die Person wählt zurück auf „läuft".
+      liveStand(client, { ...MIT_DATEN, bezirke: [{ ...UFER, raeumung: 'geraeumt' }, HAFEN] });
+      await waitFor(() =>
+        expect(within(dialog).getByRole('radio', { name: 'geräumt' })).toBeChecked(),
+      );
+      await userEvent.click(within(dialog).getByRole('radio', { name: 'läuft' }).closest('label')!);
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+      await waitFor(() =>
+        expect(api.aendereBezirk).toHaveBeenCalledWith(1, 5, { raeumung: 'laeuft' }),
+      );
+    });
+
+    it('seit dem Öffnen belegt: der Dialog bietet die Leermeldung an, statt am 422 zu scheitern', async () => {
+      api.meldeBelegung.mockResolvedValue({ meldung_id: 92, stelle: SCHULE });
+      api.aendereStelle.mockResolvedValue({ ...SCHULE, status: 'geschlossen' });
+      const { client } = renderPage();
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'Aktionen zu Stelle Schule Nord' }),
+      );
+      await userEvent.click(
+        within(await offenesMenue()).getByRole('menuitem', { name: /Bearbeiten/ }),
+      );
+      const dialog = await dialogMit('Stelle bearbeiten: Schule Nord');
+      liveStand(client, {
+        ...MIT_DATEN,
+        stellen: [
+          TURNHALLE,
+          STADION,
+          { ...SCHULE, belegung: { id: 40, belegt: 12, zeitpunkt_at: '2026-09-23 11:00:00' } },
+        ],
+      });
+      await userEvent.click(
+        within(dialog).getByRole('radio', { name: 'geschlossen' }).closest('label')!,
+      );
+      await userEvent.click(
+        await within(dialog).findByRole('checkbox', { name: /Belegung 0 melden/ }),
+      );
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+      await waitFor(() =>
+        expect(api.aendereStelle).toHaveBeenCalledWith(1, 10, { status: 'geschlossen' }),
+      );
+      expect(api.meldeBelegung).toHaveBeenCalledWith(1, 10, { belegt: 0 });
+    });
   });
 });
