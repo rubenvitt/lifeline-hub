@@ -752,7 +752,11 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
         await p.getByRole('button', { name: /^Verlauf zu Bezirk / }).click();
         await p.getByRole('button', { name: /^Verlauf zu Stelle / }).click();
       },
-      anker: (p: Page) => p.getByText(/1.420 untergebracht/),
+      // Im Verlauf gesucht, nicht auf der ganzen Seite (LFH-373, in der CI und lokal gemessen):
+      // der Paneel-Kopf der Stellen zeigt dieselbe Summe („1 420 untergebracht“), sobald die
+      // Meldung geladen ist — der seitenweite Anker traf dann zwei Elemente und scheiterte
+      // an Playwrights Strict Mode, je nachdem, was zuerst eintraf.
+      anker: (p: Page) => p.locator('[data-lfh="melde-verlauf"]').getByText(/1.420 untergebracht/),
     },
     {
       // LFH-634: Datenanker ist die Karte des gesäten Zeitfensters. Ihr zugänglicher Name
