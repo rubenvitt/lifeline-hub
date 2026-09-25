@@ -560,10 +560,19 @@ for (const modus of ['light', 'dark'] as const) {
       `${modus}/Abgelegt`,
     );
 
-    // App-weite Rollen, die dieses Modul nur ERBT (Linkfarbe, Tabellenkopf, Sekundärtext):
-    // zugesichert ist der absolute Boden, der Messwert steht als Anhang und in der Prüfliste.
+    // Der Titel-Anker ist seit LFH-21 der geteilte `DownloadAnker` in `bedienText` — eine
+    // Rolle dieses Projekts, nicht mehr antds Linkfarbe. Er trägt deshalb den Tag-/Nacht-Boden
+    // (7 / 5), gemessen am Namensknoten in der Tabellenzelle (anderer Grund als das
+    // Schaden-Paneel, Regel 3 aus LFH-618).
+    await pruefe(
+      page.getByRole('link', { name: 'Lageplan Nord' }).locator('[data-lfh="download-anker-name"]'),
+      KONTRAST_ZIEL[modus],
+      `${modus}/Titel-Anker (bedienText)`,
+    );
+
+    // App-weite Rollen, die dieses Modul nur ERBT (Tabellenkopf, Sekundärtext): zugesichert
+    // ist der absolute Boden, der Messwert steht als Anhang und in der Prüfliste.
     const geerbt: Record<string, Locator> = {
-      'Titel-Anker (Linkfarbe)': page.getByRole('link', { name: 'Lageplan Nord' }),
       Tabellenkopf: page.locator('.ant-table-thead th').first(),
       'Bezug „—" (Sekundärtext)': zeile.getByText('—', { exact: true }),
     };
