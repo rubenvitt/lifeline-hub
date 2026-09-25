@@ -2103,8 +2103,9 @@ bewacht nur an nicht vorgemerkten, nicht geschwärzten Einsätzen.
 **Der Purge-Audit ist fail-closed.** Akteurskette: abschließende Person, Einsatzleitung,
 System-Admin der Org des Einsatzes (aktive vor inaktiven, `ORDER BY id`, Org aus
 `einsatz.org_id`). Ohne Akteur liefert `system_audit_tx` einen Fehler, Vormerkung bzw.
-Schwärzung rollen zurück und der nächste Lauf versucht es erneut — die Übersicht zeigt den
-Einsatz so lange als `faellig` bzw. `schwaerzung_ausstehend`.
+Schwärzung rollen zurück und der nächste Lauf versucht es erneut. Sichtbar ist das NUR im
+Log (`tracing::error!` je Lauf, mit Einsatz und Org): eine Blockade besteht nur ohne jeden
+System-Admin in der Org, und dann kann niemand die Übersicht öffnen.
 **Scrub-Werte im Wortlaut von System-Einträgen** (Schadensort, Übergabe-Adressat,
 Verbleib-Ziel, Namen ad-hoc externer Kräfte, Dokumenttitel, Zonen-Labels u. a.) bleiben als
 Führungsdokumentation im ETB und stehen abschließend in `AUSNAHMEN_SYSTEM_ETB`

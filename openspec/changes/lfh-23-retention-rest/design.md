@@ -280,8 +280,11 @@ kommen vor inaktiven. `system_audit_tx` gibt ohne Akteur
 `Err(AppError::Internal(…))` zurück statt `Ok(())`. Die Transaktion von
 `soft_delete_einsatz` bzw. `schwaerze_einsatz` rollt damit zurück. `tick_einmal` protokolliert
 den Fehler (Phase A heute `warn`, neu `error`, wie Phase B) und versucht es im nächsten Lauf
-erneut. Die Übersicht zeigt den Einsatz solange als `faellig` bzw. `schwaerzung_ausstehend`,
-es bleibt also sichtbar statt still.
+erneut. **Sichtbar ist die Blockade nur im Log** (`tracing::error!` je Lauf, mit Einsatz und
+Org; Nachtrag aus dem Review): eine Blockade besteht nur, solange die Org keinen einzigen
+System-Admin hat — und dann kann auch niemand die Übersicht öffnen. Legt die Org wieder einen
+Admin an, löst der nächste Lauf die Blockade ohnehin auf. `faellig` in der Übersicht ist kein
+Blockade-Signal, sondern zwischen zwei Läufen der normale Zustand.
 
 Die Audit-Texte ändern sich nicht. Sie lesen sich schon als automatische Vorgänge
 („Aufbewahrungsfrist abgelaufen — Einsatz zur Löschung vorgemerkt …“), und der Text der
@@ -423,8 +426,8 @@ Seine offenen Checkboxen werden nicht abgehakt, diese Tabelle ersetzt sie als Na
   Wiederherstellung trägt einen ETB-Eintrag mit Namen, und die neue Frist ist Pflicht. Eine
   inhaltliche Grenze (etwa eine Höchstfrist) ist nicht Teil der Entscheidung.
 - [Fail-closed beim Audit hält eine Löschung auf] → Tritt nur ohne jeden Admin in der
-  Organisation ein. Die Übersicht zeigt den Einsatz dann als `faellig`, das Log meldet einen
-  Fehler je Lauf.
+  Organisation ein. Dann meldet nur das Log einen Fehler je Lauf (mit Einsatz und Org); eine
+  Übersicht, die es zeigen könnte, kann in dieser Org niemand öffnen.
 - [Takt und Zeitzone] → `retention_bis` bleibt UTC. Die Oberfläche rechnet nur über
   `filterZeit`, und die Sommerzeit-Tests gelten für beide Richtungen.
 - [Zweiter Admin-Namensraum neben `/api/org-*`] → bewusst, weil der Namensraum das

@@ -562,10 +562,18 @@ async fn system_audit_tx(
     inhalt: &str,
 ) -> Result<(), AppError> {
     let Some(akteur) = ermittle_system_akteur(conn, einsatz_id).await? else {
+        // Die Org steht in der Meldung: sichtbar ist die Blockade NUR im Log (eine Org ohne
+        // jeden Admin hat niemanden, der die Aufbewahrungsübersicht öffnen könnte), und der
+        // Betrieb soll die betroffene Org ohne DB-Abfrage finden.
+        let org_id: Option<i64> = sqlx::query_scalar("SELECT org_id FROM einsatz WHERE id = ?")
+            .bind(einsatz_id)
+            .fetch_optional(&mut *conn)
+            .await?;
         return Err(AppError::Internal(format!(
-            "Purge: kein Benutzer als ETB-Akteur für Einsatz {einsatz_id} auffindbar \
+            "Purge: kein Benutzer als ETB-Akteur für Einsatz {einsatz_id} (Org {}) auffindbar \
              (weder abschließende Person noch Einsatzleitung noch System-Admin der Org) — \
-             Mutation abgebrochen, nächster Lauf versucht es erneut"
+             Mutation abgebrochen, nächster Lauf versucht es erneut",
+            org_id.map_or_else(|| "?".to_string(), |o| o.to_string())
         )));
     };
     crate::etb::repo::anlegen_tx(

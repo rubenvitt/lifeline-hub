@@ -1092,6 +1092,12 @@ mod tests {
             .unwrap();
         assert_eq!(g, None, "ohne Audit keine Vormerkung");
         assert!(etb_erfasser(&pool, e).await.is_empty(), "kein ETB-Eintrag");
+        // Sichtbar ist die Blockade nur im Log — die Meldung nennt deshalb Einsatz UND Org.
+        let fehler = repo::soft_delete_einsatz(&pool, e, "2026-06-02 12:05:00")
+            .await
+            .unwrap_err()
+            .to_string();
+        assert!(fehler.contains(&format!("Einsatz {e} (Org 1)")), "{fehler}");
 
         let admin = org_admin_anlegen(&pool).await;
         assert_eq!(tick_einmal(&pool, t("2026-06-02 12:10:00")).await, 1);
