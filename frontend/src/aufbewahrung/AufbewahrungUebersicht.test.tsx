@@ -33,6 +33,13 @@ const EINTRAEGE: AufbewahrungEintrag[] = [
     zustand: 'ohne_frist',
   },
   {
+    // Altbestand ohne Einsatznummer (migrations/0115: „bleibt ohne Nummer“).
+    einsatz_id: 9104,
+    bezeichnung: 'Altlage Ost',
+    abgeschlossen_at: '2024-05-02 10:00:00',
+    zustand: 'ohne_frist',
+  },
+  {
     einsatz_id: 9103,
     einsatznummer_intern: 'E-2025-0001',
     bezeichnung: 'Brand West',
@@ -76,7 +83,7 @@ describe('AufbewahrungUebersicht', () => {
     const t = await tabelle();
     await within(t).findByText('E-2026-0007');
     expect(within(t).getByText('zur Löschung vorgemerkt')).toBeInTheDocument();
-    expect(within(t).getByText('ohne Frist')).toBeInTheDocument();
+    expect(within(t).getAllByText('ohne Frist')).toHaveLength(2);
     expect(within(t).getByText('geschwärzt')).toBeInTheDocument();
     // Zeitpunkt der Vormerkung — Pflichtangabe der Übersicht (Spec „Aufbewahrungsübersicht").
     expect(within(t).getByRole('columnheader', { name: /Vorgemerkt am/ })).toBeInTheDocument();
@@ -85,7 +92,7 @@ describe('AufbewahrungUebersicht', () => {
     expect(within(t).getByText(formatZeit('2026-07-01 10:10:00'))).toBeInTheDocument();
     expect(t).not.toHaveTextContent('2026-07-01 10:10:00');
     // Keine DB-id im sichtbaren Text.
-    for (const id of ['9101', '9102', '9103']) expect(t).not.toHaveTextContent(id);
+    for (const id of ['9101', '9102', '9103', '9104']) expect(t).not.toHaveTextContent(id);
   });
 
   it('filtert je Zustand über die Segmentleiste', async () => {
@@ -112,5 +119,15 @@ describe('AufbewahrungUebersicht', () => {
   it('die Führungskraft landet in der Verwaltung, nicht im Archiv', async () => {
     zeige(ME_FK);
     expect(await screen.findByLabelText('Ort')).toHaveTextContent('/admin/stammdaten/stichworte');
+  });
+
+  it('die fixierte Kennung ist ein Link in die Akte — auch ohne Einsatznummer nie „—“', async () => {
+    zeige();
+    const t = await tabelle();
+    const mitNummer = await within(t).findByRole('link', { name: 'E-2026-0007' });
+    expect(mitNummer).toHaveAttribute('href', '/admin/aufbewahrung/9101');
+    const ohneNummer = within(t).getByRole('link', { name: 'ohne Nr. · Altlage Ost' });
+    expect(ohneNummer).toHaveAttribute('href', '/admin/aufbewahrung/9104');
+    expect(within(t).queryByRole('link', { name: '—' })).toBeNull();
   });
 });

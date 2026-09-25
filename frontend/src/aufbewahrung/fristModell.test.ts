@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { darfFristSetzen, istFristverkuerzung } from './fristModell';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import {
+  darfFristSetzen,
+  fristAusEingabe,
+  istFristverkuerzung,
+  liegtInDerVergangenheit,
+} from './fristModell';
+
+dayjs.extend(utc);
 
 /**
  * Spiegel von `einsatz::berechtigung::ist_fristverkuerzung` (Rust). Der Server bleibt das
@@ -46,5 +55,28 @@ describe('darfFristSetzen (Einsatzleitung oder System-Admin, unabhängig vom Sta
       expect(darfFristSetzen({ status: 'abgeschlossen', meine_rolle: rolle }, keiner)).toBe(false);
     }
     expect(darfFristSetzen(undefined, undefined)).toBe(false);
+  });
+});
+
+describe('fristAusEingabe (Minute des Pickers gegen Sekunden der gespeicherten Frist)', () => {
+  it('dieselbe Minute gibt die gespeicherte Frist sekundengenau zurück', () => {
+    expect(fristAusEingabe('2030-10-01 10:00:00', '2030-10-01 10:00:17')).toBe(
+      '2030-10-01 10:00:17',
+    );
+  });
+  it('eine andere Minute bleibt die Eingabe', () => {
+    expect(fristAusEingabe('2030-10-01 09:59:00', '2030-10-01 10:00:17')).toBe(
+      '2030-10-01 09:59:00',
+    );
+    expect(fristAusEingabe('2030-10-01 10:00:00', null)).toBe('2030-10-01 10:00:00');
+  });
+});
+
+describe('liegtInDerVergangenheit', () => {
+  const jetzt = dayjs.utc('2026-09-25 12:00:00');
+  it('Grenze wie die Lesesperre: genau jetzt ist erreicht', () => {
+    expect(liegtInDerVergangenheit('2026-09-25 12:00:00', jetzt)).toBe(true);
+    expect(liegtInDerVergangenheit('2026-09-25 11:59:59', jetzt)).toBe(true);
+    expect(liegtInDerVergangenheit('2026-09-25 12:00:01', jetzt)).toBe(false);
   });
 });

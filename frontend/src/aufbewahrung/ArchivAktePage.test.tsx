@@ -165,6 +165,23 @@ describe('ArchivAktePage — Inhalt', () => {
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Ältere laden' })).toBeNull());
   });
 
+  it('ein gescheitertes „Ältere laden“ meldet sich unter der Liste', async () => {
+    const erste = Array.from({ length: 100 }, (_, i) => eintrag(200 - i));
+    zeige('geschwaerzt', [erste]);
+    server.use(
+      http.get('/api/aufbewahrung/einsaetze/7/etb', ({ request }) =>
+        new URL(request.url).searchParams.get('before_lfd_nr') == null
+          ? HttpResponse.json(erste)
+          : HttpResponse.json({ error: 'Datenbank ausgelastet' }, { status: 503 }),
+      ),
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Ältere laden' }));
+    expect(await screen.findByText('Ältere Einträge nicht ladbar')).toBeInTheDocument();
+    expect(screen.getByText('Datenbank ausgelastet')).toBeInTheDocument();
+    // Die geladene Seite bleibt lesbar.
+    expect(screen.getByText('Eintrag 200')).toBeInTheDocument();
+  });
+
   it('eine ungültige id leitet auf die Übersicht', async () => {
     zeige('geschwaerzt', undefined, '/admin/aufbewahrung/abc');
     expect(await screen.findByLabelText('Ort')).toHaveTextContent('/admin/aufbewahrung');

@@ -15,7 +15,7 @@ import StatusTag from '../components/StatusTag';
 import { Segmentleiste } from '../components/instrument';
 import { istAdmin } from '../einsatz/schreibrecht';
 import { aufbewahrungZustand } from '../theme/statusFarben';
-import { ZUSTAENDE } from './archivText';
+import { ZUSTAENDE, ZUSTAND_RANG } from './archivText';
 
 /**
  * Aufbewahrungsübersicht der Verwaltung (LFH-23, design.md D8) — `/admin/aufbewahrung`.
@@ -40,21 +40,31 @@ type Filter = AufbewahrungZustand | 'alle';
 
 const leer = '—';
 
+/**
+ * Menschenlesbare Kennung der fixierten Spalte. Altbestand trägt keine Einsatznummer
+ * (`migrations/0115`: „bleibt ohne Nummer“) — gerade diese Einsätze sind Aufbewahrungsfälle.
+ * Dann steht die Bezeichnung dort, nie „—“: die Zelle ist der Link in die Akte, und n Links
+ * namens „—“ wären nicht zu unterscheiden. Derselbe Rückfall wie in der Akte.
+ */
+export function kennung(e: Pick<AufbewahrungEintrag, 'einsatznummer_intern' | 'bezeichnung'>) {
+  return e.einsatznummer_intern ?? `ohne Nr. · ${e.bezeichnung}`;
+}
+
 const spalten = spaltenFuer<AufbewahrungEintrag>()([
   {
     key: 'nummer',
     title: 'Einsatznummer',
-    width: 150,
+    width: 190,
     zahl: true,
-    sortWert: (e) => e.einsatznummer_intern,
-    suchText: (e) => e.einsatznummer_intern,
-    render: (_, e) => e.einsatznummer_intern ?? leer,
+    sortWert: (e) => kennung(e),
+    suchText: (e) => kennung(e),
+    render: (_, e) => kennung(e),
   },
   {
     key: 'zustand',
     title: 'Zustand',
     width: 200,
-    sortWert: (e) => ZUSTAENDE.indexOf(e.zustand),
+    sortWert: (e) => ZUSTAND_RANG[e.zustand],
     render: (_, e) => <StatusTag darstellung={aufbewahrungZustand[e.zustand]} />,
   },
   {
@@ -109,8 +119,12 @@ const spalten = spaltenFuer<AufbewahrungEintrag>()([
 
 type Spalte = (typeof spalten)[number]['key'];
 
-/** Pflicht am Primitiv, greift bei `form="tabelle"` nie — ehrlich belegt, falls die Form je
- *  auf `auto` wechselt. */
+/**
+ * Kartenplan. Auch in der Tabellenform NICHT wirkungslos: `titel.ziel` macht die Kennungszelle
+ * in BEIDEN Zweigen zum echten `<Link>` (`Datensicht.tsx`, Dateikopf Punkt 4) — das ist das
+ * Tastaturziel der Zeile; `onZeileKlick` bedient nur Maus und Tippen. Nicht streichen.
+ * Status und Sekundärfelder greifen erst, falls die Form je auf `auto` wechselt.
+ */
 const KARTE: Kartenplan<AufbewahrungEintrag, Spalte> = {
   art: 'plan',
   titel: { spalte: 'nummer', ziel: (e) => adminAufbewahrungAktePfad(e.einsatz_id) },

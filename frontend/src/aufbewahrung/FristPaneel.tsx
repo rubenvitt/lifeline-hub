@@ -1,6 +1,6 @@
 import { App, Button, DatePicker, Flex, Form, Modal, Typography, theme } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import type { Dayjs } from 'dayjs';
+import dayjs, { type Dayjs } from 'dayjs';
 import { useEffect, useState, type ReactNode } from 'react';
 import { setzeAufbewahrungsfrist } from '../api/aufbewahrung';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
@@ -11,7 +11,12 @@ import { ErfassungsModal } from '../components/Erfassung';
 import { RechteHinweis, SpeicherFehler } from '../components/SpeicherHinweis';
 import { Datenfeld, Datenraster, Paneel } from '../components/instrument';
 import { alsBackendZeit, alsOrtszeit } from '../etb/filterZeit';
-import { darfFristSetzen, istFristverkuerzung } from './fristModell';
+import {
+  darfFristSetzen,
+  fristAusEingabe,
+  istFristverkuerzung,
+  liegtInDerVergangenheit,
+} from './fristModell';
 
 /**
  * Aufbewahrungsfrist am Einsatz anzeigen und ändern (LFH-23, design.md D8).
@@ -141,7 +146,7 @@ export function useFristAenderung(
         laeuft={mutation.isPending}
         onErfassen={async (werte) => {
           if (!werte.frist) throw new Error('keine Frist');
-          const neu = alsBackendZeit(werte.frist);
+          const neu = fristAusEingabe(alsBackendZeit(werte.frist), basis);
           const mitBestaetigung = await bestaetigt(neu);
           await mutation.mutateAsync(
             mitBestaetigung ? { retention_bis: neu, bestaetigt: true } : { retention_bis: neu },
@@ -177,8 +182,10 @@ export function useFristAenderung(
             <strong>
               <ZeitAnzeige wert={rueckfrage.neu} />
             </strong>{' '}
-            vorverlegt. Ab dann ist der abgeschlossene Einsatz für alle gesperrt und wird zur
-            Löschung vorgemerkt.
+            vorverlegt.{' '}
+            {liegtInDerVergangenheit(rueckfrage.neu, dayjs())
+              ? 'Der Zeitpunkt liegt in der Vergangenheit — ein abgeschlossener Einsatz ist damit sofort für alle gesperrt, auch für Sie, und wird mit dem nächsten Purge-Lauf zur Löschung vorgemerkt.'
+              : 'Ab dann ist der abgeschlossene Einsatz für alle gesperrt und wird zur Löschung vorgemerkt.'}
           </Typography.Paragraph>
         )}
       </Modal>

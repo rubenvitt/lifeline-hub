@@ -46,7 +46,7 @@ import {
   schadenAusmass,
   schadenStatus,
 } from '../theme/statusFarben';
-import { VERBLEIB_ART, VERBLEIB_STATUS, primaeraktion } from './archivText';
+import { ETB_TYPEN, VERBLEIB_ART, VERBLEIB_STATUS, primaeraktion } from './archivText';
 import { FristWert, useFristAenderung } from './FristPaneel';
 import WiederherstellenDialog from './WiederherstellenDialog';
 
@@ -72,14 +72,6 @@ import WiederherstellenDialog from './WiederherstellenDialog';
 const leer = '—';
 const ETB_SEITE = 100;
 type EtbFilter = EtbTyp | 'alle';
-const ETB_TYPEN: readonly EtbTyp[] = [
-  'meldung',
-  'anordnung',
-  'lage',
-  'entscheidung',
-  'berichtigung',
-  'system',
-];
 const MELDEWEG = Object.fromEntries(MELDEWEG_OPTIONEN.map((o) => [o.value, o.label]));
 
 const personSpalten: KatalogSpalte<ArchivPerson>[] = [
@@ -324,11 +316,19 @@ function ArchivEtb({ einsatzId }: { einsatzId: number }) {
           style={{ marginBottom: token.marginSM }}
         />
         {inhalt}
+        {/* Ein gescheitertes Nachladen meldet sich dort, wo die Person steht (H14/LFH-535):
+            ohne diese Zeile stünde der Knopf wieder bereit, und ein Fehlschlag wäre von
+            „nichts Älteres“ nicht zu unterscheiden. Die geladenen Seiten bleiben stehen. */}
+        {abfrage.isFetchNextPageError && (
+          <div style={{ marginTop: token.marginSM }}>
+            <SeitenFehler text="Ältere Einträge nicht ladbar" ursache={abfrage.error} />
+          </div>
+        )}
         {abfrage.hasNextPage && (
           <Flex justify="center" style={{ marginTop: token.marginSM }}>
             <Button
               onClick={() => void abfrage.fetchNextPage()}
-              disabled={abfrage.isFetchingNextPage}
+              loading={abfrage.isFetchingNextPage}
             >
               Ältere laden
             </Button>

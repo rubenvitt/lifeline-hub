@@ -200,4 +200,36 @@ describe('FristPaneel', () => {
       ),
     );
   });
+
+  it('dieselbe Minute wie die bestehende Frist ist keine Verkürzung (Sekundenrest)', async () => {
+    // Beim Abschluss entsteht die Frist aus abgeschlossen_at + Dauer und trägt Sekunden; der
+    // Picker zeigt nur Minuten. Die angezeigte Minute erneut einzugeben ist KEINE Verkürzung.
+    const basis = '2030-10-01 10:00:17';
+    zeige(ME_ADMIN, { status: 'abgeschlossen', retention_bis: basis });
+    const dialog = await dialogOeffnen();
+    await fristSetzen(dialog, alsOrtszeit(basis)!.format('YYYY-MM-DD HH:mm'));
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+    expect(rueckfrageOffen()).toBe(false);
+    // Unverändert heißt: der gespeicherte Wert geht sekundengenau zurück, ohne Bestätigung —
+    // der Server antwortet dann ohne Schreibvorgang und ohne ETB-Eintrag.
+    expect(gesendet[0]).toEqual({ retention_bis: basis });
+  });
+
+  it('ein Zeitpunkt in der Vergangenheit nennt in der Rückfrage die sofortige Sperre', async () => {
+    zeige(ME_ADMIN, { status: 'abgeschlossen', retention_bis: '2030-10-01 10:00:00' });
+    const dialog = await dialogOeffnen();
+    await fristSetzen(dialog, '2020-01-01 12:00');
+    const rueckfrage = await rueckfrageFinden();
+    expect(rueckfrage).toHaveTextContent(/sofort/);
+    expect(rueckfrage).toHaveTextContent(/auch für Sie/);
+    expect(gesendet).toHaveLength(0);
+  });
+
+  it('ein Zeitpunkt in der Zukunft nennt keine sofortige Sperre', async () => {
+    zeige(ME_ADMIN, { status: 'abgeschlossen', retention_bis: '2030-10-01 10:00:00' });
+    const dialog = await dialogOeffnen();
+    await fristSetzen(dialog, '2029-01-01 12:00');
+    const rueckfrage = await rueckfrageFinden();
+    expect(rueckfrage).not.toHaveTextContent(/sofort/);
+  });
 });
