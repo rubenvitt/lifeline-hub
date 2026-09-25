@@ -8,7 +8,7 @@ darauf auf, Gruppe 9 schließt ab.
 
 ## 1. Datenbank
 
-- [x] 1.1 `git fetch`, dann die nächste freie Nummer mit `scripts/check-migrationen.sh` gegen `origin/alpha` ermitteln (heute 0121). Migration `<nr>_etb_eintrag_anhang.sql` nach design.md D1 anlegen: beide FKs `ON DELETE CASCADE`, `anhang_id UNIQUE`, `PRIMARY KEY (eintrag_id, anhang_id)`, Kopfkommentar „dritter Linker auf `anhang`“ mit Begründung für CASCADE. Verifiziert durch `scripts/check-migrationen.sh` grün und `cargo test --lib db` (`migrationsnummern_sind_eindeutig`). *Umgesetzt als `0124`: der offene PR zu LFH-22 belegt `0123`.*
+- [x] 1.1 `git fetch`, dann die nächste freie Nummer mit `scripts/check-migrationen.sh` gegen `origin/alpha` ermitteln (heute 0121). Migration `<nr>_etb_eintrag_anhang.sql` nach design.md D1 anlegen: beide FKs `ON DELETE CASCADE`, `anhang_id UNIQUE`, `PRIMARY KEY (eintrag_id, anhang_id)`, Kopfkommentar „dritter Linker auf `anhang`“ mit Begründung für CASCADE. Verifiziert durch `scripts/check-migrationen.sh` grün und `cargo test --lib db` (`migrationsnummern_sind_eindeutig`). *Umgesetzt als `0125`: alpha trägt `0123_demo_daten`, der offene PR #159 (LFH-22) zieht `org_logo` auf `0124`.*
 - [x] 1.2 Schwärzungsregel: roter Guard zuerst (`jede_einsatz_scoped_spalte_ist_klassifiziert` bzw. der CASCADE-Hüllen-Guard wird mit der neuen Tabelle rot), dann `TabellenRegel` für `etb_eintrag_anhang` (`UeberParent { fk: "eintrag_id", parent: "etb_eintrag" }`, `retain` G_FK für beide Spalten, Kommentar nach dem Muster von `chat_nachricht_anhang`). Verifiziert durch den grünen Guard
 
 ## 2. Anhang-Unterbau: dritter Linker
