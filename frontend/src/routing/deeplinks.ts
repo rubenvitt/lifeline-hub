@@ -355,6 +355,25 @@ export function etbPfad(
 }
 
 /**
+ * Druckansicht des Tagebuchs (LFH-22, design.md D5): `/einsaetze/:id/etb/druck` mit
+ * derselben Filterachse wie {@link etbPfad}. Der Rückweg ist {@link parseEtbFilter} — eine
+ * Umkehr für beide Adressen, damit die Druckansicht genau die Auswahl druckt, die das
+ * Tagebuch zeigte.
+ */
+export function etbDruckPfad(
+  einsatzId: number,
+  filter: Pick<EtbFilterWerte, 'q' | 'typ' | 'von' | 'bis' | 'einheit_id'>,
+): string {
+  return mitQuery(`${einsatzModulPfad(einsatzId, 'etb')}/druck`, {
+    q: filter.q,
+    typ: filter.typ,
+    von: filter.von,
+    bis: filter.bis,
+    einheit_id: filter.einheit_id,
+  });
+}
+
+/**
  * Umkehr der Filterachse von {@link etbPfad} (LFH-342 · C7).
  *
  * Verwirft Unbrauchbares GANZ statt halb zu übernehmen — dieselbe Regel wie bei

@@ -81,6 +81,8 @@ export const EINSATZ_KEYS = {
   pegel: 'einsatz-pegel',
   // Wetter am Einsatzort (LFH-633): DWD-Warnungen + Vorhersage, kein Live-Event.
   wetter: 'einsatz-wetter',
+  // ETB-Druckansicht (LFH-22): Schnappschuss, eigener Prefix außerhalb von `etb`.
+  etbDruck: 'einsatz-etb-druck',
 } as const;
 
 export type EinsatzKey = (typeof EINSATZ_KEYS)[keyof typeof EINSATZ_KEYS];
@@ -215,6 +217,10 @@ export type EinsatzStreamEvent = keyof typeof EINSATZ_STREAM_EVENTS;
  * - `wetter` (LFH-633): Warnungen und Vorhersage kommen von einer externen Quelle (Bright
  *   Sky), nicht aus einem Einsatz-Datenobjekt — es gibt kein Ereignis, das sie ändert. Die
  *   Abfrage fragt alle 5 min nach, derselbe Takt wie die Pegel.
+ * - `etbDruck` (LFH-22): ein Druckbeleg ist ein Schnappschuss; er ändert sich nicht unter der
+ *   Hand. Ein neuer ETB-Eintrag darf die geladene Druckansicht NICHT still ergänzen — der
+ *   Kopf nennt den Stand (höchste Nummer), und „Neu laden" ist eine ausdrückliche Handlung.
+ *   Deshalb auch der eigene Prefix: unter `etb` zöge das `etb`-Ereignis ihn per Präfix mit.
  */
 export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.einsatz,
@@ -231,6 +237,7 @@ export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.lageSnapshotDokument,
   EINSATZ_KEYS.pegel,
   EINSATZ_KEYS.wetter,
+  EINSATZ_KEYS.etbDruck,
 ] as const satisfies readonly EinsatzKey[];
 
 /**
@@ -343,6 +350,9 @@ export const einsatzKeys = {
   pegelVerlauf: (einsatzId: number) => [EINSATZ_KEYS.pegel, einsatzId, 'verlauf'] as const,
   /** Wetter am Einsatzort (LFH-633) — NICHT live, siehe NICHT_LIVE_KEYS. */
   wetter: (einsatzId: number) => [EINSATZ_KEYS.wetter, einsatzId] as const,
+  // ETB-Druckansicht (LFH-22): Vollabruf einer Auswahl, nicht live (siehe NICHT_LIVE_KEYS).
+  etbDruck: <F>(einsatzId: number, filter: F) =>
+    [EINSATZ_KEYS.etbDruck, einsatzId, filter] as const,
 
   // Stab (LFH-46): Führungsorganisation S1–S6.
   stab: (einsatzId: number) => [EINSATZ_KEYS.stab, einsatzId] as const,

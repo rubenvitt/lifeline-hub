@@ -3,6 +3,7 @@ import { ZAEHLER_LISTEN_KEYS } from '../einsatz/useModulZaehler';
 import {
   EINSATZ_KEYS,
   EINSATZ_STREAM_EVENTS,
+  NICHT_LIVE_KEYS,
   einsatzKeys,
   globalKeys,
   istKeyDesEinsatzes,
@@ -331,6 +332,30 @@ describe('einsatzKeys (Factory-Output)', () => {
     for (const prefix of Object.values(EINSATZ_KEYS)) {
       expect(abgedeckt, `kein Factory-Eintrag für Prefix ${prefix}`).toContain(prefix);
     }
+  });
+});
+
+/**
+ * ETB-Druckansicht (LFH-22, design.md D4): ein Druckbeleg ist ein SCHNAPPSCHUSS — er ändert
+ * sich nicht unter der Hand. Deshalb ein eigener Prefix außerhalb von `etb` (das Live-Ereignis
+ * `etb` matcht per Prefix nur `['etb', …]`) und ein Eintrag in `NICHT_LIVE_KEYS`.
+ */
+describe('einsatzKeys.etbDruck (LFH-22)', () => {
+  it('baut den Key als [prefix, einsatzId, filter] mit handgeschriebenem Prefix', () => {
+    expect(einsatzKeys.etbDruck(1, { typ: 'meldung' })).toEqual([
+      'einsatz-etb-druck',
+      1,
+      { typ: 'meldung' },
+    ]);
+  });
+
+  it('ist nicht live: kein Ereignis invalidiert ihn, NICHT_LIVE_KEYS führt ihn', () => {
+    expect(NICHT_LIVE_KEYS as readonly string[]).toContain('einsatz-etb-druck');
+    for (const prefixe of Object.values(EINSATZ_STREAM_EVENTS)) {
+      expect(prefixe as readonly string[]).not.toContain('einsatz-etb-druck');
+    }
+    // Und der Prefix des Tagebuchs trifft ihn nicht (TanStack matcht per Präfix).
+    expect(einsatzKeys.etbDruck(1, {})[0]).not.toBe(EINSATZ_KEYS.etb);
   });
 });
 

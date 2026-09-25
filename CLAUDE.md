@@ -1513,6 +1513,85 @@ Elementen bleibt verboten. Und `test/utils.tsx` rendert ein **nacktes** `ConfigP
 ohne Theme — eine Höhen- oder Trefferflächen-Behauptung im Vitest misst antd-Vorgaben
 und belegt nichts.
 
+## Frontend — Druck (LFH-71/LFH-22)
+
+**Gedruckt wird über den Browser, nie auf dem Server.** Die Entscheidung 5 der
+Lagebericht-Spec („Druck/PDF via Browser-Print", `docs/superpowers/specs/2026-06-02-lage-lageberichte-design.md`)
+gilt seit LFH-22 für **jedes** Druckstück: Lagebericht, Befehl, Meldebild, ETB-Druck.
+Herleitung: `openspec/changes/lfh-22-druck-export/design.md`.
+
+- **Eine Druckwurzel, ein Stylesheet.** Ein Druckstück markiert seine Wurzel mit
+  `data-lfh="druckwurzel"`, mehr nicht; `druck/druck.css` (global in `main.tsx`) trägt die
+  Mechanik, nur unter `@media print` und nur mit Wurzel auf der Seite — bis auf `@page`
+  (Seitenrand, Seitenzählung): das hängt an keinem Selektor und gilt für jeden Ausdruck,
+  eine benannte, in `druck.test.ts` gepinnte Ausnahme. Alles außerhalb
+  von Wurzel, Vorfahren und Nachfahren wird **`display: none`** — auch jedes Portal
+  (Dialog, `message`, Menü, Drawer), ohne Markenliste. **Nie wieder `visibility: hidden`
+  plus `position: absolute`**: unsichtbare Knoten behalten ihren Platz, und Firefox und
+  Safari schneiden einen absolut positionierten Druckbereich nach Seite 1 ab. Vorfahren
+  werden neutralisiert (Flex, `100vh`, Polsterung, Bildlauf), die Wurzel steht im Fluss.
+  Papierfarben und Umbruchregeln (`h1–h6` bleiben beim Text, im Entwurf auch der
+  Abschnittstitel als `.ant-collapse-header`/`.ant-form-item-label` — dort ist er keine
+  Überschrift; `p, ul, ol, blockquote, pre, tr, img, figure` reißen nicht; `thead`
+  wiederholt sich; Codeblöcke brechen um) hängen an der Wurzel und gelten damit auch im
+  Entwurfszweig. Die Seiten-Stylesheets (`*Print.css`) tragen nur noch ihre
+  Eigenheiten (M86-Entwurfsregeln, `*-no-print`, Seitenkopf, Tabellen-Neutralisierer) und
+  pinnen per Gegenaussage, dass die Mechanik dort NICHT wieder auftaucht. Genau **eine**
+  Wurzel je Seite; was außerhalb steht, fehlt auf Papier.
+- **Nachweis:** `druck/druck.test.ts` liest die CSS-Quelle mit einem Parser, der
+  Verschachtelung versteht (`@page { @bottom-right }`). Die Wirkung misst
+  `e2e/druck-fluss.spec.ts` unter `emulateMedia('print')` — diskriminierend sind
+  `position: static` der Wurzel und `display: none` des Rahmens; Lage „oben" und
+  „Text jenseits einer A4-Höhe" waren auch am alten Muster grün. `page.pdf()` zählt Seiten
+  als Plausibilität (nur Chromium). **Firefox und Safari prüft die Prüfliste von Hand.**
+- **Seitenzählung nur, wo der Browser Randfelder zeichnet** (`@page` `@bottom-right`,
+  Chromium ab 131). Im Randfeld steht kein Freitext (Org-Name, Einsatz) — er müsste als
+  CSS-Zeichenkette in ein `<style>`, eine Escape-Fläche ohne Gewinn. Zuordenbar macht das
+  Blatt der Druckkopf.
+- **Druckkopf und `useDrucken`.** `components/druck/Druckkopf.tsx` (Organisation mit Logo,
+  Dokument als `h1`, Einsatz mit Nummer, Stand/Auswahl, „Gedruckt von" — die druckende
+  Person, nicht die Urheberin; „Erstellt von" las sich als Urheberschaft —, „Gedruckt am" in der
+  Anzeigezone, bei `beforeprint` erneuert) steht IN der Wurzel. `sichtbarkeit="druck"` =
+  nur Papier (Klasse plus `aria-hidden`), `"immer"` nur auf der ETB-Druckansicht (dort
+  `ebene={2}`, weil der Seitenkopf das `h1` trägt). Druckknöpfe sind `DruckKnopf`
+  (`useDrucken`): der Dialog öffnet erst, wenn die Organisation geladen und das Logo
+  `decode()`t ist — höchstens `LOGO_FRIST_MS` (3 s); Logo-Fehler oder Fristablauf drucken
+  ohne Logo statt gar nicht. Bereit heißt „Daten da" (`data !== undefined`), nicht „letzter
+  Abruf gelungen": ein gescheiterter Hintergrund-Refetch (TanStack v5: `isError` bei
+  stehenden Daten) sperrt nichts. Nur ohne Daten steht der Knopf gesperrt mit „Erneut laden". Kein `window.print()` direkt —
+  und in `useDrucken` **nie aus dem Passiv-Effekt heraus**, sondern nach einem Takt
+  Aufschub: `print()` feuert `beforeprint` synchron, im Effekt steht React im
+  Commit-Kontext, und das `flushSync` der Listener rendert dort nicht (gemessen: das Blatt
+  trug die Druckzeit vom Seitenaufbau). Ein Test dafür liest den Kopf IM gemockten
+  `print`, nie danach — `act` holt das liegengebliebene Update sonst nach.
+- **Was CSS allein nicht drucken kann, schaltet `beforeprint`/`afterprint` um**
+  (`components/druck/useDruckModus.ts`, `flushSync`). Einziger Nutzer heute:
+  `KatalogTabelle` rendert im Druck ohne `sticky` — mit `sticky` legt rc-table den Kopf in
+  eine eigene Tabelle im Sticky-Halter, die Körpertabelle hat kein `thead`, und die
+  Kopfwiederholung greift nicht. Am Bildschirm bleibt die stehende Kopfzeile (LFH-330).
+  `emulateMedia` und `page.pdf()` feuern kein `beforeprint`; e2e löst es selbst aus.
+- **Ein Editor druckt nie seine `<textarea>`.** Das Toggle-Layout des `MarkdownEditor`
+  (Vorgabe des Lagebericht-Entwurfs) trägt mit `druckfassung` eine gerenderte Fassung, die
+  nur der Druck zeigt; das Seiten-Stylesheet nimmt das Textfeld immer weg. Opt-in, weil sie
+  einen Markdown-Render je Anschlag kostet.
+- **ETB-Druck ist die benannte Tabellen-Ausnahme** (`pages/EtbDruckPage.tsx`,
+  `etb/EtbDruckTabelle.tsx`): die Papierform des Tagebuchs als schlichtes `<table>`, weder
+  `KatalogTabelle` noch `Datensicht`, ohne Sortierung/Filter/Spaltenschalter, **aufsteigend
+  nach `lfd_nr`** (die lückenlose Nummernfolge beweist auf Papier die Vollständigkeit).
+  Der **Vollabruf** (`etb/druckAbruf.ts`) läuft als Cursor-Schleife über die bestehende
+  Liste (500 je Seite) — **keine zweite Filterkopie, kein eigener Endpunkt**, dieselben
+  Gates. Drucken ist gesperrt, bis alles da ist; ein Teilausdruck ist ausgeschlossen. Bei
+  aktivem Filter holt ein Berichtigungs-Durchgang „berichtigt durch Nr. m" auch von
+  außerhalb der Auswahl. Der Query-Key `einsatzKeys.etbDruck` ist **nicht live**
+  (`NICHT_LIVE_KEYS`, eigener Prefix außerhalb `etb`): ein Druckbeleg ist ein Schnappschuss
+  — der offenen Ansicht. Beim Öffnen lädt sie immer frisch (`refetchOnMount: 'always'`),
+  sonst käme innerhalb der Cache-Frist der Stand des letzten Besuchs.
+- **Org-Branding:** Name (`PATCH /api/organisation`, beide Felder optional) und Logo
+  (`org_logo`, `GET|POST|DELETE /api/organisation/logo`, PNG/JPEG am Inhalt, ≤ 1 MiB,
+  Virenscan, `Cache-Control: private, no-cache` + ETag, `?v=<sha256>` als Cache-Brecher)
+  pflegt der Admin unter Verwaltung › Organisation. Das Logo hängt an keinem Einsatz und
+  liegt außerhalb der Schwärzung (Guard in `schwaerzung_registry.rs`).
+
 ## Frontend — Deeplink-Muster (Route vs. Query-Param)
 
 Modulübergreifende Deeplinks folgen einem festen Muster (LFH-25):

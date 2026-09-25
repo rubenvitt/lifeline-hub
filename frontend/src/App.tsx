@@ -11,6 +11,7 @@ import FahrzeugDetailPage from './stammdaten/FahrzeugDetailPage';
 import PersonalDetailPage from './stammdaten/PersonalDetailPage';
 import ProfilPage from './pages/ProfilPage';
 import EtbPage from './pages/EtbPage';
+import EtbDruckPage from './pages/EtbDruckPage';
 import ChatPage from './pages/ChatPage';
 import ErinnerungenPage from './pages/ErinnerungenPage';
 import AuftraegePage from './pages/AuftraegePage';
@@ -266,6 +267,9 @@ export const appRouten = createRoutesFromElements(
                 statisch ohnehin höher — die Reihenfolge steht so da, damit ein Leser das
                 nicht prüfen muss (LFH-340 · C5). */}
           <Route path="personen/aufnahme" element={<AufnahmePage />} />
+          {/* ETB-Druckansicht (LFH-22): die Papierform des Tagebuchs, Filter aus der Adresse
+              (`etbDruckPfad`/`parseEtbFilter`). */}
+          <Route path="etb/druck" element={<EtbDruckPage />} />
           <Route path="personen/:personId" element={<PersonenDetailPage />} />
           <Route path="tiere/:tierId" element={<TiereDetailPage />} />
           <Route path="schaeden/:schadenId" element={<SchaedenDetailPage />} />

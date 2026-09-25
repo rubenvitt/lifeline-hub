@@ -1864,6 +1864,10 @@ mod tests {
             "einheit_typ",
             "qualifikation",
             "karte_registry",
+            // Logo der Organisation (LFH-22, design.md D8): hängt an der Org, nicht am
+            // Einsatz. Ein späterer FK/CASCADE Richtung Einsatz zöge es still in die
+            // Schwärzung — dieser Eintrag macht das rot.
+            "org_logo",
         ] {
             assert!(
                 !s.contains(verboten),

@@ -1089,3 +1089,42 @@ describe('EtbPage – Zeitachse (Neuentwurf S4)', () => {
     expect(await screen.findAllByText('Offline-Eintrag')).not.toHaveLength(0);
   });
 });
+
+/**
+ * ── EINSTIEG IN DEN DRUCK (LFH-22, design.md D5) ─────────────────────────────────
+ *
+ * „Drucken / als PDF" im Kopf ÖFFNET die Druckansicht und sendet nichts ab — deshalb gehört
+ * es in den Kopf-Slot (LFH-346 · C11) und ist ein Link mit Knopfgestalt (Strg+Klick öffnet
+ * einen neuen Tab). Er nimmt den AKTIVEN Filter mit, sonst druckte die Person eine andere
+ * Auswahl als die, die sie gerade sieht.
+ */
+describe('EtbPage — Einstieg in den Druck (LFH-22)', () => {
+  it('verlinkt im Kopf auf die Druckansicht mit dem aktiven Filter', async () => {
+    setup('/einsaetze/7/etb?typ=meldung&q=Damm&einheit_id=5');
+    const kopf = await waitFor(() => {
+      const k = document.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]');
+      expect(k).not.toBeNull();
+      return k!;
+    });
+    const link = await within(kopf).findByRole('link', { name: 'Drucken / als PDF' });
+    const ziel = new URL(link.getAttribute('href')!, 'http://x');
+    expect(ziel.pathname).toBe('/einsaetze/7/etb/druck');
+    expect(Object.fromEntries(ziel.searchParams)).toEqual({
+      typ: 'meldung',
+      q: 'Damm',
+      einheit_id: '5',
+    });
+  });
+
+  it('ist sekundär: im Kopf steht höchstens eine Primäraktion, und das ist nicht der Druck', async () => {
+    setup();
+    const kopf = await waitFor(() => {
+      const k = document.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]');
+      expect(k).not.toBeNull();
+      return k!;
+    });
+    const link = await within(kopf).findByRole('link', { name: 'Drucken / als PDF' });
+    expect(link).not.toHaveClass('ant-btn-primary');
+    expect(kopf.querySelectorAll('.ant-btn-primary').length).toBeLessThanOrEqual(1);
+  });
+});

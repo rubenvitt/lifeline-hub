@@ -1,19 +1,10 @@
+/* Druck des Befehls — nur die Eigenheiten dieser Seite.
+
+   Ausblenden des App-Rahmens, Druck im normalen Fluss, Papierfarben und Umbruchregeln
+   liegen seit LFH-71 für alle Druckstücke in `druck/druck.css`; die Wurzel
+   `.befehl-print-root` trägt dafür `data-lfh="druckwurzel"`. Hier stehen nur noch die
+   Bedienung (`befehl-no-print`, Seitenkopf) und der Entwurfsausdruck (M86). */
 @media print {
-  /* Alles ausblenden, außer dem markierten Druckbereich. */
-  body * {
-    visibility: hidden;
-  }
-  .befehl-print-root,
-  .befehl-print-root * {
-    visibility: visible;
-  }
-  .befehl-print-root {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    padding: 0;
-  }
   /* Interaktive Elemente nie drucken. */
   .befehl-no-print {
     display: none !important;
@@ -32,7 +23,8 @@
      Akkordeon-Regel: `BefehlDetailPage.tsx` verdrahtet `layout="split"` fest und reiht
      die Abschnitte als schlichte `Form.Item`-Liste ohne `Collapse`. Eine Regel, die
      nichts trifft, behauptete eine Deckung, die es nicht gibt — wer hier ein
-     Toggle-Layout einführt, holt die `:has`-Regel aus `lageberichtPrint.css` mit. Der
+     Toggle-Layout einführt, holt die Toggle-Regeln aus `lageberichtPrint.css` mit und setzt
+     `druckfassung` am Editor. Der
      Test dieser Datei pinnt beide Voraussetzungen. */
   .befehl-print-root .markdown-editor--split .markdown-editor__eingabe {
     display: none !important;
@@ -43,58 +35,6 @@
   .befehl-print-root .markdown-editor__label,
   .befehl-print-root .markdown-editor .ant-btn {
     display: none !important;
-  }
-
-  /* Markdown-Inhalte im Druckbereich */
-  .befehl-druck .markdown h1,
-  .befehl-druck .markdown h2,
-  .befehl-druck .markdown h3,
-  .befehl-druck .markdown h4,
-  .befehl-druck .markdown h5,
-  .befehl-druck .markdown h6 {
-    font-weight: 600;
-    margin: 0.75em 0 0.3em;
-    line-height: 1.3;
-    page-break-after: avoid;
-  }
-
-  .befehl-druck .markdown ul,
-  .befehl-druck .markdown ol {
-    padding-left: 1.5em;
-    margin: 0.4em 0;
-  }
-
-  /* Blöcke nicht über Seitenumbrüche zerreißen */
-  .befehl-druck .markdown ul,
-  .befehl-druck .markdown ol,
-  .befehl-druck .markdown p,
-  .befehl-druck .markdown blockquote {
-    page-break-inside: avoid;
-  }
-
-  /* Links im Druck nicht als grelle Farbe anzeigen */
-  .befehl-druck .markdown a {
-    color: inherit;
-    text-decoration: underline;
-  }
-
-  /* ---- Papier ist hell (Neuentwurf „Instrumententafel", 21.09.2026) ----
-
-     Seit dem Neuentwurf startet die App im Nachtbetrieb: Text `text` ist fast weiß, die
-     Flächen (`paneel`, `flaeche`) stehen INLINE fast schwarz. Browser drucken Hintergründe
-     per Vorgabe nicht — übrig bliebe weißer Text auf weißem Papier. Deshalb setzt der
-     Druckbereich Schrift und Grund unbedingt auf Papierfarben; `!important` ist Pflicht,
-     weil die Bausteine ihre Farben als Inline-Stil tragen und der sonst gewinnt. Benannte
-     Farben statt Hex: Druck ist kein Rollenwert, und Gate 5 hält `theme/` als einzige
-     Quelle für Rollenfarben. */
-  body {
-    background: white !important;
-  }
-  .befehl-print-root,
-  .befehl-print-root * {
-    color: black !important;
-    background: transparent !important;
-    box-shadow: none !important;
   }
 
   /* Der Seitenkopf (`EinsatzSeite`) ist Bedienung — Ortspfad, Datenstand, Aktionen. Er

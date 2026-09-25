@@ -36,6 +36,14 @@ interface Props {
   id?: string;
   onKeyDown?: (e: KeyboardEvent<HTMLTextAreaElement>) => void;
   /**
+   * Nur `toggle`: rendert bei geschlossener Vorschau zusätzlich eine gerenderte Fassung, die
+   * ausschließlich der Druck zeigt (`.markdown-editor__druck`, am Bildschirm `display: none`).
+   * Ohne sie trüge dort nur das Textfeld den Text — auf Papier eine `<textarea>` in
+   * Bildschirmhöhe mit Rohtext, langer Text abgeschnitten (LFH-71). Opt-in, weil jede Fassung
+   * einen Markdown-Render je Tastenanschlag kostet: die ETB-Schnellerfassung druckt nicht.
+   */
+  druckfassung?: boolean;
+  /**
    * Nur `toggle`: der Aufrufer führt den Vorschau-Umschalter selbst (LFH-373). Der eigene
    * Knopf unter dem Feld entfällt, die Vorschau folgt {@link vorschauOffen}. Gebraucht von der
    * ETB-Erfassung, wo die eigene Knopfzeile im Handschuh-Betrieb eine volle Steuerhöhe der
@@ -66,6 +74,7 @@ const MarkdownEditor = forwardRef<TextAreaRef, Props>(function MarkdownEditor(
     rows,
     id,
     onKeyDown,
+    druckfassung = false,
     umschalterAussen = false,
     vorschauOffen: vorschauOffenAussen = false,
   },
@@ -108,6 +117,21 @@ const MarkdownEditor = forwardRef<TextAreaRef, Props>(function MarkdownEditor(
           </div>
         )}
         {offen && <div className="markdown-editor__vorschau">{vorschau}</div>}
+        {/* Genau EINE gerenderte Fassung im Baum: ist die Vorschau offen, trägt sie den Text.
+            Leer wie im Lesezweig (`LageberichtText`): „—", kein „Noch nichts zu zeigen". */}
+        {druckfassung && !offen && (
+          // Nur Papier: `aria-hidden` sagt dem Zugänglichkeitsbaum dasselbe wie das
+          // `display: none` am Bildschirm, auch ohne geladenes CSS (Muster Druckkopf).
+          <div className="markdown-editor__druck" aria-hidden>
+            {value.trim() ? (
+              <Markdown variante={variante} unterEbene={unterEbene}>
+                {value}
+              </Markdown>
+            ) : (
+              <Typography.Paragraph>—</Typography.Paragraph>
+            )}
+          </div>
+        )}
       </div>
     );
   }

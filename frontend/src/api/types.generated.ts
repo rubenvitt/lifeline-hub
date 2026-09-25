@@ -2436,15 +2436,25 @@ export interface components {
             zeitformat?: null | components["schemas"]["Zeitformat"];
             zeitzone?: string | null;
         };
+        /** @description Metadaten des Logos ohne Bytes — hängen als `logo` an der `OrganisationAnzeige`. */
+        OrgLogoAnzeige: {
+            geaendert_at: string;
+            /** Format: int64 */
+            groesse: number;
+            mime: string;
+            /** @description Hex-sha256 der Bytes; zugleich der ETag des Abrufs und der Cache-Brecher `?v=`. */
+            sha256: string;
+        };
         /**
          * @description Org-weite Rolle (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `org_rolle`.
          * @enum {string}
          */
         OrgRolle: "fuehrungskraft" | "keine";
-        /** @description Org-Stammdaten inkl. DV-102-Org-Default (`tz_organisation`). */
+        /** @description Org-Stammdaten inkl. DV-102-Org-Default (`tz_organisation`) und Logo-Metadaten. */
         OrganisationAnzeige: {
             /** Format: int64 */
             id: number;
+            logo?: null | components["schemas"]["OrgLogoAnzeige"];
             name: string;
             tz_organisation?: string | null;
         };
