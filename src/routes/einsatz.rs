@@ -200,10 +200,13 @@ pub async fn aufbewahrungsfrist_setzen(
     let alt = einsatz.retention_bis.as_deref();
     // Unverändert → kein UPDATE, kein Audit-Eintrag (kein Rauschen im ETB).
     if alt == neue_frist.as_deref() {
-        return Ok(Json(einsatz.anzeige(
+        let anzeige = einsatz.anzeige(
             rolle.map(|r| r.as_str().to_string()),
             repo::fuehrungsstelle_von(&state.pool, id, benutzer.id).await?,
             crate::stab::repo::sachgebiete_von(&state.pool, id, benutzer.id).await?,
+        );
+        return Ok(Json(ohne_kopf_pii_wenn_gesperrt(
+            anzeige, &einsatz, &benutzer, rolle,
         )));
     }
     if ist_fristverkuerzung(alt, neue_frist.as_deref()) && !req.bestaetigt {
@@ -220,11 +223,48 @@ pub async fn aufbewahrungsfrist_setzen(
 
     let aktualisiert =
         repo::frist_setzen(&state.pool, id, benutzer.id, neue_frist.as_deref(), &audit).await?;
-    Ok(Json(aktualisiert.anzeige(
+    let anzeige = aktualisiert.anzeige(
         rolle.map(|r| r.as_str().to_string()),
         repo::fuehrungsstelle_von(&state.pool, id, benutzer.id).await?,
         crate::stab::repo::sachgebiete_von(&state.pool, id, benutzer.id).await?,
+    );
+    Ok(Json(ohne_kopf_pii_wenn_gesperrt(
+        anzeige,
+        &aktualisiert,
+        &benutzer,
+        rolle,
     )))
+}
+
+/// Der Frist-PUT hat bewusst kein Lesegate (eine abgelaufene Frist soll reaktiv verlängert
+/// werden können). Seine Antwort darf an einem für diese Person gesperrten Einsatz deshalb
+/// nicht mehr zeigen als die Archivakte (LFH-23): Einsatzort samt Koordinate, meldende Stelle
+/// und Sachverhalt fallen weg. Maßgeblich ist der Stand NACH der Änderung — wer die Frist in
+/// die Zukunft verlegt, liest den Einsatz danach wieder regulär.
+fn ohne_kopf_pii_wenn_gesperrt(
+    mut anzeige: EinsatzAnzeige,
+    einsatz: &crate::einsatz::Einsatz,
+    benutzer: &crate::auth::Benutzer,
+    rolle: Option<EinsatzRolle>,
+) -> EinsatzAnzeige {
+    let lesbar = crate::einsatz::berechtigung::darf_lesen(
+        benutzer,
+        einsatz.org_id,
+        einsatz.status.as_str(),
+        einsatz.abgeschlossen_at.as_deref(),
+        einsatz.retention_bis.as_deref(),
+        einsatz.geloescht_at.as_deref(),
+        rolle,
+        chrono::Utc::now(),
+    );
+    if !lesbar {
+        anzeige.einsatzort = None;
+        anzeige.einsatzort_lat = None;
+        anzeige.einsatzort_lon = None;
+        anzeige.meldende_stelle = None;
+        anzeige.sachverhalt = None;
+    }
+    anzeige
 }
 
 #[derive(Debug, Deserialize)]

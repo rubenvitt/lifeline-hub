@@ -452,11 +452,34 @@ pub async fn frist_setzen(
         .await?
         .etb_startwert();
     let mut tx = pool.begin().await?;
-    sqlx::query("UPDATE einsatz SET retention_bis = ? WHERE id = ?")
-        .bind(neue_frist)
-        .bind(einsatz_id)
-        .execute(&mut *tx)
-        .await?;
+    // Bewacht (LFH-23, design.md D6): die Route prüft die Tombstones vorher, aber zwischen
+    // Prüfung und Schreiben kann der Purge-Lauf vormerken. Ohne diesen Riegel stünde dann
+    // eine „geänderte" Frist samt ETB an einem vorgemerkten Einsatz, und die Schwärzung
+    // käme trotzdem (Phase B liest `retention_bis` nicht).
+    let res = sqlx::query(
+        "UPDATE einsatz SET retention_bis = ? \
+         WHERE id = ? AND geloescht_at IS NULL AND geschwaerzt_at IS NULL",
+    )
+    .bind(neue_frist)
+    .bind(einsatz_id)
+    .execute(&mut *tx)
+    .await?;
+    if res.rows_affected() == 0 {
+        let tombstones: Option<(Option<String>, Option<String>)> =
+            sqlx::query_as("SELECT geloescht_at, geschwaerzt_at FROM einsatz WHERE id = ?")
+                .bind(einsatz_id)
+                .fetch_optional(&mut *tx)
+                .await?;
+        return Err(match tombstones {
+            None => AppError::NotFound,
+            Some((_, Some(_))) => AppError::Conflict(
+                "Einsatz ist geschwärzt — die Aufbewahrungsfrist ist nicht mehr änderbar".into(),
+            ),
+            Some(_) => AppError::UnprocessableEntity(
+                "Einsatz ist zur Löschung vorgemerkt – erst wiederherstellen".into(),
+            ),
+        });
+    }
     crate::etb::repo::anlegen_tx(
         &mut tx,
         einsatz_id,
@@ -595,17 +618,22 @@ pub async fn soft_delete_einsatz(
         .await?
         .etb_startwert();
     let mut tx = pool.begin().await?;
+    // Die Fälligkeit wird im UPDATE selbst noch einmal geprüft (LFH-23): eine Frist, die
+    // zwischen Kandidatenliste und diesem Schreibvorgang verlängert wurde, gewinnt.
     let res = sqlx::query(
         "UPDATE einsatz SET geloescht_at = ? \
-         WHERE id = ? AND status = ? AND geloescht_at IS NULL",
+         WHERE id = ? AND status = ? AND geloescht_at IS NULL \
+           AND retention_bis IS NOT NULL AND ? >= retention_bis",
     )
     .bind(jetzt)
     .bind(einsatz_id)
     .bind(STATUS_ABGESCHLOSSEN)
+    .bind(jetzt)
     .execute(&mut *tx)
     .await?;
     if res.rows_affected() == 0 {
-        // Nichts zu tun (schon soft-gelöscht oder nicht abgeschlossen) — kein Audit.
+        // Nichts zu tun (schon soft-gelöscht, nicht abgeschlossen oder nicht mehr fällig)
+        // — kein Audit.
         return Ok(false);
     }
     system_audit_tx(
@@ -646,72 +674,78 @@ pub async fn wiederherstellen(
     let etb_startwert = super::einstellungen::laden_oder_default(pool, einsatz_id)
         .await?
         .etb_startwert();
-    let mut tx = pool.begin().await?;
-    let vorher: Option<(String, Option<String>, Option<String>)> =
-        sqlx::query_as("SELECT status, geloescht_at, geschwaerzt_at FROM einsatz WHERE id = ?")
-            .bind(einsatz_id)
-            .fetch_optional(&mut *tx)
-            .await?;
-    let Some((status, geloescht_at, geschwaerzt_at)) = vorher else {
-        return Err(AppError::NotFound);
-    };
-    let res = sqlx::query(
-        "UPDATE einsatz SET geloescht_at = NULL, retention_bis = ? \
-         WHERE id = ? AND status = ? AND geloescht_at IS NOT NULL \
-           AND geschwaerzt_at IS NULL AND geloescht_at > ?",
-    )
-    .bind(neue_frist)
-    .bind(einsatz_id)
-    .bind(STATUS_ABGESCHLOSSEN)
-    .bind(super::retention::karenz_grenze(jetzt))
-    .execute(&mut *tx)
-    .await?;
-    if res.rows_affected() == 0 {
-        return Err(if status != STATUS_ABGESCHLOSSEN {
-            AppError::Conflict("Einsatz ist nicht abgeschlossen".into())
-        } else if geschwaerzt_at.is_some() {
-            AppError::Conflict(
-                "Einsatz ist bereits geschwärzt — eine Wiederherstellung ist nicht mehr möglich"
-                    .into(),
-            )
-        } else if geloescht_at.is_none() {
-            AppError::UnprocessableEntity(
-                "Einsatz ist nicht zur Löschung vorgemerkt — die Frist ändert man über die \
-                 Aufbewahrungsfrist"
-                    .into(),
-            )
-        } else {
-            AppError::Conflict(
-                "Die Karenz ist abgelaufen — eine Wiederherstellung ist nicht mehr möglich".into(),
-            )
-        });
-    }
-    let audit = format!(
-        "Löschvormerkung vom {} aufgehoben (Wiederherstellung während der Karenz). \
-         Aufbewahrungsfrist neu: {}",
-        geloescht_at.as_deref().unwrap_or("?"),
-        neue_frist.unwrap_or("unbegrenzt"),
-    );
-    crate::etb::repo::anlegen_tx(
-        &mut tx,
-        einsatz_id,
-        admin_id,
-        etb_startwert,
-        crate::etb::repo::EintragDaten {
-            typ: crate::etb::TYP_SYSTEM,
-            inhalt: &audit,
-            von: None,
-            an: None,
-            meldeweg: None,
-            veranlassung: None,
-            ereigniszeit: None,
-            erfasst_lokal_at: None,
-            berichtigt_eintrag_id: None,
-        },
-    )
-    .await?;
-    tx.commit().await?;
-    Ok(())
+    // `write_retry!` (BEGIN IMMEDIATE, F09/LFH-240): der Körper liest vor dem Schreiben; in
+    // einer verzögerten Transaktion bräche der Lock-Aufstieg bei jedem parallelen Schreiber
+    // (etwa dem Purge-Lauf) sofort mit SQLITE_BUSY ab. Der Körper ist reine DB-Arbeit und
+    // darf wiederholt werden.
+    let karenz_grenze = super::retention::karenz_grenze(jetzt);
+    crate::write_retry!(pool, |conn| {
+        let vorher: Option<(String, Option<String>, Option<String>)> =
+            sqlx::query_as("SELECT status, geloescht_at, geschwaerzt_at FROM einsatz WHERE id = ?")
+                .bind(einsatz_id)
+                .fetch_optional(&mut *conn)
+                .await?;
+        let Some((status, geloescht_at, geschwaerzt_at)) = vorher else {
+            return Err(AppError::NotFound);
+        };
+        let res = sqlx::query(
+            "UPDATE einsatz SET geloescht_at = NULL, retention_bis = ? \
+             WHERE id = ? AND status = ? AND geloescht_at IS NOT NULL \
+               AND geschwaerzt_at IS NULL AND geloescht_at > ?",
+        )
+        .bind(neue_frist)
+        .bind(einsatz_id)
+        .bind(STATUS_ABGESCHLOSSEN)
+        .bind(&karenz_grenze)
+        .execute(&mut *conn)
+        .await?;
+        if res.rows_affected() == 0 {
+            return Err(if status != STATUS_ABGESCHLOSSEN {
+                AppError::Conflict("Einsatz ist nicht abgeschlossen".into())
+            } else if geschwaerzt_at.is_some() {
+                AppError::Conflict(
+                    "Einsatz ist bereits geschwärzt — eine Wiederherstellung ist nicht mehr möglich"
+                        .into(),
+                )
+            } else if geloescht_at.is_none() {
+                AppError::UnprocessableEntity(
+                    "Einsatz ist nicht zur Löschung vorgemerkt — die Frist ändert man über die \
+                     Aufbewahrungsfrist"
+                        .into(),
+                )
+            } else {
+                AppError::Conflict(
+                    "Die Karenz ist abgelaufen — eine Wiederherstellung ist nicht mehr möglich"
+                        .into(),
+                )
+            });
+        }
+        let audit = format!(
+            "Löschvormerkung vom {} aufgehoben (Wiederherstellung während der Karenz). \
+             Aufbewahrungsfrist neu: {}",
+            geloescht_at.as_deref().unwrap_or("?"),
+            neue_frist.unwrap_or("unbegrenzt"),
+        );
+        crate::etb::repo::anlegen_tx(
+            &mut *conn,
+            einsatz_id,
+            admin_id,
+            etb_startwert,
+            crate::etb::repo::EintragDaten {
+                typ: crate::etb::TYP_SYSTEM,
+                inhalt: &audit,
+                von: None,
+                an: None,
+                meldeweg: None,
+                veranlassung: None,
+                ereigniszeit: None,
+                erfasst_lokal_at: None,
+                berichtigt_eintrag_id: None,
+            },
+        )
+        .await?;
+        Ok(())
+    })
 }
 
 /// Platzhalter für gescrubbte PII-Felder, die wegen NOT-NULL- bzw. CHECK-Constraints
@@ -2957,5 +2991,63 @@ mod tests {
             wiederherstellen(&pool, 999_999, admin, None, jetzt).await,
             Err(AppError::NotFound)
         ));
+    }
+
+    // ---------- LFH-23 Review: bewachte Schreibwege gegen den Purge-Lauf ----------
+
+    #[tokio::test]
+    async fn frist_setzen_schreibt_nicht_an_vorgemerkte_oder_geschwaerzte_einsaetze() {
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let vorgemerkt = archiv_einsatz(&pool, leit, Some("2026-06-25 12:00:00"), None).await;
+        let vorher = stand(&pool, vorgemerkt).await;
+        assert!(matches!(
+            frist_setzen(&pool, vorgemerkt, leit, Some("2099-01-01 00:00:00"), "x").await,
+            Err(AppError::UnprocessableEntity(_))
+        ));
+        assert_eq!(
+            stand(&pool, vorgemerkt).await,
+            vorher,
+            "kein Schreibvorgang, kein ETB"
+        );
+
+        let schwarz = archiv_einsatz(
+            &pool,
+            leit,
+            Some("2026-06-25 12:00:00"),
+            Some("2026-07-26 12:00:00"),
+        )
+        .await;
+        let vorher = stand(&pool, schwarz).await;
+        assert!(matches!(
+            frist_setzen(&pool, schwarz, leit, None, "x").await,
+            Err(AppError::Conflict(_))
+        ));
+        assert_eq!(stand(&pool, schwarz).await, vorher);
+    }
+
+    /// Eine zwischen Kandidatenliste und UPDATE verlängerte Frist gewinnt: der Soft-Delete
+    /// prüft `retention_bis` im UPDATE selbst noch einmal.
+    #[tokio::test]
+    async fn soft_delete_prueft_die_frist_im_update_noch_einmal() {
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let e = archiv_einsatz(&pool, leit, None, None).await;
+        assert_eq!(
+            faellige_soft_delete(&pool, "2026-06-01 00:00:00")
+                .await
+                .unwrap(),
+            vec![e]
+        );
+        sqlx::query("UPDATE einsatz SET retention_bis = '2099-01-01 00:00:00' WHERE id = ?")
+            .bind(e)
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert!(!soft_delete_einsatz(&pool, e, "2026-06-01 00:00:00")
+            .await
+            .unwrap());
+        let (_, g, _, etb) = stand(&pool, e).await;
+        assert_eq!((g, etb), (None, 0));
     }
 }

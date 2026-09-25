@@ -1,7 +1,7 @@
 import { App, Button, DatePicker, Flex, Form, Modal, Typography, theme } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { Dayjs } from 'dayjs';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { setzeAufbewahrungsfrist } from '../api/aufbewahrung';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { EinsatzAnzeige, FristSetzenBody } from '../api/types';
@@ -93,7 +93,21 @@ export function useFristAenderung(
     setBasis(alt);
     setOffen(true);
   };
-  const schliessen = () => setOffen(false);
+  const schliessen = () => {
+    // Ein Fehler, den der Dialog schon gezeigt hat, soll nach dem Schließen nicht noch
+    // einmal am Paneel auftauchen.
+    mutation.reset();
+    setOffen(false);
+  };
+
+  // Vorbelegen zum Bearbeiten per `setFieldsValue` beim Öffnen (Erfassungs-Norm), nicht über
+  // `initialValues`: die Formularinstanz lebt im Hook, und rc-field-form behält ihren
+  // Speicher über das Abhängen des Dialogs hinweg — beim nächsten Öffnen gewönne sonst der
+  // Wert der VORIGEN Öffnung, und ein Absenden nähme eine inzwischen bestätigte Verkürzung
+  // still zurück (Review-Befund, `FristPaneel.test.tsx`).
+  useEffect(() => {
+    if (offen) form.setFieldsValue({ frist: alsOrtszeit(basis ?? undefined) ?? null });
+  }, [offen, basis, form]);
 
   /** Fragt bei einer Verkürzung zurück; die Zusage lehnt ab, wenn abgebrochen wird — die
    *  Erfassungshülle lässt die Felder dann stehen und sendet nichts. */

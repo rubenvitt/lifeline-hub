@@ -2288,3 +2288,41 @@ async fn aufbewahrungsfrist_geschwaerzt_ist_409() {
     }
     assert_eq!(frist_stand(&pool, id).await, vorher);
 }
+
+#[tokio::test]
+async fn aufbewahrungsfrist_antwort_traegt_an_gesperrtem_einsatz_keinen_kopf_pii() {
+    // LFH-23 (Review): der Frist-PUT hat bewusst kein Lesegate, damit eine abgelaufene Frist
+    // reaktiv verlängert werden kann. Seine Antwort darf an einem gesperrten Einsatz aber nicht
+    // Einsatzort, Koordinate, meldende Stelle und Sachverhalt ausliefern — auch nicht über den
+    // frühen Rücksprung bei unveränderter Frist.
+    let (app, pool) = setup_with_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let id = abgeschlossen_mit(&app, &pool, &admin, "2026-01-01 00:00:00").await;
+    sqlx::query(
+        "UPDATE einsatz SET einsatzort = 'Marktplatz-GEHEIM', einsatzort_lat = 50.1, \
+            einsatzort_lon = 8.6, meldende_stelle = 'Anrufer-GEHEIM', sachverhalt = 'SV-GEHEIM' \
+         WHERE id = ?",
+    )
+    .bind(id)
+    .execute(&pool)
+    .await
+    .unwrap();
+    for body in [
+        json!({ "retention_bis": "2026-01-01 00:00:00" }),
+        json!({ "retention_bis": "2025-06-01 00:00:00", "bestaetigt": true }),
+    ] {
+        let (status, v) = frist_setzen(&app, &admin, id, body.clone()).await;
+        assert_eq!(status, StatusCode::OK, "{body}: {v}");
+        assert!(!v.to_string().contains("GEHEIM"), "{body}: {v}");
+    }
+    // Wird der Einsatz durch die neue Frist wieder lesbar, trägt die Antwort den vollen Kopf.
+    let (status, v) = frist_setzen(
+        &app,
+        &admin,
+        id,
+        json!({ "retention_bis": "2099-01-01 00:00:00" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(v["einsatzort"], "Marktplatz-GEHEIM");
+}

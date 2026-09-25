@@ -6,7 +6,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
-import { alsBackendZeit } from '../etb/filterZeit';
+import { alsBackendZeit, alsOrtszeit } from '../etb/filterZeit';
 import FristPaneel from './FristPaneel';
 
 dayjs.extend(customParseFormat);
@@ -176,5 +176,28 @@ describe('FristPaneel', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Frist ändern' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Frist aufheben' })).toBeDisabled();
+  });
+
+  it('befüllt den Dialog bei jedem Öffnen mit der AKTUELLEN Frist', async () => {
+    // Review-Befund: die Formularinstanz lebt im Hook, `initialValues` einer früheren Öffnung
+    // überlebte im Speicher von rc-field-form. Nach einer bestätigten Verkürzung stand beim
+    // nächsten Öffnen der alte Wert da — ein Absenden hätte die Verkürzung still zurückgenommen.
+    server.use(http.get('/api/auth/me', () => HttpResponse.json(ME_ADMIN)));
+    const einsatz = (retention_bis: string) =>
+      ({ status: 'abgeschlossen', meine_rolle: null, retention_bis }) as never;
+    const { rerender } = renderMitProviders(
+      <FristPaneel einsatzId={1} einsatz={einsatz('2030-10-01 10:00:00')} />,
+    );
+    let dialog = await dialogOeffnen();
+    const erster = (within(dialog).getByRole('textbox') as HTMLInputElement).value;
+    expect(erster).not.toBe('');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    rerender(<FristPaneel einsatzId={1} einsatz={einsatz('2029-01-01 10:00:00')} />);
+    dialog = await dialogOeffnen();
+    await waitFor(() =>
+      expect(within(dialog).getByRole('textbox')).toHaveValue(
+        alsOrtszeit('2029-01-01 10:00:00')!.format('YYYY-MM-DD HH:mm'),
+      ),
+    );
   });
 });
