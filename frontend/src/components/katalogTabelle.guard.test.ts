@@ -664,3 +664,50 @@ describe('Freistellungen tragen ihre Begründung (LFH-368 · B5h)', () => {
     expect(quelle).toMatch(/^\s*sticky\s*$/m);
   });
 });
+
+// ── Teil 4: der Zähler kann nicht lügen (LFH-374) ─────────────────────────────────
+
+/**
+ * antds eigene Ausblendwege. Beide verbärgen eine Spalte, die der Spaltenzähler nicht kennt:
+ * `responsive` nach Breite, `hidden` unbedingt. `KatalogSpalte` sperrt sie am Typ — aber nur
+ * an Objektliteralen; eine als `TableColumnsType<T>` annotierte Liste bleibt zuweisbar. Dieser
+ * Guard schließt die Lücke je Konsumentendatei.
+ *
+ * Doppelpunkt-Form wie die Ordnungsmuster: `overflow: 'hidden'` trifft nicht (dort steht das
+ * Wort als Wert, nicht als Schlüssel).
+ */
+const AUSBLEND_MUSTER = /\b(?:responsive|hidden)\s*:/g;
+
+/** Konsumenten mit antd-Ausblendung — rein und exportiert für den Selbstbeweis. */
+export function ausblendBefunde(quellen: { pfad: string; text: string }[]): string[] {
+  return quellen.filter((q) => treffer(q.text, AUSBLEND_MUSTER) > 0).map((q) => q.pfad);
+}
+
+describe('KatalogTabelle · Spaltenzähler (LFH-374)', () => {
+  it('kein Konsument blendet über antds responsive/hidden aus', () => {
+    expect(
+      ausblendBefunde(QUELLEN),
+      'Eine Spalte, die antd verbirgt, fehlt im Spaltenzähler — genau der Fehler, gegen den ' +
+        'Kriterium 14 steht. Breitenabhängig: `abBreite` plus `spaltenSchalter`.',
+    ).toEqual([]);
+  });
+
+  it('Selbstbeweis: responsive/hidden als Schlüssel zählen, als Wert oder im Kommentar nicht', () => {
+    const probe = (text: string) => ausblendBefunde([{ pfad: 'x', text: ohneKommentare(text) }]);
+    expect(probe("const s = [{ key: 'a', responsive: ['md'] }];")).toEqual(['x']);
+    expect(probe("const s = [{ key: 'a', hidden: true }];")).toEqual(['x']);
+    expect(probe("const stil = { overflow: 'hidden' };")).toEqual([]);
+    expect(probe('// responsive: im Kommentar\n/* hidden: auch */')).toEqual([]);
+  });
+
+  it('Datensicht setzt spaltenSchalter nie — es rendert seinen eigenen Schalter', () => {
+    /**
+     * Zwei Schalter mit zwei Zuständen wären der Fehlerfall (D5). Das Gegenstück zur Laufzeit
+     * steht in `Datensicht.test.tsx` („genau EIN Spaltenschalter").
+     */
+    const datensicht = ohneKommentare(
+      readFileSync(join(SRC, 'components', 'Datensicht.tsx'), 'utf8'),
+    );
+    expect(treffer(datensicht, /\bspaltenSchalter=/g)).toBe(0);
+  });
+});

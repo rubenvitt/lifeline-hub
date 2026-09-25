@@ -1075,6 +1075,17 @@ describe('Datensicht · Tabellenzweig', () => {
     expect(screen.getByRole('button', { name: /Spalten · 1 ausgeblendet/ })).toBeInTheDocument();
   });
 
+  it('zeigt genau EINEN Spaltenschalter, obwohl das Primitiv darunter selbst einen kann', () => {
+    /**
+     * `KatalogTabelle` trägt seit LFH-374 einen eigenen Schalter als Opt-in. `Datensicht`
+     * rendert durch sie und bringt seinen Schalter selbst mit — setzte es zusätzlich
+     * `spaltenSchalter`, stünden zwei Knöpfe mit zwei Zuständen da (D5). Der Guard in
+     * `katalogTabelle.guard.test.ts` hält das Attribut aus der Quelle, dieser Fall das Bild.
+     */
+    rendere({ form: 'tabelle' });
+    expect(screen.getAllByRole('button', { name: /^Spalten/ })).toHaveLength(1);
+  });
+
   it('eine per Breite weggefallene Spalte steht OHNE Häkchen im Menü und lässt sich zurückholen', async () => {
     /**
      * LFH-374 · D9, gemessen am Bestand: das Häkchen las `!aus.includes(key)` statt der

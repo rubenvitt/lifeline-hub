@@ -14,8 +14,8 @@
 
 ## 3. Guards
 
-- [ ] 3.1 In `katalogTabelle.guard.test.ts`: kein `responsive:`/`hidden:` in den 18 Konsumentendateien (ohne Kommentare), mit Selbstbeweis an einem gebauten Fall. Außerdem trägt `Datensicht.tsx` kein `spaltenSchalter` (D5). Per Mutationsprobe belegen: ein eingesetztes `responsive: ['md']` in einer Konsumentendatei färbt den Guard rot.
-- [ ] 3.2 Ein Test prüft, dass eine `Datensicht` mit `form="tabelle"` genau einen Spaltenschalter zeigt. Belegen mit einem grünen Test und einer Mutationsprobe, bei der `spaltenSchalter` in `Datensicht` gesetzt wird und der Test rot wird.
+- [x] 3.1 In `katalogTabelle.guard.test.ts`: kein `responsive:`/`hidden:` in den 18 Konsumentendateien (ohne Kommentare), mit Selbstbeweis an einem gebauten Fall. Außerdem trägt `Datensicht.tsx` kein `spaltenSchalter` (D5). Per Mutationsprobe belegen: ein eingesetztes `responsive: ['md']` in einer Konsumentendatei färbt den Guard rot.
+- [x] 3.2 Ein Test prüft, dass eine `Datensicht` mit `form="tabelle"` genau einen Spaltenschalter zeigt. Belegen mit einem grünen Test und einer Mutationsprobe, bei der `spaltenSchalter` in `Datensicht` gesetzt wird und der Test rot wird.
 
 ## 4. Kartenverwaltungen
 
