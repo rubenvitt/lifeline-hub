@@ -367,7 +367,9 @@ export interface components {
             stellen: components["schemas"]["BelegungKopfzahlStelle"][];
             /**
              * Format: int64
-             * @description Zahl der Stellen, die bis zum Stichtag keine Meldung haben.
+             * @description Zahl der Stellen, die bis zum Stichtag keine Meldung haben. Mitgezählt wird nur, wer zum
+             *     Stichtag betrieben sein konnte: nicht nach ihm angelegt und nicht jetzt geschlossen oder
+             *     vorbereitet ohne jede Meldung (LFH-679). Solche Stellen fehlen auch in `stellen`.
              */
             stellen_ohne_meldung: number;
             /**
@@ -392,6 +394,26 @@ export interface components {
             stelle_id: number;
             /** @description Zeitpunkt der maßgeblichen Meldung. */
             zeitpunkt_at?: string | null;
+        };
+        /**
+         * @description Eine Belegungsmeldung im Verlauf einer Stelle (LFH-676), gebaut wie
+         *     [`StandVerlaufEintrag`].
+         */
+        BelegungVerlaufEintrag: {
+            /** @description Diese Meldung ist die aktuelle Belegung der Stelle. */
+            aktuell: boolean;
+            /** Format: int64 */
+            belegt: number;
+            /** @description Wann die Meldung erfasst wurde, UTC ohne Zonenkennung. */
+            erfasst_at: string;
+            /** @description Anzeigename der erfassenden Person. */
+            erfasst_von: string;
+            /** Format: int64 */
+            id: number;
+            /** @description Zeitpunkt der Meldung, UTC ohne Zonenkennung (`YYYY-MM-DD HH:MM:SS`). */
+            zeitpunkt_at: string;
+            zurueckgenommen_at?: string | null;
+            zurueckgenommen_von?: string | null;
         };
         /**
          * @description Art eines Belegungs-Events. String = CHECK in
@@ -453,6 +475,14 @@ export interface components {
          */
         BetreuungUebersicht: {
             bezirke: components["schemas"]["EvakuierungsbezirkAnzeige"][];
+            /**
+             * @description „davon namentlich“ (LFH-674): je Stelle die Zahl der Personen, deren jüngster Verbleib
+             *     `notunterkunft` an dieser Stelle ist — nur Stellen mit mindestens einer Person. Fehlt
+             *     ganz, wenn der Lesende das Modul Personen nicht sehen darf (nicht „0“). Gefüllt NUR in
+             *     der Route: `repo::uebersicht` speist auch den gesicherten Lagestand. Die Zahl geht in
+             *     keine Belegung, Kopfzahl oder Summe ein — führend ist die Mengenmeldung.
+             */
+            namentlich?: components["schemas"]["StelleNamentlich"][] | null;
             stellen: components["schemas"]["BetreuungsstelleAnzeige"][];
         };
         /** @description Öffentliche Darstellung einer Betreuungsstelle mit ihrer aktuellen Belegung. */
@@ -2499,6 +2529,11 @@ export interface components {
             /** Format: int64 */
             aktuelle_uhs_id?: number | null;
             aktuelle_verbleib_art?: null | components["schemas"]["VerbleibArt"];
+            /**
+             * Format: int64
+             * @description Betreuungsstelle des jüngsten Verbleibs (LFH-674), nur bei `notunterkunft` gesetzt.
+             */
+            aktuelle_verbleib_betreuungsstelle_id?: number | null;
             /** Format: int64 */
             aktueller_platz_id?: number | null;
             aktueller_verbleib?: string | null;
@@ -2865,6 +2900,32 @@ export interface components {
          * @enum {string}
          */
         StaerkePosition: "fuehrer" | "unterfuehrer" | "mannschaft";
+        /**
+         * @description Eine Standmeldung im Verlauf eines Bezirks (LFH-676), zurückgenommene eingeschlossen.
+         *     `aktuell` kommt aus dem Zeiger des Bezirks — keine zweite Definition von „aktuell“.
+         */
+        StandVerlaufEintrag: {
+            /** @description Diese Meldung ist der aktuelle Stand des Bezirks. */
+            aktuell: boolean;
+            /**
+             * @description Wann die Meldung erfasst wurde, UTC ohne Zonenkennung. Liegt sie ≥ 60 s nach
+             *     `zeitpunkt_at`, zeigt die App sie als nachgetragen (dieselbe Schwelle wie im ETB).
+             */
+            erfasst_at: string;
+            /** @description Anzeigename der erfassenden Person. */
+            erfasst_von: string;
+            erhebung: components["schemas"]["Erhebung"];
+            /** Format: int64 */
+            evakuiert: number;
+            /** Format: int64 */
+            id: number;
+            /** @description Zeitpunkt der Meldung, UTC ohne Zonenkennung (`YYYY-MM-DD HH:MM:SS`). */
+            zeitpunkt_at: string;
+            /** @description Fehlt, solange die Meldung nicht zurückgenommen ist. */
+            zurueckgenommen_at?: string | null;
+            /** @description Anzeigename der zurücknehmenden Person; fehlt wie `zurueckgenommen_at`. */
+            zurueckgenommen_von?: string | null;
+        };
         /** @description Anteil eines Status an einer gemischten Einheit; `status: None` = Fahrzeuge ohne Status. */
         StatusAnteil: {
             /** Format: int32 */
@@ -2903,6 +2964,13 @@ export interface components {
             /** Format: int64 */
             meldung_id: number;
             stelle: components["schemas"]["BetreuungsstelleAnzeige"];
+        };
+        /** @description Namentlich zugeordnete Personen an einer Stelle (LFH-674), Teil von [`BetreuungUebersicht`]. */
+        StelleNamentlich: {
+            /** Format: int64 */
+            anzahl: number;
+            /** Format: int64 */
+            stelle_id: number;
         };
         /** @description Org-weiter Einsatzstichwort-Vorschlag für die Combobox. */
         StichwortVorschlag: {
@@ -3035,6 +3103,12 @@ export interface components {
         /** @description Ein Verbleib-Ereignis (1:1 zu `person_verbleib`). */
         VerbleibAnzeige: {
             art: components["schemas"]["VerbleibArt"];
+            /**
+             * Format: int64
+             * @description Betreuungsstelle eines Notunterkunft-Verbleibs (LFH-674). Nur die Kennung: den Namen
+             *     liest, wer das Modul Betreuung sehen darf, aus dessen Übersicht.
+             */
+            betreuungsstelle_id?: number | null;
             /** Format: int64 */
             einsatz_id: number;
             /** Format: int64 */

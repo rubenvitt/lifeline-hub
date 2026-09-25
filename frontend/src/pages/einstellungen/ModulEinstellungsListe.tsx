@@ -1,4 +1,4 @@
-import { Input, Switch, Typography, theme } from 'antd';
+import { Input, Switch, Tooltip, Typography, theme } from 'antd';
 import { useId, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import SektionHeader from '../../components/SektionHeader';
@@ -38,6 +38,51 @@ export function modulZeilenStil(token: {
   };
 }
 
+/** Warum eine Zeile gesperrt ist — je Zeile genau EINER, auch wenn mehrere Quellen greifen. */
+export type ModulSperrGrund = 'modul' | 'rechte' | 'laeuft';
+
+/**
+ * Die drei Sperrquellen einer Zeile, getrennt statt in einem `disabled`-Ausdruck vermischt
+ * (LFH-383). REIN und exportiert, damit der Vorrang ohne Render prüfbar ist.
+ *
+ * Vorrang: **Modul vor Recht vor Schreibvorgang.** Die Modul-Eigenschaft gilt auch für
+ * Verwaltende und ist deshalb die genauere Aussage — an „Einsatzdaten" ohne Recht steht genau
+ * EIN Grund, nicht zwei nebeneinander. Der Schreibvorgang ist vorübergehend und kommt zuletzt.
+ */
+export function modulSperrGrund(zeile: {
+  ausblendbar: boolean;
+  darfVerwalten: boolean;
+  laeuft: boolean;
+}): ModulSperrGrund | null {
+  if (!zeile.ausblendbar) return 'modul';
+  if (!zeile.darfVerwalten) return 'rechte';
+  if (zeile.laeuft) return 'laeuft';
+  return null;
+}
+
+/** Wortlaut eines Sperrgrunds: Kurzwort sichtbar, Begründung im Tooltip darüber. */
+export interface SperrWortlaut {
+  kurz: string;
+  lang: string;
+}
+
+const MODUL_GRUND: SperrWortlaut = {
+  // Der Kurztext ist Bestand (LFH-346 · A9) und in den Tests wörtlich gepinnt.
+  kurz: 'immer sichtbar, nicht ausblendbar',
+  lang: 'Selbst-Aussperr-Schutz: Einsatzdaten und Einstellungen lassen sich weder ausblenden noch auf eine Rolle beschränken — sonst käme niemand mehr an diese Einstellungen zurück.',
+};
+
+/**
+ * Rückfall, wenn der Aufrufer keinen Wortlaut für das fehlende Recht mitgibt. Bewusst ein
+ * Wort, das in JEDEM Fall stimmt: auf Einsatz-Ebene sperrt nicht nur die Rolle, sondern auch
+ * ein abgeschlossener Einsatz — ein fest verdrahtetes „nur Verwaltung" widerspräche dort dem
+ * Seitenbanner „Einsatz abgeschlossen".
+ */
+const RECHTE_GRUND_RUECKFALL: SperrWortlaut = {
+  kurz: 'nur lesen',
+  lang: 'Diese Werte lassen sich hier nicht ändern — sie stehen zum Nachlesen da.',
+};
+
 interface SichtbarSpalte {
   /** Spaltenüberschrift, z. B. „Sichtbar". */
   titel: string;
@@ -55,6 +100,12 @@ interface ModulEinstellungsListeProps {
   sichtbarSpalte?: SichtbarSpalte;
   /** Darf der Benutzer hier überhaupt etwas ändern? */
   darfVerwalten: boolean;
+  /**
+   * Warum `darfVerwalten` fehlt — vom Aufrufer, weil nur er die Ursache kennt (Rolle oder
+   * abgeschlossener Einsatz). Der Langtext ist derselbe wie der `rechteText` seines
+   * `RechteHinweis`. Fehlt er, steht „nur lesen".
+   */
+  rechteGrund?: SperrWortlaut;
   /** Modul-Key der gerade mutierenden Zeile; nur DIESE ist gesperrt. */
   laeuftKey?: string | null;
   /** Modul-Key der zuletzt fehlgeschlagenen Zeile; nur DIESE wird markiert. */
@@ -117,6 +168,23 @@ interface ModulEinstellungsListeProps {
  * **„immer sichtbar, nicht ausblendbar" an den zwei gesperrten Zeilen.** Sie standen grau da,
  * ohne Grund — und Grau allein ist eine Ein-Kanal-Aussage (WCAG 1.4.1), dieselbe Sorte
  * Befund, die LFH-345/M16 auf Blockebene gelöst hat.
+ *
+ * ── Was LFH-383 geändert hat (Zwilling von `Anmeldeverfahren`, LFH-370 · B5j) ─────
+ * **Jede der drei Sperrquellen ist je Zeile unterschieden** (`modulSperrGrund`). Die
+ * Modul-Eigenschaft und das fehlende Recht tragen ein gedämpftes Kurzwort, die lange
+ * Begründung steht im Tooltip DARÜBER — nicht allein im Tooltip: auf dem Führungs-Tablet gibt
+ * es kein Hover. Der Wortlaut fürs Recht kommt vom Aufrufer (`rechteGrund`).
+ *
+ * **Das Kurzwort steht auch dann an jeder Zeile, wenn der `RechteHinweis` darüber dasselbe
+ * sagt.** Das reibt sich mit LFH-346/M45 (dort entfällt die Zeilenaktion, weil ein Satz auf
+ * der Seite den Grund nennt) — hier aber bleibt das Steuerelement grau STEHEN, und ein grauer
+ * Schalter ohne Wort ist genau der Befund; `Anmeldeverfahren` hält es ebenso.
+ *
+ * **Der Schreibvorgang bekommt keinen Text, sondern den Ladezustand am Steuerelement.** Ein
+ * Grund, der nach 200 ms wieder geht, ist Rauschen (Begründung wie in `Anmeldeverfahren`);
+ * unterschieden ist er trotzdem, und zwar dort, wo geschrieben wird. `loading` benennt den
+ * Schalter nicht um — anders als an einem `Button` trägt er ein eigenes `aria-label`, das die
+ * Lade-Ikone schlägt (gepinnt über die Namensabfrage im Test).
  */
 export default function ModulEinstellungsListe({
   rollenSpalte,
@@ -124,6 +192,7 @@ export default function ModulEinstellungsListe({
   aufRolle,
   sichtbarSpalte,
   darfVerwalten,
+  rechteGrund = RECHTE_GRUND_RUECKFALL,
   laeuftKey,
   fehlerKey,
   hinweisVon,
@@ -159,7 +228,13 @@ export default function ModulEinstellungsListe({
 
   function zeile(m: ModulEintrag) {
     const ausblendbar = istModulAusblendbar(m.key);
-    const gesperrt = !darfVerwalten || !ausblendbar || laeuftKey === m.key;
+    const laeuft = laeuftKey === m.key;
+    const sperrGrund = modulSperrGrund({ ausblendbar, darfVerwalten, laeuft });
+    const gesperrt = sperrGrund !== null;
+    // Nur die zwei dauerhaften Gründe tragen einen Text; der Schreibvorgang zeigt sich am
+    // Steuerelement (`loading`).
+    const wortlaut =
+      sperrGrund === 'modul' ? MODUL_GRUND : sperrGrund === 'rechte' ? rechteGrund : null;
     const hinweis = hinweisVon?.(m.key);
     const hatFehler = fehlerKey === m.key;
     const feldId = `modul-sichtbar-${m.key}`;
@@ -181,10 +256,14 @@ export default function ModulEinstellungsListe({
     const beschriftung = (
       <>
         <span>{m.label}</span>
-        {!ausblendbar && (
-          <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
-            immer sichtbar, nicht ausblendbar
-          </Typography.Text>
+        {wortlaut && (
+          // Kurzwort sichtbar, lange Begründung im Tooltip darüber — und der Tooltip hängt an
+          // einem NICHT gesperrten Element, braucht also keinen Wrapper.
+          <Tooltip title={wortlaut.lang}>
+            <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
+              {wortlaut.kurz}
+            </Typography.Text>
+          </Tooltip>
         )}
       </>
     );
@@ -212,6 +291,7 @@ export default function ModulEinstellungsListe({
               aria-label={`Sichtbar: ${m.label}`}
               checked={ausblendbar ? sichtbarSpalte.sichtbarVon(m.key) : true}
               disabled={gesperrt}
+              loading={laeuft}
               onChange={(checked) => sichtbarSpalte.aufSichtbar(m.key, checked)}
             />
           </div>
@@ -222,6 +302,7 @@ export default function ModulEinstellungsListe({
             style={{ width: '100%' }}
             value={rolleVon(m.key)}
             disabled={gesperrt}
+            loading={laeuft}
             options={ROLLEN_OPTIONEN}
             onChange={(val) => aufRolle(m.key, val)}
           />

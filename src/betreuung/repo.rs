@@ -81,6 +81,8 @@ pub struct StandEingabe {
     pub evakuiert: i64,
     pub erhebung: Erhebung,
     pub zeitpunkt_at: String,
+    /// Idempotenzschlüssel der Offline-Queue (LFH-675), getrimmt, nie leer.
+    pub client_id: Option<String>,
 }
 
 /// Eingabe „Belegung melden“ (Zeitpunkt wie bei [`StandEingabe`]).
@@ -88,6 +90,8 @@ pub struct StandEingabe {
 pub struct BelegungEingabe {
     pub belegt: i64,
     pub zeitpunkt_at: String,
+    /// Idempotenzschlüssel wie bei [`StandEingabe`].
+    pub client_id: Option<String>,
 }
 
 /// Ergebnis eines Schreibvorgangs an Bezirk oder Stelle: die Objekt-ID und die dabei
@@ -109,6 +113,9 @@ pub struct Gemeldet {
     pub meldung_id: i64,
     pub objekt_id: i64,
     pub etb_id: i64,
+    /// `false` beim Replay einer Meldung mit bekannter `client_id` (LFH-675): es wurde nichts
+    /// geschrieben, die Route verteilt deshalb auch nichts live.
+    pub neu: bool,
 }
 
 // ── SQL: die eine Definition von „aktuell“ ──────────────────────────────────────────────────
@@ -119,7 +126,20 @@ pub struct Gemeldet {
 /// Als Makro, damit `concat!` daraus ein `&'static str` baut (sqlx 0.9).
 macro_rules! juengste_meldung {
     () => {
-        "zurueckgenommen_at IS NULL ORDER BY zeitpunkt_at DESC, id DESC LIMIT 1"
+        concat!(
+            "zurueckgenommen_at IS NULL ",
+            meldereihenfolge!(),
+            " LIMIT 1"
+        )
+    };
+}
+
+/// Die Ordnung, in der „aktuell“ bestimmt wird: jüngster Zeitpunkt zuerst, bei Gleichstand die
+/// später erfasste. Der Verlauf (LFH-676) liest die Reihe in genau dieser Ordnung — der erste
+/// nicht zurückgenommene Eintrag ist damit immer der aktuelle.
+macro_rules! meldereihenfolge {
+    () => {
+        "ORDER BY zeitpunkt_at DESC, id DESC"
     };
 }
 
@@ -300,7 +320,12 @@ pub async fn uebersicht(
     .into_iter()
     .map(BetreuungsstelleAnzeige::try_from)
     .collect::<Result<Vec<_>, _>>()?;
-    Ok(BetreuungUebersicht { bezirke, stellen })
+    Ok(BetreuungUebersicht {
+        bezirke,
+        stellen,
+        // Personenbezogene Zahl: setzt nur die Route, nach Prüfung des Personenrechts.
+        namentlich: None,
+    })
 }
 
 /// Lädt einen Bezirk, auch einen stornierten (`storniert_at` gesetzt). `NotFound`, wenn er
@@ -344,6 +369,21 @@ pub async fn stelle_laden(
 /// stornierter Stelle die aktuelle Meldung mit Zeitpunkt ≤ Stichtag. Stellen ohne solche
 /// Meldung stehen ohne Anzahl in der Liste und gehen nicht in die Summe ein. Ein unlesbarer
 /// Stichtag ist 400.
+///
+/// **Welche Stelle „ohne Meldung“ ist** (LFH-679): nur eine, die zum Stichtag betrieben sein
+/// konnte. Weg fallen Stellen, die erst nach dem Stichtag angelegt wurden, und Stellen, die
+/// jetzt `geschlossen` oder `vorbereitet` sind und nie eine (nicht zurückgenommene) Meldung
+/// hatten — dort war nach allem, was bekannt ist, nie jemand. Eine Statushistorie gibt es
+/// nicht, der Status ist der HEUTIGE: dieselbe Abfrage für ein vergangenes t kann deshalb
+/// später anders ausfallen. Zwei Unschärfen folgen daraus, bewusst in verschiedene Richtungen:
+/// Eine jetzt geschlossene Stelle MIT späterer Meldung bleibt „ohne Meldung“, denn sie kann zum
+/// Stichtag schon betrieben worden sein (Hinweis „Untergrenze“ eher zu oft). Eine Stelle, die
+/// zu t in Betrieb war, nie gemeldet hat und später geschlossen wurde, fällt dagegen weg (der
+/// Hinweis fehlt dann) — der Preis dafür, nie belegte Stellen nicht mitzuzählen, ohne dass es
+/// eine Migration gibt.
+/// Eine Stelle MIT Meldung ≤ Stichtag zählt immer, auch vor ihrem `angelegt_at` — eine
+/// Meldung darf nachgetragen früher liegen als die Erfassung der Stelle, und ihre Zahl ist
+/// eine Tatsache. Die Summe hängt deshalb nicht an dieser Eingrenzung.
 pub async fn kopfzahl(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -357,10 +397,17 @@ pub async fn kopfzahl(
              SELECT id FROM betreuungsstelle_belegung \
              WHERE stelle_id = s.id AND zeitpunkt_at <= ? AND ",
         juengste_meldung!(),
-        ") WHERE s.einsatz_id = ? AND s.storniert_at IS NULL ORDER BY s.id"
+        ") WHERE s.einsatz_id = ? AND s.storniert_at IS NULL \
+           AND (m.id IS NOT NULL \
+                OR (s.angelegt_at <= ? \
+                    AND NOT (s.status IN (?, ?) AND s.belegung_id IS NULL))) \
+         ORDER BY s.id"
     ))
     .bind(zeitpunkt_at)
     .bind(einsatz_id)
+    .bind(zeitpunkt_at)
+    .bind(BetreuungsstelleStatus::Geschlossen.as_str())
+    .bind(BetreuungsstelleStatus::Vorbereitet.as_str())
     .fetch_all(pool)
     .await?;
     let stellen: Vec<BelegungKopfzahlStelle> = zeilen
@@ -380,6 +427,128 @@ pub async fn kopfzahl(
         stellen_ohne_meldung: stellen.iter().filter(|s| s.belegt.is_none()).count() as i64,
         stellen,
     })
+}
+
+// ── Verlauf (LFH-676) ───────────────────────────────────────────────────────────────────────
+
+#[derive(sqlx::FromRow)]
+struct StandVerlaufZeile {
+    id: i64,
+    evakuiert: i64,
+    erhebung: String,
+    zeitpunkt_at: String,
+    erfasst_at: String,
+    erfasst_von: String,
+    aktuell: bool,
+    zurueckgenommen_at: Option<String>,
+    zurueckgenommen_von: Option<String>,
+}
+
+#[derive(sqlx::FromRow)]
+struct BelegungVerlaufZeile {
+    id: i64,
+    belegt: i64,
+    zeitpunkt_at: String,
+    erfasst_at: String,
+    erfasst_von: String,
+    aktuell: bool,
+    zurueckgenommen_at: Option<String>,
+    zurueckgenommen_von: Option<String>,
+}
+
+/// Die ganze Standreihe eines Bezirks, zurückgenommene eingeschlossen, in der Ordnung von
+/// [`meldereihenfolge!`]. `aktuell` ist der Vergleich mit dem Zeiger `stand_id` — nicht eine
+/// zweite Rechnung. Auch ein stornierter Bezirk liefert seine Reihe (Lesen ist keine
+/// Lebenszyklus-Aktion); ein Bezirk außerhalb des Einsatzes ist `NotFound`, damit „fremd“ nicht
+/// wie „ohne Meldung“ aussieht.
+///
+/// Die Namen kommen über Unterabfragen statt über einen Join: so bleibt `evakuierung_stand` die
+/// einzige Tabelle im `FROM`, und `meldereihenfolge!` trifft ohne Tabellenpräfix eindeutig.
+pub async fn stand_verlauf(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    bezirk_id: i64,
+) -> Result<Vec<super::StandVerlaufEintrag>, AppError> {
+    let zeiger: Option<(Option<i64>,)> =
+        sqlx::query_as("SELECT stand_id FROM evakuierungsbezirk WHERE id = ? AND einsatz_id = ?")
+            .bind(bezirk_id)
+            .bind(einsatz_id)
+            .fetch_optional(pool)
+            .await?;
+    let (stand_id,) = zeiger.ok_or(AppError::NotFound)?;
+    sqlx::query_as::<_, StandVerlaufZeile>(concat!(
+        "SELECT id, evakuiert, erhebung, zeitpunkt_at, erfasst_at, \
+                (SELECT anzeigename FROM benutzer WHERE benutzer.id = erfasst_von_id) \
+                    AS erfasst_von, \
+                id IS ? AS aktuell, zurueckgenommen_at, \
+                (SELECT anzeigename FROM benutzer WHERE benutzer.id = zurueckgenommen_von_id) \
+                    AS zurueckgenommen_von \
+         FROM evakuierung_stand WHERE bezirk_id = ? AND einsatz_id = ? ",
+        meldereihenfolge!()
+    ))
+    .bind(stand_id)
+    .bind(bezirk_id)
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?
+    .into_iter()
+    .map(|z| {
+        Ok(super::StandVerlaufEintrag {
+            id: z.id,
+            evakuiert: z.evakuiert,
+            erhebung: aus_db(z.erhebung)?,
+            zeitpunkt_at: z.zeitpunkt_at,
+            erfasst_at: z.erfasst_at,
+            erfasst_von: z.erfasst_von,
+            aktuell: z.aktuell,
+            zurueckgenommen_at: z.zurueckgenommen_at,
+            zurueckgenommen_von: z.zurueckgenommen_von,
+        })
+    })
+    .collect()
+}
+
+/// Die ganze Belegungsreihe einer Stelle, gebaut wie [`stand_verlauf`]. Auch eine geschlossene
+/// oder stornierte Stelle liefert ihre Reihe.
+pub async fn belegung_verlauf(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    stelle_id: i64,
+) -> Result<Vec<super::BelegungVerlaufEintrag>, AppError> {
+    let zeiger: Option<(Option<i64>,)> =
+        sqlx::query_as("SELECT belegung_id FROM betreuungsstelle WHERE id = ? AND einsatz_id = ?")
+            .bind(stelle_id)
+            .bind(einsatz_id)
+            .fetch_optional(pool)
+            .await?;
+    let (belegung_id,) = zeiger.ok_or(AppError::NotFound)?;
+    Ok(sqlx::query_as::<_, BelegungVerlaufZeile>(concat!(
+        "SELECT id, belegt, zeitpunkt_at, erfasst_at, \
+                (SELECT anzeigename FROM benutzer WHERE benutzer.id = erfasst_von_id) \
+                    AS erfasst_von, \
+                id IS ? AS aktuell, zurueckgenommen_at, \
+                (SELECT anzeigename FROM benutzer WHERE benutzer.id = zurueckgenommen_von_id) \
+                    AS zurueckgenommen_von \
+         FROM betreuungsstelle_belegung WHERE stelle_id = ? AND einsatz_id = ? ",
+        meldereihenfolge!()
+    ))
+    .bind(belegung_id)
+    .bind(stelle_id)
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?
+    .into_iter()
+    .map(|z| super::BelegungVerlaufEintrag {
+        id: z.id,
+        belegt: z.belegt,
+        zeitpunkt_at: z.zeitpunkt_at,
+        erfasst_at: z.erfasst_at,
+        erfasst_von: z.erfasst_von,
+        aktuell: z.aktuell,
+        zurueckgenommen_at: z.zurueckgenommen_at,
+        zurueckgenommen_von: z.zurueckgenommen_von,
+    })
+    .collect())
 }
 
 // ── Feldprüfungen (400) ─────────────────────────────────────────────────────────────────────
@@ -405,6 +574,17 @@ fn plan_pruefen(plan: i64) -> Result<(), AppError> {
     if plan < 1 {
         return Err(AppError::Validation(format!(
             "plan_personen muss mindestens 1 sein, war {plan}"
+        )));
+    }
+    hoechstens("plan_personen", plan)
+}
+
+/// Obergrenze aller Personenzahlen ([`super::MAX_PERSONEN`], LFH-680).
+fn hoechstens(feld: &str, n: i64) -> Result<(), AppError> {
+    if n > super::MAX_PERSONEN {
+        return Err(AppError::Validation(format!(
+            "{feld} darf höchstens {} sein, war {n}",
+            super::MAX_PERSONEN
         )));
     }
     Ok(())
@@ -437,7 +617,8 @@ fn kapazitaet_pruefen(kapazitaet: Option<i64>) -> Result<(), AppError> {
         Some(k) if k < 1 => Err(AppError::Validation(format!(
             "kapazitaet_personen muss mindestens 1 sein, war {k}"
         ))),
-        _ => Ok(()),
+        Some(k) => hoechstens("kapazitaet_personen", k),
+        None => Ok(()),
     }
 }
 
@@ -447,7 +628,7 @@ fn anzahl_pruefen(feld: &str, n: i64) -> Result<(), AppError> {
             "{feld} darf nicht negativ sein, war {n}"
         )));
     }
-    Ok(())
+    hoechstens(feld, n)
 }
 
 /// Der Zeitpunkt muss im Drahtformat vorliegen; die Route hat ihn normalisiert und gegen die
@@ -915,6 +1096,72 @@ pub async fn bezirk_stornieren_tx(
     ))
 }
 
+// ── Idempotenz der Offline-Erfassung (LFH-675) ─────────────────────────────────────────────
+
+/// Die gespeicherte Standmeldung mit dieser `client_id` im Einsatz, als Replay (`neu: false`).
+/// Einsatzgebunden: dieselbe `client_id` in einem anderen Einsatz findet nichts und legt dort
+/// nichts offen. Läuft auf dem Pool (Vorab-Lookup der Route) wie in der Transaktion.
+pub async fn stand_nach_client_id<'e, E: sqlx::SqliteExecutor<'e>>(
+    ex: E,
+    einsatz_id: i64,
+    client_id: &str,
+) -> Result<Option<Gemeldet>, AppError> {
+    let treffer: Option<(i64, i64, i64)> = sqlx::query_as(
+        "SELECT id, bezirk_id, etb_eintrag_id FROM evakuierung_stand \
+         WHERE einsatz_id = ? AND client_id = ?",
+    )
+    .bind(einsatz_id)
+    .bind(client_id)
+    .fetch_optional(ex)
+    .await?;
+    Ok(treffer.map(als_replay))
+}
+
+/// Wie [`stand_nach_client_id`] für Belegungsmeldungen.
+pub async fn belegung_nach_client_id<'e, E: sqlx::SqliteExecutor<'e>>(
+    ex: E,
+    einsatz_id: i64,
+    client_id: &str,
+) -> Result<Option<Gemeldet>, AppError> {
+    let treffer: Option<(i64, i64, i64)> = sqlx::query_as(
+        "SELECT id, stelle_id, etb_eintrag_id FROM betreuungsstelle_belegung \
+         WHERE einsatz_id = ? AND client_id = ?",
+    )
+    .bind(einsatz_id)
+    .bind(client_id)
+    .fetch_optional(ex)
+    .await?;
+    Ok(treffer.map(als_replay))
+}
+
+fn als_replay((meldung_id, objekt_id, etb_id): (i64, i64, i64)) -> Gemeldet {
+    Gemeldet {
+        meldung_id,
+        objekt_id,
+        etb_id,
+        neu: false,
+    }
+}
+
+/// Ein Replay gilt nur für das Objekt, an dem die Meldung gespeichert ist. Ein Schlüssel, der
+/// an einem anderen Bezirk bzw. einer anderen Stelle hängt, ist 422 (design.md D3): jedes Feld
+/// ist für sich gültig, erst der gespeicherte Zusammenhang verbietet die Aktion. Die fremde
+/// Meldung zurückzugeben behauptete den Stand eines Objekts, das der Client nicht adressiert hat.
+pub fn replay_am_objekt(
+    replay: Gemeldet,
+    objekt_id: i64,
+    // mit Artikel („einem anderen Evakuierungsbezirk“) — das Genus unterscheidet sich
+    objekt: &str,
+) -> Result<Gemeldet, AppError> {
+    if replay.objekt_id == objekt_id {
+        Ok(replay)
+    } else {
+        Err(AppError::UnprocessableEntity(format!(
+            "client_id gehört zu einer Meldung an {objekt}"
+        )))
+    }
+}
+
 /// Meldet einen Stand „evakuiert“. ETB-Meldung mit Vorwert, Erhebung und Plangröße, deren
 /// Ereigniszeit der Meldezeitpunkt ist; danach wird der Zeiger über die „aktuell“-Abfrage
 /// bestimmt — eine nachgetragene ältere Meldung lässt ihn stehen. Dieselbe Zahl wie der
@@ -927,6 +1174,15 @@ pub async fn stand_melden_tx(
     startwert: i64,
     eingabe: &StandEingabe,
 ) -> Result<Gemeldet, AppError> {
+    // Replay VOR jeder Zustandsprüfung (design.md D2): eine schon gespeicherte Meldung kommt
+    // auch am inzwischen stornierten Bezirk zurück. Unter `BEGIN IMMEDIATE` ist dieser Lookup
+    // gegen das INSERT unten nicht verschränkbar — zwei gleichzeitige Flushes desselben
+    // Schlüssels ergeben eine Zeile.
+    if let Some(cid) = eingabe.client_id.as_deref() {
+        if let Some(replay) = stand_nach_client_id(&mut *conn, einsatz_id, cid).await? {
+            return replay_am_objekt(replay, bezirk_id, "einem anderen Evakuierungsbezirk");
+        }
+    }
     anzahl_pruefen("evakuiert", eingabe.evakuiert)?;
     zeitpunkt_pruefen(&eingabe.zeitpunkt_at)?;
     let roh = bezirk_roh_tx(conn, einsatz_id, bezirk_id).await?;
@@ -963,8 +1219,8 @@ pub async fn stand_melden_tx(
     let meldung_id: i64 = sqlx::query_scalar(
         "INSERT INTO evakuierung_stand \
             (bezirk_id, einsatz_id, evakuiert, erhebung, zeitpunkt_at, erfasst_von_id, \
-             etb_eintrag_id) \
-         VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
+             etb_eintrag_id, client_id) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(bezirk_id)
     .bind(einsatz_id)
@@ -973,6 +1229,7 @@ pub async fn stand_melden_tx(
     .bind(&eingabe.zeitpunkt_at)
     .bind(benutzer_id)
     .bind(etb_id)
+    .bind(eingabe.client_id.as_deref())
     .fetch_one(&mut *conn)
     .await?;
     stand_zeiger_neu_tx(conn, bezirk_id).await?;
@@ -980,6 +1237,7 @@ pub async fn stand_melden_tx(
         meldung_id,
         objekt_id: bezirk_id,
         etb_id,
+        neu: true,
     })
 }
 
@@ -1034,6 +1292,7 @@ pub async fn stand_zuruecknehmen_tx(
         meldung_id: stand_id,
         objekt_id: bezirk_id,
         etb_id,
+        neu: true,
     })
 }
 
@@ -1242,6 +1501,13 @@ pub async fn belegung_melden_tx(
     startwert: i64,
     eingabe: &BelegungEingabe,
 ) -> Result<Gemeldet, AppError> {
+    // Replay vor jeder Zustandsprüfung, wie bei `stand_melden_tx`: eine gespeicherte Meldung
+    // kommt auch an der inzwischen geschlossenen oder stornierten Stelle zurück.
+    if let Some(cid) = eingabe.client_id.as_deref() {
+        if let Some(replay) = belegung_nach_client_id(&mut *conn, einsatz_id, cid).await? {
+            return replay_am_objekt(replay, stelle_id, "einer anderen Betreuungsstelle");
+        }
+    }
     anzahl_pruefen("belegt", eingabe.belegt)?;
     zeitpunkt_pruefen(&eingabe.zeitpunkt_at)?;
     let roh = stelle_roh_tx(conn, einsatz_id, stelle_id).await?;
@@ -1281,8 +1547,9 @@ pub async fn belegung_melden_tx(
     .await?;
     let meldung_id: i64 = sqlx::query_scalar(
         "INSERT INTO betreuungsstelle_belegung \
-            (stelle_id, einsatz_id, belegt, zeitpunkt_at, erfasst_von_id, etb_eintrag_id) \
-         VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
+            (stelle_id, einsatz_id, belegt, zeitpunkt_at, erfasst_von_id, etb_eintrag_id, \
+             client_id) \
+         VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(stelle_id)
     .bind(einsatz_id)
@@ -1290,6 +1557,7 @@ pub async fn belegung_melden_tx(
     .bind(&eingabe.zeitpunkt_at)
     .bind(benutzer_id)
     .bind(etb_id)
+    .bind(eingabe.client_id.as_deref())
     .fetch_one(&mut *conn)
     .await?;
     belegung_zeiger_neu_tx(conn, stelle_id).await?;
@@ -1297,6 +1565,7 @@ pub async fn belegung_melden_tx(
         meldung_id,
         objekt_id: stelle_id,
         etb_id,
+        neu: true,
     })
 }
 
@@ -1357,6 +1626,7 @@ pub async fn belegung_zuruecknehmen_tx(
         meldung_id: belegung_id,
         objekt_id: stelle_id,
         etb_id,
+        neu: true,
     })
 }
 

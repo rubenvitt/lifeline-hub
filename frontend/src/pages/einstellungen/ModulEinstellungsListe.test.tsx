@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { renderMitProviders } from '../../test/utils';
 import { setzeViewportBreite } from '../../test/viewport';
 import { kategorien } from '../../einsatz/modulRegistry';
-import ModulEinstellungsListe, { modulZeilenStil } from './ModulEinstellungsListe';
+import ModulEinstellungsListe, { modulSperrGrund, modulZeilenStil } from './ModulEinstellungsListe';
 
 /** Basis-Props der Einsatz-Ebene (drei Spalten, mit Sichtbar-Schalter). */
 function einsatzProps() {
@@ -255,5 +255,107 @@ describe('ModulEinstellungsListe · Gruppierung und Filter (LFH-346)', () => {
     expect(
       within(zeile as HTMLElement).queryByText('immer sichtbar, nicht ausblendbar'),
     ).toBeNull();
+  });
+});
+
+/**
+ * Der Sperrgrund je Zeile (LFH-383, Zwilling von `Anmeldeverfahren` aus LFH-370 · B5j).
+ *
+ * Drei Quellen sperren eine Zeile — die Modul-Eigenschaft, das fehlende Recht und der eigene
+ * Schreibvorgang. Vorher standen sie in EINEM `disabled`-Ausdruck; nur die erste trug einen
+ * Text. Die tragenden Aussagen sind die negativen: kein Rechte-Text an einer bedienbaren oder
+ * bloß schreibenden Zeile, und an „Einsatzdaten“ ohne Recht genau EIN Grund.
+ */
+describe('ModulEinstellungsListe · Sperrgrund je Zeile (LFH-383)', () => {
+  const RECHTE = {
+    kurz: 'nur Einsatzleitung',
+    lang: 'Nur die Einsatzleitung darf die Modul-Sichtbarkeit ändern.',
+  };
+
+  function zeileVon(label: string) {
+    return screen.getByText(label).closest('[data-modul-zeile]') as HTMLElement;
+  }
+
+  // Vorrang ohne Render: die Modul-Eigenschaft gilt auch für Verwaltende und sagt deshalb
+  // mehr als das Recht; der Schreibvorgang ist vorübergehend und kommt zuletzt.
+  it('leitet den Grund mit festem Vorrang ab: Modul vor Recht vor Schreibvorgang', () => {
+    expect(modulSperrGrund({ ausblendbar: false, darfVerwalten: false, laeuft: true })).toBe(
+      'modul',
+    );
+    expect(modulSperrGrund({ ausblendbar: true, darfVerwalten: false, laeuft: true })).toBe(
+      'rechte',
+    );
+    expect(modulSperrGrund({ ausblendbar: true, darfVerwalten: true, laeuft: true })).toBe(
+      'laeuft',
+    );
+    expect(modulSperrGrund({ ausblendbar: true, darfVerwalten: true, laeuft: false })).toBeNull();
+  });
+
+  it('nennt ohne Recht den Grund des Aufrufers sichtbar an der Zeile', () => {
+    renderMitProviders(
+      <ModulEinstellungsListe {...einsatzProps()} darfVerwalten={false} rechteGrund={RECHTE} />,
+    );
+
+    expect(within(zeileVon('ETB')).getByText('nur Einsatzleitung')).toBeInTheDocument();
+  });
+
+  it('trägt an einer Zeile mit zwei Gründen nur den strukturellen', () => {
+    renderMitProviders(
+      <ModulEinstellungsListe {...einsatzProps()} darfVerwalten={false} rechteGrund={RECHTE} />,
+    );
+
+    const zeile = zeileVon('Einsatzdaten');
+    expect(within(zeile).getByText('immer sichtbar, nicht ausblendbar')).toBeInTheDocument();
+    expect(within(zeile).queryByText('nur Einsatzleitung')).toBeNull();
+  });
+
+  it('fällt ohne Wortlaut des Aufrufers auf „nur lesen“ zurück — ein Wort, das immer stimmt', () => {
+    renderMitProviders(<ModulEinstellungsListe {...einsatzProps()} darfVerwalten={false} />);
+
+    expect(within(zeileVon('ETB')).getByText('nur lesen')).toBeInTheDocument();
+  });
+
+  it('hängt an eine bedienbare Zeile keinen Rechte-Text', () => {
+    renderMitProviders(<ModulEinstellungsListe {...einsatzProps()} rechteGrund={RECHTE} />);
+
+    expect(screen.queryByText('nur Einsatzleitung')).toBeNull();
+    expect(screen.queryByText('nur lesen')).toBeNull();
+  });
+
+  // Der Schreibvorgang bekommt keinen Text (ein Grund, der nach 200 ms geht, ist Rauschen),
+  // aber einen eigenen Kanal: den Ladezustand am Steuerelement selbst.
+  it('zeigt an der schreibenden Zeile keinen Text, aber den Ladezustand am Schalter', () => {
+    renderMitProviders(
+      <ModulEinstellungsListe {...einsatzProps()} rechteGrund={RECHTE} laeuftKey="etb" />,
+    );
+
+    const zeile = zeileVon('ETB');
+    expect(within(zeile).queryByText('nur Einsatzleitung')).toBeNull();
+    expect(within(zeile).queryByText('nur lesen')).toBeNull();
+    // Der zugängliche Name bleibt stehen: das `aria-label` schlägt die Lade-Ikone.
+    const schalter = screen.getByRole('switch', { name: 'Sichtbar: ETB' });
+    expect(schalter).toHaveClass('ant-switch-loading');
+    // Die Gegenaussage: eine ruhende Zeile lädt nicht.
+    expect(screen.getByRole('switch', { name: 'Sichtbar: Chat' })).not.toHaveClass(
+      'ant-switch-loading',
+    );
+  });
+
+  it('legt die lange Begründung in den Tooltip über dem Kurztext', async () => {
+    renderMitProviders(
+      <ModulEinstellungsListe {...einsatzProps()} darfVerwalten={false} rechteGrund={RECHTE} />,
+    );
+
+    fireEvent.mouseEnter(within(zeileVon('ETB')).getByText('nur Einsatzleitung'));
+    expect(await screen.findByText(RECHTE.lang)).toBeInTheDocument();
+  });
+
+  it('erklärt die Modul-Eigenschaft im Tooltip — vorher stand dort gar nichts', async () => {
+    renderMitProviders(<ModulEinstellungsListe {...einsatzProps()} />);
+
+    fireEvent.mouseEnter(
+      within(zeileVon('Einsatzdaten')).getByText('immer sichtbar, nicht ausblendbar'),
+    );
+    expect(await screen.findByText(/Selbst-Aussperr-Schutz/)).toBeInTheDocument();
   });
 });

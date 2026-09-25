@@ -1376,6 +1376,22 @@ test('Betreuung: Karten- und Zeilenaktionen folgen der Dichte-Staffel 30 / 48 / 
       `Betreuungsstelle anlegen (${dichte})`,
     );
 
+    // LFH-676: der Aufklapp-Auslöser „Verlauf" an jeder Karte und Zeile — in der Tabelle
+    // ersetzt er antds 16-px-Symbol, das die Staffel nie hielt — und „Zurücknehmen" im
+    // aufgeklappten Verlauf, das in der Aktionsspalte von `Zeitachseneintrag` steht.
+    const verlaufKarte = karten.getByRole('button', { name: /^Verlauf zu Bezirk / });
+    const verlaufZeile = tabelle.getByRole('button', { name: /^Verlauf zu Stelle / });
+    await expect(verlaufKarte).toHaveCount(2);
+    await expect(verlaufZeile).toHaveCount(3);
+    const vKarte = await alleHaltenStufe(verlaufKarte, soll, `Verlauf Bezirk (${dichte})`, 2);
+    const vZeile = await alleHaltenStufe(verlaufZeile, soll, `Verlauf Stelle (${dichte})`, 3);
+    await verlaufKarte.first().click();
+    const zurueck = karten.first().getByRole('button', { name: /zurücknehmen$/ });
+    const vZurueck = await haeltStufe(zurueck, soll, `Zurücknehmen im Verlauf (${dichte})`);
+    gemessen.push(
+      `${dichte}: Verlauf Bezirk ${vKarte}, Verlauf Stelle ${vZeile}, Zurücknehmen ${vZurueck}`,
+    );
+
     // Abstand Primäraktion ↔ Dreipunkt, je an der ersten Karte bzw. Zeile. Im
     // Handschuh-Betrieb ≥ 16 px (MIL-STD-1472F Fig. 24 [abgeleitet], Prüfliste Kriterium 2).
     const luecke = async (links: Locator, rechts: Locator) => {

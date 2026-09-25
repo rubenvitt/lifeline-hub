@@ -2,7 +2,16 @@ import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { screen, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../../test/utils';
-import Sidebar, { bedienzielStil, ebenenZeileStil, loeschDialogBild } from './Sidebar';
+import Sidebar, {
+  bedienzielStil,
+  ebenenZeileStil,
+  filtereNichtVerortet,
+  leistenZeileStil,
+  loeschDialogBild,
+  namensteilStil,
+  NICHT_VERORTET_SUCHE_AB,
+} from './Sidebar';
+import type { NichtVerortet } from './marker';
 import type { SidebarProps } from './Sidebar';
 import { dichten } from '../../theme/tokens';
 
@@ -408,21 +417,14 @@ describe('Sidebar Bild-Hintergründe', () => {
   it('schaltet die Autobahn-Ebene über ihren eigenen Schalter (LFH-80)', () => {
     const onFachebeneToggle = vi.fn();
     renderMitProviders(<Sidebar {...basisProps} onFachebeneToggle={onFachebeneToggle} />);
-    const toggle = screen
-      .getByText('Autobahn-Lage (BAB)')
-      .closest('.ant-space')
-      ?.querySelector('button[role="switch"]');
-    expect(toggle).toBeTruthy();
-    fireEvent.click(toggle as Element);
+    // Über den Namen am Schalter selbst (LFH-380) — nicht über die antd-Hülle der Zeile.
+    fireEvent.click(screen.getByRole('switch', { name: 'Autobahn-Lage (BAB)' }));
     expect(onFachebeneToggle).toHaveBeenCalledWith('autobahn', true);
   });
 
-  // Zeile einer Fachebene: äußere Space-Zeile um Schalter, Label und Hinweis.
+  // Zeile einer Fachebene: die Zeile um Schalter, Label und Hinweis (`data-fachebene`).
   const fachebenenZeile = (label: string) =>
-    screen
-      .getByText(label)
-      .closest('.ant-space')!
-      .parentElement!.closest<HTMLElement>('.ant-space')!;
+    screen.getByText(label).closest<HTMLElement>('[data-fachebene]')!;
 
   it('zeigt den Zoom-Hinweis an der Energie-Zeile, auch wenn KRITIS aus ist (LFH-81)', () => {
     renderMitProviders(
@@ -834,6 +836,31 @@ describe('Sidebar: Bedienziel-Boden der klickbaren Listeneinträge', () => {
 });
 
 /**
+ * Schalterzeilen der Leiste dürfen umbrechen (LFH-380).
+ *
+ * Der Kippschalter ist im Handschuh 144 px breit, die Leiste 300 px. Ob der Umbruch GREIFT,
+ * misst `e2e/lagekarte-leiste-dichte.spec.ts` (jsdom rechnet kein Layout). Hier stehen die
+ * zwei Voraussetzungen, ohne die er nie greifen könnte — beide als Literale.
+ */
+describe('Sidebar: Umbruchregel der Schalterzeilen (LFH-380)', () => {
+  const tokenFuer = (stufe: keyof typeof dichten) => ({
+    controlHeight: dichten[stufe].zeilenhoehe,
+    marginXS: dichten[stufe].abstand.xs,
+  });
+
+  it('die Zeile bricht um, statt über die Leiste hinauszulaufen', () => {
+    expect(leistenZeileStil(tokenFuer('handschuh')).flexWrap).toBe('wrap');
+  });
+
+  it('der Namensteil reserviert Name plus ein Bedienziel der Stufe, bei Basis 0', () => {
+    // Basis 0: sonst entschiede die Inhaltsbreite über den Umbruch, nicht der Boden.
+    expect(namensteilStil(tokenFuer('kompakt')).flex).toBe('1 1 0');
+    expect(namensteilStil(tokenFuer('kompakt')).minWidth).toBe('calc(6em + 30px)');
+    expect(namensteilStil(tokenFuer('handschuh')).minWidth).toBe('calc(6em + 72px)');
+  });
+});
+
+/**
  * Nebenläufigkeit an der Löschbestätigung (Review-Fund G2 zu LFH-366).
  *
  * Die Bildliste kommt über den SSE-Fan-out und kann sich ändern, WÄHREND die Rückfrage
@@ -1089,5 +1116,187 @@ describe('Sidebar: einklappbare Paneele', () => {
   it('ohne Schreibrecht gibt es kein Paneel „Zeichnen"', () => {
     renderMitProviders(<Sidebar {...basisProps} darfSchreiben={false} />);
     expect(screen.queryByRole('button', { name: 'Zeichnen' })).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Suchfeld über „Nicht verortet" (LFH-360). Die Liste ist in einer realen Lage mit vielen
+ * frisch eingerückten Einheiten lang, die Leiste aber nur 300 px breit — ab fünf Einträgen
+ * findet die Einsatzkraft ihr Objekt schneller über den Namen als über das Scrollen.
+ */
+describe('Sidebar „Nicht verortet": Suche (LFH-360)', () => {
+  const fuenf: NichtVerortet[] = [
+    { typ: 'uhs', id: 1, label: 'UHS Nord' },
+    { typ: 'fahrzeug', id: 2, label: 'ELW 1' },
+    { typ: 'einheit', id: 3, label: '1. Zug' },
+    { typ: 'einheit', id: 4, label: '2. Zug' },
+    { typ: 'fuehrung', id: 5, label: 'Meyer' },
+  ];
+  const feld = () => screen.queryByRole('textbox', { name: 'Nicht verortete Objekte durchsuchen' });
+
+  it('Schwelle: ab fünf Einträgen, also bei mehr als vier', () => {
+    expect(NICHT_VERORTET_SUCHE_AB).toBe(5);
+  });
+
+  it('bei vier Einträgen kein Suchfeld — die Leiste wächst im Normalfall nicht zu', () => {
+    renderMitProviders(<Sidebar {...basisProps} nichtVerortet={fuenf.slice(0, 4)} />);
+    // Positivkontrolle: die Liste selbst steht, sonst belegte die Abwesenheit nichts.
+    expect(screen.getByText('UHS: UHS Nord')).toBeInTheDocument();
+    expect(feld()).not.toBeInTheDocument();
+  });
+
+  it('bei fünf Einträgen steht das Suchfeld, und Tippen filtert live', async () => {
+    renderMitProviders(<Sidebar {...basisProps} nichtVerortet={fuenf} />);
+    const eingabe = feld();
+    expect(eingabe).toBeInTheDocument();
+    await userEvent.type(eingabe!, 'elw');
+    expect(screen.getByText('Fahrzeug: ELW 1')).toBeInTheDocument();
+    expect(screen.queryByText('UHS: UHS Nord')).not.toBeInTheDocument();
+    expect(screen.queryByText('Einheit: 1. Zug')).not.toBeInTheDocument();
+  });
+
+  it('das Suchfeld trägt keine kleine Stufe — die Höhe kommt aus der Dichte-Staffel', () => {
+    renderMitProviders(<Sidebar {...basisProps} nichtVerortet={fuenf} />);
+    const eingabe = feld()!;
+    // Die Klasse kann am Feld selbst oder an seiner Affix-Hülle (allowClear) sitzen.
+    expect(eingabe).not.toHaveClass('ant-input-sm');
+    expect(eingabe.closest('.ant-input-affix-wrapper')).not.toHaveClass(
+      'ant-input-affix-wrapper-sm',
+    );
+  });
+
+  it('der Knopfname „Nicht verortet N" nennt weiter die Gesamtzahl, nicht die Trefferzahl', async () => {
+    renderMitProviders(<Sidebar {...basisProps} nichtVerortet={fuenf} />);
+    await userEvent.type(feld()!, 'elw');
+    // Paar: gefiltert auf EINEN Treffer — und der Kopf sagt weiter fünf.
+    expect(screen.getAllByRole('button', { name: 'Platzieren' })).toHaveLength(1);
+    expect(screen.getByRole('button', { name: 'Nicht verortet 5' })).toBeInTheDocument();
+    // Die Trefferzahl steht als zweite, eigene Angabe im Körper.
+    expect(screen.getByRole('status')).toHaveTextContent('1 von 5');
+  });
+
+  /**
+   * Eine Live-Region meldet nur Änderungen an Inhalt, der schon DA war — erschiene sie erst
+   * mit dem ersten Treffer, hörte ein Vorleser den ersten Stand nicht (dieselbe Regel wie die
+   * Leerzustands-Region der Sprungpalette, Review-Befund 7 dort).
+   */
+  it('die Trefferzeile steht mit dem Feld, ohne Suchbegriff leer', () => {
+    renderMitProviders(<Sidebar {...basisProps} nichtVerortet={fuenf} />);
+    expect(screen.getByRole('status')).toHaveTextContent(/^$/);
+  });
+
+  it('ohne Feld auch keine Trefferzeile', () => {
+    renderMitProviders(<Sidebar {...basisProps} nichtVerortet={fuenf.slice(0, 4)} />);
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('kein Treffer: eigene Meldung, und „Alles verortet" steht NICHT da', async () => {
+    renderMitProviders(<Sidebar {...basisProps} nichtVerortet={fuenf} />);
+    await userEvent.type(feld()!, 'xyz');
+    expect(screen.getByText('Keine Treffer für „xyz"')).toBeInTheDocument();
+    // Auch der Vorleser erfährt es: die Fokusstelle bleibt im Feld, die Region sagt es an.
+    expect(screen.getByRole('status')).toHaveTextContent('0 von 5');
+    expect(screen.queryByText('Alles verortet')).not.toBeInTheDocument();
+    // Der Ausweg ist das Leeren am Feld — die Meldung bringt keinen eigenen Knopf mit.
+    expect(screen.queryByRole('button', { name: /Treffer/ })).not.toBeInTheDocument();
+    expect(feld()).toBeInTheDocument();
+  });
+
+  it('fällt die Liste unter die Schwelle, verschwindet der Filter mit dem Feld', async () => {
+    const { rerender } = renderMitProviders(<Sidebar {...basisProps} nichtVerortet={fuenf} />);
+    await userEvent.type(feld()!, 'elw');
+    expect(screen.queryByText('UHS: UHS Nord')).not.toBeInTheDocument();
+
+    // Das Fahrzeug ist verortet — vier bleiben, das Feld geht. Ohne Reset verschluckte ein
+    // unsichtbarer Filter jetzt alle vier Einträge.
+    const vier = fuenf.filter((o) => o.typ !== 'fahrzeug');
+    rerender(<Sidebar {...basisProps} nichtVerortet={vier} />);
+    expect(feld()).not.toBeInTheDocument();
+    expect(screen.getByText('UHS: UHS Nord')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Platzieren' })).toHaveLength(4);
+
+    // Wächst die Liste wieder, steht das Feld LEER da — der alte Begriff kommt nicht zurück.
+    rerender(
+      <Sidebar
+        {...basisProps}
+        nichtVerortet={[...vier, { typ: 'schaden', id: 9, label: 'S-009' }]}
+      />,
+    );
+    expect(feld()).toHaveValue('');
+    expect(screen.getAllByRole('button', { name: 'Platzieren' })).toHaveLength(5);
+  });
+
+  it('die Zeile im laufenden Platzier-Modus bleibt stehen — sie trägt das einzige „Abbrechen"', async () => {
+    const onPlatzierenAbbrechen = vi.fn();
+    renderMitProviders(
+      <Sidebar
+        {...basisProps}
+        nichtVerortet={fuenf}
+        platzierungZiel={{ typ: 'uhs', id: 1 }}
+        onPlatzierenAbbrechen={onPlatzierenAbbrechen}
+      />,
+    );
+    await userEvent.type(feld()!, 'elw');
+    // Positivkontrolle: der Filter wirkt auf die übrigen Zeilen …
+    expect(screen.queryByText('Einheit: 1. Zug')).not.toBeInTheDocument();
+    expect(screen.getByText('Fahrzeug: ELW 1')).toBeInTheDocument();
+    // … aber die aktive Zeile steht, und aus dem Modus kommt man weiter heraus.
+    expect(screen.getByText('UHS: UHS Nord')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    expect(onPlatzierenAbbrechen).toHaveBeenCalled();
+    // Gezählt werden nur echte Treffer: zwei Zeilen stehen, eine davon trifft.
+    expect(screen.getByRole('status')).toHaveTextContent('1 von 5');
+  });
+
+  it('trifft nichts außer dem laufenden Ziel: „0 von N", die Zeile steht, keine Leermeldung', async () => {
+    renderMitProviders(
+      <Sidebar {...basisProps} nichtVerortet={fuenf} platzierungZiel={{ typ: 'uhs', id: 1 }} />,
+    );
+    await userEvent.type(feld()!, 'xyz');
+    expect(screen.getByRole('status')).toHaveTextContent('0 von 5');
+    expect(screen.getByText('UHS: UHS Nord')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Abbrechen' })).toBeInTheDocument();
+    // Eine Leermeldung neben einer stehenden Zeile widerspräche sich selbst.
+    expect(screen.queryByText('Keine Treffer für „xyz"')).not.toBeInTheDocument();
+  });
+});
+
+describe('filtereNichtVerortet (LFH-360)', () => {
+  const liste: NichtVerortet[] = [
+    { typ: 'fahrzeug', id: 1, label: 'ELW 1' },
+    { typ: 'einheit', id: 2, label: '1. Zug' },
+    { typ: 'einheit', id: 3, label: '2. Zug' },
+    { typ: 'fuehrung', id: 4, label: 'Meyer' },
+    { typ: 'abschnitt', id: 5, label: 'EA Süd' },
+  ];
+  const ids = (r: NichtVerortet[]) => r.map((o) => o.id);
+
+  it('leerer oder nur aus Leerzeichen bestehender Begriff lässt alles stehen', () => {
+    expect(filtereNichtVerortet(liste, '', null)).toBe(liste);
+    expect(filtereNichtVerortet(liste, '   ', null)).toBe(liste);
+  });
+
+  it('trifft das Label als Teilstring, Groß-/Kleinschreibung egal', () => {
+    expect(ids(filtereNichtVerortet(liste, 'elw', null))).toEqual([1]);
+    expect(ids(filtereNichtVerortet(liste, 'süd', null))).toEqual([5]);
+  });
+
+  it('trifft das Typ-Präfix — „einheit" findet alle Einheiten', () => {
+    expect(ids(filtereNichtVerortet(liste, 'EINHEIT', null))).toEqual([2, 3]);
+  });
+
+  it('das Präfix ist das ANGEZEIGTE Wort: Führung heißt dort „Personal"', () => {
+    expect(ids(filtereNichtVerortet(liste, 'personal', null))).toEqual([4]);
+    expect(ids(filtereNichtVerortet(liste, 'fuehrung', null))).toEqual([]);
+  });
+
+  it('Leerzeichen am Rand zählen nicht mit', () => {
+    expect(ids(filtereNichtVerortet(liste, '  zug ', null))).toEqual([2, 3]);
+  });
+
+  it('das laufende Platzierungsziel überlebt jeden Begriff', () => {
+    expect(ids(filtereNichtVerortet(liste, 'elw', { typ: 'einheit', id: 3 }))).toEqual([1, 3]);
+    // Gleiche id, anderer Typ: kein Treffer — die Kennung ist das Paar.
+    expect(ids(filtereNichtVerortet(liste, 'elw', { typ: 'uhs', id: 3 }))).toEqual([1]);
   });
 });

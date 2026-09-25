@@ -72,6 +72,75 @@ describe('OnlineQuelleFormModal — Hülle (LFH-346/A6)', () => {
   });
 
   /**
+   * LFH-376 — die Zusicherung, wegen der die Maske auf der Hülle steht (Befund H69
+   * aus LFH-332/B4): Enter in einem einzeiligen Feld sendet ab. Die Strukturprobe
+   * oben (Knopf im `<form>`) ist nur die Ursache; dieser Test belegt die Wirkung.
+   * Die Attribution ist Pflicht und muss vor dem Enter stehen; sie wird ZUERST
+   * getippt, weil der Absende-Weg nicht über sie laufen kann — sie ist eine
+   * Textarea, Enter bricht dort um. Der Typ bleibt auf seiner Vorgabe, ein `Select`
+   * schluckt Enter selbst (CLAUDE.md, Erfassungs-Norm). Abgesendet wird aus der URL.
+   */
+  it('Enter im URL-Feld legt die Quelle an', async () => {
+    let rumpf: Record<string, unknown> | null = null;
+    let aufrufe = 0;
+    server.use(
+      http.post('/api/karte/online-quellen', async ({ request }) => {
+        aufrufe += 1;
+        rumpf = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ ...quelle, id: 9 });
+      }),
+    );
+    const nutzer = userEvent.setup();
+    renderMitProviders(<Harness />);
+
+    const name = await screen.findByLabelText('Name');
+    await waitFor(() => expect(document.activeElement).toBe(name));
+    await nutzer.type(screen.getByLabelText('Attribution'), '© OpenStreetMap-Mitwirkende');
+    await nutzer.type(name, 'OpenStreetMap');
+    await nutzer.type(screen.getByLabelText('URL'), 'https://example.test/style.json{Enter}');
+
+    await waitFor(() => expect(rumpf).not.toBeNull());
+    expect(aufrufe).toBe(1);
+    expect(rumpf).toMatchObject({
+      name: 'OpenStreetMap',
+      url: 'https://example.test/style.json',
+      typ: 'vektor',
+      attribution: '© OpenStreetMap-Mitwirkende',
+      sortier: 7,
+    });
+  });
+
+  /**
+   * Die Gegenprobe: in der Textarea bricht Enter um und sendet NICHT ab. Belegt wird
+   * das über den Knopf danach — genau EIN Request, und er trägt den Umbruch. Ein
+   * „nicht aufgerufen" direkt nach dem Tippen wäre zu früh gefragt: die Prüfung der
+   * Hülle läuft asynchron, ein Absenden durch Enter käme erst danach an.
+   */
+  it('Enter in der Attribution bricht um und sendet nicht ab', async () => {
+    const rumpfe: Record<string, unknown>[] = [];
+    server.use(
+      http.post('/api/karte/online-quellen', async ({ request }) => {
+        rumpfe.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json({ ...quelle, id: 9 });
+      }),
+    );
+    const nutzer = userEvent.setup();
+    renderMitProviders(<Harness />);
+
+    const name = await screen.findByLabelText('Name');
+    await waitFor(() => expect(document.activeElement).toBe(name));
+    await nutzer.type(name, 'OpenStreetMap');
+    await nutzer.type(screen.getByLabelText('URL'), 'https://example.test/style.json');
+    await nutzer.type(screen.getByLabelText('Attribution'), '© OSM{Enter}ODbL');
+    expect(screen.getByLabelText('Attribution')).toHaveValue('© OSM\nODbL');
+    await nutzer.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() => expect(rumpfe).not.toHaveLength(0));
+    expect(rumpfe).toHaveLength(1);
+    expect(rumpfe[0]).toMatchObject({ attribution: '© OSM\nODbL' });
+  });
+
+  /**
    * Die Vorgaben des früheren Anlegen-Zweigs stehen jetzt als `initialValues` an der
    * Hülle — inklusive der von aussen gereichten `naechsteSortier`. Der Beleg ist der
    * Weg über eine bearbeitete Quelle: ohne `initialValues` stünde hier deren

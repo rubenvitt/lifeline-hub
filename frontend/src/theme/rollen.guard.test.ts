@@ -2,9 +2,12 @@
  * Hält die zwei Seiten der Gestaltungssprache deckungsgleich (LFH-352 · A0).
  *
  * `tokens.ts` (TS, für antd) und `rollen.css` (CSS-Custom-Properties, für
- * handgeschriebenes CSS) tragen dieselben Werte. Das ist bewusste Redundanz —
- * CSS kann kein TS importieren, solange `cssVar` am ConfigProvider aus ist (die
- * Weiche ist nach A2/LFH-328 vertagt).
+ * handgeschriebenes CSS) tragen dieselben Werte. Das ist bewusste Redundanz — die
+ * zwei Quellen bleiben getrennt, damit handgeschriebenes CSS nicht an antds
+ * Variablennamen hängt; die Begründung steht im Kopf von `rollen.css`. Eine
+ * abgeschaltete antd-Weiche ist es nicht: antd 6 emittiert `--ant-*` immer (LFH-623).
+ * Dieser Test hängt an der Begründung nicht — er vergleicht nur zwei Dateien Wert
+ * für Wert.
  *
  * WARUM DAS EINEN TEST BRAUCHT: eine Drift zwischen beiden **bricht nichts**.
  * Kein Fehler, kein roter Build — die antd-Fläche trägt dann nur eine andere

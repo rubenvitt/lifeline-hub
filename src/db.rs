@@ -759,6 +759,118 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn betreuung_client_id_migration_partieller_unique() {
+        // LFH-675: Stand- und Belegungsmeldungen tragen denselben Idempotenzschlüssel wie ETB,
+        // Person und Meldung — je Meldereihe eindeutig pro Einsatz, NULL beliebig oft.
+        let pool = test_pool().await;
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO benutzer (id, org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1, 1, 'Leit', 'leit', 'h')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        let mut einsaetze = Vec::new();
+        for name in ["A", "B"] {
+            let e: i64 = sqlx::query_scalar(
+                "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, ?) RETURNING id",
+            )
+            .bind(name)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            let etb: i64 = sqlx::query_scalar(
+                "INSERT INTO etb_eintrag (einsatz_id, lfd_nr, typ, inhalt, erfasser_id, ereigniszeit) \
+                 VALUES (?, 1, 'meldung', 'x', 1, '2026-09-24 10:00:00') RETURNING id",
+            )
+            .bind(e)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            let bezirk: i64 = sqlx::query_scalar(
+                "INSERT INTO evakuierungsbezirk \
+                    (einsatz_id, bezeichnung, plan_personen, plan_erhebung, angelegt_von_id) \
+                 VALUES (?, 'Uferstraße', 100, 'gezaehlt', 1) RETURNING id",
+            )
+            .bind(e)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            let stelle: i64 = sqlx::query_scalar(
+                "INSERT INTO betreuungsstelle (einsatz_id, bezeichnung, art, angelegt_von_id) \
+                 VALUES (?, 'Turnhalle', 'betreuungsstelle', 1) RETURNING id",
+            )
+            .bind(e)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            einsaetze.push((e, etb, bezirk, stelle));
+        }
+
+        async fn stand(
+            pool: &SqlitePool,
+            (e, etb, bezirk, _): (i64, i64, i64, i64),
+            client_id: Option<&str>,
+        ) -> Result<(), sqlx::Error> {
+            sqlx::query(
+                "INSERT INTO evakuierung_stand (bezirk_id, einsatz_id, evakuiert, erhebung, \
+                    zeitpunkt_at, erfasst_von_id, etb_eintrag_id, client_id) \
+                 VALUES (?, ?, 5, 'gezaehlt', '2026-09-24 10:00:00', 1, ?, ?)",
+            )
+            .bind(bezirk)
+            .bind(e)
+            .bind(etb)
+            .bind(client_id)
+            .execute(pool)
+            .await
+            .map(|_| ())
+        }
+        async fn belegung(
+            pool: &SqlitePool,
+            (e, etb, _, stelle): (i64, i64, i64, i64),
+            client_id: Option<&str>,
+        ) -> Result<(), sqlx::Error> {
+            sqlx::query(
+                "INSERT INTO betreuungsstelle_belegung (stelle_id, einsatz_id, belegt, \
+                    zeitpunkt_at, erfasst_von_id, etb_eintrag_id, client_id) \
+                 VALUES (?, ?, 5, '2026-09-24 10:00:00', 1, ?, ?)",
+            )
+            .bind(stelle)
+            .bind(e)
+            .bind(etb)
+            .bind(client_id)
+            .execute(pool)
+            .await
+            .map(|_| ())
+        }
+
+        let (a, b) = (einsaetze[0], einsaetze[1]);
+        stand(&pool, a, Some("s1")).await.unwrap();
+        assert!(
+            stand(&pool, a, Some("s1")).await.is_err(),
+            "Stand-Dublette im Einsatz"
+        );
+        stand(&pool, a, None).await.unwrap();
+        stand(&pool, a, None).await.unwrap();
+        stand(&pool, b, Some("s1")).await.unwrap();
+
+        belegung(&pool, a, Some("b1")).await.unwrap();
+        assert!(
+            belegung(&pool, a, Some("b1")).await.is_err(),
+            "Belegungs-Dublette im Einsatz"
+        );
+        belegung(&pool, a, None).await.unwrap();
+        belegung(&pool, a, None).await.unwrap();
+        belegung(&pool, b, Some("b1")).await.unwrap();
+        // Getrennte Reihen, getrennte Indizes: derselbe Schlüssel in der anderen Reihe kollidiert nicht.
+        belegung(&pool, a, Some("s1")).await.unwrap();
+    }
+
+    #[tokio::test]
     async fn etb_fts_wird_bei_cascade_delete_bereinigt() {
         let pool = test_pool().await;
         sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
@@ -3038,5 +3150,48 @@ mod tests {
             .execute(&pool)
             .await
             .expect("mehrere NULL-Zahlenpaare bleiben erlaubt (Altbestand)");
+    }
+
+    // --- Migration 0121: Verweis Verbleib → Betreuungsstelle (LFH-674) ---
+    //
+    // Zwei ADD COLUMN mit FK; betreuungsstelle ist danach kein Leaf mehr. Gemessen wird auf
+    // der voll migrierten Vorlage: beide Spalten zeigen mit SET NULL auf die Stelle, der
+    // partielle Index existiert, und der FK-Check ist leer.
+    #[tokio::test]
+    async fn migration_0121_verbleib_verweist_auf_betreuungsstelle() {
+        let pool = test_pool().await;
+        for (tabelle, spalte) in [
+            ("person_verbleib", "betreuungsstelle_id"),
+            ("einsatz_person", "aktuelle_verbleib_betreuungsstelle_id"),
+        ] {
+            let fk: Vec<(String, String, String)> = sqlx::query_as(
+                "SELECT \"table\", \"to\", on_delete FROM pragma_foreign_key_list(?) \
+                 WHERE \"from\" = ?",
+            )
+            .bind(tabelle)
+            .bind(spalte)
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+            assert_eq!(
+                fk,
+                vec![("betreuungsstelle".into(), "id".into(), "SET NULL".into())],
+                "{tabelle}.{spalte} verweist mit SET NULL auf betreuungsstelle"
+            );
+        }
+        let index: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' \
+             AND name = 'idx_einsatz_person_verbleib_stelle'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(index, 1, "partieller Index für die Zählung je Stelle");
+        let fk_verletzungen: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM pragma_foreign_key_check")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(fk_verletzungen, 0);
     }
 }

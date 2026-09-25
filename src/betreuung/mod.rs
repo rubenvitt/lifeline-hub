@@ -250,6 +250,15 @@ impl TryFrom<String> for BetreuungsstelleStatus {
     }
 }
 
+/// Obergrenze je Personenzahl: Plangröße, Stand „evakuiert“, Kapazität, Belegung (LFH-680).
+/// Die größten Evakuierungen in Deutschland lagen bei einigen Zehntausend Menschen (Frankfurt
+/// 2017: rund 60 000); eine Million in EINEM Bezirk oder EINER Stelle liegt eine
+/// Größenordnung darüber und hält trotzdem jede Summe fern vom Überlauf: ohne Grenze lief die
+/// `summe` der Kopfzahl über (Debug-Build: Panic im Handler, Release: still negativ), und
+/// jenseits von 2^53 zählt eine JS-Number nicht mehr genau. Das Feld scheitert für sich,
+/// also **400** — Vorbild `verpflegung::MAX_EP`.
+pub const MAX_PERSONEN: i64 = 1_000_000;
+
 /// Liest einen Enum-Wert aus einer Eingabe. Ein unbekannter Wert scheitert am Feld für sich
 /// und ist deshalb **400** (CLAUDE.md „Statuscode-Konvention“, `src/error.rs`), nicht 422.
 pub fn enum_wert<T: TryFrom<String, Error = String>>(s: &str) -> Result<T, AppError> {
@@ -350,6 +359,20 @@ pub struct BetreuungsstelleAnzeige {
 pub struct BetreuungUebersicht {
     pub bezirke: Vec<EvakuierungsbezirkAnzeige>,
     pub stellen: Vec<BetreuungsstelleAnzeige>,
+    /// „davon namentlich“ (LFH-674): je Stelle die Zahl der Personen, deren jüngster Verbleib
+    /// `notunterkunft` an dieser Stelle ist — nur Stellen mit mindestens einer Person. Fehlt
+    /// ganz, wenn der Lesende das Modul Personen nicht sehen darf (nicht „0“). Gefüllt NUR in
+    /// der Route: `repo::uebersicht` speist auch den gesicherten Lagestand. Die Zahl geht in
+    /// keine Belegung, Kopfzahl oder Summe ein — führend ist die Mengenmeldung.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub namentlich: Option<Vec<StelleNamentlich>>,
+}
+
+/// Namentlich zugeordnete Personen an einer Stelle (LFH-674), Teil von [`BetreuungUebersicht`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct StelleNamentlich {
+    pub stelle_id: i64,
+    pub anzahl: i64,
 }
 
 /// Belegung einer Stelle zum Stichtag der Kopfzahl.
@@ -383,6 +406,50 @@ pub struct StelleMeldungAnzeige {
     pub stelle: BetreuungsstelleAnzeige,
 }
 
+/// Eine Standmeldung im Verlauf eines Bezirks (LFH-676), zurückgenommene eingeschlossen.
+/// `aktuell` kommt aus dem Zeiger des Bezirks — keine zweite Definition von „aktuell“.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct StandVerlaufEintrag {
+    pub id: i64,
+    pub evakuiert: i64,
+    pub erhebung: Erhebung,
+    /// Zeitpunkt der Meldung, UTC ohne Zonenkennung (`YYYY-MM-DD HH:MM:SS`).
+    pub zeitpunkt_at: String,
+    /// Wann die Meldung erfasst wurde, UTC ohne Zonenkennung. Liegt sie ≥ 60 s nach
+    /// `zeitpunkt_at`, zeigt die App sie als nachgetragen (dieselbe Schwelle wie im ETB).
+    pub erfasst_at: String,
+    /// Anzeigename der erfassenden Person.
+    pub erfasst_von: String,
+    /// Diese Meldung ist der aktuelle Stand des Bezirks.
+    pub aktuell: bool,
+    /// Fehlt, solange die Meldung nicht zurückgenommen ist.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub zurueckgenommen_at: Option<String>,
+    /// Anzeigename der zurücknehmenden Person; fehlt wie `zurueckgenommen_at`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub zurueckgenommen_von: Option<String>,
+}
+
+/// Eine Belegungsmeldung im Verlauf einer Stelle (LFH-676), gebaut wie
+/// [`StandVerlaufEintrag`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct BelegungVerlaufEintrag {
+    pub id: i64,
+    pub belegt: i64,
+    /// Zeitpunkt der Meldung, UTC ohne Zonenkennung (`YYYY-MM-DD HH:MM:SS`).
+    pub zeitpunkt_at: String,
+    /// Wann die Meldung erfasst wurde, UTC ohne Zonenkennung.
+    pub erfasst_at: String,
+    /// Anzeigename der erfassenden Person.
+    pub erfasst_von: String,
+    /// Diese Meldung ist die aktuelle Belegung der Stelle.
+    pub aktuell: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub zurueckgenommen_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub zurueckgenommen_von: Option<String>,
+}
+
 /// Kopfzahl „in Betreuung“ zu einem Zeitpunkt (Verpflegung, LFH-634). Ohne Personenbezug.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct BelegungKopfzahl {
@@ -392,7 +459,9 @@ pub struct BelegungKopfzahl {
     /// ist die Summe eine Untergrenze; bei 0 Stellen mit Meldung heißt `summe = 0` „nichts
     /// gemeldet“, nicht „niemand in Betreuung“.
     pub summe: i64,
-    /// Zahl der Stellen, die bis zum Stichtag keine Meldung haben.
+    /// Zahl der Stellen, die bis zum Stichtag keine Meldung haben. Mitgezählt wird nur, wer zum
+    /// Stichtag betrieben sein konnte: nicht nach ihm angelegt und nicht jetzt geschlossen oder
+    /// vorbereitet ohne jede Meldung (LFH-679). Solche Stellen fehlen auch in `stellen`.
     pub stellen_ohne_meldung: i64,
     pub stellen: Vec<BelegungKopfzahlStelle>,
 }

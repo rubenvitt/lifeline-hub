@@ -206,6 +206,48 @@ Setzen der Zuordnung ohne Modulrecht ist 403, Storno löst die Flächen im selbe
 `0119` ist der erste Rebuild von `lage_zone`. Herleitung:
 `openspec/changes/lfh-673-betreuung-auf-der-lagekarte/design.md`.
 
+**Verbleib „Notunterkunft“ → Betreuungsstelle (LFH-674).** Der Verbleib trägt nur die
+**Kennung** der Stelle (`person_verbleib.betreuungsstelle_id`, Cache
+`einsatz_person.aktuelle_verbleib_betreuungsstelle_id`, `0121`). Den Namen belegt der
+**Client** sichtbar und änderbar im Ziel vor. Der Server kopiert keinen Stellennamen in Ziel,
+Kurzform oder ETB. Die Prüfkette ist 422 (andere Art) → 403 (kein Betreuungsrecht, **vor** jedem
+Lesen der Stelle) → 404 → 409 (storniert). Eine geschlossene Stelle ist erlaubt. **„davon
+namentlich n“** rechnet die Route `…/betreuung` und **nicht** `repo::uebersicht`, denn die
+speist auch den gesicherten Lagestand. Ohne Personenrecht **fehlt** das Feld. Die Zahl geht in
+keine Belegung, Kopfzahl oder Summe ein, führend bleibt die Mengenmeldung. Live nachgeführt
+wird sie über `EINSATZ_STREAM_EVENTS.person → betreuung`, ein zweites Server-Ereignis gibt es
+nicht. Das kostet je Personen-Ereignis ein `GET …/betreuung` auf **jeder** Einsatzseite, weil
+`useModulZaehler` die Query dort hält. Das ist bewusst angenommen: Ein `betreuung`-Ereignis
+erreichte auch Lesende ohne Personenrecht und verriete ihnen den Takt der Zuordnungen. `betreuungsstelle` ist seitdem **kein Leaf** mehr, ein Rebuild braucht den FK-Schalter.
+Herleitung: `openspec/changes/lfh-674-verbleib-notunterkunft-betreuungsstelle/design.md`.
+**Meldeverlauf der Betreuung (LFH-676).** `GET …/bezirke/{bid}/staende` und
+`…/stellen/{sid}/belegungen` liefern die ganze Reihe samt zurückgenommener Meldungen, in der
+Ordnung von `juengste_meldung!` (`meldereihenfolge!` in `src/betreuung/repo.rs`). `aktuell`
+kommt aus dem **Zeiger** am Objekt, nie aus einer zweiten Rechnung, auch nicht im Client. Ein
+fremdes Objekt ist 404, bevor die Reihe gelesen wird, sonst sähe „fremd“ aus wie „ohne
+Meldung“. **Nachgetragen heißt im Verlauf ≥ 60 s zwischen Zeitpunkt und Erfassung**
+(`istNachgetragen`, dieselbe Schwelle wie das ⧖ im ETB). Die Nachtragung im Sinn von
+LFH-639 D5 („vor dem damals aktuellen“) ist nicht gespeichert. Die Rücknahme aus dem
+Verlauf ist unumkehrbar und hat deshalb eine Rückfrage. Sie läuft über eine **eigene**
+Mutation in `betreuung/MeldeVerlauf.tsx`: die der Seite melden über `SeitenHinweise`, der
+Grund stünde sonst doppelt. Der Aufklappweg ist `Datensicht.aufklappen`: beschriftet, mit
+Zeilenkennung im Namen, in Karte **und** Tabelle mit einem Zustand, Inhalt erst beim
+Aufklappen gerendert. In der Tabelle steht der Auslöser in der fixierten Kennungszelle,
+ohne eigene Aufklappspalte: hinter der Kennung glitt eine solche Spalte bei 390 px unter sie
+(Gate 1, gemessen), an Position 0 erbte sie deren `fixed`. Die Bestands-Prop `aufklappzeile` (antds 16-px-Symbol, nur Tabelle)
+verschwindet mit LFH-697. Herleitung: `openspec/changes/lfh-676-betreuung-meldeverlauf/design.md`.
+
+**Stand- und Belegungsmeldungen sind offline-fähig (LFH-675).** Sie laufen über die
+Offline-Queue (`offline/schreiben.ts`, Arten `stand`/`belegung`) mit `client_id`, eindeutig
+je Einsatz und Meldereihe (`0122`). Der Replay-Lookup läuft **vor** jeder Zustandsprüfung,
+einmal vorab und einmal in der `BEGIN IMMEDIATE`-Transaktion. Eine gespeicherte Meldung kommt
+deshalb auch am stornierten Bezirk, an der geschlossenen Stelle und nach Einsatzende zurück
+(`EinsatzSchreibfreigabe`), ohne ETB-Eintrag und ohne Live-Ereignis. Ein Schlüssel an einem
+anderen Objekt ist 422. **Den Erfassungszeitpunkt trägt nur die vorgemerkte Kopie**, online
+gilt die Serveruhr. Sonst stempelte der Flush die Sendezeit, oder eine vorgehende Tablet-Uhr
+machte Online-Meldungen zu 400. Anlegen, Ändern, Rücknahmen und die Leermeldung bleiben
+online. Herleitung: `openspec/changes/lfh-675-betreuung-meldungen-offline/design.md`.
+
 **Sichtung ist eine eigene fachliche Farbachse am selben zentralen Ort**, keine A0-Rolle.
 `SichtungsTag` zeigt die feste Kennzeichnung aus `tokens.ts` als umrandetes Farbfeld:
 SK I rot, II gelb, III grün, IV blau, Tote schwarz; „unverletzt“ ohne erfundene Fachfarbe
@@ -222,7 +264,11 @@ abgelehnt — `SichtungsTag`/`sichtungsfarben` bleiben BBK.
 
 **Nachzug LFH-650 (gemessen, Prüfliste `2026-09-22-lfh-613-pruefliste.md`):** Blauer
 Bedien-TEXT nimmt `rollen.bedienText`, nicht antds `colorLink` — der Linkton trug auf einer
-Lückenzeile 5,93 (Tag) / 4,50 (Nacht). Personen-Marker tragen eine unsichtbare Trefferzone mit
+Lückenzeile 5,93 (Tag) / 4,50 (Nacht). Dasselbe gilt für den Radio-Knopf (LFH-677): antd schreibt
+seinen Text gewählt und unter dem Zeiger in `colorPrimary`, am Tag 6,59 auf Weiß.
+`index.css` (global geladen) setzt NUR diesen Text auf `--lfh-bedien-text`, nur im Stil
+`outline`. Ein Komponenten-Token
+`Radio.colorPrimary` färbte auch Scheibe und Flächen und ist deshalb verworfen. Personen-Marker tragen eine unsichtbare Trefferzone mit
 dem Durchmesser `controlHeight` (`KarteMarker.trefferDurchmesser`) und außen 2 px Schwarz um den
 weißen Rand (Weiß + Schwarz halten gegen jeden Grund ≥ 4,58); die Lagekarte setzt beides nicht.
 Personen-Cluster zeigen ihren Ring nach Sichtung und im Kern das Kürzel der dringlichsten
@@ -396,7 +442,9 @@ Platz hat.
 `pages/lagekarte/KartenFuss.tsx`). Zeichnen-Steuerung (`bottom: 16`, mittig) und
 Zeitachsen-/Snapshot-Leiste (`bottom: 12`, volle Breite) lagen beide absolut auf `zIndex: 5`
 über der Lagekarte. Bei Gleichstand gewinnt die spätere DOM-Position — die Leiste verdeckte
-im **Default-Zustand** (`lfh:lagekarte:zeitachse-eingeklappt` ungesetzt, also ausgeklappt)
+im **Default-Zustand** (`lfh:lagekarte:zeitachse-eingeklappt` ungesetzt, damals also
+ausgeklappt; seit dem Neuentwurf gilt das nur ab `xl`, darunter startet sie eingeklappt —
+`SnapshotLeiste.tsx`, `startEingeklappt`)
 „Abschließen"/„Abbrechen" vollständig; aus dem Zeichenmodus kam man nur über Tastatur oder
 Reload heraus. Der Fix ist **ein gemeinsamer, absolut positionierter Rahmen mit den Bändern
 als Flow-Geschwistern in einer Spalte**, nicht ein höherer `zIndex`: der hätte den Klick
@@ -416,10 +464,12 @@ wer eine Bedienbarkeit zusichern will, klickt. Und ein e2e-Test, der eine Überd
 Zustand ungetestet, den der Nutzer antrifft — die Umgehung gehört mit dem Fix weg, die
 Vorbedingung („die Leiste steht ausgeklappt da") bleibt stehen, sonst wird die Messung
 still wertlos statt rot. Gemessen wird in `e2e/lagekarte-smoke.spec.ts` mit echten
-Bounding-Boxen bei 1280 px und 1024 px. **Nicht bei 390 px**, und das ist eine Aussage
-statt einer Lücke: die Lagekarten-Sidebar ist fest 300 px breit, dort bliebe für die
-Kartenfläche nichts übrig — eine eigene Frage (Sidebar-Responsivität), kein Teil dieser
-Stapelentscheidung.
+Bounding-Boxen bei 1280 px und 1024 px. **Nicht bei 390 px — das ist heute eine Lücke,
+keine Aussage mehr** (LFH-100). Die frühere Begründung („die Sidebar ist fest 300 px breit,
+für die Kartenfläche bliebe nichts") ist seit dem Neuentwurf überholt: unter `lg` liegt die
+Leiste UNTER der Karte, auf dem Handschirm per Vorgabe zu. Den Querlauf der Lagekarte misst
+seit LFH-100 Gate 1 (`e2e/gate1-ueberlauf.spec.ts`, auch bei 768 und 390 px); die
+Klickbarkeit der gestapelten Bänder bei 390 px ist weiter ungemessen und gehört zu LFH-100.
 
 **Sprungmarken sind keine Module** (LFH-620, `einsatz/sprungmarken.ts`). Führt der
 Entwurf ein „Modul“, dessen Daten ein vorhandenes Modul schon trägt (Entscheidungen =
@@ -497,16 +547,40 @@ Alltag wichtigsten:
   ist am Spaltentyp deshalb gesperrt. Die begründete Ausnahme ist **eingelöst und begrenzt**:
   Dateikopf von `Datensicht.tsx` plus Abschnitt AK3b in
   `docs/superpowers/specs/2026-06-22-drawer-nutzung-reduzieren-design.md`.
+  **Die stehende Kopfzeile hält Freiraum** (LFH-677, WCAG 2.4.11): rückwärts getabbt rollt der
+  Browser das Ziel an den oberen Rand, und im Fükw lagen 30-px-Knöpfe dort vollständig hinter
+  der Kopfzeile. `KatalogTabelle` misst die Kopfzeile (`setzeKopfFreiraum`), `sprache.css`
+  setzt `scroll-margin-top` an jedes Ziel im Tabellenkörper. Ein Fokus-Nachweis unter einer
+  stehenden Kopfzeile läuft deshalb auch mit `Shift+Tab` (`fokus-kern.ts`, Parameter `taste`),
+  vorwärts rollt der Browser Ziele an den unteren Rand und damit nicht darunter.
 - **Dichte-Staffel 30 / 48 / 72 px** (kompakt aus LFH-352 · komfortabel = Material 48 dp ·
   Handschuh = 72 px ≙ 19,05 mm, MIL-STD-1472F Fig. 12). Träger ist ein **Dichte-Token am
   `ConfigProvider`**, nicht `componentSize` und keine punktuellen Größen-Props. **Neues
   punktuelles `size="small"` auf interaktiven Elementen ist verboten**, erzwungen von
   `components/dichte.guard.test.ts` mit einer Schuldmenge `OFFEN`, die nur schrumpfen darf
-  (Stand: nur noch die geprüfte Dauerausnahme, die vier Knöpfe der UHS-Platzkarte in
-  `pages/uhs/Grundriss.tsx`, gebunden an `SCHRITT_Y = 120`). Wer eine Zeile aus `OFFEN`
+  (Stand: nur noch die vier Knöpfe der UHS-Platzkarte in `pages/uhs/Grundriss.tsx` — seit
+  LFH-359 nur in `kompakt` gerendert, wo 24 px der Boden sind; in den Berührungsstufen ist die
+  Karte selbst das eine Ziel mit Aktionsmenü, `platzBedienform`). Wer eine Zeile aus `OFFEN`
   streicht, tut es im selben Commit wie den Fix und prüft `aktionsabstand.guard.test.ts` mit.
   `Card`/`Descriptions`/`Space`/`Liste` dürfen klein bleiben (Abstandsmaß, keine Trefffläche)
   und gehören nicht in `OFFEN`. `controlHeight` = **30/48/72**, `controlHeightSM` = **24/48/72**.
+  **Die Breite eines Knopfs hat einen Boden am Kontext** (LFH-381): `antdKnopf()` in
+  `theme/tokens.ts` gibt über `ConfigProvider button.style` jedem Knopf `minWidth` =
+  `controlHeightSM`, denn antds `paddingInlineSM` ist das Literal 7 und ein „OK" blieb in jeder
+  Stufe ~38 px breit. Ein Boden, keine Polsterung: breite Etiketten bleiben unberührt. Die eine
+  benannte Ausnahme (`minWidth: 0`, Aktionszeile der UHS-Platzkarte) ist mit LFH-379 gefallen:
+  die Zeile steht nur noch in `kompakt`, und dort ist der Boden das Quadrat, mit dem sie rechnet.
+  **Nicht jede antd-Komponente liest die Steuerhöhe** (LFH-380): der `Switch` rechnet seine
+  Höhe aus der Schrift (`fontSize × lineHeight` = `fontSize + 8`, also 21,5/23/23 px). `switchMasse` in
+  `theme/tokens.ts` bindet ihn über `antdKomponenten(farben, dichte)` an `controlHeightSM`
+  (24 × 48 · 48 × 96 · 72 × 144) und setzt den **ganzen** abhängigen Satz (Griff,
+  Mindestbreite, Innenränder), weil antd die übrigen aus der Schrift weiterrechnet. Wer eine
+  weitere Komponente so nachzieht, belegt die Durchleitung am CSS-Text der `css-var-…`-Klasse
+  und liest dort **`innerHTML`**, nicht `textContent`: der Testfilter aus LFH-623 streicht die
+  Variablen aus dem Text, die Regel stünde sonst immer leer da. Ein mitwachsender Schalter
+  sprengt eine **feste** Breite: in der 300-px-Lagekarten-Leiste bricht die Schalterzeile
+  deshalb um (`leistenZeileStil`/`namensteilStil` in `pages/lagekarte/Sidebar.tsx`, gemessen
+  in `e2e/lagekarte-leiste-dichte.spec.ts`), statt Namen auf „…" zu kürzen.
   **Ein handgebautes Bedienziel** (`role="option"`-Zeile, `<div onClick>`, Zeilen-`<Link>`,
   Kommandopalette) braucht **zwei** Angaben: `minHeight: token.controlHeight` **plus** `padding`
   aus `token.paddingSM`/`token.padding`, aus aufgelösten Tokens, nie `var(--lfh-*)`, geprüft über
@@ -531,9 +605,16 @@ Alltag wichtigsten:
 - **Die Sprungpalette öffnet auf drei Wegen, nach dem Raycast-Muster** (LFH-645): ↵ öffnet,
   **Strg/⌘+↵** (auch Strg/⌘+Klick) öffnet das Ziel im **neuen Browser-Tab**, **→** zeigt am
   Textende eine Lese-Vorschau **in** der Palette. Die Vorschau ersetzt die Liste; Esc/← führen
-  zurück, Begriff und Markierung bleiben. „⇧↵ im Panel“ aus dem Neuentwurf ist entfallen, ⇧↵
-  ist frei, und es gibt keine neue Drawer-Fläche. `Befehl.ziel` ist die Marke,
-  `ausfuehren(oeffnung?)` reicht `'neuerTab'` bis `navigate`. Navigationszeilen entstehen nur
+  zurück, Begriff und Markierung bleiben. **Für Finger und Maus** trägt jede Zeile mit Vorschau
+  rechts ein **Tippziel** (Chevron, LFH-665), an jeder solchen Zeile, nicht nur an der
+  markierten, denn Touch kennt kein Hover. Es ersetzt die frühere `kbd`-→-Marke. Das Ziel ist
+  kein `Button`, weil ein fokussierbarer Knopf der Combobox den Fokus nähme. Es ist ein
+  handgebautes Ziel mit `aria-hidden` und abgefangenem `mousedown`, sein Klick endet per
+  `stopPropagation`. Der Boden kommt aus `vorschauZielStil` (`zeilenStil.ts`): `controlHeight`
+  in Höhe und Breite, bündig an der Zeilenkante über die volle Zeilenhöhe. Die Zeile ist
+  content-box, darum zieht sich das Ziel um genau ihre Polsterung heraus. „⇧↵ im Panel“ aus
+  dem Neuentwurf ist entfallen, ⇧↵ ist frei, und es gibt keine neue Drawer-Fläche.
+  `Befehl.ziel` ist die Marke, `ausfuehren(oeffnung?)` reicht `'neuerTab'` bis `navigate`. Navigationszeilen entstehen nur
   über `sprungZu` (`command-palette/typen.ts`), die Guards in `befehle.test.ts` und
   `datensaetze.test.ts` prüfen das Durchreichen je Zeile. Die Fehlerrichtung ist sonst still:
   „neuer Tab“ öffnet dann hier. Eine Zeile ohne Ziel bleibt bei Strg/⌘+↵ wirkungslos, es gibt

@@ -7,6 +7,9 @@ import {
   queueLegacyEinreihenFuerTests,
   queueLeerenFuerTests,
   queueNichtZugeordnetZaehlen,
+  schreibaktionAblehnen,
+  schreibaktionEinreihen,
+  schreibaktionenLaden,
 } from './queue';
 
 beforeEach(async () => {
@@ -47,5 +50,44 @@ describe('OfflineRecoveryDrawer: nicht attribuierbare Legacy-Daten', () => {
     );
 
     await waitFor(async () => expect(await queueNichtZugeordnetZaehlen()).toBe(0));
+  });
+});
+
+describe('OfflineRecoveryDrawer: abgelehnte Betreuungsmeldungen (LFH-675)', () => {
+  it('benennt Art und Objekt und zeigt Grund und vollständigen Inhalt', async () => {
+    await schreibaktionEinreihen(11, 7, {
+      art: 'stand',
+      bezirk_id: 3,
+      bezeichnung: 'Uferstraße 12–40',
+      daten: {
+        evakuiert: 200,
+        erhebung: 'gezaehlt',
+        zeitpunkt_at: '2026-09-24 10:00:00',
+        client_id: 'stand-abgelehnt',
+      },
+    });
+    await schreibaktionEinreihen(11, 7, {
+      art: 'belegung',
+      stelle_id: 4,
+      bezeichnung: 'Turnhalle Ost',
+      daten: { belegt: 37, client_id: 'beleg-abgelehnt' },
+    });
+    const [stand, belegung] = await schreibaktionenLaden(11, 7);
+    await schreibaktionAblehnen(11, stand, 'Evakuierungsbezirk ‚Uferstraße 12–40‘ ist storniert');
+    await schreibaktionAblehnen(11, belegung, 'Betreuungsstelle ist geschlossen');
+
+    render(
+      <App>
+        <OfflineRecoveryDrawer open onClose={vi.fn()} benutzerId={11} />
+      </App>,
+    );
+
+    expect(
+      await screen.findByText('Abgelehnte Standmeldung: Uferstraße 12–40'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Abgelehnte Belegungsmeldung: Turnhalle Ost')).toBeInTheDocument();
+    expect(screen.getByText(/ist storniert/)).toBeInTheDocument();
+    expect(screen.getByText(/"client_id": "stand-abgelehnt"/)).toBeInTheDocument();
+    expect(screen.getByText(/"belegt": 37/)).toBeInTheDocument();
   });
 });

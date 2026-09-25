@@ -360,7 +360,7 @@ pub fn build_router(state: AppState) -> Router {
         )
         .route(
             "/api/einsaetze/{id}/betreuung/bezirke/{bid}/staende",
-            post(routes::betreuung::stand_melden),
+            get(routes::betreuung::stand_verlauf).post(routes::betreuung::stand_melden),
         )
         .route(
             "/api/einsaetze/{id}/betreuung/staende/{sid}/zuruecknehmen",
@@ -380,7 +380,7 @@ pub fn build_router(state: AppState) -> Router {
         )
         .route(
             "/api/einsaetze/{id}/betreuung/stellen/{sid}/belegungen",
-            post(routes::betreuung::belegung_melden),
+            get(routes::betreuung::belegung_verlauf).post(routes::betreuung::belegung_melden),
         )
         .route(
             "/api/einsaetze/{id}/betreuung/belegungen/{mid}/zuruecknehmen",
