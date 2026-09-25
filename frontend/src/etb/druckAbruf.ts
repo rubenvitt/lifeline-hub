@@ -73,6 +73,13 @@ async function alleSeiten(
  * BERICHTIGUNGS-DURCHGANG: Ist ein Filter aktiv (und zielt nicht selbst auf
  * Berichtigungen), fehlen einem gedruckten Eintrag sonst die Berichtigungen, die außerhalb
  * der Auswahl liegen — „berichtigt durch Nr. m" ginge verloren.
+ *
+ * BEKANNTE UNSCHÄRFE, bewusst hingenommen (Review Welle B): der Durchgang läuft NACH der
+ * Hauptschleife. Wird dazwischen eine Berichtigung geschrieben, kann ein gedruckter Eintrag
+ * „berichtigt durch Nr. m" tragen, obwohl der Kopf „bis Nr. X" mit X < m nennt. Falsch ist
+ * das nicht — die Berichtigung existiert, und sie ist neuer als der Stand der Liste —, der
+ * Kopf deckt sie nur nicht ab. Eine Kappung auf X verschwiege eine vorhandene Berichtigung
+ * auf einer Beweisunterlage; das wiegt schwerer als die Unschärfe im Kopf.
  */
 export async function ladeEtbVollstaendig(
   einsatzId: number,
