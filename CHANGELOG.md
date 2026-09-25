@@ -1,3 +1,25 @@
+## [1.0.0-alpha.46](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.45...v1.0.0-alpha.46) (2026-09-25)
+
+### Wichtige Änderungen
+
+Beim Export von Einsatzdaten (Archivierung, Datenübergabe) werden nun auch Freitexte in Chat-Kanälen, Chat-Nachrichten und Erinnerungen anonymisiert. Die Struktur (Zeitpunkte, Verfasser, Status) bleibt dabei erhalten.
+
+### Betreuung
+
+Für Betreuungsbezirke und -stellen steht jetzt ein Meldeverlauf zur Verfügung, der alle Stand- und Belegungsmeldungen chronologisch anzeigt – einschließlich nachgetragener und zurückgenommener Einträge. In der Datensicht lässt sich der Verlauf per Aufklappbereich ein- und ausblenden. Meldungen können einzeln zurückgenommen werden; eine Rückfrage schützt vor versehentlichen Änderungen.
+
+### Datenschutz und Archivierung
+
+Die DSGVO-konforme Schwärzung von Einsatzdaten wurde umfassend erweitert:
+
+- **Chat und Erinnerungen**: Kanalnamen, Nachrichteninhalte, Erinnerungstitel und -beschreibungen sowie Empfängerfunktionen werden beim Export anonymisiert. Gelöschte Nachrichten und Nachrichten mit Anhängen werden ebenfalls berücksichtigt.
+
+- **Lagekarte und Einsatzabschnitte**: Freitextfelder wie Abschnittsbemerkungen, Erreichbarkeit, Abschnittsaufträge, Hinweise zu Sprechgruppen, Kartennamen und Lage-Snapshots werden geschwärzt. Strukturierte Daten wie Kurzbezeichnungen, Labels und Kommunikationsmittel (Digitalfunk, Mobil, Festnetz) bleiben erhalten.
+
+- **Zonen und Gefahrengebiete**: Nutzer-Labels werden entfernt, während die geografischen Geometrien und die zugehörigen Einsatztagebuch-Einträge erhalten bleiben.
+
+- **Technische Absicherung**: Ein automatisierter Wächter prüft bei Datenmodell-Änderungen, dass keine personenbezogenen Daten durch neue Verknüpfungen versehentlich der Schwärzung entgehen. Kommunikationsmittel-Eingaben werden auf die zulässigen Werte geprüft.
+
 ## [1.0.0-alpha.45](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.44...v1.0.0-alpha.45) (2026-09-25)
 
 ### Lagekarte
