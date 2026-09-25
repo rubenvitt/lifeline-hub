@@ -107,6 +107,25 @@ pub fn ermittle_mime_aus(dateiname: &str, erlaubt: &[&str]) -> Result<String, Ap
     Ok(mime.to_string())
 }
 
+/// **Die eine Prüfkette vor jedem Persistieren** (LFH-21, design.md D3): Typ aus der Endung
+/// gegen `erlaubt`, Größe, Virenscan — in dieser Reihenfolge. Liefert den serverseitig
+/// ermittelten MIME. Gerufen von [`hochladen_multipart`] (generischer und ETB-Upload), der
+/// Dokumentenablage und der Schaden-Ablage; eine dritte Kopie der drei Aufrufe wäre die
+/// Stelle, an der die Wege bei der nächsten Prüfung (Content-Sniffing, LFH-114) still
+/// auseinanderliefen.
+pub async fn pruefe_vor_persist(
+    dateiname: &str,
+    daten: &[u8],
+    erlaubt: &[&str],
+) -> Result<String, AppError> {
+    let mime = ermittle_mime_aus(dateiname, erlaubt)?;
+    pruefe_groesse(daten.len())?;
+    // AV-Scan (LFH-114): scan-vor-persist gegen clamd (config-getrieben, Default
+    // fail-closed). Ohne konfigurierten clamd ein No-op.
+    scan(scan_config(), daten).await?;
+    Ok(mime)
+}
+
 /// Liest alle Datei-Felder eines Multipart-Uploads, prüft je Feld Endung gegen `erlaubt`,
 /// Größe und Virenscan (scan-vor-persist) und legt jede Datei als ungebundenen Anhang des
 /// Einsatzes an. Felder ohne Dateiname werden übersprungen; kommt keine Datei an, ist das
@@ -141,15 +160,15 @@ pub async fn hochladen_multipart(
         let Some(dateiname) = feld.file_name().map(str::to_string) else {
             continue;
         };
-        let mime = ermittle_mime_aus(&dateiname, erlaubt)?;
+        // Frühe Endungsprüfung VOR dem Lesen der Bytes: ein verbotener Typ wird ohne Lesen
+        // abgewiesen, auch über dem Body-Limit. `pruefe_vor_persist` prüft sie danach noch
+        // einmal mit — das kostet nichts und hält die Kette an einer Stelle.
+        ermittle_mime_aus(&dateiname, erlaubt)?;
         let daten = feld
             .bytes()
             .await
             .map_err(|e| AppError::Validation(format!("Datei lesen fehlgeschlagen: {e}")))?;
-        pruefe_groesse(daten.len())?;
-        // AV-Scan (LFH-114): scan-vor-persist gegen clamd (config-getrieben, Default
-        // fail-closed). Ohne konfigurierten clamd ein No-op.
-        scan(scan_config(), &daten).await?;
+        let mime = pruefe_vor_persist(&dateiname, &daten, erlaubt).await?;
         let a = repo::anlegen(pool, einsatz_id, hochgeladen_von, &dateiname, &mime, &daten).await?;
         angelegt.push(a);
     }
