@@ -396,7 +396,9 @@ Platz hat.
 `pages/lagekarte/KartenFuss.tsx`). Zeichnen-Steuerung (`bottom: 16`, mittig) und
 Zeitachsen-/Snapshot-Leiste (`bottom: 12`, volle Breite) lagen beide absolut auf `zIndex: 5`
 über der Lagekarte. Bei Gleichstand gewinnt die spätere DOM-Position — die Leiste verdeckte
-im **Default-Zustand** (`lfh:lagekarte:zeitachse-eingeklappt` ungesetzt, also ausgeklappt)
+im **Default-Zustand** (`lfh:lagekarte:zeitachse-eingeklappt` ungesetzt, damals also
+ausgeklappt; seit dem Neuentwurf gilt das nur ab `xl`, darunter startet sie eingeklappt —
+`SnapshotLeiste.tsx`, `startEingeklappt`)
 „Abschließen"/„Abbrechen" vollständig; aus dem Zeichenmodus kam man nur über Tastatur oder
 Reload heraus. Der Fix ist **ein gemeinsamer, absolut positionierter Rahmen mit den Bändern
 als Flow-Geschwistern in einer Spalte**, nicht ein höherer `zIndex`: der hätte den Klick
@@ -416,10 +418,12 @@ wer eine Bedienbarkeit zusichern will, klickt. Und ein e2e-Test, der eine Überd
 Zustand ungetestet, den der Nutzer antrifft — die Umgehung gehört mit dem Fix weg, die
 Vorbedingung („die Leiste steht ausgeklappt da") bleibt stehen, sonst wird die Messung
 still wertlos statt rot. Gemessen wird in `e2e/lagekarte-smoke.spec.ts` mit echten
-Bounding-Boxen bei 1280 px und 1024 px. **Nicht bei 390 px**, und das ist eine Aussage
-statt einer Lücke: die Lagekarten-Sidebar ist fest 300 px breit, dort bliebe für die
-Kartenfläche nichts übrig — eine eigene Frage (Sidebar-Responsivität), kein Teil dieser
-Stapelentscheidung.
+Bounding-Boxen bei 1280 px und 1024 px. **Nicht bei 390 px — das ist heute eine Lücke,
+keine Aussage mehr** (LFH-100). Die frühere Begründung („die Sidebar ist fest 300 px breit,
+für die Kartenfläche bliebe nichts") ist seit dem Neuentwurf überholt: unter `lg` liegt die
+Leiste UNTER der Karte, auf dem Handschirm per Vorgabe zu. Den Querlauf der Lagekarte misst
+seit LFH-100 Gate 1 (`e2e/gate1-ueberlauf.spec.ts`, auch bei 768 und 390 px); die
+Klickbarkeit der gestapelten Bänder bei 390 px ist weiter ungemessen und gehört zu LFH-100.
 
 **Sprungmarken sind keine Module** (LFH-620, `einsatz/sprungmarken.ts`). Führt der
 Entwurf ein „Modul“, dessen Daten ein vorhandenes Modul schon trägt (Entscheidungen =
