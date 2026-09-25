@@ -7,6 +7,7 @@ import Schnellerfassung, { nurUebernahme, VERSAND_RUHE, type Versand } from '../
 import type { MetadatenWerte } from '../schnellerfassungModell';
 import { entwurfLabel, zuWerte } from './entwurfModell';
 import { useEtbEntwuerfe } from './useEtbEntwuerfe';
+import { useEntwurfsDateien, type EntwurfsDateien } from './useEntwurfsDateien';
 
 export interface EtbEntwurfsTabsProps {
   einsatzId: number;
@@ -24,6 +25,8 @@ export interface EtbEntwurfsTabsProps {
    * verlöre dabei seinen sichtbaren Zustand.
    */
   onSendetChange?: (sendet: boolean) => void;
+  /** Gewählte Anhänge je Entwurf; fehlt es, führt der Container sie selbst. */
+  dateien?: EntwurfsDateien;
 }
 
 /** Stabile leere Liste: ein frisches `[]` je Render wäre für die Schnellerfassung jedes Mal neu. */
@@ -38,6 +41,7 @@ export default function EtbEntwurfsTabs({
   werteBehalten,
   onWerteBehaltenChange,
   onSendetChange,
+  dateien: dateienVonAussen,
 }: EtbEntwurfsTabsProps) {
   const {
     entwuerfe,
@@ -45,6 +49,7 @@ export default function EtbEntwurfsTabs({
     neuerEntwurf,
     entwurfSchliessen,
     entwurfAktualisieren,
+    entwurfFesthalten,
     aktivenSetzen,
   } = useEtbEntwuerfe(einsatzId, einsatz.meine_fuehrungsstelle, kontextLaedt);
 
@@ -68,22 +73,12 @@ export default function EtbEntwurfsTabs({
    */
   const [uebernahme, setUebernahme] = useState<MetadatenWerte>({});
 
-  /**
-   * Gewählte Anhänge je Entwurf (LFH-117, design.md D9). Nur der aktive Tab ist montiert,
-   * also liegen die Dateien hier und nicht in der Schnellerfassung — sonst gingen sie beim
-   * Tabwechsel verloren. Bewusst NUR im Speicher: der Entwurfsspeicher (IndexedDB) ist JSON,
-   * und eine Datei überlebt einen Reload ohnehin nicht als `File`. Schliesst ein Entwurf,
-   * fällt sein Eintrag weg.
-   */
-  const [dateienJe, setDateienJe] = useState<Record<string, File[]>>({});
-  const dateienVerwerfen = useCallback((id: string) => {
-    setDateienJe((alt) => {
-      if (!(id in alt)) return alt;
-      const rest = { ...alt };
-      delete rest[id];
-      return rest;
-    });
-  }, []);
+  // Gewählte Anhänge je Entwurf (LFH-117, D9): nur der aktive Tab ist montiert, also liegen
+  // sie nicht in der Schnellerfassung. Vorzugsweise vom Aufrufer geführt (`EtbPage`), damit sie
+  // auch eine Berichtigung überleben — s. `useEntwurfsDateien`.
+  const eigeneDateien = useEntwurfsDateien();
+  const dateien = dateienVonAussen ?? eigeneDateien;
+  const dateienVerwerfen = dateien.verwerfen;
 
   /**
    * Sendezustand je Entwurf (LFH-117, Review C1) — aus demselben Grund hier wie die Dateien:
@@ -167,8 +162,11 @@ export default function EtbEntwurfsTabs({
           // Die Entwurfs-id ist der Idempotenzschlüssel: sie überlebt den Remount beim
           // Tabwechsel, ein zweites Absenden während des ersten dedupliziert der Server.
           clientId={e.id}
-          dateien={dateienJe[e.id] ?? KEINE_DATEIEN}
-          onDateienChange={(d) => setDateienJe((alt) => ({ ...alt, [e.id]: d }))}
+          dateien={dateien.je[e.id] ?? KEINE_DATEIEN}
+          onDateienChange={(d) => {
+            dateien.setzen(e.id, d);
+            if (d.length > 0) entwurfFesthalten(e.id);
+          }}
           versand={versandJe[e.id] ?? VERSAND_RUHE}
           onVersandChange={(a) => versandAendern(e.id, a)}
         />

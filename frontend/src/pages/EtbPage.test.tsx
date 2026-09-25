@@ -1100,6 +1100,49 @@ describe('EtbPage – Anhänge an der Erfassung (LFH-117, Review C1)', () => {
     return el;
   }
 
+  it('eine abgebrochene Berichtigung lässt die gewählten Dateien der Entwürfe stehen', async () => {
+    setup();
+    const user = userEvent.setup();
+    await screen.findByText('Erste Meldung');
+    const feld = await screen.findByPlaceholderText(/Inhalt/);
+    await user.type(feld, 'Zwei Fotos vom Deich');
+    await user.upload(dateiEingabe(), new File(['x'], 'foto-a.jpg', { type: 'image/jpeg' }));
+    expect(screen.getByRole('list', { name: 'Gewählte Anhänge' })).toHaveTextContent('foto-a.jpg');
+    await waitFor(async () =>
+      expect((await entwuerfeLaden(7))[0]?.inhalt).toBe('Zwei Fotos vom Deich'),
+    );
+
+    await waehleZeilenaktion(user, 'Berichtigen');
+    await screen.findByText(/Berichtigung zu Nr\./);
+    await user.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    await waitFor(() => expect(screen.queryByText(/Berichtigung zu Nr\./)).toBeNull());
+
+    expect(await screen.findByPlaceholderText(/Inhalt/)).toHaveValue('Zwei Fotos vom Deich');
+    expect(await screen.findByRole('list', { name: 'Gewählte Anhänge' })).toHaveTextContent(
+      'foto-a.jpg',
+    );
+  });
+
+  it('hält auch einen Entwurf, der nur Dateien trägt, über die Berichtigung', async () => {
+    setup();
+    const user = userEvent.setup();
+    await screen.findByText('Erste Meldung');
+    await screen.findByPlaceholderText(/Inhalt/);
+    await user.upload(dateiEingabe(), new File(['x'], 'foto-b.jpg', { type: 'image/jpeg' }));
+    // Ein Entwurf ohne Text läge sonst nur im Speicher: nach dem Abbrechen käme ein neuer mit
+    // neuer id, und die Dateien hingen an keinem Reiter mehr.
+    await waitFor(async () => expect(await entwuerfeLaden(7)).toHaveLength(1));
+
+    await waehleZeilenaktion(user, 'Berichtigen');
+    await screen.findByText(/Berichtigung zu Nr\./);
+    await user.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    await waitFor(() => expect(screen.queryByText(/Berichtigung zu Nr\./)).toBeNull());
+
+    expect(await screen.findByRole('list', { name: 'Gewählte Anhänge' })).toHaveTextContent(
+      'foto-b.jpg',
+    );
+  });
+
   it('sperrt „Berichtigen", solange ein Entwurf sendet — mit Grund', async () => {
     setup('/einsaetze/7/etb', [
       http.post('/api/einsaetze/7/etb/anhaenge', () => new Promise<Response>(() => {})),

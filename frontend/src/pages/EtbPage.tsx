@@ -30,6 +30,7 @@ import WiedervorlageModal from '../etb/WiedervorlageModal';
 import AuftragAusEtbModal from '../etb/AuftragAusEtbModal';
 import Schnellerfassung from '../etb/Schnellerfassung';
 import EtbEntwurfsTabs from '../etb/entwuerfe/EtbEntwurfsTabs';
+import { useEntwurfsDateien } from '../etb/entwuerfe/useEntwurfsDateien';
 import { useEtbErfassung } from '../offline/useEtbErfassung';
 import { baueZeilen } from '../etb/etbZeile';
 import { scrolleZurZeile } from '../components/Datensicht';
@@ -229,6 +230,8 @@ export default function EtbPage() {
    * seinen sichtbaren Zustand samt einem möglichen Fehlergrund.
    */
   const [entwurfSendet, setEntwurfSendet] = useState(false);
+  /** Gewählte Anhänge je Entwurf — hier, damit sie eine Berichtigung überleben (LFH-117). */
+  const entwurfsDateien = useEntwurfsDateien();
   const [wiedervorlageZu, setWiedervorlageZu] = useState<{
     eintrag: EtbEintragAnzeige;
     termin?: string | null;
@@ -500,6 +503,7 @@ export default function EtbPage() {
           werteBehalten={werteBehalten}
           onWerteBehaltenChange={setWerteBehalten}
           onSendetChange={setEntwurfSendet}
+          dateien={entwurfsDateien}
         />
       )}
     </div>

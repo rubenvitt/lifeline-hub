@@ -120,6 +120,17 @@ export function useEtbEntwuerfe(
     }
   }, []);
 
+  /**
+   * Sichert einen Entwurf auch ohne Wert (LFH-117, Review C1): trägt er gewählte Dateien, muss
+   * seine id einen Remount der Reiter überleben (Berichtigung), sonst hingen die Dateien nach
+   * dem Neuladen an keinem Entwurf mehr. Ein leerer Entwurf entfällt beim nächsten leeren
+   * Aktualisieren wie bisher.
+   */
+  const entwurfFesthalten = useCallback((id: string) => {
+    const bestand = entwuerfeRef.current.find((e) => e.id === id);
+    if (bestand) void entwurfSpeichern(bestand);
+  }, []);
+
   const entwurfSchliessen = useCallback(
     async (id: string, metadaten: MetadatenWerte = {}) => {
       await entwurfEntfernen(id);
@@ -155,6 +166,7 @@ export function useEtbEntwuerfe(
     neuerEntwurf,
     entwurfSchliessen,
     entwurfAktualisieren,
+    entwurfFesthalten,
     aktivenSetzen,
   };
 }
