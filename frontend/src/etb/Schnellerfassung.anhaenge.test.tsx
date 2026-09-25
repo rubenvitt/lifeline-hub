@@ -421,7 +421,8 @@ describe('Schnellerfassung – Sendezustand (LFH-117, Review)', () => {
     let freigeben: (a: Anhang) => void = () => {};
     hochladen.mockImplementationOnce(() => new Promise((r) => (freigeben = r)));
     const p = props({
-      initialWerte: { inhalt: '', typ: 'meldung', metadaten: { an: 'Florian 1', von: 'Kater 2' } },
+      // Typ `lage`: dann steht auch der Sprung zum strukturierten Lagebericht in der Erfassung.
+      initialWerte: { inhalt: '', typ: 'lage', metadaten: { an: 'Florian 1', von: 'Kater 2' } },
       werteBehalten: false,
       onWerteBehaltenChange: vi.fn(),
       bausteine: [{ id: 3, titel: 'Lage', inhalt: 'Text' } as unknown as EtbBaustein],
@@ -430,6 +431,7 @@ describe('Schnellerfassung – Sendezustand (LFH-117, Review)', () => {
     await waehle(container, datei('a.jpg'));
     await userEvent.type(feld(), 'Foto{Enter}');
     await screen.findByText('Lädt hoch (1/1) …');
+    expect(screen.getByText(/Als strukturierten Lagebericht erfassen/)).toBeInTheDocument();
 
     const bereich = container.querySelector<HTMLElement>('[data-lfh="etb-erfassung"]')!;
     const ausnahmen = new Set(['Vorschau']);
@@ -458,7 +460,7 @@ describe('Schnellerfassung – Sendezustand (LFH-117, Review)', () => {
     await act(async () => freigeben(anzeige(1, 'a.jpg')));
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
     expect(vi.mocked(p.erfassen).mock.calls[0][0]).toMatchObject({
-      typ: 'meldung',
+      typ: 'lage',
       an: 'Florian 1',
       von: 'Kater 2',
     });

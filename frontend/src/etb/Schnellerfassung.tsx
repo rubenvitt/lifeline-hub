@@ -841,7 +841,13 @@ export default function Schnellerfassung({
           {!istSchmal && feldKnopf}
           {!istSchmal && anhangTeil}
           {!berichtigungZu && typ === 'lage' && (
-            <Button type="link" onClick={() => navigate(`/einsaetze/${einsatz.id}/lageberichte`)}>
+            // Gesperrt beim Senden: der Sprung hängte die Erfassung ab, der Versand liefe
+            // unsichtbar weiter und ein Upload-Fehler stünde nirgends (Review C1).
+            <Button
+              type="link"
+              disabled={sendet}
+              onClick={() => navigate(`/einsaetze/${einsatz.id}/lageberichte`)}
+            >
               Als strukturierten Lagebericht erfassen →
             </Button>
           )}
