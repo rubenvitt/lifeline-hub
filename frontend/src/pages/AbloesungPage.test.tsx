@@ -436,7 +436,11 @@ describe('AbloesungPage (LFH-635)', () => {
       laufendLiefert([eins(), vier(), drei()]);
       const { client } = renderPage();
       await screen.findAllByRole('article');
-      laufendLiefert([eins(), schicht({ id: 4, faellig_at: inMinuten(150) }), drei()]);
+      // 145 statt 150 min (LFH-373, in der CI rot): die Karte rechnet mit dem „Jetzt" vom
+      // Einhängen, die Fälligkeit entsteht erst hier. Lag auf dem langsamen Runner mehr als eine
+      // Sekunde dazwischen, stand „in 2 h 30 min" da und der Test fiel. Mit 145 min trägt die
+      // Erwartung „2 h 2x" einige Minuten Drift in beide Richtungen.
+      laufendLiefert([eins(), schicht({ id: 4, faellig_at: inMinuten(145) }), drei()]);
       await client.invalidateQueries();
       await waitFor(() =>
         expect(
