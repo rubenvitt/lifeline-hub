@@ -237,7 +237,11 @@ abgelehnt — `SichtungsTag`/`sichtungsfarben` bleiben BBK.
 
 **Nachzug LFH-650 (gemessen, Prüfliste `2026-09-22-lfh-613-pruefliste.md`):** Blauer
 Bedien-TEXT nimmt `rollen.bedienText`, nicht antds `colorLink` — der Linkton trug auf einer
-Lückenzeile 5,93 (Tag) / 4,50 (Nacht). Personen-Marker tragen eine unsichtbare Trefferzone mit
+Lückenzeile 5,93 (Tag) / 4,50 (Nacht). Dasselbe gilt für den Radio-Knopf (LFH-677): antd schreibt
+seinen Text gewählt und unter dem Zeiger in `colorPrimary`, am Tag 6,59 auf Weiß.
+`index.css` (global geladen) setzt NUR diesen Text auf `--lfh-bedien-text`, nur im Stil
+`outline`. Ein Komponenten-Token
+`Radio.colorPrimary` färbte auch Scheibe und Flächen und ist deshalb verworfen. Personen-Marker tragen eine unsichtbare Trefferzone mit
 dem Durchmesser `controlHeight` (`KarteMarker.trefferDurchmesser`) und außen 2 px Schwarz um den
 weißen Rand (Weiß + Schwarz halten gegen jeden Grund ≥ 4,58); die Lagekarte setzt beides nicht.
 Personen-Cluster zeigen ihren Ring nach Sichtung und im Kern das Kürzel der dringlichsten
@@ -516,6 +520,12 @@ Alltag wichtigsten:
   ist am Spaltentyp deshalb gesperrt. Die begründete Ausnahme ist **eingelöst und begrenzt**:
   Dateikopf von `Datensicht.tsx` plus Abschnitt AK3b in
   `docs/superpowers/specs/2026-06-22-drawer-nutzung-reduzieren-design.md`.
+  **Die stehende Kopfzeile hält Freiraum** (LFH-677, WCAG 2.4.11): rückwärts getabbt rollt der
+  Browser das Ziel an den oberen Rand, und im Fükw lagen 30-px-Knöpfe dort vollständig hinter
+  der Kopfzeile. `KatalogTabelle` misst die Kopfzeile (`setzeKopfFreiraum`), `sprache.css`
+  setzt `scroll-margin-top` an jedes Ziel im Tabellenkörper. Ein Fokus-Nachweis unter einer
+  stehenden Kopfzeile läuft deshalb auch mit `Shift+Tab` (`fokus-kern.ts`, Parameter `taste`),
+  vorwärts rollt der Browser Ziele an den unteren Rand und damit nicht darunter.
 - **Dichte-Staffel 30 / 48 / 72 px** (kompakt aus LFH-352 · komfortabel = Material 48 dp ·
   Handschuh = 72 px ≙ 19,05 mm, MIL-STD-1472F Fig. 12). Träger ist ein **Dichte-Token am
   `ConfigProvider`**, nicht `componentSize` und keine punktuellen Größen-Props. **Neues

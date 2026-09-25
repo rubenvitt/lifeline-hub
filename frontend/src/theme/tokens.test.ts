@@ -20,6 +20,11 @@ import { seitenrinne } from './tokens';
 import { navDrawerBreite } from './tokens';
 // Ebenfalls eigene Zeile (LFH-380).
 import { antdKomponenten, switchMasse } from './tokens';
+// Eigene Zeile (LFH-677), aus demselben Grund.
+import { farbenDunkel } from './tokens';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 /** `ThemeConfig['token']` ist optional getypt — hier nicht wegcasten, sondern
  *  laut scheitern, wenn `antdToken` nichts liefert. */
@@ -213,5 +218,41 @@ describe('Switch-Maße (LFH-380)', () => {
     expect(antdKomponenten(farbenHell, 'kompakt').Switch).toMatchObject({ trackHeight: 24 });
     expect(antdKomponenten(farbenHell, 'komfortabel').Switch).toMatchObject({ trackHeight: 48 });
     expect(antdKomponenten(farbenHell, 'handschuh').Switch).toMatchObject({ trackHeight: 72 });
+  });
+});
+
+/**
+ * Der gewählte Radio-Knopf (Knopfform) schreibt seinen TEXT in antds `colorPrimary` — am Tag
+ * `bedien` auf Weiß, gemessen 6,59 : 1 und damit unter dem Tagesboden 7 : 1 (LFH-677,
+ * `e2e/betreuung-pruefliste.spec.ts`). Blauer Bedien-TEXT nimmt `bedienText` (LFH-650).
+ *
+ * Die Regel sitzt im global geladenen `index.css` und trifft NUR den Text. Ein Komponenten-Token
+ * `Radio.colorPrimary` war der erste Anlauf und ist verworfen (Review LFH-677): antd rechnet
+ * daraus auch die gefüllte Scheibe des normalen Radios, die Fläche des Knopfstils `solid` und
+ * die Hover-Fläche — nachts stand der weiße Punkt dann auf `#8ec2f0` bei rund 1,9 : 1.
+ */
+describe('Radio-Knopf: Text in bedienText (LFH-677)', () => {
+  // `index.css` lädt global (`main.tsx`); `sprache.css` nur mit den Bausteinen, die es importieren.
+  const css = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), '..', 'index.css'),
+    'utf8',
+  );
+
+  it('der gewählte Knopf und der Knopf unter dem Zeiger lesen --lfh-bedien-text', () => {
+    const regel = /([^{}]*)\{\s*color:\s*var\(--lfh-bedien-text\);\s*\}/.exec(css);
+    expect(regel, 'Regel mit color: var(--lfh-bedien-text)').not.toBeNull();
+    const selektoren = regel![1];
+    expect(selektoren).toContain('.ant-radio-button-wrapper-checked');
+    // Nur der Stil `outline`: im Stil `solid` stünde `bedienText` auf satter `bedien`-Fläche.
+    expect(selektoren).toContain('.ant-radio-group-outline ');
+    expect(selektoren).not.toMatch(/\.ant-radio-group[\s:]/);
+    expect(selektoren).toContain(':hover');
+    // Gesperrte Knöpfe behalten antds Sperrfarbe.
+    expect(selektoren).toContain(':not(.ant-radio-button-wrapper-disabled)');
+  });
+
+  it('kein Komponenten-Token für das Radio — der färbte auch Scheibe und Flächen', () => {
+    expect(antdKomponenten(farbenHell, 'kompakt').Radio).toBeUndefined();
+    expect(antdKomponenten(farbenDunkel, 'kompakt').Radio).toBeUndefined();
   });
 });
