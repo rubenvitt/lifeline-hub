@@ -10,8 +10,13 @@
 
    ZWEI QUELLEN, EINE WAHRHEIT: dieselben Werte stehen typisiert in `tokens.ts`
    (für antd) und hier (für handgeschriebenes CSS). Das ist bewusste Redundanz —
-   CSS kann kein TS importieren, solange `cssVar` nicht aktiv ist (die Weiche ist
-   nach A2/LFH-328 vertagt). Gegen Drift schützt `rollen.guard.test.ts`: er parst
+   die zwei Quellen bleiben getrennt, damit handgeschriebenes CSS nicht an antds
+   Variablennamen hängt. Dass antd keine Variablen hätte, ist NICHT der Grund:
+   antd 6 emittiert `--ant-*` immer, auch ohne `cssVar` am ConfigProvider
+   (gemessen in LFH-623, `test/antdCssVariablen.ts`). Laut derselben Messung gelten
+   sie nur unter antds Klasse `css-var-root`, also an antd-Komponenten und nicht an
+   `<html>`. Und die meisten Rollen hier (Paneel, Kopf, Fläche 3, die deckenden
+   Statusflächen) kennt antd gar nicht. Gegen Drift schützt `rollen.guard.test.ts`: er parst
    diese Datei und vergleicht sie Wert für Wert mit `tokens.ts`. Wer hier etwas
    ändert und dort nicht, bricht den Test.
 
