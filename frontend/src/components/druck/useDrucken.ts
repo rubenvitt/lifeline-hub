@@ -5,6 +5,13 @@ import { globalKeys } from '../../api/queryKeys';
 
 export type DruckZustand = 'bereit' | 'laedt' | 'fehler';
 
+/**
+ * Höchstwartezeit auf `decode()` des Logos. Ein Bildabruf, der nie antwortet (hängender
+ * Proxy, abgerissene Verbindung), hielte den Druckdialog sonst für immer zurück — der Klick
+ * täte scheinbar nichts. Danach wird ohne Logo gedruckt, wie beim Dekodierfehler.
+ */
+export const LOGO_FRIST_MS = 3_000;
+
 export interface Drucken {
   /** Fordert den Druckdialog an; er öffnet sich, sobald der Druckkopf vollständig ist. */
   drucken: () => void;
@@ -37,22 +44,31 @@ export function useDrucken(): Drucken {
   });
   const [anforderung, setAnforderung] = useState(0);
   const erledigt = useRef(0);
+  /**
+   * Bereit heißt „Daten da", nicht „letzter Abruf gelungen": in TanStack v5 steht nach einem
+   * gescheiterten HINTERGRUND-Refetch `isError` auf true, `data` aber bleibt. Der Kopf hat
+   * dann alles, was er braucht — gesperrt wäre der Knopf ohne Grund, und eine offene
+   * Anforderung verfiele still. Ein Fehler zählt nur, solange es keine Daten gibt.
+   */
+  const bereit = organisation.data !== undefined;
+  const gescheitert = !bereit && organisation.isError;
 
   useEffect(() => {
     if (anforderung === erledigt.current) return;
-    if (organisation.isError) {
+    if (gescheitert) {
       erledigt.current = anforderung;
       return;
     }
-    if (!organisation.isSuccess) return;
+    if (!bereit) return;
     // `window.print()` NIE direkt aus dem Effekt: es feuert `beforeprint` synchron, und im
     // Passiv-Effekt steht React noch im Commit-Kontext — das `flushSync` der Listener
     // (Druckkopf: Druckzeit, KatalogTabelle: Druckform) rendert dort nicht, das Blatt trüge
     // den Stand vom Seitenaufbau. Deshalb immer erst nach einem Takt Aufschub.
     //
     // Das Logo im Druckkopf muss dekodiert sein, bevor das Druckbild einfriert — ein
-    // nicht geladenes Bild fehlt dort, oder es steht ein leerer Rahmen. Ein Fehler zählt
-    // als „ohne Logo drucken" (der Druckkopf nimmt das Bild dann weg); der Takt Aufschub
+    // nicht geladenes Bild fehlt dort, oder es steht ein leerer Rahmen. Gewartet wird
+    // höchstens `LOGO_FRIST_MS`. Ein Fehler oder die abgelaufene Frist zählt als „ohne Logo
+    // drucken" (der Druckkopf nimmt das Bild bei einem Fehler weg); der Takt Aufschub
     // stellt dann zugleich sicher, dass dessen Fehlerereignis verarbeitet ist.
     //
     // `erledigt` wird erst beim Drucken gesetzt, nicht beim Einplanen: fällt der Effekt
@@ -62,12 +78,20 @@ export function useDrucken(): Drucken {
       document.querySelectorAll<HTMLImageElement>('[data-lfh="druckkopf"] img'),
     );
     let abgebrochen = false;
-    void Promise.all(
+    let frist: ReturnType<typeof setTimeout> | undefined;
+    const dekodiert = Promise.all(
       logos.map((bild) =>
         typeof bild.decode === 'function' ? bild.decode().catch(() => undefined) : undefined,
       ),
-    )
-      .then(() => new Promise((weiter) => setTimeout(weiter, 0)))
+    );
+    const fristAbgelaufen = new Promise<void>((weiter) => {
+      frist = setTimeout(weiter, logos.length > 0 ? LOGO_FRIST_MS : 0);
+    });
+    void Promise.race([dekodiert, fristAbgelaufen])
+      .then(() => {
+        clearTimeout(frist);
+        return new Promise((weiter) => setTimeout(weiter, 0));
+      })
       .then(() => {
         if (abgebrochen) return;
         erledigt.current = anforderung;
@@ -75,17 +99,14 @@ export function useDrucken(): Drucken {
       });
     return () => {
       abgebrochen = true;
+      clearTimeout(frist);
     };
-  }, [anforderung, organisation.isSuccess, organisation.isError]);
+  }, [anforderung, bereit, gescheitert]);
 
   const drucken = useCallback(() => setAnforderung((n) => n + 1), []);
   const { refetch } = organisation;
   const wiederholen = useCallback(() => void refetch(), [refetch]);
 
-  const zustand: DruckZustand = organisation.isSuccess
-    ? 'bereit'
-    : organisation.isError
-      ? 'fehler'
-      : 'laedt';
+  const zustand: DruckZustand = bereit ? 'bereit' : gescheitert ? 'fehler' : 'laedt';
   return { drucken, zustand, wiederholen };
 }

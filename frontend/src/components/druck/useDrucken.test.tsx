@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
@@ -94,6 +94,35 @@ describe('useDrucken / DruckKnopf', () => {
       expect(screen.getByRole('button', { name: 'Drucken / als PDF' })).toBeEnabled(),
     );
     expect(drucke).not.toHaveBeenCalled();
+  });
+
+  /**
+   * TanStack v5: scheitert ein HINTERGRUND-Refetch, steht `isError` auf true, `data` aber
+   * bleibt. Der Kopf hat dann alles, was er braucht — gesperrt zu sein wäre eine Sperre ohne
+   * Grund, und eine offene Anforderung verfiele still. Bereit heißt „Daten da", nicht
+   * „letzter Abruf gelungen".
+   */
+  it('bleibt druckbar, wenn nur ein Refetch der Organisation scheitert und die Daten da sind', async () => {
+    let abrufe = 0;
+    server.use(
+      http.get('/api/organisation', () => {
+        abrufe += 1;
+        return HttpResponse.json({ error: 'Interner Serverfehler' }, { status: 500 });
+      }),
+    );
+    const client = neuerQueryClient();
+    client.setQueryData(['organisation'], ORG);
+    renderMitProviders(<DruckKnopf />, { client });
+    // Der Mount holt neu (staleTime 0 im Testclient) — und der Abruf scheitert.
+    await waitFor(() => expect(abrufe).toBeGreaterThan(0));
+    await waitFor(() => expect(client.getQueryState(['organisation'])?.status).toBe('error'));
+    expect(client.getQueryData(['organisation'])).toEqual(ORG);
+
+    expect(screen.queryByText(/Organisation nicht geladen/)).toBeNull();
+    const knopf = screen.getByRole('button', { name: 'Drucken / als PDF' });
+    expect(knopf).toBeEnabled();
+    await userEvent.click(knopf);
+    await waitFor(() => expect(drucke).toHaveBeenCalledTimes(1));
   });
 
   it('bleibt gesperrt, solange der Aufrufer sperrt (ETB: noch nicht vollständig geladen)', async () => {
@@ -196,6 +225,33 @@ describe('useDrucken / DruckKnopf', () => {
       expect(drucke).not.toHaveBeenCalled();
       fertig();
       await waitFor(() => expect(drucke).toHaveBeenCalledTimes(1));
+    });
+
+    /**
+     * Ein `decode()`, das nie antwortet (hängender Bildabruf, kaputter Proxy), hielt den
+     * Druckdialog für immer zurück — der Klick täte scheinbar nichts. Nach der Frist wird
+     * ohne Logo gedruckt, dieselbe Semantik wie beim Dekodierfehler.
+     */
+    it('druckt nach der Frist ohne Logo, wenn decode() nie antwortet', async () => {
+      decode.mockReturnValue(new Promise<void>(() => {}));
+      seite();
+      await waitFor(() => expect(document.querySelector('.druckkopf__logo')).not.toBeNull());
+      const knopf = screen.getByRole('button', { name: 'Drucken / als PDF' });
+      await waitFor(() => expect(knopf).toBeEnabled());
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      try {
+        fireEvent.click(knopf);
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(2_900);
+        });
+        expect(drucke).not.toHaveBeenCalled();
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(200);
+        });
+        expect(drucke).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it('druckt bei einem Dekodierfehler trotzdem genau einmal — ohne Logo statt gar nicht', async () => {
