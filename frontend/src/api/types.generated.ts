@@ -1371,6 +1371,11 @@ export interface components {
         EtbEintragAnzeige: {
             an?: string | null;
             /**
+             * @description Die Dateien, die dieser Eintrag trägt (LFH-117): Metadaten ohne Bytes, aufsteigend nach
+             *     `id`, leer statt fehlend. Laden über `GET …/etb/{eintrag_id}/anhaenge/{aid}`.
+             */
+            anhaenge: components["schemas"]["AnhangAnzeige"][];
+            /**
              * Format: int64
              * @description Rückverweis auf den auslösenden Auftrag (LFH-52), falls aus Auftrag/Vollzug erzeugt.
              */

@@ -26,6 +26,7 @@ import { formatUhrzeit, inZone } from '../anzeige/format';
 import type { AbgelehnterEintrag } from '../offline/queue';
 import { etbPfad } from '../routing/deeplinks';
 import { etbTyp } from '../theme/statusFarben';
+import EtbAnhaenge from './EtbAnhaenge';
 import EtbBacklinkBadges from './EtbBacklinkBadges';
 import type { EtbZeile } from './etbZeile';
 import { MELDEWEG_OPTIONEN } from './schnellerfassungModell';
@@ -58,6 +59,11 @@ interface Props {
   eigeneBenutzerId?: number | null;
   /** Wenn gesetzt, bietet jeder Eintrag „Berichtigen" an (nicht an einer Berichtigung). */
   onBerichtigen?: (eintrag: EtbEintragAnzeige) => void;
+  /**
+   * Grund, aus dem „Berichtigen" gerade gesperrt ist (LFH-117, Review C1: ein Entwurf sendet
+   * noch). Der Punkt bleibt sichtbar und nennt den Grund — ein fehlender Punkt sagte nicht, warum.
+   */
+  berichtigenGesperrt?: string;
   /** Wenn gesetzt, bietet jeder Eintrag „Wiedervorlage" an (ETB→Erinnerung, LFH-106). */
   onWiedervorlage?: (eintrag: EtbEintragAnzeige) => void;
   /** Wenn gesetzt, bietet jeder Eintrag „Auftrag erteilen" an (ETB→Auftrag, LFH-112). */
@@ -82,6 +88,13 @@ export const MELDEWEG_LABEL = Object.fromEntries(
 function vonAn(von?: string | null, an?: string | null): string | null {
   if (!von && !an) return null;
   return `${von || '—'} → ${an || '—'}`;
+}
+
+/** „1 Anhang" / „n Anhänge" an einer gepufferten Zeile (LFH-117); ohne Anhang nichts. */
+function anhangZahl(ids: readonly number[] | undefined): string | null {
+  const n = ids?.length ?? 0;
+  if (n === 0) return null;
+  return n === 1 ? '1 Anhang' : `${n} Anhänge`;
 }
 
 /** Teile einer Hinweiszeile mit Mittelpunkt dazwischen — der Punkt ist Satz, kein Inhalt. */
@@ -144,6 +157,7 @@ export default function EtbZeitachse({
   sprungMarke,
   eigeneBenutzerId,
   onBerichtigen,
+  berichtigenGesperrt,
   onWiedervorlage,
   onAuftragErteilen,
   onErneutSenden,
@@ -209,7 +223,13 @@ export default function EtbZeitachse({
     const e = z.eintrag;
     const items = [
       ...(onBerichtigen && e.typ !== 'berichtigung'
-        ? [{ key: 'berichtigen', label: 'Berichtigen' }]
+        ? [
+            {
+              key: 'berichtigen',
+              label: berichtigenGesperrt ? `Berichtigen (${berichtigenGesperrt})` : 'Berichtigen',
+              disabled: !!berichtigenGesperrt,
+            },
+          ]
         : []),
       ...(onWiedervorlage ? [{ key: 'wiedervorlage', label: 'Wiedervorlage' }] : []),
       ...(onAuftragErteilen ? [{ key: 'auftrag', label: 'Auftrag erteilen' }] : []),
@@ -281,6 +301,9 @@ export default function EtbZeitachse({
           </Link>
         )),
         hatVerknuepfung(e) && <EtbBacklinkBadges key="rueck" eintrag={e} einsatzId={einsatzId} />,
+        // Anhänge (LFH-117) sind KEINE Kopplung: eigene Bedingung, nicht über
+        // `hatVerknuepfung` — die steuert die Rückverweise (Falle aus LFH-636).
+        e.anhaenge.length > 0 && <EtbAnhaenge key="anhaenge" eintrag={e} einsatzId={einsatzId} />,
       ],
       token.marginXS,
     );
@@ -341,11 +364,17 @@ export default function EtbZeitachse({
             </span>
           }
           toenung={z.art === 'abgelehnt' ? 'problem' : undefined}
-          hinweis={
-            z.art === 'abgelehnt'
-              ? `Vom Server abgelehnt: ${z.puffer.grund}`
-              : 'Wird gesendet, sobald wieder Verbindung besteht.'
-          }
+          hinweis={hinweisZeile(
+            [
+              z.art === 'abgelehnt'
+                ? `Vom Server abgelehnt: ${z.puffer.grund}`
+                : 'Wird gesendet, sobald wieder Verbindung besteht.',
+              // Die Dateien liegen schon auf dem Server und gehen per `anhang_ids` mit
+              // (LFH-117, design.md D10) — die Zahl macht sichtbar, DASS sie mitgehen.
+              anhangZahl(p.eintrag.anhang_ids),
+            ],
+            token.marginXS,
+          )}
           hinweisTon={z.art === 'abgelehnt' ? 'alarm' : 'schwach'}
         >
           <Markdown variante="kompakt" unterEbene={2}>

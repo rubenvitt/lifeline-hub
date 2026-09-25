@@ -168,6 +168,36 @@ describe('MarkdownEditor – toggle-Variante', () => {
     expect(container.querySelector('.markdown-editor__druck')).toHaveTextContent(/^—$/);
   });
 
+  // Merge LFH-117 × LFH-22: `readOnly` sperrt nur das Textfeld; die Druckfassung bleibt
+  // Byte für Byte dieselbe, und das Feld trägt den Wortlaut weiter.
+  it('rendert die Druckfassung im readOnly-Zustand unverändert', () => {
+    const wert = '**fett**\n\nENDE';
+    const frei = renderMitProviders(
+      <MarkdownEditor
+        unterEbene={1}
+        layout="toggle"
+        druckfassung
+        value={wert}
+        onChange={() => {}}
+      />,
+    );
+    const erwartet = frei.container.querySelector('.markdown-editor__druck')!.innerHTML;
+    frei.unmount();
+    const { container } = renderMitProviders(
+      <MarkdownEditor
+        unterEbene={1}
+        layout="toggle"
+        druckfassung
+        readOnly
+        value={wert}
+        onChange={() => {}}
+      />,
+    );
+    expect(container.querySelector('.markdown-editor__druck')!.innerHTML).toBe(erwartet);
+    expect(screen.getByRole('textbox')).toHaveAttribute('readonly');
+    expect(screen.getByRole('textbox')).toHaveValue(wert);
+  });
+
   it('rendert ohne `druckfassung` keine Druckfassung (ETB-Schnellerfassung: Tipp-Pfad)', () => {
     const { container } = renderMitProviders(
       <MarkdownEditor unterEbene={1} layout="toggle" value="**fett**" onChange={() => {}} />,

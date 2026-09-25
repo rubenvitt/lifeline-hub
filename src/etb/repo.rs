@@ -33,6 +33,21 @@ pub async fn anlegen_tx(
     startwert: i64,
     daten: EintragDaten<'_>,
 ) -> Result<i64, AppError> {
+    einfuegen(conn, einsatz_id, erfasser_id, startwert, None, &daten).await
+}
+
+/// Der EINE INSERT in `etb_eintrag` — für die Kopplungspfade ([`anlegen_tx`], ohne
+/// `client_id`) und die Client-Erfassung ([`anlegen_idempotent`], mit). `client_id = NULL`
+/// verhält sich für `UNIQUE(einsatz_id, client_id)` wie bisher: SQLite zählt NULLs als
+/// verschieden, der Index greift nur bei gesetztem Schlüssel.
+async fn einfuegen(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    erfasser_id: i64,
+    startwert: i64,
+    client_id: Option<&str>,
+    daten: &EintragDaten<'_>,
+) -> Result<i64, AppError> {
     // Funktions-Snapshot (LFH-615) HIER und nicht beim Aufrufer: jeder Kopplungspfad
     // (Meldung, Auftrag, Befehl, Stab …) läuft durch diese Funktion und kann ihn nicht
     // vergessen. Der Client liefert ihn nie — ein Nachweis, den der Absender setzt, wäre keiner.
@@ -40,9 +55,10 @@ pub async fn anlegen_tx(
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO etb_eintrag \
             (einsatz_id, lfd_nr, typ, inhalt, von, an, meldeweg, veranlassung, \
-             erfasser_id, erfasser_funktion, ereigniszeit, erfasst_lokal_at, berichtigt_eintrag_id) \
+             erfasser_id, erfasser_funktion, ereigniszeit, erfasst_lokal_at, \
+             berichtigt_eintrag_id, client_id) \
          SELECT ?, COALESCE(MAX(lfd_nr) + 1, ?), ?, ?, ?, ?, ?, ?, ?, ?, \
-                COALESCE(?, datetime('now')), ?, ? \
+                COALESCE(?, datetime('now')), ?, ?, ? \
          FROM etb_eintrag WHERE einsatz_id = ? \
          RETURNING id",
     )
@@ -59,6 +75,7 @@ pub async fn anlegen_tx(
     .bind(daten.ereigniszeit)
     .bind(daten.erfasst_lokal_at)
     .bind(daten.berichtigt_eintrag_id)
+    .bind(client_id)
     .bind(einsatz_id)
     .fetch_one(&mut *conn)
     .await?;
@@ -85,79 +102,188 @@ pub async fn anlegen(
     laden(pool, id).await
 }
 
-/// Legt einen client-erfassten ETB-Eintrag idempotent an (F03/LFH-261).
+/// Wortlaut der 400 für einen unbekannten oder fremden Anhang (LFH-117, design.md D4). Er
+/// nennt den Anhang als Ursache: ein Offline-Eintrag, dessen Datei nach der Karenz
+/// weggeräumt wurde, steht damit verständlich unter „abgelehnt".
+pub const ANHANG_UNBEKANNT: &str = "Anhang unbekannt oder nicht mehr vorhanden";
+
+/// Wortlaut des 409, wenn eine `client_id` schon für einen Eintrag mit ANDEREM Inhalt steht
+/// (Review C1): zwei Browser-Tabs mit demselben Entwurf. Er steht auch unter „abgelehnt"
+/// der Offline-Queue, sagt deshalb, was mit dem Wortlaut ist und was „Erneut senden" tut.
+pub const CLIENT_ID_KONFLIKT: &str = "client_id bereits für einen anderen Eintrag verwendet: \
+     dieser Wortlaut ist nicht erfasst. Erneut senden legt ihn als eigenen Eintrag an.";
+
+/// Ob ein Wiederholversuch derselben `client_id` wirklich DERSELBE Eintrag ist (Review C1):
+/// gleicher Typ, gleicher Inhalt (getrimmt) und dieselben Anhänge als Menge. Zeitstempel
+/// zählen nicht — `erfasst_lokal_at` entsteht je Absenden neu. Die Anhänge zählen, weil ein
+/// zweiter Tab mit demselben Wortlaut, aber weiteren Fotos sonst still seine Fotos verlöre;
+/// ein echter Wiederholversuch trägt immer dieselben IDs (die Queue speichert sie, der Client
+/// hält hochgeladene Dateien je `File` fest). Reihenfolge und Dubletten zählen nicht.
+pub fn ist_derselbe_eintrag(
+    typ_bestand: &str,
+    inhalt_bestand: &str,
+    anhaenge_bestand: &[i64],
+    typ: &str,
+    inhalt: &str,
+    anhang_ids: &[i64],
+) -> bool {
+    let menge = |ids: &[i64]| {
+        let mut v = ids.to_vec();
+        v.sort_unstable();
+        v.dedup();
+        v
+    };
+    typ_bestand == typ
+        && inhalt_bestand.trim() == inhalt.trim()
+        && menge(anhaenge_bestand) == menge(anhang_ids)
+}
+
+/// Legt einen client-erfassten ETB-Eintrag idempotent an (F03/LFH-261), optional mit
+/// Anhängen (LFH-117).
 ///
 /// Trägt der Aufrufer eine `client_id` (client-generierte UUID der Offline-/Direkterfassung),
 /// dedupliziert diese Funktion gegen `UNIQUE(einsatz_id, client_id)`: ein erneutes Senden
 /// desselben Eintrags — Retry nach verlorener Antwort, Doppel-Flush aus zwei Tabs — liefert
-/// die BESTEHENDE Antwort zurück, statt eine Dublette mit neuer `lfd_nr` zu erzeugen. Rückgabe
-/// `(anzeige, war_neu)`; bei `war_neu = false` (idempotenter Replay) unterdrückt der Aufrufer
-/// das Live-Event, damit kein doppeltes SSE-Signal für denselben Eintrag entsteht.
+/// die BESTEHENDE Antwort zurück (samt ihren Anhängen), statt eine Dublette mit neuer
+/// `lfd_nr` zu erzeugen. Rückgabe `(anzeige, war_neu)`; bei `war_neu = false` (idempotenter
+/// Replay) unterdrückt der Aufrufer das Live-Event.
 ///
-/// Ohne `client_id` (kein Idempotenzschlüssel) ist es ein normaler Insert (`anlegen`),
-/// immer `war_neu = true`.
+/// **Eine Transaktion, feste Reihenfolge** (design.md D3), in beiden Zweigen durch
+/// `write_retry!` (`BEGIN IMMEDIATE`):
+/// 1. mit `client_id`: bestehenden Eintrag suchen → Rückgabe ohne Anhangsprüfung (seine
+///    Anhänge sind ja gebunden);
+/// 2. Anhänge klassifizieren: nicht im Einsatz → `Validation` (400), an ETB, Chat oder
+///    Dokument gebunden → `UnprocessableEntity` (422);
+/// 3. Eintrag einfügen; 4. Verknüpfungen einfügen.
+///
+/// `BEGIN IMMEDIATE` serialisiert die Schreiber — damit ist Schritt 1 gegen einen
+/// gleichzeitigen Flush derselben `client_id` sicher, und der frühere Zweig auf die
+/// UNIQUE-Verletzung entfällt. Der UNIQUE-Index bleibt als Netz. Scheitert Schritt 2, rollt
+/// die Transaktion zurück: kein Eintrag, keine verbrauchte `lfd_nr`, kein Anhang gebunden.
+///
+/// Im Body steht ausschließlich Connection-Arbeit: der Test-Pool hat EINE Verbindung, ein
+/// Pool-Aufruf in der offenen Transaktion wartete auf sich selbst.
 pub async fn anlegen_idempotent(
     pool: &SqlitePool,
     einsatz_id: i64,
     erfasser_id: i64,
     client_id: Option<&str>,
+    anhang_ids: &[i64],
     daten: EintragDaten<'_>,
 ) -> Result<(EtbEintragAnzeige, bool), AppError> {
-    let Some(cid) = client_id else {
-        return Ok((anlegen(pool, einsatz_id, erfasser_id, daten).await?, true));
-    };
-
-    // Schneller Replay-Pfad: Eintrag mit dieser client_id existiert schon.
-    if let Some(id) = bestehende_client_id(pool, einsatz_id, cid).await? {
-        return Ok((laden(pool, id).await?, false));
-    }
-
     let startwert = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id)
         .await?
         .etb_startwert();
-    let mut conn = pool.acquire().await?;
-    // Snapshot wie in `anlegen_tx` (LFH-615). Außerhalb des INSERTs, weil der Race-Zweig unten
-    // den rohen sqlx-Fehler braucht; ein Replay liefert ohnehin den Originaleintrag samt
-    // Original-Snapshot zurück.
-    let funktion = crate::einsatz::funktion::kurz_fuer(&mut conn, einsatz_id, erfasser_id).await?;
-    match insert_mit_client_id(
-        &mut conn,
-        einsatz_id,
-        erfasser_id,
-        funktion.as_deref(),
-        startwert,
-        cid,
-        &daten,
-    )
-    .await
-    {
-        Ok(id) => {
-            drop(conn);
-            Ok((laden(pool, id).await?, true))
-        }
-        // Race: ein konkurrenter Flush hat dieselbe client_id zwischen SELECT und INSERT
-        // eingefügt → exactly-once. Wir liefern den bestehenden Eintrag (war_neu=false).
-        Err(sqlx::Error::Database(db)) if db.is_unique_violation() => {
-            drop(conn);
-            match bestehende_client_id(pool, einsatz_id, cid).await? {
-                Some(id) => Ok((laden(pool, id).await?, false)),
-                None => Err(sqlx::Error::Database(db).into()),
+    let (id, war_neu) = crate::write_retry!(pool, |conn| {
+        if let Some(cid) = client_id {
+            if let Some(id) = bestehende_client_id(&mut *conn, einsatz_id, cid).await? {
+                // Die Route prüft das schon vor der Transaktion; hier hält es das Rennen
+                // zweier Tabs, die beide an der frühen Prüfung vorbeikamen.
+                let (typ, inhalt): (String, String) =
+                    sqlx::query_as("SELECT typ, inhalt FROM etb_eintrag WHERE id = ?")
+                        .bind(id)
+                        .fetch_one(&mut *conn)
+                        .await?;
+                let gebunden: Vec<i64> = sqlx::query_scalar(
+                    "SELECT anhang_id FROM etb_eintrag_anhang WHERE eintrag_id = ?",
+                )
+                .bind(id)
+                .fetch_all(&mut *conn)
+                .await?;
+                if !ist_derselbe_eintrag(
+                    &typ,
+                    &inhalt,
+                    &gebunden,
+                    daten.typ,
+                    daten.inhalt,
+                    anhang_ids,
+                ) {
+                    return Err(AppError::Conflict(CLIENT_ID_KONFLIKT.into()));
+                }
+                return Ok((id, false));
             }
         }
-        Err(e) => Err(e.into()),
+        pruefe_anhaenge(&mut *conn, einsatz_id, erfasser_id, anhang_ids).await?;
+        let id = einfuegen(
+            &mut *conn,
+            einsatz_id,
+            erfasser_id,
+            startwert,
+            client_id,
+            &daten,
+        )
+        .await?;
+        for &aid in anhang_ids {
+            sqlx::query("INSERT INTO etb_eintrag_anhang (eintrag_id, anhang_id) VALUES (?, ?)")
+                .bind(id)
+                .bind(aid)
+                .execute(&mut *conn)
+                .await?;
+        }
+        Ok((id, true))
+    })?;
+    Ok((laden(pool, id).await?, war_neu))
+}
+
+/// Schritt 2 aus [`anlegen_idempotent`]: jeder genannte Anhang muss im Einsatz existieren
+/// (sonst 400) und darf an KEINEM der drei Linker hängen (sonst 422) — „eine Datei, ein
+/// Lebenszyklus". Erst alle prüfen, dann schreiben: so bindet ein Fehler hinten nichts vorn.
+///
+/// Ein freier Anhang, den eine ANDERE Person hochgeladen hat, gilt als unbekannt (Review C1,
+/// design.md D12): gleiche Antwort, gleicher Wortlaut. Sonst holte man sich einen fremden
+/// Upload über den eigenen Eintrag, oder läse aus 400/201 ab, welche IDs frei herumliegen.
+/// Der Replay (Schritt 1) prüft nichts, und die Offline-Queue sendet nur unter dem Benutzer,
+/// unter dem sie entstand (`fordere_offline_queue_benutzer`) — also unter der Hochladenden.
+async fn pruefe_anhaenge(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    erfasser_id: i64,
+    anhang_ids: &[i64],
+) -> Result<(), AppError> {
+    for &aid in anhang_ids {
+        // Eine der FÜNF Stellen, die jeden Linker auf `anhang` kennen müssen (CLAUDE.md
+        // „ETB-Anhänge", design.md D12): ein neuer Linker fehlte hier sonst, und das ETB bände
+        // dessen Dateien ein zweites Mal.
+        let stand: Option<(bool, i64)> = sqlx::query_as(
+            "SELECT EXISTS (SELECT 1 FROM etb_eintrag_anhang l WHERE l.anhang_id = a.id) \
+                 OR EXISTS (SELECT 1 FROM chat_nachricht_anhang c WHERE c.anhang_id = a.id) \
+                 OR EXISTS (SELECT 1 FROM einsatz_dokument d WHERE d.anhang_id = a.id), \
+                    a.hochgeladen_von \
+             FROM anhang a WHERE a.id = ? AND a.einsatz_id = ?",
+        )
+        .bind(aid)
+        .bind(einsatz_id)
+        .fetch_optional(&mut *conn)
+        .await?;
+        let gebunden = match stand {
+            Some((false, von)) if von != erfasser_id => None,
+            anders => anders.map(|(gebunden, _)| gebunden),
+        };
+        match gebunden {
+            None => return Err(AppError::Validation(ANHANG_UNBEKANNT.into())),
+            Some(true) => {
+                return Err(AppError::UnprocessableEntity(
+                    "Anhang ist bereits an einen ETB-Eintrag, eine Chat-Nachricht oder ein \
+                     Dokument gebunden"
+                        .into(),
+                ))
+            }
+            Some(false) => {}
+        }
     }
+    Ok(())
 }
 
 /// id des Eintrags mit dieser `(einsatz_id, client_id)`, falls vorhanden.
 async fn bestehende_client_id(
-    pool: &SqlitePool,
+    conn: &mut SqliteConnection,
     einsatz_id: i64,
     client_id: &str,
 ) -> Result<Option<i64>, AppError> {
     sqlx::query_scalar("SELECT id FROM etb_eintrag WHERE einsatz_id = ? AND client_id = ?")
         .bind(einsatz_id)
         .bind(client_id)
-        .fetch_optional(pool)
+        .fetch_optional(&mut *conn)
         .await
         .map_err(Into::into)
 }
@@ -170,50 +296,14 @@ pub async fn laden_nach_client_id(
     einsatz_id: i64,
     client_id: &str,
 ) -> Result<Option<EtbEintragAnzeige>, AppError> {
-    match bestehende_client_id(pool, einsatz_id, client_id).await? {
+    let id = {
+        let mut conn = pool.acquire().await?;
+        bestehende_client_id(&mut conn, einsatz_id, client_id).await?
+    };
+    match id {
         Some(id) => laden(pool, id).await.map(Some),
         None => Ok(None),
     }
-}
-
-/// Wie `anlegen_tx`, bindet zusätzlich `client_id`. Liefert den rohen sqlx-Fehler,
-/// damit der Aufrufer die UNIQUE-Verletzung (Race) vom übrigen Fehlerbild trennen kann.
-async fn insert_mit_client_id(
-    conn: &mut SqliteConnection,
-    einsatz_id: i64,
-    erfasser_id: i64,
-    erfasser_funktion: Option<&str>,
-    startwert: i64,
-    client_id: &str,
-    daten: &EintragDaten<'_>,
-) -> Result<i64, sqlx::Error> {
-    sqlx::query_scalar(
-        "INSERT INTO etb_eintrag \
-            (einsatz_id, lfd_nr, typ, inhalt, von, an, meldeweg, veranlassung, \
-             erfasser_id, erfasser_funktion, ereigniszeit, erfasst_lokal_at, \
-             berichtigt_eintrag_id, client_id) \
-         SELECT ?, COALESCE(MAX(lfd_nr) + 1, ?), ?, ?, ?, ?, ?, ?, ?, ?, \
-                COALESCE(?, datetime('now')), ?, ?, ? \
-         FROM etb_eintrag WHERE einsatz_id = ? \
-         RETURNING id",
-    )
-    .bind(einsatz_id)
-    .bind(startwert)
-    .bind(daten.typ)
-    .bind(daten.inhalt)
-    .bind(daten.von)
-    .bind(daten.an)
-    .bind(daten.meldeweg)
-    .bind(daten.veranlassung)
-    .bind(erfasser_id)
-    .bind(erfasser_funktion)
-    .bind(daten.ereigniszeit)
-    .bind(daten.erfasst_lokal_at)
-    .bind(daten.berichtigt_eintrag_id)
-    .bind(client_id)
-    .bind(einsatz_id)
-    .fetch_one(&mut *conn)
-    .await
 }
 
 /// Lädt einen einzelnen Eintrag als Anzeige (inkl. Erfasser-Name).
@@ -232,6 +322,7 @@ pub async fn laden(pool: &SqlitePool, id: i64) -> Result<EtbEintragAnzeige, AppE
     .await?
     .ok_or(AppError::NotFound)?;
     folgeauftraege_nachladen(pool, std::slice::from_mut(&mut eintrag)).await?;
+    anhaenge_nachladen(pool, std::slice::from_mut(&mut eintrag)).await?;
     Ok(eintrag)
 }
 
@@ -273,6 +364,77 @@ async fn folgeauftraege_nachladen(
         }
     }
     Ok(())
+}
+
+/// Füllt `anhaenge` (LFH-117) für alle übergebenen Einträge mit EINER Abfrage nach — das
+/// Muster von [`folgeauftraege_nachladen`], kein N+1 je Zeile. Die IN-Liste ist durch
+/// [`MAX_LIMIT`] begrenzt. Aufsteigend nach `anhang.id`. Die Bytes bleiben in der Tabelle.
+async fn anhaenge_nachladen(
+    pool: &SqlitePool,
+    eintraege: &mut [EtbEintragAnzeige],
+) -> Result<(), AppError> {
+    if eintraege.is_empty() {
+        return Ok(());
+    }
+    let mut qb: QueryBuilder<Sqlite> = QueryBuilder::new(
+        "SELECT l.eintrag_id, a.id, a.einsatz_id, a.dateiname, a.mime, a.groesse, \
+                a.hochgeladen_von, a.erstellt_at \
+         FROM etb_eintrag_anhang l JOIN anhang a ON a.id = l.anhang_id \
+         WHERE l.eintrag_id IN (",
+    );
+    let mut ids = qb.separated(", ");
+    for e in eintraege.iter() {
+        ids.push_bind(e.id);
+    }
+    qb.push(") ORDER BY a.id");
+    #[allow(clippy::type_complexity)]
+    let zeilen: Vec<(i64, i64, i64, String, String, i64, i64, String)> =
+        qb.build_query_as().fetch_all(pool).await?;
+    if zeilen.is_empty() {
+        return Ok(());
+    }
+    let index: HashMap<i64, usize> = eintraege
+        .iter()
+        .enumerate()
+        .map(|(i, e)| (e.id, i))
+        .collect();
+    for (eintrag_id, id, einsatz_id, dateiname, mime, groesse, hochgeladen_von, erstellt_at) in
+        zeilen
+    {
+        if let Some(&i) = index.get(&eintrag_id) {
+            eintraege[i].anhaenge.push(crate::anhang::AnhangAnzeige {
+                id,
+                einsatz_id,
+                dateiname,
+                mime,
+                groesse,
+                hochgeladen_von,
+                erstellt_at,
+            });
+        }
+    }
+    Ok(())
+}
+
+/// Hängt `anhang_id` an genau diesem Eintrag dieses Einsatzes? Die EINE Zugriffsfrage des
+/// ETB-Downloads (LFH-117, design.md D6): kein Treffer heißt 404, gleich ob Einsatz, Eintrag
+/// oder Anhang nicht passt — die Antwort verrät nicht, welcher der drei.
+pub async fn anhang_am_eintrag(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    eintrag_id: i64,
+    anhang_id: i64,
+) -> Result<bool, AppError> {
+    let treffer: Option<i64> = sqlx::query_scalar(
+        "SELECT 1 FROM etb_eintrag_anhang l JOIN etb_eintrag e ON e.id = l.eintrag_id \
+         WHERE l.anhang_id = ? AND l.eintrag_id = ? AND e.einsatz_id = ?",
+    )
+    .bind(anhang_id)
+    .bind(eintrag_id)
+    .bind(einsatz_id)
+    .fetch_optional(pool)
+    .await?;
+    Ok(treffer.is_some())
 }
 
 /// Prüft, ob ein Eintrag mit `eintrag_id` zum angegebenen `einsatz_id` gehört.
@@ -459,6 +621,7 @@ pub async fn abfrage(
         .fetch_all(pool)
         .await?;
     folgeauftraege_nachladen(pool, &mut eintraege).await?;
+    anhaenge_nachladen(pool, &mut eintraege).await?;
     Ok(eintraege)
 }
 
@@ -566,18 +729,30 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
 
-        let (e1, neu1) =
-            anlegen_idempotent(&pool, einsatz, benutzer, Some("uuid-1"), daten("Erste"))
-                .await
-                .unwrap();
+        let (e1, neu1) = anlegen_idempotent(
+            &pool,
+            einsatz,
+            benutzer,
+            Some("uuid-1"),
+            &[],
+            daten("Erste"),
+        )
+        .await
+        .unwrap();
         assert!(neu1, "erster Insert ist neu");
 
         // Retry mit derselben client_id (verlorene Antwort / Doppel-Flush) → bestehender
         // Eintrag, KEINE Dublette, war_neu=false.
-        let (e1_wieder, neu2) =
-            anlegen_idempotent(&pool, einsatz, benutzer, Some("uuid-1"), daten("Erste"))
-                .await
-                .unwrap();
+        let (e1_wieder, neu2) = anlegen_idempotent(
+            &pool,
+            einsatz,
+            benutzer,
+            Some("uuid-1"),
+            &[],
+            daten("Erste"),
+        )
+        .await
+        .unwrap();
         assert!(!neu2, "Replay derselben client_id ist nicht neu");
         assert_eq!(e1.id, e1_wieder.id, "Replay liefert dieselbe id");
         assert_eq!(
@@ -599,10 +774,10 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
 
-        let (_e1, neu1) = anlegen_idempotent(&pool, einsatz, benutzer, None, daten("A"))
+        let (_e1, neu1) = anlegen_idempotent(&pool, einsatz, benutzer, None, &[], daten("A"))
             .await
             .unwrap();
-        let (_e2, neu2) = anlegen_idempotent(&pool, einsatz, benutzer, None, daten("B"))
+        let (_e2, neu2) = anlegen_idempotent(&pool, einsatz, benutzer, None, &[], daten("B"))
             .await
             .unwrap();
         assert!(neu1 && neu2, "ohne client_id ist jeder Insert neu");
@@ -616,17 +791,13 @@ mod tests {
         assert_eq!(count, 2, "ohne client_id kein Dedup");
     }
 
-    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn anlegen_idempotent_ist_exactly_once_unter_nebenlaeufigkeit() {
-        // Zwei Tabs flushen dieselbe client_id parallel. Je nach Interleaving greift der
-        // Schnell-SELECT ODER der UNIQUE-Race-Recovery-Zweig (SELECT-Miss → INSERT-Konflikt
-        // → Re-SELECT); das ERGEBNIS ist in beiden Faellen exactly-once: EIN Eintrag, beide
-        // Aufrufe liefern dieselbe id. WAL + busy_timeout verhindern SQLITE_BUSY-Flakiness.
+    /// Datei-DB mit WAL und mehreren Verbindungen: der Test-Pool hat EINE Verbindung und
+    /// serialisierte zwei Aufrufe schon vor der Transaktion — die Nebenläufigkeit, um die es
+    /// geht, entstünde gar nicht.
+    async fn nebenlaeufiger_pool(dir: &tempfile::TempDir) -> SqlitePool {
         use std::time::Duration;
-        let dir = tempfile::tempdir().unwrap();
-        let pfad = dir.path().join("race.db");
         let opts = sqlx::sqlite::SqliteConnectOptions::new()
-            .filename(&pfad)
+            .filename(dir.path().join("race.db"))
             .create_if_missing(true)
             .foreign_keys(true)
             .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal)
@@ -637,15 +808,27 @@ mod tests {
             .await
             .unwrap();
         crate::db::migrate(&pool).await.unwrap();
+        pool
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn anlegen_idempotent_ist_exactly_once_unter_nebenlaeufigkeit() {
+        // Zwei Tabs flushen dieselbe client_id parallel. `write_retry!` öffnet die Transaktion
+        // mit `BEGIN IMMEDIATE` und serialisiert damit die Schreiber: wer zweitens drankommt,
+        // findet die client_id in Schritt 1 und bekommt den Bestand. Einen Zweig auf die
+        // UNIQUE-Verletzung gibt es nicht mehr (design.md D3), der Index bleibt nur als Netz.
+        // Das Ergebnis ist exactly-once: EIN Eintrag, beide Aufrufe liefern dieselbe id.
+        let dir = tempfile::tempdir().unwrap();
+        let pool = nebenlaeufiger_pool(&dir).await;
         let (benutzer, einsatz) = setup(&pool).await;
 
         let p1 = pool.clone();
         let p2 = pool.clone();
         let t1 = tokio::spawn(async move {
-            anlegen_idempotent(&p1, einsatz, benutzer, Some("race-1"), daten("A")).await
+            anlegen_idempotent(&p1, einsatz, benutzer, Some("race-1"), &[], daten("A")).await
         });
         let t2 = tokio::spawn(async move {
-            anlegen_idempotent(&p2, einsatz, benutzer, Some("race-1"), daten("B")).await
+            anlegen_idempotent(&p2, einsatz, benutzer, Some("race-1"), &[], daten("A")).await
         });
         let (r1, r2) = tokio::join!(t1, t2);
         let (e1, _) = r1.unwrap().expect("Task 1 idempotent OK");
@@ -665,6 +848,102 @@ mod tests {
             count, 1,
             "exactly-once: kein Duplikat trotz Nebenlaeufigkeit"
         );
+    }
+
+    /// Zusage aus tasks.md 3.2 mit Anhang (Review C1): zwei gleichzeitige Anfragen derselben
+    /// `client_id` tragen denselben freien Anhang. Die zweite darf NICHT an der Anhangsprüfung
+    /// scheitern (422, weil `a` inzwischen gebunden ist) — sie ist ein Replay und bekommt den
+    /// Bestand samt Anhang. Mehrere Durchläufe, damit beide Reihenfolgen vorkommen.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn gleichzeitiger_replay_mit_anhang_liefert_beiden_den_bestand() {
+        let dir = tempfile::tempdir().unwrap();
+        let pool = nebenlaeufiger_pool(&dir).await;
+        let (benutzer, einsatz) = setup(&pool).await;
+
+        for runde in 0..20 {
+            let a = freier_anhang(&pool, einsatz, benutzer, "foto.jpg").await;
+            let cid = format!("race-anhang-{runde}");
+            let (p1, p2) = (pool.clone(), pool.clone());
+            let (c1, c2) = (cid.clone(), cid.clone());
+            let t1 = tokio::spawn(async move {
+                anlegen_idempotent(&p1, einsatz, benutzer, Some(&c1), &[a], daten("Foto")).await
+            });
+            let t2 = tokio::spawn(async move {
+                anlegen_idempotent(&p2, einsatz, benutzer, Some(&c2), &[a], daten("Foto")).await
+            });
+            let (r1, r2) = tokio::join!(t1, t2);
+            let (e1, neu1) = r1.unwrap().expect("Aufruf 1 liefert den Eintrag");
+            let (e2, neu2) = r2.unwrap().expect("Aufruf 2 liefert den Eintrag");
+            assert_eq!(e1.id, e2.id, "Runde {runde}: derselbe Eintrag");
+            assert!(neu1 ^ neu2, "Runde {runde}: genau einer legt an");
+            assert_eq!(ids(&e1), vec![a], "Runde {runde}");
+            assert_eq!(ids(&e2), vec![a], "Runde {runde}");
+
+            let eintraege: i64 =
+                sqlx::query_scalar("SELECT COUNT(*) FROM etb_eintrag WHERE client_id = ?")
+                    .bind(&cid)
+                    .fetch_one(&pool)
+                    .await
+                    .unwrap();
+            assert_eq!(eintraege, 1, "Runde {runde}: genau ein Eintrag");
+            let links: i64 =
+                sqlx::query_scalar("SELECT COUNT(*) FROM etb_eintrag_anhang WHERE anhang_id = ?")
+                    .bind(a)
+                    .fetch_one(&pool)
+                    .await
+                    .unwrap();
+            assert_eq!(links, 1, "Runde {runde}: der Anhang hängt einmal");
+        }
+    }
+
+    /// Review C1 (WICHTIG 1), Transaktionsebene: dieselbe client_id mit anderem Inhalt, Typ
+    /// oder anderen Anhängen ist ein Konflikt (409), kein Replay — auch wenn die Route ihre
+    /// frühe Prüfung übersprungen hätte (Rennen zweier Tabs).
+    #[tokio::test]
+    async fn gleiche_client_id_mit_anderem_inhalt_ist_konflikt() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let a = freier_anhang(&pool, einsatz, benutzer, "a.jpg").await;
+        let b = freier_anhang(&pool, einsatz, benutzer, "b.jpg").await;
+        let (erst, _) =
+            anlegen_idempotent(&pool, einsatz, benutzer, Some("c-x"), &[a], daten("Tab 1"))
+                .await
+                .unwrap();
+
+        for (anhaenge, d) in [
+            (vec![a], daten("Tab 2")),
+            (
+                vec![a],
+                EintragDaten {
+                    typ: "lage",
+                    ..daten("Tab 1")
+                },
+            ),
+            (vec![a, b], daten("Tab 1")),
+        ] {
+            let r = anlegen_idempotent(&pool, einsatz, benutzer, Some("c-x"), &anhaenge, d).await;
+            assert!(matches!(r, Err(AppError::Conflict(_))), "{r:?}");
+        }
+        assert_eq!(verknuepfte_anhaenge(&pool).await, 1, "b bleibt frei");
+        let eintraege: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM etb_eintrag")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(eintraege, 1);
+
+        // Gleicher Inhalt mit anderem Leerraum: Replay.
+        let (wieder, neu) = anlegen_idempotent(
+            &pool,
+            einsatz,
+            benutzer,
+            Some("c-x"),
+            &[a],
+            daten("  Tab 1 "),
+        )
+        .await
+        .unwrap();
+        assert!(!neu);
+        assert_eq!(wieder.id, erst.id);
     }
 
     #[tokio::test]
@@ -1203,5 +1482,278 @@ mod tests {
         assert_eq!(seite.len(), 1);
         assert_eq!(seite[0].id, quelle.id);
         assert_eq!(seite[0].folgeauftraege.len(), 2);
+    }
+
+    // --- LFH-117: Anhänge an ETB-Einträgen ---
+
+    /// Freier (ungebundener) Anhang im Einsatz, direkt eingefügt.
+    async fn freier_anhang(pool: &SqlitePool, einsatz: i64, von: i64, name: &str) -> i64 {
+        sqlx::query_scalar(
+            "INSERT INTO anhang (einsatz_id, dateiname, mime, groesse, sha256, daten, hochgeladen_von) \
+             VALUES (?, ?, 'image/jpeg', 3, 'deadbeef', ?, ?) RETURNING id",
+        )
+        .bind(einsatz)
+        .bind(name)
+        .bind(b"ABC".as_slice())
+        .bind(von)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    async fn zweiter_einsatz(pool: &SqlitePool) -> i64 {
+        sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Nachbar') RETURNING id",
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    async fn verknuepfte_anhaenge(pool: &SqlitePool) -> i64 {
+        sqlx::query_scalar("SELECT COUNT(*) FROM etb_eintrag_anhang")
+            .fetch_one(pool)
+            .await
+            .unwrap()
+    }
+
+    fn ids(e: &EtbEintragAnzeige) -> Vec<i64> {
+        e.anhaenge.iter().map(|a| a.id).collect()
+    }
+
+    #[tokio::test]
+    async fn anlegen_mit_zwei_anhaengen_bindet_beide() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let a = freier_anhang(&pool, einsatz, benutzer, "a.jpg").await;
+        let b = freier_anhang(&pool, einsatz, benutzer, "b.jpg").await;
+
+        let (e, neu) = anlegen_idempotent(
+            &pool,
+            einsatz,
+            benutzer,
+            Some("c-1"),
+            &[a, b],
+            daten("Foto"),
+        )
+        .await
+        .unwrap();
+        assert!(neu);
+        assert_eq!(ids(&e), vec![a, b]);
+        assert_eq!(e.anhaenge[0].dateiname, "a.jpg");
+        assert_eq!(verknuepfte_anhaenge(&pool).await, 2);
+    }
+
+    #[tokio::test]
+    async fn fremder_anhang_rollt_alles_zurueck() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let nachbar = zweiter_einsatz(&pool).await;
+        let eigen = freier_anhang(&pool, einsatz, benutzer, "eigen.jpg").await;
+        let fremd = freier_anhang(&pool, nachbar, benutzer, "fremd.jpg").await;
+
+        // Der eigene steht VORN: ein Pfad, der je ID prüft und sofort verknüpft, hätte ihn
+        // schon gebunden, bevor der fremde scheitert.
+        let err = anlegen_idempotent(
+            &pool,
+            einsatz,
+            benutzer,
+            Some("c-2"),
+            &[eigen, fremd],
+            daten("Foto"),
+        )
+        .await
+        .unwrap_err();
+        assert!(matches!(err, AppError::Validation(_)), "{err:?}");
+        let AppError::Validation(text) = err else {
+            unreachable!()
+        };
+        assert!(
+            text.contains("Anhang"),
+            "der Wortlaut nennt den Anhang: {text}"
+        );
+
+        let eintraege: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ?")
+                .bind(einsatz)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(eintraege, 0, "kein Eintrag");
+        assert_eq!(
+            verknuepfte_anhaenge(&pool).await,
+            0,
+            "der eigene bleibt frei"
+        );
+
+        let naechster = anlegen(&pool, einsatz, benutzer, daten("danach"))
+            .await
+            .unwrap();
+        assert_eq!(naechster.lfd_nr, 1, "keine laufende Nummer verbraucht");
+    }
+
+    #[tokio::test]
+    async fn unbekannter_anhang_ist_validation() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let err = anlegen_idempotent(&pool, einsatz, benutzer, None, &[4711], daten("x"))
+            .await
+            .unwrap_err();
+        assert!(matches!(err, AppError::Validation(_)), "{err:?}");
+    }
+
+    #[tokio::test]
+    async fn anhang_an_anderem_eintrag_ist_422() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let a = freier_anhang(&pool, einsatz, benutzer, "a.jpg").await;
+        anlegen_idempotent(&pool, einsatz, benutzer, None, &[a], daten("erster"))
+            .await
+            .unwrap();
+
+        let err = anlegen_idempotent(&pool, einsatz, benutzer, None, &[a], daten("zweiter"))
+            .await
+            .unwrap_err();
+        assert!(matches!(err, AppError::UnprocessableEntity(_)), "{err:?}");
+        let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ?")
+            .bind(einsatz)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(n, 1, "kein zweiter Eintrag");
+    }
+
+    #[tokio::test]
+    async fn chat_anhang_ist_422() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let a = freier_anhang(&pool, einsatz, benutzer, "chat.jpg").await;
+        let kanal: i64 = sqlx::query_scalar(
+            "INSERT INTO chat_kanal (einsatz_id, name, erstellt_von_id) VALUES (?, 'Allgemein', ?) RETURNING id",
+        )
+        .bind(einsatz)
+        .bind(benutzer)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let nachricht: i64 = sqlx::query_scalar(
+            "INSERT INTO chat_nachricht (einsatz_id, kanal_id, autor_id, inhalt) VALUES (?, ?, ?, 'x') RETURNING id",
+        )
+        .bind(einsatz)
+        .bind(kanal)
+        .bind(benutzer)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query("INSERT INTO chat_nachricht_anhang (nachricht_id, anhang_id) VALUES (?, ?)")
+            .bind(nachricht)
+            .bind(a)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        let err = anlegen_idempotent(&pool, einsatz, benutzer, None, &[a], daten("x"))
+            .await
+            .unwrap_err();
+        assert!(matches!(err, AppError::UnprocessableEntity(_)), "{err:?}");
+    }
+
+    #[tokio::test]
+    async fn dokument_anhang_ist_422() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let a = freier_anhang(&pool, einsatz, benutzer, "plan.pdf").await;
+        let nachweis = anlegen(&pool, einsatz, benutzer, daten("Dokument abgelegt"))
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_dokument \
+               (einsatz_id, anhang_id, kategorie, titel, etb_eintrag_id, abgelegt_von_id) \
+             VALUES (?, ?, 'foto', 'Titel', ?, ?)",
+        )
+        .bind(einsatz)
+        .bind(a)
+        .bind(nachweis.id)
+        .bind(benutzer)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let err = anlegen_idempotent(&pool, einsatz, benutzer, None, &[a], daten("x"))
+            .await
+            .unwrap_err();
+        assert!(matches!(err, AppError::UnprocessableEntity(_)), "{err:?}");
+    }
+
+    #[tokio::test]
+    async fn replay_liefert_bestand_samt_anhaengen_ohne_anhangspruefung() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let a = freier_anhang(&pool, einsatz, benutzer, "a.jpg").await;
+        let (erst, _) =
+            anlegen_idempotent(&pool, einsatz, benutzer, Some("c-3"), &[a], daten("Foto"))
+                .await
+                .unwrap();
+
+        // Derselbe Eintrag noch einmal: `a` ist inzwischen gebunden. Das darf den Replay nicht
+        // stören — er prüft nicht, ob die Anhänge frei sind, nur ob es DIESELBEN sind (Review
+        // C1; andere Anhänge wären ein Konflikt, `gleiche_client_id_mit_anderem_inhalt_…`).
+        let (wieder, neu) =
+            anlegen_idempotent(&pool, einsatz, benutzer, Some("c-3"), &[a], daten("Foto"))
+                .await
+                .unwrap();
+        assert!(!neu);
+        assert_eq!(wieder.id, erst.id);
+        assert_eq!(ids(&wieder), vec![a]);
+        assert_eq!(verknuepfte_anhaenge(&pool).await, 1);
+    }
+
+    #[tokio::test]
+    async fn eintrag_ohne_anhang_traegt_leere_liste() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let e = anlegen(&pool, einsatz, benutzer, daten("ohne"))
+            .await
+            .unwrap();
+        assert!(e.anhaenge.is_empty());
+        let liste = abfrage(&pool, einsatz, &filter()).await.unwrap();
+        assert!(liste[0].anhaenge.is_empty());
+    }
+
+    #[tokio::test]
+    async fn anhaenge_stehen_aufsteigend_nach_id() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let a = freier_anhang(&pool, einsatz, benutzer, "a.jpg").await;
+        let b = freier_anhang(&pool, einsatz, benutzer, "b.jpg").await;
+        // Genannt in umgekehrter Reihenfolge — geliefert wird nach id.
+        let (e, _) = anlegen_idempotent(&pool, einsatz, benutzer, None, &[b, a], daten("x"))
+            .await
+            .unwrap();
+        assert_eq!(ids(&e), vec![a, b]);
+        let liste = abfrage(&pool, einsatz, &filter()).await.unwrap();
+        assert_eq!(ids(&liste[0]), vec![a, b]);
+    }
+
+    #[tokio::test]
+    async fn cursor_seite_traegt_vollstaendige_anhaenge() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let a = freier_anhang(&pool, einsatz, benutzer, "a.jpg").await;
+        let b = freier_anhang(&pool, einsatz, benutzer, "b.jpg").await;
+        let c = freier_anhang(&pool, einsatz, benutzer, "c.jpg").await;
+        let (alt, _) = anlegen_idempotent(&pool, einsatz, benutzer, None, &[a, b], daten("alt"))
+            .await
+            .unwrap();
+        anlegen_idempotent(&pool, einsatz, benutzer, None, &[c], daten("neu"))
+            .await
+            .unwrap();
+
+        let mut f = filter();
+        f.limit = 1;
+        f.before_lfd_nr = Some(alt.lfd_nr + 1);
+        let seite = abfrage(&pool, einsatz, &f).await.unwrap();
+        assert_eq!(seite.len(), 1);
+        assert_eq!(ids(&seite[0]), vec![a, b]);
     }
 }

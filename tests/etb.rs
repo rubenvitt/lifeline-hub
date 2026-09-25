@@ -637,6 +637,20 @@ async fn etb_client_id_replay_nach_abschluss_aber_neuer_insert_409() {
         StatusCode::CONFLICT,
         "echter Insert bleibt gesperrt"
     );
+    // Review C1: dieselbe client_id mit anderem Wortlaut prüft schon die Route (vor dem
+    // Aktiv-Gate) — der Grund ist der Konflikt der client_id, nicht der Abschluss.
+    let (status, v) = eintrag_erfassen(
+        &app,
+        &admin,
+        einsatz,
+        r#"{"typ":"meldung","inhalt":"Anders","client_id":"offline-etb-abgeschlossen"}"#,
+    )
+    .await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    assert!(
+        v["error"].as_str().unwrap().contains("client_id bereits"),
+        "{v:?}"
+    );
 }
 
 #[tokio::test]

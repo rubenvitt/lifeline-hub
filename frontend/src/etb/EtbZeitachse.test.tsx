@@ -49,6 +49,7 @@ function eintrag(over: Partial<EtbEintragAnzeige> = {}): EtbEintragAnzeige {
     auftrag_id: null,
     befehl_id: null,
     folgeauftraege: [],
+    anhaenge: [],
     ...over,
   };
 }
@@ -292,6 +293,22 @@ describe('EtbZeitachse – Aktionsmenü (LFH-365 · B5e)', () => {
     expect(onBerichtigen).toHaveBeenCalledWith(expect.objectContaining({ id: 4 }));
   });
 
+  it('LFH-117: sperrt „Berichtigen" mit sichtbarem Grund, solange ein Entwurf sendet', async () => {
+    const onBerichtigen = vi.fn();
+    renderZeitachse({
+      eintraege: [eintrag({ id: 4, lfd_nr: 17 })],
+      ...alle,
+      onBerichtigen,
+      berichtigenGesperrt: 'erst nach dem Senden',
+    });
+    const menue = await oeffneMenue(17);
+    const punkt = within(menue).getByRole('menuitem', { name: /Berichtigen/ });
+    expect(punkt).toHaveTextContent('Berichtigen (erst nach dem Senden)');
+    expect(punkt).toHaveAttribute('aria-disabled', 'true');
+    await userEvent.click(punkt);
+    expect(onBerichtigen).not.toHaveBeenCalled();
+  });
+
   it('lässt „Berichtigen" an einer Berichtigung weg', async () => {
     renderZeitachse({
       eintraege: [eintrag({ id: 2, lfd_nr: 2, typ: 'berichtigung', berichtigt_eintrag_id: 1 })],
@@ -503,5 +520,52 @@ describe('EtbZeitachse – Sammelbanner', () => {
     rerender(bau(zeilenAus([neu, alt]), 1));
     expect(screen.getByText('Neu')).toBeInTheDocument();
     expect(screen.queryByRole('status')).toBeNull();
+  });
+});
+
+describe('EtbZeitachse – Anhänge (LFH-117)', () => {
+  const foto = {
+    id: 9,
+    einsatz_id: 1,
+    dateiname: 'IMG_0412.HEIC',
+    mime: 'image/heic',
+    groesse: 3_250_586,
+    hochgeladen_von: 1,
+    erstellt_at: '2026-05-23 10:00:00',
+  };
+
+  it('zeigt die Anhänge in der Hinweiszeile, auch ohne jede Kopplung', () => {
+    // Falle aus LFH-636: die Anhänge dürfen nicht an `hatVerknuepfung` hängen — der Eintrag
+    // hier hat weder Befehl noch Lagebericht noch Auftrag noch Folgeauftrag.
+    const { container } = renderZeitachse({ eintraege: [eintrag({ anhaenge: [foto] })] });
+    const z = zeileVon(container, 'eintrag-1');
+    const verweis = within(z).getByRole('link', {
+      name: 'IMG_0412.HEIC, 3.1 MB, Anhang zu Nr. 1 herunterladen',
+    });
+    expect(verweis).toHaveAttribute('href', '/api/einsaetze/1/etb/1/anhaenge/9');
+  });
+
+  it('lässt einen Eintrag ohne Anhang unverändert', () => {
+    const { container } = renderZeitachse({ eintraege: [eintrag()] });
+    const z = zeileVon(container, 'eintrag-1');
+    expect(within(z).queryByRole('link')).toBeNull();
+    expect(z.querySelector('[data-lfh="etb-anhaenge"]')).toBeNull();
+  });
+
+  it('nennt an einer ausstehenden Zeile die Zahl der Anhänge, die mitgehen', () => {
+    const { container } = renderZeitachse({
+      zeilen: baueZeilen({
+        eintraege: [],
+        ausstehend: [
+          ausstehend({ eintrag: { typ: 'meldung', inhalt: 'Foto', anhang_ids: [4, 5] } }),
+          ausstehend({ id: 2, eintrag: { typ: 'meldung', inhalt: 'Eins', anhang_ids: [6] } }),
+          ausstehend({ id: 3, eintrag: { typ: 'meldung', inhalt: 'Ohne' } }),
+        ],
+        abgelehnt: [],
+      }),
+    });
+    expect(zeileVon(container, 'ausstehend-1')).toHaveTextContent('2 Anhänge');
+    expect(zeileVon(container, 'ausstehend-2')).toHaveTextContent('1 Anhang');
+    expect(zeileVon(container, 'ausstehend-3')).not.toHaveTextContent('Anhang');
   });
 });

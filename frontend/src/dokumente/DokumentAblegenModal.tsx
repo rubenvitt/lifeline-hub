@@ -7,6 +7,7 @@ import { ErfassungsModal } from '../components/Erfassung';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { einsatzKeys } from '../api/queryKeys';
 import {
+  DOKUMENT_ACCEPT,
   DOKUMENT_MAX_GROESSE,
   legeDokumentAb,
   type DokumentAblage,
@@ -185,7 +186,7 @@ export default function DokumentAblegenModal({ einsatzId, offen, onSchliessen }:
         <Upload
           beforeUpload={() => false}
           maxCount={1}
-          accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif,.tif,.tiff,.txt,.csv,.docx,.xlsx,.pptx"
+          accept={DOKUMENT_ACCEPT}
           onChange={({ file }) => {
             // Das Entfernen einer Datei ist keine Dateiwahl — der Titel bleibt.
             if (file.status === 'removed') return;

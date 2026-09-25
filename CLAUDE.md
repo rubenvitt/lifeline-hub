@@ -459,6 +459,46 @@ nie gegen die Breite des eigenen Containers: der Befund ist in der Contentbreite
 und ein Verhältnis zu einem mitwachsenden Container kann kleiner werden, obwohl der Text mehr
 Platz hat.
 
+**ETB-Anhänge (LFH-117).** `etb_eintrag_anhang` ist der **dritte Linker** auf `anhang`
+(neben Chat und Dokument), `anhang_id UNIQUE`: eine Datei hat genau einen Lebenszyklus.
+**Jeder Linker gehört in fünf Stellen:** `LinkerStand` (generischer Download 404, DELETE 422,
+ungebunden = nur für die hochladende Person), das `NOT EXISTS` in
+`anhang::repo::sweep_verwaiste` und in `repo::loeschen` sowie die zwei Bindungsabfragen
+`chat::repo::anlegen_mit_anhaengen` und `etb::repo::pruefe_anhaenge`. Ein fehlender Linker
+löscht still oder bindet eine Datei ein zweites Mal. **Kreuzsperren:** das ETB verknüpft keine Chat- oder Dokument-Datei (422),
+der Chat keine ETB-Datei (sein 400). Eigene Routen unter dem ETB-Präfix: Upload `POST
+…/etb/anhaenge` mit der **Dokument-Allowlist** (HEIC/TIFF), eine Datei je Anfrage, und
+Download `GET …/etb/{eintrag_id}/anhaenge/{aid}` mit den Lese-Gates und EINER
+Bindungsabfrage. Das Erfassen bindet über `anhang_ids` in derselben Transaktion wie der
+Eintrag (`anlegen_idempotent`, `write_retry!`, Replay ohne Anhangsprüfung). **Append-only:**
+kein Tauschen, kein Entfernen, nur die Schwärzung löscht die Datei, der Eintrag bleibt.
+**Nur der Upload braucht Netz:** ohne Verbindung ist „Anhang" gesperrt, ein Eintrag mit schon
+hochgeladenen Dateien geht mit `anhang_ids` in die Queue. **Während des Sendens** ist die
+ganze Erfassung gesperrt (Text `readOnly`, Typ, „Feld", Chips, „Werte behalten", „Anhang";
+der Test prüft die Erfassung als Ganzes gegen eine Ausnahmeliste), die Erfassungszeit gilt ab
+dem Absenden, nicht ab dem Ende des Uploads, und die **Entwurfs-id ist die `client_id`**.
+**Ein Replay ist nur DERSELBE Eintrag** (Review C1): gleicher Typ, gleicher Inhalt (getrimmt),
+dieselben Anhänge als Menge — geprüft in der Route UND in Schritt 1 der Transaktion; sonst
+409 „client_id bereits für einen anderen Eintrag verwendet". Sonst schloss ein zweiter
+Browser-Tab mit demselben Entwurf seinen weiter bearbeiteten Wortlaut still gegen den
+Eintrag des ersten. Nach dem 409 behält die Erfassung Wortlaut und Dateien, zeigt den Grund
+an der Erfassung, und der Entwurf bekommt eine neue id (`entwurfNeuAusweisen`); „Erneut
+senden" an einem abgelehnten Queue-Eintrag nimmt ebenfalls einen neuen Schlüssel.
+**Der Sendezustand gehört dem Entwurf, nicht der Montierung** (Review C1): `EtbEntwurfsTabs`
+hält ihn je Entwurf (`Versand`), weil nur der aktive Tab montiert ist — sonst stand nach einem
+Tabwechsel eine entsperrte Erfassung da, deren Eingaben der laufende Versand still verwarf.
+Ein sendender Entwurf trägt kein Schließkreuz, und „Berichtigen" ist gesperrt, solange einer
+sendet (die Berichtigung ersetzt die Reiter ganz). Die gewählten **Dateien liegen in
+`EtbPage`** (`useEntwurfsDateien`), aus demselben Grund wie „Werte behalten". Höchstzahl 10
+und Dubletten (Name + Größe + `lastModified`) prüft schon die Dateiwahl. **Ein ungebundener
+Anhang gehört vorerst der hochladenden Person:** die generischen Routen `GET`/`DELETE
+…/anhaenge/{aid}` antworten allen anderen 404, und das Erfassen behandelt einen fremden freien
+Anhang wie eine unbekannte ID (design.md D12) — ein vierter Linker, der in
+`LinkerStand` fehlte, machte seine Dateien damit für alle anderen unerreichbar.
+Der Download-Verweis ist blau aus
+`bedienText` und steht in der Hinweiszeile unabhängig von `hatVerknuepfung`. Prüfliste:
+`docs/superpowers/specs/2026-09-24-lfh-117-pruefliste.md`.
+
 **Zwei schwebende Bänder an einem Rand werden gestapelt, nicht gestaffelt** (LFH-355,
 `pages/lagekarte/KartenFuss.tsx`). Zeichnen-Steuerung (`bottom: 16`, mittig) und
 Zeitachsen-/Snapshot-Leiste (`bottom: 12`, volle Breite) lagen beide absolut auf `zIndex: 5`

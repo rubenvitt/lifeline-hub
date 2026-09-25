@@ -24,6 +24,7 @@ const EINTRAG = {
   erfasst_lokal_at: null,
   berichtigt_eintrag_id: null,
   folgeauftraege: [],
+  anhaenge: [],
 } as unknown as EtbEintragAnzeige;
 
 /** Die Uhr steht, damit „+30 min" eine prüfbare Zahl ist und kein bewegliches Ziel. */

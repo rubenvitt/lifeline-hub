@@ -30,6 +30,7 @@ import WiedervorlageModal from '../etb/WiedervorlageModal';
 import AuftragAusEtbModal from '../etb/AuftragAusEtbModal';
 import Schnellerfassung from '../etb/Schnellerfassung';
 import EtbEntwurfsTabs from '../etb/entwuerfe/EtbEntwurfsTabs';
+import { useEntwurfsDateien } from '../etb/entwuerfe/useEntwurfsDateien';
 import { useEtbErfassung } from '../offline/useEtbErfassung';
 import { baueZeilen } from '../etb/etbZeile';
 import { scrolleZurZeile } from '../components/Datensicht';
@@ -223,6 +224,14 @@ export default function EtbPage() {
    * verlassen wird.
    */
   const [werteBehalten, setWerteBehalten] = useState(false);
+  /**
+   * Ob ein Entwurf gerade sendet (LFH-117, Review C1). Solange, ist „Berichtigen" gesperrt:
+   * die Berichtigung ersetzt die Entwurfs-Reiter, und ein laufender Upload verlöre dabei
+   * seinen sichtbaren Zustand samt einem möglichen Fehlergrund.
+   */
+  const [entwurfSendet, setEntwurfSendet] = useState(false);
+  /** Gewählte Anhänge je Entwurf — hier, damit sie eine Berichtigung überleben (LFH-117). */
+  const entwurfsDateien = useEntwurfsDateien();
   const [wiedervorlageZu, setWiedervorlageZu] = useState<{
     eintrag: EtbEintragAnzeige;
     termin?: string | null;
@@ -275,7 +284,10 @@ export default function EtbPage() {
    */
   async function abgelehntErneutSenden(puffer: AbgelehnterEintrag) {
     try {
-      await erfassen(puffer.eintrag);
+      // Mit NEUER client_id (Review C1): ein abgelehnter Eintrag ist nie erfasst worden, ein
+      // neuer Schlüssel legt also keine Dublette an. Mit dem alten liefe ein client_id-Konflikt
+      // (409, der Schlüssel steht für einen anderen Eintrag) endlos in dieselbe Ablehnung.
+      await erfassen({ ...puffer.eintrag, client_id: crypto.randomUUID() });
       if (puffer.id != null) await abgelehntVerwerfen(puffer.id);
     } catch (err) {
       message.error(err instanceof ApiError ? err.message : 'Erneut senden fehlgeschlagen');
@@ -493,6 +505,8 @@ export default function EtbPage() {
           kontextLaedt={einsatzQuery.isFetching}
           werteBehalten={werteBehalten}
           onWerteBehaltenChange={setWerteBehalten}
+          onSendetChange={setEntwurfSendet}
+          dateien={entwurfsDateien}
         />
       )}
     </div>
@@ -660,6 +674,7 @@ export default function EtbPage() {
               fehler={etbQuery.isError}
               leerText={leerInhalt}
               onBerichtigen={darfSchreiben ? (e) => setBerichtigungZu(e) : undefined}
+              berichtigenGesperrt={entwurfSendet ? 'erst nach dem Senden' : undefined}
               onWiedervorlage={darfSchreiben ? oeffneWiedervorlage : undefined}
               onAuftragErteilen={darfSchreiben ? (e) => setAuftragZu(e) : undefined}
               onErneutSenden={(p) => void abgelehntErneutSenden(p)}

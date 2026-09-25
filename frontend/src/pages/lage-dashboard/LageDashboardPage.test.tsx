@@ -167,6 +167,7 @@ const etb = (lfd: number, over: Partial<EtbEintragAnzeige> = {}): EtbEintragAnze
   erfasser_id: 1,
   erfasser_name: 'Vitt',
   folgeauftraege: [],
+  anhaenge: [],
   ...over,
 });
 
