@@ -233,15 +233,16 @@ wird nicht zurückgedreht (sqlx-Checksum). Frontend und Backend gehen im selben 
 
 ## Open Questions
 
-**Vor `/opsx:apply` zu bestätigen**, weil die Antwort eine Anforderung kippen kann:
-- **Entfernen eines ETB-Anhangs.** Die Welle-C-Entscheidung „Entfernen als Soft-Delete mit
-  pseudonymem ETB-Nachweis“ sagt nicht, ob sie auch für ETB-Anhänge gilt. Dieser Plan baut
-  **keinen** Entfernen-Weg (append-only, Requirement „Ein ETB-Anhang ist unveränderlich“).
-  Gilt sie auch hier, ändern sich Spec und Aufgaben.
-- **Höchstzahl 10 Anhänge je Eintrag** (D4) ist eine Annahme dieses Plans, keine
-  Entscheidung des Auftraggebers.
+**Entschieden vom Auftraggeber (25.09.2026), vor `/opsx:apply`:**
+- **Entfernen eines ETB-Anhangs: nein.** Ein ETB-Anhang ist unveränderlich wie der Eintrag
+  selbst. Eine falsche Datei wird per Berichtigung eingeordnet und geht erst mit der
+  Schwärzung. Der Plan bleibt, wie er ist (Requirement „Ein ETB-Anhang ist unveränderlich“).
+- **Höchstzahl 10 Anhänge je Eintrag** (D4): als Annahme bestätigt.
+- **Migrationsnummer:** Der offene PR zu LFH-22 belegt `0123` (`org_logo`). Dieser Change
+  nimmt die nächste freie Nummer **über** allen offenen Nummern und prüft vor dem PR erneut
+  mit `scripts/check-migrationen.sh`.
 
-Die übrigen ändern Spec, Ansatz und Aufgabenschnitt nicht und können danach fallen:
+Offen, ohne Wirkung auf Spec, Ansatz und Aufgabenschnitt:
 - **„Erneut senden“ bei weggeräumtem Anhang.** Soll die Liste der abgelehnten Einträge
   anbieten, ohne Anhänge erneut zu senden? Das ginge mit derselben `client_id`, denn es gab
   keinen Commit. Heute sendet sie unverändert.
