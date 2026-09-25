@@ -5,7 +5,8 @@ use tower::ServiceExt;
 
 mod common;
 use common::{
-    anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen, setup, setup_mit_pool,
+    anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen, schaden_anhang, setup,
+    setup_mit_pool,
 };
 
 async fn default_kanal(app: &axum::Router, einsatz: i64, cookie: &str) -> i64 {
@@ -977,6 +978,97 @@ async fn etb_anhang_nicht_an_chat_verknuepfbar() {
     )
     .await;
     assert_eq!(s, StatusCode::BAD_REQUEST);
+    let (nachrichten, links): (i64, i64) = sqlx::query_as(
+        "SELECT (SELECT COUNT(*) FROM chat_nachricht WHERE einsatz_id = ?1 AND inhalt = 'x'), \
+                (SELECT COUNT(*) FROM chat_nachricht_anhang WHERE anhang_id = ?2)",
+    )
+    .bind(einsatz)
+    .bind(aid)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        (nachrichten, links),
+        (0, 0),
+        "keine Nachricht, keine Verknüpfung"
+    );
+}
+
+// --- LFH-21: `einsatz_schaden_anhang` als vierter Linker auf `anhang` ---
+//
+// Alle drei laufen als `admin`, die Person, die die Datei abgelegt hat (design.md D12): für
+// sie wäre eine Schaden-Datei ohne Registereintrag „ungebunden“ und damit generisch ladbar
+// und hart löschbar. Als andere Person wären die Tests auch ohne Eintrag grün.
+
+/// Spec „Ablegende Person über den generischen Download“: 404.
+#[tokio::test]
+async fn schaden_anhang_generischer_download_ist_404() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let aid = schaden_anhang(&pool, einsatz).await;
+
+    let (s, _, _) = download(&app, einsatz, aid, &admin).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+}
+
+/// Spec „Generisches Löschen“: 422 mit dem Wortlaut des Registereintrags; Datei und
+/// Verknüpfung bleiben.
+#[tokio::test]
+async fn schaden_anhang_generisches_loeschen_ist_422() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let aid = schaden_anhang(&pool, einsatz).await;
+
+    let (s, v) = anfrage(
+        &app,
+        "DELETE",
+        &format!("/api/einsaetze/{einsatz}/anhaenge/{aid}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(
+        v["error"],
+        "Anhang gehört zu einem Schaden und wird dort entfernt"
+    );
+    let (datei, link): (i64, i64) = sqlx::query_as(
+        "SELECT (SELECT COUNT(*) FROM anhang WHERE id = ?1), \
+                (SELECT COUNT(*) FROM einsatz_schaden_anhang \
+                  WHERE anhang_id = ?1 AND geloescht_at IS NULL)",
+    )
+    .bind(aid)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        (datei, link),
+        (1, 1),
+        "Datei und lebende Verknüpfung bleiben"
+    );
+}
+
+/// Spec „Chat-Nachricht verknüpft Schaden-Datei“: 400, keine Nachricht, keine Verknüpfung.
+#[tokio::test]
+async fn schaden_anhang_nicht_an_chat_verknuepfbar() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let kid = default_kanal(&app, einsatz, &admin).await;
+    let aid = schaden_anhang(&pool, einsatz).await;
+
+    let (s, v) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/chat/kanaele/{kid}/nachrichten"),
+        &admin,
+        Some(&format!(r#"{{"inhalt":"x","anhang_ids":[{aid}]}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    assert_eq!(v["error"], "Unbekannter oder fremder Anhang");
     let (nachrichten, links): (i64, i64) = sqlx::query_as(
         "SELECT (SELECT COUNT(*) FROM chat_nachricht WHERE einsatz_id = ?1 AND inhalt = 'x'), \
                 (SELECT COUNT(*) FROM chat_nachricht_anhang WHERE anhang_id = ?2)",

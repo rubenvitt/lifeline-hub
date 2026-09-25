@@ -13,7 +13,8 @@ use tower::ServiceExt;
 
 mod common;
 use common::{
-    anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen, setup_mit_pool_und_live,
+    anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen, schaden_anhang,
+    setup_mit_pool_und_live,
 };
 
 const ADMIN_PW: &str = "startpw12";
@@ -378,6 +379,51 @@ async fn gebundener_anhang_ist_422() {
         )
         .await,
         1
+    );
+}
+
+/// LFH-21, Spec „ETB-Eintrag verknüpft Schaden-Datei“: als die ablegende Person (D12)
+/// 422 „bereits gebunden“, kein Eintrag, keine Verknüpfung.
+#[tokio::test]
+async fn schaden_anhang_nicht_an_etb_verknuepfbar() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", ADMIN_PW).await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let aid = schaden_anhang(&pool, einsatz).await;
+    let vorher = zaehle(
+        &pool,
+        "SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ?",
+        einsatz,
+    )
+    .await;
+
+    let (s, v) = erfassen(
+        &app,
+        &admin,
+        einsatz,
+        &format!(r#"{{"typ":"meldung","inhalt":"x","anhang_ids":[{aid}]}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert_eq!(
+        zaehle(
+            &pool,
+            "SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ?",
+            einsatz
+        )
+        .await,
+        vorher,
+        "kein Eintrag"
+    );
+    assert_eq!(
+        zaehle(
+            &pool,
+            "SELECT COUNT(*) FROM etb_eintrag_anhang WHERE anhang_id = ?",
+            aid
+        )
+        .await,
+        0,
+        "keine Verknüpfung"
     );
 }
 
