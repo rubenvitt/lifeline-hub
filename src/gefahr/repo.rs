@@ -66,8 +66,11 @@ pub async fn liste(
 }
 
 /// Aktuelle Warnstufe einer Zelle (für die ETB-Entscheidung *vor* dem Schreiben).
+///
+/// Executor-generisch (Pool oder offene Verbindung): der Demo-Import liest den Vorwert auf
+/// der Verbindung seiner Transaktion (LFH-690).
 pub async fn aktuelle_warnstufe(
-    pool: &SqlitePool,
+    executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
     gefahrengebiet_id: i64,
     gefahrentyp: &str,
     schutzobjekt: &str,
@@ -79,7 +82,7 @@ pub async fn aktuelle_warnstufe(
     .bind(gefahrengebiet_id)
     .bind(gefahrentyp)
     .bind(schutzobjekt)
-    .fetch_optional(pool)
+    .fetch_optional(executor)
     .await?;
     Ok(w)
 }
