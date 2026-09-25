@@ -426,6 +426,33 @@ async fn elf_anhaenge_sind_400_elf_doppelte_nicht() {
     assert_eq!(anhang_ids(&v), vec![a]);
 }
 
+/// Gegenstück zum Elfer-Fall (Review C1): genau zehn verschiedene Anhänge gehen durch. Erst
+/// dieses Paar nagelt den Vergleich fest — mit `>=` statt `>` bliebe der Elfer-Fall grün.
+#[tokio::test]
+async fn zehn_anhaenge_gehen_durch() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", ADMIN_PW).await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+
+    let mut ids = Vec::new();
+    for i in 1..=10 {
+        ids.push(hochgeladen(&app, einsatz, &admin, &format!("f{i}.jpg")).await);
+    }
+    let liste: Vec<String> = ids.iter().map(|i| i.to_string()).collect();
+    let (s, v) = erfassen(
+        &app,
+        &admin,
+        einsatz,
+        &format!(
+            r#"{{"typ":"meldung","inhalt":"x","anhang_ids":[{}]}}"#,
+            liste.join(",")
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(anhang_ids(&v).len(), 10);
+}
+
 #[tokio::test]
 async fn berichtigung_traegt_eigenen_anhang_grundeintrag_bleibt_ohne() {
     let (app, _pool, _live) = setup_mit_pool_und_live().await;
