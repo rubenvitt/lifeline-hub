@@ -613,3 +613,133 @@ test('Modulpanel: der klebende Einsatzdauer-Fuß verdeckt kein fokussiertes Modu
   expect(unterDemFussGestartet, 'mindestens eine Lage beginnt unter dem Fuß').toBeGreaterThan(0);
   expect(befunde, befunde.join('\n')).toEqual([]);
 });
+
+// ── LFH-373 ──────────────────────────────────────────────────────────────────────────────
+
+/** Stellt die Dichte über den Weg eines wiederkehrenden Benutzers (localStorage + Neuladen)
+ *  und hält die Wache am `<html>` — Muster `stelleDichte` in `gate3-trefflaeche.spec.ts`. */
+async function stelleDichte(page: Page, dichte: string) {
+  await page.evaluate((wert) => localStorage.setItem('lifeline-hub.dichte', wert), dichte);
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+}
+
+/**
+ * Kleinster freier Streifen zwischen der UNTERKANTE eines angesteuerten Ziels und der
+ * OBERKANTE einer angepinnten Fußleiste, über `schritte` Tabulatorschritte. Gezählt werden
+ * nur Ziele mit `data-e2e-fokus`.
+ *
+ * WARUM NEBEN DEM KERN: der Kern meldet nur VOLLSTÄNDIGE Verdeckung (WCAG 2.4.11 Minimum).
+ * Ein Ziel, das zur Hälfte unter der Leiste steckt, ist dort frei — für die Bedienung aber
+ * nicht. Der Befehls-Spec hat eine verwandte Messung (`kleinsterFreiraum`), die auf dessen
+ * Formularfelder und Leiste zugeschnitten ist und sich deshalb nicht teilen lässt.
+ */
+async function kleinsterStreifen(page: Page, schritte: number, leiste: string): Promise<number> {
+  let kleinster = Number.POSITIVE_INFINITY;
+  for (let i = 0; i < schritte; i += 1) {
+    await page.keyboard.press('Tab');
+    const wert = await page.evaluate((sel) => {
+      const fokus = document.activeElement;
+      const l = document.querySelector(sel);
+      if (fokus == null || l == null || !fokus.hasAttribute('data-e2e-fokus')) return null;
+      return l.getBoundingClientRect().top - fokus.getBoundingClientRect().bottom;
+    }, leiste);
+    if (wert != null) kleinster = Math.min(kleinster, wert);
+  }
+  return kleinster;
+}
+
+/**
+ * ETB (LFH-373, Prüfliste ETB Zeile 13): die angepinnte Erfassungsleiste am Seitenfuß.
+ *
+ * GEMESSEN VOR DEM FIX (24.09.2026): beim Vorwärtstabben rollt der Browser jedes Ziel an den
+ * UNTEREN Rand des Fensters — genau dorthin, wo die Leiste klebt. Jeder zweite bis jeder
+ * Zeilenauslöser lag vollständig hinter ihr, auf beiden Breiten und in beiden Stufen.
+ *
+ * START AM ERSTEN AUSLÖSER, nicht am Dokumentanfang: die Erfassung fokussiert beim Einhängen
+ * ihr Textfeld am Seitenfuß, ein nacktes Tab nach `goto` liefe an der Zeitachse vorbei.
+ *
+ * KLEINE HÖHEN mit Absicht: ohne Bildlaufreserve klebt die Leiste am Seitenende statt über
+ * der Zeitachse, und „0 verdeckt" wäre trivial wahr. Deshalb 600 bzw. 520 px und 16 Einträge.
+ */
+test('ETB (LFH-373): kein Zeilenauslöser verschwindet beim Tabben hinter der Erfassungsleiste', async ({
+  page,
+}) => {
+  test.setTimeout(240_000);
+  await anmelden(page);
+  const antwort = await page.request.post('/api/einsaetze', {
+    data: { bezeichnung: `Fokus 373 Nord ${Date.now()}` },
+  });
+  expect(antwort.ok(), await antwort.text()).toBeTruthy();
+  const { id: einsatzId } = (await antwort.json()) as { id: number };
+  const ANZAHL = 16;
+  for (let n = 1; n <= ANZAHL; n += 1) {
+    const eintrag = await page.request.post(`/api/einsaetze/${einsatzId}/etb`, {
+      data: {
+        typ: 'meldung',
+        inhalt: `Probe ${n}: Lage unverändert`,
+        von: 'ELW 1',
+        an: 'Leitstelle',
+      },
+    });
+    expect(eintrag.ok(), await eintrag.text()).toBeTruthy();
+  }
+
+  const gemessen: string[] = [];
+  const LEISTE = '.etb-erfassung-sticky';
+  for (const flaeche of [
+    { width: 390, height: 600 },
+    { width: 1366, height: 520 },
+  ]) {
+    await page.setViewportSize(flaeche);
+    for (const dichte of ['kompakt', 'handschuh']) {
+      const lauf = `${flaeche.width}×${flaeche.height}/${dichte}`;
+      await page.goto(`/einsaetze/${einsatzId}/etb`);
+      await stelleDichte(page, dichte);
+      const zeitachse = page.getByRole('region', { name: 'Einsatztagebuch' });
+      await expect(zeitachse.getByTestId('etb-ereigniszeile')).toHaveCount(ANZAHL);
+      await expect(page.locator(LEISTE)).toHaveCSS('position', 'sticky');
+
+      const ausloeser = zeitachse.getByRole('button', { name: /^Aktionen zu Eintrag \d+$/ });
+      await expect(ausloeser).toHaveCount(ANZAHL);
+      await ausloeser.evaluateAll((els) =>
+        els.forEach((el) => el.setAttribute('data-e2e-fokus', el.getAttribute('aria-label')!)),
+      );
+      const { reserve, leiste } = await page.evaluate((sel) => {
+        const l = document.querySelector(sel)!.getBoundingClientRect();
+        return {
+          reserve: document.documentElement.scrollHeight - document.documentElement.clientHeight,
+          leiste: Math.round(l.height),
+        };
+      }, LEISTE);
+      expect(
+        reserve,
+        `${lauf}: Vorbedingung — die Bildlaufreserve (${reserve}px) muss die Leiste (${leiste}px) übersteigen`,
+      ).toBeGreaterThan(leiste);
+
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await ausloeser.first().focus();
+      const kern = await pruefeFokusVerdeckung(page, ANZAHL + 4);
+      expect(
+        kern.besuchteZiele.length,
+        `${lauf}: Vorbedingung — der Durchlauf muss die Zeitachse ablaufen`,
+      ).toBeGreaterThanOrEqual(ANZAHL - 1);
+
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await ausloeser.first().focus();
+      const streifen = await kleinsterStreifen(page, ANZAHL + 4, LEISTE);
+
+      expect(kern.verdeckt, `${lauf}: vollständig verdeckt:\n${kern.verdeckt.join('\n')}`).toEqual(
+        [],
+      );
+      expect(
+        streifen,
+        `${lauf}: kleinster freier Streifen Ziel ↔ Leiste ${streifen}px, Soll > 0`,
+      ).toBeGreaterThan(0);
+      gemessen.push(
+        `${lauf}: Leiste ${leiste}px, ${kern.besuchteZiele.length} Auslöser, Streifen ≥ ${Math.round(streifen)}px`,
+      );
+    }
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});

@@ -81,3 +81,23 @@ body {
 .ant-radio-group-outline .ant-radio-button-wrapper:not(.ant-radio-button-wrapper-disabled):hover {
   color: var(--lfh-bedien-text);
 }
+
+/* Fokusabstand zu einer am Seitenfuß angepinnten Leiste (WCAG 2.4.11), EINE Regel für alle
+   Seiten mit einer solchen Leiste: Befehlsentwurf (LFH-465) und ETB-Erfassung (LFH-373).
+   Die Variable setzt `components/fokusabstandUnten.ts` aus der GEMESSENEN Leistenhöhe und
+   räumt sie beim Aushängen weg; ohne Leiste greift der Rückfall `0px`, der sich wie die
+   Vorgabe `auto` verhält.
+
+   GEMESSEN, nicht gewählt: ohne diese Regel landete auf der Befehlsseite
+   `einsatzunterstuetzung` beim Tabulatorwechsel auf `top: 764` in einem 844-px-Fenster,
+   während die Leiste bei 766 begann; im ETB lag jeder zweite bis jeder Zeilenauslöser
+   vollständig hinter der Erfassungsleiste. `e2e/befehl-aktionsleiste.spec.ts` und der
+   ETB-Lauf in `e2e/fokus-verdeckung.spec.ts` werden ohne sie rot.
+
+   `scroll-padding-block-end` am SCROLLPORT (hier das Dokument), nicht `scroll-margin` an den
+   Zielen: die Ziel-Variante blieb in LFH-465 gemessen wirkungslos, Ursache nicht geklärt.
+   Bis LFH-373 stand die Regel seitenlokal in `pages/befehlAktionsleiste.css`; ein zweiter
+   `:root`-Block für das ETB hätte sie überschrieben, deshalb steht sie jetzt hier, einmal. */
+:root {
+  scroll-padding-block-end: var(--lfh-fokusabstand-unten, 0px);
+}

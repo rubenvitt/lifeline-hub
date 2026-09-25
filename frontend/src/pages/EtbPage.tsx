@@ -38,6 +38,7 @@ import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
 import StatusTag from '../components/StatusTag';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { Segmentleiste, useRollen, type SegmentOption } from '../components/instrument';
+import { useFokusabstandUnten } from '../components/fokusabstandUnten';
 import { useViewport } from '../components/useViewport';
 import { einsatzStatus, etbTyp, etbTypFarbe } from '../theme/statusFarben';
 import {
@@ -225,6 +226,9 @@ export default function EtbPage() {
   const zeitachseKopf = useRef<HTMLDivElement>(null);
   const { abBreite } = useViewport();
   const { token, rollen } = useRollen();
+  // Fokusabstand zur angepinnten Erfassungsleiste (WCAG 2.4.11, LFH-373): ohne ihn rollte der
+  // Browser jeden per Tab angesteuerten Zeilenauslöser hinter die Leiste.
+  const erfassungRef = useFokusabstandUnten(token.marginSM);
   const { erfassen, ausstehend, abgelehnt, abgelehntVerwerfen } = useEtbErfassung(
     einsatzId,
     benutzer?.id,
@@ -616,6 +620,7 @@ export default function EtbPage() {
               sie beim Blättern im Bild, solange die Zeitachse es ist. */}
           {darfSchreiben && (
             <div
+              ref={erfassungRef}
               className={
                 breit
                   ? 'etb-erfassung-sticky etb-erfassung-sticky--neben-leiste'

@@ -22,9 +22,9 @@ kein voller `pnpm e2e`-Lauf sie mitnimmt.
 
 ## 3. Zeile 13 · ETB: Fokus hinter der Erfassungsleiste
 
-- [ ] 3.1 Roter Nachweis in `fokus-verdeckung.spec.ts`: 16 Einträge säen, 390 × 600 und 1366 × 520, `kompakt` und `handschuh`. Start ausdrücklich am ersten Zeilenauslöser, Vorbedingungen: Leiste `toHaveCSS('position', 'sticky')`, Bildlaufreserve > Leistenhöhe, mindestens 15 besuchte Zeilenauslöser (`data-e2e-fokus`). Zusicherung: `verdeckt` leer und Freistreifen > 0. Verifiziert durch einen roten Lauf vor dem Fix (Vorab-Messung: jeder Zweite bis jeder Auslöser vollständig verdeckt), Fehlertext im Protokoll
-- [ ] 3.2 Hook `useFokusabstandUnten(ref)` und eine globale Regel `:root { scroll-padding-block-end: var(--lfh-fokusabstand-unten, 0px) }` (design.md D4). `BefehlDetailPage` stellt um, `befehlAktionsleiste.css` verliert ihren `:root`-Block samt Begründung, die in den neuen Ort wandert. Verifiziert durch Vitest für den Hook (Variable gesetzt, beim Aushängen entfernt, folgt einer Höhenänderung) und das unveränderte Grün von `befehl-aktionsleiste.spec.ts`
-- [ ] 3.3 `EtbPage` hängt den Hook an `.etb-erfassung-sticky`. Verifiziert dadurch, dass 3.1 grün wird, und durch eine Mutationsprobe mit entferntem Hook (rot)
+- [x] 3.1 Roter Nachweis in `fokus-verdeckung.spec.ts`: 16 Einträge säen, 390 × 600 und 1366 × 520, `kompakt` und `handschuh`. Start ausdrücklich am ersten Zeilenauslöser, Vorbedingungen: Leiste `toHaveCSS('position', 'sticky')`, Bildlaufreserve > Leistenhöhe, mindestens 15 besuchte Zeilenauslöser (`data-e2e-fokus`). Zusicherung: `verdeckt` leer und Freistreifen > 0. Verifiziert durch einen roten Lauf vor dem Fix (Vorab-Messung: jeder Zweite bis jeder Auslöser vollständig verdeckt), Fehlertext im Protokoll
+- [x] 3.2 Hook `useFokusabstandUnten(ref)` und eine globale Regel `:root { scroll-padding-block-end: var(--lfh-fokusabstand-unten, 0px) }` (design.md D4). `BefehlDetailPage` stellt um, `befehlAktionsleiste.css` verliert ihren `:root`-Block samt Begründung, die in den neuen Ort wandert. Verifiziert durch Vitest für den Hook (Variable gesetzt, beim Aushängen entfernt, folgt einer Höhenänderung) und das unveränderte Grün von `befehl-aktionsleiste.spec.ts`
+- [x] 3.3 `EtbPage` hängt den Hook an `.etb-erfassung-sticky`. Verifiziert dadurch, dass 3.1 grün wird, und durch eine Mutationsprobe mit entferntem Hook (rot)
 
 ## 4. Zeile 13 · Gefahrenmatrix: Fokus hinter der fixierten Spalte
 
