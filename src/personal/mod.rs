@@ -169,3 +169,43 @@ mod tests {
             .any(|(_, k, _)| *k == KATEGORIE_GEBUNDEN));
     }
 }
+
+// ── System-ETB-Wortlaute (LFH-690) ──────────────────────────────────────────────────
+// Reine Textbausteine: Handler und Demo-Import rufen dieselbe Funktion, damit ein
+// importierter Einsatz dieselben ETB-Texte trägt wie ein echter.
+
+/// Personen-Bezeichnung für ETB-Texte: Name, bei nicht leerer Funktion mit der Funktion in
+/// Klammern. Eine leere Funktion (`Some("")`) zählt wie keine.
+pub fn etb_bezeichnung(name: &str, funktion: Option<&str>) -> String {
+    match funktion {
+        Some(f) if !f.is_empty() => format!("{} ({})", name, f),
+        _ => name.to_string(),
+    }
+}
+
+/// System-ETB beim Disponieren einer Person (Stamm oder Ad-hoc).
+pub fn etb_text_disponiert(name: &str, funktion: Option<&str>) -> String {
+    format!("Person «{}» disponiert", etb_bezeichnung(name, funktion))
+}
+
+#[cfg(test)]
+mod etb_text_tests {
+    use super::*;
+
+    #[test]
+    fn disponiert_mit_ohne_und_mit_leerer_funktion() {
+        assert_eq!(
+            etb_text_disponiert("Anna Muster", Some("Zugführer, Sanitäter")),
+            "Person «Anna Muster (Zugführer, Sanitäter)» disponiert"
+        );
+        assert_eq!(
+            etb_text_disponiert("Anna Muster", None),
+            "Person «Anna Muster» disponiert"
+        );
+        assert_eq!(
+            etb_text_disponiert("Anna Muster", Some("")),
+            "Person «Anna Muster» disponiert"
+        );
+        assert_eq!(etb_bezeichnung("B", Some("SAN")), "B (SAN)");
+    }
+}

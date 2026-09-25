@@ -231,3 +231,66 @@ pub fn schutzobjekt_label(objekt: &str) -> &'static str {
         _ => "Schutzobjekt",
     }
 }
+
+// ── System-ETB-Wortlaute (LFH-690) ──────────────────────────────────────────────────
+// Reine Textbausteine: Handler und Demo-Import rufen dieselbe Funktion, damit ein
+// importierter Einsatz dieselben ETB-Texte trägt wie ein echter.
+
+/// System-ETB bei geänderter Warnstufe einer Bewertung. `gefahrentyp`/`schutzobjekt` sind die
+/// Wire-Werte, `gebiet_label` das Label des Gefahrengebiets (ohne Label «Gefahrengebiet #id»).
+/// Warnstufe `keine` heißt „aufgehoben“, jede andere nennt den Wire-Wert. Ob überhaupt
+/// geschrieben wird (nur bei Änderung), entscheidet der Aufrufer.
+pub fn etb_text_bewertung(
+    gefahrentyp: &str,
+    schutzobjekt: &str,
+    gebiet_label: Option<&str>,
+    gebiet_id: i64,
+    warnstufe: Warnstufe,
+) -> String {
+    let g = gefahrentyp_label(gefahrentyp);
+    let o = schutzobjekt_label(schutzobjekt);
+    let gname = gebiet_label
+        .map(str::to_string)
+        .unwrap_or_else(|| format!("Gefahrengebiet #{gebiet_id}"));
+    if warnstufe == Warnstufe::Keine {
+        format!("Gefahr «{g}» für «{o}» in «{gname}» aufgehoben.")
+    } else {
+        format!(
+            "Gefahr «{g}» für «{o}» in «{gname}» auf Warnstufe «{}» gesetzt.",
+            warnstufe.as_str()
+        )
+    }
+}
+
+#[cfg(test)]
+mod etb_text_tests {
+    use super::*;
+
+    #[test]
+    fn bewertung_gesetzt_aufgehoben_und_ohne_label() {
+        assert_eq!(
+            etb_text_bewertung(
+                "ertrinken",
+                "menschen",
+                Some("Deich Nord"),
+                3,
+                Warnstufe::Hoch
+            ),
+            "Gefahr «Ertrinken» für «Menschen» in «Deich Nord» auf Warnstufe «hoch» gesetzt."
+        );
+        assert_eq!(
+            etb_text_bewertung(
+                "ertrinken",
+                "menschen",
+                Some("Deich Nord"),
+                3,
+                Warnstufe::Keine
+            ),
+            "Gefahr «Ertrinken» für «Menschen» in «Deich Nord» aufgehoben."
+        );
+        assert_eq!(
+            etb_text_bewertung("einsturz", "einsatzkraefte", None, 7, Warnstufe::Akut),
+            "Gefahr «Einsturz» für «Einsatzkräfte» in «Gefahrengebiet #7» auf Warnstufe «akut» gesetzt."
+        );
+    }
+}

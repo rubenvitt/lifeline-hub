@@ -7,8 +7,10 @@ import FahrzeugeTab from '../stammdaten/FahrzeugeTab';
 import {
   adminGruppen,
   adminBenutzer,
+  adminDemoDaten,
   adminSektionPfad,
   adminBenutzerPfad,
+  adminDemoDatenPfad,
   defaultAdminPfad,
   ersteSektionPfad,
 } from './adminNav';
@@ -18,6 +20,7 @@ describe('adminNav — Pfad-Builder', () => {
     expect(adminSektionPfad('stammdaten', 'fahrzeuge')).toBe('/admin/stammdaten/fahrzeuge');
     expect(adminSektionPfad('karten', 'offline')).toBe('/admin/karten/offline');
     expect(adminBenutzerPfad()).toBe('/admin/benutzer');
+    expect(adminDemoDatenPfad()).toBe('/admin/demo-daten');
   });
 
   it('Default- und Gruppen-Erst-Pfade', () => {
@@ -28,11 +31,22 @@ describe('adminNav — Pfad-Builder', () => {
 });
 
 describe('adminNav — Registry', () => {
-  it('drei Gruppen mit 16 Sektionen gesamt (Stammdaten 11)', () => {
+  /**
+   * BEWUSST NACHGEZOGEN (LFH-690, design.md D13): „Demo-Daten“ ist der zweite Sonder-Eintrag
+   * neben „Benutzer“ und steht NICHT in `adminGruppen`. Die Zahl 16 bleibt deshalb stehen, und
+   * zwar als Aussage: wer die Sektion in eine Gruppe zöge, machte sie für jede Führungskraft
+   * sichtbar (die Gruppen kennen kein Rollenprädikat) und färbte diesen Test rot. Die
+   * Sonder-Einträge sind daneben einzeln gepinnt, samt ihrer Eindeutigkeit gegenüber den
+   * Gruppen-Keys — beide hängen als `/admin/<key>` an derselben Ebene wie die Gruppen.
+   */
+  it('drei Gruppen mit 16 Sektionen gesamt (Stammdaten 11), dazu zwei Sonder-Einträge', () => {
     expect(adminGruppen.map((g) => g.key)).toEqual(['stammdaten', 'einstellungen', 'karten']);
     expect(adminGruppen.flatMap((g) => g.sektionen).length).toBe(16);
     expect(adminGruppen.find((g) => g.key === 'stammdaten')!.sektionen.length).toBe(11);
     expect(adminBenutzer.key).toBe('benutzer');
+    expect(adminDemoDaten).toEqual({ key: 'demo-daten', label: 'Demo-Daten' });
+    const ersteEbene = [...adminGruppen.map((g) => g.key), adminBenutzer.key, adminDemoDaten.key];
+    expect(new Set(ersteEbene).size).toBe(ersteEbene.length);
   });
 
   it('Sektions-Keys je Gruppe eindeutig; jede Sektion trägt ein Element', () => {

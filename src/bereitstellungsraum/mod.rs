@@ -193,3 +193,38 @@ mod tests {
         }
     }
 }
+
+// ── System-ETB-Wortlaute (LFH-690) ──────────────────────────────────────────────────
+// Reine Textbausteine: Handler und Demo-Import rufen dieselbe Funktion, damit ein
+// importierter Einsatz dieselben ETB-Texte trägt wie ein echter.
+
+/// System-ETB beim Statuswechsel eines Bereitstellungsraums. Nur `aktiv` und `aufgeloest`
+/// schreiben einen Eintrag; jeder andere Zielstatus liefert `None`.
+pub fn etb_text_status(bezeichnung: &str, neuer_status: &str) -> Option<String> {
+    match neuer_status {
+        "aktiv" => Some(format!(
+            "Bereitstellungsraum {} in Betrieb genommen",
+            bezeichnung
+        )),
+        "aufgeloest" => Some(format!("Bereitstellungsraum {} aufgelöst", bezeichnung)),
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod etb_text_tests {
+    use super::*;
+
+    #[test]
+    fn status_aktiv_aufgeloest_und_ohne_eintrag() {
+        assert_eq!(
+            etb_text_status("BR Sportplatz", "aktiv").as_deref(),
+            Some("Bereitstellungsraum BR Sportplatz in Betrieb genommen")
+        );
+        assert_eq!(
+            etb_text_status("BR Sportplatz", "aufgeloest").as_deref(),
+            Some("Bereitstellungsraum BR Sportplatz aufgelöst")
+        );
+        assert_eq!(etb_text_status("BR Sportplatz", "geplant"), None);
+    }
+}

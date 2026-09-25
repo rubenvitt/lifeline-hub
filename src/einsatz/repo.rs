@@ -6,7 +6,7 @@ use super::{
 use crate::auth::Benutzer;
 use crate::error::AppError;
 use chrono::Utc;
-use sqlx::SqlitePool;
+use sqlx::{SqliteConnection, SqlitePool};
 
 /// Die Felder, die beim Anlegen gesetzt werden dürfen (LFH-332 · B4).
 ///
@@ -37,12 +37,34 @@ pub async fn anlegen(
 /// [`anlegen`] mit hineingereichtem Zeitpunkt für das Jahr der Einsatznummer — nur damit
 /// die Neujahrsgrenze ohne Uhr-Mock prüfbar ist. `angelegt_at`/`begonnen_at` bleiben
 /// `datetime('now')` der Datenbank.
+///
+/// Dünne Hülle über [`anlegen_tx`] (LFH-690, design.md D5): eigene `BEGIN IMMEDIATE`-
+/// Transaktion über `write_retry!`, danach das Laden über den Pool.
 pub(crate) async fn anlegen_zum(
     pool: &SqlitePool,
     daten: NeuerEinsatzDaten<'_>,
     ersteller_id: i64,
     jetzt: chrono::DateTime<chrono::Utc>,
 ) -> Result<Einsatz, AppError> {
+    let einsatz_id = crate::write_retry!(pool, |conn| {
+        anlegen_tx(conn, &daten, ersteller_id, jetzt).await
+    })?;
+
+    laden(pool, einsatz_id).await
+}
+
+/// Legt einen Einsatz auf der Verbindung des Aufrufers an: Einsatznummer aus dem Kreis der
+/// Organisation und Mitgliedschaft des Erstellers als Einsatzleitung. Liefert die neue ID.
+///
+/// Der Aufrufer hält die Transaktion (`BEGIN IMMEDIATE`, sonst ist die Nummernvergabe nicht
+/// rennfrei). So kann der Demo-Import (LFH-690) den Einsatz in seiner eigenen Transaktion
+/// anlegen und sieht dabei dieselbe Vergabe wie der Betrieb.
+pub(crate) async fn anlegen_tx(
+    conn: &mut SqliteConnection,
+    daten: &NeuerEinsatzDaten<'_>,
+    ersteller_id: i64,
+    jetzt: chrono::DateTime<chrono::Utc>,
+) -> Result<i64, AppError> {
     // Ein Einsatz gehört zur Organisation SEINES ERSTELLERS (F05/LFH-232). Vorher stand
     // hier `SELECT id FROM organisation ORDER BY id LIMIT 1` („Single-Org in T1") — sobald
     // eine zweite Organisation existiert, wäre jeder ihrer Einsätze in Org 1 gelandet und
@@ -52,87 +74,93 @@ pub(crate) async fn anlegen_zum(
     // der richtigen Quelle.
     let org_id: i64 = sqlx::query_scalar("SELECT org_id FROM benutzer WHERE id = ?")
         .bind(ersteller_id)
-        .fetch_optional(pool)
+        .fetch_optional(&mut *conn)
         .await?
         .ok_or_else(|| AppError::Internal("Ersteller nicht gefunden".into()))?;
 
-    let einsatz_id = crate::write_retry!(pool, |conn| {
-        // Einsatznummer <Präfix><JJJJ>-<NNNN> (LFH-617): NNNN je Organisation + Jahr
-        // fortlaufend über die Zahlenspalten, nicht über die Zerlegung des Textes. Präfix
-        // und Zeitzone kommen aus den Org-Einstellungen; das Präfix wird in den Text
-        // eingefroren, das Jahr zählt in der Org-Zeitzone (sonst Europe/Berlin).
-        // BEGIN IMMEDIATE (F09) schließt die read-then-write-Lücke zwischen MAX-Read und
-        // Insert; der Unique-Index (org_id, nummer_jahr, nummer_lfd) sichert zusätzlich ab.
-        let (praefix, zeitzone): (Option<String>, Option<String>) = sqlx::query_as(
-            "SELECT einsatz_nummer_praefix, zeitzone FROM org_einstellungen WHERE org_id = ?",
+    // Einsatznummer <Präfix><JJJJ>-<NNNN> (LFH-617): NNNN je Organisation + Jahr
+    // fortlaufend über die Zahlenspalten, nicht über die Zerlegung des Textes. Präfix
+    // und Zeitzone kommen aus den Org-Einstellungen; das Präfix wird in den Text
+    // eingefroren, das Jahr zählt in der Org-Zeitzone (sonst Europe/Berlin).
+    // BEGIN IMMEDIATE (F09) schließt die read-then-write-Lücke zwischen MAX-Read und
+    // Insert; der Unique-Index (org_id, nummer_jahr, nummer_lfd) sichert zusätzlich ab.
+    let (praefix, zeitzone): (Option<String>, Option<String>) = sqlx::query_as(
+        "SELECT einsatz_nummer_praefix, zeitzone FROM org_einstellungen WHERE org_id = ?",
+    )
+    .bind(org_id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .unwrap_or((None, None));
+    let jahr = super::nummer::jahr_in_zone(jetzt, zeitzone.as_deref());
+    let max_lfd: Option<i64> = sqlx::query_scalar(
+        "SELECT MAX(nummer_lfd) FROM einsatz WHERE org_id = ? AND nummer_jahr = ?",
+    )
+    .bind(org_id)
+    .bind(jahr)
+    .fetch_one(&mut *conn)
+    .await?;
+    // Belegte TEXTE überspringen: ein früher von Hand gesetzter Wert im neuen Muster
+    // (z. B. `E-2026-0005`) trägt keine Zahlen und zählt im MAX nicht mit. Ohne das
+    // Ausweichen schlüge der Text-Index aus 0005 an — bei jedem weiteren Versuch
+    // wieder, denn MAX(nummer_lfd) wüchse nie darüber hinaus. Die Schleife endet, weil
+    // eine Org nur endlich viele Texte hat.
+    let mut lfd = max_lfd.unwrap_or(0) + 1;
+    let einsatznummer = loop {
+        let kandidat = super::nummer::formatiere(praefix.as_deref(), jahr, lfd);
+        let belegt: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM einsatz \
+             WHERE org_id = ? AND einsatznummer_intern = ?)",
         )
         .bind(org_id)
-        .fetch_optional(&mut *conn)
-        .await?
-        .unwrap_or((None, None));
-        let jahr = super::nummer::jahr_in_zone(jetzt, zeitzone.as_deref());
-        let max_lfd: Option<i64> = sqlx::query_scalar(
-            "SELECT MAX(nummer_lfd) FROM einsatz WHERE org_id = ? AND nummer_jahr = ?",
-        )
-        .bind(org_id)
-        .bind(jahr)
+        .bind(&kandidat)
         .fetch_one(&mut *conn)
         .await?;
-        // Belegte TEXTE überspringen: ein früher von Hand gesetzter Wert im neuen Muster
-        // (z. B. `E-2026-0005`) trägt keine Zahlen und zählt im MAX nicht mit. Ohne das
-        // Ausweichen schlüge der Text-Index aus 0005 an — bei jedem weiteren Versuch
-        // wieder, denn MAX(nummer_lfd) wüchse nie darüber hinaus. Die Schleife endet, weil
-        // eine Org nur endlich viele Texte hat.
-        let mut lfd = max_lfd.unwrap_or(0) + 1;
-        let einsatznummer = loop {
-            let kandidat = super::nummer::formatiere(praefix.as_deref(), jahr, lfd);
-            let belegt: bool = sqlx::query_scalar(
-                "SELECT EXISTS(SELECT 1 FROM einsatz \
-                 WHERE org_id = ? AND einsatznummer_intern = ?)",
-            )
-            .bind(org_id)
-            .bind(&kandidat)
-            .fetch_one(&mut *conn)
-            .await?;
-            if !belegt {
-                break kandidat;
-            }
-            lfd += 1;
-        };
+        if !belegt {
+            break kandidat;
+        }
+        lfd += 1;
+    };
 
-        // COALESCE statt eines zweiten INSERT-Zweigs: `einsatzart` und `begonnen_at`
-        // sind NOT NULL mit DB-Default. Ein explizit gebundenes NULL überschriebe den
-        // Default und verletzte die Bedingung — COALESCE lässt den Default greifen.
-        let einsatz_id: i64 = sqlx::query_scalar(
-            "INSERT INTO einsatz (org_id, bezeichnung, stichwort, einsatzart, begonnen_at, \
-                                  einsatznummer_intern, nummer_jahr, nummer_lfd, angelegt_at) \
-             VALUES (?, ?, ?, COALESCE(?, 'realeinsatz'), COALESCE(?, datetime('now')), ?, \
-                     ?, ?, datetime('now')) RETURNING id",
-        )
-        .bind(org_id)
-        .bind(daten.bezeichnung)
-        .bind(daten.stichwort)
-        .bind(daten.einsatzart)
-        .bind(daten.begonnen_at)
-        .bind(&einsatznummer)
-        .bind(jahr)
-        .bind(lfd)
-        .fetch_one(&mut *conn)
-        .await?;
+    // COALESCE statt eines zweiten INSERT-Zweigs: `einsatzart` und `begonnen_at`
+    // sind NOT NULL mit DB-Default. Ein explizit gebundenes NULL überschriebe den
+    // Default und verletzte die Bedingung — COALESCE lässt den Default greifen.
+    //
+    // Die ID wird ausdrücklich vergeben (LFH-690, design.md D6): über allen bestehenden
+    // Einsätzen UND über jeder ID, die ein Demo-Import je getragen hat. `demo_import`
+    // behält die ID nach dem Entfernen als Sperre; ohne sie bekäme der nächste echte
+    // Einsatz die ID des gelöschten Demo-Einsatzes, und Offline-Queues oder offene Tabs
+    // schrieben still in ihn. Das gilt für JEDE Anlage, instanzweit (IDs sind nicht je Org).
+    // Ohne Demo-Historie ist das Ergebnis `MAX(id)+1` — dieselbe Vergabe wie SQLites eigene
+    // für `INTEGER PRIMARY KEY` ohne AUTOINCREMENT. Rennfrei unter BEGIN IMMEDIATE.
+    let einsatz_id: i64 = sqlx::query_scalar(
+        "INSERT INTO einsatz (id, org_id, bezeichnung, stichwort, einsatzart, begonnen_at, \
+                              einsatznummer_intern, nummer_jahr, nummer_lfd, angelegt_at) \
+         VALUES ((SELECT MAX(COALESCE((SELECT MAX(id) FROM einsatz), 0), \
+                             COALESCE((SELECT MAX(einsatz_id) FROM demo_import), 0)) + 1), \
+                 ?, ?, ?, COALESCE(?, 'realeinsatz'), COALESCE(?, datetime('now')), ?, \
+                 ?, ?, datetime('now')) RETURNING id",
+    )
+    .bind(org_id)
+    .bind(daten.bezeichnung)
+    .bind(daten.stichwort)
+    .bind(daten.einsatzart)
+    .bind(daten.begonnen_at)
+    .bind(&einsatznummer)
+    .bind(jahr)
+    .bind(lfd)
+    .fetch_one(&mut *conn)
+    .await?;
 
-        sqlx::query(
-            "INSERT INTO einsatz_mitgliedschaft (einsatz_id, benutzer_id, einsatz_rolle) \
-             VALUES (?, ?, ?)",
-        )
-        .bind(einsatz_id)
-        .bind(ersteller_id)
-        .bind(EINSATZ_ROLLE_LEITUNG)
-        .execute(&mut *conn)
-        .await?;
-        Ok(einsatz_id)
-    })?;
-
-    laden(pool, einsatz_id).await
+    sqlx::query(
+        "INSERT INTO einsatz_mitgliedschaft (einsatz_id, benutzer_id, einsatz_rolle) \
+         VALUES (?, ?, ?)",
+    )
+    .bind(einsatz_id)
+    .bind(ersteller_id)
+    .bind(EINSATZ_ROLLE_LEITUNG)
+    .execute(&mut *conn)
+    .await?;
+    Ok(einsatz_id)
 }
 
 /// Lädt einen Einsatz; `AppError::NotFound`, wenn er nicht existiert.
@@ -1999,6 +2027,84 @@ mod tests {
         let fremd_benutzer = benutzer_laden(&pool, fremd).await;
         let fuer_fremd = liste_fuer(&pool, &fremd_benutzer).await.unwrap();
         assert!(fuer_fremd.is_empty());
+    }
+
+    /// Legt einen Einsatz mit fester ID per SQL an — die ID-Vergabe von [`anlegen_tx`]
+    /// soll hier gegen einen bekannten Höchstwert laufen, nicht gegen die eigene.
+    async fn einsatz_mit_id(pool: &SqlitePool, id: i64) {
+        sqlx::query("INSERT INTO einsatz (id, org_id, bezeichnung) VALUES (?, 1, 'Bestand')")
+            .bind(id)
+            .execute(pool)
+            .await
+            .unwrap();
+    }
+
+    /// Kopf eines (entfernten) Demo-Imports per SQL — `einsatz_id` ohne FK, wie in der
+    /// Historie nach dem Entfernen (LFH-690 D6).
+    async fn demo_historie(pool: &SqlitePool, einsatz_id: i64) {
+        sqlx::query(
+            "INSERT INTO demo_import (org_id, einsatz_id, entfernt_at, bericht) \
+             VALUES (1, ?, datetime('now'), '{}')",
+        )
+        .bind(einsatz_id)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
+    /// LFH-690 D6: Die ID eines entfernten Demo-Einsatzes wird nie wiedervergeben. Höchste
+    /// Einsatz-ID 5, Demo-Historie mit ID 7 → der neue Einsatz bekommt 8, nicht 6. Die Sperre
+    /// hebt nur an: liegt die Historie darunter, gilt wieder der Höchstwert der Einsätze.
+    #[tokio::test]
+    async fn anlegen_ueberspringt_die_id_eines_entfernten_demo_einsatzes() {
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        einsatz_mit_id(&pool, 5).await;
+        demo_historie(&pool, 7).await;
+
+        let neu = test_anlegen(&pool, "Echter Einsatz", None, leit)
+            .await
+            .unwrap();
+        assert_eq!(
+            neu.id, 8,
+            "über der gesperrten Demo-ID 7, nicht MAX(id)+1 = 6"
+        );
+
+        let danach = test_anlegen(&pool, "Nächster", None, leit).await.unwrap();
+        assert_eq!(
+            danach.id, 9,
+            "Historie unter dem Höchstwert erzeugt keine Lücke"
+        );
+    }
+
+    /// LFH-690 D6: Ohne Demo-Historie ist die Vergabe dieselbe wie SQLites eigene
+    /// (`MAX(rowid)+1`) — für Bestandsinstanzen ändert sich nichts. Läuft direkt über
+    /// [`anlegen_tx`] auf einer Transaktion des Aufrufers.
+    #[tokio::test]
+    async fn anlegen_tx_ohne_demo_historie_vergibt_ohne_luecke() {
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        einsatz_mit_id(&pool, 5).await;
+
+        let mut tx = pool.begin().await.unwrap();
+        let id = anlegen_tx(
+            &mut tx,
+            &NeuerEinsatzDaten {
+                bezeichnung: "Echter Einsatz",
+                stichwort: None,
+                einsatzart: None,
+                begonnen_at: None,
+            },
+            leit,
+            Utc::now(),
+        )
+        .await
+        .unwrap();
+        tx.commit().await.unwrap();
+
+        assert_eq!(id, 6);
+        let rolle = rolle_von(&pool, id, leit).await.unwrap();
+        assert_eq!(rolle, Some(EinsatzRolle::Einsatzleitung));
     }
 
     #[tokio::test]

@@ -436,7 +436,10 @@ describe('AbloesungPage (LFH-635)', () => {
       laufendLiefert([eins(), vier(), drei()]);
       const { client } = renderPage();
       await screen.findAllByRole('article');
-      laufendLiefert([eins(), schicht({ id: 4, faellig_at: inMinuten(150) }), drei()]);
+      // 149,5 statt 150 (LFH-740): `abstandText` rundet ab, und `inMinuten` schneidet auf
+      // Sekunden. Fielen Anlage und Rendern in dieselbe Millisekunde, stünden genau 150 min
+      // da („in 2 h 30 min“), und die Erwartung unten liefe in den Timeout.
+      laufendLiefert([eins(), schicht({ id: 4, faellig_at: inMinuten(149.5) }), drei()]);
       await client.invalidateQueries();
       await waitFor(() =>
         expect(

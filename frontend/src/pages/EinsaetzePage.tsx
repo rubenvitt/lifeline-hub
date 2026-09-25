@@ -1,8 +1,8 @@
-import { App, AutoComplete, Button, DatePicker, Form, Input, Tag, theme } from 'antd';
+import { Alert, App, AutoComplete, Button, DatePicker, Form, Input, Tag, theme } from 'antd';
 import { EnvironmentOutlined, PlusOutlined } from '@ant-design/icons';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useEffect, useState, type CSSProperties } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useLinkClickHandler, useNavigate } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Einsatzart, EinsatzAnzeige } from '../api/types';
 import { ApiError } from '../api/client';
@@ -30,6 +30,8 @@ import '../theme/sprache.css';
 import './EinsaetzePage.css';
 import { monoStil, useRollen } from '../components/instrument';
 import { einsaetzeMeta, kachelKennung } from './einsatzKachelKern';
+import { adminDemoDatenPfad } from '../admin/adminNav';
+import { useDemoDatenStatus } from '../admin/useDemoDaten';
 
 /** Werte des Anlegedialogs (`begonnen_at` als Dayjs aus dem `DatePicker`). */
 interface AnlegeWerte {
@@ -136,6 +138,61 @@ export default function EinsaetzePage() {
   const [form] = Form.useForm<AnlegeWerte>();
 
   const darfAnlegen = darfVerwaltung(benutzer);
+
+  /**
+   * Hinweis auf die Demo-Daten (LFH-690, design.md D13): nur für den System-Admin, nur bei
+   * Freischaltung (Status 200) und nur, solange für die Organisation nichts importiert ist.
+   * Die Abfrage läuft ausschließlich für den System-Admin; ein 404 ist kein Fehlerbild.
+   *
+   * BENANNTE ABWEICHUNG vom Ticket, das den Leerzustand vorschlägt: der ist seit LFH-331 · AK3
+   * aktionslos gepinnt und rechnet je Benutzer, „nicht importiert“ ist dagegen eine Aussage
+   * über die Organisation. Der Hinweis springt in die Verwaltung — ein Direktimport von hier
+   * wäre eine zweite Stelle für einen unumkehrbaren Vorgang.
+   *
+   * ORT: UNTER allem, was die Einsatzliste zeichnet, nicht im `hinweis`-Slot darüber
+   * (Prüfliste T3-12, gemessen). Die Status-Abfrage kommt regelmäßig NACH der Liste an; über
+   * dem Raster schob der Hinweis es dann um 118–266 px, CLS 0,12 auf dem Tablet in
+   * `handschuh` und 0,17–0,21 mobil (Soll ≤ 0,1). Unter dem Raster liegt nichts, das springen
+   * könnte, und ein Element, das neu erscheint, zählt selbst nicht als Verschiebung. Die
+   * andere Lösung, den Inhalt erst nach beiden Abfragen zu zeichnen, hielte die Einsatzliste
+   * für eine Aufforderung ohne Eile an einer zweiten Abfrage fest. Aus demselben Grund wartet
+   * der Hinweis auf die Liste (`!isPending`): stünde er schon unter den Skeletten, schöbe ihn
+   * der Wechsel Skelett → Kacheln (andere Reihenzahl, Leerzustand darüber) selbst.
+   */
+  const demo = useDemoDatenStatus();
+  const demoPfad = adminDemoDatenPfad();
+  const zuDenDemoDaten = useLinkClickHandler<HTMLElement>(demoPfad);
+  const demoHinweis =
+    demo.freigeschaltet && demo.status?.importiert === false ? (
+      <Alert
+        type="info"
+        showIcon
+        title="Demo-Daten sind freigeschaltet und noch nicht importiert."
+        description={
+          <>
+            <div>
+              Ein Übungseinsatz samt Stammdaten für Vorführung und Schulung lässt sich in der
+              Verwaltung anlegen.
+            </div>
+            {/* Der Verweis ist ein eigenes Bedienziel unter dem Satz, nicht Teil davon
+                (Prüfliste T3-5/T3-6/T3-2, gemessen): im Satz trennte ihn nur die Farbe vom
+                Text (2,20 / 1,58 : 1, WCAG 1.4.1), `bedienText` hielt auf der Info-Fläche am
+                Tag 6,04 : 1, und `minHeight` ohne Polsterung riss die Textzeile in
+                `handschuh` auf 72 px. Als antd-`Button` erbt er Höhe und Polsterung vom
+                `ConfigProvider` (kein punktuelles `size`) und trägt `colorText` auf eigener
+                Fläche. Mit `href` bleibt er ein `<a>` (Rolle Link, Strg/⌘-Klick öffnet
+                einen Tab); `useLinkClickHandler` navigiert beim schlichten Klick in der App
+                statt mit einem Seitenneuladen. Nicht der `action`-Slot: dort stünde der Knopf
+                neben dem Text und drückte ihn bei 390 px auf die halbe Breite. */}
+            <div style={{ marginTop: token.marginSM }}>
+              <Button href={demoPfad} onClick={zuDenDemoDaten}>
+                Zu den Demo-Daten
+              </Button>
+            </div>
+          </>
+        }
+      />
+    ) : undefined;
 
   // `isPending` (erster Abruf), NICHT `isFetching`: nach dem Anlegen invalidiert die
   // Mutation die Liste — ein Ladezweig an `isFetching` nähme den Anlegen-Knopf
@@ -313,7 +370,6 @@ export default function EinsaetzePage() {
     <EinsatzSeite
       titel="Einsätze"
       meta={isPending ? undefined : einsaetzeMeta(aktive.length, abgeschlossene.length)}
-
       dataUpdatedAt={einsaetzeAktualisiertAt}
     >
       {/* Leer und anlegeberechtigt schließen sich NICHT aus: vorher lief der
@@ -389,6 +445,12 @@ export default function EinsaetzePage() {
           <div style={rasterStil(flaeche.kachelMinKlein, abstand.md)}>
             {abgeschlossene.map((e: EinsatzAnzeige) => renderKarte(e, true))}
           </div>
+        </div>
+      )}
+
+      {!isPending && demoHinweis && (
+        <div data-lfh="demo-hinweis" style={{ marginTop: abstand.lg }}>
+          {demoHinweis}
         </div>
       )}
 

@@ -165,8 +165,36 @@ pub async fn laden_anzeige_tx(
 /// setzt den ersten `gebunden`-Status. `staerke_position` ist der optionale Dispo-Override.
 /// `NotFound` bei fremder/unbek. Person, `Validation` bei außer Dienst, `Conflict` bei
 /// Doppel-Disposition. Liefert die neue `ep_id`.
+///
+/// Pool-Hülle um [`disponiere_stamm_tx`]: wie bisher ohne eigene Transaktion, Prüfungen und
+/// Insert laufen im Autocommit einer geliehenen Verbindung.
 pub async fn disponiere_stamm(
     pool: &SqlitePool,
+    einsatz_id: i64,
+    org_id: i64,
+    personal_id: i64,
+    staerke_position: Option<&str>,
+    disponiert_von: i64,
+) -> Result<i64, AppError> {
+    let mut conn = pool.acquire().await?;
+    disponiere_stamm_tx(
+        &mut conn,
+        einsatz_id,
+        org_id,
+        personal_id,
+        staerke_position,
+        disponiert_von,
+    )
+    .await
+}
+
+/// Disponiert eine Stamm-Person auf einer offenen Verbindung/Transaktion (LFH-690,
+/// Demo-Import in EINER Transaktion). Person, Funktionstext und erster `gebunden`-Status
+/// werden auf derselben Verbindung gelesen, sehen also auch Stammdaten, die dieselbe offene
+/// Transaktion gerade angelegt hat. Öffnet und committet selbst nichts. Fehlerfälle wie
+/// [`disponiere_stamm`]. Liefert die neue `ep_id`.
+pub async fn disponiere_stamm_tx(
+    conn: &mut SqliteConnection,
     einsatz_id: i64,
     org_id: i64,
     personal_id: i64,
@@ -178,7 +206,7 @@ pub async fn disponiere_stamm(
     )
     .bind(personal_id)
     .bind(org_id)
-    .fetch_optional(pool)
+    .fetch_optional(&mut *conn)
     .await?
     .ok_or(AppError::NotFound)?;
     let (name, traeger, dienststatus) = snap;
@@ -187,8 +215,9 @@ pub async fn disponiere_stamm(
             "Person ist außer Dienst und kann nicht disponiert werden".into(),
         ));
     }
-    let funktion = qualifikation_repo::funktion_text(pool, personal_id).await?;
-    let status_id = status_repo::erster_der_kategorie(pool, org_id, KATEGORIE_GEBUNDEN).await?;
+    let funktion = qualifikation_repo::funktion_text(&mut *conn, personal_id).await?;
+    let status_id =
+        status_repo::erster_der_kategorie(&mut *conn, org_id, KATEGORIE_GEBUNDEN).await?;
 
     let ergebnis = sqlx::query_scalar::<_, i64>(
         "INSERT INTO einsatz_personal \
@@ -204,7 +233,7 @@ pub async fn disponiere_stamm(
     .bind(&funktion)
     .bind(&traeger)
     .bind(disponiert_von)
-    .fetch_one(pool)
+    .fetch_one(&mut *conn)
     .await;
 
     match ergebnis {
@@ -505,6 +534,60 @@ mod tests {
         sqlx::query("INSERT INTO einsatzabschnitt (einsatz_id, name, leiter_id) VALUES (?, 'Abschnitt Nord', ?)")
             .bind(einsatz).bind(p2).execute(pool).await.unwrap();
         (einsatz, p1, p2, p3)
+    }
+
+    /// LFH-690: Stamm-Person, Qualifikation, Personalstatus und Disposition in EINER
+    /// Transaktion. Die Disposition muss Person, Funktionstext und ersten `gebunden`-Status auf
+    /// der Verbindung lesen; über den Pool fände sie die Person nicht bzw. schriebe still
+    /// `snap_funktion`/`status_id = NULL`.
+    #[tokio::test]
+    async fn disponiere_stamm_mit_stammdaten_aus_derselben_transaktion() {
+        let (_dir, pool) = crate::db::test_pool_datei().await;
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (7, 'Import-Org')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let benutzer: i64 = sqlx::query_scalar(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (7, 'Leit', 'leit7', 'h') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let (ep_id, status_id) = crate::write_retry!(&pool, |conn| {
+            let einsatz: i64 = sqlx::query_scalar(
+                "INSERT INTO einsatz (org_id, bezeichnung) VALUES (7, 'Import') RETURNING id",
+            )
+            .fetch_one(&mut *conn)
+            .await?;
+            let status_id: i64 = sqlx::query_scalar(
+                "INSERT INTO personal_status (org_id, label, kategorie, sortier) \
+                 VALUES (7, 'alarmiert', 'gebunden', 20) RETURNING id",
+            )
+            .fetch_one(&mut *conn)
+            .await?;
+            let quali: i64 = sqlx::query_scalar(
+                "INSERT INTO qualifikation (org_id, label, sortier) VALUES (7, 'Zugführer', 1) \
+                 RETURNING id",
+            )
+            .fetch_one(&mut *conn)
+            .await?;
+            let personal =
+                crate::personal::repo::anlegen_tx(&mut *conn, 7, &p_daten("Anna Import"), &[quali])
+                    .await?;
+            let ep_id =
+                disponiere_stamm_tx(&mut *conn, einsatz, 7, personal.id, None, benutzer).await?;
+            Ok((ep_id, status_id))
+        })
+        .unwrap();
+        let (snap_funktion, gesetzter_status): (Option<String>, Option<i64>) =
+            sqlx::query_as("SELECT snap_funktion, status_id FROM einsatz_personal WHERE id = ?")
+                .bind(ep_id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(snap_funktion.as_deref(), Some("Zugführer"));
+        assert_eq!(gesetzter_status, Some(status_id));
     }
 
     #[tokio::test]

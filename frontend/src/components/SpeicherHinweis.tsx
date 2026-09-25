@@ -34,10 +34,16 @@ interface SpeicherFehlerProps {
   fehler: unknown;
   /** Überschrift; Vorgabe „Nicht gespeichert". */
   titel?: string;
+  /**
+   * Text für einen Fehler, der keine `ApiError` ist (Netz, Programmfehler); Vorgabe
+   * „Speichern fehlgeschlagen" wie in {@link fehlerText}. Für Seiten, deren Vorgang kein
+   * Speichern ist (LFH-690: Import/Entfernen der Demo-Daten).
+   */
+  fallback?: string;
 }
 
-export function SpeicherFehler({ fehler, titel }: SpeicherFehlerProps) {
-  const text = fehlerText(fehler);
+export function SpeicherFehler({ fehler, titel, fallback }: SpeicherFehlerProps) {
+  const text = fehlerText(fehler, fallback);
   if (text === null) return null;
   return <Alert type="error" showIcon title={titel ?? 'Nicht gespeichert'} description={text} />;
 }
@@ -70,6 +76,8 @@ interface SeitenHinweiseProps {
   /** Nur bei FEHLENDER Berechtigung. */
   rechteFehlt?: boolean;
   fehlerTitel?: string;
+  /** Siehe {@link SpeicherFehlerProps.fallback}. */
+  fehlerFallback?: string;
 }
 
 /**
@@ -90,6 +98,7 @@ export function SeitenHinweise({
   rechteText,
   rechteFehlt = false,
   fehlerTitel,
+  fehlerFallback,
 }: SeitenHinweiseProps) {
   const { token } = theme.useToken();
   const zeigtRecht = rechteFehlt && rechteText != null;
@@ -98,7 +107,7 @@ export function SeitenHinweise({
   return (
     <Flex vertical gap={token.marginSM}>
       {zeigtRecht && <RechteHinweis sichtbar text={rechteText} />}
-      <SpeicherFehler fehler={fehler} titel={fehlerTitel} />
+      <SpeicherFehler fehler={fehler} titel={fehlerTitel} fallback={fehlerFallback} />
     </Flex>
   );
 }

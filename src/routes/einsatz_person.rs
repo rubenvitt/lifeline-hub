@@ -371,7 +371,7 @@ pub async fn anlegen(
             // Die Registriernummer kommt aus dem RÜCKGABEWERT, nicht aus einem Reload: das
             // Repo liefert sie in beiden Zweigen mit. Ein `laden_tx` an dieser Stelle wäre
             // ein zweiter Roundtrip für einen Wert, der schon dasteht.
-            let text = format!("Person {} erfasst", registrier_anzeige(reg));
+            let text = crate::person::etb_text_erfasst(reg);
             crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text).await?;
 
             /*
@@ -402,11 +402,7 @@ pub async fn anlegen(
                     matches!(status_enum, PersonStatus::Erfasst),
                 )
                 .await?;
-                let text = format!(
-                    "Person {}: Sichtung {}",
-                    registrier_anzeige(reg),
-                    k.etb_label()
-                );
+                let text = crate::person::etb_text_sichtung(reg, k);
                 crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text)
                     .await?;
             }
@@ -422,11 +418,7 @@ pub async fn anlegen(
                 )
                 .await?;
                 let uhs = crate::uhs::repo::laden_tx(conn, einsatz_id, uhs_id).await?;
-                let text = format!(
-                    "Person {}: Aufnahme in {} (Inbox)",
-                    registrier_anzeige(reg),
-                    uhs.bezeichnung,
-                );
+                let text = crate::person::etb_text_uhs_aufnahme(reg, &uhs.bezeichnung);
                 uhs_etb_id = Some(
                     crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text)
                         .await?,
@@ -857,11 +849,7 @@ pub async fn sichten(
     // F06/LFH-244 Tier-A: Sichtungs-Erfassung (optionaler Status-Hub + INSERT + Cache-Update)
     // + System-ETB-Eintrag atomar in EINER Tx (BEGIN IMMEDIATE + Retry). Der ETB-Text ist aus
     // dem VOR der Tx geladenen `person`-Vorzustand + `kategorie` berechenbar. SSE nach dem Commit.
-    let text = format!(
-        "Person {}: Sichtung {}",
-        registrier_anzeige(person.registrier_nr),
-        kategorie.etb_label()
-    );
+    let text = crate::person::etb_text_sichtung(person.registrier_nr, kategorie);
     let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
         .await?
         .etb_startwert();
