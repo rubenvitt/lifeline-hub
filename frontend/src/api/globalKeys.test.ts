@@ -26,7 +26,7 @@ describe('globalKeys: Byte-Pin gegen die ersetzten Literale (LFH-307)', () => {
     expect(globalKeys.authProvider()).toEqual(['auth-provider']);
     // LFH-690: NEU, ohne Vorbestand. Das Literal ist trotzdem handgeschrieben: Verwaltung,
     // Menü und Einsatzliste lesen denselben Status, und die Invalidierung nach Import und
-    // Entfernen trifft ihn über diesen Key. Ein still umbenanntes Fach liesse Menü und
+    // Entfernen trifft ihn über diesen Key. Ein still umbenanntes Fach ließe Menü und
     // Hinweis nach dem Import auf dem alten Stand stehen, ohne dass etwas rot wird.
     expect(globalKeys.demoDaten()).toEqual(['demo-daten']);
     // LFH-391 · Etappe D: NEU, deshalb ohne Vorbestand — das Literal ist trotzdem

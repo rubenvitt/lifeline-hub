@@ -208,6 +208,52 @@ describe('DemoDatenPage — Selbstschutz der Route', () => {
   });
 });
 
+describe('DemoDatenPage — Status-Abfrage scheitert (Spec „Status-Abfrage scheitert“)', () => {
+  it('500: Fehlerbild mit „Erneut abrufen“, keine Aktion, keine Umleitung', async () => {
+    let gets = 0;
+    server.use(
+      http.get('/api/demo-daten', () => {
+        gets += 1;
+        return HttpResponse.json({ error: 'Datenbank nicht erreichbar' }, { status: 500 });
+      }),
+    );
+    setup(admin);
+    expect(
+      await screen.findByText('Der Stand der Demo-Daten konnte nicht geladen werden.'),
+    ).toBeInTheDocument();
+    const wiederholen = screen.getByRole('button', { name: 'Erneut abrufen' });
+    expect(screen.queryByRole('button', { name: 'Importieren' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Neu importieren' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Entfernen' })).toBeNull();
+    expect(screen.queryByText('Einsatzliste')).toBeNull();
+    expect(screen.getByRole('heading', { level: 1, name: 'Demo-Daten' })).toBeInTheDocument();
+    // „Erneut abrufen“ fragt wirklich neu (retry: false — ohne Klick bleibt es bei einem).
+    expect(gets).toBe(1);
+    await userEvent.click(wiederholen);
+    await waitFor(() => expect(gets).toBe(2));
+  });
+
+  it('500: das Menü zeigt keinen Eintrag und kein Fehlerbild', async () => {
+    // Entscheidung: der Eintrag hängt an „freigeschaltet“ = Status 200. Bei 500 ist das
+    // unbekannt, der Eintrag fehlt also — wie bei 404. Die Sektion selbst bleibt über den
+    // Deeplink erreichbar und zeigt dort das Fehlerbild (Test darüber).
+    let gets = 0;
+    server.use(
+      http.get('/api/demo-daten', () => {
+        gets += 1;
+        return HttpResponse.json({ error: 'kaputt' }, { status: 500 });
+      }),
+    );
+    setup(admin, '/admin/stammdaten/fahrzeuge');
+    await waitFor(() => expect(gets).toBe(1));
+    await screen.findByText('PFAD:/admin/stammdaten/fahrzeuge');
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.getByRole('menuitem', { name: 'Benutzer' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Demo-Daten' })).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+});
+
 describe('DemoDatenPage — nicht importiert', () => {
   it('genau eine Primäraktion „Importieren“ im Kopf, keine Aktion im Inhalt', async () => {
     demoServer(NICHT_IMPORTIERT);
@@ -416,6 +462,19 @@ describe('DemoDatenPage — Fehler stehen an der Seite (LFH-345)', () => {
   });
 });
 
+describe('DemoDatenPage — Netzfehler beim Vorgang', () => {
+  it('nennt unter „Import fehlgeschlagen“ die Erreichbarkeit, nicht „Speichern fehlgeschlagen“', async () => {
+    demoServer(NICHT_IMPORTIERT);
+    server.use(http.post('/api/demo-daten', () => HttpResponse.error()));
+    setup(admin);
+    await userEvent.click(await screen.findByRole('button', { name: 'Importieren' }));
+    expect(await screen.findByText('Import fehlgeschlagen')).toBeInTheDocument();
+    const text = screen.getByText('Der Server hat nicht geantwortet. Bitte erneut versuchen.');
+    expect(text.closest('.ant-message')).toBeNull();
+    expect(screen.queryByText('Speichern fehlgeschlagen')).toBeNull();
+  });
+});
+
 describe('DemoDatenPage — Riegel gegen doppeltes Senden', () => {
   it('zwei Klicks im selben Takt senden genau einen POST', async () => {
     demoServer(NICHT_IMPORTIERT);
@@ -438,6 +497,8 @@ describe('DemoDatenPage — Riegel gegen doppeltes Senden', () => {
     fireEvent.click(knopf);
     fireEvent.click(knopf);
     await waitFor(() => expect(posts).toBe(1));
+    // Sichtbar gesperrt, solange der Vorgang läuft (`disabled` neben dem Riegel).
+    await waitFor(() => expect(knopf).toBeDisabled());
     await new Promise((r) => setTimeout(r, 50));
     expect(posts).toBe(1);
     freigeben();
@@ -445,6 +506,33 @@ describe('DemoDatenPage — Riegel gegen doppeltes Senden', () => {
     // der Invalidierung zeigt also wieder „nicht importiert“.
     await waitFor(() => expect(toastsMit('Demo-Daten importiert')).toHaveLength(1));
     expect(posts).toBe(1);
+  });
+});
+
+describe('DemoDatenPage — laufender Vorgang sperrt beide Knöpfe sichtbar', () => {
+  it('während DELETE läuft, sind „Neu importieren“ und „Entfernen“ gesperrt', async () => {
+    demoServer(IMPORTIERT);
+    let freigeben: () => void = () => {};
+    server.use(
+      http.delete('/api/demo-daten', async () => {
+        await new Promise<void>((r) => {
+          freigeben = r;
+        });
+        return HttpResponse.json(ENTFERNT);
+      }),
+    );
+    setup(admin);
+    await userEvent.click(await screen.findByRole('button', { name: 'Entfernen' }));
+    const dialog = await offenerDialog('Demo-Daten entfernen?');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Endgültig entfernen' }));
+    const stand = screen.getByRole('region', { name: 'Stand' });
+    await waitFor(() =>
+      expect(within(stand).getByRole('button', { name: 'Neu importieren' })).toBeDisabled(),
+    );
+    expect(within(stand).getByRole('button', { name: /Entfernen/ })).toBeDisabled();
+    freigeben();
+    // Quittung statt Stand: dieser Handler setzt den Serverstand nicht (siehe Doppelklick-Test).
+    await waitFor(() => expect(toastsMit('Demo-Daten entfernt')).toHaveLength(1));
   });
 });
 

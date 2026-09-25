@@ -79,6 +79,12 @@ const FEHLER_TITEL: Record<Vorgang, string> = {
   entfernen: 'Entfernen fehlgeschlagen',
 };
 
+/**
+ * Text für einen Fehler ohne Serverantwort (Netz, Zeitüberschreitung). Ohne ihn stünde unter
+ * „Import fehlgeschlagen“ der Standardsatz „Speichern fehlgeschlagen“ aus `fehlerText`.
+ */
+const NETZ_FEHLER = 'Der Server hat nicht geantwortet. Bitte erneut versuchen.';
+
 type Rueckfrage = Exclude<Vorgang, 'import'>;
 
 /**
@@ -198,6 +204,9 @@ export default function DemoDatenPage() {
     );
   }
 
+  // Status-Abfrage gescheitert (≠ 404: 500, 403, Netz). Spec „Status-Abfrage scheitert“:
+  // Fehlerbild mit „Erneut abrufen“, KEINE der Aktionen und KEINE Umleitung — eine Umleitung
+  // sähe aus wie „nicht freigeschaltet“ und verschwiege den Fehler.
   const status = demo.status;
   if (!status) {
     return (
@@ -225,6 +234,7 @@ export default function DemoDatenPage() {
           <Button
             type="primary"
             loading={laufend === 'import'}
+            disabled={vorgang.isPending}
             onClick={() => void ausloesen('import')}
           >
             Importieren
@@ -233,7 +243,11 @@ export default function DemoDatenPage() {
       }
       hinweis={
         vorgang.error && fehlerVorgang ? (
-          <SeitenHinweise fehler={vorgang.error} fehlerTitel={FEHLER_TITEL[fehlerVorgang]} />
+          <SeitenHinweise
+            fehler={vorgang.error}
+            fehlerTitel={FEHLER_TITEL[fehlerVorgang]}
+            fehlerFallback={NETZ_FEHLER}
+          />
         ) : undefined
       }
     >
@@ -270,10 +284,20 @@ export default function DemoDatenPage() {
             // `middle`: Rot steht nicht bündig neben einer weiteren Aktion
             // (aktionsabstand.guard.test.ts).
             <Space size="middle" wrap style={{ marginBlockStart: token.margin }}>
-              <Button danger loading={laufend === 'neu'} onClick={() => frage('neu')}>
+              <Button
+                danger
+                loading={laufend === 'neu'}
+                disabled={vorgang.isPending}
+                onClick={() => frage('neu')}
+              >
                 Neu importieren
               </Button>
-              <Button danger loading={laufend === 'entfernen'} onClick={() => frage('entfernen')}>
+              <Button
+                danger
+                loading={laufend === 'entfernen'}
+                disabled={vorgang.isPending}
+                onClick={() => frage('entfernen')}
+              >
                 Entfernen
               </Button>
             </Space>
