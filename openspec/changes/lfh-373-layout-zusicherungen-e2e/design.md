@@ -329,7 +329,12 @@ beide schon auf `alpha` vorhanden:
   jetzt eine Gruppe, die unter `md` eine eigene Zeile hat (CSS, nicht `useViewport`, dessen
   erstes Bild bewusst breit ist). Der Datenstand hält seine Breite als unsichtbarer, stummer
   Platzhalter „Stand 00:00“, der in Mono mit Tabellenziffern genau so breit ist wie jede
-  Uhrzeit. Das gilt für jede `EinsatzSeite`, die einen Datenstand führt.
+  Uhrzeit. Das gilt für jede `EinsatzSeite`, die einen Datenstand führt, **und nur unter
+  `md`**: Ab `md` steht die Gruppe in der Titelzeile, und die spät eintreffende Meta schob den
+  stehenden Platzhalter weit seitwärts. CLS nimmt die größte Strecke eines Bildes mal der
+  ganzen bewegten Fläche, und der Ladewechsel der Einsatzauswahl stieg so von 0,020 auf 0,068
+  (im zweiten Gate-Lauf gemessen, `einsatzauswahl-cls.spec.ts`). Ab `md` blendet
+  `EinsatzSeite.css` den Platzhalter deshalb aus.
 
 Der Durchgang `verzoegert` gehört jetzt fest zum Test. Ohne ihn wäre der Test grün durch
 Zufall. Mutationsprobe: Ohne die Bilanz-Sperre ist er deterministisch rot (0,208), ohne die

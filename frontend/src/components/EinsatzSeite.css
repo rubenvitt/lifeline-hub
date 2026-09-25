@@ -22,3 +22,15 @@
     flex-basis: 100%;
   }
 }
+
+/* Der Datenstand-Platzhalter gilt nur dort, wo er eine Zeile hält: unter `md` (oben). Ab `md`
+   steht die Gruppe in der Titelzeile, und die spät eintreffende Meta schob den schon stehenden
+   Platzhalter weit nach rechts. CLS rechnet die größte Strecke eines Bildes mal der ganzen
+   bewegten Fläche, im Gate hob das den Ladewechsel der Einsatzauswahl von 0,020 auf 0,068
+   (`e2e/einsatzauswahl-cls.spec.ts`). Ab `md` erscheint der Stand deshalb wie zuvor erst mit
+   den Daten, am Ende der Zeile, wo er nichts schiebt. */
+@media (min-width: 768px) {
+  .lfh-seitenkopf__meta [data-lfh='datenstand-platzhalter'] {
+    display: none;
+  }
+}

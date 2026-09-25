@@ -168,6 +168,17 @@ describe('EinsatzSeite', () => {
     expect(regel![1]).toMatch(/flex-basis:\s*100%/);
   });
 
+  // LFH-373, im Gate gemessen (`einsatzauswahl-cls.spec.ts`): ab `md` steht die Gruppe in der
+  // Titelzeile, und die spät eintreffende Meta schob den schon stehenden Platzhalter weit nach
+  // rechts. CLS nimmt die größte Strecke eines Bildes mal der ganzen bewegten Fläche — das
+  // Raster daneben kam so von 0,020 auf 0,068. Der Platzhalter gilt deshalb nur unter `md`.
+  it('blendet den Datenstand-Platzhalter ab md aus', () => {
+    const regel = seiteCss.match(/@media\s*\(min-width:\s*768px\)\s*\{([^}]*\{[^}]*\})/);
+    expect(regel, 'EinsatzSeite.css trägt die Breit-Regel').not.toBeNull();
+    expect(regel![1]).toContain('datenstand-platzhalter');
+    expect(regel![1]).toMatch(/display:\s*none/);
+  });
+
   it('rendert ohne Meta und ohne Datenstand keine leere Gruppe', () => {
     const { container } = renderMitProviders(
       <EinsatzSeite titel="Liste">

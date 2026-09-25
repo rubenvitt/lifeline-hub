@@ -10,7 +10,9 @@ interface DatenstandProps {
    * Seitenkopf erschien „Stand hh:mm" sonst erst mit den Daten, brach auf 390 px in eine neue
    * Zeile um und schob alles darunter 22–25 px nach unten — gemessen in
    * `e2e/leisten-flaeche.spec.ts` („Laden ohne Sprung"). Die Uhrzeit ist fest `HH:mm` in Mono
-   * mit Tabellenziffern, ein gleich langer Platzhalter ist also gleich breit.
+   * mit Tabellenziffern, ein gleich langer Platzhalter ist also gleich breit. Wirksam ist er nur
+   * unter `md`: ab dort blendet `EinsatzSeite.css` ihn aus, weil er in der Titelzeile von der
+   * spät eintreffenden Meta seitwärts geschoben würde.
    */
   platzHalten?: boolean;
 }
