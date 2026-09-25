@@ -50,6 +50,10 @@ test('Online-Quellen bei 390 px: Tabelle, Zähler für URL und Attribution, einb
 }) => {
   await anmelden(page);
   // Eine Zeile legt der Spec selbst an — ohne Zeile wäre „bleibt eine Tabelle" nur ein Kopf.
+  // INAKTIV und am Ende wieder gelöscht: Online-Quellen gelten instanzweit, und das e2e-Backend
+  // teilen alle Specs eines Shards. Eine aktive Quelle mit unerreichbarer URL blieb stehen und
+  // brach jede spätere Lagekarte im Shard (Marker kamen nie in der Quelle an; in der CI von
+  // PR #158 und auf alpha 7e427fef gemessen, lokal mit/ohne diesen Spec belegt, LFH-741).
   const antwort = await page.request.post('/api/karte/online-quellen', {
     data: {
       name: `E2E Spalten ${Date.now()}`,
@@ -57,29 +61,35 @@ test('Online-Quellen bei 390 px: Tabelle, Zähler für URL und Attribution, einb
       typ: 'raster',
       attribution: '© E2E',
       sortier: 99,
-      aktiv: true,
+      aktiv: false,
       proxy: false,
     },
   });
   expect(antwort.ok(), `Seeding: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
+  const { id: quelleId } = (await antwort.json()) as { id: number };
+  try {
+    await page.goto('/admin/karten/online');
+    await expect(page.locator('tr.ant-table-row').first()).toBeVisible();
+    await expect(page.locator('[data-lfh="datensicht-karte"]')).toHaveCount(0);
 
-  await page.goto('/admin/karten/online');
-  await expect(page.locator('tr.ant-table-row').first()).toBeVisible();
-  await expect(page.locator('[data-lfh="datensicht-karte"]')).toHaveCount(0);
+    const schalter = page.getByRole('button', {
+      name: 'Spalten · 2 ausgeblendet — Online-Quellen',
+    });
+    await expect(schalter).toBeVisible();
+    await breitenPruefen(page);
 
-  const schalter = page.getByRole('button', { name: 'Spalten · 2 ausgeblendet — Online-Quellen' });
-  await expect(schalter).toBeVisible();
-  await breitenPruefen(page);
+    const kopf = page.locator('.ant-table-thead th');
+    await expect(kopf.filter({ hasText: 'Attribution' })).toHaveCount(0);
 
-  const kopf = page.locator('.ant-table-thead th');
-  await expect(kopf.filter({ hasText: 'Attribution' })).toHaveCount(0);
-
-  await schalter.click();
-  await offenesMenue(page).getByRole('menuitem', { name: 'Attribution' }).click();
-  await expect(kopf.filter({ hasText: 'Attribution' })).toHaveCount(1);
-  await expect(
-    page.getByRole('button', { name: 'Spalten · 1 ausgeblendet — Online-Quellen' }),
-  ).toBeVisible();
+    await schalter.click();
+    await offenesMenue(page).getByRole('menuitem', { name: 'Attribution' }).click();
+    await expect(kopf.filter({ hasText: 'Attribution' })).toHaveCount(1);
+    await expect(
+      page.getByRole('button', { name: 'Spalten · 1 ausgeblendet — Online-Quellen' }),
+    ).toBeVisible();
+  } finally {
+    await page.request.delete(`/api/karte/online-quellen/${quelleId}`);
+  }
 });
 
 test('Offline-Karten bei 390 px: Tabelle mit Schalter, Attribution gezählt', async ({ page }) => {
