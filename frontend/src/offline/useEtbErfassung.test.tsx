@@ -71,8 +71,8 @@ describe('useEtbErfassung – Anhänge (LFH-117)', () => {
       await result.current.flush();
     });
     await waitFor(() => expect(result.current.ausstehend).toHaveLength(0));
-    expect(gesehen.at(-1)).toMatchObject({ client_id: 'alt-1', inhalt: 'x' });
-    expect(gesehen.at(-1)).not.toHaveProperty('anhang_ids');
+    expect(gesehen[gesehen.length - 1]).toMatchObject({ client_id: 'alt-1', inhalt: 'x' });
+    expect(gesehen[gesehen.length - 1]).not.toHaveProperty('anhang_ids');
   });
 
   it('legt einen beim Flush mit 400 abgelehnten Eintrag mit dem Server-Wortlaut ab', async () => {
