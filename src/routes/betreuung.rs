@@ -43,8 +43,9 @@ use crate::betreuung::repo::{
     StelleEingabe,
 };
 use crate::betreuung::{
-    enum_wert, BelegungKopfzahl, BetreuungUebersicht, BetreuungsstelleAnzeige,
-    BezirkMeldungAnzeige, EvakuierungsbezirkAnzeige, StelleMeldungAnzeige, StelleNamentlich,
+    enum_wert, BelegungKopfzahl, BelegungVerlaufEintrag, BetreuungUebersicht,
+    BetreuungsstelleAnzeige, BezirkMeldungAnzeige, EvakuierungsbezirkAnzeige, StandVerlaufEintrag,
+    StelleMeldungAnzeige, StelleNamentlich,
 };
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibfreigabe, EinsatzSchreibzugriff};
 use crate::einsatz::modul::Betreuung;
@@ -181,6 +182,31 @@ pub async fn kopfzahl(
     };
     Ok(Json(
         repo::kopfzahl(&state.pool, ctx.einsatz.id, &stichtag).await?,
+    ))
+}
+
+/// GET /api/einsaetze/{id}/betreuung/bezirke/{bid}/staende — die ganze Standreihe des
+/// Bezirks samt zurückgenommener Meldungen (LFH-676). Auch ein stornierter Bezirk liefert sie:
+/// 409 steht in diesem Modul für Lebenszyklus-AKTIONEN, Lesen ist keine. Fremd/unbekannt → 404.
+pub async fn stand_verlauf(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Betreuung>,
+    PfadParam((_eid, bid)): PfadParam<(i64, i64)>,
+) -> Result<Json<Vec<StandVerlaufEintrag>>, AppError> {
+    Ok(Json(
+        repo::stand_verlauf(&state.pool, ctx.einsatz.id, bid).await?,
+    ))
+}
+
+/// GET /api/einsaetze/{id}/betreuung/stellen/{sid}/belegungen — die ganze Belegungsreihe der
+/// Stelle (LFH-676), wie [`stand_verlauf`]; auch an einer geschlossenen Stelle.
+pub async fn belegung_verlauf(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Betreuung>,
+    PfadParam((_eid, sid)): PfadParam<(i64, i64)>,
+) -> Result<Json<Vec<BelegungVerlaufEintrag>>, AppError> {
+    Ok(Json(
+        repo::belegung_verlauf(&state.pool, ctx.einsatz.id, sid).await?,
     ))
 }
 

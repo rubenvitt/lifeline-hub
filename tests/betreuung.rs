@@ -1731,3 +1731,187 @@ async fn replay_am_stornierten_bezirk_und_an_der_geschlossenen_stelle() {
     assert_eq!(treffer(&etb, "meldung", &["Uferstraße", "40"]).len(), 1);
     assert_eq!(treffer(&etb, "meldung", &["Turnhalle Ost"]).len(), 1);
 }
+
+// ── Verlauf (LFH-676) ───────────────────────────────────────────────────────────────────────
+
+async fn melden(app: &axum::Router, cookie: &str, uri: &str, body: &str) -> i64 {
+    let (s, j) = anfrage(app, "POST", uri, cookie, Some(body)).await;
+    assert_eq!(s, StatusCode::CREATED, "{uri}: {j:?}");
+    j["meldung_id"].as_i64().unwrap()
+}
+
+#[tokio::test]
+async fn verlauf_liefert_die_reihen_mit_ruecknahme_und_draht_form() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let bid = bezirk(&app, &admin, e, "Uferstraße 12–40").await;
+    let staende = format!("{}/bezirke/{bid}/staende", pfad(e));
+    let m212 = melden(
+        &app,
+        &admin,
+        &staende,
+        r#"{"evakuiert":212,"erhebung":"geschaetzt","zeitpunkt_at":"2026-09-22T10:00:00Z"}"#,
+    )
+    .await;
+    melden(
+        &app,
+        &admin,
+        &staende,
+        r#"{"evakuiert":480,"erhebung":"gezaehlt","zeitpunkt_at":"2026-09-22T11:00:00Z"}"#,
+    )
+    .await;
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("{}/staende/{m212}/zuruecknehmen", pfad(e)),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+
+    let (s, v) = anfrage(&app, "GET", &staende, &admin, None).await;
+    assert_eq!(s, StatusCode::OK, "{v:?}");
+    let reihe = v.as_array().unwrap();
+    assert_eq!(reihe.len(), 2, "{v:?}");
+    assert_eq!(reihe[0]["evakuiert"], 480);
+    assert_eq!(reihe[0]["aktuell"], true);
+    assert_eq!(reihe[0]["zeitpunkt_at"], "2026-09-22 11:00:00");
+    assert_eq!(reihe[0]["erhebung"], "gezaehlt");
+    assert!(reihe[0]["erfasst_von"].is_string());
+    assert!(reihe[0]["erfasst_at"].is_string());
+    let offen = reihe[0].as_object().unwrap();
+    assert!(!offen.contains_key("zurueckgenommen_at"), "{v:?}");
+    assert!(!offen.contains_key("zurueckgenommen_von"), "{v:?}");
+    assert_eq!(reihe[1]["id"], m212);
+    assert_eq!(reihe[1]["aktuell"], false);
+    assert!(reihe[1]["zurueckgenommen_at"].is_string(), "{v:?}");
+    assert!(reihe[1]["zurueckgenommen_von"].is_string(), "{v:?}");
+
+    let sid = stelle(&app, &admin, e, "Turnhalle Ost").await;
+    let (s, j) = anfrage(
+        &app,
+        "PATCH",
+        &format!("{}/stellen/{sid}", pfad(e)),
+        &admin,
+        Some(r#"{"status":"in_betrieb"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j:?}");
+    let belegungen = format!("{}/stellen/{sid}/belegungen", pfad(e));
+    let (s, leer) = anfrage(&app, "GET", &belegungen, &admin, None).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(
+        leer,
+        serde_json::json!([]),
+        "Stelle ohne Meldung: leere Reihe"
+    );
+    melden(&app, &admin, &belegungen, r#"{"belegt":60}"#).await;
+    let (s, v) = anfrage(&app, "GET", &belegungen, &admin, None).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(v[0]["belegt"], 60);
+    assert_eq!(v[0]["aktuell"], true);
+}
+
+#[tokio::test]
+async fn verlauf_statuscodes_und_rechte() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let e2 = einsatz_anlegen(&app, &admin).await;
+    let bid = bezirk(&app, &admin, e, "Uferstraße 12–40").await;
+    let sid = stelle(&app, &admin, e, "Turnhalle Ost").await;
+    melden(
+        &app,
+        &admin,
+        &format!("{}/bezirke/{bid}/staende", pfad(e)),
+        r#"{"evakuiert":212,"erhebung":"gezaehlt"}"#,
+    )
+    .await;
+
+    // Objekt eines anderen Einsatzes und unbekanntes Objekt: 404; kaputte Sub-ID: 400.
+    for uri in [
+        format!("{}/bezirke/{bid}/staende", pfad(e2)),
+        format!("{}/stellen/{sid}/belegungen", pfad(e2)),
+        format!("{}/bezirke/99999/staende", pfad(e)),
+        format!("{}/stellen/99999/belegungen", pfad(e)),
+    ] {
+        let (s, j) = anfrage(&app, "GET", &uri, &admin, None).await;
+        assert_eq!(s, StatusCode::NOT_FOUND, "{uri}: {j:?}");
+    }
+    let (s, _) = anfrage(
+        &app,
+        "GET",
+        &format!("{}/bezirke/abc/staende", pfad(e)),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+
+    // Stornierter Bezirk: Lesen bleibt erlaubt.
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("{}/bezirke/{bid}/stornieren", pfad(e)),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, v) = anfrage(
+        &app,
+        "GET",
+        &format!("{}/bezirke/{bid}/staende", pfad(e)),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(v.as_array().unwrap().len(), 1);
+
+    // Beobachter liest.
+    let beob = benutzer_anlegen(&app, &admin, "beobachter", "keine").await;
+    rolle_setzen(&app, &admin, e, beob, "beobachter").await;
+    let beob_cookie = login_cookie(&app, "beobachter", "beobachterpw1").await;
+    let (s, _) = anfrage(
+        &app,
+        "GET",
+        &format!("{}/bezirke/{bid}/staende", pfad(e)),
+        &beob_cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+
+    // Fremde Organisation: 403 oder 404, keine Daten.
+    fremde_org_anlegen(&pool, "Fremd-Orga", "fremd", "fremdpw1", "fuehrungskraft").await;
+    let fremd = login_cookie(&app, "fremd", "fremdpw1").await;
+    for uri in [
+        format!("{}/bezirke/{bid}/staende", pfad(e)),
+        format!("{}/stellen/{sid}/belegungen", pfad(e)),
+    ] {
+        let (s, j) = anfrage(&app, "GET", &uri, &fremd, None).await;
+        assert!(
+            s == StatusCode::FORBIDDEN || s == StatusCode::NOT_FOUND,
+            "{uri}: erwartet 403/404, war {s} {j:?}"
+        );
+        assert!(
+            !j.to_string().contains("212"),
+            "keine Meldung an Fremde: {j:?}"
+        );
+    }
+
+    // Ausgeblendetes Modul: 403 für Mitglieder.
+    override_setzen(&app, &admin, e, false, None).await;
+    let (s, _) = anfrage(
+        &app,
+        "GET",
+        &format!("{}/stellen/{sid}/belegungen", pfad(e)),
+        &beob_cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+}

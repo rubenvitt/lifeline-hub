@@ -26,6 +26,7 @@ import {
   personenZahl,
   volleStellenSegment,
 } from './betreuungText';
+import MeldeVerlauf from './MeldeVerlauf';
 
 /**
  * Block „Betreuungsstellen" der Betreuungsseite (LFH-639, design.md D7).
@@ -56,9 +57,20 @@ import {
  * Personen, die einzeln mit Verbleib „Notunterkunft" hierher verbracht wurden. Es ist ein
  * Hinweis, kein Summand — Sortierung, „frei", Auslastung und die Summe im Kopf lesen nur
  * `belegung.belegt`. Ohne Personenrecht fehlt `namentlich` in der Antwort, dann steht nichts.
+ *
+ * VERLAUF (LFH-676): beschrifteter Aufklappbereich „Verlauf“ je Zeile, auch ohne
+ * Schreibrecht; die Belegungsreihe lädt erst beim Aufklappen.
  */
 
 export type StelleAktion = 'verorten' | 'bearbeiten' | 'stornieren';
+
+/**
+ * Warum an einer geschlossenen Stelle nichts zurückgenommen werden kann (D4 aus LFH-639:
+ * sonst stünde sie „geschlossen und belegt“ da, der Server lehnt mit 422 ab). Steht EINMAL im
+ * Verlauf statt n gesperrter Knöpfe (LFH-346, zwei Zuschnitte).
+ */
+export const GESCHLOSSEN_HINWEIS =
+  'Die Stelle ist geschlossen. Zurücknehmen geht erst, wenn sie wieder in Betrieb ist.';
 
 const MENUE: readonly (MenueEintrag & { key: StelleAktion })[] = [
   { key: 'bearbeiten', label: 'Bearbeiten (Status, Kapazität)' },
@@ -240,6 +252,7 @@ const KARTE: Kartenplan<Betreuungsstelle, StelleSpalte> = {
 };
 
 export default function StellenBlock({
+  einsatzId,
   stellen,
   namentlich,
   ladend,
@@ -250,6 +263,7 @@ export default function StellenBlock({
   onBelegungMelden,
   onAktion,
 }: {
+  einsatzId: number;
   stellen: readonly Betreuungsstelle[];
   /** „davon namentlich" je Stelle; fehlt ohne Personenrecht (LFH-674). */
   namentlich?: readonly StelleNamentlich[] | null;
@@ -277,6 +291,26 @@ export default function StellenBlock({
         monoStil(token.fontSize),
       ),
     [darfSchreiben, onBelegungMelden, onAktion, namentlichJeStelle, token.fontSize],
+  );
+  const aufklappen = useMemo(
+    () => ({
+      etikett: 'Verlauf',
+      zugaenglicherName: (s: Betreuungsstelle) => `Verlauf zu Stelle ${s.bezeichnung}`,
+      inhalt: (s: Betreuungsstelle) => {
+        const geschlossen = s.status === 'geschlossen';
+        return (
+          <MeldeVerlauf
+            einsatzId={einsatzId}
+            art="stelle"
+            objektId={s.id}
+            darfZuruecknehmen={darfSchreiben && !geschlossen}
+            // Ohne Schreibrecht nennt der Rechtehinweis über der Seite den Grund.
+            sperrHinweis={darfSchreiben && geschlossen ? GESCHLOSSEN_HINWEIS : undefined}
+          />
+        );
+      },
+    }),
+    [einsatzId, darfSchreiben],
   );
   const gemeldet = stellen.filter((s) => s.belegung != null);
   const summe = gemeldet.reduce((n, s) => n + s.belegung!.belegt, 0);
@@ -314,6 +348,7 @@ export default function StellenBlock({
         ladend={ladend}
         leerText="Keine Betreuungsstellen"
         karte={KARTE}
+        aufklappen={aufklappen}
         zeilenKlasse={(s) => (s.id === hervorgehoben ? HERVORGEHOBEN : undefined)}
       />
     </div>

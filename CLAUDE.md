@@ -220,6 +220,22 @@ nicht. Das kostet je Personen-Ereignis ein `GET …/betreuung` auf **jeder** Ein
 `useModulZaehler` die Query dort hält. Das ist bewusst angenommen: Ein `betreuung`-Ereignis
 erreichte auch Lesende ohne Personenrecht und verriete ihnen den Takt der Zuordnungen. `betreuungsstelle` ist seitdem **kein Leaf** mehr, ein Rebuild braucht den FK-Schalter.
 Herleitung: `openspec/changes/lfh-674-verbleib-notunterkunft-betreuungsstelle/design.md`.
+**Meldeverlauf der Betreuung (LFH-676).** `GET …/bezirke/{bid}/staende` und
+`…/stellen/{sid}/belegungen` liefern die ganze Reihe samt zurückgenommener Meldungen, in der
+Ordnung von `juengste_meldung!` (`meldereihenfolge!` in `src/betreuung/repo.rs`). `aktuell`
+kommt aus dem **Zeiger** am Objekt, nie aus einer zweiten Rechnung, auch nicht im Client. Ein
+fremdes Objekt ist 404, bevor die Reihe gelesen wird, sonst sähe „fremd“ aus wie „ohne
+Meldung“. **Nachgetragen heißt im Verlauf ≥ 60 s zwischen Zeitpunkt und Erfassung**
+(`istNachgetragen`, dieselbe Schwelle wie das ⧖ im ETB). Die Nachtragung im Sinn von
+LFH-639 D5 („vor dem damals aktuellen“) ist nicht gespeichert. Die Rücknahme aus dem
+Verlauf ist unumkehrbar und hat deshalb eine Rückfrage. Sie läuft über eine **eigene**
+Mutation in `betreuung/MeldeVerlauf.tsx`: die der Seite melden über `SeitenHinweise`, der
+Grund stünde sonst doppelt. Der Aufklappweg ist `Datensicht.aufklappen`: beschriftet, mit
+Zeilenkennung im Namen, in Karte **und** Tabelle mit einem Zustand, Inhalt erst beim
+Aufklappen gerendert. In der Tabelle steht der Auslöser in der fixierten Kennungszelle,
+ohne eigene Aufklappspalte: hinter der Kennung glitt eine solche Spalte bei 390 px unter sie
+(Gate 1, gemessen), an Position 0 erbte sie deren `fixed`. Die Bestands-Prop `aufklappzeile` (antds 16-px-Symbol, nur Tabelle)
+verschwindet mit LFH-697. Herleitung: `openspec/changes/lfh-676-betreuung-meldeverlauf/design.md`.
 
 **Stand- und Belegungsmeldungen sind offline-fähig (LFH-675).** Sie laufen über die
 Offline-Queue (`offline/schreiben.ts`, Arten `stand`/`belegung`) mit `client_id`, eindeutig

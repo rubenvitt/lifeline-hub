@@ -396,6 +396,26 @@ export interface components {
             zeitpunkt_at?: string | null;
         };
         /**
+         * @description Eine Belegungsmeldung im Verlauf einer Stelle (LFH-676), gebaut wie
+         *     [`StandVerlaufEintrag`].
+         */
+        BelegungVerlaufEintrag: {
+            /** @description Diese Meldung ist die aktuelle Belegung der Stelle. */
+            aktuell: boolean;
+            /** Format: int64 */
+            belegt: number;
+            /** @description Wann die Meldung erfasst wurde, UTC ohne Zonenkennung. */
+            erfasst_at: string;
+            /** @description Anzeigename der erfassenden Person. */
+            erfasst_von: string;
+            /** Format: int64 */
+            id: number;
+            /** @description Zeitpunkt der Meldung, UTC ohne Zonenkennung (`YYYY-MM-DD HH:MM:SS`). */
+            zeitpunkt_at: string;
+            zurueckgenommen_at?: string | null;
+            zurueckgenommen_von?: string | null;
+        };
+        /**
          * @description Art eines Belegungs-Events. String = CHECK in
          *     `migrations/0029_person_uhs_belegung.sql`. Append-only.
          * @enum {string}
@@ -2880,6 +2900,32 @@ export interface components {
          * @enum {string}
          */
         StaerkePosition: "fuehrer" | "unterfuehrer" | "mannschaft";
+        /**
+         * @description Eine Standmeldung im Verlauf eines Bezirks (LFH-676), zurückgenommene eingeschlossen.
+         *     `aktuell` kommt aus dem Zeiger des Bezirks — keine zweite Definition von „aktuell“.
+         */
+        StandVerlaufEintrag: {
+            /** @description Diese Meldung ist der aktuelle Stand des Bezirks. */
+            aktuell: boolean;
+            /**
+             * @description Wann die Meldung erfasst wurde, UTC ohne Zonenkennung. Liegt sie ≥ 60 s nach
+             *     `zeitpunkt_at`, zeigt die App sie als nachgetragen (dieselbe Schwelle wie im ETB).
+             */
+            erfasst_at: string;
+            /** @description Anzeigename der erfassenden Person. */
+            erfasst_von: string;
+            erhebung: components["schemas"]["Erhebung"];
+            /** Format: int64 */
+            evakuiert: number;
+            /** Format: int64 */
+            id: number;
+            /** @description Zeitpunkt der Meldung, UTC ohne Zonenkennung (`YYYY-MM-DD HH:MM:SS`). */
+            zeitpunkt_at: string;
+            /** @description Fehlt, solange die Meldung nicht zurückgenommen ist. */
+            zurueckgenommen_at?: string | null;
+            /** @description Anzeigename der zurücknehmenden Person; fehlt wie `zurueckgenommen_at`. */
+            zurueckgenommen_von?: string | null;
+        };
         /** @description Anteil eines Status an einer gemischten Einheit; `status: None` = Fahrzeuge ohne Status. */
         StatusAnteil: {
             /** Format: int32 */

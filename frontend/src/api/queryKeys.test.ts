@@ -279,6 +279,22 @@ describe('einsatzKeys (Factory-Output)', () => {
     // Ohne Stichtag („jetzt“) ein fester Platzhalter statt eines sekundengenauen Zeitstempels —
     // sonst entstünde bei jedem Rendern ein neuer Key und damit ein neuer Abruf.
     expect(einsatzKeys.betreuungKopfzahl(1)).toEqual(['einsatz-betreuung', 1, 'kopfzahl', 'jetzt']);
+    // LFH-676: Verlauf UNTER dem Betreuungs-Prefix — das `betreuung`-Ereignis und die
+    // Invalidierung nach jeder eigenen Mutation treffen ihn ohne eigenen Event-Eintrag.
+    expect(einsatzKeys.betreuungVerlauf(1, 'bezirk', 5)).toEqual([
+      'einsatz-betreuung',
+      1,
+      'verlauf',
+      'bezirk',
+      5,
+    ]);
+    expect(einsatzKeys.betreuungVerlauf(1, 'stelle', 9)).toEqual([
+      'einsatz-betreuung',
+      1,
+      'verlauf',
+      'stelle',
+      9,
+    ]);
     // LFH-634: Verpflegungs-Prefix als Literal gepinnt.
     expect(einsatzKeys.verpflegung(1)).toEqual(['einsatz-verpflegung', 1]);
     expect(einsatzKeys.etbListe(1, { typ: 'x' })).toEqual(['etb', 1, { typ: 'x' }]);
