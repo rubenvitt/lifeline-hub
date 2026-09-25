@@ -24,8 +24,9 @@ import { AKTIONSLEISTE_AB, aktionsleisteStil } from '../befehle/aktionsleiste';
 import { BEFEHL_STATUS, StatusBadge } from '../kommunikation';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { Paneel, monoStil } from '../components/instrument';
-import { useFokusabstandUnten } from '../components/fokusabstandUnten';
+import { FOKUSABSTAND_BEFEHL, useFokusabstandUnten } from '../components/fokusabstandUnten';
 import './befehlPrint.css';
+import './befehlAktionsleiste.css';
 
 export default function BefehlDetailPage() {
   const { befehlId } = useParams();
@@ -48,12 +49,12 @@ function BefehlDetail() {
   // (LFH-465). Begründung der Schwelle: `befehle/aktionsleiste.ts`.
   const verankert = !abBreite(AKTIONSLEISTE_AB);
   /**
-   * Fokusabstand zur verankerten Aktionsleiste (LFH-465, seit LFH-373 gemeinsam mit dem ETB):
-   * `components/fokusabstandUnten.ts`. Träger ist das Wurzelelement, weil der Scrollport das
+   * Fokusabstand zur verankerten Aktionsleiste (LFH-465; Messung seit LFH-373 geteilt mit dem
+   * ETB, `components/fokusabstandUnten.ts`, Regel in `befehlAktionsleiste.css`). Träger ist das Wurzelelement, weil der Scrollport das
    * Dokument ist — die Leiste liegt ausserhalb des Formulars, ein `closest('form')` fände im
    * freigegebenen Zweig nichts.
    */
-  const leisteRef = useFokusabstandUnten(token.marginSM);
+  const leisteRef = useFokusabstandUnten(token.marginSM, FOKUSABSTAND_BEFEHL);
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [form] = Form.useForm<Record<string, string>>();

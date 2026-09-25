@@ -1,9 +1,9 @@
 import { render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { FOKUSABSTAND_UNTEN, beobachteFussleiste, useFokusabstandUnten } from './fokusabstandUnten';
+import { FOKUSABSTAND_ETB, beobachteFussleiste, useFokusabstandUnten } from './fokusabstandUnten';
 
 /**
- * Die gemeinsame Fokusabstand-Mechanik (LFH-373, aus LFH-465 gehoben). jsdom rechnet kein
+ * Die gemeinsame Fokusabstand-MESSUNG (LFH-373, aus LFH-465 gehoben; die Regel bleibt je Seite). jsdom rechnet kein
  * Layout — geprüft wird deshalb die KOPPLUNG: gemessene Höhe + Abstand landet in der
  * Variable an der Wurzel, folgt einer Größenänderung und verschwindet beim Aushängen. Ob der
  * Browser damit wirklich freihält, belegen `e2e/befehl-aktionsleiste.spec.ts` und der
@@ -32,7 +32,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
-  document.documentElement.style.removeProperty(FOKUSABSTAND_UNTEN);
+  document.documentElement.style.removeProperty(FOKUSABSTAND_ETB);
 });
 
 function leisteMitHoehe(hoehe: { wert: number }) {
@@ -41,12 +41,12 @@ function leisteMitHoehe(hoehe: { wert: number }) {
   return el;
 }
 
-const wert = () => document.documentElement.style.getPropertyValue(FOKUSABSTAND_UNTEN);
+const wert = () => document.documentElement.style.getPropertyValue(FOKUSABSTAND_ETB);
 
 describe('beobachteFussleiste', () => {
   it('schreibt Höhe plus Abstand an die Wurzel und folgt einer Größenänderung', () => {
     const hoehe = { wert: 78 };
-    beobachteFussleiste(leisteMitHoehe(hoehe), 8);
+    beobachteFussleiste(leisteMitHoehe(hoehe), 8, FOKUSABSTAND_ETB);
     expect(wert()).toBe('86px');
 
     hoehe.wert = 184;
@@ -55,7 +55,7 @@ describe('beobachteFussleiste', () => {
   });
 
   it('räumt Variable und Beobachter beim Aushängen weg', () => {
-    const aufraeumen = beobachteFussleiste(leisteMitHoehe({ wert: 78 }), 8);
+    const aufraeumen = beobachteFussleiste(leisteMitHoehe({ wert: 78 }), 8, FOKUSABSTAND_ETB);
     expect(wert()).toBe('86px');
     aufraeumen!();
     expect(wert()).toBe('');
@@ -63,14 +63,14 @@ describe('beobachteFussleiste', () => {
   });
 
   it('ohne Leiste passiert nichts', () => {
-    expect(beobachteFussleiste(null, 8)).toBeUndefined();
+    expect(beobachteFussleiste(null, 8, FOKUSABSTAND_ETB)).toBeUndefined();
     expect(wert()).toBe('');
   });
 });
 
 describe('useFokusabstandUnten', () => {
   function Seite({ zeigen }: { zeigen: boolean }) {
-    const ref = useFokusabstandUnten(8);
+    const ref = useFokusabstandUnten(8, FOKUSABSTAND_ETB);
     return zeigen ? <div ref={ref}>Leiste</div> : null;
   }
 

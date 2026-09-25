@@ -38,7 +38,7 @@ import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
 import StatusTag from '../components/StatusTag';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { Segmentleiste, useRollen, type SegmentOption } from '../components/instrument';
-import { useFokusabstandUnten } from '../components/fokusabstandUnten';
+import { FOKUSABSTAND_ETB, useFokusabstandUnten } from '../components/fokusabstandUnten';
 import { useViewport } from '../components/useViewport';
 import { einsatzStatus, etbTyp, etbTypFarbe } from '../theme/statusFarben';
 import {
@@ -227,8 +227,9 @@ export default function EtbPage() {
   const { abBreite } = useViewport();
   const { token, rollen } = useRollen();
   // Fokusabstand zur angepinnten Erfassungsleiste (WCAG 2.4.11, LFH-373): ohne ihn rollte der
-  // Browser jeden per Tab angesteuerten Zeilenauslöser hinter die Leiste.
-  const erfassungRef = useFokusabstandUnten(token.marginSM);
+  // Browser jeden per Tab angesteuerten Zeilenauslöser hinter die Leiste. Verbraucht wird die
+  // Höhe als `scroll-margin` an der Zeitachse (`index.css`), nicht am Dokument.
+  const erfassungRef = useFokusabstandUnten(token.marginSM, FOKUSABSTAND_ETB);
   const { erfassen, ausstehend, abgelehnt, abgelehntVerwerfen } = useEtbErfassung(
     einsatzId,
     benutzer?.id,

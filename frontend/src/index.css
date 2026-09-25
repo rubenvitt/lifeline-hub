@@ -82,22 +82,19 @@ body {
   color: var(--lfh-bedien-text);
 }
 
-/* Fokusabstand zu einer am Seitenfuß angepinnten Leiste (WCAG 2.4.11), EINE Regel für alle
-   Seiten mit einer solchen Leiste: Befehlsentwurf (LFH-465) und ETB-Erfassung (LFH-373).
-   Die Variable setzt `components/fokusabstandUnten.ts` aus der GEMESSENEN Leistenhöhe und
-   räumt sie beim Aushängen weg; ohne Leiste greift der Rückfall `0px`, der sich wie die
-   Vorgabe `auto` verhält.
+/* ETB: Fokusabstand der Zeitachse zur angepinnten Erfassungsleiste (LFH-373, WCAG 2.4.11).
 
-   GEMESSEN, nicht gewählt: ohne diese Regel landete auf der Befehlsseite
-   `einsatzunterstuetzung` beim Tabulatorwechsel auf `top: 764` in einem 844-px-Fenster,
-   während die Leiste bei 766 begann; im ETB lag jeder zweite bis jeder Zeilenauslöser
-   vollständig hinter der Erfassungsleiste. `e2e/befehl-aktionsleiste.spec.ts` und der
-   ETB-Lauf in `e2e/fokus-verdeckung.spec.ts` werden ohne sie rot.
+   GEMESSEN VOR DEM FIX: beim Vorwärtstabben rollte der Browser jeden Zeilenauslöser an den
+   unteren Fensterrand, und jeder zweite bis jeder lag VOLLSTÄNDIG hinter der Leiste (390 und
+   1366 px, kompakt und handschuh). `e2e/fokus-verdeckung.spec.ts` wird ohne diese Regel rot.
 
-   `scroll-padding-block-end` am SCROLLPORT (hier das Dokument), nicht `scroll-margin` an den
-   Zielen: die Ziel-Variante blieb in LFH-465 gemessen wirkungslos, Ursache nicht geklärt.
-   Bis LFH-373 stand die Regel seitenlokal in `pages/befehlAktionsleiste.css`; ein zweiter
-   `:root`-Block für das ETB hätte sie überschrieben, deshalb steht sie jetzt hier, einmal. */
-:root {
-  scroll-padding-block-end: var(--lfh-fokusabstand-unten, 0px);
+   `scroll-margin` an den ZIELEN der Zeitachse, NICHT `scroll-padding` am Dokument wie auf der
+   Befehlsseite (LFH-465): die Scrollport-Variante zählt auch die Ziele IN der Leiste zum
+   verdeckten Streifen. Gemessen: jeder Fokus in der Erfassung (Knopf „Feld", Chip-Eingabe,
+   Rücksprung ins Textfeld) rollte die Seite dann weiter, beim Setzen dreier Felder von 0 bis
+   2593 px ans Ende. Mit dem Zielrand bleibt die Leiste unberührt. Ein negativer Rand an den
+   Leistenkindern hebt die Scrollport-Regel NICHT auf (gemessen, Chromium ignoriert ihn).
+   Die Höhe setzt `components/fokusabstandUnten.ts` aus der gemessenen Leiste. */
+[data-lfh='etb-zeitachse'] * {
+  scroll-margin-block-end: var(--lfh-etb-fokusabstand, 0px);
 }
