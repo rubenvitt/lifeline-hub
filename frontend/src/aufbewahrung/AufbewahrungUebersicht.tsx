@@ -31,7 +31,9 @@ import { ZUSTAENDE } from './archivText';
  * antwortet ohnehin 403).
  *
  * Breiten (LFH-523): die Bezeichnung FLIESST (`mindestBreite`), alle übrigen Spalten tragen
- * eine Zahlbreite — sonst bliebe das Opt-in wirkungslos und warnte nur.
+ * eine Zahlbreite — sonst bliebe das Opt-in wirkungslos und warnte nur. Der Zustand steht
+ * direkt neben der fixierten Nummer: am Handschirm (390 px) ist er damit ohne Querscrollen
+ * lesbar (im Durchstich gemessen — als dritte Spalte lag er außerhalb der Sicht).
  */
 
 type Filter = AufbewahrungZustand | 'alle';
@@ -49,19 +51,19 @@ const spalten = spaltenFuer<AufbewahrungEintrag>()([
     render: (_, e) => e.einsatznummer_intern ?? leer,
   },
   {
+    key: 'zustand',
+    title: 'Zustand',
+    width: 200,
+    sortWert: (e) => ZUSTAENDE.indexOf(e.zustand),
+    render: (_, e) => <StatusTag darstellung={aufbewahrungZustand[e.zustand]} />,
+  },
+  {
     key: 'bezeichnung',
     title: 'Bezeichnung',
     mindestBreite: 200,
     sortWert: (e) => e.bezeichnung,
     suchText: (e) => e.bezeichnung,
     render: (_, e) => e.bezeichnung,
-  },
-  {
-    key: 'zustand',
-    title: 'Zustand',
-    width: 220,
-    sortWert: (e) => ZUSTAENDE.indexOf(e.zustand),
-    render: (_, e) => <StatusTag darstellung={aufbewahrungZustand[e.zustand]} />,
   },
   {
     key: 'abgeschlossen',

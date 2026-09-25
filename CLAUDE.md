@@ -1175,8 +1175,10 @@ Alltag wichtigsten:
   `openspec/changes/archive/2026-09-21-lfh-78-fachebene-odl/design.md`) und
   `luftqualitaetIndex` (LFH-79) dazu — Stand 22.09.2026: 18. Seither kamen unter anderem
   `abschnittLagezustand` (LFH-608), `abloesungEinstufung` (LFH-635), `betreuungsstelleStatus`
-  und `raeumungszustand` (LFH-639) sowie `verpflegungDeckung` (LFH-634) dazu — **Stand
-  24.09.2026: 24** (`ALLE_MAPS` in `statusFarben.test.ts`). Der Neuentwurf hat **keine**
+  und `raeumungszustand` (LFH-639) sowie `verpflegungDeckung` (LFH-634) dazu, zuletzt
+  `aufbewahrungZustand` (LFH-23, Begründung in
+  `openspec/changes/lfh-23-retention-rest/design.md` D4) — **Stand 25.09.2026: 25**
+  (`ALLE_MAPS` in `statusFarben.test.ts`). Der Neuentwurf hat **keine**
   Karte hinzugefügt: ETB-Typfarben und Warnstufen-Balken sind eigene Paletten
   (`etbTypFarbe`/`warnstufeBalkenFarbe`), keine `StatusDarstellung`. Jede weitere Karte bleibt
   eine eigene Entscheidung, die im Ticket begründet wird.
@@ -2020,6 +2022,50 @@ die Organisation mandantenblind sucht.
   Alarm: Vergangene Erinnerungen sind erledigt, und es gibt keine Auto-Frist und keine
   Ablösungsschicht.
 - **Herleitung, Messwerte und Prüfliste:** `openspec/changes/lfh-690-demo-daten-laufzeit-import/`.
+
+## Backend — Aufbewahrung (LFH-23)
+
+**Die Totalsperre bleibt, das Archiv steht daneben.** Nach Fristablauf oder Vormerkung sperrt
+`einsatz::berechtigung::darf_lesen` einen abgeschlossenen Einsatz auf ALLEN regulären Routen,
+auch für den System-Admin — daran ändert LFH-23 nichts, `darf_lesen`/`fordere_lesezugriff`
+sind unverändert. Gelesen wird das pseudonyme Skelett ausschließlich über den eigenen
+Namensraum `/api/aufbewahrung` (`routes/aufbewahrung.rs`): Übersicht, Archivakte (Kopf,
+Zustand, Register), Archiv-ETB und als einzige schreibende Route das Wiederherstellen. Eine
+Admin-Ausnahme in `darf_lesen` hätte dagegen Personen mit Namen, Anhänge und Export während
+der Karenz wieder geöffnet. Der Struktur-Guard `archiv_namensraum_nur_lesend_und_admin`
+(`tests/aufbewahrung.rs`) hält `AdminUser` an jedem Handler und genau einen Nicht-GET fest;
+wer eine Route ergänzt, trägt sie dort ein, statt den Guard zu lockern.
+**„Org-Admin" heißt System-Admin der EIGENEN Organisation** (`fordere_archivzugriff`:
+fremde Org 403, unbekannt 404, aktiv 409) — enger als sonst beim System-Admin. Die
+Führungskraft ist ausgeschlossen. `PUT …/aufbewahrungsfrist` prüft die Org des System-Admins
+weiterhin nicht (benannte Inkonsistenz, Folgeticket).
+**Die Akte ist eine Retain-Projektion, keine Handliste.** Jede gelesene Spalte steht in
+`aufbewahrung/projektion.rs`, das SELECT entsteht aus derselben Konstante, und der Guard
+`jede_archivspalte_ist_retain` prüft jede über `klassifikation_von`; einzige Ausnahme ist
+der benannte Erfasser-Join auf `benutzer`. Deshalb trägt die Akte vor und nach der Schwärzung
+dieselben Felder, und ein Name kann nicht während der Karenz durchrutschen. Eigene DTOs
+statt `EtbEintragAnzeige`/`PersonAnzeige`: die wachsen mit anderen Modulen mit.
+**Wiederherstellen braucht die neue Frist im selben Vorgang** (`einsatz::repo::wiederherstellen`,
+Body-Feld `retention_bis` Pflicht, `null` = unbegrenzt): ohne sie merkte der nächste
+Purge-Lauf den Einsatz sofort wieder vor. Bewachtes UPDATE mit derselben Karenzgrenze wie
+`karenz_abgelaufen` (`retention::karenz_grenze`, Gleichheit an der Grenze gepinnt). Die
+409/422-Linie: geschwärzt oder Karenz abgelaufen **409** (endgültiger Lebenszyklus), nicht
+vorgemerkt **422** (der Weg ist der Frist-PUT), Feld fehlt oder unlesbar **400**, Frist
+nicht in der Zukunft **422**. Derselbe Schnitt am Frist-PUT: vorgemerkt 422 („erst
+wiederherstellen"), geschwärzt 409 — geprüft VOR dem frühen Rücksprung „unverändert → 200".
+**Der Purge-Audit ist fail-closed.** Akteurskette: abschließende Person, Einsatzleitung,
+System-Admin der Org des Einsatzes (aktive vor inaktiven, `ORDER BY id`, Org aus
+`einsatz.org_id`). Ohne Akteur liefert `system_audit_tx` einen Fehler, Vormerkung bzw.
+Schwärzung rollen zurück und der nächste Lauf versucht es erneut — die Übersicht zeigt den
+Einsatz so lange als `faellig` bzw. `schwaerzung_ausstehend`.
+**Scrub-Werte im Wortlaut von System-Einträgen** (Schadensort, Übergabe-Adressat,
+Verbleib-Ziel, Namen ad-hoc externer Kräfte, Dokumenttitel, Zonen-Labels u. a.) bleiben als
+Führungsdokumentation im ETB und stehen abschließend in `AUSNAHMEN_SYSTEM_ETB`
+(`tests/aufbewahrung_e2e.rs`, Annahme A2). Eine neue solche Stelle ohne Eintrag ist ein
+Fehler; ob künftige Einträge den Wert weglassen, entscheidet ein eigenes Ticket.
+Frontend: Verwaltung → „Aufbewahrung" (nur System-Admin, `admin/adminNav.tsx`), Akte unter
+`/admin/aufbewahrung/:einsatzId`, Frist-Paneel über dem eingefrorenen Formular der
+Einsatz-Einstellungen. Herleitung: `openspec/changes/lfh-23-retention-rest/design.md`.
 
 ## Backend — ClamAV-Upload-Scan (Default-AN, LFH-114/LFH-224)
 

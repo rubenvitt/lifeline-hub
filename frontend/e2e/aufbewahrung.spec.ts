@@ -227,6 +227,9 @@ test.describe('Aufbewahrung (LFH-23)', () => {
         await page.setViewportSize({ width: breite, height: breite === 390 ? 844 : 800 });
         await page.goto('/admin/aufbewahrung');
         await expect(zeile(page, faelle.vorgemerkt.nummer)).toBeVisible();
+        // Der Zustand steht neben der fixierten Nummer und ist auch am Handschirm ohne
+        // Querscrollen im Blick (Kriterium 9) — `toBeInViewport`, nicht `toBeVisible`.
+        await expect(zeile(page, faelle.vorgemerkt.nummer).locator('.ant-tag')).toBeInViewport();
         expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
           breite,
         );
