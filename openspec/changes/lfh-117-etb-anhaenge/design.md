@@ -53,7 +53,7 @@ Eintrag je Datei“ zur Datenbankaussage. Der Handler meldet den Fall vorher mit
 UNIQUE-Verletzung ist nur das Netz und käme über das Sicherheitsnetz als 409 heraus. Der
 Primärschlüssel deckt `eintrag_id` als Präfix ab, das Nachladen je Seite braucht keinen
 eigenen Index. Nummer: nächste freie nach `scripts/check-migrationen.sh` gegen
-`origin/alpha`, heute 0121.
+`origin/alpha`; vergeben ist 0125 (0124 belegte LFH-22).
 *Verworfen:* Die Dokumentenablage mit `bezug_etb_eintrag_id` verlangt Kategorie und Titel
 je Datei, schreibt einen eigenen System-Eintrag und steht nicht am Eintrag
 (Entscheidung des Auftraggebers).
@@ -77,8 +77,9 @@ Allowlist hinge dann an einer Client-Angabe. (b) Ein einziger multipart-POST
 Transaktion.**
 `anlegen_idempotent` läuft in beiden Zweigen, mit und ohne `client_id`, durch ein
 `write_retry!` (`BEGIN IMMEDIATE`). Die Reihenfolge ist fest:
-1. Mit `client_id`: bestehenden Eintrag suchen. Ist er da, Rückgabe `(id, war_neu=false)`
-   **ohne** Anhangsprüfung, denn seine Anhänge sind ja gebunden.
+1. Mit `client_id`: bestehenden Eintrag suchen. Ist er da und ist es DERSELBE Eintrag
+   (D13), Rückgabe `(id, war_neu=false)` **ohne** Prüfung, ob die Anhänge frei sind, denn
+   sie sind ja gebunden. Ist es ein anderer, 409.
 2. Anhänge klassifizieren. Es genügt eine Abfrage je ID oder eine gebündelte: existiert
    im Einsatz? (sonst 400) Gebunden an ETB, Chat oder Dokument? (sonst 422)
 3. Eintrag einfügen, mit dem Funktions-Snapshot wie bisher.
@@ -149,9 +150,10 @@ Es bleibt also nichts Personenbezogenes aus der Datei zurück. Der Verhaltenstes
 `schwaerzung_loescht_dokument_samt_anhang_und_haelt_den_etb_nachweis`.
 
 **D9: Schnellerfassung: Dateien im Bauteil, vom Tab-Container gehalten.**
-- Der Bedienweg „Anhang“ steht in der Chip-Leiste neben „Feld“. Er ist ein antd `Upload`
-  mit `beforeUpload={() => false}`, `multiple`, `showUploadList={false}` und einem
-  `<Button type="dashed">` mit Büroklammer-Ikone in `aria-hidden`-Hülle, ohne `size`. Das
+- Der Bedienweg „Anhang“ steht in der Chip-Leiste neben „Feld“. Er ist ein
+  `<Button type="dashed">` mit Büroklammer-Ikone in `aria-hidden`-Hülle, ohne `size`, der
+  ein verstecktes `<input type="file" multiple>` öffnet. (Geplant war antds `Upload`; der
+  wickelte den Knopf in ein zweites `role="button"` mit eigenem Tabstopp.) Das
   `accept` teilt sich die Schnellerfassung mit `DokumentAblegenModal` über eine exportierte
   Konstante neben `DOKUMENT_MAX_GROESSE` in `api/dokumente.ts`, keine Kopie.
 - Die gewählten Dateien stehen als Liste unter der Chip-Leiste: Name, Größe
@@ -229,7 +231,10 @@ dem Senden gelten die Chat-Regeln unverändert. Gebundene Anhänge sind nicht be
   `REFERENCES anhang(id)` (Migrationen 0052, 0116, 0125). `karte_hintergrundbild` (0075)
   hält seine Bytes in einer eigenen Tabelle und verweist nicht auf `anhang`. Ein vierter
   Linker, der dort fehlte, würde seine Dateien für alle außer der hochladenden Person
-  unerreichbar machen. Wer einen Linker ergänzt, ergänzt `linker_stand` mit.
+  unerreichbar machen. **Wer einen Linker ergänzt, ergänzt fünf Stellen:** `linker_stand`,
+  das `NOT EXISTS` in `sweep_verwaiste` und in `anhang::repo::loeschen` sowie die zwei
+  Bindungsabfragen `chat::repo::anlegen_mit_anhaengen` und `etb::repo::pruefe_anhaenge`
+  (beide tragen einen Kommentar dazu).
 - **Verworfen: eine Spalte `anhang.herkunft`** („chat“/„etb“) mit Modul-Gate je Herkunft.
   Sie bräuchte eine Migration und einen Parameter durch `hochladen_multipart` und schlösse
   trotzdem nur die Modulfrage, nicht das Löschen fremder Entwürfe.
@@ -239,6 +244,35 @@ dem Senden gelten die Chat-Regeln unverändert. Gebundene Anhänge sind nicht be
 - Tests: `tests/etb_anhang.rs::ungebundener_etb_upload_ist_generisch_nur_fuer_die_hochladende_person`,
   `tests/etb_anhang.rs::fremder_ungebundener_upload_laesst_sich_nicht_binden` und
   `tests/anhang.rs::chat_anhang_vor_dem_senden_nur_fuer_die_hochladende_danach_fuer_alle`.
+
+**D13: Die Entwurfs-id ist die `client_id`, ein Replay nur derselbe Eintrag.**
+(Nachtrag aus den Reviews C1.) `EtbEntwurfsTabs` reicht die Entwurfs-id als `client_id`: sie
+überlebt den Remount beim Tabwechsel, und ein inhaltsgleicher Wiederholversuch (verlorene
+Antwort, Queue) dedupliziert der Server. Der stabile Schlüssel bleibt. Entwürfe werden aber
+nur beim Mount geladen, es gibt keinen Abgleich zwischen Browser-Tabs: haben zwei Tabs
+Entwurf X geladen und sendet Tab 1, trägt Tab 2 für seinen weiter bearbeiteten Wortlaut
+dieselbe `client_id`. Früher bekam es den Eintrag aus Tab 1 als Replay (201), schloss den
+Entwurf, und der Wortlaut war weg.
+- **Vergleich:** Ein Replay ist es nur bei gleichem Typ, gleichem Inhalt (getrimmt) und
+  denselben Anhängen als Menge (`etb::repo::ist_derselbe_eintrag`). Zeitstempel zählen nicht,
+  `erfasst_lokal_at` entsteht je Absenden neu.
+- **Anhänge zählen mit.** Ein zweiter Tab mit gleichem Text, aber weiteren Fotos verlöre sie
+  sonst still. Ein echter Wiederholversuch trägt immer dieselben IDs: die Queue speichert
+  sie, und der Client hält hochgeladene Dateien je `File` fest (verworfen nur bei 400/422,
+  und dann ist nichts erfasst, also auch kein Replay möglich). Reihenfolge und Dubletten
+  zählen nicht.
+- **Zwei Stellen:** die frühe Prüfung in der Route (vor dem Aktiv-Gate, damit der Grund auch
+  im abgeschlossenen Einsatz der richtige ist) und Schritt 1 der Transaktion (Rennen zweier
+  Tabs). Abweichung → 409 (Konflikt, LFH-267) mit `CLIENT_ID_KONFLIKT`, kein Eintrag, keine
+  Bindung.
+- **Frontend:** Nach dem 409 behält die Erfassung Wortlaut und Dateien und zeigt den Grund an
+  der Erfassung. Der Entwurf bekommt eine neue id (`entwurfNeuAusweisen`), mit der alten
+  käme er nie mehr durch. Ohne Aufrufer-id (Berichtigung) nimmt die Schnellerfassung einen
+  neuen eigenen Schlüssel. Ein Queue-Eintrag mit diesem 409 steht mit dem Wortlaut des
+  Servers unter „abgelehnt“; „Erneut senden“ nimmt einen neuen Schlüssel (ein abgelehnter
+  Eintrag ist nie erfasst, eine Dublette entsteht also nicht). Jeder 409 aus dem Erfassen
+  löst die neue id aus, auch „Einsatz abgeschlossen“: dort ist sie harmlos, und so hängt
+  nichts am Wortlaut der Meldung.
 
 ## Risks / Trade-offs
 

@@ -290,6 +290,9 @@ pub async fn anlegen_mit_anhaengen(
             // Dokument-Anhänge (LFH-632) und ETB-Anhänge (LFH-117) sind nicht verknüpfbar: sie
             // gehören der Dokumentenablage bzw. einem Eintrag, ein zweiter Linker würde deren
             // Lösch-/Rechte-Semantik aushebeln („eine Datei, ein Lebenszyklus").
+            // Diese Abfrage ist eine der FÜNF Stellen, die jeden Linker auf `anhang` kennen
+            // müssen (CLAUDE.md „ETB-Anhänge", design.md D12 von LFH-117): ein neuer Linker
+            // fehlte hier sonst, und der Chat bände dessen Dateien ein zweites Mal.
             let treffer: Option<i64> = sqlx::query_scalar(
                 "SELECT 1 FROM anhang a WHERE a.id = ? AND a.einsatz_id = ? \
                    AND NOT EXISTS (SELECT 1 FROM einsatz_dokument d WHERE d.anhang_id = a.id) \

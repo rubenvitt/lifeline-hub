@@ -461,9 +461,11 @@ Platz hat.
 
 **ETB-Anhänge (LFH-117).** `etb_eintrag_anhang` ist der **dritte Linker** auf `anhang`
 (neben Chat und Dokument), `anhang_id UNIQUE`: eine Datei hat genau einen Lebenszyklus.
-**Jeder Linker gehört in drei Stellen:** `LinkerStand` (generischer Download 404, DELETE 422),
-das `NOT EXISTS` in `anhang::repo::sweep_verwaiste` und in `repo::loeschen`. Ein fehlender
-Linker löscht still. **Kreuzsperren:** das ETB verknüpft keine Chat- oder Dokument-Datei (422),
+**Jeder Linker gehört in fünf Stellen:** `LinkerStand` (generischer Download 404, DELETE 422,
+ungebunden = nur für die hochladende Person), das `NOT EXISTS` in
+`anhang::repo::sweep_verwaiste` und in `repo::loeschen` sowie die zwei Bindungsabfragen
+`chat::repo::anlegen_mit_anhaengen` und `etb::repo::pruefe_anhaenge`. Ein fehlender Linker
+löscht still oder bindet eine Datei ein zweites Mal. **Kreuzsperren:** das ETB verknüpft keine Chat- oder Dokument-Datei (422),
 der Chat keine ETB-Datei (sein 400). Eigene Routen unter dem ETB-Präfix: Upload `POST
 …/etb/anhaenge` mit der **Dokument-Allowlist** (HEIC/TIFF), eine Datei je Anfrage, und
 Download `GET …/etb/{eintrag_id}/anhaenge/{aid}` mit den Lese-Gates und EINER
@@ -475,6 +477,13 @@ hochgeladenen Dateien geht mit `anhang_ids` in die Queue. **Während des Sendens
 ganze Erfassung gesperrt (Text `readOnly`, Typ, „Feld", Chips, „Werte behalten", „Anhang";
 der Test prüft die Erfassung als Ganzes gegen eine Ausnahmeliste), die Erfassungszeit gilt ab
 dem Absenden, nicht ab dem Ende des Uploads, und die **Entwurfs-id ist die `client_id`**.
+**Ein Replay ist nur DERSELBE Eintrag** (Review C1): gleicher Typ, gleicher Inhalt (getrimmt),
+dieselben Anhänge als Menge — geprüft in der Route UND in Schritt 1 der Transaktion; sonst
+409 „client_id bereits für einen anderen Eintrag verwendet". Sonst schloss ein zweiter
+Browser-Tab mit demselben Entwurf seinen weiter bearbeiteten Wortlaut still gegen den
+Eintrag des ersten. Nach dem 409 behält die Erfassung Wortlaut und Dateien, zeigt den Grund
+an der Erfassung, und der Entwurf bekommt eine neue id (`entwurfNeuAusweisen`); „Erneut
+senden" an einem abgelehnten Queue-Eintrag nimmt ebenfalls einen neuen Schlüssel.
 **Der Sendezustand gehört dem Entwurf, nicht der Montierung** (Review C1): `EtbEntwurfsTabs`
 hält ihn je Entwurf (`Versand`), weil nur der aktive Tab montiert ist — sonst stand nach einem
 Tabwechsel eine entsperrte Erfassung da, deren Eingaben der laufende Versand still verwarf.

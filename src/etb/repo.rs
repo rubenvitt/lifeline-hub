@@ -241,6 +241,9 @@ async fn pruefe_anhaenge(
     anhang_ids: &[i64],
 ) -> Result<(), AppError> {
     for &aid in anhang_ids {
+        // Eine der FÜNF Stellen, die jeden Linker auf `anhang` kennen müssen (CLAUDE.md
+        // „ETB-Anhänge", design.md D12): ein neuer Linker fehlte hier sonst, und das ETB bände
+        // dessen Dateien ein zweites Mal.
         let stand: Option<(bool, i64)> = sqlx::query_as(
             "SELECT EXISTS (SELECT 1 FROM etb_eintrag_anhang l WHERE l.anhang_id = a.id) \
                  OR EXISTS (SELECT 1 FROM chat_nachricht_anhang c WHERE c.anhang_id = a.id) \
