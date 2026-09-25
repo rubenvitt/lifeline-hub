@@ -58,6 +58,6 @@ kein voller `pnpm e2e`-Lauf sie mitnimmt.
 ## 8. Abschluss
 
 - [x] 8.1 Mutationsproben nach design.md D11 in einem gemeinsamen Lauf, Ergebnis im Kopfkommentar der jeweiligen Spec. Verifiziert durch das JSON-Protokoll: jede tragende Mutation ist rot, das Original grün, die Kopien sind gelöscht
-- [ ] 8.2 `lint`, `tsc`, Vitest voll, Prettier. Verifiziert durch grüne Läufe ohne `| tail`
-- [ ] 8.3 `scripts/check-all.sh` mit eigenem `CARGO_TARGET_DIR` per `nohup`. Verifiziert durch Exit 0, bei Flakes durch Wiederholung des einzelnen Specs mit Begründung
+- [x] 8.2 `lint`, `tsc`, Vitest voll, Prettier. Verifiziert durch grüne Läufe ohne `| tail` (Vitest 464 Dateien / 6220 Tests)
+- [x] 8.3 `scripts/check-all.sh` mit eigenem `CARGO_TARGET_DIR` per `nohup`. Verifiziert durch Exit 0, bei Flakes durch Wiederholung des einzelnen Specs mit Begründung. **Stand 17908d70:** Schritte 1–6 und 8–10 grün. e2e 292/293: rot bleibt allein `lagekarte-betreuung` „Marker live auf einer zweiten Karte“, und der ist auf alpha in der CI genauso rot (Run 36103957251), betrifft also nicht diesen Change. Die beiden ersten Gate-Läufe fanden echte Befunde dieses Changes (Laden-Rennen im ETB, Platzhalter-Schub in der Einsatzauswahl), beide behoben, siehe Nachtrag in design.md. Der dritte Lauf fiel einer Lastmittel von 180 zum Opfer und wurde als `--nur e2e` wiederholt
 - [ ] 8.4 Review (`superpowers:requesting-code-review`) und PR gegen `alpha`
