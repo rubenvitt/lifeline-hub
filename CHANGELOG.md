@@ -1,3 +1,13 @@
+## [1.0.0-alpha.45](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.44...v1.0.0-alpha.45) (2026-09-25)
+
+### Lagekarte
+
+- **Verbesserte Bedienbarkeit auf Touch-Geräten**: Schalter (Kippschalter) in der Lagekarten-Seitenleiste passen sich nun an die gewählte Dichte-Stufe (Kompakt/Normal/Komfortabel) an. Auf Führungs-Tablets sind die Schalter jetzt in allen Stufen ausreichend groß für die Bedienung mit Handschuhen (24–72 px statt bisher einheitlich 23 px).
+
+- **Optimierte Darstellung der Seitenleiste**: Die Bildnamens-Zeilen in der Lagekarten-Seitenleiste brechen nun bei langen Namen korrekt um, sodass bei komfortabler Dichte nichts mehr aus der 300-px-Leiste ragt. Der Bildname erhält mindestens 100 px Breite, bevor die Zeile umbricht.
+
+- **Barrierefreiheit**: Alle Schalter für Fachebenen (z. B. Wetterwarnungen, Energieanlagen) verfügen nun über zugängliche Namen für Screenreader und andere Hilfstechnologien.
+
 ## [1.0.0-alpha.44](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.43...v1.0.0-alpha.44) (2026-09-25)
 
 ### Wichtige Änderungen
