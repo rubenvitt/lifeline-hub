@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import type { ArchivAkte, ArchivEtbEintrag, AufbewahrungZustand } from '../api/types';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
-import ArchivAktePage, { berichtigungText } from './ArchivAktePage';
+import ArchivAktePage, { archivHinweis, berichtigungText } from './ArchivAktePage';
 
 /** Archivakte (LFH-23, tasks.md 6.9). */
 
@@ -177,5 +177,25 @@ describe('berichtigungText', () => {
     expect(berichtigungText(e, new Map([[42, 3]]))).toBe('berichtigt Nr. 3');
     expect(berichtigungText(e, new Map())).toBe('berichtigt einen älteren Eintrag');
     expect(berichtigungText(eintrag(6), new Map())).toBeNull();
+  });
+});
+
+describe('archivHinweis', () => {
+  const zeit = (s: string) => `Z(${s})`;
+  it('nennt Nachtrag, Berichtigung und Veranlassung als Text', () => {
+    const e = eintrag(5, {
+      typ: 'berichtigung',
+      berichtigt_eintrag_id: 42,
+      ereigniszeit: '2026-05-01 10:00:00',
+      received_at: '2026-05-01 11:30:00',
+      veranlassung: 'Lagebesprechung',
+    });
+    expect(archivHinweis(e, new Map([[42, 3]]), zeit)).toBe(
+      'nachgetragen um Z(2026-05-01 11:30:00) · berichtigt Nr. 3 · Veranlassung: Lagebesprechung',
+    );
+  });
+
+  it('ohne Angaben keine Hinweiszeile', () => {
+    expect(archivHinweis(eintrag(6), new Map(), zeit)).toBeUndefined();
   });
 });

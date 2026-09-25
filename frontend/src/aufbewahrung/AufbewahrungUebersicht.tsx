@@ -82,6 +82,14 @@ const spalten = spaltenFuer<AufbewahrungEintrag>()([
     render: (_, e) => (e.retention_bis ? <ZeitAnzeige wert={e.retention_bis} /> : leer),
   },
   {
+    key: 'vorgemerkt',
+    title: 'Vorgemerkt am',
+    width: 160,
+    zahl: true,
+    sortWert: (e) => e.geloescht_at,
+    render: (_, e) => (e.geloescht_at ? <ZeitAnzeige wert={e.geloescht_at} /> : leer),
+  },
+  {
     key: 'karenz',
     title: 'Karenz-Ende',
     width: 160,

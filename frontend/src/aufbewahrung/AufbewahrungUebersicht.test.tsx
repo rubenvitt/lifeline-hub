@@ -78,6 +78,9 @@ describe('AufbewahrungUebersicht', () => {
     expect(within(t).getByText('zur Löschung vorgemerkt')).toBeInTheDocument();
     expect(within(t).getByText('ohne Frist')).toBeInTheDocument();
     expect(within(t).getByText('geschwärzt')).toBeInTheDocument();
+    // Zeitpunkt der Vormerkung — Pflichtangabe der Übersicht (Spec „Aufbewahrungsübersicht").
+    expect(within(t).getByRole('columnheader', { name: /Vorgemerkt am/ })).toBeInTheDocument();
+    expect(within(t).getByText(formatZeit('2026-06-01 10:10:00'))).toBeInTheDocument();
     // Karenz-Ende als taktische DTG, nicht als roher UTC-String.
     expect(within(t).getByText(formatZeit('2026-07-01 10:10:00'))).toBeInTheDocument();
     expect(t).not.toHaveTextContent('2026-07-01 10:10:00');

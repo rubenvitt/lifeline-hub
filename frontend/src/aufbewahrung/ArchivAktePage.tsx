@@ -13,6 +13,7 @@ import type {
   EtbTyp,
 } from '../api/types';
 import { adminAufbewahrungPfad, defaultAdminPfad } from '../admin/adminNav';
+import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { useAuth } from '../auth/AuthContext';
 import AdminPage from '../components/AdminPage';
@@ -33,6 +34,7 @@ import {
 } from '../components/instrument';
 import { istAdmin } from '../einsatz/schreibrecht';
 import { MELDEWEG_OPTIONEN } from '../etb/schnellerfassungModell';
+import { istNachgetragen } from '../etb/typFarben';
 import { verfasserText } from '../etb/verfasser';
 import { ABSCHLUSS_LABEL, TYP_LABEL } from '../pages/schaeden/schadenHelfer';
 import { SPEZIES_META, TIER_ABSCHLUSS, TIER_STATUS } from '../pages/tiere/tierHelfer';
@@ -234,8 +236,28 @@ export function berichtigungText(
   return nr != null ? `berichtigt Nr. ${nr}` : 'berichtigt einen älteren Eintrag';
 }
 
+/**
+ * Hinweiszeile eines Archiv-Eintrags: Nachtrag, Berichtigungsverweis und Veranlassung —
+ * dieselben Angaben wie im Tagebuch des Einsatzes, aber als Text, nie als Link.
+ */
+export function archivHinweis(
+  e: ArchivEtbEintrag,
+  nrVonId: ReadonlyMap<number, number>,
+  formatZeit: (utc: string) => string,
+): string | undefined {
+  const teile = [
+    istNachgetragen(e.ereigniszeit, e.received_at)
+      ? `nachgetragen um ${formatZeit(e.received_at)}`
+      : null,
+    berichtigungText(e, nrVonId),
+    e.veranlassung ? `Veranlassung: ${e.veranlassung}` : null,
+  ].filter((t): t is string => t != null);
+  return teile.length > 0 ? teile.join(' · ') : undefined;
+}
+
 function ArchivEtb({ einsatzId }: { einsatzId: number }) {
   const { token } = theme.useToken();
+  const { formatZeit } = useAnzeigeKonventionen();
   const [filter, setFilter] = useState<EtbFilter>('alle');
   const typ = filter === 'alle' ? undefined : filter;
   const abfrage = useInfiniteQuery({
@@ -274,7 +296,7 @@ function ArchivEtb({ einsatzId }: { einsatzId: number }) {
             typwort={etbTyp[e.typ].label}
             meta={e.von || e.an ? `${e.von || leer} → ${e.an || leer}` : undefined}
             toenung={e.typ === 'berichtigung' ? 'berichtigung' : undefined}
-            hinweis={berichtigungText(e, nrVonId) ?? undefined}
+            hinweis={archivHinweis(e, nrVonId, formatZeit)}
             verfasser={verfasserText(e)}
             weg={e.meldeweg ? MELDEWEG[e.meldeweg] : undefined}
           >

@@ -3,7 +3,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { kontrast, randKontrast } from './kontrast-kern';
 
 /**
- * Aufbewahrung in der Verwaltung (LFH-23, tasks.md 6.11 und 8.2).
+ * Aufbewahrung in der Verwaltung und am Einsatz (LFH-23, tasks.md 6.11 und 8.2).
  *
  * ── WARUM EIN DIREKTER DATENBANKGRIFF ───────────────────────────────────────────────────
  *
@@ -243,6 +243,18 @@ test.describe('Aufbewahrung (LFH-23)', () => {
           breite,
         );
         await testInfo.attach(`akte-${modus}-${breite}.png`, {
+          body: await page.screenshot({ fullPage: true }),
+          contentType: 'image/png',
+        });
+        // Frist-Paneel in den Einstellungen eines abgeschlossenen Einsatzes: die Dauer ist
+        // eingefroren, die Frist bleibt für die Einsatzleitung bzw. den Admin bedienbar.
+        await page.goto(`/einsaetze/${faelle.frist_laeuft.id}/einstellungen/aufbewahrung`);
+        await expect(page.getByRole('button', { name: 'Frist ändern' })).toBeEnabled();
+        await expect(page.getByLabel('Aufbewahrungs-Dauer (Tage)')).toBeDisabled();
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+          breite,
+        );
+        await testInfo.attach(`einstellungen-${modus}-${breite}.png`, {
           body: await page.screenshot({ fullPage: true }),
           contentType: 'image/png',
         });
