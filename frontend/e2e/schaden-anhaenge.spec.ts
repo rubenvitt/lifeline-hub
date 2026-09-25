@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { pruefeFokusVerdeckung } from './fokus-kern';
 import { kontrast, pruefe } from './kontrast-kern';
 
 /**
@@ -251,3 +252,42 @@ for (const modus of ['light', 'dark'] as const) {
     });
   });
 }
+
+// Kriterium 13 (Review C2): gemessen statt offen gelassen, Muster `dokumente.spec.ts`. Die
+// Detailseite muss scrollen, sonst wandert nichts unter die stehende Kopfzeile; der Durchlauf
+// muss die Zeilen des Paneels erreichen, sonst wäre „0 verdeckt“ trivial wahr.
+test('Fokus nie verdeckt: Tab-Durchlauf durch die Anhangliste unter der Kopfzeile', async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize({ width: 1366, height: 600 });
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Sturmlage Fokus ${Date.now()}`);
+  const schadenId = await schadenAnlegen(page, einsatzId);
+  for (let i = 1; i <= 12; i += 1) await seedeAnhang(page, einsatzId, schadenId, `foto-${i}.jpg`);
+  await page.goto(`/einsaetze/${einsatzId}/schaeden/${schadenId}`);
+  await expect(paneel(page).locator('a[download]')).toHaveCount(12);
+
+  const reserve = await page.evaluate(() => document.documentElement.scrollHeight - innerHeight);
+  expect(reserve, 'Vorbedingung: die Seite muss scrollen').toBeGreaterThan(200);
+  await page.evaluate((z) => window.scrollTo(0, z), Math.round(reserve / 2));
+
+  const befund = await pruefeFokusVerdeckung(page, 60, 'Tab', {
+    region: '[data-lfh="schaden-anhang-zeile"]',
+  });
+  expect(befund.fixierteKandidaten, 'Vorbedingung: es gibt einen fixierten Knoten').toBeGreaterThan(
+    0,
+  );
+  expect(
+    befund.stoppsInRegion,
+    `Vorbedingung: der Durchlauf erreicht die Zeilen (${befund.stoppsGesamt} Stopps)`,
+  ).toBeGreaterThanOrEqual(8);
+  expect(befund.verdeckt, befund.verdeckt.join('\n')).toEqual([]);
+  console.log(
+    `[LFH-21] Fokus: ${befund.stoppsGesamt} Stopps, ${befund.stoppsInRegion} in den Zeilen, ${befund.fixierteKandidaten} fixierte Kandidaten, ${befund.verdeckt.length} verdeckt`,
+  );
+  await testInfo.attach('Fokus-Verdeckung', {
+    body: `${befund.stoppsGesamt} Stopps, ${befund.stoppsInRegion} in den Zeilen, ${befund.verdeckt.length} verdeckt`,
+    contentType: 'text/plain',
+  });
+});
