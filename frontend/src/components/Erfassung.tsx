@@ -102,8 +102,28 @@ const FOKUSSIERBAR = [
   'select:not([disabled])',
 ].join(', ');
 
+/**
+ * Wohin der Fokus beim Öffnen und nach jedem Serien-Speichern geht (Code-Review C2 zu LFH-21):
+ *
+ * 1. ein ausdrückliches Fokusziel `[data-erfassung-fokus]` — für Felder, deren eigentliches
+ *    `<input>` nicht bedienbar ist. Gemessen am Dateifeld: rc-upload rendert ein
+ *    `<input type="file">` mit `display: none`; der Browser ignoriert `focus()` darauf still,
+ *    der Fokus blieb auf dem gerade gedrückten Knopf. jsdom fokussiert es klaglos — Vitest ist
+ *    für diesen Fall blind, den Beleg trägt `e2e/schaden-anhaenge.spec.ts`.
+ * 2. sonst das erste GERENDERTE Feld (`getClientRects().length > 0`) — ein ausgeblendetes wird
+ *    übersprungen, auch ohne Markierung.
+ * 3. sonst das erste Feld überhaupt: jsdom rechnet kein Layout und meldet für jedes Element
+ *    eine leere Box; ohne diesen Rückfall fokussierte die Hülle in Tests nichts mehr.
+ */
 function fokussiereErstesFeld(wurzel: HTMLElement | null) {
-  wurzel?.querySelector<HTMLElement>(FOKUSSIERBAR)?.focus();
+  if (!wurzel) return;
+  const ausdruecklich = wurzel.querySelector<HTMLElement>('[data-erfassung-fokus]');
+  if (ausdruecklich) {
+    ausdruecklich.focus();
+    return;
+  }
+  const kandidaten = Array.from(wurzel.querySelectorAll<HTMLElement>(FOKUSSIERBAR));
+  (kandidaten.find((k) => k.getClientRects().length > 0) ?? kandidaten[0])?.focus();
 }
 
 /**

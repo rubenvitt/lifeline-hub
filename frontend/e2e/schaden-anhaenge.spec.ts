@@ -144,6 +144,31 @@ test('legt ab, lädt herunter, schreibt den pseudonymen ETB-Nachweis und entfern
   expect(fremd.status()).toBe(404);
 });
 
+// Serienfokus (Code-Review C2): nach „Speichern und nächste“ muss der Fokus wieder auf
+// „Datei wählen“ stehen. jsdom fokussiert den versteckten Datei-Input klaglos und ist dafür
+// blind — nur der Browser entscheidet.
+test('nach „Speichern und nächste“ steht der Fokus wieder auf „Datei wählen“', async ({ page }) => {
+  test.setTimeout(60_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Sturmlage Serie ${Date.now()}`);
+  const schadenId = await schadenAnlegen(page, einsatzId);
+  await page.goto(`/einsaetze/${einsatzId}/schaeden/${schadenId}`);
+  await paneel(page).getByRole('button', { name: 'Datei ablegen' }).click();
+  const dialog = page.getByRole('dialog');
+  const dateiKnopf = dialog.locator('button.ant-btn', { hasText: 'Datei wählen' });
+  await expect(dateiKnopf).toBeFocused();
+
+  await dialog
+    .locator('input[type="file"]')
+    .setInputFiles({ name: 'erstes.jpg', mimeType: 'image/jpeg', buffer: JPG });
+  await dialog.getByRole('button', { name: /Speichern und nächste/ }).click();
+  await expect(paneel(page).getByRole('link', { name: /^erstes\.jpg, / })).toBeVisible();
+  await expect(dialog.getByText('erstes.jpg')).toHaveCount(0);
+  await expect(dialog, 'der Dialog bleibt offen').toBeVisible();
+  await expect(dateiKnopf, 'Fokus zurück auf „Datei wählen“').toBeFocused();
+});
+
 test('Tab-Reihenfolge im Ablegen-Dialog: kein zweiter Tab-Stopp um „Datei wählen“', async ({
   page,
 }, testInfo) => {

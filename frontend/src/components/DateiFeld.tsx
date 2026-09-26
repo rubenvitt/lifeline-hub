@@ -1,4 +1,3 @@
-import { useCallback } from 'react';
 import { Button, Form, Upload, type UploadFile } from 'antd';
 import { UploadOutlined } from '@ant-design/icons';
 import { UPLOAD_MAX_GROESSE } from '../api/upload';
@@ -22,15 +21,14 @@ interface Props {
  * (`beforeUpload={() => false}`: gesendet wird mit dem Formular), Pflicht, und die Größe wird
  * VORAB geprüft, damit niemand 25 MiB über Mobilfunk schickt, nur um die Absage zu lesen.
  *
- * Fokus: die Erfassungshülle fokussiert das erste `<input>` — hier ist das rc-uploads
- * `<input type="file">` mit `display: none`, im Browser nicht fokussierbar (jsdom merkt das
- * nicht). Der Callback-Ref am Knopf fokussiert deshalb per `requestAnimationFrame`, also NACH
- * dem Effekt der Hülle.
+ * Fokus: der Knopf trägt `data-erfassung-fokus` — die Erfassungshülle nimmt ihn beim Öffnen
+ * UND nach jedem Serien-Speichern statt des ersten `<input>`, das hier rc-uploads
+ * `<input type="file">` mit `display: none` wäre (im Browser nicht fokussierbar, jsdom merkt
+ * das nicht). Vorher trug ein Mount-Callback-Ref den Fokus; nach „Speichern und nächste“ hing
+ * er nur daran, dass der Knopf zufällig neu einhängt (Code-Review C2, e2e-Beleg in
+ * `e2e/schaden-anhaenge.spec.ts`).
  */
 export default function DateiFeld({ accept, name = 'datei', onDateiWahl }: Props) {
-  const dateiKnopf = useCallback((knopf: HTMLButtonElement | null) => {
-    if (knopf) requestAnimationFrame(() => knopf.focus());
-  }, []);
   return (
     <Form.Item
       name={name}
@@ -63,7 +61,7 @@ export default function DateiFeld({ accept, name = 'datei', onDateiWahl }: Props
         }}
       >
         <Button
-          ref={dateiKnopf}
+          data-erfassung-fokus=""
           icon={
             // `aria-hidden`-Hülle: der Icon-Knoten brächte `role="img"` mit englischem Namen
             // („upload“) in den zugänglichen Namen des Knopfs.

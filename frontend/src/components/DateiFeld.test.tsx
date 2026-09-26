@@ -71,9 +71,13 @@ describe('DateiFeld (LFH-21)', () => {
     expect(onDateiWahl).toHaveBeenCalledTimes(1);
   });
 
-  it('fokussiert „Datei wählen“ beim Einhängen', async () => {
-    renderMitProviders(<Formular onFinish={vi.fn()} />);
-    const knopf = screen.getByRole('button', { name: /Datei wählen/ });
-    await vi.waitFor(() => expect(document.activeElement).toBe(knopf));
+  it('markiert „Datei wählen“ als Fokusziel der Erfassungshülle, nicht den versteckten Input', () => {
+    // Den Fokus setzt die Hülle (`components/Erfassung.tsx`) beim Öffnen und nach jedem
+    // Serien-Speichern; das Feld liefert nur das Ziel. Der Browser-Beleg steht im e2e.
+    const { container } = renderMitProviders(<Formular onFinish={vi.fn()} />);
+    expect(screen.getByRole('button', { name: /Datei wählen/ })).toHaveAttribute(
+      'data-erfassung-fokus',
+    );
+    expect(container.querySelectorAll('[data-erfassung-fokus]')).toHaveLength(1);
   });
 });
