@@ -22,6 +22,9 @@ import type { FachebeneQuelle } from './fachebenen';
 export const EINSATZ_KEYS = {
   uhs: 'einsatz-uhs',
   schaeden: 'einsatz-schaeden',
+  // Fotos und Dateien an einem Schaden (LFH-21): eigener Prefix neben der Schadensliste, live
+  // über das `schaden`-Ereignis, das Ablegen und Entfernen verteilen.
+  schadenAnhaenge: 'einsatz-schaden-anhaenge',
   fahrzeuge: 'einsatz-fahrzeuge',
   material: 'einsatz-material',
   tiere: 'einsatz-tiere',
@@ -102,7 +105,9 @@ export type BetreuungVerlaufArt = 'bezirk' | 'stelle';
  */
 export const EINSATZ_STREAM_EVENTS = {
   uhs: [EINSATZ_KEYS.uhs],
-  schaden: [EINSATZ_KEYS.schaeden],
+  // LFH-21: Ablegen und Entfernen einer Datei verteilen `schaden` — die Anhangliste der
+  // Detailseite hängt deshalb mit daran (Prefix-Match: alle Anhanglisten des Einsatzes).
+  schaden: [EINSATZ_KEYS.schaeden, EINSATZ_KEYS.schadenAnhaenge],
   // LFH-609: der Status einer Einheit ist aus ihren Fahrzeugen abgeleitet — ein
   // Statuswechsel am Fahrzeug ändert die Einheitenliste mit.
   fahrzeug: [EINSATZ_KEYS.fahrzeuge, EINSATZ_KEYS.einheiten, EINSATZ_KEYS.modulZaehler],
@@ -321,6 +326,8 @@ export const einsatzKeys = {
     [EINSATZ_KEYS.schaeden, einsatzId, 'geschaedigt', personId] as const,
   schaden: (einsatzId: number, schadenId: number) =>
     [EINSATZ_KEYS.schaden, einsatzId, schadenId] as const,
+  schadenAnhaenge: (einsatzId: number, schadenId: number) =>
+    [EINSATZ_KEYS.schadenAnhaenge, einsatzId, schadenId] as const,
   tiere: (einsatzId: number) => [EINSATZ_KEYS.tiere, einsatzId] as const,
   tiereHalter: (einsatzId: number, personId: number) =>
     [EINSATZ_KEYS.tiere, einsatzId, 'halter', personId] as const,

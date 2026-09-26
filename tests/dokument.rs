@@ -584,3 +584,72 @@ async fn fremde_org_ist_403() {
     .await;
     assert_eq!(status, StatusCode::FORBIDDEN, "DELETE");
 }
+
+// ---------- LFH-21: Abschottung der Schaden-Anhänge ----------
+
+/// Spec „Nicht in der Dokumentenablage“: ein Foto an einem Schaden steht nicht in der Ablage.
+#[tokio::test]
+async fn schaden_anhang_erscheint_nicht_in_der_ablage() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    schaden_anhang(&pool, einsatz).await;
+
+    let (status, json) = anfrage(&app, "GET", &pfad(einsatz), &admin, None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json.as_array().unwrap().len(), 0, "{json:?}");
+}
+
+/// Spec „Recht auf Dokumente genügt nicht“: wer Dokumente sieht, aber nicht Schäden, bekommt
+/// an der Schadensroute 403. Die 404 über den generischen Download belegt HIER nichts (diese
+/// Person hat nicht abgelegt, für sie wäre ein ungebundener Anhang ohnehin 404, D12) — die
+/// Aussage tragen die Uploader-Tests in `tests/anhang.rs`; hier steht sie nur als Spec-Zeile.
+#[tokio::test]
+async fn recht_auf_dokumente_genuegt_nicht_fuer_schaden_anhaenge() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let aid = schaden_anhang(&pool, einsatz).await;
+    let (sid, lid): (i64, i64) =
+        sqlx::query_as("SELECT schaden_id, id FROM einsatz_schaden_anhang WHERE anhang_id = ?")
+            .bind(aid)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    let fid = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    rolle_setzen(&app, &admin, einsatz, fid, "fuehrungspersonal").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    let (s, _) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/modul-overrides/schaeden"),
+        &admin,
+        Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+
+    let (s, _) = anfrage(&app, "GET", &pfad(einsatz), &frieda, None).await;
+    assert_eq!(s, StatusCode::OK, "Vorbedingung: Dokumente sieht sie");
+    let schaden_pfad = format!("/api/einsaetze/{einsatz}/schaeden/{sid}/anhaenge");
+    let (s, _) = anfrage(&app, "GET", &schaden_pfad, &frieda, None).await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "Liste an der Schadensroute");
+    let (s, _) = anfrage(
+        &app,
+        "GET",
+        &format!("{schaden_pfad}/{lid}/datei"),
+        &frieda,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "Download an der Schadensroute");
+    let (s, _) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/anhaenge/{aid}"),
+        &frieda,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "generischer Download");
+}

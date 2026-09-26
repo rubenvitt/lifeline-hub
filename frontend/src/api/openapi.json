@@ -7487,6 +7487,53 @@
           "abgewiesen"
         ]
       },
+      "SchadenAnhangAnzeige": {
+        "type": "object",
+        "description": "Ein Anhang eines Schadens. `id` ist die **Linker-id** (`einsatz_schaden_anhang.id`),\nnicht `anhang.id` — die Datei ist ohnehin nur über die Schadensroute ladbar, eine\n`anhang_id` auf dem Wire wäre nur ein Anreiz, den gesperrten generischen Weg zu probieren.",
+        "required": [
+          "id",
+          "schaden_id",
+          "dateiname",
+          "mime",
+          "groesse",
+          "abgelegt_von_id",
+          "abgelegt_at"
+        ],
+        "properties": {
+          "abgelegt_at": {
+            "type": "string"
+          },
+          "abgelegt_von_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "abgelegt_von_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Anzeigename der ablegenden Person; fehlt, wenn das Konto nicht mehr existiert."
+          },
+          "dateiname": {
+            "type": "string"
+          },
+          "groesse": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "mime": {
+            "type": "string"
+          },
+          "schaden_id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "SchadenAnzeige": {
         "type": "object",
         "required": [

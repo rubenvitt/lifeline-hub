@@ -50,6 +50,7 @@ pub mod pegel;
 pub mod personal;
 pub mod personal_status;
 pub mod qualifikation;
+pub mod schaden_anhang;
 pub mod sprechgruppe;
 pub mod stab;
 pub mod stichwort;

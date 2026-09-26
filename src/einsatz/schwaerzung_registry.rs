@@ -521,7 +521,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
     TabellenRegel {
         // Ganze Zeile löschen: `daten` (BLOB NOT NULL) sind Fotos/Dateien Betroffener,
         // KEIN Kartografie-Skelett. CASCADE räumt die Linker chat_nachricht_anhang,
-        // einsatz_dokument (s. u.) und etb_eintrag_anhang (LFH-117) mit.
+        // einsatz_dokument (s. u.), etb_eintrag_anhang (LFH-117) und
+        // einsatz_schaden_anhang (LFH-21, s. u.) mit.
         tabelle: "anhang",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
@@ -560,6 +561,29 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("bezug_einheit_id", Strategie::ZeileLoeschen),
             scrub("bezug_etb_eintrag_id", Strategie::ZeileLoeschen),
             scrub("etb_eintrag_id", Strategie::ZeileLoeschen),
+            scrub("abgelegt_von_id", Strategie::ZeileLoeschen),
+            scrub("abgelegt_at", Strategie::ZeileLoeschen),
+            scrub("geloescht_at", Strategie::ZeileLoeschen),
+            scrub("geloescht_von_id", Strategie::ZeileLoeschen),
+        ],
+    },
+    TabellenRegel {
+        // LFH-21: ganze Zeile löschen wie `anhang` — die Datei, die die Zeile beschreibt, ist
+        // ohnehin weg (CASCADE von `anhang`; `anhang` steht deshalb VOR dieser Regel), und
+        // ein Linker ohne Datei trägt nichts, was die Akte bräuchte. Anders als bei
+        // `einsatz_dokument` überlebt hier KEIN Freitext: die System-ETB-Einträge nennen nur
+        // Registriernummer und Art („Schaden S-003: Foto abgelegt“, `schaden::anhang`), nie den
+        // Dateinamen. `etb_eintrag.inhalt` bleibt Retain (G_ETB) und ist damit pseudonym.
+        // Gepinnt in
+        // `einsatz::repo::tests::schwaerzung_loescht_schaden_anhaenge_und_haelt_den_etb_nachweis`.
+        tabelle: "einsatz_schaden_anhang",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        spalten: &[
+            scrub("id", Strategie::ZeileLoeschen),
+            scrub("einsatz_id", Strategie::ZeileLoeschen),
+            scrub("schaden_id", Strategie::ZeileLoeschen),
+            scrub("anhang_id", Strategie::ZeileLoeschen),
             scrub("abgelegt_von_id", Strategie::ZeileLoeschen),
             scrub("abgelegt_at", Strategie::ZeileLoeschen),
             scrub("geloescht_at", Strategie::ZeileLoeschen),

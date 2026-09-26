@@ -10,7 +10,7 @@ import type {
   NeuerAuftrag,
 } from './types';
 import { apiGet, apiSend, apiUpload, type ApiSendOptionen } from './client';
-import { DOKUMENT_UPLOAD_TIMEOUT_MS } from './dokumente';
+import { UPLOAD_TIMEOUT_MS } from './upload';
 
 export const SEITENGROESSE = 100;
 
@@ -105,7 +105,7 @@ export async function ladeEtbAnhangHoch(einsatzId: number, datei: File): Promise
   const fd = new FormData();
   fd.append('datei', datei);
   const angelegt = await apiUpload<Anhang[]>(`/api/einsaetze/${einsatzId}/etb/anhaenge`, fd, {
-    timeoutMs: DOKUMENT_UPLOAD_TIMEOUT_MS,
+    timeoutMs: UPLOAD_TIMEOUT_MS,
   });
   return angelegt[0];
 }

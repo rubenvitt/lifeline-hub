@@ -11,8 +11,8 @@ use axum::Json;
 use super::support::anhang_antwort;
 
 /// Ein UNGEBUNDENER Anhang gehört vorerst der Person, die ihn hochgeladen hat (LFH-117,
-/// Review C1, design.md D12): wem er gehören wird — Chat, ETB, Dokumentenablage —, steht erst
-/// mit dem Linker fest, und bis dahin kennt die modul-lose generische Route kein Modul-Gate.
+/// Review C1, design.md D12): wem er gehören wird — dem Chat oder einem modulgebundenen Linker
+/// aus `anhang::repo::MODUL_LINKER` —, steht erst mit dem Linker fest, und bis dahin kennt die modul-lose generische Route kein Modul-Gate.
 /// Ein ETB-Foto, dessen Erfassen vorübergehend scheiterte, läge sonst bis zu 24 h für jede
 /// lesende Person ladbar und für jede schreibende löschbar. Fremde bekommen 404 wie für einen
 /// unbekannten Anhang — die Existenz bleibt verdeckt. Gebundene Anhänge sind nicht betroffen.
@@ -62,9 +62,10 @@ pub async fn hochladen(
 ///
 /// Gatet zusätzlich über [`anhang::repo::linker_stand`] (Aggregation über ALLE Linker):
 /// (LFH-116) hängt der Anhang NUR noch an soft-gelöschten Nachrichten, ist er gesperrt
-/// (404) — der Direkt-Deeplink umgeht sonst die Frontend-Ausblendung; (LFH-632) gehört er
-/// zur Dokumentenablage, ist er nur über die modul-gegatete Dokument-Route ladbar (404);
-/// (LFH-117) hängt er an einem ETB-Eintrag, nur über die ETB-Route (404).
+/// (404) — der Direkt-Deeplink umgeht sonst die Frontend-Ausblendung; hängt er an einem
+/// modulgebundenen Linker (Register `anhang::repo::MODUL_LINKER`: Dokumentenablage, ETB,
+/// Schaden, …), ist er nur über die modul-gegatete Route seines Moduls ladbar (404) — auch
+/// ein dort entfernter.
 /// An einer lebenden Nachricht hängende Anhänge bleiben ladbar (n:m); ein ungebundener nur
 /// für die hochladende Person (Review C1 zu LFH-117).
 pub async fn herunterladen(
@@ -77,9 +78,9 @@ pub async fn herunterladen(
     if !anhang::repo::gehoert_anhang_zu_einsatz(&state.pool, anhang_id, einsatz_id).await? {
         return Err(AppError::NotFound);
     }
-    // LFH-116 + LFH-632: Aggregation über ALLE Linker. Gesperrt, wenn der Anhang zur
-    // Dokumentenablage gehört (nur über die modul-gegatete Route ladbar) oder nur noch an
-    // soft-gelöschten Chat-Nachrichten hängt (Tombstone).
+    // Aggregation über ALLE Linker. Gesperrt, wenn der Anhang an einem modulgebundenen
+    // Linker hängt (Register, nur über die modul-gegatete Route ladbar) oder nur noch an
+    // soft-gelöschten Chat-Nachrichten (Tombstone, LFH-116).
     let linker = anhang::repo::linker_stand(&state.pool, anhang_id).await?;
     if linker.generischer_download_gesperrt() {
         return Err(AppError::NotFound);
@@ -93,9 +94,9 @@ pub async fn herunterladen(
 /// DELETE /api/einsaetze/{id}/anhaenge/{aid} — Anhang hart löschen (Freigabepfad, LFH-250).
 /// Schreibrecht + aktiver Einsatz; die Ownership erzwingt die einsatz-gescopte Query
 /// (fremder Anhang → NotFound). Der `ON DELETE CASCADE`-FK räumt die
-/// `chat_nachricht_anhang`-Verknüpfungen mit. Dokument-gebundene Anhänge (LFH-632) werden
-/// mit 422 abgewiesen — sie entfernt die Dokumentenablage (Soft-Delete mit ETB-Nachweis).
-/// ETB-gebundene (LFH-117) ebenso — sie gehen nur mit der Schwärzung. Einen ungebundenen
+/// `chat_nachricht_anhang`-Verknüpfungen mit. Modulgebundene Anhänge (Dokument LFH-632, ETB
+/// LFH-117, Schaden LFH-21) werden mit 422 abgewiesen, Wortlaut aus dem Linker-Register —
+/// sie entfernt ihr Modul, ETB-Anhänge gehen nur mit der Schwärzung. Einen ungebundenen
 /// Anhang verwirft nur, wer ihn hochgeladen hat (Review C1, sonst 404).
 pub async fn loeschen(
     State(state): State<AppState>,
@@ -106,20 +107,13 @@ pub async fn loeschen(
     if !anhang::repo::gehoert_anhang_zu_einsatz(&state.pool, anhang_id, einsatz_id).await? {
         return Err(AppError::NotFound);
     }
-    // LFH-632: ein Dokument-Anhang wird über die Dokumentenablage entfernt (Soft-Delete mit
-    // ETB-Nachweis). Der generische Hard-Delete hätte beides umgangen → Zustand verbietet es.
-    // LFH-117: ein ETB-Anhang ist unveränderlich wie sein Eintrag; es gibt keinen Löschweg
-    // außer der Schwärzung des Einsatzes.
+    // Ein modulgebundener Anhang (Register `anhang::repo::MODUL_LINKER`) wird in seinem
+    // Modul entfernt oder gar nicht: Dokumentenablage und Schaden mit Soft-Delete und
+    // ETB-Nachweis (LFH-632, LFH-21), der ETB-Eintrag nie außer mit der Schwärzung
+    // (LFH-117). Der generische Hard-Delete hätte das umgangen → der Zustand verbietet es.
     let linker = anhang::repo::linker_stand(&state.pool, anhang_id).await?;
-    if linker.ist_dokument() {
-        return Err(AppError::UnprocessableEntity(
-            "Anhang gehört zur Dokumentenablage und wird dort entfernt".into(),
-        ));
-    }
-    if linker.ist_etb() {
-        return Err(AppError::UnprocessableEntity(
-            "Anhang gehört zu einem ETB-Eintrag und ist unveränderlich".into(),
-        ));
+    if let Some(modul) = linker.modul {
+        return Err(AppError::UnprocessableEntity(modul.loesch_meldung.into()));
     }
     fordere_hochladende_bei_ungebunden(&state.pool, &linker, anhang_id, ctx.benutzer.id).await?;
     anhang::repo::loeschen(&state.pool, einsatz_id, anhang_id).await?;
