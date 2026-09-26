@@ -309,6 +309,46 @@ async fn abweisungen_mit_400_speichern_nichts() {
     }
 }
 
+/// Code-Review C2: die Datei kommt im Feld `datei` (API-Vertrag, wie die Dokumentenablage).
+/// Eine Datei unter einem anderen Feldnamen ist 400 und speichert nichts — sonst nähme die
+/// Route still einen Vertrag an, den niemand dokumentiert hat.
+#[tokio::test]
+async fn datei_unter_fremdem_feldnamen_ist_400() {
+    let (app, pool, admin, einsatz, schaden) = start().await;
+    let vorher = stand(&pool, einsatz).await;
+    let b = "LFHSCHADENFELD";
+    let mut body = Vec::new();
+    body.extend_from_slice(
+        format!(
+            "--{b}\r\nContent-Disposition: form-data; name=\"foto\"; filename=\"dach.jpg\"\r\n\
+             Content-Type: image/jpeg\r\n\r\nBILD\r\n--{b}--\r\n"
+        )
+        .as_bytes(),
+    );
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(pfad(einsatz, schaden))
+                .header(header::COOKIE, admin.as_str())
+                .header(
+                    header::CONTENT_TYPE,
+                    format!("multipart/form-data; boundary={b}"),
+                )
+                .body(Body::from(body))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let status = resp.status();
+    let v: Value =
+        serde_json::from_slice(&to_bytes(resp.into_body(), usize::MAX).await.unwrap()).unwrap();
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{v}");
+    assert_eq!(v["error"], "Die Datei gehört in das Feld „datei“");
+    assert_eq!(stand(&pool, einsatz).await, vorher, "nichts gespeichert");
+}
+
 // ------------------------------- Rechte -------------------------------
 
 #[tokio::test]
