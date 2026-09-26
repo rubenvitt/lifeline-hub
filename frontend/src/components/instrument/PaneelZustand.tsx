@@ -22,8 +22,11 @@ interface PaneelZustandProps {
   leerText: string;
   /**
    * Beschriftung der Aktion im Leerzustand („Meldung erfassen"). Fehlt sie, steht nur der
-   * Satz da — für Personen OHNE Schreibrecht, denen eine Aktion ins Leere führte (LFH-21);
-   * wer schreiben darf, bekommt immer einen Ausweg.
+   * Satz da (LFH-21). Das ist richtig, wenn es keinen Ausweg gibt (ohne Schreibrecht führte
+   * eine Aktion ins Leere) ODER wenn der Ausweg an anderer Stelle steht, etwa als Aktion im
+   * Paneelkopf — zwei gleichnamige Ziele mit derselben Wirkung wären für Vorlesende nicht
+   * unterscheidbar (Schaden-Anhänge, Review C2). Ein Leerzustand ohne jeden Ausweg für jemanden,
+   * der schreiben darf, bleibt eine Sackgasse.
    */
   leerAktion?: string;
   onLeerAktion?: () => void;
