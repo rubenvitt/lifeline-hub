@@ -316,3 +316,51 @@ pub async fn system_etb_anzahl(app: &axum::Router, cookie: &str, einsatz: i64) -
         .filter(|e| e["typ"] == "system")
         .count()
 }
+
+/// LFH-21: legt per direktem SQL einen Schaden (S-00n) samt Anhang und Linker
+/// `einsatz_schaden_anhang` an und liefert die `anhang.id`. **Hochgeladen von `admin`** —
+/// die Abschottungstests laufen als die ablegende Person (design.md D12): als jemand anderes
+/// wären sie auch ohne Registereintrag grün, weil ein ungebundener Anhang für Fremde ohnehin
+/// 404 ist.
+pub async fn schaden_anhang(pool: &sqlx::SqlitePool, einsatz: i64) -> i64 {
+    let von: i64 = sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = 'admin'")
+        .fetch_one(pool)
+        .await
+        .unwrap();
+    let schaden: i64 = sqlx::query_scalar(
+        "INSERT INTO einsatz_schaden \
+           (einsatz_id, registrier_nr, typ, ausmass, ort, erfasst_von, geaendert_von) \
+         VALUES (?, (SELECT COALESCE(MAX(registrier_nr), 0) + 1 FROM einsatz_schaden \
+                     WHERE einsatz_id = ?), 'sachschaden', 'gering', 'Hauptstr. 1', ?, ?) \
+         RETURNING id",
+    )
+    .bind(einsatz)
+    .bind(einsatz)
+    .bind(von)
+    .bind(von)
+    .fetch_one(pool)
+    .await
+    .unwrap();
+    let aid: i64 = sqlx::query_scalar(
+        "INSERT INTO anhang (einsatz_id, dateiname, mime, groesse, sha256, daten, hochgeladen_von) \
+         VALUES (?, 'dach.jpg', 'image/jpeg', 3, 'deadbeef', ?, ?) RETURNING id",
+    )
+    .bind(einsatz)
+    .bind(b"ABC".as_slice())
+    .bind(von)
+    .fetch_one(pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO einsatz_schaden_anhang (einsatz_id, schaden_id, anhang_id, abgelegt_von_id) \
+         VALUES (?, ?, ?, ?)",
+    )
+    .bind(einsatz)
+    .bind(schaden)
+    .bind(aid)
+    .bind(von)
+    .execute(pool)
+    .await
+    .unwrap();
+    aid
+}

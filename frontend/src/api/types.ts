@@ -256,6 +256,8 @@ export type SchadenTyp = S['SchadenTyp'];
 export type Ausmass = S['Ausmass'];
 export type SchadenAbschlussGrund = S['SchadenAbschlussGrund'];
 export type Schaden = S['SchadenAnzeige'];
+/** LFH-21: Foto/Datei an einem Schaden; `id` ist die Linker-id, nicht `anhang.id`. */
+export type SchadenAnhang = S['SchadenAnhangAnzeige'];
 
 // ============================== E‑4 Tiere ==============================
 export type TierStatus = S['TierStatus'];

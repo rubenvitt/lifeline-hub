@@ -37,6 +37,7 @@ import { parseRouteId, schaedenPfad } from '../routing/deeplinks';
 import type { Ausmass, SchadenTyp } from '../api/types';
 import GeschaedigtPicker, { type GeschaedigtWert } from './schaeden/GeschaedigtPicker';
 import SchadenDaten from './schaeden/SchadenDaten';
+import SchadenAnhaenge from './schaeden/SchadenAnhaenge';
 import { useEditSitzung, type CasBasis } from '../components/useEditSitzung';
 import {
   ABSCHLUSS_GRUENDE,
@@ -331,6 +332,13 @@ export default function SchaedenDetailPage() {
       ) : (
         detailAnsicht
       )}
+
+      {/* Fotos und Dateien (LFH-21): unter dem Datenraster und AUSSERHALB des
+          Bearbeiten-<Form> — der Ablegen-Dialog trägt ein eigenes Formular, verschachtelt
+          schickte es beim Absenden das äußere nativ ab. Im Bearbeiten-Modus bleibt es sichtbar. */}
+      <div style={{ marginTop: 16 }}>
+        <SchadenAnhaenge einsatzId={einsatzId} schaden={s} darfSchreiben={darfSchreiben} />
+      </div>
 
       <Modal
         title="Schaden übergeben"

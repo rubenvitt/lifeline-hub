@@ -679,6 +679,24 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/schaeden/{sid}",
             delete(routes::einsatz_schaden::stornieren),
         )
+        // Schaden-Anhänge (LFH-21): Modul-Gate `schaeden`; Upload/Download wie die
+        // Dokumentenablage mit Body-Limit und Download-Concurrency-Cap.
+        .route(
+            "/api/einsaetze/{id}/schaeden/{sid}/anhaenge",
+            get(routes::schaden_anhang::liste)
+                .post(routes::schaden_anhang::ablegen)
+                .layer(DefaultBodyLimit::max(26 * 1024 * 1024)),
+        )
+        .route(
+            "/api/einsaetze/{id}/schaeden/{sid}/anhaenge/{aid}",
+            delete(routes::schaden_anhang::entfernen),
+        )
+        .route(
+            "/api/einsaetze/{id}/schaeden/{sid}/anhaenge/{aid}/datei",
+            get(routes::schaden_anhang::datei).layer(ConcurrencyLimitLayer::new(
+                MAX_GLEICHZEITIGE_ASSET_DOWNLOADS,
+            )),
+        )
         .route("/api/einsaetze/{id}/uhs", get(routes::einsatz_uhs::liste))
         .route(
             "/api/einsaetze/{id}/uhs",

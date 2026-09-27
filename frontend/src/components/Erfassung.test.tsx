@@ -100,6 +100,66 @@ describe('ErfassungsFormular — Fokus', () => {
   });
 });
 
+/** Zwei Kandidaten VOR dem Ziel: ein ausgeblendetes Eingabefeld (wie rc-uploads Datei-Input) und
+ *  ein sichtbares Textfeld; dahinter ein Knopf mit ausdrücklichem Fokusziel. */
+function FokuszielHarness(props: { markiert: boolean; serie?: boolean }) {
+  const [form] = Form.useForm<{ ort: string }>();
+  return (
+    <ErfassungsFormular<{ ort: string }>
+      form={form}
+      onErfassen={vi.fn().mockResolvedValue(undefined)}
+      onFertig={() => {}}
+      serie={props.serie}
+    >
+      <input aria-label="Versteckt" style={{ display: 'none' }} />
+      <Form.Item label="Ort" name="ort">
+        <Input />
+      </Form.Item>
+      <button type="button" data-erfassung-fokus={props.markiert ? '' : undefined}>
+        Datei wählen
+      </button>
+    </ErfassungsFormular>
+  );
+}
+
+describe('ErfassungsFormular — Fokusziel (Code-Review C2 zu LFH-21)', () => {
+  /** jsdom rechnet kein Layout: `getClientRects` ist überall leer. Für die Sichtbarkeitsfrage
+   *  wird es so gestellt, dass nur `display: none` keine Box hat — wie im Browser. */
+  function mitBoxen() {
+    return vi.spyOn(HTMLElement.prototype, 'getClientRects').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      const liste = this.style.display === 'none' ? [] : [new DOMRect(0, 0, 10, 10)];
+      return Object.assign(liste, {
+        item: (i: number) => liste[i] ?? null,
+      }) as unknown as DOMRectList;
+    });
+  }
+
+  it('bevorzugt ein ausdrückliches Fokusziel `[data-erfassung-fokus]` beim Öffnen', async () => {
+    renderMitProviders(<FokuszielHarness markiert />);
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Datei wählen' })),
+    );
+  });
+
+  it('kehrt nach „Speichern und nächste“ auf das ausdrückliche Fokusziel zurück', async () => {
+    renderMitProviders(<FokuszielHarness markiert serie />);
+    const knopf = screen.getByRole('button', { name: 'Datei wählen' });
+    await waitFor(() => expect(document.activeElement).toBe(knopf));
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
+    await waitFor(() => expect(screen.getByText('Erfasst: 1')).toBeInTheDocument());
+    await waitFor(() => expect(document.activeElement).toBe(knopf));
+  });
+
+  it('überspringt ohne Fokusziel ein nicht gerendertes Feld (display: none)', async () => {
+    const spion = mitBoxen();
+    renderMitProviders(<FokuszielHarness markiert={false} />);
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('Ort')));
+    spion.mockRestore();
+  });
+});
+
 describe('ErfassungsFormular — Enter sendet ab', () => {
   it('Enter im letzten Eingabefeld schickt das Formular ab', async () => {
     const onErfassen = vi.fn().mockResolvedValue(undefined);

@@ -98,6 +98,7 @@ function render(
     http.get('/api/einsaetze/1/schaeden/10', () => HttpResponse.json(schaden)),
     http.get('/api/einsaetze/1/personen', () => HttpResponse.json([einePerson])),
     http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/schaeden/10/anhaenge', () => HttpResponse.json([])),
   );
   if (extra.length > 0) server.use(...extra);
   return renderMitProviders(
@@ -389,6 +390,19 @@ describe('SchaedenDetailPage — Status-Aktionen', () => {
     render(einsatzAktiv, basisSchaden({ status: 'uebergeben', uebergeben_an: 'Stadtwerke' }));
     await screen.findByRole('heading', { name: /Schaden S-001/ });
     expect(screen.getByText('Stadtwerke')).toBeInTheDocument();
+  });
+});
+
+describe('SchaedenDetailPage — Fotos und Dateien (LFH-21)', () => {
+  it('trägt das Paneel unter den Stammdaten, auch im Bearbeiten-Modus, ohne <form> im <form>', async () => {
+    render(einsatzAktiv, basisSchaden());
+    expect(await screen.findByRole('region', { name: 'Fotos und Dateien' })).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    const paneel = await screen.findByRole('region', { name: 'Fotos und Dateien' });
+    expect(paneel.closest('form'), 'außerhalb des Bearbeiten-Formulars').toBeNull();
+    for (const form of document.querySelectorAll('form')) {
+      expect(form.parentElement?.closest('form'), 'kein verschachteltes Formular').toBeNull();
+    }
   });
 });
 

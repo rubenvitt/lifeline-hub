@@ -24,7 +24,9 @@ use serde::Deserialize;
 
 // ---------- ETB-/SSE-Helfer ----------
 
-fn sse_schaden(state: &AppState, einsatz_id: i64, schaden_id: i64) {
+/// Verteilt `LiveEvent::Schaden` mit `{einsatz_id, schaden_id}` — auch von den
+/// Anhang-Routen genutzt (LFH-21, `routes::schaden_anhang`), deshalb `pub(crate)`.
+pub(crate) fn sse_schaden(state: &AppState, einsatz_id: i64, schaden_id: i64) {
     let data =
         serde_json::json!({ "einsatz_id": einsatz_id, "schaden_id": schaden_id }).to_string();
     state

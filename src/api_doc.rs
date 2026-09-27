@@ -226,6 +226,7 @@ use utoipa::OpenApi;
         crate::schaden::AbschlussGrund,
         crate::schaden::Ausmass,
         crate::schaden::SchadenAnzeige,
+        crate::schaden::anhang::SchadenAnhangAnzeige,
         crate::schaden::SchadenStatus,
         crate::schaden::SchadenTyp,
         crate::sprechgruppe::SprechgruppeAnzeige,

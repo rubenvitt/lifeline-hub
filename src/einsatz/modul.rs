@@ -126,6 +126,7 @@ modul_marker! {
     Betreuung => "betreuung",
     Verpflegung => "verpflegung",
     WetterPegel => "wetter-pegel",
+    Schaeden => "schaeden",
 }
 
 /// Pfad-Präfix (app.rs-Route) → erwarteter Modul-Key (LFH-230). `None` = modul-lose
@@ -142,6 +143,10 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     ("/api/einsaetze/{id}/abloesungen", Some("abloesung")),
     ("/api/einsaetze/{id}/betreuung", Some("betreuung")),
     ("/api/einsaetze/{id}/verpflegung", Some("verpflegung")),
+    // Schäden (LFH-21): heute prüft der Guard hier nur die Anhang-Routen
+    // (`routes::schaden_anhang`); die übrigen Schadensrouten sind noch DEFERRED, für sie ist
+    // der Präfix bei ihrer Migration ohnehin der richtige.
+    ("/api/einsaetze/{id}/schaeden", Some("schaeden")),
     // Wetter & Pegel (LFH-633): nur der Wetter-Endpunkt ist am Modul gegatet. Der
     // Pegelverlauf liegt unter dem modul-losen Pegel-Präfix unten.
     ("/api/einsaetze/{id}/wetter", Some("wetter-pegel")),

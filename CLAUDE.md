@@ -461,12 +461,24 @@ Platz hat.
 
 **ETB-Anhänge (LFH-117).** `etb_eintrag_anhang` ist der **dritte Linker** auf `anhang`
 (neben Chat und Dokument), `anhang_id UNIQUE`: eine Datei hat genau einen Lebenszyklus.
-**Jeder Linker gehört in fünf Stellen:** `LinkerStand` (generischer Download 404, DELETE 422,
-ungebunden = nur für die hochladende Person), das `NOT EXISTS` in
-`anhang::repo::sweep_verwaiste` und in `repo::loeschen` sowie die zwei Bindungsabfragen
-`chat::repo::anlegen_mit_anhaengen` und `etb::repo::pruefe_anhaenge`. Ein fehlender Linker
-löscht still oder bindet eine Datei ein zweites Mal. **Kreuzsperren:** das ETB verknüpft keine Chat- oder Dokument-Datei (422),
-der Chat keine ETB-Datei (sein 400). Eigene Routen unter dem ETB-Präfix: Upload `POST
+**Ein modulgebundener Linker ist EIN Eintrag im Register `anhang::repo::MODUL_LINKER`**
+(seit LFH-21; Tabelle, 422-Wortlaut des generischen DELETE, Ortsname für die ETB-422). Aus
+dem Register beziehen alle Stellen, die jeden Linker kennen müssen, ihre Bedingung:
+`LinkerStand` (generischer Download 404, DELETE 422, ungebunden = nur für die hochladende
+Person), `sweep_verwaiste`, `repo::loeschen` und die Bindungsabfragen
+`chat::repo::anlegen_mit_anhaengen` und `etb::repo::pruefe_anhaenge` (Baustein
+`modul_gebunden_sql`). Der Chat ist die eine Ausnahme neben dem Register (n : m,
+Tombstone). **Der Guard `jeder_fremdschluessel_auf_anhang_ist_registriert`** vergleicht das
+Register mit allen deklarierten Fremdschlüsseln auf `anhang` und wird rot, sobald eine neue
+Tabelle keinen Eintrag hat; eine Spalte ohne `REFERENCES` sieht er nicht. **Warum das
+zählt:** ein Linker ohne Eintrag gilt als ungebunden — Fremde sähen weiter 404, **die
+hochladende Person aber könnte die Datei generisch laden und hart löschen**, die CASCADE nähme
+den Linker am Soft-Delete und am ETB-Nachweis vorbei mit, und der Sweep löschte sie nach
+24 h. **Abschottungstests laufen deshalb als die ablegende Person** (`admin`, Hilfe
+`common::schaden_anhang`); als jemand anderes wären sie auch ohne Eintrag grün.
+**Kreuzsperren, beide aus dem Register:** das ETB verknüpft
+keine Chat- und keine modulgebundene Datei (422, Wortlaut aus `gebunden_meldung()`), der Chat
+keine modulgebundene Datei — Dokument, ETB, Schaden, jeder künftige Eintrag (sein 400). Eigene Routen unter dem ETB-Präfix: Upload `POST
 …/etb/anhaenge` mit der **Dokument-Allowlist** (HEIC/TIFF), eine Datei je Anfrage, und
 Download `GET …/etb/{eintrag_id}/anhaenge/{aid}` mit den Lese-Gates und EINER
 Bindungsabfrage. Das Erfassen bindet über `anhang_ids` in derselben Transaktion wie der
@@ -493,11 +505,27 @@ sendet (die Berichtigung ersetzt die Reiter ganz). Die gewählten **Dateien lieg
 und Dubletten (Name + Größe + `lastModified`) prüft schon die Dateiwahl. **Ein ungebundener
 Anhang gehört vorerst der hochladenden Person:** die generischen Routen `GET`/`DELETE
 …/anhaenge/{aid}` antworten allen anderen 404, und das Erfassen behandelt einen fremden freien
-Anhang wie eine unbekannte ID (design.md D12) — ein vierter Linker, der in
-`LinkerStand` fehlte, machte seine Dateien damit für alle anderen unerreichbar.
+Anhang wie eine unbekannte ID (design.md D12) — für die hochladende Person aber erreichbar,
+deshalb der Registerguard oben.
 Der Download-Verweis ist blau aus
 `bedienText` und steht in der Hinweiszeile unabhängig von `hatVerknuepfung`. Prüfliste:
 `docs/superpowers/specs/2026-09-24-lfh-117-pruefliste.md`.
+
+**Schaden-Anhänge (LFH-21).** `einsatz_schaden_anhang` ist der **vierte Linker** und steht im
+Register; Routen `…/schaeden/{sid}/anhaenge[/{aid}[/datei]]` in `routes::schaden_anhang`
+mit `EinsatzLesezugriff<Schaeden>`/`EinsatzSchreibzugriff<Schaeden>` (die übrigen
+Schadensrouten bleiben DEFERRED). **`{aid}` ist die Linker-id, nicht `anhang.id`**, und das
+DTO trägt keine `anhang_id`. Eine Datei je Ablage (Serienmodus im Dialog), Allowlist
+`ERLAUBTE_MIME_ERFASSUNG` (Kamerabilder samt HEIC/HEIF und PDF, Spiegel `ERFASSUNG_ACCEPT`
+in `api/upload.ts`), Prüfkette `anhang::pruefe_vor_persist` VOR der Transaktion, dann Anhang,
+Linker und ETB in EINEM `write_retry!` — eine Schaden-Datei ist nie ungebunden. **Entfernen
+ist ein Soft-Delete ohne Rückweg in der Oberfläche** (Rückfrage mit rotem OK-Knopf, kein
+Rückgängig-Toast); die Datei geht erst mit der Schwärzung. Der ETB-Nachweis nennt nur
+Registriernummer und Art („Schaden S-003: Foto abgelegt“), nie den Dateinamen. Storniert →
+Ablegen/Entfernen 409, Lesen bleibt. **Bewusste Abweichung:** die neuen Routen verteilen
+neben `schaden` auch das ETB-Ereignis, die Bestandsrouten des Schadensmoduls (Anlegen,
+Übergeben, Stornieren …) nicht — das ist ein Nebenbefund, kein Muster. Prüfliste:
+`docs/superpowers/specs/2026-09-25-lfh-21-pruefliste.md`.
 
 **Zwei schwebende Bänder an einem Rand werden gestapelt, nicht gestaffelt** (LFH-355,
 `pages/lagekarte/KartenFuss.tsx`). Zeichnen-Steuerung (`bottom: 16`, mittig) und

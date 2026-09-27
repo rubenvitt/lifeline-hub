@@ -3,7 +3,8 @@ import { CloseOutlined, EyeOutlined, PaperClipOutlined, PlusOutlined } from '@an
 import dayjs from 'dayjs';
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router';
-import { DOKUMENT_ACCEPT, DOKUMENT_MAX_GROESSE } from '../api/dokumente';
+import { DOKUMENT_ACCEPT } from '../api/dokumente';
+import { UPLOAD_MAX_GROESSE } from '../api/upload';
 import { ApiError } from '../api/client';
 import { ETB_ANHAENGE_MAX, ladeEtbAnhangHoch, type NeuerEintrag } from '../api/etb';
 import { formatGroesse } from '../karten/formatGroesse';
@@ -105,7 +106,7 @@ export const VERSAND_RUHE: Versand = { sendet: false, fortschritt: null, hinweis
 const hochgeladeneIds = new WeakMap<File, number>();
 
 const ANHANG_OFFLINE = 'Anhänge brauchen eine Verbindung. Der Text lässt sich trotzdem erfassen.';
-const ANHANG_ZU_GROSS = `ist zu groß (${DOKUMENT_MAX_GROESSE / 1024 / 1024} MiB erlaubt)`;
+const ANHANG_ZU_GROSS = `ist zu groß (${UPLOAD_MAX_GROESSE / 1024 / 1024} MiB erlaubt)`;
 const ANHANG_GRENZE = `Höchstens ${ETB_ANHAENGE_MAX} Anhänge je Eintrag.`;
 
 /**
@@ -464,7 +465,7 @@ export default function Schnellerfassung({
     const neu = [...dateien];
     const gruende: string[] = [];
     for (const d of Array.from(liste ?? [])) {
-      if (d.size > DOKUMENT_MAX_GROESSE) gruende.push(`${d.name} ${ANHANG_ZU_GROSS}`);
+      if (d.size > UPLOAD_MAX_GROESSE) gruende.push(`${d.name} ${ANHANG_ZU_GROSS}`);
       else if (neu.some((x) => gleicheDatei(x, d))) gruende.push(`${d.name} ist schon gewählt`);
       else if (neu.length >= ETB_ANHAENGE_MAX)
         gruende.push(`${d.name}: höchstens ${ETB_ANHAENGE_MAX} Anhänge je Eintrag`);

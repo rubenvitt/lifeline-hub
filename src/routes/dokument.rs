@@ -121,10 +121,10 @@ pub async fn ablegen(
     let (dateiname, daten) =
         datei.ok_or_else(|| AppError::Validation("Keine Datei im Upload".into()))?;
     let (titel, kategorie, bezug) = validiere(titel, kategorie, bezug_typ, bezug_id)?;
-    let mime = anhang::ermittle_mime_aus(&dateiname, anhang::ERLAUBTE_MIME_DOKUMENT)?;
-    anhang::pruefe_groesse(daten.len())?;
-    // AV-Scan vor dem Persistieren (LFH-114); ohne clamd ein No-op, sonst fail-closed.
-    anhang::scan(anhang::scan_config(), &daten).await?;
+    // Typ, Größe, AV-Scan vor dem Persistieren (LFH-114, LFH-21: eine Prüfkette für alle
+    // Upload-Wege); ohne clamd ist der Scan ein No-op, sonst fail-closed.
+    let mime =
+        anhang::pruefe_vor_persist(&dateiname, &daten, anhang::ERLAUBTE_MIME_DOKUMENT).await?;
 
     let (id, etb_id) = repo::ablegen(
         &state.pool,

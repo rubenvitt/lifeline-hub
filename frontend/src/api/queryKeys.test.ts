@@ -1,3 +1,4 @@
+import { QueryClient } from '@tanstack/react-query';
 import { describe, expect, it } from 'vitest';
 import { ZAEHLER_LISTEN_KEYS } from '../einsatz/useModulZaehler';
 import {
@@ -36,6 +37,8 @@ describe('EINSATZ_KEYS', () => {
     expect(EINSATZ_KEYS.betreuung).toBe('einsatz-betreuung');
     // LFH-634: handgeschriebenes Literal, nicht über EINSATZ_KEYS.
     expect(EINSATZ_KEYS.verpflegung).toBe('einsatz-verpflegung');
+    // LFH-21: handgeschriebenes Literal, nicht über EINSATZ_KEYS.
+    expect(EINSATZ_KEYS.schadenAnhaenge).toBe('einsatz-schaden-anhaenge');
   });
 });
 
@@ -102,11 +105,16 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
 
   it('bildet die 1:1-Events auf genau einen Key ab', () => {
     expect(EINSATZ_STREAM_EVENTS.uhs).toEqual([EINSATZ_KEYS.uhs]);
-    expect(EINSATZ_STREAM_EVENTS.schaden).toEqual([EINSATZ_KEYS.schaeden]);
     expect(EINSATZ_STREAM_EVENTS.tier).toEqual([EINSATZ_KEYS.tiere]);
     expect(EINSATZ_STREAM_EVENTS.karte_bild).toEqual([EINSATZ_KEYS.kartenbilder]);
     // LFH-634 (design.md D6): das DTO trägt keine Nachforderungsdaten, also kein Fan-out.
     expect(EINSATZ_STREAM_EVENTS.verpflegung).toEqual([EINSATZ_KEYS.verpflegung]);
+  });
+
+  // LFH-21: Ablegen und Entfernen einer Datei verteilen `schaden` — die Anhangliste der
+  // Detailseite hängt deshalb neben der Schadensliste an diesem Ereignis.
+  it('schaden invalidiert Schadensliste und Anhanglisten', () => {
+    expect(EINSATZ_STREAM_EVENTS.schaden).toEqual(['einsatz-schaeden', 'einsatz-schaden-anhaenge']);
   });
 
   it('bildet die Cross-Modul-Fan-outs korrekt ab', () => {
@@ -223,6 +231,7 @@ describe('einsatzKeys (Factory-Output)', () => {
     expect(einsatzKeys.personAudit(1, 2)).toEqual(['einsatz-person-audit', 1, 2]);
     expect(einsatzKeys.uhsDetail(1, 2)).toEqual(['einsatz-uhs-detail', 1, 2]);
     expect(einsatzKeys.schaden(1, 2)).toEqual(['einsatz-schaden', 1, 2]);
+    expect(einsatzKeys.schadenAnhaenge(1, 2)).toEqual(['einsatz-schaden-anhaenge', 1, 2]);
     expect(einsatzKeys.tier(1, 2)).toEqual(['einsatz-tier', 1, 2]);
     expect(einsatzKeys.brDetail(1, 2)).toEqual(['einsatz-br-detail', 1, 2]);
     expect(einsatzKeys.befehl(1, 2)).toEqual(['einsatz-befehl', 1, 2]);
@@ -396,5 +405,23 @@ describe('istKeyDesEinsatzes (LFH-690)', () => {
     expect(istKeyDesEinsatzes(globalKeys.einsaetze(), 7)).toBe(false);
     // Ein fremder Prefix mit passender ID: kein Registry-Key, also kein Treffer.
     expect(istKeyDesEinsatzes(['irgendwas', 7], 7)).toBe(false);
+  });
+});
+
+describe('einsatzKeys.schadenAnhaenge (LFH-21)', () => {
+  // `new QueryClient()` statt `neuerQueryClient()`: dessen `gcTime: 0` räumte den
+  // unbeobachteten Eintrag beim ersten `await` weg, und die Aussage würde trivial grün.
+  it('das schaden-Ereignis invalidiert die Anhangliste eines Schadens per Prefix', async () => {
+    const qc = new QueryClient();
+    qc.setQueryData(einsatzKeys.schadenAnhaenge(1, 2), []);
+    qc.setQueryData(['einsatz-schaden-anhaenge', 9, 2], []);
+    for (const prefix of EINSATZ_STREAM_EVENTS.schaden) {
+      await qc.invalidateQueries({ queryKey: [prefix, 1] });
+    }
+    expect(qc.getQueryState(['einsatz-schaden-anhaenge', 1, 2])?.isInvalidated).toBe(true);
+    expect(
+      qc.getQueryState(['einsatz-schaden-anhaenge', 9, 2])?.isInvalidated,
+      'ein anderer Einsatz bleibt unberührt',
+    ).toBe(false);
   });
 });
