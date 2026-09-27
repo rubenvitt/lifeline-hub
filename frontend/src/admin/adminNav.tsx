@@ -103,6 +103,16 @@ export const adminBenutzer = { key: 'benutzer', label: 'Benutzer' } as const;
  */
 export const adminDemoDaten = { key: 'demo-daten', label: 'Demo-Daten' } as const;
 
+/**
+ * Aufbewahrung (LFH-23, design.md D8): dritter Sonder-Eintrag, sichtbar nur für den
+ * System-Admin — die Archivakte gesperrter Einsätze ist ihm vorbehalten (Annahme A1), die
+ * Führungskraft liest die Verwaltung, dieses Archiv aber nicht. Deshalb KEIN Eintrag in
+ * {@link adminGruppen}, deren Sektionen jede Person mit Verwaltungsrecht sieht. Die Pfad-
+ * Builder liegen hier und nicht in `routing/deeplinks.ts`, das nur Einsatz-Pfade trägt
+ * (Präzedenz LFH-346 · C11).
+ */
+export const adminAufbewahrung = { key: 'aufbewahrung', label: 'Aufbewahrung' } as const;
+
 /** `/admin/<gruppe>/<sektion>`. */
 export function adminSektionPfad(gruppe: string, sektion: string): string {
   return `/admin/${gruppe}/${sektion}`;
@@ -116,6 +126,16 @@ export function adminBenutzerPfad(): string {
 /** `/admin/demo-daten`. */
 export function adminDemoDatenPfad(): string {
   return `/admin/${adminDemoDaten.key}`;
+}
+
+/** `/admin/aufbewahrung` — Übersicht der abgeschlossenen Einsätze. */
+export function adminAufbewahrungPfad(): string {
+  return `/admin/${adminAufbewahrung.key}`;
+}
+
+/** `/admin/aufbewahrung/<einsatzId>` — Archivakte; die stabile DB-`id`, nie die Anzeigenummer. */
+export function adminAufbewahrungAktePfad(einsatzId: number): string {
+  return `${adminAufbewahrungPfad()}/${einsatzId}`;
 }
 
 /** Erste Sektion einer Gruppe — Ziel des Gruppen-Redirects (`/admin/<gruppe>`). */

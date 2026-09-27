@@ -29,6 +29,14 @@ describe('globalKeys: Byte-Pin gegen die ersetzten Literale (LFH-307)', () => {
     // Entfernen trifft ihn über diesen Key. Ein still umbenanntes Fach ließe Menü und
     // Hinweis nach dem Import auf dem alten Stand stehen, ohne dass etwas rot wird.
     expect(globalKeys.demoDaten()).toEqual(['demo-daten']);
+    // LFH-23: NEU, ohne Vorbestand. Übersicht, Akte und Archiv-ETB hängen unter EINEM
+    // Prefix, damit Wiederherstellen und Friständerung sie mit einem Invalidate treffen. Ein
+    // still umbenanntes Fach ließe die Übersicht nach dem Wiederherstellen auf „vorgemerkt“
+    // stehen, ohne dass etwas rot wird.
+    expect(globalKeys.aufbewahrung()).toEqual(['aufbewahrung']);
+    expect(globalKeys.aufbewahrungAkte(7)).toEqual(['aufbewahrung', 'akte', 7]);
+    expect(globalKeys.aufbewahrungEtb(7, undefined)).toEqual(['aufbewahrung', 'etb', 7, 'alle']);
+    expect(globalKeys.aufbewahrungEtb(7, 'system')).toEqual(['aufbewahrung', 'etb', 7, 'system']);
     // LFH-391 · Etappe D: NEU, deshalb ohne Vorbestand — das Literal ist trotzdem
     // handgeschrieben und nicht aus `GLOBAL_KEYS` gelesen. Der Pin schuetzt hier nicht vor
     // einer Umbenennung des Bestands, sondern vor der stillen Umbenennung DIESES Fachs:
@@ -107,11 +115,12 @@ describe('globalKeys: Byte-Pin gegen die ersetzten Literale (LFH-307)', () => {
     expect(globalKeys.fachebene('energie')).toEqual(['fachebene', 'energie']);
   });
 
-  // 23 → 24 mit `demo-daten` (LFH-690, Status der Demo-Daten je Organisation).
-  it('LEERLAUF-SCHUTZ: die Registry hat die gemessenen 24 Prefixe und keine Dubletten', () => {
+  // 23 → 24 mit `demo-daten` (LFH-690, Status der Demo-Daten je Organisation),
+  // 24 → 25 mit `aufbewahrung` (LFH-23, Archiv des Org-Admins).
+  it('LEERLAUF-SCHUTZ: die Registry hat die gemessenen 25 Prefixe und keine Dubletten', () => {
     const werte = Object.values(GLOBAL_KEYS);
-    expect(werte).toHaveLength(24);
-    expect(new Set(werte).size, 'zwei Properties tragen denselben Wire-String').toBe(24);
+    expect(werte).toHaveLength(25);
+    expect(new Set(werte).size, 'zwei Properties tragen denselben Wire-String').toBe(25);
   });
 
   it('kollidiert nicht mit den einsatz-scoped Prefixen', async () => {

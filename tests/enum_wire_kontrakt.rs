@@ -351,6 +351,14 @@ fn serde_wire_gleich_as_str() {
         Aktiv,
         Abgeschlossen,
     });
+    enum_wire_as_str!(lifeline_hub::einsatz::retention::AufbewahrungZustand {
+        OhneFrist,
+        FristLaeuft,
+        Faellig,
+        Vorgemerkt,
+        SchwaerzungAusstehend,
+        Geschwaerzt,
+    });
     enum_wire_as_str!(lifeline_hub::einsatz::Einsatzart {
         Realeinsatz,
         Uebung,

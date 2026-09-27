@@ -1,5 +1,26 @@
-import type { Spezies, Tier, TierStatus } from '../../api/types';
+import type { AbschlussGrund, Spezies, Tier, TierStatus } from '../../api/types';
 import type { StatusTon } from '../../components/instrument';
+
+/** Tierart als Wort — die EINE Zuordnung für Liste, Detailseite und Archivakte (LFH-23). */
+export const SPEZIES_META: Record<Spezies, string> = {
+  hund: 'Hund',
+  katze: 'Katze',
+  grosstier: 'Großtier',
+  nutzgefluegel: 'Nutzgeflügel',
+  kleintier: 'Kleintier',
+  wildtier: 'Wildtier',
+  sonstige: 'Sonstige',
+};
+
+/** Abschlussgrund eines Tiers als Wort — Detailseite und Archivakte (LFH-23). */
+export const TIER_ABSCHLUSS: Record<AbschlussGrund, string> = {
+  uebergabe_halter: 'Übergabe an Halter',
+  uebergabe_tierarzt: 'Übergabe an Tierarzt',
+  uebergabe_tierheim: 'Übergabe an Tierheim',
+  verstorben: 'verstorben',
+  freilauf: 'Freilauf',
+  sonstiges: 'Sonstiges',
+};
 
 /**
  * Tierstatus als Wort + Ton der Statusfläche (Neuentwurf: „Status als getönte Fläche").

@@ -131,7 +131,7 @@ export default function EinsatzEinstellungenPage() {
           <Alert
             type="info"
             showIcon
-            title="Einsatz abgeschlossen — Einstellungen sind eingefroren und können nicht mehr geändert werden."
+            title="Einsatz abgeschlossen — Einstellungen sind eingefroren und können nicht mehr geändert werden, außer der Aufbewahrungsfrist."
           />
         )
       }

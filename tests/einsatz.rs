@@ -2116,3 +2116,257 @@ async fn anlegen_mit_unbekannter_einsatzart_ist_400() {
 
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
+
+// --- LFH-23: Sperre der regulären Routen und Frist-PUT an Tombstones ---
+
+/// Abgeschlossener Einsatz des Admins mit gesetzter Frist (per SQL).
+async fn abgeschlossen_mit(
+    app: &axum::Router,
+    pool: &SqlitePool,
+    admin: &str,
+    retention_bis: &str,
+) -> i64 {
+    let (_, e) = einsatz_anlegen(app, admin, "Lage").await;
+    let id = e["id"].as_i64().unwrap();
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/einsaetze/{id}/abschliessen"))
+                .header(header::COOKIE, admin.to_string())
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    sqlx::query("UPDATE einsatz SET retention_bis = ? WHERE id = ?")
+        .bind(retention_bis)
+        .bind(id)
+        .execute(pool)
+        .await
+        .unwrap();
+    id
+}
+
+#[tokio::test]
+async fn abgelaufene_frist_ohne_tombstone_sperrt_admin_ueberall_403() {
+    // LFH-23 (design.md D2): die ZWEITE Sperrvariante — Frist abgelaufen, noch nicht
+    // vorgemerkt. Der Archiv-Namensraum öffnet daran nichts: auch der System-Admin bekommt
+    // auf Detail, ETB, Personen, Anhängen und Live 403.
+    let (app, pool) = setup_with_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let id = abgeschlossen_mit(&app, &pool, &admin, "2026-01-01 00:00:00").await;
+    let aid: i64 = sqlx::query_scalar(
+        "INSERT INTO anhang (einsatz_id, dateiname, mime, groesse, sha256, daten, hochgeladen_von) \
+         VALUES (?, 'foto.jpg', 'image/jpeg', 3, 'deadbeef', X'414243', 1) RETURNING id",
+    )
+    .bind(id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let g: Option<String> = sqlx::query_scalar("SELECT geloescht_at FROM einsatz WHERE id = ?")
+        .bind(id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(g, None, "Vorbedingung: kein Tombstone");
+    for uri in [
+        format!("/api/einsaetze/{id}"),
+        format!("/api/einsaetze/{id}/etb"),
+        format!("/api/einsaetze/{id}/personen"),
+        format!("/api/einsaetze/{id}/anhaenge/{aid}"),
+        format!("/api/einsaetze/{id}/live"),
+    ] {
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri(&uri)
+                    .header(header::COOKIE, admin.clone())
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            resp.status(),
+            StatusCode::FORBIDDEN,
+            "{uri} gesperrt (Admin)"
+        );
+    }
+}
+
+/// UTC im DB-Format, `tage` vor jetzt.
+fn vor_tagen(tage: i64) -> String {
+    (chrono::Utc::now() - chrono::Duration::days(tage))
+        .format("%Y-%m-%d %H:%M:%S")
+        .to_string()
+}
+
+async fn frist_stand(pool: &SqlitePool, id: i64) -> (Option<String>, Option<String>, i64) {
+    let (frist, g): (Option<String>, Option<String>) =
+        sqlx::query_as("SELECT retention_bis, geloescht_at FROM einsatz WHERE id = ?")
+            .bind(id)
+            .fetch_one(pool)
+            .await
+            .unwrap();
+    let etb: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ?")
+        .bind(id)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+    (frist, g, etb)
+}
+
+#[tokio::test]
+async fn aufbewahrungsfrist_vorgemerkt_ist_422_und_aendert_nichts() {
+    let (app, pool) = setup_with_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let id = abgeschlossen_mit(&app, &pool, &admin, "2026-01-01 00:00:00").await;
+    // Echte Vormerkung INNERHALB der Karenz, relativ zu jetzt — ein fester Zeitpunkt läge
+    // irgendwann jenseits der 30 Tage und träfe dann `schwaerzung_ausstehend`.
+    sqlx::query("UPDATE einsatz SET geloescht_at = ? WHERE id = ?")
+        .bind(vor_tagen(1))
+        .bind(id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let vorher = frist_stand(&pool, id).await;
+    // Verlängern, Aufheben, bestätigte Verkürzung — alles 422, nichts ändert sich.
+    for body in [
+        json!({ "retention_bis": "2099-01-01 00:00:00" }),
+        json!({ "retention_bis": null }),
+        json!({ "retention_bis": "2025-01-01 00:00:00", "bestaetigt": true }),
+    ] {
+        let (status, v) = frist_setzen(&app, &admin, id, body.clone()).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}: {v}");
+        assert!(
+            v["error"]
+                .as_str()
+                .unwrap_or("")
+                .contains("wiederherstellen"),
+            "Text nennt das Wiederherstellen: {v}"
+        );
+    }
+    assert_eq!(frist_stand(&pool, id).await, vorher);
+}
+
+#[tokio::test]
+async fn aufbewahrungsfrist_vorgemerkt_unveraendert_ist_auch_422() {
+    // Die Prüfung steht VOR dem frühen Rücksprung „unverändert → 200“.
+    let (app, pool) = setup_with_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let id = abgeschlossen_mit(&app, &pool, &admin, "2026-01-01 00:00:00").await;
+    // Echte Vormerkung INNERHALB der Karenz, relativ zu jetzt — ein fester Zeitpunkt läge
+    // irgendwann jenseits der 30 Tage und träfe dann `schwaerzung_ausstehend`.
+    sqlx::query("UPDATE einsatz SET geloescht_at = ? WHERE id = ?")
+        .bind(vor_tagen(1))
+        .bind(id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (status, _) = frist_setzen(
+        &app,
+        &admin,
+        id,
+        json!({ "retention_bis": "2026-01-01 00:00:00" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[tokio::test]
+async fn aufbewahrungsfrist_geschwaerzt_ist_409() {
+    let (app, pool) = setup_with_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let id = abgeschlossen_mit(&app, &pool, &admin, "2026-01-01 00:00:00").await;
+    sqlx::query(
+        "UPDATE einsatz SET geloescht_at = '2026-01-02 00:00:00', \
+            geschwaerzt_at = '2026-02-02 00:00:00' WHERE id = ?",
+    )
+    .bind(id)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let vorher = frist_stand(&pool, id).await;
+    for body in [
+        json!({ "retention_bis": "2099-01-01 00:00:00" }),
+        json!({ "retention_bis": "2026-01-01 00:00:00" }),
+    ] {
+        let (status, v) = frist_setzen(&app, &admin, id, body.clone()).await;
+        assert_eq!(status, StatusCode::CONFLICT, "{body}: {v}");
+    }
+    assert_eq!(frist_stand(&pool, id).await, vorher);
+}
+
+#[tokio::test]
+async fn aufbewahrungsfrist_antwort_traegt_an_gesperrtem_einsatz_keinen_kopf_pii() {
+    // LFH-23 (Review): der Frist-PUT hat bewusst kein Lesegate, damit eine abgelaufene Frist
+    // reaktiv verlängert werden kann. Seine Antwort darf an einem gesperrten Einsatz aber nicht
+    // Einsatzort, Koordinate, meldende Stelle und Sachverhalt ausliefern — auch nicht über den
+    // frühen Rücksprung bei unveränderter Frist.
+    let (app, pool) = setup_with_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let id = abgeschlossen_mit(&app, &pool, &admin, "2026-01-01 00:00:00").await;
+    sqlx::query(
+        "UPDATE einsatz SET einsatzort = 'Marktplatz-GEHEIM', einsatzort_lat = 50.1, \
+            einsatzort_lon = 8.6, meldende_stelle = 'Anrufer-GEHEIM', sachverhalt = 'SV-GEHEIM' \
+         WHERE id = ?",
+    )
+    .bind(id)
+    .execute(&pool)
+    .await
+    .unwrap();
+    for body in [
+        json!({ "retention_bis": "2026-01-01 00:00:00" }),
+        json!({ "retention_bis": "2025-06-01 00:00:00", "bestaetigt": true }),
+    ] {
+        let (status, v) = frist_setzen(&app, &admin, id, body.clone()).await;
+        assert_eq!(status, StatusCode::OK, "{body}: {v}");
+        assert!(!v.to_string().contains("GEHEIM"), "{body}: {v}");
+    }
+    // Wird der Einsatz durch die neue Frist wieder lesbar, trägt die Antwort den vollen Kopf.
+    let (status, v) = frist_setzen(
+        &app,
+        &admin,
+        id,
+        json!({ "retention_bis": "2099-01-01 00:00:00" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(v["einsatzort"], "Marktplatz-GEHEIM");
+}
+
+#[tokio::test]
+async fn aufbewahrungsfrist_nach_karenz_ist_409_und_aendert_nichts() {
+    // Karenz abgelaufen, noch nicht geschwärzt (`schwaerzung_ausstehend`): auch das
+    // Wiederherstellen ist dort 409, ein Hinweis darauf wäre ein Weg, den es nicht mehr gibt.
+    let (app, pool) = setup_with_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let id = abgeschlossen_mit(&app, &pool, &admin, "2026-01-01 00:00:00").await;
+    sqlx::query("UPDATE einsatz SET geloescht_at = ? WHERE id = ?")
+        .bind(vor_tagen(31))
+        .bind(id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let vorher = frist_stand(&pool, id).await;
+    for body in [
+        json!({ "retention_bis": "2099-01-01 00:00:00" }),
+        json!({ "retention_bis": "2026-01-01 00:00:00" }),
+    ] {
+        let (status, v) = frist_setzen(&app, &admin, id, body.clone()).await;
+        assert_eq!(status, StatusCode::CONFLICT, "{body}: {v}");
+        assert!(
+            !v["error"]
+                .as_str()
+                .unwrap_or("")
+                .contains("wiederherstellen"),
+            "kein Verweis auf einen geschlossenen Weg: {v}"
+        );
+    }
+    assert_eq!(frist_stand(&pool, id).await, vorher);
+}

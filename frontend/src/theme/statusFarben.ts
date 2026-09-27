@@ -14,6 +14,7 @@ import {
 import type {
   AbloesungEinstufung,
   AbschnittLagezustand,
+  AufbewahrungZustand,
   BelegungsArt,
   BetreuungsstelleStatus,
   Ausmass,
@@ -490,6 +491,26 @@ export const abloesungEinstufung: Record<AbloesungEinstufung, StatusDarstellung>
  * Das Wort trägt den zweiten Kanal (WCAG 1.4.1).
  */
 export type VerpflegungDeckung = 'gedeckt' | 'offen' | 'unterdeckung';
+
+/**
+ * Aufbewahrungszustand eines abgeschlossenen Einsatzes (LFH-23, design.md D4). Die Karte
+ * gibt es, weil der Zustand Handlungsdruck trägt — nur während `vorgemerkt` ist
+ * Wiederherstellen möglich — und weil er an zwei Stellen erscheint (Übersicht und Akte), die
+ * ohne gemeinsame Karte auseinanderliefen.
+ *
+ * `ohne_frist`, `frist_laeuft` und `geschwaerzt` sind Ruhezustände (`neutral`); `faellig` und
+ * `vorgemerkt` teilen sich `achtung` und werden über das Pflichtwort unterschieden;
+ * `schwaerzung_ausstehend` ist `alarm`, weil dort jede Rücknahme verloren ist. KEIN `bedien`:
+ * Wiederherstellen ist eine Aktion, kein Zustand.
+ */
+export const aufbewahrungZustand: Record<AufbewahrungZustand, StatusDarstellung> = {
+  ohne_frist: { rolle: 'neutral', label: 'ohne Frist' },
+  frist_laeuft: { rolle: 'neutral', label: 'Frist läuft' },
+  faellig: { rolle: 'achtung', label: 'fällig' },
+  vorgemerkt: { rolle: 'achtung', label: 'zur Löschung vorgemerkt' },
+  schwaerzung_ausstehend: { rolle: 'alarm', label: 'Schwärzung steht aus' },
+  geschwaerzt: { rolle: 'neutral', label: 'geschwärzt' },
+};
 
 export const verpflegungDeckung: Record<VerpflegungDeckung, StatusDarstellung> = {
   gedeckt: { rolle: 'normal', label: 'gedeckt' },

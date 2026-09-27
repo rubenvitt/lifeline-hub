@@ -2,6 +2,7 @@ pub mod abloesung;
 pub mod anhang;
 pub mod api_doc;
 pub mod app;
+pub mod aufbewahrung;
 pub mod auftrag;
 pub mod auth;
 pub mod backup;

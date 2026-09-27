@@ -8,6 +8,9 @@ import {
   adminGruppen,
   adminBenutzer,
   adminDemoDaten,
+  adminAufbewahrung,
+  adminAufbewahrungPfad,
+  adminAufbewahrungAktePfad,
   adminSektionPfad,
   adminBenutzerPfad,
   adminDemoDatenPfad,
@@ -21,6 +24,9 @@ describe('adminNav — Pfad-Builder', () => {
     expect(adminSektionPfad('karten', 'offline')).toBe('/admin/karten/offline');
     expect(adminBenutzerPfad()).toBe('/admin/benutzer');
     expect(adminDemoDatenPfad()).toBe('/admin/demo-daten');
+    // LFH-23: Übersicht und Akte mit eigener, neuladefester Adresse.
+    expect(adminAufbewahrungPfad()).toBe('/admin/aufbewahrung');
+    expect(adminAufbewahrungAktePfad(42)).toBe('/admin/aufbewahrung/42');
   });
 
   it('Default- und Gruppen-Erst-Pfade', () => {
@@ -39,13 +45,21 @@ describe('adminNav — Registry', () => {
    * Sonder-Einträge sind daneben einzeln gepinnt, samt ihrer Eindeutigkeit gegenüber den
    * Gruppen-Keys — beide hängen als `/admin/<key>` an derselben Ebene wie die Gruppen.
    */
-  it('drei Gruppen mit 16 Sektionen gesamt (Stammdaten 11), dazu zwei Sonder-Einträge', () => {
+  it('drei Gruppen mit 16 Sektionen gesamt (Stammdaten 11), dazu drei Sonder-Einträge', () => {
     expect(adminGruppen.map((g) => g.key)).toEqual(['stammdaten', 'einstellungen', 'karten']);
     expect(adminGruppen.flatMap((g) => g.sektionen).length).toBe(16);
     expect(adminGruppen.find((g) => g.key === 'stammdaten')!.sektionen.length).toBe(11);
     expect(adminBenutzer.key).toBe('benutzer');
     expect(adminDemoDaten).toEqual({ key: 'demo-daten', label: 'Demo-Daten' });
-    const ersteEbene = [...adminGruppen.map((g) => g.key), adminBenutzer.key, adminDemoDaten.key];
+    // LFH-23: dritter Sonder-Eintrag, nur für den System-Admin (die Führungskraft liest die
+    // Verwaltung, das Archiv gesperrter Einsätze nicht).
+    expect(adminAufbewahrung).toEqual({ key: 'aufbewahrung', label: 'Aufbewahrung' });
+    const ersteEbene = [
+      ...adminGruppen.map((g) => g.key),
+      adminBenutzer.key,
+      adminDemoDaten.key,
+      adminAufbewahrung.key,
+    ];
     expect(new Set(ersteEbene).size).toBe(ersteEbene.length);
   });
 

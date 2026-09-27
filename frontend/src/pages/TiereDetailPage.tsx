@@ -15,7 +15,7 @@ import {
 } from 'antd';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { Datenfeld, Datenraster, Paneel, StatusChip, monoStil } from '../components/instrument';
-import { TIER_STATUS } from './tiere/tierHelfer';
+import { SPEZIES_META, TIER_ABSCHLUSS, TIER_STATUS } from './tiere/tierHelfer';
 import { Select } from '../components/Select';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { useState } from 'react';
@@ -35,7 +35,7 @@ import {
 import { ApiError, istKonflikt } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import { parseRouteId, personDetailPfad, tierePfad } from '../routing/deeplinks';
-import type { AbschlussGrund, Spezies, Tier, TierStatus } from '../api/types';
+import type { AbschlussGrund, Tier, TierStatus } from '../api/types';
 import HalterPicker, { type HalterWert } from '../personen/HalterPicker';
 import { useEditSitzung, type CasBasis } from '../components/useEditSitzung';
 
@@ -44,25 +44,6 @@ import { useEditSitzung, type CasBasis } from '../components/useEditSitzung';
 type TierFormWerte = TierPatch & { halter?: HalterWert | null };
 
 const STATUS_META = TIER_STATUS;
-
-const SPEZIES_META: Record<Spezies, string> = {
-  hund: 'Hund',
-  katze: 'Katze',
-  grosstier: 'Großtier',
-  nutzgefluegel: 'Nutzgeflügel',
-  kleintier: 'Kleintier',
-  wildtier: 'Wildtier',
-  sonstige: 'Sonstige',
-};
-
-const ABSCHLUSS_META: Record<AbschlussGrund, string> = {
-  uebergabe_halter: 'Übergabe an Halter',
-  uebergabe_tierarzt: 'Übergabe an Tierarzt',
-  uebergabe_tierheim: 'Übergabe an Tierheim',
-  verstorben: 'verstorben',
-  freilauf: 'Freilauf',
-  sonstiges: 'Sonstiges',
-};
 
 /** Erlaubte Folge-Status (Spiegel von darf_uebergehen im Backend). */
 function naechsteStatus(aktuell: TierStatus): TierStatus[] {
@@ -439,7 +420,7 @@ export default function TiereDetailPage() {
           <Paneel titel="Abschluss">
             <Datenraster spalten={2} beschriftung="Abschluss">
               <Datenfeld label="Grund">
-                {t.abschluss_grund ? ABSCHLUSS_META[t.abschluss_grund] : '—'}
+                {t.abschluss_grund ? TIER_ABSCHLUSS[t.abschluss_grund] : '—'}
               </Datenfeld>
               <Datenfeld label="Ziel">{t.abschluss_ziel ?? '—'}</Datenfeld>
             </Datenraster>
@@ -466,9 +447,9 @@ export default function TiereDetailPage() {
             rules={[{ required: true, message: 'Grund ist Pflicht' }]}
           >
             <Select
-              options={(Object.keys(ABSCHLUSS_META) as AbschlussGrund[]).map((k) => ({
+              options={(Object.keys(TIER_ABSCHLUSS) as AbschlussGrund[]).map((k) => ({
                 value: k,
-                label: ABSCHLUSS_META[k],
+                label: TIER_ABSCHLUSS[k],
               }))}
             />
           </Form.Item>

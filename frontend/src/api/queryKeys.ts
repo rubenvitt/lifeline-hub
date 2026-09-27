@@ -1,4 +1,5 @@
 import type { FachebeneQuelle } from './fachebenen';
+import type { EtbTyp } from './types';
 
 /**
  * Zentrales Query-Key-Registry für den Einsatz-Live-Feed (LFH-122).
@@ -447,7 +448,7 @@ export const einsatzKeys = {
 /**
  * Query-Key-Prefixe für alles, was NICHT unter einer `einsatzId` hängt.
  *
- * Name bewusst `GLOBAL_KEYS` und nicht `ORG_KEYS`: drei der 24 Prefixe sind gar nicht
+ * Name bewusst `GLOBAL_KEYS` und nicht `ORG_KEYS`: drei der 25 Prefixe sind gar nicht
  * mandantenbezogen — `admin-karte` und `karte-config` sind instanzweit (eine Kartenkonfiguration
  * pro Installation), `fachebene` bezeichnet externe Fremdquellen
  * (NINA/DWD/PEGELONLINE/HOCHWASSER/KRITIS/AUTOBAHN/ODL).
@@ -476,6 +477,9 @@ export const GLOBAL_KEYS = {
   // Stand der Demo-Daten der eigenen Organisation (LFH-690). Nur für den System-Admin
   // abgefragt; 404 heißt „nicht freigeschaltet“ (design.md D2).
   demoDaten: 'demo-daten',
+  // Aufbewahrung abgeschlossener Einsätze der eigenen Organisation (LFH-23): Übersicht,
+  // Archivakte und Archiv-ETB. Nur für den System-Admin abgefragt.
+  aufbewahrung: 'aufbewahrung',
 
   // Stammdaten-Kataloge
   personal: 'personal',
@@ -514,6 +518,9 @@ export type GlobalKey = (typeof GLOBAL_KEYS)[keyof typeof GLOBAL_KEYS];
  */
 export type Dienstfilter = 'alle' | 'im-dienst';
 
+/** Die zwei adressierten Bereiche unter dem `aufbewahrung`-Prefix (LFH-23). */
+export type AufbewahrungBereich = 'akte' | 'etb';
+
 /** Die sieben Bereiche unter dem `admin-karte`-Prefix. */
 export type AdminKarteBereich =
   | 'katalog'
@@ -542,6 +549,21 @@ export const globalKeys = {
   orgModulEinstellungen: () => [GLOBAL_KEYS.orgModulEinstellungen] as const,
   authProvider: () => [GLOBAL_KEYS.authProvider] as const,
   demoDaten: () => [GLOBAL_KEYS.demoDaten] as const,
+  /**
+   * Aufbewahrung (LFH-23): der ARGUMENTLOSE Accessor ist Übersicht UND Invalidierungs-Prefix
+   * für Akte und Archiv-ETB — Wiederherstellen und Friständerung treffen alle drei mit einem
+   * Aufruf. Der ETB-Typfilter hängt als Token an (`'alle'` ohne Filter), nie als Objekt.
+   */
+  aufbewahrung: () => [GLOBAL_KEYS.aufbewahrung] as const,
+  aufbewahrungAkte: (einsatzId: number) =>
+    [GLOBAL_KEYS.aufbewahrung, 'akte' satisfies AufbewahrungBereich, einsatzId] as const,
+  aufbewahrungEtb: (einsatzId: number, typ: EtbTyp | undefined) =>
+    [
+      GLOBAL_KEYS.aufbewahrung,
+      'etb' satisfies AufbewahrungBereich,
+      einsatzId,
+      typ ?? 'alle',
+    ] as const,
 
   // Stammdaten-Kataloge ohne Filter
   qualifikationen: () => [GLOBAL_KEYS.qualifikationen] as const,
@@ -582,7 +604,7 @@ export const globalKeys = {
    * — beim Abmelden räumen — scheidet aus, weil es dafür GAR KEINEN Mechanismus gibt
    * (gemessen: kein `qc.clear`/`removeQueries`/`resetQueries` im Produktivcode, `logout()`
    * setzt allein `benutzer` auf `null`); einen einzuführen wäre eine querschnittliche
-   * Entscheidung über alle 24 Prefixe und griffe ausserdem nicht, wenn die Sitzung ohne
+   * Entscheidung über alle 25 Prefixe und griffe ausserdem nicht, wenn die Sitzung ohne
    * Abmeldung endet (401 → Sitzungswache → jemand anders meldet sich an).
    *
    * `null` steht für „niemand angemeldet" und ist ein zulässiges Key-Element wie die `bbox`
