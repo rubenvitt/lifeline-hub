@@ -3,6 +3,7 @@ use crate::auth::session::CurrentUser;
 use crate::einsatz::berechtigung::{
     fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
 };
+use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::repo as einsatz_repo;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
@@ -139,9 +140,7 @@ pub async fn bewerten(
     // Warnstufen-Änderung, aus der frisch geschriebenen Zelle (`z`) berechnet (der
     // Read-Vergleich gegen `alt` bleibt bewusst VOR der Tx — nur das Schreibpaar ist atomar).
     // SSE erst nach dem Commit (Reinheits-Kontrakt).
-    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let z = crate::write_retry!(&state.pool, |conn| {
         let z = gefahr_repo::upsert_bewertung_tx(
             conn,

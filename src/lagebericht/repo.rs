@@ -328,9 +328,8 @@ async fn snapshot_freigeben_tx(
     render: &str,
     zeitstand: &str,
 ) -> Result<i64, AppError> {
-    let etb_startwert = crate::einsatz::einstellungen::laden_oder_default(&mut *conn, einsatz_id)
-        .await?
-        .etb_startwert();
+    let etb_startwert =
+        crate::einsatz::einstellungen::etb_startwert(&mut *conn, einsatz_id).await?;
 
     // 1. ETB-Snapshot anlegen (server-autoritative lfd_nr, Startwert aus Einstellungen).
     let etb_id = etb_repo::anlegen_tx(

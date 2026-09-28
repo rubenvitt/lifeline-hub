@@ -3,6 +3,7 @@ use crate::auth::session::CurrentUser;
 use crate::einsatz::berechtigung::{
     fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
 };
+use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::repo as einsatz_repo;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
@@ -161,9 +162,7 @@ pub async fn anlegen(
     // F06/LFH-244 Tier-A: Zonen-INSERT (+ ggf. Gruppen-INSERT) + System-ETB-Eintrag atomar
     // in EINER Tx (BEGIN IMMEDIATE + Retry). Der In-Tx-Reload liefert die frische Anzeige für
     // ETB-Text (Typ-Label + Label) UND Response. SSE erst nach dem Commit (Reinheits-Kontrakt).
-    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let z = crate::write_retry!(&state.pool, |conn| {
         let id = zone_repo::anlegen_tx(
             conn,
@@ -329,7 +328,7 @@ pub async fn aktualisieren(
             benutzer.id,
             &etb_text(z.typ.as_str(), z.label.as_deref(), "geändert"),
         )
-        .await?;
+        .await;
     }
 
     sse_zone(&state, einsatz_id, zid);
@@ -382,9 +381,7 @@ pub async fn aufloesen(
     // Aufräumen einer dadurch verwaisten Gefahrengebiet-Gruppe läuft NACH dem Commit auf dem
     // Pool (zweiter Writer — darf nicht in die BEGIN-IMMEDIATE-Tx). SSE ebenfalls nach dem Commit.
     let text = etb_text(vorher.typ.as_str(), vorher.label.as_deref(), "aufgehoben");
-    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let weg = crate::write_retry!(&state.pool, |conn| {
         let weg = zone_repo::loese_auf_tx(conn, einsatz_id, zid).await?;
         crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text).await?;

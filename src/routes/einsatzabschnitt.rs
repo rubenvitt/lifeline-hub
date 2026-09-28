@@ -3,6 +3,7 @@ use crate::auth::session::CurrentUser;
 use crate::einsatz::berechtigung::{
     fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
 };
+use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::repo as einsatz_repo;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
@@ -177,7 +178,7 @@ pub async fn anlegen(
         benutzer.id,
         &crate::einsatzabschnitt::etb_text_angelegt(&anzeige.name, anzeige.lagezustand),
     )
-    .await?;
+    .await;
     sse_abschnitt(&state, einsatz_id, anzeige.id);
     Ok((StatusCode::CREATED, Json(anzeige)))
 }
@@ -283,9 +284,7 @@ pub async fn aktualisieren(
     // Zuordnung: scheitert die mit 422, bleibt der gespeicherte Wechsel trotzdem nicht
     // undokumentiert (LFH-608, Review). Der Eintrag entsteht nur bei echtem Wechsel.
     if let Some(neu) = lagezustand {
-        let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
-            .await?
-            .etb_startwert();
+        let startwert = etb_startwert(&state.pool, einsatz_id).await?;
         let etb_id = crate::write_retry!(&state.pool, |conn| {
             match abschnitt_repo::setze_lagezustand_tx(conn, einsatz_id, aid, neu).await? {
                 Some(wechsel) => {
@@ -354,9 +353,7 @@ pub async fn aufloesen(
     // atomar in EINER Tx (BEGIN IMMEDIATE + Retry). ETB-Text aus dem VOR der Tx geladenen
     // `vorher` (Name unverändert). SSE erst nach dem Commit (Reinheits-Kontrakt).
     let text = format!("Abschnitt «{}» aufgelöst", vorher.name);
-    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     crate::write_retry!(&state.pool, |conn| {
         abschnitt_repo::loese_auf_tx(conn, einsatz_id, aid).await?;
         crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text).await?;

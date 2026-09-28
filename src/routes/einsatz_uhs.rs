@@ -4,6 +4,7 @@ use crate::auth::session::CurrentUser;
 use crate::einsatz::berechtigung::{
     fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
 };
+use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::repo as einsatz_repo;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
@@ -305,11 +306,7 @@ pub async fn status_wechsel(
     // in EINER Tx (BEGIN IMMEDIATE + Retry). Startwert nur laden, wenn ein ETB-Eintrag
     // entsteht (Übergänge ohne Spur machen keinen Zusatz-Read). SSE erst nach dem Commit.
     let startwert = if etb_text.is_some() {
-        Some(
-            crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
-                .await?
-                .etb_startwert(),
-        )
+        Some(etb_startwert(&state.pool, einsatz_id).await?)
     } else {
         None
     };
@@ -674,7 +671,7 @@ pub async fn belegung(
     )
     .await?;
     if let Some(text) = text {
-        super::etb_system_degradiert(&state, einsatz_id, benutzer.id, &text).await?;
+        super::etb_system_degradiert(&state, einsatz_id, benutzer.id, &text).await;
     }
     sse_uhs(&state, einsatz_id, event.uhs_id);
     sse_person(&state, einsatz_id, person_id);

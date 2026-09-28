@@ -4,6 +4,7 @@ use crate::auth::session::CurrentUser;
 use crate::einsatz::berechtigung::{
     fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
 };
+use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::repo as einsatz_repo;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
@@ -127,9 +128,7 @@ pub async fn disponieren(
     // F06/LFH-244 Tier-A: Domänen-Write (Disposition) + System-ETB atomar in EINER Tx
     // (BEGIN IMMEDIATE + Retry). Der In-Tx-Reload liefert die aufgelöste Anzeige (funkrufname)
     // für ETB-Text UND Response. SSE erst nach dem Commit (Reinheits-Kontrakt).
-    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let anzeige = crate::write_retry!(&state.pool, |conn| {
         let ef_id = match &vorbereitet {
             Vorbereitet::Stamm(fahrzeug_id) => {
@@ -228,9 +227,7 @@ pub async fn aktualisieren(
     // (status_id/-label) stammt aus dem Vorlade-`vorher`. SSE erst nach dem Commit.
     let vorher_status_id = vorher.status_id;
     let vorher_status_label = vorher.status_label.clone();
-    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let nachher = crate::write_retry!(&state.pool, |conn| {
         disposition_repo::aktualisiere_tx(conn, einsatz_id, ef_id, body.status_id, bemerkung)
             .await?;
@@ -281,9 +278,7 @@ pub async fn entfernen(
         "Fahrzeug «{}» aus dem Einsatz entfernt",
         anzeige.funkrufname
     );
-    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     crate::write_retry!(&state.pool, |conn| {
         disposition_repo::entferne_tx(conn, einsatz_id, ef_id).await?;
         crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text).await?;
@@ -318,9 +313,7 @@ pub async fn besatzung_zuordnen(
     let fahrzeug =
         disposition_repo::laden_anzeige(&state.pool, einsatz_id, ef_id, einsatz.ist_aktiv())
             .await?;
-    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     crate::write_retry!(&state.pool, |conn| {
         let person = besatzung_repo::ordne_besatzung_zu_tx(conn, einsatz_id, ef_id, ep_id).await?;
         crate::etb::system_audit_tx(
@@ -366,9 +359,7 @@ pub async fn besatzung_freigeben(
     let fahrzeug =
         disposition_repo::laden_anzeige(&state.pool, einsatz_id, ef_id, einsatz.ist_aktiv())
             .await?;
-    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     crate::write_retry!(&state.pool, |conn| {
         let person = besatzung_repo::gib_besatzung_frei_tx(conn, einsatz_id, ef_id, ep_id).await?;
         crate::etb::system_audit_tx(

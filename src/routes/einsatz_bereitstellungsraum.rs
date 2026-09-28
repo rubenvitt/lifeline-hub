@@ -6,6 +6,7 @@ use crate::bereitstellungsraum::{BrAnzeige, BrBelegungAnzeige, BrStatus};
 use crate::einsatz::berechtigung::{
     fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
 };
+use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::repo as einsatz_repo;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
@@ -296,9 +297,7 @@ pub async fn status_wechsel(
     // darf_uebergehen/Belegungs-Vorbedingung prüft `setze_status_tx` in der Tx; SSE erst
     // nach dem Commit (Reinheits-Kontrakt).
     let etb_text = crate::bereitstellungsraum::etb_text_status(&vorher.bezeichnung, &body.status);
-    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let nachher = crate::write_retry!(&state.pool, |conn| {
         let nachher =
             br_repo::setze_status_tx(conn, einsatz_id, br_id, &body.status, benutzer.id).await?;
@@ -384,7 +383,7 @@ pub async fn belegung(
     if let Some(etb_text) =
         belegungs_etb_text(&state.pool, einsatz_id, &br.bezeichnung, &event).await?
     {
-        super::etb_system_degradiert(&state, einsatz_id, benutzer.id, &etb_text).await?;
+        super::etb_system_degradiert(&state, einsatz_id, benutzer.id, &etb_text).await;
     }
 
     sse_br(&state, einsatz_id, br_id);

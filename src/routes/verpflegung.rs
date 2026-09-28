@@ -29,6 +29,7 @@ use axum::Json;
 use serde::Deserialize;
 
 use crate::app::AppState;
+use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
 use crate::einsatz::modul::Verpflegung;
 use crate::error::AppError;
@@ -47,14 +48,6 @@ fn publiziere(state: &AppState, einsatz_id: i64, etb_ids: &[i64]) {
     state
         .live
         .publiziere_einsatz(einsatz_id, LiveEvent::Verpflegung);
-}
-
-async fn startwert(state: &AppState, einsatz_id: i64) -> Result<i64, AppError> {
-    Ok(
-        crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
-            .await?
-            .etb_startwert(),
-    )
 }
 
 /// Normalisiert einen übergebenen Zeitpunkt auf das Drahtformat (UTC). Unlesbar → 400.
@@ -112,7 +105,7 @@ pub async fn zeitfenster_anlegen(
         bedarf_weitere: req.bedarf_weitere.unwrap_or(0),
         sonderkost: req.sonderkost.unwrap_or_default(),
     };
-    let startwert = startwert(&state, einsatz_id).await?;
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let tz = repo::zeitzone(&state.pool, einsatz_id).await?;
     let benutzer_id = ctx.benutzer.id;
     let g = crate::write_retry!(&state.pool, |conn| {
@@ -161,7 +154,7 @@ pub async fn zeitfenster_aendern(
         bedarf_weitere: req.bedarf_weitere,
         sonderkost: req.sonderkost.unwrap_or_default(),
     };
-    let startwert = startwert(&state, einsatz_id).await?;
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let tz = repo::zeitzone(&state.pool, einsatz_id).await?;
     let benutzer_id = ctx.benutzer.id;
     let g = crate::write_retry!(&state.pool, |conn| {
@@ -193,7 +186,7 @@ pub async fn zeitfenster_loeschen(
     PfadParam((_eid, zid)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
     let einsatz_id = ctx.einsatz.id;
-    let startwert = startwert(&state, einsatz_id).await?;
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let tz = repo::zeitzone(&state.pool, einsatz_id).await?;
     let benutzer_id = ctx.benutzer.id;
     let g = crate::write_retry!(&state.pool, |conn| {

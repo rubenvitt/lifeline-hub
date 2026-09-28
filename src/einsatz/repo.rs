@@ -448,9 +448,7 @@ pub async fn frist_setzen(
     neue_frist: Option<&str>,
     audit_inhalt: &str,
 ) -> Result<Einsatz, AppError> {
-    let etb_startwert = super::einstellungen::laden_oder_default(pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let etb_startwert = super::einstellungen::etb_startwert(pool, einsatz_id).await?;
     let mut tx = pool.begin().await?;
     // Bewacht (LFH-23, design.md D6): die Route prüft die Tombstones vorher, aber zwischen
     // Prüfung und Schreiben kann der Purge-Lauf vormerken. Ohne diesen Riegel stünde dann
@@ -624,9 +622,7 @@ pub async fn soft_delete_einsatz(
     einsatz_id: i64,
     jetzt: &str,
 ) -> Result<bool, AppError> {
-    let etb_startwert = super::einstellungen::laden_oder_default(pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let etb_startwert = super::einstellungen::etb_startwert(pool, einsatz_id).await?;
     let mut tx = pool.begin().await?;
     // Die Fälligkeit wird im UPDATE selbst noch einmal geprüft (LFH-23): eine Frist, die
     // zwischen Kandidatenliste und diesem Schreibvorgang verlängert wurde, gewinnt.
@@ -682,9 +678,7 @@ pub async fn wiederherstellen(
     neue_frist: Option<&str>,
     jetzt: chrono::DateTime<Utc>,
 ) -> Result<(), AppError> {
-    let etb_startwert = super::einstellungen::laden_oder_default(pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let etb_startwert = super::einstellungen::etb_startwert(pool, einsatz_id).await?;
     // `write_retry!` (BEGIN IMMEDIATE, F09/LFH-240): der Körper liest vor dem Schreiben; in
     // einer verzögerten Transaktion bräche der Lock-Aufstieg bei jedem parallelen Schreiber
     // (etwa dem Purge-Lauf) sofort mit SQLITE_BUSY ab. Der Körper ist reine DB-Arbeit und
@@ -814,9 +808,7 @@ pub async fn schwaerze_einsatz(
     einsatz_id: i64,
     jetzt: &str,
 ) -> Result<bool, AppError> {
-    let etb_startwert = super::einstellungen::laden_oder_default(pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let etb_startwert = super::einstellungen::etb_startwert(pool, einsatz_id).await?;
     let mut tx = pool.begin().await?;
 
     // Idempotenz-/Sicherheits-Guard: nur abgeschlossene, soft-gelöschte, noch nicht

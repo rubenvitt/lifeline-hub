@@ -316,6 +316,16 @@ pub async fn laden_oder_default(
     Ok(row.unwrap_or_else(|| EinsatzEinstellungen::leer(einsatz_id)))
 }
 
+/// Startwert der ETB-Nummernfolge des Einsatzes (Default aus [`laden_oder_default`]).
+pub async fn etb_startwert(
+    executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
+    einsatz_id: i64,
+) -> Result<i64, AppError> {
+    Ok(laden_oder_default(executor, einsatz_id)
+        .await?
+        .etb_startwert())
+}
+
 /// Eingabe für `speichern`; bereits vom Handler getrimmt/validiert.
 #[derive(Debug, Default)]
 pub struct EinstellungenDaten<'a> {

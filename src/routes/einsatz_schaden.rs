@@ -3,6 +3,7 @@ use crate::auth::session::CurrentUser;
 use crate::einsatz::berechtigung::{
     fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
 };
+use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::repo as einsatz_repo;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
@@ -200,9 +201,7 @@ pub async fn anlegen(
     // F06/LFH-244 Tier-A: Domänen-Write + System-ETB-Eintrag atomar in EINER Tx
     // (BEGIN IMMEDIATE + Retry). Der In-Tx-Reload liefert die frische Anzeige für ETB-Text
     // (Reg.-Nr.) UND Response. SSE erst nach dem Commit.
-    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let schaden = crate::write_retry!(&state.pool, |conn| {
         let (id, _reg) = schaden_repo::anlegen_tx(
             conn,
@@ -498,9 +497,7 @@ pub async fn uebergeben(
     // F06/LFH-244 Tier-A: Status-UPDATE + System-ETB-Eintrag atomar in EINER Tx. Der ETB-Text
     // ist aus `vorher` + `adressat` VOR der Tx berechenbar (kein In-Tx-Reload nötig). SSE +
     // Response-Reload erst nach dem Commit.
-    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     crate::write_retry!(&state.pool, |conn| {
         schaden_repo::uebergebe_tx(conn, einsatz_id, schaden_id, &adressat, benutzer.id).await?;
         crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text).await?;
@@ -579,9 +576,7 @@ pub async fn abschliessen(
     );
     // F06/LFH-244 Tier-A: Abschluss-UPDATE + System-ETB-Eintrag atomar in EINER Tx. Der ETB-Text
     // ist aus `vorher` + `grund` VOR der Tx berechenbar. SSE + Response-Reload erst nach Commit.
-    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     crate::write_retry!(&state.pool, |conn| {
         schaden_repo::schliesse_ab_tx(
             conn,
@@ -631,9 +626,7 @@ pub async fn stornieren(
         "Schaden {} storniert",
         registrier_anzeige(vorher.registrier_nr)
     );
-    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     crate::write_retry!(&state.pool, |conn| {
         schaden_repo::storniere_tx(conn, einsatz_id, schaden_id, benutzer.id).await?;
         crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text).await?;

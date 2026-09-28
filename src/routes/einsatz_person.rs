@@ -4,6 +4,7 @@ use crate::einsatz::berechtigung::{
     fordere_aktiv, fordere_einsatzleitung, fordere_lesezugriff, fordere_modul_zugriff_laden,
     fordere_schreibrecht,
 };
+use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::repo as einsatz_repo;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
@@ -303,9 +304,7 @@ pub async fn anlegen(
     // F06/LFH-244 Tier-A: Domänen-Write (INSERT) + System-ETB-Eintrag atomar in EINER Tx
     // (BEGIN IMMEDIATE + Retry). Der In-Tx-Reload liefert die frische Anzeige für ETB-Text
     // (Reg.-Nr.) UND Response. SSE erst nach dem Commit.
-    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let (person, war_neu, uhs_etb_id) = crate::write_retry!(&state.pool, |conn| {
         let (id, reg, war_neu) = repo::anlegen_tx_mit_optionen(
             conn,
@@ -663,7 +662,7 @@ pub async fn status_wechsel(
             body.status
         ),
     )
-    .await?;
+    .await;
     sse_person(&state, einsatz_id, person_id);
     Ok(Json(repo::laden(&state.pool, einsatz_id, person_id).await?))
 }
@@ -714,7 +713,7 @@ pub async fn stornieren(
             registrier_anzeige(person.registrier_nr)
         ),
     )
-    .await?;
+    .await;
     sse_person(&state, einsatz_id, person_id);
     Ok(StatusCode::NO_CONTENT)
 }
@@ -773,9 +772,7 @@ pub async fn sichten(
     // + System-ETB-Eintrag atomar in EINER Tx (BEGIN IMMEDIATE + Retry). Der ETB-Text ist aus
     // dem VOR der Tx geladenen `person`-Vorzustand + `kategorie` berechenbar. SSE nach dem Commit.
     let text = crate::person::etb_text_sichtung(person.registrier_nr, kategorie);
-    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let sichtung = crate::write_retry!(&state.pool, |conn| {
         let sichtung = sichtung_repo::erfassen_tx(
             conn,
@@ -1003,7 +1000,7 @@ pub async fn verbleib(
             art.etb_sachverhalt(ziel.as_deref())
         ),
     )
-    .await?;
+    .await;
     sse_person(&state, einsatz_id, person_id);
     Ok((StatusCode::CREATED, Json(verbleib)))
 }
@@ -1177,7 +1174,7 @@ pub async fn abgleich_entscheiden(
                 registrier_anzeige(gefunden.registrier_nr)
             ),
         )
-        .await?;
+        .await;
     }
     sse_person(&state, einsatz_id, abgleich.vermisst_person_id);
     sse_person(&state, einsatz_id, abgleich.gefunden_person_id);

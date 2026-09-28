@@ -3,6 +3,7 @@ use crate::auth::session::CurrentUser;
 use crate::einsatz::berechtigung::{
     fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
 };
+use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::repo as einsatz_repo;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
@@ -127,9 +128,7 @@ pub async fn disponieren(
     // (BEGIN IMMEDIATE + Retry). Der In-Tx-Reload liefert die frische Anzeige (bei Stamm-
     // Material stammt die Bezeichnung erst aus dem Snapshot des INSERT) für ETB-Text UND
     // Response. SSE erst nach dem Commit.
-    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let anzeige = crate::write_retry!(&state.pool, |conn| {
         let em_id = match &ziel {
             Ziel::Stamm(material_id) => {
@@ -222,9 +221,7 @@ pub async fn aktualisieren(
     // EINER Tx (BEGIN IMMEDIATE + Retry). Der In-Tx-Reload (`nachher`) liefert die frischen
     // Werte für ETB-Texte UND Response; ein Menge-Wechsel und ein Status-Wechsel schreiben je
     // einen Eintrag (eine reine Bemerkungsänderung keinen). SSE erst nach dem Commit.
-    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let nachher = crate::write_retry!(&state.pool, |conn| {
         disposition_repo::aktualisiere_tx(
             conn,
@@ -299,9 +296,7 @@ pub async fn entfernen(
         "Material «{}» aus dem Einsatz entfernt",
         anzeige.bezeichnung
     );
-    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     crate::write_retry!(&state.pool, |conn| {
         disposition_repo::entferne_tx(conn, einsatz_id, em_id).await?;
         crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text).await?;

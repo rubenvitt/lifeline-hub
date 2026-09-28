@@ -516,9 +516,7 @@ pub async fn heraufstufen_zu_etb(
     inhalt: &str,
     ereigniszeit: &str,
 ) -> Result<i64, AppError> {
-    let etb_startwert = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let etb_startwert = crate::einsatz::einstellungen::etb_startwert(pool, einsatz_id).await?;
     let etb_id = crate::write_retry!(pool, |conn| {
         // Guard: schon heraufgestuft oder gelöscht? (Sperrt Doppel-Heraufstufung.)
         let zustand: Option<(Option<i64>, Option<String>)> =

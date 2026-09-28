@@ -3,6 +3,7 @@ use crate::auth::session::CurrentUser;
 use crate::einsatz::berechtigung::{
     fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
 };
+use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::repo as einsatz_repo;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
@@ -156,7 +157,7 @@ pub async fn disponieren(
         benutzer.id,
         &crate::personal::etb_text_disponiert(&anzeige.name, anzeige.funktion.as_deref()),
     )
-    .await?;
+    .await;
     sse_personal(&state, einsatz_id, ep_id);
     Ok((StatusCode::CREATED, Json(anzeige)))
 }
@@ -214,9 +215,7 @@ pub async fn aktualisieren(
     // F06/LFH-244 Tier-A: Dispo-UPDATE + (nur bei Statuswechsel) System-ETB-Eintrag atomar in
     // EINER Tx (BEGIN IMMEDIATE + Retry). Der In-Tx-Reload liefert die frische, aufgelöste
     // Anzeige für den ETB-Text UND die Response; SSE erst nach dem Commit.
-    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let nachher = crate::write_retry!(&state.pool, |conn| {
         disposition_repo::aktualisiere_tx(
             conn,
@@ -273,9 +272,7 @@ pub async fn entfernen(
         "Person «{}» aus dem Einsatz entfernt",
         person_bezeichnung(&anzeige)
     );
-    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     crate::write_retry!(&state.pool, |conn| {
         disposition_repo::entferne_tx(conn, einsatz_id, ep_id).await?;
         crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text).await?;
