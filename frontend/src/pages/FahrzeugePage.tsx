@@ -67,6 +67,10 @@ import { abstand } from '../theme/tokens';
 import StatusTag from '../components/StatusTag';
 import { fahrzeugStatusDarstellung } from '../kraefte/mittelStatus';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
+import {
+  katalogStatusWechsel,
+  useOptimistischesZeilenUpdate,
+} from '../kraefte/useOptimistischesZeilenUpdate';
 
 /**
  * Ist-Besatzungsstärke aus den Stärke-Positionen der zugeordneten Kräfte (clientseitig
@@ -310,56 +314,18 @@ export default function FahrzeugePage() {
     onSuccess: invalidate,
     onError: fehler,
   });
-  const statusMutation = useMutation({
-    mutationFn: (v: { efId: number; statusId: number }) =>
-      aktualisiereDisposition(einsatzId, v.efId, { status_id: v.statusId }),
-    onMutate: async (v) => {
-      const queryKey = einsatzKeys.fahrzeuge(einsatzId);
-      await qc.cancelQueries({ queryKey });
-      const vorher = qc.getQueryData<EinsatzFahrzeug[]>(queryKey)?.find((ef) => ef.id === v.efId);
-      const status = statusQuery.data?.find((s) => s.id === v.statusId);
-      qc.setQueryData<EinsatzFahrzeug[]>(queryKey, (alt) =>
-        alt?.map((ef) =>
-          ef.id === v.efId
-            ? {
-                ...ef,
-                status_id: v.statusId,
-                status_label: status?.label ?? ef.status_label,
-                status_kategorie: status?.kategorie ?? ef.status_kategorie,
-                status_farbe: status?.farbe ?? null,
-              }
-            : ef,
-        ),
-      );
-      return { vorher };
-    },
-    onSuccess: (serverStand) => {
-      qc.setQueryData<EinsatzFahrzeug[]>(einsatzKeys.fahrzeuge(einsatzId), (alt) =>
-        alt?.map((ef) => (ef.id === serverStand.id ? serverStand : ef)),
-      );
-      // Der Einheitenstatus ist aus den Fahrzeugen abgeleitet (LFH-609) — nicht erst auf
-      // das Live-Ereignis warten, das ohne Stream (offline, Proxy) nie käme.
-      void qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
-    },
-    onError: (e, v, kontext) => {
-      const vorher = kontext?.vorher;
-      if (vorher) {
-        qc.setQueryData<EinsatzFahrzeug[]>(einsatzKeys.fahrzeuge(einsatzId), (aktuell) =>
-          aktuell?.map((ef) =>
-            ef.id === v.efId && ef.status_id === v.statusId
-              ? {
-                  ...ef,
-                  status_id: vorher.status_id,
-                  status_label: vorher.status_label,
-                  status_kategorie: vorher.status_kategorie,
-                  status_farbe: vorher.status_farbe,
-                }
-              : ef,
-          ),
-        );
-      }
-      fehler(e);
-    },
+  const statusMutation = useOptimistischesZeilenUpdate<
+    EinsatzFahrzeug,
+    { efId: number; statusId: number }
+  >({
+    queryKey: einsatzKeys.fahrzeuge(einsatzId),
+    mutationFn: (v) => aktualisiereDisposition(einsatzId, v.efId, { status_id: v.statusId }),
+    zeilenId: (v) => v.efId,
+    ...katalogStatusWechsel<EinsatzFahrzeug>(statusQuery.data),
+    // Der Einheitenstatus ist aus den Fahrzeugen abgeleitet (LFH-609) — nicht erst auf
+    // das Live-Ereignis warten, das ohne Stream (offline, Proxy) nie käme.
+    onErfolg: () => void qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) }),
+    onFehler: fehler,
     onSettled: invalidate,
   });
   const bemerkungMutation = useMutation({

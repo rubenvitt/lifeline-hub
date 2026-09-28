@@ -45,6 +45,7 @@ import StatusWahl, { type StatusOption } from '../components/StatusWahl';
 import { einsatzStatus, materialStatus, type StatusDarstellung } from '../theme/statusFarben';
 import StatusTag from '../components/StatusTag';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
+import { useOptimistischesZeilenUpdate } from '../kraefte/useOptimistischesZeilenUpdate';
 
 /**
  * ── DIE FARBFRAGE IST ENTSCHIEDEN (LFH-341 · C6) ─────────────────────────────────────
@@ -177,34 +178,17 @@ export default function MaterialPage() {
     onSuccess: invalidate,
     onError: fehler,
   });
-  const statusMutation = useMutation({
-    mutationFn: (v: { emId: number; status: MaterialStatus }) =>
-      aktualisiereDisposition(einsatzId, v.emId, { status: v.status }),
-    onMutate: async (v) => {
-      const queryKey = einsatzKeys.material(einsatzId);
-      await qc.cancelQueries({ queryKey });
-      const vorher = qc.getQueryData<EinsatzMaterial[]>(queryKey)?.find((em) => em.id === v.emId);
-      qc.setQueryData<EinsatzMaterial[]>(queryKey, (alt) =>
-        alt?.map((em) => (em.id === v.emId ? { ...em, status: v.status } : em)),
-      );
-      return { vorher };
-    },
-    onSuccess: (serverStand) => {
-      qc.setQueryData<EinsatzMaterial[]>(einsatzKeys.material(einsatzId), (alt) =>
-        alt?.map((em) => (em.id === serverStand.id ? serverStand : em)),
-      );
-    },
-    onError: (e, v, kontext) => {
-      const vorher = kontext?.vorher;
-      if (vorher) {
-        qc.setQueryData<EinsatzMaterial[]>(einsatzKeys.material(einsatzId), (aktuell) =>
-          aktuell?.map((em) =>
-            em.id === v.emId && em.status === v.status ? { ...em, status: vorher.status } : em,
-          ),
-        );
-      }
-      fehler(e);
-    },
+  const statusMutation = useOptimistischesZeilenUpdate<
+    EinsatzMaterial,
+    { emId: number; status: MaterialStatus }
+  >({
+    queryKey: einsatzKeys.material(einsatzId),
+    mutationFn: (v) => aktualisiereDisposition(einsatzId, v.emId, { status: v.status }),
+    zeilenId: (v) => v.emId,
+    anwenden: (em, v) => ({ ...em, status: v.status }),
+    nochOptimistisch: (em, v) => em.status === v.status,
+    zuruecknehmen: (em, vorher) => ({ ...em, status: vorher.status }),
+    onFehler: fehler,
     onSettled: invalidate,
   });
   const bemerkungMutation = useMutation({
