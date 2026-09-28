@@ -1,3 +1,151 @@
+## [1.0.0-alpha.51](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.50...v1.0.0-alpha.51) (2026-09-28)
+
+### Lagekarte
+
+**Zeichnungen können jetzt korrigiert werden**
+
+- Beim Zeichnen von Linien und Flächen können einzelne Punkte mit dem neuen Knopf „Letzten Punkt zurück" widerrufen werden
+- Ein Punktzähler zeigt während des Zeichnens die Anzahl der gesetzten Punkte an
+- Die Esc-Taste verhält sich jetzt zweistufig: Erstes Drücken verwirft die aktuelle Zeichnung mit Quittung „Zeichnung verworfen" und lässt den Zeichenmodus aktiv, zweites Drücken beendet den Zeichenmodus
+- Wenn Menüs oder Dialoge geöffnet sind, schließt Esc nur diese, nicht die Zeichnung
+
+**Eigene Position auf der Karte**
+
+- Neue Funktion zur Anzeige der eigenen Position als Punkt mit Genauigkeitskreis
+- Die Position wird live nachgeführt und beim ersten Aktivieren einmal angeflogen
+- Ein-/Ausschalten über Umschalter im Knopfblock der Karte
+- Ohne sicheren Kontext (kein HTTPS/localhost) ist die Funktion gesperrt und zeigt beim Antippen den Grund an
+- Die Position wird nicht gespeichert und verlässt das Gerät nicht
+
+**Bedienung verbessert**
+
+- Die Zeichnen-Steuerung passt jetzt auch bei schmalen Bildschirmen (ab 390 px) und halbierter Karte vollständig in den Kartenfuß
+- Gesperrte Knöpfe zeigen durch blasse Farbe und Mauszeiger visuell die Sperrung an, nicht nur für Screenreader
+
+## [1.0.0-alpha.50](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.49...v1.0.0-alpha.50) (2026-09-28)
+
+### Betrieb und Installation
+
+- **Stabilität unter Node.js 26 verbessert**: Der in früheren Alpha-Versionen bei End-to-End-Tests aufgetretene Absturz des Entwicklungsservers (verursacht durch V8-Fast-API-Aufrufe bei großen vorgebündelten Modulen) wurde behoben. Die Anwendung läuft nun zuverlässig auch unter Node.js 26.
+
+### Dokumentation
+
+- **Entwickler-Dokumentation aufgeräumt**: Die technische Dokumentation für Entwickler und KI-Agenten wurde konsolidiert und von redundanten Inhalten befreit, um die Wartbarkeit des Projekts zu verbessern.
+
+## [1.0.0-alpha.49](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.48...v1.0.0-alpha.49) (2026-09-28)
+
+### Wichtige Änderungen
+
+Diese Version führt neue Datenbanktabellen und Abläufe ein:
+- Neue Tabelle für Anhänge an Schäden mit Soft-Delete-Mechanismus
+- Automatische Aufbewahrungsfrist-Verwaltung mit Vormerkung und Schwärzung personenbezogener Daten nach festgelegten Fristen
+- Archiv-Namensraum für abgeschlossene Einsätze, zugänglich nur für System-Administratoren
+
+### Lagekarte
+
+**Touch-Bedienung**
+- Touch-Gesten (Wischen, Zoomen mit zwei Fingern, Drehen) funktionieren jetzt zuverlässig auf Mobilgeräten und Tablets
+- Kippen der Kartenansicht ist deaktiviert – die Lagekarte bleibt immer in der Draufsicht
+- Größere Trefferzonen (30/48/72 px je nach Dichtestufe) für alle Marker – Kräfte, Objekte und Betroffene lassen sich leichter antippen
+- Fingergroße Bildgriffe zum Verschieben, Größe ändern und Drehen von taktischen Zeichen
+- Umschalter für Griffmodus (Verschieben/Größe/Drehen), damit immer nur die gewünschten Griffe aktiv sind
+
+**Zeichen-Werkzeug überarbeitet**
+- Zeichenwahl jetzt als Bildraster mit Vorschau statt Dropdown-Listen
+- Suchfeld für Grundzeichen und Symbole
+- „Zuletzt verwendet"-Liste der letzten sechs platzierten Zeichen
+- Enter-Taste startet das Platzieren direkt aus der Suche
+- Änderungen an taktischen Zeichen werden gebündelt gespeichert (600 ms Ruhezeit), nicht mehr bei jedem Klick
+
+**Objektsuche**
+- Neues Suchfeld im Paneel „Verortet" findet alle wählbaren Kartenobjekte: Einheiten, Einsatzort, Betreuungsstellen, Betroffene, taktische Zeichen
+- Suche auch nach Objektart möglich („takt", „fahrzeug")
+- Treffer fliegt zur Position und wählt das Objekt aus
+
+**Kartenleiste ausblendbar**
+- Ab Tablet-Breite (1024 px) lässt sich die Seitenleiste ausblenden, um mehr Platz für die Karte zu schaffen
+- Wahl wird je Breitenklasse (Tablet/Desktop vs. Smartphone) gespeichert
+- Zeichen-Modi öffnen die Leiste automatisch, da „Abbrechen" nur dort erreichbar ist
+
+**Bedienung verbessert**
+- Bei Smartphones (unter 390 px Breite) schließt die Wahl eines Zeichenwerkzeugs die Leiste automatisch, damit genug Karte zum Platzieren sichtbar bleibt
+- Fuß der Kartenleiste rollt bei Platzmangel in sich selbst, statt andere Bedienelemente zu überdecken
+- Leisten-Umschalter sitzt ab Tablet-Breite unten am Kartenrand statt im Seitenkopf
+- Klick auf Personen-Cluster öffnet wieder zuverlässig die Auffächerung statt versehentlich ein anderes Zeichen auszuwählen
+- Moduswechsel (z. B. Wechsel der Griffgröße) wartet ab, bis laufende Ziehgesten beendet sind
+
+**Rückmeldungen**
+- Rückfrage vor jedem unwiderruflichen Löschen: Zonen, freie Zeichen, gezeichnete Abschnittsflächen
+- Erfolgsquittungen nach dem Speichern: „Zeichen gespeichert", „Fläche gespeichert", „Symbol gespeichert", „Verortung gelöscht"
+- Fehler beim Speichern werden gemeldet, Erfolgsquittung erscheint nur bei tatsächlichem Erfolg
+
+### Schäden
+
+**Fotos und Dateien**
+- Neues Paneel „Fotos und Dateien" auf der Schaden-Detailseite
+- Erlaubte Formate: JPEG, PNG, WebP, HEIC, HEIF, PDF (bis 25 MB)
+- Download über Schadensroute, pseudonyme Spur im Einsatztagebuch ohne Dateinamen
+- Entfernen mit Rückfrage – Datei verschwindet aus der Liste, ETB-Nachweis bleibt
+- Fotos und Dateien werden bei der Schwärzung nach Aufbewahrungsfrist automatisch gelöscht
+- Keine Fotos/Dateien bei stornierten Schäden oder ohne Schreibrecht am Modul Schäden
+
+### Verwaltung
+
+**Aufbewahrung abgeschlossener Einsätze**
+- Neuer Bereich „Aufbewahrung" in der Verwaltung, nur für System-Administratoren der eigenen Organisation
+- Übersicht aller abgeschlossenen Einsätze mit Aufbewahrungszustand und Fristen
+- Archivakte zeigt pseudonyme Register (Personen, Tiere, Schäden) und Einsatztagebuch – alle personenbezogenen Daten sind geschwärzt
+- Aufbewahrungszustände: ohne Frist, Frist läuft, fällig, vorgemerkt, Schwärzung steht aus, geschwärzt
+- Wiederherstellen während 30-Tage-Karenz: hebt Vormerkung auf und setzt neue Frist
+- Nach Ablauf der Karenz ist Wiederherstellen nicht mehr möglich
+
+**Aufbewahrungsfrist setzen**
+- Frist-Paneel in den Einsatz-Einstellungen (für Einsatzleitung und System-Admin)
+- Frist verkürzen (auch erstmaliges Setzen) nur nach Rückfrage
+- Frist aufheben ohne Rückfrage
+- Ohne Recht gesperrt mit Hinweis
+
+**Automatische Vormerkung und Schwärzung**
+- System prüft regelmäßig abgelaufene Fristen und merkt Einsätze automatisch vor
+- Nach 30-Tagen-Karenz: Schwärzung aller personenbezogenen Daten (Namen, Adressen, Geburtsdaten, Notizen, etc.)
+- Registriernummern, Einsatztagebuch-Wortlaut und Zeitstempel bleiben erhalten
+- Fehlerhafte Audit-Einträge blockieren die Schwärzung – System versucht automatisch erneut beim nächsten Lauf
+
+### Einsatztagebuch
+
+**Archiv-Ansicht**
+- Archiv-Einsatztagebuch zeigt Wortlaut, Eingangszeit, Berichtigungsverweise und Veranlassung
+- Typfilter und „Ältere laden"-Funktion
+- Nachträge und Berichtigungen bleiben nach der Schwärzung im Wortlaut sichtbar
+
+### Einsatzakte
+
+**Lesesperre bei Aufbewahrung**
+- Hinweis „eingefroren … außer der Aufbewahrungsfrist" bei gesperrten Einsätzen
+- Nach Fristablauf: reguläre Routen (Detail, ETB, Personen, Anhänge, Live) sind für alle Rollen gesperrt (403)
+- Zugriff nur noch über Archiv-Namensraum für System-Admin
+
+### Dokumente
+
+**Gemeinsame Bausteine**
+- Dateifeld und Download-Anker sind jetzt in Schäden und Dokumentenablage einheitlich gestaltet
+- Verbesserte Kontraste der Dateinamen und Zusatzangaben in Tag- und Nacht-Modus
+- Fokus nach „Speichern und nächste" landet jetzt zuverlässig auf „Datei wählen", auch wenn das erste Eingabefeld versteckt ist
+
+### Betrieb und Installation
+
+**Anhang-System**
+- Einheitliche Prüfkette für alle Datei-Uploads: Typ, Größe, Virenscan vor dem Speichern
+- Linker-Register für modulgebundene Anhänge – neue Anhang-Typen werden zentral registriert
+- Entfernte Schaden-Anhänge bleiben generisch gesperrt und können nicht erneut über andere Wege verknüpft werden
+- Abschottung als ablegende Person: Anhänge können nur über die zugehörige Modulroute gelöscht werden
+
+**Sicherheit**
+- Fremde Organisationen können keine Anhänge verknüpfen oder löschen
+- Chat und ETB akzeptieren keine Schaden-Anhänge
+- Virenscan-Ausfall führt zu 503-Fehler (fail-closed) – keine Datei wird ohne Prüfung gespeichert
+- Audit-System bricht bei fehlenden Akteuren ab, statt Einträge stumm auszulassen
+
 ## [1.0.0-alpha.48](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.47...v1.0.0-alpha.48) (2026-09-25)
 
 ### Wichtige Änderungen

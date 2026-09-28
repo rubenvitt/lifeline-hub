@@ -223,8 +223,20 @@ export default defineConfig({
       name: 'Frontend',
       // Port als CLI-Argument, nicht über FRONTEND_PORT: die Variable steht in der
       // mise-Umgebung bereits auf 5173 und gewinnt gegen alles, was wir hier setzen.
-      // `pnpm run dev -- --port X` reicht das `--` an Vite durch → `pnpm exec vite`.
-      command: `pnpm exec vite --host 127.0.0.1 --port ${frontendPort} --strictPort`,
+      // `pnpm run dev -- --port X` reicht das `--` an Vite durch, deshalb ruft der Befehl
+      // Vite direkt auf.
+      //
+      // `--no-turbo-fast-api-calls` ist eine Messung, kein Tuning (28.09.2026): Node 26
+      // (V8 14.6.202.34, in JEDEM 26.x-Release dieselbe) bricht den Dev-Server gelegentlich
+      // mit „Lazy deopt after a fast API call with return value is unsupported" ab, Stack
+      // `Buffer.byteLength` ← `_http_outgoing.end` ← Vites `send` beim Ausliefern eines
+      // großen vorgebündelten Moduls (`@ant-design_icons.js`, ~2,5 MB samt Sourcemap).
+      // Alle Folgetests des Shards laufen dann in ERR_CONNECTION_REFUSED; auf `alpha` traf
+      // das am 25. und 28.09. mehrfach Shard 3/4. Ohne Fast-API-Calls gibt es den Pfad, der
+      // abbricht, nicht mehr. Der Schalter ist eine V8-Option und in NODE_OPTIONS verboten,
+      // deshalb startet der Befehl Node selbst — `process.execPath` ist dieselbe
+      // Node-Version, unter der Playwright läuft, also die in `check-all.sh` gepinnte.
+      command: `"${process.execPath}" --no-turbo-fast-api-calls node_modules/vite/bin/vite.js --host 127.0.0.1 --port ${frontendPort} --strictPort`,
       url: baseURL,
       // Proxy-Ziel auf unser Test-Backend umbiegen (vite.config.ts liest die Variable,
       // process.env hat dort Vorrang vor .env.local).

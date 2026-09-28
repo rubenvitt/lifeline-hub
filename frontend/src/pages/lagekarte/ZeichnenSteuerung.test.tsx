@@ -154,3 +154,86 @@ describe('ZeichnenSteuerung — Platz im KartenFuss (LFH-355)', () => {
     expect(karte.style.pointerEvents).toBe('auto');
   });
 });
+
+/**
+ * Korrigierbares Zeichnen (LFH-712). Knopf und Zähler gibt es nur in der Zeichenphase — nach
+ * dem Abschluss ist „Verwerfen" der Weg zurück, ein Punkt-Undo gibt es dort nicht.
+ */
+describe('ZeichnenSteuerung — Letzten Punkt zurück und Zähler (LFH-712)', () => {
+  it('ohne zurücknehmbaren Punkt gesperrt, mit Punkt frei — als Paar', async () => {
+    const onPunktZurueck = vi.fn();
+    const { unmount } = render(
+      <App>
+        <ZeichnenSteuerung
+          aktiv
+          titel="x"
+          phase="zeichnen"
+          punkte={0}
+          punktZurueckMoeglich={false}
+          onPunktZurueck={onPunktZurueck}
+          onAbschliessen={vi.fn()}
+          onAbbrechen={vi.fn()}
+          onSpeichern={vi.fn()}
+          onVerwerfen={vi.fn()}
+        />
+      </App>,
+    );
+    const gesperrt = screen.getByRole('button', { name: 'Letzten Punkt zurück' });
+    expect(gesperrt).toBeDisabled();
+    await userEvent.click(gesperrt);
+    expect(onPunktZurueck).not.toHaveBeenCalled();
+    unmount();
+
+    setup({ punkte: 1, punktZurueckMoeglich: true, onPunktZurueck });
+    const frei = screen.getByRole('button', { name: 'Letzten Punkt zurück' });
+    expect(frei).toBeEnabled();
+    await userEvent.click(frei);
+    expect(onPunktZurueck).toHaveBeenCalledTimes(1);
+  });
+
+  it('zeigt die Zahl der gesetzten Punkte, Einzahl eigens', () => {
+    const { unmount } = render(
+      <App>
+        <ZeichnenSteuerung
+          aktiv
+          titel="x"
+          phase="zeichnen"
+          punkte={1}
+          onAbschliessen={vi.fn()}
+          onAbbrechen={vi.fn()}
+          onSpeichern={vi.fn()}
+          onVerwerfen={vi.fn()}
+        />
+      </App>,
+    );
+    expect(screen.getByText('1 Punkt')).toBeInTheDocument();
+    unmount();
+    setup({ punkte: 2 });
+    expect(screen.getByText('2 Punkte')).toBeInTheDocument();
+  });
+
+  it('Bestätigungsphase: weder Zurück-Knopf noch Zähler', () => {
+    setup({ phase: 'bestaetigen', punkte: 3, punktZurueckMoeglich: true, onPunktZurueck: vi.fn() });
+    expect(screen.queryByRole('button', { name: 'Letzten Punkt zurück' })).not.toBeInTheDocument();
+    expect(screen.queryByText('3 Punkte')).not.toBeInTheDocument();
+  });
+
+  it('nennt beide Esc-Stufen genau einmal, als Hinweis — nicht im Knopf', () => {
+    setup({ punkte: 0, punktZurueckMoeglich: false, onPunktZurueck: vi.fn() });
+    const hinweis = 'Esc verwirft die Zeichnung, ein zweites Esc beendet das Zeichnen.';
+    expect(screen.getAllByText(hinweis)).toHaveLength(1);
+    // Nur mit feinem Zeiger sichtbar (Regel in `lagekarte.css`): Touch hat keine Esc-Taste,
+    // und die Zeile hob den Fuß auf dem Handschirm über die Karte (LFH-713).
+    expect(screen.getByText(hinweis)).toHaveClass('lfh-nur-feiner-zeiger');
+    for (const knopf of screen.getAllByRole('button')) {
+      expect(knopf.textContent ?? '').not.toContain('Esc');
+    }
+  });
+
+  it('nennt die Esc-Stufen auch in der Bestätigungsphase', () => {
+    setup({ phase: 'bestaetigen' });
+    expect(
+      screen.getByText('Esc verwirft die Zeichnung, ein zweites Esc beendet das Zeichnen.'),
+    ).toBeInTheDocument();
+  });
+});

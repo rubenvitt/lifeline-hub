@@ -38,6 +38,9 @@ import FreiesZeichenInspector from './lagekarte/FreiesZeichenInspector';
 import ZonenInspector from './lagekarte/ZonenInspector';
 import FachebenenInspector from './lagekarte/FachebenenInspector';
 import ZeichnenSteuerung from './lagekarte/ZeichnenSteuerung';
+import { LEERER_ZEICHENSTAND, type ZeichenStand } from './lagekarte/zeichnen';
+import { escGehoertOverlay, escStufe, QUITTUNG_VERWORFEN } from './lagekarte/zeichnenEsc';
+import { EIGENPOSITION_SPERRGRUND, useEigenposition } from './lagekarte/useEigenposition';
 import MessSteuerung from './lagekarte/MessSteuerung';
 import { erzeugeMessQuelle } from './lagekarte/messQuelle';
 import { HistorienBanner } from './lagekarte/HistorienBanner';
@@ -99,7 +102,7 @@ export default function LagekartePage() {
   // Imperative Karten-API (Upload-Platzierung in Viewport-Mitte, Auf-Bild-Zentrieren,
   // Abschnitt-/Zone-Zeichnen abschließen).
   const kartenRef = useRef<KartenHandle>(null);
-  const [zeichnenBereit, setZeichnenBereit] = useState(false);
+  const [zeichenStand, setZeichenStand] = useState<ZeichenStand>(LEERER_ZEICHENSTAND);
 
   // Neuentwurf S5: Rahmen, Überlagerungen, rechte Leiste.
   const { token } = useRollen();
@@ -363,6 +366,7 @@ export default function LagekartePage() {
     zoneEntwurf,
     zoneBestaetigung,
     zoneSpeichern,
+    abschnittSpeichern,
     zoneZeichnenNonce,
     zoneAuswahl,
     auswahl,
@@ -388,6 +392,7 @@ export default function LagekartePage() {
     aendereSymbol,
     bestaetigungSpeichern,
     bestaetigungVerwerfen,
+    onBestaetigungZurueck,
     onPlatzierenStart,
     onPlatzierenAbbrechen,
     onAbschnittZeichnenStart,
@@ -485,20 +490,77 @@ export default function LagekartePage() {
    * einem Klick. terra-draw bricht selbst erst beim `keyup` ab — dann ist der Modus schon
    * beendet; es gibt also keinen zweistufigen Ablauf „erst Entwurf, dann Werkzeug".
    * Nicht, wenn jemand gerade schreibt oder ein anderer Handler die Taste schon genommen hat
-   * (ein offenes Menü, ein Dialog). Die übrigen Modi bekommen das bewusst NICHT mit: dort
-   * steht ein Entwurf, der mehr kostet als eine Messung.
+   * (ein offenes Menü, ein Dialog). Das Zeichnen trägt einen Entwurf, der mehr kostet als eine
+   * Messung: dort ist Esc zweistufig (LFH-712, nächster Effekt), die übrigen Modi bekommen
+   * die Taste bewusst NICHT mit.
    */
   useEffect(() => {
     if (!messForm) return;
     const taste = (e: KeyboardEvent) => {
       if (e.key !== 'Escape' || e.defaultPrevented) return;
-      const ziel = e.target as HTMLElement | null;
+      const ziel = e.target instanceof Element ? e.target : null;
       if (ziel?.closest('input, textarea, [contenteditable="true"]')) return;
+      // Ein offenes Menü/Dialog schließt selbst per Esc, ohne `preventDefault` (LFH-712, Review).
+      if (escGehoertOverlay(e)) return;
       onMessenBeenden();
     };
     window.addEventListener('keydown', taste);
     return () => window.removeEventListener('keydown', taste);
   }, [messForm, onMessenBeenden]);
+
+  /**
+   * Esc beim Zeichnen ist zweistufig (LFH-712): erst die Figur, dann der Modus. Die Stufe
+   * entscheidet `escStufe`; hier wird nur ausgeführt. Esc gehört dabei der Seite — terra-draw
+   * hat seine Abbruchtaste abgegeben (`zeichnen.ts`). `keydown`, nicht `keyup`: ein
+   * `keyup`-Zuhörer liefe nach terra-draws Abbruch am Canvas und sähe eine leere Figur.
+   * Am Fenster, nicht am Canvas: auch mit dem Fokus auf einem Knopf der Steuerung wirkt die
+   * Taste. Dieselben Riegel wie beim Messen (Eingabeziel, schon verarbeitete Taste).
+   *
+   * Die Ausführung liegt in einem Ref, der bei jedem Render neu gesetzt wird: die Handler des
+   * Hooks sind je Render neue Funktionen, und der Zuhörer soll trotzdem nur am Modus hängen.
+   */
+  // Eigenposition (LFH-712): nur auf dem Gerät, beim ersten Standort einmal anfliegen, danach
+  // folgt die Karte nicht — der Ausschnitt bleibt frei verschiebbar.
+  const eigenposition = useEigenposition({
+    onFehler: (text) => message.warning(text),
+    onErsterFix: (p) => setFlyToZiel({ lng: p.lon, lat: p.lat }),
+  });
+
+  const zeichenmodusAktiv = zoneEntwurf != null || zeichneAbschnittId != null;
+  const escAusfuehrenRef = useRef<() => void>(() => {});
+  escAusfuehrenRef.current = () => {
+    const stufe = escStufe({
+      phase: zoneBestaetigung != null ? 'bestaetigen' : 'zeichnen',
+      speichernLaeuft: zoneSpeichern || abschnittSpeichern,
+      punkte: zeichenStand.punkte,
+      serieGespeichert: zeichneAbschnittId != null ? 0 : zoneSerieAnzahl,
+    });
+    if (stufe === 'zurueckZumZeichnen') {
+      onBestaetigungZurueck();
+      message.info(QUITTUNG_VERWORFEN);
+    } else if (stufe === 'verwerfen') {
+      kartenRef.current?.zeichnungVerwerfen();
+      message.info(QUITTUNG_VERWORFEN);
+    } else if (stufe === 'fertig') {
+      onZoneZeichnenFertig();
+    } else if (stufe === 'abbrechen') {
+      onZeichnenAbbrechen();
+    }
+  };
+  useEffect(() => {
+    if (!zeichenmodusAktiv) return;
+    const taste = (e: KeyboardEvent) => {
+      // `repeat`: eine gehaltene Taste liefe sonst in einem Zug durch beide Stufen.
+      if (e.key !== 'Escape' || e.defaultPrevented || e.repeat) return;
+      const ziel = e.target instanceof Element ? e.target : null;
+      if (ziel?.closest('input, textarea, [contenteditable="true"]')) return;
+      if (escGehoertOverlay(e)) return;
+      e.preventDefault();
+      escAusfuehrenRef.current();
+    };
+    window.addEventListener('keydown', taste);
+    return () => window.removeEventListener('keydown', taste);
+  }, [zeichenmodusAktiv]);
 
   useEffect(() => {
     const ziel = parseRouteId(searchParams.get('gefahrengebiet') ?? undefined);
@@ -830,7 +892,7 @@ export default function LagekartePage() {
         zoneZeichnenNonce={zoneZeichnenNonce}
         onZoneKlick={onZoneKlick}
         onZoneGezeichnet={onZoneGezeichnet}
-        onZeichnenBereitAenderung={setZeichnenBereit}
+        onZeichnenStandAenderung={setZeichenStand}
         messen={messForm}
         onMessung={(geometrie, fertig) => messQuelle.melde({ geometrie, fertig })}
         fachebenen={aktiveFachebenen}
@@ -849,6 +911,7 @@ export default function LagekartePage() {
         griffModus={griffModus}
         onZeigerLage={zeigerQuelle.melde}
         massstabZiel={massstabZiel}
+        eigenposition={eigenposition.position}
       />
       <KartenUeberlagerung
         grundlage={istSchmal ? null : grundlageWahl}
@@ -858,6 +921,14 @@ export default function LagekartePage() {
         onNorden={() => kartenRef.current?.nachNorden()}
         onMessen={() => (messForm ? onMessenBeenden() : onMessenStart('strecke'))}
         messenAktiv={messForm != null}
+        eigenposition={{
+          an: eigenposition.an,
+          sperrGrund:
+            eigenposition.verfuegbarkeit === 'bereit'
+              ? null
+              : EIGENPOSITION_SPERRGRUND[eigenposition.verfuegbarkeit],
+          onUmschalten: eigenposition.umschalten,
+        }}
         leiste={
           breit
             ? {
@@ -891,7 +962,12 @@ export default function LagekartePage() {
           }
           phase={zoneBestaetigung != null ? 'bestaetigen' : 'zeichnen'}
           speichernLaeuft={zoneSpeichern}
-          abschliessenMoeglich={zeichnenBereit}
+          abschliessenMoeglich={zeichenStand.bereit}
+          punkte={zeichenStand.punkte}
+          punktZurueckMoeglich={zeichenStand.kannZurueck}
+          onPunktZurueck={() => {
+            kartenRef.current?.punktZurueck();
+          }}
           onAbschliessen={() => {
             const abgeschlossen =
               zeichneAbschnittId != null

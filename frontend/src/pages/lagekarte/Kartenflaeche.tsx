@@ -43,7 +43,7 @@ import { baueClusterDonut, setzeHuelleDurchlaessig } from './clusterDonut';
 import type { TzProps } from './taktischesZeichen';
 import type { GeoJsonPolygon, GeoJsonGeometry } from './geo';
 import { werteFachebenenKlickAus } from './geo';
-import { createZeichnung, type Zeichnung, type ZeichenModus } from './zeichnen';
+import { createZeichnung, type Zeichnung, type ZeichenModus, type ZeichenStand } from './zeichnen';
 import { createMessung, type MessZeichnung } from './messZeichnung';
 import type { MessForm, MessGeometrie } from './messung';
 import { wendeKartenDatenAn } from './kartenDaten';
@@ -81,6 +81,8 @@ import type { FachebeneQuelle } from '../../api/fachebenen';
 import { PUNKT_ZOOM, type StartAnsicht } from './startAnsicht';
 import { zonenPlakette } from './plakette';
 import { useRollen } from '../../components/instrument/rollenwerte';
+import { eigenpositionFc, sorgeFuerEigenpositionLayer } from './eigenpositionLayer';
+import type { Eigenposition } from './useEigenposition';
 
 // Worker-URL setzen, bevor die erste Map entsteht — diese Datei ist die einzige Stelle im Repo,
 // die eine Map erzeugt. Der Guard davor ist keine Paranoia, sondern deckt eine gemessene Bruchlinie
@@ -180,8 +182,11 @@ export interface KartenflaecheProps {
   zoneZeichnenNonce?: number;
   /** Callback nach abgeschlossenem Zeichnen einer Zone. */
   onZoneGezeichnet?: (geometrie: GeoJsonGeometry) => void;
-  /** true, sobald im aktiven Abschnitts-/Zonen-Entwurf mindestens drei Punkte gesetzt sind. */
-  onZeichnenBereitAenderung?: (bereit: boolean) => void;
+  /**
+   * Stand der laufenden Abschnitts-/Zonen-Figur (LFH-712): Punktzahl, „Abschließen" frei,
+   * „Letzten Punkt zurück" frei. Gemeldet bei jeder Änderung, nicht nur beim Abschluss.
+   */
+  onZeichnenStandAenderung?: (stand: ZeichenStand) => void;
   /** Klick auf eine Zone → Inspector. */
   onZoneKlick?: (id: number) => void;
   /** Messwerkzeug (LFH-616): aktive Form oder `null`. */
@@ -222,6 +227,11 @@ export interface KartenflaecheProps {
    * öffentliche `IControl`-Schnittstelle (`onAdd`/`onRemove`) in ein Band des Fußes gehängt.
    */
   massstabZiel?: HTMLElement | null;
+  /**
+   * Eigener Gerätestandort (LFH-712) als Punkt mit Genauigkeitskreis; `null`/fehlt = aus.
+   * Nur Darstellung — das Anfliegen beim ersten Standort übernimmt die Seite über `flyToZiel`.
+   */
+  eigenposition?: Eigenposition | null;
 }
 
 /** Imperative Karten-API für die Page: Upload-Platzierung + Auf-Bild-Zentrieren. */
@@ -235,6 +245,10 @@ export interface KartenHandle {
   zoneAbschliessen(): boolean;
   /** Aktives Abschnitt-Zeichnen abschließen. No-op, wenn nicht aktiv. */
   abschnittAbschliessen(): boolean;
+  /** Zuletzt gesetzten Punkt der laufenden Figur zurücknehmen (LFH-712); false ohne Punkt. */
+  punktZurueck(): boolean;
+  /** Angefangene Figur verwerfen, im Zeichenmodus bleiben (erste Esc-Stufe, LFH-712). */
+  zeichnungVerwerfen(): void;
   /** Laufende Messung abschließen (LFH-616); false bei zu wenigen Punkten. */
   messungAbschliessen(): boolean;
   /** Messung verwerfen und in derselben Form neu beginnen. */
@@ -282,7 +296,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     onZoneKlick,
     messen,
     onMessung,
-    onZeichnenBereitAenderung,
+    onZeichnenStandAenderung,
+    eigenposition,
     fachebenen,
     onBboxAenderung,
     onZoomAenderung,
@@ -312,6 +327,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     type: 'FeatureCollection',
     features: [],
   });
+  // Eigenposition (LFH-712): zuletzt gezeichnete Daten + Farbe, nach setStyle re-angelegt.
+  const eigenpositionRef = useRef({ daten: eigenpositionFc(null), farbe: rollen.bedien });
   // Image-Key → TzProps; der styleimagemissing-Handler erzeugt daraus lazy die Karten-Icons.
   const tzRegistryRef = useRef<Map<string, TzProps>>(new Map());
   // Cluster-DOM-Donut-Marker (`clusterSchluessel` → Marker). clusterDomRef = alle bekannten,
@@ -364,8 +381,12 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
   onFlaecheGezeichnetRef.current = onFlaecheGezeichnet;
   const onZoneGezeichnetRef = useRef(onZoneGezeichnet);
   onZoneGezeichnetRef.current = onZoneGezeichnet;
-  const onZeichnenBereitAenderungRef = useRef(onZeichnenBereitAenderung);
-  onZeichnenBereitAenderungRef.current = onZeichnenBereitAenderung;
+  const onZeichnenStandAenderungRef = useRef(onZeichnenStandAenderung);
+  onZeichnenStandAenderungRef.current = onZeichnenStandAenderung;
+  // Welcher der beiden Controller gerade zeichnet, sagen die Props — der Handle unten fragt
+  // genau diesen einen (Zone vor Abschnitt; beide zugleich lässt der Modus-Reducer nicht zu).
+  const zeichnenArtRef = useRef({ zeichnen, zoneZeichnen });
+  zeichnenArtRef.current = { zeichnen, zoneZeichnen };
   // Dritter Controller: Messen (LFH-616). Eigene Instanz, weil er bei jeder Änderung meldet
   // statt erst beim Abschluss — Begründung in `messZeichnung.ts`.
   const messRef = useRef<MessZeichnung | null>(null);
@@ -376,9 +397,14 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
 
   // Imperative API für die Page: Upload-Platzierung (Viewport-Mitte, Bild-Seitenverhältnis)
   // und Auf-Bild-Zentrieren. Pixel-Raum via project/unproject → exakt, ohne cos(lat)-Verzerrung.
-  useImperativeHandle(
-    ref,
-    () => ({
+  useImperativeHandle(ref, () => {
+    const aktiveZeichnung = () =>
+      zeichnenArtRef.current.zoneZeichnen
+        ? zoneDrawRef.current
+        : zeichnenArtRef.current.zeichnen
+          ? drawRef.current
+          : null;
+    return {
       initialeEckenFuerBild(ar) {
         const map = mapRef.current;
         if (!map) return null;
@@ -404,6 +430,12 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       abschnittAbschliessen() {
         return drawRef.current?.abschliessen() ?? false;
       },
+      punktZurueck() {
+        return aktiveZeichnung()?.punktZurueck() ?? false;
+      },
+      zeichnungVerwerfen() {
+        aktiveZeichnung()?.verwerfen();
+      },
       messungAbschliessen() {
         return messRef.current?.abschliessen() ?? false;
       },
@@ -420,9 +452,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       nachNorden() {
         mapRef.current?.resetNorthPitch();
       },
-    }),
-    [],
-  );
+    };
+  }, []);
 
   // Karte einmalig erzeugen.
   useEffect(() => {
@@ -605,6 +636,14 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       () => bilderRef.current,
       () => markerDatenRef.current,
       () => einsatzortDatenRef.current,
+    );
+    // Nach den übrigen Ebenen angemeldet → dieser Poller läuft zuletzt, der Punkt liegt oben.
+    wendeKartenDatenAn(map, () =>
+      sorgeFuerEigenpositionLayer(
+        map,
+        eigenpositionRef.current.daten,
+        eigenpositionRef.current.farbe,
+      ),
     );
   }, [style]);
 
@@ -851,6 +890,24 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     // bei jeder Daten-Änderung (SSE/Query-Invalidation) einklappen.
     schliesseSpiderRef.current?.();
   }, [markers, markerPlakette]);
+
+  // Eigenposition (LFH-712): Punkt + Genauigkeitskreis nachführen. Nach dem Marker-Effekt
+  // registriert, damit auch der erste Lauf über den Markern landet.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    eigenpositionRef.current = {
+      daten: eigenpositionFc(eigenposition ?? null),
+      farbe: rollen.bedien,
+    };
+    wendeKartenDatenAn(map, () =>
+      sorgeFuerEigenpositionLayer(
+        map,
+        eigenpositionRef.current.daten,
+        eigenpositionRef.current.farbe,
+      ),
+    );
+  }, [eigenposition, rollen.bedien]);
 
   // Einzel-Marker-Klick → Inspector (schluessel) + Cursor. Cluster-Klick läuft über die
   // DOM-Donut-Marker (eigener Effekt unten).
@@ -1167,7 +1224,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
           (g) => {
             if (g.type === 'Polygon') onFlaecheGezeichnetRef.current?.(g);
           },
-          (bereit) => onZeichnenBereitAenderungRef.current?.(bereit),
+          (stand) => onZeichnenStandAenderungRef.current?.(stand),
           'td-abschnitt',
         );
       }
@@ -1186,7 +1243,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
         zoneDrawRef.current = createZeichnung(
           map,
           (g) => onZoneGezeichnetRef.current?.(g),
-          (bereit) => onZeichnenBereitAenderungRef.current?.(bereit),
+          (stand) => onZeichnenStandAenderungRef.current?.(stand),
           'td-zone',
         );
       }
