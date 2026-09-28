@@ -24,6 +24,7 @@ import type { GeoJsonGeometry, GeoJsonPolygon } from './geo';
 import type { ZeichenModus } from './zeichnen';
 import type { MessForm } from './messung';
 import type { PlatzierenPunktTyp } from './Sidebar';
+import { merkeZuletztVerwendet } from './zuletztVerwendet';
 
 /** EinsatzAnzeige → KopfdatenUpdate (Vollersatz) mit überschriebener Koordinate. */
 function kopfMitKoordinate(
@@ -310,6 +311,9 @@ export function useKartenInteraktion({
     },
     onSuccess: () => {
       erfolg('Taktisches Zeichen angelegt');
+      // „Zuletzt verwendet" (LFH-716, D5): erst hier, nach dem gespeicherten Zeichen — nicht
+      // beim Wählen im Picker, sonst stünden Zwischenstände statt benutzter Zeichen in der Leiste.
+      if (zeichenPlatzieren) merkeZuletztVerwendet(zeichenPlatzieren);
       qc.invalidateQueries({ queryKey: einsatzKeys.freieZeichen(einsatzId) });
       // Serienmodus (LFH-332/M76): der Platzier-Modus überlebt den POST, der Entwurf in der
       // Sidebar ohnehin (er wird dort nie zurückgesetzt). Beendet wird nur noch über

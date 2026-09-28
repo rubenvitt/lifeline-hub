@@ -2,8 +2,8 @@
 
 ## 1. „Zuletzt verwendet“ (Speicher)
 
-- [ ] 1.1 `pages/lagekarte/zuletztVerwendet.ts` samt Test aus C9 übernehmen (Deckel 6, jüngstes vorn, Dubletten wandern, lat/lon/label/ansicht_id fallen weg, kaputter/fehlender Speicher → leer, Abonnement); verifizieren: `zuletztVerwendet.test.ts` grün
-- [ ] 1.2 `useKartenInteraktion.ts`: im `onSuccess` von `legeZeichenMutation` `merkeZuletztVerwendet(zeichenPlatzieren)` rufen; verifizieren: Test in `useKartenInteraktion.test.tsx`, dass ein erfolgreiches Anlegen merkt und ein gescheitertes nicht
+- [x] 1.1 `pages/lagekarte/zuletztVerwendet.ts` samt Test aus C9 übernehmen (Deckel 6, jüngstes vorn, Dubletten wandern, lat/lon/label/ansicht_id fallen weg, kaputter/fehlender Speicher → leer, Abonnement); verifizieren: `zuletztVerwendet.test.ts` grün
+- [x] 1.2 `useKartenInteraktion.ts`: im `onSuccess` von `legeZeichenMutation` `merkeZuletztVerwendet(zeichenPlatzieren)` rufen; verifizieren: Test in `useKartenInteraktion.test.tsx`, dass ein erfolgreiches Anlegen merkt und ein gescheitertes nicht
 
 ## 2. Zeichen-Picker als Bildraster
 
