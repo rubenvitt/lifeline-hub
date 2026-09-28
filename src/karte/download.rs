@@ -1,7 +1,6 @@
-//! Offline-Karten-Download (LFH-181): SSRF-Guard, dedizierter HTTP-Client und der
-//! Streaming-Download-Core. Bewusst getrennt vom Endpunkt — der Guard (`validiere_download_url`)
-//! blockt interne Ziele, der Core (`lade_datei`) ist dagegen gegen einen lokalen
-//! Loopback-Fixture testbar (er validiert NICHT selbst).
+//! Offline-Karten-Download (LFH-181): SSRF-Guard, dedizierter HTTP-Client und
+//! Streaming-Download-Kern. Der Guard (`validiere_download_url`) blockt interne Ziele; der Kern
+//! (`lade_datei`) validiert NICHT selbst und ist so gegen einen Loopback-Fixture testbar.
 
 use std::collections::HashMap;
 use std::net::IpAddr;
@@ -14,8 +13,7 @@ use reqwest::Url;
 use sha2::{Digest, Sha256};
 use tokio::io::AsyncWriteExt;
 
-/// Transienter Download-Fortschritt — lebt rein in-memory im `AppState` (keine DB-Spalte).
-/// `gesamt = 0` heißt „Gesamtgröße unbekannt" (keine Content-Length).
+/// Transienter Download-Fortschritt, nur im `AppState`. `gesamt = 0` heißt „Größe unbekannt“.
 #[derive(Debug, Default)]
 pub struct Fortschritt {
     pub geladen: AtomicU64,
@@ -31,29 +29,25 @@ pub fn neue_fortschritt_map() -> FortschrittMap {
     Arc::new(RwLock::new(HashMap::new()))
 }
 
-/// Poisoning-fester Lese-Zugriff (LFH-260/F35): eine Panik unter dem Write-Lock würde ihn sonst
-/// vergiften und `.read().unwrap()` in allen folgenden Karten-Handlern panicken lassen. Wir
-/// erholen uns per `into_inner` (Muster wie `geocoding/mod.rs`) — der HashMap-Inhalt bleibt
-/// konsistent, weil unter dem Lock nur infallible insert/remove laufen.
+/// Poisoning-fester Lesezugriff: eine Panik unter dem Write-Lock soll nicht jeden folgenden
+/// Karten-Handler panicken lassen. `into_inner` ist sicher, weil unter dem Lock nur infallible
+/// insert/remove laufen.
 pub fn lies_fortschritt(
     map: &FortschrittMap,
 ) -> std::sync::RwLockReadGuard<'_, HashMap<i64, Arc<Fortschritt>>> {
     map.read().unwrap_or_else(|e| e.into_inner())
 }
 
-/// Poisoning-fester Schreib-Zugriff (LFH-260/F35), siehe [`lies_fortschritt`].
+/// Poisoning-fester Schreibzugriff, s. [`lies_fortschritt`].
 pub fn schreibe_fortschritt(
     map: &FortschrittMap,
 ) -> std::sync::RwLockWriteGuard<'_, HashMap<i64, Arc<Fortschritt>>> {
     map.write().unwrap_or_else(|e| e.into_inner())
 }
 
-/// Atomare Slot-Reservierung: fügt `f` unter `id` ein und liefert `true`, wenn der Slot frei war;
-/// `false`, wenn bereits ein Download/Reload für `id` läuft. Check UND Insert unter EINEM
-/// write-Lock — verhindert das TOCTOU des id-wiederverwendenden In-Place-Reload-Pffads (getrennter
-/// read-Check + späteres write-Insert liessen zwei parallele Requests denselben `.part`-Pfad
-/// truncaten/interleaven → korrupte Live-Karte). `offline_download` (frische id je Zeile) braucht
-/// das nicht, teilt aber denselben Helfer.
+/// Atomare Slot-Reservierung: `true`, wenn der Slot frei war; `false`, wenn für `id` schon ein
+/// Download/Reload läuft. Check UND Insert unter EINEM Write-Lock — beim id-wiederverwendenden
+/// In-Place-Reload schrieben sonst zwei parallele Requests in denselben `.part`-Pfad.
 pub fn reserviere_fortschritt(map: &FortschrittMap, id: i64, f: Arc<Fortschritt>) -> bool {
     let mut m = schreibe_fortschritt(map);
     if m.contains_key(&id) {
@@ -70,10 +64,10 @@ pub struct DownloadErgebnis {
     pub sha256: String,
 }
 
-/// Fehlerursachen des Download-Core (der Handler mappt sie auf `AppError`/FSM-Status).
+/// Fehlerursachen des Download-Kerns (der Handler mappt sie auf `AppError`/Status).
 #[derive(Debug)]
 pub enum DownloadFehler {
-    /// Abgebrochen (Admin hat den Abbruch ausgelöst) — Teil-Datei ist zu löschen.
+    /// Vom Admin abgebrochen; die Teil-Datei ist zu löschen.
     Abgebrochen,
     /// Upstream antwortete mit einem Nicht-Erfolgs-Status.
     Status(u16),
@@ -81,11 +75,11 @@ pub enum DownloadFehler {
     Http(String),
     /// Lokaler I/O-Fehler beim Schreiben der Datei.
     Io(String),
-    /// Heruntergeladene Datei stimmt nicht mit dem erwarteten SHA256-Pin überein (Supply-Chain).
+    /// Die Datei stimmt nicht mit dem erwarteten SHA256-Pin überein (Supply-Chain).
     HashMismatch { erwartet: String, ist: String },
     /// Download überschreitet die erlaubte Maximalgröße (Content-Length oder gestreamt erkannt).
     ZuGross { grenze: u64 },
-    /// Nicht genug freier Plattenplatz für die (server-gemeldete) Download-Größe.
+    /// Nicht genug freier Platz für die vom Server gemeldete Größe.
     KeinPlatz { frei: u64, benoetigt: u64 },
 }
 
@@ -115,8 +109,8 @@ impl std::fmt::Display for DownloadFehler {
     }
 }
 
-/// True, wenn eine IP in einem internen/nicht-routbaren Bereich liegt (SSRF-Schutz).
-/// `pub(crate)`, damit der pinnende Proxy-Resolver (`karte::proxy`) dieselbe Klassifikation nutzt.
+/// True, wenn eine IP in einem internen/nicht routbaren Bereich liegt (SSRF-Schutz). Auch vom
+/// pinnenden Proxy-Resolver (`karte::proxy`) genutzt.
 pub(crate) fn ip_ist_intern(ip: &IpAddr) -> bool {
     match ip {
         IpAddr::V4(v4) => {
@@ -137,8 +131,8 @@ pub(crate) fn ip_ist_intern(ip: &IpAddr) -> bool {
             {
                 return true;
             }
-            // Eingebettetes IPv4 in ALLEN gängigen Formen rekursiv prüfen — sonst SSRF gegen interne
-            // Ziele über IPv4-compatible/NAT64/6to4 (to_ipv4_mapped allein deckt nur ::ffff:a.b.c.d).
+            // Eingebettetes IPv4 in allen gängigen Formen prüfen; `to_ipv4_mapped` allein deckt nur
+            // `::ffff:a.b.c.d`.
             let s = v6.segments();
             // IPv4-mapped (::ffff:a.b.c.d) UND IPv4-compatible (::a.b.c.d).
             if let Some(v4) = v6.to_ipv4() {
@@ -176,27 +170,23 @@ pub(crate) fn ip_ist_intern(ip: &IpAddr) -> bool {
     }
 }
 
-/// Prüft eine (auch per Redirect erreichte) URL auf SSRF-Sicherheit: nur `https`, kein
-/// `localhost`, keine internen IP-Literale. Domains, die per DNS auf interne IPs zeigen,
-/// werden hier (Admin-only, v1) bewusst nicht aufgelöst — Defense-in-Depth, kein Vollschutz.
+/// Prüft eine (auch per Redirect erreichte) URL: nur `https`, kein `localhost`, keine internen
+/// IP-Literale. Domains werden hier nicht aufgelöst; DNS-Rebinding schließt der pinnende
+/// Resolver des Download-Clients.
 pub fn url_ist_sicher(url: &Url) -> Result<(), String> {
     url_ist_sicher_mit(url, dev_loopback_download_erlaubt())
 }
 
-/// Opt-in Dev-Escape `--download-allow-loopback` / `LIFELINE_DOWNLOAD_ALLOW_LOOPBACK`:
-/// erlaubt Downloads von Loopback-Adressen (lokaler Dev-Object-Store, auch http).
-/// Default AUS → Produktion bleibt streng (https + kein-intern).
-///
-/// Seit LFH-239/F18 aus der beim Start gesetzten [`crate::karte::KarteConfig`] statt bei
-/// jedem Aufruf aus dem Prozess-Env: der Schalter steht damit in `--help`, ein aktiver
-/// Escape wird beim Start protokolliert, und eine ambient gesetzte Variable kann die
-/// Security-Tests nicht mehr kippen (im Testprozess greift der sichere Default).
+/// Opt-in Dev-Escape `--download-allow-loopback` / `LIFELINE_DOWNLOAD_ALLOW_LOOPBACK`: erlaubt
+/// Downloads von Loopback-Adressen (auch http). Vorgabe aus. Gelesen aus der beim Start
+/// gesetzten [`crate::karte::KarteConfig`], damit eine ambient gesetzte Variable die
+/// Security-Tests nicht kippen kann.
 fn dev_loopback_download_erlaubt() -> bool {
     crate::karte::karte_config().download_allow_loopback
 }
 
-/// Ist der von `url` bereits geparste Host ein Loopback (127.0.0.0/8, ::1, „localhost")? Nutzt
-/// `host_str()` — Userinfo/Spoofing ist dort aufgelöst (`localhost@evil.com` → Host evil.com).
+/// Ist der geparste Host ein Loopback (127.0.0.0/8, ::1, „localhost“)? `host_str()` hat Userinfo
+/// schon aufgelöst (`localhost@evil.com` → Host evil.com).
 fn host_ist_loopback(url: &Url) -> bool {
     let Some(host) = url.host_str() else {
         return false;
@@ -208,10 +198,10 @@ fn host_ist_loopback(url: &Url) -> bool {
     matches!(host_clean.parse::<IpAddr>(), Ok(ip) if ip.is_loopback())
 }
 
-/// Testbarer Kern: `dev_loopback` explizit statt aus dem Env gelesen (keine Parallel-Test-Races).
+/// Testbarer Kern mit explizitem `dev_loopback` (keine Races über das Env).
 fn url_ist_sicher_mit(url: &Url, dev_loopback: bool) -> Result<(), String> {
-    // Opt-in Dev-Escape: lokaler Object-Store via Loopback (auch http). Sonst greift der strikte
-    // SSRF-Guard (dies ist der untrusted Download-Pfad, u. a. für „Per URL"-Eingaben).
+    // Dev-Escape nur für Loopback, sonst der strikte SSRF-Guard (der Pfad nimmt auch „Per
+    // URL“-Eingaben).
     if dev_loopback && host_ist_loopback(url) {
         return Ok(());
     }
@@ -242,19 +232,13 @@ pub fn validiere_download_url(roh: &str) -> Result<Url, String> {
     Ok(url)
 }
 
-/// Idle-/Read-Timeout: bricht ab, wenn der Upstream die Verbindung offen hält, aber für so lange
-/// KEINE Bytes mehr liefert (stockender CDN/Proxy, half-open). Bewusst NICHT der Globaltimeout —
-/// `read_timeout` setzt sich nach jedem erfolgreichen Read zurück, killt also keinen gesunden,
-/// langsamen Großdownload, begrenzt aber den Stall (sonst hinge `chunk().await` ewig und das
-/// Abbruch-Flag, das nur zwischen den Chunks geprüft wird, würde nie greifen).
+/// Idle-/Read-Timeout gegen stockende Verbindungen. Setzt sich nach jedem Read zurück, beendet
+/// also keinen gesunden, langsamen Großdownload — ohne ihn hinge `chunk().await` ewig, und das
+/// Abbruch-Flag griffe nie.
 const READ_TIMEOUT_SEKUNDEN: u64 = 60;
 
-/// Dedizierter Download-Client: connect-Timeout (gegen tote Hosts) + read/idle-Timeout (gegen
-/// stockende Verbindungen), aber KEIN Globaltimeout (sonst würde ein gesunder, langsamer
-/// Mehrhundert-MB-Download gekillt). Redirects werden gefolgt, aber JEDER Hop wird neu auf SSRF
-/// geprüft (N.O.M.A.D. redirectet github.com → release-assets.githubusercontent.com).
-/// Redirect-Policy, die JEDEN Hop erneut auf SSRF-Sicherheit prüft (max. 10 Hops). Herausgezogen,
-/// damit der Proxy-Client (`karte::proxy`) dieselbe per-Hop-Prüfung teilt (LFH-182).
+/// Redirect-Policy, die JEDEN Hop erneut auf SSRF-Sicherheit prüft (max. 10 Hops). Geteilt mit
+/// dem Proxy-Client (`karte::proxy`).
 pub fn ssrf_redirect_policy() -> reqwest::redirect::Policy {
     reqwest::redirect::Policy::custom(|attempt| {
         if attempt.previous().len() >= 10 {
@@ -267,11 +251,10 @@ pub fn ssrf_redirect_policy() -> reqwest::redirect::Policy {
     })
 }
 
-/// Dedizierter Download-Client (siehe Modul-Doku). Nutzt die geteilte SSRF-Redirect-Policy UND
-/// den pinnenden DNS-Resolver (`proxy::SichererResolver`, LFH-187/B1): der Host wird vor dem
-/// Connect selbst aufgelöst und über `nur_public` gefiltert — reqwest connectet exakt auf public
-/// IPs, es gibt kein Re-Resolve-/Rebind-Fenster. Schließt DNS-Rebinding auch für den (admin-only)
-/// Download-Pfad, nicht nur für den Proxy. `url_ist_sicher` (Schema/Literal-IP) bleibt Pre-Check.
+/// Dedizierter Download-Client: Connect- und Read-Timeout, aber kein Gesamt-Timeout (sonst
+/// stürbe ein langsamer Mehrhundert-MB-Download). Nutzt die SSRF-Redirect-Policy und den
+/// pinnenden DNS-Resolver (`proxy::SichererResolver`): der Host wird selbst aufgelöst und über
+/// `nur_public` gefiltert, es gibt kein Rebind-Fenster. `url_ist_sicher` bleibt Vorabprüfung.
 pub fn download_client() -> reqwest::Client {
     reqwest::Client::builder()
         .connect_timeout(Duration::from_secs(20))
@@ -283,10 +266,9 @@ pub fn download_client() -> reqwest::Client {
         .expect("Download-Client baubar")
 }
 
-/// Entfernt die vom Download-Manager VERWALTETEN Dateien einer Karte (finale `karte-{id}.mbtiles`
-/// + evtl. `.part`-Rest). Best-effort (Fehler werden ignoriert). NUR für gemanagte Downloads
-/// aufrufen — extern via `offline_registrieren` registrierte Karten haben einen beliebigen,
-/// admin-gelieferten Pfad und dürfen NICHT angefasst werden.
+/// Entfernt die vom Download-Manager verwalteten Dateien einer Karte (`karte-{id}.mbtiles` und
+/// `.part`-Rest), best-effort. NUR für gemanagte Downloads — extern registrierte Karten haben
+/// einen admin-gelieferten Pfad und dürfen nicht angefasst werden.
 pub async fn entferne_download_dateien(karten_dir: &Path, id: i64) {
     let _ = tokio::fs::remove_file(karten_dir.join(format!("karte-{id}.mbtiles"))).await;
     let _ = tokio::fs::remove_file(karten_dir.join(format!("karte-{id}.mbtiles.part"))).await;
@@ -300,23 +282,19 @@ fn hex(bytes: &[u8]) -> String {
     s
 }
 
-/// Harte Obergrenze für einen einzelnen Karten-Download (LFH-187/B2): Backstop gegen
-/// Platten-Erschöpfung durch eine bösartige/fehlkonfigurierte Quelle ohne Größen-Pin (z.B. der
-/// „Per-URL"-Pfad, der keine `groesse_erwartet` sendet). Großzügig: regionale Vektor-MBTiles liegen
-/// bei einigen GB; 64 GiB deckt auch Länder-Ausschnitte, kappt aber Absurdes/Endlos-Streams.
+/// Harte Obergrenze je Karten-Download: Backstop gegen Platten-Erschöpfung durch eine Quelle
+/// ohne Größen-Pin (z. B. „Per URL“). 64 GiB deckt auch Länder-Ausschnitte.
 pub const MAX_DOWNLOAD_BYTES: u64 = 64 * 1024 * 1024 * 1024;
 
-/// True, wenn `frei` Bytes für einen Download von `groesse` reichen (inkl. 10 % Reserve).
-/// Saturating gegen Overflow bei sehr großen `groesse`. Geteilt von Handler-Vorabcheck und
-/// Streaming-Core, damit die Reserve-Regel eine einzige Quelle der Wahrheit hat.
+/// True, wenn `frei` für `groesse` plus 10 % Reserve reicht (saturierend). Eine Quelle für
+/// Handler-Vorabcheck und Streaming-Kern.
 pub fn genug_platz(frei: u64, groesse: u64) -> bool {
     frei >= groesse.saturating_add(groesse / 10)
 }
 
-/// Lädt `url` chunked nach `ziel_part`, rechnet inkrementell sha256 mit und meldet Fortschritt.
-/// Prüft vor jedem Chunk `fortschritt.abbruch`. KEIN Range-Resume (v1: einmaliger Prep-Download).
-/// Validiert die URL NICHT selbst — der Aufruf-Pfad (Endpunkt) hat sie bereits geprüft, der
-/// Redirect-Client prüft jeden Hop. Die Teil-Datei aufzuräumen ist Sache des Aufrufers.
+/// Lädt `url` chunkweise nach `ziel_part`, rechnet sha256 mit und meldet Fortschritt; prüft vor
+/// jedem Chunk `fortschritt.abbruch`. Kein Range-Resume. Validiert die URL NICHT selbst (das
+/// tun Endpunkt und Redirect-Policy); die Teil-Datei räumt der Aufrufer.
 pub async fn lade_datei(
     client: &reqwest::Client,
     url: Url,
@@ -333,9 +311,7 @@ pub async fn lade_datei(
     if !resp.status().is_success() {
         return Err(DownloadFehler::Status(resp.status().as_u16()));
     }
-    // Vorab-Guards anhand der server-gemeldeten Content-Length (deckt BEIDE Pfade — auch den
-    // Per-URL-Pfad ohne Katalog-`groesse_erwartet`). VOR dem Anlegen der `.part`-Datei, damit ein
-    // zu großer/nicht passender Download keine leere Teil-Datei hinterlässt.
+    // Vorab-Guards über die gemeldete Content-Length, VOR dem Anlegen der `.part`-Datei.
     if let Some(len) = resp.content_length() {
         fortschritt.gesamt.store(len, Ordering::Relaxed);
         if len > max_bytes {
@@ -373,8 +349,8 @@ pub async fn lade_datei(
             None => break,
         };
         geladen += chunk.len() as u64;
-        // Streaming-Backstop: fängt fehlende/gelogene Content-Length ab (der Vorab-Check greift
-        // nur bei bekannter Länge). Vor dem Schreiben prüfen → kein Byte über der Grenze auf Platte.
+        // Streaming-Backstop gegen fehlende oder gelogene Content-Length; geprüft vor dem
+        // Schreiben.
         if geladen > max_bytes {
             return Err(DownloadFehler::ZuGross { grenze: max_bytes });
         }
@@ -460,17 +436,12 @@ mod tests {
         assert!(url_ist_sicher_mit(&u("https://8.8.8.8/x.mbtiles"), true).is_ok());
     }
 
-    /// Pinnt die Einschränkung, aus der die Gestalt der lokalen Dev-URL folgt:
-    /// `host_ist_loopback` vergleicht den HOSTNAMEN und löst bewusst kein DNS auf
-    /// (Defense-in-Depth, siehe `url_ist_sicher`). Ein Name UNTERHALB von `.localhost`
-    /// ist damit kein Loopback — obwohl RFC 6761 ihn genau dafür reserviert und der
-    /// System-Resolver ihn auf 127.0.0.1 abbildet.
+    /// `host_ist_loopback` vergleicht den Hostnamen und löst kein DNS auf; ein Name unterhalb von
+    /// `.localhost` ist damit kein Loopback, obwohl RFC 6761 ihn dafür reserviert.
     ///
-    /// Praktische Folge: Garages unsignierter Lesepfad ordnet Anfragen über den
-    /// Host-Namen zu, `http://maps.web.garage.localhost:3902/<key>` fiele hier durch
-    /// (und zwar auf „nur https erlaubt"). Deshalb gibt `mise run garage` dem Bucket
-    /// den globalen Alias `localhost` — nur so bleibt der Hostname exakt `localhost`.
-    /// Wer den Alias entfernt, macht den Kartendownload im Dev-Stack unbrauchbar.
+    /// Folge: `http://maps.web.garage.localhost:3902/<key>` fiele durch. Deshalb gibt
+    /// `mise run garage` dem Bucket den globalen Alias `localhost`; ohne ihn ist der
+    /// Kartendownload im Dev-Stack unbrauchbar.
     #[test]
     fn subdomain_von_localhost_ist_kein_loopback() {
         let u = |s: &str| Url::parse(s).unwrap();
@@ -520,9 +491,8 @@ mod tests {
         hex(&Sha256::digest(body))
     }
 
-    /// Fixture, die `chunks` Chunks à `chunk_len` Bytes OHNE Content-Length streamt (chunked
-    /// transfer via `Body::from_stream`) — so greift der Content-Length-Vorabcheck NICHT und der
-    /// Streaming-Backstop im Loop kann getroffen werden.
+    /// Fixture, die `chunks` × `chunk_len` Bytes OHNE Content-Length streamt, damit der
+    /// Streaming-Backstop getroffen wird.
     async fn spawn_streaming_fixture(chunks: usize, chunk_len: usize) -> String {
         use axum::{body::Body, routing::get, Router};
         let app = Router::new().route(
@@ -548,8 +518,7 @@ mod tests {
         let url_str = spawn_fixture(body.clone()).await;
         let tmp = tempfile::tempdir().unwrap();
         let ziel = tmp.path().join("karte-1.pmtiles.part");
-        // Client OHNE Redirect-Policy nötig — Loopback hat keinen Redirect; download_client()
-        // würde den Initial-Request NICHT blocken (Policy greift nur bei Redirects).
+        // Loopback hat keinen Redirect; die Policy greift nur bei Redirects.
         let client = download_client();
         let fortschritt = Fortschritt::default();
         let url = Url::parse(&url_str).unwrap();
@@ -572,8 +541,7 @@ mod tests {
         );
     }
 
-    // TOCTOU-Fix (LFH-187/B3): atomare Slot-Reservierung — zweite Reservierung derselben id wird
-    // abgelehnt, andere id ist frei.
+    // Atomare Slot-Reservierung: eine zweite Reservierung derselben id wird abgelehnt.
     #[test]
     fn reserviere_fortschritt_ist_atomar_ein_slot_pro_id() {
         let map = neue_fortschritt_map();
@@ -591,7 +559,7 @@ mod tests {
         );
     }
 
-    // B2 (LFH-187): Plattenplatz-Prädikat mit 10 % Reserve — pure, deshalb direkt testbar.
+    // Plattenplatz-Prädikat mit 10 % Reserve.
     #[test]
     fn genug_platz_beachtet_zehn_prozent_reserve() {
         assert!(genug_platz(1100, 1000), "exakt Größe + 10 % passt");
@@ -600,15 +568,14 @@ mod tests {
             "1 Byte unter Größe + 10 % reicht nicht"
         );
         assert!(genug_platz(50, 0), "Nullgröße passt immer");
-        // Saturating: eine riesige Größe (Reserve würde overflowen) panickt nicht und passt nicht
-        // in wenig freien Platz.
+        // Saturierend: eine riesige Größe panickt nicht und passt nicht.
         assert!(
             !genug_platz(1000, u64::MAX),
             "u64::MAX-Größe passt nicht in 1000 Bytes frei"
         );
     }
 
-    // B2: ein Download über der Max-Größe wird abgebrochen (hier via Content-Length erkannt).
+    // Ein Download über der Maximalgröße wird abgebrochen (hier über Content-Length erkannt).
     #[tokio::test]
     async fn lade_datei_lehnt_download_ueber_max_ab() {
         let body = b"y".repeat(2000);
@@ -633,9 +600,8 @@ mod tests {
         );
     }
 
-    // B2: OHNE Content-Length (chunked) greift der Vorab-Check nicht — der Streaming-Backstop im
-    // Loop muss den Download beim Überschreiten von max_bytes abbrechen (Schutz gegen unsized/
-    // lügende Quellen). Der einzige Disk-Exhaustion-Schutz für Streams ohne Content-Length.
+    // Ohne Content-Length greift nur der Streaming-Backstop — der einzige Schutz gegen
+    // Platten-Erschöpfung bei Streams ohne Längenangabe.
     #[tokio::test]
     async fn lade_datei_streaming_backstop_ohne_content_length() {
         let url_str = spawn_streaming_fixture(20, 500).await; // 20×500 = 10 000 Bytes, chunked
@@ -663,9 +629,8 @@ mod tests {
         );
     }
 
-    // B1 (LFH-187): der Download-Client pinnt DNS (nur_public-Resolver). Ein HOSTNAME, der auf
-    // Loopback auflöst (`localhost` → 127.0.0.1/::1), wird geblockt — schließt DNS-Rebinding auf
-    // interne Ziele. (IP-Literale wie 127.0.0.1 umgehen den Resolver; deshalb ein Hostname.)
+    // Der Download-Client pinnt DNS: ein Hostname, der auf Loopback auflöst, wird geblockt.
+    // IP-Literale umgehen den Resolver, deshalb ein Hostname.
     #[tokio::test]
     async fn download_client_blockt_hostnamen_die_auf_loopback_aufloesen() {
         let url_str = spawn_fixture(b"x".repeat(100))
@@ -779,9 +744,8 @@ mod tests {
         entferne_download_dateien(dir, 7).await;
     }
 
-    /// LFH-260/F35: Ein Panic unter dem Write-Lock vergiftet die Fortschritt-Map. Der Zugriff
-    /// muss poisoning-fest sein (unwrap_or_else(into_inner), Muster wie geocoding/mod.rs), sonst
-    /// panicken alle folgenden Karten-Handler.
+    /// Eine Panik unter dem Write-Lock vergiftet die Fortschritt-Map; der Zugriff muss trotzdem
+    /// funktionieren.
     #[test]
     fn fortschritt_map_ueberlebt_vergifteten_lock() {
         let map = neue_fortschritt_map();
