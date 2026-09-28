@@ -1,12 +1,8 @@
 /**
- * Zeitformatierung der Kommunikations-Module (LFH-112).
- *
- * Backend liefert UTC-Strings im Format `YYYY-MM-DD HH:mm:ss` (ohne Zeitzone).
- * Seit LFH-136 delegiert dieses Modul an die zentrale Formatlogik in
- * `anzeige/format.ts`. Die parameterlosen Funktionen nutzen `DEFAULT_KONVENTIONEN`
- * und bleiben damit byte-identisch zum bisherigen Verhalten (rückwärtskompatibel
- * für die 7 Bestandskonsumenten). Konvention-bewusste Anzeige läuft über den Hook
- * `useAnzeigeKonventionen()` bzw. die `*MitKonvention`-Varianten.
+ * Zeitformatierung der Kommunikations-Module. Backend-Zeiten sind UTC `YYYY-MM-DD HH:mm:ss`
+ * ohne Zone; alles delegiert an `anzeige/format.ts`. Die parameterlosen Funktionen nutzen
+ * `DEFAULT_KONVENTIONEN`, konventionsbewusst sind der Hook `useAnzeigeKonventionen()` und die
+ * `*MitKonvention`-Varianten.
  */
 import {
   DEFAULT_KONVENTIONEN,
@@ -15,12 +11,12 @@ import {
   type AnzeigeKonventionen,
 } from '../anzeige/format';
 
-/** UTC-Wirestring → lokal `DD.MM.YYYY HH:mm` (Default-Konvention); leer → ''. */
+/** UTC-Wirestring → taktische DTG (Default-Konvention); leer → ''. */
 export function formatZeit(utcStr?: string | null): string {
   return formatZeitKonv(utcStr, DEFAULT_KONVENTIONEN);
 }
 
-/** UTC-Wirestring → `HH:mm` wenn heute, sonst `DD.MM. HH:mm` (Default); leer → ''. */
+/** UTC-Wirestring → taktische Uhrzeit wenn heute, sonst kurze DTG (Default); leer → ''. */
 export function formatZeitKurz(utcStr?: string | null): string {
   return formatZeitKurzKonv(utcStr, DEFAULT_KONVENTIONEN);
 }

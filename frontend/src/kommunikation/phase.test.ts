@@ -45,17 +45,15 @@ describe('Status-Deskriptoren', () => {
   });
 
   it('markiert genau die unbearbeiteten Eingangszustände, nicht jede offene Phase', () => {
-    // Der Kern von H47: „neu" und „gesichtet" tragen DIESELBE Phase und sahen
-    // deshalb identisch aus — zwei graue Tags, drei Buchstaben Unterschied.
+    // „neu" und „gesichtet" tragen DIESELBE Phase; die Marke unterscheidet sie.
     expect(MELDUNG_STATUS.neu.unbearbeitet).toBe(true);
     expect(AUFTRAG_STATUS.offen.unbearbeitet).toBe(true);
     expect(MELDUNG_STATUS.gesichtet.unbearbeitet).toBeUndefined();
     expect(MELDUNG_STATUS.gesichtet.phase).toBe('offen');
 
-    // Und die Marke hängt NICHT an der Phase: Entwurf, offene Erinnerung und
-    // angeforderte Nachforderung liegen ebenfalls auf `offen`. Eine fünfte
-    // KommPhase hätte sie alle stillschweigend zu „neu" umklassifiziert — das ist
-    // der Grund, warum der Träger ein Flag am Deskriptor ist.
+    // Die Marke hängt NICHT an der Phase: Entwurf, offene Erinnerung und angeforderte
+    // Nachforderung liegen ebenfalls auf `offen`. Eine fünfte KommPhase hätte sie alle zu „neu"
+    // umklassifiziert.
     expect(BEFEHL_STATUS.entwurf.unbearbeitet).toBeUndefined();
     expect(LAGEBERICHT_STATUS.entwurf.unbearbeitet).toBeUndefined();
     expect(ERINNERUNG_STATUS.offen.unbearbeitet).toBeUndefined();
@@ -82,17 +80,13 @@ describe('Status-Deskriptoren', () => {
   it('BEFEHL/LAGEBERICHT mappen entwurf→offen, freigegeben→abgeschlossen', () => {
     expect(BEFEHL_STATUS.entwurf).toEqual({ label: 'Entwurf', phase: 'offen' });
     expect(BEFEHL_STATUS.freigegeben).toEqual({ label: 'Freigegeben', phase: 'abgeschlossen' });
-    // Eine Achse, zwei Module: `BefehlStatus` und `LageberichtStatus` sind beide
-    // 'entwurf' | 'freigegeben' (api/types.generated.ts). Zwei divergierende Maps wären
-    // ein Fehler, den nur diese Zeile sieht.
+    // `BefehlStatus` und `LageberichtStatus` haben dieselben Werte; zwei divergierende Maps sähe
+    // nur diese Zeile.
     expect(LAGEBERICHT_STATUS).toEqual(BEFEHL_STATUS);
   });
 
   it('reproduziert die Bestandsfarben der beiden Listen', () => {
-    // Vor LFH-330/B2 gaben BefehlListe und LageberichtePage `green` für freigegeben und
-    // `default` sonst. Diese Zeilen pinnen „kein sichtbarer Farbwechsel gegen vorher"
-    // gegen PHASE_META, statt es zu behaupten — es gibt keinen
-    // Vollständigkeits-Guard über die Deskriptor-Menge.
+    // Pinnt die Farben gegen PHASE_META: freigegeben `success`, sonst `default`.
     expect(PHASE_META[BEFEHL_STATUS.entwurf.phase].color).toBe('default');
     expect(PHASE_META[BEFEHL_STATUS.freigegeben.phase].color).toBe('success');
   });

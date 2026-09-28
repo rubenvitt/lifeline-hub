@@ -15,27 +15,19 @@ import { BEFEHL_STATUS, StatusBadge } from '../kommunikation';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 
 /**
- * Befehlsliste des Aufträge/Befehle-Tabs (LFH-330 · B2, Bündel III).
+ * Befehlsliste des Aufträge/Befehle-Tabs.
  *
- * `form="karte"` — in JEDER Breite Karten, nicht erst unterhalb `md`. Ein Befehl wird als
- * EINHEIT gelesen (Schema, Fassung, Freigabestand), nicht spaltenweise verglichen; die
- * Nachbarflächen desselben Tabs (Aufträge, Meldungen, Nachforderungen) sind ebenfalls
- * kartenbasiert. Ein reiner Breakpoint-Rückfall (`form="auto"`) zeigte ab `md` wieder eine
- * Vergleichsfläche und wäre der Befund, nicht der Zielzustand.
+ * `form="karte"` in JEDER Breite: ein Befehl wird als Einheit gelesen (Schema, Fassung,
+ * Freigabestand), nicht verglichen; die Nachbarflächen des Tabs sind ebenfalls Karten. Das
+ * Spaltenregister bleibt die einzige Wahrheit für Etikett, Sortierung, Suche und Filter.
  *
- * Das Spaltenregister bleibt trotzdem die einzige Wahrheit: es trägt `etikett`, `sortWert`,
- * `suchText` und den Schemafilter, und der Kartenplan adressiert nur seine Schlüssel.
+ * DIE V-NUMMER IST KEIN ZIERRAT: die Fortschreibung legt eine neue Zeile mit gleichem Titel
+ * an, der Vorgänger bleibt freigegeben liegen. Die v-Nummer unterscheidet sie und erscheint
+ * immer, nicht erst ab `version > 1`. Die Gruppierung Entwürfe/Freigegeben zerschneidet die
+ * Kette bewusst: nur der Entwurf ist bearbeitbar.
  *
- * ── DIE V-NUMMER IST KEIN ZIERRAT ────────────────────────────────────────────────────
- * Die Fortschreibung legt eine NEUE Zeile mit `version + 1`, demselben Titel und derselben
- * Vorlage an; der Vorgänger bleibt freigegeben liegen. Die Liste enthält deshalb legitim
- * mehrere Zeilen mit identischem Titel, und die v-Nummer ist das einzige Merkmal, das sie
- * unterscheidet — sie darf nicht „nur bei `version > 1`" erscheinen. Die Gruppierung
- * Entwürfe/Freigegeben zerschneidet die Kette bewusst: nur der Entwurf ist bearbeitbar.
- *
- * Das Schema (`vorlage`) ist die SKK-Befehlsform und bestimmt, welche Abschnitte der Befehl
- * trägt. Es ist über die Fortschreibung unveränderlich — ein Merkmal der Kette, nicht der
- * Fassung — und als geschlossene Menge von vier Werten ein Filter, kein Freitext.
+ * Das Schema (`vorlage`) ist über die Fortschreibung unveränderlich und als geschlossene Menge
+ * ein Filter, kein Freitext.
  */
 
 function schemaLabel(schluessel: BefehlVorlageKey | string): string {
@@ -43,9 +35,8 @@ function schemaLabel(schluessel: BefehlVorlageKey | string): string {
 }
 
 /**
- * Modulkonstante, IN dieser Datei: der Guard verlangt die Marke `spaltenFuer` je
- * Konsumentendatei. Nie annotieren — eine Typangabe weitete `K` auf `string`, und der
- * Kartenplan nähme danach jeden Slot-Tippfehler stillschweigend an.
+ * Modulkonstante IN dieser Datei (der Guard verlangt `spaltenFuer` je Konsumentendatei). Nie
+ * annotieren — eine Typangabe weitete `K` auf `string`, und der Kartenplan nähme Tippfehler an.
  */
 const befehlSpalten = spaltenFuer<BefehlAnzeige>()([
   {
@@ -60,10 +51,8 @@ const befehlSpalten = spaltenFuer<BefehlAnzeige>()([
   {
     key: 'status',
     title: 'Status',
-    // Belegt einen Sekundärslot statt `karte.status`: dieses Modul bleibt auf der
-    // Kommunikations-Phasenachse (`kommunikation/phase.ts`), die bewusst außerhalb des
-    // A2-Statusfarb-Vertrags liegt — damit sieht der Befehl aus wie der Auftrag im
-    // Nachbar-Tab.
+    // Sekundärslot statt `karte.status`: der Befehl bleibt auf der Kommunikations-Phasenachse
+    // (außerhalb des Statusfarb-Vertrags) und sieht damit aus wie der Auftrag im Nachbar-Tab.
     render: (_t, b) => (
       <StatusBadge phase={BEFEHL_STATUS[b.status].phase} label={BEFEHL_STATUS[b.status].label} />
     ),
@@ -82,10 +71,9 @@ const befehlSpalten = spaltenFuer<BefehlAnzeige>()([
     key: 'fassung',
     title: 'Fassung',
     sortWert: (b) => b.zeitstand,
-    // v-Nummer, Zeitstand und Ersteller in EINER Zeile — drei Slots sind das Maximum.
-    // `zeitstand` läuft seit LFH-350 (F2/H60) durch `ZeitAnzeige` (taktische DTG in der
-    // Anzeigezone), gleichlautend mit den beiden Detailseiten. `sortWert` oben bleibt der
-    // rohe UTC-Wirestring: der sortiert lexikografisch korrekt, die DTG (`DDHHmm…`) nicht.
+    // v-Nummer, Zeitstand und Ersteller in EINER Zeile — drei Slots sind das Maximum. `zeitstand`
+    // läuft durch `ZeitAnzeige`; `sortWert` bleibt der rohe UTC-Wirestring, der lexikografisch
+    // korrekt sortiert (die DTG nicht).
     render: (_t, b) => (
       <>
         {`v${b.version} · `}
@@ -131,23 +119,16 @@ export default function BefehlListe({
 
   return (
     <div>
-      {/*
-        Die Mengen zählen den BESTAND, während die Gruppenköpfe das ANGEZEIGTE zählen — bei
-        aktiver Suche laufen die Zahlen deshalb auseinander. Gewollt: die Kopfzeile ist die
-        Lageauskunft, der Gruppenkopf die Auskunft über die Trefferliste.
-      */}
+      {/* Die Mengen zählen den BESTAND, die Gruppenköpfe das ANGEZEIGTE — bei aktiver Suche laufen sie
+         bewusst auseinander. */}
       <Bereichskopf
         titel="Befehle"
         meta={`${befehle.length} Befehle · ${entwuerfe} im Entwurf`}
         dataUpdatedAt={befehleQuery.dataUpdatedAt}
         aktion={
           darfSchreiben && (
-            // Kein `size`-Prop: Träger der Dichte ist das Dichte-Token am `ConfigProvider`.
-            //
-            // `aria-label` ist hier PFLICHT und keine Doppelung: antds Icon rendert
-            // `<span role="img" aria-label="plus">`, und dessen Etikett fließt in den
-            // berechneten Namen des Knopfes ein — ohne diese Zeile heißt er für
-            // Screenreader und `getByRole` „plus Befehl erteilen" (gemessen).
+            // `aria-label` ist PFLICHT: antds Icon schiebt `aria-label="plus"` in den berechneten Namen,
+            // sonst hieße der Knopf „plus Befehl erteilen".
             <Button
               type="primary"
               icon={<PlusOutlined />}
@@ -178,8 +159,7 @@ export default function BefehlListe({
         karte={{
           art: 'plan',
           titel: { spalte: 'titel', ziel: (b) => befehlDetailPfad(einsatzId, b.id) },
-          // Keine `aktion`: Freigeben/Fortschreiben/Drucken liegen auf der Detailseite,
-          // die einzige Interaktion der Zeile ist der Titel-Link.
+          // Keine `aktion`: Freigeben/Fortschreiben/Drucken liegen auf der Detailseite.
           sekundaer: ['status', 'schema', 'fassung'],
         }}
       />
