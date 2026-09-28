@@ -12,9 +12,9 @@ Aussage sie belegen.
 
 ## 2. Allowlist in der Registry
 
-- [ ] 2.1 `LAGEBILD_OFFLINE` und `istLagebildOfflineKey(key)` in `api/queryKeys.ts` nach design.md D3 anlegen. Die Rückmeldungen laufen als Sub-Key-Regel, die Meldungsliste bleibt draußen. Prüfen: Unit-Tests je Zweig, darunter `['einsatz-meldungen', 7, 'rueckmeldungen']` ja und `['einsatz-meldungen', 7]` nein.
-- [ ] 2.2 Guard `api/lagebildOffline.guard.test.ts`: Er baut einen Erfolgsstand für jeden Prefix aus `EINSATZ_KEYS` und `GLOBAL_KEYS`, dehydriert mit dem Persister-Filter und vergleicht die geschriebenen Prefixe exakt mit der Allowlist. Ein Fehler- und ein Ladezustand eines gelisteten Keys werden nicht geschrieben. Prüfen: grün, und zwei Mutationsproben (zusätzlicher Prefix, `shouldDehydrateQuery: () => true`) färben ihn rot.
-- [ ] 2.3 Die beiden Auflage-Kommentare in `queryKeys.ts` (`istKeyDesEinsatzes`, Kopf `GLOBAL_KEYS`) auf den gemessenen Stand bringen: `clear()` beim Abmelden, Einsatz-Räumung bei Rechteentzug, kein Konsument der Org-Gliederung (design.md D5). Prüfen: `pnpm lint` und `queryKeys.guard.test.ts` grün.
+- [x] 2.1 `LAGEBILD_OFFLINE` und `istLagebildOfflineKey(key)` in `api/queryKeys.ts` nach design.md D3 anlegen. Die Rückmeldungen laufen als Sub-Key-Regel, die Meldungsliste bleibt draußen. Prüfen: Unit-Tests je Zweig, darunter `['einsatz-meldungen', 7, 'rueckmeldungen']` ja und `['einsatz-meldungen', 7]` nein.
+- [x] 2.2 Guard `api/lagebildOffline.guard.test.ts`: Er baut einen Erfolgsstand für jeden Prefix aus `EINSATZ_KEYS` und `GLOBAL_KEYS`, dehydriert mit dem Persister-Filter und vergleicht die geschriebenen Prefixe exakt mit der Allowlist. Ein Fehler- und ein Ladezustand eines gelisteten Keys werden nicht geschrieben. Prüfen: grün, und zwei Mutationsproben (zusätzlicher Prefix, `shouldDehydrateQuery: () => true`) färben ihn rot.
+- [x] 2.3 Die beiden Auflage-Kommentare in `queryKeys.ts` (`istKeyDesEinsatzes`, Kopf `GLOBAL_KEYS`) auf den gemessenen Stand bringen: `clear()` beim Abmelden, Einsatz-Räumung bei Rechteentzug, kein Konsument der Org-Gliederung (design.md D5). Prüfen: `pnpm lint` und `queryKeys.guard.test.ts` grün.
 
 ## 3. Bestätigung, Liegezeit und `gcTime`
 
