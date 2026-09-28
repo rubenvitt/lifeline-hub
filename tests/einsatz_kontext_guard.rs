@@ -34,7 +34,6 @@ const DEFERRED_MODULE: &[&str] = &[
     "lagebericht",
     "sprechgruppe",
     "ort_vorschau",
-    "erinnerung",
     "nachforderung",
 ];
 

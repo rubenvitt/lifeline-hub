@@ -1,23 +1,17 @@
 use crate::app::AppState;
-use crate::auth::session::CurrentUser;
-use crate::einsatz::berechtigung::{
-    fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
-};
-use crate::einsatz::repo as einsatz_repo;
-use crate::extract::JsonBody;
-use crate::extract::PfadParam;
-use crate::live::LiveEvent;
-use crate::routes::support::pflicht;
-use crate::zeit::jetzt;
-
-/// Modul-Key dieses Route-Moduls (LFH-132).
-const MODUL_KEY: &str = "erinnerungen";
+use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
+use crate::einsatz::modul::Erinnerungen;
 use crate::erinnerung::{repo, ErinnerungAnzeige, STATUS_ERLEDIGT, STATUS_OFFEN, STATUS_QUITTIERT};
 use crate::error::AppError;
+use crate::extract::JsonBody;
+use crate::extract::PfadParam;
 use crate::kommunikation::{
     repo as krepo, OBJEKT_AUFTRAG, OBJEKT_ERINNERUNG, OBJEKT_MELDUNG, VOLLZUG_OFFEN,
     VOLLZUG_VOLLZOGEN,
 };
+use crate::live::LiveEvent;
+use crate::routes::support::pflicht;
+use crate::zeit::jetzt;
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -40,21 +34,10 @@ pub struct ListeParams {
 /// GET /api/einsaetze/{id}/erinnerungen — Erinnerungen listen (Lesezugriff).
 pub async fn liste(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzLesezugriff<Erinnerungen>,
     Query(params): Query<ListeParams>,
 ) -> Result<Json<Vec<ErinnerungAnzeige>>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
+    let einsatz_id = ctx.einsatz.id;
     let nur_offen = params.nur_offen.unwrap_or(false);
     Ok(Json(
         repo::liste(&state.pool, einsatz_id, nur_offen, &jetzt()).await?,
@@ -85,23 +68,10 @@ fn parse_faellig(roh: &str) -> Result<String, AppError> {
 /// POST /api/einsaetze/{id}/erinnerungen — Erinnerung anlegen (Schreibrecht + aktiv).
 pub async fn anlegen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzSchreibzugriff<Erinnerungen>,
     JsonBody(req): JsonBody<NeueErinnerung>,
 ) -> Result<(StatusCode, Json<ErinnerungAnzeige>), AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     let titel = pflicht(&req.titel, "Titel")?;
     if let Some(iv) = req.intervall_minuten {
         if iv <= 0 {
@@ -157,7 +127,7 @@ pub async fn anlegen(
     let r = repo::anlegen(
         &state.pool,
         einsatz_id,
-        benutzer.id,
+        ctx.benutzer.id,
         repo::ErinnerungDaten {
             titel: &titel,
             beschreibung,
@@ -174,39 +144,28 @@ pub async fn anlegen(
     Ok((StatusCode::CREATED, Json(r)))
 }
 
-/// Gemeinsamer Vorlauf für Status-Übergänge: Gates + Cross-Einsatz-Schutz.
-/// Gibt `org_id` des Einsatzes zurück (für kommunikation_status-Schreibpfad).
+/// Gemeinsamer Vorlauf für Status-Übergänge: Cross-Einsatz-Schutz (die Gates laufen im
+/// Extractor).
 async fn fordere_bearbeitbar(
     state: &AppState,
-    benutzer: &crate::auth::Benutzer,
     einsatz_id: i64,
     erinnerung_id: i64,
-) -> Result<i64, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
+) -> Result<(), AppError> {
     if !repo::gehoert_zu_einsatz(&state.pool, erinnerung_id, einsatz_id).await? {
         return Err(AppError::NotFound);
     }
-    Ok(einsatz.org_id)
+    Ok(())
 }
 
 /// POST /api/einsaetze/{id}/erinnerungen/{eid}/erledigen — Status → erledigt.
 pub async fn erledigen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, erinnerung_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Erinnerungen>,
+    PfadParam((_eid, erinnerung_id)): PfadParam<(i64, i64)>,
 ) -> Result<Json<ErinnerungAnzeige>, AppError> {
-    let org_id = fordere_bearbeitbar(&state, &benutzer, einsatz_id, erinnerung_id).await?;
+    let einsatz_id = ctx.einsatz.id;
+    let org_id = ctx.einsatz.org_id;
+    fordere_bearbeitbar(&state, einsatz_id, erinnerung_id).await?;
     let now = jetzt();
     repo::status_setzen(&state.pool, erinnerung_id, STATUS_ERLEDIGT, &now).await?;
     krepo::setze_vollzug(
@@ -216,7 +175,7 @@ pub async fn erledigen(
         OBJEKT_ERINNERUNG,
         erinnerung_id,
         VOLLZUG_VOLLZOGEN,
-        benutzer.id,
+        ctx.benutzer.id,
         &now,
     )
     .await?;
@@ -228,10 +187,12 @@ pub async fn erledigen(
 /// POST /api/einsaetze/{id}/erinnerungen/{eid}/quittieren — Status → quittiert.
 pub async fn quittieren(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, erinnerung_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Erinnerungen>,
+    PfadParam((_eid, erinnerung_id)): PfadParam<(i64, i64)>,
 ) -> Result<Json<ErinnerungAnzeige>, AppError> {
-    let org_id = fordere_bearbeitbar(&state, &benutzer, einsatz_id, erinnerung_id).await?;
+    let einsatz_id = ctx.einsatz.id;
+    let org_id = ctx.einsatz.org_id;
+    fordere_bearbeitbar(&state, einsatz_id, erinnerung_id).await?;
     let now = jetzt();
     repo::status_setzen(&state.pool, erinnerung_id, STATUS_QUITTIERT, &now).await?;
     krepo::quittiere(
@@ -240,7 +201,7 @@ pub async fn quittieren(
         einsatz_id,
         OBJEKT_ERINNERUNG,
         erinnerung_id,
-        benutzer.id,
+        ctx.benutzer.id,
         &now,
     )
     .await?;
@@ -259,10 +220,12 @@ pub async fn quittieren(
 /// Quittungsvermerk.
 pub async fn oeffnen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, erinnerung_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Erinnerungen>,
+    PfadParam((_eid, erinnerung_id)): PfadParam<(i64, i64)>,
 ) -> Result<Json<ErinnerungAnzeige>, AppError> {
-    let org_id = fordere_bearbeitbar(&state, &benutzer, einsatz_id, erinnerung_id).await?;
+    let einsatz_id = ctx.einsatz.id;
+    let org_id = ctx.einsatz.org_id;
+    fordere_bearbeitbar(&state, einsatz_id, erinnerung_id).await?;
     let now = jetzt();
     let aktuell = repo::laden(&state.pool, erinnerung_id, &now).await?;
     if aktuell.status == STATUS_OFFEN {
@@ -280,7 +243,7 @@ pub async fn oeffnen(
         OBJEKT_ERINNERUNG,
         erinnerung_id,
         VOLLZUG_OFFEN,
-        benutzer.id,
+        ctx.benutzer.id,
         &now,
     )
     .await?;
