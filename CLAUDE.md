@@ -2,6 +2,7 @@
 
 Verbindliche Projektregeln. Begründungen, Messwerte und Prüfspuren stehen in den genannten
 Herleitungen (`docs/…`, `openspec/…`); hier steht nur, was gilt und wo es getragen wird.
+`AGENTS.md` ist ein Symlink auf diese Datei.
 
 ## ClickUp
 
