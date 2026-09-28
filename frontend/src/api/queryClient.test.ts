@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { QueryClient, QueryObserver } from '@tanstack/react-query';
+import { lagebildDehydrierFilter } from '../offline/lagebildFilter';
 import { ApiError, NetzFehler } from './client';
 import { erzeugeQueryClient } from './queryClient';
 import { einsatzKeys } from './queryKeys';
@@ -122,5 +124,120 @@ describe('erzeugeQueryClient — Liegezeit der Lagebild-Allowlist (LFH-723, desi
   it('setzt nichts, wenn eigene defaultOptions übergeben werden (Testclient)', () => {
     const client = erzeugeQueryClient({ queries: { gcTime: 0 } });
     expect(client.getQueryDefaults(einsatzKeys.personen(7)).gcTime).toBeUndefined();
+  });
+});
+
+describe('erzeugeQueryClient — Rechteentzug räumt das Lagebild (LFH-723, design.md D6)', () => {
+  const verboten = () => Promise.reject(new ApiError(403, 'Kein Zugriff'));
+
+  function beobachten(client: QueryClient, queryKey: readonly unknown[], queryFn: () => unknown) {
+    const beobachter = new QueryObserver(client, { queryKey, queryFn, retry: false });
+    return beobachter.subscribe(() => {});
+  }
+
+  it('räumt bei 403 auf den Einsatz alle Daten dieses Einsatzes, andere bleiben', async () => {
+    const client = erzeugeQueryClient({ queries: { retry: false } });
+    client.setQueryData(einsatzKeys.personen(7), [{ id: 1 }]);
+    client.setQueryData(einsatzKeys.etbZaehler(7, {}), { anzahl: 3 });
+    client.setQueryData(einsatzKeys.personen(8), [{ id: 2 }]);
+    client.setQueryData(einsatzKeys.einsatz(7), { id: 7 });
+    await client
+      .fetchQuery({ queryKey: einsatzKeys.einsatz(7), queryFn: verboten })
+      .catch(() => {});
+    expect(client.getQueryData(einsatzKeys.personen(7))).toBeUndefined();
+    expect(client.getQueryData(einsatzKeys.etbZaehler(7, {}))).toBeUndefined();
+    expect(client.getQueryData(einsatzKeys.einsatz(7))).toBeUndefined();
+    expect(client.getQueryData(einsatzKeys.personen(8))).toEqual([{ id: 2 }]);
+  });
+
+  it('räumt bei 404 auf den Einsatz ebenso', async () => {
+    const client = erzeugeQueryClient({ queries: { retry: false } });
+    client.setQueryData(einsatzKeys.personen(7), [{ id: 1 }]);
+    await client
+      .fetchQuery({
+        queryKey: einsatzKeys.einsatz(7),
+        queryFn: () => Promise.reject(new ApiError(404, 'weg')),
+      })
+      .catch(() => {});
+    expect(client.getQueryData(einsatzKeys.personen(7))).toBeUndefined();
+  });
+
+  it('räumt bei 403 auf ein Modul nur dessen Prefix in diesem Einsatz', async () => {
+    const client = erzeugeQueryClient({ queries: { retry: false } });
+    client.setQueryData(einsatzKeys.personen(7), [{ id: 1 }]);
+    client.setQueryData(einsatzKeys.etbZaehler(7, {}), { anzahl: 3 });
+    client.setQueryData(einsatzKeys.personen(8), [{ id: 2 }]);
+    await client
+      .fetchQuery({ queryKey: einsatzKeys.personen(7), queryFn: verboten })
+      .catch(() => {});
+    expect(client.getQueryData(einsatzKeys.personen(7))).toBeUndefined();
+    expect(client.getQueryData(einsatzKeys.etbZaehler(7, {}))).toEqual({ anzahl: 3 });
+    expect(client.getQueryData(einsatzKeys.personen(8))).toEqual([{ id: 2 }]);
+  });
+
+  it('läuft bei zwei beobachteten Queries desselben Prefix nicht in eine Abrufschleife', async () => {
+    const client = erzeugeQueryClient({ queries: { retry: false } });
+    const liste = vi.fn(verboten);
+    const zaehler = vi.fn(verboten);
+    client.setQueryData(einsatzKeys.etbListe(7, {}), { pages: [], pageParams: [] });
+    client.setQueryData(einsatzKeys.etbZaehler(7, {}), { anzahl: 3 });
+    // Das Einhängen ruft beide je einmal ab (Daten ohne staleTime sind veraltet); beide
+    // scheitern mit 403. Danach muss Ruhe sein — ein Räumen, das beobachtete Geschwister
+    // entfernte, ließe sie sich gegenseitig neu anstoßen.
+    const ab1 = beobachten(client, einsatzKeys.etbListe(7, {}), liste);
+    const ab2 = beobachten(client, einsatzKeys.etbZaehler(7, {}), zaehler);
+    await new Promise((r) => setTimeout(r, 100));
+    expect(liste).toHaveBeenCalledTimes(1);
+    expect(zaehler).toHaveBeenCalledTimes(1);
+    // Beide stehen ohne Daten im Fehlerzustand — die Seite zeigt ihren Fehlerzweig statt
+    // „Stand veraltet" mit dem alten Stand.
+    for (const key of [einsatzKeys.etbListe(7, {}), einsatzKeys.etbZaehler(7, {})]) {
+      const zustand = client.getQueryState(key);
+      expect(zustand?.status).toBe('error');
+      expect(zustand?.data).toBeUndefined();
+    }
+    ab1();
+    ab2();
+  });
+
+  it('hält einen geleerten Bereich von der Platte fern, bis er wieder erfolgreich lädt', async () => {
+    const client = erzeugeQueryClient({ queries: { retry: false } });
+    const filter = lagebildDehydrierFilter(client);
+    client.setQueryData(einsatzKeys.personen(7), [{ id: 1 }]);
+    await client
+      .fetchQuery({ queryKey: einsatzKeys.personen(7), queryFn: verboten })
+      .catch(() => {});
+    client.setQueryData(einsatzKeys.personen(7), [{ id: 9 }]);
+    const query = () => client.getQueryCache().find({ queryKey: einsatzKeys.personen(7) })!;
+    expect(filter(query())).toBe(false);
+    await client.fetchQuery({
+      queryKey: einsatzKeys.personen(7),
+      queryFn: async () => [{ id: 3 }],
+    });
+    expect(filter(query())).toBe(true);
+  });
+
+  it('räumt bei 401 nichts — der Sitzungsablauf geht über die Sitzungswache', async () => {
+    const client = erzeugeQueryClient({ queries: { retry: false } });
+    client.setQueryData(einsatzKeys.personen(7), [{ id: 1 }]);
+    await client
+      .fetchQuery({
+        queryKey: einsatzKeys.einsatz(7),
+        queryFn: () => Promise.reject(new ApiError(401, 'weg')),
+      })
+      .catch(() => {});
+    expect(client.getQueryData(einsatzKeys.personen(7))).toEqual([{ id: 1 }]);
+  });
+
+  it('räumt bei einem Netzfehler nichts', async () => {
+    const client = erzeugeQueryClient({ queries: { retry: false } });
+    client.setQueryData(einsatzKeys.personen(7), [{ id: 1 }]);
+    await client
+      .fetchQuery({
+        queryKey: einsatzKeys.personen(7),
+        queryFn: () => Promise.reject(new NetzFehler()),
+      })
+      .catch(() => {});
+    expect(client.getQueryData(einsatzKeys.personen(7))).toEqual([{ id: 1 }]);
   });
 });

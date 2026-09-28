@@ -15,6 +15,12 @@ interface DatenstandProps {
    * spät eintreffenden Meta seitwärts geschoben würde.
    */
   platzHalten?: boolean;
+  /**
+   * Ohne Verbindung (LFH-723): der Stand ist vorgehalten und kommt nicht nach. Dann lautet die
+   * Anzeige „Stand 14:32 · offline" — die Uhrzeit bleibt die der letzten Server-Antwort
+   * (`hydrate` übernimmt `dataUpdatedAt`), nicht die des Neuladens.
+   */
+  offline?: boolean;
 }
 
 /** Formatiert einen Query-Zeitstempel in der lokalen Browserzeit. */
@@ -46,7 +52,11 @@ const STIL = {
   whiteSpace: 'nowrap',
 } as const;
 
-export default function Datenstand({ dataUpdatedAt, platzHalten = false }: DatenstandProps) {
+export default function Datenstand({
+  dataUpdatedAt,
+  platzHalten = false,
+  offline = false,
+}: DatenstandProps) {
   if (!dataUpdatedAt || !Number.isFinite(dataUpdatedAt)) {
     if (!platzHalten) return null;
     // Unsichtbar UND stumm: ein Vorleser soll keinen Stand „00:00" hören.
@@ -65,10 +75,10 @@ export default function Datenstand({ dataUpdatedAt, platzHalten = false }: Daten
     <Typography.Text
       type="secondary"
       title={`Letzte Aktualisierung: ${dayjs(dataUpdatedAt).format('DD.MM.YYYY HH:mm:ss')}`}
-      aria-label={`Datenstand ${uhrzeit}`}
+      aria-label={offline ? `Datenstand ${uhrzeit}, offline` : `Datenstand ${uhrzeit}`}
       style={STIL}
     >
-      Stand {uhrzeit}
+      {offline ? `Stand ${uhrzeit} · offline` : `Stand ${uhrzeit}`}
     </Typography.Text>
   );
 }

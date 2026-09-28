@@ -39,6 +39,7 @@ import { rollenwerte } from '../../components/instrument';
 import type { SnapshotDaten, Standquelle } from './snapshotDaten';
 import { personenZugriffVon } from './personenEbene';
 import { betreuungZugriffVon } from './betreuungEbene';
+import { gemeinsamerDatenstand } from '../../components/Datenstand';
 
 /** Name der Personen-Quelle im Ausfallhinweis — die Seite filtert sie für Kopfzahl und
  *  „Nicht verortet" heraus, die Personen nie enthalten (LFH-648). */
@@ -543,6 +544,23 @@ export function useLagekarteDaten({
         // den Startausschnitt wie die UHS.
         !overridesQuery.isFetched ||
         betreuungQuery.isLoading,
+    // Datenstand der Karte (LFH-723): der älteste geladene Teil der Live-Ebenen, wie beim
+    // Meldebild. Im Snapshot-Modus keiner — dort nennt der Historien-Banner den Stand, und eine
+    // Uhrzeit daneben widerspräche ihm.
+    datenstand: istSnapshot
+      ? undefined
+      : gemeinsamerDatenstand(
+          einsatzQuery.dataUpdatedAt,
+          uhsQuery.dataUpdatedAt,
+          schaedenQuery.dataUpdatedAt,
+          einheitenQuery.dataUpdatedAt,
+          fahrzeugeQuery.dataUpdatedAt,
+          abschnitteQuery.dataUpdatedAt,
+          zonenQuery.dataUpdatedAt,
+          freieZeichenQuery.dataUpdatedAt,
+          lageMeldungenQuery.dataUpdatedAt,
+          fkQuery.dataUpdatedAt,
+        ),
     // Namen der Lagebild-Quellen, deren Abruf scheiterte (LFH-331 · B3) — leer = vollständig.
     // Die Kürzung für die Anzeige liegt bewusst NICHT hier: sie ist Darstellung, und ein Hook,
     // der schon kürzt, nähme der Seite die Wahl (und dem Test die Zählbarkeit).

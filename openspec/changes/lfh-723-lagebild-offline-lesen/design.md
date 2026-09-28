@@ -117,14 +117,41 @@ exportierte Entscheidungsfunktion `startEntscheidung(meErgebnis, datensatz, jetz
 |---|---|---|
 | ok, gleiche `benutzer.id`, frisch (≤ 24 h), gleicher Buster | vorhanden | wiederherstellen, `bestaetigtAt = jetzt` |
 | ok, andere Id, veraltet oder anderer Buster | vorhanden | löschen, nicht wiederherstellen |
-| `ApiError` (401 oder jeder andere Status) | beliebig | löschen, anonym |
-| `NetzFehler` | frisch, gleicher Buster | wiederherstellen, `benutzer = datensatz.benutzer` |
+| `ApiError` (401 oder jeder andere Status außer 502/503/504) | beliebig | löschen, anonym |
+| `NetzFehler` oder `ApiError` 502/503/504 | frisch, gleicher Buster | wiederherstellen, `benutzer = datensatz.benutzer` |
 | `NetzFehler` | fehlt oder veraltet | löschen, anonym (Verhalten wie bisher) |
 
-`laedt` bleibt `true`, bis die Wiederherstellung durch ist. `RequireAuth` zeigt so lange den
-Ladezustand, und keine Seite hängt eine Query ein, die mit einer Wiederherstellung
-konkurrieren könnte. Das ersetzt `IsRestoringProvider` ohne neuen Mechanismus. Erst danach
+**502, 503 und 504 gelten wie ein Netzfehler** (Nachtrag aus der Umsetzung). Mit diesen
+Codes meldet ein vorgeschalteter Proxy, dass der Server nicht erreichbar ist. Über die Sitzung
+sagen sie nichts. Ohne diese Regel löschte ein ausgefallener Fükw-Server hinter einem Proxy
+genau den Stand, den man in diesem Moment braucht. Ein Server ohne Proxy wäre dagegen als
+Netzfehler durchgekommen. Jede andere Antwort des Servers selbst, auch eine 500, bleibt eine
+Ablehnung.
+
+Ohne Serverbestätigung bleibt `laedt` auf `true`, bis die Wiederherstellung durch ist.
+`RequireAuth` zeigt so lange den Ladezustand. Serverbestätigt siehe die Festlegungen unten.
+Das ersetzt `IsRestoringProvider` ohne neuen Mechanismus. Erst nach der Wiederherstellung
 startet das Abonnement, das gedrosselt speichert.
+
+**Zwei Festlegungen aus der Umsetzung** (gemessen an der Vitest-Suite):
+- **Serverbestätigt wechseln `benutzer` und `laedt` sofort und zusammen**, im selben `then`
+  von `me()` wie vor LFH-723. Die Wiederherstellung läuft danach. Das ist unbedenklich, weil
+  sie nur den **eigenen** Stand der bestätigten Identität bringt und `hydrate` keinen Abruf
+  überschreibt, der inzwischen neuer ist. Nur beim Netzfehler wartet `laedt` auf den
+  Datensatz, denn erst er sagt, wer angemeldet ist.
+  - Gemessen: Kam `benutzer` eine IndexedDB-Runde später, scheiterten elf knapp getaktete
+    Bestandstests (`stammdaten/rechteGate.test.tsx`).
+  - Wechselten `benutzer` und `laedt` in zwei Takten, hängten Oberflächen außerhalb von
+    `RequireAuth` ihre Abfragen zweimal ein (`admin/DemoDatenPage.test.tsx`, sieben Tests).
+- **Das Test-Setup räumt die Lagebild-DB nach jedem Test ohne `await`**
+  (`test/setup.ts`). Ein wartendes `afterEach` verschob den Takt zwischen zwei Tests und
+  färbte dieselben elf Tests rot. Die Reihenfolge hält trotzdem, weil IndexedDB überlappende
+  Transaktionen in Erzeugungsreihenfolge ausführt.
+- **Beim Start löscht ein Verwerfen nur die Platte**, nicht den Speicher. Der verworfene Stand
+  wurde nie wiederhergestellt, im Speicher steht nur, was die laufende Sitzung schon abruft.
+  Ein `clear()` an dieser Stelle räumte in Tests gemessen die Abfragen einer schon
+  eingehängten Seite ab, 130 rote Tests. In der App wäre es Arbeit ohne Wirkung. Den Speicher
+  räumen Abmelden und Benutzerwechsel (D5).
 
 Auch `login()` und `aktualisiere()` durchlaufen den Vergleich: Eine andere `benutzer.id` als
 im Datensatz löscht vor dem Setzen des Benutzers.
@@ -207,7 +234,7 @@ Update einbaut. Deshalb gilt:
 - `logout()` im `finally`, vor `setBenutzer(null)`. Damit ist der 401-Pfad über die
   Sitzungswache mit abgedeckt.
 - Der Benutzerwechsel in `login` und `aktualisiere`.
-- Die Startentscheidung (D2).
+- Die Startentscheidung (D2), dort nur Schritt 1 und 3: Speicher siehe D2.
 
 **`qc.clear()` räumt den ganzen Cache, nicht nur die Allowlist.** Nach dem Abmelden gehört
 nichts vom alten Benutzer in den Speicher.

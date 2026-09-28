@@ -1777,6 +1777,24 @@ describe('LagekartePage · Neuentwurf S5', () => {
     await waitFor(() => expect(meta).toHaveTextContent('verortet · 1 nicht verortet'));
   });
 
+  // LFH-723: die Karte führt ihren Datenstand wie jede Seite des Lagebilds — ohne Verbindung
+  // mit „offline", damit ein vorgehaltener Stand nicht als aktueller gelesen wird.
+  it('führt im Seitenkopf den Datenstand, ohne Verbindung mit „offline"', async () => {
+    basisHandler();
+    renderSeite();
+    const kopf = await waitFor(() => {
+      const el = document.querySelector('[data-lfh="seitenkopf"]') as HTMLElement | null;
+      expect(el).not.toBeNull();
+      return el!;
+    });
+    await waitFor(() => expect(within(kopf).getByText(/^Stand \d\d:\d\d$/)).toBeInTheDocument());
+    const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    window.dispatchEvent(new Event('offline'));
+    expect(await within(kopf).findByText(/^Stand \d\d:\d\d · offline$/)).toBeInTheDocument();
+    onLine.mockRestore();
+    window.dispatchEvent(new Event('online'));
+  });
+
   it('Marker-Klick füllt das Paneel „Ausgewählt" der Leiste, nicht eine Karte über der Karte', async () => {
     basisHandler();
     const user = userEvent.setup();

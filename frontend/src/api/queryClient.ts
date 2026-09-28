@@ -1,8 +1,16 @@
-import { MutationCache, QueryCache, QueryClient, type DefaultOptions } from '@tanstack/react-query';
+import {
+  MutationCache,
+  QueryCache,
+  QueryClient,
+  type DefaultOptions,
+  type Query,
+} from '@tanstack/react-query';
 import { ApiError, NetzFehler } from './client';
 import { meldeSitzungAbgelaufen } from '../auth/sitzungsEvent';
-import { LAGEBILD_OFFLINE } from './queryKeys';
+import { EINSATZ_KEYS, LAGEBILD_OFFLINE, istKeyDesEinsatzes } from './queryKeys';
 import { HOECHSTLIEGEZEIT_MS } from '../offline/lagebildStart';
+import { fetchErfolgeVerfolgen } from '../offline/lagebildBestaetigung';
+import { lagebildEntsperren, lagebildSperren } from '../offline/lagebildFilter';
 
 /** Produktionsdefaults an einem importierbaren Seam statt versteckt in `main.tsx`.
  *  Nur reine Query-Pfade dürfen einen Leitungsfehler zweimal wiederholen; fachliche
@@ -40,17 +48,64 @@ function behandleFehler(fehler: unknown): void {
   console.error('Unerwarteter Fehler in einer Query/Mutation', fehler);
 }
 
+const EINSATZ_PREFIXE: ReadonlySet<unknown> = new Set<unknown>(Object.values(EINSATZ_KEYS));
+
+/**
+ * Rechteentzug räumt das Lagebild (LFH-723, design.md D6): 403/404 auf den Einsatzkopf räumt
+ * alles dieses Einsatzes, 403 auf einen anderen einsatzbezogenen Key dessen Prefix in diesem
+ * Einsatz — im Speicher, und über die Sperrmarke auch auf der Platte.
+ *
+ * Die Trennlinie ist BEOBACHTET gegen UNBEOBACHTET, nicht „scheiternd" gegen „Rest": ein
+ * entfernter, aber beobachteter Key wird beim nächsten Render vom Observer neu gebaut und neu
+ * abgerufen. Auf der ETB-Seite hängen Liste und Zähler am selben Prefix — das `onError` der
+ * einen entfernte die andere, deren Neuabruf gäbe 403, und so fort. Beobachtete Queries
+ * verlieren deshalb nur ihre Daten und stehen mit dem Fehler da; die Seite zeigt ihren
+ * Fehlerzweig statt „Stand veraltet" mit dem entzogenen Stand. `resetQueries` scheidet aus
+ * demselben Grund aus: es ruft aktive Queries neu ab.
+ */
+function raeumeNachRechteentzug(
+  client: QueryClient,
+  fehler: ApiError,
+  query: Query<unknown, unknown, unknown>,
+): void {
+  const key = query.queryKey;
+  const einsatzId = key[1];
+  if (typeof einsatzId !== 'number' || !EINSATZ_PREFIXE.has(key[0])) return;
+  const ganzerEinsatz =
+    key[0] === EINSATZ_KEYS.einsatz && (fehler.status === 403 || fehler.status === 404);
+  if (!ganzerEinsatz && fehler.status !== 403) return;
+
+  const imBereich = (k: readonly unknown[]) =>
+    ganzerEinsatz ? istKeyDesEinsatzes(k, einsatzId) : k[0] === key[0] && k[1] === einsatzId;
+  lagebildSperren(client, key, ganzerEinsatz ? 'einsatz' : 'prefix');
+  for (const q of client.getQueryCache().findAll({ predicate: (q) => imBereich(q.queryKey) })) {
+    if (q.getObserversCount() > 0) {
+      q.setState({ data: undefined, dataUpdatedAt: 0, status: 'error', error: fehler });
+    }
+  }
+  client.removeQueries({
+    predicate: (q) => imBereich(q.queryKey) && q.getObserversCount() === 0,
+  });
+}
+
 /** Einziger Bauplan für den QueryClient — von `main.tsx` UND `test/utils.tsx` genutzt.
  *  Ohne diese geteilte Fabrik wäre der globale Handler in keinem Test sichtbar (der
  *  Produktions-Client aus `main.tsx` wird von 0 Testdateien importiert). */
 export function erzeugeQueryClient(
   defaultOptions: DefaultOptions = queryClientDefaults,
 ): QueryClient {
-  const client = new QueryClient({
+  const client: QueryClient = new QueryClient({
     defaultOptions,
-    queryCache: new QueryCache({ onError: behandleFehler }),
+    queryCache: new QueryCache({
+      onError: (fehler, query) => {
+        behandleFehler(fehler);
+        if (fehler instanceof ApiError) raeumeNachRechteentzug(client, fehler, query);
+      },
+    }),
     mutationCache: new MutationCache({ onError: behandleFehler }),
   });
+  // Ein Fetch-Erfolg hebt die Sperrmarke seines Bereichs wieder auf (design.md D6).
+  fetchErfolgeVerfolgen(client, (key) => lagebildEntsperren(client, key));
   if (defaultOptions === queryClientDefaults) lagebildLiegezeitSetzen(client);
   return client;
 }

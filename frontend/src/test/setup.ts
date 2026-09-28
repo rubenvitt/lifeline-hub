@@ -3,6 +3,7 @@ import 'fake-indexeddb/auto';
 import { afterAll, afterEach, beforeAll, beforeEach, vi } from 'vitest';
 import { cleanup, configure } from '@testing-library/react';
 import { server } from './server';
+import { lagebildLoeschenPlatte } from '../offline/lagebildSpeicher';
 import { installiereMatchMedia, setzeViewportZurueck } from './viewport';
 import { installiereCssVariablenFilter } from './antdCssVariablen';
 import dayjs from 'dayjs';
@@ -122,6 +123,14 @@ afterEach(() => {
   server.resetHandlers();
   localStorage.clear(); // Persistenz (z. B. gemerkte Basemap/UHS) nicht zwischen Tests lecken lassen
   setzeViewportZurueck(); // Breite/Zeigerart/Zuhörer zurück auf den Ausgangszustand
+  // Vorgehaltenes Lagebild (LFH-723): jeder `AuthProvider` legt bei bestätigter Sitzung einen
+  // Datensatz an. Bliebe er stehen, stellte der nächste Test mit derselben Benutzer-ID den
+  // Stand des vorigen wieder her — frisch genug, dass `staleTime` den Abruf überspränge.
+  // BEWUSST ohne `await`: das Warten auf die IndexedDB verschob den Takt zwischen zwei Tests
+  // und färbte gemessen elf knapp getaktete Bestandstests rot (`stammdaten/rechteGate`). Die
+  // Reihenfolge hält trotzdem — IndexedDB führt Transaktionen mit überlappendem Bereich in
+  // Erzeugungsreihenfolge aus, und diese Löschung entsteht vor jedem Lesen des nächsten Tests.
+  void lagebildLoeschenPlatte();
 });
 afterAll(() => server.close());
 

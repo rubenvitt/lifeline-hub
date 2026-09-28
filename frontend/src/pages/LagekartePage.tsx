@@ -54,6 +54,8 @@ import {
 } from './lagekarte/leistenDaten';
 import { useLageSnapshots } from './lagekarte/useLageSnapshots';
 import type { Standquelle } from './lagekarte/snapshotDaten';
+import Datenstand from '../components/Datenstand';
+import { useOnline } from '../offline/useOnline';
 
 /**
  * So viele Quellen werden namentlich genannt, bevor der Rest zur Zahl wird.
@@ -199,7 +201,9 @@ export default function LagekartePage() {
     personenVerortet,
     personenFehler,
     betreuungZugriff,
+    datenstand,
   } = useLagekarteDaten({ einsatzId, zeigeZonen: layer.zone, aktiveAnsichtId, quelle });
+  const online = useOnline();
 
   // Ebene „Betroffene" (LFH-648): gezeichnet nur bei eingeschaltetem Schalter UND freiem
   // Modul. Personen sind nur wählbar (Marker-Klick, Inspector), solange sie gezeichnet werden;
@@ -767,6 +771,13 @@ export default function LagekartePage() {
         <span data-lfh="seitenkopf-meta" style={seitenMetaStil(farben)}>
           {kopfMeta(verortetAnzahl(alleVerortet), nichtVerortetAlle.length, lagebildFehler)}
         </span>
+        {/* Datenstand wie im Kopf jeder Lagebild-Seite; ohne Verbindung mit „offline"
+            (LFH-723, design.md D7). Platz vor dem ersten Abruf gehalten (LFH-373). */}
+        {datenstand !== undefined && (
+          <span style={{ color: farben.gedaempft, whiteSpace: 'nowrap' }}>
+            <Datenstand dataUpdatedAt={datenstand} platzHalten offline={!online} />
+          </span>
+        )}
       </div>
       {/* Ab `lg` sitzt der Umschalter im Knopfblock der Karte (s. `KartenUeberlagerung`). */}
       {!breit && (
