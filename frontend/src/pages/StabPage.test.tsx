@@ -9,12 +9,8 @@ import { renderMitProviders } from '../test/utils';
 import { modulRegistry } from '../einsatz/modulRegistry';
 import StabPage from './StabPage';
 import { benutzerFixture } from '../test/fixtures';
+import { FakeEventSource } from '../test/eventSource';
 
-class FakeEventSource {
-  addEventListener() {}
-  removeEventListener() {}
-  close() {}
-}
 /** Zählt die Antworten des Overrides-Handlers — Anker gegen das Rennen im Werkzeug-Link-Test. */
 let overrideAufrufe = 0;
 beforeEach(() => {

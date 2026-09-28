@@ -10,6 +10,7 @@ import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvide
 import type { TastaturAktionen } from '../command-palette/typen';
 import SchaedenPage from './SchaedenPage';
 import { benutzerFixture } from '../test/fixtures';
+import { FakeEventSource } from '../test/eventSource';
 
 /**
  * „Neue Zeile" an einer echten Modulseite (LFH-391 · B5) — und vor allem: mit demselben
@@ -39,18 +40,6 @@ vi.mock('../command-palette/useBefehle', () => ({
     })),
 }));
 
-class FakeEventSource {
-  url: string;
-  closed = false;
-  constructor(url: string) {
-    this.url = url;
-  }
-  addEventListener() {}
-  removeEventListener() {}
-  close() {
-    this.closed = true;
-  }
-}
 beforeEach(() => {
   vi.stubGlobal('EventSource', FakeEventSource);
   sessionStorage.clear();

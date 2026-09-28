@@ -9,6 +9,7 @@ import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvide
 import type { TastaturAktionen } from '../command-palette/typen';
 import StabPage from './StabPage';
 import { benutzerFixture } from '../test/fixtures';
+import { FakeEventSource } from '../test/eventSource';
 
 /**
  * „Neue Zeile" der Stab-Seite (LFH-543) mit DEMSELBEN Rechte-Riegel wie die Kopfaktion.
@@ -25,11 +26,6 @@ vi.mock('../command-palette/useBefehle', () => ({
     })),
 }));
 
-class FakeEventSource {
-  addEventListener() {}
-  removeEventListener() {}
-  close() {}
-}
 beforeEach(() => {
   vi.stubGlobal('EventSource', FakeEventSource);
   sessionStorage.clear();

@@ -9,19 +9,8 @@ import { renderMitProviders } from '../test/utils';
 import TiereDetailPage from './TiereDetailPage';
 import type { Tier } from '../api/types';
 import { benutzerFixture, einsatzFixture } from '../test/fixtures';
+import { FakeEventSource } from '../test/eventSource';
 
-class FakeEventSource {
-  url: string;
-  closed = false;
-  constructor(url: string) {
-    this.url = url;
-  }
-  addEventListener() {}
-  removeEventListener() {}
-  close() {
-    this.closed = true;
-  }
-}
 beforeEach(() => vi.stubGlobal('EventSource', FakeEventSource));
 afterEach(() => vi.unstubAllGlobals());
 

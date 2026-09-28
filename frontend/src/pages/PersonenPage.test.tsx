@@ -26,6 +26,7 @@ import {
 import { useOfflineSync } from '../offline/useOfflineSync';
 import type { KartenflaecheProps } from './lagekarte/Kartenflaeche';
 import { benutzerFixture, einsatzFixture } from '../test/fixtures';
+import { FakeEventSource } from '../test/eventSource';
 
 /**
  * Die echte Karte braucht WebGL (MapLibre), jsdom hat keins — Stub nach dem Muster von
@@ -46,19 +47,6 @@ vi.mock('./lagekarte/Kartenflaeche', () => ({
     </div>
   ),
 }));
-
-class FakeEventSource {
-  url: string;
-  closed = false;
-  constructor(url: string) {
-    this.url = url;
-  }
-  addEventListener() {}
-  removeEventListener() {}
-  close() {
-    this.closed = true;
-  }
-}
 
 class FakeBroadcastChannel {
   static instanzen: FakeBroadcastChannel[] = [];

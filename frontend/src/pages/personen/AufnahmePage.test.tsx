@@ -9,6 +9,7 @@ import { einsatzKeys } from '../../api/queryKeys';
 import { queueLeerenFuerTests, schreibaktionenLaden } from '../../offline/queue';
 import AufnahmePage from './AufnahmePage';
 import { benutzerFixture, einsatzFixture } from '../../test/fixtures';
+import { FakeEventSource } from '../../test/eventSource';
 
 /**
  * Die Vollseiten-Aufnahme (LFH-340 · C5).
@@ -26,18 +27,6 @@ function merkeRequest({ request }: { request: Request }) {
   if (request.method === 'POST') schreibrequests.push(new URL(request.url).pathname);
 }
 
-class FakeEventSource {
-  url: string;
-  closed = false;
-  constructor(url: string) {
-    this.url = url;
-  }
-  addEventListener() {}
-  removeEventListener() {}
-  close() {
-    this.closed = true;
-  }
-}
 beforeEach(async () => {
   vi.stubGlobal('EventSource', FakeEventSource);
   Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });

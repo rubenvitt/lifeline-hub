@@ -9,16 +9,8 @@ import { setzeViewportBreite } from '../test/viewport';
 import { dokumentDownloadPfad } from '../api/dokumente';
 import DokumentePage from './DokumentePage';
 import { benutzerFixture } from '../test/fixtures';
+import { FakeEventSource } from '../test/eventSource';
 
-class FakeEventSource {
-  url: string;
-  constructor(url: string) {
-    this.url = url;
-  }
-  addEventListener() {}
-  removeEventListener() {}
-  close() {}
-}
 beforeEach(() => vi.stubGlobal('EventSource', FakeEventSource));
 afterEach(() => vi.unstubAllGlobals());
 

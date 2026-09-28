@@ -15,19 +15,8 @@ import { useState } from 'react';
 import UhsAnlegenDrawer from './uhs/UhsAnlegenDrawer';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 import { einsatzFixture } from '../test/fixtures';
+import { FakeEventSource } from '../test/eventSource';
 
-class FakeEventSource {
-  url: string;
-  closed = false;
-  constructor(url: string) {
-    this.url = url;
-  }
-  addEventListener() {}
-  removeEventListener() {}
-  close() {
-    this.closed = true;
-  }
-}
 beforeEach(() => {
   vi.stubGlobal('EventSource', FakeEventSource);
   localStorage.clear();
