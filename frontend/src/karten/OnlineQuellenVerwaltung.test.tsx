@@ -72,10 +72,9 @@ describe('OnlineQuellenVerwaltung', () => {
     expect(screen.getByText('raster')).toBeInTheDocument();
   });
 
-  // ── Ordnung der Katalogtabelle (LFH-330 · AP5) ──────────────────────────────────
-  // Geprüft wird durchweg die WIRKUNG auf die Zeilenmenge, nicht die Anwesenheit eines
-  // Props. Die stehende Kopfzeile schiebt eine verborgene Messzeile als erste Körperzeile
-  // ein — deshalb überall die Verengung auf `tr.ant-table-row`.
+  // ── Ordnung der Katalogtabelle ──────────────────────────────────────────────────
+  // Geprüft wird die WIRKUNG auf die Zeilenmenge. Die stehende Kopfzeile schiebt eine verborgene
+  // Messzeile als erste Körperzeile ein — deshalb die Verengung auf `tr.ant-table-row`.
 
   const zweiteQuelle: OnlineQuelle = {
     ...quelle,
@@ -97,9 +96,8 @@ describe('OnlineQuellenVerwaltung', () => {
         (z) => z.textContent,
       );
 
-    // Voreinstellung ist die gelieferte Reihenfolge (Backend: ORDER BY sortier, id), nicht
-    // die alphabetische — die Vorgabe steht bewusst un-alphabetisch, sonst wäre die
-    // Zusicherung stumpf und ein versehentliches `defaultSortOrder` bliebe unbemerkt.
+    // Voreinstellung ist die gelieferte Reihenfolge (Backend: ORDER BY sortier, id); die Vorgabe
+    // steht bewusst un-alphabetisch, sonst bliebe ein versehentliches `defaultSortOrder` unbemerkt.
     expect(namen()).toEqual(['OpenStreetMap', 'Basemap.de']);
 
     await userEvent.click(screen.getByRole('columnheader', { name: /Name/ }));
@@ -119,16 +117,14 @@ describe('OnlineQuellenVerwaltung', () => {
     const zeilen = () => container.querySelectorAll('tr.ant-table-row');
     expect(zeilen()).toHaveLength(2);
 
-    // Erst den Griff belegen, dann klicken: sonst meldete die Probe (Filter entfernt) ein
-    // leeres Filtermenü statt den fehlenden Auslöser. „Aktiv" ist die einzige Spalte mit
-    // Filter, der Auslöser ist damit eindeutig.
+    // Erst den Griff belegen, dann klicken: sonst meldete ein fehlender Filter ein leeres Menü
+    // statt den fehlenden Auslöser. „Aktiv" ist die einzige Spalte mit Filter.
     const ausloeser = container.querySelector<HTMLElement>('.ant-table-filter-trigger');
     expect(ausloeser, 'die Aktiv-Spalte muss einen Filter tragen').not.toBeNull();
     await userEvent.click(ausloeser!);
 
-    // Das Filtermenü hängt in einem Portal an `document.body`, nicht im Container — und
-    // „inaktiv" steht zu diesem Zeitpunkt auch als Etikett in der zweiten Zeile. Der Griff
-    // muss deshalb IM Menü erfolgen, sonst ist er mehrdeutig.
+    // Das Filtermenü hängt im Portal an `document.body`, und „inaktiv" steht auch als Etikett in
+    // der zweiten Zeile — der Griff muss IM Menü erfolgen.
     const menue = await waitFor(() => {
       const m = document.querySelector<HTMLElement>('.ant-table-filter-dropdown');
       expect(m).not.toBeNull();
@@ -143,14 +139,11 @@ describe('OnlineQuellenVerwaltung', () => {
 
   it('der Wahrheitswert der Aktiv-Spalte bleibt außerhalb der Freitextsuche', async () => {
     /**
-     * Die Kehrseite des fehlenden `dataIndex` an der Aktiv-Spalte, und der Grund, warum sie
-     * einen Filter trägt. Zwei Ausfälle hängen an dieser Zusicherung:
-     *
-     * - `dataIndex: 'aktiv'` wieder gesetzt → `String(true)` landet im Suchkorpus, „true"
-     *   trifft jede aktive Quelle. Ein Wort, das in keiner Zelle steht.
-     * - `dataIndex` weg, `render` aber nicht nachgezogen → das erste Render-Argument ist der
-     *   DATENSATZ statt des Wahrheitswerts, also immer wahr, und jede Zeile behauptet
-     *   „aktiv". Kein Fehler, kein Absturz — deshalb steht die Etikettprüfung daneben.
+     * Die Kehrseite des fehlenden `dataIndex` an der Aktiv-Spalte:
+     * - `dataIndex: 'aktiv'` wieder gesetzt → „true" landet im Suchkorpus und trifft jede aktive
+     *   Quelle.
+     * - `dataIndex` weg, `render` nicht nachgezogen → das erste Render-Argument ist der DATENSATZ,
+     *   also immer wahr, und jede Zeile behauptet „aktiv" — still, deshalb die Etikettprüfung.
      */
     mockBasis(admin, [quelle, zweiteQuelle]);
     const { container } = render();
@@ -158,10 +151,8 @@ describe('OnlineQuellenVerwaltung', () => {
     const zeilen = () => container.querySelectorAll('tr.ant-table-row');
     expect(zeilen()).toHaveLength(2);
 
-    // Etiketten über ihren Text, nie über die Farbklasse (.ant-tag-green ist nicht eindeutig).
-    // „aktiv" steckt als Teilzeichenkette in „inaktiv" — die erste Zeile wird deshalb über
-    // die ABWESENHEIT von „inaktiv" belegt, sonst wäre die Zusicherung in beide Richtungen
-    // erfüllbar und die halbe Rückdrehung (jede Zeile behauptet „aktiv") bliebe grün.
+    // Etiketten über ihren Text, nie über die Farbklasse. „aktiv" steckt in „inaktiv" — die erste
+    // Zeile wird deshalb über die ABWESENHEIT von „inaktiv" belegt.
     expect(zeilen()[0].textContent).not.toContain('inaktiv');
     expect(zeilen()[1].textContent).toContain('inaktiv');
 
@@ -190,14 +181,9 @@ describe('OnlineQuellenVerwaltung', () => {
   });
 
   /**
-   * Das Partnerpaar zu AK4 (LFH-331 · B3), zusammen mit dem Leerfall darunter. Die negative
-   * Hälfte allein belegte nichts: formulierte jemand den Leertext um, wäre sie auch im
-   * Leerfall trivial grün. Erst die positive Hälfte — gleiches Literal, gleiche Datei —
-   * macht daraus eine Aussage über die Zustandsweiche statt über die Schreibweise.
-   *
-   * Die Meldung wird als EXAKTES Literal gegriffen, nicht als Teilmuster: der Umzug auf das
-   * Primitiv soll nachweisbar verhaltensgleich sein, und ein `/nicht geladen/i` bliebe auch
-   * unter einem umformulierten Text grün.
+   * Partnerpaar mit dem Leerfall darunter: die negative Hälfte allein wäre bei umformuliertem
+   * Leertext trivial grün. Die Meldung als EXAKTES Literal, damit der Umzug auf das Primitiv
+   * nachweisbar verhaltensgleich ist.
    */
   it('zeigt eine Fehlermeldung statt stiller Leere, wenn die Liste nicht lädt', async () => {
     server.use(
@@ -210,9 +196,8 @@ describe('OnlineQuellenVerwaltung', () => {
     expect(
       await screen.findByText('Online-Quellen konnten nicht geladen werden'),
     ).toBeInTheDocument();
-    // Die Detailzeile kommt aus dem `{error}`-Body des Backends — nur eine `ApiError` trägt
-    // eine Meldung, die vor einem Menschen bestehen kann. Ohne diese Zusicherung belegte der
-    // Test nur die Überschrift, und der Wegfall der Ursache bliebe unbemerkt.
+    // Die Detailzeile kommt aus dem `{error}`-Body — nur eine `ApiError` trägt eine Meldung, die
+    // vor einem Menschen besteht. Ohne sie belegte der Test nur die Überschrift.
     expect(screen.getByText('Kartenregistry nicht erreichbar')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
     expect(screen.queryByText('Noch keine Online-Quellen')).not.toBeInTheDocument();
@@ -227,9 +212,8 @@ describe('OnlineQuellenVerwaltung', () => {
 
   it('„Erneut abrufen" holt die Liste wirklich neu', async () => {
     /**
-     * Gemessen wird die WIRKUNG, nicht die Anwesenheit des Knopfes: der zweite Abruf
-     * gelingt, die Tabelle steht. Ohne diese Hälfte wäre ein `onWiederholen={() => {}}`
-     * genauso grün wie die Verdrahtung auf `refetch`.
+     * Gemessen wird die WIRKUNG: der zweite Abruf gelingt, die Tabelle steht. Sonst wäre
+     * `onWiederholen={() => {}}` genauso grün.
      */
     let abrufe = 0;
     server.use(
@@ -374,10 +358,8 @@ describe('OnlineQuellenVerwaltung', () => {
     );
     await userEvent.type(within(dialog).getByLabelText('Attribution'), '© MapTiler');
 
-    // Default ist an (LFH-190); den „Über Server proxen"-Switch gezielt AUSschalten
-    // (zwei Switches im Form) → proxy:false (Fall: Anbieter verbietet Proxying).
-    // Der Schalter liegt seit LFH-346 · A8 unter „Weitere Angaben" und ist ohne
-    // `forceRender` bis zum Aufklappen gar nicht im Baum — deshalb der Klick davor.
+    // Default ist an; den Proxy-Schalter gezielt ausschalten → `proxy: false`. Er liegt unter
+    // „Weitere Angaben" und ist ohne `forceRender` erst nach dem Aufklappen im Baum.
     await userEvent.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
     const proxyItem = (await within(dialog).findByText('Über Server proxen')).closest(
       '.ant-form-item',
@@ -392,25 +374,16 @@ describe('OnlineQuellenVerwaltung', () => {
 });
 
 /**
- * Freitext-Spalten begrenzen (LFH-346 · A4, Befund N13).
+ * Freitext-Spalten begrenzen.
  *
- * DIE KAPPUNG SITZT AN DER ZELLE, NICHT AN DER SPALTE — im Browser gemessen (25.08.2026),
- * weil der Plan hier eine Annahme trug, die nicht hält. `KatalogTabelle` fährt
- * `scroll={{ x: 'max-content' }}` mit fixierter erster Spalte; genau dafür wählt rc-table
- * ausdrücklich `table-layout: auto` (`@rc-component/table/lib/Table.js:427-434`, Kommentar:
- * „When scroll.x is max-content, no need to fix table layout"). Unter `auto` ist die `width`
- * einer Spalte nur ein Wunsch: dieselbe Zelle mit einer 200-Zeichen-URL maß **1177 px in
- * einer 1578 px breiten Tabelle, ungekürzt**, obwohl `<col width="280">` stand — antds
- * `.ant-table-cell-ellipsis` setzt nur `overflow/white-space/text-overflow`, und keins davon
- * senkt den Platzbedarf einer Zelle. `max-width` an der Zelle bindet dagegen allein (gemessen:
- * lange Zelle gekappt und gekürzt, kurze Zelle unbehelligt) — weshalb die Spalten GAR KEINE
- * `width` tragen: sie wäre wirkungslos und zugleich ein Verstoß gegen
- * `components/feldbreiten.guard.test.ts`, der genau die `maxWidth`-Form verlangt.
+ * DIE KAPPUNG SITZT AN DER ZELLE, NICHT AN DER SPALTE: `KatalogTabelle` fährt
+ * `scroll={{ x: 'max-content' }}` mit fixierter erster Spalte, dafür wählt rc-table
+ * `table-layout: auto`, und dort ist eine Spaltenbreite nur ein Wunsch (im Browser gemessen:
+ * trotz `<col width="280">` blieb eine lange URL ungekürzt). `max-width` an der Zelle bindet
+ * dagegen — und ist die Form, die `components/feldbreiten.guard.test.ts` verlangt.
  *
- * Deshalb stehen unten drei getrennte Aussagen statt einer: die Klasse (Kürzung
- * konfiguriert), die Kappung (sie greift auch) und der Titel (der volle Wert bleibt
- * erreichbar). Jede kann für sich rot werden. Pixel misst keine davon — jsdom rechnet
- * kein Layout.
+ * Drei getrennte Aussagen: Klasse (Kürzung konfiguriert), Kappung (greift) und Titel (voller
+ * Wert erreichbar). Pixel misst keine — jsdom rechnet kein Layout.
  */
 describe('OnlineQuellenVerwaltung — Freitext-Spalten (LFH-346 · A4)', () => {
   const langeUrl = `https://tiles.example.org/${'sehr-langer-pfad/'.repeat(12)}{z}/{x}/{y}.png`;
@@ -421,15 +394,12 @@ describe('OnlineQuellenVerwaltung — Freitext-Spalten (LFH-346 · A4)', () => {
     const { container } = render();
     await screen.findByText('OpenStreetMap');
 
-    // Der Layout-Pin ist die BEGRÜNDUNG der Kappung darunter, kein Selbstzweck: legt ein
-    // antd-Bump die Weiche auf `fixed` um, bände `width` allein und die Zusicherung wäre
-    // eine andere. Dann bricht diese Zeile sichtbar, statt dass die Kappung still
-    // überflüssig wird.
+    // Der Layout-Pin ist die BEGRÜNDUNG der Kappung: kippt ein antd-Bump auf `fixed`, bricht diese
+    // Zeile sichtbar, statt dass die Kappung still überflüssig wird.
     const tabelle = container.querySelector('.ant-table-tbody')!.closest('table')!;
     expect(tabelle.style.tableLayout).toBe('auto');
 
-    // Über den TEXT gegriffen, nicht über den Titel: fehlte der Titel, stürbe ein
-    // `findByTitle` an „unable to find" und bewiese weder Klasse noch Kappung.
+    // Über den TEXT gegriffen: fehlte der Titel, stürbe ein `findByTitle` und bewiese nichts.
     const zelle = screen.getByText(langeUrl);
     expect(zelle.tagName).toBe('TD');
     expect(zelle).toHaveClass('ant-table-cell-ellipsis');
@@ -449,7 +419,7 @@ describe('OnlineQuellenVerwaltung — Freitext-Spalten (LFH-346 · A4)', () => {
   });
 });
 
-// ── Spaltenschalter mit Zähler (LFH-374, Kriterium 14) ──────────────────────────────
+// ── Spaltenschalter mit Zähler ──────────────────────────────────────────────────────
 describe('OnlineQuellenVerwaltung · Spaltenschalter', () => {
   const kopf = (c: HTMLElement) =>
     Array.from(c.querySelectorAll('th.ant-table-cell')).map((z) => z.textContent);
@@ -502,11 +472,9 @@ describe('OnlineQuellenVerwaltung · Spaltenschalter', () => {
 
   it('was man nicht sieht, wirkt nicht: ein ausgeblendeter Aktiv-Filter siebt nicht', async () => {
     /**
-     * Gepinntes antd-Verhalten (antd 6, `table/hooks/useFilter`: der unkontrollierte
-     * Filterzustand gilt nur für Spalten, die noch übergeben werden). Das ist dieselbe Regel,
-     * die `Datensicht` ausdrücklich fährt — hier entsteht sie aus der Bibliothek, deshalb steht
-     * sie als Pin da: kippt ein antd-Sprung sie, bliebe sonst eine gefilterte Liste ohne
-     * sichtbaren Grund und ohne Rückweg stehen.
+     * Gepinntes antd-Verhalten: der unkontrollierte Filterzustand gilt nur für Spalten, die noch
+     * übergeben werden. Kippt ein antd-Sprung das, bliebe eine gefilterte Liste ohne sichtbaren
+     * Grund und Rückweg stehen.
      */
     const inaktiv: OnlineQuelle = {
       ...quelle,
