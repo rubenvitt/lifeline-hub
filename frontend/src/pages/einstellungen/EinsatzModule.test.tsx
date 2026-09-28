@@ -4,14 +4,7 @@ import { Route, Routes } from 'react-router';
 import { renderMitProviders } from '../../test/utils';
 import EinsatzModule from './EinsatzModule';
 
-/**
- * Sektion „Module" (LFH-345 · C10, Befund H15). Die fachlichen Aussagen stammen aus dem
- * Bestandstest von `EinsatzEinstellungenPage` (LFH-132, Task 15) und sind unverändert gültig.
- *
- * Der Befund selbst ist die Trennung: die Liste speichert je Zeile SOFORT und stand bis dahin
- * unter einem Speichern-Knopf, der sie gar nicht betraf — zweierlei Bedienlogik unter einer
- * Überschrift. Diese Sektion hat deshalb bewusst KEINE Speicher-Leiste.
- */
+/** Sektion „Module": die Liste speichert je Zeile sofort und hat deshalb keine Speicher-Leiste. */
 
 const { benutzerRolle } = vi.hoisted(() => ({ benutzerRolle: { wert: 'admin' } }));
 
@@ -94,7 +87,7 @@ describe('EinsatzModule', () => {
 
   it('laesst beim Aendern der Rolle die Sichtbarkeit als Bestandswert mitfahren (Vollersatz-PUT)', async () => {
     // Ohne den Bestandswert würde eine reine Rollen-Änderung das Ausblenden nullen — der
-    // Switch-Test allein deckt das nicht ab (er ändert nur die andere Spalte).
+    // Switch-Test allein ändert nur die andere Spalte.
     vi.mocked(ladeModulOverrides).mockResolvedValue({
       etb: { sichtbar: false, benoetigte_rolle: null },
     } as never);
@@ -129,9 +122,8 @@ describe('EinsatzModule', () => {
   });
 
   it('erklaert das strengere Recht — Modul-Overrides darf nur die Einsatzleitung (M16)', async () => {
-    // Führungspersonal darf die Einstellungen schreiben, die Modul-Sichtbarkeit aber NICHT
-    // (Backend-Gate einsatzleitung|admin). Die beiden Rechte-Achsen dürfen beim Aufteilen
-    // der Seite nicht verschmelzen.
+    // Führungspersonal darf die Einstellungen schreiben, die Modul-Sichtbarkeit aber nicht
+    // (Backend-Gate einsatzleitung|admin). Die beiden Rechte-Achsen dürfen nicht verschmelzen.
     benutzerRolle.wert = 'benutzer';
     vi.mocked(ladeEinsatz).mockResolvedValue({
       id: 1,
@@ -146,7 +138,7 @@ describe('EinsatzModule', () => {
     expect(screen.getByRole('switch', { name: 'Sichtbar: ETB' })).toBeDisabled();
   });
 
-  // LFH-383: der Grund steht zusätzlich an jeder gesperrten Zeile — mit dem Wort der Ursache.
+  // Der Grund steht zusätzlich an jeder gesperrten Zeile — mit dem Wort der Ursache.
   it('nennt an der Zeile die Rolle als Sperrgrund, solange der Einsatz läuft', async () => {
     benutzerRolle.wert = 'benutzer';
     vi.mocked(ladeEinsatz).mockResolvedValue({
@@ -162,9 +154,8 @@ describe('EinsatzModule', () => {
     expect(within(zeile).getByText('nur Einsatzleitung')).toBeInTheDocument();
   });
 
-  // Die Trennung der zwei Ursachen: `darfEinsatzLeiten` verlangt einen aktiven Einsatz, ein
-  // abgeschlossener sperrt also auch die Einsatzleitung. Ein Rollenwort widerspräche dort dem
-  // Seitenbanner — nur dieser Test unterscheidet die beiden Fälle.
+  // `darfEinsatzLeiten` verlangt einen aktiven Einsatz; ein abgeschlossener sperrt auch die
+  // Einsatzleitung. Ein Rollenwort widerspräche dort dem Seitenbanner.
   it('nennt im abgeschlossenen Einsatz den Abschluss, nicht die Rolle', async () => {
     vi.mocked(ladeEinsatz).mockResolvedValue({
       id: 1,
@@ -181,9 +172,8 @@ describe('EinsatzModule', () => {
   });
 
   it('zeigt bei nicht ladbaren Overrides KEINE Liste — sonst loegen die Bestandswerte', async () => {
-    // Ohne diesen Zweig zeigte `overrides ?? {}` alle Module als „sichtbar, keine Rolle" —
-    // und der naechste Schalterklick schickte genau das als Bestandswert in den
-    // Vollersatz-PUT. Eine gepflegte Rollenschranke waere weg, ohne jede Fehlermeldung.
+    // Ohne diesen Zweig zeigte `overrides ?? {}` alle Module als „sichtbar, keine Rolle", und der
+    // nächste Schalterklick schickte das als Bestandswert in den Vollersatz-PUT.
     vi.mocked(ladeModulOverrides).mockRejectedValue(new ApiError(500, 'kaputt'));
 
     rendern();
@@ -198,23 +188,16 @@ describe('EinsatzModule', () => {
     rendern();
     fireEvent.click(await screen.findByRole('switch', { name: 'Sichtbar: ETB' }));
 
-    // Die Abwesenheit des Message-Containers IST die Aussage — ohne sie waere der Test eine
-    // Attrappe: `renderMitProviders` huellt in `<AntApp>` (`test/utils.tsx`), ein
-    // `message.error` rendert also INNERHALB des RTL-Containers und `findByText` faende es
-    // genauso. Mit zurueckgedrehtem `onError`-Toast bliebe der Test dann gruen und koennte
-    // den Befund, fuer den er existiert, nicht widerlegen.
+    // Die Abwesenheit des Message-Containers ist die Aussage: `renderMitProviders` hüllt in
+    // `<AntApp>`, ein `message.error` fände `findByText` also genauso.
     const treffer = await screen.findByText('Modul gesperrt');
     expect(treffer.closest('.ant-message')).toBeNull();
   });
 });
 
 /**
- * Durchgriff der Listen-Gruppierung (LFH-346 · A9, Befund M48). `ModulEinstellungsListe` hat
- * ZWEI Konsumenten — die Gruppierung und das Filterfeld gelten hier genauso, ohne dass diese
- * Datei dafür eine Zeile Produktivcode braucht.
- *
- * Die Sektion behält ihre Sofort-Speicher-Semantik: **kein** Verlassen-Guard, **keine**
- * Speicherleiste. Beides wäre hier falsch — es gibt keine Fassung, die verloren gehen kann.
+ * Gruppierung und Filterfeld von `ModulEinstellungsListe` gelten hier genauso. Kein Verlassen-Guard
+ * und keine Speicherleiste — es gibt keine Fassung, die verloren gehen kann.
  */
 describe('EinsatzModule · Gruppierung und Filter (LFH-346)', () => {
   beforeEach(() => {

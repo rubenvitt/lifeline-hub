@@ -7,12 +7,9 @@ import type {
 } from '../../api/types';
 
 /**
- * Geteilte Form-Logik der drei Einstellungs-Sektions-Routen (LFH-284).
- *
- * **KRITISCH:** `PUT /api/org-einstellungen` ist Vollersatz (kein PATCH). Jede Sektion
- * speichert darum den VOLLEN Payload: `{ ...zuUpdate(geladeneDaten), ...normalisiere<Sektion>(form) }`.
- * `zuUpdate` liefert die Basis aus dem geladenen Zustand, die Sektions-Normalizer überschreiben
- * nur ihre eigenen Felder — so nullt ein Anzeige-Save nie die Einsatz-Default-Spalten.
+ * Geteilte Form-Logik der Org-Einstellungs-Sektionen. KRITISCH: `PUT /api/org-einstellungen` ist
+ * Vollersatz. Jede Sektion speichert `{ ...zuUpdate(geladeneDaten), ...normalisiere<Sektion>(form)
+ * }` — so nullt ein Anzeige-Save nie die Einsatz-Default-Spalten.
  */
 
 /** Anzeige-Sektion: Darstellungs-Defaults + Geocoder. */

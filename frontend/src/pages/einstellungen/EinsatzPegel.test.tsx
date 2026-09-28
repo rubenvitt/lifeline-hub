@@ -10,8 +10,8 @@ import { einsatzKeys } from '../../api/queryKeys';
 import EinsatzPegel, { stationenAus, stationsLabel, verschiebe, wendeAn } from './EinsatzPegel';
 
 /**
- * Sektion „Pegel" (LFH-606). Sofort-Speichern wie die Modul-Liste: jede Handlung ist ein
- * Request, es gibt keine Speicher-Leiste — Begründung im Dateikopf der Sektion.
+ * Sektion „Pegel": Sofort-Speichern wie die Modul-Liste, keine Speicher-Leiste — Begründung im
+ * Dateikopf der Sektion.
  */
 
 const UUID_HMUE = '47174d8f-1b8e-4599-8a59-b580dd55bc87';
@@ -72,7 +72,7 @@ interface Aufbau {
   stationenLeer?: boolean;
   pegelStatus?: number;
   putStatus?: number;
-  /** Schreibende Antworten verzögern (ms) — für die Rückmeldung VOR der Serverantwort. */
+  /** Schreibende Antworten verzögern (ms) — für die Rückmeldung vor der Serverantwort. */
   verzoegerung?: number;
 }
 
@@ -129,8 +129,8 @@ function stelleBereit(a: Aufbau = {}) {
       return HttpResponse.json(liste, { status: 201 });
     }),
   );
-  // `setzeListe` spielt eine Änderung von ANDERER Stelle nach (Karten-Schnellweg, zweiter
-  // Arbeitsplatz): der Server hat dann einen neuen Stand, der Cache der Seite noch nicht.
+  // `setzeListe` spielt eine Änderung von anderer Stelle nach (Karten-Schnellweg, zweiter
+  // Arbeitsplatz): der Server hat einen neuen Stand, der Cache der Seite noch nicht.
   return Object.assign(aufrufe, {
     setzeListe: (neu: unknown[]) => {
       liste = neu;
@@ -322,7 +322,7 @@ describe('EinsatzPegel', () => {
   });
 
   it('eine gesendete Änderung erneuert den Einsatz — dort steht der Auslöser der Lagekennzahl (LFH-640)', async () => {
-    // Ohne das sähe das Lage-Dashboard den neuen Zuschnitt erst beim nächsten Einsatz-Abruf.
+    // Sonst sähe das Lage-Dashboard den neuen Zuschnitt erst beim nächsten Einsatz-Abruf.
     stelleBereit();
     let einsatzAbrufe = 0;
     server.use(
@@ -367,8 +367,8 @@ describe('EinsatzPegel', () => {
   });
 
   it('ganz ohne Maus: Auswahl per Tippen + Enter, dann Tab und Enter auf „Hinzufügen"', async () => {
-    // Prüfliste Kriterium 15 (volle Tastaturbedienung). Das Label steht sichtbar über dem Feld
-    // und benennt es — `getByLabelText` findet das Feld nur über das `<label for>`.
+    // Prüfliste Kriterium 15 (volle Tastaturbedienung): `getByLabelText` findet das Feld nur über
+    // das `<label for>`.
     const aufrufe = stelleBereit();
     rendern();
     await waitFor(() => expect(zeilentitel()).toHaveLength(2));
@@ -383,8 +383,7 @@ describe('EinsatzPegel', () => {
         ),
       ).not.toBeNull(),
     );
-    // rc-select wertet am Enter das legacy `keyCode` aus — `userEvent` v14 setzt es nicht
-    // (dieselbe Falle wie antds `Editable`, CLAUDE.md), deshalb `fireEvent` mit keyCode.
+    // rc-select wertet am Enter das legacy `keyCode` aus, das `userEvent` v14 nicht setzt.
     fireEvent.keyDown(feld, { key: 'Enter', code: 'Enter', keyCode: 13, which: 13 });
     await waitFor(() => expect(screen.getByRole('button', { name: 'Hinzufügen' })).toBeEnabled());
     // Der Weg zum Knopf: Tab (über den Leeren-Knopf des Feldes, den antd fokussierbar macht).
@@ -414,8 +413,7 @@ describe('EinsatzPegel', () => {
   });
 
   it('wird die Liste bei GEWÄHLTER Station voll, sperrt „Hinzufügen“ trotzdem', async () => {
-    // Nicht trivial grün: ohne Auswahl wäre der Knopf schon über `!gewaehlt` gesperrt. Hier
-    // steht die Auswahl, und erst der fünfte Pegel von anderer Stelle sperrt.
+    // Nicht trivial grün: die Auswahl steht, erst der fünfte Pegel von anderer Stelle sperrt.
     const vier = [0, 1, 2, 3].map((i) =>
       pegel(`00000000-0000-4000-8000-00000000000${i}`, `P${i}`, 'WESER', i),
     );
@@ -450,8 +448,8 @@ describe('EinsatzPegel', () => {
     rendern();
     await waitFor(() => expect(zeilentitel()).toHaveLength(2));
     await waehleStation('KASSEL · FULDA · km 81,73');
-    // Vorbedingung: mit gewählter Station ist der Knopf bedienbar — sonst wäre die Sperre
-    // unten schon über `!gewaehlt` erfüllt und bewiese nichts.
+    // Vorbedingung: mit gewählter Station ist der Knopf bedienbar — sonst bewiese die Sperre unten
+    // nichts.
     expect(screen.getByRole('button', { name: 'Hinzufügen' })).toBeEnabled();
     await zeilenaktion('HANN. MÜNDEN', /Nach unten/);
     const knopf = screen.getByRole('button', { name: 'Hinzufügen' });
@@ -464,8 +462,8 @@ describe('EinsatzPegel', () => {
   });
 
   it('Umordnen arbeitet auf dem FRISCHEN Serverstand: „B nach oben“ bei [A,B,C] schickt [B,A,C]', async () => {
-    // Cache [A,B], Server inzwischen [A,B,C] (C über die Karte festgelegt). Ein PUT aus dem
-    // Cache nähme C still wieder heraus.
+    // Cache [A,B], Server [A,B,C] (C über die Karte festgelegt): ein PUT aus dem Cache nähme C
+    // still heraus.
     const aufrufe = stelleBereit({ liste: [HMUE, WAHN] });
     rendern();
     await waitFor(() => expect(zeilentitel()).toHaveLength(2));

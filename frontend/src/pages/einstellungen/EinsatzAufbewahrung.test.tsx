@@ -5,12 +5,8 @@ import { renderMitProviders } from '../../test/utils';
 import EinsatzAufbewahrung from './EinsatzAufbewahrung';
 
 /**
- * Sektion „Aufbewahrung & Archiv" (LFH-345 · C10) — die Sektion mit dem GRÖSSTEN Risiko und
- * deshalb dem vollständigsten Payload-Test: EIN Feld geht hinein, siebzehn kommen aus der
- * Merge-Basis. Nullte der Merge, fiele es genau hier auf.
- *
- * Die fachlichen Aussagen stammen aus dem Bestandstest von `EinsatzEinstellungenPage`
- * (LFH-135, Task 15) und sind unverändert gültig.
+ * Sektion „Aufbewahrung & Archiv" — ein Feld geht hinein, siebzehn kommen aus der Merge-Basis.
+ * Deshalb hier der vollständigste Payload-Test: nullte der Merge, fiele es genau hier auf.
  */
 
 const { benutzerRolle } = vi.hoisted(() => ({ benutzerRolle: { wert: 'admin' } }));
@@ -33,8 +29,10 @@ vi.mock('../../api/aufbewahrung', () => ({
 import { ladeEinsatz, ladeEinstellungen, speichereEinstellungen } from '../../api/einsaetze';
 import { setzeAufbewahrungsfrist } from '../../api/aufbewahrung';
 
-/** Bewusst durchweg NICHT-null: ein Payload-Vergleich gegen lauter null wäre auch dann grün,
- *  wenn der Merge Felder verlöre (fehlender Key liest sich in Vitest wie `undefined`). */
+/**
+ * Durchweg nicht-null: gegen lauter null wäre der Vergleich auch grün, wenn der Merge Felder
+ * verlöre.
+ */
 const VOLL = {
   einsatz_id: 1,
   standard_modul: 'etb',
@@ -104,11 +102,8 @@ describe('EinsatzAufbewahrung', () => {
   });
 
   /**
-   * DER Regressionstest des ganzen Umbaus (H15/M15). Der PUT ist Vollersatz: eine Sektion
-   * mit einem einzigen Feld muss siebzehn fremde Werte mitschicken. Fehlte einer, verlöre
-   * der Datensatz ihn beim Speichern hier — stumm, ohne roten Test und ohne Fehlerbild.
-   * Deshalb der volle Objekt-Vergleich statt `objectContaining`: nur er sieht ein Feld, das
-   * gar nicht erst im Payload steht.
+   * Der PUT ist Vollersatz: eine Sektion mit einem Feld muss siebzehn fremde Werte mitschicken.
+   * Deshalb der volle Objekt-Vergleich statt `objectContaining` — nur er sieht ein fehlendes Feld.
    */
   it('schickt beim Speichern den VOLLEN Payload — alle 19 Felder (Vollersatz-PUT)', async () => {
     rendern();
@@ -117,8 +112,7 @@ describe('EinsatzAufbewahrung', () => {
     await waitFor(() =>
       expect(speichereEinstellungen).toHaveBeenCalledWith(1, {
         standard_modul: 'etb',
-        // Karten-Defaults leben seit LFH-319 auf der Lagekarte und sind in KEINER Sektion
-        // sichtbar — sie fahren nur über die Merge-Basis mit.
+        // Karten-Defaults sind in keiner Sektion sichtbar und fahren nur über die Merge-Basis mit.
         basemap_modus: 'offline',
         karten_zoom_start: 12,
         fachebenen_sichtbar: { nina: true, dwd: false, pegelonline: false, kritis: false },
@@ -142,8 +136,8 @@ describe('EinsatzAufbewahrung', () => {
   });
 
   it('haelt „erbt Org-Standard" auch beim Speichern DIESER Sektion als null fest', async () => {
-    // Die Einsatz-Ebene ist dreiwertig. Würde die Merge-Basis die zweiwertige Org-Formel
-    // benutzen, verwandelte ein Speichern hier ein geerbtes „erbt Org" in ein explizites „An".
+    // Die Einsatz-Ebene ist dreiwertig. Mit der zweiwertigen Org-Formel machte ein Speichern hier
+    // aus „erbt Org" ein explizites „An".
     vi.mocked(ladeEinstellungen).mockResolvedValue({
       ...VOLL,
       auto_etb_eintraege: null,
@@ -202,9 +196,9 @@ describe('EinsatzAufbewahrung', () => {
   });
 
   /**
-   * LFH-23 (tasks.md 6.6): die Frist steht NEBEN dem eingefrorenen Formular. Am
-   * abgeschlossenen Einsatz ist die Dauer gesperrt, die Frist-Aktion für die Einsatzleitung
-   * bedienbar — und ihr PUT trägt keinen Einstellungs-Payload.
+   * Die Frist steht neben dem eingefrorenen Formular: am abgeschlossenen Einsatz ist die Dauer
+   * gesperrt, die Frist-Aktion für die Einsatzleitung bedienbar, und ihr PUT trägt keinen
+   * Einstellungs-Payload.
    */
   it('am abgeschlossenen Einsatz: Dauer gesperrt, Frist für die Einsatzleitung bedienbar', async () => {
     benutzerRolle.wert = 'keiner';
