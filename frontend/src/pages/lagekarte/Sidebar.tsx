@@ -42,6 +42,7 @@ import type { FreiesZeichenUpdate, ZoneTyp } from '../../api/types';
 import type { ZeichenModus } from './zeichnen';
 import { ZONE_TYPEN } from './zonenStil';
 import FreiesZeichenPicker from './FreiesZeichenPicker';
+import MarkerSuche from './MarkerSuche';
 import { FACHEBENEN, fachebeneKeys, istBboxAbhaengig } from './fachebenen';
 import KoordinatenEingabe from '../../anzeige/KoordinatenEingabe';
 import type { LatLon } from '../../anzeige/koordinaten';
@@ -175,6 +176,12 @@ export interface SidebarProps {
   einsatzId: number;
   nichtVerortet: NichtVerortet[];
   verortet: KarteMarker[];
+  /**
+   * Quelle der Objektsuche unter „Verortet" (LFH-716) — `suchbareMarker` aus
+   * `objektsuche.ts`, also schon ohne Namen aus Modulen, für die kein Recht besteht. Getrennt
+   * von `verortet`, weil das die Ebenen-Zeilen zählt und keine Betroffenen trägt.
+   */
+  suchbar: KarteMarker[];
   darfSchreiben: boolean;
   platzierungZiel: { typ: PlatzierenPunktTyp | 'einsatzort'; id: number } | null;
   onPlatzierenStart: (ziel: { typ: PlatzierenPunktTyp; id: number }) => void;
@@ -605,8 +612,6 @@ export default function Sidebar(props: SidebarProps) {
   const [loeschBildId, setLoeschBildId] = useState<number | null>(null);
   // Entwurf verwerfen, sobald ein anderes Bild platziert wird oder der Modus endet.
   useEffect(() => setBildMitte(null), [props.bildPlatzierenId]);
-  const uhsVerortet = verortet.filter((m) => m.typ === 'uhs');
-  const schadenVerortet = verortet.filter((m) => m.typ === 'schaden');
   const ebenen = ebenenZeilen(
     verortet,
     props.zonenAnzahl,
@@ -854,35 +859,13 @@ export default function Sidebar(props: SidebarProps) {
         onUmschalten={umschalten('verortet')}
       >
         {/* Kein eigener Fehlerkasten (Begründung an `SidebarSektionFehler`), aber die Zahlen
-            dürfen nicht lügen: „UHS (0)" ist eine Aussage über die Lage, und im Fehlerfall
-            hat sie niemand geprüft. Ein Template-Literal, damit der Text EIN Knoten bleibt. */}
-        <Typography.Text type="secondary">{`UHS (${zaehler(uhsVerortet.length)})`}</Typography.Text>
-        <Liste
-          size="small"
-          dataSource={uhsVerortet}
-          rowKey={(m) => m.schluessel}
-          renderItem={(m) => (
-            <ListenEintrag
-              style={bedienzielStil(token)}
-              onClick={() => props.onMarkerWaehlen(m.schluessel)}
-            >
-              {m.label}
-            </ListenEintrag>
-          )}
-        />
-        <Typography.Text type="secondary">{`Schäden (${zaehler(schadenVerortet.length)})`}</Typography.Text>
-        <Liste
-          size="small"
-          dataSource={schadenVerortet}
-          rowKey={(m) => m.schluessel}
-          renderItem={(m) => (
-            <ListenEintrag
-              style={bedienzielStil(token)}
-              onClick={() => props.onMarkerWaehlen(m.schluessel)}
-            >
-              {m.label}
-            </ListenEintrag>
-          )}
+            dürfen nicht lügen und die Leere wird nicht behauptet: im Fehlerfall hat die Lage
+            niemand geprüft (`zaehlerUnbekannt`). Seit LFH-716 über alle Objektarten statt
+            nur UHS und Schäden. */}
+        <MarkerSuche
+          marker={props.suchbar}
+          onMarkerWaehlen={props.onMarkerWaehlen}
+          zaehlerUnbekannt={sektionFehler.nichtVerortet != null}
         />
       </KlappPaneel>
 

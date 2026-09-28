@@ -166,7 +166,7 @@ describe('FreiesZeichenInspector — entprelltes Schreiben (LFH-716)', () => {
     fireEvent.click(kachel('Person'));
     act(() => vi.advanceTimersByTime(700));
     expect(onAendern).toHaveBeenCalledTimes(1);
-    const gesendet = onAendern.mock.calls[0][0];
+    const gesendet = vi.mocked(onAendern).mock.calls[0][0];
     serverstand({ ...basis, ...gesendet, geaendert_at: 'später' } as FreiesZeichen);
     act(() => vi.advanceTimersByTime(2000));
     expect(onAendern).toHaveBeenCalledTimes(1);
@@ -177,7 +177,7 @@ describe('FreiesZeichenInspector — entprelltes Schreiben (LFH-716)', () => {
     const { onAendern, serverstand } = renderInspector();
     fireEvent.click(kachel('Person'));
     act(() => vi.advanceTimersByTime(700));
-    const gesendet = onAendern.mock.calls[0][0];
+    const gesendet = vi.mocked(onAendern).mock.calls[0][0];
     serverstand({ ...basis, ...gesendet, geaendert_at: 't1' } as FreiesZeichen);
     serverstand({ ...basis, grundzeichen: 'befehlsstelle', geaendert_at: 't2' });
     act(() => vi.advanceTimersByTime(2000));
