@@ -10,8 +10,9 @@ import { expect, test, type CDPSession, type Page } from '@playwright/test';
 //
 // Jede Geste belegt ihre Wirkung am KARTENZUSTAND (`getZoom`/`getCenter`/`getBearing`/
 // `getPitch`, Auswahl im Paneel, gespeicherte Zone), nie an einem Bildschirmfoto. Und jede
-// Geste startet hinter einer Trefferwache (`aufKarte`): ein Finger, der auf einem Band oder
-// Knopf landet, bewegt die Karte nicht — die Aussage „keine Wirkung" wäre dann wertlos.
+// Kartengeste startet hinter einer Trefferwache (`aufKarte`): ein Finger, der auf einem Band
+// oder Knopf landet, bewegt die Karte nicht — die Aussage „keine Wirkung" wäre dann wertlos.
+// Der Tipp auf den Donut und das Rollen der Zeitachse haben je eine eigene Wache.
 //
 // Die Mehrfinger-Gesten laufen über CDP `Input.dispatchTouchEvent`, weil Playwrights
 // `touchscreen` nur einzelne Tipps kennt. Die Punkte tragen eine stabile `id`: MapLibre ordnet
@@ -187,9 +188,19 @@ async function kartenMitte(page: Page): Promise<Punkt> {
     .locator('canvas.maplibregl-canvas')
     .boundingBox();
   expect(box, 'Canvas hat keine Box').not.toBeNull();
-  const fuss = await page.locator('[data-lfh="karten-fuss"]').boundingBox();
+  // Der Fuß-Rahmen reicht bis zur Oberkante der Karte (LFH-713); frei ist nur, was über seinem
+  // obersten BAND liegt.
+  const oberstesBand = await page
+    .locator('[data-lfh="karten-fuss"] > *')
+    .first()
+    .boundingBox()
+    .catch(() => null);
   const oben = Math.max(box!.y, 0);
-  const unten = Math.min(box!.y + box!.height, fuss?.y ?? Infinity, page.viewportSize()!.height);
+  const unten = Math.min(
+    box!.y + box!.height,
+    oberstesBand?.y ?? Infinity,
+    page.viewportSize()!.height,
+  );
   return { x: box!.x + box!.width / 2, y: (oben + unten) / 2 };
 }
 
@@ -486,7 +497,7 @@ for (const viewport of [
       await abschliessen.tap();
       // „Speichern" statt der Warnung „Mindestens 3 …": terra-draw hat die drei Tipps als
       // Punkte angenommen.
-      const speichern = page.getByRole('button', { name: 'Speichern' });
+      const speichern = page.getByRole('button', { name: 'Speichern', exact: true });
       await expect(speichern).toBeVisible();
       await speichern.tap();
       await expect(speichern).toBeHidden();
@@ -513,35 +524,55 @@ for (const viewport of [
         await expect(abschliessen).toBeVisible();
         await page.getByRole('button', { name: 'Leiste einblenden' }).tap();
         await expect(page.getByRole('button', { name: 'Gefahrengebiet zeichnen' })).toBeVisible();
-        const fuss = (await page.locator('[data-lfh="karten-fuss"]').boundingBox())!;
         const karte = (await canvas.boundingBox())!;
-        expect(fuss.y, 'Fuß beginnt nicht über der Karte').toBeGreaterThanOrEqual(karte.y);
-        // Was nicht passt, rollt im Fuß — per Finger auf der Zeitachse erreichbar. Vorbedingung:
-        // er ist hier wirklich höher als sein Platz, sonst prüfte das Rollen nichts.
-        const cdp = await page.context().newCDPSession(page);
-        const fussEl = page.locator('[data-lfh="karten-fuss"]');
+        const steuerung = (await page
+          .locator('[data-lfh="karten-fuss"] > .ant-card')
+          .boundingBox())!;
+        expect(
+          steuerung.y,
+          'Zeichen-Steuerung beginnt nicht über der Karte',
+        ).toBeGreaterThanOrEqual(karte.y);
+        // Was nicht passt, gibt die Zeitachse ab und rollt in sich. Vorbedingung: sie ist hier
+        // wirklich gestaucht, sonst prüfte das Rollen nichts.
+        const zeitachseEl = page.locator('[data-lfh="zeitachse"]');
         const rollen = () =>
-          fussEl.evaluate((e) => ({ oben: e.scrollTop, mehr: e.scrollHeight - e.clientHeight }));
-        expect((await rollen()).mehr, 'Fuß ist höher als die Karte').toBeGreaterThan(0);
-        const zeitachse = (await page.locator('[data-lfh="zeitachse"]').boundingBox())!;
-        const start = {
-          x: zeitachse.x + 40,
-          y: Math.min(zeitachse.y + zeitachse.height, karte.y + karte.height) - 20,
-        };
+          zeitachseEl.evaluate((e) => ({
+            oben: e.scrollTop,
+            mehr: e.scrollHeight - e.clientHeight,
+          }));
+        expect((await rollen()).mehr, 'Zeitachse ist gestaucht').toBeGreaterThan(0);
+        // Der Finger setzt im Polster des Bands auf, nicht auf Feld oder Schieberegler — ein
+        // Tipp auf die Schiene schaltete sonst in den Historienmodus.
+        const zeitachse = (await zeitachseEl.boundingBox())!;
+        const start = { x: zeitachse.x + 5, y: zeitachse.y + zeitachse.height / 2 };
+        const unterFinger = await page.evaluate(
+          (p) =>
+            (document.elementFromPoint(p.x, p.y) as HTMLElement | null)?.dataset.lfh ?? 'anderes',
+          start,
+        );
+        expect(unterFinger, 'Finger liegt im Polster der Zeitachse').toBe('zeitachse');
+        const cdp = await page.context().newCDPSession(page);
         await geste(
           page,
           cdp,
-          [linie(start, { x: start.x, y: start.y - 150 })],
-          'Fuß rollen',
+          [linie(start, { x: start.x, y: start.y - 80 })],
+          'Zeitachse rollen',
           10,
           false,
         );
         await expect
-          .poll(async () => (await rollen()).oben, { message: 'Fuß rollt per Finger' })
+          .poll(async () => (await rollen()).oben, { message: 'Zeitachse rollt per Finger' })
           .toBeGreaterThan(0);
+        // In genau diesem Zustand — Leiste offen, Fuß übervoll — bleiben das oberste Band und
+        // der Seitenkopf bedienbar. Getippt, nicht gesehen: der Serien-Schalter oben im Fuß,
+        // dann „Leiste ausblenden", das der Fuß vorher deckte.
+        const serie = page.getByRole('switch', { name: 'Weitere zeichnen' });
+        await expect(serie).toBeChecked();
+        await serie.tap();
+        await expect(serie).not.toBeChecked();
         await page.getByRole('button', { name: 'Leiste ausblenden' }).tap();
         await expect(page.getByRole('button', { name: 'Leiste einblenden' })).toBeVisible();
-        // Und die Serie endet per Tipp auf „Fertig" — das oberste Band bleibt bedienbar.
+        // Die Serie endet per Tipp auf „Fertig".
         await page.getByRole('button', { name: 'Fertig' }).tap();
         await expect(abschliessen).toBeHidden();
       }

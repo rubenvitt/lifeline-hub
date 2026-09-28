@@ -430,7 +430,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       // Blob-Tile-Worker ohne auflösbare Base scheitern sie. Hier gegen die Origin
       // absolutieren — Begründung und DEV-Mitschnitt oben an `transformiereKartenAnfrage`.
       transformRequest: transformiereKartenAnfrage,
-      // Eine Lagekarte bleibt Draufsicht (LFH-713, Entscheidung 25.09.2026): Drehen per Pinch
+      // Eine Lagekarte bleibt Draufsicht (LFH-713, Entscheidung 25.09.2026) — das gilt mit dieser
+      // Komponente auch für die Betroffenen-Karte (`personen/BetroffeneKarte.tsx`): Drehen per Pinch
       // bleibt erlaubt, „Nach Norden ausrichten" holt die Ausrichtung zurück; Kippen nicht.
       // Zwei Angaben, weil sie Verschiedenes tun, beide gemessen in `e2e/lagekarte-touch.spec.ts`:
       // `touchPitch: false` schaltet die Zwei-Finger-Kippgeste ab — mit ihr kippte ein

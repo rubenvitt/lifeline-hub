@@ -573,9 +573,13 @@ dort behoben:
   halbierte die Karte (680 → 374 px), und der Fuß mit ausgeklappter Zeitachse (412 px) deckte
   den Rest. Er ragte dabei 50 px in den Seitenkopf. Zum Tippen blieb keine Karte. Seitdem
   schließt die Leiste beim Start einer Zonen- oder Abschnittszeichnung, Vorbild ist der
-  Navigations-Drawer. Außerdem **endet der Fuß oben an der Karte** (`fussStil`: `maxHeight` plus
-  `overflowY: auto`) und rollt in sich, per Finger gemessen. **Platzieren** schließt die
-  Leiste nicht, das ist ungemessen.
+  Navigations-Drawer. Außerdem **endet der Fuß oben an der Karte**: `fussStil` reicht mit
+  `top` bis zur Oberkante und stapelt per `flex-end` nach unten. Was nicht passt, gibt die
+  Zeitachse ab (`bandStil('voll', true)`, „nachgiebig“) und rollt in sich, per Finger
+  gemessen. **Kein `overflow` am Rahmen:** Er schnitte auf jeder Breite Schatten und
+  Fokusringe der bündig anliegenden Bänder ab, auch ohne Überlauf (Review LFH-713).
+  Platzieren, Taktisches Zeichen, Bild und Messen geben die Karte noch nicht frei, siehe
+  **LFH-765**.
 **Der Fuß endet rechts vor der Knopfspalte** (LFH-373, `fussStil(knopfKante)`): Knopfblock oben
 rechts und Fuß lagen beide auf `zIndex: 5`, und bei 390 px im Handschuh-Betrieb lagen drei
 Kartenknöpfe VOLLSTÄNDIG unter dem Zeitachsenband, per Zeiger und Tastatur unerreichbar.

@@ -261,8 +261,9 @@ export function SnapshotLeiste({
       style={{
         // Volle Kartenbreite, aber IM Fuß-Rahmen (LFH-355): absolut positioniert lag dieses
         // Band auf demselben `zIndex: 5` wie die ZeichnenSteuerung und verdeckte sie — als
-        // Flow-Band stapeln sich beide, statt sich zu überlagern.
-        ...bandStil('voll'),
+        // Flow-Band stapeln sich beide, statt sich zu überlagern. Nachgiebig (LFH-713): passt
+        // der Fuß nicht in die Karte, wird dieses Band niedriger und rollt in sich.
+        ...bandStil('voll', true),
         display: 'flex',
         alignItems: 'center',
         gap: 12,
