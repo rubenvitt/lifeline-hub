@@ -38,7 +38,6 @@ const DEFERRED_MODULE: &[&str] = &[
     "lagebericht",
     "lage_zone",
     "freies_zeichen",
-    "einsatzabschnitt",
     "karte_hintergrundbild",
     "sprechgruppe",
     "ort_vorschau",

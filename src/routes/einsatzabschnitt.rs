@@ -1,19 +1,13 @@
 use crate::app::AppState;
-use crate::auth::session::CurrentUser;
-use crate::einsatz::berechtigung::{
-    fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
-};
 use crate::einsatz::einstellungen::etb_startwert;
-use crate::einsatz::repo as einsatz_repo;
-use crate::extract::JsonBody;
-use crate::extract::PfadParam;
-use crate::live::LiveEvent;
-
-/// Modul-Key dieses Route-Moduls (LFH-132).
-const MODUL_KEY: &str = "einsatzabschnitte";
+use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
+use crate::einsatz::modul::Einsatzabschnitte;
 use crate::einsatzabschnitt::repo::{self as abschnitt_repo, AbschnittDaten, AbschnittPatch};
 use crate::einsatzabschnitt::{AbschnittLagezustand, EinsatzabschnittAnzeige};
 use crate::error::AppError;
+use crate::extract::JsonBody;
+use crate::extract::PfadParam;
+use crate::live::LiveEvent;
 use crate::routes::support::{
     deserialize_optional_field, pflicht, pruefe_kommunikationsmittel, trimme, trimme_tri,
 };
@@ -71,20 +65,9 @@ fn lage_wort(l: Option<AbschnittLagezustand>) -> &'static str {
 /// GET /api/einsaetze/{id}/abschnitte — flache Liste (Baum baut das FE). Nur Lesezugriff.
 pub async fn liste(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzLesezugriff<Einsatzabschnitte>,
 ) -> Result<Json<Vec<EinsatzabschnittAnzeige>>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
+    let einsatz_id = ctx.einsatz.id;
     Ok(Json(abschnitt_repo::liste(&state.pool, einsatz_id).await?))
 }
 
@@ -111,23 +94,10 @@ pub struct AbschnittBody {
 /// POST /api/einsaetze/{id}/abschnitte — anlegen. Schreibrecht + aktiv. ETB-Eintrag.
 pub async fn anlegen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzSchreibzugriff<Einsatzabschnitte>,
     JsonBody(body): JsonBody<AbschnittBody>,
 ) -> Result<(StatusCode, Json<EinsatzabschnittAnzeige>), AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     let name = pflicht(&body.name, "Name")?;
     let bemerkung = trimme(body.bemerkung);
     let mittel = trimme(body.kommunikationsmittel);
@@ -164,7 +134,7 @@ pub async fn anlegen(
     if let Some(ids) = body.sprechgruppe_ids {
         crate::sprechgruppe::repo::setze_abschnitt_sprechgruppen(
             &state.pool,
-            einsatz.org_id,
+            ctx.einsatz.org_id,
             einsatz_id,
             anzeige.id,
             &ids,
@@ -175,7 +145,7 @@ pub async fn anlegen(
     super::etb_system_degradiert(
         &state,
         einsatz_id,
-        benutzer.id,
+        ctx.benutzer.id,
         &crate::einsatzabschnitt::etb_text_angelegt(&anzeige.name, anzeige.lagezustand),
     )
     .await;
@@ -220,23 +190,11 @@ pub struct AbschnittPatchBody {
 /// mit Zeitpunkt und Urheber ins Tagebuch.
 pub async fn aktualisieren(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, aid)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Einsatzabschnitte>,
+    PfadParam((_eid, aid)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<AbschnittPatchBody>,
 ) -> Result<Json<EinsatzabschnittAnzeige>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     let name = match body.name {
         Some(n) => {
             let n = pflicht(&n, "Name")?;
@@ -298,7 +256,7 @@ pub async fn aktualisieren(
                         crate::etb::system_audit_tx(
                             conn,
                             einsatz_id,
-                            benutzer.id,
+                            ctx.benutzer.id,
                             startwert,
                             &text,
                         )
@@ -317,7 +275,7 @@ pub async fn aktualisieren(
     if let Some(ids) = body.sprechgruppe_ids {
         crate::sprechgruppe::repo::setze_abschnitt_sprechgruppen(
             &state.pool,
-            einsatz.org_id,
+            ctx.einsatz.org_id,
             einsatz_id,
             aid,
             &ids,
@@ -332,22 +290,10 @@ pub async fn aktualisieren(
 /// DELETE /api/einsaetze/{id}/abschnitte/{aid} — auflösen (Reparenting). ETB-Eintrag.
 pub async fn aufloesen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, aid)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Einsatzabschnitte>,
+    PfadParam((_eid, aid)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     let vorher = abschnitt_repo::laden(&state.pool, einsatz_id, aid).await?;
     // F06/LFH-244 Tier-A: Auflösen (Reparenting + Freigaben + DELETE) + System-ETB-Eintrag
     // atomar in EINER Tx (BEGIN IMMEDIATE + Retry). ETB-Text aus dem VOR der Tx geladenen
@@ -356,7 +302,7 @@ pub async fn aufloesen(
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     crate::write_retry!(&state.pool, |conn| {
         abschnitt_repo::loese_auf_tx(conn, einsatz_id, aid).await?;
-        crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text).await?;
+        crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text).await?;
         Ok(())
     })?;
     sse_abschnitt(&state, einsatz_id, aid);
@@ -376,23 +322,11 @@ pub struct FlaecheBody {
 /// PATCH /api/einsaetze/{id}/abschnitte/{aid}/flaeche — Lage-Pflege, KEIN ETB.
 pub async fn flaeche(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, aid)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Einsatzabschnitte>,
+    PfadParam((_eid, aid)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<FlaecheBody>,
 ) -> Result<Json<EinsatzabschnittAnzeige>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     if let Some(Some(gj)) = &body.flaeche_geojson {
         let v: serde_json::Value = serde_json::from_str(gj).map_err(|_| {
             AppError::UnprocessableEntity("flaeche_geojson ist kein gültiges JSON".into())
