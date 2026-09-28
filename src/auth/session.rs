@@ -11,9 +11,8 @@ use std::sync::OnceLock;
 /// Name des Session-Cookies.
 pub const SESSION_COOKIE: &str = "lifeline_sid";
 
-/// Prozessweiter `Secure`-Cookie-Schalter (nur bei aktivem HTTPS `true`).
-/// OnceLock statt AppState-Feld: bricht keine der vielen Inline-Test-Konstruktionen
-/// (Präzedenz: clamav-ScanConfig-OnceLock, LFH-114). Default (ungesetzt) = false.
+/// Prozessweiter `Secure`-Cookie-Schalter (nur bei aktivem HTTPS `true`, ungesetzt `false`).
+/// OnceLock statt AppState-Feld, damit die Inline-Test-Konstruktionen unberührt bleiben.
 static COOKIE_SECURE: OnceLock<bool> = OnceLock::new();
 
 /// Einmalig beim Serverstart setzen (true bei HTTPS). Doppelsetzen wird ignoriert.
@@ -33,10 +32,8 @@ pub fn neuer_token() -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
-/// SHA-256-Hex-Repräsentant eines Session-Tokens für die At-Rest-Speicherung.
-/// Der Klartext-Token lebt nur im Cookie; in der DB steht ausschließlich dieser Hash,
-/// und der Lookup hasht den Cookie-Wert vor dem Vergleich. Ein 256-Bit-Zufallstoken
-/// braucht kein Salt/Argon2 — ein Preimage-Angriff auf SHA-256 ist nicht praktikabel.
+/// SHA-256-Hex eines Session-Tokens für die At-Rest-Speicherung. In der DB steht nur dieser
+/// Hash; ein 256-Bit-Zufallstoken braucht kein Salt/Argon2.
 fn hash_token(token: &str) -> String {
     use sha2::{Digest, Sha256};
     Sha256::digest(token.as_bytes())
@@ -68,12 +65,8 @@ pub async fn loeschen(pool: &SqlitePool, token: &str) -> Result<(), AppError> {
     Ok(())
 }
 
-/// Benutzer-ID hinter einem Session-Token, ohne die Session zu verändern oder ihre
-/// Gültigkeit zu prüfen.
-///
-/// Für die Audit-Spur beim Logout (LFH-249/F30): wer sich abmeldet, muss VOR dem Löschen
-/// bestimmt werden, danach ist die Zuordnung weg. Bewusst eine eigene Funktion, statt
-/// `hash_token` öffentlich zu machen — die Hash-Logik bleibt in diesem Modul gekapselt.
+/// Benutzer-ID hinter einem Session-Token, ohne Gültigkeitsprüfung. Für die Audit-Spur beim
+/// Logout, die den Benutzer VOR dem Löschen der Session bestimmen muss.
 pub async fn benutzer_id_zu_token(pool: &SqlitePool, token: &str) -> Option<i64> {
     sqlx::query_scalar("SELECT benutzer_id FROM session WHERE token_hash = ?")
         .bind(hash_token(token))
