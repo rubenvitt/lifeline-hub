@@ -125,6 +125,7 @@ modul_marker! {
     Personal => "personal",
     Material => "material",
     Unfallhilfsstellen => "unfallhilfsstellen",
+    Gefahrenzonen => "gefahrenzonen",
 }
 
 /// Pfad-Präfix (app.rs-Route) → erwarteter Modul-Key (LFH-230). `None` = modul-lose
@@ -156,6 +157,7 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
         "/api/einsaetze/{id}/personen/{pid}/uhs-belegung",
         Some("unfallhilfsstellen"),
     ),
+    ("/api/einsaetze/{id}/gefahrengebiete", Some("gefahrenzonen")),
     // Hintergrundbilder und Führungskräfte-Positionen leben auf der Lagekarte.
     ("/api/einsaetze/{id}/karte", Some("lagekarte")),
     // Wetter & Pegel (LFH-633): nur der Wetter-Endpunkt ist am Modul gegatet. Der
