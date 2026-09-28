@@ -37,6 +37,27 @@ describe('KartenFuss — Rahmen', () => {
     },
   );
 
+  /**
+   * LFH-713: oben endet der Fuß an der Karte. Unten verankert und ohne Obergrenze ragte er bei
+   * 390 px (offene Leiste, Zeichen-Steuerung, ausgeklappte Zeitachse) 50 px in den Seitenkopf.
+   * Dass er im Browser wirklich in der Karte bleibt und per Finger rollt, misst
+   * `e2e/lagekarte-touch.spec.ts`.
+   */
+  it('reicht bis zur Oberkante der Karte, stapelt nach unten und schneidet nichts ab', () => {
+    const stil = fussStil(32);
+    expect(stil.top).toBe(12);
+    expect(stil.justifyContent).toBe('flex-end');
+    // Ein `overflow` am Rahmen schnitte Schatten und Fokusringe der Bänder auf jeder Breite ab.
+    expect(stil.overflow).toBeUndefined();
+    expect(stil.overflowY).toBeUndefined();
+  });
+
+  it('nur ein nachgiebiges Band gibt Höhe ab und rollt in sich', () => {
+    expect(bandStil('voll', true)).toMatchObject({ minHeight: 0, overflowY: 'auto' });
+    expect(bandStil('voll').minHeight).toBeUndefined();
+    expect(bandStil('voll').overflowY).toBeUndefined();
+  });
+
   it('lässt die Karte darunter bedienbar — der Rahmen selbst nimmt keine Zeiger an', () => {
     // Die Gegenzeile dazu steht in `bandStil`: ohne sie wäre jedes Band sichtbar und tot.
     expect(fussStil(32).pointerEvents).toBe('none');
