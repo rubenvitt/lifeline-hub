@@ -136,8 +136,6 @@ describe('SchadenAnhaenge (LFH-21)', () => {
     expect(await screen.findByRole('dialog')).toHaveTextContent('Datei ablegen · Schaden S-003');
   });
 
-  // ── Review C2 ──────────────────────────────────────────────────────────────────────
-
   async function bestaetigeEntfernen(name: string) {
     await userEvent.click(await screen.findByRole('button', { name }));
     const frage = await screen.findByText('Datei entfernen?');

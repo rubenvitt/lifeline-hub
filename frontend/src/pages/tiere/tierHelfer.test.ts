@@ -60,8 +60,7 @@ describe('filterTiere', () => {
   });
 
   it('verbindet Status und Spezies als Schnittmenge, nicht als Vereinigung', () => {
-    // Der Fall, der bei einem `||` statt `&&` (bzw. bei zwei getrennten `concat`) durchfällt:
-    // eine Vereinigung ergäbe [2, 3, 4], die Schnittmenge nur [3].
+    // Bei `||` statt `&&` ergäbe sich die Vereinigung [2, 3, 4] statt der Schnittmenge [3].
     expect(nummern(filterTiere(alle, { sicht: 'vermisst', spezies: 'katze' }))).toEqual([3]);
   });
 
