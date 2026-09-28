@@ -46,18 +46,20 @@ Heutiger Stand, soweit er den Weg bestimmt:
 
 ## Decisions
 
-### D1 — Ein Zahlwert statt zweier Booleans
+### D1 — Ein Stand statt zweier Booleans
 
-`createZeichnung` meldet künftig `onStandAendern({ punkte, kannZurueck })` statt
-`onBereitschaftAendern(bereit)`. Die Seite leitet daraus ab: `bereit = punkte >= mindestPunkte`,
-Zähler = `punkte`, Freigabe des Zurück-Knopfs = `kannZurueck`. Gemeldet wird nach jeder eigenen Aktion
-(Punkt gesetzt, `starten`, `stoppen`, `punktZurueck`, `verwerfen`, `finish`) **und** beim terra-draw-
-Ereignis `history`. Die Meldung ist entprellt auf Wertgleichheit (kein Render ohne Änderung).
+`createZeichnung` meldet `onStandAendern({ punkte, bereit, kannZurueck })` statt
+`onBereitschaftAendern(bereit)`. Alle drei Werte entstehen an **einer** Stelle im Adapter, der als
+einziger die Mindestpunktzahl je Form kennt; die Seite liest `bereit` für „Abschließen", `punkte`
+für den Zähler und `kannZurueck` für den Zurück-Knopf. Gemeldet wird nach jeder eigenen Aktion
+(Punkt gesetzt, `starten`, `stoppen`, `punktZurueck`, `verwerfen`, `finish`), nur bei Wertänderung.
 
-- `kannZurueck = aktiv && draw.enabled && punkte > 0 && draw.canUndo()` — der `enabled`-Riegel steht
-  vor `canUndo()`, weil es sonst wirft.
-- Nicht allein auf `history` verlassen: ob `clear()` bzw. ein Abbruch ein `history`-Ereignis auslöst,
-  ist ungemessen; eigene Aktionen rechnen deshalb selbst nach.
+- `kannZurueck = aktiv && punkte > 0` — aus dem **eigenen** Zähler, nicht aus `draw.canUndo()`
+  (Nachtrag aus dem Apply): der Capture-Klick des Adapters läuft, bevor terra-draw den Punkt
+  verarbeitet, `canUndo()` wäre beim ersten Punkt noch `false` und der Knopf bliebe eine Runde zu
+  lange gesperrt. Ein `history`-Zuhörer wird damit überflüssig.
+- `punktZurueck()` fragt terra-draw nur mit eigenem Punkt und hinter dem `enabled`-Riegel
+  (`undo()` wirft bei gestopptem TerraDraw).
 - Die geordnete Punktliste aus C9 (Array statt Set, Pixel-Entdoppelung bleibt) trägt `punkte`.
 
 *Alternative:* zwei getrennte Callbacks nach LFH-468 (`onZeichnenZurueckAenderung`). Verworfen: zwei
@@ -140,8 +142,9 @@ der Punkt allein als Marker hätte zwei Mechanismen für eine Anzeige.
 
 ## Risks / Trade-offs
 
-- [terra-draw meldet `history` nicht bei `clear()`] → D1 rechnet nach eigenen Aktionen selbst nach;
-  der Adapter-Test prüft die Freigabe nach `verwerfen()`/`stoppen()` ausdrücklich.
+- [eigener Zähler und terra-draws Undo-Stapel laufen auseinander, etwa wenn terra-draw einen
+  gezählten Klick verwirft] → `punktZurueck()` zählt nur herunter, wenn `undo()` gelang; der e2e
+  belegt „3 → zurück → 2" an der echten Karte.
 - [Knopf ist in jsdom „tot"-grün, weil `undoRedo` fehlt] → eigener Test, dass der Konstruktor die
   Option bekommt (Mutationsprobe in C9: ohne sie 4 von 7 rot); der e2e belegt es an echter Karte.
 - [Sechster Knopf in der Kartenspalte] bei 390 px im Handschuh-Betrieb 6 × 72 px: kann

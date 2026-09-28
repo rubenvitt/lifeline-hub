@@ -18,123 +18,151 @@ import LagekartePage, { kopfMeta, quellenMeldung } from './LagekartePage';
 // Callbacks (Karten-Klick, Marker-Klick) mit festen Werten feuern.
 // Prop-Typ wird vom echten Komponenten-Interface abgeleitet → ein künftiges
 // Umbenennen (z. B. onKarteKlick) bricht den Mock zur Compile-Zeit.
-vi.mock('./lagekarte/Kartenflaeche', () => ({
-  default: (props: Partial<KartenflaecheProps>) => (
-    <div data-testid="kartenflaeche-stub">
-      <div data-testid="attribution">{props.attribution ?? ''}</div>
-      <div data-testid="bilder-count">{(props.bilder ?? []).length}</div>
-      <div data-testid="startansicht">
-        {props.startAnsicht === undefined ? 'offen' : JSON.stringify(props.startAnsicht)}
-      </div>
-      {/* bbox-Pfad (LFH-81): ob die Seite überhaupt einen Ausschnitt hören will, und ein
+// Imperativer Handle des Stubs (LFH-712): „Letzten Punkt zurück" und die erste Esc-Stufe
+// gehen über die Karten-Ref, nicht über Props — ohne Handle liefen sie hier ins Leere.
+const kartenHandle = vi.hoisted(() => ({
+  punktZurueck: vi.fn(() => true),
+  zeichnungVerwerfen: vi.fn(),
+}));
+
+vi.mock('./lagekarte/Kartenflaeche', async () => {
+  const { forwardRef, useImperativeHandle } = await import('react');
+  return {
+    default: forwardRef(function KartenStub(props: Partial<KartenflaecheProps>, ref) {
+      useImperativeHandle(ref, () => kartenHandle as never, []);
+      return (
+        <div data-testid="kartenflaeche-stub">
+          {/* Stand der laufenden Figur, wie die echte Karte ihn bei jedem Klick meldet (LFH-712). */}
+          <button
+            onClick={() =>
+              props.onZeichnenStandAenderung?.({ punkte: 3, bereit: true, kannZurueck: true })
+            }
+          >
+            stand-3
+          </button>
+          <button
+            onClick={() =>
+              props.onZeichnenStandAenderung?.({ punkte: 0, bereit: false, kannZurueck: false })
+            }
+          >
+            stand-0
+          </button>
+          <div data-testid="attribution">{props.attribution ?? ''}</div>
+          <div data-testid="bilder-count">{(props.bilder ?? []).length}</div>
+          <div data-testid="startansicht">
+            {props.startAnsicht === undefined ? 'offen' : JSON.stringify(props.startAnsicht)}
+          </div>
+          {/* bbox-Pfad (LFH-81): ob die Seite überhaupt einen Ausschnitt hören will, und ein
           Auslöser, der einen Ausschnitt meldet wie die echte Karte nach `moveend`. */}
-      {/* Anflugziel (LFH-619): der Koordinatensprung der Sprungpalette kommt als
+          {/* Anflugziel (LFH-619): der Koordinatensprung der Sprungpalette kommt als
           ?zentrum= an und muss hier als Ziel ankommen. */}
-      <div data-testid="flyto">{JSON.stringify(props.flyToZiel ?? null)}</div>
-      <div data-testid="bbox-callback">{props.onBboxAenderung ? 'an' : 'aus'}</div>
-      {/* Die echte Karte meldet Zoom und bbox im selben Zug (`Kartenflaeche.tsx`, `verarbeite`)
+          <div data-testid="flyto">{JSON.stringify(props.flyToZiel ?? null)}</div>
+          <div data-testid="bbox-callback">{props.onBboxAenderung ? 'an' : 'aus'}</div>
+          {/* Die echte Karte meldet Zoom und bbox im selben Zug (`Kartenflaeche.tsx`, `verarbeite`)
           — der Stub tut das nachgebildet, sonst bliebe eine zoom-gebundene Ebene (Energie,
           LFH-81) ohne je gemeldeten Zoom fälschlich aus. */}
-      <button
-        onClick={() => {
-          props.onZoomAenderung?.(10);
-          props.onBboxAenderung?.('7.01,51.51,7.12,51.58');
-        }}
-      >
-        bbox-melden
-      </button>
-      <button onClick={() => props.onKarteKlick?.({ lng: 8.6, lat: 50.1 })}>karte-klick</button>
-      {/* Messen (LFH-616): welche Form die Karte bekommt, und ein Auslöser, der eine
+          <button
+            onClick={() => {
+              props.onZoomAenderung?.(10);
+              props.onBboxAenderung?.('7.01,51.51,7.12,51.58');
+            }}
+          >
+            bbox-melden
+          </button>
+          <button onClick={() => props.onKarteKlick?.({ lng: 8.6, lat: 50.1 })}>karte-klick</button>
+          {/* Messen (LFH-616): welche Form die Karte bekommt, und ein Auslöser, der eine
           abgeschlossene Strecke von ~111 m meldet wie terra-draw beim Doppelklick. */}
-      <div data-testid="messen">{props.messen ?? 'aus'}</div>
-      {props.messen && (
-        <button
-          onClick={() =>
-            props.onMessung?.(
-              {
-                type: 'LineString',
-                coordinates: [
-                  [9, 52],
-                  [9, 52.001],
-                ],
-              },
-              true,
-            )
-          }
-        >
-          mess-fertig
-        </button>
-      )}
-      {(props.markers ?? []).map((m) => (
-        <button key={m.schluessel} onClick={() => props.onMarkerKlick?.(m.schluessel)}>
-          marker-{m.schluessel}
-        </button>
-      ))}
-      {/* Polygon-Zeichnen: nur im aktiven Zeichenmodus feuerbar (spiegelt den echten Flow). */}
-      {props.zeichnen && (
-        <button
-          onClick={() =>
-            props.onFlaecheGezeichnet?.({
-              type: 'Polygon',
-              coordinates: [
-                [
-                  [8.6, 50.1],
-                  [8.7, 50.1],
-                  [8.7, 50.2],
-                  [8.6, 50.1],
-                ],
-              ],
-            })
-          }
-        >
-          flaeche-fertig
-        </button>
-      )}
-      {/* Klick auf eine gerenderte Abschnittsfläche → onFlaecheKlick. */}
-      {(props.flaechen ?? []).map((f) => (
-        <button key={f.id} onClick={() => props.onFlaecheKlick?.(f.id)}>
-          flaeche-{f.id}
-        </button>
-      ))}
-      {/* Zone zeichnen: feuert je nach Modus eine Linien- oder Polygon-Geometrie. */}
-      {props.zoneZeichnen && (
-        <button
-          onClick={() =>
-            props.onZoneGezeichnet?.(
-              props.zoneZeichnen === 'linie'
-                ? {
+          <div data-testid="messen">{props.messen ?? 'aus'}</div>
+          {props.messen && (
+            <button
+              onClick={() =>
+                props.onMessung?.(
+                  {
                     type: 'LineString',
                     coordinates: [
-                      [8.6, 50.1],
-                      [8.7, 50.2],
-                    ],
-                  }
-                : {
-                    type: 'Polygon',
-                    coordinates: [
-                      [
-                        [8.6, 50.1],
-                        [8.7, 50.1],
-                        [8.7, 50.2],
-                        [8.6, 50.1],
-                      ],
+                      [9, 52],
+                      [9, 52.001],
                     ],
                   },
-            )
-          }
-        >
-          zone-fertig
-        </button>
-      )}
-      {/* Klick auf eine gerenderte Zone → onZoneKlick. */}
-      {(props.zonen ?? []).map((z) => (
-        <button key={z.id} onClick={() => props.onZoneKlick?.(z.id)}>
-          zone-{z.id}
-        </button>
-      ))}
-    </div>
-  ),
-}));
+                  true,
+                )
+              }
+            >
+              mess-fertig
+            </button>
+          )}
+          {(props.markers ?? []).map((m) => (
+            <button key={m.schluessel} onClick={() => props.onMarkerKlick?.(m.schluessel)}>
+              marker-{m.schluessel}
+            </button>
+          ))}
+          {/* Polygon-Zeichnen: nur im aktiven Zeichenmodus feuerbar (spiegelt den echten Flow). */}
+          {props.zeichnen && (
+            <button
+              onClick={() =>
+                props.onFlaecheGezeichnet?.({
+                  type: 'Polygon',
+                  coordinates: [
+                    [
+                      [8.6, 50.1],
+                      [8.7, 50.1],
+                      [8.7, 50.2],
+                      [8.6, 50.1],
+                    ],
+                  ],
+                })
+              }
+            >
+              flaeche-fertig
+            </button>
+          )}
+          {/* Klick auf eine gerenderte Abschnittsfläche → onFlaecheKlick. */}
+          {(props.flaechen ?? []).map((f) => (
+            <button key={f.id} onClick={() => props.onFlaecheKlick?.(f.id)}>
+              flaeche-{f.id}
+            </button>
+          ))}
+          {/* Zone zeichnen: feuert je nach Modus eine Linien- oder Polygon-Geometrie. */}
+          {props.zoneZeichnen && (
+            <button
+              onClick={() =>
+                props.onZoneGezeichnet?.(
+                  props.zoneZeichnen === 'linie'
+                    ? {
+                        type: 'LineString',
+                        coordinates: [
+                          [8.6, 50.1],
+                          [8.7, 50.2],
+                        ],
+                      }
+                    : {
+                        type: 'Polygon',
+                        coordinates: [
+                          [
+                            [8.6, 50.1],
+                            [8.7, 50.1],
+                            [8.7, 50.2],
+                            [8.6, 50.1],
+                          ],
+                        ],
+                      },
+                )
+              }
+            >
+              zone-fertig
+            </button>
+          )}
+          {/* Klick auf eine gerenderte Zone → onZoneKlick. */}
+          {(props.zonen ?? []).map((z) => (
+            <button key={z.id} onClick={() => props.onZoneKlick?.(z.id)}>
+              zone-{z.id}
+            </button>
+          ))}
+        </div>
+      );
+    }),
+  };
+});
 
 const eventSourceUrls: string[] = [];
 class FakeEventSource {
@@ -1954,5 +1982,115 @@ describe('LagekartePage · Ebene „Betroffene" (LFH-648)', () => {
     // Item-Route (Deeplink-Muster LFH-25), nicht die Einsatzdaten des `default`-Zweigs.
     const link = await screen.findByRole('link', { name: /Im Fachmodul öffnen/ });
     expect(link).toHaveAttribute('href', '/einsaetze/1/personen/11');
+  });
+});
+
+/**
+ * Korrigierbares Zeichnen (LFH-712). Der Stub meldet den Zeichenstand wie die echte Karte;
+ * „Letzten Punkt zurück" und die erste Esc-Stufe laufen über den Karten-Handle.
+ */
+describe('LFH-712: Letzten Punkt zurück und zweistufiges Esc', () => {
+  const quittungen = () =>
+    Array.from(document.querySelectorAll('.ant-message')).filter((m) =>
+      (m.textContent ?? '').includes('Zeichnung verworfen'),
+    ).length;
+
+  beforeEach(() => {
+    kartenHandle.punktZurueck.mockClear();
+    kartenHandle.zeichnungVerwerfen.mockClear();
+  });
+
+  it('Knopf und Zähler folgen dem gemeldeten Stand; der Klick geht an die Karte', async () => {
+    basisHandler();
+    const user = userEvent.setup();
+    renderSeite();
+    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+    const zurueck = await screen.findByRole('button', { name: 'Letzten Punkt zurück' });
+    expect(zurueck).toBeDisabled();
+    expect(screen.getByText('0 Punkte')).toBeInTheDocument();
+
+    await user.click(screen.getByText('stand-3'));
+    expect(zurueck).toBeEnabled();
+    expect(screen.getByText('3 Punkte')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Abschließen' })).toBeEnabled();
+
+    await user.click(zurueck);
+    expect(kartenHandle.punktZurueck).toHaveBeenCalledTimes(1);
+  });
+
+  it('erstes Esc verwirft die Figur mit Quittung, der Modus bleibt; zweites Esc beendet', async () => {
+    const spy = erstelleZonenPostSpy();
+    basisHandler([spy.handler]);
+    const user = userEvent.setup();
+    renderSeite();
+    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+    await user.click(await screen.findByText('stand-3'));
+    // Fokus auf einem Knopf der Steuerung, nicht auf der Karte: die Taste wirkt trotzdem.
+    screen.getByRole('button', { name: 'Letzten Punkt zurück' }).focus();
+
+    await user.keyboard('{Escape}');
+    expect(kartenHandle.zeichnungVerwerfen).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(quittungen()).toBe(1));
+    expect(screen.getByText('Gefahrengebiet · Fläche')).toBeInTheDocument();
+
+    // Die Karte meldet den geleerten Stand zurück (so tut es `verwerfen()` im Adapter).
+    await user.click(screen.getByText('stand-0'));
+    await user.keyboard('{Escape}');
+    await waitFor(() =>
+      expect(screen.queryByText('Gefahrengebiet · Fläche')).not.toBeInTheDocument(),
+    );
+    // Die zweite Stufe verwirft nichts mehr — also auch keine zweite Quittung.
+    expect(kartenHandle.zeichnungVerwerfen).toHaveBeenCalledTimes(1);
+    expect(spy.count()).toBe(0);
+  });
+
+  it('Esc in der Bestätigungsphase führt zurück ins Zeichnen, ohne zu speichern', async () => {
+    const spy = erstelleZonenPostSpy();
+    basisHandler([spy.handler]);
+    const user = userEvent.setup();
+    renderSeite();
+    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+    await user.click(await screen.findByText('zone-fertig'));
+    expect(await screen.findByRole('button', { name: 'Speichern' })).toBeInTheDocument();
+
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('button', { name: 'Speichern' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Abschließen' })).toBeInTheDocument();
+    expect(screen.getByText('Gefahrengebiet · Fläche')).toBeInTheDocument();
+    await waitFor(() => expect(quittungen()).toBe(1));
+    expect(spy.count()).toBe(0);
+  });
+
+  it('Esc in einem Eingabefeld lässt die Figur stehen', async () => {
+    basisHandler();
+    const user = userEvent.setup();
+    renderSeite();
+    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+    await user.click(await screen.findByText('stand-3'));
+    const feld = document.createElement('input');
+    document.body.appendChild(feld);
+    feld.focus();
+    await user.keyboard('{Escape}');
+    feld.remove();
+    expect(kartenHandle.zeichnungVerwerfen).not.toHaveBeenCalled();
+    expect(screen.getByText('3 Punkte')).toBeInTheDocument();
+  });
+
+  it('Esc ohne Figur in einer Serie mit Gespeichertem beendet, die Zone bleibt gespeichert', async () => {
+    const spy = erstelleZonenPostSpy();
+    basisHandler([spy.handler]);
+    const user = userEvent.setup();
+    renderSeite();
+    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+    await user.click(await screen.findByText('zone-fertig'));
+    await user.click(await screen.findByRole('button', { name: 'Speichern' }));
+    expect(await screen.findByText('1 gespeichert')).toBeInTheDocument();
+
+    await user.keyboard('{Escape}');
+    await waitFor(() =>
+      expect(screen.queryByText('Gefahrengebiet · Fläche')).not.toBeInTheDocument(),
+    );
+    expect(spy.count()).toBe(1);
+    expect(quittungen()).toBe(0);
   });
 });

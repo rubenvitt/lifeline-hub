@@ -18,9 +18,9 @@ Arbeitsweise je Aufgabe: `superpowers:test-driven-development` (erst rot, dann g
 
 ## 3. Seite: Verdrahtung und zweistufiges Esc (`LagekartePage.tsx`, `useKartenInteraktion.ts`)
 
-- [ ] 3.1 `zeichnenBereit` durch den Stand aus 1.2 ersetzen; `bereit` aus `punkte >= mindestPunkte` (Linie 2, Fläche 3) ableiten; Stand an die Steuerung reichen, `onPunktZurueck` → Handle. Verifikation: `LagekartePage.test.tsx` — Stand-Meldung sperrt/entsperrt „Abschließen" und „Letzten Punkt zurück".
-- [ ] 3.2 Rückkehr aus der Bestätigungsphase in die Zeichenphase als benannte Aktion in `useKartenInteraktion` (Reducer-Fall `zone` mit demselben Entwurf + `zoneZeichnenNonce`, wie im Serienpfad; nichts gespeichert). Verifikation: Hook-Test — nach der Aktion `zoneBestaetigung == null`, `zoneEntwurf` unverändert, Nonce erhöht, kein POST.
-- [ ] 3.3 `keydown`-Zuhörer an `window`, nur bei aktivem Zeichenmodus, Riegel `defaultPrevented` und Eingabeziele; Stufen nach Design D2 inkl. „Speichern läuft → nichts" und Serie mit Gespeichertem → „Fertig". Quittung `message.info('Zeichnung verworfen')` nur in den Verwerfen-Zweigen. Verifikation: Tests je Zeile der D2-Tabelle; Gegenaussage: Undo des letzten Punktes erzeugt keine Quittung; Messen endet weiter mit einem Esc (Bestandstest bleibt grün).
+- [x] 3.1 `zeichnenBereit` durch den Stand aus 1.2 ersetzen; `bereit` aus `punkte >= mindestPunkte` (Linie 2, Fläche 3) ableiten; Stand an die Steuerung reichen, `onPunktZurueck` → Handle. Verifikation: `LagekartePage.test.tsx` — Stand-Meldung sperrt/entsperrt „Abschließen" und „Letzten Punkt zurück".
+- [x] 3.2 Rückkehr aus der Bestätigungsphase in die Zeichenphase als benannte Aktion in `useKartenInteraktion` (Reducer-Fall `zone` mit demselben Entwurf + `zoneZeichnenNonce`, wie im Serienpfad; nichts gespeichert). Verifikation: Hook-Test — nach der Aktion `zoneBestaetigung == null`, `zoneEntwurf` unverändert, Nonce erhöht, kein POST.
+- [x] 3.3 `keydown`-Zuhörer an `window`, nur bei aktivem Zeichenmodus, Riegel `defaultPrevented` und Eingabeziele; Stufen nach Design D2 inkl. „Speichern läuft → nichts" und Serie mit Gespeichertem → „Fertig". Quittung `message.info('Zeichnung verworfen')` nur in den Verwerfen-Zweigen. Verifikation: Tests je Zeile der D2-Tabelle; Gegenaussage: Undo des letzten Punktes erzeugt keine Quittung; Messen endet weiter mit einem Esc (Bestandstest bleibt grün).
 
 ## 4. Eigenposition
 

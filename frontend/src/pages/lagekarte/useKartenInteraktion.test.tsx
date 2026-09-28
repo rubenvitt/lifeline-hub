@@ -861,3 +861,46 @@ describe('useKartenInteraktion — Betreuungsstelle (LFH-673)', () => {
     });
   });
 });
+
+/**
+ * Erste Esc-Stufe in der Bestätigungsphase (LFH-712): die fertige, ungespeicherte Figur geht
+ * weg, der Zeichenmodus bleibt — anders als „Verwerfen", das den Modus ganz beendet.
+ */
+describe('useKartenInteraktion — Rückweg aus der Bestätigung (LFH-712)', () => {
+  it('führt zurück in die Zeichenphase desselben Entwurfs, ohne zu speichern', () => {
+    lagezonenApi.legeZoneAn.mockClear();
+    const { result } = rendere();
+    const entwurf = { typ: 'gefahrengebiet' as const, modus: 'polygon' as const };
+    act(() => result.current.onZoneZeichnenStart(entwurf));
+    act(() => result.current.onZoneGezeichnet(POLYGON));
+    const nonceVorher = result.current.zoneZeichnenNonce;
+
+    act(() => result.current.onBestaetigungZurueck());
+
+    expect(result.current.zoneBestaetigung).toBeNull();
+    expect(result.current.zoneEntwurf).toEqual(entwurf);
+    // Die Nonce erzwingt `starten()` an der Karte — sonst bliebe die fertige Figur stehen.
+    expect(result.current.zoneZeichnenNonce).toBe(nonceVorher + 1);
+    expect(lagezonenApi.legeZoneAn).not.toHaveBeenCalled();
+  });
+
+  it('ist ohne offene Bestätigung wirkungslos', () => {
+    const { result } = rendere();
+    act(() => result.current.onZoneZeichnenStart({ typ: 'gefahrengebiet', modus: 'polygon' }));
+    const nonceVorher = result.current.zoneZeichnenNonce;
+    act(() => result.current.onBestaetigungZurueck());
+    expect(result.current.zoneZeichnenNonce).toBe(nonceVorher);
+    expect(result.current.zoneEntwurf).not.toBeNull();
+  });
+
+  it('behält den Serienzähler (die gespeicherten Zonen bleiben gezählt)', async () => {
+    const { result } = rendere();
+    act(() => result.current.onZoneZeichnenStart({ typ: 'gefahrengebiet', modus: 'polygon' }));
+    act(() => result.current.onZoneGezeichnet(POLYGON));
+    act(() => result.current.bestaetigungSpeichern());
+    await waitFor(() => expect(result.current.zoneSerieAnzahl).toBe(1));
+    act(() => result.current.onZoneGezeichnet(POLYGON));
+    act(() => result.current.onBestaetigungZurueck());
+    expect(result.current.zoneSerieAnzahl).toBe(1);
+  });
+});

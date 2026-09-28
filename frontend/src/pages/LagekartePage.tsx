@@ -36,6 +36,7 @@ import ZonenInspector from './lagekarte/ZonenInspector';
 import FachebenenInspector from './lagekarte/FachebenenInspector';
 import ZeichnenSteuerung from './lagekarte/ZeichnenSteuerung';
 import { LEERER_ZEICHENSTAND, type ZeichenStand } from './lagekarte/zeichnen';
+import { escStufe, QUITTUNG_VERWORFEN } from './lagekarte/zeichnenEsc';
 import MessSteuerung from './lagekarte/MessSteuerung';
 import { erzeugeMessQuelle } from './lagekarte/messQuelle';
 import { HistorienBanner } from './lagekarte/HistorienBanner';
@@ -374,6 +375,7 @@ export default function LagekartePage() {
     aendereSymbol,
     bestaetigungSpeichern,
     bestaetigungVerwerfen,
+    onBestaetigungZurueck,
     onPlatzierenStart,
     onPlatzierenAbbrechen,
     onAbschnittZeichnenStart,
@@ -471,8 +473,9 @@ export default function LagekartePage() {
    * einem Klick. terra-draw bricht selbst erst beim `keyup` ab — dann ist der Modus schon
    * beendet; es gibt also keinen zweistufigen Ablauf „erst Entwurf, dann Werkzeug".
    * Nicht, wenn jemand gerade schreibt oder ein anderer Handler die Taste schon genommen hat
-   * (ein offenes Menü, ein Dialog). Die übrigen Modi bekommen das bewusst NICHT mit: dort
-   * steht ein Entwurf, der mehr kostet als eine Messung.
+   * (ein offenes Menü, ein Dialog). Das Zeichnen trägt einen Entwurf, der mehr kostet als eine
+   * Messung: dort ist Esc zweistufig (LFH-712, nächster Effekt), die übrigen Modi bekommen
+   * die Taste bewusst NICHT mit.
    */
   useEffect(() => {
     if (!messForm) return;
@@ -485,6 +488,51 @@ export default function LagekartePage() {
     window.addEventListener('keydown', taste);
     return () => window.removeEventListener('keydown', taste);
   }, [messForm, onMessenBeenden]);
+
+  /**
+   * Esc beim Zeichnen ist zweistufig (LFH-712): erst die Figur, dann der Modus. Die Stufe
+   * entscheidet `escStufe`; hier wird nur ausgeführt. Esc gehört dabei der Seite — terra-draw
+   * hat seine Abbruchtaste abgegeben (`zeichnen.ts`), sonst hätte es die Figur schon beim
+   * `keyup` am Canvas verworfen und dieser Zuhörer sähe beim ersten Esc eine leere Figur.
+   * Am Fenster, nicht am Canvas: auch mit dem Fokus auf einem Knopf der Steuerung wirkt die
+   * Taste. Dieselben Riegel wie beim Messen (Eingabeziel, schon verarbeitete Taste).
+   *
+   * Die Ausführung liegt in einem Ref, der bei jedem Render neu gesetzt wird: die Handler des
+   * Hooks sind je Render neue Funktionen, und der Zuhörer soll trotzdem nur am Modus hängen.
+   */
+  const zeichenmodusAktiv = zoneEntwurf != null || zeichneAbschnittId != null;
+  const escAusfuehrenRef = useRef<() => void>(() => {});
+  escAusfuehrenRef.current = () => {
+    const stufe = escStufe({
+      phase: zoneBestaetigung != null ? 'bestaetigen' : 'zeichnen',
+      speichernLaeuft: zoneSpeichern,
+      punkte: zeichenStand.punkte,
+      serieGespeichert: zeichneAbschnittId != null ? 0 : zoneSerieAnzahl,
+    });
+    if (stufe === 'zurueckZumZeichnen') {
+      onBestaetigungZurueck();
+      message.info(QUITTUNG_VERWORFEN);
+    } else if (stufe === 'verwerfen') {
+      kartenRef.current?.zeichnungVerwerfen();
+      message.info(QUITTUNG_VERWORFEN);
+    } else if (stufe === 'fertig') {
+      onZoneZeichnenFertig();
+    } else if (stufe === 'abbrechen') {
+      onZeichnenAbbrechen();
+    }
+  };
+  useEffect(() => {
+    if (!zeichenmodusAktiv) return;
+    const taste = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      const ziel = e.target as HTMLElement | null;
+      if (ziel?.closest('input, textarea, [contenteditable="true"]')) return;
+      e.preventDefault();
+      escAusfuehrenRef.current();
+    };
+    window.addEventListener('keydown', taste);
+    return () => window.removeEventListener('keydown', taste);
+  }, [zeichenmodusAktiv]);
 
   useEffect(() => {
     const ziel = parseRouteId(searchParams.get('gefahrengebiet') ?? undefined);
@@ -840,6 +888,11 @@ export default function LagekartePage() {
           phase={zoneBestaetigung != null ? 'bestaetigen' : 'zeichnen'}
           speichernLaeuft={zoneSpeichern}
           abschliessenMoeglich={zeichenStand.bereit}
+          punkte={zeichenStand.punkte}
+          punktZurueckMoeglich={zeichenStand.kannZurueck}
+          onPunktZurueck={() => {
+            kartenRef.current?.punktZurueck();
+          }}
           onAbschliessen={() => {
             const abgeschlossen =
               zeichneAbschnittId != null

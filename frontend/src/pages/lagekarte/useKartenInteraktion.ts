@@ -490,6 +490,17 @@ export function useKartenInteraktion({
   };
   // Verwirft den Entwurf (stoppen() → clear()).
   const bestaetigungVerwerfen = () => dispatch({ t: 'beenden', arten: ['zone'] });
+  // Erste Esc-Stufe in der Bestätigungsphase (LFH-712): die fertige, ungespeicherte Figur geht
+  // weg, der Modus bleibt — derselbe Weg wie der Serienpfad nach dem Speichern (Fall `zone` +
+  // Nonce, damit die Karte `starten()` ruft und die Figur räumt). Der Serienzähler bleibt: die
+  // schon gespeicherten Zonen sind nicht zurückgenommen. Während des Speicherns wirkungslos —
+  // die Promise-Kette oben erkennt ihren Zug an `speichern` und liefe sonst ins Leere.
+  const onBestaetigungZurueck = () => {
+    const m = modusRef.current;
+    if (m.art !== 'zone' || m.bestaetigung == null || m.speichern) return;
+    dispatch({ t: 'zone', entwurf: m.entwurf });
+    setZoneZeichnenNonce((n) => n + 1);
+  };
 
   // --- Start-/Reset-Handler (mutually-exclusive Modi) -------------------------
   // Ein Start setzt nur noch SEINEN Modus — der Reducer verdrängt jeden anderen. Die
@@ -664,6 +675,7 @@ export function useKartenInteraktion({
     loescheVerortung,
     aendereSymbol,
     bestaetigungSpeichern,
+    onBestaetigungZurueck,
     bestaetigungVerwerfen,
     onPlatzierenStart,
     onPlatzierenAbbrechen,

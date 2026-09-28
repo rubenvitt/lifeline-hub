@@ -43,12 +43,7 @@ import { baueClusterDonut, setzeHuelleDurchlaessig } from './clusterDonut';
 import type { TzProps } from './taktischesZeichen';
 import type { GeoJsonPolygon, GeoJsonGeometry } from './geo';
 import { werteFachebenenKlickAus } from './geo';
-import {
-  createZeichnung,
-  type Zeichnung,
-  type ZeichenModus,
-  type ZeichenStand,
-} from './zeichnen';
+import { createZeichnung, type Zeichnung, type ZeichenModus, type ZeichenStand } from './zeichnen';
 import { createMessung, type MessZeichnung } from './messZeichnung';
 import type { MessForm, MessGeometrie } from './messung';
 import { wendeKartenDatenAn } from './kartenDaten';
