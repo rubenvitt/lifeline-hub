@@ -22,6 +22,7 @@ import { parsePolygon, polygonZentroid } from './lagekarte/geo';
 import { useThemeMode } from '../theme/ThemeModeProvider';
 import { useKartenbilder } from './lagekarte/useKartenbilder';
 import { useBasemap } from './lagekarte/useBasemap';
+import { leisteSichtbar, useLeistenWahl } from './lagekarte/leistenWahl';
 import { useKartenAnsicht } from './lagekarte/useKartenAnsicht';
 import { QUELLE_BETROFFENE, useLagekarteDaten } from './lagekarte/useLagekarteDaten';
 import { useFachebenen } from './lagekarte/useFachebenen';
@@ -103,13 +104,10 @@ export default function LagekartePage() {
   const farben = useModusFarben();
   const { abBreite, istSchmal } = useViewport();
   const breit = abBreite('lg');
-  // Unter `lg` liegt die Leiste UNTER der Karte und lässt sich ausblenden (die Karte bekommt
-  // dann die ganze Höhe). Ab `lg` steht sie immer rechts daneben. Ohne eigene Wahl ist sie
-  // auf dem Handschirm (< `md`) zu — dort trüge die Karte neben ihr keine 300 px mehr —, auf
-  // dem Tablet offen. `null` = noch keine Wahl; die Vorgabe folgt dann der Breite, auch wenn
-  // die erst nach dem ersten Rendern bekannt ist.
-  const [leisteWahl, setLeisteWahl] = useState<boolean | null>(null);
-  const leisteOffen = leisteWahl ?? !istSchmal;
+  // Unter `lg` liegt die Leiste UNTER der Karte, ab `lg` rechts daneben. Auf jeder Breite
+  // lässt sie sich ausblenden (LFH-715), die Wahl bleibt je Breitenklasse gemerkt; Vorgabe und
+  // Vorrang stehen in `lagekarte/leistenWahl.ts`.
+  const leistenWahl = useLeistenWahl(breit);
   // Zeigerkoordinate: die Karte meldet, nur die Anzeige rendert mit (siehe `mausPosition.ts`).
   const zeigerQuelle = useMemo(() => erzeugeZeigerQuelle(), []);
   // Band des Kartenfusses, in das die MapLibre-Maßstabsleiste gehängt wird. State statt Ref,
@@ -696,10 +694,21 @@ export default function LagekartePage() {
       </>
     ) : null;
 
-  // Unter `lg`: eine Auswahl holt die ausgeblendete Leiste zurück — sonst wählte man auf der
-  // Karte ein Objekt und sähe nichts davon. Abgeleitet, nicht per Effekt: wird die Auswahl
-  // geschlossen, gilt wieder die eigene Wahl.
-  const leisteSichtbar = breit || leisteOffen || auswahlInhalt != null;
+  // Eine Auswahl holt die ausgeblendete Leiste zurück — sonst wählte man auf der Karte ein
+  // Objekt und sähe nichts davon. Ebenso ein Platzier-Modus (Objekt, Bild, Zeichen): sein
+  // einziger „Abbrechen"-Knopf steht in der Leiste, ausgeblendet säße man im Modus fest.
+  // Abgeleitet, nicht per Effekt: endet beides, gilt wieder die eigene Wahl.
+  const leisteErzwungen =
+    auswahlInhalt != null ||
+    platzierungZiel != null ||
+    bildPlatzierenId != null ||
+    zeichenPlatzieren != null;
+  const leisteIstSichtbar = leisteSichtbar({
+    gemerkt: leistenWahl.gemerkt,
+    breit,
+    istSchmal,
+    erzwungen: leisteErzwungen,
+  });
 
   // Die Kartengrundlage: ab `md` als Segmentleiste über der Karte (Neuentwurf S5). Auf dem
   // Handschirm bräche die Leiste mit mehreren Online-Stilen in vier Zeilen um und läge über
@@ -736,21 +745,23 @@ export default function LagekartePage() {
           {kopfMeta(verortetAnzahl(alleVerortet), nichtVerortetAlle.length, lagebildFehler)}
         </span>
       </div>
-      {!breit && (
-        <div data-lfh="seitenkopf-aktionen">
-          <Button
-            aria-expanded={leisteSichtbar}
-            aria-controls="lagekarte-leiste"
-            onClick={() => setLeisteWahl(!leisteSichtbar)}
-            disabled={auswahlInhalt != null}
-            title={
-              auswahlInhalt != null ? 'Auswahl schließen, um die Leiste auszublenden' : undefined
-            }
-          >
-            {leisteSichtbar ? 'Leiste ausblenden' : 'Leiste einblenden'}
-          </Button>
-        </div>
-      )}
+      <div data-lfh="seitenkopf-aktionen">
+        <Button
+          aria-expanded={leisteIstSichtbar}
+          aria-controls="lagekarte-leiste"
+          onClick={() => leistenWahl.merke(!leisteIstSichtbar)}
+          disabled={leisteErzwungen}
+          title={
+            auswahlInhalt != null
+              ? 'Auswahl schließen, um die Leiste auszublenden'
+              : leisteErzwungen
+                ? 'Platzieren beenden, um die Leiste auszublenden'
+                : undefined
+          }
+        >
+          {leisteIstSichtbar ? 'Leiste ausblenden' : 'Leiste einblenden'}
+        </Button>
+      </div>
     </div>
   );
 
@@ -817,7 +828,7 @@ export default function LagekartePage() {
         onZeichnen={
           darfSchreiben
             ? () => {
-                setLeisteWahl(true);
+                leistenWahl.merke(true);
                 setZeichnenAnfrage((n) => n + 1);
               }
             : undefined
@@ -1083,7 +1094,7 @@ export default function LagekartePage() {
           }}
         >
           {karte}
-          {leisteSichtbar && leiste}
+          {leisteIstSichtbar && leiste}
         </div>
       </div>
     </FensterRahmen>

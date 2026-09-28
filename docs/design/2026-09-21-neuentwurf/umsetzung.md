@@ -183,3 +183,19 @@ Auftraggebers:
   ETB-Eintrag in die abgelehnten Aktionen.
 - Die Lagekarte zeigt „Letzte Meldung“ im taktischen Zeitformat (`1411`) wie der Rest des
   Paneels, nicht `14:11` wie im Entwurf.
+
+## Kartenleiste am Fükw ausblendbar (LFH-715, 25.09.2026)
+
+Abweichung vom Entwurf S5, dort steht die rechte Kartenleiste ab `lg` fest neben der Karte.
+Entscheidung des Auftraggebers:
+
+- Die Leiste bleibt **per Vorgabe offen**, lässt sich aber **auf jeder Breite** über den Knopf
+  „Leiste ausblenden“ im Seitenkopf ausblenden. Grund ist die Kartenfläche am Fükw: bei 1366 px
+  blieben nach Rail (60), Modulpanel (208) und Leiste (300) rund 797 px Karte. Ausgeblendet sind
+  es ≥ 1000 px (gemessen in `e2e/lagekarte-leiste-einklappen.spec.ts`).
+- Die Wahl wird **je Breitenklasse** gemerkt, `lg` und darüber getrennt von darunter, und zwar
+  im `localStorage` des Geräts (`pages/lagekarte/leistenWahl.ts`). Sie gehört **nicht** in die
+  Kartenansicht: im geteilten Konfig-Bag machte jedes Klappen die Ansicht „geändert“.
+- Eine Auswahl auf der Karte holt die Leiste zurück wie bisher. Ebenso ein laufender
+  Platzier-Modus (Objekt, Bild, Zeichen), denn sein einziger „Abbrechen“-Knopf steht in der
+  Leiste. Solange einer der beiden gilt, ist der Knopf gesperrt und nennt den Grund.
