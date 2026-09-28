@@ -19,9 +19,8 @@ export function quittiereErinnerung(einsatzId: number, id: number): Promise<Erin
 }
 
 /**
- * Nimmt Erledigt/Quittiert zurück (LFH-343 · C8) — der Gegenweg zur Direktaktion
- * ohne Rückfrage. Räumt serverseitig alle drei Achsen (Status, Vollzug, Quittung);
- * auf eine bereits offene Erinnerung angewandt: 422.
+ * Nimmt Erledigt/Quittiert zurück, der Gegenweg zur Direktaktion ohne Rückfrage. Räumt
+ * serverseitig alle drei Achsen (Status, Vollzug, Quittung); auf eine offene Erinnerung: 422.
  */
 export function oeffneErinnerung(einsatzId: number, id: number): Promise<Erinnerung> {
   return apiSend<Erinnerung>(`/api/einsaetze/${einsatzId}/erinnerungen/${id}/oeffnen`, 'POST');

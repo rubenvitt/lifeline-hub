@@ -39,12 +39,10 @@ export function ladePersonalVorschlaege(): Promise<PersonalVorschlaege> {
 export type PersonalNeu = { name: string } & Partial<Omit<PersonalEingabe, 'name'>>;
 
 /**
- * PATCH ist ein ECHTER Teil-Patch (LFH-306) — Begruendung wortgleich bei `FahrzeugPatch`:
- * die auf vier Felder gekuerzte Schnellerfassung darf die vier NICHT gezeigten (Telefon,
- * Staerke-Position, Benutzer-Konto, Bemerkung) nicht als `null` mitschicken.
- *
- * `qualifikation_ids` ist dabei der gefaehrlichste Key: `Some([])` LEERT die Zuordnung
- * vollstaendig (`src/routes/personal.rs:86`), absent laesst sie stehen.
+ * PATCH ist ein ECHTER Teil-Patch (wie `FahrzeugPatch`): die auf vier Felder gekürzte
+ * Schnellerfassung darf die nicht gezeigten Felder nicht als `null` mitschicken.
+ * `qualifikation_ids` ist der gefährlichste Key: `[]` LEERT die Zuordnung, absent lässt sie
+ * stehen.
  */
 export type PersonalPatch = Partial<PersonalEingabe>;
 
