@@ -251,6 +251,8 @@ describe('sorgeFuerMarkerLayer', () => {
       'personen-kurz',
       'personen-label',
       'marker-treffer',
+      // Der Einsatzort hat eine eigene, ungeclusterte Quelle und damit eine eigene Zone (LFH-711).
+      'marker-einsatzort-treffer',
       'marker-status-ring',
       'marker-kante',
       'marker-kreis',
@@ -273,21 +275,27 @@ describe('sorgeFuerMarkerLayer', () => {
   it('die Trefferzone (LFH-650) ist unsichtbar, liegt ganz unten, ist Klickziel und nur für Features MIT `treffer`', () => {
     const { map, layers } = fakeMap();
     sorgeFuerMarkerLayer(map as never, leer, leer);
-    for (const id of ['marker-treffer', 'spider-treffer']) {
+    for (const id of ['marker-treffer', 'marker-einsatzort-treffer', 'spider-treffer']) {
       const layer = layers.get(id) as {
         type: string;
         filter: unknown;
         paint: Record<string, unknown>;
       };
       expect(layer.type).toBe('circle');
-      // Ohne `treffer` keine Zone — die Lagekarte setzt die Eigenschaft nicht und bleibt gleich.
+      // Ohne `treffer` keine Zone: die Eigenschaft bringt der Marker mit (Builder, LFH-711).
       expect(JSON.stringify(layer.filter)).toContain('["has","treffer"]');
       expect(layer.paint['circle-opacity']).toBe(0);
       // Radius = halber Durchmesser aus der Feature-Eigenschaft, keine feste Zahl.
       expect(layer.paint['circle-radius']).toEqual(['/', ['get', 'treffer'], 2]);
     }
     expect(MARKER_KLICK_LAYER).toContain('marker-treffer');
+    expect(MARKER_KLICK_LAYER).toContain('marker-einsatzort-treffer');
     expect(SPIDER_KLICK_LAYER).toContain('spider-treffer');
+    // Die Einsatzort-Zone hängt an SEINER Quelle: an `marker-cluster` hinge sie nie an einem
+    // Feature, denn der Einsatzort steht dort nicht (`baueMarkerFc` nimmt ihn aus).
+    expect((layers.get('marker-einsatzort-treffer') as { source: string }).source).toBe(
+      'marker-einsatzort',
+    );
   });
 
   it('die dunkle Außenkante (LFH-650) liegt direkt unter dem Kreis, schwarz und nur an Personen', () => {
@@ -314,7 +322,7 @@ describe('sorgeFuerMarkerLayer', () => {
 });
 
 describe('Trefferzone und Sichtung als Feature-Properties (LFH-650)', () => {
-  it('trägt beide nur, wenn der Marker sie hat — ein Lagekarten-Marker bekommt keins', () => {
+  it('trägt beide nur, wenn der Marker sie hat — ohne Angabe keine Zone', () => {
     const fc = baueMarkerFc([
       mk({ schluessel: 'person-1', typ: 'person', trefferDurchmesser: 48, sichtung: 'sk1' }),
       mk({ schluessel: 'uhs-1' }),
@@ -322,6 +330,13 @@ describe('Trefferzone und Sichtung als Feature-Properties (LFH-650)', () => {
     expect(fc.features[0].properties).toMatchObject({ treffer: 48, sk: 'sk1' });
     expect(fc.features[1].properties).not.toHaveProperty('treffer');
     expect(fc.features[1].properties).not.toHaveProperty('sk');
+  });
+
+  it('reicht die Zone auch am Einsatzort durch, der eine eigene Quelle hat (LFH-711)', () => {
+    const fc = baueEinsatzortFc([
+      mk({ schluessel: 'einsatzort', typ: 'einsatzort', trefferDurchmesser: 72 }),
+    ]);
+    expect(fc.features[0].properties).toMatchObject({ treffer: 72 });
   });
 });
 
@@ -605,6 +620,36 @@ describe('personenClusterTreffer (LFH-648)', () => {
 
   it('leerer Klick: kein Treffer', () => {
     expect(personenClusterTreffer([])).toBeNull();
+  });
+
+  // Review LFH-711: seit jeder Kräfte-/Objektmarker eine unsichtbare Zone trägt, liegt sie in
+  // der Mal-Reihenfolge ÜBER den Personen-Clustern. Zählte sie als „oberstes Feature", nähme ein
+  // Einsatzort oder RTW im Umkreis von 24–36 px (komfortabel/handschuh) dem sichtbaren Cluster
+  // den Tipp weg — genau in den Berührungsstufen, für die die Zone gebaut ist.
+  const zone = (id: string, schluessel: string) => ({
+    layer: { id },
+    properties: { schluessel, treffer: 72 },
+    geometry: { type: 'Point', coordinates: [11.5001, 53.5501] },
+  });
+
+  it('eine bloße Trefferzone über dem Cluster zählt nicht — der Cluster fächert auf', () => {
+    for (const id of ['marker-treffer', 'marker-einsatzort-treffer', 'spider-treffer']) {
+      expect(personenClusterTreffer([zone(id, 'einsatzort'), cluster]), id).toEqual({
+        clusterId: 7,
+        center: [11.5, 53.55],
+        anzahl: 3,
+      });
+    }
+  });
+
+  it('ein GEZEICHNETES Zeichen über dem Cluster gewinnt weiterhin, auch unter einer Zone', () => {
+    expect(
+      personenClusterTreffer([zone('marker-treffer', 'einheit-1'), einheit, cluster]),
+    ).toBeNull();
+  });
+
+  it('nur Zonen am Punkt, kein Cluster: kein Treffer', () => {
+    expect(personenClusterTreffer([zone('marker-treffer', 'einheit-1')])).toBeNull();
   });
 });
 

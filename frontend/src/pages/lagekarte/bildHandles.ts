@@ -13,50 +13,51 @@ import {
   type Kante,
   type Punkt,
 } from './bildGeometrie';
+import {
+  DREHGRIFF_ABSTAND_PX,
+  griffStil,
+  griffeFuerModus,
+  type GriffArt,
+  type GriffKontext,
+  type GriffModus,
+} from './bildGriffe';
 
 type Vier = [Punkt, Punkt, Punkt, Punkt];
 
-// Drehgriff sitzt diesen Pixel-Abstand über der oberen Bildkante.
-const DREHGRIFF_ABSTAND_PX = 28;
-
-function eckGriffEl(): HTMLElement {
+/**
+ * Ein Griff ist seit LFH-711 ZWEI Knoten: ein durchsichtiger Container in Stufengröße (das
+ * Ziel, mindestens 44 px) und ein kleiner farbiger Kern (die Ansage, wo genau der Punkt
+ * sitzt). Vorher war es einer, 11 bis 22 px groß — mit Handschuhen kein Ziel.
+ *
+ * Der Container ist das Element des Markers; MapLibre setzt seine Position auf dessen
+ * MITTELPUNKT, die Vergrößerung verschiebt den Griff also nicht.
+ */
+function griffEl(art: GriffArt, kontext: GriffKontext): HTMLElement {
+  const { container, kern } = griffStil(art, kontext);
   const el = document.createElement('div');
-  el.style.cssText =
-    'width:12px;height:12px;background:#fff;border:2px solid #1677ff;border-radius:2px;cursor:pointer;box-shadow:0 0 2px rgba(0,0,0,.5)';
-  return el;
-}
-// Kantengriff bewusst rund (vs. eckiges Quadrat der proportionalen Eckgriffe), damit der
-// freie 1D-Strecken-Griff visuell unterscheidbar ist.
-function kantenGriffEl(): HTMLElement {
-  const el = document.createElement('div');
-  el.style.cssText =
-    'width:11px;height:11px;background:#fff;border:2px solid #1677ff;border-radius:50%;cursor:pointer;box-shadow:0 0 2px rgba(0,0,0,.5)';
-  return el;
-}
-function drehGriffEl(): HTMLElement {
-  const el = document.createElement('div');
-  el.style.cssText =
-    'width:22px;height:22px;background:#1677ff;border:2px solid #fff;border-radius:50%;cursor:grab;display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;line-height:1;box-shadow:0 0 3px rgba(0,0,0,.5)';
-  el.textContent = '↻';
-  return el;
-}
-function mitteGriffEl(): HTMLElement {
-  const el = document.createElement('div');
-  el.style.cssText =
-    'width:16px;height:16px;background:rgba(22,119,255,.9);border:2px solid #fff;border-radius:50%;cursor:move;box-shadow:0 0 3px rgba(0,0,0,.5)';
+  el.style.cssText = container;
+  el.dataset.lfh = `bildgriff-${art}`;
+  const innen = document.createElement('div');
+  innen.style.cssText = kern;
+  if (art === 'dreh') innen.textContent = '↻';
+  el.appendChild(innen);
   return el;
 }
 
 export interface BildHandles {
   /** Ecken extern setzen (z. B. nach numerischer Mittelpunkt-Eingabe oder Refetch). */
   setzeEcken(ecken: Ecken): void;
+  /** Griffsorte umschalten (LFH-711) — nur die gewählte hängt an der Karte. */
+  setzeModus(modus: GriffModus): void;
   zerstoeren(): void;
 }
 
 /** Direkte Manipulation eines Bild-Overlays über Griffe auf der Karte:
  *  - 4 Eckgriffe: skalieren uniform um die gegenüberliegende Ecke (Seitenverhältnis + Drehung bleiben),
+ *  - 4 Kantengriffe: strecken eine Dimension frei,
  *  - 1 Drehgriff: dreht um den Mittelpunkt,
  *  - 1 Mittelgriff: verschiebt.
+ *  Scharf ist immer nur die Sorte des Modus (`griffeFuerModus`, LFH-711).
  *  Während des Ziehens nur Live-Vorschau (setCoordinates, kein React-State, kein PATCH);
  *  `onCommit` feuert einmal bei `dragend` (→ persistierender PATCH). Gerechnet wird im
  *  Pixel-Raum (map.project/unproject) — exakt und ohne cos(lat)-Verzerrung. */
@@ -65,8 +66,11 @@ export function erzeugeBildHandles(
   bildId: number,
   initial: Ecken,
   onCommit: (ecken: Ecken) => void,
+  kontext: GriffKontext,
+  modusInitial: GriffModus = 'groesse',
 ): BildHandles {
   let ecken: Ecken = initial;
+  let modus: GriffModus = modusInitial;
 
   const projAll = (e: Ecken): Vier =>
     e.map((p) => {
@@ -79,24 +83,40 @@ export function erzeugeBildHandles(
       return [ll.lng, ll.lat] as Ecke;
     }) as Ecken;
 
+  // Die Griffe werden EINMAL gebaut und je nach Modus an die Karte gehängt oder abgezogen;
+  // ihre Zieh-Verdrahtung hängt am Marker, nicht am Kartenzustand, und überlebt das Abziehen.
+  const griff = (art: GriffArt) =>
+    new maplibregl.Marker({ element: griffEl(art, kontext), draggable: true });
   const eckGriffe: Marker[] = [0, 1, 2, 3].map((i) =>
-    new maplibregl.Marker({ element: eckGriffEl(), draggable: true })
-      .setLngLat(ecken[i] as [number, number])
-      .addTo(map),
+    griff('eck').setLngLat(ecken[i] as [number, number]),
   );
   const KANTEN: Kante[] = ['oben', 'rechts', 'unten', 'links'];
   const kantenGriffe: Marker[] = KANTEN.map(() =>
-    new maplibregl.Marker({ element: kantenGriffEl(), draggable: true })
-      .setLngLat(ecken[0] as [number, number])
-      .addTo(map),
+    griff('kante').setLngLat(ecken[0] as [number, number]),
   );
-  const drehGriff = new maplibregl.Marker({ element: drehGriffEl(), draggable: true })
-    .setLngLat(ecken[0] as [number, number])
-    .addTo(map);
-  const mitteGriff = new maplibregl.Marker({ element: mitteGriffEl(), draggable: true })
-    .setLngLat(ecken[0] as [number, number])
-    .addTo(map);
+  const drehGriff = griff('dreh').setLngLat(ecken[0] as [number, number]);
+  const mitteGriff = griff('mitte').setLngLat(ecken[0] as [number, number]);
   const alle = [...eckGriffe, ...kantenGriffe, drehGriff, mitteGriff];
+
+  const nachArt: Record<GriffArt, Marker[]> = {
+    eck: eckGriffe,
+    kante: kantenGriffe,
+    dreh: [drehGriff],
+    mitte: [mitteGriff],
+  };
+
+  /**
+   * Nur die Griffe des aktuellen Modus hängen an der Karte. Zehn große Ziele auf einem
+   * daumengroßen Bild lägen übereinander, und welches man erwischt, entschiede die
+   * Reihenfolge im DOM statt die Absicht.
+   */
+  function wendeModusAn() {
+    const scharf = new Set(griffeFuerModus(modus).flatMap((a) => nachArt[a]));
+    for (const m of alle) {
+      if (scharf.has(m)) m.addTo(map);
+      else m.remove();
+    }
+  }
 
   /** Drehgriff-Position: über der Mitte der oberen Kante, in Bild-„oben"-Richtung versetzt. */
   function drehGriffPos(e: Ecken): [number, number] {
@@ -142,6 +162,7 @@ export function erzeugeBildHandles(
     if (mitteGriff !== ausser) mitteGriff.setLngLat(zentroid(ecken) as [number, number]);
   }
   positioniere();
+  wendeModusAn();
 
   // Eckgriffe — uniform skalieren um die Anker-Ecke (Seitenverhältnis bleibt).
   eckGriffe.forEach((m, i) => {
@@ -220,11 +241,45 @@ export function erzeugeBildHandles(
     onCommit(ecken);
   });
 
+  // Nach den Griff-Hörern angemeldet, damit `dragend` ERST speichert und dann umschaltet.
+  // Ein Moduswechsel MITTEN in einer Ziehgeste (Multitouch: ein Finger zieht, der andere tippt
+  // den Umschalter) wartet bis `dragend` (Review LFH-711). Sofort angewandt zöge er den
+  // gezogenen Griff ab: MapLibre meldet dabei seinen `mouseup`-Hörer ab, `dragend` käme nie,
+  // der Vorschaustand würde nicht gespeichert, und der Griff behielte `pointer-events: none`
+  // aus der Geste — nach dem Zurückschalten wäre er tot.
+  let ziehend = false;
+  let wartenderModus: GriffModus | null = null;
+  for (const m of alle) {
+    m.on('dragstart', () => {
+      ziehend = true;
+    });
+    m.on('dragend', () => {
+      ziehend = false;
+      if (wartenderModus) {
+        modus = wartenderModus;
+        wartenderModus = null;
+        positioniere();
+        wendeModusAn();
+      }
+    });
+  }
+
   return {
     setzeEcken(e: Ecken) {
       ecken = e;
       setzeBildGeometrie(map, bildId, e);
       positioniere();
+    },
+    setzeModus(m: GriffModus) {
+      if (ziehend) {
+        wartenderModus = m;
+        return;
+      }
+      modus = m;
+      // ERST positionieren, dann anhängen: ein Griff, der seit dem letzten Modus abgezogen
+      // war, hat die zwischenzeitlichen Ecken nie gesehen und säße sonst am alten Ort.
+      positioniere();
+      wendeModusAn();
     },
     zerstoeren() {
       for (const m of alle) m.remove();

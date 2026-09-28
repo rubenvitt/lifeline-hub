@@ -149,11 +149,18 @@ export type ClusterQuelle = (typeof CLUSTER_QUELLEN)[number];
 export function clusterSchluessel(quelle: ClusterQuelle, clusterId: number | string): string {
   return `${quelle}:${clusterId}`;
 }
+/** Die unsichtbaren Trefferzonen (LFH-650/LFH-711) — Klickziel, aber keine Zeichnung. */
+export function istTrefferzone(layerId: string): boolean {
+  return layerId.endsWith('-treffer');
+}
 /**
- * Entscheidet einen Karten-Klick für die Personen-Cluster (LFH-648): ist das OBERSTE Feature am
- * Klickpunkt ein Personen-Cluster, wird er aufgefächert. Liegt ein anderes Zeichen darüber, gehört
- * der Klick ihm — genau das ist die Zusicherung „Personen verdecken keine Kräfte". Rein, damit sie
- * ohne WebGL prüfbar ist; `features` kommt von `queryRenderedFeatures` (oben zuerst).
+ * Entscheidet einen Karten-Klick für die Personen-Cluster (LFH-648): ist das oberste GEZEICHNETE
+ * Feature am Klickpunkt ein Personen-Cluster, wird er aufgefächert. Liegt ein anderes Zeichen
+ * darüber, gehört der Klick ihm — genau das ist die Zusicherung „Personen verdecken keine Kräfte".
+ * Trefferzonen zählen dabei nicht (Review LFH-711): sie liegen über den Clustern, sind aber nicht
+ * zu sehen, und ein sichtbarer Cluster darf nicht von einem unsichtbaren Kreis daneben verdeckt
+ * werden. `Kartenflaeche` unterdrückt dann auch die Markerauswahl desselben Klicks. Rein, damit
+ * sie ohne WebGL prüfbar ist; `features` kommt von `queryRenderedFeatures` (oben zuerst).
  */
 export function personenClusterTreffer(
   features: readonly {
@@ -162,7 +169,7 @@ export function personenClusterTreffer(
     geometry: { type: string; coordinates?: unknown };
   }[],
 ): { clusterId: number; center: [number, number]; anzahl: number } | null {
-  const oben = features[0];
+  const oben = features.find((f) => !istTrefferzone(f.layer.id));
   if (!oben || !(PERSONEN_CLUSTER_KLICK_LAYER as readonly string[]).includes(oben.layer.id)) {
     return null;
   }
@@ -186,6 +193,7 @@ export const MARKER_KLICK_LAYER = [
   'personen-kurz',
   'personen-label',
   'marker-treffer',
+  'marker-einsatzort-treffer',
   'marker-symbol',
   'marker-kreis',
   'marker-kurz',
@@ -223,6 +231,7 @@ const MARKER_LAYER_REIHENFOLGE = [
   'personen-kurz',
   'personen-label',
   'marker-treffer',
+  'marker-einsatzort-treffer',
   'marker-status-ring',
   'marker-kante',
   'marker-kreis',
@@ -254,7 +263,10 @@ const STATUS_RING_PAINT: CircleLayerSpecification['paint'] = {
  * wie sie — MapLibre prüft beim Treffertest die Geometrie, nicht die Deckkraft (gemessen in
  * `e2e/gate3-trefflaeche.spec.ts`, „Betroffene Karte …": ein Klick mit Versatz neben den
  * gezeichneten Kreis öffnet die Person). Überlappen sich Zonen, wählt der Klick-Handler das
- * nächstgelegene Merkmal ({@link naechstesMerkmal}). Nur Features mit `treffer` erzeugen eine Zone; die Lagekarte setzt keins.
+ * nächstgelegene Merkmal ({@link naechstesMerkmal}). Nur Features mit `treffer` erzeugen eine
+ * Zone. Seit LFH-711 setzt jeder Marker-Builder der Lagekarte die Eigenschaft (Kräfte, Objekte,
+ * Lagemeldungen, freie Zeichen, Abschnitte, Einsatzort), nicht mehr nur `personenMarker`; die
+ * dunkle Außenkante ({@link KANTE_PAINT}) bleibt dagegen den Personen vorbehalten.
  */
 const TREFFER_PAINT: CircleLayerSpecification['paint'] = {
   'circle-radius': ['/', ['get', 'treffer'], 2],
@@ -481,6 +493,17 @@ export function sorgeFuerMarkerLayer(
   // gerendert (clusterDonut + DOM-Sync in Kartenflaeche): weiche Schatten + Typ-Zusammensetzung,
   // was WebGL-circle nicht kann. Die unclustered Einzelpunkte bleiben die Layer oben.
   // Einsatzort (eigene, ungeclusterte Source) — immer als Einzelsymbol sichtbar.
+  // Trefferzone des Einsatzorts (LFH-711): eigene Quelle, also eigene Zone — `marker-treffer`
+  // sieht den Einsatzort nicht, weil `baueMarkerFc` ihn aus `marker-cluster` herausnimmt.
+  if (!map.getLayer('marker-einsatzort-treffer')) {
+    map.addLayer({
+      id: 'marker-einsatzort-treffer',
+      type: 'circle',
+      source: MARKER_EINSATZORT_QUELLE,
+      filter: ['has', 'treffer'],
+      paint: { ...TREFFER_PAINT },
+    });
+  }
   if (!map.getLayer('marker-einsatzort-symbol')) {
     map.addLayer({
       id: 'marker-einsatzort-symbol',

@@ -1,4 +1,4 @@
-import { Button, Space, Typography } from 'antd';
+import { Button, Popconfirm, Space, Typography } from 'antd';
 import { useId, useMemo } from 'react';
 import { erzeugeTaktischesZeichen } from 'taktische-zeichen-react';
 import { Select } from '../../components/Select';
@@ -310,11 +310,33 @@ export default function Inspector({
         </div>
         {/* Lagemeldungen sind auf der Karte read-only: verortet wird ausschließlich beim
             Übergeben (LFH-113). Re-/Ent-Verorten würde am ON-CONFLICT-Upsert ohnehin verpuffen. */}
-        {darfSchreiben && marker.typ !== 'einsatzort' && marker.typ !== 'lagemeldung' && (
-          <Button danger block onClick={() => onVerortungLoeschen(marker)}>
-            Verortung löschen
-          </Button>
-        )}
+        {darfSchreiben &&
+          marker.typ !== 'einsatzort' &&
+          marker.typ !== 'lagemeldung' &&
+          (marker.typ === 'abschnitt' ? (
+            // Ein Abschnitt steht NUR mit gezeichneter Fläche auf der Karte (`flaechen` in
+            // `useLagekarteDaten`), und sein Löschen schickt `flaeche_geojson: null` — die
+            // Fläche ist danach weg. Unumkehrbar, also Rückfrage (LFH-710, LFH-363). Käme je
+            // ein Abschnitt als Punkt dazu, gehörte diese Bedingung an die Geometrie.
+            <Popconfirm
+              title={`Fläche von „${marker.label}“ löschen?`}
+              description="Die gezeichnete Fläche geht verloren und muss neu gezeichnet werden."
+              okText="Löschen"
+              okButtonProps={{ danger: true }}
+              cancelText="Abbrechen"
+              onConfirm={() => onVerortungLoeschen(marker)}
+            >
+              <Button danger block>
+                Verortung löschen
+              </Button>
+            </Popconfirm>
+          ) : (
+            // Ein Punkt lässt sich über „Auf Karte verorten" neu setzen: umkehrbar, keine
+            // Rückfrage (LFH-363).
+            <Button danger block onClick={() => onVerortungLoeschen(marker)}>
+              Verortung löschen
+            </Button>
+          ))}
       </Space>
     </KartenDetailCard>
   );

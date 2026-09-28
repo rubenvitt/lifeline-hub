@@ -30,10 +30,9 @@ import {
   baueLageMeldungMarker,
   baueFreieZeichenMarker,
   baueBetreuungMarker,
-  type KarteMarker,
+  baueAbschnittMarker,
 } from './marker';
 import { parsePolygon, parseGeometry, polygonZentroid } from './geo';
-import { baueTzProps } from './taktischesZeichen';
 import { zoneStil, gefahrengebietStil, zonenBeschriftung, bezirkBeschriftung } from './zonenStil';
 import { zonenPlakette, type ZoneFeature } from './kartenLayer';
 import { rollenwerte } from '../../components/instrument';
@@ -304,13 +303,16 @@ export function useLagekarteDaten({
 
   const taktisch = useMemo(
     () =>
-      baueTaktischeMarker({
-        einheiten: einheitenRoh ?? [],
-        fahrzeuge: fahrzeugeRoh ?? [],
-        fuehrungskraefte: fkRoh ?? [],
-        orgDefault,
-      }),
-    [einheitenRoh, fahrzeugeRoh, fkRoh, orgDefault],
+      baueTaktischeMarker(
+        {
+          einheiten: einheitenRoh ?? [],
+          fahrzeuge: fahrzeugeRoh ?? [],
+          fuehrungskraefte: fkRoh ?? [],
+          orgDefault,
+        },
+        token,
+      ),
+    [einheitenRoh, fahrzeugeRoh, fkRoh, orgDefault, token],
   );
 
   const flaechen = useMemo(
@@ -320,32 +322,16 @@ export function useLagekarteDaten({
         if (!poly) return [];
         const z = polygonZentroid(poly);
         if (!z) return [];
-        const tz = baueTzProps({
-          objekttyp: 'abschnitt',
-          fachaufgabe: a.tz_fachaufgabe,
-          organisation: a.tz_organisation,
-          orgDefault,
-        });
         return [
           {
             id: a.id,
             label: a.name,
             polygon: poly,
-            tzMarker: {
-              schluessel: `abschnitt-${a.id}`,
-              typ: 'abschnitt' as const,
-              id: a.id,
-              lon: z[0],
-              lat: z[1],
-              label: a.name,
-              farbe: '#722ed1',
-              tz,
-              geometrie: poly, // Kennzahlen (Fläche/Umfang) im Inspector, LFH-146
-            } satisfies KarteMarker,
+            tzMarker: baueAbschnittMarker(a, poly, z, orgDefault, token),
           },
         ];
       }),
-    [abschnitteRoh, orgDefault],
+    [abschnitteRoh, orgDefault, token],
   );
 
   const gebietWarnstufe = useMemo(() => {
@@ -491,11 +477,14 @@ export function useLagekarteDaten({
   };
 
   const lageMeldungMarker = useMemo(
-    () => baueLageMeldungMarker(lageMeldungenRoh ?? []),
-    [lageMeldungenRoh],
+    () => baueLageMeldungMarker(lageMeldungenRoh ?? [], token),
+    [lageMeldungenRoh, token],
   );
 
-  const freieZeichenMarker = useMemo(() => baueFreieZeichenMarker(freieZeichen), [freieZeichen]);
+  const freieZeichenMarker = useMemo(
+    () => baueFreieZeichenMarker(freieZeichen, token),
+    [freieZeichen, token],
+  );
 
   const alleVerortet = useMemo(
     () => [

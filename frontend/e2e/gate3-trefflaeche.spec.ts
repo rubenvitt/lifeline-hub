@@ -2174,6 +2174,186 @@ test('Lagekarte (LFH-373): „Verortet", Kartenknöpfe und Zeitachse folgen der 
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
+// ── LFH-711: Trefferzonen der Lagekarte ────────────────────────────────────────────────
+//
+// Seit LFH-650 trugen nur die Betroffenen eine unsichtbare Trefferzone; Kräfte- und
+// Objektzeichen der Lagekarte waren genau so groß wie gezeichnet (TZ-Symbol ≤ 34 px). Jetzt
+// setzt jeder Marker-Builder `trefferDurchmesser = controlHeight`. Gemessen wird am
+// UHS-Zeichen in allen drei Stufen, nach dem Muster des Betroffenen-Blocks oben.
+//
+// WARUM DER VERSATZ NICHT `soll/2 − 1` IST WIE DORT: ein TZ-Symbol ist bis zu 34 px groß
+// (halbe Kante 17). In `kompakt` misst die Zone 30 px, ihr Radius 15 liegt INNERHALB des
+// Symbols — dort gibt es keinen Streifen „Zone, aber nicht Zeichnung", ein Versatzklick wäre
+// ein Klick aufs Symbol und bewiese nichts. Die Stufe zeigt sich deshalb an EINEM festen
+// Punkt 23 px über dem Zeichen (Radius der komfortabel-Zone minus 1): in `komfortabel` und
+// `handschuh` liegt er in der Zone und wählt den Marker, in `kompakt` liegt dort gar kein
+// Klickziel. Das ist die Gegenprobe, die rot wird, wenn die Zone nicht der Stufe folgt.
+// Senkrecht nach oben, weil die Plakette per Vorgabe RECHTS vom Zeichen steht.
+//
+// DICHT LIEGENDE MARKER: zwei Zeichen 50 px übereinander, `handschuh` (Zone 72, Radius 36).
+// Geklickt wird 21 px unter dem oberen — außerhalb beider Symbole (> 17), innerhalb beider
+// Zonen (21 und 29 < 36), also NUR Zonen am Punkt. Welche Zone oben liegt, hängt an der
+// Zeichenreihenfolge und ist für beide Klicks dieselbe; „die oberste gewinnt" wählte also
+// beide Male denselben Marker, „die nächste gewinnt" (`naechstesMerkmal`) je den richtigen.
+//
+// MUTATIONSPROBE (28.09.2026): UHS-Builder ohne `trefferDurchmesser` → rot in `komfortabel`
+// („der Versatzpunkt liegt in der Zone", 0 statt 1); Klick-Handler mit dem OBERSTEN statt dem
+// nächsten Merkmal → rot am Paar („Zone Nord" wird nicht gewählt).
+
+/** Klickebenen der Zeichnung, OHNE Trefferzonen — für die Selbstprobe „dort ist nichts
+ *  gezeichnet". Die Plakette gehört dazu: sie ist Klickziel wie das Zeichen. */
+const GEZEICHNETE_KLICKEBENEN = [
+  'marker-symbol',
+  'marker-kreis',
+  'marker-kurz',
+  'marker-status-ring',
+  'marker-label',
+  'marker-einsatzort-symbol',
+  'marker-einsatzort-label',
+];
+
+/** Features an einem Seitenpunkt, je Ebenenliste. */
+async function merkmaleAm(page: Page, punkt: { x: number; y: number }, ebenen: string[]) {
+  return page.evaluate(
+    ([x, y, ids]) => {
+      const k = (window as unknown as { __lfhKarte: KartenHaken }).__lfhKarte;
+      const r = k.getCanvas().getBoundingClientRect();
+      return k.queryRenderedFeatures([x - r.left, y - r.top], { layers: ids }).length;
+    },
+    [punkt.x, punkt.y, ebenen] as const,
+  );
+}
+
+/** Springt ohne Animation und wartet, bis nichts mehr zu zeichnen ist (`idle`, s. o.). */
+async function springe(page: Page, center: [number, number], zoom: number) {
+  await page.evaluate(
+    ([ll, z]) =>
+      new Promise<void>((fertig) => {
+        const k = (window as unknown as { __lfhKarte: KartenHaken }).__lfhKarte;
+        k.once('idle', () => fertig());
+        k.jumpTo({ center: ll, zoom: z });
+      }),
+    [center, zoom] as const,
+  );
+}
+
+/**
+ * Wartet, bis die Karte steht. Eine Markerauswahl fliegt die Karte zum Marker, auf Zoom 15
+ * (`onMarkerWaehlen` → `flyToZiel`): ein VOR der Auswahl berechneter Seitenpunkt ist danach
+ * veraltet (in der CI gemessen: der zweite Klick am Paar traf den ersten Marker).
+ */
+async function kartenRuht(page: Page) {
+  await page.waitForFunction(
+    () => !(window as unknown as { __lfhKarte: { isMoving(): boolean } }).__lfhKarte.isMoving(),
+    undefined,
+    { timeout: 15_000 },
+  );
+}
+
+test('Lagekarte (LFH-711): Objektmarker tragen die Trefferzone der Staffel, dicht liegende wählt der nächste', async ({
+  page,
+}) => {
+  test.setTimeout(240_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E 711 Zone ${Date.now()}`);
+  const einzeln: [number, number] = [9.14, 49.35];
+  // Das Paar liegt weit genug vom Einzelnen, dass keine Zone hinüberreicht, und senkrecht
+  // übereinander (rund 39 m); den Pixelabstand stellt der Zoom unten auf 50 px.
+  const nord: [number, number] = [9.3, 49.45];
+  const sued: [number, number] = [9.3, 49.45 - 0.00035];
+  for (const [bezeichnung, [lon, lat]] of [
+    ['Zone Einzeln', einzeln],
+    ['Zone Nord', nord],
+    ['Zone Süd', sued],
+  ] as const) {
+    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/uhs`, {
+      data: { typ: 'patientenablage', bezeichnung },
+    });
+    expect(antwort.ok(), `Seeding UHS: ${await antwort.text()}`).toBeTruthy();
+    const { id } = (await antwort.json()) as { id: number };
+    const lage = await page.request.patch(`/api/einsaetze/${einsatzId}/uhs/${id}`, {
+      data: { lat, lon },
+    });
+    expect(lage.ok(), `Verortung UHS: ${await lage.text()}`).toBeTruthy();
+  }
+
+  const auswahl = (name: string) =>
+    page.locator('[data-lfh="auswahl"]').getByRole('heading', { name, exact: true });
+  const VERSATZ = 23;
+  const gemessen: string[] = [];
+
+  for (const { dichte } of STAFFEL) {
+    await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
+    await stelleDichte(page, dichte);
+    await karteBereit(page);
+    await page.getByTestId('kartenflaeche').locator('canvas').scrollIntoViewIfNeeded();
+    // Zoom 17 liegt über `clusterMaxZoom` (14): der Marker steht einzeln, nicht im Donut.
+    await springe(page, einzeln, 17);
+    const mitte = await aufSeite(page, einzeln);
+    // Vorbedingung: das Zeichen ist WIRKLICH gezeichnet — sonst wäre die Selbstprobe unten
+    // („am Versatz ist nichts gezeichnet") auch dann grün, wenn das Symbol noch fehlt.
+    expect(await merkmaleAm(page, mitte, ['marker-symbol']), `Symbol (${dichte})`).toBe(1);
+    const daneben = { x: mitte.x, y: mitte.y - VERSATZ };
+    expect(
+      await merkmaleAm(page, daneben, GEZEICHNETE_KLICKEBENEN),
+      `am Versatz ${VERSATZ}px liegt nichts Gezeichnetes (${dichte})`,
+    ).toBe(0);
+    const inZone = await merkmaleAm(page, daneben, ['marker-treffer']);
+
+    if (dichte === 'kompakt') {
+      // Gegenprobe: 30-px-Zone, Radius 15 — der Punkt liegt außerhalb.
+      expect(inZone, 'kompakt: der Versatzpunkt liegt außerhalb der 30-px-Zone').toBe(0);
+      gemessen.push(`kompakt: Versatz ${VERSATZ}px außerhalb der Zone`);
+      continue;
+    }
+    expect(inZone, `${dichte}: der Versatzpunkt liegt in der Zone`).toBe(1);
+    await page.mouse.click(daneben.x, daneben.y);
+    await expect(auswahl('Zone Einzeln')).toBeVisible();
+    gemessen.push(`${dichte}: Versatzklick ${VERSATZ}px wählt den Marker`);
+
+    if (dichte !== 'handschuh') continue;
+    await kartenRuht(page);
+
+    // Dicht liegende Marker: den Zoom so wählen, dass das Paar 50 px auseinander steht.
+    const zoom = await page.evaluate(
+      ([a, b]) => {
+        const k = (window as unknown as { __lfhKarte: KartenHaken & { getZoom(): number } })
+          .__lfhKarte;
+        const pa = k.project(a);
+        const pb = k.project(b);
+        return k.getZoom() + Math.log2(50 / Math.hypot(pa.x - pb.x, pa.y - pb.y));
+      },
+      [nord, sued] as const,
+    );
+    expect(zoom, 'das Paar darf nicht clustern').toBeGreaterThan(14);
+    for (const [ziel, anker, zu] of [
+      ['Zone Nord', nord, 1],
+      ['Zone Süd', sued, -1],
+    ] as const) {
+      // Eine Auswahl fliegt die Karte zum Marker, auf Zoom 15 (`flyToZiel`): dort stünde das
+      // Paar nur noch rund 12 px auseinander. Deshalb JE KLICK erst die Ruhe abwarten, dann
+      // Ausschnitt und Zoom neu setzen und die Lage neu lesen.
+      await kartenRuht(page);
+      await springe(page, [nord[0], (nord[1] + sued[1]) / 2], zoom);
+      const oben = await aufSeite(page, nord);
+      const unten = await aufSeite(page, sued);
+      expect(Math.abs(unten.y - oben.y - 50), 'Paarabstand').toBeLessThan(1);
+      const von = anker === nord ? oben : unten;
+      const punkt = { x: von.x, y: von.y + zu * 21 };
+      expect(
+        await merkmaleAm(page, punkt, GEZEICHNETE_KLICKEBENEN),
+        `${ziel}: nichts gezeichnet`,
+      ).toBe(0);
+      expect(await merkmaleAm(page, punkt, ['marker-treffer']), `${ziel}: beide Zonen`).toBe(2);
+      await page.mouse.click(punkt.x, punkt.y);
+      await expect(auswahl(ziel)).toBeVisible();
+    }
+    gemessen.push('handschuh: Paar 50 px, 21 px neben jedem wählt je den nächsten');
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
 test('Gefahrenmatrix (LFH-373): 58 Zellen halten die kurze Achse, die Gebietszeilen die Staffel', async ({
   page,
 }) => {

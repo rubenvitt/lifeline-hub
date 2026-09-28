@@ -74,6 +74,7 @@ import {
 import { synchronisiereBildLayer, entferneBildLayer, type BildOverlay } from './bildLayer';
 import { eckenInitialPixel, type Punkt } from './bildGeometrie';
 import { erzeugeBildHandles, type BildHandles } from './bildHandles';
+import type { GriffKontext, GriffModus } from './bildGriffe';
 import type { Ecken } from '../../api/kartenbilder';
 import { BBOX_MIN_ZOOM } from './fachebenen';
 import type { FachebeneQuelle } from '../../api/fachebenen';
@@ -211,6 +212,12 @@ export interface KartenflaecheProps {
   platzierBild?: { id: number; ecken: Ecken } | null;
   /** Callback, wenn Platzier-Geometrie per Drag verändert wurde. */
   onPlatzierGeometrie?: (ecken: Ecken) => void;
+  /**
+   * Welche Griffsorte im Platzier-Modus scharf ist (LFH-711). Vorgabe `groesse` (Ecken und
+   * Kanten). Alle zehn Griffe in Fingergröße auf einem daumengroßen Bild lägen übereinander;
+   * welchen man erwischte, entschiede die Reihenfolge im DOM statt die Absicht.
+   */
+  griffModus?: GriffModus;
   /** Zeigerlage über der Karte (Koordinatenanzeige); `null`, sobald er die Karte verlässt. */
   onZeigerLage?: (lage: { lat: number; lon: number } | null) => void;
   /**
@@ -253,6 +260,22 @@ export interface KartenHandle {
   nachNorden(): void;
 }
 
+/**
+ * Der Personen-Cluster, dem ein Klick gehört, oder `null` (LFH-648, Review LFH-711). EINE
+ * Abfrage für beide Klickwege — Auffächern und Markerauswahl —, damit sie nie verschieden
+ * entscheiden: sonst fächerte derselbe Tipp auf UND öffnete einen Inspector.
+ */
+function personenClusterAm(map: maplibregl.Map, punkt: maplibregl.PointLike) {
+  const layers = [
+    ...MARKER_KLICK_LAYER,
+    ...SPIDER_KLICK_LAYER,
+    ...PERSONEN_CLUSTER_KLICK_LAYER,
+  ].filter((id) => map.getLayer(id));
+  return layers.length
+    ? personenClusterTreffer(map.queryRenderedFeatures(punkt, { layers }))
+    : null;
+}
+
 const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kartenflaeche(
   {
     style,
@@ -282,6 +305,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     bilder,
     platzierBild,
     onPlatzierGeometrie,
+    griffModus,
     onZeigerLage,
     massstabZiel,
     startAnsicht,
@@ -292,7 +316,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
   const mapRef = useRef<maplibregl.Map | null>(null);
   // Namensplaketten der Marker in den Rollen des aktiven Modus (LFH-622) — dieselbe
   // Plakette wie an den Zonen. `rollen` ist eine der zwei Paletten-Konstanten, also stabil.
-  const { rollen } = useRollen();
+  const { rollen, token } = useRollen();
   const markerPlakette = useMemo(() => zonenPlakette(rollen), [rollen]);
   // Aktuelle Marker-Daten als FeatureCollections; nach setStyle re-angelegt (analog flaechenDatenRef).
   const markerDatenRef = useRef<MarkerFeatureCollection>({
@@ -883,6 +907,10 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     // dreimal — seit den überlappenden Trefferzonen womöglich mit VERSCHIEDENEN Schlüsseln.
     // Gewählt wird das Merkmal, das dem Klickpunkt am nächsten liegt.
     const klickMarker = (e: maplibregl.MapLayerMouseEvent) => {
+      // Gehört der Klick einem Personen-Cluster, fächert der Karten-Klick unten auf; hier wird
+      // dann nichts gewählt (Review LFH-711). Sonst öffnete die unsichtbare Zone eines Zeichens
+      // daneben dessen Inspector, während der sichtbare Cluster, auf den getippt wurde, zu bliebe.
+      if (personenClusterAm(map, e.point)) return;
       const merkmal = naechstesMerkmal(e.features ?? [], e.point, (ll) => map.project(ll));
       const schluessel = merkmal?.properties?.schluessel;
       if (typeof schluessel === 'string') onMarkerKlick?.(schluessel);
@@ -1041,14 +1069,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     // das OBERSTE Feature am Punkt ist. Jeder andere Klick klappt ein wie bisher (leerer Klick,
     // Leaf-Routing, Klick auf ein Kräfte-Zeichen über dem Cluster).
     const klick = (e: maplibregl.MapMouseEvent) => {
-      const layers = [
-        ...MARKER_KLICK_LAYER,
-        ...SPIDER_KLICK_LAYER,
-        ...PERSONEN_CLUSTER_KLICK_LAYER,
-      ].filter((id) => map.getLayer(id));
-      const treffer = layers.length
-        ? personenClusterTreffer(map.queryRenderedFeatures(e.point, { layers }))
-        : null;
+      const treffer = personenClusterAm(map, e.point);
       if (treffer)
         oeffne(PERSONEN_CLUSTER_QUELLE, treffer.clusterId, treffer.center, treffer.anzahl);
       else schliesse();
@@ -1255,6 +1276,18 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
 
   // Bild-Manipulationsgriffe (Ecken/Drehen/Verschieben) im Platzier-Modus.
   const handlesRef = useRef<BildHandles | null>(null);
+  // Modus und Maße gehen über Refs in die Erzeugung (LFH-711): als Deps des Effekts unten
+  // zerstörten und bauten sie die Griffe bei jedem Umschalten neu. Aus demselben Grund hängt
+  // jener Effekt nur an der Bild-ID. Einen Wechsel mitten in einer Ziehgeste stellt
+  // `bildHandles` selbst bis `dragend` zurück. Die Maße (Stufe, Rolle
+  // `bedien`) gelten ab dem nächsten Platzieren; ein Stufenwechsel mitten im Einpassen ist
+  // kein Fall, für den sich ein Neuaufbau lohnt.
+  const griffModusRef = useRef<GriffModus>(griffModus ?? 'groesse');
+  const griffKontextRef = useRef<GriffKontext>({
+    controlHeight: token.controlHeight,
+    bedien: rollen.bedien,
+  });
+  griffKontextRef.current = { controlHeight: token.controlHeight, bedien: rollen.bedien };
 
   // Griffe erzeugen/zerstören — NUR an der Bild-ID hängen, damit ecken-Änderungen
   // (numerische Eingabe / Refetch nach Commit) die Griffe nicht zerstören/neu erzeugen
@@ -1267,9 +1300,16 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       handlesRef.current = null;
       return;
     }
-    const handles = erzeugeBildHandles(map, platzierBild.id, platzierBild.ecken, (ecken) => {
-      onPlatzierGeometrieRef.current?.(ecken);
-    });
+    const handles = erzeugeBildHandles(
+      map,
+      platzierBild.id,
+      platzierBild.ecken,
+      (ecken) => {
+        onPlatzierGeometrieRef.current?.(ecken);
+      },
+      griffKontextRef.current,
+      griffModusRef.current,
+    );
     handlesRef.current = handles;
     return () => {
       handles.zerstoeren();
@@ -1277,6 +1317,12 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [platzierBild?.id]);
+
+  // Ein Moduswechsel schaltet die LAUFENDE Griffgruppe um, statt sie neu zu bauen (s. o.).
+  useEffect(() => {
+    griffModusRef.current = griffModus ?? 'groesse';
+    handlesRef.current?.setzeModus(griffModusRef.current);
+  }, [griffModus]);
 
   // Externe Ecken-Änderungen (numerische Mittelpunkt-Eingabe / Refetch nach Commit) an die
   // Griffe spiegeln. Läuft nicht mid-drag (der drag setzt die Geometrie selbst kontinuierlich).

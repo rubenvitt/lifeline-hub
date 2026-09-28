@@ -359,72 +359,117 @@ export function useKartenInteraktion({
     if (m) setFlyToZiel({ lng: m.lon, lat: m.lat });
   }
 
+  /**
+   * Nimmt einem Objekt seine Kartenverortung. Jeder Zweig liefert nur seinen Aufruf und die
+   * Fächer, die danach frisch sein müssen; Quittung, Invalidierung und Fehler laufen in EINER
+   * Kette (LFH-710), damit kein Zweig die Rückmeldung vergisst. Die Rückfrage für den
+   * unumkehrbaren Fall (Abschnittsfläche) stellt der Inspector, nicht dieser Hook.
+   */
   function loescheVerortung(marker: KarteMarker) {
-    if (marker.typ === 'uhs') {
-      aktualisiereUhs(einsatzId, marker.id, { lat: null, lon: null })
-        .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.uhs(einsatzId) }))
-        .catch(fehler);
-    } else if (marker.typ === 'schaden') {
-      aktualisiereSchaden(einsatzId, marker.id, { lat: null, lon: null })
-        .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.schaeden(einsatzId) }))
-        .catch(fehler);
-    } else if (marker.typ === 'einheit') {
-      verorteEinheit(einsatzId, marker.id, { lat: null, lon: null })
-        .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) }))
-        .catch(fehler);
-    } else if (marker.typ === 'fahrzeug') {
-      verorteFahrzeug(einsatzId, marker.id, { lat: null, lon: null })
-        .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.fahrzeuge(einsatzId) }))
-        .catch(fehler);
-    } else if (marker.typ === 'fuehrung') {
-      verortePerson(einsatzId, marker.id, { lat: null, lon: null })
-        .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.fuehrungskraefte(einsatzId) }))
-        .catch(fehler);
-    } else if (marker.typ === 'abschnitt') {
-      zeichneAbschnitt(einsatzId, marker.id, { flaeche_geojson: null })
-        .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.abschnitte(einsatzId) }))
-        .catch(fehler);
-    } else if (marker.typ === 'betreuungsstelle') {
-      // LFH-673: nur das Paar; die Stelle bleibt, nur ihr Kartenpunkt geht. Umkehrbar über
-      // „Auf Karte verorten" der Betreuungsseite, deshalb ohne Rückfrage (LFH-363).
-      aendereStelle(einsatzId, marker.id, { lat: null, lon: null })
-        .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.betreuung(einsatzId) }))
-        .catch(fehler);
-    } else if (marker.typ === 'person') {
-      // Betroffene (LFH-648): NUR die zwei Koordinatenfelder, wie im Platzier-Zweig — die
-      // Person bleibt bestehen, nur ihr Fundort-Punkt geht. Umkehrbar über „Auf Lagekarte
-      // verorten" der Detailseite, deshalb ohne Rückfrage (CLAUDE.md, LFH-363).
-      aktualisierePerson(einsatzId, marker.id, { antreff_lat: null, antreff_lon: null })
+    const vorgang = verortungLoeschenVorgang(marker);
+    if (vorgang) {
+      vorgang.aufruf
         .then(() => {
-          qc.invalidateQueries({ queryKey: einsatzKeys.personen(einsatzId) });
-          qc.invalidateQueries({ queryKey: einsatzKeys.person(einsatzId, marker.id) });
+          erfolg('Verortung gelöscht');
+          return Promise.all(vorgang.faecher.map((queryKey) => qc.invalidateQueries({ queryKey })));
         })
         .catch(fehler);
     }
     setAuswahl(null);
   }
 
+  function verortungLoeschenVorgang(
+    marker: KarteMarker,
+  ): { aufruf: Promise<unknown>; faecher: readonly (readonly unknown[])[] } | null {
+    switch (marker.typ) {
+      case 'uhs':
+        return {
+          aufruf: aktualisiereUhs(einsatzId, marker.id, { lat: null, lon: null }),
+          faecher: [einsatzKeys.uhs(einsatzId)],
+        };
+      case 'schaden':
+        return {
+          aufruf: aktualisiereSchaden(einsatzId, marker.id, { lat: null, lon: null }),
+          faecher: [einsatzKeys.schaeden(einsatzId)],
+        };
+      case 'einheit':
+        return {
+          aufruf: verorteEinheit(einsatzId, marker.id, { lat: null, lon: null }),
+          faecher: [einsatzKeys.einheiten(einsatzId)],
+        };
+      case 'fahrzeug':
+        return {
+          aufruf: verorteFahrzeug(einsatzId, marker.id, { lat: null, lon: null }),
+          faecher: [einsatzKeys.fahrzeuge(einsatzId)],
+        };
+      case 'fuehrung':
+        return {
+          aufruf: verortePerson(einsatzId, marker.id, { lat: null, lon: null }),
+          faecher: [einsatzKeys.fuehrungskraefte(einsatzId)],
+        };
+      case 'abschnitt':
+        return {
+          aufruf: zeichneAbschnitt(einsatzId, marker.id, { flaeche_geojson: null }),
+          faecher: [einsatzKeys.abschnitte(einsatzId)],
+        };
+      case 'betreuungsstelle':
+        // LFH-673: nur das Paar; die Stelle bleibt, nur ihr Kartenpunkt geht. Umkehrbar über
+        // „Auf Karte verorten" der Betreuungsseite, deshalb ohne Rückfrage (LFH-363).
+        return {
+          aufruf: aendereStelle(einsatzId, marker.id, { lat: null, lon: null }),
+          faecher: [einsatzKeys.betreuung(einsatzId)],
+        };
+      case 'person':
+        // Betroffene (LFH-648): NUR die zwei Koordinatenfelder, wie im Platzier-Zweig — die
+        // Person bleibt bestehen, nur ihr Fundort-Punkt geht. Umkehrbar über „Auf Lagekarte
+        // verorten" der Detailseite, deshalb ohne Rückfrage (CLAUDE.md, LFH-363).
+        return {
+          aufruf: aktualisierePerson(einsatzId, marker.id, {
+            antreff_lat: null,
+            antreff_lon: null,
+          }),
+          faecher: [einsatzKeys.personen(einsatzId), einsatzKeys.person(einsatzId, marker.id)],
+        };
+      default:
+        return null;
+    }
+  }
+
+  /** Symbol-Override eines taktischen Markers; quittiert erst nach Erfolg (LFH-710). */
   function aendereSymbol(
     marker: KarteMarker,
     patch: { tz_fachaufgabe?: string | null; tz_organisation?: string | null },
   ) {
+    let vorgang: { aufruf: Promise<unknown>; fach: readonly unknown[] } | null = null;
     if (marker.typ === 'einheit') {
-      verorteEinheit(einsatzId, marker.id, patch)
-        .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) }))
-        .catch(fehler);
+      vorgang = {
+        aufruf: verorteEinheit(einsatzId, marker.id, patch),
+        fach: einsatzKeys.einheiten(einsatzId),
+      };
     } else if (marker.typ === 'fahrzeug') {
-      verorteFahrzeug(einsatzId, marker.id, patch)
-        .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.fahrzeuge(einsatzId) }))
-        .catch(fehler);
+      vorgang = {
+        aufruf: verorteFahrzeug(einsatzId, marker.id, patch),
+        fach: einsatzKeys.fahrzeuge(einsatzId),
+      };
     } else if (marker.typ === 'fuehrung') {
-      verortePerson(einsatzId, marker.id, patch)
-        .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.fuehrungskraefte(einsatzId) }))
-        .catch(fehler);
+      vorgang = {
+        aufruf: verortePerson(einsatzId, marker.id, patch),
+        fach: einsatzKeys.fuehrungskraefte(einsatzId),
+      };
     } else if (marker.typ === 'abschnitt') {
-      zeichneAbschnitt(einsatzId, marker.id, patch)
-        .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.abschnitte(einsatzId) }))
-        .catch(fehler);
+      vorgang = {
+        aufruf: zeichneAbschnitt(einsatzId, marker.id, patch),
+        fach: einsatzKeys.abschnitte(einsatzId),
+      };
     }
+    if (!vorgang) return;
+    const { aufruf, fach } = vorgang;
+    aufruf
+      .then(() => {
+        erfolg('Symbol gespeichert');
+        return qc.invalidateQueries({ queryKey: fach });
+      })
+      .catch(fehler);
   }
 
   // Bestätigungs-Phase persistieren (LFH-145): erst hier, nicht schon bei onZoneGezeichnet.
@@ -579,11 +624,15 @@ export function useKartenInteraktion({
    */
   const onMessenBeenden = useCallback(() => dispatch({ t: 'beenden', arten: ['messen'] }), []);
 
-  // Abschnittsfläche zeichnen fertig → persistieren, dann Zeichenmodus beenden.
+  // Abschnittsfläche zeichnen fertig → persistieren, quittieren (LFH-710), dann Zeichenmodus
+  // beenden.
   const onFlaecheGezeichnet = (poly: GeoJsonPolygon) => {
     setAbschnittSpeichern(true);
     zeichneAbschnitt(einsatzId, zeichneAbschnittId!, { flaeche_geojson: JSON.stringify(poly) })
-      .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.abschnitte(einsatzId) }))
+      .then(() => {
+        erfolg('Fläche gespeichert');
+        return qc.invalidateQueries({ queryKey: einsatzKeys.abschnitte(einsatzId) });
+      })
       .catch(fehler)
       .finally(() => {
         setAbschnittSpeichern(false);
@@ -637,18 +686,26 @@ export function useKartenInteraktion({
       .catch(fehler);
 
   // Freies-Zeichen-Inspector-CRUD (LFH-170). Whole-Spec-Update (lat/lon unverändert).
+  // Jede der drei quittiert erst nach erfolgreicher Antwort (LFH-710), wie `zoneAendern`.
   const zeichenAendern = (id: number, spec: FreiesZeichenUpdate) =>
     aktualisiereFreiesZeichen(einsatzId, id, spec)
-      .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.freieZeichen(einsatzId) }))
+      .then(() => {
+        erfolg('Taktisches Zeichen gespeichert');
+        return qc.invalidateQueries({ queryKey: einsatzKeys.freieZeichen(einsatzId) });
+      })
       .catch(fehler);
   // Verschieben auf eine andere Ansicht bzw. auf alle (`null`) — Teil-Patch (B/LFH-320).
   const zeichenVerschieben = (id: number, ansichtId: number | null) =>
     verschiebeFreiesZeichen(einsatzId, id, ansichtId)
-      .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.freieZeichen(einsatzId) }))
+      .then(() => {
+        erfolg('Taktisches Zeichen verschoben');
+        return qc.invalidateQueries({ queryKey: einsatzKeys.freieZeichen(einsatzId) });
+      })
       .catch(fehler);
   const zeichenLoeschen = (id: number) =>
     loescheFreiesZeichen(einsatzId, id)
       .then(() => {
+        erfolg('Taktisches Zeichen gelöscht');
         setAuswahl(null);
         return qc.invalidateQueries({ queryKey: einsatzKeys.freieZeichen(einsatzId) });
       })
