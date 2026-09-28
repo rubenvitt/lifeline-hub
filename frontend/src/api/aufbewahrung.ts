@@ -32,7 +32,7 @@ export function ladeArchivAkte(einsatzId: number): Promise<ArchivAkte> {
   return apiGet<ArchivAkte>(`${BASIS}/einsaetze/${einsatzId}`);
 }
 
-export interface ArchivEtbFilter {
+interface ArchivEtbFilter {
   typ?: EtbTyp;
   /** Cursor: nur Einträge mit kleinerer laufender Nummer (ältere). */
   beforeLfdNr?: number;

@@ -43,7 +43,7 @@ export type PersonErfassungsSicht = Extract<Person['status'], 'erfasst' | 'vermi
 /** Dauerhafte Erfolgsquittung einer offline vorgemerkten Person. Sie wird erst
  * nach erfolgreichem Server-Replay zusammen mit dem Entfernen der Pending-Zeile
  * geschrieben und bleibt bis zur Darstellung auf der Personen-Seite erhalten. */
-export interface PersonErfassungsQuittung {
+interface PersonErfassungsQuittung {
   benutzer_id: number;
   einsatz_id: number;
   client_id: string;

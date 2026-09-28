@@ -82,9 +82,9 @@ const MENUE: readonly (MenueEintrag & { key: BezirkAktion })[] = [
  * Menü einer Bezirkskarte (LFH-673): „Auf Karte zeigen" zuerst, sobald der Bezirk eine Fläche
  * hat — auch OHNE Schreibrecht, denn ein Sprung ist Lesen (LFH-616). Die Handlungen folgen
  * nur mit Schreibrecht. Ohne Fläche fehlt der Eintrag; ein eigenes Feld „keine Fläche" hat
- * der Plan-Modus nicht (höchstens drei Sekundärfelder, alle belegt). Rein und exportiert.
+ * der Plan-Modus nicht (höchstens drei Sekundärfelder, alle belegt).
  */
-export function bezirkMenue(
+function bezirkMenue(
   b: Pick<Evakuierungsbezirk, 'flaechen'>,
   darfSchreiben: boolean,
 ): readonly (MenueEintrag & { key: BezirkAktion })[] {

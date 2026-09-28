@@ -1,6 +1,6 @@
 import type { Einheit, EinsatzFahrzeug } from '../../api/types';
 
-export interface KraefteGruppe {
+interface KraefteGruppe {
   titel: string;
   einheiten: Einheit[];
   fahrzeuge: EinsatzFahrzeug[];

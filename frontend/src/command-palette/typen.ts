@@ -410,7 +410,7 @@ export type PaletteModus = 'alles' | 'aktionen' | 'etb' | 'kraefte';
  */
 export type DatensatzQuelle = keyof DatensatzQuellen;
 
-export interface ModusBeschreibung {
+interface ModusBeschreibung {
   /** Zeichen am Anfang der Eingabe; `null` für den Vorgabemodus, der ohne Präfix gilt. */
   praefix: string | null;
   /** Gruppen, auf die eingeschränkt wird; `null` = keine Einschränkung. */

@@ -74,7 +74,7 @@ import {
 
 const ZEITFORMAT = 'YYYY-MM-DD HH:mm';
 
-export interface AbschnittOption {
+interface AbschnittOption {
   value: number;
   label: string;
 }
@@ -104,7 +104,7 @@ function zeitpunkt(z: Dayjs | null | undefined): { zeitpunkt_at?: string } {
   return z ? { zeitpunkt_at: alsBackendZeit(z) } : {};
 }
 
-export interface StandWerte {
+interface StandWerte {
   evakuiert: number;
   erhebung: Erhebung;
   zeitpunkt?: Dayjs | null;
@@ -114,7 +114,7 @@ export function standBody(w: StandWerte): StandmeldungEingabe {
   return { evakuiert: w.evakuiert, erhebung: w.erhebung, ...zeitpunkt(w.zeitpunkt) };
 }
 
-export interface BelegungWerte {
+interface BelegungWerte {
   belegt: number;
   zeitpunkt?: Dayjs | null;
 }
@@ -123,7 +123,7 @@ export function belegungBody(w: BelegungWerte): BelegungsmeldungEingabe {
   return { belegt: w.belegt, ...zeitpunkt(w.zeitpunkt) };
 }
 
-export interface BezirkWerte {
+interface BezirkWerte {
   bezeichnung: string;
   plan_personen: number;
   plan_erhebung: Erhebung;
@@ -132,7 +132,7 @@ export interface BezirkWerte {
   notiz?: string | null;
 }
 
-export function bezirkAnlegenBody(w: BezirkWerte): EvakuierungsbezirkEingabe {
+function bezirkAnlegenBody(w: BezirkWerte): EvakuierungsbezirkEingabe {
   return {
     bezeichnung: w.bezeichnung.trim(),
     plan_personen: w.plan_personen,
@@ -168,7 +168,7 @@ export function bezirkPatch(vorher: Evakuierungsbezirk, w: BezirkWerte): Evakuie
   return patch;
 }
 
-export interface StelleWerte {
+interface StelleWerte {
   bezeichnung: string;
   art: BetreuungsstelleArt;
   status?: BetreuungsstelleStatus;
@@ -178,7 +178,7 @@ export interface StelleWerte {
   notiz?: string | null;
 }
 
-export function stelleAnlegenBody(w: StelleWerte): BetreuungsstelleEingabe {
+function stelleAnlegenBody(w: StelleWerte): BetreuungsstelleEingabe {
   return {
     bezeichnung: w.bezeichnung.trim(),
     art: w.art,

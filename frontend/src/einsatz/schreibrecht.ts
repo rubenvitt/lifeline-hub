@@ -87,7 +87,7 @@ export function darfImEinsatzSchreiben(
 
 /** Nur die zwei Benutzer-Felder der Org-Achse — bewusst getrennt von `BenutzerSchreibkontext`
  *  (das nur `system_rolle` kennt), damit die Achsen nicht über einen gemeinsamen Typ verschmelzen. */
-export type BenutzerVerwaltungskontext =
+type BenutzerVerwaltungskontext =
   Pick<BenutzerAnzeige, 'system_rolle' | 'org_rolle'> | null | undefined;
 
 /** Zugang zum Verwaltungsbereich (`/admin` samt Stammdaten): System-Admin ODER Führungskraft

@@ -4,7 +4,7 @@ import { bandStil } from './KartenFuss';
 import { messErgebnis, type MessForm } from './messung';
 import { useMessStand, type MessQuelle } from './messQuelle';
 
-export interface MessSteuerungProps {
+interface MessSteuerungProps {
   /** Aktive Form; `null` = nicht messen, dann rendert nichts. */
   form: MessForm | null;
   /** Laufender Stand aus der Karte — abonniert HIER, nicht in der Seite (`messQuelle.ts`). */

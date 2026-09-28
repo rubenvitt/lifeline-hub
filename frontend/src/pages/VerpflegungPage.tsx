@@ -52,7 +52,7 @@ import { deckungEinstufung, istVergangen } from '../verpflegung/deckung';
 import { nachforderungVorbelegung, zitat } from '../verpflegung/verpflegungText';
 
 /** Grund der fehlenden Schreibberechtigung als ganzer Satz (C10/M16). */
-export function verpflegungRechteText(status: EinsatzStatus): string {
+function verpflegungRechteText(status: EinsatzStatus): string {
   return status !== 'aktiv'
     ? 'Der Einsatz ist abgeschlossen — die Verpflegung ist nur noch lesbar.'
     : 'Nur Einsatzleitung und Führungspersonal können Zeitfenster anlegen und Ausgaben erfassen.';
@@ -69,7 +69,7 @@ const BEGINN: Sortierschluessel<VerpflegungZeitfenster> = (zf) => zf.von_at;
  * „1 neues Zeitfenster, davon 1 mit Unterdeckung" — der Wortlaut des Sammelbanners; bei einer
  * fremden Umordnung zusätzlich „Reihenfolge geändert".
  */
-export function zuflussText(
+function zuflussText(
   zurueckgehalten: readonly VerpflegungZeitfenster[],
   jetzt: Parameters<typeof deckungEinstufung>[1],
   umgeordnet = false,

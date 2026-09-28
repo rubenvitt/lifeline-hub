@@ -10,7 +10,6 @@ import { reAnlegenMarker, type MarkerFeatureCollection } from './markerLayer';
 import { farbenDunkel } from '../../theme/tokens';
 import { plakettenBildId, plakettenSchrift, zonenPlakette, type Plakette } from './plakette';
 
-export type { BildOverlay };
 // Die Plakette ist seit LFH-622 ein eigenes Modul (Marker brauchen sie auch, und
 // `markerLayer` → `kartenLayer` wäre ein Importkreis); die Bestandsimporte laufen weiter.
 export { PLAKETTE_PRAEFIX, plakettenBild, plakettenBildId, zonenPlakette } from './plakette';

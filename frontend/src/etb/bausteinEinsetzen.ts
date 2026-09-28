@@ -11,7 +11,7 @@ export interface BausteinFelder {
 }
 
 /** Metadaten eines vorkonfigurierten (automatisch befüllten) Platzhalters. */
-export interface AutoPlatzhalter {
+interface AutoPlatzhalter {
   /** Name innerhalb der geschweiften Klammern, z. B. `uhrzeit` für `{uhrzeit}`. */
   name: string;
   /** Kurzbeschreibung des automatisch eingesetzten Werts (für die Admin-UI). */

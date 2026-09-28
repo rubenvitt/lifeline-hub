@@ -10,7 +10,7 @@ import { sitzungsMeldungZuruecksetzen } from './sitzungsEvent';
  *  (`mfa_erforderlich`, s. `authApi.login`-Doc) — die aufrufende Seite (`LoginPage`) schaltet im
  *  letzteren Fall auf die Code-Eingabe um, statt direkt zu navigieren. `benutzer` bleibt in
  *  diesem Fall bewusst `null`: es gibt noch keine Session. */
-export type LoginErgebnis = { status: 'ok' } | { status: 'mfa_erforderlich' };
+type LoginErgebnis = { status: 'ok' } | { status: 'mfa_erforderlich' };
 
 interface AuthWert {
   benutzer: BenutzerAnzeige | null;

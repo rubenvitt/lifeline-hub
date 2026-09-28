@@ -17,7 +17,7 @@ import type { Dichte } from './tokens';
  * Umschalter mehr) — die Listen gehören damit dorthin, wo die Achsen selbst wohnen,
  * neben `ThemeModeProvider` und `tokens`.
  */
-export type Darstellungsstufe<W> = { wert: W; titel: string; Icon: IconType };
+type Darstellungsstufe<W> = { wert: W; titel: string; Icon: IconType };
 
 /**
  * DIE VOLLSTÄNDIGKEIT HÄNGT AN DEM OBJEKT, AUS DEM DIE ANZEIGE ENTSTEHT — nicht an

@@ -41,7 +41,7 @@ export function legeUhsAn(einsatzId: number, daten: UhsEingabe): Promise<Uhs> {
   return apiSend<Uhs>(`/api/einsaetze/${einsatzId}/uhs`, 'POST', daten);
 }
 
-export interface UhsPatch {
+interface UhsPatch {
   bezeichnung?: string;
   /** `null` = explizit löschen, undefined = unverändert. */
   abschnitt_id?: number | null;
@@ -66,7 +66,7 @@ export function storniereUhs(einsatzId: number, uhsId: number): Promise<void> {
 
 // ---------- Plätze ----------
 
-export interface PlatzBulkEingabe {
+interface PlatzBulkEingabe {
   typ: PlatzTyp;
   menge: number;
 }
@@ -85,7 +85,7 @@ export function legePlaetzeAn(
   );
 }
 
-export interface PlatzPatch {
+interface PlatzPatch {
   bezeichnung?: string;
   pos_x?: number | null;
   pos_y?: number | null;
@@ -124,7 +124,7 @@ export function stornierePlatz(einsatzId: number, uhsId: number, platzId: number
 
 // ---------- Belegung ----------
 
-export interface BelegungEingabe {
+interface BelegungEingabe {
   art: BelegungsArt;
   uhs_id?: number; // erforderlich bei eintritt/wechsel
   platz_id?: number | null;

@@ -19,7 +19,7 @@ export function legeBefehlAn(einsatzId: number, daten: NeuerBefehl): Promise<Bef
   return apiSend<BefehlAnzeige>(`/api/einsaetze/${einsatzId}/befehle`, 'POST', daten);
 }
 
-export interface BefehlPatch {
+interface BefehlPatch {
   titel?: string;
   zeitstand?: string;
   abschnitte?: BefehlAbschnitt[];

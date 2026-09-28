@@ -13,8 +13,7 @@
  *    abgeschickt wird.
  */
 
-export type KoordinatenErgebnis =
-  { ok: true; lat: number; lon: number } | { ok: false; grund: string };
+type KoordinatenErgebnis = { ok: true; lat: number; lon: number } | { ok: false; grund: string };
 
 const ZAHL = /^-?\d{1,3}(?:[.,]\d+)?$/;
 

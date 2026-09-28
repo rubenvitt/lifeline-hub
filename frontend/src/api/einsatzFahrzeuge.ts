@@ -2,8 +2,6 @@ import type { EinsatzFahrzeug } from './types';
 import { apiGet, apiSend } from './client';
 import type { PositionPatch } from './einheiten';
 
-export type { PositionPatch } from './einheiten';
-
 export interface AdhocEingabe {
   funkrufname: string;
   fahrzeugtyp?: string | null;

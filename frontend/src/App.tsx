@@ -179,7 +179,7 @@ function BetriebsLayout() {
 }
 
 /** Persistenter Rahmen auch für Login, globale Verwaltung und Einsatz-Routen. */
-export default function App() {
+function App() {
   return (
     <AuthProvider>
       <CommandPaletteProvider>

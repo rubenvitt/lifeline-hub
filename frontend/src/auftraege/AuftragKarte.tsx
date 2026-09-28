@@ -36,7 +36,7 @@ function gefuellteFelder(a: Auftrag): { label: string; wert: string }[] {
   }).filter(({ wert }) => typeof wert === 'string' && wert.trim() !== '');
 }
 
-export interface AuftragKarteProps {
+interface AuftragKarteProps {
   auftrag: Auftrag;
   ansicht?: 'offen' | 'abgeschlossen';
   einsatzId?: number;

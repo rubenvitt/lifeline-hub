@@ -34,13 +34,13 @@ export interface TierPatch {
   halter_kontakt?: string | null;
 }
 
-export interface TierStatusEingabe {
+interface TierStatusEingabe {
   status: TierStatus;
   abschluss_grund?: string | null;
   abschluss_ziel?: string | null;
 }
 
-export interface TiereFilter {
+interface TiereFilter {
   status?: TierStatus;
   spezies?: Spezies;
   halterPersonId?: number;

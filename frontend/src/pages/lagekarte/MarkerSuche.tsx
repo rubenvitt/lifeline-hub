@@ -31,7 +31,7 @@ import { gruppiereTreffer } from './objektsuche';
  * **Keine Entprellung:** gefiltert wird lokal über eine geladene Liste, eine Frist brächte nur
  * Verzögerung ohne eingesparte Abfrage.
  */
-export interface MarkerSucheProps {
+interface MarkerSucheProps {
   marker: KarteMarker[];
   onMarkerWaehlen: (schluessel: string) => void;
   /** Eine Lagebild-Quelle ist ausgefallen — dann steht „—" statt einer Zahl und keine Leere. */

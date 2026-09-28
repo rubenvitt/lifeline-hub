@@ -143,7 +143,7 @@ export function KlappPaneel({
 }
 
 /** Kennungen der einklappbaren Paneele — die Vorgabe ihres Zustands steht daneben. */
-export type PaneelKennung =
+type PaneelKennung =
   | 'nichtVerortet'
   | 'einsatzort'
   | 'verortet'

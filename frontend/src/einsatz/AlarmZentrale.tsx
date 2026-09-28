@@ -31,20 +31,19 @@ import { farbenDunkel, rahmenFarben } from '../theme/tokens';
 /**
  * Farbe eines Alarm-Knopfs in der Kommandoleiste (Neuentwurf „Instrumententafel").
  *
- * Rein und exportiert, damit die Zuordnung ohne Rendern prüfbar ist. Die Leiste ist in
- * beiden Modi dunkel — die Werte kommen deshalb aus den NACHTrollen, nicht aus dem
- * Modus-Token und nicht mehr aus `#fff`. Ein auffälliger Zustand („stumm", „blockiert")
+ * Die Leiste ist in beiden Modi dunkel — die Werte kommen deshalb aus den NACHTrollen, nicht
+ * aus dem Modus-Token und nicht mehr aus `#fff`. Ein auffälliger Zustand („stumm", „blockiert")
  * steht in `achtung`: er verzögert eine Alarmierung, er ist selbst keine. Der zweite Kanal
  * ist das Wort im Knopf (WCAG 1.4.1) — die Farbe ergänzt, sie trägt nicht allein.
  */
-export function alarmKnopfFarbe(auffaellig: boolean): string {
+function alarmKnopfFarbe(auffaellig: boolean): string {
   return auffaellig ? farbenDunkel.achtung : rahmenFarben.gedaempft;
 }
 
 dayjs.extend(utc);
 
 /** Payload des Scheduler-Hinweises `abloesung` (LFH-635, `src/erinnerung/scheduler.rs`). */
-export type AbloesungAlarmDetail = {
+type AbloesungAlarmDetail = {
   abloesung_id?: number;
   art?: 'vorwarnung' | 'faellig';
   /** „Ablösung fällig: Florian 1" — Titel der Frist, trägt den Einheitsnamen. */
@@ -54,7 +53,7 @@ export type AbloesungAlarmDetail = {
 };
 
 /** Toast-Text eines Ablösungshinweises: Einheit und Ortszeit der Fälligkeit (rein, getestet). */
-export function abloesungAlarmText(detail: AbloesungAlarmDetail): {
+function abloesungAlarmText(detail: AbloesungAlarmDetail): {
   titel: string;
   beschreibung: string;
 } {
@@ -99,7 +98,7 @@ type AlarmScope = {
 
 type DesktopZustand = 'aus' | 'erlaubt' | 'browser-blockiert';
 
-export function desktopZustand(permission: NotificationPermission | 'unsupported'): DesktopZustand {
+function desktopZustand(permission: NotificationPermission | 'unsupported'): DesktopZustand {
   if (permission === 'granted') return 'erlaubt';
   if (permission === 'default') return 'aus';
   return 'browser-blockiert';

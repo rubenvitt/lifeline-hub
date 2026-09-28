@@ -1,12 +1,12 @@
 import type { BefehlVorlageKey } from '../api/types';
 
-export interface AbschnittDef {
+interface AbschnittDef {
   schluessel: string;
   label: string;
   /** Frontend-only Eingabehilfe (SKK-Unterpunkte); nicht im Backend. */
   hilfetext?: string;
 }
-export interface VorlageDef {
+interface VorlageDef {
   schluessel: BefehlVorlageKey;
   label: string;
   abschnitte: AbschnittDef[];
@@ -80,8 +80,4 @@ export const VORLAGEN: VorlageDef[] = [
 
 export function vorlage(schluessel: BefehlVorlageKey): VorlageDef | undefined {
   return VORLAGEN.find((v) => v.schluessel === schluessel);
-}
-
-export function leereAbschnitte(v: VorlageDef): { schluessel: string; text: string }[] {
-  return v.abschnitte.map((a) => ({ schluessel: a.schluessel, text: '' }));
 }

@@ -58,7 +58,7 @@ import {
  */
 
 /** Alter-Anzeige: Geburtsdatum > geschätztes Alter (mit Tilde — das Feld IST geschätzt). */
-export function alterAnzeige(p: Pick<Person, 'geburtsdatum' | 'alter_geschaetzt'>): string | null {
+function alterAnzeige(p: Pick<Person, 'geburtsdatum' | 'alter_geschaetzt'>): string | null {
   if (p.geburtsdatum) return p.geburtsdatum;
   if (p.alter_geschaetzt != null) return `~${p.alter_geschaetzt}`;
   return null;
@@ -146,7 +146,7 @@ function FundortZelle({ p }: { p: Person }) {
 }
 
 /** Bedienung der Zustand-Spalte; ohne sie bleibt die Spalte reine Anzeige. */
-export interface ZustandBedienung {
+interface ZustandBedienung {
   einsatzId: number;
   darfSchreiben: boolean;
 }

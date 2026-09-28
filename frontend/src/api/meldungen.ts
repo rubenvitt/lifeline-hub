@@ -8,7 +8,7 @@ import type {
   Rueckmeldungen,
 } from './types';
 
-export interface MeldungFilter {
+interface MeldungFilter {
   status?: string;
   richtung?: string;
 }

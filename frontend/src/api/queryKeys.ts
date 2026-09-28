@@ -511,8 +511,6 @@ export const GLOBAL_KEYS = {
   fachebene: 'fachebene',
 } as const;
 
-export type GlobalKey = (typeof GLOBAL_KEYS)[keyof typeof GLOBAL_KEYS];
-
 /**
  * Dienstfilter der Stammdaten-Listen (`personal` / `fahrzeuge` / `material`).
  *
@@ -523,13 +521,13 @@ export type GlobalKey = (typeof GLOBAL_KEYS)[keyof typeof GLOBAL_KEYS];
  * Invalidierungsverhalten der `stammdaten/*`-Mutationen — bei 90 migrierten Call-Sites ist das
  * zu viel Risiko auf einmal. Eigener Task, wenn überhaupt.
  */
-export type Dienstfilter = 'alle' | 'im-dienst';
+type Dienstfilter = 'alle' | 'im-dienst';
 
 /** Die zwei adressierten Bereiche unter dem `aufbewahrung`-Prefix (LFH-23). */
-export type AufbewahrungBereich = 'akte' | 'etb';
+type AufbewahrungBereich = 'akte' | 'etb';
 
 /** Die sieben Bereiche unter dem `admin-karte`-Prefix. */
-export type AdminKarteBereich =
+type AdminKarteBereich =
   | 'katalog'
   | 'bau-status'
   | 'offline-karten'

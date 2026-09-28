@@ -23,7 +23,7 @@ export function ladeEinsatz(id: number): Promise<EinsatzAnzeige> {
  * Anlegefelder eines Einsatzes (LFH-332 · B4). `einsatzart` und `begonnen_at` sind
  * optional — fehlen sie, greifen die DB-Defaults `'realeinsatz'` und `jetzt`.
  */
-export interface NeuerEinsatz {
+interface NeuerEinsatz {
   bezeichnung: string;
   stichwort?: string;
   einsatzart?: Einsatzart;

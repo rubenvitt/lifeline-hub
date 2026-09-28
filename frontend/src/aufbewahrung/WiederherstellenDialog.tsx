@@ -35,7 +35,7 @@ interface WiederherstellenWerte {
 const FRIST_VERGANGEN = 'Die neue Frist muss in der Zukunft liegen';
 
 /** Reiner Body-Bau — ohne Render prüfbar. */
-export function wiederherstellenBody(werte: WiederherstellenWerte): WiederherstellenBody {
+function wiederherstellenBody(werte: WiederherstellenWerte): WiederherstellenBody {
   if (werte.unbegrenzt) return { retention_bis: null };
   if (!werte.frist) throw new Error('Frist fehlt');
   return { retention_bis: alsBackendZeit(werte.frist) };

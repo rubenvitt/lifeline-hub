@@ -3,7 +3,7 @@ import type { Sichtungskategorie, Verbleib } from '../api/types';
 /** Triage-Reihenfolge der Patienten-Abschnitte (SK I zuerst, tot zuletzt).
  *  Single Source of Truth dafür, welche Sichtungen einen „Patienten" ausmachen —
  *  geteilt zwischen Personen-Liste (Patienten-Tab) und Lagebild-Streifen. */
-export const PATIENT_SK: Sichtungskategorie[] = ['sk1', 'sk2', 'sk3', 'sk4', 'tot'];
+const PATIENT_SK: Sichtungskategorie[] = ['sk1', 'sk2', 'sk3', 'sk4', 'tot'];
 
 /** Patient = gesichtet mit behandlungsrelevanter Kategorie (SK I–IV oder tot).
  *  Strukturell typisiert, damit sowohl `Person` (Liste) als auch `PersonDetail` passen. */

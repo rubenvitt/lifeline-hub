@@ -165,7 +165,7 @@ function codeVon(w: StatusWert | null | undefined): string | null {
 }
 
 /** Ein Katalogeintrag als Chip-Beschreibung (Ton nur aus der Kategorie). */
-export function statusWertAnzeige(w: StatusWert): MittelStatus {
+function statusWertAnzeige(w: StatusWert): MittelStatus {
   return {
     ton: tonAusKategorie(w.kategorie),
     wort: fmsWort(w.label, w.fms_anker),

@@ -53,7 +53,7 @@ export type BefehlTeil =
 
 export type GeschlechtWert = 'maennlich' | 'weiblich' | 'divers';
 
-export interface PersonBefehl {
+interface PersonBefehl {
   /** Erkannte Teile in Eingabereihenfolge (der Name als EIN Teil an seiner ersten Stelle). */
   teile: BefehlTeil[];
   /** Die Felder der Anlage — ohne `uhs_id`, die braucht die UHS-Liste ({@link loeseBefehl}). */
@@ -291,11 +291,11 @@ export function parsePersonBefehl(eingabe: string): PersonBefehl {
 }
 
 /** Wählbar ist eine UHS, die nicht aufgelöst und nicht storniert ist. */
-export function istWaehlbareUhs(u: Pick<Uhs, 'status' | 'storniert_at'>): boolean {
+function istWaehlbareUhs(u: Pick<Uhs, 'status' | 'storniert_at'>): boolean {
   return u.status !== 'aufgeloest' && !u.storniert_at;
 }
 
-export type UhsAufloesung = { uhs: Uhs } | { problem: string };
+type UhsAufloesung = { uhs: Uhs } | { problem: string };
 
 /**
  * `@`-Suchtext → Unfallhilfsstelle. Nur ein EINDEUTIGER Treffer gilt: zuerst exakt
@@ -318,7 +318,7 @@ export function loeseUhsAuf(suche: string, liste: readonly Uhs[]): UhsAufloesung
   return { problem: `„${suche}" ist mehrdeutig (${teil.length} Unfallhilfsstellen)` };
 }
 
-export type BefehlErgebnis =
+type BefehlErgebnis =
   { ok: true; eingabe: PersonAnlegenEingabe; uhs: Uhs | null } | { ok: false; probleme: string[] };
 
 /**

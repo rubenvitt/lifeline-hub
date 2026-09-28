@@ -66,7 +66,7 @@ export function SeitenSkeleton({ zeilen = 3 }: SeitenSkeletonProps) {
 }
 
 /** Die eine Handlung, die aus einem Leerzustand herausführt. */
-export interface SeitenLeerAktion {
+interface SeitenLeerAktion {
   label: string;
   /**
    * Zielpfad — gebaut vom Aufrufer über `routing/deeplinks.ts`. Das Primitiv kennt

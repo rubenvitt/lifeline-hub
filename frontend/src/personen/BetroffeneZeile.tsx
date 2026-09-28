@@ -50,7 +50,7 @@ import { loeseBefehl, loeseUhsAuf, parsePersonBefehl, type BefehlTeil } from './
  * Zeile kennt keinen Transport.
  */
 
-export interface BetroffeneZeileProps {
+interface BetroffeneZeileProps {
   uhsListe: readonly Uhs[];
   /** Anlegen. **Muss bei Ablehnung ablehnen** (`mutateAsync`). */
   onErfassen: (eingabe: PersonAnlegenEingabe) => Promise<unknown>;

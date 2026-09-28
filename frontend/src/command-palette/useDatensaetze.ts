@@ -66,7 +66,7 @@ import {
 /** Trefferdeckel des ETB-Volltextzweigs — geht als `limit` MIT in den Request (5 statt 100). */
 const ETB_TEXT_DECKEL = 5;
 
-export interface DatensatzAbruf {
+interface DatensatzAbruf {
   /** Aus dem Pfad gezogen; `null` ausserhalb eines Einsatzes. */
   einsatzId: number | null;
   modus: PaletteModus;
@@ -77,12 +77,12 @@ export interface DatensatzAbruf {
 /**
  * Die drei Riegel vor jedem `enabled`, an EINER Stelle (LFH-391 · C3).
  *
- * Rein und exportiert, weil zwei Hooks sie brauchen: `useDatensaetze` für seine vierzehn Abrufe
+ * Eine Funktion, weil zwei Hooks sie brauchen: `useDatensaetze` für seine vierzehn Abrufe
  * UND `useDatensatzTreffer` für den Sichtbarkeits-Abruf darunter. Zwei Kopien wären zwei
  * Bedingungen, und die Overrides liefen dann in einem Zustand los, in dem keine einzige
  * Liste folgt — ein Request für eine Ansicht ohne Datensatzzeile.
  */
-export function datensatzAbrufAktiv({ einsatzId, modus, suche }: DatensatzAbruf): boolean {
+function datensatzAbrufAktiv({ einsatzId, modus, suche }: DatensatzAbruf): boolean {
   return (
     einsatzId != null &&
     suche.trim().length >= DATENSATZ_MINDESTZEICHEN &&
@@ -116,7 +116,7 @@ export { etbNummerSchluessel } from './datensatzAbfrage';
  * und vom Volltextfach oben — eine Zahl und ein Array unter einem Schlüssel wären derselbe
  * stille Fehler wie in {@link etbSuchSchluessel} beschrieben.
  */
-export function etbAnzahlSchluessel(einsatzId: number, q: string) {
+function etbAnzahlSchluessel(einsatzId: number, q: string) {
   return einsatzKeys.etbListe(einsatzId, { q, anzahl: true });
 }
 

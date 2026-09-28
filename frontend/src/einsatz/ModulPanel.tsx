@@ -12,7 +12,7 @@ import { einsatzDauer } from './einsatzDauer';
 import { fussFokusabstandStil, useFussFokusabstand } from './fussFokusabstand';
 
 /** Breite des Modulpanels (Neuentwurf, `shell.dc.html`). Layoutmaß, keine Dichte-Angabe. */
-export const PANEL_BREITE = 208;
+const PANEL_BREITE = 208;
 
 /** Höhe des Panelkopfs mit der Augenbraue (Entwurf: 42 px). Layoutmaß. */
 const PANEL_KOPF = 42;
@@ -51,7 +51,7 @@ interface ListeProps {
 }
 
 /** Die Farbrollen, die eine Modulzeile liest — als Ausschnitt, damit der Test sie setzen kann. */
-export type ModulZeilenFarben = Pick<
+type ModulZeilenFarben = Pick<
   Farbrollen,
   'flaeche3' | 'text' | 'text2' | 'gedaempft' | 'schwach' | 'bedien'
 >;

@@ -65,7 +65,7 @@ function sonderkostAnlegen(sk: SonderkostWerte | undefined): SonderkostEingabe |
 
 // ── Zeitfenster: reine Abbildungen ──────────────────────────────────────────────────────
 
-export interface ZeitfensterWerte {
+interface ZeitfensterWerte {
   bezeichnung: string;
   zeitraum: [Dayjs, Dayjs];
   bedarf_kraefte: number;
@@ -118,7 +118,7 @@ export function zeitfensterPatch(
 
 // ── Ausgabe: reine Abbildung ────────────────────────────────────────────────────────────
 
-export interface AusgabeWerte {
+interface AusgabeWerte {
   menge: number;
   ort?: string | null;
   zeitpunkt?: Dayjs | null;
@@ -181,13 +181,13 @@ interface DialogBasis {
  * die Herkunft. Beim BEARBEITEN überschreibt der Vorschlag nichts — die Hilfe nennt deshalb
  * die Zahl mit (Risiko „gespeicherter Bedarf veraltet", D8).
  */
-export function vorschlagHilfe(v: Vorschlag, anlegen: boolean): string | undefined {
+function vorschlagHilfe(v: Vorschlag, anlegen: boolean): string | undefined {
   if (v.hinweis == null) return undefined;
   if (anlegen || v.wert == null) return v.hinweis;
   return `Aktuell ${v.wert} — ${v.hinweis}`;
 }
 
-export type ZeitfensterModus =
+type ZeitfensterModus =
   | { art: 'anlegen'; onErfassen: (body: ZeitfensterEingabe) => Promise<unknown> }
   | {
       art: 'bearbeiten';

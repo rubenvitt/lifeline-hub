@@ -39,9 +39,9 @@ const BEZUG_TYPEN: readonly DokumentBezugTyp[] = ['abschnitt', 'einheit', 'etb_e
 const kuerze = (text: string, max: number) =>
   text.length > max ? `${text.slice(0, max - 1)}…` : text;
 
-/** Formularwerte → API-Eingabe. Rein und exportiert, damit die Präfix-Trennung ohne Render
- *  prüfbar bleibt. Ein unbekannter Präfix fällt weg, statt einen halben Bezug zu senden. */
-export function zuAblage(werte: AblageFormular): DokumentAblage {
+/** Formularwerte → API-Eingabe. Ein unbekannter Präfix fällt weg, statt einen halben Bezug
+ *  zu senden. */
+function zuAblage(werte: AblageFormular): DokumentAblage {
   const datei = werte.datei?.[0]?.originFileObj as File;
   const ablage: DokumentAblage = { datei, titel: werte.titel, kategorie: werte.kategorie };
   if (werte.bezug) {

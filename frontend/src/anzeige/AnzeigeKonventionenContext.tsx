@@ -22,7 +22,7 @@ import {
   type AnzeigeKonventionen,
 } from './format';
 
-export interface AnzeigeKonventionenHook {
+interface AnzeigeKonventionenHook {
   konventionen: AnzeigeKonventionen;
   formatZeit: (utcStr?: string | null) => string;
   formatZeitKurz: (utcStr?: string | null) => string;

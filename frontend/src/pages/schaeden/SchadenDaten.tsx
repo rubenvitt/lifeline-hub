@@ -9,7 +9,7 @@ import type { Schaden } from '../../api/types';
 import { ABSCHLUSS_LABEL, AUSMASS_META, TYP_LABEL, geschaedigtAnzeige } from './schadenHelfer';
 
 /** Die Felder, die die Detailseite im Bearbeiten-Modus an Ort und Stelle als Eingabe zeigt. */
-export type SchadenEingabeFeld = 'typ' | 'ausmass' | 'ort' | 'beschreibung' | 'geschaedigt';
+type SchadenEingabeFeld = 'typ' | 'ausmass' | 'ort' | 'beschreibung' | 'geschaedigt';
 
 /**
  * Die Schadensdaten als Datenraster — EIN Bauteil für die Detailseite und die Vorschau der

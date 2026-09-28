@@ -28,7 +28,7 @@ import type { EinsatzEinstellungen } from '../api/types';
  * diese Frage nur nach oben. TanStack führt die gleichen Query-Keys ohnehin zusammen, der
  * doppelte Aufruf kostet also keinen zweiten Request.
  */
-export interface EinstellungenDaten {
+interface EinstellungenDaten {
   laedt: boolean;
   einsatz?: Awaited<ReturnType<typeof ladeEinsatz>>;
   einstellungen?: EinsatzEinstellungen;

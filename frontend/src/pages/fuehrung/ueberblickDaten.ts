@@ -55,13 +55,13 @@ import { warnstufeKennzahl, type Statusrolle } from '../../theme/statusFarben';
 dayjs.extend(utc);
 
 /** Das Fenster „in 60 min" / „der letzten Stunde". */
-export const FENSTER_MINUTEN = 60;
+const FENSTER_MINUTEN = 60;
 /** Ab hier gilt eine Marke als knapp (Ton `achtung`). */
-export const KNAPP_MINUTEN = 30;
+const KNAPP_MINUTEN = 30;
 /** Wie viele Entscheidungen der Rückfall zeigt, wenn die letzte Stunde leer ist. */
-export const ENTSCHEIDUNGEN_RUECKFALL = 5;
+const ENTSCHEIDUNGEN_RUECKFALL = 5;
 /** Wie viele Marken das Seitenfeld trägt; der Rest wird gezählt, nicht verschwiegen. */
-export const MARKEN_MAX = 6;
+const MARKEN_MAX = 6;
 
 /** Wire-Zeit (UTC ohne Zone) → Zeitpunkt; `null` bei fehlendem oder unlesbarem Wert. */
 export function zeitpunkt(wire: string | null | undefined): Dayjs | null {
@@ -89,7 +89,7 @@ const ROLLE_ALS_TON: Record<Statusrolle, KennzahlTon> = {
   marke: 'neutral',
 };
 
-export interface BetroffeneKennzahl {
+interface BetroffeneKennzahl {
   anzahl: number;
   /** Erfasst in den letzten {@link FENSTER_MINUTEN} Minuten. */
   neu: number;
@@ -101,7 +101,7 @@ export function betroffeneKennzahl(personen: Person[], jetzt: Dayjs): Betroffene
   return { anzahl: personen.length, neu };
 }
 
-export interface KraefteKennzahl {
+interface KraefteKennzahl {
   gesamt: number;
   /** BOS-Schreibweise F/UF/M//Σ aus `staerkeText`. */
   text: string;
@@ -116,7 +116,7 @@ export function kraefteKennzahl(
   return { gesamt: s.gesamt, text: staerkeText(s) };
 }
 
-export interface WarnstufeKennzahl {
+interface WarnstufeKennzahl {
   stufe: Warnstufe;
   /** Das Wort — der zweite Kanal neben der Farbe. */
   wort: string;
@@ -155,7 +155,7 @@ export function warnstufeNotiz(anzahlAktiv: number, pegelNotiz: string | null): 
   return pegelNotiz ? `${gebiete} · ${pegelNotiz}` : gebiete;
 }
 
-export interface AuftraegeKennzahl {
+interface AuftraegeKennzahl {
   offen: number;
   /** Davon schon angenommen (`in_arbeit`). */
   inArbeit: number;
@@ -192,7 +192,7 @@ function sortiereAbschnitte(abschnitte: Einsatzabschnitt[]): Einsatzabschnitt[] 
 
 /** Offen im Sinne des Überblicks: `offen` oder `in_arbeit` — dieselbe Menge wie
  *  `auftraegeOffen` im Lage-Dashboard (alles außer vollzogen/abgenommen). */
-export function istOffen(a: Auftrag): boolean {
+function istOffen(a: Auftrag): boolean {
   return a.bearbeitungsstatus === 'offen' || a.bearbeitungsstatus === 'in_arbeit';
 }
 
@@ -293,7 +293,7 @@ const LAGE_RANG: Record<AbschnittLagezustand, number> = {
 };
 const lageRang = (l: AbschnittLagezustand | null | undefined) => (l ? LAGE_RANG[l] : 0);
 
-export interface AbschnittRohdaten {
+interface AbschnittRohdaten {
   abschnitte: Einsatzabschnitt[];
   einheiten: Einheit[];
   personal: EinsatzPersonal[];
@@ -439,7 +439,7 @@ export function abschnittZeilen(r: AbschnittRohdaten): AbschnittZeile[] {
 
 // ── Entscheidungen ──────────────────────────────────────────────────────────────
 
-export interface EntscheidungsAuswahl {
+interface EntscheidungsAuswahl {
   eintraege: EtbEintragAnzeige[];
   /** `stunde`: die letzte Stunde trug Entscheidungen. `zuletzt`: Rückfall auf die jüngsten. */
   modus: 'stunde' | 'zuletzt';
@@ -482,7 +482,7 @@ export interface Marke {
   wort: string;
 }
 
-export interface MarkenAuswahl {
+interface MarkenAuswahl {
   marken: Marke[];
   /** Wie viele Marken hinter {@link MARKEN_MAX} nicht gezeigt werden. */
   weitere: number;
@@ -497,7 +497,7 @@ export function markenBewertung(zeit: Dayjs, jetzt: Dayjs): { ton: MarkenTon; wo
 }
 
 /** „HANN. MÜNDEN (WESER)" — Station mit Gewässer, ohne Gewässer nur die Station. Rein. */
-export function pegelBezeichnung(p: Pick<PegelAnzeige, 'name' | 'gewaesser'>): string {
+function pegelBezeichnung(p: Pick<PegelAnzeige, 'name' | 'gewaesser'>): string {
   const gewaesser = p.gewaesser?.trim();
   return gewaesser ? `${p.name} (${gewaesser})` : p.name;
 }

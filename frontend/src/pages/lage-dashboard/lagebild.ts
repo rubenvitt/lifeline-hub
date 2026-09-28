@@ -146,7 +146,7 @@ export function reihenWechsel(
   return teile.length > 0 ? teile.join(' · ') : null;
 }
 
-export interface Kennzahl {
+interface Kennzahl {
   etikett: KennzahlEtikett;
   wert: string;
   einheit?: string;
@@ -167,7 +167,7 @@ export interface Kennzahl {
 }
 
 /** Der Führungsstand unter den drei Paneelen: was vorher eigene Kacheln hatte. */
-export interface Fuehrungsstand {
+interface Fuehrungsstand {
   auftraegeOffen: number;
   auftraegeUeberfaellig: number;
   meldungenOffen: number;
@@ -185,7 +185,7 @@ export interface Fuehrungsstand {
   } | null;
 }
 
-export interface Lagebild {
+interface Lagebild {
   kennzahlen: Kennzahl[];
   /** Für das Sichtungsbild: die Verteilung aus derselben Verdichtung wie die Kennzahlen. */
   sk: SkVerteilung;

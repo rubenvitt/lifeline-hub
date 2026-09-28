@@ -29,7 +29,7 @@ export function tagesSchluessel(
 }
 
 /** „Jetzt" in der Anzeigezone — dieselbe Zone, in der `tagesSchluessel` den Tag bestimmt. */
-export function jetztInZone(
+function jetztInZone(
   konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
   jetzt: Dayjs = dayjs(),
 ): Dayjs {
@@ -96,7 +96,7 @@ export function filterAktiv(f: LageFilter): boolean {
 }
 
 /** Die Felder, die ein Lageobjekt für Filter und Gruppen braucht (Teil von `LageMeldung`). */
-export interface LageEintragKern {
+interface LageEintragKern {
   text: string;
   erstellt_at: string;
   lat?: number | null;
@@ -126,7 +126,7 @@ export function filtereLagemeldungen<T extends LageEintragKern>(
   });
 }
 
-export interface Tagesgruppe<T> {
+interface Tagesgruppe<T> {
   schluessel: string;
   etikett: string;
   zeilen: T[];

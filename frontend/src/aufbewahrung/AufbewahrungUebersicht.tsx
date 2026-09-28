@@ -46,7 +46,7 @@ const leer = '—';
  * Dann steht die Bezeichnung dort, nie „—“: die Zelle ist der Link in die Akte, und n Links
  * namens „—“ wären nicht zu unterscheiden. Derselbe Rückfall wie in der Akte.
  */
-export function kennung(e: Pick<AufbewahrungEintrag, 'einsatznummer_intern' | 'bezeichnung'>) {
+function kennung(e: Pick<AufbewahrungEintrag, 'einsatznummer_intern' | 'bezeichnung'>) {
   return e.einsatznummer_intern ?? `ohne Nr. · ${e.bezeichnung}`;
 }
 
@@ -133,7 +133,7 @@ const KARTE: Kartenplan<AufbewahrungEintrag, Spalte> = {
 };
 
 /** Reine Filterfunktion — „alle" oder genau ein Zustand. */
-export function filtereAufbewahrung(
+function filtereAufbewahrung(
   eintraege: readonly AufbewahrungEintrag[],
   filter: Filter,
 ): AufbewahrungEintrag[] {

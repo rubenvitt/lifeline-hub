@@ -10,7 +10,7 @@ import { UEBERLAGERUNG_RAND, kartenKnopfKante } from './KartenUeberlagerung';
  */
 export const FUSS_ABSTAND = 12;
 
-export type BandAusrichtung = 'voll' | 'mitte' | 'links';
+type BandAusrichtung = 'voll' | 'mitte' | 'links';
 
 /**
  * Stil eines Bandes IM Fuß-Rahmen (LFH-355). Rein und exportiert nach dem Muster von

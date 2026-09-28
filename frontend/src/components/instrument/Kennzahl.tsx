@@ -74,7 +74,7 @@ import '../../theme/sprache.css';
 
 export type KennzahlZustand = 'daten' | 'laden' | 'fehler';
 export type KennzahlTon = 'neutral' | 'normal' | 'bedien' | 'achtung' | 'alarm';
-export type KennzahlGroesse = 'klein' | 'mittel' | 'gross';
+type KennzahlGroesse = 'klein' | 'mittel' | 'gross';
 
 const STUFE: Record<KennzahlGroesse, Schriftstufenname> = {
   klein: 'datenwertKlein',
@@ -83,7 +83,7 @@ const STUFE: Record<KennzahlGroesse, Schriftstufenname> = {
 };
 
 /** Kantenbreite je Ton — abgestuft, damit Alarm und Achtung ohne Farbe unterscheidbar sind. */
-export const KANTE: Record<KennzahlTon, number> = {
+const KANTE: Record<KennzahlTon, number> = {
   neutral: 0,
   normal: 0,
   bedien: 0,
@@ -91,10 +91,10 @@ export const KANTE: Record<KennzahlTon, number> = {
   alarm: 6,
 };
 
-export const LADE_ZEICHEN = '····';
-export const FEHLER_ZEICHEN = '?';
-export const STAND_UNBEKANNT = 'Stand unbekannt';
-export const WIRD_ABGERUFEN = 'wird abgerufen';
+const LADE_ZEICHEN = '····';
+const FEHLER_ZEICHEN = '?';
+const STAND_UNBEKANNT = 'Stand unbekannt';
+const WIRD_ABGERUFEN = 'wird abgerufen';
 
 /** Die Zahlfarbe — nur im Zustand `daten` getönt, Kontrast siehe Dateikopf. Rein. */
 export function zahlFarbe(
@@ -158,7 +158,7 @@ export function kennzahlStil(
   };
 }
 
-export interface KennzahlProps {
+interface KennzahlProps {
   /** Augenbraue — was gezählt wird. */
   titel: ReactNode;
   wert: ReactNode;

@@ -13,7 +13,7 @@ import { useCallback, useState } from 'react';
  * Leiste rechts neben der Karte, darunter liegt sie unter ihr — ein Ausblenden am Fükw soll das
  * Tablet nicht mit ausblenden.
  */
-export type LeistenKlasse = 'breit' | 'schmal';
+type LeistenKlasse = 'breit' | 'schmal';
 
 export const LEISTE_SPEICHER_SCHLUESSEL: Record<LeistenKlasse, string> = {
   breit: 'lfh:lagekarte:leiste-offen:ab-lg',

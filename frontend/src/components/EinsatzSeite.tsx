@@ -14,7 +14,7 @@ import { useModusFarben } from './rahmenStil';
 
 /** Höhe der Seitenkopfleiste (Neuentwurf: 44 px). Layoutmaß und Boden — Aktionen in
  *  `komfortabel`/`handschuh` (48/72) lassen sie wachsen. */
-export const SEITENKOPF_HOEHE = 44;
+const SEITENKOPF_HOEHE = 44;
 
 /**
  * Stil der Seitenkopfleiste — rein und exportiert.

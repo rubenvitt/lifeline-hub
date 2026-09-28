@@ -2,7 +2,7 @@ import type { StatusTon } from '../components/instrument';
 import type { Farbrollen } from '../theme/tokens';
 import type { KommPhase, KommPrio } from './phase';
 
-export type KantenZustand = 'alarm' | 'unbearbeitet' | 'keine';
+type KantenZustand = 'alarm' | 'unbearbeitet' | 'keine';
 
 /**
  * Der linke Kartenrand der Kommunikations-Karten (LFH-343 · C8, Befund H47) — EINE Farbe,

@@ -23,7 +23,7 @@ import KartenOfflineSektion from '../karten/KartenOfflineSektion';
  * Bestands-Deep-Links weiterfunktionieren. Pfad-Builder statt inline-Template-Literals.
  */
 
-export interface AdminSektion {
+interface AdminSektion {
   key: string;
   label: string;
   /**
@@ -34,7 +34,7 @@ export interface AdminSektion {
   element: ReactElement;
 }
 
-export interface AdminGruppe {
+interface AdminGruppe {
   key: string;
   label: string;
   sektionen: AdminSektion[];

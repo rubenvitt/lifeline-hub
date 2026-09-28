@@ -8,7 +8,7 @@ import type { Dayjs } from 'dayjs';
  * Die Beschriftungen sind Bestand und hängen an Tests („+1 h", nicht „+60 min").
  * `components/`, nicht `etb/` oder `stab/`: beide Module konsumieren sie, keines besitzt sie.
  */
-export interface SchnellwahlEintrag {
+interface SchnellwahlEintrag {
   readonly label: string;
   readonly minuten: number;
 }

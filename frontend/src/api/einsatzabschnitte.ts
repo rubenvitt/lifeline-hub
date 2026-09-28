@@ -46,7 +46,7 @@ export function loeseAbschnittAuf(einsatzId: number, aid: number): Promise<void>
 
 /** L‑2: Fläche (GeoJSON-String) und Verortungs-Metadaten eines Abschnitts.
  *  `null` löscht explizit, undefined = unverändert. */
-export interface FlaechePatch {
+interface FlaechePatch {
   flaeche_geojson?: string | null;
   tz_fachaufgabe?: string | null;
   tz_organisation?: string | null;

@@ -69,7 +69,7 @@ export type StelleAktion = 'verorten' | 'bearbeiten' | 'stornieren';
  * sonst stünde sie „geschlossen und belegt“ da, der Server lehnt mit 422 ab). Steht EINMAL im
  * Verlauf statt n gesperrter Knöpfe (LFH-346, zwei Zuschnitte).
  */
-export const GESCHLOSSEN_HINWEIS =
+const GESCHLOSSEN_HINWEIS =
   'Die Stelle ist geschlossen. Zurücknehmen geht erst, wenn sie wieder in Betrieb ist.';
 
 const MENUE: readonly (MenueEintrag & { key: StelleAktion })[] = [
@@ -77,8 +77,8 @@ const MENUE: readonly (MenueEintrag & { key: StelleAktion })[] = [
   { key: 'stornieren', label: 'Stornieren', gefahr: true },
 ];
 
-/** Menü einer Zeile: unverortet zuerst „Auf Karte verorten" (LFH-673). Rein und exportiert. */
-export function stellenMenue(
+/** Menü einer Zeile: unverortet zuerst „Auf Karte verorten" (LFH-673). */
+function stellenMenue(
   s: Pick<Betreuungsstelle, 'lat' | 'lon'>,
 ): readonly (MenueEintrag & { key: StelleAktion })[] {
   const verortet = s.lat != null && s.lon != null;

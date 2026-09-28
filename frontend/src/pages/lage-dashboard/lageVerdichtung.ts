@@ -23,7 +23,7 @@ export interface SkVerteilung {
   ohne: number;
 }
 
-export interface PersonStatusVerteilung {
+interface PersonStatusVerteilung {
   erfasst: number;
   vermisst: number;
   betroffen: number;
@@ -31,7 +31,7 @@ export interface PersonStatusVerteilung {
   abgemeldet: number;
 }
 
-export interface BetroffeneVerdichtung {
+interface BetroffeneVerdichtung {
   sk: SkVerteilung;
   status: PersonStatusVerteilung;
   /** Personen mit Sichtung SK I–IV (medizinisch/triage-relevant). */
@@ -48,7 +48,7 @@ export const WARNSTUFE_RANG: Record<Warnstufe, number> = {
   akut: 4,
 };
 
-export interface GefahrVerdichtung {
+interface GefahrVerdichtung {
   hoechste: Warnstufe;
   /** Anzahl Gefahrengebiete mit höchster Warnstufe !== 'keine'. */
   anzahlAktiv: number;
@@ -75,7 +75,7 @@ export interface GefahrenZeile {
   stufe: Warnstufe;
 }
 
-export interface GefahrenmatrixVerdichtung {
+interface GefahrenmatrixVerdichtung {
   /** Nur BEWERTETE Gefahrentypen, in Katalogreihenfolge. */
   zeilen: GefahrenZeile[];
   /** Gefahrentypen ohne jede Bewertung in irgendeinem Gebiet. */
@@ -175,7 +175,7 @@ export function neuesterLagebericht(berichte: LageberichtAnzeige[]): Lagebericht
   return berichte.reduce((neuester, b) => (b.erstellt_at > neuester.erstellt_at ? b : neuester));
 }
 
-export interface TierVerdichtung {
+interface TierVerdichtung {
   aktiv: number;
   vermisst: number;
   abgeschlossen: number;
@@ -187,7 +187,7 @@ export function verdichteTiere(tiere: Tier[]): TierVerdichtung {
   return v;
 }
 
-export interface UhsVerdichtung {
+interface UhsVerdichtung {
   geplant: number;
   aktiv: number;
   aufgeloest: number;
@@ -199,7 +199,7 @@ export function verdichteUhs(uhs: Uhs[]): UhsVerdichtung {
   return v;
 }
 
-export interface SchadenVerdichtung {
+interface SchadenVerdichtung {
   offen: number;
   uebergeben: number;
   abgeschlossen: number;

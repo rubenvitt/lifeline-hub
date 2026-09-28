@@ -37,7 +37,7 @@ export const ABSCHLUSS_GRUENDE = (Object.keys(ABSCHLUSS_LABEL) as SchadenAbschlu
   }),
 );
 
-export function pad3(nr: number): string {
+function pad3(nr: number): string {
   return String(nr).padStart(3, '0');
 }
 

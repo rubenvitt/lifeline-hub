@@ -17,7 +17,7 @@ import {
  * - `dtgVoll` → `161430JUL2026` (volle DTG, dt. Monatskürzel) — Default
  * - `kurz`    → `1430` heute, sonst `161430`
  */
-export type ZeitFormat = 'uhrzeit' | 'dtg' | 'dtgVoll' | 'kurz';
+type ZeitFormat = 'uhrzeit' | 'dtg' | 'dtgVoll' | 'kurz';
 
 const FORMATTER: Record<
   ZeitFormat,

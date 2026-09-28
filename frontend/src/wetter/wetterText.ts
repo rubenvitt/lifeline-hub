@@ -8,7 +8,7 @@ import { DEFAULT_KONVENTIONEN, type AnzeigeKonventionen } from '../anzeige/forma
 import { standZeit } from '../pegel/pegelKennzahl';
 import { himmelsrichtung } from './wetterStand';
 
-export const FEHLT = '—';
+const FEHLT = '—';
 const MINUS = '−';
 
 const EINE_STELLE = new Intl.NumberFormat('de-DE', {

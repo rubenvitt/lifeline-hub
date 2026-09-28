@@ -35,7 +35,7 @@ export function ladeFahrzeugVorschlaege(): Promise<FahrzeugVorschlaege> {
  * jedes weitere Feld ist `Option<T>`, `sondersignal` traegt ein `#[serde(default)]`). Die
  * gekuerzte Schnellerfassung schickt deshalb ihre vier Felder und sonst nichts.
  */
-export type FahrzeugNeu = { funkrufname: string } & Partial<Omit<FahrzeugEingabe, 'funkrufname'>>;
+type FahrzeugNeu = { funkrufname: string } & Partial<Omit<FahrzeugEingabe, 'funkrufname'>>;
 
 /**
  * PATCH ist ein ECHTER Teil-Patch (LFH-306): fehlender Key = unveraendert, `null` = leeren.
@@ -47,7 +47,7 @@ export type FahrzeugNeu = { funkrufname: string } & Partial<Omit<FahrzeugEingabe
  * Liste loeschte OPTA, Standort, FMS-ISSI, Tragenkapazitaet, Soll-Staerke und Bemerkung.
  * Die Detailseite schickt weiterhin alle Felder — sie zeigt sie auch alle.
  */
-export type FahrzeugPatch = Partial<FahrzeugEingabe>;
+type FahrzeugPatch = Partial<FahrzeugEingabe>;
 
 export function legeFahrzeugAn(daten: FahrzeugNeu): Promise<Fahrzeug> {
   return apiSend<Fahrzeug>('/api/fahrzeuge', 'POST', daten);

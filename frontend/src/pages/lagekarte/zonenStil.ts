@@ -48,7 +48,7 @@ export function zoneStil(typ: ZoneTyp, farbe: string | null | undefined): ZoneSt
   return STILE[typ];
 }
 
-export interface ZoneTypInfo {
+interface ZoneTypInfo {
   typ: ZoneTyp;
   label: string;
   /** Geometrie, die der Typ erzwingt; `beides` = Nutzer wählt Fläche/Linie. */

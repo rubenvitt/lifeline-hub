@@ -19,7 +19,7 @@ import { useEffect, useState, type CSSProperties } from 'react';
  * Konstante wäre in zwei von drei Stufen falsch). Die Variable hängt an der Wurzel der
  * Spalte; wo kein Fuß steht (Akkordeon im Navigations-Drawer), greift der Rückfall `0px`.
  */
-export const FUSS_FOKUSABSTAND = '--lfh-fuss-fokusabstand';
+const FUSS_FOKUSABSTAND = '--lfh-fuss-fokusabstand';
 
 /** Stilanteil der Ziele — rein, damit die Zusicherung ohne Layout prüfbar bleibt. */
 export const fussFokusabstandStil: CSSProperties = {

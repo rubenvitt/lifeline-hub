@@ -56,7 +56,7 @@ export const ETB_TYPEN: readonly EtbTyp[] = (Object.keys(ETB_TYP_RANG) as EtbTyp
 /** Welche EINE Primäraktion die Akte im Kopf trägt (design.md D8). Nach Karenz-Ende und nach
  *  der Schwärzung gibt es keine: der Server lehnt dort mit 409 ab, und ein Knopf, der nur
  *  abgelehnt werden kann, ist schlechter als keiner. */
-export type AktePrimaeraktion = 'frist' | 'wiederherstellen' | null;
+type AktePrimaeraktion = 'frist' | 'wiederherstellen' | null;
 
 export function primaeraktion(zustand: AufbewahrungZustand): AktePrimaeraktion {
   switch (zustand) {

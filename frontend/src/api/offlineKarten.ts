@@ -37,10 +37,10 @@ export type OfflineKarte = S['OfflineKarteAntwort'];
  * Mutations-Antwort heute aus (alle invalidieren nur), deshalb ist das reine Typ-Ehrlichkeit —
  * aber genau die ist der Zweck des Codegens.
  */
-export type OfflineKarteZeile = S['OfflineKarte'];
+type OfflineKarteZeile = S['OfflineKarte'];
 
 /** Body zum Starten eines Downloads (aus Katalog oder eigener URL). `lizenz` ist Pflicht. */
-export interface OfflineDownloadBody {
+interface OfflineDownloadBody {
   name: string;
   url: string;
   lizenz: string;
@@ -58,7 +58,7 @@ export interface OfflineDownloadBody {
  * Name/Lizenz bleiben die der Karte (kein neuer Eintrag). Anders als `ersetzt_karte_id` (neue Zeile)
  * bleibt die id stabil und die alte Datei wird bis zum atomaren Swap weiter ausgeliefert.
  */
-export interface OfflineNeuLadenBody {
+interface OfflineNeuLadenBody {
   url: string;
   /** Erwartete Größe (Bytes) — Plattenplatz-Vorabcheck. */
   groesse_erwartet?: number;
@@ -105,7 +105,7 @@ export function ladeOfflineKatalog(frisch = false): Promise<OfflineKatalogEintra
 export type VorhandeneKarte = S['VorhandeneKarte'];
 
 /** Body zum Registrieren einer bereits im karten_dir liegenden Karte (lokaler Import). */
-export interface RegistriereBody {
+interface RegistriereBody {
   name: string;
   pfad: string;
   lizenz: string;

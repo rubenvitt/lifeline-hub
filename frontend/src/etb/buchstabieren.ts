@@ -91,7 +91,7 @@ const NATO: Record<string, string> = {
   '9': 'Nine',
 };
 
-export interface BuchstabierZeichen {
+interface BuchstabierZeichen {
   /** Das Original-Zeichen (Groß-/Kleinschreibung erhalten). */
   zeichen: string;
   /** Das Buchstabierwort, oder `null` für nicht-buchstabierbare Zeichen (Leerzeichen, Sonderzeichen). */

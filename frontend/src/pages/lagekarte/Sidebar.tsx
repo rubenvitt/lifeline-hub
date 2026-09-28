@@ -144,7 +144,7 @@ export function ortVorschauExclude(
 }
 
 /** Ein Fehler-Slot: was schiefging, woran es lag, und der Weg zurück. */
-export interface SektionFehler {
+interface SektionFehler {
   /** Aus Sicht der Einsatzkraft — kein Statuscode, kein Stacktrace. */
   text: string;
   /** Rohfehler der Query; das Primitiv filtert selbst auf `ApiError`. */

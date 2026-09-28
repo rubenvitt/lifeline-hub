@@ -20,7 +20,7 @@ import { istAlarmiert } from './meldungKennzahlen';
 
 const { Text } = Typography;
 
-export interface BearbeiterOption {
+interface BearbeiterOption {
   benutzer_id: number;
   anzeigename: string;
 }
@@ -41,7 +41,7 @@ const WEG_LABEL: Record<string, string> = {
   sonstige: 'Sonstige',
 };
 
-export interface MeldungKarteProps {
+interface MeldungKarteProps {
   meldung: Meldung;
   ansicht?: 'offen' | 'abgeschlossen';
   /** Einsatz-id für den Backlink auf den ausgelösten Auftrag (`/einsaetze/:id/auftraege`). */

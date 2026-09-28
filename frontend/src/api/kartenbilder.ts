@@ -11,7 +11,7 @@ export type Ecken = [Ecke, Ecke, Ecke, Ecke];
 /** Rust: `HintergrundbildAnzeige` (Anzeige-DTO ohne BLOB-Bytes). `opazitaet` 0..100. */
 export type Hintergrundbild = components['schemas']['HintergrundbildAnzeige'];
 
-export interface BildPatch {
+interface BildPatch {
   name?: string;
   ecken_json?: string;
   opazitaet?: number;

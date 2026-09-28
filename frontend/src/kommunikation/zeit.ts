@@ -32,11 +32,3 @@ export function formatZeitMitKonvention(
 ): string {
   return formatZeitKonv(utcStr, konventionen);
 }
-
-/** Konvention-bewusste Kurz-Variante. */
-export function formatZeitKurzMitKonvention(
-  utcStr: string | null | undefined,
-  konventionen: AnzeigeKonventionen,
-): string {
-  return formatZeitKurzKonv(utcStr, konventionen);
-}

@@ -6,7 +6,7 @@
  * Autoplay-Policy ggf. erst nach der ersten User-Geste — schlägt das Abspielen fehl, bleibt es
  * still (die visuelle Spur trägt).
  */
-export type AlarmStufe = 'dezent' | 'alarm';
+type AlarmStufe = 'dezent' | 'alarm';
 export type AlarmTonStatus = 'bereit' | 'blockiert';
 
 /** Browser-internes Statussignal für die einsatzweite Alarm-Anzeige. */

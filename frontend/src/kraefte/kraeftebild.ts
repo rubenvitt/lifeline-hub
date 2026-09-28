@@ -42,7 +42,7 @@ export interface MeldebildZeile {
   children?: MeldebildZeile[];
 }
 
-export interface Verdichtung {
+interface Verdichtung {
   staerke: StaerkeSumme;
   soll: StaerkeSumme | null;
   personalStatus: StatusVerteilung;
@@ -53,7 +53,7 @@ export interface Verdichtung {
   anzahlMaterialPositionen: number;
 }
 
-export interface Kraeftebild {
+interface Kraeftebild {
   baum: MeldebildZeile[];
   verdichtung: Verdichtung;
 }
@@ -531,7 +531,7 @@ export function rendereMeldebildMarkdown(bild: Kraeftebild, stand: string): stri
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /** Verdichtung ohne `soll` — der Teil, der sich allein aus den drei Mittel-Listen ergibt. */
-export type Kurzverdichtung = Omit<Verdichtung, 'soll'>;
+type Kurzverdichtung = Omit<Verdichtung, 'soll'>;
 
 /**
  * Kopfzahlen aus den ROHLISTEN, nicht aus dem Baum.

@@ -9,7 +9,7 @@ import { formatFlaeche, formatLaenge, lineLaengeM, polygonFlaecheM2, polygonUmfa
  */
 export type MessForm = 'strecke' | 'flaeche';
 
-export interface MessErgebnis {
+interface MessErgebnis {
   /** Der Messwert, formatiert; „—", solange zu wenige Punkte gesetzt sind. */
   haupt: string;
   /** Zusatz, nur bei der Fläche: der Umfang. */

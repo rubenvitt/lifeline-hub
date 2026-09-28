@@ -3,8 +3,6 @@
  * Module Chat/Erinnerung/Auftrag/Meldung/Nachforderung. Aufträge sind das Vorbild.
  */
 export {
-  PHASE_META,
-  PRIO_META,
   AUFTRAG_STATUS,
   MELDUNG_STATUS,
   NACHFORDERUNG_STATUS,
@@ -12,10 +10,8 @@ export {
   BEFEHL_STATUS,
   LAGEBERICHT_STATUS,
   istAbgeschlossen,
-  PRIO_ORDNUNG,
   prioRang,
 } from './phase';
-export type { KommPhase, KommPrio, StatusDeskriptor } from './phase';
 
 export { formatZeit, formatZeitKurz } from './zeit';
 

@@ -47,11 +47,11 @@ import type { PegelAnzeige, PegelPrognose } from '../api/types';
 import { DEFAULT_KONVENTIONEN, inZone, type AnzeigeKonventionen } from '../anzeige/format';
 
 /** Ab diesem Alter ist eine Messung „veraltet". */
-export const PEGEL_VERALTET_MS = 60 * 60_000;
+const PEGEL_VERALTET_MS = 60 * 60_000;
 
 export const KEIN_PEGEL = 'kein Pegel festgelegt';
 export const PEGEL_STAND_UNBEKANNT = 'Stand unbekannt';
-export const TREND_UNBEKANNT = 'Trend unbekannt';
+const TREND_UNBEKANNT = 'Trend unbekannt';
 export const VERALTET = 'veraltet';
 
 /** Echtes Minuszeichen (U+2212) — der Bindestrich ist kein Rechenzeichen. */
@@ -113,7 +113,7 @@ export function messEpoche(zeitpunkt: string): number {
 
 /** Wire-Zeit der Prognose (UTC ohne Zonenkennung, `YYYY-MM-DD HH:MM:SS`) als Epoche; `NaN`
  *  bei Unlesbarem. Rein. */
-export function prognoseEpoche(zeitpunkt: string): number {
+function prognoseEpoche(zeitpunkt: string): number {
   return Date.parse(`${zeitpunkt.trim().replace(' ', 'T')}Z`);
 }
 
@@ -142,9 +142,9 @@ function prognoseTeil(leit: PegelAnzeige, jetzt: number, konv: AnzeigeKonvention
 }
 
 /** Der Fall, den die Kennzahl zeigt — für Aufrufer, die daran ein Ziel oder einen Ton hängen. */
-export type PegelFall = 'messung' | 'ausfall' | 'keiner';
+type PegelFall = 'messung' | 'ausfall' | 'keiner';
 
-export interface PegelKennzahl {
+interface PegelKennzahl {
   fall: PegelFall;
   wert: string;
   einheit?: string;
@@ -181,7 +181,7 @@ function leitmessung(leit: PegelAnzeige, jetzt: number): Leitmessung | null {
  * Prognose nur solange offen —, aber je Pegel statt nur für den Leitpegel. Die Kennzahl baut
  * auf dieser Ableitung auf, damit die Schwellen an genau einer Stelle stehen.
  */
-export interface PegelZeile {
+interface PegelZeile {
   fall: Exclude<PegelFall, 'keiner'>;
   name: string;
   gewaesser: string | null;

@@ -4,7 +4,7 @@ import type { LageberichtAnzeige } from '../api/types';
 import { vorlage } from './vorlagen';
 
 /** Ebene der Überschrift über dem Berichtstext; Titel und `#` im Text rücken eine darunter. */
-export type BerichtUnterEbene = 1 | 2 | 3 | 4;
+type BerichtUnterEbene = 1 | 2 | 3 | 4;
 
 /**
  * Der Berichtstext eines Lageberichts zum Lesen: je Vorlagen-Abschnitt Titel und Markdown,

@@ -1,9 +1,9 @@
 import { Button, Card, Space, Switch, Typography, theme } from 'antd';
 import { bandStil } from './KartenFuss';
 
-export type ZeichnenPhase = 'zeichnen' | 'bestaetigen';
+type ZeichnenPhase = 'zeichnen' | 'bestaetigen';
 
-export interface ZeichnenSteuerungProps {
+interface ZeichnenSteuerungProps {
   aktiv: boolean;
   /** z. B. "Gefahrengebiet · Fläche" oder "Abschnitt". */
   titel: string;

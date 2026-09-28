@@ -15,7 +15,7 @@
 import { DEFAULT_KONVENTIONEN, type AnzeigeKonventionen } from '../anzeige/format';
 import { PEGEL_STAND_UNBEKANNT, VERALTET, standZeit } from '../pegel/pegelKennzahl';
 
-export type WetterTeilName = 'warnungen' | 'vorhersage';
+type WetterTeilName = 'warnungen' | 'vorhersage';
 
 /** Ab diesem Alter des letzten Abrufs ist ein Teil „veraltet" (Spec „Datenstand"). */
 export const VERALTET_AB_MS: Record<WetterTeilName, number> = {

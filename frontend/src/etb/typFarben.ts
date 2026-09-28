@@ -22,7 +22,7 @@ function alsMillis(zeit: string): number {
 }
 
 /** Schwelle, ab der ereigniszeit als „nachgetragen/gepuffert" gilt. */
-export const NACHTRAG_SCHWELLE_MS = 60_000;
+const NACHTRAG_SCHWELLE_MS = 60_000;
 
 /** Ob ereigniszeit spürbar (>= 60 s) vom Server-Empfang abweicht. Schwelle, damit
  *  normale Live-Latenz nicht jeden Eintrag mit ⧖ markiert (Spec §11). */

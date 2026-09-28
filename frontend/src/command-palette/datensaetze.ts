@@ -71,7 +71,7 @@ import type {
  */
 
 /** Sortenbuchstabe einer gedruckten Kennung: R-042 ist eine Person, S-042 ein Schaden. */
-export type Nummernsorte = 'person' | 'schaden';
+type Nummernsorte = 'person' | 'schaden';
 
 export interface DatensatzQuellen {
   personen?: Person[];

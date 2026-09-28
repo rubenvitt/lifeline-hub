@@ -59,7 +59,7 @@
  * {@link normalisierePatch}, und gepinnt ist sie in `patchTriState.test.ts` gegen die
  * SERIALISIERTE Form — der einzigen Ebene, auf der der Unterschied sichtbar wird.
  */
-export type PatchWire<T> = { [K in keyof T]?: Exclude<T[K], undefined> | null };
+type PatchWire<T> = { [K in keyof T]?: Exclude<T[K], undefined> | null };
 
 /**
  * Feld-Helfer: EIN einzelner Formular-String → Wire-Wert. Trimmt, und macht aus einem leeren

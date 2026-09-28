@@ -58,7 +58,7 @@ function BezugLink({ e, einsatzId }: { e: Erinnerung; einsatzId: string | undefi
   );
 }
 
-export interface ErinnerungKarteProps {
+interface ErinnerungKarteProps {
   erinnerung: Erinnerung;
   /** Steuert die Abschluss-Spalten (Erledigt/Quittiert-Zeitpunkt) in der Abgeschlossen-Ansicht. */
   ansicht?: 'offen' | 'abgeschlossen';

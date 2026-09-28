@@ -52,9 +52,9 @@ const ZEIGER_GROB = '(pointer: coarse)';
 export type AbBreitePunkt = Exclude<Breakpoint, 'xs'>;
 
 /** Die von antd gelieferte Screens-Karte; auf dem ersten Render leer. */
-export type ScreensKarte = Partial<Record<Breakpoint, boolean>>;
+type ScreensKarte = Partial<Record<Breakpoint, boolean>>;
 
-export interface ViewportZustand {
+interface ViewportZustand {
   /**
    * Rohe antd-Karte, unverändert durchgereicht. Achtung: `screens.xs` ist eine
    * `max-width`-Aussage und damit nicht wie die übrigen Stufen zu lesen.

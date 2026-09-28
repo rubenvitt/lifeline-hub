@@ -214,7 +214,7 @@ export function Uhr() {
  * erwartet" — auf der Einsatzliste läuft kein SSE-Strom, ein dauerhaftes „verbinde …" dort
  * wäre eine Falschmeldung.
  */
-export type SyncZustand =
+type SyncZustand =
   'verbunden' | 'verbinde' | 'getrennt' | 'offline' | 'ausstehend' | 'abgelehnt' | 'ruhe';
 
 /**

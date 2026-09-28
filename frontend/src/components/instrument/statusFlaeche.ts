@@ -37,7 +37,7 @@ import type { Farbrollen } from '../../theme/tokens';
  */
 export type StatusTon = 'normal' | 'achtung' | 'alarm' | 'bedien' | 'neutral';
 
-export interface StatusFlaecheWerte {
+interface StatusFlaecheWerte {
   grund: string;
   text: string;
   kante: string;

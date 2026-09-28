@@ -93,7 +93,7 @@ export function clusterTypProperties(): Record<string, unknown> {
   return props;
 }
 
-export interface DonutSegment {
+interface DonutSegment {
   typ: ClusterTyp;
   /** Nur an Personen-Segmenten: die Kategorie, deren Farbe das Segment trägt. */
   sichtung?: Sichtungskategorie | 'ohne';
@@ -127,7 +127,7 @@ export function dringlichsteSichtung(
 }
 
 /** Wortlaut für Tooltip und zugänglichen Namen eines Personen-Clusters. */
-export function personenClusterText(gesamt: number, k: Sichtungskategorie | 'ohne'): string {
+function personenClusterText(gesamt: number, k: Sichtungskategorie | 'ohne'): string {
   const wer = gesamt === 1 ? '1 Person' : `${gesamt} Personen`;
   if (k === 'ohne') return `${wer}, noch nicht gesichtet`;
   return `${wer}, dringlichste Sichtung: ${sichtung[k].label}`;

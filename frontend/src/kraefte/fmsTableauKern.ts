@@ -33,13 +33,13 @@ export const OHNE_EINHEIT_TITEL = 'ohne Einheit';
 /** Titel der einen Gruppe, wenn die Einheiten nicht abrufbar sind (Modul `einheiten` gesperrt). */
 export const UNGEGLIEDERT_TITEL = 'Alle Fahrzeuge';
 
-export interface FmsKachel {
+interface FmsKachel {
   ef: EinsatzFahrzeug;
   /** Name der Einheit, `null` ohne (bekannte) Einheit. */
   einheit: string | null;
 }
 
-export interface FmsGruppe {
+interface FmsGruppe {
   schluessel: string;
   titel: string;
   kacheln: FmsKachel[];
@@ -127,7 +127,7 @@ export function fmsStatusOptionen(katalog: readonly FahrzeugStatus[]): StatusOpt
 }
 
 /** Was eine Ziffer auslöst. Eine Ziffer ohne Eintrag ist keinem Status zugeordnet. */
-export type ZifferZiel =
+type ZifferZiel =
   { art: 'eindeutig'; status: FahrzeugStatus } | { art: 'mehrdeutig'; anzahl: number };
 
 /**

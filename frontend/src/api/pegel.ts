@@ -26,7 +26,7 @@ export const PEGEL_MAX = 5;
  */
 export const PEGEL_ABRUF_MS = 5 * 60_000;
 
-export function listePegel(einsatzId: number): Promise<PegelAnzeige[]> {
+function listePegel(einsatzId: number): Promise<PegelAnzeige[]> {
   return apiGet<PegelAnzeige[]>(`/api/einsaetze/${einsatzId}/pegel`);
 }
 
@@ -179,7 +179,7 @@ export function pegelSchreibScope(einsatzId: number) {
  * Stand kommt mit leerer Reihe. Eigene Route statt Feld in der Liste: die Liste lesen auch
  * Dashboard und Überblick alle 5 min, die Reihe braucht nur die Modulseite.
  */
-export function ladeVerlauf(einsatzId: number): Promise<PegelVerlauf[]> {
+function ladeVerlauf(einsatzId: number): Promise<PegelVerlauf[]> {
   return apiGet<PegelVerlauf[]>(`/api/einsaetze/${einsatzId}/pegel/verlauf`);
 }
 

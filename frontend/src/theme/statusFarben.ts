@@ -190,7 +190,7 @@ export function bezugsDarstellung(label: string): StatusDarstellung {
   return { label, rolle: 'bedien' };
 }
 
-export interface SichtungsDarstellung {
+interface SichtungsDarstellung {
   label: string;
   farbe: keyof typeof sichtungsfarben | null;
 }
@@ -613,7 +613,7 @@ export const dwdWarnstufe: Record<WetterWarnstufe, StatusDarstellung> = {
  * Form je Stufe, und eine vierte Stufe bräuchte ein viertes Formzeichen, das es nicht gibt.
  * Die Verengung ist damit das Ehrlichere, nicht das Bequemere.
  */
-export type Dringlichkeit = Extract<Statusrolle, 'alarm' | 'achtung' | 'normal'>;
+type Dringlichkeit = Extract<Statusrolle, 'alarm' | 'achtung' | 'normal'>;
 
 /**
  * Der ZWEITE KANAL des Dringlichkeitsmarkers (LFH-395, WCAG 1.4.1).
@@ -696,7 +696,7 @@ function istDunklerModus(token: GlobalToken): boolean {
 
 /** Eine Flächen-Füllungsrolle. Bewusst enger als `keyof Farbrollen`: `markeGlut` ist
  *  ein Schatten, keine Fläche, und `text` schon gar nicht. */
-export type Fuellungsrolle =
+type Fuellungsrolle =
   | 'achtungFuellung'
   | 'achtungFuellungStark'
   | 'alarmFuellung'
@@ -711,7 +711,7 @@ export type Fuellungsrolle =
  * Etikett-Maps verwässert und `rollenFarbe` einen Fall gegeben, den es nicht
  * bedienen kann (`antdToken()` bildet die Füllungsrollen nicht ab).
  */
-export interface Flaechendarstellung {
+interface Flaechendarstellung {
   /** `null` = keine Fläche. Kein `'transparent'` als Rollenname — das ist ein Wert. */
   fuellung: Fuellungsrolle | null;
   /** Pflicht, zweiter Kanal (WCAG 1.4.1). */

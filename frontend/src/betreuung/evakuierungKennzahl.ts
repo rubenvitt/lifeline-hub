@@ -37,7 +37,7 @@ import type { Evakuierungsbezirk } from '../api/types';
 
 /** Was die Kennzahl von einem Bezirk liest — schmal, damit Zähler und Tests nicht mehr
  *  bauen müssen als nötig. */
-export type KennzahlBezirk = Pick<
+type KennzahlBezirk = Pick<
   Evakuierungsbezirk,
   'raeumung' | 'storniert_at' | 'plan_personen' | 'plan_erhebung' | 'stand'
 >;

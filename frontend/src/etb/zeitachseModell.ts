@@ -19,11 +19,11 @@ type EtbTypZaehler = EtbZaehler['je_typ'];
 // ── Stundengruppen ──────────────────────────────────────────────────────────────────
 
 /** Die Zeit, nach der eine Zeile einsortiert wird: Ereigniszeit bzw. lokale Erfassungszeit. */
-export function zeilenZeit(z: EtbZeile): string {
+function zeilenZeit(z: EtbZeile): string {
   return z.art === 'eintrag' ? z.eintrag.ereigniszeit : z.puffer.erstellt_at;
 }
 
-export interface Stundengruppe {
+interface Stundengruppe {
   /** `YYYY-MM-DD HH` in der Anzeigezone. */
   schluessel: string;
   /** „23.05. · 14 Uhr". */
@@ -71,12 +71,12 @@ export function gruppiereNachStunde(
 
 // ── Berichtigungsverknüpfung ────────────────────────────────────────────────────────
 
-export interface Verweis {
+interface Verweis {
   id: number;
   lfd_nr: number;
 }
 
-export interface Berichtigungsindex {
+interface Berichtigungsindex {
   /** Berichtigung → ihr Grundeintrag (lfd_nr nur, wenn der Grundeintrag geladen ist). */
   grundeintrag: (e: EtbEintragAnzeige) => { id: number; lfd_nr: number | null } | null;
   /** Grundeintrag → die Berichtigung(en), die ihn korrigieren (nur geladene). */
@@ -122,7 +122,7 @@ export function letzteBerichtigungen(
 // ── Bilanz ──────────────────────────────────────────────────────────────────────────
 
 /** Die Reihenfolge der Bilanz — wie die Typ-Segmente, System nur bei Bedarf (s. u.). */
-export const BILANZ_TYPEN: readonly EtbTyp[] = [
+const BILANZ_TYPEN: readonly EtbTyp[] = [
   'meldung',
   'anordnung',
   'entscheidung',
@@ -130,7 +130,7 @@ export const BILANZ_TYPEN: readonly EtbTyp[] = [
   'berichtigung',
 ];
 
-export interface BilanzZeile {
+interface BilanzZeile {
   typ: EtbTyp;
   anzahl: number;
 }

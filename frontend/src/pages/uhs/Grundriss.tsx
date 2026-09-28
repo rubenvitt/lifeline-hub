@@ -126,7 +126,7 @@ const AKTIONEN_MAX = 4;
  * Vitest die Knopfzeile erwartet, rendert im App-Theme `kompakt`
  * (`antdToken(farbenDunkel, 'kompakt')`, Muster in `Grundriss.test.tsx`).
  */
-export type PlatzBedienform = { form: 'zeile'; abstand: number } | { form: 'karte' };
+type PlatzBedienform = { form: 'zeile'; abstand: number } | { form: 'karte' };
 export function platzBedienform(token: {
   controlHeightSM: number;
   marginSM: number;
@@ -142,7 +142,7 @@ export function platzBedienform(token: {
  * gibt es in keiner Form ein Menü (die Zeile rendert es nicht, die Karte öffnet dann direkt
  * die Person oder ist gar kein Ziel).
  */
-export interface PlatzMenueLage {
+interface PlatzMenueLage {
   form: PlatzBedienform['form'];
   belegt: boolean;
   /** Unbelegt, mit Schreibrecht, nicht im Bearbeiten-Modus — die Bedingung des Wurzelklicks. */

@@ -494,7 +494,7 @@ export function modulAusPfad(
  * Module, die nicht ausgeblendet werden dürfen (Spiegel des Backends
  * `src/einsatz/modul.rs::NICHT_AUSBLENDBAR`): Stammdaten + Einstellungen selbst.
  */
-export const NICHT_AUSBLENDBARE_MODULE = ['einsatzdaten', 'einsatz-einstellungen'] as const;
+const NICHT_AUSBLENDBARE_MODULE = ['einsatzdaten', 'einsatz-einstellungen'] as const;
 
 /** Ob ein Modul ausgeblendet werden darf (alle außer den nicht-ausblendbaren). */
 export function istModulAusblendbar(key: string): boolean {

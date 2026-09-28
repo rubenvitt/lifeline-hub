@@ -16,7 +16,6 @@ type S = components['schemas'];
 
 // ============================== Auth ==============================
 export type AuthProvider = S['AuthProviderAnzeige'];
-export type AuthProviderTyp = S['AuthProviderTyp'];
 // LFH-43 (Increment 5): TOTP-Enroll-DTOs (`/api/auth/totp/enroll/start|finish`).
 export type TotpEnrollStart = S['TotpEnrollStart'];
 export type TotpEnrollFinish = S['TotpEnrollFinish'];
@@ -64,8 +63,6 @@ export interface FachebenenSichtbar {
 /** Stand der Demo-Daten der eigenen Organisation — die eine Antwort aller vier Endpunkte.
  *  `import` fehlt ohne aktiven Import, `bericht` fehlt, solange nie importiert wurde. */
 export type DemoDatenStatus = S['DemoDatenStatus'];
-export type DemoImportKopf = S['DemoImportKopf'];
-export type DemoBericht = S['DemoBericht'];
 export type DemoBerichtZeile = S['DemoBerichtZeile'];
 export type DemoStammdatenArt = S['DemoStammdatenArt'];
 export type DemoVorgang = S['DemoVorgang'];
@@ -162,7 +159,6 @@ export type EtbAnzahl = S['EtbAnzahlAnzeige'];
 export type LiveEvent = S['LiveEvent'];
 
 // ============================== Fahrzeuge / Material / Personal ==============================
-export type Dienststatus = S['Dienststatus'];
 export type StatusKategorie = S['StatusKategorie'];
 export type Staerke = S['Staerke'];
 export type Fahrzeug = S['FahrzeugAnzeige'];
@@ -172,9 +168,7 @@ export type EinsatzFahrzeug = S['EinsatzFahrzeugAnzeige'];
 export type MaterialStatus = S['MaterialStatus'];
 export type Material = S['MaterialAnzeige'];
 export type EinsatzMaterial = S['EinsatzMaterialAnzeige'];
-export type EinheitMitgliedMaterial = S['EinheitMitgliedMaterial'];
 export type StaerkePosition = S['StaerkePosition'];
-export type QualifikationRef = S['QualifikationRef'];
 export type Personal = S['PersonalAnzeige'];
 export type PersonalVorschlaege = S['PersonalVorschlaege'];
 export type Qualifikation = S['Qualifikation'];
@@ -198,24 +192,18 @@ export interface SprechgruppeEingabe {
 // ============================== Struktur (Abschnitte / Einheiten) ==============================
 export type Einsatzabschnitt = S['EinsatzabschnittAnzeige'];
 export type AbschnittLagezustand = S['AbschnittLagezustand'];
-export type EinheitMitgliedPerson = S['EinheitMitgliedPerson'];
-export type EinheitMitgliedFahrzeug = S['EinheitMitgliedFahrzeug'];
 export type Einheit = S['EinheitAnzeige'];
 export type EinheitStatus = S['EinheitStatus'];
-export type EinheitStatusQuelle = S['EinheitStatusQuelle'];
 export type StatusWert = S['StatusWert'];
 export type FuehrungskraftKarte = S['FuehrungskraftKarte'];
 export type OrganisationInfo = S['OrganisationAnzeige'];
-export type OrgLogo = S['OrgLogoAnzeige'];
 
 // ============================== E‑2 Personen ==============================
 export type PersonStatus = S['PersonStatus'];
-export type Geschlecht = S['Geschlecht'];
 export type Person = S['PersonAnzeige'];
 export type Sichtungskategorie = S['Sichtungskategorie'];
 export type VerbleibArt = S['VerbleibArt'];
 export type VerbleibStatus = S['VerbleibStatus'];
-export type AbgleichStatus = S['AbgleichStatus'];
 export type Sichtung = S['SichtungAnzeige'];
 export type Verlaufsnotiz = S['NotizAnzeige'];
 export type Verbleib = S['VerbleibAnzeige'];
@@ -262,7 +250,6 @@ export type SchadenAnhang = S['SchadenAnhangAnzeige'];
 // ============================== E‑4 Tiere ==============================
 export type TierStatus = S['TierStatus'];
 export type Spezies = S['Spezies'];
-export type TierGeschlecht = S['TierGeschlecht'];
 export type AbschlussGrund = S['AbschlussGrund'];
 export type Tier = S['TierAnzeige'];
 
@@ -353,29 +340,21 @@ export type LageberichtAnzeige = S['LageberichtAnzeige'];
 
 // ============================== LFH-64 Befehlsgebung ==============================
 export type BefehlVorlageKey = S['BefehlVorlage'];
-export type BefehlStatus = S['BefehlStatus'];
 export type BefehlAbschnitt = S['BefehlAbschnitt'];
 export type BefehlAnzeige = S['BefehlAnzeige'];
 
 // ============================== LFH-606 Pegel-Kennzahl ==============================
 export type PegelAnzeige = S['PegelAnzeige'];
-export type PegelMessung = S['PegelMessung'];
 export type PegelPrognose = S['PegelPrognose'];
 export type PegelVorhersage = S['PegelVorhersage'];
 export type PegelVorhersageAntwort = S['PegelVorhersageAntwort'];
 
 // ============================== LFH-633 Wetter & Pegel ==============================
 export type PegelVerlauf = S['PegelVerlauf'];
-export type PegelVerlaufPunkt = S['PegelVerlaufPunkt'];
 export type WetterAnzeige = S['WetterAnzeige'];
 export type WetterOrt = S['WetterOrt'];
-export type WetterWarnungen = S['WetterWarnungen'];
 export type WetterWarnung = S['WetterWarnung'];
 export type WetterWarnstufe = S['WetterWarnstufe'];
-export type WetterVorhersageTeil = S['WetterVorhersageTeil'];
-export type WetterVorhersage = S['WetterVorhersage'];
-export type WetterStunde = S['WetterStunde'];
-export type WetterTeilZustand = S['WetterTeilZustand'];
 
 // ============================== LFH-632 Dokumentenablage ==============================
 export type Dokument = S['DokumentAnzeige'];
@@ -414,11 +393,9 @@ export interface LagebesprechungAbschlussBody {
 
 // ============================== LFH-635 Ablösung ==============================
 export type Abloesung = S['AbloesungAnzeige'];
-export type AbloesungStatus = S['AbloesungStatus'];
 export type AbloesungVollzug = S['AbloesungVollzugAnzeige'];
 export type AbloesungVorgabe = S['AbloesungVorgabeAnzeige'];
 export type AbloesungEinstufung = S['Einstufung'];
-export type RhythmusQuelle = S['RhythmusQuelle'];
 
 /**
  * LFH-120: kein Backend-Schema — Eingabe-Body von `POST …/abloesungen`, FE-lokal.
@@ -455,13 +432,10 @@ export type Raeumungszustand = S['Raeumungszustand'];
 export type BetreuungsstelleArt = S['BetreuungsstelleArt'];
 export type BetreuungsstelleStatus = S['BetreuungsstelleStatus'];
 export type Evakuierungsbezirk = S['EvakuierungsbezirkAnzeige'];
-export type Evakuierungsstand = S['EvakuierungsstandAnzeige'];
 export type Betreuungsstelle = S['BetreuungsstelleAnzeige'];
-export type Belegungsmeldung = S['BelegungsmeldungAnzeige'];
 export type BetreuungUebersicht = S['BetreuungUebersicht'];
 export type StelleNamentlich = S['StelleNamentlich'];
 export type BelegungKopfzahl = S['BelegungKopfzahl'];
-export type BelegungKopfzahlStelle = S['BelegungKopfzahlStelle'];
 /** Antwort auf Melden/Zurücknehmen eines Stands: `meldung_id` ist die GEMELDETE bzw.
  *  zurückgenommene Meldung — `bezirk.stand` ist die aktuelle und bei einer Nachtragung
  *  eine andere. Ein Rückgängig nimmt deshalb `meldung_id`, nie `bezirk.stand.id`. */
@@ -572,9 +546,6 @@ export type VerpflegungAusgabe = S['AusgabeAnzeige'];
 /** Antwort auf Erfassen/Zurücknehmen: `ausgabe_id` ist die betroffene Ausgabe — ein
  *  Rückgängig nimmt diese Kennung, `zeitfenster` trägt die nachgerechnete Deckung. */
 export type VerpflegungAusgabeErgebnis = S['AusgabeErgebnis'];
-export type VerpflegungBedarf = S['Bedarf'];
-/** Gesamt plus je Kostform — Form von `ausgegeben` und `fehlmenge`. */
-export type Portionen = S['Portionen'];
 /** Die fünf festen Kostformen als Teilmenge (design.md D1). */
 export type Sonderkost = S['Sonderkost'];
 export type Kostform = keyof Sonderkost;
@@ -640,7 +611,6 @@ export interface NeueErinnerung {
 
 // ============================== LFH-52 Aufträge/Befehle ==============================
 export type AuftragPrioritaet = S['Prioritaet'];
-export type AuftragBearbeitungsstatus = S['AuftragBearbeitungsstatus'];
 export type EmpfaengerTyp = S['EmpfaengerTyp'];
 export type Richtung = S['Richtung'];
 export type AuftragEmpfaenger = S['AuftragEmpfaengerAnzeige'];
@@ -738,7 +708,6 @@ export type AufbewahrungZustand = S['AufbewahrungZustand'];
 export type AufbewahrungEintrag = S['AufbewahrungEintragAnzeige'];
 /** Pseudonyme Archivakte: Kopf, Zustand, Register — nur Retain-Spalten. */
 export type ArchivAkte = S['ArchivAkteAnzeige'];
-export type ArchivKopf = S['ArchivKopfAnzeige'];
 export type ArchivPerson = S['ArchivPersonAnzeige'];
 export type ArchivTier = S['ArchivTierAnzeige'];
 export type ArchivSchaden = S['ArchivSchadenAnzeige'];

@@ -12,7 +12,7 @@ import { abloesungZeit, einstufungVon, rhythmusText } from './einstufung';
 
 const { Text } = Typography;
 
-export interface AbloesungKarteProps {
+interface AbloesungKarteProps {
   schicht: Abloesung;
   jetzt: Dayjs;
   darfSchreiben: boolean;
@@ -23,7 +23,7 @@ export interface AbloesungKarteProps {
 }
 
 /** „in 23 min" · „seit 12 min überfällig" — das Wort neben der Uhrzeit. */
-export function abstandText(faelligAt: string, jetzt: Dayjs): string {
+function abstandText(faelligAt: string, jetzt: Dayjs): string {
   const f = abloesungZeit(faelligAt);
   if (!f) return '';
   const minuten = Math.floor((f.valueOf() - jetzt.valueOf()) / 60_000);

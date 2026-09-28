@@ -10,7 +10,7 @@ import { entwurfLabel, zuWerte } from './entwurfModell';
 import { useEtbEntwuerfe } from './useEtbEntwuerfe';
 import { useEntwurfsDateien, type EntwurfsDateien } from './useEntwurfsDateien';
 
-export interface EtbEntwurfsTabsProps {
+interface EtbEntwurfsTabsProps {
   einsatzId: number;
   erfassen: (e: NeuerEintrag) => Promise<void>;
   bausteine: EtbBaustein[];

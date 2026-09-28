@@ -3,7 +3,7 @@
 
 import type { MarkerProps, MarkerFeature, MarkerFeatureCollection } from './markerLayer';
 
-export interface SpiderOffset {
+interface SpiderOffset {
   x: number;
   y: number;
 }
@@ -52,7 +52,7 @@ export interface SpiderProjektor {
   unproject(px: { x: number; y: number }): { lng: number; lat: number };
 }
 
-export type SpiderLegFeatureCollection = {
+type SpiderLegFeatureCollection = {
   type: 'FeatureCollection';
   features: Array<{
     type: 'Feature';
@@ -61,7 +61,7 @@ export type SpiderLegFeatureCollection = {
   }>;
 };
 
-export interface SpiderFcs {
+interface SpiderFcs {
   leaves: MarkerFeatureCollection;
   legs: SpiderLegFeatureCollection;
 }

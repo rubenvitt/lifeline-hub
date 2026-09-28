@@ -36,7 +36,7 @@ export function ladePersonalVorschlaege(): Promise<PersonalVorschlaege> {
 }
 
 /** Anlegen: nur `name` ist Pflicht (`PersonalBody`, alles Weitere `Option<T>`). */
-export type PersonalNeu = { name: string } & Partial<Omit<PersonalEingabe, 'name'>>;
+type PersonalNeu = { name: string } & Partial<Omit<PersonalEingabe, 'name'>>;
 
 /**
  * PATCH ist ein ECHTER Teil-Patch (LFH-306) — Begruendung wortgleich bei `FahrzeugPatch`:
@@ -46,7 +46,7 @@ export type PersonalNeu = { name: string } & Partial<Omit<PersonalEingabe, 'name
  * `qualifikation_ids` ist dabei der gefaehrlichste Key: `Some([])` LEERT die Zuordnung
  * vollstaendig (`src/routes/personal.rs:86`), absent laesst sie stehen.
  */
-export type PersonalPatch = Partial<PersonalEingabe>;
+type PersonalPatch = Partial<PersonalEingabe>;
 
 export function legePersonAn(daten: PersonalNeu): Promise<Personal> {
   return apiSend<Personal>('/api/personal', 'POST', daten);

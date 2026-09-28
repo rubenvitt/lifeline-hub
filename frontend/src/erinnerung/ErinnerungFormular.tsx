@@ -7,7 +7,7 @@ import type { NeueErinnerung } from '../api/types';
 const { TextArea } = Input;
 
 /// Lokale Picker-Zeit → UTC-Wireformat 'YYYY-MM-DD HH:mm:ss' (rein, testbar).
-export function dayjsZuWire(d: Dayjs): string {
+function dayjsZuWire(d: Dayjs): string {
   return d.utc().format('YYYY-MM-DD HH:mm:ss');
 }
 

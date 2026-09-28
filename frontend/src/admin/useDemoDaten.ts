@@ -23,7 +23,7 @@ import { istAdmin } from '../einsatz/schreibrecht';
  * (`apiResponseTypen.guard.test.ts`) verlangt dort für jeden exportierten Objekt-Typ ein
  * generiertes Gegenstück, und {@link DemoDatenStand} ist eine reine Oberflächenform.
  */
-export interface DemoDatenStand {
+interface DemoDatenStand {
   /** Status 200 für einen System-Admin. Nur dann gibt es Menüeintrag, Sektion und Hinweis. */
   freigeschaltet: boolean;
   /** Status 404: nicht freigeschaltet. Die Route leitet weg; das ist KEIN Fehler. */

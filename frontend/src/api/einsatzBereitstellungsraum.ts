@@ -59,7 +59,7 @@ export function storniereBr(einsatzId: number, brId: number): Promise<void> {
   return apiSend<void>(`/api/einsaetze/${einsatzId}/bereitstellungsraeume/${brId}`, 'DELETE');
 }
 
-export interface BrBelegungEingabe {
+interface BrBelegungEingabe {
   objekt_typ: ObjektTyp;
   objekt_id: number;
   art: BrBelegungsArt;

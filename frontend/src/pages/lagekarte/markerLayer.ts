@@ -141,7 +141,7 @@ export const PERSONEN_CLUSTER_KLICK_LAYER = [
   'personen-cluster-kreis',
   'personen-cluster-zahl',
 ] as const;
-export type ClusterQuelle = (typeof CLUSTER_QUELLEN)[number];
+type ClusterQuelle = (typeof CLUSTER_QUELLEN)[number];
 /**
  * Schlüssel eines Clusters über alle Quellen: `cluster_id` ist nur JE Quelle eindeutig. Ohne
  * Präfix überschrieben sich zwei Donuts mit derselben id im DOM-Sync gegenseitig.
@@ -150,7 +150,7 @@ export function clusterSchluessel(quelle: ClusterQuelle, clusterId: number | str
   return `${quelle}:${clusterId}`;
 }
 /** Die unsichtbaren Trefferzonen (LFH-650/LFH-711) — Klickziel, aber keine Zeichnung. */
-export function istTrefferzone(layerId: string): boolean {
+function istTrefferzone(layerId: string): boolean {
   return layerId.endsWith('-treffer');
 }
 /**

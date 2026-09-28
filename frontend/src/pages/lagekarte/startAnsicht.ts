@@ -25,7 +25,7 @@ export type StartAnsicht =
 /** Zoom auf einen einzelnen Bezugspunkt: Ortsteil-Maßstab, Straßen und Gebäude lesbar. */
 export const PUNKT_ZOOM = 14;
 
-export interface AnsichtZentrum {
+interface AnsichtZentrum {
   zentrum_lat?: number | null;
   zentrum_lon?: number | null;
   zoom?: number | null;

@@ -396,7 +396,7 @@ export function auswahlRaster(
   }
 }
 
-export interface LetzteMeldungBlock {
+interface LetzteMeldungBlock {
   /** Wortlaut der Meldung. */
   text: string;
   /** Mono-Zeile „14:11 · Funk" — Zeit nach Anzeigekonvention · Meldeweg. */

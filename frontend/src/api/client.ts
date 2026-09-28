@@ -1,6 +1,6 @@
 /** Fehler einer API-Antwort mit Nicht-2xx-Status. Trägt den Statuscode und die
  *  Server-Meldung aus dem `{ error }`-Format. */
-export type HttpMethode = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+type HttpMethode = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 /** Zusätzliche Metadaten für einen schreibenden API-Aufruf.
  *
