@@ -3,10 +3,9 @@ import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes, useLocation, useNavigate } from 'react-router';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { setzeViewportBreite } from '../test/viewport';
 import { renderMitProviders } from '../test/utils';
-import { AuthProvider } from '../auth/AuthContext';
 import { einsatzKeys } from '../api/queryKeys';
 import type { EinsatzAnzeige, Person } from '../api/types';
 import PersonenPage from './PersonenPage';
@@ -26,7 +25,7 @@ import {
 } from '../offline/ereignisse';
 import { useOfflineSync } from '../offline/useOfflineSync';
 import type { KartenflaecheProps } from './lagekarte/Kartenflaeche';
-import { einsatzFixture } from '../test/fixtures';
+import { benutzerFixture, einsatzFixture } from '../test/fixtures';
 
 /**
  * Die echte Karte braucht WebGL (MapLibre), jsdom hat keins — Stub nach dem Muster von
@@ -108,15 +107,7 @@ afterEach(() => {
 
 // Normaler Benutzer (kein System-Admin): so prüfen die Rollen-Tests die EINSATZ-Rolle,
 // nicht den admin-globalen Zweig (LFH-234). Admin-global ist in schreibrecht.test.ts abgedeckt.
-const nutzer = {
-  id: 1,
-  anzeigename: 'Nutzer',
-  benutzername: 'nutzer',
-  system_rolle: 'keiner',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-05-27 10:00:00',
-};
+const nutzer = benutzerFixture();
 const einsatzAktiv = einsatzFixture();
 const einsatzBeobachter = einsatzFixture({ meine_rolle: 'beobachter' });
 
@@ -174,19 +165,17 @@ function render(
   route = '/einsaetze/1/personen',
 ) {
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+    meHandler(nutzer),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
     http.get('/api/einsaetze/1/personen', () => HttpResponse.json(personen)),
     http.get('/api/einsaetze/1/tiere', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
   );
   return renderMitProviders(
-    <AuthProvider>
-      <Routes>
-        <Route path="/einsaetze/:id/personen" element={<PersonenPage />} />
-        <Route path="/einsaetze/:id/personen/:personId" element={<PersonenDetailPage />} />
-      </Routes>
-    </AuthProvider>,
+    <Routes>
+      <Route path="/einsaetze/:id/personen" element={<PersonenPage />} />
+      <Route path="/einsaetze/:id/personen/:personId" element={<PersonenDetailPage />} />
+    </Routes>,
     { route },
   );
 }
@@ -203,19 +192,17 @@ function EinsatzNavigation() {
 
 function renderMitEinsatzNavigation(route = '/einsaetze/1/personen') {
   return renderMitProviders(
-    <AuthProvider>
-      <Routes>
-        <Route
-          path="/einsaetze/:id/personen"
-          element={
-            <>
-              <EinsatzNavigation />
-              <PersonenPage />
-            </>
-          }
-        />
-      </Routes>
-    </AuthProvider>,
+    <Routes>
+      <Route
+        path="/einsaetze/:id/personen"
+        element={
+          <>
+            <EinsatzNavigation />
+            <PersonenPage />
+          </>
+        }
+      />
+    </Routes>,
     { route },
   );
 }
@@ -439,7 +426,7 @@ describe('PersonenPage', () => {
     });
     let abrufe = 0;
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+      meHandler(nutzer),
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
       http.get('/api/einsaetze/1/personen', async () => {
         abrufe += 1;
@@ -455,11 +442,9 @@ describe('PersonenPage', () => {
       http.post('/api/einsaetze/1/personen', () => HttpResponse.json(neu, { status: 201 })),
     );
     const { client } = renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route path="/einsaetze/:id/personen" element={<PersonenPage />} />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route path="/einsaetze/:id/personen" element={<PersonenPage />} />
+      </Routes>,
       { route: '/einsaetze/1/personen' },
     );
 
@@ -513,7 +498,7 @@ describe('PersonenPage', () => {
       antwortFreigeben = resolve;
     });
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+      meHandler(nutzer),
       http.get('/api/einsaetze/:einsatzId', ({ params }) => {
         const id = Number(params.einsatzId);
         return HttpResponse.json({ ...einsatzAktiv, id, bezeichnung: `Einsatz ${id}` });
@@ -801,7 +786,7 @@ describe('PersonenPage', () => {
       vorname: null,
     };
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+      meHandler(nutzer),
       http.get('/api/einsaetze/:einsatzId', ({ params }) => {
         const id = Number(params.einsatzId);
         return HttpResponse.json({ ...einsatzAktiv, id, bezeichnung: `Einsatz ${id}` });
@@ -1183,16 +1168,14 @@ describe('PersonenPage', () => {
    */
   it('zeigt bei gescheitertem Abruf den Fehler und NICHT die Leertexte', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+      meHandler(nutzer),
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
       http.get('/api/einsaetze/1/personen', () => new HttpResponse(null, { status: 500 })),
     );
     renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route path="/einsaetze/:id/personen" element={<PersonenPage />} />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route path="/einsaetze/:id/personen" element={<PersonenPage />} />
+      </Routes>,
       { route: '/einsaetze/1/personen' },
     );
 
@@ -1506,26 +1489,24 @@ describe('PersonenPage — Sichtvorgabe aus der URL (LFH-620)', () => {
 
   function renderMitSuche(route: string) {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+      meHandler(nutzer),
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
       http.get('/api/einsaetze/1/personen', () => HttpResponse.json([person, unbekannt])),
       http.get('/api/einsaetze/1/tiere', () => HttpResponse.json([])),
       http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
     );
     return renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route
-            path="/einsaetze/:id/personen"
-            element={
-              <>
-                <Suche />
-                <PersonenPage />
-              </>
-            }
-          />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route
+          path="/einsaetze/:id/personen"
+          element={
+            <>
+              <Suche />
+              <PersonenPage />
+            </>
+          }
+        />
+      </Routes>,
       { route },
     );
   }
@@ -1585,7 +1566,7 @@ describe('PersonenPage — Kartenansicht (LFH-613)', () => {
 
   function renderKarte(personen: unknown[], einsatzObj: EinsatzAnzeige = einsatzAktiv) {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+      meHandler(nutzer),
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
       http.get('/api/einsaetze/1/personen', () => HttpResponse.json(personen)),
       http.get('/api/einsaetze/1/tiere', () => HttpResponse.json([])),
@@ -1594,13 +1575,13 @@ describe('PersonenPage — Kartenansicht (LFH-613)', () => {
       http.get('/api/einsaetze/1/karten-ansichten', () => HttpResponse.json([])),
     );
     return renderMitProviders(
-      <AuthProvider>
+      <>
         <Ort />
         <Routes>
           <Route path="/einsaetze/:id/personen" element={<PersonenPage />} />
           <Route path="/einsaetze/:id/personen/:personId" element={<p>Detailseite</p>} />
         </Routes>
-      </AuthProvider>,
+      </>,
       { route: '/einsaetze/1/personen' },
     );
   }

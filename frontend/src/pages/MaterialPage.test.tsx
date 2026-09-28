@@ -3,23 +3,14 @@ import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
-import { AuthProvider } from '../auth/AuthContext';
 import MaterialPage from './MaterialPage';
 import { einsatzKeys } from '../api/queryKeys';
-import { einsatzFixture } from '../test/fixtures';
+import { adminFixture, einsatzFixture } from '../test/fixtures';
 
-const admin = {
-  id: 1,
-  anzeigename: 'Admin',
-  benutzername: 'admin',
-  system_rolle: 'admin',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-05-27 10:00:00',
-};
+const admin = adminFixture();
 
 const einsatzAktiv = einsatzFixture();
 
@@ -42,7 +33,7 @@ const em = {
 
 function render(einsatzObj: typeof einsatzAktiv, materialListe: (typeof em)[]) {
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(admin)),
+    meHandler(admin),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
     http.get('/api/einsaetze/1/material', () => HttpResponse.json(materialListe)),
     http.get('/api/material', () => HttpResponse.json([])),
@@ -54,11 +45,9 @@ function render(einsatzObj: typeof einsatzAktiv, materialListe: (typeof em)[]) {
     http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
   );
   return renderMitProviders(
-    <AuthProvider>
-      <Routes>
-        <Route path="/einsaetze/:id/material" element={<MaterialPage />} />
-      </Routes>
-    </AuthProvider>,
+    <Routes>
+      <Route path="/einsaetze/:id/material" element={<MaterialPage />} />
+    </Routes>,
     { route: '/einsaetze/1/material' },
   );
 }
@@ -364,7 +353,7 @@ describe('MaterialPage', () => {
  */
 describe('MaterialPage · Datenzustände', () => {
   const gruenerBoden = () => [
-    http.get('/api/auth/me', () => HttpResponse.json(admin)),
+    meHandler(admin),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
     http.get('/api/einsaetze/1/material', () => HttpResponse.json([])),
     http.get('/api/material', () => HttpResponse.json([])),
@@ -380,11 +369,9 @@ describe('MaterialPage · Datenzustände', () => {
     // Abweichung VORN: der erste passende Handler gewinnt.
     server.use(...abweichungen, ...gruenerBoden());
     return renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route path="/einsaetze/:id/material" element={<MaterialPage />} />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route path="/einsaetze/:id/material" element={<MaterialPage />} />
+      </Routes>,
       { route: '/einsaetze/1/material' },
     );
   }

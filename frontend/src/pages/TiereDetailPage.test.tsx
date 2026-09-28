@@ -3,13 +3,12 @@ import { act, fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { einsatzKeys } from '../api/queryKeys';
 import { renderMitProviders } from '../test/utils';
-import { AuthProvider } from '../auth/AuthContext';
 import TiereDetailPage from './TiereDetailPage';
 import type { Tier } from '../api/types';
-import { einsatzFixture } from '../test/fixtures';
+import { benutzerFixture, einsatzFixture } from '../test/fixtures';
 
 class FakeEventSource {
   url: string;
@@ -28,15 +27,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 // Normaler Benutzer (kein System-Admin): so prüfen die Rollen-Tests die EINSATZ-Rolle,
 // nicht den admin-globalen Zweig (LFH-234). Admin-global ist in schreibrecht.test.ts abgedeckt.
-const nutzer = {
-  id: 1,
-  anzeigename: 'Nutzer',
-  benutzername: 'nutzer',
-  system_rolle: 'keiner',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-05-29 10:00:00',
-};
+const nutzer = benutzerFixture();
 const einsatzAktiv = einsatzFixture();
 const einsatzBeobachter = einsatzFixture({ meine_rolle: 'beobachter' });
 
@@ -86,7 +77,7 @@ function render(
   route = '/einsaetze/1/tiere/10',
 ) {
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+    meHandler(nutzer),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
     http.get('/api/einsaetze/1/tiere/10', () => HttpResponse.json(tier)),
     http.get('/api/einsaetze/1/personen', () => HttpResponse.json([einePerson])),
@@ -94,13 +85,11 @@ function render(
   // extra-Handler separat prependen, damit sie Vorrang vor den Default-Handlern haben.
   if (extra.length > 0) server.use(...extra);
   return renderMitProviders(
-    <AuthProvider>
-      <Routes>
-        <Route path="/einsaetze/:id/tiere" element={<div>LISTE</div>} />
-        <Route path="/einsaetze/:id/tiere/:tierId" element={<TiereDetailPage />} />
-        <Route path="/einsaetze/:id/personen/:personId" element={<div>PERSON-DETAIL</div>} />
-      </Routes>
-    </AuthProvider>,
+    <Routes>
+      <Route path="/einsaetze/:id/tiere" element={<div>LISTE</div>} />
+      <Route path="/einsaetze/:id/tiere/:tierId" element={<TiereDetailPage />} />
+      <Route path="/einsaetze/:id/personen/:personId" element={<div>PERSON-DETAIL</div>} />
+    </Routes>,
     { route },
   );
 }

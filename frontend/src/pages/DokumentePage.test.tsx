@@ -3,12 +3,12 @@ import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes, useLocation } from 'react-router';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
-import { AuthProvider } from '../auth/AuthContext';
 import { dokumentDownloadPfad } from '../api/dokumente';
 import DokumentePage from './DokumentePage';
+import { benutzerFixture } from '../test/fixtures';
 
 class FakeEventSource {
   url: string;
@@ -22,12 +22,7 @@ class FakeEventSource {
 beforeEach(() => vi.stubGlobal('EventSource', FakeEventSource));
 afterEach(() => vi.unstubAllGlobals());
 
-const nutzer = {
-  id: 1,
-  anzeigename: 'Nutzer',
-  system_rolle: 'keiner',
-  org_rolle: 'fuehrungskraft',
-};
+const nutzer = benutzerFixture({ org_rolle: 'fuehrungskraft' });
 const einsatzAktiv = {
   id: 1,
   bezeichnung: 'Lage',
@@ -70,7 +65,7 @@ function rendere(
 ) {
   loeschAufrufe = [];
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+    meHandler(nutzer),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz)),
     http.get('/api/einsaetze/1/dokumente', () =>
       listeStatus === 200
@@ -85,19 +80,17 @@ function rendere(
     http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
   );
   return renderMitProviders(
-    <AuthProvider>
-      <Routes>
-        <Route
-          path="/einsaetze/:id/dokumente"
-          element={
-            <>
-              <SuchAnzeige />
-              <DokumentePage />
-            </>
-          }
-        />
-      </Routes>
-    </AuthProvider>,
+    <Routes>
+      <Route
+        path="/einsaetze/:id/dokumente"
+        element={
+          <>
+            <SuchAnzeige />
+            <DokumentePage />
+          </>
+        }
+      />
+    </Routes>,
     { route },
   );
 }
@@ -285,16 +278,14 @@ describe('DokumentePage', () => {
 
   it('zeigt einen Seitenfehler, wenn der Einsatz nicht lädt', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+      meHandler(nutzer),
       http.get('/api/einsaetze/1', () => new HttpResponse(null, { status: 404 })),
       http.get('/api/einsaetze/1/dokumente', () => HttpResponse.json([])),
     );
     renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route path="/einsaetze/:id/dokumente" element={<DokumentePage />} />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route path="/einsaetze/:id/dokumente" element={<DokumentePage />} />
+      </Routes>,
       { route: '/einsaetze/1/dokumente' },
     );
     expect(await screen.findByText('Einsatz nicht gefunden oder kein Zugriff')).toBeInTheDocument();

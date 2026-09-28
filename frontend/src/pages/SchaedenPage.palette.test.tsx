@@ -4,12 +4,12 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
-import { AuthProvider } from '../auth/AuthContext';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 import type { TastaturAktionen } from '../command-palette/typen';
 import SchaedenPage from './SchaedenPage';
+import { benutzerFixture } from '../test/fixtures';
 
 /**
  * „Neue Zeile" an einer echten Modulseite (LFH-391 · B5) — und vor allem: mit demselben
@@ -57,12 +57,7 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-const nutzer = {
-  id: 1,
-  anzeigename: 'Nutzer',
-  system_rolle: 'keiner',
-  org_rolle: 'fuehrungskraft',
-};
+const nutzer = benutzerFixture({ org_rolle: 'fuehrungskraft' });
 const einsatzAktiv = {
   id: 1,
   bezeichnung: 'Lage',
@@ -106,20 +101,18 @@ const einSchaden = {
 
 function render(einsatzObj: object) {
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+    meHandler(nutzer),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
     http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([einSchaden])),
     http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
   );
   return renderMitProviders(
-    <AuthProvider>
-      <CommandPaletteProvider>
-        <Routes>
-          <Route path="/einsaetze/:id/schaeden" element={<SchaedenPage />} />
-        </Routes>
-      </CommandPaletteProvider>
-    </AuthProvider>,
+    <CommandPaletteProvider>
+      <Routes>
+        <Route path="/einsaetze/:id/schaeden" element={<SchaedenPage />} />
+      </Routes>
+    </CommandPaletteProvider>,
     { route: '/einsaetze/1/schaeden' },
   );
 }

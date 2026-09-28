@@ -3,24 +3,15 @@ import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
 import { einsatzKeys } from '../api/queryKeys';
-import { AuthProvider } from '../auth/AuthContext';
 import PersonalPage from './PersonalPage';
 import type { EinsatzAnzeige } from '../api/types';
-import { einsatzFixture } from '../test/fixtures';
+import { adminFixture, einsatzFixture } from '../test/fixtures';
 
-const admin = {
-  id: 1,
-  anzeigename: 'Admin',
-  benutzername: 'admin',
-  system_rolle: 'admin',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-05-26 10:00:00',
-};
+const admin = adminFixture();
 
 function einsatz(overrides: Partial<EinsatzAnzeige> = {}) {
   return einsatzFixture({ id: 7, ...overrides });
@@ -74,7 +65,7 @@ const disponiert = [
 
 function render(einsatzObj: ReturnType<typeof einsatz>, personalDaten: unknown[] = disponiert) {
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(admin)),
+    meHandler(admin),
     http.get('/api/einsaetze/7', () => HttpResponse.json(einsatzObj)),
     http.get('/api/einsaetze/7/personal', () => HttpResponse.json(personalDaten)),
     http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json(einheiten)),
@@ -88,11 +79,9 @@ function render(einsatzObj: ReturnType<typeof einsatz>, personalDaten: unknown[]
     http.get('/api/personal', () => HttpResponse.json([])), // Pool (nur_im_dienst)
   );
   return renderMitProviders(
-    <AuthProvider>
-      <Routes>
-        <Route path="/einsaetze/:id/personal" element={<PersonalPage />} />
-      </Routes>
-    </AuthProvider>,
+    <Routes>
+      <Route path="/einsaetze/:id/personal" element={<PersonalPage />} />
+    </Routes>,
     { route: '/einsaetze/7/personal' },
   );
 }
@@ -221,7 +210,7 @@ describe('PersonalPage', () => {
 
   it('hebt per ?personal=<id> die Zeile hervor (LFH-25 Inspector-Deeplink)', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      meHandler(admin),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz())),
       http.get('/api/einsaetze/7/personal', () => HttpResponse.json(disponiert)),
       http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json(einheiten)),
@@ -234,11 +223,9 @@ describe('PersonalPage', () => {
       http.get('/api/personal', () => HttpResponse.json([])),
     );
     const { container } = renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route path="/einsaetze/:id/personal" element={<PersonalPage />} />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route path="/einsaetze/:id/personal" element={<PersonalPage />} />
+      </Routes>,
       { route: '/einsaetze/7/personal?personal=10' },
     );
     await screen.findByText('Thomas Müller');
@@ -267,7 +254,7 @@ describe('PersonalPage', () => {
 
     try {
       server.use(
-        http.get('/api/auth/me', () => HttpResponse.json(admin)),
+        meHandler(admin),
         http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz())),
         http.get('/api/einsaetze/7/personal', () => HttpResponse.json(disponiert)),
         http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json(einheiten)),
@@ -280,11 +267,9 @@ describe('PersonalPage', () => {
         http.get('/api/personal', () => HttpResponse.json([])),
       );
       const { container } = renderMitProviders(
-        <AuthProvider>
-          <Routes>
-            <Route path="/einsaetze/:id/personal" element={<PersonalPage />} />
-          </Routes>
-        </AuthProvider>,
+        <Routes>
+          <Route path="/einsaetze/:id/personal" element={<PersonalPage />} />
+        </Routes>,
         { route: '/einsaetze/7/personal?personal=10' },
       );
       await screen.findByText('Thomas Müller');
@@ -575,7 +560,7 @@ function zelleNachKopf(container: HTMLElement, zeile: HTMLElement, kopf: string)
  */
 describe('PersonalPage · Datenzustände', () => {
   const gruenerBoden = () => [
-    http.get('/api/auth/me', () => HttpResponse.json(admin)),
+    meHandler(admin),
     http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz())),
     http.get('/api/einsaetze/7/personal', () => HttpResponse.json([])),
     http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json(einheiten)),
@@ -593,11 +578,9 @@ describe('PersonalPage · Datenzustände', () => {
     // gewinnt — andersherum schluckte der grüne Boden jede Abweichung.
     server.use(...abweichungen, ...gruenerBoden());
     return renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route path="/einsaetze/:id/personal" element={<PersonalPage />} />
-        </Routes>
-      </AuthProvider>,
+      <Routes>
+        <Route path="/einsaetze/:id/personal" element={<PersonalPage />} />
+      </Routes>,
       { route: '/einsaetze/7/personal' },
     );
   }

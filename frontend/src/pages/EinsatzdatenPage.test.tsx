@@ -5,25 +5,15 @@ import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
-import { AuthProvider } from '../auth/AuthContext';
 import type { BenutzerAnzeige, EinsatzAnzeige } from '../api/types';
 import EinsatzdatenPage, { pickerZuWire, wireZuPicker } from './EinsatzdatenPage';
-import { einsatzFixture } from '../test/fixtures';
+import { adminFixture, einsatzFixture } from '../test/fixtures';
 
 dayjs.extend(utc);
 
-const admin: BenutzerAnzeige = {
-  id: 1,
-  anzeigename: 'Admin',
-  benutzername: 'admin',
-  system_rolle: 'admin',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-05-23 10:00:00',
-  totp_aktiviert: false,
-};
+const admin = adminFixture();
 
 const basisEinsatz = einsatzFixture({
   id: 7,
@@ -64,7 +54,7 @@ function setup(opts: SetupOpts = {}) {
   const einsatz = { ...basisEinsatz, ...opts.einsatz };
   const benutzer = opts.benutzer ?? admin;
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(benutzer)),
+    meHandler(benutzer),
     http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
     http.get('/api/einsaetze/7/mitglieder', () => HttpResponse.json(mitglieder)),
     http.get('/api/benutzer', () => HttpResponse.json([])),
@@ -74,11 +64,9 @@ function setup(opts: SetupOpts = {}) {
     ),
   );
   return renderMitProviders(
-    <AuthProvider>
-      <Routes>
-        <Route path="/einsaetze/:id/einsatzdaten" element={<EinsatzdatenPage />} />
-      </Routes>
-    </AuthProvider>,
+    <Routes>
+      <Route path="/einsaetze/:id/einsatzdaten" element={<EinsatzdatenPage />} />
+    </Routes>,
     { route: '/einsaetze/7/einsatzdaten' },
   );
 }

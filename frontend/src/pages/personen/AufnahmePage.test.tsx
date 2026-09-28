@@ -3,13 +3,12 @@ import { cleanup, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes, useLocation } from 'react-router';
-import { server } from '../../test/server';
+import { meHandler, server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
 import { einsatzKeys } from '../../api/queryKeys';
-import { AuthProvider } from '../../auth/AuthContext';
 import { queueLeerenFuerTests, schreibaktionenLaden } from '../../offline/queue';
 import AufnahmePage from './AufnahmePage';
-import { einsatzFixture } from '../../test/fixtures';
+import { benutzerFixture, einsatzFixture } from '../../test/fixtures';
 
 /**
  * Die Vollseiten-Aufnahme (LFH-340 · C5).
@@ -52,15 +51,7 @@ afterEach(() => {
   server.events.removeListener('request:start', merkeRequest);
 });
 
-const nutzer = {
-  id: 1,
-  anzeigename: 'Nutzer',
-  benutzername: 'nutzer',
-  system_rolle: 'keiner',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-05-27 10:00:00',
-};
+const nutzer = benutzerFixture();
 const einsatzAktiv = einsatzFixture();
 const einsatzBeobachter = einsatzFixture({ meine_rolle: 'beobachter' });
 
@@ -111,13 +102,13 @@ function render(
   route = '/einsaetze/1/personen/aufnahme',
 ) {
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+    meHandler(nutzer),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
     http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])),
   );
   if (extra.length > 0) server.use(...extra);
   return renderMitProviders(
-    <AuthProvider>
+    <>
       <LocationProbe />
       <Routes>
         <Route path="/einsaetze/:id/personen" element={<div>PERSONENLISTE</div>} />
@@ -126,7 +117,7 @@ function render(
             dieselbe Bauform wie „PERSONENLISTE" oben. */}
         <Route path="/einsaetze/:id/unfallhilfsstellen/:uhsId" element={<div>UHS-DETAIL</div>} />
       </Routes>
-    </AuthProvider>,
+    </>,
     { route },
   );
 }
