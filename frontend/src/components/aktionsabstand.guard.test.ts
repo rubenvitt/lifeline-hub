@@ -54,10 +54,10 @@ const SRC = join(dirname(fileURLToPath(import.meta.url)), '..');
  */
 const MIT_NACHBARSCHAFT = [
   'stammdaten/EtbBausteineTab.tsx',
-  'stammdaten/FahrzeugeTab.tsx',
-  'stammdaten/MaterialTab.tsx',
-  'stammdaten/PersonalTab.tsx',
   'stammdaten/SprechgruppenTab.tsx',
+  // Die Aktionsspalte von Fahrzeugen, Personal und Material („Bearbeiten" neben
+  // „Außer Dienst") steht nur noch im gemeinsamen Baustein.
+  'stammdaten/dienststatus.tsx',
   // Die Aktionsspalte von Qualifikationen, Einheitstypen, Personal- und Fahrzeug-Status
   // steht nur noch hier, in der gemeinsamen Hülle.
   'stammdaten/KatalogVerwaltung.tsx',

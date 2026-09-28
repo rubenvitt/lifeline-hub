@@ -172,19 +172,21 @@ function treffer(text: string, muster: RegExp): number {
 }
 
 /**
- * Hüllen um das Primitiv: ein Katalog, der eine davon rendert, trägt deren Tabelle und
- * Suche. Ihr Text wird deshalb an den des Katalogs angehängt — Sortierung und Filterachse
- * müssen weiter im Katalog selbst stehen, denn die Hülle bringt keine mit.
+ * Geteilte Bausteine der Kataloge: wer einen davon nutzt, trägt dessen Tabelle, Suche oder
+ * Spalten. Ihr Text wird deshalb an den des Katalogs angehängt; geprüft wird weiter je
+ * Katalog, und was kein Baustein mitbringt, muss im Katalog selbst stehen.
  */
-const HUELLEN: Record<string, string> = {
-  KatalogVerwaltung: 'stammdaten/KatalogVerwaltung.tsx',
-};
+const HUELLEN: [RegExp, string][] = [
+  [elementMuster('KatalogVerwaltung'), 'stammdaten/KatalogVerwaltung.tsx'],
+  // Status- und Aktionsspalte der Dienststatus-Kataloge (Fahrzeuge, Personal, Material).
+  [/\bdienststatusSpalten</g, 'stammdaten/dienststatus.tsx'],
+];
 
 function katalogText(pfad: string): string {
   const eigen = ohneKommentare(readFileSync(join(SRC, pfad), 'utf8'));
-  const huellen = Object.entries(HUELLEN)
-    .filter(([name]) => treffer(eigen, elementMuster(name)) > 0)
-    .map(([, huelle]) => ohneKommentare(readFileSync(join(SRC, huelle), 'utf8')));
+  const huellen = HUELLEN.filter(([marke]) => treffer(eigen, marke) > 0).map(([, huelle]) =>
+    ohneKommentare(readFileSync(join(SRC, huelle), 'utf8')),
+  );
   return [eigen, ...huellen].join('\n');
 }
 
