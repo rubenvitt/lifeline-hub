@@ -27,9 +27,8 @@ const hellToken = tokenFuer(farbenHell, false);
 const dunkelToken = tokenFuer(farbenDunkel, true);
 const ALLE_ROLLEN: sf.Statusrolle[] = ['alarm', 'achtung', 'normal', 'neutral', 'bedien', 'marke'];
 
-/** Bewusst AUS DEM MODUL abgeleitet statt handgepflegt: eine handgeschriebene Liste
- *  ließe eine zusätzliche Map still am Kanal-Test vorbeilaufen. Die Zahl unten ist der
- *  Wächter — kommt ein Enum dazu, wird sie laut, statt dass die Abdeckung schrumpft. */
+/** Aus dem Modul abgeleitet statt handgepflegt, damit keine zusätzliche Karte am Kanal-Test
+ *  vorbeiläuft. Die Liste unten ist der Wächter: kommt eine Karte dazu, wird sie laut. */
 const ALLE_MAPS = Object.fromEntries(
   Object.entries(sf).filter(
     ([, wert]) =>
@@ -41,10 +40,8 @@ const ALLE_MAPS = Object.fromEntries(
 
 describe('Statusfarb-Vertrag', () => {
   it('deckt alle fünfundzwanzig Vertragskarten ab — eine weitere Map rutscht nicht still durch', () => {
-    // „Karten", nicht „Enums": `dringlichkeit` ist über eine {@link Statusrolle} geschlüsselt
-    // und damit die eine Karte, die keine Domänen-Achse beschriftet, sondern die Stufe selbst.
-    // Beide Zugänge von LFH-358 stehen hier — sie lagen bis dahin AUSSERHALB und liefen damit
-    // an genau dieser Liste vorbei; das war der Befund, nicht die Zahl.
+    // „Karten“, nicht „Enums“: `dringlichkeit` ist über eine Statusrolle geschlüsselt und
+    // beschriftet die Stufe selbst.
     expect(Object.keys(ALLE_MAPS).sort()).toEqual([
       'abloesungEinstufung',
       'abschnittLagezustand',
@@ -113,9 +110,8 @@ describe('Statusfarb-Vertrag', () => {
     }
   });
 
-  // Absichtlich nur Verschiedenheit, nicht Unterscheidbarkeit: `marke` und `alarm` sind
-  // beide Rot in anderer Sättigung (A0: „ROT BEDIENT NICHTS" trennt Marke von Gefahr über
-  // den Ort, nicht über den Farbton). Den zweiten Kanal trägt `label`, nicht der Abstand.
+  // Nur Verschiedenheit, nicht Unterscheidbarkeit: `marke` und `alarm` sind beide Rot in anderer
+  // Sättigung; den zweiten Kanal trägt `label`.
   it('gibt in BEIDEN Modi keiner Rolle den Farbwert einer anderen', () => {
     for (const token of [hellToken, dunkelToken]) {
       const werte = ALLE_ROLLEN.map((r) => sf.rollenFarbe(r, token).toLowerCase());
@@ -138,8 +134,7 @@ describe('Warnstufe als Fläche (LFH-368 · B5h)', () => {
   it('pinnt die zwei neuen Intensitäten byte-genau', () => {
     expect(farbenHell.achtungFuellungStark).toBe('rgba(122, 82, 0, 0.2)');
     expect(farbenHell.alarmFuellungStark).toBe('rgba(176, 35, 24, 0.2)');
-    // Nachtwerte seit dem Neuentwurf (21.09.2026) auf die neue Palette gestimmt:
-    // dieselbe Intensität, der Farbton aus `achtung` #e8cc3a bzw. `alarm` #ff6b6b.
+    // Dieselbe Intensität, der Farbton aus `achtung` #e8cc3a bzw. `alarm` #ff6b6b.
     expect(farbenDunkel.achtungFuellungStark).toBe('rgba(232, 204, 58, 0.24)');
     expect(farbenDunkel.alarmFuellungStark).toBe('rgba(255, 107, 107, 0.24)');
   });
@@ -174,9 +169,7 @@ describe('Warnstufe als Fläche (LFH-368 · B5h)', () => {
   });
 
   it('bleibt wie die Sichtung aus der Rollen-Abdeckung heraus', () => {
-    // `warnstufeFlaeche`-Einträge tragen KEIN `rolle`-Feld und werden von `ALLE_MAPS`
-    // deshalb nicht erfasst. Das ist Absicht: eine Fläche ist keine Statusrolle, und
-    // `StatusDarstellung` hineinzubiegen hätte den Kanal-Vertrag verwässert.
+    // Eine Fläche ist keine Statusrolle und gehört deshalb nicht in `ALLE_MAPS`.
     expect(Object.keys(ALLE_MAPS)).not.toContain('warnstufeFlaeche');
     expect(Object.keys(ALLE_MAPS)).not.toContain('sichtung');
     expect(Object.keys(ALLE_MAPS)).toHaveLength(25);
@@ -387,26 +380,20 @@ describe('Betroffenen-Farbachsen (LFH-455)', () => {
 });
 
 /**
- * Übernommen aus dem gelöschten `einsatz/einsatzStatus.test.ts` (LFH-358). Die Zuordnung
- * selbst wird hier nicht erfunden, sondern zitiert (A0-Spec §6, Prüflistenzeile 7).
- * Geprüft wird deshalb NICHT „sieht plausibel aus", sondern die drei Eigenschaften, die
- * beim Umzug aus `EinsaetzePage` bzw. beim Heben in den Vertrag verlorengehen könnten.
+ * Die Zuordnung ist zitiert (A0-Spec §6, Prüflistenzeile 7); geprüft werden Vollständigkeit,
+ * Rollen und echte Beschriftungen.
  */
 describe('einsatzStatus (LFH-345 · C10 Befund M14, LFH-358)', () => {
   it('deckt das Enum vollständig ab — eine dritte Variante bricht hier', () => {
-    // Die Liste steht als LITERAL da, nicht aus `Object.keys(…)` abgeleitet: sonst prüfte
-    // die Zusicherung die Map gegen sich selbst und wäre auch bei einer fehlenden Variante
-    // grün. Der `EinsatzStatus[]`-Typ zieht die zweite Hälfte nach — kommt aus dem Codegen
-    // ein dritter Wert, bricht schon der Typcheck.
+    // Literal statt `Object.keys(…)`, sonst prüfte die Zusicherung die Map gegen sich selbst. Ein
+    // dritter Wert aus dem Codegen bricht schon den `EinsatzStatus[]`-Typcheck.
     const alle: EinsatzStatus[] = ['aktiv', 'abgeschlossen'];
     expect(Object.keys(sf.einsatzStatus).sort()).toEqual([...alle].sort());
   });
 
   it('zeigt ein Wort, nicht den Wire-Wert — genau der gemeldete Mangel', () => {
-    // DAS ist die Aussage des Befunds: in zehn Seitenköpfen stand `{einsatz.status}`, also
-    // der rohe Enum-String klein geschrieben. Ein `label`, das gleich dem Schlüssel ist,
-    // wäre die Rückkehr dorthin — mit dem Unterschied, dass sie dann wie eine gepflegte
-    // Beschriftung aussähe.
+    // Ein `label` gleich dem Wire-Schlüssel wäre der rohe Enum-String im Seitenkopf, nur als
+    // gepflegte Beschriftung getarnt.
     for (const [wire, d] of Object.entries(sf.einsatzStatus)) {
       expect(d.label).not.toBe(wire);
     }
@@ -422,9 +409,8 @@ describe('einsatzStatus (LFH-345 · C10 Befund M14, LFH-358)', () => {
 
 describe('dringlichkeit (LFH-395, hierher mit LFH-358)', () => {
   it('bleibt über die drei stufbaren Rollen geschlüsselt, nicht über alle sechs', () => {
-    // Die Verengung ist die Zusicherung: je Stufe ein Wort UND ein Formzeichen (dreieck,
-    // balken, kreis). Die früheren Klassen `lfh-plakette--${stufe}` sind mit dem Neuentwurf
-    // entfallen; ein vierter Schlüssel bräuchte weiterhin eine vierte Form.
+    // Je Stufe ein Wort UND ein Formzeichen (dreieck, balken, kreis); ein vierter Schlüssel
+    // bräuchte eine vierte Form.
     expect(Object.keys(sf.dringlichkeit).sort()).toEqual(['achtung', 'alarm', 'normal']);
   });
 
@@ -590,8 +576,7 @@ describe('Warnstufen-Balken (Neuentwurf, 21.09.2026)', () => {
 
 describe('Nacht-Algorithmus hält die Signalfarben auf dem Rollenwert (Neuentwurf)', () => {
   it('colorPrimary/Error/Warning/Success sind nachts genau die Rollen', () => {
-    // Literale: ohne die zweite Algorithmusstufe rechnete `darkAlgorithm` sie um
-    // (gemessen #4d94d6 → #4481b9, #ff6b6b → #dc5e5e, #52c41a → #49aa19).
+    // Literale: ohne die zweite Algorithmusstufe rechnete `darkAlgorithm` die Seeds um.
     expect(dunkelToken.colorPrimary).toBe('#4d94d6');
     expect(dunkelToken.colorError).toBe('#ff6b6b');
     expect(dunkelToken.colorWarning).toBe('#e8cc3a');
