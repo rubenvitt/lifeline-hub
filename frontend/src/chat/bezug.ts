@@ -42,9 +42,8 @@ export const BEZUG_TYP_OPTIONEN: { value: BezugTyp; label: string }[] = (
 ).map((value) => ({ value, label: BEZUG_TYP_LABEL[value] }));
 
 /**
- * Kürzungsgrenze für Freitext in einer Zeile. EXPORTIERT für `command-palette/datensaetze.ts`
- * (LFH-391 · C1): dessen ETB-Label kürzt denselben Sorte Freitext wie `auftragLabel`. Kopiert
- * wären es zwei Zahlen, und die zweite zöge beim nächsten Anfassen nicht mit.
+ * Kürzungsgrenze für Freitext in einer Zeile; exportiert, damit die Sprungpalette dieselbe
+ * Grenze nutzt.
  */
 export function kuerze(s: string, max = 60): string {
   return s.length > max ? `${s.slice(0, max - 1)}…` : s;
@@ -100,9 +99,10 @@ export function auftragInfo(a: Auftrag): BezugKurzinfo {
   return { titel: `Auftrag #${a.id}`, zeilen: [a.auftrag_text] };
 }
 
-/** Löst (Typ, ID) gegen die geladenen Optionen zu einem Label auf. Fällt auf
- *  „{Typ} #{id}" zurück, wenn das Objekt nicht (mehr) in der Liste ist —
- *  z. B. storniert/gefiltert (kein DB-FK, vgl. LFH-103). */
+/**
+ * Löst (Typ, ID) gegen die geladenen Optionen zu einem Label auf; „{Typ} #{id}", wenn das
+ * Objekt nicht (mehr) in der Liste ist (storniert/gefiltert, kein DB-FK).
+ */
 export function bezugLabel(typ: BezugTyp, id: number, optionen: BezugOptionen): string {
   const treffer = optionen[typ]?.find((o) => o.value === id);
   return treffer ? treffer.label : `${BEZUG_TYP_LABEL[typ]} #${id}`;

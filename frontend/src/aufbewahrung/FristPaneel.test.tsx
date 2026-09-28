@@ -12,9 +12,8 @@ import FristPaneel from './FristPaneel';
 dayjs.extend(customParseFormat);
 
 /**
- * Frist-Paneel (LFH-23, tasks.md 6.5): Verlängern ohne Rückfrage, Verkürzen erst nach
- * Rückfrage mit `bestaetigt: true`, Abbrechen sendet nichts, ohne Recht gesperrt mit Grund,
- * Invalidierungen nach design.md D8.
+ * Frist-Paneel: Verlängern ohne Rückfrage, Verkürzen erst nach Rückfrage mit
+ * `bestaetigt: true`, Abbrechen sendet nichts, ohne Recht gesperrt mit Grund.
  */
 
 const ME_ADMIN = { id: 1, anzeigename: 'Admin', system_rolle: 'admin', org_rolle: 'keine' };
@@ -52,9 +51,8 @@ function zeige(
 }
 
 /**
- * Setzt den DatePicker des Dialogs auf einen Ortszeit-Wert und sendet mit Enter ab — Enter im
- * Feld übernimmt den Wert UND übermittelt das Formular (Erfassungs-Norm: der Knopf liegt im
- * `<form>`). Ein zusätzlicher Klick auf „Frist setzen" träfe den schon schließenden Dialog.
+ * Setzt den DatePicker auf einen Ortszeit-Wert und sendet mit Enter ab (übernimmt den Wert
+ * UND übermittelt); ein zusätzlicher Klick träfe den schon schließenden Dialog.
  */
 async function fristSetzen(dialog: HTMLElement, ortszeit: string) {
   const u = userEvent.setup();
@@ -68,9 +66,8 @@ async function fristSetzen(dialog: HTMLElement, ortszeit: string) {
 const wire = (ortszeit: string) => alsBackendZeit(dayjs(ortszeit, 'YYYY-MM-DD HH:mm'));
 
 /**
- * Die Rückfrage über ihren Titeltext statt über den Rollennamen: in jsdom tragen beide offenen
- * antd-Dialoge dieselbe `aria-labelledby`-Kennung (`test-id`), der Name des zweiten löst also
- * auf den Titel des ERSTEN auf.
+ * Die Rückfrage über ihren Titeltext: in jsdom tragen beide offenen antd-Dialoge dieselbe
+ * `aria-labelledby`-Kennung, der Name des zweiten löst auf den Titel des ersten auf.
  */
 async function rueckfrageFinden(): Promise<HTMLElement> {
   const titel = await screen.findByText('Aufbewahrungsfrist verkürzen?');
@@ -101,8 +98,7 @@ describe('FristPaneel', () => {
     const dialog = await dialogOeffnen();
     await fristSetzen(dialog, '2030-01-01 12:00');
     await waitFor(() => expect(gesendet).toHaveLength(1));
-    // Der Wert selbst, nicht nur „irgendein String": sonst bliebe der Test grün, wenn der
-    // Picker den Wert nie annähme und die alte Frist unverändert hinausginge.
+    // Der Wert selbst: sonst bliebe der Test grün, wenn der Picker den Wert nie annähme.
     expect(gesendet[0]).toEqual({ retention_bis: wire('2030-01-01 12:00') });
     expect(rueckfrageOffen()).toBe(false);
     const keys = invalidiert.mock.calls.map((c) => JSON.stringify(c[0]?.queryKey));
@@ -133,9 +129,8 @@ describe('FristPaneel', () => {
     const rueckfrage = await rueckfrageFinden();
     expect(rueckfrage).toHaveTextContent('unbegrenzt');
     await userEvent.click(within(rueckfrage).getByRole('button', { name: 'Abbrechen' }));
-    // Die Erfassungshülle lässt den Dialog mit Wert stehen, nichts ging hinaus.
-    // antd räumt den Knoten erst am Ende der Zoom-Animation ab, jsdom feuert kein
-    // `transitionend` — geprüft wird deshalb `ant-zoom-leave` (Konvention MaterialPage.test).
+    // Die Hülle lässt den Dialog mit Wert stehen, nichts ging hinaus. antd räumt den Knoten erst
+    // am Ende der Zoom-Animation ab, jsdom feuert kein `transitionend` — daher `ant-zoom-leave`.
     await waitFor(() => expect(rueckfrage).toHaveClass('ant-zoom-leave'));
     expect(gesendet).toHaveLength(0);
     expect(within(dialog).getByRole('textbox')).toHaveValue('2030-01-01 12:00');
@@ -179,9 +174,8 @@ describe('FristPaneel', () => {
   });
 
   it('befüllt den Dialog bei jedem Öffnen mit der AKTUELLEN Frist', async () => {
-    // Review-Befund: die Formularinstanz lebt im Hook, `initialValues` einer früheren Öffnung
-    // überlebte im Speicher von rc-field-form. Nach einer bestätigten Verkürzung stand beim
-    // nächsten Öffnen der alte Wert da — ein Absenden hätte die Verkürzung still zurückgenommen.
+    // Die Formularinstanz lebt im Hook; überlebte `initialValues` einer früheren Öffnung, nähme
+    // ein Absenden eine bestätigte Verkürzung still zurück.
     server.use(http.get('/api/auth/me', () => HttpResponse.json(ME_ADMIN)));
     const einsatz = (retention_bis: string) =>
       ({ status: 'abgeschlossen', meine_rolle: null, retention_bis }) as never;

@@ -8,7 +8,7 @@ import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import ArchivAktePage, { archivHinweis, berichtigungText } from './ArchivAktePage';
 
-/** Archivakte (LFH-23, tasks.md 6.9). */
+/** Archivakte. */
 
 const ME_ADMIN = { id: 1, anzeigename: 'Admin', system_rolle: 'admin', org_rolle: 'keine' };
 

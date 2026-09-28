@@ -63,10 +63,9 @@ export function useOfflineSync(benutzerId?: number): void {
             continue;
           }
           const { aktion } = element.wert;
-          // Exhaustiv über die Art (LFH-675), mit `never` am Ende: eine neue Variante bricht
-          // den Typcheck, statt still im Meldungszweig zu landen — genau dort landete eine
-          // Standmeldung vor diesem Umbau. Bewusst KEIN `switch`: ein `break` darin verließe
-          // nur den `switch`, und die Abbruch-Riegel unten liefen still ins Leere.
+          // Exhaustiv über die Art, mit `never` am Ende: eine neue Variante bricht den Typcheck, statt
+          // still im Meldungszweig zu landen. Bewusst KEIN `switch`: ein `break` darin verließe nur den
+          // `switch`, und die Abbruch-Riegel unten liefen ins Leere.
           if (aktion.art === 'person') {
             const person = await legePersonAn(element.wert.einsatz_id, aktion.daten, {
               offlineQueueBenutzerId: aktuellerBenutzerId,
@@ -91,8 +90,8 @@ export function useOfflineSync(benutzerId?: number): void {
               refetchType: 'none',
             });
             void qc.invalidateQueries({ queryKey: einsatzKeys.etb(element.wert.einsatz_id) });
-            // Der Anlege-Request kann zugleich den UHS-Eintritt enthalten (LFH-458).
-            // Auch ohne funktionierenden Live-Stream muss die gerade offene UHS nachladen.
+            // Der Anlege-Request kann den UHS-Eintritt enthalten; die offene UHS muss auch ohne
+            // Live-Stream nachladen.
             const uhsId = aktion.daten.uhs_id;
             if (uhsId != null) {
               void qc.invalidateQueries({ queryKey: einsatzKeys.uhs(element.wert.einsatz_id) });
@@ -127,8 +126,7 @@ export function useOfflineSync(benutzerId?: number): void {
               });
             }
           } else if (aktion.art === 'stand' || aktion.art === 'belegung') {
-            // Stand- und Belegungsmeldungen (LFH-675): die Antwort braucht niemand — die Seite
-            // lädt über dieselben zwei Keys nach wie nach einer Online-Meldung.
+            // Stand- und Belegungsmeldungen: die Seite lädt über dieselben zwei Keys nach wie online.
             const optionen = { offlineQueueBenutzerId: aktuellerBenutzerId };
             if (aktion.art === 'stand') {
               await meldeStand(element.wert.einsatz_id, aktion.bezirk_id, aktion.daten, optionen);

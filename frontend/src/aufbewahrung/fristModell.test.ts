@@ -11,8 +11,7 @@ import {
 dayjs.extend(utc);
 
 /**
- * Spiegel von `einsatz::berechtigung::ist_fristverkuerzung` (Rust). Der Server bleibt das
- * Sicherheitsnetz (409 ohne Bestätigung); der Client fragt VORHER zurück. Laufen beide
+ * Spiegel von `einsatz::berechtigung::ist_fristverkuerzung`: laufen Client und Server
  * auseinander, fragt der Client nicht und der Server lehnt ab — oder umgekehrt.
  */
 describe('istFristverkuerzung (Spiegel des Servers)', () => {

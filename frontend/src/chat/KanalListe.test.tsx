@@ -116,8 +116,7 @@ describe('KanalListe', () => {
         onKanalAnlegen={vi.fn()}
       />,
     );
-    // Am Element MIT der Rolle (LFH-621): vorher saß es am inneren `div`, und die
-    // Schaltfläche selbst war für Vorleser nie „aktuell".
+    // Am Element MIT der Rolle, sonst wäre die Schaltfläche für Vorleser nie „aktuell".
     const aktiv = screen.getByRole('button', { current: true });
     expect(aktiv).toHaveTextContent('S2/S3');
     expect(screen.getAllByRole('button', { current: false })).not.toContain(aktiv);

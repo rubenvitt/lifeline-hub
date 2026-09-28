@@ -9,7 +9,7 @@ import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import AufbewahrungUebersicht from './AufbewahrungUebersicht';
 
-/** Übersicht (LFH-23, tasks.md 6.8). */
+/** Übersicht. */
 
 const ME_ADMIN = { id: 1, anzeigename: 'Admin', system_rolle: 'admin', org_rolle: 'keine' };
 const ME_FK = { id: 2, anzeigename: 'FK', system_rolle: 'keiner', org_rolle: 'fuehrungskraft' };
