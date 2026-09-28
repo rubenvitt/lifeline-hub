@@ -33,7 +33,6 @@ const DEFERRED_MODULE: &[&str] = &[
     "einsatz_person",
     "einsatz_uhs",
     "einsatz_einheit",
-    "einsatz_material",
     "chat",
     "etb",
     "befehl",
