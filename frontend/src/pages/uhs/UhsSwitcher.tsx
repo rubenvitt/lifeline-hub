@@ -9,7 +9,7 @@ import type { Uhs, UhsStatus } from '../../api/types';
 import { uhsStatus } from '../../theme/statusFarben';
 import EinstiegSwitcher from '../../components/EinstiegSwitcher';
 
-/** Sortierrang — fachliche Reihenfolge dieser Liste, keine Darstellung (bleibt lokal, s. Bestand). */
+/** Sortierrang — fachliche Reihenfolge dieser Liste, keine Darstellung. */
 const STATUS_RANG: Record<UhsStatus, number> = { aktiv: 0, geplant: 1, aufgeloest: 2 };
 
 /** Header-Switcher im UHS-Detail — UHS-Belegung von `EinstiegSwitcher`. */
