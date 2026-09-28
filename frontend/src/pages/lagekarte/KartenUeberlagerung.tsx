@@ -4,6 +4,8 @@ import {
   TbCompass,
   TbCrosshair,
   TbCurrentLocation,
+  TbLayoutSidebarRightCollapse,
+  TbLayoutSidebarRightExpand,
   TbMinus,
   TbPencil,
   TbPlus,
@@ -18,7 +20,8 @@ import './lagekarte.css';
 
 /**
  * Überlagerungen der Kartenfläche (Neuentwurf S5): oben links Kartengrundlage und
- * Zeigerkoordinate, oben rechts der Knopfblock (Zoom, Nordung, Eigenposition, Messen, Zeichnen).
+ * Zeigerkoordinate, oben rechts der Knopfblock (Zoom, Nordung, Eigenposition, Messen, Zeichnen,
+ * ab `lg` der Leisten-Umschalter).
  *
  * KEIN AUFSPANNENDER RAHMEN: jeder Block ist einzeln positioniert. Ein Elternteil über die
  * ganze Karte schluckte jedes Ziehen darunter — derselbe Befund, den `KartenFuss` mit
@@ -193,7 +196,9 @@ function Kartenknopf({
   kante,
   farbe,
   gedrueckt,
-  gesperrtGrund,
+  ausgeklappt,
+  steuert,
+  sperrGrund,
   children,
 }: {
   beschriftung: string;
@@ -202,12 +207,17 @@ function Kartenknopf({
   farbe: string;
   /** Gesetzt = Umschalter; der Zustand steht in `aria-pressed`, die Optik folgt daraus (CSS). */
   gedrueckt?: boolean;
+  /** Gesetzt = Auf-/Zu-Schalter einer Fläche (`aria-expanded`), die `steuert` benennt. */
+  ausgeklappt?: boolean;
+  steuert?: string;
   /**
-   * Gesetzt = gesperrt, mit Grund (LFH-712). `aria-disabled` statt `disabled`: ein echtes
-   * `disabled` nähme den Klick und damit auf Touch den einzigen Weg zum Text. Der Klick
-   * öffnet stattdessen den Grund am Knopf; Vorlesende bekommen ihn über `aria-describedby`.
+   * Gesetzt = gesperrt. `aria-disabled` statt `disabled`: der Knopf bleibt in der Tab-Folge und
+   * nimmt weiter den Klick — ein natives `disabled` nähme beides, übrig bliebe ein grauer Knopf
+   * ohne Grund. Der Klick löst die Handlung nicht aus, sondern zeigt den Grund als Text am Knopf
+   * (LFH-712: auf Touch der einzige Weg zum Text, ein `title` erscheint dort nie); Vorlesende
+   * bekommen ihn über `aria-describedby`. Der Name bleibt die Handlung.
    */
-  gesperrtGrund?: string;
+  sperrGrund?: string | null;
   children: ReactNode;
 }) {
   const grundId = useId();
@@ -216,10 +226,12 @@ function Kartenknopf({
       type="button"
       aria-label={beschriftung}
       aria-pressed={gedrueckt}
-      aria-disabled={gesperrtGrund ? true : undefined}
-      aria-describedby={gesperrtGrund ? grundId : undefined}
-      title={beschriftung}
-      onClick={gesperrtGrund ? undefined : onClick}
+      aria-expanded={ausgeklappt}
+      aria-controls={steuert}
+      aria-disabled={sperrGrund != null ? true : undefined}
+      aria-describedby={sperrGrund != null ? grundId : undefined}
+      title={sperrGrund ?? beschriftung}
+      onClick={sperrGrund != null ? undefined : onClick}
       className="lfh-kartenknopf"
       style={{
         width: kante,
@@ -230,8 +242,9 @@ function Kartenknopf({
         padding: 0,
         margin: 0,
         border: 0,
-        color: farbe,
-        cursor: gesperrtGrund ? 'not-allowed' : 'pointer',
+        // Gesperrt: Farbe und Zeiger aus `.lfh-kartenknopf[aria-disabled]` (`lagekarte.css`) — ein
+        // Inline-Wert schlüge die Regel, und der Knopf sähe bedienbar aus.
+        ...(sperrGrund != null ? {} : { color: farbe, cursor: 'pointer' }),
       }}
     >
       <span aria-hidden="true" style={{ display: 'inline-flex' }}>
@@ -239,14 +252,14 @@ function Kartenknopf({
       </span>
     </button>
   );
-  if (!gesperrtGrund) return knopf;
+  if (sperrGrund == null) return knopf;
   return (
     <>
-      <Popover trigger={['click']} placement="left" content={gesperrtGrund}>
+      <Popover trigger={['click']} placement="left" content={sperrGrund}>
         {knopf}
       </Popover>
       <span id={grundId} style={NUR_VORLESEN}>
-        {gesperrtGrund}
+        {sperrGrund}
       </span>
     </>
   );
@@ -269,10 +282,18 @@ export interface KartenUeberlagerungProps {
   onMessen?: () => void;
   messenAktiv?: boolean;
   /**
-   * Eigenposition (LFH-712): Umschalter, auch ohne Schreibrecht. `sperrgrund` gesetzt → der
+   * Eigenposition (LFH-712): Umschalter, auch ohne Schreibrecht. `sperrGrund` gesetzt → der
    * Knopf steht gesperrt da und nennt den Grund beim Antippen. Nicht gesetzt → kein Knopf.
    */
-  eigenposition?: { an: boolean; sperrgrund: string | null; onUmschalten: () => void };
+  eigenposition?: { an: boolean; sperrGrund: string | null; onUmschalten: () => void };
+  /**
+   * Leiste ein-/ausblenden (LFH-715). Nur ab `lg` gesetzt: dort steht die Leiste rechts neben
+   * der Karte, der Umschalter sitzt an ihrer Kante. Im Seitenkopf hob ein 72-px-Knopf
+   * (Handschuh) den Kopf um 43 px, und am Tablet belegte die ausgeklappte Zeitachse dann 53 %
+   * der Karte (Deckel 50 %, `e2e/leisten-flaeche.spec.ts`). Unter `lg` steht er weiter im
+   * Seitenkopf, dort liegt die Leiste unter der Karte.
+   */
+  leiste?: { sichtbar: boolean; sperrGrund: string | null; onUmschalten: () => void };
 }
 
 export default function KartenUeberlagerung(props: KartenUeberlagerungProps) {
@@ -348,15 +369,9 @@ export default function KartenUeberlagerung(props: KartenUeberlagerungProps) {
             beschriftung="Eigenposition"
             onClick={props.eigenposition.onUmschalten}
             kante={kante}
-            farbe={
-              props.eigenposition.sperrgrund
-                ? rollen.schwach
-                : props.eigenposition.an
-                  ? rollen.bedien
-                  : rollen.gedaempft
-            }
+            farbe={props.eigenposition.an ? rollen.bedien : rollen.gedaempft}
             gedrueckt={props.eigenposition.an}
-            gesperrtGrund={props.eigenposition.sperrgrund ?? undefined}
+            sperrGrund={props.eigenposition.sperrGrund}
           >
             <TbCurrentLocation size={16} />
           </Kartenknopf>
@@ -381,6 +396,23 @@ export default function KartenUeberlagerung(props: KartenUeberlagerungProps) {
             farbe={rollen.bedien}
           >
             <TbPencil size={16} />
+          </Kartenknopf>
+        )}
+        {props.leiste && (
+          <Kartenknopf
+            beschriftung={props.leiste.sichtbar ? 'Leiste ausblenden' : 'Leiste einblenden'}
+            onClick={props.leiste.onUmschalten}
+            kante={kante}
+            farbe={rollen.gedaempft}
+            ausgeklappt={props.leiste.sichtbar}
+            steuert="lagekarte-leiste"
+            sperrGrund={props.leiste.sperrGrund}
+          >
+            {props.leiste.sichtbar ? (
+              <TbLayoutSidebarRightCollapse size={16} />
+            ) : (
+              <TbLayoutSidebarRightExpand size={16} />
+            )}
           </Kartenknopf>
         )}
       </div>
