@@ -2237,6 +2237,19 @@ async function springe(page: Page, center: [number, number], zoom: number) {
   );
 }
 
+/**
+ * Wartet, bis die Karte steht. Eine Markerauswahl fliegt die Karte zum Marker, auf Zoom 15
+ * (`onMarkerWaehlen` → `flyToZiel`): ein VOR der Auswahl berechneter Seitenpunkt ist danach
+ * veraltet (in der CI gemessen: der zweite Klick am Paar traf den ersten Marker).
+ */
+async function kartenRuht(page: Page) {
+  await page.waitForFunction(
+    () => !(window as unknown as { __lfhKarte: { isMoving(): boolean } }).__lfhKarte.isMoving(),
+    undefined,
+    { timeout: 15_000 },
+  );
+}
+
 test('Lagekarte (LFH-711): Objektmarker tragen die Trefferzone der Staffel, dicht liegende wählt der nächste', async ({
   page,
 }) => {
@@ -2300,6 +2313,7 @@ test('Lagekarte (LFH-711): Objektmarker tragen die Trefferzone der Staffel, dich
     gemessen.push(`${dichte}: Versatzklick ${VERSATZ}px wählt den Marker`);
 
     if (dichte !== 'handschuh') continue;
+    await kartenRuht(page);
 
     // Dicht liegende Marker: den Zoom so wählen, dass das Paar 50 px auseinander steht.
     const zoom = await page.evaluate(
@@ -2313,14 +2327,19 @@ test('Lagekarte (LFH-711): Objektmarker tragen die Trefferzone der Staffel, dich
       [nord, sued] as const,
     );
     expect(zoom, 'das Paar darf nicht clustern').toBeGreaterThan(14);
-    await springe(page, [nord[0], (nord[1] + sued[1]) / 2], zoom);
-    const oben = await aufSeite(page, nord);
-    const unten = await aufSeite(page, sued);
-    expect(Math.abs(unten.y - oben.y - 50), 'Paarabstand').toBeLessThan(1);
-    for (const [ziel, von, zu] of [
-      ['Zone Nord', oben, 1],
-      ['Zone Süd', unten, -1],
+    for (const [ziel, anker, zu] of [
+      ['Zone Nord', nord, 1],
+      ['Zone Süd', sued, -1],
     ] as const) {
+      // Eine Auswahl fliegt die Karte zum Marker, auf Zoom 15 (`flyToZiel`): dort stünde das
+      // Paar nur noch rund 12 px auseinander. Deshalb JE KLICK erst die Ruhe abwarten, dann
+      // Ausschnitt und Zoom neu setzen und die Lage neu lesen.
+      await kartenRuht(page);
+      await springe(page, [nord[0], (nord[1] + sued[1]) / 2], zoom);
+      const oben = await aufSeite(page, nord);
+      const unten = await aufSeite(page, sued);
+      expect(Math.abs(unten.y - oben.y - 50), 'Paarabstand').toBeLessThan(1);
+      const von = anker === nord ? oben : unten;
       const punkt = { x: von.x, y: von.y + zu * 21 };
       expect(
         await merkmaleAm(page, punkt, GEZEICHNETE_KLICKEBENEN),
