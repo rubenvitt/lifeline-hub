@@ -35,6 +35,7 @@ Arbeitsweise je Aufgabe: `superpowers:test-driven-development` (erst rot, dann g
 - [x] 5.2 e2e Eigenposition: Kontext mit `geolocation` + `permissions: ['geolocation']`; Einschalten → Knopf gedrückt, Quelle mit Punkt vorhanden, Karte zentriert; Grundlagenwechsel → Punkt bleibt; `page.on('request')` findet die Koordinaten in keiner Anfrage. Verifikation: Spec grün.
 - [x] 5.3 `e2e/fokus-verdeckung.spec.ts` und `e2e/gate3-trefflaeche.spec.ts` mit dem neuen Knopf laufen lassen (390 px Handschuh). Verifikation: beide grün; bricht einer, Spaltenlösung klären statt den Test zu lockern.
 - [ ] 5.4 `./scripts/check-all.sh` grün (Fmt/Prettier, Lint `--max-warnings 0`, tsc, Vitest, e2e). Verifikation: Exit 0, Log ohne „ÜBERSPRUNGEN" für e2e.
+  - Stand 28.09.2026: voller Lauf Schritte 1–6 grün (Vitest 6717/6717); e2e 322/324 — rot `dokumente.spec.ts:423` und `kraefte-kontrast.spec.ts:140` bei Lastmittel 60–97, beide außerhalb dieses Changes und danach 36/36 grün; nach dem letzten `alpha`-Merge Lagekarte, Gate 3, Verdeckung, Leistenfläche 63/63. Offen: ein Lauf mit Exit 0 (CI am PR).
 
 ## 6. Doku und Abschluss
 
