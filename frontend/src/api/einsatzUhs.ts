@@ -66,21 +66,6 @@ export function storniereUhs(einsatzId: number, uhsId: number): Promise<void> {
 
 // ---------- Plätze ----------
 
-export interface PlatzEingabe {
-  typ: PlatzTyp;
-  bezeichnung: string;
-  pos_x?: number | null;
-  pos_y?: number | null;
-}
-
-export function legePlatzAn(
-  einsatzId: number,
-  uhsId: number,
-  daten: PlatzEingabe,
-): Promise<UhsPlatz> {
-  return apiSend<UhsPlatz>(`/api/einsaetze/${einsatzId}/uhs/${uhsId}/plaetze`, 'POST', daten);
-}
-
 export interface PlatzBulkEingabe {
   typ: PlatzTyp;
   menge: number;

@@ -345,13 +345,6 @@ export interface NeuerLageSnapshot {
   notiz?: string | null;
 }
 
-/** PATCH-Body eines Snapshots (LFH-321): NUR Metadaten — `daten`/`stand_at`/`erstellt_*` sind
- *  unveränderlich und im DTO nicht enthalten. `null` löscht das Feld, absent lässt es unverändert. */
-export interface PatchLageSnapshot {
-  bezeichnung?: string | null;
-  notiz?: string | null;
-}
-
 // ============================== LFH-48 Lageberichte ==============================
 export type LageberichtVorlageKey = S['LageberichtVorlage'];
 export type LageberichtStatus = S['LageberichtStatus'];

@@ -77,10 +77,6 @@ export function starteOfflineDownload(body: OfflineDownloadBody): Promise<Offlin
   return apiSend<OfflineKarteZeile>('/api/karte/offline-karten/download', 'POST', body);
 }
 
-export function aktiviereOfflineKarte(id: number): Promise<OfflineKarteZeile> {
-  return apiSend<OfflineKarteZeile>(`/api/karte/offline-karten/${id}/aktivieren`, 'POST');
-}
-
 /** In-Place-Hot-Swap (B3): Update der aktiven Karte in dieselbe Zeile — downtime-frei. */
 export function neuLadeOfflineKarte(
   id: number,
