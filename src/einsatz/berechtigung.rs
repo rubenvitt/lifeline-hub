@@ -1,4 +1,4 @@
-use super::modul::{ist_ausblendbar, registry_benoetigte_rolle};
+use super::modul::ist_ausblendbar;
 use super::modul_override::EinsatzModulOverride;
 use super::{modul_override, Einsatz, EinsatzRolle, STATUS_ABGESCHLOSSEN, STATUS_AKTIV};
 use crate::auth::Benutzer;
@@ -207,10 +207,10 @@ pub fn fordere_aktiv(einsatz: &Einsatz) -> Result<(), AppError> {
 /// 2. Ausblenden: ist das Modul ausblendbar und der Override setzt `sichtbar=false`,
 ///    → `Forbidden`. Nicht-ausblendbare Module (einsatzdaten, einsatz-einstellungen)
 ///    werden NIE versteckt — ein `sichtbar=false` darauf wird defensiv ignoriert.
-/// 3. Rollen-Schranke: effektive Rolle = Einsatz-Override ?? Org-Default ??
-///    Registry-Default (heute `None` für alle). `admin` → nur System-Admin (oben schon
-///    durch), sonst `Forbidden`; `fuehrungskraft` → System-Admin oder org-weite
-///    Führungskraft (`ist_hoehere_berechtigung`), sonst `Forbidden`. `None` → frei.
+/// 3. Rollen-Schranke: effektive Rolle = Einsatz-Override ?? Org-Default. `admin` → nur
+///    System-Admin (oben schon durch), sonst `Forbidden`; `fuehrungskraft` → System-Admin
+///    oder org-weite Führungskraft (`ist_hoehere_berechtigung`), sonst `Forbidden`.
+///    `None` → frei.
 pub fn fordere_modul_zugriff(
     overrides: &HashMap<String, EinsatzModulOverride>,
     org_defaults: &HashMap<String, Option<String>>,
@@ -236,14 +236,11 @@ pub fn fordere_modul_zugriff(
         return Err(AppError::Forbidden);
     }
 
-    // 4. Rollen-Schranke: Einsatz-Override ?? Org-Default ?? Registry-Default.
+    // 4. Rollen-Schranke: Einsatz-Override ?? Org-Default.
     let einsatz_override_rolle = ueberschreibung.and_then(|o| o.benoetigte_rolle.as_deref());
     let org_default = org_defaults.get(modul_key).and_then(|r| r.as_deref());
     let effektiv = effektive_modul_rolle(einsatz_override_rolle, org_default);
-    let benoetigte = effektiv
-        .as_deref()
-        .or_else(|| registry_benoetigte_rolle(modul_key));
-    match benoetigte {
+    match effektiv.as_deref() {
         Some("admin") => Err(AppError::Forbidden), // System-Admin ist oben bereits durch.
         Some("fuehrungskraft") => {
             if benutzer.ist_hoehere_berechtigung() {
@@ -982,7 +979,7 @@ mod tests {
 
     #[test]
     fn modul_zugriff_kein_override_kein_org_default_frei() {
-        // Weder Einsatz-Override noch Org-Default → frei (Registry-Default = None).
+        // Weder Einsatz-Override noch Org-Default → frei.
         let normal = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
         let leer: HashMap<String, EinsatzModulOverride> = HashMap::new();
         assert!(fordere_modul_zugriff(&leer, &leere_org_defaults(), "etb", &normal).is_ok());

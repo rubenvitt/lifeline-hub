@@ -366,17 +366,6 @@ pub async fn storniere_tx(
     .await
 }
 
-/// Pool-Wrapper (eigene Tx).
-pub async fn storniere(
-    pool: &SqlitePool,
-    einsatz_id: i64,
-    tier_id: i64,
-    geaendert_von: i64,
-) -> Result<(), AppError> {
-    let mut conn = pool.acquire().await?;
-    storniere_tx(&mut conn, einsatz_id, tier_id, geaendert_von).await
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -437,7 +426,9 @@ mod tests {
         let t1 = anlegen(&pool, e, b, "aktiv", hund()).await.unwrap();
         assert_eq!(t1.registrier_nr, 1);
         assert_eq!(t1.status, TierStatus::Aktiv);
-        storniere(&pool, e, t1.id, b).await.unwrap();
+        storniere_tx(&mut *pool.acquire().await.unwrap(), e, t1.id, b)
+            .await
+            .unwrap();
         let t2 = anlegen(&pool, e, b, "vermisst", hund()).await.unwrap();
         assert_eq!(t2.registrier_nr, 2, "Soft-Delete recycelt keine Nummern");
         assert_eq!(t2.status, TierStatus::Vermisst);
@@ -464,7 +455,9 @@ mod tests {
         let pool = test_pool().await;
         let (b, e) = setup(&pool).await;
         let t1 = anlegen(&pool, e, b, "aktiv", hund()).await.unwrap();
-        storniere(&pool, e, t1.id, b).await.unwrap();
+        storniere_tx(&mut *pool.acquire().await.unwrap(), e, t1.id, b)
+            .await
+            .unwrap();
         let liste = liste(&pool, e, None, None, None).await.unwrap();
         assert!(liste.is_empty(), "storniertes Tier nicht in der Liste");
         let detail = laden(&pool, e, t1.id).await.unwrap();

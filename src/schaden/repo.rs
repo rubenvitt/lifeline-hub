@@ -286,25 +286,6 @@ pub async fn uebergebe_tx(
     Ok(())
 }
 
-/// Pool-Wrapper (eigene Tx).
-pub async fn uebergebe(
-    pool: &SqlitePool,
-    einsatz_id: i64,
-    schaden_id: i64,
-    uebergeben_an: &str,
-    geaendert_von: i64,
-) -> Result<(), AppError> {
-    let mut conn = pool.acquire().await?;
-    uebergebe_tx(
-        &mut conn,
-        einsatz_id,
-        schaden_id,
-        uebergeben_an,
-        geaendert_von,
-    )
-    .await
-}
-
 /// Schließt einen Schaden ab INNERHALB einer offenen Transaktion (F06/LFH-244, Tier-A:
 /// atomar mit dem System-ETB-Eintrag). `NotFound`, falls nicht zum Einsatz.
 pub async fn schliesse_ab_tx(
@@ -353,27 +334,6 @@ pub async fn schliesse_ab_tx(
     Ok(())
 }
 
-/// Pool-Wrapper (eigene Tx).
-pub async fn schliesse_ab(
-    pool: &SqlitePool,
-    einsatz_id: i64,
-    schaden_id: i64,
-    abschluss_grund: &str,
-    notiz: Option<&str>,
-    geaendert_von: i64,
-) -> Result<(), AppError> {
-    let mut conn = pool.acquire().await?;
-    schliesse_ab_tx(
-        &mut conn,
-        einsatz_id,
-        schaden_id,
-        abschluss_grund,
-        notiz,
-        geaendert_von,
-    )
-    .await
-}
-
 /// Storniert einen Schaden (Soft-Delete) INNERHALB einer offenen Transaktion (F06/LFH-244,
 /// Tier-A: atomar mit dem System-ETB-Eintrag). Fremd → `NotFound`, storniert → `Conflict`.
 pub async fn storniere_tx(
@@ -392,17 +352,6 @@ pub async fn storniere_tx(
         Some("Schaden ist bereits storniert"),
     )
     .await
-}
-
-/// Pool-Wrapper (eigene Tx).
-pub async fn storniere(
-    pool: &SqlitePool,
-    einsatz_id: i64,
-    schaden_id: i64,
-    storniert_von: i64,
-) -> Result<(), AppError> {
-    let mut conn = pool.acquire().await?;
-    storniere_tx(&mut conn, einsatz_id, schaden_id, storniert_von).await
 }
 
 /// Prüft, ob eine Einsatzkraft (einsatz_personal) zu diesem Einsatz gehört
@@ -481,7 +430,15 @@ mod tests {
         let pool = test_pool().await;
         let (b, e) = setup(&pool).await;
         let s = anlegen(&pool, e, b, minimal()).await.unwrap();
-        uebergebe(&pool, e, s.id, "Stadtwerke", b).await.unwrap();
+        uebergebe_tx(
+            &mut *pool.acquire().await.unwrap(),
+            e,
+            s.id,
+            "Stadtwerke",
+            b,
+        )
+        .await
+        .unwrap();
         let neu = laden(&pool, e, s.id).await.unwrap();
         assert_eq!(neu.status, SchadenStatus::Uebergeben);
         assert_eq!(neu.uebergeben_an.as_deref(), Some("Stadtwerke"));
@@ -503,9 +460,16 @@ mod tests {
         )
         .await
         .unwrap();
-        schliesse_ab(&pool, e, s.id, "behoben", Some("vor Ort erledigt"), b)
-            .await
-            .unwrap();
+        schliesse_ab_tx(
+            &mut *pool.acquire().await.unwrap(),
+            e,
+            s.id,
+            "behoben",
+            Some("vor Ort erledigt"),
+            b,
+        )
+        .await
+        .unwrap();
         let neu = laden(&pool, e, s.id).await.unwrap();
         assert_eq!(neu.status, SchadenStatus::Abgeschlossen);
         assert_eq!(neu.abschluss_grund, Some(AbschlussGrund::Behoben));
@@ -522,7 +486,9 @@ mod tests {
         let pool = test_pool().await;
         let (b, e) = setup(&pool).await;
         let s = anlegen(&pool, e, b, minimal()).await.unwrap();
-        storniere(&pool, e, s.id, b).await.unwrap();
+        storniere_tx(&mut *pool.acquire().await.unwrap(), e, s.id, b)
+            .await
+            .unwrap();
         let neu = laden(&pool, e, s.id).await.unwrap();
         assert!(neu.storniert_at.is_some());
         assert_eq!(neu.storniert_von, Some(b));
@@ -533,7 +499,9 @@ mod tests {
         let pool = test_pool().await;
         let (b, e) = setup(&pool).await;
         let s = anlegen(&pool, e, b, minimal()).await.unwrap();
-        storniere(&pool, e, s.id, b).await.unwrap();
+        storniere_tx(&mut *pool.acquire().await.unwrap(), e, s.id, b)
+            .await
+            .unwrap();
         let ohne = liste(&pool, e, None, None, None, None, false)
             .await
             .unwrap();

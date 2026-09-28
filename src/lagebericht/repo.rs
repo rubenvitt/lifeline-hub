@@ -238,31 +238,6 @@ pub async fn aktualisiere_tx(
     laden(&mut *conn, einsatz_id, id).await
 }
 
-/// Gibt einen Entwurf frei: schreibt **in einer Transaktion** den gerenderten
-/// Snapshot als etb_eintrag (typ='lage', ereigniszeit=zeitstand), verknüpft beide
-/// Seiten und setzt den Bericht auf `freigegeben` (danach immutable). `render` und
-/// `zeitstand` bringt der Aufrufer mit; Validierung und Rendering aus dem Datensatz macht
-/// [`freigeben_gerendert`] bzw. [`freigeben_tx`]. `zeitstand` ist bereits normalisiert.
-/// `UnprocessableEntity`, wenn der Bericht nicht (mehr) im Entwurf ist.
-///
-/// Pool-Hülle um [`snapshot_freigeben_tx`] in `write_retry!` (`BEGIN IMMEDIATE`): der Rumpf
-/// liest zuerst die Einstellungen und schreibt dann. Scheitert die Status-Bedingung, fällt
-/// die Transaktion samt eben angelegtem ETB-Eintrag zurück, es bleibt kein verwaister Snapshot.
-pub async fn freigeben(
-    pool: &SqlitePool,
-    einsatz_id: i64,
-    id: i64,
-    freigeber_id: i64,
-    render: &str,
-    zeitstand: &str,
-) -> Result<LageberichtAnzeige, AppError> {
-    crate::write_retry!(pool, |conn| {
-        snapshot_freigeben_tx(conn, einsatz_id, id, freigeber_id, render, zeitstand).await?;
-        Ok(())
-    })?;
-    laden(pool, einsatz_id, id).await
-}
-
 /// Freigabe aus dem gespeicherten Entwurf, wie der Handler sie braucht: Pool-Hülle um
 /// [`freigeben_tx`] in `write_retry!`. Lesen, Prüfen, Rendern und Schreiben laufen damit in
 /// EINER Transaktion; die Anzeige kommt aus derselben Transaktion zurück.
@@ -426,6 +401,22 @@ pub async fn fortschreiben(
 mod tests {
     use super::*;
     use crate::lagebericht::{vorlage, STATUS_ENTWURF};
+
+    /// Pool-Hülle für die Tests: Freigabe mit vorgegebenem Snapshot in `write_retry!`.
+    async fn freigeben(
+        pool: &SqlitePool,
+        einsatz_id: i64,
+        id: i64,
+        freigeber_id: i64,
+        render: &str,
+        zeitstand: &str,
+    ) -> Result<LageberichtAnzeige, AppError> {
+        crate::write_retry!(pool, |conn| {
+            snapshot_freigeben_tx(conn, einsatz_id, id, freigeber_id, render, zeitstand).await?;
+            Ok(())
+        })?;
+        laden(pool, einsatz_id, id).await
+    }
 
     /// Legt Org (id=1), einen Benutzer und einen Einsatz an;
     /// liefert (einsatz_id, ersteller_id).

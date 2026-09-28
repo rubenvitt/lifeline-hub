@@ -58,27 +58,9 @@ pub async fn loesche_quittung(
 
 /// Wie [`quittiere`], aber **einmalig**: schreibt die Quittung nur, wenn noch keine
 /// existiert (Guard `quittiert_at IS NULL` im DO-UPDATE). Liefert `true`, wenn DIESER Aufruf
-/// quittiert hat — sonst `false` (bereits quittiert). Macht „Doppel-Bestätigung → 422" atomar,
-/// ohne TOCTOU (Muster wie setze_eskaliert). Die geteilte `quittiere` bleibt last-writer-wins.
-pub async fn quittiere_einmalig(
-    pool: &SqlitePool,
-    org_id: i64,
-    einsatz_id: i64,
-    objekt_typ: &str,
-    objekt_id: i64,
-    von_id: i64,
-    jetzt: &str,
-) -> Result<bool, AppError> {
-    let mut conn = pool.acquire().await?;
-    quittiere_einmalig_tx(
-        &mut conn, org_id, einsatz_id, objekt_typ, objekt_id, von_id, jetzt,
-    )
-    .await
-}
-
-/// Transaktionsfaehige Variante von [`quittiere_einmalig`]. Der Aufrufer kann die
-/// Quittung damit atomar mit Folgeaenderungen (z. B. Reminder schliessen und
-/// Eskalations-Flag loeschen) committen oder gemeinsam zurueckrollen.
+/// quittiert hat — sonst `false`. Macht „Doppel-Bestätigung → 422" atomar, ohne TOCTOU.
+/// Läuft auf der Verbindung des Aufrufers, damit die Quittung mit Folgeaenderungen (z. B.
+/// Reminder schliessen, Eskalations-Flag loeschen) gemeinsam committet oder zurueckrollt.
 #[allow(clippy::too_many_arguments)]
 pub async fn quittiere_einmalig_tx(
     conn: &mut sqlx::SqliteConnection,
@@ -183,56 +165,6 @@ pub async fn lade_status(
     .fetch_optional(pool)
     .await
     .map_err(Into::into)
-}
-
-/// Vermerkt Zustellung (zugestellt_at) je (Objekt, Empfänger), idempotent.
-pub async fn vermerke_zustellung(
-    pool: &SqlitePool,
-    org_id: i64,
-    einsatz_id: i64,
-    objekt_typ: &str,
-    objekt_id: i64,
-    empfaenger_id: i64,
-    jetzt: &str,
-) -> Result<(), AppError> {
-    sqlx::query(
-        "INSERT INTO kommunikation_zustellung \
-           (org_id, einsatz_id, objekt_typ, objekt_id, empfaenger_id, zugestellt_at) \
-         VALUES (?, ?, ?, ?, ?, ?) \
-         ON CONFLICT(objekt_typ, objekt_id, empfaenger_id) DO UPDATE SET \
-           zugestellt_at = COALESCE(kommunikation_zustellung.zugestellt_at, excluded.zugestellt_at)",
-    )
-    .bind(org_id).bind(einsatz_id).bind(objekt_typ).bind(objekt_id).bind(empfaenger_id).bind(jetzt)
-    .execute(pool).await?;
-    Ok(())
-}
-
-/// Markiert Lesebestätigung (gelesen_at) je (Objekt, Empfänger), idempotent.
-pub async fn markiere_gelesen(
-    pool: &SqlitePool,
-    org_id: i64,
-    einsatz_id: i64,
-    objekt_typ: &str,
-    objekt_id: i64,
-    empfaenger_id: i64,
-    jetzt: &str,
-) -> Result<(), AppError> {
-    sqlx::query(
-        "INSERT INTO kommunikation_zustellung \
-           (org_id, einsatz_id, objekt_typ, objekt_id, empfaenger_id, gelesen_at) \
-         VALUES (?, ?, ?, ?, ?, ?) \
-         ON CONFLICT(objekt_typ, objekt_id, empfaenger_id) DO UPDATE SET \
-           gelesen_at = COALESCE(kommunikation_zustellung.gelesen_at, excluded.gelesen_at)",
-    )
-    .bind(org_id)
-    .bind(einsatz_id)
-    .bind(objekt_typ)
-    .bind(objekt_id)
-    .bind(empfaenger_id)
-    .bind(jetzt)
-    .execute(pool)
-    .await?;
-    Ok(())
 }
 
 #[cfg(test)]
@@ -359,43 +291,6 @@ mod tests {
             .await
             .unwrap()
             .is_none());
-    }
-
-    #[tokio::test]
-    async fn zustellung_gelesen_ist_idempotent_pro_empfaenger() {
-        let pool = crate::db::test_pool().await;
-        let (b, e) = setup(&pool).await;
-        markiere_gelesen(&pool, 1, e, OBJEKT_ERINNERUNG, 7, b, "2026-06-11 10:00:00")
-            .await
-            .unwrap();
-        markiere_gelesen(&pool, 1, e, OBJEKT_ERINNERUNG, 7, b, "2026-06-11 10:05:00")
-            .await
-            .unwrap();
-        let n: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM kommunikation_zustellung WHERE objekt_id = 7 AND empfaenger_id = ?")
-            .bind(b).fetch_one(&pool).await.unwrap();
-        assert_eq!(n, 1);
-    }
-
-    #[tokio::test]
-    async fn vermerke_zustellung_haelt_ersten_zeitstempel() {
-        let pool = crate::db::test_pool().await;
-        let (b, e) = setup(&pool).await;
-        vermerke_zustellung(&pool, 1, e, OBJEKT_ERINNERUNG, 7, b, "2026-06-11 10:00:00")
-            .await
-            .unwrap();
-        vermerke_zustellung(&pool, 1, e, OBJEKT_ERINNERUNG, 7, b, "2026-06-11 10:09:00")
-            .await
-            .unwrap();
-        let row: (i64, Option<String>) = sqlx::query_as(
-            "SELECT COUNT(*), MIN(zugestellt_at) FROM kommunikation_zustellung WHERE objekt_id = 7 AND empfaenger_id = ?")
-            .bind(b).fetch_one(&pool).await.unwrap();
-        assert_eq!(row.0, 1, "eine Zeile je (Objekt, Empfänger)");
-        assert_eq!(
-            row.1.as_deref(),
-            Some("2026-06-11 10:00:00"),
-            "erster Zeitstempel bleibt erhalten"
-        );
     }
 
     #[tokio::test]
