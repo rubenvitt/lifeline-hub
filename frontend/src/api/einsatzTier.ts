@@ -1,5 +1,5 @@
 import type { Tier, TierStatus, Spezies } from './types';
-import { apiGet, apiSend } from './client';
+import { apiGet, apiSend, mitParametern } from './client';
 import { patchBody } from './patchTriState';
 import { registrierNummer } from '../anzeige/registrierNummer';
 
@@ -48,12 +48,13 @@ export interface TiereFilter {
 }
 
 export function listeTiere(einsatzId: number, filter: TiereFilter = {}): Promise<Tier[]> {
-  const params = new URLSearchParams();
-  if (filter.status) params.set('status', filter.status);
-  if (filter.spezies) params.set('spezies', filter.spezies);
-  if (filter.halterPersonId != null) params.set('halter_person_id', String(filter.halterPersonId));
-  const q = params.toString();
-  return apiGet<Tier[]>(`/api/einsaetze/${einsatzId}/tiere${q ? `?${q}` : ''}`);
+  return apiGet<Tier[]>(
+    mitParametern(`/api/einsaetze/${einsatzId}/tiere`, {
+      status: filter.status,
+      spezies: filter.spezies,
+      halter_person_id: filter.halterPersonId,
+    }),
+  );
 }
 
 export function ladeTier(einsatzId: number, tierId: number): Promise<Tier> {

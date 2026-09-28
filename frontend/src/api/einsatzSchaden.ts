@@ -1,5 +1,5 @@
 import type { Schaden, SchadenAnhang, SchadenStatus, SchadenTyp, Ausmass } from './types';
-import { apiGet, apiSend, apiUpload } from './client';
+import { apiGet, apiSend, apiUpload, mitParametern } from './client';
 import { UPLOAD_TIMEOUT_MS } from './upload';
 import { registrierNummer } from '../anzeige/registrierNummer';
 
@@ -43,15 +43,15 @@ export interface SchaedenFilter {
 }
 
 export function listeSchaeden(einsatzId: number, filter: SchaedenFilter = {}): Promise<Schaden[]> {
-  const params = new URLSearchParams();
-  if (filter.status) params.set('status', filter.status);
-  if (filter.typ) params.set('typ', filter.typ);
-  if (filter.ausmass) params.set('ausmass', filter.ausmass);
-  if (filter.geschaedigtPersonId != null)
-    params.set('geschaedigt_person_id', String(filter.geschaedigtPersonId));
-  if (filter.inklStorniert) params.set('inkl_storniert', 'true');
-  const q = params.toString();
-  return apiGet<Schaden[]>(`/api/einsaetze/${einsatzId}/schaeden${q ? `?${q}` : ''}`);
+  return apiGet<Schaden[]>(
+    mitParametern(`/api/einsaetze/${einsatzId}/schaeden`, {
+      status: filter.status,
+      typ: filter.typ,
+      ausmass: filter.ausmass,
+      geschaedigt_person_id: filter.geschaedigtPersonId,
+      inkl_storniert: filter.inklStorniert,
+    }),
+  );
 }
 
 export function ladeSchaden(einsatzId: number, schadenId: number): Promise<Schaden> {
