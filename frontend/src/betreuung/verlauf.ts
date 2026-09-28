@@ -4,15 +4,10 @@ import { istNachgetragen } from '../etb/typFarben';
 import { ERHEBUNG_LABEL, personenZahl } from './betreuungText';
 
 /**
- * Reine Hilfen des Meldeverlaufs (LFH-676, design.md D2/D5/D6).
- *
- * Beide Reihen — Standmeldungen eines Bezirks, Belegungsmeldungen einer Stelle — laufen auf
- * EINE Zeilenform zusammen. Die Komponente kennt danach nur noch diese Form, und Wortlaut
- * und Zahlformat stehen an einer Stelle statt je Reihe.
- *
- * Was hier bewusst FEHLT: jede Rechnung, welche Meldung „aktuell“ ist. Das liefert der Server
- * aus dem Zeiger am Objekt (`aktuell`). Eine zweite Definition im Client könnte von der der
- * Karte abweichen, ohne dass ein Test es bemerkt.
+ * Reine Hilfen des Meldeverlaufs: Stand- und Belegungsmeldungen laufen auf EINE Zeilenform
+ * zusammen.
+ * Bewusst FEHLT jede Rechnung, welche Meldung „aktuell“ ist — das liefert der Server aus dem
+ * Zeiger am Objekt; eine zweite Definition könnte unbemerkt abweichen.
  */
 
 export interface VerlaufZeile {
@@ -57,9 +52,8 @@ export function belegungZeile(e: BelegungVerlaufEintrag): VerlaufZeile {
 }
 
 /**
- * Nachgetragen heißt: der Zeitpunkt liegt mindestens 60 s vor der Erfassung. Das ist
- * `istNachgetragen` aus dem ETB, das der ETB-Eintrag derselben Meldung für sein ⧖ nutzt
- * (`ereigniszeit = zeitpunkt_at`) — eine Aussage an zwei Stellen, nicht zwei Schwellen.
+ * Nachgetragen: der Zeitpunkt liegt mindestens 60 s vor der Erfassung — `istNachgetragen` aus
+ * dem ETB, das der ETB-Eintrag derselben Meldung für sein ⧖ nutzt.
  */
 export function istNachgetragenMeldung(z: Pick<VerlaufZeile, 'zeitpunkt_at' | 'erfasst_at'>) {
   return istNachgetragen(z.zeitpunkt_at, z.erfasst_at);
@@ -71,24 +65,21 @@ export function aktuellWort(art: BetreuungVerlaufArt): string {
 }
 
 /**
- * Zugänglicher Name des Auslösers „Zurücknehmen“: Anzahl und Uhrzeit als Zeilenkennung
- * (LFH-365/369) — n Einträge ergäben sonst n gleichnamige Knöpfe. `zeit` kommt formatiert
- * vom Aufrufer, der die Anzeigekonventionen kennt.
+ * Zugänglicher Name des Auslösers „Zurücknehmen“: Anzahl und Uhrzeit als Zeilenkennung, sonst
+ * n gleichnamige Knöpfe. `zeit` kommt formatiert vom Aufrufer.
  */
 export function ruecknahmeName(z: Pick<VerlaufZeile, 'anzahl'>, zeit: string): string {
   return `Meldung ${personenZahl(z.anzahl)} von ${zeit} zurücknehmen`;
 }
 
 /**
- * Zweiter Satz der Rückfrage. Er sagt, ob die Meldung den Stand trägt, nennt aber KEINE
- * vorhergesagte neue Zahl: die bestimmt der Server beim Schreiben, und eine Vorhersage hier
- * wäre eine zweite Definition von „aktuell“ (design.md D6).
+ * Zweiter Satz der Rückfrage: ob die Meldung den Stand trägt, aber KEINE vorhergesagte neue
+ * Zahl — die bestimmt der Server; eine Vorhersage wäre eine zweite Definition von „aktuell“.
  */
 export function rueckfrageHinweis(art: BetreuungVerlaufArt, aktuell: boolean): string {
   const was = art === 'bezirk' ? 'aktuelle Stand' : 'aktuelle Belegung';
   if (aktuell) {
-    // Nicht „danach gilt die vorherige Meldung“: ist es die einzige nicht zurückgenommene,
-    // gibt es keine — der Bezirk steht dann ohne Stand da.
+    // Nicht „danach gilt die vorherige Meldung“: ist es die einzige, gibt es keine.
     return art === 'bezirk'
       ? `Das ist der ${was}. Er wird danach aus den übrigen Meldungen bestimmt.`
       : `Das ist die ${was}. Sie wird danach aus den übrigen Meldungen bestimmt.`;

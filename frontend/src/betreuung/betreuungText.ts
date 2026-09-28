@@ -9,12 +9,8 @@ import { auslastung } from '../theme/statusFarben';
 import type { EvakuierungKennzahl } from './evakuierungKennzahl';
 
 /**
- * Wortlaut und Zahlformat des Fachmoduls Betreuung (LFH-639), rein und exportiert.
- *
- * Die Zahlen stehen hier und nicht in der Seite, weil zwei Leser sie brauchen: die
- * Bezirkskarte („1 320 · von 1 850 geplant") und die Kennzahl im Lagebild (LFH-607). Zwei
- * Formatierer für dieselbe Aussage wären der Unterschied ohne Bedeutung, den niemand sieht,
- * bis Karte und Dashboard verschiedene Zahlen zu zeigen scheinen.
+ * Wortlaut und Zahlformat des Fachmoduls Betreuung, rein und exportiert — eine Formatierung für
+ * Bezirkskarte und Lage-Dashboard.
  */
 
 /** Schmales geschütztes Leerzeichen: Tausendertrenner (DIN 5008), bricht nicht um. */
@@ -28,12 +24,10 @@ export function personenZahl(n: number): string {
 }
 
 /**
- * „davon namentlich n" an einer Stelle (LFH-674, design.md D7): Personen, die einzeln mit
- * Verbleib „Notunterkunft" hierher verbracht wurden. Ein HINWEIS neben der Mengenmeldung, nie
- * ein Summand — führend ist die Belegung. Ohne Belegungsmeldung entfällt „davon", weil es keine
- * Menge gibt, von der die Zahl ein Teil wäre. Bei 0 oder ohne Auskunft (kein Personenrecht:
- * das Feld fehlt in der Antwort) steht nichts. Wort und Zahl kommen getrennt zurück, weil die
- * Zahl Mono mit `tabular-nums` läuft und das Wort nicht.
+ * „davon namentlich n": einzeln mit Verbleib „Notunterkunft" hierher verbrachte Personen. Ein
+ * HINWEIS neben der Mengenmeldung, nie ein Summand. Ohne Belegungsmeldung entfällt „davon"; bei
+ * 0 oder ohne Personenrecht (Feld fehlt) steht nichts. Wort und Zahl kommen getrennt zurück,
+ * weil nur die Zahl Mono mit `tabular-nums` läuft.
  */
 export function namentlichTeile(
   anzahl: number | undefined,
@@ -50,9 +44,8 @@ export function mengeText(n: number, erhebung: Erhebung): string {
 
 /**
  * Die Hauptzeile einer Bezirkskarte: „N · von M geplant".
- *
- * Ohne Standmeldung steht „keine Meldung" statt 0 — „nichts gemeldet" ist nicht „niemand
- * evakuiert" (Spec, Kennzahl-Anforderung). N wird NICHT auf M gedeckelt.
+ * Ohne Standmeldung „keine Meldung" statt 0 — „nichts gemeldet" ist nicht „niemand evakuiert".
+ * N wird NICHT auf M gedeckelt.
  */
 export function evakuiertText(
   b: Pick<Evakuierungsbezirk, 'stand' | 'plan_personen' | 'plan_erhebung'>,
@@ -62,16 +55,12 @@ export function evakuiertText(
 }
 
 /**
- * Die Kennzahl „Evakuiert N · von M geplant" in ihren zwei Teilen — N und der Rest. Die
- * Dashboard-Zelle (LFH-607) setzt N als Wert und den Rest als Notiz, der Blockkopf der Seite
- * setzt beides in eine Zeile ({@link kennzahlText}). EINE Formatierung für beide Leser.
+ * Die Kennzahl „Evakuiert N · von M geplant" in zwei Teilen — N und der Rest (Dashboard-Zelle:
+ * Wert und Notiz; Blockkopf: eine Zeile über {@link kennzahlText}).
  *
- * Ist ein beteiligter Stand oder eine Plangröße geschätzt, trägt die Kennzahl ein „≈" (Spec
- * „Kennzahl"): vor N, solange es ein N gibt; ohne jede Meldung vor M — dann kann nur die
- * Plangröße geschätzt sein, und ohne das Zeichen wirkte sie gezählt. `evakuiert` ist dann
- * `null`: „nichts gemeldet" ist nicht „niemand evakuiert", der Aufrufer setzt sein eigenes
- * Wort statt einer 0. Bezirke ohne Meldung stehen in der Notiz, statt als 0 in N zu
- * verschwinden.
+ * Ist ein beteiligter Stand oder eine Plangröße geschätzt, steht „≈" vor N bzw. ohne jede
+ * Meldung vor M. `evakuiert` ist ohne Meldung `null` — der Aufrufer setzt sein eigenes Wort
+ * statt einer 0. Bezirke ohne Meldung stehen in der Notiz.
  */
 export function kennzahlTeile(k: EvakuierungKennzahl): { evakuiert: string | null; notiz: string } {
   const ca = k.geschaetzt ? '≈ ' : '';
@@ -97,12 +86,9 @@ export function freiePlaetze(
 }
 
 /**
- * Zahl der Stellen, die „voll" oder „überbelegt" sind — die Einstufungen mit der Rolle `alarm`
- * (LFH-678, Kriterium 9 der Prüfliste LFH-639). „fast voll" (`achtung`) zählt nicht.
- *
- * Abgeleitet aus {@link auslastung}, nicht aus eigenen Schwellen: sonst könnten Kopfzahl und
- * Wort in der Spalte „belegt" auseinanderlaufen. Eine geschlossene Stelle braucht keinen
- * Sonderfall — schließen darf man nur bei Belegung 0 (design.md), sie ist also nie voll.
+ * Zahl der Stellen, die „voll" oder „überbelegt" sind (Rolle `alarm`); „fast voll" zählt nicht.
+ * Abgeleitet aus {@link auslastung}, damit Kopfzahl und Wort in der Spalte „belegt" nicht
+ * auseinanderlaufen. Eine geschlossene Stelle ist nie voll (schließen nur bei Belegung 0).
  */
 export function volleStellen(
   stellen: readonly Pick<Betreuungsstelle, 'kapazitaet_personen' | 'belegung'>[],

@@ -52,9 +52,8 @@ const stelle = (over: Partial<Betreuungsstelle> = {}): Betreuungsstelle => ({
 const ABSCHNITTE = [{ value: 3, label: 'Deichwache Nord' }];
 
 /**
- * Zählt die BEDIENBAREN Felder — Muster `stab/LagebesprechungModal.test.tsx`. Die Rollenabfrage
- * blendet aus, was im Barrierefreiheitsbaum nicht steht; genau das ist der eingeklappte Bereich
- * (`forceRender` lässt ihn im DOM, `display: none` am Element).
+ * Zählt die BEDIENBAREN Felder: die Rollenabfrage blendet den eingeklappten Bereich aus
+ * (`forceRender` hält ihn im DOM, `display: none` am Element).
  */
 function sichtbareFelder(dialog: HTMLElement): number {
   const rollen = ['textbox', 'spinbutton', 'combobox', 'checkbox', 'radio', 'switch'] as const;
@@ -268,8 +267,8 @@ describe('Obergrenze der Personenzahlen (LFH-680)', () => {
     await userEvent.type(feld, '1000001');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Melden' }));
     expect(await within(dialog).findByText(/Höchstens 1\s000\s000 Personen/)).toBeInTheDocument();
-    // Kein `max` am InputNumber: das klemmte beim Verlassen still auf 1 000 000, und eine
-    // Personenzahl, die sich still ändert, wäre schlimmer als die Ablehnung.
+    // Kein `max` am InputNumber: das klemmte beim Verlassen still auf 1 000 000; eine Personenzahl,
+    // die sich still ändert, wäre schlimmer als die Ablehnung.
     expect(feld).toHaveValue('1000001');
     expect(onErfassen).not.toHaveBeenCalled();
   });

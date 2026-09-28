@@ -64,8 +64,8 @@ describe('LagebesprechungHistorie', () => {
       .map((li) => within(li).getByRole('heading', { level: 4 }).textContent);
 
   /**
-   * I4 (Ruling 11): die Historie steht ÜBER der Besetzung. Ab dem vierten Eintrag wächst sie
-   * nicht mehr in der Höhe — ein Live-Abschluss ändert nur die Zahl im Expander-Titel.
+   * Die Historie steht ÜBER der Besetzung; ab dem vierten Eintrag wächst sie nicht mehr in der
+   * Höhe — ein Live-Abschluss ändert nur die Zahl im Expander-Titel.
    */
   it('zeigt die drei jüngsten; die älteren liegen eingeklappt im Expander mit Anzahl', async () => {
     zeige(() => HttpResponse.json([eintrag(5), eintrag(4), eintrag(3), eintrag(2), eintrag(1)]));
@@ -111,9 +111,8 @@ describe('LagebesprechungHistorie', () => {
   });
 
   /**
-   * Fehler ≠ leer auch NACH einer ersten Antwort (LFH-331 · B3): `[]` ist truthy. Eine Prüfung
-   * auf den Wahrheitswert der Daten zeigte hier „Stand veraltet" über dem Leer-Text — eine
-   * Aussage über eine Menge, die nach dem gescheiterten Abruf niemand kennt.
+   * Fehler ≠ leer auch NACH einer ersten Antwort: `[]` ist truthy, eine Prüfung auf den
+   * Wahrheitswert zeigte „Stand veraltet" über dem Leer-Text.
    */
   it('leer geladen, dann scheitert das Neuladen → Fehler, kein Leer-Text', async () => {
     const { client } = zeige(() => HttpResponse.json([]));

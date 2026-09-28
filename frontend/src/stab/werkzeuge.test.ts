@@ -5,8 +5,8 @@ import type { ModulEintrag } from '../einsatz/modulRegistry';
 import { werkzeugeFuer } from './werkzeuge';
 
 /**
- * Registry-STUB statt der echten Registry (Muster `befehle.modulstatus.test.ts`): nach dem Flip
- * gibt es kein `wip`-Modul mehr, an dem sich der Status-Zweig beobachten ließe.
+ * Registry-STUB statt der echten Registry: es gibt kein `wip`-Modul mehr, an dem sich der
+ * Status-Zweig beobachten ließe.
  */
 const stub = (over: Partial<ModulEintrag>): ModulEintrag => ({
   key: 'x',
