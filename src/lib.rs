@@ -53,6 +53,7 @@ pub mod stab;
 pub mod staerke;
 pub mod static_files;
 pub mod stichwort;
+pub mod storno;
 pub mod tier;
 pub mod tls;
 pub mod tx;

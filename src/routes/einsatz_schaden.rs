@@ -617,11 +617,8 @@ pub async fn stornieren(
     fordere_aktiv(&einsatz)?;
 
     let vorher = schaden_repo::laden(&state.pool, einsatz_id, schaden_id).await?; // 404
-    if vorher.storniert_at.is_some() {
-        return Err(AppError::Conflict("Schaden ist bereits storniert".into()));
-    }
-    // F06/LFH-244 Tier-A: Storno-UPDATE + System-ETB-Eintrag atomar in EINER Tx. Der ETB-Text
-    // ist aus `vorher` VOR der Tx berechenbar. SSE erst nach dem Commit.
+                                                                                  // F06/LFH-244 Tier-A: Storno-UPDATE + System-ETB-Eintrag atomar in EINER Tx. Der ETB-Text
+                                                                                  // ist aus `vorher` VOR der Tx berechenbar. SSE erst nach dem Commit.
     let text = format!(
         "Schaden {} storniert",
         registrier_anzeige(vorher.registrier_nr)

@@ -445,7 +445,12 @@ mod tests {
         belege(&pool, e, br, "einheit", einheit, "eintritt", None, b)
             .await
             .unwrap();
-        assert_eq!(br_repo::aktive_belegungen(&pool, br).await.unwrap(), 1);
+        assert_eq!(
+            br_repo::aktive_belegungen_tx(&mut *pool.acquire().await.unwrap(), br)
+                .await
+                .unwrap(),
+            1
+        );
 
         let ev = belege(&pool, e, br, "einheit", einheit, "austritt", None, b)
             .await
@@ -454,7 +459,12 @@ mod tests {
         assert_eq!(cache_einheit(&pool, einheit).await, None);
 
         // WICHTIG: nach Austritt muss BR auflösbar sein
-        assert_eq!(br_repo::aktive_belegungen(&pool, br).await.unwrap(), 0);
+        assert_eq!(
+            br_repo::aktive_belegungen_tx(&mut *pool.acquire().await.unwrap(), br)
+                .await
+                .unwrap(),
+            0
+        );
         br_repo::setze_status(&pool, e, br, "aufgeloest", b)
             .await
             .unwrap();
@@ -571,7 +581,12 @@ mod tests {
             .unwrap();
 
         assert_eq!(cache_fahrzeug(&pool, fz).await, None);
-        assert_eq!(br_repo::aktive_belegungen(&pool, br).await.unwrap(), 0);
+        assert_eq!(
+            br_repo::aktive_belegungen_tx(&mut *pool.acquire().await.unwrap(), br)
+                .await
+                .unwrap(),
+            0
+        );
     }
 
     // ─── Validierungs-Tests ─────────────────────────────────────────────────

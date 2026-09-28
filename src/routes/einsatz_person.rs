@@ -688,9 +688,6 @@ pub async fn stornieren(
     fordere_aktiv(&einsatz)?;
 
     let person = repo::laden(&state.pool, einsatz_id, person_id).await?;
-    if person.storniert_at.is_some() {
-        return Err(AppError::Conflict("Person ist bereits storniert".into()));
-    }
     repo::storniere(&state.pool, einsatz_id, person_id, benutzer.id).await?;
     // E‑3: Storno → UHS-Auto-Austritt + Reservierungs-Cleanup (Repo schreibt nur ETB, wenn Austritt nötig).
     if let Some(effekt) = crate::uhs::auto_austritt(

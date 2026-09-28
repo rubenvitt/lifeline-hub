@@ -492,9 +492,6 @@ pub async fn stornieren(
     fordere_aktiv(&einsatz)?;
 
     let tier = tier_repo::laden(&state.pool, einsatz_id, tier_id).await?;
-    if tier.storniert_at.is_some() {
-        return Err(AppError::Conflict("Tier ist bereits storniert".into()));
-    }
     // F06/LFH-244 Tier-A: Storno-UPDATE + System-ETB-Eintrag atomar in EINER Tx.
     let text = format!("Tier {} storniert", registrier_anzeige(tier.registrier_nr));
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;

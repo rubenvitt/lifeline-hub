@@ -258,7 +258,8 @@ pub async fn aktualisiere(
 }
 
 /// Setzt den Status auf `uebergeben` INNERHALB einer offenen Transaktion (F06/LFH-244,
-/// Tier-A: atomar mit dem System-ETB-Eintrag). `NotFound`, falls nicht zum Einsatz.
+/// Tier-A: atomar mit dem System-ETB-Eintrag). Fremd → `NotFound`, schon storniert →
+/// `Conflict`.
 pub async fn uebergebe_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -374,29 +375,23 @@ pub async fn schliesse_ab(
 }
 
 /// Storniert einen Schaden (Soft-Delete) INNERHALB einer offenen Transaktion (F06/LFH-244,
-/// Tier-A: atomar mit dem System-ETB-Eintrag). `NotFound`, falls nicht zum Einsatz.
+/// Tier-A: atomar mit dem System-ETB-Eintrag). Fremd → `NotFound`, storniert → `Conflict`.
 pub async fn storniere_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     schaden_id: i64,
     storniert_von: i64,
 ) -> Result<(), AppError> {
-    let betroffen = sqlx::query(
-        "UPDATE einsatz_schaden SET storniert_at = strftime('%Y-%m-%d %H:%M:%S','now'), \
-            storniert_von = ?, geaendert_at = strftime('%Y-%m-%d %H:%M:%S','now'), geaendert_von = ? \
-         WHERE id = ? AND einsatz_id = ?",
+    crate::storno::storniere(
+        conn,
+        "einsatz_schaden",
+        "einsatz_id",
+        einsatz_id,
+        schaden_id,
+        crate::storno::Vermerk::GeaendertUndStorniert(storniert_von),
+        Some("Schaden ist bereits storniert"),
     )
-    .bind(storniert_von)
-    .bind(storniert_von)
-    .bind(schaden_id)
-    .bind(einsatz_id)
-    .execute(&mut *conn)
-    .await?
-    .rows_affected();
-    if betroffen == 0 {
-        return Err(AppError::NotFound);
-    }
-    Ok(())
+    .await
 }
 
 /// Pool-Wrapper (eigene Tx).
