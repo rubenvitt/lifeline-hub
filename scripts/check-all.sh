@@ -82,9 +82,15 @@ FE="$ROOT/frontend"
 #           deterministisch mit „object.stream is not a function" (@mswjs/interceptors
 #           ruft .stream() auf einem Blob, den Node 22 nicht so liefert).
 #
-# 26.7.0 trägt beides: Vitest 3666/3666 und e2e 93/93, ohne Absturz. Wer die Zahl
+# 26.7.0 trug beides: Vitest 3666/3666 und e2e 93/93, ohne Absturz. Wer die Zahl
 # ändert, prüft BEIDE Schritte (5 und 7) — eine Version, die nur einen davon grün
 # macht, ist keine.
+#
+# Nachtrag 28.09.2026: Der Abbruch aus 26.8.1 trifft auch 26.7.0 (CI auf `alpha`,
+# derselbe Stack, Shard 3/4). Alle 26.x-Releases tragen dieselbe V8 14.6.202.34, die
+# Versionswahl innerhalb von 26 kann ihn also gar nicht beheben; „26.7.0 ohne Absturz"
+# war ein Lauf, in dem es ihn nicht erwischt hat. Die Abhilfe sitzt am Vite-Aufruf in
+# `frontend/playwright.config.ts` (`--no-turbo-fast-api-calls`), nicht hier.
 PNPM="mise exec node@26.7.0 pnpm@11.10.0 -- pnpm"
 SCHRITTE=10
 
