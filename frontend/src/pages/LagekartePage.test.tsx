@@ -1862,6 +1862,30 @@ describe('LagekartePage · Ebene „Betroffene" (LFH-648)', () => {
     expect(screen.queryByText(/Kowalski|Anna/)).not.toBeInTheDocument();
   });
 
+  // Objektsuche (LFH-716): die Leiste bekommt `suchbareMarker`, nicht `alleVerortet` — das Paar
+  // belegt die Verdrahtung samt Modulsperre an der Seite, nicht nur an der reinen Funktion.
+  it('mit Zugriff und eingeschalteter Ebene: die Objektsuche führt die Person (LFH-716)', async () => {
+    basisHandler([
+      ANSICHT_BETROFFENE_AN,
+      http.get('/api/einsaetze/1/personen', () => HttpResponse.json([PERSON_VERORTET])),
+    ]);
+    renderSeite();
+    expect(await screen.findByText('marker-person-11')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^R-042 · / })).toBeInTheDocument();
+  });
+
+  it('403 trotz eingeschalteter Ebene: die Objektsuche führt keine Person (LFH-716)', async () => {
+    basisHandler([
+      ANSICHT_BETROFFENE_AN,
+      http.get('/api/einsaetze/1/personen', () => new HttpResponse(null, { status: 403 })),
+    ]);
+    renderSeite();
+    expect(await screen.findByText('Keine Berechtigung')).toBeInTheDocument();
+    // Gegenprobe, dass die Suche überhaupt gefüllt ist — sonst wäre die Abwesenheit trivial.
+    expect(screen.getByText(/^Schaden \(\d+\)$/)).toBeInTheDocument();
+    expect(screen.queryByText(/^R-042/)).not.toBeInTheDocument();
+  });
+
   it('403 trotz eingeschalteter Ebene: kein Personen-Marker und KEIN Ausfallhinweis', async () => {
     basisHandler([
       ANSICHT_BETROFFENE_AN,
@@ -1933,6 +1957,17 @@ describe('LagekartePage · Ebene „Betroffene" (LFH-648)', () => {
     expect(screen.getByText('1 verortet · 1 nicht verortet')).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: 'Schäden' })).toHaveTextContent('Schäden1');
     expect(screen.getByRole('switch', { name: 'Betroffene' })).toHaveTextContent('Betroffene—');
+    // Die Objektsuche dagegen führt Betroffene bei eingeschalteter Ebene — ohne ihre Liste ist
+    // sie unvollständig und darf keine Zahl behaupten (LFH-716, Review M1).
+    expect(screen.getByText('Schaden (—)')).toBeInTheDocument();
+  });
+
+  it('ohne eingeschaltete Ebene macht ein Ausfall der Personenliste die Suche nicht unvollständig', async () => {
+    basisHandler([
+      http.get('/api/einsaetze/1/personen', () => new HttpResponse(null, { status: 500 })),
+    ]);
+    renderSeite();
+    expect(await screen.findByText('Schaden (1)')).toBeInTheDocument();
   });
 
   it('die Kopfzahl „verortet" zählt Betroffene nicht mit', async () => {
@@ -1954,7 +1989,9 @@ describe('LagekartePage · Ebene „Betroffene" (LFH-648)', () => {
     const user = userEvent.setup();
     renderSeite();
     await user.click(await screen.findByText('marker-person-11'));
-    expect(await screen.findByText('R-042 · SK II')).toBeInTheDocument();
+    // Im Paneel „Ausgewählt" — seit LFH-716 steht dieselbe Beschriftung auch in der Objektsuche.
+    const paneel = screen.getByRole('region', { name: 'Ausgewählt' });
+    expect(await within(paneel).findByText('R-042 · SK II')).toBeInTheDocument();
     expect(screen.queryByText(/Kowalski|Anna/)).not.toBeInTheDocument();
     // Item-Route (Deeplink-Muster LFH-25), nicht die Einsatzdaten des `default`-Zweigs.
     const link = await screen.findByRole('link', { name: /Im Fachmodul öffnen/ });

@@ -8,6 +8,7 @@ import type { GeoJsonGeometry, GeoJsonPolygon } from './geo';
 import type { KarteMarker } from './marker';
 import { useKartenInteraktion } from './useKartenInteraktion';
 import { einsatzKeys } from '../../api/queryKeys';
+import { leseZuletztVerwendet } from './zuletztVerwendet';
 
 // API-Client der freien Zeichen mocken (LFH-170 Etappe 3): der Hook ruft ihn bei Platzieren/
 // Ändern/Löschen; hier nur die Aufrufe prüfen (kein Netz).
@@ -510,6 +511,59 @@ describe('useKartenInteraktion — freies Zeichen platzieren (LFH-170)', () => {
     await waitFor(() => expect(result.current.zeichenSerieAnzahl).toBe(1));
     expect(result.current.zeichenPlatzieren).toEqual({ grundzeichen: 'stelle', label: 'X' });
     expect(erfolg).toHaveBeenCalledWith('Taktisches Zeichen angelegt');
+  });
+
+  // LFH-716 (D5): „zuletzt verwendet" zählt nur, was wirklich angelegt wurde — als Paar,
+  // sonst wäre ein Merken schon beim Start des Platzier-Modus ebenso grün.
+  it('merkt das Zeichen nach erfolgreichem Anlegen unter „zuletzt verwendet"', async () => {
+    localStorage.clear();
+    freieZeichenApi.legeFreiesZeichenAn.mockClear();
+    const { result } = rendere();
+    act(() => result.current.onZeichenPlatzierenStart({ grundzeichen: 'stelle', label: 'X' }));
+    expect(leseZuletztVerwendet()).toEqual([]);
+    act(() => result.current.onKarteKlick({ lng: 8.6, lat: 50.1 }));
+    await waitFor(() => expect(result.current.zeichenSerieAnzahl).toBe(1));
+    expect(leseZuletztVerwendet().map((z) => z.grundzeichen)).toEqual(['stelle']);
+  });
+
+  it('merkt das gesendete Zeichen auch, wenn der Modus vor der Antwort beendet wurde', async () => {
+    // Review LFH-716, M5: gemerkt wird, was gesendet wurde — nicht, was beim Eintreffen der
+    // Antwort noch im Platzier-Modus steht.
+    localStorage.clear();
+    let aufloesen: (v: { id: number }) => void = () => {};
+    freieZeichenApi.legeFreiesZeichenAn.mockReset();
+    freieZeichenApi.legeFreiesZeichenAn.mockImplementation(
+      () =>
+        new Promise((r) => {
+          aufloesen = r;
+        }),
+    );
+    const { result } = rendere();
+    act(() => result.current.onZeichenPlatzierenStart({ grundzeichen: 'stelle' }));
+    act(() => result.current.onKarteKlick({ lng: 8.6, lat: 50.1 }));
+    await waitFor(() => expect(freieZeichenApi.legeFreiesZeichenAn).toHaveBeenCalledTimes(1));
+    act(() => result.current.onZeichenPlatzierenFertig());
+    expect(result.current.zeichenPlatzieren).toBeNull();
+    await act(async () => aufloesen({ id: 7 }));
+    await waitFor(() =>
+      expect(leseZuletztVerwendet().map((z) => z.grundzeichen)).toEqual(['stelle']),
+    );
+    freieZeichenApi.legeFreiesZeichenAn.mockReset();
+    freieZeichenApi.legeFreiesZeichenAn.mockImplementation(() => Promise.resolve({ id: 42 }));
+  });
+
+  it('merkt nichts, wenn das Anlegen scheitert', async () => {
+    localStorage.clear();
+    freieZeichenApi.legeFreiesZeichenAn.mockReset();
+    freieZeichenApi.legeFreiesZeichenAn.mockImplementation(() => Promise.reject(new Error('500')));
+    const fehler = vi.fn();
+    const { result } = rendere(fehler);
+    act(() => result.current.onZeichenPlatzierenStart({ grundzeichen: 'stelle' }));
+    act(() => result.current.onKarteKlick({ lng: 8.6, lat: 50.1 }));
+    await waitFor(() => expect(fehler).toHaveBeenCalled());
+    expect(leseZuletztVerwendet()).toEqual([]);
+    freieZeichenApi.legeFreiesZeichenAn.mockReset();
+    freieZeichenApi.legeFreiesZeichenAn.mockImplementation(() => Promise.resolve({ id: 42 }));
   });
 
   it('quittiert Zonenänderung und -löschung erst nach erfolgreicher API-Antwort', async () => {

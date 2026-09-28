@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { afterEach, describe, it, expect, vi } from 'vitest';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { offeneRueckfrage } from '../../test/rueckfrage';
 import { renderMitProviders } from '../../test/utils';
@@ -34,25 +34,32 @@ function renderInspector(
 ) {
   const onAendern = opts.onAendern ?? vi.fn<FreiesZeichenInspectorProps['onAendern']>();
   const onLoeschen = opts.onLoeschen ?? vi.fn<FreiesZeichenInspectorProps['onLoeschen']>();
-  renderMitProviders(
+  const element = (zeichen: FreiesZeichen) => (
     <FreiesZeichenInspector
-      zeichen={opts.zeichen ?? basis}
+      zeichen={zeichen}
       darfSchreiben={opts.darfSchreiben ?? true}
       onSchliessen={() => {}}
       onAendern={onAendern}
       onLoeschen={onLoeschen}
       ansichten={[]}
       onVerschieben={() => {}}
-    />,
+    />
   );
-  return { onAendern, onLoeschen };
+  const ergebnis = renderMitProviders(element(opts.zeichen ?? basis));
+  /** Neuer Serverstand, wie ihn die Live-Invalidierung bringt (gleiche `id`, kein Remount). */
+  const serverstand = (zeichen: FreiesZeichen) => ergebnis.rerender(element(zeichen));
+  return { onAendern, onLoeschen, serverstand, unmount: ergebnis.unmount };
 }
 
 describe('FreiesZeichenInspector', () => {
-  it('rendert mit vorbelegtem Picker (Grundzeichen des Records sichtbar)', () => {
+  it('rendert mit vorbelegtem Picker (Grundzeichen des Records gewählt)', () => {
     renderInspector();
-    // Der Grundzeichen-Select zeigt das Label des Records als gewählten Wert.
-    expect(screen.getByText('Taktische Formation')).toBeInTheDocument();
+    expect(kachel('Taktische Formation')).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('nimmt dem Kartenklick nicht den Fokus (kein autoFokus im Inspector)', () => {
+    renderInspector();
+    expect(screen.getByLabelText('Grundzeichen suchen')).not.toHaveFocus();
   });
 
   // LFH-710: das Zeichen wird hart gelöscht (`freies_zeichen/repo.rs`) — unumkehrbar, also
@@ -117,5 +124,180 @@ describe('FreiesZeichenInspector', () => {
     // Werte als Text (Grundzeichen + gesetzte Overlays).
     expect(screen.getByText('Taktische Formation')).toBeInTheDocument();
     expect(screen.getByText('Feuerwehr')).toBeInTheDocument();
+  });
+});
+
+const kachel = (name: string) =>
+  within(screen.getByRole('radiogroup', { name: 'Grundzeichen' })).getByRole('radio', { name });
+
+/**
+ * Entprelltes Schreiben (LFH-716, D6). Als Raster meldet jeder Pfeilschritt eine Auswahl,
+ * und `onAendern` führt auf ein PATCH samt Invalidierung und Live-Ereignis — ohne Frist
+ * schriebe das Durchsteppen des Katalogs jeden Zwischenstand in die Datenbank.
+ */
+describe('FreiesZeichenInspector — entprelltes Schreiben (LFH-716)', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it('schreibt beim bloßen Öffnen nichts', () => {
+    vi.useFakeTimers();
+    const { onAendern } = renderInspector();
+    act(() => vi.advanceTimersByTime(2000));
+    expect(onAendern).not.toHaveBeenCalled();
+  });
+
+  it('fasst schnelle Auswahlwechsel zu EINEM Schreibvorgang mit dem letzten Stand zusammen', () => {
+    vi.useFakeTimers();
+    const { onAendern } = renderInspector();
+    for (const name of ['Person', 'Befehlsstelle', 'Gebäude']) {
+      fireEvent.click(kachel(name));
+      act(() => vi.advanceTimersByTime(200));
+    }
+    expect(onAendern).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(700));
+    expect(onAendern).toHaveBeenCalledTimes(1);
+    expect(onAendern).toHaveBeenCalledWith(expect.objectContaining({ grundzeichen: 'gebaeude' }));
+  });
+
+  it('holt eine Änderung nach, die beim Schließen noch in der Frist stand', () => {
+    vi.useFakeTimers();
+    const { onAendern, unmount } = renderInspector();
+    fireEvent.click(kachel('Person'));
+    unmount();
+    expect(onAendern).toHaveBeenCalledTimes(1);
+    expect(onAendern).toHaveBeenCalledWith(expect.objectContaining({ grundzeichen: 'person' }));
+  });
+
+  it('schreibt beim Schließen ohne Änderung nichts', () => {
+    vi.useFakeTimers();
+    const { onAendern, unmount } = renderInspector();
+    unmount();
+    expect(onAendern).not.toHaveBeenCalled();
+  });
+
+  // Das Paar zum Riegel gegen den Fremd-Refetch (CLAUDE.md, C7): ohne eigene Änderung folgt
+  // der Inspector dem Server; mit eigener sendet er genau einmal und nicht erneut, wenn der
+  // eigene Stand zurückkommt.
+  it('übernimmt eine fremde Änderung, solange nichts Eigenes offen ist, und schreibt nichts', () => {
+    vi.useFakeTimers();
+    const { onAendern, serverstand } = renderInspector();
+    serverstand({ ...basis, grundzeichen: 'person', geaendert_at: 'später' });
+    act(() => vi.advanceTimersByTime(2000));
+    expect(onAendern).not.toHaveBeenCalled();
+    expect(kachel('Person')).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('sendet eine eigene Änderung genau einmal, auch wenn der eigene Stand zurückkommt', () => {
+    vi.useFakeTimers();
+    const { onAendern, serverstand } = renderInspector();
+    fireEvent.click(kachel('Person'));
+    act(() => vi.advanceTimersByTime(700));
+    expect(onAendern).toHaveBeenCalledTimes(1);
+    const gesendet = vi.mocked(onAendern).mock.calls[0][0];
+    serverstand({ ...basis, ...gesendet, geaendert_at: 'später' } as FreiesZeichen);
+    act(() => vi.advanceTimersByTime(2000));
+    expect(onAendern).toHaveBeenCalledTimes(1);
+  });
+
+  it('folgt nach dem eigenen Schreiben wieder fremden Änderungen', () => {
+    vi.useFakeTimers();
+    const { onAendern, serverstand } = renderInspector();
+    fireEvent.click(kachel('Person'));
+    act(() => vi.advanceTimersByTime(700));
+    const gesendet = vi.mocked(onAendern).mock.calls[0][0];
+    serverstand({ ...basis, ...gesendet, geaendert_at: 't1' } as FreiesZeichen);
+    serverstand({ ...basis, grundzeichen: 'befehlsstelle', geaendert_at: 't2' });
+    act(() => vi.advanceTimersByTime(2000));
+    expect(onAendern).toHaveBeenCalledTimes(1);
+    expect(kachel('Befehlsstelle')).toHaveAttribute('aria-checked', 'true');
+  });
+
+  // Review-Befund I1: ein Merker, der ohne Sendung stehen bleibt, schaltet die Übernahme
+  // fremder Änderungen dauerhaft ab.
+  it('Klick auf die schon gewählte Kachel, danach eine fremde Änderung: nichts zurückschreiben', () => {
+    vi.useFakeTimers();
+    const { onAendern, serverstand } = renderInspector();
+    fireEvent.click(kachel('Taktische Formation'));
+    act(() => vi.advanceTimersByTime(1000));
+    serverstand({ ...basis, label: 'Fremd', geaendert_at: 'x' });
+    act(() => vi.advanceTimersByTime(1000));
+    expect(onAendern).not.toHaveBeenCalled();
+  });
+
+  it('hin und zurück in der Frist, danach eine fremde Änderung: nichts zurückschreiben', () => {
+    vi.useFakeTimers();
+    const { onAendern, serverstand } = renderInspector();
+    fireEvent.click(kachel('Person'));
+    act(() => vi.advanceTimersByTime(200));
+    fireEvent.click(kachel('Taktische Formation'));
+    act(() => vi.advanceTimersByTime(1000));
+    serverstand({ ...basis, label: 'Fremd', geaendert_at: 'x' });
+    act(() => vi.advanceTimersByTime(1000));
+    expect(onAendern).not.toHaveBeenCalled();
+  });
+
+  // Review-Befund I2: das Feld „Bezeichnung" darf nach einer fremden Änderung weder den alten
+  // Wortlaut zeigen noch ihn beim bloßen Verlassen zurückschreiben.
+  it('Bezeichnung nach fremder Änderung: zeigt den neuen Wortlaut und schreibt beim Verlassen nichts', () => {
+    vi.useFakeTimers();
+    const { onAendern, serverstand } = renderInspector();
+    serverstand({ ...basis, label: 'Fremd', geaendert_at: 'x' });
+    const feld = screen.getByLabelText('Bezeichnung');
+    expect(feld).toHaveValue('Fremd');
+    fireEvent.focus(feld);
+    fireEvent.blur(feld);
+    act(() => vi.advanceTimersByTime(1000));
+    expect(onAendern).not.toHaveBeenCalled();
+  });
+
+  it('eine getippte Bezeichnung geht beim Verlassen entprellt raus', () => {
+    vi.useFakeTimers();
+    const { onAendern } = renderInspector();
+    const feld = screen.getByLabelText('Bezeichnung');
+    fireEvent.change(feld, { target: { value: 'Zug 2' } });
+    fireEvent.blur(feld);
+    act(() => vi.advanceTimersByTime(700));
+    expect(onAendern).toHaveBeenCalledTimes(1);
+    expect(onAendern).toHaveBeenCalledWith(expect.objectContaining({ label: 'Zug 2' }));
+  });
+
+  it('Enter in der Bezeichnung übernimmt im Inspector den Wortlaut (ohne Platzieren)', () => {
+    vi.useFakeTimers();
+    const { onAendern } = renderInspector();
+    const feld = screen.getByLabelText('Bezeichnung');
+    fireEvent.change(feld, { target: { value: 'Zug 3' } });
+    fireEvent.keyDown(feld, { key: 'Enter' });
+    act(() => vi.advanceTimersByTime(700));
+    expect(onAendern).toHaveBeenCalledWith(expect.objectContaining({ label: 'Zug 3' }));
+    expect(feld).toHaveValue('Zug 3');
+  });
+
+  // Review-Befund I3: der Wächter der Übernahme — eine offene eigene Änderung gewinnt gegen
+  // einen neuen Serverstand, der in ihrer Frist ankommt.
+  it('eine offene eigene Änderung überlebt einen fremden Serverstand und wird gesendet', () => {
+    vi.useFakeTimers();
+    const { onAendern, serverstand } = renderInspector();
+    fireEvent.click(kachel('Person'));
+    act(() => vi.advanceTimersByTime(200));
+    serverstand({ ...basis, grundzeichen: 'befehlsstelle', geaendert_at: 'x' });
+    expect(kachel('Person')).toHaveAttribute('aria-checked', 'true');
+    act(() => vi.advanceTimersByTime(700));
+    expect(onAendern).toHaveBeenCalledTimes(1);
+    expect(onAendern).toHaveBeenCalledWith(expect.objectContaining({ grundzeichen: 'person' }));
+  });
+
+  // Review-Befund M4: nach „Löschen" holt der Abbau keine offene Änderung mehr nach — ein
+  // PATCH auf das gelöschte Zeichen endete in 404 und einem Fehlertoast nach Erfolg.
+  it('„Löschen" verwirft eine offene Änderung, statt sie beim Abbau nachzuholen', () => {
+    vi.useFakeTimers();
+    const { onAendern, onLoeschen, unmount } = renderInspector();
+    fireEvent.click(kachel('Person'));
+    // Seit LFH-710 geht das Löschen über die Rückfrage; verworfen wird erst beim Bestätigen.
+    fireEvent.click(screen.getByRole('button', { name: 'Löschen' }));
+    const rueckfrage = document.querySelector<HTMLElement>('.ant-popconfirm');
+    expect(rueckfrage).not.toBeNull();
+    fireEvent.click(within(rueckfrage!).getByRole('button', { name: 'Löschen' }));
+    expect(onLoeschen).toHaveBeenCalledTimes(1);
+    unmount();
+    expect(onAendern).not.toHaveBeenCalled();
   });
 });
