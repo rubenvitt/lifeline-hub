@@ -425,27 +425,41 @@ export function useKartenInteraktion({
     }
   }
 
+  /** Symbol-Override eines taktischen Markers; quittiert erst nach Erfolg (LFH-710). */
   function aendereSymbol(
     marker: KarteMarker,
     patch: { tz_fachaufgabe?: string | null; tz_organisation?: string | null },
   ) {
+    let vorgang: { aufruf: Promise<unknown>; fach: readonly unknown[] } | null = null;
     if (marker.typ === 'einheit') {
-      verorteEinheit(einsatzId, marker.id, patch)
-        .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) }))
-        .catch(fehler);
+      vorgang = {
+        aufruf: verorteEinheit(einsatzId, marker.id, patch),
+        fach: einsatzKeys.einheiten(einsatzId),
+      };
     } else if (marker.typ === 'fahrzeug') {
-      verorteFahrzeug(einsatzId, marker.id, patch)
-        .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.fahrzeuge(einsatzId) }))
-        .catch(fehler);
+      vorgang = {
+        aufruf: verorteFahrzeug(einsatzId, marker.id, patch),
+        fach: einsatzKeys.fahrzeuge(einsatzId),
+      };
     } else if (marker.typ === 'fuehrung') {
-      verortePerson(einsatzId, marker.id, patch)
-        .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.fuehrungskraefte(einsatzId) }))
-        .catch(fehler);
+      vorgang = {
+        aufruf: verortePerson(einsatzId, marker.id, patch),
+        fach: einsatzKeys.fuehrungskraefte(einsatzId),
+      };
     } else if (marker.typ === 'abschnitt') {
-      zeichneAbschnitt(einsatzId, marker.id, patch)
-        .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.abschnitte(einsatzId) }))
-        .catch(fehler);
+      vorgang = {
+        aufruf: zeichneAbschnitt(einsatzId, marker.id, patch),
+        fach: einsatzKeys.abschnitte(einsatzId),
+      };
     }
+    if (!vorgang) return;
+    const { aufruf, fach } = vorgang;
+    aufruf
+      .then(() => {
+        erfolg('Symbol gespeichert');
+        return qc.invalidateQueries({ queryKey: fach });
+      })
+      .catch(fehler);
   }
 
   // Bestätigungs-Phase persistieren (LFH-145): erst hier, nicht schon bei onZoneGezeichnet.
@@ -589,10 +603,14 @@ export function useKartenInteraktion({
    */
   const onMessenBeenden = useCallback(() => dispatch({ t: 'beenden', arten: ['messen'] }), []);
 
-  // Abschnittsfläche zeichnen fertig → persistieren, dann Zeichenmodus beenden.
+  // Abschnittsfläche zeichnen fertig → persistieren, quittieren (LFH-710), dann Zeichenmodus
+  // beenden.
   const onFlaecheGezeichnet = (poly: GeoJsonPolygon) => {
     zeichneAbschnitt(einsatzId, zeichneAbschnittId!, { flaeche_geojson: JSON.stringify(poly) })
-      .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.abschnitte(einsatzId) }))
+      .then(() => {
+        erfolg('Fläche gespeichert');
+        return qc.invalidateQueries({ queryKey: einsatzKeys.abschnitte(einsatzId) });
+      })
       .catch(fehler)
       .finally(() => dispatch({ t: 'beenden', arten: ['abschnitt'] }));
   };

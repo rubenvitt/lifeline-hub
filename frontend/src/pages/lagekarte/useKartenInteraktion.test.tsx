@@ -4,7 +4,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { neuerQueryClient } from '../../test/utils';
 import type { FreiesZeichenUpdate } from '../../api/types';
-import type { GeoJsonGeometry } from './geo';
+import type { GeoJsonGeometry, GeoJsonPolygon } from './geo';
 import type { KarteMarker } from './marker';
 import { useKartenInteraktion } from './useKartenInteraktion';
 import { einsatzKeys } from '../../api/queryKeys';
@@ -982,6 +982,74 @@ describe('useKartenInteraktion — Quittungen der Karten-Mutationen (LFH-710)', 
     });
     expect(fehler).toHaveBeenCalledTimes(1);
     expect(erfolg).not.toHaveBeenCalled();
+  });
+
+  // Symbol-Override an allen vier taktischen Markerarten.
+  const SYMBOL: [KarteMarker['typ'], Ruf][] = [
+    ['einheit', einheitenApi.verorteEinheit],
+    ['fahrzeug', einsatzFahrzeugeApi.verorteFahrzeug],
+    ['fuehrung', einsatzPersonalApi.verortePerson],
+    ['abschnitt', einsatzabschnitteApi.zeichneAbschnitt],
+  ];
+
+  it.each(SYMBOL)('Symbol ändern (%s): Erfolg → Quittung', async (typ, api) => {
+    api.mockClear();
+    const fehler = vi.fn();
+    const erfolg = vi.fn();
+    const { result } = rendere(fehler, erfolg);
+    act(() => result.current.aendereSymbol(markerVon(typ, 9), { tz_fachaufgabe: 'betreuung' }));
+    await waitFor(() => expect(erfolg).toHaveBeenCalledWith('Symbol gespeichert'));
+    expect(api).toHaveBeenCalledWith(1, 9, { tz_fachaufgabe: 'betreuung' });
+    expect(fehler).not.toHaveBeenCalled();
+  });
+
+  it.each(SYMBOL)('Symbol ändern (%s): Fehlschlag → keine Quittung', async (typ, api) => {
+    api.mockRejectedValueOnce(new Error('abgelehnt'));
+    const fehler = vi.fn();
+    const erfolg = vi.fn();
+    const { result } = rendere(fehler, erfolg);
+    act(() => result.current.aendereSymbol(markerVon(typ, 9), { tz_organisation: null }));
+    await waitFor(() => expect(fehler).toHaveBeenCalledTimes(1));
+    expect(erfolg).not.toHaveBeenCalled();
+  });
+
+  const POLY: GeoJsonPolygon = {
+    type: 'Polygon',
+    coordinates: [
+      [
+        [8, 50],
+        [8.1, 50],
+        [8.1, 50.1],
+        [8, 50],
+      ],
+    ],
+  };
+
+  it('Abschnittsfläche speichern: Erfolg → Quittung, der Zeichenmodus endet', async () => {
+    einsatzabschnitteApi.zeichneAbschnitt.mockClear();
+    const fehler = vi.fn();
+    const erfolg = vi.fn();
+    const { result } = rendere(fehler, erfolg);
+    act(() => result.current.onAbschnittZeichnenStart(8));
+    act(() => result.current.onFlaecheGezeichnet(POLY));
+    await waitFor(() => expect(erfolg).toHaveBeenCalledWith('Fläche gespeichert'));
+    expect(einsatzabschnitteApi.zeichneAbschnitt).toHaveBeenCalledWith(1, 8, {
+      flaeche_geojson: JSON.stringify(POLY),
+    });
+    expect(fehler).not.toHaveBeenCalled();
+    await waitFor(() => expect(result.current.zeichneAbschnittId).toBeNull());
+  });
+
+  it('Abschnittsfläche speichern: Fehlschlag → keine Quittung, der Zeichenmodus endet', async () => {
+    einsatzabschnitteApi.zeichneAbschnitt.mockRejectedValueOnce(new Error('abgelehnt'));
+    const fehler = vi.fn();
+    const erfolg = vi.fn();
+    const { result } = rendere(fehler, erfolg);
+    act(() => result.current.onAbschnittZeichnenStart(8));
+    act(() => result.current.onFlaecheGezeichnet(POLY));
+    await waitFor(() => expect(fehler).toHaveBeenCalledTimes(1));
+    expect(erfolg).not.toHaveBeenCalled();
+    await waitFor(() => expect(result.current.zeichneAbschnittId).toBeNull());
   });
 
   it('zoneLoeschen: Fehlschlag → keine Quittung', async () => {
