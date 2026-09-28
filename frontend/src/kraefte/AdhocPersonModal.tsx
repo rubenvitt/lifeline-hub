@@ -20,15 +20,10 @@ interface AdhocPersonModalProps {
 }
 
 /**
- * Ad-hoc-Person disponieren — EIN Bauteil für zwei Orte (Personal-Liste, Stab-Besetzung).
- *
- * FELDBUDGET: vier Felder (Name, Funktion, Trägerorganisation, Stärke-Position), im Rahmen der
- * Modal-/Schnellerfassungs-Leitlinie (LFH-19: ≤ ~4). Name ist Pflicht, die anderen drei
- * unterscheiden eine ad-hoc erfasste Person von einer namenlosen Zeile.
- *
- * `onFertig` der Hülle gibt kein Ergebnis weiter; die angelegte Disposition wandert deshalb über
- * `onSuccess` in einen Ref und wird in `onErfasst` gemeldet — das läuft erst nach bestandener
- * Abbruchprüfung der Hülle.
+ * Ad-hoc-Person disponieren — ein Bauteil für Personal-Liste und Stab-Besetzung.
+ * Vier Felder (Name, Funktion, Trägerorganisation, Stärke-Position); Name ist Pflicht.
+ * `onFertig` der Hülle gibt kein Ergebnis weiter: die Disposition wandert über `onSuccess` in
+ * einen Ref und wird in `onErfasst` gemeldet, nach bestandener Abbruchprüfung der Hülle.
  */
 export default function AdhocPersonModal({
   offen,

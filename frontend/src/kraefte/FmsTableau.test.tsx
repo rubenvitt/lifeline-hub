@@ -31,7 +31,7 @@ const KATALOG: FahrzeugStatus[] = [
     fms_anker: 4,
     sortier: 40,
   },
-  // Doppelt belegte Ziffer 3 — der Anker ist nicht eindeutig (migrations/0008).
+  // Doppelt belegte Ziffer 3 — der Anker ist nicht eindeutig.
   {
     id: 4,
     label: 'Anfahrt Bereitstellungsraum',
@@ -182,8 +182,8 @@ describe('FmsTableau (LFH-642)', () => {
     it('während eine Mutation läuft, nimmt die Kachel keine Ziffer an', () => {
       const b = bedienung({ gesperrt: true });
       zeige({ bedienungVon: b.von });
-      // Der gesperrte Knopf ist `disabled` und nicht fokussierbar — der Riegel muss also
-      // auch dann halten, wenn das Ereignis von anderswo aus der Kachel kommt.
+      // Der gesperrte Knopf ist `disabled` und nicht fokussierbar — der Riegel muss auch halten, wenn
+      // das Ereignis von anderswo aus der Kachel kommt.
       const kachel = ausloeser('Florian 1').closest<HTMLElement>('[data-lfh="fms-kachel"]')!;
       fireEvent.keyDown(kachel, { key: '4' });
       expect(b.onWaehlen).not.toHaveBeenCalled();
@@ -200,8 +200,7 @@ describe('FmsTableau (LFH-642)', () => {
       await userEvent.click(ausloeser('Florian 1'));
       const menue = document.querySelector<HTMLElement>('.ant-dropdown [role="menu"]')!;
       expect(menue).not.toBeNull();
-      // Das Synthetic Event steigt aus dem Portal in den Komponentenbaum auf — der
-      // DOM-Vorfahr ist aber keine Kachel.
+      // Das Synthetic Event steigt aus dem Portal auf, der DOM-Vorfahr ist aber keine Kachel.
       fireEvent.keyDown(menue, { key: '4' });
       expect(onWaehlen).not.toHaveBeenCalled();
     });
@@ -260,8 +259,8 @@ describe('FmsTableau (LFH-642)', () => {
       const { rerender, props } = zeige();
       const knopf = ausloeser('Florian 1');
       act(() => knopf.focus());
-      // jsdom schiebt den Fokus beim Öffnen nicht ins Portal (gemessen, LFH-339) — ein
-      // Test, der bloss das Menü öffnet, belegte nichts. Deshalb der Handler direkt.
+      // jsdom schiebt den Fokus beim Öffnen nicht ins Portal; ein Test, der nur das Menü öffnet,
+      // belegte nichts. Deshalb der Handler direkt.
       const portal = document.createElement('div');
       portal.className = 'ant-dropdown';
       portal.dataset.testPortal = '';
@@ -283,9 +282,8 @@ describe('FmsTableau (LFH-642)', () => {
   });
 
   /**
-   * Review LFH-642, im Browser gemessen: während der Mutation sind alle Auslöser `disabled`,
-   * und ein fokussierter Knopf, der `disabled` wird, verliert den Fokus an `<body>`
-   * (`focusout` mit `relatedTarget = null`). jsdom tut das NICHT von selbst — der Test
+   * Während der Mutation sind alle Auslöser `disabled`, und ein fokussierter Knopf verliert den
+   * Fokus an `<body>` (`focusout` ohne `relatedTarget`). jsdom tut das nicht selbst — der Test
    * spielt es mit `blur()` nach.
    */
   describe('Fokus nach dem Statuswechsel', () => {
@@ -319,9 +317,8 @@ describe('FmsTableau (LFH-642)', () => {
       tippe(ausloeser('Florian 1'), '4');
       expect(onWaehlen).toHaveBeenCalledExactlyOnceWith(3);
 
-      // Mutation läuft: Fokus fällt auf <body>, Knopf gesperrt, ein neues Fahrzeug kommt an.
-      // Der Fokusverlust steht VOR der Sperre, weil jsdom `blur()` an einem gesperrten
-      // Knopf ignoriert — gleichwertig für die Aussage: focusout ohne relatedTarget.
+      // Mutation läuft: Fokus fällt auf <body>, Knopf gesperrt, ein neues Fahrzeug kommt an. Der
+      // Fokusverlust steht VOR der Sperre, weil jsdom `blur()` an einem gesperrten Knopf ignoriert.
       act(() => ausloeser('Florian 1').blur());
       rerender(<FmsTableau {...props} fahrzeuge={neu} bedienungVon={gesperrt} />);
       expect(document.activeElement).toBe(document.body);
@@ -344,8 +341,7 @@ describe('FmsTableau (LFH-642)', () => {
       await userEvent.click(within(menue).getByRole('menuitem', { name: /S4 · Am Einsatzort/ }));
       expect(onWaehlen).toHaveBeenCalledWith(3);
 
-      // Das Menü gibt den Fokus nur bei Escape zurück (rc-dropdown) — er liegt danach auf
-      // <body>. In jsdom bleibt er stehen, deshalb von Hand.
+      // Das Menü gibt den Fokus nur bei Escape zurück; in jsdom bleibt er stehen, deshalb von Hand.
       act(() => (document.activeElement as HTMLElement | null)?.blur());
       rerender(<FmsTableau {...props} bedienungVon={gesperrt} />);
       expect(document.activeElement).toBe(document.body);
@@ -372,8 +368,8 @@ describe('FmsTableau (LFH-642)', () => {
   it('taut die Schleuse auf, wenn die fokussierte Kachel verschwindet (WebKit feuert kein focusout)', () => {
     const { rerender, props } = zeige({ fahrzeuge: [fzg(10, 'Florian 1'), fzg(12, 'Florian 5')] });
     act(() => ausloeser('Florian 1').focus());
-    // Fahrzeug 10 wird fremd entfernt, gleichzeitig kommt Fahrzeug 11 an. jsdom verschiebt
-    // den Fokus beim Entfernen still auf <body>, wie WebKit — ohne Ereignis.
+    // Fahrzeug 10 wird fremd entfernt, Fahrzeug 11 kommt an. jsdom verschiebt den Fokus beim
+    // Entfernen still auf <body>, wie WebKit — ohne Ereignis.
     rerender(<FmsTableau {...props} fahrzeuge={[fzg(12, 'Florian 5'), fzg(11, 'Florian 0')]} />);
     expect(screen.getByText('Florian 0')).toBeInTheDocument();
     expect(screen.queryByRole('status')).toBeNull();

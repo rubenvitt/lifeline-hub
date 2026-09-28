@@ -183,8 +183,8 @@ it('verdichtet Fahrzeug-Status getrennt', () => {
 });
 
 it('Waisen-Abschnitt (Eltern nicht in Eingabe) wird zur Wurzel promotet', () => {
-  // Filter auf Unter-Abschnitt 2 (ueber_abschnitt_id=1), aber Abschnitt 1 fehlt
-  // in der Eingabe. Ohne Promotion bliebe der Baum leer, während der Kopf zählt.
+  // Filter auf Unter-Abschnitt 2, Abschnitt 1 fehlt in der Eingabe. Ohne Promotion bliebe der
+  // Baum leer, während der Kopf zählt.
   const bild = baueKraeftebild([ab(2, 1)], [eh(10, 2)], [p(1, 10, 'mannschaft')], [], []);
   expect(bild.verdichtung.anzahlPersonal).toBe(1);
   const a2 = bild.baum.find((z) => z.key === 'ab-2');
@@ -270,9 +270,8 @@ it('Abschnitts-Filter grenzt Blätter ein und liefert nur den gewählten Abschni
 });
 
 it('rendert das Meldebild als Markdown mit Kopfzeile und Abschnitten', () => {
-  // Die Fixture trägt ALLE DREI Mittelarten. Mit nur einer Person wäre die
-  // „keine Bildzeichen"-Behauptung unten für zwei der drei Zweige gar nicht belegt —
-  // sie liefe über Text, den der Renderer nie erzeugt hat.
+  // Die Fixture trägt ALLE DREI Mittelarten, sonst wäre „keine Bildzeichen" für zwei Zweige
+  // nicht belegt.
   const bild = baueKraeftebild(
     [ab(1)],
     [eh(10, 1)],
@@ -285,13 +284,11 @@ it('rendert das Meldebild als Markdown mit Kopfzeile und Abschnitten', () => {
   expect(md).toContain('Stand 12:00');
   expect(md).toContain('Gesamtstärke');
   expect(md).toContain('A1');
-  // Die Art des Mittels steht als KURZWORT in der Liste, nicht als Bildzeichen: der
-  // Lagebericht wird gedruckt und in Textketten weitergereicht. Als Literale gepinnt und
-  // nicht über die Konstante des Renderers — sonst prüfte der Test sie gegen sich selbst.
+  // Die Art des Mittels als KURZWORT, als Literale gepinnt — nicht über die Konstante des
+  // Renderers.
   expect(md).toContain('- Pers. P1');
   expect(md).toContain('- Fzg. F1');
   expect(md).toContain('- Mtl. M1');
-  // Hier stand vorher je ein Emoji.
   expect(md).not.toMatch(/\p{Extended_Pictographic}/u);
 });
 
@@ -316,17 +313,10 @@ it('Suche matcht über Name und Funkrufname', () => {
 });
 
 /**
- * Die BRÜCKE zwischen den zwei Zahlenwegen derselben Frage (LFH-330 · B2).
- *
- * Der Kennzahlenkopf der Kräfteübersicht liest `verdichtung`, gerechnet direkt aus den
- * Rohlisten. Die neue Ampelzeile in den Baumzeilen liest `personalVerteilung` /
- * `fahrzeugVerteilung`, kumuliert über `addKategorie` und `addVerteilung`. Zwei Wege, eine
- * Frage — und bei kaputter Kumulation laufen sie auseinander, ohne dass ein Test es merkt:
- * „Kopf zählt jede Kraft genau einmal" deckt den Kopf, nicht den Vergleich.
- *
- * Die Fixture ist absichtlich schief: verschachtelte Einheiten, eine Kraft OHNE Einheit
- * (landet im Sammelknoten) und drei verschiedene Kategorien. Eine flache Fixture mit einer
- * Kategorie wäre auch bei kaputter Rekursion grün.
+ * Die BRÜCKE zwischen zwei Zahlenwegen derselben Frage: der Kennzahlenkopf liest
+ * `verdichtung` (aus den Rohlisten), die Ampelzeile im Baum die kumulierten Verteilungen. Bei
+ * kaputter Kumulation liefen sie auseinander. Die Fixture ist absichtlich schief (verschachtelte
+ * Einheiten, eine Kraft ohne Einheit, drei Kategorien).
  */
 it('Brücke: die Wurzelzeilen summieren sich auf die Verdichtung — beide Achsen', () => {
   const personal = [
@@ -367,7 +357,7 @@ it('Brücke: die Wurzelzeilen summieren sich auf die Verdichtung — beide Achse
 
   expect(summe('personalVerteilung')).toEqual(bild.verdichtung.personalStatus);
   expect(summe('fahrzeugVerteilung')).toEqual(bild.verdichtung.fahrzeugStatus);
-  // Und die Verdichtung selbst ist nicht leer — sonst wäre 0 == 0 die ganze Aussage.
+  // Die Verdichtung selbst ist nicht leer — sonst wäre 0 == 0 die ganze Aussage.
   expect(bild.verdichtung.personalStatus).toEqual({
     verfuegbar: 1,
     gebunden: 1,
@@ -382,13 +372,8 @@ it('Brücke: die Wurzelzeilen summieren sich auf die Verdichtung — beide Achse
   });
 });
 
-// ── verdichte() als eigenständige reine Funktion (LFH-338 · C3) ────────────────
-//
-// Dieselbe Rechnung wird dreimal gebraucht: gefiltert für die Kopfzahlen, UNGEFILTERT als
-// Bezugswert daneben und in der Verdichtungszeile der vier Kräfte-Modulseiten. Solange sie
-// im Rumpf von `baueKraeftebild` steckte, war der zweite und dritte Aufruf nur über einen
-// vollen Baumaufbau zu haben — inklusive Abschnitten und Einheiten, die keiner der beiden
-// braucht.
+// `verdichte()` als eigenständige reine Funktion: gefiltert für die Kopfzahlen, ungefiltert als
+// Bezugswert und in der Verdichtungszeile der Kräfte-Modulseiten.
 
 it('verdichte summiert Stärke, Status und Mengen über die drei Rohlisten', () => {
   const v = verdichte(
@@ -415,10 +400,8 @@ it('verdichte liefert auf leeren Listen Nullen statt undefined', () => {
   expect(v.fahrzeugStatus.ohne).toBe(0);
 });
 
-// ANKER, keine Zusicherung: seit der Auslösung RUFT `baueKraeftebild` die Funktion, der
-// Vergleich kann also nicht mehr rot werden. Er steht für den Fall, dass jemand die Rechnung
-// dort wieder von Hand einbaut — dann fällt eine Abweichung sofort auf, statt den Kopf zwei
-// Wahrheiten zeigen zu lassen.
+// ANKER: `baueKraeftebild` ruft `verdichte`, der Vergleich kann heute nicht rot werden. Er fängt
+// eine künftige Handrechnung dort ab.
 it('verdichte stimmt mit der Verdichtung aus baueKraeftebild überein', () => {
   const personal = [p(1, 10, 'fuehrer'), p(2, 10, 'mannschaft'), p(3, null, 'mannschaft')];
   const fahrzeuge = [fz(1, 10), fz(2, null, 'gebunden')];
