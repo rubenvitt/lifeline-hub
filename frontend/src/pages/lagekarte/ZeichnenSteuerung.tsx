@@ -1,6 +1,8 @@
 import { Button, Card, Space, Switch, Typography, theme } from 'antd';
+import { TbArrowBackUp } from 'react-icons/tb';
 import { monoStil } from '../../components/instrument';
 import { bandStil } from './KartenFuss';
+import './lagekarte.css';
 
 export type ZeichnenPhase = 'zeichnen' | 'bestaetigen';
 
@@ -74,9 +76,12 @@ export default function ZeichnenSteuerung(props: ZeichnenSteuerungProps) {
   // Beenden „Fertig".
   // Der Tastaturvertrag steht EINMAL, hier — nicht im Knopf, nicht als Tooltip (CLAUDE.md,
   // „Ein Tastaturvertrag steht EINMAL"). Er gilt in beiden Phasen: auch eine fertige,
-  // ungespeicherte Figur verwirft das erste Esc (LFH-712, design.md D2).
+  // ungespeicherte Figur verwirft das erste Esc (LFH-712, design.md D2). Nur mit feinem Zeiger
+  // (`lfh-nur-feiner-zeiger`): ein reines Touch-Gerät hat keine Esc-Taste, und die Zeile kostete
+  // dort die Höhe, die der Fuß auf der halbierten Karte bei 390 px nicht hat (LFH-713,
+  // `e2e/lagekarte-touch.spec.ts`).
   const escHinweis = (
-    <Typography.Text type="secondary">
+    <Typography.Text type="secondary" className="lfh-nur-feiner-zeiger">
       Esc verwirft die Zeichnung, ein zweites Esc beendet das Zeichnen.
     </Typography.Text>
   );
@@ -102,7 +107,23 @@ export default function ZeichnenSteuerung(props: ZeichnenSteuerungProps) {
       }}
     >
       <Space orientation="vertical" size={8} style={{ width: '100%' }}>
-        <Typography.Text strong>{props.titel}</Typography.Text>
+        {/* Titel und Punktzähler teilen eine Zeile: jede Zeile mehr hebt den Fuß über die Karte,
+            sobald sie auf dem Handschirm halbiert ist (LFH-713). */}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'baseline',
+            gap: token.marginXS,
+          }}
+        >
+          <Typography.Text strong>{props.titel}</Typography.Text>
+          {!bestaetigen && props.punkte != null && (
+            <Typography.Text data-lfh="zeichnen-punkte" style={monoStil(token.fontSize)}>
+              {props.punkte === 1 ? '1 Punkt' : `${props.punkte} Punkte`}
+            </Typography.Text>
+          )}
+        </div>
         {bestaetigen ? (
           <>
             <Typography.Text type="secondary">Entwurf prüfen und speichern.</Typography.Text>
@@ -123,14 +144,11 @@ export default function ZeichnenSteuerung(props: ZeichnenSteuerungProps) {
               Punkte per Klick setzen. Startpunkt klicken, doppelklicken oder „Abschließen".
             </Typography.Text>
             {escHinweis}
-            {props.punkte != null && (
-              <Typography.Text data-lfh="zeichnen-punkte" style={monoStil(token.fontSize)}>
-                {props.punkte === 1 ? '1 Punkt' : `${props.punkte} Punkte`}
-              </Typography.Text>
-            )}
             {serienZeile}
-            {/* Drei Knöpfe: die Reihe bricht um, statt das 320-px-Band (und bei 390 px den
-                Fuß) waagerecht zu sprengen. */}
+            {/* Drei Knöpfe in EINER Reihe: „zurück" als Symbolknopf, beschriftet über den
+                zugänglichen Namen und `title`. Mit Textetikett brach die Reihe bei Touch-Höhe
+                um und hob den Fuß um eine Knopfhöhe (LFH-713). `wrap` bleibt als Rückfall für
+                die Handschuhstufe. */}
             <Space wrap>
               <Button
                 type="primary"
@@ -141,11 +159,16 @@ export default function ZeichnenSteuerung(props: ZeichnenSteuerungProps) {
               </Button>
               {props.onPunktZurueck && (
                 <Button
+                  aria-label="Letzten Punkt zurück"
+                  title="Letzten Punkt zurück"
+                  icon={
+                    <span aria-hidden="true" style={{ display: 'inline-flex' }}>
+                      <TbArrowBackUp size={18} />
+                    </span>
+                  }
                   disabled={props.punktZurueckMoeglich === false}
                   onClick={props.onPunktZurueck}
-                >
-                  Letzten Punkt zurück
-                </Button>
+                />
               )}
               {beenden}
             </Space>

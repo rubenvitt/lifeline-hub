@@ -114,15 +114,22 @@ C9 hing die Quittung an `keyup`, weil terra-draw dort abbrach und ein `keydown`-
 bevor etwas passiert ist". Mit D2 gibt es diese Reihenfolge nicht mehr: die Seite verwirft selbst,
 synchron, im selben Handler. `keydown` ist dann richtig und entspricht dem Messen-Handler.
 
-### D4 — Steuerung: Knopf, Zähler, Hinweis an genau einer Stelle
+### D4 — Steuerung: Knopf, Zähler, Hinweis an genau einer Stelle, kompakt
 
 `ZeichnenSteuerung` bekommt in der Zeichenphase `punkte` (Anzeige „n Punkte", Mono, `tabular-nums`)
 und `onPunktZurueck` + `punktZurueckMoeglich`. Der Knopf ist ein antd-`Button` (erbt die Steuerhöhe,
-kein punktuelles `size`), gesperrt über `disabled`. Die Reihe hat damit drei Knöpfe — sie trägt
-`Space` mit Umbruch, damit sie im 320-px-Band und bei 390 px nicht überläuft.
+kein punktuelles `size`), gesperrt über `disabled`.
 
 Der Tastaturvertrag steht **einmal**, in der Hinweiszeile der Steuerung: „Esc verwirft die Zeichnung,
 ein zweites Esc beendet das Zeichnen." — nicht zusätzlich im Knopf oder als Tooltip.
+
+*Nachtrag aus der CI (LFH-713 kam parallel auf `alpha`):* der Kartenfuß ist seit LFH-713 auf die
+Kartenhöhe begrenzt, und `e2e/lagekarte-touch.spec.ts` misst bei 390 px mit eingeblendeter Leiste,
+dass die Steuerung in der halbierten Karte beginnt. Mit Zähler- und Hinweiszeile und einer
+umbrechenden Dreierreihe ragte sie 57–101 px darüber. Deshalb: der Zähler steht rechts in der
+Titelzeile, „Letzten Punkt zurück" ist ein Symbolknopf (Name und `title` tragen die Beschriftung),
+und der Esc-Hinweis erscheint nur mit feinem Zeiger (`@media not (any-pointer: fine)` blendet ihn aus,
+ein reines Touch-Gerät hat keine Esc-Taste).
 
 ### D5 — Eigenposition: Zustand in einem Hook, Darstellung in der Karte
 

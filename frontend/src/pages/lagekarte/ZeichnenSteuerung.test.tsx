@@ -222,6 +222,9 @@ describe('ZeichnenSteuerung — Letzten Punkt zurück und Zähler (LFH-712)', ()
     setup({ punkte: 0, punktZurueckMoeglich: false, onPunktZurueck: vi.fn() });
     const hinweis = 'Esc verwirft die Zeichnung, ein zweites Esc beendet das Zeichnen.';
     expect(screen.getAllByText(hinweis)).toHaveLength(1);
+    // Nur mit feinem Zeiger sichtbar (Regel in `lagekarte.css`): Touch hat keine Esc-Taste,
+    // und die Zeile hob den Fuß auf dem Handschirm über die Karte (LFH-713).
+    expect(screen.getByText(hinweis)).toHaveClass('lfh-nur-feiner-zeiger');
     for (const knopf of screen.getAllByRole('button')) {
       expect(knopf.textContent ?? '').not.toContain('Esc');
     }
