@@ -1,18 +1,12 @@
 use super::einsatz_person::sse_person;
 use crate::app::AppState;
-use crate::auth::session::CurrentUser;
-use crate::einsatz::berechtigung::{
-    fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
-};
 use crate::einsatz::einstellungen::etb_startwert;
-use crate::einsatz::repo as einsatz_repo;
+use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
+use crate::einsatz::modul::Unfallhilfsstellen;
+use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::live::LiveEvent;
-
-/// Modul-Key dieses Route-Moduls (LFH-132).
-const MODUL_KEY: &str = "unfallhilfsstellen";
-use crate::error::AppError;
 use crate::material::disposition_repo as material_repo;
 use crate::material::EinsatzMaterialAnzeige;
 use crate::person::{registrier_anzeige, repo as person_repo};
@@ -62,22 +56,10 @@ pub struct ListeParams {
 /// GET /api/einsaetze/{id}/uhs — Liste (Filter `?status=`, `?abschnitt_id=`).
 pub async fn liste(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzLesezugriff<Unfallhilfsstellen>,
     Query(params): Query<ListeParams>,
 ) -> Result<Json<Vec<UhsAnzeige>>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-
+    let einsatz_id = ctx.einsatz.id;
     parse_enum_opt(
         UhsStatus::parse,
         params.status.as_deref(),
@@ -107,23 +89,10 @@ pub struct AnlegenBody {
 /// (Spec: erst die Inbetriebnahme ist lagerelevant). SSE.
 pub async fn anlegen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzSchreibzugriff<Unfallhilfsstellen>,
     JsonBody(body): JsonBody<AnlegenBody>,
 ) -> Result<(StatusCode, Json<UhsAnzeige>), AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     parse_enum(UhsTyp::parse, &body.typ, "Unbekannter UHS-Typ")?;
     let bezeichnung = pflicht(&body.bezeichnung, "Bezeichnung")?;
     let standort = trimme(body.standort);
@@ -132,7 +101,7 @@ pub async fn anlegen(
     let uhs = uhs_repo::anlegen(
         &state.pool,
         einsatz_id,
-        benutzer.id,
+        ctx.benutzer.id,
         NeueDaten {
             typ: &body.typ,
             bezeichnung: &bezeichnung,
@@ -149,26 +118,16 @@ pub async fn anlegen(
 /// GET /api/einsaetze/{id}/uhs/{uid} — Detail (Stamm + Plätze + Belegungen + Material).
 pub async fn detail(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, uhs_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzLesezugriff<Unfallhilfsstellen>,
+    PfadParam((_eid, uhs_id)): PfadParam<(i64, i64)>,
 ) -> Result<Json<UhsDetail>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-
+    let einsatz_id = ctx.einsatz.id;
     let uhs = uhs_repo::laden(&state.pool, einsatz_id, uhs_id).await?;
     let plaetze = platz_repo::liste_je_uhs(&state.pool, uhs_id).await?;
     let belegungen = belegung_repo::liste_je_uhs(&state.pool, uhs_id).await?;
     let material =
-        material_repo::liste_je_uhs(&state.pool, einsatz_id, uhs_id, einsatz.ist_aktiv()).await?;
+        material_repo::liste_je_uhs(&state.pool, einsatz_id, uhs_id, ctx.einsatz.ist_aktiv())
+            .await?;
     Ok(Json(UhsDetail {
         uhs,
         plaetze,
@@ -201,23 +160,11 @@ pub struct PatchBody {
 /// PATCH /api/einsaetze/{id}/uhs/{uid} — Stammfelder. KEIN ETB-Eintrag.
 pub async fn aktualisieren(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, uhs_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Unfallhilfsstellen>,
+    PfadParam((_eid, uhs_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<PatchBody>,
 ) -> Result<Json<UhsAnzeige>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     let vorher = uhs_repo::laden(&state.pool, einsatz_id, uhs_id).await?; // 404 falls fremd
     if vorher.storniert_at.is_some() {
         return Err(AppError::Conflict(
@@ -242,7 +189,7 @@ pub async fn aktualisieren(
         &state.pool,
         einsatz_id,
         uhs_id,
-        benutzer.id,
+        ctx.benutzer.id,
         body.basis_geaendert_at.as_deref(),
         PatchDaten {
             bezeichnung: bezeichnung.as_deref(),
@@ -268,23 +215,11 @@ pub struct StatusBody {
 /// ETB-Spur bei `→ aktiv` und `→ aufgeloest`. SSE.
 pub async fn status_wechsel(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, uhs_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Unfallhilfsstellen>,
+    PfadParam((_eid, uhs_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<StatusBody>,
 ) -> Result<Json<UhsAnzeige>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     parse_enum(UhsStatus::parse, &body.status, "Unbekannter Status")?;
     let vorher = uhs_repo::laden(&state.pool, einsatz_id, uhs_id).await?;
     if vorher.storniert_at.is_some() {
@@ -311,9 +246,9 @@ pub async fn status_wechsel(
         None
     };
     crate::write_retry!(&state.pool, |conn| {
-        uhs_repo::setze_status_tx(conn, einsatz_id, uhs_id, &body.status, benutzer.id).await?;
+        uhs_repo::setze_status_tx(conn, einsatz_id, uhs_id, &body.status, ctx.benutzer.id).await?;
         if let (Some(text), Some(sw)) = (etb_text.as_deref(), startwert) {
-            crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, sw, text).await?;
+            crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, sw, text).await?;
         }
         Ok(())
     })?;
@@ -327,23 +262,11 @@ pub async fn status_wechsel(
 /// Belegung (Repo). KEIN ETB-Eintrag (Spec: nur Lifecycle aktiv/aufgeloest).
 pub async fn stornieren(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, uhs_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Unfallhilfsstellen>,
+    PfadParam((_eid, uhs_id)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
-    uhs_repo::storniere(&state.pool, einsatz_id, uhs_id, benutzer.id).await?;
+    let einsatz_id = ctx.einsatz.id;
+    uhs_repo::storniere(&state.pool, einsatz_id, uhs_id, ctx.benutzer.id).await?;
     sse_uhs(&state, einsatz_id, uhs_id);
     Ok(StatusCode::NO_CONTENT)
 }
@@ -361,23 +284,11 @@ pub struct PlatzAnlegenBody {
 /// POST /api/einsaetze/{id}/uhs/{uid}/plaetze — Platz anlegen. KEIN ETB. SSE.
 pub async fn platz_anlegen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, uhs_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Unfallhilfsstellen>,
+    PfadParam((_eid, uhs_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<PlatzAnlegenBody>,
 ) -> Result<(StatusCode, Json<PlatzAnzeige>), AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     parse_enum(PlatzTyp::parse, &body.typ, "Unbekannter Platz-Typ")?;
     let bezeichnung = pflicht(&body.bezeichnung, "Bezeichnung")?;
     // Existenz der UHS im Einsatz prüfen (404 sonst):
@@ -394,7 +305,6 @@ pub async fn platz_anlegen(
         },
     )
     .await?;
-    let _ = benutzer; // benutzer.id wird hier nicht persistiert (kein Audit-Feld auf uhs_platz)
     sse_uhs(&state, einsatz_id, uhs_id);
     Ok((StatusCode::CREATED, Json(platz)))
 }
@@ -410,23 +320,11 @@ pub struct PlatzBulkBody {
 /// KEIN ETB (interne Logistik). SSE.
 pub async fn plaetze_bulk_anlegen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, uhs_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Unfallhilfsstellen>,
+    PfadParam((_eid, uhs_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<PlatzBulkBody>,
 ) -> Result<(StatusCode, Json<Vec<PlatzAnzeige>>), AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     let Some(typ) = PlatzTyp::parse(&body.typ) else {
         return Err(AppError::Validation("Unbekannter Platz-Typ".into()));
     };
@@ -446,7 +344,6 @@ pub async fn plaetze_bulk_anlegen(
         body.menge,
     )
     .await?;
-    let _ = benutzer; // kein Audit-Feld auf uhs_platz
     sse_uhs(&state, einsatz_id, uhs_id);
     Ok((StatusCode::CREATED, Json(plaetze)))
 }
@@ -464,22 +361,11 @@ pub struct PlatzPatchBody {
 /// KEIN ETB (interne Logistik). SSE.
 pub async fn platz_aktualisieren(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, uhs_id, pid)): PfadParam<(i64, i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Unfallhilfsstellen>,
+    PfadParam((_eid, uhs_id, pid)): PfadParam<(i64, i64, i64)>,
     JsonBody(body): JsonBody<PlatzPatchBody>,
 ) -> Result<Json<PlatzAnzeige>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
+    let einsatz_id = ctx.einsatz.id;
     uhs_repo::laden(&state.pool, einsatz_id, uhs_id).await?;
 
     let bezeichnung = pflicht_tri(body.bezeichnung.as_deref(), "Bezeichnung")?;
@@ -508,22 +394,11 @@ pub struct VerfuegbarkeitBody {
 /// Verfügbarkeit (+ ggf. Reservierungs-Ziel). KEIN ETB. SSE.
 pub async fn platz_verfuegbarkeit(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, uhs_id, pid)): PfadParam<(i64, i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Unfallhilfsstellen>,
+    PfadParam((_eid, uhs_id, pid)): PfadParam<(i64, i64, i64)>,
     JsonBody(body): JsonBody<VerfuegbarkeitBody>,
 ) -> Result<Json<PlatzAnzeige>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
+    let einsatz_id = ctx.einsatz.id;
     uhs_repo::laden(&state.pool, einsatz_id, uhs_id).await?;
 
     parse_enum(
@@ -554,21 +429,10 @@ pub async fn platz_verfuegbarkeit(
 /// 409 bei aktiver Belegung. KEIN ETB. SSE.
 pub async fn platz_stornieren(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, uhs_id, pid)): PfadParam<(i64, i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Unfallhilfsstellen>,
+    PfadParam((_eid, uhs_id, pid)): PfadParam<(i64, i64, i64)>,
 ) -> Result<StatusCode, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
+    let einsatz_id = ctx.einsatz.id;
     uhs_repo::laden(&state.pool, einsatz_id, uhs_id).await?;
 
     platz_repo::storniere(&state.pool, uhs_id, pid).await?;
@@ -591,23 +455,11 @@ pub struct BelegungBody {
 /// pseudonyme ETB-Spur (Spec ETB-Tabelle) + zwei SSE-Events (`uhs` + `person`).
 pub async fn belegung(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, person_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Unfallhilfsstellen>,
+    PfadParam((_eid, person_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<BelegungBody>,
 ) -> Result<(StatusCode, Json<BelegungAnzeige>), AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     let art = BelegungsArt::parse(&body.art)
         .ok_or_else(|| AppError::Validation("Unbekannte Belegungs-Art".into()))?;
     let person = person_repo::laden(&state.pool, einsatz_id, person_id).await?;
@@ -629,7 +481,7 @@ pub async fn belegung(
                 uhs,
                 body.platz_id,
                 notiz.as_deref(),
-                benutzer.id,
+                ctx.benutzer.id,
             )
             .await?
         }
@@ -644,7 +496,7 @@ pub async fn belegung(
                 uhs,
                 body.platz_id,
                 notiz.as_deref(),
-                benutzer.id,
+                ctx.benutzer.id,
             )
             .await?
         }
@@ -654,7 +506,7 @@ pub async fn belegung(
                 einsatz_id,
                 person_id,
                 notiz.as_deref(),
-                benutzer.id,
+                ctx.benutzer.id,
             )
             .await?
         }
@@ -671,7 +523,7 @@ pub async fn belegung(
     )
     .await?;
     if let Some(text) = text {
-        super::etb_system_degradiert(&state, einsatz_id, benutzer.id, &text).await;
+        super::etb_system_degradiert(&state, einsatz_id, ctx.benutzer.id, &text).await;
     }
     sse_uhs(&state, einsatz_id, event.uhs_id);
     sse_person(&state, einsatz_id, person_id);
