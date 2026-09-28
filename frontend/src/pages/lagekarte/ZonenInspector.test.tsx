@@ -1,6 +1,7 @@
 import { type Mock, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { offeneRueckfrage } from '../../test/rueckfrage';
 import { renderMitProviders } from '../../test/utils';
 import type { Gefahrengebiet, LageZone } from '../../api/types';
 import ZonenInspector, { type ZonenInspectorProps } from './ZonenInspector';
@@ -154,11 +155,42 @@ describe('ZonenInspector — Gefahrengebiet-Gruppe', () => {
     renderInspector({ darfSchreiben: false });
     expect(screen.queryByRole('button', { name: /Zone aufheben/i })).not.toBeInTheDocument();
   });
+});
 
-  it('Popconfirm statt direkter Löschen-Button wenn Gebiet Warnstufen hat', () => {
-    renderInspector({ gebiete: [gebietMitWarnstufe] });
-    // Popconfirm rendert den Trigger-Button — bei Warnstufe soll es ein Popconfirm sein.
-    expect(screen.getByRole('button', { name: /Zone aufheben/i })).toBeInTheDocument();
+/**
+ * Rückfrage vor dem Aufheben (LFH-710). Die Zone wird hart gelöscht (`lage_zone/repo.rs`),
+ * also unumkehrbar — in BEIDEN Zweigen, nicht nur bei einem Gefahrengebiet mit Warnstufen
+ * (LFH-363: Unumkehrbares bekommt eine Rückfrage, deren OK-Knopf `danger` trägt).
+ */
+describe('ZonenInspector — Rückfrage vor dem Aufheben (LFH-710)', () => {
+  it.each([
+    ['ohne Warnstufen', [gebiet], /endgültig gelöscht/],
+    ['mit Warnstufen', [gebietMitWarnstufe], /Matrix verloren/],
+  ])('%s: erst die Rückfrage, dann genau ein Aufheben', async (_fall, gebiete, hinweis) => {
+    const { onLoeschen } = renderInspector({ gebiete });
+    await userEvent.click(screen.getByRole('button', { name: 'Zone aufheben' }));
+
+    const rueckfrage = await offeneRueckfrage();
+    expect(onLoeschen).not.toHaveBeenCalled();
+    expect(rueckfrage).toHaveTextContent('Zone aufheben?');
+    expect(rueckfrage).toHaveTextContent(hinweis);
+    const ok = within(rueckfrage).getByRole('button', { name: 'Aufheben' });
+    expect(ok).toHaveClass('ant-btn-dangerous');
+
+    await userEvent.click(within(rueckfrage).getByRole('button', { name: 'Abbrechen' }));
+    expect(onLoeschen).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Zone aufheben' }));
+    await userEvent.click(
+      within(await offeneRueckfrage()).getByRole('button', { name: 'Aufheben' }),
+    );
+    expect(onLoeschen).toHaveBeenCalledTimes(1);
+  });
+
+  it('die Rückfrage nennt die Zone beim Namen, den auch die Karte zeigt', async () => {
+    renderInspector({ zone: { ...basisZone, label: 'Sperrzone Süd' } });
+    await userEvent.click(screen.getByRole('button', { name: 'Zone aufheben' }));
+    expect(await offeneRueckfrage()).toHaveTextContent('„Sperrzone Süd“');
   });
 });
 

@@ -173,9 +173,11 @@ export default function ZonenInspector({
       </>
     ) : null;
 
+  const titel = entwurf.label.trim() ? entwurf.label : zoneTypLabel(entwurf.typ);
+
   return (
     <KartenDetailCard
-      titel={entwurf.label.trim() ? entwurf.label : zoneTypLabel(entwurf.typ)}
+      titel={titel}
       akzentFarbe={zoneStil(entwurf.typ, entwurf.farbe).lineColor}
       onSchliessen={onSchliessen}
     >
@@ -365,22 +367,27 @@ export default function ZonenInspector({
           </Typography.Text>
         )}
 
-        {darfSchreiben &&
-          (aktuellHatWarnstufen ? (
-            <Popconfirm
-              title="Zone aufheben?"
-              description="Wird das Gefahrengebiet dadurch leer, geht seine Matrix verloren."
-              okText="Aufheben"
-              cancelText="Abbrechen"
-              onConfirm={onLoeschen}
-            >
-              <Button danger>Zone aufheben</Button>
-            </Popconfirm>
-          ) : (
-            <Button danger onClick={onLoeschen}>
-              Zone aufheben
-            </Button>
-          ))}
+        {/* Rückfrage in JEDEM Fall (LFH-710): die Zone wird hart gelöscht
+            (`lage_zone/repo.rs`), es gibt keinen Rückweg. Die Warnstufen entscheiden nur
+            über den Hinweis, nicht mehr darüber, ob gefragt wird (LFH-363). */}
+        {darfSchreiben && (
+          <Popconfirm
+            title="Zone aufheben?"
+            description={
+              <>
+                „{titel}“ wird endgültig gelöscht.
+                {aktuellHatWarnstufen &&
+                  ' Wird das Gefahrengebiet dadurch leer, geht seine Matrix verloren.'}
+              </>
+            }
+            okText="Aufheben"
+            okButtonProps={{ danger: true }}
+            cancelText="Abbrechen"
+            onConfirm={onLoeschen}
+          >
+            <Button danger>Zone aufheben</Button>
+          </Popconfirm>
+        )}
       </Space>
     </KartenDetailCard>
   );
