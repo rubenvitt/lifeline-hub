@@ -6,32 +6,24 @@
 pub mod repo;
 
 use crate::einsatz::einstellungen::BasemapModus;
+use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use utoipa::ToSchema;
 
-/// Karten-Theme (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `karten_theme`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum KartenTheme {
-    Auto,
-    Light,
-    Dark,
-}
-
-impl KartenTheme {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            KartenTheme::Auto => "auto",
-            KartenTheme::Light => "light",
-            KartenTheme::Dark => "dark",
-        }
+wire_enum! {
+    /// Karten-Theme (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `karten_theme`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum KartenTheme {
+        Auto => "auto",
+        Light => "light",
+        Dark => "dark",
     }
 }
 
 /// Wire-Whitelist für `karten_theme` (Validierung in Rust, kein DB-CHECK — analog
 /// `einstellungen::ist_gueltiger_basemap_modus`).
 pub fn ist_gueltiges_karten_theme(s: &str) -> bool {
-    matches!(s, "auto" | "light" | "dark")
+    KartenTheme::parse(s).is_some()
 }
 
 /// Eine Kartenansicht wie ans Frontend geliefert. Enum-tragende `String`-Felder

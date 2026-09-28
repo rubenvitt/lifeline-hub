@@ -5,39 +5,20 @@
 //! Loopback-Fixture testbar (sie validiert NICHT selbst — das SSRF-Gate sitzt im Handler).
 
 use crate::config::OnlineStyleTyp;
+use crate::wire_enum::wire_enum;
 use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
 
-/// Art eines Proxy-Assets — bestimmt Endpunkt-Form und bindet einen Slot an seinen Abruf-Pfad
-/// (Defense-in-Depth: ein Sprite-Slot darf nicht als Tile geladen werden).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum SlotArt {
-    Static,
-    Template,
-    Tilejson,
-    Sprite,
-    Glyphs,
-}
-
-impl SlotArt {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            SlotArt::Static => "static",
-            SlotArt::Template => "template",
-            SlotArt::Tilejson => "tilejson",
-            SlotArt::Sprite => "sprite",
-            SlotArt::Glyphs => "glyphs",
-        }
-    }
-
-    pub fn aus_str(s: &str) -> Option<SlotArt> {
-        match s {
-            "static" => Some(SlotArt::Static),
-            "template" => Some(SlotArt::Template),
-            "tilejson" => Some(SlotArt::Tilejson),
-            "sprite" => Some(SlotArt::Sprite),
-            "glyphs" => Some(SlotArt::Glyphs),
-            _ => None,
-        }
+wire_enum! {
+    #[wire(ohne_serde)]
+    /// Art eines Proxy-Assets — bestimmt Endpunkt-Form und bindet einen Slot an seinen Abruf-Pfad
+    /// (Defense-in-Depth: ein Sprite-Slot darf nicht als Tile geladen werden).
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub enum SlotArt {
+        Static => "static",
+        Template => "template",
+        Tilejson => "tilejson",
+        Sprite => "sprite",
+        Glyphs => "glyphs",
     }
 }
 
@@ -783,16 +764,10 @@ mod tests {
 
     #[test]
     fn slot_art_round_trip() {
-        for a in [
-            SlotArt::Static,
-            SlotArt::Template,
-            SlotArt::Tilejson,
-            SlotArt::Sprite,
-            SlotArt::Glyphs,
-        ] {
-            assert_eq!(SlotArt::aus_str(a.as_str()), Some(a));
+        for a in SlotArt::ALLE {
+            assert_eq!(SlotArt::parse(a.as_str()), Some(a));
         }
-        assert_eq!(SlotArt::aus_str("quatsch"), None);
+        assert_eq!(SlotArt::parse("quatsch"), None);
     }
 
     #[test]
