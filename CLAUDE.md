@@ -595,7 +595,10 @@ dort behoben:
   halbierte die Karte (680 → 374 px), und der Fuß mit ausgeklappter Zeitachse (412 px) deckte
   den Rest. Er ragte dabei 50 px in den Seitenkopf. Zum Tippen blieb keine Karte. Seitdem
   schließt die Leiste beim Start einer Zonen- oder Abschnittszeichnung, Vorbild ist der
-  Navigations-Drawer. Außerdem **endet der Fuß oben an der Karte**: `fussStil` reicht mit
+  Navigations-Drawer. Das gilt **nur für die Sitzung** (`verberge` in
+  `lagekarte/leistenWahl.ts`, Gegenstück zu `zeige`). Zwischen `md` und `lg` ist die Leiste per
+  Vorgabe offen, und eine Zeichnung soll das nicht in der gemerkten Wahl (LFH-715)
+  überschreiben. Außerdem **endet der Fuß oben an der Karte**: `fussStil` reicht mit
   `top` bis zur Oberkante und stapelt per `flex-end` nach unten. Was nicht passt, gibt die
   Zeitachse ab (`bandStil('voll', true)`, „nachgiebig“) und rollt in sich, per Finger
   gemessen. **Kein `overflow` am Rahmen:** Er schnitte auf jeder Breite Schatten und
