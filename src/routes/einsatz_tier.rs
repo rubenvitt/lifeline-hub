@@ -12,7 +12,7 @@ use crate::live::LiveEvent;
 const MODUL_KEY: &str = "tiere";
 use crate::error::AppError;
 use crate::person::repo as person_repo; // Org-Isolation der Halter-FK (404 bei fremder Person)
-use crate::routes::support::{trimme, trimme_tri};
+use crate::routes::support::{parse_enum, parse_enum_opt, trimme, trimme_tri};
 use crate::tier::{
     darf_uebergehen, registrier_anzeige, repo as tier_repo, AbschlussGrund, Spezies, TierAnzeige,
     TierGeschlecht, TierStatus,
@@ -32,19 +32,6 @@ fn sse_tier(state: &AppState, einsatz_id: i64, tier_id: i64) {
     state
         .live
         .publiziere_event(einsatz_id, LiveEvent::Tier, data);
-}
-
-/// Validiert optionales Tier-Geschlecht; `Validation`, falls gesetzt und unbekannt.
-/// Prüft einen zu SETZENDEN Geschlechtswert. `None` heißt „kein Wert wird gesetzt" und ist
-/// immer zulässig — beim PATCH deckt das sowohl das absente Feld als auch den Leerwunsch
-/// (`null`/`""`) ab. Der Aufrufer flacht das Tri-State entsprechend ab.
-fn pruefe_geschlecht(g: Option<&str>) -> Result<(), AppError> {
-    if let Some(g) = g {
-        if TierGeschlecht::parse(g).is_none() {
-            return Err(AppError::Validation("Unbekanntes Geschlecht".into()));
-        }
-    }
-    Ok(())
 }
 
 // ============================== Routen ==============================
@@ -75,16 +62,16 @@ pub async fn liste(
     )
     .await?;
 
-    if let Some(s) = &params.status {
-        if TierStatus::parse(s).is_none() {
-            return Err(AppError::Validation("Unbekannter Status im Filter".into()));
-        }
-    }
-    if let Some(s) = &params.spezies {
-        if Spezies::parse(s).is_none() {
-            return Err(AppError::Validation("Unbekannte Spezies im Filter".into()));
-        }
-    }
+    parse_enum_opt(
+        TierStatus::parse,
+        params.status.as_deref(),
+        "Unbekannter Status im Filter",
+    )?;
+    parse_enum_opt(
+        Spezies::parse,
+        params.spezies.as_deref(),
+        "Unbekannte Spezies im Filter",
+    )?;
     Ok(Json(
         tier_repo::liste(
             &state.pool,
@@ -137,11 +124,11 @@ pub async fn anlegen(
     fordere_aktiv(&einsatz)?;
 
     // Spezies (Pflicht) prüfen.
-    if Spezies::parse(&body.spezies).is_none() {
-        return Err(AppError::Validation(
-            "Unbekannte oder fehlende Spezies".into(),
-        ));
-    }
+    parse_enum(
+        Spezies::parse,
+        &body.spezies,
+        "Unbekannte oder fehlende Spezies",
+    )?;
     // Status: Default aktiv; nur aktiv|vermisst erlaubt.
     let status = body.status.as_deref().unwrap_or("aktiv");
     if !matches!(status, "aktiv" | "vermisst") {
@@ -149,7 +136,11 @@ pub async fn anlegen(
             "Beim Anlegen ist nur Status 'aktiv' oder 'vermisst' erlaubt".into(),
         ));
     }
-    pruefe_geschlecht(body.geschlecht.as_deref())?;
+    parse_enum_opt(
+        TierGeschlecht::parse,
+        body.geschlecht.as_deref(),
+        "Unbekanntes Geschlecht",
+    )?;
     // Halter-Exklusivität (zweite Verteidigungslinie zum DB-CHECK).
     if body.halter_person_id.is_some() && trimme(body.halter_kontakt.clone()).is_some() {
         return Err(AppError::UnprocessableEntity(
@@ -332,10 +323,12 @@ pub async fn aktualisieren(
     )
     .await?;
     fordere_aktiv(&einsatz)?;
-    pruefe_geschlecht(
+    parse_enum_opt(
+        TierGeschlecht::parse,
         body.geschlecht
             .as_ref()
             .and_then(|o| o.as_deref().map(str::trim).filter(|s| !s.is_empty())),
+        "Unbekanntes Geschlecht",
     )?;
 
     let vorher = tier_repo::laden(&state.pool, einsatz_id, tier_id).await?;
@@ -435,9 +428,7 @@ pub async fn status_wechsel(
     .await?;
     fordere_aktiv(&einsatz)?;
 
-    if TierStatus::parse(&body.status).is_none() {
-        return Err(AppError::Validation("Unbekannter Status".into()));
-    }
+    parse_enum(TierStatus::parse, &body.status, "Unbekannter Status")?;
     let vorher = tier_repo::laden(&state.pool, einsatz_id, tier_id).await?;
     if vorher.storniert_at.is_some() {
         return Err(AppError::Conflict(

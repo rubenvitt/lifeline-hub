@@ -9,6 +9,7 @@ use crate::einsatz::repo as einsatz_repo;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::live::LiveEvent;
+use crate::routes::support::pflicht;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
 const MODUL_KEY: &str = "chat";
@@ -97,12 +98,7 @@ pub async fn kanal_anlegen(
     .await?;
     fordere_aktiv(&einsatz)?;
 
-    let name = req.name.trim();
-    if name.is_empty() {
-        return Err(AppError::Validation(
-            "Kanalname darf nicht leer sein".into(),
-        ));
-    }
+    let name = pflicht(&req.name, "Kanalname")?;
     let beschreibung = req
         .beschreibung
         .as_deref()
@@ -110,7 +106,7 @@ pub async fn kanal_anlegen(
         .filter(|s| !s.is_empty());
 
     let kanal =
-        repo::kanal_anlegen(&state.pool, einsatz_id, benutzer.id, name, beschreibung).await?;
+        repo::kanal_anlegen(&state.pool, einsatz_id, benutzer.id, &name, beschreibung).await?;
     sse_chat(&state, einsatz_id, kanal_ids(einsatz_id, kanal.id));
     Ok((StatusCode::CREATED, Json(kanal)))
 }
@@ -137,7 +133,7 @@ pub async fn kanal_gelesen_markieren(
         return Err(AppError::NotFound);
     }
 
-    let jetzt = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let jetzt = crate::zeit::jetzt();
     repo::kanal_gelesen_markieren(
         &state.pool,
         einsatz.org_id,
@@ -298,13 +294,8 @@ pub async fn nachricht_bearbeiten(
     JsonBody(req): JsonBody<NeueNachricht>,
 ) -> Result<Json<ChatNachrichtAnzeige>, AppError> {
     fordere_autor(&state, &benutzer, einsatz_id, nachricht_id).await?;
-    let inhalt = req.inhalt.trim();
-    if inhalt.is_empty() {
-        return Err(AppError::Validation(
-            "Nachricht darf nicht leer sein".into(),
-        ));
-    }
-    let nachricht = repo::bearbeiten(&state.pool, nachricht_id, inhalt).await?;
+    let inhalt = pflicht(&req.inhalt, "Nachricht")?;
+    let nachricht = repo::bearbeiten(&state.pool, nachricht_id, &inhalt).await?;
     sse_chat(&state, einsatz_id, nachricht_ids(&nachricht));
     Ok(Json(nachricht))
 }
@@ -497,7 +488,7 @@ pub async fn heraufstufen_auftrag(
     }
 
     // Gleiche Validierung wie POST /auftraege (geteilt) → kein zweiter, ungeprüfter Pfad.
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let now = crate::zeit::jetzt();
     let validiert =
         crate::auftrag::validiere_neuen_auftrag(&state.pool, einsatz_id, &req, &now, None).await?;
     let auftrag_id = repo::heraufstufen_zu_auftrag(

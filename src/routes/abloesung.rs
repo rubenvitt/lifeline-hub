@@ -23,11 +23,7 @@ use crate::error::AppError;
 use crate::extract::{JsonBody, PfadParam};
 use crate::live::LiveEvent;
 use crate::routes::support;
-
-/// Aktuelle Server-Zeit im SQLite-Format.
-fn jetzt() -> String {
-    chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string()
-}
+use crate::zeit::jetzt;
 
 /// Listen-Refresh für Ablösungs-Leser. Ohne `art` — nur der Scheduler setzt `art` und löst
 /// damit den Hinweis in der AlarmZentrale aus (Muster wie `erinnerung`).

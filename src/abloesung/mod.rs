@@ -11,7 +11,7 @@
 //!
 //! Spec: `openspec/changes/lfh-635-fachmodul-abloesung/`
 
-use chrono::NaiveDateTime;
+use crate::zeit;
 use serde::Serialize;
 use utoipa::ToSchema;
 
@@ -116,30 +116,20 @@ impl Einstufung {
     }
 }
 
-/// Parst einen DB-Zeitstempel (`YYYY-MM-DD HH:MM:SS`, UTC).
-pub fn parse_zeit(s: &str) -> Option<NaiveDateTime> {
-    NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S").ok()
-}
-
-/// Formatiert einen Zeitpunkt im DB-Format.
-pub fn fmt_zeit(t: NaiveDateTime) -> String {
-    t.format("%Y-%m-%d %H:%M:%S").to_string()
-}
-
 /// Fälligkeit = Beginn + Rhythmus. `None` bei unparsbarem Beginn.
 pub fn faelligkeit(beginn_at: &str, rhythmus_minuten: i64) -> Option<String> {
-    parse_zeit(beginn_at).map(|b| fmt_zeit(b + chrono::Duration::minutes(rhythmus_minuten)))
+    zeit::plus_minuten(beginn_at, rhythmus_minuten)
 }
 
 /// Zeitpunkt der Vorwarnung = Fälligkeit − [`VORWARNUNG_MINUTEN`].
 pub fn vorwarnzeit(faellig_at: &str) -> Option<String> {
-    parse_zeit(faellig_at).map(|f| fmt_zeit(f - chrono::Duration::minutes(VORWARNUNG_MINUTEN)))
+    zeit::plus_minuten(faellig_at, -VORWARNUNG_MINUTEN)
 }
 
 /// Einstufung einer laufenden Schicht (rein, deterministisch testbar). Eine unparsbare
 /// Fälligkeit gilt defensiv als überfällig: sie soll auffallen, nicht verschwinden.
 pub fn einstufung(faellig_at: &str, jetzt: &str) -> Einstufung {
-    match (parse_zeit(faellig_at), parse_zeit(jetzt)) {
+    match (zeit::parse(faellig_at), zeit::parse(jetzt)) {
         (Some(f), Some(j)) => {
             if f <= j {
                 Einstufung::Ueberfaellig

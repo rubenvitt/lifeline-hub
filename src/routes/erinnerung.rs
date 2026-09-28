@@ -7,6 +7,8 @@ use crate::einsatz::repo as einsatz_repo;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::live::LiveEvent;
+use crate::routes::support::pflicht;
+use crate::zeit::jetzt;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
 const MODUL_KEY: &str = "erinnerungen";
@@ -19,13 +21,8 @@ use crate::kommunikation::{
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::Json;
-use chrono::{NaiveDateTime, Utc};
-use serde::Deserialize;
 
-/// Kanonischer Zeitstempel „jetzt" (UTC) im DB-Format.
-fn jetzt() -> String {
-    Utc::now().format("%Y-%m-%d %H:%M:%S").to_string()
-}
+use serde::Deserialize;
 
 /// SSE-Notify: Erinnerungen des Einsatzes haben sich geändert (Tag `erinnerung`).
 fn sse(state: &AppState, einsatz_id: i64) {
@@ -83,15 +80,8 @@ pub struct NeueErinnerung {
 /// Normalisiert einen Eingabe-Zeitstempel auf 'YYYY-MM-DD HH:MM:SS' (UTC).
 /// Akzeptiert mit/ohne Sekunden; sonst `Validation`.
 fn parse_faellig(roh: &str) -> Result<String, AppError> {
-    let roh = roh.trim().replace('T', " ");
-    for fmt in ["%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"] {
-        if let Ok(n) = NaiveDateTime::parse_from_str(&roh, fmt) {
-            return Ok(n.format("%Y-%m-%d %H:%M:%S").to_string());
-        }
-    }
-    Err(AppError::Validation(
-        "Ungültiger Fälligkeitszeitpunkt".into(),
-    ))
+    crate::zeit::normalisiere_eingabe(roh)
+        .ok_or_else(|| AppError::Validation("Ungültiger Fälligkeitszeitpunkt".into()))
 }
 
 /// POST /api/einsaetze/{id}/erinnerungen — Erinnerung anlegen (Schreibrecht + aktiv).
@@ -114,10 +104,7 @@ pub async fn anlegen(
     .await?;
     fordere_aktiv(&einsatz)?;
 
-    let titel = req.titel.trim();
-    if titel.is_empty() {
-        return Err(AppError::Validation("Titel darf nicht leer sein".into()));
-    }
+    let titel = pflicht(&req.titel, "Titel")?;
     if let Some(iv) = req.intervall_minuten {
         if iv <= 0 {
             return Err(AppError::Validation("Intervall muss positiv sein".into()));
@@ -174,7 +161,7 @@ pub async fn anlegen(
         einsatz_id,
         benutzer.id,
         repo::ErinnerungDaten {
-            titel,
+            titel: &titel,
             beschreibung,
             faellig_at: &faellig,
             intervall_minuten: req.intervall_minuten,

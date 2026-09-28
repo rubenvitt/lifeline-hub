@@ -3,6 +3,7 @@ use crate::auth::session::{AdminUser, CurrentUser};
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
+use crate::routes::support::pflicht;
 use crate::stichwort::{self, StichwortVorschlag};
 use axum::extract::State;
 use axum::http::StatusCode;
@@ -30,13 +31,8 @@ pub async fn anlegen(
     AdminUser(benutzer): AdminUser,
     JsonBody(req): JsonBody<NeuerVorschlag>,
 ) -> Result<(StatusCode, Json<StichwortVorschlag>), AppError> {
-    let text = req.text.trim();
-    if text.is_empty() {
-        return Err(AppError::Validation(
-            "Stichwort darf nicht leer sein".into(),
-        ));
-    }
-    let vorschlag = stichwort::anlegen(&state.pool, benutzer.org_id, text).await?;
+    let text = pflicht(&req.text, "Stichwort")?;
+    let vorschlag = stichwort::anlegen(&state.pool, benutzer.org_id, &text).await?;
     Ok((StatusCode::CREATED, Json(vorschlag)))
 }
 

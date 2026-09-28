@@ -5,7 +5,7 @@ use crate::einheit::EinheitTyp;
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
-use crate::routes::support::deserialize_optional_field;
+use crate::routes::support::{deserialize_optional_field, pflicht};
 use crate::staerke::Staerke;
 use axum::extract::State;
 use axum::http::StatusCode;
@@ -46,10 +46,7 @@ impl Normalisiert {
 /// Trimmt das Label und validiert die Soll-Regel „alle drei oder keiner" über
 /// `Staerke::aus_optionen` (mappt String-Fehler auf `Validation`).
 fn normalisiere(body: TypBody) -> Result<Normalisiert, AppError> {
-    let label = body.label.trim().to_string();
-    if label.is_empty() {
-        return Err(AppError::Validation("Label darf nicht leer sein".into()));
-    }
+    let label = pflicht(&body.label, "Label")?;
     // Validierung der Vollständigkeit/Bereiche; Rückgabewert verwerfen wir, wir
     // speichern die rohen Optionen (durch aus_optionen als konsistent bestätigt).
     Staerke::aus_optionen(
@@ -117,10 +114,7 @@ fn normalisiere_patch(
 ) -> Result<PatchNormalisiert, AppError> {
     let label = match body.label {
         Some(l) => {
-            let l = l.trim().to_string();
-            if l.is_empty() {
-                return Err(AppError::Validation("Label darf nicht leer sein".into()));
-            }
+            let l = pflicht(&l, "Label")?;
             Some(l)
         }
         None => None,

@@ -22,7 +22,9 @@ use crate::person::{
     darf_uebergehen, registrier_anzeige, repo, AbgleichStatus, Geschlecht, PersonAnzeige,
     PersonStatus, Sichtungskategorie, VerbleibArt, VerbleibStatus,
 };
-use crate::routes::support::{trimme, trimme_tri};
+use crate::routes::support::{
+    parse_enum, parse_enum_opt, pflicht, pruefe_koordinate, trimme, trimme_tri,
+};
 use axum::extract::{Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
@@ -70,26 +72,9 @@ fn sse_auto_austritt(state: &AppState, einsatz_id: i64, effekt: &crate::uhs::Aut
     );
 }
 
-/// Validiert ein optionales Geschlecht; `Validation`, falls gesetzt und unbekannt.
-///
-/// Prüft einen zu SETZENDEN Geschlechtswert. `None` heißt „kein Wert wird gesetzt" und ist
-/// immer zulässig — beim PATCH deckt das sowohl das absente Feld als auch den Leerwunsch
-/// (`null`/`""`) ab. Der Aufrufer flacht das Tri-State entsprechend ab.
-fn pruefe_geschlecht(g: Option<&str>) -> Result<(), AppError> {
-    if let Some(g) = g {
-        if Geschlecht::parse(g).is_none() {
-            return Err(AppError::Validation("Unbekanntes Geschlecht".into()));
-        }
-    }
-    Ok(())
-}
-
 /// Toleranz für „vermisst seit" in der Zukunft (design.md D4): fängt eine vorgehende
 /// Geräteuhr ab. Ohne sie verwürfe die Offline-Queue eine Erfassung mit 400.
 const VERMISST_SEIT_TOLERANZ: chrono::Duration = chrono::Duration::minutes(5);
-
-/// Wire-Format aller Zeitstempel: UTC ohne Zonenkennung.
-const ZEIT_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
 
 fn jetzt_utc() -> chrono::NaiveDateTime {
     chrono::Utc::now().naive_utc()
@@ -102,41 +87,15 @@ fn jetzt_utc() -> chrono::NaiveDateTime {
 /// unbrauchbarer Wert ist schon für sich unbrauchbar (LFH-267). Ein Body mit kaputtem
 /// Zeitpunkt UND falschem Status ist deshalb 400, nicht 422.
 fn pruefe_vermisst_seit(roh: &str, jetzt: chrono::NaiveDateTime) -> Result<String, AppError> {
-    let zeitpunkt =
-        chrono::NaiveDateTime::parse_from_str(roh.trim(), ZEIT_FORMAT).map_err(|_| {
-            AppError::Validation(
-                "vermisst_seit muss das Format JJJJ-MM-TT hh:mm:ss (UTC) haben".into(),
-            )
-        })?;
+    let zeitpunkt = crate::zeit::parse(roh.trim()).ok_or_else(|| {
+        AppError::Validation("vermisst_seit muss das Format JJJJ-MM-TT hh:mm:ss (UTC) haben".into())
+    })?;
     if zeitpunkt > jetzt + VERMISST_SEIT_TOLERANZ {
         return Err(AppError::Validation(
             "vermisst_seit darf nicht in der Zukunft liegen".into(),
         ));
     }
-    Ok(zeitpunkt.format(ZEIT_FORMAT).to_string())
-}
-
-/// Fundort-Koordinate als Paar im gültigen Wertebereich (LFH-613). Beim PATCH ist mit dem
-/// EFFEKTIVEN Zustand nach der Änderung aufzurufen, nicht mit dem Body allein — sonst ließe
-/// `{"antreff_lon": null}` gegen einen Bestand mit Koordinate eine halbe stehen. 422 wie
-/// `einsatz_uhs.rs` (Feld-Kombination bzw. Wertebereich).
-fn pruefe_koordinate(lat: Option<f64>, lon: Option<f64>) -> Result<(), AppError> {
-    if lat.is_some() != lon.is_some() {
-        return Err(AppError::UnprocessableEntity(
-            "antreff_lat und antreff_lon müssen gemeinsam gesetzt oder gemeinsam leer sein".into(),
-        ));
-    }
-    if lat.is_some_and(|la| !(-90.0..=90.0).contains(&la)) {
-        return Err(AppError::UnprocessableEntity(
-            "antreff_lat muss zwischen -90 und 90 liegen".into(),
-        ));
-    }
-    if lon.is_some_and(|lo| !(-180.0..=180.0).contains(&lo)) {
-        return Err(AppError::UnprocessableEntity(
-            "antreff_lon muss zwischen -180 und 180 liegen".into(),
-        ));
-    }
-    Ok(())
+    Ok(crate::zeit::formatiere(zeitpunkt))
 }
 
 #[derive(Debug, Deserialize)]
@@ -163,11 +122,11 @@ pub async fn liste(
     )
     .await?;
 
-    if let Some(s) = &params.status {
-        if PersonStatus::parse(s).is_none() {
-            return Err(AppError::Validation("Unbekannter Status im Filter".into()));
-        }
-    }
+    parse_enum_opt(
+        PersonStatus::parse,
+        params.status.as_deref(),
+        "Unbekannter Status im Filter",
+    )?;
     Ok(Json(
         repo::liste(&state.pool, einsatz_id, params.status.as_deref()).await?,
     ))
@@ -257,7 +216,11 @@ pub async fn anlegen(
         }
     }
     fordere_aktiv(&einsatz)?;
-    pruefe_geschlecht(body.geschlecht.as_deref())?;
+    parse_enum_opt(
+        Geschlecht::parse,
+        body.geschlecht.as_deref(),
+        "Unbekanntes Geschlecht",
+    )?;
 
     let status = body
         .status
@@ -321,11 +284,16 @@ pub async fn anlegen(
     // hierher (Lookup oben) bzw. schreibt in der Tx nichts neu (`war_neu`).
     let vermisst_seit = match status_enum {
         PersonStatus::Vermisst => {
-            Some(vermisst_seit_angabe.unwrap_or_else(|| jetzt.format(ZEIT_FORMAT).to_string()))
+            Some(vermisst_seit_angabe.unwrap_or_else(|| crate::zeit::formatiere(jetzt)))
         }
         _ => None,
     };
-    pruefe_koordinate(body.antreff_lat, body.antreff_lon)?;
+    pruefe_koordinate(
+        body.antreff_lat,
+        body.antreff_lon,
+        "antreff_lat",
+        "antreff_lon",
+    )?;
     let zustand = trimme(body.zustand);
 
     let name = trimme(body.name);
@@ -596,10 +564,12 @@ pub async fn aktualisieren(
     // Fehler-Präzedenz gegenüber Storno/Zustandsfehlern hängt an dieser Position.
     // Normalisiert wird deshalb nur für diese eine Prüfung inline; ein leerer Wert ist
     // ein Leerwunsch, kein „unbekanntes Geschlecht" (das lieferte vorher 400).
-    pruefe_geschlecht(
+    parse_enum_opt(
+        Geschlecht::parse,
         body.geschlecht
             .as_ref()
             .and_then(|opt| opt.as_deref().map(str::trim).filter(|s| !s.is_empty())),
+        "Unbekanntes Geschlecht",
     )?;
 
     let name = trimme_tri(body.name);
@@ -631,7 +601,7 @@ pub async fn aktualisieren(
         let vorher = repo::laden(&state.pool, einsatz_id, person_id).await?;
         let eff_lat = body.antreff_lat.unwrap_or(vorher.antreff_lat);
         let eff_lon = body.antreff_lon.unwrap_or(vorher.antreff_lon);
-        pruefe_koordinate(eff_lat, eff_lon)?;
+        pruefe_koordinate(eff_lat, eff_lon, "antreff_lat", "antreff_lon")?;
         if vermisst_seit.is_some() && vorher.status != PersonStatus::Vermisst {
             return Err(AppError::UnprocessableEntity(
                 "vermisst_seit ist nur bei einer vermissten Person änderbar".into(),
@@ -693,9 +663,7 @@ pub async fn status_wechsel(
     .await?;
     fordere_aktiv(&einsatz)?;
 
-    if PersonStatus::parse(&body.status).is_none() {
-        return Err(AppError::Validation("Unbekannter Status".into()));
-    }
+    parse_enum(PersonStatus::parse, &body.status, "Unbekannter Status")?;
     let vorher = repo::laden(&state.pool, einsatz_id, person_id).await?;
     if vorher.storniert_at.is_some() {
         return Err(AppError::Conflict(
@@ -999,11 +967,11 @@ pub async fn verbleib(
 
     let art = VerbleibArt::parse(&body.art)
         .ok_or_else(|| AppError::Validation("Unbekannte Verbleib-Art".into()))?;
-    if let Some(s) = &body.status {
-        if VerbleibStatus::parse(s).is_none() {
-            return Err(AppError::Validation("Unbekannter Verbleib-Status".into()));
-        }
-    }
+    parse_enum_opt(
+        VerbleibStatus::parse,
+        body.status.as_deref(),
+        "Unbekannter Verbleib-Status",
+    )?;
     if let Some(stelle_id) = body.betreuungsstelle_id {
         if art != VerbleibArt::Notunterkunft {
             return Err(AppError::UnprocessableEntity(
@@ -1111,12 +1079,7 @@ pub async fn notiz(
     .await?;
     fordere_aktiv(&einsatz)?;
 
-    let text = body.text.trim();
-    if text.is_empty() {
-        return Err(AppError::Validation(
-            "Notiztext darf nicht leer sein".into(),
-        ));
-    }
+    let text = pflicht(&body.text, "Notiztext")?;
     let person = repo::laden(&state.pool, einsatz_id, person_id).await?;
     if person.storniert_at.is_some() {
         return Err(AppError::Conflict(
@@ -1124,7 +1087,7 @@ pub async fn notiz(
         ));
     }
     let notiz =
-        verlaufsnotiz_repo::anlegen(&state.pool, einsatz_id, person_id, text, benutzer.id).await?;
+        verlaufsnotiz_repo::anlegen(&state.pool, einsatz_id, person_id, &text, benutzer.id).await?;
     // BEWUSST kein super::etb_system_degradiert(): besondere Kategorie gehört NICHT in den ETB.
     sse_person(&state, einsatz_id, person_id);
     Ok((StatusCode::CREATED, Json(notiz)))

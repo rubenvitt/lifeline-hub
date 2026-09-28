@@ -5,7 +5,7 @@ use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::material::repo::{self, MaterialDaten, MaterialPatch};
 use crate::material::MaterialAnzeige;
-use crate::routes::support::{deserialize_optional_field, trimme, trimme_tri};
+use crate::routes::support::{deserialize_optional_field, pflicht, trimme, trimme_tri};
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -47,12 +47,7 @@ impl Normalisiert {
 }
 
 fn normalisiere(body: MaterialBody) -> Result<Normalisiert, AppError> {
-    let bezeichnung = body.bezeichnung.trim().to_string();
-    if bezeichnung.is_empty() {
-        return Err(AppError::Validation(
-            "Bezeichnung darf nicht leer sein".into(),
-        ));
-    }
+    let bezeichnung = pflicht(&body.bezeichnung, "Bezeichnung")?;
     Ok(Normalisiert {
         bezeichnung,
         kategorie: trimme(body.kategorie),
@@ -112,12 +107,7 @@ impl PatchNormalisiert {
 fn normalisiere_patch(body: PatchMaterial) -> Result<PatchNormalisiert, AppError> {
     let bezeichnung = match body.bezeichnung {
         Some(b) => {
-            let b = b.trim().to_string();
-            if b.is_empty() {
-                return Err(AppError::Validation(
-                    "Bezeichnung darf nicht leer sein".into(),
-                ));
-            }
+            let b = pflicht(&b, "Bezeichnung")?;
             Some(b)
         }
         None => None,

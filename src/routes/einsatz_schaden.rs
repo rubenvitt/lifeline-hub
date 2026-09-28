@@ -12,7 +12,9 @@ use crate::live::LiveEvent;
 const MODUL_KEY: &str = "schaeden";
 use crate::error::AppError;
 use crate::person::repo as person_repo; // Org-Isolation der Geschädigt-FK (404 bei fremder Person)
-use crate::routes::support::trimme;
+use crate::routes::support::{
+    parse_enum, parse_enum_opt, pflicht, pflicht_tri, pruefe_koordinate, trimme,
+};
 use crate::schaden::{
     darf_uebergehen, ort_kurz, registrier_anzeige, repo as schaden_repo, AbschlussGrund, Ausmass,
     SchadenAnzeige, SchadenStatus, SchadenTyp,
@@ -68,21 +70,21 @@ pub async fn liste(
     // (LFH-305). Ohne diese Prechecks gäbe es hier kein 422, sondern ein 200 mit leerer
     // Liste — der Filterwert landet nur in einer WHERE-Klausel, es gibt keinen DB-CHECK
     // dahinter.
-    if let Some(s) = &params.status {
-        if SchadenStatus::parse(s).is_none() {
-            return Err(AppError::Validation("Unbekannter Status im Filter".into()));
-        }
-    }
-    if let Some(t) = &params.typ {
-        if SchadenTyp::parse(t).is_none() {
-            return Err(AppError::Validation("Unbekannter Typ im Filter".into()));
-        }
-    }
-    if let Some(a) = &params.ausmass {
-        if Ausmass::parse(a).is_none() {
-            return Err(AppError::Validation("Unbekanntes Ausmaß im Filter".into()));
-        }
-    }
+    parse_enum_opt(
+        SchadenStatus::parse,
+        params.status.as_deref(),
+        "Unbekannter Status im Filter",
+    )?;
+    parse_enum_opt(
+        SchadenTyp::parse,
+        params.typ.as_deref(),
+        "Unbekannter Typ im Filter",
+    )?;
+    parse_enum_opt(
+        Ausmass::parse,
+        params.ausmass.as_deref(),
+        "Unbekanntes Ausmaß im Filter",
+    )?;
     Ok(Json(
         schaden_repo::liste(
             &state.pool,
@@ -98,30 +100,6 @@ pub async fn liste(
 }
 
 // ---------- POST /schaeden (Anlegen) ----------
-
-/// Anlegen und PATCH prüfen denselben vollständigen Koordinatenzustand.
-fn pruefe_koordinaten(lat: Option<f64>, lon: Option<f64>) -> Result<(), AppError> {
-    if lat.is_some() != lon.is_some() {
-        return Err(AppError::UnprocessableEntity(
-            "lat und lon müssen gemeinsam gesetzt oder gemeinsam leer sein".into(),
-        ));
-    }
-    if let Some(lat) = lat {
-        if !(-90.0..=90.0).contains(&lat) {
-            return Err(AppError::UnprocessableEntity(
-                "lat muss zwischen -90 und 90 liegen".into(),
-            ));
-        }
-    }
-    if let Some(lon) = lon {
-        if !(-180.0..=180.0).contains(&lon) {
-            return Err(AppError::UnprocessableEntity(
-                "lon muss zwischen -180 und 180 liegen".into(),
-            ));
-        }
-    }
-    Ok(())
-}
 
 #[derive(Debug, Deserialize)]
 pub struct AnlegenBody {
@@ -185,10 +163,8 @@ pub async fn anlegen(
     let Some(ort_roh) = body.ort.clone() else {
         return Err(AppError::Validation("Ort ist Pflicht".into()));
     };
-    let Some(ort) = trimme(Some(ort_roh)) else {
-        return Err(AppError::Validation("Ort darf nicht leer sein".into()));
-    };
-    pruefe_koordinaten(body.lat, body.lon)?;
+    let ort = pflicht(&ort_roh, "Ort")?;
+    pruefe_koordinate(body.lat, body.lon, "lat", "lon")?;
     let kontakt = trimme(body.geschaedigt_kontakt.clone());
 
     // Eigene Organisation: id wird IMMER serverseitig aus einsatz.org_id abgeleitet,
@@ -367,15 +343,9 @@ pub async fn aktualisieren(
     }
 
     // lat/lon als Paar: Effektivzustand nach dem Patch prüfen (422 statt 500).
-    let eff_lat = match body.lat {
-        Some(opt) => opt,
-        None => vorher.lat,
-    };
-    let eff_lon = match body.lon {
-        Some(opt) => opt,
-        None => vorher.lon,
-    };
-    pruefe_koordinaten(eff_lat, eff_lon)?;
+    let eff_lat = body.lat.unwrap_or(vorher.lat);
+    let eff_lon = body.lon.unwrap_or(vorher.lon);
+    pruefe_koordinate(eff_lat, eff_lon, "lat", "lon")?;
 
     // Enum-Prechecks: Feld isoliert unbrauchbar → 400 (LFH-305). Diese drei sind zugleich
     // der einzige Schutz vor einem stillen Durchfall auf die DB — schaden/repo.rs bindet
@@ -383,27 +353,14 @@ pub async fn aktualisieren(
     // aus migrations/0033 würden über das LFH-245-Sicherheitsnetz wieder als 422
     // herauskommen. Wer einen dieser Zweige entfernt, bekommt also kein 500, sondern
     // lautlos den alten Statuscode zurück.
-    if let Some(t) = &body.typ {
-        if SchadenTyp::parse(t).is_none() {
-            return Err(AppError::Validation("Ungültiger Typ".into()));
-        }
-    }
-    if let Some(a) = &body.ausmass {
-        if Ausmass::parse(a).is_none() {
-            return Err(AppError::Validation("Ungültiges Ausmaß".into()));
-        }
-    }
+    parse_enum_opt(SchadenTyp::parse, body.typ.as_deref(), "Ungültiger Typ")?;
+    parse_enum_opt(Ausmass::parse, body.ausmass.as_deref(), "Ungültiges Ausmaß")?;
     if let Some(Some(g)) = &body.abschluss_grund {
-        if AbschlussGrund::parse(g.trim()).is_none() {
-            return Err(AppError::Validation("Ungültiger Abschlussgrund".into()));
-        }
+        parse_enum(AbschlussGrund::parse, g.trim(), "Ungültiger Abschlussgrund")?;
     }
     // Vorhanden, aber leer: scheitert am Feld selbst → 400. Der Guard trennt „Feld fehlt"
     // (dann bleibt der Ort unverändert) sauber von „Feld ist da, aber leer".
-    let ort_norm = trimme(body.ort.clone());
-    if body.ort.is_some() && ort_norm.is_none() {
-        return Err(AppError::Validation("Ort darf nicht leer sein".into()));
-    }
+    let ort_norm = pflicht_tri(body.ort.as_deref(), "Ort")?;
 
     // Normalisierte Bindungen (müssen den `aktualisiere`-Aufruf überleben → eigene `let`s).
     let beschreibung_norm = trimme(body.beschreibung.clone());
@@ -542,11 +499,7 @@ pub async fn uebergeben(
     let Some(adressat_roh) = body.uebergeben_an.clone() else {
         return Err(AppError::Validation("Übergabe-Adressat ist Pflicht".into()));
     };
-    let Some(adressat) = trimme(Some(adressat_roh)) else {
-        return Err(AppError::Validation(
-            "Übergabe-Adressat darf nicht leer sein".into(),
-        ));
-    };
+    let adressat = pflicht(&adressat_roh, "Übergabe-Adressat")?;
     let vorher = schaden_repo::laden(&state.pool, einsatz_id, schaden_id).await?; // 404
     if vorher.storniert_at.is_some() {
         return Err(AppError::Conflict(
@@ -625,11 +578,7 @@ pub async fn abschliessen(
     let Some(grund_roh) = body.abschluss_grund.clone() else {
         return Err(AppError::Validation("Abschlussgrund ist Pflicht".into()));
     };
-    let Some(grund_norm) = trimme(Some(grund_roh)) else {
-        return Err(AppError::Validation(
-            "Abschlussgrund darf nicht leer sein".into(),
-        ));
-    };
+    let grund_norm = pflicht(&grund_roh, "Abschlussgrund")?;
     let Some(grund) = AbschlussGrund::parse(&grund_norm) else {
         return Err(AppError::Validation("Unbekannter Abschlussgrund".into()));
     };

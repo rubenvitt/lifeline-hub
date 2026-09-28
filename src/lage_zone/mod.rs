@@ -1,5 +1,6 @@
 pub mod repo;
 
+use crate::routes::support::parse_enum;
 use serde::Serialize;
 use utoipa::ToSchema;
 
@@ -139,18 +140,16 @@ pub fn validiere_neu(
     geometrie: &str,
 ) -> Result<(), crate::error::AppError> {
     use crate::error::AppError;
-    if LageZoneTyp::parse(typ).is_none() {
-        return Err(AppError::Validation(format!(
-            "Unbekannter Zonen-Typ: {}",
-            typ
-        )));
-    }
-    if GeometrieTyp::parse(geometrie_typ).is_none() {
-        return Err(AppError::Validation(format!(
-            "Unbekannter Geometrie-Typ: {}",
-            geometrie_typ
-        )));
-    }
+    parse_enum(
+        LageZoneTyp::parse,
+        typ,
+        format!("Unbekannter Zonen-Typ: {}", typ),
+    )?;
+    parse_enum(
+        GeometrieTyp::parse,
+        geometrie_typ,
+        format!("Unbekannter Geometrie-Typ: {}", geometrie_typ),
+    )?;
     if !geometrie_klasse_passt(typ, geometrie_typ) {
         return Err(AppError::UnprocessableEntity(format!(
             "Typ {} ist mit Geometrie {} nicht zulässig",

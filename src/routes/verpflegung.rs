@@ -25,7 +25,7 @@
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
-use chrono::Utc;
+
 use serde::Deserialize;
 
 use crate::app::AppState;
@@ -36,7 +36,7 @@ use crate::extract::{JsonBody, PfadParam};
 use crate::live::LiveEvent;
 use crate::verpflegung::repo::{self, AusgabeEingabe, ZeitfensterAenderung, ZeitfensterEingabe};
 use crate::verpflegung::{
-    AusgabeErgebnis, SonderkostEingabe, VerpflegungAnzeige, ZeitfensterAnzeige, DRAHT,
+    AusgabeErgebnis, SonderkostEingabe, VerpflegungAnzeige, ZeitfensterAnzeige,
 };
 
 /// Nach dem Commit: ETB-Kurzruf je Eintrag, dann das Modul-Ereignis mit Kennungen only.
@@ -236,7 +236,7 @@ pub async fn ausgabe_erfassen(
     let einsatz_id = ctx.einsatz.id;
     let zeitpunkt_at = match req.zeitpunkt_at.as_deref().map(str::trim) {
         Some(s) if !s.is_empty() => zeit(s)?,
-        _ => Utc::now().format(DRAHT).to_string(),
+        _ => crate::zeit::jetzt(),
     };
     // Die Nachforderung muss zu DIESEM Einsatz gehören; der FK sichert nur, dass es sie gibt.
     // Vor der Transaktion: die Prüfung nimmt den Pool, und Nachforderungen werden nicht

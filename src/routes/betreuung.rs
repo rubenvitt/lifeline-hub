@@ -34,7 +34,7 @@
 use axum::extract::{Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::Json;
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::{DateTime, Utc};
 use serde::Deserialize;
 
 use crate::app::AppState;
@@ -58,10 +58,8 @@ use crate::routes::support;
 /// Zeitpunkt, der weiter in der Zukunft liegt, ist für sich unbrauchbar → 400.
 pub const ZUKUNFT_TOLERANZ_SEKUNDEN: i64 = 60;
 
-const DRAHT: &str = "%Y-%m-%d %H:%M:%S";
-
 fn draht(t: DateTime<Utc>) -> String {
-    t.format(DRAHT).to_string()
+    crate::zeit::formatiere(t.naive_utc())
 }
 
 /// Meldezeitpunkt: fehlt/leer → `jetzt`, sonst normalisiert (400 bei Unlesbarem) und höchstens
@@ -74,8 +72,8 @@ fn meldezeitpunkt(eingabe: Option<&str>, jetzt: DateTime<Utc>) -> Result<String,
         Some(s) if !s.is_empty() => crate::etb::normalisiere_zeit(s)?,
         _ => return Ok(draht(jetzt)),
     };
-    let t = NaiveDateTime::parse_from_str(&zeit, DRAHT)
-        .map_err(|_| AppError::Validation(format!("Ungültiger Zeitpunkt '{zeit}'")))?
+    let t = crate::zeit::parse(&zeit)
+        .ok_or_else(|| AppError::Validation(format!("Ungültiger Zeitpunkt '{zeit}'")))?
         .and_utc();
     if (t - jetzt).num_seconds() > ZUKUNFT_TOLERANZ_SEKUNDEN {
         return Err(AppError::Validation(format!(
@@ -643,7 +641,7 @@ mod tests {
     use super::*;
 
     fn t(s: &str) -> DateTime<Utc> {
-        NaiveDateTime::parse_from_str(s, DRAHT).unwrap().and_utc()
+        crate::zeit::parse_utc(s).unwrap()
     }
 
     #[test]

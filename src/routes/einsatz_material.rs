@@ -13,7 +13,7 @@ const MODUL_KEY: &str = "material";
 use crate::error::AppError;
 use crate::material::disposition_repo::{self, AdhocDaten};
 use crate::material::{EinsatzMaterialAnzeige, MaterialStatus};
-use crate::routes::support::{trimme, trimme_tri};
+use crate::routes::support::{pflicht, trimme, trimme_tri};
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
@@ -106,12 +106,7 @@ pub async fn disponieren(
     let ziel = match (body.material_id, body.adhoc) {
         (Some(material_id), None) => Ziel::Stamm(material_id),
         (None, Some(adhoc)) => {
-            bezeichnung_owned = adhoc.bezeichnung.trim().to_string();
-            if bezeichnung_owned.is_empty() {
-                return Err(AppError::Validation(
-                    "Bezeichnung darf nicht leer sein".into(),
-                ));
-            }
+            bezeichnung_owned = pflicht(&adhoc.bezeichnung, "Bezeichnung")?;
             kategorie_owned = trimme(adhoc.kategorie);
             bestandsnummer_owned = trimme(adhoc.bestandsnummer);
             traeger_owned = trimme(adhoc.traegerorganisation);

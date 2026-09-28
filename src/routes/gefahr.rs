@@ -13,7 +13,7 @@ const MODUL_KEY: &str = "gefahrenzonen";
 use crate::error::AppError;
 use crate::gefahr::repo::{self as gefahr_repo, BewertungDaten};
 use crate::gefahr::{self, GefahrBewertungAnzeige, GefahrengebietAnzeige};
-use crate::routes::support::{deserialize_optional_field, trimme, trimme_tri};
+use crate::routes::support::{deserialize_optional_field, parse_enum, trimme, trimme_tri};
 use axum::extract::State;
 use axum::Json;
 use serde::Deserialize;
@@ -104,24 +104,21 @@ pub async fn bewerten(
 
     // Unbekannter Enum-Wert = das Feld ist für sich unbrauchbar → 400 (LFH-305).
     // Die Kombinationsprüfung darunter bewertet erst den Zusammenhang → bleibt 422.
-    if gefahr::Gefahrentyp::parse(&body.gefahrentyp).is_none() {
-        return Err(AppError::Validation(format!(
-            "Unbekannter Gefahrentyp: {}",
-            body.gefahrentyp
-        )));
-    }
-    if gefahr::Schutzobjekt::parse(&body.schutzobjekt).is_none() {
-        return Err(AppError::Validation(format!(
-            "Unbekanntes Schutzobjekt: {}",
-            body.schutzobjekt
-        )));
-    }
-    if gefahr::Warnstufe::parse(&body.warnstufe).is_none() {
-        return Err(AppError::Validation(format!(
-            "Unbekannte Warnstufe: {}",
-            body.warnstufe
-        )));
-    }
+    parse_enum(
+        gefahr::Gefahrentyp::parse,
+        &body.gefahrentyp,
+        format!("Unbekannter Gefahrentyp: {}", body.gefahrentyp),
+    )?;
+    parse_enum(
+        gefahr::Schutzobjekt::parse,
+        &body.schutzobjekt,
+        format!("Unbekanntes Schutzobjekt: {}", body.schutzobjekt),
+    )?;
+    parse_enum(
+        gefahr::Warnstufe::parse,
+        &body.warnstufe,
+        format!("Unbekannte Warnstufe: {}", body.warnstufe),
+    )?;
     if !gefahr::kombination_gueltig(&body.gefahrentyp, &body.schutzobjekt) {
         return Err(AppError::UnprocessableEntity(format!(
             "Kombination {} × {} ist nicht zulässig",

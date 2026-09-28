@@ -45,7 +45,7 @@ fn parse_mez(s: &str) -> Option<NaiveDateTime> {
         let tag = NaiveDate::parse_from_str(datum, "%Y-%m-%d").ok()?;
         return tag.succ_opt()?.and_hms_opt(0, 0, 0);
     }
-    NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S").ok()
+    crate::zeit::parse(s)
 }
 
 /// MEZ-Stundenende der Quelle → RFC 3339 mit `+01:00` (derselbe absolute Moment).

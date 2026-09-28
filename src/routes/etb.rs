@@ -8,6 +8,8 @@ use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::live::LiveEvent;
+use crate::routes::support::{parse_enum_opt, pflicht};
+use crate::zeit::jetzt;
 
 /// Modul-Key dieses Route-Moduls (LFH-132); gegen die Override-Map geprüft.
 const MODUL_KEY: &str = "etb";
@@ -128,18 +130,11 @@ pub async fn erfassen(
         ));
     }
 
-    let inhalt = req.inhalt.trim();
-    if inhalt.is_empty() {
-        return Err(AppError::Validation("Inhalt darf nicht leer sein".into()));
-    }
+    let inhalt = pflicht(&req.inhalt, "Inhalt")?;
 
     // Meldeweg validieren (falls gesetzt).
     let meldeweg = bereinige(req.meldeweg);
-    if let Some(w) = &meldeweg {
-        if MeldeWeg::parse(w).is_none() {
-            return Err(AppError::Validation("Ungültiger Meldeweg".into()));
-        }
-    }
+    parse_enum_opt(MeldeWeg::parse, meldeweg.as_deref(), "Ungültiger Meldeweg")?;
 
     // Berichtigungs-Regeln (Spec §6: Korrekturen nur als verknüpfte Berichtigung).
     if typ.ist_berichtigung() {
@@ -179,7 +174,7 @@ pub async fn erfassen(
         &anhang_ids,
         repo::EintragDaten {
             typ: typ.as_str(),
-            inhalt,
+            inhalt: &inhalt,
             von: von.as_deref(),
             an: an.as_deref(),
             meldeweg: meldeweg.as_deref(),
@@ -317,11 +312,6 @@ pub async fn auftrag_erteilen(
     Ok((StatusCode::CREATED, Json(detail)))
 }
 
-/// Kanonischer Zeitstempel „jetzt" (UTC) im DB-Format.
-fn jetzt() -> String {
-    chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string()
-}
-
 #[derive(Debug, Deserialize)]
 pub struct EtbAbfrageParams {
     /// Volltext-Suchbegriff.
@@ -436,13 +426,11 @@ async fn fordere_lese_gates(
 /// auseinanderliefen.
 fn filter_merkmale(params: &EtbAbfrageParams) -> Result<repo::EtbZaehlFilter, AppError> {
     // Typ validieren, falls gesetzt.
-    if let Some(t) = &params.typ {
-        if EtbTyp::parse(t).is_none() {
-            return Err(AppError::Validation(
-                "Ungültiger Eintragstyp im Filter".into(),
-            ));
-        }
-    }
+    parse_enum_opt(
+        EtbTyp::parse,
+        params.typ.as_deref(),
+        "Ungültiger Eintragstyp im Filter",
+    )?;
     let von_zeit = params.von.as_deref().map(normalisiere_zeit).transpose()?;
     let bis_zeit = params.bis.as_deref().map(normalisiere_zeit).transpose()?;
     // q nur als Filter nutzen, wenn nach Trim nicht leer.

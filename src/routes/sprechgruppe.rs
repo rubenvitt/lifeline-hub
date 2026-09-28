@@ -6,7 +6,7 @@ use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::katalog::Betriebsart;
-use crate::routes::support::{deserialize_optional_field, trimme_tri};
+use crate::routes::support::{deserialize_optional_field, parse_enum, pflicht, trimme_tri};
 use crate::sprechgruppe::repo as sg_repo;
 use crate::sprechgruppe::{Sprechgruppe, SprechgruppeAnzeige};
 use axum::extract::{Query, State};
@@ -61,18 +61,15 @@ impl NormalisierterKatalog {
 /// `Betriebsart::parse` (ungültig → `Validation`), trimmt `hinweis`
 /// (leer → `None`).
 fn normalisiere_katalog(body: KatalogBody) -> Result<NormalisierterKatalog, AppError> {
-    let bezeichnung = body.bezeichnung.trim().to_string();
-    if bezeichnung.is_empty() {
-        return Err(AppError::Validation(
-            "Bezeichnung darf nicht leer sein".into(),
-        ));
-    }
-    if Betriebsart::parse(&body.betriebsart).is_none() {
-        return Err(AppError::Validation(format!(
+    let bezeichnung = pflicht(&body.bezeichnung, "Bezeichnung")?;
+    parse_enum(
+        Betriebsart::parse,
+        &body.betriebsart,
+        format!(
             "Ungültige Betriebsart «{}» — erlaubt: TMO, DMO",
             body.betriebsart
-        )));
-    }
+        ),
+    )?;
     let hinweis = body
         .hinweis
         .map(|s| s.trim().to_string())
@@ -129,22 +126,17 @@ impl PatchNormalisiert {
 fn normalisiere_patch_katalog(body: PatchKatalog) -> Result<PatchNormalisiert, AppError> {
     let bezeichnung = match body.bezeichnung {
         Some(b) => {
-            let b = b.trim().to_string();
-            if b.is_empty() {
-                return Err(AppError::Validation(
-                    "Bezeichnung darf nicht leer sein".into(),
-                ));
-            }
+            let b = pflicht(&b, "Bezeichnung")?;
             Some(b)
         }
         None => None,
     };
     if let Some(ba) = &body.betriebsart {
-        if Betriebsart::parse(ba).is_none() {
-            return Err(AppError::Validation(format!(
-                "Ungültige Betriebsart «{ba}» — erlaubt: TMO, DMO"
-            )));
-        }
+        parse_enum(
+            Betriebsart::parse,
+            ba,
+            format!("Ungültige Betriebsart «{ba}» — erlaubt: TMO, DMO"),
+        )?;
     }
     Ok(PatchNormalisiert {
         bezeichnung,
@@ -165,18 +157,15 @@ struct NormalisierterLokal {
 }
 
 fn normalisiere_lokal(body: EinsatzLokalBody) -> Result<NormalisierterLokal, AppError> {
-    let bezeichnung = body.bezeichnung.trim().to_string();
-    if bezeichnung.is_empty() {
-        return Err(AppError::Validation(
-            "Bezeichnung darf nicht leer sein".into(),
-        ));
-    }
-    if Betriebsart::parse(&body.betriebsart).is_none() {
-        return Err(AppError::Validation(format!(
+    let bezeichnung = pflicht(&body.bezeichnung, "Bezeichnung")?;
+    parse_enum(
+        Betriebsart::parse,
+        &body.betriebsart,
+        format!(
             "Ungültige Betriebsart «{}» — erlaubt: TMO, DMO",
             body.betriebsart
-        )));
-    }
+        ),
+    )?;
     let hinweis = body
         .hinweis
         .map(|s| s.trim().to_string())

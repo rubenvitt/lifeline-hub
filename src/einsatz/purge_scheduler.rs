@@ -25,17 +25,12 @@ use std::time::Duration;
 /// kein Sekunden-Druck wie bei Erinnerungen).
 const TICK_SEKUNDEN: u64 = 600;
 
-/// Formatiert einen UTC-Zeitpunkt im kanonischen DB-Format.
-fn fmt(t: DateTime<Utc>) -> String {
-    t.format("%Y-%m-%d %H:%M:%S").to_string()
-}
-
 /// Ein Purge-Durchlauf für den Zeitpunkt `jetzt`. Führt Phase A (Soft-Delete) und
 /// Phase B (PII-Schwärzung) aus und liefert die Gesamtzahl der mutierten Einsätze.
 /// Async + injiziertes `jetzt` = deterministisch testbar. Idempotent: ein zweiter
 /// Tick ohne neue Fälligkeiten liefert 0.
 pub async fn tick_einmal(pool: &SqlitePool, jetzt: DateTime<Utc>) -> usize {
-    let jetzt_s = fmt(jetzt);
+    let jetzt_s = crate::zeit::formatiere_utc(jetzt);
     let mut anzahl = 0;
 
     // --- Phase A: Soft-Delete fälliger Einsätze (reversibel, Karenz-Start) ---
@@ -124,12 +119,9 @@ pub fn starte_purge_scheduler(pool: SqlitePool) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::NaiveDateTime;
 
     fn t(s: &str) -> DateTime<Utc> {
-        NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S")
-            .unwrap()
-            .and_utc()
+        crate::zeit::parse_utc(s).unwrap()
     }
 
     /// Org + Benutzer + ABGESCHLOSSENER Einsatz mit gesetzter, abgelaufener Frist.

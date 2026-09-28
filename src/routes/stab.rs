@@ -16,14 +16,10 @@ use crate::einsatz::modul::Stab;
 use crate::error::AppError;
 use crate::extract::{JsonBody, PfadParam};
 use crate::live::LiveEvent;
-use crate::routes::support;
+use crate::routes::support::{self, pflicht};
 use crate::stab::repo::{self, AbschlussEingabe, BesetzungEingabe};
 use crate::stab::{BesetzungArt, LagebesprechungAnzeige, Sachgebiet, StabAnzeige, BEZEICHNUNG_MAX};
-
-/// Aktuelle Server-Zeit im SQLite-Format (Default-Zeitpunkt der Besprechung).
-fn jetzt() -> String {
-    chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string()
-}
+use crate::zeit::jetzt;
 
 fn sse(state: &AppState, einsatz_id: i64) {
     state.live.publiziere_event(
@@ -217,12 +213,7 @@ pub async fn lagebesprechung_abschliessen(
     // Ein leeres Pflichtfeld scheitert am Feld ISOLIERT → 400 (LFH-267). „Lage unverändert,
     // Maßnahmen fortführen" ist ein gültiger Entschluss, ein leerer Eintrag vom Typ
     // `entscheidung` wäre semantisch leer.
-    let entschluss = req.entschluss.trim().to_string();
-    if entschluss.is_empty() {
-        return Err(AppError::Validation(
-            "entschluss darf nicht leer sein".into(),
-        ));
-    }
+    let entschluss = pflicht(&req.entschluss, "entschluss")?;
 
     // Nicht parsebare Zeit → 400 (Feld isoliert). `normalisiere_zeit` läuft in der ROUTE, nie
     // im Repo — dieselbe Arbeitsteilung wie im Bestand.

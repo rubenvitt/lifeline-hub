@@ -14,7 +14,9 @@ use crate::error::AppError;
 use crate::material::disposition_repo as material_repo;
 use crate::material::EinsatzMaterialAnzeige;
 use crate::person::{registrier_anzeige, repo as person_repo};
-use crate::routes::support::trimme;
+use crate::routes::support::{
+    parse_enum, parse_enum_opt, pflicht, pflicht_tri, pruefe_koordinate, trimme,
+};
 use crate::uhs::belegung_repo;
 use crate::uhs::platz_repo::{self, NeuerPlatz, PatchPlatz};
 use crate::uhs::repo::{self as uhs_repo, NeueDaten, PatchDaten};
@@ -81,13 +83,11 @@ pub async fn liste(
     )
     .await?;
 
-    if let Some(s) = &params.status {
-        if UhsStatus::parse(s).is_none() {
-            return Err(AppError::Validation(
-                "Unbekannter UHS-Status im Filter".into(),
-            ));
-        }
-    }
+    parse_enum_opt(
+        UhsStatus::parse,
+        params.status.as_deref(),
+        "Unbekannter UHS-Status im Filter",
+    )?;
     Ok(Json(
         uhs_repo::liste(
             &state.pool,
@@ -129,15 +129,8 @@ pub async fn anlegen(
     .await?;
     fordere_aktiv(&einsatz)?;
 
-    if UhsTyp::parse(&body.typ).is_none() {
-        return Err(AppError::Validation("Unbekannter UHS-Typ".into()));
-    }
-    let bezeichnung = body.bezeichnung.trim().to_string();
-    if bezeichnung.is_empty() {
-        return Err(AppError::Validation(
-            "Bezeichnung darf nicht leer sein".into(),
-        ));
-    }
+    parse_enum(UhsTyp::parse, &body.typ, "Unbekannter UHS-Typ")?;
+    let bezeichnung = pflicht(&body.bezeichnung, "Bezeichnung")?;
     let standort = trimme(body.standort);
     let notiz = trimme(body.notiz);
 
@@ -253,46 +246,11 @@ pub async fn aktualisieren(
     }
 
     // lat/lon als Paar: Effektivzustand nach dem Patch prüfen (422 statt 500).
-    let eff_lat = match body.lat {
-        Some(opt) => opt,
-        None => vorher.lat,
-    };
-    let eff_lon = match body.lon {
-        Some(opt) => opt,
-        None => vorher.lon,
-    };
-    if eff_lat.is_some() != eff_lon.is_some() {
-        return Err(AppError::UnprocessableEntity(
-            "lat und lon müssen gemeinsam gesetzt oder gemeinsam leer sein".into(),
-        ));
-    }
-    if let Some(la) = eff_lat {
-        if !(-90.0..=90.0).contains(&la) {
-            return Err(AppError::UnprocessableEntity(
-                "lat muss zwischen -90 und 90 liegen".into(),
-            ));
-        }
-    }
-    if let Some(lo) = eff_lon {
-        if !(-180.0..=180.0).contains(&lo) {
-            return Err(AppError::UnprocessableEntity(
-                "lon muss zwischen -180 und 180 liegen".into(),
-            ));
-        }
-    }
+    let eff_lat = body.lat.unwrap_or(vorher.lat);
+    let eff_lon = body.lon.unwrap_or(vorher.lon);
+    pruefe_koordinate(eff_lat, eff_lon, "lat", "lon")?;
 
-    let bezeichnung = body
-        .bezeichnung
-        .as_deref()
-        .map(str::trim)
-        .map(str::to_string);
-    if let Some(b) = &bezeichnung {
-        if b.is_empty() {
-            return Err(AppError::Validation(
-                "Bezeichnung darf nicht leer sein".into(),
-            ));
-        }
-    }
+    let bezeichnung = pflicht_tri(body.bezeichnung.as_deref(), "Bezeichnung")?;
     let standort = body
         .standort
         .map(|opt| opt.map(|s| s.trim().to_string()).filter(|s| !s.is_empty()));
@@ -347,9 +305,7 @@ pub async fn status_wechsel(
     .await?;
     fordere_aktiv(&einsatz)?;
 
-    if UhsStatus::parse(&body.status).is_none() {
-        return Err(AppError::Validation("Unbekannter Status".into()));
-    }
+    parse_enum(UhsStatus::parse, &body.status, "Unbekannter Status")?;
     let vorher = uhs_repo::laden(&state.pool, einsatz_id, uhs_id).await?;
     if vorher.storniert_at.is_some() {
         return Err(AppError::Conflict(
@@ -446,15 +402,8 @@ pub async fn platz_anlegen(
     .await?;
     fordere_aktiv(&einsatz)?;
 
-    if PlatzTyp::parse(&body.typ).is_none() {
-        return Err(AppError::Validation("Unbekannter Platz-Typ".into()));
-    }
-    let bezeichnung = body.bezeichnung.trim().to_string();
-    if bezeichnung.is_empty() {
-        return Err(AppError::Validation(
-            "Bezeichnung darf nicht leer sein".into(),
-        ));
-    }
+    parse_enum(PlatzTyp::parse, &body.typ, "Unbekannter Platz-Typ")?;
+    let bezeichnung = pflicht(&body.bezeichnung, "Bezeichnung")?;
     // Existenz der UHS im Einsatz prüfen (404 sonst):
     uhs_repo::laden(&state.pool, einsatz_id, uhs_id).await?;
 
@@ -563,18 +512,7 @@ pub async fn platz_aktualisieren(
     fordere_aktiv(&einsatz)?;
     uhs_repo::laden(&state.pool, einsatz_id, uhs_id).await?;
 
-    let bezeichnung = body
-        .bezeichnung
-        .as_deref()
-        .map(str::trim)
-        .map(str::to_string);
-    if let Some(b) = &bezeichnung {
-        if b.is_empty() {
-            return Err(AppError::Validation(
-                "Bezeichnung darf nicht leer sein".into(),
-            ));
-        }
-    }
+    let bezeichnung = pflicht_tri(body.bezeichnung.as_deref(), "Bezeichnung")?;
     let platz = platz_repo::aktualisiere(
         &state.pool,
         uhs_id,
@@ -618,9 +556,11 @@ pub async fn platz_verfuegbarkeit(
     fordere_aktiv(&einsatz)?;
     uhs_repo::laden(&state.pool, einsatz_id, uhs_id).await?;
 
-    if Verfuegbarkeit::parse(&body.verfuegbarkeit).is_none() {
-        return Err(AppError::Validation("Unbekannte Verfügbarkeit".into()));
-    }
+    parse_enum(
+        Verfuegbarkeit::parse,
+        &body.verfuegbarkeit,
+        "Unbekannte Verfügbarkeit",
+    )?;
     // Bei Reservierung: Person muss zum Einsatz gehören (404 sonst).
     if body.verfuegbarkeit == "reserviert" {
         let pid_ziel = body.reserviert_fuer_person_id.ok_or_else(|| {

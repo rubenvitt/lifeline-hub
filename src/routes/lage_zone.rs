@@ -14,7 +14,7 @@ use crate::error::AppError;
 use crate::lage_zone::repo::{self as zone_repo, ZoneNeu, ZonePatch};
 // ETB-Wortlaut der Zone: der Baustein liegt seit LFH-690 im Fachmodul (Demo-Import).
 use crate::lage_zone::{self, etb_text, LageZoneAnzeige};
-use crate::routes::support::{deserialize_optional_field, trimme, AnsichtFilter};
+use crate::routes::support::{deserialize_optional_field, parse_enum, trimme, AnsichtFilter};
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -260,9 +260,11 @@ pub async fn aktualisieren(
         Some(t) => {
             // Feld isoliert unbrauchbar → 400; die Passung zur gespeicherten Geometrie
             // darunter ist ein Zusammenhang → bleibt 422 (LFH-305).
-            if lage_zone::LageZoneTyp::parse(t).is_none() {
-                return Err(AppError::Validation(format!("Unbekannter Zonen-Typ: {t}")));
-            }
+            parse_enum(
+                lage_zone::LageZoneTyp::parse,
+                t,
+                format!("Unbekannter Zonen-Typ: {t}"),
+            )?;
             if !lage_zone::geometrie_klasse_passt(t, &vorher.geometrie_typ) {
                 return Err(AppError::UnprocessableEntity(format!(
                     "Typ {t} ist mit der vorhandenen Geometrie ({}) nicht zulässig",

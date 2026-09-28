@@ -3,7 +3,7 @@ pub mod repo;
 pub mod zaehler;
 
 use crate::error::AppError;
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::{DateTime, Utc};
 use serde::Serialize;
 use sqlx::{SqliteConnection, SqlitePool};
 use utoipa::ToSchema;
@@ -207,13 +207,10 @@ where
 /// konsistent. `Validation` (400) bei unbekanntem Format.
 pub fn normalisiere_zeit(eingabe: &str) -> Result<String, AppError> {
     if let Ok(dt) = DateTime::parse_from_rfc3339(eingabe) {
-        return Ok(dt
-            .with_timezone(&Utc)
-            .format("%Y-%m-%d %H:%M:%S")
-            .to_string());
+        return Ok(crate::zeit::formatiere_utc(dt.with_timezone(&Utc)));
     }
-    if let Ok(ndt) = NaiveDateTime::parse_from_str(eingabe, "%Y-%m-%d %H:%M:%S") {
-        return Ok(ndt.format("%Y-%m-%d %H:%M:%S").to_string());
+    if let Some(ndt) = crate::zeit::parse(eingabe) {
+        return Ok(crate::zeit::formatiere(ndt));
     }
     Err(AppError::Validation(
         "Ungültiges Zeitformat (erwartet ISO-8601)".into(),

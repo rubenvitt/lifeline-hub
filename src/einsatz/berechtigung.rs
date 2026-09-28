@@ -4,7 +4,7 @@ use super::{modul_override, Einsatz, EinsatzRolle, STATUS_ABGESCHLOSSEN, STATUS_
 use crate::auth::Benutzer;
 use crate::einsatz::effektiv::effektive_modul_rolle;
 use crate::error::AppError;
-use chrono::{DateTime, Duration, NaiveDateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 use sqlx::SqlitePool;
 use std::collections::{HashMap, HashSet};
 
@@ -18,10 +18,7 @@ pub fn ist_in_nachlauffrist(abgeschlossen_at: Option<&str>, jetzt: DateTime<Utc>
     let Some(s) = abgeschlossen_at else {
         return false;
     };
-    let Some(abgeschlossen) = NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S")
-        .ok()
-        .map(|naive| naive.and_utc())
-    else {
+    let Some(abgeschlossen) = crate::zeit::parse_utc(s) else {
         return false;
     };
     jetzt - abgeschlossen < Duration::hours(NACHLAUF_STUNDEN)
@@ -35,10 +32,7 @@ pub fn retention_abgelaufen(retention_bis: Option<&str>, jetzt: DateTime<Utc>) -
     let Some(s) = retention_bis else {
         return false;
     };
-    let Some(frist) = NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S")
-        .ok()
-        .map(|naive| naive.and_utc())
-    else {
+    let Some(frist) = crate::zeit::parse_utc(s) else {
         return false;
     };
     jetzt >= frist
@@ -363,9 +357,7 @@ mod tests {
 
     /// Fester Referenzzeitpunkt für die Zeit-abhängigen Tests.
     fn jetzt() -> DateTime<Utc> {
-        NaiveDateTime::parse_from_str("2026-05-25 12:00:00", "%Y-%m-%d %H:%M:%S")
-            .unwrap()
-            .and_utc()
+        crate::zeit::parse_utc("2026-05-25 12:00:00").unwrap()
     }
 
     #[test]

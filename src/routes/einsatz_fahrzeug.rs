@@ -15,7 +15,7 @@ use crate::fahrzeug::besatzung_repo;
 use crate::fahrzeug::disposition_repo::{self, AdhocDaten};
 use crate::fahrzeug::status_repo;
 use crate::fahrzeug::EinsatzFahrzeugAnzeige;
-use crate::routes::support::{trimme, trimme_tri};
+use crate::routes::support::{pflicht, pruefe_koordinate, trimme, trimme_tri};
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
@@ -110,12 +110,7 @@ pub async fn disponieren(
     let vorbereitet = match (body.fahrzeug_id, body.adhoc) {
         (Some(fahrzeug_id), None) => Vorbereitet::Stamm(fahrzeug_id),
         (None, Some(adhoc)) => {
-            let funkrufname = adhoc.funkrufname.trim().to_string();
-            if funkrufname.is_empty() {
-                return Err(AppError::Validation(
-                    "Funkrufname darf nicht leer sein".into(),
-                ));
-            }
+            let funkrufname = pflicht(&adhoc.funkrufname, "Funkrufname")?;
             Vorbereitet::Adhoc {
                 funkrufname,
                 fahrzeugtyp: trimme(adhoc.fahrzeugtyp),
@@ -456,33 +451,9 @@ pub async fn position(
             .fetch_optional(&state.pool)
             .await?
             .ok_or(AppError::NotFound)?;
-    let eff_lat = match body.lat {
-        Some(o) => o,
-        None => vorher.0,
-    };
-    let eff_lon = match body.lon {
-        Some(o) => o,
-        None => vorher.1,
-    };
-    if eff_lat.is_some() != eff_lon.is_some() {
-        return Err(AppError::UnprocessableEntity(
-            "lat und lon müssen gemeinsam gesetzt oder gemeinsam leer sein".into(),
-        ));
-    }
-    if let Some(la) = eff_lat {
-        if !(-90.0..=90.0).contains(&la) {
-            return Err(AppError::UnprocessableEntity(
-                "lat muss zwischen -90 und 90 liegen".into(),
-            ));
-        }
-    }
-    if let Some(lo) = eff_lon {
-        if !(-180.0..=180.0).contains(&lo) {
-            return Err(AppError::UnprocessableEntity(
-                "lon muss zwischen -180 und 180 liegen".into(),
-            ));
-        }
-    }
+    let eff_lat = body.lat.unwrap_or(vorher.0);
+    let eff_lon = body.lon.unwrap_or(vorher.1);
+    pruefe_koordinate(eff_lat, eff_lon, "lat", "lon")?;
 
     let nachher = disposition_repo::aktualisiere_position(
         &state.pool,

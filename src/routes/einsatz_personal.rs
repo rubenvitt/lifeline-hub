@@ -14,7 +14,7 @@ use crate::error::AppError;
 use crate::personal::disposition_repo::{self, AdhocDaten};
 use crate::personal::status_repo;
 use crate::personal::{EinsatzPersonalAnzeige, FuehrungskraftKarte};
-use crate::routes::support::{trimme, trimme_tri};
+use crate::routes::support::{parse_enum, pflicht, pruefe_koordinate, trimme, trimme_tri};
 use crate::staerke::StaerkePosition;
 use axum::extract::State;
 use axum::http::StatusCode;
@@ -40,9 +40,7 @@ fn person_bezeichnung(a: &EinsatzPersonalAnzeige) -> String {
 /// Validiert eine optionale Stärke-Position gegen das Enum (leer/None erlaubt).
 fn pruefe_position(p: &Option<String>) -> Result<(), AppError> {
     if let Some(s) = p.as_deref() {
-        if StaerkePosition::parse(s).is_none() {
-            return Err(AppError::Validation("Ungültige Stärke-Position".into()));
-        }
+        parse_enum(StaerkePosition::parse, s, "Ungültige Stärke-Position")?;
     }
     Ok(())
 }
@@ -119,10 +117,7 @@ pub async fn disponieren(
             .await?
         }
         (None, Some(adhoc)) => {
-            let name = adhoc.name.trim().to_string();
-            if name.is_empty() {
-                return Err(AppError::Validation("Name darf nicht leer sein".into()));
-            }
+            let name = pflicht(&adhoc.name, "Name")?;
             pruefe_position(&adhoc.staerke_position)?;
             let funktion = trimme(adhoc.funktion);
             let traeger = trimme(adhoc.traegerorganisation);
@@ -210,9 +205,7 @@ pub async fn aktualisieren(
     }
     // staerke_position ist Tri-State; nur ein konkret gesetzter Wert wird validiert.
     if let Some(Some(pos)) = &body.staerke_position {
-        if StaerkePosition::parse(pos).is_none() {
-            return Err(AppError::Validation("Ungültige Stärke-Position".into()));
-        }
+        parse_enum(StaerkePosition::parse, pos, "Ungültige Stärke-Position")?;
     }
 
     let vorher = disposition_repo::laden_anzeige(&state.pool, einsatz_id, ep_id, true).await?;
@@ -350,33 +343,9 @@ pub async fn position(
             .fetch_optional(&state.pool)
             .await?
             .ok_or(AppError::NotFound)?;
-    let eff_lat = match body.lat {
-        Some(o) => o,
-        None => vorher.0,
-    };
-    let eff_lon = match body.lon {
-        Some(o) => o,
-        None => vorher.1,
-    };
-    if eff_lat.is_some() != eff_lon.is_some() {
-        return Err(AppError::UnprocessableEntity(
-            "lat und lon müssen gemeinsam gesetzt oder gemeinsam leer sein".into(),
-        ));
-    }
-    if let Some(la) = eff_lat {
-        if !(-90.0..=90.0).contains(&la) {
-            return Err(AppError::UnprocessableEntity(
-                "lat muss zwischen -90 und 90 liegen".into(),
-            ));
-        }
-    }
-    if let Some(lo) = eff_lon {
-        if !(-180.0..=180.0).contains(&lo) {
-            return Err(AppError::UnprocessableEntity(
-                "lon muss zwischen -180 und 180 liegen".into(),
-            ));
-        }
-    }
+    let eff_lat = body.lat.unwrap_or(vorher.0);
+    let eff_lon = body.lon.unwrap_or(vorher.1);
+    pruefe_koordinate(eff_lat, eff_lon, "lat", "lon")?;
 
     let nachher = disposition_repo::aktualisiere_position(
         &state.pool,

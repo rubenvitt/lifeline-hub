@@ -3008,9 +3008,7 @@ mod tests {
     // ---------- LFH-23: Wiederherstellen während der Karenz ----------
 
     fn zeit(s: &str) -> chrono::DateTime<Utc> {
-        chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S")
-            .unwrap()
-            .and_utc()
+        crate::zeit::parse_utc(s).unwrap()
     }
 
     /// Abgeschlossener Einsatz mit abgelaufener Frist und den übergebenen Tombstones.
@@ -3167,9 +3165,7 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let leit = benutzer_anlegen(&pool, "leit").await;
         // Vormerkung relativ zu jetzt, damit sie wirklich INNERHALB der Karenz liegt.
-        let gestern = (Utc::now() - chrono::Duration::days(1))
-            .format("%Y-%m-%d %H:%M:%S")
-            .to_string();
+        let gestern = crate::zeit::formatiere_utc(Utc::now() - chrono::Duration::days(1));
         let vorgemerkt = archiv_einsatz(&pool, leit, Some(&gestern), None).await;
         let vorher = stand(&pool, vorgemerkt).await;
         assert!(matches!(

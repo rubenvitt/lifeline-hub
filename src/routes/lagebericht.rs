@@ -7,6 +7,8 @@ use crate::einsatz::repo as einsatz_repo;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::live::LiveEvent;
+use crate::routes::support::{pflicht, pflicht_tri};
+use crate::zeit::jetzt;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
 const MODUL_KEY: &str = "lageberichte";
@@ -18,11 +20,6 @@ use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
-
-/// Aktuelle Server-Zeit im SQLite-Format (Default-Zeitstand).
-fn jetzt() -> String {
-    chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string()
-}
 
 /// SSE-Notify: Lageberichte des Einsatzes haben sich geändert. Event-Tag `lagebericht`.
 fn sse_lagebericht(state: &AppState, einsatz_id: i64, lb_id: i64) {
@@ -106,10 +103,7 @@ pub async fn anlegen(
     if vorlage(&body.vorlage).is_none() {
         return Err(AppError::Validation("Unbekannte Vorlage".into()));
     }
-    let titel = body.titel.trim().to_string();
-    if titel.is_empty() {
-        return Err(AppError::Validation("Titel darf nicht leer sein".into()));
-    }
+    let titel = pflicht(&body.titel, "Titel")?;
     let zeitstand = match body.zeitstand.as_deref() {
         Some(z) => normalisiere_zeit(z)?,
         None => jetzt(),
@@ -162,12 +156,7 @@ pub async fn aktualisieren(
         ));
     }
 
-    let titel = body.titel.as_ref().map(|t| t.trim().to_string());
-    if let Some(t) = &titel {
-        if t.is_empty() {
-            return Err(AppError::Validation("Titel darf nicht leer sein".into()));
-        }
-    }
+    let titel = pflicht_tri(body.titel.as_deref(), "Titel")?;
     let zeitstand = match body.zeitstand.as_deref() {
         Some(z) => Some(normalisiere_zeit(z)?),
         None => None,

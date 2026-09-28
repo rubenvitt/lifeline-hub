@@ -15,7 +15,8 @@ use crate::live::LiveEvent;
 /// Modul-Key dieses Route-Moduls (LFH-132).
 const MODUL_KEY: &str = "einheiten";
 use crate::routes::support::{
-    deserialize_optional_field, pruefe_kommunikationsmittel, trimme, trimme_tri,
+    deserialize_optional_field, pflicht, pruefe_kommunikationsmittel, pruefe_koordinate, trimme,
+    trimme_tri,
 };
 use crate::staerke::Staerke;
 use axum::extract::State;
@@ -143,10 +144,7 @@ pub async fn bilden(
     JsonBody(body): JsonBody<EinheitBody>,
 ) -> Result<(StatusCode, Json<EinheitAnzeige>), AppError> {
     let einsatz = schreib_gate(&state, &benutzer, einsatz_id).await?;
-    let name = body.name.trim().to_string();
-    if name.is_empty() {
-        return Err(AppError::Validation("Name darf nicht leer sein".into()));
-    }
+    let name = pflicht(&body.name, "Name")?;
     Staerke::aus_optionen(
         body.soll_fuehrer,
         body.soll_unterfuehrer,
@@ -250,10 +248,7 @@ pub async fn aktualisieren(
     let einsatz = schreib_gate(&state, &benutzer, einsatz_id).await?;
     let name = match body.name {
         Some(n) => {
-            let n = n.trim().to_string();
-            if n.is_empty() {
-                return Err(AppError::Validation("Name darf nicht leer sein".into()));
-            }
+            let n = pflicht(&n, "Name")?;
             Some(n)
         }
         None => None,
@@ -619,33 +614,9 @@ pub async fn position(
     fordere_aktiv(&einsatz)?;
 
     let vorher = einheit_repo::laden(&state.pool, einsatz_id, einheit_id).await?; // 404 falls fremd
-    let eff_lat = match body.lat {
-        Some(o) => o,
-        None => vorher.lat,
-    };
-    let eff_lon = match body.lon {
-        Some(o) => o,
-        None => vorher.lon,
-    };
-    if eff_lat.is_some() != eff_lon.is_some() {
-        return Err(AppError::UnprocessableEntity(
-            "lat und lon müssen gemeinsam gesetzt oder gemeinsam leer sein".into(),
-        ));
-    }
-    if let Some(la) = eff_lat {
-        if !(-90.0..=90.0).contains(&la) {
-            return Err(AppError::UnprocessableEntity(
-                "lat muss zwischen -90 und 90 liegen".into(),
-            ));
-        }
-    }
-    if let Some(lo) = eff_lon {
-        if !(-180.0..=180.0).contains(&lo) {
-            return Err(AppError::UnprocessableEntity(
-                "lon muss zwischen -180 und 180 liegen".into(),
-            ));
-        }
-    }
+    let eff_lat = body.lat.unwrap_or(vorher.lat);
+    let eff_lon = body.lon.unwrap_or(vorher.lon);
+    pruefe_koordinate(eff_lat, eff_lon, "lat", "lon")?;
 
     let nachher = einheit_repo::aktualisiere_position(
         &state.pool,

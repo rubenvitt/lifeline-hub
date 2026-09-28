@@ -13,7 +13,7 @@ const MODUL_KEY: &str = "einsatzabschnitte";
 use crate::einsatzabschnitt::repo::{self as abschnitt_repo, AbschnittDaten, AbschnittPatch};
 use crate::einsatzabschnitt::{AbschnittLagezustand, EinsatzabschnittAnzeige};
 use crate::error::AppError;
-use crate::routes::support::{pruefe_kommunikationsmittel, trimme, trimme_tri};
+use crate::routes::support::{pflicht, pruefe_kommunikationsmittel, trimme, trimme_tri};
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
@@ -126,10 +126,7 @@ pub async fn anlegen(
     .await?;
     fordere_aktiv(&einsatz)?;
 
-    let name = body.name.trim().to_string();
-    if name.is_empty() {
-        return Err(AppError::Validation("Name darf nicht leer sein".into()));
-    }
+    let name = pflicht(&body.name, "Name")?;
     let bemerkung = trimme(body.bemerkung);
     let mittel = trimme(body.kommunikationsmittel);
     pruefe_kommunikationsmittel(mittel.as_deref())?;
@@ -267,10 +264,7 @@ pub async fn aktualisieren(
 
     let name = match body.name {
         Some(n) => {
-            let n = n.trim().to_string();
-            if n.is_empty() {
-                return Err(AppError::Validation("Name darf nicht leer sein".into()));
-            }
+            let n = pflicht(&n, "Name")?;
             Some(n)
         }
         None => None,

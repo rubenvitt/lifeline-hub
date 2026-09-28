@@ -14,7 +14,7 @@ use crate::live::LiveEvent;
 /// Modul-Key dieses Route-Moduls (LFH-132).
 const MODUL_KEY: &str = "bereitstellungsraeume";
 use crate::error::AppError;
-use crate::routes::support::trimme;
+use crate::routes::support::{parse_enum, parse_enum_opt, pflicht, pflicht_tri, trimme};
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -106,13 +106,11 @@ pub async fn liste(
     )
     .await?;
 
-    if let Some(s) = &params.status {
-        if BrStatus::parse(s).is_none() {
-            return Err(AppError::Validation(
-                "Unbekannter BR-Status im Filter".into(),
-            ));
-        }
-    }
+    parse_enum_opt(
+        BrStatus::parse,
+        params.status.as_deref(),
+        "Unbekannter BR-Status im Filter",
+    )?;
     Ok(Json(
         br_repo::liste(
             &state.pool,
@@ -153,12 +151,7 @@ pub async fn anlegen(
     .await?;
     fordere_aktiv(&einsatz)?;
 
-    let bezeichnung = body.bezeichnung.trim().to_string();
-    if bezeichnung.is_empty() {
-        return Err(AppError::Validation(
-            "Bezeichnung darf nicht leer sein".into(),
-        ));
-    }
+    let bezeichnung = pflicht(&body.bezeichnung, "Bezeichnung")?;
     let standort = trimme(body.standort);
     let notiz = trimme(body.notiz);
 
@@ -247,18 +240,7 @@ pub async fn aktualisieren(
         ));
     }
 
-    let bezeichnung = body
-        .bezeichnung
-        .as_deref()
-        .map(str::trim)
-        .map(str::to_string);
-    if let Some(b) = &bezeichnung {
-        if b.is_empty() {
-            return Err(AppError::Validation(
-                "Bezeichnung darf nicht leer sein".into(),
-            ));
-        }
-    }
+    let bezeichnung = pflicht_tri(body.bezeichnung.as_deref(), "Bezeichnung")?;
     let standort = body
         .standort
         .map(|opt| opt.map(|s| s.trim().to_string()).filter(|s| !s.is_empty()));
@@ -309,9 +291,7 @@ pub async fn status_wechsel(
     .await?;
     fordere_aktiv(&einsatz)?;
 
-    if BrStatus::parse(&body.status).is_none() {
-        return Err(AppError::Validation("Unbekannter Status".into()));
-    }
+    parse_enum(BrStatus::parse, &body.status, "Unbekannter Status")?;
     let vorher = br_repo::laden(&state.pool, einsatz_id, br_id).await?;
     if vorher.storniert_at.is_some() {
         return Err(AppError::Conflict(

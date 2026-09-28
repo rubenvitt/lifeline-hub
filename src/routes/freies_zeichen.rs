@@ -10,7 +10,9 @@ use crate::extract::PfadParam;
 use crate::freies_zeichen::repo::{self as zeichen_repo, ZeichenNeu, ZeichenPatch};
 use crate::freies_zeichen::FreiesZeichenAnzeige;
 use crate::live::LiveEvent;
-use crate::routes::support::{deserialize_optional_field, trimme, trimme_tri, AnsichtFilter};
+use crate::routes::support::{
+    deserialize_optional_field, pflicht, trimme, trimme_tri, AnsichtFilter,
+};
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -240,11 +242,6 @@ pub async fn aufloesen(
 /// 422 erst den Zusammenhang (Feld-Kombination, Objekt-Zustand). Siehe CLAUDE.md, Abschnitt
 /// „Backend — Statuscode-Konvention".
 fn grundzeichen_pflicht(roh: &str) -> Result<String, AppError> {
-    let g = roh.trim();
-    if g.is_empty() {
-        return Err(AppError::Validation(
-            "grundzeichen darf nicht leer sein".into(),
-        ));
-    }
+    let g = pflicht(&roh, "grundzeichen")?;
     Ok(g.to_string())
 }

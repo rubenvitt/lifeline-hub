@@ -11,7 +11,7 @@ use crate::einsatz::{
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
-use crate::routes::support;
+use crate::routes::support::{self, pflicht};
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
@@ -41,11 +41,7 @@ pub async fn anlegen(
     if !benutzer.darf_einsatz_anlegen() {
         return Err(AppError::Forbidden);
     }
-    if req.bezeichnung.trim().is_empty() {
-        return Err(AppError::Validation(
-            "Bezeichnung darf nicht leer sein".into(),
-        ));
-    }
+    pflicht(&req.bezeichnung, "Bezeichnung")?;
     let stichwort = req
         .stichwort
         .as_deref()
@@ -794,12 +790,7 @@ pub async fn aktualisieren(
     // jeder Teil-Patch abgelehnt. Vorhanden-aber-leer bleibt 400 (LFH-305).
     let bezeichnung = match req.bezeichnung {
         Some(b) => {
-            let b = b.trim().to_string();
-            if b.is_empty() {
-                return Err(AppError::Validation(
-                    "Bezeichnung darf nicht leer sein".into(),
-                ));
-            }
+            let b = pflicht(&b, "Bezeichnung")?;
             Some(b)
         }
         None => None,

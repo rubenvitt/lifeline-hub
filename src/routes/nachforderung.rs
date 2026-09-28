@@ -6,6 +6,8 @@ use crate::einsatz::repo as einsatz_repo;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::live::LiveEvent;
+use crate::routes::support::pflicht;
+use crate::zeit::jetzt;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
 const MODUL_KEY: &str = "nachforderungen";
@@ -14,13 +16,8 @@ use crate::nachforderung::{repo, NachforderungAnzeige, PRIO_NORMAL, STATUS_ABGEL
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::Json;
-use chrono::{NaiveDateTime, Utc};
-use serde::Deserialize;
 
-/// Kanonischer Zeitstempel „jetzt" (UTC) im DB-Format.
-fn jetzt() -> String {
-    Utc::now().format("%Y-%m-%d %H:%M:%S").to_string()
-}
+use serde::Deserialize;
 
 /// SSE-Notify: Nachforderungen des Einsatzes haben sich geändert (Tag `nachforderung`,
 /// auf der EINEN bestehenden /etb/stream-Verbindung).
@@ -34,13 +31,8 @@ fn sse(state: &AppState, einsatz_id: i64) {
 
 /// Normalisiert einen Eingabe-Zeitstempel auf 'YYYY-MM-DD HH:MM:SS' (UTC).
 fn parse_zeit(roh: &str) -> Result<String, AppError> {
-    let roh = roh.trim().replace('T', " ");
-    for fmt in ["%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"] {
-        if let Ok(n) = NaiveDateTime::parse_from_str(&roh, fmt) {
-            return Ok(n.format("%Y-%m-%d %H:%M:%S").to_string());
-        }
-    }
-    Err(AppError::Validation("Ungültiger Zeitpunkt".into()))
+    crate::zeit::normalisiere_eingabe(roh)
+        .ok_or_else(|| AppError::Validation("Ungültiger Zeitpunkt".into()))
 }
 
 fn trimme(o: &Option<String>) -> Option<&str> {
@@ -116,16 +108,8 @@ pub async fn anlegen(
     .await?;
     fordere_aktiv(&einsatz)?;
 
-    let art = req.art.trim();
-    let bezeichnung = req.bezeichnung.trim();
-    if art.is_empty() {
-        return Err(AppError::Validation("Art darf nicht leer sein".into()));
-    }
-    if bezeichnung.is_empty() {
-        return Err(AppError::Validation(
-            "Bezeichnung darf nicht leer sein".into(),
-        ));
-    }
+    let art = pflicht(&req.art, "Art")?;
+    let bezeichnung = pflicht(&req.bezeichnung, "Bezeichnung")?;
     if let Some(a) = req.anzahl {
         if a < 1 {
             return Err(AppError::Validation("Anzahl muss mindestens 1 sein".into()));
@@ -154,8 +138,8 @@ pub async fn anlegen(
         einsatz_id,
         benutzer.id,
         repo::NachforderungDaten {
-            art,
-            bezeichnung,
+            art: &art,
+            bezeichnung: &bezeichnung,
             anzahl: req.anzahl,
             adressat_kategorie: adressat,
             adressat_bezeichnung: trimme(&req.adressat_bezeichnung),
