@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { http, HttpResponse } from 'msw';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -10,7 +9,8 @@ import { AuthProvider } from '../auth/AuthContext';
 import type { Meldung } from '../api/types';
 import { ladeEinsatz } from '../api/einsaetze';
 import { queueLeerenFuerTests, schreibaktionenLaden } from '../offline/queue';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
+import { benutzerFixture } from '../test/fixtures';
 
 vi.mock('../live/useEinsatzLiveStream', () => ({ useEinsatzLiveStream: () => {} }));
 vi.mock('../api/einsaetze', () => ({
@@ -110,19 +110,7 @@ function LocationProbe() {
 }
 
 function renderPage(route = '/einsaetze/1/meldungen') {
-  server.use(
-    http.get('/api/auth/me', () =>
-      HttpResponse.json({
-        id: 1,
-        anzeigename: 'Leitung',
-        benutzername: 'leitung',
-        system_rolle: 'keiner',
-        org_rolle: 'keine',
-        aktiv: true,
-        erstellt_at: '2026-08-06 10:00:00',
-      }),
-    ),
-  );
+  server.use(meHandler(benutzerFixture({ anzeigename: 'Leitung' })));
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>

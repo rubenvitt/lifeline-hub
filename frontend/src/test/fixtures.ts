@@ -1,4 +1,6 @@
+import { vi } from 'vitest';
 import type { BenutzerAnzeige, EinsatzAnzeige } from '../api/types';
+import type { useAuth } from '../auth/AuthContext';
 
 /**
  * Geteilte Datenfabriken für Tests. Die Vorgaben sind ein neutraler, vollständiger
@@ -57,4 +59,9 @@ export function adminFixture(overrides: Partial<BenutzerAnzeige> = {}): Benutzer
     system_rolle: 'admin',
     ...overrides,
   });
+}
+
+/** Rückgabe eines gemockten `useAuth` mit festem Benutzer und Stub-Aktionen. */
+export function authWertFixture(benutzer: BenutzerAnzeige | null): ReturnType<typeof useAuth> {
+  return { benutzer, laedt: false, login: vi.fn(), logout: vi.fn(), aktualisiere: vi.fn() };
 }

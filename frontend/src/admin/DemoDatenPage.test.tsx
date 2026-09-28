@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { Route, Routes, useLocation } from 'react-router';
 import type { QueryClient } from '@tanstack/react-query';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { erzeugeQueryClient } from '../api/queryClient';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
@@ -12,6 +12,8 @@ import type { DemoDatenStatus } from '../api/types';
 import AdminLayout from './AdminLayout';
 import DemoDatenPage from './DemoDatenPage';
 import { adminDemoDatenPfad } from './adminNav';
+import { adminFixture, benutzerFixture } from '../test/fixtures';
+import type { BenutzerAnzeige } from '../api/types';
 
 /**
  * Verwaltungssektion „Demo-Daten“ (LFH-690, Task 6.2; Spec „Verwaltungssektion Demo-Daten“,
@@ -22,25 +24,9 @@ import { adminDemoDatenPfad } from './adminNav';
  * `dayjs(s)` — in UTC gerechnet stünde beides auf 08:00.
  */
 
-const admin = {
-  id: 1,
-  anzeigename: 'Chef',
-  benutzername: 'chef',
-  system_rolle: 'admin',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-05-23 10:00:00',
-};
+const admin = adminFixture({ anzeigename: 'Chef' });
 
-const fuehrungskraft = {
-  id: 2,
-  anzeigename: 'Eva',
-  benutzername: 'eva',
-  system_rolle: 'keiner',
-  org_rolle: 'fuehrungskraft',
-  aktiv: true,
-  erstellt_at: '2026-05-23 10:00:00',
-};
+const fuehrungskraft = benutzerFixture({ id: 2, anzeigename: 'Eva', org_rolle: 'fuehrungskraft' });
 
 const NICHT_IMPORTIERT: DemoDatenStatus = { importiert: false };
 
@@ -125,8 +111,8 @@ function Pfad() {
   return <div>PFAD:{useLocation().pathname}</div>;
 }
 
-function setup(me: Record<string, unknown>, route = adminDemoDatenPfad(), client?: QueryClient) {
-  server.use(http.get('/api/auth/me', () => HttpResponse.json(me)));
+function setup(me: BenutzerAnzeige, route = adminDemoDatenPfad(), client?: QueryClient) {
+  server.use(meHandler(me));
   return renderMitProviders(
     <Routes>
       <Route path="/admin" element={<AdminLayout />}>

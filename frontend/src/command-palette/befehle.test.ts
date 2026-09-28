@@ -15,18 +15,9 @@ import type {
   ModulOverride,
   Koordinatenformat,
 } from '../api/types';
-import { einsatzFixture } from '../test/fixtures';
+import { benutzerFixture, einsatzFixture } from '../test/fixtures';
 
-const fuehrungskraft: BenutzerAnzeige = {
-  id: 1,
-  anzeigename: 'EL',
-  benutzername: 'el',
-  system_rolle: 'keiner',
-  org_rolle: 'fuehrungskraft',
-  aktiv: true,
-  erstellt_at: '',
-  totp_aktiviert: false,
-};
+const fuehrungskraft = benutzerFixture({ anzeigename: 'EL', org_rolle: 'fuehrungskraft' });
 const sichter: BenutzerAnzeige = { ...fuehrungskraft, id: 2, org_rolle: 'keine' };
 const admin: BenutzerAnzeige = { ...fuehrungskraft, id: 3, system_rolle: 'admin' };
 

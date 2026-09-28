@@ -4,23 +4,16 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import dayjs from 'dayjs';
 import { Route, Routes } from 'react-router';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { formatZeitKurz } from '../anzeige/format';
-import type { EinsatzAnzeige } from '../api/types';
+import type { BenutzerAnzeige, EinsatzAnzeige } from '../api/types';
 import { globalKeys } from '../api/queryKeys';
 import EinsaetzePage, { kartenTitelStil } from './EinsaetzePage';
 import { dichten } from '../theme/tokens';
+import { adminFixture } from '../test/fixtures';
 
-const admin = {
-  id: 1,
-  anzeigename: 'Admin',
-  benutzername: 'admin',
-  system_rolle: 'admin',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-05-23 10:00:00',
-};
+const admin = adminFixture();
 
 function einsatz(over: Partial<Record<string, unknown>> = {}) {
   return {
@@ -39,7 +32,7 @@ function einsatz(over: Partial<Record<string, unknown>> = {}) {
 // `renderMitProviders` (test/utils.tsx:37) rendert den `AuthProvider` selbst — ein
 // zweiter drumherum wäre ein doppelter `/api/auth/me`-Abruf ohne jeden Nutzen.
 function setup() {
-  server.use(http.get('/api/auth/me', () => HttpResponse.json(admin)));
+  server.use(meHandler(admin));
   return renderMitProviders(<EinsaetzePage />);
 }
 
@@ -54,7 +47,7 @@ describe('EinsaetzePage', () => {
 
   it('öffnet den neuen Einsatz direkt nach dem Anlegen', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      meHandler(admin),
       http.get('/api/einsaetze', () => HttpResponse.json([])),
       http.post('/api/einsaetze', () =>
         HttpResponse.json(einsatz({ bezeichnung: 'Sturm Süd' }), { status: 201 }),
@@ -79,7 +72,7 @@ describe('EinsaetzePage', () => {
     // genauso aus.
     let rumpf: Record<string, unknown> | null = null;
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      meHandler(admin),
       http.get('/api/einsaetze', () => HttpResponse.json([])),
       http.post('/api/einsaetze', async ({ request }) => {
         rumpf = (await request.json()) as Record<string, unknown>;
@@ -111,7 +104,7 @@ describe('EinsaetzePage', () => {
 
   it('führt genau vier Felder — die Obergrenze einer Schnellerfassung', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      meHandler(admin),
       http.get('/api/einsaetze', () => HttpResponse.json([])),
     );
     renderMitProviders(<EinsaetzePage />);
@@ -127,7 +120,7 @@ describe('EinsaetzePage', () => {
 
   it('setzt den Fokus beim Öffnen ins erste Feld und sendet per Enter', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      meHandler(admin),
       http.get('/api/einsaetze', () => HttpResponse.json([])),
       http.post('/api/einsaetze', () =>
         HttpResponse.json(einsatz({ bezeichnung: 'Sturm Süd' }), { status: 201 }),
@@ -148,9 +141,9 @@ describe('EinsaetzePage', () => {
   });
 
   it('zeigt den Anlege-Button nicht für Nutzer ohne Recht', async () => {
-    const ohneRecht = { ...admin, system_rolle: 'keiner', org_rolle: 'keine' };
+    const ohneRecht = adminFixture({ system_rolle: 'keiner' });
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(ohneRecht)),
+      meHandler(ohneRecht),
       http.get('/api/einsaetze', () => HttpResponse.json([einsatz()])),
     );
     renderMitProviders(<EinsaetzePage />);
@@ -184,7 +177,7 @@ describe('EinsaetzePage', () => {
 
   it('oeffnet beim Klick auf eine Kachel den Workspace unter /einsaetze/:id', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      meHandler(admin),
       http.get('/api/einsaetze', () => HttpResponse.json([einsatz()])),
     );
     renderMitProviders(
@@ -200,7 +193,7 @@ describe('EinsaetzePage', () => {
   it('macht jede geladene Einsatzkarte per Titel-Link erreichbar und navigiert per Enter', async () => {
     const user = userEvent.setup();
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      meHandler(admin),
       http.get('/api/einsaetze', () =>
         HttpResponse.json([
           einsatz(),
@@ -236,7 +229,7 @@ describe('EinsaetzePage', () => {
 
   it('lässt Modifier-Klicks auf den Einsatz-Titel browsernativ und ohne Karten-Navigation', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      meHandler(admin),
       http.get('/api/einsaetze', () => HttpResponse.json([einsatz()])),
       http.get('/api/stichwort-vorschlaege', () => HttpResponse.json([])),
     );
@@ -266,7 +259,7 @@ describe('EinsaetzePage', () => {
 
   it('zeigt beim Laden Karten-Skelette im Raster und noch keinen Anlegen-Knopf', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      meHandler(admin),
       http.get('/api/einsaetze', async () => {
         await delay(60);
         return HttpResponse.json([einsatz()]);
@@ -292,7 +285,7 @@ describe('EinsaetzePage', () => {
   it('zeigt bei einem Fehler eine Meldung, deren Wiederholen-Aktion neu abruft', async () => {
     let abrufe = 0;
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      meHandler(admin),
       http.get('/api/einsaetze', () => {
         abrufe += 1;
         return abrufe === 1
@@ -316,7 +309,7 @@ describe('EinsaetzePage', () => {
 
   it('zeigt bei leerer Liste den Leer-Zustand — auch für Anlegeberechtigte', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      meHandler(admin),
       http.get('/api/einsaetze', () => HttpResponse.json([])),
     );
     const { container } = renderMitProviders(<EinsaetzePage />);
@@ -340,7 +333,7 @@ describe('Einsatzkarte — Lagebild statt vier Felder (LFH-336 · M4/M5)', () =>
   // abruft (`onUnhandledRequest: 'error'` in `test/setup.ts`).
   function mockEinsaetze(liste: EinsatzAnzeige[]) {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      meHandler(admin),
       http.get('/api/einsaetze', () => HttpResponse.json(liste)),
       http.get('/api/stichwort-vorschlaege', () => HttpResponse.json([])),
     );
@@ -681,7 +674,11 @@ describe('Titel-Link der Einsatzkarte — Bedienziel auf der Dichte-Staffel (LFH
  * grün, wenn der Hinweis nie gebaut würde oder die Abfrage nie feuert.
  */
 describe('Demo-Daten-Hinweis (LFH-690)', () => {
-  const fuehrungskraft = { ...admin, id: 2, system_rolle: 'keiner', org_rolle: 'fuehrungskraft' };
+  const fuehrungskraft = adminFixture({
+    id: 2,
+    system_rolle: 'keiner',
+    org_rolle: 'fuehrungskraft',
+  });
 
   function demoStatus(antwort: 'aus' | { importiert: boolean }) {
     const zaehler = { get: 0 };
@@ -698,12 +695,12 @@ describe('Demo-Daten-Hinweis (LFH-690)', () => {
   }
 
   function rendern(
-    me: Record<string, unknown>,
+    me: BenutzerAnzeige,
     einsaetze: unknown[] = [einsatz()],
     liste?: () => Promise<void>,
   ) {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(me)),
+      meHandler(me),
       http.get('/api/einsaetze', async () => {
         await liste?.();
         return HttpResponse.json(einsaetze);

@@ -2,20 +2,13 @@ import { http, HttpResponse } from 'msw';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import OrganisationTab from './OrganisationTab';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
+import { adminFixture } from '../test/fixtures';
 
-const admin = {
-  id: 1,
-  anzeigename: 'Admin',
-  benutzername: 'admin',
-  system_rolle: 'admin',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-05-26 10:00:00',
-};
+const admin = adminFixture();
 
 function renderTab() {
   return renderMitProviders(<OrganisationTab />);
@@ -27,7 +20,7 @@ describe('OrganisationTab', () => {
     server.use(
       // Seit LFH-346 · A2 hat diese Sektion ein Rechte-Gate: ohne Admin sind Feld und
       // Knopf gesperrt. Der MSW-Default liefert 401 → benutzer=null → kein Admin.
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      meHandler(admin),
       http.get('/api/organisation', () =>
         HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' }),
       ),
@@ -83,7 +76,7 @@ describe('OrganisationTab', () => {
   it('zeigt einen Speicherfehler dauerhaft an der Seite und räumt ihn beim nächsten Versuch', async () => {
     let scheitern = true;
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      meHandler(admin),
       http.get('/api/organisation', () =>
         HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' }),
       ),
@@ -135,7 +128,7 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
   it('speichert den Namen per Enter und schickt nur den Namen', async () => {
     let patched: unknown = null;
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      meHandler(admin),
       http.get('/api/organisation', () =>
         HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' }),
       ),
@@ -154,7 +147,7 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
 
   it('zeigt einen abgelehnten Namen an der Seite, nicht nur im Toast', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      meHandler(admin),
       http.get('/api/organisation', () =>
         HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' }),
       ),
@@ -183,7 +176,7 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
 
   it('zeigt ein hinterlegtes Logo mit dem sha256 als Cache-Brecher', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      meHandler(admin),
       http.get('/api/organisation', () => HttpResponse.json(MIT_LOGO)),
     );
     renderTab();
@@ -198,7 +191,7 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
    */
   it('nimmt ein Logo, das nicht lädt, weg und sagt es', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      meHandler(admin),
       http.get('/api/organisation', () => HttpResponse.json(MIT_LOGO)),
     );
     renderTab();
@@ -219,7 +212,7 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
     let koerper = '';
     let typ = '';
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      meHandler(admin),
       http.get('/api/organisation', () =>
         HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' }),
       ),
@@ -244,7 +237,7 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
   it('lehnt 2 MiB schon im Client ab und sagt es an der Seite', async () => {
     let hochgeladen = 0;
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      meHandler(admin),
       http.get('/api/organisation', () =>
         HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' }),
       ),
@@ -265,7 +258,7 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
   it('fragt vor dem Entfernen nach (roter Bestätigungsknopf); Abbrechen sendet nichts', async () => {
     let geloescht = 0;
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      meHandler(admin),
       http.get('/api/organisation', () => HttpResponse.json(MIT_LOGO)),
       http.delete('/api/organisation/logo', () => {
         geloescht += 1;
@@ -296,7 +289,7 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
    */
   it('zeigt den Grund eines gescheiterten Entfernens im Dialog und räumt ihn beim nächsten Öffnen', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      meHandler(admin),
       http.get('/api/organisation', () => HttpResponse.json(MIT_LOGO)),
       http.delete('/api/organisation/logo', () =>
         HttpResponse.json({ error: 'Logo gerade in Verwendung' }, { status: 409 }),
@@ -324,7 +317,7 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
    */
   it('zeigt jeden Fehler an seinem Paneel, auch wenn zwei Speicherwege nacheinander scheitern', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      meHandler(admin),
       http.get('/api/organisation', () =>
         HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' }),
       ),
@@ -363,7 +356,7 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
    */
   it('übernimmt nach dem Speichern wieder den Serverstand ins Namensfeld (auch bei gleichem Namen)', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      meHandler(admin),
       http.get('/api/organisation', () =>
         HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' }),
       ),
@@ -383,7 +376,7 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
   it('übernimmt nach dem Speichern auch einen fremd geänderten Namen', async () => {
     let name = 'DRK';
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      meHandler(admin),
       http.get('/api/organisation', () =>
         HttpResponse.json({ id: 1, name, tz_organisation: 'hilfsorganisation' }),
       ),
@@ -405,7 +398,7 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
   it('überschreibt einen angefangenen Namen nicht durch einen Refetch', async () => {
     let name = 'DRK';
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      meHandler(admin),
       http.get('/api/organisation', () =>
         HttpResponse.json({ id: 1, name, tz_organisation: 'hilfsorganisation' }),
       ),
@@ -429,7 +422,7 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
   it('zeigt nach „Namen speichern" sofort den gespeicherten Namen, auch wenn der Refetch nicht kommt', async () => {
     let gespeichert = false;
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      meHandler(admin),
       http.get('/api/organisation', async () => {
         if (gespeichert) await new Promise(() => {}); // Refetch hängt
         return HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' });
@@ -458,7 +451,7 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
     let gespeichert = false;
     const patches: unknown[] = [];
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      meHandler(admin),
       http.get('/api/organisation', () =>
         gespeichert
           ? HttpResponse.json({ error: 'Interner Serverfehler' }, { status: 500 })
@@ -487,7 +480,7 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
   it('zeigt ein hochgeladenes Logo sofort aus der Antwort, auch wenn der Refetch nicht kommt', async () => {
     let hochgeladen = false;
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      meHandler(admin),
       http.get('/api/organisation', async () => {
         if (hochgeladen) await new Promise(() => {}); // Refetch hängt
         return HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' });
@@ -512,7 +505,7 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
 
   it('invalidiert die Organisation auch nach dem Umbenennen', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      meHandler(admin),
       http.get('/api/organisation', () =>
         HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' }),
       ),

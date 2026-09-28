@@ -24,6 +24,7 @@ import {
   ladeOrgModulEinstellungen,
   setzeOrgModulEinstellung,
 } from '../../api/orgEinstellungen';
+import { adminFixture, authWertFixture, benutzerFixture } from '../../test/fixtures';
 
 const VOLL = {
   org_id: 1,
@@ -46,22 +47,7 @@ const VOLL = {
 };
 
 function alsAdmin() {
-  vi.mocked(useAuth).mockReturnValue({
-    benutzer: {
-      id: 1,
-      system_rolle: 'admin',
-      org_rolle: 'keine',
-      anzeigename: 'Admin',
-      benutzername: 'admin',
-      aktiv: true,
-      erstellt_at: '',
-      totp_aktiviert: false,
-    },
-    laedt: false,
-    login: vi.fn(),
-    logout: vi.fn(),
-    aktualisiere: vi.fn(),
-  } as never);
+  vi.mocked(useAuth).mockReturnValue(authWertFixture(adminFixture()));
 }
 
 describe('EinsatzDefaults', () => {
@@ -181,22 +167,9 @@ describe('EinsatzDefaults', () => {
   // Grund steht daneben (M16). Ein fehlender Knopf ist von „diese Seite kann das nicht"
   // nicht zu unterscheiden.
   it('ist read-only für Nicht-Admins (fuehrungskraft): Speichern-Button gesperrt, Felder disabled', async () => {
-    vi.mocked(useAuth).mockReturnValue({
-      benutzer: {
-        id: 2,
-        system_rolle: 'keiner',
-        org_rolle: 'fuehrungskraft',
-        anzeigename: 'FK',
-        benutzername: 'fk',
-        aktiv: true,
-        erstellt_at: '',
-        totp_aktiviert: false,
-      },
-      laedt: false,
-      login: vi.fn(),
-      logout: vi.fn(),
-      aktualisiere: vi.fn(),
-    } as never);
+    vi.mocked(useAuth).mockReturnValue(
+      authWertFixture(benutzerFixture({ id: 2, org_rolle: 'fuehrungskraft', anzeigename: 'FK' })),
+    );
 
     renderMitProviders(<EinsatzDefaults />);
 
@@ -265,22 +238,9 @@ describe('EinsatzDefaults · Speicherfehler und Berechtigung (LFH-345)', () => {
 
   it('erklaert der Fuehrungskraft den Grund UND laesst den Knopf stehen', async () => {
     vi.mocked(speichereOrgEinstellungen).mockResolvedValue({ ...VOLL } as never);
-    vi.mocked(useAuth).mockReturnValue({
-      benutzer: {
-        id: 2,
-        system_rolle: 'keiner',
-        org_rolle: 'fuehrungskraft',
-        anzeigename: 'FK',
-        benutzername: 'fk',
-        aktiv: true,
-        erstellt_at: '',
-        totp_aktiviert: false,
-      },
-      laedt: false,
-      login: vi.fn(),
-      logout: vi.fn(),
-      aktualisiere: vi.fn(),
-    } as never);
+    vi.mocked(useAuth).mockReturnValue(
+      authWertFixture(benutzerFixture({ id: 2, org_rolle: 'fuehrungskraft', anzeigename: 'FK' })),
+    );
 
     renderMitProviders(<EinsatzDefaults />);
 

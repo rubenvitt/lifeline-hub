@@ -4,10 +4,11 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes, useLocation } from 'react-router';
 import { einsatzKeys } from '../api/queryKeys';
-import { server } from '../test/server';
+import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { modulRegistry } from '../einsatz/modulRegistry';
 import StabPage from './StabPage';
+import { benutzerFixture } from '../test/fixtures';
 
 class FakeEventSource {
   addEventListener() {}
@@ -22,12 +23,7 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-const nutzer = {
-  id: 1,
-  anzeigename: 'Nutzer',
-  system_rolle: 'keiner',
-  org_rolle: 'fuehrungskraft',
-};
+const nutzer = benutzerFixture({ org_rolle: 'fuehrungskraft' });
 const einsatz = (over: object = {}) => ({
   id: 1,
   bezeichnung: 'Lage',
@@ -55,7 +51,7 @@ function rendere({
   post = () => HttpResponse.json(leererStab, { status: 201 }) as Response,
 } = {}) {
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+    meHandler(nutzer),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
     http.get('/api/einsaetze/1/stab', () =>
       stabStatus === 200
@@ -177,7 +173,7 @@ describe('StabPage', () => {
 
   it('behauptet während des Ladens keine Besetzung und keinen Termin, sperrt die Kopfaktion', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
+      meHandler(nutzer),
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
       // Antwort bleibt aus: der Abruf steht dauerhaft auf „lädt".
       http.get('/api/einsaetze/1/stab', () => new Promise<never>(() => {})),

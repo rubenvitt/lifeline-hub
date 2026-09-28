@@ -4,18 +4,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { renderMitProviders } from '../test/utils';
 import ModulAkkordeon from './ModulAkkordeon';
 import { kategorien } from './modulRegistry';
-import type { BenutzerAnzeige, ModulOverrides } from '../api/types';
+import type { ModulOverrides } from '../api/types';
+import { benutzerFixture } from '../test/fixtures';
 
-const ohne: BenutzerAnzeige = {
-  id: 1,
-  anzeigename: 'E',
-  benutzername: 'e',
-  system_rolle: 'keiner',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-05-23 10:00:00',
-  totp_aktiviert: false,
-};
+const ohne = benutzerFixture({ anzeigename: 'E' });
 
 const ueberschreibung = (
   modulKey: string,

@@ -9,6 +9,7 @@ import { neuerQueryClient } from '../test/utils';
 import { formatiere } from '../anzeige/koordinaten';
 import { useKoordinatenSprung } from './useKoordinatenSprung';
 import type { PaletteModus } from './typen';
+import { authWertFixture, benutzerFixture } from '../test/fixtures';
 
 /**
  * Die Beschaffungs-Hälfte des Koordinatensprungs (LFH-619). Der reine Kern steht in
@@ -20,22 +21,7 @@ import type { PaletteModus } from './typen';
  * mit `onUnhandledRequest: 'error'`, ein eager Abruf bräche sie.
  */
 vi.mock('../auth/AuthContext', () => ({
-  useAuth: () => ({
-    benutzer: {
-      id: 1,
-      anzeigename: 'EL',
-      benutzername: 'el',
-      system_rolle: 'keiner',
-      org_rolle: 'fuehrungskraft',
-      aktiv: true,
-      erstellt_at: '',
-      totp_aktiviert: false,
-    },
-    laedt: false,
-    login: vi.fn(),
-    logout: vi.fn(),
-    aktualisiere: vi.fn(),
-  }),
+  useAuth: () => authWertFixture(benutzerFixture({ org_rolle: 'fuehrungskraft' })),
 }));
 
 const EINSATZ = 1;

@@ -17,6 +17,7 @@ vi.mock('../../api/auth', () => ({
 import { useAuth } from '../../auth/AuthContext';
 import { providerListeAdmin, providerSchalten } from '../../api/auth';
 import { ApiError } from '../../api/client';
+import { adminFixture, authWertFixture, benutzerFixture } from '../../test/fixtures';
 
 const PROVIDER_LISTE = [
   { id: 'passwort', typ: 'passwort' as const, anzeigename: 'Passwort', aktiviert: true },
@@ -25,22 +26,7 @@ const PROVIDER_LISTE = [
 ];
 
 function alsAdmin() {
-  vi.mocked(useAuth).mockReturnValue({
-    benutzer: {
-      id: 1,
-      system_rolle: 'admin',
-      org_rolle: 'keine',
-      anzeigename: 'Admin',
-      benutzername: 'admin',
-      aktiv: true,
-      erstellt_at: '',
-      totp_aktiviert: false,
-    },
-    laedt: false,
-    login: vi.fn(),
-    logout: vi.fn(),
-    aktualisiere: vi.fn(),
-  } as never);
+  vi.mocked(useAuth).mockReturnValue(authWertFixture(adminFixture()));
 }
 
 describe('Anmeldeverfahren', () => {
@@ -182,22 +168,9 @@ describe('Anmeldeverfahren', () => {
   });
 
   it('ist read-only für Nicht-Admins (fuehrungskraft)', async () => {
-    vi.mocked(useAuth).mockReturnValue({
-      benutzer: {
-        id: 2,
-        system_rolle: 'keiner',
-        org_rolle: 'fuehrungskraft',
-        anzeigename: 'FK',
-        benutzername: 'fk',
-        aktiv: true,
-        erstellt_at: '',
-        totp_aktiviert: false,
-      },
-      laedt: false,
-      login: vi.fn(),
-      logout: vi.fn(),
-      aktualisiere: vi.fn(),
-    } as never);
+    vi.mocked(useAuth).mockReturnValue(
+      authWertFixture(benutzerFixture({ id: 2, org_rolle: 'fuehrungskraft', anzeigename: 'FK' })),
+    );
 
     renderMitProviders(<Anmeldeverfahren />);
     expect(
@@ -225,22 +198,9 @@ describe('Anmeldeverfahren · Sperrgrund und Zeilenziel (LFH-370)', () => {
   });
 
   it('nennt der Fuehrungskraft den Grund je Zeile, nicht nur die Ausgrauung', async () => {
-    vi.mocked(useAuth).mockReturnValue({
-      benutzer: {
-        id: 2,
-        system_rolle: 'keiner',
-        org_rolle: 'fuehrungskraft',
-        anzeigename: 'FK',
-        benutzername: 'fk',
-        aktiv: true,
-        erstellt_at: '',
-        totp_aktiviert: false,
-      },
-      laedt: false,
-      login: vi.fn(),
-      logout: vi.fn(),
-      aktualisiere: vi.fn(),
-    } as never);
+    vi.mocked(useAuth).mockReturnValue(
+      authWertFixture(benutzerFixture({ id: 2, org_rolle: 'fuehrungskraft', anzeigename: 'FK' })),
+    );
 
     renderMitProviders(<Anmeldeverfahren />);
     await screen.findByRole('switch', { name: 'Anmeldeverfahren: PocketID' });

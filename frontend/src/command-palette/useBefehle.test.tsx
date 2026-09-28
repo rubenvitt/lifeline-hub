@@ -5,16 +5,11 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router';
 import type { ReactNode } from 'react';
 import { neuerQueryClient } from '../test/utils';
-import { benutzerFixture, einsatzFixture } from '../test/fixtures';
+import { authWertFixture, benutzerFixture, einsatzFixture } from '../test/fixtures';
 import { useBefehle } from './useBefehle';
 
 vi.mock('../auth/AuthContext', () => ({
-  useAuth: () => ({
-    benutzer: benutzerFixture({ org_rolle: 'fuehrungskraft' }),
-    laedt: false,
-    login: vi.fn(),
-    logout: vi.fn(),
-  }),
+  useAuth: () => authWertFixture(benutzerFixture({ org_rolle: 'fuehrungskraft' })),
 }));
 vi.mock('../api/einsaetze', () => ({
   listeEinsaetze: vi.fn(() => Promise.resolve([])),
