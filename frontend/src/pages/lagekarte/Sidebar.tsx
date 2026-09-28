@@ -43,6 +43,7 @@ import type { FreiesZeichenUpdate, ZoneTyp } from '../../api/types';
 import type { ZeichenModus } from './zeichnen';
 import { ZONE_TYPEN } from './zonenStil';
 import FreiesZeichenPicker from './FreiesZeichenPicker';
+import MarkerSuche from './MarkerSuche';
 import { FACHEBENEN, fachebeneKeys, istBboxAbhaengig } from './fachebenen';
 import KoordinatenEingabe from '../../anzeige/KoordinatenEingabe';
 import type { LatLon } from '../../anzeige/koordinaten';
@@ -176,6 +177,15 @@ export interface SidebarProps {
   einsatzId: number;
   nichtVerortet: NichtVerortet[];
   verortet: KarteMarker[];
+  /**
+   * Quelle der Objektsuche unter „Verortet" (LFH-716) — `suchbareMarker` aus
+   * `objektsuche.ts`, also schon ohne Namen aus Modulen, für die kein Recht besteht. Getrennt
+   * von `verortet`, weil das die Ebenen-Zeilen zählt und keine Betroffenen trägt.
+   */
+  suchbar: KarteMarker[];
+  /** Eine Quelle der Suche ist ausgefallen — dann „—" statt Zahlen und keine behauptete Leere.
+   *  Weiter als `sektionFehler.nichtVerortet`, weil die Suche auch Betroffene trägt. */
+  suchbarUnvollstaendig?: boolean;
   darfSchreiben: boolean;
   platzierungZiel: { typ: PlatzierenPunktTyp | 'einsatzort'; id: number } | null;
   onPlatzierenStart: (ziel: { typ: PlatzierenPunktTyp; id: number }) => void;
@@ -575,6 +585,13 @@ export default function Sidebar(props: SidebarProps) {
   const [zeichenEntwurf, setZeichenEntwurf] = useState<FreiesZeichenUpdate>({
     grundzeichen: 'taktische-formation',
   });
+  /** Knopf „Platzieren" und Enter im Picker: der Entwurf übernimmt die Spec, damit der
+   *  wieder geöffnete Picker dort weitermacht, wo platziert wurde. */
+  const platziereZeichen = (spec: FreiesZeichenUpdate) => {
+    setZeichenEntwurf(spec);
+    props.onZeichenPlatzierenStart(spec);
+    setZeichenPickerOffen(false);
+  };
   // Suche über „Nicht verortet" (LFH-360). Wirksam ist der Begriff nur, solange das Feld
   // steht: fällt die Liste unter die Schwelle, verschwindet mit dem Feld auch sein
   // `allowClear` — ein weiterwirkender Filter verschluckte dann Einträge ohne sichtbaren
@@ -602,8 +619,6 @@ export default function Sidebar(props: SidebarProps) {
   const [loeschBildId, setLoeschBildId] = useState<number | null>(null);
   // Entwurf verwerfen, sobald ein anderes Bild platziert wird oder der Modus endet.
   useEffect(() => setBildMitte(null), [props.bildPlatzierenId]);
-  const uhsVerortet = verortet.filter((m) => m.typ === 'uhs');
-  const schadenVerortet = verortet.filter((m) => m.typ === 'schaden');
   const ebenen = ebenenZeilen(
     verortet,
     props.zonenAnzahl,
@@ -851,35 +866,15 @@ export default function Sidebar(props: SidebarProps) {
         onUmschalten={umschalten('verortet')}
       >
         {/* Kein eigener Fehlerkasten (Begründung an `SidebarSektionFehler`), aber die Zahlen
-            dürfen nicht lügen: „UHS (0)" ist eine Aussage über die Lage, und im Fehlerfall
-            hat sie niemand geprüft. Ein Template-Literal, damit der Text EIN Knoten bleibt. */}
-        <Typography.Text type="secondary">{`UHS (${zaehler(uhsVerortet.length)})`}</Typography.Text>
-        <Liste
-          size="small"
-          dataSource={uhsVerortet}
-          rowKey={(m) => m.schluessel}
-          renderItem={(m) => (
-            <ListenEintrag
-              style={bedienzielStil(token)}
-              onClick={() => props.onMarkerWaehlen(m.schluessel)}
-            >
-              {m.label}
-            </ListenEintrag>
-          )}
-        />
-        <Typography.Text type="secondary">{`Schäden (${zaehler(schadenVerortet.length)})`}</Typography.Text>
-        <Liste
-          size="small"
-          dataSource={schadenVerortet}
-          rowKey={(m) => m.schluessel}
-          renderItem={(m) => (
-            <ListenEintrag
-              style={bedienzielStil(token)}
-              onClick={() => props.onMarkerWaehlen(m.schluessel)}
-            >
-              {m.label}
-            </ListenEintrag>
-          )}
+            dürfen nicht lügen und die Leere wird nicht behauptet: im Fehlerfall hat die Lage
+            niemand geprüft (`zaehlerUnbekannt`). Seit LFH-716 über alle Objektarten statt
+            nur UHS und Schäden. */}
+        <MarkerSuche
+          marker={props.suchbar}
+          onMarkerWaehlen={props.onMarkerWaehlen}
+          zaehlerUnbekannt={
+            sektionFehler.nichtVerortet != null || props.suchbarUnvollstaendig === true
+          }
         />
       </KlappPaneel>
 
@@ -979,15 +974,16 @@ export default function Sidebar(props: SidebarProps) {
                   </Space>
                 ) : zeichenPickerOffen ? (
                   <Space orientation="vertical" style={{ width: '100%' }}>
-                    <FreiesZeichenPicker wert={zeichenEntwurf} onChange={setZeichenEntwurf} />
+                    {/* Enter im Picker (LFH-716, D4) nimmt denselben Weg wie der Knopf —
+                        mit der Spec, die der Picker mitbringt, weil `zeichenEntwurf` die per
+                        Enter gewählte Kachel in dieser Runde noch nicht trägt. */}
+                    <FreiesZeichenPicker
+                      wert={zeichenEntwurf}
+                      onChange={setZeichenEntwurf}
+                      onAbsenden={platziereZeichen}
+                    />
                     <Space>
-                      <Button
-                        type="primary"
-                        onClick={() => {
-                          props.onZeichenPlatzierenStart(zeichenEntwurf);
-                          setZeichenPickerOffen(false);
-                        }}
-                      >
+                      <Button type="primary" onClick={() => platziereZeichen(zeichenEntwurf)}>
                         Platzieren
                       </Button>
                       <Button onClick={() => setZeichenPickerOffen(false)}>Abbrechen</Button>

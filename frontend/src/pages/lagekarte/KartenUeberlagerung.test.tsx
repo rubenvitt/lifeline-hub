@@ -69,6 +69,56 @@ describe('KartenUeberlagerung — Knopfblock', () => {
     ]);
   });
 
+  it('LFH-715: der Leisten-Umschalter steht unten im Block und meldet seinen Zustand', () => {
+    const onUmschalten = vi.fn();
+    const { rerender } = renderMitProviders(
+      <KartenUeberlagerung
+        {...basis()}
+        leiste={{ sichtbar: true, sperrGrund: null, onUmschalten }}
+      />,
+    );
+    const namen = screen.getByRole('group', { name: 'Kartensteuerung' }).querySelectorAll('button');
+    expect(namen[namen.length - 1]).toHaveAttribute('aria-label', 'Leiste ausblenden');
+    const knopf = screen.getByRole('button', { name: 'Leiste ausblenden' });
+    expect(knopf).toHaveAttribute('aria-expanded', 'true');
+    expect(knopf).toHaveAttribute('aria-controls', 'lagekarte-leiste');
+    fireEvent.click(knopf);
+    expect(onUmschalten).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <KartenUeberlagerung
+        {...basis()}
+        leiste={{ sichtbar: false, sperrGrund: null, onUmschalten }}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Leiste einblenden' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+  });
+
+  it('LFH-715: gesperrt nennt der Umschalter den Grund und löst nichts aus', () => {
+    const onUmschalten = vi.fn();
+    renderMitProviders(
+      <KartenUeberlagerung
+        {...basis()}
+        leiste={{ sichtbar: true, sperrGrund: 'Auswahl schließen', onUmschalten }}
+      />,
+    );
+    const knopf = screen.getByRole('button', { name: 'Leiste ausblenden' });
+    // Fokussierbar gesperrt: der Grund bleibt für Tastatur und Vorlesende erreichbar.
+    expect(knopf).not.toBeDisabled();
+    expect(knopf).toHaveAttribute('aria-disabled', 'true');
+    expect(knopf).toHaveAccessibleDescription('Auswahl schließen');
+    fireEvent.click(knopf);
+    expect(onUmschalten).not.toHaveBeenCalled();
+  });
+
+  it('LFH-715: ohne `leiste` gibt es keinen Umschalter (unter lg steht er im Seitenkopf)', () => {
+    renderMitProviders(<KartenUeberlagerung {...basis()} />);
+    expect(screen.queryByRole('button', { name: /Leiste/ })).not.toBeInTheDocument();
+  });
+
   it('die Knopfkante folgt dem Dichte-Boden, nie unter die 32 px des Entwurfs', () => {
     expect(kartenKnopfKante({ controlHeight: dichten.kompakt.zeilenhoehe })).toBe(32);
     expect(kartenKnopfKante({ controlHeight: dichten.komfortabel.zeilenhoehe })).toBe(48);

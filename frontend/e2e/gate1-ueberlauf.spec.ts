@@ -773,7 +773,7 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
       // LFH-100: die Lagekarte stand bis dahin in keinem Überlauf-Gate, obwohl sie die Seite
       // mit den meisten schwebenden Aufbauten ist (`lagekarte-smoke.spec.ts` misst 1024, 1280
       // und 1440 px, und nie den Querlauf). Unter `lg` liegt die Leiste UNTER der Karte und
-      // ist auf dem Handschirm per Vorgabe ZU (`LagekartePage.tsx`, `leisteWahl`) — gemessen
+      // ist auf dem Handschirm per Vorgabe ZU (`lagekarte/leistenWahl.ts`) — gemessen
       // wird der Zustand mit OFFENER Leiste, weil das der breitere Rahmen ist.
       // WAS DIESE ZEILE MISST, ist der RAHMEN: Seitenkopf mit Umschaltknopf, das `<aside>`,
       // die Kartenspalte mit ihren schwebenden Bändern. Den Leisteninhalt misst sie NICHT —

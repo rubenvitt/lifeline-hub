@@ -934,6 +934,9 @@ const KARTENKNOEPFE = [
   'Zeichenwerkzeuge',
 ];
 
+/** Ab `lg` (992) sitzt der Leisten-Umschalter unten im Knopfblock (LFH-715). */
+const LG = 992;
+
 /**
  * Knopfblock gegen jedes Fußband, als Rechteckschnitt. Liefert die Überschneidungen als Text;
  * leer heißt: keine.
@@ -997,13 +1000,22 @@ test('Lagekarte (LFH-373): Kartenknöpfe liegen nie unter den Fußbändern', asy
     const lauf = `${lage.width}×${lage.height}${lage.leiste ? ' mit Leiste' : ''}/${lage.dichte}`;
     await page.setViewportSize({ width: lage.width, height: lage.height });
     await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
-    await page.evaluate(() => localStorage.setItem('lfh:lagekarte:zeitachse-eingeklappt', '0'));
+    // Die Leisten-Wahl ist seit LFH-715 gemerkt: gesetzt statt geklickt, sonst erbte eine
+    // spätere Lage die offene Leiste der vorigen.
+    await page.evaluate((offen) => {
+      localStorage.setItem('lfh:lagekarte:zeitachse-eingeklappt', '0');
+      localStorage.removeItem('lfh:lagekarte:leiste-offen:ab-lg');
+      if (offen) localStorage.setItem('lfh:lagekarte:leiste-offen:unter-lg', '1');
+      else localStorage.removeItem('lfh:lagekarte:leiste-offen:unter-lg');
+    }, lage.leiste);
     await stelleDichte(page, lage.dichte);
     await expect(page.getByTestId('kartenflaeche').locator('canvas.maplibregl-canvas')).toHaveCount(
       1,
       { timeout: 60_000 },
     );
-    if (lage.leiste) await page.getByRole('button', { name: 'Leiste einblenden' }).click();
+    if (lage.leiste) {
+      await expect(page.getByRole('complementary', { name: 'Kartenleiste' })).toBeVisible();
+    }
     // Vorbedingung: die Zeitachse steht ausgeklappt — sonst gäbe es das hohe Band nicht, und
     // der Test wäre still wertlos statt rot.
     await expect(page.getByRole('button', { name: 'Zeitachse ausblenden' })).toBeVisible();
@@ -1012,7 +1024,8 @@ test('Lagekarte (LFH-373): Kartenknöpfe liegen nie unter den Fußbändern', asy
     const ueberschnitt = await knopfblockUeberFuss(page);
     expect(ueberschnitt, `${lauf}: Knopfblock überschneidet Fußband`).toEqual([]);
 
-    for (const name of KARTENKNOEPFE) {
+    // Der Umschalter ist ab `lg` der unterste Knopf, also der dem Fuß nächste.
+    for (const name of lage.width >= LG ? [...KARTENKNOEPFE, 'Leiste ausblenden'] : KARTENKNOEPFE) {
       await knoepfe
         .getByRole('button', { name, exact: true })
         .click({ trial: true, timeout: 5_000 });

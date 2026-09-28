@@ -22,8 +22,10 @@ import { parsePolygon, polygonZentroid } from './lagekarte/geo';
 import { useThemeMode } from '../theme/ThemeModeProvider';
 import { useKartenbilder } from './lagekarte/useKartenbilder';
 import { useBasemap } from './lagekarte/useBasemap';
+import { leisteSichtbar, useLeistenWahl } from './lagekarte/leistenWahl';
 import { useKartenAnsicht } from './lagekarte/useKartenAnsicht';
 import { QUELLE_BETROFFENE, useLagekarteDaten } from './lagekarte/useLagekarteDaten';
+import { suchbareMarker } from './lagekarte/objektsuche';
 import { useFachebenen } from './lagekarte/useFachebenen';
 import { useKartenInteraktion } from './lagekarte/useKartenInteraktion';
 import { braucheViewportBbox, rasterBbox } from './lagekarte/fachebenen';
@@ -104,15 +106,12 @@ export default function LagekartePage() {
   const farben = useModusFarben();
   const { abBreite, istSchmal } = useViewport();
   const breit = abBreite('lg');
-  // Unter `lg` liegt die Leiste UNTER der Karte und lässt sich ausblenden (die Karte bekommt
-  // dann die ganze Höhe). Ab `lg` steht sie immer rechts daneben. Ohne eigene Wahl ist sie
-  // auf dem Handschirm (< `md`) zu — dort trüge die Karte neben ihr keine 300 px mehr —, auf
-  // dem Tablet offen. `null` = noch keine Wahl; die Vorgabe folgt dann der Breite, auch wenn
-  // die erst nach dem ersten Rendern bekannt ist.
-  const [leisteWahl, setLeisteWahl] = useState<boolean | null>(null);
+  // Unter `lg` liegt die Leiste UNTER der Karte, ab `lg` rechts daneben. Auf jeder Breite
+  // lässt sie sich ausblenden (LFH-715), die Wahl bleibt je Breitenklasse gemerkt; Vorgabe und
+  // Vorrang stehen in `lagekarte/leistenWahl.ts`.
+  const leistenWahl = useLeistenWahl(breit);
   /** Scharfe Griffsorte beim Bild-Einpassen (LFH-711). Vorgabe: Größe. */
   const [griffModus, setGriffModus] = useState<GriffModus>('groesse');
-  const leisteOffen = leisteWahl ?? !istSchmal;
   // Zeigerkoordinate: die Karte meldet, nur die Anzeige rendert mit (siehe `mausPosition.ts`).
   const zeigerQuelle = useMemo(() => erzeugeZeigerQuelle(), []);
   // Band des Kartenfusses, in das die MapLibre-Maßstabsleiste gehängt wird. State statt Ref,
@@ -218,6 +217,19 @@ export default function LagekartePage() {
   const waehlbar = useMemo(
     () => (personenAufKarte.length ? [...alleVerortet, ...personenAufKarte] : alleVerortet),
     [alleVerortet, personenAufKarte],
+  );
+  // Objektsuche der Leiste (LFH-716): dieselbe Menge wie `waehlbar`, aber mit eigener
+  // Modulprüfung je Typ — „kein Name ohne Recht" hängt so nicht an der Datenquelle (D1).
+  const suchbar = useMemo(
+    () =>
+      suchbareMarker({
+        verortet: alleVerortet,
+        personen: personenVerortet,
+        personenZugriff,
+        personenEbeneAn: layer.person,
+        betreuungZugriff,
+      }),
+    [alleVerortet, personenVerortet, personenZugriff, layer.person, betreuungZugriff],
   );
 
   const {
@@ -699,10 +711,27 @@ export default function LagekartePage() {
       </>
     ) : null;
 
-  // Unter `lg`: eine Auswahl holt die ausgeblendete Leiste zurück — sonst wählte man auf der
-  // Karte ein Objekt und sähe nichts davon. Abgeleitet, nicht per Effekt: wird die Auswahl
-  // geschlossen, gilt wieder die eigene Wahl.
-  const leisteSichtbar = breit || leisteOffen || auswahlInhalt != null;
+  // Eine Auswahl holt die ausgeblendete Leiste zurück — sonst wählte man auf der Karte ein
+  // Objekt und sähe nichts davon. Ebenso ein Platzier-Modus (Objekt, Bild, Zeichen): sein
+  // einziger „Abbrechen"-Knopf steht in der Leiste, ausgeblendet säße man im Modus fest.
+  // Abgeleitet, nicht per Effekt: endet beides, gilt wieder die eigene Wahl.
+  const leisteErzwungen =
+    auswahlInhalt != null ||
+    platzierungZiel != null ||
+    bildPlatzierenId != null ||
+    zeichenPlatzieren != null;
+  const leisteIstSichtbar = leisteSichtbar({
+    gemerkt: leistenWahl.wahl,
+    breit,
+    istSchmal,
+    erzwungen: leisteErzwungen,
+  });
+  const leisteSperrGrund =
+    auswahlInhalt != null
+      ? 'Auswahl schließen, um die Leiste auszublenden'
+      : leisteErzwungen
+        ? 'Platzieren beenden, um die Leiste auszublenden'
+        : null;
 
   // Die Kartengrundlage: ab `md` als Segmentleiste über der Karte (Neuentwurf S5). Auf dem
   // Handschirm bräche die Leiste mit mehreren Online-Stilen in vier Zeilen um und läge über
@@ -739,18 +768,17 @@ export default function LagekartePage() {
           {kopfMeta(verortetAnzahl(alleVerortet), nichtVerortetAlle.length, lagebildFehler)}
         </span>
       </div>
+      {/* Ab `lg` sitzt der Umschalter im Knopfblock der Karte (s. `KartenUeberlagerung`). */}
       {!breit && (
         <div data-lfh="seitenkopf-aktionen">
           <Button
-            aria-expanded={leisteSichtbar}
+            aria-expanded={leisteIstSichtbar}
             aria-controls="lagekarte-leiste"
-            onClick={() => setLeisteWahl(!leisteSichtbar)}
-            disabled={auswahlInhalt != null}
-            title={
-              auswahlInhalt != null ? 'Auswahl schließen, um die Leiste auszublenden' : undefined
-            }
+            onClick={() => leistenWahl.merke(!leisteIstSichtbar)}
+            disabled={leisteSperrGrund != null}
+            title={leisteSperrGrund ?? undefined}
           >
-            {leisteSichtbar ? 'Leiste ausblenden' : 'Leiste einblenden'}
+            {leisteIstSichtbar ? 'Leiste ausblenden' : 'Leiste einblenden'}
           </Button>
         </div>
       )}
@@ -818,10 +846,19 @@ export default function LagekartePage() {
         onNorden={() => kartenRef.current?.nachNorden()}
         onMessen={() => (messForm ? onMessenBeenden() : onMessenStart('strecke'))}
         messenAktiv={messForm != null}
+        leiste={
+          breit
+            ? {
+                sichtbar: leisteIstSichtbar,
+                sperrGrund: leisteSperrGrund,
+                onUmschalten: () => leistenWahl.merke(!leisteIstSichtbar),
+              }
+            : undefined
+        }
         onZeichnen={
           darfSchreiben
             ? () => {
-                setLeisteWahl(true);
+                leistenWahl.zeige();
                 setZeichnenAnfrage((n) => n + 1);
               }
             : undefined
@@ -915,27 +952,38 @@ export default function LagekartePage() {
     <aside
       id="lagekarte-leiste"
       aria-label="Kartenleiste"
+      // Ausgeblendet bleibt die Leiste MONTIERT (LFH-715, Review): abgehängt verlöre die
+      // Sidebar ihren Zustand (Zeichen-Entwurf, Suche, Rollposition), und ihr Effekt auf
+      // `zeichnenAnfrage` feuerte beim Wiedereinhängen erneut — eine spätere Auswahl klappte
+      // dann „Zeichnen" auf und rollte die Leiste vom Inspector weg.
+      hidden={!leisteIstSichtbar}
       style={
-        breit
-          ? {
-              width: LEISTE_BREITE,
-              flex: `0 0 ${LEISTE_BREITE}px`,
-              minHeight: 0,
-              borderInlineStart: `1px solid ${farben.linie}`,
-            }
-          : {
-              // Unter `lg`: unterer Bereich. Höchstens die halbe Fläche — die Karte bleibt
-              // die Hauptsache und auf 390 px bedienbar; die Leiste scrollt in sich.
-              flex: '0 0 45%',
-              minHeight: 0,
-              borderBlockStart: `1px solid ${farben.linie}`,
-            }
+        !leisteIstSichtbar
+          ? { display: 'none' }
+          : breit
+            ? {
+                width: LEISTE_BREITE,
+                flex: `0 0 ${LEISTE_BREITE}px`,
+                minHeight: 0,
+                borderInlineStart: `1px solid ${farben.linie}`,
+              }
+            : {
+                // Unter `lg`: unterer Bereich. Höchstens die halbe Fläche — die Karte bleibt
+                // die Hauptsache und auf 390 px bedienbar; die Leiste scrollt in sich.
+                flex: '0 0 45%',
+                minHeight: 0,
+                borderBlockStart: `1px solid ${farben.linie}`,
+              }
       }
     >
       <Sidebar
         einsatzId={einsatzId}
         nichtVerortet={nichtVerortetAlle}
         verortet={alleVerortet}
+        suchbar={suchbar}
+        // Betroffene zählen nicht zum Lagebild-Fehler oben, gehören aber bei eingeschalteter
+        // Ebene zur Suche — ihr Ausfall macht die Suche unvollständig (Review LFH-716, M1).
+        suchbarUnvollstaendig={lagebildFehler || (personenFehler && layer.person)}
         darfSchreiben={!!darfSchreiben}
         platzierungZiel={platzierungZiel}
         onPlatzierenStart={onPlatzierenStart}
@@ -1089,7 +1137,7 @@ export default function LagekartePage() {
           }}
         >
           {karte}
-          {leisteSichtbar && leiste}
+          {leiste}
         </div>
       </div>
     </FensterRahmen>
