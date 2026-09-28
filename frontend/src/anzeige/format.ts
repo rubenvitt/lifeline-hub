@@ -1,8 +1,7 @@
 /**
  * Reine, framework-freie Formatlogik für Anzeige-Konventionen (LFH-136):
  * Zeit (Zeitzone + 24h/12h), Koordinaten (WGS84/MGRS/UTM) und Einheiten
- * (metrisch/imperial). Provider/Hook (AnzeigeKonventionenContext) und die
- * zentrale `kommunikation/zeit.ts` delegieren hierher.
+ * (metrisch/imperial). Provider/Hook (AnzeigeKonventionenContext) delegieren hierher.
  *
  * `DEFAULT_KONVENTIONEN` reproduziert byte-genau das bisherige Verhalten
  * (lokal `DD.MM.YYYY HH:mm`, Koordinate dezimal `lat.toFixed(5), lon.toFixed(5)`),

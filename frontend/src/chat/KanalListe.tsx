@@ -4,7 +4,7 @@ import type { ChatKanal } from '../api/types';
 import { ErfassungsModal } from '../components/Erfassung';
 import { Liste, ListenEintrag } from '../components/Liste';
 import { Paneel, monoStil, useRollen } from '../components/instrument';
-import { formatZeitKurz } from '../kommunikation';
+import { formatZeitKurz } from '../anzeige/format';
 
 interface Props {
   kanaele: ChatKanal[];

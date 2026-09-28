@@ -7,6 +7,7 @@ import { aktualisiereMaterial, legeMaterialAn, type MaterialEingabe } from '../a
 import type { Material } from '../api/types';
 import { globalKeys } from '../api/queryKeys';
 import { leerZuNull } from '../api/patchTriState';
+import { teilwortSuche } from '../components/teilwortSuche';
 
 interface FormWerte {
   bezeichnung: string;
@@ -107,10 +108,7 @@ export default function MaterialFormModal({
           options={kategorien.map((k) => ({ value: k }))}
           allowClear
           placeholder="z. B. Betreuung, Sanität, Hochwasser"
-          showSearch={{
-            filterOption: (input, option) =>
-              (option?.value ?? '').toLowerCase().includes(input.toLowerCase()),
-          }}
+          showSearch={teilwortSuche}
         />
       </Form.Item>
       <Form.Item label="Bestandsnummer" name="bestandsnummer">

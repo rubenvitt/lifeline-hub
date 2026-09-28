@@ -11,6 +11,7 @@ import type { Personal, PersonalVorschlaege } from '../api/types';
 import { globalKeys } from '../api/queryKeys';
 import { leerZuNull } from '../api/patchTriState';
 import { personalDetailPfad } from './stammdatenDetail';
+import { teilwortSuche } from '../components/teilwortSuche';
 
 /**
  * SCHNELLERFASSUNG, kein Vollformular mehr (LFH-346 · A7, Befund H36) — dieselbe
@@ -138,10 +139,7 @@ export default function PersonalFormModal({
           options={vorschlaege.traegerorganisation.map((t) => ({ value: t }))}
           allowClear
           placeholder="z. B. DRK Musterstadt"
-          showSearch={{
-            filterOption: (input, option) =>
-              (option?.value ?? '').toLowerCase().includes(input.toLowerCase()),
-          }}
+          showSearch={teilwortSuche}
         />
       </Form.Item>
       <Form.Item label="Qualifikationen" name="qualifikation_ids">

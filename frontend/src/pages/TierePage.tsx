@@ -34,6 +34,7 @@ import StatusTag from '../components/StatusTag';
 import { einsatzStatus } from '../theme/statusFarben';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
 import { useFrischAngelegt } from '../components/useFrischAngelegt';
+import { registrierNummer } from '../anzeige/registrierNummer';
 
 const STATUS_META = TIER_STATUS;
 
@@ -50,9 +51,7 @@ const SICHTEN: { key: Sicht; label: string }[] = [
 
 /** Registriernummer des Halters in Anzeigeschreibweise, oder `null`. */
 function halterNummer(t: Tier): string | null {
-  return t.halter_registrier_nr != null
-    ? `R-${String(t.halter_registrier_nr).padStart(3, '0')}`
-    : null;
+  return t.halter_registrier_nr != null ? registrierNummer('R', t.halter_registrier_nr) : null;
 }
 
 /** Halter-Kurzanzeige für die Liste. */

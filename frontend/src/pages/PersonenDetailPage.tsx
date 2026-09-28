@@ -92,6 +92,7 @@ import {
   type PersonBearbeitenWerte,
 } from '../personen/personBearbeiten';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
+import { registrierNummer } from '../anzeige/registrierNummer';
 
 const TIER_SPEZIES_LABEL: Record<Spezies, string> = {
   hund: 'Hund',
@@ -647,12 +648,12 @@ export default function PersonenDetailPage() {
                     {a.status}
                   </Tag>
                   <Typography.Text>
-                    R-
-                    {String(
+                    {registrierNummer(
+                      'R',
                       a.vermisst_person_id === person.id
                         ? a.gefunden_person_id
                         : a.vermisst_person_id,
-                    ).padStart(3, '0')}
+                    )}
                   </Typography.Text>
                   {a.status === 'verdacht' && a.vermisst_person_id === person.id && (
                     /* `size="middle"` wie an der UHS-Zeile (LFH-363): „Verwerfen" ist

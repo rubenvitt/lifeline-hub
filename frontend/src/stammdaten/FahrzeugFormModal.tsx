@@ -9,6 +9,7 @@ import type { Fahrzeug, FahrzeugVorschlaege } from '../api/types';
 import { globalKeys } from '../api/queryKeys';
 import { leerZuNull } from '../api/patchTriState';
 import { fahrzeugDetailPfad } from './stammdatenDetail';
+import { teilwortSuche } from '../components/teilwortSuche';
 
 /**
  * SCHNELLERFASSUNG, kein Vollformular mehr (LFH-346 · A7, Befund H36).
@@ -125,10 +126,7 @@ export default function FahrzeugFormModal({
           options={vorschlaege.fahrzeugtyp.map((t) => ({ value: t }))}
           allowClear
           placeholder="z. B. LF 20, RTW"
-          showSearch={{
-            filterOption: (input, option) =>
-              (option?.value ?? '').toLowerCase().includes(input.toLowerCase()),
-          }}
+          showSearch={teilwortSuche}
         />
       </Form.Item>
       <Form.Item label="Trägerorganisation" name="traegerorganisation">
@@ -136,10 +134,7 @@ export default function FahrzeugFormModal({
           options={vorschlaege.traegerorganisation.map((t) => ({ value: t }))}
           allowClear
           placeholder="z. B. Feuerwehr Musterstadt"
-          showSearch={{
-            filterOption: (input, option) =>
-              (option?.value ?? '').toLowerCase().includes(input.toLowerCase()),
-          }}
+          showSearch={teilwortSuche}
         />
       </Form.Item>
       <Form.Item label="Kennzeichen" name="kennzeichen">

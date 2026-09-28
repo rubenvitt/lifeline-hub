@@ -1,6 +1,7 @@
 import type { Tier, TierStatus, Spezies } from './types';
 import { apiGet, apiSend } from './client';
 import { patchBody } from './patchTriState';
+import { registrierNummer } from '../anzeige/registrierNummer';
 
 /** Felder beim Anlegen (Spezies Pflicht; Rest optional). Halter FK XOR Freitext. */
 export interface TierEingabe {
@@ -108,5 +109,5 @@ export function storniereTier(einsatzId: number, tierId: number): Promise<void> 
 
 /** Registriernummer-Anzeige wie im Backend (T-042). */
 export function tierRegistrierAnzeige(nr: number): string {
-  return `T-${String(nr).padStart(3, '0')}`;
+  return registrierNummer('T', nr);
 }

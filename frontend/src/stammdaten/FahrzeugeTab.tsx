@@ -15,12 +15,7 @@ import { globalKeys } from '../api/queryKeys';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 import { fahrzeugDetailPfad } from './stammdatenDetail';
 import { dienststatusSpalten, useDienststatusMutation } from './dienststatus';
-
-function staerkeText(f: Fahrzeug): string {
-  if (!f.staerke) return '—';
-  const { fuehrer, unterfuehrer, mannschaft } = f.staerke;
-  return `${fuehrer}/${unterfuehrer}/${mannschaft}//${fuehrer + unterfuehrer + mannschaft}`;
-}
+import { staerkeText } from '../anzeige/staerke';
 
 export default function FahrzeugeTab() {
   const { benutzer } = useAuth();
@@ -80,7 +75,7 @@ export default function FahrzeugeTab() {
     {
       title: 'Stärke',
       key: 'staerke',
-      render: (_, f) => <span style={monoStil(12)}>{staerkeText(f)}</span>,
+      render: (_, f) => <span style={monoStil(12)}>{staerkeText(f.staerke)}</span>,
     },
     ...dienststatusSpalten<Fahrzeug>({
       mutation: dienststatusMutation,

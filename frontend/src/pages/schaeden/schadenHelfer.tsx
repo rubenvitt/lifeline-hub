@@ -5,6 +5,7 @@ import { bezugsDarstellung } from '../../theme/statusFarben';
 import { personDetailPfad, personalPfad } from '../../routing/deeplinks';
 import type { Schaden, SchadenAbschlussGrund, SchadenStatus, SchadenTyp } from '../../api/types';
 import type { GeschaedigtWert } from './GeschaedigtPicker';
+import { registrierNummer } from '../../anzeige/registrierNummer';
 
 // Gemeinsame Anzeige-/Mapping-Helfer für Schäden-Liste (SchaedenPage) und
 // -Detailseite (SchaedenDetailPage). Insbesondere die Geschädigt-XOR-Abbildung auf die
@@ -37,10 +38,6 @@ export const ABSCHLUSS_GRUENDE = (Object.keys(ABSCHLUSS_LABEL) as SchadenAbschlu
   }),
 );
 
-export function pad3(nr: number): string {
-  return String(nr).padStart(3, '0');
-}
-
 /** Reiterachse der Schäden-Liste: Status oder „alle".
  *
  *  SEIT LFH-340 · C5 nur noch das. Typ, Ausmaß und Freitextsuche lagen bis dahin ebenfalls
@@ -57,7 +54,7 @@ export function filterSchaeden(
 /** Kompakte Geschädigt-Anzeige inkl. Deeplinks (Person→Detailseite, Einsatzkraft→Personal-Liste). */
 export function geschaedigtAnzeige(s: Schaden, einsatzId: number): React.ReactNode {
   if (s.geschaedigt_registrier_nr != null) {
-    const label = `R-${pad3(s.geschaedigt_registrier_nr)}`;
+    const label = registrierNummer('R', s.geschaedigt_registrier_nr);
     // Storniert bleibt grauer Text ohne Deeplink (Status-quo-Optik).
     if (s.geschaedigt_storniert_at) {
       return <Typography.Text type="secondary">Geschädigt (storniert): {label}</Typography.Text>;
@@ -98,7 +95,7 @@ export function geschaedigtAusSchaden(s: Schaden): GeschaedigtWert {
       refId: s.geschaedigt_person_id,
       label:
         s.geschaedigt_registrier_nr != null
-          ? `R-${pad3(s.geschaedigt_registrier_nr)}`
+          ? registrierNummer('R', s.geschaedigt_registrier_nr)
           : 'Betroffene Person',
     };
   }

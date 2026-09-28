@@ -1,6 +1,7 @@
 import type { Schaden, SchadenAnhang, SchadenStatus, SchadenTyp, Ausmass } from './types';
 import { apiGet, apiSend, apiUpload } from './client';
 import { UPLOAD_TIMEOUT_MS } from './upload';
+import { registrierNummer } from '../anzeige/registrierNummer';
 
 /** Felder beim Anlegen (Typ + Ort + Ausmaß Pflicht; Rest optional). Geschädigt FK XOR Freitext. */
 export interface SchadenEingabe {
@@ -109,7 +110,7 @@ export function storniereSchaden(einsatzId: number, schadenId: number): Promise<
 
 /** Registriernummer-Anzeige wie im Backend (S-007). */
 export function schadenRegistrierAnzeige(nr: number): string {
-  return `S-${String(nr).padStart(3, '0')}`;
+  return registrierNummer('S', nr);
 }
 
 // ---------- Fotos und Dateien (LFH-21) ----------

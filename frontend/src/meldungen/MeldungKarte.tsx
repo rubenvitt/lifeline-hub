@@ -6,13 +6,8 @@ import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { auftraegePfad } from '../routing/deeplinks';
 import type { Meldung, MeldungStatus } from '../api/types';
-import {
-  MELDUNG_STATUS,
-  PrioBadge,
-  QuittungIndikator,
-  StatusBadge,
-  formatZeit,
-} from '../kommunikation';
+import { MELDUNG_STATUS, PrioBadge, QuittungIndikator, StatusBadge } from '../kommunikation';
+import { formatZeit } from '../anzeige/format';
 import KommKarte from '../kommunikation/KommKarte';
 import { StatusChip, monoStil, useRollen } from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';

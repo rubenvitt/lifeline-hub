@@ -24,6 +24,7 @@ import {
   type FormWerteAllgemein,
 } from './einsatzEinstellungenForm';
 import { speicherLeisteStil } from '../../components/speicherLeiste';
+import { teilwortSuche } from '../../components/teilwortSuche';
 
 /**
  * Sektion `…/einstellungen/allgemein` (LFH-345 · C10) — Einstieg + Anzeige-Konventionen.
@@ -123,10 +124,7 @@ export default function EinsatzAllgemein() {
               allowClear
               options={ZEITZONEN_OPTIONEN}
               placeholder="Europe/Berlin (Standard)"
-              showSearch={{
-                filterOption: (eingabe, option) =>
-                  (option?.value ?? '').toLowerCase().includes(eingabe.toLowerCase()),
-              }}
+              showSearch={teilwortSuche}
             />
           </Form.Item>
           <Form.Item

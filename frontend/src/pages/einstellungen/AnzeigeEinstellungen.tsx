@@ -21,6 +21,7 @@ import {
 } from './orgEinstellungenForm';
 import { speicherLeisteStil } from '../../components/speicherLeiste';
 import { Formularpaneel } from '../../components/instrument';
+import { teilwortSuche } from '../../components/teilwortSuche';
 
 /**
  * Admin-Sektion `/admin/einstellungen/anzeige` — org-weite Darstellungs-Defaults + Geocoder.
@@ -107,10 +108,7 @@ export default function AnzeigeEinstellungen() {
               allowClear
               options={ZEITZONEN_OPTIONEN}
               placeholder="Europe/Berlin (Fallback)"
-              showSearch={{
-                filterOption: (eingabe, option) =>
-                  (option?.value ?? '').toLowerCase().includes(eingabe.toLowerCase()),
-              }}
+              showSearch={teilwortSuche}
             />
           </Form.Item>
           <Form.Item label="Zeitformat" name="zeitformat">
