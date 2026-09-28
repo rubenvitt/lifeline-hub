@@ -15,7 +15,8 @@ use crate::material::disposition_repo as material_repo;
 use crate::material::EinsatzMaterialAnzeige;
 use crate::person::{registrier_anzeige, repo as person_repo};
 use crate::routes::support::{
-    parse_enum, parse_enum_opt, pflicht, pflicht_tri, pruefe_koordinate, trimme,
+    deserialize_optional_field, parse_enum, parse_enum_opt, pflicht, pflicht_tri,
+    pruefe_koordinate, trimme,
 };
 use crate::uhs::belegung_repo;
 use crate::uhs::platz_repo::{self, NeuerPlatz, PatchPlatz};
@@ -186,31 +187,16 @@ pub async fn detail(
 pub struct PatchBody {
     pub bezeichnung: Option<String>,
     /// `Some(null)` = explizit löschen; absent = unverändert. Serde-Default = absent.
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub abschnitt_id: Option<Option<i64>>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub standort: Option<Option<String>>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub notiz: Option<Option<String>>,
     /// lat/lon werden als Paar behandelt (Effektivzustand-Check im Handler). `Some(null)` = löschen.
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub lat: Option<Option<f64>>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub lon: Option<Option<f64>>,
     /// Optimistisches Lock (LFH-241/F10): der beim Laden gelesene `geaendert_at`-Stand.
     /// Stimmt er nicht mehr → 409 statt stillem Overwrite. Fehlt er (Overwrite aus dem
@@ -478,15 +464,9 @@ pub async fn plaetze_bulk_anlegen(
 #[derive(Debug, Deserialize)]
 pub struct PlatzPatchBody {
     pub bezeichnung: Option<String>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub pos_x: Option<Option<f64>>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub pos_y: Option<Option<f64>>,
 }
 

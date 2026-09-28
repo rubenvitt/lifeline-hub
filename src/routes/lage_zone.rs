@@ -204,25 +204,13 @@ pub async fn anlegen(
 #[derive(Debug, Deserialize)]
 pub struct ZonePatchBody {
     pub typ: Option<String>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub label: Option<Option<String>>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub farbe: Option<Option<String>>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub notiz: Option<Option<String>>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub gefahrengebiet_id: Option<Option<i64>>,
     /// Verschieben/Freigeben (LFH-320): absent = unverändert, `null` = auf alle Ansichten.
     #[serde(default, deserialize_with = "deserialize_optional_field")]

@@ -13,7 +13,7 @@ const MODUL_KEY: &str = "material";
 use crate::error::AppError;
 use crate::material::disposition_repo::{self, AdhocDaten};
 use crate::material::{EinsatzMaterialAnzeige, MaterialStatus};
-use crate::routes::support::{pflicht, trimme, trimme_tri};
+use crate::routes::support::{deserialize_optional_field, pflicht, trimme, trimme_tri};
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
@@ -169,15 +169,9 @@ pub struct DispoPatchBody {
     pub menge: Option<i64>,
     pub status: Option<String>,
     /// Tri-State (F12-c/LFH-266): fehlend = unverändert, `null`/`""` = leeren, Wert = setzen.
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub bemerkung: Option<Option<String>>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub uhs_id: Option<Option<i64>>,
 }
 

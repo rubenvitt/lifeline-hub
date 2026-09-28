@@ -14,7 +14,9 @@ use crate::live::LiveEvent;
 /// Modul-Key dieses Route-Moduls (LFH-132).
 const MODUL_KEY: &str = "bereitstellungsraeume";
 use crate::error::AppError;
-use crate::routes::support::{parse_enum, parse_enum_opt, pflicht, pflicht_tri, trimme};
+use crate::routes::support::{
+    deserialize_optional_field, parse_enum, parse_enum_opt, pflicht, pflicht_tri, trimme,
+};
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -195,20 +197,11 @@ pub async fn detail(
 #[derive(Debug, Deserialize)]
 pub struct PatchBody {
     pub bezeichnung: Option<String>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub abschnitt_id: Option<Option<i64>>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub standort: Option<Option<String>>,
-    #[serde(
-        default,
-        deserialize_with = "crate::routes::support::deserialize_optional_field"
-    )]
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub notiz: Option<Option<String>>,
 }
 
