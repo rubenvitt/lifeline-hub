@@ -438,7 +438,7 @@ async fn wiederherstellen_mit_frist_oeffnet_den_einsatz_wieder() {
     assert_eq!(erfasser, admin_id);
     assert!(inhalt.contains("Löschvormerkung"), "{inhalt}");
 
-    // Kein Wiedervormerken im nächsten Purge-Lauf (design.md D5).
+    // Kein Wiedervormerken im nächsten Purge-Lauf.
     lifeline_hub::einsatz::purge_scheduler::tick_einmal(&pool, Utc::now()).await;
     let g: Option<String> = sqlx::query_scalar("SELECT geloescht_at FROM einsatz WHERE id = ?")
         .bind(id)
@@ -551,7 +551,7 @@ async fn wiederherstellen_statuscodes_ohne_schreibvorgang() {
     assert_eq!(s, StatusCode::CONFLICT, "aktiv");
 }
 
-// ───────────────────── Struktur-Guard des Namensraums (design.md D2) ─────────────────────
+// ───────────────────────────── Struktur-Guard des Namensraums ─────────────────────────────
 
 /// Eine Route unter `/api/aufbewahrung` aus `src/app.rs`: Pfad plus Methoden-Handler.
 #[derive(Debug)]
@@ -684,7 +684,7 @@ fn archiv_namensraum_nur_lesend_und_admin() {
     );
 }
 
-/// Selbsttest des Guards: die beiden Mutationen aus tasks.md 2.5 machen ihn rot.
+/// Selbsttest des Guards: zwei gezielte Mutationen machen ihn rot.
 #[test]
 fn guard_erkennt_zusaetzlichen_schreibweg_und_current_user() {
     let app_rs = std::fs::read_to_string("src/app.rs").unwrap();
