@@ -9,15 +9,14 @@ import type { Personal } from '../api/types';
 import PersonalFormModal from './PersonalFormModal';
 
 /**
- * LFH-332/B4 — die Stammdaten-Personalmaske als Hüllen-Pilot.
+ * Die Stammdaten-Personalmaske auf `ErfassungsModal` (LFH-332).
  *
- * Geprüft wird, was die Umstellung auf `ErfassungsModal` zusichert: Fokus im
- * ersten Feld, Enter sendet ab, Zurücksetzen auf BEIDEN Wegen. Was die Hülle
- * selbst schon beweist (`components/Erfassung.test.tsx`), wird hier nicht
- * nachgespielt — hier steht nur, was an DIESER Maske verdrahtet ist.
+ * Geprüft wird, was an DIESER Maske verdrahtet ist: Fokus im ersten Feld, Enter sendet ab,
+ * Zurücksetzen auf BEIDEN Wegen. Was die Hülle selbst beweist (`components/Erfassung.test.tsx`),
+ * wird hier nicht nachgespielt.
  *
- * Bewusst KEINE Behauptung über Höhen/Trefflächen: `renderMitProviders` nutzt
- * ein nacktes `ConfigProvider` ohne Theme, eine solche Zusicherung wäre wertlos.
+ * Bewusst KEINE Behauptung über Höhen/Trefflächen: `renderMitProviders` nutzt ein nacktes
+ * `ConfigProvider` ohne Theme.
  */
 
 const person: Personal = {
@@ -52,10 +51,9 @@ function handler(onPost: (body: unknown) => void = () => {}) {
 }
 
 /**
- * Eltern mit Offen-Zustand — nur so lässt sich „nach Abbrechen leer" überhaupt messen.
- * „Wieder öffnen" öffnet bewusst IMMER im Anlegen-Fall (`person=null`): das ist der
- * Weg, den `PersonalTab` nimmt, wenn nach einem Bearbeiten „Person anlegen" gedrückt
- * wird — und genau der Weg, den der entfernte `resetFields()`-Zweig früher abdeckte.
+ * Eltern mit Offen-Zustand — nur so lässt sich „nach Abbrechen leer" messen. „Wieder öffnen"
+ * öffnet bewusst IMMER im Anlegen-Fall (`person=null`): der Weg, den `PersonalTab` nimmt,
+ * wenn nach einem Bearbeiten „Person anlegen" gedrückt wird.
  */
 function Harness({ bestand, onClose }: { bestand?: Personal | null; onClose?: () => void }) {
   const [offen, setOffen] = useState(true);
@@ -106,10 +104,8 @@ describe('PersonalFormModal — Hülle (LFH-332/B4)', () => {
   });
 
   /**
-   * Das Paar zu `serie={person == null}` (LFH-346/A6). Beide Hälften zusammen sind die
-   * Aussage: erst „im Anlegen-Fall DA" und „im Bearbeiten-Fall WEG" machen die
-   * Modus-Bedingung prüfbar — eine der beiden allein bliebe auch bei einem festen
-   * `serie`-Wert grün.
+   * Das Paar zu `serie={person == null}`: eine der beiden Hälften allein bliebe auch bei einem
+   * festen `serie`-Wert grün.
    */
   it('Anlegen: der Serienweg steht — hier wird Personal am Stück erfasst', async () => {
     handler();
@@ -128,8 +124,8 @@ describe('PersonalFormModal — Hülle (LFH-332/B4)', () => {
   });
 
   it('Abbrechen leert die Felder — der zweite Aufruf startet leer', async () => {
-    // Der Bestand setzte NUR im Erfolgsfall zurück. Genau diese Asymmetrie hebt die
-    // Hülle auf; ohne sie stünde „Erika" beim nächsten Anlegen noch im Feld.
+    // Zurückgesetzt wird auch nach dem Abbrechen; sonst stünde „Erika" beim nächsten Anlegen noch
+    // im Feld.
     handler();
     renderMitProviders(<Harness />);
     const nutzer = userEvent.setup();
@@ -142,9 +138,7 @@ describe('PersonalFormModal — Hülle (LFH-332/B4)', () => {
   });
 
   it('Bearbeiten: die Vorbelegung steht — sie ist kein Reset und bleibt erhalten', async () => {
-    // Das Telefon stand hier bis LFH-346 · A7 als dritte Zusicherung. Es ist auf die
-    // Detailseite gewandert; die Trägerorganisation nimmt seinen Platz ein — sie ist
-    // ebenfalls vorbelegt und bleibt sichtbar.
+    // Die Trägerorganisation ist vorbelegt und bleibt sichtbar.
     handler();
     renderMitProviders(<Harness bestand={person} />);
     expect(await screen.findByLabelText('Name')).toHaveValue('Thomas Müller');
@@ -153,8 +147,8 @@ describe('PersonalFormModal — Hülle (LFH-332/B4)', () => {
   });
 
   it('nach erfolgreichem Bearbeiten startet das nächste Anlegen leer', async () => {
-    // Der Weg, den der entfernte `resetFields()`-Zweig abdeckte: Person speichern,
-    // danach „Person anlegen". Trägt jetzt die Hülle — hier wird belegt, dass sie es tut.
+    // Person speichern, danach „Person anlegen": das Zurücksetzen trägt die Hülle, hier ist es
+    // belegt.
     handler();
     renderMitProviders(<Harness bestand={person} />);
     const nutzer = userEvent.setup();
@@ -170,10 +164,9 @@ describe('PersonalFormModal — Hülle (LFH-332/B4)', () => {
 
 describe('PersonalFormModal — Schnellerfassung (LFH-346/A7)', () => {
   /**
-   * Feldbudget (LFH-19: ≤ ~4). Über die Label gezählt, nicht über Rollen: die
-   * Trägerorganisation ist eine AutoComplete und die Qualifikationen ein Mehrfach-`Select`
-   * — beide tragen `combobox`, eine Rollenzählung ergäbe eine andere Zahl als die Aussage.
-   * Die Abwesenheits-Hälfte trägt: „vier sind da" bliebe auch mit acht Feldern grün.
+   * Feldbudget (LFH-19: ≤ ~4). Über die Label gezählt: Trägerorganisation (AutoComplete) und
+   * Qualifikationen (Mehrfach-`Select`) tragen beide `combobox`. Die Abwesenheits-Hälfte trägt:
+   * „vier sind da" bliebe auch mit acht Feldern grün.
    */
   it('zeigt genau die vier Felder, ohne die eine Person nicht auffindbar ist', async () => {
     handler();
@@ -190,8 +183,8 @@ describe('PersonalFormModal — Schnellerfassung (LFH-346/A7)', () => {
 
   /**
    * Wie bei `FahrzeugFormModal`: der PATCH ist ein echter Teil-Patch (LFH-306). Ein
-   * mitgeschicktes `telefon: null` für ein Feld, das diese Maske gar nicht mehr zeigt,
-   * löschte die Nummer — ohne Fehler und ohne roten Test. Geprüft werden die KEYS.
+   * mitgeschicktes `telefon: null` für ein nicht gezeigtes Feld löschte die Nummer. Geprüft
+   * werden die KEYS.
    */
   it('schickt beim Bearbeiten NUR seine vier Felder — der Teil-Patch lässt den Rest stehen', async () => {
     const gesendet = vi.fn();

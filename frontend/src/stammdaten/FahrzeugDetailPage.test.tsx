@@ -11,11 +11,11 @@ import FahrzeugeTab from './FahrzeugeTab';
 import { fahrzeugDetailPfad } from './stammdatenDetail';
 
 /**
- * LFH-346 · A7 — die Fahrzeug-Detailroute.
+ * Die Fahrzeug-Detailroute (LFH-346).
  *
- * Gemessen wird, was diese Seite zusichert: den Datensatz aus der LISTEN-Query (kein neuer
- * Endpunkt), den selbst erzeugten Nicht-gefunden-Fall, den gesperrten statt verschwundenen
- * Speichern-Knopf ohne Recht — und dass der Listenpfad ohne id weiterhin die Liste zeigt.
+ * Zugesichert: der Datensatz aus der LISTEN-Query (kein neuer Endpunkt), der selbst erzeugte
+ * Nicht-gefunden-Fall, der gesperrte statt verschwundene Speichern-Knopf ohne Recht — und
+ * dass der Listenpfad ohne id die Liste zeigt.
  */
 
 const admin = {
@@ -93,9 +93,8 @@ function renderRoute(pfad: string) {
 }
 
 /**
- * Ein Detail→Detail-Sprung, wie ihn ein künftiger „nächstes Fahrzeug"-Link auslöste. Er steht
- * NEBEN den `Routes`, damit der Klick die Route wechselt, ohne den Baum neu aufzubauen — genau
- * der Fall, für den `key={id}` am `<Form>` steht.
+ * Ein Detail→Detail-Sprung. Er steht NEBEN den `Routes`, damit der Klick die Route wechselt,
+ * ohne den Baum neu aufzubauen — genau der Fall, für den `key={id}` am `<Form>` steht.
  */
 function NaechstesFahrzeug() {
   const navigate = useNavigate();
@@ -128,7 +127,7 @@ describe('FahrzeugDetailPage (LFH-346 · A7)', () => {
     renderRoute('/admin/stammdaten/fahrzeuge/7');
 
     expect(await screen.findByRole('heading', { name: 'Florian 1' })).toBeInTheDocument();
-    // Die sieben Felder, die aus der Schnellerfassung hierher gewandert sind.
+    // Die sieben Felder der Detailseite.
     expect(screen.getByLabelText('OPTA')).toHaveValue('FL MUS 01');
     expect(screen.getByLabelText('Standort')).toHaveValue('Wache Mitte');
     expect(screen.getByLabelText('FMS-ISSI')).toHaveValue('12345');
@@ -136,7 +135,7 @@ describe('FahrzeugDetailPage (LFH-346 · A7)', () => {
     expect(screen.getByRole('switch', { name: 'Sonder-/Wegerecht' })).toBeChecked();
     expect(screen.getByLabelText('Tragenkapazität')).toHaveValue('2');
     // Die Soll-Stärke ist EIN Formularfeld mit drei Zahlen (Backend-CHECK „alle drei oder
-    // keiner", `src/routes/fahrzeug.rs:267`) — deshalb drei Eingaben, ein `Form.Item`.
+    // keiner") — deshalb drei Eingaben, ein `Form.Item`.
     expect(screen.getByLabelText('Unterführer')).toHaveValue('1');
     expect(screen.getByLabelText('Mannschaft')).toHaveValue('8');
     // Die zweite Hälfte der „kein neuer Endpunkt"-Aussage: EIN Listenabruf, kein zweiter.
@@ -190,10 +189,9 @@ describe('FahrzeugDetailPage (LFH-346 · A7)', () => {
   });
 
   /**
-   * M16 (LFH-345 · C10): fehlende Berechtigung wird ERKLÄRT, nicht stumm weggeschaltet. Der
-   * Knopf steht gesperrt da — ein fehlender Knopf ist von „diese Seite kann das gar nicht"
-   * nicht zu unterscheiden. Die Gegenaussage („mit Recht ist er bedienbar") gehört dazu,
-   * sonst bliebe der Test auch bei einem dauerhaft gesperrten Knopf grün.
+   * Fehlende Berechtigung wird ERKLÄRT, nicht stumm weggeschaltet (LFH-345). Die Gegenaussage
+   * („mit Recht ist er bedienbar") gehört dazu, sonst bliebe der Test auch bei einem dauerhaft
+   * gesperrten Knopf grün.
    */
   it('ohne Admin-Recht: Speichern gesperrt statt weg, mit Begründung', async () => {
     handler(nichtAdmin);
@@ -211,13 +209,12 @@ describe('FahrzeugDetailPage (LFH-346 · A7)', () => {
   });
 
   /**
-   * Ein laufender Entwurf überlebt eine FREMDE Änderung (LFH-342 · C7). Die Listen-Query
-   * wird auch von Änderungen invalidiert, die jemand anders ausgelöst hat; ein Effekt, der
-   * bei jeder Query-Änderung `setFieldsValue` ruft, ersetzte den gerade getippten Text ohne
-   * Vorwarnung. Deshalb seedet die Seite NUR beim Mount.
+   * Ein laufender Entwurf überlebt eine FREMDE Änderung: die Listen-Query wird auch von fremden
+   * Änderungen invalidiert, und ein Effekt, der dann `setFieldsValue` ruft, ersetzte den
+   * getippten Text. Deshalb seedet die Seite NUR beim Mount.
    *
-   * Der Abrufzähler ist hier nicht Beiwerk: ohne ihn wäre die Behauptung trivial grün,
-   * solange der Refetch noch gar nicht gelandet ist.
+   * Der Abrufzähler ist nicht Beiwerk: ohne ihn wäre die Behauptung trivial grün, solange der
+   * Refetch noch nicht gelandet ist.
    */
   it('ersetzt einen getippten Entwurf NICHT, wenn die Liste neu geladen wird', async () => {
     let abrufe = 0;
@@ -241,12 +238,9 @@ describe('FahrzeugDetailPage (LFH-346 · A7)', () => {
       await client.invalidateQueries({ queryKey: globalKeys.fahrzeugeListe('alle') });
     });
     /*
-     * Gewartet wird auf die ÜBERSCHRIFT, nicht auf den Abrufzähler: der zählt im
-     * MSW-Handler hoch, also bevor React die neuen Daten überhaupt gerendert hat — eine
-     * Behauptung an dieser Stelle liefe dem Effekt davon, den sie widerlegen soll.
-     * Die Überschrift liest direkt aus der Query; steht dort der fremde Funkrufname, ist
-     * der neue Stand im Baum und ein Seeding-Effekt hätte längst gefeuert. (Per
-     * Mutationsprobe belegt: mit wieder eingebautem Effekt färbt genau diese Zeile rot.)
+     * Gewartet wird auf die ÜBERSCHRIFT, nicht auf den Abrufzähler: der zählt im MSW-Handler,
+     * bevor React die neuen Daten gerendert hat. Die Überschrift liest direkt aus der Query;
+     * steht dort der fremde Funkrufname, hätte ein Seeding-Effekt längst gefeuert.
      */
     expect(await screen.findByRole('heading', { name: 'Florian 9' })).toBeInTheDocument();
     expect(abrufe).toBe(2);
@@ -261,14 +255,12 @@ describe('FahrzeugDetailPage (LFH-346 · A7)', () => {
     expect(await screen.findByRole('button', { name: 'Fahrzeug anlegen' })).toBeInTheDocument();
   });
   /**
-   * `key={id}` am `<Form>` (Review-Befund LFH-346 · C11): antds `initialValues` wird genau
-   * EINMAL beim Mount gelesen. Hängt dieselbe Seite auf einen anderen Datensatz um, trüge das
-   * Formular ohne den Schlüssel die Werte des vorigen — der Nutzer bearbeitete Fahrzeug 8 mit
-   * den Feldern von Fahrzeug 7 und schriebe sie beim Speichern fest.
+   * `key={id}` am `<Form>`: antds `initialValues` wird genau EINMAL beim Mount gelesen. Ohne den
+   * Schlüssel trüge das Formular nach dem Umhängen die Werte des vorigen Datensatzes und
+   * schriebe sie beim Speichern fest.
    *
-   * Die Überschrift ist die Positivprobe: sie liest direkt aus der Query, ist also auch ohne
-   * Schlüssel richtig. Erst sie macht eine rote Feldzeile zur Aussage über das Seeding statt
-   * über eine ausgebliebene Navigation.
+   * Die Überschrift ist die Positivprobe: sie liest direkt aus der Query. Erst sie macht eine
+   * rote Feldzeile zur Aussage über das Seeding statt über eine ausgebliebene Navigation.
    */
   it('trägt nach dem Wechsel auf einen anderen Datensatz DESSEN Werte', async () => {
     const nutzer = userEvent.setup();

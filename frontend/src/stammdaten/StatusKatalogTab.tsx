@@ -49,10 +49,9 @@ export default function StatusKatalogTab() {
   const qc = useQueryClient();
   const { message } = App.useApp();
   const [form] = Form.useForm<FormWerte>();
-  // Der Offen-Zustand des Dialogs IST der zu bearbeitende Datensatz (LFH-332 · B4):
-  // seit das Anlegen in der Schnellerfassung sitzt, gibt es kein „offen ohne
-  // Datensatz" mehr. Ein zweites `modalOffen` daneben könnte nur noch von diesem
-  // hier abweichen.
+  // Der Offen-Zustand des Dialogs IST der zu bearbeitende Datensatz: angelegt wird in der
+  // Schnellerfassung, ein „offen ohne Datensatz" gibt es nicht. Ein zweites `modalOffen`
+  // könnte nur von diesem abweichen.
   const [bearbeite, setBearbeite] = useState<FahrzeugStatus | null>(null);
 
   const statusQuery = useQuery({
@@ -77,13 +76,9 @@ export default function StatusKatalogTab() {
   });
 
   /**
-   * Schnellerfassung (LFH-332 · B4, Befund M43). Pflicht ist allein das Label.
-   * `kategorie: 'gebunden'` und `sortier: 0` sind keine erfundenen Werte, sondern
-   * byte-genau die Vorbelegung, die der gestrichene Anlege-Zweig des Dialogs
-   * gesetzt hat (`form.setFieldsValue({ kategorie: 'gebunden', sortier: 0 })`);
-   * `farbe: null` und `fms_anker: null` entsprechen den leeren Feldern, die dieser
-   * Zweig ebenfalls hinterliess. Kategorie, Farbe, FMS-Anker und Reihenfolge trägt
-   * man bei Bedarf im Bearbeiten-Dialog nach.
+   * Schnellerfassung (LFH-332). Pflicht ist allein das Label; `kategorie: 'gebunden'`,
+   * `sortier: 0`, `farbe: null` und `fms_anker: null` sind die Vorbelegung des Bearbeiten-Dialogs,
+   * keine erfundenen Werte. Den Rest trägt man bei Bedarf im Dialog nach.
    *
    * KEINE Erfolgsmeldung: die neue Zeile in der Tabelle ist die Rückmeldung.
    */
@@ -101,9 +96,8 @@ export default function StatusKatalogTab() {
       message.error(e instanceof ApiError ? e.message : 'Deaktivieren fehlgeschlagen'),
   });
 
-  // VORBELEGUNG, kein Zurücksetzen (LFH-332 · B4, Regel 3): das Leeren macht
-  // `ErfassungsModal` auf allen vier Auswegen selbst. Ein Reset hier wäre doppelt
-  // und verdeckte, ob die Hülle ihre Zusicherung überhaupt einlöst.
+  // VORBELEGUNG, kein Zurücksetzen: das Leeren macht `ErfassungsModal` auf allen vier Auswegen
+  // selbst. Ein Reset hier wäre doppelt und verdeckte, ob die Hülle ihre Zusicherung einlöst.
   useEffect(() => {
     if (bearbeite) {
       form.setFieldsValue({
@@ -124,12 +118,10 @@ export default function StatusKatalogTab() {
       /**
        * Leitspalte: am Label wird ein Status gesucht, nicht an der DB-Kennung.
        *
-       * KEIN `defaultSortOrder` — und hier trägt das mehr Gewicht als in den anderen
-       * Katalogen: `sortier` IST die fachliche Reihenfolge dieses Katalogs, sie
-       * bestimmt die Anordnung in jeder Statusauswahl, und das Backend liefert
-       * `ORDER BY sortier, id` (`src/fahrzeug/status_repo.rs:44`). Sie bleibt die
-       * Voreinstellung; die alphabetische Sortierung ist ein Angebot zum Auffinden
-       * eines Eintrags und wird vom dritten Kopfklick wieder zurückgenommen.
+       * KEIN `defaultSortOrder`: `sortier` IST die fachliche Reihenfolge dieses Katalogs und
+       * bestimmt die Anordnung in jeder Statusauswahl; das Backend liefert `ORDER BY sortier, id`.
+       * Die alphabetische Sortierung ist ein Angebot zum Auffinden und wird vom dritten Kopfklick
+       * zurückgenommen.
        */
       sorter: (a, b) => a.label.localeCompare(b.label, 'de'),
     },
@@ -138,14 +130,11 @@ export default function StatusKatalogTab() {
       dataIndex: 'kategorie',
       key: 'kategorie',
       /**
-       * Die geschlossene Achse dieses Katalogs. Die Filterliste kommt aus
-       * {@link statusKategorie} statt aus einer eigenen Aufzählung — derselbe Griff wie
-       * beim `Select` im Formular unten. Der Vertrag ist ein exhaustiver
-       * `Record<StatusKategorie, …>`, eine neue Enum-Variante taucht damit von selbst
-       * im Filter auf, statt still zu fehlen.
+       * Die Filterliste kommt aus {@link statusKategorie} statt aus einer eigenen Aufzählung: der
+       * Vertrag ist ein exhaustiver `Record<StatusKategorie, …>`, eine neue Enum-Variante taucht
+       * damit von selbst im Filter auf.
        *
-       * `String(wert)`, weil antd das Filterargument als `React.Key | boolean`
-       * typisiert, nicht als `StatusKategorie`.
+       * `String(wert)`, weil antd das Filterargument als `React.Key | boolean` typisiert.
        */
       filters: (Object.keys(statusKategorie) as StatusKategorie[]).map((k) => ({
         text: statusKategorie[k].label,
@@ -202,19 +191,13 @@ export default function StatusKatalogTab() {
       titel="Fahrzeug-Status"
       hinweis={<SeitenHinweise rechteFehlt={!istAdmin} rechteText={STAMMDATEN_RECHTE_TEXT} />}
     >
-      {/* KEIN `aktionen`-Slot (LFH-346 · A3): der Anlegen-Weg dieser Sektion ist die
-        SchnellAnlegen Schnellerfassungszeile am Inhalt. Ein zweiter Knopf im Kopf wären
-        zwei Primäraktionen für dieselbe Sache — und der Dialog, den er öffnete, wäre für
-        einen Katalog, der am Stück gepflegt wird, das falsche Werkzeug. */}
-      {/* Die Schnellerfassung steht ÜBER der Tabelle — dort, wo bis LFH-332 der Knopf
-          „Status anlegen" stand, und bewusst AUSSERHALB der Fehlerweiche darunter: ein
-          gescheiterter Abruf der Liste ist kein Grund, die einzige Schreibmöglichkeit
-          der Seite verschwinden zu lassen. */}
-      {/* Die Zeile steht IMMER, auch ohne Recht — dann gesperrt (LFH-346,
-          Nacharbeit zu Befund M45). Sie zu verstecken war die vierte Ausprägung
-          von „nur lesen", die M45 abschaffen sollte: ein fehlender Knopf ist von
-          „diese Seite kann das gar nicht" nicht zu unterscheiden. Den Grund nennt
-          der `RechteHinweis` im `hinweis`-Slot darüber. */}
+      {/* KEIN `aktionen`-Slot: der Anlegen-Weg ist die Schnellerfassungszeile am Inhalt. Ein zweiter
+         Knopf im Kopf wären zwei Primäraktionen für dieselbe Sache. */}
+      {/* Die Schnellerfassung steht ÜBER der Tabelle und AUSSERHALB der Fehlerweiche: ein
+         gescheiterter Abruf der Liste ist kein Grund, die einzige Schreibmöglichkeit der Seite
+         verschwinden zu lassen. */}
+      {/* Die Zeile steht IMMER, ohne Recht gesperrt: ein fehlender Knopf ist von „diese Seite kann
+         das gar nicht" nicht zu unterscheiden. Den Grund nennt der `RechteHinweis` im `hinweis`-Slot. */}
       <SchnellAnlegen
         beschriftung="Neuer Fahrzeug-Status"
         platzhalter="z. B. einsatzbereit"
@@ -223,11 +206,9 @@ export default function StatusKatalogTab() {
         laeuft={schnellAnlegen.isPending}
         gesperrt={!istAdmin}
       />
-      {/* Der Fehler tauscht die Tabelle aus, statt durch sie hindurchgereicht zu werden
-          (LFH-331 · B3): `Datensicht` führt den Kartenzweig an `Liste`, und `ListeProps`
-          kennt keinen Fehlerbegriff — ein Prop am Tabellen-Primitiv wirkte nur in einer
-          der beiden Formen. Ohne diese Weiche behauptet „Kein Status" auch dann einen
-          leeren Katalog, wenn bloß die Verbindung abgerissen ist. */}
+      {/* Der Fehler tauscht die Tabelle aus (LFH-331): `Datensicht` führt den Kartenzweig an
+         `Liste`, und `ListeProps` kennt keinen Fehlerbegriff. Ohne diese Weiche behauptete „Kein
+         Status" einen leeren Katalog, wenn bloß die Verbindung abgerissen ist. */}
       {statusQuery.isError ? (
         <SeitenFehler
           text="Statuskatalog konnte nicht geladen werden"
@@ -241,45 +222,34 @@ export default function StatusKatalogTab() {
           dataSource={statusQuery.data ?? []}
           columns={spalten}
           locale={{ emptyText: 'Kein Status' }}
-          // Der Platzhalter nennt NUR das Label, obwohl die Suche des Primitivs jede Spalte
-          // mit Datenbezug liest. Grund: sie greift den Rohwert, und der stimmt hier bei
-          // genau einer Spalte nicht mit dem Gezeigten überein — die Kategorie zeigt
-          // „verfügbar", der Drahtwert heißt `verfuegbar`. Ein Platzhalter, der „Kategorie"
-          // verspräche, ginge bei getippten Umlauten ins Leere. Diese Achse bedient der
-          // Spaltenfilter, nicht die Suche.
+          // Der Platzhalter nennt NUR das Label, obwohl die Suche jede Spalte mit Datenbezug liest: sie
+          // greift den Rohwert, und die Kategorie zeigt „verfügbar", heißt aber `verfuegbar`. Ein
+          // Platzhalter „Kategorie" ginge bei Umlauten ins Leere; diese Achse bedient der Spaltenfilter.
           suche={{ platzhalter: 'Label' }}
         />
       )}
-      {/* Nur noch Bearbeiten (LFH-332 · B4). Angelegt wird über die Zeile oben.
-
-          Auf der Hülle seit LFH-346 · A6: der Absende-Knopf liegt damit IM `<form>`,
-          also sendet Enter ab (Befund H69) — vorher stand er in antds Fusszeile und
-          war ein DOM-Geschwister ausserhalb. KEIN `serie`: hier wird bearbeitet,
-          nicht in Serie erfasst. Die Feldzahl ist seit LFH-346 · A8 gekürzt: zwei
-          sichtbare Felder, drei unter „Weitere Angaben". */}
+      {/* Nur Bearbeiten; angelegt wird über die Zeile oben. Auf der Hülle, damit der Absende-Knopf IM
+         `<form>` liegt und Enter absendet. KEIN `serie`: hier wird bearbeitet. Zwei sichtbare
+         Felder, drei unter „Weitere Angaben". */}
       <ErfassungsModal<FormWerte>
         offen={bearbeite !== null}
         titel="Status bearbeiten"
         form={form}
         erfassenText="Speichern"
         laeuft={speichern.isPending}
-        // `mutateAsync`, nicht `mutate`: bei Ablehnung MUSS die Zusage brechen,
-        // sonst leert die Hülle die Felder, obwohl der Datensatz nie ankam. Der
-        // Wurf im Leerfall ist derselbe Gedanke — ein stilles `return` läse sich
-        // für die Hülle als Erfolg und schlösse den Dialog ohne Request.
-        // NICHT die Werte aus `onFinish` (`w`), sondern der Formularspeicher (LFH-346 · A8):
-        // ohne `forceRender` sind die eingeklappten Felder nicht montiert, und `onFinish`
-        // liefert ausschliesslich montierte Felder. Farbe, FMS-Anker und Sortierung eines
-        // bearbeiteten Status fielen sonst bei jedem Speichern heraus, an dem niemand
-        // aufgeklappt hat — `StatusEingabe` ist Vollersatz, `farbe: null` löschte sie still.
-        // Ein Rückfall auf `bearbeite.farbe` wäre die FALSCHE Reparatur: er kann „nie
-        // montiert" nicht von „aufgeklappt und bewusst geleert" unterscheiden und füllte ein
-        // absichtlich geräumtes Feld wieder. `getFieldsValue(true)` liest den Speicher ganz
-        // aus — dort steht, was `setFieldsValue` beim Öffnen geschrieben hat, und dort steht
-        // `undefined`, wenn jemand das Feld sichtbar geleert hat.
+        // `mutateAsync`, nicht `mutate`: bei Ablehnung MUSS die Zusage brechen, sonst leert die Hülle
+        // die Felder, obwohl der Datensatz nie ankam. Ein stilles `return` im Leerfall läse sich als
+        // Erfolg und schlösse den Dialog ohne Request.
         //
-        // Beachten: der Aufruf ist bei antd `any`-typisiert — die Feldnamen prüft nicht
-        // er, sondern der Parametertyp von `mutationFn`.
+        // NICHT die Werte aus `onFinish`, sondern der Formularspeicher: ohne `forceRender` liefert
+        // `onFinish` nur montierte Felder, und Farbe, FMS-Anker und Sortierung fielen bei jedem
+        // Speichern ohne Aufklappen heraus (`StatusEingabe` ist Vollersatz). Ein Rückfall auf
+        // `bearbeite.farbe` wäre die FALSCHE Reparatur: er kann „nie montiert" nicht von „bewusst
+        // geleert" unterscheiden. `getFieldsValue(true)` liest den ganzen Speicher — dort steht, was
+        // `setFieldsValue` beim Öffnen schrieb, und `undefined`, wenn jemand das Feld geleert hat.
+        //
+        // Der Aufruf ist bei antd `any`-typisiert — die Feldnamen prüft der Parametertyp von
+        // `mutationFn`.
         onErfassen={async () => {
           if (!bearbeite) throw new Error('Kein Datensatz zum Bearbeiten');
           await speichern.mutateAsync({ id: bearbeite.id, werte: form.getFieldsValue(true) });
@@ -298,21 +268,14 @@ export default function StatusKatalogTab() {
             }))}
           />
         </Form.Item>
-        {/* FELDBUDGET (LFH-346 · A8, Befund N20): zwei sichtbare Felder, drei eingeklappt.
-            Sichtbar bleiben genau die Pflichtwerte — Farbe, FMS-Anker und Sortierung sind
-            optional und tragen einen brauchbaren Bestandswert; kein Pflichtfeld wandert
-            hinter den Collapse (LFH-343 · H49).
+        {/* FELDBUDGET: zwei sichtbare Felder, drei eingeklappt. Sichtbar bleiben die Pflichtwerte;
+           kein Pflichtfeld wandert hinter den Collapse (LFH-343).
 
-            Bewusst OHNE `forceRender` — dieselbe Entscheidung wie in `AuftragFormular`:
-            nur wenn die eingeklappten Felder gar nicht im DOM stehen, ist „im
-            Ausgangszustand zwei Felder" überhaupt prüfbar, und erst zusammen mit der
-            zweiten Hälfte („Aufklappen bringt die drei") ist die Zusicherung widerlegbar.
-            Der Preis dafür — unmontierte Felder fehlen in `onFinish` — ist am
-            `onErfassen` oben bezahlt, nicht mit `forceRender`.
+           Bewusst OHNE `forceRender` (wie `AuftragFormular`): nur so ist „im Ausgangszustand zwei
+           Felder" prüfbar. Der Preis — unmontierte Felder fehlen in `onFinish` — ist am `onErfassen`
+           oben bezahlt.
 
-            Beschriftung „Weitere Angaben" wie in `AufnahmeFelder`, `MaterialPage` und
-            `FahrzeugePage`; der Plan schrieb „Erweitert", eine zweite Sprachvariante für
-            dieselbe Sache wäre das Gegenteil des Ticketziels. */}
+           Beschriftung „Weitere Angaben" wie in `AufnahmeFelder`, `MaterialPage` und `FahrzeugePage`. */}
         <Collapse
           ghost
           style={{ marginInline: -8 }}

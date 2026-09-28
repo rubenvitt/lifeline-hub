@@ -39,30 +39,22 @@ export default function EtbBausteineTab() {
       dataIndex: 'label',
       key: 'baustein',
       /**
-       * Leitspalte: an ihr sucht ein Mensch den Baustein. Kein `defaultSortOrder` — die
-       * fachliche Reihenfolge ist `sortier` und kommt vom Server
-       * (`src/etb_baustein/repo.rs:47` — `ORDER BY sortier, id`); sie bestimmt, in welcher
-       * Folge die Bausteine im ETB angeboten werden, und bleibt deshalb der Einstieg.
+       * Leitspalte: an ihr sucht ein Mensch den Baustein. Kein `defaultSortOrder` — die fachliche
+       * Reihenfolge ist `sortier` (`ORDER BY sortier, id`); sie bestimmt, in welcher Folge die
+       * Bausteine im ETB angeboten werden, und bleibt der Einstieg.
        *
-       * ZWEI ZEILEN, EINE ZELLE (LFH-346 · A4, Befund N13): Label und Inhalt gehören
-       * zusammen gelesen („was fügt dieser Baustein ein?"), nicht verglichen — als zwei
-       * Spalten nebeneinander zwangen sie den Blick zum Springen, und der ungekürzte Inhalt
-       * trieb die Zeilenhöhe.
+       * ZWEI ZEILEN, EINE ZELLE (LFH-346): Label und Inhalt werden zusammen gelesen („was fügt
+       * dieser Baustein ein?"), nicht verglichen.
        *
-       * `dataIndex: 'label'` BLEIBT stehen — es trägt die Sortierung und den angezeigten
-       * Wert. Den SUCHKORPUS trägt es hier nicht mehr: die Zwei-Zeilen-Zelle schob den
-       * Inhaltstext in ein `render`, und was erst beim Rendern entsteht, liest die Suche des
-       * Primitivs nicht. Der Ausweg ist der `suchText`-Haken unten (LFH-346 · C11) — er
-       * gewinnt über den `dataIndex` und nimmt deshalb BEIDE Werte auf; ein Haken, der nur
-       * den Inhalt zurückgäbe, verlöre das Label. Der Suchplatzhalter darf damit wieder
-       * „Label oder Inhalt" sagen.
+       * `dataIndex: 'label'` trägt Sortierung und angezeigten Wert, aber nicht den Suchkorpus: der
+       * Inhalt steht im `render`, und das liest die Suche nicht. Der `suchText`-Haken unten gewinnt
+       * über den `dataIndex` und nimmt deshalb BEIDE Werte auf; ein Haken nur mit dem Inhalt
+       * verlöre das Label.
        *
-       * Gekappt wird an der ZELLE, nicht über eine Spaltenbreite — die im Browser gemessene
-       * Begründung steht in `karten/OnlineQuellenVerwaltung.tsx`: unter `table-layout: auto`,
-       * das `KatalogTabelle` mit `scroll={{ x: 'max-content' }}` erzwingt, ist eine
-       * Spaltenbreite wirkungslos. Einzeilig gekürzt wird über `Typography.Text` —
-       * mehrzeilige Kürzung gibt es in antd 6 nur über `Paragraph` (LFH-369), und hier ist
-       * einzeilig gewollt.
+       * Gekappt wird an der ZELLE, nicht über eine Spaltenbreite: unter `table-layout: auto`, das
+       * `KatalogTabelle` mit `scroll={{ x: 'max-content' }}` erzwingt, ist eine Spaltenbreite
+       * wirkungslos (Herleitung in `karten/OnlineQuellenVerwaltung.tsx`). Einzeilig über
+       * `Typography.Text` — mehrzeilig kürzt antd 6 nur über `Paragraph`.
        */
       sorter: (a, b) => a.label.localeCompare(b.label, 'de'),
       // Beide Werte, durch Leerzeichen getrennt: ein Begriff, der über die Grenze hinweg
@@ -71,8 +63,7 @@ export default function EtbBausteineTab() {
       onCell: () => ({ style: { maxWidth: 320 } }),
       render: (label: string, b: EtbBaustein) => (
         <>
-          {/* Die Marke trägt die Testabfrage: der `textContent` der Zelle enthält seit der
-              Vereinigung Label UND Inhalt, ein `td:first-child`-Griff läse beides. */}
+          {/* Die Marke trägt die Testabfrage: der `textContent` der Zelle enthält Label UND Inhalt. */}
           <div data-lfh="baustein-label" style={{ fontWeight: token.fontWeightStrong }}>
             {label}
           </div>
@@ -91,18 +82,17 @@ export default function EtbBausteineTab() {
       dataIndex: 'typ',
       key: 'typ',
       /**
-       * Werte aus derselben Quelle wie die Anzeige (`theme/statusFarben`) — ein neuer
-       * ETB-Typ taucht damit von selbst im Trichter auf. Dass der Drahtwert (`lage`) hier
-       * zufällig fast wie sein Label („Lage") aussieht, ändert nichts: der Typ gehört in den
-       * Filter, nicht in den Suchplatzhalter, sonst hinge das Versprechen an einem Zufall.
+       * Werte aus derselben Quelle wie die Anzeige (`theme/statusFarben`) — ein neuer ETB-Typ
+       * taucht von selbst im Trichter auf. Der Typ gehört in den Filter, nicht in den
+       * Suchplatzhalter: dass der Drahtwert (`lage`) fast wie sein Label aussieht, ist Zufall.
        */
       filters: (Object.keys(etbTyp) as EtbBaustein['typ'][]).map((t) => ({
         text: etbTyp[t].label,
         value: t,
       })),
       onFilter: (wert, b) => b.typ === wert,
-      // Typ als KANTE + TYPWORT wie auf der ETB-Zeitachse (Neuentwurf, Entscheidung 2), nicht
-      // als Etikett: derselbe Typ sieht im Katalog aus wie im Tagebuch, das er befüllt.
+      // Typ als KANTE + TYPWORT wie auf der ETB-Zeitachse, nicht als Etikett: derselbe Typ sieht im
+      // Katalog aus wie im Tagebuch, das er befüllt.
       render: (t: EtbBaustein['typ']) => {
         const farbe = etbTypFarbe(t, token);
         return (
@@ -126,7 +116,7 @@ export default function EtbBausteineTab() {
       title: 'Sortierung',
       dataIndex: 'sortier',
       key: 'sortier',
-      // Zahlen in Mono (Neuentwurf) — die Spalte wird zeilenweise verglichen.
+      // Zahlen in Mono — die Spalte wird zeilenweise verglichen.
       render: (n: number) => <span style={monoStil(12)}>{n}</span>,
     },
     ...(istAdmin
@@ -162,12 +152,10 @@ export default function EtbBausteineTab() {
     <AdminPage
       titel="ETB-Schnellbausteine"
       aktionen={
-        /* Der Knopf VERSCHWINDET nicht mehr, wenn das Recht fehlt (M16, LFH-345 · C10) —
-           er steht gesperrt, den Grund nennt der Hinweis darunter. Ein fehlender Knopf ist
-           von „diese Seite kann das gar nicht" nicht zu unterscheiden; „ausgegraut" allein
-           wäre eine Ein-Kanal-Aussage (Grau ist eine Farbe, WCAG 1.4.1).
-           Der Slot liegt AUSSERHALB jedes `<form>` (Dateikopf `AdminPage`) — hier steht
-           deshalb nie ein `htmlType="submit"`, sondern immer ein Modal-Öffner. */
+        /* Der Knopf steht ohne Recht gesperrt, den Grund nennt der Hinweis (LFH-345): ein fehlender
+           Knopf ist von „diese Seite kann das gar nicht" nicht zu unterscheiden, „ausgegraut" allein
+           wäre eine Ein-Kanal-Aussage (WCAG 1.4.1). Der Slot liegt AUSSERHALB jedes `<form>`
+           (`AdminPage`) — hier steht deshalb ein Modal-Öffner, nie ein `htmlType="submit"`. */
         <Button
           type="primary"
           disabled={!istAdmin}
@@ -181,11 +169,9 @@ export default function EtbBausteineTab() {
       }
       hinweis={<SeitenHinweise rechteFehlt={!istAdmin} rechteText={STAMMDATEN_RECHTE_TEXT} />}
     >
-      {/* Der Fehler tauscht die Tabelle aus, statt durch sie hindurchgereicht zu werden
-          (LFH-331 · B3): `Datensicht` führt den Kartenzweig an `Liste`, und `ListeProps`
-          kennt keinen Fehlerbegriff — ein Prop am Tabellen-Primitiv wirkte nur in einer
-          der beiden Formen. Ohne diese Weiche behauptet „Keine Bausteine" auch dann
-          einen leeren Katalog, wenn bloß die Verbindung abgerissen ist. */}
+      {/* Der Fehler tauscht die Tabelle aus (LFH-331): `Datensicht` führt den Kartenzweig an
+         `Liste`, und `ListeProps` kennt keinen Fehlerbegriff. Ohne diese Weiche behauptete „Keine
+         Bausteine" einen leeren Katalog, wenn bloß die Verbindung abgerissen ist. */}
       {query.isError ? (
         <SeitenFehler
           text="ETB-Bausteine konnten nicht geladen werden"
@@ -199,10 +185,8 @@ export default function EtbBausteineTab() {
           dataSource={query.data ?? []}
           columns={spalten}
           /**
-           * Wieder BEIDES — der `suchText`-Haken der Leitspalte holt den Inhalt zurück in den
-           * Korpus, den die Zwei-Zeilen-Zelle (LFH-346 · A4) ihm genommen hatte. Der
-           * Platzhalter ist an den Haken gebunden, nicht an die Spaltenzahl: wer ihn
-           * entfernt, nimmt hier „oder Inhalt" mit heraus.
+           * Beides: der `suchText`-Haken der Leitspalte hält den Inhalt im Korpus. Der Platzhalter ist
+           * an den Haken gebunden — wer ihn entfernt, nimmt hier „oder Inhalt" mit heraus.
            */
           suche={{ platzhalter: 'Label oder Inhalt' }}
           locale={{ emptyText: 'Keine Bausteine' }}

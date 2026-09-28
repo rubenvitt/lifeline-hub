@@ -13,8 +13,8 @@ import { leerZuNull } from '../api/patchTriState';
 import { personalDetailPfad } from './stammdatenDetail';
 
 /**
- * SCHNELLERFASSUNG, kein Vollformular mehr (LFH-346 · A7, Befund H36) — dieselbe
- * Entscheidung und dieselbe Begründung wie bei `FahrzeugFormModal`.
+ * SCHNELLERFASSUNG, kein Vollformular (LFH-346) — dieselbe Entscheidung wie bei
+ * `FahrzeugFormModal`.
  *
  * Sichtbar bleiben Name, Personalnummer, Trägerorganisation und Qualifikationen. Telefon,
  * Stärke-Position, Benutzer-Konto und Bemerkung stehen auf `PersonalDetailPage`.
@@ -47,13 +47,11 @@ export default function PersonalFormModal({
   });
 
   /**
-   * VORBELEGUNG, kein Zurücksetzen (LFH-332/B4, Regel 3). Der Anlegen-Zweig, der
-   * früher hier `resetFields()` + den Leerwert für `qualifikation_ids` setzte, ist
-   * weg: das Zurücksetzen macht `ErfassungsModal` auf BEIDEN Wegen (nach dem
-   * Speichern und beim Abbrechen), und der Leerwert steht jetzt als `initialValues`
-   * an der Hülle — von dort holt ihn jedes `resetFields` wieder. Ein
-   * zurückgebliebener Aufrufer-Reset wäre doppelt und würde verdecken, ob die Hülle
-   * ihre Zusicherung überhaupt einlöst.
+   * VORBELEGUNG, kein Zurücksetzen (LFH-332). Das Zurücksetzen macht `ErfassungsModal` auf
+   * BEIDEN Wegen (nach dem Speichern und beim Abbrechen), und der Leerwert für
+   * `qualifikation_ids` steht als `initialValues` an der Hülle — von dort holt ihn jedes
+   * `resetFields` wieder. Ein Aufrufer-Reset wäre doppelt und verdeckte, ob die Hülle ihre
+   * Zusicherung einlöst.
    */
   useEffect(() => {
     if (!offen || !person) return;
@@ -80,7 +78,7 @@ export default function PersonalFormModal({
       };
       return person ? aktualisierePerson(person.id, daten) : legePersonAn(daten);
     },
-    // Nur noch invalidieren: das Schliessen macht `onFertig`, das Leeren die Hülle.
+    // Nur invalidieren: das Schließen macht `onFertig`, das Leeren die Hülle.
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: globalKeys.personal() });
       qc.invalidateQueries({ queryKey: globalKeys.personalVorschlaege() });
@@ -100,14 +98,11 @@ export default function PersonalFormModal({
   ];
 
   /*
-   * Diese Maske war der HÜLLEN-PILOT aus LFH-332/B4 und trug dabei bewusst weiter acht
-   * Felder — umgestellt wurde damals die Hülle, nicht der Feldbestand. Das Feldbudget
-   * löst A7: vier sichtbare Felder, der Rest auf der Detailseite.
+   * Vier sichtbare Felder, der Rest auf der Detailseite (LFH-19).
    *
-   * `serie={person == null}` zeigt den Serienweg genau im Anlegen-Fall — dem, in dem eine
-   * Einheit ihr Personal am Stück erfasst; beim Bearbeiten wäre er ein toter Knopf.
-   * `uebernahme` trägt nur, was über eine Serie hinweg gleich bleibt: die
-   * Trägerorganisation, nie Name oder Personalnummer.
+   * `serie={person == null}` zeigt den Serienweg genau im Anlegen-Fall, in dem eine Einheit ihr
+   * Personal am Stück erfasst; beim Bearbeiten wäre er ein toter Knopf. `uebernahme` trägt nur,
+   * was über eine Serie hinweg gleich bleibt: die Trägerorganisation.
    */
   return (
     <ErfassungsModal<FormWerte>

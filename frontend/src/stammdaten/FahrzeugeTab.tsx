@@ -51,23 +51,20 @@ export default function FahrzeugeTab() {
       dataIndex: 'funkrufname',
       key: 'funkrufname',
       /**
-       * Leitspalte: am Funkrufname wird ein Fahrzeug gesucht, nie an der DB-Kennung —
-       * dieselbe Spalte, die `KatalogTabelle` als menschenlesbare Kennung fixiert.
+       * Leitspalte: am Funkrufname wird ein Fahrzeug gesucht, nie an der DB-Kennung — dieselbe
+       * Spalte, die `KatalogTabelle` als menschenlesbare Kennung fixiert.
        *
-       * `numeric: true`, weil Funkrufnamen durchnummeriert sind; rein lexikografisch
-       * stünde „Florian 10" vor „Florian 2" [abgeleitet].
+       * `numeric: true`, weil Funkrufnamen durchnummeriert sind; rein lexikografisch stünde
+       * „Florian 10" vor „Florian 2" [abgeleitet].
        *
-       * KEIN `defaultSortOrder`: das Backend liefert bereits `ORDER BY funkrufname`
-       * (`src/fahrzeug/repo.rs:74`). Die Sortierung ist hier also ein Angebot —
-       * absteigend, und mit `de`-Kollation statt SQLites BINARY-Vergleich — kein
-       * neuer Default.
+       * KEIN `defaultSortOrder`: das Backend liefert bereits `ORDER BY funkrufname`. Die Sortierung
+       * ist ein Angebot — absteigend, und mit `de`-Kollation statt SQLites BINARY-Vergleich.
        */
       sorter: (a, b) => a.funkrufname.localeCompare(b.funkrufname, 'de', { numeric: true }),
       /**
-       * Die Leitspalte führt auf die Detailseite (LFH-346 · A7). Der Anker-Riegel aus
-       * LFH-340 ist hier NICHT nötig: `KatalogTabelle` kennt kein `onZeileKlick` — er
-       * betrifft ausschliesslich `Datensicht`, wo Zeilenklick und Link gleichzeitig feuern
-       * könnten.
+       * Die Leitspalte führt auf die Detailseite. Ein Anker-Riegel ist NICHT nötig: `KatalogTabelle`
+       * kennt kein `onZeileKlick` — das betrifft nur `Datensicht`, wo Zeilenklick und Link
+       * gleichzeitig feuern könnten.
        */
       render: (_, f) => (
         <Link to={fahrzeugDetailPfad(f.id)} style={monoStil(13)}>
@@ -92,19 +89,15 @@ export default function FahrzeugeTab() {
       title: 'Status',
       key: 'dienststatus',
       /**
-       * Die einzige geschlossene Achse dieser Tabelle (`Dienststatus` =
-       * `in_dienst | ausser_dienst`) und die Frage, die im Einsatz zuerst gestellt
-       * wird: welche Fahrzeuge stehen überhaupt zur Verfügung. Typ und Träger sind
-       * dagegen Freitext aus den Stammdaten — die bedient die Suche besser als eine
-       * Auswahlliste, die mit dem Bestand driftet.
+       * Die einzige geschlossene Achse dieser Tabelle (`in_dienst | ausser_dienst`) und die Frage,
+       * die im Einsatz zuerst gestellt wird. Typ und Träger sind Freitext — die bedient die Suche
+       * besser als eine Auswahlliste, die mit dem Bestand driftet.
        *
-       * BEWUSST WEITERHIN OHNE `dataIndex`: der wäre für den Filter nicht nötig
-       * (`onFilter` liest den Datensatz selbst), zöge aber den Drahtwert `in_dienst`
-       * in die Freitextsuche des Primitivs — ein Wort, das hier niemand tippt, weil
-       * die Zelle „in Dienst" zeigt.
+       * OHNE `dataIndex`: `onFilter` liest den Datensatz selbst, und ein Bezug zöge den Drahtwert
+       * `in_dienst` in die Freitextsuche — ein Wort, das niemand tippt, weil die Zelle „in Dienst"
+       * zeigt.
        *
-       * `String(wert)`: antd typisiert das Filterargument als `React.Key | boolean`,
-       * nicht als unser `Dienststatus`.
+       * `String(wert)`: antd typisiert das Filterargument als `React.Key | boolean`.
        */
       filters: [
         { text: 'in Dienst', value: 'in_dienst' },
@@ -125,23 +118,16 @@ export default function FahrzeugeTab() {
             key: 'aktionen',
             render: (_, f: Fahrzeug) => {
               /**
-               * Eine laufende Mutation gehört GENAU EINER Zeile (LFH-346 · A1). Vorher
-               * hing die Sperre am blanken `dienststatusMutation.isPending` — das sperrte
-               * JEDE Zeile der Tabelle, während eine einzige Mutation lief; bei 150
-               * Personalzeilen eine Vollsperre wegen eines Klicks.
+               * Eine laufende Mutation gehört GENAU EINER Zeile (LFH-346): eine Sperre an
+               * `dienststatusMutation.isPending` legte die ganze Tabelle still.
                *
-               * Der Riegel gegen ein zweites Absenden DERSELBEN Zeile ist unten im
-               * `onConfirm`/`onClick` mitgewandert: ein Klick auf eine ANDERE Zeile ist kein
-               * Doppelklick, sondern die nächste Aufgabe — bliebe der Riegel global, sähe
-               * der fremde Knopf bedienbar aus und schluckte den Klick.
+               * Der Riegel gegen ein zweites Absenden DERSELBEN Zeile sitzt im `onConfirm`/`onClick`: ein
+               * Klick auf eine ANDERE Zeile ist die nächste Aufgabe, kein Doppelklick.
                *
-               * Er hält dabei WENIGER als der alte, und das ist der bewusst gezahlte Preis:
-               * EIN `useMutation`-Observer meldet nur den JÜNGSTEN Aufruf, die Marke WANDERT
-               * also beim Klick auf eine andere Zeile, statt sich zu sammeln (dieselbe
-               * Beobachtung wie in LFH-345). Nach A → B → A ist A wieder klickbar, obwohl
-               * seine erste Anfrage noch läuft. Unschädlich, weil der Endpunkt einen Status
-               * SETZT (idempotent), nicht umschaltet. Wer das enger will, braucht einen
-               * Zustand je Zeile — nicht diese eine Zeile Code.
+               * Er hält bewusst WENIGER: EIN `useMutation`-Observer meldet nur den JÜNGSTEN Aufruf, die
+               * Marke WANDERT also. Nach A → B → A ist A wieder klickbar, obwohl seine erste Anfrage noch
+               * läuft. Unschädlich, weil der Endpunkt einen Status SETZT (idempotent). Enger ginge es nur
+               * mit einem Zustand je Zeile.
                */
               const laeuft =
                 dienststatusMutation.isPending && dienststatusMutation.variables?.id === f.id;
@@ -196,12 +182,10 @@ export default function FahrzeugeTab() {
     <AdminPage
       titel="Fahrzeuge"
       aktionen={
-        /* Der Knopf VERSCHWINDET nicht mehr, wenn das Recht fehlt (M16, LFH-345 · C10) —
-           er steht gesperrt, den Grund nennt der Hinweis darunter. Ein fehlender Knopf ist
-           von „diese Seite kann das gar nicht" nicht zu unterscheiden; „ausgegraut" allein
-           wäre eine Ein-Kanal-Aussage (Grau ist eine Farbe, WCAG 1.4.1).
-           Der Slot liegt AUSSERHALB jedes `<form>` (Dateikopf `AdminPage`) — hier steht
-           deshalb nie ein `htmlType="submit"`, sondern immer ein Modal-Öffner. */
+        /* Der Knopf steht ohne Recht gesperrt, den Grund nennt der Hinweis (LFH-345): ein fehlender
+           Knopf ist von „diese Seite kann das gar nicht" nicht zu unterscheiden, „ausgegraut" allein
+           wäre eine Ein-Kanal-Aussage (WCAG 1.4.1). Der Slot liegt AUSSERHALB jedes `<form>`
+           (`AdminPage`) — hier steht deshalb ein Modal-Öffner, nie ein `htmlType="submit"`. */
         <Button
           type="primary"
           disabled={!istAdmin}
@@ -215,11 +199,9 @@ export default function FahrzeugeTab() {
       }
       hinweis={<SeitenHinweise rechteFehlt={!istAdmin} rechteText={STAMMDATEN_RECHTE_TEXT} />}
     >
-      {/* Der Fehler tauscht die Tabelle aus, statt durch sie hindurchgereicht zu werden
-          (LFH-331 · B3): `Datensicht` führt den Kartenzweig an `Liste`, und `ListeProps`
-          kennt keinen Fehlerbegriff — ein Prop am Tabellen-Primitiv wirkte nur in einer
-          der beiden Formen. Ohne diese Weiche behauptet „Noch keine Fahrzeuge" auch dann
-          einen leeren Katalog, wenn bloß die Verbindung abgerissen ist. */}
+      {/* Der Fehler tauscht die Tabelle aus (LFH-331): `Datensicht` führt den Kartenzweig an
+         `Liste`, und `ListeProps` kennt keinen Fehlerbegriff. Ohne diese Weiche behauptete „Noch
+         keine Fahrzeuge" einen leeren Katalog, wenn bloß die Verbindung abgerissen ist. */}
       {fahrzeugeQuery.isError ? (
         <SeitenFehler
           text="Fahrzeuge konnten nicht geladen werden"
@@ -233,10 +215,9 @@ export default function FahrzeugeTab() {
           dataSource={fahrzeugeQuery.data ?? []}
           columns={spalten}
           locale={{ emptyText: 'Noch keine Fahrzeuge' }}
-          // Durchsucht werden die vier Spalten mit Datenbezug: Funkrufname, Typ, Träger,
-          // Kennzeichen. Stärke und Status sind render-only und tragen nichts bei. Der
-          // Platzhalter nennt die drei, nach denen tatsächlich gesucht wird — die volle
-          // Aufzählung würde im 220 px breiten Feld ohnehin abgeschnitten.
+          // Durchsucht werden die vier Spalten mit Datenbezug (Funkrufname, Typ, Träger, Kennzeichen);
+          // Stärke und Status sind render-only. Der Platzhalter nennt drei — die volle Aufzählung würde
+          // im schmalen Feld abgeschnitten.
           suche={{ platzhalter: 'Funkrufname, Typ oder Kennzeichen' }}
         />
       )}

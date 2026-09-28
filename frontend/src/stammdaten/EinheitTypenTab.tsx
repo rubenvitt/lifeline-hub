@@ -44,10 +44,9 @@ export default function EinheitTypenTab() {
   const qc = useQueryClient();
   const { message } = App.useApp();
   const [form] = Form.useForm<FormWerte>();
-  // Der Offen-Zustand des Dialogs IST der zu bearbeitende Datensatz (LFH-332 · B4):
-  // seit das Anlegen in der Schnellerfassung sitzt, gibt es kein „offen ohne
-  // Datensatz" mehr. Ein zweites `modalOffen` daneben könnte nur noch von diesem
-  // hier abweichen.
+  // Der Offen-Zustand des Dialogs IST der zu bearbeitende Datensatz: angelegt wird in der
+  // Schnellerfassung, ein „offen ohne Datensatz" gibt es nicht. Ein zweites `modalOffen`
+  // könnte nur von diesem abweichen.
   const [bearbeite, setBearbeite] = useState<EinheitTyp | null>(null);
 
   const typenQuery = useQuery({ queryKey: globalKeys.einheitTypen(), queryFn: listeEinheitTypen });
@@ -63,17 +62,15 @@ export default function EinheitTypenTab() {
       };
       return aktualisiereTyp(id, daten);
     },
-    // Nur noch invalidieren: das Schliessen macht `onFertig`, das Leeren die Hülle.
+    // Nur invalidieren: das Schließen macht `onFertig`, das Leeren die Hülle.
     onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.einheitTypen() }),
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),
   });
 
   /**
-   * Schnellerfassung (LFH-332 · B4, Befund M43). Pflicht ist allein das Label.
-   * Die Soll-Stärke bleibt leer — `TypEingabe` lässt alle drei Teile `null` zu,
-   * und die Tabelle zeigt dafür „—"; `sortier: 0` ist byte-genau die Vorbelegung
-   * des gestrichenen Anlege-Zweigs (`form.setFieldsValue({ sortier: 0 })`).
-   * Beides trägt man bei Bedarf im Bearbeiten-Dialog nach.
+   * Schnellerfassung (LFH-332). Pflicht ist allein das Label. Die Soll-Stärke bleibt leer
+   * (`TypEingabe` lässt alle drei Teile `null` zu, die Tabelle zeigt „—"); `sortier: 0` ist die
+   * Vorbelegung des Bearbeiten-Dialogs. Beides trägt man bei Bedarf im Dialog nach.
    *
    * KEINE Erfolgsmeldung: die neue Zeile in der Tabelle ist die Rückmeldung.
    */
@@ -97,9 +94,8 @@ export default function EinheitTypenTab() {
       message.error(e instanceof ApiError ? e.message : 'Deaktivieren fehlgeschlagen'),
   });
 
-  // VORBELEGUNG, kein Zurücksetzen (LFH-332 · B4, Regel 3): das Leeren macht
-  // `ErfassungsModal` auf allen vier Auswegen selbst. Ein Reset hier wäre doppelt
-  // und verdeckte, ob die Hülle ihre Zusicherung überhaupt einlöst.
+  // VORBELEGUNG, kein Zurücksetzen: das Leeren macht `ErfassungsModal` auf allen vier Auswegen
+  // selbst. Ein Reset hier wäre doppelt und verdeckte, ob die Hülle ihre Zusicherung einlöst.
   useEffect(() => {
     if (bearbeite) {
       form.setFieldsValue({
@@ -110,9 +106,8 @@ export default function EinheitTypenTab() {
     }
   }, [bearbeite, form]);
 
-  // Keine Filterspalte in diesem Katalog: `EinheitTyp` trägt weder Status noch Kategorie, und
-  // `einheit/typ_repo.rs` liefert ohnehin nur `WHERE aktiv = 1` — eine Aktiv-Achse gäbe es hier
-  // also nicht einmal in den Daten. Erfunden wird sie nicht.
+  // Keine Filterspalte: `EinheitTyp` trägt weder Status noch Kategorie, und das Backend liefert
+  // nur `WHERE aktiv = 1`. Eine Achse wird nicht erfunden.
   const spalten: TableColumnsType<EinheitTyp> = [
     {
       title: 'Label',
@@ -120,7 +115,7 @@ export default function EinheitTypenTab() {
       key: 'label',
       // Leitspalte: am Label sucht ein Mensch den Typ. Die Sortierung ist ein ANGEBOT ohne
       // `defaultSortOrder` — voreingestellt bleibt die fachliche Reihenfolge des Backends
-      // (`einheit/typ_repo.rs`: ORDER BY sortier, id), die die Zug-vor-Gruppe-Ordnung hält.
+      // (`ORDER BY sortier, id`), die die Zug-vor-Gruppe-Ordnung hält.
       sorter: (a, b) => a.label.localeCompare(b.label, 'de'),
     },
     {
@@ -169,22 +164,15 @@ export default function EinheitTypenTab() {
       titel="Einheitstypen"
       hinweis={<SeitenHinweise rechteFehlt={!istAdmin} rechteText={STAMMDATEN_RECHTE_TEXT} />}
     >
-      {/* KEIN `aktionen`-Slot (LFH-346 · A3): der Anlegen-Weg dieser Sektion ist die
-        SchnellAnlegen Schnellerfassungszeile am Inhalt. Ein zweiter Knopf im Kopf wären
-        zwei Primäraktionen für dieselbe Sache — und der Dialog, den er öffnete, wäre für
-        einen Katalog, der am Stück gepflegt wird, das falsche Werkzeug. */}
-      {/* Die Schnellerfassung steht ÜBER der Tabelle — dort, wo bis LFH-332 der Knopf
-          „Typ anlegen" stand, und bewusst AUSSERHALB der Fehlerweiche darunter: ein
-          gescheiterter Abruf der Liste ist kein Grund, die einzige Schreibmöglichkeit
-          der Seite verschwinden zu lassen.
-          Der Platzhalter nennt NICHT „Label" — diesen Wortlaut trägt bereits das
-          Suchfeld der Tabelle, und ein zweiter Knoten mit demselben Platzhalter machte
-          den Griff darauf mehrdeutig. */}
-      {/* Die Zeile steht IMMER, auch ohne Recht — dann gesperrt (LFH-346,
-          Nacharbeit zu Befund M45). Sie zu verstecken war die vierte Ausprägung
-          von „nur lesen", die M45 abschaffen sollte: ein fehlender Knopf ist von
-          „diese Seite kann das gar nicht" nicht zu unterscheiden. Den Grund nennt
-          der `RechteHinweis` im `hinweis`-Slot darüber. */}
+      {/* KEIN `aktionen`-Slot: der Anlegen-Weg ist die Schnellerfassungszeile am Inhalt. Ein zweiter
+         Knopf im Kopf wären zwei Primäraktionen für dieselbe Sache. */}
+      {/* Die Schnellerfassung steht ÜBER der Tabelle und AUSSERHALB der Fehlerweiche: ein
+         gescheiterter Abruf der Liste ist kein Grund, die einzige Schreibmöglichkeit der Seite
+         verschwinden zu lassen.
+         Der Platzhalter nennt NICHT „Label" — den trägt schon das Suchfeld der Tabelle, und ein
+         zweiter Knoten mit demselben Platzhalter machte den Griff darauf mehrdeutig. */}
+      {/* Die Zeile steht IMMER, ohne Recht gesperrt: ein fehlender Knopf ist von „diese Seite kann
+         das gar nicht" nicht zu unterscheiden. Den Grund nennt der `RechteHinweis` im `hinweis`-Slot. */}
       <SchnellAnlegen
         beschriftung="Neuer Einheitstyp"
         platzhalter="z. B. Zug"
@@ -193,11 +181,9 @@ export default function EinheitTypenTab() {
         laeuft={schnellAnlegen.isPending}
         gesperrt={!istAdmin}
       />
-      {/* Der Fehler tauscht die Tabelle aus, statt durch sie hindurchgereicht zu werden
-          (LFH-331 · B3): `Datensicht` führt den Kartenzweig an `Liste`, und `ListeProps`
-          kennt keinen Fehlerbegriff — ein Prop am Tabellen-Primitiv wirkte nur in einer
-          der beiden Formen. Ohne diese Weiche behauptet „Kein Einheitstyp" auch dann
-          einen leeren Katalog, wenn bloß die Verbindung abgerissen ist. */}
+      {/* Der Fehler tauscht die Tabelle aus (LFH-331): `Datensicht` führt den Kartenzweig an
+         `Liste`, und `ListeProps` kennt keinen Fehlerbegriff. Ohne diese Weiche behauptete „Kein
+         Einheitstyp" einen leeren Katalog, wenn bloß die Verbindung abgerissen ist. */}
       {typenQuery.isError ? (
         <SeitenFehler
           text="Einheitstypen konnten nicht geladen werden"
@@ -211,28 +197,23 @@ export default function EinheitTypenTab() {
           dataSource={typenQuery.data ?? []}
           columns={spalten}
           locale={{ emptyText: 'Kein Einheitstyp' }}
-          // Der Platzhalter nennt das Feld, das man tippt. Die Spalte „Sortierung" fällt über ihren
-          // `dataIndex` technisch mit in den Suchkorpus (gemessen: „4" trifft Zug über `sortier: 40`) —
-          // harmlos, aber kein Grund, sie in den Platzhalter zu schreiben.
+          // Der Platzhalter nennt das Feld, das man tippt. „Sortierung" fällt über ihren `dataIndex`
+          // mit in den Suchkorpus („4" trifft `sortier: 40`) — harmlos, aber kein Grund für den
+          // Platzhalter.
           suche={{ platzhalter: 'Label' }}
         />
       )}
-      {/* Nur noch Bearbeiten (LFH-332 · B4). Angelegt wird über die Zeile oben.
-
-          Auf der Hülle seit LFH-346 · A6: der Absende-Knopf liegt damit IM `<form>`,
-          also sendet Enter ab (Befund H69) — vorher stand er in antds Fusszeile und
-          war ein DOM-Geschwister ausserhalb. KEIN `serie`: hier wird bearbeitet,
-          nicht in Serie erfasst. Die Feldzahl bleibt unverändert. */}
+      {/* Nur Bearbeiten; angelegt wird über die Zeile oben. Auf der Hülle, damit der Absende-Knopf IM
+         `<form>` liegt und Enter absendet. KEIN `serie`: hier wird bearbeitet. */}
       <ErfassungsModal<FormWerte>
         offen={bearbeite !== null}
         titel="Typ bearbeiten"
         form={form}
         erfassenText="Speichern"
         laeuft={speichern.isPending}
-        // `mutateAsync`, nicht `mutate`: bei Ablehnung MUSS die Zusage brechen,
-        // sonst leert die Hülle die Felder, obwohl der Datensatz nie ankam. Der
-        // Wurf im Leerfall ist derselbe Gedanke — ein stilles `return` läse sich
-        // für die Hülle als Erfolg und schlösse den Dialog ohne Request.
+        // `mutateAsync`, nicht `mutate`: bei Ablehnung MUSS die Zusage brechen, sonst leert die Hülle
+        // die Felder, obwohl der Datensatz nie ankam. Ein stilles `return` im Leerfall läse sich als
+        // Erfolg und schlösse den Dialog ohne Request.
         onErfassen={async (w) => {
           if (!bearbeite) throw new Error('Kein Datensatz zum Bearbeiten');
           await speichern.mutateAsync({ id: bearbeite.id, werte: w });

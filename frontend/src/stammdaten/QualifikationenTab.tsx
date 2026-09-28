@@ -41,10 +41,9 @@ export default function QualifikationenTab() {
   const qc = useQueryClient();
   const { message } = App.useApp();
   const [form] = Form.useForm<FormWerte>();
-  // Der Offen-Zustand des Dialogs IST der zu bearbeitende Datensatz (LFH-332 · B4):
-  // seit das Anlegen in der Schnellerfassung sitzt, gibt es kein „offen ohne
-  // Datensatz" mehr. Ein zweites `modalOffen` daneben könnte nur noch von diesem
-  // hier abweichen.
+  // Der Offen-Zustand des Dialogs IST der zu bearbeitende Datensatz: angelegt wird in der
+  // Schnellerfassung, ein „offen ohne Datensatz" gibt es nicht. Ein zweites `modalOffen`
+  // könnte nur von diesem abweichen.
   const [bearbeite, setBearbeite] = useState<Qualifikation | null>(null);
 
   const query = useQuery({ queryKey: globalKeys.qualifikationen(), queryFn: listeQualifikationen });
@@ -57,21 +56,17 @@ export default function QualifikationenTab() {
       };
       return aktualisiereQualifikation(id, daten);
     },
-    // Nur noch invalidieren: das Schliessen macht `onFertig`, das Leeren die Hülle.
+    // Nur invalidieren: das Schließen macht `onFertig`, das Leeren die Hülle.
     onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.qualifikationen() }),
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),
   });
 
   /**
-   * Schnellerfassung (LFH-332 · B4, Befund M43). Pflicht ist an dieser Entität
-   * allein das Label; `sortier: 0` ist deshalb kein erfundener Wert, sondern
-   * byte-genau die Vorbelegung, die der gestrichene Anlege-Zweig des Dialogs
-   * gesetzt hat (`form.setFieldsValue({ sortier: 0 })`). Wer eine Reihenfolge
-   * braucht, trägt sie im Bearbeiten-Dialog nach.
+   * Schnellerfassung (LFH-332). Pflicht ist allein das Label; `sortier: 0` ist die Vorbelegung
+   * des Bearbeiten-Dialogs, kein erfundener Wert. Eine Reihenfolge trägt man im Dialog nach.
    *
-   * KEINE Erfolgsmeldung: die neue Zeile in der Tabelle ist die Rückmeldung.
-   * Bei 25 Qualifikationen am Stück wären 25 Einblendungen genau die Störung,
-   * gegen die dieses Ticket antritt.
+   * KEINE Erfolgsmeldung: die neue Zeile in der Tabelle ist die Rückmeldung. Bei 25 Einträgen
+   * am Stück wären 25 Einblendungen genau die Störung, die vermieden werden soll.
    */
   const schnellAnlegen = useMutation({
     mutationFn: (label: string) => legeQualifikationAn({ label, sortier: 0 }),
@@ -86,9 +81,8 @@ export default function QualifikationenTab() {
       message.error(e instanceof ApiError ? e.message : 'Deaktivieren fehlgeschlagen'),
   });
 
-  // VORBELEGUNG, kein Zurücksetzen (LFH-332 · B4, Regel 3): das Leeren macht
-  // `ErfassungsModal` auf allen vier Auswegen selbst. Ein Reset hier wäre doppelt
-  // und verdeckte, ob die Hülle ihre Zusicherung überhaupt einlöst.
+  // VORBELEGUNG, kein Zurücksetzen: das Leeren macht `ErfassungsModal` auf allen vier Auswegen
+  // selbst. Ein Reset hier wäre doppelt und verdeckte, ob die Hülle ihre Zusicherung einlöst.
   useEffect(() => {
     if (bearbeite) form.setFieldsValue({ label: bearbeite.label, sortier: bearbeite.sortier });
   }, [bearbeite, form]);
@@ -99,11 +93,9 @@ export default function QualifikationenTab() {
       dataIndex: 'label',
       key: 'label',
       /**
-       * Leitspalte: an ihr sucht ein Mensch die Qualifikation. Kein `defaultSortOrder` —
-       * die fachliche Reihenfolge ist `sortier` und kommt vom Server
-       * (`src/personal/qualifikation_repo.rs:55` — `ORDER BY sortier, id`); sie bleibt der
-       * Einstieg, das Alphabet ist ein Angebot. Antds dritter Klick auf den Kopf schaltet
-       * die Sortierung wieder ab und stellt damit genau diese Reihenfolge her.
+       * Leitspalte: an ihr sucht ein Mensch die Qualifikation. Kein `defaultSortOrder` — die
+       * fachliche Reihenfolge ist `sortier` (`ORDER BY sortier, id`); sie bleibt der Einstieg, das
+       * Alphabet ist ein Angebot. Antds dritter Kopfklick stellt sie wieder her.
        */
       sorter: (a, b) => a.label.localeCompare(b.label, 'de'),
     },
@@ -140,19 +132,13 @@ export default function QualifikationenTab() {
       titel="Qualifikationen"
       hinweis={<SeitenHinweise rechteFehlt={!istAdmin} rechteText={STAMMDATEN_RECHTE_TEXT} />}
     >
-      {/* KEIN `aktionen`-Slot (LFH-346 · A3): der Anlegen-Weg dieser Sektion ist die
-        SchnellAnlegen Schnellerfassungszeile am Inhalt. Ein zweiter Knopf im Kopf wären
-        zwei Primäraktionen für dieselbe Sache — und der Dialog, den er öffnete, wäre für
-        einen Katalog, der am Stück gepflegt wird, das falsche Werkzeug. */}
-      {/* Die Schnellerfassung steht ÜBER der Tabelle — dort, wo bis LFH-332 der
-          Knopf „Qualifikation anlegen" stand, und bewusst AUSSERHALB der
-          Fehlerweiche darunter: ein gescheiterter Abruf der Liste ist kein Grund,
-          die einzige Schreibmöglichkeit der Seite verschwinden zu lassen. */}
-      {/* Die Zeile steht IMMER, auch ohne Recht — dann gesperrt (LFH-346,
-          Nacharbeit zu Befund M45). Sie zu verstecken war die vierte Ausprägung
-          von „nur lesen", die M45 abschaffen sollte: ein fehlender Knopf ist von
-          „diese Seite kann das gar nicht" nicht zu unterscheiden. Den Grund nennt
-          der `RechteHinweis` im `hinweis`-Slot darüber. */}
+      {/* KEIN `aktionen`-Slot: der Anlegen-Weg ist die Schnellerfassungszeile am Inhalt. Ein zweiter
+         Knopf im Kopf wären zwei Primäraktionen für dieselbe Sache. */}
+      {/* Die Schnellerfassung steht ÜBER der Tabelle und AUSSERHALB der Fehlerweiche: ein
+         gescheiterter Abruf der Liste ist kein Grund, die einzige Schreibmöglichkeit der Seite
+         verschwinden zu lassen. */}
+      {/* Die Zeile steht IMMER, ohne Recht gesperrt: ein fehlender Knopf ist von „diese Seite kann
+         das gar nicht" nicht zu unterscheiden. Den Grund nennt der `RechteHinweis` im `hinweis`-Slot. */}
       <SchnellAnlegen
         beschriftung="Neue Qualifikation"
         platzhalter="z. B. Sanitäter"
@@ -161,11 +147,9 @@ export default function QualifikationenTab() {
         laeuft={schnellAnlegen.isPending}
         gesperrt={!istAdmin}
       />
-      {/* Der Fehler tauscht die Tabelle aus, statt durch sie hindurchgereicht zu werden
-          (LFH-331 · B3): `Datensicht` führt den Kartenzweig an `Liste`, und `ListeProps`
-          kennt keinen Fehlerbegriff — ein Prop am Tabellen-Primitiv wirkte nur in einer
-          der beiden Formen. Ohne diese Weiche behauptet „Keine Qualifikationen" auch dann
-          einen leeren Katalog, wenn bloß die Verbindung abgerissen ist. */}
+      {/* Der Fehler tauscht die Tabelle aus (LFH-331): `Datensicht` führt den Kartenzweig an
+         `Liste`, und `ListeProps` kennt keinen Fehlerbegriff. Ohne diese Weiche behauptete „Keine
+         Qualifikationen" einen leeren Katalog, wenn bloß die Verbindung abgerissen ist. */}
       {query.isError ? (
         <SeitenFehler
           text="Qualifikationen konnten nicht geladen werden"
@@ -179,33 +163,24 @@ export default function QualifikationenTab() {
           dataSource={query.data ?? []}
           columns={spalten}
           /**
-           * Kein Filter in dieser Tabelle, und das ist kein Versäumnis: der Katalog hat weder
-           * Status noch Kategorie, und die einzige Zustandsspalte `aktiv` siebt schon der
-           * Server aus (`src/personal/qualifikation_repo.rs:55` — `WHERE … aktiv = 1`).
-           * Ein Trichter über zwei Spalten, von denen eine eine Zahl ist, wäre Zierrat.
+           * Kein Filter, und das ist kein Versäumnis: der Katalog hat weder Status noch Kategorie, und
+           * `aktiv` siebt schon der Server (`WHERE … aktiv = 1`).
            */
           suche={{ platzhalter: 'Label' }}
           locale={{ emptyText: 'Keine Qualifikationen' }}
         />
       )}
-      {/* Nur noch Bearbeiten (LFH-332 · B4). Angelegt wird über die Zeile oben;
-          ein Dialog, der sich nach jedem Speichern schliesst, ist für 25 Einträge
-          am Stück das falsche Werkzeug.
-
-          Auf der Hülle seit LFH-346 · A6: der Absende-Knopf liegt damit IM `<form>`,
-          also sendet Enter ab (Befund H69) — vorher stand er in antds Fusszeile und
-          war ein DOM-Geschwister ausserhalb. KEIN `serie`: hier wird bearbeitet,
-          nicht in Serie erfasst. Die Feldzahl bleibt unverändert. */}
+      {/* Nur Bearbeiten; angelegt wird über die Zeile oben. Auf der Hülle, damit der Absende-Knopf IM
+         `<form>` liegt und Enter absendet. KEIN `serie`: hier wird bearbeitet. */}
       <ErfassungsModal<FormWerte>
         offen={bearbeite !== null}
         titel="Qualifikation bearbeiten"
         form={form}
         erfassenText="Speichern"
         laeuft={speichern.isPending}
-        // `mutateAsync`, nicht `mutate`: bei Ablehnung MUSS die Zusage brechen,
-        // sonst leert die Hülle die Felder, obwohl der Datensatz nie ankam. Der
-        // Wurf im Leerfall ist derselbe Gedanke — ein stilles `return` läse sich
-        // für die Hülle als Erfolg und schlösse den Dialog ohne Request.
+        // `mutateAsync`, nicht `mutate`: bei Ablehnung MUSS die Zusage brechen, sonst leert die Hülle
+        // die Felder, obwohl der Datensatz nie ankam. Ein stilles `return` im Leerfall läse sich als
+        // Erfolg und schlösse den Dialog ohne Request.
         onErfassen={async (w) => {
           if (!bearbeite) throw new Error('Kein Datensatz zum Bearbeiten');
           await speichern.mutateAsync({ id: bearbeite.id, werte: w });

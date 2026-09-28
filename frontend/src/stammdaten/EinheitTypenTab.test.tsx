@@ -43,8 +43,8 @@ describe('EinheitTypenTab', () => {
     expect(screen.getByText('Sonstige')).toBeInTheDocument();
   });
 
-  // Neuentwurf (LFH-621): Zahlen stehen Mono mit `tabular-nums` — die Stärke UND die Sortierung.
-  // Das Label bleibt Satzschrift; ohne die Gegenprobe wäre „alles Mono" ebenso grün.
+  // Zahlen stehen Mono mit `tabular-nums` — Stärke UND Sortierung. Das Label bleibt Satzschrift;
+  // ohne die Gegenprobe wäre „alles Mono" ebenso grün.
   it('setzt Soll-Stärke und Sortierung in die Zahlenschrift, das Label nicht', async () => {
     render(nichtAdmin);
     await screen.findByText('Zug');
@@ -73,9 +73,9 @@ describe('EinheitTypenTab', () => {
         (z) => z.textContent,
       );
 
-    // Voreinstellung ist die gelieferte Reihenfolge, nicht die alphabetische — die Vorgabe
-    // steht bewusst un-alphabetisch (Zug vor Sonstige), sonst wäre die Zusicherung stumpf.
-    // Dass das Backend nach `sortier` ordnet, kann dieser Test nicht prüfen: hier antwortet msw.
+    // Voreinstellung ist die gelieferte Reihenfolge, bewusst un-alphabetisch (Zug vor Sonstige),
+    // sonst wäre die Zusicherung stumpf. Dass das Backend nach `sortier` ordnet, prüft dieser Test
+    // nicht: hier antwortet msw.
     expect(labels()).toEqual(['Zug', 'Sonstige']);
 
     await userEvent.click(screen.getByRole('columnheader', { name: /Label/ }));
@@ -86,12 +86,10 @@ describe('EinheitTypenTab', () => {
   });
 
   /**
-   * Zwei Zuschnitte, nicht einer (LFH-346, Nacharbeit zu Befund M45). Die PRIMÄRAKTION
-   * steht gesperrt — sie zu verstecken machte „kein Recht" von „diese Seite kann das gar
-   * nicht" ununterscheidbar; den Grund nennt der Hinweis darüber. Die ZEILENAKTIONEN
-   * entfallen weiterhin ganz: n Zeilen mal zwei gesperrte Knöpfe kosten Platz für null
-   * Handlungsmöglichkeit. Beide Hälften gehören in dieselbe Aussage, sonst liest sich die
-   * eine als Versehen der anderen.
+   * Zwei Zuschnitte (LFH-346): die PRIMÄRAKTION steht gesperrt — versteckt wäre „kein Recht"
+   * von „diese Seite kann das nicht" nicht zu unterscheiden; den Grund nennt der Hinweis. Die
+   * ZEILENAKTIONEN entfallen: n Zeilen × 2 gesperrte Knöpfe kosteten Platz für null
+   * Handlungsmöglichkeit.
    */
   it('Nicht-Admin: Primäraktion GESPERRT, Zeilenaktionen weg', async () => {
     render(nichtAdmin);
@@ -104,10 +102,9 @@ describe('EinheitTypenTab', () => {
   });
 
   /**
-   * Das Partnerpaar zu AK4 (LFH-331 · B3). Die negative Hälfte allein belegte nichts:
-   * änderte man den Leertext beim Umbau, wäre sie auch im Leerfall trivial grün. Erst
-   * die positive Hälfte darunter — gleiches Literal, gleiche Datei — macht sie zu einer
-   * Aussage über die Zustandsweiche statt über die Schreibweise eines Strings.
+   * Partnerpaar zu AK4 (LFH-331): die negative Hälfte allein wäre auch im Leerfall trivial
+   * grün; erst die positive darunter mit demselben Literal macht sie zu einer Aussage über die
+   * Zustandsweiche.
    */
   it('zeigt bei gescheitertem Abruf den Fehler und NICHT den Leertext', async () => {
     server.use(
@@ -132,13 +129,12 @@ describe('EinheitTypenTab', () => {
   });
 
   /**
-   * LFH-332 · B4. Geprüft wird der RUMPF, nicht bloß, dass gesendet wurde: der
-   * Anlege-Zweig setzt seine Vorgaben jetzt von Hand zusammen — drei `null` für die
-   * Soll-Stärke und `sortier: 0` —, und genau ein solches Vorgabe-Objekt kann still
-   * falsch sein. Ein Test, der nur zählt, bliebe dabei grün.
+   * Geprüft wird der RUMPF, nicht bloß, dass gesendet wurde: ein Vorgabe-Objekt (drei `null`
+   * für die Soll-Stärke, `sortier: 0`) kann still falsch sein, und ein Test, der nur zählt,
+   * bliebe grün.
    *
-   * Der Knopf trägt weiter den Namen des gestrichenen Dialog-Knopfes, deshalb sind
-   * die Rechte-Prüfungen oben unverändert gültig.
+   * Der Knopf trägt den Namen des früheren Dialog-Knopfes, deshalb gelten die Rechte-Prüfungen
+   * oben unverändert.
    */
   it('die Schnellerfassung legt mit Label und leerer Soll-Stärke an', async () => {
     const ruempfe: unknown[] = [];
@@ -167,9 +163,8 @@ describe('EinheitTypenTab', () => {
   });
 
   /**
-   * Der Dialog ist seit LFH-332 · B4 reines Bearbeiten. Ohne diese Prüfung schiffe
-   * eine kaputte Vorbelegung mit vollständig grüner Suite: kein anderer Test dieser
-   * Datei öffnet ihn.
+   * Der Dialog ist reines Bearbeiten, und kein anderer Test dieser Datei öffnet ihn: ohne diese
+   * Prüfung schiffte eine kaputte Vorbelegung mit grüner Suite.
    */
   it('Bearbeiten öffnet den Dialog mit vorbelegten Werten', async () => {
     render(admin);
@@ -183,14 +178,9 @@ describe('EinheitTypenTab', () => {
   });
 
   /**
-   * LFH-346 · A6. DIE Zusicherung des Umbaus auf `ErfassungsModal`, und die einzige,
-   * die strukturell prüfbar ist: Enter kommt aus der eingebauten Formularübermittlung
-   * des Browsers, und die greift nur, wenn der Knopf IM `<form>` liegt (bei einer
-   * Select-lastigen Maske ist der Tastendruck ohnehin kein Beleg — `@rc-component/select`
-   * ruft bei jedem Enter `preventDefault()`). Beide Hälften zusammen sind die Aussage:
-   * keine antd-Fusszeile (dort stünde der Knopf als DOM-Geschwister ausserhalb,
-   * Befund H69) UND der Knopf hat tatsächlich ein `form` als Vorfahr. Mutationsprobe:
-   * dreht man auf `<Modal onOk okText="Speichern">` zurück, fallen beide Abfragen.
+   * Die Zusicherung der Hülle `ErfassungsModal`: Enter kommt aus der eingebauten
+   * Formularübermittlung und greift nur, wenn der Knopf IM `<form>` liegt. Beide Hälften
+   * zusammen sind die Aussage: keine antd-Fußzeile UND ein `form` als Vorfahr des Knopfes.
    */
   it('trägt keine antd-Fusszeile — der Absende-Knopf liegt im Formular', async () => {
     render(admin);
@@ -204,11 +194,7 @@ describe('EinheitTypenTab', () => {
     ).not.toBeNull();
   });
 
-  /**
-   * Die zweite Zusicherung der Hülle: der Fokus steht beim Öffnen im ersten Feld.
-   * Vorher fokussierte dieser Dialog nichts — wer bearbeiten wollte, musste erst
-   * ins Feld klicken.
-   */
+  /** Die zweite Zusicherung der Hülle: der Fokus steht beim Öffnen im ersten Feld. */
   it('setzt den Fokus beim Öffnen ins erste Feld', async () => {
     render(admin);
     await screen.findByText('Zug');
@@ -219,9 +205,8 @@ describe('EinheitTypenTab', () => {
   });
 
   /**
-   * `onErfassen` bekommt `mutateAsync`, nicht `mutate` — sonst löste die Hülle den
-   * Erfolgszweig aus, während der Server ablehnt: Felder leer, Dialog zu, nichts
-   * gespeichert. Geprüft wird das Ergebnis, nicht die Schreibweise.
+   * `onErfassen` bekommt `mutateAsync`, nicht `mutate` — sonst löste die Hülle den Erfolgszweig
+   * aus, während der Server ablehnt: Felder leer, Dialog zu, nichts gespeichert.
    */
   it('lässt nach einer Ablehnung Dialog und Wortlaut stehen', async () => {
     server.use(

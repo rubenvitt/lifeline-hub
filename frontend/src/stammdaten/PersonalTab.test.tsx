@@ -35,17 +35,14 @@ const personal = [
 ];
 
 /**
- * Zweite Person NUR für die Ordnungs-Prüfung, deshalb als Parameter und nicht in `personal`:
- * die Bestandstests greifen ihre Knöpfe per `getByRole` (Einzahl), eine zweite Zeile brächte
- * eine zweite „Bearbeiten"-Schaltfläche und machte sie mehrdeutig. Absichtlich NICHT
- * alphabetisch hinter „Thomas Müller" — sonst wäre die Reihenfolge nach dem Sortierklick
- * dieselbe wie davor und die Zusicherung bewiese nichts.
+ * Zweite Person NUR für die Ordnungs-Prüfung, als Parameter: eine zweite „Bearbeiten"-
+ * Schaltfläche machte die `getByRole`-Griffe der übrigen Tests mehrdeutig. Absichtlich NICHT
+ * alphabetisch hinter „Thomas Müller", sonst bewiese der Sortierklick nichts.
  *
- * Der Umlaut in „Ömer" ist der Grund für genau diesen Namen und keinen anderen: „Ö" ist
- * byteweise (U+00D6) HINTER „T", sprachbewusst nach DIN 5007-1 aber davor. Damit fällt die
- * Sortier-Zusicherung auch, wenn nur das `localeCompare(…, 'de')` der Leitspalte zu einem
- * schlichten Zeichenvergleich verkommt — vorher blieb sie bei dieser Mutation grün (gemessen).
- * Wer den Namen „normalisiert", nimmt der Prüfung ihren Zweck.
+ * Der Umlaut in „Ömer" ist der Grund für genau diesen Namen: „Ö" ist byteweise (U+00D6)
+ * HINTER „T", nach DIN 5007-1 davor. So fällt die Prüfung auch, wenn `localeCompare(…, 'de')`
+ * zu einem schlichten Zeichenvergleich verkommt. Wer den Namen „normalisiert", nimmt der
+ * Prüfung ihren Zweck.
  */
 const zweiPersonen = [
   personal[0],
@@ -66,8 +63,7 @@ const namen = (c: HTMLElement) =>
   [...c.querySelectorAll('tr.ant-table-row td:first-child')].map((z) => z.textContent);
 
 /**
- * Der Eintrag IM Filtermenü. Der gesuchte Text steht zweimal im Dokument — in der Zelle als
- * `Tag` und im Menü —, ein schlichtes `findByText` bräche also an der Mehrdeutigkeit. Und das
+ * Der Eintrag IM Filtermenü. Der Text steht zweimal im Dokument (Zelle und Menü), und das
  * Menü hängt in einem Portal unter `document.body`, nicht unter dem `container`.
  */
 /** Der Filterauslöser der Status-Spalte, über seine Kopfzelle statt über „der einzige im Baum". */
@@ -118,23 +114,18 @@ describe('PersonalTab', () => {
   });
 
   /**
-   * LFH-346 · A1: eine laufende Mutation gehört GENAU EINER Zeile. Vorher sperrte
-   * `dienststatusMutation.isPending` jede Zeile der Tabelle — bei 150 Zeilen eine
-   * Vollsperre wegen eines Klicks.
+   * Eine laufende Mutation gehört GENAU EINER Zeile (LFH-346), keine Vollsperre der Tabelle.
    *
-   * Die zweite Hälfte („Zeile B feuert wirklich") ist die eigentliche Aussage: ein
-   * `toBeEnabled()` allein bliebe grün, wenn der Riegel im `onConfirm`
-   * (`if (!…isPending)`) stehen bliebe — der Knopf sähe bedienbar aus und schluckte
-   * den Klick. Muster aus `pages/BenutzerPage.test.tsx` („patchIds").
+   * Die zweite Hälfte („Zeile B feuert wirklich") ist die eigentliche Aussage: `toBeEnabled()`
+   * allein bliebe grün, wenn ein Riegel im `onConfirm` den Klick schluckte. Muster aus
+   * `pages/BenutzerPage.test.tsx` („patchIds").
    *
-   * Reihenfolge ist Absicht: EIN `useMutation`-Observer meldet nur den JÜNGSTEN Aufruf.
-   * Nach dem Klick auf Zeile B wandert `variables` dorthin, Zeile A verliert ihre
-   * Ladeanzeige, obwohl ihre Anfrage noch läuft. Alle A-Zusicherungen stehen deshalb
-   * VOR dem zweiten Klick; „A und B laden gleichzeitig" wäre schlicht falsch.
+   * Reihenfolge ist Absicht: EIN `useMutation`-Observer meldet nur den JÜNGSTEN Aufruf. Nach
+   * dem Klick auf Zeile B wandert `variables` dorthin, Zeile A verliert ihre Ladeanzeige. Alle
+   * A-Zusicherungen stehen deshalb VOR dem zweiten Klick.
    *
-   * Zeile 2 steht bewusst auf `ausser_dienst`: ihre Aktion ist dann der schlichte
-   * Knopf „Wieder in Dienst" ohne Rückfrage — sonst stünde ein zweites „OK" neben dem
-   * noch offenen Portal der ersten.
+   * Zeile 2 steht auf `ausser_dienst`: ihre Aktion ist dann „Wieder in Dienst" ohne Rückfrage —
+   * sonst stünde ein zweites „OK" neben dem offenen Portal der ersten.
    */
   it('sperrt beim Dienststatuswechsel NUR die betroffene Zeile', async () => {
     const gerufen: string[] = [];
@@ -186,11 +177,9 @@ describe('PersonalTab', () => {
   });
 
   /**
-   * Die Primäraktion ist seit LFH-346 · A3 SICHTBAR UND GESPERRT, die Zeilenaktionsspalte
-   * bleibt weg. Zwei Zuschnitte, bewusst: der eine Knopf im Kopf soll den Grund nennen
-   * können (M16 — ein fehlender Knopf ist von „diese Seite kann das gar nicht" nicht zu
-   * unterscheiden), n Zeilen × 2 Knöpfe wären dagegen eine Spalte toter Knöpfe, die
-   * waagerechten Platz für null Handlungsmöglichkeit kostet.
+   * Primäraktion SICHTBAR UND GESPERRT, Zeilenaktionsspalte weg (LFH-346): der Knopf im Kopf
+   * nennt über den Hinweis den Grund, n Zeilen × 2 gesperrte Knöpfe kosteten Platz für null
+   * Handlungsmöglichkeit.
    */
   it('Nicht-Admin sieht die Primäraktion gesperrt und keine Zeilenaktionen', async () => {
     render(nichtAdmin);
@@ -203,10 +192,9 @@ describe('PersonalTab', () => {
     await screen.findByText('Thomas Müller');
     expect(namen(container)).toEqual(['Thomas Müller', 'Ömer Berg']);
 
-    // Der Sortierauslöser sitzt in der Kopfzelle der fixierten Leitspalte. jsdom rechnet
-    // dort kein Layout — dass der Klick auch am 390-px-Schirm ankommt, ist hier NICHT belegt.
-    // Die Erwartung ist zugleich die Kollationsprobe: byteweise käme „Ömer" hinter „Thomas",
-    // die Reihenfolge bliebe also die der Serverantwort.
+    // Der Sortierauslöser sitzt in der Kopfzelle der fixierten Leitspalte; ob der Klick am
+    // 390-px-Schirm ankommt, belegt jsdom NICHT. Die Erwartung ist zugleich die Kollationsprobe:
+    // byteweise käme „Ömer" hinter „Thomas".
     await userEvent.click(container.querySelector<HTMLElement>('th.ant-table-cell-fix-start')!);
     expect(namen(container)).toEqual(['Ömer Berg', 'Thomas Müller']);
 
@@ -217,10 +205,9 @@ describe('PersonalTab', () => {
     await userEvent.clear(feld);
     expect(namen(container)).toHaveLength(2);
 
-    // Gefiltert wird die ZEILENMENGE, nicht die Anwesenheit des Trichters: antd zeichnet ihn
-    // schon bei gesetztem `filters`, gefiltert wird aber erst mit `onFilter`.
-    // Der Trichter wird über seine Kopfzelle gegriffen, nicht als einziger im Container: heute
-    // ist Status die einzige filterbare Spalte, morgen ist es vielleicht nicht mehr so.
+    // Gefiltert wird die ZEILENMENGE, nicht die Anwesenheit des Trichters: antd zeichnet ihn schon
+    // bei gesetztem `filters`, gefiltert wird erst mit `onFilter`. Gegriffen über seine Kopfzelle,
+    // nicht als einziger im Container.
     await userEvent.click(statusTrichter());
     await userEvent.click(await menueEintrag('in Dienst'));
     await userEvent.click(
@@ -230,13 +217,12 @@ describe('PersonalTab', () => {
   });
 
   /**
-   * Die Stärke-Position darf NICHTS zum Suchkorpus des Primitivs beitragen, das die ROHWERTE
-   * der Spalten mit `dataIndex` liest. Gemessen mit `dataIndex: 'staerke_position'`: „mann"
-   * und „sch" trafen jede Mannschafts-Person (Rohwert `mannschaft`), während „Führer" mit
-   * Umlaut nichts traf — genau verkehrt herum zu dem, was der Platzhalter verspricht.
+   * Die Stärke-Position darf NICHTS zum Suchkorpus beitragen, der die ROHWERTE der Spalten mit
+   * `dataIndex` liest: mit `dataIndex: 'staerke_position'` träfen „mann" und „sch" jede
+   * Mannschafts-Person, „Führer" mit Umlaut dagegen nichts.
    *
-   * Die Kontrollsuche steht vorweg und ist nicht Zierde: ohne sie wäre die leere Erwartung auch
-   * dann grün, wenn das Suchfeld gar nicht gefunden wäre.
+   * Die Kontrollsuche vorweg ist nötig: ohne sie wäre die leere Erwartung auch grün, wenn das
+   * Suchfeld gar nicht gefunden wäre.
    */
   it('die Stärke-Position trägt nichts zum Suchkorpus bei', async () => {
     const { container } = render(admin, zweiPersonen);
@@ -257,11 +243,9 @@ describe('PersonalTab', () => {
   });
 
   /**
-   * Der zweite Filterwert. Er stand ungeprüft: mit `value: 'voellig_falsch'` statt
-   * `'ausser_dienst'` blieb die Datei grün (gemessen) — belegt war nur die halbe Achse.
-   * Eigener `it` mit frischem Rendern, weil sich die Auswahl im Filtermenü nach dem Anwenden
-   * nicht verlässlich zurücknehmen lässt (die „Reset"-Schaltfläche ist dort deaktiviert,
-   * gemessen in `SprechgruppenTab.test.tsx`).
+   * Der zweite Filterwert, sonst wäre nur die halbe Achse belegt. Eigener `it` mit frischem
+   * Rendern, weil sich die Auswahl im Filtermenü nach dem Anwenden nicht verlässlich zurücknehmen
+   * lässt (die „Reset"-Schaltfläche ist dort deaktiviert).
    */
   it('der Dienststatus-Filter kennt auch „außer Dienst"', async () => {
     const { container } = render(admin, zweiPersonen);
@@ -277,10 +261,9 @@ describe('PersonalTab', () => {
   });
 
   /**
-   * Das Partnerpaar zu AK4 (LFH-331 · B3). Die negative Hälfte allein belegte nichts:
-   * änderte man den Leertext beim Umbau, wäre sie auch im Leerfall trivial grün. Erst
-   * die positive Hälfte darunter — gleiches Literal, gleiche Datei — macht sie zu einer
-   * Aussage über die Zustandsweiche statt über die Schreibweise eines Strings.
+   * Partnerpaar zu AK4 (LFH-331): die negative Hälfte allein wäre auch im Leerfall trivial
+   * grün; erst die positive darunter mit demselben Literal macht sie zu einer Aussage über die
+   * Zustandsweiche.
    */
   it('zeigt bei gescheitertem Abruf den Fehler und NICHT den Leertext', async () => {
     server.use(

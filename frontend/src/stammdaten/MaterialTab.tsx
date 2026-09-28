@@ -43,14 +43,12 @@ export default function MaterialTab() {
       dataIndex: 'bezeichnung',
       key: 'bezeichnung',
       /**
-       * Leitspalte: an der Bezeichnung wird ein Materialposten gesucht, nicht an der
-       * DB-Kennung — dieselbe Spalte, die `KatalogTabelle` als menschenlesbare Kennung
-       * fixiert. `numeric: true`, weil Bezeichnungen Größen tragen („B-Schlauch 5 m"
-       * vs. „… 20 m"); rein lexikografisch stünde 20 vor 5 [abgeleitet].
+       * Leitspalte: an der Bezeichnung wird ein Materialposten gesucht, nicht an der DB-Kennung —
+       * dieselbe Spalte, die `KatalogTabelle` als menschenlesbare Kennung fixiert. `numeric: true`,
+       * weil Bezeichnungen Größen tragen („B-Schlauch 5 m" vs. „… 20 m") [abgeleitet].
        *
-       * KEIN `defaultSortOrder`: das Backend liefert bereits `ORDER BY bezeichnung`
-       * (`src/material/repo.rs:54`). Die Sortierung ist ein Angebot — absteigend und
-       * mit `de`-Kollation statt SQLites BINARY-Vergleich —, kein neuer Default.
+       * KEIN `defaultSortOrder`: das Backend liefert bereits `ORDER BY bezeichnung`. Die Sortierung
+       * ist ein Angebot — absteigend und mit `de`-Kollation statt SQLites BINARY-Vergleich.
        */
       sorter: (a, b) => a.bezeichnung.localeCompare(b.bezeichnung, 'de', { numeric: true }),
     },
@@ -66,17 +64,13 @@ export default function MaterialTab() {
       title: 'Status',
       key: 'dienststatus',
       /**
-       * Gefiltert wird über den Dienststatus, nicht über die Kategorie: `Dienststatus`
-       * ist ein geschlossenes Enum (`in_dienst | ausser_dienst`) und beantwortet die
-       * Frage, die im Einsatz zuerst gestellt wird. Die Kategorie ist mandantengepflegt
-       * — eine Filterliste daraus (`kategorienQuery`) käme aus einer zweiten Abfrage und
-       * könnte mit den angezeigten Zeilen auseinanderlaufen; sie hat einen `dataIndex`
-       * und wird deshalb bereits von der Freitextsuche bedient.
+       * Gefiltert wird über den Dienststatus, nicht über die Kategorie: `Dienststatus` ist ein
+       * geschlossenes Enum und beantwortet die Frage, die im Einsatz zuerst gestellt wird. Die
+       * Kategorie ist mandantengepflegt — eine Filterliste daraus käme aus einer zweiten Abfrage
+       * und könnte driften; sie hat einen `dataIndex` und wird von der Freitextsuche bedient.
        *
-       * BEWUSST WEITERHIN OHNE `dataIndex` (Begründung wie in `FahrzeugeTab`): der
-       * Filter braucht keinen, ein gesetzter zöge aber den Drahtwert `in_dienst` in die
-       * Suche. `String(wert)`, weil antd das Filterargument als `React.Key | boolean`
-       * typisiert.
+       * OHNE `dataIndex` (wie in `FahrzeugeTab`): ein gesetzter zöge den Drahtwert `in_dienst` in
+       * die Suche. `String(wert)`, weil antd das Filterargument als `React.Key | boolean` typisiert.
        */
       filters: [
         { text: 'in Dienst', value: 'in_dienst' },
@@ -97,23 +91,16 @@ export default function MaterialTab() {
             key: 'aktionen',
             render: (_, m: Material) => {
               /**
-               * Eine laufende Mutation gehört GENAU EINER Zeile (LFH-346 · A1). Vorher
-               * hing die Sperre am blanken `dienststatusMutation.isPending` — das sperrte
-               * JEDE Zeile der Tabelle, während eine einzige Mutation lief; bei 150
-               * Personalzeilen eine Vollsperre wegen eines Klicks.
+               * Eine laufende Mutation gehört GENAU EINER Zeile (LFH-346): eine Sperre an
+               * `dienststatusMutation.isPending` legte die ganze Tabelle still.
                *
-               * Der Riegel gegen ein zweites Absenden DERSELBEN Zeile ist unten im
-               * `onConfirm`/`onClick` mitgewandert: ein Klick auf eine ANDERE Zeile ist kein
-               * Doppelklick, sondern die nächste Aufgabe — bliebe der Riegel global, sähe
-               * der fremde Knopf bedienbar aus und schluckte den Klick.
+               * Der Riegel gegen ein zweites Absenden DERSELBEN Zeile sitzt im `onConfirm`/`onClick`: ein
+               * Klick auf eine ANDERE Zeile ist die nächste Aufgabe, kein Doppelklick.
                *
-               * Er hält dabei WENIGER als der alte, und das ist der bewusst gezahlte Preis:
-               * EIN `useMutation`-Observer meldet nur den JÜNGSTEN Aufruf, die Marke WANDERT
-               * also beim Klick auf eine andere Zeile, statt sich zu sammeln (dieselbe
-               * Beobachtung wie in LFH-345). Nach A → B → A ist A wieder klickbar, obwohl
-               * seine erste Anfrage noch läuft. Unschädlich, weil der Endpunkt einen Status
-               * SETZT (idempotent), nicht umschaltet. Wer das enger will, braucht einen
-               * Zustand je Zeile — nicht diese eine Zeile Code.
+               * Er hält bewusst WENIGER: EIN `useMutation`-Observer meldet nur den JÜNGSTEN Aufruf, die
+               * Marke WANDERT also. Nach A → B → A ist A wieder klickbar, obwohl seine erste Anfrage noch
+               * läuft. Unschädlich, weil der Endpunkt einen Status SETZT (idempotent). Enger ginge es nur
+               * mit einem Zustand je Zeile.
                */
               const laeuft =
                 dienststatusMutation.isPending && dienststatusMutation.variables?.id === m.id;
@@ -168,12 +155,10 @@ export default function MaterialTab() {
     <AdminPage
       titel="Material"
       aktionen={
-        /* Der Knopf VERSCHWINDET nicht mehr, wenn das Recht fehlt (M16, LFH-345 · C10) —
-           er steht gesperrt, den Grund nennt der Hinweis darunter. Ein fehlender Knopf ist
-           von „diese Seite kann das gar nicht" nicht zu unterscheiden; „ausgegraut" allein
-           wäre eine Ein-Kanal-Aussage (Grau ist eine Farbe, WCAG 1.4.1).
-           Der Slot liegt AUSSERHALB jedes `<form>` (Dateikopf `AdminPage`) — hier steht
-           deshalb nie ein `htmlType="submit"`, sondern immer ein Modal-Öffner. */
+        /* Der Knopf steht ohne Recht gesperrt, den Grund nennt der Hinweis (LFH-345): ein fehlender
+           Knopf ist von „diese Seite kann das gar nicht" nicht zu unterscheiden, „ausgegraut" allein
+           wäre eine Ein-Kanal-Aussage (WCAG 1.4.1). Der Slot liegt AUSSERHALB jedes `<form>`
+           (`AdminPage`) — hier steht deshalb ein Modal-Öffner, nie ein `htmlType="submit"`. */
         <Button
           type="primary"
           disabled={!istAdmin}
@@ -187,11 +172,9 @@ export default function MaterialTab() {
       }
       hinweis={<SeitenHinweise rechteFehlt={!istAdmin} rechteText={STAMMDATEN_RECHTE_TEXT} />}
     >
-      {/* Der Fehler tauscht die Tabelle aus, statt durch sie hindurchgereicht zu werden
-          (LFH-331 · B3): `Datensicht` führt den Kartenzweig an `Liste`, und `ListeProps`
-          kennt keinen Fehlerbegriff — ein Prop am Tabellen-Primitiv wirkte nur in einer
-          der beiden Formen. Ohne diese Weiche behauptet „Noch kein Material" auch dann
-          einen leeren Katalog, wenn bloß die Verbindung abgerissen ist. */}
+      {/* Der Fehler tauscht die Tabelle aus (LFH-331): `Datensicht` führt den Kartenzweig an
+         `Liste`, und `ListeProps` kennt keinen Fehlerbegriff. Ohne diese Weiche behauptete „Noch
+         kein Material" einen leeren Katalog, wenn bloß die Verbindung abgerissen ist. */}
       {materialQuery.isError ? (
         <SeitenFehler
           text="Material konnte nicht geladen werden"
@@ -205,10 +188,9 @@ export default function MaterialTab() {
           dataSource={materialQuery.data ?? []}
           columns={spalten}
           locale={{ emptyText: 'Noch kein Material' }}
-          // Durchsucht werden die vier Spalten mit Datenbezug: Bezeichnung, Kategorie,
-          // Bestandsnummer, Träger. Die Statusspalte ist render-only und trägt nichts bei.
-          // Der Platzhalter nennt die beiden, nach denen tatsächlich gesucht wird — die
-          // volle Aufzählung würde im 220 px breiten Feld abgeschnitten.
+          // Durchsucht werden die vier Spalten mit Datenbezug (Bezeichnung, Kategorie, Bestandsnummer,
+          // Träger); die Statusspalte ist render-only. Der Platzhalter nennt zwei — die volle
+          // Aufzählung würde im schmalen Feld abgeschnitten.
           suche={{ platzhalter: 'Bezeichnung oder Kategorie' }}
         />
       )}

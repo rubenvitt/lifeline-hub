@@ -30,9 +30,8 @@ const material = {
   angelegt_at: '2026-05-27 10:00:00',
 };
 
-// Voreinstellung bleibt EIN Posten: die Bestandsprüfungen unten greifen „Bearbeiten" per
-// `getByRole` (Einzahl), eine zweite Zeile brächte zwei gleichnamige Schaltflächen und
-// ließe sie an der Mehrdeutigkeit scheitern statt an der Sache.
+// Voreinstellung bleibt EIN Posten: die Prüfungen unten greifen „Bearbeiten" per `getByRole`
+// (Einzahl), eine zweite Zeile machte sie mehrdeutig.
 function render(benutzer: typeof admin, posten = [material]) {
   server.use(
     http.get('/api/auth/me', () => HttpResponse.json(benutzer)),
@@ -61,23 +60,18 @@ describe('MaterialTab', () => {
   });
 
   /**
-   * LFH-346 · A1: eine laufende Mutation gehört GENAU EINER Zeile. Vorher sperrte
-   * `dienststatusMutation.isPending` jede Zeile der Tabelle — bei 150 Zeilen eine
-   * Vollsperre wegen eines Klicks.
+   * Eine laufende Mutation gehört GENAU EINER Zeile (LFH-346), keine Vollsperre der Tabelle.
    *
-   * Die zweite Hälfte („Zeile B feuert wirklich") ist die eigentliche Aussage: ein
-   * `toBeEnabled()` allein bliebe grün, wenn der Riegel im `onConfirm`
-   * (`if (!…isPending)`) stehen bliebe — der Knopf sähe bedienbar aus und schluckte
-   * den Klick. Muster aus `pages/BenutzerPage.test.tsx` („patchIds").
+   * Die zweite Hälfte („Zeile B feuert wirklich") ist die eigentliche Aussage: `toBeEnabled()`
+   * allein bliebe grün, wenn ein Riegel im `onConfirm` den Klick schluckte. Muster aus
+   * `pages/BenutzerPage.test.tsx` („patchIds").
    *
-   * Reihenfolge ist Absicht: EIN `useMutation`-Observer meldet nur den JÜNGSTEN Aufruf.
-   * Nach dem Klick auf Zeile B wandert `variables` dorthin, Zeile A verliert ihre
-   * Ladeanzeige, obwohl ihre Anfrage noch läuft. Alle A-Zusicherungen stehen deshalb
-   * VOR dem zweiten Klick; „A und B laden gleichzeitig" wäre schlicht falsch.
+   * Reihenfolge ist Absicht: EIN `useMutation`-Observer meldet nur den JÜNGSTEN Aufruf. Nach
+   * dem Klick auf Zeile B wandert `variables` dorthin, Zeile A verliert ihre Ladeanzeige. Alle
+   * A-Zusicherungen stehen deshalb VOR dem zweiten Klick.
    *
-   * Zeile 2 steht bewusst auf `ausser_dienst`: ihre Aktion ist dann der schlichte
-   * Knopf „Wieder in Dienst" ohne Rückfrage — sonst stünde ein zweites „OK" neben dem
-   * noch offenen Portal der ersten.
+   * Zeile 2 steht auf `ausser_dienst`: ihre Aktion ist dann „Wieder in Dienst" ohne Rückfrage —
+   * sonst stünde ein zweites „OK" neben dem offenen Portal der ersten.
    */
   it('sperrt beim Dienststatuswechsel NUR die betroffene Zeile', async () => {
     const gerufen: string[] = [];
@@ -129,11 +123,9 @@ describe('MaterialTab', () => {
   });
 
   /**
-   * Die Primäraktion ist seit LFH-346 · A3 SICHTBAR UND GESPERRT, die Zeilenaktionsspalte
-   * bleibt weg. Zwei Zuschnitte, bewusst: der eine Knopf im Kopf soll den Grund nennen
-   * können (M16 — ein fehlender Knopf ist von „diese Seite kann das gar nicht" nicht zu
-   * unterscheiden), n Zeilen × 2 Knöpfe wären dagegen eine Spalte toter Knöpfe, die
-   * waagerechten Platz für null Handlungsmöglichkeit kostet.
+   * Primäraktion SICHTBAR UND GESPERRT, Zeilenaktionsspalte weg (LFH-346): der Knopf im Kopf
+   * nennt über den Hinweis den Grund, n Zeilen × 2 gesperrte Knöpfe kosteten Platz für null
+   * Handlungsmöglichkeit.
    */
   it('Nicht-Admin sieht die Primäraktion gesperrt und keine Zeilenaktionen', async () => {
     render(nichtAdmin);
@@ -144,13 +136,11 @@ describe('MaterialTab', () => {
 
   it('die Freitextsuche verkleinert die Zeilenmenge', async () => {
     /**
-     * Gemessen wird die WIRKUNG, nicht die Anwesenheit des `suche`-Props. Ohne das Prop
-     * rendert `KatalogTabelle` gar kein Suchfeld — der Griff darauf scheitert dann schon
-     * am `null`, bevor eine Zeile gezählt wird.
+     * Gemessen wird die WIRKUNG, nicht die Anwesenheit des `suche`-Props: ohne das Prop gibt es
+     * kein Suchfeld, und der Griff fällt schon am `null`.
      *
-     * Gesucht wird über die Kategorie, nicht über die Bezeichnung: das belegt zugleich,
-     * dass die Suche mehr als die Leitspalte liest, und damit den Platzhalter
-     * „Bezeichnung oder Kategorie".
+     * Gesucht wird über die Kategorie: das belegt, dass die Suche mehr als die Leitspalte liest,
+     * und damit den Platzhalter „Bezeichnung oder Kategorie".
      */
     const { container } = render(admin, [
       material,
@@ -170,17 +160,14 @@ describe('MaterialTab', () => {
 
   it('der Statusfilter verkleinert die Zeilenmenge auf die gewählte Kategorie', async () => {
     /**
-     * Gemessen wird die WIRKUNG (Zeilenmenge schrumpft, und zwar auf die richtige Zeile),
-     * nicht die Anwesenheit von `filters`/`onFilter` — genau die Lücke, die eine
-     * Mutationsjagd hier gefunden hat: beide Eigenschaften entfernt, 32/32 grün. Zwei
-     * Posten mit verschiedenem Dienststatus sind das Mindeste, an dem ein Filter
-     * überhaupt etwas ändern kann.
+     * Gemessen wird die WIRKUNG (die Zeilenmenge schrumpft auf die richtige Zeile), nicht die
+     * Anwesenheit von `filters`/`onFilter`. Zwei Posten mit verschiedenem Dienststatus sind das
+     * Mindeste, an dem ein Filter etwas ändern kann.
      *
-     * Die Statusspalte trägt bewusst KEINEN `dataIndex` (Begründung am Produktivcode) —
-     * `onFilter` liest den Datensatz selbst. Dass das trägt, belegt diese Prüfung mit.
+     * Die Statusspalte trägt bewusst KEINEN `dataIndex` — `onFilter` liest den Datensatz selbst.
      *
      * `renderMitProviders` montiert `ConfigProvider` OHNE Locale — die Bestätigung im
-     * Filtermenü heißt daher „OK", in en_US wie in de_DE derselbe Text.
+     * Filtermenü heißt daher „OK".
      */
     const { container } = render(admin, [
       material,
@@ -190,16 +177,14 @@ describe('MaterialTab', () => {
     const zeilen = () => container.querySelectorAll('tr.ant-table-row');
     expect(zeilen()).toHaveLength(2);
 
-    // Erst der Griff, dann der Klick: ohne diese Zwischenprüfung meldete die Probe
-    // (Filter entfernt) erst zwölf Zeilen später ein leeres Filtermenü statt hier den
-    // fehlenden Auslöser — im Schwestertest `FahrzeugeTab` gemessen.
+    // Erst der Griff, dann der Klick: so meldet ein fehlender Filter sich hier statt erst am
+    // leeren Filtermenü.
     const ausloeser = container.querySelector<HTMLElement>('.ant-table-filter-trigger');
     expect(ausloeser, 'die Statusspalte muss einen Filter tragen').not.toBeNull();
     await userEvent.click(ausloeser!);
-    // Das Filtermenü hängt in einem Portal an `document.body`, nicht im Container. Die
-    // Auswahl wird DARIN gegriffen, und zwar zwingend: „außer Dienst" steht zu diesem
-    // Zeitpunkt auch als Etikett in der Statusspalte der zweiten Zeile — ein Griff über
-    // `screen` träfe zwei Knoten (`span.ant-tag` der Zeile gegen `span` des Eintrags).
+    // Das Filtermenü hängt in einem Portal an `document.body`. Die Auswahl wird DARIN gegriffen:
+    // „außer Dienst" steht auch als Etikett in der Statusspalte, ein Griff über `screen` träfe
+    // zwei Knoten.
     const menue = await waitFor(() => {
       const m = document.querySelector<HTMLElement>('.ant-table-filter-dropdown');
       expect(m).not.toBeNull();
@@ -214,23 +199,17 @@ describe('MaterialTab', () => {
 
   it('die Leitspalte sortiert numerisch, ohne die Serverreihenfolge zu verdrängen', async () => {
     /**
-     * Der Vorrat ist nach EINER Regel gewählt, und nur sie macht alle drei Aussagen
-     * tötbar:
+     * Der Vorrat folgt EINER Regel:
      *
      *   lexikografisch aufsteigend == Serverreihenfolge,
      *   numerisch aufsteigend      != Serverreihenfolge.
      *
-     * „B-Schlauch 20 m" vor „B-Schlauch 5 m" erfüllt beides: das Backend liefert
-     * `ORDER BY bezeichnung` (`src/material/repo.rs:54`) über SQLites BINARY-Vergleich,
-     * dort steht „2" vor „5". Daraus folgt:
+     * „B-Schlauch 20 m" vor „B-Schlauch 5 m" erfüllt beides (`ORDER BY bezeichnung`, SQLites
+     * BINARY-Vergleich). Daraus folgt:
      *
-     * 1. Die erste Erwartung pinnt, dass KEIN `defaultSortOrder` gesetzt ist — ein
-     *    aufsteigender Default zöge „5 m" nach oben.
-     * 2. Die zweite pinnt den `sorter` überhaupt; fehlt er, fällt schon der benannte
-     *    Griff auf den Sortierkopf.
-     * 3. Sie pinnt zugleich `{ numeric: true }` — rein lexikografisch bliebe „20 m"
-     *    vorn und die Reihenfolge unverändert. Genau der Fall, für den der
-     *    Produktivkommentar die Größenangabe als Begründung nennt.
+     * 1. Die erste Erwartung pinnt, dass KEIN `defaultSortOrder` gesetzt ist.
+     * 2. Die zweite pinnt den `sorter`; fehlt er, fällt schon der Griff auf den Sortierkopf.
+     * 3. Sie pinnt zugleich `{ numeric: true }` — rein lexikografisch bliebe „20 m" vorn.
      */
     const { container } = render(admin, [
       { ...material, id: 1, bezeichnung: 'B-Schlauch 20 m' },
@@ -241,8 +220,8 @@ describe('MaterialTab', () => {
 
     expect(ersteZeile()).toContain('B-Schlauch 20 m');
 
-    // Erst der Griff, dann der Klick: sonst meldet die Probe (`sorter` entfernt) einen
-    // null-Zugriff statt den fehlenden Sortierkopf.
+    // Erst der Griff, dann der Klick: sonst meldete ein fehlender `sorter` einen null-Zugriff
+    // statt den fehlenden Sortierkopf.
     const kopf = container.querySelector<HTMLElement>('th.ant-table-column-has-sorters');
     expect(kopf, 'die Leitspalte muss sortierbar sein').not.toBeNull();
     await userEvent.click(kopf!);
@@ -250,10 +229,9 @@ describe('MaterialTab', () => {
   });
 
   /**
-   * Das Partnerpaar zu AK4 (LFH-331 · B3). Die negative Hälfte allein belegte nichts:
-   * änderte man den Leertext beim Umbau, wäre sie auch im Leerfall trivial grün. Erst
-   * die positive Hälfte darunter — gleiches Literal, gleiche Datei — macht sie zu einer
-   * Aussage über die Zustandsweiche statt über die Schreibweise eines Strings.
+   * Partnerpaar zu AK4 (LFH-331): die negative Hälfte allein wäre auch im Leerfall trivial
+   * grün; erst die positive darunter mit demselben Literal macht sie zu einer Aussage über die
+   * Zustandsweiche.
    */
   it('zeigt bei gescheitertem Abruf den Fehler und NICHT den Leertext', async () => {
     server.use(

@@ -10,8 +10,8 @@ import PersonalTab from './PersonalTab';
 import { personalDetailPfad } from './stammdatenDetail';
 
 /**
- * LFH-346 · A7 — die Personal-Detailroute. Gegenstück zu `FahrzeugDetailPage.test.tsx`;
- * dieselben vier Aussagen, an der Personal-Feldmenge gemessen.
+ * Die Personal-Detailroute (LFH-346). Gegenstück zu `FahrzeugDetailPage.test.tsx`; dieselben
+ * vier Aussagen, an der Personal-Feldmenge gemessen.
  */
 
 const admin = {

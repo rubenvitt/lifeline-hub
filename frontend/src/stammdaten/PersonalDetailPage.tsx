@@ -37,13 +37,12 @@ interface FormWerte {
 }
 
 /**
- * Vollseite eines Personal-Stammdatensatzes (LFH-346 · A7, Befund H36) — Gegenstück zu
- * `FahrzeugDetailPage`, mit derselben Begründung und denselben zwei Festlegungen:
+ * Vollseite eines Personal-Stammdatensatzes (LFH-346) — Gegenstück zu `FahrzeugDetailPage`,
+ * mit denselben zwei Festlegungen:
  *
- * **Kein neuer Endpunkt.** `PersonalAnzeige` (`src/personal/mod.rs:64`) trägt jedes
- * editierbare Feld von `PersonalEingabe` — Name, Personalnummer, Trägerorganisation,
- * Telefon, Stärke-Position, Bemerkung, Benutzer-Konto und die Qualifikationen (als
- * `QualifikationRef` mit id). Es fehlt keins; ein Einzel-GET wäre eine Kopie der Liste.
+ * **Kein eigener Endpunkt.** `PersonalAnzeige` trägt jedes editierbare Feld von
+ * `PersonalEingabe` (Qualifikationen als `QualifikationRef` mit id); ein Einzel-GET wäre eine
+ * Kopie der Liste.
  *
  * **Derselbe Query-Key wie die Liste** (`personalListe('alle')`, nicht `personal()`) — nur
  * dann führt TanStack die beiden Abrufe zusammen; siehe `FahrzeugDetailPage`.
@@ -108,8 +107,8 @@ export default function PersonalDetailPage() {
   }
 
   const vorschlaege = vorschlaegeQuery.data ?? { traegerorganisation: [] };
-  // Aktive Qualifikationen + bereits zugeordnete (auch deaktivierte), damit eine
-  // deaktivierte Zuordnung sichtbar und erhaltbar bleibt — Bestandsverhalten der Maske.
+  // Aktive Qualifikationen + bereits zugeordnete (auch deaktivierte), damit eine deaktivierte
+  // Zuordnung sichtbar und erhaltbar bleibt.
   const aktive = qualQuery.data ?? [];
   const qualOptionen = [
     ...aktive.map((q) => ({ value: q.id, label: q.label })),
@@ -140,31 +139,23 @@ export default function PersonalDetailPage() {
           />
         }
       >
-        {/*
-          SEEDING NUR BEIM MOUNT — und `key={id}` fuer den Fall, dass dieselbe Seite auf
-          einen ANDEREN Datensatz umgehaengt wird (Link von Detail zu Detail): antds
-          `initialValues` wird genau einmal gelesen, ohne den Schluessel truege das
-          Formular die Werte des vorigen Satzes.
+        {/* SEEDING NUR BEIM MOUNT — und `key={id}` für den Wechsel auf einen ANDEREN Datensatz: antds
+           `initialValues` wird genau einmal gelesen, ohne den Schlüssel trüge das Formular die Werte
+           des vorigen Satzes.
 
-          UND DESHALB STEHT HIER KEIN `Form.useForm()` (LFH-346, Review-Befund, gemessen).
-          Der Schluessel allein reicht NICHT: eine in der Seite gehaltene Instanz liegt
-          AUSSERHALB des gekeyten Teilbaums, ihr rc-field-form-Speicher ueberlebt den
-          Remount und gewinnt gegen die neuen `initialValues` (`preserve` ist per Vorgabe
-          an) — dieselbe Mechanik, die CLAUDE.md fuer `destroyOnHidden` beschreibt.
-          Ohne die Instanz legt `<Form>` seinen Speicher je `key` selbst an.
+           UND DESHALB STEHT HIER KEIN `Form.useForm()`. Der Schlüssel allein reicht NICHT: eine in der
+           Seite gehaltene Instanz liegt AUSSERHALB des gekeyten Teilbaums, ihr rc-field-form-Speicher
+           überlebt den Remount und gewinnt gegen die neuen `initialValues` (`preserve` ist per
+           Vorgabe an). Ohne die Instanz legt `<Form>` seinen Speicher je `key` selbst an.
 
-          Wer hier `form.validateFields()` o. ae. braucht, holt sich mit `const [form]`
-          den Fehler zurueck — dann ist `key={id}` wieder wirkungslos, und ALLE Tests
-          bleiben gruen ausser „traegt nach dem Wechsel auf einen anderen Datensatz
-          DESSEN Werte". Der Absende-Knopf braucht die Instanz nicht: er liegt als
-          `htmlType="submit"` IM `<form>`.
+           Wer hier `form.validateFields()` o. ä. braucht, holt mit `const [form]` den Fehler zurück —
+           dann ist `key={id}` wirkungslos, und nur „trägt nach dem Wechsel auf einen anderen
+           Datensatz DESSEN Werte" wird rot. Der Absende-Knopf braucht die Instanz nicht: er liegt als
+           `htmlType="submit"` IM `<form>`.
 
-          Ein Effekt, der bei jeder Query-Aenderung `setFieldsValue` ruft, stand hier
-          zunaechst und ist WEG: die Query wird auch von FREMDEN Aenderungen invalidiert,
-          und wer gerade schrieb, saehe seinen Text ohne Vorwarnung ersetzt (LFH-342 · C7,
-          derselbe Befund). Noetig war er ohnehin nicht — die Rueckgaben oben stellen
-          sicher, dass das Formular erst mit vorhandenem Datensatz montiert.
-        */}
+           Ein Effekt, der bei jeder Query-Änderung `setFieldsValue` ruft, gehört NICHT hierher: die
+           Query wird auch von FREMDEN Änderungen invalidiert und ersetzte den gerade getippten Text.
+           Die Rückgaben oben stellen sicher, dass das Formular erst mit vorhandenem Datensatz montiert. */}
         <Form<FormWerte>
           key={id}
           layout="vertical"

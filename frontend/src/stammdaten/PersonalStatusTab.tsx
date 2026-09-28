@@ -47,10 +47,9 @@ export default function PersonalStatusTab() {
   const qc = useQueryClient();
   const { message } = App.useApp();
   const [form] = Form.useForm<FormWerte>();
-  // Der Offen-Zustand des Dialogs IST der zu bearbeitende Datensatz (LFH-332 · B4):
-  // seit das Anlegen in der Schnellerfassung sitzt, gibt es kein „offen ohne
-  // Datensatz" mehr. Ein zweites `modalOffen` daneben könnte nur noch von diesem
-  // hier abweichen.
+  // Der Offen-Zustand des Dialogs IST der zu bearbeitende Datensatz: angelegt wird in der
+  // Schnellerfassung, ein „offen ohne Datensatz" gibt es nicht. Ein zweites `modalOffen`
+  // könnte nur von diesem abweichen.
   const [bearbeite, setBearbeite] = useState<PersonalStatus | null>(null);
 
   const statusQuery = useQuery({
@@ -74,13 +73,9 @@ export default function PersonalStatusTab() {
   });
 
   /**
-   * Schnellerfassung (LFH-332 · B4, Befund M43). Pflicht ist allein das Label.
-   * `kategorie: 'gebunden'` und `sortier: 0` sind keine erfundenen Werte, sondern
-   * byte-genau die Vorbelegung, die der gestrichene Anlege-Zweig des Dialogs
-   * gesetzt hat (`form.setFieldsValue({ kategorie: 'gebunden', sortier: 0 })`);
-   * `farbe: null` entspricht dem leeren Feld, das dieser Zweig ebenfalls
-   * hinterliess (`leerZuNull(undefined)`). Kategorie, Farbe und Reihenfolge trägt
-   * man bei Bedarf im Bearbeiten-Dialog nach.
+   * Schnellerfassung (LFH-332). Pflicht ist allein das Label; `kategorie: 'gebunden'`,
+   * `sortier: 0` und `farbe: null` sind die Vorbelegung des Bearbeiten-Dialogs, keine
+   * erfundenen Werte. Den Rest trägt man bei Bedarf im Dialog nach.
    *
    * KEINE Erfolgsmeldung: die neue Zeile in der Tabelle ist die Rückmeldung.
    */
@@ -98,9 +93,8 @@ export default function PersonalStatusTab() {
       message.error(e instanceof ApiError ? e.message : 'Deaktivieren fehlgeschlagen'),
   });
 
-  // VORBELEGUNG, kein Zurücksetzen (LFH-332 · B4, Regel 3): das Leeren macht
-  // `ErfassungsModal` auf allen vier Auswegen selbst. Ein Reset hier wäre doppelt
-  // und verdeckte, ob die Hülle ihre Zusicherung überhaupt einlöst.
+  // VORBELEGUNG, kein Zurücksetzen: das Leeren macht `ErfassungsModal` auf allen vier Auswegen
+  // selbst. Ein Reset hier wäre doppelt und verdeckte, ob die Hülle ihre Zusicherung einlöst.
   useEffect(() => {
     if (bearbeite) {
       form.setFieldsValue({
@@ -118,9 +112,8 @@ export default function PersonalStatusTab() {
       dataIndex: 'label',
       key: 'label',
       /**
-       * Leitspalte: an ihr sucht ein Mensch den Status. Kein `defaultSortOrder` — die
-       * fachliche Reihenfolge ist `sortier` und kommt vom Server
-       * (`src/personal/status_repo.rs:42` — `ORDER BY sortier, id`); sie bleibt der
+       * Leitspalte: an ihr sucht ein Mensch den Status. Kein `defaultSortOrder` — die fachliche
+       * Reihenfolge ist `sortier` und kommt vom Server (`ORDER BY sortier, id`); sie bleibt der
        * Einstieg, das Alphabet ist ein Angebot.
        */
       sorter: (a, b) => a.label.localeCompare(b.label, 'de'),
@@ -130,12 +123,10 @@ export default function PersonalStatusTab() {
       dataIndex: 'kategorie',
       key: 'kategorie',
       /**
-       * Die Filterwerte kommen aus derselben Quelle wie die Anzeige (`theme/statusFarben`),
-       * damit eine neue Kategorie nicht an zwei Stellen nachgetragen werden muss. Der
-       * gefilterte Wert ist der DRAHTWERT (`nicht_verfuegbar`), der angezeigte Text sein
-       * Label — genau deshalb ist die Kategorie hier ein Filter und steht nicht im
-       * Suchplatzhalter: die Freitextsuche des Primitivs liest Rohwerte, „nicht verfügbar"
-       * fände dort nichts.
+       * Die Filterwerte kommen aus derselben Quelle wie die Anzeige (`theme/statusFarben`). Der
+       * gefilterte Wert ist der DRAHTWERT (`nicht_verfuegbar`), der angezeigte sein Label — deshalb
+       * ist die Kategorie ein Filter und steht nicht im Suchplatzhalter: die Freitextsuche liest
+       * Rohwerte, „nicht verfügbar" fände dort nichts.
        */
       filters: (Object.keys(statusKategorie) as StatusKategorie[]).map((k) => ({
         text: statusKategorie[k].label,
@@ -185,19 +176,13 @@ export default function PersonalStatusTab() {
       titel="Personal-Status"
       hinweis={<SeitenHinweise rechteFehlt={!istAdmin} rechteText={STAMMDATEN_RECHTE_TEXT} />}
     >
-      {/* KEIN `aktionen`-Slot (LFH-346 · A3): der Anlegen-Weg dieser Sektion ist die
-        SchnellAnlegen Schnellerfassungszeile am Inhalt. Ein zweiter Knopf im Kopf wären
-        zwei Primäraktionen für dieselbe Sache — und der Dialog, den er öffnete, wäre für
-        einen Katalog, der am Stück gepflegt wird, das falsche Werkzeug. */}
-      {/* Die Schnellerfassung steht ÜBER der Tabelle — dort, wo bis LFH-332 der Knopf
-          „Status anlegen" stand, und bewusst AUSSERHALB der Fehlerweiche darunter: ein
-          gescheiterter Abruf der Liste ist kein Grund, die einzige Schreibmöglichkeit
-          der Seite verschwinden zu lassen. */}
-      {/* Die Zeile steht IMMER, auch ohne Recht — dann gesperrt (LFH-346,
-          Nacharbeit zu Befund M45). Sie zu verstecken war die vierte Ausprägung
-          von „nur lesen", die M45 abschaffen sollte: ein fehlender Knopf ist von
-          „diese Seite kann das gar nicht" nicht zu unterscheiden. Den Grund nennt
-          der `RechteHinweis` im `hinweis`-Slot darüber. */}
+      {/* KEIN `aktionen`-Slot: der Anlegen-Weg ist die Schnellerfassungszeile am Inhalt. Ein zweiter
+         Knopf im Kopf wären zwei Primäraktionen für dieselbe Sache. */}
+      {/* Die Schnellerfassung steht ÜBER der Tabelle und AUSSERHALB der Fehlerweiche: ein
+         gescheiterter Abruf der Liste ist kein Grund, die einzige Schreibmöglichkeit der Seite
+         verschwinden zu lassen. */}
+      {/* Die Zeile steht IMMER, ohne Recht gesperrt: ein fehlender Knopf ist von „diese Seite kann
+         das gar nicht" nicht zu unterscheiden. Den Grund nennt der `RechteHinweis` im `hinweis`-Slot. */}
       <SchnellAnlegen
         beschriftung="Neuer Personal-Status"
         platzhalter="z. B. dienstbereit"
@@ -206,11 +191,9 @@ export default function PersonalStatusTab() {
         laeuft={schnellAnlegen.isPending}
         gesperrt={!istAdmin}
       />
-      {/* Der Fehler tauscht die Tabelle aus, statt durch sie hindurchgereicht zu werden
-          (LFH-331 · B3): `Datensicht` führt den Kartenzweig an `Liste`, und `ListeProps`
-          kennt keinen Fehlerbegriff — ein Prop am Tabellen-Primitiv wirkte nur in einer
-          der beiden Formen. Ohne diese Weiche behauptet „Kein Status" auch dann einen
-          leeren Katalog, wenn bloß die Verbindung abgerissen ist. */}
+      {/* Der Fehler tauscht die Tabelle aus (LFH-331): `Datensicht` führt den Kartenzweig an
+         `Liste`, und `ListeProps` kennt keinen Fehlerbegriff. Ohne diese Weiche behauptete „Kein
+         Status" einen leeren Katalog, wenn bloß die Verbindung abgerissen ist. */}
       {statusQuery.isError ? (
         <SeitenFehler
           text="Personal-Status konnte nicht geladen werden"
@@ -232,22 +215,17 @@ export default function PersonalStatusTab() {
           locale={{ emptyText: 'Kein Status' }}
         />
       )}
-      {/* Nur noch Bearbeiten (LFH-332 · B4). Angelegt wird über die Zeile oben.
-
-          Auf der Hülle seit LFH-346 · A6: der Absende-Knopf liegt damit IM `<form>`,
-          also sendet Enter ab (Befund H69) — vorher stand er in antds Fusszeile und
-          war ein DOM-Geschwister ausserhalb. KEIN `serie`: hier wird bearbeitet,
-          nicht in Serie erfasst. Die Feldzahl bleibt unverändert. */}
+      {/* Nur Bearbeiten; angelegt wird über die Zeile oben. Auf der Hülle, damit der Absende-Knopf IM
+         `<form>` liegt und Enter absendet. KEIN `serie`: hier wird bearbeitet. */}
       <ErfassungsModal<FormWerte>
         offen={bearbeite !== null}
         titel="Status bearbeiten"
         form={form}
         erfassenText="Speichern"
         laeuft={speichern.isPending}
-        // `mutateAsync`, nicht `mutate`: bei Ablehnung MUSS die Zusage brechen,
-        // sonst leert die Hülle die Felder, obwohl der Datensatz nie ankam. Der
-        // Wurf im Leerfall ist derselbe Gedanke — ein stilles `return` läse sich
-        // für die Hülle als Erfolg und schlösse den Dialog ohne Request.
+        // `mutateAsync`, nicht `mutate`: bei Ablehnung MUSS die Zusage brechen, sonst leert die Hülle
+        // die Felder, obwohl der Datensatz nie ankam. Ein stilles `return` im Leerfall läse sich als
+        // Erfolg und schlösse den Dialog ohne Request.
         onErfassen={async (w) => {
           if (!bearbeite) throw new Error('Kein Datensatz zum Bearbeiten');
           await speichern.mutateAsync({ id: bearbeite.id, werte: w });
