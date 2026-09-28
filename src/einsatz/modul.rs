@@ -127,6 +127,7 @@ modul_marker! {
     Unfallhilfsstellen => "unfallhilfsstellen",
     Gefahrenzonen => "gefahrenzonen",
     Einsatzabschnitte => "einsatzabschnitte",
+    Personen => "personen",
     Einheiten => "einheiten",
 }
 
@@ -159,6 +160,7 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
         "/api/einsaetze/{id}/personen/{pid}/uhs-belegung",
         Some("unfallhilfsstellen"),
     ),
+    ("/api/einsaetze/{id}/personen", Some("personen")),
     ("/api/einsaetze/{id}/einheiten", Some("einheiten")),
     ("/api/einsaetze/{id}/gefahrengebiete", Some("gefahrenzonen")),
     ("/api/einsaetze/{id}/abschnitte", Some("einsatzabschnitte")),
@@ -320,8 +322,8 @@ mod tests {
             key_fuer_pfad("/api/einsaetze/{id}/pegel/verlauf"),
             Some(None)
         );
-        // Noch DEFERRED / nicht registriert.
-        assert_eq!(key_fuer_pfad("/api/einsaetze/{id}/personen"), None);
+        // Nicht registriert.
+        assert_eq!(key_fuer_pfad("/api/einsaetze/{id}/unbekannt"), None);
     }
 
     #[test]

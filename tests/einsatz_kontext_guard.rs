@@ -30,7 +30,6 @@ use std::fs;
 /// einsatz-Routen: den Gate-Extractor ziehen (nicht eintragen).
 const DEFERRED_MODULE: &[&str] = &[
     "einsatz",
-    "einsatz_person",
     "chat",
     "etb",
     "befehl",
@@ -47,6 +46,7 @@ const SANKTIONIERTE_GATES: &[&str] = &[
     "EinsatzLesezugriff",
     "EinsatzSchreibzugriff",
     "EinsatzSchreibfreigabe",
+    "EinsatzLeitungszugriff",
 ];
 
 /// Handler, die BEWUSST nur den Org-Floor (`EinsatzKontext`) ziehen, ohne Read-/Write-
