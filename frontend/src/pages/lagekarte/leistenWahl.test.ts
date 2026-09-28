@@ -46,14 +46,14 @@ describe('useLeistenWahl (LFH-715)', () => {
     const { result, rerender } = renderHook(({ breit }) => useLeistenWahl(breit), {
       initialProps: { breit: true },
     });
-    expect(result.current.gemerkt).toBe(false);
+    expect(result.current.wahl).toBe(false);
     rerender({ breit: false });
-    expect(result.current.gemerkt).toBe(true);
+    expect(result.current.wahl).toBe(true);
   });
 
   it('ohne Eintrag ist nichts gewählt, und das Einhängen schreibt nichts', () => {
     const { result } = renderHook(() => useLeistenWahl(true));
-    expect(result.current.gemerkt).toBeNull();
+    expect(result.current.wahl).toBeNull();
     expect(localStorage.getItem(LEISTE_SPEICHER_SCHLUESSEL.breit)).toBeNull();
     expect(localStorage.getItem(LEISTE_SPEICHER_SCHLUESSEL.schmal)).toBeNull();
   });
@@ -63,20 +63,48 @@ describe('useLeistenWahl (LFH-715)', () => {
       initialProps: { breit: true },
     });
     act(() => result.current.merke(false));
-    expect(result.current.gemerkt).toBe(false);
+    expect(result.current.wahl).toBe(false);
     expect(localStorage.getItem(LEISTE_SPEICHER_SCHLUESSEL.breit)).toBe('0');
     expect(localStorage.getItem(LEISTE_SPEICHER_SCHLUESSEL.schmal)).toBeNull();
 
     rerender({ breit: false });
-    expect(result.current.gemerkt).toBeNull();
+    expect(result.current.wahl).toBeNull();
     act(() => result.current.merke(true));
     expect(localStorage.getItem(LEISTE_SPEICHER_SCHLUESSEL.schmal)).toBe('1');
     expect(localStorage.getItem(LEISTE_SPEICHER_SCHLUESSEL.breit)).toBe('0');
   });
 
+  it('`zeige` öffnet nur für die Sitzung: nichts gespeichert, nach dem Neuladen gilt die Wahl', () => {
+    localStorage.setItem(LEISTE_SPEICHER_SCHLUESSEL.breit, '0');
+    const erst = renderHook(() => useLeistenWahl(true));
+    act(() => erst.result.current.zeige());
+    expect(erst.result.current.wahl).toBe(true);
+    expect(localStorage.getItem(LEISTE_SPEICHER_SCHLUESSEL.breit)).toBe('0');
+    erst.unmount();
+    expect(renderHook(() => useLeistenWahl(true)).result.current.wahl).toBe(false);
+  });
+
+  it('nach `zeige` gewinnt das nächste eigene Umschalten', () => {
+    const { result } = renderHook(() => useLeistenWahl(true));
+    act(() => result.current.zeige());
+    act(() => result.current.merke(false));
+    expect(result.current.wahl).toBe(false);
+    expect(localStorage.getItem(LEISTE_SPEICHER_SCHLUESSEL.breit)).toBe('0');
+  });
+
+  it('`zeige` gilt nur in der Klasse, in der es geschah', () => {
+    localStorage.setItem(LEISTE_SPEICHER_SCHLUESSEL.schmal, '0');
+    const { result, rerender } = renderHook(({ breit }) => useLeistenWahl(breit), {
+      initialProps: { breit: true },
+    });
+    act(() => result.current.zeige());
+    rerender({ breit: false });
+    expect(result.current.wahl).toBe(false);
+  });
+
   it('ein unlesbarer Eintrag gilt als keine Wahl', () => {
     localStorage.setItem(LEISTE_SPEICHER_SCHLUESSEL.breit, 'kaputt');
     const { result } = renderHook(() => useLeistenWahl(true));
-    expect(result.current.gemerkt).toBeNull();
+    expect(result.current.wahl).toBeNull();
   });
 });

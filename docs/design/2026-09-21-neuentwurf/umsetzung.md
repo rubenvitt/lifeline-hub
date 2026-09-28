@@ -184,7 +184,7 @@ Auftraggebers:
 - Die Lagekarte zeigt „Letzte Meldung“ im taktischen Zeitformat (`1411`) wie der Rest des
   Paneels, nicht `14:11` wie im Entwurf.
 
-## Kartenleiste am Fükw ausblendbar (LFH-715, 25.09.2026)
+## Kartenleiste am Fükw ausblendbar (LFH-715, 25. und 28.09.2026)
 
 Abweichung vom Entwurf S5, dort steht die rechte Kartenleiste ab `lg` fest neben der Karte.
 Entscheidung des Auftraggebers:
@@ -204,3 +204,7 @@ Entscheidung des Auftraggebers:
 - Eine Auswahl auf der Karte holt die Leiste zurück wie bisher. Ebenso ein laufender
   Platzier-Modus (Objekt, Bild, Zeichen), denn sein einziger „Abbrechen“-Knopf steht in der
   Leiste. Solange einer der beiden gilt, ist der Knopf gesperrt und nennt den Grund.
+- Der Stift über der Karte öffnet eine ausgeblendete Leiste samt Paneel „Zeichnen“ **nur für
+  die Sitzung**. Gemerkt wird allein das eigene Umschalten.
+- Ausgeblendet bleibt die Leiste montiert (`hidden`). Abgehängt verlöre sie Zeichen-Entwurf,
+  Suche und Rollposition.

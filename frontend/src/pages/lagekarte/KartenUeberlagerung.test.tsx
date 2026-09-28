@@ -106,8 +106,10 @@ describe('KartenUeberlagerung — Knopfblock', () => {
       />,
     );
     const knopf = screen.getByRole('button', { name: 'Leiste ausblenden' });
-    expect(knopf).toBeDisabled();
-    expect(knopf).toHaveAttribute('title', 'Auswahl schließen');
+    // Fokussierbar gesperrt: der Grund bleibt für Tastatur und Vorlesende erreichbar.
+    expect(knopf).not.toBeDisabled();
+    expect(knopf).toHaveAttribute('aria-disabled', 'true');
+    expect(knopf).toHaveAccessibleDescription('Auswahl schließen');
     fireEvent.click(knopf);
     expect(onUmschalten).not.toHaveBeenCalled();
   });

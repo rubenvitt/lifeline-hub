@@ -48,19 +48,30 @@ function lesen(klasse: LeistenKlasse): boolean | null {
 }
 
 /**
- * Gemerkte Wahl der aktuellen Breitenklasse. Beide Plätze werden beim Einhängen gelesen und je
- * Render nach der aktuellen Klasse gewählt: `abBreite('lg')` meldet im ersten Render „breit",
- * solange die Breite unbekannt ist — ein einzelner, beim Einhängen gefüllter Zustand läse auf
- * dem Handschirm den `lg`-Platz. Das Einhängen schreibt nichts, sonst würde die Vorgabe zur Wahl.
+ * Wahl der aktuellen Breitenklasse. Beide Plätze werden beim Einhängen gelesen und je Render
+ * nach der aktuellen Klasse gewählt: `abBreite('lg')` meldet im ersten Render „breit", solange
+ * die Breite unbekannt ist — ein einzelner, beim Einhängen gefüllter Zustand läse auf dem
+ * Handschirm den `lg`-Platz. Das Einhängen schreibt nichts, sonst würde die Vorgabe zur Wahl.
+ *
+ * Zwei Wege, die Leiste zu öffnen: `merke` ist das eigene Umschalten und wird gespeichert.
+ * `zeige` öffnet sie nur für diese Sitzung, für eine Handlung, die die Leiste braucht (der
+ * Stift über der Karte öffnet das Paneel „Zeichnen"). Gespeichert, machte ein einziger
+ * Stiftklick die Leiste am Handschirm nach jedem Neuladen wieder auf. Das nächste `merke`
+ * löst `zeige` ab.
  */
 export function useLeistenWahl(breit: boolean) {
   const [plaetze, setPlaetze] = useState<Record<LeistenKlasse, boolean | null>>(() => ({
     breit: lesen('breit'),
     schmal: lesen('schmal'),
   }));
+  const [gezeigt, setGezeigt] = useState<Record<LeistenKlasse, boolean>>({
+    breit: false,
+    schmal: false,
+  });
   const klasse: LeistenKlasse = breit ? 'breit' : 'schmal';
   const merke = useCallback(
     (offen: boolean) => {
+      setGezeigt((alt) => (alt[klasse] ? { ...alt, [klasse]: false } : alt));
       setPlaetze((alt) => (alt[klasse] === offen ? alt : { ...alt, [klasse]: offen }));
       try {
         localStorage.setItem(LEISTE_SPEICHER_SCHLUESSEL[klasse], offen ? '1' : '0');
@@ -70,5 +81,9 @@ export function useLeistenWahl(breit: boolean) {
     },
     [klasse],
   );
-  return { gemerkt: plaetze[klasse], merke };
+  const zeige = useCallback(
+    () => setGezeigt((alt) => (alt[klasse] ? alt : { ...alt, [klasse]: true })),
+    [klasse],
+  );
+  return { wahl: gezeigt[klasse] ? true : plaetze[klasse], merke, zeige };
 }

@@ -704,7 +704,7 @@ export default function LagekartePage() {
     bildPlatzierenId != null ||
     zeichenPlatzieren != null;
   const leisteIstSichtbar = leisteSichtbar({
-    gemerkt: leistenWahl.gemerkt,
+    gemerkt: leistenWahl.wahl,
     breit,
     istSchmal,
     erzwungen: leisteErzwungen,
@@ -840,7 +840,7 @@ export default function LagekartePage() {
         onZeichnen={
           darfSchreiben
             ? () => {
-                leistenWahl.merke(true);
+                leistenWahl.zeige();
                 setZeichnenAnfrage((n) => n + 1);
               }
             : undefined
@@ -934,21 +934,28 @@ export default function LagekartePage() {
     <aside
       id="lagekarte-leiste"
       aria-label="Kartenleiste"
+      // Ausgeblendet bleibt die Leiste MONTIERT (LFH-715, Review): abgehängt verlöre die
+      // Sidebar ihren Zustand (Zeichen-Entwurf, Suche, Rollposition), und ihr Effekt auf
+      // `zeichnenAnfrage` feuerte beim Wiedereinhängen erneut — eine spätere Auswahl klappte
+      // dann „Zeichnen" auf und rollte die Leiste vom Inspector weg.
+      hidden={!leisteIstSichtbar}
       style={
-        breit
-          ? {
-              width: LEISTE_BREITE,
-              flex: `0 0 ${LEISTE_BREITE}px`,
-              minHeight: 0,
-              borderInlineStart: `1px solid ${farben.linie}`,
-            }
-          : {
-              // Unter `lg`: unterer Bereich. Höchstens die halbe Fläche — die Karte bleibt
-              // die Hauptsache und auf 390 px bedienbar; die Leiste scrollt in sich.
-              flex: '0 0 45%',
-              minHeight: 0,
-              borderBlockStart: `1px solid ${farben.linie}`,
-            }
+        !leisteIstSichtbar
+          ? { display: 'none' }
+          : breit
+            ? {
+                width: LEISTE_BREITE,
+                flex: `0 0 ${LEISTE_BREITE}px`,
+                minHeight: 0,
+                borderInlineStart: `1px solid ${farben.linie}`,
+              }
+            : {
+                // Unter `lg`: unterer Bereich. Höchstens die halbe Fläche — die Karte bleibt
+                // die Hauptsache und auf 390 px bedienbar; die Leiste scrollt in sich.
+                flex: '0 0 45%',
+                minHeight: 0,
+                borderBlockStart: `1px solid ${farben.linie}`,
+              }
       }
     >
       <Sidebar
@@ -1106,7 +1113,7 @@ export default function LagekartePage() {
           }}
         >
           {karte}
-          {leisteIstSichtbar && leiste}
+          {leiste}
         </div>
       </div>
     </FensterRahmen>

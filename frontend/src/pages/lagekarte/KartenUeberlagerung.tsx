@@ -198,7 +198,12 @@ function Kartenknopf({
   /** Gesetzt = Auf-/Zu-Schalter einer Fläche (`aria-expanded`), die `steuert` benennt. */
   ausgeklappt?: boolean;
   steuert?: string;
-  /** Gesetzt = gesperrt; der Grund steht im `title`, der Name bleibt die Handlung. */
+  /**
+   * Gesetzt = gesperrt. `aria-disabled` statt `disabled`: der Knopf bleibt in der Tab-Folge, und
+   * der Grund im `title` erreicht als Beschreibung auch Tastatur und Vorlesende — ein natives
+   * `disabled` nähme ihn aus der Folge, übrig bliebe ein grauer Knopf ohne Grund. Der Name bleibt
+   * die Handlung.
+   */
   sperrGrund?: string | null;
   children: ReactNode;
 }) {
@@ -209,9 +214,9 @@ function Kartenknopf({
       aria-pressed={gedrueckt}
       aria-expanded={ausgeklappt}
       aria-controls={steuert}
-      disabled={sperrGrund != null}
+      aria-disabled={sperrGrund != null ? true : undefined}
       title={sperrGrund ?? beschriftung}
-      onClick={onClick}
+      onClick={sperrGrund != null ? undefined : onClick}
       className="lfh-kartenknopf"
       style={{
         width: kante,
@@ -222,7 +227,7 @@ function Kartenknopf({
         padding: 0,
         margin: 0,
         border: 0,
-        // Gesperrt: Farbe und Zeiger aus `.lfh-kartenknopf:disabled` (`lagekarte.css`) — ein
+        // Gesperrt: Farbe und Zeiger aus `.lfh-kartenknopf[aria-disabled]` (`lagekarte.css`) — ein
         // Inline-Wert schlüge die Regel, und der Knopf sähe bedienbar aus.
         ...(sperrGrund != null ? {} : { color: farbe, cursor: 'pointer' }),
       }}

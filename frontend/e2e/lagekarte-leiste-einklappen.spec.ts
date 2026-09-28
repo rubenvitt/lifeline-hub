@@ -120,3 +120,26 @@ test('Die Wahl ist je Breitenklasse gemerkt: lg und darunter getrennt', async ({
   await page.setViewportSize(FUEKW);
   await expect(leiste(page)).toHaveCount(0);
 });
+
+test('Der Stift öffnet die ausgeblendete Leiste samt „Zeichnen“, aber nur für die Sitzung', async ({
+  page,
+}) => {
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page);
+  await page.setViewportSize(FUEKW);
+  await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
+  await karteBereit(page);
+  await page.getByRole('button', { name: 'Leiste ausblenden' }).click();
+  await expect(leiste(page)).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Zeichenwerkzeuge' }).click();
+  await expect(leiste(page)).toBeVisible();
+  await expect(
+    leiste(page).locator('[data-paneel="zeichnen"] button[aria-expanded]').first(),
+  ).toHaveAttribute('aria-expanded', 'true');
+
+  // Nicht gespeichert: nach dem Neuladen gilt wieder das eigene Ausblenden.
+  await page.reload();
+  await karteBereit(page);
+  await expect(leiste(page)).toHaveCount(0);
+});
