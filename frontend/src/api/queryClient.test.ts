@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, NetzFehler } from './client';
 import { erzeugeQueryClient } from './queryClient';
+import { einsatzKeys } from './queryKeys';
+import { HOECHSTLIEGEZEIT_MS } from '../offline/lagebildStart';
 import { SITZUNG_ABGELAUFEN, sitzungsMeldungZuruecksetzen } from '../auth/sitzungsEvent';
 
 afterEach(() => sitzungsMeldungZuruecksetzen());
@@ -100,5 +102,25 @@ describe('erzeugeQueryClient — Produktionsdefaults', () => {
 
   it('wiederholt Mutationen nie automatisch', () => {
     expect(erzeugeQueryClient().getDefaultOptions().mutations?.retry).toBe(0);
+  });
+});
+
+describe('erzeugeQueryClient — Liegezeit der Lagebild-Allowlist (LFH-723, design.md D8)', () => {
+  it('hält gelistete Keys so lange im Speicher, wie sie auf der Platte liegen dürfen', () => {
+    const client = erzeugeQueryClient();
+    expect(client.getQueryDefaults(einsatzKeys.etbListe(7, {})).gcTime).toBe(HOECHSTLIEGEZEIT_MS);
+    expect(client.getQueryDefaults(einsatzKeys.personen(7)).gcTime).toBe(HOECHSTLIEGEZEIT_MS);
+    expect(client.getQueryDefaults(['karte-config']).gcTime).toBe(HOECHSTLIEGEZEIT_MS);
+  });
+
+  it('lässt ungelistete Keys beim Vorgabewert', () => {
+    const client = erzeugeQueryClient();
+    expect(client.getQueryDefaults(einsatzKeys.chatNachrichten(7)).gcTime).toBeUndefined();
+    expect(client.getQueryDefaults(['benutzer']).gcTime).toBeUndefined();
+  });
+
+  it('setzt nichts, wenn eigene defaultOptions übergeben werden (Testclient)', () => {
+    const client = erzeugeQueryClient({ queries: { gcTime: 0 } });
+    expect(client.getQueryDefaults(einsatzKeys.personen(7)).gcTime).toBeUndefined();
   });
 });

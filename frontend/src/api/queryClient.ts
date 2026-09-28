@@ -1,6 +1,8 @@
 import { MutationCache, QueryCache, QueryClient, type DefaultOptions } from '@tanstack/react-query';
 import { ApiError, NetzFehler } from './client';
 import { meldeSitzungAbgelaufen } from '../auth/sitzungsEvent';
+import { LAGEBILD_OFFLINE } from './queryKeys';
+import { HOECHSTLIEGEZEIT_MS } from '../offline/lagebildStart';
 
 /** Produktionsdefaults an einem importierbaren Seam statt versteckt in `main.tsx`.
  *  Nur reine Query-Pfade dürfen einen Leitungsfehler zweimal wiederholen; fachliche
@@ -44,9 +46,35 @@ function behandleFehler(fehler: unknown): void {
 export function erzeugeQueryClient(
   defaultOptions: DefaultOptions = queryClientDefaults,
 ): QueryClient {
-  return new QueryClient({
+  const client = new QueryClient({
     defaultOptions,
     queryCache: new QueryCache({ onError: behandleFehler }),
     mutationCache: new MutationCache({ onError: behandleFehler }),
   });
+  if (defaultOptions === queryClientDefaults) lagebildLiegezeitSetzen(client);
+  return client;
+}
+
+/**
+ * Die Keys der Lagebild-Allowlist bleiben so lange im Speicher, wie sie auf der Platte liegen
+ * dürfen (LFH-723, design.md D8). Beim Vorgabewert von 5 min räumte der Speicher eine
+ * wiederhergestellte, gerade nicht beobachtete Query ab, und die nächste Speicherung nähme sie
+ * auch von der Platte — wer die Lagekarte offen hat, verlöre den ETB-Stand.
+ *
+ * Die Rückmeldungen sind ein Sub-Key: `setQueryDefaults` matcht per Prefix, die Einsatz-ID
+ * steht an Stelle 1, also trägt der ganze Meldungs-Prefix die lange Liegezeit — im Speicher,
+ * nicht auf der Platte (das entscheidet der Dehydrier-Filter).
+ *
+ * Nur mit den Produktionsdefaults: ein Testclient (`test/utils.tsx`, `gcTime: 0`) bleibt
+ * unberührt, sonst hielte er Einträge zwischen Tests fest.
+ */
+function lagebildLiegezeitSetzen(client: QueryClient): void {
+  const prefixe = [
+    ...LAGEBILD_OFFLINE.einsatz,
+    ...LAGEBILD_OFFLINE.global,
+    ...LAGEBILD_OFFLINE.einsatzUnterKeys.map(([prefix]) => prefix),
+  ];
+  for (const prefix of prefixe) {
+    client.setQueryDefaults([prefix], { gcTime: HOECHSTLIEGEZEIT_MS });
+  }
 }

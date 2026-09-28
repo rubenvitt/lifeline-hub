@@ -18,9 +18,9 @@ Aussage sie belegen.
 
 ## 3. Bestätigung, Liegezeit und `gcTime`
 
-- [ ] 3.1 `HOECHSTLIEGEZEIT_MS` (24 h) und die reine `startEntscheidung(meErgebnis, datensatz, jetzt, buster)` nach der Tabelle in design.md D2. Prüfen: ein Vitest-Fall je Tabellenzeile, dazu die Grenze genau 24 h (noch gültig) gegen 24 h + 1 ms (verworfen).
-- [ ] 3.2 Den Bestätigungs-Tracker am QueryCache bauen: `bestaetigtAt` bewegt sich nur bei `success` ohne `manual` (design.md D4). Prüfen: Vitest. Ein Fetch-Erfolg bewegt den Zeitstempel. `setQueryData` bewegt ihn **nicht**. `hydrate` bewegt ihn **nicht**. Mutationsprobe: Ohne `manual`-Prüfung wird der zweite Fall rot.
-- [ ] 3.3 `erzeugeQueryClient` setzt für jeden Allowlist-Prefix `gcTime = HOECHSTLIEGEZEIT_MS`, aber nur mit Produktions-Defaults (design.md D8). Prüfen: `api/queryClient.test.ts` pinnt den Wert für einen gelisteten und die Abwesenheit für einen ungelisteten Prefix. Die volle Vitest-Suite bleibt grün (`test/utils.tsx` unverändert bei `gcTime: 0`).
+- [x] 3.1 `HOECHSTLIEGEZEIT_MS` (24 h) und die reine `startEntscheidung(meErgebnis, datensatz, jetzt, buster)` nach der Tabelle in design.md D2. Prüfen: ein Vitest-Fall je Tabellenzeile, dazu die Grenze genau 24 h (noch gültig) gegen 24 h + 1 ms (verworfen).
+- [x] 3.2 Den Bestätigungs-Tracker am QueryCache bauen: `bestaetigtAt` bewegt sich nur bei `success` ohne `manual` (design.md D4). Prüfen: Vitest. Ein Fetch-Erfolg bewegt den Zeitstempel. `setQueryData` bewegt ihn **nicht**. `hydrate` bewegt ihn **nicht**. Mutationsprobe: Ohne `manual`-Prüfung wird der zweite Fall rot.
+- [x] 3.3 `erzeugeQueryClient` setzt für jeden Allowlist-Prefix `gcTime = HOECHSTLIEGEZEIT_MS`, aber nur mit Produktions-Defaults (design.md D8). Prüfen: `api/queryClient.test.ts` pinnt den Wert für einen gelisteten und die Abwesenheit für einen ungelisteten Prefix. Die volle Vitest-Suite bleibt grün (`test/utils.tsx` unverändert bei `gcTime: 0`).
 
 ## 4. Identität, Wiederherstellen und Löschen im AuthProvider
 
