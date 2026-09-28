@@ -1,19 +1,12 @@
 #!/usr/bin/env bash
-# Selbsttest für scripts/check-deps.sh (LFH-316).
+# Selbsttest für scripts/check-deps.sh. Dessen Fehlerbild ist STILL: liest es eine
+# Teilmenge, meldet es „OK" wie ein vollständiger Lauf. Gemessen wird deshalb nicht, WAS der
+# Audit findet (ändert sich über Nacht), sondern WORAUF er schaut und OB sein Urteil
+# durchschlägt — ohne Netz, `mise`/`cargo` sind aufzeichnende Attrappen.
 #
-# WARUM DIESES GATE EIN GATE BRAUCHT: check-deps.sh ist die einzige Stelle, an der ein
-# neues Advisory überhaupt ein Signal erzeugt — und sein Fehlerbild ist STILL. Liest es
-# eine Teilmenge, meldet es „OK: keine bekannten Schwachstellen" und sieht dabei exakt aus
-# wie ein vollständiger Lauf. Genau das war der Befund von LFH-316: derselbe Commit, zwei
-# Arbeitsbäume, zwei Antworten — der lang gewachsene Checkout gab Entwarnung.
-#
-# Gemessen wird deshalb nicht, WAS der Audit findet (das hängt an der Advisory-Datenbank
-# und ändert sich über Nacht), sondern WORAUF er schaut und OB sein Urteil durchschlägt.
-# Beides ohne Netz: `mise`/`cargo` sind Attrappen, die aufzeichnen statt zu prüfen.
-#
-# DIE SCHÄRFEREN HÄLFTEN SIND DIE NEGATIVEN. „Der Audit sieht das Lockfile" wäre auch dann
-# grün, wenn er nebenher den halben Arbeitsbaum sähe; erst „er sieht node_modules NICHT"
-# und „ein Fund bricht" schließen das falsche Grün aus, für das dieses Ticket existiert.
+# Die schärferen Hälften sind die NEGATIVEN: „der Audit sieht node_modules NICHT" und „ein
+# Fund bricht". „Er sieht das Lockfile" allein wäre auch grün, wenn er nebenher den halben
+# Arbeitsbaum sähe.
 set -euo pipefail
 
 SKRIPT_UNTER_TEST="$(cd "$(dirname "$0")" && pwd)/check-deps.sh"
@@ -21,15 +14,10 @@ ARBEIT="$(mktemp -d)"
 trap 'rm -rf "$ARBEIT"' EXIT
 fehler=0
 
-# HASHWERKZEUG: `shasum -a 256` ist die Konvention des Repos (build-offline-karten.sh,
-# artefakte.yml), `sha256sum` fehlt auf macOS. Die Wahl steht HIER und wird an die Attrappe
-# durchgereicht, damit beide Seiten desselben Vergleichs dasselbe Werkzeug nehmen.
-#
-# UND SEIN FEHLEN IST EIN ABBRUCH, KEIN LEERSTRING. Ohne diesen Riegel kollabieren beide
-# Seiten von Fall 2 zu "" und die Aussage „das Lockfile kam unverändert mit" ist trivial
-# grün, ohne dass je etwas gehasht wurde — nachgestellt, indem `sha256sum` aus dem PATH
-# genommen wurde: der Fall meldete „ok". Ein Test, der nicht rot werden kann, behauptet
-# eine Deckung, die er nicht hat.
+# HASHWERKZEUG: `shasum -a 256` wie im übrigen Repo, `sha256sum` fehlt auf macOS; die Wahl
+# wird an die Attrappe durchgereicht, damit beide Seiten dasselbe Werkzeug nehmen. Fehlt
+# beides, wird abgebrochen — sonst kollabierten beide Seiten von Fall 2 zu "" und der
+# Vergleich wäre trivial grün.
 if command -v shasum >/dev/null 2>&1; then
   HASHBEFEHL="shasum -a 256"
 elif command -v sha256sum >/dev/null 2>&1; then
@@ -45,10 +33,9 @@ hashe() { # <datei> -> gekürzter Hash
   $HASHBEFEHL < "$1" | cut -c1-16
 }
 
-# PATH-Einträge fallenlassen, die ein echtes cargo-audit führen. Fall 8 braucht das:
-# `check-deps.sh` fragt zuerst `command -v cargo-audit` und erreicht die Attrappe gar
-# nicht, wenn das Werkzeug wirklich installiert ist — in der CI ist es das
-# (ci.yml installiert cargo-audit 0.22.2 vor den Schnellprüfungen).
+# PATH-Einträge fallenlassen, die ein echtes cargo-audit führen: `check-deps.sh` fragt
+# zuerst `command -v cargo-audit` und erreichte die Attrappe in der CI (dort installiert)
+# sonst nie (Fall 8).
 pfad_ohne_cargo_audit() {
   local neu="" eintrag
   local IFS=:
@@ -70,8 +57,7 @@ pruefe() { # <name> <erwartet> <gemessen>
 }
 
 # Ein Repo-Skelett: das Skript unter Test plus die drei Manifest-Dateien, die es kopiert.
-# Bewusst KEIN echtes Frontend — der Lockfile-Inhalt ist für die Aussagen egal, seine
-# Bytes sind es nicht (Fall 3).
+# Der Lockfile-Inhalt ist für die Aussagen egal, seine Bytes nicht (Fall 2).
 repo_neu() { # <name> -> pfad
   local pfad="$ARBEIT/$1"
   mkdir -p "$pfad/scripts" "$pfad/frontend" "$pfad/bin"
@@ -158,9 +144,8 @@ befund() { # <repo> <schluessel>
 
 echo "==> Selbsttest check-deps.sh"
 
-# 1 — DER KERN DES TICKETS: ein stale node_modules im Arbeitsbaum darf den Audit nicht
-# erreichen. Gebaut wird genau der beschriebene Zustand — ein node_modules, das Versionen
-# führt, die im Lockfile gar nicht stehen.
+# 1 — Ein stale node_modules im Arbeitsbaum, das Versionen führt, die im Lockfile nicht
+# stehen, darf den Audit nicht erreichen.
 r="$(repo_neu stale)"
 mkdir -p "$r/frontend/node_modules/.pnpm/linke-tuete@9.9.9/node_modules/linke-tuete"
 printf '{"name":"linke-tuete","version":"9.9.9"}\n' \
@@ -170,30 +155,26 @@ pruefe "stale node_modules: Gate bleibt grün, wenn der Audit grün ist" "0" "$r
 pruefe "stale node_modules: der Audit sieht es NICHT" "WEG" "$(befund "$r" node_modules)"
 pruefe "der Audit läuft ausserhalb des Arbeitsbaums" "NEIN" "$(befund "$r" im_repo)"
 
-# 2 — Das Lockfile kommt BYTE-IDENTISCH mit. Ohne diese Hälfte wäre Fall 1 auch dann grün,
-# wenn gar nichts kopiert würde und der Audit ein leeres Verzeichnis sähe.
+# 2 — Das Lockfile kommt BYTE-IDENTISCH mit — sonst wäre Fall 1 auch grün, wenn der Audit ein
+# leeres Verzeichnis sähe.
 pruefe "das Lockfile kommt unverändert mit" \
   "$(hashe "$r/frontend/pnpm-lock.yaml")" "$(befund "$r" lockfile)"
 
-# 3 — pnpm-workspace.yaml MUSS mit: dort stehen die Overrides. Fehlte sie, liefe das Gate
-# nicht falsch grün, sondern falsch ROT — das andere Fehlerbild, das ein Gate abschaltet.
+# 3 — pnpm-workspace.yaml MUSS mit (Overrides); fehlte sie, liefe das Gate falsch ROT.
 pruefe "die Overrides kommen mit" "DA" "$(befund "$r" workspace)"
 
-# 4 — Das Wegwerf-Verzeichnis bleibt nicht liegen. Ein Gate, das je Lauf ein Verzeichnis
-# hinterlässt, wird auf einer Entwicklungsmaschine zum Dauerläufer.
+# 4 — Das Wegwerf-Verzeichnis bleibt nicht liegen.
 verz="$(befund "$r" dir)"
 pruefe "das Wegwerf-Verzeichnis ist danach weg" "WEG" \
   "$([ -e "$verz" ] && echo DA || echo WEG)"
 
-# 5 — Die Schwelle wird durchgereicht. Sie entscheidet, welcher Fund bricht; fiele sie weg,
-# wäre das Gate durch moderate-Rauschen dauerrot und würde abgeschaltet.
+# 5 — Die Schwelle wird durchgereicht; fiele sie weg, wäre das Gate durch moderate-Rauschen
+# dauerrot.
 pruefe "--audit-level=high wird übergeben" "ja" \
   "$(grep -q -- '--audit-level=high' "$r/protokoll/pnpm-aufrufe" && echo ja || echo nein)"
 
-# 6 — DIE ZWEITE SCHÄRFERE HÄLFTE: ein Fund schlägt durch. Ohne diesen Fall belegt die
-# ganze Datei nur, dass der Audit an der richtigen Stelle steht — nicht, dass sein Urteil
-# irgendwen erreicht. Mit stale node_modules gefahren, weil genau diese Kombination der
-# gemeldete Defekt war.
+# 6 — Ein Fund schlägt durch, mit stale node_modules gefahren — sonst belegte die Datei nur,
+# dass der Audit an der richtigen Stelle steht.
 rc="$(lauf "$r" STUB_PNPM_RC=1)"
 pruefe "ein Frontend-Fund bricht das Gate (trotz stale node_modules)" "1" "$rc"
 
@@ -201,15 +182,9 @@ pruefe "ein Frontend-Fund bricht das Gate (trotz stale node_modules)" "1" "$rc"
 rc="$(lauf "$r" STUB_CARGO_RC=1)"
 pruefe "ein cargo-audit-Fund bricht das Gate" "1" "$rc"
 
-# 8 — Ein unvollständiger Scan darf einen echten Fund nicht schlucken. Die Kombination ist
-# real: cargo-audit fehlt auf vielen Maschinen, und das Skript beendet sich in dem Fall
-# bewusst mit 0. Läge dieser Zweig VOR dem Frontend-Audit, ginge der Fund verloren.
-#
-# DER PATH MUSS DAFÜR GEFILTERT WERDEN, und das ist gemessen statt vermutet: `check-deps.sh`
-# fragt zuerst `command -v cargo-audit`. Ist das Werkzeug echt installiert — in der CI ist es
-# das —, wird die Attrappe nie gefragt, der Zweig nie betreten, und dieser Fall wäre eine
-# Dublette von Fall 6. Deshalb wird zusätzlich BELEGT, dass der Zweig lief: ohne diese
-# Zeile ist „grün" von „gar nicht ausgeführt" nicht zu unterscheiden.
+# 8 — Ein unvollständiger Scan (cargo-audit fehlt, das Skript endet dann bewusst mit 0) darf
+# einen echten Frontend-Fund nicht schlucken. Der PATH wird gefiltert (s. o.), und belegt wird
+# zusätzlich, dass der Zweig wirklich lief — sonst wäre der Fall eine Dublette von Fall 6.
 rc="$(lauf --ohne-cargo-audit "$r" STUB_CARGO_AUDIT_DA=0 STUB_PNPM_RC=1)"
 pruefe "fehlendes cargo-audit schluckt den Frontend-Fund nicht" "1" "$rc"
 pruefe "fehlendes cargo-audit: der Zweig wurde wirklich betreten" "ja" \
@@ -222,17 +197,11 @@ pruefe "fehlendes Lockfile bricht laut ab" "1" "$rc"
 pruefe "fehlendes Lockfile: der Audit läuft gar nicht erst" "nein" \
   "$([ -e "$r/protokoll/pnpm-aufrufe" ] && echo ja || echo nein)"
 
-# 10 — DER RIEGEL GEGEN DAS NÄCHSTE FALSCHE GRÜN: bekommt das Frontend echte
-# Workspace-Pakete, fehlen deren package.json im Wegwerf-Verzeichnis und der Audit-Baum
-# wäre still unvollständig. Dann ist die Kopierliste zu erweitern — und bis dahin bricht es.
-#
-# DAS LOCKFILE WIRD GESCHRIEBEN, NICHT NACHTRÄGLICH VERÄNDERT. Ein Ersetzen von Hand
-# brauchte ein Werkzeug, das dieses Projekt nicht voraussetzt — die README nennt Rust,
-# Node/pnpm über mise, Perl, einen C-Compiler und nasm, kein Python, und kein anderes
-# Skript unter scripts/ ruft eines. Ein Selbsttest, der auf einer Maschine ohne dieses
-# Werkzeug abbricht, reisst unter `set -e` das GANZE check-all.sh mit: aus einem Gate,
-# das eine Lücke schliessen soll, würde eines, das grundlos rot ist — und ein grundlos
-# rotes Gate wird abgeschaltet statt befolgt.
+# 10 — Bekommt das Frontend echte Workspace-Pakete, fehlten deren package.json im
+# Wegwerf-Verzeichnis; bis die Kopierliste erweitert ist, bricht es. Das Lockfile wird
+# GESCHRIEBEN statt nachträglich verändert: dafür bräuchte es ein Werkzeug (etwa Python),
+# das das Projekt nicht voraussetzt, und ein Abbruch risse unter `set -e` das ganze
+# check-all.sh mit.
 r="$(repo_neu fremder_importer)"
 cat > "$r/frontend/pnpm-lock.yaml" <<'LOCK'
 lockfileVersion: '9.0'
