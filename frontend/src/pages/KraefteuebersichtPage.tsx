@@ -66,39 +66,32 @@ import { StatusChip, StatusZelle, monoStil, useRollen } from '../components/inst
 import './kraefteuebersichtPrint.css';
 
 /**
- * MELDEBILD (Neuentwurf S6 „Statusraster über alle Einheiten", 21.09.2026).
+ * Meldebild: Statusraster über alle Einheiten.
  *
- * Aufbau: Seitenkopf (Titel · Mono-Meta · Abschnitt-Filter · „Einheit") → Statusband
- * (Einheiten je FMS-Status, Personal je Kategorie, Kachel „keine Rückmeldung") →
- * Werkzeugzeile außerhalb des Primitivs
- * (Auswahlzeile, weitere Filter, Aufklappen, Lagebericht, Druck) → Raster: EINE Zeile je
+ * Aufbau: Seitenkopf (Titel · Mono-Meta · Abschnitt-Filter · „Einheit") → Statusband (Einheiten je
+ * FMS-Status, Personal je Kategorie, Kachel „keine Rückmeldung") → Werkzeugzeile außerhalb des
+ * Primitivs (Auswahlzeile, weitere Filter, Aufklappen, Lagebericht, Druck) → Raster: eine Zeile je
  * Einheit, die Mittel als aufklappbares Detail. Die Ableitungen stehen rein in
  * `kraefte/meldebildRaster.ts`.
  *
- * EINHEITENSTATUS UND „SEIT" (LFH-609, Entscheidung vom 22.09.2026): der Status einer
- * Einheit wird serverseitig aus ihren Fahrzeugen ABGELEITET — gemeinsam oder „gemischt"
- * mit Verteilung —, eine Einheit ohne Fahrzeug führt ihn von Hand (Auslöser nur dort).
- * Das Statusband zählt die Einheiten je Status wie der Entwurf. Die verdichtete
- * Verteilung der Mittel (bereit / gebunden / Ausfall) bleibt als eigene Spalte „Mittel".
+ * Einheitenstatus (LFH-609): serverseitig aus den Fahrzeugen abgeleitet — gemeinsam oder „gemischt"
+ * mit Verteilung —, eine Einheit ohne Fahrzeug führt ihn von Hand (Auslöser nur dort). Das
+ * Statusband zählt die Einheiten je Status; die Verteilung der Mittel (bereit / gebunden / Ausfall)
+ * steht als eigene Spalte „Mittel".
  *
- * Der Funkrufname der Einheit ist ihr gepflegter eigener (LFH-614); fehlt er, steht nur
- * der eines EINZIGEN Fahrzeugs, sonst bleibt die Zelle leer.
+ * Der Funkrufname der Einheit ist ihr gepflegter eigener (LFH-614); fehlt er, steht nur der eines
+ * einzigen Fahrzeugs, sonst bleibt die Zelle leer.
  *
- * RÜCKMELDUNG (LFH-610) — seit es `GET …/meldungen/rueckmeldungen` gibt, ist sie da: die
- * letzte Spalte zeigt die Uhrzeit der letzten Rückmeldung (neutral), überfällig in
- * `achtung`, nie zurückgemeldet „—" in `alarm`; beide Problemfälle tönen die Zeile. Die
- * Kachel „keine Rückmeldung" zählt NUR die nie zurückgemeldeten Einheiten. Solange die
- * Daten laden, gescheitert oder für die Rolle gesperrt (403) sind, steht nirgends „keine" —
- * eine leere Menge hieße sonst „niemand hat je zurückgemeldet" und färbte alles rot.
- *
- * NICHTS IST MEHR WEGGELASSEN: die beiden Lücken, die hier bis 22.09.2026 unter
- * „Entscheidung 4, keine erfundenen Daten" standen (Einheitenstatus/„Seit", Rückmeldung),
- * haben seither je eine echte Datenquelle.
+ * Rückmeldung (LFH-610): die letzte Spalte zeigt die Uhrzeit der letzten Rückmeldung (neutral),
+ * überfällig in `achtung`, nie zurückgemeldet „—" in `alarm`; beide Problemfälle tönen die Zeile.
+ * Die Kachel „keine Rückmeldung" zählt nur die nie zurückgemeldeten Einheiten. Solange die Daten
+ * laden, gescheitert oder gesperrt (403) sind, steht nirgends „keine" — eine leere Menge färbte
+ * sonst alles rot.
  */
 
 /**
- * Der leere Filterzustand — EINE Quelle für Startwert, Zurücksetzen und das Zurücknehmen
- * einer einzelnen Marke.
+ * Der leere Filterzustand — eine Quelle für Startwert, Zurücksetzen und das Zurücknehmen einer
+ * einzelnen Marke.
  */
 export const LEERER_FILTER: FilterWerte = {
   abschnittId: null,
@@ -113,9 +106,8 @@ export interface FilterChip {
 }
 
 /**
- * Die gesetzten Filter als Beschriftungen (LFH-338 · C3, Befund H3). Feste Reihenfolge
- * (Abschnitt · Träger · Status · Suche), nicht die Setzreihenfolge; `suche` getrimmt wie in
- * `filtereKraefte`.
+ * Die gesetzten Filter als Beschriftungen, in fester Reihenfolge (Abschnitt · Träger · Status ·
+ * Suche); `suche` getrimmt wie in `filtereKraefte`.
  */
 export function aktiveFilterChips(
   filter: FilterWerte,
@@ -141,11 +133,9 @@ export function aktiveFilterChips(
 /**
  * Der Seitenkopf-Meta — Einheitenzahl und Stärke in BOS-Schreibweise (`F/UF/M//Ges`).
  *
- * DIE H3-ZUSICHERUNG LEBT HIER WEITER: bei gesetztem Filter nennt die Zeile den Ausschnitt
- * UND den Bezugswert („3 von 7 Einheiten · Stärke 1/0/5//6 von 2/3/10//15"). Ohne ihn
- * verschwände die Gesamtstärke des Einsatzes genau in dem Moment, in dem jemand einen
- * Abschnitt anwählt — und dann wird gemeldet. Rein und exportiert, damit beide Zweige ohne
- * Rendern prüfbar sind.
+ * Bei gesetztem Filter nennt die Zeile den Ausschnitt und den Bezugswert („3 von 7 Einheiten ·
+ * Stärke 1/0/5//6 von 2/3/10//15"); sonst verschwände die Gesamtstärke genau dann, wenn jemand
+ * einen Abschnitt anwählt. Rein und exportiert, damit beide Zweige ohne Rendern prüfbar sind.
  */
 export function meldebildMeta(args: {
   einheiten: number;
@@ -168,10 +158,10 @@ export function meldebildMeta(args: {
  */
 export function handStatusOptionen(katalog: readonly FahrzeugStatus[]): StatusOption<number>[] {
   return [
-    // Dieselbe Beschriftung wie im FMS-Tableau (LFH-642) — eine Quelle für beide Menüs.
+    // Dieselbe Beschriftung wie im FMS-Tableau — eine Quelle für beide Menüs.
     ...fmsStatusOptionen(katalog),
-    // Der Handstatus muss sich auch wieder ENTFERNEN lassen — sonst bliebe ein einmal
-    // gesetzter Wert für immer stehen und tauchte nach jeder Fahrzeugabgabe wieder auf.
+    // Der Handstatus muss sich auch entfernen lassen — sonst bliebe ein einmal gesetzter Wert
+    // stehen und tauchte nach jeder Fahrzeugabgabe wieder auf.
     { wert: KEIN_HANDSTATUS, label: 'kein Status' },
   ];
 }
@@ -183,13 +173,12 @@ export const KEIN_HANDSTATUS = -1;
 const MITTEL_KURZ = { fahrzeug: 'Fzg.', person: 'Pers.', material: 'Mtl.' } as const;
 
 /**
- * Die Spalten des Rasters. In einer Fabrik statt als Modulkonstante, weil zwei Zellen vom
- * Kontext abhängen (Einsatz-ID für den Auftrags-Deeplink, Abrufzustand der Aufträge).
- * Durch `spaltenFuer<RasterZeile>()` geführt, NICHT annotiert (Schlüsselliterale).
+ * Die Spalten des Rasters. Eine Fabrik, weil zwei Zellen vom Kontext abhängen (Einsatz-ID für den
+ * Auftrags-Deeplink, Abrufzustand der Aufträge). Durch `spaltenFuer<RasterZeile>()` geführt, nicht
+ * annotiert.
  *
- * Keine Sortierung, kein Spaltenfilter, keine Suche im Primitiv (`VOLLMENGE_PFLICHT`):
- * gefiltert wird außerhalb über die Rohlisten, aus denen Zeilen und Verteilungen neu
- * entstehen.
+ * Keine Sortierung, kein Spaltenfilter, keine Suche im Primitiv (`VOLLMENGE_PFLICHT`): gefiltert
+ * wird außerhalb über die Rohlisten, aus denen Zeilen und Verteilungen neu entstehen.
  */
 /** Abrufzustand eines Zusatzabrufs — `gesperrt` ist 403, kein Defekt. */
 type AbrufZustand = 'daten' | 'laden' | 'fehler' | 'gesperrt';
@@ -236,10 +225,9 @@ function rasterSpalten(
           <span style={monoStil(12)}>{z.funkrufname}</span>
         ) : null,
     },
-    // KEIN `abBreite`: der Abschnitt war im alten Baum eine Ebene und damit in jeder Breite
-    // und im Ausdruck da. Als Spalte ist er die Gliederung, die die Zeilenform ersetzt hat —
-    // `abBreite` hängt an der Fensterbreite, nicht an `@media print`, und ein Meldeblatt auf
-    // A4 (717 px) ginge sonst ohne die Zuordnung Einheit → Abschnitt hinaus.
+    // Kein `abBreite`: als Spalte ist der Abschnitt die Gliederung. `abBreite` hängt an der
+    // Fensterbreite, nicht an `@media print`, und ein Meldeblatt auf A4 ginge sonst ohne die
+    // Zuordnung Einheit → Abschnitt hinaus.
     { title: 'Abschnitt', dataIndex: 'abschnitt', key: 'abschnitt', width: 140 },
     {
       title: 'Stärke',
@@ -263,8 +251,8 @@ function rasterSpalten(
           <span style={monoStil(12)}>{z.seit ? kontext.zeit(z.seit) : '—'}</span>
         ) : null,
     },
-    // Die Mittelverteilung ist Zusatz zum Einheitenstatus, keine Vergleichsachse — sie
-    // weicht auf schmalem Schirm zuerst (Zähler im Spaltenschalter).
+    // Die Mittelverteilung ist Zusatz zum Einheitenstatus, keine Vergleichsachse — sie weicht auf
+    // schmalem Schirm zuerst (Zähler im Spaltenschalter).
     {
       title: 'Mittel',
       key: 'mittel',
@@ -279,10 +267,9 @@ function rasterSpalten(
         <AuftragZelle einsatzId={einsatzId} zeile={z} zustand={auftraegeZustand} />
       ),
     },
-    // Letzte Spalte wie im Entwurf, rechtsbündig. KEIN `abBreite` (Begründung wie beim
-    // Abschnitt: das Meldeblatt auf A4 braucht sie). Für eine Rolle ohne Leserecht auf
-    // „Meldungen" (403) entfällt die Spalte ganz — n leere Zellen sagten nichts, und ein
-    // grauer Strich stünde verwechselbar neben dem roten „—" für „nie zurückgemeldet".
+    // Letzte Spalte, rechtsbündig. Kein `abBreite` (das Meldeblatt auf A4 braucht sie). Für eine
+    // Rolle ohne Leserecht auf „Meldungen" (403) entfällt die Spalte — ein grauer Strich stünde
+    // verwechselbar neben dem roten „—" für „nie zurückgemeldet".
     ...(rueckmeldung.zustand === 'gesperrt'
       ? []
       : [
@@ -305,9 +292,9 @@ function rasterSpalten(
 
 function EinheitZelle({ zeile: z }: { zeile: RasterZeile }) {
   const { token, rollen } = useRollen();
-  // Umbrechend, NICHT `nowrap`: die Einheitenspalte hat keine feste Breite, und ein
-  // nicht umbrechender Nebentext hebt die Mindestbreite der ganzen Tabelle — im Druck auf
-  // A4 ragte sie dann aus dem Blatt (`e2e/meldebild-tabelle.spec.ts`, Nachweis 2).
+  // Umbrechend: die Einheitenspalte hat keine feste Breite, und ein nicht umbrechender Nebentext
+  // höbe die Mindestbreite der ganzen Tabelle — im Druck auf A4 ragte sie aus dem Blatt
+  // (`e2e/meldebild-tabelle.spec.ts`).
   const nebentext = z.zusatz && (
     <span style={{ display: 'block', fontSize: 11, color: rollen.gedaempft }}>{z.zusatz}</span>
   );
@@ -334,10 +321,9 @@ function EinheitZelle({ zeile: z }: { zeile: RasterZeile }) {
 }
 
 /**
- * Statusspalte. Mittel: der echte Einzelstatus als Chip (Fahrzeug mit FMS-Code). Einheit:
- * ihr Status (LFH-609) — abgeleitet als Chip, „gemischt" mit der Verteilung als Text
- * daneben, und bei einer Einheit ohne Fahrzeug mit Schreibrecht der Auslöser für den
- * Handstatus.
+ * Statusspalte. Mittel: der Einzelstatus als Chip (Fahrzeug mit FMS-Code). Einheit: abgeleitet als
+ * Chip, „gemischt" mit der Verteilung als Text daneben, und bei einer Einheit ohne Fahrzeug mit
+ * Schreibrecht der Auslöser für den Handstatus.
  */
 function StatusSpalte({
   zeile: z,
@@ -366,9 +352,9 @@ function StatusSpalte({
 }
 
 /**
- * Die verdichtete Verteilung der Fahrzeuge und des Personals einer Einheit als drei
- * Statuszellen in FESTER Folge, auch bei 0 — sonst fluchten zwei Zeilen nicht. Eine 0
- * bekommt keinen Ton: eine rot getönte Null meldete das Gegenteil dessen, was sie heißt.
+ * Die verdichtete Verteilung der Fahrzeuge und des Personals als drei Statuszellen in fester Folge,
+ * auch bei 0 — sonst fluchten zwei Zeilen nicht. Eine 0 bekommt keinen Ton: eine rot getönte Null
+ * meldete das Gegenteil.
  */
 function MittelVerteilungZellen({ zeile: z }: { zeile: RasterZeile }) {
   const { rollen } = useRollen();
@@ -417,10 +403,9 @@ function AuftragZelle({
 }) {
   const { rollen } = useRollen();
   if (z.art !== 'einheit' || z.einheitId == null) return null;
-  // Scheitert der Auftragsabruf, bleibt die Tabelle stehen — die Zelle sagt, dass sie
-  // nichts weiß, statt „kein Auftrag" zu behaupten (Fehler ≠ leer).
-  // Eine Rolle ohne Auftragsrecht bekommt 403 — das ist „nicht für dich", keine Störung,
-  // und darf nicht wie eine aussehen.
+  // Scheitert der Auftragsabruf, bleibt die Tabelle stehen — die Zelle sagt, dass sie nichts weiß,
+  // statt „kein Auftrag" zu behaupten. Eine Rolle ohne Auftragsrecht bekommt 403 — „nicht für
+  // dich", keine Störung, und darf nicht wie eine aussehen.
   if (zustand === 'gesperrt') {
     return (
       <span title="Aufträge für diese Rolle nicht einsehbar" style={{ color: rollen.gedaempft }}>
@@ -448,8 +433,8 @@ function AuftragZelle({
     <Link
       to={auftraegePfad(einsatzId, { auftrag: a.id })}
       title={text}
-      // Zwei Zeilen mit Auslassung statt `nowrap`: eine nicht umbrechende Zeile setzte die
-      // Mindestbreite der Spalte auf die Textlänge. Der Volltext steht im `title`.
+      // Zwei Zeilen mit Auslassung: eine nicht umbrechende Zeile setzte die Mindestbreite der
+      // Spalte auf die Textlänge. Der Volltext steht im `title`.
       style={{
         display: '-webkit-box',
         WebkitLineClamp: 2,
@@ -464,12 +449,9 @@ function AuftragZelle({
 }
 
 /**
- * Rückmeldungszelle (Neuentwurf S6): Mono 11, Uhrzeit der letzten Rückmeldung.
- *
- * Farbe allein trägt die Aussage nicht (WCAG 1.4.1): „nie" ist ein eigenes Zeichen („—"
- * statt einer Uhrzeit), und jeder Zustand steht als Wort im zugänglichen Namen und im
- * Tooltip (`RUECKMELDUNG_WORT`). `achtung` als Textfarbe in Mono 11 folgt
- * `personen/personenSpalten.tsx` (Lückenzeile).
+ * Rückmeldungszelle: Mono 11, Uhrzeit der letzten Rückmeldung. Die Farbe trägt die Aussage nicht
+ * allein (WCAG 1.4.1): „nie" ist ein eigenes Zeichen („—"), und jeder Zustand steht als Wort im
+ * zugänglichen Namen und Tooltip (`RUECKMELDUNG_WORT`).
  */
 function RueckmeldungZelle({
   zeile: z,
@@ -483,7 +465,7 @@ function RueckmeldungZelle({
   const { rollen } = useRollen();
   const { konventionen } = useAnzeigeKonventionen();
   if (z.art !== 'einheit' || z.einheitId == null) return null;
-  // Scheitert der Abruf, sagt die Zelle, dass sie nichts weiß — NICHT „keine Rückmeldung".
+  // Scheitert der Abruf, sagt die Zelle, dass sie nichts weiß — nicht „keine Rückmeldung".
   if (zustand === 'fehler') {
     return (
       <span title="Rückmeldungen nicht abrufbar" style={{ color: rollen.gedaempft }}>
@@ -573,9 +555,9 @@ export default function KraefteuebersichtPage() {
     queryKey: einsatzKeys.auftraege(einsatzId),
     queryFn: () => listeAuftraege(einsatzId),
   });
-  // Dritter Zusatzabruf (LFH-610). Liegt unter dem `meldungen`-Präfix und wird vom
-  // Live-Ereignis `meldung` mit invalidiert. 403 heißt „Meldungen für diese Rolle nicht
-  // lesbar" — dann gibt es weder Spalte noch Kachel.
+  // Dritter Zusatzabruf. Liegt unter dem `meldungen`-Präfix und wird vom Live-Ereignis `meldung`
+  // mit invalidiert. 403 heißt „Meldungen für diese Rolle nicht lesbar" — dann gibt es weder Spalte
+  // noch Kachel.
   const rueckmeldungenQuery = useQuery({
     queryKey: einsatzKeys.meldungenRueckmeldungen(einsatzId),
     queryFn: () => holeRueckmeldungen(einsatzId),
@@ -625,9 +607,9 @@ export default function KraefteuebersichtPage() {
   const rueckmeldungZustand = abrufZustand(rueckmeldungenQuery);
   const rueckmeldungDaten = rueckmeldungZustand === 'daten' ? rueckmeldungenQuery.data : undefined;
   /**
-   * Anzeige je Zeilenschlüssel — NUR bei lesbaren Daten. Beim Laden, bei Fehler und bei 403
-   * bleibt die Tabelle leer statt einer leeren Nachschlagetabelle, die jede Einheit zu „nie
-   * zurückgemeldet" machte. Hängt an `jetzt`: das Urteil „überfällig" schlägt mit der Uhr um.
+   * Anzeige je Zeilenschlüssel — nur bei lesbaren Daten. Beim Laden, bei Fehler und bei 403 bleibt
+   * die Tabelle leer, statt jede Einheit zu „nie zurückgemeldet" zu machen. Hängt an `jetzt`:
+   * „überfällig" schlägt mit der Uhr um.
    */
   const rueckmeldungJeZeile = useMemo(() => {
     const m = new Map<string, RueckmeldungAnzeige>();
@@ -646,22 +628,20 @@ export default function KraefteuebersichtPage() {
       personal: personalBand(gefiltertRoh.personal),
       rueckmeldung: rueckmeldungDaten ? keineRueckmeldungZelle(raster, rueckmeldungDaten) : null,
     }),
-    // Kein `statusKatalogQuery.data` mehr: `einheitBand` liest den Status seit LFH-609 an
-    // der Einheit selbst, nicht mehr über den Katalog.
+    // `einheitBand` liest den Status an der Einheit selbst, nicht über den Katalog.
     [gefiltertRoh, raster, rueckmeldungDaten],
   );
 
   /**
-   * Handstatus einer Einheit ohne Fahrzeug (LFH-609). Kein optimistisches Update: der
-   * Status der Einheit ist eine Ableitung des Servers, und die Antwort trägt ihn fertig.
+   * Handstatus einer Einheit ohne Fahrzeug. Kein optimistisches Update: der Status ist eine
+   * Ableitung des Servers, und die Antwort trägt ihn fertig.
    */
   const handStatusMutation = useMutation({
     mutationFn: (v: { eid: number; statusId: number | null }) =>
       setzeEinheitStatus(einsatzId, v.eid, v.statusId),
     onSuccess: () => qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) }),
-    // Auch der Fehlerweg holt den Serverstand: ein 422 heißt meist, dass die Einheit
-    // inzwischen ein Fahrzeug hat — ohne Refetch bliebe der Auslöser stehen und jeder
-    // weitere Versuch scheiterte ohne Grund.
+    // Auch der Fehlerweg holt den Serverstand: ein 422 heißt meist, dass die Einheit inzwischen ein
+    // Fahrzeug hat — ohne Refetch bliebe der Auslöser stehen.
     onError: (e) => {
       void qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
       message.error(e instanceof ApiError && e.status === 422 ? e.message : 'Status nicht gesetzt');
@@ -672,7 +652,7 @@ export default function KraefteuebersichtPage() {
     () => verdichte(gefiltertRoh.personal, gefiltertRoh.fahrzeuge, gefiltertRoh.material),
     [gefiltertRoh],
   );
-  /** Der Bezugswert — dieselbe Rechnung über die UNGEFILTERTEN Listen (Befund H3). */
+  /** Der Bezugswert — dieselbe Rechnung über die ungefilterten Listen. */
   const gesamt = useMemo(
     () => verdichte(personalQuery.data ?? [], fahrzeugeQuery.data ?? [], materialQuery.data ?? []),
     [personalQuery.data, fahrzeugeQuery.data, materialQuery.data],
@@ -757,8 +737,8 @@ export default function KraefteuebersichtPage() {
         vorlage: 'freitext',
         titel: `Kräftemeldebild ${stand}`,
       });
-      // Schlägt der PATCH fehl, bleibt ein leerer Entwurf zurück (vom EL löschbar) —
-      // atomar wäre nur ein eigener Backend-Endpunkt, bewusster v1-Kompromiss.
+      // Schlägt der PATCH fehl, bleibt ein leerer Entwurf zurück (vom EL löschbar) — atomar wäre
+      // nur ein eigener Backend-Endpunkt.
       await aktualisiereLagebericht(einsatzId, lb.id, {
         abschnitte: [{ schluessel: 'text', text: md }],
       });
@@ -768,13 +748,11 @@ export default function KraefteuebersichtPage() {
     onError: () => message.error('Übernahme fehlgeschlagen'),
   });
 
-  // Ein Einsatzwechsel setzt Filter und Aufklappzustand zurück — sonst trüge die
-  // Filtermarke den Abschnittsnamen des vorigen Einsatzes.
+  // Ein Einsatzwechsel setzt Filter und Aufklappzustand zurück — sonst trüge die Filtermarke den
+  // Abschnittsnamen des vorigen Einsatzes.
   //
-  // ZUGEKLAPPT STARTEN ist hier richtig, und es dreht H7 (LFH-338 · C3) nicht zurück: der
-  // Befund war, dass im alten Baum die meldefähigen Zahlen erst nach n Klicks zu sehen
-  // waren. Im Raster trägt die EINHEITENZEILE selbst Stärke, Verteilung und Auftrag; die
-  // Mittel darunter sind Detail. Ein Riegel „nur einmal aufklappen" ist damit entfallen.
+  // Zugeklappt starten ist richtig: die Einheitenzeile selbst trägt Stärke, Verteilung und Auftrag;
+  // die Mittel darunter sind Detail.
   useEffect(() => {
     setExpandedKeys([]);
     setFilter(LEERER_FILTER);
@@ -802,9 +780,9 @@ export default function KraefteuebersichtPage() {
   );
 
   /**
-   * Stehen alle Mittel offen? Trägt den Zustand des Umschalters. Als benannte
-   * Zwischenvariable, nicht inline im `value` — `datensicht.guard.test.ts` liest aus dem
-   * Schalter-Attribut eine „Reiterachse"; hier liest der Schalter die Daten, nicht umgekehrt.
+   * Stehen alle Mittel offen? Trägt den Zustand des Umschalters. Als benannte Zwischenvariable,
+   * nicht inline im `value` — `datensicht.guard.test.ts` liest aus dem Schalter-Attribut eine
+   * „Reiterachse"; hier liest der Schalter die Daten, nicht umgekehrt.
    */
   const alleAufgeklappt =
     expandedKeys.length > 0 && expandedKeys.length === aufklappbareSchluessel(raster).length;
@@ -813,7 +791,7 @@ export default function KraefteuebersichtPage() {
     (abschnitteQuery.data ?? []).find((a) => a.id === aid)?.name ?? `Abschnitt ${aid}`;
   const chips = aktiveFilterChips(filter, abschnittName);
   const gefiltert = chips.length > 0;
-  /** „Kräfte" = Personal + Fahrzeuge, kein Material (eigene Statusachse, kein Kategoriefilter). */
+  /** „Kräfte" = Personal + Fahrzeuge, kein Material (eigene Statusachse). */
   const sichtbareKraefte = v.anzahlPersonal + v.anzahlFahrzeuge;
   const alleKraefte = gesamt.anzahlPersonal + gesamt.anzahlFahrzeuge;
   const einheitenZeilen = raster.filter((z) => z.einheitId != null).length;
@@ -830,8 +808,8 @@ export default function KraefteuebersichtPage() {
   });
 
   return (
-    // `kraefte-print-root` bleibt die ÄUSSERE Hülle: `kraefteuebersichtPrint.css` hängt daran,
-    // und `EinsatzSeite` nimmt kein `className` entgegen.
+    // `kraefte-print-root` bleibt die äußere Hülle: `kraefteuebersichtPrint.css` hängt daran, und
+    // `EinsatzSeite` nimmt kein `className`.
     <div className="kraefte-print-root" data-lfh="druckwurzel">
       <EinsatzSeite
         titel="Meldebild"
@@ -839,8 +817,8 @@ export default function KraefteuebersichtPage() {
         dataUpdatedAt={datenstand}
         aktionen={
           <Space className="kraefte-no-print" wrap>
-            {/* Sekundär: der Abschnitt-Filter. Er wirkt wie alle Filter AUSSERHALB des
-                Primitivs auf die Rohlisten (VOLLMENGE_PFLICHT). */}
+            {/* Sekundär: der Abschnitt-Filter. Er wirkt wie alle Filter außerhalb des Primitivs
+                auf die Rohlisten. */}
             <Select
               aria-label="Abschnitt filtern"
               placeholder="Abschnitt"
@@ -855,10 +833,9 @@ export default function KraefteuebersichtPage() {
               options={(abschnitteQuery.data ?? []).map((a) => ({ value: a.id, label: a.name }))}
               onChange={(wert) => setFilter((f) => ({ ...f, abschnittId: wert ?? null }))}
             />
-            {/* Primär: eine Einheit bilden. Die Maske lebt auf der Einheiten-Seite (dort
-                steht das Anlegen-Modal); ein zweites Formular hier wäre eine zweite
-                Erfassungsmaske derselben Sache. Ohne Schreibrecht kein Knopf — dort
-                entstünde keine Einheit. */}
+            {/* Primär: eine Einheit bilden. Die Maske lebt auf der Einheiten-Seite; ein zweites
+                Formular hier wäre eine zweite Erfassungsmaske derselben Sache. Ohne
+                Schreibrecht kein Knopf. */}
             {darfSchreiben && (
               <Button
                 type="primary"
@@ -876,10 +853,9 @@ export default function KraefteuebersichtPage() {
           </Space>
         }
       >
-        {/* ── DRUCKKOPF (LFH-338 · C3, Befund H4; seit LFH-22 der gemeinsame) ──────────────
-          Einsatz, Stand, druckende Person und Auswahl — ohne diese Angaben ist ein Meldeblatt nicht
-          zuordenbar. Am Schirm verborgen: dort stehen sie in Seitenkopf und Filterleiste. Der
-          Stand ist der ÄLTESTE erfolgreiche Listenabruf, nicht die Druckzeit. */}
+        {/* ── Druckkopf ── Einsatz, Stand, druckende Person und Auswahl — ohne sie ist ein
+            Meldeblatt nicht zuordenbar. Am Schirm verborgen. Der Stand ist der älteste
+            erfolgreiche Listenabruf, nicht die Druckzeit. */}
         <Druckkopf
           dokumentart="Meldebild"
           einsatz={einsatz}
@@ -913,11 +889,10 @@ export default function KraefteuebersichtPage() {
           />
         </div>
 
-        {/* ── WERKZEUGZEILE, AUSSERHALB DES PRIMITIVS ─────────────────────────────────
-          Die Auswahlzeile sagt IMMER, wie viel von wie viel gezeigt wird (H3) — auch
-          ungefiltert, sonst wäre ihr Erscheinen selbst das Signal. Träger, Status und Suche
-          filtern die Rohlisten wie der Abschnitt im Kopf. Druck und Lagebericht stehen HIER
-          und nicht in der Werkzeugzeile von `Datensicht`: nur hier trägt `.kraefte-no-print`. */}
+        {/* ── Werkzeugzeile, außerhalb des Primitivs ── Die Auswahlzeile sagt immer, wie viel
+            von wie viel gezeigt wird — auch ungefiltert, sonst wäre ihr Erscheinen selbst das
+            Signal. Druck und Lagebericht stehen hier und nicht in der Werkzeugzeile von
+            `Datensicht`: nur hier trägt `.kraefte-no-print`. */}
         <div
           className="kraefte-no-print"
           data-lfh="meldebild-werkzeuge"
@@ -956,8 +931,8 @@ export default function KraefteuebersichtPage() {
             options={traeger.map((t) => ({ value: t, label: t }))}
             onChange={(wert) => setFilter((f) => ({ ...f, traeger: wert ?? null }))}
           />
-          {/* Der vierte Eimer („ohne Status") bleibt draußen: `filtereKraefte` vergleicht
-            `kat === f.kategorie`, ein Wert `'ohne'` träfe nie eine Zeile. */}
+          {/* Der vierte Eimer („ohne Status") bleibt draußen: `filtereKraefte` vergleicht `kat
+              === f.kategorie`, ein Wert `'ohne'` träfe nie eine Zeile. */}
           <Select
             placeholder="Status"
             allowClear
@@ -976,9 +951,9 @@ export default function KraefteuebersichtPage() {
             value={filter.suche}
             onChange={(e) => setFilter((f) => ({ ...f, suche: e.target.value }))}
           />
-          {/* Zwei Zustände desselben Rasters, keine zwei Handlungen. Der Wert wird aus
-            `expandedKeys` ABGELEITET, gegen die Vollzähligkeit — mit `length > 0` stünde der
-            Umschalter nach dem Zuklappen einer einzelnen Zeile weiter auf „alles". */}
+          {/* Zwei Zustände desselben Rasters. Der Wert wird aus `expandedKeys` gegen die
+              Vollzähligkeit abgeleitet — mit `length > 0` stünde der Umschalter nach dem
+              Zuklappen einer einzelnen Zeile weiter auf „alles". */}
           <Segmented
             value={alleAufgeklappt ? 'mittel' : 'einheiten'}
             onChange={(wert) =>
@@ -994,31 +969,28 @@ export default function KraefteuebersichtPage() {
               In Lagebericht übernehmen
             </Button>
           )}
-          {/* Erst nach committetem Aufklappen drucken (sonst fehlen die Mittel im Ausdruck) —
-              `useDrucken` löst den Dialog im Effekt NACH dem Commit aus. */}
+          {/* Erst nach committetem Aufklappen drucken (sonst fehlen die Mittel) — `useDrucken`
+              löst den Dialog nach dem Commit aus. */}
           <DruckKnopf vorbereiten={() => setExpandedKeys(aufklappbareSchluessel(raster))} />
         </div>
 
-        {/* Das Raster läuft mit `form="tabelle"` — in JEDER Breite Tabelle (Vergleichsfläche,
-          Kriterium 14; `NUR_TABELLE`). Die fixierte menschenlesbare Kennung ist die
-          Einheitenspalte.
+        {/* Das Raster läuft mit `form="tabelle"` — in jeder Breite Tabelle (Vergleichsfläche).
+            Die fixierte menschenlesbare Kennung ist die Einheitenspalte.
 
-          KEIN `suche`, KEIN Spaltenfilter, KEINE Sortierung im Primitiv (`VOLLMENGE_PFLICHT`):
-          die Verteilungen je Einheit entstehen aus den gefilterten Rohlisten; fiele im
-          Primitiv eine Mittelzeile weg, behielte die Einheit Zahlen über unsichtbare Kinder.
+            Kein `suche`, kein Spaltenfilter, keine Sortierung im Primitiv
+            (`VOLLMENGE_PFLICHT`): die Verteilungen entstehen aus den gefilterten Rohlisten;
+            fiele im Primitiv eine Mittelzeile weg, behielte die Einheit Zahlen über unsichtbare
+            Kinder.
 
-          ZUFLUSS: Vorgabe `sammelbanner`. Bis 21.09. stand hier `sofort`, weil die Schleuse
-          nur die WURZEL-Schlüsselfolge führt und eine neue Disposition tief im alten Baum
-          landete. Die Wurzel ist jetzt die Einheitenliste — eine neu gebildete Einheit
-          erscheint als Banner statt unter dem Cursor einzurutschen; neue Mittel wachsen in
-          den Kindern und ändern die Wurzelfolge nicht.
+            Zufluss: `sammelbanner`. Die Wurzel ist die Einheitenliste — eine neu gebildete
+            Einheit erscheint als Banner; neue Mittel wachsen in den Kindern und ändern die
+            Wurzelfolge nicht.
 
-          PROBLEMZEILE: eine Einheit mit Ausfall trägt `meldebild-problemzeile` (Tönung aus
-          `--lfh-problem-zeile`, Regel in `kraefteuebersichtPrint.css`); der zweite Kanal ist
-          die Ausfall-Zahl in der Statusspalte. Dieselbe Tönung trägt eine Einheit mit
-          überfälliger oder fehlender Rückmeldung (LFH-610, Entwurf `rowBg`) — zweiter Kanal
-          dort Uhrzeit bzw. „—" samt Wort im zugänglichen Namen. KEINE zweite Tönungsfarbe:
-          der Entwurf nimmt für beide Fälle denselben Wert. */}
+            Problemzeile: eine Einheit mit Ausfall oder mit überfälliger/fehlender Rückmeldung
+            trägt `meldebild-problemzeile` (Tönung `--lfh-problem-zeile`, Regel in
+            `kraefteuebersichtPrint.css`). Zweiter Kanal ist die Ausfall-Zahl bzw. Uhrzeit oder
+            „—" samt Wort im zugänglichen Namen. Eine Tönungsfarbe für beide Fälle, wie im
+            Entwurf. */}
         <Datensicht
           bezeichnung="Meldebild"
           form="tabelle"

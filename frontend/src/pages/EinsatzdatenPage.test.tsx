@@ -119,33 +119,25 @@ describe('Führungsstellen-Berechtigung', () => {
 
 describe('Alarmzeit-Wandlung (Wire ↔ Picker)', () => {
   it('liest den Wirestring als UTC — geprüft am absoluten Instant, nicht an der Wanduhrzeit', () => {
-    // Die Assertion prüft den INSTANT, nicht das Format: `Date.UTC(...)` ist in jeder
-    // Zeitzone derselbe Zeitpunkt. Die frühere Fassung (`dayjs(wire)`) parst den naiven
-    // Wirestring als LOKALE Zeit und landet damit auf einem anderen Instant — in
-    // Europe/Berlin um 2 h daneben. Eine Prüfung auf die Form 'YYYY-MM-DD HH:mm:ss'
-    // wäre hier wertlos, sie ist in jeder Zeitzone grün.
-    //
-    // Bleibt eine unvermeidbare Grenze: unter TZ=UTC sind beide Lesarten derselbe
-    // Instant, der Test also trivial grün. Gegengeprüft wird deshalb unter
-    // TZ=Europe/Berlin (dort ist er scharf) — dieselbe Einschränkung, die
-    // `ErinnerungFormular.test.tsx` für die Gegenrichtung dokumentiert.
+    // Geprüft wird der Instant, nicht das Format: `Date.UTC(...)` ist in jeder Zeitzone derselbe
+    // Zeitpunkt, `dayjs(wire)` parste den naiven Wirestring als lokale Zeit. Unter TZ=UTC sind
+    // beide Lesarten gleich und der Test trivial grün; scharf ist er unter TZ=Europe/Berlin.
     expect(wireZuPicker('2026-05-23 09:00:00').valueOf()).toBe(Date.UTC(2026, 4, 23, 9, 0, 0));
   });
 
   it('hält den Picker in lokaler Zeit — dieselbe Wanduhrzeit, die ZeitAnzeige daneben rendert', () => {
-    // `ZeitAnzeige`/`format.ts:inZone` rendert ohne konfigurierte Zone `dayjs.utc(x).local()`.
-    // Der Picker muss dieselbe Wanduhrzeit zeigen, sonst steht im Bearbeiten-Modus eine
-    // andere Uhrzeit als in der Descriptions-Zelle direkt daneben — der gemeldete Fehler.
+    // `format.ts:inZone` rendert ohne konfigurierte Zone `dayjs.utc(x).local()`. Der Picker muss
+    // dieselbe Wanduhrzeit zeigen, sonst stünde im Bearbeiten-Modus eine andere Uhrzeit als in der
+    // Zelle daneben.
     expect(wireZuPicker('2026-05-23 09:00:00').format('YYYY-MM-DD HH:mm:ss')).toBe(
       dayjs.utc('2026-05-23 09:00:00').local().format('YYYY-MM-DD HH:mm:ss'),
     );
   });
 
   it('normalisiert die lokale Picker-Zeit zurück auf den UTC-Wirestring', () => {
-    // Fester Instant 09:00 UTC, als Dayjs im Lokal-Modus übergeben — so liefert ihn der
-    // antd-DatePicker. Ohne `.utc()` im Helfer formatiert `.format()` die lokale
-    // Wanduhrzeit und der Test fällt auf jeder Nicht-UTC-Maschine; der local→UTC-Shift
-    // wird also echt exerziert statt durch UTC-Eingabe zum No-op zu werden.
+    // Fester Instant 09:00 UTC, als Dayjs im Lokal-Modus — so liefert ihn der antd-DatePicker. Ohne
+    // `.utc()` im Helfer formatierte `.format()` die lokale Wanduhrzeit; der local→UTC-Shift wird
+    // echt exerziert.
     const lokal = dayjs.utc('2026-05-23 09:00:00').local();
     expect(pickerZuWire(lokal)).toBe('2026-05-23 09:00:00');
   });
@@ -221,9 +213,8 @@ describe('EinsatzdatenPage', () => {
     // 'Admin' erscheint als Einsatzleitung in der Kopfleiste und zusätzlich in der Zugriff-Tabelle.
     expect(screen.getAllByText('Admin').length).toBeGreaterThan(0);
     expect(screen.getAllByText('—').length).toBeGreaterThan(0);
-    // Die Einsatznummer ist seit der Gliederung (M14) eine TECHNISCHE Angabe und steht im
-    // eingeklappten Abschnitt. Ohne `forceRender` ist sie gar nicht im Baum — die
-    // Gegenaussage steht deshalb hier, das Aufklappen im Gliederungs-Block weiter unten.
+    // Die Einsatznummer ist eine technische Angabe im eingeklappten Abschnitt; ohne `forceRender`
+    // steht sie nicht im Baum. Das Aufklappen prüft der Gliederungs-Block weiter unten.
     expect(screen.queryByText('2026-001')).toBeNull();
   });
 
@@ -276,9 +267,8 @@ describe('EinsatzdatenPage', () => {
   });
 
   it('speichert via PATCH und invalidiert den Einsatz-Cache', async () => {
-    // Den PATCH-Body direkt im Handler prüfen und den Aufruf über ein Boolean
-    // signalisieren — so umgehen wir die TS-Control-Flow-Eigenheit, dass eine
-    // in einer Closure zugewiesene Variable außerhalb nicht eng typisiert wird.
+    // Den PATCH-Body im Handler prüfen und den Aufruf über ein Boolean signalisieren — eine in
+    // einer Closure zugewiesene Variable wird außerhalb nicht eng typisiert.
     let patchAufgerufen = false;
     setup();
     server.use(
@@ -320,8 +310,8 @@ describe('EinsatzdatenPage', () => {
   });
 
   it('blendet Verwaltungs-Aktionen für Führungspersonal aus', async () => {
-    // benutzer ohne System-Admin: sonst gewährt der admin-globale Zweig (LFH-234) die
-    // Leitungs-/Verwaltungsrechte auch dem Führungspersonal-Konto. Hier zählt die Einsatz-Rolle.
+    // Benutzer ohne System-Admin: sonst gewährte der admin-globale Zweig die Leitungsrechte auch
+    // dem Führungspersonal-Konto.
     setup({
       einsatz: { meine_rolle: 'fuehrungspersonal' },
       benutzer: { ...admin, system_rolle: 'keiner' },
@@ -340,16 +330,10 @@ describe('EinsatzdatenPage', () => {
 });
 
 /**
- * Persistenter Speicherfehler (LFH-345 · C10, Befund H14).
- *
- * ── Warum hier KEIN Fake-Timer-Vorlauf steht ────────────────────────────────────
- * Das AK verlangt ihn, aber er belegt an dieser Stelle nichts: nach dem Klick läuft antds
- * Message-Timer bereits mit echten Timern, ein danach aktivierter Fake-Timer erreicht ihn
- * nicht mehr — der Test wäre grün gewesen, bevor es Produktivcode gab (gemessen 24.08.2026,
- * ausführlich in `einstellungen/EinsatzDefaults.test.tsx`). Und ihn VOR dem Rendern zu
- * setzen geht hier nicht: diese Seite lädt über MSW, dessen Antwortweg unter Fake-Timern
- * hängen bliebe. Bleibt die stärkere Aussage — die Meldung steht in der Seite, nicht in
- * antds Message-Container. Genau die dreht ein zurückgebautes `message.error` wieder um.
+ * Persistenter Speicherfehler: die Meldung steht in der Seite, nicht in antds Message-Container.
+ * Kein Fake-Timer-Vorlauf: ein nach dem Klick aktivierter Fake-Timer erreicht antds laufenden
+ * Message-Timer nicht, und vor dem Rendern gesetzt hinge der MSW-Antwortweg (Details in
+ * `einstellungen/EinsatzDefaults.test.tsx`).
  */
 describe('EinsatzdatenPage · Speicherfehler (LFH-345)', () => {
   it('meldet den Fehler an der Seite, NICHT als Toast', async () => {
@@ -366,7 +350,7 @@ describe('EinsatzdatenPage · Speicherfehler (LFH-345)', () => {
     expect(treffer.closest('.ant-message')).toBeNull();
   });
 
-  // Die zweite Haelfte: ein Alert, der NIE geht, ist so falsch wie einer, der zu frueh geht.
+  // Die zweite Hälfte: ein Alert, der nie geht, ist so falsch wie einer, der zu früh geht.
   it('raeumt den Fehler beim naechsten Absenden weg', async () => {
     setup();
     let abgelehnt = true;
@@ -392,12 +376,9 @@ describe('EinsatzdatenPage · Speicherfehler (LFH-345)', () => {
 });
 
 /**
- * Gliederung der Leseansicht (LFH-345 · C10, Befund M14).
- *
- * Die drei Aussagen sind die drei Hälften des Befunds: der Status stand als ROHER
- * Wire-Wert im Titel-Tag, die zwölf Zeilen standen als Datenwand ohne Gewichtung
- * nebeneinander, und der Wechsel in den Bearbeiten-Modus ließ den Fokus auf dem
- * gerade verschwundenen Knopf zurück.
+ * Gliederung der Leseansicht: Status als Beschriftung statt Wire-Wert, gewichtete Kopfangaben statt
+ * Datenwand, und der Fokus bleibt beim Wechsel in den Bearbeiten-Modus nicht auf dem verschwundenen
+ * Knopf.
  */
 describe('EinsatzdatenPage · Gliederung (LFH-345, M14)', () => {
   it('zeigt den Status als Wort, nicht als Wire-Wert', async () => {
@@ -405,16 +386,14 @@ describe('EinsatzdatenPage · Gliederung (LFH-345, M14)', () => {
     const tag = await screen.findByText('Abgeschlossen');
     expect(screen.queryByText('abgeschlossen')).toBeNull();
 
-    // Die zweite, unterscheidende Hälfte: ein lokales `status[0].toUpperCase()` erfüllte
-    // das Paar oben vollständig. Erst `data-rolle` belegt, dass der Wert durch
-    // `einsatzStatus` und `StatusTag` gelaufen ist — und damit über die Rollenachse des
-    // Statusfarb-Vertrags statt über eine erfundene Farbe.
+    // Die unterscheidende Hälfte: ein lokales `status[0].toUpperCase()` erfüllte das Paar oben.
+    // Erst `data-rolle` belegt, dass der Wert durch `einsatzStatus` und `StatusTag` gelaufen ist.
     expect(tag.closest('[data-rolle]')).toHaveAttribute('data-rolle', 'neutral');
   });
 
   it('hält die technischen Angaben eingeklappt, die Kopfangaben aber sichtbar', async () => {
-    // `basisEinsatz` trägt für beide Felder `null` — ohne diese Werte prüfte der Test
-    // gegen zwei Gedankenstriche und wäre über den Umbau hinweg blind.
+    // `basisEinsatz` trägt für beide Felder `null` — ohne diese Werte prüfte der Test gegen zwei
+    // Gedankenstriche.
     setup({ einsatz: { einsatzort: 'Musterstraße 1', leitstellen_nr: 'LS-4711' } });
     expect(await screen.findByText('Musterstraße 1')).toBeInTheDocument();
     expect(screen.queryByText('LS-4711')).toBeNull();
@@ -446,7 +425,7 @@ describe('EinsatzdatenPage · Gliederung (LFH-345, M14)', () => {
 
     await user.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(patchBody).not.toBeNull());
-    // Abwesenheit des SCHLÜSSELS, nicht bloß `null`: auch `null` ist beim Server 400.
+    // Abwesenheit des Schlüssels, nicht bloß `null`: auch `null` ist beim Server 400.
     expect(patchBody).not.toHaveProperty('einsatznummer_intern');
     expect(patchBody).toHaveProperty('leitstellen_nr', 'LS-1');
   });

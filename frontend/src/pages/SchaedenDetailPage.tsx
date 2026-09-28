@@ -71,10 +71,9 @@ export default function SchaedenDetailPage() {
   const { message, modal } = App.useApp();
   const [editForm] = Form.useForm<EditWerte>();
   const editSitzung = useEditSitzung<EditWerte>(editForm);
-  // Als `const` herausgezogen, damit TypeScript im Formularzweig auf „Sitzung offen"
-  // verengt: `basis` ist dort nicht optional. Mit `editSitzung.sitzung?.basis` wäre der
-  // unmögliche Fall still ein Schreiben OHNE Lock — also genau der blinde Overwrite,
-  // gegen den F10 gebaut ist.
+  // Als `const` herausgezogen, damit TypeScript im Formularzweig auf „Sitzung offen" verengt:
+  // `basis` ist dort nicht optional. Mit `editSitzung.sitzung?.basis` wäre der unmögliche Fall
+  // still ein Schreiben ohne Lock.
   const sitzung = editSitzung.sitzung;
   const bearbeiten = sitzung != null;
   const [uebergebenOffen, setUebergebenOffen] = useState(false);
@@ -104,13 +103,12 @@ export default function SchaedenDetailPage() {
     enabled: idGueltig,
   });
 
-  // Optimistisches Lock (LFH-300/F10): `basis` trägt den beim ÖFFNEN der Maske eingefrorenen
-  // geaendert_at-Stand (LFH-303 — aus den Live-Query-Daten gelesen hebelte ein
-  // Hintergrund-Refetch das Lock aus); ein 409 öffnet den Konfliktdialog (neu laden vs.
-  // überschreiben), statt still zu überschreiben.
+  // Optimistisches Lock: `basis` trägt den beim Öffnen der Maske eingefrorenen geaendert_at-Stand
+  // (aus den Live-Query-Daten gelesen hebelte ein Hintergrund-Refetch das Lock aus); ein 409 öffnet
+  // den Konfliktdialog, statt still zu überschreiben.
   const editMutation = useMutation({
-    // `basis` ist eine `CasBasis` und damit nur aus `useEditSitzung` zu bekommen: ein
-    // blanker `s.geaendert_at` aus den Live-Query-Daten bricht hier den Typcheck (LFH-303).
+    // `basis` ist eine `CasBasis` und nur aus `useEditSitzung` zu bekommen: ein blanker
+    // `s.geaendert_at` bricht hier den Typcheck.
     mutationFn: (v: { daten: SchadenPatch; basis?: CasBasis; overwrite?: boolean }) =>
       aktualisiereSchaden(einsatzId, schadenId, v.daten, v.overwrite ? undefined : v.basis),
     onSuccess: () => {
@@ -118,11 +116,9 @@ export default function SchaedenDetailPage() {
       editSitzung.beende();
     },
     onError: (e, v) => {
-      // Nur der ERSTE 409 (Save MIT Baseline) ist der Sperrkonflikt. Anders als beim
-      // Person-PATCH (Referenz LFH-241) kennt die Schaden-Route einen ZWEITEN 409: den
-      // Storno-Guard, der vor der CAS greift und den `overwrite` nicht umgehen kann.
-      // Ein 409 auf den Overwrite muss deshalb die echte Servermeldung zeigen, statt
-      // denselben Dialog erneut zu öffnen — sonst wäre „Überschreiben" ein toter Button.
+      // Nur der erste 409 (Save mit Baseline) ist der Sperrkonflikt. Die Schaden-Route kennt einen
+      // zweiten 409, den Storno-Guard vor der CAS, den `overwrite` nicht umgeht. Ein 409 auf den
+      // Overwrite zeigt deshalb die Servermeldung, sonst wäre „Überschreiben" ein toter Knopf.
       if (istKonflikt(e) && !v.overwrite) {
         modal.confirm({
           title: 'Zwischenzeitlich geändert',
@@ -170,7 +166,7 @@ export default function SchaedenDetailPage() {
     onError: fehler,
   });
 
-  // NaN-/Bad-ID-Guard nach allen Hooks (Rules-of-Hooks): ungültige Route-ID → zurück auf die Liste.
+  // Bad-ID-Guard nach allen Hooks (Rules-of-Hooks): ungültige Route-ID → zurück auf die Liste.
   if (!idGueltig) {
     return <Navigate to={schaedenPfad(einsatzId)} replace />;
   }
@@ -204,9 +200,8 @@ export default function SchaedenDetailPage() {
 
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
-  // Eine Eingabe-Zelle: im Edit-Modus ein noStyle-Form.Item, das `SchadenDaten` an die Stelle
-  // der Anzeige setzt — so bleibt dasselbe Datenraster stehen, statt die Ansicht gegen ein
-  // separates Formular zu tauschen. Die Regeln bleiben hier, am Formular der Seite.
+  // Eine Eingabe-Zelle: im Edit-Modus ein noStyle-Form.Item an der Stelle der Anzeige — dasselbe
+  // Datenraster bleibt stehen. Die Regeln bleiben am Formular der Seite.
   const feld = (name: string, input: React.ReactNode, rules?: object[]) => (
     <Form.Item name={name} noStyle rules={rules}>
       {input}
@@ -333,9 +328,9 @@ export default function SchaedenDetailPage() {
         detailAnsicht
       )}
 
-      {/* Fotos und Dateien (LFH-21): unter dem Datenraster und AUSSERHALB des
-          Bearbeiten-<Form> — der Ablegen-Dialog trägt ein eigenes Formular, verschachtelt
-          schickte es beim Absenden das äußere nativ ab. Im Bearbeiten-Modus bleibt es sichtbar. */}
+      {/* Fotos und Dateien: unter dem Datenraster und außerhalb des Bearbeiten-<Form> — der
+          Ablegen-Dialog trägt ein eigenes Formular, verschachtelt schickte es beim Absenden das
+          äußere nativ ab. Im Bearbeiten-Modus bleibt es sichtbar. */}
       <div style={{ marginTop: 16 }}>
         <SchadenAnhaenge einsatzId={einsatzId} schaden={s} darfSchreiben={darfSchreiben} />
       </div>

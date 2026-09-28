@@ -148,7 +148,7 @@ describe('MitgliederAbschnitt', () => {
       screen.getByRole('textbox', { name: 'Führungsstelle' }),
       'Florian Leitung',
     );
-    // LFH-461 Review: native Formularübermittlung statt eines Modal-Fußknopfs.
+    // Native Formularübermittlung statt eines Modal-Fußknopfs.
     const speichern = screen.getByRole('button', { name: 'Speichern' });
     expect(speichern.closest('form')).not.toBeNull();
     expect(speichern).toHaveAttribute('type', 'submit');
@@ -241,9 +241,8 @@ describe('MitgliederAbschnitt', () => {
 
   it('beschriftet die Aktionsspalte und trägt einen echten Knopf statt eines Textlinks', async () => {
     /**
-     * Befund N7 (LFH-339 · C4). Die Aktionsspalte hiess `title: ''` — eine namenlose
-     * Spalte ist für einen Screenreader eine Zelle ohne Zugehörigkeit, und ein
-     * `Button type="link"` sieht aus wie Fliesstext, obwohl er die einzige destruktive
+     * Die Aktionsspalte ist beschriftet (eine namenlose Spalte ist für einen Screenreader eine
+     * Zelle ohne Zugehörigkeit), und der Knopf ist kein Textlink, weil er die einzige destruktive
      * Handlung der Zeile auslöst.
      */
     server.use(
@@ -253,14 +252,13 @@ describe('MitgliederAbschnitt', () => {
     renderMitProviders(
       <MitgliederAbschnitt einsatzId={7} darfVerwalten darfFuehrungsstelleVerwalten />,
     );
-    // Erst auf die DATENZEILE warten: die Kopfzeile steht auch ohne Mitglieder im Baum,
-    // ein `findByRole('columnheader')` allein wäre also grün, bevor es etwas zu bedienen
-    // gibt — und der Knopf darunter dann noch nicht da.
+    // Erst auf die Datenzeile warten: die Kopfzeile steht auch ohne Mitglieder im Baum,
+    // `findByRole('columnheader')` allein wäre grün, bevor es etwas zu bedienen gibt.
     await screen.findByText('Eva Einsatz');
     expect(screen.getByRole('columnheader', { name: 'Aktion' })).toBeInTheDocument();
     const knopf = screen.getByRole('button', { name: 'Entfernen' });
     expect(knopf.className).not.toMatch(/ant-btn-link\b/);
-    // `danger` bleibt: Löschen IST Gefahr. Rot bedient nichts — aber es warnt.
+    // `danger` bleibt: Löschen ist Gefahr. Rot bedient nichts — aber es warnt.
     expect(knopf.className).toMatch(/ant-btn-color-dangerous|ant-btn-dangerous/);
   });
 

@@ -343,8 +343,8 @@ describe('VerpflegungPage (LFH-634)', () => {
   });
 
   describe('Live-Zufluss (Spec „Live-Verteilung")', () => {
-    // Das fremde Zeitfenster beginnt VOR allen anderen — die Zeitordnung stellt es oben hin.
-    // Landete es unten, verschöbe sich auch ohne Schleuse nichts, und der Test bewiese nichts.
+    // Das fremde Zeitfenster beginnt vor allen anderen und steht oben. Landete es unten, verschöbe
+    // sich auch ohne Schleuse nichts.
     const fremd = () =>
       zeitfenster({ id: 9, bezeichnung: 'Imbiss', von_at: um(-60), bis_at: um(30) });
 
@@ -359,7 +359,7 @@ describe('VerpflegungPage (LFH-634)', () => {
       await waitFor(() => expect(sammelbanner()).not.toBeNull());
       expect(sammelbanner()).toHaveTextContent('1 neues Zeitfenster, davon 1 mit Unterdeckung');
       expect(kartenNamen()).toEqual(['Mittag', 'Abend']);
-      // Die Zahlen lügen nicht: der Kopf zählt das zurückgehaltene mit.
+      // Der Kopf zählt das zurückgehaltene mit.
       expect(screen.getByText('4 Zeitfenster · 3 mit Unterdeckung')).toBeInTheDocument();
 
       await userEvent.click(
