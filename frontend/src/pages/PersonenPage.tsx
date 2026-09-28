@@ -8,7 +8,6 @@ import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
 import { listePersonen, registrierAnzeige, schlageAbgleichVor } from '../api/einsatzPerson';
-import { fehlerText } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import { listeUhs } from '../api/einsatzUhs';
 import Datensicht, { spaltenFuer } from '../components/Datensicht';
@@ -54,6 +53,7 @@ import {
   personErfassungsQuittungEntfernen,
   personErfassungsQuittungenLaden,
 } from '../offline/queue';
+import { useFehlerMeldung } from '../components/useFehlerMeldung';
 
 /**
  * Betroffene (Neuentwurf S7 „Erfassung Betroffene — das Formular wird zur Zeile").
@@ -218,7 +218,7 @@ export default function PersonenPage() {
     qc.invalidateQueries({ queryKey: einsatzKeys.personen(einsatzId) });
     qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
   }
-  const fehler = (e: unknown) => message.error(fehlerText(e));
+  const fehler = useFehlerMeldung();
 
   const anlegenMutation = useMutation({
     mutationFn: async (v: {

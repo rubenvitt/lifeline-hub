@@ -7,7 +7,7 @@ import { SeitenFehler } from '../components/SeitenZustand';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
-import { ApiError } from '../api/client';
+import { fehlerText } from '../api/client';
 import { listeKategorien, listeMaterial, setzeDienststatus } from '../api/material';
 import type { Material } from '../api/types';
 import MaterialFormModal from './MaterialFormModal';
@@ -34,7 +34,7 @@ export default function MaterialTab() {
   const dienststatusMutation = useMutation({
     mutationFn: (v: { id: number; inDienst: boolean }) => setzeDienststatus(v.id, v.inDienst),
     onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.material() }),
-    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen'),
+    onError: (e) => message.error(fehlerText(e)),
   });
 
   const spalten: TableColumnsType<Material> = [

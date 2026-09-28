@@ -56,7 +56,7 @@ import type {
   VerbleibArt,
   Verfuegbarkeit,
 } from '../../api/types';
-import { ApiError } from '../../api/client';
+import { fehlerText } from '../../api/client';
 import { einsatzKeys } from '../../api/queryKeys';
 import PersonDetailDrawer from '../../personen/PersonDetailDrawer';
 import { ErfassungsModal } from '../../components/Erfassung';
@@ -64,6 +64,7 @@ import StatusTag from '../../components/StatusTag';
 import { Augenbraue, Paneel, StatusChip, monoStil, useRollen } from '../../components/instrument';
 import { rollenFarbe, verfuegbarkeit as verfuegbarkeitVertrag } from '../../theme/statusFarben';
 import { useViewport } from '../../components/useViewport';
+import { useFehlerMeldung } from '../../components/useFehlerMeldung';
 
 // Feste Karten-Höhe. Muss unter dem Raster-Zeilenabstand (raster_position SCHRITT_Y=120
 // im Backend) bleiben, damit absolut platzierte Karten einander nicht überlappen, und
@@ -1067,8 +1068,7 @@ export default function Grundriss({
       qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) }),
     ]);
   }
-  const fehler = (e: unknown) =>
-    message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
+  const fehler = useFehlerMeldung();
 
   const layoutMut = useMutation({
     mutationFn: ({ pid, pos_x, pos_y }: { pid: number; pos_x: number; pos_y: number }) =>
@@ -1654,8 +1654,7 @@ function NeuerPlatzKnopf({
       setOpen(false);
       onSuccess();
     },
-    onError: (e: unknown) =>
-      message.error(e instanceof ApiError ? e.message : 'Anlegen fehlgeschlagen'),
+    onError: (e: unknown) => message.error(fehlerText(e, 'Anlegen fehlgeschlagen')),
   });
   if (!open) {
     return (

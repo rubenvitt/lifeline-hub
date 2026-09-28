@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ApiError } from '../api/client';
+import { ApiError, fehlerText } from '../api/client';
 import { erfasseEtb, type NeuerEintrag } from '../api/etb';
 import { einsatzKeys } from '../api/queryKeys';
 import { meldeSitzungAbgelaufen } from '../auth/sitzungsEvent';
@@ -134,7 +134,7 @@ export function useEtbErfassung(einsatzId: number, benutzerId?: number) {
           }
           // Fachliche Ablehnung → aus der Queue nehmen, aber persistent als abgelehnt
           // ablegen (nicht still in flüchtigem State verlieren).
-          await queueAblehnen(benutzerId, a, e instanceof ApiError ? e.message : 'Abgelehnt');
+          await queueAblehnen(benutzerId, a, fehlerText(e, 'Abgelehnt'));
         }
       }
       if (!darfFortsetzen()) return;

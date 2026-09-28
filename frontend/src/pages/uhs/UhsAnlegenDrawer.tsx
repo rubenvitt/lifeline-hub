@@ -4,7 +4,7 @@ import { Select } from '../../components/Select';
 import { ErfassungsFormular, type ErfassungsFormularSteuerung } from '../../components/Erfassung';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { legeUhsAn, type UhsEingabe } from '../../api/einsatzUhs';
-import { ApiError } from '../../api/client';
+import { fehlerText } from '../../api/client';
 import { einsatzKeys } from '../../api/queryKeys';
 import type { Uhs } from '../../api/types';
 import { uhsTyp } from '../../theme/statusFarben';
@@ -40,8 +40,7 @@ export default function UhsAnlegenDrawer({ einsatzId, open, onClose, onAngelegt 
       qc.invalidateQueries({ queryKey: einsatzKeys.uhs(einsatzId) });
       qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
     },
-    onError: (e: unknown) =>
-      message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen'),
+    onError: (e: unknown) => message.error(fehlerText(e)),
   });
 
   const abbrechen = useCallback(() => {

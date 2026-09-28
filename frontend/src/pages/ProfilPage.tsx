@@ -13,7 +13,7 @@ import { useQuery } from '@tanstack/react-query';
 import { startRegistration } from '@simplewebauthn/browser';
 import { QRCodeSVG } from 'qrcode.react';
 import OtpEingabe from '../components/OtpEingabe';
-import { ApiError } from '../api/client';
+import { fehlerText } from '../api/client';
 import { providerListe } from '../api/auth';
 import { ladeOrganisation } from '../api/organisation';
 import { globalKeys } from '../api/queryKeys';
@@ -111,7 +111,7 @@ export default function ProfilPage() {
       await webauthnRegistrierungAbschliessen(cred);
       setErfolg(true);
     } catch (e) {
-      setFehler(e instanceof ApiError ? e.message : 'Passkey-Registrierung fehlgeschlagen');
+      setFehler(fehlerText(e, 'Passkey-Registrierung fehlgeschlagen'));
     } finally {
       setLaedt(false);
     }
@@ -126,7 +126,7 @@ export default function ProfilPage() {
       const start = await enrollStart();
       setTotpEnrollment({ otpauthUrl: start.otpauth_url, secretBase32: start.secret_base32 });
     } catch (e) {
-      setTotpFehler(e instanceof ApiError ? e.message : 'TOTP-Einrichtung fehlgeschlagen');
+      setTotpFehler(fehlerText(e, 'TOTP-Einrichtung fehlgeschlagen'));
     } finally {
       setTotpLaedt(false);
     }
@@ -148,7 +148,7 @@ export default function ProfilPage() {
       totpForm.resetFields();
       await aktualisiere();
     } catch (e) {
-      setTotpFehler(e instanceof ApiError ? e.message : 'Code ungültig');
+      setTotpFehler(fehlerText(e, 'Code ungültig'));
     } finally {
       // Fällt im finally: nach einer Ablehnung muss der nächste Versuch sofort gehen.
       sendetRef.current = false;

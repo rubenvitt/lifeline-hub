@@ -8,7 +8,7 @@ import { SeitenFehler } from '../components/SeitenZustand';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
-import { ApiError } from '../api/client';
+import { fehlerText } from '../api/client';
 import { ladeFahrzeugVorschlaege, listeFahrzeuge, setzeDienststatus } from '../api/fahrzeuge';
 import type { Fahrzeug } from '../api/types';
 import FahrzeugFormModal from './FahrzeugFormModal';
@@ -42,7 +42,7 @@ export default function FahrzeugeTab() {
   const dienststatusMutation = useMutation({
     mutationFn: (v: { id: number; inDienst: boolean }) => setzeDienststatus(v.id, v.inDienst),
     onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.fahrzeuge() }),
-    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen'),
+    onError: (e) => message.error(fehlerText(e)),
   });
 
   const spalten: TableColumnsType<Fahrzeug> = [

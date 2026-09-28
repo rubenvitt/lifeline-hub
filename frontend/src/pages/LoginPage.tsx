@@ -3,7 +3,7 @@ import { KeyOutlined, LoginOutlined } from '@ant-design/icons';
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { startAuthentication } from '@simplewebauthn/browser';
-import { ApiError } from '../api/client';
+import { ApiError, fehlerText } from '../api/client';
 import OtpEingabe from '../components/OtpEingabe';
 import { devBenutzerLaden, type DevBenutzer } from '../api/dev';
 import { providerListe } from '../api/auth';
@@ -152,7 +152,7 @@ export default function LoginPage() {
       await aktualisiere();
       navigate(zielPfad, { replace: true });
     } catch (e) {
-      setFehler(e instanceof ApiError ? e.message : 'Code ungültig');
+      setFehler(fehlerText(e, 'Code ungültig'));
     } finally {
       // Der Riegel fällt IM finally, nicht erst beim nächsten Render: nach einer Ablehnung
       // muss der nächste Versuch sofort möglich sein.
@@ -199,7 +199,7 @@ export default function LoginPage() {
       await aktualisiere();
       navigate(zielPfad, { replace: true });
     } catch (e) {
-      setFehler(e instanceof ApiError ? e.message : 'Passkey-Anmeldung fehlgeschlagen');
+      setFehler(fehlerText(e, 'Passkey-Anmeldung fehlgeschlagen'));
     } finally {
       setLaedt(null);
     }

@@ -31,7 +31,7 @@ import {
   uebergebeSchaden,
   type SchadenPatch,
 } from '../api/einsatzSchaden';
-import { ApiError, istKonflikt } from '../api/client';
+import { istKonflikt } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import { parseRouteId, schaedenPfad } from '../routing/deeplinks';
 import type { Ausmass, SchadenTyp } from '../api/types';
@@ -47,6 +47,7 @@ import {
   geschaedigtAusSchaden,
   geschaedigtFelder,
 } from './schaeden/schadenHelfer';
+import { useFehlerMeldung } from '../components/useFehlerMeldung';
 
 const TYP_OPTIONS = (Object.keys(TYP_LABEL) as SchadenTyp[]).map((t) => ({
   value: t,
@@ -68,7 +69,7 @@ export default function SchaedenDetailPage() {
   const navigate = useNavigate();
 
   const qc = useQueryClient();
-  const { message, modal } = App.useApp();
+  const { modal } = App.useApp();
   const [editForm] = Form.useForm<EditWerte>();
   const editSitzung = useEditSitzung<EditWerte>(editForm);
   // Als `const` herausgezogen, damit TypeScript im Formularzweig auf „Sitzung offen"
@@ -82,8 +83,7 @@ export default function SchaedenDetailPage() {
   const [uebergebForm] = Form.useForm<{ uebergeben_an: string }>();
   const [abschlussForm] = Form.useForm<{ abschluss_grund: string; notiz?: string }>();
 
-  const fehler = (e: unknown) =>
-    message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
+  const fehler = useFehlerMeldung();
 
   function invalidate() {
     qc.invalidateQueries({ queryKey: einsatzKeys.schaeden(einsatzId) });

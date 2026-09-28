@@ -8,7 +8,6 @@ import { einsatzKeys } from '../api/queryKeys';
 import { ladeEinsatz, ladeMitglieder } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
-import { fehlerText } from '../api/client';
 import {
   bestaetigeMeldung,
   erteileAuftragAusMeldung,
@@ -37,6 +36,7 @@ import {
   useRollen,
 } from '../components/instrument';
 import { meldungKennzahlen } from '../meldungen/meldungKennzahlen';
+import { useFehlerMeldung } from '../components/useFehlerMeldung';
 
 /**
  * Sortierung der Meldungen: Prio (sofort→dringend→normal), dann eskaliert zuerst
@@ -125,7 +125,7 @@ export default function MeldungenPage() {
       ?.scrollIntoView?.({ block: 'center' });
   }, [highlightMeldungId]);
 
-  const fehler = (e: unknown) => message.error(fehlerText(e));
+  const fehler = useFehlerMeldung();
   const invalidiere = () => qc.invalidateQueries({ queryKey: einsatzKeys.meldungen(einsatzId) });
 
   // LFH-332/B4: kein `setFormOffen(false)` mehr. Das Inline-Formular bleibt nach

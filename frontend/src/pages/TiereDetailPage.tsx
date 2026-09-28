@@ -32,12 +32,13 @@ import {
   tierRegistrierAnzeige,
   type TierPatch,
 } from '../api/einsatzTier';
-import { ApiError, istKonflikt } from '../api/client';
+import { istKonflikt } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import { parseRouteId, personDetailPfad, tierePfad } from '../routing/deeplinks';
 import type { AbschlussGrund, Tier, TierStatus } from '../api/types';
 import HalterPicker, { type HalterWert } from '../personen/HalterPicker';
 import { useEditSitzung, type CasBasis } from '../components/useEditSitzung';
+import { useFehlerMeldung } from '../components/useFehlerMeldung';
 
 /** Formularwerte der Bearbeiten-Maske: der Patch plus die zusammengesetzte
  *  Halter-Auswahl, die erst beim Absenden in das XOR-Feldpaar zerlegt wird. */
@@ -80,7 +81,7 @@ export default function TiereDetailPage() {
   const navigate = useNavigate();
 
   const qc = useQueryClient();
-  const { message, modal } = App.useApp();
+  const { modal } = App.useApp();
   const [editForm] = Form.useForm<TierFormWerte>();
   const editSitzung = useEditSitzung<TierFormWerte>(editForm);
   // Als `const` herausgezogen, damit TypeScript im Formularzweig auf „Sitzung offen"
@@ -95,8 +96,7 @@ export default function TiereDetailPage() {
     abschluss_ziel?: string;
   }>();
 
-  const fehler = (e: unknown) =>
-    message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
+  const fehler = useFehlerMeldung();
 
   function invalidate() {
     qc.invalidateQueries({ queryKey: einsatzKeys.tiere(einsatzId) });

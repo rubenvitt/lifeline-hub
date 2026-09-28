@@ -1,4 +1,4 @@
-import { Alert, App, Breadcrumb, Button, Form, Input, Space, Tag, Typography } from 'antd';
+import { Alert, Breadcrumb, Button, Form, Input, Space, Tag, Typography } from 'antd';
 import { Augenbraue, Segmentleiste, StatusChip } from '../components/instrument';
 import { Select } from '../components/Select';
 import { Link, useNavigate, useParams } from 'react-router';
@@ -13,7 +13,6 @@ import {
   tierRegistrierAnzeige,
   type TierEingabe,
 } from '../api/einsatzTier';
-import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import Datensicht, {
   scrolleZurZeile,
@@ -33,6 +32,7 @@ import { SPEZIES_META, TIER_STATUS, filterTiere, type TiereSicht } from './tiere
 import type { Spezies, Tier } from '../api/types';
 import StatusTag from '../components/StatusTag';
 import { einsatzStatus } from '../theme/statusFarben';
+import { useFehlerMeldung } from '../components/useFehlerMeldung';
 
 const STATUS_META = TIER_STATUS;
 
@@ -206,7 +206,6 @@ export default function TierePage() {
   });
 
   const qc = useQueryClient();
-  const { message } = App.useApp();
   const [modus, setModus] = useState<{
     einsatzId: number;
     wert: 'schnell' | 'vermisst';
@@ -233,8 +232,7 @@ export default function TierePage() {
     form.setFieldValue('antreff_ort', ort);
   }, [aktuellerModus, einsatzId, form]);
 
-  const fehler = (e: unknown) =>
-    message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
+  const fehler = useFehlerMeldung();
 
   useEffect(() => {
     if (highlight?.einsatzId !== einsatzId) return;

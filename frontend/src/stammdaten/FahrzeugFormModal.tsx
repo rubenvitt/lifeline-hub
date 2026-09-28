@@ -2,7 +2,7 @@ import { App, AutoComplete, Form, Input, Typography } from 'antd';
 import { useEffect } from 'react';
 import { Link } from 'react-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ApiError } from '../api/client';
+import { fehlerText } from '../api/client';
 import { ErfassungsModal } from '../components/Erfassung';
 import { aktualisiereFahrzeug, legeFahrzeugAn } from '../api/fahrzeuge';
 import type { Fahrzeug, FahrzeugVorschlaege } from '../api/types';
@@ -89,7 +89,7 @@ export default function FahrzeugFormModal({
       qc.invalidateQueries({ queryKey: globalKeys.fahrzeuge() });
       qc.invalidateQueries({ queryKey: globalKeys.fahrzeugVorschlaege() });
     },
-    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),
+    onError: (e) => message.error(fehlerText(e, 'Speichern fehlgeschlagen')),
   });
 
   return (

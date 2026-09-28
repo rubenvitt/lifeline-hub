@@ -21,7 +21,6 @@ import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
 import { kraefteuebersichtPfad, einheitenPfad, fahrzeugePfad } from '../routing/deeplinks';
 import Verdichtungszeile from '../kraefte/Verdichtungszeile';
 import AdhocPersonModal from '../kraefte/AdhocPersonModal';
-import { ApiError } from '../api/client';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { EinsatzPersonal, StaerkePosition } from '../api/types';
 import StatusWahl, { type StatusOption } from '../components/StatusWahl';
@@ -44,6 +43,7 @@ import { einsatzStatus, statusKategorie } from '../theme/statusFarben';
 import { abstand } from '../theme/tokens';
 import StatusTag from '../components/StatusTag';
 import { personalStatusDarstellung } from '../kraefte/mittelStatus';
+import { useFehlerMeldung } from '../components/useFehlerMeldung';
 
 export default function PersonalPage() {
   const { id } = useParams();
@@ -95,8 +95,7 @@ export default function PersonalPage() {
     qc.invalidateQueries({ queryKey: einsatzKeys.personal(einsatzId) });
     qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
   }
-  const fehler = (e: unknown) =>
-    message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
+  const fehler = useFehlerMeldung();
 
   const disponiereMutation = useMutation({
     mutationFn: (personalId: number) => disponierePerson(einsatzId, personalId),

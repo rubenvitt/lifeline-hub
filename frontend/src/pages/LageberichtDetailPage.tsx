@@ -24,7 +24,6 @@ import {
   lageberichtDetailPfad,
   etbPfad,
 } from '../routing/deeplinks';
-import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import {
   aktualisiereLagebericht,
@@ -53,6 +52,7 @@ import Druckkopf from '../components/druck/Druckkopf';
 import DruckKnopf from '../components/druck/DruckKnopf';
 import { Paneel, monoStil } from '../components/instrument';
 import './lageberichtPrint.css';
+import { useFehlerMeldung } from '../components/useFehlerMeldung';
 
 /**
  * Formularwerte des Entwurfs: Titel, Zeitstand (lokale Picker-Zeit, UTC erst beim Senden —
@@ -176,8 +176,7 @@ function LageberichtDetail() {
     qc.invalidateQueries({ queryKey: einsatzKeys.lagebericht(einsatzId, berichtId) });
     qc.invalidateQueries({ queryKey: einsatzKeys.lageberichte(einsatzId) });
   };
-  const fehler = (e: unknown) =>
-    message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
+  const fehler = useFehlerMeldung();
 
   // Persistiert die aktuellen Formularwerte als Entwurf (ohne Erfolgs-Toast) — von der
   // „Entwurf speichern"-Mutation und vom Freigabe-Flow gemeinsam genutzt.

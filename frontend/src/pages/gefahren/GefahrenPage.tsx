@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Alert, App, Breadcrumb, Button, Space, Spin, Typography, theme } from 'antd';
+import { Alert, Breadcrumb, Button, Space, Spin, Typography, theme } from 'antd';
 import type { BewertungEingabe } from '../../api/gefahren';
-import { ApiError } from '../../api/client';
 import { einsatzKeys } from '../../api/queryKeys';
 import {
   benenneGefahrengebiet,
@@ -25,6 +24,7 @@ import { SeitenLeer } from '../../components/SeitenZustand';
 import { gemeinsamerDatenstand } from '../../components/Datenstand';
 import EinsatzSeite from '../../components/EinsatzSeite';
 import { Paneel } from '../../components/instrument';
+import { useFehlerMeldung } from '../../components/useFehlerMeldung';
 
 /**
  * Trefflächenboden der Gebietszeile (Abschluss-Review zu LFH-368 · B5h, Konvention aus
@@ -72,7 +72,7 @@ export default function GefahrenPage() {
   const einsatzId = Number(id);
   const { benutzer } = useAuth();
   const qc = useQueryClient();
-  const { message } = App.useApp();
+
   const { token } = theme.useToken();
   const [gewaehlt, setGewaehlt] = useState<number | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -120,8 +120,7 @@ export default function GefahrenPage() {
     enabled: gewaehlt != null,
   });
 
-  const fehler = (e: unknown) =>
-    message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
+  const fehler = useFehlerMeldung();
   const setzen = useMutation({
     mutationFn: (d: BewertungEingabe) => setzeBewertung(einsatzId, gewaehlt as number, d),
     onSuccess: () => {

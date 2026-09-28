@@ -6,7 +6,7 @@ import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
 import { parseRouteId, befehlDetailPfad, auftraegePfad, etbPfad } from '../routing/deeplinks';
-import { ApiError } from '../api/client';
+import { fehlerText } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import { aktualisiereBefehl, gibBefehlFrei, ladeBefehl, schreibeBefehlFort } from '../api/befehle';
 import type { BefehlAbschnitt, BefehlAnzeige } from '../api/types';
@@ -84,7 +84,7 @@ function BefehlDetail() {
     qc.invalidateQueries({ queryKey: einsatzKeys.befehle(einsatzId) });
   };
   const fehler = (e: unknown) => {
-    if (aktiv.current) message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
+    if (aktiv.current) message.error(fehlerText(e));
   };
 
   // Persistiert die aktuellen Formularwerte als Entwurf (ohne Erfolgs-Toast) — von der

@@ -9,7 +9,7 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Navigate } from 'react-router';
 import type { BenutzerAnzeige, OrgRolle, SystemRolle } from '../api/types';
-import { ApiError } from '../api/client';
+import { fehlerText } from '../api/client';
 import {
   bearbeiteBenutzer,
   deaktiviereBenutzer,
@@ -57,14 +57,13 @@ export default function BenutzerPage() {
     // (LFH-346 · A6). Ein `resetFields()` hier wäre der zweite Mechanismus für
     // dieselbe Sache und verdeckte, ob die Hülle ihre Zusicherung einlöst.
     onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.benutzer() }),
-    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Anlegen fehlgeschlagen'),
+    onError: (e) => message.error(fehlerText(e, 'Anlegen fehlgeschlagen')),
   });
 
   const deaktivieren = useMutation({
     mutationFn: (id: number) => deaktiviereBenutzer(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.benutzer() }),
-    onError: (e) =>
-      message.error(e instanceof ApiError ? e.message : 'Deaktivieren fehlgeschlagen'),
+    onError: (e) => message.error(fehlerText(e, 'Deaktivieren fehlgeschlagen')),
   });
 
   const bearbeiten = useMutation({
@@ -74,7 +73,7 @@ export default function BenutzerPage() {
     // Zeile. Das Schliessen des Dialogs macht deshalb `onFertig` an der Hülle, nicht
     // dieser Erfolgszweig — der lief bisher auch nach einem Reaktivieren mit.
     onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.benutzer() }),
-    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),
+    onError: (e) => message.error(fehlerText(e, 'Speichern fehlgeschlagen')),
   });
 
   /**

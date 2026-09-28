@@ -37,7 +37,6 @@ import {
   listeEinsatzMaterial,
   type MaterialAdhocEingabe,
 } from '../api/einsatzMaterial';
-import { ApiError } from '../api/client';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { EinsatzMaterial, MaterialStatus } from '../api/types';
 import { kraefteuebersichtPfad } from '../routing/deeplinks';
@@ -45,6 +44,7 @@ import Verdichtungszeile from '../kraefte/Verdichtungszeile';
 import StatusWahl, { type StatusOption } from '../components/StatusWahl';
 import { einsatzStatus, materialStatus, type StatusDarstellung } from '../theme/statusFarben';
 import StatusTag from '../components/StatusTag';
+import { useFehlerMeldung } from '../components/useFehlerMeldung';
 
 /**
  * ── DIE FARBFRAGE IST ENTSCHIEDEN (LFH-341 · C6) ─────────────────────────────────────
@@ -136,8 +136,7 @@ export default function MaterialPage() {
     qc.invalidateQueries({ queryKey: einsatzKeys.material(einsatzId) });
     qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
   }
-  const fehler = (e: unknown) =>
-    message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
+  const fehler = useFehlerMeldung();
 
   const disponiereMutation = useMutation({
     mutationFn: (v: { materialId: number; menge: number }) =>

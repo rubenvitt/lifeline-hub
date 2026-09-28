@@ -19,7 +19,7 @@ import { Select } from '../components/Select';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
-import { ApiError } from '../api/client';
+import { fehlerText } from '../api/client';
 import {
   aktualisiereStatus,
   deaktiviereStatus,
@@ -70,7 +70,7 @@ export default function PersonalStatusTab() {
     },
     // Nur noch invalidieren: das Schliessen macht `onFertig`, das Leeren die Hülle.
     onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.personalStatus() }),
-    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),
+    onError: (e) => message.error(fehlerText(e, 'Speichern fehlgeschlagen')),
   });
 
   /**
@@ -88,14 +88,13 @@ export default function PersonalStatusTab() {
     mutationFn: (label: string) =>
       legeStatusAn({ label, kategorie: 'gebunden', farbe: null, sortier: 0 }),
     onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.personalStatus() }),
-    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Anlegen fehlgeschlagen'),
+    onError: (e) => message.error(fehlerText(e, 'Anlegen fehlgeschlagen')),
   });
 
   const deaktivieren = useMutation({
     mutationFn: (id: number) => deaktiviereStatus(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.personalStatus() }),
-    onError: (e) =>
-      message.error(e instanceof ApiError ? e.message : 'Deaktivieren fehlgeschlagen'),
+    onError: (e) => message.error(fehlerText(e, 'Deaktivieren fehlgeschlagen')),
   });
 
   // VORBELEGUNG, kein Zurücksetzen (LFH-332 · B4, Regel 3): das Leeren macht

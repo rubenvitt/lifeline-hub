@@ -34,7 +34,6 @@ import {
   ordnePersonalZu,
   type EinheitEingabe,
 } from '../api/einheiten';
-import { ApiError } from '../api/client';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { Einheit, Staerke } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
@@ -54,6 +53,7 @@ import {
   SeitenSkeleton,
 } from '../components/SeitenZustand';
 import './EinheitDetailPage.css';
+import { useFehlerMeldung } from '../components/useFehlerMeldung';
 
 /** Die echte Höhe zählt: Handschuh-Stufe und umgebrochene Aktionen verändern die Leiste.
  * Der Scrollabstand muss schon VOR dem nativen Fokus-Scroll am Ziel stehen (LFH-446).
@@ -184,8 +184,7 @@ export default function EinheitDetailPage() {
     qc.invalidateQueries({ queryKey: einsatzKeys.material(einsatzId) });
     qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
   }
-  const fehler = (e: unknown) =>
-    message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
+  const fehler = useFehlerMeldung();
 
   const einheiten = useMemo(() => einheitenQuery.data ?? [], [einheitenQuery.data]);
   const aktuell = einheiten.find((e) => e.id === einheitId) ?? null;

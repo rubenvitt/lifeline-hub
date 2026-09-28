@@ -1,7 +1,7 @@
 import { App, AutoComplete, Collapse, Form, Input } from 'antd';
 import { useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ApiError } from '../api/client';
+import { fehlerText } from '../api/client';
 import { ErfassungsModal } from '../components/Erfassung';
 import { aktualisiereMaterial, legeMaterialAn, type MaterialEingabe } from '../api/material';
 import type { Material } from '../api/types';
@@ -63,7 +63,7 @@ export default function MaterialFormModal({
       qc.invalidateQueries({ queryKey: globalKeys.material() });
       qc.invalidateQueries({ queryKey: globalKeys.materialKategorien() });
     },
-    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),
+    onError: (e) => message.error(fehlerText(e, 'Speichern fehlgeschlagen')),
   });
 
   return (

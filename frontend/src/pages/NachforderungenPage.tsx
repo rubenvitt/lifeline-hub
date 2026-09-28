@@ -6,7 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
-import { ApiError } from '../api/client';
+import { fehlerText } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import {
   legeNachforderungAn,
@@ -70,7 +70,7 @@ export default function NachforderungenPage() {
   // Bei Fehler (insb. 422 aus der optimistischen Sperre) zusätzlich invalidieren,
   // damit der ggf. veraltete View den echten Status nachlädt.
   const fehler = (e: unknown) => {
-    message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
+    message.error(fehlerText(e));
     invalidiere();
   };
 
