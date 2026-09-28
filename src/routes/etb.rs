@@ -1,21 +1,15 @@
 use crate::app::AppState;
-use crate::auth::session::CurrentUser;
-use crate::einsatz::berechtigung::{
-    fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
-};
-use crate::einsatz::repo as einsatz_repo;
+use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibfreigabe, EinsatzSchreibzugriff};
+use crate::einsatz::modul::Etb;
 use crate::error::AppError;
+use crate::etb::lesemarke::{self, EtbLesemarkeAnzeige};
+use crate::etb::zaehler::EtbZaehlerAnzeige;
+use crate::etb::{normalisiere_zeit, repo, EtbEintragAnzeige, EtbTyp, MeldeWeg};
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::live::LiveEvent;
 use crate::routes::support::{parse_enum_opt, pflicht};
 use crate::zeit::jetzt;
-
-/// Modul-Key dieses Route-Moduls (LFH-132); gegen die Override-Map geprüft.
-const MODUL_KEY: &str = "etb";
-use crate::etb::lesemarke::{self, EtbLesemarkeAnzeige};
-use crate::etb::zaehler::EtbZaehlerAnzeige;
-use crate::etb::{normalisiere_zeit, repo, EtbEintragAnzeige, EtbTyp, MeldeWeg};
 use axum::extract::{Multipart, Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::Response;
@@ -60,23 +54,12 @@ fn bereinige(feld: Option<String>) -> Option<String> {
 /// fertigen Eintrag an alle SSE-Abonnenten.
 pub async fn erfassen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzSchreibfreigabe<Etb>,
     headers: HeaderMap,
     JsonBody(req): JsonBody<NeuerEintrag>,
 ) -> Result<(StatusCode, Json<EtbEintragAnzeige>), AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    crate::routes::support::fordere_offline_queue_benutzer(&headers, benutzer.id)?;
+    let einsatz_id = ctx.einsatz.id;
+    crate::routes::support::fordere_offline_queue_benutzer(&headers, ctx.benutzer.id)?;
 
     // Replay erst NACH Auth-/Schreib-/Modul-Gates, aber VOR dem Aktiv-Gate erkennen:
     // ein bereits committeter Offline-Eintrag bleibt auch im abgeschlossenen Einsatz
@@ -106,7 +89,7 @@ pub async fn erfassen(
             return Ok((StatusCode::CREATED, Json(anzeige)));
         }
     }
-    fordere_aktiv(&einsatz)?;
+    ctx.fordere_aktiv()?;
 
     // Anhänge (LFH-117): erst NACH der Replay-Erkennung — ein Replay prüft nicht, ob seine
     // Anhänge frei sind (sie sind ja gebunden), nur ob es dieselben sind. Doppelte IDs gelten
@@ -169,7 +152,7 @@ pub async fn erfassen(
     let (anzeige, war_neu) = repo::anlegen_idempotent(
         &state.pool,
         einsatz_id,
-        benutzer.id,
+        ctx.benutzer.id,
         client_id.as_deref(),
         &anhang_ids,
         repo::EintragDaten {
@@ -208,26 +191,14 @@ pub async fn erfassen(
 /// schickt eine Datei je Anfrage; das Body-Limit (26 MiB) sitzt in `app.rs` an der Route.
 pub async fn anhang_hochladen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzSchreibzugriff<Etb>,
     mut multipart: Multipart,
 ) -> Result<(StatusCode, Json<Vec<crate::anhang::AnhangAnzeige>>), AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
+    let einsatz_id = ctx.einsatz.id;
     let angelegt = crate::anhang::hochladen_multipart(
         &state.pool,
         einsatz_id,
-        benutzer.id,
+        ctx.benutzer.id,
         &mut multipart,
         crate::anhang::ERLAUBTE_MIME_DOKUMENT,
     )
@@ -238,18 +209,18 @@ pub async fn anhang_hochladen(
 /// GET /api/einsaetze/{id}/etb/{eintrag_id}/anhaenge/{aid} — Anhang eines Eintrags laden
 /// (LFH-117, design.md D6).
 ///
-/// Gates wie die Leserouten ([`fordere_lese_gates`]: Lesezugriff inklusive Beobachter, Modul
+/// Gates wie die Leserouten (`EinsatzLesezugriff<Etb>`: Lesezugriff inklusive Beobachter, Modul
 /// „etb"; ein abgeschlossener Einsatz bleibt lesbar). Die Bindung prüft EINE Abfrage
 /// ([`repo::anhang_am_eintrag`]); kein Treffer ist 404. Die Eintrags-ID im Pfad bindet den
 /// Link an genau einen Eintrag. Die Antwort (ETag/304, `Content-Disposition`) teilt die Route
 /// mit dem generischen und dem Dokument-Download.
 pub async fn anhang_herunterladen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, eintrag_id, anhang_id)): PfadParam<(i64, i64, i64)>,
+    ctx: EinsatzLesezugriff<Etb>,
+    PfadParam((_eid, eintrag_id, anhang_id)): PfadParam<(i64, i64, i64)>,
     req_headers: HeaderMap,
 ) -> Result<Response, AppError> {
-    fordere_lese_gates(&state, &benutzer, einsatz_id).await?;
+    let einsatz_id = ctx.einsatz.id;
     if !repo::anhang_am_eintrag(&state.pool, einsatz_id, eintrag_id, anhang_id).await? {
         return Err(AppError::NotFound);
     }
@@ -264,22 +235,11 @@ pub async fn anhang_herunterladen(
 /// + Cross-Einsatz-Schutz wie bei `erfassen`. Antwortet mit dem erzeugten Auftrag (201).
 pub async fn auftrag_erteilen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, eintrag_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Etb>,
+    PfadParam((_eid, eintrag_id)): PfadParam<(i64, i64)>,
     JsonBody(req): JsonBody<crate::auftrag::NeuerAuftrag>,
 ) -> Result<(StatusCode, Json<crate::auftrag::AuftragDetail>), AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
+    let einsatz_id = ctx.einsatz.id;
     // Cross-Einsatz-Schutz: der Quell-Eintrag muss zu diesem Einsatz gehören.
     if !repo::gehoert_zu_einsatz(&state.pool, eintrag_id, einsatz_id).await? {
         return Err(AppError::NotFound);
@@ -293,7 +253,7 @@ pub async fn auftrag_erteilen(
         &state.pool,
         einsatz_id,
         eintrag_id,
-        benutzer.id,
+        ctx.benutzer.id,
         validiert.daten(),
     )
     .await?;
@@ -335,11 +295,10 @@ pub struct EtbAbfrageParams {
 /// Sortierung: lfd_nr DESC (neueste zuerst); Cursor über before_lfd_nr.
 pub async fn liste(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzLesezugriff<Etb>,
     Query(params): Query<EtbAbfrageParams>,
 ) -> Result<Json<Vec<EtbEintragAnzeige>>, AppError> {
-    fordere_lese_gates(&state, &benutzer, einsatz_id).await?;
+    let einsatz_id = ctx.einsatz.id;
     let merkmale = filter_merkmale(&params)?;
     let limit = params
         .limit
@@ -370,17 +329,16 @@ pub struct EtbAnzahlAnzeige {
 /// GET /api/einsaetze/{id}/etb/anzahl — wie viele Einträge der Filter von [`liste`] trifft
 /// (LFH-619, Sammeltreffer der Sprungpalette „ETB · Einträge zu … — 31 Treffer“).
 ///
-/// DIESELBEN Gates und DIESELBEN Filtermerkmale wie die Liste ([`fordere_lese_gates`],
+/// DIESELBEN Gates und DIESELBEN Filtermerkmale wie die Liste (`EinsatzLesezugriff<Etb>`,
 /// [`filter_merkmale`]): eine Zahl, die anders filtert als die Liste, auf die der Treffer
 /// springt, wäre eine Behauptung ohne Beleg. `limit` und `before_lfd_nr` werden ignoriert —
 /// [`repo::EtbZaehlFilter`] kann sie gar nicht tragen.
 pub async fn anzahl(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzLesezugriff<Etb>,
     Query(params): Query<EtbAbfrageParams>,
 ) -> Result<Json<EtbAnzahlAnzeige>, AppError> {
-    fordere_lese_gates(&state, &benutzer, einsatz_id).await?;
+    let einsatz_id = ctx.einsatz.id;
     let merkmale = filter_merkmale(&params)?;
     let anzahl = repo::anzahl(&state.pool, einsatz_id, &merkmale).await?;
     Ok(Json(EtbAnzahlAnzeige { anzahl }))
@@ -393,29 +351,13 @@ pub async fn anzahl(
 /// Liste: Lesezugriff (auch Beobachter) + Modul `etb`.
 pub async fn zaehler(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzLesezugriff<Etb>,
     Query(params): Query<EtbAbfrageParams>,
 ) -> Result<Json<EtbZaehlerAnzeige>, AppError> {
-    fordere_lese_gates(&state, &benutzer, einsatz_id).await?;
+    let einsatz_id = ctx.einsatz.id;
     let merkmale = filter_merkmale(&params)?;
     let zeilen = repo::zaehle(&state.pool, einsatz_id, &merkmale).await?;
     Ok(Json(EtbZaehlerAnzeige::aus_zeilen(&zeilen)?))
-}
-
-/// Lesezugriff auf den Einsatz plus Modulzugriff „etb“ — die Gates aller fünf Leserouten
-/// (Liste, beide Zählungen, beide Lesemarken-Routen). NICHT Schreibrecht und NICHT „aktiv":
-/// ein Beobachter liest und führt seine Lesemarke ebenso, und ein abgeschlossener Einsatz
-/// bleibt lesbar.
-async fn fordere_lese_gates(
-    state: &AppState,
-    benutzer: &crate::auth::Benutzer,
-    einsatz_id: i64,
-) -> Result<(), AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?; // 404, wenn unbekannt
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, benutzer).await
 }
 
 /// Prüft und normalisiert die Filtermerkmale einer ETB-Abfrage (unbekannter Typ und
@@ -458,12 +400,11 @@ pub struct LesemarkeSetzen {
 /// Zeitpunkt der letzten Sichtung und die Zahl fremder Einträge darüber.
 pub async fn lesemarke(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzLesezugriff<Etb>,
 ) -> Result<Json<EtbLesemarkeAnzeige>, AppError> {
-    fordere_lese_gates(&state, &benutzer, einsatz_id).await?;
+    let einsatz_id = ctx.einsatz.id;
     Ok(Json(
-        lesemarke::laden(&state.pool, einsatz_id, benutzer.id).await?,
+        lesemarke::laden(&state.pool, einsatz_id, ctx.benutzer.id).await?,
     ))
 }
 
@@ -474,11 +415,10 @@ pub async fn lesemarke(
 /// der höchsten vergebenen Nummer — erst der Zustand des Einsatzes verbietet das.
 pub async fn lesemarke_setzen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzLesezugriff<Etb>,
     JsonBody(req): JsonBody<LesemarkeSetzen>,
 ) -> Result<Json<EtbLesemarkeAnzeige>, AppError> {
-    fordere_lese_gates(&state, &benutzer, einsatz_id).await?;
+    let einsatz_id = ctx.einsatz.id;
     if req.bis_lfd_nr < 1 {
         return Err(AppError::Validation(
             "bis_lfd_nr muss mindestens 1 sein".into(),
@@ -494,8 +434,8 @@ pub async fn lesemarke_setzen(
             "bis_lfd_nr liegt über dem jüngsten Eintrag".into(),
         ));
     }
-    lesemarke::setzen(&state.pool, einsatz_id, benutzer.id, req.bis_lfd_nr).await?;
+    lesemarke::setzen(&state.pool, einsatz_id, ctx.benutzer.id, req.bis_lfd_nr).await?;
     Ok(Json(
-        lesemarke::laden(&state.pool, einsatz_id, benutzer.id).await?,
+        lesemarke::laden(&state.pool, einsatz_id, ctx.benutzer.id).await?,
     ))
 }
