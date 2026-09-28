@@ -1,6 +1,7 @@
 pub mod disposition_repo;
 pub mod repo;
 
+use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use utoipa::ToSchema;
 
@@ -54,53 +55,23 @@ pub struct MaterialAnzeige {
     pub angelegt_at: String,
 }
 
-/// Fester Status einer Material-Dispositionszeile (kein admin-pflegbarer Katalog).
-/// Als TEXT in der DB gespeichert; manuell konvertiert (analog `StaerkePosition`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum MaterialStatus {
-    Einsatzbereit,
-    ImEinsatz,
-    Defekt,
-    Verbraucht,
-    DesinfektionNoetig,
-}
-
-impl MaterialStatus {
-    /// DB-/API-Stringrepräsentation. **Muss exakt dem CHECK-Constraint in
-    /// `migrations/0019_einsatz_material.sql` entsprechen.**
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            MaterialStatus::Einsatzbereit => "einsatzbereit",
-            MaterialStatus::ImEinsatz => "im_einsatz",
-            MaterialStatus::Defekt => "defekt",
-            MaterialStatus::Verbraucht => "verbraucht",
-            MaterialStatus::DesinfektionNoetig => "desinfektion_noetig",
-        }
+wire_enum! {
+    /// Fester Status einer Material-Dispositionszeile (kein admin-pflegbarer Katalog).
+    /// Als TEXT in der DB gespeichert; manuell konvertiert (analog `StaerkePosition`).
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum MaterialStatus {
+        Einsatzbereit => "einsatzbereit",
+        ImEinsatz => "im_einsatz",
+        Defekt => "defekt",
+        Verbraucht => "verbraucht",
+        DesinfektionNoetig => "desinfektion_noetig",
     }
-
-    /// Parst einen Statusstring; `None` bei ungültigem Wert.
-    pub fn parse(s: &str) -> Option<MaterialStatus> {
-        match s {
-            "einsatzbereit" => Some(MaterialStatus::Einsatzbereit),
-            "im_einsatz" => Some(MaterialStatus::ImEinsatz),
-            "defekt" => Some(MaterialStatus::Defekt),
-            "verbraucht" => Some(MaterialStatus::Verbraucht),
-            "desinfektion_noetig" => Some(MaterialStatus::DesinfektionNoetig),
-            _ => None,
-        }
-    }
+    try_from = |s| format!("Ungültiger MaterialStatus: {s}");
 }
 
 // Non-null, manuell gemappt (`disposition_repo::zu_anzeige` aus dem internen `Row`) —
 // TryFrom<String> für `#[sqlx(try_from = "String")]` auf dem internen FromRow-Struct
 // (analog `LageZoneTyp` in `src/lage_zone/repo.rs`).
-impl TryFrom<String> for MaterialStatus {
-    type Error = String;
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        MaterialStatus::parse(&s).ok_or_else(|| format!("Ungültiger MaterialStatus: {s}"))
-    }
-}
 
 /// Aufgelöste Material-Dispositionszeile: Identität nach der Auflösungsregel
 /// (Live aus dem Stamm bei aktivem Einsatz + Material in Dienst, sonst Snapshot);

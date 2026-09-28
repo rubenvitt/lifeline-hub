@@ -61,5 +61,6 @@ pub mod uhs;
 pub mod verbindung;
 pub mod verpflegung;
 pub mod wetter;
+mod wire_enum;
 pub mod zeit;
 pub mod zulassung;
