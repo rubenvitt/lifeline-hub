@@ -1,17 +1,11 @@
 use crate::app::AppState;
-use crate::auth::session::CurrentUser;
-use crate::einsatz::berechtigung::{
-    fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
-};
 use crate::einsatz::einstellungen::etb_startwert;
-use crate::einsatz::repo as einsatz_repo;
+use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
+use crate::einsatz::modul::Schaeden;
+use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::live::LiveEvent;
-
-/// Modul-Key dieses Route-Moduls (LFH-132).
-const MODUL_KEY: &str = "schaeden";
-use crate::error::AppError;
 use crate::person::repo as person_repo; // Org-Isolation der Geschädigt-FK (404 bei fremder Person)
 use crate::routes::support::{
     deserialize_optional_field, parse_enum, parse_enum_opt, pflicht, pflicht_tri,
@@ -50,22 +44,10 @@ pub struct ListeParams {
 
 pub async fn liste(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzLesezugriff<Schaeden>,
     Query(params): Query<ListeParams>,
 ) -> Result<Json<Vec<SchadenAnzeige>>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-
+    let einsatz_id = ctx.einsatz.id;
     // Unbekannter Enum-Wert im Query-Filter: das Feld ist für sich unbrauchbar → 400
     // (LFH-305). Ohne diese Prechecks gäbe es hier kein 422, sondern ein 200 mit leerer
     // Liste — der Filterwert landet nur in einer WHERE-Klausel, es gibt keinen DB-CHECK
@@ -118,23 +100,10 @@ pub struct AnlegenBody {
 
 pub async fn anlegen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzSchreibzugriff<Schaeden>,
     JsonBody(body): JsonBody<AnlegenBody>,
 ) -> Result<(StatusCode, Json<SchadenAnzeige>), AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     if let Some(s) = &body.status {
         if s != "offen" {
             return Err(AppError::UnprocessableEntity(
@@ -167,11 +136,11 @@ pub async fn anlegen(
     pruefe_koordinate(body.lat, body.lon, "lat", "lon")?;
     let kontakt = trimme(body.geschaedigt_kontakt.clone());
 
-    // Eigene Organisation: id wird IMMER serverseitig aus einsatz.org_id abgeleitet,
+    // Eigene Organisation: id wird IMMER serverseitig aus ctx.einsatz.org_id abgeleitet,
     // der vom Client gesendete Wert wird ignoriert (nie vertrauen).
     let org_gesetzt = body.geschaedigt_organisation_id.is_some();
     let geschaedigt_org_id = if org_gesetzt {
-        Some(einsatz.org_id)
+        Some(ctx.einsatz.org_id)
     } else {
         None
     };
@@ -206,7 +175,7 @@ pub async fn anlegen(
         let (id, _reg) = schaden_repo::anlegen_tx(
             conn,
             einsatz_id,
-            benutzer.id,
+            ctx.benutzer.id,
             schaden_repo::NeueDaten {
                 typ: typ.as_str(),
                 ausmass: ausmass.as_str(),
@@ -229,7 +198,7 @@ pub async fn anlegen(
             ausmass.as_str(),
             ort_kurz(&ort),
         );
-        crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text).await?;
+        crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text).await?;
         Ok(schaden)
     })?;
     sse_schaden(&state, einsatz_id, schaden.id);
@@ -240,20 +209,10 @@ pub async fn anlegen(
 
 pub async fn detail(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, schaden_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzLesezugriff<Schaeden>,
+    PfadParam((_eid, schaden_id)): PfadParam<(i64, i64)>,
 ) -> Result<Json<SchadenAnzeige>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
+    let einsatz_id = ctx.einsatz.id;
     Ok(Json(
         schaden_repo::laden(&state.pool, einsatz_id, schaden_id).await?,
     ))
@@ -292,23 +251,11 @@ pub struct PatchBody {
 
 pub async fn aktualisieren(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, schaden_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Schaeden>,
+    PfadParam((_eid, schaden_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<PatchBody>,
 ) -> Result<Json<SchadenAnzeige>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     let vorher = schaden_repo::laden(&state.pool, einsatz_id, schaden_id).await?; // 404
     if vorher.storniert_at.is_some() {
         return Err(AppError::Conflict(
@@ -349,11 +296,11 @@ pub async fn aktualisieren(
         .map(|o| o.map(|s| s.trim().to_string()).filter(|s| !s.is_empty()));
 
     // Eigene Organisation: der vom Client gesendete id-Wert wird ignoriert. Die Tri-State
-    // wird auf die ABGELEITETE Org-id gemappt: Some(Some(_)) → Some(Some(einsatz.org_id)),
+    // wird auf die ABGELEITETE Org-id gemappt: Some(Some(_)) → Some(Some(ctx.einsatz.org_id)),
     // Some(None) → Some(None) (löschen), None → None (unverändert).
     let org_delta: Option<Option<i64>> = body
         .geschaedigt_organisation_id
-        .map(|opt| opt.map(|_| einsatz.org_id));
+        .map(|opt| opt.map(|_| ctx.einsatz.org_id));
 
     // Effektivzustand NACH dem Patch für ALLE VIER Quellen (4‑Wege-CHECK) → 422 statt 500.
     let eff_person: Option<i64> = match body.geschaedigt_person_id {
@@ -413,7 +360,7 @@ pub async fn aktualisieren(
         &state.pool,
         einsatz_id,
         schaden_id,
-        benutzer.id,
+        ctx.benutzer.id,
         body.basis_geaendert_at.as_deref(),
         schaden_repo::PatchDaten {
             typ: body.typ.as_deref(),
@@ -445,23 +392,11 @@ pub struct UebergebenBody {
 
 pub async fn uebergeben(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, schaden_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Schaeden>,
+    PfadParam((_eid, schaden_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<UebergebenBody>,
 ) -> Result<Json<SchadenAnzeige>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     // LFH-305: DEDIZIERTER Aktions-Endpunkt — wer hierher POSTet, will übergeben, der
     // Adressat ist also unbedingt Pflicht. Damit scheitert das Feld ISOLIERT → 400, in zwei
     // Zweigen (fehlt / vorhanden aber leer).
@@ -499,8 +434,9 @@ pub async fn uebergeben(
     // Response-Reload erst nach dem Commit.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     crate::write_retry!(&state.pool, |conn| {
-        schaden_repo::uebergebe_tx(conn, einsatz_id, schaden_id, &adressat, benutzer.id).await?;
-        crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text).await?;
+        schaden_repo::uebergebe_tx(conn, einsatz_id, schaden_id, &adressat, ctx.benutzer.id)
+            .await?;
+        crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text).await?;
         Ok(())
     })?;
     sse_schaden(&state, einsatz_id, schaden_id);
@@ -519,23 +455,11 @@ pub struct AbschliessenBody {
 
 pub async fn abschliessen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, schaden_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Schaeden>,
+    PfadParam((_eid, schaden_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<AbschliessenBody>,
 ) -> Result<Json<SchadenAnzeige>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     // LFH-305: DEDIZIERTER Aktions-Endpunkt — wer hierher POSTet, will abschließen, der
     // Abschlussgrund ist also unbedingt Pflicht. Damit scheitert das Feld ISOLIERT → 400, in
     // drei Zweigen (fehlt / vorhanden aber leer / vorhanden aber unbekannt).
@@ -584,10 +508,10 @@ pub async fn abschliessen(
             schaden_id,
             grund.as_str(),
             notiz.as_deref(),
-            benutzer.id,
+            ctx.benutzer.id,
         )
         .await?;
-        crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text).await?;
+        crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text).await?;
         Ok(())
     })?;
     sse_schaden(&state, einsatz_id, schaden_id);
@@ -600,22 +524,10 @@ pub async fn abschliessen(
 
 pub async fn stornieren(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, schaden_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Schaeden>,
+    PfadParam((_eid, schaden_id)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     let vorher = schaden_repo::laden(&state.pool, einsatz_id, schaden_id).await?; // 404
                                                                                   // F06/LFH-244 Tier-A: Storno-UPDATE + System-ETB-Eintrag atomar in EINER Tx. Der ETB-Text
                                                                                   // ist aus `vorher` VOR der Tx berechenbar. SSE erst nach dem Commit.
@@ -625,8 +537,8 @@ pub async fn stornieren(
     );
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     crate::write_retry!(&state.pool, |conn| {
-        schaden_repo::storniere_tx(conn, einsatz_id, schaden_id, benutzer.id).await?;
-        crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text).await?;
+        schaden_repo::storniere_tx(conn, einsatz_id, schaden_id, ctx.benutzer.id).await?;
+        crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text).await?;
         Ok(())
     })?;
     sse_schaden(&state, einsatz_id, schaden_id);
