@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes, useLocation } from 'react-router';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
+import { offeneRueckfrage } from '../test/rueckfrage';
 import type { KarteServerConfig } from '../api/karte';
 import type { KartenflaecheProps } from './lagekarte/Kartenflaeche';
 import LagekartePage, { kopfMeta, quellenMeldung } from './LagekartePage';
@@ -1465,6 +1466,10 @@ describe('LagekartePage', () => {
     renderSeite();
     await user.click(await screen.findByText('zone-7'));
     await user.click(await screen.findByRole('button', { name: 'Zone aufheben' }));
+    // Rückfrage vor dem harten Löschen (LFH-710): ohne Bestätigung geht kein DELETE raus.
+    const rueckfrage = await offeneRueckfrage();
+    expect(geloescht).toBe(false);
+    await user.click(within(rueckfrage).getByRole('button', { name: 'Aufheben' }));
     await waitFor(() => expect(geloescht).toBe(true));
   });
 

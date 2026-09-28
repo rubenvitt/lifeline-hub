@@ -1,7 +1,9 @@
 import type { ReactElement } from 'react';
-import { screen } from '@testing-library/react';
-import { describe, it, expect, beforeEach } from 'vitest';
+import { screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
+import { offeneRueckfrage } from '../../test/rueckfrage';
 import { renderMitProviders, neuerQueryClient } from '../../test/utils';
 import { server } from '../../test/server';
 import Inspector from './Inspector';
@@ -549,5 +551,85 @@ describe('Inspector für Betroffene (LFH-648)', () => {
     );
     screen.getByRole('button', { name: /Verortung löschen/ }).click();
     expect(geloescht.map((m) => m.schluessel)).toEqual(['person-11']);
+  });
+});
+
+/**
+ * „Verortung löschen" ist nicht überall gleich destruktiv (LFH-710, LFH-363). Ein Abschnitt
+ * steht nur mit gezeichneter Fläche auf der Karte, und sein Löschen schickt
+ * `flaeche_geojson: null` — die Fläche ist danach weg. Ein Punkt dagegen lässt sich über
+ * „Auf Karte verorten" jederzeit neu setzen. Deshalb gehören die beiden als PAAR getestet:
+ * der Abschnitt fragt nach, der Punkt nicht.
+ */
+describe('Inspector „Verortung löschen" — Rückfrage nur, wo sie unumkehrbar ist (LFH-710)', () => {
+  beforeEach(() => {
+    server.use(
+      http.get('/api/einsaetze/:id/ort-vorschau', () =>
+        HttpResponse.json({ peilung: null, ortsname: null }),
+      ),
+    );
+  });
+
+  const abschnitt = {
+    schluessel: 'abschnitt-3',
+    typ: 'abschnitt',
+    id: 3,
+    lat: 50.005,
+    lon: 8.005,
+    label: 'EA Nord',
+    farbe: '#722ed1',
+    geometrie: {
+      type: 'Polygon',
+      coordinates: [
+        [
+          [8, 50],
+          [8.02, 50],
+          [8.02, 50.02],
+          [8, 50],
+        ],
+      ],
+    },
+  } as KarteMarker;
+
+  function mit(m: KarteMarker) {
+    const onVerortungLoeschen = vi.fn<(m: KarteMarker) => void>();
+    renderMitProviders(
+      <Inspector
+        einsatzId={1}
+        marker={m}
+        darfSchreiben
+        onSchliessen={() => {}}
+        onVerortungLoeschen={onVerortungLoeschen}
+      />,
+    );
+    return onVerortungLoeschen;
+  }
+
+  it('Abschnitt mit Fläche: erst die Rückfrage mit rotem OK, dann genau ein Löschen', async () => {
+    const onVerortungLoeschen = mit(abschnitt);
+    await userEvent.click(screen.getByRole('button', { name: 'Verortung löschen' }));
+
+    const rueckfrage = await offeneRueckfrage();
+    expect(onVerortungLoeschen).not.toHaveBeenCalled();
+    expect(rueckfrage).toHaveTextContent('Fläche von „EA Nord“ löschen?');
+    const ok = within(rueckfrage).getByRole('button', { name: 'Löschen' });
+    expect(ok).toHaveClass('ant-btn-dangerous');
+
+    await userEvent.click(within(rueckfrage).getByRole('button', { name: 'Abbrechen' }));
+    expect(onVerortungLoeschen).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Verortung löschen' }));
+    await userEvent.click(
+      within(await offeneRueckfrage()).getByRole('button', { name: 'Löschen' }),
+    );
+    expect(onVerortungLoeschen).toHaveBeenCalledTimes(1);
+    expect(onVerortungLoeschen).toHaveBeenCalledWith(abschnitt);
+  });
+
+  it('Punktverortung (UHS): löscht sofort, ohne Rückfrage', async () => {
+    const onVerortungLoeschen = mit({ ...marker });
+    await userEvent.click(screen.getByRole('button', { name: 'Verortung löschen' }));
+    expect(onVerortungLoeschen).toHaveBeenCalledTimes(1);
+    expect(document.querySelector('.ant-popconfirm')).toBeNull();
   });
 });
