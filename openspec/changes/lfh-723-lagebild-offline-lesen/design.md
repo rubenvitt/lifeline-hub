@@ -263,12 +263,19 @@ nicht zwischen „scheiternd“ und „Rest“.
   abgerufen. Auf der ETB-Seite hängen Liste und Zähler beide am Prefix `etb`: Das `onError` der
   Liste entfernte den Zähler, dessen Neuabruf gäbe 403, dessen `onError` entfernte die Liste,
   und so weiter. Stattdessen verlieren sie ihre Daten per
-  `query.setState({ data: undefined, dataUpdatedAt: 0 })`. Die scheiternde behält Status
-  `error`, eine beobachtete Geschwister-Query ihren Status.
+  `query.setState({ data: undefined, dataUpdatedAt: 0, status: 'error', error })`, auch eine
+  beobachtete Geschwister-Query. Sie zeigt dann den Fehlerzweig ihrer Seite statt einer Liste
+  aus `undefined`, und das ist auch sachlich richtig, denn ihr Bereich ist gesperrt.
 - **Sperrmarke je Bereich** (Einsatz oder Einsatz + Prefix), die der Dehydrier-Filter
-  zusätzlich zur Allowlist prüft. Eine Geschwister-Query steht nach dem Leeren auf `success`
-  mit `data: undefined` und würde sonst so geschrieben. Die Marke fällt beim nächsten
-  Fetch-Erfolg im Bereich (Tracker aus D4) und lebt nur im Speicher des Tabs.
+  zusätzlich zur Allowlist prüft. Sie hält auch **die Wiederherstellung** fern (Nachtrag
+  aus dem Review): Serverbestätigt laufen die Abrufe der Seite schon, während der Start die
+  IndexedDB liest. Kam die 403 vorher, legte `hydrate` den entzogenen Stand sonst zurück in
+  den Speicher, denn der Rechteentzug hat `dataUpdatedAt` auf 0 gesetzt. Deshalb stellt
+  `lagebildSitzung.ts` selbst wieder her, statt `persistQueryClientRestore` zu nutzen. Es
+  filtert unmittelbar vor dem `hydrate` (Allowlist, Sperrmarke, Höchstliegezeit je
+  Einzelstand, kein Überschreiben einer Query auf `error`) und schreibt nur den gefilterten
+  Stand zurück. Die Marke fällt beim nächsten Fetch-Erfolg im Bereich (Tracker aus D4) und
+  lebt nur im Speicher des Tabs.
   - Die Seiten sehen dann `isError && !data` und zeigen ihren Fehlerzweig statt
     „Stand veraltet“ mit alten Daten.
   - Der Einsatz landet wie bisher in der `SeitenSackgasse`.
@@ -323,6 +330,33 @@ unter Playwrights Offline-Schalter `onLine === true`, obwohl jeder Abruf scheite
   im laufenden Dokument um.
 
 Kein neuer Banner: Kopfleiste (`OFFLINE`) und `LiveStatusBanner` melden den Zustand schon.
+
+### D7a — Nachträge aus dem Code-Review
+
+- **Keine Mutationen auf der Platte.** `dehydrate` nimmt per Vorgabe jede **pausierte**
+  Mutation samt `variables` mit. Ohne Netz pausiert jede Mutation, das betrifft also
+  Chat-Texte und Personen-PATCHes. `lagebildDehydrierOptionen` setzt deshalb
+  `shouldDehydrateMutation: () => false`, und der Guard prüft es mit einer pausierten
+  Mutation. Offline-Schreiben läuft über die Offline-Queue.
+- **Höchstliegezeit je Einzelstand.** `bestaetigtAt` gilt je Benutzer. Ein Einsatz, den
+  niemand mehr öffnet, trüge seinen alten Stand sonst unbegrenzt weiter, solange die Person
+  anderswo arbeitet, auch nach einem Rechteentzug, den kein Abruf mehr bemerkt. Geschrieben
+  und wiederhergestellt wird deshalb nur, was höchstens 24 h alt ist
+  (`lagebildStandZulaessig`).
+- **Eigene 502/503/504 sind keine Unerreichbarkeit.** Der eigene Server liefert diese Codes
+  selbst: Lastabwurf, Pegel-Upstream, ClamAV fail-closed. `ApiError.vomAnwendungsserver`
+  erkennt seinen `{error}`-Umschlag. Für die Kennzeichnung gilt nur eine Antwort **ohne**
+  Umschlag als Gateway-Fehlerseite. Für die Sitzungsprüfung bleibt jede 502/503/504 ohne
+  Aussage über die Sitzung, sonst löschte eine Überlast-503 den Stand.
+- **Unlesbarer Stand ohne Serverbestätigung heißt keine Anmeldung.** Scheitert die
+  Wiederherstellung, ist der Datensatz weg. Eine Offline-Anmeldung ohne Stand verspräche
+  etwas, das nicht da ist.
+- **Bewusst nicht umgesetzt:**
+  - Die ETB-Filtervarianten werden je Variante mitgeschrieben. Das kostet Platz, verletzt
+    aber keine Anforderung, messen, wenn es auffällt.
+  - Die Offline-Identität wird nach der Rückkehr des Netzes nicht per `me()` aufgefrischt.
+    Rollen und Anzeigename können also bis zu 24 h alt sein. Der Server erzwingt die Rechte
+    unabhängig davon, und eine 401 räumt über die Sitzungswache.
 
 ### D8 — `gcTime` der Allowlist
 

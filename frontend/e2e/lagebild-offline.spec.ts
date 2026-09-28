@@ -213,7 +213,14 @@ test.describe('Lagebild ohne Netz (LFH-723)', () => {
     const keys = (await vorgehalteneKeys(page))!;
     expect(keys.filter((k) => /druck|chat|audit/.test(k))).toEqual([]);
 
-    // (3) Netz weg — und nachweislich weg.
+    // (3) Netz weg — und nachweislich weg. Die Uhrzeit des Schalters begrenzt unten die
+    //     erlaubte Anzeige: eine Seite, die online nach ihrer Ablesung noch einmal abrief
+    //     (`staleTime` 10 s), darf eine spätere Online-Minute zeigen, aber keine nach dem
+    //     Schalter — das wäre die Zeit des Neuladens.
+    const offlineAb = await page.evaluate(() => {
+      const d = new Date();
+      return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    });
     await page.context().setOffline(true);
     expect(
       await page.evaluate(() =>
@@ -231,9 +238,11 @@ test.describe('Lagebild ohne Netz (LFH-723)', () => {
       const kopf = page.locator('[data-lfh="seitenkopf"]').first();
       if (route.inhalt) await expect(page.getByText(route.inhalt).first()).toBeVisible();
       else await expect(kopf).toContainText('1 verortet');
-      await expect(
-        page.getByText(`${standOnline.get(route.name)} · offline`).first(),
-      ).toBeVisible();
+      const anzeige = page.getByText(/^Stand \d\d:\d\d · offline$/).first();
+      await expect(anzeige).toBeVisible();
+      const uhrzeit = (await anzeige.textContent())!.slice('Stand '.length, 'Stand '.length + 5);
+      const online = standOnline.get(route.name)!.slice('Stand '.length);
+      expect(uhrzeit >= online && uhrzeit <= offlineAb, `${route.name}: ${uhrzeit}`).toBe(true);
     }
 
     expect(seitenFehler).toEqual([]);

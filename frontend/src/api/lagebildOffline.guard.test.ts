@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { QueryClient, dehydrate } from '@tanstack/react-query';
+import { QueryClient, dehydrate, onlineManager } from '@tanstack/react-query';
 import {
   EINSATZ_KEYS,
   GLOBAL_KEYS,
@@ -7,7 +7,8 @@ import {
   einsatzKeys,
   istLagebildOfflineKey,
 } from './queryKeys';
-import { lagebildDehydrierFilter, lagebildSperren } from '../offline/lagebildFilter';
+import { lagebildDehydrierOptionen, lagebildSperren } from '../offline/lagebildFilter';
+import { HOECHSTLIEGEZEIT_MS } from '../offline/lagebildStart';
 
 // Guard auf die Allowlist des Lagebilds (LFH-723, design.md D3): was nicht gelistet ist,
 // landet NIE auf der Platte — auch dann nicht, wenn es im Tab geladen war. Geprüft wird
@@ -45,9 +46,7 @@ const ERWARTET_EINSATZ = new Set([
 const ERWARTET_GLOBAL = new Set(['einsaetze', 'karte-config', 'organisation', 'fahrzeug-status']);
 
 function geschriebeneKeys(qc: QueryClient): unknown[][] {
-  return dehydrate(qc, { shouldDehydrateQuery: lagebildDehydrierFilter(qc) }).queries.map(
-    (q) => q.queryKey as unknown[],
-  );
+  return dehydrate(qc, lagebildDehydrierOptionen(qc)).queries.map((q) => q.queryKey as unknown[]);
 }
 
 describe('istLagebildOfflineKey', () => {
@@ -113,6 +112,40 @@ describe('Guard: nur die Allowlist erreicht die Platte', () => {
       queryFn: () => new Promise(() => {}),
     });
     expect(geschriebeneKeys(qc)).toEqual([]);
+  });
+});
+
+describe('Guard: keine Mutationen auf der Platte (Review LFH-723, Befund 1)', () => {
+  // Ohne eigene Regel nähme `dehydrate` jede PAUSIERTE Mutation samt `variables` mit — ohne
+  // Netz pausiert jede (networkMode 'online'), also Chat-Texte, Personen-PATCHes …
+  it('schreibt eine ohne Netz pausierte Mutation nicht', async () => {
+    const qc = new QueryClient();
+    onlineManager.setOnline(false);
+    try {
+      void qc
+        .getMutationCache()
+        .build(qc, { mutationFn: async (v: { nachricht: string }) => v })
+        .execute({ nachricht: 'Chat-Text mit Namen' })
+        .catch(() => {});
+      await new Promise((r) => setTimeout(r, 0));
+      expect(qc.getMutationCache().getAll()[0]?.state.isPaused).toBe(true);
+      expect(dehydrate(qc, lagebildDehydrierOptionen(qc)).mutations).toEqual([]);
+    } finally {
+      onlineManager.setOnline(true);
+    }
+  });
+});
+
+describe('Guard: jeder Einzelstand hat die Höchstliegezeit (Review LFH-723, Befund 3)', () => {
+  // `bestaetigtAt` gilt je Benutzer. Ein Einsatz, den niemand mehr öffnet, trüge sonst seinen
+  // alten Stand unbegrenzt weiter, solange die Person anderswo arbeitet.
+  it('schreibt einen Stand nicht, dessen letzter Abruf älter als 24 h ist', () => {
+    const qc = new QueryClient();
+    qc.setQueryData(einsatzKeys.personen(7), [], {
+      updatedAt: Date.now() - HOECHSTLIEGEZEIT_MS - 1,
+    });
+    qc.setQueryData(einsatzKeys.personen(8), [], { updatedAt: Date.now() - 60_000 });
+    expect(geschriebeneKeys(qc)).toEqual([einsatzKeys.personen(8)]);
   });
 });
 

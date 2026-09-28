@@ -18,12 +18,22 @@ import { useOnline } from './useOnline';
  */
 
 /** Gateway-Antworten, mit denen ein vorgeschalteter Proxy „Server nicht erreichbar" meldet. */
-const GATEWAY_NICHT_ERREICHBAR = new Set([502, 503, 504]);
+export const GATEWAY_NICHT_ERREICHBAR: ReadonlySet<number> = new Set([502, 503, 504]);
 
-/** Ein Leitungsfehler — kein Server hat fachlich geantwortet. */
+/**
+ * Ein Leitungsfehler — der Anwendungsserver hat nicht geantwortet: kein Netz, ein Abbruch, oder
+ * die Fehlerseite eines Gateways. Eine 502/503/504 MIT dem `{error}`-Umschlag des eigenen
+ * Servers zählt NICHT: der eigene Server liefert sie selbst (Lastabwurf, Pegel-Upstream,
+ * ClamAV fail-closed), und eine einzige gescheiterte Vorhersage kennzeichnete sonst jeden
+ * Datenstand der App als offline (Review LFH-723, Befund 4).
+ */
 export function istVerbindungsfehler(fehler: unknown): boolean {
   if (fehler instanceof NetzFehler) return true;
-  return fehler instanceof ApiError && GATEWAY_NICHT_ERREICHBAR.has(fehler.status);
+  return (
+    fehler instanceof ApiError &&
+    GATEWAY_NICHT_ERREICHBAR.has(fehler.status) &&
+    !fehler.vomAnwendungsserver
+  );
 }
 
 let erreichbar = true;

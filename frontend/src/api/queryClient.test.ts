@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryObserver } from '@tanstack/react-query';
-import { lagebildDehydrierFilter } from '../offline/lagebildFilter';
+import { lagebildDehydrierOptionen } from '../offline/lagebildFilter';
 import { ApiError, NetzFehler } from './client';
 import { erzeugeQueryClient } from './queryClient';
 import { einsatzKeys } from './queryKeys';
@@ -202,7 +202,7 @@ describe('erzeugeQueryClient — Rechteentzug räumt das Lagebild (LFH-723, desi
 
   it('hält einen geleerten Bereich von der Platte fern, bis er wieder erfolgreich lädt', async () => {
     const client = erzeugeQueryClient({ queries: { retry: false } });
-    const filter = lagebildDehydrierFilter(client);
+    const filter = lagebildDehydrierOptionen(client).shouldDehydrateQuery!;
     client.setQueryData(einsatzKeys.personen(7), [{ id: 1 }]);
     await client
       .fetchQuery({ queryKey: einsatzKeys.personen(7), queryFn: verboten })

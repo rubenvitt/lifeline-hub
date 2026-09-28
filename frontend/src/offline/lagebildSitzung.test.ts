@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { QueryClient } from '@tanstack/react-query';
+import { QueryClient, dehydrate } from '@tanstack/react-query';
+import type { PersistedClient } from '@tanstack/query-persist-client-core';
+import { ApiError } from '../api/client';
+import { erzeugeQueryClient } from '../api/queryClient';
 import type { BenutzerAnzeige } from '../api/types';
 import { einsatzKeys } from '../api/queryKeys';
 import { lagebildAnlegen, lagebildLesen, lagebildLoeschenPlatte } from './lagebildSpeicher';
@@ -63,6 +66,105 @@ describe('Lagebild-Sitzung', () => {
     expect(satz.client.clientState.queries.map((q) => q.queryKey)).toEqual([
       einsatzKeys.personen(3),
     ]);
+  });
+
+  it('holt einen nach 403 geleerten Stand über die Wiederherstellung nicht zurück', async () => {
+    // Review LFH-723, Befund 2: serverbestätigt laufen die Abrufe der Seite schon, während der
+    // Start noch die IndexedDB liest. Kommt die 403 vorher, darf `hydrate` den entzogenen
+    // Stand nicht wieder in den Speicher legen — weder für die gescheiterte Query noch für
+    // ihre Geschwister im gesperrten Bereich.
+    const erster = neuerClient();
+    await lagebildStarten(erster, { art: 'ok', benutzer: A }, { drosselMs: DROSSEL });
+    erster.setQueryData(einsatzKeys.personen(3), [{ id: 1 }]);
+    erster.setQueryData(einsatzKeys.einsatz(4), { id: 4 });
+    erster.setQueryData(einsatzKeys.etbZaehler(4, {}), { anzahl: 2 });
+    erster.setQueryData(einsatzKeys.einheiten(3), [{ id: 5 }]);
+    await warteAufGeschrieben((n) => n >= 4);
+    await lagebildBeenden(erster);
+
+    const zweiter = erzeugeQueryClient({ queries: { retry: false } });
+    clients.push(zweiter);
+    await zweiter
+      .fetchQuery({
+        queryKey: einsatzKeys.personen(3),
+        queryFn: () => Promise.reject(new ApiError(403, 'Kein Zugriff')),
+      })
+      .catch(() => {});
+    await zweiter
+      .fetchQuery({
+        queryKey: einsatzKeys.einsatz(4),
+        queryFn: () => Promise.reject(new ApiError(404, 'weg')),
+      })
+      .catch(() => {});
+    await lagebildStarten(zweiter, { art: 'ok', benutzer: A }, { drosselMs: DROSSEL });
+    expect(zweiter.getQueryData(einsatzKeys.personen(3))).toBeUndefined();
+    expect(zweiter.getQueryData(einsatzKeys.einsatz(4))).toBeUndefined();
+    expect(zweiter.getQueryData(einsatzKeys.etbZaehler(4, {}))).toBeUndefined();
+    // Nicht Gesperrtes kommt zurück.
+    expect(zweiter.getQueryData(einsatzKeys.einheiten(3))).toEqual([{ id: 5 }]);
+    // Und der Datensatz trägt den gesperrten Stand nicht weiter.
+    const keys = (await lagebildLesen())!.client.clientState.queries.map((q) => q.queryKey);
+    expect(keys).not.toContainEqual(einsatzKeys.personen(3));
+    expect(keys).not.toContainEqual(einsatzKeys.einsatz(4));
+  });
+
+  it('überdeckt einen jüngeren Fehler nicht mit dem vorgehaltenen Stand', async () => {
+    // Ohne Sperrmarke (500 ist kein Rechteentzug): die Query steht im Cache schon auf
+    // `error`, ohne Daten. `hydrate` übernähme den älteren Stand, weil 0 < dataUpdatedAt, und
+    // die Seite zeigte ihn als Erfolg statt ihres Fehlers.
+    const erster = neuerClient();
+    await lagebildStarten(erster, { art: 'ok', benutzer: A }, { drosselMs: DROSSEL });
+    erster.setQueryData(einsatzKeys.personen(3), [{ id: 1 }]);
+    await warteAufGeschrieben((n) => n > 0);
+    await lagebildBeenden(erster);
+
+    const zweiter = erzeugeQueryClient({ queries: { retry: false } });
+    clients.push(zweiter);
+    await zweiter
+      .fetchQuery({
+        queryKey: einsatzKeys.personen(3),
+        queryFn: () => Promise.reject(new ApiError(500, 'kaputt', { vomAnwendungsserver: true })),
+      })
+      .catch(() => {});
+    await lagebildStarten(zweiter, { art: 'ok', benutzer: A }, { drosselMs: DROSSEL });
+    expect(zweiter.getQueryState(einsatzKeys.personen(3))?.status).toBe('error');
+    expect(zweiter.getQueryData(einsatzKeys.personen(3))).toBeUndefined();
+  });
+
+  it('stellt einen Einzelstand älter als 24 h nicht wieder her', async () => {
+    const quelle = new QueryClient();
+    quelle.setQueryData(einsatzKeys.personen(3), [{ id: 1 }], {
+      updatedAt: Date.now() - HOECHSTLIEGEZEIT_MS - 1,
+    });
+    quelle.setQueryData(einsatzKeys.einheiten(3), [{ id: 5 }]);
+    await lagebildAnlegen({
+      benutzer: A,
+      bestaetigtAt: Date.now(),
+      buster: __APP_VERSION__,
+      client: { timestamp: Date.now(), buster: __APP_VERSION__, clientState: dehydrate(quelle) },
+    });
+    const qc = neuerClient();
+    await lagebildStarten(qc, { art: 'netzfehler' });
+    expect(qc.getQueryData(einsatzKeys.personen(3))).toBeUndefined();
+    expect(qc.getQueryData(einsatzKeys.einheiten(3))).toEqual([{ id: 5 }]);
+  });
+
+  it('meldet ohne Serverbestätigung niemanden an, wenn der Stand nicht lesbar ist', async () => {
+    // Review LFH-723 (Minor): scheitert die Wiederherstellung, ist der Datensatz weg — eine
+    // Offline-Anmeldung ohne jeden Stand verspräche etwas, das nicht da ist.
+    await lagebildAnlegen({
+      benutzer: A,
+      bestaetigtAt: Date.now(),
+      buster: __APP_VERSION__,
+      client: {
+        timestamp: Date.now(),
+        buster: __APP_VERSION__,
+        clientState: { queries: 'kaputt' } as unknown as PersistedClient['clientState'],
+      },
+    });
+    const qc = neuerClient();
+    expect(await lagebildStarten(qc, { art: 'netzfehler' })).toBeNull();
+    expect(await lagebildLesen()).toBeUndefined();
   });
 
   it('stellt den Stand nach einem Netzfehler als dieselbe Person wieder her', async () => {

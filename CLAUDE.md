@@ -1820,14 +1820,22 @@ draußen gelassen werden.
 - **Rechteentzug im Fehler-Seam** (`api/queryClient.ts`): 403/404 auf den Einsatzkopf räumt
   den ganzen Einsatz, 403 auf einen anderen Key dessen Prefix im Einsatz. Die Trennlinie
   verläuft zwischen **beobachtet und unbeobachtet**: Beobachtete Queries verlieren nur ihre
-  Daten (`setState`), unbeobachtete werden entfernt. Entfernte beobachtete Geschwister (ETB-
+  Daten und stehen auf `error` (`setState`), unbeobachtete werden entfernt. Entfernte beobachtete Geschwister (ETB-
   Liste und -Zähler) stießen sich sonst gegenseitig neu an, eine Abrufschleife.
   `resetQueries` scheidet aus demselben Grund aus. Eine Sperrmarke je Bereich hält die
-  geleerten Queries bis zum nächsten Erfolg von der Platte fern.
+  geleerten Queries bis zum nächsten Erfolg von der Platte **und von der Wiederherstellung**
+  fern. Deshalb stellt `lagebildSitzung.ts` selbst wieder her (Filter unmittelbar vor
+  `hydrate`), nicht `persistQueryClientRestore`: Eine 403, die vor dem Lesen der IndexedDB
+  eintraf, holte `hydrate` sonst zurück.
+- **Keine Mutationen, kein Einzelstand über 24 h** (`lagebildDehydrierOptionen`): Pausierte
+  Mutationen trügen sonst ihre `variables` (Chat, Personen) auf die Platte.
 - **„· offline“ entscheidet `Datenstand` selbst** (`useOhneVerbindung`,
   `offline/verbindung.ts`). Es gilt, wenn der Browser offline ist **oder** Abrufe an der Leitung
   scheitern. `navigator.onLine` allein trägt nicht: Chromium meldet nach einem Neuladen unter
   Playwrights Offline-Schalter `true` (gemessen), im Feld steht oft das WLAN ohne Server.
+  Eine 502/503/504 **mit** dem `{error}`-Umschlag des eigenen Servers
+  (`ApiError.vomAnwendungsserver`) ist keine Unerreichbarkeit, sonst setzte eine gescheiterte
+  Pegel-Vorhersage die ganze App auf „offline“.
 - **Die erste Speicherung erfolgt beim Abonnieren.** Das Abonnement sieht nur künftige
   Änderungen. Hatte die Seite ihre Abfragen schon fertig, blieb der Stand sonst leer
   (gemessen an der Lagekarte).

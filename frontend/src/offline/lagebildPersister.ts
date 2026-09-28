@@ -2,7 +2,9 @@ import type { PersistedClient, Persister } from '@tanstack/query-persist-client-
 import { lagebildClientSchreiben, lagebildLesen, lagebildLoeschenPlatte } from './lagebildSpeicher';
 
 /** Drosselung der Speicherung (design.md D1). Der Persister wird bei JEDER Cache-Änderung
- *  gerufen; ohne Drosselung dehydrierte ein ETB-Abruf mit vielen Seiten bei jedem Ereignis. */
+ *  gerufen, das Dehydrieren davor läuft ungedrosselt (`persistQueryClientSave`). Gedrosselt
+ *  wird der IndexedDB-Schreibvorgang samt Structured Clone — ohne ihn schriebe ein ETB mit
+ *  vielen Seiten bei jedem Ereignis den ganzen Stand. */
 export const LAGEBILD_DROSSEL_MS = 1_000;
 
 export interface LagebildPersister extends Persister {

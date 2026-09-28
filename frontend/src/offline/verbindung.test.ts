@@ -14,9 +14,14 @@ afterEach(() => verbindungZuruecksetzenFuerTests());
 describe('Verbindung (LFH-723, design.md D7)', () => {
   it('ordnet nur Leitungsfehler als Verbindungsfehler ein', () => {
     expect(istVerbindungsfehler(new NetzFehler())).toBe(true);
+    // Ohne den `{error}`-Umschlag des eigenen Servers: die Fehlerseite eines Gateways.
     expect(istVerbindungsfehler(new ApiError(503, 'x'))).toBe(true);
     expect(istVerbindungsfehler(new ApiError(502, 'x'))).toBe(true);
     expect(istVerbindungsfehler(new ApiError(504, 'x'))).toBe(true);
+    // MIT Umschlag hat der eigene Server geantwortet (Lastabwurf 503, Pegel-Upstream 502):
+    // er ist erreichbar, also nicht „offline" (Review LFH-723, Befund 4).
+    expect(istVerbindungsfehler(new ApiError(503, 'x', { vomAnwendungsserver: true }))).toBe(false);
+    expect(istVerbindungsfehler(new ApiError(502, 'x', { vomAnwendungsserver: true }))).toBe(false);
     expect(istVerbindungsfehler(new ApiError(500, 'x'))).toBe(false);
     expect(istVerbindungsfehler(new ApiError(403, 'x'))).toBe(false);
     expect(istVerbindungsfehler(new Error('x'))).toBe(false);

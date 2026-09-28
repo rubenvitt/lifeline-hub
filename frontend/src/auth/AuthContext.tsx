@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { BenutzerAnzeige } from '../api/types';
-import { ApiError } from '../api/client';
+import { ApiError, NetzFehler } from '../api/client';
 import * as authApi from '../api/auth';
 import { sitzungsMeldungZuruecksetzen } from './sitzungsEvent';
 import {
@@ -12,7 +12,11 @@ import {
   lagebildStarten,
 } from '../offline/lagebildSitzung';
 import type { MeErgebnis } from '../offline/lagebildStart';
-import { istVerbindungsfehler, meldeServerErreichbar } from '../offline/verbindung';
+import {
+  GATEWAY_NICHT_ERREICHBAR,
+  istVerbindungsfehler,
+  meldeServerErreichbar,
+} from '../offline/verbindung';
 
 /** Ergebnis von `login()` (LFH-43, Increment 5): unterscheidet den Sofort-Erfolg (Session
  *  bereits gesetzt, `benutzer` im Context übernommen) vom TOTP-Zweitfaktor-Fall
@@ -40,10 +44,15 @@ const AuthContext = createContext<AuthWert | null>(null);
  *  Netzfehler (oder die Meldung eines Gateways, der Server sei nicht erreichbar) öffnet die
  *  Offline-Identität, jede Antwort des Servers selbst ungleich Erfolg nicht. */
 function meFehlerEinordnen(e: unknown): MeErgebnis {
-  // Auch die Gateway-Antworten 502/503/504 zählen: mit ihnen meldet ein vorgeschalteter Proxy
-  // „Server nicht erreichbar", über die Sitzung sagen sie nichts (design.md D2).
-  if (istVerbindungsfehler(e)) {
-    meldeServerErreichbar(false);
+  // Auch 502/503/504 zählen, gleich von wem: über die Sitzung sagen sie nichts — ein
+  // überlasteter eigener Server (503 MIT Umschlag) löschte sonst den vorgehaltenen Stand
+  // (design.md D2). Als „nicht erreichbar" für die Kennzeichnung gilt nur ein echter
+  // Leitungsfehler (`istVerbindungsfehler`).
+  if (
+    e instanceof NetzFehler ||
+    (e instanceof ApiError && GATEWAY_NICHT_ERREICHBAR.has(e.status))
+  ) {
+    if (istVerbindungsfehler(e)) meldeServerErreichbar(false);
     return { art: 'netzfehler' };
   }
   // 401 = nicht angemeldet (erwartet); andere Fehler ebenfalls als „anonym" behandeln

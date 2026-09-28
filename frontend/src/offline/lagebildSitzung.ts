@@ -1,12 +1,12 @@
-import type { QueryClient } from '@tanstack/react-query';
+import { hydrate, type QueryClient } from '@tanstack/react-query';
 import {
-  persistQueryClientRestore,
   persistQueryClientSave,
   persistQueryClientSubscribe,
+  type PersistedClient,
 } from '@tanstack/query-persist-client-core';
 import type { BenutzerAnzeige } from '../api/types';
 import { fetchErfolgeVerfolgen } from './lagebildBestaetigung';
-import { lagebildDehydrierFilter } from './lagebildFilter';
+import { lagebildDehydrierOptionen, lagebildStandZulaessig } from './lagebildFilter';
 import { erzeugeLagebildPersister, type LagebildPersister } from './lagebildPersister';
 import {
   lagebildAnlegen,
@@ -14,7 +14,7 @@ import {
   lagebildLesen,
   lagebildLoeschenPlatte,
 } from './lagebildSpeicher';
-import { HOECHSTLIEGEZEIT_MS, startEntscheidung, type MeErgebnis } from './lagebildStart';
+import { startEntscheidung, type MeErgebnis } from './lagebildStart';
 
 /**
  * Steuerung der Lagebild-Vorhaltung je QueryClient (LFH-723, design.md D2/D5): Start nach
@@ -73,7 +73,7 @@ function abonnieren(
     queryClient: qc,
     persister,
     buster,
-    dehydrateOptions: { shouldDehydrateQuery: lagebildDehydrierFilter(qc) },
+    dehydrateOptions: lagebildDehydrierOptionen(qc),
   };
   const speichernAbmelden = persistQueryClientSubscribe(speichern);
   // Einmal sofort (gedrosselt): das Abonnement sieht nur KÜNFTIGE Änderungen. Serverbestätigt
@@ -96,6 +96,35 @@ function abonnieren(
       bestaetigungAbmelden();
     },
   });
+}
+
+/**
+ * Legt den vorgehaltenen Stand in den Speicher — eigener Schritt statt
+ * `persistQueryClientRestore`, weil gefiltert werden muss, und zwar UNMITTELBAR vor dem
+ * `hydrate`, ohne `await` dazwischen (Review LFH-723, Befund 2):
+ *
+ * - Serverbestätigt laufen die Abrufe der Seite schon, während der Start die IndexedDB liest.
+ *   Kam eine 403/404 vorher, trägt der Bereich eine Sperrmarke, und `hydrate` legte den
+ *   entzogenen Stand sonst wieder in den Speicher: es übernimmt jeden Stand, dessen
+ *   `dataUpdatedAt` neuer ist als der im Cache — und der Rechteentzug hat ihn auf 0 gesetzt.
+ * - Eine Query, die im Cache schon auf `error` steht, wird nicht überschrieben: ihr Fehler ist
+ *   jünger als jeder vorgehaltene Stand.
+ * - Ein Einzelstand älter als die Höchstliegezeit kommt nicht zurück (`lagebildStandZulaessig`).
+ *
+ * Mutationen stellt der Schritt nie her — es werden keine geschrieben (`lagebildFilter.ts`).
+ * Gibt den tatsächlich hergestellten Stand zurück; nur DER darf auf die Platte zurück.
+ */
+function wiederherstellen(qc: QueryClient, client: PersistedClient): PersistedClient {
+  const jetzt = Date.now();
+  const cache = qc.getQueryCache();
+  const queries = client.clientState.queries.filter(
+    (q) =>
+      lagebildStandZulaessig(qc, q.queryKey, q.state.dataUpdatedAt, jetzt) &&
+      cache.find({ queryKey: q.queryKey, exact: true })?.state.status !== 'error',
+  );
+  const clientState = { mutations: [], queries };
+  hydrate(qc, clientState);
+  return { ...client, clientState };
 }
 
 /** Beendet das Speichern, ohne zu löschen: ein ausstehender Durchlauf entfällt. */
@@ -149,28 +178,28 @@ export function lagebildStarten(
     if (SITZUNGEN.get(qc)?.benutzerId === benutzer.id) return benutzer;
     await beenden(qc);
 
-    if (entscheidung.wiederherstellen) {
+    let wiederhergestellt: PersistedClient | undefined;
+    if (entscheidung.wiederherstellen && satz) {
       try {
-        await persistQueryClientRestore({
-          queryClient: qc,
-          persister: erzeugeLagebildPersister(benutzer.id),
-          buster,
-          maxAge: HOECHSTLIEGEZEIT_MS,
-        });
-      } catch {
-        // Ein unlesbarer Stand ist verworfen (der Restore löscht ihn selbst) — weiter ohne.
+        wiederhergestellt = wiederherstellen(qc, satz.client);
+      } catch (fehler) {
+        // Ein unlesbarer Stand ist verworfen. Ohne Serverbestätigung gibt es dann auch keine
+        // Offline-Anmeldung: sie verspräche einen Stand, der nicht da ist.
+        console.warn('Lagebild: vorgehaltener Stand unlesbar, verworfen', fehler);
+        await lagebildLoeschenPlatte();
+        if (me.art !== 'ok') return null;
       }
     }
     if (abgebrochen()) return null;
     if (me.art === 'ok') {
       // Serverbestätigt: Datensatz anlegen bzw. mit frischer Identität und Bestätigung
-      // fortschreiben. Ohne Server (Netzfehler) bleibt der Datensatz, wie er ist.
-      const bestand = entscheidung.wiederherstellen ? await lagebildLesen() : undefined;
+      // fortschreiben — mit dem GEFILTERTEN Stand, nie dem gelesenen. Ohne Server
+      // (Netzfehler) bleibt der Datensatz, wie er ist.
       await lagebildAnlegen({
         benutzer,
         bestaetigtAt: jetzt,
         buster,
-        client: bestand?.client ?? leererClient(buster),
+        client: wiederhergestellt ?? leererClient(buster),
       });
     }
     abonnieren(qc, benutzer.id, buster, optionen);
