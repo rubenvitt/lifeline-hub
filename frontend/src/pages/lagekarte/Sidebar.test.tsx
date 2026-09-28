@@ -474,6 +474,25 @@ describe('Sidebar Bild-Hintergründe', () => {
     );
   });
 
+  it('startet das Platzieren per Enter im Picker wie der Knopf und schließt den Picker (LFH-716)', () => {
+    const onZeichenPlatzierenStart = vi.fn();
+    renderMitProviders(
+      <Sidebar {...basisProps} onZeichenPlatzierenStart={onZeichenPlatzierenStart} />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Taktisches Zeichen platzieren' }));
+    const kachel = within(screen.getByRole('radiogroup', { name: 'Grundzeichen' })).getByRole(
+      'radio',
+      { name: 'Person' },
+    );
+    kachel.focus();
+    fireEvent.keyDown(kachel, { key: 'Enter' });
+    // Die Spec der Enter-Kachel, nicht der Entwurf von vorher (taktische-formation).
+    expect(onZeichenPlatzierenStart).toHaveBeenCalledWith(
+      expect.objectContaining({ grundzeichen: 'person' }),
+    );
+    expect(screen.queryByRole('radiogroup', { name: 'Grundzeichen' })).not.toBeInTheDocument();
+  });
+
   it('zeigt im Platzier-Modus den Hinweis und meldet Abbrechen (LFH-170)', () => {
     const onZeichenPlatzierenAbbrechen = vi.fn();
     renderMitProviders(

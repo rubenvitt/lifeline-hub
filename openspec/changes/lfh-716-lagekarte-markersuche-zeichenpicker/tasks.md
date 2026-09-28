@@ -7,10 +7,10 @@
 
 ## 2. Zeichen-Picker als Bildraster
 
-- [ ] 2.1 `FreiesZeichenPicker.tsx` auf Raster umbauen (Grundzeichen- und Symbolraster mit Suche, „Kein Symbol“, Radiogruppe mit rollendem Tabstopp und Pfeiltasten, Details eingeklappt mit `forceRender`, `kachelStil` auf Dichte-Staffel, Rollenfarben über `useRollen`, Radius aus Token) und die C9-Tests angepasst übernehmen; verifizieren: `FreiesZeichenPicker.test.tsx` grün, inkl. `kachelStil` über zwei Dichtestufen und Feldbudget-Paar (zu: zwei Suchfelder offen; auf: Details-Felder zählen mit)
-- [ ] 2.2 Leiste „Zuletzt verwendet“ im Picker (Name als `aria-label` + Tooltip, Übernahme ohne Bezeichnung, Erneuerung per Abonnement); verifizieren: Tests „keine Leiste ohne Einträge“, „Übernahme lässt Bezeichnung stehen“, „erneuert sich nach Merken“
-- [ ] 2.3 Enter-Vertrag nach D4 (`onAbsenden` auf Kachel, Suchfeld mit Erst-Treffer-Wahl, Bezeichnung mit frischem Wortlaut; Blur platziert nicht; ohne `onAbsenden` kein Absenden); verifizieren: Picker-Tests je Weg, darunter „platziert per Enter“
-- [ ] 2.4 `Sidebar.tsx` Zeichnen-Paneel: `onAbsenden` wie der Platzieren-Knopf verdrahten; verifizieren: `Sidebar.test.tsx` — Enter im geöffneten Picker ruft `onZeichenPlatzierenStart` mit der Spec und schließt den Picker
+- [x] 2.1 `FreiesZeichenPicker.tsx` auf Raster umbauen (Grundzeichen- und Symbolraster mit Suche, „Kein Symbol“, Radiogruppe mit rollendem Tabstopp und Pfeiltasten, Details eingeklappt mit `forceRender`, `kachelStil` auf Dichte-Staffel, Rollenfarben über `useRollen`, Radius aus Token) und die C9-Tests angepasst übernehmen; verifizieren: `FreiesZeichenPicker.test.tsx` grün, inkl. `kachelStil` über zwei Dichtestufen und Feldbudget-Paar (zu: zwei Suchfelder offen; auf: Details-Felder zählen mit)
+- [x] 2.2 Leiste „Zuletzt verwendet“ im Picker (Name als `aria-label` + Tooltip, Übernahme ohne Bezeichnung, Erneuerung per Abonnement); verifizieren: Tests „keine Leiste ohne Einträge“, „Übernahme lässt Bezeichnung stehen“, „erneuert sich nach Merken“
+- [x] 2.3 Enter-Vertrag nach D4 (`onAbsenden` auf Kachel, Suchfeld mit Erst-Treffer-Wahl, Bezeichnung mit frischem Wortlaut; Blur platziert nicht; ohne `onAbsenden` kein Absenden); verifizieren: Picker-Tests je Weg, darunter „platziert per Enter“
+- [x] 2.4 `Sidebar.tsx` Zeichnen-Paneel: `onAbsenden` wie der Platzieren-Knopf verdrahten; verifizieren: `Sidebar.test.tsx` — Enter im geöffneten Picker ruft `onZeichenPlatzierenStart` mit der Spec und schließt den Picker
 
 ## 3. Inspector entprellt mit Eigen-Merker
 

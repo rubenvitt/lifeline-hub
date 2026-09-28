@@ -571,6 +571,13 @@ export default function Sidebar(props: SidebarProps) {
   const [zeichenEntwurf, setZeichenEntwurf] = useState<FreiesZeichenUpdate>({
     grundzeichen: 'taktische-formation',
   });
+  /** Knopf „Platzieren" und Enter im Picker: der Entwurf übernimmt die Spec, damit der
+   *  wieder geöffnete Picker dort weitermacht, wo platziert wurde. */
+  const platziereZeichen = (spec: FreiesZeichenUpdate) => {
+    setZeichenEntwurf(spec);
+    props.onZeichenPlatzierenStart(spec);
+    setZeichenPickerOffen(false);
+  };
   // Suche über „Nicht verortet" (LFH-360). Wirksam ist der Begriff nur, solange das Feld
   // steht: fällt die Liste unter die Schwelle, verschwindet mit dem Feld auch sein
   // `allowClear` — ein weiterwirkender Filter verschluckte dann Einträge ohne sichtbaren
@@ -975,15 +982,16 @@ export default function Sidebar(props: SidebarProps) {
                   </Space>
                 ) : zeichenPickerOffen ? (
                   <Space orientation="vertical" style={{ width: '100%' }}>
-                    <FreiesZeichenPicker wert={zeichenEntwurf} onChange={setZeichenEntwurf} />
+                    {/* Enter im Picker (LFH-716, D4) nimmt denselben Weg wie der Knopf —
+                        mit der Spec, die der Picker mitbringt, weil `zeichenEntwurf` die per
+                        Enter gewählte Kachel in dieser Runde noch nicht trägt. */}
+                    <FreiesZeichenPicker
+                      wert={zeichenEntwurf}
+                      onChange={setZeichenEntwurf}
+                      onAbsenden={platziereZeichen}
+                    />
                     <Space>
-                      <Button
-                        type="primary"
-                        onClick={() => {
-                          props.onZeichenPlatzierenStart(zeichenEntwurf);
-                          setZeichenPickerOffen(false);
-                        }}
-                      >
+                      <Button type="primary" onClick={() => platziereZeichen(zeichenEntwurf)}>
                         Platzieren
                       </Button>
                       <Button onClick={() => setZeichenPickerOffen(false)}>Abbrechen</Button>
