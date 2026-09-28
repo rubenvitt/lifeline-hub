@@ -129,6 +129,7 @@ modul_marker! {
     Einsatzabschnitte => "einsatzabschnitte",
     Personen => "personen",
     Einheiten => "einheiten",
+    Chat => "chat",
 }
 
 /// Pfad-Präfix (app.rs-Route) → erwarteter Modul-Key (LFH-230). `None` = modul-lose
@@ -162,6 +163,7 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     ),
     ("/api/einsaetze/{id}/personen", Some("personen")),
     ("/api/einsaetze/{id}/einheiten", Some("einheiten")),
+    ("/api/einsaetze/{id}/chat", Some("chat")),
     ("/api/einsaetze/{id}/gefahrengebiete", Some("gefahrenzonen")),
     ("/api/einsaetze/{id}/abschnitte", Some("einsatzabschnitte")),
     ("/api/einsaetze/{id}/zonen", Some("lagekarte")),

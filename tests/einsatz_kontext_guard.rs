@@ -30,7 +30,6 @@ use std::fs;
 /// einsatz-Routen: den Gate-Extractor ziehen (nicht eintragen).
 const DEFERRED_MODULE: &[&str] = &[
     "einsatz",
-    "chat",
     "etb",
     "befehl",
     "lagebericht",
