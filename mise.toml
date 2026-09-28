@@ -1,9 +1,8 @@
-# mise.toml — versionierte Projekt-Tasks (wird mit dem lokalen, gitignorierten
-# mise.local.toml gemerged; dort liegen die .env-abhängigen Dev-Server-Tasks backend/frontend/karten-service).
+# mise.toml — versionierte Projekt-Tasks (gemerged mit dem gitignorierten mise.local.toml, das die
+# .env-abhängigen Dev-Server-Tasks backend/frontend/karten-service trägt).
 #
-# Cleanup-Tasks (gestuft): `mise run clean` räumt nur BILLIG regenerierbare
-# Build-Artefakte. Teure/destruktive Ziele (Karten, Dev-DB, Docker, Worktrees) sind
-# bewusst Opt-in und per `confirm` bzw. Dry-Run abgesichert.
+# `mise run clean` räumt nur billig regenerierbare Build-Artefakte; teure/destruktive Ziele sind
+# Opt-in und per `confirm` bzw. Dry-Run abgesichert.
 #
 #   mise run clean            # target/, node_modules, dist(→.gitkeep), .pnpm-store, karten-build/out
 #   mise run clean:karten     # heruntergeladene Offline-Karten in karten/ (~7 G, Neu-Download nötig)
@@ -13,9 +12,9 @@
 #   mise run clean:worktrees  # merged/verwaiste Worktrees unter .claude|.claire/worktrees (Dry-Run;
 #                             #   FORCE=1 mise run clean:worktrees führt aus)
 #
-# Reihenfolge-Hinweis: mise führt `depends` VOR dem `confirm` aus. Damit die Rückfrage
-# wirklich gated, steckt die Löschlogik in versteckten `_clean:*`-Workern, die per
-# `run = [{ task = … }]` NACH dem confirm laufen (empirisch verifiziert).
+# mise führt `depends` VOR dem `confirm` aus. Damit die Rückfrage wirklich sperrt, steckt die
+# Löschlogik in versteckten `_clean:*`-Workern, die per `run = [{ task = … }]` NACH dem confirm
+# laufen.
 
 # ── Build-Artefakte (sicher, kein confirm — genau dafür ist der Task da) ────────────
 [tasks."clean"]
@@ -65,28 +64,21 @@ confirm = { message = "Löscht lifeline.db* (lokale Dev-DB inkl. Seed-Daten) + l
 run = [{ task = "_clean:db" }]
 
 # ── Lokaler Object-Store: Garage (Docker) ──────────────────────────────────────────
-# Steht hier und nicht in der (gitignorten) mise.local.toml: alle Werte stehen in
-# compose.yml/garage.toml, der Task braucht weder .env noch Geheimnisse. Damit
-# funktioniert `mise run garage` auf einem frischen Klon — bacon.toml:30 verweist darauf.
+# Hier statt in mise.local.toml: der Task braucht weder .env noch Geheimnisse und läuft so auf
+# einem frischen Klon (bacon.toml verweist darauf).
 [tasks.garage]
 description = "Lokalen Garage-Object-Store (S3 für karten-service) starten + Bucket 'maps' bereitstellen"
 run = '''
 #!/usr/bin/env bash
 set -euo pipefail
 docker compose up -d --wait garage
-# Beide Schritte sind idempotent (gemessen: zweiter Lauf exit 0) — der Task darf
-# beliebig oft laufen. Sie laufen per `exec` IM laufenden Container statt als eigener
-# Init-Service: das Garage-Image bringt keine Shell mit, und die CLI erreicht den
-# Knoten über dessen RPC-Socket, den ein Fremdcontainer nicht ohne Weiteres hat.
-# `--default-bucket` legt Bucket und Schlüssel an, setzt das Website-Flag aber NICHT
-# (gemessen: „Website access: false") — der erste Schritt bleibt deshalb nötig.
+# Beide Schritte sind idempotent. Sie laufen per `exec` IM Container, weil das Image keine Shell
+# hat und die CLI den Knoten nur über dessen RPC-Socket erreicht. `--default-bucket` setzt das
+# Website-Flag NICHT, deshalb der erste Schritt.
 docker compose exec -T garage /garage bucket website --allow maps
-# Globaler Alias 'localhost': Garage bedient den unsignierten Lesepfad Host-basiert,
-# nicht über den Pfad (gemessen: /maps/<key> am Web-Endpunkt → 404). Der Alias macht
-# das Bucket unter http://localhost:3902/<key> erreichbar und hält den Hostnamen bei
-# exakt 'localhost' — nur so passiert die URL den SSRF-Riegel in
-# src/karte/download.rs: `host_ist_loopback` vergleicht den Hostnamen und löst
-# bewusst kein DNS auf, ein 'maps.web.garage.localhost' fiele durch.
+# Globaler Alias 'localhost': Garage bedient den unsignierten Lesepfad Host-basiert, nicht über
+# den Pfad. Der Hostname muss exakt 'localhost' sein, sonst fällt die URL durch den SSRF-Riegel
+# in src/karte/download.rs (`host_ist_loopback` vergleicht den Namen und löst kein DNS auf).
 docker compose exec -T garage /garage bucket alias maps localhost
 echo "✓ Garage läuft: S3 :3900 (signiert) · öffentlich http://localhost:3902/<key>"
 '''
@@ -97,8 +89,7 @@ run = '''
 #!/usr/bin/env bash
 set -euo pipefail
 docker compose down -v --remove-orphans >/dev/null 2>&1 || true
-# Nachlese für Bestände, die noch vor compose.yml von Hand angelegt wurden, und für
-# das abgelöste MinIO (Container/Volume hießen lfh-minio bzw. lfh-minio-data).
+# Nachlese für von Hand angelegte Bestände und das abgelöste MinIO (lfh-minio, lfh-minio-data).
 for c in lfh-garage lfh-minio; do docker rm -f "$c" >/dev/null 2>&1 || true; done
 for v in lfh-garage-meta lfh-garage-data lfh-minio-data; do docker volume rm "$v" >/dev/null 2>&1 || true; done
 docker network rm lfh-dev >/dev/null 2>&1 || true
@@ -136,8 +127,8 @@ for a in "$@"; do [ "$a" = "--force" ] && FORCE=1; done
 
 root="$(git rev-parse --show-toplevel)"
 
-# Gemergt = Vorfahre von lokalem alpha ODER origin/alpha. Feature-Branches zweigen von alpha ab und
-# mergen dorthin; main ist nur die Release-Linie und hinkt hinterher (konservativ: stale alpha hält eher).
+# Gemergt = Vorfahre von lokalem alpha ODER origin/alpha; main ist nur die Release-Linie und hinkt
+# hinterher.
 is_merged() {
   local rev="$1" ref
   for ref in alpha origin/alpha; do
