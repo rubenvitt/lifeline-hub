@@ -23,26 +23,22 @@ interface AdminPageProps {
   /** Optionaler Hinweis unter dem Header (z. B. ein read-only-Alert). */
   hinweis?: ReactNode;
   /**
-   * Breite der Spalte — dieselbe Achse und dieselbe Vorgabe wie an `EinsatzSeite`
-   * (`'voll'`, Neuentwurf 22.09.2026): Stammdaten-Tabellen, Benutzer- und Kartenlisten füllen
-   * die Spalte neben der Verwaltungs-Seitenleiste. `'schmal'` setzen die reinen
-   * Formularseiten AUSDRÜCKLICH (Organisation, Fahrzeug-/Personal-Detail, Profil,
-   * Einstellungen).
+   * Breite der Spalte — dieselbe Achse und Vorgabe `'voll'` wie an `EinsatzSeite`: Tabellen und
+   * Listen füllen die Spalte neben der Verwaltungs-Seitenleiste. `'schmal'` setzen die reinen
+   * Formularseiten AUSDRÜCKLICH (Organisation, Fahrzeug-/Personal-Detail, Profil, Einstellungen).
    */
   breite?: SeitenBreite;
   children: ReactNode;
 }
 
 /**
- * Geteilter schlanker Seiten-Rahmen + Header für die Verwaltungs-Seiten (LFH-281):
- * Stammdaten, Globale Einstellungen, Karten, Benutzer. Der Titel ist das `h1` der Seite
- * (Satz 14/600 wie an `EinsatzSeite`), Abstände und Farben aus `theme.useToken()` bzw. den
- * Rollen des Modus.
+ * Geteilter Seiten-Rahmen + Header für die Verwaltungs-Seiten (LFH-281): Stammdaten, Globale
+ * Einstellungen, Karten, Benutzer. Der Titel ist das `h1` der Seite (Satz 14/600), Abstände und
+ * Farben aus `theme.useToken()` bzw. den Rollen des Modus.
  *
- * NEUENTWURF (21.09.2026): derselbe Seitenkopf wie `EinsatzSeite` — 44-px-Leiste mit
- * Haarlinie, Titel 14/600, rechts der Aktionen-Slot. Anders als dort NICHT vollbreit: die
- * Seite steht neben der Verwaltungs-Seitenleiste, ein negativer Rand liefe in sie hinein.
- * Die Spalte ist linksbündig an der Seitenleiste verankert statt zentriert.
+ * Derselbe Seitenkopf wie `EinsatzSeite` (44-px-Leiste mit Haarlinie, rechts der
+ * Aktionen-Slot), aber NICHT vollbreit: die Seite steht neben der Verwaltungs-Seitenleiste, ein
+ * negativer Rand liefe in sie hinein. Die Spalte ist linksbündig an der Seitenleiste verankert.
  */
 export default function AdminPage({
   titel,
@@ -60,10 +56,9 @@ export default function AdminPage({
         <Typography.Title level={1} style={{ ...seitentitelStil(farben), minWidth: 0 }}>
           {titel}
         </Typography.Title>
-        {/* `data-lfh` markiert den Kopf-Slot, damit „genau eine Primäraktion im Kopf" AM KOPF
-          prüfbar ist statt global (LFH-340 · C5, dieselbe Bauform wie
-          `data-lfh="seitenkopf-aktionen"` an `EinsatzSeite`). Global gezählt wäre die Aussage
-          falsch: eine Sektion mit Formular im Inhalt hat dort zu Recht einen Absende-Knopf. */}
+        {/* `data-lfh` macht „genau eine Primäraktion im Kopf" AM KOPF prüfbar (LFH-340 · C5, wie
+          `data-lfh="seitenkopf-aktionen"` an `EinsatzSeite`); global gezählt fiele eine Sektion mit
+          Absende-Knopf im Formular zu Unrecht durch. */}
         {aktionen && <div data-lfh="adminpage-aktionen">{aktionen}</div>}
       </div>
       {beschreibung && (

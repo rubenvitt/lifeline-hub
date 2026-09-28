@@ -13,88 +13,50 @@ import {
 import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
 
 /**
- * Schnellerfassungs-Primitive (LFH-332 · B4) — Formularhülle, Serienmodus,
- * Wertübernahme.
- *
- * **Das Problem, gemessen am 29.07.2026.** 26 Erfassungsdialoge senden über
- * `onOk` am Modal, also mit einem Absende-Knopf ausserhalb des `<form>`; Enter
- * löst dort nichts aus. `autoFocus` kommt in den geprüften Erfassungs- und
- * Stammdatenmasken kein einziges Mal vor. Neun von neun Stammdaten-Modalen
- * schliessen nach jedem Speichern. An Aufnahme, BHP und BTP wird im Minutentakt
- * erfasst — dort kostet genau das die meiste Zeit.
+ * Schnellerfassungs-Primitive (LFH-332 · B4) — Formularhülle, Serienmodus, Wertübernahme.
  *
  * ── DREI ZUSICHERUNGEN ─────────────────────────────────────────────
  *
- * 1. **Der Absende-Knopf liegt im Formular.** Deshalb sendet Enter in einem
- *    Eingabefeld ab — das ist die eingebaute Formularübermittlung des Browsers,
- *    kein nachgebauter Tastaturbehandler. Ein `Input.TextArea` bleibt davon
- *    unberührt: dort erzeugt Enter weiterhin einen Zeilenumbruch, weil ein
- *    mehrzeiliges Feld an der Übermittlung nicht teilnimmt.
- * 2. **Der Fokus steht beim Öffnen im ersten Feld** und kehrt nach jedem
- *    Serien-Speichern dorthin zurück.
- * 3. **Zurückgesetzt wird auf JEDEM Weg hinaus** — nach dem Erfassen, über den
- *    Abbrechen-Knopf, über das Schliesskreuz, über Escape und über den Klick auf
- *    die Maske. Die letzten drei laufen nicht durch das Formular; warum sie
- *    trotzdem zurücksetzen müssen und warum `destroyOnHidden` das eben NICHT
- *    erledigt, steht am `ErfassungsModal` weiter unten. Der Bestand machte das
- *    asymmetrisch: `SchadenErfassenModal` schliesst sich selbst,
- *    `PersonErfassungModal` wird vom Eltern geschlossen, die beiden
- *    Ad-hoc-Dialoge setzen nur im Erfolgsfall zurück, das Verbleib-Modal im
- *    UHS-Grundriss auf beiden. Diese Hülle vereinheitlicht das nach der
- *    strengsten der vier Varianten.
+ * 1. **Der Absende-Knopf liegt im Formular.** Deshalb sendet Enter in einem Eingabefeld ab —
+ *    die eingebaute Formularübermittlung des Browsers, kein nachgebauter Tastaturbehandler. In
+ *    einer `Input.TextArea` bleibt Enter ein Zeilenumbruch.
+ * 2. **Der Fokus steht beim Öffnen im ersten Feld** und kehrt nach jedem Serien-Speichern
+ *    dorthin zurück.
+ * 3. **Zurückgesetzt wird auf JEDEM Weg hinaus** — nach dem Erfassen, über Abbrechen,
+ *    Schliesskreuz, Escape und Maskenklick. Warum `destroyOnHidden` das NICHT erledigt, steht
+ *    am `ErfassungsModal`.
  *
- * ── ZWEI ABWEICHUNGEN VON DER TICKET-FORMULIERUNG ──────────────────
+ * Die Fusszeile rendert die Hülle **selbst und innerhalb** des Formulars (`footer={null}`):
+ * der sichtbare Knopf ist damit schon der Übermittlungsknopf, ein versteckter Zwilling wäre
+ * überflüssig.
  *
- * Das Ticket verlangt „im Modal zusätzlich als visuell verstecktes
- * `<Button htmlType="submit">`". Das setzt voraus, dass die Knöpfe in der
- * Modal-Fusszeile bleiben. Diese Hülle rendert die Fusszeile stattdessen
- * **selbst und innerhalb** des Formulars (`footer={null}`) — damit ist der
- * sichtbare Knopf schon der Übermittlungsknopf, und ein versteckter Zwilling
- * wäre ein zweites Ding, das mit dem ersten synchron gehalten werden müsste,
- * ohne etwas hinzuzufügen. Im Repo gibt es ausserdem keinen
- * Sehhilfe-Versteckhelfer (`sr-only` o. ä.); der hätte für diesen einen Zweck
- * neu entstehen müssen.
- *
- * Der Zähler heisst **„Erfasst: n"**, nicht „heute erfasst: n". Er zählt, was
- * seit dem Öffnen dieses Dialogs gespeichert wurde — eine Tagesangabe wäre eine
- * Behauptung über Daten, die die Hülle nicht kennt.
+ * Der Zähler heisst **„Erfasst: n"**, nicht „heute erfasst": er zählt seit dem Öffnen dieses
+ * Dialogs, eine Tagesangabe behauptete Daten, die die Hülle nicht kennt.
  *
  * ── EINE FALLE ─────────────────────────────────────────────────────
  *
- * Nur der Primär-Knopf ist ein Übermittlungsknopf. „Speichern und nächste" ruft
- * `form.submit()` von Hand. Grund: Enter in einem Feld löst den **ersten**
- * Übermittlungsknopf im Baum aus. Wären es zwei, entschiede die Anordnung im
- * DOM darüber, was Enter tut — und die Anordnung ist eine Gestaltungsfrage
- * (primär steht rechts), keine Verhaltensfrage.
+ * Nur der Primär-Knopf ist ein Übermittlungsknopf; „Speichern und nächste" ruft `form.submit()`
+ * von Hand. Enter löst den **ersten** Übermittlungsknopf im Baum aus, bei zweien entschiede
+ * die DOM-Anordnung darüber.
  *
- * ── NACHTRAG 30.07.2026: DER FUSS HAT ZWEI ZEILEN ──────────────────
+ * ── DER FUSS HAT ZWEI ZEILEN ───────────────────────────────────────
  *
- * Bis hierher standen Zähler, „Werte behalten" und die drei Knöpfe in EINER
- * Reihe. Der Schalter wirkt aber ausschliesslich auf „Speichern und nächste" —
- * der Primär-Knopf direkt daneben leert und schliesst, mit Schalter oder ohne.
- * Ein Umschalter, der mitten in einer Knopfreihe steht und nur einen der Knöpfe
- * betrifft, ist von der Bedienung aus nicht von „wirkungslos" zu unterscheiden;
- * genau so wurde er gemeldet. Deshalb liegt die **Einstellung** jetzt in einer
- * eigenen, sekundär gesetzten Zeile über der **Aktion**, und der Tooltip nennt
- * die Bedingung („beim Speichern und nächste"), statt sie den Bedienenden
- * herleiten zu lassen.
+ * „Werte behalten" wirkt nur auf „Speichern und nächste"; mitten in der Knopfreihe wäre der
+ * Schalter von „wirkungslos" nicht zu unterscheiden. Die **Einstellung** steht deshalb in einer
+ * eigenen, sekundär gesetzten Zeile über der **Aktion**, der Tooltip nennt die Bedingung.
  *
- * Der Schalter startet **AUS**. Er verändert, was nach einem Speichern im
- * Formular steht — ein Vorgabewert AN bedeutet, dass die erste Person, die ihn
- * bemerkt, ihn bereits benutzt hat, ohne ihn zu wählen. Wer in Serie erfasst,
- * schaltet ihn einmal an; er hält für die Lebensdauer des Dialogs.
+ * Der Schalter startet **AUS**: ein Vorgabewert AN wäre benutzt, ohne gewählt zu sein. Er hält
+ * für die Lebensdauer des Dialogs.
  *
- * Das Tastenkürzel **Strg/⌘ + Enter** löst „Speichern und nächste" aus (blankes
- * Enter bleibt der Primär-Knopf). Es hängt am Wurzel-`div`, nicht am `<form>`:
- * so ist es unabhängig davon, ob antd unbekannte Props ans native `form`
- * durchreicht. Der Riegel gegen ein doppeltes Absenden sitzt in `abschicken`
- * (`sendetRef`) und nicht nur am Knopf — ein `loading`-Knopf ignoriert Klicks,
- * eine Tastenwiederholung erreicht ihn nie.
+ * **Strg/⌘ + Enter** löst „Speichern und nächste" aus (blankes Enter bleibt der Primär-Knopf).
+ * Das Kürzel hängt am Wurzel-`div`, unabhängig davon, ob antd unbekannte Props ans `form`
+ * durchreicht. Der Riegel gegen doppeltes Absenden sitzt in `abschicken` (`sendetRef`): ein
+ * `loading`-Knopf ignoriert Klicks, eine Tastenwiederholung erreicht ihn nie.
  */
 
 /**
- * Erstes bedienbares Feld im Formular. Deckt bewusst auch antds `Select`,
- * `AutoComplete` und `DatePicker` ab — die rendern alle ein echtes `<input>`.
+ * Erstes bedienbares Feld im Formular. Deckt auch antds `Select`, `AutoComplete` und
+ * `DatePicker` ab — die rendern alle ein echtes `<input>`.
  */
 const FOKUSSIERBAR = [
   'input:not([type="hidden"]):not([disabled])',
@@ -103,17 +65,15 @@ const FOKUSSIERBAR = [
 ].join(', ');
 
 /**
- * Wohin der Fokus beim Öffnen und nach jedem Serien-Speichern geht (Code-Review C2 zu LFH-21):
+ * Wohin der Fokus beim Öffnen und nach jedem Serien-Speichern geht:
  *
- * 1. ein ausdrückliches Fokusziel `[data-erfassung-fokus]` — für Felder, deren eigentliches
- *    `<input>` nicht bedienbar ist. Gemessen am Dateifeld: rc-upload rendert ein
- *    `<input type="file">` mit `display: none`; der Browser ignoriert `focus()` darauf still,
- *    der Fokus blieb auf dem gerade gedrückten Knopf. jsdom fokussiert es klaglos — Vitest ist
- *    für diesen Fall blind, den Beleg trägt `e2e/schaden-anhaenge.spec.ts`.
- * 2. sonst das erste GERENDERTE Feld (`getClientRects().length > 0`) — ein ausgeblendetes wird
- *    übersprungen, auch ohne Markierung.
- * 3. sonst das erste Feld überhaupt: jsdom rechnet kein Layout und meldet für jedes Element
- *    eine leere Box; ohne diesen Rückfall fokussierte die Hülle in Tests nichts mehr.
+ * 1. ein ausdrückliches Fokusziel `[data-erfassung-fokus]` — für Felder, deren `<input>` nicht
+ *    bedienbar ist (rc-upload rendert `<input type="file">` mit `display: none`, `focus()` darauf
+ *    verpufft still). jsdom fokussiert es trotzdem; den Beleg trägt
+ *    `e2e/schaden-anhaenge.spec.ts`.
+ * 2. sonst das erste GERENDERTE Feld (`getClientRects().length > 0`).
+ * 3. sonst das erste Feld überhaupt: jsdom rechnet kein Layout, ohne diesen Rückfall fokussierte
+ *    die Hülle in Tests nichts.
  */
 function fokussiereErstesFeld(wurzel: HTMLElement | null) {
   if (!wurzel) return;
@@ -127,11 +87,8 @@ function fokussiereErstesFeld(wurzel: HTMLElement | null) {
 }
 
 /**
- * Beschriftung des Serien-Kürzels. Auf dem Mac heisst die Taste ⌘, sonst Strg;
- * beide werden im Handler gleichwertig akzeptiert, angezeigt wird die ortsübliche.
- *
- * Exportiert und mit Parameter, damit BEIDE Zweige prüfbar sind: jsdom meldet
- * keinen Mac, ein Test gegen die Modul-Konstante träfe also immer denselben.
+ * Beschriftung des Serien-Kürzels: ⌘ auf dem Mac, sonst Strg; der Handler akzeptiert beide.
+ * Exportiert und mit Parameter, damit BEIDE Zweige prüfbar sind (jsdom meldet keinen Mac).
  */
 export function serienKuerzel(userAgent: string) {
   return /Mac|iPhone|iPad|iPod/.test(userAgent) ? '⌘ ↵' : 'Strg + ↵';
@@ -209,39 +166,24 @@ export function ErfassungsFormular<T extends object>({
   const { token } = theme.useToken();
   const wurzel = useRef<HTMLDivElement>(null);
   const [zaehler, setZaehler] = useState(0);
-  // Vorgabe AUS — Begründung im Dateikopf, Abschnitt „NACHTRAG".
+  // Vorgabe AUS — siehe Dateikopf.
   const [behalten, setBehalten] = useState(false);
-  // Ref statt State: der Wert wird zwischen Klick und `onFinish` im selben Zug
-  // gelesen — ein State-Update wäre zu diesem Zeitpunkt noch nicht sichtbar.
+  // Ref statt State: der Wert wird zwischen Klick und `onFinish` im selben Zug gelesen.
   const serienlaufRef = useRef(false);
-  // „Ein Absenden ist unterwegs." Gleicher Grund für die Ref: der Riegel muss
-  // innerhalb desselben Zuges greifen, in dem er gesetzt wurde.
+  // „Ein Absenden ist unterwegs." Ref, weil der Riegel im selben Zug greifen muss.
   const sendetRef = useRef(false);
   // Jeder Abbruch macht einen bereits laufenden Abschluss ungültig. Die Mutation
   // darf serverseitig zu Ende laufen, aber danach weder schließen noch navigieren.
   const abbruchGenerationRef = useRef(0);
 
   /**
-   * Der Fokus läuft über **zwei Effekte, nicht über eine Zeitangabe** — und das
-   * ist die teuerste Lektion dieser Datei.
+   * Der Fokus läuft über **Effekte, nicht über eine Zeitangabe**. Ein direkter `focus()` im
+   * Absende-Handler verpufft (React flusht danach noch einmal, der Fokus landet auf `<body>`).
+   * `requestAnimationFrame` wäre lastabhängig: am Mount spränge der Cursor notfalls mitten im
+   * Tippen zurück, und nach dem Serien-Speichern käme der Fokus zu spät.
    *
-   * Ein direkter `focus()` im Absende-Handler verpufft: React flusht danach noch
-   * einen Renderdurchgang, und der Fokus landet gemessen auf `<body>`. Der
-   * naheliegende Ausweg `requestAnimationFrame` behebt das — und handelt sich
-   * zwei lastabhängige Fehler ein, beide von der vollen Vitest-Suite gefunden und
-   * im Einzellauf unsichtbar:
-   *
-   * 1. Am Mount greift ein aufgeschobener Fokus, wann immer das Bild kommt —
-   *    notfalls erst, wenn die Person schon tippt. Dann springt der Cursor mitten
-   *    im Wortlaut ins erste Feld zurück (`Erfassung.test.tsx`, „Enter in der
-   *    Textarea sendet NICHT ab").
-   * 2. Nach dem Serien-Speichern kam das Bild unter Last später als die
-   *    Erwartung des Tests (`PersonalPage.test.tsx:556`).
-   *
-   * Ein Effekt läuft **nach dem Commit** — also später als der direkte Aufruf und
-   * dennoch an einem festen Punkt statt an einem Zeitpunkt. Der Zähler
-   * `fokusTick` ist die Auslöse-Abhängigkeit; er zählt Serien-Speicherungen und
-   * hat sonst keine Bedeutung.
+   * Ein Effekt läuft nach dem Commit, an einem festen Punkt. `fokusTick` ist nur die
+   * Auslöse-Abhängigkeit und zählt Serien-Speicherungen.
    */
   const [fokusTick, setFokusTick] = useState(0);
 
@@ -255,8 +197,8 @@ export function ErfassungsFormular<T extends object>({
 
   const abschicken = useCallback(
     async (werte: T) => {
-      // Der Riegel liegt HIER und nicht am Knopf: über das Tastenkürzel erreicht
-      // eine gehaltene Taste den Knopf nie, und `loading` blockiert nur Klicks.
+      // Der Riegel liegt HIER und nicht am Knopf: eine gehaltene Taste erreicht den Knopf nie, und
+      // `loading` blockiert nur Klicks.
       if (sendetRef.current) return;
       sendetRef.current = true;
       const abbruchGeneration = abbruchGenerationRef.current;
@@ -304,23 +246,20 @@ export function ErfassungsFormular<T extends object>({
   );
 
   /**
-   * Der Serienlauf — eine Funktion für Knopf UND Tastenkürzel. Zwei Kopien
-   * gingen genau so lange auseinander, bis eine von beiden die Marke vergisst.
+   * Der Serienlauf — eine Funktion für Knopf UND Tastenkürzel, damit keine Kopie die Marke
+   * vergisst.
    */
   const serienSpeichern = useCallback(() => {
-    // Greift NICHT beim auslösenden Druck — `sendetRef` wird erst in `abschicken`
-    // gesetzt, also nach der Prüfung. Der Riegel hier erspart einem Druck WÄHREND
-    // eines laufenden Absendens die überflüssige Prüfrunde; der wirksame Riegel
-    // steht in `abschicken`.
+    // Erspart einem Druck WÄHREND eines laufenden Absendens die Prüfrunde; der wirksame Riegel steht
+    // in `abschicken`.
     if (sendetRef.current) return;
     serienlaufRef.current = true;
     form.submit();
   }, [form]);
 
   function aufTaste(e: KeyboardEvent<HTMLDivElement>) {
-    // Ohne Serienmodus gibt es den Knopf nicht — dann darf das Kürzel auch
-    // keine Serien-Marke setzen. Eine stehengebliebene Marke färbt das nächste
-    // reguläre Absenden still zum Serienlauf (s. `onFinishFailed` unten).
+    // Ohne Serienmodus gibt es den Knopf nicht, also darf das Kürzel keine Serien-Marke setzen
+    // (s. `onFinishFailed` unten).
     if (
       e.nativeEvent.isComposing ||
       e.repeat ||
@@ -355,11 +294,9 @@ export function ErfassungsFormular<T extends object>({
 
   return (
     <div ref={wurzel} onKeyDown={aufTaste}>
-      {/* `onFinishFailed` ist die zweite Hälfte von `serienlaufRef`. Scheitert die
-          Prüfung, läuft `onFinish` NIE — die Marke bliebe auf „Serie" stehen und
-          das nächste, reguläre Absenden nähme still den Serien-Zweig: gespeichert,
-          Felder leer, Dialog offen. Wer dann ein zweites Mal drückt, legt den
-          Datensatz doppelt an. Gemessen an einer Serien-Maske mit Pflichtfeld. */}
+      {/* `onFinishFailed` ist die zweite Hälfte von `serienlaufRef`: scheitert die Prüfung, läuft
+          `onFinish` NIE, die Marke bliebe auf „Serie", und das nächste reguläre Absenden hielte den
+          Dialog offen — ein zweiter Druck legte den Datensatz doppelt an. */}
       <Form
         form={form}
         layout="vertical"
@@ -377,12 +314,9 @@ export function ErfassungsFormular<T extends object>({
             borderTop: `1px solid ${token.colorBorderSecondary}`,
           }}
         >
-          {/* EINSTELLUNG — eigene Zeile über der Aktion. Warum getrennt: Dateikopf,
-              Abschnitt „NACHTRAG". Die Zeile steht im Serienmodus IMMER, denn sie
-              trägt die Ansage-Region: wird die erst zusammen mit ihrem ersten Text
-              eingehängt, sagt der Screenreader genau die erste Speicherung nicht an
-              — eine `aria-live`-Region meldet nur Änderungen an bereits vorhandenem
-              Inhalt. */}
+          {/* EINSTELLUNG — eigene Zeile über der Aktion (siehe Dateikopf). Sie steht im Serienmodus
+              IMMER, weil sie die Ansage-Region trägt: eine `aria-live`-Region meldet nur Änderungen an
+              bereits vorhandenem Inhalt, sonst bliebe die erste Speicherung unangesagt. */}
           {serie && (
             <div
               style={{
@@ -409,11 +343,8 @@ export function ErfassungsFormular<T extends object>({
           <Space style={{ display: 'flex', justifyContent: 'flex-end' }}>
             {onAbbrechen && <Button onClick={abbrechen}>Abbrechen</Button>}
             {serie && (
-              // htmlType="button": siehe „EINE FALLE" im Dateikopf.
-              // Das Kürzel steht `aria-hidden` im Knopf: sichtbar für die Augen,
-              // unsichtbar für den zugänglichen Namen — sonst müsste jede
-              // Aufrufstelle ihre Knopf-Abfrage auf den Zusatz umschreiben, und
-              // eine Vorlesehilfe buchstabierte „Strg Plus Pfeil".
+              // htmlType="button": siehe „EINE FALLE" im Dateikopf. Das Kürzel steht `aria-hidden` im
+              // Knopf, damit der zugängliche Name „Speichern und nächste" bleibt.
               <Button loading={laeuft} onClick={serienSpeichern}>
                 Speichern und nächste
                 <span
@@ -444,25 +375,18 @@ interface ErfassungsModalProps<T> extends ErfassungsFormularProps<T> {
 }
 
 /**
- * Dieselbe Hülle als Dialog. `footer={null}`, weil die Knöpfe **im** Formular
- * liegen (Dateikopf, Abweichung 1); `destroyOnHidden`, damit ein geschlossener
- * Dialog keine Felder im Baum stehen lässt.
+ * Dieselbe Hülle als Dialog. `footer={null}`, weil die Knöpfe **im** Formular liegen;
+ * `destroyOnHidden`, damit ein geschlossener Dialog keine Felder im Baum stehen lässt.
  *
- * **`onCancel` wird NICHT durchgereicht, sondern umschlossen — und das ist kein
- * Feinschliff.** Ein Dialog hat vier Auswege: den Abbrechen-Knopf, das
- * Schließkreuz, Escape und den Klick auf die Maske. Nur der erste läuft durch das
- * Formular. Reichte man `onAbbrechen` roh an das Modal durch, setzten die anderen
- * drei nicht zurück — und `destroyOnHidden` fängt das **nicht** auf: es hängt die
- * Kinder ab, aber der Formularspeicher von rc-field-form überlebt
- * (`destroyForm(undefined)` lässt den Store stehen, `preserve` ist per Vorgabe an,
- * und beim nächsten Öffnen gewinnt der alte Store gegen `initialValues`). Gemessen
- * an `PersonalFormModal`: Person bearbeiten, mit Escape schließen, „Person
- * anlegen" öffnen — das Formular trug Name, Personalnummer und Telefon der
- * bearbeiteten Person, und Speichern legte sie als Dublette an.
+ * **`onCancel` wird umschlossen, nicht durchgereicht.** Von den vier Auswegen (Abbrechen,
+ * Schließkreuz, Escape, Maske) läuft nur der erste durch das Formular, und `destroyOnHidden`
+ * fängt die übrigen **nicht** auf: der Speicher von rc-field-form überlebt das Abhängen
+ * (`preserve` per Vorgabe an) und gewinnt beim nächsten Öffnen gegen `initialValues`. Ein
+ * Anlegen-Dialog trüge sonst die Werte des zuletzt bearbeiteten Datensatzes und legte ihn als
+ * Dublette an.
  *
- * Deshalb besitzen alle vier Wege denselben zentralen Abbruch: der Knopf und
- * Escape gehen direkt durch `ErfassungsFormular.abbrechen`; Kreuz und Maske
- * rufen dieselbe Funktion über `ErfassungsFormularSteuerung` auf.
+ * Deshalb besitzen alle vier Wege denselben zentralen Abbruch: Knopf und Escape gehen direkt
+ * durch `ErfassungsFormular.abbrechen`, Kreuz und Maske über `ErfassungsFormularSteuerung`.
  */
 export function ErfassungsModal<T extends object>({
   offen,

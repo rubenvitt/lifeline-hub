@@ -27,10 +27,8 @@ describe('SeitenSkeleton', () => {
   });
 
   it('trägt die Skelett-Klassen der Gestaltungssprache (Höhe kommt aus `sprache.css`)', () => {
-    // jsdom rechnet kein Layout — die Balkenhöhe ist im Test nicht messbar. Geprüft
-    // wird deshalb der Vertrag zur Stylesheet-Seite: ohne diese Klassen (und ohne den
-    // `sprache.css`-Import der Komponente) sind die Balken 0 px hoch und die Seite bleibt
-    // beim Laden leer.
+    // jsdom rechnet kein Layout; geprüft wird der Vertrag zur Stylesheet-Seite: ohne diese Klassen
+    // (und den `sprache.css`-Import der Komponente) wären die Balken 0 px hoch.
     const { container } = renderMitProviders(<SeitenSkeleton />);
 
     expect(container.querySelector('.lfh-skelett')).not.toBeNull();
@@ -117,10 +115,8 @@ describe('SeitenLeer', () => {
   });
 
   it('trägt mit Aktion genau einen Knopf', () => {
-    // Die Zusicherung „genau ein Primärbutton" (AK3) trägt nur, weil die Box selbst
-    // keinen Knopf beisteuert. Mit antds `<Empty>` als Rumpf wäre die Zahl nicht mehr
-    // eindeutig dem Slot zuzuordnen — deshalb ist das hier eine Aussage über den
-    // Bauplan, nicht bloß über diesen Aufruf.
+    // „Genau ein Primärbutton" (AK3) trägt nur, weil die Box selbst keinen Knopf beisteuert — eine
+    // Aussage über den Bauplan, nicht bloß über diesen Aufruf.
     renderMitProviders(
       <SeitenLeer
         titel="Noch keine Personen"
@@ -243,16 +239,9 @@ describe('SeitenStandVeraltet', () => {
   });
 
   it('trägt keinen Zeitstempel', () => {
-    // Ein „Stand von HH:MM" koppelte das Primitiv an `AnzeigeKonventionenContext` und trüge
-    // die aus LFH-318 bekannte Zeitzonen-Falle in ein GETEILTES Primitiv — die Kopplung
-    // schlüge auf jeden Konsumenten zugleich durch. Handlungsleitend ist ohnehin der Knopf,
-    // nicht die Zahl.
-    //
-    // Hier steht bewusst KEINE Anzahl der Konsumenten: sie wächst mit dem B3-Rollout
-    // (gemessen auf diesem Branch: `UnfallhilfsstellenPage`, `Sidebar` und
-    // `BereitstellungsraeumePage` sind währenddessen dazugekommen). Eine Zahl an dieser
-    // Stelle ist keine Tatsache, sondern eine Wartungslast — sie veraltet still, und genau
-    // das ist ihr vorheriger Stand („vier") schon einmal getan.
+    // Kein „Stand von HH:MM": das koppelte das geteilte Primitiv an `AnzeigeKonventionenContext`
+    // samt Zeitzonen-Falle, für jeden Konsumenten zugleich. Handlungsleitend ist der Knopf. Eine
+    // Konsumentenzahl steht hier bewusst nicht — sie veraltete still.
     renderMitProviders(<SeitenStandVeraltet onWiederholen={vi.fn()} />);
 
     expect(screen.getByRole('alert').textContent).not.toMatch(/\d{1,2}:\d{2}/);
@@ -283,9 +272,8 @@ describe('nichtGefundenInhalt', () => {
   });
 
   it('meldet auch einen 403 allgemein, wo der Aufrufer keinen 403-Text gibt', () => {
-    // Gemessen am Backend: von den sechs Katalog-GETs der Kräfte-Module trägt nur
-    // `benutzer.rs:64` ein `_admin: AdminUser`. Wer dem Fahrzeug-Pool ein „nur für
-    // Admins" anhängt, erfindet einen Fehlerfall, den das Backend nicht kennt.
+    // Von den Katalog-GETs der Kräfte-Module verlangt nur `benutzer.rs` einen `AdminUser`; ein
+    // „nur für Admins" am Fahrzeug-Pool erfände einen Fehlerfall.
     const query = { isError: true, error: new ApiError(403, 'verboten') };
 
     expect(nichtGefundenInhalt(query, { allgemein: 'Statuskatalog nicht verfügbar' })).toBe(
@@ -306,9 +294,8 @@ describe('ursacheText', () => {
   });
 
   it('gibt bei allem anderen `undefined` zurück', () => {
-    // Bestandsverhalten der fünf abgelösten Kopien, nicht eine Verbesserung nebenbei:
-    // ein gewöhnlicher `Error` trägt oft eine technische Meldung („Failed to fetch"),
-    // die vor einer Einsatzkraft nichts zu suchen hat.
+    // Ein gewöhnlicher `Error` trägt oft eine technische Meldung („Failed to fetch"), die vor einer
+    // Einsatzkraft nichts zu suchen hat.
     expect(ursacheText(new Error('Failed to fetch'))).toBeUndefined();
     expect(ursacheText('kaputt')).toBeUndefined();
     expect(ursacheText(null)).toBeUndefined();

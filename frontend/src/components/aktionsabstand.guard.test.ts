@@ -1,40 +1,33 @@
 /**
- * Abstands-Guard (LFH-363 · B5c): eine destruktive Aktion steht nicht bündig neben
- * einer neutralen.
+ * Abstands-Guard (LFH-363 · B5c): eine destruktive Aktion steht nicht bündig neben einer
+ * neutralen.
  *
- * ── Warum es diesen Guard gibt ──────────────────────────────────────────────────
- * In den Aktionsspalten der Stammdaten stand „Bearbeiten" unmittelbar neben
- * „Außer Dienst"/„Deaktivieren" — im Vorgabe-Abstand eines `<Space>`. Der ist hier
- * NICHT antds 8 px: antd mappt `spaceGapSmallSize` auf `token.paddingXS`
- * (`antd/es/space/style/index.js:72`), und `theme/tokens.ts` setzt das auf
- * `abstand.xs` = 3/5/7 px je Dichtestufe. Drei Pixel zwischen einem neutralen und
- * einem roten Knopf sind im Handschuh-Betrieb keine Trennung.
+ * ── Warum ───────────────────────────────────────────────────────────────────────
+ * Der Vorgabe-Abstand eines `<Space>` ist hier NICHT antds 8 px: antd mappt
+ * `spaceGapSmallSize` auf `token.paddingXS`, und `theme/tokens.ts` setzt das auf `abstand.xs` =
+ * 3/5/7 px. Drei Pixel zwischen einem neutralen und einem roten Knopf sind im Handschuh-Betrieb
+ * keine Trennung.
  *
- * `size="middle"` führt auf `token.padding` = `abstand.md` = 11/18/26 px und liegt
- * damit in JEDER Stufe über dem im Ticket geforderten `token.marginSM`
- * (= `abstand.sm` = 7/11/16). Der Test unten beweist diese Ordnung aus
- * `theme/tokens.ts` heraus, statt sie zu behaupten.
+ * `size="middle"` führt auf `token.padding` = `abstand.md` = 11/18/26 px und liegt in JEDER
+ * Stufe über `token.marginSM` (`abstand.sm` = 7/11/16). Der Test unten beweist diese Ordnung aus
+ * `theme/tokens.ts` heraus.
  *
- * ── Warum Quelltext und nicht gemessene Pixel ───────────────────────────────────
- * jsdom rechnet kein Layout, und `test/utils.tsx` rendert ein NACKTES
- * `ConfigProvider` ohne unser Theme — eine Pixel-Zusicherung im Vitest misse
- * antd-Vorgaben und belegte nichts (CLAUDE.md, Erfassungs-Norm). Geprüft wird
- * deshalb der Prop-Wert im Quelltext.
+ * ── Warum Quelltext und nicht Pixel ─────────────────────────────────────────────
+ * jsdom rechnet kein Layout, und `test/utils.tsx` rendert ein NACKTES `ConfigProvider` — eine
+ * Pixel-Zusicherung mäße antd-Vorgaben.
  *
  * ── Was dieser Guard NICHT sieht ────────────────────────────────────────────────
  * Teil des Vertrags, nicht Beiwerk:
  *   • einen Abstand, der über `style`/CSS statt über `size` kommt;
  *   • eine Größe aus Variable oder Ausdruck (`size={weit}`);
- *   • destruktive Aktionen, die nicht als `<Button danger>` geschrieben sind;
- *   • Nachbarschaften außerhalb der unten gelisteten Dateien ({@link BEREICH}) —
- *     der Rest des Bestands fällt mit B5d–B5j.
+ *   • destruktive Aktionen, die nicht als `<Button danger>` geschrieben sind (z. B.
+ *     Menüeinträge mit `danger: true`);
+ *   • Nachbarschaften außerhalb der unten gelisteten Dateien ({@link BEREICH}).
  *
- * ── Warum auf B5c gescopt ───────────────────────────────────────────────────────
- * Anders als beim Dichte-Guard (LFH-362) gibt es hier keine erhobene Schuldmenge
- * über den ganzen Baum: die danger-Nachbarschaft ist kein zählbares Prop, sondern
- * eine Bewertung je Stelle. Ein baumweiter Guard müsste sie für 40+ ungeprüfte
- * Dateien vorwegnehmen und entschiede damit über Geschwistertickets. Er hält
- * deshalb nur, was dieser Task bewertet hat, und wächst mit jedem Bündel.
+ * ── Warum gescopt ───────────────────────────────────────────────────────────────
+ * Die danger-Nachbarschaft ist kein zählbares Prop, sondern eine Bewertung je Stelle. Ein
+ * baumweiter Guard müsste sie für ungeprüfte Dateien vorwegnehmen; er hält deshalb nur, was
+ * bewertet ist, und wächst mit.
  */
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -45,12 +38,9 @@ import { dichten } from '../theme/tokens';
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 /**
- * Dateien mit bewerteter NACHBARSCHAFT: dort steht eine destruktive Aktion neben
- * mindestens einer weiteren. Jede muss belegt bleiben — verschwindet die Reihe
- * beim nächsten Umbau, wird der Guard sonst still trivial grün und behauptet
- * weiter eine Deckung, die er nicht mehr hat. Gegenstück zur „toten
- * Schuld-Ausnahme" in `dichte.guard.test.ts`, nur in der anderen Richtung: dort
- * verrottet eine Ausnahmeliste, hier eine Soll-Liste.
+ * Dateien mit bewerteter NACHBARSCHAFT: eine destruktive Aktion neben mindestens einer
+ * weiteren. Jede muss belegt bleiben — verschwindet die Reihe, würde der Guard still trivial
+ * grün (Gegenstück zur „toten Schuld-Ausnahme" in `dichte.guard.test.ts`).
  */
 const MIT_NACHBARSCHAFT = [
   'stammdaten/EinheitTypenTab.tsx',
@@ -63,69 +53,38 @@ const MIT_NACHBARSCHAFT = [
   'stammdaten/SprechgruppenTab.tsx',
   'stammdaten/StatusKatalogTab.tsx',
   'pages/BenutzerPage.tsx',
-  // Mit LFH-339 · C4 von `EinheitenPage.tsx` hierher gezogen: die Reihe
-  // Speichern + Auflösen(danger) sitzt jetzt in der sticky Aktionsleiste der eigenen
-  // Detailroute. Der Guard hat den Umzug selbst gemeldet — der alte Eintrag war eine
-  // Zusicherung ohne Fundstelle.
+  // Reihe Speichern + Auflösen(danger) in der sticky Aktionsleiste der Detailroute.
   'pages/EinheitDetailPage.tsx',
   'pages/EinsatzabschnittePage.tsx',
-  // ── B5f · Kartenverwaltung (LFH-366) ──────────────────────────────────────
-  // Beide tragen in ihrer Aktionsspalte „Löschen" neben mindestens einer neutralen Aktion.
-  // `OfflineKartenVerwaltung` führte das Elternticket von LFH-333 irrtümlich als
-  // Referenzmuster; es war dieselbe Fundstelle wie in `stammdaten/`, nur unentdeckt.
+  // ── Kartenverwaltung (LFH-366) ────────────────────────────────────────────
+  // Beide tragen „Löschen" neben mindestens einer neutralen Aktion.
   //
-  // `pages/lagekarte/Sidebar.tsx` steht bewusst in KEINER der beiden Listen: dort ist das
-  // Löschen seit LFH-366 ein Menü-Eintrag mit `danger: true`, und den sieht {@link reihenIn}
-  // nicht (es matcht `<Button` mit `danger` im Tag). Die Datei aufzunehmen behauptete eine
-  // Deckung, die der Scanner nicht hat — die Trennung dort ist der Menü-Trenner und wird in
-  // `Sidebar.test.tsx` geprüft.
+  // `pages/lagekarte/Sidebar.tsx` steht bewusst in KEINER Liste: dort ist Löschen ein Menüeintrag
+  // mit `danger: true`, den {@link reihenIn} nicht sieht. Die Trennung dort ist der Menü-Trenner,
+  // geprüft in `Sidebar.test.tsx`.
   'karten/OfflineKartenVerwaltung.tsx',
   'karten/OnlineQuellenVerwaltung.tsx',
-  // ── B5j · Detailseiten Schäden/Tiere (LFH-370) ────────────────────────────
-  // Erst durch B5j entstanden, nicht vorher übersehen: solange die vier Knöpfe der inneren
-  // Aktionsreihe `size="small"` trugen, standen sie in einer Größe, für die die Frage nach
-  // dem Abstand nicht gestellt war. Mit dem Abbau der Klein-Angabe wächst „Stornieren"
-  // (`danger`) auf bis zu 72 px und stünde bündig neben drei gleich hohen neutralen
-  // Aktionen — genau die Nachbarschaft, die LFH-363 verboten hat.
-  // Gemessen liefert der Scanner für beide Dateien {weit: false, knoepfe: 4, destruktiv: true}.
+  // ── Detailseiten Schäden/Tiere (LFH-370) ──────────────────────────────────
+  // „Stornieren" (`danger`) steht in der inneren Aktionsreihe neben drei gleich hohen neutralen
+  // Aktionen.
   'pages/SchaedenDetailPage.tsx',
   'pages/TiereDetailPage.tsx',
-  // ── B5k · Meldungskarte (LFH-372) ─────────────────────────────────────────
-  // „Bestätigen" (`danger`) bleibt als sichtbarer Knopf neben der Statusbewegung und dem
-  // ⋮-Trigger stehen — die Reihe ist mit der Bündelung von `<Flex gap={8}>` (dichteblinder
-  // Festwert) auf `<Space size="middle">` gewechselt. Anders als `pages/lagekarte/Sidebar.tsx`
-  // gehört diese Datei sehr wohl in die Liste: die destruktive Aktion steht hier NICHT im
-  // Menü, sondern in der Reihe, die {@link reihenIn} sieht.
-  // Die Nachbarschaft ist dabei BEDINGT — „Bestätigen" wird nur bei
-  // `bestaetigung_pflicht && !ist_bestaetigt` gerendert, bei einer gewöhnlichen Meldung
-  // steht zur Laufzeit also gar kein roter Knopf in der Reihe. Der Scanner liest Quelltext
-  // und kann das nicht unterscheiden; er sichert hier den Abstand für den Fall zu, in dem
-  // es ihn braucht. Wer den `danger`-Knopf aus der Reihe nimmt, streicht die Zeile.
-  // Und die Reihe hat ZWEI Renderformen: ab drei Aktionen ein ⋮-Menü, darunter dieselben
-  // Aktionen als direkte Knöpfe (LFH-366). Beide liegen in derselben `<Space size="middle">`
-  // — wer den Direkt-Zweig auf ein eigenes `<Flex gap>` umbaut, fällt aus dem Scanner,
-  // ohne dass sich an dieser Zeile etwas ändert.
+  // ── Meldungskarte (LFH-372) ───────────────────────────────────────────────
+  // „Bestätigen" (`danger`) steht als Knopf neben Statusbewegung und ⋮-Trigger in
+  // `<Space size="middle">` — anders als `Sidebar.tsx` in der Reihe, nicht im Menü.
+  // Die Nachbarschaft ist BEDINGT („Bestätigen" nur bei `bestaetigung_pflicht && !ist_bestaetigt`);
+  // der Scanner liest Quelltext und sichert den Abstand für den Fall zu, in dem es ihn braucht.
+  // Beide Renderformen (⋮-Menü ab drei Aktionen, darunter Direktknöpfe) liegen in derselben
+  // `<Space size="middle">` — ein eigenes `<Flex gap>` für den Direktzweig fiele aus dem Scanner.
   'meldungen/MeldungKarte.tsx',
-  // ── C5 · Personen-Detailseite (LFH-340) ───────────────────────────────────
-  // ZWEI Reihen, und nur eine davon ist neu. Die Abgleich-Zeile („Bestätigen" neben
-  // „Verwerfen"/`danger`) stand seit jeher ohne Abstand da — der Scanner hat sie beim
-  // Aufnehmen der Datei selbst gemeldet, sie war nie bewertet worden. Die UHS-Zeile
-  // („UHS ändern" neben „Austragen"/`danger`) ist mit C5 in den Zuordnungs-Expander
-  // gewandert und hat dabei ihren Abstand bekommen.
-  //
-  // Die Datei gehört SEHR WOHL in diese Liste, obwohl das Stornieren mit C5 ins
-  // Kopfmenü gezogen ist: das betrifft nur den Kopf. Beide Reihen hier tragen ihren
-  // `danger`-Knopf weiterhin direkt, und genau die sieht {@link reihenIn}. Der
-  // Menü-Trenner des Kopfes ist eine eigene Zusicherung und wird im Komponententest
-  // geprüft — er ersetzt diese Zeile nicht.
+  // ── Personen-Detailseite (LFH-340) ────────────────────────────────────────
+  // ZWEI Reihen: Abgleich („Bestätigen" neben „Verwerfen"/`danger`) und UHS-Zuordnung
+  // („UHS ändern" neben „Austragen"/`danger`). Das Stornieren steht im Kopfmenü; dessen Trenner
+  // prüft der Komponententest und ersetzt diese Zeile nicht.
   'pages/PersonenDetailPage.tsx',
-  // ── C6 · UHS-Kopfzeile (LFH-341) ──────────────────────────────────────────
-  // „Patient aufnehmen" (primary) steht im Betrieb neben „Auflösen" (danger), im geplanten
-  // Zustand steht „In Betrieb nehmen" neben „Stornieren" (danger) — zur Laufzeit nie alle
-  // vier zugleich (die Zustände schliessen sich aus), aber der Scanner liest Quelltext und
-  // sieht alle vier `<Button>` im selben unmittelbar umschließenden `<Space>`. Der Abstand
-  // (`size="middle"`) kam bereits mit Task 2 dieses Tickets — die Zeile hier macht die
-  // Zusicherung nur ausdrücklich, statt sie unbewertet zu lassen.
+  // ── UHS-Kopfzeile (LFH-341) ───────────────────────────────────────────────
+  // Je Zustand steht ein Knopf neben einem `danger`-Knopf („Auflösen" bzw. „Stornieren"); der
+  // Scanner sieht alle vier `<Button>` im selben unmittelbar umschließenden `<Space>`.
   'pages/uhs/UhsDetailPage.tsx',
 ];
 
@@ -133,32 +92,19 @@ const MIT_NACHBARSCHAFT = [
  * BEWERTET, ABER FÜR DEN SCANNER UNSICHTBAR (LFH-343 · C8).
  *
  * `nachforderungen/NachforderungKarte.tsx` trägt „Ablehnen" (`danger`) neben der
- * Status-Fortschaltung und hat mit C8 den Abstand aus LFH-363 bekommen — die Datei
- * wurde ohnehin angefasst (die Rückfrage vor der Fortschaltung ist weg). Sie steht
- * trotzdem **nicht** in {@link MIT_NACHBARSCHAFT}, und der Versuch ist gemessen:
- * {@link reihenIn} findet dort keine Reihe.
+ * Status-Fortschaltung, mit Abstand. Die Karte baut ihre Aktionen als `ReactNode[]` und spreizt
+ * sie mit `{aktionen}` in die Reihe; {@link reihenIn} findet dort keine Reihe.
  *
- * Grund: die Karte baut ihre Aktionen als `ReactNode[]`-Konstante und spreizt sie
- * mit `{aktionen}` in die Reihe. Im `<Space>` steht damit kein `<Button … danger>`,
- * das der Scanner sehen könnte — er liest Quelltext, keine Renderergebnisse.
- * Dieselbe Bauweise haben `AuftragKarte` und `ErinnerungKarte`; beide tragen in
- * ihrer Reihe kein `danger` und wären auch inhaltlich keine Kandidaten.
- *
- * Ein Eintrag in `MIT_NACHBARSCHAFT` färbte diesen Guard rot (der Test „jede
- * bewertete Nachbarschaft ist noch da" verlangt einen echten Fund), einer in
- * {@link OHNE_NACHBARSCHAFT} behauptete das Gegenteil des Wahren. Die Zusicherung
- * steht deshalb als Kommentar in der Karte selbst — dieselbe Auflösung wie bei
- * der früheren `etb/EtbTabelle.tsx` in LFH-342/C7 (seit dem Neuentwurf durch
- * `etb/EtbZeitachse.tsx` ersetzt): die Regel gilt, nicht der Scanner.
+ * Ein Eintrag in `MIT_NACHBARSCHAFT` färbte den Guard rot, einer in {@link OHNE_NACHBARSCHAFT}
+ * behauptete das Gegenteil des Wahren. Die Zusicherung steht deshalb als Kommentar in der Karte
+ * selbst; der Test unten pinnt beide Hälften.
  */
 const BEWERTET_OHNE_SCANNER_DECKUNG = ['nachforderungen/NachforderungKarte.tsx'];
 
 /**
- * Ebenfalls in LFH-363 bewertet, aber OHNE Nachbarschaft: die destruktive Aktion
- * steht dort allein in der Zelle, es gibt nichts zu trennen. Sie werden trotzdem
- * mitgescannt, damit ein später danebengestellter Knopf auffällt — und hier
- * gepinnt, damit „findet keine Reihe" eine Aussage bleibt und nicht bloß der
- * Zustand ist, in dem ein kaputter Scanner auch wäre.
+ * Bewertet, aber OHNE Nachbarschaft: die destruktive Aktion steht allein. Mitgescannt, damit
+ * ein später danebengestellter Knopf auffällt, und gepinnt, damit „findet keine Reihe" eine
+ * Aussage bleibt und nicht der Zustand eines kaputten Scanners.
  */
 const OHNE_NACHBARSCHAFT = ['stammdaten/StichworteTab.tsx', 'pages/MitgliederAbschnitt.tsx'];
 
@@ -168,10 +114,9 @@ const BEREICH = [...MIT_NACHBARSCHAFT, ...OHNE_NACHBARSCHAFT];
 const WEIT = ['middle', 'large'];
 
 /**
- * Blendet Kommentarinhalt aus, Blockzustand über Zeilengrenzen getragen.
- * Kopie aus `dichte.guard.test.ts` — ohne sie zählte dieser Dateikopf seine
- * eigenen Beispiele als Verstoß. Bewusst kopiert und nicht importiert: ein Import
- * aus einer fremden `.test.ts` zöge deren ganze Suite in jeden Lauf dieser hier.
+ * Blendet Kommentarinhalt aus, Blockzustand über Zeilengrenzen getragen. Kopie aus
+ * `dichte.guard.test.ts`, nicht importiert: ein Import aus einer fremden `.test.ts` zöge deren
+ * Suite in jeden Lauf dieser hier.
  */
 function ohneKommentare(inhalt: string): string {
   const zeilen: string[] = [];
@@ -207,10 +152,9 @@ function ohneKommentare(inhalt: string): string {
 }
 
 /**
- * Ende des öffnenden JSX-Tags ab `start` (Index des `<`), oder `-1`.
- * Kopie aus `dichte.guard.test.ts`, siehe {@link ohneKommentare}. Zählt geschweifte
- * Klammern mit, sonst beendete das `>` einer Pfeilfunktion das Tag zu früh — und
- * genau dahinter steht in diesen Dateien reihenweise die nächste Prop.
+ * Ende des öffnenden JSX-Tags ab `start` (Index des `<`), oder `-1`. Kopie aus
+ * `dichte.guard.test.ts`. Zählt geschweifte Klammern mit, sonst beendete das `>` einer
+ * Pfeilfunktion das Tag zu früh.
  */
 function tagEnde(text: string, start: number): number {
   let tiefe = 0;
@@ -238,16 +182,11 @@ interface Reihe {
 }
 
 /**
- * Alle Aktionsreihen einer Datei, die eine destruktive UND mindestens eine weitere
- * Aktion tragen.
+ * Alle Aktionsreihen einer Datei, die eine destruktive UND mindestens eine weitere Aktion
+ * tragen.
  *
- * Der Stack ist der Punkt: `EinheitDetailPage` schachtelt eine Knopfreihe in ein
- * äußeres `<Space>`. Gezählt wird deshalb je UNMITTELBAR umschließendem `<Space>` —
- * ein Knopf im äußeren zählt nicht als Nachbar eines Knopfs im inneren.
- *
- * Ein `<Space>` mit nur EINER Aktion bleibt draußen: dort gibt es keine
- * Nachbarschaft, vor der zu trennen wäre (`StichworteTab`, die
- * Zuordnungs-Zeilen in `EinheitDetailPage`).
+ * Gezählt wird je UNMITTELBAR umschließendem `<Space>` (Stack): ein Knopf im äußeren zählt
+ * nicht als Nachbar eines Knopfs im inneren. Ein `<Space>` mit nur EINER Aktion bleibt draußen.
  */
 export function reihenIn(quelltext: string): Reihe[] {
   const text = ohneKommentare(quelltext);
@@ -320,13 +259,9 @@ describe('Abstands-Guard (LFH-363 · B5c)', () => {
   });
 
   /**
-   * Der Blindfleck ist gepinnt, nicht bloß beschrieben (LFH-343 · C8).
-   *
-   * Beide Hälften sind nötig: dass der Scanner die Datei NICHT sieht (sonst gehörte
-   * sie in `MIT_NACHBARSCHAFT` und dieser Test wäre eine Ausrede), und dass der
-   * Abstand trotzdem im Quelltext steht (sonst wäre die Ausnahme eine Lücke). Fängt
-   * die Karte an, ihre Knöpfe direkt in die Reihe zu schreiben, wird die erste
-   * Hälfte rot — und dann gehört die Datei in die Liste darüber.
+   * Der Blindfleck ist gepinnt: der Scanner sieht die Datei NICHT (sonst gehörte sie in
+   * `MIT_NACHBARSCHAFT`), und der Abstand steht trotzdem im Quelltext (sonst wäre die Ausnahme
+   * eine Lücke). Schreibt die Karte ihre Knöpfe direkt in die Reihe, wird die erste Hälfte rot.
    */
   it('die bewertete Reihe ohne Scanner-Deckung ist unsichtbar UND trägt den Abstand', () => {
     for (const pfad of BEWERTET_OHNE_SCANNER_DECKUNG) {
@@ -344,8 +279,8 @@ describe('Abstands-Guard (LFH-363 · B5c)', () => {
     }
   });
 
-  // ── Selbstbeweise: ein Guard, der nichts findet, ist von einem kaputten Guard
-  //    nicht zu unterscheiden.
+  // ── Selbstbeweise: ein Guard, der nichts findet, ist von einem kaputten nicht zu
+  //    unterscheiden.
   it('meldet die Vorgabe-Nachbarschaft', () => {
     const quelle = '<Space><Button>Bearbeiten</Button><Button danger>Weg</Button></Space>';
     expect(reihenIn(quelle)).toHaveLength(1);

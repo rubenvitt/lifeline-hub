@@ -4,87 +4,55 @@ import StatusTag from './StatusTag';
 import { rollenFarbe, type StatusDarstellung } from '../theme/statusFarben';
 
 /**
- * Statuswechsel am Ort — die Statusanzeige IST der Auslöser (LFH-339 · C4).
+ * Statuswechsel am Ort — die Statusanzeige IST der Auslöser (LFH-339 · C4). Zielform:
+ * `docs/superpowers/specs/2026-07-30-kraefte-listen-statuswechsel-zielform.md` (Z1–Z3).
  *
- * Umsetzung der Festlegungen Z1–Z3 aus
- * `docs/superpowers/specs/2026-07-30-kraefte-listen-statuswechsel-zielform.md`. Wo das
- * Elternticket dieser Spec widerspricht, gilt die Spec — so ausdrücklich in ihrem Kopf.
- *
- * ── WARUM SENKRECHT UND NICHT `Segmented` (Z1, gerechnet) ──────────────────────────────
+ * ── WARUM SENKRECHT UND NICHT `Segmented` (Z1) ─────────────────────────────────────────
  *
  * Gegen die Quick-View-Obergrenze 480 px trägt eine waagerechte Reihe höchstens ZWEI
- * beschriftete Werte — dichteunabhängig, weil die Zielbreite 150 px die im Bestand als
- * nötig befundene `minWidth` der Statusfelder ist, nicht eine geschätzte Zeichenbreite.
- * Die Kataloge haben 10 (Fahrzeug, FMS 0–9), 6 (Personal) und 5 (Material) Werte; jeder
- * liegt über jeder Schwelle, in jeder Dichtestufe. Der Fahrzeugkatalog ist zudem
- * mandantengepflegt — zehn ist der Seed, nicht die Obergrenze.
+ * beschriftete Werte (Zielbreite 150 px je Statusfeld). Die Kataloge haben 10 (Fahrzeug),
+ * 6 (Personal) und 5 (Material) Werte, der Fahrzeugkatalog ist mandantengepflegt.
  *
- * Senkrecht trägt, weil ein Menü SCROLLEN darf und im Portal liegt: außerhalb der Zelle
- * und außerhalb der 390-px-Karte. Damit entfällt zugleich die feste Mindestbreite, die
- * das frühere `<Select>` aus der schmalen Karte drängte (`Datensicht.tsx:234-236`) — das
- * ist der eigentliche Grund, warum der Statuswechsel dort bisher fehlte.
+ * Senkrecht trägt, weil ein Menü SCROLLEN darf und im Portal liegt — außerhalb der Zelle und der
+ * 390-px-Karte. Damit entfällt auch die feste Mindestbreite eines `<Select>`.
  *
- * ── WARUM KEIN DRAWER (Z2/Z3) ──────────────────────────────────────────────────────────
+ * ── KEIN DRAWER, KEIN ZWEITER PRIMÄRAKTIONS-SLOT (Z2/Z3) ────────────────────────────────
  *
- * Das Elternticket verlangte einen „read-only Quick-View mit Statuswahl". Das ist ein
- * Eigenwiderspruch gegen LFH-19 („read-only Vorschau ODER Schnellerfassung") und hätte
- * eine dritte Drawer-Art erfunden. Er entfällt hier, statt umbenannt zu werden: bedient
- * wird an der Stelle, an der der Status schon steht. Die Zahl der Inhalts-Drawer steigt
- * durch dieses Primitiv NICHT.
+ * Bedient wird dort, wo der Status schon steht; ein „read-only Quick-View mit Statuswahl"
+ * widerspräche LFH-19. `Datensicht.tsx` sichert genau EINE Primäraktion zu, auf den Kräfteseiten
+ * „Entfernen".
  *
- * Es entsteht auch kein zweiter Primäraktions-Slot: `Datensicht.tsx` sichert genau EINE
- * Primäraktion zu, und die ist auf allen drei Seiten mit „Entfernen" belegt.
+ * ── WARUM EIN `Button` ─────────────────────────────────────────────────────────────────
  *
- * ── WARUM EIN `Button` UND KEIN GESTYLTES `<span onClick>` ─────────────────────────────
+ * Ein antd-`Button` erbt seine Höhe vom `ConfigProvider`; ein handgebautes Ziel schuldete die
+ * zwei Angaben aus LFH-365. `type="text"` hält die Fläche unaufdringlich.
  *
- * Ein handgebautes Bedienziel schuldet nach LFH-365 ZWEI Angaben (`minHeight:
- * token.controlHeight` PLUS Polsterung) und eine eigene Zusicherung über zwei
- * Dichtestufen, weil kein Guard eine Pixelangabe sieht. Ein antd-`Button` erbt seine Höhe
- * vom `ConfigProvider` und schuldet nichts davon. `type="text"` hält die Fläche
- * unaufdringlich — die Farbe der Statusrolle soll die einzige im Etikett bleiben.
+ * ── FARBE ──────────────────────────────────────────────────────────────────────────────
  *
- * ── DIE FARBE STEHT NEBEN DEM TEXT, NIE DAHINTER (Z2b) ─────────────────────────────────
- *
- * FORTGESCHRIEBEN MIT DEM NEUENTWURF (21.09.2026, Entscheidung 2): für ROLLENfarben ist die
- * getönte Fläche jetzt die Vorgabe — das AUSLÖSER-Etikett ist ein `StatusTag` und trägt sie
- * (Werte und Kontrastrechnung in `instrument/statusFlaeche.ts`). Unverändert gilt der
- * zweite Grund unten: eine MANDANTENFARBE bleibt Punkt, nie Fläche, und die Menüzeilen
- * bleiben ungefärbt. Der erste Grund (antds Vollflächen-`color`) bleibt richtig — die Fläche
- * kommt aus den Rollen, nicht aus antds Farbberechnung. Der Punkt ist quadratisch (Radius 0).
- *
- * Zwei belegte Gründe, warum „Statusfarbe als Fläche" aus dem Elternticket eine
- * begründete Entscheidung zurückdrehen würde:
- *
- *  1. `components/StatusTag.tsx` verwirft antds Vollflächen-`color` ausdrücklich: ein
- *     Nicht-Preset-Wert rendert als Fläche mit erzwungen weißem Text, und im Dunkelmodus
- *     sind die Rollenfarben aufgehellt — Weiß darauf ist unlesbar.
- *  2. Für Fahrzeug und Personal liegt die Statusfarbe gar nicht im Rollenvertrag, sondern
- *     als ungeprüfter Freitext `status_farbe` in der DB (`theme/statusFarben.ts`). Eine
- *     Flächenvorschrift schriebe unvalidierte Mandantenfarben auf große Flächen; Kontrast
- *     (WCAG 1.4.11) ist dort nicht zugesichert. Auf einem Punkt trägt die Farbe keine
- *     Textlesbarkeit — genau deshalb ist das die zulässige Form.
+ * Das AUSLÖSER-Etikett ist ein `StatusTag` und trägt für ROLLENfarben die getönte Fläche (Werte
+ * und Kontrast in `instrument/statusFlaeche.ts`). Eine MANDANTENFARBE bleibt Punkt, nie Fläche:
+ * `status_farbe` ist bei Fahrzeug und Personal ungeprüfter Freitext (`theme/statusFarben.ts`),
+ * Kontrast auf großer Fläche wäre nicht zugesichert. Die Menüzeilen bleiben ungefärbt, der Punkt
+ * ist quadratisch (Radius 0). antds Vollflächen-`color` scheidet aus (erzwungen weißer Text).
  *
  * Das Textlabel ist Pflicht (zweiter Kanal, WCAG 1.4.1) — der Typ {@link StatusOption}
- * erzwingt es, nicht die Disziplin.
+ * erzwingt es.
  *
- * ── ZWEI FALLEN, DIE HIER SCHON GEMESSEN WURDEN ────────────────────────────────────────
+ * ── ZWEI FALLEN ────────────────────────────────────────────────────────────────────────
  *
- * · **Die Zuordnung gehört ans MENÜ, nicht an jedes Item** (LFH-365/LFH-366). Liegt das
- *   Menü in einem klickbaren Elternteil — eine Tabellenzeile, eine Karte —, steigt sein
- *   Synthetic Event aus dem Portal in den KOMPONENTENbaum auf und feuert dessen `onClick`
- *   mit. Mit `onClick` am `menu` hat der Riegel dagegen genau einen Ort.
- * · **`fms_anker` wird NICHT tragende Bedienform.** Die Spalte ist nullable, ein Mandant
- *   darf sie frei lassen (`stammdaten/StatusKatalogTab.test.tsx:181`); ein 0–9-Tastenfeld
- *   darauf hätte Löcher. Der Ziffernraum steht ohnehin schon im Label („1 – Frei auf
- *   Funk"). Der Anker bleibt Sortierachse und optionales Tastenkürzel.
+ * · **Die Zuordnung gehört ans MENÜ, nicht an jedes Item** (LFH-365/LFH-366): das Synthetic
+ *   Event des Portals steigt im KOMPONENTENbaum in einen klickbaren Elternteil auf; mit
+ *   `onClick` am `menu` hat der Riegel genau einen Ort.
+ * · **`fms_anker` ist KEINE tragende Bedienform.** Die Spalte ist nullable, ein 0–9-Tastenfeld
+ *   darauf hätte Löcher. Der Anker bleibt Sortierachse und optionales Tastenkürzel.
  */
 export interface StatusOption<W> {
   wert: W;
   /** Sichtbare Beschriftung. Pflicht — sie IST der zweite Kanal. */
   label: string;
   /**
-   * Rollenachse für den Farbpunkt im Menüeintrag. Fehlt sie, bleibt der Eintrag
-   * ungefärbt — zulässig für Kataloge außerhalb des A2-Vertrags.
+   * Rollenachse für den Farbpunkt im Menüeintrag. Fehlt sie, bleibt der Eintrag ungefärbt —
+   * zulässig für Kataloge außerhalb des A2-Vertrags.
    */
   darstellung?: StatusDarstellung;
   /** Mandantenfarbe für den Punkt — überschreibt die Rollenfarbe (siehe `StatusTag`). */
@@ -94,9 +62,8 @@ export interface StatusOption<W> {
 /**
  * Deskriptor für den Bedienweg am Statusslot der `Datensicht`.
  *
- * Über `string | number` gefasst, weil das Primitiv den Wert nur durchreicht: die drei
- * Module tragen Katalog-IDs (`number`) bzw. ein lokales Enum (`string`). Ein generischer
- * Slot am Kartenplan zwänge jeden Konsumenten, seinen eigenen Werttyp zu verbreitern.
+ * Über `string | number` gefasst, weil das Primitiv den Wert nur durchreicht (Katalog-IDs bzw.
+ * lokales Enum); ein generischer Slot zwänge jeden Konsumenten, seinen Werttyp zu verbreitern.
  */
 export interface StatusBedienung {
   optionen: readonly StatusOption<string | number>[];
@@ -114,49 +81,40 @@ export interface StatusWahlProps<W> {
   /** Aktueller Stand als Etikett. `null` = kein Status gesetzt. */
   darstellung: StatusDarstellung | null;
   /**
-   * Mandantengepflegte Zusatzfarbe des aktuellen Status. Siehe `StatusTag`: seit LFH-446
-   * ein dekorativer Punkt neben dem Wortlaut; Text und tragender Rahmen bleiben lesbar.
+   * Mandantengepflegte Zusatzfarbe des aktuellen Status: ein dekorativer Punkt neben dem Wortlaut
+   * (siehe `StatusTag`).
    */
   farbe?: string | null;
   /**
-   * Aktueller Wert für die Markierung im Menü. Bewusst EIGENSTÄNDIG und nicht aus
-   * {@link StatusWahlProps.darstellung} erschlossen: ein Label-Vergleich koppelte die
-   * Markierung an eine Zeichenkette, die bei Fahrzeug und Personal aus dem
-   * Mandantenkatalog kommt und dort frei umbenannt werden darf.
+   * Aktueller Wert für die Markierung im Menü. EIGENSTÄNDIG und nicht aus
+   * {@link StatusWahlProps.darstellung} erschlossen: das Label kommt bei Fahrzeug und Personal aus
+   * dem Mandantenkatalog und darf umbenannt werden.
    */
   aktuell?: W | null;
   optionen: readonly StatusOption<W>[];
   /**
-   * Menschenlesbare Zeilenkennung (Funkrufname, Name, Bezeichnung) für den zugänglichen
-   * Namen. Ohne sie liefern n Zeilen n gleichnamige Knöpfe — dieselbe Regel wie bei der
-   * Aktionsbündelung aus LFH-365 und bei `components/BemerkungZelle.tsx`.
+   * Menschenlesbare Zeilenkennung (Funkrufname, Name, Bezeichnung) für den zugänglichen Namen —
+   * sonst liefern n Zeilen n gleichnamige Knöpfe.
    */
   kennung: string;
   onWaehlen: (wert: W) => void;
   /**
-   * DIESE Zeile schreibt gerade — Ladeanzeige am Auslöser.
-   *
-   * Getrennt von {@link StatusWahlProps.gesperrt}, weil es zwei verschiedene Aussagen
-   * sind: „hier passiert gerade etwas" und „hier ist gerade nichts anzunehmen". Der
-   * Bestand hatte beides an einem `Select` (`loading` an der laufenden Zeile, `disabled`
-   * an allen) — die Trennung erhält genau das.
+   * DIESE Zeile schreibt gerade — Ladeanzeige am Auslöser. Getrennt von
+   * {@link StatusWahlProps.gesperrt}: „hier passiert gerade etwas" gegen „hier ist gerade nichts
+   * anzunehmen".
    */
   laeuft?: boolean;
   /**
-   * Nimmt keine Eingabe an — etwa weil irgendwo in der Liste eine Mutation läuft.
-   *
-   * Der eigentliche Riegel sitzt im `onWaehlen` der Seite; diese Prop macht ihn SICHTBAR.
-   * Ein Auslöser, der klickbar aussieht und nichts tut, ist schlechter als ein gesperrter.
+   * Nimmt keine Eingabe an — etwa weil irgendwo in der Liste eine Mutation läuft. Der Riegel
+   * sitzt im `onWaehlen` der Seite; diese Prop macht ihn SICHTBAR.
    */
   gesperrt?: boolean;
   /** Ohne Schreibrecht wird ein reines Etikett gerendert, KEIN Auslöser. */
   darfSchreiben: boolean;
   /**
-   * Eigene Anzeige des aktuellen Stands statt des `StatusTag` aus
-   * {@link StatusWahlProps.darstellung} — im FMS-Tableau (LFH-642) der `StatusChip` mit
-   * S-Code und Wort. Gilt für Auslöser UND Lesezweig: zwei Formen desselben Status je nach
-   * Recht wären ein Unterschied ohne Bedeutung. Das Wort als zweiter Kanal (WCAG 1.4.1)
-   * liegt dann beim Aufrufer.
+   * Eigene Anzeige des aktuellen Stands statt des `StatusTag` — im FMS-Tableau (LFH-642) der
+   * `StatusChip` mit S-Code und Wort. Gilt für Auslöser UND Lesezweig. Das Wort als zweiter Kanal
+   * (WCAG 1.4.1) liegt dann beim Aufrufer.
    */
   etikett?: ReactNode;
 }
@@ -187,9 +145,8 @@ export default function StatusWahl<W extends string | number>({
       <span>{OHNE_STATUS}</span>
     );
 
-  // Ohne Schreibrecht KEIN Auslöser — nicht ein gesperrter. Ein deaktivierter Knopf
-  // verspricht eine Fähigkeit, die es hier nicht gibt (Muster: LFH-365, „bleibt keine
-  // Aktion übrig, wird gar kein Auslöser gerendert").
+  // Ohne Schreibrecht KEIN Auslöser, auch kein gesperrter: ein deaktivierter Knopf verspräche
+  // eine Fähigkeit, die es hier nicht gibt.
   if (!darfSchreiben) return <>{etikett}</>;
 
   const eintraege = optionen.map((o) => ({
@@ -197,8 +154,7 @@ export default function StatusWahl<W extends string | number>({
     label: (
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: token.marginXXS }}>
         {o.darstellung && (
-          // Punkt statt Fläche, und für Screenreader unsichtbar: die Bedeutung trägt
-          // bereits das Label, sonst läse er sie doppelt (Muster `StatusTag`).
+          // Punkt statt Fläche, für Screenreader unsichtbar: die Bedeutung trägt das Label.
           <span
             aria-hidden="true"
             style={{
@@ -226,9 +182,8 @@ export default function StatusWahl<W extends string | number>({
         selectedKeys: aktuell != null ? [String(aktuell)] : [],
         // Die Zuordnung liegt am MENÜ, nicht je Eintrag — siehe Dateikopf.
         onClick: ({ key, domEvent }) => {
-          // Hält den Klick aus einer klickbaren Zeile heraus. Reicht allein NICHT gegen
-          // das Aufsteigen im Komponentenbaum (gemessen in LFH-367) — wer dieses Primitiv
-          // in einen klickbaren Container hängt, setzt den Riegel zusätzlich dort.
+          // Hält den Klick aus einer klickbaren Zeile heraus, reicht aber allein NICHT gegen das
+          // Aufsteigen im Komponentenbaum — ein klickbarer Container braucht zusätzlich seinen Riegel.
           domEvent.stopPropagation();
           const treffer = optionen.find((o) => String(o.wert) === key);
           if (treffer) onWaehlen(treffer.wert);

@@ -12,198 +12,115 @@ import { useViewport, type AbBreitePunkt } from './useViewport';
 import type { Farbrollen } from '../theme/tokens';
 import { useRollen } from './instrument/rollenwerte';
 import { useDruckModus } from './druck/useDruckModus';
-// Kopfzellen-Typografie und die Mono-Spalten liegen als Klassen in der Gestaltungssprache
-// (`.lfh-katalog …`). Der Import gehört HIERHER, nicht an die Aufrufer: achtzehn
-// Konsumenten, und nur einige montieren `EinsatzSeite` (Muster `SeitenZustand.tsx`).
+// Kopfzellen-Typografie und Mono-Spalten liegen als Klassen in der Gestaltungssprache
+// (`.lfh-katalog …`). Der Import gehört HIERHER: nicht jeder Konsument montiert `EinsatzSeite`.
 import '../theme/sprache.css';
 
 /**
- * Geteiltes Tabellen-Primitiv der Katalog-/Verwaltungsseiten (LFH-329 · B1).
+ * Geteiltes Tabellen-Primitiv der Katalog-/Verwaltungsseiten (LFH-329 · B1): Gate 2 der
+ * Bedien-Leitlinie an EINER Stelle. Drei Merkmale setzt das Primitiv unbedingt:
  *
- * Erfüllt Gate 2 der Bedien-Leitlinie („Tabelle nur, wenn verglichen wird — dann
- * vollständig") an genau EINER Stelle statt an neunzehn. Drei Merkmale setzt das
- * Primitiv unbedingt, sie gehören ihm und nicht dem Aufrufer:
+ * 1. **Waagerechter Scrollcontainer über die Spaltenbreite.** Auf schmalem Schirm wird die
+ *    Tabelle angepasst, nicht in Karten aufgelöst; sie scrollt in sich.
+ * 2. **Stehende Kopfzeile.** antd zieht Kopf und Körper dafür in zwei `<table>` auseinander und
+ *    schiebt eine verborgene Messzeile als erste Körperzeile ein; Tests verengen deshalb auf
+ *    `tr.ant-table-row`.
+ * 3. **Fixierte Identifierspalte.** Die erste Spalte bleibt stehen, und sie ist die
+ *    MENSCHENLESBARE Kennung, nie die DB-Kennung (DEV-Warnung unten).
  *
- * 1. **Waagerechter Scrollcontainer über die Spaltenbreite.** Auf schmalem Schirm wird
- *    die Tabelle angepasst, nicht in Karten aufgelöst (A1, Festlegung 2) — sie scrollt
- *    in sich und drückt die Seite nicht breit.
- * 2. **Stehende Kopfzeile.** Beim Scrollen bleibt die Spaltenbedeutung lesbar. Antd zieht
- *    Kopf und Körper dafür in zwei `<table>`-Elemente auseinander und schiebt eine
- *    verborgene Messzeile als erste Körperzeile ein — wer Zeilen im Test greift, muss
- *    daher auf die Datenzeile (`tr.ant-table-row`) verengen.
- * 3. **Fixierte Identifierspalte.** Die erste Spalte bleibt beim waagerechten Scrollen
- *    stehen. Fixiert wird ausdrücklich die MENSCHENLESBARE Kennung (Funkrufname,
- *    Bezeichnung, Ordnungsnummer), nie die Datenbank-Kennung — dagegen steht die
- *    DEV-Warnung unten.
+ * Zeilenschlüssel, Ladezustand und Leertext setzt der Aufrufer; ihre VERSCHRÄNKUNG gehört hierher
+ * (siehe unten).
  *
- * Die WERTE des Übrigen (Zeilenschlüssel, Ladezustand, Leertext) bleiben beim Aufrufer: die
- * Aufrufstellen setzen sie heute selbst und behalten sie, was den Migrations-Diff je Datei
- * auf zwei Zeilen hält. Ihre VERSCHRÄNKUNG dagegen gehört hierher — siehe den Abschnitt zu
- * den drei Zuständen unten.
+ * **Suche: opt-in.** Ohne `suche` gibt es weder Feld noch Werkzeugzeile (manche Seiten haben eine
+ * eigene Suche, `Datensicht` bringt seine mit). Gesucht wird über {@link zellenWert}, also nur in
+ * Spalten mit auflösbarem Datenbezug; render-only-Spalten tragen NICHT bei, außer mit einem
+ * {@link KatalogSpalte.suchText}-Haken (dieselbe Signatur wie `DatensichtSpalte.suchText`).
+ * **`suchText` gewinnt**: trägt eine Spalte beides, wird nur der Haken bewertet, ein Haken kann
+ * also auch verengen.
  *
- * ── ZWEI ADDITIVE ERWEITERUNGEN (LFH-330 · B2) ──────────────────────────────────
+ * **Blätterung ab {@link BLAETTER_SCHWELLE} Zeilen.** Gerechnet gegen `dataSource.length`, nicht
+ * gegen die gefilterte Menge, sonst verschwände die Leiste beim Tippen (Kriterium 12). Ein
+ * übergebenes `pagination` gewinnt (`??`, damit ein gesetztes `false` hält).
  *
- * **Suche — opt-in, nicht opt-out.** Ohne `suche`-Prop existiert weder Feld noch
- * Werkzeugzeile. Default-AN wäre in drei gemessenen Fällen Schaden statt Nutzen:
- * `pages/SchaedenPage.tsx` hat bereits ein eigenes `Input.Search` mit ANDERER Semantik
- * (Ort/Beschreibung), das ETB (heute die Zeitachse `etb/EtbZeitachse.tsx`) sucht
- * serverweit über seine eigene Filterleiste,
- * und `Datensicht` nutzt dieses Primitiv intern und brächte sein eigenes Feld daneben.
+ * **Spaltenschalter: opt-in** (Kriterium 14).
+ * · Mit `spaltenSchalter` steht er in der Werkzeugzeile; Zählung und Menü aus
+ *   `SpaltenSchalter.tsx`, derselben Quelle wie in `Datensicht`.
+ * · Ohne Opt-in bleiben alle Spalten sichtbar: `abBreite` wirkt nicht (DEV-Meldung), antds
+ *   `responsive`/`hidden` sind am Typ und per Guard gesperrt.
+ * · `Datensicht` setzt das Prop NIE, es rendert seinen eigenen Schalter.
+ * · Was man nicht sieht, wirkt nicht: antd hält Filter- und Sortierzustand nur für übergebene
+ *   Spalten, eine ausgeblendete gefilterte Spalte siebt nicht (gepinnt in
+ *   `OnlineQuellenVerwaltung.test.tsx`).
  *
- * Die Suche liest die Rohdaten über {@link zellenWert}, also nur Spalten mit auflösbarem
- * Datenbezug. **Render-only-Spalten tragen ohne Zutun NICHT bei** — der Zellinhalt entsteht
- * erst beim Rendern. Das bleibt die Vorgabe und steht in `KatalogTabelle.test.tsx` als
- * negative Zusicherung.
+ * ── DREI ZUSTÄNDE, DIE LADEUNTERDRÜCKUNG LEBT HIER ──
  *
- * **Die Grenze ist seit LFH-346 · C11 eine ANNAHME mit Ausweg, keine Wand:** eine Spalte darf
- * einen {@link KatalogSpalte.suchText}-Haken tragen — dieselbe Signatur und denselben Namen
- * wie `DatensichtSpalte.suchText`, damit es EIN Begriff bleibt und nicht zwei. Anlass war die
- * ETB-Baustein-Tabelle, deren Inhaltstext mit der Zwei-Zeilen-Zelle in ein `render` wanderte
- * und damit aus dem Korpus fiel; wer einen Baustein an einer Wendung des Vorlagentextes
- * sucht, ist der häufigere Fall.
+ * **ladend**, **leer** und **gefüllt**; **Fehler** tauscht die Seite gegen `SeitenFehler`, bevor
+ * die Tabelle montiert (ein `fehler`-Prop wirkte im Kartenzweig von `Datensicht` nicht).
  *
- * **Vorrang: `suchText` gewinnt.** Trägt eine Spalte beides, wird NUR der Haken bewertet, nie
- * zusätzlich der `dataIndex` — sonst hinge der Korpus einer Spalte an der Frage, ob ihr
- * Datenbezug zufällig noch dasteht, und ein Haken könnte nur erweitern, nie ersetzen. Ein
- * Haken, der weniger liefert als der Rohwert, ist damit eine bewusste Verengung. Gepinnt von
- * `KatalogTabelle.test.tsx` mit einer Spalte, deren Haken den `dataIndex`-Wert VERDECKT.
+ * **Ladend und leer schließen sich aus, entschieden an EINER Stelle: hier.** Solange geladen
+ * wird, wird der Leertext unterdrückt (`locale.emptyText` auf `null`), wie in `Liste.tsx`. Sonst
+ * behauptete jede Seite beim ersten Rendern „Noch keine …“. Deshalb fallen `loading` und `locale`
+ * NICHT durch `...rest` an antd. (Bei ganz fehlender `dataSource` unterdrückt antd selbst; diese
+ * Stelle deckt `[]`.)
  *
- * `Datensicht` bleibt der Weg für die grössere Kür (Kartenzweig, Gruppen, eigene Sortier- und
- * Filterachse); es reicht seine eigenen Spalten OHNE `suchText` hier herein und ist von diesem
- * Haken unberührt.
- *
- * **Blätterung — ab {@link BLAETTER_SCHWELLE} Zeilen, sonst nicht.** Antds Default wäre
- * zehn Zeilen und blätterte damit fast jede Aufrufstelle. Die Schwelle rechnet gegen
- * `dataSource.length`, NICHT gegen die gefilterte Menge: sonst verschwände die Leiste beim
- * Tippen und erzeugte genau den Layoutsprung, gegen den Prüflisten-Kriterium 12 existiert.
- * Aus demselben Grund ist `hideOnSinglePage` nicht der Mechanismus. Ein übergebenes
- * `pagination` gewinnt immer (`??`, nicht `||` — sonst verlöre ein gesetztes `false`).
- *
- * **Spaltenschalter — opt-in seit LFH-374.** Kriterium 14 verlangt einen umschaltbaren
- * Spaltensatz mit Zähler ausgeblendeter Spalten. Bis LFH-374 trug ihn nur `Datensicht`, und
- * dieser Kopf erklärte ihn für die Katalogfamilie pauschal für „nicht anwendbar" (höchstens
- * sieben Spalten, alle sichtbar) — eine Ausnahme, die ihre eigene Obergrenze schon erreicht
- * hatte (LFH-346-Prüfliste: „sieben von sieben"). Jetzt gilt:
- *
- * · Mit `spaltenSchalter` steht der Schalter in der Werkzeugzeile. Zählung und Menü kommen
- *   aus `SpaltenSchalter.tsx`, DERSELBEN Quelle wie in `Datensicht` — Handauswahl und
- *   `abBreite` laufen durch eine Funktion, der Zähler kann nicht lügen. Heute schalten ihn die
- *   beiden Kartenverwaltungen ein.
- * · Ohne `spaltenSchalter` bleibt die Ausnahme stehen, aber nur, solange ihre Bedingung hält:
- *   alle Spalten sichtbar. Deshalb wirkt `abBreite` ohne Opt-in nicht (und meldet sich in
- *   DEV), und antds `responsive`/`hidden` sind am Spaltentyp und per Guard gesperrt. Wer einer
- *   Katalogtabelle eine Spalte nehmen will, nimmt das Opt-in dazu.
- * · `Datensicht` setzt das Prop NIE: es rendert seinen Schalter selbst und reicht die Spalten
- *   ohne `abBreite` herein. Zwei Schalter mit zwei Zuständen wären der Fehlerfall.
- * · **Was man nicht sieht, wirkt nicht** — auch hier, aber aus der Bibliothek statt aus eigenem
- *   Code: antd hält den unkontrollierten Filter- und Sortierzustand nur für Spalten, die noch
- *   übergeben werden. Wer eine gefilterte Spalte ausblendet, bekommt die ungefilterte Menge
- *   zurück — dieselbe Regel, die `Datensicht` ausdrücklich fährt. Gepinnt in
- *   `OnlineQuellenVerwaltung.test.tsx` („ein ausgeblendeter Aktiv-Filter siebt nicht"), weil
- *   ein antd-Sprung sie sonst still ändern könnte.
- *
- * ── DREI ZUSTÄNDE — UND DIE LADEUNTERDRÜCKUNG LEBT HIER (LFH-331 · B3, D4) ───────
- *
- * Dieses Primitiv kennt **ladend** (`loading`), **leer** (`dataSource` ohne Zeile) und
- * **gefüllt**. Den vierten Zustand — **Fehler** — trägt es ausdrücklich NICHT: er wird an
- * der Seite gegen `SeitenFehler` getauscht, bevor die Tabelle überhaupt montiert ist (D3).
- * Ein `fehler`-Prop wirkte hier nur unter `form="tabelle"` und täte im Kartenzweig von
- * `Datensicht` nichts, weil `ListeProps` keinen Fehlerbegriff kennt — zwei Wahrheiten für
- * dieselbe Sache.
- *
- * **Ladend und leer schließen sich aus, und das wird an genau EINER Stelle entschieden:
- * hier.** Solange geladen wird, wird nichts über die Menge behauptet — der Leertext wird
- * unterdrückt (`locale.emptyText` auf `null`), der Leerknoten fällt aus dem DOM. Vorbild ist
- * `Liste.tsx` (`const leer = loading ? null : …`), das seit je so gebaut ist. Ohne diese
- * Stelle behaupteten alle Aufrufstellen beim ersten Rendern „Noch keine …", bevor eine Zeile
- * überhaupt da sein kann, und Tabellen- und Kartenzweig von `Datensicht` verhielten sich
- * ungleich. Deshalb dürfen `loading` und `locale` NICHT durch `...rest` an antd
- * durchfallen; beide werden ausgepackt und verschränkt.
- *
- * Ehrlich gemacht: bei GANZ FEHLENDER `dataSource` unterdrückt antd schon selbst
- * (`rawData === EMPTY_LIST`). Diese Stelle deckt den Fall `[]` — den alle Aufrufstellen
- * fahren, weil sie `daten ?? []` übergeben — und damit den einzigen, der ohne sie leckt.
- *
- * Zwei gemessene Feinheiten, die eine naive Fassung verfehlt:
- *
- * · `loading` ist `boolean | SpinProps`. Ein OBJEKT ohne `spinning` lädt ebenfalls
- *   (`antd/es/table/hooks/useSpinProps.js`: `{ spinning: true, ...loading }`) — eine
- *   Prüfung auf `loading === true` ließe diese Form still durch.
- * · `emptyText: null` unterdrückt wirklich und fällt NICHT auf `renderEmpty` zurück:
- *   `antd/es/table/InternalTable.js` prüft `typeof locale?.emptyText !== 'undefined'`.
- *   Das ist gemessenes antd-Verhalten, kein zugesicherter Vertrag — es steht deshalb als
- *   Pin in `KatalogTabelle.test.tsx` und bricht sichtbar bei einem antd-Bump.
+ * · `loading` ist `boolean | SpinProps`; ein OBJEKT ohne `spinning` lädt ebenfalls.
+ * · `emptyText: null` unterdrückt wirklich (antd prüft `typeof … !== 'undefined'`); gemessenes
+ *   Verhalten, deshalb als Pin in `KatalogTabelle.test.tsx`.
  */
 export type KatalogSpalte<T> = OhneAntdAusblendung<
   NonNullable<TableProps<T>['columns']>[number]
 > & {
   /**
-   * Beitrag dieser Spalte zur Freitextsuche. Gleiche Signatur und gleicher Name wie
-   * `DatensichtSpalte.suchText` (`components/Datensicht.tsx`) — EIN Begriff, zwei Träger.
+   * Beitrag dieser Spalte zur Freitextsuche, gleiche Signatur und gleicher Name wie
+   * `DatensichtSpalte.suchText`. Fehlt er, gilt der Rohwert über den `dataIndex`-Pfad; ist er da,
+   * gewinnt er allein.
    *
-   * Fehlt er, bleibt es beim alten Verhalten (Rohwert über den `dataIndex`-Pfad). Ist er da,
-   * gewinnt er: der `dataIndex` derselben Spalte wird dann NICHT zusätzlich bewertet.
-   *
-   * Das Feld gehört diesem Primitiv, nicht antd. Es fällt trotzdem mit an `<Table>` durch,
-   * und das ist gemessen statt vermutet: `@rc-component/table` reicht an eine Zelle nur die
-   * Rückgabe von `onCell`/`onHeaderCell` durch (`es/Cell/index.js`, `additionalProps`), nie
-   * die Spaltenfelder selbst — ein unbekanntes Feld landet also in keinem DOM-Attribut.
+   * Das Feld fällt mit an `<Table>` durch, landet aber in keinem DOM-Attribut:
+   * `@rc-component/table` reicht an eine Zelle nur die Rückgabe von `onCell`/`onHeaderCell` durch.
    */
   suchText?: (zeile: T) => string | null | undefined;
   /**
-   * Diese Spalte FLIESST: sie nimmt den Rest der Sichtbreite und bricht ihren Inhalt um,
-   * statt die Tabelle zu verbreitern. Der Wert ist ihr Mindestmaß in px (LFH-523).
-   *
-   * Gegenstück zu antds `width`, nicht Ergänzung: eine Spalte trägt das eine ODER das
-   * andere. `width` sagt „so breit", `mindestBreite` sagt „mindestens so breit, sonst der
-   * Rest" — und genau dieser Rest fehlte dem Meldungstext des Einsatztagebuchs.
-   *
-   * OPT-IN, und das ist der Punkt: ohne diesen Haken bleibt jede der achtzehn
-   * Katalogtabellen inhaltsgetrieben wie bisher. Siehe {@link fliessBreite}.
+   * Diese Spalte FLIESST: sie nimmt den Rest der Sichtbreite und bricht um, statt die Tabelle zu
+   * verbreitern. Wert ist ihr Mindestmaß in px (LFH-523). Gegenstück zu antds `width` (eine Spalte
+   * trägt das eine ODER das andere). OPT-IN; ohne Haken bleibt jede Tabelle inhaltsgetrieben. Siehe
+   * {@link fliessBreite}.
    */
   mindestBreite?: number;
   /**
-   * Zahlen-, Zeit- oder Kennungsspalte: Zellen in Mono mit `tabular-nums` (Neuentwurf,
-   * „Zahlen, Zeiten, Funkrufnamen, Koordinaten, Nr. immer Mono"). Wird als Klasse
-   * `lfh-zahl-spalte` an Kopf- und Datenzelle gehängt; die Schrift steht in `sprache.css`.
+   * Zahlen-, Zeit- oder Kennungsspalte: Zellen in Mono mit `tabular-nums`, als Klasse
+   * `lfh-zahl-spalte` an Kopf- und Datenzelle (Schrift in `sprache.css`).
    */
   zahl?: boolean;
   /**
-   * Klartext für den Spaltenschalter, wenn `title` kein String ist. Gleicher Name wie an
-   * `DatensichtSpalte` — EIN Begriff, zwei Träger (LFH-374).
+   * Klartext für den Spaltenschalter, wenn `title` kein String ist; gleicher Name wie an
+   * `DatensichtSpalte`.
    */
   etikett?: string;
   /** Im Spaltenschalter nicht abwählbar (Aktionsspalte). Spalte 0 ist es immer. */
   immerSichtbar?: boolean;
   /**
-   * Erst ab dieser Breite sichtbar — darunter fällt die Spalte weg und der Schalter zählt
-   * sie mit. Wirkt NUR mit `spaltenSchalter`: ohne Zähler wäre das eine stille Ausblendung,
-   * genau der Fehler, gegen den Kriterium 14 steht. Ohne Opt-in bleibt es wirkungslos und
-   * meldet sich in DEV (LFH-374 · D3).
+   * Erst ab dieser Breite sichtbar; darunter fällt die Spalte weg und der Schalter zählt sie mit.
+   * Wirkt NUR mit `spaltenSchalter`, sonst wäre es eine stille Ausblendung (Kriterium 14); ohne
+   * Opt-in meldet es sich in DEV.
    */
   abBreite?: AbBreitePunkt;
 };
 
 /**
- * antds eigene Ausblendwege (`responsive`, `hidden`) sind gesperrt: sie verbärgen Spalten,
- * die der Spaltenzähler nicht kennt (LFH-374 · D4, Muster `AntdErbe` in `Datensicht`).
- * DISTRIBUTIV, weil antds Spaltentyp eine Union aus Blattspalte und Spaltengruppe ist — ein
- * plumpes `Omit` faltete sie zusammen. Die Sperre greift an Objektliteralen; eine als
- * `TableColumnsType<T>` annotierte Liste bleibt zuweisbar, dort hält der Guard in
- * `katalogTabelle.guard.test.ts` die beiden Felder fern.
+ * antds Ausblendwege (`responsive`, `hidden`) sind gesperrt: sie verbärgen Spalten, die der
+ * Spaltenzähler nicht kennt. DISTRIBUTIV, weil antds Spaltentyp eine Union aus Blattspalte und
+ * Gruppe ist. Die Sperre greift an Objektliteralen; für annotierte `TableColumnsType<T>`-Listen
+ * hält der Guard in `katalogTabelle.guard.test.ts` die Felder fern.
  */
 type OhneAntdAusblendung<C> = C extends unknown ? Omit<C, 'responsive' | 'hidden'> : never;
 
 /**
- * Die Tabellen-Tokens des Neuentwurfs — rein und exportiert, damit die Zuordnung ohne
- * Render prüfbar ist (jsdom rechnet kein CSS-in-JS nach).
+ * Die Tabellen-Tokens, rein und exportiert (jsdom rechnet kein CSS-in-JS).
  *
- * Kopfzeile auf `kopf` (nachts `#0c0e11`), Kopftext `schwach`, keine senkrechten Trenner im
- * Kopf; Zeilentrenner als Haarlinie — nachts `flaeche2` (Entwurf `#14171b`), am Tag
- * `flaeche3`: `flaeche2` läge dort bei 1,08 : 1 auf Weiß und wäre schlicht nicht da.
- * Hover auf `flaeche3` — aus demselben Grund: auf `flaeche2` war die Zeile am Tag nicht
- * hervorgehoben (1,08 : 1), nachts trennt beide nur 1,02 : 1 (LFH-618). Die Zellpolsterung folgt der Dichte-Staffel (`paddingSM` /
- * `padding`), statt auf antds festen 16 px zu stehen — die Zeilenhöhe zieht damit mit.
+ * Kopfzeile auf `kopf`, Kopftext `schwach`, keine senkrechten Trenner im Kopf. Zeilentrenner als
+ * Haarlinie: nachts `flaeche2`, am Tag `flaeche3` (`flaeche2` läge dort bei 1,08 : 1 auf Weiß).
+ * Hover auf `flaeche3` aus demselben Grund. Die Zellpolsterung folgt der Dichte-Staffel
+ * (`paddingSM` / `padding`).
  */
 export function tabellenTokens(
   rollen: Pick<Farbrollen, 'kopf' | 'schwach' | 'flaeche2' | 'flaeche3'>,
@@ -230,23 +147,19 @@ export type KatalogTabelleProps<T> = Omit<
   'scroll' | 'sticky' | 'columns' | 'tableLayout'
 > & {
   /**
-   * Wie antds `columns`, je Spalte um {@link KatalogSpalte.suchText} erweitert. Der Zusatz ist
-   * OPTIONAL — eine als `TableColumnsType<T>` annotierte Spaltenliste bleibt zuweisbar, und
-   * genau deshalb ändert sich an den übrigen Aufrufstellen nichts.
+   * Wie antds `columns`, je Spalte um {@link KatalogSpalte.suchText} erweitert (optional, damit
+   * annotierte `TableColumnsType<T>`-Listen zuweisbar bleiben).
    */
   columns?: KatalogSpalte<T>[];
   /**
-   * Schaltet Werkzeugzeile und Freitextsuche ein. Ohne dieses Prop existiert beides nicht.
-   * Die Suche greift Spalten mit auflösbarem `dataIndex` sowie Spalten mit `suchText` —
-   * siehe Dateikopf.
+   * Schaltet Werkzeugzeile und Freitextsuche ein. Gesucht wird in Spalten mit auflösbarem
+   * `dataIndex` oder mit `suchText` (siehe Dateikopf).
    */
   suche?: { platzhalter: string };
   /**
-   * Schaltet den Spaltenschalter mit Zähler ein (LFH-374, Kriterium 14). OPT-IN: ohne dieses
-   * Prop bleibt jede Spalte sichtbar und `abBreite` wirkungslos. `bezeichnung` steht im
-   * zugänglichen Namen des Knopfs („Spalten · 2 ausgeblendet — Online-Quellen"), damit zwei
-   * Schalter auf einer Seite unterscheidbar bleiben. `Datensicht` setzt es NIE — es rendert
-   * seinen eigenen Schalter (Guard in `katalogTabelle.guard.test.ts`).
+   * Schaltet den Spaltenschalter mit Zähler ein (Kriterium 14). OPT-IN: ohne dieses Prop bleibt
+   * jede Spalte sichtbar und `abBreite` wirkungslos. `bezeichnung` steht im zugänglichen Namen des
+   * Knopfs, damit zwei Schalter unterscheidbar bleiben. `Datensicht` setzt es NIE.
    */
   spaltenSchalter?: { bezeichnung: string };
 };
@@ -257,13 +170,9 @@ export const BLAETTER_SCHWELLE = 50;
 type Spalte<T> = NonNullable<TableProps<T>['columns']>[number];
 
 /**
- * Der bewertbare Schlüssel eines Spaltenbezugs. Antd erlaubt neben `'name'` auch die
- * Pfadform `['meta', 'id']`; bewertet wird dann das letzte Glied, weil es das
- * angezeigte Feld benennt. Alles Nicht-Textliche (Zahl-Index) ist nicht bewertbar.
- *
- * NUR für die DEV-Warnung unten. **Nicht** als Suchresolver benutzen: `['meta','id']`
- * fällt hier auf `'id'` zusammen, und `zeile['id']` ist nicht `zeile.meta.id` — das wäre
- * ein still falscher Wert. Dafür gibt es {@link zellenWert}, das den vollen Pfad läuft.
+ * Der bewertbare Schlüssel eines Spaltenbezugs; bei der Pfadform `['meta', 'id']` das letzte
+ * Glied. NUR für die DEV-Warnung: als Suchresolver lieferte er `zeile['id']` statt
+ * `zeile.meta.id`; dafür gibt es {@link zellenWert}.
  */
 function bezugsSchluessel<T>(spalte: Spalte<T> | undefined): string | undefined {
   if (!spalte || 'children' in spalte || !('dataIndex' in spalte)) return undefined;
@@ -301,41 +210,19 @@ export interface Fliessmass {
 }
 
 /**
- * Die Tabellenbreite aus den ÜBERGEBENEN Spalten (LFH-523) — rein und exportiert, damit die
- * Zusicherung ohne Rendern prüfbar ist (Muster `bedienzielStil`, `aktionsabstand`).
+ * Die Tabellenbreite aus den ÜBERGEBENEN Spalten (LFH-523), rein und exportiert.
  *
- * ── DER BEFUND ──────────────────────────────────────────────────────────────────
+ * `scroll={{ x: 'max-content' }}` macht die Breite inhaltsgetrieben: eine Spalte ohne `width`
+ * trägt ihre volle `max-content`-Breite bei, und ein umbrechbarer Langtext bleibt einzeilig und
+ * läuft weit aus der Sicht. Trägt genau EINE Spalte {@link KatalogSpalte.mindestBreite}, ist die
+ * Breite `Σ(width der übrigen) + mindestBreite`; antds `min-width: 100%` bleibt, die Tabelle
+ * füllt weiter den Container und scrollt erst unterhalb dieser Zahl. Liegt die Zahl unter der
+ * Containerbreite, verteilt die `auto`-Layoutrechnung identisch zur Vorgabe.
  *
- * `scroll={{ x: 'max-content' }}` macht die Tabellenbreite inhaltsgetrieben. Eine Spalte
- * ohne `width` trägt dann ihre volle `max-content`-Breite bei, und ein normal umbrechbarer
- * Meldungstext bleibt EINZEILIG statt umzubrechen: im Handschuhmodus gemessen 1484 px Text
- * gegen 936 px Sicht, 1122 px innerer Überlauf bei 1280 px und 1036 px bei 1366 px. Der
- * Kartenzweig derselben Daten bricht denselben Text um — der Tabelle fehlte bloß der
- * Deckel, gegen den sie hätte umbrechen können.
- *
- * ── DIE RECHNUNG ────────────────────────────────────────────────────────────────
- *
- * Trägt genau EINE Spalte {@link KatalogSpalte.mindestBreite}, ist die Breite
- * `Σ(width der übrigen) + mindestBreite`. Antd behält daneben sein `min-width: 100%`; die
- * Tabelle füllt also weiter den Container und scrollt erst UNTERHALB dieser Zahl in sich.
- *
- * **Warum das die ≥50-%-Zusicherung aus LFH-342 · C7 nicht anfasst:** liegt die gerechnete
- * Zahl unter der Containerbreite, ist die BENUTZTE Breite in beiden Fassungen dieselbe
- * (`min-width: 100%` gewinnt gegen beide), und die `auto`-Layoutrechnung verteilt die
- * Spalten danach identisch. Auseinander gehen die zwei Fassungen erst, wenn `max-content`
- * den Container ÜBERSTEIGT — und das ist genau der Befund, nicht die Zusicherung.
- *
- * ── ZWEI ABBRÜCHE, BEIDE MIT GRUND STATT STILL ──────────────────────────────────
- *
- * · **Eine Nachbarspalte ohne Zahlbreite.** Dann wäre die Summe geraten, und ein geratener
- *   Deckel ist schlechter als keiner: er behauptete eine Breite, die die Spalte nicht hält.
- *   Erfasst ist auch die Zeichenkettenform (`width: '20%'`) und die Spaltengruppe, die gar
- *   keine Blattbreite hat.
- * · **Zwei Fließspalten.** Das sind kein Deckel, sondern zwei Reste — welche der beiden den
- *   Überschuss bekäme, entschiede die Layoutrechnung und nicht der Entwurf.
- *
- * In beiden Fällen bleibt es beim Bestandsverhalten, und der Grund geht als DEV-Warnung
- * heraus. Ein Opt-in, das still nichts tut, wäre von einem kaputten nicht zu unterscheiden.
+ * Zwei Abbrüche, beide mit DEV-Warnung und Bestandsverhalten: eine Nachbarspalte ohne Zahlbreite
+ * (auch `'20%'` oder eine Gruppe; ein geratener Deckel wäre schlechter als keiner) und zwei
+ * Fließspalten (welche den Rest bekäme, entschiede das Layout). Ein Opt-in, das still nichts tut,
+ * wäre von einem kaputten nicht zu unterscheiden.
  */
 export function fliessBreite<T>(spalten: readonly KatalogSpalte<T>[] | undefined): Fliessmass {
   const fliessend = (spalten ?? []).filter((s) => s.mindestBreite != null);
@@ -369,14 +256,9 @@ export function fliessBreite<T>(spalten: readonly KatalogSpalte<T>[] | undefined
 }
 
 /**
- * Ref-gezählte, modulweite `/`-Bindung.
- *
- * Ein Zuhörer je Instanz wäre falsch: `pages/uhs/UhsDetailPage.tsx` rendert `Tabs` OHNE
- * `destroyOnHidden`, nach dem Besuch beider Reiter sind also zwei Tabellen gleichzeitig
- * montiert. Zwei Bindungen stritten dann um den Fokus, und wer gewinnt, hinge an der
- * Montagereihenfolge. Bei mehr als einer angemeldeten Instanz tut das Kürzel deshalb
- * NICHTS und warnt in DEV. Auf-/Abmelde-Bauform nach
- * `command-palette/CommandPaletteProvider.tsx`, der einzigen anderen globalen Bindung.
+ * Ref-gezählte, modulweite `/`-Bindung. Zwei gleichzeitig montierte Tabellen (etwa Reiter ohne
+ * `destroyOnHidden`) stritten sonst um den Fokus; bei mehr als einer Instanz tut das Kürzel
+ * NICHTS und warnt in DEV.
  */
 const suchFelder = new Set<() => void>();
 let schonGewarnt = false;
@@ -404,9 +286,8 @@ function slashBehandeln(ereignis: KeyboardEvent): void {
 }
 
 function useSlashKuerzel(aktiv: boolean, fokussiere: () => void): void {
-  // Der Ref hält die jeweils frische Fokusfunktion, damit der Effekt an `aktiv` allein
-  // hängt: eine je Render neu gebaute Funktion in den Deps meldete den Zuhörer bei
-  // JEDEM Render ab und wieder an — und die Zählung „genau eine Instanz" flackerte.
+  // Der Ref hält die frische Fokusfunktion, damit der Effekt an `aktiv` allein hängt; sonst meldete
+  // er den Zuhörer bei jedem Render ab und an, und die Zählung flackerte.
   const merker = useRef(fokussiere);
   merker.current = fokussiere;
 
@@ -426,24 +307,16 @@ function useSlashKuerzel(aktiv: boolean, fokussiere: () => void): void {
 }
 
 /**
- * CSS-Variable für den Freiraum unter der stehenden Kopfzeile (LFH-677). Die Regel, die sie
- * liest, steht in `theme/sprache.css` (`.lfh-katalog .ant-table-tbody *`).
+ * CSS-Variable für den Freiraum unter der stehenden Kopfzeile; gelesen in `theme/sprache.css`
+ * (`.lfh-katalog .ant-table-tbody *`).
  */
 export const KOPF_FREIRAUM = '--lfh-tabellenkopf-hoehe';
 
 /**
- * Schreibt die Höhe der stehenden Kopfzeile als {@link KOPF_FREIRAUM} an die Tabellenwurzel.
- *
- * DER BEFUND (LFH-677, WCAG 2.4.11): die Kopfzeile steht per `sticky` am oberen Rand. Wer
- * rückwärts tabbt, dem rollt der Browser das Ziel an den oberen Rand — GENAU unter die
- * Kopfzeile. Gemessen an der Betreuungsseite im Fükw (1366 × 600, kompakt): „Belegung
- * melden" und der Dreipunkt (30 px hoch) lagen bei y = 0 vollständig hinter der höheren
- * Kopfzeile. `scroll-margin-top` am Fokusziel hält den Freiraum frei; der Browser rollt dann
- * so, dass das Ziel UNTER der Kopfzeile steht.
- *
- * GEMESSEN statt aus Tokens gerechnet: die Kopfzeile bricht bei schmalen Spalten auf zwei
- * Zeilen um, und ihre Höhe zieht mit der Dichte-Staffel. Ohne stehende Kopfzeile ist der
- * Freiraum 0 — nicht ein alter Wert.
+ * Schreibt die Höhe der stehenden Kopfzeile als {@link KOPF_FREIRAUM} an die Tabellenwurzel
+ * (WCAG 2.4.11): rückwärts getabbt rollt der Browser das Ziel an den oberen Rand, genau unter die
+ * Kopfzeile. `scroll-margin-top` am Ziel hält den Freiraum frei. Gemessen statt aus Tokens
+ * gerechnet, weil die Kopfzeile umbrechen kann; ohne stehende Kopfzeile ist er 0.
  */
 export function setzeKopfFreiraum(wurzel: HTMLElement): void {
   const kopf = wurzel.querySelector<HTMLElement>('.ant-table-sticky-holder');
@@ -451,14 +324,10 @@ export function setzeKopfFreiraum(wurzel: HTMLElement): void {
 }
 
 /**
- * Hält {@link KOPF_FREIRAUM} aktuell. Beobachtet wird die WURZEL, nicht die Kopfzeile: die
- * Kopfzeile kann nach dem ersten Bild erst entstehen oder ausgetauscht werden (Laden,
- * Spaltenwechsel), und jede solche Änderung ändert auch die Größe der Wurzel.
- *
- * Exportiert seit LFH-373: die Gefahrenmatrix ist bewusst keine `KatalogTabelle` (Ausnahme im
- * Guard), trägt aber dieselbe stehende Kopfzeile und denselben Befund beim Rückwärtstabben.
- * Den `scroll-margin-top` der Ziele bringt sie selbst mit (`gefahrenMatrix.css`), weil die
- * Regel in `sprache.css` auf `.lfh-katalog` gescopt ist.
+ * Hält {@link KOPF_FREIRAUM} aktuell. Beobachtet wird die WURZEL: die Kopfzeile kann nach dem
+ * ersten Bild entstehen oder ausgetauscht werden, und das ändert auch die Wurzel. Exportiert für
+ * die Gefahrenmatrix (keine `KatalogTabelle`, aber dieselbe stehende Kopfzeile; ihren
+ * `scroll-margin-top` bringt sie in `gefahrenMatrix.css` selbst mit).
  */
 export function useKopfFreiraum(tabelle: RefObject<TableRef | null>): void {
   useEffect(() => {
@@ -472,9 +341,8 @@ export function useKopfFreiraum(tabelle: RefObject<TableRef | null>): void {
 }
 
 /**
- * Lädt die Tabelle gerade? Bildet {@link https://github.com/ant-design/ant-design | antds}
- * `useSpinProps` nach: ein Objekt ohne `spinning` lädt, ein explizites `spinning: false`
- * nicht. Eine Prüfung auf `loading === true` verfehlte die Objektform still.
+ * Lädt die Tabelle gerade? Wie antds `useSpinProps`: ein Objekt ohne `spinning` lädt, ein
+ * explizites `spinning: false` nicht.
  */
 function istLadend(loading: TableProps['loading']): boolean {
   if (typeof loading === 'boolean') return loading;
@@ -486,12 +354,9 @@ function istLadend(loading: TableProps['loading']): boolean {
 type IndizierteSpalte = SchaltbareSpalte & { index: number };
 
 /**
- * Übersetzt die Spalten in die Form, die {@link sichtbareSpalten} liest (LFH-374 · D2).
- *
- * Der Schalter braucht String-Schlüssel. Eine Spalte ohne String-`key` bekommt bei Opt-in
- * einen Ersatzschlüssel und gilt als `immerSichtbar` — so kann der Zähler sie nie als
- * „ausgeblendet" führen, ohne dass sie im Menü wählbar wäre; gemeldet wird sie trotzdem.
- * Ohne Opt-in bleibt `abBreite` außen vor (D3), die Liste dient dann nur der Registrierung.
+ * Übersetzt die Spalten in die Form, die {@link sichtbareSpalten} liest. Eine Spalte ohne
+ * String-`key` bekommt bei Opt-in einen Ersatzschlüssel und gilt als `immerSichtbar` (gemeldet
+ * wird sie trotzdem). Ohne Opt-in bleibt `abBreite` außen vor.
  */
 function schaltbareFassung<T>(
   spalten: readonly KatalogSpalte<T>[],
@@ -537,9 +402,8 @@ export default function KatalogTabelle<T extends object>({
   useKopfFreiraum(tabelleRef);
   useSlashKuerzel(suche != null, () => feldRef.current?.focus());
 
-  // ── Spaltenschalter (LFH-374) ─────────────────────────────────────────────────────
-  // Zählung und Schalter kommen aus `SpaltenSchalter.tsx` — dieselbe Funktion, die auch
-  // `Datensicht` liest. Hier wohnt nur der Zustand dieses Trägers.
+  // ── Spaltenschalter ───────────────────────────────────────────────────────────────
+  // Zählung und Schalter kommen aus `SpaltenSchalter.tsx`; hier wohnt nur der Zustand.
   const [spaltenAus, setSpaltenAus] = useState<readonly string[]>([]);
   const [spaltenAn, setSpaltenAn] = useState<readonly string[]>([]);
   const [spaltenOffen, setSpaltenOffen] = useState(false);
@@ -549,15 +413,13 @@ export default function KatalogTabelle<T extends object>({
   );
   const schalterDa = spaltenSchalter != null && hatWaehlbareSpalten(schaltbar);
 
-  // Verschwindet der Schalter, feuert antd KEIN `onOpenChange(false)` — die kontrollierte
-  // Offen-Achse bliebe auf `true` und klappte beim Wiederauftauchen ungefragt auf. Dieselbe
-  // gemessene Falle wie in `Datensicht` (LFH-391 · B4).
+  // Verschwindet der Schalter, feuert antd KEIN `onOpenChange(false)`; der kontrollierte Zustand
+  // klappte beim Wiederauftauchen ungefragt auf (wie in `Datensicht`).
   useEffect(() => {
     if (!schalterDa) setSpaltenOffen(false);
   }, [schalterDa]);
 
-  // Als Zeichenkette in die Deps: die Spaltenliste der Aufrufer ist je Render neu gebaut, ein
-  // Array hier meldete dieselbe Spalte bei jedem Render erneut.
+  // Als Zeichenkette in die Deps: die Spaltenliste der Aufrufer ist je Render neu gebaut.
   const ohneSchluesselText = ohneSchluessel.join(', ');
   useEffect(() => {
     if (!import.meta.env.DEV || ohneSchluesselText === '') return;
@@ -578,9 +440,8 @@ export default function KatalogTabelle<T extends object>({
 
   const filterZuruecksetzen = useCallback(() => setSuchbegriff(''), []);
   const oeffneSpalten = useCallback(() => setSpaltenOffen(true), []);
-  // Nur melden, was die Werkzeugzeile auch hält — ein Befehl auf einen nicht vorhandenen
-  // Schalter wäre ein Befehl ohne Wirkung. `hatWaehlbareSpalten` ist dieselbe Wahrheit, die
-  // der Schalter selbst liest.
+  // Nur melden, was die Werkzeugzeile auch hält (`hatWaehlbareSpalten`, dieselbe Wahrheit wie der
+  // Schalter).
   const tastaturAktionen: TastaturAktionen = {
     ...(suche != null ? { 'filter-zuruecksetzen': filterZuruecksetzen } : {}),
     ...(schalterDa ? { spalten: oeffneSpalten } : {}),
@@ -593,9 +454,9 @@ export default function KatalogTabelle<T extends object>({
   });
 
   /**
-   * Die WIRKLICH gezeigte Garnitur. Ohne Opt-in unverändert (und `abBreite` wirkungslos);
-   * mit Opt-in durch {@link sichtbareSpalten}, das Spalte 0 nie entfernt — die fixierte
-   * Kennung bleibt damit die Kennung. Die drei Schalterfelder werden vor antd herausgelöst.
+   * Die WIRKLICH gezeigte Garnitur. Ohne Opt-in unverändert; mit Opt-in über
+   * {@link sichtbareSpalten}, das Spalte 0 nie entfernt. Die Schalterfelder werden vor antd
+   * herausgelöst.
    */
   const gezeigteSpalten = useMemo(() => {
     if (!columns) return columns;
@@ -619,15 +480,12 @@ export default function KatalogTabelle<T extends object>({
   }, [columns, spaltenSchalter, schaltbar, spaltenAus, spaltenAn, abBreite]);
 
   /**
-   * Fixiert wird die ERSTE Spalte, nicht eine per Prop benannte: in allen Aufrufstellen
-   * ist sie bereits die menschenlesbare Kennung, ein Pflicht-Prop wäre dort reine
-   * Zeremonie und würde driften. Nicht angetastet wird sie, wenn der Aufrufer selbst eine
-   * Seite gewählt hat oder wenn dort eine Spaltengruppe steht — eine Gruppe ist keine
-   * Blattspalte, ihre Fixierung wäre wirkungslos.
+   * Fixiert wird die ERSTE Spalte: sie ist überall die menschenlesbare Kennung, ein Pflicht-Prop
+   * wäre Zeremonie. Unangetastet bleibt sie, wenn der Aufrufer eine Seite gewählt hat oder dort
+   * eine Spaltengruppe steht (deren Fixierung wirkungslos wäre).
    */
   const fixierteSpalten = useMemo(() => {
-    // Mono-Spalten (`zahl`) bekommen ihre Klasse, bevor fixiert wird — eine Optik-Zutat,
-    // die an der Spaltenfolge und damit an der Fixierregel darunter nichts ändert.
+    // Mono-Spalten bekommen ihre Klasse vor dem Fixieren; die Spaltenfolge bleibt.
     const gestaltet = gezeigteSpalten?.map((s) =>
       s.zahl ? { ...s, className: [s.className, 'lfh-zahl-spalte'].filter(Boolean).join(' ') } : s,
     );
@@ -637,19 +495,14 @@ export default function KatalogTabelle<T extends object>({
   }, [gezeigteSpalten]);
 
   /**
-   * DIE EINE benannte Quelle der gerenderten Zeilen.
-   *
-   * Genau hier tauscht LFH-331/B3 die Herkunft (serverseitige Seite statt Vollmenge) —
-   * die Signatur bleibt, `dataSource` bleibt `dataSource`. Bewusst NICHT `effektiveDaten`
-   * genannt: derselbe Name in `Datensicht.tsx` bezeichnet eine größere Operation
-   * (Filter + Suche + Gruppen + Sortierung), und zwei gleichnamige Funktionen mit
-   * verschiedenem Vertrag in einem Verzeichnis sind eine Falle.
+   * DIE EINE Quelle der gerenderten Zeilen. Bewusst nicht `effektiveDaten` genannt: der Name
+   * bezeichnet in `Datensicht.tsx` eine größere Operation.
    */
   const sichtbareZeilen = useMemo(() => {
     const begriff = suchbegriff.trim().toLowerCase();
     if (begriff === '' || !dataSource) return dataSource;
-    // `suchText` gewinnt über `dataIndex` — Begründung im Dateikopf. Eine Spalte ohne beides
-    // (render-only, Gruppe) fällt hier heraus und trägt wie bisher nicht bei.
+    // `suchText` gewinnt über `dataIndex`; eine Spalte ohne beides (render-only, Gruppe) trägt nicht
+    // bei.
     const suchbar = (columns ?? []).filter(
       (s) => s.suchText != null || (!('children' in s) && 'dataIndex' in s),
     );
@@ -662,10 +515,8 @@ export default function KatalogTabelle<T extends object>({
   }, [dataSource, columns, suchbegriff]);
 
   /**
-   * Die gedeckelte Tabellenbreite (LFH-523). Gerechnet wird über `fixierteSpalten`, also
-   * über die Garnitur, die auch WIRKLICH gerendert wird — `Datensicht` hat `abBreite`-Spalten
-   * da längst herausgefiltert, und ein Deckel aus einer Vollmenge wäre genau dort zu breit,
-   * wo der Befund gemessen wurde.
+   * Die gedeckelte Tabellenbreite, gerechnet über `fixierteSpalten`, die WIRKLICH gerenderte
+   * Garnitur; ein Deckel aus der Vollmenge wäre zu breit.
    */
   const { x: scrollX, warnung: breitenWarnung } = useMemo(
     () => fliessBreite(fixierteSpalten),
@@ -687,19 +538,13 @@ export default function KatalogTabelle<T extends object>({
   }, [identifier]);
 
   /**
-   * Die Schwelle rechnet gegen die ÜBERGEBENE Menge, nicht gegen `sichtbareZeilen` —
-   * Begründung im Dateikopf. `showSizeChanger` ist ausdrücklich `false`: rc-pagination
-   * schaltet es bei `total > 50` von selbst ein, also genau ab der Zeilenzahl, ab der
-   * geblättert wird, und schöbe damit das breiteste Element der Leiste in eine Fläche,
-   * die bei 390 px gemessen wird.
+   * Die Schwelle rechnet gegen die ÜBERGEBENE Menge (siehe Dateikopf). `showSizeChanger: false`:
+   * rc-pagination schaltete ihn ab `total > 50` selbst ein und schöbe das breiteste Element in eine
+   * Leiste, die bei 390 px gemessen wird.
    */
   /**
-   * Ladend schlägt leer — D4, für alle Aufrufstellen an dieser einen Stelle.
-   *
-   * `emptyText: null` ist die Unterdrückung, nicht das Weglassen des Schlüssels: antd
-   * bewertet `typeof locale?.emptyText !== 'undefined'`, ein fehlender Schlüssel fiele also
-   * auf `renderEmpty` (Bild + „Keine Daten") zurück. Der Rest von `locale` bleibt stehen —
-   * er trägt Filter- und Sortierbeschriftungen, die mit dem Ladezustand nichts zu tun haben.
+   * Ladend schlägt leer. `emptyText: null` statt Weglassen des Schlüssels: ein fehlender Schlüssel
+   * fiele auf `renderEmpty` („Keine Daten“) zurück. Der Rest von `locale` bleibt stehen.
    */
   const wirkendesLocale = istLadend(loading) ? { ...locale, emptyText: null } : locale;
 
@@ -712,10 +557,8 @@ export default function KatalogTabelle<T extends object>({
   return (
     <>
       {(suche != null || schalterDa) && (
-        // Die Werkzeugzeile liegt AUSSERHALB von `.ant-table`: `katalogtabelle-schmal.spec.ts`
-        // misst `scrollWidth` am Tabellenwurzelknoten gegen 390 px, eine Leiste darin zählte
-        // in dieses Maß hinein und machte die Messung stumpf. Umbrechende Flex-Zeile mit
-        // `gap`: Suche und Schalter stehen sonst bündig aneinander.
+        // Die Werkzeugzeile liegt AUSSERHALB von `.ant-table`: `katalogtabelle-schmal.spec.ts` misst
+        // `scrollWidth` am Tabellenwurzelknoten. Umbrechende Flex-Zeile mit `gap`.
         <div
           ref={werkzeugWurzel}
           data-lfh="katalog-werkzeuge"
@@ -734,8 +577,7 @@ export default function KatalogTabelle<T extends object>({
               placeholder={suche.platzhalter}
               value={suchbegriff}
               onChange={(e) => setSuchbegriff(e.target.value)}
-              // Kein `size`-Prop (E8): die Höhe kommt aus `controlHeight` und zieht mit der
-              // Dichtestufe mit. Fluide Breite statt fester Zahl.
+              // Kein `size`-Prop: die Höhe kommt aus `controlHeight`. Fluide Breite statt fester Zahl.
               style={{ width: '100%', maxWidth: 220 }}
             />
           )}
@@ -753,9 +595,8 @@ export default function KatalogTabelle<T extends object>({
           )}
         </div>
       )}
-      {/* Geschachtelter Provider nur für die Tabellen-Tokens: er erbt Algorithmus, Rollen und
-          Dichte vom Eltern-Theme (`inherit` ist antds Vorgabe) und färbt NUR diese Tabelle —
-          `tokens.ts:antdKomponenten` bleibt die globale Stelle und wird nicht angefasst. */}
+      {/* Geschachtelter Provider nur für die Tabellen-Tokens: er erbt Algorithmus, Rollen und Dichte
+          und färbt NUR diese Tabelle; `tokens.ts:antdKomponenten` bleibt die globale Stelle. */}
       <ConfigProvider theme={{ components: { Table: tabellenTokens(rollen, dunkel, token) } }}>
         <Table<T>
           {...rest}
@@ -766,33 +607,22 @@ export default function KatalogTabelle<T extends object>({
           loading={loading}
           locale={wirkendesLocale}
           pagination={blaetterung}
-          // `test/utils.tsx` montiert `ConfigProvider` OHNE Locale, die Produktion setzt
-          // `deDE` — der Sortier-Tooltip wäre im Test englisch und in Produktion deutsch,
-          // jede Textzusicherung darauf entweder falsch oder umgebungsabhängig. Am
-          // Berührungsgerät trägt er ohnehin nichts.
+          // `test/utils.tsx` montiert `ConfigProvider` ohne Locale; der Sortier-Tooltip wäre im Test
+          // englisch und in Produktion deutsch. Am Berührungsgerät trägt er ohnehin nichts.
           showSorterTooltip={false}
           scroll={{ x: scrollX }}
           /*
-           * GEMESSEN an `@rc-component/table/es/Table.js`: das Layout wählt rc-table selbst —
-           * `if (fixColumn) return mergedScrollX === 'max-content' ? 'auto' : 'fixed'`. Dieses
-           * Primitiv fixiert Spalte 0 IMMER, `fixColumn` ist also gesetzt; eine Zahl statt
-           * `'max-content'` kippte das Layout still auf `fixed`. Unter `fixed` ist eine
-           * Spaltenbreite BINDEND statt bevorzugt — die 96 px der ETB-Aktionsspalte schnitten
-           * den 72-px-Knopf der Handschuhstufe an, und die Mindestinhaltsbreite jeder anderen
-           * Spalte gleich mit. `auto` ist zugleich das, was der Bestand schon fährt.
-           *
-           * Nur im Zahlfall gesetzt: bei `'max-content'` wählt rc-table ohnehin `auto`, und im
-           * Sonderfall einer Spaltengruppe an Position 0 (dann fixiert das Primitiv nichts,
-           * und `sticky` führt auf `fixed`) wäre ein hartes `auto` eine stille Änderung an
-           * einer Tabelle, die von LFH-523 gar nicht handelt.
+           * rc-table wählt das Layout selbst: `if (fixColumn) return mergedScrollX === 'max-content' ?
+           * 'auto' : 'fixed'`. Dieses Primitiv fixiert Spalte 0 immer; eine Zahl kippte das Layout still
+           * auf `fixed`, wo Spaltenbreiten BINDEND sind (ein 72-px-Knopf in einer 96-px-Aktionsspalte wurde
+           * angeschnitten). Nur im Zahlfall gesetzt: bei `'max-content'` wählt rc-table ohnehin `auto`, und
+           * bei einer Gruppe an Position 0 wäre ein hartes `auto` eine stille Änderung.
            */
           tableLayout={typeof scrollX === 'number' ? 'auto' : undefined}
           /*
-           * Stehende Kopfzeile am Bildschirm (LFH-330), NICHT im Druck (LFH-71): mit `sticky`
-           * legt rc-table den Kopf in eine eigene Tabelle im Sticky-Halter (`Table.js`,
-           * Zweig `fixHeader || isSticky`) — der Körper, der über die Blätter läuft, trüge
-           * dann kein `thead`, und `thead { display: table-header-group }` aus
-           * `druck/druck.css` wiederholte nichts. Umgeschaltet über `beforeprint`/`afterprint`.
+           * Stehende Kopfzeile am Bildschirm, NICHT im Druck: mit `sticky` legt rc-table den Kopf in eine
+           * eigene Tabelle, der Körper trüge kein `thead`, und die Kopfwiederholung aus `druck/druck.css`
+           * griffe nicht. Umgeschaltet über `beforeprint`/`afterprint`.
            */
           sticky={!druckt}
         />
