@@ -34,7 +34,6 @@ const DEFERRED_MODULE: &[&str] = &[
     "lagebericht",
     "sprechgruppe",
     "ort_vorschau",
-    "nachforderung",
 ];
 
 /// Extractor-Typen, die ein Gate strukturell erzwingen (LFH-230). Neue Variante
