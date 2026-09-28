@@ -127,6 +127,7 @@ modul_marker! {
     Unfallhilfsstellen => "unfallhilfsstellen",
     Gefahrenzonen => "gefahrenzonen",
     Einsatzabschnitte => "einsatzabschnitte",
+    Einheiten => "einheiten",
 }
 
 /// Pfad-Präfix (app.rs-Route) → erwarteter Modul-Key (LFH-230). `None` = modul-lose
@@ -158,6 +159,7 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
         "/api/einsaetze/{id}/personen/{pid}/uhs-belegung",
         Some("unfallhilfsstellen"),
     ),
+    ("/api/einsaetze/{id}/einheiten", Some("einheiten")),
     ("/api/einsaetze/{id}/gefahrengebiete", Some("gefahrenzonen")),
     ("/api/einsaetze/{id}/abschnitte", Some("einsatzabschnitte")),
     ("/api/einsaetze/{id}/zonen", Some("lagekarte")),

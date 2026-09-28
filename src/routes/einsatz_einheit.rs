@@ -2,22 +2,15 @@ use super::einsatz_fahrzeug::sse_fahrzeug;
 use super::einsatz_material::sse_material;
 use super::einsatz_personal::sse_personal;
 use crate::app::AppState;
-use crate::auth::session::CurrentUser;
-use crate::auth::Benutzer;
 use crate::einheit::repo::{self as einheit_repo, EinheitDaten, EinheitPatch};
 use crate::einheit::{mitglied_repo, EinheitAnzeige};
-use crate::einsatz::berechtigung::{
-    fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
-};
 use crate::einsatz::einstellungen::etb_startwert;
-use crate::einsatz::repo as einsatz_repo;
+use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
+use crate::einsatz::modul::Einheiten;
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::live::LiveEvent;
-
-/// Modul-Key dieses Route-Moduls (LFH-132).
-const MODUL_KEY: &str = "einheiten";
 use crate::routes::support::{
     deserialize_optional_field, pflicht, pruefe_kommunikationsmittel, pruefe_koordinate, trimme,
     trimme_tri,
@@ -35,27 +28,6 @@ fn sse_einheit(state: &AppState, einsatz_id: i64, einheit_id: i64) {
         .publiziere_objekt(einsatz_id, LiveEvent::Einheit, "einheit_id", einheit_id);
 }
 
-/// Holt den Einsatz + Rolle und prüft Schreibrecht + aktiv. Liefert den Einsatz.
-async fn schreib_gate(
-    state: &AppState,
-    benutzer: &Benutzer,
-    einsatz_id: i64,
-) -> Result<crate::einsatz::Einsatz, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-    Ok(einsatz)
-}
-
 /// Lädt nur den Einheiten-Namen (für ETB-Texte); `NotFound`, falls nicht zum Einsatz.
 async fn einheit_name(state: &AppState, einsatz_id: i64, eid: i64) -> Result<String, AppError> {
     sqlx::query_scalar::<_, String>(
@@ -71,20 +43,9 @@ async fn einheit_name(state: &AppState, einsatz_id: i64, eid: i64) -> Result<Str
 /// GET /api/einsaetze/{id}/einheiten — Liste (aufgelöst). Nur Lesezugriff.
 pub async fn liste(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzLesezugriff<Einheiten>,
 ) -> Result<Json<Vec<EinheitAnzeige>>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
+    let einsatz_id = ctx.einsatz.id;
     Ok(Json(einheit_repo::liste(&state.pool, einsatz_id).await?))
 }
 
@@ -113,11 +74,10 @@ pub struct EinheitBody {
 /// POST /api/einsaetze/{id}/einheiten — Einheit bilden. ETB-Eintrag.
 pub async fn bilden(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzSchreibzugriff<Einheiten>,
     JsonBody(body): JsonBody<EinheitBody>,
 ) -> Result<(StatusCode, Json<EinheitAnzeige>), AppError> {
-    let einsatz = schreib_gate(&state, &benutzer, einsatz_id).await?;
+    let einsatz_id = ctx.einsatz.id;
     let name = pflicht(&body.name, "Name")?;
     Staerke::aus_optionen(
         body.soll_fuehrer,
@@ -133,7 +93,7 @@ pub async fn bilden(
     let anzeige = einheit_repo::anlegen(
         &state.pool,
         einsatz_id,
-        einsatz.org_id,
+        ctx.einsatz.org_id,
         EinheitDaten {
             name: &name,
             abschnitt_id: body.abschnitt_id,
@@ -148,13 +108,13 @@ pub async fn bilden(
             erreichbarkeit: erreichbarkeit.as_deref(),
             sortier: body.sortier,
         },
-        benutzer.id,
+        ctx.benutzer.id,
     )
     .await?;
     if let Some(ids) = &body.sprechgruppe_ids {
         crate::sprechgruppe::repo::setze_einheit_sprechgruppen(
             &state.pool,
-            einsatz.org_id,
+            ctx.einsatz.org_id,
             einsatz_id,
             anzeige.id,
             ids,
@@ -165,7 +125,7 @@ pub async fn bilden(
     super::etb_system_degradiert(
         &state,
         einsatz_id,
-        benutzer.id,
+        ctx.benutzer.id,
         &crate::einheit::etb_text_gebildet(&anzeige.name),
     )
     .await;
@@ -215,11 +175,11 @@ pub struct EinheitPatchBody {
 /// schreiben je einen ETB-Eintrag.
 pub async fn aktualisieren(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, eid)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Einheiten>,
+    PfadParam((_eid, eid)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<EinheitPatchBody>,
 ) -> Result<Json<EinheitAnzeige>, AppError> {
-    let einsatz = schreib_gate(&state, &benutzer, einsatz_id).await?;
+    let einsatz_id = ctx.einsatz.id;
     let name = match body.name {
         Some(n) => {
             let n = pflicht(&n, "Name")?;
@@ -264,7 +224,7 @@ pub async fn aktualisieren(
     let nachher = einheit_repo::patche(
         &state.pool,
         einsatz_id,
-        einsatz.org_id,
+        ctx.einsatz.org_id,
         eid,
         EinheitPatch {
             name: name.as_deref(),
@@ -290,7 +250,7 @@ pub async fn aktualisieren(
     if let Some(ids) = &body.sprechgruppe_ids {
         crate::sprechgruppe::repo::setze_einheit_sprechgruppen(
             &state.pool,
-            einsatz.org_id,
+            ctx.einsatz.org_id,
             einsatz_id,
             eid,
             ids,
@@ -317,7 +277,7 @@ pub async fn aktualisieren(
             (None, None) => String::new(),
         };
         if !inhalt.is_empty() {
-            super::etb_system_degradiert(&state, einsatz_id, benutzer.id, &inhalt).await;
+            super::etb_system_degradiert(&state, einsatz_id, ctx.benutzer.id, &inhalt).await;
         }
     }
     if vorher.abschnitt_id != nachher.abschnitt_id {
@@ -325,7 +285,7 @@ pub async fn aktualisieren(
             Some(a) => format!("Einheit «{}»: Abschnitt «{}» zugeordnet", nachher.name, a),
             None => format!("Einheit «{}»: Abschnittszuordnung aufgehoben", nachher.name),
         };
-        super::etb_system_degradiert(&state, einsatz_id, benutzer.id, &inhalt).await;
+        super::etb_system_degradiert(&state, einsatz_id, ctx.benutzer.id, &inhalt).await;
     }
     sse_einheit(&state, einsatz_id, eid);
     Ok(Json(final_anzeige))
@@ -334,10 +294,10 @@ pub async fn aktualisieren(
 /// DELETE /api/einsaetze/{id}/einheiten/{eid} — auflösen. ETB-Eintrag.
 pub async fn aufloesen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, eid)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Einheiten>,
+    PfadParam((_eid, eid)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
-    schreib_gate(&state, &benutzer, einsatz_id).await?;
+    let einsatz_id = ctx.einsatz.id;
     let name = einheit_name(&state, einsatz_id, eid).await?;
     // F06/LFH-244 Tier-A: Auflösung (Freigaben + Hochzug + Löschung) + System-ETB-Eintrag
     // atomar in EINER Tx. SSE erst nach dem Commit.
@@ -347,7 +307,7 @@ pub async fn aufloesen(
         crate::etb::system_audit_tx(
             conn,
             einsatz_id,
-            benutzer.id,
+            ctx.benutzer.id,
             startwert,
             &format!("Einheit «{}» aufgelöst", name),
         )
@@ -361,10 +321,10 @@ pub async fn aufloesen(
 /// PUT .../einheiten/{eid}/personal/{ep_id} — Person zuordnen. ETB-Eintrag.
 pub async fn personal_zuordnen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, eid, ep_id)): PfadParam<(i64, i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Einheiten>,
+    PfadParam((_eid, eid, ep_id)): PfadParam<(i64, i64, i64)>,
 ) -> Result<StatusCode, AppError> {
-    schreib_gate(&state, &benutzer, einsatz_id).await?;
+    let einsatz_id = ctx.einsatz.id;
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
     // F06/LFH-244 Tier-A: Zuordnung (inkl. Stale-Führer-Bereinigung) + System-ETB-Eintrag
     // atomar in EINER Tx. Der Personalname kommt aus dem Write und speist den ETB-Text.
@@ -374,7 +334,7 @@ pub async fn personal_zuordnen(
         crate::etb::system_audit_tx(
             conn,
             einsatz_id,
-            benutzer.id,
+            ctx.benutzer.id,
             startwert,
             &crate::einheit::etb_text_personal_zugeordnet(&einheit, &person),
         )
@@ -389,10 +349,10 @@ pub async fn personal_zuordnen(
 /// DELETE .../einheiten/{eid}/personal/{ep_id} — Person freigeben. ETB-Eintrag.
 pub async fn personal_freigeben(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, eid, ep_id)): PfadParam<(i64, i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Einheiten>,
+    PfadParam((_eid, eid, ep_id)): PfadParam<(i64, i64, i64)>,
 ) -> Result<StatusCode, AppError> {
-    schreib_gate(&state, &benutzer, einsatz_id).await?;
+    let einsatz_id = ctx.einsatz.id;
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
     // F06/LFH-244 Tier-A: Freigabe (inkl. Führer-Leerung) + System-ETB-Eintrag atomar.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
@@ -401,7 +361,7 @@ pub async fn personal_freigeben(
         crate::etb::system_audit_tx(
             conn,
             einsatz_id,
-            benutzer.id,
+            ctx.benutzer.id,
             startwert,
             &format!("Einheit «{}»: «{}» freigegeben", einheit, person),
         )
@@ -416,10 +376,10 @@ pub async fn personal_freigeben(
 /// PUT .../einheiten/{eid}/fahrzeug/{ef_id} — Fahrzeug zuordnen. ETB-Eintrag.
 pub async fn fahrzeug_zuordnen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, eid, ef_id)): PfadParam<(i64, i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Einheiten>,
+    PfadParam((_eid, eid, ef_id)): PfadParam<(i64, i64, i64)>,
 ) -> Result<StatusCode, AppError> {
-    schreib_gate(&state, &benutzer, einsatz_id).await?;
+    let einsatz_id = ctx.einsatz.id;
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
     // F06/LFH-244 Tier-A: Zuordnung + System-ETB-Eintrag atomar.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
@@ -428,7 +388,7 @@ pub async fn fahrzeug_zuordnen(
         crate::etb::system_audit_tx(
             conn,
             einsatz_id,
-            benutzer.id,
+            ctx.benutzer.id,
             startwert,
             &crate::einheit::etb_text_fahrzeug_zugeordnet(&einheit, &fz),
         )
@@ -443,10 +403,10 @@ pub async fn fahrzeug_zuordnen(
 /// DELETE .../einheiten/{eid}/fahrzeug/{ef_id} — Fahrzeug freigeben. ETB-Eintrag.
 pub async fn fahrzeug_freigeben(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, eid, ef_id)): PfadParam<(i64, i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Einheiten>,
+    PfadParam((_eid, eid, ef_id)): PfadParam<(i64, i64, i64)>,
 ) -> Result<StatusCode, AppError> {
-    schreib_gate(&state, &benutzer, einsatz_id).await?;
+    let einsatz_id = ctx.einsatz.id;
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
     // F06/LFH-244 Tier-A: Freigabe + System-ETB-Eintrag atomar.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
@@ -455,7 +415,7 @@ pub async fn fahrzeug_freigeben(
         crate::etb::system_audit_tx(
             conn,
             einsatz_id,
-            benutzer.id,
+            ctx.benutzer.id,
             startwert,
             &format!("Einheit «{}»: Fahrzeug «{}» freigegeben", einheit, fz),
         )
@@ -470,10 +430,10 @@ pub async fn fahrzeug_freigeben(
 /// PUT .../einheiten/{eid}/material/{em_id} — Material zuordnen. ETB-Eintrag.
 pub async fn material_zuordnen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, eid, em_id)): PfadParam<(i64, i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Einheiten>,
+    PfadParam((_eid, eid, em_id)): PfadParam<(i64, i64, i64)>,
 ) -> Result<StatusCode, AppError> {
-    schreib_gate(&state, &benutzer, einsatz_id).await?;
+    let einsatz_id = ctx.einsatz.id;
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
     // F06/LFH-244 Tier-A: Zuordnung + System-ETB-Eintrag atomar.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
@@ -483,7 +443,7 @@ pub async fn material_zuordnen(
         crate::etb::system_audit_tx(
             conn,
             einsatz_id,
-            benutzer.id,
+            ctx.benutzer.id,
             startwert,
             &format!(
                 "Einheit «{}»: Material «{}» (×{}) zugeordnet",
@@ -501,10 +461,10 @@ pub async fn material_zuordnen(
 /// DELETE .../einheiten/{eid}/material/{em_id} — Material freigeben. ETB-Eintrag.
 pub async fn material_freigeben(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, eid, em_id)): PfadParam<(i64, i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Einheiten>,
+    PfadParam((_eid, eid, em_id)): PfadParam<(i64, i64, i64)>,
 ) -> Result<StatusCode, AppError> {
-    schreib_gate(&state, &benutzer, einsatz_id).await?;
+    let einsatz_id = ctx.einsatz.id;
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
     // F06/LFH-244 Tier-A: Freigabe + System-ETB-Eintrag atomar.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
@@ -514,7 +474,7 @@ pub async fn material_freigeben(
         crate::etb::system_audit_tx(
             conn,
             einsatz_id,
-            benutzer.id,
+            ctx.benutzer.id,
             startwert,
             &format!(
                 "Einheit «{}»: Material «{}» (×{}) freigegeben",
@@ -544,23 +504,11 @@ pub struct PositionBody {
 /// PATCH /api/einsaetze/{id}/einheiten/{eid}/position — reine Lage-Pflege, KEIN ETB.
 pub async fn position(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, einheit_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Einheiten>,
+    PfadParam((_eid, einheit_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<PositionBody>,
 ) -> Result<Json<EinheitAnzeige>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     let vorher = einheit_repo::laden(&state.pool, einsatz_id, einheit_id).await?; // 404 falls fremd
     let eff_lat = body.lat.unwrap_or(vorher.lat);
     let eff_lon = body.lon.unwrap_or(vorher.lon);
@@ -597,16 +545,16 @@ pub struct StatusBody {
 /// Ein echter Wechsel schreibt einen System-ETB-Eintrag (atomar) und setzt „Seit“.
 pub async fn status_setzen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, eid)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Einheiten>,
+    PfadParam((_eid, eid)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<StatusBody>,
 ) -> Result<Json<EinheitAnzeige>, AppError> {
-    let einsatz = schreib_gate(&state, &benutzer, einsatz_id).await?;
+    let einsatz_id = ctx.einsatz.id;
     let status_id = body
         .status_id
         .ok_or_else(|| AppError::Validation("status_id fehlt".into()))?;
     if let Some(sid) = status_id {
-        if !crate::fahrzeug::status_repo::ist_in_org(&state.pool, einsatz.org_id, sid).await? {
+        if !crate::fahrzeug::status_repo::ist_in_org(&state.pool, ctx.einsatz.org_id, sid).await? {
             return Err(AppError::Validation("Unbekannter Status".into()));
         }
     }
@@ -618,7 +566,7 @@ pub async fn status_setzen(
             crate::etb::system_audit_tx(
                 conn,
                 einsatz_id,
-                benutzer.id,
+                ctx.benutzer.id,
                 startwert,
                 &format!(
                     "Einheit «{}»: Status «{}» → «{}»",

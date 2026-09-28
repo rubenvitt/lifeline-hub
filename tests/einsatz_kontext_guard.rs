@@ -31,7 +31,6 @@ use std::fs;
 const DEFERRED_MODULE: &[&str] = &[
     "einsatz",
     "einsatz_person",
-    "einsatz_einheit",
     "chat",
     "etb",
     "befehl",
