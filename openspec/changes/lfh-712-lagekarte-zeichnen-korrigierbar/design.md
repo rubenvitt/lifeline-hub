@@ -54,13 +54,17 @@ einziger die Mindestpunktzahl je Form kennt; die Seite liest `bereit` für „Ab
 für den Zähler und `kannZurueck` für den Zurück-Knopf. Gemeldet wird nach jeder eigenen Aktion
 (Punkt gesetzt, `starten`, `stoppen`, `punktZurueck`, `verwerfen`, `finish`), nur bei Wertänderung.
 
-- `kannZurueck = aktiv && punkte > 0` — aus dem **eigenen** Zähler, nicht aus `draw.canUndo()`
-  (Nachtrag aus dem Apply): der Capture-Klick des Adapters läuft, bevor terra-draw den Punkt
-  verarbeitet, `canUndo()` wäre beim ersten Punkt noch `false` und der Knopf bliebe eine Runde zu
-  lange gesperrt. Ein `history`-Zuhörer wird damit überflüssig.
-- `punktZurueck()` fragt terra-draw nur mit eigenem Punkt und hinter dem `enabled`-Riegel
-  (`undo()` wirft bei gestopptem TerraDraw).
-- Die geordnete Punktliste aus C9 (Array statt Set, Pixel-Entdoppelung bleibt) trägt `punkte`.
+- `punkte` kommt aus **terra-draw selbst**: jeder fest gesetzte Punkt liegt auf dem Undo-Stapel des
+  Modus, und das Ereignis `history` (Stapel `mode`) meldet dessen Größe, auch beim Zurücknehmen.
+  Gemessen an der echten Karte (e2e): 3 Punkte → „3", zurück → „2", die gespeicherte Fläche hat
+  drei Ecken.
+- *Nachtrag aus dem Review:* der erste Stand zählte DOM-Klicks (wie C9). Die laufen an terra-draw
+  vorbei: terra-draw setzt auf `pointerup` mit eigenen Ziehschwellen, MapLibre unterdrückt den
+  Klick ab 3 px Bewegung. Ein Mikro-Ziehen am Tablet ergab „1 Punkt" für eine leere Figur, der
+  Zurück-Knopf stand frei und tat nichts, und die Pixel-Entdoppelung über die ganze Liste verschluckte
+  einen später erneut benutzten Pixel. Der Klickzähler ist deshalb gestrichen.
+- `kannZurueck = aktiv && punkte > 0`; `punktZurueck()` fragt terra-draw nur mit Punkt und hinter
+  dem `enabled`-Riegel (`undo()` wirft bei gestopptem TerraDraw).
 
 *Alternative:* zwei getrennte Callbacks nach LFH-468 (`onZeichnenZurueckAenderung`). Verworfen: zwei
 Meldewege für einen Zustand sind genau die Stelle, an der Zähler und Knopf auseinanderlaufen.
@@ -123,7 +127,7 @@ ein zweites Esc beendet das Zeichnen." — nicht zusätzlich im Knopf oder als T
 ### D5 — Eigenposition: Zustand in einem Hook, Darstellung in der Karte
 
 - **Hook `useEigenposition()`** (`pages/lagekarte/useEigenposition.ts`): kennt `verfuegbarkeit`
-  (`'bereit' | 'unsicher' | 'fehlt'` aus `window.isSecureContext` und `'geolocation' in navigator`),
+  (`'bereit' | 'unsicher' | 'fehlt'` aus `window.isSecureContext` und `navigator.geolocation`),
   `an`, `position` (`lat`, `lon`, `genauigkeit`) und schaltet `watchPosition`/`clearWatch`. Aufräumen
   beim Ausschalten **und** beim Unmount (e2e läuft unter StrictMode: doppeltes Einhängen darf keine
   zweite Uhr hinterlassen). Kein `localStorage`, kein Zustand über den Hook hinaus. Fehler
@@ -136,7 +140,9 @@ ein zweites Esc beendet das Zeichnen." — nicht zusätzlich im Knopf oder als T
   Ein echtes `disabled` nähme den Klick und damit den einzigen Weg zum Text auf Touch.
 - **Darstellung** in `Kartenflaeche.tsx`: Prop `eigenposition` (Position oder `null`) und eine
   eigene GeoJSON-Quelle (Genauigkeitskreis als Polygon aus Radius in Metern + Punkt), angelegt und
-  nach `setStyle` neu angelegt über `planeReAnlegenNachStyle` wie die übrigen Ebenen. Das Anfliegen
+  nach `setStyle` neu angelegt über einen eigenen `wendeKartenDatenAn`-Aufruf im Style-Effekt, nach
+  `planeReAnlegenNachStyle` angemeldet (läuft zuletzt, liegt oben). Ohne je gemeldete Position
+  legt die Karte keine Ebene an. Das Anfliegen
   beim ersten Fix übernimmt die Seite über das bestehende `flyToZiel`.
 - **`localhost` ist ein sicherer Kontext** — im e2e steht der Knopf deshalb frei. Der gesperrte Zweig
   wird in Vitest mit gestubbtem `isSecureContext` belegt, der Geolocation-Pfad im e2e mit
@@ -148,17 +154,21 @@ der Punkt allein als Marker hätte zwei Mechanismen für eine Anzeige.
 
 ## Risks / Trade-offs
 
-- [eigener Zähler und terra-draws Undo-Stapel laufen auseinander, etwa wenn terra-draw einen
-  gezählten Klick verwirft] → `punktZurueck()` zählt nur herunter, wenn `undo()` gelang; der e2e
-  belegt „3 → zurück → 2" an der echten Karte.
+- [terra-draw meldet `history` nach `undo()` nicht synchron] → `punktZurueck()` zieht dann selbst
+  um einen nach; der e2e belegt „3 → zurück → 2" an der echten Karte.
+- [Eigenposition: erster Standort kommt spät (bis 15 s) und fliegt mit festem Zoom an; bei
+  WLAN-Ortung am Fükw ist der Zoom zu eng] → offen, LFH-766 (Review, Minor).
 - [Knopf ist in jsdom „tot"-grün, weil `undoRedo` fehlt] → eigener Test, dass der Konstruktor die
   Option bekommt (Mutationsprobe in C9: ohne sie 4 von 7 rot); der e2e belegt es an echter Karte.
 - [Sechster Knopf in der Kartenspalte] bei 390 px im Handschuh-Betrieb 6 × 72 px: kann
   `e2e/fokus-verdeckung.spec.ts` (Fuß endet vor der Knopfspalte, LFH-373) und
   `e2e/gate3-trefflaeche.spec.ts` treffen → beide Specs laufen im Apply mit; bricht einer, wird die
   Spalte geklärt statt der Test gelockert.
-- [Esc-Zuhörer an `window` kollidiert mit Menüs/Dialogen] → `defaultPrevented`-Riegel wie beim Messen;
-  antd-Dropdowns und -Modals schließen per Esc und setzen den Default-Weg.
+- [Esc-Zuhörer an `window` kollidiert mit Menüs/Dialogen] → `defaultPrevented` reicht **nicht**
+  (Review, nachgelesen): antd-Dropdown, -Menü und -Modal schließen über eigene `window`-keydown-Zuhörer
+  ohne `preventDefault`. Der Riegel `escGehoertOverlay` (`zeichnenEsc.ts`) steigt bei einem sichtbaren
+  Overlay oder Fokus in `[role=dialog|menu|listbox]` aus; er gilt auch für den Messen-Zuhörer, der
+  dieselbe Lücke hatte. Gehaltene Taste (`repeat`) läuft nicht durch beide Stufen.
 - [Eigenposition am Fükw ohne GPS] liefert ungenaue oder keine Position → Genauigkeitskreis zeigt die
   Unschärfe ehrlich; kein Standort → Meldung (Spec).
 - [Datenschutz] → Spec „Standort verlässt das Gerät nicht"; e2e prüft, dass keine Anfrage die

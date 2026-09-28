@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { act, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes, useLocation } from 'react-router';
@@ -2041,6 +2041,7 @@ describe('LFH-712: Letzten Punkt zurück und zweistufiges Esc', () => {
     );
     // Die zweite Stufe verwirft nichts mehr — also auch keine zweite Quittung.
     expect(kartenHandle.zeichnungVerwerfen).toHaveBeenCalledTimes(1);
+    expect(quittungen()).toBe(1);
     expect(spy.count()).toBe(0);
   });
 
@@ -2059,6 +2060,37 @@ describe('LFH-712: Letzten Punkt zurück und zweistufiges Esc', () => {
     expect(screen.getByText('Gefahrengebiet · Fläche')).toBeInTheDocument();
     await waitFor(() => expect(quittungen()).toBe(1));
     expect(spy.count()).toBe(0);
+  });
+
+  it('Esc bei offenem Menü schließt nur das Menü, die Figur bleibt (Review)', async () => {
+    basisHandler();
+    const user = userEvent.setup();
+    renderSeite();
+    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+    await user.click(await screen.findByText('stand-3'));
+    // Ein offenes antd-Menü schließt über einen eigenen window-keydown ohne preventDefault —
+    // nachgestellt als sichtbares Dropdown im Portal.
+    const menue = document.createElement('div');
+    menue.className = 'ant-dropdown';
+    document.body.appendChild(menue);
+    screen.getByRole('button', { name: 'Letzten Punkt zurück' }).focus();
+    await user.keyboard('{Escape}');
+    menue.remove();
+    expect(kartenHandle.zeichnungVerwerfen).not.toHaveBeenCalled();
+    expect(screen.getByText('3 Punkte')).toBeInTheDocument();
+  });
+
+  it('eine gehaltene Esc-Taste läuft nicht durch beide Stufen', async () => {
+    basisHandler();
+    const user = userEvent.setup();
+    renderSeite();
+    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+    await user.click(await screen.findByText('stand-3'));
+    fireEvent.keyDown(window, { key: 'Escape' });
+    fireEvent.keyDown(window, { key: 'Escape', repeat: true });
+    expect(kartenHandle.zeichnungVerwerfen).toHaveBeenCalledTimes(1);
+    // Die Wiederholung beendet den Modus nicht.
+    expect(screen.getByText('Gefahrengebiet · Fläche')).toBeInTheDocument();
   });
 
   it('Esc in einem Eingabefeld lässt die Figur stehen', async () => {

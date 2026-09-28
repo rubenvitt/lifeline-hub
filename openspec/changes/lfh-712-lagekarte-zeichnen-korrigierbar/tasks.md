@@ -6,7 +6,7 @@ Arbeitsweise je Aufgabe: `superpowers:test-driven-development` (erst rot, dann g
 ## 1. Adapter: Undo, Punktstand, Esc-Besitz (`pages/lagekarte/zeichnen.ts`)
 
 - [x] 1.1 Konstruktor mit `undoRedo: { modeLevel: new TerraDrawModeUndoRedo() }` und beiden Modi mit `keyEvents: { cancel: null, finish: 'Enter' }`; `prefixId: praefix` bleibt. Verifikation: `zeichnen.test.ts` prüft beide Optionen am Konstruktor-Aufruf (Mock zeichnet die Argumente auf); Mutationsprobe — jede Option einzeln entfernt färbt mindestens einen Test rot.
-- [x] 1.2 Geordnete Punktliste (Array, Pixel-Entdoppelung bleibt) und `onStandAendern({ punkte, kannZurueck })` statt `onBereitschaftAendern`, gemeldet nach Punkt/`starten`/`stoppen`/`finish` und bei `history`, nur bei Wertänderung. Verifikation: Tests „ohne Punkt `kannZurueck` false, nach erstem Punkt true" als Paar; keine Doppelmeldung bei gleichem Stand.
+- [x] 1.2 Punktzahl aus terra-draws `history` (Modus-Stapel; nach Review statt Klickzähler) und `onStandAendern({ punkte, bereit, kannZurueck })` statt `onBereitschaftAendern`, gemeldet bei `history` und nach `starten`/`stoppen`/`finish`/`verwerfen`, nur bei Wertänderung. Verifikation: Tests „ohne Punkt `kannZurueck` false, nach erstem Punkt true" als Paar; keine Doppelmeldung bei gleichem Stand.
 - [x] 1.3 `punktZurueck()` (Riegel `aktiv && draw.enabled` vor `undo()`) und `verwerfen()` (Entwurf löschen, Modus neu setzen, Stand 0). Verifikation: Tests „Undo nimmt genau einen Punkt" (3 → 2, `bereit` fällt), „Undo des letzten Punktes → 0, gesperrt, Modus aktiv", „gestoppt: `punktZurueck` wirft nicht und liefert false", „nach `verwerfen` Stand 0 und `kannZurueck` false".
 - [x] 1.4 Aufrufer in `Kartenflaeche.tsx` umstellen: Callback-Prop `onZeichnenStandAenderung`, Handle-Methoden `punktZurueck()` und `zeichnungVerwerfen()` (fragen genau den aktiven Controller). Verifikation: `pnpm exec tsc --noEmit` grün; bestehende Kartenflaeche-/LagekartePage-Tests grün.
 
@@ -39,4 +39,4 @@ Arbeitsweise je Aufgabe: `superpowers:test-driven-development` (erst rot, dann g
 ## 6. Doku und Abschluss
 
 - [x] 6.1 CLAUDE.md: Absatz „Ein Sprung ist keine Handlung" (LFH-616) — Messen endet mit einem Esc, Zeichnen zweistufig (LFH-712, Entscheidung 28.09.2026); Hinweis auf Esc-Besitz (terra-draw `cancel: null`). Verifikation: `grep -n "einzige Modus, den Escape" CLAUDE.md` liefert nichts mehr.
-- [ ] 6.2 Prüfliste Einsatztauglichkeit (15 Kriterien) für die Lagekarte unter `docs/superpowers/specs/2026-09-28-lfh-712-pruefliste.md`, jede Zeile mit Verdikt. Verifikation: keine Zeile „nicht geprüft".
+- [x] 6.2 Prüfliste Einsatztauglichkeit (15 Kriterien) für die Lagekarte unter `docs/superpowers/specs/2026-09-28-lfh-712-pruefliste.md`, jede Zeile mit Verdikt. Verifikation: keine Zeile „nicht geprüft".

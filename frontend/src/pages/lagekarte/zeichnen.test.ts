@@ -16,6 +16,8 @@ const aufrufe = vi.hoisted(() => ({
   modi: [] as { name: string; optionen: unknown }[],
   undo: 0,
   clear: 0,
+  /** Nächster Klick setzt in terra-draw KEINEN Punkt (Mikro-Ziehen, Phantomklick). */
+  verschlucken: false,
 }));
 
 vi.mock('terra-draw', () => ({
@@ -33,6 +35,7 @@ vi.mock('terra-draw', () => ({
   TerraDraw: class {
     enabled = false;
     private finish?: (id: number, context: { action: string }) => void;
+    private history?: (e: { stack: string; undoSize: number }) => void;
     private readonly canvas: HTMLCanvasElement;
     private mode = 'polygon';
     /** Koordinaten der laufenden Figur, wie terra-draw sie hält. */
@@ -44,13 +47,24 @@ vi.mock('terra-draw', () => ({
       this.canvas.addEventListener('keydown', (event) => {
         if (event.key === 'Enter') this.finish?.(1, { action: 'draw' });
       });
+      // Wie terra-draw 1.34: ein gesetzter Punkt landet auf dem Modus-Stapel und meldet die
+      // neue Größe als `history`. Derselbe Pixel ergibt keinen zweiten Punkt.
       this.canvas.addEventListener('click', (event) => {
-        if (this.enabled) this.stapel.push(`${event.clientX}:${event.clientY}`);
+        if (!this.enabled) return;
+        if (aufrufe.verschlucken) {
+          aufrufe.verschlucken = false;
+          return;
+        }
+        const p = `${event.clientX}:${event.clientY}`;
+        if (this.stapel[this.stapel.length - 1] === p) return;
+        this.stapel.push(p);
+        this.history?.({ stack: 'mode', undoSize: this.stapel.length });
       });
     }
 
-    on(event: string, handler: (id: number, context: { action: string }) => void) {
+    on(event: string, handler: never) {
       if (event === 'finish') this.finish = handler;
+      if (event === 'history') this.history = handler;
     }
 
     start() {
@@ -70,7 +84,9 @@ vi.mock('terra-draw', () => ({
     undo() {
       if (!this.enabled) throw new Error('Terra Draw is not enabled');
       aufrufe.undo += 1;
-      return this.stapel.pop() != null;
+      if (this.stapel.pop() == null) return false;
+      this.history?.({ stack: 'mode', undoSize: this.stapel.length });
+      return true;
     }
     canUndo() {
       if (!this.enabled) throw new Error('Terra Draw is not enabled');
@@ -130,6 +146,7 @@ beforeEach(() => {
   aufrufe.modi.length = 0;
   aufrufe.undo = 0;
   aufrufe.clear = 0;
+  aufrufe.verschlucken = false;
 });
 
 describe('createZeichnung — expliziter Abschluss', () => {
@@ -226,6 +243,26 @@ describe('createZeichnung — Punktstand und Zurücknehmen (LFH-712)', () => {
     zeichnung.starten('polygon');
     zeichnung.stoppen();
     expect(zeichnung.punktZurueck()).toBe(false);
+  });
+
+  it('zählt, was terra-draw setzt — ein Klick ohne gesetzten Punkt zählt nicht', () => {
+    // Mikro-Ziehen am Tablet: MapLibre meldet einen Klick, terra-draw setzt keinen Punkt.
+    // Ein eigener Klickzähler zeigte „1 Punkt" für eine leere Figur, „zurück" stünde frei.
+    const { zeichnung, klick, letzter } = aufbau();
+    zeichnung.starten('polygon');
+    aufrufe.verschlucken = true;
+    klick(10, 10);
+    expect(letzter()).toEqual({ punkte: 0, bereit: false, kannZurueck: false });
+    expect(zeichnung.punktZurueck()).toBe(false);
+  });
+
+  it('ein früher benutzter Pixel zählt wieder, wenn terra-draw ihn setzt', () => {
+    const { zeichnung, klick, letzter } = aufbau();
+    zeichnung.starten('polygon');
+    klick(10, 10);
+    klick(20, 10);
+    klick(10, 10);
+    expect(letzter()?.punkte).toBe(3);
   });
 
   it('meldet einen unveränderten Stand nicht doppelt', () => {

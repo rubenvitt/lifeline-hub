@@ -168,7 +168,10 @@ test.describe('Eigenposition', () => {
       .toBe(true);
 
     // Grundlagenwechsel (`setStyle` mit `diff: false`) wirft eigene Quellen weg — die
-    // Eigenposition muss danach wieder stehen.
+    // Eigenposition muss danach wieder stehen. Grenze dieses Belegs (Review): der Wechsel auf
+    // „Hell" ändert auch die Bedienfarbe, dann legt schon der Farb-Effekt die Ebene neu an —
+    // welcher der beiden Wege sie zurückholt, trennt der Schritt nicht. Einen reinen
+    // Grundlagenwechsel ohne zweite konfigurierte Grundlage gibt die e2e-Umgebung nicht her.
     await page.getByRole('button', { name: 'Benutzermenü' }).click();
     await page.getByRole('menuitem', { name: /Hell/ }).click();
     await expect.poll(quelleDa, { timeout: 10_000 }).toBe(true);
@@ -179,9 +182,19 @@ test.describe('Eigenposition', () => {
     expect(anfragen.filter((a) => a.includes(breite) || a.includes(laenge))).toEqual([]);
     expect(await page.evaluate(() => JSON.stringify(localStorage))).not.toContain(breite);
 
-    // Ausschalten räumt den Punkt.
+    // Ausschalten räumt den Punkt: die Quelle bleibt, ist aber leer.
     await knopf.click();
     await expect(knopf).toHaveAttribute('aria-pressed', 'false');
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const map = (window as unknown as { __lfhKarte?: MapHaken }).__lfhKarte!;
+          const q = map.getStyle()?.sources?.['eigenposition'] as
+            { data?: { features?: unknown[] } } | undefined;
+          return q?.data?.features?.length ?? -1;
+        }),
+      )
+      .toBe(0);
 
     expect(seitenFehler.map((f) => f.message)).toEqual([]);
   });

@@ -19,7 +19,7 @@ const MODUS_NAME: Record<ZeichenModus, string> = { polygon: 'polygon', linie: 'l
  * Zustand wären genau die Stelle, an der Zähler und Knopf auseinanderliefen.
  */
 export interface ZeichenStand {
-  /** Fest gesetzte, pixelverschiedene Punkte der laufenden Figur. */
+  /** Fest gesetzte Punkte der laufenden Figur, wie terra-draw sie hält. */
   punkte: number;
   /** Mindestzahl erreicht (Linie 2, Fläche 3) — „Abschließen" ist frei. */
   bereit: boolean;
@@ -86,19 +86,14 @@ export function createZeichnung(
   const canvas = map.getCanvas();
   let aktiv = false;
   let aktiverModus: ZeichenModus | null = null;
-  // Geordnete Reihe statt Set: beim Zurücknehmen muss der ZULETZT aufgenommene Eintrag wieder
-  // verschwinden, und ein Set kennt keine Reihenfolge.
-  const gesetztePunkte: string[] = [];
+  let punkte = 0;
   let fertigZaehler = 0;
   let gemeldet: ZeichenStand | null = null;
 
   const mindestPunkte = () => (aktiverModus === 'linie' ? 2 : 3);
 
-  // Die Freigabe von „zurück" folgt dem EIGENEN Zähler, nicht `draw.canUndo()`: der
-  // Capture-Klick unten läuft, bevor terra-draw den Punkt verarbeitet — `canUndo()` wäre beim
-  // ersten Punkt noch false und der Knopf bliebe eine Runde zu lange gesperrt.
   const melde = () => {
-    const n = aktiv ? gesetztePunkte.length : 0;
+    const n = aktiv ? punkte : 0;
     const stand: ZeichenStand = { punkte: n, bereit: n >= mindestPunkte(), kannZurueck: n > 0 };
     if (
       gemeldet &&
@@ -111,25 +106,23 @@ export function createZeichnung(
     onStandAendern(stand);
   };
 
-  // TerraDraw veröffentlicht keine Anzahl der FEST gesetzten Punkte. Der Snapshot enthält
-  // während des Zeichnens zusätzlich den beweglichen Vorschaupunkt und wäre deshalb schon
-  // vor dem dritten Klick scheinbar vollständig. Gezählt werden stattdessen die wirklichen
-  // Canvas-Klicks des aktiven Zeichenmodus.
-  const punktGesetzt = (event: MouseEvent) => {
-    if (!aktiv) return;
-    // Ein Doppelklick erzeugt zwei `click`-Events an derselben Pixelposition. Ohne die
-    // Entdoppelung würden zwei wirkliche Punkte als drei zählen und den Knopf zu früh
-    // freigeben. Derselbe Pixel ist auch fachlich kein zusätzlicher Polygonpunkt.
-    const schluessel = `${event.clientX}:${event.clientY}`;
-    if (!gesetztePunkte.includes(schluessel)) gesetztePunkte.push(schluessel);
+  // Die Punktzahl kommt aus terra-draw selbst (LFH-712, Review): jeder fest gesetzte Punkt
+  // liegt auf dem Undo-Stapel des Modus, und `history` meldet dessen Größe — auch beim
+  // Zurücknehmen. Bis dahin zählte der Adapter DOM-Klicks. Die laufen aber an terra-draw
+  // vorbei: terra-draw setzt auf `pointerup` mit eigenen Ziehschwellen, MapLibre unterdrückt den
+  // Klick ab 3 px Bewegung. Ein Mikro-Ziehen am Tablet ergab so „1 Punkt" für eine leere Figur,
+  // und „Letzten Punkt zurück" stand frei, ohne etwas zu tun. Der Snapshot taugt als Quelle
+  // nicht: er enthält während des Zeichnens den beweglichen Vorschaupunkt.
+  draw.on('history', (e) => {
+    if (!aktiv || e.stack !== 'mode') return;
+    punkte = e.undoSize;
     melde();
-  };
-  canvas.addEventListener('click', punktGesetzt, true);
+  });
 
   const zuruecksetzen = () => {
     aktiv = false;
     aktiverModus = null;
-    gesetztePunkte.length = 0;
+    punkte = 0;
     melde();
   };
 
@@ -155,7 +148,7 @@ export function createZeichnung(
       // unbestätigten Entwurf verwerfen (das Cleanup ist bewusst bis hierher aufgeschoben).
       else draw.clear();
       draw.setMode(MODUS_NAME[modus]);
-      gesetztePunkte.length = 0;
+      punkte = 0;
       aktiverModus = modus;
       aktiv = true;
       melde();
@@ -170,11 +163,10 @@ export function createZeichnung(
     },
     zerstoeren: () => {
       if (draw.enabled) draw.stop();
-      canvas.removeEventListener('click', punktGesetzt, true);
       zuruecksetzen();
     },
     abschliessen: () => {
-      if (!aktiv || gesetztePunkte.length < mindestPunkte()) return false;
+      if (!aktiv || punkte < mindestPunkte()) return false;
       // terra-draw hat keine öffentliche finish()-API. Der native Abschluss läuft über die
       // Finish-Taste (default 'Enter'); terra-draw registriert seine Key-Listener auf dem
       // Karten-Canvas. Der Event-Zähler belegt zusätzlich, ob die synchrone Geste wirklich
@@ -188,9 +180,12 @@ export function createZeichnung(
       // `undo()` WIRFT bei gestopptem TerraDraw ("Terra Draw is not enabled"), statt false zu
       // liefern (LFH-344, im Bundle gemessen) — deshalb der `enabled`-Riegel davor. Ohne
       // eigenen Punkt wird terra-draw gar nicht erst gefragt.
-      if (!aktiv || !draw.enabled || gesetztePunkte.length === 0) return false;
+      if (!aktiv || !draw.enabled || punkte === 0) return false;
+      const vorher = punkte;
       if (!draw.undo()) return false;
-      gesetztePunkte.pop();
+      // `history` meldet den neuen Stand in der Regel synchron aus `undo()` heraus. Bleibt die
+      // Meldung aus, wird hier nachgezogen, damit der Knopf nicht auf dem alten Stand stehen bleibt.
+      if (punkte === vorher) punkte = vorher - 1;
       melde();
       return true;
     },
@@ -199,7 +194,7 @@ export function createZeichnung(
       // Dieselbe Folge wie beim Re-Aktivieren in `starten`: Entwurf weg, Modus neu setzen.
       draw.clear();
       draw.setMode(MODUS_NAME[aktiverModus]);
-      gesetztePunkte.length = 0;
+      punkte = 0;
       melde();
     },
   };

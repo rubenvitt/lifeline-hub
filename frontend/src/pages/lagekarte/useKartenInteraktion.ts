@@ -185,6 +185,9 @@ export function useKartenInteraktion({
   const [zeichenSerieAnzahl, setZeichenSerieAnzahl] = useState(0);
   const [zoneSerie, setZoneSerie] = useState(true);
   const [zoneSerieAnzahl, setZoneSerieAnzahl] = useState(0);
+  // Läuft das Speichern einer Abschnittsfläche? Esc bleibt dann wirkungslos (LFH-712) — wie
+  // beim Zonen-Speichern, dessen Marke im Modus steht (`speichern`).
+  const [abschnittSpeichern, setAbschnittSpeichern] = useState(false);
 
   // Spiegel von `modus` und `zoneSerie` fuer die asynchrone Aufloesung des
   // Zonen-Speicherns. Die Zuweisung steht bewusst im Renderrumpf und nicht in
@@ -571,10 +574,14 @@ export function useKartenInteraktion({
 
   // Abschnittsfläche zeichnen fertig → persistieren, dann Zeichenmodus beenden.
   const onFlaecheGezeichnet = (poly: GeoJsonPolygon) => {
+    setAbschnittSpeichern(true);
     zeichneAbschnitt(einsatzId, zeichneAbschnittId!, { flaeche_geojson: JSON.stringify(poly) })
       .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.abschnitte(einsatzId) }))
       .catch(fehler)
-      .finally(() => dispatch({ t: 'beenden', arten: ['abschnitt'] }));
+      .finally(() => {
+        setAbschnittSpeichern(false);
+        dispatch({ t: 'beenden', arten: ['abschnitt'] });
+      });
   };
   const onFlaecheKlick = (fid: number) => {
     if (exklusiverModusAktiv) return; // LFH-208: kein Panel während eines exklusiven Modus
@@ -663,6 +670,7 @@ export function useKartenInteraktion({
     zoneSerie,
     setZoneSerie,
     zoneSerieAnzahl,
+    abschnittSpeichern,
     // Panel-Schließer (onSchliessen der Inspektoren).
     setAuswahl,
     setZoneAuswahl,

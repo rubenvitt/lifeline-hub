@@ -231,7 +231,7 @@ function Kartenknopf({
         margin: 0,
         border: 0,
         color: farbe,
-        cursor: 'pointer',
+        cursor: gesperrtGrund ? 'not-allowed' : 'pointer',
       }}
     >
       <span aria-hidden="true" style={{ display: 'inline-flex' }}>
@@ -348,7 +348,13 @@ export default function KartenUeberlagerung(props: KartenUeberlagerungProps) {
             beschriftung="Eigenposition"
             onClick={props.eigenposition.onUmschalten}
             kante={kante}
-            farbe={props.eigenposition.an ? rollen.bedien : rollen.gedaempft}
+            farbe={
+              props.eigenposition.sperrgrund
+                ? rollen.schwach
+                : props.eigenposition.an
+                  ? rollen.bedien
+                  : rollen.gedaempft
+            }
             gedrueckt={props.eigenposition.an}
             gesperrtGrund={props.eigenposition.sperrgrund ?? undefined}
           >

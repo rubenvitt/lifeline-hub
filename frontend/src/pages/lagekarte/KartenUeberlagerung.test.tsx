@@ -122,6 +122,13 @@ describe('KartenUeberlagerung — Eigenposition (LFH-712)', () => {
     const beschreibung = document.getElementById(knopf.getAttribute('aria-describedby') ?? '');
     expect(beschreibung).toHaveTextContent(GRUND);
 
+    // Sichtbar gesperrt, nicht nur für Vorlesende (Review): der Inline-Stil schlüge jede
+    // CSS-Regel auf `[aria-disabled]`, deshalb trägt der Knopf Zeiger und Farbe selbst.
+    expect(knopf.style.cursor).toBe('not-allowed');
+    // Blasser als ein freier, ausgeschalteter Knopf derselben Spalte (Nordung, `gedaempft`).
+    const norden = screen.getByRole('button', { name: 'Nach Norden ausrichten' });
+    expect(knopf.style.color).not.toBe(norden.style.color);
+
     fireEvent.click(knopf);
     expect(onUmschalten).not.toHaveBeenCalled();
     const sichtbar = await screen.findByRole('tooltip');

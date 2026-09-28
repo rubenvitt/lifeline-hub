@@ -32,8 +32,9 @@
   background: var(--lfh-flaeche-3);
   box-shadow: inset 2px 0 0 var(--lfh-bedien);
 }
-.lfh-kartenknopf:disabled,
-.lfh-kartenknopf[aria-disabled='true'] {
+/* `aria-disabled` (Eigenposition, LFH-712) trägt Zeiger und Farbe inline am Knopf — ein
+   Inline-Stil schlüge diese Regel. */
+.lfh-kartenknopf:disabled {
   cursor: not-allowed;
   color: var(--lfh-schwach);
 }

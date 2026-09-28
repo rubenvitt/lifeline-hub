@@ -36,7 +36,7 @@ import ZonenInspector from './lagekarte/ZonenInspector';
 import FachebenenInspector from './lagekarte/FachebenenInspector';
 import ZeichnenSteuerung from './lagekarte/ZeichnenSteuerung';
 import { LEERER_ZEICHENSTAND, type ZeichenStand } from './lagekarte/zeichnen';
-import { escStufe, QUITTUNG_VERWORFEN } from './lagekarte/zeichnenEsc';
+import { escGehoertOverlay, escStufe, QUITTUNG_VERWORFEN } from './lagekarte/zeichnenEsc';
 import { EIGENPOSITION_SPERRGRUND, useEigenposition } from './lagekarte/useEigenposition';
 import MessSteuerung from './lagekarte/MessSteuerung';
 import { erzeugeMessQuelle } from './lagekarte/messQuelle';
@@ -351,6 +351,7 @@ export default function LagekartePage() {
     zoneEntwurf,
     zoneBestaetigung,
     zoneSpeichern,
+    abschnittSpeichern,
     zoneZeichnenNonce,
     zoneAuswahl,
     auswahl,
@@ -482,8 +483,10 @@ export default function LagekartePage() {
     if (!messForm) return;
     const taste = (e: KeyboardEvent) => {
       if (e.key !== 'Escape' || e.defaultPrevented) return;
-      const ziel = e.target as HTMLElement | null;
+      const ziel = e.target instanceof Element ? e.target : null;
       if (ziel?.closest('input, textarea, [contenteditable="true"]')) return;
+      // Ein offenes Menü/Dialog schließt selbst per Esc, ohne `preventDefault` (LFH-712, Review).
+      if (escGehoertOverlay(e)) return;
       onMessenBeenden();
     };
     window.addEventListener('keydown', taste);
@@ -513,7 +516,7 @@ export default function LagekartePage() {
   escAusfuehrenRef.current = () => {
     const stufe = escStufe({
       phase: zoneBestaetigung != null ? 'bestaetigen' : 'zeichnen',
-      speichernLaeuft: zoneSpeichern,
+      speichernLaeuft: zoneSpeichern || abschnittSpeichern,
       punkte: zeichenStand.punkte,
       serieGespeichert: zeichneAbschnittId != null ? 0 : zoneSerieAnzahl,
     });
@@ -532,9 +535,11 @@ export default function LagekartePage() {
   useEffect(() => {
     if (!zeichenmodusAktiv) return;
     const taste = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || e.defaultPrevented) return;
-      const ziel = e.target as HTMLElement | null;
+      // `repeat`: eine gehaltene Taste liefe sonst in einem Zug durch beide Stufen.
+      if (e.key !== 'Escape' || e.defaultPrevented || e.repeat) return;
+      const ziel = e.target instanceof Element ? e.target : null;
       if (ziel?.closest('input, textarea, [contenteditable="true"]')) return;
+      if (escGehoertOverlay(e)) return;
       e.preventDefault();
       escAusfuehrenRef.current();
     };

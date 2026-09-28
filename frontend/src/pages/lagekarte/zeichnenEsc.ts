@@ -38,3 +38,31 @@ export function escStufe(lage: EscLage): EscStufe {
 
 /** Die Quittung der beiden verwerfenden Stufen — ein Wortlaut, an einer Stelle. */
 export const QUITTUNG_VERWORFEN = 'Zeichnung verworfen';
+
+/**
+ * Ein offenes antd-Overlay schließt selbst per Esc — und zwar über einen eigenen
+ * `window`-keydown, der weder `preventDefault` ruft noch andere Zuhörer am Fenster aufhält
+ * (Review LFH-712, nachgelesen in `@rc-component/dropdown` 1.0.3, `@rc-component/portal` 2.2.1
+ * und `@rc-component/dialog`). `defaultPrevented` allein fängt das also nicht: ohne diesen
+ * Riegel schlösse Esc das Benutzermenü UND verwürfe die Zeichnung darunter.
+ *
+ * Gefragt wird nach dem sichtbaren Overlay, nicht nach dem Fokus: die Spec verlangt, dass Esc
+ * sonst unabhängig vom Fokus wirkt. Ein Dialog-Rahmen, den antd nach dem Schließen stehen
+ * lässt, trägt `display: none`.
+ */
+const OFFENE_OVERLAYS = [
+  '.ant-dropdown:not(.ant-dropdown-hidden)',
+  '.ant-select-dropdown:not(.ant-select-dropdown-hidden)',
+  '.ant-picker-dropdown:not(.ant-picker-dropdown-hidden)',
+  '.ant-popover:not(.ant-popover-hidden)',
+  '.ant-modal-wrap',
+  '.ant-drawer-open',
+].join(', ');
+
+export function escGehoertOverlay(e: KeyboardEvent): boolean {
+  const ziel = e.target instanceof Element ? e.target : null;
+  if (ziel?.closest('[role="dialog"], [role="menu"], [role="listbox"]')) return true;
+  return Array.from(document.querySelectorAll<HTMLElement>(OFFENE_OVERLAYS)).some(
+    (el) => getComputedStyle(el).display !== 'none',
+  );
+}
