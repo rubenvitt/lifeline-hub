@@ -24,6 +24,7 @@ import { useKartenbilder } from './lagekarte/useKartenbilder';
 import { useBasemap } from './lagekarte/useBasemap';
 import { useKartenAnsicht } from './lagekarte/useKartenAnsicht';
 import { QUELLE_BETROFFENE, useLagekarteDaten } from './lagekarte/useLagekarteDaten';
+import { suchbareMarker } from './lagekarte/objektsuche';
 import { useFachebenen } from './lagekarte/useFachebenen';
 import { useKartenInteraktion } from './lagekarte/useKartenInteraktion';
 import { braucheViewportBbox, rasterBbox } from './lagekarte/fachebenen';
@@ -215,6 +216,19 @@ export default function LagekartePage() {
   const waehlbar = useMemo(
     () => (personenAufKarte.length ? [...alleVerortet, ...personenAufKarte] : alleVerortet),
     [alleVerortet, personenAufKarte],
+  );
+  // Objektsuche der Leiste (LFH-716): dieselbe Menge wie `waehlbar`, aber mit eigener
+  // Modulprüfung je Typ — „kein Name ohne Recht" hängt so nicht an der Datenquelle (D1).
+  const suchbar = useMemo(
+    () =>
+      suchbareMarker({
+        verortet: alleVerortet,
+        personen: personenVerortet,
+        personenZugriff,
+        personenEbeneAn: layer.person,
+        betreuungZugriff,
+      }),
+    [alleVerortet, personenVerortet, personenZugriff, layer.person, betreuungZugriff],
   );
 
   const {
@@ -942,6 +956,10 @@ export default function LagekartePage() {
         einsatzId={einsatzId}
         nichtVerortet={nichtVerortetAlle}
         verortet={alleVerortet}
+        suchbar={suchbar}
+        // Betroffene zählen nicht zum Lagebild-Fehler oben, gehören aber bei eingeschalteter
+        // Ebene zur Suche — ihr Ausfall macht die Suche unvollständig (Review LFH-716, M1).
+        suchbarUnvollstaendig={lagebildFehler || (personenFehler && layer.person)}
         darfSchreiben={!!darfSchreiben}
         platzierungZiel={platzierungZiel}
         onPlatzierenStart={onPlatzierenStart}

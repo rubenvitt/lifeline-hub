@@ -19,6 +19,7 @@ const basisProps: SidebarProps = {
   einsatzId: 1,
   nichtVerortet: [],
   verortet: [],
+  suchbar: [],
   darfSchreiben: true,
   platzierungZiel: null,
   onPlatzierenStart: vi.fn(),
@@ -474,6 +475,25 @@ describe('Sidebar Bild-Hintergründe', () => {
     );
   });
 
+  it('startet das Platzieren per Enter im Picker wie der Knopf und schließt den Picker (LFH-716)', () => {
+    const onZeichenPlatzierenStart = vi.fn();
+    renderMitProviders(
+      <Sidebar {...basisProps} onZeichenPlatzierenStart={onZeichenPlatzierenStart} />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Taktisches Zeichen platzieren' }));
+    const kachel = within(screen.getByRole('radiogroup', { name: 'Grundzeichen' })).getByRole(
+      'radio',
+      { name: 'Person' },
+    );
+    kachel.focus();
+    fireEvent.keyDown(kachel, { key: 'Enter' });
+    // Die Spec der Enter-Kachel, nicht der Entwurf von vorher (taktische-formation).
+    expect(onZeichenPlatzierenStart).toHaveBeenCalledWith(
+      expect.objectContaining({ grundzeichen: 'person' }),
+    );
+    expect(screen.queryByRole('radiogroup', { name: 'Grundzeichen' })).not.toBeInTheDocument();
+  });
+
   it('zeigt im Platzier-Modus den Hinweis und meldet Abbrechen (LFH-170)', () => {
     const onZeichenPlatzierenAbbrechen = vi.fn();
     renderMitProviders(
@@ -539,7 +559,9 @@ describe('Sidebar Bild-Hintergründe', () => {
     );
     // antd Typography editable: Edit-Auslöser hat aria-label „Umbenennen".
     fireEvent.click(screen.getByRole('button', { name: /Umbenennen/i }));
-    const input = screen.getByRole('textbox');
+    // Seit LFH-716 steht in der Leiste auch das (benannte) Suchfeld; das Bearbeitungsfeld ist
+    // das namenlose Textfeld. `getByDisplayValue` trifft zusätzlich antds Messkopie.
+    const input = screen.getByRole('textbox', { name: '' });
     fireEvent.change(input, { target: { value: 'Objektskizze' } });
     fireEvent.blur(input); // antd Editable committet bei Blur (und Enter-keyUp)
     expect(onBildUmbenennen).toHaveBeenCalledWith(1, 'Objektskizze');
@@ -724,43 +746,63 @@ describe('Sidebar Fehler-Slots', () => {
 
   /**
    * Die Karte „Verortet" bekommt bewusst KEINEN eigenen Fehlerkasten (siehe
-   * `SidebarSektionFehler`), aber ihre Zahlen dürfen trotzdem nicht lügen: „UHS (0)" ist im
+   * `SidebarSektionFehler`), aber ihre Zahlen dürfen trotzdem nicht lügen: eine Zahl ist im
    * Fehlerfall eine Behauptung über die Lage, die niemand geprüft hat.
    */
-  it('„Verortet": die Zählungen zeigen im Fehlerfall keinen Nullwert', () => {
-    renderMitProviders(
-      <Sidebar {...basisProps} verortet={[]} sektionFehler={{ nichtVerortet: slot }} />,
+  const uhsNord = {
+    schluessel: 'uhs-7',
+    typ: 'uhs' as const,
+    id: 7,
+    lat: 50,
+    lon: 8,
+    label: 'UHS Nord',
+    farbe: '#1677ff',
+  };
+
+  it('„Verortet": die Zählungen zeigen im Fehlerfall keinen Wert, und die Leere wird nicht behauptet', () => {
+    const { unmount } = renderMitProviders(
+      <Sidebar {...basisProps} suchbar={[uhsNord]} sektionFehler={{ nichtVerortet: slot }} />,
     );
-    expect(screen.getByText('UHS (—)')).toBeInTheDocument();
-    expect(screen.getByText('Schäden (—)')).toBeInTheDocument();
-    expect(screen.queryByText('UHS (0)')).not.toBeInTheDocument();
+    expect(screen.getByText('Unfallhilfsstelle (—)')).toBeInTheDocument();
+    expect(screen.queryByText('Unfallhilfsstelle (1)')).not.toBeInTheDocument();
+    unmount();
+    renderMitProviders(
+      <Sidebar {...basisProps} suchbar={[]} sektionFehler={{ nichtVerortet: slot }} />,
+    );
+    expect(screen.queryByText('Nichts verortet')).not.toBeInTheDocument();
   });
 
   it('„Verortet": ohne Fehler zählen sie wie bisher', () => {
-    renderMitProviders(<Sidebar {...basisProps} verortet={[]} />);
-    expect(screen.getByText('UHS (0)')).toBeInTheDocument();
-    expect(screen.queryByText('UHS (—)')).not.toBeInTheDocument();
+    renderMitProviders(<Sidebar {...basisProps} suchbar={[uhsNord]} />);
+    expect(screen.getByText('Unfallhilfsstelle (1)')).toBeInTheDocument();
+    expect(screen.queryByText('Unfallhilfsstelle (—)')).not.toBeInTheDocument();
+  });
+
+  it('„Verortet" durchsucht die übergebene Suchquelle über alle Objektarten (LFH-716)', async () => {
+    const onMarkerWaehlen = vi.fn();
+    renderMitProviders(
+      <Sidebar
+        {...basisProps}
+        // `verortet` bleibt leer: die Suche liest `suchbar`, nicht die Ebenen-Quelle.
+        suchbar={[
+          uhsNord,
+          { ...uhsNord, schluessel: 'einheit-3', typ: 'einheit', id: 3, label: 'Florian Nord 1' },
+          { ...uhsNord, schluessel: 'fahrzeug-4', typ: 'fahrzeug', id: 4, label: 'RTW Süd' },
+        ]}
+        onMarkerWaehlen={onMarkerWaehlen}
+      />,
+    );
+    await userEvent.type(screen.getByLabelText('Kartenobjekte suchen'), 'nord');
+    expect(screen.queryByRole('button', { name: 'RTW Süd' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Florian Nord 1' }));
+    expect(onMarkerWaehlen).toHaveBeenCalledWith('einheit-3');
   });
 
   it('wählt einen verorteten Marker mit Space über die Auswahlzeile', async () => {
     const user = userEvent.setup();
     const onMarkerWaehlen = vi.fn();
     renderMitProviders(
-      <Sidebar
-        {...basisProps}
-        verortet={[
-          {
-            schluessel: 'uhs-7',
-            typ: 'uhs',
-            id: 7,
-            lat: 50,
-            lon: 8,
-            label: 'UHS Nord',
-            farbe: '#1677ff',
-          },
-        ]}
-        onMarkerWaehlen={onMarkerWaehlen}
-      />,
+      <Sidebar {...basisProps} suchbar={[uhsNord]} onMarkerWaehlen={onMarkerWaehlen} />,
     );
 
     const zeile = screen.getByRole('button', { name: 'UHS Nord' });
