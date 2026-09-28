@@ -80,6 +80,8 @@ import type { FachebeneQuelle } from '../../api/fachebenen';
 import { PUNKT_ZOOM, type StartAnsicht } from './startAnsicht';
 import { zonenPlakette } from './plakette';
 import { useRollen } from '../../components/instrument/rollenwerte';
+import { eigenpositionFc, sorgeFuerEigenpositionLayer } from './eigenpositionLayer';
+import type { Eigenposition } from './useEigenposition';
 
 // Worker-URL setzen, bevor die erste Map entsteht — diese Datei ist die einzige Stelle im Repo,
 // die eine Map erzeugt. Der Guard davor ist keine Paranoia, sondern deckt eine gemessene Bruchlinie
@@ -218,6 +220,11 @@ export interface KartenflaecheProps {
    * öffentliche `IControl`-Schnittstelle (`onAdd`/`onRemove`) in ein Band des Fußes gehängt.
    */
   massstabZiel?: HTMLElement | null;
+  /**
+   * Eigener Gerätestandort (LFH-712) als Punkt mit Genauigkeitskreis; `null`/fehlt = aus.
+   * Nur Darstellung — das Anfliegen beim ersten Standort übernimmt die Seite über `flyToZiel`.
+   */
+  eigenposition?: Eigenposition | null;
 }
 
 /** Imperative Karten-API für die Page: Upload-Platzierung + Auf-Bild-Zentrieren. */
@@ -267,6 +274,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     messen,
     onMessung,
     onZeichnenStandAenderung,
+    eigenposition,
     fachebenen,
     onBboxAenderung,
     onZoomAenderung,
@@ -295,6 +303,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     type: 'FeatureCollection',
     features: [],
   });
+  // Eigenposition (LFH-712): zuletzt gezeichnete Daten + Farbe, nach setStyle re-angelegt.
+  const eigenpositionRef = useRef({ daten: eigenpositionFc(null), farbe: rollen.bedien });
   // Image-Key → TzProps; der styleimagemissing-Handler erzeugt daraus lazy die Karten-Icons.
   const tzRegistryRef = useRef<Map<string, TzProps>>(new Map());
   // Cluster-DOM-Donut-Marker (`clusterSchluessel` → Marker). clusterDomRef = alle bekannten,
@@ -591,6 +601,14 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       () => markerDatenRef.current,
       () => einsatzortDatenRef.current,
     );
+    // Nach den übrigen Ebenen angemeldet → dieser Poller läuft zuletzt, der Punkt liegt oben.
+    wendeKartenDatenAn(map, () =>
+      sorgeFuerEigenpositionLayer(
+        map,
+        eigenpositionRef.current.daten,
+        eigenpositionRef.current.farbe,
+      ),
+    );
   }, [style]);
 
   // AttributionControl je nach aktivem View neu setzen (config-autoritativ). MapLibre
@@ -836,6 +854,24 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     // bei jeder Daten-Änderung (SSE/Query-Invalidation) einklappen.
     schliesseSpiderRef.current?.();
   }, [markers, markerPlakette]);
+
+  // Eigenposition (LFH-712): Punkt + Genauigkeitskreis nachführen. Nach dem Marker-Effekt
+  // registriert, damit auch der erste Lauf über den Markern landet.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    eigenpositionRef.current = {
+      daten: eigenpositionFc(eigenposition ?? null),
+      farbe: rollen.bedien,
+    };
+    wendeKartenDatenAn(map, () =>
+      sorgeFuerEigenpositionLayer(
+        map,
+        eigenpositionRef.current.daten,
+        eigenpositionRef.current.farbe,
+      ),
+    );
+  }, [eigenposition, rollen.bedien]);
 
   // Einzel-Marker-Klick → Inspector (schluessel) + Cursor. Cluster-Klick läuft über die
   // DOM-Donut-Marker (eigener Effekt unten).

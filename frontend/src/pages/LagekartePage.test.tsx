@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes, useLocation } from 'react-router';
@@ -2092,5 +2092,59 @@ describe('LFH-712: Letzten Punkt zurück und zweistufiges Esc', () => {
     );
     expect(spy.count()).toBe(1);
     expect(quittungen()).toBe(0);
+  });
+});
+
+describe('LFH-712: Eigenposition', () => {
+  const ursprung = {
+    sicher: Object.getOwnPropertyDescriptor(window, 'isSecureContext'),
+    geo: Object.getOwnPropertyDescriptor(navigator, 'geolocation'),
+  };
+  afterEach(() => {
+    if (ursprung.sicher) Object.defineProperty(window, 'isSecureContext', ursprung.sicher);
+    else delete (window as { isSecureContext?: boolean }).isSecureContext;
+    if (ursprung.geo) Object.defineProperty(navigator, 'geolocation', ursprung.geo);
+    else delete (navigator as { geolocation?: unknown }).geolocation;
+  });
+
+  it('erster Standort fliegt an, ein weiterer verschiebt die Karte nicht', async () => {
+    let melde: ((p: GeolocationPosition) => void) | null = null;
+    const watchPosition = vi.fn((ok: (p: GeolocationPosition) => void) => {
+      melde = ok;
+      return 1;
+    });
+    Object.defineProperty(window, 'isSecureContext', { configurable: true, value: true });
+    Object.defineProperty(navigator, 'geolocation', {
+      configurable: true,
+      value: { watchPosition, clearWatch: vi.fn() },
+    });
+    const position = (lat: number, lon: number) =>
+      ({ coords: { latitude: lat, longitude: lon, accuracy: 20 }, timestamp: 0 }) as never;
+
+    basisHandler();
+    const user = userEvent.setup();
+    renderSeite();
+    const knopf = await screen.findByRole('button', { name: 'Eigenposition' });
+    await user.click(knopf);
+    expect(knopf).toHaveAttribute('aria-pressed', 'true');
+    expect(watchPosition).toHaveBeenCalled();
+
+    act(() => melde?.(position(52.1, 9.3)));
+    await waitFor(() =>
+      expect(screen.getByTestId('flyto')).toHaveTextContent('{"lng":9.3,"lat":52.1}'),
+    );
+    act(() => melde?.(position(52.2, 9.4)));
+    expect(screen.getByTestId('flyto')).toHaveTextContent('{"lng":9.3,"lat":52.1}');
+  });
+
+  it('ohne sicheren Kontext gesperrt, der Grund steht am Knopf', async () => {
+    Object.defineProperty(window, 'isSecureContext', { configurable: true, value: false });
+    basisHandler();
+    renderSeite();
+    const knopf = await screen.findByRole('button', { name: 'Eigenposition' });
+    expect(knopf).toHaveAttribute('aria-disabled', 'true');
+    expect(document.getElementById(knopf.getAttribute('aria-describedby') ?? '')).toHaveTextContent(
+      /https/,
+    );
   });
 });

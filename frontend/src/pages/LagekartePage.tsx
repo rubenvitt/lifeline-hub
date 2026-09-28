@@ -37,6 +37,7 @@ import FachebenenInspector from './lagekarte/FachebenenInspector';
 import ZeichnenSteuerung from './lagekarte/ZeichnenSteuerung';
 import { LEERER_ZEICHENSTAND, type ZeichenStand } from './lagekarte/zeichnen';
 import { escStufe, QUITTUNG_VERWORFEN } from './lagekarte/zeichnenEsc';
+import { EIGENPOSITION_SPERRGRUND, useEigenposition } from './lagekarte/useEigenposition';
 import MessSteuerung from './lagekarte/MessSteuerung';
 import { erzeugeMessQuelle } from './lagekarte/messQuelle';
 import { HistorienBanner } from './lagekarte/HistorienBanner';
@@ -500,6 +501,13 @@ export default function LagekartePage() {
    * Die Ausführung liegt in einem Ref, der bei jedem Render neu gesetzt wird: die Handler des
    * Hooks sind je Render neue Funktionen, und der Zuhörer soll trotzdem nur am Modus hängen.
    */
+  // Eigenposition (LFH-712): nur auf dem Gerät, beim ersten Standort einmal anfliegen, danach
+  // folgt die Karte nicht — der Ausschnitt bleibt frei verschiebbar.
+  const eigenposition = useEigenposition({
+    onFehler: (text) => message.warning(text),
+    onErsterFix: (p) => setFlyToZiel({ lng: p.lon, lat: p.lat }),
+  });
+
   const zeichenmodusAktiv = zoneEntwurf != null || zeichneAbschnittId != null;
   const escAusfuehrenRef = useRef<() => void>(() => {});
   escAusfuehrenRef.current = () => {
@@ -854,6 +862,7 @@ export default function LagekartePage() {
         onPlatzierGeometrie={onPlatzierGeometrie}
         onZeigerLage={zeigerQuelle.melde}
         massstabZiel={massstabZiel}
+        eigenposition={eigenposition.position}
       />
       <KartenUeberlagerung
         grundlage={istSchmal ? null : grundlageWahl}
@@ -863,6 +872,14 @@ export default function LagekartePage() {
         onNorden={() => kartenRef.current?.nachNorden()}
         onMessen={() => (messForm ? onMessenBeenden() : onMessenStart('strecke'))}
         messenAktiv={messForm != null}
+        eigenposition={{
+          an: eigenposition.an,
+          sperrgrund:
+            eigenposition.verfuegbarkeit === 'bereit'
+              ? null
+              : EIGENPOSITION_SPERRGRUND[eigenposition.verfuegbarkeit],
+          onUmschalten: eigenposition.umschalten,
+        }}
         onZeichnen={
           darfSchreiben
             ? () => {

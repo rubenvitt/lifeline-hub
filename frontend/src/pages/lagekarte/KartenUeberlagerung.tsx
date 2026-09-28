@@ -1,5 +1,14 @@
-import { useRef, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
-import { TbCompass, TbCrosshair, TbMinus, TbPencil, TbPlus, TbRulerMeasure } from 'react-icons/tb';
+import { useId, useRef, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
+import { Popover } from 'antd';
+import {
+  TbCompass,
+  TbCrosshair,
+  TbCurrentLocation,
+  TbMinus,
+  TbPencil,
+  TbPlus,
+  TbRulerMeasure,
+} from 'react-icons/tb';
 import { naechsterIndex, monoStil, segmentStil, useRollen } from '../../components/instrument';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { useZeigerLage, type ZeigerQuelle } from './mausPosition';
@@ -9,7 +18,7 @@ import './lagekarte.css';
 
 /**
  * Überlagerungen der Kartenfläche (Neuentwurf S5): oben links Kartengrundlage und
- * Zeigerkoordinate, oben rechts der Knopfblock (Zoom, Nordung, Zeichnen).
+ * Zeigerkoordinate, oben rechts der Knopfblock (Zoom, Nordung, Eigenposition, Messen, Zeichnen).
  *
  * KEIN AUFSPANNENDER RAHMEN: jeder Block ist einzeln positioniert. Ein Elternteil über die
  * ganze Karte schluckte jedes Ziehen darunter — derselbe Befund, den `KartenFuss` mit
@@ -168,12 +177,23 @@ export function ZeigerKoordinate({ quelle }: { quelle: ZeigerQuelle }) {
   );
 }
 
+/** Nur für Vorlesende sichtbar — der Grund einer Sperre steht so auch ohne Antippen am Knopf. */
+const NUR_VORLESEN: CSSProperties = {
+  position: 'absolute',
+  width: 1,
+  height: 1,
+  overflow: 'hidden',
+  clip: 'rect(0 0 0 0)',
+  whiteSpace: 'nowrap',
+};
+
 function Kartenknopf({
   beschriftung,
   onClick,
   kante,
   farbe,
   gedrueckt,
+  gesperrtGrund,
   children,
 }: {
   beschriftung: string;
@@ -182,15 +202,24 @@ function Kartenknopf({
   farbe: string;
   /** Gesetzt = Umschalter; der Zustand steht in `aria-pressed`, die Optik folgt daraus (CSS). */
   gedrueckt?: boolean;
+  /**
+   * Gesetzt = gesperrt, mit Grund (LFH-712). `aria-disabled` statt `disabled`: ein echtes
+   * `disabled` nähme den Klick und damit auf Touch den einzigen Weg zum Text. Der Klick
+   * öffnet stattdessen den Grund am Knopf; Vorlesende bekommen ihn über `aria-describedby`.
+   */
+  gesperrtGrund?: string;
   children: ReactNode;
 }) {
-  return (
+  const grundId = useId();
+  const knopf = (
     <button
       type="button"
       aria-label={beschriftung}
       aria-pressed={gedrueckt}
+      aria-disabled={gesperrtGrund ? true : undefined}
+      aria-describedby={gesperrtGrund ? grundId : undefined}
       title={beschriftung}
-      onClick={onClick}
+      onClick={gesperrtGrund ? undefined : onClick}
       className="lfh-kartenknopf"
       style={{
         width: kante,
@@ -210,6 +239,17 @@ function Kartenknopf({
       </span>
     </button>
   );
+  if (!gesperrtGrund) return knopf;
+  return (
+    <>
+      <Popover trigger={['click']} placement="left" content={gesperrtGrund}>
+        {knopf}
+      </Popover>
+      <span id={grundId} style={NUR_VORLESEN}>
+        {gesperrtGrund}
+      </span>
+    </>
+  );
 }
 
 export interface KartenUeberlagerungProps {
@@ -228,6 +268,11 @@ export interface KartenUeberlagerungProps {
    */
   onMessen?: () => void;
   messenAktiv?: boolean;
+  /**
+   * Eigenposition (LFH-712): Umschalter, auch ohne Schreibrecht. `sperrgrund` gesetzt → der
+   * Knopf steht gesperrt da und nennt den Grund beim Antippen. Nicht gesetzt → kein Knopf.
+   */
+  eigenposition?: { an: boolean; sperrgrund: string | null; onUmschalten: () => void };
 }
 
 export default function KartenUeberlagerung(props: KartenUeberlagerungProps) {
@@ -297,6 +342,19 @@ export default function KartenUeberlagerung(props: KartenUeberlagerungProps) {
         >
           <TbCompass size={16} />
         </Kartenknopf>
+        {/* Eigenposition gehört zur Navigation (wohin schaue ich?), deshalb vor den Werkzeugen. */}
+        {props.eigenposition && (
+          <Kartenknopf
+            beschriftung="Eigenposition"
+            onClick={props.eigenposition.onUmschalten}
+            kante={kante}
+            farbe={props.eigenposition.an ? rollen.bedien : rollen.gedaempft}
+            gedrueckt={props.eigenposition.an}
+            gesperrtGrund={props.eigenposition.sperrgrund ?? undefined}
+          >
+            <TbCurrentLocation size={16} />
+          </Kartenknopf>
+        )}
         {/* Reihenfolge wie im Entwurf S5: Lineal vor Stift. */}
         {props.onMessen && (
           <Kartenknopf
