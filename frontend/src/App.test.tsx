@@ -12,22 +12,12 @@ import { server } from './test/server';
 import { SITZUNG_ABGELAUFEN } from './auth/sitzungsEvent';
 
 /**
- * LFH-541: Die Routing-Tests hängen nicht mehr am `stab`-Eintrag der echten Registry.
- *
- * Drei Stellen prüften hier „🚧 Stab" — zwei davon nur als Barriere („die Seite steht"), eine
- * als echte Zusicherung („eine WIP-Route rendert den Stub"). Alle drei brachen nicht an der
- * Statusachse, sondern an `MODUL_ELEMENTE`: `App.tsx` wählt den Stub über die **Abwesenheit**
- * eines Elements (`MODUL_ELEMENTE[m.key] ?? <ModulStub …>`), nicht über `status === 'wip'`.
- * Mit der Freischaltung von `stab` (LFH-46/ST4) bekommt es ein Element — und die drei Tests
- * hätten still die echte Seite geprüft statt den Stub.
- *
- * Deshalb ein synthetisches WIP-Modul: es hat keinen `MODUL_ELEMENTE`-Eintrag und kann keinen
- * bekommen, die Zusicherung ist damit dauerhaft. Anders als bei `ModulStub.test.tsx` greift der
- * Registry-Stub hier, weil `App.tsx` `modulRegistry` als benannten Import liest — nicht als
- * Default-Argument im eigenen Modul-Scope.
+ * Synthetisches WIP-Modul ohne `MODUL_ELEMENTE`-Eintrag: `App.tsx` wählt den Stub über die
+ * Abwesenheit eines Elements, nicht über `status === 'wip'`. Ein echtes Registry-Modul bekäme
+ * irgendwann ein Element, und die Stub-Tests prüften still die echte Seite.
  *
  * Gestubbt wird NUR die Datentabelle; die Freigabefunktionen bleiben die echten, sonst prüfte
- * der Test seine eigene Attrappe (Muster `command-palette/befehle.modulstatus.test.ts`).
+ * der Test seine eigene Attrappe.
  */
 vi.mock('./einsatz/modulRegistry', async (importOriginal) => {
   const echt = await importOriginal<typeof import('./einsatz/modulRegistry')>();
@@ -166,10 +156,7 @@ describe('App-Routing', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/einsaetze/7/ueberblick'));
     expect(await screen.findByRole('heading', { name: 'Überblick' })).toBeInTheDocument();
     // Panel öffnet sich auf dem Redirect-Pfad zur Kategorie des Ziel-Moduls (Führung).
-    //
-    // AUF DAS PANEL GESCOPT (LFH-337 · Fix-Welle): „Führung" steht zweimal im Baum —
-    // einmal als Rail-Etikett, einmal als Panel-Augenbraue. Der Anker ist das Datenmerkmal
-    // des Panels, nicht die Rail: eine Rail-gescopte Abfrage wäre auf jeder Route grün.
+    // Auf das Panel gescopt: „Führung" steht auch als Rail-Etikett im Baum.
     await waitFor(() => {
       const panel = document.querySelector<HTMLElement>('[data-lfh="modul-panel"]');
       expect(panel).not.toBeNull();
@@ -219,13 +206,8 @@ describe('App-Routing', () => {
   });
 
   /**
-   * Der BARE Einstellungs-Pfad landet auf der ersten Sektion (LFH-345 · C10, H15/M15).
-   *
-   * Genau diesen Pfad baut `modulZielRoute` und damit jeder Klick aus der Modul-Navigation —
-   * nach der Zerlegung in vier Sektionen trägt ihn keine Sektionsroute mehr, sondern eine
-   * Index-Umleitung. Bricht sie, steht ein Reiterband über weißer Fläche: der Layout-Test
-   * montiert die Sektionen selbst und der e2e-Spec springt direkt auf `…/module`, keiner von
-   * beiden käme hier vorbei.
+   * Der BARE Einstellungs-Pfad (Ziel jedes Klicks aus der Modul-Navigation) landet auf der
+   * ersten Sektion. Layout-Test und e2e springen direkt auf eine Sektion und sähen den Bruch nicht.
    */
   function einstellungenServer() {
     server.use(
@@ -304,10 +286,7 @@ describe('App-Routing', () => {
       http.get('/api/fahrzeuge', () => HttpResponse.json([])),
     );
     renderApp('/einsaetze/7/fahrzeuge');
-    // Teilstring statt exaktem Namen: seit die Seite ihren Kopf über `EinsatzSeite` baut,
-    // steht der Einsatz-Status-Tag INNERHALB der Überschrift (Muster aus `BrDetailPage`),
-    // und der zugängliche Name lautet damit „Fahrzeuge aktiv". Was der Test belegen soll —
-    // die echte Seite statt des Platzhalters — trägt die 🚧-Zusicherung darunter.
+    // Teilstring: der Einsatz-Status-Tag steht innerhalb der Überschrift („Fahrzeuge aktiv").
     await waitFor(() =>
       expect(screen.getByRole('heading', { name: /Fahrzeuge/ })).toBeInTheDocument(),
     );
