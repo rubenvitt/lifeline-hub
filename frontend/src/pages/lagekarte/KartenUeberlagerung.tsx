@@ -1,5 +1,14 @@
 import { useRef, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
-import { TbCompass, TbCrosshair, TbMinus, TbPencil, TbPlus, TbRulerMeasure } from 'react-icons/tb';
+import {
+  TbCompass,
+  TbCrosshair,
+  TbLayoutSidebarRightCollapse,
+  TbLayoutSidebarRightExpand,
+  TbMinus,
+  TbPencil,
+  TbPlus,
+  TbRulerMeasure,
+} from 'react-icons/tb';
 import { naechsterIndex, monoStil, segmentStil, useRollen } from '../../components/instrument';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { useZeigerLage, type ZeigerQuelle } from './mausPosition';
@@ -9,7 +18,8 @@ import './lagekarte.css';
 
 /**
  * Überlagerungen der Kartenfläche (Neuentwurf S5): oben links Kartengrundlage und
- * Zeigerkoordinate, oben rechts der Knopfblock (Zoom, Nordung, Zeichnen).
+ * Zeigerkoordinate, oben rechts der Knopfblock (Zoom, Nordung, Messen, Zeichnen, ab `lg` der
+ * Leisten-Umschalter).
  *
  * KEIN AUFSPANNENDER RAHMEN: jeder Block ist einzeln positioniert. Ein Elternteil über die
  * ganze Karte schluckte jedes Ziehen darunter — derselbe Befund, den `KartenFuss` mit
@@ -174,6 +184,9 @@ function Kartenknopf({
   kante,
   farbe,
   gedrueckt,
+  ausgeklappt,
+  steuert,
+  sperrGrund,
   children,
 }: {
   beschriftung: string;
@@ -182,6 +195,11 @@ function Kartenknopf({
   farbe: string;
   /** Gesetzt = Umschalter; der Zustand steht in `aria-pressed`, die Optik folgt daraus (CSS). */
   gedrueckt?: boolean;
+  /** Gesetzt = Auf-/Zu-Schalter einer Fläche (`aria-expanded`), die `steuert` benennt. */
+  ausgeklappt?: boolean;
+  steuert?: string;
+  /** Gesetzt = gesperrt; der Grund steht im `title`, der Name bleibt die Handlung. */
+  sperrGrund?: string | null;
   children: ReactNode;
 }) {
   return (
@@ -189,7 +207,10 @@ function Kartenknopf({
       type="button"
       aria-label={beschriftung}
       aria-pressed={gedrueckt}
-      title={beschriftung}
+      aria-expanded={ausgeklappt}
+      aria-controls={steuert}
+      disabled={sperrGrund != null}
+      title={sperrGrund ?? beschriftung}
       onClick={onClick}
       className="lfh-kartenknopf"
       style={{
@@ -201,8 +222,9 @@ function Kartenknopf({
         padding: 0,
         margin: 0,
         border: 0,
-        color: farbe,
-        cursor: 'pointer',
+        // Gesperrt: Farbe und Zeiger aus `.lfh-kartenknopf:disabled` (`lagekarte.css`) — ein
+        // Inline-Wert schlüge die Regel, und der Knopf sähe bedienbar aus.
+        ...(sperrGrund != null ? {} : { color: farbe, cursor: 'pointer' }),
       }}
     >
       <span aria-hidden="true" style={{ display: 'inline-flex' }}>
@@ -228,6 +250,14 @@ export interface KartenUeberlagerungProps {
    */
   onMessen?: () => void;
   messenAktiv?: boolean;
+  /**
+   * Leiste ein-/ausblenden (LFH-715). Nur ab `lg` gesetzt: dort steht die Leiste rechts neben
+   * der Karte, der Umschalter sitzt an ihrer Kante. Im Seitenkopf hob ein 72-px-Knopf
+   * (Handschuh) den Kopf um 43 px, und am Tablet belegte die ausgeklappte Zeitachse dann 53 %
+   * der Karte (Deckel 50 %, `e2e/leisten-flaeche.spec.ts`). Unter `lg` steht er weiter im
+   * Seitenkopf, dort liegt die Leiste unter der Karte.
+   */
+  leiste?: { sichtbar: boolean; sperrGrund: string | null; onUmschalten: () => void };
 }
 
 export default function KartenUeberlagerung(props: KartenUeberlagerungProps) {
@@ -317,6 +347,23 @@ export default function KartenUeberlagerung(props: KartenUeberlagerungProps) {
             farbe={rollen.bedien}
           >
             <TbPencil size={16} />
+          </Kartenknopf>
+        )}
+        {props.leiste && (
+          <Kartenknopf
+            beschriftung={props.leiste.sichtbar ? 'Leiste ausblenden' : 'Leiste einblenden'}
+            onClick={props.leiste.onUmschalten}
+            kante={kante}
+            farbe={rollen.gedaempft}
+            ausgeklappt={props.leiste.sichtbar}
+            steuert="lagekarte-leiste"
+            sperrGrund={props.leiste.sperrGrund}
+          >
+            {props.leiste.sichtbar ? (
+              <TbLayoutSidebarRightCollapse size={16} />
+            ) : (
+              <TbLayoutSidebarRightExpand size={16} />
+            )}
           </Kartenknopf>
         )}
       </div>

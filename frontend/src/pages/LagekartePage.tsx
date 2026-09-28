@@ -709,6 +709,12 @@ export default function LagekartePage() {
     istSchmal,
     erzwungen: leisteErzwungen,
   });
+  const leisteSperrGrund =
+    auswahlInhalt != null
+      ? 'Auswahl schließen, um die Leiste auszublenden'
+      : leisteErzwungen
+        ? 'Platzieren beenden, um die Leiste auszublenden'
+        : null;
 
   // Die Kartengrundlage: ab `md` als Segmentleiste über der Karte (Neuentwurf S5). Auf dem
   // Handschirm bräche die Leiste mit mehreren Online-Stilen in vier Zeilen um und läge über
@@ -745,23 +751,20 @@ export default function LagekartePage() {
           {kopfMeta(verortetAnzahl(alleVerortet), nichtVerortetAlle.length, lagebildFehler)}
         </span>
       </div>
-      <div data-lfh="seitenkopf-aktionen">
-        <Button
-          aria-expanded={leisteIstSichtbar}
-          aria-controls="lagekarte-leiste"
-          onClick={() => leistenWahl.merke(!leisteIstSichtbar)}
-          disabled={leisteErzwungen}
-          title={
-            auswahlInhalt != null
-              ? 'Auswahl schließen, um die Leiste auszublenden'
-              : leisteErzwungen
-                ? 'Platzieren beenden, um die Leiste auszublenden'
-                : undefined
-          }
-        >
-          {leisteIstSichtbar ? 'Leiste ausblenden' : 'Leiste einblenden'}
-        </Button>
-      </div>
+      {/* Ab `lg` sitzt der Umschalter im Knopfblock der Karte (s. `KartenUeberlagerung`). */}
+      {!breit && (
+        <div data-lfh="seitenkopf-aktionen">
+          <Button
+            aria-expanded={leisteIstSichtbar}
+            aria-controls="lagekarte-leiste"
+            onClick={() => leistenWahl.merke(!leisteIstSichtbar)}
+            disabled={leisteSperrGrund != null}
+            title={leisteSperrGrund ?? undefined}
+          >
+            {leisteIstSichtbar ? 'Leiste ausblenden' : 'Leiste einblenden'}
+          </Button>
+        </div>
+      )}
     </div>
   );
 
@@ -825,6 +828,15 @@ export default function LagekartePage() {
         onNorden={() => kartenRef.current?.nachNorden()}
         onMessen={() => (messForm ? onMessenBeenden() : onMessenStart('strecke'))}
         messenAktiv={messForm != null}
+        leiste={
+          breit
+            ? {
+                sichtbar: leisteIstSichtbar,
+                sperrGrund: leisteSperrGrund,
+                onUmschalten: () => leistenWahl.merke(!leisteIstSichtbar),
+              }
+            : undefined
+        }
         onZeichnen={
           darfSchreiben
             ? () => {

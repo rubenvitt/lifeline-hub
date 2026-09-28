@@ -189,10 +189,15 @@ Auftraggebers:
 Abweichung vom Entwurf S5, dort steht die rechte Kartenleiste ab `lg` fest neben der Karte.
 Entscheidung des Auftraggebers:
 
-- Die Leiste bleibt **per Vorgabe offen**, lässt sich aber **auf jeder Breite** über den Knopf
-  „Leiste ausblenden“ im Seitenkopf ausblenden. Grund ist die Kartenfläche am Fükw: bei 1366 px
-  blieben nach Rail (60), Modulpanel (208) und Leiste (300) rund 797 px Karte. Ausgeblendet sind
-  es ≥ 1000 px (gemessen in `e2e/lagekarte-leiste-einklappen.spec.ts`).
+- Die Leiste bleibt **per Vorgabe offen**, lässt sich aber **auf jeder Breite** ausblenden
+  („Leiste ausblenden“). Grund ist die Kartenfläche am Fükw: bei 1366 px blieben nach Rail
+  (60), Modulpanel (208) und Leiste (300) 798 px Karte, ausgeblendet sind es 1098 px (gemessen
+  in `e2e/lagekarte-leiste-einklappen.spec.ts`).
+- **Ab `lg` sitzt der Umschalter unten im Knopfblock der Karte**, an der Kante der Leiste, nicht
+  im Seitenkopf (Entscheidung 28.09.2026). Der Kopf hat einen Boden von 44 px, ein Knopf der
+  Handschuh-Stufe ist 72 px hoch und hob ihn um 43 px. Am Tablet (1024 px, Handschuh) belegte
+  die ausgeklappte Zeitachse dann 53 % statt 49 % der Karte, der Deckel aus LFH-373 liegt bei
+  50 %. Unter `lg` steht der Knopf weiter im Seitenkopf, dort liegt die Leiste unter der Karte.
 - Die Wahl wird **je Breitenklasse** gemerkt, `lg` und darüber getrennt von darunter, und zwar
   im `localStorage` des Geräts (`pages/lagekarte/leistenWahl.ts`). Sie gehört **nicht** in die
   Kartenansicht: im geteilten Konfig-Bag machte jedes Klappen die Ansicht „geändert“.

@@ -67,12 +67,19 @@ test('Fükw 1366 px: ausgeblendete Leiste gibt der Karte ≥ 1000 px, die Wahl �
   // Vorbedingung: per Vorgabe offen, und dann ist die Karte schmaler als 1000 px.
   await expect(leiste(page)).toBeVisible();
   await expect.poll(() => kartenBreite(page)).toBeLessThan(1000);
+  const offen = await kartenBreite(page);
 
   const knopf = page.getByRole('button', { name: 'Leiste ausblenden' });
   await expect(knopf).toHaveAttribute('aria-expanded', 'true');
   await knopf.click();
   await expect(leiste(page)).toHaveCount(0);
   await expect.poll(() => kartenBreite(page)).toBeGreaterThanOrEqual(1000);
+  const zu = await kartenBreite(page);
+  test.info().annotations.push({
+    type: 'Kartenbreite bei 1366 px',
+    description: `Leiste offen ${offen} px · ausgeblendet ${zu} px`,
+  });
+  console.log(`LFH-715 Kartenbreite: offen ${offen} px, ausgeblendet ${zu} px`);
 
   await page.reload();
   await karteBereit(page);
