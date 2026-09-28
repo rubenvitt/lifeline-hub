@@ -1,17 +1,11 @@
 use crate::app::AppState;
-use crate::auth::session::CurrentUser;
-use crate::einsatz::berechtigung::{
-    fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
-};
 use crate::einsatz::einstellungen::etb_startwert;
-use crate::einsatz::repo as einsatz_repo;
+use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
+use crate::einsatz::modul::{Lagekarte, Personal};
+use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::live::LiveEvent;
-
-/// Modul-Key dieses Route-Moduls (LFH-132).
-const MODUL_KEY: &str = "personal";
-use crate::error::AppError;
 use crate::personal::disposition_repo::{self, AdhocDaten};
 use crate::personal::status_repo;
 use crate::personal::{EinsatzPersonalAnzeige, FuehrungskraftKarte};
@@ -50,22 +44,11 @@ fn pruefe_position(p: &Option<String>) -> Result<(), AppError> {
 /// GET /api/einsaetze/{id}/personal — disponiertes Personal (aufgelöst). Nur Lesezugriff.
 pub async fn liste(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzLesezugriff<Personal>,
 ) -> Result<Json<Vec<EinsatzPersonalAnzeige>>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
+    let einsatz_id = ctx.einsatz.id;
     Ok(Json(
-        disposition_repo::liste(&state.pool, einsatz_id, einsatz.ist_aktiv()).await?,
+        disposition_repo::liste(&state.pool, einsatz_id, ctx.einsatz.ist_aktiv()).await?,
     ))
 }
 
@@ -88,33 +71,20 @@ pub struct DisponierenBody {
 /// Schreibberechtigt + aktiver Einsatz. Schreibt ETB-Eintrag.
 pub async fn disponieren(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzSchreibzugriff<Personal>,
     JsonBody(body): JsonBody<DisponierenBody>,
 ) -> Result<(StatusCode, Json<EinsatzPersonalAnzeige>), AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     let ep_id = match (body.personal_id, body.adhoc) {
         (Some(personal_id), None) => {
             pruefe_position(&body.staerke_position)?;
             disposition_repo::disponiere_stamm(
                 &state.pool,
                 einsatz_id,
-                einsatz.org_id,
+                ctx.einsatz.org_id,
                 personal_id,
                 body.staerke_position.as_deref(),
-                benutzer.id,
+                ctx.benutzer.id,
             )
             .await?
         }
@@ -127,14 +97,14 @@ pub async fn disponieren(
             disposition_repo::disponiere_adhoc(
                 &state.pool,
                 einsatz_id,
-                einsatz.org_id,
+                ctx.einsatz.org_id,
                 AdhocDaten {
                     name: &name,
                     funktion: funktion.as_deref(),
                     traegerorganisation: traeger.as_deref(),
                     staerke_position: position.as_deref(),
                 },
-                benutzer.id,
+                ctx.benutzer.id,
             )
             .await?
         }
@@ -154,7 +124,7 @@ pub async fn disponieren(
     super::etb_system_degradiert(
         &state,
         einsatz_id,
-        benutzer.id,
+        ctx.benutzer.id,
         &crate::personal::etb_text_disponiert(&anzeige.name, anzeige.funktion.as_deref()),
     )
     .await;
@@ -177,25 +147,13 @@ pub struct DispoPatchBody {
 /// Status-Wechsel schreibt ETB-Eintrag.
 pub async fn aktualisieren(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, ep_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Personal>,
+    PfadParam((_eid, ep_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<DispoPatchBody>,
 ) -> Result<Json<EinsatzPersonalAnzeige>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     if let Some(sid) = body.status_id {
-        if !status_repo::ist_in_org(&state.pool, einsatz.org_id, sid).await? {
+        if !status_repo::ist_in_org(&state.pool, ctx.einsatz.org_id, sid).await? {
             return Err(AppError::Validation("Unbekannter Status".into()));
         }
     }
@@ -233,7 +191,7 @@ pub async fn aktualisieren(
             crate::etb::system_audit_tx(
                 conn,
                 einsatz_id,
-                benutzer.id,
+                ctx.benutzer.id,
                 startwert,
                 &format!("Person «{}»: Status «{}» → «{}»", nachher.name, alt, neu),
             )
@@ -248,22 +206,10 @@ pub async fn aktualisieren(
 /// DELETE /api/einsaetze/{id}/personal/{ep_id} — aus dem Einsatz entfernen. Schreibt ETB-Eintrag.
 pub async fn entfernen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, ep_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Personal>,
+    PfadParam((_eid, ep_id)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     let anzeige = disposition_repo::laden_anzeige(&state.pool, einsatz_id, ep_id, true).await?;
     // F06/LFH-244 Tier-A: Führungsrollen-Freigabe + DELETE + System-ETB-Eintrag atomar in EINER
     // Tx (BEGIN IMMEDIATE + Retry). ETB-Text aus der VOR der Tx geladenen Anzeige; SSE erst
@@ -275,7 +221,7 @@ pub async fn entfernen(
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     crate::write_retry!(&state.pool, |conn| {
         disposition_repo::entferne_tx(conn, einsatz_id, ep_id).await?;
-        crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text).await?;
+        crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text).await?;
         Ok(())
     })?;
     sse_personal(&state, einsatz_id, ep_id);
@@ -298,23 +244,11 @@ pub struct PositionBody {
 /// Liefert die Karten-Sicht; jede disponierte Person des Einsatzes ist verortbar (LFH-276).
 pub async fn position(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, ep_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Personal>,
+    PfadParam((_eid, ep_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<PositionBody>,
 ) -> Result<Json<FuehrungskraftKarte>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     // Effektivzustand für die Paar-Validierung: vorhandene lat/lon (404 falls fremd).
     let vorher: (Option<f64>, Option<f64>) =
         sqlx::query_as("SELECT lat, lon FROM einsatz_personal WHERE id = ? AND einsatz_id = ?")
@@ -347,20 +281,9 @@ pub async fn position(
 /// (Führung via `ist_einheitsfuehrer`/`ist_abschnittsleiter`-Flags kenntlich, LFH-276).
 pub async fn karte_fuehrungskraefte(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzLesezugriff<Lagekarte>,
 ) -> Result<Json<Vec<FuehrungskraftKarte>>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        "lagekarte",
-        &benutzer,
-    )
-    .await?;
+    let einsatz_id = ctx.einsatz.id;
     Ok(Json(
         disposition_repo::liste_fuehrungskraefte(&state.pool, einsatz_id).await?,
     ))
