@@ -5,12 +5,8 @@ import NachforderungListe from './NachforderungListe';
 
 describe('NachforderungListe — Leerzustand (LFH-331 · B3)', () => {
   /**
-   * Der Wortlaut bleibt byte-gleich; getauscht wird der Knoten. Deshalb steht die
-   * Text-Zusicherung neben der Knoten-Zusicherung: allein wäre sie vor dem Umbau
-   * genauso grün gewesen und belegte nichts.
-   *
-   * Keine Primäraktion: die Liste ist rein darstellend — das Anfordern liegt auf der
-   * Seite darüber, nicht in dieser Komponente.
+   * Leerzustand über das Leer-Primitiv; die Text-Zusicherung allein wäre auch mit antds
+   * Leer-Element grün. Keine Primäraktion: das Anfordern liegt auf der Seite darüber.
    */
   it('zeigt den Leertext über das Leer-Primitiv, ohne antds Leer-Element', () => {
     const { container } = renderMitProviders(<NachforderungListe nachforderungen={[]} />);

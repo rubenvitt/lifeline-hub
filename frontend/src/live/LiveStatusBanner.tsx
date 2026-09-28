@@ -11,22 +11,15 @@ import OfflineRecoveryDrawer from '../offline/OfflineRecoveryDrawer';
 
 /**
  * Eine globale Betriebszeile für Leitung, Einsatz-Live-Feed und App-Version.
- *
- * Lauscht auf das window-CustomEvent `lfh:live-status` (von `useEinsatzLiveStream` gemeldet)
- * und zeigt bei unterbrochener/wiederverbindender Leitung einen Hinweis. Zusätzlich wird der
- * initiale `navigator.onLine`-Zustand beobachtet. So ist weder „der Feed ist tot / die Lage ist
- * evtl. veraltet" noch ein lokaler Netzausfall unsichtbar. Über Events bzw. den kleinen
- * PWA-Store entkoppelt, damit der Hook render-state-frei und EINE EventSource bleibt.
+ * Zeigt bei unterbrochener Leitung (`liveStatusStore`) und bei `navigator.onLine === false`
+ * einen Hinweis, damit weder ein toter Feed noch ein lokaler Netzausfall unsichtbar bleibt.
  */
 export default function LiveStatusBanner({ benutzerId }: { benutzerId?: number }) {
-  // Beweissichernde Offline-Aktionen bleiben einsatzübergreifend sichtbar. Würde
-  // die globale Zeile auf den aktuellen Route-Einsatz filtern, verschwände eine
-  // abgelehnte Aktion aus Einsatz A beim Wechsel nach B vollständig aus dem Blick.
+  // Offline-Aktionen bleiben einsatzübergreifend sichtbar: gefiltert auf den Route-Einsatz
+  // verschwände eine abgelehnte Aktion aus Einsatz A beim Wechsel nach B aus dem Blick.
   const queue = useOfflineQueueZaehler(benutzerId);
   const { token } = theme.useToken();
-  // EINE Quelle mit dem Instrumentenband des Lage-Dashboards (LFH-336 · M3).
-  // Der frühere lokale Listener war für sich richtig, aber er war die ZWEITE
-  // Kopie desselben Zustands — und die dritte wäre nur eine Datei entfernt.
+  // Dieselbe Quelle wie das Instrumentenband des Lage-Dashboards.
   const status = useSyncExternalStore(abonniereLiveStatus, leseLiveStatus, leseLiveStatus);
   const [istOnline, setIstOnline] = useState(() => navigator.onLine);
   const [aktualisierungLaeuft, setAktualisierungLaeuft] = useState(false);

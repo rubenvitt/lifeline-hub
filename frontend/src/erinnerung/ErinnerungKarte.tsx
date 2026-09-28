@@ -17,15 +17,12 @@ import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 
 const { Text } = Typography;
 
-/** Fachliche Erklärung der beiden Abschluss-Wege (Kern von LFH-106). */
+/** Fachliche Erklärung der beiden Abschluss-Wege. */
 const TOOLTIP_QUITTIEREN = 'Quittiert = zur Kenntnis genommen; die Erinnerung erübrigt sich.';
 const TOOLTIP_ERLEDIGT = 'Erledigt = die erinnerte Handlung wurde durchgeführt (Vollzug).';
 
 /**
- * bezug_typ → zentraler Deeplink-Builder (mit Objekt-Selektion) + Anzeige-Wort. Baut über
- * routing/deeplinks.ts (Quelle der Wahrheit, LFH-25) statt lokaler Route-Literale, damit der
- * Deeplink das referenzierte Objekt selektiert (`?auftrag=`/`?meldung=`/`?eintrag=`) statt nur
- * auf die ungefilterte Liste zu zeigen (F36/LFH-257). Ohne Treffer: kein Deeplink.
+ * bezug_typ → Deeplink-Builder mit Objekt-Selektion + Anzeige-Wort. Ohne Treffer: kein Deeplink.
  */
 const BEZUG_LINK: Record<
   string,
@@ -34,8 +31,8 @@ const BEZUG_LINK: Record<
   auftrag: { pfad: (einsatzId, id) => auftraegePfad(einsatzId, { auftrag: id }), wort: 'Auftrag' },
   meldung: { pfad: (einsatzId, id) => meldungenPfad(einsatzId, { meldung: id }), wort: 'Meldung' },
   etb: { pfad: (einsatzId, id) => etbPfad(einsatzId, { eintrag: id }), wort: 'ETB-Eintrag' },
-  // LFH-635: Auto-Fristen einer Ablösungsschicht. Die Seite kennt keine Selektion per Query —
-  // der Link führt auf die Liste, die nach Fälligkeit geordnet ist.
+  // Auto-Fristen einer Ablösungsschicht: die Seite kennt keine Selektion per Query, der Link
+  // führt auf die nach Fälligkeit geordnete Liste.
   abloesung: { pfad: (einsatzId) => abloesungPfad(einsatzId), wort: 'Ablösung' },
   abloesung_vorwarnung: { pfad: (einsatzId) => abloesungPfad(einsatzId), wort: 'Ablösung' },
 };
@@ -50,7 +47,7 @@ function BezugLink({ e, einsatzId }: { e: Erinnerung; einsatzId: string | undefi
     // Unbekannter Bezugstyp oder fehlende/ungültige Einsatz-id → Verweistext ohne Link.
     return <span style={monoStil(11)}>{text}</span>;
   }
-  // Verweis als Link mit ↗-Zeichen (Neuentwurf: Deeplink-Glyphe), kein farbiges Etikett.
+  // Verweis als Link mit ↗-Zeichen, kein farbiges Etikett.
   return (
     <Link to={bezug.pfad(eid, e.bezug_id)} style={monoStil(11)}>
       {text}
@@ -68,9 +65,8 @@ export interface ErinnerungKarteProps {
 }
 
 /**
- * Erinnerungs-Karte (LFH-112): Karten-Look analog AuftragKarte, ohne Prio. Fällig-/Überfällig-
- * Hervorhebung über den Kartenrand-Vertrag von `KommKarte` (Alarmrand + Alarmfläche).
- * Quittiert-vs-Erledigt bleibt fachlich getrennt (Tooltips + getrennte Aktionen, LFH-106).
+ * Erinnerungs-Karte: Fällig-Hervorhebung über den Kartenrand-Vertrag von `KommKarte`.
+ * Quittiert und Erledigt bleiben fachlich getrennt (Tooltips + getrennte Aktionen).
  */
 export default function ErinnerungKarte({
   erinnerung: e,
@@ -82,16 +78,11 @@ export default function ErinnerungKarte({
   const { id: einsatzId } = useParams();
   const status = ERINNERUNG_STATUS[e.status] ?? ERINNERUNG_STATUS.offen;
   const istAbg = ansicht === 'abgeschlossen';
-  // ist_faellig ist ein reiner faellig_at<=jetzt-Vergleich (Backend) und bleibt auf
-  // abgeschlossenen Erinnerungen true → Hervorhebung nur in der Offen-Ansicht zeigen.
+  // `ist_faellig` bleibt auf abgeschlossenen Erinnerungen true → Hervorhebung nur in der Offen-Ansicht.
   const faellig = e.ist_faellig && !istAbg;
 
-  // Beide Schritte schalten mit EINEM Klick (LFH-343 · C8, Befund H50). Der
-  // Rückfrage-Dialog, der hier stand, kostete jede Routine-Aktion zwei Klicks; der
-  // Rückweg steht stattdessen im Rückgängig-Toast der Seite, und seit derselben
-  // Änderung nimmt der Server ihn auch an (`POST …/erinnerungen/{eid}/oeffnen`).
-  // Die Tooltips BLEIBEN — sie tragen die fachliche Trennung Quittiert/Erledigt
-  // (LFH-106), die der Rückfrage-Dialog nur mit übernommen hatte.
+  // Beide Schritte schalten mit EINEM Klick; der Rückweg steht im Rückgängig-Toast der Seite
+  // (`POST …/erinnerungen/{eid}/oeffnen`). Die Tooltips tragen die Trennung Quittiert/Erledigt.
   const aktionen: ReactNode[] =
     darfSchreiben && !istAbg
       ? [
@@ -107,8 +98,7 @@ export default function ErinnerungKarte({
       : [];
 
   return (
-    // Zeitachsen-Optik (Neuentwurf): die Fälligkeit führt links in Mono. Der linke Rand ist
-    // der Kartenrand-Vertrag aus C8/H47 — eine fällige Erinnerung trägt den Alarmrand.
+    // Die Fälligkeit führt links in Mono; eine fällige Erinnerung trägt den Alarmrand.
     <KommKarte
       alarm={faellig}
       zeit={e.faellig_at ? <ZeitAnzeige wert={e.faellig_at} format="uhrzeit" /> : undefined}
@@ -150,8 +140,7 @@ export default function ErinnerungKarte({
         {e.beschreibung && <Text style={{ fontSize: 13 }}>{e.beschreibung}</Text>}
         {istAbg && (
           <Space wrap size={[8, 4]}>
-            {/* QuittungIndikator nur bei quittiert: bei erledigt wäre „Quittung offen"
-                neben dem grünen „Erledigt"-Badge irreführend (scheinbarer Widerspruch). */}
+            {/* QuittungIndikator nur bei quittiert: bei erledigt widerspräche „Quittung offen" dem Badge. */}
             {e.status === 'quittiert' && <QuittungIndikator quittiert am={e.quittiert_at} />}
             {e.status === 'erledigt' && e.erledigt_at && (
               <Text type="secondary" style={{ fontSize: 13 }}>

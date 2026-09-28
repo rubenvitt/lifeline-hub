@@ -21,9 +21,8 @@ describe('liveStatusStore', () => {
     ab();
   });
 
-  // DER GRUND für den Store. `lfh:live-status` ist ein Broadcast ohne Replay:
-  // ein Konsument, der NACH dem Abriss mountet, bliebe mit eigenem Listener auf
-  // 'idle' stehen und meldete „Live" in eine tote Leitung.
+  // `lfh:live-status` ist ein Broadcast ohne Replay: ein später mountender Leser bliebe sonst
+  // auf 'idle' und meldete „Live" in eine tote Leitung.
   it('hält den letzten Stand für später hinzukommende Leser', () => {
     melde('lost');
     const spaeter = vi.fn();

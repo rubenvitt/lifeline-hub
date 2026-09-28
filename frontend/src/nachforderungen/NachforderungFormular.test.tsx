@@ -4,11 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../test/utils';
 import NachforderungFormular from './NachforderungFormular';
 
-/**
- * Serienerfassung (LFH-343 · C8, Befund H52). Wer nachfordert, fordert meist
- * mehreres bei derselben Stelle nach — Adressat und Dringlichkeit bleiben, Art
- * und Bezeichnung wechseln.
- */
+/** Serienerfassung: Adressat und Dringlichkeit bleiben, Art und Bezeichnung wechseln. */
 describe('NachforderungFormular — Serienerfassung', () => {
   it('bleibt nach dem Speichern offen, leert die Art und behält den Adressaten', async () => {
     const onAnlegen = vi.fn().mockResolvedValue({});

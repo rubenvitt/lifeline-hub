@@ -54,12 +54,7 @@ describe('ErinnerungListe', () => {
     expect(screen.getByText(/^fällig$/i)).toBeInTheDocument();
   });
 
-  /**
-   * Vorher stand hier ein `Popconfirm`: der erste Klick öffnete nur ein Popover,
-   * der Callback kam mit dem zweiten. Seit LFH-343 · C8 schaltet der Knopf sofort —
-   * der Rückweg steht im Rückgängig-Toast, und seit derselben Änderung nimmt ihn
-   * der Server auch an (`POST …/erinnerungen/{eid}/oeffnen`).
-   */
+  /** Kein `Popconfirm`: der Knopf schaltet sofort, der Rückweg steht im Rückgängig-Toast. */
   it('löst onErledigen mit EINEM Klick aus, ohne Rückfrage', () => {
     const onErledigen = vi.fn();
     renderListe(
@@ -72,8 +67,7 @@ describe('ErinnerungListe', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: /erledigt/i }));
     expect(onErledigen).toHaveBeenCalledWith(1);
-    // Die Gegenaussage: ohne sie bliebe der Test grün, wenn jemand die Rückfrage
-    // wieder einzöge und der Knopftext zufällig auch im Popover steht.
+    // Gegenaussage: sonst bliebe der Test grün, wenn die Rückfrage zurückkäme.
     expect(document.querySelector('.ant-popconfirm')).toBeNull();
   });
 
@@ -156,18 +150,13 @@ describe('ErinnerungListe', () => {
       />,
     );
     const link = screen.getByRole('link', { name: /Auftrag #42/ });
-    // F36/LFH-257: Deeplink selektiert das referenzierte Objekt (?auftrag=), statt nur
-    // auf die ungefilterte Liste zu zeigen.
+    // Der Deeplink selektiert das referenzierte Objekt, statt nur auf die Liste zu zeigen.
     expect(link).toHaveAttribute('href', '/einsaetze/1/auftraege?auftrag=42');
   });
 
   /**
-   * Leerzustand (LFH-331 · B3). Der Wortlaut bleibt byte-gleich; getauscht wird der
-   * Knoten. Deshalb steht die Text-Zusicherung neben der Knoten-Zusicherung: allein
-   * wäre sie vor dem Umbau genauso grün gewesen und belegte nichts.
-   *
-   * Keine Primäraktion: die Liste ist rein darstellend — das Anlegen liegt auf der
-   * Seite darüber, nicht in dieser Komponente.
+   * Leerzustand über das Leer-Primitiv; die Text-Zusicherung allein wäre auch mit antds
+   * Leer-Element grün. Keine Primäraktion: das Anlegen liegt auf der Seite darüber.
    */
   it('zeigt den Leertext über das Leer-Primitiv, ohne antds Leer-Element', () => {
     const { container } = renderListe(

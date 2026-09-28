@@ -1,7 +1,6 @@
 /**
- * Desktop-Benachrichtigung (LFH-118) via Browser-Notification-API — NUR wenn der Tab im
- * Hintergrund ist (`document.hidden`) und die Permission erteilt wurde. Defensiv: API fehlt oder
- * Permission verweigert → No-op (der In-App-Toast trägt in jedem Fall).
+ * Desktop-Benachrichtigung — NUR wenn der Tab im Hintergrund ist und die Permission erteilt
+ * wurde. API fehlt oder Permission verweigert → No-op (der In-App-Toast trägt).
  */
 function verfuegbar(): boolean {
   return typeof window !== 'undefined' && 'Notification' in window;

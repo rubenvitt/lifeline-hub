@@ -31,10 +31,8 @@ export interface NachforderungKarteProps {
 }
 
 /**
- * Nachforderungs-Karte (LFH-112): Karten-Look analog AuftragKarte. Kopf mit Prio + Status,
- * Titel „Anzahl× Art → Adressat", Bezeichnung/Begründung, Übergangs-Timeline. Die
- * Ausnahme-Phase „abgelehnt" wird dark-safe über Theme-Tokens (colorError/colorErrorBg)
- * akzentuiert statt mit hartkodiertem Rot.
+ * Nachforderungs-Karte: Kopf mit Prio + Status, Titel „Anzahl× Art → Adressat",
+ * Bezeichnung/Begründung, Übergangs-Timeline.
  */
 export default function NachforderungKarte({
   nachforderung: n,
@@ -53,11 +51,8 @@ export default function NachforderungKarte({
   const aktionen: ReactNode[] =
     darfSchreiben && n.ist_offen
       ? [
-          // Fortschaltung mit EINEM Klick (LFH-343 · C8, Befund H50). Der
-          // Rückfrage-Dialog, der hier stand, kostete jeden Schritt der Kette zwei
-          // Klicks; der Rückweg steht stattdessen im Rückgängig-Toast der Seite,
-          // und `uebergang_erlaubt` nimmt seit derselben Änderung die Rücknahme um
-          // genau eine Stufe an.
+          // Fortschaltung mit EINEM Klick; der Rückweg steht im Rückgängig-Toast, und
+          // `uebergang_erlaubt` nimmt die Rücknahme um genau eine Stufe an.
           next && onStatus ? (
             <Button key="next" onClick={() => onStatus(n.id, next)}>
               → {NACHFORDERUNG_STATUS[next].label}
@@ -73,8 +68,7 @@ export default function NachforderungKarte({
       : [];
 
   return (
-    // Zeitachsen-Optik (Neuentwurf): die Anforderungszeit führt links in Mono. Der linke
-    // Rand ist der Kartenrand-Vertrag aus C8/H47 — abgelehnt trägt den Alarmrand.
+    // Die Anforderungszeit führt links in Mono; abgelehnt trägt den Alarmrand.
     <KommKarte alarm={abgelehnt} zeit={<ZeitAnzeige wert={n.angefordert_at} format="uhrzeit" />}>
       <Flex justify="space-between" align="center" style={{ marginBottom: 6 }} gap={8} wrap>
         <Space size={6} wrap>
@@ -127,13 +121,8 @@ export default function NachforderungKarte({
         )}
       </Space>
 
-      {/* `<Space size="middle">` statt `<Flex gap={8}>` (LFH-363, nachgezogen in
-          LFH-343 · C8): „Ablehnen" ist `danger` und steht neben der Fortschaltung.
-          Der Vorgabeabstand wäre `abstand.xs` = 3/5/7 px je Dichtestufe und damit
-          im Handschuh-Betrieb keine Trennung. Die Zeile war schon vorher so — C8
-          fasst sie an (die Rückfrage der Fortschaltung ist weg) und trägt sie
-          deshalb nach der Norm „verbindlich für ohnehin Angefasstes" nach.
-          Gepinnt in `components/aktionsabstand.guard.test.ts`. */}
+      {/* `<Space size="middle">`: „Ablehnen" ist `danger` und braucht Abstand zur Fortschaltung
+         (gepinnt in `components/aktionsabstand.guard.test.ts`). */}
       {aktionen.length > 0 && (
         <Space
           size="middle"
