@@ -7,10 +7,8 @@ import { Vorschau } from './Vorschau';
 import type { VorschauZiel } from './typen';
 
 /**
- * Die Zuordnung `art` → Bauteil (LFH-664). Die Bauteile haben je einen eigenen Test mit
- * echtem Inhalt; hier zählt allein, dass jede Sorte auf IHR Bauteil und mit IHREN Kennungen
- * trifft. Deshalb Attrappen: ein vertauschter Zweig (Personal → Fahrzeug) sähe sonst aus wie
- * ein grüner Ladefehler.
+ * Die Zuordnung `art` → Bauteil mit Attrappen: jede Sorte muss IHR Bauteil mit IHREN Kennungen
+ * treffen. Ein vertauschter Zweig sähe mit echten Bauteilen aus wie ein grüner Ladefehler.
  */
 vi.mock('../etb/EtbEintragVorschau', () => ({
   default: (p: object) => <div data-testid="bauteil">etb {JSON.stringify(p)}</div>,

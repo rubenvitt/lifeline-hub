@@ -32,12 +32,9 @@ const liste: Befehl[] = [
 ];
 
 /**
- * Der Korpus mit den ECHTEN Schlagworten der Schnellaktion (befehle.ts: `SCHNELLAKTIONEN`,
- * Zeile `personen`). Gemessen gegen fuse.js 7.5.0: für 'etb' liefert Fuse `modul:etb` mit
- * 8.60e-9 und `aktion:personen` mit 5.77e-1 — der zweite ist reines Rauschen (kein Wort des
- * Labels und kein Schlagwort hat mit ETB zu tun), steht aber in der Gruppe, die die
- * kuratierte Startordnung nach vorn zieht. Genau diese Konstellation ordnet die Palette
- * heute falsch, und sie ist der Grund für den Sortierschlüssel weiter unten.
+ * Der Korpus mit den ECHTEN Schlagworten der Schnellaktion `personen`. Für 'etb' bewertet Fuse
+ * `modul:etb` weit besser als `aktion:personen` (Rauschen), das aber in der Gruppe steht, die die
+ * Startordnung nach vorn zieht; der Grund für den Sortierschlüssel unten.
  */
 const rangKorpus: Befehl[] = [
   b('modul:etb', 'ETB', ['tagebuch'], 'module'),
@@ -64,14 +61,9 @@ describe('filtereBefehle', () => {
   });
 
   /**
-   * `includeScore` ist in fuse.js per Vorgabe AUS — ohne die Option liefert `search` das
-   * Feld gar nicht erst, nicht bloss einen ignorierten Wert. Die Rangfolge unten kann also
-   * nur so gut sein wie diese eine Option.
-   *
-   * Die TRAGENDE Hälfte ist der Grössenvergleich, nicht die Formprüfung darüber: `filtereBefehle`
-   * fängt ein fehlendes `score` mit `?? 0` ab (Fuse typisiert es optional), die Form bliebe also
-   * auch ohne die Option `number`. Gemessen bei zurückgedrehtem `includeScore` färbt sich genau
-   * die Ungleichung rot („expected 0 to be less than 0"), die Formzeile nicht.
+   * `includeScore` ist in fuse.js per Vorgabe AUS. Tragend ist der Größenvergleich, nicht die
+   * Formprüfung: `filtereBefehle` fängt ein fehlendes `score` mit `?? 0` ab, die Form bliebe also
+   * auch ohne die Option `number`.
    */
   it('reicht den Fuse-Score hoch, und der genaue Treffer trägt den kleineren', () => {
     const treffer = filtereBefehle(rangKorpus, 'etb');
@@ -81,22 +73,11 @@ describe('filtereBefehle', () => {
   });
 
   /**
-   * WARUM {@link UNBEWERTET} genau 1 ist und keine kleinere Zahl (Review-Befund zu C).
-   *
-   * Ein Datensatz-Treffer ist nie durch Fuse gelaufen und bekommt deshalb den schlechtesten
-   * denkbaren Score, damit er auf gleicher Stufe gegen jeden BEWERTETEN Befehl verliert. Das
-   * trägt nur, wenn kein Fuse-Score ihn erreicht — und der Abstand ist kleiner, als er
-   * aussieht: fuse.js deckelt den Bitap-Score zwar auf `threshold` (0,4), potenziert ihn in
-   * `computeScore` aber mit `weight * norm`, und `norm` ist `1/sqrt(Tokenzahl)`. Bei einem
-   * langen Feld geht der Exponent gegen 0, und `0,4^x` geht damit gegen 1.
-   *
-   * Gemessen an fuse.js 7.5.0: ein Tippfehler auf einem 400-Wort-Label liefert 0,973 — ein
-   * Deckel bei 0,9 hätte den Datensatz vor diesen Befehl gestellt. Strikt unter 1 bleibt es
-   * trotzdem in jedem Fall, weil der Exponent strikt positiv ist.
-   *
-   * Die zwei Hälften gehören zusammen: die untere Schranke widerlegt jeden kleineren Wert,
-   * die obere belegt, dass 1 als Deckel hält. (Mutationsprobe: `UNBEWERTET = 0.9` färbt die
-   * erste rot.)
+   * Warum {@link UNBEWERTET} genau 1 ist: fuse.js deckelt den Bitap-Score auf `threshold` (0,4),
+   * potenziert ihn aber mit `weight * norm`, und `norm` ist `1/sqrt(Tokenzahl)`. Bei langem Feld
+   * geht der Score gegen 1 (ein Tippfehler auf einem 400-Wort-Label liefert rund 0,97), bleibt
+   * aber strikt darunter. Die untere Schranke widerlegt jeden kleineren Wert, die obere belegt,
+   * dass 1 hält.
    */
   it('kommt bei langem Label nahe an 1 heran, bleibt aber strikt darunter', () => {
     const rauschen = Array.from({ length: 400 }, (_, i) => `wort${i}`).join(' ');
@@ -111,12 +92,8 @@ describe('filtereBefehle', () => {
 });
 
 /**
- * Die Stufe ist der Präfixbonus, den Fuse NICHT liefert: mit `threshold: 0.4` und
- * `ignoreLocation` bewertet Fuse einen Präfix nicht besonders — das Akzeptanzkriterium
- * „exakter Präfixtreffer vor unscharfem Treffer" ist mit Fuse allein nicht erfüllbar.
- *
- * BLINDFLECK, bewusst: `praefixStufe` faltet keine Diakritika. 'einsaetze' gegen
- * 'Einsätze' trägt weiterhin allein Fuse und bleibt Stufe 3.
+ * Die Stufe ist der Präfixbonus, den Fuse nicht liefert. Blindfleck, bewusst: keine
+ * Diakritika-Faltung ('einsaetze' gegen 'Einsätze' bleibt Stufe 3).
  */
 describe('praefixStufe', () => {
   const lagekarte = b('modul:lagekarte', 'Lagekarte', ['karte', 'lage']);
@@ -130,10 +107,8 @@ describe('praefixStufe', () => {
   });
 
   /**
-   * Im Suchfeld wird klein getippt, die Labels tragen Grossbuchstaben (e2e tippt
-   * 'lagekarte' gegen das Label 'Lagekarte'). Vergliche die Stufe zeichengenau, griffe
-   * KEINE der drei Stufen im Normalbetrieb — der ganze Bonus liefe leer, und die
-   * Bestandstests sind ordnungsagnostisch (`toContain`), es fiele niemandem auf.
+   * Im Suchfeld wird klein getippt, die Labels tragen Großbuchstaben; zeichengenau griffe keine
+   * Stufe, und die ordnungsagnostischen Bestandstests sähen das nicht.
    */
   it('vergleicht ohne Rücksicht auf Groß-/Kleinschreibung', () => {
     expect(praefixStufe(lagekarte, 'lagekarte')).toBe(0);
@@ -143,9 +118,8 @@ describe('praefixStufe', () => {
 });
 
 /**
- * Die Stufenrechnung über einen NACKTEN Text (LFH-391 · C1). `praefixStufe` ist seither ihr
- * Aufrufer für Label und Schlagworte; ein zweiter Aufrufer sind die Datensatz-Treffer, die
- * ihre Stufe aus dem Basislabel OHNE Modulherkunft rechnen (siehe `datensaetze.ts`).
+ * Die Stufenrechnung über einen NACKTEN Text; Aufrufer sind `praefixStufe` und die
+ * Datensatz-Treffer (Basislabel ohne Modulherkunft).
  */
 describe('textStufe', () => {
   it('unterscheidet dieselben vier Stufen wie praefixStufe', () => {
@@ -162,9 +136,8 @@ describe('textStufe', () => {
 
 describe('ordneTreffer', () => {
   /**
-   * Die Aussage, um die es in A3 geht: der gruppenübergreifend beste Treffer steht vorn.
-   * Ohne Score-Achse ordnet allein `GRUPPEN_REIHENFOLGE` — und die stellt die
-   * Schnellaktion (Rauschen, 5.77e-1) vor den genauen Modultreffer (8.60e-9).
+   * Der gruppenübergreifend beste Treffer steht vorn; ohne Score-Achse stünde das Rauschen der
+   * Schnellaktion vor dem genauen Modultreffer.
    */
   it('stellt den besseren Score vor die kuratierte Gruppenachse', () => {
     const treffer = filtereBefehle(rangKorpus, 'etb');
@@ -181,8 +154,8 @@ describe('ordneTreffer', () => {
   });
 
   /**
-   * Gruppenrang als TIEBREAK, nicht als Primärachse: bei gleichwertigen Treffern bleibt die
-   * kuratierte Ordnung aus LFH-337 · M11 erhalten (`schnellaktionen` vor `module`).
+   * Gruppenrang als TIEBREAK: bei gleichwertigen Treffern bleibt die kuratierte Ordnung
+   * (`schnellaktionen` vor `module`).
    */
   it('entscheidet Gleichstand über den Gruppenrang', () => {
     const treffer: Treffer[] = [
@@ -192,7 +165,7 @@ describe('ordneTreffer', () => {
     expect(ordneTreffer(treffer, 'zzz').map((x) => x.id)).toEqual(['s', 'm']);
   });
 
-  /** Und darunter der Eingabeindex — erst damit ist der Schlüssel total. */
+  /** Darunter der Eingabeindex, erst damit ist der Schlüssel total. */
   it('hält bei gleichem Rang die Eingabereihenfolge', () => {
     const treffer: Treffer[] = [
       { befehl: b('erst', 'ETB', undefined, 'module'), score: 0.1 },
@@ -202,9 +175,8 @@ describe('ordneTreffer', () => {
   });
 
   /**
-   * PAAR zur Regel darunter (LFH-391 · C1): ein Treffer, der NICHT durch Fuse gelaufen ist,
-   * bringt seine Stufe selbst mit — sonst rechnete `ordneTreffer` sie aus einem Label, das
-   * mit der Fundstelle nichts zu tun haben muss (Datensatz-Treffer, ETB-Volltext).
+   * Ein Treffer, der NICHT durch Fuse gelaufen ist, bringt seine Stufe selbst mit; sonst rechnete
+   * `ordneTreffer` sie aus einem Label, das mit der Fundstelle nichts zu tun haben muss.
    */
   it('respektiert eine mitgelieferte Stufe, statt sie aus dem Label zu rechnen', () => {
     const treffer: Treffer[] = [
@@ -224,12 +196,8 @@ describe('ordneTreffer', () => {
 });
 
 /**
- * Der `>`-Präfixmodus (LFH-391 · A4) — ein reiner GRUPPENFILTER, keine zweite Suchachse.
- *
- * Der Parser hat genau EINE Aufrufstelle (`CommandPalette.tsx`); die Zerlegung selbst ist
- * hier ohne Render prüfbar. Getrimmt wird zweimal und aus zwei Gründen: aussen, damit ein
- * führendes Leerzeichen das Präfix nicht verdeckt, und hinter dem Präfixzeichen, damit
- * '> lage' und '>lage' dasselbe bedeuten — auf dem Berührungsweg tippt niemand fugenlos.
+ * Präfixmodi: ein reiner GRUPPENFILTER. Getrimmt wird außen und hinter dem Präfixzeichen, damit
+ * '> lage' und '>lage' dasselbe bedeuten (auf dem Berührungsweg tippt niemand fugenlos).
  */
 describe('parsePraefix', () => {
   it('trennt Modus und Rest', () => {
@@ -251,17 +219,14 @@ describe('parsePraefix', () => {
     }
   });
 
-  /** Ein Präfixzeichen MITTEN im Text ist Suchtext, kein Modus — sonst zerschnitte ein '>'
-   *  in einem Suchbegriff die Eingabe. */
+  /** Ein Präfixzeichen MITTEN im Text ist Suchtext, sonst zerschnitte ein '>' die Eingabe. */
   it('erkennt ein Präfixzeichen nur am Anfang', () => {
     expect(parsePraefix('a>b')).toEqual({ modus: 'alles', rest: 'a>b' });
   });
 
   /**
-   * Wächst mit Etappe C: sobald dort '#'/'@' in `PALETTE_MODI` stehen, deckt diese Aussage
-   * sie mit ab. `modiMitPraefix` ist zugleich die einzige Quelle, aus der Parser UND
-   * Legende lesen — ein Modus, der in der einen, aber nicht in der anderen auftaucht, ist
-   * damit strukturell ausgeschlossen.
+   * `modiMitPraefix` ist die einzige Quelle für Parser UND Legende; ein Modus, der nur in einer
+   * von beiden auftaucht, ist strukturell ausgeschlossen.
    */
   it('erreicht jeden Modus mit Präfixzeichen über genau dieses Zeichen', () => {
     const mitPraefix = modiMitPraefix();
@@ -287,8 +252,8 @@ describe('filtereNachModus', () => {
     ]);
   });
 
-  /** Die Gegenaussage: ohne Präfix schränkt nichts ein. Ohne sie wäre auch ein Filter grün,
-   *  der IMMER auf zwei Gruppen kürzt. */
+  /** Gegenaussage: ohne Präfix schränkt nichts ein; sonst wäre auch ein Filter grün, der IMMER
+   *  kürzt. */
   it('lässt im Modus „alles" die Liste unverändert', () => {
     expect(filtereNachModus(modusKorpus, 'alles').map((x) => x.id)).toEqual([
       'aktion:speichern',
@@ -314,11 +279,8 @@ describe('ohneOrdnungsdubletten', () => {
   });
 
   /**
-   * BEIDE Gedächtnisgruppen fallen bei aktiver Suche weg (LFH-391 · Etappe D), aus demselben
-   * Grund: `ausgefuehrt:nav:profil` ist eine Kopie von `nav:profil` mit gleichem Label,
-   * gleicher Ikone und gleichem Ziel — flach gerendert stünde „Profil, Profil" da, für
-   * Vorlesende zweimal derselbe Name ohne Hinweis, warum. Die Rangfolge leistet bei aktiver
-   * Suche ohnehin, wofür die Gruppe da ist.
+   * BEIDE Gedächtnisgruppen fallen bei aktiver Suche weg: `ausgefuehrt:nav:profil` ist eine Kopie
+   * von `nav:profil`; flach stünde „Profil, Profil“ da.
    */
   it('entfernt auch die Gedächtnisgruppe „ausgefuehrt" samt ihrem Zwilling-Original', () => {
     const mitGedaechtnis: Befehl[] = [
@@ -332,8 +294,7 @@ describe('ohneOrdnungsdubletten', () => {
     ]);
   });
 
-  /** Die Gegenaussage: es fällt NUR diese eine Gruppe weg. Ohne sie wäre auch ein Filter
-   *  grün, der die Liste auf „module" verengte — und `schnellaktionen` gingen mit. */
+  /** Gegenaussage: es fällt NUR diese Gruppe weg, nicht etwa auch `schnellaktionen`. */
   it('rührt keine andere Gruppe an', () => {
     expect(ohneOrdnungsdubletten(modusKorpus).map((x) => x.id)).toEqual([
       'aktion:speichern',

@@ -1,4 +1,3 @@
-// frontend/src/command-palette/useZuletztBefehle.test.tsx
 import { http, HttpResponse } from 'msw';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -49,9 +48,8 @@ const putHandler = () =>
     return HttpResponse.json({ eintraege: { [String(params.schluessel)]: body.wert } });
   });
 
-/** Kurzer Vorlauf in ECHTZEIT. Für die Negativaussagen „es wurde NICHT geschrieben" gibt es
- *  kein Ereignis, auf das `waitFor` warten könnte — ohne diesen Vorlauf wäre `puts` auch bei
- *  kaputter Fassung noch leer, weil der msw-Handler erst einen Makrotask später schreibt. */
+/** Kurzer Vorlauf in ECHTZEIT: für „es wurde NICHT geschrieben“ gibt es kein Ereignis zum
+ *  Warten, und der msw-Handler schreibt erst einen Makrotask später. */
 const flush = () =>
   new Promise((r) => {
     setTimeout(r, 40);
@@ -94,10 +92,8 @@ describe('useZuletztBefehle', () => {
   });
 
   /**
-   * DIE ANTWORT WIRD NICHT ABGEWARTET. Der Stand liegt sofort im Cache, weil er sonst erst
-   * nach dem Netzweg sichtbar würde — und das Gedächtnis wird EINEN Wimpernschlag vor dem
-   * Schliessen der Palette geschrieben. Wäre die Anzeige an die Antwort gebunden, fehlte
-   * der Eintrag beim nächsten Öffnen, ohne Fehlermeldung.
+   * Die Antwort wird NICHT abgewartet: das Gedächtnis wird kurz vor dem Schließen der Palette
+   * geschrieben und muss beim nächsten Öffnen schon im Cache stehen.
    */
   it('nimmt den Befehl sofort auf und schickt ihn hinterher', async () => {
     server.use(...handler(stand(['koord:utm'])));
@@ -116,13 +112,9 @@ describe('useZuletztBefehle', () => {
   });
 
   /**
-   * FALLE (a) auf Hook-Ebene: `CommandPalette.fuehreAus` ruft `schliesse()` VOR
-   * `ausfuehren()`, und `destroyOnHidden` hängt den Teilbaum ab, in dem die Palette lebt.
-   * Ein Träger mit Komponentenbindung (`useMutation` im abgehängten Baum) verlöre den
-   * Eintrag genau hier — lautlos.
-   *
-   * Geprüft wird deshalb der Callback NACH dem Unmount seines Halters: er schreibt in den
-   * QueryClient (der lebt an der Wurzel) und schickt den Request selbst.
+   * `CommandPalette.fuehreAus` ruft `schliesse()` VOR `ausfuehren()`, der Palettenbaum ist dann
+   * abgehängt. Geprüft wird der Callback NACH dem Unmount seines Halters: er schreibt in den
+   * QueryClient und schickt den Request selbst.
    */
   it('schreibt auch dann noch, wenn die haltende Komponente längst abgehängt ist', async () => {
     server.use(...handler(stand([])));
@@ -130,15 +122,10 @@ describe('useZuletztBefehle', () => {
     const { result, unmount } = renderHook(() => useZuletztBefehle(), { wrapper: Wrapper });
     await waitFor(() => expect(gets).toBe(1));
     const merke = result.current.merke;
-    // Ein zweiter, dauerhafter Beobachter — er steht für den Provider, der in der Produktion
-    // die Palette überlebt. OHNE ihn räumt `neuerQueryClient` (`gcTime: 0`) den Eintrag beim
-    // Unmount des letzten Beobachters sofort weg, und die Cache-Aussage unten wäre nicht
-    // „nicht geschrieben", sondern „nicht mehr da" (CLAUDE.md, Query-Key-Testfallen).
-    // SEINE SITZUNG MUSS STEHEN, bevor der erste abgehängt wird: der Key trägt die
-    // `benutzer.id`, und `renderHook` gibt jedem Aufruf einen EIGENEN `AuthProvider` — bis
-    // dessen `/api/auth/me` zurück ist, beobachtet der zweite Hook das Fach `[…, null]` und
-    // nicht das des Benutzers. Gemessen: ohne dieses Warten stand das Fach zwischenzeitlich
-    // ohne Beobachter da, wurde weggeräumt und danach frisch vom Server geholt.
+    // Ein zweiter, dauerhafter Beobachter steht für den Provider. Ohne ihn räumte `neuerQueryClient`
+    // (`gcTime: 0`) den Eintrag beim Unmount weg. Seine Sitzung muss stehen, bevor der erste
+    // abgehängt wird: der Key trägt die `benutzer.id`, und bis `/api/auth/me` zurück ist,
+    // beobachtete er das Fach `[…, null]`.
     const bleibt = renderHook(() => ({ auth: useAuth(), g: useZuletztBefehle() }), {
       wrapper: Wrapper,
     });
@@ -156,8 +143,7 @@ describe('useZuletztBefehle', () => {
     bleibt.unmount();
   });
 
-  /** Ein abgelehnter Schreibvorgang darf nichts umwerfen: die Palette ist zu diesem
-   *  Zeitpunkt geschlossen, es gibt keine Fläche, auf der ein Fehler stünde. */
+  /** Ein abgelehnter Schreibvorgang darf nichts umwerfen; die Palette ist dann geschlossen. */
   it('verschluckt einen abgelehnten Schreibvorgang, ohne den Stand zu verlieren', async () => {
     server.use(
       ...handler(stand([])),
@@ -175,9 +161,8 @@ describe('useZuletztBefehle', () => {
   });
 
   /**
-   * Ohne Sitzung wird gar nicht erst geholt. Das ist keine Sparsamkeit: ein 401 auf einer
-   * Query läuft in `queryClient.ts` durch `meldeSitzungAbgelaufen()` — die Anmeldeseite
-   * bekäme beim blossen Laden die Meldung „Sitzung abgelaufen".
+   * Ohne Sitzung wird nicht geholt: ein 401 liefe durch `meldeSitzungAbgelaufen()`, und die
+   * Anmeldeseite meldete „Sitzung abgelaufen“.
    */
   it('holt ohne angemeldeten Benutzer nichts — auch nicht über einen Schreibvorgang', async () => {
     // Kein `/api/auth/me`-Handler → der Default liefert 401 → benutzer = null.
@@ -195,9 +180,7 @@ describe('useZuletztBefehle', () => {
     await waitFor(() => expect(result.current.ids).toEqual([]));
     expect(gets).toBe(0);
 
-    // Der Schreibweg holt seit dem Bestands-Riegel selbst nach, wenn der Cache leer ist —
-    // ohne Sitzung darf er das NICHT: der 401 liefe in `queryClient.ts` durch
-    // `meldeSitzungAbgelaufen()`, und die Anmeldeseite bekäme „Sitzung abgelaufen" ohne Anlass.
+    // Der Schreibweg holt bei leerem Cache selbst nach, ohne Sitzung aber nicht (401-Seam).
     act(() => {
       result.current.merke('nav:profil');
     });
@@ -209,14 +192,10 @@ describe('useZuletztBefehle', () => {
 });
 
 /**
- * DER SERVER-SLOT IST PRO BENUTZER, sein Cache-Fach muss es auch sein (Review-Befund zu
- * Etappe D, von zwei Prüfern unabhängig gefunden).
- *
- * Der Fall, der zählt, ist der Schichtwechsel am gemeinsamen Fükw-Rechner OHNE Neuladen:
- * `LoginPage` navigiert nur, und `main.tsx` hält einen prozessweiten QueryClient. Deshalb
- * läuft der Wechsel hier über `useAuth().logout()`/`login()` in DERSELBEN Montage — ein
- * Test, der zwei Hooks nacheinander frisch rendert, prüfte etwas anderes und wäre auch mit
- * einem benutzerlosen Key grün.
+ * Der Server-Slot ist pro Benutzer, das Cache-Fach auch. Der Schichtwechsel am gemeinsamen
+ * Fükw-Rechner läuft OHNE Neuladen (prozessweiter QueryClient), deshalb hier über
+ * `logout()`/`login()` in DERSELBEN Montage; zwei frisch gerenderte Hooks wären auch mit einem
+ * benutzerlosen Key grün.
  */
 describe('useZuletztBefehle · Schichtwechsel ohne Neuladen', () => {
   /** Handler-Satz mit zwei Fächern; die „Sitzung" wechselt mit dem Login-Aufruf. */
@@ -232,8 +211,8 @@ describe('useZuletztBefehle · Schichtwechsel ohne Neuladen', () => {
       }),
       http.get('/api/benutzer-einstellungen', () => {
         gets += 1;
-        // Das Fach hängt serverseitig AN DER SITZUNG, nie am Pfad — genau deshalb kann der
-        // Client die beiden nur über seinen eigenen Key auseinanderhalten.
+        // Das Fach hängt serverseitig AN DER SITZUNG, nie am Pfad; der Client trennt die beiden nur über
+        // seinen Key.
         return HttpResponse.json(stand(faecher[sitzung.id]));
       }),
       putHandler(),
@@ -266,8 +245,8 @@ describe('useZuletztBefehle · Schichtwechsel ohne Neuladen', () => {
     await waitFor(() => expect(result.current.g.ids).toEqual(['koord:utm']));
   });
 
-  /** Die teurere Hälfte: ohne eigenes Fach schreibt der erste Griff der neuen Schicht den
-   *  Eintrag der alten in IHR Serverfach — und dort steht er dann dauerhaft. */
+  /** Die teurere Hälfte: ohne eigenes Fach schriebe die neue Schicht den Eintrag der alten
+   *  dauerhaft in IHR Serverfach. */
   it('schreibt den ersten Befehl der neuen Schicht auf DEREN Bestand', async () => {
     server.use(...zweiSchichten());
     const { Wrapper } = wrapper();
@@ -291,12 +270,8 @@ describe('useZuletztBefehle · Schichtwechsel ohne Neuladen', () => {
 });
 
 /**
- * EIN SCHREIBVORGANG, DER DEN BESTAND NICHT KENNT, DARF IHN NICHT ERSETZEN (Review-Befunde 3
- * und 4 zu Etappe D — dieselbe Naht zwischen Abfrage, Cache und Schreibvorgang).
- *
- * Das PUT ist VOLLERSATZ. Aus einem leeren Cache gebildet ersetzt es die fünf gemerkten IDs
- * durch die eine gerade ausgeführte — stumm, ohne Fehlerbild, und dauerhaft, wenn der GET
- * scheitert.
+ * Ein Schreibvorgang, der den Bestand nicht kennt, darf ihn nicht ersetzen: das PUT ist
+ * VOLLERSATZ, aus einem leeren Cache gebildet ersetzte es alle gemerkten IDs.
  */
 describe('useZuletztBefehle · Schreiben vor dem ersten Lesen', () => {
   /** GET, der erst auf Kommando antwortet. */
@@ -344,9 +319,8 @@ describe('useZuletztBefehle · Schreiben vor dem ersten Lesen', () => {
   });
 
   /**
-   * Befund 4, dieselbe Wurzel: die noch laufende Erst-Abfrage schrieb ihre Antwort ÜBER den
-   * gerade gemerkten Befehl (react-query setzt den Serverstand in den Cache), und der nächste
-   * Schreibvorgang las den geräumten Cache und löschte ihn dann auch auf dem Server.
+   * Die laufende Erst-Abfrage darf ihre Antwort nicht ÜBER den gerade gemerkten Befehl schreiben,
+   * sonst löschte der nächste Schreibvorgang ihn auch auf dem Server.
    */
   it('lässt die eintreffende Erst-Antwort den gemerkten Befehl nicht überschreiben', async () => {
     const { handler, loese } = langsam(['koord:utm']);
@@ -362,7 +336,7 @@ describe('useZuletztBefehle · Schreiben vor dem ersten Lesen', () => {
 
     await waitFor(() => expect(result.current.ids).toEqual(['nav:admin', 'koord:utm']));
 
-    // Und der NÄCHSTE Schreibvorgang trägt ihn weiter, statt ihn zu löschen.
+    // Der NÄCHSTE Schreibvorgang trägt ihn weiter.
     act(() => {
       result.current.merke('nav:stammdaten');
     });
@@ -374,9 +348,8 @@ describe('useZuletztBefehle · Schreiben vor dem ersten Lesen', () => {
     );
   });
 
-  /** Scheitert der GET, ist der Bestand DAUERHAFT unbekannt. Dann geht der eine Befehl
-   *  verloren — das ist der billigere Verlust: ein Vollersatz aus dem Nichts löschte die
-   *  gemerkten Befehle auf dem Server, und die kommen nicht wieder. */
+  /** Scheitert der GET, geht der eine Befehl verloren, der billigere Verlust: ein Vollersatz aus
+   *  dem Nichts löschte alle gemerkten Befehle. */
   it('schreibt gar nicht, wenn der Bestand nicht zu laden ist', async () => {
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json(nutzer)),

@@ -1,4 +1,3 @@
-// frontend/src/command-palette/koordinatenSprung.ts
 import { forward as mgrsVorwaerts } from 'mgrs';
 import { TbMapPin } from 'react-icons/tb';
 import { formatiere, parse, type LatLon } from '../anzeige/koordinaten';
@@ -7,32 +6,22 @@ import { lagekartePfad } from '../routing/deeplinks';
 import { sprungZu, type Befehl, type Oeffnung } from './typen';
 
 /**
- * Der Koordinatensprung der Sprungpalette (LFH-619): wer eine Koordinate tippt, bekommt ganz
- * oben „Auf Lagekarte zeigen" — ein Enter, und die Karte fliegt die Stelle an.
+ * Der Koordinatensprung der Sprungpalette: wer eine Koordinate tippt, bekommt ganz oben „Auf
+ * Lagekarte zeigen“.
  *
- * KEIN PRÄFIX, SONDERN DIE FORM (Entscheidung zu LFH-619). Der Neuentwurf zeigt `# Koordinate`,
- * aber `#` ist seit LFH-391 · C3 das ETB-Präfix, begründet mit der laufenden Nummer, die im
- * Tagebuch ohnehin hinter `#` steht. Eine Koordinate braucht das Zeichen nicht: sie ist an
- * ihrer Form so eindeutig zu erkennen wie eine gedruckte Kennung an `zahlAusSuche`
- * (`datensaetze.ts`). Ein Suchbegriff, eine Nummer oder ein Funkrufname hat diese Form nie.
+ * KEIN PRÄFIX, SONDERN DIE FORM: `#` ist das ETB-Präfix, und eine Koordinate ist an ihrer Form so
+ * eindeutig wie eine gedruckte Kennung. Erkannt wird JEDE Form, nicht nur das eingestellte
+ * Format; die Einstellung bestimmt nur die Beschriftung.
  *
- * ERKANNT WIRD JEDE FORM, NICHT NUR DAS EINGESTELLTE FORMAT. Wer auf MGRS steht und eine
- * Dezimalangabe vom Leitstellenfax abtippt, meint trotzdem eine Stelle. Die Einstellung
- * entscheidet nur, wie die Zeile den Punkt BESCHRIFTET.
+ * Die Formen sind bewusst eng: „12 34“ ist eine Hausnummer oder Stärke, „12.30 13.45“ eine
+ * Uhrzeitspanne. Dezimalgrad verlangt deshalb mindestens DREI Nachkommastellen (≙ rund 100 m) in
+ * BEIDEN Werten.
  *
- * Die Formen sind bewusst eng: zwei ganze Zahlen („12 34") sind keine Koordinate, sondern eine
- * Hausnummer, eine Stärke oder ein halber Funkrufname, und „12.30 13.45" ist eine
- * Uhrzeitspanne. Dezimalgrad verlangt deshalb mindestens DREI Nachkommastellen (≙ rund
- * 100 m) in BEIDEN Werten.
+ * MGRS BRAUCHT DEN RÜCKWEG: „1 HLF 20“ oder „12 Uhr 30“ haben die MGRS-Form, und `toPoint` prüft
+ * nicht, ob das 100-km-Quadrat zur Zone passt. Eine echte Angabe ergibt beim Zurückrechnen
+ * dieselbe Zeichenkette, eine erfundene nicht.
  *
- * MGRS BRAUCHT DEN RÜCKWEG (Review-Befund zu LFH-619, gemessen an mgrs 2.2.0): eine
- * Fahrzeugkennung wie „1 HLF 20" oder eine Uhrzeit wie „12 Uhr 30" hat genau die Form
- * „Zone · Band · Quadrat · Ziffern", und `toPoint` prüft nicht, ob das 100-km-Quadrat zur
- * Zone passt — es rechnet sie in Punkte im Südpazifik um. Eine echte Angabe ergibt beim
- * Zurückrechnen dieselbe Zeichenkette, eine erfundene nicht („1HLF20" → „2JNL…").
- *
- * Rein und exportiert: kein Hook, kein Netz. Die Rechteprüfung („darf ich die Lagekarte
- * sehen?") liegt beim Aufrufer, der die Overrides kennt.
+ * Rein und exportiert. Die Rechteprüfung (Lagekarte sichtbar?) liegt beim Aufrufer.
  */
 
 /** Dezimalgrad mit Punkt: Trenner Komma, Semikolon oder Leerraum. */
@@ -104,15 +93,13 @@ function kurz(x: number): string {
 }
 
 /**
- * Die Zeile „Auf Lagekarte zeigen · <Punkt>" für einen erkannten Punkt.
+ * Die Zeile „Auf Lagekarte zeigen · <Punkt>“.
  *
- * Gruppe `koordinate`, nicht `datensaetze`: der Treffer hat keinen Datensatz und keinen
- * Modulschlüssel, und `sichtbareDatensaetze` filtert über genau diesen. Er geht auch nicht ins
- * Gedächtnis (`GRUPPE_MERKBAR`): eine einmal getippte Stelle ist kein wiederkehrender Befehl.
+ * Gruppe `koordinate`, nicht `datensaetze`: kein Datensatz, kein Modulschlüssel
+ * (`sichtbareDatensaetze` filtert über den). Nicht merkbar (`GRUPPE_MERKBAR`).
  *
- * Die id trägt den gerundeten Punkt. Die Auswahl der Palette hängt an der Befehls-id — eine
- * feste id liesse beim Weitertippen die Markierung an einer Zeile kleben, die inzwischen
- * einen anderen Punkt meint.
+ * Die id trägt den gerundeten Punkt: die Auswahl hängt an der Befehls-id, eine feste id ließe
+ * die Markierung beim Weitertippen an einem veralteten Punkt kleben.
  */
 export function koordinatenBefehl({
   einsatzId,
@@ -123,7 +110,7 @@ export function koordinatenBefehl({
   einsatzId: number;
   punkt: LatLon;
   format: Koordinatenformat;
-  /** `oeffnung` fehlt = im aktuellen Tab (LFH-645). */
+  /** `oeffnung` fehlt = im aktuellen Tab. */
   navigate: (pfad: string, oeffnung?: Oeffnung) => void;
 }): Befehl {
   return {
