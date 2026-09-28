@@ -65,9 +65,8 @@ function setup(me: Record<string, unknown>, route = defaultAdminPfad()) {
           />
           <Route path="karten" element={<Navigate to={ersteSektionPfad('karten')} replace />} />
           <Route path=":gruppe/:sektion" element={<Pfad />} />
-          {/* Die A7-Detailrouten NAMENTLICH wie in `App.tsx` — ein generisches
-              `:gruppe/:sektion/:id` machte im Test Adressen auflösbar, die es in der
-              Anwendung nicht gibt (z. B. `/admin/karten/online/7`). */}
+          {/* Die Detailrouten NAMENTLICH wie in `App.tsx` — ein generisches `:gruppe/:sektion/:id`
+             machte Adressen auflösbar, die es nicht gibt. */}
           <Route path="stammdaten/fahrzeuge/:fahrzeugId" element={<Pfad />} />
           <Route path="stammdaten/personal/:personalId" element={<Pfad />} />
           <Route path="benutzer" element={<Pfad />} />
@@ -89,7 +88,7 @@ describe('AdminLayout — Sidebar', () => {
     expect(screen.getByRole('menuitem', { name: 'Online-Quellen' })).toBeInTheDocument();
     // Benutzer nur für System-Admins.
     expect(screen.queryByRole('menuitem', { name: 'Benutzer' })).not.toBeInTheDocument();
-    // LFH-23: das Archiv gesperrter Einsätze ist dem System-Admin vorbehalten.
+    // Das Archiv gesperrter Einsätze ist dem System-Admin vorbehalten.
     expect(screen.queryByRole('menuitem', { name: 'Aufbewahrung' })).not.toBeInTheDocument();
   });
 
@@ -140,10 +139,9 @@ describe('AdminLayout — Sidebar', () => {
   });
 
   /**
-   * Review-Befund zu LFH-346 · C11: die Menü-Keys sind zweisegmentig, die Detailrouten aus A7
-   * dreisegmentig — mit exaktem Vergleich war auf einer Detailseite KEIN Eintrag markiert, die
-   * Sidebar sah aus wie verlassen. Geprüft wird die Markierung UND ihre Eindeutigkeit: genau
-   * ein selektierter Eintrag schlägt zugleich ein zu gieriges Präfix.
+   * Menü-Keys sind zweisegmentig, Detailrouten dreisegmentig — auf einer Detailseite muss der
+   * Eintrag trotzdem markiert sein. Geprüft wird die Markierung UND ihre Eindeutigkeit (genau ein
+   * selektierter Eintrag schlägt ein zu gieriges Präfix).
    */
   it.each([
     ['/admin/stammdaten/fahrzeuge/7', 'Fahrzeuge'],
@@ -165,16 +163,9 @@ describe('AdminLayout — Sidebar', () => {
   });
 
   /**
-   * `stammdaten/personal` ist echtes Präfix von `stammdaten/personal-status` — das einzige
-   * solche Paar im Bestand. Stünde hier „Personal" markiert, landete der Rückklick auf der
-   * falschen Liste.
-   *
-   * Was dieser Test GENAU pinnt, ist gemessen und nicht behauptet: der Präfix-Match hat zwei
-   * Riegel (Trenner `/` und längster Treffer), und auf den heute erreichbaren Routen genügt
-   * JEDER von beiden allein. Einzeln zurückgedreht bleibt der Test deshalb grün (beide Proben
-   * gefahren); rot wird er, sobald BEIDE fallen — er belegt also „mindestens ein Riegel
-   * greift", nicht die Wahl des Tie-Breaks. Ein Gegenbeleg für die einzelne Hälfte bräuchte
-   * einen dreisegmentigen Menü-Key, den es (noch) nicht gibt.
+   * `stammdaten/personal` ist echtes Präfix von `stammdaten/personal-status`. Heute genügt jeder
+   * der beiden Riegel (Trenner `/`, längster Treffer) allein; der Test belegt also „mindestens
+   * ein Riegel greift", nicht die Wahl des Tie-Breaks.
    */
   it('Präfix-gleiche Keys: Personal-Status markiert, Personal nicht', async () => {
     setup(fuehrungskraft, '/admin/stammdaten/personal-status');

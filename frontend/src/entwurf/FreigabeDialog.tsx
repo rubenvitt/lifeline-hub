@@ -2,31 +2,15 @@ import { Button, Flex, Modal, theme } from 'antd';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 
 /**
- * Die Rückfrage vor der endgültigen Freigabe eines Entwurfs (LFH-535, Nachzug N5 aus
- * LFH-348 · C13).
+ * Die Rückfrage vor der endgültigen Freigabe eines Entwurfs, geteilt von Befehl und Lagebericht.
  *
- * ── Warum eine Komponente und kein `modal.confirm` (LFH-535) ───────────────────
- * Beide Zwillingsseiten fragten über `App.useApp().modal.confirm(...)` nach. Dessen
- * `content` wird beim AUFRUF eingefroren: ein `<SpeicherFehler fehler={mutation.error}>`
- * darin rendert nicht nach, der Grund müsste per `instanz.update({ content })` von Hand
- * nachgeschoben werden. Das wäre ein zweiter Anzeigemechanismus neben dem, den LFH-494
- * für `EntwurfNavigationSchutz` schon gebaut hat — dieselbe Bauform ist hier ein
- * kontrolliertes `<Modal>` mit eigenem State.
+ * Kein `modal.confirm`: dessen `content` wird beim AUFRUF eingefroren, ein
+ * `<SpeicherFehler fehler={mutation.error}>` darin rendert nicht nach. Stattdessen ein
+ * kontrolliertes `<Modal>` wie `EntwurfNavigationSchutz`.
  *
- * Der zweite Grund ist die Gemeinsamkeit: die Bedienentscheidung gilt für BEIDE
- * Zwillingsseiten, und eine geteilte Komponente macht sie strukturell statt zur
- * Konvention — dieselbe Antwort, die LFH-348 · C13 mit dem geteilten Verlustschutz-Hook
- * gegeben hat. Zwei Copy-Paste-Dialoge sind genau die Divergenz, die dort geschlossen wurde.
- *
- * ── Warum der Grund IM Dialog steht (H14) ─────────────────────────────────────
- * Der Modal trägt `mask={{ closable: false }}` — alles dahinter ist abgedunkelt und
- * unbedienbar, ein Seiten-Alert also unsichtbar, solange der Dialog offen steht. Und ein
- * Toast allein ist nach rund drei Sekunden weg: der unveränderte Dialog ist dann von
- * „nichts passiert" nicht zu unterscheiden. Das ist die H14-Diagnose (LFH-345 · C10),
- * hier am Zustandsübergang statt am Speicherpfad.
- *
- * Der Erfolg bleibt beim Toast: er quittiert eine abgeschlossene Handlung, und der Dialog,
- * in dem er stünde, ist dann geschlossen. Dieselbe Trennung wie in `SpeicherHinweis`.
+ * Der Grund steht IM Dialog: `mask={{ closable: false }}` dunkelt die Seite ab, ein Seiten-Alert
+ * wäre unsichtbar, und ein Toast wäre nach drei Sekunden weg. Der Erfolg bleibt beim Toast —
+ * der Dialog ist dann zu.
  */
 
 interface Props {
@@ -46,20 +30,15 @@ interface Props {
 }
 
 /**
- * Welcher der beiden Gründe steht im Dialog — rein und exportiert, damit die
- * Fallunterscheidung ohne Render prüfbar ist (Muster `fehlerText`/`bedienzielStil`).
+ * Welcher der beiden Gründe im Dialog steht — rein und exportiert.
  *
- * Der Freigabe-Flow hat ZWEI Fehlerquellen hintereinander: erst den Speicher-Vorlauf
- * (`/freigeben` prüft den persistierten Stand, nicht den Editor-Inhalt), dann den
- * Zustandsübergang selbst. Sie brauchen verschiedene Überschriften — „Nicht gespeichert"
- * und „Freigabe fehlgeschlagen" sagen der Person Verschiedenes darüber, was ihr Entwurf
- * jetzt ist.
+ * Der Flow hat ZWEI Fehlerquellen: erst den Speicher-Vorlauf (`/freigeben` prüft den
+ * persistierten Stand), dann den Übergang selbst — mit verschiedenen Überschriften („Nicht
+ * gespeichert" / „Freigabe fehlgeschlagen").
  *
- * VORRANG HAT DER SPEICHERFEHLER, und das ist die Reihenfolge, nicht Geschmack: scheitert
- * der Vorlauf, läuft die Freigabe gar nicht erst — ein dann noch stehender
- * `freigabeFehler` stammt aus einem FRÜHEREN Versuch. Umgekehrt kann der Speicherfehler
- * nicht veralten: er fällt bei jedem gelungenen Speichern (`quittungVorbereiten` räumt
- * ihn), und ohne gelungenes Speichern gibt es keinen Freigabe-Versuch.
+ * VORRANG HAT DER SPEICHERFEHLER: scheitert der Vorlauf, läuft die Freigabe nicht, ein stehender
+ * `freigabeFehler` stammt dann aus einem früheren Versuch. Der Speicherfehler selbst kann nicht
+ * veralten, er fällt bei jedem gelungenen Speichern.
  */
 export function freigabeGrund(
   speicherFehler: unknown,
@@ -88,8 +67,8 @@ export default function FreigabeDialog({
       title={titel}
       open={offen}
       onCancel={onAbbrechen}
-      // Wie antds `Modal.confirm` (dort ist `maskClosable` von Haus aus aus): ein
-      // Fehlklick neben den Dialog darf einen gerade gezeigten Grund nicht wegräumen.
+      // Wie bei `Modal.confirm`: ein Fehlklick neben den Dialog darf einen gezeigten Grund nicht
+      // wegräumen.
       mask={{ closable: false }}
       footer={
         <Flex gap={token.marginSM} wrap justify="end">

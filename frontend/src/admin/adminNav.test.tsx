@@ -24,7 +24,7 @@ describe('adminNav — Pfad-Builder', () => {
     expect(adminSektionPfad('karten', 'offline')).toBe('/admin/karten/offline');
     expect(adminBenutzerPfad()).toBe('/admin/benutzer');
     expect(adminDemoDatenPfad()).toBe('/admin/demo-daten');
-    // LFH-23: Übersicht und Akte mit eigener, neuladefester Adresse.
+    // Übersicht und Akte mit eigener, neuladefester Adresse.
     expect(adminAufbewahrungPfad()).toBe('/admin/aufbewahrung');
     expect(adminAufbewahrungAktePfad(42)).toBe('/admin/aufbewahrung/42');
   });
@@ -38,12 +38,10 @@ describe('adminNav — Pfad-Builder', () => {
 
 describe('adminNav — Registry', () => {
   /**
-   * BEWUSST NACHGEZOGEN (LFH-690, design.md D13): „Demo-Daten“ ist der zweite Sonder-Eintrag
-   * neben „Benutzer“ und steht NICHT in `adminGruppen`. Die Zahl 16 bleibt deshalb stehen, und
-   * zwar als Aussage: wer die Sektion in eine Gruppe zöge, machte sie für jede Führungskraft
-   * sichtbar (die Gruppen kennen kein Rollenprädikat) und färbte diesen Test rot. Die
-   * Sonder-Einträge sind daneben einzeln gepinnt, samt ihrer Eindeutigkeit gegenüber den
-   * Gruppen-Keys — beide hängen als `/admin/<key>` an derselben Ebene wie die Gruppen.
+   * „Demo-Daten“ und „Aufbewahrung“ sind Sonder-Einträge neben „Benutzer“, NICHT in
+   * `adminGruppen`: die Gruppen kennen kein Rollenprädikat, eine Sektion dort sähe jede
+   * Führungskraft. Die Zahl 16 ist deshalb eine Aussage. Die Sonder-Einträge sind einzeln
+   * gepinnt, samt Eindeutigkeit gegenüber den Gruppen-Keys (gleiche Ebene `/admin/<key>`).
    */
   it('drei Gruppen mit 16 Sektionen gesamt (Stammdaten 11), dazu drei Sonder-Einträge', () => {
     expect(adminGruppen.map((g) => g.key)).toEqual(['stammdaten', 'einstellungen', 'karten']);
@@ -51,8 +49,7 @@ describe('adminNav — Registry', () => {
     expect(adminGruppen.find((g) => g.key === 'stammdaten')!.sektionen.length).toBe(11);
     expect(adminBenutzer.key).toBe('benutzer');
     expect(adminDemoDaten).toEqual({ key: 'demo-daten', label: 'Demo-Daten' });
-    // LFH-23: dritter Sonder-Eintrag, nur für den System-Admin (die Führungskraft liest die
-    // Verwaltung, das Archiv gesperrter Einsätze nicht).
+    // Nur für den System-Admin (die Führungskraft liest die Verwaltung, dieses Archiv nicht).
     expect(adminAufbewahrung).toEqual({ key: 'aufbewahrung', label: 'Aufbewahrung' });
     const ersteEbene = [
       ...adminGruppen.map((g) => g.key),
@@ -76,16 +73,10 @@ describe('adminNav — Registry', () => {
 });
 
 /**
- * Titel-Drift (LFH-346 · A3). Seit `stammdatenSektion()` entfallen ist, steht der Titel
- * ZWEIMAL: als `label` in dieser Registry (fürs Sidebar-Menü) und als `titel` in der
- * Sektion (für den Seitenkopf). Diese Dopplung trugen die fünf selbstwickelnden Sektionen
- * (Karten, Einstellungen) schon vorher — unbemerkt und ungeprüft. Der Guard schließt sie,
- * statt sie um elf Fälle zu vergrößern: driftet der Sektionstitel gegen das Menü-Label,
- * zeigt die Sidebar auf einen anderen Namen als die Seite, ohne dass irgendetwas bricht.
- *
- * GESCOPT auf die elf Stammdaten-Sektionen. Über alle sechzehn zu iterieren zöge die
- * Queries der Karten- und Einstellungssektionen in diese Datei und färbte sie aus
- * Mock-Gründen rot, die mit Titel-Drift nichts zu tun haben.
+ * Titel-Drift: der Titel steht als `label` in der Registry (Menü) UND als `titel` in der
+ * Sektion (Seitenkopf). Driftet einer, zeigt die Sidebar einen anderen Namen als die Seite.
+ * Gescopt auf die elf Stammdaten-Sektionen; alle sechzehn zögen die Queries der Karten- und
+ * Einstellungssektionen herein und färbten den Test aus Mock-Gründen rot.
  */
 const admin = {
   id: 1,
@@ -98,10 +89,8 @@ const admin = {
 };
 
 /**
- * Alle Abrufe der elf Tabs. `onUnhandledRequest: 'error'` (test/setup.ts) macht eine
- * fehlende Route zu einem Fehler statt zu einem stillen Leerlauf — die Liste ist deshalb
- * Pflicht, nicht Bequemlichkeit. Leere Kataloge reichen: geprüft wird der Seitenkopf, den
- * `AdminPage` unabhängig vom Ladezustand rendert.
+ * Alle Abrufe der elf Tabs — Pflicht, weil `onUnhandledRequest: 'error'` eine fehlende Route
+ * zum Fehler macht. Leere Kataloge reichen: geprüft wird der Seitenkopf.
  */
 function stammdatenHandler() {
   server.use(
@@ -140,7 +129,7 @@ describe('adminNav — Seitenkopf trägt den Registry-Titel', () => {
     async (label, element) => {
       stammdatenHandler();
       renderMitProviders(element);
-      // Der Kopf von `AdminPage` ist ein level-4-Heading (Dateikopf dort).
+      // Der Kopf von `AdminPage` ist ein h1.
       expect(await screen.findByRole('heading', { level: 1, name: label })).toBeInTheDocument();
     },
   );
@@ -149,11 +138,7 @@ describe('adminNav — Seitenkopf trägt den Registry-Titel', () => {
     stammdatenHandler();
     renderMitProviders(<FahrzeugeTab />);
     const knopf = await screen.findByRole('button', { name: 'Fahrzeug anlegen' });
-    /**
-     * NUR diese Aussage diskriminiert. Eine Positionsprüfung „Knopf vor Tabelle" wäre eine
-     * Attrappe: der Knopf stand VORHER schon über der Tabelle, und der `aktionen`-Slot von
-     * `AdminPage` steht ohnehin vor `children` — sie wäre in beiden Bäumen grün.
-     */
+    /** Nur diese Aussage diskriminiert: „Knopf vor Tabelle" wäre auch ohne Kopf-Slot grün. */
     expect(knopf.closest('[data-lfh="adminpage-aktionen"]')).not.toBeNull();
   });
 });
