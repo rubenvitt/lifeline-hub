@@ -36,7 +36,6 @@ const DEFERRED_MODULE: &[&str] = &[
     "etb",
     "befehl",
     "lagebericht",
-    "karte_hintergrundbild",
     "sprechgruppe",
     "ort_vorschau",
     "erinnerung",

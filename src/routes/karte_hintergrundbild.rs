@@ -1,9 +1,6 @@
 use crate::app::AppState;
-use crate::auth::session::CurrentUser;
-use crate::einsatz::berechtigung::{
-    fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
-};
-use crate::einsatz::repo as einsatz_repo;
+use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
+use crate::einsatz::modul::Lagekarte;
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
@@ -20,8 +17,6 @@ use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde::Deserialize;
 
-const MODUL_KEY: &str = "lagekarte";
-
 /// SSE-Notify: ein Bild-Hintergrund hat sich geändert. Event-Tag `karte_bild`.
 fn sse_bild(state: &AppState, einsatz_id: i64) {
     state
@@ -32,21 +27,10 @@ fn sse_bild(state: &AppState, einsatz_id: i64) {
 /// GET Liste (Metadaten ohne BLOB). Nur Lesezugriff.
 pub async fn liste(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzLesezugriff<Lagekarte>,
     Query(filter): Query<AnsichtFilter>,
 ) -> Result<Json<Vec<HintergrundbildAnzeige>>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
+    let einsatz_id = ctx.einsatz.id;
     Ok(Json(
         bild_repo::liste(&state.pool, einsatz_id, filter.ansicht).await?,
     ))
@@ -56,23 +40,10 @@ pub async fn liste(
 /// optional `name`. Schreibrecht + aktiv.
 pub async fn hochladen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzSchreibzugriff<Lagekarte>,
     mut multipart: Multipart,
 ) -> Result<(StatusCode, Json<HintergrundbildAnzeige>), AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     let mut bytes: Option<Vec<u8>> = None;
     let mut ecken: Option<String> = None;
     let mut name: Option<String> = None;
@@ -134,7 +105,7 @@ pub async fn hochladen(
     let a = bild_repo::anlegen(
         &state.pool,
         einsatz_id,
-        benutzer.id,
+        ctx.benutzer.id,
         &name,
         mime,
         &bytes,
@@ -149,22 +120,11 @@ pub async fn hochladen(
 /// GET Download der Bytes. Nur Lesezugriff; Ownership über `laden_bytes(einsatz_id, id)`.
 pub async fn herunterladen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, bild_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzLesezugriff<Lagekarte>,
+    PfadParam((_eid, bild_id)): PfadParam<(i64, i64)>,
     req_headers: HeaderMap,
 ) -> Result<Response, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-
+    let einsatz_id = ctx.einsatz.id;
     // Cache-Kurzschluss (LFH-258): sha256-Meta OHNE BLOB; passt der If-None-Match-Header,
     // antworten wir 304 und sparen den teuren Voll-BLOB-Read.
     let (name, mime, sha256) =
@@ -217,23 +177,11 @@ pub struct BildPatchBody {
 /// PATCH Stil/Geometrie ohne Neuupload. Schreibrecht + aktiv.
 pub async fn aktualisieren(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, bild_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Lagekarte>,
+    PfadParam((_eid, bild_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<BildPatchBody>,
 ) -> Result<Json<HintergrundbildAnzeige>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-
+    let einsatz_id = ctx.einsatz.id;
     if let Some(o) = body.opazitaet {
         bild::pruefe_opazitaet(o)?;
     }
@@ -262,21 +210,10 @@ pub async fn aktualisieren(
 /// DELETE (Hard-Delete). Schreibrecht + aktiv.
 pub async fn loeschen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam((einsatz_id, bild_id)): PfadParam<(i64, i64)>,
+    ctx: EinsatzSchreibzugriff<Lagekarte>,
+    PfadParam((_eid, bild_id)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
+    let einsatz_id = ctx.einsatz.id;
     bild_repo::loeschen(&state.pool, einsatz_id, bild_id).await?;
     sse_bild(&state, einsatz_id);
     Ok(StatusCode::NO_CONTENT)
