@@ -9,6 +9,8 @@ import { setzeViewportBreite } from '../test/viewport';
 import { einsatzKeys } from '../api/queryKeys';
 import { AuthProvider } from '../auth/AuthContext';
 import PersonalPage from './PersonalPage';
+import type { EinsatzAnzeige } from '../api/types';
+import { einsatzFixture } from '../test/fixtures';
 
 const admin = {
   id: 1,
@@ -20,28 +22,8 @@ const admin = {
   erstellt_at: '2026-05-26 10:00:00',
 };
 
-function einsatz(overrides: Record<string, unknown> = {}) {
-  return {
-    id: 7,
-    bezeichnung: 'Hochwasser',
-    stichwort: null,
-    status: 'aktiv',
-    begonnen_at: '2026-05-26 09:00:00',
-    abgeschlossen_at: null,
-    abgeschlossen_von: null,
-    einsatzart: 'realeinsatz',
-    einsatznummer_intern: null,
-    angelegt_at: '2026-05-26 09:00:00',
-    leitstellen_nr: null,
-    einsatzort: null,
-    einsatzort_lat: null,
-    einsatzort_lon: null,
-    meldende_stelle: null,
-    sachverhalt: null,
-    anzahl_betroffene_initial: null,
-    meine_rolle: 'einsatzleitung',
-    ...overrides,
-  };
+function einsatz(overrides: Partial<EinsatzAnzeige> = {}) {
+  return einsatzFixture({ id: 7, ...overrides });
 }
 
 // LFH-139: Struktur-Listen für die Auflösung einheit_id/fahrzeug_id → Klartext-Label.

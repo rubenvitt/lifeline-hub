@@ -10,10 +10,11 @@ import { setzeViewportBreite } from '../test/viewport';
 import { AuthProvider } from '../auth/AuthContext';
 import LageberichtePage from './LageberichtePage';
 import LageberichtDetailPage from './LageberichtDetailPage';
-import type { EinsatzAnzeige, LageberichtAnzeige } from '../api/types';
+import type { LageberichtAnzeige } from '../api/types';
 import { einsatzKeys } from '../api/queryKeys';
 import { alsOrtszeit } from '../etb/filterZeit';
 import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
+import { einsatzFixture } from '../test/fixtures';
 
 const admin = {
   id: 1,
@@ -25,30 +26,12 @@ const admin = {
   erstellt_at: '2026-06-02 10:00:00',
 };
 
-const einsatz: EinsatzAnzeige = {
+const einsatz = einsatzFixture({
   id: 7,
   bezeichnung: 'Hochwasser Nord',
-  stichwort: null,
-  status: 'aktiv',
   begonnen_at: '2026-06-02 09:00:00',
-  abgeschlossen_at: null,
-  abgeschlossen_von: null,
-  einsatzart: 'realeinsatz',
-  einsatznummer_intern: null,
   angelegt_at: '2026-06-02 09:00:00',
-  leitstellen_nr: null,
-  einsatzort: null,
-  einsatzort_lat: null,
-  einsatzort_lon: null,
-  meldende_stelle: null,
-  sachverhalt: null,
-  anzahl_betroffene_initial: null,
-  meine_rolle: 'einsatzleitung',
-  org_id: 1,
-  org_name: 'Orga',
-  meine_sachgebiete: [],
-  lagekennzahlen: [],
-};
+});
 
 const bericht: LageberichtAnzeige = {
   id: 11,

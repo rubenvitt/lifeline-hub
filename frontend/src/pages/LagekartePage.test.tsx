@@ -10,6 +10,7 @@ import { offeneRueckfrage } from '../test/rueckfrage';
 import type { KarteServerConfig } from '../api/karte';
 import type { KartenflaecheProps } from './lagekarte/Kartenflaeche';
 import LagekartePage, { kopfMeta, quellenMeldung } from './LagekartePage';
+import { einsatzFixture } from '../test/fixtures';
 
 // URL.createObjectURL / revokeObjectURL fehlen in jsdom → Stubs definieren bevor Tests laufen.
 // Direkt auf URL setzen (nicht via spyOn, da die Methoden in jsdom gar nicht existieren).
@@ -158,28 +159,12 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-const EINSATZ = {
-  id: 1,
+const EINSATZ = einsatzFixture({
   bezeichnung: 'Test',
-  stichwort: null,
-  status: 'aktiv',
-  begonnen_at: '2026-05-30 10:00:00',
-  abgeschlossen_at: null,
-  abgeschlossen_von: null,
-  einsatzart: 'realeinsatz',
-  einsatznummer_intern: null,
-  angelegt_at: '2026-05-30 10:00:00',
-  leitstellen_nr: null,
   einsatzort: 'ELW',
   einsatzort_lat: 50.0,
   einsatzort_lon: 8.5,
-  meldende_stelle: null,
-  sachverhalt: null,
-  anzahl_betroffene_initial: null,
-  meine_rolle: 'einsatzleitung',
-  org_id: 1,
-  org_name: 'Org',
-};
+});
 
 const UHS_NICHT_VERORTET = {
   id: 5,

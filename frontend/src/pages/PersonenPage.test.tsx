@@ -8,7 +8,7 @@ import { setzeViewportBreite } from '../test/viewport';
 import { renderMitProviders } from '../test/utils';
 import { AuthProvider } from '../auth/AuthContext';
 import { einsatzKeys } from '../api/queryKeys';
-import type { Person } from '../api/types';
+import type { EinsatzAnzeige, Person } from '../api/types';
 import PersonenPage from './PersonenPage';
 import PersonenDetailPage from './PersonenDetailPage';
 import {
@@ -26,6 +26,7 @@ import {
 } from '../offline/ereignisse';
 import { useOfflineSync } from '../offline/useOfflineSync';
 import type { KartenflaecheProps } from './lagekarte/Kartenflaeche';
+import { einsatzFixture } from '../test/fixtures';
 
 /**
  * Die echte Karte braucht WebGL (MapLibre), jsdom hat keins — Stub nach dem Muster von
@@ -116,27 +117,8 @@ const nutzer = {
   aktiv: true,
   erstellt_at: '2026-05-27 10:00:00',
 };
-const einsatzAktiv = {
-  id: 1,
-  bezeichnung: 'Hochwasser',
-  stichwort: null,
-  status: 'aktiv',
-  begonnen_at: '2026-05-27 08:00:00',
-  abgeschlossen_at: null,
-  abgeschlossen_von: null,
-  einsatzart: 'realeinsatz',
-  einsatznummer_intern: null,
-  angelegt_at: '2026-05-27 08:00:00',
-  leitstellen_nr: null,
-  einsatzort: null,
-  einsatzort_lat: null,
-  einsatzort_lon: null,
-  meldende_stelle: null,
-  sachverhalt: null,
-  anzahl_betroffene_initial: null,
-  meine_rolle: 'einsatzleitung',
-};
-const einsatzBeobachter = { ...einsatzAktiv, meine_rolle: 'beobachter' };
+const einsatzAktiv = einsatzFixture();
+const einsatzBeobachter = einsatzFixture({ meine_rolle: 'beobachter' });
 
 const person: Person = {
   id: 10,
@@ -1601,13 +1583,7 @@ describe('PersonenPage — Kartenansicht (LFH-613)', () => {
     return <output data-testid="ort">{useLocation().pathname}</output>;
   }
 
-  function renderKarte(
-    personen: unknown[],
-    einsatzObj: Omit<typeof einsatzAktiv, 'einsatzort_lat' | 'einsatzort_lon'> & {
-      einsatzort_lat: number | null;
-      einsatzort_lon: number | null;
-    } = einsatzAktiv,
-  ) {
+  function renderKarte(personen: unknown[], einsatzObj: EinsatzAnzeige = einsatzAktiv) {
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),

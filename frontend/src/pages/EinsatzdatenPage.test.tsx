@@ -10,6 +10,7 @@ import { renderMitProviders } from '../test/utils';
 import { AuthProvider } from '../auth/AuthContext';
 import type { BenutzerAnzeige, EinsatzAnzeige } from '../api/types';
 import EinsatzdatenPage, { pickerZuWire, wireZuPicker } from './EinsatzdatenPage';
+import { einsatzFixture } from '../test/fixtures';
 
 dayjs.extend(utc);
 
@@ -24,30 +25,13 @@ const admin: BenutzerAnzeige = {
   totp_aktiviert: false,
 };
 
-const basisEinsatz: EinsatzAnzeige = {
+const basisEinsatz = einsatzFixture({
   id: 7,
   bezeichnung: 'Hochwasser Nord',
   stichwort: 'H1',
-  status: 'aktiv',
   begonnen_at: '2026-05-23 09:00:00',
-  abgeschlossen_at: null,
-  abgeschlossen_von: null,
-  einsatzart: 'realeinsatz',
   einsatznummer_intern: '2026-001',
-  angelegt_at: '2026-05-23 09:00:05',
-  leitstellen_nr: null,
-  einsatzort: null,
-  einsatzort_lat: null,
-  einsatzort_lon: null,
-  meldende_stelle: null,
-  sachverhalt: null,
-  anzahl_betroffene_initial: null,
-  meine_rolle: 'einsatzleitung',
-  org_id: 1,
-  org_name: 'DRK Musterstadt',
-  meine_sachgebiete: [],
-  lagekennzahlen: [],
-};
+});
 
 const mitglieder = [
   {

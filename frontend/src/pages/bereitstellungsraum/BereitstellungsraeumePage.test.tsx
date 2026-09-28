@@ -9,33 +9,10 @@ import BereitstellungsraeumePage from './BereitstellungsraeumePage';
 import { einsatzKeys } from '../../api/queryKeys';
 import type { Bereitstellungsraum, EinsatzAnzeige } from '../../api/types';
 import { CommandPaletteProvider } from '../../command-palette/CommandPaletteProvider';
+import { einsatzFixture } from '../../test/fixtures';
 
 function einsatz(over: Partial<EinsatzAnzeige> = {}): EinsatzAnzeige {
-  return {
-    id: 1,
-    bezeichnung: 'Lage',
-    stichwort: null,
-    status: 'aktiv',
-    begonnen_at: 'x',
-    abgeschlossen_at: null,
-    abgeschlossen_von: null,
-    einsatzart: 'realeinsatz',
-    einsatznummer_intern: null,
-    angelegt_at: 'x',
-    leitstellen_nr: null,
-    einsatzort: null,
-    einsatzort_lat: null,
-    einsatzort_lon: null,
-    meldende_stelle: null,
-    sachverhalt: null,
-    anzahl_betroffene_initial: null,
-    meine_rolle: 'einsatzleitung',
-    org_id: 1,
-    org_name: 'Org',
-    meine_sachgebiete: [],
-    lagekennzahlen: [],
-    ...over,
-  };
+  return einsatzFixture({ bezeichnung: 'Lage', ...over });
 }
 
 function br(over: Partial<Bereitstellungsraum> = {}): Bereitstellungsraum {

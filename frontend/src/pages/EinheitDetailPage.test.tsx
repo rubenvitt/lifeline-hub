@@ -6,6 +6,7 @@ import { Route, Routes } from 'react-router';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import EinheitDetailPage from './EinheitDetailPage';
+import { einsatzFixture } from '../test/fixtures';
 
 /**
  * Detailansicht einer Einheit (LFH-339 · C4, Befund M26).
@@ -37,26 +38,7 @@ const dmoSprechgruppe = {
   sortier: 1,
 };
 
-const einsatz = {
-  id: 1,
-  bezeichnung: 'Lage',
-  stichwort: null,
-  status: 'aktiv',
-  begonnen_at: '',
-  abgeschlossen_at: null,
-  abgeschlossen_von: null,
-  einsatzart: 'realeinsatz',
-  einsatznummer_intern: null,
-  angelegt_at: '',
-  leitstellen_nr: null,
-  einsatzort: null,
-  einsatzort_lat: null,
-  einsatzort_lon: null,
-  meldende_stelle: null,
-  sachverhalt: null,
-  anzahl_betroffene_initial: null,
-  meine_rolle: 'einsatzleitung',
-};
+const einsatz = einsatzFixture({ bezeichnung: 'Lage' });
 
 const einheiten = [
   {

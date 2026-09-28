@@ -14,6 +14,7 @@ import { App as AntApp } from 'antd';
 import { useState } from 'react';
 import UhsAnlegenDrawer from './uhs/UhsAnlegenDrawer';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
+import { einsatzFixture } from '../test/fixtures';
 
 class FakeEventSource {
   url: string;
@@ -34,26 +35,7 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 function einsatzAntwort(rolle: 'einsatzleitung' | 'beobachter' = 'einsatzleitung') {
-  return {
-    id: 1,
-    bezeichnung: 'Lage',
-    stichwort: null,
-    status: 'aktiv',
-    begonnen_at: '2026-05-28',
-    abgeschlossen_at: null,
-    abgeschlossen_von: null,
-    einsatzart: 'realeinsatz',
-    einsatznummer_intern: null,
-    angelegt_at: '2026-05-28',
-    leitstellen_nr: null,
-    einsatzort: null,
-    einsatzort_lat: null,
-    einsatzort_lon: null,
-    meldende_stelle: null,
-    sachverhalt: null,
-    anzahl_betroffene_initial: null,
-    meine_rolle: rolle,
-  };
+  return einsatzFixture({ bezeichnung: 'Lage', meine_rolle: rolle });
 }
 
 /** Eine UHS-Zeile — die Kennung `BHP 50` ist in mehreren Tests der Beleg „Zeile steht". */

@@ -9,6 +9,8 @@ import { setzeViewportBreite } from '../test/viewport';
 import { einsatzKeys } from '../api/queryKeys';
 import { AuthProvider } from '../auth/AuthContext';
 import FahrzeugePage from './FahrzeugePage';
+import type { EinsatzAnzeige } from '../api/types';
+import { einsatzFixture } from '../test/fixtures';
 
 // Normaler Benutzer (kein System-Admin): so prüfen die Rollen-Tests die EINSATZ-Rolle,
 // nicht den admin-globalen Zweig (LFH-234). Admin-global ist in schreibrecht.test.ts abgedeckt.
@@ -22,28 +24,13 @@ const nutzer = {
   erstellt_at: '2026-05-26 10:00:00',
 };
 
-function einsatz(overrides: Record<string, unknown> = {}) {
-  return {
+function einsatz(overrides: Partial<EinsatzAnzeige> = {}) {
+  return einsatzFixture({
     id: 7,
     bezeichnung: 'Hochwasser Nord',
-    stichwort: null,
-    status: 'aktiv',
-    begonnen_at: '2026-05-26 09:00:00',
-    abgeschlossen_at: null,
-    abgeschlossen_von: null,
-    einsatzart: 'realeinsatz',
     einsatznummer_intern: '2026-001',
-    angelegt_at: '2026-05-26 09:00:00',
-    leitstellen_nr: null,
-    einsatzort: null,
-    einsatzort_lat: null,
-    einsatzort_lon: null,
-    meldende_stelle: null,
-    sachverhalt: null,
-    anzahl_betroffene_initial: null,
-    meine_rolle: 'einsatzleitung',
     ...overrides,
-  };
+  });
 }
 
 const ef = {

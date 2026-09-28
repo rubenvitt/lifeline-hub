@@ -9,6 +9,7 @@ import { renderMitProviders } from '../test/utils';
 import { AuthProvider } from '../auth/AuthContext';
 import TiereDetailPage from './TiereDetailPage';
 import type { Tier } from '../api/types';
+import { einsatzFixture } from '../test/fixtures';
 
 class FakeEventSource {
   url: string;
@@ -36,27 +37,8 @@ const nutzer = {
   aktiv: true,
   erstellt_at: '2026-05-29 10:00:00',
 };
-const einsatzAktiv = {
-  id: 1,
-  bezeichnung: 'Hochwasser',
-  stichwort: null,
-  status: 'aktiv',
-  begonnen_at: '2026-05-29 08:00:00',
-  abgeschlossen_at: null,
-  abgeschlossen_von: null,
-  einsatzart: 'realeinsatz',
-  einsatznummer_intern: null,
-  angelegt_at: '2026-05-29 08:00:00',
-  leitstellen_nr: null,
-  einsatzort: null,
-  einsatzort_lat: null,
-  einsatzort_lon: null,
-  meldende_stelle: null,
-  sachverhalt: null,
-  anzahl_betroffene_initial: null,
-  meine_rolle: 'einsatzleitung',
-};
-const einsatzBeobachter = { ...einsatzAktiv, meine_rolle: 'beobachter' };
+const einsatzAktiv = einsatzFixture();
+const einsatzBeobachter = einsatzFixture({ meine_rolle: 'beobachter' });
 
 // Quelle der Halter-Combobox (lädt beim Öffnen des Edit-Formulars). Minimalobjekt — der
 // HalterPicker liest nur id/registrier_nr/name/vorname.

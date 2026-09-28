@@ -15,6 +15,7 @@ import { setzeLiveStatusFuerTest } from '../../live/liveStatusStore';
 import LageDashboardPage from './LageDashboardPage';
 import type { Auftrag, EtbEintragAnzeige, GefahrBewertung, Meldung } from '../../api/types';
 import { EinsatzAnzeigeProvider } from '../../anzeige/AnzeigeKonventionenContext';
+import { einsatzFixture } from '../../test/fixtures';
 
 class FakeEventSource {
   url: string;
@@ -32,30 +33,13 @@ beforeEach(() => vi.stubGlobal('EventSource', FakeEventSource));
 afterEach(() => vi.unstubAllGlobals());
 afterEach(() => setzeLiveStatusFuerTest('idle'));
 
-const einsatz = {
-  id: 1,
+const einsatz = einsatzFixture({
   bezeichnung: 'Hochwasser Musterstadt',
   stichwort: 'TH Hochwasser',
-  status: 'aktiv',
   begonnen_at: '2026-06-08 06:12:00',
-  abgeschlossen_at: null,
-  abgeschlossen_von: null,
-  einsatzart: 'realeinsatz',
-  einsatznummer_intern: null,
-  angelegt_at: '2026-06-08 06:12:00',
-  leitstellen_nr: null,
-  einsatzort: null,
-  einsatzort_lat: null,
-  einsatzort_lon: null,
-  meldende_stelle: null,
-  sachverhalt: null,
-  anzahl_betroffene_initial: null,
-  meine_rolle: 'einsatzleitung',
-  org_id: 1,
-  org_name: 'THW Musterstadt',
   // Ein Hochwasser mit festgelegtem Pegel (LFH-640): Platz 1 trägt den Pegel.
   lagekennzahlen: ['pegel'],
-};
+});
 
 const person = (
   sichtung: string | null,

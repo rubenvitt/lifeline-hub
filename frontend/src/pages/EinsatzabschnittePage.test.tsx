@@ -9,6 +9,7 @@ import { setzeViewportBreite } from '../test/viewport';
 import EinsatzabschnittePage from './EinsatzabschnittePage';
 import { einsatzKeys } from '../api/queryKeys';
 import { formatiereDatenstand } from '../components/Datenstand';
+import { einsatzFixture } from '../test/fixtures';
 
 const tmoSprechgruppe = {
   id: 7,
@@ -60,26 +61,7 @@ function renderPage() {
   );
 }
 
-const einsatz = {
-  id: 1,
-  bezeichnung: 'Lage',
-  stichwort: null,
-  status: 'aktiv',
-  begonnen_at: '',
-  abgeschlossen_at: null,
-  abgeschlossen_von: null,
-  einsatzart: 'realeinsatz',
-  einsatznummer_intern: null,
-  angelegt_at: '',
-  leitstellen_nr: null,
-  einsatzort: null,
-  einsatzort_lat: null,
-  einsatzort_lon: null,
-  meldende_stelle: null,
-  sachverhalt: null,
-  anzahl_betroffene_initial: null,
-  meine_rolle: 'einsatzleitung',
-};
+const einsatz = einsatzFixture({ bezeichnung: 'Lage' });
 
 function handlers(
   rolle = 'einsatzleitung',
