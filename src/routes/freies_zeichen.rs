@@ -24,10 +24,9 @@ const MODUL_KEY: &str = "lagekarte";
 /// SSE-Notify (Lage-Karte): ein freies Zeichen hat sich geändert. Event-Tag `freies_zeichen`.
 /// Der Wire-Tag ist load-bearing — das Frontend filtert exakt darauf.
 fn sse_zeichen(state: &AppState, einsatz_id: i64, id: i64) {
-    let data = serde_json::json!({ "einsatz_id": einsatz_id, "zeichen_id": id }).to_string();
     state
         .live
-        .publiziere_event(einsatz_id, LiveEvent::FreiesZeichen, data);
+        .publiziere_objekt(einsatz_id, LiveEvent::FreiesZeichen, "zeichen_id", id);
 }
 
 /// GET /api/einsaetze/{id}/freie-zeichen — Liste aller freien Zeichen. Nur Lesezugriff.

@@ -22,11 +22,9 @@ use serde::Deserialize;
 /// SSE-Notify: Nachforderungen des Einsatzes haben sich geändert (Tag `nachforderung`,
 /// auf der EINEN bestehenden /etb/stream-Verbindung).
 fn sse(state: &AppState, einsatz_id: i64) {
-    state.live.publiziere_event(
-        einsatz_id,
-        LiveEvent::Nachforderung,
-        serde_json::json!({ "einsatz_id": einsatz_id }).to_string(),
-    );
+    state
+        .live
+        .publiziere_einsatz(einsatz_id, LiveEvent::Nachforderung);
 }
 
 /// Normalisiert einen Eingabe-Zeitstempel auf 'YYYY-MM-DD HH:MM:SS' (UTC).

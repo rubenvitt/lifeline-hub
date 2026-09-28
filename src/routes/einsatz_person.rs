@@ -48,11 +48,10 @@ pub struct PersonDetail {
 
 /// Broadcastet ein dediziertes `person`-SSE-Event OHNE sensible Payload
 /// (nur einsatz_id + person_id); Clients refetchen die Liste.
-fn sse_person(state: &AppState, einsatz_id: i64, person_id: i64) {
-    let data = serde_json::json!({ "einsatz_id": einsatz_id, "person_id": person_id }).to_string();
+pub(super) fn sse_person(state: &AppState, einsatz_id: i64, person_id: i64) {
     state
         .live
-        .publiziere_event(einsatz_id, LiveEvent::Person, data);
+        .publiziere_objekt(einsatz_id, LiveEvent::Person, "person_id", person_id);
 }
 
 /// Emittiert die SSE-Events eines UHS-Auto-Austritts (LFH-124): der pool-basierte
@@ -61,16 +60,12 @@ fn sse_person(state: &AppState, einsatz_id: i64, person_id: i64) {
 /// (`Some(effekt)`) aufrufen.
 fn sse_auto_austritt(state: &AppState, einsatz_id: i64, effekt: &crate::uhs::AutoAustrittEffekt) {
     state.live.publiziere(einsatz_id, effekt.etb_eintrag.id);
-    state.live.publiziere_event(
-        einsatz_id,
-        LiveEvent::Uhs,
-        serde_json::json!({ "einsatz_id": einsatz_id, "uhs_id": effekt.uhs_id }).to_string(),
-    );
-    state.live.publiziere_event(
-        einsatz_id,
-        LiveEvent::Person,
-        serde_json::json!({ "einsatz_id": einsatz_id, "person_id": effekt.person_id }).to_string(),
-    );
+    state
+        .live
+        .publiziere_objekt(einsatz_id, LiveEvent::Uhs, "uhs_id", effekt.uhs_id);
+    state
+        .live
+        .publiziere_objekt(einsatz_id, LiveEvent::Person, "person_id", effekt.person_id);
 }
 
 /// Toleranz für „vermisst seit" in der Zukunft (design.md D4): fängt eine vorgehende
@@ -403,11 +398,9 @@ pub async fn anlegen(
     if war_neu {
         sse_person(&state, einsatz_id, person.id);
         if let Some(uhs_id) = body.uhs_id {
-            state.live.publiziere_event(
-                einsatz_id,
-                LiveEvent::Uhs,
-                serde_json::json!({ "einsatz_id": einsatz_id, "uhs_id": uhs_id }).to_string(),
-            );
+            state
+                .live
+                .publiziere_objekt(einsatz_id, LiveEvent::Uhs, "uhs_id", uhs_id);
         }
         if let Some(etb_id) = uhs_etb_id {
             state.live.publiziere(einsatz_id, etb_id);

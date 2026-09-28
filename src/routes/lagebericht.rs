@@ -23,10 +23,9 @@ use serde::Deserialize;
 
 /// SSE-Notify: Lageberichte des Einsatzes haben sich geändert. Event-Tag `lagebericht`.
 fn sse_lagebericht(state: &AppState, einsatz_id: i64, lb_id: i64) {
-    let data = serde_json::json!({ "einsatz_id": einsatz_id, "lagebericht_id": lb_id }).to_string();
     state
         .live
-        .publiziere_event(einsatz_id, LiveEvent::Lagebericht, data);
+        .publiziere_objekt(einsatz_id, LiveEvent::Lagebericht, "lagebericht_id", lb_id);
 }
 
 /// GET /api/einsaetze/{id}/lageberichte — Liste. Nur Lesezugriff (inkl. Beobachter).

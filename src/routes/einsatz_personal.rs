@@ -27,11 +27,10 @@ use serde::Deserialize;
 /// Eigenes Tag seit F01/LFH-227: `person` trägt BETROFFENE Personen (Modul `personen`),
 /// hier geht es um disponiertes Personal (Modul `personal`) — die ID-Räume sind disjunkt,
 /// und nur getrennte Tags lassen sich getrennt gaten.
-fn sse_personal(state: &AppState, einsatz_id: i64, ep_id: i64) {
-    let data = serde_json::json!({ "einsatz_id": einsatz_id, "personal_id": ep_id }).to_string();
+pub(super) fn sse_personal(state: &AppState, einsatz_id: i64, ep_id: i64) {
     state
         .live
-        .publiziere_event(einsatz_id, LiveEvent::Personal, data);
+        .publiziere_objekt(einsatz_id, LiveEvent::Personal, "personal_id", ep_id);
 }
 
 /// Personen-Bezeichnung für ETB-Texte: Name, optional mit Funktion in Klammern.

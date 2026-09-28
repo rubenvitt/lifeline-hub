@@ -108,11 +108,7 @@ pub async fn tick_einmal(pool: &SqlitePool, live: &LiveHub, jetzt: DateTime<Utc>
         }
         // Re-Highlight nur bei frischer Eskalation (ein Event, kein Spam auf Folge-Ticks).
         if let Some(mid) = eskaliert_mid {
-            live.publiziere_event(
-                f.einsatz_id,
-                LiveEvent::Sofortmeldung,
-                serde_json::json!({ "einsatz_id": f.einsatz_id, "meldung_id": mid }).to_string(),
-            );
+            live.publiziere_objekt(f.einsatz_id, LiveEvent::Sofortmeldung, "meldung_id", mid);
         }
         ausgeloest += 1;
     }

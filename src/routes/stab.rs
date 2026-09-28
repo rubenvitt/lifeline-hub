@@ -22,11 +22,7 @@ use crate::stab::{BesetzungArt, LagebesprechungAnzeige, Sachgebiet, StabAnzeige,
 use crate::zeit::jetzt;
 
 fn sse(state: &AppState, einsatz_id: i64) {
-    state.live.publiziere_event(
-        einsatz_id,
-        LiveEvent::Stab,
-        serde_json::json!({ "einsatz_id": einsatz_id }).to_string(),
-    );
+    state.live.publiziere_einsatz(einsatz_id, LiveEvent::Stab);
 }
 
 /// Ein unbekanntes Sachgebiet im Pfad ist ein **Feld für sich** → 400 (LFH-267).

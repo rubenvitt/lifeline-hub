@@ -506,11 +506,9 @@ pub async fn heraufstufen_auftrag(
             state.live.publiziere(einsatz_id, etb_id);
         }
     }
-    state.live.publiziere_event(
-        einsatz_id,
-        LiveEvent::Auftrag,
-        serde_json::json!({ "einsatz_id": einsatz_id }).to_string(),
-    );
+    state
+        .live
+        .publiziere_einsatz(einsatz_id, LiveEvent::Auftrag);
     let nachricht = repo::laden(&state.pool, nachricht_id).await?;
     sse_chat(&state, einsatz_id, nachricht_ids(&nachricht));
     Ok((StatusCode::CREATED, Json(nachricht)))

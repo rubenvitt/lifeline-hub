@@ -23,10 +23,9 @@ use serde::Deserialize;
 
 /// SSE-Notify (Lage-Karte): Abschnitt (Fläche/Symbol) hat sich geändert.
 fn sse_abschnitt(state: &AppState, einsatz_id: i64, aid: i64) {
-    let data = serde_json::json!({ "einsatz_id": einsatz_id, "abschnitt_id": aid }).to_string();
     state
         .live
-        .publiziere_event(einsatz_id, LiveEvent::Abschnitt, data);
+        .publiziere_objekt(einsatz_id, LiveEvent::Abschnitt, "abschnitt_id", aid);
 }
 
 /// Längster zulässiger Kurzname — ein Rufname wie „EA-Nord", kein zweiter Name.

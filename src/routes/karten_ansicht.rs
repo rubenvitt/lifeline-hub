@@ -16,11 +16,12 @@ use serde::Deserialize;
 /// `karten_ansicht` — das Frontend filtert exakt darauf und invalidiert den
 /// Ansichts-Cache des Einsatzes.
 fn sse_ansicht(state: &AppState, einsatz_id: i64, ansicht_id: i64) {
-    let data =
-        serde_json::json!({ "einsatz_id": einsatz_id, "ansicht_id": ansicht_id }).to_string();
-    state
-        .live
-        .publiziere_event(einsatz_id, LiveEvent::KartenAnsicht, data);
+    state.live.publiziere_objekt(
+        einsatz_id,
+        LiveEvent::KartenAnsicht,
+        "ansicht_id",
+        ansicht_id,
+    );
 }
 
 /// SSE-Notify für die drei ansichtsgebundenen Objekt-Layer (LFH-320): beim Löschen einer
@@ -30,16 +31,13 @@ fn sse_ansicht(state: &AppState, einsatz_id: i64, ansicht_id: i64) {
 /// `einsatz_id` (das FE invalidiert die ganze Liste). Ohne das sähen andere Clients, die die
 /// betroffene Ansicht offen haben, veraltete Objekte bis zu einem unbezogenen Refetch.
 fn sse_objekt_layer(state: &AppState, einsatz_id: i64) {
-    let data = serde_json::json!({ "einsatz_id": einsatz_id }).to_string();
-    state
-        .live
-        .publiziere_event(einsatz_id, LiveEvent::FreiesZeichen, data.clone());
-    state
-        .live
-        .publiziere_event(einsatz_id, LiveEvent::LageZone, data.clone());
-    state
-        .live
-        .publiziere_event(einsatz_id, LiveEvent::KarteBild, data);
+    for event in [
+        LiveEvent::FreiesZeichen,
+        LiveEvent::LageZone,
+        LiveEvent::KarteBild,
+    ] {
+        state.live.publiziere_einsatz(einsatz_id, event);
+    }
 }
 
 /// GET /api/einsaetze/{id}/karten-ansichten — Liste der Ansichten des Einsatzes.

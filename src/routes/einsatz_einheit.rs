@@ -1,3 +1,6 @@
+use super::einsatz_fahrzeug::sse_fahrzeug;
+use super::einsatz_material::sse_material;
+use super::einsatz_personal::sse_personal;
 use crate::app::AppState;
 use crate::auth::session::CurrentUser;
 use crate::auth::Benutzer;
@@ -26,39 +29,9 @@ use serde::Deserialize;
 
 /// SSE-Notify (Lage-Karte): Einheit hat sich geändert. Frontend filtert per Event-Name.
 fn sse_einheit(state: &AppState, einsatz_id: i64, einheit_id: i64) {
-    let data =
-        serde_json::json!({ "einsatz_id": einsatz_id, "einheit_id": einheit_id }).to_string();
     state
         .live
-        .publiziere_event(einsatz_id, LiveEvent::Einheit, data);
-}
-
-/// SSE-Notify (Lage-Karte): betroffenes Fahrzeug aktualisieren (z.B. bei Zuordnung/Freigabe).
-/// Lokaler Spiegel von `routes::einsatz_fahrzeug::sse_fahrzeug` (gleiche Payload), um
-/// Cross-Modul-Sichtbarkeit zu vermeiden.
-fn sse_fahrzeug(state: &AppState, einsatz_id: i64, ef_id: i64) {
-    let data = serde_json::json!({ "einsatz_id": einsatz_id, "fahrzeug_id": ef_id }).to_string();
-    state
-        .live
-        .publiziere_event(einsatz_id, LiveEvent::Fahrzeug, data);
-}
-
-/// SSE-Notify: disponierte Einsatzkraft aktualisieren (z.B. bei Zuordnung/Freigabe).
-/// Lokaler Spiegel von `routes::einsatz_personal::sse_personal` (Tag `personal`, gleiche Payload).
-fn sse_personal(state: &AppState, einsatz_id: i64, ep_id: i64) {
-    let data = serde_json::json!({ "einsatz_id": einsatz_id, "personal_id": ep_id }).to_string();
-    state
-        .live
-        .publiziere_event(einsatz_id, LiveEvent::Personal, data);
-}
-
-/// SSE-Notify (Meldebild): betroffenes Material aktualisieren (z.B. bei Zuordnung/Freigabe).
-/// Lokaler Spiegel von `routes::einsatz_material::sse_material` (Tag `material`, gleiche Payload).
-fn sse_material(state: &AppState, einsatz_id: i64, em_id: i64) {
-    let data = serde_json::json!({ "einsatz_id": einsatz_id, "material_id": em_id }).to_string();
-    state
-        .live
-        .publiziere_event(einsatz_id, LiveEvent::Material, data);
+        .publiziere_objekt(einsatz_id, LiveEvent::Einheit, "einheit_id", einheit_id);
 }
 
 /// Holt den Einsatz + Rolle und prüft Schreibrecht + aktiv. Liefert den Einsatz.

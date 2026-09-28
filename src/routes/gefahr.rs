@@ -20,12 +20,12 @@ use serde::Deserialize;
 
 /// SSE-Notify: die Gefahrenmatrix eines Gebiets hat sich geändert. Event-Tag `gefahr`.
 fn sse_gefahr(state: &AppState, einsatz_id: i64, gefahrengebiet_id: i64) {
-    let data =
-        serde_json::json!({ "einsatz_id": einsatz_id, "gefahrengebiet_id": gefahrengebiet_id })
-            .to_string();
-    state
-        .live
-        .publiziere_event(einsatz_id, LiveEvent::Gefahr, data);
+    state.live.publiziere_objekt(
+        einsatz_id,
+        LiveEvent::Gefahr,
+        "gefahrengebiet_id",
+        gefahrengebiet_id,
+    );
 }
 
 /// GET /api/einsaetze/{id}/gefahrengebiete — alle Gefahrengebiete (Übersicht/Karten-Styling).

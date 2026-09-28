@@ -49,10 +49,9 @@ pub struct BrFahrzeugKurz {
 // ---------- ETB-/SSE-Helfer ----------
 
 fn sse_br(state: &AppState, einsatz_id: i64, br_id: i64) {
-    let data = serde_json::json!({ "einsatz_id": einsatz_id, "br_id": br_id }).to_string();
     state
         .live
-        .publiziere_event(einsatz_id, LiveEvent::Bereitstellungsraum, data);
+        .publiziere_objekt(einsatz_id, LiveEvent::Bereitstellungsraum, "br_id", br_id);
 }
 
 // ---------- Detail-Helfer ----------

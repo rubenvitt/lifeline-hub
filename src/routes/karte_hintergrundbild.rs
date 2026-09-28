@@ -24,10 +24,9 @@ const MODUL_KEY: &str = "lagekarte";
 
 /// SSE-Notify: ein Bild-Hintergrund hat sich geändert. Event-Tag `karte_bild`.
 fn sse_bild(state: &AppState, einsatz_id: i64) {
-    let data = serde_json::json!({ "einsatz_id": einsatz_id }).to_string();
     state
         .live
-        .publiziere_event(einsatz_id, LiveEvent::KarteBild, data);
+        .publiziere_einsatz(einsatz_id, LiveEvent::KarteBild);
 }
 
 /// GET Liste (Metadaten ohne BLOB). Nur Lesezugriff.

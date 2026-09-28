@@ -1,3 +1,4 @@
+use super::einsatz_personal::sse_personal;
 use crate::app::AppState;
 use crate::auth::session::CurrentUser;
 use crate::einsatz::berechtigung::{
@@ -24,20 +25,10 @@ use axum::Json;
 use serde::Deserialize;
 
 /// SSE-Notify (Lage-Karte): Fahrzeug-Disposition hat sich geändert.
-fn sse_fahrzeug(state: &AppState, einsatz_id: i64, ef_id: i64) {
-    let data = serde_json::json!({ "einsatz_id": einsatz_id, "fahrzeug_id": ef_id }).to_string();
+pub(super) fn sse_fahrzeug(state: &AppState, einsatz_id: i64, ef_id: i64) {
     state
         .live
-        .publiziere_event(einsatz_id, LiveEvent::Fahrzeug, data);
-}
-
-/// SSE-Notify: disponierte Einsatzkraft aktualisieren (z.B. bei Besatzungs-Zuordnung/
-/// -Freigabe). Lokaler Spiegel von `routes::einsatz_personal::sse_personal` (Tag `personal`).
-fn sse_personal(state: &AppState, einsatz_id: i64, ep_id: i64) {
-    let data = serde_json::json!({ "einsatz_id": einsatz_id, "personal_id": ep_id }).to_string();
-    state
-        .live
-        .publiziere_event(einsatz_id, LiveEvent::Personal, data);
+        .publiziere_objekt(einsatz_id, LiveEvent::Fahrzeug, "fahrzeug_id", ef_id);
 }
 
 /// GET /api/einsaetze/{id}/fahrzeuge — disponierte Fahrzeuge (aufgelöst). Nur Mitglieder/höhere Berechtigung.

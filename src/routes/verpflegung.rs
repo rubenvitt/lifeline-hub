@@ -44,11 +44,9 @@ fn publiziere(state: &AppState, einsatz_id: i64, etb_ids: &[i64]) {
     for etb_id in etb_ids {
         state.live.publiziere(einsatz_id, *etb_id);
     }
-    state.live.publiziere_event(
-        einsatz_id,
-        LiveEvent::Verpflegung,
-        serde_json::json!({ "einsatz_id": einsatz_id }).to_string(),
-    );
+    state
+        .live
+        .publiziere_einsatz(einsatz_id, LiveEvent::Verpflegung);
 }
 
 async fn startwert(state: &AppState, einsatz_id: i64) -> Result<i64, AppError> {

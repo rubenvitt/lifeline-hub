@@ -22,11 +22,10 @@ use serde::Deserialize;
 /// SSE-Notify (Lage-Karte/Meldebild): Material-Disposition hat sich geändert.
 /// Wird unbedingt nach jeder Mutation gesendet — auch bei reinen Bemerkungs-/
 /// UHS-Zuordnungs-Änderungen, die keinen ETB-Eintrag schreiben (LFH-66).
-fn sse_material(state: &AppState, einsatz_id: i64, em_id: i64) {
-    let data = serde_json::json!({ "einsatz_id": einsatz_id, "material_id": em_id }).to_string();
+pub(super) fn sse_material(state: &AppState, einsatz_id: i64, em_id: i64) {
     state
         .live
-        .publiziere_event(einsatz_id, LiveEvent::Material, data);
+        .publiziere_objekt(einsatz_id, LiveEvent::Material, "material_id", em_id);
 }
 
 /// GET /api/einsaetze/{id}/material — disponiertes Material (aufgelöst). Nur Lesezugriff.

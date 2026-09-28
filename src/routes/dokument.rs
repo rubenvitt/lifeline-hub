@@ -21,11 +21,9 @@ use crate::routes::support::pflicht;
 use super::support::anhang_antwort;
 
 fn sse(state: &AppState, einsatz_id: i64) {
-    state.live.publiziere_event(
-        einsatz_id,
-        LiveEvent::Dokument,
-        serde_json::json!({ "einsatz_id": einsatz_id }).to_string(),
-    );
+    state
+        .live
+        .publiziere_einsatz(einsatz_id, LiveEvent::Dokument);
 }
 
 /// GET /api/einsaetze/{id}/dokumente — lebende Dokumente, neueste zuerst.

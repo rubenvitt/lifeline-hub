@@ -22,20 +22,19 @@ use serde::Deserialize;
 
 /// SSE-Notify: Meldungen des Einsatzes haben sich geändert (Tag `meldung`).
 fn sse(state: &AppState, einsatz_id: i64) {
-    state.live.publiziere_event(
-        einsatz_id,
-        LiveEvent::Meldung,
-        serde_json::json!({ "einsatz_id": einsatz_id }).to_string(),
-    );
+    state
+        .live
+        .publiziere_einsatz(einsatz_id, LiveEvent::Meldung);
 }
 
 /// SSE-Notify: unübersehbares Sofort-Highlight (Tag `sofortmeldung`, LFH-97). Läuft über
 /// dieselbe eine EventSource pro Einsatz; der Client löst Alarm (visuell + Ton) aus.
 fn sse_sofort(state: &AppState, einsatz_id: i64, meldung_id: i64) {
-    state.live.publiziere_event(
+    state.live.publiziere_objekt(
         einsatz_id,
         LiveEvent::Sofortmeldung,
-        serde_json::json!({ "einsatz_id": einsatz_id, "meldung_id": meldung_id }).to_string(),
+        "meldung_id",
+        meldung_id,
     );
 }
 
@@ -517,11 +516,9 @@ pub async fn auftrag_erteilen(
             state.live.publiziere(einsatz_id, etb_id);
         }
     }
-    state.live.publiziere_event(
-        einsatz_id,
-        LiveEvent::Auftrag,
-        serde_json::json!({ "einsatz_id": einsatz_id }).to_string(),
-    );
+    state
+        .live
+        .publiziere_einsatz(einsatz_id, LiveEvent::Auftrag);
     sse(&state, einsatz_id);
 
     let m = repo::laden(&state.pool, meldung_id, &now).await?;

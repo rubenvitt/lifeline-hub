@@ -387,6 +387,27 @@ impl LiveHub {
         );
     }
 
+    /// Modul-Ereignis mit der üblichen ID-only-Payload `{"einsatz_id": …, <schluessel>: id}`.
+    pub fn publiziere_objekt(&self, einsatz_id: i64, event: LiveEvent, schluessel: &str, id: i64) {
+        let mut data = serde_json::Map::new();
+        data.insert("einsatz_id".into(), einsatz_id.into());
+        data.insert(schluessel.into(), id.into());
+        self.publiziere_event(
+            einsatz_id,
+            event,
+            serde_json::Value::Object(data).to_string(),
+        );
+    }
+
+    /// Modul-Ereignis ohne Objekt-Kennung: Payload `{"einsatz_id": …}` (Listen-Refresh).
+    pub fn publiziere_einsatz(&self, einsatz_id: i64, event: LiveEvent) {
+        self.publiziere_event(
+            einsatz_id,
+            event,
+            serde_json::json!({ "einsatz_id": einsatz_id }).to_string(),
+        );
+    }
+
     /// Sendet ein getaggtes Event an alle Abonnenten eines Einsatzes.
     ///
     /// Vergibt die monotone Id, pflegt den Replay-Ring und sendet — alles unter EINEM

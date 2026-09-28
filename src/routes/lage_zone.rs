@@ -22,10 +22,9 @@ use serde::Deserialize;
 
 /// SSE-Notify (Lage-Karte): eine Zone hat sich geändert. Event-Tag `lage_zone`.
 pub(crate) fn sse_zone(state: &AppState, einsatz_id: i64, zid: i64) {
-    let data = serde_json::json!({ "einsatz_id": einsatz_id, "zone_id": zid }).to_string();
     state
         .live
-        .publiziere_event(einsatz_id, LiveEvent::LageZone, data);
+        .publiziere_objekt(einsatz_id, LiveEvent::LageZone, "zone_id", zid);
 }
 
 /// SSE-Notify an das Modul Betreuung (LFH-673): die Flächenzahl eines Bezirks hat sich
@@ -33,10 +32,9 @@ pub(crate) fn sse_zone(state: &AppState, einsatz_id: i64, zid: i64) {
 /// `lage_zone` erreicht nur Leser von Lagekarte/Gefahren — wer nur die Betreuung liest, sähe
 /// `flaechen` sonst nie nachziehen. Nutzlast nur Kennungen, wie in `routes/betreuung.rs`.
 fn sse_bezirk(state: &AppState, einsatz_id: i64, bezirk_id: i64) {
-    let data = serde_json::json!({ "einsatz_id": einsatz_id, "bezirk_id": bezirk_id }).to_string();
     state
         .live
-        .publiziere_event(einsatz_id, LiveEvent::Betreuung, data);
+        .publiziere_objekt(einsatz_id, LiveEvent::Betreuung, "bezirk_id", bezirk_id);
 }
 
 /// Prüft eine Bezirks-Zuordnung (LFH-673, design.md D4/D5). Reihenfolge = Codes:
@@ -349,12 +347,9 @@ pub async fn aktualisieren(
     // Merge/Split hat die Gebiete-Liste verändert → zusätzlich gefahr-Event (Design-Spec).
     if gebiet_patch.is_some() {
         if let Some(gid) = z.gefahrengebiet_id {
-            state.live.publiziere_event(
-                einsatz_id,
-                LiveEvent::Gefahr,
-                serde_json::json!({ "einsatz_id": einsatz_id, "gefahrengebiet_id": gid })
-                    .to_string(),
-            );
+            state
+                .live
+                .publiziere_objekt(einsatz_id, LiveEvent::Gefahr, "gefahrengebiet_id", gid);
         }
     }
 

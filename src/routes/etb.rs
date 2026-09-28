@@ -303,11 +303,9 @@ pub async fn auftrag_erteilen(
     if let Some(etb_id) = detail.auftrag.etb_anordnung_id {
         state.live.publiziere(einsatz_id, etb_id);
     }
-    state.live.publiziere_event(
-        einsatz_id,
-        LiveEvent::Auftrag,
-        serde_json::json!({ "einsatz_id": einsatz_id }).to_string(),
-    );
+    state
+        .live
+        .publiziere_einsatz(einsatz_id, LiveEvent::Auftrag);
 
     Ok((StatusCode::CREATED, Json(detail)))
 }

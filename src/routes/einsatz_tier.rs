@@ -30,10 +30,9 @@ use serde::Deserialize;
 /// Dediziertes `tier`-SSE-Event OHNE sensible Payload (nur einsatz_id + tier_id);
 /// Clients refetchen.
 fn sse_tier(state: &AppState, einsatz_id: i64, tier_id: i64) {
-    let data = serde_json::json!({ "einsatz_id": einsatz_id, "tier_id": tier_id }).to_string();
     state
         .live
-        .publiziere_event(einsatz_id, LiveEvent::Tier, data);
+        .publiziere_objekt(einsatz_id, LiveEvent::Tier, "tier_id", tier_id);
 }
 
 // ============================== Routen ==============================

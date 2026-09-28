@@ -2,9 +2,9 @@
 //!
 //! Bündelt die zuvor 9–18-fach wörtlich kopierten Infrastruktur-Helfer an EINER Stelle,
 //! damit ein Fix (z. B. an der Tri-State-PATCH-Semantik oder am lagged-Resync) alle
-//! Routen zugleich erreicht, statt zwischen byte-identischen Kopien zu driften. Die
-//! modul-spezifischen `sse_*`-Notify-Wrapper bleiben bewusst lokal (unterscheiden sich in
-//! Event-Name und Payload-Keys).
+//! Routen zugleich erreicht, statt zwischen byte-identischen Kopien zu driften. Die Payload
+//! der `sse_*`-Wrapper baut `LiveHub::publiziere_objekt` / `publiziere_einsatz`; jeder
+//! Wrapper steht einmal, im Modul, dem das Ereignis gehört.
 
 use crate::anhang;
 use crate::error::AppError;

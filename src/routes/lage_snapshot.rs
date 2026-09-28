@@ -17,11 +17,12 @@ use axum::Json;
 /// SSE-Notify (Lage-Karte): ein Snapshot wurde angelegt/geändert/gelöscht. Wire-Tag
 /// `lage_snapshot` — das Frontend filtert exakt darauf und invalidiert die Snapshot-Liste.
 fn sse_snapshot(state: &AppState, einsatz_id: i64, snapshot_id: i64) {
-    let data =
-        serde_json::json!({ "einsatz_id": einsatz_id, "snapshot_id": snapshot_id }).to_string();
-    state
-        .live
-        .publiziere_event(einsatz_id, LiveEvent::LageSnapshot, data);
+    state.live.publiziere_objekt(
+        einsatz_id,
+        LiveEvent::LageSnapshot,
+        "snapshot_id",
+        snapshot_id,
+    );
 }
 
 /// GET /api/einsaetze/{id}/lage-snapshots — Metadaten-Liste (neueste zuerst, ohne `daten`).

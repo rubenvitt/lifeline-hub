@@ -26,11 +26,9 @@ use serde::Deserialize;
 
 /// SSE-Notify: Erinnerungen des Einsatzes haben sich geändert (Tag `erinnerung`).
 fn sse(state: &AppState, einsatz_id: i64) {
-    state.live.publiziere_event(
-        einsatz_id,
-        LiveEvent::Erinnerung,
-        serde_json::json!({ "einsatz_id": einsatz_id }).to_string(),
-    );
+    state
+        .live
+        .publiziere_einsatz(einsatz_id, LiveEvent::Erinnerung);
 }
 
 #[derive(Debug, Deserialize)]

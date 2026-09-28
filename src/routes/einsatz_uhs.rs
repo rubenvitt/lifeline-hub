@@ -1,3 +1,4 @@
+use super::einsatz_person::sse_person;
 use crate::app::AppState;
 use crate::auth::session::CurrentUser;
 use crate::einsatz::berechtigung::{
@@ -44,17 +45,9 @@ pub struct UhsDetail {
 // ---------- ETB-/SSE-Helfer (lokales Muster wie in anderen Routen) ----------
 
 fn sse_uhs(state: &AppState, einsatz_id: i64, uhs_id: i64) {
-    let data = serde_json::json!({ "einsatz_id": einsatz_id, "uhs_id": uhs_id }).to_string();
     state
         .live
-        .publiziere_event(einsatz_id, LiveEvent::Uhs, data);
-}
-
-fn sse_person(state: &AppState, einsatz_id: i64, person_id: i64) {
-    let data = serde_json::json!({ "einsatz_id": einsatz_id, "person_id": person_id }).to_string();
-    state
-        .live
-        .publiziere_event(einsatz_id, LiveEvent::Person, data);
+        .publiziere_objekt(einsatz_id, LiveEvent::Uhs, "uhs_id", uhs_id);
 }
 
 // ============================== UHS-Routen ==============================
