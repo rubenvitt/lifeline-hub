@@ -28,14 +28,14 @@
 | 3 | **Rückmeldung vor der Serverantwort** | **nicht anwendbar** | Keine Serveraktion, das Umschalten wirkt sofort lokal | — |
 | 4 | **Kritische Aktion hat eine zweite Handlung** | **nicht anwendbar** | Umkehrbar, ändert keine Daten | — |
 | 5 | **Kontrast in beiden Modi** | **erfüllt** `[abgeleitet]` | Ikone ist Nicht-Text (Boden 3 : 1), gerechnet aus `tokens.ts`: Tag `gedaempft`/`flaeche` 8,42, Hover auf `flaeche3` 6,60, gesperrt `schwach` 6,37 · Nacht 7,27 / 6,83 / 5,03. Nicht im Browser gemessen | — |
-| 6 | **Kein Status allein über Farbe** | **erfüllt** | Zustand im Namen („ausblenden“/„einblenden“), in `aria-expanded` und in der Ikone (Einklappen/Ausklappen). Gesperrt: `aria-disabled`, fokussierbar, Grund als zugängliche Beschreibung. Auf Touch erscheint der `title` nicht; dann steht die erzwingende Auswahl bzw. der Platzier-Modus selbst sichtbar in der Leiste | — |
+| 6 | **Kein Status allein über Farbe** | **erfüllt** | Zustand im Namen („ausblenden“/„einblenden“), in `aria-expanded` und in der Ikone (Einklappen/Ausklappen). Gesperrt ab `lg`: `aria-disabled`, fokussierbar, Grund als zugängliche Beschreibung. Unter `lg` bleibt der Kopfknopf (Bestand) ein natives `disabled` mit Grund nur im `title`. Auf Touch erscheint der `title` nicht; dann steht die erzwingende Auswahl bzw. der Platzier-Modus selbst sichtbar in der Leiste | — |
 | 7 | **Eine Farbe = eine Bedeutung** | **erfüllt** | `gedaempft` wie Zoom und Nordung, kein Blau (bedient nichts Primäres), kein Rot | — |
 | 8 | **Helligkeits-/Kontrastregler** | **offen → LFH-397** | App-weite Lücke, unverändert | LFH-397 |
 | 9 | **Kritische Anzeigen im Blickfeld** | **erfüllt** | Eine Auswahl und ein Platzier-Modus holen die Leiste zurück; der einzige „Abbrechen“-Knopf der Platzier-Modi bleibt damit erreichbar | — |
 | 10 | **Alarmbudget** | **nicht anwendbar** | Keine Alarme | — |
 | 11 | **Warnverhalten** | **nicht anwendbar** | Kein Blinken, kein Ton | — |
 | 12 | **Kein Sprung unter dem Cursor** | **erfüllt** | Die Kartenbreite ändert sich nur auf eine eigene Handlung, nie durch ein Live-Ereignis. **Benannt:** bei ausgeblendeter Leiste holt ein Markerklick oder ein Platzier-Modus sie zurück; die Karte wird 300 px schmaler und der Inhalt rückt um rund 150 px. Endet die Auswahl, wächst sie zurück. Das ist die Folge der erzwungenen Leiste, unter `lg` gab es dasselbe senkrecht | — |
-| 13 | **Fokus nie verdeckt** | **erfüllt** | `fokus-verdeckung.spec.ts` grün; der Fuß endet vor der Knopfspalte (`fussStil(knopfKante)`), der Block wird dabei nur länger | — |
+| 13 | **Fokus nie verdeckt** | **erfüllt** | `fokus-verdeckung.spec.ts` grün; der Fuß endet vor der Knopfspalte (`fussStil(knopfKante)`), der Block wird dabei nur länger. **Nicht gemessen:** sechs Knöpfe à 72 px ergeben in Handschuh rund 451 px Block; belegt ist 1024 × 768, niedrigere Fensterhöhen (Tablet mit Browserleiste) und der Fall mit Historienbanner nicht | — |
 | 14 | **Tabellenseite vollständig** | **nicht anwendbar** | Keine Tabelle | — |
 | 15 | **Erfassungsmaske vollständig** | **nicht anwendbar** | Keine Erfassung | — |
 
