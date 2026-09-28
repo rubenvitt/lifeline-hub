@@ -1,20 +1,16 @@
-//! Katalog-Lookup des Demo-Imports (LFH-690, design.md D8).
+//! Katalog-Lookup des Demo-Imports (LFH-690).
 //!
-//! **Kataloge werden nie angelegt, nur mitbenutzt.** Eine neu angelegte Katalogzeile würde
-//! per `NO ACTION` von echten Einsätzen festgehalten und machte das Entfernen unsauber
-//! (Entscheidung Auftraggeber, 24.09.2026). Jeder Lookup sieht nur **aktive** Einträge der
-//! **eigenen** Organisation. Fehlt einer, bricht der Import mit 422 ab und nennt ihn:
-//! „Katalogeintrag fehlt: Einheitstyp «Gruppe»“.
+//! **Kataloge werden nie angelegt, nur mitbenutzt:** eine neue Katalogzeile würde per
+//! `NO ACTION` von echten Einsätzen festgehalten und machte das Entfernen unsauber. Jeder
+//! Lookup sieht nur **aktive** Einträge der **eigenen** Organisation; fehlt einer, bricht der
+//! Import mit 422 ab und nennt ihn („Katalogeintrag fehlt: Einheitstyp «Gruppe»“).
 //!
-//! Die Prüfungen der Fach-Repos reichen dafür nicht, und das ist der Grund für dieses Modul:
-//! `personal::repo::setze_qualifikationen` prüft `aktiv` nicht und verwirft eine fremde ID
-//! still (`INSERT OR IGNORE … WHERE org_id = ?`), `einheit::typ_repo::ist_in_org` lässt
-//! deaktivierte Typen bewusst gelten, und die Dispositionen setzen ohne passenden Status
-//! still `NULL`.
+//! Die Prüfungen der Fach-Repos reichen dafür nicht: `personal::repo::setze_qualifikationen`
+//! prüft `aktiv` nicht und verwirft eine fremde ID still, `einheit::typ_repo::ist_in_org` lässt
+//! deaktivierte Typen gelten, und die Dispositionen setzen ohne passenden Status still `NULL`.
 //!
-//! Alle Helfer arbeiten auf der offenen Verbindung des Imports, committen nicht und sind für
-//! den Einsatz-Teil (Block 4.2) gedacht. Bei mehreren Treffern gewinnt der erste nach
-//! `sortier, id`, dieselbe Ordnung wie `erster_der_kategorie_tx`.
+//! Alle Helfer arbeiten auf der offenen Verbindung des Imports und committen nicht. Bei
+//! mehreren Treffern gewinnt der erste nach `sortier, id` (wie `erster_der_kategorie_tx`).
 
 use sqlx::SqliteConnection;
 
@@ -42,7 +38,7 @@ impl Katalog {
     }
 }
 
-/// Die 422-Meldung für einen fehlenden Eintrag (design.md D3/D8).
+/// Die 422-Meldung für einen fehlenden Eintrag.
 pub fn fehlt(katalog: Katalog, bezeichnung: &str) -> AppError {
     AppError::UnprocessableEntity(format!(
         "Katalogeintrag fehlt: {} «{bezeichnung}»",
@@ -187,8 +183,8 @@ pub struct KatalogIds {
 }
 
 impl KatalogIds {
-    /// ID eines aufgelösten Eintrags. Ein Eintrag, der nicht im Bedarf stand, ist ein
-    /// Programmierfehler des Drehbuchs und endet laut als `Internal`, nie als stilles `None`.
+    /// ID eines aufgelösten Eintrags. Ein Eintrag außerhalb des Bedarfs ist ein Programmierfehler
+    /// des Drehbuchs und endet laut als `Internal`, nie als stilles `None`.
     pub fn id(&self, eintrag: Katalogeintrag) -> Result<i64, AppError> {
         self.eintraege
             .iter()
