@@ -7,9 +7,11 @@ import {
   baueLageMeldungMarker,
   baueFreieZeichenMarker,
   baueFreiesZeichenTz,
+  baueAbschnittMarker,
   type TaktischeQuelle,
 } from './marker';
 import { rollenFarbe } from '../../theme/statusFarben';
+import { antdToken, farbenDunkel, type Dichte } from '../../theme/tokens';
 import type {
   Betreuungsstelle,
   EinsatzAnzeige,
@@ -213,6 +215,7 @@ describe('baueBetreuungMarker (LFH-673)', () => {
         label: 'NU Turnhalle Nord',
         farbe: rollenFarbe('bedien', token),
         tz: { grundzeichen: 'stelle', fachaufgabe: 'betreuung' },
+        trefferDurchmesser: token.controlHeight,
       },
     ]);
   });
@@ -232,10 +235,10 @@ describe('baueBetreuungMarker (LFH-673)', () => {
 
 describe('baueLageMeldungMarker', () => {
   it('erzeugt Marker nur für verortete Lagemeldungen, mit Herkunfts-Info', () => {
-    const marker = baueLageMeldungMarker([
-      lageMeldung({ id: 4, lat: 50.3, lon: 8.7 }),
-      lageMeldung({ id: 5, lat: null, lon: null }),
-    ]);
+    const marker = baueLageMeldungMarker(
+      [lageMeldung({ id: 4, lat: 50.3, lon: 8.7 }), lageMeldung({ id: 5, lat: null, lon: null })],
+      token,
+    );
     expect(marker.map((m) => m.schluessel)).toEqual(['lagemeldung-4']);
     expect(marker[0].typ).toBe('lagemeldung');
     expect(marker[0].lageMeldung).toEqual({
@@ -247,7 +250,7 @@ describe('baueLageMeldungMarker', () => {
   });
 
   it('setzt kein taktisches Zeichen (Lagemeldung bleibt Kreis)', () => {
-    const marker = baueLageMeldungMarker([lageMeldung({ id: 4, lat: 50.3, lon: 8.7 })]);
+    const marker = baueLageMeldungMarker([lageMeldung({ id: 4, lat: 50.3, lon: 8.7 })], token);
     expect(marker[0].tz).toBeUndefined();
   });
 });
@@ -274,12 +277,15 @@ describe('baueTaktischeMarker', () => {
         tz_organisation: null,
       },
     ] as unknown as TaktischeQuelle['einheiten'];
-    const { verortet, nichtVerortet } = baueTaktischeMarker({
-      einheiten,
-      fahrzeuge: [],
-      fuehrungskraefte: [],
-      orgDefault: 'hilfsorganisation',
-    });
+    const { verortet, nichtVerortet } = baueTaktischeMarker(
+      {
+        einheiten,
+        fahrzeuge: [],
+        fuehrungskraefte: [],
+        orgDefault: 'hilfsorganisation',
+      },
+      token,
+    );
     expect(verortet.find((m) => m.schluessel === 'einheit-1')?.tz?.grundzeichen).toBe(
       'taktische-formation',
     );
@@ -301,12 +307,15 @@ describe('baueTaktischeMarker', () => {
         traegerorganisation: 'Feuerwehr',
       },
     ] as unknown as TaktischeQuelle['fahrzeuge'];
-    const { verortet } = baueTaktischeMarker({
-      einheiten: [],
-      fahrzeuge,
-      fuehrungskraefte: [],
-      orgDefault: null,
-    });
+    const { verortet } = baueTaktischeMarker(
+      {
+        einheiten: [],
+        fahrzeuge,
+        fuehrungskraefte: [],
+        orgDefault: null,
+      },
+      token,
+    );
     const tz = verortet.find((m) => m.schluessel === 'fahrzeug-7')?.tz;
     expect(tz?.grundzeichen).toBe('wasserfahrzeug');
     expect(tz?.organisation).toBe('feuerwehr');
@@ -326,12 +335,15 @@ describe('baueTaktischeMarker', () => {
         ist_abschnittsleiter: false,
       },
     ] as unknown as TaktischeQuelle['fuehrungskraefte'];
-    const { verortet } = baueTaktischeMarker({
-      einheiten: [],
-      fahrzeuge: [],
-      fuehrungskraefte,
-      orgDefault: null,
-    });
+    const { verortet } = baueTaktischeMarker(
+      {
+        einheiten: [],
+        fahrzeuge: [],
+        fuehrungskraefte,
+        orgDefault: null,
+      },
+      token,
+    );
     const tz = verortet.find((m) => m.schluessel === 'fuehrung-3')?.tz;
     expect(tz?.funktion).toBe('fuehrungskraft');
     expect(tz?.fachaufgabe).toBe('rettungswesen');
@@ -404,16 +416,19 @@ describe('baueFreiesZeichenTz (accepts-Gating aus taktische-zeichen-core-Katalog
 
 describe('baueFreieZeichenMarker', () => {
   it('baut Karten-Marker mit stabilem Schlüssel, Typ und taktischem Zeichen', () => {
-    const marker = baueFreieZeichenMarker([
-      freiesZeichen({
-        id: 7,
-        lat: 50.1,
-        lon: 8.1,
-        grundzeichen: 'stelle',
-        label: 'Sammelplatz',
-        farbe: '#123456',
-      }),
-    ]);
+    const marker = baueFreieZeichenMarker(
+      [
+        freiesZeichen({
+          id: 7,
+          lat: 50.1,
+          lon: 8.1,
+          grundzeichen: 'stelle',
+          label: 'Sammelplatz',
+          farbe: '#123456',
+        }),
+      ],
+      token,
+    );
     expect(marker).toHaveLength(1);
     expect(marker[0].schluessel).toBe('freies_zeichen-7');
     expect(marker[0].typ).toBe('freies_zeichen');
@@ -425,8 +440,114 @@ describe('baueFreieZeichenMarker', () => {
   });
 
   it('nutzt sinnvolle Defaults für label und farbe, wenn nicht gesetzt', () => {
-    const marker = baueFreieZeichenMarker([freiesZeichen({ id: 2, label: null, farbe: null })]);
+    const marker = baueFreieZeichenMarker(
+      [freiesZeichen({ id: 2, label: null, farbe: null })],
+      token,
+    );
     expect(marker[0].label).toBe('(freies Zeichen)');
     expect(marker[0].farbe).toBeTruthy();
+  });
+});
+
+/**
+ * Trefferzone der Kräfte- und Objektmarker (LFH-711, Nachzug zu LFH-650).
+ *
+ * Bis hierher trugen nur die Betroffenen eine unsichtbare Trefferzone; auf der Lagekarte war
+ * die Trefffläche das gezeichnete Zeichen (≤ 34 px, zoomabhängig) bzw. der Kreis einer
+ * Lagemeldung (22 px). Jetzt setzt JEDER Builder der Lagekarte `trefferDurchmesser` aus
+ * `controlHeight` — die Staffel aus dem echten Dichte-Helfer (`antdToken`), die Böden als
+ * Literale: ein Token, der seine Erwartung selbst mitbringt, prüfte nur sich selbst.
+ */
+describe('Trefferzone je Dichtestufe (LFH-711)', () => {
+  const STUFEN = [
+    { dichte: 'kompakt', boden: 30 },
+    { dichte: 'handschuh', boden: 72 },
+  ] as const;
+  const tokenFuer = (dichte: Dichte) =>
+    theme.getDesignToken({ token: antdToken(farbenDunkel, dichte) });
+
+  function alleLagekartenMarker(t: ReturnType<typeof tokenFuer>) {
+    const einsatz = {
+      einsatzort_lat: 50,
+      einsatzort_lon: 8,
+      einsatzort: 'Marktplatz',
+    } as unknown as EinsatzAnzeige;
+    const objekte = baueMarker(
+      einsatz,
+      [uhs({ id: 5, lat: 50.1, lon: 8.1 })],
+      [schaden({ id: 9, lat: 50.2, lon: 8.2 })],
+      t,
+    ).verortet;
+    const stellen = baueBetreuungMarker([stelle({ lat: 51.93, lon: 8.87 })], t).verortet;
+    const kraefte = baueTaktischeMarker(
+      {
+        einheiten: [
+          { id: 1, name: 'Zug 1', typ_label: 'Zug', lat: 50.1, lon: 8.6 },
+        ] as unknown as TaktischeQuelle['einheiten'],
+        fahrzeuge: [
+          { id: 7, funkrufname: 'Florian 1', lat: 50.2, lon: 8.7, status_farbe: '#0a0' },
+        ] as unknown as TaktischeQuelle['fahrzeuge'],
+        fuehrungskraefte: [
+          { id: 3, name: 'Meier', lat: 50.3, lon: 8.8 },
+        ] as unknown as TaktischeQuelle['fuehrungskraefte'],
+        orgDefault: null,
+      },
+      t,
+    ).verortet;
+    const abschnitt = baueAbschnittMarker(
+      { id: 4, name: 'EA Nord', tz_fachaufgabe: null, tz_organisation: null },
+      {
+        type: 'Polygon',
+        coordinates: [
+          [
+            [8, 50],
+            [8.1, 50],
+            [8.1, 50.1],
+            [8, 50],
+          ],
+        ],
+      },
+      [8.05, 50.05],
+      null,
+      t,
+    );
+    const meldungen = baueLageMeldungMarker([lageMeldung({ id: 4, lat: 50.3, lon: 8.7 })], t);
+    const zeichen = baueFreieZeichenMarker([freiesZeichen({ id: 2, lat: 50.4, lon: 8.4 })], t);
+    return [...objekte, ...stellen, ...kraefte, abschnitt, ...meldungen, ...zeichen];
+  }
+
+  it('deckt jede Markersorte der Lagekarte ab (außer den Betroffenen, die LFH-650 trägt)', () => {
+    // Selbstprobe der Stichprobe: fehlt hier eine Sorte, prüfte der nächste Test sie nicht.
+    const typen = new Set(alleLagekartenMarker(tokenFuer('kompakt')).map((m) => m.typ));
+    expect([...typen].sort()).toEqual(
+      [
+        'abschnitt',
+        'betreuungsstelle',
+        'einheit',
+        'einsatzort',
+        'fahrzeug',
+        'freies_zeichen',
+        'fuehrung',
+        'lagemeldung',
+        'schaden',
+        'uhs',
+      ].sort(),
+    );
+  });
+
+  for (const { dichte, boden } of STUFEN) {
+    it(`setzt trefferDurchmesser = controlHeight in „${dichte}" (${boden} px)`, () => {
+      for (const m of alleLagekartenMarker(tokenFuer(dichte))) {
+        expect(m.trefferDurchmesser, m.schluessel).toBe(boden);
+      }
+    });
+  }
+
+  it('die Stufe schlägt durch: kompakt ist streng kleiner als handschuh', () => {
+    // Gegenprobe: eine feste Zahl in den Buildern bestünde beide Böden nicht, aber ein
+    // Boden allein belegte nicht, dass die Zone überhaupt der Stufe folgt.
+    const k = alleLagekartenMarker(tokenFuer('kompakt'))[0].trefferDurchmesser!;
+    const h = alleLagekartenMarker(tokenFuer('handschuh'))[0].trefferDurchmesser!;
+    expect(k).toBeLessThan(h);
   });
 });

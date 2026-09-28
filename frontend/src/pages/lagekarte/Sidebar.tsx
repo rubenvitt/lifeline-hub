@@ -25,7 +25,8 @@ import {
 } from '@ant-design/icons';
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { TbLayersIntersect } from 'react-icons/tb';
-import { monoStil, useRollen } from '../../components/instrument';
+import { monoStil, Segmentleiste, useRollen } from '../../components/instrument';
+import { griffHinweis, type GriffModus } from './bildGriffe';
 import { KlappPaneel, LeistenAbschnitt, usePaneelZustand } from './KlappPaneel';
 import {
   ebenenFarbe,
@@ -264,6 +265,9 @@ export interface SidebarProps {
   /** Mittelpunkt des gerade platzierten Bilds numerisch setzen. */
   onBildMittelpunkt: (lat: number, lon: number) => void;
   bildPlatzierenId: number | null;
+  /** Scharfe Griffsorte beim Bild-Einpassen (LFH-711). */
+  griffModus: GriffModus;
+  onGriffModus: (modus: GriffModus) => void;
   /** Aktueller Mittelpunkt des Platzier-Bilds (für die numerische Eingabe). */
   bildPlatzierZentrum: LatLon | null;
   /** Ansichts-Switcher (B/LFH-320). */
@@ -1255,9 +1259,26 @@ export default function Sidebar(props: SidebarProps) {
                       borderRadius: token.borderRadiusSM,
                     }}
                   >
-                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                      Auf der Karte: Ecken = Größe (Seitenverhältnis), Kanten = frei strecken, ↻ =
-                      drehen, Mitte = verschieben. Oder Mittelpunkt numerisch:
+                    {/* Der Umschalter statt zehn gleichzeitig scharfer Griffe (LFH-711): in
+                        Fingergröße lägen Ecken, Kanten, Drehung und Mitte auf einem daumengroßen
+                        Bild übereinander. Der Hinweis nennt nur die Griffe, die es gerade gibt. */}
+                    <Segmentleiste<GriffModus>
+                      beschriftung="Griffe auf der Karte"
+                      wert={props.griffModus}
+                      onWechsel={props.onGriffModus}
+                      optionen={[
+                        { wert: 'verschieben', label: 'Verschieben' },
+                        { wert: 'groesse', label: 'Größe' },
+                        { wert: 'drehen', label: 'Drehen' },
+                      ]}
+                      style={{ marginBottom: token.marginXS }}
+                    />
+                    <Typography.Text
+                      type="secondary"
+                      style={{ fontSize: 12, display: 'block' }}
+                      data-lfh="bildgriff-hinweis"
+                    >
+                      {griffHinweis(props.griffModus)} Oder Mittelpunkt numerisch:
                     </Typography.Text>
                     <div style={{ marginTop: token.marginSM }}>
                       <KoordinatenEingabe

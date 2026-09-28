@@ -31,6 +31,7 @@ import { useKartenInteraktion } from './lagekarte/useKartenInteraktion';
 import { braucheViewportBbox, rasterBbox } from './lagekarte/fachebenen';
 import { ZONE_TYPEN } from './lagekarte/zonenStil';
 import Kartenflaeche, { type KartenHandle } from './lagekarte/Kartenflaeche';
+import type { GriffModus } from './lagekarte/bildGriffe';
 import Sidebar from './lagekarte/Sidebar';
 import Inspector from './lagekarte/Inspector';
 import FreiesZeichenInspector from './lagekarte/FreiesZeichenInspector';
@@ -109,6 +110,8 @@ export default function LagekartePage() {
   // lässt sie sich ausblenden (LFH-715), die Wahl bleibt je Breitenklasse gemerkt; Vorgabe und
   // Vorrang stehen in `lagekarte/leistenWahl.ts`.
   const leistenWahl = useLeistenWahl(breit);
+  /** Scharfe Griffsorte beim Bild-Einpassen (LFH-711). Vorgabe: Größe. */
+  const [griffModus, setGriffModus] = useState<GriffModus>('groesse');
   // Zeigerkoordinate: die Karte meldet, nur die Anzeige rendert mit (siehe `mausPosition.ts`).
   const zeigerQuelle = useMemo(() => erzeugeZeigerQuelle(), []);
   // Band des Kartenfusses, in das die MapLibre-Maßstabsleiste gehängt wird. State statt Ref,
@@ -831,6 +834,7 @@ export default function LagekartePage() {
         bilder={bildOverlays}
         platzierBild={aktivesPlatzierBild}
         onPlatzierGeometrie={onPlatzierGeometrie}
+        griffModus={griffModus}
         onZeigerLage={zeigerQuelle.melde}
         massstabZiel={massstabZiel}
       />
@@ -1033,6 +1037,8 @@ export default function LagekartePage() {
         onBildMittelpunkt={onBildMittelpunkt}
         bildPlatzierenId={bildPlatzierenId}
         bildPlatzierZentrum={bildPlatzierZentrum}
+        griffModus={griffModus}
+        onGriffModus={setGriffModus}
         ansichten={ansichten ?? []}
         aktiveAnsichtId={aktiveAnsichtId}
         onAnsichtWaehlen={waehleAnsicht}

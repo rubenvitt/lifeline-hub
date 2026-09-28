@@ -270,3 +270,112 @@ test('Betroffene: eigene Cluster-Quelle, Kräfte bleiben einzeln, ohne Modulzugr
   await expect(page.getByRole('button', { name: /Betroffene/ })).toHaveCount(0);
   await expect(page.getByRole('list', { name: 'Sichtungslegende' })).toHaveCount(0);
 });
+
+// Review LFH-711: seit Kräfte- und Objektmarker eine unsichtbare Trefferzone tragen, liegt sie
+// in der Mal-Reihenfolge ÜBER den Personen-Clustern. Zählte sie als „oberstes Feature", nähme
+// eine Einheit knapp neben einem Cluster diesem den Tipp weg: statt aufzufächern öffnete der
+// Inspector der Einheit. Gemessen in `handschuh` (Zone 72, Radius 36) mit der Einheit rund
+// 34 px neben der Clustermitte: die Mitte liegt in ihrer Zone, aber nicht unter ihrem Zeichen.
+test('Betroffene (LFH-711): die Trefferzone einer Einheit daneben nimmt dem Personen-Cluster den Tipp nicht', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await anmeldenAls(page, ADMIN, PW);
+  const { id: einsatzId } = await senden(page, 'post', '/api/einsaetze', {
+    bezeichnung: `E2E Zonenlage ${Date.now()}`,
+  });
+  const basis = `/api/einsaetze/${einsatzId}`;
+  const ort: [number, number] = [8.4, 52.0];
+  for (let i = 0; i < 3; i++) {
+    await senden(page, 'post', `${basis}/personen`, {
+      antreff_lat: ort[1] + i * 0.0002,
+      antreff_lon: ort[0],
+    });
+  }
+  const mitte: [number, number] = [ort[0], ort[1] + 0.0002];
+  const { id: einheitId } = await senden(page, 'post', `${basis}/einheiten`, { name: 'Zug Rand' });
+  // Rund 34 px östlich bei Zoom 12 — nachgemessen und nachgestellt unten.
+  await senden(page, 'patch', `${basis}/einheiten/${einheitId}/position`, {
+    lat: mitte[1],
+    lon: mitte[0] + 0.0117,
+  });
+  const ansichten = (await (await page.request.get(`${basis}/karten-ansichten`)).json()) as {
+    id: number;
+    ist_standard: boolean;
+  }[];
+  const standard = ansichten.find((a) => a.ist_standard)!;
+  await senden(page, 'patch', `${basis}/karten-ansichten/${standard.id}`, {
+    layer_sichtbar: { einheit: true, person: true },
+  });
+
+  await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
+  await page.evaluate(() => localStorage.setItem('lifeline-hub.dichte', 'handschuh'));
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-dichte', 'handschuh');
+  await karteBereit(page);
+  await springe(page, mitte, 12);
+  await expect
+    .poll(async () => (await features(page, 'marker-personen')).some((p) => p.cluster), {
+      timeout: 30_000,
+    })
+    .toBe(true);
+  await expect
+    .poll(async () => (await features(page, 'marker-cluster')).map((p) => p.schluessel), {
+      timeout: 30_000,
+    })
+    .toContain(`einheit-${einheitId}`);
+  // Zoom so, dass die Einheit 30 px neben der Clustermitte steht: in der Zone (Radius 36),
+  // ihr ≤ 34-px-Zeichen (halbe Kante 17) aber nicht über der Mitte. Bis Zoom 14 bleibt die
+  // Dreiergruppe (rund 44 m) ein Cluster.
+  const zoom = await page.evaluate(
+    ({ a, b }) => {
+      const k = (window as unknown as { __lfhKarte: MapHaken & { getZoom(): number } }).__lfhKarte;
+      const pa = k.project(a);
+      const pb = k.project(b);
+      return k.getZoom() + Math.log2(30 / Math.hypot(pa.x - pb.x, pa.y - pb.y));
+    },
+    { a: mitte, b: [mitte[0] + 0.0117, mitte[1]] as [number, number] },
+  );
+  expect(zoom, 'die Dreiergruppe muss geclustert bleiben').toBeLessThanOrEqual(14);
+  await springe(page, mitte, zoom);
+  await expect
+    .poll(async () => (await features(page, 'marker-personen')).some((p) => p.cluster), {
+      timeout: 30_000,
+    })
+    .toBe(true);
+
+  // Vorbedingungen am Klickpunkt: die Zone der Einheit liegt DARÜBER (sonst prüfte der Test
+  // nichts), ihr Zeichen nicht (sonst gehörte der Tipp zu Recht der Einheit).
+  const amPunkt = (ebenen: string[]) =>
+    page.evaluate(
+      ({ c, ids }) => {
+        const k = (
+          window as unknown as {
+            __lfhKarte: MapHaken & {
+              queryRenderedFeatures(p: [number, number], o: { layers: string[] }): unknown[];
+            };
+          }
+        ).__lfhKarte;
+        const p = k.project(c);
+        return k.queryRenderedFeatures([p.x, p.y], { layers: ids }).length;
+      },
+      { c: mitte, ids: ebenen },
+    );
+  await expect.poll(() => amPunkt(['personen-cluster-kreis']), { timeout: 15_000 }).toBe(1);
+  expect(await amPunkt(['marker-treffer']), 'die Zone der Einheit deckt die Clustermitte').toBe(1);
+  expect(await amPunkt(['marker-symbol', 'marker-label']), 'kein Zeichen an der Mitte').toBe(0);
+
+  await klickeAuf(page, mitte);
+  await expect
+    .poll(
+      async () =>
+        new Set(
+          (await features(page, 'spider-leaves'))
+            .map((p) => String(p.schluessel))
+            .filter((s) => s.startsWith('person-')),
+        ).size,
+      { timeout: 15_000 },
+    )
+    .toBe(3);
+  await expect(page.locator('[data-lfh="auswahl"]').getByText('Zug Rand')).toHaveCount(0);
+});
