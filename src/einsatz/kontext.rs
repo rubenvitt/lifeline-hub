@@ -235,3 +235,26 @@ impl<M: ModulMarker> Deref for EinsatzLeitungszugriff<M> {
         &self.0
     }
 }
+
+/// Gate der Kopfdaten- und Einstellungs-Routen: Org-Floor → `fordere_schreibrecht_oder_admin`
+/// → `fordere_aktiv`. Anders als [`EinsatzSchreibzugriff`] darf hier auch ein System-Admin ohne
+/// Mitgliedschaft schreiben; ein Modul-Gate gibt es nicht.
+pub struct EinsatzVerwaltungszugriff(pub EinsatzKontext);
+
+impl FromRequestParts<AppState> for EinsatzVerwaltungszugriff {
+    type Rejection = AppError;
+
+    async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, AppError> {
+        let ctx = EinsatzKontext::from_request_parts(parts, state).await?;
+        ctx.fordere_schreibrecht_oder_admin()?;
+        ctx.fordere_aktiv()?;
+        Ok(Self(ctx))
+    }
+}
+
+impl Deref for EinsatzVerwaltungszugriff {
+    type Target = EinsatzKontext;
+    fn deref(&self) -> &EinsatzKontext {
+        &self.0
+    }
+}

@@ -28,7 +28,7 @@ use std::fs;
 /// Ein Handler in einem NICHT gelisteten Modul ohne sanktionierten Gate-Typ bricht den
 /// Test. Beim Migrieren eines Moduls: hier streichen. Bei einem neuen Modul mit
 /// einsatz-Routen: den Gate-Extractor ziehen (nicht eintragen).
-const DEFERRED_MODULE: &[&str] = &["einsatz", "befehl", "lagebericht"];
+const DEFERRED_MODULE: &[&str] = &["befehl", "lagebericht"];
 
 /// Extractor-Typen, die ein Gate strukturell erzwingen (LFH-230). Neue Variante
 /// (z. B. `EinsatzEinsatzleitung`) beim Einführen hier ergänzen.
@@ -37,13 +37,20 @@ const SANKTIONIERTE_GATES: &[&str] = &[
     "EinsatzSchreibzugriff",
     "EinsatzSchreibfreigabe",
     "EinsatzLeitungszugriff",
+    "EinsatzVerwaltungszugriff",
 ];
 
 /// Handler, die BEWUSST nur den Org-Floor (`EinsatzKontext`) ziehen, ohne Read-/Write-
 /// Gate — z. B. DSGVO-Carve-outs (`aufbewahrungsfrist_setzen`), die auch auf einem
 /// abgelaufenen Einsatz laufen müssen. Jeder Eintrag braucht eine Begründung.
-/// Leer im Pilot-Batch (LFH-230 2a) — die Ausnahmen liegen in DEFERRED-Modulen.
-const ORG_FLOOR_AUSNAHME: &[(&str, &str)] = &[];
+const ORG_FLOOR_AUSNAHME: &[(&str, &str)] = &[
+    // Admin ODER Einsatzleitung, auch an einem Einsatz mit abgelaufener Frist, den das
+    // Lese-Gate hart sperrt. Die Prüfung steht im Rumpf.
+    ("einsatz", "aufbewahrungsfrist_setzen"),
+    // Admin ODER Einsatzleitung plus aktiver Einsatz; kein Gate-Typ bildet das ab, die
+    // Prüfung steht im Rumpf.
+    ("einsatz", "modul_override_setzen"),
+];
 
 /// Der erste doppelt-gequotete String in einem `.route(`-Segment = der Pfad.
 fn erster_string(seg: &str) -> Option<&str> {

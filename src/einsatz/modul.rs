@@ -199,7 +199,21 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     // wirken als Filter über die Felder der Antwort — ein nicht erlaubtes Modul fehlt —,
     // nicht als Türsteher der Route.
     ("/api/einsaetze/{id}/modul-zaehler", None),
+    // Kopfdaten, Abschluss, Frist, Einstellungen, Modul-Overrides und Mitglieder
+    // (`routes::einsatz`): modul-los. Die Wurzel selbst trifft nur exakt, siehe
+    // [`EINSATZ_WURZEL`].
+    (EINSATZ_WURZEL, None),
+    ("/api/einsaetze/{id}/abschliessen", None),
+    ("/api/einsaetze/{id}/aufbewahrungsfrist", None),
+    ("/api/einsaetze/{id}/einstellungen", None),
+    ("/api/einsaetze/{id}/modul-overrides", None),
+    ("/api/einsaetze/{id}/mitglieder", None),
 ];
+
+/// Der Einsatz selbst (`GET`/`PATCH /api/einsaetze/{id}`). In [`key_fuer_pfad`] trifft dieser
+/// Eintrag nur exakt: als Präfix registrierte er jede künftige Sub-Route als modul-los, und der
+/// Guard meldete einen vergessenen [`PFAD_KEY`]-Eintrag nicht mehr.
+const EINSATZ_WURZEL: &str = "/api/einsaetze/{id}";
 
 /// Längster-Präfix-Match über [`PFAD_KEY`]. Äußeres `None` = Pfad nicht registriert;
 /// `Some(inner)` = registriert (inner `None` = modul-lose Route). Segment-grenzen-sicher:
@@ -210,9 +224,10 @@ pub fn key_fuer_pfad(pfad: &str) -> Option<Option<&'static str>> {
         .iter()
         .filter(|(prefix, _)| {
             pfad == *prefix
-                || pfad
-                    .strip_prefix(*prefix)
-                    .is_some_and(|rest| rest.starts_with('/'))
+                || (*prefix != EINSATZ_WURZEL
+                    && pfad
+                        .strip_prefix(*prefix)
+                        .is_some_and(|rest| rest.starts_with('/')))
         })
         .max_by_key(|(prefix, _)| prefix.len())
         .map(|(_, key)| *key)
@@ -337,6 +352,17 @@ mod tests {
             Some(None)
         );
         // Nicht registriert.
+        assert_eq!(key_fuer_pfad("/api/einsaetze/{id}/unbekannt"), None);
+    }
+
+    #[test]
+    fn einsatz_wurzel_trifft_nur_exakt() {
+        assert_eq!(key_fuer_pfad("/api/einsaetze/{id}"), Some(None));
+        assert_eq!(
+            key_fuer_pfad("/api/einsaetze/{id}/mitglieder/{benutzer_id}"),
+            Some(None)
+        );
+        // Eine unregistrierte Sub-Route erbt die Wurzel NICHT.
         assert_eq!(key_fuer_pfad("/api/einsaetze/{id}/unbekannt"), None);
     }
 
