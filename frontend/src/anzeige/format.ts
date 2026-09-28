@@ -1,12 +1,7 @@
 /**
- * Reine, framework-freie Formatlogik für Anzeige-Konventionen (LFH-136):
- * Zeit (Zeitzone + 24h/12h), Koordinaten (WGS84/MGRS/UTM) und Einheiten
- * (metrisch/imperial). Provider/Hook (AnzeigeKonventionenContext) und die
- * zentrale `kommunikation/zeit.ts` delegieren hierher.
- *
- * `DEFAULT_KONVENTIONEN` reproduziert byte-genau das bisherige Verhalten
- * (lokal `DD.MM.YYYY HH:mm`, Koordinate dezimal `lat.toFixed(5), lon.toFixed(5)`),
- * damit Bestandskonsumenten unverändert grün bleiben.
+ * Reine Formatlogik für Anzeige-Konventionen: Zeit (Zeitzone + 24h/12h), Koordinaten
+ * (WGS84/MGRS/UTM/GK) und Einheiten (metrisch/imperial). Provider/Hook und
+ * `kommunikation/zeit.ts` delegieren hierher.
  */
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -14,7 +9,6 @@ import timezone from 'dayjs/plugin/timezone';
 import type { EinheitenSystem, Koordinatenformat, Zeitformat } from '../api/types';
 import { formatiere } from './koordinaten';
 
-// Idempotent (mehrfaches extend ist unschädlich) — robust bei isoliertem Import.
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
@@ -25,7 +19,7 @@ export interface AnzeigeKonventionen {
   koordinatenformat?: Koordinatenformat | null;
 }
 
-/** Default = heutiges Verhalten (alles null → lokal, 24h, dezimal, metrisch). */
+/** Default: alles null → lokal, 24h, dezimal, metrisch. */
 export const DEFAULT_KONVENTIONEN: AnzeigeKonventionen = {
   zeitzone: null,
   zeitformat: null,
@@ -35,12 +29,8 @@ export const DEFAULT_KONVENTIONEN: AnzeigeKonventionen = {
 
 /**
  * UTC-Wirestring → dayjs in der gewünschten Zeitzone (sonst lokal).
- *
- * `d.tz(zone)` wirft bei ungültiger IANA-Zone einen `RangeError` (intern
- * `Intl.DateTimeFormat`). Da das Zeitzonen-Feld Freitext ist und das Backend nur
- * „nicht-leer" prüft, könnte ein Tippfehler (z. B. `Europe/Brelin`) sonst bei
- * JEDEM Zeit-Rendering den ganzen Einsatz-Subtree crashen. Defensiver Fallback
- * auf lokale Zeit (Review LFH-136).
+ * `d.tz(zone)` wirft bei ungültiger IANA-Zone; das Feld ist Freitext, ein Tippfehler ließe sonst
+ * jedes Zeit-Rendering crashen — deshalb Fallback auf lokale Zeit.
  */
 export function inZone(utcStr: string, konv: AnzeigeKonventionen) {
   const d = dayjs.utc(utcStr);
@@ -53,9 +43,8 @@ export function inZone(utcStr: string, konv: AnzeigeKonventionen) {
 }
 
 /**
- * Deutsche Monats-Großkürzel für die taktische Datum-Zeit-Gruppe (LFH-141).
- * dayjs' `MMM`-Token liefert das nicht (de-Locale → "Jan."/"Juli", en → gemischt,
- * nie großgeschrieben-punktlos), daher ein eigenes Array, indexiert über `.month()` (0–11).
+ * Deutsche Monats-Großkürzel für die taktische DTG; dayjs' `MMM` liefert nie großgeschrieben
+ * ohne Punkt.
  */
 const MONATE_DE = [
   'JAN',
@@ -72,10 +61,7 @@ const MONATE_DE = [
   'DEZ',
 ];
 
-/**
- * Taktische Uhrzeit als vierstellige Gruppe „1430" (LFH-141). BOS-Konvention ist inhärent
- * 24h; das 12h/24h-Setting (LFH-136) wird für die taktische Anzeige bewusst ignoriert.
- */
+/** Taktische Uhrzeit „1430". BOS-Konvention ist 24h; das 12h/24h-Setting gilt hier nicht. */
 export function taktischeUhrzeit(
   utcStr?: string | null,
   konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
@@ -103,7 +89,7 @@ export function taktischeDtgVoll(
   return `${d.format('DDHHmm')}${MONATE_DE[d.month()]}${d.format('YYYY')}`;
 }
 
-/** Volle Zeitangabe → taktische DTG „161430JUL2026" (ersetzt das frühere `DD.MM.YYYY HH:mm`). */
+/** Volle Zeitangabe → taktische DTG „161430JUL2026". */
 export function formatZeit(
   utcStr?: string | null,
   konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
@@ -124,12 +110,9 @@ export function formatZeitKurz(
 }
 
 /**
- * Reine Uhrzeit `HH:mm` in der Anzeigezone — für Instrumente, die den Tag schon
- * aus dem Zusammenhang kennen (Lage-Dashboard: alles vom laufenden Einsatz).
- *
- * Der Leerwert ist ein Leerstrich in Ziffernbreite (`——:——`) und nicht der leere
- * String wie bei den DTG-Formatierern: er steht in einer Instrumentenspalte, und
- * eine Lücke, die zusammenfällt, verschiebt die Zeilen daneben.
+ * Reine Uhrzeit `HH:mm` in der Anzeigezone — für Instrumente, die den Tag aus dem Zusammenhang
+ * kennen. Der Leerwert `——:——` hat Ziffernbreite, damit eine Lücke in einer Instrumentenspalte
+ * die Nachbarzeilen nicht verschiebt.
  */
 export function formatUhrzeit(
   utcStr?: string | null,
@@ -140,12 +123,9 @@ export function formatUhrzeit(
 }
 
 /**
- * Tagesbewusste Uhrzeit `HH:mm` (heute) bzw. `DD. HH:mm` (sonst) in der Anzeigezone —
- * für Fristen, bei denen eine reine `HH:mm`-Angabe „in 20 Minuten" optisch nicht von
- * „morgen früh" unterscheidet (LFH-336, Fix-Runde 1 zu Task 3, Bedenken Nr. 4).
- *
- * Die „heute"-Bestimmung läuft in DERSELBEN Zeitzone wie die Formatierung — sonst
- * kippt die Tagesgrenze. Gleiches Muster wie `formatZeitKurz` oben.
+ * Tagesbewusste Uhrzeit `HH:mm` (heute) bzw. `DD. HH:mm` (sonst) — für Fristen, bei denen
+ * „in 20 Minuten" sonst nicht von „morgen früh" zu unterscheiden wäre. „Heute" in DERSELBEN
+ * Zeitzone wie die Formatierung.
  */
 export function formatUhrzeitMitTag(
   utcStr?: string | null,
@@ -159,12 +139,8 @@ export function formatUhrzeitMitTag(
 
 /**
  * Das wirksame Koordinatenformat: Anwender-Override vor Einsatz-Einstellung vor Org-Default.
- * Drei Einzelwerte statt des Einstellungsobjekts, damit ein `useMemo` des Aufrufers an
- * Primitiven hängt und nicht an einer je Abruf neuen Objektidentität.
- *
- * Herausgezogen für den zweiten Leser, die Sprungpalette (LFH-619): sie hängt auf App-Ebene
- * und damit AUSSERHALB des `EinsatzAnzeigeProvider`, sähe über dessen Hook also nur die
- * Defaults. Zwei Kopien der Reihenfolge wären zwei Meinungen darüber, welches Format gilt.
+ * Drei Primitive statt des Einstellungsobjekts, damit ein `useMemo` des Aufrufers stabil bleibt.
+ * Eine Stelle auch für die Sprungpalette, die außerhalb des `EinsatzAnzeigeProvider` hängt.
  */
 export function effektivesKoordinatenformat(
   override: Koordinatenformat | null,

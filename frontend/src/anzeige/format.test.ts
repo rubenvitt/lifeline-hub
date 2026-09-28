@@ -18,7 +18,7 @@ import {
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
-// LFH-141: taktische Schreibweise (1430 / 161430 / 161430JUL2026, dt. Monatskürzel).
+// Taktische Schreibweise (1430 / 161430 / 161430JUL2026, dt. Monatskürzel).
 describe('taktische Zeit-Varianten', () => {
   const wire = '2026-07-16 12:30:00'; // fest, Zeitzone-Tests unten
 

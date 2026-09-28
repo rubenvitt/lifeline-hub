@@ -1,17 +1,10 @@
 /**
- * Verpflegung (LFH-634) — Wortlaute und Zeitraumtexte an EINER Stelle.
+ * Verpflegung — Wortlaute und Zeitraumtexte an EINER Stelle, damit Kartenkopf, zugängliche
+ * Namen und Nachforderungs-Vorbelegung nicht auseinanderlaufen.
  *
- * Kartenkopf, zugänglicher Name der Kartenaktionen und die Vorbelegung der Nachforderung
- * (design.md D9) nennen dasselbe Zeitfenster. Stünde die Formatierung an drei Stellen, liefen
- * „24.09. 12:00–13:30" am Kopf und „12:00–13:30" in der Nachforderung still auseinander, sobald
- * jemand eine davon anfasst.
- *
- * ZEIT: Wire-Strings sind UTC ohne Zonenkennung. Umgerechnet wird über `inZone` aus
- * `anzeige/format.ts` — die Zeitzone der Anzeige-Konventionen (die der Organisation), ohne sie
- * die Ortszeit des Browsers (`dayjs.utc(s).local()`). Damit stehen dieselben Uhrzeiten auf der
- * Karte wie im ETB-Eintrag, den der Server in der Zeitzone der Organisation schreibt (D5).
- *
- * ANFÜHRUNGSZEICHEN: ‚…‘ (U+201A/U+2018) wie in den ETB-Sätzen (`src/verpflegung/mod.rs`).
+ * Umgerechnet wird über `inZone` in der Zeitzone der Anzeige-Konventionen, damit dieselben
+ * Uhrzeiten auf der Karte stehen wie im ETB-Eintrag, den der Server in der Org-Zeitzone schreibt.
+ * Anführungszeichen ‚…‘ wie in den ETB-Sätzen (`src/verpflegung/mod.rs`).
  */
 import { DEFAULT_KONVENTIONEN, inZone, type AnzeigeKonventionen } from '../anzeige/format';
 import type { Kostform, Sonderkost, VerpflegungZeitfenster } from '../api/types';
@@ -49,8 +42,8 @@ export function uhrzeitenText(
 }
 
 /**
- * „24.09. 12:00–13:30", über Mitternacht „24.09. 22:00–25.09. 02:00" — dieselbe Form wie
- * `zeitraum_text` im Backend (D5), damit Karte und ETB-Eintrag gleich lauten.
+ * „24.09. 12:00–13:30", über Mitternacht „24.09. 22:00–25.09. 02:00" — wie `zeitraum_text` im
+ * Backend, damit Karte und ETB-Eintrag gleich lauten.
  */
 export function zeitraumText(
   zf: Pick<VerpflegungZeitfenster, 'von_at' | 'bis_at'>,
@@ -89,10 +82,8 @@ export function sonderkostText(sk: Sonderkost): string {
 }
 
 /**
- * Anzahl, die eine Nachforderung für dieses Zeitfenster anfordert: die Gesamtfehlmenge, bei
- * einer Fehlmenge nur in Kostformen (Gesamtmenge gedeckt, aber z. B. 3 vegan fehlen) deren
- * Summe. Sonderkost ist eine Teilmenge der EP (Spec), die fehlenden Kostformen stecken also in
- * der Gesamtfehlmenge, wenn es eine gibt. 0 heißt: nichts nachzufordern.
+ * Anzahl, die eine Nachforderung anfordert: die Gesamtfehlmenge, bei einer Fehlmenge nur in
+ * Kostformen deren Summe (Sonderkost ist Teilmenge der EP). 0 heißt: nichts nachzufordern.
  */
 export function nachforderungsAnzahl(zf: VerpflegungZeitfenster): number {
   const sonderkost = KOSTFORMEN.reduce((s, k) => s + zf.fehlmenge.sonderkost[k], 0);
@@ -100,9 +91,8 @@ export function nachforderungsAnzahl(zf: VerpflegungZeitfenster): number {
 }
 
 /**
- * Vorbelegung der Nachforderung aus einer Fehlmenge (design.md D9). `null` ohne jede
- * Fehlmenge. Fehlende Sonderkost steht in der Begründung — sonst ginge sie auf dem Weg in die
- * Nachforderung verloren, obwohl die Karte sie als Unterdeckung zeigt.
+ * Vorbelegung der Nachforderung aus einer Fehlmenge; `null` ohne Fehlmenge. Fehlende Sonderkost
+ * steht in der Begründung, sonst ginge sie auf dem Weg verloren.
  */
 export function nachforderungVorbelegung(
   zf: VerpflegungZeitfenster,

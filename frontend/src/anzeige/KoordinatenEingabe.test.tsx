@@ -57,8 +57,8 @@ describe('KoordinatenEingabe', () => {
     expect(onChange).toHaveBeenLastCalledWith(null);
   });
 
-  // Diskriminierender Test: in einer Form wird das onChange-Ergebnis als neues value
-  // zurückgespeist. Ohne Fokus-Guard würde der useEffect die laufende Eingabe überschreiben.
+  // In einer Form wird das onChange-Ergebnis als value zurückgespeist; ohne Fokus-Guard
+  // überschriebe der useEffect die laufende Eingabe.
   it('überschreibt die laufende Eingabe nicht, wenn value zurückgespeist wird (Form-Loop)', () => {
     function Wrapper() {
       const [v, setV] = useState<LatLon | null>(null);

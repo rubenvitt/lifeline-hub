@@ -1,12 +1,8 @@
 import type { Staerke } from '../api/types';
 
 /**
- * Summe der kumulierten Ist-Stärke einer Einheitenmenge, oder `null` bei leerer Menge.
- *
- * `null` und nicht `0/0/0`: „keine Einheit zugeordnet" ist eine andere Aussage als „eine
- * Einheit mit null Personen". `StaerkeAnzeige` zeigt dafür „—". Verhalten byte-gleich zur
- * früheren Inline-Reduktion in `EinsatzabschnittePage` (LFH-347 · C12 hat sie herausgezogen,
- * weil dieselbe Summe jetzt drei Konsumenten hat).
+ * Summe der kumulierten Ist-Stärke einer Einheitenmenge, oder `null` bei leerer Menge:
+ * „keine Einheit zugeordnet" ist eine andere Aussage als „null Personen".
  */
 export function summiereStaerke(
   einheiten: ReadonlyArray<{ ist_kumuliert: Staerke }>,

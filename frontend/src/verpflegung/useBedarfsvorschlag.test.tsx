@@ -16,10 +16,8 @@ import type {
 import { useBedarfsvorschlag, type BedarfsvorschlagArgs } from './useBedarfsvorschlag';
 
 /**
- * Bedarfsvorschläge (LFH-634, design.md D8; Spec „Bedarfsvorschläge aus Personal und
- * Betreuung“). Geprüft am Draht: was angefragt wird (Aufrufzähler), was vorbelegt wird und
- * was als Hinweis dasteht. Ein Test der reinen Freigabe-Prüfung sähe nicht, ob sie an der
- * `useQuery` ankommt.
+ * Bedarfsvorschläge, geprüft am Draht: was angefragt wird (Aufrufzähler), was vorbelegt wird und
+ * was als Hinweis dasteht.
  */
 
 const benutzer: BenutzerAnzeige = {
@@ -330,8 +328,8 @@ describe('useBedarfsvorschlag — Quelle nicht zugänglich', () => {
   it('403 trotz Freigabe: Felder leer, keine Fehlermeldung, kein Wiederholungsversuch', async () => {
     const fehlerAusgabe = vi.spyOn(console, 'error');
     const z = antworte(403, 403);
-    // Ein Client, der wiederholen WÜRDE — mit `neuerQueryClient()` (retry: false global) wäre
-    // der Zähler auch ohne `retry: false` am Hook bei 1 und belegte nichts.
+    // Ein Client, der wiederholen WÜRDE — mit `neuerQueryClient()` (retry: false global) belegte
+    // der Zähler nichts.
     const client = erzeugeQueryClient({ queries: { retry: 2, retryDelay: 0, gcTime: 0 } });
     const { result } = rendere({}, client);
     await waitFor(() => expect(z).toMatchObject({ personal: 1, kopfzahl: 1 }));
