@@ -110,9 +110,8 @@ describe('warnstufeTon', () => {
 });
 
 /**
- * Die lagebezogene Kennzahlreihe (LFH-640). Alle Erwartungen sind HANDGESCHRIEBENE Literale —
- * aus der Platzbeschreibung gelesen prüfte der Pin die Beschreibung gegen sich selbst.
- * Spec: `docs/superpowers/specs/2026-09-23-lfh-640-lagebezogene-kennzahlreihe-design.md`.
+ * Die lagebezogene Kennzahlreihe. Alle Erwartungen sind handgeschriebene Literale — aus der
+ * Platzbeschreibung gelesen prüfte der Pin sie gegen sich selbst.
  */
 describe('kennzahlReihe (LFH-640)', () => {
   const KERN = { 1: 'Betroffene', 3: 'Kräfte', 4: 'Vermisste', 5: 'Einsatzdauer' } as const;
@@ -357,8 +356,8 @@ describe('baueLagebild', () => {
 });
 
 describe('Vermisste seit über 4 h (LFH-613)', () => {
-  // Per Etikett, nicht per Index: das Band hat seine Reihenfolge schon einmal geändert
-  // (LFH-606 setzte den Pegel auf Platz 1), ein Index träfe dann still eine andere Kennzahl.
+  // Per Etikett, nicht per Index: bei geänderter Reihenfolge träfe ein Index still eine andere
+  // Kennzahl.
   const vermisste = (bild: ReturnType<typeof baueLagebild>) =>
     bild.kennzahlen.find((k) => k.etikett === 'Vermisste')!;
 
