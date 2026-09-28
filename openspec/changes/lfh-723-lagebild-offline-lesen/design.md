@@ -88,6 +88,17 @@ Zur Motivation siehe proposal.md. Die Anforderungen stehen in
 - **Pakete.** Nur `@tanstack/query-persist-client-core`, exakt gepinnt auf die installierte
   Version von `@tanstack/query-core`. `@tanstack/react-query-persist-client` wird nicht
   gebraucht, siehe D2.
+- **Schreiben nur in einen bestehenden Datensatz derselben Identität.** `persistClient` legt
+  keinen Datensatz an. Er schreibt nur, wenn schon einer mit derselben `benutzer.id`
+  existiert. Angelegt wird der Datensatz ausschließlich beim Start (D2) und bei
+  `login`/`aktualisiere`. Hat ein Tab gelöscht, legt ein zweiter Tab desselben Geräts ihn beim
+  nächsten Speichern also nicht wieder an. Sonst verletzte „nach dem Abmelden ist der Speicher
+  leer“ die Spec, sobald zwei Tabs offen sind.
+- **Ohne IndexedDB keine Vorhaltung.** Das betrifft private Fenster, blockierte Website-Daten
+  und jsdom. Jeder Zugriff sitzt in `try/catch`, und ein Fehlschlag heißt „kein Datensatz“. Die
+  App verhält sich dann wie bisher. Das gilt auch für die rund 60 Testdateien, die über
+  `test/utils.tsx` einen `AuthProvider` einhängen: Ihr Start darf an der fehlenden IndexedDB
+  weder hängen noch scheitern.
 - **Verworfen:**
   - `idb-keyval`: eine neue Abhängigkeit, obwohl `idb` schon vorhanden ist.
   - `localStorage`: synchron und auf etwa 5 MB begrenzt. Ein ETB mit einigen hundert
@@ -158,14 +169,20 @@ setzt ein eigenes `gcTime` von 30 s. Sie fallen also ohnehin schnell heraus.
 
 ### D4 — Bestätigungszeitstempel getrennt vom Speicherzeitpunkt
 
-`maxAge` des Persisters misst ab dem letzten **Speichern**. Die Offline-Queue schreibt ihre
-vorgemerkten Einträge per `setQueryData` in den Cache, und jede solche Änderung speichert neu.
-Die Frist verlängerte sich dadurch beliebig. Deshalb gilt:
+`maxAge` des Persisters misst ab dem letzten **Speichern**, und gespeichert wird bei **jeder**
+Änderung im Cache, auch bei einer ohne Server. Heute schreibt der Client zwar nur nach einer
+Serverantwort per `setQueryData` in den Cache (gemessen: `offline/useOfflineSync.ts:84` beim
+Flush, `etb/EtbLesemarkeBanner.tsx:58`, beide in einem `onSuccess`). Vorgemerkte ETB-Einträge
+zeigt die Seite aus der Queue selbst und nicht aus dem Cache. Die Frist an das Speichern zu
+hängen, machte ihre Einhaltung aber davon abhängig, dass niemand künftig ein optimistisches
+Update einbaut. Deshalb gilt:
 
 - **`bestaetigtAt`** wird nur gesetzt bei `me()`-Erfolg, bei `login` und `aktualisiere`
   sowie bei einem **Fetch-Erfolg** im QueryCache. Letzterer ist ein `updated`-Ereignis mit
   `action.type === 'success'` und `action.manual !== true`. Ein `setQueryData` trägt
-  `manual: true`, und `hydrate` erzeugt keine `success`-Aktion.
+  `manual: true`, und `hydrate` erzeugt keine `success`-Aktion. Die beiden Bestandsstellen
+  oben zählen damit bewusst nicht als Bestätigung. Sie folgen einer Mutation, und deren
+  Serverantwort bestätigt die Sitzung ohnehin nicht über den Cache.
   - Beide Annahmen werden in Vitest belegt und nicht nur behauptet: `setQueryData` darf
     `bestaetigtAt` nicht bewegen, ein Fetch muss es bewegen.
 - **Höchstliegezeit:** `HOECHSTLIEGEZEIT_MS = 24 h` ist eine Konstante neben der
@@ -213,13 +230,22 @@ Org-Gliederung“), statt stillschweigend veraltet stehen zu bleiben.
   derselben `einsatzId`. „Modul“ heißt dabei Prefix. So trifft ein Entzug der Personen auch
   deren Sub-Keys.
 
-**So wird geräumt:**
-- Andere Queries des Bereichs entfernt `qc.removeQueries({ predicate })`, nicht per Inline-Key.
-  Der AST-Guard aus `queryKeyScan.ts` kennt `removeQueries`.
-- Die **scheiternde Query selbst** wird nicht entfernt. Sie ist beobachtet, und ein Entfernen
-  mit anschließendem Neuaufbau riskierte genau die Abrufschleife aus dem Spec-Szenario.
-  Stattdessen verliert sie ihre Daten per `query.setState({ data: undefined, dataUpdatedAt: 0 })`
-  und behält Status `error`.
+**So wird geräumt:** Die Unterscheidung verläuft zwischen *beobachtet* und *unbeobachtet*,
+nicht zwischen „scheiternd“ und „Rest“.
+- **Unbeobachtete** Queries des Bereichs (`getObserversCount() === 0`) entfernt
+  `qc.removeQueries({ predicate })`, nicht per Inline-Key. Der AST-Guard aus `queryKeyScan.ts`
+  kennt `removeQueries`.
+- **Beobachtete** Queries des Bereichs werden nie entfernt, auch die scheiternde nicht. Ein
+  entfernter, aber beobachteter Key wird beim nächsten Render vom Observer neu gebaut und neu
+  abgerufen. Auf der ETB-Seite hängen Liste und Zähler beide am Prefix `etb`: Das `onError` der
+  Liste entfernte den Zähler, dessen Neuabruf gäbe 403, dessen `onError` entfernte die Liste,
+  und so weiter. Stattdessen verlieren sie ihre Daten per
+  `query.setState({ data: undefined, dataUpdatedAt: 0 })`. Die scheiternde behält Status
+  `error`, eine beobachtete Geschwister-Query ihren Status.
+- **Sperrmarke je Bereich** (Einsatz oder Einsatz + Prefix), die der Dehydrier-Filter
+  zusätzlich zur Allowlist prüft. Eine Geschwister-Query steht nach dem Leeren auf `success`
+  mit `data: undefined` und würde sonst so geschrieben. Die Marke fällt beim nächsten
+  Fetch-Erfolg im Bereich (Tracker aus D4) und lebt nur im Speicher des Tabs.
   - Die Seiten sehen dann `isError && !data` und zeigen ihren Fehlerzweig statt
     „Stand veraltet“ mit alten Daten.
   - Der Einsatz landet wie bisher in der `SeitenSackgasse`.
@@ -234,7 +260,9 @@ Org-Gliederung“), statt stillschweigend veraltet stehen zu bleiben.
   Platte“.
 
 **Tests:**
-- „Kein erneuter Abruf nach 403“ wird über die Zahl der `queryFn`-Aufrufe geprüft.
+- „Kein erneuter Abruf nach 403“ wird mit **zwei beobachteten Queries desselben Prefix**
+  geprüft, die beide 403 liefern. Gezählt werden die Aufrufe **aller** `queryFn`, nicht nur
+  der einen.
 - „Einsatz 8 und ETB bleiben“ als Gegenaussage.
 
 ### D7 — Offline-Kennzeichnung am vorhandenen Datenstand
@@ -280,7 +308,9 @@ Reihenfolge der Messung im e2e:
 
 1. Regulärer Stil offline: erscheinen die Ebenen?
 2. Falls nicht: ohne Netz beim Aufbau `blindStyle` wählen. Das ist eine kleine,
-   benannte Änderung in `baueBasemapStyle`.
+   benannte Änderung in `baueBasemapStyle`. Die Karte zeigt dann ohne Netz Ebenen auf
+   einfarbigem Grund statt einer Basiskarte. Das geht über die Entscheidung „zeichnet oder
+   raus“ hinaus und ist deshalb zur Bestätigung vorgelegt.
 3. Falls auch das nicht zeichnet: Lagekarten-Prefixe (`zonen` … `lageSnapshot`) aus der
    Allowlist nehmen, im Spec-Szenario streichen und ein Folgeticket anlegen.
 
@@ -333,9 +363,12 @@ nur Kommentarzeile 28.
 - **[Hydrierter Stand älterer App-Version]** → Der Buster ist `__APP_VERSION__`.
 - **[Mehrere Tabs]** → Jeder Tab hat seinen QueryClient und schreibt denselben Datensatz. Es
   gewinnt der zuletzt speichernde Tab. Das ist unkritisch, weil beide denselben Benutzer
-  haben. Das Löschen in einem Tab räumt die Platte, der andere Tab schreibt erst beim nächsten
-  Speichern wieder. Beim Abmelden meldet der Server die Sitzung ab, der andere Tab läuft bei
-  seinem nächsten Abruf in die 401 und löscht dann selbst.
+  haben. Nach dem Löschen in einem Tab legt der andere den Datensatz nicht wieder an (D1,
+  „Schreiben nur in einen bestehenden Datensatz“). Sein Speicher-Cache hält den Stand, bis er
+  bei seinem nächsten Abruf in die 401 läuft und selbst löscht.
+- **[Tab länger als 24 h ohne Netz]** → Der Stand bleibt im laufenden Tab sichtbar,
+  gekennzeichnet als offline, und wird erst beim nächsten Start verworfen (D4). Das ist eine
+  bewusste Abwägung und zur Bestätigung vorgelegt.
 
 ## Migration Plan
 
