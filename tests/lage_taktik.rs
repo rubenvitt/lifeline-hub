@@ -5,82 +5,20 @@
 //! reguläre Org-Isolation (Fremd-Nutzer ohne Mitgliedschaft) sowie Live-Events bei
 //! Geo-PATCH und K&M-Mutation.
 //!
-//! Harness identisch zu tests/einsatz_einheit.rs; `setup()` liefert hier zusätzlich
+//! Harness aus tests/common; `setup_mit_pool_und_live()` liefert zusätzlich
 //! den `LiveHub`-Klon (teilt denselben inneren Zustand wie der im AppState), damit
 //! der SSE-Test direkt via `live.abonniere(einsatz_id)` mithören kann.
 
 use axum::http::StatusCode;
-use lifeline_hub::app::{build_router, AppState};
-use lifeline_hub::auth::bootstrap::bootstrap_admin;
-use lifeline_hub::db;
-use lifeline_hub::live::{LiveHub, LiveNachricht};
-use sqlx::SqlitePool;
 use std::time::Duration;
-use tokio::sync::broadcast::Receiver;
 
 mod common;
-use common::{anfrage, einsatz_anlegen, login_cookie};
+use common::{
+    anfrage, einheit_bilden, einsatz_anlegen, login_cookie, recv_until_tag,
+    setup_mit_pool_und_live, stammpersonal_disponieren,
+};
 
 // ---------- Harness ----------
-
-/// Baut Router + DB mit Bootstrap-Admin und liefert (Router, LiveHub-Klon, Pool).
-/// Der zurückgegebene LiveHub teilt den inneren `Arc`-Zustand mit dem im AppState,
-/// sodass `abonniere` echte Events der Handler empfängt.
-async fn setup() -> (axum::Router, LiveHub, SqlitePool) {
-    let pool = db::test_pool().await;
-    bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
-        .await
-        .unwrap();
-    let live = LiveHub::new();
-    let app = build_router(AppState {
-        pool: pool.clone(),
-        live: live.clone(),
-        karten_dir: std::env::temp_dir(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
-        download_client: lifeline_hub::karte::download::download_client(),
-        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
-        karten_service_url: None,
-        karten_service_token: None,
-    });
-    (app, live, pool)
-}
-
-async fn einheit_bilden(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -> i64 {
-    let (s, json) = anfrage(
-        app,
-        "POST",
-        &format!("/api/einsaetze/{einsatz}/einheiten"),
-        cookie,
-        Some(&format!(r#"{{"name":"{name}"}}"#)),
-    )
-    .await;
-    assert_eq!(s, StatusCode::CREATED);
-    json["id"].as_i64().unwrap()
-}
-
-/// Stamm anlegen + in den Einsatz disponieren → liefert die einsatz_personal.id.
-async fn person_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -> i64 {
-    let (s1, stamm) = anfrage(
-        app,
-        "POST",
-        "/api/personal",
-        cookie,
-        Some(&format!(r#"{{"name":"{name}"}}"#)),
-    )
-    .await;
-    assert_eq!(s1, StatusCode::CREATED);
-    let pid = stamm["id"].as_i64().unwrap();
-    let (s2, dispo) = anfrage(
-        app,
-        "POST",
-        &format!("/api/einsaetze/{einsatz}/personal"),
-        cookie,
-        Some(&format!(r#"{{"personal_id":{pid}}}"#)),
-    )
-    .await;
-    assert_eq!(s2, StatusCode::CREATED);
-    dispo["id"].as_i64().unwrap()
-}
 
 /// Anzahl ETB-Einträge (gesamt) im Einsatz.
 async fn etb_anzahl(app: &axum::Router, cookie: &str, einsatz: i64) -> usize {
@@ -96,30 +34,11 @@ async fn etb_anzahl(app: &axum::Router, cookie: &str, einsatz: i64) -> usize {
     json.as_array().unwrap().len()
 }
 
-/// Empfängt Events bis zum gewünschten Event-Tag oder bricht nach `timeout` ab.
-/// `bilden` feuert ZWEI Events (zuerst "etb", dann "einheit"); diese Drain-Logik
-/// überspringt die Zwischen-Events und leert dabei den Puffer.
-async fn recv_until_tag(
-    rx: &mut Receiver<LiveNachricht>,
-    tag: &str,
-    timeout: Duration,
-) -> LiveNachricht {
-    loop {
-        let n = tokio::time::timeout(timeout, rx.recv())
-            .await
-            .unwrap_or_else(|_| panic!("Timeout: kein '{tag}'-Event empfangen"))
-            .expect("Broadcast-Kanal geschlossen");
-        if n.event.as_str() == tag {
-            return n;
-        }
-    }
-}
-
 // ---------- Fall 1: Verorten erzeugt KEINEN ETB-Eintrag ----------
 
 #[tokio::test]
 async fn verorten_erzeugt_keinen_etb() {
-    let (app, _live, _pool) = setup().await;
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let eid = einheit_bilden(&app, &admin, einsatz, "1. Zug").await; // Bilden DARF ETB erzeugen.
@@ -151,7 +70,7 @@ async fn verorten_erzeugt_keinen_etb() {
 
 #[tokio::test]
 async fn geo_paar_partial_merge_und_unpaarig_422() {
-    let (app, _live, _pool) = setup().await;
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let eid = einheit_bilden(&app, &admin, einsatz, "1. Zug").await;
@@ -203,7 +122,7 @@ async fn geo_paar_partial_merge_und_unpaarig_422() {
 
 #[tokio::test]
 async fn aufgeloeste_verschwinden_und_karte_zeigt_alle_personen() {
-    let (app, _live, _pool) = setup().await;
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
 
@@ -243,8 +162,8 @@ async fn aufgeloeste_verschwinden_und_karte_zeigt_alle_personen() {
     assert!(ids.contains(&bleibt));
 
     // Personal: einer wird Einheitsführer, einer bleibt normal.
-    let chef = person_anlegen(&app, &admin, einsatz, "Chef").await;
-    let normal = person_anlegen(&app, &admin, einsatz, "Helfer").await;
+    let chef = stammpersonal_disponieren(&app, &admin, einsatz, "Chef").await;
+    let normal = stammpersonal_disponieren(&app, &admin, einsatz, "Helfer").await;
     // Chef in die verbleibende Einheit, dann als Führer setzen.
     assert_eq!(
         anfrage(
@@ -308,10 +227,10 @@ async fn personal_ohne_fuehrung_ist_verortbar() {
     // LFH-276: Der 404 entstand ausschließlich am Re-list-`.find` in aktualisiere_position
     // (der Filter schloss Nicht-Führung aus der Ergebnisliste aus; das UPDATE lief bereits).
     // Fix = Filter entfernt → die Position eines beliebigen disponierten Helfers ist setzbar.
-    let (app, _live, _pool) = setup().await;
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let helfer = person_anlegen(&app, &admin, einsatz, "Helfer").await;
+    let helfer = stammpersonal_disponieren(&app, &admin, einsatz, "Helfer").await;
 
     let (s, body) = anfrage(
         &app,
@@ -330,7 +249,7 @@ async fn personal_ohne_fuehrung_ist_verortbar() {
 
 #[tokio::test]
 async fn fremder_org_nutzer_wird_abgewiesen() {
-    let (app, _live, pool) = setup().await;
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let eid = einheit_bilden(&app, &admin, einsatz, "1. Zug").await;
@@ -393,7 +312,7 @@ async fn fremder_org_nutzer_wird_abgewiesen() {
 
 #[tokio::test]
 async fn sse_feuert_bei_kum_mutation_und_geo_patch() {
-    let (app, live, _pool) = setup().await;
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await; // Anlage ist kein gemessenes Event.
 
