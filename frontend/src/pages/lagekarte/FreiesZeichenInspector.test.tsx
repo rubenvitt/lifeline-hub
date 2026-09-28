@@ -1,6 +1,7 @@
 import { afterEach, describe, it, expect, vi } from 'vitest';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { offeneRueckfrage } from '../../test/rueckfrage';
 import { renderMitProviders } from '../../test/utils';
 import type { FreiesZeichen } from '../../api/types';
 import FreiesZeichenInspector, { type FreiesZeichenInspectorProps } from './FreiesZeichenInspector';
@@ -61,10 +62,35 @@ describe('FreiesZeichenInspector', () => {
     expect(screen.getByLabelText('Grundzeichen suchen')).not.toHaveFocus();
   });
 
-  it('„Löschen" ruft onLoeschen', async () => {
+  // LFH-710: das Zeichen wird hart gelöscht (`freies_zeichen/repo.rs`) — unumkehrbar, also
+  // Rückfrage mit rotem OK-Knopf (LFH-363), und sie nennt das Zeichen beim Namen.
+  it('„Löschen" fragt erst nach und löscht erst auf Bestätigung, genau einmal', async () => {
     const { onLoeschen } = renderInspector();
+    // Auslöser und OK heißen beide „Löschen"; die Rückfrage bleibt in jsdom nach dem
+    // Schließen im Baum (keine Ausblend-Animation), also den Auslöser vorher greifen.
+    const ausloeser = screen.getByRole('button', { name: 'Löschen' });
+    await userEvent.click(ausloeser);
+
+    const rueckfrage = await offeneRueckfrage();
+    expect(onLoeschen).not.toHaveBeenCalled();
+    expect(rueckfrage).toHaveTextContent('„Zug 1“ löschen?');
+    const ok = within(rueckfrage).getByRole('button', { name: 'Löschen' });
+    expect(ok).toHaveClass('ant-btn-dangerous');
+
+    await userEvent.click(within(rueckfrage).getByRole('button', { name: 'Abbrechen' }));
+    expect(onLoeschen).not.toHaveBeenCalled();
+
+    await userEvent.click(ausloeser);
+    await userEvent.click(
+      within(await offeneRueckfrage()).getByRole('button', { name: 'Löschen' }),
+    );
+    expect(onLoeschen).toHaveBeenCalledTimes(1);
+  });
+
+  it('ohne Bezeichnung nennt die Rückfrage das Zeichen wie der Kartenkopf', async () => {
+    renderInspector({ zeichen: { ...basis, label: null } });
     await userEvent.click(screen.getByRole('button', { name: 'Löschen' }));
-    expect(onLoeschen).toHaveBeenCalled();
+    expect(await offeneRueckfrage()).toHaveTextContent('„Taktisches Zeichen“ löschen?');
   });
 
   it('zeigt KEINEN „Im Fach-Modul öffnen"-Link', () => {
@@ -265,8 +291,12 @@ describe('FreiesZeichenInspector — entprelltes Schreiben (LFH-716)', () => {
     vi.useFakeTimers();
     const { onAendern, onLoeschen, unmount } = renderInspector();
     fireEvent.click(kachel('Person'));
+    // Seit LFH-710 geht das Löschen über die Rückfrage; verworfen wird erst beim Bestätigen.
     fireEvent.click(screen.getByRole('button', { name: 'Löschen' }));
-    expect(onLoeschen).toHaveBeenCalled();
+    const rueckfrage = document.querySelector<HTMLElement>('.ant-popconfirm');
+    expect(rueckfrage).not.toBeNull();
+    fireEvent.click(within(rueckfrage!).getByRole('button', { name: 'Löschen' }));
+    expect(onLoeschen).toHaveBeenCalledTimes(1);
     unmount();
     expect(onAendern).not.toHaveBeenCalled();
   });

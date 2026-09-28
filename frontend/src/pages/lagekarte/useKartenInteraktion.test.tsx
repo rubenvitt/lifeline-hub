@@ -4,7 +4,8 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { neuerQueryClient } from '../../test/utils';
 import type { FreiesZeichenUpdate } from '../../api/types';
-import type { GeoJsonGeometry } from './geo';
+import type { GeoJsonGeometry, GeoJsonPolygon } from './geo';
+import type { KarteMarker } from './marker';
 import { useKartenInteraktion } from './useKartenInteraktion';
 import { einsatzKeys } from '../../api/queryKeys';
 import { leseZuletztVerwendet } from './zuletztVerwendet';
@@ -15,6 +16,7 @@ const freieZeichenApi = vi.hoisted(() => ({
   legeFreiesZeichenAn: vi.fn(() => Promise.resolve({ id: 42 })),
   aktualisiereFreiesZeichen: vi.fn(() => Promise.resolve({ id: 42 })),
   loescheFreiesZeichen: vi.fn(() => Promise.resolve()),
+  verschiebeFreiesZeichen: vi.fn(() => Promise.resolve({ id: 42 })),
 }));
 vi.mock('../../api/freieZeichen', () => freieZeichenApi);
 
@@ -44,6 +46,28 @@ const betreuungApi = vi.hoisted(() => ({
   aendereStelle: vi.fn(() => Promise.resolve({ id: 4 })),
 }));
 vi.mock('../../api/betreuung', () => betreuungApi);
+
+// Die übrigen Zweige von `loescheVerortung` (LFH-710): je Objektart eine eigene API.
+const einsatzSchadenApi = vi.hoisted(() => ({
+  aktualisiereSchaden: vi.fn(() => Promise.resolve({ id: 3 })),
+}));
+vi.mock('../../api/einsatzSchaden', () => einsatzSchadenApi);
+const einheitenApi = vi.hoisted(() => ({
+  verorteEinheit: vi.fn(() => Promise.resolve({ id: 5 })),
+}));
+vi.mock('../../api/einheiten', () => einheitenApi);
+const einsatzFahrzeugeApi = vi.hoisted(() => ({
+  verorteFahrzeug: vi.fn(() => Promise.resolve({ id: 6 })),
+}));
+vi.mock('../../api/einsatzFahrzeuge', () => einsatzFahrzeugeApi);
+const einsatzPersonalApi = vi.hoisted(() => ({
+  verortePerson: vi.fn(() => Promise.resolve({ id: 7 })),
+}));
+vi.mock('../../api/einsatzPersonal', () => einsatzPersonalApi);
+const einsatzabschnitteApi = vi.hoisted(() => ({
+  zeichneAbschnitt: vi.fn(() => Promise.resolve({ id: 8 })),
+}));
+vi.mock('../../api/einsatzabschnitte', () => einsatzabschnitteApi);
 
 function wrapper() {
   const client = neuerQueryClient();
@@ -913,5 +937,184 @@ describe('useKartenInteraktion — Betreuungsstelle (LFH-673)', () => {
       const keys = invalidiert.mock.calls.map((c) => c[0]?.queryKey);
       expect(keys).toContainEqual(['einsatz-betreuung', 1]);
     });
+  });
+});
+
+/**
+ * Quittungen (LFH-710). Jede Karten-Mutation sagt, ob sie geklappt hat — und zwar erst NACH
+ * der erfolgreichen Antwort: ein Erfolg, der vor dem Fehlschlag gemeldet wird, ist schlimmer
+ * als gar keiner. Deshalb je Mutation das Paar: Erfolg → Quittung, Fehlschlag → Fehler und
+ * KEINE Erfolgsquittung.
+ */
+describe('useKartenInteraktion — Quittungen der Karten-Mutationen (LFH-710)', () => {
+  type Ruf = ReturnType<typeof vi.fn>;
+  const markerVon = (typ: KarteMarker['typ'], id: number): KarteMarker => ({
+    schluessel: `${typ}-${id}`,
+    typ,
+    id,
+    lat: 50.1,
+    lon: 8.6,
+    label: 'Objekt',
+    farbe: '#000',
+  });
+
+  // Alle acht Zweige von `loescheVerortung`, je mit der API, die er ruft.
+  const ZWEIGE: [KarteMarker['typ'], Ruf][] = [
+    ['uhs', einsatzUhsApi.aktualisiereUhs],
+    ['schaden', einsatzSchadenApi.aktualisiereSchaden],
+    ['einheit', einheitenApi.verorteEinheit],
+    ['fahrzeug', einsatzFahrzeugeApi.verorteFahrzeug],
+    ['fuehrung', einsatzPersonalApi.verortePerson],
+    ['abschnitt', einsatzabschnitteApi.zeichneAbschnitt],
+    ['betreuungsstelle', betreuungApi.aendereStelle],
+    ['person', einsatzPersonApi.aktualisierePerson],
+  ];
+
+  it.each(ZWEIGE)('Verortung löschen (%s): Erfolg → Quittung', async (typ, api) => {
+    api.mockClear();
+    const fehler = vi.fn();
+    const erfolg = vi.fn();
+    const { result } = rendere(fehler, erfolg);
+    act(() => result.current.loescheVerortung(markerVon(typ, 9)));
+    await waitFor(() => expect(erfolg).toHaveBeenCalledWith('Verortung gelöscht'));
+    expect(api).toHaveBeenCalledTimes(1);
+    expect(fehler).not.toHaveBeenCalled();
+  });
+
+  it.each(ZWEIGE)('Verortung löschen (%s): Fehlschlag → keine Quittung', async (typ, api) => {
+    api.mockRejectedValueOnce(new Error('abgelehnt'));
+    const fehler = vi.fn();
+    const erfolg = vi.fn();
+    const { result } = rendere(fehler, erfolg);
+    act(() => result.current.loescheVerortung(markerVon(typ, 9)));
+    await waitFor(() => expect(fehler).toHaveBeenCalledTimes(1));
+    expect(erfolg).not.toHaveBeenCalled();
+  });
+
+  // Ändern, Verschieben und Löschen eines freien Zeichens.
+  const ZEICHEN: [string, Ruf, (r: HookResult) => Promise<unknown>, string][] = [
+    [
+      'zeichenAendern',
+      freieZeichenApi.aktualisiereFreiesZeichen,
+      (r) => r.current.zeichenAendern(42, { grundzeichen: 'stelle' }),
+      'Taktisches Zeichen gespeichert',
+    ],
+    [
+      'zeichenVerschieben',
+      freieZeichenApi.verschiebeFreiesZeichen,
+      (r) => r.current.zeichenVerschieben(42, 3),
+      'Taktisches Zeichen verschoben',
+    ],
+    [
+      'zeichenLoeschen',
+      freieZeichenApi.loescheFreiesZeichen,
+      (r) => r.current.zeichenLoeschen(42),
+      'Taktisches Zeichen gelöscht',
+    ],
+  ];
+
+  it.each(ZEICHEN)('%s: Erfolg → Quittung', async (_name, api, ausloesen, quittung) => {
+    api.mockClear();
+    const fehler = vi.fn();
+    const erfolg = vi.fn();
+    const { result } = rendere(fehler, erfolg);
+    await act(async () => {
+      await ausloesen(result);
+    });
+    expect(api).toHaveBeenCalledTimes(1);
+    expect(erfolg).toHaveBeenCalledWith(quittung);
+    expect(fehler).not.toHaveBeenCalled();
+  });
+
+  it.each(ZEICHEN)('%s: Fehlschlag → keine Quittung', async (_name, api, ausloesen) => {
+    api.mockRejectedValueOnce(new Error('abgelehnt'));
+    const fehler = vi.fn();
+    const erfolg = vi.fn();
+    const { result } = rendere(fehler, erfolg);
+    await act(async () => {
+      await ausloesen(result);
+    });
+    expect(fehler).toHaveBeenCalledTimes(1);
+    expect(erfolg).not.toHaveBeenCalled();
+  });
+
+  // Symbol-Override an allen vier taktischen Markerarten.
+  const SYMBOL: [KarteMarker['typ'], Ruf][] = [
+    ['einheit', einheitenApi.verorteEinheit],
+    ['fahrzeug', einsatzFahrzeugeApi.verorteFahrzeug],
+    ['fuehrung', einsatzPersonalApi.verortePerson],
+    ['abschnitt', einsatzabschnitteApi.zeichneAbschnitt],
+  ];
+
+  it.each(SYMBOL)('Symbol ändern (%s): Erfolg → Quittung', async (typ, api) => {
+    api.mockClear();
+    const fehler = vi.fn();
+    const erfolg = vi.fn();
+    const { result } = rendere(fehler, erfolg);
+    act(() => result.current.aendereSymbol(markerVon(typ, 9), { tz_fachaufgabe: 'betreuung' }));
+    await waitFor(() => expect(erfolg).toHaveBeenCalledWith('Symbol gespeichert'));
+    expect(api).toHaveBeenCalledWith(1, 9, { tz_fachaufgabe: 'betreuung' });
+    expect(fehler).not.toHaveBeenCalled();
+  });
+
+  it.each(SYMBOL)('Symbol ändern (%s): Fehlschlag → keine Quittung', async (typ, api) => {
+    api.mockRejectedValueOnce(new Error('abgelehnt'));
+    const fehler = vi.fn();
+    const erfolg = vi.fn();
+    const { result } = rendere(fehler, erfolg);
+    act(() => result.current.aendereSymbol(markerVon(typ, 9), { tz_organisation: null }));
+    await waitFor(() => expect(fehler).toHaveBeenCalledTimes(1));
+    expect(erfolg).not.toHaveBeenCalled();
+  });
+
+  const POLY: GeoJsonPolygon = {
+    type: 'Polygon',
+    coordinates: [
+      [
+        [8, 50],
+        [8.1, 50],
+        [8.1, 50.1],
+        [8, 50],
+      ],
+    ],
+  };
+
+  it('Abschnittsfläche speichern: Erfolg → Quittung, der Zeichenmodus endet', async () => {
+    einsatzabschnitteApi.zeichneAbschnitt.mockClear();
+    const fehler = vi.fn();
+    const erfolg = vi.fn();
+    const { result } = rendere(fehler, erfolg);
+    act(() => result.current.onAbschnittZeichnenStart(8));
+    act(() => result.current.onFlaecheGezeichnet(POLY));
+    await waitFor(() => expect(erfolg).toHaveBeenCalledWith('Fläche gespeichert'));
+    expect(einsatzabschnitteApi.zeichneAbschnitt).toHaveBeenCalledWith(1, 8, {
+      flaeche_geojson: JSON.stringify(POLY),
+    });
+    expect(fehler).not.toHaveBeenCalled();
+    await waitFor(() => expect(result.current.zeichneAbschnittId).toBeNull());
+  });
+
+  it('Abschnittsfläche speichern: Fehlschlag → keine Quittung, der Zeichenmodus endet', async () => {
+    einsatzabschnitteApi.zeichneAbschnitt.mockRejectedValueOnce(new Error('abgelehnt'));
+    const fehler = vi.fn();
+    const erfolg = vi.fn();
+    const { result } = rendere(fehler, erfolg);
+    act(() => result.current.onAbschnittZeichnenStart(8));
+    act(() => result.current.onFlaecheGezeichnet(POLY));
+    await waitFor(() => expect(fehler).toHaveBeenCalledTimes(1));
+    expect(erfolg).not.toHaveBeenCalled();
+    await waitFor(() => expect(result.current.zeichneAbschnittId).toBeNull());
+  });
+
+  it('zoneLoeschen: Fehlschlag → keine Quittung', async () => {
+    lagezonenApi.loescheZone.mockRejectedValueOnce(new Error('abgelehnt'));
+    const fehler = vi.fn();
+    const erfolg = vi.fn();
+    const { result } = rendere(fehler, erfolg);
+    await act(async () => {
+      await result.current.zoneLoeschen(5);
+    });
+    expect(fehler).toHaveBeenCalledTimes(1);
+    expect(erfolg).not.toHaveBeenCalled();
   });
 });

@@ -1,4 +1,4 @@
-import { Button, Descriptions, Space } from 'antd';
+import { Button, Descriptions, Popconfirm, Space } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import TaktischesZeichen, {
   einheiten,
@@ -155,18 +155,26 @@ export default function FreiesZeichenInspector({
             disabled={!darfSchreiben}
             onChange={onVerschieben}
           />
-          <Button
-            danger
-            block
-            onClick={() => {
+          {/* Hart gelöscht (`freies_zeichen/repo.rs`), also Rückfrage mit rotem OK
+              (LFH-710, LFH-363). Der Name ist derselbe wie im Kartenkopf. */}
+          <Popconfirm
+            title={`„${titel}“ löschen?`}
+            description="Das Zeichen wird endgültig von der Karte entfernt."
+            okText="Löschen"
+            okButtonProps={{ danger: true }}
+            cancelText="Abbrechen"
+            onConfirm={() => {
               // Eine offene Änderung wird verworfen, nicht beim Abbau nachgeholt: der PATCH
-              // träfe das gelöschte Zeichen und endete in 404 (Review LFH-716, M4).
+              // träfe das gelöschte Zeichen und endete in 404 (Review LFH-716, M4). Erst beim
+              // Bestätigen — ein Abbrechen darf die offene Änderung nicht verlieren.
               offenerStand.current = null;
               onLoeschen();
             }}
           >
-            Löschen
-          </Button>
+            <Button danger block>
+              Löschen
+            </Button>
+          </Popconfirm>
         </Space>
       ) : (
         <Space orientation="vertical" style={{ width: '100%', alignItems: 'center' }}>
