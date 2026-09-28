@@ -275,9 +275,14 @@ dem Durchmesser `controlHeight` (`KarteMarker.trefferDurchmesser`) und außen 2 
 weißen Rand (Weiß + Schwarz halten gegen jeden Grund ≥ 4,58). Die Trefferzone trägt seit LFH-711
 **jeder** Marker der Lagekarte (Kräfte, Objekte, Lagemeldungen, freie Zeichen, Abschnitte, der
 Einsatzort mit eigener Ebene `marker-einsatzort-treffer`), die schwarze Außenkante bleibt den
-Personen vorbehalten. Die Bild-Ziehgriffe (`pages/lagekarte/bildGriffe.ts`) sind Container in
-`max(controlHeight, 44)` mit 12-px-Kern in `bedien`; scharf ist je Modus („Verschieben / Größe /
-Drehen“, Umschalter in der Leiste) nur eine Griffsorte.
+Personen vorbehalten. Eine Zone zählt nicht als „oberstes Feature“ über einem Personen-Cluster
+(`istTrefferzone`, `personenClusterAm`): sonst nähme ein Zeichen daneben dem sichtbaren Cluster
+den Tipp weg. Die Bild-Ziehgriffe (`pages/lagekarte/bildGriffe.ts`) sind durchsichtige Container
+in `max(controlHeight, 44)` mit kleinem Kern in `bedien` (Ecke/Kante 12 px weiß mit Rand,
+Drehen/Verschieben gefüllt). Ein Umschalter „Verschieben / Größe / Drehen“ in der Leiste lässt
+je Modus nur seine Griffe scharf — „Größe“ trägt Ecken UND Kanten, dort können sich auf einem
+kleinen Bild weiterhin Griffe überlappen. Ein Wechsel mitten in einer Ziehgeste wartet bis
+`dragend`.
 Personen-Cluster zeigen ihren Ring nach Sichtung und im Kern das Kürzel der dringlichsten
 Kategorie — kein eigenes Personen-Segment mehr. Die gefüllte `BemerkungZelle` ist ein
 Textknopf (gleiche Höhe wie der Platzhalter), der Fehler einer Inline-Zelle steht an der Zelle

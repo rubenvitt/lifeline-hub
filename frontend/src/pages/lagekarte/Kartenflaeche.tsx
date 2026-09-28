@@ -208,9 +208,9 @@ export interface KartenflaecheProps {
   /** Callback, wenn Platzier-Geometrie per Drag verändert wurde. */
   onPlatzierGeometrie?: (ecken: Ecken) => void;
   /**
-   * Welche Griffsorte im Platzier-Modus scharf ist (LFH-711). Vorgabe `groesse`. Zehn
-   * Griffe in Fingergröße auf einem daumengroßen Bild lägen übereinander; welchen man
-   * erwischte, entschiede die Reihenfolge im DOM statt die Absicht.
+   * Welche Griffsorte im Platzier-Modus scharf ist (LFH-711). Vorgabe `groesse` (Ecken und
+   * Kanten). Alle zehn Griffe in Fingergröße auf einem daumengroßen Bild lägen übereinander;
+   * welchen man erwischte, entschiede die Reihenfolge im DOM statt die Absicht.
    */
   griffModus?: GriffModus;
   /** Zeigerlage über der Karte (Koordinatenanzeige); `null`, sobald er die Karte verlässt. */
@@ -244,6 +244,22 @@ export interface KartenHandle {
   zoomRaus(): void;
   /** Drehung und Neigung zurücksetzen (Nordung) — der Kompass des alten `NavigationControl`. */
   nachNorden(): void;
+}
+
+/**
+ * Der Personen-Cluster, dem ein Klick gehört, oder `null` (LFH-648, Review LFH-711). EINE
+ * Abfrage für beide Klickwege — Auffächern und Markerauswahl —, damit sie nie verschieden
+ * entscheiden: sonst fächerte derselbe Tipp auf UND öffnete einen Inspector.
+ */
+function personenClusterAm(map: maplibregl.Map, punkt: maplibregl.PointLike) {
+  const layers = [
+    ...MARKER_KLICK_LAYER,
+    ...SPIDER_KLICK_LAYER,
+    ...PERSONEN_CLUSTER_KLICK_LAYER,
+  ].filter((id) => map.getLayer(id));
+  return layers.length
+    ? personenClusterTreffer(map.queryRenderedFeatures(punkt, { layers }))
+    : null;
 }
 
 const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kartenflaeche(
@@ -834,6 +850,10 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     // dreimal — seit den überlappenden Trefferzonen womöglich mit VERSCHIEDENEN Schlüsseln.
     // Gewählt wird das Merkmal, das dem Klickpunkt am nächsten liegt.
     const klickMarker = (e: maplibregl.MapLayerMouseEvent) => {
+      // Gehört der Klick einem Personen-Cluster, fächert der Karten-Klick unten auf; hier wird
+      // dann nichts gewählt (Review LFH-711). Sonst öffnete die unsichtbare Zone eines Zeichens
+      // daneben dessen Inspector, während der sichtbare Cluster, auf den getippt wurde, zu bliebe.
+      if (personenClusterAm(map, e.point)) return;
       const merkmal = naechstesMerkmal(e.features ?? [], e.point, (ll) => map.project(ll));
       const schluessel = merkmal?.properties?.schluessel;
       if (typeof schluessel === 'string') onMarkerKlick?.(schluessel);
@@ -992,14 +1012,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     // das OBERSTE Feature am Punkt ist. Jeder andere Klick klappt ein wie bisher (leerer Klick,
     // Leaf-Routing, Klick auf ein Kräfte-Zeichen über dem Cluster).
     const klick = (e: maplibregl.MapMouseEvent) => {
-      const layers = [
-        ...MARKER_KLICK_LAYER,
-        ...SPIDER_KLICK_LAYER,
-        ...PERSONEN_CLUSTER_KLICK_LAYER,
-      ].filter((id) => map.getLayer(id));
-      const treffer = layers.length
-        ? personenClusterTreffer(map.queryRenderedFeatures(e.point, { layers }))
-        : null;
+      const treffer = personenClusterAm(map, e.point);
       if (treffer)
         oeffne(PERSONEN_CLUSTER_QUELLE, treffer.clusterId, treffer.center, treffer.anzahl);
       else schliesse();
@@ -1207,8 +1220,9 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
   // Bild-Manipulationsgriffe (Ecken/Drehen/Verschieben) im Platzier-Modus.
   const handlesRef = useRef<BildHandles | null>(null);
   // Modus und Maße gehen über Refs in die Erzeugung (LFH-711): als Deps des Effekts unten
-  // zerstörten sie die Griffe bei jedem Umschalten — mitten in einer Ziehgeste risse die Geste
-  // ab. Aus demselben Grund hängt jener Effekt nur an der Bild-ID. Die Maße (Stufe, Rolle
+  // zerstörten und bauten sie die Griffe bei jedem Umschalten neu. Aus demselben Grund hängt
+  // jener Effekt nur an der Bild-ID. Einen Wechsel mitten in einer Ziehgeste stellt
+  // `bildHandles` selbst bis `dragend` zurück. Die Maße (Stufe, Rolle
   // `bedien`) gelten ab dem nächsten Platzieren; ein Stufenwechsel mitten im Einpassen ist
   // kein Fall, für den sich ein Neuaufbau lohnt.
   const griffModusRef = useRef<GriffModus>(griffModus ?? 'groesse');

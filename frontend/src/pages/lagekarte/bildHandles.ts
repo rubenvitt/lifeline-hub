@@ -241,6 +241,29 @@ export function erzeugeBildHandles(
     onCommit(ecken);
   });
 
+  // Nach den Griff-Hörern angemeldet, damit `dragend` ERST speichert und dann umschaltet.
+  // Ein Moduswechsel MITTEN in einer Ziehgeste (Multitouch: ein Finger zieht, der andere tippt
+  // den Umschalter) wartet bis `dragend` (Review LFH-711). Sofort angewandt zöge er den
+  // gezogenen Griff ab: MapLibre meldet dabei seinen `mouseup`-Hörer ab, `dragend` käme nie,
+  // der Vorschaustand würde nicht gespeichert, und der Griff behielte `pointer-events: none`
+  // aus der Geste — nach dem Zurückschalten wäre er tot.
+  let ziehend = false;
+  let wartenderModus: GriffModus | null = null;
+  for (const m of alle) {
+    m.on('dragstart', () => {
+      ziehend = true;
+    });
+    m.on('dragend', () => {
+      ziehend = false;
+      if (wartenderModus) {
+        modus = wartenderModus;
+        wartenderModus = null;
+        positioniere();
+        wendeModusAn();
+      }
+    });
+  }
+
   return {
     setzeEcken(e: Ecken) {
       ecken = e;
@@ -248,6 +271,10 @@ export function erzeugeBildHandles(
       positioniere();
     },
     setzeModus(m: GriffModus) {
+      if (ziehend) {
+        wartenderModus = m;
+        return;
+      }
       modus = m;
       // ERST positionieren, dann anhängen: ein Griff, der seit dem letzten Modus abgezogen
       // war, hat die zwischenzeitlichen Ecken nie gesehen und säße sonst am alten Ort.

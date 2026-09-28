@@ -621,6 +621,36 @@ describe('personenClusterTreffer (LFH-648)', () => {
   it('leerer Klick: kein Treffer', () => {
     expect(personenClusterTreffer([])).toBeNull();
   });
+
+  // Review LFH-711: seit jeder Kräfte-/Objektmarker eine unsichtbare Zone trägt, liegt sie in
+  // der Mal-Reihenfolge ÜBER den Personen-Clustern. Zählte sie als „oberstes Feature", nähme ein
+  // Einsatzort oder RTW im Umkreis von 24–36 px (komfortabel/handschuh) dem sichtbaren Cluster
+  // den Tipp weg — genau in den Berührungsstufen, für die die Zone gebaut ist.
+  const zone = (id: string, schluessel: string) => ({
+    layer: { id },
+    properties: { schluessel, treffer: 72 },
+    geometry: { type: 'Point', coordinates: [11.5001, 53.5501] },
+  });
+
+  it('eine bloße Trefferzone über dem Cluster zählt nicht — der Cluster fächert auf', () => {
+    for (const id of ['marker-treffer', 'marker-einsatzort-treffer', 'spider-treffer']) {
+      expect(personenClusterTreffer([zone(id, 'einsatzort'), cluster]), id).toEqual({
+        clusterId: 7,
+        center: [11.5, 53.55],
+        anzahl: 3,
+      });
+    }
+  });
+
+  it('ein GEZEICHNETES Zeichen über dem Cluster gewinnt weiterhin, auch unter einer Zone', () => {
+    expect(
+      personenClusterTreffer([zone('marker-treffer', 'einheit-1'), einheit, cluster]),
+    ).toBeNull();
+  });
+
+  it('nur Zonen am Punkt, kein Cluster: kein Treffer', () => {
+    expect(personenClusterTreffer([zone('marker-treffer', 'einheit-1')])).toBeNull();
+  });
 });
 
 describe('naechstesMerkmal (Review LFH-650)', () => {

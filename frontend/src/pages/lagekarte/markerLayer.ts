@@ -149,11 +149,18 @@ export type ClusterQuelle = (typeof CLUSTER_QUELLEN)[number];
 export function clusterSchluessel(quelle: ClusterQuelle, clusterId: number | string): string {
   return `${quelle}:${clusterId}`;
 }
+/** Die unsichtbaren Trefferzonen (LFH-650/LFH-711) — Klickziel, aber keine Zeichnung. */
+export function istTrefferzone(layerId: string): boolean {
+  return layerId.endsWith('-treffer');
+}
 /**
- * Entscheidet einen Karten-Klick für die Personen-Cluster (LFH-648): ist das OBERSTE Feature am
- * Klickpunkt ein Personen-Cluster, wird er aufgefächert. Liegt ein anderes Zeichen darüber, gehört
- * der Klick ihm — genau das ist die Zusicherung „Personen verdecken keine Kräfte". Rein, damit sie
- * ohne WebGL prüfbar ist; `features` kommt von `queryRenderedFeatures` (oben zuerst).
+ * Entscheidet einen Karten-Klick für die Personen-Cluster (LFH-648): ist das oberste GEZEICHNETE
+ * Feature am Klickpunkt ein Personen-Cluster, wird er aufgefächert. Liegt ein anderes Zeichen
+ * darüber, gehört der Klick ihm — genau das ist die Zusicherung „Personen verdecken keine Kräfte".
+ * Trefferzonen zählen dabei nicht (Review LFH-711): sie liegen über den Clustern, sind aber nicht
+ * zu sehen, und ein sichtbarer Cluster darf nicht von einem unsichtbaren Kreis daneben verdeckt
+ * werden. `Kartenflaeche` unterdrückt dann auch die Markerauswahl desselben Klicks. Rein, damit
+ * sie ohne WebGL prüfbar ist; `features` kommt von `queryRenderedFeatures` (oben zuerst).
  */
 export function personenClusterTreffer(
   features: readonly {
@@ -162,7 +169,7 @@ export function personenClusterTreffer(
     geometry: { type: string; coordinates?: unknown };
   }[],
 ): { clusterId: number; center: [number, number]; anzahl: number } | null {
-  const oben = features[0];
+  const oben = features.find((f) => !istTrefferzone(f.layer.id));
   if (!oben || !(PERSONEN_CLUSTER_KLICK_LAYER as readonly string[]).includes(oben.layer.id)) {
     return null;
   }
