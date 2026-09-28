@@ -1,3 +1,13 @@
+## [1.0.0-alpha.50](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.49...v1.0.0-alpha.50) (2026-09-28)
+
+### Betrieb und Installation
+
+- **Stabilität unter Node.js 26 verbessert**: Der in früheren Alpha-Versionen bei End-to-End-Tests aufgetretene Absturz des Entwicklungsservers (verursacht durch V8-Fast-API-Aufrufe bei großen vorgebündelten Modulen) wurde behoben. Die Anwendung läuft nun zuverlässig auch unter Node.js 26.
+
+### Dokumentation
+
+- **Entwickler-Dokumentation aufgeräumt**: Die technische Dokumentation für Entwickler und KI-Agenten wurde konsolidiert und von redundanten Inhalten befreit, um die Wartbarkeit des Projekts zu verbessern.
+
 ## [1.0.0-alpha.49](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.48...v1.0.0-alpha.49) (2026-09-28)
 
 ### Wichtige Änderungen
