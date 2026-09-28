@@ -3,50 +3,26 @@ import { pruefeFokusVerdeckung } from './fokus-kern';
 import { kontrast, pruefe } from './kontrast-kern';
 
 /**
- * Dokumentenablage im Browser (LFH-632).
+ * Dokumentenablage im Browser — was jsdom nicht tragen kann:
  *
- * ── WAS NUR HIER MESSBAR IST ────────────────────────────────────────────────────────────
+ * 1. Der Fokus beim Öffnen des Ablegen-Dialogs: die Erfassungs-Hülle fokussiert das erste
+ *    `<input>`, hier rc-uploads `<input type="file">` mit `display: none` — im Browser NICHT
+ *    fokussierbar, jsdom fokussiert es klaglos. Geprüft wird, dass „Datei wählen" den Fokus
+ *    trägt und der verborgene Input nicht.
+ * 2. Der Download: ob aus `<a href download>` ein Download mit dem erwarteten Dateinamen wird,
+ *    entscheidet der Browser mit dem `Content-Disposition` des Backends.
+ * 3. Die Formweiche und der Querlauf.
  *
- * Drei Aussagen dieses Moduls kann jsdom nicht tragen, und genau sie stehen hier:
+ * Dazu die Dichte-Staffel am Download-Anker (ein Inline-`<a>` erbt keine Steuerhöhe), an
+ * Zeilenaktion und Dialogzielen, als Literale 30 / 48 / 72. Die übrigen Tests belegen
+ * Tastaturweg (Kriterium 15), Kontrast in beiden Modi (5) und Fokus-Verdeckung (13); was nur
+ * gemessen, nicht zugesichert wird, steht als Anhang am Test.
  *
- * 1. **Der Fokus beim Öffnen des Ablegen-Dialogs.** Die Erfassungs-Hülle fokussiert das erste
- *    `<input>` — hier ist das rc-uploads `<input type="file">` mit `display: none`, im Browser
- *    also NICHT fokussierbar. jsdom fokussiert es klaglos und belegt damit das Gegenteil dessen,
- *    was im Betrieb passiert. Geprüft wird deshalb hier, dass „Datei wählen" den Fokus trägt
- *    und der verborgene Datei-Input ihn NICHT hat (Nacharbeit aus dem Review zu Task 4).
- * 2. **Der Download.** Der Titel ist ein echter `<a href download>` auf `/api/…/datei`; ob
- *    daraus ein Download-Ereignis mit dem erwarteten Dateinamen wird, entscheidet der Browser
- *    zusammen mit dem `Content-Disposition` des Backends (`anhang::content_disposition` liefert
- *    ASCII-Rückfall UND `filename*`), nicht die Komponente.
- * 3. **Die Formweiche und der Querlauf.** jsdom rechnet kein Layout (Memory
- *    `layout-regression-nur-e2e`); Tabelle gegen Karte und `scrollWidth` sind Browserwerte.
+ * Der Download läuft VOR dem Kategorie-Filter — der Filter „Foto" verdeckte sonst genau die
+ * Zeile, deren Anker gezogen wird.
  *
- * Dazu die Dichte-Staffel am **Download-Anker**: ein Inline-`<a>` erbt keine Steuerhöhe
- * (gemessen 17 px, LFH-396), `DownloadAnker` trägt `minHeight: token.controlHeight` deshalb
- * selbst. Die Sollwerte stehen als Literale (30 / 48 / 72) — aus dem Token zurückgelesen prüfte
- * der Test den Token gegen sich selbst. Dieselbe Messung deckt Zeilenaktion und Dialogziele.
- *
- * Die übrigen Tests sind die Belege der Prüfliste Einsatztauglichkeit
- * (`docs/superpowers/specs/2026-09-22-lfh-632-pruefliste.md`): Tastaturweg (Kriterium 15),
- * Kontrast in beiden Modi (5) und Fokus-Verdeckung unter der stehenden Kopfzeile (13). Was
- * dort nur gemessen und nicht zugesichert wird (geerbte App-Rollen, Klappkopf, Knopffuge),
- * steht als Anhang am Test und als „offen" in der Prüfliste.
- *
- * ── REIHENFOLGE IST HIER EINE ZUSICHERUNG, KEIN ZUFALL ──────────────────────────────────
- *
- * Der Download läuft VOR dem Kategorie-Filter. Andersherum verdeckte der Filter „Foto" genau
- * die Zeile, deren Anker gezogen werden soll — der Test wartete dann auf einen Treffer, den es
- * nach Konstruktion nicht geben kann.
- *
- * ── WAS HIER BEWUSST NICHT GEMESSEN WIRD ────────────────────────────────────────────────
- *
- * Kein `waitForLoadState('networkidle')`: auf Einsatzrouten bleibt ein SSE-Strom offen, die
- * Bedingung tritt nie sauber ein (LFH-385; gleichlautend in mehreren Bestands-Specs).
- * Kein Modulzähler bei 390 px — unterhalb `lg` liegt der Navigationsrahmen im Drawer
- * (LFH-329 · B1), die Zählermessung gehört an den Fükw-Durchgang.
- * Der Fixture-Name trägt KEINEN Modulnamen (Memory `e2e-fixture-namen-ohne-modulnamen`): die
- * Kommandopalette sucht Module und Einsätze gemeinsam, ein Einsatz „E2E Dokumente …" machte
- * jede Modulsuche mehrdeutig.
+ * Kein `networkidle` (SSE-Strom). Der Fixture-Name trägt keinen Modulnamen, sonst würde jede
+ * Modulsuche der Palette mehrdeutig.
  */
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
@@ -67,8 +43,6 @@ const STAFFEL = [
 const PDF = Buffer.from('%PDF-1.4 e2e');
 const JPG = Buffer.from('\xff\xd8\xff\xe0 e2e', 'binary');
 
-// Login-/Anlege-Helfer kopiert — es gibt (noch) kein geteiltes e2e-Hilfsmodul
-// (gleichlautend in sechs Bestands-Specs vermerkt).
 async function anmelden(page: Page, modus?: 'light' | 'dark') {
   // Der Modus muss VOR dem ersten Laden stehen — der Bootstrap in `index.html` liest ihn.
   if (modus) await page.addInitScript((m) => localStorage.setItem('lifeline-hub.theme', m), modus);
@@ -87,8 +61,8 @@ async function einsatzAnlegen(page: Page, name: string): Promise<string> {
   return page.url().match(/\/einsaetze\/(\d+)/)![1];
 }
 
-/** Seeding per `page.request` (Cookie-Jar geteilt) — für die Layout-Läufe, die den Dialog
- *  nicht prüfen. Der Ablegen-Weg über die Oberfläche steht im ersten Test. */
+/** Seeding per `page.request` für die Layout-Läufe; den Ablegen-Weg über die Oberfläche prüft
+ *  der erste Test. */
 async function seedeDokument(
   page: Page,
   einsatzId: string,
@@ -110,8 +84,7 @@ async function seedeDokument(
   ).toBeTruthy();
 }
 
-/** Der offene Dialog. antd lässt die Portale geschlossener Modale im Baum stehen; die
- *  Rollenabfrage übergeht sie, weil sie nicht im Zugänglichkeitsbaum liegen. */
+/** Der offene Dialog. Geschlossene Modal-Portale liegen nicht im Zugänglichkeitsbaum. */
 function ablegenDialog(page: Page): Locator {
   return page.getByRole('dialog');
 }
@@ -182,17 +155,15 @@ async function legeAb(
 test('legt ab, zählt, lädt herunter, filtert und entfernt — der ganze Weg im Browser', async ({
   page,
 }) => {
-  // Ganzer Weg mit zwei Ablagen: unter Gate-Last (vier Shards, Rust-Suite daneben) reicht
-  // die Vorgabe von 30 s nicht.
+  // Ganzer Weg mit zwei Ablagen: unter Gate-Last reicht die Vorgabe von 30 s nicht.
   test.setTimeout(90_000);
   await page.setViewportSize(FUEKW);
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Ablage ${Date.now()}`);
 
-  // Der Navigationsrahmen steht ab `lg` inline; sein Zähler ist der zweite Beleg dafür, dass
-  // die Ablage wirklich im Bestand landet (Query-Key `einsatz-dokumente`, gemeinsam genutzt).
-  // Angesteuert wird über die Modulzeile, nicht per `goto`: der Einstieg über die Navigation
-  // ist Teil des AK (Kategorie „Führung", die Startkategorie eines Einsatzes).
+  // Der Zähler im Navigationsrahmen belegt zweitens, dass die Ablage im Bestand landet
+  // (gemeinsamer Query-Key). Angesteuert über die Modulzeile — der Einstieg über die
+  // Navigation ist Teil der Aussage.
   const modulKnopf = page.getByRole('button', { name: /^Dokumente/ });
   const zaehler = modulKnopf.locator('[data-lfh="modul-zaehler"]');
   await expect(modulKnopf, 'Modulzeile „Dokumente" steht im Rahmen').toBeVisible();
@@ -209,8 +180,8 @@ test('legt ab, zählt, lädt herunter, filtert und entfernt — der ganze Weg im
   await page.getByRole('button', { name: 'Dokument ablegen' }).click();
   const dialog = ablegenDialog(page);
   await expect(dialog).toBeVisible();
-  // DIE Aussage, die jsdom nicht tragen kann: der verborgene `input[type=file]` ist im
-  // Browser nicht fokussierbar, der Knopf holt den Fokus per `requestAnimationFrame`.
+  // Der verborgene `input[type=file]` ist im Browser nicht fokussierbar; der Knopf holt den
+  // Fokus per `requestAnimationFrame`.
   await expect(
     dialog.locator('button.ant-btn', { hasText: 'Datei wählen' }),
     'Fokus liegt beim Öffnen auf „Datei wählen"',
@@ -219,8 +190,7 @@ test('legt ab, zählt, lädt herunter, filtert und entfernt — der ganze Weg im
     dialog.locator('input[type="file"]'),
     'der verborgene Datei-Input trägt den Fokus NICHT',
   ).not.toBeFocused();
-  // Dieselbe Aussage direkt am `document.activeElement` — weder `<body>` noch der Input,
-  // sondern der native `<button>` mit dem Wortlaut „Datei wählen".
+  // Dasselbe direkt am `document.activeElement`: der native `<button>` „Datei wählen".
   const aktiv = await page.evaluate(() => {
     const el = document.activeElement;
     return {
@@ -286,8 +256,7 @@ test('Formweiche und Querlauf: Tabelle bei 1280 px, Karte bei 390 px', async ({ 
 
   await page.setViewportSize(FUEKW);
   await page.goto(pfad);
-  // Der Anker steht VOR jeder Messung — sonst prüft der Test den Ladezustand, und ohne
-  // Zeilen gibt es keinen Überlauf (Lehre aus `kraefte-schmal.spec.ts`).
+  // Der Anker steht VOR jeder Messung — ohne Zeilen gibt es keinen Überlauf.
   await expect(page.getByRole('link', { name: 'Lageplan Nord' })).toBeVisible();
   await expect(page.locator('.ant-table').first(), 'Tabellenzweig bei 1280 px').toBeVisible();
   await expect(
@@ -306,8 +275,8 @@ test('Formweiche und Querlauf: Tabelle bei 1280 px, Karte bei 390 px', async ({ 
   await expect(page.locator('.ant-table'), 'keine Tabelle bei 390 px').toHaveCount(0);
   await keinQuerlauf(page, `${pfad} @390`);
 
-  // Entfernen im Kartenzweig: Auslöser neutral, OK der Rückfrage rot (E1 gilt auch unter md),
-  // der zugängliche Name trägt den Titel (n Karten ≠ n gleichnamige Knöpfe).
+  // Entfernen im Kartenzweig: Auslöser neutral, OK der Rückfrage rot; der zugängliche Name
+  // trägt den Titel.
   const entfernenKarte = page.getByRole('button', { name: 'Dokument Lageplan Nord entfernen' });
   await expect(entfernenKarte, 'der Auslöser ist NICHT rot').not.toHaveClass(/ant-btn-dangerous/);
   await entfernenKarte.click();
@@ -364,8 +333,7 @@ test.describe('Dichte-Staffel: Download-Anker, Zeilenaktion und Ablegen-Dialog',
       await page.getByRole('button', { name: 'Dokument ablegen' }).click();
       const dialog = ablegenDialog(page);
       await expect(dialog.locator('button.ant-btn', { hasText: 'Datei wählen' })).toBeFocused();
-      // Erst nach der Zoom-Einblendung messen: währenddessen ist der Dialog skaliert, und ein
-      // 48-px-Knopf misst gemessen 36 px (erster Lauf dieses Tests unter Last).
+      // Erst nach der Zoom-Einblendung messen: währenddessen ist der Dialog skaliert.
       await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
 
       const ziele: Record<string, Locator> = {
@@ -386,9 +354,8 @@ test.describe('Dichte-Staffel: Download-Anker, Zeilenaktion und Ablegen-Dialog',
           `${name} (${dichte}): gemessen ${h} px, Soll ≥ ${soll} px`,
         ).toBeGreaterThanOrEqual(soll - SUBPIXEL);
       }
-      // NUR GEMESSEN, NICHT ZUGESICHERT — beide liegen unter der Staffel und gehören nicht dem
-      // Modul: der Klappkopf ist antds `Collapse` (kein `controlHeight`), der Abstand der
-      // Fußknöpfe kommt aus der Erfassungs-Hülle. Die Zahlen stehen in der Prüfliste (Nr. 2).
+      // NUR GEMESSEN, NICHT ZUGESICHERT: der Klappkopf ist antds `Collapse` (kein
+      // `controlHeight`), der Abstand der Fußknöpfe kommt aus der Erfassungs-Hülle.
       const klappkopf = await hoehe(dialog.locator('.ant-collapse-header'));
       const abbrechen = (await ziele.Abbrechen.boundingBox())!;
       const ablegen = (await ziele.Ablegen.boundingBox())!;
@@ -434,9 +401,8 @@ test('Tastaturweg: Dialog öffnen, Datei wählen, Kategorie, Enter legt ab', asy
   const dateiKnopf = dialog.locator('button.ant-btn', { hasText: 'Datei wählen' });
   await expect(dateiKnopf).toBeFocused();
 
-  // Tab-Reihenfolge im Dialog, GEMESSEN statt aus dem Quelltext gelesen: rc-upload hüllt den
-  // Knopf in ein `span[role=button]` — wäre das ein eigener Tab-Stopp, stünde er hier doppelt.
-  // Knopf und Klappkopf über ihren Wortlaut, Felder über ihr Label.
+  // Tab-Reihenfolge im Dialog, gemessen: rc-upload hüllt den Knopf in ein `span[role=button]`
+  // — wäre das ein eigener Tab-Stopp, stünde er hier doppelt.
   const beschreibe = () =>
     page.evaluate(() => {
       const e = document.activeElement;
@@ -476,10 +442,7 @@ test('Tastaturweg: Dialog öffnen, Datei wählen, Kategorie, Enter legt ab', asy
   ]);
   await expect(dateiKnopf, 'zurück am ersten Ziel').toBeFocused();
 
-  // Enter auf dem Knopf öffnet den Dateidialog des Browsers — der Weg ohne Maus zur Datei.
-  // Enter und nicht die Leertaste, weil es der Weg ist, den man nimmt. Gemessen (Sonde mit
-  // Zähler auf `HTMLInputElement.prototype.click`, 12 Läufe): genau EIN `input.click()` und
-  // EIN Dateiwähler je Tastendruck, für Enter wie für die Leertaste.
+  // Enter auf dem Knopf öffnet den Dateidialog — genau EIN `input.click()` je Tastendruck.
   const [waehler] = await Promise.all([
     page.waitForEvent('filechooser'),
     page.keyboard.press('Enter'),
@@ -487,11 +450,9 @@ test('Tastaturweg: Dialog öffnen, Datei wählen, Kategorie, Enter legt ab', asy
   await waehler.setFiles({ name: 'Einsatzbefehl 3.pdf', mimeType: 'application/pdf', buffer: PDF });
   await expect(dialog.getByLabel('Titel')).toHaveValue('Einsatzbefehl 3');
 
-  // Nach der Wahl steht die Datei als Listeneintrag mit „Datei entfernen" im Dialog — beide
-  // sind Tab-Stopps, die gewählte Datei lässt sich also ohne Maus wieder verwerfen. Wo der
-  // Fokus unmittelbar nach `setFiles` steht, ist KEINE Produktmessung: Playwright fängt den
-  // Dateidialog ab, ein echter Dialog gibt den Fokus beim Schließen selbst zurück. Gezählt
-  // wird deshalb nur der Weg bis zur Kategorie.
+  // Nach der Wahl sind Listeneintrag und „Datei entfernen" Tab-Stopps. Wo der Fokus direkt
+  // nach `setFiles` steht, ist keine Produktmessung (Playwright fängt den Dialog ab); gezählt
+  // wird nur der Weg bis zur Kategorie.
   const nachWahl: string[] = [];
   const kategorie = dialog.getByRole('combobox', { name: 'Kategorie' });
   for (
@@ -505,18 +466,18 @@ test('Tastaturweg: Dialog öffnen, Datei wählen, Kategorie, Enter legt ab', asy
   expect(nachWahl.slice(-3)).toEqual(['Einsatzbefehl 3.pdf', 'Datei entfernen', 'Kategorie']);
   await expect(kategorie).toBeFocused();
   await page.keyboard.type('Befehl');
-  // Erst Enter, wenn die Liste wirklich auf den einen Treffer gefiltert ist — sonst wählt
-  // Enter unter Last den noch aktiven ersten Eintrag oder gar nichts (Gate-Lauf, 1 von 194).
+  // Erst Enter, wenn die Liste auf den einen Treffer gefiltert ist — sonst wählt Enter unter
+  // Last den falschen Eintrag.
   const offeneListe = page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)');
   await expect(offeneListe.locator('.ant-select-item-option')).toHaveCount(1);
   await expect(offeneListe.locator('.ant-select-item-option-active')).toHaveText('Befehl');
   await page.keyboard.press('Enter');
   await expect(offeneListe).toHaveCount(0);
-  // Der Titel des gewählten Eintrags — NICHT der Textinhalt der Hülle: der enthält unter
-  // antd 6 auch den getippten Suchtext und wäre schon vor der Wahl „Befehl".
+  // Der Titel des gewählten Eintrags, nicht der Textinhalt der Hülle (der trägt in antd 6
+  // auch den getippten Suchtext).
   await expect(dialog.locator('.ant-select').first().getByTitle('Befehl')).toBeVisible();
 
-  // Enter im Titelfeld ist die eingebaute Formularübermittlung (Knopf im `<form>`, LFH-332).
+  // Enter im Titelfeld ist die eingebaute Formularübermittlung (Knopf im `<form>`).
   await page.keyboard.press('Tab');
   await expect(dialog.getByLabel('Titel')).toBeFocused();
   await page.keyboard.press('Enter');
@@ -524,7 +485,7 @@ test('Tastaturweg: Dialog öffnen, Datei wählen, Kategorie, Enter legt ab', asy
   await expect(page.getByRole('link', { name: 'Einsatzbefehl 3' })).toBeVisible();
 });
 
-// Kriterium 5: Tag ≥ 7, Nacht ≥ 5, nie < 4,5 — als Literale (Muster `hellmodus-kontrast`).
+// Kriterium 5: Tag ≥ 7, Nacht ≥ 5, nie < 4,5 — als Literale.
 const KONTRAST_ZIEL = { light: 7, dark: 5 } as const;
 const KONTRAST_BODEN = 4.5;
 
@@ -560,18 +521,16 @@ for (const modus of ['light', 'dark'] as const) {
       `${modus}/Abgelegt`,
     );
 
-    // Der Titel-Anker ist seit LFH-21 der geteilte `DownloadAnker` in `bedienText` — eine
-    // Rolle dieses Projekts, nicht mehr antds Linkfarbe. Er trägt deshalb den Tag-/Nacht-Boden
-    // (7 / 5), gemessen am Namensknoten in der Tabellenzelle (anderer Grund als das
-    // Schaden-Paneel, Regel 3 aus LFH-618).
+    // Der Titel-Anker ist der geteilte `DownloadAnker` in `bedienText` und trägt den vollen
+    // Boden, gemessen am Namensknoten in der Tabellenzelle.
     await pruefe(
       page.getByRole('link', { name: 'Lageplan Nord' }).locator('[data-lfh="download-anker-name"]'),
       KONTRAST_ZIEL[modus],
       `${modus}/Titel-Anker (bedienText)`,
     );
 
-    // App-weite Rollen, die dieses Modul nur ERBT (Tabellenkopf, Sekundärtext): zugesichert
-    // ist der absolute Boden, der Messwert steht als Anhang und in der Prüfliste.
+    // App-weite Rollen, die das Modul nur ERBT: zugesichert ist der absolute Boden, der
+    // Messwert steht als Anhang.
     const geerbt: Record<string, Locator> = {
       Tabellenkopf: page.locator('.ant-table-thead th').first(),
       'Bezug „—" (Sekundärtext)': zeile.getByText('—', { exact: true }),
@@ -596,8 +555,7 @@ for (const modus of ['light', 'dark'] as const) {
       `${modus}/Datei wählen`,
     );
     await pruefe(dialog.getByText('Bezug (optional)'), KONTRAST_ZIEL[modus], `${modus}/Klappkopf`);
-    // Pflichtmeldung: leeres Absenden. Rot als TEXT ist eine app-weite Rolle (antds
-    // `colorError`), deshalb auch hier nur der Boden plus Messwert.
+    // Pflichtmeldung: Rot als TEXT ist eine app-weite Rolle, deshalb nur Boden plus Messwert.
     await dialog.getByRole('button', { name: 'Ablegen' }).click();
     const pflicht = dialog.getByText('Bitte eine Datei wählen');
     await pruefe(pflicht, KONTRAST_BODEN, `${modus}/Pflichtmeldung`);
@@ -644,11 +602,9 @@ test('Fokus nie verdeckt: Tab-Durchlauf durch die Liste unter der stehenden Kopf
   });
 });
 
-// Kriterium 13 im Dialog: gemessen statt aus „kein sticky im Quelltext" geschlossen. Die Maske
-// des Modals und die Kopfleiste der Seite sind fixiert; der Durchlauf muss jedes Dialogziel
-// besuchen, sonst wäre „0 verdeckt" trivial wahr. Bei 390 px in `handschuh` ist der Dialog
-// höher als der Schirm und scrollt in seiner Hülle — genau dort könnte ein Ziel unter einer
-// fixierten Fläche landen.
+// Kriterium 13 im Dialog: die Maske des Modals und die Kopfleiste sind fixiert; der Durchlauf
+// muss jedes Dialogziel besuchen. Bei 390 px in `handschuh` scrollt der Dialog in seiner Hülle
+// — dort könnte ein Ziel unter einer fixierten Fläche landen.
 for (const viewport of [FUEKW, HANDSCHIRM]) {
   for (const dichte of ['kompakt', 'handschuh'] as const) {
     test(`Fokus nie verdeckt im Ablegen-Dialog bei ${viewport.width} px, ${dichte}`, async ({
@@ -664,7 +620,7 @@ for (const viewport of [FUEKW, HANDSCHIRM]) {
       const dialog = ablegenDialog(page);
       await expect(dialog.locator('button.ant-btn', { hasText: 'Datei wählen' })).toBeFocused();
       await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
-      // Datei gewählt und Bezug aufgeklappt: jedes Ziel, das der Dialog tragen kann, steht im Baum.
+      // Datei gewählt und Bezug aufgeklappt: jedes mögliche Dialogziel steht im Baum.
       await dialog
         .locator('input[type="file"]')
         .setInputFiles({ name: 'Lageplan Nord.pdf', mimeType: 'application/pdf', buffer: PDF });

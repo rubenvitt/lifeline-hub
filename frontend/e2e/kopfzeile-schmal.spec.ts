@@ -1,25 +1,15 @@
 import { expect, test, type Page } from '@playwright/test';
 
 /**
- * Die Kopfzeile auf dem Handschirm (LFH-329 · B1/M12).
- *
- * WARUM HIER UND NICHT IN VITEST: `vite.config.ts` fährt Vitest mit `css: false`,
- * und jsdom rechnet kein Layout. Die eine Frage, die dieses Paket wirklich
- * beantworten muss — schlägt das Inline-`paddingInline` antds Klassenregel
- * (`padding: 0 46.875px` bei der kompakten Steuerhöhe), auch logisch gegen
- * physisch? — ist ausschließlich im Browser messbar. Die Quelltext-Verdrahtung
+ * Die Kopfzeile auf dem Handschirm. Ob das Inline-`paddingInline` antds Klassenregel schlägt
+ * (auch logisch gegen physisch), ist nur im Browser messbar; die Quelltext-Verdrahtung
  * bewacht `src/theme/kopfpolsterung.guard.test.ts`.
  *
- * Bewusst KEIN zweites Playwright-Projekt und kein Device-Descriptor: ein
- * `devices['iPhone …']` zöge webkit nach, und ein Browser-Download ist im Repo
- * nirgends abgesichert. Der Viewport wird im bestehenden chromium-Projekt
- * umgestellt.
+ * Kein Device-Descriptor (zöge webkit nach); der Viewport wird umgestellt.
  *
- * NICHT geprüft: `document.body.scrollWidth <= window.innerWidth` über das ganze
- * Dokument. Der Überlauf auf 390 px hat auf einer Modulseite mehrere Quellen
- * (Tabellen, Karten) — dieses Paket kann nur seinen eigenen Beitrag belegen und
- * misst deshalb punktgenau das `header`-Element. Wer das zur dokumentweiten
- * Form „repariert", macht die Spec zur Sammelstelle fremder Befunde.
+ * Gemessen wird punktgenau das `header`-Element, nicht `body.scrollWidth`: auf einer
+ * Modulseite hat der Überlauf mehrere Quellen, und die Spec würde sonst zur Sammelstelle
+ * fremder Befunde.
  */
 
 const ADMIN = 'admin';
@@ -28,8 +18,6 @@ const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 const SCHMAL = { width: 390, height: 844 };
 const BREIT = { width: 1366, height: 768 };
 
-// Login-/Anlege-Helfer aus `kernfluss.spec.ts` kopiert — es gibt (noch) kein
-// geteiltes e2e-Hilfsmodul.
 async function anmeldenAls(page: Page, benutzer: string, passwort: string) {
   await page.goto('/login');
   await page.getByLabel('Benutzername').fill(benutzer);
@@ -57,18 +45,13 @@ test('Kopf-Polsterung: 24 px an der Suchzelle am Fükw-Schirm, randlose Leiste a
   const einsatzId = await einsatzAnlegen(page, `E2E Kopf ${Date.now()}`);
 
   // BEIDE Layouts: `/einsaetze` hängt an der Ebene-1-Shell, die Modulseite am
-  // Einsatz-Workspace. Es sind Geschwister — wer nur eines umstellt, lässt den
-  // Handschirm auf der halben App auf dem antd-Maß stehen.
-  //
-  // NEUENTWURF (21.09.2026): die Kommandoleiste ist randlos — Markenzelle bzw. Griff
-  // stehen bündig am Fensterrand, die Zellen tragen ihren eigenen Innenrand. Die
-  // viewportabhängige Kopf-Polsterung sitzt an der Suchzelle (ab `lg`).
+  // Einsatz-Workspace — Geschwister, die einzeln umgestellt werden könnten. Die Leiste ist
+  // randlos; die viewportabhängige Polsterung sitzt an der Suchzelle (ab `lg`).
   for (const route of ['/einsaetze', `/einsaetze/${einsatzId}/etb`]) {
     await page.setViewportSize(BREIT);
     await page.goto(route);
     const kopf = page.locator('header');
-    // Beweist, dass der Selektor genau eine Kopfzeile trifft — sonst wäre eine
-    // grüne Zusicherung grün durch Nichtstun.
+    // Genau eine Kopfzeile — sonst wäre eine grüne Zusicherung grün durch Nichtstun.
     await expect(kopf, route).toHaveCount(1);
     await expect(kopf, route).toHaveCSS('padding-left', '0px');
     const suche = kopf.locator('[data-lfh="kopf-suche"]');
@@ -84,10 +67,9 @@ test('Kopf-Polsterung: 24 px an der Suchzelle am Fükw-Schirm, randlose Leiste a
   }
 });
 
-/** Kompakte Vorgabe und Touch-Vorbelegung prüfen beide Layoutfamilien.
- *  LFH-460 ergänzt die gespeicherte Wahl aller drei Stufen in gate1-ueberlauf.
- *  Der Kopf darf jetzt kontrolliert umbrechen, seine Ziele aber nicht abschneiden.
- */
+/** Kompakte Vorgabe und Touch-Vorbelegung, beide Layoutfamilien: der Kopf darf kontrolliert
+ *  umbrechen, seine Ziele aber nicht abschneiden (die drei gespeicherten Stufen prüft
+ *  `gate1-ueberlauf`). */
 async function kopfLaeuftNichtUeber(page: Page, route: string, stufe: 'kompakt' | 'komfortabel') {
   await page.goto(route);
   const kopf = page.locator('header');
@@ -105,19 +87,13 @@ async function kopfLaeuftNichtUeber(page: Page, route: string, stufe: 'kompakt' 
   expect(masse.scrollB, `${route}: Kopfzeile läuft WAAGERECHT über`).toBeLessThanOrEqual(
     masse.klientB,
   );
-  // BEIDE ACHSEN — und die senkrechte ist die schärfere (LFH-511 · AK1). Sie fehlte
-  // bis hierher, und ihr Fehlen war kein Zufall: waagerecht blieb die Kopfzeile
-  // ausgerechnet DESHALB grün, weil die Alarmzentrale umbrach. Der Umbruch ist die
-  // Ursache des Befunds, nicht sein Gegenteil — er kauft Breite mit Höhe, und ein
-  // Kopf, dessen Inhalt höher ist als er selbst, schneidet ihn oben und unten an.
+  // BEIDE ACHSEN, die senkrechte ist die schärfere: ein Umbruch kauft Breite mit Höhe, und
+  // ein Kopf, dessen Inhalt höher ist als er selbst, schneidet ihn an.
   expect(masse.scrollH, `${route}: Kopfzeile läuft SENKRECHT über`).toBeLessThanOrEqual(
     masse.klientH,
   );
-  // LFH-460 erlaubt zwei Zeilen. Der Deckel verhindert ungebremstes Wachstum,
-  // während die Inhaltsprüfung oben weiterhin jedes Abschneiden aufdeckt.
-  // Neuentwurf (21.09.2026): eine Zeile ist die 52-px-Kommandoleiste — in `kompakt` wie in
-  // `komfortabel`, weil die 48-px-Ziele der komfortablen Stufe in 52 px passen. (Vorher
-  // 60 / 96: die alte Kopfzeile trug die doppelte Steuerhöhe als Mindesthöhe.)
+  // Zwei Zeilen sind erlaubt, der Deckel verhindert ungebremstes Wachstum. Eine Zeile ist die
+  // 52-px-Kommandoleiste, in `kompakt` wie in `komfortabel`.
   const einzeilig = 52;
   expect(masse.klientH, `${route}: Kopfhöhe der Stufe ${stufe}`).toBeGreaterThanOrEqual(einzeilig);
   expect(masse.klientH, `${route}: höchstens zwei Kopfzeilen`).toBeLessThanOrEqual(2 * einzeilig);
@@ -150,23 +126,12 @@ for (const [stufe, hasTouch] of [
 }
 
 /**
- * DERSELBE Nachweis für den GESPERRTEN Zweig der Topbar (LFH-337 · Fix-Welle, Befund B1).
+ * Derselbe Nachweis für den GESPERRTEN Verwaltungs-Zweig der Topbar: gedämpfter Text plus
+ * „Keine Berechtigung"-Tag, der weder kürzen noch umbrechen kann. Ein Admin läuft nur durch
+ * den freien Zweig. Nur `/einsaetze`: `GlobalLink` wohnt in der Ebene-1-Schale.
  *
- * Der Test darüber meldet sich als Admin an; `darfVerwaltung(admin)` ist `true`, er läuft
- * also ausschließlich durch den freien `<Link>`-Zweig von `GlobalLink`
- * (`src/components/AppLayout.tsx`). Der gesperrte Zweig — gedämpfter Text plus
- * „Keine Berechtigung"-Tag — war nie gemessen, und genau er ist der breitere: er kann
- * weder kürzen (`flexShrink: 0`) noch umbrechen (antds `Tag` setzt `white-space: nowrap`).
- * Ein Guard, der nur den privilegiertesten Benutzer prüft, ist strukturell blind.
- *
- * NUR `/einsaetze`, KEINE Einsatzroute: `GlobalLink` wohnt in der Ebene-1-Schale
- * (`App.tsx:132-133`), der Einsatz-Workspace hat eine eigene Kopfzeile ohne diesen
- * Eintrag. Damit entfällt zugleich die Mitgliedschaftsfrage an einem vom Admin
- * angelegten Einsatz.
- *
- * Die VORBEDINGUNGEN sind tragend: ohne sie bliebe der Test auch dann grün, wenn
- * jemand den gesperrten Zweig ganz entfernte — dann liefe die Breitenmessung gegen
- * eine Kopfzeile ohne den Block, den sie messen soll.
+ * Die VORBEDINGUNGEN sind tragend: ohne sie bliebe der Test grün, wenn jemand den gesperrten
+ * Zweig ganz entfernte.
  */
 test('Kopfzeile: auf 390 px läuft sie auch für einen Benutzer OHNE Verwaltungsrecht nicht über', async ({
   page,
@@ -175,9 +140,8 @@ test('Kopfzeile: auf 390 px läuft sie auch für einen Benutzer OHNE Verwaltungs
   const NUTZER = `e2e-kopf-ohne-${LAUF}`;
   const NUTZER_PW = 'e2e-kopf-ohne-pw-123';
 
-  // Anlegen braucht den Admin. Ohne `system_rolle`/`org_rolle` im Body fällt das
-  // Backend auf 'keiner'/'keine' zurück (`src/routes/benutzer.rs:99-103`) —
-  // `darfVerwaltung` ist damit false. Präzedenz: `fokus-verdeckung.spec.ts:197-209`.
+  // Anlegen braucht den Admin. Ohne `system_rolle`/`org_rolle` im Body gilt 'keiner'/'keine',
+  // `darfVerwaltung` ist damit false.
   await anmelden(page);
   const angelegt = await page.request.post('/api/benutzer', {
     data: { anzeigename: `E2E Ohne Recht ${LAUF}`, benutzername: NUTZER, passwort: NUTZER_PW },
@@ -187,8 +151,7 @@ test('Kopfzeile: auf 390 px läuft sie auch für einen Benutzer OHNE Verwaltungs
     `Seeding Benutzer: ${angelegt.status()} ${await angelegt.text()}`,
   ).toBeTruthy();
 
-  // Sitzung wechseln. Der Cookie-Jar ist zwischen `page` und `page.request` geteilt,
-  // ein Abmelden über die API genügt deshalb.
+  // Sitzung wechseln: der Cookie-Jar ist geteilt, ein Abmelden über die API genügt.
   const abgemeldet = await page.request.post('/api/auth/logout');
   expect(abgemeldet.ok(), `Abmelden: ${abgemeldet.status()}`).toBeTruthy();
   await anmeldenAls(page, NUTZER, NUTZER_PW);
@@ -207,7 +170,7 @@ test('Kopfzeile: auf 390 px läuft sie auch für einen Benutzer OHNE Verwaltungs
     kopf.getByText('Verwaltung', { exact: true }),
     'Vorbedingung: der gedämpfte Eintrag bleibt auf JEDER Breite stehen (gesperrt statt versteckt)',
   ).toBeVisible();
-  // Der Tag selbst entfällt unter `lg` — das ist die Änderung, die den Überlauf behebt.
+  // Der Tag selbst entfällt unter `lg` — das behebt den Überlauf.
   await expect(
     kopf.getByText('Keine Berechtigung'),
     'unter lg trägt die Kopfzeile den Tag nicht',
@@ -237,23 +200,14 @@ test('Such-Trigger bleibt auf 390 px in beiden Kopfzeilen eine 48-px-Trefffläch
 });
 
 test('Bediendichte bleibt auf 390 px bedienbar — über das Benutzermenü', async ({ page }) => {
-  // DIE EIGENTLICHE ZUSICHERUNG DIESES PAKETS. A1 weist dem Führungs-Tablet und
-  // dem mobilen Kontext gerade `komfortabel` und `handschuh` zu. Die
-  // Kommandopalette trägt beide Achsen zwar und hat seit LFH-335 auch einen
-  // sichtbaren Auslöser — sie zeigt aber keinen AKTIVEN Wert an. Das Menü ist
-  // der Bedienweg, der die Stufe zeigt UND setzt.
-  //
-  // Unter lg ist dieser Test seit LFH-392 UNVERÄNDERT — was sich geändert hat,
-  // ist die Gegenprobe darunter: sie belegt nicht mehr, dass die BREITE die
-  // Umschalter entfernt, sondern dass sie in keiner Breite mehr im Kopf stehen.
+  // A1 weist Führungs-Tablet und mobilem Kontext `komfortabel` und `handschuh` zu; das Menü
+  // ist der Bedienweg, der die Stufe zeigt UND setzt.
   await anmelden(page);
   await page.setViewportSize(SCHMAL);
   await page.goto('/einsaetze');
 
-  // Über die ROLLE gezählt, nicht über die zwei Etiketten: die kamen mit
-  // `ThemeToggle.tsx` fort und stehen im Repo nirgends mehr — eine Null darauf
-  // wäre durch keine Änderung am Produktivcode rot zu bekommen. Diese hier
-  // schlägt an, sobald irgendein Segmented in die Kopfzeile zurückkehrt.
+  // Über die ROLLE gezählt, nicht über Etiketten, die es nicht mehr gibt: schlägt an, sobald
+  // irgendein Segmented in die Kopfzeile zurückkehrt.
   await expect(page.locator('header').getByRole('radio')).toHaveCount(0);
 
   const trigger = page.getByRole('button', { name: 'Benutzermenü' });
@@ -274,25 +228,14 @@ test('Bediendichte bleibt auf 390 px bedienbar — über das Benutzermenü', asy
 
 test('auch ab lg stehen die Umschalter nicht im Kopf — bedienbar bleiben sie', async ({ page }) => {
   /**
-   * UMGEDREHT IN LFH-392. Bis dahin hieß dieser Test „ab lg stehen die
-   * Umschalter wieder in der Kopfzeile" und war die Gegenprobe zur Null oben:
-   * ohne ihn belegte jene nur, dass irgendetwas fehlt, nicht dass die BREITE es
-   * entfernt.
-   *
-   * Diese Gegenprobe gibt es nicht mehr, weil es die Regel nicht mehr gibt — die
-   * Umschalter sind auf JEDER Breite aus dem Kopf. Die Null oben ersatzlos
-   * stehenzulassen hieße, eine nicht mehr widerlegbare Behauptung zu behalten.
-   * An ihre Stelle tritt deshalb die ANDERE Hälfte: nicht im Kopf, aber im Menü
-   * bedienbar — beides auf derselben Breite, in derselben Runde geprüft.
+   * Die Umschalter stehen auf JEDER Breite nicht im Kopf. Die Gegenprobe zur Null ist deshalb
+   * die andere Hälfte: im Menü bedienbar, auf derselben Breite geprüft.
    */
   await anmelden(page);
   await page.setViewportSize(BREIT);
   await page.goto('/einsaetze');
 
-  // Über die ROLLE gezählt, nicht über die zwei Etiketten: die kamen mit
-  // `ThemeToggle.tsx` fort und stehen im Repo nirgends mehr — eine Null darauf
-  // wäre durch keine Änderung am Produktivcode rot zu bekommen. Diese hier
-  // schlägt an, sobald irgendein Segmented in die Kopfzeile zurückkehrt.
+  // Über die ROLLE gezählt (s. o.).
   await expect(page.locator('header').getByRole('radio')).toHaveCount(0);
 
   const trigger = page.getByRole('button', { name: 'Benutzermenü' });
@@ -307,14 +250,9 @@ test('auch ab lg stehen die Umschalter nicht im Kopf — bedienbar bleiben sie',
 
 test('die Alarmzentrale steht ab lg sichtbar abgesetzt von den Aktionen', async ({ page }) => {
   /**
-   * DIE HÄLFTE, DIE VITEST NICHT KANN (LFH-392). `EinsatzLayout.test.tsx` belegt die
-   * DOM-Semantik — die Alarm-Knöpfe in eigener Zelle, Suche und Benutzermenü außerhalb.
-   * Ob daraus im Browser eine sichtbare Trennung wird, kann es nicht sagen: jsdom rechnet
-   * kein Layout.
-   *
-   * Seit dem Neuentwurf trennt die HAARLINIE der Zelle, nicht mehr ein Trenner-Element im
-   * Knopfrhythmus. Gemessen wird deshalb, dass die Zelle eine echte Linie trägt und dass die
-   * Suche nicht in ihr liegt — ein `display: none` oder eine Nullbreite fiele hier auf.
+   * Die Alarm-Knöpfe stehen in eigener Zelle, die DOM-Semantik belegt
+   * `EinsatzLayout.test.tsx`. Hier: die Zelle trägt eine echte Haarlinie und die Suche liegt
+   * nicht in ihr — ein `display: none` oder eine Nullbreite fiele auf.
    */
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Absetzung ${Date.now()}`);
@@ -341,13 +279,10 @@ test('Führungs-Tablet 1024 px, handschuh: im Ruhezustand ist der Einsatz-Kopf E
   page,
 }) => {
   /**
-   * Die zweite Hälfte zur `kompakt`-Aussage in `gate1-ueberlauf.spec.ts` (22.09.2026). Dort
-   * misst der Kopf mit den Störungswörtern, die diese Umgebung liefert („Desktop blockiert",
-   * oft noch „VERBINDE"). Hier der RUHEZUSTAND, für den die Verdichtung gebaut ist:
-   * Benachrichtigungen erlaubt (headless gibt es die API nicht — sie wird für diesen Test
-   * nachgebildet), Strom verbunden, Ton bereit. Dann stehen die drei Zustände nur als Ikone,
-   * und auch die breiteste Stufe hält eine Zeile. Gemessen beim Bau: 52 / 52 / 72 px in
-   * kompakt / komfortabel / handschuh; geprüft wird die engste Stufe.
+   * Der RUHEZUSTAND, für den die Verdichtung gebaut ist (die Störungswörter misst
+   * `gate1-ueberlauf.spec.ts`): Benachrichtigungen erlaubt (headless nachgebildet), Strom
+   * verbunden, Ton bereit. Dann stehen die Zustände nur als Ikone, und auch die breiteste
+   * Stufe hält eine Zeile.
    */
   test.setTimeout(60_000);
   await page.addInitScript(() => {

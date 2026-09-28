@@ -1,19 +1,15 @@
 import { expect, test, type Page } from '@playwright/test';
 
 /**
- * ETB-Anhänge Ende zu Ende (LFH-117): Datei wählen → Text → Enter → der Eintrag steht mit
+ * ETB-Anhänge Ende zu Ende: Datei wählen → Text → Enter → der Eintrag steht mit
  * Download-Verweis in der Zeitachse → der Klick lädt die Datei über die ETB-Route.
  *
- * Dazu die zwei Sperren, die nur im echten Stack zusammen stehen: der Pfad eines Anhangs
- * aus Einsatz A ist über Einsatz B 404, und die generische, modul-lose Route
- * `/anhaenge/{aid}` liefert einen ETB-Anhang nicht aus. Und offline: „Anhang" ist gesperrt,
- * ein Text-Eintrag geht trotzdem in die Queue.
+ * Dazu die Sperren, die nur im echten Stack zusammen stehen: ein Anhang aus Einsatz A ist über
+ * Einsatz B 404, und die generische Route `/anhaenge/{aid}` liefert einen ETB-Anhang nicht aus.
+ * Offline ist „Anhang" gesperrt, ein Text-Eintrag geht trotzdem in die Queue.
  *
- * Bedienbarkeit wird per KLICK belegt, nicht per `toBeVisible()` (CLAUDE.md, LFH-355):
- * „Anhang" öffnet den Dateidialog über `filechooser`, der Verweis löst ein `download` aus.
- *
- * SEEDING PER `page.request`: die Session ist Cookie-basiert, `page.request` teilt den
- * Cookie-Jar des Kontexts.
+ * Bedienbarkeit per KLICK belegt (`filechooser`, `download`), nicht per `toBeVisible()`.
+ * Seeding per `page.request`.
  */
 
 const ADMIN = 'admin';

@@ -1,15 +1,13 @@
 import { expect, test, type Page } from '@playwright/test';
 
-// LFH-622: Namensplaketten an den Markern und Mono-Glyphen vom eigenen Glyphen-Server.
+// Namensplaketten an den Markern und Mono-Glyphen vom eigenen Glyphen-Server. Ob MapLibre die
+// Plaketten tatsächlich setzt (Kollision, Mindestzoom, `icon-text-fit`), sieht nur ein echter
+// Renderer.
 //
-// Warum im Browser: `markerLayer.test.ts` prüft die Layer-SPEZIFIKATION gegen eine
-// Attrappe. Ob MapLibre die Plaketten tatsächlich setzt (Kollision, Mindestzoom,
-// `icon-text-fit` mit wechselnden Ankern) und ob der Server den Mono-Fontstack wirklich
-// ausliefert, sieht nur ein echter Renderer. Der zweite Punkt ist die stille Falle: der
-// Fontstack-Name steht einmal in `plakette.ts` (`PLAKETTEN_MONO`) und einmal als Ordner
-// unter `assets/karten/fonts/`. Wird nur einer umbenannt, antwortet der Server 404, und
-// MapLibre zeichnet in einer lokalen Systemschrift weiter — kein Fehlerbild, nur Warnungen
-// in der Konsole. Deshalb prüft dieser Test den Status der Glyphen-Antwort, nicht die Optik.
+// Die stille Falle: der Fontstack-Name steht in `plakette.ts` (`PLAKETTEN_MONO`) und als
+// Ordner unter `assets/karten/fonts/`. Wird nur einer umbenannt, antwortet der Server 404, und
+// MapLibre zeichnet in einer Systemschrift weiter — nur Konsolenwarnungen. Deshalb prüft der
+// Test den Status der Glyphen-Antwort, nicht die Optik.
 
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
@@ -40,11 +38,9 @@ async function post(page: Page, pfad: string, data: unknown): Promise<number> {
 const MITTE: [number, number] = [8.8, 53.0775];
 
 /** Ein Einsatz mit drei verorteten Einheiten, je rund 2,7 km auseinander. Das Clustering
- *  rechnet bei Zoom 11,5 mit der ganzzahligen Stufe 11: dort liegen die Einheiten knapp
- *  60 px auseinander, über dem Cluster-Radius von 45 px. So misst „keine Plakette unter
- *  Zoom 12" den Mindestzoom und nicht das Clustering; bei 12,5 bleiben alle drei samt
- *  Plakette im Bild (je rund 165 px Abstand). Der Name
- *  enthält keinen Modulnamen (siehe `lagekarte-smoke.spec.ts`: die Palette sucht beides). */
+ *  rechnet bei Zoom 11,5 mit Stufe 11: dort liegen die Einheiten knapp 60 px auseinander, über
+ *  dem Cluster-Radius von 45 px — „keine Plakette unter Zoom 12" misst also den Mindestzoom,
+ *  nicht das Clustering. Kein Modulname im Einsatznamen (Palette). */
 async function einsatzMitEinheiten(page: Page): Promise<{ einsatzId: number; ersteId: number }> {
   const einsatzId = await post(page, '/api/einsaetze', {
     bezeichnung: `E2E Plaketten ${Date.now()}`,
@@ -95,12 +91,10 @@ test('Marker tragen ihre Namensplakette erst ab Zoom 12, offline in Mono', async
   expect(await plakettenBeiZoom(page, 11.5)).toBe(0);
   await expect.poll(() => plakettenBeiZoom(page, 12.5)).toBe(3);
 
-  // Offline-Glyphen: die e2e-DB hat keine Basiskarte (Blindstil ohne `glyphs`). Ein
-  // Hintergrundstil MIT dem eigenen Glyphen-Server stellt die Offline-Lage her. Der
-  // `setStyle` von außen wischt die Marker-Layer, stößt aber die Re-Anlage der Seite nicht
-  // an (die hängt an ihrem eigenen Stilwechsel). Das tut die nächste Datenänderung: eine
-  // leicht verschobene Position kommt über den Live-Strom zurück und legt die Marker-Layer
-  // auf dem neuen Stil an — mit der Schrift, die `plakettenSchrift` für ihn wählt.
+  // Offline-Glyphen: die e2e-DB hat keine Basiskarte (Blindstil ohne `glyphs`); ein
+  // Hintergrundstil MIT dem eigenen Glyphen-Server stellt die Offline-Lage her. Der `setStyle`
+  // von außen wischt die Marker-Layer, stößt ihre Re-Anlage aber nicht an — das tut eine leicht
+  // verschobene Position, die über den Live-Strom zurückkommt.
   const glyphen = page.waitForResponse((r) =>
     decodeURIComponent(r.url()).includes('/api/karte/offline/fonts/JetBrains Mono Regular/'),
   );

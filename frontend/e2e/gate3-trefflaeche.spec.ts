@@ -7,92 +7,33 @@ import {
 } from './einheit-fixture';
 
 /**
- * Gate 3 der Bedien-Leitlinie: Lage-Dashboard und Einsatzauswahl (LFH-396, Nachzug zur
- * Prüfliste von LFH-336 · C1, Kriterium 2), die Einheiten-Detailroute (LFH-446,
- * Nachzug zu LFH-339 · Kriterium 2), der Einsatz-NAVIGATIONSRAHMEN (LFH-516,
- * Nachzug zu LFH-337 · C2, Kriterium 2) sowie Kräfteübersicht und Verdichtungszeile
- * (LFH-515, Nachzug zu LFH-338 · C3, Kriterium 2) und die Stab-Route (LFH-542, Nachzug zu
- * LFH-46, Kriterium 2).
+ * Gate 3 der Bedien-Leitlinie: Trefflächen gegen die Dichte-Staffel auf Lage-Dashboard,
+ * Einsatzauswahl, Einheiten-Detailroute, Einsatz-Navigationsrahmen, Kräfteübersicht mit
+ * Verdichtungszeile und Stab-Route. Alle Blöcke teilen die Helfer unten; wer etwas anhängt,
+ * nimmt dieselben Helfer statt einer Kopie.
  *
- * DIE DATEI TRÄGT VIER ROUTEN, DEN NAVIGATIONSRAHMEN UND EINEN SATZ HELFER. Das ist die
- * Gestalt, die der LFH-446-Plan ausdrücklich vorsah („vorhandene STAFFEL, stelleDichte,
- * haeltStufe und alleHaltenStufe aus gate3-trefflaeche.spec.ts verwenden") — die
- * Einheiten-Tests entstanden nur deshalb mit eigenen Kopien dieser Helfer, weil ihr Branch
- * die LFH-396-Fassung noch nicht hatte. Beim Zusammenführen (LFH-457, 06.09.2026) waren
- * `anmelden`, `stelleDichte` und `haeltStufe` auf beiden Seiten BYTE-GLEICH; geblieben
- * ist je eine Fassung. Der Navigationsrahmen (LFH-516, 11.09.2026) ist der erste Zugang,
- * der KEINE Route ist — er steht auf jeder Einsatzroute — und hat die Einladung
- * „wer hier etwas anhängt, nimmt dieselben Helfer" eingelöst, statt eine vierte Kopie
- * von `anmelden`/`stelleDichte`/`haeltStufe` anzulegen; Kräfteübersicht und
- * Verdichtungszeile (LFH-515, 11.09.2026) sind derselben Einladung gefolgt. Die beiden
- * Nachzüge entstanden am selben Tag auf getrennten Branches und trafen sich hier im
- * Rebase — jeder trägt seinen eigenen Block am Dateiende, die Helfer sind geteilt.
+ * Browser statt Vitest: Vitest fährt mit `css: false`, jsdom rechnet kein Layout. Ein
+ * überschriebenes `min-height`, ein `display: inline` oder ein Wrapper ohne Staffel wären
+ * dort grün; hier steht die gemessene `boundingBox()`.
  *
- * WARUM HIER UND NICHT IN VITEST: `vite.config.ts` fährt Vitest mit `css: false`, und
- * jsdom rechnet kein Layout. Belegt war für beide Routen bisher nur, dass die Ziele ihre
- * Höhe aus `var(--lfh-zeilenhoehe)` LESEN (`LageDashboardPage.test.tsx`, Quellpin auf
- * `sprache.css`) — nicht, dass sie sie im Betrieb ERREICHEN. Ein `min-height`, das eine
- * Kaskadenregel weiter unten überschreibt, ein `display: inline`, das die Mindesthöhe
- * ignoriert, oder ein Wrapper, der die Staffel nicht durchreicht, wären dort alle grün.
- * Hier steht die gemessene `boundingBox()`.
+ * MENGEN STATT EINZELKNOTEN: wo ein Ziel bewusst mehrfach steht (Kennzahlen, Paneel-Ausgänge),
+ * verlangt `alleHaltenStufe` eine MINDESTZAHL und misst jeden Knoten — ein leerer Locator wäre
+ * sonst grün durch Nichtstun. Einzelknoten laufen über `haeltStufe` mit `toHaveCount(1)`.
  *
- * ── WAS GEMESSEN WIRD (die fünf Ziele aus dem Ticket) ─────────────────────────────
- *
- *  Lage-Dashboard (`/einsaetze/:id/lage-dashboard`, Neuentwurf 22.09.2026):
- *   - `a[data-lfh="kennzahl"]`     die sechs Kennzahl-Zellen des Bands „Lage in Zahlen"
- *   - `[data-lfh="paneel-link"]`   der Ausgang („… ↗") im Kopf jedes der drei Paneele
- *   (Die früheren Kurzlisten-Zeilen `a.lfh-zeile` und Kachel-Ausgänge `.lfh-kachel__mehr`
- *   gibt es mit dem Neuentwurf nicht mehr.)
- *  Einsatzauswahl (`/einsaetze`):
- *   - der Titel-Link der Einsatzkarte (das Tastaturziel der Karte)
- *   - das Suchfeld samt Such-Knopf — es erscheint erst ab `SUCHE_AB = 8` aktiven
- *     Einsätzen (`EinsaetzePage.tsx`), deshalb sät der Test acht.
- *
- * MENGEN STATT EINZELKNOTEN. `datensicht-schmal.spec.ts` verlangt `toHaveCount(1)` vor jeder
- * Messung; hier ist das für Kennzahlen und Paneel-Ausgänge nicht die richtige Aussage —
- * sie stehen bewusst mehrfach, und jeder Einzelne muss den Boden halten. `alleHaltenStufe`
- * verlangt deshalb eine MINDESTZAHL (die gesäte, nicht null) und misst dann jeden Knoten;
- * ein leerer Locator wäre sonst grün durch Nichtstun. Der Titel-Link und das Suchfeld sind
- * dagegen echte Einzelknoten und laufen über `haeltStufe` mit `toHaveCount(1)`.
- *
- * UNTERGRENZE, KEINE GLEICHHEIT (Ticket): Polsterung und Zeilenumbruch dürfen ein Ziel
- * größer machen — die Kennzahl trägt Etikett + Zahl + Zusatz und misst in jeder Stufe weit
- * über dem Boden —, nur nicht kleiner.
+ * UNTERGRENZE, KEINE GLEICHHEIT: Polsterung und Zeilenumbruch dürfen ein Ziel größer machen,
+ * nur nicht kleiner.
  *
  * DIE BÖDEN STEHEN ALS LITERALE (30 / 48 / 72), nicht aus `theme/tokens` gelesen — sonst
- * prüfte der Test den Token gegen sich selbst (LFH-365, dort gemessen). Quellen wie in
- * `datensicht-schmal.spec.ts`: kompakt 30 px aus A0/LFH-352 · komfortabel 48 px = Material
- * 48 dp · handschuh 72 px ≙ 19,05 mm nach MIL-STD-1472F Fig. 12.
+ * prüfte der Test den Token gegen sich selbst. Quellen: kompakt 30 px (A0) · komfortabel
+ * 48 px = Material 48 dp · handschuh 72 px ≙ 19,05 mm nach MIL-STD-1472F Fig. 12.
  *
- * MUTATIONSPROBE (Akzeptanzkriterium), am 05.09.2026 mit zwei temporären Kopien gefahren:
- *  - `localStorage` in `stelleDichte` auf `'kompakt'` festgenagelt, Staffel nur `handschuh`:
- *    beide Tests rot an der `data-dichte`-Wache („Expected handschuh, Received kompakt"),
- *    noch VOR jeder Höhenmessung.
- *  - dieselbe Mutation, zusätzlich die Wache entfernt: rot an der ERSTEN Höhenmessung —
- *    Dashboard „Kurzlisten-Zeile #1 gemessen 30px, Soll ≥ 72", Einsatzauswahl „Titel-Link
- *    gemessen 39,47px, Soll ≥ 72". Der Spec misst also die Staffel, nicht sich selbst.
- *
- * DER BEFUND, den der erste Lauf lieferte: der Titel-Link der Einsatzkarte maß 17 px in JEDER
- * Stufe — ein nacktes Inline-`<a>` im Kartenkopf, unter dem 24-px-Boden schon in `kompakt`.
- * Die Prüfliste von LFH-336 hatte für Kriterium 1 „Card-Link erbt die Steuerhöhe vom
- * ConfigProvider" geschrieben; das war eine Annahme, keine Messung. Behoben über
- * `kartenTitelStil` in `EinsaetzePage.tsx` (zwei Angaben nach LFH-365). Messwerte danach:
- *  - Dashboard: Zeile 30 / 48 / 72 · Kennzahl 81,9 / 99,9 / 119,9 · Mehr 30 / 48 / 72
- *  - Einsatzauswahl: Titel-Link 39,5 / 49,6 / 72 · Suchfeld 30,1 / 48 / 72 · Such-Knopf 30 / 48 / 72
- *
- * WARUM NICHT IN `dichte.spec.ts` ODER `trefflaeche-tablet.spec.ts`: die eine grenzt sich
- * wörtlich gegen Routen-Geometrie ab und meldet nicht an, die andere braucht `hasTouch` auf
- * Dateiebene für ihre Tablet-Vorbelegung — hier wird die Stufe ausdrücklich GESPEICHERT
- * gestellt, damit alle drei Stufen auf demselben Kontext laufen.
- *
- * BEWUSST KEIN Device-Descriptor und kein zweites Playwright-Projekt (Browser-Download ohne
- * Guard, gleichlautend in den Bestands-Specs begründet). Seeding per `page.request`: die
- * Session ist Cookie-basiert und `page.request` teilt den Cookie-Jar des Kontexts
- * (`gate1-ueberlauf.spec.ts`).
+ * Die Stufe wird GESPEICHERT gestellt (nicht per `hasTouch`-Vorbelegung wie in
+ * `trefflaeche-tablet.spec.ts`), damit alle drei Stufen auf demselben Kontext laufen.
+ * Seeding per `page.request`, der den Cookie-Jar des Kontexts teilt.
  *
  * DIE EINSATZNAMEN tragen keinen Modulnamen (`E2E Gate3 <ts> Nr <n>`): die Kommandopalette
- * durchsucht Module UND Einsätze in einer Liste, ein Modulwort im Namen ließe
- * `command-palette.spec.ts` per strict mode flaken (`lagekarte-smoke.spec.ts:56-60`).
+ * durchsucht Module und Einsätze in einer Liste, ein Modulwort im Namen ließe
+ * `command-palette.spec.ts` per strict mode flaken.
  */
 
 const ADMIN = 'admin';
@@ -106,45 +47,31 @@ const STAFFEL = [
 ] as const;
 
 /**
- * Subpixel-Spielraum wie in `datensicht-schmal.spec.ts:96-104`: `boundingBox()` liefert
- * Fließkomma, und Chromium rundet unter Last anders als im Einzellauf (dort dreimal
- * 47,99999809 gegen 48 gemessen). Ein halbes Pixel trennt die Stufen weiterhin klar.
+ * Subpixel-Spielraum: `boundingBox()` liefert Fließkomma, und Chromium rundet unter Last
+ * anders (47,99999809 gegen 48). Ein halbes Pixel trennt die Stufen weiterhin klar.
  */
 const SUBPIXEL = 0.5;
 
-/** Fükw-Maß aus der Bedien-Leitlinie (A1, Gate 1). Beide Routen sind Fükw-Routen. */
+/** Fükw-Maß aus der Bedien-Leitlinie (A1, Gate 1). */
 const FUEKW = { width: 1366, height: 768 };
 
-/** Handschirm-Maß aus A1 (mobil, einhändig) — unter antds `lg`, also der Drawer-Zweig
- *  des Navigationsrahmens (`nav-schmal.spec.ts:48` nimmt dieselben Zahlen). */
+/** Handschirm-Maß aus A1 — unter antds `lg`, also der Drawer-Zweig des Navigationsrahmens. */
 const HANDSCHIRM = { width: 390, height: 844 };
 
 /**
- * Die Böden JE ZIEL des Navigationsrahmens (LFH-516) — handgeschriebene Literale wie
- * {@link STAFFEL}, aus demselben Grund: aus dem Token zurückgelesen prüfte die Zusicherung
- * den Token gegen sich selbst.
+ * Die Böden JE ZIEL des Navigationsrahmens, als Literale wie {@link STAFFEL}. Der Rahmen
+ * trägt vier Verträge:
  *
- * Warum nicht eine Zahlenreihe für alles: der Rahmen trägt VIER verschiedene Verträge, und
- * jeder steht an seiner Fundstelle:
+ *  - `staffel` (30/48/72) — liest nur `token.controlHeight`: Modul-Panel-Zeilen,
+ *    Palettenzeilen, Kopfzeilen-Ziele und der Suchzugang ab `lg`.
+ *  - `mitA1Boden` (48/48/72) — `Math.max(48, controlHeight)`: Kategorie-Rail, Hamburger,
+ *    Suchzugang unter `lg` und die Modulzeilen im Drawer. Die 48 ist BODEN unter der
+ *    Staffel, deshalb misst `kompakt` hier ≥ 48.
+ *  - `benutzermenue` (40/48/72) — `Math.max(40, controlHeight)`, weil der Auslöser einen
+ *    28-px-Avatar trägt.
+ *  - `fest48` (48/48/48) — die zwei festen 48er des Drawer-Zweigs (LFH-537).
  *
- *  - `staffel` (30/48/72) — was nur `token.controlHeight` liest: Modul-Panel-Zeilen
- *    (`ModulPanel.modulZeilenStil`), Palettenzeilen (`command-palette/zeilenStil.ts`),
- *    die Kopfzeilen-Ziele aus `AppLayout`/`EinsatzLayout` und der Suchzugang ab `lg`.
- *  - `mitA1Boden` (48/48/72) — `Math.max(48, controlHeight)`: die Kategorie-Rail
- *    (`IconRail.railZielStil`), der Hamburger (`EinsatzLayout.tsx:319-320`), der
- *    Suchzugang unter `lg` (`CommandPaletteTrigger.tsx:25`) und die Modulzeilen IM
- *    Drawer (`mindestTrefflaeche={48}`). Die 48 ist dort BODEN unter der Staffel, nicht
- *    ihr Ersatz — deshalb muss `kompakt` hier ≥ 48 messen und nicht ≥ 30.
- *  - `benutzermenue` (40/48/72) — `Math.max(40, controlHeight)` (`BenutzerMenu.tsx:188`,
- *    LFH-460). Ein dritter Boden, weil der Auslöser einen 28-px-Avatar trägt; er steht
- *    hier als eigene Zeile, damit `kompakt` nicht stillschweigend auf 30 geprüft wird
- *    und die 40 damit unbelegt bliebe.
- *  - `fest48` (48/48/48) — die zwei bewusst FESTEN 48er des Drawer-Zweigs, siehe den
- *    Abschnitt „Der Drawer" weiter unten.
- *
- * ALLE VIER sind UNTERGRENZEN (wie im Kopfkommentar für die Routen begründet): Polsterung
- * und Zeilenumbruch dürfen ein Ziel größer machen. `fest48` zementiert die Ausnahme also
- * nicht — hübe jemand den Akkordeon-Kopf auf die Staffel, bliebe diese Zeile grün.
+ * Alle vier sind UNTERGRENZEN; `fest48` zementiert die Ausnahme also nicht.
  */
 const BODEN = {
   staffel: { kompakt: 30, komfortabel: 48, handschuh: 72 },
@@ -156,12 +83,10 @@ const BODEN = {
 /** Schlüssel aus `theme/ThemeModeProvider.tsx`. Bewusst literal — Vertrag, kein Import. */
 const DICHTE_SCHLUESSEL = 'lifeline-hub.dichte';
 
-/** `SUCHE_AB` aus `EinsaetzePage.tsx`, als Literal: fällt die Schwelle dort, sät der
- *  Test zu wenige Einsätze, das Suchfeld fehlt, und `toHaveCount(1)` sagt es laut. */
+/** `SUCHE_AB` aus `EinsaetzePage.tsx`, als Literal: fällt die Schwelle dort, fehlt das
+ *  Suchfeld, und `toHaveCount(1)` sagt es laut. */
 const SUCHE_AB = 8;
 
-// Login-Helfer aus `kernfluss.spec.ts` kopiert — es gibt (noch) kein geteiltes
-// e2e-Hilfsmodul (gleichlautend in den Bestands-Specs vermerkt).
 async function anmelden(page: Page) {
   await page.goto('/login');
   await page.getByLabel('Benutzername').fill(ADMIN);
@@ -170,11 +95,7 @@ async function anmelden(page: Page) {
   await expect(page).toHaveURL(/\/einsaetze/);
 }
 
-/**
- * Einsatz per API statt über das Anlege-Modal: acht Einsätze über die UI wären 32
- * Formularaktionen ohne Erkenntnisgewinn für eine Höhenmessung. `POST /api/einsaetze`
- * antwortet mit der `EinsatzAnzeige` samt `id` (`src/routes/einsatz.rs`).
- */
+/** Einsatz per API: acht Einsätze über die UI wären 32 Formularaktionen ohne Erkenntnisgewinn. */
 async function einsatzAnlegen(page: Page, bezeichnung: string): Promise<string> {
   const antwort = await page.request.post('/api/einsaetze', { data: { bezeichnung } });
   expect(
@@ -191,10 +112,8 @@ async function anlegen(page: Page, einsatzId: string, pfad: string, data: unknow
 }
 
 /**
- * Stellt die Bediendichte und lädt neu. `ThemeModeProvider` liest den Speicher beim
- * Montieren; ohne Neuladen bliebe das Setzen folgenlos und der Test misst dreimal dieselbe
- * Stufe. Die `data-dichte`-Wache ist die erste Zusicherung: sie trennt „Ziel zu klein" von
- * „Stufe gar nicht angekommen" (Muster aus `datensicht-schmal.spec.ts:139-157`).
+ * Stellt die Bediendichte und lädt neu — `ThemeModeProvider` liest den Speicher nur beim
+ * Montieren. Die `data-dichte`-Wache trennt „Ziel zu klein" von „Stufe nicht angekommen".
  */
 async function stelleDichte(page: Page, dichte: string) {
   await page.evaluate(([schluessel, wert]) => window.localStorage.setItem(schluessel, wert), [
@@ -219,9 +138,8 @@ async function haeltStufe(ziel: Locator, soll: number, name: string): Promise<nu
 
 /**
  * Höhe JEDES Knotens einer Menge. `mindestens` ist die Zahl, die das Seeding garantiert —
- * ein Locator, der weniger trifft, misst einen Leer- oder Ladezustand, und das ist ein
- * Fehler, keine grüne Zeile. Zurück kommt das kleinste Maß, damit die Anmerkung am Test
- * den knappsten Wert nennt.
+ * trifft der Locator weniger, misst er einen Leer- oder Ladezustand. Zurück kommt das
+ * kleinste Maß für die Anmerkung am Test.
  */
 async function alleHaltenStufe(
   ziele: Locator,
@@ -249,26 +167,21 @@ async function alleHaltenStufe(
 test('Lage-Dashboard: Kennzahl-Zellen und Paneel-Ausgänge folgen der Dichte-Staffel 30 / 48 / 72 px', async ({
   page,
 }) => {
-  // Drei Stufen mit je einem Neuladen — einzeln reicht das Vorgabebudget, unter Volllast
-  // der Suite nicht (Begründung wie `datensicht-schmal.spec.ts:264-269`).
+  // Drei Stufen mit je einem Neuladen: unter Volllast der Suite reicht das Vorgabebudget nicht.
   test.setTimeout(90_000);
   await page.setViewportSize(FUEKW);
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Lage`);
 
-  // Kein Säen mehr (Neuentwurf 22.09.2026): die früheren Kurzlisten-Zeilen (`a.lfh-zeile`)
-  // gibt es nicht mehr, der Meldungsstrom besteht aus Lesezeilen ohne Bedienziel. Die
-  // Ziele des neuen Dashboards stehen UNBEDINGT da — die sechs Kennzahl-Zellen des Bands
-  // „Lage in Zahlen" (Links, sobald das Lagebild geladen ist) und die drei Ausgänge in den
-  // Paneelköpfen (Gefahren ↗, Personen ↗, ETB ↗), die außerhalb der Zustandsweiche sitzen.
+  // Die Ziele stehen UNBEDINGT da: die sechs Kennzahl-Zellen des Bands „Lage in Zahlen" und
+  // die drei Ausgänge in den Paneelköpfen, außerhalb der Zustandsweiche.
   const gemessen: string[] = [];
 
   for (const { dichte, soll } of STAFFEL) {
     await page.goto(`/einsaetze/${einsatzId}/lage-dashboard`);
     await stelleDichte(page, dichte);
 
-    // Anker: die Daten sind da. Vor dem Einsatz-Abruf stehen die sechs Zellen als
-    // Platzhalter ohne Ziel (`div`); gemessen wird der LINK, also erst nach dem Laden.
+    // Vor dem Laden stehen die Zellen als Platzhalter ohne Ziel (`div`); gemessen wird der Link.
     const kennzahlen = page
       .getByRole('group', { name: 'Lage in Zahlen' })
       .locator('a[data-lfh="kennzahl"]');
@@ -277,9 +190,7 @@ test('Lage-Dashboard: Kennzahl-Zellen und Paneel-Ausgänge folgen der Dichte-Sta
     await expect(ausgaenge).toHaveCount(3);
 
     const kennzahl = await alleHaltenStufe(kennzahlen, soll, `Kennzahl-Zelle (${dichte})`, 6);
-    // Drei, nicht „mindestens einer": das Dashboard rendert die drei Paneele UNBEDINGT
-    // (`LageDashboardPage.tsx`), und der Ausgang sitzt im Paneelkopf außerhalb der
-    // Zustandsweiche. Mit `1` bliebe der Test grün, wenn zwei Paneele verschwänden.
+    // Drei, nicht „mindestens einer": mit `1` bliebe der Test grün, wenn zwei Paneele verschwänden.
     const ausgang = await alleHaltenStufe(ausgaenge, soll, `Paneel-Ausgang (${dichte})`, 3);
 
     gemessen.push(`${dichte} (Soll ≥ ${soll}): Kennzahl ${kennzahl}, Ausgang ${ausgang}`);
@@ -295,9 +206,7 @@ test('Einsatzauswahl: Einsatzkarten-Titel-Link und Suchfeld folgen der Dichte-St
   await page.setViewportSize(FUEKW);
   await anmelden(page);
 
-  // Acht aktive Einsätze, damit das Suchfeld sicher erscheint — unabhängig davon, wie
-  // viele Einsätze die parallel laufenden Specs in derselben Datenbank schon angelegt
-  // haben. Der erste ist zugleich die Karte, deren Titel-Link gemessen wird.
+  // Acht aktive Einsätze, damit das Suchfeld sicher erscheint; der erste ist die gemessene Karte.
   const stempel = Date.now();
   const kartenName = `E2E Gate3 ${stempel} Nr 1`;
   await einsatzAnlegen(page, kartenName);
@@ -311,16 +220,12 @@ test('Einsatzauswahl: Einsatzkarten-Titel-Link und Suchfeld folgen der Dichte-St
     await page.goto('/einsaetze');
     await stelleDichte(page, dichte);
 
-    // Der Titel-Link ist das Tastaturziel der Karte (`EinsaetzePage.tsx`, `renderKarte`) —
-    // namentlich gegriffen, weil das Raster die Einsätze aller anderen Specs mitzeigt.
+    // Namentlich gegriffen, weil das Raster die Einsätze aller anderen Specs mitzeigt.
     const titelLink = page.getByRole('link', { name: kartenName, exact: true });
     const titel = await haeltStufe(titelLink, soll, `Titel-Link der Einsatzkarte (${dichte})`);
     await expect(titelLink).toHaveAttribute('href', /\/einsaetze\/\d+$/);
 
-    // Das Suchfeld: gemessen wird die sichtbare Feldhülle (`.ant-input-affix-wrapper`, sie
-    // trägt Rahmen und Polsterung), nicht das nackte `<input>` darin — das ist so hoch wie
-    // seine Zeile, und seine Höhe sagt nichts über das Ziel, das jemand trifft. Der Anker
-    // per zugänglichem Namen sichert, dass es DAS Suchfeld ist.
+    // Gemessen wird die sichtbare Feldhülle, nicht das nackte `<input>` (so hoch wie seine Zeile).
     const suche = page.locator('.ant-input-search');
     await expect(suche).toHaveCount(1);
     await expect(suche.getByLabel('Einsätze durchsuchen')).toHaveCount(1);
@@ -329,12 +234,8 @@ test('Einsatzauswahl: Einsatzkarten-Titel-Link und Suchfeld folgen der Dichte-St
       soll,
       `Suchfeld (${dichte})`,
     );
-    // Der Such-Knopf heißt in antd 6 `.ant-input-search-btn` (`input/Search.js`:
-    // `btnPrefixCls = \`${prefixCls}-btn\``) — NICHT mehr `-button`; der erste Anlauf dieses
-    // Specs hatte die alte Klasse und fand 0 Knoten. Bewusst die Klasse statt
-    // `getByRole('button')`: das Löschkreuz von `allowClear` trägt selbst `role="button"` und
-    // ist bei leerem Feld nur `visibility: hidden` — ein Rollen-Locator hinge still daran, dass
-    // vor der Messung niemand tippt (Review-Befund).
+    // antd 6: `.ant-input-search-btn` (nicht `-button`). Bewusst die Klasse statt
+    // `getByRole('button')`: das Löschkreuz von `allowClear` trägt selbst `role="button"`.
     const knopf = await haeltStufe(
       suche.locator('.ant-input-search-btn'),
       soll,
@@ -349,9 +250,8 @@ test('Einsatzauswahl: Einsatzkarten-Titel-Link und Suchfeld folgen der Dichte-St
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
-// ── Einheiten-Detailroute (LFH-446, Nachzug zu LFH-339 · Kriterium 2) ────────────────
-// Sichtbare Feldhüllen, Zuordnungszeilen und Aktionsabstände werden im Browser gemessen.
-// Die Böden stehen als Literale; weder CSS-Tokens noch `data-dichte` ersetzen die Geometrie.
+// ── Einheiten-Detailroute ───────────────────────────────────────────────────────────
+// Sichtbare Feldhüllen, Zuordnungszeilen und Aktionsabstände, im Browser gemessen.
 
 test('Einheit: Formularfelder und Zuordnungszeilen halten 30 / 48 / 72 px und den Aktionsabstand', async ({
   page,
@@ -498,89 +398,24 @@ test('Einheit Selbstbeweis: feste Kompaktgröße fällt trotz aktiver Handschuhs
   await haeltStufe(name, 72, 'Handschuhfeld nach Wiederherstellung');
 });
 
-// ── Einsatz-Navigationsrahmen (LFH-516, Nachzug zu LFH-337 · C2, Kriterium 2) ────────
+// ── Einsatz-Navigationsrahmen ───────────────────────────────────────────────────────
 //
-// WARUM EIN EIGENER NACHZUG UND NICHT LFH-396: die Prüfliste von LFH-337 verwies Kriterium 2
-// zunächst dorthin. LFH-396 ist aber namentlich auf Lage-Dashboard und Einsatzauswahl mit
-// fünf benannten Zielen gescopt — die Tests oben decken keine Fläche des Rahmens. Mit dem
-// Schließen von LFH-396 (05.09.2026) wäre der Verweis tot gewesen; dieselbe Lage, die
-// LFH-446 und LFH-515 mit eigenen Nachzügen gelöst haben.
+// Der Rahmen steht auf JEDER Einsatzroute und hat zwei Gestalten (Weiche an antds `lg`):
+// oberhalb Rail + Modul-Panel inline, darunter dieselbe Navigation als Akkordeon im Drawer.
+// Beide brauchen einen eigenen Durchgang mit eigenem Viewport.
 //
-// ── WAS DER RAHMEN IST, UND WARUM ER NICHT WIE EINE ROUTE ZU MESSEN IST ─────────────
-//
-// Er steht auf JEDER Einsatzroute und hat ZWEI Gestalten, die einander ausschließen
-// (Breitenweiche an antds `lg`, `EinsatzLayout.tsx`): oberhalb Rail + Modul-Panel inline,
-// unterhalb dieselbe Navigation als Akkordeon im Drawer. Beide brauchen deshalb einen
-// eigenen Durchgang mit eigenem Viewport — ein Test auf einer Breite ließe die andere
-// Hälfte ungemessen, und genau das war der Bestand: `nav-schmal.spec.ts` misst den
-// Drawer-Zweig, aber NUR gegen die feste 48 und in keiner gesetzten Dichtestufe;
-// `trefflaeche-tablet.spec.ts` misst Panel und Rail, aber nur in `komfortabel`/`handschuh`
-// und nur am Tablet. Die kompakte Stufe — die Fükw-Stufe, also der Primärkontext aus A1 —
-// war an keiner Fläche des Rahmens im Browser belegt.
-//
-// ── DER DRAWER: GEMESSEN, MIT ZWEI BENANNTEN AUSNAHMEN ──────────────────────────────
-//
-// CLAUDE.md führt den Navigations-Drawer als benannte Ausnahme — das gilt der
-// DRAWER-NUTZUNG (er trägt Navigation, keine Entität), nicht der Dichteachse. Er wird hier
-// deshalb mitgemessen und nicht ausgenommen. Gemessen sind dabei zwei verschiedene Sorten:
-//
-//  (1) DIE MODULZEILEN IM DRAWER FOLGEN DER STAFFEL. `ModulAkkordeon.tsx:101` übergibt
-//      `mindestTrefflaeche={48}`, und `ModulPanel.modulZeilenStil` verrechnet das per
-//      `Math.max` mit `controlHeight` — 48 / 48 / 72. Der Prop-Kommentar dort hält
-//      ausdrücklich fest, warum es `Math.max` und nicht `??` ist: mit `??` deckelte die
-//      Drawer-Trefffläche die Handschuh-Stufe auf 48. Dieser Test ist der Browser-Beleg
-//      dafür; bis hierher stand die Aussage nur als Begründung am Prop.
-//
-//  (2) DER AKKORDEON-KOPF UND DER DRAWER-SCHLIESSER TUN ES NICHT — gemessen, nicht
-//      vermutet. Beide tragen ein nacktes `minHeight: 48` (`ModulAkkordeon.tsx:78`,
-//      `EinsatzLayout.tsx:462`) und bleiben damit auch in `handschuh` bei 48 statt 72.
-//      Sie stehen deshalb auf {@link BODEN}.fest48 statt auf der Staffel.
-//
-//      DAS IST HIER FESTGEHALTEN, NICHT BEHOBEN, und zwar aus demselben Grund, aus dem
-//      LFH-367/B5g ein Popconfirm gehärtet statt entfernt hat: die Größe eines
-//      Bedienziels im Drawer zu ändern ist eine Bedienentscheidung und gehört nicht ins
-//      Akzeptanzkriterium eines Mess-Tickets. Der Befund liegt als LFH-537.
-//
-//      Der Widerspruch, der ihn auslöst, steht in `ModulAkkordeon.tsx:41-46` selbst: die
-//      48 wird dort mit „dieselbe Zahl, die die Rail schon trägt" begründet — und die Rail
-//      trägt sie seit LFH-337 als BODEN unter der Staffel (`Math.max(48, controlHeight)`),
-//      nicht als Höhe. Die Begründung zeigt also auf eine Fundstelle, die inzwischen das
-//      Gegenteil tut. Genau derselbe Satz stand bis LFH-337 auch an der Rail.
-//
-//      Weil {@link BODEN}.fest48 eine UNTERGRENZE ist, zementiert dieser Test die Ausnahme
-//      nicht: hübe LFH-537 die zwei Stellen auf `Math.max(48, controlHeight)`, bliebe die
-//      Zeile grün, und nur die Messwert-Anmerkung änderte sich.
-//
-// ── MUTATIONSPROBE (Akzeptanzkriterium) ─────────────────────────────────────────────
-//
-// Gefahren am 11.09.2026 nach dem Muster der LFH-396-Probe oben, mit einer temporären
-// Kopie des Inline-Tests:
-//  - `stelleDichte` auf `'kompakt'` festgenagelt, Staffel nur `handschuh`: rot an der
-//    `data-dichte`-Wache in `stelleDichte` („Expected handschuh, Received kompakt"), noch
-//    VOR jeder Höhenmessung.
-//  - dieselbe Mutation, zusätzlich die Wache entfernt: rot an der ERSTEN Höhenmessung —
-//    „Kategorie-Ziel (handschuh) #1 (gemessen 51.796875px hoch, Soll ≥ 72)". Der Spec misst
-//    also die Staffel und nicht sich selbst. (Die 51,8 statt 48: das Rail-Ziel trägt Ikone
-//    UND zweizeiliges Etikett, liegt in `kompakt` also über seinem eigenen Boden — genau die
-//    Untergrenzen-Lesart, die im Kopfkommentar oben für die Routen begründet ist.)
-//
-// ── MESSWERTE DES ERSTEN GRÜNEN LAUFS (11.09.2026, kompakt / komfortabel / handschuh) ──
-//
-//  inline:  Rail 51,8 / 59,8 / 72 · Panel-Zeile 32 / 48 / 72 · Einsatz-Wechsler 30 / 48 / 72
-//           · Alarm Desktop 30 / 48 / 72 · Alarm Ton 30 / 48 / 72 · Suchzugang 30 / 48 / 72
-//           · Benutzermenü 40 / 48 / 72 · Palettenzeile 36 / 58 / 86
-//  global:  Logo 34 / 48 / 72 · Verwaltung 30 / 48 / 72 · Suchzugang 30 / 48 / 72
-//           · Benutzermenü 40 / 48 / 72
-//  Drawer:  Hamburger 48 / 48 / 72 (beide Achsen) · Suchzugang schmal 48 / 48 / 72
-//           · Modulzeile 48 / 48 / 72 · Akkordeon-Kopf 48 / 48 / **48** · Schließer 48 / 48 / **48**
-//
-// Die zwei fetten 48er sind der Befund dieses Laufs und liegen als LFH-537 (siehe unten).
-// Das laufende Protokoll steht als `test.info().annotations` an jedem Test.
+// Der Drawer ist nur als DRAWER-NUTZUNG eine benannte Ausnahme, nicht auf der Dichteachse,
+// und wird deshalb mitgemessen:
+//  (1) Die Modulzeilen im Drawer folgen der Staffel: `mindestTrefflaeche={48}` wird per
+//      `Math.max` mit `controlHeight` verrechnet (mit `??` deckelte es `handschuh` auf 48).
+//  (2) Akkordeon-Kopf und Drawer-Schließer tragen ein nacktes `minHeight: 48` und bleiben
+//      auch in `handschuh` bei 48 — festgehalten auf {@link BODEN}.fest48, nicht behoben
+//      (Bedienentscheidung, LFH-537). Als Untergrenze bliebe die Zeile nach einem Fix grün.
 
 test('Navigationsrahmen inline: Rail, Modul-Panel, Einsatz-Kopfzeile und Kommandopalette folgen der Staffel', async ({
   page,
 }) => {
-  // Drei Stufen mit je einem Neuladen plus drei Paletten-Öffnungen (Begründung wie oben).
+  // Drei Stufen mit je einem Neuladen plus drei Paletten-Öffnungen.
   test.setTimeout(90_000);
   await page.setViewportSize(FUEKW);
   await anmelden(page);
@@ -590,21 +425,18 @@ test('Navigationsrahmen inline: Rail, Modul-Panel, Einsatz-Kopfzeile und Kommand
   const gemessen: string[] = [];
 
   for (const { dichte } of STAFFEL) {
-    // `…/personal` wie in `trefflaeche-tablet.spec.ts`: die Route öffnet die Kategorie
-    // „Kräfte & Mittel", das Panel steht damit ohne Klick und trägt fünf Module.
+    // `…/personal` öffnet die Kategorie „Kräfte & Mittel": das Panel trägt ohne Klick fünf Module.
     await page.goto(`/einsaetze/${einsatzId}/personal`);
     await stelleDichte(page, dichte);
 
-    // Wache vor jeder Messung: der INLINE-Rahmen steht und der Drawer ist gar nicht im
-    // Baum. Ohne sie wäre der Test auch dann grün, wenn er versehentlich den Drawer misst
-    // (Wortlaut aus `trefflaeche-tablet.spec.ts:174-178`).
+    // Wache: der INLINE-Rahmen steht und der Drawer ist nicht im Baum — sonst wäre der Test
+    // auch grün, wenn er versehentlich den Drawer misst.
     const rail = page.getByRole('navigation', { name: 'Kategorien' });
     await expect(rail, 'der inline-Rahmen steht am Fükw-Maß').toBeVisible();
     await expect(page.getByRole('button', { name: 'Navigation öffnen' })).toHaveCount(0);
     await expect(page.getByRole('dialog')).toHaveCount(0);
 
-    // (a) Kategorie-Rail — sechs Kategorien aus `modulRegistry.kategorien`. Die Zahl steht
-    // als Mindestmenge: ein Locator, der weniger trifft, misst einen Ladezustand.
+    // (a) Kategorie-Rail — sechs Kategorien als Mindestmenge.
     const railZiel = await alleHaltenStufe(
       rail.locator('button'),
       BODEN.mitA1Boden[dichte],
@@ -622,23 +454,19 @@ test('Navigationsrahmen inline: Rail, Modul-Panel, Einsatz-Kopfzeile und Kommand
       5,
     );
 
-    // (c) die Einsatz-Kopfzeile. Genau EINE — `EinsatzLayout` rendert seinen eigenen
-    // `<Header>`, `AppLayout` ist auf Einsatzrouten nicht mit im Baum; ohne diese Wache
-    // wären alle Kopfzeilen-Locator unten stillschweigend mehrdeutig.
+    // (c) die Einsatz-Kopfzeile. Genau EINE (`EinsatzLayout` rendert seinen eigenen
+    // `<Header>`); sonst wären die Kopfzeilen-Locator unten still mehrdeutig.
     const kopf = page.locator('.ant-layout-header');
     await expect(kopf, 'genau eine Kopfzeile auf der Einsatzroute').toHaveCount(1);
-    // Der Einsatz-Wechsler über sein `title`, NICHT über den zugänglichen Namen: sein
-    // `DownOutlined` bringt ein eigenes englisches `aria-label` mit und stünde im Namen
-    // („… down") — dieselbe Falle, die CLAUDE.md aus LFH-366 als „delete Bild entfernen"
-    // führt.
+    // Der Einsatz-Wechsler über sein `title`: sein `DownOutlined` bringt ein englisches
+    // `aria-label` mit, das im zugänglichen Namen stünde („… down").
     const wechsler = await haeltStufe(
       kopf.locator(`button[title="${name}"]`),
       BODEN.staffel[dichte],
       `Einsatz-Wechsler (${dichte})`,
     );
-    // Die zwei Alarm-Knöpfe per Regex: ihr zugänglicher Name trägt den ZUSTAND
-    // („Desktop blockiert", „Alarmton durch Klick entsperren"), und der hängt an
-    // Browser-Berechtigung und Tonfreigabe — ein exakter Name pinnte eine Umgebung.
+    // Alarm-Knöpfe per Regex: ihr Name trägt den ZUSTAND (Browser-Berechtigung, Tonfreigabe),
+    // ein exakter Name pinnte eine Umgebung.
     const desktop = await haeltStufe(
       kopf.getByRole('button', { name: /^Desktop-Benachrichtigungen:/ }),
       BODEN.staffel[dichte],
@@ -649,8 +477,7 @@ test('Navigationsrahmen inline: Rail, Modul-Panel, Einsatz-Kopfzeile und Kommand
       BODEN.staffel[dichte],
       `Alarm-Knopf Ton (${dichte})`,
     );
-    // Ab `lg` trägt der Suchzugang KEINE feste Größe (`CommandPaletteTrigger.tsx:32-39`)
-    // und hängt allein an `controlHeight` — hier also die Staffel, nicht der A1-Boden.
+    // Ab `lg` hängt der Suchzugang allein an `controlHeight` — hier die Staffel, nicht der A1-Boden.
     const suchen = await haeltStufe(
       kopf.getByRole('button', { name: 'Suchen', exact: true }),
       BODEN.staffel[dichte],
@@ -662,39 +489,23 @@ test('Navigationsrahmen inline: Rail, Modul-Panel, Einsatz-Kopfzeile und Kommand
       `Benutzermenü (${dichte})`,
     );
 
-    // (d) die Kommandopalette. Sie ist seit LFH-335 der Berührungsweg zu 42+ Befehlen;
-    // gemessen werden ihre `role="option"`-Zeilen (`command-palette/zeilenStil.ts`).
-    // Bei LEERER Suche steht die kuratierte Startansicht — ihre Einträge stehen im DOM,
-    // auch wo der 480-px-Kasten sie abschneidet, und `boundingBox()` misst sie dort.
+    // (d) die `role="option"`-Zeilen der Kommandopalette. Bei leerer Suche steht die
+    // Startansicht; `boundingBox()` misst auch Einträge, die der Kasten abschneidet.
     await kopf.getByRole('button', { name: 'Suchen', exact: true }).click();
     await expect(page.getByRole('listbox'), 'die Palette ist offen').toBeVisible();
     /**
-     * ERST WENN DIE EINBLENDUNG DURCH IST — und das ist eine KLASSENWACHE, kein Höhen-Poll.
-     *
-     * antds `Modal` fährt die `zoom`-Bewegung von `transform: scale(0.2)` hoch, und
-     * `boundingBox()` liefert die TRANSFORMIERTE Box: der erste Anlauf dieses Specs meldete
-     * „Palettenzeile (kompakt) gemessen 7.2px" — exakt 36 × 0,2 (die Zeile misst in
-     * `kompakt` 36 px, `minHeight` 30 plus Polsterung). Dieselbe Falle beschreibt
-     * `trefflaeche-tablet.spec.ts:138-148` an der Bestätigungsblase.
-     *
-     * DORT GENÜGT `expect.poll` AUF DIE HÖHE, HIER NICHT — im Browser nachgemessen
-     * (Stichprobe alle 100 ms ab dem Klick): im ersten Frame trägt das Modal zwar schon
-     * `ant-zoom-appear-start`, aber noch `transform: none`, die Zeile misst also volle
-     * 36 px. Erst danach greift `scale(0.2)`. Ein Höhen-Poll ist damit KEIN Riegel: er
-     * besteht auf dem Frame VOR der Bewegung und gibt die Messung genau in sie hinein
-     * frei — beim zweiten Anlauf war der Test deshalb weiterhin rot, nur an einer anderen
-     * Zeilennummer. Die Klasse verschwindet dagegen erst, wenn rc-motion fertig ist
-     * (gemessen: ab ~200 ms trägt das Modal nur noch `ant-modal` + Emotion-Klasse).
+     * Erst wenn die Einblendung durch ist — per KLASSENWACHE, kein Höhen-Poll. antds `Modal`
+     * zoomt von `scale(0.2)` hoch, und `boundingBox()` liefert die transformierte Box. Ein
+     * Höhen-Poll ist kein Riegel: im ersten Frame steht noch `transform: none` (volle Höhe),
+     * erst danach greift die Skalierung. Die `ant-zoom`-Klasse verschwindet erst, wenn
+     * rc-motion fertig ist.
      */
     await expect(
       page.locator('.ant-modal'),
       'die Einblendung der Palette ist durch',
     ).not.toHaveClass(/ant-zoom/);
     /**
-     * Der Locator ist auf die Listbox GESCOPT. Gemessen ist das heute folgenlos (48
-     * `role="option"` auf der Seite, alle 48 in der Palette), aber `role="option"` ist die
-     * Rolle, die jedes antd-`Select`-Dropdown vergibt — eine Seite mit offener Auswahl zöge
-     * deren Einträge sonst in diese Zusicherung.
+     * Auf die Listbox gescopt: `role="option"` vergibt auch jedes antd-`Select`-Dropdown.
      */
     const zeile = await alleHaltenStufe(
       page.getByRole('listbox').getByRole('option'),
@@ -718,9 +529,8 @@ test('Globale Kopfzeile: Logo, Verwaltungs-Link, Suchzugang und Benutzermenü fo
 }) => {
   test.setTimeout(90_000);
   await page.setViewportSize(FUEKW);
-  // `/einsaetze` ist die Route von `AppLayout` — der ZWEITEN Kopfzeile. Sie teilt mit der
-  // Einsatz-Kopfzeile nur `KOPF_STIL` und die zwei rechten Ziele; Logo und Verwaltungs-Link
-  // tragen ihre Höhe über `linkStil` (`AppLayout.tsx:123-130`) und kommen sonst nirgends vor.
+  // `/einsaetze` ist die Route von `AppLayout`, der zweiten Kopfzeile. Logo und
+  // Verwaltungs-Link kommen nur dort vor.
   await anmelden(page);
 
   const gemessen: string[] = [];
@@ -737,9 +547,8 @@ test('Globale Kopfzeile: Logo, Verwaltungs-Link, Suchzugang und Benutzermenü fo
       BODEN.staffel[dichte],
       `Logo-Link (${dichte})`,
     );
-    // Als `admin` ist die Verwaltung FREI, der Eintrag also ein `<Link>` und damit ein
-    // Bedienziel. Gesperrt wäre er ein `Typography.Text` ohne Ziel — dann gäbe es hier
-    // nichts zu messen, und `toHaveCount(1)` in `haeltStufe` sagt das laut.
+    // Als `admin` ist die Verwaltung frei, also ein `<Link>`; gesperrt wäre sie kein Ziel,
+    // und `toHaveCount(1)` sagt das laut.
     const verwaltung = await haeltStufe(
       kopf.getByRole('link', { name: 'Verwaltung', exact: true }),
       BODEN.staffel[dichte],
@@ -769,8 +578,7 @@ test('Navigations-Drawer auf 390 px: Hamburger und Modulzeilen folgen der Staffe
   page,
 }) => {
   test.setTimeout(90_000);
-  // Anmelden und Anlegen am Fükw-Maß, erst danach umstellen — Vorgehen aus
-  // `nav-schmal.spec.ts:14-17` und `trefflaeche-tablet.spec.ts:184-185`.
+  // Anmelden und Anlegen am Fükw-Maß, erst danach umstellen.
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Drawer`);
   await page.setViewportSize(HANDSCHIRM);
@@ -784,8 +592,7 @@ test('Navigations-Drawer auf 390 px: Hamburger und Modulzeilen folgen der Staffe
     // Wache: hier gilt der SCHMAL-Zweig — der inline-Rahmen ist weg, der Griff steht.
     await expect(page.getByRole('navigation', { name: 'Kategorien' })).toHaveCount(0);
     const hamburger = page.getByRole('button', { name: 'Navigation öffnen' });
-    // Beide Achsen: ein icon-only-Knopf setzt `width` UND `height` aus derselben Zahl
-    // (`EinsatzLayout.tsx:319-320`), eine Messung allein der Höhe ließe die Hälfte offen.
+    // Beide Achsen: der icon-only-Knopf setzt `width` UND `height` aus derselben Zahl.
     const griff = await haeltStufe(hamburger, BODEN.mitA1Boden[dichte], `Hamburger (${dichte})`);
     const griffBreite = (await hamburger.boundingBox())!.width;
     expect(
@@ -793,8 +600,7 @@ test('Navigations-Drawer auf 390 px: Hamburger und Modulzeilen folgen der Staffe
       `Hamburger-Breite (${dichte}, gemessen ${griffBreite}px, Soll ≥ ${BODEN.mitA1Boden[dichte]})`,
     ).toBeGreaterThanOrEqual(BODEN.mitA1Boden[dichte] - SUBPIXEL);
 
-    // Unter `lg` bekommt der Suchzugang seine feste Trefffläche (`Math.max(48, …)`) — die
-    // andere Hälfte der Aussage aus dem Inline-Test, wo derselbe Knopf an der Staffel hängt.
+    // Unter `lg` bekommt der Suchzugang seine feste Trefffläche (`Math.max(48, …)`).
     const suchen = await haeltStufe(
       page.locator('.ant-layout-header').getByRole('button', { name: 'Suchen', exact: true }),
       BODEN.mitA1Boden[dichte],
@@ -807,9 +613,8 @@ test('Navigations-Drawer auf 390 px: Hamburger und Modulzeilen folgen der Staffe
     const nav = drawer.getByRole('navigation', { name: 'Einsatz-Navigation' });
     await expect(nav).toBeVisible();
 
-    // Kopfzeilen gegen Modulzeilen: die Kategorie-Köpfe tragen `aria-expanded`, die
-    // Modulknöpfe darunter nicht. Das trennt die zwei Verträge ohne Strukturselektor —
-    // ein `> div > button` bräche beim ersten Umbau der Verschachtelung.
+    // Kategorie-Köpfe tragen `aria-expanded`, Modulknöpfe nicht — das trennt die zwei
+    // Verträge ohne Strukturselektor.
     const koepfe = nav.locator('button[aria-expanded]');
     const kopfHoehe = await alleHaltenStufe(
       koepfe,
@@ -841,72 +646,20 @@ test('Navigations-Drawer auf 390 px: Hamburger und Modulzeilen folgen der Staffe
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
-// ── Kräfteübersicht und Verdichtungszeile (LFH-515, Nachzug zu LFH-338 · C3, Kriterium 2) ──
+// ── Kräfteübersicht und Verdichtungszeile ────────────────────────────────────────────
 //
-// DIE VIERTE ROUTE dieser Datei, mit denselben Helfern — genau die Gestalt, die der
-// Kopfkommentar oben vorsieht („wer hier etwas anhängt, nimmt dieselben Helfer").
+// DER UMSCHALTER: die Hülle trägt die Staffel, das einzelne Wahlfeld liegt konstant 4 px
+// darunter (antds `segmentedContainerPadding`, 2 px je Seite). Das ist kein Mangel: die
+// Wahlfelder kacheln die Hülle lückenlos, und ein 72-px-Wahlfeld machte die Hülle 76 px hoch.
+// Zugesichert werden deshalb die Hülle gegen den Boden und die lückenlose Kachelung.
 //
-// WARUM EIN EIGENER NACHZUG UND NICHT LFH-396: jenes Ticket ist namentlich auf Lage-Dashboard
-// und Einsatzauswahl mit fünf benannten Zielen gescopt und deckt keine Fläche der
-// Kräfteübersicht. Die Prüfliste von LFH-338 verwies zwischenzeitlich dorthin; mit dem
-// Schließen von LFH-396 (05.09.2026) wären die Verweise tot gewesen — dieselbe Lage, die
-// LFH-446 und LFH-516 mit eigenen Nachzügen gelöst haben.
-//
-// ── WAS DER ERSTE LAUF GEMESSEN HAT (vor jedem Fix, Fükw 1366 px) ───────────────────
-//
-//   Umschalter (Hülle)      30,00 / 48,00 / 72,00   ✓ hält
-//   Umschalter (Wahlfeld)   26,00 / 44,00 / 68,00   — 4 px unter dem Boden, siehe unten
-//   „Filter zurücksetzen"   30,00 / 48,00 / 72,00   ✓ hält
-//   Suchfeld des Filters    30,09 / 48,00 / 72,00   ✓ hält
-//   Filter-Marke            22,00 / 22,00 / 22,00   — dichteblind, benannte Ausnahme
-//   Schließkreuz der Marke  10×10 in JEDER Stufe    — dichteblind, benannte Ausnahme
-//   Kräfteübersicht-Link    15,00 / 16,00 / 16,00   ✗ BEFUND, behoben (s. u.)
-//
-// DER BEFUND: der Link der Verdichtungszeile ist das EINZIGE Bedienelement dieser Zeile und
-// blieb im Handschuh-Betrieb bei 16 px — nicht einmal ein Viertel des Bodens, und schon in
-// `kompakt` unter 24 px. Es ist wörtlich derselbe Befund, den LFH-396 am Titel-Link der
-// Einsatzkarte gemessen hat (17 px in jeder Stufe): CLAUDE.md führt ihn seither als Regel
-// „ein `<a>` erbt keine Steuerhöhe". Die Prüfliste von LFH-338 hatte für Kriterium 1
-// geschrieben, alle neuen Bedienelemente seien echte antd-Steuerelemente und erbten die
-// Staffel vom `ConfigProvider` — für `Segmented`, `Button type="link"` und `Input.Search`
-// stimmt das (Messwerte oben), für `Link` nicht. Eine Annahme, keine Messung. Behoben über
-// `verdichtungsLinkStil` (zwei Angaben nach LFH-365); danach gemessen **35,50 / 48,00 / 72,00**.
-// Der Kompaktwert liegt über dem Boden, weil die Polsterung auf beiden Achsen liegt und die
-// Zeilenhöhe des Textes dazukommt — Untergrenze, keine Gleichheit (siehe Kopfkommentar).
-//
-// DER UMSCHALTER: die Hülle trägt die Staffel punktgenau, das einzelne Wahlfeld liegt
-// konstant 4 px darunter — das sind die 2 px Innenpolsterung, die antd der Hülle je Seite
-// gibt (`segmentedContainerPadding`). Das ist KEIN Mangel und wird deshalb auch nicht
-// „behoben": die beiden Wahlfelder kacheln die Hülle lückenlos, es gibt keine tote Zone
-// zwischen ihnen, und ein Wahlfeld auf 72 px zu zwingen machte die Hülle 76 px hoch und
-// damit die Staffel selbst falsch. Zugesichert wird deshalb (a) die Hülle gegen den Boden
-// und (b) die lückenlose Kachelung — nicht eine Zahl, die man nur durch Brechen der Staffel
-// erreichte. Die 4 px stehen als Literal, damit ein Wachsen der Innenpolsterung auffliegt.
-//
-// MUTATIONSPROBE (Akzeptanzkriterium), am 11.09.2026 nach dem Muster oben mit zwei
-// temporären Kopien gefahren — beide Male danach zurückgedreht und byte-gleich verglichen:
-//  - `localStorage` in `stelleDichte` auf `'kompakt'` festgenagelt, `STAFFEL` nur
-//    `handschuh`: beide Tests rot an der `data-dichte`-Wache („Expected handschuh,
-//    Received kompakt"), noch VOR jeder Höhenmessung.
-//  - dieselbe Mutation, zusätzlich die Wache entfernt: rot an der ERSTEN Höhenmessung —
-//    „Umschalter-Hülle (handschuh) (gemessen 30px hoch, Soll ≥ 72)" und
-//    „Kräfteübersicht-Link (handschuh) (gemessen 35.5px hoch, Soll ≥ 72)".
-//    Beide Tests messen also die Staffel, nicht sich selbst.
-//
-// DIE FILTER-MARKE ist die benannte Ausnahme aus Kriterium 1 der Prüfliste, und dieser Spec
-// macht sie von einer Behauptung zu einer MESSUNG: `Tag closable` hängt nicht am
-// `ConfigProvider` — weder die Marke (22 px) noch ihr Schließkreuz (10×10 px) bewegen sich
-// über die Stufen. Getragen wird die Ausnahme allein davon, dass „Filter zurücksetzen" als
-// vollwertiger Knopf danebensteht und dieselbe Wirkung für ALLE Filter auf einmal hat. Genau
-// das ist hier die Zusicherung (und die kann rot werden): steht mindestens eine Marke, MUSS
-// der Zweitweg dastehen und den Boden halten. Die Maße der Marke werden protokolliert, nicht
-// gepinnt — sie sind antd-Bestand, kein C3-Erzeugnis, und ein Pin auf 22 bräche bei einem
-// antd-Sprung, ohne dass jemand etwas falsch gemacht hätte. Eine dichteabhängige Projekt-Hülle
-// um `Tag closable` ist Nachzug 1 der Prüfliste und eine Komponentenentscheidung mit eigenem
-// Ticket, nicht ein Nebenprodukt dieses Nachweises.
+// DIE FILTER-MARKE ist eine benannte Ausnahme: `Tag closable` hängt nicht am
+// `ConfigProvider` (Marke 22 px, Kreuz 10×10 in jeder Stufe). Getragen wird sie davon, dass
+// „Filter zurücksetzen" als vollwertiger Knopf danebensteht — steht eine Marke, MUSS dieser
+// Zweitweg dastehen und den Boden halten. Die Maße der Marke werden protokolliert, nicht
+// gepinnt: sie sind antd-Bestand, ein Pin bräche bei einem antd-Sprung grundlos.
 
-/** Die Innenpolsterung, die antd der Segmented-Hülle je Seite gibt (`segmentedContainerPadding`).
- *  Literal wie die Böden: aus dem Token zurückgelesen prüfte es den Token gegen sich selbst. */
+/** Innenpolsterung der Segmented-Hülle je Seite (`segmentedContainerPadding`), als Literal. */
 const SEGMENTED_POLSTER = 2;
 
 test('Kräfteübersicht: Umschalter, Filterzeile und Suchfeld folgen der Dichte-Staffel 30 / 48 / 72 px', async ({
@@ -917,9 +670,7 @@ test('Kräfteübersicht: Umschalter, Filterzeile und Suchfeld folgen der Dichte-
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Meldebild`);
 
-  // Ohne Kräfte hat das Meldebild keinen Baum — der Umschalter stünde über einer leeren
-  // Tabelle, und der Suchfilter unten hätte nichts zu treffen. Ein Fahrzeug dazu, damit die
-  // Fahrzeugachse des Kopfes nicht nur Nullen trägt.
+  // Ohne Kräfte hat das Meldebild keinen Baum und der Suchfilter nichts zu treffen.
   await anlegen(page, einsatzId, 'personal', { adhoc: { name: 'Messkraft Gate3' } }, 'Personal');
   await anlegen(
     page,
@@ -935,11 +686,10 @@ test('Kräfteübersicht: Umschalter, Filterzeile und Suchfeld folgen der Dichte-
     await page.goto(`/einsaetze/${einsatzId}/kraefteuebersicht`);
     await stelleDichte(page, dichte);
 
-    // Anker: die Seite ist fertig geladen. Ohne ihn misst der Rest einen Ladezustand.
+    // Anker: die Seite ist fertig geladen.
     await expect(page.getByRole('region', { name: 'Meldebild' })).toHaveCount(1);
 
-    // (1) DER UMSCHALTER. Gemessen wird die Hülle gegen den Boden — sie trägt die
-    //     Steuerhöhe — und zusätzlich, dass die beiden Wahlfelder sie lückenlos kacheln.
+    // (1) Umschalter: Hülle gegen den Boden, dazu die lückenlose Kachelung.
     const huelle = page.locator('.ant-segmented');
     const umschalter = await haeltStufe(huelle, soll, `Umschalter-Hülle (${dichte})`);
     const wahlfelder = page.locator('.ant-segmented-item');
@@ -949,38 +699,27 @@ test('Kräfteübersicht: Umschalter, Filterzeile und Suchfeld folgen der Dichte-
       `Umschalter-Wahlfeld (${dichte})`,
       2,
     );
-    // Lückenlos: das Wahlfeld füllt die Hülle abzüglich ihrer Innenpolsterung GENAU aus.
-    // Ohne diese Hälfte wäre die Nachsicht oben ein Freibrief — ein Wahlfeld, das nur halb
-    // so hoch wie seine Hülle ist, käme durch dieselbe gelockerte Schranke.
+    // Lückenlos: ohne diese Hälfte wäre die Nachsicht oben ein Freibrief für ein halbhohes Wahlfeld.
     expect(
       umschalter - wahlfeld,
       `Umschalter (${dichte}): Wahlfeld kachelt die Hülle (Hülle ${umschalter}, Wahlfeld ${wahlfeld})`,
     ).toBeLessThanOrEqual(2 * SEGMENTED_POLSTER + SUBPIXEL);
 
-    // (2) DAS SUCHFELD DER FILTERLEISTE. Gemessen wird die sichtbare Feldhülle
-    //     (`.ant-input-affix-wrapper`, sie trägt Rahmen und Polsterung), nicht das nackte
-    //     `<input>` darin — das ist so hoch wie seine Zeile (Begründung wie bei der
-    //     Einsatzauswahl oben).
+    // (2) Suchfeld der Filterleiste, an der sichtbaren Feldhülle gemessen.
     const suchfeld = page.locator('.ant-input-affix-wrapper');
     const feld = await haeltStufe(suchfeld, soll, `Filter-Suchfeld (${dichte})`);
 
-    // (3) FILTER SETZEN. Der Suchfilter ist der einzige, der ohne Stammdaten auskommt:
-    //     Abschnitt, Träger und Status ziehen ihre Optionen aus gepflegten Katalogen.
-    //     Gegriffen über den Platzhalter und NICHT über `getByRole('textbox')`: antds
-    //     `Input.Search` rendert `type="search"`, und das ist die Rolle `searchbox` — ein
-    //     Rollen-Locator lief hier gemessen in den Zeitablauf statt in eine Aussage.
+    // (3) Filter setzen — der Suchfilter kommt als einziger ohne Stammdaten aus. Über den
+    //     Platzhalter gegriffen: `Input.Search` hat die Rolle `searchbox`, nicht `textbox`.
     await page.getByPlaceholder('Suche...').fill('Messkraft');
     const marke = page.locator('.ant-tag').filter({ hasText: 'Suche:' });
     await expect(marke).toHaveCount(1);
 
-    // (4) DER ZWEITWEG, an dem die Ausnahme der Marke hängt — und er ist zuerst DA und
-    //     dann groß genug. Beide Hälften zählen: ein Knopf, der bei gesetztem Filter
-    //     fehlte, machte die Marke zum einzigen Weg, und dann wären ihre 22 px ein Mangel
-    //     statt einer Ausnahme.
+    // (4) Der Zweitweg, an dem die Ausnahme der Marke hängt: zuerst DA, dann groß genug.
     const zuruecksetzen = page.getByRole('button', { name: 'Filter zurücksetzen', exact: true });
     const knopf = await haeltStufe(zuruecksetzen, soll, `„Filter zurücksetzen" (${dichte})`);
 
-    // (5) …und die Marke selbst, protokolliert statt gepinnt (Begründung im Block oben).
+    // (5) Die Marke selbst, protokolliert statt gepinnt.
     const markenKasten = (await marke.boundingBox())!;
     const kreuz = (await marke.locator('.ant-tag-close-icon').boundingBox())!;
 
@@ -1002,9 +741,8 @@ test('Verdichtungszeile: der Meldebild-Link folgt der Dichte-Staffel 30 / 48 / 7
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Verdichtung`);
 
-  // Die Zeile rendert `null`, solange NICHT BEIDE Listen da sind (`Verdichtungszeile.tsx`,
-  // Datenriegel). Leere Listen zählen als Daten — gesät wird trotzdem, sonst misst der Test
-  // eine Zeile aus lauter Nullen und die Fahrzeugachse hätte nichts zu zeigen.
+  // Die Zeile rendert `null`, solange nicht beide Listen da sind; gesät wird, damit sie
+  // nicht nur Nullen trägt.
   await anlegen(
     page,
     einsatzId,
@@ -1023,18 +761,13 @@ test('Verdichtungszeile: der Meldebild-Link folgt der Dichte-Staffel 30 / 48 / 7
   const gemessen: string[] = [];
 
   for (const { dichte, soll } of STAFFEL) {
-    // Die Fahrzeugseite als einer der vier Einbauorte. Die Zeile ist dort dieselbe
-    // Komponente wie auf Personal, Material und Einheiten — vier Messungen derselben
-    // Komponente wären vier Abschriften desselben Satzes.
+    // Die Fahrzeugseite steht für alle vier Einbauorte derselben Komponente.
     await page.goto(`/einsaetze/${einsatzId}/fahrzeuge`);
     await stelleDichte(page, dichte);
 
-    // Seit dem Neuentwurf (21.09.2026) heißt die Zielseite „Meldebild" — der Linktext folgt
-    // dem Namen aus Modulpanel und Seitenkopf (`Verdichtungszeile.tsx`); die Route bleibt.
     const link = page.getByRole('link', { name: 'Meldebild', exact: true });
     const hoehe = await haeltStufe(link, soll, `Meldebild-Link (${dichte})`);
-    // Er muss auch dorthin zeigen: ein Bedienziel der richtigen Größe am falschen Ziel
-    // bestünde diese Messung ebenso.
+    // Er muss auch dorthin zeigen: ein Ziel der richtigen Größe am falschen Ort bestünde sonst.
     await expect(link).toHaveAttribute('href', `/einsaetze/${einsatzId}/kraefteuebersicht`);
 
     gemessen.push(`${dichte} (Soll ≥ ${soll}): Link ${hoehe}`);
@@ -1043,56 +776,17 @@ test('Verdichtungszeile: der Meldebild-Link folgt der Dichte-Staffel 30 / 48 / 7
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
-// ── Stab (LFH-542, Nachzug zu LFH-46 · Kriterium 2) ──────────────────────────────────
+// ── Stab ────────────────────────────────────────────────────────────────────────────
 //
-// DIE FÜNFTE ROUTE dieser Datei (`/einsaetze/:id/stab`), mit denselben Helfern. Anlass war
-// der Review an PR #62: das Modul wurde als fertig markiert und trägt handgebaute Links, aber
-// keinen Gate-3-Nachweis im Browser. Vitest belegt für `stabZeilenzielStil` nur den
-// Inline-Style über zwei Stufen (`stab/zeilenziel.test.ts`) — nicht, dass ein `<Link>` in
-// einer `Descriptions`-Zelle oder einer `Liste`-Beschreibung die Höhe im Layout ERREICHT.
-//
-// ── WAS GEMESSEN WIRD ───────────────────────────────────────────────────────────────
-//
-//  - die ETB-Links (`stabZeilenzielStil`): Zeile „Letzte" in `LagebesprechungStand` und je
-//    ein Link pro sichtbarem Historien-Eintrag (`LagebesprechungHistorie`, SICHTBAR = 3).
-//    Gesät werden ZWEI Lagebesprechungen → genau DREI Links (Letzte Nr. 2 + Historie Nr. 2
-//    und Nr. 1). Mit einer allein stünden zwei gleichnamige Links da, und die Schleife über
-//    die Historie wäre nicht als Schleife belegt.
-//  - die Werkzeug-Links (`stabZeilenzielStil`) in `role="group"` „Werkzeuge S…". Die Menge
-//    kommt nicht aus dem Seeding, sondern aus `stab/sachgebiete.ts`: 3 + 3 + 3 + 3 + 0 + 2 =
-//    14 Registry-Schlüssel, alle mit `status: 'fertig'`, als `admin` ohne Overrides alle
-//    freigegeben — also 14 Links in FÜNF Gruppen (S5 hat keine Werkzeuge und damit keine
-//    Gruppe). Die Zahl steht exakt, nicht als weiche Untergrenze (Muster Mehr-Knopf oben):
-//    fällt ein Modul aus der Freigabe, soll das hier auffallen statt still weniger zu messen.
-//  - die sechs Knöpfe „Besetzung ändern" (antd `Button`, nur mit Schreibrecht und Stand).
-//  - die Kopfaktion „Lagebesprechung abschließen" im Slot `seitenkopf-aktionen`.
-//
-// DER BODEN IST FÜR ALLE VIER DIE STAFFEL 30 / 48 / 72. Für die Links, weil sie allein an
-// `token.controlHeight` hängen; für die antd-Knöpfe, weil der Bestand einen plain `Button`
-// genau so misst (Einheit: „Speichern"/„Auflösen", Kräfteübersicht: „Filter zurücksetzen") —
-// er erbt `controlHeight` vom `ConfigProvider`, einen eigenen Boden gibt es dort nicht.
-//
-// DIE LOCATOR SIND GESCOPT: die Werkzeug-Links über ihre Gruppen (sonst zögen Breadcrumb,
-// ETB-Links und Kopfzeilen-Links in die Zusicherung), die ETB-Links über ihre Sektion und
-// ihren Namensanfang, die Kopfaktion über den Slot.
-//
-// ── MUTATIONSPROBE (Akzeptanzkriterium), am 13.09.2026 ──────────────────────────────
-//
-// Anders als die Proben oben nicht an `stelleDichte`, sondern an der QUELLE der Staffel:
-// in `stab/zeilenziel.ts` `minHeight: token.controlHeight` → `minHeight: 30` (die Polsterung
-// blieb stehen und wächst weiter mit der Stufe). Danach zurückgedreht, `git diff` leer.
-//  - voller Durchlauf: rot in `komfortabel` an der ersten Messung — „ETB-Link (komfortabel)
-//    #1 (gemessen 45px hoch, Soll ≥ 48)". `kompakt` blieb grün (35,5 über 30).
-//  - temporäre Kopie mit `STAFFEL` nur `handschuh`: rot — „ETB-Link (handschuh) #1
-//    (gemessen 55px hoch, Soll ≥ 72)".
-// Die Polsterung allein trägt den Boden also nicht (LFH-365), und der Spec misst die Staffel,
-// nicht sich selbst.
-//
-// ── MESSWERTE DES ERSTEN GRÜNEN LAUFS (13.09.2026, kompakt / komfortabel / handschuh) ──
-//
-//  ETB-Link 35,5 / 48 / 72 · Werkzeug-Link 35,5 / 48 / 72 · „Besetzung ändern" 30 / 48 / 72
-//  · Kopfaktion 30 / 48 / 72. Kein Ziel unter dem Boden. Der Kompaktwert der Links liegt
-//  über 30, weil die Polsterung auf beiden Achsen liegt — Untergrenze, keine Gleichheit.
+// Vitest belegt für `stabZeilenzielStil` nur den Inline-Style, nicht dass ein `<Link>` in
+// einer `Descriptions`-Zelle die Höhe im Layout ERREICHT. Gemessen werden:
+//  - die ETB-Links: „Letzte" plus je ein Link pro Historien-Eintrag. ZWEI gesäte
+//    Lagebesprechungen → genau drei Links, damit die Historie als Schleife belegt ist.
+//  - die Werkzeug-Links je Gruppe „Werkzeuge S…"; die Zahl kommt aus `stab/sachgebiete.ts`
+//    und steht exakt, damit ein Modul, das aus der Freigabe fällt, auffällt.
+//  - die sechs Knöpfe „Besetzung ändern" und die Kopfaktion „Lagebesprechung abschließen".
+// Der Boden ist für alle die Staffel. Die Locator sind gescopt, sonst zögen Breadcrumb und
+// Kopfzeilen-Links in die Zusicherung.
 
 /** Zwei abgeschlossene Lagebesprechungen → Stand „Letzte" + zwei Historien-Einträge. */
 const STAB_ETB_LINKS = 3;
@@ -1112,9 +806,7 @@ test('Stab: ETB-Links, Werkzeug-Links, „Besetzung ändern" und Kopfaktion folg
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Fuehrung`);
 
-  // Ohne abgeschlossene Lagebesprechung steht in „Letzte" nur „noch keine" und die Historie ist
-  // leer — es gäbe keinen einzigen ETB-Link zu messen. `entschluss` ist das einzige Pflichtfeld
-  // (`routes/stab.rs`, `LagebesprechungAbschluss`); fehlt `abgehalten_at`, gilt „jetzt".
+  // Ohne abgeschlossene Lagebesprechung gäbe es keinen ETB-Link zu messen.
   for (const nr of [1, 2]) {
     await anlegen(
       page,
@@ -1131,8 +823,7 @@ test('Stab: ETB-Links, Werkzeug-Links, „Besetzung ändern" und Kopfaktion folg
     await page.goto(`/einsaetze/${einsatzId}/stab`);
     await stelleDichte(page, dichte);
 
-    // Anker: beide Sektionen stehen, der Stand ist geladen (sonst Skeleton ohne Links) und die
-    // Historie trägt ihre zwei Einträge — ohne diese Wache misst der Rest einen Ladezustand.
+    // Anker: beide Sektionen stehen, der Stand ist geladen und die Historie trägt zwei Einträge.
     const lage = page.getByRole('region', { name: 'Lagebesprechung', exact: true });
     const besetzung = page.getByRole('region', { name: 'Besetzung S1–S6', exact: true });
     await expect(lage).toHaveCount(1);
@@ -1143,8 +834,7 @@ test('Stab: ETB-Links, Werkzeug-Links, „Besetzung ändern" und Kopfaktion folg
       lage.getByRole('link', { name: 'ETB-Eintrag zu Lagebesprechung Nr. 1', exact: true }),
     ).toHaveCount(1);
 
-    // (1) ETB-Links. Sie müssen auch ins ETB zeigen — ein Ziel der richtigen Größe am falschen
-    //     Ort bestünde die Höhenmessung ebenso.
+    // (1) ETB-Links; sie müssen auch ins ETB zeigen.
     const etb = await alleHaltenStufe(etbLinks, soll, `ETB-Link (${dichte})`, STAB_ETB_LINKS);
     await expect(etbLinks.first()).toHaveAttribute(
       'href',
@@ -1173,8 +863,7 @@ test('Stab: ETB-Links, Werkzeug-Links, „Besetzung ändern" und Kopfaktion folg
       STAB_BESETZUNG_KNOEPFE,
     );
 
-    // (4) Die Kopfaktion. Erst FREIGEGEBEN, dann gemessen: gesperrt stünde sie ebenso hoch da,
-    //     und die Messung sagte nichts über das Ziel, das jemand tatsächlich bedient.
+    // (4) Die Kopfaktion: erst freigegeben, dann gemessen — gesperrt stünde sie ebenso hoch da.
     const kopfaktion = page
       .locator('[data-lfh="seitenkopf-aktionen"]')
       .getByRole('button', { name: 'Lagebesprechung abschließen', exact: true });
@@ -1190,15 +879,11 @@ test('Stab: ETB-Links, Werkzeug-Links, „Besetzung ändern" und Kopfaktion folg
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
-// ── Ablösung (LFH-635) ────────────────────────────────────────────────────────────────
+// ── Ablösung ─────────────────────────────────────────────────────────────────────────
 //
-// Die Seite trägt KEIN handgebautes Bedienziel: Primäraktion je Karte, Dreipunkt-Auslöser und
-// der Bearbeiten-Knopf je Abschnittsvorgabe sind antd-`Button` und erben `controlHeight` vom
-// `ConfigProvider`. Gemessen wird trotzdem, weil die Karte eine eigene Flex-Hülle ist
-// (`abloesung/AbloesungKarte.tsx`): ein `align-items`/Schrumpfen darin könnte die Knöpfe
-// unter den Boden drücken, ohne dass eine Größen-Prop im Quelltext stünde. Gesät werden ZWEI
-// Schichten → je zwei Primär- und Dreipunkt-Knöpfe; mit einer allein wäre die Schleife über
-// die Karten nicht als Schleife belegt.
+// Nur antd-`Button`, gemessen wird trotzdem: die Karte ist eine eigene Flex-Hülle, ein
+// `align-items`/Schrumpfen darin drückte die Knöpfe unter den Boden, ohne dass eine
+// Größen-Prop im Quelltext stünde. ZWEI Schichten, damit die Karten als Schleife belegt sind.
 
 test('Ablösung: Kartenaktionen und Vorgabe-Knopf folgen der Dichte-Staffel 30 / 48 / 72 px', async ({
   page,
@@ -1238,8 +923,8 @@ test('Ablösung: Kartenaktionen und Vorgabe-Knopf folgen der Dichte-Staffel 30 /
       soll,
       `Vorgabe-Knopf (${dichte})`,
     );
-    // Abstand zwischen Kartenaktion und Dreipunkt-Auslöser: im Handschuh-Betrieb ≥ 16 px
-    // (MIL-STD-1472F Fig. 24 [abgeleitet], Prüfliste Kriterium 2). Gemessen an der ersten Karte.
+    // Abstand Kartenaktion ↔ Dreipunkt: im Handschuh-Betrieb ≥ 16 px (MIL-STD-1472F Fig. 24
+    // [abgeleitet]). Gemessen an der ersten Karte.
     const links = (await vollziehen.first().boundingBox())!;
     const rechts = (await menue.first().boundingBox())!;
     const luecke = Math.round(rechts.x - (links.x + links.width));
@@ -1256,29 +941,15 @@ test('Ablösung: Kartenaktionen und Vorgabe-Knopf folgen der Dichte-Staffel 30 /
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
-// ── Betreuung (LFH-639) ───────────────────────────────────────────────────────────────
+// ── Betreuung ────────────────────────────────────────────────────────────────────────
 //
-// Zwei Blöcke, zwei Formen: Bezirke als Karten im Plan-Modus der `Datensicht`, Stellen als
-// Tabelle. Die Seite trägt KEIN handgebautes Bedienziel: „Stand melden", „Belegung melden",
-// beide Dreipunkt-Auslöser, die Kopfaktion und „Betreuungsstelle anlegen" sind antd-`Button`
-// und erben `controlHeight`. Gemessen wird trotzdem, aus zwei Gründen:
-//  - der Menü-Auslöser der Karte ist NEU im Primitiv (`weitere`, LFH-639) und steht in der
-//    Aktionsleiste von `ListenEintrag`; ein `align-items`/Schrumpfen dort drückte ihn unter
-//    den Boden, ohne dass eine Größen-Prop im Quelltext stünde;
-//  - die Tabellenzelle legt ihre zwei Ziele in ein `Space wrap` — dort entscheidet der
-//    Abstand, nicht die Höhe, ob der Handschuh-Betrieb trägt (Kriterium 2: ≥ 16 px).
+// Bezirke als Karten (`Datensicht`), Stellen als Tabelle, nur antd-`Button`. Gemessen wird
+// trotzdem: der Menü-Auslöser `weitere` steht in der Aktionsleiste von `ListenEintrag`, und
+// in der Tabellenzelle entscheidet der Abstand im `Space wrap` (≥ 16 px im Handschuh-Betrieb).
 //
-// Gesät werden ZWEI Bezirke (je zwei Primär- und Dreipunkt-Knöpfe) und DREI Stellen, davon
-// eine geschlossen: dort entfällt „Belegung melden", der Dreipunkt bleibt — 2 Primär-, 3
-// Dreipunkt-Knöpfe in der Tabelle. Namen OHNE „Betreuung" (design.md D10 e: die Palette
-// durchsucht Module und Einsätze gemeinsam).
-//
-// BELEGT, NICHT BEHAUPTET (23.09.2026): der erste Lauf war rot am Abstand der Tabellenzeile
-// („Abstand Zeilenaktionen (handschuh, gemessen 7px)", `Space`-Vorgabe = `abstand.xs`); der
-// Fix ist `size="middle"` in `betreuung/StellenBlock.tsx` (11 / 18 / 26 px). Mutationsprobe
-// „Stufe festgenagelt": `stelleDichte` schreibt immer `'kompakt'`, die `data-dichte`-Wache
-// entfernt, `STAFFEL` nur `handschuh` → rot an der ersten Höhenmessung, „Stand melden
-// (handschuh) #1 (gemessen 30px hoch, Soll ≥ 72)". Danach zurückgesetzt.
+// Gesät: ZWEI Bezirke und DREI Stellen, davon eine geschlossen — dort entfällt „Belegung
+// melden", der Dreipunkt bleibt. Namen ohne „Betreuung", weil die Palette Module und Einsätze
+// gemeinsam durchsucht.
 
 test('Betreuung: Karten- und Zeilenaktionen folgen der Dichte-Staffel 30 / 48 / 72 px', async ({
   page,
@@ -1324,7 +995,7 @@ test('Betreuung: Karten- und Zeilenaktionen folgen der Dichte-Staffel 30 / 48 / 
     await senden('patch', `stellen/${stelle.id}`, { status: 'in_betrieb' }, 'Status');
     await senden('post', `stellen/${stelle.id}/belegungen`, { belegt: 140 }, 'Belegung');
   }
-  // Ohne Meldung darf eine Stelle schließen (design.md D4) — kein Leermelden nötig.
+  // Ohne Meldung darf eine Stelle schließen.
   const zu = await senden(
     'post',
     'stellen',
@@ -1344,9 +1015,8 @@ test('Betreuung: Karten- und Zeilenaktionen folgen der Dichte-Staffel 30 / 48 / 
     await expect(karten).toHaveCount(2);
     const standMelden = karten.getByRole('button', { name: /^Stand melden für Bezirk / });
     const karteMenue = karten.getByRole('button', { name: /^Aktionen zu Bezirk / });
-    // GENAUE Zahlen vor der Messung: `alleHaltenStufe` prüft nur eine Untergrenze. Ohne diese
-    // Zeilen bliebe grün, wenn die geschlossene Stelle doch „Belegung melden" trüge oder eine
-    // Karte zwei Menü-Auslöser hätte — Punkt (a) der Prüfliste wäre dann behauptet, nicht belegt.
+    // GENAUE Zahlen vor der Messung: `alleHaltenStufe` prüft nur eine Untergrenze und bliebe
+    // grün, wenn die geschlossene Stelle doch „Belegung melden" trüge.
     await expect(standMelden).toHaveCount(2);
     await expect(karteMenue).toHaveCount(2);
     const karteStand = await alleHaltenStufe(standMelden, soll, `Stand melden (${dichte})`, 2);
@@ -1359,8 +1029,7 @@ test('Betreuung: Karten- und Zeilenaktionen folgen der Dichte-Staffel 30 / 48 / 
     await expect(belegung).toHaveCount(2);
     await expect(zeileMenue).toHaveCount(3);
     const zeileBelegung = await alleHaltenStufe(belegung, soll, `Belegung melden (${dichte})`, 2);
-    // Drei, nicht zwei: auch die geschlossene Stelle behält ihr Menü (Bündelung nach der
-    // Rechteprüfung gezählt, nicht nach dem Zeilenzustand — Prüfliste, Punkt a).
+    // Drei, nicht zwei: auch die geschlossene Stelle behält ihr Menü.
     const zeileDrei = await alleHaltenStufe(zeileMenue, soll, `Dreipunkt Stelle (${dichte})`, 3);
 
     const kopf = await haeltStufe(
@@ -1376,9 +1045,8 @@ test('Betreuung: Karten- und Zeilenaktionen folgen der Dichte-Staffel 30 / 48 / 
       `Betreuungsstelle anlegen (${dichte})`,
     );
 
-    // LFH-676: der Aufklapp-Auslöser „Verlauf" an jeder Karte und Zeile — in der Tabelle
-    // ersetzt er antds 16-px-Symbol, das die Staffel nie hielt — und „Zurücknehmen" im
-    // aufgeklappten Verlauf, das in der Aktionsspalte von `Zeitachseneintrag` steht.
+    // Der Aufklapp-Auslöser „Verlauf" an jeder Karte und Zeile, dazu „Zurücknehmen" im
+    // aufgeklappten Verlauf.
     const verlaufKarte = karten.getByRole('button', { name: /^Verlauf zu Bezirk / });
     const verlaufZeile = tabelle.getByRole('button', { name: /^Verlauf zu Stelle / });
     await expect(verlaufKarte).toHaveCount(2);
@@ -1392,8 +1060,8 @@ test('Betreuung: Karten- und Zeilenaktionen folgen der Dichte-Staffel 30 / 48 / 
       `${dichte}: Verlauf Bezirk ${vKarte}, Verlauf Stelle ${vZeile}, Zurücknehmen ${vZurueck}`,
     );
 
-    // Abstand Primäraktion ↔ Dreipunkt, je an der ersten Karte bzw. Zeile. Im
-    // Handschuh-Betrieb ≥ 16 px (MIL-STD-1472F Fig. 24 [abgeleitet], Prüfliste Kriterium 2).
+    // Abstand Primäraktion ↔ Dreipunkt an der ersten Karte bzw. Zeile: im Handschuh-Betrieb
+    // ≥ 16 px (MIL-STD-1472F Fig. 24 [abgeleitet]).
     const luecke = async (links: Locator, rechts: Locator) => {
       const l = (await links.boundingBox())!;
       const r = (await rechts.boundingBox())!;
@@ -1420,25 +1088,16 @@ test('Betreuung: Karten- und Zeilenaktionen folgen der Dichte-Staffel 30 / 48 / 
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
-// ── Verpflegung (LFH-634) ─────────────────────────────────────────────────────────────
+// ── Verpflegung ──────────────────────────────────────────────────────────────────────
 //
-// Die Karte (`verpflegung/ZeitfensterKarte.tsx`) trägt KEIN handgebautes Bedienziel: „Ausgabe
-// erfassen", der Dreipunkt-Auslöser, „Bedarf bearbeiten" und „Zurücknehmen" an der
-// Ausgabenzeile sind antd-`Button` und erben `controlHeight`. Gemessen wird trotzdem, weil
-// beide Aktionsorte eigene Flex-Hüllen sind (Aktionszeile der Karte, Aktionsspalte des
-// `Zeitachseneintrag`) — ein `align-items`/Schrumpfen dort drückte die Knöpfe unter den Boden,
-// ohne dass eine Größen-Prop im Quelltext stünde.
-//
-// ZWEI Karten, damit BEIDE Aktionsformen stehen (LFH-365, gezählt nach der Rechteprüfung):
-//  - „Frühstück Deich": Fehlmenge, begonnen, KEINE Ausgabe → erfassen · bearbeiten · löschen
-//    (+ nachfordern, sobald die Modul-Overrides geladen sind) — drei oder mehr, also Menü.
-//    Bewusst OHNE gültige Ausgabe: sonst hinge die dritte Aktion allein an „Nachfordern" und
-//    damit an einer Abfrage, die nach dem ersten Bild eintrifft; die Knopfzahl wäre dann vom
-//    Zeitpunkt der Messung abhängig.
-//  - „Mittag Deich": gedeckt durch ZWEI gültige Ausgaben → erfassen · „Bedarf bearbeiten" als
-//    zweiter Knopf, dazu zwei „Zurücknehmen" (eine Schleife über die Zeilen, nicht ein Knoten).
-// Namen OHNE den Modulnamen (die Palette durchsucht Module und Datensätze gemeinsam), und
-// jeder Namens-Regex endet mit dem Leerzeichen vor dem Zeitraum der Kennung.
+// Nur antd-`Button`, gemessen wird wegen der eigenen Flex-Hüllen (Aktionszeile der Karte,
+// Aktionsspalte des `Zeitachseneintrag`). ZWEI Karten, damit BEIDE Aktionsformen stehen:
+//  - „Frühstück Deich": Fehlmenge, KEINE Ausgabe → drei oder mehr Aktionen, also Menü. Ohne
+//    Ausgabe, sonst hinge die dritte Aktion allein an „Nachfordern" und damit an einer
+//    Abfrage, die erst nach dem ersten Bild eintrifft.
+//  - „Mittag Deich": gedeckt durch zwei Ausgaben → „Bedarf bearbeiten" als zweiter Knopf,
+//    dazu zwei „Zurücknehmen".
+// Namen ohne den Modulnamen; jeder Namens-Regex endet mit dem Leerzeichen vor dem Zeitraum.
 
 test('Verpflegung: Kartenaktionen folgen der Dichte-Staffel 30 / 48 / 72 px', async ({ page }) => {
   test.setTimeout(90_000);
@@ -1509,9 +1168,7 @@ test('Verpflegung: Kartenaktionen folgen der Dichte-Staffel 30 / 48 / 72 px', as
     const zuruecknehmen = mittagKarte.getByRole('button', {
       name: /^Zurücknehmen: Ausgabe 20 EP um \d\d:\d\d zu Mittag Deich /,
     });
-    // GENAUE Zahlen vor der Messung (Muster Betreuung): `alleHaltenStufe` prüft nur eine
-    // Untergrenze. Ohne diese Zeilen bliebe grün, wenn die gedeckte Karte doch ein Menü trüge
-    // oder die Menü-Karte ihre Aktionen zusätzlich als Knöpfe zeigte.
+    // GENAUE Zahlen vor der Messung: `alleHaltenStufe` prüft nur eine Untergrenze.
     await expect(erfassen).toHaveCount(2);
     await expect(menue).toHaveCount(1);
     await expect(fruehstueck.getByRole('button', { name: /^Bedarf bearbeiten zu / })).toHaveCount(
@@ -1534,9 +1191,7 @@ test('Verpflegung: Kartenaktionen folgen der Dichte-Staffel 30 / 48 / 72 px', as
     );
 
     // Abstand Kartenaktion ↔ Nachbar: im Handschuh-Betrieb ≥ 16 px (MIL-STD-1472F Fig. 24
-    // [abgeleitet], Prüfliste Kriterium 2). Waagerecht in der Aktionszeile wie bei Ablösung;
-    // „Zurücknehmen" gegen JEDES andere Bedienziel der Karte (die zweite Ausgabe darunter,
-    // „Ausgabe erfassen" in der Aktionszeile).
+    // [abgeleitet]); „Zurücknehmen" gegen JEDES andere Bedienziel der Karte.
     const luecke = async (links: Locator, rechts: Locator) => {
       const l = (await links.boundingBox())!;
       const r = (await rechts.boundingBox())!;
@@ -1574,31 +1229,16 @@ test('Verpflegung: Kartenaktionen folgen der Dichte-Staffel 30 / 48 / 72 px', as
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
-// ─── Betroffene (LFH-650, Nachzug zur LFH-613-Prüfliste, Tabellen 1, 3 und 4, Nr. 1 · 2) ──
+// ── Betroffene ───────────────────────────────────────────────────────────────────────
 //
-// Vier Flächen, alle mit denselben Helfern wie oben:
-//  - Liste `/personen`: der Zustand-Knopf LEER („Zustand zu R-001 hinzufügen") und GEFÜLLT
-//    („Zustand zu R-002 bearbeiten"). Bis LFH-650 war das Ziel am gefüllten Wert antds
-//    kleiner Typography-Stift; seitdem ist der Wert selbst ein Textknopf (`BemerkungZelle`).
-//    Dazu der Abstand zum nächsten Bedienziel derselben Zeile.
+// Vier Flächen:
+//  - Liste: der Zustand-Knopf leer („… hinzufügen") und gefüllt („… bearbeiten", der Wert
+//    selbst ist ein Textknopf der `BemerkungZelle`), dazu der Abstand zum nächsten Ziel.
 //  - Detailseite: „Auf Lagekarte verorten", ein handgebauter `<Link>` in einer
-//    `Descriptions`-Zelle. LFH-396 hat genau so einen Anker mit 17 px in jeder Stufe gemessen.
-//  - Aufnahme-Route und Modal, „Weitere Angaben" aufgeklappt: Zustand, Koordinate und —
-//    im Modus „vermisst" — „vermisst seit".
-//  - Karte `?ansicht=karte`: Marker (WebGL — gemessen per KLICK mit Versatz neben den
-//    gezeichneten Kreis), Cluster-Donut (DOM) und die Zoom-/Nord-Knöpfe der Überlagerung.
-//
-// MUTATIONSPROBE (Akzeptanzkriterium), am 23.09.2026 mit temporären Änderungen gefahren:
-//  - `BemerkungZelle` auf den Stand vor LFH-650 (Typography-Stift) zurückgedreht: rot an
-//    „Zustand-Knopf gefüllt (kompakt) (gemessen 15px hoch, Soll ≥ 30)" — schon die erste
-//    Stufe fällt, der Stift liegt unter dem 24-px-Boden.
-//  - `trefferDurchmesser` aus `personenMarker` entfernt: rot am Versatzklick in `kompakt`
-//    (URL bleibt auf der Liste) — neben dem gezeichneten Kreis trifft dann nichts mehr.
-//
-// Messwerte nach dem Umbau (23.09.2026): Zustand-Knopf leer/gefüllt 30 / 48 / 72, nächstes
-// Bedienziel der Zeile ≥ 321 px entfernt · Verorten-Link 30 / 48 / 72 hoch, ≥ 149 px breit ·
-// Zustand, Koordinate, „vermisst seit" 30,1 / 48 / 72 · Kartenknöpfe 32 / 48 / 72 · Donut
-// 46 / 48 / 72 · Versatzklick 14 / 23 / 35 px neben der Kreismitte trifft.
+//    `Descriptions`-Zelle — ein `<a>` erbt keine Steuerhöhe.
+//  - Aufnahme-Route und Modal mit „Weitere Angaben": Zustand, Koordinate, „vermisst seit".
+//  - Karte `?ansicht=karte`: Marker (WebGL, per KLICK mit Versatz neben den gezeichneten
+//    Kreis gemessen), Cluster-Donut (DOM) und die Kartenknöpfe.
 
 /** Die Zeile einer Person in der Tabelle (antd `data-row-key` = DB-`id`). */
 const personZeile = (page: Page, id: number) =>
@@ -1611,9 +1251,8 @@ async function personAnlegen(page: Page, einsatzId: string, daten: object): Prom
 }
 
 /**
- * Kleinster Abstand von `ziel` zu irgendeinem anderen Bedienziel innerhalb von `bereich`
- * (Achsen-Abstand wie oben: bei Überlappung in einer Achse zählt die andere). Vorfahren und
- * Nachfahren des Ziels zählen nicht — sie SIND das Ziel.
+ * Kleinster Achsen-Abstand von `ziel` zu irgendeinem anderen Bedienziel in `bereich`.
+ * Vorfahren und Nachfahren des Ziels zählen nicht — sie SIND das Ziel.
  */
 async function abstandZuNachbarn(bereich: Locator, ziel: Locator): Promise<number> {
   const zielGriff = await ziel.elementHandle();
@@ -1633,7 +1272,7 @@ async function abstandZuNachbarn(bereich: Locator, ziel: Locator): Promise<numbe
     }
     return min;
   }, zielGriff);
-  // Ohne jedes Nachbarziel bliebe der Wert +∞ und „≥ 16 px" trivial grün (Review LFH-650).
+  // Ohne jedes Nachbarziel bliebe der Wert +∞ und „≥ 16 px" trivial grün.
   expect(Number.isFinite(abstand), 'mindestens ein Nachbarziel in der Zeile').toBe(true);
   return abstand;
 }
@@ -1700,9 +1339,8 @@ test('Betroffene Detailseite: „Auf Lagekarte verorten" folgt der Staffel', asy
 });
 
 /**
- * Wartet, bis die Einblend-Animation des Modals vorbei ist. antds Zoom skaliert den Dialog
- * beim Öffnen; unter Last gemessen 42,86 statt 48 px (× 0,893) — der Test maß die
- * Animation, nicht das Feld. `getAnimations()` ist leer, sobald nichts mehr läuft.
+ * Wartet, bis die Einblend-Animation des Modals vorbei ist — antds Zoom skaliert den Dialog,
+ * sonst mäße der Test die Animation statt des Felds.
  */
 async function modalRuht(page: Page) {
   await page.waitForFunction(() => {
@@ -1724,9 +1362,9 @@ test('Betroffene Aufnahme: Zustand, Koordinate und „vermisst seit" folgen der 
   const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Aufnahme`);
 
   /**
-   * Die sichtbare Feldhülle: ein nacktes `Input` IST sie (Klasse `ant-input`), beim
-   * DatePicker ist es der Vorfahr `.ant-picker` — NICHT das innere `.ant-picker-input`, das
-   * gemessen nur 15 px hoch ist. Deshalb Klassen-TOKEN statt Teilstring.
+   * Die sichtbare Feldhülle: beim `Input` das Element selbst (`ant-input`), beim DatePicker
+   * der Vorfahr `.ant-picker` — nicht das nur 15 px hohe `.ant-picker-input`. Deshalb
+   * Klassen-TOKEN statt Teilstring.
    */
   const huelle = (feld: Locator) =>
     feld.locator(
@@ -1822,8 +1460,8 @@ test('Betroffene Karte: Marker-Trefferzone, Cluster-Donut und Kartenknöpfe folg
   await page.setViewportSize(FUEKW);
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Karte`);
-  // Zwei EINZELNE Marker weit auseinander (kein Cluster) und ein enges Paar, das bei jedem
-  // Startausschnitt zu einem Cluster verschmilzt (rund 20 m Abstand).
+  // Zwei EINZELNE Marker weit auseinander und ein enges Paar (rund 20 m), das bei jedem
+  // Startausschnitt zu einem Cluster verschmilzt.
   const einzeln: [number, number] = [8.8, 53.0];
   const zielId = await personAnlegen(page, einsatzId, {
     name: 'Einzeln',
@@ -1860,9 +1498,8 @@ test('Betroffene Karte: Marker-Trefferzone, Cluster-Donut und Kartenknöpfe folg
       );
     }
 
-    // Cluster (DOM-Donut): das Klickziel ist die Hülle bzw. der Ring, gemessen in BEIDEN Achsen.
-    // MapLibre setzt `maplibregl-marker` auf das übergebene Element SELBST: ohne Hülle ist
-    // der Ring der Marker (und trägt `data-sichtung`), mit Hülle steckt der Ring darin.
+    // Cluster (DOM-Donut), in BEIDEN Achsen gemessen. MapLibre setzt `maplibregl-marker` auf
+    // das übergebene Element selbst: ohne Hülle IST der Ring der Marker, mit Hülle steckt er darin.
     const cluster = page.locator(
       '.maplibregl-marker[data-sichtung], .maplibregl-marker:has([data-sichtung])',
     );
@@ -1876,15 +1513,12 @@ test('Betroffene Karte: Marker-Trefferzone, Cluster-Donut und Kartenknöpfe folg
     );
     await expect(cluster.locator('[data-lfh="cluster-sichtung"]')).toHaveText('I');
 
-    // Marker (WebGL): ein Klick NEBEN den gezeichneten Kreis (Außenkante bei 13 px), aber
-    // innerhalb der Zone, öffnet die Person. Versatz = halbe Stufe minus 1 px, also in
-    // `kompakt` 14 px — einen Pixel außerhalb der Zeichnung (Kante bis 13), nicht AUF ihr.
-    // Erst den Marker in die Kartenmitte holen und die Karte ins Bild scrollen: in
-    // `handschuh` schiebt der höhere Seitenkopf den Startausschnitt unter den Viewport, und ein
-    // Klick außerhalb des Viewports trifft nichts. Zoom 15 liegt über `clusterMaxZoom` (14).
+    // Marker (WebGL): ein Klick NEBEN den gezeichneten Kreis (Kante bei 13 px), aber in der
+    // Zone, öffnet die Person; Versatz = halbe Stufe minus 1 px. Vorher den Marker in die
+    // Mitte holen und ins Bild scrollen — in `handschuh` schiebt der höhere Seitenkopf den
+    // Ausschnitt sonst unter den Viewport. Zoom 15 liegt über `clusterMaxZoom` (14).
     await page.locator('[data-lfh="betroffene-karte"] canvas').scrollIntoViewIfNeeded();
-    // `idle` statt `loaded()`: nach einem Sprung ohne Kachelquelle bleibt `loaded()` gemessen
-    // stehen, `idle` feuert, sobald nichts mehr zu zeichnen ist.
+    // `idle` statt `loaded()`: ohne Kachelquelle bleibt `loaded()` nach einem Sprung stehen.
     await page.evaluate(
       (ll) =>
         new Promise<void>((fertig) => {
@@ -1917,33 +1551,17 @@ test('Betroffene Karte: Marker-Trefferzone, Cluster-Donut und Kartenknöpfe folg
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
-// ── LFH-373: ETB, Lagekarte, Gefahrenmatrix ─────────────────────────────────────────────
+// ── ETB, Lagekarte, Gefahrenmatrix ───────────────────────────────────────────────────
 //
-// Nachzug zu den Prüflisten vom 30.07.2026 (ETB, Lagekarte, Gefahrenmatrix), Zeile 2
-// („Handschuh-Modus"; bei der Matrix auch Zeile 1, Trefffläche der kurzen Achse). Die drei
-// Blöcke folgen der Einladung im Kopf dieser Datei und nehmen `STAFFEL`/`stelleDichte`/
-// `haeltStufe`/`alleHaltenStufe` mit. Neu sind zwei Dinge, beide aus dem Ticket-AK:
-//
-//  - DIE KURZE ACHSE. Ein unbeschriftetes Ziel (Symbolknopf, Ein-Buchstaben-Zelle) muss die
-//    Stufe auf BEIDEN Achsen halten — Gate 3 spricht von der kurzen Achse, und bei der
-//    Matrixzelle ist die Breite gerade die tragende (Prüfliste B5h, Zeile 1: „24 × 24, nicht
-//    24 hoch"). {@link kurzeAchseHaelt} misst `min(Breite, Höhe)`.
-//  - EINE GEGENPROBE, DIE ROT WERDEN KANN. Alle Helfer hier sind Untergrenzen; sie blieben
-//    grün, wenn jedes Ziel in jeder Stufe 72 px mäße — dann hätte die Stufe nichts bewirkt,
-//    und genau davor warnt das AK („ein e2e-Spec, der die Dichtestufe nicht wirklich
-//    umschaltet, ist trivial grün"). Jeder Block sichert deshalb zusätzlich zu: das kleinste
-//    Maß in `kompakt` ist STRENG kleiner als in `handschuh`, und die Matrix hält in `kompakt`
-//    eine OBERgrenze (< 48).
-//
-// Vorab-Messung (24.09.2026, 1366 × 768 bzw. 390 × 844): Slash-Option 35,5 / 72, Zeilen-
-// auslöser 30 / 72, Menüeintrag 30 / 72, „Verortet" 35,5 / 72, Kartenknopf 32 / 72,
-// Matrixzelle 38,75 × 30 / 72 × 72.
-//
-// MUTATIONSPROBE (25.09.2026): die Dichte per Init-Skript auf `kompakt` festgenagelt →
-// ETB-Block ROT an der `data-dichte`-Wache, noch vor jeder Höhe.
+// Zwei Zusätze zu den Helfern oben:
+//  - DIE KURZE ACHSE: ein unbeschriftetes Ziel (Symbolknopf, Matrixzelle) muss die Stufe auf
+//    BEIDEN Achsen halten; {@link kurzeAchseHaelt} misst `min(Breite, Höhe)`.
+//  - EINE GEGENPROBE, DIE ROT WERDEN KANN: Untergrenzen blieben grün, wenn jedes Ziel in
+//    jeder Stufe 72 px mäße — dann hätte die Stufe nichts bewirkt. Jeder Block sichert
+//    deshalb zu, dass das kleinste Maß in `kompakt` STRENG kleiner ist als in `handschuh`;
+//    die Matrix hält in `kompakt` zusätzlich eine Obergrenze (< 48).
 
-/** Boden der Menüeinträge eines `Dropdown`: `controlHeightSM` (24 / 48 / 72), nicht die
- *  Steuerhöhe — antd gibt Menüeinträgen die kleine Steuerhöhe (Muster `pegel-pruefliste`). */
+/** Boden der Menüeinträge eines `Dropdown`: antd gibt ihnen `controlHeightSM` (24 / 48 / 72). */
 const BODEN_MENUE = { kompakt: 24, komfortabel: 48, handschuh: 72 } as const;
 
 /** Boden der Kartenknöpfe: `kartenKnopfKante = max(32, controlHeight)` in
@@ -1983,10 +1601,8 @@ async function kurzeAchseHaelt(
 
 /**
  * Höhe eines animiert aufklappenden Menüeintrags, erst wenn der Kasten STEHT (zwei gleiche
- * Lesungen in Folge). `expect.poll(… ≥ soll)` allein genügt hier nicht: für die Gegenprobe
- * zählt die Zahl selbst, und ein mitten in der `scaleY`-Animation gelesener Kasten wäre in
- * `kompakt` zu klein — die Gegenprobe „kompakt < handschuh" wäre dann grün durch zu frühes
- * Hinsehen.
+ * Lesungen). Mitten in der `scaleY`-Animation gelesen wäre er in `kompakt` zu klein, und die
+ * Gegenprobe „kompakt < handschuh" grün durch zu frühes Hinsehen.
  */
 async function ruhigeHoehe(ziel: Locator, name: string): Promise<number> {
   let vorher = -1;
@@ -2046,14 +1662,12 @@ test('ETB (LFH-373): Slash-Menü, Zeilenauslöser und Zeilenmenü folgen der Dic
     const ausloeser = zeitachse.getByRole('button', { name: /^Aktionen zu Eintrag \d+$/ });
     const zeile = await kurzeAchseHaelt(ausloeser, soll, `Zeilenauslöser (${dichte})`, 3);
 
-    // Slash-Menü über „Feld" (öffnet deterministisch die Sektion „Felder"). Eingegrenzt auf
-    // `[data-slash-menu]`: die Kommandopalette rendert ebenfalls `role="option"`. JEDE Option,
-    // auch die im internen Bildlauf (Höchsthöhe 280 px) — `boundingBox()` misst sie trotzdem.
+    // Slash-Menü über „Feld" (öffnet deterministisch „Felder"). Auf `[data-slash-menu]`
+    // eingegrenzt, weil die Kommandopalette ebenfalls `role="option"` rendert.
     await page.getByRole('button', { name: 'Feld', exact: true }).click();
     const optionen = page.locator('[data-slash-menu] [role="option"]');
     const slash = await alleHaltenStufe(optionen, soll, `Slash-Option (${dichte})`, 5);
-    // Zu über denselben Knopf: „Feld" schaltet um. Escape wirkt nur im Textfeld, und der Fokus
-    // steht hier auf dem Knopf.
+    // Zu über denselben Knopf: Escape wirkt nur im Textfeld, der Fokus steht auf dem Knopf.
     await page.getByRole('button', { name: 'Feld', exact: true }).click();
     await expect(page.locator('[data-slash-menu]')).toHaveCount(0);
 
@@ -2112,8 +1726,8 @@ test('Lagekarte (LFH-373): „Verortet", Kartenknöpfe und Zeitachse folgen der 
   const gemessen: string[] = [];
   const je = new Map<string, number>();
 
-  // Ab `xl` startet die Zeitachse ausgeklappt; die gemerkte Wahl wird trotzdem gesetzt, damit
-  // ein Nachbarspec im selben Browserprofil sie nicht eingeklappt hinterlässt.
+  // Ab `xl` startet die Zeitachse ausgeklappt; die Wahl wird trotzdem gesetzt, damit ein
+  // Nachbarspec im selben Browserprofil sie nicht eingeklappt hinterlässt.
   await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
   await page.evaluate(() => localStorage.setItem('lfh:lagekarte:zeitachse-eingeklappt', '0'));
 
@@ -2125,8 +1739,7 @@ test('Lagekarte (LFH-373): „Verortet", Kartenknöpfe und Zeitachse folgen der 
       { timeout: 60_000 },
     );
 
-    // „Verortet": handgebaute Zeilen (`bedienzielStil`). Per exaktem Namen, weil
-    // `getByRole('button')` im Paneel auch den Klappkopf „Verortet" träfe.
+    // „Verortet": handgebaute Zeilen. Per exaktem Namen, weil sonst auch der Klappkopf träfe.
     const leiste = page.locator('[data-lfh="kartenleiste"]');
     let verortet = Number.POSITIVE_INFINITY;
     for (const name of ablagen) {
@@ -2149,12 +1762,10 @@ test('Lagekarte (LFH-373): „Verortet", Kartenknöpfe und Zeitachse folgen der 
 
     // Zeitachse: beschriftete Knöpfe halten die Höhe, Symbolknöpfe die kurze Achse.
     const band = page.locator('[data-lfh="zeitachse"]');
-    // Erst zählen, wenn die Stände geladen sind — sonst steht nur „Stand sichern" im Band und
-    // die Mindestzahl schlägt unter Last falsch an (Review LFH-373).
+    // Erst zählen, wenn die Stände geladen sind — sonst steht nur „Stand sichern" im Band.
     await expect(band.getByRole('button', { name: 'Stand B' })).toBeVisible();
     const beschriftet = band.getByRole('button', {
-      // „Stand sichern" ohne `^`: bis LFH-373 trug der Name das englische Icon-Label vorne
-      // („camera Stand sichern"). Der Name selbst ist in `SnapshotLeiste.test.tsx` gepinnt (Vitest).
+      // „Stand sichern" ohne `^` (vorn kann ein Icon-Label stehen); der Name ist in Vitest gepinnt.
       name: /(Stand sichern|^Aktuell|^Stand A|^Stand B)$/,
     });
     const zeitBeschriftet = await alleHaltenStufe(beschriftet, soll, `Zeitachse (${dichte})`, 4);
@@ -2174,33 +1785,22 @@ test('Lagekarte (LFH-373): „Verortet", Kartenknöpfe und Zeitachse folgen der 
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
-// ── LFH-711: Trefferzonen der Lagekarte ────────────────────────────────────────────────
+// ── Trefferzonen der Lagekarte ───────────────────────────────────────────────────────
 //
-// Seit LFH-650 trugen nur die Betroffenen eine unsichtbare Trefferzone; Kräfte- und
-// Objektzeichen der Lagekarte waren genau so groß wie gezeichnet (TZ-Symbol ≤ 34 px). Jetzt
-// setzt jeder Marker-Builder `trefferDurchmesser = controlHeight`. Gemessen wird am
-// UHS-Zeichen in allen drei Stufen, nach dem Muster des Betroffenen-Blocks oben.
+// Jeder Marker-Builder setzt `trefferDurchmesser = controlHeight`; gemessen am UHS-Zeichen.
 //
-// WARUM DER VERSATZ NICHT `soll/2 − 1` IST WIE DORT: ein TZ-Symbol ist bis zu 34 px groß
-// (halbe Kante 17). In `kompakt` misst die Zone 30 px, ihr Radius 15 liegt INNERHALB des
-// Symbols — dort gibt es keinen Streifen „Zone, aber nicht Zeichnung", ein Versatzklick wäre
-// ein Klick aufs Symbol und bewiese nichts. Die Stufe zeigt sich deshalb an EINEM festen
-// Punkt 23 px über dem Zeichen (Radius der komfortabel-Zone minus 1): in `komfortabel` und
-// `handschuh` liegt er in der Zone und wählt den Marker, in `kompakt` liegt dort gar kein
-// Klickziel. Das ist die Gegenprobe, die rot wird, wenn die Zone nicht der Stufe folgt.
-// Senkrecht nach oben, weil die Plakette per Vorgabe RECHTS vom Zeichen steht.
+// Der Versatz ist nicht `soll/2 − 1` wie bei den Betroffenen: ein TZ-Symbol ist bis zu 34 px
+// groß, in `kompakt` läge der Zonenrand (15) INNERHALB des Symbols. Geprüft wird deshalb EIN
+// fester Punkt 23 px über dem Zeichen: in `komfortabel`/`handschuh` liegt er in der Zone und
+// wählt den Marker, in `kompakt` liegt dort kein Klickziel — die Gegenprobe. Senkrecht, weil
+// die Plakette rechts vom Zeichen steht.
 //
-// DICHT LIEGENDE MARKER: zwei Zeichen 50 px übereinander, `handschuh` (Zone 72, Radius 36).
-// Geklickt wird 21 px unter dem oberen — außerhalb beider Symbole (> 17), innerhalb beider
-// Zonen (21 und 29 < 36), also NUR Zonen am Punkt. Welche Zone oben liegt, hängt an der
-// Zeichenreihenfolge und ist für beide Klicks dieselbe; „die oberste gewinnt" wählte also
-// beide Male denselben Marker, „die nächste gewinnt" (`naechstesMerkmal`) je den richtigen.
-//
-// MUTATIONSPROBE (28.09.2026): UHS-Builder ohne `trefferDurchmesser` → rot in `komfortabel`
-// („der Versatzpunkt liegt in der Zone", 0 statt 1); Klick-Handler mit dem OBERSTEN statt dem
-// nächsten Merkmal → rot am Paar („Zone Nord" wird nicht gewählt).
+// DICHT LIEGENDE MARKER: zwei Zeichen 50 px übereinander, `handschuh` (Radius 36). Geklickt
+// wird 21 px unter dem oberen — außerhalb beider Symbole, innerhalb beider Zonen. „Die oberste
+// gewinnt" wählte beide Male denselben Marker, „die nächste gewinnt" (`naechstesMerkmal`) je
+// den richtigen.
 
-/** Klickebenen der Zeichnung, OHNE Trefferzonen — für die Selbstprobe „dort ist nichts
+/** Klickebenen der Zeichnung OHNE Trefferzonen, für die Selbstprobe „dort ist nichts
  *  gezeichnet". Die Plakette gehört dazu: sie ist Klickziel wie das Zeichen. */
 const GEZEICHNETE_KLICKEBENEN = [
   'marker-symbol',
@@ -2238,9 +1838,8 @@ async function springe(page: Page, center: [number, number], zoom: number) {
 }
 
 /**
- * Wartet, bis die Karte steht. Eine Markerauswahl fliegt die Karte zum Marker, auf Zoom 15
- * (`onMarkerWaehlen` → `flyToZiel`): ein VOR der Auswahl berechneter Seitenpunkt ist danach
- * veraltet (in der CI gemessen: der zweite Klick am Paar traf den ersten Marker).
+ * Wartet, bis die Karte steht: eine Markerauswahl fliegt die Karte zum Marker, ein vorher
+ * berechneter Seitenpunkt wäre danach veraltet.
  */
 async function kartenRuht(page: Page) {
   await page.waitForFunction(
@@ -2259,7 +1858,7 @@ test('Lagekarte (LFH-711): Objektmarker tragen die Trefferzone der Staffel, dich
   const einsatzId = await einsatzAnlegen(page, `E2E 711 Zone ${Date.now()}`);
   const einzeln: [number, number] = [9.14, 49.35];
   // Das Paar liegt weit genug vom Einzelnen, dass keine Zone hinüberreicht, und senkrecht
-  // übereinander (rund 39 m); den Pixelabstand stellt der Zoom unten auf 50 px.
+  // übereinander; den Pixelabstand stellt der Zoom unten auf 50 px.
   const nord: [number, number] = [9.3, 49.45];
   const sued: [number, number] = [9.3, 49.45 - 0.00035];
   for (const [bezeichnung, [lon, lat]] of [
@@ -2291,8 +1890,7 @@ test('Lagekarte (LFH-711): Objektmarker tragen die Trefferzone der Staffel, dich
     // Zoom 17 liegt über `clusterMaxZoom` (14): der Marker steht einzeln, nicht im Donut.
     await springe(page, einzeln, 17);
     const mitte = await aufSeite(page, einzeln);
-    // Vorbedingung: das Zeichen ist WIRKLICH gezeichnet — sonst wäre die Selbstprobe unten
-    // („am Versatz ist nichts gezeichnet") auch dann grün, wenn das Symbol noch fehlt.
+    // Vorbedingung: das Zeichen ist WIRKLICH gezeichnet — sonst wäre die Selbstprobe unten grün.
     expect(await merkmaleAm(page, mitte, ['marker-symbol']), `Symbol (${dichte})`).toBe(1);
     const daneben = { x: mitte.x, y: mitte.y - VERSATZ };
     expect(
@@ -2331,9 +1929,8 @@ test('Lagekarte (LFH-711): Objektmarker tragen die Trefferzone der Staffel, dich
       ['Zone Nord', nord, 1],
       ['Zone Süd', sued, -1],
     ] as const) {
-      // Eine Auswahl fliegt die Karte zum Marker, auf Zoom 15 (`flyToZiel`): dort stünde das
-      // Paar nur noch rund 12 px auseinander. Deshalb JE KLICK erst die Ruhe abwarten, dann
-      // Ausschnitt und Zoom neu setzen und die Lage neu lesen.
+      // Eine Auswahl fliegt die Karte auf Zoom 15, dort stünde das Paar nur ~12 px auseinander.
+      // Deshalb je Klick Ruhe abwarten, Ausschnitt und Zoom neu setzen, Lage neu lesen.
       await kartenRuht(page);
       await springe(page, [nord[0], (nord[1] + sued[1]) / 2], zoom);
       const oben = await aufSeite(page, nord);
@@ -2358,10 +1955,9 @@ test('Gefahrenmatrix (LFH-373): 58 Zellen halten die kurze Achse, die Gebietszei
   page,
 }) => {
   test.setTimeout(180_000);
-  // Fükw OHNE `hasTouch`: mit grobem Zeiger belegte die App ohne gespeicherte Wahl
-  // `komfortabel` vor, und die Wache unten könnte eine halb umgeschaltete Stufe nicht von
-  // einer gewählten unterscheiden. Den Tablet-Nachweis (44 px, M51) trägt weiterhin
-  // `gefahren-matrix-zelle.spec.ts`.
+  // Fükw OHNE `hasTouch`: mit grobem Zeiger belegte die App `komfortabel` vor, und die Wache
+  // könnte eine halb umgeschaltete Stufe nicht von einer gewählten unterscheiden. Den
+  // Tablet-Nachweis trägt `gefahren-matrix-zelle.spec.ts`.
   await page.setViewportSize(FUEKW);
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E 373 Sued ${Date.now()}`);
@@ -2401,8 +1997,7 @@ test('Gefahrenmatrix (LFH-373): 58 Zellen halten die kurze Achse, die Gebietszei
     await page.goto(`/einsaetze/${einsatzId}/gefahren`);
     await stelleDichte(page, dichte);
 
-    // 13 Gefahrentypen × 5 Schutzobjekte, davon 7 Paare „nicht anwendbar" (kein Knopf) = 58.
-    // Exakt, nicht „mindestens": die Zellen hängen am Einsatz, die Zahl ist fest.
+    // 13 Gefahrentypen × 5 Schutzobjekte, davon 7 Paare „nicht anwendbar" = 58, exakt.
     const zellen = page.getByRole('button', { name: /^Bewertung / });
     await expect(zellen).toHaveCount(58);
     const zelle = await kurzeAchseHaelt(zellen, soll, `Matrixzelle (${dichte})`, 58);
@@ -2428,8 +2023,8 @@ test('Gefahrenmatrix (LFH-373): 58 Zellen halten die kurze Achse, die Gebietszei
   }
 
   for (const sorte of ['Matrixzelle', 'Gebietszeile']) gegenprobe(je, sorte);
-  // Obergrenze (Prüfliste B5h, Zeile 1): in `kompakt` ist keine Zelle 48 px oder größer —
-  // sonst stünde sie auch ohne Staffel auf komfortabel-Maß, und die Messung oben bewiese nichts.
+  // Obergrenze: in `kompakt` ist keine Zelle ≥ 48 px — sonst stünde sie auch ohne Staffel auf
+  // komfortabel-Maß, und die Messung oben bewiese nichts.
   expect(
     groesstesKompakt,
     `Matrixzelle in kompakt: größtes Maß ${groesstesKompakt} px, Soll < 48`,
