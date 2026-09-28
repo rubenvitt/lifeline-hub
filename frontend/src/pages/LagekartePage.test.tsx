@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes, useLocation } from 'react-router';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
+import { setzeViewportBreite } from '../test/viewport';
 import { offeneRueckfrage } from '../test/rueckfrage';
 import type { KarteServerConfig } from '../api/karte';
 import type { KartenflaecheProps } from './lagekarte/Kartenflaeche';
@@ -1805,6 +1806,40 @@ describe('LagekartePage · Neuentwurf S5', () => {
       await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }),
     ).toBeInTheDocument();
   });
+
+  // LFH-713: bei 390 px halbierte die offene Leiste die Karte (680 → 374 px), und der Fuß mit
+  // Zeichen-Steuerung und ausgeklappter Zeitachse (412 px) deckte den Rest — es blieb keine
+  // Karte zum Tippen. Unter `lg` gibt die Werkzeugwahl die Karte deshalb frei. Als Paar: ab
+  // `lg` steht die Leiste daneben und bleibt.
+  it.each([
+    { breite: 390, leisteBleibt: false },
+    { breite: 1024, leisteBleibt: true },
+  ])(
+    'Werkzeugwahl bei $breite px: Leiste bleibt = $leisteBleibt',
+    async ({ breite, leisteBleibt }) => {
+      setzeViewportBreite(breite);
+      basisHandler();
+      const user = userEvent.setup();
+      renderSeite();
+      await screen.findByText('marker-schaden-9');
+      await user.click(screen.getByRole('button', { name: 'Zeichenwerkzeuge' }));
+      await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+      // Der Zeichenmodus läuft in beiden Fällen.
+      expect(await screen.findByRole('button', { name: 'Abschließen' })).toBeInTheDocument();
+      if (leisteBleibt) {
+        expect(screen.getByRole('button', { name: 'Gefahrengebiet zeichnen' })).toBeInTheDocument();
+      } else {
+        expect(
+          screen.queryByRole('button', { name: 'Gefahrengebiet zeichnen' }),
+        ).not.toBeInTheDocument();
+        // Und sie lässt sich zurückholen — es ist die eigene Wahl, kein Sperrzustand.
+        await user.click(screen.getByRole('button', { name: 'Leiste einblenden' }));
+        expect(
+          await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }),
+        ).toBeInTheDocument();
+      }
+    },
+  );
 
   it('hängt die Maßstabsleiste als Band in den Kartenfuß, nicht frei über die Karte', async () => {
     basisHandler();

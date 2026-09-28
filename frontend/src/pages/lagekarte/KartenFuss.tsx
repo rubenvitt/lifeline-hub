@@ -19,9 +19,16 @@ export type BandAusrichtung = 'voll' | 'mitte' | 'links';
  * `pointerEvents: 'auto'` ist die Gegenzeile zu `pointerEvents: 'none'` am Rahmen und
  * gehört zwingend an JEDES Band — ein Band ohne sie wäre sichtbar und tot.
  */
-export function bandStil(ausrichtung: BandAusrichtung = 'voll'): CSSProperties {
+export function bandStil(
+  ausrichtung: BandAusrichtung = 'voll',
+  /** Das Band gibt Höhe ab, wenn der Fuß nicht in die Karte passt, und rollt dann in sich
+   *  (LFH-713). Genau EIN Band trägt das: die Zeitachse, das höchste und am ehesten
+   *  verzichtbare. Die übrigen behalten ihre Inhaltshöhe (`min-height: auto`). */
+  nachgiebig = false,
+): CSSProperties {
   return {
     pointerEvents: 'auto',
+    ...(nachgiebig ? { minHeight: 0, overflowY: 'auto' as const } : {}),
     alignSelf:
       ausrichtung === 'mitte' ? 'center' : ausrichtung === 'links' ? 'flex-start' : 'stretch',
     // Ein Band darf den Rahmen nie überlaufen, sonst käme die Überdeckung über die
@@ -54,6 +61,16 @@ export function fussStil(knopfKante: number): CSSProperties {
     flexDirection: 'column',
     alignItems: 'stretch',
     gap: FUSS_ABSTAND,
+    // OBEN ENDET DER FUSS AN DER KARTE (LFH-713). Unten verankert und ohne Obergrenze wuchs
+    // er nach oben aus der Kartenspalte hinaus: gemessen bei 390 px mit offener Leiste,
+    // Zeichen-Steuerung und ausgeklappter Zeitachse 412 px Fuß auf 374 px Karte — er ragte in
+    // den Seitenkopf und deckte „Leiste ausblenden". Der Rahmen spannt deshalb bis zur
+    // Oberkante und stapelt nach unten; was nicht passt, gibt die Zeitachse ab, die dann in
+    // sich rollt (`nachgiebig` in `bandStil`). Bewusst KEIN `overflow` am Rahmen: das schnitte
+    // auf jeder Breite Schatten und Fokusringe der bündig anliegenden Bänder ab, auch ohne
+    // Überlauf. Die eigene Kante eines Bands schneidet `overflow` dagegen nicht.
+    top: FUSS_ABSTAND,
+    justifyContent: 'flex-end',
     // Der Rahmen spannt bis vor die Knopfspalte, trägt aber selbst nichts. Ohne diese
     // Zeile schluckte der Leerraum zwischen (und neben) den Bändern jedes Ziehen und Klicken
     // auf der Karte darunter — die Bänder holen sich die Ereignisse über `bandStil` zurück.

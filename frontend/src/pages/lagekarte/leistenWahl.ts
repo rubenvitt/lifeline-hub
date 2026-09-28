@@ -56,22 +56,25 @@ function lesen(klasse: LeistenKlasse): boolean | null {
  * Zwei Wege, die Leiste zu öffnen: `merke` ist das eigene Umschalten und wird gespeichert.
  * `zeige` öffnet sie nur für diese Sitzung, für eine Handlung, die die Leiste braucht (der
  * Stift über der Karte öffnet das Paneel „Zeichnen"). Gespeichert, machte ein einziger
- * Stiftklick die Leiste am Handschirm nach jedem Neuladen wieder auf. Das nächste `merke`
- * löst `zeige` ab.
+ * Stiftklick die Leiste am Handschirm nach jedem Neuladen wieder auf. `verberge` ist das
+ * Gegenstück für eine Handlung, die die Karte braucht: unter `lg` schließt die Wahl eines
+ * Zeichenwerkzeugs die Leiste (LFH-713), ohne die Vorgabe „offen" des Tablets zu überschreiben.
+ * Das nächste `merke` löst beide ab.
  */
 export function useLeistenWahl(breit: boolean) {
   const [plaetze, setPlaetze] = useState<Record<LeistenKlasse, boolean | null>>(() => ({
     breit: lesen('breit'),
     schmal: lesen('schmal'),
   }));
-  const [gezeigt, setGezeigt] = useState<Record<LeistenKlasse, boolean>>({
-    breit: false,
-    schmal: false,
+  // Nur für diese Sitzung, `null` = keine: `zeige` setzt `true`, `verberge` setzt `false`.
+  const [vorlaeufig, setVorlaeufig] = useState<Record<LeistenKlasse, boolean | null>>({
+    breit: null,
+    schmal: null,
   });
   const klasse: LeistenKlasse = breit ? 'breit' : 'schmal';
   const merke = useCallback(
     (offen: boolean) => {
-      setGezeigt((alt) => (alt[klasse] ? { ...alt, [klasse]: false } : alt));
+      setVorlaeufig((alt) => (alt[klasse] === null ? alt : { ...alt, [klasse]: null }));
       setPlaetze((alt) => (alt[klasse] === offen ? alt : { ...alt, [klasse]: offen }));
       try {
         localStorage.setItem(LEISTE_SPEICHER_SCHLUESSEL[klasse], offen ? '1' : '0');
@@ -81,9 +84,12 @@ export function useLeistenWahl(breit: boolean) {
     },
     [klasse],
   );
-  const zeige = useCallback(
-    () => setGezeigt((alt) => (alt[klasse] ? alt : { ...alt, [klasse]: true })),
+  const vorlaeufigSetzen = useCallback(
+    (offen: boolean) =>
+      setVorlaeufig((alt) => (alt[klasse] === offen ? alt : { ...alt, [klasse]: offen })),
     [klasse],
   );
-  return { wahl: gezeigt[klasse] ? true : plaetze[klasse], merke, zeige };
+  const zeige = useCallback(() => vorlaeufigSetzen(true), [vorlaeufigSetzen]);
+  const verberge = useCallback(() => vorlaeufigSetzen(false), [vorlaeufigSetzen]);
+  return { wahl: vorlaeufig[klasse] ?? plaetze[klasse], merke, zeige, verberge };
 }

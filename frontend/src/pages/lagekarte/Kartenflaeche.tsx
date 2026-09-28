@@ -454,6 +454,18 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       // Blob-Tile-Worker ohne auflösbare Base scheitern sie. Hier gegen die Origin
       // absolutieren — Begründung und DEV-Mitschnitt oben an `transformiereKartenAnfrage`.
       transformRequest: transformiereKartenAnfrage,
+      // Eine Lagekarte bleibt Draufsicht (LFH-713, Entscheidung 25.09.2026) — das gilt mit dieser
+      // Komponente auch für die Betroffenen-Karte (`personen/BetroffeneKarte.tsx`): Drehen per Pinch
+      // bleibt erlaubt, „Nach Norden ausrichten" holt die Ausrichtung zurück; Kippen nicht.
+      // Zwei Angaben, weil sie Verschiedenes tun, beide gemessen in `e2e/lagekarte-touch.spec.ts`:
+      // `touchPitch: false` schaltet die Zwei-Finger-Kippgeste ab — mit ihr kippte ein
+      // senkrechter Zwei-Finger-Zug auf 60°, und selbst bei gedeckelter Neigung schluckte der
+      // aktive Kipp-Erkenner den Zug, statt die Karte zu verschieben. `maxPitch: 0` deckelt die
+      // Neigung selbst und schließt damit die übrigen Wege (gemessen: Umschalt+↑ kippte ohne
+      // sie um 10°; Rechts-Ziehen über `pitchWithRotate` folgt aus dem Deckel, ungemessen),
+      // ohne deren Drehen mit abzuschalten.
+      touchPitch: false,
+      maxPitch: 0,
     });
     // KEIN `NavigationControl` mehr (Neuentwurf S5): Zoom, Nordung und Zeichnen stehen im
     // Knopfblock der Überlagerung (`KartenUeberlagerung.tsx`) und rufen den Handle oben.
