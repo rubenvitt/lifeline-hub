@@ -197,9 +197,9 @@ describe('AuthContext — Lagebild ohne Netz (LFH-723)', () => {
     const { client } = rendern();
     await waitFor(() => expect(screen.getByTestId('name')).toHaveTextContent('Zweite'));
     expect(client.getQueryData(einsatzKeys.personen(3))).toBeUndefined();
-    const satz = await lagebildLesen();
-    expect(satz?.benutzer.id).toBe(2);
-    expect(satz?.client.clientState.queries).toEqual([]);
+    // Serverbestätigt steht der Name, bevor der Start den Datensatz ersetzt hat.
+    await waitFor(async () => expect((await lagebildLesen())?.benutzer.id).toBe(2));
+    expect((await lagebildLesen())?.client.clientState.queries).toEqual([]);
   });
 
   it('löscht beim Abmelden Speicher und Platte, auch wenn der Server-Logout scheitert', async () => {

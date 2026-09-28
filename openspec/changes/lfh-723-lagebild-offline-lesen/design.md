@@ -59,10 +59,6 @@ Zur Motivation siehe proposal.md. Die Anforderungen stehen in
   ausdrücklich aus.
 - **Kein Offline-Schreiben über das Bestehende hinaus.** Offline bleibt ein Lesezustand, und
   die Offline-Queue ist unverändert.
-- **„Server nicht erreichbar, Gerät aber online“** bekommt nicht das Suffix „· offline“.
-  Diesen Fall melden heute schon `SeitenStandVeraltet`, `SeitenFehler` und der
-  `LiveStatusBanner`. Die Offline-Identität greift beim Start trotzdem, weil `me()` auch hier
-  an einem `NetzFehler` scheitert.
 - **Kein eigener Leerzustand „ohne Verbindung nicht geladen“** für nie besuchte Ansichten. Sie
   zeigen ihren Bestands-Leer- oder -Fehlerzustand, siehe Risiken.
 - **Kacheln der Basiskarte offline.** Die Kacheln kommen vom eigenen Server und sind nicht Teil
@@ -294,20 +290,37 @@ nicht zwischen „scheiternd“ und „Rest“.
 
 ### D7 — Offline-Kennzeichnung am vorhandenen Datenstand
 
-`Datenstand` bekommt `offline?: boolean`. Dann lautet der Text „Stand 14:32 · offline“ und der
-zugängliche Name „Datenstand 14:32, offline“. Das Wort ist der zweite Kanal neben der Farbe.
+`Datenstand` zeigt ohne Verbindung „Stand 14:32 · offline“, der zugängliche Name lautet dann
+„Datenstand 14:32, offline“. Das Wort ist der zweite Kanal neben der Farbe.
 
-**Wer es setzt:**
-- `EinsatzSeite` berechnet `offline = !useOnline()` einmal zentral. Die Seiten reichen nichts
-  Neues durch. `useOnline` existiert bereits (`offline/useOnline.ts`).
-- Die Lagekarte bekommt in ihrem eigenen Kopf einen `Datenstand` aus `gemeinsamerDatenstand`
-  ihrer Datenebenen, mit `platzHalten` wie der Seitenkopf.
+**Die Kennzeichnung entscheidet `Datenstand` selbst**, nicht der Aufrufer. Der Datenstand
+steht im Seitenkopf (`EinsatzSeite`), in Abschnittsköpfen (`Bereichskopf`, `SektionHeader`)
+und in Paneelen. Eine Kennzeichnung, die jede Stelle durchreichen muss, fehlt an der ersten
+vergessenen. Gemessen: Die Aufträge führen ihren Stand im Abschnittskopf, der erste Entwurf
+(nur `EinsatzSeite`) ließ sie unmarkiert. Die Prop `offline` übersteuert nur. Die Lagekarte
+bekommt in ihrem eigenen Kopf einen `Datenstand` aus `gemeinsamerDatenstand` ihrer
+Datenebenen, mit `platzHalten` wie der Seitenkopf. Im Snapshot-Modus hat sie keinen, dort
+nennt der Historien-Banner den Stand.
+
+**„Ohne Verbindung“ hat zwei Kanäle** (`offline/verbindung.ts`, `useOhneVerbindung`): Der
+Browser ist offline **oder** der Server ist nicht erreichbar. `navigator.onLine` allein trägt
+nicht. Er sagt „das Gerät hat ein Netz“, nicht „der Server antwortet“. Im Feld steht das WLAN
+oft, während der Fükw-Server dahinter weg ist. Gemessen: Chromium meldet nach einem Neuladen
+unter Playwrights Offline-Schalter `onLine === true`, obwohl jeder Abruf scheitert.
+- **Wer meldet „nicht erreichbar“:** Der QueryClient meldet jeden Abruf, der an der Leitung
+  scheitert (Netzfehler, Gateway 502/503/504), schon beim ersten Fehlversuch (`failed`),
+  nicht erst nach den Wiederholungen. Dasselbe gilt für Mutationen und für die
+  Sitzungsprüfung beim Start.
+- **Was es aufhebt:** jeder Fetch-Erfolg.
+- **Was nichts ändert:** Eine fachliche Ablehnung (403, 500) ist eine Antwort.
+- Damit gilt die Kennzeichnung ausdrücklich auch für „Gerät online, Server weg“. Das
+  korrigiert eine erste Fassung dieses Abschnitts, die das ausnahm.
 
 **Gemessen wird:**
-- Die Meta-Gruppe bei 390 px darf nicht umbrechen, geprüft nach dem Muster von
-  `e2e/leisten-flaeche.spec.ts`.
+- Die Meta-Gruppe bei 390 px darf nicht umbrechen, geprüft in
+  `e2e/lagebild-offline-kopf.spec.ts`.
 - Das geht **ohne** Service Worker. `context.setOffline(true)` schaltet `navigator.onLine`
-  auch im Dev-Server um.
+  im laufenden Dokument um.
 
 Kein neuer Banner: Kopfleiste (`OFFLINE`) und `LiveStatusBanner` melden den Zustand schon.
 
@@ -344,9 +357,16 @@ Reihenfolge der Messung im e2e:
 Die Entscheidung des Auftraggebers vom 28.09.2026 lautet „mit Lagekarte, aber nur, wenn das
 e2e sie offline tatsächlich zeichnet“.
 
-Weil der Prod-Bundle den DEV-Haken `__lfhKarte` nicht trägt, prüft das e2e die gezeichneten
-Ebenen über die Oberfläche: die Marker-Liste bzw. „Nicht verortet“ der Seitenleiste und den
-Datenstand. Die Zeichenfläche liest es nicht aus.
+Weil der Prod-Bundle den DEV-Haken `__lfhKarte` nicht trägt, teilt sich der Nachweis:
+- **`lagebild-offline.spec.ts` (Prod, Service Worker)** belegt die Wiederherstellung der
+  Kartendaten nach dem Offline-Neuladen: Kopfzahl „1 verortet“ und „Stand … · offline“.
+- **`lagekarte-offline-zeichnen.spec.ts` (Dev)** baut die Karte ohne Netz neu auf. Die Daten
+  kommen dort aus dem Speicher, was nach der Wiederherstellung dieselbe Lage ist. Geprüft
+  wird, dass der Marker in der Quelle steht. Dazu setzt der Test einen Stil mit Glyphen und
+  Sprite vom unerreichbaren Server und prüft, dass er fertig lädt, denn am `style.load` hängt
+  das Anlegen der Ebenen.
+
+**Ergebnis: Stufe 1 trägt.** Die Lagekarte bleibt im Umfang, der Blindstil-Umbau entfällt.
 
 ### D10 — e2e nach dem Precache-Muster
 

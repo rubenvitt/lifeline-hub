@@ -4,6 +4,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, vi } from 'vitest';
 import { cleanup, configure } from '@testing-library/react';
 import { server } from './server';
 import { lagebildLoeschenPlatte } from '../offline/lagebildSpeicher';
+import { verbindungZuruecksetzenFuerTests } from '../offline/verbindung';
 import { installiereMatchMedia, setzeViewportZurueck } from './viewport';
 import { installiereCssVariablenFilter } from './antdCssVariablen';
 import dayjs from 'dayjs';
@@ -131,6 +132,9 @@ afterEach(() => {
   // Reihenfolge hält trotzdem — IndexedDB führt Transaktionen mit überlappendem Bereich in
   // Erzeugungsreihenfolge aus, und diese Löschung entsteht vor jedem Lesen des nächsten Tests.
   void lagebildLoeschenPlatte();
+  // Der Verbindungszustand ist modulweit (LFH-723): ein Test mit Netzfehler färbte sonst den
+  // Datenstand aller folgenden als „offline".
+  verbindungZuruecksetzenFuerTests();
 });
 afterAll(() => server.close());
 

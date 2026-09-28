@@ -1,6 +1,7 @@
 import type { QueryClient } from '@tanstack/react-query';
 import {
   persistQueryClientRestore,
+  persistQueryClientSave,
   persistQueryClientSubscribe,
 } from '@tanstack/query-persist-client-core';
 import type { BenutzerAnzeige } from '../api/types';
@@ -68,12 +69,18 @@ function abonnieren(
   { drosselMs }: SitzungsOptionen,
 ): void {
   const persister = erzeugeLagebildPersister(benutzerId, { drosselMs });
-  const speichernAbmelden = persistQueryClientSubscribe({
+  const speichern = {
     queryClient: qc,
     persister,
     buster,
     dehydrateOptions: { shouldDehydrateQuery: lagebildDehydrierFilter(qc) },
-  });
+  };
+  const speichernAbmelden = persistQueryClientSubscribe(speichern);
+  // Einmal sofort (gedrosselt): das Abonnement sieht nur KÜNFTIGE Änderungen. Serverbestätigt
+  // hängen die Seiten ihre Abfragen schon ein, während die Wiederherstellung läuft — sind sie
+  // fertig, bevor das Abonnement steht, käme sonst nie ein Ereignis, und der Stand bliebe
+  // leer (gemessen an der Lagekarte, e2e `lagebild-offline.spec.ts`).
+  void persistQueryClientSave(speichern);
   let zuletztBestaetigt = 0;
   const bestaetigungAbmelden = fetchErfolgeVerfolgen(qc, () => {
     const jetzt = Date.now();

@@ -52,6 +52,19 @@ describe('Lagebild-Sitzung', () => {
     ]);
   });
 
+  it('schreibt auch, was schon VOR dem Abonnieren im Cache lag', async () => {
+    // Serverbestätigt hängen die Seiten ihre Abfragen ein, während die Wiederherstellung noch
+    // läuft — sind sie fertig, bevor das Abonnement steht, kommt kein Cache-Ereignis mehr
+    // (gemessen an der Lagekarte im e2e: der Datensatz blieb leer).
+    const qc = neuerClient();
+    qc.setQueryData(einsatzKeys.personen(3), [{ id: 1 }]);
+    await lagebildStarten(qc, { art: 'ok', benutzer: A }, { drosselMs: DROSSEL });
+    const satz = await warteAufGeschrieben((n) => n > 0);
+    expect(satz.client.clientState.queries.map((q) => q.queryKey)).toEqual([
+      einsatzKeys.personen(3),
+    ]);
+  });
+
   it('stellt den Stand nach einem Netzfehler als dieselbe Person wieder her', async () => {
     const erster = neuerClient();
     await lagebildStarten(erster, { art: 'ok', benutzer: A }, { drosselMs: DROSSEL });

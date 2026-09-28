@@ -9,7 +9,6 @@ import { flaeche, schrift, schriftskala, type Farbrollen } from '../theme/tokens
 import '../theme/sprache.css';
 import './EinsatzSeite.css';
 import Datenstand from './Datenstand';
-import { useOnline } from '../offline/useOnline';
 import FensterRahmen from './FensterRahmen';
 import { useModusFarben } from './rahmenStil';
 
@@ -231,9 +230,6 @@ export default function EinsatzSeite({
 }: EinsatzSeiteProps) {
   const { token } = theme.useToken();
   const farben = useModusFarben();
-  // Ohne Verbindung kennzeichnet der Kopf den Datenstand als vorgehalten (LFH-723, design.md
-  // D7) — zentral hier, damit keine Seite etwas durchreichen muss.
-  const online = useOnline();
   const aktionenRef = useRef<HTMLDivElement>(null);
   const seitenWurzel = useRef<HTMLDivElement>(null);
 
@@ -335,7 +331,6 @@ export default function EinsatzSeite({
                 <Datenstand
                   dataUpdatedAt={dataUpdatedAt}
                   platzHalten={dataUpdatedAt !== undefined}
-                  offline={!online}
                 />
               </span>
             </span>

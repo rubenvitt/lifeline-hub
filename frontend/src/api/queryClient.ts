@@ -11,6 +11,7 @@ import { EINSATZ_KEYS, LAGEBILD_OFFLINE, istKeyDesEinsatzes } from './queryKeys'
 import { HOECHSTLIEGEZEIT_MS } from '../offline/lagebildStart';
 import { fetchErfolgeVerfolgen } from '../offline/lagebildBestaetigung';
 import { lagebildEntsperren, lagebildSperren } from '../offline/lagebildFilter';
+import { istVerbindungsfehler, meldeServerErreichbar } from '../offline/verbindung';
 
 /** Produktionsdefaults an einem importierbaren Seam statt versteckt in `main.tsx`.
  *  Nur reine Query-Pfade dürfen einen Leitungsfehler zweimal wiederholen; fachliche
@@ -102,10 +103,31 @@ export function erzeugeQueryClient(
         if (fehler instanceof ApiError) raeumeNachRechteentzug(client, fehler, query);
       },
     }),
-    mutationCache: new MutationCache({ onError: behandleFehler }),
+    mutationCache: new MutationCache({
+      onError: (fehler) => {
+        behandleFehler(fehler);
+        if (istVerbindungsfehler(fehler)) meldeServerErreichbar(false);
+      },
+    }),
   });
-  // Ein Fetch-Erfolg hebt die Sperrmarke seines Bereichs wieder auf (design.md D6).
-  fetchErfolgeVerfolgen(client, (key) => lagebildEntsperren(client, key));
+  // Ein Fetch-Erfolg hebt die Sperrmarke seines Bereichs wieder auf (design.md D6) und belegt,
+  // dass der Server antwortet (design.md D7).
+  fetchErfolgeVerfolgen(client, (key) => {
+    lagebildEntsperren(client, key);
+    meldeServerErreichbar(true);
+  });
+  // Ein Abruf, der an der LEITUNG scheitert, meldet „Server nicht erreichbar" — schon beim
+  // ersten Fehlversuch (`failed`), nicht erst nach den Wiederholungen (`error`, bis ~3 s).
+  client.getQueryCache().subscribe((ereignis) => {
+    if (ereignis.type !== 'updated') return;
+    const { action } = ereignis;
+    if (
+      (action.type === 'failed' || action.type === 'error') &&
+      istVerbindungsfehler(action.error)
+    ) {
+      meldeServerErreichbar(false);
+    }
+  });
   if (defaultOptions === queryClientDefaults) lagebildLiegezeitSetzen(client);
   return client;
 }

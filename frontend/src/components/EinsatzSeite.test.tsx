@@ -143,8 +143,8 @@ describe('EinsatzSeite', () => {
     expect(screen.getByText('Stand 14:07')).toBeInTheDocument();
   });
 
-  // LFH-723: die Kennzeichnung „offline" setzt der Seitenkopf zentral aus dem Online-Zustand
-  // des Browsers; keine Seite reicht dafür etwas durch.
+  // LFH-723: die Kennzeichnung „offline" folgt dem Online-Zustand des Browsers; keine Seite
+  // reicht dafür etwas durch.
   it('kennzeichnet den Datenstand, solange der Browser offline ist', async () => {
     const zeit = new Date(2026, 5, 10, 14, 32).getTime();
     renderMitProviders(

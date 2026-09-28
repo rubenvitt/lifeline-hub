@@ -21,14 +21,15 @@ import { fileURLToPath } from 'node:url';
 // ohne zusätzlichen Proxy und ohne zweiten Webserver. Der Port kommt aus `LIFELINE_E2E_LAUF`,
 // derselben Variablen, über die playwright.config.ts ihre Wahl an die Worker vererbt.
 //
-// WAS DIESER TEST NICHT BEHAUPTET (bewusst, gemessen): dass die Lagekarte offline vollständig
+// WAS DIESER TEST NICHT BEHAUPTET (bewusst): dass die Lagekarte offline vollständig
 // hochkommt. Der Prod-Bundle trägt den DEV-Haken `__lfhKarte` nicht — in ihm ist Kartenzustand
-// nicht auslesbar —, und die API ist NICHT precacht: nach einem Offline-Reload bootet die Shell
-// aus dem Cache, aber `/api/einsaetze/…` und `/api/karte/config` scheitern, der React-Root
-// bleibt leer (gemessen: `body.innerText` == ''). Offline-Datenhaltung ist eine eigene Frage
-// (die Offline-Queue der Erfassung), nicht die dieses Tests. Geprüft wird deshalb genau das
-// Asset-Versprechen: Shell und Worker kommen aus dem Precache, und der Worker ist aus dem
-// Cache heraus startbar.
+// nicht auslesbar —, und die API ist NICHT precacht. Die Daten des Lagebilds hält seit LFH-723
+// nicht der Service Worker vor, sondern die App selbst (IndexedDB, Allowlist der Query-Keys);
+// das belegen `lagebild-offline.spec.ts` (Offline-Neuladen) und
+// `lagekarte-offline-zeichnen.spec.ts` (Zeichnen ohne Netz). Vor LFH-723 blieb der React-Root
+// nach einem Offline-Reload leer (gemessen: `body.innerText` == ''). Geprüft wird hier deshalb
+// genau das Asset-Versprechen: Shell und Worker kommen aus dem Precache, und der Worker ist aus
+// dem Cache heraus startbar.
 //
 // DIE TRAGENDE ZEILE IST `fromServiceWorker()`. Ein bloßes „fetch hat offline funktioniert"
 // wäre kein Beleg: das Asset trägt `Cache-Control: immutable`, es könnte also aus dem
@@ -213,8 +214,8 @@ test('Lagekarte: der maplibre-Worker kommt offline aus dem Service-Worker-Precac
 
   // (5) Und die App-Shell selbst kommt offline aus dem Precache — sonst wäre der gecachte
   //     Worker wertlos, weil die Seite ihn nie anfordern könnte. Geprüft an der
-  //     NAVIGATIONS-Antwort, nicht an sichtbarem Inhalt: die Datenschicht ist offline
-  //     erwartungsgemäß tot (s. Kopf), der Shell-Abruf ist die Aussage.
+  //     NAVIGATIONS-Antwort, nicht an sichtbarem Inhalt: welche Daten offline stehen, ist
+  //     Sache von `lagebild-offline.spec.ts` (s. Kopf), der Shell-Abruf ist die Aussage.
   const navigation = await page.reload({ timeout: 20_000 });
   expect(navigation?.status()).toBe(200);
   expect(navigation?.fromServiceWorker(), 'Shell kam nicht aus dem Service-Worker-Cache').toBe(
@@ -222,7 +223,7 @@ test('Lagekarte: der maplibre-Worker kommt offline aus dem Service-Worker-Precac
   );
 
   // Backstop über den GANZEN Lauf, den Offline-Start eingeschlossen (gemessen leer, drei Läufe).
-  // Dass die Shell offline keine Daten zeigt, ist erwartet; dass sie dabei eine Ausnahme wirft,
+  // Dass Abrufe offline scheitern, ist erwartet; dass die Seite dabei eine Ausnahme wirft,
   // wäre keine Folge des fehlenden Netzes, sondern ein Fehler — eine App, die beim Ausfall ihrer
   // API den React-Root abreißt, verliert offline auch das, was sie noch könnte.
   expect(seitenFehler.map((f) => f.message)).toEqual([]);

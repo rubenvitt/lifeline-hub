@@ -156,7 +156,8 @@ Höchstliegezeit.
 ### Requirement: Offline-Kennzeichnung des Datenstands
 
 Solange das Gerät ohne Verbindung ist, SHALL jede Ansicht aus der Allowlist ihren Datenstand
-als „Stand HH:MM · offline“ ausweisen. HH:MM ist dabei die Zeit der letzten erfolgreichen
+als „Stand HH:MM · offline“ ausweisen. Ohne Verbindung heißt: Der Browser meldet kein Netz
+**oder** der Server antwortet nicht, weil Abrufe an der Leitung scheitern. HH:MM ist dabei die Zeit der letzten erfolgreichen
 Server-Antwort für diese Daten und nicht die Zeit des Neuladens. Mit Verbindung bleibt die
 Anzeige „Stand HH:MM“. Die Kennzeichnung MUST neben der Farbe einen Textkanal haben, und die
 Kopfzeile MUST bei 390 px Breite ohne Layoutsprung bleiben.
@@ -165,6 +166,12 @@ Kopfzeile MUST bei 390 px Breite ohne Layoutsprung bleiben.
 
 - **WHEN** die ETB-Seite um 14:32 geladen wurde und um 15:10 ohne Netz neu geladen wird
 - **THEN** steht im Seitenkopf „Stand 14:32 · offline“
+
+#### Scenario: Netz vorhanden, Server nicht erreichbar
+
+- **WHEN** das Gerät ein Netz hat, die Abrufe aber an der Leitung scheitern (Server weg oder
+  Gateway meldet 502/503/504)
+- **THEN** steht im Seitenkopf „Stand HH:MM · offline“
 
 #### Scenario: Verbindung kehrt zurück
 

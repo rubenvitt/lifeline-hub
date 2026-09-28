@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { BenutzerAnzeige } from '../api/types';
-import { ApiError, NetzFehler } from '../api/client';
+import { ApiError } from '../api/client';
 import * as authApi from '../api/auth';
 import { sitzungsMeldungZuruecksetzen } from './sitzungsEvent';
 import {
@@ -12,6 +12,7 @@ import {
   lagebildStarten,
 } from '../offline/lagebildSitzung';
 import type { MeErgebnis } from '../offline/lagebildStart';
+import { istVerbindungsfehler, meldeServerErreichbar } from '../offline/verbindung';
 
 /** Ergebnis von `login()` (LFH-43, Increment 5): unterscheidet den Sofort-Erfolg (Session
  *  bereits gesetzt, `benutzer` im Context übernommen) vom TOTP-Zweitfaktor-Fall
@@ -35,17 +36,14 @@ interface AuthWert {
 
 const AuthContext = createContext<AuthWert | null>(null);
 
-/** Gateway-Antworten, mit denen ein vorgeschalteter Proxy „Server nicht erreichbar" meldet.
- *  Sie sagen nichts über die Sitzung — ein Fükw-Server hinter einem Proxy, der ausgefallen
- *  ist, sähe sonst anders aus als einer ohne Proxy (design.md D2). */
-const GATEWAY_NICHT_ERREICHBAR = new Set([502, 503, 504]);
-
 /** Gescheiterte Sitzungsprüfung, klassifiziert für die Lagebild-Vorhaltung (LFH-723): nur ein
  *  Netzfehler (oder die Meldung eines Gateways, der Server sei nicht erreichbar) öffnet die
  *  Offline-Identität, jede Antwort des Servers selbst ungleich Erfolg nicht. */
 function meFehlerEinordnen(e: unknown): MeErgebnis {
-  if (e instanceof NetzFehler) return { art: 'netzfehler' };
-  if (e instanceof ApiError && GATEWAY_NICHT_ERREICHBAR.has(e.status)) {
+  // Auch die Gateway-Antworten 502/503/504 zählen: mit ihnen meldet ein vorgeschalteter Proxy
+  // „Server nicht erreichbar", über die Sitzung sagen sie nichts (design.md D2).
+  if (istVerbindungsfehler(e)) {
+    meldeServerErreichbar(false);
     return { art: 'netzfehler' };
   }
   // 401 = nicht angemeldet (erwartet); andere Fehler ebenfalls als „anonym" behandeln
@@ -80,6 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Die Wiederherstellung läuft danach — sie bringt nur den EIGENEN Stand, und
         // `hydrate` überschreibt keinen Abruf, der inzwischen neuer ist.
         bestaetigt = true;
+        meldeServerErreichbar(true);
         if (aktiv) {
           setBenutzer(b);
           setLaedt(false);
