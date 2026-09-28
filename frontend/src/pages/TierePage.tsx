@@ -33,6 +33,7 @@ import type { Spezies, Tier } from '../api/types';
 import StatusTag from '../components/StatusTag';
 import { einsatzStatus } from '../theme/statusFarben';
 import { useFehlerMeldung } from '../components/useFehlerMeldung';
+import { useFrischAngelegt } from '../components/useFrischAngelegt';
 
 const STATUS_META = TIER_STATUS;
 
@@ -175,13 +176,6 @@ export default function TierePage() {
     {},
   );
   const [highlight, setHighlight] = useState<{ einsatzId: number; tierId: number } | null>(null);
-  const [frischAngelegt, setFrischAngelegt] = useState<
-    Array<{
-      einsatzId: number;
-      tier: Tier;
-      bestaetigenNach: number;
-    }>
-  >([]);
   const aktuellerEinsatzRef = useRef(einsatzId);
   aktuellerEinsatzRef.current = einsatzId;
   const sicht = sichtNachEinsatz[einsatzId] ?? 'aktiv';
@@ -204,6 +198,7 @@ export default function TierePage() {
     queryKey: einsatzKeys.tiere(einsatzId),
     queryFn: () => listeTiere(einsatzId),
   });
+  const frischAngelegt = useFrischAngelegt<Tier>(einsatzId, einsatzKeys.tiere, tiereQuery);
 
   const qc = useQueryClient();
   const [modus, setModus] = useState<{
@@ -239,20 +234,6 @@ export default function TierePage() {
     scrolleZurZeile(highlight.tierId);
   }, [highlight, einsatzId, sicht]);
 
-  useEffect(() => {
-    const serverIds = new Set((tiereQuery.data ?? []).map((tier) => tier.id));
-    if (serverIds.size === 0) return;
-    setFrischAngelegt((alt) => {
-      const offen = alt.filter(
-        (eintrag) =>
-          eintrag.einsatzId !== einsatzId ||
-          tiereQuery.dataUpdatedAt <= eintrag.bestaetigenNach ||
-          !serverIds.has(eintrag.tier.id),
-      );
-      return offen.length === alt.length ? alt : offen;
-    });
-  }, [einsatzId, tiereQuery.data, tiereQuery.dataUpdatedAt]);
-
   /**
    * Anlegen. `onSuccess` invalidiert nur noch (LFH-332 · B4) — Schliessen macht `onFertig`
    * der Erfassungshülle, Leeren macht die Hülle auf BEIDEN Wegen (Erfassen und Abbrechen).
@@ -272,17 +253,7 @@ export default function TierePage() {
       // kleinen lokalen Overlay-Liste. So kann weder ein alter GET noch Replikationsverzug die
       // neue Zeile ausblenden; bei noch fehlendem Cache erfinden wir zugleich keine scheinbar
       // vollstaendige Singleton-Serverliste.
-      setFrischAngelegt((alt) => [
-        {
-          einsatzId: variablen.einsatzId,
-          tier,
-          bestaetigenNach:
-            qc.getQueryState(einsatzKeys.tiere(variablen.einsatzId))?.dataUpdatedAt ?? 0,
-        },
-        ...alt.filter(
-          (eintrag) => eintrag.einsatzId !== variablen.einsatzId || eintrag.tier.id !== tier.id,
-        ),
-      ]);
+      frischAngelegt.merke(variablen.einsatzId, [tier]);
       setHighlight({ einsatzId: variablen.einsatzId, tierId: tier.id });
       setSichtFuer(variablen.einsatzId, tier.status);
       setSpeziesFuer(variablen.einsatzId, undefined);
@@ -314,14 +285,7 @@ export default function TierePage() {
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
-  const aktuelleFrische = frischAngelegt
-    .filter((eintrag) => eintrag.einsatzId === einsatzId)
-    .map((eintrag) => eintrag.tier);
-  const frischeIds = new Set(aktuelleFrische.map((tier) => tier.id));
-  const alle = [
-    ...aktuelleFrische,
-    ...(tiereQuery.data ?? []).filter((tier) => !frischeIds.has(tier.id)),
-  ];
+  const alle = frischAngelegt.alle;
   const tiere = filterTiere(alle, { sicht, spezies: speziesFilter });
 
   /**
