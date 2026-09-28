@@ -38,7 +38,7 @@ Aussage sie belegen.
 - [x] 6.1 `Datenstand` nimmt `offline?: boolean` an, Text „Stand HH:MM · offline“, zugänglicher Name „Datenstand HH:MM, offline“. `EinsatzSeite` setzt die Prop zentral aus `useOnline()`. Prüfen: Vitest für `Datenstand` (beide Zustände, Name) und für `EinsatzSeite` (Ereignis `offline` → Suffix, `online` → weg).
 - [x] 6.2 Die Lagekarte bekommt im eigenen Kopf einen `Datenstand` (`gemeinsamerDatenstand` der Datenebenen, `platzHalten`, `offline`). Prüfen: Vitest an `LagekartePage` bzw. am Kopfbaustein.
 - [x] 6.3 Layout bei 390 px: Die Meta-Gruppe mit „Stand HH:MM · offline“ bricht nicht um, und der Rest der Seite springt nicht. Prüfen: e2e-Fall in `e2e/leisten-flaeche.spec.ts` (oder daneben) mit `context.setOffline(true)` im Dev-Server, gemessen nach `document.fonts.ready`.
-- [ ] 6.4 Prüfliste Einsatztauglichkeit (15 Kriterien) für die berührten Kopfzeilen anlegen: `docs/superpowers/specs/2026-09-28-lfh-723-pruefliste.md`, jede Zeile mit Verdikt. Prüfen: keine Zeile „nicht geprüft“.
+- [x] 6.4 Prüfliste Einsatztauglichkeit (15 Kriterien) für die berührten Kopfzeilen anlegen: `docs/superpowers/specs/2026-09-28-lfh-723-pruefliste.md`, jede Zeile mit Verdikt. Prüfen: keine Zeile „nicht geprüft“.
 
 ## 7. Nachweis ohne Netz (e2e) und Lagekarten-Entscheidung
 
@@ -49,6 +49,6 @@ Aussage sie belegen.
 
 ## 8. Doku, Folgeticket, Abschluss
 
-- [ ] 8.1 CLAUDE.md: Absatz „Lagebild offline lesen (LFH-723)“ im Frontend-Teil. Er nennt Allowlist in der Registry, Identität nur bei Netzfehler, 24 h ab Serverbestätigung, Löschwege, Rechteentzug per `setState` statt `resetQueries` und die Lagekarten-Entscheidung, mit Verweis auf dieses design.md. Prüfen: `prettier --check` grün, die Verweise zeigen auf existierende Pfade.
-- [ ] 8.2 Folgeticket „Übrige PII auf dem Gerät räumen“ (Personen-Quittungen der Queue, ETB-Entwürfe, Ortscache, `localStorage`) über `clickup-task-anlegen` erfassen und die Nummer in design.md unter Non-Goals nachtragen. Prüfen: Das Ticket steht auf dem Entwicklungsboard.
+- [x] 8.1 CLAUDE.md: Absatz „Lagebild offline lesen (LFH-723)“ im Frontend-Teil. Er nennt Allowlist in der Registry, Identität nur bei Netzfehler, 24 h ab Serverbestätigung, Löschwege, Rechteentzug per `setState` statt `resetQueries` und die Lagekarten-Entscheidung, mit Verweis auf dieses design.md. Prüfen: `prettier --check` grün, die Verweise zeigen auf existierende Pfade.
+- [x] 8.2 Folgeticket „Übrige PII auf dem Gerät räumen“ (Personen-Quittungen der Queue, ETB-Entwürfe, Ortscache, `localStorage`) über `clickup-task-anlegen` erfassen und die Nummer in design.md unter Non-Goals nachtragen. Prüfen: Das Ticket steht auf dem Entwicklungsboard.
 - [ ] 8.3 Gesamtlauf `./scripts/check-all.sh` (ohne `| tail`, Log nach „ÜBERSPRUNGEN“ durchsuchen, damit e2e und die Precache-Specs wirklich liefen). Prüfen: Exit 0.

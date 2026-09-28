@@ -64,7 +64,7 @@ Zur Motivation siehe proposal.md. Die Anforderungen stehen in
 - **Kacheln der Basiskarte offline.** Die Kacheln kommen vom eigenen Server und sind nicht Teil
   dieses Change.
 - **Räumung der übrigen PII auf dem Gerät.** Gemeint sind Personen-Quittungen der Queue,
-  ETB-Entwürfe, Ortscache und `localStorage`. Dafür gibt es ein Folgeticket.
+  ETB-Entwürfe, Ortscache und `localStorage`. Dafür gibt es das Folgeticket LFH-767.
 
 ## Decisions
 
