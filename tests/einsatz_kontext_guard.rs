@@ -28,7 +28,7 @@ use std::fs;
 /// Ein Handler in einem NICHT gelisteten Modul ohne sanktionierten Gate-Typ bricht den
 /// Test. Beim Migrieren eines Moduls: hier streichen. Bei einem neuen Modul mit
 /// einsatz-Routen: den Gate-Extractor ziehen (nicht eintragen).
-const DEFERRED_MODULE: &[&str] = &["einsatz", "befehl", "lagebericht", "ort_vorschau"];
+const DEFERRED_MODULE: &[&str] = &["einsatz", "befehl", "lagebericht"];
 
 /// Extractor-Typen, die ein Gate strukturell erzwingen (LFH-230). Neue Variante
 /// (z. B. `EinsatzEinsatzleitung`) beim Einführen hier ergänzen.

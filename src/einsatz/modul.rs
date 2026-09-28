@@ -175,6 +175,7 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     ),
     // Sprechgruppen und Ort-Vorschau gehören keinem Modul (wie die Einsatz-Kopfdaten).
     ("/api/einsaetze/{id}/sprechgruppen", None),
+    ("/api/einsaetze/{id}/ort-vorschau", None),
     ("/api/einsaetze/{id}/gefahrengebiete", Some("gefahrenzonen")),
     ("/api/einsaetze/{id}/abschnitte", Some("einsatzabschnitte")),
     ("/api/einsaetze/{id}/zonen", Some("lagekarte")),
