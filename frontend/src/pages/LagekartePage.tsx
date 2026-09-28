@@ -493,8 +493,8 @@ export default function LagekartePage() {
   /**
    * Esc beim Zeichnen ist zweistufig (LFH-712): erst die Figur, dann der Modus. Die Stufe
    * entscheidet `escStufe`; hier wird nur ausgeführt. Esc gehört dabei der Seite — terra-draw
-   * hat seine Abbruchtaste abgegeben (`zeichnen.ts`), sonst hätte es die Figur schon beim
-   * `keyup` am Canvas verworfen und dieser Zuhörer sähe beim ersten Esc eine leere Figur.
+   * hat seine Abbruchtaste abgegeben (`zeichnen.ts`). `keydown`, nicht `keyup`: ein
+   * `keyup`-Zuhörer liefe nach terra-draws Abbruch am Canvas und sähe eine leere Figur.
    * Am Fenster, nicht am Canvas: auch mit dem Fokus auf einem Knopf der Steuerung wirkt die
    * Taste. Dieselben Riegel wie beim Messen (Eingabeziel, schon verarbeitete Taste).
    *

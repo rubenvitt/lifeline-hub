@@ -31,12 +31,12 @@ Arbeitsweise je Aufgabe: `superpowers:test-driven-development` (erst rot, dann g
 
 ## 5. e2e und Gates
 
-- [ ] 5.1 e2e Lagekarte (neuer Spec `e2e/lagekarte-zeichnen-korrigierbar.spec.ts`): Gefahrengebiet zeichnen, drei Punkte per `page.mouse.click` auf den Canvas (Vorbild `lagekarte-smoke.spec.ts`), „Letzten Punkt zurück" → Zähler „2 Punkte" und Knopf frei; Esc → Zähler „0 Punkte", Quittung sichtbar, Steuerung offen; zweites Esc → Steuerung weg. Verifikation: Spec grün, Fokus beim Esc auf dem Zurück-Knopf (nicht auf dem Canvas) belegt den Besitzwechsel.
-- [ ] 5.2 e2e Eigenposition: Kontext mit `geolocation` + `permissions: ['geolocation']`; Einschalten → Knopf gedrückt, Quelle mit Punkt vorhanden, Karte zentriert; Grundlagenwechsel → Punkt bleibt; `page.on('request')` findet die Koordinaten in keiner Anfrage. Verifikation: Spec grün.
-- [ ] 5.3 `e2e/fokus-verdeckung.spec.ts` und `e2e/gate3-trefflaeche.spec.ts` mit dem neuen Knopf laufen lassen (390 px Handschuh). Verifikation: beide grün; bricht einer, Spaltenlösung klären statt den Test zu lockern.
+- [x] 5.1 e2e Lagekarte (neuer Spec `e2e/lagekarte-zeichnen-korrigierbar.spec.ts`): Gefahrengebiet zeichnen, drei Punkte per `page.mouse.click` auf den Canvas (Vorbild `lagekarte-smoke.spec.ts`), „Letzten Punkt zurück" → Zähler „2 Punkte" und Knopf frei; Esc → Zähler „0 Punkte", Quittung sichtbar, Steuerung offen; zweites Esc → Steuerung weg. Verifikation: Spec grün, Fokus beim Esc auf dem Zurück-Knopf (nicht auf dem Canvas) belegt den Besitzwechsel.
+- [x] 5.2 e2e Eigenposition: Kontext mit `geolocation` + `permissions: ['geolocation']`; Einschalten → Knopf gedrückt, Quelle mit Punkt vorhanden, Karte zentriert; Grundlagenwechsel → Punkt bleibt; `page.on('request')` findet die Koordinaten in keiner Anfrage. Verifikation: Spec grün.
+- [x] 5.3 `e2e/fokus-verdeckung.spec.ts` und `e2e/gate3-trefflaeche.spec.ts` mit dem neuen Knopf laufen lassen (390 px Handschuh). Verifikation: beide grün; bricht einer, Spaltenlösung klären statt den Test zu lockern.
 - [ ] 5.4 `./scripts/check-all.sh` grün (Fmt/Prettier, Lint `--max-warnings 0`, tsc, Vitest, e2e). Verifikation: Exit 0, Log ohne „ÜBERSPRUNGEN" für e2e.
 
 ## 6. Doku und Abschluss
 
-- [ ] 6.1 CLAUDE.md: Absatz „Ein Sprung ist keine Handlung" (LFH-616) — Messen endet mit einem Esc, Zeichnen zweistufig (LFH-712, Entscheidung 28.09.2026); Hinweis auf Esc-Besitz (terra-draw `cancel: null`). Verifikation: `grep -n "einzige Modus, den Escape" CLAUDE.md` liefert nichts mehr.
+- [x] 6.1 CLAUDE.md: Absatz „Ein Sprung ist keine Handlung" (LFH-616) — Messen endet mit einem Esc, Zeichnen zweistufig (LFH-712, Entscheidung 28.09.2026); Hinweis auf Esc-Besitz (terra-draw `cancel: null`). Verifikation: `grep -n "einzige Modus, den Escape" CLAUDE.md` liefert nichts mehr.
 - [ ] 6.2 Prüfliste Einsatztauglichkeit (15 Kriterien) für die Lagekarte unter `docs/superpowers/specs/2026-09-28-lfh-712-pruefliste.md`, jede Zeile mit Verdikt. Verifikation: keine Zeile „nicht geprüft".

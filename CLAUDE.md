@@ -766,8 +766,18 @@ Alltag wichtigsten:
   zugänglichen Namen („Einsatztagebuch zu 1. Zug“), sichtbar steht nur „ETB ↗“.
   Das **Messwerkzeug** derselben Karte ist ein exklusiver Modus im Reducer von
   `useKartenInteraktion` wie Zeichnen und Platzieren. Es braucht aber **kein** Schreibrecht,
-  weil nichts gespeichert wird. Es ist der einzige Modus, den Escape beendet: Die übrigen
-  tragen einen Entwurf, der mehr kostet als ein Blick. Sein Stand läuft wie die
+  weil nichts gespeichert wird. Es ist der einzige Modus, den **ein** Escape beendet: Die
+  übrigen tragen einen Entwurf, der mehr kostet als ein Blick. **Das Zeichnen (Zone,
+  Abschnitt) ist zweistufig** (LFH-712, Entscheidung 28.09.2026: „je öfter Esc, desto mehr
+  Richtung view-only“): das erste Esc verwirft die Figur mit Quittung, der Modus bleibt, und
+  erst ein Esc ohne Figur beendet ihn. Die Stufe entscheidet `lagekarte/zeichnenEsc.ts`.
+  **Esc gehört dort der Seite, nicht terra-draw**: ein `keydown`-Zuhörer am Fenster (wirkt
+  auch mit Fokus auf der Steuerung), und die Zeichen-Modi tragen `keyEvents: { cancel: null }`,
+  damit nur ein Ort über die Taste entscheidet. Ein `keyup`-Zuhörer liefe nach terra-draws
+  Abbruch und sähe schon beim ersten Esc eine leere Figur. Die Option selbst ist gemessen
+  **keine** Voraussetzung der Zweistufigkeit (die Seite verwirft beim `keydown` zuerst), das
+  e2e kann sie deshalb nicht belegen, der Adapter-Test pinnt sie. Beim Messen bleibt das
+  terra-draw-Esc. Sein Stand läuft wie die
   Zeigerkoordinate über eine Quelle (`messQuelle.ts`), nicht über den Seiten-State. Im
   Bildtakt neu zu rendern wäre die Folge. terra-draw meldet neben der Figur eigene
   **Hilfspunkte** als `create` (gemessen im Browser). `messZeichnung.ts` nimmt deshalb nur

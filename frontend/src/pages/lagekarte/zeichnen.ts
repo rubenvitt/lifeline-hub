@@ -61,11 +61,12 @@ export function createZeichnung(
    */
   praefix = 'td-zeichnen',
 ): Zeichnung {
-  // Esc gehört der Seite, nicht terra-draw (LFH-712, design.md D2). terra-draw bricht per
-  // Vorgabe auf `keyup` AM CANVAS ab; ein Zuhörer der Seite liefe danach und sähe schon beim
-  // ersten Esc eine leere Figur — das zweistufige Esc wäre einstufig. Und bei Fokus auf einem
-  // Knopf der Steuerung erreichte die Taste den Canvas gar nicht. `finish` bleibt Enter:
-  // `abschliessen()` löst den Abschluss über genau diese Taste aus.
+  // Esc gehört der Seite, nicht terra-draw (LFH-712, design.md D2): genau EIN Ort entscheidet,
+  // was die Taste beim Zeichnen tut. terra-draw bricht per Vorgabe auf `keyup` am Canvas ab,
+  // also nur mit Fokus auf der Karte und dann still. Gemessen: der `keydown`-Zuhörer der Seite
+  // verwirft ohnehin zuerst, die Zweistufigkeit hängt NICHT an dieser Option — sie verhindert,
+  // dass terra-draw verwirft, wo die Seite die Taste bewusst liegen lässt. `finish` bleibt
+  // Enter: `abschliessen()` löst den Abschluss über genau diese Taste aus.
   // (`messZeichnung.ts` behält das terra-draw-Esc bewusst — dort endet ein Blick, kein Entwurf.)
   const keyEvents = { cancel: null, finish: 'Enter' };
   // Hinweis: terra-draw-maplibre-gl-adapter@1.x nimmt KEIN `lib` — er importiert maplibre-gl gar

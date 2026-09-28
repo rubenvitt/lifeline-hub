@@ -81,10 +81,16 @@ Die Seite (`LagekartePage.tsx`) hängt, solange ein Zeichenmodus aktiv ist, eine
 | Zeichenphase, `punkte > 0` | `verwerfen()` am Adapter (Entwurf löschen, Modus neu setzen), Quittung |
 | Zeichenphase, `punkte == 0` | Modus beenden: in einer Serie mit Gespeichertem `onZoneZeichnenFertig`, sonst `onZeichnenAbbrechen` |
 
-Warum der Besitz wechseln muss (gemessen am C9-Stand, nicht vermutet): terra-draw bricht auf `keyup`
-am Canvas ab, ein `window`-Zuhörer läuft danach. Er sähe also schon beim **ersten** Esc „0 Punkte" und
-spränge direkt in Stufe 2 — das zweistufige Esc wäre im ersten Test einstufig. Und bei Fokus auf einem
-Steuerungsknopf erreicht die Taste den Canvas gar nicht; das Verwerfen hinge dann am Fokus.
+Warum die Seite die Taste besitzt: bei Fokus auf einem Steuerungsknopf erreicht Esc den Canvas gar
+nicht, das Verwerfen hinge sonst am Fokus. Und ein `keyup`-Zuhörer (wie in C9) liefe **nach**
+terra-draws Abbruch am Canvas und sähe beim ersten Esc schon „0 Punkte" — er spränge direkt in Stufe 2.
+
+*Nachtrag aus dem Apply (gemessen, Mutationsprobe im e2e):* Mit dem `keydown`-Zuhörer aus D3 ist das
+zweistufige Esc auch dann grün, wenn terra-draw sein `cancel: 'Escape'` behält — die Seite verwirft
+beim `keydown` zuerst, terra-draws `keyup` findet danach keine Figur mehr. `cancel: null` ist damit
+**keine** Voraussetzung der Zweistufigkeit, sondern eine Besitzregel: genau ein Ort entscheidet, was Esc
+beim Zeichnen tut, und terra-draw kann nie still verwerfen, wenn die Seite die Taste bewusst liegen
+lässt. Getragen wird die Option vom Adapter-Test (`zeichnen.test.ts`), nicht vom e2e.
 
 Die Quittung („Zeichnung verworfen", `message.info` über `App.useApp()`) entsteht **nur** im Esc-Zweig,
 nicht aus einem `change`-Ereignis. Dadurch kann das Zurücknehmen des letzten Punktes — terra-draw
