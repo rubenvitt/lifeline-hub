@@ -18,9 +18,9 @@
 
 ## 4. Objektsuche
 
-- [ ] 4.1 `pages/lagekarte/objektsuche.ts`: `suchbareMarker` (D1), `gruppiereTreffer` und `TYP_REIHENFOLGE` über alle elf `MarkerTyp`, Beschriftung aus `OBJEKTART`; verifizieren: `objektsuche.test.ts` mit dem Paar mit/ohne Betreuungsrecht, dem Paar Personen frei+Ebene an / gesperrt / Ebene aus, Gruppierung, Gleichstand-Reihenfolge und Deckungsgleichheit `TYP_REIHENFOLGE` ↔ `OBJEKTART`
-- [ ] 4.2 `MarkerSuche.tsx` aus C9 übernehmen (Suchfeld mit eigenem Namen, Gruppen als `Liste`, `bedienzielStil`, genau ein Leerzustand, Fehlerfall ohne falsche Leere, „—“ statt Zahl); verifizieren: `MarkerSuche.test.tsx` grün, inkl. Render-Paar „ohne Betreuungsrecht erscheint der Name nicht“ über `suchbareMarker`
-- [ ] 4.3 `Sidebar.tsx`: Paneel „Verortet“ trägt `MarkerSuche` statt der UHS-/Schaden-Listen; neue Prop für die Suchquelle; `LagekartePage.tsx` reicht `suchbareMarker(...)` aus `alleVerortet`, `personenVerortet`, Zugriffen und `layer.person` durch; verifizieren: `Sidebar.test.tsx` und `LagekartePage`-Tests grün, bisherige „Verortet“-Tests auf die Suche umgestellt, Klick ruft `onMarkerWaehlen`
+- [x] 4.1 `pages/lagekarte/objektsuche.ts`: `suchbareMarker` (D1), `gruppiereTreffer` und `TYP_REIHENFOLGE` über alle elf `MarkerTyp`, Beschriftung aus `OBJEKTART`; verifizieren: `objektsuche.test.ts` mit dem Paar mit/ohne Betreuungsrecht, dem Paar Personen frei+Ebene an / gesperrt / Ebene aus, Gruppierung, Gleichstand-Reihenfolge und Deckungsgleichheit `TYP_REIHENFOLGE` ↔ `OBJEKTART`
+- [x] 4.2 `MarkerSuche.tsx` aus C9 übernehmen (Suchfeld mit eigenem Namen, Gruppen als `Liste`, `bedienzielStil`, genau ein Leerzustand, Fehlerfall ohne falsche Leere, „—“ statt Zahl); verifizieren: `MarkerSuche.test.tsx` grün, inkl. Render-Paar „ohne Betreuungsrecht erscheint der Name nicht“ über `suchbareMarker`
+- [x] 4.3 `Sidebar.tsx`: Paneel „Verortet“ trägt `MarkerSuche` statt der UHS-/Schaden-Listen; neue Prop für die Suchquelle; `LagekartePage.tsx` reicht `suchbareMarker(...)` aus `alleVerortet`, `personenVerortet`, Zugriffen und `layer.person` durch; verifizieren: `Sidebar.test.tsx` und `LagekartePage`-Tests grün, bisherige „Verortet“-Tests auf die Suche umgestellt, Klick ruft `onMarkerWaehlen`
 
 ## 5. Doku und Abschluss
 

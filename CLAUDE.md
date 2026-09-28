@@ -208,6 +208,21 @@ Setzen der Zuordnung ohne Modulrecht ist 403, Storno löst die Flächen im selbe
 `0119` ist der erste Rebuild von `lage_zone`. Herleitung:
 `openspec/changes/lfh-673-betreuung-auf-der-lagekarte/design.md`.
 
+**Objektsuche und Zeichenwahl der Lagekarte (LFH-716).** Das Paneel „Verortet“ ist eine
+Suche über alle wählbaren Objekte (`MarkerSuche`), gespeist aus `suchbareMarker`
+(`pages/lagekarte/objektsuche.ts`). Die Funktion prüft die Modulsperre **je Typ** selbst:
+Betreuungsstellen nur bei freiem Modul Betreuung, Betroffene nur bei freiem Modul Personen
+**und** eingeschalteter Ebene, weil `onMarkerWaehlen` nur Gezeichnetes findet. Dass
+`alleVerortet` die Stellen ohne Recht schon leer liefert, ist ein Nebeneffekt der Quelle und
+keine Zusicherung. Der Zeichen-Picker ist ein Bildraster: Kacheln auf der Dichte-Staffel,
+Rollenfarben, Ruhe-Rand `steuerRahmen`. Enter sendet nur über `onAbsenden` und bringt die
+Spec **mit**, denn der Aufrufer hat die per Enter gewählte Kachel in dieser Runde noch nicht
+im State. „Zuletzt verwendet“ schreibt erst das erfolgreiche Anlegen
+(`useKartenInteraktion`). Der `FreiesZeichenInspector` schreibt entprellt (600 ms) und hat
+einen **eigenen** Änderungsmerker. Ohne ihn schriebe der unberührte Entwurf eine fremde
+Änderung nach der Frist zurück. Herleitung:
+`openspec/changes/lfh-716-lagekarte-markersuche-zeichenpicker/design.md`.
+
 **Verbleib „Notunterkunft“ → Betreuungsstelle (LFH-674).** Der Verbleib trägt nur die
 **Kennung** der Stelle (`person_verbleib.betreuungsstelle_id`, Cache
 `einsatz_person.aktuelle_verbleib_betreuungsstelle_id`, `0121`). Den Namen belegt der
