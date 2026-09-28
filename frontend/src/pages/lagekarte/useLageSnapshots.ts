@@ -7,11 +7,10 @@ import {
 } from '../../api/lageSnapshot';
 
 /**
- * Daten-Leg der Lage-Snapshots (LFH-321): Metadaten-Liste + „Stand sichern"/Löschen.
- * Geteilt von der Snapshot-Leiste (C) und der Replay-Zeitleiste (D). Die Liste ist SSE-live
- * (`lage_snapshot`-Event invalidiert `einsatzKeys.lageSnapshot`); Snapshot-Dokumente selbst sind
- * unveränderlich und liegen unter einem EIGENEN Prefix (`lageSnapshotDokument`), damit die
- * Listen-Invalidierung sie nicht per Prefix mit-refetcht.
+ * Daten-Leg der Lage-Snapshots: Metadaten-Liste + „Stand sichern"/Löschen, geteilt von
+ * Snapshot-Leiste und Replay-Zeitleiste. Die Liste ist live (`lage_snapshot` invalidiert
+ * `einsatzKeys.lageSnapshot`); die unveränderlichen Dokumente liegen unter eigenem Prefix
+ * (`lageSnapshotDokument`), damit die Listen-Invalidierung sie nicht mit-refetcht.
  */
 export function useLageSnapshots(einsatzId: number) {
   const qc = useQueryClient();

@@ -80,13 +80,11 @@ export function blindStyle(theme: KartenTheme): StyleSpecification {
 export const OFFLINE_GLYPHS = '/api/karte/offline/fonts/{fontstack}/{range}.pbf';
 
 /**
- * Offline-Vektor-Style über die selbst-servierten Shortbread-MBTiles-Kacheln (LFH-195). Multi-Region
- * (LFH-188, „alle automatisch gemeinsam"): je übergebener Region eine eigene Vector-Source
- * `basemap-{karte_id}` + ein Layer-Set mit region-suffixierten IDs; die Regionen werden gemeinsam
- * gezeichnet (Vereinigung). Ein gemeinsamer Hintergrund + geteilte Glyphs/Sprite. Theme-Farben aus
- * FARBEN. Überlappen zwei Regionen (z. B. Welt-Übersicht unter einem Regional-Pack), zeichnen sich
- * gleiche Features doppelt — bei identischem Schema/Theme optisch unkritisch (spätere Option:
- * per-Region-bbox-Clip, LFH-188).
+ * Offline-Vektor-Style über die selbst-servierten Shortbread-MBTiles-Kacheln. Je Region eine eigene
+ * Vector-Source `basemap-{karte_id}` plus ein Layer-Set mit region-suffixierten IDs; alle Regionen
+ * werden gemeinsam gezeichnet, mit einem gemeinsamen Hintergrund und geteilten Glyphs/Sprite.
+ * Überlappen zwei Regionen (Welt-Übersicht unter einem Regional-Pack), zeichnen sich gleiche
+ * Features doppelt — optisch unkritisch.
  */
 export function offlineStyle(theme: KartenTheme, regionen: OfflineRegion[]): StyleSpecification {
   const f = FARBEN[theme];
@@ -97,15 +95,11 @@ export function offlineStyle(theme: KartenTheme, regionen: OfflineRegion[]): Sty
   ];
   for (const r of regionen) {
     const src = `basemap-${r.karte_id}`;
-    // tiles_url bleibt ROOT-RELATIV mit literalen {z}/{x}/{y}: NICHT via new URL() absolutieren —
-    // das würde die Platzhalter percent-kodieren (%7Bz%7D), MapLibre substituiert sie dann nie →
-    // 0 Tiles. (Siehe absolutiereProxyAnfrage + Memory [[maplibre-rootrelative-url-worker]].) Der
-    // global verdrahtete transformRequest (absolutiereProxyAnfrage, Kartenflaeche.tsx) absolutiert
-    // die substituierte Kachel-/Glyph-/Sprite-URL im Worker gegen die Origin.
-    // maxzoom je Region: Regional-Packs 14, die Welt-Übersicht 6 (LFH-207) — darüber überzoomt
-    // MapLibre die grobe Welt als Kontext, während Regional-Packs oben scharfes Detail liefern.
-    // Kein `?? 14` mehr (LFH-265): `maxzoom` ist im generierten Schema PFLICHT, das Backend liefert
-    // es für jede Region, und der Kompat-Pfad unten setzt es explizit — der Fallback war unerreichbar.
+    // `tiles_url` bleibt root-relativ mit literalen {z}/{x}/{y}: `new URL()` percent-kodierte die
+    // Platzhalter, MapLibre ersetzte sie nie → 0 Tiles. Absolutiert wird die substituierte URL im
+    // Worker durch den globalen `transformRequest` (`absolutiereProxyAnfrage`, Kartenflaeche.tsx).
+    // `maxzoom` je Region (Pflicht im Schema): Regional-Packs 14, die Welt-Übersicht 6 — darüber
+    // überzoomt MapLibre die grobe Welt als Kontext.
     sources[src] = {
       type: 'vector',
       tiles: [r.tiles_url],
@@ -125,13 +119,10 @@ export function offlineStyle(theme: KartenTheme, regionen: OfflineRegion[]): Sty
 }
 
 /**
- * Das vollständige Shortbread-Layer-Set EINER Offline-Region (Source `src`), alle IDs mit `suffix`
- * (z. B. `-{karte_id}`) eindeutig gemacht, damit mehrere Regionen im selben Style koexistieren.
- * source-layer-Namen + `kind`-Vokabulare gegen das reale Shortbread-Schema verifiziert (karten-build,
- * aus den ausgelieferten MBTiles dekodiert, 2026-07-06): u. a. land, water_polygons/water_lines
- * (+_labels), streets, boundaries, bridges, sites. Ein 'landuse'-Layer gibt es in Shortbread NICHT
- * (das war Protomaps) → 'land'. LFH-197: auf die vollständige Shortbread-Geometrie gehoben (ocean,
- * water_lines …). Bewusst NICHT gerendert (niedriger Nutzen / Clutter): pois, addresses, aerialways,
+ * Das vollständige Shortbread-Layer-Set einer Offline-Region (Source `src`), alle IDs mit `suffix`
+ * eindeutig gemacht, damit mehrere Regionen im selben Style koexistieren. source-layer- Namen und
+ * `kind`-Vokabulare sind gegen das reale Shortbread-Schema verifiziert; einen 'landuse'-Layer gibt
+ * es dort nicht (→ 'land'). Bewusst nicht gerendert (Clutter): pois, addresses, aerialways,
  * public_transport, street_labels_points, streets_polygons_labels, boundary_labels.
  */
 function regionLayers(
@@ -152,8 +143,8 @@ function regionLayers(
   const textFeld = ['coalesce', ['get', 'name_de'], ['get', 'name']] as const;
   // Reihenfolge = Zeichenreihenfolge (unten → oben): Flächen, Wasser, Gebäude, Straßen, Grenzen, Labels.
   const layers = [
-    // FIX: Meer/Ozean (eigener Shortbread-Layer 'ocean', 1 großes Polygon je Küstenkachel) wurde
-    // vorher NICHT gerendert → Meere zeigten die Land-Hintergrundfarbe. Als Wasser-Fill ganz unten.
+    // Meer/Ozean (eigener Layer 'ocean', ein großes Polygon je Küstenkachel) als Wasser-Fill ganz
+    // unten.
     {
       id: 'ozean',
       source: src,
@@ -162,7 +153,7 @@ function regionLayers(
       paint: { 'fill-color': f.wasser },
     },
 
-    // --- Landnutzung nach kind gestaffelt (statt einfarbig) ---
+    // --- Landnutzung nach kind gestaffelt ---
     {
       id: 'land',
       source: src,
@@ -255,7 +246,7 @@ function regionLayers(
       paint: { 'fill-color': f.strasse },
     },
     {
-      // FIX (LFH-197): Linien-Gewässer wurden vorher gar nicht gerendert → Bäche/Flüsse/Gräben unsichtbar.
+      // Linien-Gewässer: Bäche, Flüsse, Gräben.
       id: 'wasser_linien',
       source: src,
       'source-layer': 'water_lines',
@@ -508,10 +499,12 @@ export function defaultModus(config: KarteServerConfig | undefined): BasemapModu
   return 'blind';
 }
 
-/** Verpackt ein Raster-Tile-Template (`{z}/{x}/{y}`) in einen MapLibre-Raster-Style. Dient online
- *  (proxied Upstream) wie offline (LFH-185: aktive Raster-MBTiles). Die URL wird VERBATIM
- *  durchgereicht (offline root-relativ mit literalen {z}/{x}/{y} → transformRequest absolutiert im
- *  Worker); Attribution läuft NICHT über die Source, sondern config-autoritativ (aktuelleAttribution). */
+/**
+ * Verpackt ein Raster-Tile-Template (`{z}/{x}/{y}`) in einen MapLibre-Raster-Style, online (proxied
+ * Upstream) wie offline (aktive Raster-MBTiles). Die URL geht verbatim durch (`transformRequest`
+ * absolutiert im Worker); die Attribution läuft config-autoritativ (`aktuelleAttribution`), nicht
+ * über die Source.
+ */
 function rasterStyle(tilesUrl: string, tileSize = 256): StyleSpecification {
   return {
     version: 8,
@@ -523,15 +516,13 @@ function rasterStyle(tilesUrl: string, tileSize = 256): StyleSpecification {
 }
 
 /**
- * `transformRequest` für MapLibre: absolutiert **root-relative** URLs (`/api/karte/proxy/…`,
- * LFH-182) gegen die Origin. MapLibre lädt Tiles in einem Web-Worker ohne Dokument-Base-URL —
- * dort scheitern root-relative Tile-URLs mit „Failed to parse URL". Bereits absolute URLs
- * (Online direkt) bleiben unangetastet; protokoll-relative `//host` werden bewusst ausgenommen.
+ * `transformRequest` für MapLibre: absolutiert root-relative URLs (`/api/karte/proxy/…`) gegen die
+ * Origin — im Web-Worker ohne Dokument-Base-URL scheiterten sie mit „Failed to parse URL". Absolute
+ * URLs bleiben unangetastet, protokoll-relative `//host` sind ausgenommen.
  */
 export function absolutiereProxyAnfrage(url: string): { url: string } {
-  // Bewusst String-Konkatenation statt new URL(): Letzteres würde `{z}`/`{x}`/`{y}` im Pfad
-  // percent-kodieren. (MapLibre ruft transformRequest zwar mit substituierten URLs, der Schutz
-  // ist defensiv.)
+  // String-Konkatenation statt `new URL()`: Letzteres percent-kodierte `{z}`/`{x}`/`{y}` (defensiv
+  // — MapLibre ruft transformRequest mit substituierten URLs).
   if (url.startsWith('/') && !url.startsWith('//')) {
     return { url: window.location.origin + url };
   }
@@ -541,9 +532,8 @@ export function absolutiereProxyAnfrage(url: string): { url: string } {
 /** Style für einen Online-View: Vektor → URL-String, Raster → verpackter Raster-Style. */
 export function baueOnlineStyle(stil: OnlineStyle): StyleSpecification | string {
   if (stil.typ === 'raster') return rasterStyle(stil.url);
-  // Vektor: Style-JSON-URL. Relative Proxy-URLs (/api/karte/proxy/{id}/style.json, LFH-182) gegen
-  // die Origin absolutieren (idempotent für bereits absolute URLs), damit MapLibre die
-  // setStyle-URL zuverlässig auflöst.
+  // Vektor: Style-JSON-URL. Relative Proxy-URLs gegen die Origin absolutieren (idempotent), damit
+  // MapLibre die setStyle-URL zuverlässig auflöst.
   return new URL(stil.url, window.location.origin).href;
 }
 
@@ -559,9 +549,8 @@ export function baueBasemapStyle(
 ): StyleSpecification | string {
   if (modus === 'online' && onlineStil) return baueOnlineStyle(onlineStil);
   if (modus === 'offline') {
-    // Multi-Region (LFH-188): alle bereiten Vektor-Regionen gemeinsam in einem Style. Raster-
-    // Offline-Karten (LFH-185, selten/legacy) laufen NICHT über den Multi-Source-Vektor-Style;
-    // für sie greift der Kompat-Pfad über offline_tiles_url (erste Region).
+    // Alle bereiten Vektor-Regionen gemeinsam in einem Style. Raster-Offline-Karten laufen über den
+    // Kompat-Pfad `offline_tiles_url` (erste Region).
     const vektorRegionen = (config?.offline_regionen ?? []).filter((r) => r.format !== 'raster');
     if (vektorRegionen.length > 0) return offlineStyle(theme, vektorRegionen);
     // Kompat/Fallback für Configs ohne offline_regionen (alte Backends) oder Raster-Offline-Karten.
@@ -569,8 +558,7 @@ export function baueBasemapStyle(
       return config.offline_format === 'raster'
         ? rasterStyle(config.offline_tiles_url)
         : offlineStyle(theme, [
-            // maxzoom seit LFH-265 Pflicht im Schema; hier der Regional-Pack-Default, der vorher
-            // aus dem `r.maxzoom ?? 14` unten kam — der Kompat-Pfad kennt keine Regions-Angabe.
+            // Regional-Pack-Default: der Kompat-Pfad kennt keine Regions-Angabe.
             {
               karte_id: 0,
               name: '',
@@ -586,20 +574,19 @@ export function baueBasemapStyle(
 }
 
 /**
- * Config-autoritative Pflicht-Attribution des aktiven Views. Online: Attribution des Views;
- * Offline: Lizenz der aktiven Offline-Karte (`offline_attribution`, z. B. ODbL — auch ohne Netz
- * rechtlich sichtbar, LFH-181); blind: keine.
+ * Config-autoritative Pflicht-Attribution des aktiven Views. Online: die des Views; offline: die
+ * Lizenz der aktiven Offline-Karte (auch ohne Netz rechtlich sichtbar); blind: keine.
  */
 export function aktuelleAttribution(
   modus: BasemapModus,
   onlineStil: OnlineStyle | undefined,
   config: KarteServerConfig | undefined,
 ): string | null {
-  // `?? null`: `attribution` ist seit LFH-265 absent-statt-null (generiertes Schema `?: string | null`).
+  // `?? null`: `attribution` ist absent statt null (`?: string | null`).
   if (modus === 'online' && onlineStil) return onlineStil.attribution ?? null;
   if (modus === 'offline') {
-    // Attribution über alle sichtbaren Regionen dedupliziert (i. d. R. identisch, © OSM/ODbL) —
-    // nicht N-fach anzeigen (LFH-188). Fallback: das Kompat-Feld offline_attribution.
+    // Über alle sichtbaren Regionen dedupliziert (meist identisch, © OSM/ODbL). Fallback: das
+    // Kompat-Feld `offline_attribution`.
     const regionen = config?.offline_regionen ?? [];
     const uniq = [...new Set(regionen.map((r) => r.attribution).filter((a): a is string => !!a))];
     if (uniq.length > 0) return uniq.join(' · ');

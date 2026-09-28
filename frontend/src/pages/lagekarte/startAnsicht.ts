@@ -1,22 +1,15 @@
 import type { KarteMarker } from './marker';
 
 /**
- * Wohin die Lagekarte beim Öffnen schaut (Nacharbeit Neuentwurf, 22.09.2026).
- *
- * Bis hierher startete die Karte IMMER auf „Mitte Deutschland, Zoom 5" (Konstruktor in
- * `Kartenflaeche.tsx`) — auch dann, wenn der Einsatz verortet war. Das war keine Regression
- * des Umbaus, sondern schon vorher so (`82e9440f` hat dieselbe Konstruktorzeile); in der
- * Sichtprüfung fiel es auf, weil die Karte im Neuentwurf die Seite führt.
- *
- * Reihenfolge, jede Stufe nur mit echten Daten (keine erfundenen Koordinaten):
+ * Wohin die Lagekarte beim Öffnen schaut. Reihenfolge, jede Stufe nur mit echten Daten:
  * 1. Zentrum der aktiven Ansicht, wenn sie eins trägt (`zentrum_lat`/`zentrum_lon`).
- * 2. Der Einsatzort-Marker — er ist der fachliche Bezugspunkt des Einsatzes.
+ * 2. Der Einsatzort-Marker — der fachliche Bezugspunkt des Einsatzes.
  * 3. Genau ein verortetes Objekt → auf dieses.
  * 4. Mehrere verortete Objekte → Rahmen um alle.
  * 5. Nichts verortet → `null`: die Karte bleibt auf der neutralen Übersicht.
  *
- * Der Zoom kommt aus der Ansicht (`zoom`, gesät aus `karten_zoom_start`), sonst
- * {@link PUNKT_ZOOM}. Rein, damit die Entscheidung ohne WebGL prüfbar ist.
+ * Der Zoom kommt aus der Ansicht (`zoom`, gesät aus `karten_zoom_start`), sonst {@link PUNKT_ZOOM}.
+ * Rein, damit die Entscheidung ohne WebGL prüfbar ist.
  */
 export type StartAnsicht =
   | { art: 'punkt'; lng: number; lat: number; zoom: number }

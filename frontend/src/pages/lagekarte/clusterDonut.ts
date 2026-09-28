@@ -7,15 +7,10 @@ import type { MarkerTyp } from './marker';
 type ClusterTyp = Exclude<MarkerTyp, 'einsatzort'>;
 
 /**
- * Segment-Farben pro Marker-Typ für den Cluster-Donut. Eigene, kräftige + unterscheidbare
- * Donut-Palette (unabhängig von den DV-102-Zeichen) — der Ring kommuniziert die Zusammensetzung
- * eines Clusters auf einen Blick.
- *
- * **Personen fehlen hier absichtlich (LFH-650).** LFH-613 hatte ihnen ein eigenes Segment
- * `#be185d` (Rosé) gegeben — ein Literal außerhalb der Tokens, auf derselben Karte neben
- * SK-I-Rot und nicht auf Verwechslung geprüft. Ein Personen-Cluster zeigt stattdessen seine
- * Zusammensetzung nach SICHTUNG in den festen Farben der Sichtungsachse und im Kern das
- * Kürzel der dringlichsten Kategorie (siehe {@link donutSegmente}, {@link dringlichsteSichtung}).
+ * Segment-Farben je Marker-Typ für den Cluster-Donut — eine eigene, kräftige Palette unabhängig von
+ * den DV-102-Zeichen. Personen fehlen absichtlich: ein Personen-Cluster zeigt seine Zusammensetzung
+ * nach Sichtung in den Farben der Sichtungsachse und im Kern das Kürzel der dringlichsten Kategorie
+ * (siehe {@link donutSegmente}, {@link dringlichsteSichtung}).
  */
 export const CLUSTER_TYP_FARBE: Record<Exclude<ClusterTyp, 'person'>, string> = {
   fahrzeug: '#64748b', // slate
@@ -26,23 +21,20 @@ export const CLUSTER_TYP_FARBE: Record<Exclude<ClusterTyp, 'person'>, string> = 
   schaden: '#ea580c', // orange
   lagemeldung: '#d48806', // amber
   freies_zeichen: '#4f46e5', // indigo
-  // LFH-673: nicht rot/orange/amber (Gefahr/Schaden/Meldung) und abgesetzt vom UHS-Blau.
+  // Nicht rot/orange/amber (Gefahr/Schaden/Meldung) und abgesetzt vom UHS-Blau.
   betreuungsstelle: '#0891b2', // cyan
 };
 
 /**
- * Segmentfarbe ohne Fachfarbe („unverletzt", noch nicht gesichtet) und Ringfarbe ohne
- * Segmente. Derselbe Schieferton, den der Donut ohnehin für einen leeren Ring nahm — kein
- * neuer Wert, und bewusst neutral: „unverletzt" hat keine BBK-Farbe (CLAUDE.md, Sichtung).
+ * Segmentfarbe ohne Fachfarbe („unverletzt", ungesichtet) und Ringfarbe ohne Segmente: derselbe
+ * neutrale Schieferton — „unverletzt" hat keine BBK-Farbe.
  */
 const DONUT_NEUTRAL = '#94a3b8';
 
 /**
- * Sichtungskategorien in der Reihenfolge der DRINGLICHKEIT: SK I vor II vor III, dann SK IV
- * (ohne Überlebenschance — betreuend, nicht zuerst), Tote, Unverletzte, und zuletzt „ohne":
- * noch nicht gesichtet ist keine Kategorie, der Cluster sagt dann „–". Dieselbe Reihenfolge
- * legt die Segmente im Ring. Ein Array, kein Record — dass keine Kategorie aus `SK_KURZZEICHEN`
- * fehlt, sichert `clusterDonut.test.ts` („führt jede Kategorie … genau einmal"), nicht der Typ.
+ * Sichtungskategorien nach Dringlichkeit: SK I, II, III, dann SK IV, Tote, Unverletzte, zuletzt
+ * „ohne" (der Cluster sagt dann „–"). Dieselbe Reihenfolge legt die Segmente. Dass keine Kategorie
+ * fehlt, sichert `clusterDonut.test.ts`, nicht der Typ.
  */
 export const SK_DRINGLICHKEIT: readonly (Sichtungskategorie | 'ohne')[] = [
   'sk1',
@@ -54,8 +46,10 @@ export const SK_DRINGLICHKEIT: readonly (Sichtungskategorie | 'ohne')[] = [
   'ohne',
 ];
 
-/** Segment- bzw. Füllfarbe einer Sichtung — auch für die WebGL-Personen-Cluster der Lagekarte
- *  (LFH-648), damit Donut und Kreis dieselbe Farbe für dieselbe Kategorie tragen. */
+/**
+ * Segment- bzw. Füllfarbe einer Sichtung — auch für die WebGL-Personen-Cluster, damit Donut und
+ * Kreis dieselbe Farbe tragen.
+ */
 export function skFarbe(k: Sichtungskategorie | 'ohne'): string {
   const farbe = k === 'ohne' ? null : sichtung[k].farbe;
   return farbe ? sichtungsfarben[farbe] : DONUT_NEUTRAL;
@@ -75,20 +69,20 @@ const TYP_REIHENFOLGE: Exclude<ClusterTyp, 'person'>[] = [
 ];
 
 /**
- * `clusterProperties`-Spec für die GeoJSON-Source: pro Typ eine Summe (Anzahl im Cluster).
- * MapLibre aggregiert beim Clustern → die Counts liegen als `c_<typ>` an jedem Cluster-Feature.
+ * `clusterProperties`-Spec für die GeoJSON-Source: je Typ eine Summe, MapLibre legt sie als
+ * `c_<typ>` an jedes Cluster-Feature.
  */
 export function clusterTypProperties(): Record<string, unknown> {
   const props: Record<string, unknown> = {};
   for (const t of [...TYP_REIHENFOLGE, 'person'] as const) {
     props[`c_${t}`] = ['+', ['case', ['==', ['get', 'typ'], t], 1, 0]];
   }
-  // Personen je Sichtung (LFH-650): `sk` trägt nur ein Personen-Marker.
+  // Personen je Sichtung: `sk` trägt nur ein Personen-Marker.
   for (const k of SK_DRINGLICHKEIT) {
     props[`s_${k}`] = ['+', ['case', ['==', ['get', 'sk'], k], 1, 0]];
   }
-  // Größte Trefferzone der Blätter (LFH-650): der Donut macht sich mindestens so groß
-  // anklickbar wie seine Marker. Ohne `treffer` (Lagekarte) 0 — dort ändert sich nichts.
+  // Größte Trefferzone der Blätter: der Donut ist mindestens so groß anklickbar wie seine Marker.
+  // Ohne `treffer` (Lagekarte) 0.
   props.treffer = ['max', ['coalesce', ['get', 'treffer'], 0]];
   return props;
 }
@@ -102,9 +96,8 @@ export interface DonutSegment {
 }
 
 /**
- * Liest die per-Typ-Counts (`c_<typ>`) aus den Cluster-Properties → Segmente (count > 0),
- * stabile Reihenfolge. Personen gehen NICHT als ein Segment ein, sondern je Sichtung
- * (`s_<kategorie>`) in den Farben der Sichtungsachse (LFH-650).
+ * Per-Typ-Counts (`c_<typ>`) → Segmente (count > 0) in stabiler Reihenfolge. Personen gehen je
+ * Sichtung (`s_<kategorie>`) ein, nicht als ein Segment.
  */
 export function donutSegmente(props: Record<string, unknown>): DonutSegment[] {
   const segs: DonutSegment[] = [];
@@ -138,16 +131,15 @@ function zahlLabel(gesamt: number): string {
 }
 
 /**
- * Baut das DOM-Element eines Cluster-Donuts: conic-gradient-Ring (Typ-Segmente) mit weichem
- * Schatten + weißem Kern und der Gesamtzahl. Per DOM-API (kein innerHTML); alle Werte stammen
- * aus kontrollierten Quellen (Enum-Farben, Zahlen).
+ * DOM-Element eines Cluster-Donuts: conic-gradient-Ring mit Schatten, weißer Kern mit Gesamtzahl.
+ * Per DOM-API (kein innerHTML); alle Werte stammen aus kontrollierten Quellen.
  *
- * **Personen-Cluster (LFH-650):** der Kern trägt unter der Zahl das Kürzel der dringlichsten
- * Sichtung („I") — derselbe zweite Kanal wie im Einzelmarker, damit SK I nicht nur als
- * rotes Ringsegment erkennbar ist (WCAG 1.4.1). `title` und `aria-label` sagen es als Satz.
+ * Personen-Cluster: der Kern trägt unter der Zahl das Kürzel der dringlichsten Sichtung — der
+ * zweite Kanal, damit SK I nicht nur als rotes Segment erkennbar ist. `title` und `aria-label`
+ * sagen es als Satz.
  *
- * **Trefferzone:** liegt `treffer` über dem gezeichneten Durchmesser, hüllt eine durchsichtige
- * Fläche den Ring; das Klickziel ist dann die Hülle. Der Ring bleibt so groß wie bisher.
+ * Liegt `treffer` über dem gezeichneten Durchmesser, hüllt eine durchsichtige Fläche den Ring und
+ * ist das Klickziel.
  */
 export function baueClusterDonut(props: Record<string, unknown>): HTMLDivElement {
   const gesamt = Number(props.point_count ?? 0);
@@ -206,9 +198,7 @@ export function baueClusterDonut(props: Record<string, unknown>): HTMLDivElement
     kern.appendChild(kurz);
     const text = personenClusterText(gesamt, dringlichst);
     ring.title = text;
-    // Ein `aria-label` braucht eine Rolle, sonst wird es auf einem nackten `div` übergangen.
-    // `img`, nicht `button`: der Donut ist kein Tastaturziel (die Auffächerung ist Zeiger-
-    // Bedienung der Karte), eine Knopfrolle ohne Fokus versprach etwas, das nicht geht.
+    // Ein `aria-label` braucht eine Rolle. `img`, nicht `button`: der Donut ist kein Tastaturziel.
     ring.setAttribute('role', 'img');
     ring.setAttribute('aria-label', text);
     ring.dataset.sichtung = dringlichst;
@@ -241,12 +231,9 @@ export function baueClusterDonut(props: Record<string, unknown>): HTMLDivElement
 }
 
 /**
- * Macht die Trefferzonen-Hülle eines Donuts für Klicks durchlässig, solange sein Spider offen
- * ist (Review LFH-650). In `handschuh` misst die Hülle 72 px (Radius 36), die aufgefächerten
- * Blätter liegen aber schon ab 40 px vom Mittelpunkt — ihr gezeichneter Kreis beginnt bei
- * 27 px. Ohne das fing die Hülle den Tipp auf den inneren Teil eines Blatts ab und klappte den
- * Spider zu, statt die Person zu öffnen. Der Ring selbst bleibt klickbar (erneuter Klick
- * klappt weiter ein), nur die Fläche um ihn herum gibt nach. Ohne Hülle: nichts zu tun.
+ * Macht die Trefferzonen-Hülle durchlässig, solange ihr Spider offen ist: in `handschuh` misst sie
+ * 72 px, die aufgefächerten Blätter beginnen aber schon bei 27 px vom Mittelpunkt — sonst klappte
+ * ein Tipp auf ein Blatt den Spider zu. Der Ring selbst bleibt klickbar.
  */
 export function setzeHuelleDurchlaessig(el: HTMLElement | undefined, durchlaessig: boolean) {
   if (!el || el.dataset.lfh !== 'cluster-treffer') return;

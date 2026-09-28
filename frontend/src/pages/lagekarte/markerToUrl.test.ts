@@ -42,7 +42,7 @@ describe('markerToUrl (LFH-25) — Inspector-Deeplinks je Marker-Typ', () => {
     );
   });
   it('person → Item-Route der Personen-Detailseite (LFH-648), nicht die Einsatzdaten', () => {
-    // Vorher fiel `person` still in den `default`-Zweig — der Typcheck warnte nicht.
+    // Ohne eigenen Zweig fiele `person` still in den `default` — der Typcheck warnte nicht.
     expect(markerToUrl(m({ typ: 'person', id: 11 }), E)).toBe('/einsaetze/7/personen/11');
   });
   it('einsatzort → Einsatzdaten (Fallback ohne Item-Bezug)', () => {

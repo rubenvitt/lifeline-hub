@@ -152,8 +152,8 @@ describe('Inspector Symbol-Auswahl — Beschriftung (LFH-328)', () => {
     );
   });
 
-  // Bewusst MIT gesetztem `tz`: bei leerem Select wäre der Accessible Name auch dann sauber,
-  // wenn die Beschriftung das Feld umschlösse — der gewählte Wert ist der Prüfstein.
+  // Bewusst mit gesetztem `tz`: bei leerem Select wäre der Accessible Name auch dann sauber, wenn
+  // die Beschriftung das Feld umschlösse.
   const einheitMarker = {
     schluessel: 'einheit-4',
     typ: 'einheit',
@@ -202,12 +202,9 @@ describe('Inspector Aktionsreihe — Überlauf in der 300-px-Karte', () => {
     farbe: '#faad14',
   } as KarteMarker;
 
-  // Gemessen an der Vorlage: „Im Fach-Modul öffnen" + „Verortung löschen" tragen nebeneinander
-  // rund 300 px Eigenbreite und passen damit in KEINER Dichtestufe in den ~278 px Innenraum
-  // der Karte. `KartenDetailCard` setzt `overflowY: 'auto'`, was per CSS auch `overflow-x`
-  // auf `auto` zieht — der zweite Knopf wird also abgeschnitten statt umzubrechen.
-  // Ein Pixelbeleg ist in jsdom nicht baubar (kein Layout); geprüft wird die Struktur,
-  // die den Überlauf unmöglich macht.
+  // „Im Fach-Modul öffnen" + „Verortung löschen" brauchen nebeneinander rund 300 px, der Innenraum
+  // hat ~278 px, und `overflowY: 'auto'` der Karte zieht `overflow-x` mit — der zweite Knopf würde
+  // abgeschnitten. Geprüft wird die Struktur, die den Überlauf unmöglich macht.
   it('stapelt die Aktionen senkrecht, jede über die volle Kartenbreite', () => {
     renderMitProviders(
       <Inspector
@@ -221,21 +218,18 @@ describe('Inspector Aktionsreihe — Überlauf in der 300-px-Karte', () => {
     const modulLink = screen.getByRole('link', { name: 'Im Fachmodul öffnen' });
     const loeschen = screen.getByRole('button', { name: 'Verortung löschen' });
 
-    // `size="middle"` statt des Vorgabe-Abstands: der rote Knopf steht sonst 3–7 px unter
-    // einem neutralen (CLAUDE.md, „Rot steht auch nicht bündig neben Neutralem").
+    // `size="middle"`: der rote Knopf steht nicht bündig unter einem neutralen.
     expect(loeschen.closest('.ant-space')).toHaveClass(
       'ant-space-vertical',
       'ant-space-gap-row-middle',
     );
     expect(loeschen).toHaveClass('ant-btn-block');
-    // Der Anker ist inline — ohne eigenes `display: block` liefe `block` am Knopf darin
-    // ins Leere und die Zeile bliebe schmal.
+    // Der Anker ist inline — ohne `display: block` bliebe die Zeile schmal.
     expect(modulLink).toHaveStyle({ display: 'block' });
     expect(modulLink.querySelector('.ant-btn')).toHaveClass('ant-btn-block');
   });
 
-  // Zweite Hälfte des Paares (LFH-366): ohne Schreibrecht bleibt EINE Aktion — genau deshalb
-  // ist hier kein Dreipunkt-Menü richtig, und deshalb muss der direkte Knopf dann weg sein.
+  // Ohne Schreibrecht bleibt eine Aktion — deshalb kein Dreipunkt-Menü und kein direkter Knopf.
   it('ohne Schreibrecht bleibt allein der Modul-Link', () => {
     renderMitProviders(
       <Inspector
@@ -269,9 +263,8 @@ describe('Inspector Aktionsreihe — Überlauf in der 300-px-Karte', () => {
         onVerortungLoeschen={() => {}}
       />,
     );
-    // Die Kürzung selbst rechnet der Browser (`-webkit-line-clamp`); jsdom meldet keine
-    // Unterstützung und fällt auf den Messpfad zurück. Belegbar ist deshalb, DASS die
-    // Kürzung konfiguriert ist — antd setzt die Klasse unabhängig vom Messweg.
+    // Die Kürzung rechnet der Browser (`-webkit-line-clamp`); belegbar ist in jsdom nur, dass sie
+    // konfiguriert ist.
     const zeile = await screen.findByText(/St\. Michaelis/);
     expect(zeile).toHaveClass('ant-typography-ellipsis');
   });
@@ -311,8 +304,8 @@ describe('Inspector Typ-Tag (LFH-276)', () => {
 });
 
 /**
- * Neuentwurf S5: der Inspector steht im Paneel „Ausgewählt" der rechten Leiste —
- * Symbol-Kachel, Mono-Unterzeile, Datenraster mit Augenbrauen, nur Felder mit Datenquelle.
+ * Der Inspector im Paneel „Ausgewählt": Symbol-Kachel, Mono-Unterzeile, Datenraster mit
+ * Augenbrauen, nur Felder mit Datenquelle.
  */
 describe('Inspector im Paneel „Ausgewählt"', () => {
   const einheitMarker = {
@@ -369,12 +362,11 @@ describe('Inspector im Paneel „Ausgewählt"', () => {
     expect(raster).toHaveTextContent('Stärke');
     expect(raster).toHaveTextContent('1/2/9//12');
     expect(raster).toHaveTextContent('Nord');
-    // Status und „Seit" einer Einheit (LFH-609): ohne Status steht das auch so da, kein
-    // erfundener Wert.
+    // Status und „Seit" einer Einheit: ohne Status steht das auch so da, kein erfundener Wert.
     expect(raster).toHaveTextContent('Status');
     expect(raster).toHaveTextContent('ohne Status');
     expect(raster).toHaveTextContent('Seit');
-    // Ohne Rückmeldungen (lädt, 403, Historie) KEIN Block „Letzte Meldung" (LFH-610).
+    // Ohne Rückmeldungen (lädt, 403, Historie) kein Block „Letzte Meldung".
     expect(screen.queryByText(/Letzte Meldung/)).not.toBeInTheDocument();
     expect(container.querySelector('[data-lfh="auswahl-letzte-meldung"]')).toBeNull();
   });
@@ -405,8 +397,7 @@ describe('Inspector im Paneel „Ausgewählt"', () => {
     );
     const block = screen.getByRole('region', { name: 'Letzte Meldung' });
     expect(block).toHaveTextContent('Sickerstelle unverändert, Sandsackverbau hält.');
-    // Zeit nach der Anzeigekonvention des Paneels (`formatZeitKurz`, taktisch `DDHHmm` bzw.
-    // `HHmm`) — dieselbe wie „Disponiert" im Raster darüber.
+    // Zeit nach der Anzeigekonvention des Paneels (`formatZeitKurz`), wie „Disponiert" im Raster.
     expect(block).toHaveTextContent(/\d{2}11 · Funk$/);
     // Neben dem Raster, nicht darin — das `dl` bleibt Feld-für-Feld.
     const raster = container.querySelector('[data-lfh="auswahl-raster"]') as HTMLElement;
@@ -507,8 +498,8 @@ describe('Inspector für Betroffene (LFH-648)', () => {
     );
   });
 
-  // Der Marker stammt aus `personenMarker`: das Label trägt Registriernummer und Sichtung,
-  // und der Inspector liest KEINE Personenliste — der Name kann also nirgends herkommen.
+  // Der Marker stammt aus `personenMarker`: das Label trägt Registriernummer und Sichtung, der
+  // Inspector liest keine Personenliste — ein Name kann nirgends herkommen.
   const personMarker = {
     schluessel: 'person-11',
     typ: 'person',
@@ -555,11 +546,9 @@ describe('Inspector für Betroffene (LFH-648)', () => {
 });
 
 /**
- * „Verortung löschen" ist nicht überall gleich destruktiv (LFH-710, LFH-363). Ein Abschnitt
- * steht nur mit gezeichneter Fläche auf der Karte, und sein Löschen schickt
- * `flaeche_geojson: null` — die Fläche ist danach weg. Ein Punkt dagegen lässt sich über
- * „Auf Karte verorten" jederzeit neu setzen. Deshalb gehören die beiden als PAAR getestet:
- * der Abschnitt fragt nach, der Punkt nicht.
+ * „Verortung löschen" ist nicht überall gleich destruktiv: ein Abschnitt steht nur mit Fläche auf
+ * der Karte, sein Löschen schickt `flaeche_geojson: null` — unumkehrbar, also Rückfrage. Ein Punkt
+ * lässt sich neu setzen, also keine. Deshalb als Paar getestet.
  */
 describe('Inspector „Verortung löschen" — Rückfrage nur, wo sie unumkehrbar ist (LFH-710)', () => {
   beforeEach(() => {

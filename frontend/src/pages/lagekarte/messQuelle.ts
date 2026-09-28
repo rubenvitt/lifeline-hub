@@ -8,10 +8,9 @@ export interface MessStand {
 }
 
 /**
- * Zustandsträger der laufenden Messung (LFH-616) — dieselbe Bauform wie die Zeigerquelle
- * (`mausPosition.ts`) und aus demselben Grund: die Messung ändert sich bei JEDER
- * Zeigerbewegung (der Vorschaupunkt läuft mit). Im State von `LagekartePage` renderte das die
- * ganze Seite im Bildtakt neu. Die Karte meldet, nur `MessSteuerung` abonniert.
+ * Zustandsträger der laufenden Messung — wie die Zeigerquelle (`mausPosition.ts`): die Messung
+ * ändert sich bei jeder Zeigerbewegung, im State von `LagekartePage` renderte das die Seite im
+ * Bildtakt. Die Karte meldet, nur `MessSteuerung` abonniert.
  */
 export interface MessQuelle {
   melde: (stand: MessStand) => void;

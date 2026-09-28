@@ -19,14 +19,11 @@ import '../../theme/sprache.css';
 import './lagekarte.css';
 
 /**
- * Überlagerungen der Kartenfläche (Neuentwurf S5): oben links Kartengrundlage und
- * Zeigerkoordinate, oben rechts der Knopfblock (Zoom, Nordung, Eigenposition, Messen, Zeichnen,
- * ab `lg` der Leisten-Umschalter).
+ * Überlagerungen der Kartenfläche: oben links Kartengrundlage und Zeigerkoordinate, oben rechts der
+ * Knopfblock (Zoom, Nordung, Eigenposition, Messen, Zeichnen, ab `lg` der Leisten-Umschalter).
  *
- * KEIN AUFSPANNENDER RAHMEN: jeder Block ist einzeln positioniert. Ein Elternteil über die
- * ganze Karte schluckte jedes Ziehen darunter — derselbe Befund, den `KartenFuss` mit
- * `pointerEvents: 'none'` am Rahmen löst (LFH-355). Die Bänder am UNTEREN Rand stehen
- * weiterhin dort, im Fluss; hier liegt nur, was oben schwebt.
+ * Kein aufspannender Rahmen: jeder Block ist einzeln positioniert, sonst schluckte ein Elternteil
+ * über der ganzen Karte jedes Ziehen (vgl. `KartenFuss`).
  */
 
 /** Abstand der Überlagerungen zum Kartenrand — derselbe wie der des Kartenfusses. */
@@ -34,8 +31,7 @@ export const UEBERLAGERUNG_RAND = 12;
 
 /**
  * Kantenlänge eines Kartenknopfs: der Entwurf zeichnet 32 px, die Dichte-Staffel verlangt
- * mindestens `controlHeight` (30 / 48 / 72). Es gilt das Größere — rein und exportiert, damit
- * die Zusicherung über drei Stufen ohne Rendern prüfbar ist.
+ * mindestens `controlHeight`. Es gilt das Größere — rein und exportiert.
  */
 export function kartenKnopfKante(token: { controlHeight: number }): number {
   return Math.max(32, token.controlHeight);
@@ -68,10 +64,9 @@ export function naechsterFreierIndex(
 
 /**
  * Segmentleiste der Kartengrundlage — lokale Ergänzung zu `components/instrument/Segmentleiste`,
- * die keinen GESPERRTEN Zustand kennt. Nicht konfigurierte Grundlagen stehen gesperrt da
- * (mit Grund als `title`), statt zu fehlen: dass es keine Offline-Karte gibt, ist eine
- * Aussage über die Installation. Dieselben Klassen (`.lfh-segmente`, `.lfh-segment`) und
- * dieselbe Geometrie (`segmentStil`), Tastatur nach APG mit übersprungenen Sperren.
+ * die keinen gesperrten Zustand kennt. Nicht konfigurierte Grundlagen stehen gesperrt da (Grund als
+ * `title`), statt zu fehlen. Dieselben Klassen und dieselbe Geometrie (`segmentStil`), Tastatur
+ * nach APG mit übersprungenen Sperren.
  */
 export function GrundlageLeiste({
   optionen,
@@ -83,10 +78,9 @@ export function GrundlageLeiste({
   wert: GrundlageWert;
   onWechsel: (wert: GrundlageWert) => void;
   /**
-   * Eine Zeile, die waagerecht scrollt, statt umzubrechen — für die Überlagerung der Karte.
-   * Mit mehreren Online-Stilen brach die Leiste sonst am Führungs-Tablet (1024 px, Karte
-   * ~450 px breit) in drei Zeilen um und deckte das obere Drittel der Karte ab. Der
-   * Tastaturweg bleibt: der Fokus holt das gewählte Segment in den sichtbaren Bereich.
+   * Eine Zeile, die waagerecht scrollt, statt umzubrechen: mit mehreren Online-Stilen deckte die
+   * umbrechende Leiste am Tablet das obere Drittel der Karte ab. Der Fokus holt das gewählte
+   * Segment in den sichtbaren Bereich.
    */
   einzeilig?: boolean;
 }) {
@@ -212,10 +206,8 @@ function Kartenknopf({
   steuert?: string;
   /**
    * Gesetzt = gesperrt. `aria-disabled` statt `disabled`: der Knopf bleibt in der Tab-Folge und
-   * nimmt weiter den Klick — ein natives `disabled` nähme beides, übrig bliebe ein grauer Knopf
-   * ohne Grund. Der Klick löst die Handlung nicht aus, sondern zeigt den Grund als Text am Knopf
-   * (LFH-712: auf Touch der einzige Weg zum Text, ein `title` erscheint dort nie); Vorlesende
-   * bekommen ihn über `aria-describedby`. Der Name bleibt die Handlung.
+   * nimmt den Klick — der zeigt den Grund als Text am Knopf (auf Touch der einzige Weg, ein `title`
+   * erscheint dort nie); Vorlesende bekommen ihn über `aria-describedby`.
    */
   sperrGrund?: string | null;
   children: ReactNode;
@@ -243,7 +235,7 @@ function Kartenknopf({
         margin: 0,
         border: 0,
         // Gesperrt: Farbe und Zeiger aus `.lfh-kartenknopf[aria-disabled]` (`lagekarte.css`) — ein
-        // Inline-Wert schlüge die Regel, und der Knopf sähe bedienbar aus.
+        // Inline-Wert schlüge die Regel.
         ...(sperrGrund != null ? {} : { color: farbe, cursor: 'pointer' }),
       }}
     >
@@ -275,23 +267,20 @@ export interface KartenUeberlagerungProps {
   /** Öffnet die Zeichenwerkzeuge der Leiste; ohne Schreibrecht nicht gesetzt → kein Knopf. */
   onZeichnen?: () => void;
   /**
-   * Messwerkzeug an/aus (LFH-616). Steht auch OHNE Schreibrecht da: gemessen wird nur,
-   * gespeichert nichts — anders als der Stift darunter. Nicht gesetzt (Karte ohne
-   * Messwerkzeug, z. B. `personen/BetroffeneKarte.tsx`) → kein Knopf.
+   * Messwerkzeug an/aus. Steht auch ohne Schreibrecht da: gemessen wird nur, gespeichert nichts.
+   * Nicht gesetzt (z. B. `personen/BetroffeneKarte.tsx`) → kein Knopf.
    */
   onMessen?: () => void;
   messenAktiv?: boolean;
   /**
-   * Eigenposition (LFH-712): Umschalter, auch ohne Schreibrecht. `sperrGrund` gesetzt → der
-   * Knopf steht gesperrt da und nennt den Grund beim Antippen. Nicht gesetzt → kein Knopf.
+   * Eigenposition: Umschalter, auch ohne Schreibrecht. `sperrGrund` gesetzt → gesperrt mit Grund.
+   * Nicht gesetzt → kein Knopf.
    */
   eigenposition?: { an: boolean; sperrGrund: string | null; onUmschalten: () => void };
   /**
-   * Leiste ein-/ausblenden (LFH-715). Nur ab `lg` gesetzt: dort steht die Leiste rechts neben
-   * der Karte, der Umschalter sitzt an ihrer Kante. Im Seitenkopf hob ein 72-px-Knopf
-   * (Handschuh) den Kopf um 43 px, und am Tablet belegte die ausgeklappte Zeitachse dann 53 %
-   * der Karte (Deckel 50 %, `e2e/leisten-flaeche.spec.ts`). Unter `lg` steht er weiter im
-   * Seitenkopf, dort liegt die Leiste unter der Karte.
+   * Leiste ein-/ausblenden, nur ab `lg`: dort steht der Umschalter an der Leistenkante. Im
+   * Seitenkopf hob ein 72-px-Knopf den Kopf so weit, dass die Zeitachse am Tablet über die Hälfte
+   * der Karte belegte (`e2e/leisten-flaeche.spec.ts`). Unter `lg` steht er im Seitenkopf.
    */
   leiste?: { sichtbar: boolean; sperrGrund: string | null; onUmschalten: () => void };
 }
@@ -311,8 +300,7 @@ export default function KartenUeberlagerung(props: KartenUeberlagerungProps) {
         style={{
           ...blockStil,
           left: UEBERLAGERUNG_RAND,
-          // Platz für den Knopfblock rechts lassen — sonst überdeckt eine lange Liste von
-          // Online-Stilen auf dem Handschirm die Zoomknöpfe.
+          // Platz für den Knopfblock lassen — sonst überdeckt eine lange Stil-Liste die Zoomknöpfe.
           maxWidth: `calc(100% - ${kante + 3 * UEBERLAGERUNG_RAND}px)`,
           display: 'flex',
           flexDirection: 'column',

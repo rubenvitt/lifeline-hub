@@ -2,10 +2,9 @@ import { OFFLINE_GLYPHS } from './basemapStil';
 import type { Farbrollen } from '../../theme/tokens';
 
 /**
- * Beschriftung im Entwurfsstil (Neuentwurf S5): dunkle Plakette mit Rahmen `linieStark`,
- * Text in `text` — an Zonen und, seit LFH-622, an Markern. Die Werte sind AUFGELÖSTE Rollen:
- * MapLibre-`paint` kennt weder `var(--lfh-*)` noch antd-Token, deshalb reichen
- * `useLagekarteDaten` (Zonen) und `Kartenflaeche` (Marker) sie durch.
+ * Beschriftung im Entwurfsstil: dunkle Plakette mit Rahmen `linieStark`, Text in `text` — an Zonen
+ * und Markern. Die Werte sind aufgelöste Rollen: MapLibre-`paint` kennt weder `var(--lfh-*)` noch
+ * antd-Token, deshalb reichen `useLagekarteDaten` (Zonen) und `Kartenflaeche` (Marker) sie durch.
  */
 export interface Plakette {
   text: string;
@@ -13,8 +12,10 @@ export interface Plakette {
   rahmen: string;
 }
 
-/** Plakette aus einem Rollensatz — rein, damit die Rollenwahl ohne Karte prüfbar ist. Der
- *  Name stammt aus der Zeit, als nur Zonen eine trugen; Marker nehmen dieselbe (LFH-622). */
+/**
+ * Plakette aus einem Rollensatz — rein, damit die Rollenwahl ohne Karte prüfbar ist. Der Name
+ * stammt aus der Zeit, als nur Zonen eine trugen.
+ */
 export function zonenPlakette(
   rollen: Pick<Farbrollen, 'text' | 'paneel' | 'linieStark'>,
 ): Plakette {
@@ -24,8 +25,10 @@ export function zonenPlakette(
 /** Präfix der Plakettenbilder; `styleimagemissing` in `Kartenflaeche.tsx` erkennt es daran. */
 export const PLAKETTE_PRAEFIX = 'plakette|';
 
-/** Bild-Id einer Plakette: die Farben stehen IN der Id, damit der Handler sie nach einem
- *  `setStyle` (der alle Bilder wegwischt) ohne weiteren Zustand neu zeichnen kann. */
+/**
+ * Bild-Id einer Plakette: die Farben stehen in der Id, damit der Handler sie nach einem `setStyle`
+ * (der alle Bilder wegwischt) ohne weiteren Zustand neu zeichnen kann.
+ */
 export function plakettenBildId(p: Pick<Plakette, 'grund' | 'rahmen'>): string {
   return `${PLAKETTE_PRAEFIX}${p.grund}|${p.rahmen}`;
 }
@@ -42,11 +45,10 @@ function hexZuRgb(hex: string): [number, number, number] | null {
 const PLAKETTE_KANTE = 8;
 
 /**
- * Das Plakettenbild als Pixeldaten für `map.addImage` — ein 9-Slice aus 1 px Rahmen und
- * dehnbarem Innenraum, das `icon-text-fit` um den Text legt. Rein und exportiert: die
- * Karte selbst läuft in jsdom nicht, die Pixel schon. `null` für eine fremde oder
- * unlesbare Id — der Aufrufer legt dann kein Bild an, und die Beschriftung steht ohne
- * Plakette da, statt dass ein Fehler aus dem MapLibre-Callback fliegt.
+ * Das Plakettenbild als Pixeldaten für `map.addImage` — ein 9-Slice aus 1 px Rahmen und dehnbarem
+ * Innenraum, das `icon-text-fit` um den Text legt. Rein und exportiert (die Karte läuft in jsdom
+ * nicht, die Pixel schon). `null` für eine fremde oder unlesbare Id — dann steht die Beschriftung
+ * ohne Plakette da, statt dass ein Fehler aus dem MapLibre-Callback fliegt.
  */
 export function plakettenBild(id: string): {
   width: number;
@@ -87,8 +89,8 @@ export function plakettenBild(id: string): {
 
 /**
  * Fontstack der eingebetteten Mono-Glyphs (`assets/karten/fonts/`, erzeugt von
- * `karten-build/gen-assets.sh`). Der Name muss byte-gleich zum Ordner sein — der Server
- * liefert pfadbasiert aus.
+ * `karten-build/gen-assets.sh`). Der Name muss byte-gleich zum Ordner sein — der Server liefert
+ * pfadbasiert aus.
  */
 export const PLAKETTEN_MONO = 'JetBrains Mono Regular';
 
@@ -105,21 +107,15 @@ function schriftListe(wert: unknown): string[] | undefined {
 }
 
 /**
- * Welche Schrift die Plaketten anfordern (LFH-622). Ein Fontstack, den der Glyphen-Server
- * des aktiven Stils nicht führt, beantwortet er mit 404. MapLibre 6 zeichnet die Zeichen
- * dann lokal in einer Systemschrift und warnt je Zeichen in der Konsole (im Browser
- * gemessen: 38 Warnungen für acht kurze Namen). Die Plakette bleibt stehen, nur eben nicht
- * in Mono, und die Konsole läuft voll. Deshalb hängt die Wahl am Stil, nicht an einer
- * Vorgabe:
+ * Welche Schrift die Plaketten anfordern. Einen Fontstack, den der Glyphen-Server des aktiven Stils
+ * nicht führt, beantwortet er mit 404; MapLibre 6 zeichnet dann lokal in einer Systemschrift und
+ * warnt je Zeichen. Deshalb hängt die Wahl am Stil:
+ * - offline → Mono, der eigene Server liefert sie aus;
+ * - online → die erste literale Schrift des Anbieter-Stils (die führt dessen Server sicher);
+ * - ohne Glyphen-Server (Blindkarte) → keine Angabe, MapLibre zeichnet lokal.
  *
- * - **offline** → Mono, denn der eigene Server liefert sie aus;
- * - **online** → die erste literale Schrift des Anbieter-Stils: die führt dessen Server
- *   sicher, eine Mono-Familie dort nicht;
- * - **ohne Glyphen-Server** (Blindkarte) → keine Angabe, MapLibre zeichnet lokal.
- *
- * `undefined` heißt „kein `text-font` setzen". Offline wäre das der eben beschriebene
- * Rückfall: MapLibres Vorgabe ist „Open Sans Regular,Arial Unicode MS Regular", die der
- * eigene Server nicht führt — so liefen die Zonenplaketten bis LFH-622.
+ * `undefined` heißt „kein `text-font` setzen". Offline wäre das der Rückfall auf MapLibres Vorgabe
+ * „Open Sans Regular,Arial Unicode MS Regular", die der eigene Server nicht führt.
  */
 export function plakettenSchrift(stil: StilAusschnitt | undefined): string[] | undefined {
   if (!stil?.glyphs) return undefined;

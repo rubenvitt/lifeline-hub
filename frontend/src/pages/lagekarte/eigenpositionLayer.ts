@@ -2,10 +2,9 @@ import type { GeoJSONSource, Map as MapLibreMap } from 'maplibre-gl';
 import type { Eigenposition } from './useEigenposition';
 
 /**
- * Kartenebene der Eigenposition (LFH-712): Genauigkeitskreis als Fläche in Metern plus Punkt.
- * Eine eigene GeoJSON-Quelle statt eines DOM-Markers: der Kreis muss mit dem Zoom mitwachsen,
- * und ein DOM-Element müsste dafür bei jedem Zoom nachgerechnet werden. Den Verlust bei
- * `setStyle` fängt `Kartenflaeche` über denselben Render-Poller ab wie die übrigen Ebenen.
+ * Kartenebene der Eigenposition: Genauigkeitskreis als Fläche in Metern plus Punkt. Eine
+ * GeoJSON-Quelle statt eines DOM-Markers, weil der Kreis mit dem Zoom mitwachsen muss. Den Verlust
+ * bei `setStyle` fängt `Kartenflaeche` über den Render-Poller ab.
  */
 
 export const EIGENPOSITION_QUELLE = 'eigenposition';
@@ -19,9 +18,8 @@ export const EIGENPOSITION_LAYER = [
 const ERDRADIUS_M = 6_371_008.8;
 
 /**
- * Kreis um (lat, lon) mit Radius in Metern als geschlossener Ring aus `stuetzen` Punkten —
- * auf der Kugel gerechnet (Zielpunkt aus Peilung und Distanz), damit er in Nord-Süd- und
- * Ost-West-Richtung gleich weit reicht und nicht mit cos(lat) gestaucht wird.
+ * Kreis um (lat, lon) mit Radius in Metern als geschlossener Ring — auf der Kugel gerechnet, damit
+ * er nicht mit cos(lat) gestaucht wird.
  */
 export function genauigkeitsKreis(
   lat: number,
@@ -86,9 +84,8 @@ export function eigenpositionFc(position: Eigenposition | null): EigenpositionFc
 
 /**
  * Quelle und Layer idempotent anlegen, Daten einspielen, nach oben ziehen. `farbe` ist die
- * Bedienrolle des aktiven Modus: die Eigenposition ist eine aktive Beziehung des Geräts,
- * kein Zustand eines Objekts. Rand und Kante sind Kontur, keine Rolle — dieselbe Wahl wie am
- * Personen-Marker (`markerLayer.ts`, LFH-650): Weiß plus Schwarz halten gegen jeden Grund.
+ * Bedienrolle: die Eigenposition ist eine aktive Beziehung des Geräts. Rand und Kante sind Kontur
+ * (Weiß plus Schwarz halten gegen jeden Grund, wie am Personen-Marker).
  */
 export function sorgeFuerEigenpositionLayer(
   map: MapLibreMap,
