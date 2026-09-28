@@ -246,11 +246,8 @@ describe('Schnellerfassung', () => {
   /**
    * Der Wortlaut steht GENAU EINMAL, und zwar in der Steuerzeile.
    *
-   * Die zweite Hälfte ist die, die die Aussage widerlegbar macht: ohne sie bliebe
-   * der Test grün, wenn der Hinweis dem Platzhalter wieder vorangestellt würde —
-   * und das war der Zustand, in dem das Feld nicht mehr sagte, was hineingehört
-   * (der sichtbare Anfang des Platzhalters war der Tastaturvertrag, „Inhalt …"
-   * stand dahinter). LFH-335 verlangt den Wortlaut im DOM, nicht zweimal.
+   * Die zweite Hälfte macht die Aussage widerlegbar: ohne sie bliebe der Test grün, wenn der
+   * Hinweis dem Platzhalter wieder vorangestellt würde (LFH-335).
    */
   it('erklärt den Enter-Vertrag genau einmal — sichtbar, nicht im Platzhalter', () => {
     renderMitProviders(<Schnellerfassung {...props()} />);
@@ -264,20 +261,18 @@ describe('Schnellerfassung', () => {
   });
 
   /**
-   * LFH-373 (Checkpoint 25.09.2026): unter `md` wird die Hinweiszeile zur einzeiligen
-   * Kurzform mit dem Tastaturvertrag. Befehle und Einheit stehen dort schon im Platzhalter;
-   * der Vertrag stand nur hier und bleibt deshalb — genau einmal. Hintergrund: die angepinnte
-   * Leiste belegte auf dem Handschirm im Handschuh-Betrieb sonst über die Hälfte des Fensters.
+   * Unter `md` wird die Hinweiszeile zur einzeiligen Kurzform mit dem Tastaturvertrag — genau
+   * einmal; sonst belegte die angepinnte Leiste im Handschuh-Betrieb über die Hälfte des
+   * Fensters (LFH-373).
    */
   it('unter md: Kurzform des Enter-Vertrags, einmal, ohne Befehlsliste', () => {
     setzeViewportBreite(390);
     renderMitProviders(<Schnellerfassung {...props()} />);
     expect(screen.getAllByText('Enter sendet · Shift+Enter neue Zeile')).toHaveLength(1);
     expect(screen.queryByText(/Mehrzeiler mit Cmd\/Strg\+Enter/)).toBeNull();
-    // Der Platzhalter hat unter `md` ebenfalls eine Kurzform (LFH-373, in der CI gemessen): der
-    // volle Wortlaut brach in den Linux-Schriften bei 390 px in eine zweite Zeile, das
-    // mitwachsende Feld misst den Platzhalter mit, und die Leiste riss im Handschuh-Betrieb den
-    // 50-%-Deckel (435 von 844 px). „Inhalt …" steht weiter vorn, beide Auslöser bleiben.
+    // Der Platzhalter hat unter `md` ebenfalls eine Kurzform: der volle Wortlaut brach bei 390 px
+    // um und trieb die Leiste über den 50-%-Deckel. „Inhalt …" steht weiter vorn, beide Auslöser
+    // bleiben.
     expect(screen.getByPlaceholderText(/^Inhalt …/)).toHaveAttribute(
       'placeholder',
       'Inhalt … ( / für Befehle · @ für Einheit )',
@@ -286,8 +281,7 @@ describe('Schnellerfassung', () => {
   });
 
   /**
-   * LFH-373: „Vorschau" steht neben „Erfassen" statt auf eigener Zeile unter dem Feld —
-   * genau EIN Umschalter, und er wirkt.
+   * „Vorschau" steht neben „Erfassen" statt auf eigener Zeile — genau EIN Umschalter, und er wirkt.
    */
   it('Vorschau steht einmal in der Aktionszeile und blendet die Vorschau ein', async () => {
     const { container } = renderMitProviders(<Schnellerfassung {...props()} />);
@@ -395,23 +389,20 @@ describe('Schnellerfassung', () => {
     renderMitProviders(<Schnellerfassung {...p} />);
     await userEvent.click(screen.getByRole('button', { name: /Feld/ }));
     await userEvent.click(await screen.findByText('Ereigniszeit'));
-    // Geprüft wird der Chip-Editor über sein `aria-label`, NICHT ein Text „Ereigniszeit"
-    // irgendwo: der Menüeintrag heisst genauso, ein `findByText(/Ereigniszeit/)` fand also
-    // auch dann etwas, wenn gar kein Chip aufging und bloss das Menü stehenblieb.
+    // Geprüft wird der Chip-Editor über sein `aria-label`, NICHT ein Text „Ereigniszeit": der
+    // Menüeintrag heißt genauso, ein `findByText` fände also auch dann etwas, wenn bloß das Menü
+    // stehenbliebe.
     expect(await screen.findByLabelText('Ereigniszeit')).toBeInTheDocument();
   });
 
   it('schliesst das Menü nach der Auswahl — auch wenn es über den Feld-Button kam', async () => {
     /**
-     * Der Bug, gemeldet am 30.07.2026. `waehleEintrag` schloss das Menü nicht selbst,
-     * sondern verliess sich auf `entferneTriggerText` — und die steigt bei
-     * `triggerStart < 0` sofort aus, BEVOR sie schliesst. Der Feld-Button setzt
-     * `triggerStart` ausdrücklich auf -1 (es gibt keinen „/"-Text zu entfernen), also
-     * blieb das Menü genau auf diesem Weg stehen. Es liegt absolut über der Chip-Leiste
-     * und verdeckte damit den Chip-Editor, der gerade aufgegangen war.
+     * `waehleEintrag` muss das Menü selbst schließen: `entferneTriggerText` steigt bei
+     * `triggerStart < 0` (Öffnung über den Feld-Knopf) vor jedem Schließen aus, und das stehende
+     * Menü verdeckte den gerade geöffneten Chip-Editor.
      *
-     * Beide Öffnungswege in EINEM Test: über „/" schloss es immer, über den Knopf nie.
-     * Ein Test für nur einen Weg wäre entweder trivial grün oder ohne Kontrast.
+     * Beide Öffnungswege in EINEM Test — ein Test für nur einen Weg wäre entweder trivial grün
+     * oder ohne Kontrast.
      */
     const p = props();
     renderMitProviders(<Schnellerfassung {...p} />);
@@ -424,7 +415,7 @@ describe('Schnellerfassung', () => {
     await nutzer.click(await screen.findByText('Ereigniszeit'));
     await waitFor(() => expect(screen.queryByTestId('slash-menu')).toBeNull());
 
-    // Weg 2 — über „/" im Text. Zur Kontrolle, dass der Fix ihn nicht verliert.
+    // Weg 2 — über „/" im Text.
     await nutzer.type(feld, '/');
     expect(await screen.findByTestId('slash-menu')).toBeInTheDocument();
     await nutzer.click(await screen.findByText('Von'));
@@ -447,8 +438,8 @@ describe('Schnellerfassung', () => {
   });
 
   it('schliesst das Menü beim Klick daneben', async () => {
-    // Die zweite Hälfte von „schliesst sich nicht": ohne Auswahl gab es überhaupt
-    // keinen Weg hinaus ausser Escape oder einem zweiten Druck auf denselben Knopf.
+    // Die zweite Hälfte von „schließt sich nicht": ohne Auswahl muss es einen Weg hinaus geben
+    // außer Escape oder einem zweiten Druck auf denselben Knopf.
     const p = props();
     renderMitProviders(<Schnellerfassung {...p} />);
     const nutzer = userEvent.setup();
@@ -535,11 +526,10 @@ describe('Schnellerfassung', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Wertübernahme (LFH-332/H61)
+// Wertübernahme (LFH-332)
 //
-// Hier steht nur, was OHNE Remount gilt. Der Fall, der in der Anwendung wirklich
-// zählt — Entwurfs-Tab schließt, Komponente wird neu montiert — kann diese Datei
-// nicht prüfen; er liegt in `entwuerfe/EtbEntwurfsTabs.test.tsx`.
+// Hier steht nur, was OHNE Remount gilt. Der Fall mit Remount (Entwurfs-Tab schließt) liegt
+// in `entwuerfe/EtbEntwurfsTabs.test.tsx`.
 // ---------------------------------------------------------------------------
 
 describe('Schnellerfassung – Wertübernahme', () => {
@@ -654,7 +644,7 @@ describe('Schnellerfassung – Entwurf-Anbindung', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Neuentwurf S4: Typ per `/` am Zeilenanfang, `@` für Von/An, Hinweiszeile
+// Typ per `/` am Zeilenanfang, `@` für Von/An, Hinweiszeile
 // ---------------------------------------------------------------------------
 
 describe('Schnellerfassung – Befehlszeile (Neuentwurf S4)', () => {
@@ -758,9 +748,8 @@ describe('Schnellerfassung – Befehlszeile (Neuentwurf S4)', () => {
 
 describe('Schnellerfassung — Chip-Zeile auf dem Handschirm (LFH-373)', () => {
   /**
-   * Gemessen vorher: im Handschuh-Betrieb bei 390 px kostete jeder gesetzte Chip eine eigene
-   * Reihe (+81 px), bei drei Chips belegte die angepinnte Leiste 578 von 844 px. Unter `md`
-   * rollt die Zeile deshalb waagerecht; die Pixel misst `e2e/leisten-flaeche.spec.ts`.
+   * Unter `md` rollt die Zeile waagerecht, damit nicht jeder gesetzte Chip eine eigene Reihe
+   * kostet; die Pixel misst `e2e/leisten-flaeche.spec.ts`.
    */
   it('unter md einzeilig mit waagerechtem Bildlauf, sonst umbrechend', () => {
     expect(chipZeileStil(true, { marginXS: 4 })).toMatchObject({
@@ -774,10 +763,9 @@ describe('Schnellerfassung — Chip-Zeile auf dem Handschirm (LFH-373)', () => {
   });
 
   /**
-   * Review LFH-373: in der einzeilig rollenden Chip-Zeile lag „Werte behalten" rechts hinter
-   * dem Bildlauf — nur durch zufälliges Wischen auffindbar. Unter `md` steht der Schalter
-   * deshalb in der Hinweiszeile der Erfassung (innerhalb von `[data-lfh="schnellerfassung"]`),
-   * ab `md` weiter in der Chip-Zeile.
+   * In der einzeilig rollenden Chip-Zeile läge „Werte behalten" hinter dem Bildlauf. Unter `md`
+   * steht der Schalter deshalb in der Hinweiszeile der Erfassung (innerhalb von
+   * `[data-lfh="schnellerfassung"]`), ab `md` in der Chip-Zeile.
    */
   it.each([
     [390, true],

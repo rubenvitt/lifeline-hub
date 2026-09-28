@@ -1,4 +1,3 @@
-// frontend/src/etb/entwuerfe/EtbEntwurfsTabs.test.tsx
 import { http, HttpResponse } from 'msw';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -42,9 +41,8 @@ function props(over: Partial<React.ComponentProps<typeof EtbEntwurfsTabs>> = {})
 }
 
 /**
- * Wrapper, der den Schalterzustand hält — seit er in `EtbPage` liegt und nicht mehr
- * in den Tabs (LFH-332, Review). Wer ihn im Test umlegen will, braucht diesen
- * Zustand; die Tabs selbst sind darin jetzt gesteuert.
+ * Wrapper, der den Schalterzustand hält — der liegt in `EtbPage`, nicht in den Tabs. Wer ihn
+ * im Test umlegen will, braucht diesen Zustand.
  */
 function MitSchalter(p: React.ComponentProps<typeof EtbEntwurfsTabs>) {
   const [behalten, setBehalten] = useState(p.werteBehalten);
@@ -160,11 +158,9 @@ describe('EtbEntwurfsTabs', () => {
   });
 
   it('behält das Erfassungsfeld nach dem Absenden — auch unter StrictMode (LFH-214)', async () => {
-    // Der e2e läuft über den Vite-Dev-Server, also unter React.StrictMode. Dort
-    // desynchronisierte ein impurer setEntwuerfe-Updater in entwurfSchliessen
-    // (setAktiverId/localStorage/leererEntwurf im Updater, doppelt invoked) entwuerfe
-    // und aktiverId, sodass der neue leere Entwurf-Tab keinen aktiven Inhalt mehr
-    // rendert → das Erfassungsfeld verschwand nach dem Absenden.
+    // Unter React.StrictMode (e2e über den Vite-Dev-Server) laufen Updater doppelt. Ein impurer
+    // setEntwuerfe-Updater in entwurfSchliessen desynchronisierte entwuerfe und aktiverId, und das
+    // Erfassungsfeld verschwand nach dem Absenden.
     const p = props();
     renderMitProviders(
       <StrictMode>
@@ -210,12 +206,11 @@ describe('EtbEntwurfsTabs', () => {
   });
 
   // -------------------------------------------------------------------------
-  // Wertübernahme über die Remount-Grenze (LFH-332/H61)
+  // Wertübernahme über die Remount-Grenze (LFH-332)
   //
-  // Genau hier — und nur hier — ist der Fall prüfbar: nach erfolgreichem Erfassen
-  // schließt dieser Container den Entwurfs-Tab, und das key-Prop erzwingt einen
-  // Remount der Schnellerfassung. Ein Wert, der nur in deren useState läge, wäre
-  // danach weg.
+  // Nur hier prüfbar: nach erfolgreichem Erfassen schließt dieser Container den Entwurfs-Tab,
+  // und das key-Prop erzwingt einen Remount der Schnellerfassung. Ein Wert, der nur in deren
+  // useState läge, wäre danach weg.
   // -------------------------------------------------------------------------
 
   async function setzeAnUndMeldeweg(feld: HTMLElement) {
@@ -231,7 +226,7 @@ describe('EtbEntwurfsTabs', () => {
     const p = props();
     renderMitProviders(<EtbEntwurfsTabs {...p} />);
     const feld = await screen.findByPlaceholderText(/Inhalt/);
-    // Vorgabe des Schalters ist AN.
+    // In `props()` steht der Schalter auf AN.
     expect(screen.getByRole('checkbox', { name: 'Werte behalten' })).toBeChecked();
 
     await userEvent.type(feld, 'Erste Meldung');
@@ -302,7 +297,7 @@ describe('EtbEntwurfsTabs', () => {
     );
   });
 
-  // --- LFH-117: Anhänge je Entwurf, nur im Speicher ---
+  // --- Anhänge je Entwurf, nur im Speicher ---
 
   function dateiEingabe(): HTMLInputElement {
     const el = document.querySelector<HTMLInputElement>('input[type="file"]');
@@ -355,7 +350,7 @@ describe('EtbEntwurfsTabs', () => {
     expect(screen.queryByText(/foto-c\.jpg/)).toBeNull();
   });
 
-  // --- LFH-117 (Review C1): der Sendezustand gehört dem Entwurf, nicht der Montierung ---
+  // --- Der Sendezustand gehört dem Entwurf, nicht der Montierung ---
 
   /** Ein Upload, der hängt, bis der Test ihn freigibt (oder scheitern lässt). */
   function haengenderUpload() {

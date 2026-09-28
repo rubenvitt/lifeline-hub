@@ -13,11 +13,9 @@ export default function BuchstabierHilfe({ text }: { text: string }) {
   /**
    * Der Popover-Zustand liegt hier, damit der Tooltip von ihm weiß.
    *
-   * Beide Hüllen hängen am selben Knopf und teilen Anker wie Ausrichtungsregel; der
-   * Tooltip liegt per z-index über dem Popover und verdeckte dessen erste Tafelzeile,
-   * solange der Zeiger nach dem Klick auf dem Knopf blieb. Auf Touch ist das der
-   * Normalfall — rc-trigger ergänzt einem Hover-Auslöser zusätzlich `touch`, ein Tipp
-   * öffnet also beides zugleich.
+   * Beide Hüllen hängen am selben Knopf und teilen Anker wie Ausrichtung; der Tooltip liegt per
+   * z-index über dem Popover und verdeckte dessen erste Tafelzeile. Auf Touch ist das der
+   * Normalfall — rc-trigger ergänzt einem Hover-Auslöser `touch`, ein Tipp öffnet beides.
    */
   const [tafelOffen, setTafelOffen] = useState(false);
   const zeichen = buchstabiere(text, tafel);
@@ -62,22 +60,14 @@ export default function BuchstabierHilfe({ text }: { text: string }) {
       open={tafelOffen}
       onOpenChange={setTafelOffen}
     >
-      {/*
-        Der Tooltip ist die fehlende Erklärung des icon-only-Auslösers (LFH-365 · B5e):
-        vorher trug er allein ein `aria-label`, war also für Maus und Touch stumm.
+      {/* Der Tooltip erklärt den icon-only-Auslöser für Maus und Touch (LFH-365). Wortlaut gleich dem
+         `aria-label` (WCAG 2.5.3).
 
-        Wortlaut gleich dem `aria-label`, damit sichtbarer Hinweis und zugänglicher Name
-        übereinstimmen (WCAG 2.5.3).
+         Der leere Titel bei offener Tafel ist der Riegel gegen den Stapel: antd rendert ohne Titel
+         kein Overlay. Ein `open={false}` täte es nicht — es machte den Tooltip dauerhaft kontrolliert
+         und nähme ihm sein eigenes Zeigerverhalten.
 
-        Der leere Titel bei offener Tafel ist der Riegel gegen den Stapel: antd rendert
-        ohne Titel kein Overlay, und die Erklärung hat ausgedient, sobald das Erklärte
-        offen steht. Ein `open={false}` täte es nicht — es machte den Tooltip dauerhaft
-        kontrolliert und nähme ihm sein eigenes Zeigerverhalten.
-
-        Kein `size`-Prop am Knopf: die Trefffläche kommt aus `controlHeight`. Sie hing
-        bis LFH-365 doppelt fest — an diesem Knopf UND am `Space.Compact` in
-        `MetaChip.tsx`, das sie über den Kontext auch ohne eigene Prop erzwang.
-      */}
+         Kein `size`-Prop am Knopf: die Trefffläche kommt aus `controlHeight`. */}
       <Tooltip title={tafelOffen ? '' : 'Buchstabierhilfe'}>
         <Button type="text" aria-label="Buchstabierhilfe" icon={<SoundOutlined />} />
       </Tooltip>

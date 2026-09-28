@@ -20,7 +20,7 @@ interface Props {
   onCancel: (feld: MetaFeld) => void;
   onRemove: (feld: MetaFeld) => void;
   onEdit: (feld: MetaFeld) => void;
-  /** Während des Sendens (LFH-117, Review C1): kein Schnellweg, kein Aktionsmenü. */
+  /** Während des Sendens: kein Schnellweg, kein Aktionsmenü. */
   gesperrt?: boolean;
 }
 
@@ -39,9 +39,8 @@ function anzeige(feld: MetaFeld, wert: Wert): string {
 /**
  * Fokussiert die Eingabe OHNE die Seite zu rollen (LFH-373). Ersetzt `autoFocus` an den vier
  * Editoren: React ruft dafür `focus()` ohne Optionen, und die Chip-Eingabe steht in der
- * angepinnten Erfassungsleiste am Seitenfuß — gemessen rollte der native Fokus die Seite bei
- * 390 px im Handschuh-Betrieb um 467 px, sobald „An" gesetzt wurde; wer oben im Tagebuch las,
- * verlor seine Stelle. antd reicht die Optionen bis zum nativen Feld durch
+ * angepinnten Erfassungsleiste am Seitenfuß — der native Fokus rollte die Seite, und wer oben
+ * im Tagebuch las, verlor seine Stelle. antd reicht die Optionen bis zum nativen Feld durch
  * (`@rc-component/input` `triggerFocus`, `@rc-component/select` `SelectInput`). Modulweit,
  * damit die Ref-Identität stabil bleibt und React sie nur beim Einhängen ruft.
  */
@@ -101,16 +100,13 @@ export default function MetaChip({
             }}
           />
         );
-      // LFH-110: Buchstabierhilfe additiv am Von/An-Feld (Funkrufname/Absender/Empfänger).
+      // Buchstabierhilfe additiv am Von/An-Feld (LFH-110).
       if (feld === 'von' || feld === 'an') {
         return (
           /*
-           * Ohne Größenangabe (LFH-365 · B5e): `Space.Compact size="small"` trug die
-           * Kleingröße über `SpaceCompactItemContext` auch den Kindern auf, die selbst
-           * keine hatten (gemessen an `antd/es/space/Compact.js` — Kinder bekamen
-           * `ant-input-sm`/`ant-btn-sm`). Die Angabe hier zu lassen und nur den Knopf in
-           * `BuchstabierHilfe` zu befreien, wäre also wirkungslos gewesen; der Wrapper
-           * steht genau deshalb in der Liste interaktiver Elemente des Dichte-Guards.
+           * Ohne Größenangabe: `Space.Compact size="small"` trägt die Kleingröße über
+           * `SpaceCompactItemContext` auch den Kindern auf (`ant-input-sm`/`ant-btn-sm`). Deshalb steht
+           * der Wrapper in der Liste interaktiver Elemente des Dichte-Guards.
            */
           <Space.Compact block>
             {editor}
@@ -154,25 +150,15 @@ export default function MetaChip({
 
   return (
     <Tag>
-      {/*
-        Der Maus-Schnellweg hängt am TEXT, nicht am ganzen Chip — und das ist der Kern
-        der Sache, nicht Kosmetik.
+      {/* Der Maus-Schnellweg hängt am TEXT, nicht am ganzen Chip.
 
-        Ein `onClick` am `<Tag>` machte jeden Nachfahren zum Auslöser, und der
-        Menü-Overlay IST ein Nachfahre: ein React-Synthetic-Event steigt durch den
-        Komponentenbaum auf, auch über die Portal-Grenze. Das Overlay trägt rings um
-        seine Einträge ein 4-px-Polsterband (`dropdownEdgeChildPadding` → `paddingXXS`,
-        vom Projekt-Theme nicht überschrieben, also in JEDER Dichtestufe gleich schmal).
-        Ein Griff daneben schloss das Menü ohne die Aktion auszuführen UND schaltete den
-        Chip in den Editor — im Review gemessen.
-
-        Zwei Riegel standen hier vorher und fingen es nicht: einer am Auslöser, einer am
-        Menü-`onClick`. Der zweite feuert nur für Einträge; das Band gehört keinem. Ein
-        dritter Riegel wäre die falsche Antwort auf die Frage — richtig ist, dem Overlay
-        den klickbaren Vorfahren zu nehmen. Deshalb liegt der Handler jetzt an einem
-        Geschwisterknoten des Menüs, und es braucht überhaupt kein `stopPropagation`
-        mehr.
-      */}
+         Ein `onClick` am `<Tag>` machte jeden Nachfahren zum Auslöser, und das Menü-Overlay IST
+         ein Nachfahre: ein Synthetic Event steigt durch den Komponentenbaum auf, auch über die
+         Portal-Grenze. Ein Griff auf das 4-px-Polsterband des Overlays
+         (`dropdownEdgeChildPadding` → `paddingXXS`) schlösse das Menü ohne Aktion UND schaltete den
+         Chip in den Editor. Riegel am Auslöser oder am Menü-`onClick` fangen das nicht (der feuert
+         nur für Einträge); richtig ist, dem Overlay den klickbaren Vorfahren zu nehmen. Der Handler
+         liegt deshalb an einem Geschwisterknoten des Menüs, ohne `stopPropagation`. */}
       <span
         onClick={gesperrt ? undefined : () => onEdit(feld)}
         style={{ cursor: gesperrt ? 'default' : 'pointer' }}
@@ -183,34 +169,25 @@ export default function MetaChip({
         trigger={['click']}
         disabled={gesperrt}
         /*
-         * `autoFocus` aus demselben Grund wie am Aktionsmenü der Zeile in `EtbZeitachse.tsx`
-         * und in `components/Datensicht.tsx`: ohne ihn bleibt der Fokus am
-         * Auslöser und die Pfeiltasten heben im Menü nichts hervor. Anders als dort ist
-         * die Wirkung hier gemessen — mit dem Prop trägt der erste Eintrag beim Öffnen
-         * die Hervorhebung, ohne ihn keiner.
+         * `autoFocus` wie am Aktionsmenü in `EtbZeitachse.tsx` und `components/Datensicht.tsx`: ohne
+         * ihn bleibt der Fokus am Auslöser und die Pfeiltasten heben im Menü nichts hervor.
          */
         autoFocus
         menu={{
           items: [
             { key: 'bearbeiten', label: 'Bearbeiten' },
-            // `danger`, aber ohne Rückfrage: ein entferntes Metadatenfeld ist umkehrbar —
-            // „Bearbeiten" daneben legt es wieder an. Reibung gehört ans Unumkehrbare
-            // (LFH-363).
+            // `danger`, aber ohne Rückfrage: ein entferntes Metadatenfeld ist umkehrbar — „Bearbeiten"
+            // daneben legt es wieder an (LFH-363).
             { key: 'entfernen', label: 'Entfernen', danger: true },
           ],
-          // Zuordnung am Menü statt an jedem Eintrag (Muster
-          // `pages/lagekarte/AnsichtSwitcher.tsx:138`).
+          // Zuordnung am Menü statt an jedem Eintrag (Muster `pages/lagekarte/AnsichtSwitcher.tsx`).
           onClick: ({ key }) => {
             if (key === 'bearbeiten') onEdit(feld);
             if (key === 'entfernen') onRemove(feld);
           },
         }}
       >
-        {/*
-          Kein `size`-Prop: die Trefffläche kommt aus `controlHeight` und zieht mit der
-          Dichtestufe mit (30 / 48 / 72 px). Genau das konnte das ~10-px-`closeIcon`
-          nicht, das hier vorher stand.
-        */}
+        {/* Kein `size`-Prop: die Trefffläche kommt aus `controlHeight` und zieht mit der Dichtestufe mit. */}
         <Button
           type="text"
           disabled={gesperrt}

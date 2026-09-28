@@ -7,25 +7,20 @@ import { hatVerknuepfung, verweisStil } from './zeitachseModell';
 /**
  * Rückverweise eines ETB-Eintrags auf die gekoppelten Objekte (LFH-25): Befehl und
  * Lagebericht haben eine Item-Route, der Auftrag wird per Query-Param auf der Liste
- * adressiert. Rendert nichts, wenn kein Rückverweis gesetzt ist.
+ * adressiert. Rendert nichts, wenn kein Verweis gesetzt ist.
  *
- * Seit dem Neuentwurf (S4, 21.09.2026) als Textverweis mit ↗ in der Hinweiszeile des
- * Zeitachsen-Eintrags statt als farbiges Etikett: die Farben Blau/Violett/Cyan der alten
- * Etiketten sind jetzt die ETB-Typkanten Meldung/Entscheidung/Lage — ein violettes
- * „Lagebericht" neben einer violetten Entscheidungskante behauptete eine Verwandtschaft,
- * die es nicht gibt. Das ↗ ist Glyphe (Entscheidung 2 des Auftraggebers) und steht
+ * Textverweis mit ↗ in der Hinweiszeile statt farbiges Etikett: Blau/Violett/Cyan sind die
+ * ETB-Typkanten, ein violettes „Lagebericht" neben einer violetten Entscheidungskante
+ * behauptete eine Verwandtschaft, die es nicht gibt. Das ↗ ist Glyphe und steht
  * `aria-hidden`: der zugängliche Name ist das Wort.
  *
- * Einen Verweis auf eine Meldung trägt der Eintrag nicht (es gibt kein `meldung_id` am
- * Wire-Typ) — er wird deshalb auch nicht gezeigt.
+ * Einen Verweis auf eine Meldung gibt es nicht (kein `meldung_id` am Wire-Typ).
  *
- * **Vorwärtsrichtung (LFH-636):** neben den Rückverweisen steht je Folgeauftrag — ein
- * Auftrag, der AUS diesem Eintrag erteilt wurde (`folgeauftraege`) — ein eigener Verweis
- * „Folgeauftrag Nr. 12". Einzelverweise statt Sammelverweis (Entscheidung des
- * Auftraggebers 22.09.2026): jeder hat ein eindeutiges Ziel und einen eigenen Namen. Das
- * Wort „Folgeauftrag" trennt ihn vom Rückverweis „Auftrag" (Eintrag wurde VON einem
+ * **Vorwärtsrichtung (LFH-636):** je Folgeauftrag — ein Auftrag, der AUS diesem Eintrag
+ * erteilt wurde — ein eigener Verweis „Folgeauftrag Nr. 12", mit eindeutigem Ziel und Namen.
+ * Das Wort „Folgeauftrag" trennt ihn vom Rückverweis „Auftrag" (Eintrag wurde VON einem
  * Auftrag erzeugt); beide können am selben Eintrag stehen. Die DB-`id` erscheint nie im
- * Namen — fehlt die Nummer (Aufträge vor LFH-133), heisst er nur „Folgeauftrag".
+ * Namen — fehlt die Nummer, heißt er nur „Folgeauftrag".
  */
 export default function EtbBacklinkBadges({
   eintrag,

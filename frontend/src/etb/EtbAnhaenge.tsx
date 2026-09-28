@@ -5,15 +5,13 @@ import { formatGroesse } from '../karten/formatGroesse';
 import { verweisStil } from './zeitachseModell';
 
 /**
- * Die Anhänge eines ETB-Eintrags als Download-Verweise (LFH-117, design.md D11) — ein
- * Bauteil für Zeitachse und Palettenvorschau.
+ * Die Anhänge eines ETB-Eintrags als Download-Verweise (LFH-117) — ein Bauteil für Zeitachse
+ * und Palettenvorschau.
  *
- * Sichtbar steht „Name · Größe"; der zugängliche Name trägt dazu die laufende Nummer des
- * Eintrags und die Handlung („…, Anhang zu Nr. 42 herunterladen"), weil zwei Einträge mit
- * `IMG_0001.jpg` sonst zwei gleichnamige Verweise lieferten (Regel wie beim Aktionsmenü,
- * LFH-364). Keine Ikone, kein Emoji, kein ↗: ↗ ist die Glyphe für Navigation, ein Download
- * navigiert nicht. Die Mindesthöhe kommt aus `verweisStil` (Boden `controlHeight` der
- * Dichtestufe), wie bei den übrigen Textverweisen der Zeitachse; die Farbe aus `bedienText`.
+ * Sichtbar steht „Name · Größe"; der zugängliche Name trägt dazu die laufende Nummer und die
+ * Handlung („…, Anhang zu Nr. 42 herunterladen"), sonst lieferten zwei Einträge mit
+ * `IMG_0001.jpg` zwei gleichnamige Verweise. Kein ↗: das ist die Glyphe für Navigation, ein
+ * Download navigiert nicht. Mindesthöhe aus `verweisStil`, Farbe aus `bedienText`.
  *
  * Der Verweis zeigt auf die ETB-Route (`etbAnhangPfad`), nie auf die generische — dort
  * antwortet der Server für ETB-Anhänge 404.
@@ -27,8 +25,8 @@ export default function EtbAnhaenge({
 }) {
   const { token, rollen } = useRollen();
   if (eintrag.anhaenge.length === 0) return null;
-  // Blauer Bedien-TEXT nimmt `bedienText`, nicht antds `colorLink` (LFH-650): der Linkton
-  // hielt auf dem Zeitachsengrund gemessen nur 4,82 : 1 in der Nacht (Boden 5).
+  // Blauer Bedien-TEXT nimmt `bedienText`, nicht antds `colorLink` (LFH-650): der Linkton hält
+  // auf dem Zeitachsengrund nachts den Boden 5 : 1 nicht.
   const stil = { ...verweisStil(token), color: rollen.bedienText };
   return (
     <span

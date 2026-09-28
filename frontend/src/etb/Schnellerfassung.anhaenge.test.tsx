@@ -413,10 +413,10 @@ describe('Schnellerfassung – Sendezustand (LFH-117, Review)', () => {
   });
 
   /**
-   * Review C1: gesperrt war nur Text und „Anhang" — Typ, „Feld", die Chips und „Werte
-   * behalten" blieben bedienbar, und was man dort während des Uploads änderte, ging nicht mit
-   * und wurde nach dem Erfolg still geleert. Geprüft wird die GANZE Erfassung, mit einer
-   * ausdrücklichen Ausnahmeliste: ein neues Bedienelement rutscht so nicht durch.
+   * Gesperrt ist die GANZE Erfassung, nicht nur Text und „Anhang": was man während des Uploads
+   * an Typ, „Feld", Chips oder „Werte behalten" änderte, ginge nicht mit und würde nach dem
+   * Erfolg still geleert. Die ausdrückliche Ausnahmeliste lässt kein neues Bedienelement
+   * durchrutschen.
    */
   it('sperrt während des Absendens JEDES Bedienelement der Erfassung außer „Vorschau"', async () => {
     let freigeben: (a: Anhang) => void = () => {};
