@@ -14,7 +14,7 @@
 
 ## 3. Inspector entprellt mit Eigen-Merker
 
-- [ ] 3.1 `FreiesZeichenInspector.tsx` nach D6 (600 ms Frist, Serverstand-Vergleich, Eigen-Merker, Übernahme fremder Änderung ohne eigene, Nachholen beim Schließen, `autoFokus={false}`); verifizieren: `FreiesZeichenInspector.test.tsx` mit „Öffnen schreibt nichts“, „schnelle Wechsel = ein PATCH“, „Schließen in der Frist holt nach“, „Schließen ohne Änderung schreibt nichts“ und dem Paar „fremde Änderung ohne eigene wird übernommen, nichts geschrieben“ / „mit eigener Änderung wird genau einmal gesendet“
+- [x] 3.1 `FreiesZeichenInspector.tsx` nach D6 (600 ms Frist, Serverstand-Vergleich, Eigen-Merker, Übernahme fremder Änderung ohne eigene, Nachholen beim Schließen, `autoFokus={false}`); verifizieren: `FreiesZeichenInspector.test.tsx` mit „Öffnen schreibt nichts“, „schnelle Wechsel = ein PATCH“, „Schließen in der Frist holt nach“, „Schließen ohne Änderung schreibt nichts“ und dem Paar „fremde Änderung ohne eigene wird übernommen, nichts geschrieben“ / „mit eigener Änderung wird genau einmal gesendet“
 
 ## 4. Objektsuche
 
