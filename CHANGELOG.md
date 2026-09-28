@@ -1,3 +1,27 @@
+## [1.0.0-alpha.51](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.50...v1.0.0-alpha.51) (2026-09-28)
+
+### Lagekarte
+
+**Zeichnungen können jetzt korrigiert werden**
+
+- Beim Zeichnen von Linien und Flächen können einzelne Punkte mit dem neuen Knopf „Letzten Punkt zurück" widerrufen werden
+- Ein Punktzähler zeigt während des Zeichnens die Anzahl der gesetzten Punkte an
+- Die Esc-Taste verhält sich jetzt zweistufig: Erstes Drücken verwirft die aktuelle Zeichnung mit Quittung „Zeichnung verworfen" und lässt den Zeichenmodus aktiv, zweites Drücken beendet den Zeichenmodus
+- Wenn Menüs oder Dialoge geöffnet sind, schließt Esc nur diese, nicht die Zeichnung
+
+**Eigene Position auf der Karte**
+
+- Neue Funktion zur Anzeige der eigenen Position als Punkt mit Genauigkeitskreis
+- Die Position wird live nachgeführt und beim ersten Aktivieren einmal angeflogen
+- Ein-/Ausschalten über Umschalter im Knopfblock der Karte
+- Ohne sicheren Kontext (kein HTTPS/localhost) ist die Funktion gesperrt und zeigt beim Antippen den Grund an
+- Die Position wird nicht gespeichert und verlässt das Gerät nicht
+
+**Bedienung verbessert**
+
+- Die Zeichnen-Steuerung passt jetzt auch bei schmalen Bildschirmen (ab 390 px) und halbierter Karte vollständig in den Kartenfuß
+- Gesperrte Knöpfe zeigen durch blasse Farbe und Mauszeiger visuell die Sperrung an, nicht nur für Screenreader
+
 ## [1.0.0-alpha.50](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.49...v1.0.0-alpha.50) (2026-09-28)
 
 ### Betrieb und Installation
