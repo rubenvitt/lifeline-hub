@@ -1,52 +1,27 @@
 pub mod repo;
 
 use crate::anhang::AnhangAnzeige;
+use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use utoipa::ToSchema;
 
 /// Name des Default-Kanals, der pro Einsatz garantiert existiert.
 pub const DEFAULT_KANAL_NAME: &str = "Allgemein";
 
-/// Typ des polymorphen Sachbezugs einer Nachricht (LFH-103). Code-validiert (kein
-/// DB-CHECK, analog `auftrag.prioritaet`/`meldung.status`); die Codes sind die
-/// Modulnamen der referenzierbaren Domänenobjekte. Bewusst getrennt von der
-/// Heraufstufung (`etb_eintrag_id`/`auftrag_id`): ein Bezug verweist auf ein
-/// bestehendes Objekt, eine Heraufstufung erzeugt eines.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum BezugTyp {
-    Schaden,
-    Uhs,
-    Person,
-    Lagebericht,
-    Meldung,
-    Auftrag,
-}
-
-impl BezugTyp {
-    /// Parst einen Code in den Typ; `None` bei unbekanntem Code (→ Validation im Handler).
-    pub fn parse(s: &str) -> Option<Self> {
-        match s {
-            "schaden" => Some(Self::Schaden),
-            "uhs" => Some(Self::Uhs),
-            "person" => Some(Self::Person),
-            "lagebericht" => Some(Self::Lagebericht),
-            "meldung" => Some(Self::Meldung),
-            "auftrag" => Some(Self::Auftrag),
-            _ => None,
-        }
-    }
-
-    /// Stabiler Code für Persistenz und API.
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Schaden => "schaden",
-            Self::Uhs => "uhs",
-            Self::Person => "person",
-            Self::Lagebericht => "lagebericht",
-            Self::Meldung => "meldung",
-            Self::Auftrag => "auftrag",
-        }
+wire_enum! {
+    /// Typ des polymorphen Sachbezugs einer Nachricht (LFH-103). Code-validiert (kein
+    /// DB-CHECK, analog `auftrag.prioritaet`/`meldung.status`); die Codes sind die
+    /// Modulnamen der referenzierbaren Domänenobjekte. Bewusst getrennt von der
+    /// Heraufstufung (`etb_eintrag_id`/`auftrag_id`): ein Bezug verweist auf ein
+    /// bestehendes Objekt, eine Heraufstufung erzeugt eines.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum BezugTyp {
+        Schaden => "schaden",
+        Uhs => "uhs",
+        Person => "person",
+        Lagebericht => "lagebericht",
+        Meldung => "meldung",
+        Auftrag => "auftrag",
     }
 }
 
