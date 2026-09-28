@@ -99,6 +99,13 @@ setzen ihn. Ohne ihn übernimmt ein Effekt den Serverstand in den Entwurf. Mit i
 (`entwurf = Serverstand`), fällt der Merker. Der Nachhol-Ref für das Schließen innerhalb der
 Frist bleibt aus C9. Getestet als Paar: ohne eigene Änderung übernimmt er den fremden Stand und
 schreibt nichts; mit eigener Änderung sendet er genau einmal.
+Nachzug aus der Review: Der Merker fällt auch, sobald der Entwurf wieder dem Serverstand
+gleicht. Sonst bliebe er nach „dieselbe Kachel erneut“ ohne Sendung stehen und schaltete die
+Übernahme dauerhaft ab. Die Bezeichnung ist kontrolliert, mit eigenem Tipp-Merker; ein
+`defaultValue` fror den alten Wortlaut ein und schrieb ihn beim bloßen Verlassen zurück.
+„Löschen“ verwirft eine offene Änderung, statt sie beim Abbau als PATCH auf das gelöschte
+Zeichen nachzuholen. „Zuletzt verwendet“ merkt die gesendete Spec aus dem Ergebnis der
+Mutation, nicht den Platzier-Modus beim Eintreffen der Antwort.
 *Verworfen:* ein expliziter „Übernehmen“-Knopf. Er kostet einen Klick je Änderung und passt
 nicht zum Sofort-Verhalten der übrigen Inspectors.
 
@@ -116,6 +123,11 @@ Erfassungs-Norm).
   wahr, weil er nur über Suchbares spricht.
 - [Enter im Suchfeld platziert mit dem ersten Treffer] → Das Platzieren beginnt erst mit dem
   Kartenklick und ist mit „Abbrechen“ umkehrbar; ein falscher Treffer kostet keinen Datensatz.
+- [Eigene und fremde Änderung in derselben Frist: gesendet wird die ganze Spec, fremde Felder,
+  die die Person nicht berührt hat, gehen verloren] → hingenommen. Ein feldweises Zusammenführen
+  gegen die Basis wäre ein eigener Schritt, die Spec schweigt dazu.
+- [Gescheiterter PATCH: der Picker zeigt weiter den ungesendeten Stand, gemeldet nur per
+  Fehlertoast] → Bestand vor LFH-716, mit der Frist nur weniger auffällig.
 - [Zirkulärer Import `MarkerSuche ↔ Sidebar`] → wie in C9 begründet; eine Modulebenen-Ableitung
   aus `Sidebar` in `MarkerSuche` würde ihn brechen und steht als Warnung im Kopf.
 

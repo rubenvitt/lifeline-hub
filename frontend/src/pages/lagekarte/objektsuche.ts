@@ -64,7 +64,8 @@ export interface MarkerGruppe {
 }
 
 /**
- * Gruppiert die Treffer eines Suchbegriffs nach Objektart.
+ * Gruppiert die Treffer eines Suchbegriffs nach Objektart. Gesucht wird in Beschriftung und
+ * Objektart.
  *
  * Leere Gruppen fallen weg. Sortiert wird nach Trefferzahl absteigend, bei Gleichstand nach
  * {@link TYP_REIHENFOLGE} — ausdrücklich zweistufig: bei gleicher Zahl entschiede sonst die
@@ -74,7 +75,10 @@ export function gruppiereTreffer(marker: KarteMarker[], suche: string): MarkerGr
   const begriff = suche.trim().toLocaleLowerCase();
   const nachTyp = new Map<MarkerTyp, KarteMarker[]>();
   for (const x of marker) {
-    if (begriff !== '' && !x.label.toLocaleLowerCase().includes(begriff)) continue;
+    // Beschriftung ODER Objektart: ein unbenanntes Zeichen heißt überall „(freies Zeichen)",
+    // gefunden wird es über „takt"; „fahrzeug" listet alle Fahrzeuge (Browserprobe LFH-716).
+    const text = `${x.label} ${OBJEKTART[x.typ]}`.toLocaleLowerCase();
+    if (begriff !== '' && !text.includes(begriff)) continue;
     const bisher = nachTyp.get(x.typ);
     if (bisher) bisher.push(x);
     else nachTyp.set(x.typ, [x]);

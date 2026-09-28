@@ -88,6 +88,11 @@ export default function FreiesZeichenInspector({
     setGesehenerServerStand(serverStand);
     if (!eigeneAenderung) setEntwurf(baueWert(zeichen));
   }
+  // Steht der Entwurf wieder auf dem Serverstand (dieselbe Kachel erneut gewählt, hin und
+  // zurück in der Frist, Echo der eigenen Sendung), ist nichts Eigenes mehr offen. Ohne diese
+  // Zeile bliebe der Merker ohne Sendung stehen, die Übernahme oben wäre dauerhaft aus, und
+  // die nächste fremde Änderung würde nach der Frist überschrieben (Review LFH-716, I1).
+  if (eigeneAenderung && entwurfText === serverStand) setEigeneAenderung(false);
 
   const onAendernRef = useRef(onAendern);
   useEffect(() => {
@@ -150,7 +155,16 @@ export default function FreiesZeichenInspector({
             disabled={!darfSchreiben}
             onChange={onVerschieben}
           />
-          <Button danger block onClick={onLoeschen}>
+          <Button
+            danger
+            block
+            onClick={() => {
+              // Eine offene Änderung wird verworfen, nicht beim Abbau nachgeholt: der PATCH
+              // träfe das gelöschte Zeichen und endete in 404 (Review LFH-716, M4).
+              offenerStand.current = null;
+              onLoeschen();
+            }}
+          >
             Löschen
           </Button>
         </Space>

@@ -182,6 +182,9 @@ export interface SidebarProps {
    * von `verortet`, weil das die Ebenen-Zeilen zählt und keine Betroffenen trägt.
    */
   suchbar: KarteMarker[];
+  /** Eine Quelle der Suche ist ausgefallen — dann „—" statt Zahlen und keine behauptete Leere.
+   *  Weiter als `sektionFehler.nichtVerortet`, weil die Suche auch Betroffene trägt. */
+  suchbarUnvollstaendig?: boolean;
   darfSchreiben: boolean;
   platzierungZiel: { typ: PlatzierenPunktTyp | 'einsatzort'; id: number } | null;
   onPlatzierenStart: (ziel: { typ: PlatzierenPunktTyp; id: number }) => void;
@@ -865,7 +868,9 @@ export default function Sidebar(props: SidebarProps) {
         <MarkerSuche
           marker={props.suchbar}
           onMarkerWaehlen={props.onMarkerWaehlen}
-          zaehlerUnbekannt={sektionFehler.nichtVerortet != null}
+          zaehlerUnbekannt={
+            sektionFehler.nichtVerortet != null || props.suchbarUnvollstaendig === true
+          }
         />
       </KlappPaneel>
 

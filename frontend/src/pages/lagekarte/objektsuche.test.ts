@@ -82,6 +82,17 @@ describe('gruppiereTreffer', () => {
     ]);
   });
 
+  it('findet auch über die Objektart — ein unbenanntes Zeichen heißt überall gleich', () => {
+    // Browserbefund LFH-716: „(freies Zeichen)" war unter „takt" nicht zu finden.
+    const marker = [
+      m('freies_zeichen', 1, '(freies Zeichen)'),
+      m('fahrzeug', 2, 'Florian 11-1'),
+      UHS,
+    ];
+    expect(gruppiereTreffer(marker, 'takt').map((g) => g.typ)).toEqual(['freies_zeichen']);
+    expect(gruppiereTreffer(marker, 'fahrzeug').map((g) => g.typ)).toEqual(['fahrzeug']);
+  });
+
   it('lässt leere Gruppen weg und zeigt bei leerer Suche alles', () => {
     const marker = [UHS, m('einheit', 1, 'Florian 1')];
     expect(gruppiereTreffer(marker, 'florian').map((g) => g.typ)).toEqual(['einheit']);

@@ -64,12 +64,19 @@ Im Inspector eines bestehenden Zeichens MUST NOT jede Auswahl im Picker sofort g
 werden. Änderungen SHALL nach einer kurzen Frist ohne weitere Änderung als ein Schreibvorgang
 gesendet werden. Das bloße Öffnen und das Schließen ohne Änderung MUST NOT schreiben. Eine noch
 in der Frist stehende Änderung MUST beim Schließen nachgeholt werden. Solange die Person
-nichts geändert hat, MUST der Inspector eine fremde Änderung am Zeichen übernehmen und MUST NOT
-den alten Stand zurückschreiben.
+nichts geändert hat, MUST der Inspector eine fremde Änderung am Zeichen übernehmen, auch in der
+Bezeichnung, und MUST NOT den alten Stand zurückschreiben. Das gilt auch, wenn eine eigene
+Änderung auf den Serverstand zurückführt (dieselbe Kachel erneut, hin und zurück) und wenn ein
+Feld nur fokussiert und verlassen wird. Nach „Löschen“ MUST NOT eine offene Änderung
+nachgeholt werden.
 
 #### Scenario: Durch das Raster steppen
 - **WHEN** die Person im Inspector mit den Pfeiltasten über fünf Grundzeichen läuft
 - **THEN** geht nach der Frist genau ein Schreibvorgang mit dem letzten Zeichen raus
+
+#### Scenario: Zurück auf den Serverstand, dann fremde Änderung
+- **WHEN** die Person die schon gewählte Kachel erneut wählt und danach jemand anderes die Bezeichnung ändert
+- **THEN** zeigt der Inspector die neue Bezeichnung und schreibt nichts
 
 #### Scenario: Fremde Änderung ohne eigene
 - **WHEN** der Inspector offen ist, die Person nichts geändert hat und jemand anderes das Zeichen ändert

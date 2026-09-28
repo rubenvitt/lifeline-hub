@@ -301,19 +301,22 @@ export function useKartenInteraktion({
   // Freies Zeichen am Klickpunkt anlegen (LFH-170); Spec kommt aus dem Platzier-Modus.
   const legeZeichenMutation = useMutation({
     mutationFn: async (p: { lat: number; lon: number }) => {
-      if (!zeichenPlatzieren) return;
+      if (!zeichenPlatzieren) return null;
       await legeFreiesZeichenAn(einsatzId, {
         lat: p.lat,
         lon: p.lon,
         ...zeichenPlatzieren,
         ansicht_id: aktiveAnsichtId ?? null,
       });
+      return zeichenPlatzieren;
     },
-    onSuccess: () => {
+    onSuccess: (gesendet) => {
       erfolg('Taktisches Zeichen angelegt');
       // „Zuletzt verwendet" (LFH-716, D5): erst hier, nach dem gespeicherten Zeichen — nicht
       // beim Wählen im Picker, sonst stünden Zwischenstände statt benutzter Zeichen in der Leiste.
-      if (zeichenPlatzieren) merkeZuletztVerwendet(zeichenPlatzieren);
+      // Gemerkt wird, was GESENDET wurde: wer vor der Antwort „Fertig" drückt, hat den Modus
+      // schon geleert (Review M5).
+      if (gesendet) merkeZuletztVerwendet(gesendet);
       qc.invalidateQueries({ queryKey: einsatzKeys.freieZeichen(einsatzId) });
       // Serienmodus (LFH-332/M76): der Platzier-Modus überlebt den POST, der Entwurf in der
       // Sidebar ohnehin (er wird dort nie zurückgesetzt). Beendet wird nur noch über

@@ -947,6 +947,9 @@ export default function LagekartePage() {
         nichtVerortet={nichtVerortetAlle}
         verortet={alleVerortet}
         suchbar={suchbar}
+        // Betroffene zählen nicht zum Lagebild-Fehler oben, gehören aber bei eingeschalteter
+        // Ebene zur Suche — ihr Ausfall macht die Suche unvollständig (Review LFH-716, M1).
+        suchbarUnvollstaendig={lagebildFehler || (personenFehler && layer.person)}
         darfSchreiben={!!darfSchreiben}
         platzierungZiel={platzierungZiel}
         onPlatzierenStart={onPlatzierenStart}

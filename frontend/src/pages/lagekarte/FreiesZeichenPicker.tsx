@@ -452,6 +452,26 @@ export default function FreiesZeichenPicker({
 
   const mitLabel = (roh: string): FreiesZeichenUpdate => ({ ...wert, label: roh.trim() || null });
 
+  /**
+   * Die Bezeichnung ist kontrolliert, mit eigenem Tipp-Merker (Review LFH-716, I2). Ein
+   * `defaultValue` fror den Wortlaut beim Einhängen ein: nach einer übernommenen fremden
+   * Änderung zeigte der Inspector den alten Namen, und schon Fokussieren und Verlassen schrieb
+   * ihn zurück. Jetzt folgt das Feld `wert.label`, solange nicht getippt wird, und übernommen
+   * wird nur, was wirklich getippt wurde. Kein `key={wert.label}`: der Remount verwürfe Text,
+   * den jemand gerade tippt, wenn in dem Moment eine fremde Änderung kommt.
+   *
+   * Übernommen wird weiter erst beim Verlassen, nicht je Anschlag — sonst liefe jedes Zeichen
+   * als Entwurfsänderung durch die Kartenseite.
+   */
+  const [bezeichnung, setBezeichnung] = useState(wert.label ?? '');
+  const [bezeichnungGetippt, setBezeichnungGetippt] = useState(false);
+  if (!bezeichnungGetippt && bezeichnung !== (wert.label ?? '')) setBezeichnung(wert.label ?? '');
+  const bezeichnungUebernehmen = (): FreiesZeichenUpdate | null => {
+    setBezeichnungGetippt(false);
+    const spec = mitLabel(bezeichnung);
+    return spec.label !== (wert.label ?? null) ? spec : null;
+  };
+
   const vorschau = baueFreiesZeichenTz(wert);
   const zeigtSymbol = grundzeichenAkzeptiert(wert.grundzeichen, 'symbol');
   const leistenKnopf = { ...kachelStil(token), ...kachelFarben(rollen, false) };
@@ -591,12 +611,23 @@ export default function FreiesZeichenPicker({
                   <Input
                     aria-label="Bezeichnung"
                     placeholder="Bezeichnung"
-                    defaultValue={wert.label ?? ''}
-                    onBlur={(e) => {
-                      const spec = mitLabel(e.target.value);
-                      if (spec.label !== (wert.label ?? null)) onChange(spec);
+                    value={bezeichnung}
+                    onChange={(e) => {
+                      setBezeichnung(e.target.value);
+                      setBezeichnungGetippt(true);
                     }}
-                    onPressEnter={(e) => uebernimmUndSende(mitLabel(e.currentTarget.value))}
+                    onBlur={() => {
+                      if (!bezeichnungGetippt) return;
+                      const spec = bezeichnungUebernehmen();
+                      if (spec) onChange(spec);
+                    }}
+                    onPressEnter={() => {
+                      const geaendert = bezeichnungUebernehmen();
+                      // Mit `onAbsenden` (Leiste) platziert Enter; ohne (Inspector) übernimmt
+                      // es nur, damit der getippte Name nicht beim Zurückfallen verloren geht.
+                      if (onAbsenden) uebernimmUndSende(geaendert ?? wert);
+                      else if (geaendert) onChange(geaendert);
+                    }}
                   />
                 </Space>
               </div>

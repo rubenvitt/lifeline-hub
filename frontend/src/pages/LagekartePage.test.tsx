@@ -1952,6 +1952,17 @@ describe('LagekartePage · Ebene „Betroffene" (LFH-648)', () => {
     expect(screen.getByText('1 verortet · 1 nicht verortet')).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: 'Schäden' })).toHaveTextContent('Schäden1');
     expect(screen.getByRole('switch', { name: 'Betroffene' })).toHaveTextContent('Betroffene—');
+    // Die Objektsuche dagegen führt Betroffene bei eingeschalteter Ebene — ohne ihre Liste ist
+    // sie unvollständig und darf keine Zahl behaupten (LFH-716, Review M1).
+    expect(screen.getByText('Schaden (—)')).toBeInTheDocument();
+  });
+
+  it('ohne eingeschaltete Ebene macht ein Ausfall der Personenliste die Suche nicht unvollständig', async () => {
+    basisHandler([
+      http.get('/api/einsaetze/1/personen', () => new HttpResponse(null, { status: 500 })),
+    ]);
+    renderSeite();
+    expect(await screen.findByText('Schaden (1)')).toBeInTheDocument();
   });
 
   it('die Kopfzahl „verortet" zählt Betroffene nicht mit', async () => {

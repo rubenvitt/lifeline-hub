@@ -24,6 +24,6 @@
 
 ## 5. Doku und Abschluss
 
-- [ ] 5.1 CLAUDE.md: kurzer Absatz „Objektsuche und Zeichenwahl der Lagekarte (LFH-716)“ mit Suchquelle/Modulsperre (D1), Enter-Vertrag (D4) und Inspector-Riegel (D6); verifizieren: Absatz verweist auf `design.md` dieses Change
-- [ ] 5.2 Prüfliste Einsatztauglichkeit (15 Kriterien) als `pruefliste.md` im Change-Verzeichnis, jede Zeile mit Verdikt; verifizieren: keine Zeile „nicht geprüft“
-- [ ] 5.3 Integration: `pnpm lint`, `tsc` (über `check-typ-codegen.sh`), volle Vitest-Suite, `prettier --check`; im Browser gegen den Dev-Stack Suche und Picker (inkl. Handschuh-Stufe in der 300-px-Leiste) einmal durchklicken; verifizieren: alle Gates grün, Beobachtung in der Prüfliste vermerkt
+- [x] 5.1 CLAUDE.md: kurzer Absatz „Objektsuche und Zeichenwahl der Lagekarte (LFH-716)“ mit Suchquelle/Modulsperre (D1), Enter-Vertrag (D4) und Inspector-Riegel (D6); verifizieren: Absatz verweist auf `design.md` dieses Change
+- [x] 5.2 Prüfliste Einsatztauglichkeit (15 Kriterien) als `pruefliste.md` im Change-Verzeichnis, jede Zeile mit Verdikt; verifizieren: keine Zeile „nicht geprüft“
+- [x] 5.3 Integration: `pnpm lint`, `tsc` (über `check-typ-codegen.sh`), volle Vitest-Suite, `prettier --check`; im Browser gegen den Dev-Stack Suche und Picker (inkl. Handschuh-Stufe in der 300-px-Leiste) einmal durchklicken; verifizieren: alle Gates grün, Beobachtung in der Prüfliste vermerkt

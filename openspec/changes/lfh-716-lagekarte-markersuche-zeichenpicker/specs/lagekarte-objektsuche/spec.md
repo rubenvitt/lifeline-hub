@@ -9,7 +9,8 @@ anspringbar, ohne Namen aus Modulen preiszugeben, für die die Person kein Recht
 
 ### Requirement: Suche über alle wählbaren verorteten Objekte
 Die Kartenleiste SHALL im Paneel „Verortet“ ein Suchfeld anbieten, das die Beschriftungen aller
-wählbaren verorteten Kartenobjekte ohne Rücksicht auf Groß- und Kleinschreibung durchsucht.
+wählbaren verorteten Kartenobjekte und ihre Objektart ohne Rücksicht auf Groß- und
+Kleinschreibung durchsucht.
 Wählbar sind Einsatzort, UHS, Schäden, Einheiten, Fahrzeuge, Führung, Einsatzabschnitte,
 Lagemeldungen, freie taktische Zeichen, Betreuungsstellen und Betroffene, jeweils nur unter
 den Bedingungen der Anforderung „Modulsperren“. Die Treffer MUST nach Objektart gruppiert
@@ -20,6 +21,10 @@ Reihenfolge der Objektarten stehen, unabhängig von der Ladereihenfolge der Date
 #### Scenario: Suchbegriff grenzt über alle Objektarten ein
 - **WHEN** verortet sind eine Einheit „Florian Nord 1“, ein Schaden „Keller Nordstraße“ und eine UHS „UHS Süd“, und die Person tippt „nord“
 - **THEN** stehen die Gruppen „Einheit (1)“ und „Schaden (1)“ da, die UHS nicht
+
+#### Scenario: Suche über die Objektart
+- **WHEN** ein freies Zeichen ohne Bezeichnung verortet ist und die Person „takt“ tippt
+- **THEN** steht es in der Gruppe „Taktisches Zeichen“
 
 #### Scenario: Leere Suche zeigt alles
 - **WHEN** das Suchfeld leer ist
@@ -36,7 +41,8 @@ Trefflächenboden der aktiven Dichtestufe sein.
 
 ### Requirement: Ein Leerzustand und keine falsche Leere
 Findet die Suche nichts, SHALL genau ein Leerzustand für die ganze Fläche erscheinen, mit dem
-Suchbegriff, wenn einer eingegeben ist. Ist eine Lagebild-Quelle ausgefallen, MUST die Fläche
+Suchbegriff, wenn einer eingegeben ist. Ist eine Quelle der Suche ausgefallen (eine Lagebild-Quelle, bei eingeschalteter Ebene
+„Betroffene“ auch die Personenliste), MUST die Fläche
 statt „Nichts verortet“ bzw. „kein Kartenobjekt“ sagen, dass die Liste unvollständig ist, und
 die Trefferzahlen MUST einen Gedankenstrich statt einer Zahl tragen.
 

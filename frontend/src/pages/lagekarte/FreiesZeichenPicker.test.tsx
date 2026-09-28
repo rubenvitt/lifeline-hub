@@ -127,6 +127,22 @@ describe('FreiesZeichenPicker — Grundzeichen als Bild-Raster', () => {
     expect(screen.getByLabelText('Grundzeichen suchen')).not.toHaveFocus();
   });
 
+  it('Pfeiltasten tragen den Fokus mit, rückwärts mit Umlauf ans Ende', () => {
+    const { onChange } = render({ grundzeichen: 'ohne' });
+    const gz = raster('Grundzeichen');
+    const erste = gz.getByRole('radio', { name: 'Kein Grundzeichen' });
+    erste.focus();
+    fireEvent.keyDown(erste, { key: 'ArrowDown' });
+    expect(gz.getByRole('radio', { name: 'Taktische Formation' })).toHaveFocus();
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowUp' });
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowLeft' });
+    const alle = gz.getAllByRole('radio');
+    expect(alle[alle.length - 1]).toHaveFocus();
+    expect(onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ grundzeichen: alle[alle.length - 1].getAttribute('data-id') }),
+    );
+  });
+
   it('bewegt die Auswahl mit den Pfeiltasten und ist EIN Tabstopp', () => {
     const { onChange } = render({ grundzeichen: 'ohne' });
     const erste = raster('Grundzeichen').getByRole('radio', { name: 'Kein Grundzeichen' });
@@ -227,6 +243,17 @@ describe('FreiesZeichenPicker — Enter platziert (LFH-716, D4)', () => {
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ grundzeichen: 'person' }));
   });
 
+  it('Enter mit echter Tastatur auf einer Kachel: genau EIN onChange und EIN Absenden', async () => {
+    // `fireEvent.keyDown` erzeugt keinen synthetischen Klick; erst die echte Tastenfolge
+    // zeigt, ob der Browser auf dem `<button>` zusätzlich klickt (Review LFH-716, I3).
+    const user = userEvent.setup();
+    const { onAbsenden, onChange } = render({ grundzeichen: 'taktische-formation' });
+    raster('Grundzeichen').getByRole('radio', { name: 'Person' }).focus();
+    await user.keyboard('{Enter}');
+    expect(onAbsenden).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenCalledTimes(1);
+  });
+
   it('platziert per Enter im Suchfeld mit dem ersten Treffer, wenn die Auswahl nicht darunter ist', () => {
     const { onAbsenden } = render({ grundzeichen: 'person' });
     const suche = screen.getByLabelText('Grundzeichen suchen');
@@ -287,7 +314,7 @@ describe('FreiesZeichenPicker — Enter platziert (LFH-716, D4)', () => {
     expect(onAbsenden).not.toHaveBeenCalled();
   });
 
-  it('kommt ohne den Callback aus und sendet dann nichts (Inspector)', () => {
+  it('wählt ohne `onAbsenden` (Inspector) per Enter nur aus', () => {
     const onChange = vi.fn();
     renderMitProviders(
       <FreiesZeichenPicker
@@ -296,11 +323,13 @@ describe('FreiesZeichenPicker — Enter platziert (LFH-716, D4)', () => {
         autoFokus={false}
       />,
     );
-    const kachel = raster('Grundzeichen').getByRole('radio', { name: 'Person' });
-    expect(() => fireEvent.keyDown(kachel, { key: 'Enter' })).not.toThrow();
-    expect(() =>
-      fireEvent.keyDown(screen.getByLabelText('Bezeichnung'), { key: 'Enter' }),
-    ).not.toThrow();
+    const kachel = raster('Grundzeichen').getByRole('radio', { name: 'Befehlsstelle' });
+    kachel.focus();
+    fireEvent.keyDown(kachel, { key: 'Enter' });
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({ grundzeichen: 'befehlsstelle' }),
+    );
   });
 });
 

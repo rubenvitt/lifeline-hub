@@ -218,9 +218,16 @@ keine Zusicherung. Der Zeichen-Picker ist ein Bildraster: Kacheln auf der Dichte
 Rollenfarben, Ruhe-Rand `steuerRahmen`. Enter sendet nur über `onAbsenden` und bringt die
 Spec **mit**, denn der Aufrufer hat die per Enter gewählte Kachel in dieser Runde noch nicht
 im State. „Zuletzt verwendet“ schreibt erst das erfolgreiche Anlegen
-(`useKartenInteraktion`). Der `FreiesZeichenInspector` schreibt entprellt (600 ms) und hat
-einen **eigenen** Änderungsmerker. Ohne ihn schriebe der unberührte Entwurf eine fremde
-Änderung nach der Frist zurück. Herleitung:
+(`useKartenInteraktion`, mit der gesendeten Spec aus dem Mutationsergebnis). Der
+`FreiesZeichenInspector` schreibt entprellt (600 ms) und hat einen **eigenen**
+Änderungsmerker. Ohne ihn schriebe der unberührte Entwurf eine fremde Änderung nach der Frist
+zurück. Der Merker fällt auch, sobald der Entwurf wieder dem Serverstand gleicht (dieselbe
+Kachel erneut gewählt). Sonst bleibt er ohne Sendung stehen, und dieselbe Lücke ist wieder
+offen, per Mutation gemessen. Die Bezeichnung im Picker ist deshalb **kontrolliert**, mit
+Tipp-Merker und ohne `key`-Remount. Ein `defaultValue` schrieb nach einer fremden Änderung den
+alten Namen schon beim Fokussieren und Verlassen zurück. Enter-Tests auf einer Kachel laufen
+über `userEvent.keyboard`, weil `fireEvent.keyDown` keinen synthetischen Klick auslöst und das
+fehlende `preventDefault` so nicht sähe. Herleitung:
 `openspec/changes/lfh-716-lagekarte-markersuche-zeichenpicker/design.md`.
 
 **Verbleib „Notunterkunft“ → Betreuungsstelle (LFH-674).** Der Verbleib trägt nur die

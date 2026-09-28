@@ -502,6 +502,32 @@ describe('useKartenInteraktion — freies Zeichen platzieren (LFH-170)', () => {
     expect(leseZuletztVerwendet().map((z) => z.grundzeichen)).toEqual(['stelle']);
   });
 
+  it('merkt das gesendete Zeichen auch, wenn der Modus vor der Antwort beendet wurde', async () => {
+    // Review LFH-716, M5: gemerkt wird, was gesendet wurde — nicht, was beim Eintreffen der
+    // Antwort noch im Platzier-Modus steht.
+    localStorage.clear();
+    let aufloesen: (v: { id: number }) => void = () => {};
+    freieZeichenApi.legeFreiesZeichenAn.mockReset();
+    freieZeichenApi.legeFreiesZeichenAn.mockImplementation(
+      () =>
+        new Promise((r) => {
+          aufloesen = r;
+        }),
+    );
+    const { result } = rendere();
+    act(() => result.current.onZeichenPlatzierenStart({ grundzeichen: 'stelle' }));
+    act(() => result.current.onKarteKlick({ lng: 8.6, lat: 50.1 }));
+    await waitFor(() => expect(freieZeichenApi.legeFreiesZeichenAn).toHaveBeenCalledTimes(1));
+    act(() => result.current.onZeichenPlatzierenFertig());
+    expect(result.current.zeichenPlatzieren).toBeNull();
+    await act(async () => aufloesen({ id: 7 }));
+    await waitFor(() =>
+      expect(leseZuletztVerwendet().map((z) => z.grundzeichen)).toEqual(['stelle']),
+    );
+    freieZeichenApi.legeFreiesZeichenAn.mockReset();
+    freieZeichenApi.legeFreiesZeichenAn.mockImplementation(() => Promise.resolve({ id: 42 }));
+  });
+
   it('merkt nichts, wenn das Anlegen scheitert', async () => {
     localStorage.clear();
     freieZeichenApi.legeFreiesZeichenAn.mockReset();

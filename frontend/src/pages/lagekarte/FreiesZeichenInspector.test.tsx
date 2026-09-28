@@ -184,4 +184,90 @@ describe('FreiesZeichenInspector — entprelltes Schreiben (LFH-716)', () => {
     expect(onAendern).toHaveBeenCalledTimes(1);
     expect(kachel('Befehlsstelle')).toHaveAttribute('aria-checked', 'true');
   });
+
+  // Review-Befund I1: ein Merker, der ohne Sendung stehen bleibt, schaltet die Übernahme
+  // fremder Änderungen dauerhaft ab.
+  it('Klick auf die schon gewählte Kachel, danach eine fremde Änderung: nichts zurückschreiben', () => {
+    vi.useFakeTimers();
+    const { onAendern, serverstand } = renderInspector();
+    fireEvent.click(kachel('Taktische Formation'));
+    act(() => vi.advanceTimersByTime(1000));
+    serverstand({ ...basis, label: 'Fremd', geaendert_at: 'x' });
+    act(() => vi.advanceTimersByTime(1000));
+    expect(onAendern).not.toHaveBeenCalled();
+  });
+
+  it('hin und zurück in der Frist, danach eine fremde Änderung: nichts zurückschreiben', () => {
+    vi.useFakeTimers();
+    const { onAendern, serverstand } = renderInspector();
+    fireEvent.click(kachel('Person'));
+    act(() => vi.advanceTimersByTime(200));
+    fireEvent.click(kachel('Taktische Formation'));
+    act(() => vi.advanceTimersByTime(1000));
+    serverstand({ ...basis, label: 'Fremd', geaendert_at: 'x' });
+    act(() => vi.advanceTimersByTime(1000));
+    expect(onAendern).not.toHaveBeenCalled();
+  });
+
+  // Review-Befund I2: das Feld „Bezeichnung" darf nach einer fremden Änderung weder den alten
+  // Wortlaut zeigen noch ihn beim bloßen Verlassen zurückschreiben.
+  it('Bezeichnung nach fremder Änderung: zeigt den neuen Wortlaut und schreibt beim Verlassen nichts', () => {
+    vi.useFakeTimers();
+    const { onAendern, serverstand } = renderInspector();
+    serverstand({ ...basis, label: 'Fremd', geaendert_at: 'x' });
+    const feld = screen.getByLabelText('Bezeichnung');
+    expect(feld).toHaveValue('Fremd');
+    fireEvent.focus(feld);
+    fireEvent.blur(feld);
+    act(() => vi.advanceTimersByTime(1000));
+    expect(onAendern).not.toHaveBeenCalled();
+  });
+
+  it('eine getippte Bezeichnung geht beim Verlassen entprellt raus', () => {
+    vi.useFakeTimers();
+    const { onAendern } = renderInspector();
+    const feld = screen.getByLabelText('Bezeichnung');
+    fireEvent.change(feld, { target: { value: 'Zug 2' } });
+    fireEvent.blur(feld);
+    act(() => vi.advanceTimersByTime(700));
+    expect(onAendern).toHaveBeenCalledTimes(1);
+    expect(onAendern).toHaveBeenCalledWith(expect.objectContaining({ label: 'Zug 2' }));
+  });
+
+  it('Enter in der Bezeichnung übernimmt im Inspector den Wortlaut (ohne Platzieren)', () => {
+    vi.useFakeTimers();
+    const { onAendern } = renderInspector();
+    const feld = screen.getByLabelText('Bezeichnung');
+    fireEvent.change(feld, { target: { value: 'Zug 3' } });
+    fireEvent.keyDown(feld, { key: 'Enter' });
+    act(() => vi.advanceTimersByTime(700));
+    expect(onAendern).toHaveBeenCalledWith(expect.objectContaining({ label: 'Zug 3' }));
+    expect(feld).toHaveValue('Zug 3');
+  });
+
+  // Review-Befund I3: der Wächter der Übernahme — eine offene eigene Änderung gewinnt gegen
+  // einen neuen Serverstand, der in ihrer Frist ankommt.
+  it('eine offene eigene Änderung überlebt einen fremden Serverstand und wird gesendet', () => {
+    vi.useFakeTimers();
+    const { onAendern, serverstand } = renderInspector();
+    fireEvent.click(kachel('Person'));
+    act(() => vi.advanceTimersByTime(200));
+    serverstand({ ...basis, grundzeichen: 'befehlsstelle', geaendert_at: 'x' });
+    expect(kachel('Person')).toHaveAttribute('aria-checked', 'true');
+    act(() => vi.advanceTimersByTime(700));
+    expect(onAendern).toHaveBeenCalledTimes(1);
+    expect(onAendern).toHaveBeenCalledWith(expect.objectContaining({ grundzeichen: 'person' }));
+  });
+
+  // Review-Befund M4: nach „Löschen" holt der Abbau keine offene Änderung mehr nach — ein
+  // PATCH auf das gelöschte Zeichen endete in 404 und einem Fehlertoast nach Erfolg.
+  it('„Löschen" verwirft eine offene Änderung, statt sie beim Abbau nachzuholen', () => {
+    vi.useFakeTimers();
+    const { onAendern, onLoeschen, unmount } = renderInspector();
+    fireEvent.click(kachel('Person'));
+    fireEvent.click(screen.getByRole('button', { name: 'Löschen' }));
+    expect(onLoeschen).toHaveBeenCalled();
+    unmount();
+    expect(onAendern).not.toHaveBeenCalled();
+  });
 });
