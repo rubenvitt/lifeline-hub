@@ -11,10 +11,10 @@ pub struct ZoneNeu<'a> {
     pub label: Option<&'a str>,
     pub farbe: Option<&'a str>,
     pub notiz: Option<&'a str>,
-    /// Ansichts-Zugehörigkeit (LFH-320): `None` = auf allen Ansichten sichtbar.
+    /// Ansichts-Zugehörigkeit: `None` = auf allen Ansichten sichtbar.
     pub ansicht_id: Option<i64>,
-    /// Zugeordneter Evakuierungsbezirk (LFH-673). Der Handler hat Typ, Einsatz, Lebenszyklus
-    /// und Modulrecht geprüft; hier wird nur geschrieben.
+    /// Zugeordneter Evakuierungsbezirk. Typ, Einsatz, Lebenszyklus und Modulrecht hat der Handler
+    /// geprüft; hier wird nur geschrieben.
     pub evakuierungsbezirk_id: Option<i64>,
     pub erstellt_von: i64,
 }
@@ -27,12 +27,12 @@ pub struct ZonePatch<'a> {
     pub farbe: Option<Option<&'a str>>,
     pub notiz: Option<Option<&'a str>>,
     pub gefahrengebiet_id: Option<Option<i64>>,
-    /// Verschieben/Freigeben (LFH-320): `None` = unverändert, `Some(None)` = auf alle
-    /// Ansichten (NULL), `Some(Some(x))` = auf Ansicht x.
+    /// Verschieben/Freigeben: `None` = unverändert, `Some(None)` = auf alle Ansichten (NULL),
+    /// `Some(Some(x))` = auf Ansicht x.
     pub ansicht_id: Option<Option<i64>>,
-    /// Bezirks-Zuordnung (LFH-673): `None` = unverändert, `Some(None)` = lösen,
-    /// `Some(Some(x))` = zuordnen. Wechselt die Zone weg vom Typ `evakuierungsbezirk`, fällt
-    /// die Zuordnung unabhängig davon (wie beim Gefahrengebiet).
+    /// Bezirks-Zuordnung: `None` = unverändert, `Some(None)` = lösen, `Some(Some(x))` = zuordnen.
+    /// Wechselt die Zone weg vom Typ `evakuierungsbezirk`, fällt die Zuordnung ohnehin (wie beim
+    /// Gefahrengebiet).
     pub evakuierungsbezirk_id: Option<Option<i64>>,
 }
 
@@ -80,8 +80,8 @@ fn zu_anzeige(r: Row) -> LageZoneAnzeige {
     }
 }
 
-/// Alle Zonen eines Einsatzes, älteste zuerst. `ansicht = Some(x)` filtert auf die Zonen der
-/// Ansicht x PLUS die ansichtslosen (`ansicht_id IS NULL`); `None` liefert alles (LFH-320).
+/// Alle Zonen eines Einsatzes, älteste zuerst. `ansicht = Some(x)` liefert die Zonen der Ansicht
+/// x PLUS die ansichtslosen; `None` liefert alles.
 pub async fn liste(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -118,9 +118,8 @@ pub async fn laden(
     .ok_or(AppError::NotFound)
 }
 
-/// Wie [`laden`], aber auf einer offenen Connection/Transaktion (F06/LFH-244 Tier-A):
-/// liefert die frische Anzeige samt geparster Felder für ETB-Text UND Response innerhalb
-/// derselben `write_retry!`-Tx (analog `tier::repo::laden_tx`). `NotFound`, falls fremd.
+/// Wie [`laden`], auf einer offenen Verbindung: die frische Anzeige für ETB-Text und Response in
+/// derselben `write_retry!`-Transaktion. `NotFound`, falls fremd.
 pub async fn laden_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -137,11 +136,10 @@ pub async fn laden_tx(
     .ok_or(AppError::NotFound)
 }
 
-/// Legt eine Zone an (Felder bereits validiert) INNERHALB einer offenen Transaktion
-/// (F06/LFH-244 Tier-A) und liefert die neue `id`. gefahrengebiet-Zonen tragen immer eine
-/// Gruppe (Gruppe-von-eins beim Zeichnen); Gruppen-INSERT + Zonen-INSERT laufen im selben
-/// `conn`, damit keine Ghost-Gruppe zurückbleibt. Beide sind reine INSERTs (retry-sicher:
-/// bei ROLLBACK persistiert nichts).
+/// Legt eine Zone (bereits validiert) in einer offenen Transaktion an und liefert die `id`.
+/// Gefahrengebiet-Zonen tragen immer eine Gruppe; Gruppen- und Zonen-INSERT laufen auf derselben
+/// Verbindung, damit keine Geister-Gruppe zurückbleibt. Beides sind reine INSERTs und damit
+/// retry-sicher.
 pub async fn anlegen_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -176,20 +174,19 @@ pub async fn anlegen_tx(
     )
     .bind(einsatz_id).bind(daten.typ).bind(daten.geometrie_typ).bind(daten.geometrie)
     .bind(daten.label).bind(daten.farbe).bind(daten.notiz).bind(gebiet_id)
-    // ansicht_id NUR in der Zone (LFH-320) — die Gefahrengebiet-Gruppe oben ist ansichtslos.
+    // `ansicht_id` nur an der Zone; die Gefahrengebiet-Gruppe ist ansichtslos.
     .bind(daten.ansicht_id)
-    // Nur an Bezirksflächen (LFH-673); an jedem anderen Typ bleibt die Spalte leer.
+    // Nur an Bezirksflächen; an jedem anderen Typ bleibt die Spalte leer.
     .bind(bezirk_id)
     .bind(daten.erstellt_von)
     .fetch_one(&mut *conn).await?;
     Ok(id)
 }
 
-/// In-Tx-Wache der Bezirks-Zuordnung (LFH-673): der Bezirk gehört zum Einsatz und ist nicht
-/// storniert — geprüft auf DERSELBEN Verbindung wie der Schreibvorgang. Die Route prüft
-/// vorab (für die genauen Codes 403/404/409); diese Wache schließt das Fenster zwischen
-/// Vorabprüfung und Schreiben, in dem ein paralleler Storno die Fläche sonst wieder an eine
-/// Fehlanlage hängen ließe (Review LFH-673, Befund 2). Verfehlt → 409.
+/// Wache der Bezirks-Zuordnung in der Transaktion: der Bezirk gehört zum Einsatz und ist nicht
+/// storniert, geprüft auf DERSELBEN Verbindung wie das Schreiben. Die Route prüft vorab (für
+/// 403/404/409); diese Wache schließt das Fenster, in dem ein paralleler Storno die Fläche
+/// sonst an eine Fehlanlage hängen ließe. Verfehlt → 409.
 async fn bezirk_lebt_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -212,7 +209,7 @@ async fn bezirk_lebt_tx(
     }
 }
 
-/// Pool-Wrapper: legt an (eigene Tx) und lädt die Anzeige. Delegiert an [`anlegen_tx`].
+/// Pool-Wrapper: legt in eigener Transaktion an und lädt die Anzeige.
 pub async fn anlegen(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -224,8 +221,8 @@ pub async fn anlegen(
     laden(pool, einsatz_id, id).await
 }
 
-/// Partial-Update gegen den Effektivzustand (nur gesendete Felder ändern), `geaendert_at`
-/// stets aktualisiert. Geometrie ist NICHT änderbar (kein Reshape). `NotFound`, falls fremd.
+/// Partial-Update gegen den Effektivzustand (nur gesendete Felder), `geaendert_at` stets neu.
+/// Die Geometrie ist nicht änderbar. `NotFound`, falls fremd.
 pub async fn aktualisiere(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -237,12 +234,12 @@ pub async fn aktualisiere(
     let neuer_typ = daten.typ.unwrap_or(vorher.typ.as_str());
     let alt_gebiet = vorher.gefahrengebiet_id;
 
-    // Gruppen-INSERT (Split/Neuanlage) und das anschließende UPDATE laufen atomar,
-    // damit nie eine committete Gruppe ohne zugehörige Zone zurückbleibt.
+    // Gruppen-INSERT (Split/Neuanlage) und UPDATE laufen atomar, damit nie eine Gruppe ohne Zone
+    // zurückbleibt.
     let mut tx = pool.begin().await?;
 
-    // gefahrengebiet-Zonen tragen IMMER eine Gruppe. `Some(None)` heißt NICHT
-    // „Spalte auf NULL", sondern „in NEUE eigene Gruppe abspalten".
+    // Gefahrengebiet-Zonen tragen IMMER eine Gruppe: `Some(None)` heißt nicht „NULL“, sondern „in
+    // eine neue eigene Gruppe abspalten“.
     let ziel_gebiet: Option<i64> = if neuer_typ != "gefahrengebiet" {
         None
     } else {
@@ -272,11 +269,10 @@ pub async fn aktualisiere(
         }
     };
 
-    // Bezirks-Zuordnung (LFH-673): ein anderer Typ trägt nie einen Bezirk, sonst gewinnt der
-    // Patch, sonst bleibt der Bestand — der Bestand aber aus der ZEILE (CASE im UPDATE), nicht
-    // aus dem vorab gelesenen `vorher`: ein paralleler Storno hat sie womöglich schon gelöst,
-    // und ein reiner Label-PATCH hängte die Fläche sonst wieder an die Fehlanlage (Review
-    // LFH-673, Befund 2). Beim Setzen zusätzlich die Wache in derselben Transaktion.
+    // Bezirks-Zuordnung: ein anderer Typ trägt nie einen Bezirk; sonst gewinnt der Patch; sonst
+    // bleibt der Bestand — und zwar aus der ZEILE (CASE im UPDATE), nicht aus dem vorab gelesenen
+    // `vorher`, weil ein paralleler Storno sie schon gelöst haben kann. Beim Setzen zusätzlich die
+    // Wache in derselben Transaktion.
     let bezirk_weg = neuer_typ != "evakuierungsbezirk";
     if !bezirk_weg {
         if let Some(Some(b)) = daten.evakuierungsbezirk_id {
@@ -305,7 +301,7 @@ pub async fn aktualisiere(
     .bind(daten.farbe.flatten())
     .bind(daten.notiz.is_some())
     .bind(daten.notiz.flatten())
-    // ziel_gebiet enthält bereits den Effektivwert (None-Arm = unverändert) → kein CASE nötig.
+    // `ziel_gebiet` enthält schon den Effektivwert, kein CASE nötig.
     .bind(ziel_gebiet)
     .bind(daten.ansicht_id.is_some())
     .bind(daten.ansicht_id.flatten())
@@ -322,7 +318,7 @@ pub async fn aktualisiere(
     }
     tx.commit().await?;
 
-    // Verlassene Gruppe aufräumen, falls jetzt leer (Matrix cascaded mit weg).
+    // Verlassene Gruppe aufräumen, falls sie jetzt leer ist (die Matrix kaskadiert mit).
     if alt_gebiet != ziel_gebiet {
         if let Some(g) = alt_gebiet {
             crate::gefahr::repo::gebiet_aufraeumen_wenn_leer(pool, g).await?;
@@ -331,10 +327,10 @@ pub async fn aktualisiere(
     laden(pool, einsatz_id, id).await
 }
 
-/// Hard-Delete INNERHALB einer offenen Transaktion (F06/LFH-244 Tier-A). Liefert
-/// [`Aufgeloest`] — u. a. die `gefahrengebiet_id` der gelöschten Zone (für das Aufräumen der ggf. verwaisten Gruppe
-/// NACH dem Commit — das läuft auf dem Pool und darf nicht in dieselbe Tx, sonst Deadlock
-/// gegen den eigenen Write-Lock). `NotFound`, falls nichts gelöscht wurde (fremd/inexistent).
+/// Hard-Delete in einer offenen Transaktion. Liefert [`Aufgeloest`], u. a. die
+/// `gefahrengebiet_id` für das Aufräumen einer verwaisten Gruppe NACH dem Commit — das läuft auf
+/// dem Pool und in derselben Transaktion gäbe es einen Deadlock gegen den eigenen Write-Lock.
+/// `NotFound`, falls nichts gelöscht wurde.
 pub async fn loese_auf_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -361,12 +357,11 @@ pub async fn loese_auf_tx(
 pub struct Aufgeloest {
     /// Gefahrengebiet-Gruppe (Aufräumen einer ggf. verwaisten Gruppe).
     pub gefahrengebiet_id: Option<i64>,
-    /// Evakuierungsbezirk (LFH-673): dessen Flächenzahl hat sich geändert → Live-Ereignis.
+    /// Evakuierungsbezirk, dessen Flächenzahl sich geändert hat → Live-Ereignis.
     pub evakuierungsbezirk_id: Option<i64>,
 }
 
-/// Pool-Wrapper: Hard-Delete (eigene Tx) + Aufräumen der verwaisten Gruppe. `NotFound`,
-/// falls nicht zum Einsatz. Delegiert an [`loese_auf_tx`].
+/// Pool-Wrapper: Hard-Delete in eigener Transaktion und Aufräumen der verwaisten Gruppe.
 pub async fn loese_auf(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<(), AppError> {
     let mut conn = pool.acquire().await?;
     let gebiet_id = loese_auf_tx(&mut conn, einsatz_id, id)
@@ -663,7 +658,7 @@ mod tests {
         ));
     }
 
-    // ── LFH-673: Bezirks-Zuordnung — Wache in der Transaktion, Bestand aus der Zeile ──
+    // ── Bezirks-Zuordnung: Wache in der Transaktion, Bestand aus der Zeile ──
 
     async fn bezirk(pool: &SqlitePool, einsatz: i64, von: i64, storniert: bool) -> i64 {
         sqlx::query_scalar(
@@ -700,8 +695,7 @@ mod tests {
         }
     }
 
-    /// Am Vorabcheck der Route vorbei: die Wache in der Transaktion lehnt einen stornierten
-    /// Bezirk selbst ab (409) — sonst schlösse ein paralleler Storno das Fenster nicht.
+    /// Am Vorabcheck der Route vorbei lehnt die Wache einen stornierten Bezirk selbst ab (409).
     #[tokio::test]
     async fn stornierter_bezirk_scheitert_an_der_wache_in_der_transaktion() {
         let pool = crate::db::test_pool().await;
@@ -736,7 +730,7 @@ mod tests {
         );
     }
 
-    /// Ein Patch ohne Zuordnung lässt die Spalte, wie sie in der ZEILE steht — nicht wie ein
+    /// Ein Patch ohne Zuordnung lässt die Spalte so, wie sie in der ZEILE steht, nicht wie ein
     /// vorab gelesener Stand sie zeigte.
     #[tokio::test]
     async fn label_patch_laesst_die_zuordnung_der_zeile_stehen() {

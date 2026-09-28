@@ -1,12 +1,9 @@
-//! ETB-Lesemarke je Benutzer und Einsatz (LFH-611, Neuentwurf S4): „14 neue Einträge seit
-//! Ihrer letzten Sichtung um 13:04 · alle als gesichtet markieren".
+//! ETB-Lesemarke je Benutzer und Einsatz (LFH-611): „14 neue Einträge seit Ihrer letzten
+//! Sichtung um 13:04 · alle als gesichtet markieren“.
 //!
 //! Die Marke ist eine GRENZE über `lfd_nr` (Begründung im Kopf von
 //! `migrations/0103_etb_lesemarke.sql`). Sie läuft nur vorwärts und wird nur ausdrücklich
-//! gesetzt — Öffnen oder Blättern im Tagebuch verschiebt sie nicht.
-//!
-//! Abgrenzung zu LFH-612: hier entsteht ausschließlich der Zähler RELATIV zur Marke, kein
-//! allgemeiner ETB-Gesamtzähler.
+//! gesetzt; Öffnen oder Blättern verschiebt sie nicht. Gezählt wird nur relativ zur Marke.
 
 use crate::error::AppError;
 use serde::Serialize;
@@ -72,11 +69,9 @@ pub async fn laden(
     })
 }
 
-/// Setzt die Marke auf `bis_lfd_nr` — nur vorwärts. Ein verspäteter Request mit älterem
-/// Stand (zweiter Tab) dreht weder die Nummer zurück noch behauptet er eine neuere Sichtung:
-/// `gesichtet_at` rückt nur mit, wenn die Nummer rückt.
-///
-/// Die Obergrenze prüft der Aufrufer (422, eine Sichtung von Einträgen, die es nicht gibt).
+/// Setzt die Marke auf `bis_lfd_nr` — nur vorwärts. Ein verspäteter Request (zweiter Tab) dreht
+/// die Nummer nicht zurück und behauptet keine neuere Sichtung: `gesichtet_at` rückt nur mit
+/// der Nummer. Die Obergrenze prüft der Aufrufer (422).
 pub async fn setzen(
     pool: &SqlitePool,
     einsatz_id: i64,

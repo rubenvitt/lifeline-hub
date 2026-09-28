@@ -1,20 +1,17 @@
 //! Aufbewahrung abgeschlossener Einsätze aus Sicht des Org-Admins (LFH-23).
 //!
 //! Die Lesesperre der regulären Einsatz-Routen (`einsatz::berechtigung::darf_lesen`) bleibt
-//! unverändert — auch für den System-Admin. Dieses Modul stellt **daneben** einen eigenen,
-//! lesenden Pfad bereit (Namensraum `/api/aufbewahrung`, `routes::aufbewahrung`): eine
-//! Übersicht der abgeschlossenen Einsätze der eigenen Organisation mit ihrem
-//! Aufbewahrungszustand und eine pseudonyme Archivakte (Kopf, Register, ETB), die
-//! ausschließlich aus Retain-Spalten der Schwärzungs-Registry gelesen wird
-//! ([`projektion`]). Einzige schreibende Aktion ist das Wiederherstellen während der
-//! Karenz (`einsatz::repo::wiederherstellen`).
+//! unverändert, auch für den System-Admin. Daneben gibt es einen eigenen, lesenden Pfad
+//! (`/api/aufbewahrung`, `routes::aufbewahrung`): eine Übersicht der abgeschlossenen Einsätze
+//! der eigenen Organisation mit Aufbewahrungszustand und eine pseudonyme Archivakte (Kopf,
+//! Register, ETB) nur aus Retain-Spalten ([`projektion`]). Einzige Schreibaktion ist das
+//! Wiederherstellen während der Karenz (`einsatz::repo::wiederherstellen`).
 //!
-//! **„Org-Admin“ ist der System-Admin derselben Organisation** (Annahme A1, design.md D1):
-//! enger als sonst beim System-Admin, der Einsätze serverweit lesen darf. Die Prüfung
-//! steht in [`fordere_archivzugriff`].
+//! **„Org-Admin“ ist der System-Admin derselben Organisation** — enger als sonst beim
+//! System-Admin. Die Prüfung steht in [`fordere_archivzugriff`].
 //!
-//! Eigene DTOs statt `EinsatzAnzeige`/`EtbEintragAnzeige`/`PersonAnzeige`: diese wachsen
-//! (Anhänge am ETB, LFH-117), und das Archiv würde neue Felder still mitliefern.
+//! Eigene DTOs statt `EinsatzAnzeige`/`EtbEintragAnzeige`/`PersonAnzeige`: die wachsen mit
+//! anderen Modulen, und das Archiv lieferte neue Felder still mit.
 
 pub mod projektion;
 pub mod repo;
@@ -169,11 +166,10 @@ pub struct ArchivEtbEintragAnzeige {
     pub berichtigt_eintrag_id: Option<i64>,
 }
 
-/// Archivzugriff (design.md D1/D2): nur der System-Admin, nur für Einsätze seiner
-/// Organisation (fremde Org → 403), nur für abgeschlossene Einsätze (aktiv → 409, eine
-/// Archivakte gibt es erst nach dem Abschluss). Die Admin-Eigenschaft selbst sichert der
-/// `AdminUser`-Extractor der Route; sie wird hier trotzdem geprüft, damit die Funktion
-/// allein keine falsche Zusage macht.
+/// Archivzugriff: nur der System-Admin, nur für Einsätze seiner Organisation (fremd → 403), nur
+/// für abgeschlossene Einsätze (aktiv → 409). Die Admin-Eigenschaft sichert schon der
+/// `AdminUser`-Extractor; sie wird hier trotzdem geprüft, damit die Funktion allein keine
+/// falsche Zusage macht.
 pub fn fordere_archivzugriff(
     benutzer: &Benutzer,
     einsatz_org_id: i64,
@@ -191,12 +187,11 @@ pub fn fordere_archivzugriff(
     Ok(())
 }
 
-/// Sperre des Frist-PUT an Tombstones (LFH-23, design.md D6) — EINE Stelle für Route und
-/// Repo-Fallback, damit beide dieselbe Linie ziehen:
+/// Sperre des Frist-PUT an Tombstones — EINE Stelle für Route und Repo:
 /// - geschwärzt → 409 (endgültig),
-/// - vorgemerkt, Karenz abgelaufen (`schwaerzung_ausstehend`) → 409: auch das
-///   Wiederherstellen ist dort 409, ein Verweis darauf zeigte auf einen geschlossenen Weg,
-/// - vorgemerkt, Karenz läuft → 422 mit dem Hinweis auf das Wiederherstellen,
+/// - vorgemerkt, Karenz abgelaufen (`schwaerzung_ausstehend`) → 409, weil auch das
+///   Wiederherstellen dort 409 ist,
+/// - vorgemerkt, Karenz läuft → 422 mit Hinweis auf das Wiederherstellen,
 /// - sonst `None` (die Frist darf gesetzt werden).
 pub fn frist_sperre(
     geloescht_at: Option<&str>,

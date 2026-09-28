@@ -29,9 +29,9 @@ fn bestandsnummer_conflict<T>(e: sqlx::Error) -> Result<T, AppError> {
     Err(e.into())
 }
 
-/// Lädt ein Material der eigenen Org; `NotFound`, falls unbekannt oder fremde Org.
-/// Executor-generisch (Pool oder offene Verbindung), damit [`anlegen_tx`] den frisch
-/// angelegten Datensatz in derselben Transaktion zurücklesen kann (LFH-690).
+/// Lädt ein Material der eigenen Org; `NotFound`, falls unbekannt oder fremd.
+/// Executor-generisch, damit [`anlegen_tx`] den neuen Datensatz in derselben Transaktion
+/// zurückliest.
 pub async fn laden(
     executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
     org_id: i64,
@@ -66,8 +66,8 @@ pub async fn liste(
         .map_err(Into::into)
 }
 
-/// Abgeleitete Kategorie-Vorschläge (DISTINCT, org-weit, nicht-leer, sortiert) für die
-/// AutoComplete. Kein eigener Katalog/keine eigene Tabelle.
+/// Kategorie-Vorschläge (DISTINCT, org-weit, nicht leer, sortiert) für die AutoComplete; kein
+/// eigener Katalog.
 pub async fn kategorien(pool: &SqlitePool, org_id: i64) -> Result<Vec<String>, AppError> {
     sqlx::query_scalar::<_, String>(
         "SELECT DISTINCT kategorie FROM material \
@@ -80,9 +80,8 @@ pub async fn kategorien(pool: &SqlitePool, org_id: i64) -> Result<Vec<String>, A
     .map_err(Into::into)
 }
 
-/// Legt ein Material an. Dublette Bestandsnummer (unter aktiven) → `Conflict`.
-/// Pool-Hülle um [`anlegen_tx`]: wie bisher ohne eigene Transaktion, die Statements laufen
-/// im Autocommit einer geliehenen Verbindung.
+/// Legt ein Material an; Bestandsnummer-Dublette (unter aktiven) → `Conflict`. Pool-Hülle um
+/// [`anlegen_tx`] ohne eigene Transaktion.
 pub async fn anlegen(
     pool: &SqlitePool,
     org_id: i64,
@@ -92,9 +91,8 @@ pub async fn anlegen(
     anlegen_tx(&mut conn, org_id, &daten).await
 }
 
-/// Legt ein Material auf einer offenen Verbindung/Transaktion an und liest es dort zurück
-/// (LFH-690, Demo-Import in EINER Transaktion). Öffnet und committet selbst nichts.
-/// Dublette Bestandsnummer (unter aktiven) → `Conflict`.
+/// Legt ein Material auf einer offenen Verbindung an und liest es dort zurück (Demo-Import in
+/// EINER Transaktion). Öffnet und committet nichts. Bestandsnummer-Dublette → `Conflict`.
 pub async fn anlegen_tx(
     conn: &mut SqliteConnection,
     org_id: i64,
@@ -122,9 +120,8 @@ pub async fn anlegen_tx(
     laden(&mut *conn, org_id, id).await
 }
 
-/// Teil-Patch der editierbaren Stammfelder (LFH-306, Tri-State): die äußere `Option` sagt
-/// „im Patch enthalten?" — `None` lässt die Spalte unverändert. Bei den nullable Spalten
-/// trägt der Wert selbst noch eine `Option`: `Some(None)` setzt sie auf NULL.
+/// Teil-Patch (Tri-State): äußere `Option` = „im Patch?“; bei nullable Spalten setzt
+/// `Some(None)` NULL.
 #[derive(Debug, Default)]
 pub struct MaterialPatch<'a> {
     pub bezeichnung: Option<&'a str>,
@@ -135,16 +132,13 @@ pub struct MaterialPatch<'a> {
     pub bemerkung: Option<Option<&'a str>>,
 }
 
-/// Teil-Patch der editierbaren Felder (org-scoped). `NotFound` bei fremder Org,
-/// `Conflict` bei Bestandsnummer-Dublette — beides unverändert gegenüber dem früheren
-/// Vollersatz.
+/// Teil-Patch der editierbaren Felder (org-scoped); `NotFound` bei fremder Org, `Conflict` bei
+/// Bestandsnummer-Dublette.
 ///
-/// Flag/Wert-Paare statt COALESCE (LFH-266/F12, Vorlage `personal/status_repo.rs`): erst so
-/// lässt sich eine nullable Spalte über die API wieder auf NULL setzen, und ein nicht
-/// gesendetes Feld fasst seine Spalte nicht an. Die Parameter sind **nummeriert**, weil
-/// eine um eine Position verschobene Bind-Kette die gleichtypigen Nachbarspalten
-/// (`standort`↔`bemerkung`) STILL vertauschen würde — abgesichert von
-/// `patche_setzt_jede_spalte_an_ihren_platz`.
+/// Flag/Wert-Paare statt COALESCE: so lässt sich eine nullable Spalte wieder auf NULL setzen,
+/// und ein nicht gesendetes Feld bleibt stehen. Nummerierte Parameter, damit eine verschobene
+/// Bind-Kette `standort`↔`bemerkung` nicht still vertauscht
+/// (`patche_setzt_jede_spalte_an_ihren_platz`).
 pub async fn patche(
     pool: &SqlitePool,
     org_id: i64,
@@ -188,12 +182,10 @@ pub async fn patche(
     laden(pool, org_id, id).await
 }
 
-/// Vollersatz der editierbaren Felder (org-scoped). `NotFound` bei fremder Org,
-/// `Conflict` bei Bestandsnummer-Dublette.
+/// Vollersatz der editierbaren Felder (org-scoped).
 ///
-/// **Nicht mehr im Produktivpfad** — die PATCH-Route nutzt seit LFH-306 [`patche`].
-/// Bleibt stehen, weil die co-lokierten Tests von `material/disposition_repo.rs` sie als
-/// Stamm-Änderungs-Werkzeug (Snapshot-vs-Live) aufrufen.
+/// Nicht im Produktivpfad (die PATCH-Route nutzt [`patche`]); die Tests von
+/// `material/disposition_repo.rs` ändern damit den Stamm (Snapshot vs. Live).
 pub async fn aktualisiere(
     pool: &SqlitePool,
     org_id: i64,
@@ -392,8 +384,7 @@ mod tests {
         ));
     }
 
-    /// Migriert aus `aktualisiere_ersetzt_felder` (LFH-306): dieselbe fachliche Zusage —
-    /// gesendete Felder kommen an — jetzt über `patche`.
+    /// Gesendete Felder kommen an.
     #[tokio::test]
     async fn patche_ersetzt_gesendete_felder() {
         let pool = crate::db::test_pool().await;
@@ -417,9 +408,8 @@ mod tests {
         assert_eq!(g.standort.as_deref(), Some("Lagerhalle 2"));
     }
 
-    /// Migriert aus `aktualisiere_fremde_org_ist_notfound` (LFH-306). Mandantengrenze
-    /// (LFH-232): ein Patch mit fremder `org_id` trifft die Zeile nicht und ist `NotFound`,
-    /// nicht etwa ein stiller No-Op.
+    /// Mandantengrenze: ein Patch mit fremder `org_id` trifft die Zeile nicht und ist `NotFound`,
+    /// kein stiller No-op.
     #[tokio::test]
     async fn patche_fremde_org_ist_notfound() {
         let pool = crate::db::test_pool().await;
@@ -447,10 +437,8 @@ mod tests {
         );
     }
 
-    /// Bind-Reihenfolge der Flag/Wert-Kette: alle sechs Spalten in EINEM Patch auf distinkte
-    /// Werte setzen und einzeln prüfen. Eine um eine Position verschobene Kette würde
-    /// gleichtypige Nachbarspalten (`standort`↔`bemerkung`) still vertauschen — ohne
-    /// Compile- und ohne Laufzeitfehler.
+    /// Bind-Reihenfolge: alle sechs Spalten in EINEM Patch auf distinkte Werte setzen und einzeln
+    /// prüfen.
     #[tokio::test]
     async fn patche_setzt_jede_spalte_an_ihren_platz() {
         let pool = crate::db::test_pool().await;
@@ -479,8 +467,8 @@ mod tests {
         assert_eq!(g.bemerkung.as_deref(), Some("M-Wert"));
     }
 
-    /// Der Kern von LFH-306: ein Patch fasst NUR die gesendeten Spalten an. Der
-    /// `Default`-Patch (alle Felder absent) darf die Zeile Byte für Byte so lassen.
+    /// Ein Patch fasst NUR die gesendeten Spalten an; der `Default`-Patch lässt die Zeile
+    /// unverändert.
     #[tokio::test]
     async fn patche_laesst_nicht_gesendete_spalten_stehen() {
         let pool = crate::db::test_pool().await;
@@ -527,8 +515,7 @@ mod tests {
         assert_eq!(u.standort.as_deref(), Some("Halle 1"));
     }
 
-    /// `Some(None)` ist der Leerwunsch und muss von „absent" unterscheidbar sein —
-    /// grenzt gegen `patche_laesst_nicht_gesendete_spalten_stehen` ab.
+    /// `Some(None)` ist der Leerwunsch und von „absent“ unterscheidbar.
     #[tokio::test]
     async fn patche_none_loescht_die_spalte() {
         let pool = crate::db::test_pool().await;
@@ -556,8 +543,7 @@ mod tests {
         assert_eq!(g.bezeichnung, "Wolldecke", "Nachbar unberührt");
     }
 
-    /// Die Bestandsnummer-Dublette bleibt auch im Teil-Patch ein `Conflict` (Verhalten
-    /// aus dem Vollersatz übernommen).
+    /// Die Bestandsnummer-Dublette bleibt auch im Teil-Patch ein `Conflict`.
     #[tokio::test]
     async fn patche_auf_vergebene_bestandsnummer_ist_conflict() {
         let pool = crate::db::test_pool().await;

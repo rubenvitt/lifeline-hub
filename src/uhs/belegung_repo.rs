@@ -14,10 +14,9 @@ pub struct AustrittInfo {
     pub event_id: i64,
 }
 
-/// Eintritt einer Person in eine UHS. Vorbedingungen: UHS = `aktiv`, Person nicht
-/// schon belegt; falls Platz: Verfügbarkeits-Regel (siehe Spec Annahme 10/12).
-/// Inbox-Eintritt = `platz_id = None`. Schreibt das Event + Cache-Update + ggf.
-/// Reservierungs-Einlösung in EINER Transaktion.
+/// Eintritt einer Person in eine UHS. Die UHS muss `aktiv` sein, die Person noch nicht belegt;
+/// mit Platz gilt die Verfügbarkeits-Regel. Inbox-Eintritt = `platz_id = None`. Event,
+/// Cache-Update und ggf. Reservierungs-Einlösung in EINER Transaktion.
 pub async fn eintritt(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -42,8 +41,8 @@ pub async fn eintritt(
     laden(pool, einsatz_id, id).await
 }
 
-/// Eintritt auf der Transaktion des Aufrufers (LFH-458): bei der Aufnahme gehören
-/// Person, Sichtung, Belegung und Audit zusammen. Kein eigener Commit/Pool-Read.
+/// Eintritt auf der Transaktion des Aufrufers: bei der Aufnahme gehören Person, Sichtung,
+/// Belegung und Audit zusammen. Kein eigener Commit, kein Pool-Read.
 pub async fn eintritt_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -76,10 +75,9 @@ pub async fn eintritt_tx(
     Ok(id)
 }
 
-/// UHS-/Platz-Wechsel einer Person. Erfordert aktive Belegung der Person.
-/// Ziel-UHS muss `aktiv` sein; falls Ziel-Platz: Verfügbarkeits-Regel. Vor dem
-/// Wechsel wird der ehemalige Platz (falls vorhanden) auto-aufbereitet (nur, wenn
-/// vorher `frei`). Alles in EINER Tx.
+/// UHS-/Platz-Wechsel einer Person mit aktiver Belegung. Die Ziel-UHS muss `aktiv` sein, mit
+/// Ziel-Platz gilt die Verfügbarkeits-Regel. Der bisherige Platz wird vorher auto-aufbereitet
+/// (nur, wenn er `frei` war). Alles in EINER Transaktion.
 pub async fn wechsel(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -131,8 +129,8 @@ pub async fn wechsel(
     laden(pool, einsatz_id, id).await
 }
 
-/// Manueller Austritt. Erfordert aktive Belegung. Schreibt Event, leert Cache,
-/// auto-aufbereitet Ex-Platz (falls vorher frei). Alles in EINER Tx.
+/// Manueller Austritt bei aktiver Belegung: Event, Cache leeren, Ex-Platz auto-aufbereiten
+/// (falls vorher frei). Alles in EINER Transaktion.
 pub async fn austritt(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -164,14 +162,12 @@ pub async fn austritt(
     laden(pool, einsatz_id, id).await
 }
 
-/// Auto-Austritt-Helper für Cross-Modul-Hooks (E‑1-Status/E‑2-Verbleib/E‑1-Storno).
-/// Macht in EINER Tx: (a) wenn Person belegt → Austritt-Event + Cache-Cleanup +
-/// Auto-Aufbereitung; (b) IMMER → etwaige Reservierungen `reserviert_fuer_person_id =
-/// person_id` auflösen (Spec: Reservierungs-Folgekonsistenz).
+/// Auto-Austritt für Cross-Modul-Hooks (Personenstatus, Verbleib, Storno), in EINER
+/// Transaktion: (a) ist die Person belegt → Austritt-Event, Cache-Cleanup, Auto-Aufbereitung;
+/// (b) IMMER → Reservierungen mit `reserviert_fuer_person_id = person_id` auflösen.
 ///
-/// Liefert `Some(AustrittInfo)` nur, wenn ein Austritt-Event geschrieben wurde —
-/// der Wrapper (Task 9) braucht das für ETB-Text + SSE. Bei `None` (Person war nicht
-/// belegt) hat trotzdem ggf. ein Reservierungs-Cleanup stattgefunden.
+/// `Some(AustrittInfo)` nur, wenn ein Austritt-Event geschrieben wurde (für ETB-Text und SSE im
+/// Wrapper); bei `None` kann trotzdem ein Reservierungs-Cleanup gelaufen sein.
 pub async fn austritt_intern(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -181,7 +177,7 @@ pub async fn austritt_intern(
 ) -> Result<Option<AustrittInfo>, AppError> {
     crate::write_retry!(pool, |conn| {
         let (ex_uhs, ex_platz) = lade_cache(&mut *conn, person_id).await?;
-        // Reservierungs-Cleanup IMMER (Spec: bei Storno / Status verstorben / abgemeldet):
+        // Reservierungs-Cleanup IMMER (bei Storno, Status verstorben/abgemeldet):
         sqlx::query(
             "UPDATE uhs_platz SET verfuegbarkeit = 'frei', reserviert_fuer_person_id = NULL \
              WHERE reserviert_fuer_person_id = ?",
@@ -391,8 +387,8 @@ async fn update_cache(
     uhs_id: Option<i64>,
     platz_id: Option<i64>,
 ) -> Result<(), AppError> {
-    // Bei Cache-Setzung kann der partielle Unique-Index zuschlagen (anderer
-    // Person bereits aktueller_platz_id = platz_id). Konflikt mappen.
+    // Beim Setzen des Caches kann der partielle Unique-Index zuschlagen (eine andere Person hält
+    // den Platz) → Konflikt.
     let ergebnis = sqlx::query(
         "UPDATE einsatz_person SET aktuelle_uhs_id = ?, aktueller_platz_id = ? \
          WHERE id = ? AND einsatz_id = ?",
@@ -559,12 +555,10 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn eintritt_unter_konkurrierendem_writer_ist_ok() {
-        // F09/LFH-240 red→green: das echte eintritt (deferred BEGIN → read-then-write)
-        // darf unter einem kurz konkurrierenden Writer NICHT mit SQLITE_BUSY (500)
-        // scheitern. ROT auf dem Ist-Code: der deferred Read-Snapshot macht den ersten
-        // Write zum Lock-Upgrade → sofortiges BUSY. GRÜN nach BEGIN IMMEDIATE (parkt am
-        // BEGIN, wo der busy_timeout warten darf, bis Writer B nach 200ms committet).
-        // Braucht das Datei/WAL-Harness (F28) — mit test_pool() (1 Conn) unsichtbar.
+        // `eintritt` (read-then-write) darf unter einem kurz konkurrierenden Writer nicht mit
+        // SQLITE_BUSY scheitern: unter `BEGIN IMMEDIATE` wartet es am BEGIN, bis Writer B
+        // committet.
+        // Braucht das Datei/WAL-Harness.
         let (_dir, pool) = crate::db::test_pool_datei().await;
         let (b, e, u, _, _, _, p) = setup(&pool).await;
 

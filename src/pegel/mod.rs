@@ -3,16 +3,13 @@
 //!
 //! - `repo`: die Festlegung (Tabelle `einsatz_pegel`, Reihenfolge = Leitpegel zuerst).
 //! - `abruf`: die Zeitreihe je Station über PEGELONLINE, gecacht in `karte::cache`.
-//! - `trend`: reine Trendrechnung (lineare Regression über 60 min) und der 24-h-Verlauf
-//!   (LFH-633).
+//! - `trend`: reine Trendrechnung (lineare Regression über 60 min) und der 24-h-Verlauf.
 //! - `vorhersage`: die Vorhersage-Reihe `WV` einer Station als Vorschlag für die Prognose
 //!   (LFH-628) — nur ein Vorschlag, die Prognose selbst wird von Hand gepflegt.
 //!
 //! **Kein Richtungs-Enum auf dem Draht**: die Richtung („steigend"/„fallend") formuliert das
 //! Frontend aus `trend_cm_pro_h` — eine zweite Wahrheit neben der Zahl wäre eine Stelle mehr,
 //! an der Schwelle und Anzeige auseinanderlaufen.
-//!
-//! Spec: `docs/superpowers/specs/2026-09-22-lfh-606-pegel-kennzahl-design.md`
 
 use serde::Serialize;
 use utoipa::ToSchema;
