@@ -1,7 +1,6 @@
 use crate::app::AppState;
 use crate::auth::session::{AdminUser, CurrentUser};
-use crate::einsatz::berechtigung::{fordere_aktiv, fordere_lesezugriff, fordere_schreibrecht};
-use crate::einsatz::repo as einsatz_repo;
+use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
@@ -244,14 +243,11 @@ pub async fn deaktivieren(
 /// Lesezugriff erforderlich; kein Modul-Key (Sprechgruppen sind modulübergreifend).
 pub async fn liste_fuer_einsatz(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzLesezugriff,
 ) -> Result<Json<Vec<SprechgruppeAnzeige>>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
+    let einsatz_id = ctx.einsatz.id;
     // org_id kommt vom Einsatz, nicht vom Aufrufer (Cross-Org-Zugriff möglich).
-    let sgs = sg_repo::liste_fuer_einsatz(&state.pool, einsatz.org_id, einsatz_id).await?;
+    let sgs = sg_repo::liste_fuer_einsatz(&state.pool, ctx.einsatz.org_id, einsatz_id).await?;
     Ok(Json(sgs.iter().map(Sprechgruppe::anzeige).collect()))
 }
 
@@ -259,19 +255,15 @@ pub async fn liste_fuer_einsatz(
 /// Schreibrecht + aktiver Einsatz; kein Modul-Key.
 pub async fn anlegen_einsatz_lokal(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    PfadParam(einsatz_id): PfadParam<i64>,
+    ctx: EinsatzSchreibzugriff,
     JsonBody(body): JsonBody<EinsatzLokalBody>,
 ) -> Result<(StatusCode, Json<SprechgruppeAnzeige>), AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_aktiv(&einsatz)?;
+    let einsatz_id = ctx.einsatz.id;
     let n = normalisiere_lokal(body)?;
     // org_id kommt vom Einsatz, nicht vom Aufrufer (Cross-Org-Zugriff möglich).
     let sg = sg_repo::anlegen_einsatz_lokal(
         &state.pool,
-        einsatz.org_id,
+        ctx.einsatz.org_id,
         einsatz_id,
         &n.bezeichnung,
         &n.betriebsart,
