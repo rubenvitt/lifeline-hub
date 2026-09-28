@@ -26,8 +26,7 @@ const benutzer: BenutzerAnzeige = {
 };
 
 describe('Modul-Zähler', () => {
-  // Bis LFH-612 rechnete der Browser diese Zahlen aus vollen Listen; die Wortlaute sind seither
-  // dieselben, nur die Eingabe kommt vom Server. Die Paare (Mehrzahl / Einzahl) bleiben.
+  // Die Zahlen kommen vom Server; die Wortlaute (Mehrzahl / Einzahl) bleiben die der Liste.
   it('bildet die Kommunikationszähler mit dem bisherigen Wortlaut ab', () => {
     expect(
       bildeZaehler({

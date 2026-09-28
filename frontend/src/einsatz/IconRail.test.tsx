@@ -7,9 +7,10 @@ import { dichten, farbenDunkel, rahmenFarben } from '../theme/tokens';
 import IconRail, { railZielStil } from './IconRail';
 import { kategorien } from './modulRegistry';
 
-/** Legt die Token-Werte des UMGEBENDEN Providers als data-Attribute ab. Bewusst so und
- *  nicht über `theme.getDesignToken()`: nur damit ist garantiert derselbe Token im Spiel,
- *  den die Komponente im selben Render-Pfad sieht. */
+/**
+ * Legt die Token-Werte des UMGEBENDEN Providers als data-Attribute ab, nicht über
+ * `theme.getDesignToken()`: nur so ist derselbe Token im Spiel, den die Komponente sieht.
+ */
 function TokenSonde() {
   const { token } = theme.useToken();
   return <div data-testid="token" data-bedien={token.colorPrimary} data-alarm={token.colorError} />;
@@ -33,11 +34,9 @@ describe('IconRail', () => {
     expect(screen.getByRole('button', { name: 'Führung' })).not.toHaveAttribute('aria-current');
   });
 
-  // Neuentwurf „Instrumententafel" (21.09.2026), Entscheidung 2 des Auftraggebers: die aktive
-  // Kategorie trägt eine 2-px-Marke in `marke` (Rot = Marke) auf NEUTRALER Fläche. Das dreht
-  // die A2-Aussage „aktiv = blaue Bedienfläche" bewusst um — aber nicht „Rot bedient nichts":
-  // die Fläche bleibt neutral, rot ist allein die schmale Ortsmarke. Beides wird hier gepinnt,
-  // weil der Gate-5-Hexscan nur sieht, DASS kein Literal dasteht, nicht welche Rolle gewählt wurde.
+  // Die aktive Kategorie trägt eine 2-px-Marke in `marke` auf NEUTRALER Fläche; rot ist allein
+  // die Ortsmarke („Rot bedient nichts"). Gepinnt, weil der Gate-5-Hexscan nur sieht, DASS kein
+  // Literal dasteht, nicht welche Rolle gewählt wurde.
   it('markiert die aktive Kategorie mit der roten Marke auf neutraler Fläche (Neuentwurf)', () => {
     renderMitProviders(
       <>
@@ -88,11 +87,9 @@ describe('IconRail', () => {
     renderMitProviders(
       <IconRail kategorien={kategorien} aktiveKategorie={null} onKategorieKlick={() => {}} />,
     );
-    // `getByText`, NICHT `getByRole(name:)`: der Name kam schon vorher aus `aria-label`
-    // und wäre auch bei rein bebilderten Knöpfen grün. Die Aussage von Befund H8 ist,
-    // dass ein Text SICHTBAR im Baum steht — auf dem Führungs-Tablet gibt es kein Hover.
-    // Seit dem Neuentwurf ist es das Kurzetikett (9 px Versalien in 60 px Rail); der volle
-    // Name bleibt `aria-label` und `title`.
+    // `getByText`, NICHT `getByRole(name:)`: der Name käme auch aus `aria-label`. Die Aussage ist,
+    // dass ein Text SICHTBAR im Baum steht — auf dem Tablet gibt es kein Hover. Sichtbar steht das
+    // Kurzetikett, der volle Name bleibt `aria-label` und `title`.
     for (const k of kategorien) {
       expect(screen.getByText(k.kurz)).toBeVisible();
       if (k.kurz !== k.label) {
@@ -103,12 +100,10 @@ describe('IconRail', () => {
 });
 
 /**
- * Die Zielhöhe OHNE zu rendern — `test/utils.tsx:31` montiert ein nacktes `ConfigProvider`
- * ohne unser Theme, `useToken()` liefert dort den antd-Seed (`controlHeight: 32`), also
- * keine der Stufen 30/48/72. Bauform 1:1 nach `ModulPanel.test.tsx:216-247`.
+ * Die Zielhöhe OHNE zu rendern: `test/utils.tsx` montiert ein nacktes `ConfigProvider`,
+ * `useToken()` liefert dort den antd-Seed statt der Staffel. Bauform wie `ModulPanel.test.tsx`.
  *
- * Die Böden stehen als LITERALE da und werden NICHT aus `dichten` zurückgelesen — sonst
- * prüfte der Test den Token gegen sich selbst.
+ * Die Böden stehen als LITERALE da, sonst prüfte der Test den Token gegen sich selbst.
  */
 describe('IconRail · Dichte', () => {
   const tokenFuer = (s: keyof typeof dichten) => ({
@@ -118,8 +113,7 @@ describe('IconRail · Dichte', () => {
   const hoehe = (s: keyof typeof dichten) => railZielStil(tokenFuer(s), { aktiv: false }).minHeight;
 
   it('hält die Entwurfshöhe 62 als Boden — über dem A1-Boden von 48 px', () => {
-    // `Math.max`, nicht `??`: mit `??` stände in der kompakten Stufe 30 — unter dem
-    // A1-Boden, den die Rail seit LFH-329 trägt.
+    // `Math.max`, nicht `??`: mit `??` stände in der kompakten Stufe 30 — unter dem Boden der Rail.
     expect(hoehe('kompakt')).toBe(62);
     expect(hoehe('komfortabel')).toBe(62);
     expect(hoehe('handschuh')).toBe(72);

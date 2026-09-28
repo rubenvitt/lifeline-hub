@@ -73,9 +73,8 @@ function renderAlarm({
 }
 
 /**
- * AntD wartet beim Entfernen einer Notification auf das Ende der CSS-Bewegung. jsdom
- * erzeugt dieses Ereignis nicht selbst; ohne den Anstoß bliebe eine korrekt zerstörte
- * Notice mit `*-leave-active` im Test-DOM stehen.
+ * antd wartet beim Entfernen einer Notification auf das Ende der CSS-Bewegung, das jsdom nicht
+ * erzeugt; ohne Anstoß bliebe die zerstörte Notice mit `*-leave-active` im DOM.
  */
 async function warteBisNotificationWeg(titel: string) {
   await waitFor(() => {
@@ -136,8 +135,8 @@ afterEach(() => {
 });
 
 describe('AlarmZentrale', () => {
-  // Die breite Bauform mit Wort auch im Ruhezustand gilt seit 22.09.2026 erst ab `xl`;
-  // der Vorgabe-Viewport des Stubs (1024 px) liegt darunter — siehe den Block „Tablet".
+  // Die breite Bauform mit Wort auch im Ruhezustand gilt erst ab `xl`; der Vorgabe-Viewport
+  // (1024 px) liegt darunter.
   beforeEach(() => setzeViewportBreite(1366));
 
   it('zeigt einen Toast bei window-Event lfh:sofortmeldung', async () => {
@@ -238,8 +237,8 @@ describe('AlarmZentrale', () => {
     expect(await screen.findByText('Fremde Notification')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Einsatz wechseln' }));
 
-    // Selbst während AntD die alte Notice noch ausblendet, darf deren Aktion nicht
-    // mehr zur Route des vorherigen Einsatzes springen.
+    // Selbst während antd die alte Notice ausblendet, darf ihre Aktion nicht zur Route des
+    // vorherigen Einsatzes springen.
     await userEvent.click(alteSammelAktion);
     expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/2/start');
     await warteBisNotificationWeg('Sofortmeldung eingegangen');
@@ -383,25 +382,11 @@ describe('AlarmZentrale', () => {
 });
 
 /**
- * ── Die Kopfzeile auf dem Handschirm (LFH-511) ───────────────────────────────
- *
- * Zwei beschriftete Ziele passen auf 390 px nicht neben Menügriff, Suche und
- * Benutzermenü: die Reihe bekommt dort 180 px, die zwei Knöpfe brauchen 286.
- * Bis hierher löste das der Browser selbst — beide Knöpfe liegen in EINEM
- * `.ant-space-item`, flossen inline und BRACHEN UM. Waagerecht sah das gut aus,
- * senkrecht stand der Kopfinhalt auf 144 px in einem 96 px hohen Kopf und wurde
- * oben wie unten angeschnitten (gemessen in `e2e/kopfzeile-schmal.spec.ts`).
- *
- * DIE BESCHRIFTUNG DARF NICHT ERSATZLOS ZUR IKONE WERDEN — CLAUDE.md verlangt,
- * dass „blockiert"/„stumm" benannt bleibt. Deshalb die dritte der im Ticket
- * genannten Möglichkeiten: EIN Ziel mit Sammelbeschriftung, die den Zustand
- * nennt, der genannt werden muss; beide Steuerungen liegen vollständig
- * beschriftet im Menü darunter.
- *
- * Die Breitenfrage stellt `useViewport` (`istSchmal`, also unter `md`) — bei
- * 768 px und darüber ist Platz im Überfluss, dort bleiben es zwei Knöpfe.
- * `test/viewport.ts` steht per Vorgabe auf 1024 px; alle Tests oben messen
- * deshalb weiterhin die breite Bauform, ohne davon zu wissen.
+ * Die Kopfzeile auf dem Handschirm: zwei beschriftete Ziele passen auf 390 px nicht (180 px
+ * verfügbar, 286 nötig) und brächen um. Die Beschriftung darf nicht zur Ikone werden, deshalb
+ * EIN Ziel mit Sammelbeschriftung, die den nötigen Zustand nennt, und beide Steuerungen
+ * beschriftet im Menü. Ab `md` bleiben es zwei Knöpfe; `test/viewport.ts` steht per Vorgabe auf
+ * 1024 px.
  */
 describe('AlarmZentrale auf dem Handschirm (LFH-511)', () => {
   afterEach(() => setzeViewportBreite(VIEWPORT_STANDARD));
@@ -412,31 +397,25 @@ describe('AlarmZentrale auf dem Handschirm (LFH-511)', () => {
     setzeViewportBreite(390);
     renderAlarm();
 
-    // Die zwei getrennten Ziele der breiten Bauform sind WEG — das ist die
-    // Hälfte der Aussage, ohne die ein zusätzlicher Knopf sie auch erfüllte.
+    // Die zwei Ziele der breiten Bauform sind WEG — sonst erfüllte auch ein zusätzlicher Knopf die
+    // Aussage.
     expect(
       screen.queryByRole('button', { name: 'Desktop-Benachrichtigungen: blockiert' }),
     ).toBeNull();
-    // Der Ton-Knopf wird über ein MUSTER über alle drei Wortlaute gesucht, nicht
-    // über einen davon: `tonStatus` steht beim Rendern noch auf dem Initialwert
-    // und dreht erst einen Microtask später auf `bereit`. Ein Name-Literal träfe
-    // den Knopf in diesem Moment ohnehin nicht — die Zeile wäre auch dann grün,
-    // wenn es die Bündelung gar nicht gäbe, und belegte nichts.
+    // Über ein MUSTER über alle drei Wortlaute: `tonStatus` dreht erst einen Microtask später auf
+    // `bereit`, ein Literal träfe den Knopf in diesem Moment nicht und die Zeile belegte nichts.
     expect(screen.queryByRole('button', { name: /^Alarmton / })).toBeNull();
 
-    // Und an ihrer Stelle steht genau EINES, das den Zustand BENENNT. `waitFor`,
-    // weil das Muster auf beide Zustände passt und schon greift, bevor die
-    // Tonprüfung durch ist — ohne das schlüge der Test an einem korrekten Bau an.
+    // An ihrer Stelle steht genau EINES, das den Zustand benennt. `findBy…`, weil das Muster schon
+    // greift, bevor die Tonprüfung durch ist.
     const ziel = await screen.findByRole('button', { name: /^Alarmzentrale:/ });
     await waitFor(() => expect(ziel).toHaveTextContent('Desktop blockiert'));
     expect(screen.getAllByRole('button', { name: /^Alarmzentrale:/ })).toHaveLength(1);
   });
 
   it('bei erlaubtem Desktop und gutem Ton nennt die Marke den Ton', async () => {
-    // Deckt den Zweig `|| desktop === 'erlaubt'` ab. Ohne diesen Test liesse er
-    // sich streichen, ohne dass etwas rot wird — und er trägt die Festlegung,
-    // dass die Marke auch im unauffälligen Fall einen ZUSTAND nennt statt eines
-    // erfundenen Sammelworts.
+    // Deckt `|| desktop === 'erlaubt'` ab: auch im unauffälligen Fall nennt die Marke einen
+    // Zustand statt eines Sammelworts.
     stubAudioReady();
     stubNotification('granted');
     setzeViewportBreite(390);
@@ -447,9 +426,7 @@ describe('AlarmZentrale auf dem Handschirm (LFH-511)', () => {
   });
 
   it('ist der Desktop abschaltbar, ist sein Menüeintrag bedienbar und fordert die Berechtigung an', async () => {
-    // Der einzige im schmalen Zweig überhaupt handlungsfähige Desktop-Pfad —
-    // ohne diesen Test liefe er in keinem Lauf, und weder das `disabled` noch
-    // der `key === 'desktop'`-Zweig könnten rot werden.
+    // Der einzige handlungsfähige Desktop-Pfad im schmalen Zweig — ohne diesen Test liefe er nie.
     stubAudioReady();
     const NotificationMock = stubNotification('default');
     setzeViewportBreite(390);
@@ -462,9 +439,7 @@ describe('AlarmZentrale auf dem Handschirm (LFH-511)', () => {
     expect(menue, 'das Menü muss offen sein').not.toBeNull();
 
     const eintrag = within(menue).getByRole('menuitem', { name: /aktivieren/ });
-    // KEIN antd-Ikonenname im zugänglichen Namen: `@ant-design/icons` setzt
-    // unbedingt ein englisches `aria-label`, antds Menü hängt kein `aria-hidden`
-    // davor. Ohne die Hülle hiesse der Eintrag „desktop Desktop-…".
+    // Kein antd-Ikonenname im zugänglichen Namen (antds Menü hängt kein `aria-hidden` davor).
     expect(eintrag.textContent).not.toMatch(/desktop-outlined|check-circle|^stop/i);
     await userEvent.click(eintrag);
     expect(NotificationMock.requestPermission).toHaveBeenCalledOnce();
@@ -477,23 +452,20 @@ describe('AlarmZentrale auf dem Handschirm (LFH-511)', () => {
     renderAlarm();
 
     await userEvent.click(await screen.findByRole('button', { name: /^Alarmzentrale:/ }));
-    // Über das GEÖFFNETE Menü greifen: antd lässt die Portale geschlossener
-    // Dropdowns im Baum stehen.
+    // Über das GEÖFFNETE Menü: antd lässt geschlossene Portale im Baum.
     const menue = document.querySelector(
       '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
     ) as HTMLElement;
     expect(menue, 'das Menü muss offen sein').not.toBeNull();
-    // ZWEI EINTRÄGE, einzeln gegriffen — ein Gesamttext-Vergleich wäre auch von
-    // einer Regression erfüllt, die beide Wortlaute in EINEN Eintrag legt.
+    // ZWEI Einträge, einzeln gegriffen — ein Gesamttext-Vergleich erfüllte auch eine Regression,
+    // die beide in EINEN legt.
     const eintraege = within(menue).getAllByRole('menuitem');
     expect(eintraege).toHaveLength(2);
-    // Der Desktop-Eintrag NENNT seinen Zustand: er ist der einzige Ort, an dem
-    // er steht, wenn die Marke oben gerade den Ton nennt.
+    // Der Desktop-Eintrag NENNT seinen Zustand: er ist der einzige Ort dafür, wenn die Marke den
+    // Ton nennt.
     expect(eintraege[0].textContent).toMatch(/im Browser blockiert/);
-    // Der Ton-Eintrag nennt die HANDLUNG, nicht den Zustand. „Ton bereit" als
-    // Etikett eines Eintrags, der stummschaltet, sagte das Gegenteil dessen,
-    // was er tut — und auf dem Handschirm gibt es keinen Tooltip, der das
-    // geraderückte.
+    // Der Ton-Eintrag nennt die HANDLUNG; „Ton bereit" an einem Eintrag, der stummschaltet, sagte
+    // das Gegenteil, und es gibt keinen Tooltip.
     expect(eintraege[1].textContent).toMatch(/stummschalten/);
   });
 
@@ -511,8 +483,7 @@ describe('AlarmZentrale auf dem Handschirm (LFH-511)', () => {
     await userEvent.click(within(menue).getByRole('menuitem', { name: /stummschalten/ }));
 
     expect(istAlarmGemutet()).toBe(true);
-    // Vorher nannte die Marke „Desktop blockiert", jetzt den Ton: bei zwei
-    // auffälligen Zuständen gewinnt der hörbare Kanal.
+    // Bei zwei auffälligen Zuständen gewinnt der hörbare Kanal.
     await waitFor(() =>
       expect(screen.getByRole('button', { name: /^Alarmzentrale:/ })).toHaveTextContent(
         'Ton stumm',
@@ -534,9 +505,8 @@ describe('AlarmZentrale auf dem Handschirm (LFH-511)', () => {
 });
 
 /**
- * FÜHRUNGS-TABLET zwischen `md` und `xl` (22.09.2026): zwei Knöpfe mit je einem Tipper wie
- * breit, aber der RUHEZUSTAND steht nur als Ikone — sonst brach die Kopfzeile bei 1024 px
- * auf zwei Zeilen. Eine STÖRUNG nennt ihr Wort weiter (LFH-392). Beide Hälften als Paar.
+ * Führungs-Tablet zwischen `md` und `xl`: zwei Knöpfe, der RUHEZUSTAND nur als Ikone, eine
+ * STÖRUNG nennt ihr Wort weiter. Beide Hälften als Paar.
  */
 describe('AlarmZentrale auf dem Führungs-Tablet (1024 px)', () => {
   beforeEach(() => setzeViewportBreite(1024));

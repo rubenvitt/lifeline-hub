@@ -1,37 +1,25 @@
 import { describe, expect, it } from 'vitest';
 
 /**
- * Guard (LFH-328/M8): erzwingt, dass `darfVerwaltung` aus `einsatz/schreibrecht.ts` die EINE
- * Quelle für die ORG-Achsen-Regel „darf der Benutzer in die Verwaltung?" bleibt.
+ * Guard (LFH-328/M8): `darfVerwaltung` aus `einsatz/schreibrecht.ts` bleibt die EINE Quelle
+ * für „darf der Benutzer in die Verwaltung?".
  *
- * Verbietet die duplizierte FORMEL — eine Zeile, die eine `org_rolle`-Gleichheit UND eine
- * `system_rolle`-Gleichheit trägt (die OR-Form des Gates). Genau diese Formel
- * (`system_rolle === 'admin' || org_rolle === 'fuehrungskraft'`) lag byte-gleich dreifach kopiert
- * herum — `components/AppLayout.tsx` (privat), `admin/AdminLayout.tsx` (exportiert, von AppLayout
- * NICHT importiert) und `pages/EinsaetzePage.tsx` (unter dem Namen `darfAnlegen`) — während
- * `command-palette/befehle.ts` dieselbe Berechtigung mit `system_rolle === 'admin'` ALLEIN gatete:
- * eine Führungskraft sah „Verwaltung" in der Topbar, durfte die Route betreten, fand den Eintrag
- * aber nicht in der Kommandopalette. Neue Verwaltungs-Gates laufen ab jetzt durch `darfVerwaltung`.
+ * Verbietet die duplizierte FORMEL: eine Zeile mit einer `org_rolle`-Gleichheit UND einer
+ * `system_rolle`-Gleichheit (`system_rolle === 'admin' || org_rolle === 'fuehrungskraft'`).
+ * Kopien davon ließen Topbar, Route und Kommandopalette auseinanderlaufen.
  *
- * Bewusst NICHT gescannt: die ~24 einzelnen `system_rolle === 'admin'`-Vergleiche
- * (Stammdaten, Karten, Benutzerverwaltung). Das sind legitime **System**-Admin-Gates auf einer
- * anderen Achse, keine Verwaltungs-Gates — der Guard sucht deshalb die KOMBINATION beider Felder
- * und nicht das einzelne Feld. Aus demselben Grund schließt `schreibrecht.guard.test.ts:13-14`
- * `system_rolle` aus.
+ * Bewusst NICHT gescannt: einzelne `system_rolle === 'admin'`-Vergleiche. Das sind
+ * System-Admin-Gates auf einer anderen Achse; der Guard sucht deshalb die KOMBINATION beider
+ * Felder (aus demselben Grund schließt `schreibrecht.guard.test.ts` `system_rolle` aus).
+ * Nur `===`, weil hier nur die kombinierte Gate-Formel verboten ist, nicht jeder Vergleich.
  *
- * Warum hier nur `===` und nicht `[=!]==` wie im schreibrecht-Guard: dort ist JEDER rohe
- * `meine_rolle`-Vergleich verboten, hier nur die kombinierte Gate-Formel.
- *
- * Bekannte Grenzen (zeilenbasierter Scan, wie beim schreibrecht-/queryKeys-Guard):
+ * Bekannte Grenzen (zeilenbasierter Scan):
  * - Die negierte Form (`system_rolle !== 'admin' && org_rolle !== 'fuehrungskraft'`) wird NICHT
- *   erfasst. Gemessen gibt es sie einmal, in `pages/BenutzerPage.tsx:88` — dort bewusst: das ist
- *   der „weder-noch"-Arm einer dreiteiligen Rollen-ANZEIGE (die zwei Zeilen davor rendern die
- *   Admin- und Führungskraft-Tags), kein Gate. `!darfVerwaltung(b)` dort einzusetzen würde eine
- *   Anzeige-Aufzählung an den Berechtigungshelfer koppeln: widert die Verwaltungsregel später auf
- *   (dritte Org-Rolle), änderte sich still die Bedeutung des Tags.
- * - Ein über mehrere Zeilen umbrochener Vergleich entgeht ihm — `modulRegistry.ts:119/126` prüft
- *   beide Felder in getrennten Zeilen (dort bewusst: das ist die Modul-Sichtbarkeitsregel, NICHT
- *   die Verwaltungsformel).
+ *   erfasst. Sie steht bewusst in `pages/BenutzerPage.tsx` als „weder-noch"-Arm einer
+ *   Rollen-ANZEIGE, kein Gate; sie an den Helfer zu koppeln änderte bei einer dritten
+ *   Org-Rolle still die Bedeutung des Tags.
+ * - Ein über mehrere Zeilen umbrochener Vergleich entgeht ihm (`modulRegistry.ts` prüft beide
+ *   Felder getrennt — dort ist es die Modul-Sichtbarkeitsregel, nicht die Verwaltungsformel).
  * - Aliasierte Werte entgehen ihm (`const r = b.org_rolle; if (r === 'fuehrungskraft' && …)`).
  * Neue Verwaltungs-Logik muss deshalb bewusst durch den Helfer geführt werden.
  */

@@ -51,9 +51,8 @@ describe('useModulZaehler (LFH-612)', () => {
     expect(result.current.meldungen?.beschreibung).toBe('3 offene Meldungen, davon 1 ungesehen');
     // Ein fehlendes Feld bleibt fehlend — keine erfundene 0.
     expect(result.current.auftraege).toBeUndefined();
-    // Genau die eine Zählabfrage für die acht Serverquellen — die Listen, aus denen der Rahmen
-    // vorher zählte, nie. Dazu kommen nur die drei Browser-Zähler (LFH-632, LFH-635,
-    // LFH-639), die ihre eigene Modulliste lesen und nicht in der Serverantwort stehen.
+    // Genau die eine Zählabfrage für die Serverquellen, nie die Listen. Dazu kommen nur die drei
+    // Browser-Zähler, die ihre eigene Modulliste lesen und nicht in der Serverantwort stehen.
     await waitFor(() => expect(angefragt).toHaveLength(4));
     expect([...angefragt].sort()).toEqual([
       '/api/einsaetze/7/abloesungen',

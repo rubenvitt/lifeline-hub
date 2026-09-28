@@ -64,8 +64,7 @@ describe('ModulPanel', () => {
     expect(screen.getByText('Erfassung')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /ETB/ })).toBeEnabled();
     expect(screen.getByRole('button', { name: /Sachschäden/ })).toBeEnabled();
-    // Am Titel der Hülle greifen, nicht am Zeichen: die Marker sind seit LFH-370 Ikonen,
-    // und der Glyph ist bewusst austauschbar — die Aussage ist der Titel.
+    // Am Titel der Hülle greifen, nicht am Zeichen: der Glyph ist austauschbar, die Aussage ist der Titel.
     expect(screen.getByTitle('In Arbeit')).toBeInTheDocument();
     const geheim = screen.getByRole('button', { name: /Geheim/ });
     expect(geheim).toBeDisabled();
@@ -74,8 +73,8 @@ describe('ModulPanel', () => {
     expect(geheim.querySelector('.anticon-lock')).not.toBeNull();
   });
 
-  // Der WIP-Marker ist reine Dekoration neben dem Label — er darf nicht im Accessible Name
-  // des Knopfes landen („Sachschäden 🚧"), so wie das ↗ daneben es schon vormacht (LFH-328).
+  // Der WIP-Marker ist Dekoration und darf nicht im Accessible Name des Knopfes landen,
+  // wie das ↗ daneben (LFH-328).
   it('haelt den WIP-Marker aus dem Accessible Name heraus', () => {
     renderMitProviders(
       <ModulPanel
@@ -88,7 +87,7 @@ describe('ModulPanel', () => {
     );
     expect(screen.getByRole('button', { name: 'Sachschäden' })).toBeInTheDocument();
     expect(screen.getByTitle('In Arbeit')).toBeInTheDocument();
-    // Dasselbe gilt für das Schloss — die Sperre trägt `disabled` + `title`, nicht der Emoji.
+    // Dasselbe gilt für das Schloss: die Sperre trägt `disabled` + `title`.
     expect(screen.getByRole('button', { name: 'Geheim' })).toBeDisabled();
   });
 
@@ -201,7 +200,6 @@ describe('ModulPanel', () => {
     const knopf = screen.getByRole('button', {
       name: 'Meldungen, 5 offene Meldungen, davon 2 ungesehen',
     });
-    // Mono-Zahl statt Badge-Pille (Neuentwurf) — der Wert steht sichtbar im Knopf.
     const zahl = knopf.querySelector('[data-lfh="modul-zaehler"]');
     expect(zahl).not.toBeNull();
     expect(zahl!.textContent).toBe('5');
@@ -213,9 +211,8 @@ describe('ModulPanel', () => {
   });
 
   it('traegt den Testanker des e2e-Trefflaechennachweises', () => {
-    // `e2e/trefflaeche-tablet.spec.ts` greift die Modulzeilen des inline-Rahmens über
-    // dieses Merkmal. Ohne diesen Pin wäre der Anker unbewacht: wer ihn entfernt, färbt
-    // einen e2e-Lauf rot, dessen Ursache dann in einer anderen Datei liegt.
+    // `e2e/trefflaeche-tablet.spec.ts` greift die Modulzeilen über dieses Merkmal; der Pin
+    // bewacht den Anker hier statt erst im e2e-Lauf.
     const { container } = renderMitProviders(
       <ModulPanel
         titel="Erfassung"
@@ -230,8 +227,8 @@ describe('ModulPanel', () => {
 
   it('markiert das aktive Modul via aria-current', () => {
     /**
-     * Der aktive Zustand hing bis LFH-370 allein an Fläche und Schriftfarbe und war damit
-     * programmatisch unsichtbar. Spiegelbild zu `IconRail.test.tsx:30-35`.
+     * Der aktive Zustand muss programmatisch sichtbar sein, nicht nur über Fläche und
+     * Schriftfarbe. Spiegelbild zu `IconRail.test.tsx`.
      */
     const { container } = renderMitProviders(
       <ModulPanel
@@ -249,13 +246,9 @@ describe('ModulPanel', () => {
 
   it('traegt die Marker als Ikone in aria-hidden-Huelle, nicht als Emoji', () => {
     /**
-     * „Ein Emoji ist keine Ikone" (30.07.2026): Zeichnung, Farbe und Breite eines Emojis
-     * kommen aus der Systemschrift statt aus dem Entwurf.
-     *
-     * ZWEI Hälften, beide Pflicht. Ohne die erste bliebe unbemerkt, dass ein
-     * `@ant-design/icons`-Knoten `role="img"` mit englischem `aria-label` mitbringt und in
-     * einer Liste aus 24 Modulen in jeder Zeile als eigenes Vorleseziel stünde. Ohne die
-     * zweite wäre der Test auch grün, wenn die Emojis daneben stehen blieben.
+     * „Ein Emoji ist keine Ikone": zwei Hälften, beide Pflicht. Die erste hält die
+     * `role="img"`-Knoten der Ikonen (englisches `aria-label`) aus dem Vorlesebaum, die
+     * zweite schließt aus, dass Emojis daneben stehen bleiben.
      */
     const { container } = renderMitProviders(
       <ModulPanel
@@ -278,13 +271,9 @@ describe('ModulPanel', () => {
 });
 
 /**
- * Die Zeilenhöhe OHNE zu rendern — `test/utils.tsx:31` montiert ein nacktes `ConfigProvider`
- * ohne unser Theme, `useToken()` liefert dort den antd-Seed (`controlHeight: 32`), also keine
- * der Stufen 30/48/72. Ein Render-Test belegte antd-Vorgaben statt der Staffel.
- * Bauform 1:1 nach `pages/lagekarte/Sidebar.test.tsx:591-637`.
- *
- * Die Böden stehen als LITERALE da und werden NICHT aus `dichten` zurückgelesen — sonst
- * prüfte der Test den Token gegen sich selbst.
+ * Die Zeilenhöhe OHNE zu rendern: `test/utils.tsx` montiert ein nacktes `ConfigProvider`,
+ * `useToken()` liefert dort den antd-Seed statt der Staffel 30/48/72.
+ * Die Böden stehen als LITERALE da, sonst prüfte der Test den Token gegen sich selbst.
  */
 describe('ModulPanel · Dichte', () => {
   const tokenFuer = (s: keyof typeof dichten) => ({
@@ -314,8 +303,8 @@ describe('ModulPanel · Dichte', () => {
   });
 
   it('laesst die Drawer-Trefflaeche den Boden HEBEN, nie senken', () => {
-    // Die eigentliche Aussage des Pakets: mit `??` statt `Math.max` stuende hier im
-    // Handschuh-Betrieb 48 — die Prop drehte die Staffel zurueck, statt sie zu ergaenzen.
+    // Mit `??` statt `Math.max` stünde hier im Handschuh-Betrieb 48 — die Prop drehte die
+    // Staffel zurück, statt sie zu ergänzen.
     expect(hoehe('kompakt', 48)).toBe(48);
     expect(hoehe('komfortabel', 48)).toBe(48);
     expect(hoehe('handschuh', 48)).toBe(72);
@@ -406,9 +395,8 @@ describe('ModulPanel · Einsatzdauer im Fuß', () => {
 });
 
 /**
- * Sprungmarken (LFH-620): gefilterte Sichten in ein vorhandenes Modul. Die Marke erbt
- * Sichtbarkeit und Sperre ihres ZIELmoduls — geprüft an einem echten Registry-Schlüssel
- * (`etb`), weil `sprungZiel` in der Registry nachschlägt.
+ * Sprungmarken (LFH-620) erben Sichtbarkeit und Sperre ihres ZIELmoduls — geprüft an einem
+ * echten Registry-Schlüssel, weil `sprungZiel` in der Registry nachschlägt.
  */
 describe('ModulListe — Sprungmarken', () => {
   const marke: Sprungmarke = {
