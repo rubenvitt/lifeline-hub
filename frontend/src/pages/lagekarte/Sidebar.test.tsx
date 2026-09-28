@@ -94,6 +94,8 @@ const basisProps: SidebarProps = {
   onBildMittelpunkt: vi.fn(),
   bildPlatzierenId: null,
   bildPlatzierZentrum: null,
+  griffModus: 'groesse',
+  onGriffModus: vi.fn(),
   ansichten: [],
   aktiveAnsichtId: undefined,
   onAnsichtWaehlen: vi.fn(),
@@ -366,6 +368,38 @@ describe('Sidebar Bild-Hintergründe', () => {
     expect(screen.getByRole('button', { name: /Mittelpunkt setzen/i })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: /^Fertig$/i }));
     expect(onBildPlatzierenFertig).toHaveBeenCalled();
+  });
+
+  it('schaltet die scharfe Griffsorte um und nennt nur die Griffe, die es gibt (LFH-711)', () => {
+    const onGriffModus = vi.fn();
+    const props = {
+      ...basisProps,
+      darfSchreiben: true,
+      bilder: [bildLageplan],
+      bildPlatzierenId: 1,
+      onGriffModus,
+    };
+    const { rerender } = renderMitProviders(<Sidebar {...props} griffModus="groesse" />);
+    const gruppe = screen.getByRole('radiogroup', { name: 'Griffe auf der Karte' });
+    expect(within(gruppe).getByRole('radio', { name: 'Größe' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    fireEvent.click(within(gruppe).getByRole('radio', { name: 'Drehen' }));
+    expect(onGriffModus).toHaveBeenCalledWith('drehen');
+
+    // Der Hinweis folgt dem Modus — sonst wäre der Umschalter von „wirkungslos" nicht zu
+    // unterscheiden: der Text behauptete weiter, man könne an den Ecken ziehen.
+    rerender(<Sidebar {...props} griffModus="drehen" />);
+    expect(screen.getByText(/zum Drehen/i)).toBeInTheDocument();
+    expect(screen.queryByText(/frei strecken/i)).toBeNull();
+  });
+
+  it('zeigt den Griff-Umschalter nur im Platzier-Modus mit Schreibrecht (LFH-711)', () => {
+    renderMitProviders(
+      <Sidebar {...basisProps} darfSchreiben bilder={[bildLageplan]} bildPlatzierenId={null} />,
+    );
+    expect(screen.queryByRole('radiogroup', { name: 'Griffe auf der Karte' })).toBeNull();
   });
 
   it('zeigt den Karten-Design-Umschalter nur im Offline-Modus und meldet die Wahl', () => {

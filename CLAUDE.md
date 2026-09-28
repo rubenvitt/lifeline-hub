@@ -272,7 +272,12 @@ seinen Text gewählt und unter dem Zeiger in `colorPrimary`, am Tag 6,59 auf Wei
 `outline`. Ein Komponenten-Token
 `Radio.colorPrimary` färbte auch Scheibe und Flächen und ist deshalb verworfen. Personen-Marker tragen eine unsichtbare Trefferzone mit
 dem Durchmesser `controlHeight` (`KarteMarker.trefferDurchmesser`) und außen 2 px Schwarz um den
-weißen Rand (Weiß + Schwarz halten gegen jeden Grund ≥ 4,58); die Lagekarte setzt beides nicht.
+weißen Rand (Weiß + Schwarz halten gegen jeden Grund ≥ 4,58). Die Trefferzone trägt seit LFH-711
+**jeder** Marker der Lagekarte (Kräfte, Objekte, Lagemeldungen, freie Zeichen, Abschnitte, der
+Einsatzort mit eigener Ebene `marker-einsatzort-treffer`), die schwarze Außenkante bleibt den
+Personen vorbehalten. Die Bild-Ziehgriffe (`pages/lagekarte/bildGriffe.ts`) sind Container in
+`max(controlHeight, 44)` mit 12-px-Kern in `bedien`; scharf ist je Modus („Verschieben / Größe /
+Drehen“, Umschalter in der Leiste) nur eine Griffsorte.
 Personen-Cluster zeigen ihren Ring nach Sichtung und im Kern das Kürzel der dringlichsten
 Kategorie — kein eigenes Personen-Segment mehr. Die gefüllte `BemerkungZelle` ist ein
 Textknopf (gleiche Höhe wie der Platzhalter), der Fehler einer Inline-Zelle steht an der Zelle

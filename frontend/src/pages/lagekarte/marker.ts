@@ -3,6 +3,7 @@ import { rollenFarbe } from '../../theme/statusFarben';
 import type {
   Betreuungsstelle,
   Einheit,
+  Einsatzabschnitt,
   EinsatzAnzeige,
   EinsatzFahrzeug,
   FreiesZeichen,
@@ -21,7 +22,7 @@ import {
   betreuungsstelleTz,
   type TzProps,
 } from './taktischesZeichen';
-import type { GeoJsonGeometry } from './geo';
+import type { GeoJsonGeometry, GeoJsonPolygon } from './geo';
 
 export type MarkerTyp =
   | 'einsatzort'
@@ -62,10 +63,11 @@ export interface KarteMarker {
    *  Nur für Marker ohne taktisches Zeichen (`tz`) — sonst läge es auf dem Symbol. */
   kurzzeichen?: string;
   /**
-   * Durchmesser der unsichtbaren Trefferzone in px (LFH-650). Der gezeichnete Personen-
-   * Marker bleibt klein (Kreis, weißer Rand, schwarze Kante: 26 px); die Zone macht die Trefffläche so groß wie die Dichtestufe verlangt
-   * (`token.controlHeight`: 30 / 48 / 72). Ohne Angabe gibt es keine Zone — die Lagekarte
-   * setzt sie nicht und bleibt damit unverändert.
+   * Durchmesser der unsichtbaren Trefferzone in px (LFH-650, für die Lagekarte LFH-711). Das
+   * gezeichnete Zeichen bleibt, wie es ist (Personen-Kreis 26 px, taktisches Zeichen ≤ 34 px,
+   * Lagemeldungs-Kreis 22 px); die Zone macht die Trefffläche so groß, wie die Dichtestufe
+   * verlangt (`token.controlHeight`: 30 / 48 / 72). Jeder Builder hier und `personenMarker`
+   * setzen sie; ohne Angabe gäbe es keine Zone.
    */
   trefferDurchmesser?: number;
   /**
@@ -134,6 +136,7 @@ export function baueMarker(
       label: einsatz.einsatzort ?? 'Einsatzort',
       farbe: rollenFarbe(EINSATZORT_ROLLE, token),
       tz: einsatzortTz(),
+      trefferDurchmesser: token.controlHeight,
     });
   }
 
@@ -148,6 +151,7 @@ export function baueMarker(
         label: u.bezeichnung,
         farbe: rollenFarbe(UHS_ROLLE, token),
         tz: uhsTz(u.typ),
+        trefferDurchmesser: token.controlHeight,
       });
     } else {
       nichtVerortet.push({ typ: 'uhs', id: u.id, label: u.bezeichnung });
@@ -166,6 +170,7 @@ export function baueMarker(
         label: schadenLabel(s.registrier_nr),
         farbe: tz.farbe,
         tz,
+        trefferDurchmesser: token.controlHeight,
       });
     } else {
       nichtVerortet.push({ typ: 'schaden', id: s.id, label: schadenLabel(s.registrier_nr) });
@@ -200,6 +205,7 @@ export function baueBetreuungMarker(
         label: s.bezeichnung,
         farbe: rollenFarbe(UHS_ROLLE, token),
         tz: betreuungsstelleTz(),
+        trefferDurchmesser: token.controlHeight,
       });
     } else {
       nichtVerortet.push({ typ: 'betreuungsstelle', id: s.id, label: s.bezeichnung });
@@ -212,7 +218,10 @@ const LAGEMELDUNG_FARBE = '#d48806';
 
 /** Leitet Marker für verortete Lagemeldungen ab (LFH-113). Unverortete bleiben außen vor —
  *  Lagemeldungen werden NICHT auf der Karte platziert (Verorten erfolgt beim Übergeben). */
-export function baueLageMeldungMarker(lagemeldungen: LageMeldung[]): KarteMarker[] {
+export function baueLageMeldungMarker(
+  lagemeldungen: LageMeldung[],
+  token: Pick<GlobalToken, 'controlHeight'>,
+): KarteMarker[] {
   const verortet: KarteMarker[] = [];
   for (const l of lagemeldungen) {
     if (l.lat == null || l.lon == null) continue;
@@ -224,6 +233,7 @@ export function baueLageMeldungMarker(lagemeldungen: LageMeldung[]): KarteMarker
       lon: l.lon,
       label: `Meldung #${l.meldung_lfd_nr}`,
       farbe: LAGEMELDUNG_FARBE,
+      trefferDurchmesser: token.controlHeight,
       lageMeldung: {
         meldungId: l.meldung_id,
         meldungLfdNr: l.meldung_lfd_nr,
@@ -269,7 +279,10 @@ export function baueFreiesZeichenTz(
 export const FREIES_ZEICHEN_ERSATZLABEL = '(freies Zeichen)';
 
 /** Leitet Karten-Marker für freie taktische Zeichen ab (immer verortet, LFH-170). */
-export function baueFreieZeichenMarker(zeichen: FreiesZeichen[]): KarteMarker[] {
+export function baueFreieZeichenMarker(
+  zeichen: FreiesZeichen[],
+  token: Pick<GlobalToken, 'controlHeight'>,
+): KarteMarker[] {
   return zeichen.map((z) => ({
     schluessel: `freies_zeichen-${z.id}`,
     typ: 'freies_zeichen' as const,
@@ -279,6 +292,7 @@ export function baueFreieZeichenMarker(zeichen: FreiesZeichen[]): KarteMarker[] 
     label: z.label ?? FREIES_ZEICHEN_ERSATZLABEL,
     farbe: z.farbe ?? FREIES_ZEICHEN_FARBE,
     tz: baueFreiesZeichenTz(z),
+    trefferDurchmesser: token.controlHeight,
   }));
 }
 
@@ -290,7 +304,10 @@ export interface TaktischeQuelle {
 }
 
 /** Leitet taktische Marker (Einheit/Fahrzeug/Führung) + Nicht-verortet-Liste ab. */
-export function baueTaktischeMarker(q: TaktischeQuelle): {
+export function baueTaktischeMarker(
+  q: TaktischeQuelle,
+  token: Pick<GlobalToken, 'controlHeight'>,
+): {
   verortet: KarteMarker[];
   nichtVerortet: NichtVerortet[];
 } {
@@ -316,6 +333,7 @@ export function baueTaktischeMarker(q: TaktischeQuelle): {
         farbe: '#555',
         tz,
         statusFarbe,
+        trefferDurchmesser: token.controlHeight,
       });
     } else {
       nichtVerortet.push({ typ, id, label });
@@ -374,4 +392,37 @@ export function baueTaktischeMarker(q: TaktischeQuelle): {
     );
   }
   return { verortet, nichtVerortet };
+}
+
+const ABSCHNITT_FARBE = '#722ed1';
+
+/**
+ * Taktisches Zeichen eines Einsatzabschnitts am Zentroid seiner Fläche. `polygon` trägt die
+ * Kennzahlen (Fläche/Umfang) in den Inspector (LFH-146). Eigener Builder statt Literal im
+ * Datenhook, damit die Trefferzone (LFH-711) hier geprüft wird wie an jedem anderen Marker.
+ */
+export function baueAbschnittMarker(
+  a: Pick<Einsatzabschnitt, 'id' | 'name' | 'tz_fachaufgabe' | 'tz_organisation'>,
+  polygon: GeoJsonPolygon,
+  zentroid: [number, number],
+  orgDefault: string | null,
+  token: Pick<GlobalToken, 'controlHeight'>,
+): KarteMarker {
+  return {
+    schluessel: `abschnitt-${a.id}`,
+    typ: 'abschnitt',
+    id: a.id,
+    lon: zentroid[0],
+    lat: zentroid[1],
+    label: a.name,
+    farbe: ABSCHNITT_FARBE,
+    tz: baueTzProps({
+      objekttyp: 'abschnitt',
+      fachaufgabe: a.tz_fachaufgabe,
+      organisation: a.tz_organisation,
+      orgDefault,
+    }),
+    geometrie: polygon,
+    trefferDurchmesser: token.controlHeight,
+  };
 }

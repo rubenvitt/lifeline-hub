@@ -74,6 +74,7 @@ import {
 import { synchronisiereBildLayer, entferneBildLayer, type BildOverlay } from './bildLayer';
 import { eckenInitialPixel, type Punkt } from './bildGeometrie';
 import { erzeugeBildHandles, type BildHandles } from './bildHandles';
+import type { GriffKontext, GriffModus } from './bildGriffe';
 import type { Ecken } from '../../api/kartenbilder';
 import { BBOX_MIN_ZOOM } from './fachebenen';
 import type { FachebeneQuelle } from '../../api/fachebenen';
@@ -206,6 +207,12 @@ export interface KartenflaecheProps {
   platzierBild?: { id: number; ecken: Ecken } | null;
   /** Callback, wenn Platzier-Geometrie per Drag verändert wurde. */
   onPlatzierGeometrie?: (ecken: Ecken) => void;
+  /**
+   * Welche Griffsorte im Platzier-Modus scharf ist (LFH-711). Vorgabe `groesse`. Zehn
+   * Griffe in Fingergröße auf einem daumengroßen Bild lägen übereinander; welchen man
+   * erwischte, entschiede die Reihenfolge im DOM statt die Absicht.
+   */
+  griffModus?: GriffModus;
   /** Zeigerlage über der Karte (Koordinatenanzeige); `null`, sobald er die Karte verlässt. */
   onZeigerLage?: (lage: { lat: number; lon: number } | null) => void;
   /**
@@ -267,6 +274,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     bilder,
     platzierBild,
     onPlatzierGeometrie,
+    griffModus,
     onZeigerLage,
     massstabZiel,
     startAnsicht,
@@ -277,7 +285,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
   const mapRef = useRef<maplibregl.Map | null>(null);
   // Namensplaketten der Marker in den Rollen des aktiven Modus (LFH-622) — dieselbe
   // Plakette wie an den Zonen. `rollen` ist eine der zwei Paletten-Konstanten, also stabil.
-  const { rollen } = useRollen();
+  const { rollen, token } = useRollen();
   const markerPlakette = useMemo(() => zonenPlakette(rollen), [rollen]);
   // Aktuelle Marker-Daten als FeatureCollections; nach setStyle re-angelegt (analog flaechenDatenRef).
   const markerDatenRef = useRef<MarkerFeatureCollection>({
@@ -1198,6 +1206,17 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
 
   // Bild-Manipulationsgriffe (Ecken/Drehen/Verschieben) im Platzier-Modus.
   const handlesRef = useRef<BildHandles | null>(null);
+  // Modus und Maße gehen über Refs in die Erzeugung (LFH-711): als Deps des Effekts unten
+  // zerstörten sie die Griffe bei jedem Umschalten — mitten in einer Ziehgeste risse die Geste
+  // ab. Aus demselben Grund hängt jener Effekt nur an der Bild-ID. Die Maße (Stufe, Rolle
+  // `bedien`) gelten ab dem nächsten Platzieren; ein Stufenwechsel mitten im Einpassen ist
+  // kein Fall, für den sich ein Neuaufbau lohnt.
+  const griffModusRef = useRef<GriffModus>(griffModus ?? 'groesse');
+  const griffKontextRef = useRef<GriffKontext>({
+    controlHeight: token.controlHeight,
+    bedien: rollen.bedien,
+  });
+  griffKontextRef.current = { controlHeight: token.controlHeight, bedien: rollen.bedien };
 
   // Griffe erzeugen/zerstören — NUR an der Bild-ID hängen, damit ecken-Änderungen
   // (numerische Eingabe / Refetch nach Commit) die Griffe nicht zerstören/neu erzeugen
@@ -1210,9 +1229,16 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       handlesRef.current = null;
       return;
     }
-    const handles = erzeugeBildHandles(map, platzierBild.id, platzierBild.ecken, (ecken) => {
-      onPlatzierGeometrieRef.current?.(ecken);
-    });
+    const handles = erzeugeBildHandles(
+      map,
+      platzierBild.id,
+      platzierBild.ecken,
+      (ecken) => {
+        onPlatzierGeometrieRef.current?.(ecken);
+      },
+      griffKontextRef.current,
+      griffModusRef.current,
+    );
     handlesRef.current = handles;
     return () => {
       handles.zerstoeren();
@@ -1220,6 +1246,12 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [platzierBild?.id]);
+
+  // Ein Moduswechsel schaltet die LAUFENDE Griffgruppe um, statt sie neu zu bauen (s. o.).
+  useEffect(() => {
+    griffModusRef.current = griffModus ?? 'groesse';
+    handlesRef.current?.setzeModus(griffModusRef.current);
+  }, [griffModus]);
 
   // Externe Ecken-Änderungen (numerische Mittelpunkt-Eingabe / Refetch nach Commit) an die
   // Griffe spiegeln. Läuft nicht mid-drag (der drag setzt die Geometrie selbst kontinuierlich).

@@ -29,6 +29,7 @@ import { useKartenInteraktion } from './lagekarte/useKartenInteraktion';
 import { braucheViewportBbox, rasterBbox } from './lagekarte/fachebenen';
 import { ZONE_TYPEN } from './lagekarte/zonenStil';
 import Kartenflaeche, { type KartenHandle } from './lagekarte/Kartenflaeche';
+import type { GriffModus } from './lagekarte/bildGriffe';
 import Sidebar from './lagekarte/Sidebar';
 import Inspector from './lagekarte/Inspector';
 import FreiesZeichenInspector from './lagekarte/FreiesZeichenInspector';
@@ -109,6 +110,8 @@ export default function LagekartePage() {
   // dem Tablet offen. `null` = noch keine Wahl; die Vorgabe folgt dann der Breite, auch wenn
   // die erst nach dem ersten Rendern bekannt ist.
   const [leisteWahl, setLeisteWahl] = useState<boolean | null>(null);
+  /** Scharfe Griffsorte beim Bild-Einpassen (LFH-711). Vorgabe: Größe. */
+  const [griffModus, setGriffModus] = useState<GriffModus>('groesse');
   const leisteOffen = leisteWahl ?? !istSchmal;
   // Zeigerkoordinate: die Karte meldet, nur die Anzeige rendert mit (siehe `mausPosition.ts`).
   const zeigerQuelle = useMemo(() => erzeugeZeigerQuelle(), []);
@@ -803,6 +806,7 @@ export default function LagekartePage() {
         bilder={bildOverlays}
         platzierBild={aktivesPlatzierBild}
         onPlatzierGeometrie={onPlatzierGeometrie}
+        griffModus={griffModus}
         onZeigerLage={zeigerQuelle.melde}
         massstabZiel={massstabZiel}
       />
@@ -985,6 +989,8 @@ export default function LagekartePage() {
         onBildMittelpunkt={onBildMittelpunkt}
         bildPlatzierenId={bildPlatzierenId}
         bildPlatzierZentrum={bildPlatzierZentrum}
+        griffModus={griffModus}
+        onGriffModus={setGriffModus}
         ansichten={ansichten ?? []}
         aktiveAnsichtId={aktiveAnsichtId}
         onAnsichtWaehlen={waehleAnsicht}
