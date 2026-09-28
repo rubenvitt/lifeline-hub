@@ -60,6 +60,7 @@ pub mod tx;
 pub mod uhs;
 pub mod verbindung;
 pub mod verpflegung;
+pub mod vorlagendokument;
 pub mod wetter;
 pub mod zeit;
 pub mod zulassung;
