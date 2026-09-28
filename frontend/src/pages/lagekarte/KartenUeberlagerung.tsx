@@ -1,7 +1,9 @@
-import { useRef, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
+import { useId, useRef, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
+import { Popover } from 'antd';
 import {
   TbCompass,
   TbCrosshair,
+  TbCurrentLocation,
   TbLayoutSidebarRightCollapse,
   TbLayoutSidebarRightExpand,
   TbMinus,
@@ -18,8 +20,8 @@ import './lagekarte.css';
 
 /**
  * Überlagerungen der Kartenfläche (Neuentwurf S5): oben links Kartengrundlage und
- * Zeigerkoordinate, oben rechts der Knopfblock (Zoom, Nordung, Messen, Zeichnen, ab `lg` der
- * Leisten-Umschalter).
+ * Zeigerkoordinate, oben rechts der Knopfblock (Zoom, Nordung, Eigenposition, Messen, Zeichnen,
+ * ab `lg` der Leisten-Umschalter).
  *
  * KEIN AUFSPANNENDER RAHMEN: jeder Block ist einzeln positioniert. Ein Elternteil über die
  * ganze Karte schluckte jedes Ziehen darunter — derselbe Befund, den `KartenFuss` mit
@@ -178,6 +180,16 @@ export function ZeigerKoordinate({ quelle }: { quelle: ZeigerQuelle }) {
   );
 }
 
+/** Nur für Vorlesende sichtbar — der Grund einer Sperre steht so auch ohne Antippen am Knopf. */
+const NUR_VORLESEN: CSSProperties = {
+  position: 'absolute',
+  width: 1,
+  height: 1,
+  overflow: 'hidden',
+  clip: 'rect(0 0 0 0)',
+  whiteSpace: 'nowrap',
+};
+
 function Kartenknopf({
   beschriftung,
   onClick,
@@ -199,15 +211,17 @@ function Kartenknopf({
   ausgeklappt?: boolean;
   steuert?: string;
   /**
-   * Gesetzt = gesperrt. `aria-disabled` statt `disabled`: der Knopf bleibt in der Tab-Folge, und
-   * der Grund im `title` erreicht als Beschreibung auch Tastatur und Vorlesende — ein natives
-   * `disabled` nähme ihn aus der Folge, übrig bliebe ein grauer Knopf ohne Grund. Der Name bleibt
-   * die Handlung.
+   * Gesetzt = gesperrt. `aria-disabled` statt `disabled`: der Knopf bleibt in der Tab-Folge und
+   * nimmt weiter den Klick — ein natives `disabled` nähme beides, übrig bliebe ein grauer Knopf
+   * ohne Grund. Der Klick löst die Handlung nicht aus, sondern zeigt den Grund als Text am Knopf
+   * (LFH-712: auf Touch der einzige Weg zum Text, ein `title` erscheint dort nie); Vorlesende
+   * bekommen ihn über `aria-describedby`. Der Name bleibt die Handlung.
    */
   sperrGrund?: string | null;
   children: ReactNode;
 }) {
-  return (
+  const grundId = useId();
+  const knopf = (
     <button
       type="button"
       aria-label={beschriftung}
@@ -215,6 +229,7 @@ function Kartenknopf({
       aria-expanded={ausgeklappt}
       aria-controls={steuert}
       aria-disabled={sperrGrund != null ? true : undefined}
+      aria-describedby={sperrGrund != null ? grundId : undefined}
       title={sperrGrund ?? beschriftung}
       onClick={sperrGrund != null ? undefined : onClick}
       className="lfh-kartenknopf"
@@ -237,6 +252,17 @@ function Kartenknopf({
       </span>
     </button>
   );
+  if (sperrGrund == null) return knopf;
+  return (
+    <>
+      <Popover trigger={['click']} placement="left" content={sperrGrund}>
+        {knopf}
+      </Popover>
+      <span id={grundId} style={NUR_VORLESEN}>
+        {sperrGrund}
+      </span>
+    </>
+  );
 }
 
 export interface KartenUeberlagerungProps {
@@ -255,6 +281,11 @@ export interface KartenUeberlagerungProps {
    */
   onMessen?: () => void;
   messenAktiv?: boolean;
+  /**
+   * Eigenposition (LFH-712): Umschalter, auch ohne Schreibrecht. `sperrGrund` gesetzt → der
+   * Knopf steht gesperrt da und nennt den Grund beim Antippen. Nicht gesetzt → kein Knopf.
+   */
+  eigenposition?: { an: boolean; sperrGrund: string | null; onUmschalten: () => void };
   /**
    * Leiste ein-/ausblenden (LFH-715). Nur ab `lg` gesetzt: dort steht die Leiste rechts neben
    * der Karte, der Umschalter sitzt an ihrer Kante. Im Seitenkopf hob ein 72-px-Knopf
@@ -332,6 +363,19 @@ export default function KartenUeberlagerung(props: KartenUeberlagerungProps) {
         >
           <TbCompass size={16} />
         </Kartenknopf>
+        {/* Eigenposition gehört zur Navigation (wohin schaue ich?), deshalb vor den Werkzeugen. */}
+        {props.eigenposition && (
+          <Kartenknopf
+            beschriftung="Eigenposition"
+            onClick={props.eigenposition.onUmschalten}
+            kante={kante}
+            farbe={props.eigenposition.an ? rollen.bedien : rollen.gedaempft}
+            gedrueckt={props.eigenposition.an}
+            sperrGrund={props.eigenposition.sperrGrund}
+          >
+            <TbCurrentLocation size={16} />
+          </Kartenknopf>
+        )}
         {/* Reihenfolge wie im Entwurf S5: Lineal vor Stift. */}
         {props.onMessen && (
           <Kartenknopf

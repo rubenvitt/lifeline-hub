@@ -55,3 +55,12 @@
   line-height: 14px;
   white-space: nowrap;
 }
+
+/* Tastaturhinweise nur, wenn es einen feinen Zeiger gibt (LFH-712): ein reines Touch-Gerät hat
+   keine Esc-Taste, und die Zeile kostete im Kartenfuß die Höhe, die er auf der halbierten Karte
+   nicht hat. `any-pointer`, nicht `pointer`: ein Tablet mit angesteckter Maus zeigt sie. */
+@media not (any-pointer: fine) {
+  .lfh-nur-feiner-zeiger {
+    display: none;
+  }
+}
