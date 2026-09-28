@@ -5,8 +5,8 @@ import { renderMitProviders } from '../test/utils';
 import BetroffenenSeitenleiste from './BetroffenenSeitenleiste';
 
 /**
- * Die Seitenleiste liest die Bilanz aus `personenBilanz.ts` — hier nur, dass die neuen
- * Posten (LFH-613: Notunterkunft, Fundort über Koordinate) tatsächlich ankommen.
+ * Die Seitenleiste liest die Bilanz aus `personenBilanz.ts` — hier nur, dass Notunterkunft und
+ * Fundort über Koordinate ankommen.
  */
 
 const basis: Person = {

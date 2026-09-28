@@ -16,27 +16,19 @@ import { useKartenAnsicht } from '../pages/lagekarte/useKartenAnsicht';
 import { personenMarker } from './personenKarte';
 
 /**
- * Kartenansicht der Betroffenen (LFH-613, design D7): jede nicht stornierte Person mit
- * Fundort-Koordinate als Marker auf der Einsatzkarte.
+ * Kartenansicht der Betroffenen: jede nicht stornierte Person mit Fundort-Koordinate als Marker.
  *
- * - **Eigenes Bündel.** `PersonenPage` lädt diese Datei per `React.lazy`, erst wenn „Karte"
- *   gewählt ist — MapLibre gehört nicht in das Bündel der Liste.
- * - **Dieselbe Grundlage wie die Lagekarte.** Die Basemap kommt aus der Standardansicht des
- *   Einsatzes (`useKartenAnsicht` + `useBasemap`), nicht aus einer eigenen Wahl: zwei
- *   Karten desselben Einsatzes mit verschiedener Grundlage wären ein Unterschied ohne
- *   Bedeutung. Umgeschaltet wird sie hier nicht — das ist Sache der Lagekarte.
- * - **Keine Zeichen-, Zonen- oder Fachebenen-Props.** Die Karte zeigt, sie bearbeitet nicht;
- *   verortet wird über die Detailseite („Auf Lagekarte verorten").
- * - **Startausschnitt:** Rahmen um die Personen-Marker, ohne sie der Einsatzort. Die Ansicht
- *   der Lagekarte (`zentrum_lat`/`zoom`) zählt bewusst NICHT — sie schlüge den Rahmen, und
- *   gefragt ist hier, wo die Betroffenen liegen. Ohne beides: Leerzustand statt einer
- *   Weltkarte, auf der nichts steht.
- * - **Die Lücke wird GESAGT:** „n ohne Koordinate" steht über der Karte. Eine Karte, die
- *   still weniger zeigt als die Liste, läse sich als vollständig. Die Zeile steht IMMER da —
- *   ohne Lücke sagt sie das (LFH-650): kam sie nur bei `> 0`, sprang die ganze Karte um eine
- *   Zeile, sobald die letzte Person live verortet wurde oder die erste ohne dazukam.
- * - **Begrenzte Höhe in `dvh`** (Höhenkette, LFH-343 · C8): das Layout darüber gibt keine
- *   Höhe vor, und die Browserleiste des Handschirms frisst bei `vh` den unteren Rand.
+ * - **Eigenes Bündel** (`React.lazy` in `PersonenPage`) — MapLibre gehört nicht ins Bündel der
+ *   Liste.
+ * - **Dieselbe Grundlage wie die Lagekarte** (`useKartenAnsicht` + `useBasemap`); umgeschaltet
+ *   wird sie nur dort.
+ * - **Keine Bearbeitungs-Props**: die Karte zeigt nur; verortet wird über die Detailseite.
+ * - **Startausschnitt:** Rahmen um die Personen-Marker, sonst der Einsatzort; die gespeicherte
+ *   Ansicht der Lagekarte zählt bewusst nicht. Ohne beides Leerzustand statt Weltkarte.
+ * - **Die Lücke wird GESAGT:** „n ohne Koordinate" steht immer über der Karte — nur bei `> 0`
+ *   spränge die Karte um eine Zeile, sobald die letzte Person live verortet wird.
+ * - **Begrenzte Höhe in `dvh`**: das Layout gibt keine Höhe vor, und bei `vh` fräße die
+ *   Browserleiste des Handschirms den unteren Rand.
  */
 export interface BetroffeneKarteProps {
   einsatzId: number;
@@ -56,10 +48,9 @@ export function personIdAusSchluessel(schluessel: string): number | null {
 }
 
 /**
- * `verortet` = Personen-Marker auf der Karte. Ohne Lücke UND ohne Marker (Filter „vermisst",
- * leere Auswahl) wäre „alle stehen auf der Karte" über einer leeren Karte falsch (Review
- * LFH-650) — dann sagt der Satz, dass die Auswahl keine angetroffene Person enthält. Die Karte
- * zeigt die GEFILTERTE Menge, deshalb „dieser Auswahl".
+ * `verortet` = Personen-Marker auf der Karte. Ohne Lücke UND ohne Marker wäre „alle stehen auf
+ * der Karte" über einer leeren Karte falsch — dann sagt der Satz, dass die Auswahl keine
+ * angetroffene Person enthält.
  */
 export function ohneKoordinateText(anzahl: number, verortet: number): string {
   if (anzahl === 0 && verortet === 0) return 'Keine angetroffene Person in dieser Auswahl';
@@ -100,8 +91,8 @@ export default function BetroffeneKarte({
     () => personenMarker(personen, token),
     [personen, token],
   );
-  // Der Einsatzort steht zur Orientierung mit auf der Karte; `baueMarker` ist die eine
-  // Quelle seiner Signatur (Farbrolle `marke`, taktisches Zeichen).
+  // Der Einsatzort steht zur Orientierung mit auf der Karte; `baueMarker` ist die eine Quelle
+  // seiner Signatur.
   const ort = useMemo(() => baueMarker(einsatz, [], [], token).verortet, [einsatz, token]);
   const alleMarker = useMemo(() => [...ort, ...marker], [ort, marker]);
   const start = useMemo(() => startAnsicht(marker.length > 0 ? marker : ort), [marker, ort]);

@@ -3,9 +3,8 @@ import type { Uhs } from '../api/types';
 import { loeseBefehl, loeseUhsAuf, nameAus, parsePersonBefehl } from './personBefehl';
 
 /**
- * Der Parser der Betroffenen-Zeile. Jede Aussage über ein Kürzel steht mit ihrer
- * Gegenhälfte: dass etwas erkannt wird, belegt nur dann etwas, wenn Ähnliches NICHT erkannt
- * wird (sonst wäre ein Parser grün, der alles als Namen führt oder alles als Kürzel).
+ * Der Parser der Betroffenen-Zeile. Jede Aussage über ein Kürzel steht mit ihrer Gegenhälfte,
+ * sonst wäre ein Parser grün, der alles als Namen oder alles als Kürzel führt.
  */
 
 function uhs(id: number, bezeichnung: string, extra: Partial<Uhs> = {}): Uhs {
