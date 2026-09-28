@@ -161,6 +161,7 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     ("/api/einsaetze/{id}/gefahrengebiete", Some("gefahrenzonen")),
     ("/api/einsaetze/{id}/abschnitte", Some("einsatzabschnitte")),
     ("/api/einsaetze/{id}/zonen", Some("lagekarte")),
+    ("/api/einsaetze/{id}/freie-zeichen", Some("lagekarte")),
     // Hintergrundbilder und Führungskräfte-Positionen leben auf der Lagekarte.
     ("/api/einsaetze/{id}/karte", Some("lagekarte")),
     // Wetter & Pegel (LFH-633): nur der Wetter-Endpunkt ist am Modul gegatet. Der
