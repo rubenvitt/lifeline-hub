@@ -700,6 +700,16 @@ export default function LagekartePage() {
   // Karte ein Objekt und sähe nichts davon. Abgeleitet, nicht per Effekt: wird die Auswahl
   // geschlossen, gilt wieder die eigene Wahl.
   const leisteSichtbar = breit || leisteOffen || auswahlInhalt != null;
+  // Unter `lg` gibt die Wahl eines Zeichenwerkzeugs die Karte frei (LFH-713, Entscheidung
+  // 28.09.2026) — Vorbild ist der Navigations-Drawer, der beim Modulklick schließt. Gemessen
+  // bei 390 px: die offene Leiste halbierte die Karte (680 → 374 px), und der Fuß mit
+  // Zeichen-Steuerung und ausgeklappter Zeitachse (412 px) deckte den Rest; es blieb keine
+  // Karte, auf die man die Punkte hätte tippen können. Die Wahl ist eine eigene, keine Sperre:
+  // „Leiste einblenden" im Seitenkopf holt sie zurück. Beide Startwege räumen die Auswahl
+  // selbst (`useKartenInteraktion`), sonst hielte `auswahlInhalt` die Leiste offen.
+  const karteFreigeben = () => {
+    if (!breit) setLeisteWahl(false);
+  };
 
   // Die Kartengrundlage: ab `md` als Segmentleiste über der Karte (Neuentwurf S5). Auf dem
   // Handschirm bräche die Leiste mit mehreren Online-Stilen in vier Zeilen um und läge über
@@ -936,8 +946,14 @@ export default function LagekartePage() {
         platzierungZiel={platzierungZiel}
         onPlatzierenStart={onPlatzierenStart}
         onPlatzierenAbbrechen={onPlatzierenAbbrechen}
-        onAbschnittZeichnenStart={onAbschnittZeichnenStart}
-        onZoneZeichnenStart={onZoneZeichnenStart}
+        onAbschnittZeichnenStart={(id) => {
+          karteFreigeben();
+          onAbschnittZeichnenStart(id);
+        }}
+        onZoneZeichnenStart={(entwurf) => {
+          karteFreigeben();
+          onZoneZeichnenStart(entwurf);
+        }}
         zeichenPlatzieren={zeichenPlatzieren}
         onZeichenPlatzierenStart={onZeichenPlatzierenStart}
         onZeichenPlatzierenAbbrechen={onZeichenPlatzierenAbbrechen}

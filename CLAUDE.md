@@ -553,13 +553,29 @@ wer eine Bedienbarkeit zusichern will, klickt. Und ein e2e-Test, der eine Überd
 Zustand ungetestet, den der Nutzer antrifft — die Umgehung gehört mit dem Fix weg, die
 Vorbedingung („die Leiste steht ausgeklappt da") bleibt stehen, sonst wird die Messung
 still wertlos statt rot. Gemessen wird in `e2e/lagekarte-smoke.spec.ts` mit echten
-Bounding-Boxen bei 1280 px und 1024 px. **Nicht bei 390 px — das ist heute eine Lücke,
-keine Aussage mehr** (LFH-100). Die frühere Begründung („die Sidebar ist fest 300 px breit,
-für die Kartenfläche bliebe nichts") ist seit dem Neuentwurf überholt: unter `lg` liegt die
-Leiste UNTER der Karte, auf dem Handschirm per Vorgabe zu. Den Querlauf der Lagekarte misst
-seit LFH-100 Gate 1 (`e2e/gate1-ueberlauf.spec.ts`, auch bei 768 und 390 px); die
-Klickbarkeit der ZEICHENSTEUERUNG im Zeichenmodus bei 390 px ist weiter ungemessen und gehört
-zu LFH-100.
+Bounding-Boxen bei 1280 px und 1024 px. Den Querlauf der Lagekarte misst seit LFH-100 Gate 1
+(`e2e/gate1-ueberlauf.spec.ts`, auch bei 768 und 390 px).
+**Bei 390 und 1024 px mit Fingern misst es `e2e/lagekarte-touch.spec.ts`** (LFH-713, `hasTouch`):
+Pan, Pinch, Drehen samt „Nach Norden ausrichten", Tipps auf Einzelzeichen, Donut und
+Spider-Leaf, ein per Tipp gezeichnetes und gespeichertes Gefahrengebiet, und „Abbrechen"/
+„Fertig" bei ausgeklappter Zeitachse **getippt**. Jede Geste wird am Kartenzustand belegt und
+startet hinter einer Trefferwache (`elementFromPoint` = Canvas). Zwei Befunde der Messung sind
+dort behoben:
+- **Die Karte kippt nicht** (Entscheidung 25.09.2026, Draufsicht). `Kartenflaeche.tsx` setzt
+  `touchPitch: false` **und** `maxPitch: 0`, und keine Angabe ersetzt die andere. Ohne die
+  erste schluckt der gedeckelte Kipp-Erkenner den Zwei-Finger-Zug, die Karte verschiebt sich
+  dann nicht. Ohne die zweite kippt Umschalt+↑. Drehen bleibt erlaubt. MapLibre kippt nur bei
+  Fingern **nebeneinander**, die sich gemeinsam nach **oben** bewegen. Ein Zug nach unten
+  deckelt bei Neigung 0 und wäre auch ohne Abschaltung grün. Deshalb gehört die
+  Positivkontrolle „Zentrum hat sich bewegt" zur Aussage.
+- **Unter `lg` gibt die Werkzeugwahl die Karte frei** (`karteFreigeben` in
+  `LagekartePage.tsx`, Entscheidung 28.09.2026). Gemessen bei 390 px: Die offene Leiste
+  halbierte die Karte (680 → 374 px), und der Fuß mit ausgeklappter Zeitachse (412 px) deckte
+  den Rest. Er ragte dabei 50 px in den Seitenkopf. Zum Tippen blieb keine Karte. Seitdem
+  schließt die Leiste beim Start einer Zonen- oder Abschnittszeichnung, Vorbild ist der
+  Navigations-Drawer. Außerdem **endet der Fuß oben an der Karte** (`fussStil`: `maxHeight` plus
+  `overflowY: auto`) und rollt in sich, per Finger gemessen. **Platzieren** schließt die
+  Leiste nicht, das ist ungemessen.
 **Der Fuß endet rechts vor der Knopfspalte** (LFH-373, `fussStil(knopfKante)`): Knopfblock oben
 rechts und Fuß lagen beide auf `zIndex: 5`, und bei 390 px im Handschuh-Betrieb lagen drei
 Kartenknöpfe VOLLSTÄNDIG unter dem Zeitachsenband, per Zeiger und Tastatur unerreichbar.

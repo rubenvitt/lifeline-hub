@@ -54,6 +54,13 @@ export function fussStil(knopfKante: number): CSSProperties {
     flexDirection: 'column',
     alignItems: 'stretch',
     gap: FUSS_ABSTAND,
+    // OBEN ENDET DER FUSS AN DER KARTE (LFH-713). Unten verankert und ohne Obergrenze wuchs
+    // er nach oben aus der Kartenspalte hinaus: gemessen bei 390 px mit offener Leiste,
+    // Zeichen-Steuerung und ausgeklappter Zeitachse 412 px Fuß auf 374 px Karte — er ragte in
+    // den Seitenkopf und deckte „Leiste ausblenden". Wird er höher als die Karte, rollt er in
+    // sich; die Zeichen-Steuerung steht oben und bleibt zuerst im Bild.
+    maxHeight: `calc(100% - ${2 * FUSS_ABSTAND}px)`,
+    overflowY: 'auto',
     // Der Rahmen spannt bis vor die Knopfspalte, trägt aber selbst nichts. Ohne diese
     // Zeile schluckte der Leerraum zwischen (und neben) den Bändern jedes Ziehen und Klicken
     // auf der Karte darunter — die Bänder holen sich die Ereignisse über `bandStil` zurück.
