@@ -354,6 +354,10 @@ Kein neuer Banner: Kopfleiste (`OFFLINE`) und `LiveStatusBanner` melden den Zust
 - **Bewusst nicht umgesetzt:**
   - Die ETB-Filtervarianten werden je Variante mitgeschrieben. Das kostet Platz, verletzt
     aber keine Anforderung, messen, wenn es auffällt.
+  - Eine 503 **mit** Umschlag beim Start (Lastabwurf des eigenen Servers) stellt die
+    Offline-Identität her, kennzeichnet aber nicht „· offline“. Der Server ist erreichbar und
+    hat nur gerade nicht angenommen. Der nächste scheiternde Abruf zeigt auf den Seiten ihren
+    Fehler bzw. „Stand veraltet“, und die Uhrzeit des Datenstands ist die alte.
   - Die Offline-Identität wird nach der Rückkehr des Netzes nicht per `me()` aufgefrischt.
     Rollen und Anzeigename können also bis zu 24 h alt sein. Der Server erzwingt die Rechte
     unabhängig davon, und eine 401 räumt über die Sitzungswache.

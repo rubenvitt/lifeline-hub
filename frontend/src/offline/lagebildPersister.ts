@@ -48,6 +48,9 @@ export function erzeugeLagebildPersister(
       ausstehend = client;
       if (uhr === null) uhr = setTimeout(durchlauf, drosselMs);
     },
+    // Vom Start nicht genutzt: er stellt selbst wieder her, weil unmittelbar vor `hydrate`
+    // gefiltert werden muss (`wiederherstellen` in `lagebildSitzung.ts`, Review Befund 2).
+    // Das `Persister`-Interface verlangt die Methode; sie bleibt identitätsgebunden richtig.
     async restoreClient() {
       const satz = await lagebildLesen();
       return satz && satz.benutzer.id === benutzerId ? satz.client : undefined;
