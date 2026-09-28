@@ -320,14 +320,24 @@ test('Lagekarte (LFH-373): die Zeitachse belegt höchstens die halbe Karte und l
   ]) {
     await page.setViewportSize({ width: lage.width, height: lage.height });
     await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
-    await page.evaluate(() => localStorage.setItem('lfh:lagekarte:zeitachse-eingeklappt', '0'));
+    // Die Kartenleiste merkt ihre Wahl seit LFH-715 je Breitenklasse und überlebt damit das
+    // Neuladen in `stelleDichte`. Ein Klick auf „Leiste einblenden“ je Stufe fände den Knopf ab
+    // der zweiten Stufe nicht mehr — die Vorbedingung wird deshalb gesetzt, nicht geklickt.
+    await page.evaluate((offen) => {
+      localStorage.setItem('lfh:lagekarte:zeitachse-eingeklappt', '0');
+      localStorage.removeItem('lfh:lagekarte:leiste-offen:ab-lg');
+      if (offen) localStorage.setItem('lfh:lagekarte:leiste-offen:unter-lg', '1');
+      else localStorage.removeItem('lfh:lagekarte:leiste-offen:unter-lg');
+    }, lage.leiste);
     for (const dichte of DICHTEN) {
       const lauf = `${lage.name}/${dichte}`;
       await stelleDichte(page, dichte);
       await expect(
         page.getByTestId('kartenflaeche').locator('canvas.maplibregl-canvas'),
       ).toHaveCount(1, { timeout: 60_000 });
-      if (lage.leiste) await page.getByRole('button', { name: 'Leiste einblenden' }).click();
+      if (lage.leiste) {
+        await expect(page.getByRole('complementary', { name: 'Kartenleiste' })).toBeVisible();
+      }
       const band = page.locator('[data-lfh="zeitachse"]');
       await expect(band.getByRole('button', { name: 'Stand A' })).toBeVisible();
       await schriftenGeladen(page);
