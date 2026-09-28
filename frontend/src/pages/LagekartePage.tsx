@@ -35,6 +35,7 @@ import FreiesZeichenInspector from './lagekarte/FreiesZeichenInspector';
 import ZonenInspector from './lagekarte/ZonenInspector';
 import FachebenenInspector from './lagekarte/FachebenenInspector';
 import ZeichnenSteuerung from './lagekarte/ZeichnenSteuerung';
+import { LEERER_ZEICHENSTAND, type ZeichenStand } from './lagekarte/zeichnen';
 import MessSteuerung from './lagekarte/MessSteuerung';
 import { erzeugeMessQuelle } from './lagekarte/messQuelle';
 import { HistorienBanner } from './lagekarte/HistorienBanner';
@@ -96,7 +97,7 @@ export default function LagekartePage() {
   // Imperative Karten-API (Upload-Platzierung in Viewport-Mitte, Auf-Bild-Zentrieren,
   // Abschnitt-/Zone-Zeichnen abschließen).
   const kartenRef = useRef<KartenHandle>(null);
-  const [zeichnenBereit, setZeichnenBereit] = useState(false);
+  const [zeichenStand, setZeichenStand] = useState<ZeichenStand>(LEERER_ZEICHENSTAND);
 
   // Neuentwurf S5: Rahmen, Überlagerungen, rechte Leiste.
   const { token } = useRollen();
@@ -787,7 +788,7 @@ export default function LagekartePage() {
         zoneZeichnenNonce={zoneZeichnenNonce}
         onZoneKlick={onZoneKlick}
         onZoneGezeichnet={onZoneGezeichnet}
-        onZeichnenBereitAenderung={setZeichnenBereit}
+        onZeichnenStandAenderung={setZeichenStand}
         messen={messForm}
         onMessung={(geometrie, fertig) => messQuelle.melde({ geometrie, fertig })}
         fachebenen={aktiveFachebenen}
@@ -838,7 +839,7 @@ export default function LagekartePage() {
           }
           phase={zoneBestaetigung != null ? 'bestaetigen' : 'zeichnen'}
           speichernLaeuft={zoneSpeichern}
-          abschliessenMoeglich={zeichnenBereit}
+          abschliessenMoeglich={zeichenStand.bereit}
           onAbschliessen={() => {
             const abgeschlossen =
               zeichneAbschnittId != null

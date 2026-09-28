@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 
 vi.mock('terra-draw-maplibre-gl-adapter', () => ({
@@ -10,19 +10,42 @@ vi.mock('terra-draw-maplibre-gl-adapter', () => ({
   },
 }));
 
+/** Aufzeichnung der Konstruktor-Optionen — die Undo- und Tastenoptionen SIND die Zusicherung. */
+const aufrufe = vi.hoisted(() => ({
+  terraDraw: [] as Record<string, unknown>[],
+  modi: [] as { name: string; optionen: unknown }[],
+  undo: 0,
+  clear: 0,
+}));
+
 vi.mock('terra-draw', () => ({
-  TerraDrawPolygonMode: class {},
-  TerraDrawLineStringMode: class {},
+  TerraDrawPolygonMode: class {
+    constructor(optionen?: unknown) {
+      aufrufe.modi.push({ name: 'polygon', optionen });
+    }
+  },
+  TerraDrawLineStringMode: class {
+    constructor(optionen?: unknown) {
+      aufrufe.modi.push({ name: 'linestring', optionen });
+    }
+  },
+  TerraDrawModeUndoRedo: class {},
   TerraDraw: class {
     enabled = false;
     private finish?: (id: number, context: { action: string }) => void;
     private readonly canvas: HTMLCanvasElement;
     private mode = 'polygon';
+    /** Koordinaten der laufenden Figur, wie terra-draw sie hält. */
+    private stapel: string[] = [];
 
-    constructor({ adapter }: { adapter: { map: MapLibreMap } }) {
-      this.canvas = adapter.map.getCanvas();
+    constructor(optionen: { adapter: { map: MapLibreMap } } & Record<string, unknown>) {
+      aufrufe.terraDraw.push(optionen);
+      this.canvas = optionen.adapter.map.getCanvas();
       this.canvas.addEventListener('keydown', (event) => {
         if (event.key === 'Enter') this.finish?.(1, { action: 'draw' });
+      });
+      this.canvas.addEventListener('click', (event) => {
+        if (this.enabled) this.stapel.push(`${event.clientX}:${event.clientY}`);
       });
     }
 
@@ -36,9 +59,22 @@ vi.mock('terra-draw', () => ({
     stop() {
       this.enabled = false;
     }
-    clear() {}
+    clear() {
+      aufrufe.clear += 1;
+      this.stapel = [];
+    }
     setMode(mode: string) {
       this.mode = mode;
+    }
+    // Wie terra-draw 1.34 (im Bundle gemessen): beide WERFEN, solange die Instanz gestoppt ist.
+    undo() {
+      if (!this.enabled) throw new Error('Terra Draw is not enabled');
+      aufrufe.undo += 1;
+      return this.stapel.pop() != null;
+    }
+    canUndo() {
+      if (!this.enabled) throw new Error('Terra Draw is not enabled');
+      return this.stapel.length > 0;
     }
     getSnapshot() {
       if (this.mode === 'linestring') {
@@ -75,44 +111,157 @@ vi.mock('terra-draw', () => ({
   },
 }));
 
-import { createZeichnung } from './zeichnen';
+import { createZeichnung, type ZeichenStand } from './zeichnen';
+
+function aufbau() {
+  const canvas = document.createElement('canvas');
+  const map = { getCanvas: () => canvas } as unknown as MapLibreMap;
+  const fertig = vi.fn();
+  const stand = vi.fn<(s: ZeichenStand) => void>();
+  const zeichnung = createZeichnung(map, fertig, stand);
+  const klick = (x: number, y: number) =>
+    canvas.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: x, clientY: y }));
+  const letzter = () => stand.mock.lastCall?.[0];
+  return { canvas, fertig, stand, zeichnung, klick, letzter };
+}
+
+beforeEach(() => {
+  aufrufe.terraDraw.length = 0;
+  aufrufe.modi.length = 0;
+  aufrufe.undo = 0;
+  aufrufe.clear = 0;
+});
 
 describe('createZeichnung — expliziter Abschluss', () => {
   it('meldet erst ab drei gesetzten Punkten Bereitschaft und bestätigt nur ein echtes Finish', () => {
-    const canvas = document.createElement('canvas');
-    const map = { getCanvas: () => canvas } as unknown as MapLibreMap;
-    const fertig = vi.fn();
-    const bereitschaft = vi.fn();
-    const zeichnung = createZeichnung(map, fertig, bereitschaft);
+    const { fertig, zeichnung, klick, letzter } = aufbau();
 
     zeichnung.starten('polygon');
-    canvas.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 10, clientY: 10 }));
-    canvas.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 20, clientY: 10 }));
+    klick(10, 10);
+    klick(20, 10);
     expect(zeichnung.abschliessen()).toBe(false);
     expect(fertig).not.toHaveBeenCalled();
 
-    canvas.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 20, clientY: 10 }));
+    klick(20, 10);
     expect(zeichnung.abschliessen()).toBe(false);
-    canvas.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 20, clientY: 20 }));
-    expect(bereitschaft).toHaveBeenLastCalledWith(true);
+    klick(20, 20);
+    expect(letzter()).toEqual({ punkte: 3, bereit: true, kannZurueck: true });
     expect(zeichnung.abschliessen()).toBe(true);
     expect(fertig).toHaveBeenCalledWith(expect.objectContaining({ type: 'Polygon' }));
   });
 
   it('gibt eine Linie bereits nach zwei verschiedenen Punkten zum Abschluss frei', () => {
-    const canvas = document.createElement('canvas');
-    const map = { getCanvas: () => canvas } as unknown as MapLibreMap;
-    const fertig = vi.fn();
-    const bereitschaft = vi.fn();
-    const zeichnung = createZeichnung(map, fertig, bereitschaft);
+    const { fertig, zeichnung, klick, letzter } = aufbau();
 
     zeichnung.starten('linie');
-    canvas.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 10, clientY: 10 }));
+    klick(10, 10);
     expect(zeichnung.abschliessen()).toBe(false);
-    canvas.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 20, clientY: 20 }));
+    klick(20, 20);
 
-    expect(bereitschaft).toHaveBeenLastCalledWith(true);
+    expect(letzter()?.bereit).toBe(true);
     expect(zeichnung.abschliessen()).toBe(true);
     expect(fertig).toHaveBeenCalledWith(expect.objectContaining({ type: 'LineString' }));
+  });
+});
+
+describe('createZeichnung — Konstruktor (LFH-712)', () => {
+  it('schaltet terra-draws Undo auf Modus-Ebene ein — ohne die Option liefert undo() immer false', () => {
+    aufbau();
+    const undoRedo = aufrufe.terraDraw[0]?.undoRedo as { modeLevel?: unknown } | undefined;
+    expect(undoRedo?.modeLevel).toBeDefined();
+  });
+
+  it('nimmt terra-draw das Escape ab und lässt Enter als Abschluss stehen', () => {
+    aufbau();
+    // Beide Zeichen-Modi, nicht nur einer: sonst wäre das Esc je nach Modus zwei- oder einstufig.
+    expect(aufrufe.modi.map((m) => m.name).sort()).toEqual(['linestring', 'polygon']);
+    for (const m of aufrufe.modi) {
+      expect(m.optionen).toMatchObject({ keyEvents: { cancel: null, finish: 'Enter' } });
+    }
+  });
+});
+
+describe('createZeichnung — Punktstand und Zurücknehmen (LFH-712)', () => {
+  it('ohne Punkt nicht zurücknehmbar, ab dem ersten Punkt schon — als Paar', () => {
+    const { zeichnung, klick, letzter } = aufbau();
+    zeichnung.starten('polygon');
+    expect(letzter()).toEqual({ punkte: 0, bereit: false, kannZurueck: false });
+    klick(10, 10);
+    expect(letzter()).toEqual({ punkte: 1, bereit: false, kannZurueck: true });
+  });
+
+  it('nimmt genau einen Punkt zurück, und „bereit" fällt unter die Mindestzahl', () => {
+    const { zeichnung, klick, letzter } = aufbau();
+    zeichnung.starten('polygon');
+    klick(10, 10);
+    klick(20, 10);
+    klick(20, 20);
+    expect(zeichnung.punktZurueck()).toBe(true);
+    expect(aufrufe.undo).toBe(1);
+    expect(letzter()).toEqual({ punkte: 2, bereit: false, kannZurueck: true });
+  });
+
+  it('nach dem Zurücknehmen des letzten Punktes gesperrt, das Zeichnen läuft weiter', () => {
+    const { zeichnung, klick, letzter } = aufbau();
+    zeichnung.starten('polygon');
+    klick(10, 10);
+    expect(zeichnung.punktZurueck()).toBe(true);
+    expect(letzter()).toEqual({ punkte: 0, bereit: false, kannZurueck: false });
+    // Weiterzeichnen geht ohne Neustart.
+    klick(30, 30);
+    expect(letzter()?.punkte).toBe(1);
+  });
+
+  it('ohne Punkt ruft punktZurueck terra-draw gar nicht erst', () => {
+    const { zeichnung } = aufbau();
+    zeichnung.starten('polygon');
+    expect(zeichnung.punktZurueck()).toBe(false);
+    expect(aufrufe.undo).toBe(0);
+  });
+
+  it('wirft nicht, wenn TerraDraw gestoppt ist', () => {
+    const { zeichnung } = aufbau();
+    expect(() => zeichnung.punktZurueck()).not.toThrow();
+    expect(zeichnung.punktZurueck()).toBe(false);
+    zeichnung.starten('polygon');
+    zeichnung.stoppen();
+    expect(zeichnung.punktZurueck()).toBe(false);
+  });
+
+  it('meldet einen unveränderten Stand nicht doppelt', () => {
+    const { zeichnung, klick, stand } = aufbau();
+    zeichnung.starten('polygon');
+    klick(10, 10);
+    const vorher = stand.mock.calls.length;
+    // Doppelklick-Hälfte am selben Pixel: kein neuer Punkt, also keine neue Meldung.
+    klick(10, 10);
+    expect(stand.mock.calls.length).toBe(vorher);
+  });
+});
+
+describe('createZeichnung — Verwerfen (LFH-712)', () => {
+  it('verwirft die Figur, bleibt im Zeichenmodus und meldet Stand 0', () => {
+    const { zeichnung, klick, letzter, fertig } = aufbau();
+    zeichnung.starten('polygon');
+    klick(10, 10);
+    klick(20, 10);
+    const clearVorher = aufrufe.clear;
+    zeichnung.verwerfen();
+    expect(aufrufe.clear).toBe(clearVorher + 1);
+    expect(letzter()).toEqual({ punkte: 0, bereit: false, kannZurueck: false });
+    // Weiter im Modus: neue Punkte zählen, drei davon schließen ab.
+    klick(1, 1);
+    klick(2, 1);
+    klick(2, 2);
+    expect(letzter()?.bereit).toBe(true);
+    expect(zeichnung.abschliessen()).toBe(true);
+    expect(fertig).toHaveBeenCalledTimes(1);
+  });
+
+  it('ist außerhalb des Zeichnens wirkungslos', () => {
+    const { zeichnung, stand } = aufbau();
+    zeichnung.verwerfen();
+    expect(aufrufe.clear).toBe(0);
+    expect(stand).not.toHaveBeenCalled();
   });
 });

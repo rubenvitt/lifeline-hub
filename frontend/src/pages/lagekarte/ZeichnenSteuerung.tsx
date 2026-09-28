@@ -1,4 +1,5 @@
 import { Button, Card, Space, Switch, Typography, theme } from 'antd';
+import { monoStil } from '../../components/instrument';
 import { bandStil } from './KartenFuss';
 
 export type ZeichnenPhase = 'zeichnen' | 'bestaetigen';
@@ -13,6 +14,15 @@ export interface ZeichnenSteuerungProps {
   /** Mindestens drei Punkte sind gesetzt; bis dahin ist der explizite Abschluss gesperrt. */
   abschliessenMoeglich?: boolean;
   onAbschliessen: () => void;
+  /**
+   * Punkte der laufenden Figur (LFH-712) — als Zähler in der Zeichenphase. Nicht gesetzt →
+   * kein Zähler.
+   */
+  punkte?: number;
+  /** Es gibt einen Punkt zum Zurücknehmen; bis dahin ist „Letzten Punkt zurück" gesperrt. */
+  punktZurueckMoeglich?: boolean;
+  /** „Letzten Punkt zurück" (LFH-712). Nicht gesetzt → kein Knopf. */
+  onPunktZurueck?: () => void;
   onAbbrechen: () => void;
   onSpeichern: () => void;
   onVerwerfen: () => void;
@@ -35,7 +45,7 @@ export interface ZeichnenSteuerungProps {
 /**
  * Overlay über der Karte, das den aktiven Zeichen-Zustand sichtbar macht und den
  * Abschluss explizit steuert (LFH-145). Zwei Phasen:
- *  - 'zeichnen'    → Hinweis + „Abschließen" / „Abbrechen"
+ *  - 'zeichnen'    → Hinweis + Punktzähler + „Abschließen" / „Letzten Punkt zurück" / „Abbrechen"
  *  - 'bestaetigen' → „Speichern" / „Verwerfen" (Entwurf bleibt auf der Karte sichtbar)
  * Präsentationsfrei: keine Karten-/terra-draw-Kenntnis, nur Props + Callbacks.
  */
@@ -62,6 +72,14 @@ export default function ZeichnenSteuerung(props: ZeichnenSteuerungProps) {
   // Ein Knopf, zwei Wahrheiten (wie in der Sidebar): „Abbrechen" verwirft nur einen Entwurf.
   // Ab der ersten gespeicherten Zone der Serie bliebe das Gespeicherte stehen — dann heißt
   // Beenden „Fertig".
+  // Der Tastaturvertrag steht EINMAL, hier — nicht im Knopf, nicht als Tooltip (CLAUDE.md,
+  // „Ein Tastaturvertrag steht EINMAL"). Er gilt in beiden Phasen: auch eine fertige,
+  // ungespeicherte Figur verwirft das erste Esc (LFH-712, design.md D2).
+  const escHinweis = (
+    <Typography.Text type="secondary">
+      Esc verwirft die Zeichnung, ein zweites Esc beendet das Zeichnen.
+    </Typography.Text>
+  );
   const beenden =
     gespeichert > 0 && props.onFertig ? (
       <Button onClick={props.onFertig}>Fertig</Button>
@@ -88,6 +106,7 @@ export default function ZeichnenSteuerung(props: ZeichnenSteuerungProps) {
         {bestaetigen ? (
           <>
             <Typography.Text type="secondary">Entwurf prüfen und speichern.</Typography.Text>
+            {escHinweis}
             {serienZeile}
             <Space>
               <Button type="primary" loading={props.speichernLaeuft} onClick={props.onSpeichern}>
@@ -103,8 +122,16 @@ export default function ZeichnenSteuerung(props: ZeichnenSteuerungProps) {
             <Typography.Text type="secondary">
               Punkte per Klick setzen. Startpunkt klicken, doppelklicken oder „Abschließen".
             </Typography.Text>
+            {escHinweis}
+            {props.punkte != null && (
+              <Typography.Text data-lfh="zeichnen-punkte" style={monoStil(token.fontSize)}>
+                {props.punkte === 1 ? '1 Punkt' : `${props.punkte} Punkte`}
+              </Typography.Text>
+            )}
             {serienZeile}
-            <Space>
+            {/* Drei Knöpfe: die Reihe bricht um, statt das 320-px-Band (und bei 390 px den
+                Fuß) waagerecht zu sprengen. */}
+            <Space wrap>
               <Button
                 type="primary"
                 disabled={props.abschliessenMoeglich === false}
@@ -112,6 +139,14 @@ export default function ZeichnenSteuerung(props: ZeichnenSteuerungProps) {
               >
                 Abschließen
               </Button>
+              {props.onPunktZurueck && (
+                <Button
+                  disabled={props.punktZurueckMoeglich === false}
+                  onClick={props.onPunktZurueck}
+                >
+                  Letzten Punkt zurück
+                </Button>
+              )}
               {beenden}
             </Space>
           </>

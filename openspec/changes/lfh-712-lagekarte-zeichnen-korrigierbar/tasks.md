@@ -5,16 +5,16 @@ Arbeitsweise je Aufgabe: `superpowers:test-driven-development` (erst rot, dann g
 
 ## 1. Adapter: Undo, Punktstand, Esc-Besitz (`pages/lagekarte/zeichnen.ts`)
 
-- [ ] 1.1 Konstruktor mit `undoRedo: { modeLevel: new TerraDrawModeUndoRedo() }` und beiden Modi mit `keyEvents: { cancel: null, finish: 'Enter' }`; `prefixId: praefix` bleibt. Verifikation: `zeichnen.test.ts` prüft beide Optionen am Konstruktor-Aufruf (Mock zeichnet die Argumente auf); Mutationsprobe — jede Option einzeln entfernt färbt mindestens einen Test rot.
-- [ ] 1.2 Geordnete Punktliste (Array, Pixel-Entdoppelung bleibt) und `onStandAendern({ punkte, kannZurueck })` statt `onBereitschaftAendern`, gemeldet nach Punkt/`starten`/`stoppen`/`finish` und bei `history`, nur bei Wertänderung. Verifikation: Tests „ohne Punkt `kannZurueck` false, nach erstem Punkt true" als Paar; keine Doppelmeldung bei gleichem Stand.
-- [ ] 1.3 `punktZurueck()` (Riegel `aktiv && draw.enabled` vor `undo()`) und `verwerfen()` (Entwurf löschen, Modus neu setzen, Stand 0). Verifikation: Tests „Undo nimmt genau einen Punkt" (3 → 2, `bereit` fällt), „Undo des letzten Punktes → 0, gesperrt, Modus aktiv", „gestoppt: `punktZurueck` wirft nicht und liefert false", „nach `verwerfen` Stand 0 und `kannZurueck` false".
-- [ ] 1.4 Aufrufer in `Kartenflaeche.tsx` umstellen: Callback-Prop `onZeichnenStandAenderung`, Handle-Methoden `punktZurueck()` und `zeichnungVerwerfen()` (fragen genau den aktiven Controller). Verifikation: `pnpm exec tsc --noEmit` grün; bestehende Kartenflaeche-/LagekartePage-Tests grün.
+- [x] 1.1 Konstruktor mit `undoRedo: { modeLevel: new TerraDrawModeUndoRedo() }` und beiden Modi mit `keyEvents: { cancel: null, finish: 'Enter' }`; `prefixId: praefix` bleibt. Verifikation: `zeichnen.test.ts` prüft beide Optionen am Konstruktor-Aufruf (Mock zeichnet die Argumente auf); Mutationsprobe — jede Option einzeln entfernt färbt mindestens einen Test rot.
+- [x] 1.2 Geordnete Punktliste (Array, Pixel-Entdoppelung bleibt) und `onStandAendern({ punkte, kannZurueck })` statt `onBereitschaftAendern`, gemeldet nach Punkt/`starten`/`stoppen`/`finish` und bei `history`, nur bei Wertänderung. Verifikation: Tests „ohne Punkt `kannZurueck` false, nach erstem Punkt true" als Paar; keine Doppelmeldung bei gleichem Stand.
+- [x] 1.3 `punktZurueck()` (Riegel `aktiv && draw.enabled` vor `undo()`) und `verwerfen()` (Entwurf löschen, Modus neu setzen, Stand 0). Verifikation: Tests „Undo nimmt genau einen Punkt" (3 → 2, `bereit` fällt), „Undo des letzten Punktes → 0, gesperrt, Modus aktiv", „gestoppt: `punktZurueck` wirft nicht und liefert false", „nach `verwerfen` Stand 0 und `kannZurueck` false".
+- [x] 1.4 Aufrufer in `Kartenflaeche.tsx` umstellen: Callback-Prop `onZeichnenStandAenderung`, Handle-Methoden `punktZurueck()` und `zeichnungVerwerfen()` (fragen genau den aktiven Controller). Verifikation: `pnpm exec tsc --noEmit` grün; bestehende Kartenflaeche-/LagekartePage-Tests grün.
 
 ## 2. Zeichnen-Steuerung (`ZeichnenSteuerung.tsx`)
 
-- [ ] 2.1 Props `punkte`, `punktZurueckMoeglich`, `onPunktZurueck`; Knopf „Letzten Punkt zurück" (antd-`Button`, kein `size`), Zähler „n Punkte" (Mono, `tabular-nums`), Knopfreihe umbrechend. Verifikation: `ZeichnenSteuerung.test.tsx` — gesperrt bei `false`, frei bei `true`, Klick meldet; Zähler-Text; Bestätigungsphase zeigt weder Knopf noch Zähler.
-- [ ] 2.2 Hinweiszeile nennt beide Esc-Stufen genau einmal („Esc verwirft die Zeichnung, ein zweites Esc beendet das Zeichnen."). Verifikation: Test zählt den Wortlaut genau einmal im Baum (Gegenaussage: nicht im Knopf, nicht doppelt).
-- [ ] 2.3 `dichte.guard.test.ts` und `aktionsabstand.guard.test.ts` grün (kein neues punktuelles `size`, keine `danger`-Nachbarschaft ohne Abstand).
+- [x] 2.1 Props `punkte`, `punktZurueckMoeglich`, `onPunktZurueck`; Knopf „Letzten Punkt zurück" (antd-`Button`, kein `size`), Zähler „n Punkte" (Mono, `tabular-nums`), Knopfreihe umbrechend. Verifikation: `ZeichnenSteuerung.test.tsx` — gesperrt bei `false`, frei bei `true`, Klick meldet; Zähler-Text; Bestätigungsphase zeigt weder Knopf noch Zähler.
+- [x] 2.2 Hinweiszeile nennt beide Esc-Stufen genau einmal („Esc verwirft die Zeichnung, ein zweites Esc beendet das Zeichnen."). Verifikation: Test zählt den Wortlaut genau einmal im Baum (Gegenaussage: nicht im Knopf, nicht doppelt).
+- [x] 2.3 `dichte.guard.test.ts` und `aktionsabstand.guard.test.ts` grün (kein neues punktuelles `size`, keine `danger`-Nachbarschaft ohne Abstand).
 
 ## 3. Seite: Verdrahtung und zweistufiges Esc (`LagekartePage.tsx`, `useKartenInteraktion.ts`)
 
