@@ -120,6 +120,7 @@ modul_marker! {
     WetterPegel => "wetter-pegel",
     Schaeden => "schaeden",
     Tiere => "tiere",
+    Bereitstellungsraeume => "bereitstellungsraeume",
 }
 
 /// Pfad-Präfix (app.rs-Route) → erwarteter Modul-Key (LFH-230). `None` = modul-lose
@@ -138,6 +139,10 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     ("/api/einsaetze/{id}/verpflegung", Some("verpflegung")),
     ("/api/einsaetze/{id}/schaeden", Some("schaeden")),
     ("/api/einsaetze/{id}/tiere", Some("tiere")),
+    (
+        "/api/einsaetze/{id}/bereitstellungsraeume",
+        Some("bereitstellungsraeume"),
+    ),
     // Wetter & Pegel (LFH-633): nur der Wetter-Endpunkt ist am Modul gegatet. Der
     // Pegelverlauf liegt unter dem modul-losen Pegel-Präfix unten.
     ("/api/einsaetze/{id}/wetter", Some("wetter-pegel")),
