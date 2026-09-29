@@ -108,4 +108,30 @@ describe('FlaechenwahlMenue (LFH-812)', () => {
     expect(escGehoertOverlay(new KeyboardEvent('keydown', { key: 'Escape' }))).toBe(true);
     expect(screen.queryByRole('menu', { hidden: true })).not.toBeNull();
   });
+
+  // Die Karte nimmt das Menü auch ohne antd weg: Kartenbewegung, Beginn eines exklusiven Modus.
+  // Der Fokus darf dann nicht auf `body` fallen (Review LFH-812).
+  it('verschwindet die Wahl von außen, geht der Fokus aus dem Menü an die Karte', async () => {
+    const karte = document.createElement('button');
+    document.body.appendChild(karte);
+    const props = { onWaehlen: vi.fn(), onSchliessen: vi.fn(), fokusZiel: () => karte };
+    const { rerender } = renderMitProviders(<FlaechenwahlMenue wahl={wahl} {...props} />);
+    await waitFor(() => expect(offenesMenue()?.contains(document.activeElement)).toBe(true));
+    rerender(<FlaechenwahlMenue wahl={null} {...props} />);
+    await waitFor(() => expect(document.activeElement).toBe(karte));
+    expect(props.onSchliessen).not.toHaveBeenCalled();
+  });
+
+  it('hat der Mensch den Fokus woanders hingesetzt, bleibt er dort', async () => {
+    const karte = document.createElement('button');
+    const knopf = document.createElement('button');
+    document.body.append(karte, knopf);
+    const props = { onWaehlen: vi.fn(), onSchliessen: vi.fn(), fokusZiel: () => karte };
+    const { rerender } = renderMitProviders(<FlaechenwahlMenue wahl={wahl} {...props} />);
+    await waitFor(() => expect(offenesMenue()).not.toBeNull());
+    knopf.focus();
+    rerender(<FlaechenwahlMenue wahl={null} {...props} />);
+    await act(async () => {});
+    expect(document.activeElement).toBe(knopf);
+  });
 });

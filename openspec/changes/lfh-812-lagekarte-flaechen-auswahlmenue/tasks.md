@@ -6,36 +6,36 @@ und `requesting-code-review`.
 
 ## 1. Schiedsrichter: Mehrdeutigkeit (D1)
 
-- [ ] 1.1 `klickziel.test.ts`: Test „oberste Fläche gewinnt" aus LFH-764 auf das neue Verhalten umschreiben (Zone über Abschnitt → `mehrdeutig`, Reihenfolge Zone, Abschnitt); neue Fälle: Zone + DWD-Fläche → `mehrdeutig` mit Zone zuerst, auch wenn die Fachebene oben liegt; Zone über `zonen-fill` + `zonen-line` → direkt `zone`; zwei Kachel-Duplikate einer Fachebenen-Meldung ohne `id` → direkt `fachebene`; Trefferzone bzw. Punktziel über zwei Flächen → Marker bzw. Punktziel. Rot belegen.
-- [ ] 1.2 `entscheideKlickziel` um `{ art: 'mehrdeutig'; flaechen }` und `Flaechenziel` erweitern (Entdoppelschlüssel, Gruppierung eigene vor Fachebene); Tests aus 1.1 grün, übrige `klickziel.test.ts` unverändert grün.
+- [x] 1.1 `klickziel.test.ts`: Test „oberste Fläche gewinnt" aus LFH-764 auf das neue Verhalten umschreiben (Zone über Abschnitt → `mehrdeutig`, Reihenfolge Zone, Abschnitt); neue Fälle: Zone + DWD-Fläche → `mehrdeutig` mit Zone zuerst, auch wenn die Fachebene oben liegt; Zone über `zonen-fill` + `zonen-line` → direkt `zone`; zwei Kachel-Duplikate einer Fachebenen-Meldung ohne `id` → direkt `fachebene`; Trefferzone bzw. Punktziel über zwei Flächen → Marker bzw. Punktziel. Rot belegen.
+- [x] 1.2 `entscheideKlickziel` um `{ art: 'mehrdeutig'; flaechen }` und `Flaechenziel` erweitern (Entdoppelschlüssel, Gruppierung eigene vor Fachebene); Tests aus 1.1 grün, übrige `klickziel.test.ts` unverändert grün.
 
 ## 2. Kennung und Eintragsstil (D3, D4)
 
-- [ ] 2.1 `fachebeneTitel(quelle, props)` aus `FachebenenInspector.tsx` als reine Funktion (ohne Emoji) herausziehen, Inspector setzt sein Zeichen selbst davor; Vitest für DWD-Ereignis, NINA, `titel`/`name`, Rückfall; `FachebenenInspector.test.tsx` unverändert grün.
-- [ ] 2.2 `typ` als Merkmals-Eigenschaft in `ZoneFeature`, `baueZonenFc` und `useLagekarteDaten` (`zonenFeatures`) ergänzen; Vitest in `kartenLayer`-Tests prüft `properties.typ`.
-- [ ] 2.3 `pages/lagekarte/flaechenwahl.ts`: `flaechenKennung(ziel, kontext)` und `flaechenwahlEintragStil(token)`; `flaechenwahl.test.ts` für Zone mit/ohne Label (Typbezeichnung aus `ZONE_TYPEN`), Abschnitt, Fachebene mit/ohne Titel, kein Emoji, keine ID im Text, Stilböden 30/48/72 als Literale.
+- [x] 2.1 `fachebeneTitel(quelle, props)` aus `FachebenenInspector.tsx` als reine Funktion (ohne Emoji) herausziehen, Inspector setzt sein Zeichen selbst davor; Vitest für DWD-Ereignis, NINA, `titel`/`name`, Rückfall; `FachebenenInspector.test.tsx` unverändert grün.
+- [x] 2.2 `typ` als Merkmals-Eigenschaft in `ZoneFeature`, `baueZonenFc` und `useLagekarteDaten` (`zonenFeatures`) ergänzen; Vitest in `kartenLayer`-Tests prüft `properties.typ`.
+- [x] 2.3 `pages/lagekarte/flaechenwahl.ts`: `flaechenKennung(ziel, kontext)` und `flaechenwahlEintragStil(token)`; `flaechenwahl.test.ts` für Zone mit/ohne Label (Typbezeichnung aus `ZONE_TYPEN`), Abschnitt, Fachebene mit/ohne Titel, kein Emoji, keine ID im Text, Stilböden 30/48/72 als Literale.
 
 ## 3. Menü-Bauteil (D3)
 
-- [ ] 3.1 `FlaechenwahlMenue.test.tsx` zuerst: Einträge in übergebener Reihenfolge mit Kennung; ArrowDown+Enter wählt den zweiten und ruft `onSchliessen`; Esc schließt ohne Wahl; Fokus geht an das übergebene Ziel zurück; `escGehoertOverlay` ist bei offenem Menü `true`. Rot belegen.
-- [ ] 3.2 `pages/lagekarte/FlaechenwahlMenue.tsx` bauen (Punktanker, gesteuertes antd-`Dropdown`, `autoFocus`, `aria-label="Fläche wählen"`, Eintragsstil aus 2.3); Tests aus 3.1 grün; `dichte.guard.test.ts` grün (kein `size="small"`).
+- [x] 3.1 `FlaechenwahlMenue.test.tsx` zuerst: Einträge in übergebener Reihenfolge mit Kennung; ArrowDown+Enter wählt den zweiten und ruft `onSchliessen`; Esc schließt ohne Wahl; Fokus geht an das übergebene Ziel zurück; `escGehoertOverlay` ist bei offenem Menü `true`. Rot belegen.
+- [x] 3.2 `pages/lagekarte/FlaechenwahlMenue.tsx` bauen (Punktanker, gesteuertes antd-`Dropdown`, `autoFocus`, `aria-label="Fläche wählen"`, Eintragsstil aus 2.3); Tests aus 3.1 grün; `dichte.guard.test.ts` grün (kein `size="small"`).
 
 ## 4. Karte verdrahten (D2, D5)
 
-- [ ] 4.1 `Kartenflaeche.tsx`: Prop `flaechenwahl` (Ref), globaler Klick-Hörer öffnet bei `mehrdeutig` das Menü, `movestart` schließt es, Wahl über gemeinsame Hilfsfunktion auf `onZoneKlick`/`onFlaecheKlick`/`onFachebeneKlick` (Fachebenen-Auswertung mit dem Fachebenen-Hörer geteilt), Fokus zurück an den Kartencontainer; bestehende Vitests der Lagekarte grün.
-- [ ] 4.2 `LagekartePage.tsx`: `flaechenwahl={!exklusiverModusAktiv}` durchreichen; Vitest oder bestehender Seitentest belegt, dass die Prop im exklusiven Modus `false` ist.
+- [x] 4.1 `Kartenflaeche.tsx`: Prop `flaechenwahl` (Ref), globaler Klick-Hörer öffnet bei `mehrdeutig` das Menü, `movestart` schließt es, Wahl über gemeinsame Hilfsfunktion auf `onZoneKlick`/`onFlaecheKlick`/`onFachebeneKlick` (Fachebenen-Auswertung mit dem Fachebenen-Hörer geteilt), Fokus zurück an den Kartencontainer; bestehende Vitests der Lagekarte grün.
+- [x] 4.2 `LagekartePage.tsx`: `flaechenwahl={!exklusiverModusAktiv}` durchreichen; Vitest oder bestehender Seitentest belegt, dass die Prop im exklusiven Modus `false` ist.
 
 ## 5. e2e unter Touch (D7)
 
-- [ ] 5.1 `lagekarte-touch.spec.ts` (Touch, 1024 px): Zone und Abschnitt überlappend per API anlegen, Tipp in die Überschneidung (Trefferwache `elementFromPoint`) → Menü mit beiden, Abschnitt tippen → Abschnitts-Inspector; Menüeintrag-Bounding-Box ≥ `controlHeight` der Stufe.
-- [ ] 5.2 Gleiche Spec: DWD per `page.route` mit Warnfläche über der Zone stubben, Ebene einschalten, Tipp → Menü „Zone" vor „Wetterwarnungen (DWD)", Warnung tippen → Fachebenen-Detail.
-- [ ] 5.3 Gleiche Spec: Marker in der Zone, Tipp in seinen Ring → Marker-Inspector, kein Menü (`[role="menu"]` abwesend).
-- [ ] 5.4 Mutationsprobe: `mehrdeutig`-Zweig aus (oberste Fläche zurückgeben) → 5.1/5.2 rot, zurückdrehen → grün; Befund in der Prüfliste (6.1) festhalten.
+- [x] 5.1 `lagekarte-touch.spec.ts` (Touch, 1024 px): Zone und Abschnitt überlappend per API anlegen, Tipp in die Überschneidung (Trefferwache `elementFromPoint`) → Menü mit beiden, Abschnitt tippen → Abschnitts-Inspector; Menüeintrag-Bounding-Box ≥ `controlHeight` der Stufe.
+- [x] 5.2 Gleiche Spec: DWD per `page.route` mit Warnfläche über der Zone stubben, Ebene einschalten, Tipp → Menü „Zone" vor „Wetterwarnungen (DWD)", Warnung tippen → Fachebenen-Detail.
+- [x] 5.3 Gleiche Spec: Marker in der Zone, Tipp in seinen Ring → Marker-Inspector, kein Menü (`[role="menu"]` abwesend).
+- [x] 5.4 Mutationsprobe: `mehrdeutig`-Zweig aus (oberste Fläche zurückgeben) → 5.1/5.2 rot, zurückdrehen → grün; Befund in der Prüfliste (6.1) festhalten.
 
 ## 6. Prüfliste und Doku
 
-- [ ] 6.1 `docs/superpowers/specs/2026-09-29-lfh-812-pruefliste.md` nach dem Muster von LFH-712: 15 Kriterien der Einsatztauglichkeit, je Zeile Verdikt (erfüllt / offen → Ticket / nicht anwendbar), Mutationsprobe aus 5.4.
-- [ ] 6.2 `CLAUDE.md`, Abschnitt Lagekarte: eine Zeile zum Flächen-Auswahlmenü (Träger `klickziel.ts` `mehrdeutig`, `FlaechenwahlMenue.tsx`, Sperre über `flaechenwahl`); `check-fmt.sh` grün.
+- [x] 6.1 `docs/superpowers/specs/2026-09-29-lfh-812-pruefliste.md` nach dem Muster von LFH-712: 15 Kriterien der Einsatztauglichkeit, je Zeile Verdikt (erfüllt / offen → Ticket / nicht anwendbar), Mutationsprobe aus 5.4.
+- [x] 6.2 `CLAUDE.md`, Abschnitt Lagekarte: eine Zeile zum Flächen-Auswahlmenü (Träger `klickziel.ts` `mehrdeutig`, `FlaechenwahlMenue.tsx`, Sperre über `flaechenwahl`); `check-fmt.sh` grün.
 
 ## 7. Integration
 

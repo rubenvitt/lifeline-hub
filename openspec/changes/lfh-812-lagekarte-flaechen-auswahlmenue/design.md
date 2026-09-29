@@ -76,8 +76,9 @@ Neues Bauteil `pages/lagekarte/FlaechenwahlMenue.tsx`: ein unsichtbarer 1×1-Ank
 nach `body` (antd-Vorgabe). Pfeile/Enter/Esc bringt antds Menü mit.
 
 - **Schließen:** Wahl, Esc und Außenklick über `onOpenChange(false)`; `movestart` der Karte
-  (wie beim Spider). Beim Schließen `map.getCanvasContainer()`/Canvas fokussieren
-  (`preventScroll`).
+  (wie beim Spider) und der Beginn eines exklusiven Modus nehmen die Wahl von außen weg. Jeder
+  Weg gibt den Fokus an den Canvas zurück (`preventScroll`); beim Wegnehmen von außen nur, wenn
+  er noch im Menü oder auf `body` steht (Review: sonst fiel er mit dem Eintrag auf `body`).
 - **Dichte:** antds Menüeinträge folgen `controlHeight` nicht. Jeder Eintrag bekommt `style` aus der
   reinen Funktion `flaechenwahlEintragStil(token)` (`minHeight: token.controlHeight`, Innenabstand aus
   `token.paddingSM`), geprüft mit Böden als Literalen (30/48/72) wie `bedienzielStil`.

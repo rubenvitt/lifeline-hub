@@ -8,6 +8,7 @@
  * gibt den Fokus an die Karte zurück (`fokusZiel`). Esc bei offenem Menü erkennt der Zeichnen-Esc
  * über `escGehoertOverlay` als Overlay.
  */
+import { useEffect, useRef } from 'react';
 import { Dropdown, theme } from 'antd';
 import { flaechenwahlEintragStil } from './flaechenwahl';
 
@@ -28,6 +29,20 @@ interface Props {
 
 export default function FlaechenwahlMenue({ wahl, onWaehlen, onSchliessen, fokusZiel }: Props) {
   const { token } = theme.useToken();
+  const fokusZielRef = useRef(fokusZiel);
+  fokusZielRef.current = fokusZiel;
+  // Nimmt die Karte das Menü ohne antd weg (Kartenbewegung, exklusiver Modus), fiele der Fokus
+  // mit dem Eintrag auf `body`. Zurück an die Karte, aber nur, wenn er noch im Menü oder im
+  // Nichts steht: einen Fokus, den der Mensch woanders hingesetzt hat, nimmt das nicht weg.
+  const offen = wahl != null;
+  useEffect(() => {
+    if (!offen) return;
+    return () => {
+      const aktiv = document.activeElement;
+      if (!aktiv || aktiv === document.body || aktiv.closest('.ant-dropdown'))
+        fokusZielRef.current?.()?.focus({ preventScroll: true });
+    };
+  }, [offen]);
   if (!wahl) return null;
 
   const schliessen = () => {

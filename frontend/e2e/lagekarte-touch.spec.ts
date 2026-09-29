@@ -1312,11 +1312,45 @@ test.describe('Flächen-Auswahlmenü am Führungs-Tablet (LFH-812)', () => {
       .first()
       .click();
 
-    // 3. Eine Kartenbewegung schließt das Menü.
+    // 3. Eine Kartenbewegung schließt das Menü, ohne dass antd davon weiß; der Fokus fällt
+    // trotzdem nicht auf `body`.
     await tippAuf(west, 'Überschneidung Zone/Abschnitt (Bewegung)');
     await expect(menue).toBeVisible();
     await springe(page, EINZEL, 15.2);
     await expect(menue).toHaveCount(0);
+    await expect(page.locator('canvas.maplibregl-canvas')).toBeFocused();
+    await springe(page, EINZEL, 15);
+
+    // 3a. Im exklusiven Modus (Messen) gehört der Tipp dem Modus: kein Menü, Esc beendet ihn.
+    await page.getByRole('button', { name: 'Messen' }).tap();
+    await expect(page.getByRole('button', { name: 'Messen' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    // Der Messwert steht im Fuß über der Kartenmitte: den Punkt in die freie Fläche darüber holen.
+    await springe(page, west, 15);
+    const frei = await kartenMitte(page);
+    const jetzt = await aufSchirm(page, west);
+    await page.evaluate(
+      (d) =>
+        (
+          window as unknown as { __lfhKarte: { panBy(o: [number, number], a: object): void } }
+        ).__lfhKarte.panBy([d.x, d.y], { duration: 0 }),
+      { x: jetzt.x - frei.x, y: jetzt.y - frei.y },
+    );
+    await ruhe(page);
+    expect(await layerAm(west)).toEqual(expect.arrayContaining(['zonen-fill', 'abschnitte-fill']));
+    const messTipp = await aufSchirm(page, west);
+    await aufKarte(page, [messTipp], 'Überschneidung Zone/Abschnitt (Messen)');
+    await tippe(page, messTipp);
+    await page.waitForTimeout(600);
+    await expect(menue).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('button', { name: 'Messen' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+
     await springe(page, EINZEL, 15);
 
     // 4. Zone unter einer DWD-Warnfläche: eigene Fläche zuerst, dann die Warnung.
