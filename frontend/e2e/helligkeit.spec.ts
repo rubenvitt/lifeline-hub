@@ -51,12 +51,16 @@ test('Bootstrap: die gespeicherte Stufe dunkelt ab, bevor ein App-Skript läuft'
     route.request().resourceType() === 'script' ? route.abort() : route.continue(),
   );
   await page.goto('/einsaetze');
-  expect(await schicht(page)).toEqual({
-    merkmal: '40',
-    content: '""',
-    opacity: '0.6',
-    pointerEvents: 'none',
-  });
+  // Geprüft wird, was das Skript setzt — Merkmal und Deckkraft —, nicht die Regel: die
+  // kommt mit dem Stylesheet (im Produktions-Bundle ein `<link>` im Kopf, unter dem
+  // Vite-Dev-Server erst über das Modul, das hier abgewiesen ist). Die Regel selbst belegen
+  // die übrigen Tests dieser Datei.
+  expect(
+    await page.evaluate(() => ({
+      merkmal: document.documentElement.dataset.helligkeit ?? null,
+      deckkraft: document.documentElement.style.getPropertyValue('--lfh-abdunkelung'),
+    })),
+  ).toEqual({ merkmal: '40', deckkraft: '0.6' });
 });
 
 test('Klick durch die Deckschicht: bei 40 % löst ein Knopf aus', async ({ page }) => {

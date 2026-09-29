@@ -63,7 +63,8 @@ Deshalb gehört zum Regler eine Sperre.
 - **Frontend:** `theme/ThemeModeProvider.tsx`, neu `theme/helligkeit.ts` (+ Test),
   `theme/rollen.css` (Abdunklungsschicht), `theme/darstellungOptionen.ts`,
   `components/BenutzerMenu.tsx`, `command-palette/befehle.ts`, `typen.ts`, `useBefehle.ts`,
-  `einsatz/EinsatzLayout.tsx` (Warnsignal melden), `einsatz/useModulZaehler.ts`,
+  `einsatz/EinsatzLayout.tsx` (Warnsignal melden), neu `einsatz/aktiveWarnung.ts` und
+  `einsatz/useAktiveWarnung.ts`,
   `index.html`.
 - **Backend:** `src/einsatz/zaehler.rs` (ein Feld, ein Test). Codegen
   (`openapi.json`, `types.generated.ts`). Keine Migration.
