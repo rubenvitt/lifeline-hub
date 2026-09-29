@@ -2,6 +2,7 @@ import { App, Button, Form, Input, InputNumber, Switch, theme } from 'antd';
 import { useEffect, useState } from 'react';
 import { SeitenFehler, SeitenSkeleton } from '../../components/SeitenZustand';
 import ModulEinstellungsListe from './ModulEinstellungsListe';
+import { quittiereModulGespeichert } from './modulQuittung';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ladeOrgEinstellungen,
@@ -13,7 +14,7 @@ import AdminPage from '../../components/AdminPage';
 import { SeitenHinweise, SpeicherFehler } from '../../components/SpeicherHinweis';
 import { useAuth } from '../../auth/AuthContext';
 import { globalKeys, istRueckmeldungenKey } from '../../api/queryKeys';
-import { speicherLeisteStil } from '../../components/speicherLeiste';
+import { useSpeicherLeiste } from '../../components/speicherLeiste';
 import {
   type FormWerteEinsatz,
   initialEinsatz,
@@ -40,6 +41,7 @@ export default function EinsatzDefaults() {
   const { message } = App.useApp();
   const [form] = Form.useForm<FormWerteEinsatz>();
   const { token } = theme.useToken();
+  const speicherLeiste = useSpeicherLeiste();
   const istAdmin = benutzer?.system_rolle === 'admin';
   const [hatFassung, setHatFassung] = useState(false);
 
@@ -72,7 +74,7 @@ export default function EinsatzDefaults() {
       setzeOrgModulEinstellung(vars.modulKey, vars.rolle),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: globalKeys.orgModulEinstellungen() });
-      message.success('Modul-Default gespeichert');
+      quittiereModulGespeichert(message, 'Modul-Default gespeichert');
     },
   });
 
@@ -229,7 +231,7 @@ export default function EinsatzDefaults() {
         </Formularpaneel>
 
         {/* Ohne Recht steht der Knopf gesperrt da, der Grund als `RechteHinweis` im Kopf. */}
-        <div style={speicherLeisteStil(token)}>
+        <div {...speicherLeiste}>
           <Button
             type="primary"
             htmlType="submit"

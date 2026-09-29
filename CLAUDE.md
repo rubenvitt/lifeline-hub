@@ -192,10 +192,20 @@ Soft-Delete mit roter Rückfrage; ETB nennt nie den Dateinamen; storniert → 40
   rundet vorsichtshalber auf `keine`/Alarm); „keine" = keine Stufe gesetzt. Kollision des
   `zonen-label` ist nicht abgesichert (eigene Entscheidung).
 - **Trefferzone `controlHeight`** an jedem Marker (`KarteMarker.trefferDurchmesser`,
-  `marker-einsatzort-treffer`); Personen zusätzlich 2 px schwarze Außenkante; Zone schlägt keinen
-  Personen-Cluster (`istTrefferzone`, `personenClusterAm`). Bild-Ziehgriffe
+  `marker-einsatzort-treffer`); Personen zusätzlich 2 px schwarze Außenkante. Bild-Ziehgriffe
   (`pages/lagekarte/bildGriffe.ts`) in `max(controlHeight, 44)`, je Modus scharf, Moduswechsel
-  wartet auf `dragend`.
+  wartet auf `dragend`; in „Größe" Ecken immer, eine Kante nur ohne Überlappung mit Ecke oder
+  Kante (`scharfeGriffe`, neu bei `move`/`dragend`/`setzeEcken`, nie im Zug; LFH-764).
+- **Ein Tipp gehört genau einem Ziel** (LFH-764,
+  `openspec/changes/lfh-764-lagekarte-griffe-klickwege/design.md`): jeder Karten-Klickhörer fragt
+  `klickzielAm` (`Kartenflaeche.tsx`, ein Urteil je Originalereignis) → `entscheideKlickziel`
+  (`pages/lagekarte/klickziel.ts`): gezeichnetes Punktziel > Trefferzone > Fläche. Eine neue
+  Klickebene braucht eine Rolle in `ordneKlickebene` (Guard in `klickziel.test.ts`).
+  **Mehrere Flächen am Punkt wählt der Mensch** (LFH-812,
+  `openspec/changes/lfh-812-lagekarte-flaechen-auswahlmenue/design.md`): erst entdoppeln (Zone
+  über Füllung + Umriss zählt einmal), ab zwei `mehrdeutig` → `FlaechenwahlMenue` am Tipppunkt,
+  eigene vor Fachebenen, Kennung aus `flaechenwahl.ts`; Wahl über dieselben Callbacks, aus im
+  exklusiven Modus (Prop `flaechenwahl`). Geschlossen wird nur über `onOpenChange`.
 - **Betreuung auf der Karte** (LFH-673, `openspec/changes/archive/2026-09-29-lfh-673-betreuung-auf-der-lagekarte/design.md`):
   Marker-Ebene wie UHS (`alleVerortet`, `?platzieren=betreuungsstelle:<id>`), Sperre an der
   **Datenquelle** (`pages/lagekarte/betreuungEbene.ts`);
@@ -212,12 +222,18 @@ Soft-Delete mit roter Rückfrage; ETB nennt nie den Dateinamen; storniert → 40
   Flow-Geschwister mit `bandStil(…)` (`'auto'`, nie `position: 'absolute'`). Der Fuß endet vor der
   Knopfspalte (`fussStil(knopfKante)`) und oben an der Karte; kein `overflow` am Rahmen.
 - **Die Karte kippt nicht** (`touchPitch: false` **und** `maxPitch: 0` in `Kartenflaeche.tsx`).
-  Unter `lg` schließt eine Zonen-/Abschnittszeichnung die Leiste für die Sitzung
-  (`karteFreigeben` in `LagekartePage.tsx`, `verberge` in `lagekarte/leistenWahl.ts`; Rest
-  LFH-765).
+- **Unter `lg` gibt jeder Kartenmodus die Karte frei** (LFH-765,
+  `openspec/changes/lfh-765-lagekarte-modi-karte-freigeben/design.md`): abgeleitet aus
+  `exklusiverModusAktiv` in `leisteSichtbar` (`lagekarte/leistenWahl.ts`), nie per Aufruf je
+  Startweg; nach dem Modus gilt wieder der vorherige Zustand (Entscheidung 29.09.2026).
+  „Leiste einblenden" im Modus ist `umschalteImModus` (nie gespeichert). Die Bedienung der
+  Leistenmodi (Platzieren, Taktisches Zeichen, Bild) steht unter `lg` im Fuß-Band
+  `PlatzierSteuerung`, die Sidebar zeigt dann nur einen Hinweis (`modusBedienungImFuss`) — je
+  Breite genau ein Knopf je Handlung. Ab `lg` erzwingen die Leistenmodi die Leiste wie bisher.
 - Nachweise: `e2e/lagekarte-smoke.spec.ts`, `e2e/gate1-ueberlauf.spec.ts`,
   `e2e/lagekarte-touch.spec.ts` (LFH-713, `hasTouch`, Trefferwache `elementFromPoint`), `fokus-verdeckung.spec.ts`; Kartenaufbauten sieht
-  `e2e/fokus-kern.ts` nur über `zusatzKandidaten`.
+  `e2e/fokus-kern.ts` nur über `zusatzKandidaten`, das Abschneiden der nachgiebigen Zeitachse nur
+  über `beschnitt` (LFH-811: Tab/Shift+Tab in jedem Kartenmodus bei 390 und 768 px).
 - **`toBeVisible()` ist kein Beleg für Klickbarkeit** (LFH-355) — klicken. Ein Test, der eine
   Überdeckung umgeht, testet den Nutzerzustand nicht.
 
@@ -343,7 +359,13 @@ anwendbar), „nicht geprüft" ist keins.
   `components/BemerkungZelle.tsx`, nicht `Typography.Text editable` (Platzhalter `Button type="link"`, Zeilenkennung im Namen,
   Lesezweig „—", Fehler an der Zelle per `data-fehler`, Fokusrückgabe und Wertgleichheits-Riegel
   im Primitiv). Falle: antds `Editable` wertet **legacy `keyCode`** aus — Tasten per `fireEvent`
-  mit `keyCode`, Mausweg (`onBlur`) eigens, Speicherfall mit `rerender`.
+  mit `keyCode`, Mausweg (`onBlur`) eigens, Speicherfall mit `rerender`. **Pflichtangaben und
+  andere Eingabearten** (Datum, Auswahl, Zahl) nehmen `components/InlineAngabe.tsx` (LFH-472):
+  eigenes `<form>`, kein Speichern beim Verlassen, leere Pflicht → kein PATCH, alter Wert und
+  Hinweis per `data-fehler`; Zeitpunkte über `wireZuPicker`/`pickerZuWire` und Gleichheit am
+  Instant. Die Fokusrückgabe beider Primitive steht in `components/useFokusRueckgabe.ts`.
+  Einsatzdaten: eine Zeile schickt EIN Feld (`patcheEinsatz`), Bezeichnung und Koordinate nur
+  im Vollformular.
 - **Statuswechsel in Kräfte-Listen**: Auslöser ist die Statusanzeige, senkrechtes Menü im Portal
   (`components/StatusWahl.tsx`, `statusBedienung`), am `status`-Slot, nie am `aktion`-Slot
   (`docs/superpowers/specs/2026-07-30-kraefte-listen-statuswechsel-zielform.md`).
@@ -357,7 +379,7 @@ anwendbar), „nicht geprüft" ist keins.
 - Portal-Menüs sind kein Verlassen der `Datensicht` (`pruefeVerlassen`); in jsdom wandert der
   Fokus nicht — Handler direkt mit `relatedTarget` prüfen.
 - **Ein Status gehört in den Vertrag:** jede `Record<…, StatusDarstellung>` steht in
-  `theme/statusFarben.ts` (`ALLE_MAPS` in `statusFarben.test.ts`: 25 am 25.09.2026); jede weitere
+  `theme/statusFarben.ts` (`ALLE_MAPS` in `statusFarben.test.ts`: 26 am 29.09.2026); jede weitere
   Karte ist eine begründete Entscheidung (Beispiele: `odlStufe` in
   `openspec/changes/archive/2026-09-21-lfh-78-fachebene-odl/design.md`, `aufbewahrungZustand` in
   `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md` D4). `theme/statusVertrag.guard.test.ts`: keine Karte außerhalb
@@ -441,8 +463,11 @@ anwendbar), „nicht geprüft" ist keins.
   `einsatzEinstellungenPfad`) schicken über `einstellungen/einsatzEinstellungenForm.ts`
   (`zuUpdate`) immer alle Felder mit, auch `basemap_modus`, `karten_zoom_start`,
   `fachebenen_sichtbar`. Jede Sektion stellt ihre Queries selbst (kein `useOutletContext`).
-  Speichern-Leiste sticky im `<form>` (`htmlType="submit"`); `speicherLeisteStil`/
-  `feldrasterStil` rein, die Breite liest der Aufrufer aus `useViewport`.
+  Speichern-Leiste sticky im `<form>` (`htmlType="submit"`), gebaut nur über
+  `<div {...useSpeicherLeiste()}>` (`components/speicherLeiste.ts`) — sie bringt den Fokusabstand
+  mit (LFH-475, `scroll-padding` über `:root:has(...)` in `index.css`, Nachweis
+  `e2e/fokus-verdeckung.spec.ts`); `speicherLeisteStil`/`feldrasterStil` rein, die Breite liest
+  der Aufrufer aus `useViewport`.
 - Ein Collapse-Kopf im Formular ist kein Übermittlungsknopf (`MaterialFormModal.test.tsx`).
 - **Direkteinstieg** (LFH-347, `components/Direkteinstieg.tsx`,
   `components/EinstiegSwitcher.tsx`, `components/direkteinstiegKern.ts`; Tabelle unter `…/liste`;
@@ -477,6 +502,29 @@ anwendbar), „nicht geprüft" ist keins.
 - **Live-Updates springen nicht unter dem Cursor:** Sammelbanner statt Einschieben (CLS ≤ 0,1,
   WCAG 3.2.5); Alarmbudget EEMUA 191/ISA-18.2: 1–2 je 10 min, ≤ 3 Stufen. **Kein Blinken auf
   lesbarem Text.**
+
+## Frontend — Keine Arbeitsplatzachse (LFH-456)
+
+Neben Form (LFH-19) und Kontext (LFH-327) gibt es **keine dritte Bedienachse „Arbeitsplatz“**
+(Entscheidung 29.09.2026, `openspec/changes/archive/2026-09-29-lfh-456-keine-arbeitsplatzachse/design.md`,
+Spec `bedien-arbeitsplatz`).
+- **Einstieg statt Achse:** Eine Fläche für einen Arbeitsplatz ist ein Einzelfall. Sie wird
+  über einen Einstieg in einer bestehenden Fläche erreicht (Primäraktion im Seitenkopf,
+  Sprungmarke, Leeraktion eines Paneels, Sprungpalette) und hat eine Adresse, die als Lesezeichen
+  taugt. Was je Standort verschieden ist, trägt die Kontext-Achse **am Gerät**; „Fükw-Arbeitsplatz“
+  in `ThemeModeProvider.tsx` meint das Gerät. Keine Wahl einer „Arbeitsweise“, keine Vorbelegung
+  von Startziel, Primäraktion, Modulreihenfolge oder Dichte je Person; `standard_modul` gilt für
+  den ganzen Einsatz. Je Person liegt nur das Palettengedächtnis „Zuletzt“
+  (`benutzer_einstellungen::BEKANNTE_SCHLUESSEL`, geschlossener Schlüsselraum).
+- **Nicht zuständig für Rechte:** Sichtbarkeit und Schreibrecht kommen allein aus `EinsatzRolle`,
+  Systemrolle und Modulfreigabe (`einsatz/schreibrecht.ts`, `berechtigung::erlaubte_module`); ein
+  Einstieg ist keine Freigabe, die Zielseite prüft selbst. Stabsfunktionen S1–S6 ebenso (LFH-46).
+- **Aufnahme** (`personenAufnahmePfad`): Einstiege sind die UHS-Kopfzeile „Patient aufnehmen“
+  (LFH-341/C6, nur `aktiv` und mit Schreibrecht) und die Leeraktion des Sichtungspaneels. Die
+  Palette führt „Neue Person erfassen“ auf Liste + Modal und **keinen** Aufnahme-Befehl.
+- **Wiedervorlage** einer wählbaren Arbeitsweise nur mit Feldbefund (Personenwechsel zwischen
+  Arbeitsplätzen auf einem geteilten Gerät, dem Lesezeichen und Einstiege nicht genügen) oder bei
+  einem dritten Einstieg in dieselbe Fläche. Transport hat keine eigene Fläche (Lücke, kein Anlass).
 
 ## Frontend — Erfassungs-Norm (LFH-332/B4)
 
@@ -627,7 +675,7 @@ strukturell lösen (Primitive, `useMemo`/`useCallback`). `eslint-disable` nur be
 ## Qualitäts-Gates — ein Kommando (LFH-235/F17)
 
 `./scripts/check-all.sh` vor dem Merge: `check-fmt.sh` (rustfmt + Prettier) → `pnpm lint` →
-`check-typ-codegen.sh` → `cargo test --workspace` → Vitest → `check-deps.sh` → `pnpm e2e` →
+`check-typ-codegen.sh` → `cargo test` (Workspace, Hülle getrennt) → Vitest → `check-deps.sh` → `pnpm e2e` →
 `release-ruhefenster.test.sh` + `ki-notizen.test.mjs` → `check-deps.test.sh` →
 `check-migrationen.sh` → `check-all.test.sh` → `check-toolversionen.sh`.
 - **Das Skript ist die Wahrheit**; `.github/workflows/ci.yml` ruft es unverändert. Neue Schritte
@@ -651,6 +699,12 @@ strukturell lösen (Primitive, `useMemo`/`useCallback`). `eslint-disable` nur be
   (`prod_bundle_bereitstellen`; Service Worker für `e2e/lagekarte-offline-precache.spec.ts`,
   ausgeliefert vom e2e-Backend über `src/static_files.rs`).
 - **Kein `| tail` um Gate-Kommandos.** Testgüte belegen Mutationsproben, nicht Abdeckung.
+- **Ein Layout-Gate misst jeden rollenabhängigen Zustand auch nicht-privilegiert** (LFH-435):
+  Beobachter, Org-Führungskraft bzw. Führungspersonal über `e2e/rollen-kern.ts` (Seeding als
+  Admin, Wechsel im selben Kontext). Der Rollenzweig ist VOR der Messung Vorbedingung
+  (Hinweis steht, Aktion gesperrt oder abwesend), die Mutationsprobe macht nur den
+  Nicht-Admin rot. Freistellungen in Gate 1 nennen die Rolle. Inventar:
+  `openspec/changes/lfh-435-e2e-gates-nicht-privilegiert/pruefliste.md`.
 - **e2e wartet nie auf `networkidle`** (LFH-385): der SSE-Strom der Einsatzrouten lässt das Netz
   nie ruhen (parallel rot, `--workers=1` grün). Gewartet wird auf einen Inhaltsanker; Riegel
   `no-restricted-syntax` für `e2e/**` in `frontend/eslint.config.js`.
@@ -666,6 +720,31 @@ strukturell lösen (Primitive, `useMemo`/`useCallback`). `eslint-disable` nur be
   Verstoß). Overrides pflegen Bereich **und** Zielversion. Der Audit prüft das **Lockfile** in
   einem Wegwerf-Verzeichnis (`package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`; nie
   `node_modules`; Node/pnpm aus `mise.toml`), Selbsttest `scripts/check-deps.test.sh`.
+
+## Desktop-Hülle (LFH-721)
+
+`src-tauri/` (Crate `lifeline-desktop`, Tauri 2), Anforderungen `openspec/specs/desktop-huelle/`
+und `…/desktop-auslieferung/`, Betrieb `docs/betrieb/desktop-app.md`.
+- **Keine Anwendungslogik in der Hülle** (Variante A, LFH-720): der Webview lädt die
+  https-Adresse des Servers. Abhilfen für Webview-Grenzen gehören in die Hülle (Init-Skript,
+  Command), nicht ins Frontend.
+- **Rechte:** Adresse setzen nur die lokale Maske (`capabilities/lokal.json`); die Serverseite
+  bekommt zur Laufzeit genau für ihre Origin nur `drucken` (`server_freigeben`). Jeder neue
+  Command steht im `AppManifest` von `build.rs`, sonst wäre er für jede Seite offen.
+- Adresse, Deeplink (`lifeline://verbinden?server=`, Vertrag für LFH-38) und Speicherung sind
+  reine, getestete Funktionen (`adresse.rs`, `deeplink.rs`, `verbindung.rs`).
+- **Version: eine Quelle** in `[workspace.package]` der Wurzel, Server und Hülle erben
+  (`version.workspace = true`), `tauri.conf.json` trägt keine; `prepareCmd` setzt sie über
+  `-p lifeline-hub`. Kein eigenes Versionsfeld in `src-tauri` (driftet beim alpha-Merge; Test
+  `version_kommt_aus_dem_workspace`).
+- Pakete + `latest.json` nur bei stabilen Tags (`artefakte.yml`, Ausgabe `desktop`);
+  `scripts/release/desktop-manifest.mjs`, Selbsttest in Schritt 8. Der Updater-Schlüssel liegt
+  außerhalb des Repos (Secrets `TAURI_SIGNING_PRIVATE_KEY[_PASSWORD]`), der Pubkey in
+  `tauri.conf.json`.
+- **Schritt 4 testet Server und Hülle getrennt** (`--workspace --exclude lifeline-desktop`, dann
+  `-p lifeline-desktop`): in einem Zug vereinigte Cargo die Features, der Server liefe mit zwei
+  rustls-Providern (Stolperdraht `tls::tests::rcgen_pem_ist_per_rustls_ladbar`). Linux-Runner
+  des Rust-Jobs brauchen die GTK-/WebKit-Pakete (`ci.yml`); `coverage.yml` misst ohne Hülle.
 
 ## Backend↔Frontend — Typ-Codegen (LFH-120)
 

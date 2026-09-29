@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { wechsleZuRolle } from './rollen-kern';
 
 /**
  * Die Einsatz-Einstellungen am Handschirm. Die Modulzeile stapelt unter `md`, damit das
@@ -56,12 +57,19 @@ async function einsatzAnlegen(page: Page, name: string): Promise<string> {
  * dass der Ladebildschirm gemessen wird (ohne Zeilen kein Überlauf); `poll` fängt ein Layout,
  * das erst nach dem ersten Bild in seine Endbreite wächst.
  */
-async function keinQuerlauf(page: Page, pfad: string, inhaltsWortlaut: string | RegExp) {
+async function keinQuerlauf(
+  page: Page,
+  pfad: string,
+  inhaltsWortlaut: string | RegExp,
+  vorbedingung?: (p: Page) => Promise<void>,
+) {
   await page.goto(pfad);
   await expect(
     page.getByText(inhaltsWortlaut).first(),
     `${pfad}: der Inhalt muss vor der Messung stehen — sonst misst der Test den Ladezustand`,
   ).toBeVisible();
+  // Der Rollenzweig (LFH-435) muss stehen, BEVOR gemessen wird.
+  if (vorbedingung) await vorbedingung(page);
   await expect
     .poll(
       async () =>
@@ -198,25 +206,199 @@ for (const { dichte, soll } of STAFFEL) {
 }
 
 /**
- * Der Rollen-Auswähler bleibt auf der schmalen Karte bedienbar: im Raster
- * `minmax(0, 1fr) auto auto` hat ein `<Select>` mit `width: 100%` keine eigene Mindestbreite
- * und könnte auf seine Pfeil-Ikone zusammenfallen.
+ * Der Rollen-Auswähler bleibt auf jeder Breite bedienbar: ein `<Select>` mit `width: 100%` hat
+ * keine eigene Inhaltsbreite und fiel in einer `auto`-Spur bei 1280 px auf rund 56 px zusammen
+ * (LFH-474). Bei 390 px stapelt das Raster, bei 1280 px trägt ihn die feste Rollen-Spur.
  */
-test('der Rollen-Auswähler bleibt auf 390 px breit genug zum Treffen', async ({ page }) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `Rollenspalte ${Date.now()}`);
+for (const [name, fenster] of [
+  ['390 px', HANDSCHIRM],
+  ['1280 px', FUEKW],
+] as const) {
+  test(`der Rollen-Auswähler bleibt auf ${name} breit genug zum Treffen`, async ({ page }) => {
+    await anmelden(page);
+    const einsatzId = await einsatzAnlegen(page, `Rollenspalte ${Date.now()}`);
 
-  await page.setViewportSize(HANDSCHIRM);
-  await page.goto(modulPfad(einsatzId));
+    await page.setViewportSize(fenster);
+    await page.goto(modulPfad(einsatzId));
 
+    const auswahl = page.getByRole('combobox', { name: `Benötigte Rolle: ${MODUL}` });
+    await expect(auswahl).toBeVisible();
+
+    const kasten = await auswahl.boundingBox();
+    expect(kasten, 'Rollen-Auswähler nicht messbar').not.toBeNull();
+    const zeilenbreite = await auswahl.evaluate(
+      (el) => (el.closest('[data-modul-zeile]') as HTMLElement).clientWidth,
+    );
+    // Die Breite, ab der die längste Option („Führungskraft") lesbar steht statt abgeschnitten.
+    expect(
+      kasten!.width,
+      `Rollen-Auswähler bei ${name} (gemessen ${kasten!.width} px in einer ${zeilenbreite} px breiten Zeile) ist zu schmal zum Treffen und Lesen`,
+    ).toBeGreaterThanOrEqual(120);
+    // …und er sprengt die Zeile nicht: ohne Obergrenze erfüllte auch ein Überlauf die Aussage.
+    expect(
+      kasten!.width,
+      `Rollen-Auswähler (${kasten!.width} px) darf die Contentbreite seiner Zeile (${zeilenbreite} px) nicht überschreiten`,
+    ).toBeLessThanOrEqual(zeilenbreite + SUBPIXEL);
+  });
+}
+
+// ── LFH-435: die Sektionen ohne volles Recht ────────────────────────────────────────────
+//
+// Ohne Recht fügen die Sektionen hinzu (Rechtehinweis, Sperrgrund „nur Einsatzleitung" an jeder
+// Modulzeile) — genau die Zweige, die ein Admin-Durchgang nie sieht. Jede Vorbedingung steht
+// VOR der Messung; ohne sie wäre der Durchgang grün durch Nichtstun.
+
+/** Die Rechtehinweise der Sektionen, je über ein Fragment, das nur EINEN Hinweis trifft —
+ *  auf der Aufbewahrung stehen zwei (Einstellungen und Frist). */
+const HINWEIS_EINSTELLUNGEN = 'darf die Einstellungen dieses Einsatzes';
+const HINWEIS_FRIST = 'darf die Aufbewahrungsfrist';
+const HINWEIS_MODULE = 'darf die Modul-Sichtbarkeit';
+
+function rechteHinweis(p: Page, fragment: string) {
+  return p.getByRole('alert').filter({ hasText: fragment });
+}
+
+/** Der Speichern-Knopf der Formular-Sektion (die Frist trägt „Frist ändern", nicht „Speichern"). */
+function speichern(p: Page) {
+  return p.getByRole('button', { name: 'Speichern', exact: true });
+}
+
+/**
+ * Keine Modulzeile läuft in sich über. Die Dokumentmessung sähe einen Sperrgrund nicht, der
+ * nur seine Zeile sprengt; gemessen wird deshalb das Element, das die Rolle hinzufügt.
+ */
+async function modulZeilenOhneUeberlauf(page: Page) {
+  const zeilen = page.locator('[data-modul-zeile]');
+  await expect(zeilen.first()).toBeVisible();
+  const befunde = await zeilen.evaluateAll((els) =>
+    els
+      .map((el) => ({
+        modul: el.getAttribute('data-modul-zeile'),
+        ueber: el.scrollWidth - el.clientWidth,
+      }))
+      .filter((z) => z.ueber > 0),
+  );
+  expect(befunde, 'Modulzeilen laufen waagerecht über').toEqual([]);
+}
+
+/** Die gesperrte Modulzeile: Sperrgrund sichtbar, Schalter und Auswähler gesperrt. */
+async function modulZeileGesperrt(page: Page) {
+  await expect(
+    rechteHinweis(page, HINWEIS_MODULE),
+    'Vorbedingung: der Rechtehinweis der Modul-Sektion steht',
+  ).toBeVisible();
+  await expect(
+    page.locator(`[data-modul-zeile]`).filter({ hasText: MODUL }).getByText('nur Einsatzleitung'),
+    'Vorbedingung: die Modulzeile nennt ihren Sperrgrund',
+  ).toBeVisible();
+  await expect(
+    page.getByRole('switch', { name: `Sichtbar: ${MODUL}` }),
+    'Vorbedingung: der Schalter ist gesperrt, nicht versteckt',
+  ).toBeDisabled();
+}
+
+/** Der Rollen-Auswähler hält auch gesperrt die Breite des Admin-Tests. */
+async function rollenAuswaehlerLesbar(page: Page) {
   const auswahl = page.getByRole('combobox', { name: `Benötigte Rolle: ${MODUL}` });
   await expect(auswahl).toBeVisible();
-
+  await expect(auswahl, 'der Rollen-Auswähler ist gesperrt, nicht versteckt').toBeDisabled();
   const kasten = await auswahl.boundingBox();
   expect(kasten, 'Rollen-Auswähler nicht messbar').not.toBeNull();
-  // Die Breite, ab der die längste Option („Führungskraft") lesbar steht statt abgeschnitten.
   expect(
     kasten!.width,
-    `Rollen-Auswähler (gemessen ${kasten!.width} px) ist zu schmal zum Treffen und Lesen`,
+    `Rollen-Auswähler (gemessen ${kasten!.width} px) ist zu schmal zum Lesen`,
   ).toBeGreaterThanOrEqual(120);
+}
+
+/**
+ * LFH-435 · Zweig „Führungspersonal": schreibt, leitet aber nicht (`darfEinsatzLeiten` ≠
+ * Schreibrecht). Die Modul-Sektion steht gesperrt mit Hinweis (`EinsatzModule.tsx`), die
+ * Aufbewahrungsfrist ebenso (`darfFristSetzen`); Allgemein ist frei — das unterscheidet den
+ * Zweig vom Beobachter und belegt, dass die Sitzung wirklich die gemeinte Rolle trägt.
+ */
+test('bei 390 px läuft keine Einstellungs-Sektion über — auch mit gesperrten Modulen (Führungspersonal)', async ({
+  page,
+}) => {
+  // Fünf Sektionen plus Rollenwechsel: 30 s reichten unter Last nicht.
+  test.slow();
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `Einstellungen Fuehrungspersonal ${Date.now()}`);
+  await wechsleZuRolle(page, 'fuehrungspersonal', einsatzId);
+
+  await page.setViewportSize(HANDSCHIRM);
+  const basis = `/einsaetze/${einsatzId}/einstellungen`;
+
+  await keinQuerlauf(page, `${basis}/allgemein`, 'Standard-Modul (Einstieg)', async (p) => {
+    await expect(
+      rechteHinweis(p, HINWEIS_EINSTELLUNGEN),
+      'Vorbedingung: Führungspersonal darf die Einstellungen ändern — kein Hinweis',
+    ).toHaveCount(0);
+    await expect(speichern(p), 'Vorbedingung: Speichern ist frei').toBeEnabled();
+  });
+  await keinQuerlauf(page, `${basis}/verhalten`, /Präfix ETB/);
+  await keinQuerlauf(page, `${basis}/aufbewahrung`, /Aufbewahrungs-Dauer/, async (p) => {
+    await expect(
+      rechteHinweis(p, HINWEIS_FRIST),
+      'Vorbedingung: die Frist setzen nur Einsatzleitung und Admin',
+    ).toBeVisible();
+    await expect(p.getByRole('button', { name: 'Frist ändern', exact: true })).toBeDisabled();
+  });
+  await keinQuerlauf(page, modulPfad(einsatzId), MODUL, modulZeileGesperrt);
+  await modulZeilenOhneUeberlauf(page);
+  await rollenAuswaehlerLesbar(page);
+});
+
+/**
+ * LFH-435 · Zweig „Beobachter": weder Schreib- noch Leitungsrecht. JEDE Sektion trägt ihren
+ * Rechtehinweis (`EinsatzAllgemein.tsx`, `EinsatzVerhalten.tsx`, `EinsatzAufbewahrung.tsx`,
+ * `EinsatzPegel.tsx`, `EinsatzModule.tsx`), die Formulare stehen gesperrt. Die Pegel-Sektion
+ * läuft hier zusätzlich mit: ihr Hinweis ist ein weiterer Zweig, den der Admin nicht sieht.
+ */
+test('bei 390 px läuft keine Einstellungs-Sektion über — auch mit Rechtehinweis (Beobachter)', async ({
+  page,
+}) => {
+  // Fünf Sektionen plus Rollenwechsel: 30 s reichten unter Last nicht.
+  test.slow();
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `Einstellungen Beobachter ${Date.now()}`);
+  await wechsleZuRolle(page, 'beobachter', einsatzId);
+
+  await page.setViewportSize(HANDSCHIRM);
+  const basis = `/einsaetze/${einsatzId}/einstellungen`;
+
+  /** Hinweis sichtbar und Speichern gesperrt statt versteckt. */
+  const formularGesperrt = async (p: Page) => {
+    await expect(
+      rechteHinweis(p, HINWEIS_EINSTELLUNGEN),
+      'Vorbedingung: der Rechtehinweis der Sektion steht',
+    ).toBeVisible();
+    await expect(
+      speichern(p),
+      'Vorbedingung: Speichern ist gesperrt, nicht versteckt',
+    ).toBeDisabled();
+  };
+
+  await keinQuerlauf(page, `${basis}/allgemein`, 'Standard-Modul (Einstieg)', formularGesperrt);
+  await keinQuerlauf(page, `${basis}/verhalten`, /Präfix ETB/, formularGesperrt);
+  await keinQuerlauf(page, `${basis}/aufbewahrung`, /Aufbewahrungs-Dauer/, async (p) => {
+    await formularGesperrt(p);
+    await expect(
+      rechteHinweis(p, HINWEIS_FRIST),
+      'Vorbedingung: auch der Frist-Hinweis steht',
+    ).toBeVisible();
+    await expect(p.getByRole('button', { name: 'Frist ändern', exact: true })).toBeDisabled();
+  });
+  await keinQuerlauf(page, `${basis}/pegel`, 'Maßgebliche Pegel', async (p) => {
+    await expect(
+      rechteHinweis(p, HINWEIS_EINSTELLUNGEN),
+      'Vorbedingung: der Rechtehinweis der Pegel-Sektion steht',
+    ).toBeVisible();
+    await expect(
+      p.getByRole('button', { name: 'Hinzufügen', exact: true }),
+      'Vorbedingung: „Hinzufügen" ist gesperrt, nicht versteckt',
+    ).toBeDisabled();
+  });
+  await keinQuerlauf(page, modulPfad(einsatzId), MODUL, modulZeileGesperrt);
+  await modulZeilenOhneUeberlauf(page);
+  await rollenAuswaehlerLesbar(page);
 });

@@ -106,6 +106,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::auth::totp_enroll_finish),
         )
         .route("/api/auth/totp/finish", post(routes::auth::totp_finish))
+        .route("/api/auth/passwort", post(routes::auth::passwort_aendern))
         .route("/api/benutzer", get(routes::benutzer::liste))
         .route("/api/benutzer", post(routes::benutzer::anlegen))
         .route("/api/benutzer/{id}", patch(routes::benutzer::bearbeiten))

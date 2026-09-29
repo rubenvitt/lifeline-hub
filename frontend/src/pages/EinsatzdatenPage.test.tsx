@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router';
@@ -8,7 +8,11 @@ import utc from 'dayjs/plugin/utc';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import type { BenutzerAnzeige, EinsatzAnzeige } from '../api/types';
-import EinsatzdatenPage, { pickerZuWire, wireZuPicker } from './EinsatzdatenPage';
+import EinsatzdatenPage, {
+  gleicherZeitpunkt,
+  pickerZuWire,
+  wireZuPicker,
+} from './EinsatzdatenPage';
 import { adminFixture, einsatzFixture } from '../test/fixtures';
 
 dayjs.extend(utc);
@@ -112,6 +116,24 @@ describe('Alarmzeit-Wandlung (Wire ↔ Picker)', () => {
     // echt exerziert.
     const lokal = dayjs.utc('2026-05-23 09:00:00').local();
     expect(pickerZuWire(lokal)).toBe('2026-05-23 09:00:00');
+  });
+});
+
+describe('gleicherZeitpunkt (LFH-472)', () => {
+  it('vergleicht den Instant, nicht die Objektidentität', () => {
+    // Zwei Renders bauen zwei Objekte für denselben Wirestring; „unverändert" muss das bleiben.
+    expect(
+      gleicherZeitpunkt(wireZuPicker('2026-05-23 09:00:00'), wireZuPicker('2026-05-23 09:00:00')),
+    ).toBe(true);
+    expect(
+      gleicherZeitpunkt(wireZuPicker('2026-05-23 09:00:00'), wireZuPicker('2026-05-23 09:00:01')),
+    ).toBe(false);
+  });
+
+  it('leer ist nur leer gleich', () => {
+    expect(gleicherZeitpunkt(null, null)).toBe(true);
+    expect(gleicherZeitpunkt(null, wireZuPicker('2026-05-23 09:00:00'))).toBe(false);
+    expect(gleicherZeitpunkt(wireZuPicker('2026-05-23 09:00:00'), null)).toBe(false);
   });
 });
 
@@ -407,4 +429,231 @@ describe('EinsatzdatenPage · Gliederung (LFH-345, M14)', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
     expect(screen.getByLabelText('Bezeichnung')).toHaveFocus();
   });
+});
+
+describe('EinsatzdatenPage · Zeilenbearbeitung (LFH-472)', () => {
+  /**
+   * Nimmt jeden PATCH-Body auf und legt ihn wie der Server über den Stand; das GET danach (die
+   * Invalidierung) liefert den neuen Stand, nicht den alten.
+   */
+  function patchMitschnitt(einsatz: Partial<EinsatzAnzeige> = {}) {
+    const bodies: Record<string, unknown>[] = [];
+    let stand: EinsatzAnzeige = { ...basisEinsatz, ...einsatz };
+    server.use(
+      http.get('/api/einsaetze/7', () => HttpResponse.json(stand)),
+      http.patch('/api/einsaetze/7', async ({ request }) => {
+        const body = (await request.json()) as Partial<EinsatzAnzeige>;
+        bodies.push(body);
+        stand = { ...stand, ...body };
+        return HttpResponse.json(stand);
+      }),
+    );
+    return bodies;
+  }
+
+  async function technikAufklappen(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(await screen.findByRole('button', { name: /Technische Angaben/ }));
+  }
+
+  it('trägt die Leitstellen-Nr. nach, ohne die Leseansicht zu verlassen — nur dieses Feld geht raus', async () => {
+    setup();
+    const bodies = patchMitschnitt();
+    const user = userEvent.setup();
+    await technikAufklappen(user);
+    await user.click(await screen.findByRole('button', { name: 'Leitstellen-Nr. eintragen' }));
+
+    // Die Leseansicht steht weiter: Kopfleiste und Lagedaten sind sichtbar, kein Vollformular.
+    expect(screen.getByText('Einsatzstichwort')).toBeInTheDocument();
+    expect(screen.getByText('Lagedaten')).toBeInTheDocument();
+    expect(screen.queryByText('Einsatzdaten bearbeiten')).toBeNull();
+
+    await user.type(screen.getByRole('textbox', { name: 'Leitstellen-Nr.' }), 'ILS-4711{Enter}');
+    await waitFor(() => expect(bodies).toEqual([{ leitstellen_nr: 'ILS-4711' }]));
+    expect(
+      await screen.findByRole('button', { name: 'Leitstellen-Nr. bearbeiten' }),
+    ).toHaveAccessibleDescription('ILS-4711');
+  });
+
+  it('Einsatzstichwort über die Vorschlagseingabe ändern', async () => {
+    setup();
+    const bodies = patchMitschnitt();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Einsatzstichwort bearbeiten' }));
+    const feld = screen.getByRole('combobox', { name: 'Einsatzstichwort' });
+    expect(feld).toHaveValue('H1');
+    await user.clear(feld);
+    await user.type(feld, 'MANV 2');
+    await user.click(screen.getByRole('button', { name: 'Einsatzstichwort speichern' }));
+    await waitFor(() => expect(bodies).toEqual([{ stichwort: 'MANV 2' }]));
+  });
+
+  it('leeren einer optionalen Angabe sendet null', async () => {
+    setup({ einsatz: { einsatzort: 'Deich Süd' } });
+    const bodies = patchMitschnitt({ einsatzort: 'Deich Süd' });
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Einsatzort bearbeiten' }));
+    await user.clear(screen.getByRole('textbox', { name: 'Einsatzort' }));
+    await user.keyboard('{Enter}');
+    await waitFor(() => expect(bodies).toEqual([{ einsatzort: null }]));
+  });
+
+  it('unveränderter Wert sendet nichts', async () => {
+    setup({ einsatz: { meldende_stelle: 'ILS Nord' } });
+    const bodies = patchMitschnitt({ meldende_stelle: 'ILS Nord' });
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Meldende Stelle bearbeiten' }));
+    await user.keyboard('{Enter}');
+    expect(await screen.findByRole('button', { name: 'Meldende Stelle bearbeiten' })).toBeVisible();
+    expect(bodies).toEqual([]);
+  });
+
+  it('Anzahl Betroffene geht als Zahl raus, nicht als Text', async () => {
+    setup();
+    const bodies = patchMitschnitt();
+    const user = userEvent.setup();
+    await user.click(
+      await screen.findByRole('button', { name: 'Anzahl Betroffene (initial) eintragen' }),
+    );
+    await user.type(screen.getByRole('spinbutton', { name: 'Anzahl Betroffene (initial)' }), '12');
+    await user.click(screen.getByRole('button', { name: 'Anzahl Betroffene (initial) speichern' }));
+    await waitFor(() => expect(bodies).toEqual([{ anzahl_betroffene_initial: 12 }]));
+  });
+
+  it('Alarmzeit geleert: kein PATCH, alte Zeit steht wieder da, Hinweis an der Zeile', async () => {
+    setup();
+    const bodies = patchMitschnitt();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Alarmzeit bearbeiten' }));
+    const feld = screen.getByRole('textbox', { name: 'Alarmzeit' });
+    fireEvent.click(feld.closest('.ant-picker')!.querySelector<HTMLElement>('.ant-picker-clear')!);
+    await user.click(screen.getByRole('button', { name: 'Alarmzeit speichern' }));
+
+    expect(
+      await screen.findByText('Alarmzeit ist eine Pflichtangabe — der bisherige Wert bleibt.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Alarmzeit bearbeiten' })).toBeInTheDocument();
+    expect(bodies).toEqual([]);
+  });
+
+  it('Alarmzeit unverändert gespeichert: kein PATCH (Wandlung ohne Versatz)', async () => {
+    setup();
+    const bodies = patchMitschnitt();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Alarmzeit bearbeiten' }));
+    expect(screen.getByRole('textbox', { name: 'Alarmzeit' })).toHaveValue(
+      dayjs.utc(basisEinsatz.begonnen_at).local().format('YYYY-MM-DD HH:mm:ss'),
+    );
+    await user.click(screen.getByRole('button', { name: 'Alarmzeit speichern' }));
+    expect(await screen.findByRole('button', { name: 'Alarmzeit bearbeiten' })).toBeVisible();
+    expect(bodies).toEqual([]);
+  });
+
+  it('Alarmzeit inline: gesendet wird der gewählte absolute Zeitpunkt, beidseits der Sommerzeit-Umstellungen', async () => {
+    /*
+     * Eingetippt wird die LOKALE Wanduhrzeit des Instants, erwartet der UTC-Wirestring desselben
+     * Instants. Unter TZ=UTC wäre das trivial grün; scharf ist es unter TZ=Europe/Berlin
+     * (`check-all.sh`). Die Instants liegen je eine Stunde vor und nach beiden Umstellungen 2026
+     * und meiden die doppelte Stunde im Oktober, die als Wanduhrzeit mehrdeutig ist.
+     */
+    for (const wire of [
+      '2026-03-29 00:30:00',
+      '2026-03-29 01:30:00',
+      '2026-10-24 23:30:00',
+      '2026-10-25 02:30:00',
+    ]) {
+      const { unmount } = setup();
+      const bodies = patchMitschnitt();
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole('button', { name: 'Alarmzeit bearbeiten' }));
+      const feld = screen.getByRole('textbox', { name: 'Alarmzeit' });
+      await user.clear(feld);
+      await user.type(feld, dayjs.utc(wire).local().format('YYYY-MM-DD HH:mm:ss'));
+      // Enter übernimmt die Eingabe in den Picker; der Knopf sendet.
+      fireEvent.keyDown(feld, { key: 'Enter' });
+      await user.click(screen.getByRole('button', { name: 'Alarmzeit speichern' }));
+      await waitFor(() => expect(bodies, wire).toEqual([{ begonnen_at: wire }]));
+      unmount();
+    }
+  });
+
+  it('Escape bei offenem Kalender schließt erst den Kalender, das zweite verwirft die Zeile', async () => {
+    setup();
+    const bodies = patchMitschnitt();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Alarmzeit bearbeiten' }));
+    const feld = screen.getByRole('textbox', { name: 'Alarmzeit' });
+    // Ein Klick ins Feld öffnet den Kalender.
+    await user.click(feld);
+    await waitFor(() =>
+      expect(
+        document.querySelector('.ant-picker-dropdown:not(.ant-picker-dropdown-hidden)'),
+      ).not.toBeNull(),
+    );
+    fireEvent.keyDown(feld, { key: 'Escape' });
+    // Die Zeile steht noch. Ob der Kalender zu ist, zeigt jsdom nicht: es beendet die
+    // Schließ-Animation nie, `-hidden` käme nicht an.
+    expect(screen.getByRole('textbox', { name: 'Alarmzeit' })).toBeInTheDocument();
+    // rc-picker meldet das Schließen erst im nächsten Frame (`useDelayState`); ein Mensch drückt
+    // das zweite Escape nie schneller.
+    await act(() => new Promise((fertig) => requestAnimationFrame(() => fertig(undefined))));
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Alarmzeit' }), { key: 'Escape' });
+    expect(screen.queryByRole('textbox', { name: 'Alarmzeit' })).toBeNull();
+    expect(bodies).toEqual([]);
+  });
+
+  it('Speicherfehler steht an der Zeile, die Eingabe bleibt offen, kein Toast', async () => {
+    setup();
+    server.use(
+      http.patch('/api/einsaetze/7', () =>
+        HttpResponse.json({ error: 'Einsatz ist abgeschlossen' }, { status: 409 }),
+      ),
+    );
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Meldende Stelle eintragen' }));
+    await user.type(screen.getByRole('textbox', { name: 'Meldende Stelle' }), 'ILS{Enter}');
+    expect(await screen.findByText('Einsatz ist abgeschlossen')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Meldende Stelle' })).toHaveValue('ILS');
+    expect(document.querySelector('.ant-message-error')).toBeNull();
+  });
+
+  it('Koordinate, Einsatzleitung, Einsatznummer und „Angelegt am" tragen keine Aufforderung', async () => {
+    setup({ einsatz: { einsatzort_lat: 48.1234, einsatzort_lon: 11.5678 } });
+    const user = userEvent.setup();
+    await technikAufklappen(user);
+    // Exakte Namen statt eines gebauten RegExp: die Etiketten tragen Punkt und Klammern.
+    for (const angabe of [
+      'Koordinate',
+      'Einsatzleitung',
+      'Einsatznummer',
+      'Angelegt am (techn.)',
+    ]) {
+      for (const aufforderung of ['bearbeiten', 'eintragen']) {
+        expect(screen.queryByRole('button', { name: `${angabe} ${aufforderung}` })).toBeNull();
+      }
+    }
+    // Gegenprobe: die inline bearbeitbaren Angaben daneben tragen eine.
+    expect(screen.getByRole('button', { name: 'Leitstellen-Nr. eintragen' })).toBeInTheDocument();
+  });
+
+  it.each([
+    [
+      'Beobachter',
+      { meine_rolle: 'beobachter' as const },
+      { ...admin, system_rolle: 'keiner' as const },
+    ],
+    [
+      'abgeschlossener Einsatz',
+      { status: 'abgeschlossen' as const, abgeschlossen_at: '2026-05-24 10:00:00' },
+      admin,
+    ],
+  ])(
+    'ohne Schreibrecht (%s) keine Aufforderung an einer Zeile',
+    async (_fall, einsatz, benutzer) => {
+      setup({ einsatz, benutzer });
+      const user = userEvent.setup();
+      await technikAufklappen(user);
+      expect(screen.queryAllByRole('button', { name: / (bearbeiten|eintragen)$/ })).toEqual([]);
+      expect(screen.getAllByText('—').length).toBeGreaterThan(0);
+    },
+  );
 });

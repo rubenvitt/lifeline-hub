@@ -1,7 +1,7 @@
 import { Breadcrumb, Button, type TableColumnsType } from 'antd';
-import { Link, useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { bereitstellungsraumDetailPfad } from '../../routing/deeplinks';
 import { ladeEinsatz } from '../../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
@@ -39,6 +39,20 @@ export default function BereitstellungsraeumePage() {
   const [anlegen, setAnlegen] = useState(false);
 
   const schreibgeschuetzt = !darfImEinsatzSchreiben(einsatzQuery.data, benutzer);
+
+  // Schnellaktion: ?neu=1 öffnet den Anlege-Drawer (Sprungpalette, LFH-506). Gelesen auf der
+  // LISTEN-Route — `BereitstellungsraeumeDefault` am baren Modulpfad liest den Parameter nicht,
+  // deshalb zeigt `bereitstellungsraeumeListePfad` hierher. Warten bis der Einsatz geladen ist;
+  // Param immer löschen, Drawer nur bei Schreibrecht.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get('neu') !== '1') return;
+    if (einsatzQuery.isLoading) return;
+    if (!schreibgeschuetzt) setAnlegen(true);
+    const naechste = new URLSearchParams(searchParams);
+    naechste.delete('neu');
+    setSearchParams(naechste, { replace: true });
+  }, [searchParams, setSearchParams, einsatzQuery.isLoading, schreibgeschuetzt]);
 
   const spalten: TableColumnsType<Bereitstellungsraum> = [
     {

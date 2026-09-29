@@ -14,7 +14,7 @@ import {
   type TreeDataNode,
 } from 'antd';
 import { Select } from '../components/Select';
-import { Link, useParams } from 'react-router';
+import { Link, useParams, useSearchParams } from 'react-router';
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
@@ -135,6 +135,26 @@ export default function EinsatzabschnittePage() {
       setGewaehlt(zid);
     }
   });
+
+  // Schnellaktion: ?neu=1 öffnet den Entwurf eines neuen Abschnitts (Sprungpalette, LFH-506) —
+  // dieselben Schritte wie `entwurfOeffnen`, hier ausgeschrieben, weil die Funktion je Render neu
+  // entsteht. Warten bis der Einsatz geladen ist; Param immer löschen, Entwurf nur bei
+  // Schreibrecht.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const darfSchreibenRoh = darfImEinsatzSchreiben(einsatzQuery.data, benutzer);
+  useEffect(() => {
+    if (searchParams.get('neu') !== '1') return;
+    if (einsatzQuery.isLoading) return;
+    if (darfSchreibenRoh) {
+      setGewaehlt(null);
+      setBearbeiten(false);
+      form.resetFields();
+      setEntwurf(true);
+    }
+    const naechste = new URLSearchParams(searchParams);
+    naechste.delete('neu');
+    setSearchParams(naechste, { replace: true });
+  }, [searchParams, setSearchParams, einsatzQuery.isLoading, darfSchreibenRoh, form]);
 
   function invalidate() {
     qc.invalidateQueries({ queryKey: einsatzKeys.abschnitte(einsatzId) });

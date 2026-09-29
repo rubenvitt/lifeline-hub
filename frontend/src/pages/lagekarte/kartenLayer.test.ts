@@ -353,3 +353,14 @@ describe('plakettenBild', () => {
     expect(plakettenBild('plakette|rot|blau')).toBeNull();
   });
 });
+
+describe('baueZonenFc: Zonentyp (LFH-812)', () => {
+  it('trägt den Typ als Eigenschaft, für die Kennung im Flächen-Auswahlmenü', () => {
+    const fc = baueZonenFc([{ ...ZONE, typ: 'absperrbereich' }]);
+    expect(fc.features[0].properties.typ).toBe('absperrbereich');
+  });
+
+  it('ohne Typ bleibt die Eigenschaft leer', () => {
+    expect(baueZonenFc([ZONE]).features[0].properties.typ).toBe('');
+  });
+});

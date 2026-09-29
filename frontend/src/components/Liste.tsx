@@ -1,7 +1,8 @@
 import { Spin, theme } from 'antd';
-import { createContext, useContext } from 'react';
+import { createContext, useContext, useId } from 'react';
 import type { AriaAttributes, CSSProperties, Key, ReactNode } from 'react';
 import { KlickbareZeile } from './Klickbar';
+import type { UnterEbene } from './Markdown';
 import { SeitenLeer } from './SeitenZustand';
 import { useRollen } from './instrument/rollenwerte';
 
@@ -24,6 +25,12 @@ import { useRollen } from './instrument/rollenwerte';
  * **Optik.** Karten ohne Schatten und ohne Rundung; die umrandete Liste steht auf `flaeche` mit
  * Rahmen `linie` (die dekorative Haarlinie, nicht antds `colorBorder`), die Zeilen trennt
  * `flaeche3`. Die Rollen kommen über `instrument/rollenwerte.ts`; antd kennt `flaeche3` nicht.
+ *
+ * **Kopf (LFH-470).** Der Kopf einer Liste benennt sie: er ist eine echte Überschrift, und die
+ * `<ul>` ist per `aria-labelledby` an ihn gebunden. Ein Vorleser springt so zwischen den Gruppen,
+ * statt durch alle Einträge zu wandern. Die Ebene kennt nur der Einbauort, deshalb ist
+ * `unterEbene` Pflicht (Ebene der nächsten Überschrift darüber, gerendert wird eine darunter;
+ * dieselbe Rechnung wie `Markdown`). Die Optik bleibt die der früheren Kopfzeile.
  */
 
 const { useToken } = theme;
@@ -37,6 +44,22 @@ interface ListenKontext {
 
 const ListeContext = createContext<ListenKontext>({ size: 'default', bordered: false });
 
+/** Kopf einer Liste — immer eine Überschrift, nie bloß eine Zeile. */
+export interface ListenKopf {
+  inhalt: ReactNode;
+  /** Ebene der nächsten Überschrift über der Liste (Seitentitel = 1, Paneel = 2, …). */
+  unterEbene: UnterEbene;
+}
+
+/** Eine Ebene unter der nächsten Überschrift darüber; `UnterEbene` endet bei 5, der Kopf bei h6. */
+const KOPF_ELEMENT = {
+  1: 'h2',
+  2: 'h3',
+  3: 'h4',
+  4: 'h5',
+  5: 'h6',
+} as const satisfies Record<UnterEbene, string>;
+
 interface ListeProps<T> {
   dataSource?: readonly T[];
   renderItem: (item: T, index: number) => ReactNode;
@@ -44,7 +67,7 @@ interface ListeProps<T> {
   rowKey?: (item: T, index: number) => Key;
   size?: ListenGroesse;
   bordered?: boolean;
-  header?: ReactNode;
+  kopf?: ListenKopf;
   loading?: boolean;
   /** Inhalt bei leerer `dataSource` (analog antd `locale.emptyText`). */
   emptyText?: ReactNode;
@@ -58,13 +81,16 @@ export function Liste<T>({
   rowKey = (_item, index) => index,
   size = 'default',
   bordered = false,
-  header,
+  kopf,
   loading = false,
   emptyText,
   style,
   className,
 }: ListeProps<T>) {
   const { token, rollen } = useRollen();
+  const kopfId = useId();
+  // Ein Kopf ohne Inhalt ergäbe eine leere Überschrift und einen leeren Listennamen.
+  const KopfElement = kopf != null && kopf.inhalt != null ? KOPF_ELEMENT[kopf.unterEbene] : null;
 
   const containerStyle: CSSProperties = {
     ...(bordered
@@ -105,7 +131,10 @@ export function Liste<T>({
     dataSource.length === 0 ? (
       leer
     ) : (
-      <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
+      <ul
+        aria-labelledby={KopfElement ? kopfId : undefined}
+        style={{ margin: 0, padding: 0, listStyle: 'none' }}
+      >
         {dataSource.map((item, index) => (
           <li
             key={rowKey(item, index)}
@@ -120,15 +149,24 @@ export function Liste<T>({
   return (
     <ListeContext.Provider value={{ size, bordered }}>
       <div style={containerStyle} className={className}>
-        {header != null && (
-          <div
+        {KopfElement && (
+          <KopfElement
+            id={kopfId}
             style={{
+              // Die globalen h*-Stile (antd-Reset: Abstand, Gewicht, Größe, Überschriftenfarbe)
+              // dürfen die Kopfzeile nicht verändern — die Gliederung gehört in den Baum, nicht
+              // ins Aussehen.
+              margin: 0,
+              fontSize: 'inherit',
+              fontWeight: 'inherit',
+              lineHeight: 'inherit',
+              color: 'inherit',
               padding: `${token.paddingSM}px ${headerPaddingInline}px`,
               borderBlockEnd: `1px solid ${rollen.linie}`,
             }}
           >
-            {header}
-          </div>
+            {kopf?.inhalt}
+          </KopfElement>
         )}
         <Spin spinning={loading}>{inhalt}</Spin>
       </div>

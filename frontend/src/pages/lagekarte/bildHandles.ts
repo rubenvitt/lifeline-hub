@@ -14,9 +14,11 @@ import {
 } from './bildGeometrie';
 import {
   DREHGRIFF_ABSTAND_PX,
+  griffKante,
   griffStil,
-  griffeFuerModus,
+  scharfeGriffe,
   type GriffArt,
+  type KantenAus,
   type GriffKontext,
   type GriffModus,
 } from './bildGriffe';
@@ -43,7 +45,7 @@ function griffEl(art: GriffArt, kontext: GriffKontext): HTMLElement {
 export interface BildHandles {
   /** Ecken extern setzen (z. B. nach numerischer Mittelpunkt-Eingabe oder Refetch). */
   setzeEcken(ecken: Ecken): void;
-  /** Griffsorte umschalten — nur die gewählte hängt an der Karte. */
+  /** Griffsorte umschalten — nur die gewählte hängt an der Karte (Kanten nur mit Platz). */
   setzeModus(modus: GriffModus): void;
   zerstoeren(): void;
 }
@@ -53,8 +55,9 @@ export interface BildHandles {
  * - 4 Eckgriffe: skalieren uniform um die gegenüberliegende Ecke,
  * - 4 Kantengriffe: strecken eine Dimension frei,
  * - 1 Drehgriff: dreht um den Mittelpunkt,
- * - 1 Mittelgriff: verschiebt. Scharf ist nur die Sorte des Modus (`griffeFuerModus`). Während des
- *   Ziehens nur Live-Vorschau (setCoordinates, kein PATCH); `onCommit` feuert einmal bei `dragend`.
+ * - 1 Mittelgriff: verschiebt. Scharf ist nur die Sorte des Modus, Kanten nur mit Platz
+ *   (`scharfeGriffe`, LFH-764); `onGriffStand` meldet, wie viele Kanten fehlen. Während des Ziehens nur
+ *   Live-Vorschau (setCoordinates, kein PATCH); `onCommit` feuert einmal bei `dragend`.
  *   Gerechnet wird im Pixel-Raum (project/unproject), ohne cos(lat)-Verzerrung.
  */
 export function erzeugeBildHandles(
@@ -64,6 +67,7 @@ export function erzeugeBildHandles(
   onCommit: (ecken: Ecken) => void,
   kontext: GriffKontext,
   modusInitial: GriffModus = 'groesse',
+  onGriffStand?: (stand: { kantenAus: KantenAus }) => void,
 ): BildHandles {
   let ecken: Ecken = initial;
   let modus: GriffModus = modusInitial;
@@ -101,15 +105,47 @@ export function erzeugeBildHandles(
     mitte: [mitteGriff],
   };
 
+  const dran = new Set<Marker>();
+  let kantenAus: KantenAus | null = null;
+
   /**
-   * Nur die Griffe des aktuellen Modus hängen an der Karte — sonst entschiede bei übereinander
-   * liegenden Griffen die DOM-Reihenfolge statt die Absicht.
+   * Nur die Griffe des aktuellen Modus hängen an der Karte, und von den Kanten nur die mit Platz —
+   * sonst entschiede bei übereinander liegenden Griffen die DOM-Reihenfolge statt die Absicht.
+   * Läuft bei jeder Kartenbewegung, deshalb fasst es das DOM nur bei einem Wechsel an.
    */
   function wendeModusAn() {
-    const scharf = new Set(griffeFuerModus(modus).flatMap((a) => nachArt[a]));
+    const px = (m: Marker): Punkt => {
+      const q = map.project(m.getLngLat());
+      return [q.x, q.y];
+    };
+    const wahl = scharfeGriffe(
+      modus,
+      {
+        eck: eckGriffe.map(px) as Vier,
+        kante: kantenGriffe.map(px) as Vier,
+        dreh: px(drehGriff),
+        mitte: px(mitteGriff),
+      },
+      griffKante(kontext.controlHeight),
+    );
+    const scharf = new Set<Marker>([
+      ...nachArt.eck.filter((_, i) => wahl.eck[i]),
+      ...nachArt.kante.filter((_, i) => wahl.kante[i]),
+      ...(wahl.dreh ? nachArt.dreh : []),
+      ...(wahl.mitte ? nachArt.mitte : []),
+    ]);
     for (const m of alle) {
-      if (scharf.has(m)) m.addTo(map);
-      else m.remove();
+      if (scharf.has(m) && !dran.has(m)) {
+        m.addTo(map);
+        dran.add(m);
+      } else if (!scharf.has(m) && dran.has(m)) {
+        m.remove();
+        dran.delete(m);
+      }
+    }
+    if (wahl.kantenAus !== kantenAus) {
+      kantenAus = wahl.kantenAus;
+      onGriffStand?.({ kantenAus });
     }
   }
 
@@ -240,6 +276,7 @@ export function erzeugeBildHandles(
   // Moduswechsel mitten in einer Ziehgeste (ein Finger zieht, der andere tippt) wartet bis
   // `dragend`: sofort angewandt zöge er den gezogenen Griff ab, MapLibre meldete dessen
   // `mouseup`-Hörer ab, `dragend` käme nie, und der Griff bliebe mit `pointer-events: none` tot.
+  // Aus demselben Grund entscheidet die Griffwahl nach Platz erst bei `dragend` neu.
   let ziehend = false;
   let wartenderModus: GriffModus | null = null;
   for (const m of alle) {
@@ -252,16 +289,24 @@ export function erzeugeBildHandles(
         modus = wartenderModus;
         wartenderModus = null;
         positioniere();
-        wendeModusAn();
       }
+      wendeModusAn();
     });
   }
+
+  // Zoom und Drehung ändern die Pixelgröße des Bildes und damit den Platz für die Kanten.
+  const beiBewegung = () => {
+    if (!ziehend) wendeModusAn();
+  };
+  map.on('move', beiBewegung);
 
   return {
     setzeEcken(e: Ecken) {
       ecken = e;
       setzeBildGeometrie(map, bildId, e);
       positioniere();
+      // Eine neue Größe ändert den Platz für die Kanten; im Zug gilt die Regel aus `dragend`.
+      if (!ziehend) wendeModusAn();
     },
     setzeModus(m: GriffModus) {
       if (ziehend) {
@@ -275,7 +320,9 @@ export function erzeugeBildHandles(
       wendeModusAn();
     },
     zerstoeren() {
+      map.off('move', beiBewegung);
       for (const m of alle) m.remove();
+      dran.clear();
     },
   };
 }

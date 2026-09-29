@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { wechsleZuRolle } from './rollen-kern';
 
 // Das Katalogtabellen-Primitiv am schmalen Schirm: die Tabelle scrollt in sich, drückt die
 // Seite nicht breit, und Kopfzeile und erste Spalte stehen. jsdom rechnet kein Layout.
@@ -146,6 +147,133 @@ test('Katalogtabelle bei 390 px: scrollt in sich, drückt die Seite nicht breit,
 
   const kopfNach = (await kopf.boundingBox())!;
   // Die Kopfzeile steht am oberen Rand, statt mit der Seite aus dem Bild zu wandern.
+  expect(
+    Math.abs(kopfNach.y),
+    `Kopfzeile steht am oberen Rand (${kopfVor.y} → ${kopfNach.y})`,
+  ).toBeLessThanOrEqual(1);
+});
+
+/**
+ * LFH-435 · Zweig „Org-Führungskraft": die Benutzerliste des Admin-Tests leitet sie um, gemessen
+ * wird deshalb die Katalogtabelle der Fahrzeug-Stammdaten. Ohne Admin-Recht steht der
+ * Rechtehinweis, „Fahrzeug anlegen" ist gesperrt, und die Aktionsspalte ENTFÄLLT
+ * (`stammdaten/dienststatus.tsx`, Befund M45) — die Tabelle hat also eine Spalte weniger. Das
+ * gefährdet die Aussagekraft: passte sie ohne Aktionen in den Schirm, wäre (a) bis (f) trivial.
+ * Gesät wird deshalb langer Stoff, und der Bildlaufweg bleibt Vorbedingung.
+ */
+test('Katalogtabelle bei 390 px: scrollt auch ohne Aktionsspalte in sich, Kopfzeile bleibt stehen (Führungskraft)', async ({
+  page,
+}) => {
+  await anmelden(page);
+  const LAUF = Date.now();
+  // 16 Zeilen: mit dem Rechtehinweis darüber startet die Tabelle tiefer, und (f) braucht
+  // Bildlaufweg unter der Kopfzeile (8 reichten auf 400 px nicht).
+  for (let i = 0; i < 16; i += 1) {
+    const antwort = await page.request.post('/api/fahrzeuge', {
+      data: {
+        // Funkrufnamen sind je Org eindeutig.
+        funkrufname: `E2E Katalog Florian Musterstadt-Nordwest ${LAUF}-${i}`,
+        fahrzeugtyp: 'Wechselladerfahrzeug mit Abrollbehälter Hochwasser',
+        traegerorganisation: 'Freiwillige Feuerwehr Musterstadt-Nordwest Löschzug Deichweg',
+        kennzeichen: `MU-NW ${4600 + i}`,
+      },
+    });
+    expect(
+      antwort.ok(),
+      `Seeding Fahrzeug ${i}: ${antwort.status()} ${await antwort.text()}`,
+    ).toBeTruthy();
+  }
+  await wechsleZuRolle(page, 'fuehrungskraft');
+  await page.goto('/admin/stammdaten/fahrzeuge');
+
+  const zeile = page.locator('tr.ant-table-row').first();
+  await expect(zeile).toBeVisible();
+  await expect(
+    page.getByText(`E2E Katalog Florian Musterstadt-Nordwest ${LAUF}-0`),
+    'der gesäte Stoff steht in der Tabelle',
+  ).toBeVisible();
+
+  // ── VORBEDINGUNGEN: der Nur-Lese-Zweig steht.
+  await expect(
+    page.getByRole('alert').filter({ hasText: 'dürfen die Stammdaten ändern' }),
+    'Vorbedingung: der Rechtehinweis des Nur-Lese-Zweigs steht',
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Fahrzeug anlegen' }),
+    'Vorbedingung: die Primäraktion steht gesperrt, nicht versteckt',
+  ).toBeDisabled();
+  // Zeilenaktionen sind ohne Recht ABWESEND (M45), nicht gesperrt.
+  await expect(
+    page.getByRole('columnheader', { name: 'Aktionen' }),
+    'Vorbedingung: ohne Admin-Recht entfällt die Aktionsspalte',
+  ).toHaveCount(0);
+  for (const aktion of ['Bearbeiten', 'Außer Dienst', 'Wieder in Dienst']) {
+    await expect(
+      page.locator('tr.ant-table-row').getByRole('button', { name: aktion }),
+      `Vorbedingung: keine Zeilenaktion „${aktion}"`,
+    ).toHaveCount(0);
+  }
+
+  const koerper = page.locator('.ant-table-body');
+  const rahmen = page.locator('.ant-table').first();
+
+  // (a) Die Tabelle ist breiter als der Schirm UND scrollt in sich.
+  const masse = await koerper.evaluate((el) => ({
+    scrollWidth: el.scrollWidth,
+    clientWidth: el.clientWidth,
+  }));
+  expect(
+    masse.scrollWidth,
+    'Vorbedingung: auch ohne Aktionsspalte ist die Tabelle breiter als der Schirm',
+  ).toBeGreaterThan(masse.clientWidth);
+
+  // (b) …und der Tabellenrahmen drückt die Seite nicht breit.
+  const rahmenMasse = await rahmen.evaluate((el) => ({
+    scrollWidth: el.scrollWidth,
+    clientWidth: el.clientWidth,
+  }));
+  expect(
+    rahmenMasse.scrollWidth,
+    `Tabelleninhalt drückt die Seite breit (scrollWidth ${rahmenMasse.scrollWidth}, clientWidth ${rahmenMasse.clientWidth})`,
+  ).toBeLessThanOrEqual(BREITE);
+
+  // (c) Genau eine fixierte, menschenlesbare Kennung.
+  const fixierte = page.locator('th.ant-table-cell-fix-start');
+  await expect(fixierte).toHaveCount(1);
+  await expect(fixierte).toHaveCSS('position', 'sticky');
+
+  // (d) Die Kopfzeile steht fest.
+  const kopf = page.locator('.ant-table-sticky-holder');
+  await expect(kopf).toHaveCSS('position', 'sticky');
+
+  // (e) Wirknachweis der fixierten Spalte.
+  const xVor = await zellenX(page);
+  expect(xVor.restweg, 'Vorbedingung: Tabelle braucht waagerechten Bildlaufweg').toBeGreaterThan(
+    50,
+  );
+  await koerper.evaluate((el) => el.scrollTo(300, 0));
+  const xNach = await zellenX(page);
+  expect(xNach.nichtFix, 'nicht-fixierte Zelle muss mitwandern').toBeLessThan(xVor.nichtFix - 100);
+  expect(
+    Math.abs(xNach.fix - xVor.fix),
+    `fixierte Spalte hält ihre x-Position (${xVor.fix} → ${xNach.fix})`,
+  ).toBeLessThanOrEqual(1);
+
+  // (f) Wirknachweis der stehenden Kopfzeile — mit dem Rechtehinweis darüber startet sie tiefer.
+  await page.setViewportSize({ width: BREITE, height: 400 });
+  await expect(zeile).toBeVisible();
+  const kopfVor = (await kopf.boundingBox())!;
+  const hoeheVor = kopfVor.height;
+  const ziel = kopfVor.y + 20;
+  await page.evaluate((z) => window.scrollTo(0, z), ziel);
+  const erreicht = await page.evaluate(() => window.scrollY);
+  expect(erreicht, 'Vorbedingung: die Seite muss so weit scrollen können').toBeCloseTo(ziel, 0);
+  const rahmenNach = (await rahmen.boundingBox())!;
+  expect(
+    rahmenNach.y + rahmenNach.height,
+    'Vorbedingung: die Tabelle darf noch nicht durchgelaufen sein',
+  ).toBeGreaterThan(hoeheVor);
+  const kopfNach = (await kopf.boundingBox())!;
   expect(
     Math.abs(kopfNach.y),
     `Kopfzeile steht am oberen Rand (${kopfVor.y} → ${kopfNach.y})`,

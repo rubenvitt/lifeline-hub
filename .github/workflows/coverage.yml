@@ -90,7 +90,9 @@ jobs:
       # Dieselbe Env-Hygiene wie im Sammel-Gate: der Runner setzt zwar keine
       # LIFELINE_*-Variablen, aber der Aufruf soll dem lokalen gleichen.
       - name: Rust-Coverage
-        run: cargo llvm-cov --workspace --lcov --output-path lcov.info
+        # Ohne die Desktop-Hülle: sie vereinigte ihre Features mit denen des Servers (Begründung in
+        # scripts/check-all.sh, Schritt 4), und gemessen wird die Server-Abdeckung.
+        run: cargo llvm-cov --workspace --exclude lifeline-desktop --lcov --output-path lcov.info
 
       # Die Instrumentierung macht die Suite auf zwei vCPU so langsam, dass der
       # Vorgabe-Timeout von 10 s nicht reicht — mehr Zeit und weniger Parallelität statt

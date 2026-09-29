@@ -36,3 +36,6 @@ lifeline-tls-*.pem
 .claude/worktrees
 .claire/worktrees
 .worktrees/
+
+# Desktop-Hülle (LFH-721): von tauri-build erzeugte Schemata, bei jedem Build neu.
+/src-tauri/gen/

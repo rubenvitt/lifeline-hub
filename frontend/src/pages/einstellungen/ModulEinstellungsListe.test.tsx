@@ -3,7 +3,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { renderMitProviders } from '../../test/utils';
 import { setzeViewportBreite } from '../../test/viewport';
 import { kategorien } from '../../einsatz/modulRegistry';
-import ModulEinstellungsListe, { modulSperrGrund, modulZeilenStil } from './ModulEinstellungsListe';
+import ModulEinstellungsListe, {
+  modulRasterSpalten,
+  modulSperrGrund,
+  modulZeilenStil,
+} from './ModulEinstellungsListe';
 
 /** Basis-Props der Einsatz-Ebene (drei Spalten, mit Sichtbar-Schalter). */
 function einsatzProps() {
@@ -135,7 +139,39 @@ describe('ModulEinstellungsListe · Zeilenzustand (LFH-345)', () => {
   });
 });
 
-/** Trefffläche und Stapelung: Raster `minmax(0,1fr) auto auto`, gestapelt unter `md`. */
+/**
+ * Spurbreite der Rollen-Spalte (LFH-474). Die Pixel misst `e2e/verwaltung-vereinheitlicht.spec.ts`
+ * und `e2e/einstellungen-schmal.spec.ts` bei 1280 px; hier steht nur die Spurvorschrift, mit den
+ * erwarteten Werten als Literalen (13,5 und 15 px sind die Grundschriften der Staffel).
+ */
+describe('modulRasterSpalten (LFH-474)', () => {
+  it('gibt der Rollen-Spalte eine feste Spur statt `auto`, die mit der Schrift wächst', () => {
+    expect(modulRasterSpalten({ mitSichtbar: true, fontSize: 13.5 })).toBe(
+      'minmax(0, 1fr) auto 162px',
+    );
+    expect(modulRasterSpalten({ mitSichtbar: true, fontSize: 15 })).toBe(
+      'minmax(0, 1fr) auto 180px',
+    );
+  });
+
+  // Ohne Schalter hat die Zeile zwei Kinder: bei drei Spuren fiele der Auswähler in die
+  // `auto`-Spur des Schalters, und die feste Spur stünde leer daneben.
+  it('legt ohne Sichtbar-Spalte genau zwei Spuren an', () => {
+    expect(modulRasterSpalten({ mitSichtbar: false, fontSize: 13.5 })).toBe('minmax(0, 1fr) 162px');
+  });
+
+  it('rendert Kopf und Zeilen mit derselben Spurvorschrift', () => {
+    setzeViewportBreite(1280);
+    renderMitProviders(<ModulEinstellungsListe {...einsatzProps()} sichtbarSpalte={undefined} />);
+
+    const zeile = document.querySelector<HTMLElement>('[data-modul-zeile="etb"]')!;
+    const kopf = screen.getByText('Modul').parentElement!;
+    expect(zeile.style.gridTemplateColumns).toMatch(/^minmax\(0, 1fr\) \d+px$/);
+    expect(kopf.style.gridTemplateColumns).toBe(zeile.style.gridTemplateColumns);
+  });
+});
+
+/** Trefffläche und Stapelung: Raster aus `modulRasterSpalten`, gestapelt unter `md`. */
 describe('ModulEinstellungsListe · Trefffläche und Stapelung (LFH-345)', () => {
   // Prüfbar ist der Inline-Style, nicht ein Pixel. Die Böden stehen als Literale da.
   it('traegt den Boden der Stufe an der Beschriftung — und die ZWEITE Angabe daneben', () => {

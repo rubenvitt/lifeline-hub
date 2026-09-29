@@ -6,6 +6,7 @@ import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import FahrzeugeTab from './FahrzeugeTab';
 import { adminFixture } from '../test/fixtures';
+import { keinStehenderFehler, stehenderFehler } from '../test/stehenderFehler';
 
 const admin = adminFixture();
 const nichtAdmin = adminFixture({ system_rolle: 'keiner' });
@@ -47,6 +48,20 @@ describe('FahrzeugeTab', () => {
     expect(screen.getByText('0/1/8//9')).toBeInTheDocument();
   });
 
+  // LFH-476: Wort und Rolle kommen aus dem Vertrag (`theme/statusFarben.ts`, `dienststatus`),
+  // der Tab setzt keine Farbe selbst. Die Spalte teilen Fahrzeuge, Personal und Material.
+  it('zeigt den Dienststatus als Vertragsetikett', async () => {
+    const { container } = render(nichtAdmin, [
+      fahrzeug,
+      { ...fahrzeug, id: 2, funkrufname: 'Florian 2', dienststatus: 'ausser_dienst' },
+    ]);
+    await screen.findByText('Florian 1');
+    const erste = container.querySelector('[data-row-key="1"]') as HTMLElement;
+    const zweite = container.querySelector('[data-row-key="2"]') as HTMLElement;
+    expect(within(erste).getByText('in Dienst')).toHaveAttribute('data-rolle', 'normal');
+    expect(within(zweite).getByText('außer Dienst')).toHaveAttribute('data-rolle', 'neutral');
+  });
+
   it('Admin sieht „Fahrzeug anlegen" und Aktionen', async () => {
     render(admin);
     await screen.findByText('Florian 1');
@@ -65,8 +80,8 @@ describe('FahrzeugeTab', () => {
    * dem Klick auf Zeile B wandert `variables` dorthin, Zeile A verliert ihre Ladeanzeige. Alle
    * A-Zusicherungen stehen deshalb VOR dem zweiten Klick.
    *
-   * Zeile 2 steht auf `ausser_dienst`: ihre Aktion ist dann „Wieder in Dienst" ohne Rückfrage —
-   * sonst stünde ein zweites „OK" neben dem offenen Portal der ersten.
+   * Zeile 2 steht auf `ausser_dienst`, damit beide Richtungen des Wechsels in einem Test laufen.
+   * Keine der beiden fragt zurück (LFH-477) — ein „OK"-Dialog wäre hier der Fehlerfall.
    */
   it('sperrt beim Dienststatuswechsel NUR die betroffene Zeile', async () => {
     const gerufen: string[] = [];
@@ -94,8 +109,10 @@ describe('FahrzeugeTab', () => {
     const erste = container.querySelector('[data-row-key="1"]') as HTMLElement;
     const zweite = container.querySelector('[data-row-key="2"]') as HTMLElement;
 
+    // Keine Rückfrage (LFH-477): „Außer Dienst" ist umkehrbar, der Klick setzt sofort.
     await userEvent.click(within(erste).getByRole('button', { name: 'Außer Dienst' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'OK' }));
+    expect(screen.queryByRole('button', { name: 'OK' })).not.toBeInTheDocument();
+    await waitFor(() => expect(gerufen).toEqual(['ausser-dienst/1']));
 
     // Die eigene Zeile ist gesperrt und zeigt den Lauf …
     expect(within(erste).getByRole('button', { name: /Außer Dienst/ })).toBeDisabled();
@@ -218,5 +235,37 @@ describe('FahrzeugeTab', () => {
 
     expect(await screen.findByText('Noch keine Fahrzeuge')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Ein gescheiterter Statuswechsel steht an der SEITE, nicht im Toast (LFH-473): nach drei
+ * Sekunden wäre der Toast weg und mit ihm der Grund. Die zweite Hälfte der Zusicherung:
+ * das nächste Absenden räumt den Hinweis (react-query setzt `error` beim Übergang nach `pending`
+ * zurück) — deshalb hängt der zweite Versuch, statt zu gelingen.
+ */
+describe('FahrzeugeTab — Fehlschlag des Statuswechsels (LFH-473)', () => {
+  it('hinterlässt einen stehenden Hinweis, den das nächste Absenden räumt', async () => {
+    let versuch = 0;
+    server.use(
+      http.post('/api/fahrzeuge/:id/ausser-dienst', () => {
+        versuch += 1;
+        if (versuch > 1) return new Promise<never>(() => {});
+        return HttpResponse.json(
+          { error: 'Fahrzeug ist einem laufenden Einsatz zugeordnet' },
+          { status: 409 },
+        );
+      }),
+    );
+    render(admin);
+    await screen.findByText('Florian 1');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Außer Dienst' }));
+    const hinweis = await stehenderFehler('Fahrzeug ist einem laufenden Einsatz zugeordnet');
+    expect(hinweis).toHaveTextContent('Dienststatus nicht geändert');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Außer Dienst' }));
+    await keinStehenderFehler('Fahrzeug ist einem laufenden Einsatz zugeordnet');
+    expect(versuch).toBe(2);
   });
 });

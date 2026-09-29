@@ -18,7 +18,7 @@ import PersonalFormModal from './PersonalFormModal';
 import { globalKeys } from '../api/queryKeys';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 import { personalDetailPfad } from './stammdatenDetail';
-import { dienststatusSpalten, useDienststatusMutation } from './dienststatus';
+import { DIENSTSTATUS_FEHLER, dienststatusSpalten, useDienststatusMutation } from './dienststatus';
 
 export default function PersonalTab() {
   const { benutzer } = useAuth();
@@ -119,7 +119,14 @@ export default function PersonalTab() {
           Person anlegen
         </Button>
       }
-      hinweis={<SeitenHinweise rechteFehlt={!istAdmin} rechteText={STAMMDATEN_RECHTE_TEXT} />}
+      hinweis={
+        <SeitenHinweise
+          fehler={dienststatusMutation.error}
+          {...DIENSTSTATUS_FEHLER}
+          rechteFehlt={!istAdmin}
+          rechteText={STAMMDATEN_RECHTE_TEXT}
+        />
+      }
     >
       {/* Der Fehler tauscht die Tabelle aus (LFH-331): `Datensicht` führt den Kartenzweig an
          `Liste`, und `ListeProps` kennt keinen Fehlerbegriff. Ohne diese Weiche behauptete „Noch

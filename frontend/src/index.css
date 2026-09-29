@@ -69,3 +69,15 @@ body {
 [data-lfh='seiten-inhalt'] * {
   scroll-margin-block-end: var(--lfh-etb-fokusabstand, 0px);
 }
+
+/* Formularseiten: Fokusabstand zur sticky Speicherleiste (LFH-475, WCAG 2.4.11).
+   `scroll-padding-block-end` am SCROLLPORT, wie der Befehlsentwurf (`pages/befehlAktionsleiste.css`,
+   LFH-465) und aus demselben gemessenen Grund: `scroll-margin` an den Feldern stand im Browser
+   gerechnet an (52 px), blieb aber wirkungslos — ein Feld, das schon im Fenster liegt, rollt
+   Chromium gar nicht erst, auch wenn es ganz hinter der Leiste steht (Einsatz-Defaults 390 × 420:
+   Feld 386–416, Leiste ab 375). Gescopt über `:has`, damit die Regel nur mit Leiste im Baum gilt und
+   die Befehlsseite (eigener `:root`-Block, keine Speicherleiste) nicht überschreibt. Die Höhe setzt
+   `components/speicherLeiste.ts` (`useSpeicherLeiste`) und nimmt sie beim Aushängen wieder weg. */
+:root:has([data-lfh='speicherleiste']) {
+  scroll-padding-block-end: var(--lfh-speicherleiste-fokusabstand, 0px);
+}

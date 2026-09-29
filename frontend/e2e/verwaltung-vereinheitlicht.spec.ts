@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { wechsleZuRolle } from './rollen-kern';
 
 /**
  * Die Verwaltungsflächen im echten Layout: Trefflächenhöhe einer Zeilenaktion, Abstand zur
@@ -193,16 +194,11 @@ test('bei 390 px stapelt die Modulzeile der Einsatz-Defaults, die Spaltenköpfe 
 });
 
 /**
- * BEFUND, BEWUSST NICHT BEHOBEN: in der breiten Ansicht (1280 px) fällt die `auto`-Spalte des
- * Rasters `minmax(0, 1fr) auto auto` in `ModulEinstellungsListe.tsx` auf rund 56 px zusammen —
- * auf der Einsatz- wie auf der Admin-Route. Die Behebung (etwa eine `minmax()`-Spur) gehört
- * in ein eigenes Ticket.
- *
- * Ein GRÜNER Pin statt `test.fail()`: `test.fail()` akzeptierte jeden Fehler, auch einen
- * kaputten Locator, und hörte still auf zu messen. Das Fenster um den Ist-Wert wird rot, wenn
- * der Befund behoben ist (dann Test samt Block entfernen) oder sich verschlechtert.
+ * Die breite Ansicht (LFH-474): bis dahin fiel die `auto`-Spur der Rollen-Spalte hier auf rund
+ * 56 px zusammen, weil ein `<Select>` mit `width: 100%` keine Inhaltsbreite beiträgt. Die Spur
+ * ist jetzt fest (`modulRasterSpalten`); gemessen wird dieselbe Schwelle wie bei 390 px.
  */
-test('BEFUND (Bestand seit LFH-345): der Rollen-Auswähler fällt bei 1280 px auf 56 px zusammen', async ({
+test('bei 1280 px steht der Rollen-Auswähler der Einsatz-Defaults breit genug zum Lesen', async ({
   page,
 }) => {
   await anmelden(page);
@@ -215,17 +211,88 @@ test('BEFUND (Bestand seit LFH-345): der Rollen-Auswähler fällt bei 1280 px au
   ).toBeVisible();
 
   const masse = await rollenspaltenMasse(page);
-  const meldung =
-    `Rollen-Auswähler bei 1280 px: gemessen ${masse.breite} px in einer ` +
-    `${masse.zeilenbreite} px breiten Zeile (Befundstand: 56,3 px).`;
-  // Untergrenze: nicht auf die nackte Pfeil-Ikone (~32 px) zusammengefallen.
-  expect(masse.breite, `${meldung} Verschlechterung auf die Pfeil-Ikone.`).toBeGreaterThan(40);
-  // Obergrenze: solange der Befund steht, unter der Lesbarkeitsschwelle. Fällt sie, gehört die
-  // Aussage als `>= LESBAR` in den 390-px-Fall daneben.
   expect(
     masse.breite,
-    `${meldung} Sieht nach BEHOBEN aus — Befund-Test entfernen und die Zusicherung regulär stellen.`,
-  ).toBeLessThan(LESBAR);
+    `Rollen-Auswähler bei 1280 px (gemessen ${masse.breite} px in einer ${masse.zeilenbreite} px breiten Zeile) ist zu schmal zum Lesen`,
+  ).toBeGreaterThanOrEqual(LESBAR);
+  expect(
+    masse.breite,
+    `Rollen-Auswähler (${masse.breite} px) darf die Contentbreite seiner Zeile (${masse.zeilenbreite} px) nicht überschreiten`,
+  ).toBeLessThanOrEqual(masse.zeilenbreite + SUBPIXEL);
+});
+
+/**
+ * LFH-435 · Zweig „Org-Führungskraft": dieselbe Messung ohne Admin-Recht. Die Führungskraft
+ * erreicht die Einsatz-Defaults, darf sie aber nicht ändern: Rechtehinweis, gesperrtes
+ * Formular, und JEDE Modulzeile trägt den Sperrgrund „nur Admins" in ihrer Beschriftungszelle
+ * (`EinsatzDefaults.tsx`, `ModulEinstellungsListe.tsx`). Der Sperrgrund ist das Element, das
+ * die Rolle hinzufügt — gemessen wird deshalb zusätzlich, dass keine Zeile in sich überläuft;
+ * die Breite des Auswählers sähe einen Sperrgrund nicht, der nur die Beschriftung sprengt.
+ *
+ * Nicht gespiegelt: Messung 1 (die Aktionsspalte entfällt ohne Admin-Recht, `dienststatus.tsx`
+ * — es gibt nichts zu messen) und Messung 3 (1280 px, außerhalb dieses Auftrags).
+ */
+test('bei 390 px stapelt die gesperrte Modulzeile der Einsatz-Defaults, und keine Zeile läuft über (Führungskraft)', async ({
+  page,
+}) => {
+  await anmelden(page);
+  await wechsleZuRolle(page, 'fuehrungskraft');
+  await page.setViewportSize(HANDSCHIRM);
+  await page.goto('/admin/einstellungen/einsatz');
+
+  const auswahl = page.getByRole('combobox', { name: `Benötigte Rolle: ${MODUL}` });
+  await expect(auswahl).toBeVisible();
+
+  // ── VORBEDINGUNGEN: der Nur-Lese-Zweig steht.
+  await expect(
+    page.getByRole('alert').filter({ hasText: 'dürfen die Org-Defaults ändern' }),
+    'Vorbedingung: der Rechtehinweis des Nur-Lese-Zweigs steht',
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Speichern', exact: true }),
+    'Vorbedingung: Speichern ist gesperrt, nicht versteckt',
+  ).toBeDisabled();
+  const modulZeile = page.locator('[data-modul-zeile]').filter({ hasText: MODUL });
+  await expect(
+    modulZeile.getByText('nur Admins', { exact: true }),
+    'Vorbedingung: die Modulzeile nennt ihren Sperrgrund',
+  ).toBeVisible();
+  await expect(auswahl, 'Vorbedingung: der Auswähler ist gesperrt, nicht versteckt').toBeDisabled();
+
+  // Wie im Admin-Test: Spaltenköpfe weg, gestapelt, Auswähler lesbar und in seiner Zeile.
+  await expect(
+    page.getByText('Benötigte Rolle (Default)', { exact: true }),
+    'unter md fallen die Spaltenköpfe GANZ weg',
+  ).toHaveCount(0);
+  const label = page.getByText(MODUL, { exact: true }).first();
+  await expect(label).toBeVisible();
+  const l = (await label.boundingBox())!;
+  const a = (await auswahl.boundingBox())!;
+  expect(
+    a.y,
+    `bei 390 px muss der Auswähler UNTER der Beschriftung liegen (Label y=${l.y}, Auswähler y=${a.y})`,
+  ).toBeGreaterThan(l.y);
+
+  const masse = await rollenspaltenMasse(page);
+  expect(
+    masse.breite,
+    `Rollen-Auswähler bei 390 px (gemessen ${masse.breite} px in einer ${masse.zeilenbreite} px breiten Zeile) ist zu schmal zum Treffen und Lesen`,
+  ).toBeGreaterThanOrEqual(LESBAR);
+  expect(
+    masse.breite,
+    `Rollen-Auswähler (${masse.breite} px) darf die Contentbreite seiner Zeile (${masse.zeilenbreite} px) nicht überschreiten`,
+  ).toBeLessThanOrEqual(masse.zeilenbreite + SUBPIXEL);
+
+  // Zusätzlich: der Sperrgrund sprengt keine Zeile.
+  const befunde = await page.locator('[data-modul-zeile]').evaluateAll((els) =>
+    els
+      .map((el) => ({
+        modul: el.getAttribute('data-modul-zeile'),
+        ueber: el.scrollWidth - el.clientWidth,
+      }))
+      .filter((z) => z.ueber > 0),
+  );
+  expect(befunde, 'Modulzeilen laufen waagerecht über (gesperrter Zweig)').toEqual([]);
 });
 
 // ── MESSUNG 3 ───────────────────────────────────────────────────────────────────────────

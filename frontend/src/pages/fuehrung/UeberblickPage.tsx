@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
-import { Link, useNavigate, useParams } from 'react-router';
+import { Link, useParams } from 'react-router';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { Breadcrumb, Button } from 'antd';
 import { TbFileText, TbPlus } from 'react-icons/tb';
@@ -9,6 +9,7 @@ import { RechteHinweis } from '../../components/SpeicherHinweis';
 import { useAuth } from '../../auth/AuthContext';
 import { istKeyFreigegeben } from '../../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
+import { useModulWahl } from '../../einsatz/useModulWahl';
 import {
   Augenbraue,
   Kennzahl,
@@ -154,7 +155,7 @@ function Zustandsfeld({
   children: ReactNode;
 }) {
   const { token, rollen } = useRollen();
-  const navigate = useNavigate();
+  const { waehle } = useModulWahl();
   const polster = { padding: token.padding } as const;
   if (zustand === 'laden') {
     return (
@@ -181,7 +182,7 @@ function Zustandsfeld({
         <span style={{ fontSize: 12, color: rollen.gedaempft }}>{leerText}</span>
         {leerAktion && (
           <span>
-            <Button onClick={() => navigate(leerAktion.ziel)}>{leerAktion.text}</Button>
+            <Button onClick={() => waehle(leerAktion.ziel)}>{leerAktion.text}</Button>
           </span>
         )}
       </div>
@@ -193,7 +194,7 @@ function Zustandsfeld({
 export default function UeberblickPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
-  const navigate = useNavigate();
+  const { waehle, linkFaenger } = useModulWahl();
   const { token, rollen } = useRollen();
   const { abBreite } = useViewport();
   const breit = abBreite('lg');
@@ -387,384 +388,390 @@ export default function UeberblickPage() {
       : 'Letzte Entscheidungen';
 
   return (
-    <EinsatzSeite
-      titel="Überblick"
-      breadcrumb={
-        <Breadcrumb
-          items={[
-            { title: <Link to={einsaetzePfad()}>Einsätze</Link> },
-            { title: einsatz?.bezeichnung ?? '…' },
-            { title: 'Überblick' },
-          ]}
-        />
-      }
-      dataUpdatedAt={einsatzQ.dataUpdatedAt}
-      // Bedingt übergeben: ein JSX-Element ist immer truthy und hinterließe ein leeres `div` mit
-      // Außenabstand.
-      hinweis={
-        einsatz != null &&
-        !darfSchreiben && <RechteHinweis sichtbar text={ueberblickRechteText(einsatz.status)} />
-      }
-      aktionen={
-        <>
-          <Button
-            icon={
-              <Ikone>
-                <TbFileText size={14} />
-              </Ikone>
-            }
-            onClick={() => navigate(lageberichtePfad(einsatzId))}
-          >
-            Lagebericht
-          </Button>
-          {/* Gesperrt statt versteckt: der Hinweis darüber nennt den Grund. */}
-          <Button
-            type="primary"
-            disabled={!darfSchreiben}
-            icon={
-              <Ikone>
-                <TbPlus size={14} />
-              </Ikone>
-            }
-            onClick={() => navigate(etbPfad(einsatzId, { neu: true }))}
-          >
-            Eintrag
-          </Button>
-        </>
-      }
-    >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginLG }}>
-        <Kennzahlenband beschriftung="Lage in Zahlen">
-          <Kennzahl
-            titel="Betroffene"
-            groesse="gross"
-            zustand={zBetroffene}
-            wert={betroffene.anzahl}
-            einheit="Pers."
-            notiz={`+${betroffene.neu} in 60 min`}
-            ziel={personenPfad(einsatzId)}
+    // Jeder Link der Seite ist eine Modulwahl für „Zuletzt besucht" (LFH-436, `useModulWahl`).
+    // `display: contents`: die Hülle trägt nur den Fänger und nimmt am Layout nicht teil.
+    <div style={{ display: 'contents' }} {...linkFaenger}>
+      <EinsatzSeite
+        titel="Überblick"
+        breadcrumb={
+          <Breadcrumb
+            items={[
+              { title: <Link to={einsaetzePfad()}>Einsätze</Link> },
+              { title: einsatz?.bezeichnung ?? '…' },
+              { title: 'Überblick' },
+            ]}
           />
-          <Kennzahl
-            titel="Kräfte im Einsatz"
-            groesse="gross"
-            zustand={zKraefte}
-            wert={kraefte.gesamt}
-            einheit="Ges."
-            notiz={`F/UF/M//Σ ${kraefte.text}`}
-            ziel={kraefteuebersichtPfad(einsatzId)}
-          />
-          <Kennzahl
-            titel="Warnstufe"
-            groesse="gross"
-            zustand={zWarnstufe}
-            ton={warnstufe.ton}
-            wert={warnstufe.wort}
-            notiz={warnstufeNotiz(warnstufe.anzahlAktiv, pegelNotiz)}
-            ziel={gefahrenPfad(einsatzId)}
-          />
-          <Kennzahl
-            titel="Offene Aufträge"
-            groesse="gross"
-            zustand={zAuftraege}
-            ton={auftragszahl.ton}
-            wert={auftragszahl.offen}
-            einheit={
-              auftragszahl.ueberfaellig > 0 ? `davon ${auftragszahl.ueberfaellig} ü.` : undefined
-            }
-            notiz={
-              auftragszahl.ueberfaellig > 0
-                ? `${auftragszahl.inArbeit} in Arbeit`
-                : `keine über Frist · ${auftragszahl.inArbeit} in Arbeit`
-            }
-            ziel={auftraegePfad(einsatzId)}
-          />
-          <Kennzahl
-            titel="Einsatzabschnitte"
-            groesse="gross"
-            zustand={zAbschnitteZahl}
-            wert={abschnitte?.length ?? 0}
-            notiz={
-              abschnitte && abschnitte.length > 0
-                ? abschnittNamen(abschnitte)
-                : 'noch keine angelegt'
-            }
-            ziel={einsatzabschnittePfad(einsatzId)}
-          />
-        </Kennzahlenband>
-
-        <div style={rasterStil(breit, token.marginLG)}>
-          <Paneel
-            titel="Einsatzabschnitte"
-            meta={
-              zAbschnitte === 'daten'
-                ? `${abschnitte?.length ?? 0} Abschnitte · ${einheiten?.length ?? 0} Einheiten`
-                : undefined
-            }
-            fuss={
-              zAbschnitte === 'daten' && zeilen.length > 0 ? (
-                <span style={{ ...monoStil(10), color: rollen.schwach }}>
-                  Einheiten nach Status: bereit · gebunden · Ausfall
-                  {auftraegeFehlen && ' — Aufträge nicht abrufbar, Auftragstexte fehlen'}
-                </span>
-              ) : undefined
-            }
-          >
-            <Zustandsfeld
-              zustand={zAbschnitte}
-              leer={zeilen.length === 0}
-              leerText="Noch keine Abschnitte und keine Kräfte erfasst."
-              leerAktion={
-                darfSchreiben
-                  ? { text: 'Abschnitt anlegen', ziel: einsatzabschnittePfad(einsatzId) }
-                  : undefined
+        }
+        dataUpdatedAt={einsatzQ.dataUpdatedAt}
+        // Bedingt übergeben: ein JSX-Element ist immer truthy und hinterließe ein leeres `div` mit
+        // Außenabstand.
+        hinweis={
+          einsatz != null &&
+          !darfSchreiben && <RechteHinweis sichtbar text={ueberblickRechteText(einsatz.status)} />
+        }
+        aktionen={
+          <>
+            <Button
+              icon={
+                <Ikone>
+                  <TbFileText size={14} />
+                </Ikone>
               }
-              onNeuladen={() => {
-                void abschnitteQ.refetch();
-                void einheitenQ.refetch();
-                void personalQ.refetch();
-                void fahrzeugeQ.refetch();
-                void materialQ.refetch();
-              }}
+              onClick={() => waehle(lageberichtePfad(einsatzId))}
             >
-              <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-                {zeilen.map((z) => (
-                  <li key={z.key}>
-                    <AbschnittEintrag
-                      zeile={z}
-                      zeit={frist}
-                      ziel={
-                        z.abschnittId != null
-                          ? einsatzabschnittePfad(einsatzId, { abschnitt: z.abschnittId })
-                          : einheitenPfad(einsatzId)
-                      }
-                    />
-                  </li>
-                ))}
-              </ul>
-            </Zustandsfeld>
-          </Paneel>
-
-          <Paneel titel="Offene Aufträge" meta={ueberfaelligMeta}>
-            <Zustandsfeld
+              Lagebericht
+            </Button>
+            {/* Gesperrt statt versteckt: der Hinweis darüber nennt den Grund. */}
+            <Button
+              type="primary"
+              disabled={!darfSchreiben}
+              icon={
+                <Ikone>
+                  <TbPlus size={14} />
+                </Ikone>
+              }
+              onClick={() => waehle(etbPfad(einsatzId, { neu: true }))}
+            >
+              Eintrag
+            </Button>
+          </>
+        }
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginLG }}>
+          <Kennzahlenband beschriftung="Lage in Zahlen">
+            <Kennzahl
+              titel="Betroffene"
+              groesse="gross"
+              zustand={zBetroffene}
+              wert={betroffene.anzahl}
+              einheit="Pers."
+              notiz={`+${betroffene.neu} in 60 min`}
+              ziel={personenPfad(einsatzId)}
+            />
+            <Kennzahl
+              titel="Kräfte im Einsatz"
+              groesse="gross"
+              zustand={zKraefte}
+              wert={kraefte.gesamt}
+              einheit="Ges."
+              notiz={`F/UF/M//Σ ${kraefte.text}`}
+              ziel={kraefteuebersichtPfad(einsatzId)}
+            />
+            <Kennzahl
+              titel="Warnstufe"
+              groesse="gross"
+              zustand={zWarnstufe}
+              ton={warnstufe.ton}
+              wert={warnstufe.wort}
+              notiz={warnstufeNotiz(warnstufe.anzahlAktiv, pegelNotiz)}
+              ziel={gefahrenPfad(einsatzId)}
+            />
+            <Kennzahl
+              titel="Offene Aufträge"
+              groesse="gross"
               zustand={zAuftraege}
-              leer={offene.length === 0}
-              leerText="Keine offenen Aufträge."
-              leerAktion={{ text: 'Zu den Aufträgen', ziel: auftraegePfad(einsatzId) }}
-              onNeuladen={() => void auftraegeQ.refetch()}
-            >
-              <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-                {offene.slice(0, AUFTRAEGE_MAX).map((a) => {
-                  const farbe = a.ist_ueberfaellig ? rollen.alarmText : rollen.gedaempft;
-                  return (
-                    <li key={a.id}>
-                      <Link
-                        to={auftraegePfad(einsatzId, { auftrag: a.id })}
-                        data-lfh="ueberblick-auftrag"
-                        style={zeile}
-                      >
-                        <span style={{ ...monoStil(11), color: farbe, flex: '0 0 40px' }}>
-                          {uhrzeit(a.erteilt_at)}
-                        </span>
-                        <span
-                          style={{
-                            flex: '1 1 auto',
-                            minWidth: 0,
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: 4,
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontSize: 12,
-                              lineHeight: 1.45,
-                              color: rollen.text2,
-                              overflowWrap: 'anywhere',
-                            }}
-                          >
-                            {a.auftrag_text}
-                          </span>
-                          <span style={{ ...monoStil(10), color: rollen.schwach }}>
-                            {[
-                              empfaengerText(a) ? `an ${empfaengerText(a)}` : 'ohne Empfänger',
-                              a.frist_at ? `Frist ${frist(a.frist_at)}` : 'ohne Frist',
-                            ].join(' · ')}
-                          </span>
-                        </span>
-                        <span
-                          style={{
-                            ...monoStil(10),
-                            letterSpacing: '0.06em',
-                            color: farbe,
-                            flex: '0 0 auto',
-                          }}
-                        >
-                          {a.ist_ueberfaellig ? 'überfällig' : 'läuft'}
-                        </span>
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-              {offene.length > AUFTRAEGE_MAX && (
-                <Link
-                  to={auftraegePfad(einsatzId)}
-                  style={{ ...zeile, ...monoStil(11), color: rollen.bedien, borderBlockEnd: 0 }}
-                >
-                  alle {offene.length} offenen Aufträge ↗
-                </Link>
-              )}
-            </Zustandsfeld>
-          </Paneel>
+              ton={auftragszahl.ton}
+              wert={auftragszahl.offen}
+              einheit={
+                auftragszahl.ueberfaellig > 0 ? `davon ${auftragszahl.ueberfaellig} ü.` : undefined
+              }
+              notiz={
+                auftragszahl.ueberfaellig > 0
+                  ? `${auftragszahl.inArbeit} in Arbeit`
+                  : `keine über Frist · ${auftragszahl.inArbeit} in Arbeit`
+              }
+              ziel={auftraegePfad(einsatzId)}
+            />
+            <Kennzahl
+              titel="Einsatzabschnitte"
+              groesse="gross"
+              zustand={zAbschnitteZahl}
+              wert={abschnitte?.length ?? 0}
+              notiz={
+                abschnitte && abschnitte.length > 0
+                  ? abschnittNamen(abschnitte)
+                  : 'noch keine angelegt'
+              }
+              ziel={einsatzabschnittePfad(einsatzId)}
+            />
+          </Kennzahlenband>
 
-          <div
-            style={{
-              gridColumn: '1 / -1',
-              display: 'flex',
-              flexDirection: breit ? 'row' : 'column',
-              minWidth: 0,
-            }}
-          >
+          <div style={rasterStil(breit, token.marginLG)}>
             <Paneel
-              titel={entscheidungTitel}
-              style={{ flex: '1 1 auto' }}
+              titel="Einsatzabschnitte"
               meta={
-                zEntscheidungen === 'daten' &&
-                entscheidungen.modus === 'zuletzt' &&
-                entscheidungen.eintraege.length > 0
-                  ? 'keine in der letzten Stunde'
+                zAbschnitte === 'daten'
+                  ? `${abschnitte?.length ?? 0} Abschnitte · ${einheiten?.length ?? 0} Einheiten`
                   : undefined
               }
-              aktion={
-                <Link
-                  to={etbPfad(einsatzId, { typ: 'entscheidung' })}
-                  aria-label="Entscheidungen im Einsatztagebuch öffnen"
-                  style={{
-                    ...monoStil(11),
-                    color: rollen.bedien,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    minHeight: token.controlHeight,
-                    paddingInline: token.paddingXS,
-                  }}
-                >
-                  ETB ↗
-                </Link>
+              fuss={
+                zAbschnitte === 'daten' && zeilen.length > 0 ? (
+                  <span style={{ ...monoStil(10), color: rollen.schwach }}>
+                    Einheiten nach Status: bereit · gebunden · Ausfall
+                    {auftraegeFehlen && ' — Aufträge nicht abrufbar, Auftragstexte fehlen'}
+                  </span>
+                ) : undefined
               }
             >
               <Zustandsfeld
-                zustand={zEntscheidungen}
-                leer={entscheidungen.eintraege.length === 0}
-                leerText="Noch keine Entscheidung im Einsatztagebuch."
+                zustand={zAbschnitte}
+                leer={zeilen.length === 0}
+                leerText="Noch keine Abschnitte und keine Kräfte erfasst."
                 leerAktion={
                   darfSchreiben
-                    ? { text: 'Eintrag erfassen', ziel: etbPfad(einsatzId, { neu: true }) }
+                    ? { text: 'Abschnitt anlegen', ziel: einsatzabschnittePfad(einsatzId) }
                     : undefined
                 }
-                onNeuladen={() => void etbQ.refetch()}
-              >
-                <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-                  {entscheidungen.eintraege.map((e) => {
-                    // Aus dem ETB-Eintrag selbst, nicht aus der Auftragsliste — die bekommt nicht,
-                    // wer das Aufträge-Modul gesperrt hat.
-                    const folgeWort = folgeText(e.folgeauftraege.length);
-                    return (
-                      <Zeitachseneintrag
-                        key={e.id}
-                        als="li"
-                        typ="entscheidung"
-                        typwort={etbTyp.entscheidung.label}
-                        zeit={uhrzeit(e.ereigniszeit)}
-                        nr={`Nr. ${e.lfd_nr}`}
-                        meta={verfasserText(e)}
-                        aktionen={
-                          folgeWort ? (
-                            <span
-                              data-lfh="entscheidung-folge"
-                              style={{
-                                ...monoStil(10),
-                                letterSpacing: '0.06em',
-                                color: rollen.bedien,
-                              }}
-                            >
-                              {folgeWort}
-                            </span>
-                          ) : undefined
-                        }
-                      >
-                        {e.inhalt}
-                      </Zeitachseneintrag>
-                    );
-                  })}
-                </ul>
-              </Zustandsfeld>
-            </Paneel>
-
-            <Paneel
-              titel="Nächste Marken"
-              style={
-                breit
-                  ? { flex: `0 0 ${MARKEN_BREITE}px`, width: MARKEN_BREITE, borderInlineStart: 0 }
-                  : { borderBlockStart: 0 }
-              }
-              meta={
-                zMarken === 'daten' && marken.weitere > 0 ? `+${marken.weitere} weitere` : undefined
-              }
-            >
-              <Zustandsfeld
-                zustand={zMarken}
-                leer={marken.marken.length === 0}
-                leerText="Keine anstehenden Fristen."
                 onNeuladen={() => {
-                  void einsatzQ.refetch();
-                  void auftraegeQ.refetch();
-                  void erinnerungenQ.refetch();
+                  void abschnitteQ.refetch();
+                  void einheitenQ.refetch();
+                  void personalQ.refetch();
+                  void fahrzeugeQ.refetch();
+                  void materialQ.refetch();
                 }}
               >
                 <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-                  {marken.marken.map((m) => (
-                    <li key={m.key}>
-                      <Link
-                        to={markenZiel(m)}
-                        data-lfh="ueberblick-marke"
-                        data-ton={m.ton}
-                        style={{ ...zeile, alignItems: 'baseline', borderBlockEnd: 0 }}
-                      >
-                        <span
-                          style={{
-                            flex: '0 0 auto',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            minWidth: 52,
-                          }}
-                        >
-                          <span style={{ ...monoStil(13), color: markenFarbe(m) }}>
-                            {frist(m.zeit)}
-                          </span>
-                          <span style={{ ...monoStil(10), color: markenFarbe(m) }}>{m.wort}</span>
-                        </span>
-                        <span
-                          style={{
-                            flex: '1 1 auto',
-                            minWidth: 0,
-                            fontSize: 12,
-                            lineHeight: 1.4,
-                            color: rollen.gedaempft,
-                            overflowWrap: 'anywhere',
-                          }}
-                        >
-                          {m.text}
-                        </span>
-                      </Link>
+                  {zeilen.map((z) => (
+                    <li key={z.key}>
+                      <AbschnittEintrag
+                        zeile={z}
+                        zeit={frist}
+                        ziel={
+                          z.abschnittId != null
+                            ? einsatzabschnittePfad(einsatzId, { abschnitt: z.abschnittId })
+                            : einheitenPfad(einsatzId)
+                        }
+                      />
                     </li>
                   ))}
                 </ul>
               </Zustandsfeld>
             </Paneel>
+
+            <Paneel titel="Offene Aufträge" meta={ueberfaelligMeta}>
+              <Zustandsfeld
+                zustand={zAuftraege}
+                leer={offene.length === 0}
+                leerText="Keine offenen Aufträge."
+                leerAktion={{ text: 'Zu den Aufträgen', ziel: auftraegePfad(einsatzId) }}
+                onNeuladen={() => void auftraegeQ.refetch()}
+              >
+                <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+                  {offene.slice(0, AUFTRAEGE_MAX).map((a) => {
+                    const farbe = a.ist_ueberfaellig ? rollen.alarmText : rollen.gedaempft;
+                    return (
+                      <li key={a.id}>
+                        <Link
+                          to={auftraegePfad(einsatzId, { auftrag: a.id })}
+                          data-lfh="ueberblick-auftrag"
+                          style={zeile}
+                        >
+                          <span style={{ ...monoStil(11), color: farbe, flex: '0 0 40px' }}>
+                            {uhrzeit(a.erteilt_at)}
+                          </span>
+                          <span
+                            style={{
+                              flex: '1 1 auto',
+                              minWidth: 0,
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: 4,
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: 12,
+                                lineHeight: 1.45,
+                                color: rollen.text2,
+                                overflowWrap: 'anywhere',
+                              }}
+                            >
+                              {a.auftrag_text}
+                            </span>
+                            <span style={{ ...monoStil(10), color: rollen.schwach }}>
+                              {[
+                                empfaengerText(a) ? `an ${empfaengerText(a)}` : 'ohne Empfänger',
+                                a.frist_at ? `Frist ${frist(a.frist_at)}` : 'ohne Frist',
+                              ].join(' · ')}
+                            </span>
+                          </span>
+                          <span
+                            style={{
+                              ...monoStil(10),
+                              letterSpacing: '0.06em',
+                              color: farbe,
+                              flex: '0 0 auto',
+                            }}
+                          >
+                            {a.ist_ueberfaellig ? 'überfällig' : 'läuft'}
+                          </span>
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {offene.length > AUFTRAEGE_MAX && (
+                  <Link
+                    to={auftraegePfad(einsatzId)}
+                    style={{ ...zeile, ...monoStil(11), color: rollen.bedien, borderBlockEnd: 0 }}
+                  >
+                    alle {offene.length} offenen Aufträge ↗
+                  </Link>
+                )}
+              </Zustandsfeld>
+            </Paneel>
+
+            <div
+              style={{
+                gridColumn: '1 / -1',
+                display: 'flex',
+                flexDirection: breit ? 'row' : 'column',
+                minWidth: 0,
+              }}
+            >
+              <Paneel
+                titel={entscheidungTitel}
+                style={{ flex: '1 1 auto' }}
+                meta={
+                  zEntscheidungen === 'daten' &&
+                  entscheidungen.modus === 'zuletzt' &&
+                  entscheidungen.eintraege.length > 0
+                    ? 'keine in der letzten Stunde'
+                    : undefined
+                }
+                aktion={
+                  <Link
+                    to={etbPfad(einsatzId, { typ: 'entscheidung' })}
+                    aria-label="Entscheidungen im Einsatztagebuch öffnen"
+                    style={{
+                      ...monoStil(11),
+                      color: rollen.bedien,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      minHeight: token.controlHeight,
+                      paddingInline: token.paddingXS,
+                    }}
+                  >
+                    ETB ↗
+                  </Link>
+                }
+              >
+                <Zustandsfeld
+                  zustand={zEntscheidungen}
+                  leer={entscheidungen.eintraege.length === 0}
+                  leerText="Noch keine Entscheidung im Einsatztagebuch."
+                  leerAktion={
+                    darfSchreiben
+                      ? { text: 'Eintrag erfassen', ziel: etbPfad(einsatzId, { neu: true }) }
+                      : undefined
+                  }
+                  onNeuladen={() => void etbQ.refetch()}
+                >
+                  <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+                    {entscheidungen.eintraege.map((e) => {
+                      // Aus dem ETB-Eintrag selbst, nicht aus der Auftragsliste — die bekommt nicht,
+                      // wer das Aufträge-Modul gesperrt hat.
+                      const folgeWort = folgeText(e.folgeauftraege.length);
+                      return (
+                        <Zeitachseneintrag
+                          key={e.id}
+                          als="li"
+                          typ="entscheidung"
+                          typwort={etbTyp.entscheidung.label}
+                          zeit={uhrzeit(e.ereigniszeit)}
+                          nr={`Nr. ${e.lfd_nr}`}
+                          meta={verfasserText(e)}
+                          aktionen={
+                            folgeWort ? (
+                              <span
+                                data-lfh="entscheidung-folge"
+                                style={{
+                                  ...monoStil(10),
+                                  letterSpacing: '0.06em',
+                                  color: rollen.bedien,
+                                }}
+                              >
+                                {folgeWort}
+                              </span>
+                            ) : undefined
+                          }
+                        >
+                          {e.inhalt}
+                        </Zeitachseneintrag>
+                      );
+                    })}
+                  </ul>
+                </Zustandsfeld>
+              </Paneel>
+
+              <Paneel
+                titel="Nächste Marken"
+                style={
+                  breit
+                    ? { flex: `0 0 ${MARKEN_BREITE}px`, width: MARKEN_BREITE, borderInlineStart: 0 }
+                    : { borderBlockStart: 0 }
+                }
+                meta={
+                  zMarken === 'daten' && marken.weitere > 0
+                    ? `+${marken.weitere} weitere`
+                    : undefined
+                }
+              >
+                <Zustandsfeld
+                  zustand={zMarken}
+                  leer={marken.marken.length === 0}
+                  leerText="Keine anstehenden Fristen."
+                  onNeuladen={() => {
+                    void einsatzQ.refetch();
+                    void auftraegeQ.refetch();
+                    void erinnerungenQ.refetch();
+                  }}
+                >
+                  <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+                    {marken.marken.map((m) => (
+                      <li key={m.key}>
+                        <Link
+                          to={markenZiel(m)}
+                          data-lfh="ueberblick-marke"
+                          data-ton={m.ton}
+                          style={{ ...zeile, alignItems: 'baseline', borderBlockEnd: 0 }}
+                        >
+                          <span
+                            style={{
+                              flex: '0 0 auto',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              minWidth: 52,
+                            }}
+                          >
+                            <span style={{ ...monoStil(13), color: markenFarbe(m) }}>
+                              {frist(m.zeit)}
+                            </span>
+                            <span style={{ ...monoStil(10), color: markenFarbe(m) }}>{m.wort}</span>
+                          </span>
+                          <span
+                            style={{
+                              flex: '1 1 auto',
+                              minWidth: 0,
+                              fontSize: 12,
+                              lineHeight: 1.4,
+                              color: rollen.gedaempft,
+                              overflowWrap: 'anywhere',
+                            }}
+                          >
+                            {m.text}
+                          </span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </Zustandsfeld>
+              </Paneel>
+            </div>
           </div>
         </div>
-      </div>
-    </EinsatzSeite>
+      </EinsatzSeite>
+    </div>
   );
 }
 

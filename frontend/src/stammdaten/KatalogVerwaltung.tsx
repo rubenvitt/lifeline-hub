@@ -69,10 +69,12 @@ export default function KatalogVerwaltung<T extends KatalogEintrag, W extends ob
 
   const query = useQuery({ queryKey, queryFn: liste });
   const speicherFehler = useFehlerMeldung('Speichern fehlgeschlagen');
-  const anlegenFehler = useFehlerMeldung('Anlegen fehlgeschlagen');
-  const deaktivierenFehler = useFehlerMeldung('Deaktivieren fehlgeschlagen');
 
   // Das Schliessen macht `onFertig`, das Leeren die Hülle.
+  //
+  // Der Toast BLEIBT hier (LFH-473, eigene Entscheidung für den Dialog): nach einer Ablehnung
+  // steht der Dialog offen und der Wortlaut in den Feldern, nichts wirkt gespeichert. Der
+  // Seiten-Slot läge hinter der Maske.
   const speichern = useMutation({
     mutationFn: ({ id, werte }: { id: number; werte: W }) => aktualisiere(id, werte),
     onSuccess: invalidiere,
@@ -83,14 +85,29 @@ export default function KatalogVerwaltung<T extends KatalogEintrag, W extends ob
   const schnellAnlegen = useMutation({
     mutationFn: legeAn,
     onSuccess: invalidiere,
-    onError: anlegenFehler,
   });
 
   const deaktivieren = useMutation({
     mutationFn: deaktiviere,
     onSuccess: invalidiere,
-    onError: deaktivierenFehler,
   });
+
+  /**
+   * Schnellerfassung und Deaktivieren OHNE `onError` (LFH-473): ein Toast wäre nach drei Sekunden
+   * weg, danach sagte nichts mehr, dass und warum die Handlung scheiterte. Der Fehler steht im
+   * `SeitenHinweise`-Slot.
+   *
+   * EIN Slot, zwei Handlungen: wer eine auslöst, räumt den Fehler der anderen (`reset`). Sonst
+   * stünde nach dem nächsten Versuch ein alter Grund über der Seite, denn react-query räumt
+   * `error` nur beim eigenen `mutate()`.
+   */
+  const seitenFehler = deaktivieren.error
+    ? {
+        fehler: deaktivieren.error,
+        titel: 'Nicht deaktiviert',
+        fallback: 'Deaktivieren fehlgeschlagen',
+      }
+    : { fehler: schnellAnlegen.error, titel: 'Nicht angelegt', fallback: 'Anlegen fehlgeschlagen' };
 
   // VORBELEGUNG, kein Zurücksetzen: das Leeren macht `ErfassungsModal` auf allen vier
   // Auswegen selbst.
@@ -110,7 +127,10 @@ export default function KatalogVerwaltung<T extends KatalogEintrag, W extends ob
               <Popconfirm
                 title={deaktivierenFrage}
                 okButtonProps={{ danger: true }}
-                onConfirm={() => deaktivieren.mutate(eintrag.id)}
+                onConfirm={() => {
+                  schnellAnlegen.reset();
+                  deaktivieren.mutate(eintrag.id);
+                }}
               >
                 <Button danger>Deaktivieren</Button>
               </Popconfirm>
@@ -123,7 +143,15 @@ export default function KatalogVerwaltung<T extends KatalogEintrag, W extends ob
   return (
     <AdminPage
       titel={titel}
-      hinweis={<SeitenHinweise rechteFehlt={!istAdmin} rechteText={STAMMDATEN_RECHTE_TEXT} />}
+      hinweis={
+        <SeitenHinweise
+          fehler={seitenFehler.fehler}
+          fehlerTitel={seitenFehler.titel}
+          fehlerFallback={seitenFehler.fallback}
+          rechteFehlt={!istAdmin}
+          rechteText={STAMMDATEN_RECHTE_TEXT}
+        />
+      }
     >
       {/* Kein `aktionen`-Slot: der Anlegen-Weg ist die Schnellerfassung. Sie steht
           ausserhalb der Fehlerweiche (ein gescheiterter Abruf nimmt nicht die einzige
@@ -133,7 +161,10 @@ export default function KatalogVerwaltung<T extends KatalogEintrag, W extends ob
         beschriftung={schnell.beschriftung}
         platzhalter={schnell.platzhalter}
         knopfText={schnell.knopfText}
-        onAnlegen={(label) => schnellAnlegen.mutateAsync(label)}
+        onAnlegen={(label) => {
+          deaktivieren.reset();
+          return schnellAnlegen.mutateAsync(label);
+        }}
         laeuft={schnellAnlegen.isPending}
         gesperrt={!istAdmin}
       />

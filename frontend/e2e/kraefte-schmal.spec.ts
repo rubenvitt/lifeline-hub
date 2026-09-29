@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { wechsleZuRolle } from './rollen-kern';
 
 /**
  * Die Kräfte-Module am Handschirm:
@@ -92,12 +93,20 @@ async function seedeAlles(page: Page, einsatzId: string) {
  * Überlauf, und ein Test vor dem Inhalt prüfte den Ladebildschirm. `poll` fängt zusätzlich ein
  * Layout, das erst nach dem ersten Bild in seine Endbreite wächst.
  */
-async function keinQuerlauf(page: Page, pfad: string, inhaltsWortlaut: string | RegExp) {
+async function keinQuerlauf(
+  page: Page,
+  pfad: string,
+  inhaltsWortlaut: string | RegExp,
+  vorbedingung?: () => Promise<void>,
+) {
   await page.goto(pfad);
   await expect(
     page.getByText(inhaltsWortlaut).first(),
     `${pfad}: der Inhalt muss vor der Messung stehen — sonst misst der Test den Ladezustand`,
   ).toBeVisible();
+  // Zwischen Anker und Messung: der Rollenzweig muss stehen (LFH-435), sonst mäße ein
+  // Nicht-Admin-Durchgang still den Admin-Zweig.
+  if (vorbedingung) await vorbedingung();
   await expect
     .poll(
       async () =>
@@ -130,6 +139,111 @@ test('bei 390 px läuft keine der vier Kräfte-Routen waagerecht über', async (
   ];
   for (const [modul, wortlaut] of routen) {
     await keinQuerlauf(page, `/einsaetze/${einsatzId}/${modul}`, wortlaut);
+  }
+});
+
+/**
+ * LFH-435 · Zweig: Beobachter (kein Schreibrecht). Die Karten verlieren Statusauslöser und
+ * „Entfernen", der Kopf seine Dispositionsfelder, Einheiten und Meldebild ihre Primäraktion.
+ * Gemessen wird wie oben, dazu das Meldebild (`kraefteuebersicht`), das im Nur-Lese-Zweig
+ * ebenfalls Knöpfe verliert.
+ *
+ * Jede Abwesenheit steht neben einem Geschwister, das BLEIBT (Ansicht-Umschalter, Drucken,
+ * Karte): erst dessen Sichtbarkeit belegt, dass der Slot überhaupt gerendert hat — sonst wäre
+ * `toHaveCount(0)` auch bei einem Tippfehler im Namen grün.
+ */
+test('bei 390 px läuft keine der Kräfte-Routen waagerecht über (Beobachter)', async ({ page }) => {
+  // Zusätzliche Anmeldung und eine Route mehr als der Admin-Geschwister.
+  test.slow();
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `Kraefte schmal lesend ${Date.now()}`);
+  await seedeAlles(page, einsatzId);
+  await wechsleZuRolle(page, 'beobachter', einsatzId);
+
+  await page.setViewportSize(HANDSCHIRM);
+  const karte = page.locator('[data-lfh="datensicht-karte"]');
+  const hauptteil = page.getByRole('main');
+
+  const routen: [string, string, () => Promise<void>][] = [
+    [
+      'fahrzeuge',
+      FUNKRUFNAME,
+      async () => {
+        await expect(karte, 'Vorbedingung: genau eine Fahrzeugkarte').toHaveCount(1);
+        await expect(
+          page.getByRole('radiogroup', { name: 'Ansicht' }),
+          'Vorbedingung: der Ansicht-Umschalter bleibt auch ohne Schreibrecht',
+        ).toBeVisible();
+        await expect(
+          page.getByRole('button', { name: `Status von ${FUNKRUFNAME} ändern` }),
+          'Vorbedingung: ohne Schreibrecht kein Statusauslöser (FahrzeugePage `statusBedienung`)',
+        ).toHaveCount(0);
+        await expect(
+          karte.getByRole('combobox'),
+          'Vorbedingung: die Karte trägt keine Besatzungs-Auswahl',
+        ).toHaveCount(0);
+        await expect(page.getByRole('button', { name: 'Ad-hoc-Fahrzeug' })).toHaveCount(0);
+      },
+    ],
+    [
+      'personal',
+      KRAFT,
+      async () => {
+        await expect(karte, 'Vorbedingung: genau eine Personalkarte').toHaveCount(1);
+        await expect(
+          page.getByRole('button', { name: `Status von ${KRAFT} ändern` }),
+          'Vorbedingung: ohne Schreibrecht kein Statusauslöser (PersonalPage `statusBedienung`)',
+        ).toHaveCount(0);
+        // Strukturell statt per Name: die Admin-Karte trägt Statusauslöser UND „Entfernen".
+        await expect(
+          karte.getByRole('button'),
+          'Vorbedingung: die Personalkarte trägt ohne Schreibrecht kein Bedienziel',
+        ).toHaveCount(0);
+        await expect(page.getByRole('button', { name: 'Ad-hoc-Person' })).toHaveCount(0);
+      },
+    ],
+    [
+      'material',
+      MATERIAL,
+      async () => {
+        await expect(karte, 'Vorbedingung: genau eine Materialkarte').toHaveCount(1);
+        await expect(
+          page.getByRole('button', { name: `Status von ${MATERIAL} ändern` }),
+          'Vorbedingung: ohne Schreibrecht kein Statusauslöser (MaterialPage `statusBedienung`)',
+        ).toHaveCount(0);
+      },
+    ],
+    [
+      'einheiten',
+      '1. Zug',
+      async () => {
+        await expect(
+          hauptteil.getByRole('button', { name: 'Einheit bilden', exact: true }),
+          'Vorbedingung: ohne Schreibrecht kein „Einheit bilden"',
+        ).toHaveCount(0);
+      },
+    ],
+    [
+      'kraefteuebersicht',
+      '1. Zug',
+      async () => {
+        await expect(
+          page.getByRole('button', { name: /Drucken/ }).first(),
+          'Vorbedingung: der Druckknopf bleibt — die Werkzeugzeile ist gerendert',
+        ).toBeVisible();
+        await expect(
+          page.getByRole('button', { name: 'In Lagebericht übernehmen' }),
+          'Vorbedingung: ohne Schreibrecht kein „In Lagebericht übernehmen"',
+        ).toHaveCount(0);
+        await expect(
+          page.getByRole('button', { name: 'Einheit', exact: true }),
+          'Vorbedingung: ohne Schreibrecht keine Primäraktion „Einheit"',
+        ).toHaveCount(0);
+      },
+    ],
+  ];
+  for (const [modul, wortlaut, vorbedingung] of routen) {
+    await keinQuerlauf(page, `/einsaetze/${einsatzId}/${modul}`, wortlaut, vorbedingung);
   }
 });
 

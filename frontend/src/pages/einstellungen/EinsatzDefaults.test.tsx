@@ -151,6 +151,21 @@ describe('EinsatzDefaults', () => {
     await waitFor(() => expect(setzeOrgModulEinstellung).toHaveBeenCalledWith('etb', 'admin'));
   });
 
+  it('stapelt die Quittung beim Serienschalten nicht (LFH-478)', async () => {
+    renderMitProviders(<EinsatzDefaults />);
+
+    for (const [i, modul] of ['ETB', 'Chat'].entries()) {
+      fireEvent.mouseDown(
+        await screen.findByRole('combobox', { name: `Benötigte Rolle: ${modul}` }),
+      );
+      const optionen = await screen.findAllByText('Admin');
+      fireEvent.click(optionen[optionen.length - 1]);
+      await waitFor(() => expect(setzeOrgModulEinstellung).toHaveBeenCalledTimes(i + 1));
+    }
+
+    await waitFor(() => expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(1));
+  });
+
   it('deaktiviert nicht-ausblendbare Modul-Selects auch als Admin', async () => {
     // 'einsatzdaten' und 'einsatz-einstellungen' sind NICHT_AUSBLENDBAR — ihr Rollen-Select bleibt
     // gesperrt; ein ausblendbares Modul (ETB) ist editierbar.

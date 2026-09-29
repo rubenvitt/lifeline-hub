@@ -5,7 +5,7 @@ import {
   kopfFelder,
   zuordnungsKarte,
 } from './einheit-fixture';
-import { pruefeFokusVerdeckung } from './fokus-kern';
+import { pruefeFokusVerdeckung, type Verdeckungsbefund } from './fokus-kern';
 
 /**
  * Prüflisten-Zeile Z13 der Bedien-Leitlinie — WCAG 2.4.11 „Focus Not Obscured (Minimum)":
@@ -104,6 +104,41 @@ test('Selbstbeweis (LFH-373): Zusatzkandidaten machen einen ABSOLUTEN Verdecker 
     ohne.verdeckt,
     'ohne Zusatzkandidat bleibt der absolute Verdecker unsichtbar — die Vorgabe ist unverändert',
   ).toEqual([]);
+});
+
+test('Selbstbeweis (LFH-811): `beschnitt` meldet ein ganz abgeschnittenes Ziel — ohne die Option nicht', async ({
+  page,
+}) => {
+  // Ein Band, das Höhe abgibt und in sich rollt, verdeckt nicht, es SCHNEIDET AB. Die Attrappe
+  // ist ein Knopf in einer Hülle ohne Höhe mit `overflow: hidden`, als erstes Tabulaturziel.
+  await anmelden(page);
+  await page.setViewportSize({ width: 390, height: 400 });
+
+  const laufMitAttrappe = async (optionen?: { beschnitt: boolean }) => {
+    await page.goto('/admin/benutzer');
+    await expect(page.locator('tr.ant-table-row').first()).toBeVisible();
+    await page.evaluate(() => {
+      const huelle = Object.assign(document.createElement('div'), {
+        style: 'overflow:hidden;height:0',
+      });
+      const knopf = Object.assign(document.createElement('button'), { textContent: 'Attrappe' });
+      knopf.setAttribute('data-e2e-fokus', 'attrappe');
+      huelle.append(knopf);
+      document.body.prepend(huelle);
+      (document.activeElement as HTMLElement | null)?.blur();
+    });
+    return pruefeFokusVerdeckung(page, 1, 'Tab', optionen);
+  };
+
+  const ohne = await laufMitAttrappe();
+  const mit = await laufMitAttrappe({ beschnitt: true });
+  // Vorbedingung für BEIDE Hälften: der eine Tab landet auf der Attrappe.
+  expect(ohne.besuchteZiele, 'ohne: der Tab landet auf der Attrappe').toEqual(['attrappe']);
+  expect(mit.besuchteZiele, 'mit: der Tab landet auf der Attrappe').toEqual(['attrappe']);
+  expect(mit.verdeckt.join('\n'), 'mit `beschnitt` findet der Kern die Attrappe').toMatch(
+    /Attrappe.*abgeschnitten/,
+  );
+  expect(ohne.verdeckt, 'ohne `beschnitt` bleibt die Vorgabe unverändert').toEqual([]);
 });
 
 test('Katalogtabelle: Tabulaturdurchlauf hinter stehender Kopfzeile und fixierter erster Spalte', async ({
@@ -299,6 +334,136 @@ test('Einstellungen: Tabulaturdurchlauf unter der sticky Speicherleiste', async 
       `${ergebnis.fixierteKandidaten} fixierte Knoten, Reserve ${reserve}px`,
   });
 });
+
+/**
+ * LFH-475 (Nachzug N2 aus LFH-346 · C11): die zwei sticky Speicherleisten, die C11 gebaut hat.
+ * Dieselbe Stilfunktion wie oben (`speicherLeisteStil`) belegt nur die GEOMETRIE der Leiste,
+ * nicht die Tabulaturordnung über DIESEN Formularen — deshalb je Route ein eigener Lauf.
+ *
+ * Drei Vorbedingungen, ohne die „0 verdeckte Ziele" trivial wahr ist, und jede bricht den Test:
+ * Bildlaufreserve > 0 (sonst klebt die Leiste am Seitenende statt über dem Inhalt), die Leiste
+ * steht `sticky` im Baum, ≥ 8 Tabulator-Stopps IM Formular (Stopps der Navigation zählen nicht).
+ * Zusätzlich muss jedes Bedienziel des Formulars besucht werden, auch das Speichern selbst.
+ *
+ * Bei 390 px war der Lauf auf BEIDEN Routen rot (ein Feld ganz hinter der Leiste), bis
+ * `useSpeicherLeiste` den Fokusabstand mitbrachte (`components/speicherLeiste.ts`).
+ */
+async function speicherleisteFokusBereit(page: Page, ersteFeld: string) {
+  const leiste = page
+    .locator('form [data-lfh="speicherleiste"]')
+    .filter({ has: page.getByRole('button', { name: 'Speichern', exact: true }) });
+  await expect(leiste, 'Vorbedingung: die Speicherleiste steht im Formular').toHaveCount(1);
+  await expect(leiste, 'Vorbedingung: die Speicherleiste muss stehen').toHaveCSS(
+    'position',
+    'sticky',
+  );
+  await leiste.evaluate((el) => el.classList.add('e2e-speicherleiste'));
+
+  // Jedes Bedienziel des Formulars trägt eine Kennung; `besuchteZiele` belegt den Besuch.
+  const formular = leiste.locator('xpath=ancestor::form[1]');
+  await expect(formular).toHaveCount(1);
+  const ziele = await formular.evaluate((form) => {
+    form.classList.add('e2e-formular');
+    const kennungen: string[] = [];
+    const kandidaten = form.querySelectorAll<HTMLElement>(
+      'input:not([type="hidden"]), textarea, button, [tabindex]',
+    );
+    for (const el of Array.from(kandidaten)) {
+      const r = el.getBoundingClientRect();
+      if (el.tabIndex < 0 || (el as HTMLInputElement).disabled) continue;
+      if (r.width === 0 && r.height === 0) continue;
+      const kennung = `${kennungen.length}:${(el.getAttribute('aria-label') ?? el.id) || el.tagName}`;
+      el.setAttribute('data-e2e-fokus', kennung);
+      kennungen.push(kennung);
+    }
+    return kennungen;
+  });
+
+  const reserve = await page.evaluate(
+    () => document.documentElement.scrollHeight - document.documentElement.clientHeight,
+  );
+  expect(
+    reserve,
+    'Vorbedingung: die Seite muss scrollen, sonst klebt die Leiste am Seitenende',
+  ).toBeGreaterThan(0);
+
+  // Start unmittelbar VOR dem ersten Feld: `Tab` führt dann in das Formular hinein, statt die
+  // Schritte in der Navigation zu verbrauchen.
+  await page.getByLabel(ersteFeld, { exact: true }).focus();
+  // Die Leiste steht während der Eingabe tatsächlich über dem Inhalt, nicht erst am Seitenende.
+  await expect(leiste, 'Vorbedingung: die Leiste steht beim ersten Feld im Bild').toBeInViewport();
+  await page.keyboard.press('Shift+Tab');
+  return { ziele, reserve };
+}
+
+for (const { name, feld, seite } of [
+  {
+    name: 'Fahrzeug-Detailseite',
+    feld: 'Funkrufname',
+    seite: async (page: Page) => {
+      const antwort = await page.request.post('/api/fahrzeuge', {
+        data: { funkrufname: `E2E-FOKUS ${Date.now()}`, fahrzeugtyp: 'LF 20' },
+      });
+      expect(
+        antwort.ok(),
+        `Seeding Fahrzeug: ${antwort.status()} ${await antwort.text()}`,
+      ).toBeTruthy();
+      const { id } = (await antwort.json()) as { id: number };
+      return `/admin/stammdaten/fahrzeuge/${id}`;
+    },
+  },
+  {
+    name: 'Einsatz-Defaults',
+    feld: 'Aufbewahrungs-Dauer (Tage)',
+    seite: async () => '/admin/einstellungen/einsatz',
+  },
+]) {
+  for (const viewport of [
+    { width: 390, height: 420 },
+    { width: 1366, height: 520 },
+  ]) {
+    test(`${name} (LFH-475): Tabulaturdurchlauf unter der sticky Speicherleiste bei ${viewport.width}px`, async ({
+      page,
+    }) => {
+      await anmelden(page);
+      const pfad = await seite(page);
+      await page.setViewportSize(viewport);
+      await page.goto(pfad);
+      await expect(page.getByLabel(feld, { exact: true })).toBeVisible();
+
+      const { ziele, reserve } = await speicherleisteFokusBereit(page, feld);
+      const befund = await pruefeFokusVerdeckung(page, ziele.length + 4, 'Tab', {
+        region: '.e2e-formular',
+      });
+
+      expect(
+        befund.fixierteKandidaten,
+        'Vorbedingung: mindestens ein sticky Knoten im Baum',
+      ).toBeGreaterThanOrEqual(1);
+      expect(
+        befund.stoppsInRegion,
+        `Vorbedingung: ≥ 8 Tabulator-Stopps im Formular (${befund.stoppsGesamt} gesamt)`,
+      ).toBeGreaterThanOrEqual(8);
+      expect(
+        befund.besuchteZiele.sort(),
+        'jedes Bedienziel des Formulars, das Speichern eingeschlossen, muss per Tab besucht werden',
+      ).toEqual([...ziele].sort());
+
+      expect(
+        befund.verdeckt,
+        `Fokusziele vollständig verdeckt:\n${befund.verdeckt.join('\n')}`,
+      ).toEqual([]);
+
+      test.info().annotations.push({
+        type: 'messwert',
+        description:
+          `${name} ${viewport.width}×${viewport.height}: ${befund.stoppsInRegion} Stopps im ` +
+          `Formular (${ziele.length} Ziele), ${befund.stoppsBeruehrt} an einem sticky Knoten, ` +
+          `${befund.fixierteKandidaten} fixierte Knoten, Reserve ${reserve}px`,
+      });
+    });
+  }
+}
 
 /** Besuchsnachweise gehören zur Route, allgemeine Stopps zählen auch die Navigation. */
 async function einheitFokusBereit(page: Page, dichte: string) {
@@ -1078,3 +1243,220 @@ test('Personenliste (LFH-373): kein Fokusziel verschwindet hinter der stehenden 
   }
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
+
+// ── LFH-811: Fokus in jedem Kartenmodus unter `lg` ────────────────────────────────────────────
+//
+// Unter `lg` trägt während eines Kartenmodus ein Band im Kartenfuß die Bedienung
+// (`ZeichnenSteuerung`, `PlatzierSteuerung`, `MessSteuerung`), gestapelt mit der ausgeklappten
+// Zeitachse. Zwei Wege, ein Fokusziel zu verlieren, und der Kern sieht beide nur per Opt-in:
+//  - Überdeckung durch Knopfblock, linke Überlagerung oder ein anderes Band. Die Bänder sind
+//    Flow-Geschwister im absolut positionierten Fuß (nie selbst absolut, LFH-355), weder
+//    `sticky` noch `fixed` — deshalb über `zusatzKandidaten` (`KARTEN_AUFBAUTEN`).
+//  - Abschneiden: die Zeitachse gibt Höhe ab und rollt in sich (`bandStil(…, nachgiebig)`), der
+//    Fuß endet an der Karte — also `beschnitt`.
+// Dichte `handschuh`: die höchsten Bänder, die meiste Stauchung.
+
+const MODUS_BILD = 'Lageplan Fokusprobe';
+/** 1 × 1-PNG, wie in `lagekarte-touch.spec.ts`. */
+const MODUS_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+  'base64',
+);
+/** Tabulaturziel: aktiv und nicht per `tabindex="-1"` ausgenommen (Segmentleiste: roving). */
+const TABSTOPP =
+  'button:not([disabled]):not([tabindex="-1"]), input:not([disabled]):not([tabindex="-1"]), [tabindex="0"]';
+/** Kleinster sichtbarer Anteil über beide Richtungen, als „sichtbar/Zielhöhe px“. */
+function rest(...laeufe: Verdeckungsbefund[]): string {
+  const reste = laeufe.flatMap((l) => (l.kleinsterRestInRegion ? [l.kleinsterRestInRegion] : []));
+  if (reste.length === 0) return '—';
+  const r = reste.reduce((a, b) => (b.sichtbar / b.ziel < a.sichtbar / a.ziel ? b : a));
+  return `${Math.round(r.sichtbar)}/${Math.round(r.ziel)} px`;
+}
+
+/** Das Modusband: jedes Kind des Fußes außer Zeitachse und Maßstab. */
+const MODUSBAND =
+  '[data-lfh="karten-fuss"] > :not([data-lfh="zeitachse"]):not([data-lfh="massstab"])';
+
+interface Kartenmodus {
+  name: string;
+  /** Adresszusatz, mit dem die Karte geöffnet wird. */
+  query?: (saat: { schadenId: number }) => string;
+  /** Vor dem Öffnen gesetzte `localStorage`-Einträge. */
+  speicher?: Record<string, string>;
+  betreten?: (page: Page, breit768: boolean) => Promise<void>;
+}
+
+const KARTENMODI: Kartenmodus[] = [
+  {
+    name: 'Zone',
+    betreten: async (page) => {
+      await page.getByRole('button', { name: 'Zeichenwerkzeuge' }).click();
+      await page.getByRole('button', { name: 'Gefahrengebiet zeichnen' }).click();
+    },
+  },
+  {
+    name: 'Platzieren',
+    query: ({ schadenId }) => `?platzieren=schaden:${schadenId}`,
+  },
+  {
+    name: 'Taktisches Zeichen',
+    betreten: async (page) => {
+      await page.getByRole('button', { name: 'Zeichenwerkzeuge' }).click();
+      const paneel = page.locator('[data-paneel="zeichnen"]');
+      await paneel.getByRole('button', { name: 'Taktisches Zeichen platzieren' }).click();
+      await paneel.getByRole('button', { name: 'Platzieren', exact: true }).click();
+    },
+  },
+  {
+    name: 'Bild einpassen',
+    speicher: { 'lfh:lagekarte:paneele': JSON.stringify({ bilder: true }) },
+    betreten: async (page, breit768) => {
+      // Bei 768 px ist die Leiste per Vorgabe offen, bei 390 px zu.
+      if (!breit768) await page.getByRole('button', { name: 'Leiste einblenden' }).click();
+      await page.getByRole('button', { name: `Aktionen zu ${MODUS_BILD}` }).click();
+      await page.getByRole('menuitem', { name: 'Auf der Karte platzieren' }).click();
+    },
+  },
+  {
+    name: 'Messen',
+    betreten: async (page) => {
+      await page
+        .locator('[data-lfh="karten-knoepfe"]')
+        .getByRole('button', { name: 'Messen', exact: true })
+        .click();
+    },
+  },
+];
+
+for (const viewport of [
+  { width: 390, height: 844 },
+  { width: 768, height: 1024 },
+]) {
+  test.describe(`Lagekarte bei ${viewport.width} px (LFH-811): kein Fokusziel im Kartenmodus verdeckt`, () => {
+    test.use({ viewport });
+
+    for (const modus of KARTENMODI) {
+      test(`${modus.name}: Tab und Shift+Tab durch Knöpfe, Modusband und Zeitachse`, async ({
+        page,
+      }) => {
+        test.setTimeout(180_000);
+        await ohneDevtoolsKnopf(page);
+        await anmelden(page);
+
+        const einsatz = await page.request.post('/api/einsaetze', {
+          data: { bezeichnung: `Fokus 811 ${Date.now()}` },
+        });
+        expect(einsatz.ok(), await einsatz.text()).toBeTruthy();
+        const { id: einsatzId } = (await einsatz.json()) as { id: number };
+        // Zwei Stände: erst dann trägt die Zeitachse ihre volle Bedienung (Leiste, Stand-Knöpfe).
+        for (const bezeichnung of ['Stand A', 'Stand B']) {
+          const stand = await page.request.post(`/api/einsaetze/${einsatzId}/lage-snapshots`, {
+            data: { bezeichnung },
+          });
+          expect(stand.ok(), await stand.text()).toBeTruthy();
+        }
+        const schaden = await page.request.post(`/api/einsaetze/${einsatzId}/schaeden`, {
+          data: { typ: 'sachschaden', ausmass: 'gering', ort: 'Fokusprobe Keller' },
+        });
+        expect(schaden.ok(), await schaden.text()).toBeTruthy();
+        const { id: schadenId } = (await schaden.json()) as { id: number };
+        const bild = await page.request.post(
+          `/api/einsaetze/${einsatzId}/karte/hintergrundbilder`,
+          {
+            multipart: {
+              datei: { name: 'plan.png', mimeType: 'image/png', buffer: MODUS_PNG },
+              ecken: JSON.stringify([
+                [8.796, 53.08],
+                [8.804, 53.08],
+                [8.804, 53.075],
+                [8.796, 53.075],
+              ]),
+              name: MODUS_BILD,
+            },
+          },
+        );
+        expect(bild.ok(), await bild.text()).toBeTruthy();
+
+        // Dichte ZUERST: `stelleDichte` lädt neu, und `?platzieren=` ist ein Auftrag, den die Karte
+        // anwendet und aus der Adresse räumt — ein Neuladen danach liefe ohne Modus.
+        await stelleDichte(page, 'handschuh');
+        await page.evaluate((speicher) => {
+          localStorage.setItem('lfh:lagekarte:zeitachse-eingeklappt', '0');
+          localStorage.removeItem('lfh:lagekarte:leiste-offen:unter-lg');
+          localStorage.removeItem('lfh:lagekarte:leiste-offen:ab-lg');
+          for (const [schluessel, wert] of Object.entries(speicher)) {
+            localStorage.setItem(schluessel, wert);
+          }
+        }, modus.speicher ?? {});
+        await page.goto(`/einsaetze/${einsatzId}/lagekarte${modus.query?.({ schadenId }) ?? ''}`);
+        await expect(page.locator('html')).toHaveAttribute('data-dichte', 'handschuh');
+        await expect(
+          page.getByTestId('kartenflaeche').locator('canvas.maplibregl-canvas'),
+        ).toHaveCount(1, { timeout: 60_000 });
+        await modus.betreten?.(page, viewport.width >= 768);
+
+        // Vorbedingungen: der Modus läuft, die Leiste ist zu, die Zeitachse steht ausgeklappt
+        // daneben, und das Modusband ist ein direktes Kind des Fußes — nur dann sieht es der Kern.
+        await expect(page.locator(MODUSBAND)).toHaveCount(1);
+        await expect(page.locator('#lagekarte-leiste')).toBeHidden();
+        await expect(page.getByRole('button', { name: 'Zeitachse ausblenden' })).toBeVisible();
+        const bandStopps = await page.locator(MODUSBAND).evaluate((band, sel) => {
+          const stopps = Array.from(band.querySelectorAll<HTMLElement>(sel));
+          stopps.forEach((el, i) => el.setAttribute('data-e2e-fokus', `band-${i}`));
+          return stopps.length;
+        }, TABSTOPP);
+        expect(bandStopps, 'Vorbedingung: das Modusband trägt Tabulaturziele').toBeGreaterThan(0);
+        const hoehen = await page.evaluate((bandSel) => {
+          const r = (sel: string) => document.querySelector(sel)!.getBoundingClientRect();
+          const karte = r('[data-testid="kartenflaeche"]');
+          return {
+            karte: Math.round(karte.height),
+            zeitachse: Math.round(r('[data-lfh="zeitachse"]').height),
+            bandOben: Math.round(r(bandSel).top - karte.top),
+          };
+        }, MODUSBAND);
+
+        const optionen = {
+          zusatzKandidaten: KARTEN_AUFBAUTEN,
+          region: '[data-lfh="zeitachse"]',
+          beschnitt: true,
+        };
+        const alleBandStopps = Array.from({ length: bandStopps }, (_, i) => `band-${i}`).sort();
+
+        // Vorwärts ab dem Knopfblock: der Fuß steht im DOM dahinter.
+        await page
+          .locator('[data-lfh="karten-knoepfe"]')
+          .getByRole('button', { name: 'Hineinzoomen', exact: true })
+          .focus();
+        const vor = await pruefeFokusVerdeckung(page, 30, 'Tab', optionen);
+        expect([...vor.besuchteZiele].sort(), 'vorwärts: jedes Ziel im Modusband besucht').toEqual(
+          alleBandStopps,
+        );
+        expect(vor.stoppsInRegion, 'vorwärts: durch die Zeitachse').toBeGreaterThan(0);
+        expect(vor.verdeckt, `vorwärts:\n${vor.verdeckt.join('\n')}`).toEqual([]);
+
+        // Rückwärts ab dem letzten Ziel im Fuß.
+        await page.locator('[data-lfh="karten-fuss"]').evaluate((fuss, sel) => {
+          const stopps = fuss.querySelectorAll<HTMLElement>(sel);
+          stopps[stopps.length - 1].focus();
+        }, TABSTOPP);
+        const rueck = await pruefeFokusVerdeckung(page, 30, 'Shift+Tab', optionen);
+        expect(
+          [...rueck.besuchteZiele].sort(),
+          'rückwärts: jedes Ziel im Modusband besucht',
+        ).toEqual(alleBandStopps);
+        expect(rueck.stoppsInRegion, 'rückwärts: durch die Zeitachse').toBeGreaterThan(0);
+        expect(rueck.verdeckt, `rückwärts:\n${rueck.verdeckt.join('\n')}`).toEqual([]);
+
+        test.info().annotations.push({
+          type: 'messwert',
+          description:
+            `${viewport.width}×${viewport.height}/handschuh ${modus.name}: Karte ${hoehen.karte} px, ` +
+            `Zeitachse ${hoehen.zeitachse} px, Band ${hoehen.bandOben} px unter der Kartenoberkante, ` +
+            `${bandStopps} Bandziele, ${vor.stoppsInRegion}/${rueck.stoppsInRegion} Zeitachsenstopps vor/rück, ` +
+            `kleinster sichtbarer Rest eines Zeitachsenziels ${rest(vor, rueck)}, keines ganz verdeckt`,
+        });
+      });
+    }
+  });
+}

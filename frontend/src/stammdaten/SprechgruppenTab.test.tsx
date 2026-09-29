@@ -6,6 +6,8 @@ import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import SprechgruppenTab from './SprechgruppenTab';
 import { adminFixture } from '../test/fixtures';
+import { offeneRueckfrage } from '../test/rueckfrage';
+import { keinStehenderFehler, stehenderFehler } from '../test/stehenderFehler';
 
 const admin = adminFixture();
 const nichtAdmin = adminFixture({ system_rolle: 'keiner' });
@@ -225,5 +227,39 @@ describe('SprechgruppenTab — Freitext-Spalte (LFH-346 · A4)', () => {
     expect(zelle).toHaveClass('ant-table-cell-ellipsis');
     expect(zelle).toHaveStyle({ maxWidth: '240px' });
     expect(zelle).toHaveAttribute('title', langerHinweis);
+  });
+});
+
+/**
+ * Ein gescheitertes Deaktivieren steht an der SEITE, nicht im Toast (LFH-473): nach drei Sekunden
+ * wäre der Toast weg und die Zeile stünde unverändert da. Das nächste Absenden räumt den Hinweis
+ * (react-query setzt `error` beim Übergang nach `pending` zurück) — deshalb hängt der zweite
+ * Versuch, statt zu gelingen.
+ */
+describe('SprechgruppenTab — Fehlschlag des Deaktivierens (LFH-473)', () => {
+  it('hinterlässt einen stehenden Hinweis, den das nächste Absenden räumt', async () => {
+    let versuch = 0;
+    server.use(
+      http.post('/api/sprechgruppen/:id/deaktivieren', () => {
+        versuch += 1;
+        if (versuch > 1) return new Promise<never>(() => {});
+        return HttpResponse.json(
+          { error: 'Sprechgruppe ist einem laufenden Einsatz zugeordnet' },
+          { status: 409 },
+        );
+      }),
+    );
+    render(admin);
+    await screen.findByText('412_F_DRK');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Deaktivieren' }));
+    await userEvent.click(within(await offeneRueckfrage()).getByRole('button', { name: 'OK' }));
+    const hinweis = await stehenderFehler('Sprechgruppe ist einem laufenden Einsatz zugeordnet');
+    expect(hinweis).toHaveTextContent('Nicht deaktiviert');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Deaktivieren' }));
+    await userEvent.click(within(await offeneRueckfrage()).getByRole('button', { name: 'OK' }));
+    await keinStehenderFehler('Sprechgruppe ist einem laufenden Einsatz zugeordnet');
+    expect(versuch).toBe(2);
   });
 });

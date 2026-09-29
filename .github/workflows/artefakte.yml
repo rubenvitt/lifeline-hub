@@ -1,5 +1,7 @@
 # Release-Artefakte — vier Binaries, zwei Container-Abbilder (lifeline-hub und
-# karten-service), bei Alpha-Releases danach ein GitHub-Deployment.
+# karten-service), bei Alpha-Releases danach ein GitHub-Deployment. Bei STABILEN Releases
+# zusätzlich die Desktop-Hülle (LFH-721): Pakete für macOS arm64 und Windows x64 plus das
+# Update-Manifest latest.json, das installierte Hüllen über …/releases/latest/download/ lesen.
 #
 # Hängt am fertigen Release, nicht am Release-Lauf: so lassen sich die Artefakte eines
 # bestehenden Releases per workflow_dispatch nachbauen, ohne die Version neu zu ermitteln.
@@ -18,6 +20,11 @@ on:
         description: 'Release-Tag, dessen Artefakte (neu) gebaut werden sollen, z. B. v0.2.0'
         required: true
         type: string
+      desktop:
+        description: 'Desktop-Hülle auch für eine Vorabversion bauen (Prüflauf vor dem ersten stabilen Release)'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -36,10 +43,12 @@ jobs:
     outputs:
       tag: ${{ steps.pruefen.outputs.tag }}
       version: ${{ steps.pruefen.outputs.version }}
+      desktop: ${{ steps.pruefen.outputs.desktop }}
     steps:
       - id: pruefen
         env:
           ROH_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+          DESKTOP_ERZWUNGEN: ${{ inputs.desktop || false }}
         run: |
           set -euo pipefail
           if ! printf '%s' "$ROH_TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'; then
@@ -48,6 +57,14 @@ jobs:
           fi
           echo "tag=$ROH_TAG" >> "$GITHUB_OUTPUT"
           echo "version=${ROH_TAG#v}" >> "$GITHUB_OUTPUT"
+          # Die Desktop-Hülle hat EINEN Kanal, den stabilen (Entscheidung 25.09.2026): gebaut
+          # wird bei einem Tag ohne Vorabkennung — oder per Dispatch ausdrücklich. Bewusst am
+          # Tag entschieden, nicht an github.event.release.prerelease: das ist beim Dispatch leer.
+          if [ "${ROH_TAG#*-}" = "$ROH_TAG" ] || [ "$DESKTOP_ERZWUNGEN" = "true" ]; then
+            echo "desktop=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "desktop=false" >> "$GITHUB_OUTPUT"
+          fi
 
   bauen:
     name: ${{ matrix.name }}
@@ -225,6 +242,165 @@ jobs:
           TAG: ${{ needs.vorbereiten.outputs.tag }}
         run: |
           set -euo pipefail
+          ls -lh versand
+          gh release upload "$TAG" versand/* --clobber
+
+  # ── Desktop-Hülle (LFH-721) ─────────────────────────────────────────────────────────
+  # Nativ je Plattform: die NSIS-Bündelung und WebView2 laufen auf dem Windows-Runner, nicht
+  # als Cross-Build wie die Server-Binary. Hängt nur an `vorbereiten`, nie an `bauen` — ein
+  # roter Server-Build hält die Hülle nicht auf und umgekehrt. Kein MSI: MSI nimmt keine
+  # Vorabversion an, und Prüfläufe per Dispatch tragen eine.
+  desktop:
+    name: ${{ matrix.name }}
+    needs: vorbereiten
+    if: needs.vorbereiten.outputs.desktop == 'true'
+    runs-on: ${{ matrix.runs-on }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: desktop-macos-arm64
+            runs-on: macos-latest
+            target: aarch64-apple-darwin
+            bundles: app,dmg
+          - name: desktop-windows-x86_64
+            runs-on: windows-latest
+            target: x86_64-pc-windows-msvc
+            bundles: nsis
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.vorbereiten.outputs.tag }}
+
+      - name: Rust-Toolchain (stable, Ziel ${{ matrix.target }})
+        run: |
+          rustup toolchain install stable --profile minimal --no-self-update
+          rustup default stable
+          rustup target add ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: desktop-${{ matrix.target }}
+
+      # Gepinnt wie cargo-cyclonedx; dieselbe Minor wie die tauri-Crate in src-tauri/Cargo.toml.
+      - name: Tauri-CLI
+        run: |
+          cargo tauri --version 2>/dev/null | grep -qx 'tauri-cli 2.12.0' \
+            || cargo install tauri-cli --locked --version 2.12.0
+
+      - name: Bauen
+        working-directory: src-tauri
+        env:
+          # Ohne den privaten Schlüssel entstehen keine .sig-Dateien und damit kein Update.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          VERSION: ${{ needs.vorbereiten.outputs.version }}
+          ZIEL: ${{ matrix.target }}
+          BUNDLES: ${{ matrix.bundles }}
+        run: |
+          set -euo pipefail
+          if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            echo "FEHLER: Secret TAURI_SIGNING_PRIVATE_KEY fehlt (docs/betrieb/desktop-app.md)." >&2
+            exit 1
+          fi
+          # Die Hülle muss die Release-Version tragen, sonst vergleicht ihr Updater falsch. Sie
+          # erbt sie aus [workspace.package] (gesetzt von release.config.mjs); gefragt wird Cargo,
+          # nicht die Datei — die trägt nur `version.workspace = true` und unter Windows CRLF.
+          ist="$(cargo metadata --format-version 1 --no-deps | node -p 'JSON.parse(require("node:fs").readFileSync(0, "utf8")).packages.find((p) => p.name === "lifeline-desktop").version')"
+          [ "$ist" = "$VERSION" ] \
+            || { echo "FEHLER: lifeline-desktop trägt $ist, erwartet $VERSION." >&2; exit 1; }
+          cargo tauri build --ci --target "$ZIEL" --bundles "$BUNDLES"
+
+      # Kanonische Dateinamen: Tauris eigene tragen Leerzeichen, die GitHub beim Hochladen still
+      # durch Punkte ersetzt — die URL in latest.json zeigte dann ins Leere.
+      - name: Pakete einsammeln
+        env:
+          VERSION: ${{ needs.vorbereiten.outputs.version }}
+          ZIEL: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          target_dir="$(cargo metadata --format-version 1 --no-deps | node -p 'JSON.parse(require("node:fs").readFileSync(0, "utf8")).target_directory')"
+          # Auf dem Windows-Runner liefert Cargo `D:\a\…`; im Bash-Glob unten wäre der Backslash
+          # ein Maskierzeichen.
+          if command -v cygpath > /dev/null; then target_dir="$(cygpath -u "$target_dir")"; fi
+          bundle="$target_dir/$ZIEL/release/bundle"
+          name="lifeline-hub-desktop-$VERSION"
+          genau_eine() {
+            local treffer=("$@")
+            [ "${#treffer[@]}" -eq 1 ] && [ -f "${treffer[0]}" ] \
+              || { echo "FEHLER: erwartet genau eine Datei, gefunden: ${treffer[*]}" >&2; exit 1; }
+            printf '%s' "${treffer[0]}"
+          }
+          mkdir -p versand
+          case "$ZIEL" in
+            *apple-darwin)
+              archiv="$(genau_eine "$bundle"/macos/*.app.tar.gz)"
+              cp "$archiv" "versand/$name-macos-arm64.app.tar.gz"
+              cp "$archiv.sig" "versand/$name-macos-arm64.app.tar.gz.sig"
+              cp "$(genau_eine "$bundle"/dmg/*.dmg)" "versand/$name-macos-arm64.dmg"
+              ;;
+            *windows*)
+              installer="$(genau_eine "$bundle"/nsis/*-setup.exe)"
+              cp "$installer" "versand/$name-windows-x64-setup.exe"
+              cp "$installer.sig" "versand/$name-windows-x64-setup.exe.sig"
+              ;;
+          esac
+          ( cd versand && for f in *; do
+              case "$f" in *.sig) continue ;; esac
+              if command -v sha256sum > /dev/null; then sha256sum "$f" > "$f.sha256"; else shasum -a 256 "$f" > "$f.sha256"; fi
+            done )
+          ls -l versand
+
+      # Eigener Präfix `desktop-`: `veroeffentlichen` lädt `versand-*` und soll diese Dateien
+      # nicht je nach Laufreihenfolge mitnehmen.
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ matrix.name }}
+          path: versand/
+          retention-days: 7
+
+  # latest.json entsteht aus dem, was TATSÄCHLICH gebaut wurde: `!cancelled()`, damit eine
+  # gescheiterte Plattform nur aus dem Manifest fällt, statt die andere mitzunehmen. Ein
+  # ABGEBROCHENER Lauf veröffentlicht nichts — sonst zeigte „latest“ bis zum nächsten Release auf
+  # ein Manifest mit nur der Plattform, die zufällig schon fertig war. Ohne ein
+  # einziges Paket bricht das Skript ab (scripts/release/desktop-manifest.mjs, Selbsttest in
+  # Schritt 8 von check-all.sh).
+  desktop-veroeffentlichen:
+    name: Desktop-Pakete und latest.json ans Release hängen
+    needs: [vorbereiten, desktop]
+    if: ${{ !cancelled() && needs.vorbereiten.outputs.desktop == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.vorbereiten.outputs.tag }}
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: desktop-*
+          merge-multiple: true
+          path: versand
+
+      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          version: 2026.9.1
+          cache: true
+
+      - name: latest.json erzeugen und hochladen
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.vorbereiten.outputs.tag }}
+        run: |
+          set -euo pipefail
+          mise exec -- node scripts/release/desktop-manifest.mjs --dir versand --tag "$TAG" --repo "$GH_REPO"
           ls -lh versand
           gh release upload "$TAG" versand/* --clobber
 

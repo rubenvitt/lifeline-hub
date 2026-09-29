@@ -1,8 +1,14 @@
 import { expect, test, type Page } from '@playwright/test';
+import { wechsleZuRolle } from './rollen-kern';
 
 // Eine feste Reserve verschenkt Platz oder schiebt die Unterkante aus dem Fenster. Echte
 // Layout-Messung; jsdom kann diesen Fehler nicht nachweisen.
 async function aufbauen(page: Page) {
+  return (await aufbauenMitEinsatz(page)).pfad;
+}
+
+/** Wie `aufbauen`, liefert zusätzlich die Einsatz-ID (für die Mitgliedschaft der Rolle). */
+async function aufbauenMitEinsatz(page: Page) {
   await page.goto('/login');
   await page.getByLabel('Benutzername').fill('admin');
   await page.getByLabel('Passwort').fill(process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw');
@@ -23,7 +29,10 @@ async function aufbauen(page: Page) {
     typ: 'bett',
     menge: 2,
   });
-  return `/einsaetze/${einsatz.id}/unfallhilfsstellen/${uhs.id}`;
+  return {
+    einsatzId: String(einsatz.id),
+    pfad: `/einsaetze/${einsatz.id}/unfallhilfsstellen/${uhs.id}`,
+  };
 }
 
 test('UHS mit langem Kopf erhält eine nutzbare Arbeitsfläche vor den nachfolgenden Reitern', async ({
@@ -162,5 +171,63 @@ for (const breite of [1366, 1024, 390]) {
       body: JSON.stringify(messungen, null, 2),
       contentType: 'application/json',
     });
+  });
+}
+
+/**
+ * LFH-435, Nur-Lese-Zweig der UHS-Detailseite: der Beobachter sieht den Kopf OHNE Aktionen
+ * (`UhsDetailPage.tsx`, `aktionen` hinter `!schreibgeschuetzt`) und den Grundriss ohne
+ * „Plätze anlegen"/„Plätze bearbeiten". Der Kopf ist dadurch anders gebaut als beim Admin; die
+ * Resthöhe muss ihm trotzdem folgen, und die Seite läuft nicht waagerecht über. Gleiche Messung
+ * wie der Admin-Test oben, auf den Breiten des Führungs-Tablets und des Handschirms.
+ */
+for (const breite of [1024, 390]) {
+  test(`UHS-Resthöhe folgt Kopf und Dichte bei ${breite}px (Beobachter)`, async ({ page }) => {
+    test.setTimeout(90_000);
+    await page.setViewportSize({ width: breite, height: 900 });
+    // Gesät wird als Admin (die UHS bleibt „geplant": dort trüge der Admin-Kopf zwei Aktionen
+    // und der Grundriss „Plätze anlegen"), dann Wechsel im selben Kontext.
+    const { einsatzId, pfad } = await aufbauenMitEinsatz(page);
+    await wechsleZuRolle(page, 'beobachter', einsatzId);
+    const messungen = [];
+    for (const dichte of ['kompakt', 'komfortabel', 'handschuh']) {
+      await page.evaluate((wert) => localStorage.setItem('lifeline-hub.dichte', wert), dichte);
+      await page.goto(pfad);
+      await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+      // Positiver Anker zuerst: eine Abwesenheit wäre auf halb gerenderter Seite sofort wahr.
+      await expect(page.getByText('Bett 2', { exact: true })).toBeVisible();
+      // ── VORBEDINGUNG: der Nur-Lese-Zweig steht. Der Aktions-Slot rendert immer (die Seite
+      // übergibt stets ein `<Space>`), er ist nur leer.
+      const aktionen = page.locator('[data-lfh="seitenkopf-aktionen"]');
+      await expect(aktionen, 'der Kopf trägt seinen Aktions-Slot').toHaveCount(1);
+      await expect(
+        aktionen.getByRole('button'),
+        'Vorbedingung: der Kopf trägt ohne Schreibrecht keine Aktion',
+      ).toHaveCount(0);
+      await expect(
+        page.getByRole('button', { name: /^Plätze (anlegen|bearbeiten)$/ }),
+        'Vorbedingung: der Grundriss bietet ohne Schreibrecht keine Platzbearbeitung an',
+      ).toHaveCount(0);
+      messungen.push({ dichte, ...(await fuelltArbeitsflaeche(page)) });
+      const ueberlauf = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
+      expect(ueberlauf, `${dichte}: die Seite läuft nicht waagerecht über`).toBeLessThanOrEqual(1);
+    }
+    expect(messungen[0].hoehe).toBeGreaterThan(messungen[2].hoehe);
+    if (breite === 390) {
+      const pane = page.getByTestId('grundriss-rahmen').getByRole('tabpanel');
+      const innen = await pane.boundingBox();
+      const rahmen = await page.getByTestId('grundriss-rahmen').boundingBox();
+      expect(innen!.height).toBeGreaterThan(150);
+      expect(innen!.y + innen!.height).toBeLessThanOrEqual(rahmen!.y + rahmen!.height + 1);
+    }
+    // Wie beim Admin: bei 390 px erzwingt eine Fensterhöhe von 600 px den BODEN-Zweig.
+    await page.setViewportSize({ width: breite, height: breite === 390 ? 600 : 844 });
+    const verkleinert = await fuelltArbeitsflaeche(page);
+    if (breite === 390) {
+      expect(verkleinert.fenster - verkleinert.polster - verkleinert.oben).toBeLessThan(380);
+      expect(verkleinert.hoehe).toBeCloseTo(380, 0);
+    }
   });
 }

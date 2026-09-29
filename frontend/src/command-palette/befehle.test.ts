@@ -135,13 +135,17 @@ describe('baueBefehle — Schnellaktionen', () => {
       'aktion:schaeden',
       'aktion:stab',
       'aktion:dokumente',
+      'aktion:tiere',
+      'aktion:bereitstellungsraeume',
+      'aktion:einsatzabschnitte',
     ]);
   });
   /**
-   * Die Ziele stammen aus `routing/deeplinks.ts`: `/unfallhilfsstellen` zeigt auf eine Seite, die
-   * `?neu=1` nicht liest, die Schnellaktion braucht die Listenroute.
+   * Die Ziele stammen aus `routing/deeplinks.ts`: `/unfallhilfsstellen` und
+   * `/bereitstellungsraeume` zeigen auf Seiten, die `?neu=1` nicht lesen, die Schnellaktion
+   * braucht jeweils die Listenroute.
    */
-  it('baut die Schnellaktions-Ziele über die Deeplink-Registry (UHS auf die Listenroute)', () => {
+  it('baut die Schnellaktions-Ziele über die Deeplink-Registry (UHS und BR auf die Listenroute)', () => {
     const k = kontext();
     const b = baueBefehle(k);
     for (const [id, ziel] of [
@@ -151,6 +155,9 @@ describe('baueBefehle — Schnellaktionen', () => {
       ['aktion:schaeden', '/einsaetze/5/schaeden?neu=1'],
       ['aktion:stab', '/einsaetze/5/stab?neu=1'],
       ['aktion:dokumente', '/einsaetze/5/dokumente?neu=1'],
+      ['aktion:tiere', '/einsaetze/5/tiere?neu=1'],
+      ['aktion:bereitstellungsraeume', '/einsaetze/5/bereitstellungsraeume/liste?neu=1'],
+      ['aktion:einsatzabschnitte', '/einsaetze/5/einsatzabschnitte?neu=1'],
     ] as const) {
       b.find((x) => x.id === id)!.ausfuehren();
       expect(k.navigate).toHaveBeenCalledWith(ziel);
@@ -485,14 +492,20 @@ describe('baueBefehle · Gruppenordnung und Zuletzt (LFH-337 · M11/H12)', () =>
     expect(merkeModulBesuch).toHaveBeenCalledWith('etb');
   });
 
-  it('lässt eine Schnellaktion den Besuch NICHT melden', () => {
-    // Gegenaussage: eine Schnellaktion ist ein Erfassungssprung, keine Modulwahl.
-    const merkeModulBesuch = vi.fn();
-    const befehle = baueBefehle({ ...kontext(), merkeModulBesuch });
+  /**
+   * LFH-436 kehrt die Gegenaussage aus LFH-337 um: ein Griff zur Schnellaktion führt in genau EIN
+   * Modul und ist damit eine Wahl. Gemerkt wird das MODUL; die Aktion selbst trägt das
+   * Befehls-Gedächtnis (`ausgefuehrt:`), eine Dublette entsteht nicht.
+   */
+  it('meldet beim Ausführen einer Schnellaktion ihr Modul, bevor es navigiert', () => {
+    const reihenfolge: string[] = [];
+    const merkeModulBesuch = vi.fn((key: string) => reihenfolge.push(`merke:${key}`));
+    const navigate = vi.fn((p: string) => reihenfolge.push(`nav:${p}`));
+    const befehle = baueBefehle({ ...kontext({ navigate }), merkeModulBesuch });
 
-    befehle.find((b) => b.id === 'aktion:personen')!.ausfuehren();
+    befehle.find((b) => b.id === 'aktion:etb')!.ausfuehren();
 
-    expect(merkeModulBesuch).not.toHaveBeenCalled();
+    expect(reihenfolge).toEqual(['merke:etb', 'nav:/einsaetze/5/etb?neu=1']);
   });
 
   it('vergibt Zuletzt-Befehlen eigene ids, die nicht mit den Modul-Befehlen kollidieren', () => {

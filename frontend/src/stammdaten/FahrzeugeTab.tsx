@@ -14,7 +14,7 @@ import FahrzeugFormModal from './FahrzeugFormModal';
 import { globalKeys } from '../api/queryKeys';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 import { fahrzeugDetailPfad } from './stammdatenDetail';
-import { dienststatusSpalten, useDienststatusMutation } from './dienststatus';
+import { DIENSTSTATUS_FEHLER, dienststatusSpalten, useDienststatusMutation } from './dienststatus';
 import { staerkeText } from '../anzeige/staerke';
 
 export default function FahrzeugeTab() {
@@ -103,7 +103,14 @@ export default function FahrzeugeTab() {
           Fahrzeug anlegen
         </Button>
       }
-      hinweis={<SeitenHinweise rechteFehlt={!istAdmin} rechteText={STAMMDATEN_RECHTE_TEXT} />}
+      hinweis={
+        <SeitenHinweise
+          fehler={dienststatusMutation.error}
+          {...DIENSTSTATUS_FEHLER}
+          rechteFehlt={!istAdmin}
+          rechteText={STAMMDATEN_RECHTE_TEXT}
+        />
+      }
     >
       {/* Der Fehler tauscht die Tabelle aus (LFH-331): `Datensicht` führt den Kartenzweig an
          `Liste`, und `ListeProps` kennt keinen Fehlerbegriff. Ohne diese Weiche behauptete „Noch

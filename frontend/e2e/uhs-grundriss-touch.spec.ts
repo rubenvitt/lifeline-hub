@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { wechsleZuRolle } from './rollen-kern';
 
 /**
  * UHS-Grundriss unter Berührungsbedienung.
@@ -274,6 +275,10 @@ test.describe('UHS-Grundriss unter Touch', () => {
     const { personName } = await setupPatientUndPlatz(page, 40);
 
     const spalte = page.getByTestId('warteliste-scroll');
+    // Erst messen, wenn die Personenliste da ist (LFH-398): das Setup wartet nur auf „Bett 1"
+    // aus der Platzabfrage, die Liste kommt aus einer eigenen. Unter paralleler Last maß die
+    // Vorbedingung sonst die leere Spalte. Eine Antwort bringt alle 41 Personen.
+    await expect(spalte.getByText(personName)).toBeVisible();
     const masse = await spalte.evaluate((el) => ({
       scrollHeight: el.scrollHeight,
       clientHeight: el.clientHeight,
@@ -577,4 +582,146 @@ test.describe('UHS-Grundriss unter Touch', () => {
     await eintraege.first().tap();
     await expect(page.getByRole('dialog')).toContainText('Verbleib');
   });
+
+  /**
+   * LFH-435, Nur-Lese-Zweig der Kartenform (`Grundriss.tsx`, `kartenPerson`): ohne Schreibrecht
+   * gibt es kein Menü. Der belegte Platz öffnet per Tipp direkt die Person (ein Menü mit einem
+   * Eintrag wäre ein Umweg), der unbelegte ist KEIN Ziel. Gemessen wie in den Berührungsstufen
+   * oben: die Karte hält die Stufe, die Seite läuft nicht waagerecht über — auf dem
+   * Führungs-Tablet und dem Handschirm (dort liegt die Fläche im vorderen Reiter).
+   */
+  for (const [flaeche, groesse] of [
+    ['Führungs-Tablet', TABLET],
+    ['Mobil', HANDSCHIRM],
+  ] as const) {
+    for (const [dichte, soll] of [
+      ['komfortabel', 48],
+      ['handschuh', 72],
+    ] as const) {
+      test(`${flaeche} (${groesse.width} px), ${dichte}: der belegte Platz öffnet die Person, der freie ist kein Ziel (Beobachter)`, async ({
+        page,
+      }) => {
+        await page.setViewportSize(groesse);
+        const { einsatzId, uhsId, personName } = await setupBeobachter(page);
+        await page.evaluate(
+          (wert) => window.localStorage.setItem('lifeline-hub.dichte', wert),
+          dichte,
+        );
+        await page.goto(`/einsaetze/${einsatzId}/unfallhilfsstellen/${uhsId}`);
+        await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+
+        const belegt = bett1(page);
+        const frei = page.locator('[data-testid="platz-karte"]', { hasText: 'Bett 2' });
+        // Positive Anker zuerst: jede Abwesenheit unten wäre sonst auf halb gerenderter Seite wahr.
+        await expect(belegt).toContainText(personName);
+        await expect(frei).toBeVisible();
+
+        // ── VORBEDINGUNGEN: der Nur-Lese-Zweig steht, nicht das Menü des Admins.
+        await expect(
+          belegt,
+          'Vorbedingung: der belegte Platz ist das Ziel „Person öffnen"',
+        ).toHaveAttribute('aria-label', 'Bett 1: Person öffnen');
+        await expect(belegt).toHaveAttribute('role', 'button');
+        await expect(belegt, 'Vorbedingung: ohne Schreibrecht kein Menü').not.toHaveAttribute(
+          'aria-haspopup',
+          /.*/,
+        );
+        await expect(frei, 'Vorbedingung: der freie Platz ist kein Ziel').not.toHaveAttribute(
+          'role',
+          /.*/,
+        );
+        await expect(frei).not.toHaveAttribute('tabindex', /.*/);
+        await expect(
+          page.locator('[data-lfh="seitenkopf-aktionen"]').getByRole('button'),
+          'Vorbedingung: der Kopf trägt ohne Schreibrecht keine Aktion',
+        ).toHaveCount(0);
+
+        // Querlauf VOR dem Drawer: der ist 460 px breit und hat einen eigenen Scrollrahmen.
+        // Gepollt wie in `kraefte-schmal`: gleich nach dem Rendern ragt der Grundriss kurz über
+        // (gemessen 11–13 px, einmalig); maßgeblich ist der ruhende Zustand.
+        await expect
+          .poll(
+            () =>
+              page.evaluate(
+                () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+              ),
+            { message: 'die Seite läuft nicht waagerecht über' },
+          )
+          .toBeLessThanOrEqual(1);
+
+        const kasten = await belegt.boundingBox();
+        expect(kasten, 'Karte steht im Layout').not.toBeNull();
+        expect(kasten!.width, 'Kartenbreite').toBeGreaterThanOrEqual(soll);
+        expect(kasten!.height, 'Kartenhöhe').toBeGreaterThanOrEqual(soll);
+
+        const offenesMenue = page.locator('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]');
+        // Der freie Platz: ein Tipp bewirkt nichts.
+        await frei.tap();
+        await expect(offenesMenue, 'der freie Platz öffnet kein Menü').toHaveCount(0);
+        await expect(page.getByRole('dialog'), 'der freie Platz öffnet nichts').toHaveCount(0);
+
+        // Der belegte Platz: ein Tipp öffnet direkt die Person, kein Menü dazwischen.
+        await belegt.tap();
+        await expect(page.getByRole('dialog'), 'der Tipp öffnet die Person').toContainText(
+          personName,
+        );
+        await expect(offenesMenue).toHaveCount(0);
+      });
+    }
+  }
 });
+
+/**
+ * Seeding für den Beobachter (LFH-435): zwei Betten an einer aktiven UHS, „Bett 1" mit der
+ * benannten Person belegt, „Bett 2" frei. ALLES als Admin — nach dem Wechsel schreibt
+ * `page.request` als Beobachter und bekäme 403. Danach steht die Sitzung auf dem Beobachter.
+ */
+async function setupBeobachter(page: Page): Promise<Aufbau> {
+  await anmelden(page);
+  const stempel = Date.now();
+  const { id: einsatzId } = await seede<{ id: number }>(
+    page,
+    '/api/einsaetze',
+    { bezeichnung: `E2E UHS Touch lesend ${stempel}` },
+    'Einsatz',
+  );
+  const personName = `TouchLes${stempel}`;
+  await seede(page, `/api/einsaetze/${einsatzId}/personen`, { name: personName }, 'Person');
+  const { id: uhsId } = await seede<{ id: number }>(
+    page,
+    `/api/einsaetze/${einsatzId}/uhs`,
+    { typ: 'behandlungsplatz', bezeichnung: `BHP Touch lesend ${stempel}` },
+    'UHS',
+  );
+  await seede(
+    page,
+    `/api/einsaetze/${einsatzId}/uhs/${uhsId}/plaetze/bulk`,
+    { typ: 'bett', menge: 2 },
+    'Plätze',
+  );
+  await seede(
+    page,
+    `/api/einsaetze/${einsatzId}/uhs/${uhsId}/status`,
+    { status: 'aktiv' },
+    'UHS-Status',
+  );
+  const detail = (await (
+    await page.request.get(`/api/einsaetze/${einsatzId}/uhs/${uhsId}`)
+  ).json()) as { plaetze: { id: number; bezeichnung: string }[] };
+  const personen = (await (
+    await page.request.get(`/api/einsaetze/${einsatzId}/personen`)
+  ).json()) as { id: number; name: string | null }[];
+  const person = personen.find((p) => p.name === personName);
+  expect(person, 'Seeding: die benannte Person existiert').toBeDefined();
+  // Am Namen, nicht an der Position: die Reihenfolge der Plätze ist kein Vertrag.
+  const platz = detail.plaetze.find((p) => p.bezeichnung === 'Bett 1');
+  expect(platz, 'Seeding: „Bett 1" existiert').toBeDefined();
+  await seede(
+    page,
+    `/api/einsaetze/${einsatzId}/personen/${person!.id}/uhs-belegung`,
+    { art: 'eintritt', uhs_id: uhsId, platz_id: platz!.id },
+    'Belegung',
+  );
+  await wechsleZuRolle(page, 'beobachter', String(einsatzId));
+  return { einsatzId, uhsId, personName };
+}
