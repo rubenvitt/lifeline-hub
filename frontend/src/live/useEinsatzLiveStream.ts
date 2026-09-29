@@ -7,38 +7,26 @@ import { meldeSitzungAbgelaufen } from '../auth/sitzungsEvent';
 /**
  * EINE SSE-Verbindung für den gesamten Einsatz-Live-Feed.
  *
- * Der Backend-`LiveHub` multiplext ALLE Event-Typen (uhs, person, schaden, einheit,
- * fahrzeug, abschnitt, lage_zone, …) auf EINEN broadcast-Kanal pro Einsatz; jede
- * `/live`-Route ist der kanonische Einsatz-Feed (F01/LFH-227; sie ersetzt die 9 alten
- * modul-benannten `…/stream`-Routen). Deshalb genügt EINE Verbindung; client-seitig wird nach
- * Event-Name auf die betroffenen Query-Keys verteilt.
+ * Der Backend-`LiveHub` multiplext alle Event-Typen auf einen Kanal pro Einsatz; clientseitig
+ * wird nach Event-Name auf die Query-Keys verteilt.
  *
- * WICHTIG (Grund für die Konsolidierung): Pro Domäne eine eigene `EventSource` zu
- * öffnen, sprengt das HTTP/1.1-Limit von 6 Verbindungen je Origin. Sind alle 6 von
- * langlebigen SSE belegt, hängt JEDER weitere Request (z. B. ein POST zum Anlegen
- * einer Zone) endlos — die Mutation persistiert nie und die Karte aktualisiert nicht.
- * Diese eine Verbindung hält die Lagekarte sicher unter dem Limit.
+ * Warum EINE Verbindung: je Domäne eine `EventSource` sprengt das HTTP/1.1-Limit von 6
+ * Verbindungen je Origin, danach hängt JEDER weitere Request (z. B. ein POST) endlos. Das Limit
+ * gilt pro Origin über alle Tabs; dagegen hilft `--tls` (HTTP/2, `docs/betrieb-tls.md`),
+ * tab-übergreifendes Teilen ist offen (LFH-264).
  *
- * Das Limit gilt jedoch pro Origin über ALLE Tabs/Fenster eines Profils, diese
- * Konsolidierung nur pro Tab (F21/LFH-264). Mitigation für Multi-Fenster-Setups:
- * `--tls` betreiben → der Browser handelt HTTP/2 aus (Multiplexing hebt das Limit auf,
- * siehe `docs/betrieb-tls.md`). Für Klartext-HTTP-LAN bleibt Tab-übergreifendes Teilen
- * EINER EventSource (SharedWorker / Web-Locks-Leader) offen (LFH-264).
- *
- * LFH-122: Listener, Invalidierung UND der lagged-Vollabgleich werden aus dem zentralen
- * Registry `EINSATZ_STREAM_EVENTS` (siehe `api/queryKeys.ts`) ABGELEITET — statt an drei
- * Stellen (Handler-Definition, add/removeEventListener, lagged-Liste) manuell gepflegt zu
- * werden. Ein neues Live-Modul ist damit EIN Map-Eintrag, kein Dreifach-Edit, das man
- * vergessen kann. Ausnahmen mit Seiteneffekt (`sofortmeldung`) bzw. Sonderlogik (`lagged`)
- * bleiben bewusst als expliziter Code hier.
+ * Listener, Invalidierung und lagged-Vollabgleich werden aus `EINSATZ_STREAM_EVENTS`
+ * (`api/queryKeys.ts`) abgeleitet; ein neues Live-Modul ist ein Map-Eintrag. Nur Ereignisse
+ * mit Seiteneffekt (`sofortmeldung`, Erinnerung, Ablösung) und `lagged` stehen explizit hier.
  */
-/** Verbindungsstatus des Live-Feeds — via window-CustomEvent `lfh:live-status` an einen
- *  sichtbaren Indikator (globale Betriebszeile) gemeldet, damit der Hook
- *  render-state-frei und EINE EventSource bleibt. */
+/**
+ * Verbindungsstatus des Live-Feeds, gemeldet per window-CustomEvent `lfh:live-status`, damit
+ * der Hook render-state-frei und EINE EventSource bleibt.
+ */
 export type LiveVerbindungsStatus = 'idle' | 'open' | 'connecting' | 'lost';
 
 /** Exponentieller Backoff (ms) für den manuellen Reconnect, wenn der Browser aufgibt
- *  (readyState CLOSED) und die Session noch gültig ist. */
+    (readyState CLOSED) und die Session noch gültig ist. */
 const RECONNECT_BACKOFF_MS = [1000, 3000, 10000, 30000];
 
 export function useEinsatzLiveStream(einsatzId: number): void {
@@ -50,22 +38,17 @@ export function useEinsatzLiveStream(einsatzId: number): void {
     const meldeStatus = (status: LiveVerbindungsStatus) =>
       window.dispatchEvent(new CustomEvent('lfh:live-status', { detail: { status } }));
 
-    // Aus dem Registry abgeleitet: je Wire-Event ein Handler, der die deklarierten Keys
-    // invalidiert.
     const listeners: [string, EventListener][] = Object.entries(EINSATZ_STREAM_EVENTS).map(
       ([event, keys]) => [event, () => invalAlle(keys)],
     );
 
-    // lagged (Reconnect/Overflow) → konservativ ALLE Registry-Keys refetchen (dedupliziert).
-    // Bewusst OHNE Ton — sonst Fehlalarm ohne neue Sofortmeldung; der Refetch + die
-    // persistente Server-Hervorhebung (ist_ueberfaellig/eskaliert) tragen.
+    // lagged (Reconnect/Overflow) → alle Registry-Keys refetchen. Bewusst OHNE Ton, sonst
+    // Fehlalarm ohne neue Sofortmeldung.
     const alleKeys = [...new Set(Object.values(EINSATZ_STREAM_EVENTS).flat())];
     listeners.push(['lagged', () => invalAlle(alleKeys)]);
 
-    // Sofortmeldung (LFH-97): Escape-Hatch mit Seiteneffekten — Meldungs-Listen aktualisieren
-    // UND unübersehbar alarmieren (Ton + Toast). Der Toast wird einsatzweit über ein
-    // window-CustomEvent aufgelöst (AlarmZentrale im Layout lauscht), damit der Hook ohne
-    // Render-State auskommt und EINE EventSource bleibt. NICHT im lagged-Fan-out.
+    // Sofortmeldung: Listen aktualisieren UND alarmieren (Ton + Toast). Der Toast läuft über ein
+    // window-CustomEvent (AlarmZentrale im Layout). NICHT im lagged-Fan-out.
     const onSofort = (ev: MessageEvent) => {
       invalAlle(EINSATZ_STREAM_EVENTS.meldung);
       spieleAlarmTon('alarm');
@@ -79,12 +62,9 @@ export function useEinsatzLiveStream(einsatzId: number): void {
     };
     listeners.push(['sofortmeldung', onSofort as EventListener]);
 
-    // Erinnerung-Side-Effect (LFH-118): NEBEN der Registry-Invalidierung (deckt 'erinnerung'
-    // bereits ab) alarmiert dieser zweite Listener abgestuft und modulübergreifend. bezug_typ
-    // ist der Diskriminator: 'meldung' wird übersprungen (der sofortmeldung-Pfad alarmiert diese
-    // Meldung schon → kein Doppel-Alarm), 'auftrag' → Alarmton + auftraege-Invalidierung, sonst
-    // dezenter Ton. Der Toast wird einsatzweit über ein window-CustomEvent aufgelöst (AlarmZentrale
-    // lauscht) — der Hook bleibt render-state-frei und EINE EventSource.
+    // Erinnerung: zusätzlich zur Registry-Invalidierung abgestuft alarmieren. `bezug_typ`
+    // 'meldung' wird übersprungen (der sofortmeldung-Pfad alarmiert schon), 'auftrag' → Alarmton +
+    // auftraege-Invalidierung, sonst dezent. Toast über window-CustomEvent (AlarmZentrale).
     const onErinnerung = (ev: MessageEvent) => {
       let detail: {
         einsatz_id?: number;
@@ -97,13 +77,11 @@ export function useEinsatzLiveStream(einsatzId: number): void {
       } catch {
         /* Payload optional */
       }
-      // Nur scheduler-gefeuerte Fälligkeit alarmiert: die CRUD-Route (routes/erinnerung.rs) sendet
-      // dasselbe `erinnerung`-Event mit nur {einsatz_id} als Listen-Refresh — ohne erinnerung_id.
-      // Die Registry-Invalidierung von einsatz-erinnerungen (separater Listener) trägt diesen Fall.
+      // Nur scheduler-gefeuerte Fälligkeit alarmiert; die CRUD-Route sendet dasselbe Event ohne
+      // `erinnerung_id` als reinen Listen-Refresh.
       if (detail.erinnerung_id == null) return;
       if (detail.bezug_typ === 'meldung') return; // Doppel-Alarm-Guard
-      // LFH-635: Ablösungsfristen alarmieren über das eigene `abloesung`-Ereignis (Gate
-      // `abloesung` statt `erinnerungen`) — hier nicht ein zweites Mal.
+      // Ablösungsfristen alarmieren über das eigene `abloesung`-Ereignis, hier nicht ein zweites Mal.
       if (detail.bezug_typ === 'abloesung' || detail.bezug_typ === 'abloesung_vorwarnung') return;
       if (detail.bezug_typ === 'auftrag') {
         spieleAlarmTon('alarm');
@@ -115,9 +93,8 @@ export function useEinsatzLiveStream(einsatzId: number): void {
     };
     listeners.push(['erinnerung', onErinnerung as EventListener]);
 
-    // Ablösungs-Hinweis (LFH-635): NEBEN der Registry-Invalidierung (deckt 'abloesung' ab)
-    // alarmiert dieser Listener nur, wenn `art` gesetzt ist — das setzt ausschliesslich der
-    // Scheduler. Die CRUD-Routen senden dasselbe Ereignis nur mit {einsatz_id} als Refresh.
+    // Ablösung: alarmiert nur, wenn `art` gesetzt ist — das setzt ausschließlich der Scheduler;
+    // die CRUD-Routen senden dasselbe Ereignis nur als Refresh.
     const onAbloesung = (ev: MessageEvent) => {
       let detail: { art?: 'vorwarnung' | 'faellig' } = {};
       try {
@@ -131,14 +108,12 @@ export function useEinsatzLiveStream(einsatzId: number): void {
     };
     listeners.push(['abloesung', onAbloesung as EventListener]);
 
-    // Reconnect-Resync + sichtbarer Fehlerpfad (F14/LFH-263):
-    // - `ersterOpen` ist EFFEKT-lokal (kein useRef): pro Verbindung/Mount neu, sonst würde ein
-    //   StrictMode-/e2e-Doppelmount den Erst-Open des zweiten Mounts fälschlich als Reconnect
-    //   invalidieren. Erst-Open = frischer GET hat die Lage schon → kein Voll-Invalidate; jeder
-    //   FOLGE-Open (Browser-Auto-Reconnect ODER manueller Reconnect) resynct wie `lagged`.
-    // - `onerror` bei readyState CONNECTING → der Browser reconnectet selbst (nur Status melden);
-    //   bei CLOSED hat der Browser aufgegeben (typisch non-200, z. B. 401) → Auth proben und
-    //   entweder in den Login-Flow (401) oder per Backoff manuell neu verbinden.
+    // Reconnect-Resync + sichtbarer Fehlerpfad:
+    // - `ersterOpen` ist EFFEKT-lokal (kein useRef), sonst hielte ein StrictMode-Doppelmount den
+    //   Erst-Open des zweiten Mounts für einen Reconnect. Der Erst-Open invalidiert nicht; jeder
+    //   Folge-Open resynct wie `lagged`.
+    // - `onerror` bei CONNECTING → der Browser reconnectet selbst; bei CLOSED hat er aufgegeben
+    //   (typisch 401) → Auth proben, dann Login-Flow (401) oder manueller Reconnect per Backoff.
     let ersterOpen = true;
     let abgebrochen = false;
     let backoffStufe = 0;
@@ -155,13 +130,11 @@ export function useEinsatzLiveStream(einsatzId: number): void {
         });
         if (res.status === 401) sessionGueltig = false;
       } catch {
-        // Netzfehler bei der Probe → Session-Status unbekannt, wie gültig behandeln und
-        // per Backoff weiter versuchen (der nächste Reconnect deckt einen echten 401 auf).
+        // Netzfehler bei der Probe → wie gültige Session behandeln und per Backoff weiter versuchen.
       }
       if (abgebrochen) return;
       if (!sessionGueltig) {
-        // Session abgelaufen → der Browser reconnectet nicht selbst; die Sitzungswache auf
-        // App-Ebene übernimmt (LFH-268: EIN 401-Pfad für SSE und HTTP, mit Rückkehr-URL).
+        // Session abgelaufen → die Sitzungswache übernimmt (ein 401-Pfad für SSE und HTTP).
         meldeSitzungAbgelaufen();
         return;
       }
@@ -184,8 +157,7 @@ export function useEinsatzLiveStream(einsatzId: number): void {
         if (ersterOpen) {
           ersterOpen = false;
         } else {
-          // Reconnect (Browser-Auto oder manuell): verpasste Events sind möglich → Voll-Resync
-          // über alle Registry-Keys, wie `lagged` (bewusst ohne Ton).
+          // Reconnect: verpasste Events sind möglich → Voll-Resync wie `lagged`, ohne Ton.
           invalAlle(alleKeys);
         }
       };
@@ -210,9 +182,8 @@ export function useEinsatzLiveStream(einsatzId: number): void {
         aktuelle.onerror = null;
         aktuelle.close();
       }
-      // Die Betriebszeile bleibt über dem Router global gemountet. Ohne einen expliziten
-      // inaktiven Zustand würde ein früheres `lost` nach Verlassen des Einsatzes auf
-      // `/profil` oder `/admin` stehenbleiben, obwohl dort gar kein Live-Feed laufen soll.
+      // Die Betriebszeile bleibt global gemountet; ohne `idle` stünde ein früheres `lost` nach
+      // Verlassen des Einsatzes auf `/profil` oder `/admin` weiter da.
       meldeStatus('idle');
     };
   }, [einsatzId, qc]);

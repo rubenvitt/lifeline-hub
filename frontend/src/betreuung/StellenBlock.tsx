@@ -29,45 +29,38 @@ import {
 import MeldeVerlauf from './MeldeVerlauf';
 
 /**
- * Block „Betreuungsstellen" der Betreuungsseite (LFH-639, design.md D7).
+ * Block „Betreuungsstellen" der Betreuungsseite.
  *
- * FORM: Tabelle (`form="tabelle"`) in JEDER Breite — hier wird VERGLICHEN („welche Stelle hat
- * noch Platz?"). Fixierte Kennung ist die Bezeichnung, nie die DB-`id`. Den Spaltenschalter mit
- * Zähler bringt das Primitiv.
+ * Tabelle in JEDER Breite — hier wird verglichen („welche Stelle hat noch Platz?"). Fixierte
+ * Kennung ist die Bezeichnung, nie die DB-`id`.
  *
- * „frei" steht nur bei gesetzter Kapazität (Spec: ohne Kapazität keine Zahl freier Plätze).
- * Die Auslastung („fast voll", „voll", „überbelegt") erscheint als `StatusTag` neben der
- * Belegung — Farbe nur am Rand, das Wort ist der zweite Kanal (D8, WCAG 1.4.1). Unter 90 % gibt
- * es kein Wort und deshalb auch keine Farbe.
+ * „frei" nur bei gesetzter Kapazität. Die Auslastung („fast voll", „voll", „überbelegt") steht
+ * als `StatusTag` neben der Belegung, das Wort ist der zweite Kanal; unter 90 % kein Wort und
+ * keine Farbe.
  *
- * VOLLE STELLEN IM BLICKFELD (LFH-678): Blockkopf und Seitenkopf nennen „n voll" (voll und
- * überbelegt, `volleStellen`), weil diese Tabelle ab etwa vier Bezirkskarten unter der Falz
- * liegt. Die Vorgabesortierung bleibt die Anlagereihenfolge: nach Auslastung sortiert, sprängen
- * die Zeilen bei jeder Belegungsmeldung unter dem Cursor (Bedien-Leitlinie, Live-Updates).
+ * Volle Stellen: Block- und Seitenkopf nennen „n voll", weil die Tabelle oft unter der Falz
+ * liegt. Sortiert wird nach Anlagereihenfolge — nach Auslastung sprängen die Zeilen bei jeder
+ * Meldung unter dem Cursor.
  *
- * Zeilenaktionen: „Belegung melden" direkt, „Bearbeiten" und „Stornieren" gebündelt im Menü
- * (LFH-365). An einer Stelle ohne Koordinate steht dort zuerst „Auf Karte verorten" (LFH-673):
- * ein Sprung in den Platziermodus der Lagekarte, keine vierte Knopfreihe — dass das Menü damit
- * je Zeile verschieden lang ist, ändert seine Form nicht. Die Menge bleibt auch an einer geschlossenen Stelle ein Menü, obwohl dort „Belegung
- * melden" entfällt (der Server nimmt keine Meldung an, 422): die Regel „unter drei kein Menü"
- * zählt NACH der Rechteprüfung, nicht nach dem Zustand der Zeile — sonst wechselte die Form der
- * Aktionsspalte mit jedem Statuswechsel. Ohne Schreibrecht entfällt die Spalte ganz.
+ * Zeilenaktionen: „Belegung melden" direkt, „Bearbeiten" und „Stornieren" im Menü, an einer
+ * unverorteten Stelle zuerst „Auf Karte verorten". Auch an einer geschlossenen Stelle (ohne
+ * „Belegung melden") bleibt es ein Menü: gezählt wird NACH der Rechteprüfung, nicht nach dem
+ * Zeilenzustand, sonst wechselte die Form der Spalte mit jedem Statuswechsel. Ohne
+ * Schreibrecht entfällt die Spalte.
  *
- * „davon namentlich n" (LFH-674, design.md D7) steht in der Zelle „belegt" HINTER der Belegung:
- * Personen, die einzeln mit Verbleib „Notunterkunft" hierher verbracht wurden. Es ist ein
- * Hinweis, kein Summand — Sortierung, „frei", Auslastung und die Summe im Kopf lesen nur
- * `belegung.belegt`. Ohne Personenrecht fehlt `namentlich` in der Antwort, dann steht nichts.
+ * „davon namentlich n" steht HINTER der Belegung: einzeln mit Verbleib „Notunterkunft"
+ * hierher verbrachte Personen. Ein Hinweis, kein Summand — Sortierung, „frei", Auslastung und
+ * Summe lesen nur `belegung.belegt`. Ohne Personenrecht fehlt das Feld.
  *
- * VERLAUF (LFH-676): beschrifteter Aufklappbereich „Verlauf“ je Zeile, auch ohne
- * Schreibrecht; die Belegungsreihe lädt erst beim Aufklappen.
+ * „Verlauf“ als Aufklappbereich je Zeile, auch ohne Schreibrecht; lädt erst beim Aufklappen.
  */
 
 export type StelleAktion = 'verorten' | 'bearbeiten' | 'stornieren';
 
 /**
- * Warum an einer geschlossenen Stelle nichts zurückgenommen werden kann (D4 aus LFH-639:
- * sonst stünde sie „geschlossen und belegt“ da, der Server lehnt mit 422 ab). Steht EINMAL im
- * Verlauf statt n gesperrter Knöpfe (LFH-346, zwei Zuschnitte).
+ * Warum an einer geschlossenen Stelle nichts zurückgenommen werden kann (sonst stünde sie
+ * „geschlossen und belegt“ da, der Server lehnt mit 422 ab). Steht EINMAL im Verlauf statt n
+ * gesperrter Knöpfe.
  */
 export const GESCHLOSSEN_HINWEIS =
   'Die Stelle ist geschlossen. Zurücknehmen geht erst, wenn sie wieder in Betrieb ist.';
@@ -77,7 +70,7 @@ const MENUE: readonly (MenueEintrag & { key: StelleAktion })[] = [
   { key: 'stornieren', label: 'Stornieren', gefahr: true },
 ];
 
-/** Menü einer Zeile: unverortet zuerst „Auf Karte verorten" (LFH-673). Rein und exportiert. */
+/** Menü einer Zeile: unverortet zuerst „Auf Karte verorten". Rein und exportiert. */
 export function stellenMenue(
   s: Pick<Betreuungsstelle, 'lat' | 'lon'>,
 ): readonly (MenueEintrag & { key: StelleAktion })[] {
@@ -95,7 +88,7 @@ const stellenSpalten = (
   onBelegungMelden: (s: Betreuungsstelle) => void,
   onAktion: (aktion: StelleAktion, s: Betreuungsstelle) => void,
   namentlich: ReadonlyMap<number, number> | undefined,
-  /** Mono-Stil der Zahl in „davon namentlich n" — Zahlen laufen immer Mono (Neuentwurf). */
+  /** Mono-Stil der Zahl in „davon namentlich n". */
   zahlStil: CSSProperties,
 ) =>
   spaltenFuer<Betreuungsstelle>()([
@@ -182,7 +175,7 @@ const stellenSpalten = (
       zahl: true,
       abBreite: 'lg',
       sortWert: (s) => s.belegung?.zeitpunkt_at,
-      // `ZeitAnzeige` liest den Wire-String als UTC (`dayjs.utc`) — nie `dayjs(s)` (D2).
+      // `ZeitAnzeige` liest den Wire-String als UTC — nie `dayjs(s)`.
       render: (_, s) =>
         s.belegung ? <ZeitAnzeige wert={s.belegung.zeitpunkt_at} format="kurz" /> : leer,
     },
@@ -200,10 +193,8 @@ const stellenSpalten = (
             title: 'Aktionen',
             immerSichtbar: true,
             render: (_: unknown, s: Betreuungsstelle) => (
-              // `middle` statt der Vorgabe: die führt auf `abstand.xs` = 3 / 5 / 7 px, im
-              // Handschuh-Betrieb also 7 px zwischen „Belegung melden" und dem Dreipunkt —
-              // gemessen in Gate 3 (`e2e/gate3-trefflaeche.spec.ts`, „Betreuung: …"). `middle`
-              // führt auf `abstand.md` = 11 / 18 / 26 px und hält Kriterium 2 (≥ 16 px).
+              // `middle`: die Vorgabe ergäbe im Handschuh-Betrieb 7 px zwischen „Belegung melden" und dem
+              // Dreipunkt; `middle` hält ≥ 16 px (gemessen in `e2e/gate3-trefflaeche.spec.ts`).
               <Space wrap size="middle">
                 {s.status !== 'geschlossen' && (
                   <Button
@@ -241,8 +232,8 @@ const stellenSpalten = (
 type StelleSpalte = ReturnType<typeof stellenSpalten>[number]['key'];
 
 /**
- * Der Kartenplan ist Pflicht am Primitiv, greift bei `form="tabelle"` aber nie. Er bleibt
- * trotzdem ehrlich belegt — falls die Form je auf `auto` wechselt, steht dort keine leere Karte.
+ * Der Kartenplan ist Pflicht am Primitiv, greift bei `form="tabelle"` aber nie; ehrlich belegt,
+ * falls die Form je auf `auto` wechselt.
  */
 const KARTE: Kartenplan<Betreuungsstelle, StelleSpalte> = {
   art: 'plan',
@@ -265,7 +256,7 @@ export default function StellenBlock({
 }: {
   einsatzId: number;
   stellen: readonly Betreuungsstelle[];
-  /** „davon namentlich" je Stelle; fehlt ohne Personenrecht (LFH-674). */
+  /** „davon namentlich" je Stelle; fehlt ohne Personenrecht. */
   namentlich?: readonly StelleNamentlich[] | null;
   ladend: boolean;
   darfSchreiben: boolean;
@@ -316,7 +307,7 @@ export default function StellenBlock({
   const summe = gemeldet.reduce((n, s) => n + s.belegung!.belegt, 0);
   const ohne = stellen.length - gemeldet.length;
   // Hat keine Stelle gemeldet, ist die Summe 0 nur „nichts gemeldet", nicht „niemand in
-  // Betreuung" (Spec, Kopfzahl) — dasselbe Wort wie im Evakuierungsblock (`kennzahlText`).
+  // Betreuung" — dasselbe Wort wie im Evakuierungsblock.
   const kopfzahl = gemeldet.length === 0 ? 'keine Meldung' : `${personenZahl(summe)} untergebracht`;
 
   return (
@@ -330,9 +321,8 @@ export default function StellenBlock({
             : `${kopfzahl}${volleStellenSegment(stellen)}${ohne > 0 ? ` · ${personenZahl(ohne)} ohne Meldung` : ''}`
         }
         dataUpdatedAt={dataUpdatedAt}
-        // Sekundär und im Block, nicht im Kopf: die EINE Primäraktion der Seite ist
-        // „Evakuierungsbezirk anlegen" (LFH-340). Gesperrt statt versteckt (C10/M16) — der
-        // Grund steht im Hinweis über der Seite.
+        // Sekundär und im Block: die EINE Primäraktion der Seite ist „Evakuierungsbezirk anlegen".
+        // Gesperrt statt versteckt; der Grund steht im Hinweis über der Seite.
         aktion={
           <Button disabled={!darfSchreiben} onClick={onAnlegen}>
             Betreuungsstelle anlegen

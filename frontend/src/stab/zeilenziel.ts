@@ -1,13 +1,10 @@
 import type { CSSProperties } from 'react';
 
 /**
- * Trefffläche der handgebauten Bedienziele der Stab-Seite (Werkzeug-Links; in ST5/ST6 auch
- * ETB-Link und Kennzahl-Deeplinks). Schablone `bedienzielStil` (`pages/lagekarte/Sidebar.tsx`),
- * aber `inline-flex`: die Links stehen in einer Textzeile.
- *
- * ZWEI Angaben, nicht eine (LFH-365): die Polsterung allein trägt den Boden nicht. Aufgelöste
- * Tokens aus `theme.useToken()`, nie `var(--lfh-*)`. Eigener Name, weil `zeilenzielStil` in
- * `pages/einstellungen/Anmeldeverfahren.tsx` schon exportiert ist (dort `display: 'flex'`).
+ * Trefffläche der handgebauten Bedienziele der Stab-Seite (Werkzeug-, ETB- und
+ * Kennzahl-Links). Schablone `bedienzielStil`, aber `inline-flex`, weil die Links in einer
+ * Textzeile stehen. ZWEI Angaben — die Polsterung allein trägt den Boden nicht; aufgelöste
+ * Tokens, nie `var(--lfh-*)`. Eigener Name, weil `zeilenzielStil` schon exportiert ist.
  */
 export function stabZeilenzielStil(token: {
   controlHeight: number;

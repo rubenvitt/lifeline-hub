@@ -66,13 +66,11 @@ export default function SprechgruppenTab() {
       dataIndex: 'hinweis',
       key: 'hinweis',
       /**
-       * Die einzige Freitextspalte dieser Tabelle — sie trägt Belegungshinweise und trieb
-       * ungekürzt die Zeilenhöhe (Befund N13). `showTitle` hält den vollen Wert erreichbar,
-       * und der Bezug bleibt: der Hinweis steht namentlich im Suchplatzhalter.
-       * Gekappt wird an der ZELLE, nicht über eine Spaltenbreite — die im Browser gemessene
-       * Begründung steht in `karten/OnlineQuellenVerwaltung.tsx`: unter `table-layout: auto`,
-       * das `KatalogTabelle` mit `scroll={{ x: 'max-content' }}` erzwingt, ist eine
-       * Spaltenbreite wirkungslos.
+       * Die einzige Freitextspalte — ungekürzt trieb sie die Zeilenhöhe. `showTitle` hält den vollen
+       * Wert erreichbar, und der Hinweis steht namentlich im Suchplatzhalter. Gekappt wird an der
+       * ZELLE, nicht über eine Spaltenbreite: unter `table-layout: auto`, das `KatalogTabelle` mit
+       * `scroll={{ x: 'max-content' }}` erzwingt, ist eine Spaltenbreite wirkungslos (Herleitung in
+       * `karten/OnlineQuellenVerwaltung.tsx`).
        */
       ellipsis: { showTitle: true },
       onCell: () => ({ style: { maxWidth: 240 } }),
@@ -81,20 +79,18 @@ export default function SprechgruppenTab() {
     {
       title: 'Aktiv',
       key: 'aktiv',
-      // Zweite Filterachse: der Tab lädt bewusst auch die deaktivierten (`listeSprechgruppen(false)`),
+      // Zweite Filterachse: der Tab lädt bewusst auch die deaktivierten (`listeSprechgruppen(false)`);
       // wer nur den Bestand im Funkbetrieb sehen will, blendet sie hier weg.
       //
-      // Bewusst OHNE `dataIndex` — `onFilter` und `render` bekommen ohnehin den ganzen Datensatz,
-      // ein Bezug trüge hier nur den Drahtwert in den Suchkorpus des Primitivs, das die ROHWERTE
-      // liest. Gemessen: mit `dataIndex: 'aktiv'` traf die Eingabe „al" jede INAKTIVE Zeile
-      // („false") und „ru" jede aktive („true") — Zufallstreffer, die niemand tippen wollte.
-      // Gleiche Bauform wie die Status-Spalte in `pages/BenutzerPage.tsx`.
+      // OHNE `dataIndex`: `onFilter` und `render` bekommen den ganzen Datensatz, ein Bezug trüge nur
+      // den Drahtwert in den Suchkorpus — „al" träfe jede inaktive Zeile („false"), „ru" jede
+      // aktive („true"). Bauform wie die Status-Spalte in `pages/BenutzerPage.tsx`.
       filters: [
         { text: 'Aktiv', value: true },
         { text: 'Inaktiv', value: false },
       ],
       onFilter: (wert, sg) => sg.aktiv === wert,
-      // Status als getönte Fläche mit Wort (Neuentwurf), nicht als antd-Farbetikett.
+      // Status als getönte Fläche mit Wort, nicht als antd-Farbetikett.
       render: (_, sg) =>
         sg.aktiv ? (
           <StatusChip ton="normal" wort="Aktiv" />
@@ -137,12 +133,10 @@ export default function SprechgruppenTab() {
     <AdminPage
       titel="Sprechgruppen"
       aktionen={
-        /* Der Knopf VERSCHWINDET nicht mehr, wenn das Recht fehlt (M16, LFH-345 · C10) —
-           er steht gesperrt, den Grund nennt der Hinweis darunter. Ein fehlender Knopf ist
-           von „diese Seite kann das gar nicht" nicht zu unterscheiden; „ausgegraut" allein
-           wäre eine Ein-Kanal-Aussage (Grau ist eine Farbe, WCAG 1.4.1).
-           Der Slot liegt AUSSERHALB jedes `<form>` (Dateikopf `AdminPage`) — hier steht
-           deshalb nie ein `htmlType="submit"`, sondern immer ein Modal-Öffner. */
+        /* Der Knopf steht ohne Recht gesperrt, den Grund nennt der Hinweis (LFH-345): ein fehlender
+           Knopf ist von „diese Seite kann das gar nicht" nicht zu unterscheiden, „ausgegraut" allein
+           wäre eine Ein-Kanal-Aussage (WCAG 1.4.1). Der Slot liegt AUSSERHALB jedes `<form>`
+           (`AdminPage`) — hier steht deshalb ein Modal-Öffner, nie ein `htmlType="submit"`. */
         <Button
           type="primary"
           disabled={!istAdmin}
@@ -156,11 +150,9 @@ export default function SprechgruppenTab() {
       }
       hinweis={<SeitenHinweise rechteFehlt={!istAdmin} rechteText={STAMMDATEN_RECHTE_TEXT} />}
     >
-      {/* Der Fehler tauscht die Tabelle aus, statt durch sie hindurchgereicht zu werden
-          (LFH-331 · B3): `Datensicht` führt den Kartenzweig an `Liste`, und `ListeProps`
-          kennt keinen Fehlerbegriff — ein Prop am Tabellen-Primitiv wirkte nur in einer
-          der beiden Formen. Ohne diese Weiche behauptet „Noch keine Sprechgruppen" auch
-          dann einen leeren Katalog, wenn bloß die Verbindung abgerissen ist. */}
+      {/* Der Fehler tauscht die Tabelle aus (LFH-331): `Datensicht` führt den Kartenzweig an
+         `Liste`, und `ListeProps` kennt keinen Fehlerbegriff. Ohne diese Weiche behauptete „Noch
+         keine Sprechgruppen" einen leeren Katalog, wenn bloß die Verbindung abgerissen ist. */}
       {sprechgruppenQuery.isError ? (
         <SeitenFehler
           text="Sprechgruppen konnten nicht geladen werden"

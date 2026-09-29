@@ -32,12 +32,10 @@ const spalten: TableColumnsType<FahrzeugStatus> = [
     /**
      * Leitspalte: am Label wird ein Status gesucht, nicht an der DB-Kennung.
      *
-     * KEIN `defaultSortOrder` — und hier trägt das mehr Gewicht als in den anderen
-     * Katalogen: `sortier` IST die fachliche Reihenfolge dieses Katalogs, sie
-     * bestimmt die Anordnung in jeder Statusauswahl, und das Backend liefert
-     * `ORDER BY sortier, id` (`src/fahrzeug/status_repo.rs:44`). Sie bleibt die
-     * Voreinstellung; die alphabetische Sortierung ist ein Angebot zum Auffinden
-     * eines Eintrags und wird vom dritten Kopfklick wieder zurückgenommen.
+     * KEIN `defaultSortOrder`: `sortier` IST die fachliche Reihenfolge dieses Katalogs und
+     * bestimmt die Anordnung in jeder Statusauswahl; das Backend liefert `ORDER BY sortier, id`.
+     * Die alphabetische Sortierung ist ein Angebot zum Auffinden und wird vom dritten Kopfklick
+     * zurückgenommen.
      */
     sorter: (a, b) => a.label.localeCompare(b.label, 'de'),
   },
@@ -51,8 +49,7 @@ const spalten: TableColumnsType<FahrzeugStatus> = [
      * beim `Select` im Formular unten. Eine neue Enum-Variante taucht damit von selbst
      * im Filter auf, statt still zu fehlen.
      *
-     * `String(wert)`, weil antd das Filterargument als `React.Key | boolean`
-     * typisiert, nicht als `StatusKategorie`.
+     * `String(wert)`, weil antd das Filterargument als `React.Key | boolean` typisiert.
      */
     filters: kategorien.map((k) => ({ text: statusKategorie[k].label, value: k })),
     onFilter: (wert, s) => s.kategorie === String(wert),

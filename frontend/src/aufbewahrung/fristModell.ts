@@ -10,18 +10,14 @@ import {
 dayjs.extend(utc);
 
 /**
- * Reine Regeln der Aufbewahrungsfrist am Einsatz (LFH-23, design.md D8).
- *
- * Die Frist ist NICHT Teil der eingefrorenen Einstellungen: Einsatzleitung und System-Admin
- * setzen sie auch nach dem Abschluss (`PUT …/aufbewahrungsfrist`) — deshalb hängt
- * {@link darfFristSetzen} bewusst nicht am Status, anders als `darfEinsatzLeiten`.
+ * Reine Regeln der Aufbewahrungsfrist am Einsatz. Die Frist ist nicht Teil der eingefrorenen
+ * Einstellungen, deshalb hängt {@link darfFristSetzen} nicht am Status.
  */
 
 /**
  * Spiegel von `einsatz::berechtigung::ist_fristverkuerzung`: Aufheben ist nie eine Verkürzung,
- * erstmaliges Setzen an einem Einsatz ohne Frist schon (von „unbegrenzt" auf endlich), sonst
- * zählt ein früherer Zeitpunkt. Vergleich lexikografisch — korrekt für das feste Wire-Format
- * `YYYY-MM-DD HH:mm:ss` (UTC), das beide Seiten tragen.
+ * erstmaliges Setzen schon, sonst zählt ein früherer Zeitpunkt. Lexikografischer Vergleich,
+ * korrekt für das feste Wire-Format `YYYY-MM-DD HH:mm:ss` (UTC).
  */
 export function istFristverkuerzung(
   alt: string | null | undefined,
@@ -41,11 +37,10 @@ export function darfFristSetzen(
 }
 
 /**
- * Die Frist, die aus einer Picker-Eingabe hinausgeht. Der Picker zeigt und parst Minuten; die
- * gespeicherte Frist trägt die Sekunden des Abschlusses (`abgeschlossen_at` + Dauer). Wer die
- * ANGEZEIGTE Minute erneut eingibt, meint „unverändert“ — dann geht der gespeicherte Wert
- * sekundengenau zurück: keine Verkürzung um den Sekundenrest, keine Rückfrage, und der Server
- * antwortet ohne Schreibvorgang und ohne ETB-Eintrag.
+ * Die Frist, die aus einer Picker-Eingabe hinausgeht. Der Picker kennt nur Minuten, die
+ * gespeicherte Frist trägt Sekunden. Wer die ANGEZEIGTE Minute erneut eingibt, meint
+ * „unverändert“ — dann geht der gespeicherte Wert sekundengenau zurück (keine Verkürzung,
+ * keine Rückfrage, kein Schreibvorgang am Server).
  */
 export function fristAusEingabe(eingabe: string, basis: string | null | undefined): string {
   if (basis != null && eingabe.slice(0, 16) === basis.slice(0, 16)) return basis;

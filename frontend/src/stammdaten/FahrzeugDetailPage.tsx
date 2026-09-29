@@ -26,8 +26,8 @@ import {
   type FahrzeugEingabe,
 } from '../api/fahrzeuge';
 import { globalKeys } from '../api/queryKeys';
-// Die Speicherleiste wird WIEDERVERWENDET, nicht nachgebaut: sie ist seit LFH-345 · C10 die
-// eine Stelle, an der „sticky am unteren Rand, im Formular" begründet und geprüft steht.
+// Die Speicherleiste wird WIEDERVERWENDET, nicht nachgebaut: `speicherLeiste` ist die eine
+// Stelle, an der „sticky am unteren Rand, im Formular" begründet und geprüft ist.
 import { speicherLeisteStil } from '../components/speicherLeiste';
 import { leerZuNull } from '../api/patchTriState';
 import { parseRouteId } from '../routing/deeplinks';
@@ -52,24 +52,21 @@ interface FormWerte {
 }
 
 /**
- * Vollseite eines Fahrzeug-Stammdatensatzes (LFH-346 · A7, Befund H36).
+ * Vollseite eines Fahrzeug-Stammdatensatzes (LFH-346, Befund H36).
  *
- * Elf Felder passen nicht in ein 520-px-Modal (LFH-19: Modal ≤ ~3, Schnellerfassung ≤ ~4);
- * `FahrzeugFormModal` trägt seit A7 nur noch die vier Felder, ohne die ein Fahrzeug im
- * Einsatz nicht auffindbar ist. Alles Übrige steht hier.
+ * Elf Felder passen nicht in ein Modal (LFH-19); `FahrzeugFormModal` trägt nur die vier
+ * Felder, ohne die ein Fahrzeug im Einsatz nicht auffindbar ist. Alles Übrige steht hier.
  *
- * **KEIN neuer Backend-Endpunkt.** `FahrzeugAnzeige` (`src/fahrzeug/mod.rs:92`) trägt bereits
- * jedes Stammdatenfeld — ein `GET /api/fahrzeuge/{id}` läge Byte für Byte auf dem, was die
- * Liste liefert. Die Seite liest deshalb DIESELBE Query wie `FahrzeugeTab` und selektiert die
- * Zeile.
+ * **KEIN eigener Backend-Endpunkt.** `FahrzeugAnzeige` trägt bereits jedes Stammdatenfeld —
+ * ein `GET /api/fahrzeuge/{id}` läge Byte für Byte auf der Liste. Die Seite liest deshalb
+ * DIESELBE Query wie `FahrzeugeTab` und selektiert die Zeile.
  *
- * **Der Schlüssel muss dabei byte-gleich der des Tabs sein.** `globalKeys.fahrzeugeListe('alle')`
+ * **Der Schlüssel muss byte-gleich der des Tabs sein.** `globalKeys.fahrzeugeListe('alle')`
  * ist `['fahrzeuge','alle']`, `globalKeys.fahrzeuge()` dagegen `['fahrzeuge']` — ein anderes
- * Cache-Fach und damit ein zweiter Request; der argumentlose Accessor ist der
- * INVALIDIERUNGS-Prefix, kein Abrufschlüssel (Konvention in `api/queryKeys.ts`). Die
- * Zusammenführung durch TanStack, auf die dieser Aufbau baut, gibt es nur bei gleichem Key.
+ * Cache-Fach und ein zweiter Request; der argumentlose Accessor ist der INVALIDIERUNGS-Prefix,
+ * kein Abrufschlüssel (`api/queryKeys.ts`).
  *
- * Den Nicht-gefunden-Fall erzeugt die Seite selbst: ohne ihn zeigte ein toter Deeplink ein
+ * Den Nicht-gefunden-Fall erzeugt die Seite selbst: sonst zeigte ein toter Deeplink ein
  * leeres Formular, dessen Speichern einen fremden Datensatz träfe.
  */
 export default function FahrzeugDetailPage() {
@@ -99,8 +96,8 @@ export default function FahrzeugDetailPage() {
       qc.invalidateQueries({ queryKey: globalKeys.fahrzeugVorschlaege() });
       message.success('Fahrzeug gespeichert');
     },
-    // KEIN `onError`-Toast (LFH-345 · H14): der Fehler hängt an `mutation.error` und steht
-    // als Alert über dem Formular, bis der nächste Versuch läuft.
+    // KEIN `onError`-Toast: der Fehler hängt an `mutation.error` und steht als Alert über dem
+    // Formular, bis der nächste Versuch läuft.
   });
 
   // Eine kaputte Route-ID ist ein toter Link, kein leerer Datensatz (Regel `parseRouteId`).
@@ -119,11 +116,9 @@ export default function FahrzeugDetailPage() {
   if (fahrzeugeQuery.isLoading) return <SeitenSkeleton />;
   if (!fahrzeug) {
     /**
-     * `SeitenLeer` statt antds `Empty` — und ausdrücklich nicht `components/Platzhalter.tsx`:
-     * der trägt ein Emoji im Titel (Bestandsliste in CLAUDE.md), und die Regel „ein Emoji ist
-     * keine Ikone" gilt für Neues. Antds Leer-Element wiederum ist genau der Bezeichner, den
-     * LFH-331 · AK3 repoweit auf null zählt; eine brandneue Seite handelt sich die Altlast
-     * nicht ein. `SeitenLeer` bringt den Rückweg als Knopf mit und kommt ohne Bildzeichen aus.
+     * `SeitenLeer` statt antds `Empty` und statt `components/Platzhalter.tsx` (der trägt ein
+     * Emoji im Titel): antds Leer-Element zählt LFH-331 repoweit auf null. `SeitenLeer` bringt den
+     * Rückweg als Knopf mit und kommt ohne Bildzeichen aus.
      */
     return (
       <AdminPage titel="Fahrzeug">
@@ -144,9 +139,8 @@ export default function FahrzeugDetailPage() {
 
   return (
     <div>
-      {/* Brotkrume statt eines zweiten „Zurück"-Knopfes im Kopf: der Aktionen-Slot sichert
-          GENAU EINE Primäraktion zu (LFH-340 · C5), und die ist hier das Speichern — das
-          im Formular steht, nicht im Kopf. */}
+      {/* Brotkrume statt eines zweiten „Zurück"-Knopfes im Kopf: der Aktionen-Slot sichert GENAU
+         EINE Primäraktion zu, und die ist hier das Speichern — das im Formular steht. */}
       <Breadcrumb
         style={{ marginBottom: token.marginSM }}
         items={[
@@ -166,36 +160,25 @@ export default function FahrzeugDetailPage() {
           />
         }
       >
-        {/* `disabled` am Formular sperrt über antds DisabledContext auch den Speichern-Knopf
-            — er steht gesperrt DA, statt zu verschwinden (M16, LFH-345 · C10). Ein fehlender
-            Knopf ist von „diese Seite kann das gar nicht" nicht zu unterscheiden. */}
-        {/*
-          SEEDING NUR BEIM MOUNT — und `key={id}` fuer den Fall, dass dieselbe Seite auf
-          einen ANDEREN Datensatz umgehaengt wird (Link von Detail zu Detail): antds
-          `initialValues` wird genau einmal gelesen, ohne den Schluessel truege das
-          Formular die Werte des vorigen Satzes.
+        {/* `disabled` am Formular sperrt über antds DisabledContext auch den Speichern-Knopf — er
+           steht gesperrt DA, statt zu verschwinden. */}
+        {/* SEEDING NUR BEIM MOUNT — und `key={id}` für den Wechsel auf einen ANDEREN Datensatz: antds
+           `initialValues` wird genau einmal gelesen, ohne den Schlüssel trüge das Formular die Werte
+           des vorigen Satzes.
 
-          UND DESHALB STEHT HIER KEIN `Form.useForm()` (LFH-346, Review-Befund, gemessen).
-          Der Schluessel allein reicht NICHT: eine in der Seite gehaltene Instanz liegt
-          AUSSERHALB des gekeyten Teilbaums, ihr rc-field-form-Speicher ueberlebt den
-          Remount und gewinnt gegen die neuen `initialValues` (`preserve` ist per Vorgabe
-          an) — dieselbe Mechanik, die CLAUDE.md fuer `destroyOnHidden` beschreibt.
-          Gemessen: nach dem Wechsel 7 → 8 stand die Ueberschrift auf dem NEUEN Fahrzeug,
-          das OPTA-Feld trug den Wert des alten. Ohne die Instanz legt `<Form>` seinen
-          Speicher je `key` selbst an.
+           UND DESHALB STEHT HIER KEIN `Form.useForm()`. Der Schlüssel allein reicht NICHT: eine in der
+           Seite gehaltene Instanz liegt AUSSERHALB des gekeyten Teilbaums, ihr rc-field-form-Speicher
+           überlebt den Remount und gewinnt gegen die neuen `initialValues` (`preserve` ist per
+           Vorgabe an). Ohne die Instanz legt `<Form>` seinen Speicher je `key` selbst an.
 
-          Wer hier `form.validateFields()` o. ae. braucht, holt sich mit `const [form]`
-          den Fehler zurueck — dann ist `key={id}` wieder wirkungslos, und ALLE Tests
-          bleiben gruen ausser „traegt nach dem Wechsel auf einen anderen Datensatz
-          DESSEN Werte". Der Absende-Knopf braucht die Instanz nicht: er liegt als
-          `htmlType="submit"` IM `<form>`.
+           Wer hier `form.validateFields()` o. ä. braucht, holt mit `const [form]` den Fehler zurück —
+           dann ist `key={id}` wirkungslos, und nur „trägt nach dem Wechsel auf einen anderen
+           Datensatz DESSEN Werte" wird rot. Der Absende-Knopf braucht die Instanz nicht: er liegt als
+           `htmlType="submit"` IM `<form>`.
 
-          Ein Effekt, der bei jeder Query-Aenderung `setFieldsValue` ruft, stand hier
-          zunaechst und ist WEG: die Query wird auch von FREMDEN Aenderungen invalidiert,
-          und wer gerade schrieb, saehe seinen Text ohne Vorwarnung ersetzt (LFH-342 · C7,
-          derselbe Befund). Noetig war er ohnehin nicht — die Rueckgaben oben stellen
-          sicher, dass das Formular erst mit vorhandenem Datensatz montiert.
-        */}
+           Ein Effekt, der bei jeder Query-Änderung `setFieldsValue` ruft, gehört NICHT hierher: die
+           Query wird auch von FREMDEN Änderungen invalidiert und ersetzte den gerade getippten Text.
+           Die Rückgaben oben stellen sicher, dass das Formular erst mit vorhandenem Datensatz montiert. */}
         <Form<FormWerte>
           key={id}
           layout="vertical"
@@ -286,14 +269,9 @@ export default function FahrzeugDetailPage() {
                 </Form.Item>
               </Col>
               <Col xs={24} lg={12}>
-                {/*
-                EIN `Form.Item` für das ganze F/UF/M-Trio — nicht drei.
-                `src/routes/fahrzeug.rs:267` prüft die Stärke gegen den EFFEKTIVZUSTAND
-                (`staerke_roh`, Mehrspalten-CHECK „alle drei oder keiner"). Eine Maske, die
-                die drei Zahlen über Sektionen verteilt und teilweise sendet, kann eine
-                Kombination erzeugen, die der CHECK ablehnt — deshalb ein Formular, ein
-                Absenden, alle drei Werte.
-              */}
+                {/* EIN `Form.Item` für das ganze F/UF/M-Trio — nicht drei. Das Backend prüft die Stärke gegen
+                   den EFFEKTIVZUSTAND (Mehrspalten-CHECK „alle drei oder keiner"); verteilt und teilweise
+                   gesendet entstünde eine Kombination, die der CHECK ablehnt. */}
                 <Form.Item label="Soll-Stärke (alle drei oder keiner)" name="staerke">
                   <StaerkeEingabe />
                 </Form.Item>
@@ -307,11 +285,9 @@ export default function FahrzeugDetailPage() {
             </Form.Item>
           </Formularpaneel>
 
-          {/* Sticky am unteren Rand und IM `<form>`: nur dort trägt der Knopf
-              `htmlType="submit"`, und Enter sendet über die eingebaute Formularübermittlung
-              des Browsers ab (Erfassungs-Norm B4/LFH-332, Bauform aus LFH-345 · C10).
-              Ein Knopf im Kopf-Slot von `AdminPage` wäre ein DOM-Geschwister ausserhalb des
-              Formulars und könnte nichts übermitteln. */}
+          {/* Sticky am unteren Rand und IM `<form>`: nur dort trägt der Knopf `htmlType="submit"`, und
+             Enter sendet über die eingebaute Formularübermittlung ab. Ein Knopf im Kopf-Slot von
+             `AdminPage` läge außerhalb des Formulars. */}
           <div style={speicherLeisteStil(token)}>
             <Button type="primary" htmlType="submit" loading={speichern.isPending}>
               Speichern
@@ -341,12 +317,11 @@ function zuFormWerten(f: Fahrzeug): FormWerte {
 }
 
 /**
- * Formularwerte → Wire. Diese Seite trägt ALLE elf Felder, schickt also den vollen Satz;
- * ein geleertes Feld ist hier echt gemeint und geht als `null` raus (`leerZuNull`).
+ * Formularwerte → Wire. Diese Seite trägt ALLE elf Felder und schickt den vollen Satz; ein
+ * geleertes Feld ist echt gemeint und geht als `null` raus (`leerZuNull`).
  *
- * Das ist der Unterschied zur gekürzten Schnellerfassung: die schickt beim Bearbeiten nur
- * ihre vier sichtbaren Felder, weil ein `null` für ein Feld, das sie gar nicht zeigt, den
- * Wert löschte (der PATCH ist ein echter Teil-Patch, LFH-306).
+ * Anders die Schnellerfassung: sie schickt beim Bearbeiten nur ihre vier sichtbaren Felder,
+ * weil ein `null` für ein nicht gezeigtes Feld den Wert löschte (Teil-Patch, LFH-306).
  */
 function zuEingabe(w: FormWerte): FahrzeugEingabe {
   return {

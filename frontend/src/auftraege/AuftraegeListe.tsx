@@ -64,7 +64,7 @@ export default function AuftraegeListe({
   // Offen/Abgeschlossen-Trennung erfolgt clientseitig (alle Aufträge laden).
   const [ansicht, setAnsicht] = useState<'offen' | 'abgeschlossen'>('offen');
   const [richtungFilter, setRichtungFilter] = useState<string | undefined>(undefined);
-  // Empfänger-Filter (LFH-92): kodiert als "abschnitt:<id>" bzw. "einheit:<id>".
+  // Empfänger-Filter: kodiert als "abschnitt:<id>" bzw. "einheit:<id>".
   const [empfFilter, setEmpfFilter] = useState<string | undefined>(undefined);
   const [empfTyp, empfId] = empfFilter ? empfFilter.split(':') : [undefined, undefined];
   const abschnittId = empfTyp === 'abschnitt' ? Number(empfId) : undefined;
@@ -75,9 +75,8 @@ export default function AuftraegeListe({
     queryFn: () => listeAuftraege(einsatzId, { richtung: richtungFilter, abschnittId, einheitId }),
   });
 
-  // Cross-Modul-Deeplink (LFH-153): ?auftrag=<id> (z. B. ETB-Backlink) hebt den Auftrag hervor.
-  // Ansicht/Richtungs-/Empfänger-Filter zurücksetzen, damit das Ziel garantiert sichtbar ist;
-  // Scroll ist best-effort (jsdom-No-op).
+  // Deeplink ?auftrag=<id> hebt den Auftrag hervor. Ansicht und Filter werden zurückgesetzt, damit
+  // das Ziel sichtbar ist; Scroll ist best-effort.
   const [highlightAuftragId, setHighlightAuftragId] = useState<number | null>(null);
   useQueryParamSelektion('auftrag', auftraegeQuery.isSuccess, (aid) => {
     const a = (auftraegeQuery.data ?? []).find((x) => x.id === aid);
@@ -98,17 +97,14 @@ export default function AuftraegeListe({
       ?.scrollIntoView?.({ block: 'center' });
   }, [highlightAuftragId]);
 
-  // Inline-Anlegen-Formular (LFH-112): per Kopf-Button auf-/zugeklappt, kein Drawer/Modal.
+  // Inline-Anlegen-Formular: per Kopf-Button auf-/zugeklappt, kein Drawer/Modal.
   const [formOffen, setFormOffen] = useState(false);
 
   const fehler = useFehlerMeldung();
   const invalidiere = () => qc.invalidateQueries({ queryKey: einsatzKeys.auftraege(einsatzId) });
 
-  // LFH-343/C8: kein `setFormOffen(false)` mehr. Das Inline-Formular bleibt nach
-  // dem Erteilen offen, damit der nächste Auftrag ohne Aufklappen weitergeht;
-  // Zuklappen ist ausdrückliche Nutzeraktion (Kopf-Umschalter oder Kreuz an der
-  // Paneel). Der conditional Render des Paneels würde das Formular sonst unmounten —
-  // samt Serienzähler und Wertübernahme. Muster: `pages/MeldungenPage.tsx`.
+  // Kein `setFormOffen(false)`: das Inline-Formular bleibt nach dem Erteilen offen (Zuklappen ist
+  // ausdrückliche Nutzeraktion); ein Unmount verlöre Serienzähler und Wertübernahme.
   const anlegenMutation = useMutation({
     mutationFn: (d: NeuerAuftrag) => legeAuftragAn(einsatzId, d),
     onSuccess: () => {
@@ -197,10 +193,9 @@ export default function AuftraegeListe({
   });
   const [vollzugFuer, setVollzugFuer] = useState<number | null>(null);
   /**
-   * Fortschaltung und Rücknahme laufen durch DIESELBE Mutation (LFH-343 · C8).
-   * Der Rückgängig-Toast erscheint nur bei `in_arbeit`: „Vollzogen" trägt eine
-   * Vollzugsmeldung, geht ins ETB (append-only) und ist deshalb serverseitig
-   * nicht über diese Achse rücknehmbar — ein Knopf dafür liefe in ein 422.
+   * Fortschaltung und Rücknahme laufen durch DIESELBE Mutation. Der Rückgängig-Toast erscheint
+   * nur bei `in_arbeit`: „Vollzogen" geht ins ETB (append-only) und ist über diese Achse nicht
+   * rücknehmbar — ein Knopf dafür liefe in ein 422.
    */
   const vollzugMutation = useMutation({
     mutationFn: ({
@@ -321,11 +316,9 @@ export default function AuftraegeListe({
             senden={anlegenMutation.isPending}
             abschnitte={abschnitte}
             einheiten={einheiten}
-            // Serienerfassung an der Liste (LFH-343 · C8): hier entstehen mehrere
-            // Aufträge hintereinander, an derselben Lage meist an dieselbe Stelle.
+            // Serienerfassung: an derselben Lage entstehen mehrere Aufträge hintereinander.
             serie
-            // mutateAsync, nicht mutate: die Erfassungshülle darf die Felder nur
-            // leeren, wenn der Auftrag wirklich angekommen ist.
+            // mutateAsync: die Hülle darf die Felder nur leeren, wenn der Auftrag angekommen ist.
             onAnlegen={(d) => anlegenMutation.mutateAsync(d)}
           />
         </Paneel>

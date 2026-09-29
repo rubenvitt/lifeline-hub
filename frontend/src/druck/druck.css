@@ -1,31 +1,18 @@
-/* Gemeinsame Druckmechanik (LFH-71, Change `lfh-22-druck-export`, design.md D1/D3).
-   ============================================================================
-   Ein Druckstück markiert seine Wurzel mit `data-lfh="druckwurzel"` — mehr braucht es
-   nicht. Alle Regeln unten greifen nur unter `@media print` und nur, wenn eine Wurzel auf
-   der Seite steht (`:has`). Ohne Wurzel druckt Strg+P den Bildschirm wie vorher — bis auf
-   Seitenrand und Seitenzählung: `@page` hängt an keinem Selektor und gilt für jeden
-   Ausdruck der App (benannte Ausnahme, gepinnt in `druck.test.ts`).
+/* Gemeinsame Druckmechanik (LFH-71/LFH-22).
+   Ein Druckstück markiert seine Wurzel mit `data-lfh="druckwurzel"`. Alle Regeln greifen nur
+   unter `@media print` und nur mit Wurzel auf der Seite (`:has`) — bis auf `@page`, das an
+   keinem Selektor hängt (benannte Ausnahme, gepinnt in `druck.test.ts`).
 
-   WARUM `display: none` UND NICHT `visibility: hidden`: das alte Muster (alles unsichtbar,
-   Druckbereich `position: absolute`) ließ jeden unsichtbaren Knoten seinen Platz behalten
-   und nahm den Druckbereich aus dem Fluss. Firefox und Safari schneiden einen absolut
-   positionierten Bereich nach der ersten Seite ab (LFH-71). Hier steht der Druckbereich im
-   normalen Fluss, und alles andere ist wirklich weg.
+   `display: none` statt `visibility: hidden`: unsichtbare Knoten behielten ihren Platz, und
+   Firefox/Safari schneiden einen absolut positionierten Druckbereich nach Seite 1 ab. Die
+   generische Ausblende-Regel trifft Rahmen UND jedes Portal unter `body`, ohne Markenliste.
 
-   Die generische Ausblende-Regel trifft Kopfleiste, Rail, Modulpanel, Hinweisbanner UND
-   jedes Portal unter `body` (Dialog, `message`, Menü, Drawer), ohne dass jede Stelle eine
-   Marke tragen muss — eine Markenliste veraltete beim nächsten Rahmenteil still.
+   `:has()`/komplexe `:not()`: Chromium ≥ 105, Safari ≥ 15.4, Firefox ≥ 121.
+   Seiteneigenheiten bleiben in den Seiten-Stylesheets. Form geprüft in `druck.test.ts`,
+   Wirkung in `e2e/druck-fluss.spec.ts`. */
 
-   `:has()` und komplexe Selektoren in `:not()`: Chromium ≥ 105, Safari ≥ 15.4,
-   Firefox ≥ 121.
-
-   Seiteneigenheiten (Entwurfsregeln M86, `*-no-print`, Seitenkopf, Tabellen-Neutralisierer
-   des Meldebilds) bleiben in den Seiten-Stylesheets. Geprüft wird diese Datei als Quelltext
-   in `druck.test.ts`, ihre Wirkung in `e2e/druck-fluss.spec.ts`. */
-
-/* Der Druckkopf (`components/druck/Druckkopf.tsx`) steht auf Befehl, Lagebericht und
-   Meldebild nur auf Papier — am Bildschirm tragen Seitenkopf und Leisten dieselben Angaben.
-   Die ETB-Druckansicht zeigt ihn auch am Bildschirm (`sichtbarkeit="immer"`). */
+/* Der Druckkopf steht auf Befehl, Lagebericht und Meldebild nur auf Papier; die
+   ETB-Druckansicht zeigt ihn auch am Bildschirm (`sichtbarkeit="immer"`). */
 @media screen {
   .druckkopf--nur-druck {
     display: none;
@@ -33,11 +20,9 @@
 }
 
 @media print {
-  /* Seitenrand und Seitenzählung (D3). Randfelder zeichnet Chromium (ab 131); in Firefox
-     und Safari bleibt das Feld leer, dort kann die Kopf-/Fußzeile des Browsers die
-     Seitenzahl liefern. KEIN freier Text (Org-Name, Einsatz): er müsste als CSS-Zeichenkette
-     in ein `<style>` gesetzt werden — eine Escape-Fläche ohne Gewinn. Die Zuordnung trägt
-     der Druckkopf auf Seite 1. `margin: 15mm` ist die Rechengrundlage der e2e-Maße. */
+  /* Seitenrand und Seitenzählung. Randfelder zeichnet nur Chromium (ab 131). KEIN freier Text
+     (Org-Name, Einsatz): er müsste als CSS-Zeichenkette in ein `<style>` — eine Escape-Fläche
+     ohne Gewinn. `margin: 15mm` ist die Rechengrundlage der e2e-Maße. */
   @page {
     margin: 15mm;
 
@@ -55,10 +40,9 @@
     display: none !important;
   }
 
-  /* Vorfahren der Wurzel (inklusive `html` und `body`): Flex-Layout, `min-height: 100vh`,
-     die Content-Polsterung und jeder Bildlaufcontainer fallen weg. Sonst begänne der Druck
-     nicht oben auf der Seite, und ein `overflow: hidden` schnitte ihn ab. Papier ist hell:
-     der Grund wird hier weiß, weil der Nachtbetrieb ihn sonst dunkel setzte. */
+  /* Vorfahren der Wurzel: Flex-Layout, `min-height: 100vh`, Polsterung und Bildlaufcontainer
+     fallen weg, sonst begänne der Druck nicht oben und `overflow: hidden` schnitte ihn ab.
+     Papier ist hell, auch im Nachtbetrieb. */
   :has([data-lfh='druckwurzel']) {
     position: static !important;
     display: block !important;
@@ -88,12 +72,11 @@
     max-width: none !important;
   }
 
-  /* ---- Papier ist hell (Neuentwurf „Instrumententafel", 21.09.2026) ----
-     Nachtbetrieb ist Vorgabe: Text `text` ist fast weiß, die Flächen stehen INLINE fast
-     schwarz. Browser drucken Hintergründe per Vorgabe nicht — übrig bliebe weißer Text auf
-     weißem Papier. `!important` ist Pflicht, weil die Bausteine ihre Farben inline tragen.
-     Benannte Farben statt Hex: Druck ist kein Rollenwert, Gate 5 hält `theme/` als einzige
-     Quelle für Rollenfarben. */
+  /* ---- Papier ist hell ----
+     Im Nachtbetrieb stehen die Flächen INLINE fast schwarz, Browser drucken Hintergründe aber
+     nicht — übrig bliebe weißer Text auf weißem Papier. `!important`, weil die Bausteine ihre
+     Farben inline tragen. Benannte Farben statt Hex: Gate 5 hält `theme/` als einzige Quelle
+     für Rollenfarben. */
   [data-lfh='druckwurzel'],
   [data-lfh='druckwurzel'] * {
     color: black !important;
@@ -102,12 +85,9 @@
   }
 
   /* ---- Umbruchregeln ----
-     An der Wurzel, nicht an `.X-druck .markdown`: so gelten sie im Lese- UND im
-     Entwurfszweig (Editor-Vorschau bzw. Druckfassung des Editors).
-     Der Abschnittstitel ist nur im LESEZWEIG eine Überschrift (`h3`). Im Entwurf ist er beim
-     Lagebericht der Kopf des Akkordeons (`.ant-collapse-header`), beim Befehl das
-     Feldetikett (`.ant-form-item-label`, im senkrechten Formular ein eigenes Element über dem
-     Feld) — beide stehen deshalb mit in der Liste. */
+     An der Wurzel, damit sie im Lese- UND im Entwurfszweig gelten. Im Entwurf ist der
+     Abschnittstitel keine Überschrift, sondern Akkordeonkopf (Lagebericht) bzw. Feldetikett
+     (Befehl) — beide stehen deshalb mit in der Liste. */
   [data-lfh='druckwurzel'] :is(h1, h2, h3, h4, h5, h6, .ant-collapse-header, .ant-form-item-label) {
     break-after: avoid;
   }
@@ -124,8 +104,7 @@
     max-width: 100%;
   }
 
-  /* Markdown im Druck: Satz der Überschriften und Listen, Links ohne grelle Farbe. Vorher
-     je Seite doppelt in `lageberichtPrint.css` und `befehlPrint.css`. */
+  /* Markdown im Druck: Satz der Überschriften und Listen, Links ohne grelle Farbe. */
   [data-lfh='druckwurzel'] .markdown :is(h1, h2, h3, h4, h5, h6) {
     font-weight: 600;
     margin: 0.75em 0 0.3em;
@@ -141,9 +120,8 @@
     text-decoration: underline;
   }
 
-  /* Codeblöcke: am Bildschirm `overflow-x: auto` bei `white-space: pre` (`Markdown.css`).
-     Papier hat keinen Bildlauf — eine lange Zeile wäre rechts abgeschnitten. Schon ein um
-     vier Leerzeichen eingerückter Absatz wird zum Codeblock. */
+  /* Codeblöcke: am Bildschirm `white-space: pre` mit Bildlauf; Papier hat keinen, eine lange
+     Zeile wäre abgeschnitten. */
   [data-lfh='druckwurzel'] .markdown pre {
     overflow: visible !important;
     white-space: pre-wrap !important;

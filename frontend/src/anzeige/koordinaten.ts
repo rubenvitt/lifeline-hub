@@ -1,14 +1,10 @@
 /**
- * WGS84 → UTM / MGRS (LFH-136). Kleine, getestete Eigenimplementierung ohne
- * schwere Dependency (kein proj4), bewusst auf den BOS-Einsatzraum zugeschnitten.
+ * WGS84 → UTM / MGRS als kleine Eigenimplementierung, zugeschnitten auf den BOS-Einsatzraum;
+ * Gauß-Krüger über proj4 (Bessel, ~3 m).
  *
- * UTM-Vorwärtsprojektion: Snyder-/Karney-Reihe (mm-genau im Streifen). MGRS:
- * 100-km-Quadrat-Buchstaben mit der zonenparität-abhängigen Zeilensequenz.
- *
- * Bewusste Grenzen (siehe Plan-Risiken): die UTM-Zonen-Ausnahmen für
- * Norwegen (32V) und Svalbard (31X/33X/35X/37X) sind NICHT abgebildet — für
- * Deutschland/Mitteleuropa irrelevant. Polnahe Bereiche (UPS) ebenfalls nicht.
- * GK-Genauigkeit ca. 3 m (Gauss-Krüger via proj4, Bessel-Ellipsoid).
+ * UTM: Snyder-/Karney-Reihe (mm-genau im Streifen). MGRS: 100-km-Quadrat-Buchstaben mit
+ * zonenparitätsabhängiger Zeilensequenz. NICHT abgebildet: die Zonen-Ausnahmen Norwegen (32V)
+ * und Svalbard sowie UPS in Polnähe.
  */
 
 import proj4 from 'proj4';
@@ -154,9 +150,8 @@ export function formatiere(lat: number, lon: number, system: Koordinatenformat):
         return formatiereWgs84(lat, lon);
     }
   } catch {
-    // formatiere läuft ungeschützt im Render-Pfad; projizierte Systeme (GK außerhalb
-    // der DE-Zonen 2–5, MGRS außerhalb 80S–84N) können werfen → WGS84-Dezimal-Fallback
-    // statt App-Crash.
+    // `formatiere` läuft im Render-Pfad; projizierte Systeme können außerhalb ihres Bereichs werfen
+    // → WGS84-Dezimal-Fallback statt App-Crash.
     return formatiereWgs84(lat, lon);
   }
 }

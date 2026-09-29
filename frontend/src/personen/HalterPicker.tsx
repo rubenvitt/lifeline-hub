@@ -6,13 +6,16 @@ import { listePersonen, registrierAnzeige } from '../api/einsatzPerson';
 import { einsatzKeys } from '../api/queryKeys';
 
 /**
- * Strukturierter Wert der Halter-Combobox. Genau eine Variante (oder null = unbekannt).
- * Spiegelt das halter_person_id XOR halter_kontakt des Backends.
+ * Strukturierter Wert der Halter-Combobox: genau eine Variante oder null (unbekannt) —
+ * spiegelt `halter_person_id` XOR `halter_kontakt` des Backends.
  */
 export type HalterWert =
   { typ: 'person'; refId: number; label: string } | { typ: 'extern'; kontakt: string } | null;
 
-/** Option-Objekt mit Zusatzfeldern; onChange liest typ/refId/kontakt vom Objekt (nie value-String parsen). */
+/**
+ * Option-Objekt mit Zusatzfeldern; onChange liest typ/refId/kontakt vom Objekt, nie den
+ * value-String.
+ */
 interface HalterOption {
   value: string;
   label: string;
@@ -40,9 +43,8 @@ interface Props {
 }
 
 /**
- * Gemischtes Select für den Tier-Halter: wählt entweder eine betroffene Person des Einsatzes
- * (→ halter_person_id) oder erfasst einen externen Kontakt als Freitext (→ halter_kontakt).
- * Muster gespiegelt von GeschaedigtPicker.
+ * Gemischtes Select für den Tier-Halter: eine betroffene Person des Einsatzes
+ * (→ `halter_person_id`) oder ein externer Kontakt als Freitext (→ `halter_kontakt`).
  */
 export default function HalterPicker({ einsatzId, value = null, onChange }: Props) {
   const [suche, setSuche] = useState('');
@@ -89,8 +91,8 @@ export default function HalterPicker({ einsatzId, value = null, onChange }: Prop
     if (personOptions.length)
       gruppen.push({ label: 'Betroffene Personen', options: personOptions });
 
-    // Edit-Modus: aktuelle Person-Auswahl als Option vorhalten, damit der Select das Label statt
-    // eines rohen Tokens zeigt (sofern sie nicht ohnehin schon in der Liste steckt).
+    // Edit-Modus: die aktuelle Person als Option vorhalten, damit das Select ihr Label statt eines
+    // rohen Tokens zeigt.
     if (aktuellerKey && aktuellerKey !== 'extern' && aktuellesLabel != null) {
       const bereitsDa = personOptions.some((o) => o.value === aktuellerKey);
       if (!bereitsDa) {
@@ -114,7 +116,7 @@ export default function HalterPicker({ einsatzId, value = null, onChange }: Prop
       value={aktuellerKey}
       // Anzeige-Label aus dem Wert ableiten (extern hat keine bleibende Option nach Such-Reset).
       labelRender={() => aktuellesLabel ?? ''}
-      // Eigene Filterung (useMemo) — antd-Filter würde die synthetische Freitext-Option verstecken.
+      // Eigene Filterung — antds Filter versteckte die synthetische Freitext-Option.
       showSearch={{ filterOption: false, onSearch: setSuche }}
       options={optionen}
       loading={personenQuery.isLoading}

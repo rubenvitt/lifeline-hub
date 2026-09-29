@@ -14,8 +14,8 @@ const folge = (module: ModulEintrag[], marken: Sprungmarke[]) =>
 
 describe('Sprungmarken (LFH-620)', () => {
   it('führt genau die entschiedenen Sichten', () => {
-    // Die übrigen Module des Entwurfs sind Folgetasks oder verworfen — siehe LFH-620. Das
-    // FMS-Tableau ist LFH-642: eine Ansicht der Fahrzeugseite, kein eigenes Modul.
+    // Die übrigen Module des Entwurfs sind Folgetasks oder verworfen (LFH-620); das FMS-Tableau ist
+    // eine Ansicht der Fahrzeugseite (LFH-642).
     expect(sprungmarken.map((m) => m.key)).toEqual([
       'entscheidungen',
       'patienten',

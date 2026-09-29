@@ -16,7 +16,6 @@ describe('einsatzDauer', () => {
 
   it('setzt ab 24 Stunden die vollen Tage vor die Uhrzeitform', () => {
     expect(einsatzDauer('2026-09-20 07:17:00', null, JETZT)).toBe('1 d 07:05 h');
-    // 62:20 h — die Form, die der Neuentwurf ablöst.
     expect(einsatzDauer('2026-09-19 00:02:00', null, JETZT)).toBe('2 d 14:20 h');
   });
 

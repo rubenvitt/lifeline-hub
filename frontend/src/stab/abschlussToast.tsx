@@ -3,20 +3,17 @@ import type { MessageInstance } from 'antd/es/message/interface';
 import type { Lagebesprechung } from '../api/types';
 import { etbPfad } from '../routing/deeplinks';
 
-/** Fester Schlüssel: ein zweiter Abschluss ersetzt den stehenden Toast (Bauform `rueckgaengig.tsx`). */
+/** Fester Schlüssel: ein zweiter Abschluss ersetzt den stehenden Toast. */
 const SCHLUESSEL = 'lfh-lagebesprechung-abgeschlossen';
 /** Wie der Rückgängig-Toast: hier steht eine Entscheidung an (hinspringen oder nicht). */
 const DAUER_S = 6;
 
 /**
- * Erfolgs-Quittung des Abschlusses mit Deeplink auf den ETB-Beleg (Spec 10).
- *
- * Der Link zeigt nur dann auf `?eintrag=`, wenn die Antwort der eigenen Anfrage zugeordnet
- * werden konnte (`eigeneLagebesprechung`); sonst auf das ETB — ein fremder Beleg wäre schlimmer
- * als keiner. `navigate` kommt vom Aufrufer: `<AntApp>` liegt außerhalb des Routers
- * (`main.tsx`), ein `<Link>` im Toast hätte keinen Router-Kontext.
- *
- * Der Fehlerfall hat hier nichts verloren — er steht IM Modal (LFH-535).
+ * Erfolgs-Quittung des Abschlusses mit Deeplink auf den ETB-Beleg.
+ * Auf `?eintrag=` nur, wenn die Antwort der eigenen Anfrage zugeordnet werden konnte; sonst auf
+ * das ETB — ein fremder Beleg wäre schlimmer als keiner. `navigate` kommt vom Aufrufer:
+ * `<AntApp>` liegt außerhalb des Routers, ein `<Link>` im Toast hätte keinen Kontext. Der
+ * Fehlerfall steht IM Modal.
  */
 export function zeigeAbschlussToast(
   api: MessageInstance,

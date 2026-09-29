@@ -56,10 +56,9 @@ function istRasterKarte(k: OfflineKarte): boolean {
 }
 
 /**
- * Vereinheitlichter Regions-Picker (LFH-206): EIN Weg, eine Region aufs Gerät zu bringen. Je Region
- * genau ein adaptiver Button — je nach Zustand „Bauen & laden" (stößt den Bau an und lädt danach
- * automatisch), „Laden" (schon gebaut), „Lädt…", „Baut…", „Auf dem Gerät" oder „Nicht verfügbar".
- * Ersetzt die früher getrennten „Region neu bauen"- und „Region aufs Gerät bringen"-Modals.
+ * Regions-Picker: EIN Weg, eine Region aufs Gerät zu bringen. Je Region ein adaptiver Button —
+ * „Bauen & laden" (Bau, danach automatisch Download), „Laden", „Lädt…", „Baut…", „Auf dem
+ * Gerät" oder „Nicht verfügbar".
  */
 export default function OfflineRegionPicker({
   offen,
@@ -70,8 +69,8 @@ export default function OfflineRegionPicker({
 }) {
   const qc = useQueryClient();
   const { message } = App.useApp();
-  // Regionen im „Bauen & laden"-Fluss: slug → name (Name mitgeführt, damit die Verkettung auch nach
-  // dem Schließen des Modals — wenn die Regionen-Query deaktiviert ist — den Katalog-Eintrag findet).
+  // Regionen im „Bauen & laden"-Fluss: slug → name. Der Name wird mitgeführt, damit die
+  // Verkettung auch nach dem Schließen (Regionen-Query deaktiviert) den Katalog-Eintrag findet.
   const [verkettung, setVerkettung] = useState<Map<string, string>>(new Map());
   // Bereits verarbeitete Bau-Jobs (per id) — verhindert Doppel-Downloads über die Poll-Zyklen.
   const verarbeitet = useRef<Set<number>>(new Set());
@@ -98,8 +97,8 @@ export default function OfflineRegionPicker({
   });
   const bauStatusQuery = useQuery({
     queryKey: globalKeys.adminKarteBereich('bau-status'),
-    // Auch bei geschlossenem Modal pollen, solange eine Verkettung auf ihren „fertig"-Übergang wartet
-    // (der Picker bleibt im Host gemountet → der Bau→Download-Fluss überlebt das Schließen).
+    // Auch bei geschlossenem Modal pollen, solange eine Verkettung auf „fertig" wartet (der Picker
+    // bleibt im Host gemountet, der Fluss überlebt das Schließen).
     enabled: (offen || verkettung.size > 0) && bauVerfuegbar,
     queryFn: ladeBauStatus,
     // Solange ein Bau aktiv ist ODER eine Verkettung auf „fertig" wartet, alle 2 s pollen.
@@ -141,8 +140,8 @@ export default function OfflineRegionPicker({
     onError: (e) => message.error(fehlerText(e, 'Bau konnte nicht gestartet werden')),
   });
 
-  // Verkettung: ein Bau-Job einer verketteten Region erreicht „done“ → frischen Katalog holen (TTL
-  // umgehen) und den Download automatisch anstoßen. Bei „failed“ die Verkettung mit Fehler beenden.
+  // Verkettung: ein Bau-Job einer verketteten Region erreicht „done“ → frischen Katalog holen
+  // (TTL umgehen) und den Download anstoßen. Bei „failed“ endet die Verkettung mit Fehler.
   useEffect(() => {
     if (verkettung.size === 0) return;
     const entfernen = (slug: string) =>
@@ -175,13 +174,13 @@ export default function OfflineRegionPicker({
         entfernen(slug);
       }
     }
-    // download/message/qc sind stabile Referenzen (React Query/antd); bewusst nicht in den Deps,
-    // um die Verarbeitung nur an neue Bau-Status-/Verkettungs-Stände zu koppeln.
+    // download/message/qc sind stabile Referenzen; bewusst nicht in den Deps, damit die
+    // Verarbeitung nur an neuen Bau-Status-/Verkettungs-Ständen hängt.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bauJobs, verkettung]);
 
-  // Basisliste: mit karten-service die vollen baubaren Regionen, sonst nur die lieferbaren
-  // Katalog-Einträge (dann nur Download, kein Bau). Join je über den Namen (identisch in beiden Quellen).
+  // Basisliste: mit karten-service alle baubaren Regionen, sonst nur die lieferbaren
+  // Katalog-Einträge (nur Download). Join je über den Namen.
   const zeilen: RegionZeile[] = useMemo(() => {
     const karteFuer = (name: string) => karten.find((k) => k.name === name);
     const katalogFuer = (name: string) => katalog.find((e) => e.name === name);

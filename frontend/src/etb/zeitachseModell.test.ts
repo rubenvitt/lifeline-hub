@@ -224,11 +224,9 @@ describe('teileZufluss', () => {
   });
 
   /*
-   * Befund A (Review 22.09.2026): ein Deeplink auf einen nicht geladenen Grundeintrag lädt
-   * ÄLTERE Seiten nach, während der Fokus im Verweis liegt. Die Vorgängerin hielt alles
-   * zurück, was nicht im Einfrier-Satz stand — auch das Alte, das unter dem Cursor gar
-   * nicht springen kann (es kommt UNTEN an). Das Banner meldete es als „neu", und der
-   * Sprung fand seine Zeile nicht.
+   * Ein Deeplink auf einen nicht geladenen Grundeintrag lädt ÄLTERE Seiten nach, während der
+   * Fokus im Verweis liegt. Die kommen UNTEN an und können nicht unter dem Cursor springen;
+   * zurückgehalten meldete das Banner sie als „neu", und der Sprung fände seine Zeile nicht.
    */
   it('sortiert nachgeladene ÄLTERE Einträge sofort ein, auch eingefroren', () => {
     const mitAelteren = baueZeilen({
@@ -245,9 +243,9 @@ describe('teileZufluss', () => {
   });
 
   /*
-   * Befund B: der eigene gepufferte Eintrag wird gesendet — die Pufferzeile geht, die
-   * Serverzeile kommt mit neuem Schlüssel. Hielte die Achse sie zurück, wäre der eigene
-   * Eintrag für diesen Moment nirgends zu sehen.
+   * Der eigene gepufferte Eintrag wird gesendet — die Pufferzeile geht, die Serverzeile kommt
+   * mit neuem Schlüssel. Hielte die Achse sie zurück, wäre der eigene Eintrag für diesen Moment
+   * nirgends zu sehen.
    */
   it('hält den EIGENEN gerade gesendeten Eintrag nie zurück', () => {
     const nachSenden = baueZeilen({
@@ -277,8 +275,8 @@ describe('teileZufluss', () => {
 
 describe('verweisStil', () => {
   it('gibt einem Textverweis den Boden der Dichtestufe — über zwei Stufen verschieden', () => {
-    // Böden als Literale (CLAUDE.md, LFH-365): aus dem Token zurückgelesen prüfte die
-    // Zusicherung den Token gegen sich selbst.
+    // Böden als Literale (LFH-365): aus dem Token zurückgelesen prüfte die Zusicherung den Token
+    // gegen sich selbst.
     expect(verweisStil({ controlHeight: 30 }).minHeight).toBe(30);
     expect(verweisStil({ controlHeight: 72 }).minHeight).toBe(72);
     expect(verweisStil({ controlHeight: 30 }).display).toBe('inline-flex');

@@ -3,10 +3,9 @@ import { dichten } from '../theme/tokens';
 import { stabZeilenzielStil } from './zeilenziel';
 
 /**
- * Ein `<a>` erbt KEINE Steuerhöhe (LFH-396: 17 px in jeder Stufe gemessen). Geprüft wird der
- * Inline-Stil der reinen Funktion über die Dichtestufen — `test/utils.tsx` montiert ein nacktes
- * `ConfigProvider`, jsdom rechnet kein Layout. Die Böden stehen als LITERALE da; aus dem Token
- * zurückgelesen prüften sie den Token gegen sich selbst.
+ * Ein `<a>` erbt KEINE Steuerhöhe. Geprüft wird der Inline-Stil der reinen Funktion über die
+ * Dichtestufen (jsdom rechnet kein Layout). Die Böden stehen als LITERALE da, sonst prüften sie
+ * den Token gegen sich selbst.
  */
 describe('stabZeilenzielStil', () => {
   const tokenFuer = (stufe: keyof typeof dichten) => ({

@@ -5,9 +5,9 @@ import { formatZeit } from '../anzeige/format';
 const ERKLAERUNG = 'Quittiert = empfangen/zur Kenntnis genommen — sagt nichts über die Erledigung.';
 
 /**
- * Orthogonale Kenntnisnahme-Achse (LFH-112): NICHT Teil der Status-Phase.
- * Statusfläche `normal` „✓ Quittiert" (optional von wem/wann), sonst neutral „Quittung offen".
- * Die Hülle (`span`) trägt den Tooltip — `StatusChip` reicht keine Referenz durch.
+ * Orthogonale Kenntnisnahme-Achse, NICHT Teil der Status-Phase: `normal` „✓ Quittiert"
+ * (optional von wem/wann), sonst neutral „Quittung offen". Die Hülle (`span`) trägt den
+ * Tooltip, weil `StatusChip` keine Referenz durchreicht.
  */
 export default function QuittungIndikator({
   quittiert,

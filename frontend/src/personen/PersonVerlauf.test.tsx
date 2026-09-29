@@ -4,8 +4,8 @@ import { describe, expect, it } from 'vitest';
 import PersonVerlauf from './PersonVerlauf';
 import type { PersonDetail } from '../api/types';
 
-// Vertrag der Komponente (LFH-328/Task 12): EIN chronologischer Verlauf für Drawer
-// und Detailseite. Zeitstempel taktisch (ZeitAnzeige/DTG), nie roher Wire-String.
+// EIN chronologischer Verlauf für Drawer und Detailseite; Zeitstempel taktisch, nie roher
+// Wire-String.
 
 const basis = {
   id: 10,

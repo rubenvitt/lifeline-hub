@@ -108,7 +108,7 @@ const mt = (id: number, einheit_id: number | null) =>
     status: 'defekt',
   }) as EinsatzMaterial;
 
-/** Katalog wie im Seed (`migrations/0008`): Label trägt die Ziffer selbst. */
+/** Katalog wie im Seed: das Label trägt die Ziffer selbst. */
 const KATALOG: FahrzeugStatus[] = [
   { id: 101, label: '2 – Frei auf Wache', kategorie: 'verfuegbar', fms_anker: 2, sortier: 20 },
   { id: 103, label: '3 – Auf Anfahrt', kategorie: 'gebunden', fms_anker: 3, sortier: 30 },
@@ -182,8 +182,8 @@ describe('baueMeldebildRaster', () => {
     });
     const raster = baueMeldebildRaster(e);
 
-    // Keine Kumulation: jede Zeile trägt nur ihre EIGENEN Kräfte, die Summe der Zeilen ist
-    // die Verdichtung der Rohlisten — sonst zählte die Untereinheit doppelt.
+    // Keine Kumulation: jede Zeile trägt nur ihre EIGENEN Kräfte, die Summe der Zeilen ist die
+    // Verdichtung der Rohlisten.
     const summe = { fuehrer: 0, unterfuehrer: 0, mannschaft: 0, gesamt: 0 };
     for (const z of raster) {
       summe.fuehrer += z.staerke!.fuehrer;
@@ -293,8 +293,8 @@ describe('fahrzeugStatus', () => {
   });
 
   it('Ton NUR aus der Kategorie — „am Einsatzort" wird nicht blau', () => {
-    // Entwurf S6 färbt S4 `bedien`; der Vertrag (`statusKategorie.gebunden`) sagt `achtung`,
-    // und die Fahrzeugseite färbt denselben Status ebenso. Ein Anker → Rolle gibt es nicht.
+    // Der Vertrag (`statusKategorie.gebunden`) sagt `achtung`, wie auf der Fahrzeugseite; eine
+    // Abbildung Anker → Rolle gibt es nicht.
     expect(fahrzeugStatus(fz(1, null, 104), katalog).ton).toBe('achtung');
     expect(fahrzeugStatus(fz(1, null, 101), katalog).ton).toBe('normal');
     expect(fahrzeugStatus(fz(1, null, 106), katalog).ton).toBe('alarm');
@@ -330,9 +330,7 @@ describe('fahrzeugStatus', () => {
   });
 });
 
-// ── Statusband ───────────────────────────────────────────────────────────────
-
-// ── Einheitenstatus (LFH-609) ─────────────────────────────────────────────────
+// ── Einheitenstatus ───────────────────────────────────────────────────────────
 
 const wert = (k: FahrzeugStatus) => ({
   status_id: k.id,
@@ -416,8 +414,7 @@ describe('Raster trägt den Einheitenstatus', () => {
   });
 
   it('der Status kommt vom Server, nicht aus den (gefilterten) Fahrzeuglisten', () => {
-    // Die Einheit trägt S4, die übergebene Fahrzeugliste ist leer (weggefiltert) —
-    // der Status darf dadurch nicht kippen.
+    // Die Einheit trägt S4, die Fahrzeugliste ist weggefiltert — der Status darf nicht kippen.
     const e = eh(1, null, null, {
       status: st.fahrzeuge(S4),
       fahrzeug_mitglieder: [{ ef_id: 1, funkrufname: 'F1' }],
@@ -527,7 +524,7 @@ describe('istProblemZeile', () => {
       }),
     );
     expect(raster.map(istProblemZeile)).toEqual([true, false, true]);
-    // Eine Einheit ohne Mittel mit Handstatus „nicht verfügbar" (LFH-609) ist ebenso eine.
+    // Eine Einheit ohne Mittel mit Handstatus „nicht verfügbar" ist ebenso eine.
     const [hand] = baueMeldebildRaster(
       eingabe({ einheiten: [eh(9, null, null, { status: st.hand(S6) } as Partial<Einheit>)] }),
     );
@@ -546,7 +543,7 @@ describe('aufklappbareSchluessel', () => {
   });
 });
 
-// ── Rückmeldung (LFH-610) ─────────────────────────────────────────────────────
+// ── Rückmeldung ───────────────────────────────────────────────────────────────
 
 describe('Rückmeldung je Rasterzeile', () => {
   const JETZT = dayjs.utc('2026-09-22 12:00:00');

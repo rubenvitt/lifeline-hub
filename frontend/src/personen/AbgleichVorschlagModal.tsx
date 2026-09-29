@@ -5,16 +5,9 @@ import { registrierAnzeige } from '../api/einsatzPerson';
 import type { Person } from '../api/types';
 
 /**
- * Abgleich-Vorschlag für eine vermisste Person (LFH-330 · B2, Bündel I).
- *
- * WARUM ES DIESES MODAL GIBT: die Tabellenspalte `abgleich` trägt ein Auswahlfeld in der
- * Zelle — ~24 px hoch, 200 px fest breit. Auf einer 390-px-Karte ist das dreifach
- * regelwidrig (Trefffläche, Überlauf, Klein-Variante), und der Aktions-Deskriptor des
- * Kartenplans nimmt bewusst keinen fremden Knoten an. Er ERSETZT das Feld also durch einen
- * Knopf, der diesen Dialog öffnet; ein Feld ⇒ Modal nach der UI-Form-Leitlinie (LFH-19).
- *
- * Kein `size`-Prop am Auswahlfeld: die Höhe kommt aus `controlHeight` und zieht mit der
- * Dichtestufe mit.
+ * Abgleich-Vorschlag für eine vermisste Person. Das Auswahlfeld der Tabellenspalte trägt auf
+ * einer 390-px-Karte nicht (Trefffläche, Überlauf); der Kartenzweig ersetzt es durch einen
+ * Knopf, der diesen Dialog öffnet. Die Höhe des Felds kommt aus `controlHeight`.
  */
 export default function AbgleichVorschlagModal({
   vermisst,
@@ -32,8 +25,8 @@ export default function AbgleichVorschlagModal({
 }) {
   const [gewaehlt, setGewaehlt] = useState<number | undefined>(undefined);
 
-  // Auf die vermisste Person, nicht auf `open` gehört: sonst behielte ein zweiter Aufruf für
-  // eine ANDERE Person die Auswahl des ersten und schlüge sie still am falschen Satz vor.
+  // Auf die vermisste Person, nicht auf `open` gehört: sonst behielte ein Aufruf für eine ANDERE
+  // Person die Auswahl des ersten und schlüge sie still am falschen Satz vor.
   useEffect(() => setGewaehlt(undefined), [vermisst?.id]);
 
   return (

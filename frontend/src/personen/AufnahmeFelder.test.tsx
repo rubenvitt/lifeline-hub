@@ -10,11 +10,8 @@ import AufnahmeFelder, {
 } from './AufnahmeFelder';
 
 /**
- * Die Feldgruppe der Personen-Aufnahme (LFH-340 · C5, Befund H31).
- *
- * Sie ist ein Bauteil mit zwei Mounts — Schnellerfassungs-Modal und Aufnahme-Route. Geprüft
- * wird hier, was in beiden gilt; die Wege durch die Hülle (Enter, Serie, Fokus) prüfen die
- * Aufrufer, weil sie erst mit ihr entstehen.
+ * Die Feldgruppe der Personen-Aufnahme — geprüft wird, was in beiden Mounts gilt; die Wege durch
+ * die Hülle prüfen die Aufrufer.
  */
 function zeige(modus: AufnahmeModus = 'schnell') {
   return renderMitProviders(
@@ -27,10 +24,8 @@ function zeige(modus: AufnahmeModus = 'schnell') {
 describe('AufnahmeFelder — Sichtungskategorie', () => {
   it('stellt die sechs Kategorien als benannte Auswahlflächen bereit', () => {
     zeige();
-    // ÜBER DEN NAMEN abgefragt, nicht blank: das `Form.Item`-Label allein benennt die Gruppe
-    // NICHT — `label[for]` gilt nur für labelable elements, und eine `Radio.Group` ist ein
-    // `div[role="radiogroup"]`. Ein blankes `getByRole('radiogroup')` wäre auch ohne
-    // `aria-label` grün und beliebe die Zusicherung schuldig.
+    // ÜBER DEN NAMEN abgefragt: `label[for]` benennt eine `Radio.Group` nicht, ein blankes
+    // `getByRole('radiogroup')` wäre auch ohne `aria-label` grün.
     const gruppe = screen.getByRole('radiogroup', { name: 'Sichtungskategorie' });
     const flaechen = within(gruppe).getAllByRole('radio');
     expect(flaechen).toHaveLength(6);
@@ -47,10 +42,8 @@ describe('AufnahmeFelder — Sichtungskategorie', () => {
   });
 
   /**
-   * Nicht Kosmetik, sondern der API-Vertrag: `POST /personen` beantwortet die Kombination
-   * `status: 'vermisst'` + `sichtung` mit 422. Ein Feld im Vermisst-Modus könnte also nur
-   * einen Fehler erzeugen. Das Paar ist Pflicht — „im Vermisst-Modus fehlt es" allein wäre
-   * auch grün, wenn es das Feld gar nicht mehr gäbe.
+   * Der API-Vertrag: `status: 'vermisst'` + `sichtung` ist 422. Als Paar, sonst wäre „fehlt im
+   * Vermisst-Modus" auch grün, wenn es das Feld gar nicht gäbe.
    */
   it('fehlt im Vermisst-Modus und steht im Betroffen-Modus', () => {
     const { unmount } = zeige('vermisst');
@@ -62,9 +55,8 @@ describe('AufnahmeFelder — Sichtungskategorie', () => {
 
   it('trägt die Farbe im Etikett, nicht als Fläche', () => {
     zeige();
-    // Die Farbe steht an einem `Tag` INNERHALB der Fläche — dieselbe Darstellung wie in
-    // Liste und Detailseite. Ein eingefärbter Radio-Button wäre eine Textfläche in einer
-    // Farbe, deren Kontrast niemand zugesichert hat.
+    // Die Farbe steht an einem `Tag` INNERHALB der Fläche; ein eingefärbter Radio-Button wäre
+    // Text in einer Farbe mit unzugesichertem Kontrast.
     const gruppe = screen.getByRole('radiogroup');
     expect(gruppe.querySelectorAll('.ant-tag')).toHaveLength(6);
   });
@@ -74,13 +66,13 @@ describe('AufnahmeFelder — Feldbudget', () => {
   it('zeigt vier Felder, und der Name liegt unter „Weitere Angaben"', async () => {
     const { container } = zeige();
     expect(container.querySelectorAll('.ant-form-item')).toHaveLength(4);
-    // Über die Rolle, nicht über das Label: das `Form.Item`-Label hängt an der GRUPPE, und
-    // `getByLabelText` fände darüber alle sechs Radio-Eingaben.
+    // Über die Rolle: das `Form.Item`-Label hängt an der GRUPPE, `getByLabelText` fände alle sechs
+    // Radio-Eingaben.
     expect(screen.getByRole('radiogroup')).toBeInTheDocument();
     expect(screen.getByLabelText('Geschlecht')).toBeInTheDocument();
     expect(screen.getByLabelText('Geschätztes Alter (Jahre)')).toBeInTheDocument();
     expect(screen.getByLabelText('Antreffort')).toBeInTheDocument();
-    // Bis C5 war der Name sichtbar; er hat der Sichtung Platz gemacht.
+    // Der Name hat der Sichtung im sichtbaren Budget Platz gemacht.
     expect(screen.queryByLabelText('Name')).not.toBeInTheDocument();
   });
 });
@@ -147,9 +139,8 @@ describe('aufnahmeZuEingabe', () => {
 
 describe('skFlaechenStil()', () => {
   /**
-   * Rein gerufen, ohne Rendern: jsdom rechnet kein Layout, ein gemessenes Pixel gäbe es dort
-   * nicht. Die Böden stehen als LITERALE da — aus dem Token zurückgelesen prüften sie den
-   * Token gegen sich selbst.
+   * Rein gerufen (jsdom rechnet kein Layout). Die Böden stehen als LITERALE da, sonst prüften sie
+   * den Token gegen sich selbst.
    */
   it('hält 64 px als Boden und folgt darüber der Dichtestufe', () => {
     expect(skFlaechenStil({ controlHeight: 30 }).minHeight).toBe(64); // kompakt

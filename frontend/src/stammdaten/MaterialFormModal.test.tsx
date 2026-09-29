@@ -9,10 +9,9 @@ import type { Material } from '../api/types';
 import MaterialFormModal from './MaterialFormModal';
 
 /**
- * LFH-346/A6 — die Materialmaske auf `ErfassungsModal`. Geprüft wird nur, was an
- * DIESER Maske verdrahtet ist; die Mechanik der Hülle beweist
- * `components/Erfassung.test.tsx`, die Übernahmefelder einmalig
- * `FahrzeugFormModal.test.tsx`.
+ * Die Materialmaske auf `ErfassungsModal` (LFH-346). Geprüft wird nur, was an DIESER Maske
+ * verdrahtet ist; die Mechanik der Hülle beweist `components/Erfassung.test.tsx`, die
+ * Übernahmefelder einmalig `FahrzeugFormModal.test.tsx`.
  */
 
 const material: Material = {
@@ -93,9 +92,9 @@ describe('MaterialFormModal — Hülle (LFH-346/A6)', () => {
   });
 
   it('bleibt beim Serien-Speichern offen und leert die Bezeichnung', async () => {
-    // Ein im `onSuccess` der Mutation stehengebliebenes `onClose()` schlösse den Dialog
-    // auch im Serienlauf; jsdom hält den schliessenden Dialog samt Feldern im Baum, der
-    // Beleg ist deshalb der NICHT gerufene Schliess-Callback.
+    // Ein `onClose()` im `onSuccess` der Mutation schlösse den Dialog auch im Serienlauf; jsdom
+    // hält den schließenden Dialog samt Feldern im Baum, der Beleg ist deshalb der NICHT gerufene
+    // Schließ-Callback.
     handler();
     const geschlossen = vi.fn();
     const nutzer = userEvent.setup();
@@ -123,14 +122,12 @@ describe('MaterialFormModal — Hülle (LFH-346/A6)', () => {
   });
 
   /**
-   * LFH-346 · A8, Befund N20. Die tragende Prüfung des Collapse-Umbaus — nicht die
-   * Zählung darunter: beide Hälften der Zählung stünden grün, während jedes Speichern
-   * drei Felder still leert.
+   * Die tragende Prüfung des Collapse-Umbaus (LFH-346): die Zählung darunter stünde grün,
+   * während jedes Speichern drei Felder still leert.
    *
-   * `MaterialEingabe` ist Vollersatz. Ohne `forceRender` sind Träger, Standort und
-   * Bemerkung nicht montiert, und `onFinish` liefert nur montierte Felder — ein
-   * `onErfassen`, das seine Werte von dort nimmt, schickte drei `null` an ein
-   * Material, an dem niemand etwas davon angefasst hat.
+   * `MaterialEingabe` ist Vollersatz. Ohne `forceRender` sind Träger, Standort und Bemerkung
+   * nicht montiert, und `onFinish` liefert nur montierte Felder — ein `onErfassen` von dort
+   * schickte drei `null` an ein Material, an dem niemand etwas davon angefasst hat.
    */
   it('behält Träger, Standort und Bemerkung, wenn niemand aufklappt', async () => {
     let rumpf: Record<string, unknown> | null = null;
@@ -182,12 +179,10 @@ describe('MaterialFormModal — Hülle (LFH-346/A6)', () => {
   });
 
   /**
-   * Träger und Standort sind zugleich die Wiederholfelder des Serienlaufs
-   * (`uebernahme`) und liegen seit A8 hinter dem Collapse. Die Hülle liest sie aus
-   * den `onFinish`-Werten, also nur, solange sie montiert sind — was sie sind,
-   * sobald jemand aufgeklappt hat, um sie überhaupt einzutragen. Und der Bereich
-   * bleibt über ein `resetFields` hinweg offen. Beides zusammen ist die Aussage;
-   * ohne diese Prüfung wäre „Wiederholfeld hinter dem Collapse" eine Vermutung.
+   * Träger und Standort sind die Wiederholfelder des Serienlaufs (`uebernahme`) und liegen
+   * hinter dem Collapse. Die Hülle liest sie aus den `onFinish`-Werten, also nur, solange sie
+   * montiert sind — was sie sind, sobald jemand aufgeklappt hat, um sie einzutragen. Und der
+   * Bereich bleibt über ein `resetFields` hinweg offen. Beides zusammen ist die Aussage.
    */
   it('Wiederholfelder überleben den Serienlauf auch hinter dem Collapse', async () => {
     handler();
@@ -207,18 +202,14 @@ describe('MaterialFormModal — Hülle (LFH-346/A6)', () => {
   });
 
   /**
-   * Der Collapse liegt IM `<form>` — also in Reichweite der eingebauten
-   * Formularübermittlung. Der Dateikopf von `components/Erfassung.tsx` benennt die
-   * Falle: Enter löst den ERSTEN Übermittlungsknopf im Baum aus, und der Klapp-Kopf
-   * steht vor dem Speichern-Knopf. Wäre er ein `<button>` ohne `type="button"`,
+   * Der Collapse liegt IM `<form>` und damit in Reichweite der eingebauten
+   * Formularübermittlung: Enter löst den ERSTEN Übermittlungsknopf im Baum aus, und der
+   * Klapp-Kopf steht vor dem Speichern-Knopf. Wäre er ein `<button>` ohne `type="button"`,
    * klappte Enter im ersten Feld den Bereich auf, statt zu speichern.
    *
-   * GEMESSEN ist er ein `<div role="button">` (antd 6) — die Zusicherung hält also.
-   * Diese Prüfung ist die Stelle, an der ein antd-Sprung das auffliegen liesse; die
-   * Struktur-Abfragen daneben (keine Fusszeile, Knopf im `<form>`) blieben dabei
-   * beide grün. Hier ist Enter ausnahmsweise per Tastendruck belegbar: das erste
-   * sichtbare Feld ist ein einfaches `Input`, `@rc-component/select` kommt nicht
-   * dazwischen.
+   * In antd 6 ist er ein `<div role="button">` — die Zusicherung hält. Hier fiele ein
+   * antd-Sprung auf; die Struktur-Abfragen daneben blieben dabei grün. Enter ist hier per
+   * Tastendruck belegbar: das erste sichtbare Feld ist ein einfaches `Input`.
    */
   it('Enter im ersten Feld speichert — der Klapp-Kopf fängt es nicht ab', async () => {
     let rumpf: Record<string, unknown> | null = null;
@@ -241,11 +232,11 @@ describe('MaterialFormModal — Hülle (LFH-346/A6)', () => {
   });
 
   /**
-   * Das Feldbudget (LFH-346 · A8): drei sichtbare Felder statt sechs.
+   * Das Feldbudget (LFH-346): drei sichtbare Felder statt sechs.
    *
-   * Gezählt werden `.ant-form-item`-Knoten, nicht `role="textbox"` — die Kategorie ist
-   * ein `AutoComplete` und zählte in der Rollenzählung als `combobox`. Die zweite
-   * Hälfte ist Pflicht: „höchstens drei" allein erfüllte auch ein Dialog ohne Felder.
+   * Gezählt werden `.ant-form-item`-Knoten, nicht `role="textbox"` — die Kategorie ist ein
+   * `AutoComplete` (`combobox`). Die zweite Hälfte ist Pflicht: „höchstens drei" erfüllte auch
+   * ein Dialog ohne Felder.
    */
   it('zeigt drei Felder und deckt drei weitere erst beim Aufklappen auf', async () => {
     handler();

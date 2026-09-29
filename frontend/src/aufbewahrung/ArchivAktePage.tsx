@@ -51,22 +51,19 @@ import { FristWert, useFristAenderung } from './FristPaneel';
 import WiederherstellenDialog from './WiederherstellenDialog';
 
 /**
- * Pseudonyme Archivakte eines abgeschlossenen Einsatzes (LFH-23, design.md D8) —
- * `/admin/aufbewahrung/:einsatzId`, nur für den System-Admin der eigenen Organisation.
+ * Pseudonyme Archivakte eines abgeschlossenen Einsatzes — `/admin/aufbewahrung/:einsatzId`,
+ * nur für den System-Admin der eigenen Organisation.
  *
- * Drei Paneele: **Aufbewahrung** (Zustand, Frist, Vormerkung, Karenz-Ende, Schwärzung und der
- * Kopf ohne Einsatzort und Sachverhalt), **Register** (Personen, Tiere, Schäden als Tabellen:
- * Registriernummer und Kategorien, keine Namen, Kontakte oder Orte) und **Einsatztagebuch**
- * (lesende Zeitachse im Wortlaut). Jede Angabe stammt aus einer Retain-Spalte der
- * Schwärzungs-Registry; die Akte sieht deshalb vor und nach der Schwärzung gleich aus.
+ * Drei Paneele: **Aufbewahrung** (Zustand, Fristen, Schwärzung, Kopf ohne Ort und
+ * Sachverhalt), **Register** (Personen, Tiere, Schäden ohne Namen, Kontakte oder Orte) und
+ * **Einsatztagebuch** (lesende Zeitachse). Jede Angabe stammt aus einer Retain-Spalte, die
+ * Akte sieht deshalb vor und nach der Schwärzung gleich aus.
  *
- * **Genau eine Primäraktion im Kopf-Slot, je Zustand:** „Frist ändern" solange der Einsatz
- * nicht vorgemerkt ist, „Wiederherstellen" während der Karenz, keine nach Karenz-Ende oder
- * Schwärzung (der Server lehnte dort mit 409 ab).
+ * Genau eine Primäraktion je Zustand: „Frist ändern" solange nicht vorgemerkt,
+ * „Wiederherstellen" während der Karenz, danach keine (der Server lehnte mit 409 ab).
  *
- * Das Tagebuch ist bewusst NICHT `EtbZeitachse`: die bringt Berichtigen, Folgeaufträge und
- * Deeplinks mit, deren Ziele im Archiv nicht lesbar sind. Ein Berichtigungsverweis steht als
- * Text („berichtigt Nr. 7"), nicht als Link.
+ * Das Tagebuch ist bewusst NICHT `EtbZeitachse`: deren Aktionen und Deeplinks zielen auf im
+ * Archiv nicht lesbare Ziele. Ein Berichtigungsverweis steht als Text, nicht als Link.
  */
 
 const leer = '—';
@@ -292,7 +289,7 @@ function ArchivEtb({ einsatzId }: { einsatzId: number }) {
             verfasser={verfasserText(e)}
             weg={e.meldeweg ? MELDEWEG[e.meldeweg] : undefined}
           >
-            {/* Unter dem Paneelkopf (h2) — `#` im Eintrag wird h3 (LFH-621). */}
+            {/* Unter dem Paneelkopf (h2) — `#` im Eintrag wird h3. */}
             <Markdown variante="kompakt" unterEbene={2}>
               {e.inhalt}
             </Markdown>
@@ -316,9 +313,8 @@ function ArchivEtb({ einsatzId }: { einsatzId: number }) {
           style={{ marginBottom: token.marginSM }}
         />
         {inhalt}
-        {/* Ein gescheitertes Nachladen meldet sich dort, wo die Person steht (H14/LFH-535):
-            ohne diese Zeile stünde der Knopf wieder bereit, und ein Fehlschlag wäre von
-            „nichts Älteres“ nicht zu unterscheiden. Die geladenen Seiten bleiben stehen. */}
+        {/* Ein gescheitertes Nachladen meldet sich hier, sonst wäre es von „nichts Älteres“ nicht zu
+           unterscheiden. Die geladenen Seiten bleiben stehen. */}
         {abfrage.isFetchNextPageError && (
           <div style={{ marginTop: token.marginSM }}>
             <SeitenFehler text="Ältere Einträge nicht ladbar" ursache={abfrage.error} />

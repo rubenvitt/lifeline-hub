@@ -37,14 +37,12 @@ export default function MaterialTab() {
       dataIndex: 'bezeichnung',
       key: 'bezeichnung',
       /**
-       * Leitspalte: an der Bezeichnung wird ein Materialposten gesucht, nicht an der
-       * DB-Kennung — dieselbe Spalte, die `KatalogTabelle` als menschenlesbare Kennung
-       * fixiert. `numeric: true`, weil Bezeichnungen Größen tragen („B-Schlauch 5 m"
-       * vs. „… 20 m"); rein lexikografisch stünde 20 vor 5 [abgeleitet].
+       * Leitspalte: an der Bezeichnung wird ein Materialposten gesucht, nicht an der DB-Kennung —
+       * dieselbe Spalte, die `KatalogTabelle` als menschenlesbare Kennung fixiert. `numeric: true`,
+       * weil Bezeichnungen Größen tragen („B-Schlauch 5 m" vs. „… 20 m") [abgeleitet].
        *
-       * KEIN `defaultSortOrder`: das Backend liefert bereits `ORDER BY bezeichnung`
-       * (`src/material/repo.rs:54`). Die Sortierung ist ein Angebot — absteigend und
-       * mit `de`-Kollation statt SQLites BINARY-Vergleich —, kein neuer Default.
+       * KEIN `defaultSortOrder`: das Backend liefert bereits `ORDER BY bezeichnung`. Die Sortierung
+       * ist ein Angebot — absteigend und mit `de`-Kollation statt SQLites BINARY-Vergleich.
        */
       sorter: (a, b) => a.bezeichnung.localeCompare(b.bezeichnung, 'de', { numeric: true }),
     },
@@ -70,12 +68,10 @@ export default function MaterialTab() {
     <AdminPage
       titel="Material"
       aktionen={
-        /* Der Knopf VERSCHWINDET nicht mehr, wenn das Recht fehlt (M16, LFH-345 · C10) —
-           er steht gesperrt, den Grund nennt der Hinweis darunter. Ein fehlender Knopf ist
-           von „diese Seite kann das gar nicht" nicht zu unterscheiden; „ausgegraut" allein
-           wäre eine Ein-Kanal-Aussage (Grau ist eine Farbe, WCAG 1.4.1).
-           Der Slot liegt AUSSERHALB jedes `<form>` (Dateikopf `AdminPage`) — hier steht
-           deshalb nie ein `htmlType="submit"`, sondern immer ein Modal-Öffner. */
+        /* Der Knopf steht ohne Recht gesperrt, den Grund nennt der Hinweis (LFH-345): ein fehlender
+           Knopf ist von „diese Seite kann das gar nicht" nicht zu unterscheiden, „ausgegraut" allein
+           wäre eine Ein-Kanal-Aussage (WCAG 1.4.1). Der Slot liegt AUSSERHALB jedes `<form>`
+           (`AdminPage`) — hier steht deshalb ein Modal-Öffner, nie ein `htmlType="submit"`. */
         <Button
           type="primary"
           disabled={!istAdmin}
@@ -89,11 +85,9 @@ export default function MaterialTab() {
       }
       hinweis={<SeitenHinweise rechteFehlt={!istAdmin} rechteText={STAMMDATEN_RECHTE_TEXT} />}
     >
-      {/* Der Fehler tauscht die Tabelle aus, statt durch sie hindurchgereicht zu werden
-          (LFH-331 · B3): `Datensicht` führt den Kartenzweig an `Liste`, und `ListeProps`
-          kennt keinen Fehlerbegriff — ein Prop am Tabellen-Primitiv wirkte nur in einer
-          der beiden Formen. Ohne diese Weiche behauptet „Noch kein Material" auch dann
-          einen leeren Katalog, wenn bloß die Verbindung abgerissen ist. */}
+      {/* Der Fehler tauscht die Tabelle aus (LFH-331): `Datensicht` führt den Kartenzweig an
+         `Liste`, und `ListeProps` kennt keinen Fehlerbegriff. Ohne diese Weiche behauptete „Noch
+         kein Material" einen leeren Katalog, wenn bloß die Verbindung abgerissen ist. */}
       {materialQuery.isError ? (
         <SeitenFehler
           text="Material konnte nicht geladen werden"
@@ -107,10 +101,9 @@ export default function MaterialTab() {
           dataSource={materialQuery.data ?? []}
           columns={spalten}
           locale={{ emptyText: 'Noch kein Material' }}
-          // Durchsucht werden die vier Spalten mit Datenbezug: Bezeichnung, Kategorie,
-          // Bestandsnummer, Träger. Die Statusspalte ist render-only und trägt nichts bei.
-          // Der Platzhalter nennt die beiden, nach denen tatsächlich gesucht wird — die
-          // volle Aufzählung würde im 220 px breiten Feld abgeschnitten.
+          // Durchsucht werden die vier Spalten mit Datenbezug (Bezeichnung, Kategorie, Bestandsnummer,
+          // Träger); die Statusspalte ist render-only. Der Platzhalter nennt zwei — die volle
+          // Aufzählung würde im schmalen Feld abgeschnitten.
           suche={{ platzhalter: 'Bezeichnung oder Kategorie' }}
         />
       )}
